@@ -4,6 +4,7 @@
 # Shell-Skripte und Vorlagen der macOS/Linux-Pakete: immer LF, auch in einem
 # Windows-Klon mit autocrlf -- "/bin/sh^M: bad interpreter".
 installer/posix/* text eol=lf
+*.sh text eol=lf
 
 # Dateien, die ein Test BYTE FUER BYTE mit der Ausgabe eines Werkzeugs
 # vergleicht -- sie muessen ueberall dieselben Zeilenenden haben. Auf einem

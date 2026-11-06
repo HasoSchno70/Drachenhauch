@@ -241,6 +241,10 @@ accesskit_windows = { version = "0.35", optional = true }
 [target.'cfg(target_os = "macos")'.dependencies]
 accesskit_macos = { version = "0.27", optional = true }
 
+# Pins unter Linux (pins.rs): ioctl/fcntl auf /dev/gpiochip*, /dev/i2c-*, /dev/spidev*.
+[target.'cfg(target_os = "linux")'.dependencies]
+libc = "0.2"
+
 [target.'cfg(all(unix, not(target_os = "macos"), not(target_os = "emscripten")))'.dependencies]
 accesskit_unix = { version = "0.23", optional = true, features = ["async-io"] }
 # Tray-Symbol unter Linux (tray.rs): StatusNotifierItem und com.canonical.dbusmenu
@@ -264,6 +268,11 @@ raylib = { version = "6.0", optional = true, features = ["opengl_es_30"] }
 default = []
 # Grafik (raylib: Fenster/GL/Input) + Audio (Kira: src/audio.rs) + native Dialoge.
 graphics = ["dep:raylib", "dep:kira", "dep:mint", "dep:symphonia", "dep:xmrs", "dep:xmrsplayer", "dep:ttf-parser", "a11y", "tray"]
+# Grafik ueber OpenGL ES 3.0 statt OpenGL 3.3 -- fuer den Raspberry Pi (Pi 4/5
+# bieten ES 3.1, aber nur OpenGL 2.1/3.1). Dieselbe Sprache wie WebGL 2:
+# graphics.rs schreibt die Shader beim Laden auf `#version 300 es` um. Nur
+# unter Linux gedacht (raylib linkt GLESv2 und GLdispatch aus libglvnd).
+gles = ["graphics", "raylib/opengl_es_30"]
 # Barrierefreiheit (a11y.rs) als eigenes Feature, damit sich der Adapter-Code
 # fuer macOS/Linux mit `cargo check --features a11y --target ...` pruefen
 # laesst, ohne raylib fuer das fremde Ziel zu bauen.

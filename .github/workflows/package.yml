@@ -27,7 +27,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        # Der ARM-Laeufer baut das Paket fuer den Raspberry Pi (64 Bit, Pi 3/4/5
+        # mit 64-Bit-Raspberry-Pi-OS): Grafik ueber OpenGL ES (Feature `gles`),
+        # weil der Pi kein OpenGL 3.3 kann. Die Pins (gpio/i2c/spi) stecken
+        # unter Linux ohnehin in jedem Bau.
+        include:
+          - os: ubuntu-latest
+            grafik: graphics
+          - os: ubuntu-24.04-arm
+            grafik: gles
+          - os: macos-latest
+            grafik: graphics
     runs-on: ${{ matrix.os }}
     env:
       CFLAGS: -DMAX_CHAR_PRESSED_QUEUE=256
@@ -55,14 +65,14 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y cmake clang libasound2-dev libgtk-3-dev libudev-dev pkg-config \
             libx11-dev libxrandr-dev libxi-dev libxinerama-dev libxcursor-dev \
-            libgl1-mesa-dev libwayland-dev libxkbcommon-dev wayland-protocols \
+            libgl1-mesa-dev libgles-dev libegl-dev libwayland-dev libxkbcommon-dev wayland-protocols \
             xvfb xauth
 
       - name: dhrt bauen (mit Grafik)
         working-directory: rust/drachenhauch_runtime
         # serial und midi gehoeren dazu: der serielle Monitor der IDE und die
         # Bastler-Module sollen auf dem Mac und unter Linux genauso gehen.
-        run: cargo build --release --locked --features "graphics dialogs video db pg mysql net http smtp pdf physik jit ffi serial midi"
+        run: cargo build --release --locked --features "${{ matrix.grafik }} dialogs video db pg mysql net http smtp pdf physik jit ffi serial midi"
 
       # Die kleinen Laufzeiten fuer `dhrt --export --schlank` -- dieselben
       # Features wie LAUFZEITEN in rust/build_runtime.py. Jede in ein eigenes
@@ -74,7 +84,7 @@ jobs:
           mkdir -p target/release/laufzeiten
           CARGO_TARGET_DIR=target/laufzeit-konsole cargo build --release --locked --features "db pg mysql net http smtp jit ffi"
           cp target/laufzeit-konsole/release/dhrt target/release/laufzeiten/dhrt-konsole
-          CARGO_TARGET_DIR=target/laufzeit-spiel cargo build --release --locked --features "graphics dialogs physik jit ffi"
+          CARGO_TARGET_DIR=target/laufzeit-spiel cargo build --release --locked --features "${{ matrix.grafik }} dialogs physik jit ffi"
           cp target/laufzeit-spiel/release/dhrt target/release/laufzeiten/dhrt-spiel
           ls -l target/release/laufzeiten
 
@@ -159,6 +169,24 @@ jobs:
       - name: Sammlung werkzeug_paket (Linux, mit Grafik)
         if: runner.os == 'Linux'
         run: xvfb-run -a -s "-screen 0 1920x1080x24" rust/drachenhauch_runtime/target/release/dhrt test tests/pruef/werkzeug_paket.dhtest tests/pruef/grafik_aufraeumen.dhtest
+
+      # Grafik-Sammlungen mit echtem Fenster unter xvfb (Mesa): Licht,
+      # Schatten, PBR mit HDR-Umgebung, Instancing, Shader, Post-FX,
+      # Render-Ziele, Schrift als Bild und Programme mit Fenster. Auf dem
+      # ARM-Laeufer ist es der GLES-Bau fuer den Raspberry Pi (llvmpipe kann
+      # OpenGL ES 3.x; auf einem echten Pi rechnet dessen V3D-Treiber, das
+      # prueft diese Probe nicht). Auf x86 der gewoehnliche Bau -- dort
+      # blieben bis 2026.42 Post-FX und RENDERTARGET schwarz (gcc-raylib,
+      # graphics.rs `render_ziel`), und niemand sah es, weil diese Proben nur
+      # unter Windows liefen.
+      - name: Grafik-Sammlungen (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          rust/drachenhauch_runtime/target/release/dhrt --version
+          xvfb-run -a -s "-screen 0 1920x1080x24" rust/drachenhauch_runtime/target/release/dhrt test \
+            tests/pruef/gles.dhtest tests/pruef/g3d_licht.dhtest tests/pruef/m3d.dhtest \
+            tests/pruef/shader_uniforms_geometry.dhtest tests/pruef/rendertarget_persistenz.dhtest \
+            tests/pruef/grafik_text_ausbau.dhtest tests/pruef/beispiele_gui_enden.dhtest tests/pruef/pins.dhtest
 
       # Die macOS-Laeufer haben kein passendes OpenGL ("NSGL: Failed to find a
       # suitable pixel format", gemessen 2026-09-19) -- ein Fenster geht dort

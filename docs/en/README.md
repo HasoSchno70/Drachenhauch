@@ -78,6 +78,7 @@ Each module is activated with `IMPORT "<name>"` and provides its own commands.
 | `smtp` | Send e-mail: text and HTML, attachments, STARTTLS/TLS | [module-smtp.md](module-smtp.md) |
 | `geld` | An amount of money as a value of its own: exact, cannot be mixed with numbers, no lost cents | [module-geld.md](module-geld.md) |
 | `firmata` | Control Arduino/ESP32 pins directly, without a sketch of your own | [module-firmata.md](module-firmata.md) |
+| `gpio`, `i2c`, `spi` | The Raspberry Pi's pins directly: GPIO with edges, I2C, SPI | [module-pins.md](module-pins.md) |
 
 ### Designs and investigations
 
@@ -110,6 +111,7 @@ designed, recommended; none of it is decided.
 - **[Language server + VS Code](lsp.md)** — `dhrt lsp`: the same diagnostics in other editors, without Python
 - **[Recording input](automation.md)** — demo mode, replayable bug reports, automated game tests
 - **[Web playground](web-playground.md)** — dhrt as WebAssembly, a link is all it takes
+- **[Raspberry Pi](raspberry-pi.md)** — the package for the Pi (64 bit, graphics through OpenGL ES), pins directly, troubleshooting
 
 ### Internals
 

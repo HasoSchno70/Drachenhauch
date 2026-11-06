@@ -3322,6 +3322,63 @@ Ausstellen geloescht, gueltig bis 2126) -- Rundweg mit eigener CA und
 Ablehnung ohne. Sechs Verfaelschungen fallen je in ihrem Fall. Gegen einen
 echten Broker mit TLS ungeprueft.
 
+## Raspberry Pi: Pins, GLES-Bau, ARM-Paket (2026-11-06)
+
+Vierter Punkt der Bastler-Liste. **Module `gpio`, `i2c`, `spi`** (`pins.rs`):
+nicht die Register des Pi, sondern die Schnittstellen des Kernels --
+`/dev/gpiochipN` (uAPI v2, je Pin eine eigene Leitungsanforderung,
+`GPIO_V2_LINE_SET_CONFIG` zum Umstellen), `/dev/i2c-N` (SMBus zuerst --
+der Kernel bildet ihn auf jedem I2C-Bus nach, und nur er laesst sich mit
+`i2c-stub` pruefen --, rohes I2C/`I2C_RDWR` fuer den Rest; `i2c_weg` ist die
+reine Entscheidung), `/dev/spidevB.C`. So geht es auf Pi 3/4/5 (drei
+verschiedene GPIO-Chips; `GPIO_OPEN()` nimmt per `standard_chip` den mit der
+Stiftleiste, `pinctrl-rp1`/`-bcm2711`/`-bcm2835`) und laesst sich ohne Pi
+pruefen. Unter Linux in jedem Bau ohne Feature (Abhaengigkeit `libc` nur
+fuer linux), anderswo eine Stub-Fassung mit "gibt es nur unter Linux";
+`MODULE_AVAILABLE` und die IMPORT-Warnung (`hardware_missing_msg` mit
+eigenem Satz fuer diese drei) wissen es. Befehlsfamilie 29
+(`BUILTIN_FAMILIEN` = 30). Ein beschriebener Pin wird von selbst Ausgang,
+ein gelesener Eingang; `GPIO_WATCH` + `GPIO_NEXT`/`GPIO_EVENT_*` holen
+Flanken mit Kernel-Zeit (Schlange 1024, aelteste faellt weg), entprellt auf
+Wunsch der Kernel. Die ioctl-Strukturen haben `const`-Asserts auf die
+Groessen des Kernels (die Groesse steckt in der Nummer). Tests
+`tests/pruef/pins.dhtest` (11): Faelle "sim" gegen `gpio-sim` und `i2c-stub`,
+die `tests/pruef/_hilfen/pins_simulieren.sh` auf dem Linux-Laeufer der CI
+einrichtet (DH_TEST_GPIO/_GPIO_SIM/_I2C; ohne sie ueberspringen sie sich --
+lokal geht es nicht, der WSL-Kern hat beides nicht); 6 Rust-Tests.
+**Ungeprueft:** SPI (kein Simulator) und alles auf echter Pi-Hardware.
+
+**GLES-Bau** (Feature `gles` = `graphics` + `raylib/opengl_es_30`): die
+Shader schreibt `fuer_ziel_uebersetzen` wie im Web auf `#version 300 es`
+um; `dhrt --version` sagt "grafik (OpenGL ES)". `package.yml` baut auf
+`ubuntu-24.04-arm` damit das Paket `linux-aarch64` und faehrt die
+Grafik-Sammlungen unter xvfb (beide Linux-Laeufer). Lokal geprueft in der
+WSL gegen Mesa llvmpipe (OpenGL ES 3.2) -- dafuer stehen dort jetzt die
+raylib-Bauabhaengigkeiten, gdb und xvfb; Ziele `$HOME/dht_gl`/`dht_gles`.
+**Der Fund dabei betrifft JEDES Linux-Paket:** das mit gcc uebersetzte
+`rlLoadTexture` ruft fuer `data = NULL` `glCompressedTexImage2D` (gdb-
+Rueckverfolgung), jedes Render-Ziel war "incomplete attachment" -- POSTFX
+und RENDERTARGET blieben unter Linux schwarz, der HDR-Umgebung fehlte die
+BRDF-Tabelle, und niemand sah es, weil die Grafik-Proben nur unter Windows
+liefen. Jetzt legt `render_ziel` (graphics.rs) jedes Ziel selbst an, mit
+leerem Puffer (`leere_textur`), auf allen Systemen gleich; ein Ziel, das
+nicht vollstaendig wird, ist ein Fehler statt eines schwarzen Bildes.
+`FONT_TO_IMAGE` liest die Zeichenbilder (`GlyphInfo.image`) statt den Atlas
+zurueck -- unter OpenGL ES ist ein Grauwert-Atlas nicht lesbar.
+`DHRT_RAYLIB_LOG=info` zeigt, was raylib beim Anlegen sagt (Treiber,
+Fassung). **Bekannter Rest:** eine 1-Pixel-Linie genau auf einer
+Pixelgrenze faellt unter GLES einen Punkt anders als auf dem Desktop
+(Windows nimmt bei Senkrechten den linken, bei Waagerechten den unteren
+Punkt -- kein fester Versatz bildet das nach); zwei Bildproben
+(`grafik_formen_ausbau` gestrichelt, `gui_tabelle_kante`) fallen darum nur
+unter GLES und stehen nicht im ARM-Lauf. Vergleich ueber 122 Grafik-
+Sammlungen: Linux-GL und Linux-GLES fallen danach exakt gleich (die
+uebrigen Unterschiede zu Windows sind Linux-Eigenheiten). Tests
+`tests/pruef/gles.dhtest` (4); drei Gegenproben (NULL-Textur, leere
+Zeichenbilder, kein Umschreiben der Shader) fallen je in ihrem Fall.
+Doku `docs/raspberry-pi.md`, `docs/module-pins.md`, Beispiel
+`examples/211_raspberry_pi.dh`, Lehrbuch Kapitel 76.
+
 ## Dogfooding 15: Landkarte (2026-10-26)
 
 `examples/karten/`: `kern.dh` (Web-Mercator, Kachelnummern, Haversine,

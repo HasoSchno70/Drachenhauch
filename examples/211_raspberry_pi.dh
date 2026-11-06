@@ -1,0 +1,69 @@
+' Raspberry Pi: eine LED blinkt, ein Taster zaehlt mit -- direkt an den Pins
+' des Pi, ohne Arduino dazwischen (Module gpio und i2c, docs/module-pins.md).
+'
+'   LED mit Vorwiderstand (220 Ohm) zwischen GPIO17 (Stift 11) und Masse
+'   Taster zwischen GPIO27 (Stift 13) und Masse -- den Widerstand nach oben
+'   schaltet der Pi selbst ein ("up")
+'
+' Laeuft auf jedem Linux-Rechner mit Pins. Anderswo (Windows, macOS) sagt das
+' Programm nur, dass es die Pins hier nicht gibt.
+
+IMPORT "gpio" OPTIONAL
+IMPORT "i2c" OPTIONAL
+
+IF NOT MODULE_AVAILABLE("gpio") THEN
+    PRINT "Die Pins gibt es nur unter Linux, etwa auf dem Raspberry Pi."
+    END
+END IF
+
+DIM chip AS GPIO_CHIP
+chip = GPIO_OPEN()
+PRINT "GPIO-Chip: "; GPIO_LABEL$(chip); " ("; GPIO_COUNT(chip); " Leitungen)"
+
+CONST LED = 17
+CONST TASTER = 27
+GPIO_MODE(chip, TASTER, "in", "up")
+' Der Kernel merkt sich jeden Druck samt Zeit -- auch einen, der zwischen zwei
+' Abfragen der Schleife kommt. 20 ms entprellen.
+GPIO_WATCH(chip, TASTER, "falling", 20)
+
+PRINT "Die LED blinkt zehn Sekunden lang; den Taster druecken zaehlt mit."
+DIM an AS BOOLEAN : an = FALSE
+DIM druecke AS INTEGER : druecke = 0
+DIM start AS INTEGER : start = MILLIS()
+DIM naechster AS INTEGER : naechster = start
+WHILE MILLIS() - start < 10000
+    IF MILLIS() >= naechster THEN
+        an = NOT an
+        GPIO_WRITE(chip, LED, an)
+        naechster = naechster + 500
+    END IF
+    WHILE GPIO_NEXT(chip)
+        druecke = druecke + 1
+        PRINT "Druck "; druecke
+    END WHILE
+    SLEEP(5)
+WEND
+GPIO_WRITE(chip, LED, FALSE)
+GPIO_CLOSE(chip)
+PRINT "Gedrueckt: "; druecke; " Mal"
+
+' Wer einen I2C-Baustein angeschlossen hat (und I2C mit raspi-config
+' eingeschaltet), sieht hier seine Adresse.
+IF MODULE_AVAILABLE("i2c") THEN
+    TRY
+        DIM bus AS I2C_BUS : bus = I2C_OPEN()
+        DIM gefunden AS ARRAY OF INTEGER : gefunden = I2C_SCAN(bus)
+        IF LEN(gefunden) = 0 THEN
+            PRINT "I2C: kein Baustein gefunden."
+        ELSE
+            DIM i AS INTEGER
+            FOR i = 0 TO LEN(gefunden) - 1
+                PRINT "I2C-Baustein an 0x"; HEX$(gefunden[i])
+            NEXT
+        END IF
+        I2C_CLOSE(bus)
+    CATCH e
+        PRINT e
+    END TRY
+END IF

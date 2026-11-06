@@ -206,6 +206,14 @@ jobs:
           echo "DH_TEST_PG=postgres://dh:dhtest@localhost:5432/dhtest" >> "$GITHUB_ENV"
           echo "DH_TEST_MYSQL=mysql://dh:dhtest@localhost:3306/dhtest" >> "$GITHUB_ENV"
 
+      # Simulierte Pins fuer tests/pruef/pins.dhtest (gpio-sim, i2c-stub aus
+      # dem Kernel des Laeufers): das Skript schreibt DH_TEST_GPIO,
+      # DH_TEST_GPIO_SIM und DH_TEST_I2C fuer die folgenden Schritte. Geht
+      # etwas nicht, fehlt die Variable und die Faelle ueberspringen sich.
+      - name: Simulierte Pins (nur Linux)
+        if: runner.os == 'Linux'
+        run: sh tests/pruef/_hilfen/pins_simulieren.sh >> "$GITHUB_ENV"
+
       # Wie im Windows-Job: die Sammlungen direkt, ohne pytest als Anker.
       # Ohne Grafik ueberspringen sich die Fenster-Faelle selbst.
       - name: Pruefsammlungen (dhrt test)

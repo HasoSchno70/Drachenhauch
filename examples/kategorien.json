@@ -13,6 +13,6 @@
   {"name": "Fenster und System", "dateien": ["106_windows.dh", "120_monitors.dh", "121_screen_native.dh", "123_overlay.dh", "124_glass_window.dh", "125_vortex_overlay.dh", "126_audio_overlay.dh", "127_filedialog.dh", "161_werkzeug.dh", "168_hintergrund.dh", "170_task.dh", "206_fremde_bibliotheken.dh", "207_gtk.dh", "208_python.dh", "209_pausenwecker.dh", "web_demo.dh"]},
   {"name": "Daten, Dateien und Netz", "dateien": ["24_json.dh", "25_db.dh", "41_html.dh", "72_net_chat.dh", "162_binaerdatei.dh", "163_rest_api.dh", "164_signatur.dh", "169_csv.dh", "171_json_bauen.dh", "172_filter.dh", "173_webserver.dh", "174_einstellungen.dh", "175_xml.dh"]},
   {"name": "Geschäftsanwendungen", "dateien": ["176_rechnung_pdf.dh", "177_auswertung_xlsx.dh", "178_bericht_verschicken.dh", "179_kasse.dh", "180_geld.dh", "196_rechnungen.dh", "196_rechnung_fenster.dh"]},
-  {"name": "Hardware", "dateien": ["35_serial.dh", "36_wifi.dh", "37_usb.dh", "38_bt.dh", "147_firmata.dh", "148_mqtt.dh", "159_esp32_bruecke.dh"]},
+  {"name": "Hardware", "dateien": ["35_serial.dh", "36_wifi.dh", "37_usb.dh", "38_bt.dh", "147_firmata.dh", "148_mqtt.dh", "159_esp32_bruecke.dh", "211_raspberry_pi.dh"]},
   {"name": "Werkzeuge in Drachenhauch", "dateien": ["183_sfx_generator.dh", "185_partikel_editor.dh", "187_tilemap_editor.dh", "189_sprite_editor.dh", "190_tracker.dh", "197_form_designer.dh", "198_anim_fsm_editor.dh", "199_notenblatt.dh", "66_sprite_editor.dh", "210_klassendiagramm.dh"]}
 ]

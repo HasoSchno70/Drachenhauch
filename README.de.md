@@ -86,7 +86,7 @@ Nachzulesen im [Handbuch](docs/README.md); wie es dazu kam, steht in der
 
 ## Herunterladen
 
-**[Drachenhauch herunterladen](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — für Windows ein Installer (rund 58 MB), für macOS eine `.dmg`, für Linux ein `.tar.gz`; aktuell Fassung 2026.42.
+**[Drachenhauch herunterladen](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — für Windows ein Installer (rund 58 MB), für macOS eine `.dmg`, für Linux ein `.tar.gz` (x86_64; für den [Raspberry Pi](docs/raspberry-pi.md) ab der nächsten Fassung auch aarch64); aktuell Fassung 2026.42.
 
 Python muss dafür **nicht** installiert sein. Mit dabei sind die komplette Entwicklungsumgebung, die Runtime `dhrt`, alle 226 Beispiele samt Assets, beide Bücher (*Der Einstieg* und *Das Lehrbuch*, letzteres in beiden Sprachen) als `.docx` und `.epub` sowie das ESP32-Grundgerüst. Der Windows-Installer ist nicht signiert, SmartScreen meldet sich also beim ersten Start; die macOS-App ist noch nicht beglaubigt.
 
@@ -229,6 +229,7 @@ Vollständige Doku im [docs/](docs/README.md)-Ordner:
 | [`httpd`](docs/module-httpd.md) | die andere Richtung: ein kleiner Webserver im Takt der Hauptschleife — Bedienoberfläche im Heimnetz |
 | [`mqtt`](docs/module-mqtt.md) | das Pub/Sub-Protokoll der IoT-Welt — der Weg zum ESP32 **über WLAN**; QoS 0/1, TLS (`mqtts://`) |
 | [`firmata`](docs/module-firmata.md) | Arduino-/ESP32-Pins, Servos, I2C-Geräte und Schrittmotoren direkt steuern, über USB oder WLAN (`tcp:host:port`), ohne eigenen Sketch |
+| [`gpio`, `i2c`, `spi`](docs/module-pins.md) | die Pins des Raspberry Pi selbst (und jedes Linux-Boards): GPIO mit Flanken-Ereignissen, I2C-Sensoren, SPI-Bausteine -- über die Schnittstellen des Kernels, darum auf Pi 3, 4 und 5 |
 | [`serial`](docs/module-serial.md) | rohe COM-Verbindung für eigene Protokolle — und in der IDE ein **serieller Monitor mit Kurve** (Alt+4) |
 | [`usb`](docs/module-usb.md) | USB-HID: Bastelboards, Programmieradapter, eigene Controller |
 | [`midi`](docs/module-midi.md) | Noten von einem angeschlossenen Instrument lesen und welche hinausschicken |

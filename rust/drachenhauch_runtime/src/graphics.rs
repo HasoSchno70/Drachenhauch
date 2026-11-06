@@ -337,7 +337,7 @@ struct LightData {
 ///
 /// Auf dem Desktop nur vom Test benutzt -- die Logik soll dort trotzdem
 /// nachweisbar sein, statt nur im Browser zu existieren.
-#[cfg_attr(not(target_os = "emscripten"), allow(dead_code))]
+#[cfg_attr(not(any(target_os = "emscripten", feature = "gles")), allow(dead_code))]
 const GLSL_KOPF_WEB: &str = "#version 300 es\n\
                              precision highp float;\n\
                              precision highp int;\n\
@@ -350,7 +350,7 @@ const GLSL_KOPF_WEB: &str = "#version 300 es\n\
 /// **getestet** werden kann -- ein `#[cfg(emscripten)]`-Rumpf waere hier nie
 /// unter einem Test gelaufen. Gesucht wird ZEILENWEISE: ein "#version" mitten
 /// in einem Kommentar ist keine Versionsangabe.
-#[cfg_attr(not(target_os = "emscripten"), allow(dead_code))]
+#[cfg_attr(not(any(target_os = "emscripten", feature = "gles")), allow(dead_code))]
 fn kopf_ersetzen(src: &str, kopf: &str) -> String {
     let mut ausgabe = String::with_capacity(src.len() + kopf.len());
     let mut ersetzt = false;
@@ -368,12 +368,14 @@ fn kopf_ersetzen(src: &str, kopf: &str) -> String {
     ausgabe
 }
 
-#[cfg(target_os = "emscripten")]
+// Auch der GLES-Bau fuer den Raspberry Pi (Feature `gles`): OpenGL ES 3.x
+// spricht dieselbe Sprache wie WebGL 2.
+#[cfg(any(target_os = "emscripten", feature = "gles"))]
 pub fn fuer_ziel_uebersetzen(src: &str) -> std::borrow::Cow<'_, str> {
     std::borrow::Cow::Owned(kopf_ersetzen(src, GLSL_KOPF_WEB))
 }
 
-#[cfg(not(target_os = "emscripten"))]
+#[cfg(not(any(target_os = "emscripten", feature = "gles")))]
 pub fn fuer_ziel_uebersetzen(src: &str) -> std::borrow::Cow<'_, str> {
     std::borrow::Cow::Borrowed(src)
 }
@@ -1680,6 +1682,55 @@ fn fenster_handle(rl: &mut RaylibHandle) -> *mut std::ffi::c_void {
     unsafe { rl.get_window_handle() }
 }
 
+/// Ein Render-Ziel (Farbe + Tiefe) anlegen -- EINE Stelle fuer alle.
+///
+/// Unter Linux war jedes Ziel aus raylibs `LoadRenderTexture` "incomplete
+/// attachment": jede Szene ueber POSTFX und jedes RENDERTARGET blieb schwarz,
+/// die HDR-Umgebung ohne BRDF-Tabelle -- im gewoehnlichen Bau (Mesa, OpenGL
+/// 4.5) genauso wie im GLES-Bau fuer den Raspberry Pi (OpenGL ES 3.2),
+/// gefunden erst beim GLES-Bau, weil die Grafik-Proben bis dahin nur unter
+/// Windows liefen. Ursache, mit gdb verfolgt: das mit gcc uebersetzte
+/// `rlLoadTexture` ruft fuer eine Farb-Textur OHNE Anfangsdaten (data =
+/// NULL, wie fuer jedes Render-Ziel) `glCompressedTexImage2D` statt
+/// `glTexImage2D`; Mesa lehnt GL_RGBA dort ab, und die Textur bleibt ohne
+/// Speicher. Mit Daten nimmt raylib den richtigen Weg -- darum legt dhrt
+/// das Ziel selbst an, mit einem leeren Puffer, auf jedem System gleich.
+fn render_ziel(_rl: &mut RaylibHandle, _thread: &RaylibThread, w: u32, h: u32)
+    -> Result<RenderTexture2D, raylib::core::error::LoadTextureError> {
+    use raylib::ffi;
+    unsafe {
+        let (wi, hi) = (w.max(1) as i32, h.max(1) as i32);
+        let id = ffi::rlLoadFramebuffer();
+        if id == 0 { return Err(raylib::core::error::LoadTextureError::CreateRenderTextureFailed); }
+        ffi::rlEnableFramebuffer(id);
+        let farbe = leere_textur(wi, hi);
+        let tiefe = ffi::rlLoadTextureDepth(wi, hi, true);
+        // Farbe: COLOR0 (0) als Textur (100); Tiefe: DEPTH (100) als
+        // Renderbuffer (200) -- wie in raylibs LoadRenderTexture.
+        ffi::rlFramebufferAttach(id, farbe, 0, 100, 0);
+        ffi::rlFramebufferAttach(id, tiefe, 100, 200, 0);
+        let fertig = ffi::rlFramebufferComplete(id);
+        ffi::rlDisableFramebuffer();
+        let roh = ffi::RenderTexture2D {
+            id,
+            texture: ffi::Texture { id: farbe, width: wi, height: hi, mipmaps: 1, format: 7 },
+            depth: ffi::Texture { id: tiefe, width: wi, height: hi, mipmaps: 1, format: 19 },
+        };
+        if !fertig {
+            ffi::UnloadRenderTexture(roh);
+            return Err(raylib::core::error::LoadTextureError::CreateRenderTextureFailed);
+        }
+        Ok(RenderTexture2D::from_raw(roh))
+    }
+}
+
+/// Eine leere RGBA8-Textur (Format 7) fuer ein Render-Ziel -- mit Nullen
+/// statt NULL, warum, steht bei `render_ziel`.
+unsafe fn leere_textur(w: i32, h: i32) -> u32 {
+    let leer = vec![0u8; w.max(1) as usize * h.max(1) as usize * 4];
+    unsafe { raylib::ffi::rlLoadTexture(leer.as_ptr() as *const std::ffi::c_void, w, h, 7, 1) }
+}
+
 /// Eine eingebaute Schrift steht in `font_herkunft` als "eingebaut:sans" --
 /// so laufen sie und eine Datei durch dieselben Wege (Laden, Schnitte).
 const EINGEBAUT_VORSATZ: &str = "eingebaut:";
@@ -1722,8 +1773,20 @@ fn ohne_warnungen<T>(f: impl FnOnce() -> T) -> T {
     use raylib::consts::TraceLogLevel;
     unsafe { raylib::ffi::SetTraceLogLevel(TraceLogLevel::LOG_ERROR as i32); }
     let r = f();
-    unsafe { raylib::ffi::SetTraceLogLevel(TraceLogLevel::LOG_WARNING as i32); }
+    unsafe { raylib::ffi::SetTraceLogLevel(raylib_meldestufe() as i32); }
     r
+}
+
+/// Wie gespraechig raylib ist: per Vorgabe nur Warnungen. `DHRT_RAYLIB_LOG=info`
+/// zeigt alles, was raylib beim Anlegen sagt (OpenGL-Fassung und -Treiber,
+/// Framebuffer, Shader) -- fuer die Fehlersuche auf fremder Hardware wie dem
+/// Raspberry Pi.
+fn raylib_meldestufe() -> raylib::consts::TraceLogLevel {
+    use raylib::consts::TraceLogLevel;
+    match std::env::var("DHRT_RAYLIB_LOG").as_deref() {
+        Ok("info") | Ok("alles") => TraceLogLevel::LOG_INFO,
+        _ => TraceLogLevel::LOG_WARNING,
+    }
 }
 
 /// Handle des Ausweich-Fonts in einem Zeichen-Befehl. Nicht -1 (eingebaute
@@ -1872,7 +1935,7 @@ impl Graphics {
         let mut builder = raylib::init();
         builder.size(win_w, win_h)
             .title(title)
-            .log_level(raylib::consts::TraceLogLevel::LOG_WARNING);
+            .log_level(raylib_meldestufe());
         // FLAG_WINDOW_TRANSPARENT MUSS vor build() gesetzt sein (GLFW-Hint).
         if transparent { builder.transparent(); }
         // IMMER versteckt anlegen: der Barrierefreiheits-Adapter (a11y.rs)
@@ -1936,7 +1999,7 @@ impl Graphics {
         let mut layer_names = HashMap::new();
         layer_names.insert(String::new(), 0usize); // Main-Layer
         // Szene-Render-Target (Fenstergroesse) fuer Post-Processing.
-        let scene_rt = rl.load_render_texture(&thread, win_w as u32, win_h as u32).ok();
+        let scene_rt = render_ziel(&mut rl, &thread, win_w as u32, win_h as u32).ok();
         let mut g = Graphics {
             rl, thread, width, height, scale,
             a11y, a11y_versorgt: false, sichtbar: !hidden, flips: 0,
@@ -2366,7 +2429,7 @@ impl Graphics {
         self.rl.set_window_title(&self.thread, title);
         self.titel = title.to_string();
         // Szene-Render-Target an die neue Groesse anpassen (Post-Processing).
-        self.scene_rt = self.rl.load_render_texture(&self.thread, win_w as u32, win_h as u32).ok();
+        self.scene_rt = render_ziel(&mut self.rl, &self.thread, win_w as u32, win_h as u32).ok();
     }
 
     /// SCREEN_NATIVE([titel$]) -- Vollbild in der ECHTEN Aufloesung des aktuellen
@@ -2408,7 +2471,7 @@ impl Graphics {
     // --- Render-Targets (RENDERTARGET_*) ---
     /// Legt ein neues Render-Target (RenderTexture2D) an -> Handle (Index).
     pub fn rendertarget_new(&mut self, w: i32, h: i32, behalten: bool) -> Result<i64, String> {
-        let rt = self.rl.load_render_texture(&self.thread, w.max(1) as u32, h.max(1) as u32)
+        let rt = render_ziel(&mut self.rl, &self.thread, w.max(1) as u32, h.max(1) as u32)
             .map_err(|e| format!("RENDERTARGET_NEW: {}", e))?;
         self.render_targets.push(RenderTarget { rt, cmds: Vec::new(), behalten });
         Ok((self.render_targets.len() - 1) as i64)
@@ -2483,7 +2546,7 @@ impl Graphics {
         let (sw, sh) = (self.screen_width().max(1) as i32, self.screen_height().max(1) as i32);
         let neu = match self.zoom_rt { Some((_, w, h)) => w != sw || h != sh, None => true };
         if neu {
-            let rt = match self.rl.load_render_texture(&self.thread, sw as u32, sh as u32) { Ok(rt) => rt, Err(_) => return false };
+            let rt = match render_ziel(&mut self.rl, &self.thread, sw as u32, sh as u32) { Ok(rt) => rt, Err(_) => return false };
             // Weich vergroessert -- mit dem Vorgabefilter (naechster Punkt)
             // waeren Schrift und Linien bei 150 % treppig.
             unsafe { raylib::ffi::SetTextureFilter(rt.texture, 1 /*BILINEAR*/); }
@@ -3436,7 +3499,7 @@ impl Graphics {
         let (win_w, win_h) = (self.width * self.scale, self.height * self.scale);
         let brdf;
         unsafe {
-            brdf = raylib::ffi::rlLoadTexture(std::ptr::null(), size, size, 7, 1);
+            brdf = leere_textur(size, size);
             let fbo = raylib::ffi::rlLoadFramebuffer();
             raylib::ffi::rlFramebufferAttach(fbo, brdf, 0, 100, 0);   // COLOR0, TEXTURE2D
             raylib::ffi::rlEnableFramebuffer(fbo);
@@ -4706,22 +4769,28 @@ impl Graphics {
         };
         let ist_sdf = sdf::ist(h);
         let hoehe = f.baseSize.max(1);
-        let atlas = unsafe { ffi::LoadImageFromTexture(f.texture) };
-        let (aw, ah) = (atlas.width, atlas.height);
-        let quelle: Vec<ffi::Color> = unsafe {
-            let p = ffi::LoadImageColors(atlas);
-            let v = std::slice::from_raw_parts(p, (aw * ah).max(0) as usize).to_vec();
-            ffi::UnloadImageColors(p);
-            ffi::UnloadImage(atlas);
-            v
+        // Die Punkte kommen aus den Zeichenbildern, die raylib zu jeder
+        // Schrift im Speicher haelt (GlyphInfo.image) -- NICHT aus dem Atlas
+        // in der Grafikkarte: den zurueckzulesen ging unter OpenGL ES (GLES-
+        // Bau, Raspberry Pi) nicht, ein Grauwert-Atlas laesst sich dort nicht
+        // als Farbziel lesen, und das Bild blieb leer.
+        let zeichen_punkte = |g: &ffi::GlyphInfo| -> (Vec<ffi::Color>, i32, i32) {
+            let bild = g.image;
+            if bild.data.is_null() || bild.width <= 0 || bild.height <= 0 { return (Vec::new(), 0, 0); }
+            unsafe {
+                let p = ffi::LoadImageColors(bild);
+                let v = std::slice::from_raw_parts(p, (bild.width * bild.height) as usize).to_vec();
+                ffi::UnloadImageColors(p);
+                (v, bild.width, bild.height)
+            }
         };
-        // Je Zeichen: Feldbreite und wohin aus dem Atlas.
+        // Je Zeichen: Feldbreite und seine Punkte.
         let mut felder = Vec::new();
         for cp in erstes..=letztes {
             let i = unsafe { ffi::GetGlyphIndex(f, cp as i32) }.max(0) as usize;
             let (g, r) = unsafe { (*f.glyphs.add(i), *f.recs.add(i)) };
             let vorschub = if g.advanceX > 0 { g.advanceX } else { r.width as i32 };
-            felder.push((vorschub.max(1), g, r));
+            felder.push((vorschub.max(1), g, zeichen_punkte(&g)));
         }
         // Zeilen bis etwa 1024 Punkte breit, 1 Punkt Magenta dazwischen.
         let mut zeilen: Vec<Vec<usize>> = vec![Vec::new()];
@@ -4738,15 +4807,14 @@ impl Graphics {
             let y0 = 1 + zi as i32 * (hoehe + 1);
             let mut x0 = 1;
             for &k in zeile {
-                let (w, g, r) = felder[k];
+                let (w, g, (quelle, qw, qh)) = &felder[k];
+                let (w, g, qw, qh) = (*w, *g, *qw, *qh);
                 for yy in 0..hoehe { for xx in 0..w { px[((y0 + yy) * breite + x0 + xx) as usize] = [0, 0, 0, 0]; } }
-                for sy in 0..r.height as i32 {
-                    for sx in 0..r.width as i32 {
+                for sy in 0..qh {
+                    for sx in 0..qw {
                         let (dx, dy) = (g.offsetX + sx, g.offsetY + sy);
                         if dx < 0 || dy < 0 || dx >= w || dy >= hoehe { continue; }   // im eigenen Feld bleiben
-                        let (qx, qy) = (r.x as i32 + sx, r.y as i32 + sy);
-                        if qx < 0 || qy < 0 || qx >= aw || qy >= ah { continue; }
-                        let q = quelle[(qy * aw + qx) as usize];
+                        let q = quelle[(sy * qw + sx) as usize];
                         let a = if ist_sdf { ((q.a as i32 - 128) * 4 + 128).clamp(0, 255) as u8 } else { q.a };
                         if a == 0 { continue; }
                         let (rr, gg, bb) = if ist_sdf { (255, 255, 255) } else { (q.r, q.g, q.b) };
@@ -6815,7 +6883,7 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
             let ah = self.rl.get_screen_height().max(k);
             self.width = aw / k;
             self.height = ah / k;
-            self.scene_rt = self.rl.load_render_texture(&self.thread, aw as u32, ah as u32).ok();
+            self.scene_rt = render_ziel(&mut self.rl, &self.thread, aw as u32, ah as u32).ok();
         } else {
             self.rl.toggle_borderless_windowed();
             if let Some((w, h, sc)) = self.pre_fullscreen.take() {
@@ -6836,7 +6904,7 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         let win_w = width * scale;
         let win_h = height * scale;
         self.rl.set_window_size(win_w, win_h);
-        self.scene_rt = self.rl.load_render_texture(&self.thread, win_w as u32, win_h as u32).ok();
+        self.scene_rt = render_ziel(&mut self.rl, &self.thread, win_w as u32, win_h as u32).ok();
     }
 
     /// WINDOW_ESC_QUIT(an) -- ESC als Fenster-Schliessen-Taste an/aus.
@@ -7468,7 +7536,7 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         if let Some((kw, kh)) = klein_mass {
             let neu = !matches!(self.post_klein, Some((_, w, h)) if w == kw && h == kh);
             if neu {
-                self.post_klein = self.rl.load_render_texture(&self.thread, kw, kh).ok().map(|rt| {
+                self.post_klein = render_ziel(&mut self.rl, &self.thread, kw, kh).ok().map(|rt| {
                     unsafe { raylib::ffi::SetTextureFilter(rt.texture, 1 /*BILINEAR*/); }
                     (rt, kw, kh)
                 });
