@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 2275,
+ "count": 2303,
  "builtins": [
   {
    "name": "ABS",
@@ -1201,6 +1201,36 @@
    "kind": "core",
    "signature": "BUFFER_ZEIGER(puffer) AS INTEGER",
    "module": "dhrt"
+  },
+  {
+   "name": "I2C_CLOSE",
+   "kind": "core",
+   "signature": "I2C_CLOSE(bus)",
+   "module": "i2c"
+  },
+  {
+   "name": "I2C_OPEN",
+   "kind": "core",
+   "signature": "I2C_OPEN([bus]) AS I2C_BUS",
+   "module": "i2c"
+  },
+  {
+   "name": "I2C_READ",
+   "kind": "core",
+   "signature": "I2C_READ(bus, adresse: INTEGER, register: INTEGER, anzahl: INTEGER) AS ARRAY OF INTEGER",
+   "module": "i2c"
+  },
+  {
+   "name": "I2C_SCAN",
+   "kind": "core",
+   "signature": "I2C_SCAN(bus) AS ARRAY OF INTEGER",
+   "module": "i2c"
+  },
+  {
+   "name": "I2C_WRITE",
+   "kind": "core",
+   "signature": "I2C_WRITE(bus, adresse: INTEGER, daten)",
+   "module": "i2c"
   },
   {
    "name": "SIZEOF",
@@ -3181,6 +3211,102 @@
    "kind": "graphics",
    "signature": "GFX_PUSH()",
    "module": "core"
+  },
+  {
+   "name": "GPIO_CHIPS",
+   "kind": "core",
+   "signature": "GPIO_CHIPS() AS ARRAY OF STRING",
+   "module": "gpio"
+  },
+  {
+   "name": "GPIO_CLOSE",
+   "kind": "core",
+   "signature": "GPIO_CLOSE(chip)",
+   "module": "gpio"
+  },
+  {
+   "name": "GPIO_COUNT",
+   "kind": "core",
+   "signature": "GPIO_COUNT(chip) AS INTEGER",
+   "module": "gpio"
+  },
+  {
+   "name": "GPIO_EVENT_PIN",
+   "kind": "core",
+   "signature": "GPIO_EVENT_PIN(chip) AS INTEGER",
+   "module": "gpio"
+  },
+  {
+   "name": "GPIO_EVENT_RISING",
+   "kind": "core",
+   "signature": "GPIO_EVENT_RISING(chip) AS BOOLEAN",
+   "module": "gpio"
+  },
+  {
+   "name": "GPIO_EVENT_TIME",
+   "kind": "core",
+   "signature": "GPIO_EVENT_TIME(chip) AS FLOAT",
+   "module": "gpio"
+  },
+  {
+   "name": "GPIO_FIND",
+   "kind": "core",
+   "signature": "GPIO_FIND(chip, name: STRING) AS INTEGER",
+   "module": "gpio"
+  },
+  {
+   "name": "GPIO_LABEL$",
+   "kind": "core",
+   "signature": "GPIO_LABEL$(chip) AS STRING",
+   "module": "gpio"
+  },
+  {
+   "name": "GPIO_LINE_NAME$",
+   "kind": "core",
+   "signature": "GPIO_LINE_NAME$(chip, pin: INTEGER) AS STRING",
+   "module": "gpio"
+  },
+  {
+   "name": "GPIO_MODE",
+   "kind": "core",
+   "signature": "GPIO_MODE(chip, pin: INTEGER, richtung: STRING [, widerstand: STRING])",
+   "module": "gpio"
+  },
+  {
+   "name": "GPIO_NEXT",
+   "kind": "core",
+   "signature": "GPIO_NEXT(chip) AS BOOLEAN",
+   "module": "gpio"
+  },
+  {
+   "name": "GPIO_OPEN",
+   "kind": "core",
+   "signature": "GPIO_OPEN([chip: STRING]) AS GPIO_CHIP",
+   "module": "gpio"
+  },
+  {
+   "name": "GPIO_READ",
+   "kind": "core",
+   "signature": "GPIO_READ(chip, pin: INTEGER) AS BOOLEAN",
+   "module": "gpio"
+  },
+  {
+   "name": "GPIO_RELEASE",
+   "kind": "core",
+   "signature": "GPIO_RELEASE(chip, pin: INTEGER)",
+   "module": "gpio"
+  },
+  {
+   "name": "GPIO_WATCH",
+   "kind": "core",
+   "signature": "GPIO_WATCH(chip, pin: INTEGER, flanke: STRING [, entprellen_ms: INTEGER])",
+   "module": "gpio"
+  },
+  {
+   "name": "GPIO_WRITE",
+   "kind": "core",
+   "signature": "GPIO_WRITE(chip, pin: INTEGER, wert: BOOLEAN)",
+   "module": "gpio"
   },
   {
    "name": "GRADIENTH",
@@ -13495,6 +13621,48 @@
    "kind": "core",
    "signature": "SNAKE$(s$)",
    "module": "core"
+  },
+  {
+   "name": "SPI_CLOSE",
+   "kind": "core",
+   "signature": "SPI_CLOSE(spi)",
+   "module": "spi"
+  },
+  {
+   "name": "SPI_MODE",
+   "kind": "core",
+   "signature": "SPI_MODE(spi, modus: INTEGER)",
+   "module": "spi"
+  },
+  {
+   "name": "SPI_OPEN",
+   "kind": "core",
+   "signature": "SPI_OPEN(bus: INTEGER, cs: INTEGER [, takt_hz: INTEGER [, modus: INTEGER]]) AS SPI_DEVICE",
+   "module": "spi"
+  },
+  {
+   "name": "SPI_READ",
+   "kind": "core",
+   "signature": "SPI_READ(spi, anzahl: INTEGER) AS ARRAY OF INTEGER",
+   "module": "spi"
+  },
+  {
+   "name": "SPI_SPEED",
+   "kind": "core",
+   "signature": "SPI_SPEED(spi, takt_hz: INTEGER)",
+   "module": "spi"
+  },
+  {
+   "name": "SPI_TRANSFER",
+   "kind": "core",
+   "signature": "SPI_TRANSFER(spi, daten) AS ARRAY OF INTEGER",
+   "module": "spi"
+  },
+  {
+   "name": "SPI_WRITE",
+   "kind": "core",
+   "signature": "SPI_WRITE(spi, daten)",
+   "module": "spi"
   },
   {
    "name": "PASCAL$",

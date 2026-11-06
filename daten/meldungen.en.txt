@@ -1811,3 +1811,39 @@ MQTT_CONNECT: in der CA-Datei {} steht kein Zertifikat (erwartet PEM, -----BEGIN
 MQTT_CONNECT: TLS liess sich nicht einrichten: {}	MQTT_CONNECT: TLS could not be set up: {}
 MQTT_CONNECT: {} ist kein gueltiger Servername fuer TLS	MQTT_CONNECT: {} is not a valid server name for TLS
 MQTT_CONNECT: TLS-Verbindung fehlgeschlagen: {}	MQTT_CONNECT: TLS connection failed: {}
+# ---------------------------------------------------------------- gpio/i2c/spi (2026-11-06)
+Modul '{}' gibt es nur unter Linux (etwa auf dem Raspberry Pi) -- Funktionsaufrufe melden hier einen Fehler	Module '{}' only exists under Linux (e.g. on the Raspberry Pi) -- calls report an error here
+{}: gibt es nur unter Linux (etwa auf dem Raspberry Pi)	{}: only exists under Linux (e.g. on the Raspberry Pi)
+{}: unbekannte Richtung "{}" -- erlaubt sind "in", "out" und "opendrain"	{}: unknown direction "{}" -- allowed are "in", "out" and "opendrain"
+{}: unbekannter Widerstand "{}" -- erlaubt sind "up", "down" und "none"	{}: unknown resistor "{}" -- allowed are "up", "down" and "none"
+{}: unbekannte Flanke "{}" -- erlaubt sind "rising", "falling", "both" und "none"	{}: unknown edge "{}" -- allowed are "rising", "falling", "both" and "none"
+{}: Byte {} an Stelle {} ausserhalb 0..255	{}: byte {} at position {} outside 0..255
+{}: {} gibt es nicht -- I2C einschalten (Raspberry Pi: sudo raspi-config, Interface Options, I2C) bzw. sudo modprobe i2c-dev	{}: {} does not exist -- switch I2C on (Raspberry Pi: sudo raspi-config, Interface Options, I2C) or sudo modprobe i2c-dev
+{}: {} gibt es nicht -- SPI einschalten (Raspberry Pi: sudo raspi-config, Interface Options, SPI)	{}: {} does not exist -- switch SPI on (Raspberry Pi: sudo raspi-config, Interface Options, SPI)
+{}: {} gibt es nicht	{}: {} does not exist
+{}: keine Berechtigung fuer {} -- den Benutzer in die Gruppe {} aufnehmen (sudo adduser $USER {}, dann neu anmelden)	{}: no permission for {} -- add the user to the group {} (sudo adduser $USER {}, then log in again)
+{}: kein GPIO-Chip gefunden (/dev/gpiochip*)	{}: no GPIO chip found (/dev/gpiochip*)
+{}: kein GPIO-Chip mit der Beschriftung "{}" -- GPIO_CHIPS() nennt die vorhandenen	{}: no GPIO chip with the label "{}" -- GPIO_CHIPS() lists the ones there are
+{}: {} ist kein GPIO-Chip ({})	{}: {} is not a GPIO chip ({})
+{}: Pin {} ausserhalb 0..{} ({} hat {} Leitungen)	{}: pin {} outside 0..{} ({} has {} lines)
+{}: Pin {} laesst sich nicht so einstellen ({})	{}: pin {} cannot be set up like that ({})
+{}: Pin {} ist schon belegt (von "{}")	{}: pin {} is already in use (by "{}")
+{}: Pin {} ist schon belegt	{}: pin {} is already in use
+{}: Pin {} laesst sich nicht anfordern ({})	{}: pin {} cannot be requested ({})
+{}: Pin {} ist ein Eingang -- erst GPIO_MODE(chip, {}, "out")	{}: pin {} is an input -- first GPIO_MODE(chip, {}, "out")
+{}: Pin {}: {}	{}: pin {}: {}
+{}: {} ist kein I2C-Bus ({})	{}: {} is not an I2C bus ({})
+{}: dieser Bus kennt keine 10-Bit-Adressen	{}: this bus knows no 10-bit addresses
+{}: 10-Bit-Adresse: {}	{}: 10-bit address: {}
+{}: Adresse 0x{} gehoert einem Treiber des Kernels	{}: address 0x{} belongs to a kernel driver
+{}: an Adresse 0x{} antwortet nichts (Verkabelung? I2C_SCAN zeigt, wer da ist)	{}: nothing answers at address 0x{} (wiring? I2C_SCAN shows who is there)
+{}: Adresse 0x{}: {}	{}: address 0x{}: {}
+{}: {} Bytes passen auf diesem Bus nicht in einen Auftrag	{}: {} bytes do not fit into one request on this bus
+{}: {} Bytes lassen sich auf diesem Bus nicht in einem Auftrag lesen	{}: {} bytes cannot be read in one request on this bus
+{}: hoechstens 65536 Bytes je Auftrag	{}: at most 65536 bytes per request
+{}: Anzahl {} ausserhalb 1..65536	{}: count {} outside 1..65536
+{}: erwartet TRUE/FALSE oder 0/1, erhalten {}	{}: expects TRUE/FALSE or 0/1, got {}
+{}: erwartet eine Nummer oder einen Namen, nicht {}	{}: expects a number or a name, not {}
+Entprellzeit (ms)	debounce time (ms)
+Takt (Hz)	clock (Hz)
+Chip-Select	chip select

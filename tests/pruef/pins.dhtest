@@ -1,0 +1,388 @@
+' Module `gpio`, `i2c` und `spi` (src/pins.rs): die Pins des Kernels.
+'
+' Ohne Raspberry Pi: die Faelle mit "sim" laufen gegen die Simulatoren des
+' Kernels, die tests/pruef/_hilfen/pins_simulieren.sh auf einem Linux-
+' Rechner einrichtet (die CI tut das auf dem Linux-Laeufer):
+'   DH_TEST_GPIO      Beschriftung des gpio-sim-Chips ("dhsim")
+'   DH_TEST_GPIO_SIM  Ordner seiner Dateien sim_gpioN/{value,pull}
+'   DH_TEST_I2C       Nummer des i2c-stub-Busses (Baustein an 0x50)
+' Fehlen sie, ueberspringen sich die Faelle. Fuer SPI gibt es keinen
+' Simulator -- geprueft sind dort die Meldungen; die Aufbauten der Auftraege
+' und die ioctl-Nummern prueft der Rust-Test in pins.rs.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== die befehle stehen im verzeichnis
+FUNCTION bekannt(name AS STRING) AS BOOLEAN
+    DIM v AS ARRAY OF STRING : v = CODE_COMPLETE(name, 1, LEN(name) + 1)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(v) - 1
+        IF UPPER$(v[i]) = UPPER$(name) THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+DIM namen AS ARRAY OF STRING
+namen = SPLIT$("GPIO_CHIPS GPIO_OPEN GPIO_CLOSE GPIO_LABEL$ GPIO_COUNT GPIO_LINE_NAME$ " + _
+    "GPIO_FIND GPIO_MODE GPIO_WRITE GPIO_READ GPIO_WATCH GPIO_RELEASE GPIO_NEXT " + _
+    "GPIO_EVENT_PIN GPIO_EVENT_RISING GPIO_EVENT_TIME " + _
+    "I2C_OPEN I2C_CLOSE I2C_WRITE I2C_READ I2C_SCAN " + _
+    "SPI_OPEN SPI_CLOSE SPI_TRANSFER SPI_WRITE SPI_READ SPI_SPEED SPI_MODE", " ")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(namen) - 1
+    IF NOT bekannt(namen[i]) THEN PRINT "fehlt: " + namen[i]
+NEXT
+PRINT STR$(LEN(namen)) + " geprueft"
+--- erwartet
+28 geprueft
+
+=== ausserhalb von linux gibt es die pins nicht (windows)
+IMPORT "gpio" OPTIONAL
+IMPORT "i2c" OPTIONAL
+IMPORT "spi" OPTIONAL
+PRINT MODULE_AVAILABLE("gpio"), MODULE_AVAILABLE("i2c"), MODULE_AVAILABLE("spi")
+TRY
+    DIM c AS GPIO_CHIP : c = GPIO_OPEN()
+CATCH e
+    PRINT e
+END TRY
+TRY
+    DIM b AS I2C_BUS : b = I2C_OPEN()
+CATCH e
+    PRINT e
+END TRY
+TRY
+    DIM s AS SPI_DEVICE : s = SPI_OPEN(0, 0)
+CATCH e
+    PRINT e
+END TRY
+--- system windows
+--- erwartet
+FALSE FALSE FALSE
+GPIO_OPEN: gibt es nur unter Linux (etwa auf dem Raspberry Pi)
+I2C_OPEN: gibt es nur unter Linux (etwa auf dem Raspberry Pi)
+SPI_OPEN: gibt es nur unter Linux (etwa auf dem Raspberry Pi)
+
+=== ausserhalb von linux gibt es die pins nicht (macos)
+IMPORT "gpio" OPTIONAL
+PRINT MODULE_AVAILABLE("gpio")
+TRY
+    DIM c AS GPIO_CHIP : c = GPIO_OPEN()
+CATCH e
+    PRINT e
+END TRY
+--- system macos
+--- erwartet
+FALSE
+GPIO_OPEN: gibt es nur unter Linux (etwa auf dem Raspberry Pi)
+
+=== --check warnt ausserhalb von linux, mit OPTIONAL nicht
+' Unter Linux gibt es keine Warnung (eigener Fall unten).
+FUNCTION pruefe(datei AS STRING) AS STRING
+    DIM p AS INTEGER : p = PROCESS_START("dhrt", "--check", datei)
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    WHILE leer < 5
+        DIM z AS STRING : z = PROCESS_READ$(p)
+        IF z = "" THEN
+            IF NOT PROCESS_RUNNING(p) THEN leer = leer + 1
+            SLEEP(30)
+        ELSE
+            aus = aus + TRIM$(z)
+        END IF
+    WEND
+    RETURN aus
+END FUNCTION
+PRINT INSTR(pruefe("mit.dh"), "gibt es nur unter Linux") >= 0
+PRINT INSTR(pruefe("optional.dh"), "gibt es nur unter Linux") >= 0
+--- system windows
+--- datei mit.dh
+IMPORT "gpio"
+PRINT 1
+--- datei optional.dh
+IMPORT "gpio" OPTIONAL
+PRINT 1
+--- erwartet
+TRUE
+FALSE
+
+=== unter linux gibt es die module, ohne warnung
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "--check", "mit.dh")
+DIM aus AS STRING : aus = ""
+DIM leer AS INTEGER : leer = 0
+WHILE leer < 5
+    DIM z AS STRING : z = PROCESS_READ$(p)
+    IF z = "" THEN
+        IF NOT PROCESS_RUNNING(p) THEN leer = leer + 1
+        SLEEP(30)
+    ELSE
+        aus = aus + TRIM$(z)
+    END IF
+WEND
+PRINT aus
+PRINT MODULE_AVAILABLE("gpio"), MODULE_AVAILABLE("i2c"), MODULE_AVAILABLE("spi")
+--- system linux
+--- datei mit.dh
+IMPORT "gpio"
+IMPORT "i2c"
+IMPORT "spi"
+PRINT 1
+--- erwartet
+[]
+TRUE TRUE TRUE
+
+=== unter linux sagen fehlende geraete, was zu tun ist
+' Weder gpiochip99 noch i2c-99 noch spidev9.9 gibt es auf einem
+' gewoehnlichen Rechner; ein Modus ausserhalb 0..3 faellt vor dem Oeffnen.
+IMPORT "gpio"
+IMPORT "i2c"
+IMPORT "spi"
+TRY
+    DIM c AS GPIO_CHIP : c = GPIO_OPEN("gpiochip99")
+CATCH e
+    PRINT e
+END TRY
+TRY
+    DIM b AS I2C_BUS : b = I2C_OPEN(99)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    DIM s AS SPI_DEVICE : s = SPI_OPEN(9, 9)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    s = SPI_OPEN(0, 0, 1000000, 4)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    c = GPIO_OPEN("gibt-es-nicht-als-beschriftung")
+CATCH e
+    PRINT e
+END TRY
+--- system linux
+--- erwartet
+GPIO_OPEN: /dev/gpiochip99 gibt es nicht
+I2C_OPEN: /dev/i2c-99 gibt es nicht -- I2C einschalten (Raspberry Pi: sudo raspi-config, Interface Options, I2C) bzw. sudo modprobe i2c-dev
+SPI_OPEN: /dev/spidev9.9 gibt es nicht -- SPI einschalten (Raspberry Pi: sudo raspi-config, Interface Options, SPI)
+SPI_OPEN: Modus 4 ausserhalb 0..3
+GPIO_OPEN: kein GPIO-Chip mit der Beschriftung "gibt-es-nicht-als-beschriftung" -- GPIO_CHIPS() nennt die vorhandenen
+
+=== sim: chip oeffnen, beschriftung, namen der leitungen
+IMPORT "gpio"
+IF GETENV$("DH_TEST_GPIO") = "" THEN
+    PRINT "UEBERSPRINGEN: kein gpio-sim (tests/pruef/_hilfen/pins_simulieren.sh)"
+    EXIT(0)
+END IF
+DIM c AS GPIO_CHIP
+c = GPIO_OPEN(GETENV$("DH_TEST_GPIO"))
+PRINT GPIO_LABEL$(c), GPIO_COUNT(c)
+PRINT GPIO_LINE_NAME$(c, 17), "|" + GPIO_LINE_NAME$(c, 3) + "|"
+PRINT GPIO_FIND(c, "gpio17"), GPIO_FIND(c, "GPIO99")
+' derselbe Chip ueber seinen Namen aus GPIO_CHIPS
+DIM namen AS ARRAY OF STRING : namen = GPIO_CHIPS()
+DIM i AS INTEGER
+DIM gefunden AS BOOLEAN : gefunden = FALSE
+FOR i = 0 TO LEN(namen) - 1
+    DIM d AS GPIO_CHIP
+    TRY
+        d = GPIO_OPEN(namen[i])
+        IF GPIO_LABEL$(d) = "dhsim" THEN gefunden = TRUE
+        GPIO_CLOSE(d)
+    CATCH e
+    END TRY
+NEXT
+PRINT gefunden
+TRY
+    PRINT GPIO_READ(c, 32)
+CATCH e
+    PRINT e
+END TRY
+--- system linux
+--- erwartet
+dhsim 32
+GPIO17 ||
+17 -1
+TRUE
+GPIO_READ: Pin 32 ausserhalb 0..31 (dhsim hat 32 Leitungen)
+
+=== sim: ausgang schreiben, eingang lesen, widerstaende
+' Ein beschriebener Pin wird von selbst Ausgang; gpio-sim zeigt seinen Wert
+' in sim_gpioN/value. Einen Eingang stellt die Datei sim_gpioN/pull -- oder
+' der Widerstand, den GPIO_MODE verlangt.
+IMPORT "gpio"
+IF GETENV$("DH_TEST_GPIO") = "" THEN
+    PRINT "UEBERSPRINGEN: kein gpio-sim (tests/pruef/_hilfen/pins_simulieren.sh)"
+    EXIT(0)
+END IF
+DIM sim AS STRING : sim = GETENV$("DH_TEST_GPIO_SIM")
+FUNCTION simWert(ordner AS STRING, pin AS INTEGER) AS STRING
+    DIM z AS ARRAY OF STRING : z = READLINES(ordner + "/sim_gpio" + TRIM$(STR$(pin)) + "/value")
+    RETURN TRIM$(z[0])
+END FUNCTION
+SUB simZiehen(ordner AS STRING, pin AS INTEGER, wie AS STRING)
+    WRITEALL(ordner + "/sim_gpio" + TRIM$(STR$(pin)) + "/pull", wie)
+END SUB
+DIM c AS GPIO_CHIP : c = GPIO_OPEN("dhsim")
+GPIO_WRITE(c, 5, TRUE)
+PRINT "an", simWert(sim, 5)
+GPIO_WRITE(c, 5, 0)
+PRINT "aus", simWert(sim, 5)
+GPIO_WRITE(c, 5, 1)
+PRINT "an", simWert(sim, 5)
+' lesen: von aussen gezogen
+simZiehen(sim, 8, "pull-up")
+PRINT "hoch", GPIO_READ(c, 8)
+simZiehen(sim, 8, "pull-down")
+PRINT "runter", GPIO_READ(c, 8)
+' Widerstand ueber GPIO_MODE
+GPIO_MODE(c, 9, "in", "up")
+PRINT "up", GPIO_READ(c, 9)
+GPIO_MODE(c, 9, "eingang", "runter")
+PRINT "down", GPIO_READ(c, 9)
+' ein Eingang laesst sich nicht beschreiben, ein Ausgang schon wieder
+TRY
+    GPIO_WRITE(c, 9, TRUE)
+CATCH e
+    PRINT e
+END TRY
+GPIO_MODE(c, 9, "out")
+GPIO_WRITE(c, 9, TRUE)
+PRINT "neu ausgang", simWert(sim, 9)
+TRY
+    GPIO_MODE(c, 9, "seitlich")
+CATCH e
+    PRINT e
+END TRY
+--- system linux
+--- erwartet
+an 1
+aus 0
+an 1
+hoch TRUE
+runter FALSE
+up TRUE
+down FALSE
+GPIO_WRITE: Pin 9 ist ein Eingang -- erst GPIO_MODE(chip, 9, "out")
+neu ausgang 1
+GPIO_MODE: unbekannte Richtung "seitlich" -- erlaubt sind "in", "out" und "opendrain"
+
+=== sim: flanken als ereignisse, in der reihenfolge und mit zeit
+IMPORT "gpio"
+IF GETENV$("DH_TEST_GPIO") = "" THEN
+    PRINT "UEBERSPRINGEN: kein gpio-sim (tests/pruef/_hilfen/pins_simulieren.sh)"
+    EXIT(0)
+END IF
+DIM sim AS STRING : sim = GETENV$("DH_TEST_GPIO_SIM")
+SUB simZiehen(ordner AS STRING, pin AS INTEGER, wie AS STRING)
+    WRITEALL(ordner + "/sim_gpio" + TRIM$(STR$(pin)) + "/pull", wie)
+    SLEEP(20)
+END SUB
+DIM c AS GPIO_CHIP : c = GPIO_OPEN("dhsim")
+simZiehen(sim, 12, "pull-down")
+simZiehen(sim, 13, "pull-down")
+GPIO_WATCH(c, 12, "both")
+GPIO_WATCH(c, 13, "steigend")
+PRINT "vorher", GPIO_NEXT(c)
+simZiehen(sim, 12, "pull-up")
+simZiehen(sim, 13, "pull-up")
+simZiehen(sim, 12, "pull-down")
+simZiehen(sim, 13, "pull-down")
+DIM t AS FLOAT : t = 0.0
+DIM steigt AS BOOLEAN : steigt = TRUE
+WHILE GPIO_NEXT(c)
+    steigt = GPIO_EVENT_TIME(c) > t
+    t = GPIO_EVENT_TIME(c)
+    PRINT GPIO_EVENT_PIN(c), GPIO_EVENT_RISING(c), steigt
+WEND
+PRINT "nachher", GPIO_NEXT(c), GPIO_EVENT_PIN(c)
+' aufhoeren
+GPIO_WATCH(c, 12, "none")
+simZiehen(sim, 12, "pull-up")
+PRINT "ohne beobachtung", GPIO_NEXT(c)
+--- system linux
+--- erwartet
+vorher FALSE
+12 TRUE TRUE
+13 TRUE TRUE
+12 FALSE TRUE
+nachher FALSE -1
+ohne beobachtung FALSE
+
+=== sim: ein belegter pin nennt, wer ihn hat; freigeben gibt ihn weiter
+IMPORT "gpio"
+IF GETENV$("DH_TEST_GPIO") = "" THEN
+    PRINT "UEBERSPRINGEN: kein gpio-sim (tests/pruef/_hilfen/pins_simulieren.sh)"
+    EXIT(0)
+END IF
+DIM a AS GPIO_CHIP : a = GPIO_OPEN("dhsim")
+DIM b AS GPIO_CHIP : b = GPIO_OPEN("dhsim")
+GPIO_WRITE(a, 20, TRUE)
+TRY
+    GPIO_WRITE(b, 20, FALSE)
+CATCH e
+    PRINT e
+END TRY
+GPIO_RELEASE(a, 20)
+GPIO_WRITE(b, 20, FALSE)
+PRINT "uebernommen"
+GPIO_CLOSE(b)
+GPIO_WRITE(a, 20, TRUE)
+PRINT "zurueck"
+--- system linux
+--- erwartet
+GPIO_WRITE: Pin 20 ist schon belegt (von "drachenhauch")
+uebernommen
+zurueck
+
+=== sim: i2c register schreiben und lesen, scan
+' i2c-stub kann nur SMBus: Register + 1 Byte, Register + Block (bis 32)
+' und ein Byte ohne Register gehen, mehr nicht -- genau dieser Weg ist auf
+' dem Pi der erste. Ein zweiter Baustein antwortet nicht.
+IMPORT "i2c"
+IF GETENV$("DH_TEST_I2C") = "" THEN
+    PRINT "UEBERSPRINGEN: kein i2c-stub (tests/pruef/_hilfen/pins_simulieren.sh)"
+    EXIT(0)
+END IF
+DIM b AS I2C_BUS : b = I2C_OPEN(VAL(GETENV$("DH_TEST_I2C")))
+PRINT JOIN$(I2C_SCAN(b), ",")
+I2C_WRITE(b, &H50, [&H10, 171])
+PRINT JOIN$(I2C_READ(b, &H50, &H10, 1), ",")
+I2C_WRITE(b, &H50, [&H20, 1, 2, 3, 4, 250])
+PRINT JOIN$(I2C_READ(b, &H50, &H20, 5), ",")
+DIM puffer AS BUFFER : puffer = BUFFER_NEW(3)
+BUFFER_SET(puffer, 0, &H30) : BUFFER_SET(puffer, 1, 7) : BUFFER_SET(puffer, 2, 8)
+I2C_WRITE(b, &H50, puffer)
+PRINT JOIN$(I2C_READ(b, &H50, &H30, 2), ",")
+PRINT LEN(I2C_READ(b, &H50, -1, 1))
+TRY
+    PRINT I2C_READ(b, &H51, 0, 1)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PRINT I2C_READ(b, &H50, -1, 2)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    I2C_WRITE(b, &H50, [1, 256])
+CATCH e
+    PRINT e
+END TRY
+TRY
+    I2C_WRITE(b, 300, [1, 2])
+CATCH e
+    PRINT e
+END TRY
+--- system linux
+--- erwartet
+80
+171
+1,2,3,4,250
+7,8
+1
+I2C_READ: an Adresse 0x51 antwortet nichts (Verkabelung? I2C_SCAN zeigt, wer da ist)
+I2C_READ: 2 Bytes lassen sich auf diesem Bus nicht in einem Auftrag lesen
+I2C_WRITE: Byte 256 an Stelle 1 ausserhalb 0..255
+I2C_WRITE: dieser Bus kennt keine 10-Bit-Adressen

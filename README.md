@@ -230,6 +230,7 @@ Full documentation lives in [docs/en/](docs/en/README.md) — the English transl
 | [`httpd`](docs/en/module-httpd.md) | the other direction: a small web server driven by the main loop — a control panel on the home network |
 | [`mqtt`](docs/en/module-mqtt.md) | the IoT world's pub/sub protocol — the way to reach an ESP32 **over Wi-Fi**; QoS 0/1, TLS (`mqtts://`) |
 | [`firmata`](docs/en/module-firmata.md) | drive Arduino/ESP32 pins, servos, I2C devices and stepper motors directly, over USB or WiFi (`tcp:host:port`), no sketch of your own needed |
+| [`gpio`, `i2c`, `spi`](docs/en/module-pins.md) | the Raspberry Pi's own pins (and those of any Linux board): GPIO with edge events, I2C sensors, SPI chips -- through the kernel's interfaces, so it works on Pi 3, 4 and 5 |
 | [`serial`](docs/en/module-serial.md) | raw COM connection for your own protocols — and in the IDE a **serial monitor with a plotter** (Alt+4) |
 | [`usb`](docs/en/module-usb.md) | USB HID: maker boards, programmers, custom controllers |
 | [`midi`](docs/en/module-midi.md) | read notes from a connected instrument and send some out |

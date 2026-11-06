@@ -119,6 +119,7 @@ mod serial;
 // Firmata gibt es in jedem Bau: ueber das Netz (tcp:host:port) braucht es
 // kein Feature, nur die serielle Leitung haengt an `serial`.
 mod firmata;
+mod pins;
 #[cfg(feature = "usb")]
 mod usb;
 #[cfg(feature = "wifi")]

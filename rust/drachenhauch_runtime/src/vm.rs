@@ -595,7 +595,7 @@ fn ui_preset_metrics(name: &str) -> Vec<(&'static str, i64)> {
 /// damit ein Tippfehler im DH-Programm NICHT die Runtime abstuerzen laesst,
 /// sondern einen klaren Laufzeitfehler liefert.
 /// Zahl der Befehlsfamilien in `Vm::familie_rufen`; die letzte sind die reinen.
-pub(crate) const BUILTIN_FAMILIEN: u8 = 29;
+pub(crate) const BUILTIN_FAMILIEN: u8 = 30;
 
 fn safe_call_builtin(name: &str, args: &[Value]) -> Option<Result<Value, String>> {
     use std::panic::{catch_unwind, AssertUnwindSafe};
@@ -1053,6 +1053,9 @@ pub struct Vm<'p> {
     #[cfg(feature = "serial")]
     serial_ports: Vec<Option<crate::serial::Port>>,
     firmata_boards: Vec<Option<crate::firmata::Board>>,
+    gpio_chips: Vec<Option<crate::pins::Chip>>,
+    i2c_busse: Vec<Option<crate::pins::Bus>>,
+    spi_geraete: Vec<Option<crate::pins::Spi>>,
     #[cfg(feature = "usb")]
     usb_devs: Vec<Option<hidapi::HidDevice>>,
     #[cfg(feature = "bt")]
@@ -1227,6 +1230,9 @@ impl<'p> Vm<'p> {
             #[cfg(feature = "serial")]
             serial_ports: Vec::new(),
             firmata_boards: Vec::new(),
+            gpio_chips: Vec::new(),
+            i2c_busse: Vec::new(),
+            spi_geraete: Vec::new(),
             #[cfg(feature = "usb")]
             usb_devs: Vec::new(),
             #[cfg(feature = "bt")]
@@ -2266,6 +2272,7 @@ impl<'p> Vm<'p> {
             27 => self.try_graphics_app(name, a),
             28 => if name == "__ffi" { crate::ffi::vm_setzen(self); crate::ffi::rufen(a).map(Some) }
                   else { crate::ffi::zeiger_befehl(name, a).transpose() },
+            29 => self.try_pins(name, a),
             _ => match safe_call_builtin(name, a) {
                 Some(Ok(v)) => Ok(Some(v)),
                 Some(Err(e)) if e.starts_with("__UNKNOWN_BUILTIN__:") => Err(unknown_builtin_msg(name)),
@@ -6638,6 +6645,160 @@ impl<'p> Vm<'p> {
             "serial_available" => { let i = bi_int(a, 0, "SERIAL_AVAILABLE")?; Value::Int(serial::available(self.ser_port(i)?)?) }
             "serial_flush" => { let i = bi_int(a, 0, "SERIAL_FLUSH")?; serial::flush(self.ser_port(i)?); Value::Nil }
             "serial_timeout" => { let i = bi_int(a, 0, "SERIAL_TIMEOUT")?; let s = bi_num(a, 1, "SERIAL_TIMEOUT")?; serial::set_timeout(self.ser_port(i)?, s); Value::Nil }
+            _ => return Ok(None),
+        };
+        Ok(Some(v))
+    }
+
+    // ===================================================================
+    // Module gpio/i2c/spi: die Pins des Kernels (pins.rs). In jedem Bau;
+    // ausserhalb von Linux meldet jeder Aufruf "nur unter Linux".
+    // ===================================================================
+    fn try_pins(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        if !(name.starts_with("gpio_") || name.starts_with("i2c_") || name.starts_with("spi_")) { return Ok(None); }
+        use crate::pins;
+        fn bytes(a: &[Value], i: usize, f: &str) -> R<Vec<u8>> {
+            let roh: Vec<i64> = match a.get(i) {
+                Some(Value::Buffer(b)) => return Ok(b.borrow().clone()),
+                Some(Value::Array(arr)) => {
+                    let arr = arr.borrow();
+                    let mut out = Vec::with_capacity(arr.cells.len());
+                    for k in 0..arr.cells.len() {
+                        match arr.cells.get(k) {
+                            Value::Int(x) => out.push(x),
+                            Value::Float(v) if v.fract() == 0.0 => out.push(v as i64),
+                            v => return Err(format!("{}: im Feld steht an Stelle {} keine ganze Zahl ({})", f, k, v.type_name())),
+                        }
+                    }
+                    out
+                }
+                Some(v) => return Err(format!("{}: erwartet ein Feld aus Zahlen oder einen BUFFER, nicht {}", f, v.type_name())),
+                None => return Err(format!("{}: die Bytes fehlen", f)),
+            };
+            pins::bytes_pruefen(f, &roh)
+        }
+        fn feld(v: Vec<u8>) -> Value {
+            let n = v.len() as i64;
+            let mut arr = crate::value::DhArray::new("integer".to_string(), vec![n], || Value::Int(0));
+            for (k, x) in v.into_iter().enumerate() { arr.cells.set(k, Value::Int(x as i64)); }
+            Value::Array(Rc::new(RefCell::new(arr)))
+        }
+        fn zahlen(v: Vec<i64>) -> Value {
+            let n = v.len() as i64;
+            let mut arr = crate::value::DhArray::new("integer".to_string(), vec![n], || Value::Int(0));
+            for (k, x) in v.into_iter().enumerate() { arr.cells.set(k, Value::Int(x)); }
+            Value::Array(Rc::new(RefCell::new(arr)))
+        }
+        // Wahrheitswert oder 0/1 -- ein Pin ist beides gewohnt.
+        fn an_aus(a: &[Value], i: usize, f: &str) -> R<bool> {
+            match a.get(i) {
+                Some(Value::Bool(b)) => Ok(*b),
+                Some(Value::Int(0)) => Ok(false),
+                Some(Value::Int(1)) => Ok(true),
+                Some(v) => Err(format!("{}: erwartet TRUE/FALSE oder 0/1, erhalten {}", f, v.type_name())),
+                None => Err(format!("{}: fehlendes Argument {}", f, i + 1)),
+            }
+        }
+        fn ziel(a: &[Value], i: usize, vorgabe: &str, f: &str) -> R<String> {
+            match a.get(i) {
+                None => Ok(vorgabe.to_string()),
+                Some(Value::Int(n)) => Ok(n.to_string()),
+                Some(Value::Str(s)) => Ok(s.to_string()),
+                Some(v) => Err(format!("{}: erwartet eine Nummer oder einen Namen, nicht {}", f, v.type_name())),
+            }
+        }
+        macro_rules! chip { ($f:expr) => {
+            Self::handle_get_mut(&mut self.gpio_chips, bi_int(a, 0, $f)?, $f, "ungueltiger/geschlossener GPIO_CHIP")?
+        }; }
+        macro_rules! bus { ($f:expr) => {
+            Self::handle_get_mut(&mut self.i2c_busse, bi_int(a, 0, $f)?, $f, "ungueltiger/geschlossener I2C_BUS")?
+        }; }
+        macro_rules! spi { ($f:expr) => {
+            Self::handle_get_mut(&mut self.spi_geraete, bi_int(a, 0, $f)?, $f, "ungueltiges/geschlossenes SPI_DEVICE")?
+        }; }
+        let v = match name {
+            "gpio_chips" => {
+                let liste = pins::chips()?;
+                let n = liste.len() as i64;
+                let mut arr = crate::value::DhArray::new("string".to_string(), vec![n], || Value::str_rc(""));
+                for (k, (name, _, _)) in liste.into_iter().enumerate() { arr.cells.set(k, Value::str_rc(name)); }
+                Value::Array(Rc::new(RefCell::new(arr)))
+            }
+            "gpio_open" => {
+                let z = ziel(a, 0, "", "GPIO_OPEN")?;
+                self.gpio_chips.push(Some(pins::Chip::oeffnen(&z)?));
+                Value::Int((self.gpio_chips.len() - 1) as i64)
+            }
+            "gpio_close" => { let i = bi_int(a, 0, "GPIO_CLOSE")? as usize; if let Some(s) = self.gpio_chips.get_mut(i) { *s = None; } Value::Nil }
+            "gpio_label$" => Value::str_rc(chip!("GPIO_LABEL$").label.clone()),
+            "gpio_count" => Value::Int(chip!("GPIO_COUNT").zahl as i64),
+            "gpio_line_name$" => {
+                const F: &str = "GPIO_LINE_NAME$"; let pin = bi_int(a, 1, F)?;
+                Value::str_rc(chip!(F).linien_name(F, pin)?)
+            }
+            "gpio_find" => { const F: &str = "GPIO_FIND"; let n = bi_str(a, 1, F)?.to_string(); Value::Int(chip!(F).finden(&n)) }
+            "gpio_mode" => {
+                const F: &str = "GPIO_MODE";
+                let pin = bi_int(a, 1, F)?;
+                let r = pins::richtung_lesen(bi_str(a, 2, F)?, F)?;
+                let w = if a.len() > 3 { pins::widerstand_lesen(bi_str(a, 3, F)?, F)? } else { pins::Widerstand::Unveraendert };
+                chip!(F).modus(F, pin, r, w)?; Value::Nil
+            }
+            "gpio_write" => {
+                const F: &str = "GPIO_WRITE";
+                let pin = bi_int(a, 1, F)?; let wert = an_aus(a, 2, F)?;
+                chip!(F).schreiben(F, pin, wert)?; Value::Nil
+            }
+            "gpio_read" => { const F: &str = "GPIO_READ"; let pin = bi_int(a, 1, F)?; Value::Bool(chip!(F).lesen(F, pin)?) }
+            "gpio_watch" => {
+                const F: &str = "GPIO_WATCH";
+                let pin = bi_int(a, 1, F)?;
+                let fl = pins::flanke_lesen(bi_str(a, 2, F)?, F)?;
+                let ms = if a.len() > 3 { bi_int(a, 3, F)? } else { 0 };
+                chip!(F).beobachten(F, pin, fl, ms)?; Value::Nil
+            }
+            "gpio_release" => { const F: &str = "GPIO_RELEASE"; let pin = bi_int(a, 1, F)?; chip!(F).freigeben(pin); Value::Nil }
+            "gpio_next" => Value::Bool(chip!("GPIO_NEXT").naechstes()),
+            "gpio_event_pin" => Value::Int(chip!("GPIO_EVENT_PIN").letztes().map(|e| e.pin as i64).unwrap_or(-1)),
+            "gpio_event_rising" => Value::Bool(chip!("GPIO_EVENT_RISING").letztes().map(|e| e.steigend).unwrap_or(false)),
+            "gpio_event_time" => Value::Float(chip!("GPIO_EVENT_TIME").letztes().map(|e| e.zeit_ns as f64 / 1e9).unwrap_or(0.0)),
+
+            "i2c_open" => {
+                let z = ziel(a, 0, "1", "I2C_OPEN")?;
+                self.i2c_busse.push(Some(pins::Bus::oeffnen(&z)?));
+                Value::Int((self.i2c_busse.len() - 1) as i64)
+            }
+            "i2c_close" => { let i = bi_int(a, 0, "I2C_CLOSE")? as usize; if let Some(s) = self.i2c_busse.get_mut(i) { *s = None; } Value::Nil }
+            "i2c_write" => {
+                const F: &str = "I2C_WRITE";
+                let adr = bi_int(a, 1, F)?; let d = bytes(a, 2, F)?;
+                bus!(F).schreiben(F, adr, &d)?; Value::Nil
+            }
+            "i2c_read" => {
+                const F: &str = "I2C_READ";
+                let adr = bi_int(a, 1, F)?; let reg = bi_int(a, 2, F)?; let n = bi_int(a, 3, F)?;
+                feld(bus!(F).lesen(F, adr, reg, n)?)
+            }
+            "i2c_scan" => zahlen(bus!("I2C_SCAN").suchen()),
+
+            "spi_open" => {
+                const F: &str = "SPI_OPEN";
+                let b = bi_int(a, 0, F)?; let cs = bi_int(a, 1, F)?;
+                let hz = if a.len() > 2 { bi_int(a, 2, F)? } else { 1_000_000 };
+                let m = if a.len() > 3 { bi_int(a, 3, F)? } else { 0 };
+                self.spi_geraete.push(Some(pins::Spi::oeffnen(b, cs, hz, m)?));
+                Value::Int((self.spi_geraete.len() - 1) as i64)
+            }
+            "spi_close" => { let i = bi_int(a, 0, "SPI_CLOSE")? as usize; if let Some(s) = self.spi_geraete.get_mut(i) { *s = None; } Value::Nil }
+            "spi_transfer" => { const F: &str = "SPI_TRANSFER"; let d = bytes(a, 1, F)?; feld(spi!(F).tauschen(F, &d)?) }
+            "spi_write" => { const F: &str = "SPI_WRITE"; let d = bytes(a, 1, F)?; spi!(F).tauschen(F, &d)?; Value::Nil }
+            "spi_read" => {
+                const F: &str = "SPI_READ"; let n = bi_int(a, 1, F)?;
+                if !(1..=65536).contains(&n) { return Err(format!("{F}: Anzahl {n} ausserhalb 1..65536")); }
+                feld(spi!(F).tauschen(F, &vec![0u8; n as usize])?)
+            }
+            "spi_speed" => { const F: &str = "SPI_SPEED"; let hz = bi_int(a, 1, F)?; spi!(F).takt_setzen(F, hz)?; Value::Nil }
+            "spi_mode" => { const F: &str = "SPI_MODE"; let m = bi_int(a, 1, F)?; spi!(F).modus_setzen(F, m)?; Value::Nil }
             _ => return Ok(None),
         };
         Ok(Some(v))

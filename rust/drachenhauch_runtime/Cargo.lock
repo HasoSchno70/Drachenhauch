@@ -1343,6 +1343,7 @@ dependencies = [
  "indexmap",
  "kira",
  "krilla",
+ "libc",
  "libloading 0.8.9",
  "md-5 0.10.6",
  "midir",

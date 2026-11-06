@@ -241,6 +241,10 @@ accesskit_windows = { version = "0.35", optional = true }
 [target.'cfg(target_os = "macos")'.dependencies]
 accesskit_macos = { version = "0.27", optional = true }
 
+# Pins unter Linux (pins.rs): ioctl/fcntl auf /dev/gpiochip*, /dev/i2c-*, /dev/spidev*.
+[target.'cfg(target_os = "linux")'.dependencies]
+libc = "0.2"
+
 [target.'cfg(all(unix, not(target_os = "macos"), not(target_os = "emscripten")))'.dependencies]
 accesskit_unix = { version = "0.23", optional = true, features = ["async-io"] }
 # Tray-Symbol unter Linux (tray.rs): StatusNotifierItem und com.canonical.dbusmenu

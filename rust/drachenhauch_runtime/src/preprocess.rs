@@ -23,10 +23,10 @@ use regex::Regex;
 /// ein `IMPORT "<modul>"` wird hier nur zu einem Kommentar.
 const MODULES: &[&str] = &[
     "animfsm", "astar", "audio", "bt", "camera", "chart", "cloud", "controller", "curves", "db", "ecs",
-    "firmata", "g3d", "gui", "html", "httpd", "imgfx", "ini", "input", "json", "m3d", "midi", "mqtt", "net", "particles",
+    "firmata", "g3d", "gpio", "gui", "html", "httpd", "i2c", "imgfx", "ini", "input", "json", "m3d", "midi", "mqtt", "net", "particles",
     "geld", "pdf", "smtp", "xlsx", "xml",
     "physics", "physics2d", "physics3d", "regex", "save", "scene", "serial", "sprite",
-    "tile_collide", "tiled", "timer", "tween", "ui", "usb", "vec2", "video", "wifi", "zeit",
+    "spi", "tile_collide", "tiled", "timer", "tween", "ui", "usb", "vec2", "video", "wifi", "zeit",
 ];
 
 /// Hardware-/IoT-Module hinter Cargo-Features (= die `--hardware`-Features in
@@ -34,7 +34,7 @@ const MODULES: &[&str] = &[
 /// Default-Build NICHT einkompiliert -- jeder Funktionsaufruf schluege sonst
 /// erst zur Laufzeit fehl (vgl. `vm.rs::unknown_builtin_msg`). Darum wird beim
 /// IMPORT frueh gewarnt.
-const HARDWARE_MODULES: &[&str] = &["serial", "usb", "bt", "wifi", "firmata", "midi"];
+const HARDWARE_MODULES: &[&str] = &["serial", "usb", "bt", "wifi", "firmata", "midi", "gpio", "i2c", "spi"];
 
 /// Externe Typen, die ein Built-in-Modul registriert (lowercase, wie der
 /// Lexer IDENTs liefert). Spiegelt `register_type(...)` der Module -- damit
@@ -51,6 +51,9 @@ const MODULE_TYPES: &[(&str, &[&str])] = &[
     ("db", &["db_conn", "db_result"]),
     ("ecs", &["ecs_world"]),
     ("firmata", &["firmata_handle"]),
+    ("gpio", &["gpio_chip"]),
+    ("i2c", &["i2c_bus"]),
+    ("spi", &["spi_device"]),
     ("gui", &["gui_widget", "gui_window"]),
     ("json", &["json_handle"]),
     ("m3d", &["vec3", "vec4", "quat", "mat4"]),
@@ -224,6 +227,9 @@ fn hardware_module_compiled(m: &str) -> bool {
         // Firmata geht in jedem Bau ueber tcp:host:port; nur die serielle
         // Leitung braucht --hardware, das sagt FIRMATA_OPEN selbst.
         "firmata" => true,
+        // Die Pins des Kernels (/dev/gpiochip*, /dev/i2c-*, /dev/spidev*)
+        // gibt es nur unter Linux -- dort in jedem Bau, ohne Feature.
+        "gpio" | "i2c" | "spi" => cfg!(target_os = "linux"),
         "usb" => cfg!(feature = "usb"),
         "bt" => cfg!(feature = "bt"),
         "wifi" => cfg!(feature = "wifi"),
@@ -236,6 +242,11 @@ fn hardware_module_compiled(m: &str) -> bool {
 /// `vm.rs::unknown_builtin_msg`, damit die fruehe IMPORT-Warnung denselben
 /// Wortlaut hat wie der Fehler beim ersten Aufruf.
 pub fn hardware_missing_msg(module: &str) -> String {
+    if matches!(module, "gpio" | "i2c" | "spi") {
+        return format!(
+            "Modul '{}' gibt es nur unter Linux (etwa auf dem Raspberry Pi) -- Funktionsaufrufe melden hier einen Fehler",
+            module);
+    }
     format!(
         "Hardware-Modul '{}' ist in diesem dhrt-Build nicht enthalten -- \
          Funktionsaufrufe schlagen zur Laufzeit fehl. Neu bauen mit: \
