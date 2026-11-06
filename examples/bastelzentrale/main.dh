@@ -118,15 +118,15 @@ GUI_LISTBOX_SET_SELECTED(lsBereiche, 0)
 DIM lbLeiste AS GUI_WIDGET : lbLeiste = GUI_LABEL(win, "", 16, 440)
 DIM sbStatus AS GUI_WIDGET : sbStatus = GUI_STATUSBAR(win, 0, HOEHE - 28, BREITE, 28, "bereit")
 
-IMPORT "netz.dh"
-IMPORT "uebersicht.dh"
-IMPORT "seriell.dh"
-IMPORT "arduino.dh"
-IMPORT "mqttbereich.dh"
-IMPORT "modbusbereich.dh"
-IMPORT "klang.dh"
-IMPORT "kamera.dh"
-IMPORT "pins.dh"
+IMPORT "bereiche/netz.dh"
+IMPORT "bereiche/uebersicht.dh"
+IMPORT "bereiche/seriell.dh"
+IMPORT "bereiche/arduino.dh"
+IMPORT "bereiche/mqtt.dh"
+IMPORT "bereiche/modbus.dh"
+IMPORT "bereiche/klang.dh"
+IMPORT "bereiche/kamera.dh"
+IMPORT "bereiche/pins.dh"
 
 ueAufbau()
 seAufbau()

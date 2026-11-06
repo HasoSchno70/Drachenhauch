@@ -52,7 +52,7 @@ SUB nzStart()
         ereignis("OSC: " + e)
     END TRY
     IF nzWebDa THEN
-        nzSeite = REPLACE$(JOIN$(READLINES("handy.html"), CHR$(10)), "%%WSPORT%%", STR$(nzWsPort))
+        nzSeite = REPLACE$(JOIN$(READLINES("assets/handy.html"), CHR$(10)), "%%WSPORT%%", STR$(nzWsPort))
         IF GETENV$("DH_BZ_MDNS", "1") <> "0" THEN
             TRY
                 nzName = MDNS_ANNOUNCE("bastelzentrale", "_http._tcp", nzWebPort, "pfad=/")
@@ -139,6 +139,7 @@ FUNCTION nzStand$() AS STRING
         j = j + "{" + q + "p" + q + ":" + STR$(piAusPins[i]) + "," + q + "an" + q + ":" + IIF(piAus[i], "true", "false") + "}"
     NEXT
     j = j + "]," + q + "servo" + q + ":" + STR$(arServo)
+    j = j + "," + q + "handys" + q + ":" + STR$(LEN(nzHandys))
     j = j + "," + q + "pegel" + q + ":" + nzZahl$(klPegel)
     j = j + "," + q + "ton" + q + ":" + nzText$(klNoteText)
     j = j + "," + q + "bewegung" + q + ":" + nzZahl$(kaBewegung)

@@ -138,7 +138,7 @@ SLEEP(600)
 s = stand()
 PRINT "servo "; JSON_GET_INT(s, "servo")
 PRINT "demo seriell "; JSON_LEN(s, "seriell"); " modbus 1 "; JSON_GET_INT(s, "modbus.1") > 100
-PRINT "zustand "; JSON_GET_STRING(s, "zustand.8.0"); " "; INSTR(JSON_GET_STRING(s, "zustand.8.1"), "1 verbunden") >= 0
+PRINT "zustand "; JSON_GET_STRING(s, "zustand.8.0"); " handys "; JSON_GET_INT(s, "handys")
 PRINT "osc "; JSON_GET_STRING(s, "zustand.9.1")
 WS_CLOSE(ws)
 PROCESS_KILL(p)
@@ -154,5 +154,5 @@ fehler unbekannt: unsinn
 servo 120 gpio 17 TRUE mqtt an
 servo 45
 demo seriell 3 modbus 1 TRUE
-zustand Handy-Seite TRUE
+zustand Handy-Seite handys 1
 osc Port 48192, 3 Nachrichten
