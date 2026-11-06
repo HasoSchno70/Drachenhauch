@@ -517,6 +517,9 @@ bus (`AUDIO_BUS_VOLUME("sfx", 0.4)`), not a quieter master afterwards. A
 master volume driven by `AUDIO_MODULATE("master", "volume", ...)` is unknown
 to recording and level -- they use the value from `AUDIO_BUS_VOLUME`.
 
+What arrives at the **input** (microphone: level, pitch, spectrum,
+recording) is in [Microphone](module-mikrofon.md).
+
 ## Real-time effects (filter / reverb / delay)
 
 Every bus (`sfx`, `music`, `master`) has a **real-time effects chain** on the

@@ -24,6 +24,10 @@
     <string>public.app-category.developer-tools</string>
     <key>NSHighResolutionCapable</key>
     <true/>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Ein Drachenhauch-Programm moechte das Mikrofon benutzen (MIC_START).</string>
+    <key>NSCameraUsageDescription</key>
+    <string>Ein Drachenhauch-Programm moechte die Kamera benutzen (CAM_OPEN).</string>
     <key>CFBundleDocumentTypes</key>
     <array>
         <dict>

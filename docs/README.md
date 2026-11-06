@@ -49,6 +49,7 @@ Jedes Modul wird mit `IMPORT "<name>"` aktiviert und stellt eigene Befehle berei
 | `input` | Action-basiertes Input-Mapping, Multi-Key-Bindings, Edge-Detection (PRESSED/RELEASED), virtuelle Achse | [module-input.md](module-input.md) |
 | `regex` | Python-kompatible Pattern-Matching mit Pattern-Cache: `REGEX_MATCH/TEST/FIND/REPLACE/SPLIT` | [module-regex.md](module-regex.md) |
 | `audio` | Erweiterte Audio-API: Channels, Pause/Resume/Fade, Pan, Music-Position, Tone-Generation (Sine/Square/Saw/Triangle/Noise) | [module-audio.md](module-audio.md) |
+| Mikrofon | Pegel, Tonhoehe, Spektrum, Wellenform und Aufnahme vom Eingang (`MIC_*`, Modul `audio`) | [module-mikrofon.md](module-mikrofon.md) |
 | `curves` | Animation-Kurven: Bezier, Catmull-Rom, Hermite, Smoothstep — pure Functions, kein State | [module-curves.md](module-curves.md) |
 | `net` | TCP + UDP via stdlib-Sockets, non-blocking by default, UTF-8-Encoding | [module-net.md](module-net.md) |
 | `html` | HTTP-GET/POST/DOWNLOAD und HTML-Parsing — pure stdlib, kein pip noetig | [module-html.md](module-html.md) |

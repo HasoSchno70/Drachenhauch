@@ -520,6 +520,9 @@ im Nachhinein. Eine Master-Lautstaerke per `AUDIO_MODULATE("master",
 "volume", ...)` kennen Mitschnitt und Pegel nicht -- sie rechnen mit dem
 Wert aus `AUDIO_BUS_VOLUME`.
 
+Was am **Eingang** ankommt (Mikrofon: Pegel, Tonhoehe, Spektrum,
+Aufnahme), steht in [Mikrofon](module-mikrofon.md).
+
 ## Echtzeit-Effekte (Filter / Reverb / Delay)
 
 Jeder Bus (`sfx`, `music`, `master`) hat eine **Echtzeit-Effektkette** auf dem
