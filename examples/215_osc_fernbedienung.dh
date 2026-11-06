@@ -1,0 +1,70 @@
+' OSC-Fernbedienung: ein Punkt, den man vom Telefon aus steuert -- mit
+' TouchOSC, Open Stage Control oder jedem anderen OSC-Programm (Modul osc).
+'
+'   Am Telefon als Ziel diesen Rechner und Port 8000 eintragen. Verstanden
+'   werden:
+'     /xy      zwei Kommazahlen 0..1  (ein XY-Feld) -> Lage des Punkts
+'     /1/xy1   dasselbe, wie es TouchOSC in seiner ersten Vorlage schickt
+'     /farbe   drei Zahlen 0..1        -> Farbe
+'     /groesse eine Zahl 0..1          -> Groesse
+'   Zurueck geht an den Absender /punkt mit der Lage, wenn man klickt.
+'
+' Ohne Telefon: die Pfeiltasten schicken dieselben Nachrichten an das
+' Programm selbst (ueber 127.0.0.1).
+
+IMPORT "osc"
+
+DIM o AS OSC
+o = OSC_OPEN(8000)
+DIM selbst AS OSC
+selbst = OSC_OPEN()
+
+DIM px AS FLOAT : px = 0.5
+DIM py AS FLOAT : py = 0.5
+DIM groesse AS FLOAT : groesse = 0.3
+DIM farbe AS INTEGER : farbe = &H40C0FF
+DIM zuletzt AS STRING : zuletzt = "(noch nichts)"
+DIM absender AS STRING : absender = ""
+DIM absPort AS INTEGER : absPort = 0
+
+FUNCTION zahl(i AS INTEGER) AS FLOAT
+    DIM w AS FLOAT : w = OSC_ARG(o, i)
+    RETURN CLAMP(w, 0.0, 1.0)
+END FUNCTION
+
+SCREEN(640, 480, "OSC-Fernbedienung")
+SETFPS(60)
+WHILE NOT QUITREQUESTED()
+    WHILE OSC_NEXT(o)
+        DIM ad AS STRING : ad = OSC_ADDRESS$(o)
+        zuletzt = ad + " " + OSC_TYPES$(o)
+        absender = OSC_SENDER$(o)
+        absPort = OSC_SENDER_PORT(o)
+        IF OSC_MATCH("{/xy,/1/xy1}", ad) AND OSC_COUNT(o) >= 2 THEN
+            px = zahl(0)
+            py = 1.0 - zahl(1)
+        ELSEIF ad = "/farbe" AND OSC_COUNT(o) >= 3 THEN
+            farbe = RGB(INT(zahl(0) * 255), INT(zahl(1) * 255), INT(zahl(2) * 255))
+        ELSEIF ad = "/groesse" AND OSC_COUNT(o) >= 1 THEN
+            groesse = zahl(0)
+        END IF
+    WEND
+    ' Pfeiltasten: dieselben Nachrichten an uns selbst
+    DIM dx AS FLOAT : dx = 0
+    DIM dy AS FLOAT : dy = 0
+    IF KEYPRESSED(KEY_LEFT) THEN dx = -0.01
+    IF KEYPRESSED(KEY_RIGHT) THEN dx = 0.01
+    IF KEYPRESSED(KEY_UP) THEN dy = 0.01
+    IF KEYPRESSED(KEY_DOWN) THEN dy = -0.01
+    IF dx <> 0 OR dy <> 0 THEN
+        OSC_SEND(selbst, "127.0.0.1", 8000, "/xy", CLAMP(px + dx, 0.0, 1.0), CLAMP(1.0 - py + dy, 0.0, 1.0))
+    END IF
+    IF MOUSE_HIT(0) AND absender <> "" THEN
+        OSC_SEND(o, absender, absPort, "/punkt", px, 1.0 - py)
+    END IF
+
+    CLS(&H101018)
+    CIRCLE(INT(px * 640), INT(py * 440), 10 + INT(groesse * 80), farbe)
+    TEXT(10, 450, "Port " + STR$(OSC_PORT(o)) + "   zuletzt: " + zuletzt, &HA0A0B0)
+    FLIP()
+WEND

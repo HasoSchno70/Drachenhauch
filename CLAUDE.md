@@ -3432,6 +3432,43 @@ liefert macOS sonst still Stille bzw. kein Bild (Probe in
 `docs/module-webcam.md`, Beispiele `examples/212_stimmgeraet.dh`,
 `examples/213_webcam.dh`, Lehrbuch Kapitel 71 und 76.
 
+## WebSocket, OSC und mDNS (2026-11-06)
+
+Sechster Punkt der Bastler-Liste, drei Module, eine Befehlsfamilie
+(`try_netzdienste`, Familie 32, `BUILTIN_FAMILIEN` = 33). **`websocket`**
+(`websocket.rs`, Feature `net`, Typen WEBSOCKET/WS_SERVER): eigene Umsetzung
+nach RFC 6455 -- Client `ws://`/`wss://` (rustls wie mqtt), Server ueber
+`WS_LISTEN`/`WS_ACCEPT` (ohne Warten; der Handschlag einer angenommenen
+Verbindung wartet hoechstens 3 s, eine Anfrage ohne Upgrade bekommt 400 und
+zaehlt nicht). Nach dem Handschlag ist der Strom nicht wartend; jeder
+WS_NEXT/WS_CONNECTED pumpt (Rahmen zusammensetzen, Ping -> Pong, Schliessen
+beantworten), Cursor-Muster wie MQTT. **Maskierung je Seite geprueft** (ein
+Server muss unmaskierte Client-Rahmen mit 1002 abweisen, RFC 6455 5.1 --
+erst beim Durchsehen nachgetragen). Grenze 16 MB. `WS_CONNECT` fragt fuer
+`.local` selbst ueber mDNS, wenn das System den Namen nicht kennt (Linux
+ohne nss-mdns). **`osc`** (`osc.rs`, ungated, Typ OSC): OSC 1.0 ueber UDP,
+liest i f s b h d t T F N I c r m S und Buendel (verschachtelt, einzeln
+abgeliefert), schreibt aus DH-Werten (INTEGER ausserhalb 32 Bit -> h),
+`OSC_MATCH` mit ? * [] [!] {}. Ein Windows-10054 nach einem Paket an einen
+geschlossenen Port ist kein Fehler. **`mdns`** (`mdns.rs`, ungated):
+Fragen per **legacy unicast** (RFC 6762 6.7) von einem gewoehnlichen
+Anschluss -- 5353 braucht nur, wer ankuendigt (`socket2` mit
+SO_REUSEADDR/-PORT, Feature `all`, schon im Baum); Wiederholung nach 0/300/
+900 ms, fehlende SRV/A werden nachgefragt; der Antworter (Faden) antwortet
+direkt mit Kennung, wenn die Frage nicht von 5353 kam, sonst an die Gruppe,
+meldet sich beim Ankuendigen einmal von selbst und zieht beim Stopp mit
+TTL 0 zurueck. **`DHRT_MDNS_PORT=n`** laesst beides ueber 127.0.0.1:n
+laufen. Tests `tests/pruef/websocket.dhtest` (7: Gegenserver
+`_hilfen/wsecho.dh` als Prozess, roher Client ueber net mit dem
+RFC-Schluessel, **Node ab 22 als fremder Client**), `osc.dhtest` (5:
+Leitungsformat Byte fuer Byte gegen die Spezifikation, von Hand gebaute
+Buendel), `mdns.dhtest` (6, seriell; der Fall mit echtem Multicast auf 5353
+lief hier, ohne Multicast ueberspringt er sich); Rust-Tests mit den
+Pruefwerten aus RFC 6455 und OSC 1.0. Doku `docs/module-websocket.md`,
+`module-osc.md`, `module-mdns.md`, Beispiele `examples/214_websocket_chat.dh`
+(httpd + WebSocket + mDNS, mit curl und Node nachgefahren) und
+`examples/215_osc_fernbedienung.dh`, Lehrbuch Kapitel 73.
+
 ## Dogfooding 15: Landkarte (2026-10-26)
 
 `examples/karten/`: `kern.dh` (Web-Mercator, Kachelnummern, Haversine,
