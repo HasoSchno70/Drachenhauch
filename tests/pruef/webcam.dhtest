@@ -8,7 +8,10 @@
 '                      (tests/pruef/_hilfen/kamera_simulieren.sh im Paketlauf)
 ' Nicht geprueft: Media Foundation (Windows) und AVFoundation (macOS) mit
 ' echter Kamera.
+' Nacheinander: die zwei vivid-Faelle oeffnen dieselbe Kamera, und eine
+' Kamera, die schon Bilder liefert, ist fuer den zweiten "belegt".
 ' Format: docs/werkzeuge.md, dhrt test.
+--- seriell
 
 === das testbild ist das einzige geraet
 IMPORT "webcam"

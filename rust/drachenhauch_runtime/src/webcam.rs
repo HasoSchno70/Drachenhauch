@@ -426,6 +426,7 @@ mod os {
             let reihe: &[u32] = if b * h > 640 * 480 { &[MJPG, YUYV, RGB3, BGR3, XR24, AR24, BGR4] }
                                 else { &[YUYV, MJPG, RGB3, BGR3, XR24, AR24, BGR4] };
             let mut gewaehlt: Option<PixFormat> = None;
+            let mut belegt = false;
             for &pf in reihe {
                 let mut f: Format = unsafe { std::mem::zeroed() };
                 f.typ = TYP_CAPTURE;
@@ -433,10 +434,17 @@ mod os {
                 f.pix.hoehe = h;
                 f.pix.format = pf;
                 f.pix.feld = FELD_NONE;
-                if unsafe { ioctl(fd, S_FMT, &mut f) }.is_ok() && f.pix.format == pf {
-                    gewaehlt = Some(f.pix);
-                    break;
+                match unsafe { ioctl(fd, S_FMT, &mut f) } {
+                    Ok(()) if f.pix.format == pf => { gewaehlt = Some(f.pix); break; }
+                    // Liefert ein anderes Programm schon Bilder aus der Kamera,
+                    // laesst sich das Format nicht mehr umstellen -- das ist
+                    // "belegt", nicht "kein Format".
+                    Err(e) if e.raw_os_error() == Some(libc::EBUSY) => { belegt = true; break; }
+                    _ => {}
                 }
+            }
+            if belegt && gewaehlt.is_none() {
+                return Err(format!("WEBCAM_OPEN: {} ist belegt -- ein anderes Programm benutzt die Kamera", name));
             }
             let pix = gewaehlt.ok_or_else(|| format!("WEBCAM_OPEN: {} liefert kein Format, das dhrt liest (YUYV, MJPEG, RGB24, BGRX)", name))?;
             let mut anf = Anforderung { zahl: 4, typ: TYP_CAPTURE, speicher: SPEICHER_MMAP, caps: 0, flags: 0, reserviert: [0; 3] };
