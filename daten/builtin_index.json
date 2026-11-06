@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 2330,
+ "count": 2369,
  "builtins": [
   {
    "name": "ABS",
@@ -1233,6 +1233,60 @@
    "module": "i2c"
   },
   {
+   "name": "MDNS_RESOLVE$",
+   "kind": "core",
+   "signature": "MDNS_RESOLVE$(name$ [, ms]) AS STRING",
+   "module": "mdns"
+  },
+  {
+   "name": "MDNS_BROWSE",
+   "kind": "core",
+   "signature": "MDNS_BROWSE(dienst$ [, ms]) AS INTEGER",
+   "module": "mdns"
+  },
+  {
+   "name": "MDNS_SERVICE_NAME$",
+   "kind": "core",
+   "signature": "MDNS_SERVICE_NAME$(index) AS STRING",
+   "module": "mdns"
+  },
+  {
+   "name": "MDNS_SERVICE_HOST$",
+   "kind": "core",
+   "signature": "MDNS_SERVICE_HOST$(index) AS STRING",
+   "module": "mdns"
+  },
+  {
+   "name": "MDNS_SERVICE_ADDRESS$",
+   "kind": "core",
+   "signature": "MDNS_SERVICE_ADDRESS$(index) AS STRING",
+   "module": "mdns"
+  },
+  {
+   "name": "MDNS_SERVICE_PORT",
+   "kind": "core",
+   "signature": "MDNS_SERVICE_PORT(index) AS INTEGER",
+   "module": "mdns"
+  },
+  {
+   "name": "MDNS_SERVICE_TXT$",
+   "kind": "core",
+   "signature": "MDNS_SERVICE_TXT$(index, schluessel$) AS STRING",
+   "module": "mdns"
+  },
+  {
+   "name": "MDNS_ANNOUNCE",
+   "kind": "core",
+   "signature": "MDNS_ANNOUNCE(name$, dienst$, port [, txt$]) AS STRING",
+   "module": "mdns"
+  },
+  {
+   "name": "MDNS_STOP",
+   "kind": "core",
+   "signature": "MDNS_STOP()",
+   "module": "mdns"
+  },
+  {
    "name": "MIC_DEVICES",
    "kind": "core",
    "signature": "MIC_DEVICES() AS ARRAY OF STRING",
@@ -1333,6 +1387,78 @@
    "kind": "core",
    "signature": "MIC_RECORD_SAVE(pfad$) AS INTEGER",
    "module": "audio"
+  },
+  {
+   "name": "OSC_OPEN",
+   "kind": "core",
+   "signature": "OSC_OPEN([port [, bind$]]) AS OSC",
+   "module": "osc"
+  },
+  {
+   "name": "OSC_CLOSE",
+   "kind": "core",
+   "signature": "OSC_CLOSE(osc)",
+   "module": "osc"
+  },
+  {
+   "name": "OSC_PORT",
+   "kind": "core",
+   "signature": "OSC_PORT(osc) AS INTEGER",
+   "module": "osc"
+  },
+  {
+   "name": "OSC_SEND",
+   "kind": "core",
+   "signature": "OSC_SEND(osc, host$, port, adresse$, ...)",
+   "module": "osc"
+  },
+  {
+   "name": "OSC_NEXT",
+   "kind": "core",
+   "signature": "OSC_NEXT(osc) AS BOOLEAN",
+   "module": "osc"
+  },
+  {
+   "name": "OSC_ADDRESS$",
+   "kind": "core",
+   "signature": "OSC_ADDRESS$(osc) AS STRING",
+   "module": "osc"
+  },
+  {
+   "name": "OSC_TYPES$",
+   "kind": "core",
+   "signature": "OSC_TYPES$(osc) AS STRING",
+   "module": "osc"
+  },
+  {
+   "name": "OSC_COUNT",
+   "kind": "core",
+   "signature": "OSC_COUNT(osc) AS INTEGER",
+   "module": "osc"
+  },
+  {
+   "name": "OSC_ARG",
+   "kind": "core",
+   "signature": "OSC_ARG(osc, index)",
+   "module": "osc"
+  },
+  {
+   "name": "OSC_SENDER$",
+   "kind": "core",
+   "signature": "OSC_SENDER$(osc) AS STRING",
+   "module": "osc"
+  },
+  {
+   "name": "OSC_SENDER_PORT",
+   "kind": "core",
+   "signature": "OSC_SENDER_PORT(osc) AS INTEGER",
+   "module": "osc"
+  },
+  {
+   "name": "OSC_MATCH",
+   "kind": "core",
+   "signature": "OSC_MATCH(muster$, adresse$) AS BOOLEAN",
+   "module": "osc"
   },
   {
    "name": "SIZEOF",
@@ -2863,6 +2989,114 @@
    "kind": "core",
    "signature": "WEBCAM_ERROR$(kamera) AS STRING",
    "module": "webcam"
+  },
+  {
+   "name": "WS_CONNECT",
+   "kind": "core",
+   "signature": "WS_CONNECT(url$) AS WEBSOCKET",
+   "module": "websocket"
+  },
+  {
+   "name": "WS_LISTEN",
+   "kind": "core",
+   "signature": "WS_LISTEN(port [, bind$]) AS WS_SERVER",
+   "module": "websocket"
+  },
+  {
+   "name": "WS_PORT",
+   "kind": "core",
+   "signature": "WS_PORT(server) AS INTEGER",
+   "module": "websocket"
+  },
+  {
+   "name": "WS_ACCEPT",
+   "kind": "core",
+   "signature": "WS_ACCEPT(server) AS WEBSOCKET",
+   "module": "websocket"
+  },
+  {
+   "name": "WS_STOP",
+   "kind": "core",
+   "signature": "WS_STOP(server)",
+   "module": "websocket"
+  },
+  {
+   "name": "WS_SEND",
+   "kind": "core",
+   "signature": "WS_SEND(ws, daten) AS BOOLEAN",
+   "module": "websocket"
+  },
+  {
+   "name": "WS_NEXT",
+   "kind": "core",
+   "signature": "WS_NEXT(ws) AS BOOLEAN",
+   "module": "websocket"
+  },
+  {
+   "name": "WS_MESSAGE$",
+   "kind": "core",
+   "signature": "WS_MESSAGE$(ws) AS STRING",
+   "module": "websocket"
+  },
+  {
+   "name": "WS_MESSAGE_BYTES",
+   "kind": "core",
+   "signature": "WS_MESSAGE_BYTES(ws) AS BUFFER",
+   "module": "websocket"
+  },
+  {
+   "name": "WS_IS_BINARY",
+   "kind": "core",
+   "signature": "WS_IS_BINARY(ws) AS BOOLEAN",
+   "module": "websocket"
+  },
+  {
+   "name": "WS_PENDING",
+   "kind": "core",
+   "signature": "WS_PENDING(ws) AS INTEGER",
+   "module": "websocket"
+  },
+  {
+   "name": "WS_CONNECTED",
+   "kind": "core",
+   "signature": "WS_CONNECTED(ws) AS BOOLEAN",
+   "module": "websocket"
+  },
+  {
+   "name": "WS_PING",
+   "kind": "core",
+   "signature": "WS_PING(ws) AS BOOLEAN",
+   "module": "websocket"
+  },
+  {
+   "name": "WS_PATH$",
+   "kind": "core",
+   "signature": "WS_PATH$(ws) AS STRING",
+   "module": "websocket"
+  },
+  {
+   "name": "WS_PEER$",
+   "kind": "core",
+   "signature": "WS_PEER$(ws) AS STRING",
+   "module": "websocket"
+  },
+  {
+   "name": "WS_CLOSE",
+   "kind": "core",
+   "signature": "WS_CLOSE(ws [, code [, grund$]])",
+   "module": "websocket"
+  },
+  {
+   "name": "WS_CLOSE_CODE",
+   "kind": "core",
+   "signature": "WS_CLOSE_CODE(ws) AS INTEGER",
+   "module": "websocket"
+  },
+  {
+   "name": "WS_CLOSE_REASON$",
+   "kind": "core",
+   "signature": "WS_CLOSE_REASON$(ws) AS STRING",
+   "module": "websocket"
   },
   {
    "name": "ZAHL$",

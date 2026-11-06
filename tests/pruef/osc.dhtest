@@ -1,0 +1,125 @@
+' OSC (Open Sound Control, OSC_*, src/osc.rs). Zwei Anschluesse im selben
+' Programm reichen (UDP wartet nicht). Das Leitungsformat wird nicht am
+' eigenen Leser geprueft, sondern an Bytes, die der Fall selbst nach der
+' Spezifikation (OSC 1.0) zusammensetzt und ueber das net-Modul schickt bzw.
+' empfaengt.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== senden und empfangen mit allen arten
+IMPORT "osc"
+DIM a AS OSC : a = OSC_OPEN(0, "127.0.0.1")
+DIM b AS OSC : b = OSC_OPEN(0, "127.0.0.1")
+DIM blob AS BUFFER : blob = BUFFER_NEW(2)
+BUFFER_SET(blob, 0, 9) : BUFFER_SET(blob, 1, 200)
+OSC_SEND(a, "127.0.0.1", OSC_PORT(b), "/synth/1/freq", 440.5, 7, "hallo", TRUE, FALSE, blob, 10000000000, NIL)
+DIM t AS INTEGER : t = MILLIS()
+WHILE NOT OSC_NEXT(b) AND MILLIS() - t < 3000
+    SLEEP(5)
+WEND
+PRINT OSC_ADDRESS$(b); " "; OSC_TYPES$(b); " "; OSC_COUNT(b)
+PRINT OSC_ARG(b, 0); " "; OSC_ARG(b, 1); " "; OSC_ARG(b, 2); " "; OSC_ARG(b, 3); " "; OSC_ARG(b, 4)
+DIM z AS BUFFER : z = OSC_ARG(b, 5)
+PRINT BUFFER_LEN(z); " "; BUFFER_GET(z, 1); " "; OSC_ARG(b, 6)
+PRINT "absender "; OSC_SENDER$(b); " "; OSC_SENDER_PORT(b) = OSC_PORT(a)
+' antworten an den Absender
+OSC_SEND(b, OSC_SENDER$(b), OSC_SENDER_PORT(b), "/ok")
+t = MILLIS()
+WHILE NOT OSC_NEXT(a) AND MILLIS() - t < 3000
+    SLEEP(5)
+WEND
+PRINT "antwort "; OSC_ADDRESS$(a); " ["; OSC_TYPES$(a); "] "; OSC_COUNT(a)
+PRINT "nichts mehr "; OSC_NEXT(a)
+--- erwartet
+/synth/1/freq fisTFbhN 8
+440.5 7 hallo TRUE FALSE
+2 200 10000000000
+absender 127.0.0.1 TRUE
+antwort /ok [] 0
+nichts mehr FALSE
+
+=== das leitungsformat wie in der spezifikation
+' "/oscillator/4/frequency" ,f 440.0 -- Bytes aus OSC 1.0; empfangen ueber
+' einen rohen UDP-Anschluss und Byte fuer Byte verglichen.
+IMPORT "osc"
+IMPORT "net"
+DIM roh AS NET_UDP : roh = NET_UDP_BIND(0, "127.0.0.1")
+DIM a AS OSC : a = OSC_OPEN(0, "127.0.0.1")
+OSC_SEND(a, "127.0.0.1", NET_UDP_PORT(roh), "/oscillator/4/frequency", 440.0)
+DIM d AS BUFFER
+DIM t AS INTEGER : t = MILLIS()
+DO
+    d = NET_UDP_RECV_BYTES(roh, 1000)
+    SLEEP(5)
+LOOP UNTIL BUFFER_LEN(d) > 0 OR MILLIS() - t > 3000
+DIM hex AS STRING : hex = ""
+DIM i AS INTEGER
+FOR i = 0 TO BUFFER_LEN(d) - 1
+    hex = hex + RIGHT$("0" + HEX$(BUFFER_GET(d, i)), 2)
+NEXT
+PRINT LOWER$(hex)
+--- erwartet
+2f6f7363696c6c61746f722f342f6672657175656e6379002c66000043dc0000
+
+=== fremde bytes werden gelesen, auch buendel
+' Ein Buendel mit zwei Nachrichten, von Hand gebaut: "/eins" ,i 1000 und
+' "/zwei" ,s "ab". Dazu ein kaputtes Paket, das still uebergangen wird.
+IMPORT "osc"
+IMPORT "net"
+FUNCTION bytes(hex AS STRING) AS BUFFER
+    DIM b AS BUFFER : b = BUFFER_NEW(LEN(hex) \ 2)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(hex) \ 2 - 1
+        BUFFER_SET(b, i, INT(VAL("&H" + MID$(hex, i * 2, 2))))
+    NEXT
+    RETURN b
+END FUNCTION
+DIM b AS OSC : b = OSC_OPEN(0, "127.0.0.1")
+DIM roh AS NET_UDP : roh = NET_UDP_OPEN()
+DIM eins AS STRING : eins = "2f65696e73000000" + "2c690000" + "000003e8"
+DIM zwei AS STRING : zwei = "2f7a776569000000" + "2c730000" + "61620000"
+DIM buendel AS STRING : buendel = "2362756e646c6500" + "0000000000000001" + "00000010" + eins + "00000010" + zwei
+NET_UDP_SEND(roh, "127.0.0.1", OSC_PORT(b), bytes("6b6170757474"))
+NET_UDP_SEND(roh, "127.0.0.1", OSC_PORT(b), bytes(buendel))
+SLEEP(100)
+WHILE OSC_NEXT(b)
+    PRINT OSC_ADDRESS$(b); " "; OSC_TYPES$(b); " "; OSC_ARG(b, 0)
+WEND
+--- erwartet
+/eins i 1000
+/zwei s ab
+
+=== adressmuster
+IMPORT "osc"
+PRINT OSC_MATCH("/synth/*/freq", "/synth/2/freq"); " "; OSC_MATCH("/synth/*/freq", "/synth/2/x/freq")
+PRINT OSC_MATCH("/fader[1-4]", "/fader3"); " "; OSC_MATCH("/fader[!1-4]", "/fader3")
+PRINT OSC_MATCH("/farbe/{rot,gruen}", "/farbe/gruen"); " "; OSC_MATCH("/farbe/{rot,gruen}", "/farbe/blau")
+PRINT OSC_MATCH("/knopf?", "/knopf7"); " "; OSC_MATCH("/knopf?", "/knopf")
+--- erwartet
+TRUE FALSE
+TRUE FALSE
+TRUE FALSE
+TRUE FALSE
+
+=== fehler werden gemeldet
+IMPORT "osc"
+DIM a AS OSC : a = OSC_OPEN()
+TRY
+    OSC_SEND(a, "127.0.0.1", 9000, "synth")
+CATCH e
+    PRINT e
+END TRY
+DIM m AS MAP OF INTEGER
+TRY
+    OSC_SEND(a, "127.0.0.1", 9000, "/x", m)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PRINT OSC_ARG(a, 0)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+OSC_SEND: eine OSC-Adresse beginnt mit /, nicht "synth"
+OSC_SEND: Wert 1 ist MAP -- OSC kennt Zahlen, Texte, Wahrheitswerte und BUFFER
+OSC_ARG: Wert 0 gibt es nicht -- die Nachricht hat 0 (gezaehlt ab 0)

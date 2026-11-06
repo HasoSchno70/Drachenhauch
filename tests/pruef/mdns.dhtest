@@ -1,0 +1,122 @@
+' mDNS (MDNS_*, src/mdns.rs). Mit DHRT_MDNS_PORT laufen Fragen und
+' Ankuendigen ueber 127.0.0.1 statt ueber die Gruppe 224.0.0.251 -- so findet
+' ein Programm seinen eigenen Dienst auch dort, wo kein Multicast geht (die
+' Laeufer der CI). Ein Fall prueft das echte Multicast auf Port 5353; geht es
+' auf dem Rechner nicht, ueberspringt er sich.
+' Nacheinander: der Pruefport ist fest.
+' Format: docs/werkzeuge.md, dhrt test.
+--- seriell
+
+=== einen angekuendigten dienst finden
+IMPORT "mdns"
+PRINT MDNS_ANNOUNCE("Kueche", "_http._tcp", 8080, "pfad=/licht; an")
+PRINT "aufgeloest "; MDNS_RESOLVE$("kueche", 1000)
+PRINT "gefunden "; MDNS_BROWSE("_http._tcp", 600)
+PRINT MDNS_SERVICE_NAME$(0); " "; MDNS_SERVICE_HOST$(0); " "; MDNS_SERVICE_ADDRESS$(0); " "; MDNS_SERVICE_PORT(0)
+PRINT "txt ["; MDNS_SERVICE_TXT$(0, "pfad"); "] ["; MDNS_SERVICE_TXT$(0, "an"); "] ["; MDNS_SERVICE_TXT$(0, "gibts-nicht"); "]"
+--- umgebung
+DHRT_MDNS_PORT=53531
+--- erwartet
+kueche.local
+aufgeloest 127.0.0.1
+gefunden 1
+Kueche kueche.local 127.0.0.1 8080
+txt [/licht] [] []
+
+=== zwei dienste, sortiert, und ein anderer typ
+IMPORT "mdns"
+MDNS_ANNOUNCE("Wohnzimmer", "_http._tcp", 80)
+MDNS_ANNOUNCE("Arbeitszimmer", "_http._tcp", 81)
+MDNS_ANNOUNCE("Drucker", "_ipp._tcp", 631)
+PRINT MDNS_BROWSE("_http._tcp", 600)
+PRINT MDNS_SERVICE_NAME$(0); " "; MDNS_SERVICE_PORT(0); " / "; MDNS_SERVICE_NAME$(1); " "; MDNS_SERVICE_PORT(1)
+PRINT MDNS_BROWSE("_ipp._tcp.local", 600); " "; MDNS_SERVICE_NAME$(0)
+--- umgebung
+DHRT_MDNS_PORT=53531
+--- erwartet
+2
+Arbeitszimmer 81 / Wohnzimmer 80
+1 Drucker
+
+=== niemand antwortet
+IMPORT "mdns"
+DIM t AS INTEGER : t = MILLIS()
+PRINT "["; MDNS_RESOLVE$("gibt-es-nicht", 300); "]"
+PRINT MDNS_BROWSE("_nichts._tcp", 300)
+PRINT "gewartet "; MILLIS() - t >= 550
+--- umgebung
+DHRT_MDNS_PORT=53532
+--- erwartet
+[]
+0
+gewartet TRUE
+
+=== nach mdns_stop antwortet der dienst nicht mehr
+IMPORT "mdns"
+MDNS_ANNOUNCE("Garage", "_http._tcp", 80)
+PRINT MDNS_RESOLVE$("garage", 1000)
+MDNS_STOP()
+PRINT "["; MDNS_RESOLVE$("garage", 300); "]"
+--- umgebung
+DHRT_MDNS_PORT=53531
+--- erwartet
+127.0.0.1
+[]
+
+=== echtes multicast auf 5353
+' Ankuendigen an der Gruppe und ueber die Gruppe fragen -- wie ein ESP32
+' im WLAN. Ohne Multicast (manche Laeufer, manche Netze) ueberspringt sich
+' der Fall.
+IMPORT "mdns"
+DIM name AS STRING : name = "dh-probe-" + STR$(INT(RND(1) * 100000))
+TRY
+    MDNS_ANNOUNCE(name, "_dhprobe._tcp", 4711)
+CATCH e
+    PRINT "UEBERSPRINGEN: " + e
+    EXIT(0)
+END TRY
+DIM ip AS STRING : ip = MDNS_RESOLVE$(name, 2000)
+IF ip = "" THEN
+    PRINT "UEBERSPRINGEN: kein Multicast auf diesem Rechner"
+    EXIT(0)
+END IF
+PRINT "aufgeloest "; LEN(ip) >= 7
+PRINT "gefunden "; MDNS_BROWSE("_dhprobe._tcp", 2000) >= 1
+DIM i AS INTEGER
+DIM da AS BOOLEAN : da = FALSE
+FOR i = 0 TO MDNS_BROWSE("_dhprobe._tcp", 1500) - 1
+    IF MDNS_SERVICE_NAME$(i) = name AND MDNS_SERVICE_PORT(i) = 4711 THEN da = TRUE
+NEXT
+PRINT "unser dienst "; da
+--- erwartet
+aufgeloest TRUE
+gefunden TRUE
+unser dienst TRUE
+
+=== fehler werden gemeldet
+IMPORT "mdns"
+TRY
+    PRINT MDNS_BROWSE("http", 300)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PRINT MDNS_ANNOUNCE("a.b", "_http._tcp", 80)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PRINT MDNS_RESOLVE$("x", 10)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PRINT MDNS_SERVICE_PORT(0)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+MDNS_BROWSE: ein Diensttyp sieht aus wie "_http._tcp", nicht "http"
+MDNS_ANNOUNCE: der Name darf nicht leer sein und keinen Punkt enthalten, nicht "a.b"
+MDNS_RESOLVE$: Wartezeit 10 ms ausserhalb 50..30000
+MDNS_SERVICE_PORT: Dienst 0 gibt es nicht -- die letzte Suche fand 0 (gezaehlt ab 0)

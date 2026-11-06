@@ -595,7 +595,7 @@ fn ui_preset_metrics(name: &str) -> Vec<(&'static str, i64)> {
 /// damit ein Tippfehler im DH-Programm NICHT die Runtime abstuerzen laesst,
 /// sondern einen klaren Laufzeitfehler liefert.
 /// Zahl der Befehlsfamilien in `Vm::familie_rufen`; die letzte sind die reinen.
-pub(crate) const BUILTIN_FAMILIEN: u8 = 32;
+pub(crate) const BUILTIN_FAMILIEN: u8 = 33;
 
 fn safe_call_builtin(name: &str, args: &[Value]) -> Option<Result<Value, String>> {
     use std::panic::{catch_unwind, AssertUnwindSafe};
@@ -1074,6 +1074,16 @@ pub struct Vm<'p> {
     mic_baender: Vec<f32>,
     #[cfg(feature = "graphics")]
     mic_agc: f32,
+    /// WebSocket-Server und -Verbindungen (WS_*), OSC-Anschluesse,
+    /// das Ergebnis der letzten mDNS-Suche und der mDNS-Antworter.
+    #[cfg(feature = "net")]
+    ws_server: Vec<Option<crate::websocket::Server>>,
+    #[cfg(feature = "net")]
+    ws_verbindungen: Vec<Option<crate::websocket::Verbindung>>,
+    osc_anschluesse: Vec<Option<crate::osc::Osc>>,
+    mdns_dienste: Vec<crate::mdns::Dienst>,
+    mdns_typ: String,
+    mdns_antworter: Option<crate::mdns::Antworter>,
     gpio_chips: Vec<Option<crate::pins::Chip>>,
     i2c_busse: Vec<Option<crate::pins::Bus>>,
     spi_geraete: Vec<Option<crate::pins::Spi>>,
@@ -1259,6 +1269,14 @@ impl<'p> Vm<'p> {
             mic_baender: Vec::new(),
             #[cfg(feature = "graphics")]
             mic_agc: 1e-4,
+            #[cfg(feature = "net")]
+            ws_server: Vec::new(),
+            #[cfg(feature = "net")]
+            ws_verbindungen: Vec::new(),
+            osc_anschluesse: Vec::new(),
+            mdns_dienste: Vec::new(),
+            mdns_typ: String::new(),
+            mdns_antworter: None,
             gpio_chips: Vec::new(),
             i2c_busse: Vec::new(),
             spi_geraete: Vec::new(),
@@ -2304,6 +2322,7 @@ impl<'p> Vm<'p> {
             29 => self.try_pins(name, a),
             30 => self.try_mikrofon(name, a),
             31 => self.try_webcam(name, a),
+            32 => self.try_netzdienste(name, a),
             _ => match safe_call_builtin(name, a) {
                 Some(Ok(v)) => Ok(Some(v)),
                 Some(Err(e)) if e.starts_with("__UNKNOWN_BUILTIN__:") => Err(unknown_builtin_msg(name)),
@@ -6691,6 +6710,234 @@ impl<'p> Vm<'p> {
     // ===================================================================
     // Modul webcam (src/webcam.rs): Bilder einer Kamera in ein IMAGE
     // ===================================================================
+    // ===================================================================
+    // WebSocket (WS_*), OSC (OSC_*), mDNS (MDNS_*): src/websocket.rs,
+    // src/osc.rs, src/mdns.rs
+    // ===================================================================
+    fn try_netzdienste(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        if name.starts_with("ws_") {
+            #[cfg(feature = "net")]
+            { return self.try_websocket(name, a); }
+            #[allow(unreachable_code)]
+            { return Ok(None); }
+        }
+        if name.starts_with("osc_") { return self.try_osc(name, a); }
+        if name.starts_with("mdns_") { return self.try_mdns(name, a); }
+        Ok(None)
+    }
+
+    #[cfg(feature = "net")]
+    fn try_websocket(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        use crate::websocket as ws;
+        fn puffer(v: Vec<u8>) -> Value { Value::Buffer(Rc::new(RefCell::new(v))) }
+        macro_rules! vb { ($f:expr) => {
+            Self::handle_get_mut(&mut self.ws_verbindungen, bi_int(a, 0, $f)?, $f, "ungueltiges/geschlossenes WEBSOCKET")?
+        }; }
+        macro_rules! srv { ($f:expr) => {
+            Self::handle_get_mut(&mut self.ws_server, bi_int(a, 0, $f)?, $f, "ungueltiger/geschlossener WS_SERVER")?
+        }; }
+        let v = match name {
+            "ws_connect" => {
+                let url = bi_str(a, 0, "WS_CONNECT")?.to_string();
+                self.ws_verbindungen.push(Some(ws::verbinden(&url)?));
+                Value::Int((self.ws_verbindungen.len() - 1) as i64)
+            }
+            "ws_listen" => {
+                let port = bi_int(a, 0, "WS_LISTEN")?;
+                let bind = if a.len() >= 2 { bi_str(a, 1, "WS_LISTEN")?.to_string() } else { "0.0.0.0".to_string() };
+                self.ws_server.push(Some(ws::lauschen(port, &bind)?));
+                Value::Int((self.ws_server.len() - 1) as i64)
+            }
+            "ws_port" => Value::Int(srv!("WS_PORT").port as i64),
+            "ws_accept" => {
+                match srv!("WS_ACCEPT").annehmen() {
+                    Some(v) => { self.ws_verbindungen.push(Some(v)); Value::Int((self.ws_verbindungen.len() - 1) as i64) }
+                    None => Value::Int(-1),
+                }
+            }
+            "ws_stop" => { let i = bi_int(a, 0, "WS_STOP")? as usize; if let Some(x) = self.ws_server.get_mut(i) { *x = None; } Value::Nil }
+            "ws_send" => {
+                const F: &str = "WS_SEND";
+                let (daten, binaer) = match a.get(1) {
+                    Some(Value::Str(t)) => (t.as_bytes().to_vec(), false),
+                    Some(Value::Buffer(b)) => (b.borrow().clone(), true),
+                    Some(v) => return Err(format!("{}: erwartet einen Text oder einen BUFFER, nicht {}", F, v.type_name())),
+                    None => return Err(format!("{}: fehlendes Argument 2", F)),
+                };
+                if daten.len() > ws::MAX_NACHRICHT { return Err(format!("{}: hoechstens {} Bytes je Nachricht", F, ws::MAX_NACHRICHT)); }
+                Value::Bool(vb!(F).senden(&daten, binaer)?)
+            }
+            "ws_next" => Value::Bool(vb!("WS_NEXT").naechste()),
+            "ws_message$" | "ws_message" => {
+                let n = vb!("WS_MESSAGE$").aktuell().map(|n| String::from_utf8_lossy(&n.daten).into_owned()).unwrap_or_default();
+                Value::str_rc(n)
+            }
+            "ws_message_bytes" => puffer(vb!("WS_MESSAGE_BYTES").aktuell().map(|n| n.daten.clone()).unwrap_or_default()),
+            "ws_is_binary" => Value::Bool(vb!("WS_IS_BINARY").aktuell().map_or(false, |n| n.binaer)),
+            "ws_pending" => Value::Int(vb!("WS_PENDING").wartend() as i64),
+            "ws_connected" => Value::Bool(vb!("WS_CONNECTED").offen()),
+            "ws_ping" => Value::Bool(vb!("WS_PING").ping()),
+            "ws_path$" | "ws_path" => Value::str_rc(vb!("WS_PATH$").pfad.clone()),
+            "ws_peer$" | "ws_peer" => Value::str_rc(vb!("WS_PEER$").gegenstelle.clone()),
+            "ws_close_code" => Value::Int(vb!("WS_CLOSE_CODE").schliess_code),
+            "ws_close_reason$" | "ws_close_reason" => Value::str_rc(vb!("WS_CLOSE_REASON$").schliess_grund.clone()),
+            "ws_close" => {
+                const F: &str = "WS_CLOSE";
+                let code = if a.len() >= 2 { bi_int(a, 1, F)? } else { 1000 };
+                if !(1000..=4999).contains(&code) || matches!(code, 1004..=1006 | 1015) {
+                    return Err(format!("{}: Code {} ist nicht erlaubt (1000 normal, 1001 weg, 4000..4999 eigene)", F, code));
+                }
+                let grund = if a.len() >= 3 { bi_str(a, 2, F)?.to_string() } else { String::new() };
+                let i = bi_int(a, 0, F)?;
+                vb!(F).schliessen(code as u16, &grund);
+                let _ = i;
+                Value::Nil
+            }
+            _ => return Ok(None),
+        };
+        Ok(Some(v))
+    }
+
+    fn try_osc(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        use crate::osc;
+        macro_rules! anschluss { ($f:expr) => {
+            Self::handle_get_mut(&mut self.osc_anschluesse, bi_int(a, 0, $f)?, $f, "ungueltiger/geschlossener OSC")?
+        }; }
+        let v = match name {
+            "osc_open" => {
+                let port = if a.is_empty() { 0 } else { bi_int(a, 0, "OSC_OPEN")? };
+                let bind = if a.len() >= 2 { bi_str(a, 1, "OSC_OPEN")?.to_string() } else { "0.0.0.0".to_string() };
+                self.osc_anschluesse.push(Some(osc::oeffnen(port, &bind)?));
+                Value::Int((self.osc_anschluesse.len() - 1) as i64)
+            }
+            "osc_close" => { let i = bi_int(a, 0, "OSC_CLOSE")? as usize; if let Some(x) = self.osc_anschluesse.get_mut(i) { *x = None; } Value::Nil }
+            "osc_port" => Value::Int(anschluss!("OSC_PORT").port as i64),
+            "osc_send" => {
+                const F: &str = "OSC_SEND";
+                if a.len() < 4 { return Err(format!("{}: erwartet (osc, host$, port, adresse$, werte...)", F)); }
+                let host = bi_str(a, 1, F)?.to_string();
+                let port = bi_int(a, 2, F)?;
+                if !(1..=65535).contains(&port) { return Err(format!("{}: Port {} ausserhalb 1..65535", F, port)); }
+                let adresse = bi_str(a, 3, F)?.to_string();
+                if !adresse.starts_with('/') { return Err(format!("{}: eine OSC-Adresse beginnt mit /, nicht {:?}", F, adresse)); }
+                let mut werte = Vec::new();
+                for (k, w) in a[4..].iter().enumerate() {
+                    werte.push(match w {
+                        Value::Int(n) => if let Ok(x) = i32::try_from(*n) { osc::Wert::Int(x) } else { osc::Wert::Long(*n) },
+                        Value::Float(f) => osc::Wert::Float(*f as f32),
+                        Value::Str(t) => osc::Wert::Text(t.to_string()),
+                        Value::Bool(b) => if *b { osc::Wert::Wahr } else { osc::Wert::Falsch },
+                        Value::Buffer(b) => osc::Wert::Blob(b.borrow().clone()),
+                        Value::Nil => osc::Wert::Nichts,
+                        v => return Err(format!("{}: Wert {} ist {} -- OSC kennt Zahlen, Texte, Wahrheitswerte und BUFFER", F, k + 1, v.type_name())),
+                    });
+                }
+                let n = osc::Nachricht { adresse, werte };
+                anschluss!(F).senden(&host, port as u16, &n)?;
+                Value::Nil
+            }
+            "osc_next" => Value::Bool(anschluss!("OSC_NEXT").naechste()),
+            "osc_address$" | "osc_address" => Value::str_rc(anschluss!("OSC_ADDRESS$").aktuell().map(|(n, _)| n.adresse.clone()).unwrap_or_default()),
+            "osc_types$" | "osc_types" => Value::str_rc(anschluss!("OSC_TYPES$").aktuell().map(|(n, _)| n.werte.iter().map(|w| w.kennung()).collect::<String>()).unwrap_or_default()),
+            "osc_count" => Value::Int(anschluss!("OSC_COUNT").aktuell().map_or(0, |(n, _)| n.werte.len() as i64)),
+            "osc_arg" => {
+                const F: &str = "OSC_ARG";
+                let i = bi_int(a, 1, F)?;
+                let werte = anschluss!(F).aktuell().map(|(n, _)| n.werte.clone()).unwrap_or_default();
+                let w = usize::try_from(i).ok().and_then(|i| werte.get(i))
+                    .ok_or_else(|| format!("{}: Wert {} gibt es nicht -- die Nachricht hat {} (gezaehlt ab 0)", F, i, werte.len()))?;
+                match w {
+                    osc::Wert::Int(x) => Value::Int(*x as i64),
+                    osc::Wert::Long(x) => Value::Int(*x),
+                    osc::Wert::Float(x) => Value::Float(*x as f64),
+                    osc::Wert::Double(x) => Value::Float(*x),
+                    osc::Wert::Text(t) => Value::str_rc(t.clone()),
+                    osc::Wert::Blob(d) => Value::Buffer(Rc::new(RefCell::new(d.clone()))),
+                    osc::Wert::Wahr => Value::Bool(true),
+                    osc::Wert::Falsch => Value::Bool(false),
+                    osc::Wert::Nichts => Value::Nil,
+                    osc::Wert::Unendlich => Value::Float(f64::INFINITY),
+                    osc::Wert::Zeit(t) => Value::Int(*t as i64),
+                    osc::Wert::Zeichen(c) => Value::str_rc(c.to_string()),
+                    osc::Wert::Farbe(c) => Value::Int(*c as i64),
+                    osc::Wert::Midi(m) => Value::Int(u32::from_be_bytes(*m) as i64),
+                }
+            }
+            "osc_sender$" | "osc_sender" => Value::str_rc(anschluss!("OSC_SENDER$").aktuell().map(|(_, s)| s.ip().to_string()).unwrap_or_default()),
+            "osc_sender_port" => Value::Int(anschluss!("OSC_SENDER_PORT").aktuell().map_or(0, |(_, s)| s.port() as i64)),
+            "osc_match" => {
+                let m = bi_str(a, 0, "OSC_MATCH")?.to_string();
+                let ad = bi_str(a, 1, "OSC_MATCH")?.to_string();
+                Value::Bool(osc::passt(&m, &ad))
+            }
+            _ => return Ok(None),
+        };
+        Ok(Some(v))
+    }
+
+    fn try_mdns(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        use crate::mdns;
+        fn frist(a: &[Value], i: usize, f: &str, vorgabe: i64) -> R<u64> {
+            let ms = if a.len() > i { bi_int(a, i, f)? } else { vorgabe };
+            if !(50..=30000).contains(&ms) { return Err(format!("{}: Wartezeit {} ms ausserhalb 50..30000", f, ms)); }
+            Ok(ms as u64)
+        }
+        macro_rules! dienst { ($f:expr) => {{
+            let i = bi_int(a, 0, $f)?;
+            let n = self.mdns_dienste.len();
+            usize::try_from(i).ok().and_then(|i| self.mdns_dienste.get(i))
+                .ok_or_else(|| format!("{}: Dienst {} gibt es nicht -- die letzte Suche fand {} (gezaehlt ab 0)", $f, i, n))?
+        }}; }
+        let v = match name {
+            "mdns_resolve$" | "mdns_resolve" => {
+                let n = bi_str(a, 0, "MDNS_RESOLVE$")?.to_string();
+                let ms = frist(a, 1, "MDNS_RESOLVE$", 1500)?;
+                Value::str_rc(mdns::aufloesen(&n, ms)?)
+            }
+            "mdns_browse" => {
+                let d = bi_str(a, 0, "MDNS_BROWSE")?.to_string();
+                if !d.starts_with('_') { return Err(format!("MDNS_BROWSE: ein Diensttyp sieht aus wie \"_http._tcp\", nicht {:?}", d)); }
+                let ms = frist(a, 1, "MDNS_BROWSE", 2000)?;
+                self.mdns_typ = mdns::lokal(&d);
+                self.mdns_dienste = mdns::suchen(&d, ms)?;
+                Value::Int(self.mdns_dienste.len() as i64)
+            }
+            "mdns_service_name$" | "mdns_service_name" => { let t = self.mdns_typ.clone(); let d = dienst!("MDNS_SERVICE_NAME$"); Value::str_rc(mdns::kurzname(&d.name, &t)) }
+            "mdns_service_host$" | "mdns_service_host" => Value::str_rc(dienst!("MDNS_SERVICE_HOST$").host.clone()),
+            "mdns_service_address$" | "mdns_service_address" => Value::str_rc(dienst!("MDNS_SERVICE_ADDRESS$").adresse.clone()),
+            "mdns_service_port" => Value::Int(dienst!("MDNS_SERVICE_PORT").port as i64),
+            "mdns_service_txt$" | "mdns_service_txt" => {
+                let k = bi_str(a, 1, "MDNS_SERVICE_TXT$")?.to_string();
+                let d = dienst!("MDNS_SERVICE_TXT$");
+                Value::str_rc(d.txt.iter().find(|(n, _)| n.eq_ignore_ascii_case(&k)).map(|(_, w)| w.clone()).unwrap_or_default())
+            }
+            "mdns_announce" => {
+                const F: &str = "MDNS_ANNOUNCE";
+                let n = bi_str(a, 0, F)?.to_string();
+                let d = bi_str(a, 1, F)?.to_string();
+                let port = bi_int(a, 2, F)?;
+                if !(1..=65535).contains(&port) { return Err(format!("{}: Port {} ausserhalb 1..65535", F, port)); }
+                if n.is_empty() || n.contains('.') { return Err(format!("{}: der Name darf nicht leer sein und keinen Punkt enthalten, nicht {:?}", F, n)); }
+                if !d.starts_with('_') { return Err(format!("{}: ein Diensttyp sieht aus wie \"_http._tcp\", nicht {:?}", F, d)); }
+                let txt = if a.len() >= 4 { mdns::txt_aus_text(bi_str(a, 3, F)?) } else { Vec::new() };
+                let host: String = n.chars().map(|c| if c.is_ascii_alphanumeric() || c == '-' { c.to_ascii_lowercase() } else { '-' }).collect();
+                let ank = mdns::Ankuendigung { name: n, dienst: mdns::lokal(&d), host: mdns::lokal(&host), port: port as u16, txt };
+                if self.mdns_antworter.is_none() { self.mdns_antworter = Some(mdns::antworter_starten()?); }
+                let liste = self.mdns_antworter.as_ref().unwrap().liste.clone();
+                {
+                    let mut l = liste.lock().unwrap_or_else(|e| e.into_inner());
+                    l.retain(|x| x.instanz() != ank.instanz());
+                    l.push(ank.clone());
+                }
+                mdns::melden(&ank);
+                Value::str_rc(ank.host)
+            }
+            "mdns_stop" => { self.mdns_antworter = None; Value::Nil }
+            _ => return Ok(None),
+        };
+        Ok(Some(v))
+    }
+
     fn try_webcam(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         if !name.starts_with("webcam_") { return Ok(None); }
         #[cfg(feature = "graphics")]
