@@ -227,6 +227,7 @@ IMPORT "gui"
 | `GUI_FILETREE_CHECKED(ft, pfad$)` / `GUI_FILETREE_SET_CHECKED(ft, pfad$, an)` | BOOLEAN / — | read and set the check mark on a path |
 | `GUI_FILETREE_CHECKED_COUNT(ft)` / `GUI_FILETREE_CHECKED_PATH$(ft, i)` | INTEGER / STRING | all checked paths, including those currently collapsed |
 | `GUI_FILETREE_ICONS(ft, ordnerbild, dateibild)` | — | icons for folders and files (-1 = none) |
+| `GUI_FILETREE_COLOR(ft, muster$, farbe)` | — | text colour per file type: patterns as with the filter (`"*.json;*.ini"`), `"/"` for folders; the first match wins, -1 removes the colour |
 | `GUI_TABCONTROL(win, x, y, w, h)` | GUI_WIDGET | tabs **inside** a window (card index) |
 | `GUI_TABCONTROL_ADD(tc, titel$)` | INTEGER | append a page, returns its number |
 | `GUI_TABCONTROL_ADD_WIDGET(tc, wdg, seite)` | — | put a widget on a page; it keeps its position in the window |

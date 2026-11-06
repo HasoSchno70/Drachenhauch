@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/en und dem englischen Buch von `dhrt doku prosa` -- NICHT von Hand aendern. Der Hover nimmt sie mit DHRT_LANG=en.",
- "count": 2367,
+ "count": 2368,
  "docs": {
   "ABS": "Absolute value.",
   "ACOS": "Arc sine/cosine (x in [-1, 1])",
@@ -664,6 +664,7 @@
   "GUI_FILETREE_CHECKED": "BOOLEAN / — — read and set the check mark on a path",
   "GUI_FILETREE_CHECKED_COUNT": "INTEGER / STRING all checked paths, including those currently collapsed",
   "GUI_FILETREE_CHECKED_PATH$": "INTEGER / STRING all checked paths, including those currently collapsed",
+  "GUI_FILETREE_COLOR": "text colour per file type: patterns as with the filter (\"*.json;*.ini\"), \"/\" for folders; the first match wins, -1 removes the colour",
   "GUI_FILETREE_COUNT": "INTEGER / STRING count and read the visible rows",
   "GUI_FILETREE_EXPAND": "expand or collapse a folder",
   "GUI_FILETREE_FILTER": "which files it shows (*.dh;*.md, empty = all)",

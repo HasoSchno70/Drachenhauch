@@ -1512,6 +1512,9 @@ struct DateiBaum {
     klick_klappt: bool,       // ein Klick auf einen Ordner klappt ihn auf/zu
     auffrischen: f64,         // Sekunden zwischen zwei Blicken auf die Platte, 0 = nie
     naechste: f64,            // Zeitpunkt des naechsten Blicks
+    /// Textfarbe je Muster (GUI_FILETREE_COLOR), in der Reihenfolge, in der
+    /// sie gesetzt wurden -- das erste passende gilt. "/" meint Ordner.
+    farben: Vec<(String, i64)>,
 }
 
 impl DateiBaum {
@@ -1525,6 +1528,13 @@ impl DateiBaum {
     }
     fn passt_datei(&self, name: &str) -> bool {
         self.muster.is_empty() || self.muster.iter().any(|m| crate::builtins::passt_muster(name, m))
+    }
+    /// Die Farbe eines Eintrags: "/" trifft Ordner, jedes andere Muster nur
+    /// Dateien (ein Ordner namens "bilder.png" ist kein Bild). -1 = Thema.
+    fn farbe_fuer(&self, name: &str, ist_ordner: bool) -> i64 {
+        self.farben.iter()
+            .find(|(m, _)| if m == "/" { ist_ordner } else { !ist_ordner && crate::builtins::passt_muster(name, m) })
+            .map(|(_, f)| *f).unwrap_or(-1)
     }
 }
 
@@ -1580,6 +1590,7 @@ fn dateibaum_sammeln(d: &DateiBaum, rel: &str, eltern: i32, ebene: i32,
     });
     for (name, ist_ordner) in liste {
         let weg = if rel.is_empty() { name.clone() } else { format!("{}/{}", rel, name) };
+        let farbe = d.farbe_fuer(&name, ist_ordner);
         let auf = ist_ordner && d.offen.iter().any(|o| o == &weg);
         if eltern >= 0 { nodes[eltern as usize].has_children = true; }
         nodes.push(TreeNode {
@@ -1589,7 +1600,7 @@ fn dateibaum_sammeln(d: &DateiBaum, rel: &str, eltern: i32, ebene: i32,
             // vorsorglich hineinzusehen ist genau das, was der Baum vermeidet.
             has_children: ist_ordner,
             icon: if ist_ordner { d.bild_ordner } else { d.bild_datei },
-            color: -1,
+            color: farbe,
         });
         pfade.push(weg.clone());
         ordner.push(ist_ordner);
@@ -7398,6 +7409,28 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         let (_, d) = self.ft_ref(h, "GUI_FILETREE_CHECKED_PATH")?;
         Ok(d.gehakt.get(i.max(-1) as usize).filter(|_| i >= 0).map(|p| Self::ft_abs(d, p)).unwrap_or_default())
     }
+    /// Textfarbe je Dateiart: `muster` wie beim Filter ("*.dh;*.dhform"),
+    /// "/" fuer Ordner; -1 nimmt die Farbe wieder weg. Ein Muster, das schon
+    /// eine Farbe hat, bekommt die neue an derselben Stelle -- die Reihenfolge
+    /// bleibt, und das erste passende gilt.
+    pub fn filetree_color(&mut self, h: i64, muster: &str, farbe: i64) -> Result<(), String> {
+        let t = self.ft_mut(h, "GUI_FILETREE_COLOR")?;
+        let liste = Self::ft_liste(muster);
+        if liste.is_empty() {
+            return Err("GUI_FILETREE_COLOR: kein Muster -- so: \"*.dh\", \"*.json;*.ini\" oder \"/\" fuer Ordner".to_string());
+        }
+        let d = t.datei.as_mut().unwrap();
+        for m in liste {
+            match d.farben.iter().position(|(x, _)| *x == m) {
+                Some(k) if farbe < 0 => { d.farben.remove(k); }
+                Some(k) => d.farben[k].1 = farbe,
+                None if farbe >= 0 => d.farben.push((m, farbe)),
+                None => {}
+            }
+        }
+        dateibaum_neu(t); Ok(())
+    }
+
     pub fn filetree_icons(&mut self, h: i64, ordner: i64, datei: i64) -> Result<(), String> {
         let t = self.ft_mut(h, "GUI_FILETREE_ICONS")?;
         let d = t.datei.as_mut().unwrap();
@@ -11634,6 +11667,10 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     "ordner_zuerst": d.ordner_zuerst, "verborgene": d.verborgene,
                     "nur_ordner": d.nur_ordner, "offen": d.offen,
                 });
+                if !d.farben.is_empty() {
+                    o["filetree"]["farben"] = serde_json::json!(d.farben.iter()
+                        .map(|(m, f)| serde_json::json!([m, f])).collect::<Vec<_>>());
+                }
             }
         }
         if w.kind == Kind::TimePicker {
@@ -11993,6 +12030,9 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     verborgene: fj["verborgene"].as_bool().unwrap_or(false),
                     nur_ordner: fj["nur_ordner"].as_bool().unwrap_or(false),
                     bild_ordner: -1, bild_datei: -1,
+                    farben: fj["farben"].as_array().map(|a| a.iter().filter_map(|p| {
+                        Some((p.get(0)?.as_str()?.to_string(), p.get(1)?.as_i64()?))
+                    }).collect()).unwrap_or_default(),
                     ..Default::default()
                 }));
                 ts.selected = -1;
