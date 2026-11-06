@@ -85,7 +85,7 @@ Details in the [manual](docs/en/README.md); how it got there is in the
 
 ## Download
 
-**[Download Drachenhauch](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — for Windows a single installer (about 58 MB), for macOS a `.dmg`, for Linux a `.tar.gz` (x86_64; for the [Raspberry Pi](docs/en/raspberry-pi.md) aarch64 from the next version on); currently version 2026.42.
+**[Download Drachenhauch](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — for Windows a single installer (about 58 MB), for macOS a `.dmg`, for Linux a `.tar.gz` (x86_64, and aarch64 for the [Raspberry Pi](docs/en/raspberry-pi.md)); currently version 2026.43.
 
 You do **not** need Python installed. It ships the complete development environment, the `dhrt` runtime, all 226 examples with their assets, the textbook in both languages as `.docx` and `.epub`, and the ESP32 skeleton. The Windows installer is unsigned, so SmartScreen will speak up on first launch; the macOS app is not notarised yet.
 
@@ -129,7 +129,7 @@ Full documentation lives in [docs/en/](docs/en/README.md) — the English transl
 - **[Standard built-ins](docs/en/builtins-core.md)** — math, strings, maps, file I/O, …
 - **[Graphics built-ins](docs/en/builtins-grafik.md)** — native runtime (dhrt/raylib), Z-layers, sprite atlas, asset preloader
 - **[Performance](docs/PERFORMANCE.md)** (German) — benchmark numbers + optimizations shipped (spec ops, inline caches, typed arrays, ECS bulk ops, …)
-- **Modules** — 48 of them, [table below](#modules)
+- **Modules** — 57 of them, [table below](#modules)
 - **[IDE](docs/en/ide.md)** — the development environment, written in Drachenhauch itself: tabs, project tree, completion, help on the word, snippets, multi-cursor, folding, split view, project-wide refactorings, **debugger** (incl. conditional breakpoints), **profiler**, git blame/diff, manual in a window, welcome page with an example gallery
 - **[Drachenhauch Studio](docs/en/studio.md)** (`studio/studio.dh`) — GUI applications in the style of Xojo: window designer with alignment guides, inspector, navigator, code per event, layout containers, custom controls, databases with queries, reports (PDF, print, preview), menus, timers, images, dialogs, project templates, German and English interface, start/build/debug; example project `examples/studio/rechnungen/`
 - **Tools** — all written in Drachenhauch, in the IDE under *Tools* or directly with `dhrt run examples/<file>`:
@@ -149,7 +149,7 @@ Full documentation lives in [docs/en/](docs/en/README.md) — the English transl
 
 ### Modules
 
-48 modules, available via `IMPORT "name"`. Each has its own page under
+57 modules, available via `IMPORT "name"`. Each has its own page under
 [docs/en/](docs/en/README.md#modules).
 
 **Game building blocks**

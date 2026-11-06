@@ -86,7 +86,7 @@ Nachzulesen im [Handbuch](docs/README.md); wie es dazu kam, steht in der
 
 ## Herunterladen
 
-**[Drachenhauch herunterladen](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — für Windows ein Installer (rund 58 MB), für macOS eine `.dmg`, für Linux ein `.tar.gz` (x86_64; für den [Raspberry Pi](docs/raspberry-pi.md) ab der nächsten Fassung auch aarch64); aktuell Fassung 2026.42.
+**[Drachenhauch herunterladen](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — für Windows ein Installer (rund 58 MB), für macOS eine `.dmg`, für Linux ein `.tar.gz` (x86_64, und aarch64 für den [Raspberry Pi](docs/raspberry-pi.md)); aktuell Fassung 2026.43.
 
 Python muss dafür **nicht** installiert sein. Mit dabei sind die komplette Entwicklungsumgebung, die Runtime `dhrt`, alle 226 Beispiele samt Assets, beide Bücher (*Der Einstieg* und *Das Lehrbuch*, letzteres in beiden Sprachen) als `.docx` und `.epub` sowie das ESP32-Grundgerüst. Der Windows-Installer ist nicht signiert, SmartScreen meldet sich also beim ersten Start; die macOS-App ist noch nicht beglaubigt.
 
@@ -128,7 +128,7 @@ Vollständige Doku im [docs/](docs/README.md)-Ordner:
 - **[Standard-Built-ins](docs/builtins-core.md)** — Math, Strings, Maps, File-I/O, …
 - **[Grafik-Built-ins](docs/builtins-grafik.md)** — native Runtime (dhrt/raylib), Z-Layer, Sprite-Atlas, Asset-Preloader
 - **[Performance](docs/PERFORMANCE.md)** — Bench-Zahlen + umgesetzte Optimierungen (Spec-Ops, IC, Typed Arrays, ECS Bulk-Ops, …)
-- **Module** — 48 Stück, [Tabelle unten](#module)
+- **Module** — 57 Stück, [Tabelle unten](#module)
 - **[IDE](docs/ide.md)** — die Entwicklungsumgebung, selbst in Drachenhauch geschrieben: Reiter, Projektbaum, Vervollständigung, Hilfe zum Wort, Schnipsel, Mehrfach-Marken, Faltung, geteilte Ansicht, Umbauten über das ganze Projekt, **Debugger** (auch bedingte Haltepunkte), **Profiler**, git blame/diff, Handbuch im Fenster, Willkommensseite mit Beispiel-Galerie
 - **[Drachenhauch Studio](docs/studio.md)** (`studio/studio.dh`) — Anwendungen mit Oberfläche im Stil von Xojo: Fenster-Entwurf mit Ausrichtungslinien, Inspektor, Navigator, Code je Ereignis, Layout-Behälter, eigene Controls, Datenbanken mit Abfragen, Berichte (PDF, Druck, Vorschau), Menüs, Timer, Bilder, Dialoge, Projektvorlagen, deutsche und englische Oberfläche, Starten/Bauen/Debuggen; Beispielprojekt `examples/studio/rechnungen/`
 - **Werkzeuge** — alle in Drachenhauch geschrieben, in der IDE unter *Werkzeuge* oder direkt mit `dhrt run examples/<datei>`:
@@ -148,7 +148,7 @@ Vollständige Doku im [docs/](docs/README.md)-Ordner:
 
 ### Module
 
-48 Module, per `IMPORT "name"` verfügbar. Jedes hat eine eigene Seite unter
+57 Module, per `IMPORT "name"` verfügbar. Jedes hat eine eigene Seite unter
 [docs/](docs/README.md#module).
 
 **Spiel-Bausteine**
