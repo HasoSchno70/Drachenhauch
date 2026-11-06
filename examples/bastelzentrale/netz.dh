@@ -1,0 +1,257 @@
+' Bastelzentrale -- das Netz: eine Seite fuer das Handy (httpd), ein
+' WebSocket, ueber den sie lebt, die Ankuendigung im Heimnetz (mDNS) und
+' OSC fuer Apps wie TouchOSC.
+'
+' Die Ports lassen sich ueber die Umgebung setzen (0 = ein freier):
+' DH_BZ_WEB (8090), DH_BZ_WS (8091), DH_BZ_OSC (8000); DH_BZ_MDNS=0 laesst
+' die Ankuendigung weg.
+'
+' Befehle, gleich ob vom Handy, ueber /befehl?c=... oder per OSC:
+'   pin 13 1        Arduino-Ausgang an (0 = aus)       OSC /pin/13 1
+'   servo 120       Servo auf 120 Grad                 OSC /servo 0.66 (0..1) oder 120
+'   gpio 17 1       Raspberry-Pi-Ausgang an            OSC /gpio/17 1
+'   mqtt a/b text   Nachricht senden                   OSC /mqtt/a/b "text"
+'   modbus 3 42     Register schreiben                 OSC /modbus/3 42
+
+DIM nzWeb AS HTTPD
+DIM nzWebDa AS BOOLEAN : nzWebDa = FALSE
+DIM nzWs AS WS_SERVER
+DIM nzWsDa AS BOOLEAN : nzWsDa = FALSE
+DIM nzOsc AS OSC
+DIM nzOscDa AS BOOLEAN : nzOscDa = FALSE
+DIM nzWebPort AS INTEGER : nzWebPort = 0
+DIM nzWsPort AS INTEGER : nzWsPort = 0
+DIM nzOscPort AS INTEGER : nzOscPort = 0
+DIM nzName AS STRING : nzName = ""
+DIM nzSeite AS STRING : nzSeite = ""
+DIM nzHandys AS ARRAY OF INTEGER : nzHandys = []
+DIM nzOscZahl AS INTEGER : nzOscZahl = 0
+DIM nzBefehle AS INTEGER : nzBefehle = 0
+DIM nzSendeZeit AS INTEGER : nzSendeZeit = 0
+
+SUB nzStart()
+    TRY
+        nzWeb = HTTPD_START(VAL(GETENV$("DH_BZ_WEB", "8090")))
+        nzWebPort = HTTPD_PORT(nzWeb)
+        nzWebDa = TRUE
+    CATCH e
+        ereignis("Handy-Seite: " + e)
+    END TRY
+    TRY
+        nzWs = WS_LISTEN(VAL(GETENV$("DH_BZ_WS", "8091")))
+        nzWsPort = WS_PORT(nzWs)
+        nzWsDa = TRUE
+    CATCH e
+        ereignis("WebSocket: " + e)
+    END TRY
+    TRY
+        nzOsc = OSC_OPEN(VAL(GETENV$("DH_BZ_OSC", "8000")))
+        nzOscPort = OSC_PORT(nzOsc)
+        nzOscDa = TRUE
+    CATCH e
+        ereignis("OSC: " + e)
+    END TRY
+    IF nzWebDa THEN
+        nzSeite = REPLACE$(JOIN$(READLINES("handy.html"), CHR$(10)), "%%WSPORT%%", STR$(nzWsPort))
+        IF GETENV$("DH_BZ_MDNS", "1") <> "0" THEN
+            TRY
+                nzName = MDNS_ANNOUNCE("bastelzentrale", "_http._tcp", nzWebPort, "pfad=/")
+            CATCH e
+                ereignis("mDNS: " + e)
+            END TRY
+        END IF
+        ereignis("Handy-Seite: http://" + IIF(nzName <> "", nzName, "localhost") + ":" + STR$(nzWebPort) + "/")
+    END IF
+END SUB
+
+' --- Befehle --------------------------------------------------------------------
+FUNCTION nzAn(t AS STRING) AS BOOLEAN
+    DIM l AS STRING : l = LOWER$(TRIM$(t))
+    RETURN l = "1" OR l = "an" OR l = "on" OR l = "true"
+END FUNCTION
+
+FUNCTION nzBefehl(text AS STRING) AS STRING
+    DIM t AS STRING : t = TRIM$(text)
+    DIM k AS INTEGER : k = INSTR(t, " ")
+    IF k < 0 THEN RETURN "unbekannt: " + t
+    DIM wort AS STRING : wort = LOWER$(LEFT$(t, k))
+    DIM rest AS STRING : rest = TRIM$(MID$(t, k + 1))
+    DIM k2 AS INTEGER : k2 = INSTR(rest, " ")
+    DIM a AS STRING : a = rest
+    DIM b AS STRING : b = ""
+    IF k2 >= 0 THEN
+        a = LEFT$(rest, k2)
+        b = TRIM$(MID$(rest, k2 + 1))
+    END IF
+    nzBefehle = nzBefehle + 1
+    SELECT CASE wort
+        CASE "pin"
+            arPinSetzen(INT(VAL(a)), nzAn(b))
+        CASE "servo"
+            arServoSetzen(INT(VAL(a)))
+        CASE "gpio"
+            piSetzen(INT(VAL(a)), nzAn(b))
+        CASE "mqtt"
+            mqSenden(a, b)
+        CASE "modbus"
+            mbSchreiben(INT(VAL(a)), INT(VAL(b)))
+        CASE ELSE
+            nzBefehle = nzBefehle - 1
+            RETURN "unbekannt: " + t
+    END SELECT
+    RETURN "ok"
+END FUNCTION
+
+' --- Der Stand als JSON (fuer die Seite und /zustand) -----------------------------
+FUNCTION nzText$(s AS STRING) AS STRING
+    DIM t AS STRING : t = REPLACE$(s, "\", "\\")
+    t = REPLACE$(t, CHR$(34), "\" + CHR$(34))
+    t = REPLACE$(t, CHR$(10), " ")
+    RETURN CHR$(34) + t + CHR$(34)
+END FUNCTION
+
+FUNCTION nzZahl$(x AS FLOAT) AS STRING
+    RETURN FORMAT$(x, "%.2f")
+END FUNCTION
+
+FUNCTION nzStand$() AS STRING
+    DIM q AS STRING : q = CHR$(34)
+    DIM j AS STRING : j = "{" + q + "zeit" + q + ":" + nzText$(LEFT$(TIME$(), 8))
+    DIM i AS INTEGER
+    j = j + "," + q + "seriell" + q + ":["
+    FOR i = 0 TO LEN(seNamen) - 1
+        IF i > 0 THEN j = j + ","
+        j = j + "{" + q + "n" + q + ":" + nzText$(seNamen[i]) + "," + q + "w" + q + ":" + nzZahl$(seWerte[i]) + "}"
+    NEXT
+    j = j + "]," + q + "analog" + q + ":["
+    FOR i = 0 TO 5
+        IF i > 0 THEN j = j + ","
+        j = j + STR$(arAnalog[i])
+    NEXT
+    j = j + "]," + q + "pins" + q + ":["
+    FOR i = 0 TO LEN(arPins) - 1
+        IF i > 0 THEN j = j + ","
+        j = j + "{" + q + "p" + q + ":" + STR$(arPins[i]) + "," + q + "an" + q + ":" + IIF(arAn[i], "true", "false") + "}"
+    NEXT
+    j = j + "]," + q + "gpio" + q + ":["
+    FOR i = 0 TO LEN(piAusPins) - 1
+        IF i > 0 THEN j = j + ","
+        j = j + "{" + q + "p" + q + ":" + STR$(piAusPins[i]) + "," + q + "an" + q + ":" + IIF(piAus[i], "true", "false") + "}"
+    NEXT
+    j = j + "]," + q + "servo" + q + ":" + STR$(arServo)
+    j = j + "," + q + "pegel" + q + ":" + nzZahl$(klPegel)
+    j = j + "," + q + "ton" + q + ":" + nzText$(klNoteText)
+    j = j + "," + q + "bewegung" + q + ":" + nzZahl$(kaBewegung)
+    j = j + "," + q + "modbus" + q + ":["
+    FOR i = 0 TO MB_ANZAHL - 1
+        IF i > 0 THEN j = j + ","
+        j = j + STR$(mbRegister[i])
+    NEXT
+    j = j + "]," + q + "mqtt" + q + ":" + nzText$(mqLetzte)
+    j = j + "," + q + "themen" + q + ":["
+    FOR i = 0 TO LEN(mqTopics) - 1
+        IF i > 0 THEN j = j + ","
+        j = j + "[" + nzText$(mqTopics[i]) + "," + nzText$(GUI_TABLE_GET_CELL(tbMqLetzte, i, 1)) + "]"
+    NEXT
+    j = j + "]"
+    j = j + "," + q + "zustand" + q + ":["
+    FOR i = 0 TO LEN(ueNamen) - 1
+        IF i > 0 THEN j = j + ","
+        j = j + "[" + nzText$(ueNamen[i]) + "," + nzText$(GUI_TABLE_GET_CELL(tbUe, i, 1)) + "]"
+    NEXT
+    j = j + "]," + q + "ereignisse" + q + ":["
+    FOR i = 0 TO MIN(8, GUI_LISTBOX_COUNT(lsEreignisse)) - 1
+        IF i > 0 THEN j = j + ","
+        j = j + nzText$(GUI_LISTBOX_ITEM(lsEreignisse, i))
+    NEXT
+    RETURN j + "]}"
+END FUNCTION
+
+' --- Je Bild -------------------------------------------------------------------
+SUB nzTakt()
+    IF nzWebDa THEN
+        WHILE HTTPD_ACCEPT(nzWeb)
+            DIM pfad AS STRING : pfad = HTTPD_PATH$(nzWeb)
+            IF pfad = "/" OR pfad = "/index.html" THEN
+                HTTPD_SEND(nzWeb, 200, "text/html; charset=utf-8", nzSeite)
+            ELSEIF pfad = "/zustand" THEN
+                HTTPD_SEND(nzWeb, 200, "application/json", nzStand$())
+            ELSEIF pfad = "/befehl" THEN
+                HTTPD_SEND(nzWeb, 200, "text/plain; charset=utf-8", nzBefehl(HTTPD_QUERY$(nzWeb, "c")))
+            ELSE
+                HTTPD_SEND(nzWeb, 404, "text/plain; charset=utf-8", "nicht gefunden")
+            END IF
+        WEND
+    END IF
+    IF nzWsDa THEN
+        DIM neu AS WEBSOCKET : neu = WS_ACCEPT(nzWs)
+        IF neu >= 0 THEN
+            ARRAY_PUSH(nzHandys, neu)
+            ereignis("Handy verbunden (" + WS_PEER$(neu) + ")")
+            WS_SEND(neu, nzStand$())
+        END IF
+        DIM i AS INTEGER
+        FOR i = LEN(nzHandys) - 1 TO 0 STEP -1
+            DIM h AS WEBSOCKET : h = nzHandys[i]
+            IF NOT WS_CONNECTED(h) THEN
+                ARRAY_REMOVE_AT(nzHandys, i)
+                ereignis("Handy getrennt")
+            ELSE
+                WHILE WS_NEXT(h)
+                    DIM antwort AS STRING : antwort = nzBefehl(WS_MESSAGE$(h))
+                    IF antwort <> "ok" THEN WS_SEND(h, "{" + CHR$(34) + "fehler" + CHR$(34) + ":" + nzText$(antwort) + "}")
+                WEND
+            END IF
+        NEXT
+        IF LEN(nzHandys) > 0 AND MILLIS() - nzSendeZeit >= 250 THEN
+            nzSendeZeit = MILLIS()
+            DIM stand AS STRING : stand = nzStand$()
+            FOR i = 0 TO LEN(nzHandys) - 1
+                WS_SEND(nzHandys[i], stand)
+            NEXT
+        END IF
+    END IF
+    IF nzOscDa THEN
+        WHILE OSC_NEXT(nzOsc)
+            nzOscZahl = nzOscZahl + 1
+            nzOscBefehl(OSC_ADDRESS$(nzOsc))
+        WEND
+    END IF
+END SUB
+
+' Eine OSC-Adresse wie /pin/13 in einen Befehl uebersetzen.
+SUB nzOscBefehl(adr AS STRING)
+    DIM teile AS ARRAY OF STRING : teile = SPLIT$(MID$(adr, 1), "/")
+    IF LEN(teile) = 0 THEN RETURN
+    DIM arg AS STRING : arg = ""
+    IF OSC_COUNT(nzOsc) > 0 THEN arg = STR$(OSC_ARG(nzOsc, 0))
+    DIM wort AS STRING : wort = LOWER$(teile[0])
+    IF wort = "servo" THEN
+        DIM w AS FLOAT : w = VAL(arg)
+        IF w <= 1.0 AND INSTR(arg, ".") >= 0 THEN w = w * 180.0
+        nzBefehl("servo " + STR$(INT(ROUND(w))))
+    ELSEIF wort = "pin" OR wort = "gpio" OR wort = "modbus" THEN
+        IF LEN(teile) < 2 THEN RETURN
+        DIM wert AS STRING : wert = arg
+        IF wort <> "modbus" THEN wert = IIF(VAL(arg) >= 0.5 OR LOWER$(arg) = "true", "1", "0")
+        nzBefehl(wort + " " + teile[1] + " " + wert)
+    ELSEIF wort = "mqtt" THEN
+        nzBefehl("mqtt " + MID$(adr, 6) + " " + arg)
+    ELSE
+        ereignis("OSC: unbekannt " + adr)
+    END IF
+END SUB
+
+FUNCTION nzHandyZustand$() AS STRING
+    IF NOT nzWebDa THEN RETURN "aus (Port belegt?)"
+    RETURN "http://" + IIF(nzName <> "", nzName, "localhost") + ":" + STR$(nzWebPort) + "/, " + STR$(LEN(nzHandys)) + " verbunden, " + STR$(nzBefehle) + " Befehle"
+END FUNCTION
+
+FUNCTION nzOscZustand$() AS STRING
+    IF NOT nzOscDa THEN RETURN "aus (Port belegt?)"
+    RETURN "Port " + STR$(nzOscPort) + ", " + STR$(nzOscZahl) + " Nachrichten"
+END FUNCTION
+
+FUNCTION nzStatus$() AS STRING
+    RETURN "Handy: " + nzHandyZustand$() + "   ·   OSC: " + nzOscZustand$()
+END FUNCTION

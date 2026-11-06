@@ -1,0 +1,160 @@
+' Bastelzentrale -- Kamera: Vorschau, Bewegungsmelder und Schnappschuss.
+' "Testbild" ist die eingebaute Probekamera der Laufzeit (Farbbalken mit
+' einem wandernden Quadrat) -- daran sieht man den Melder auch ohne Webcam.
+
+DIM ddKaGeraet AS GUI_WIDGET
+DIM btKaStart AS GUI_WIDGET
+DIM btKaFoto AS GUI_WIDGET
+DIM slKaSchwelle AS GUI_WIDGET
+DIM lbKaSchwelle AS GUI_WIDGET
+DIM lbKaInfo AS GUI_WIDGET
+DIM cKaBewegung AS CHART
+DIM rKaBewegung AS INTEGER
+DIM kaCam AS WEBCAM
+DIM kaAn AS BOOLEAN : kaAn = FALSE
+DIM kaBild AS IMAGE
+DIM kaBildDa AS BOOLEAN : kaBildDa = FALSE
+DIM kaBewegung AS FLOAT : kaBewegung = 0.0
+DIM kaMeldung AS INTEGER : kaMeldung = 0
+DIM kaMeldungen AS INTEGER : kaMeldungen = 0
+CONST KA_GX = 16
+CONST KA_GY = 12
+DIM kaAlt[KA_GX * KA_GY] AS INTEGER
+DIM kaAltDa AS BOOLEAN : kaAltDa = FALSE
+
+SUB kaAufbau()
+    DIM b AS INTEGER : b = B_KAMERA
+    schild(b, "Kamera", X0, Y0 + 6)
+    DIM geraete AS ARRAY OF STRING : geraete = ["Testbild"]
+    TRY
+        DIM g AS STRING
+        FOR EACH g IN WEBCAM_DEVICES()
+            IF g <> "Testbild" THEN ARRAY_PUSH(geraete, g)
+        NEXT
+    CATCH e
+    END TRY
+    ddKaGeraet = reg(b, GUI_DROPDOWN(win, X0 + 80, Y0, 320, 32, geraete))
+    GUI_DROPDOWN_SET_SELECTED(ddKaGeraet, 0)
+    btKaStart = knopf(b, "Start", X0 + 410, Y0, 110)
+    GUI_BUTTON_VARIANT(btKaStart, "primaer")
+    btKaFoto = knopf(b, "Schnappschuss", X0 + 530, Y0, 150)
+    schild(b, "Melder ab", X0 + 700, Y0 + 6)
+    slKaSchwelle = reg(b, GUI_SLIDER(win, X0 + 790, Y0 + 8, 160, 1, 30, 4))
+    lbKaSchwelle = schild(b, "4 %", X0 + 962, Y0 + 6)
+    lbKaInfo = schild(b, "", X0, Y0 + 536)
+    cKaBewegung = diagramm("linie", X0 + 700, Y0 + 52, 328, 470, "Bewegung %")
+    CHART_SET_NUM(cKaBewegung, "fenster", 200)
+    CHART_SET_NUM(cKaBewegung, "nachkomma", 1)
+    rKaBewegung = CHART_SERIES(cKaBewegung, "Bewegung", RGB(240, 150, 70))
+END SUB
+
+SUB kaUmschalten()
+    IF kaAn THEN
+        WEBCAM_CLOSE(kaCam)
+        kaAn = FALSE
+        GUI_SET_TEXT(btKaStart, "Start")
+        ereignis("Kamera: aus")
+        RETURN
+    END IF
+    DIM g AS STRING : g = GUI_DROPDOWN_TEXT(ddKaGeraet)
+    ' Die Probekamera schaltet die Laufzeit ueber DHRT_WEBCAM zu.
+    IF g = "Testbild" THEN
+        SETENV("DHRT_WEBCAM", "test")
+    ELSE
+        SETENV("DHRT_WEBCAM", "")
+    END IF
+    TRY
+        kaCam = WEBCAM_OPEN(IIF(g = "Testbild", "", g), 640, 480)
+    CATCH e
+        ereignis("Kamera: " + e)
+        RETURN
+    END TRY
+    kaAn = TRUE
+    kaAltDa = FALSE
+    GUI_SET_TEXT(btKaStart, "Stopp")
+    ereignis("Kamera: " + WEBCAM_NAME$(kaCam) + " an")
+END SUB
+
+' Bewegung = mittlere Helligkeitsaenderung auf einem 16x12-Raster, in Prozent.
+SUB kaMessen()
+    DIM bb AS INTEGER : bb = IMAGE_WIDTH(kaBild)
+    DIM bh AS INTEGER : bh = IMAGE_HEIGHT(kaBild)
+    DIM summe AS INTEGER : summe = 0
+    DIM gx AS INTEGER
+    DIM gy AS INTEGER
+    FOR gy = 0 TO KA_GY - 1
+        FOR gx = 0 TO KA_GX - 1
+            DIM f AS INTEGER : f = GETPIXEL(kaBild, (gx * 2 + 1) * bb \ (KA_GX * 2), (gy * 2 + 1) * bh \ (KA_GY * 2))
+            DIM hell AS INTEGER : hell = ((f SHR 16) BAND 255) + ((f SHR 8) BAND 255) + (f BAND 255)
+            DIM k AS INTEGER : k = gy * KA_GX + gx
+            IF kaAltDa THEN summe = summe + ABS(hell - kaAlt[k])
+            kaAlt[k] = hell
+        NEXT
+    NEXT
+    IF NOT kaAltDa THEN
+        kaAltDa = TRUE
+        RETURN
+    END IF
+    kaBewegung = summe * 100.0 / (KA_GX * KA_GY * 765.0)
+    CHART_PUSH(cKaBewegung, rKaBewegung, kaBewegung)
+    IF kaBewegung >= GUI_VALUE(slKaSchwelle) AND MILLIS() - kaMeldung > 10000 THEN
+        kaMeldung = MILLIS()
+        kaMeldungen = kaMeldungen + 1
+        ereignis("Kamera: Bewegung (" + FORMAT$(kaBewegung, "%.1f") + " %)")
+    END IF
+END SUB
+
+SUB kaFoto()
+    IF NOT kaBildDa THEN
+        ereignis("Kamera: noch kein Bild -- erst starten")
+        RETURN
+    END IF
+    DIM pfad AS STRING : pfad = PATHJOIN(STARTDIR$(), "schnappschuss_" + REPLACE$(LEFT$(TIME$(), 8), ":", "-") + ".png")
+    IMAGE_SAVE(kaBild, pfad, FALSE)
+    ereignis("Kamera: gesichert als " + pfad)
+END SUB
+
+SUB kaTakt()
+    IF GUI_CLICKED(btKaStart) THEN kaUmschalten()
+    IF GUI_CLICKED(btKaFoto) THEN kaFoto()
+    IF GUI_CHANGED(slKaSchwelle) THEN GUI_SET_TEXT(lbKaSchwelle, STR$(INT(GUI_VALUE(slKaSchwelle))) + " %")
+    IF NOT kaAn THEN RETURN
+    IF WEBCAM_ERROR$(kaCam) <> "" THEN
+        ereignis("Kamera: " + WEBCAM_ERROR$(kaCam))
+        kaUmschalten()
+        RETURN
+    END IF
+    IF WEBCAM_UPDATE(kaCam) THEN
+        kaBild = WEBCAM_IMAGE(kaCam)
+        kaBildDa = TRUE
+        kaMessen()
+        GUI_SET_TEXT(lbKaInfo, WEBCAM_NAME$(kaCam) + ", " + STR$(WEBCAM_WIDTH(kaCam)) + " x " + STR$(WEBCAM_HEIGHT(kaCam)) + ", " + STR$(WEBCAM_FRAMES(kaCam)) + " Bilder")
+    END IF
+END SUB
+
+SUB kaZeichnen()
+    DIM x AS INTEGER : x = X0
+    DIM y AS INTEGER : y = Y0 + 52
+    BOX(x, y, x + 680, y + 470, &H0C0F16)
+    IF kaBildDa THEN
+        DIM bb AS INTEGER : bb = IMAGE_WIDTH(kaBild)
+        DIM bh AS INTEGER : bh = IMAGE_HEIGHT(kaBild)
+        DIM s AS FLOAT : s = MIN(680.0 / bb, 470.0 / bh)
+        DIM w AS INTEGER : w = INT(bb * s)
+        DIM h AS INTEGER : h = INT(bh * s)
+        DRAWIMAGEPARTEX(kaBild, 0, 0, bb, bh, x + (680 - w) \ 2, y + (470 - h) \ 2, w, h)
+        IF kaAn AND kaBewegung >= GUI_VALUE(slKaSchwelle) THEN RECT(x, y, x + 680, y + 470, RGB(240, 90, 60))
+    ELSE
+        TEXT(x + 240, y + 225, "Keine Kamera an.", &H8090A0)
+    END IF
+    CHART_DRAW(cKaBewegung)
+END SUB
+
+SUB kaEnde()
+    IF kaAn THEN WEBCAM_CLOSE(kaCam)
+END SUB
+
+FUNCTION kaZustand$() AS STRING
+    IF NOT kaAn THEN RETURN "aus"
+    RETURN WEBCAM_NAME$(kaCam) + ", Bewegung " + FORMAT$(kaBewegung, "%.1f") + " %, " + STR$(kaMeldungen) + " Meldungen"
+END FUNCTION

@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bastelzentrale</title>
+<style>
+:root { color-scheme: dark; }
+body { margin: 0; font: 16px system-ui, sans-serif; background: #141a24; color: #d8dee8; }
+header { position: sticky; top: 0; background: #1c2230; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; }
+header b { font-size: 20px; }
+#verbindung { font-size: 13px; color: #e8a050; }
+#verbindung.da { color: #80d080; }
+main { padding: 12px 16px 40px; display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+section { background: #1c2230; border-radius: 10px; padding: 12px 14px; }
+h2 { margin: 0 0 10px; font-size: 15px; color: #8fb8e8; font-weight: 600; }
+.zeile { display: flex; justify-content: space-between; padding: 3px 0; gap: 8px; }
+.zeile span:first-child { color: #9aa4b4; white-space: nowrap; }
+.zeile span:last-child { text-align: right; }
+.balken { display: grid; grid-template-columns: 30px 1fr 44px; align-items: center; gap: 6px; margin: 4px 0; font-size: 13px; }
+.balken div { height: 12px; background: #2a3242; border-radius: 6px; overflow: hidden; }
+.balken i { display: block; height: 100%; background: #5aa8f0; }
+.knoepfe { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+button { font: inherit; padding: 12px 4px; border: 0; border-radius: 8px; background: #2a3242; color: #d8dee8; }
+button.an { background: #e8b840; color: #141a24; font-weight: 600; }
+input[type=range] { width: 100%; }
+input[type=text] { font: inherit; width: 100%; box-sizing: border-box; padding: 8px; margin: 4px 0; border-radius: 6px; border: 1px solid #3a4456; background: #141a24; color: inherit; }
+#ereignisse { font-size: 13px; color: #9aa4b4; margin: 0; padding-left: 18px; }
+#fehler { color: #f08070; font-size: 13px; min-height: 1em; }
+</style>
+</head>
+<body>
+<header><b>Bastelzentrale</b><span id="verbindung">verbinde ...</span></header>
+<main>
+<section><h2>Werte</h2><div id="werte"></div></section>
+<section><h2>Arduino &ndash; Ausgänge</h2><div class="knoepfe" id="pins"></div>
+<h2 style="margin-top:14px">Servo <span id="servoWert">90</span>&deg;</h2>
+<input type="range" id="servo" min="0" max="180" value="90"></section>
+<section><h2>Arduino &ndash; analog</h2><div id="analog"></div></section>
+<section><h2>Raspberry Pi</h2><div class="knoepfe" id="gpio"></div></section>
+<section><h2>MQTT</h2><div id="themen"></div>
+<input type="text" id="topic" value="werkstatt/licht"><input type="text" id="text" value="an">
+<button id="senden" style="width:100%">Senden</button><div id="fehler"></div></section>
+<section><h2>Zustand</h2><div id="zustand"></div></section>
+<section><h2>Ereignisse</h2><ul id="ereignisse"></ul></section>
+</main>
+<script>
+const WSPORT = %%WSPORT%%;
+let ws = null, servoZiehen = false;
+const $ = id => document.getElementById(id);
+function zeile(a, b) { return '<div class="zeile"><span>' + a + '</span><span>' + b + '</span></div>'; }
+function esc(s) { return String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function knoepfe(el, liste, befehl) {
+  if (el.children.length !== liste.length) {
+    el.innerHTML = '';
+    liste.forEach(p => {
+      const b = document.createElement('button');
+      b.textContent = p.p;
+      b.onclick = () => senden(befehl + ' ' + p.p + ' ' + (b.classList.contains('an') ? 0 : 1));
+      el.appendChild(b);
+    });
+  }
+  liste.forEach((p, i) => el.children[i].classList.toggle('an', p.an));
+}
+function zeigen(s) {
+  if (s.fehler) { $('fehler').textContent = s.fehler; return; }
+  let w = zeile('Uhrzeit', s.zeit);
+  s.seriell.forEach(x => w += zeile('Seriell ' + esc(x.n), x.w));
+  w += zeile('Mikrofon', Math.round(s.pegel * 100) + ' %, Ton ' + esc(s.ton));
+  w += zeile('Bewegung', s.bewegung + ' %');
+  w += zeile('Modbus 0 / 1', s.modbus[0] + ' / ' + s.modbus[1]);
+  $('werte').innerHTML = w;
+  $('analog').innerHTML = s.analog.map((v, i) =>
+    '<div class="balken"><span>A' + i + '</span><div><i style="width:' + (v / 10.23) + '%"></i></div><span>' + v + '</span></div>').join('');
+  knoepfe($('pins'), s.pins, 'pin');
+  knoepfe($('gpio'), s.gpio, 'gpio');
+  if (!servoZiehen) { $('servo').value = s.servo; $('servoWert').textContent = s.servo; }
+  $('themen').innerHTML = s.themen.map(t => zeile(esc(t[0]), esc(t[1]))).join('');
+  $('zustand').innerHTML = s.zustand.map(z => zeile(esc(z[0]), esc(z[1]))).join('');
+  $('ereignisse').innerHTML = s.ereignisse.map(e => '<li>' + esc(e) + '</li>').join('');
+}
+function senden(t) { if (ws && ws.readyState === 1) ws.send(t); }
+function verbinden() {
+  ws = new WebSocket('ws://' + location.hostname + ':' + WSPORT + '/');
+  ws.onopen = () => { $('verbindung').textContent = 'verbunden'; $('verbindung').className = 'da'; };
+  ws.onclose = () => { $('verbindung').textContent = 'getrennt, neuer Versuch ...'; $('verbindung').className = ''; setTimeout(verbinden, 2000); };
+  ws.onmessage = e => zeigen(JSON.parse(e.data));
+}
+$('servo').oninput = e => { servoZiehen = true; $('servoWert').textContent = e.target.value; senden('servo ' + e.target.value); };
+$('servo').onchange = () => { servoZiehen = false; };
+$('senden').onclick = () => { $('fehler').textContent = ''; senden('mqtt ' + $('topic').value + ' ' + $('text').value); };
+verbinden();
+</script>
+</body>
+</html>

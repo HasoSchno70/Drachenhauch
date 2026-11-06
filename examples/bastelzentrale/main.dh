@@ -1,0 +1,205 @@
+' Bastelzentrale -- ein Leitstand fuer alles, was am Rechner haengt.
+'
+'     dhrt run examples/bastelzentrale/main.dh
+'
+' Links die Bereiche: Uebersicht, Seriell (mit Kurve), Arduino (Firmata:
+' Pins, Analogwerte, Servo), MQTT, Modbus, Klang (Mikrofon und MIDI-Uhr),
+' Kamera (mit Bewegungsmelder) und die Pins des Raspberry Pi. Jeder Bereich
+' laeuft auch ohne Geraet: die Quelle "Demo" spielt eins.
+'
+' Dazu eine Seite fuer das Handy: im Browser http://<dieser Rechner>:8090/
+' (im Heimnetz auch http://bastelzentrale.local:8090/) -- Werte live, Pins
+' und Servo bedienen, MQTT senden. Dieselben Befehle nimmt die
+' Bastelzentrale ueber OSC auf Port 8000 an (/pin/3 1, /servo 0.5), etwa von
+' TouchOSC. Angesteckte und abgezogene Geraete stehen in der Uebersicht.
+'
+' Module: gui, chart, serial, firmata, mqtt, modbus, audio (MIC_*), midi,
+' webcam, gpio, httpd, websocket, mdns, osc, hotplug.
+
+IMPORT "gui"
+IMPORT "chart"
+IMPORT "imgfx"
+IMPORT "hotplug"
+IMPORT "firmata"
+IMPORT "mqtt"
+IMPORT "modbus"
+IMPORT "audio"
+IMPORT "webcam"
+IMPORT "httpd"
+IMPORT "websocket"
+IMPORT "mdns"
+IMPORT "osc"
+IMPORT "serial" OPTIONAL
+IMPORT "midi" OPTIONAL
+IMPORT "gpio" OPTIONAL
+
+CONST BREITE = 1280
+CONST HOEHE = 800
+CONST X0 = 236          ' linke Kante des Inhalts
+CONST Y0 = 64           ' Oberkante des Inhalts
+CONST INHALT_B = 1028   ' Breite des Inhalts
+
+SCREEN(BREITE, HOEHE, "Bastelzentrale")
+SETFPS(60)
+GUI_THEME_PRESET("glas_dunkel")
+' Eine Schrift fuer alles, auch fuer das, was die Bereiche selbst zeichnen.
+DIM schrift AS INTEGER : schrift = LOADFONT("sans", 40)
+SETFONT(schrift, 18)
+GUI_FONT(schrift, 18)
+DIM win AS GUI_WINDOW : win = GUI_WINDOW("Bastelzentrale", 0, 0, BREITE, HOEHE)
+GUI_WINDOW_CHROME(win, FALSE)
+
+' --- Ereignisse: eine Liste fuer alles, was passiert ---------------------------
+DIM ereignisse AS ARRAY OF STRING : ereignisse = []
+SUB ereignis(t AS STRING)
+    ARRAY_INSERT(ereignisse, 0, LEFT$(TIME$(), 8) + "  " + t)
+    IF LEN(ereignisse) > 200 THEN ARRAY_REMOVE_AT(ereignisse, 200)
+    uiEreignis(ereignisse[0])
+END SUB
+
+' --- Bereiche: jedes Widget gehoert einem Bereich ------------------------------
+CONST B_UEBERSICHT = 0
+CONST B_SERIELL = 1
+CONST B_ARDUINO = 2
+CONST B_MQTT = 3
+CONST B_MODBUS = 4
+CONST B_KLANG = 5
+CONST B_KAMERA = 6
+CONST B_PINS = 7
+DIM bereichNamen AS ARRAY OF STRING
+bereichNamen = ["Übersicht", "Seriell", "Arduino", "MQTT", "Modbus", "Klang", "Kamera", "Raspberry Pi"]
+DIM regW AS ARRAY OF INTEGER : regW = []
+DIM regB AS ARRAY OF INTEGER : regB = []
+DIM aktiv AS INTEGER : aktiv = B_UEBERSICHT
+
+' Ein Widget fuer einen Bereich anmelden (und zurueckgeben, fuer kurze Zeilen).
+FUNCTION reg(b AS INTEGER, w AS GUI_WIDGET) AS GUI_WIDGET
+    ARRAY_PUSH(regW, w)
+    ARRAY_PUSH(regB, b)
+    GUI_SET_VISIBLE(w, b = aktiv)
+    RETURN w
+END FUNCTION
+
+SUB bereichZeigen(b AS INTEGER)
+    aktiv = b
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(regW) - 1
+        GUI_SET_VISIBLE(regW[i], regB[i] = b)
+    NEXT
+END SUB
+
+' Bequeme Bausteine.
+FUNCTION knopf(b AS INTEGER, text AS STRING, x AS INTEGER, y AS INTEGER, w AS INTEGER) AS GUI_WIDGET
+    RETURN reg(b, GUI_BUTTON(win, text, x, y, w, 32))
+END FUNCTION
+FUNCTION schild(b AS INTEGER, text AS STRING, x AS INTEGER, y AS INTEGER) AS GUI_WIDGET
+    RETURN reg(b, GUI_LABEL(win, text, x, y))
+END FUNCTION
+FUNCTION feld(b AS INTEGER, x AS INTEGER, y AS INTEGER, w AS INTEGER, vorgabe AS STRING) AS GUI_WIDGET
+    DIM f AS GUI_WIDGET : f = reg(b, GUI_TEXTINPUT(win, x, y, w, 32))
+    GUI_SET_TEXT(f, vorgabe)
+    RETURN f
+END FUNCTION
+FUNCTION diagramm(art AS STRING, x AS INTEGER, y AS INTEGER, w AS INTEGER, h AS INTEGER, titel AS STRING) AS CHART
+    DIM c AS CHART : c = CHART_NEW(art, x, y, w, h)
+    CHART_THEME(c, "dunkel")
+    CHART_SET(c, "titel", titel)
+    CHART_SET_FLAG(c, "komma", TRUE)
+    RETURN c
+END FUNCTION
+
+' --- Kopf, Seitenleiste, Statusleiste ------------------------------------------
+DIM lbTitel AS GUI_WIDGET : lbTitel = GUI_LABEL(win, "Bastelzentrale", 20, 18)
+GUI_SET_FONT_SIZE(lbTitel, 26)
+DIM lbBereich AS GUI_WIDGET : lbBereich = GUI_LABEL(win, "Übersicht", X0, 22)
+GUI_SET_FONT_SIZE(lbBereich, 20)
+DIM lsBereiche AS GUI_WIDGET : lsBereiche = GUI_LISTBOX(win, 16, Y0, 200, 360, bereichNamen)
+GUI_LISTBOX_SET_SELECTED(lsBereiche, 0)
+DIM lbLeiste AS GUI_WIDGET : lbLeiste = GUI_LABEL(win, "", 16, 440)
+DIM sbStatus AS GUI_WIDGET : sbStatus = GUI_STATUSBAR(win, 0, HOEHE - 28, BREITE, 28, "bereit")
+
+IMPORT "netz.dh"
+IMPORT "uebersicht.dh"
+IMPORT "seriell.dh"
+IMPORT "arduino.dh"
+IMPORT "mqttbereich.dh"
+IMPORT "modbusbereich.dh"
+IMPORT "klang.dh"
+IMPORT "kamera.dh"
+IMPORT "pins.dh"
+
+ueAufbau()
+seAufbau()
+arAufbau()
+mqAufbau()
+mbAufbau()
+klAufbau()
+kaAufbau()
+piAufbau()
+nzStart()
+ereignis("Bastelzentrale gestartet")
+' Fuer Vorfuehrungen und Pruefungen: DH_BZ_DEMO=1 startet alle Demos,
+' DH_BZ_BEREICH=n zeigt gleich den Bereich n (0 = Uebersicht).
+IF GETENV$("DH_BZ_DEMO", "") = "1" THEN ueAlleDemos()
+IF GETENV$("DH_BZ_BEREICH", "") <> "" THEN
+    bereichZeigen(CLAMP(INT(VAL(GETENV$("DH_BZ_BEREICH", "0"))), 0, LEN(bereichNamen) - 1))
+    GUI_LISTBOX_SET_SELECTED(lsBereiche, aktiv)
+    GUI_SET_TEXT(lbBereich, bereichNamen[aktiv])
+END IF
+
+' --- An- und abstecken ----------------------------------------------------------
+SUB geraeteNachsehen()
+    WHILE HOTPLUG_NEXT()
+        DIM art AS STRING : art = HOTPLUG_KIND$()
+        DIM name AS STRING : name = HOTPLUG_NAME$()
+        IF HOTPLUG_ADDED() THEN
+            ereignis("angesteckt: " + art + " " + name)
+        ELSE
+            ereignis("abgezogen: " + art + " " + name)
+        END IF
+        IF art = "serial" THEN
+            seAnschluesse()
+            arAnschluesse()
+        END IF
+    WEND
+END SUB
+
+' --- Die Bildschleife -----------------------------------------------------------
+DIM letzteSekunde AS INTEGER : letzteSekunde = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_CHANGED(lsBereiche) AND GUI_LISTBOX_SELECTED(lsBereiche) >= 0 THEN
+        bereichZeigen(GUI_LISTBOX_SELECTED(lsBereiche))
+        GUI_SET_TEXT(lbBereich, bereichNamen[aktiv])
+    END IF
+    geraeteNachsehen()
+    seTakt()
+    arTakt()
+    mqTakt()
+    mbTakt()
+    klTakt()
+    kaTakt()
+    piTakt()
+    nzTakt()
+    ueTakt()
+    IF MILLIS() - letzteSekunde > 1000 THEN
+        letzteSekunde = MILLIS()
+        GUI_STATUSBAR_SET(sbStatus, 0, nzStatus$())
+    END IF
+
+    CLS(&H141A24)
+    GUI_DRAW(FALSE)
+    SELECT CASE aktiv
+        CASE B_UEBERSICHT : ueZeichnen()
+        CASE B_SERIELL : seZeichnen()
+        CASE B_ARDUINO : arZeichnen()
+        CASE B_MODBUS : mbZeichnen()
+        CASE B_KLANG : klZeichnen()
+        CASE B_KAMERA : kaZeichnen()
+        CASE B_PINS : piZeichnen()
+    END SELECT
+    GUI_DRAW_TOP()
+    FLIP()
+WEND
+kaEnde()
+klEnde()
