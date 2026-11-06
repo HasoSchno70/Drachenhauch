@@ -1,0 +1,83 @@
+' Kameraspiegel mit Bewegungsmelder: das Bild der Webcam, gespiegelt wie ein
+' Spiegel, und ein roter Rahmen, wenn sich im Bild etwas bewegt (Modul webcam,
+' docs/module-webcam.md).
+'
+'   F   ein Foto als webcam_foto.png sichern
+'   S   Spiegeln an/aus
+'
+' Ohne Kamera zum Ausprobieren: DHRT_WEBCAM=test liefert ein Testbild.
+
+IMPORT "webcam"
+IMPORT "imgfx"
+
+DIM geraete AS ARRAY OF STRING
+geraete = WEBCAM_DEVICES()
+IF LEN(geraete) = 0 THEN
+    SCREEN(480, 120, "Webcam")
+    WHILE NOT QUITREQUESTED()
+        CLS(&H101018)
+        TEXT(20, 20, "Keine Kamera gefunden.", &HFFFFFF)
+        TEXT(20, 50, "Zum Ausprobieren: DHRT_WEBCAM=test", &HA0A0B0)
+        FLIP()
+    WEND
+    END
+END IF
+
+DIM cam AS WEBCAM
+cam = WEBCAM_OPEN("", 640, 480)
+DIM b AS INTEGER : b = WEBCAM_WIDTH(cam)
+DIM h AS INTEGER : h = WEBCAM_HEIGHT(cam)
+SCREEN(b, h + 30, "Webcam: " + WEBCAM_NAME$(cam))
+SETFPS(60)
+
+' Fuer den Vergleich: die Helligkeit jedes achten Punkts aus dem vorigen Bild.
+CONST RASTER = 8
+DIM spalten AS INTEGER : spalten = b \ RASTER
+DIM zeilen AS INTEGER : zeilen = h \ RASTER
+DIM vorher[spalten * zeilen] AS INTEGER
+DIM bewegung AS INTEGER : bewegung = 0
+DIM spiegeln AS BOOLEAN : spiegeln = TRUE
+DIM meldung AS STRING : meldung = "F: Foto  S: Spiegeln"
+
+FUNCTION hell(farbe AS INTEGER) AS INTEGER
+    RETURN (((farbe SHR 16) BAND 255) + ((farbe SHR 8) BAND 255) + (farbe BAND 255)) \ 3
+END FUNCTION
+
+WHILE NOT QUITREQUESTED()
+    IF WEBCAM_UPDATE(cam) THEN
+        DIM bild AS IMAGE : bild = WEBCAM_IMAGE(cam)
+        DIM anders AS INTEGER : anders = 0
+        DIM x AS INTEGER
+        DIM y AS INTEGER
+        FOR y = 0 TO zeilen - 1
+            FOR x = 0 TO spalten - 1
+                DIM wert AS INTEGER : wert = hell(GETPIXEL(bild, x * RASTER, y * RASTER))
+                IF ABS(wert - vorher[y * spalten + x]) > 30 THEN anders = anders + 1
+                vorher[y * spalten + x] = wert
+            NEXT
+        NEXT
+        ' Ein paar Punkte aendern sich immer (Rauschen) -- gezaehlt wird erst ab 2 %.
+        bewegung = IIF(anders * 50 > spalten * zeilen, 15, MAX(bewegung - 1, 0))
+    END IF
+    IF KEYHIT(KEY_S) THEN spiegeln = NOT spiegeln
+    IF KEYHIT(KEY_F) THEN
+        IMAGE_SAVE(WEBCAM_IMAGE(cam), "webcam_foto.png")
+        meldung = "gesichert als webcam_foto.png"
+    END IF
+
+    CLS(&H000000)
+    IF spiegeln THEN
+        DRAWIMAGEFLIPPED(WEBCAM_IMAGE(cam), 0, 0, TRUE, FALSE)
+    ELSE
+        DRAWIMAGE(WEBCAM_IMAGE(cam), 0, 0)
+    END IF
+    IF bewegung > 0 THEN
+        LINEW(2, 2, b - 2, 2, 4, &HFF3030)
+        LINEW(2, h - 2, b - 2, h - 2, 4, &HFF3030)
+        LINEW(2, 2, 2, h - 2, 4, &HFF3030)
+        LINEW(b - 2, 2, b - 2, h - 2, 4, &HFF3030)
+    END IF
+    TEXT(8, h + 6, STR$(WEBCAM_FRAMES(cam)) + " Bilder  --  " + meldung, &HA0A0B0)
+    FLIP()
+WEND
+WEBCAM_CLOSE(cam)

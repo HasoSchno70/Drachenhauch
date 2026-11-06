@@ -57,18 +57,22 @@ silent zero could not be told apart from "it is quiet".
 | `MIC_WAVE(werte)` | fills an `ARRAY OF FLOAT` with the most recent values (-1..1), oldest first; at most 8192 |
 
 `MIC_PITCH` uses the YIN method and also finds the fundamental of tones with
-many overtones (guitar, voice, sawtooth). `MIDI_NOTE_NAME$` turns the
-frequency into a note name:
+many overtones (guitar, voice, sawtooth). The frequency becomes a note name
+(69 is A4 at 440 Hz, 12 semitones per octave):
 
 ```basic
 IMPORT "audio"
-IMPORT "midi"
+FUNCTION notenname$(n AS INTEGER) AS STRING
+    DIM namen AS ARRAY OF STRING
+    namen = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "H"]
+    RETURN namen[n MOD 12] + STR$(n \ 12 - 1)
+END FUNCTION
 MIC_START()
 WHILE TRUE
     DIM f AS FLOAT : f = MIC_PITCH()
     IF f > 0 THEN
         DIM n AS FLOAT : n = 69 + 12 * LOG(f / 440) / LOG(2)
-        PRINT MIDI_NOTE_NAME$(ROUND(n)); "  "; FORMAT$(f, "%.1f"); " Hz"
+        PRINT notenname$(ROUND(n)); "  "; FORMAT$(f, "%.1f"); " Hz"
     END IF
     SLEEP(100)
 WEND

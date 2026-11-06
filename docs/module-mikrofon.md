@@ -58,17 +58,21 @@ Alles weiter unten verlangt einen laufenden Eingang; ohne ist es ein Fehler
 
 `MIC_PITCH` rechnet nach dem YIN-Verfahren und trifft auch Töne mit vielen
 Obertönen (Gitarre, Stimme, Sägezahn) auf ihren Grundton. Aus der Frequenz
-wird ein Notenname mit `MIDI_NOTE_NAME$`:
+wird ein Notenname (69 ist A4 mit 440 Hz, 12 Halbtöne je Oktave):
 
 ```basic
 IMPORT "audio"
-IMPORT "midi"
+FUNCTION notenname$(n AS INTEGER) AS STRING
+    DIM namen AS ARRAY OF STRING
+    namen = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "H"]
+    RETURN namen[n MOD 12] + STR$(n \ 12 - 1)
+END FUNCTION
 MIC_START()
 WHILE TRUE
     DIM f AS FLOAT : f = MIC_PITCH()
     IF f > 0 THEN
         DIM n AS FLOAT : n = 69 + 12 * LOG(f / 440) / LOG(2)
-        PRINT MIDI_NOTE_NAME$(ROUND(n)); "  "; FORMAT$(f, "%.1f"); " Hz"
+        PRINT notenname$(ROUND(n)); "  "; FORMAT$(f, "%.1f"); " Hz"
     END IF
     SLEEP(100)
 WEND

@@ -50,6 +50,7 @@ Each module is activated with `IMPORT "<name>"` and provides its own commands.
 | `regex` | Python-compatible pattern matching with a pattern cache: `REGEX_MATCH/TEST/FIND/REPLACE/SPLIT` | [module-regex.md](module-regex.md) |
 | `audio` | Extended audio API: channels, pause/resume/fade, pan, music position, tone generation (sine/square/saw/triangle/noise) | [module-audio.md](module-audio.md) |
 | Microphone | Level, pitch, spectrum, waveform and recording from the input (`MIC_*`, module `audio`) | [module-mikrofon.md](module-mikrofon.md) |
+| `webcam` | Pictures from a camera into an IMAGE: V4L2, Media Foundation, AVFoundation | [module-webcam.md](module-webcam.md) |
 | `curves` | Animation curves: Bezier, Catmull-Rom, Hermite, smoothstep — pure functions, no state | [module-curves.md](module-curves.md) |
 | `net` | TCP + UDP via stdlib sockets, non-blocking by default, UTF-8 encoding | [module-net.md](module-net.md) |
 | `html` | HTTP GET/POST/DOWNLOAD and HTML parsing — pure stdlib, no pip needed | [module-html.md](module-html.md) |

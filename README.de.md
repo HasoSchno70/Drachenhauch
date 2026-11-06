@@ -230,6 +230,8 @@ Vollständige Doku im [docs/](docs/README.md)-Ordner:
 | [`mqtt`](docs/module-mqtt.md) | das Pub/Sub-Protokoll der IoT-Welt — der Weg zum ESP32 **über WLAN**; QoS 0/1, TLS (`mqtts://`) |
 | [`firmata`](docs/module-firmata.md) | Arduino-/ESP32-Pins, Servos, I2C-Geräte und Schrittmotoren direkt steuern, über USB oder WLAN (`tcp:host:port`), ohne eigenen Sketch |
 | [`gpio`, `i2c`, `spi`](docs/module-pins.md) | die Pins des Raspberry Pi selbst (und jedes Linux-Boards): GPIO mit Flanken-Ereignissen, I2C-Sensoren, SPI-Bausteine -- über die Schnittstellen des Kernels, darum auf Pi 3, 4 und 5 |
+| [Mikrofon](docs/module-mikrofon.md) (`MIC_*`) | Pegel, Tonhöhe, Spektrum und Aufnahme vom Eingang des Rechners -- ein Stimmgerät oder ein Spiel, das man mit der Stimme steuert |
+| [`webcam`](docs/module-webcam.md) | Bilder einer Kamera in ein `IMAGE` (V4L2, Media Foundation, AVFoundation) -- ein Spiegel, ein Bewegungsmelder, eine Fotobox |
 | [`serial`](docs/module-serial.md) | rohe COM-Verbindung für eigene Protokolle — und in der IDE ein **serieller Monitor mit Kurve** (Alt+4) |
 | [`usb`](docs/module-usb.md) | USB-HID: Bastelboards, Programmieradapter, eigene Controller |
 | [`midi`](docs/module-midi.md) | Noten von einem angeschlossenen Instrument lesen und welche hinausschicken |

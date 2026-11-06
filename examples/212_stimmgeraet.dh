@@ -1,0 +1,112 @@
+' Stimmgeraet: welcher Ton kommt am Mikrofon an, wie weit liegt er daneben?
+' Dazu der Pegel und das Spektrum als Balken (Modul audio, MIC_*,
+' docs/module-mikrofon.md).
+'
+'   Leertaste   eine Aufnahme von fuenf Sekunden beginnen; danach wird sie
+'               abgespielt und als stimmgeraet.wav gesichert
+'
+' Ohne Mikrofon zum Ausprobieren: DHRT_MIKROFON=datei.wav spielt eine
+' WAV-Datei als Mikrofon.
+
+IMPORT "audio"
+
+CONST BREITE = 640
+CONST HOEHE = 360
+SCREEN(BREITE, HOEHE, "Stimmgeraet")
+SETFPS(60)
+
+DIM geraete AS ARRAY OF STRING
+geraete = MIC_DEVICES()
+IF LEN(geraete) = 0 THEN
+    WHILE NOT QUITREQUESTED()
+        CLS(&H101018)
+        TEXT(20, 20, "Kein Mikrofon gefunden.", &HFFFFFF)
+        TEXT(20, 50, "Zum Ausprobieren: DHRT_MIKROFON=datei.wav", &HA0A0B0)
+        FLIP()
+    WEND
+    END
+END IF
+MIC_START()
+
+DIM baender[32] AS FLOAT
+DIM welle[640] AS FLOAT
+DIM ton AS FLOAT : ton = 0
+DIM pegel AS FLOAT : pegel = 0
+DIM aufnahmeBis AS INTEGER : aufnahmeBis = 0
+DIM meldung AS STRING : meldung = "Leertaste: fuenf Sekunden aufnehmen"
+
+' Ganzer Halbton und Abweichung in Cent (100 Cent = ein Halbton).
+FUNCTION halbton(f AS FLOAT) AS FLOAT
+    RETURN 69 + 12 * LOG(f / 440) / LOG(2)
+END FUNCTION
+
+' Notenname wie im Klavier: 69 ist A4 (440 Hz), 60 das mittlere C.
+FUNCTION notenname$(n AS INTEGER) AS STRING
+    DIM namen AS ARRAY OF STRING
+    namen = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "H"]
+    RETURN namen[n MOD 12] + STR$(n \ 12 - 1)
+END FUNCTION
+
+WHILE NOT QUITREQUESTED()
+    ' Der Pegel faellt langsam ab, damit man ihn lesen kann.
+    pegel = MAX(MIC_LEVEL(), pegel * 0.9)
+    DIM f AS FLOAT : f = MIC_PITCH()
+    IF f > 0 THEN ton = f
+    MIC_FFT(baender)
+    MIC_WAVE(welle)
+
+    IF KEYHIT(KEY_SPACE) AND NOT MIC_RECORDING() THEN
+        MIC_RECORD_START(5)
+        aufnahmeBis = MILLIS() + 5000
+        meldung = "Aufnahme laeuft ..."
+    END IF
+    IF MIC_RECORDING() AND MILLIS() >= aufnahmeBis THEN
+        DIM s AS SOUND
+        s = MIC_RECORD_STOP()
+        AUDIO_SAVE_WAV(s, "stimmgeraet.wav")
+        PLAYSOUND(s)
+        meldung = "gesichert als stimmgeraet.wav und abgespielt"
+    END IF
+
+    CLS(&H101018)
+    ' Ton und Abweichung
+    IF ton > 0 THEN
+        DIM n AS FLOAT : n = halbton(ton)
+        DIM ganz AS INTEGER : ganz = ROUND(n)
+        DIM cent AS INTEGER : cent = ROUND((n - ganz) * 100)
+        TEXT_SIZE(64)
+        TEXT(20, 20, notenname$(ganz), IIF(ABS(cent) <= 5, &H60E080, &HFFFFFF))
+        TEXT_SIZE(20)
+        TEXT(200, 30, FORMAT$(ton, "%.1f") + " Hz", &HC0C0D0)
+        TEXT(200, 60, IIF(cent >= 0, "+", "") + STR$(cent) + " Cent", &HC0C0D0)
+        ' Zeiger: Mitte = richtig gestimmt
+        BOX(20, 110, BREITE - 20, 114, &H303040)
+        DIM zx AS INTEGER : zx = BREITE \ 2 + cent * (BREITE \ 2 - 20) \ 50
+        BOX(zx - 2, 100, zx + 2, 124, IIF(ABS(cent) <= 5, &H60E080, &HE0A040))
+        BOX(BREITE \ 2 - 1, 98, BREITE \ 2 + 1, 126, &H808090)
+    ELSE
+        TEXT_SIZE(20)
+        TEXT(20, 40, "Kein Ton -- singen, pfeifen, eine Saite zupfen", &HA0A0B0)
+    END IF
+    TEXT_SIZE(20)
+
+    ' Wellenform
+    DIM i AS INTEGER
+    FOR i = 1 TO 639
+        LINE(i - 1, 190 + INT(welle[i - 1] * 40), i, 190 + INT(welle[i] * 40), &H4080C0)
+    NEXT
+
+    ' Spektrum
+    DIM bw AS INTEGER : bw = (BREITE - 40) \ 32
+    FOR i = 0 TO 31
+        DIM hb AS INTEGER : hb = INT(baender[i] * 90)
+        BOX(20 + i * bw, 330 - hb, 20 + i * bw + bw - 3, 330, &H6060C0)
+    NEXT
+
+    ' Pegel rechts
+    BOX(BREITE - 16, 340 - INT(pegel * 200), BREITE - 6, 340, IIF(pegel > 0.9, &HFF4040, &H40D060))
+
+    TEXT(20, 340, MIC_DEVICE$() + "  --  " + meldung, &H808090)
+    FLIP()
+WEND
+MIC_STOP()

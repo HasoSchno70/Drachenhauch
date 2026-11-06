@@ -27,7 +27,7 @@
     <key>NSMicrophoneUsageDescription</key>
     <string>Ein Drachenhauch-Programm moechte das Mikrofon benutzen (MIC_START).</string>
     <key>NSCameraUsageDescription</key>
-    <string>Ein Drachenhauch-Programm moechte die Kamera benutzen (CAM_OPEN).</string>
+    <string>Ein Drachenhauch-Programm moechte die Kamera benutzen (WEBCAM_OPEN).</string>
     <key>CFBundleDocumentTypes</key>
     <array>
         <dict>
