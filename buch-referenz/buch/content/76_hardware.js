@@ -273,6 +273,50 @@ module.exports = (H) => [
     ]),
   H.note("Ohne Kamera zum Ausprobieren: DHRT_WEBCAM=test liefert eine Testbild-Kamera mit Farbbalken und einem wandernden Quadrat. Ein Foto ist ein Einzeiler: IMAGE_SAVE(WEBCAM_IMAGE(cam), \"foto.png\")."),
 
+  H.h2("modbus – Zähler, Wechselrichter, SPS"),
+  H.p("Modbus spricht fast jedes Gerät der Gebäude- und Industrietechnik: Stromzähler, Wechselrichter, Batteriespeicher, Heizungsregler, SPS. Über das Netz heißt es Modbus TCP, über eine RS-485-Leitung Modbus RTU. Ein Gerät hat Spulen (Schalter) und Register (16-Bit-Zahlen); welche Adresse was bedeutet, steht im Datenblatt. Das Modul steht in jedem Bau – nur RTU an einer seriellen Schnittstelle braucht --hardware."),
+  H.cmd("MODBUS_TCP · MODBUS_RTU · MODBUS_UNIT · MODBUS_CLOSE", 'MODBUS_TCP(host$ [, port [, einheit]]) AS MODBUS   MODBUS_RTU(anschluss$ [, baud [, format$ [, einheit]]]) AS MODBUS   MODBUS_UNIT(m, einheit)   MODBUS_CLOSE(m)',
+    "MODBUS_TCP verbindet sich mit einem Gerät im Netz (Port 502). MODBUS_RTU öffnet eine serielle Leitung (\"COM4\", 9600, \"8E1\") oder als \"tcp:host:port\" einen RTU-Umsetzer im Netz. An einem RS-485-Bus hängen oft mehrere Geräte; MODBUS_UNIT wählt, wen die nächste Anfrage meint.",
+    [
+      'IMPORT "modbus"',
+      "DIM zaehler AS MODBUS",
+      'zaehler = MODBUS_TCP("192.168.1.60")',
+    ]),
+  H.cmd("MODBUS_READ_HOLDING · MODBUS_READ_INPUT · MODBUS_READ_COILS · MODBUS_READ_DISCRETE", 'MODBUS_READ_HOLDING(m, adresse, anzahl) AS ARRAY OF INTEGER   MODBUS_READ_INPUT(m, adresse, anzahl)   MODBUS_READ_COILS(m, adresse, anzahl) AS ARRAY OF BOOLEAN   MODBUS_READ_DISCRETE(m, adresse, anzahl)',
+    "Liest Register (0..65535) bzw. Spulen und Eingänge. Jeder Befehl wartet auf die Antwort – ein Gerät antwortet in Millisekunden. Meldet es einen Fehler, ist das ein Laufzeitfehler mit der Bedeutung, etwa „unerlaubte Datenadresse“.",
+    [
+      "DIM r AS ARRAY OF INTEGER",
+      "r = MODBUS_READ_INPUT(zaehler, 0, 2)",
+    ]),
+  H.cmd("MODBUS_WRITE_REGISTER · MODBUS_WRITE_REGISTERS · MODBUS_WRITE_COIL · MODBUS_WRITE_COILS", 'MODBUS_WRITE_REGISTER(m, adresse, wert)   MODBUS_WRITE_REGISTERS(m, adresse, werte)   MODBUS_WRITE_COIL(m, adresse, an)   MODBUS_WRITE_COILS(m, adresse, werte)',
+    "Schreibt ein oder mehrere Halteregister bzw. Spulen.",
+    [
+      "MODBUS_WRITE_COIL(zaehler, 0, TRUE)",
+      "MODBUS_WRITE_REGISTER(zaehler, 10, 215)",
+    ]),
+  H.cmd("MODBUS_FLOAT · MODBUS_INT32 · MODBUS_INT16 · MODBUS_FLOAT_REGS", 'MODBUS_FLOAT(register, stelle [, folge$])   MODBUS_INT32(register, stelle [, folge$])   MODBUS_UINT32(register, stelle [, folge$])   MODBUS_INT16(wert)   MODBUS_FLOAT_REGS(wert [, folge$])   MODBUS_INT32_REGS(wert [, folge$])',
+    "Größere Werte stehen in zwei Registern – in welcher Reihenfolge, sagt das Datenblatt: \"ABCD\" (die häufigste), \"CDAB\", \"BADC\" oder \"DCBA\". MODBUS_INT16 liest ein Register mit Vorzeichen, die _REGS-Befehle machen aus einer Zahl zwei Register zum Schreiben.",
+    [
+      'PRINT "Leistung: "; MODBUS_FLOAT(r, 0); " W"',
+    ]),
+  H.note("Zum Ausprobieren ohne Gerät gibt es Modbus-Geräte als Programm (etwa diagslave oder ModbusPal). Das Beispiel 216_modbus_monitor.dh zeigt zehn Register laufend an."),
+
+  H.h2("hotplug – Geräte an- und abstecken"),
+  H.p("Ein Programm, das mit einem Arduino spricht, bricht ab, wenn jemand das Kabel zieht – und merkt nicht, wenn es wieder steckt. Das Modul hotplug meldet beides: für serielle Anschlüsse, MIDI-Geräte und USB-HID-Geräte, je nachdem, was dein Bau kennt."),
+  H.cmd("HOTPLUG_NEXT · HOTPLUG_KIND$ · HOTPLUG_NAME$ · HOTPLUG_ADDED", 'HOTPLUG_NEXT() AS BOOLEAN   HOTPLUG_KIND$()   HOTPLUG_NAME$()   HOTPLUG_ADDED()',
+    "Wie MIDI_NEXT: HOTPLUG_NEXT holt die nächste Meldung, die übrigen lesen sie – die Art (\"serial\", \"midi_in\", \"midi_out\", \"hid\"), den Namen und ob angesteckt (TRUE) oder abgezogen.",
+    [
+      'IMPORT "hotplug"',
+      "WHILE HOTPLUG_NEXT()",
+      '    PRINT HOTPLUG_KIND$(); " "; HOTPLUG_NAME$(); " "; HOTPLUG_ADDED()',
+      "WEND",
+    ]),
+  H.cmd("HOTPLUG_LIST · HOTPLUG_KINDS · HOTPLUG_INTERVAL", 'HOTPLUG_LIST(art$) AS ARRAY OF STRING   HOTPLUG_KINDS() AS ARRAY OF STRING   HOTPLUG_INTERVAL(ms)',
+    "Was beim Start schon steckt, wird nicht gemeldet – das liefert HOTPLUG_LIST. HOTPLUG_KINDS sagt, was dieser Bau beobachtet, HOTPLUG_INTERVAL, wie oft nachgesehen wird (Vorgabe 500 ms).",
+    [
+      'PRINT JOIN$(HOTPLUG_LIST("serial"), ", ")',
+    ]),
+
   H.h2("mqtt – Nachrichten mit dem IoT-Netz austauschen"),
   H.p("MQTT ist das im Maker- und IoT-Bereich verbreitetste Nachrichtenprotokoll: Geräte schicken Nachrichten an ein „Thema“ (Topic) auf einem Vermittler (Broker), und wer dieses Thema abonniert hat, bekommt sie. Damit steuerst du einen ESP32 aus deinem Spiel heraus – oder lässt umgekehrt einen Sensor dein Spiel steuern."),
   H.cmd("MQTT_CONNECT · MQTT_IS_CONNECTED · MQTT_DISCONNECT", 'MQTT_CONNECT(host$, port, client_id$[, keepalive_s[, benutzer$[, passwort$]]])   MQTT_IS_CONNECTED(h)   MQTT_DISCONNECT(h)',

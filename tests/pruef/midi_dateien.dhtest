@@ -1,0 +1,193 @@
+' MIDI-Dateien (MIDI_FILE_*, src/midifile.rs) -- in jedem Bau, ohne Geraet.
+' Gelesen wird die Beispieldatei aus der Spezifikation (SMF 1.0, Format 0:
+' ein Akkord mit laufendem Status); was geschrieben wird, prueft der Fall
+' Byte fuer Byte gegen den Aufbau, den die Spezifikation vorschreibt.
+' Das Abspielen an einem Ausgang steht in modules_midi.dhtest.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== die beispieldatei der spezifikation lesen
+IMPORT "midi"
+DIM mf AS MIDI_FILE
+mf = MIDI_FILE_LOAD("beispiel.mid")
+PRINT "spuren "; MIDI_FILE_TRACKS(mf); " ppq "; MIDI_FILE_PPQ(mf); " tempo "; MIDI_FILE_TEMPO(mf); " dauer "; MIDI_FILE_DURATION(mf)
+PRINT "ereignisse "; MIDI_FILE_EVENTS(mf)
+DIM i AS INTEGER
+DIM t AS FLOAT
+DIM sp, st, k, a, b AS INTEGER
+FOR i = 0 TO MIDI_FILE_EVENTS(mf) - 1
+    (t, sp, st, k, a, b) = MIDI_FILE_EVENT(mf, i)
+    PRINT t; " "; sp; " "; st; " "; k; " "; a; " "; b
+NEXT
+DIM dauer AS FLOAT
+DIM note, ans AS INTEGER
+PRINT "noten "; MIDI_FILE_NOTES(mf)
+FOR i = 0 TO MIDI_FILE_NOTES(mf) - 1
+    (t, dauer, k, note, ans, sp) = MIDI_FILE_NOTE(mf, i)
+    PRINT t; " "; dauer; " kanal "; k; " "; MIDI_NOTE_NAME$(note); " "; ans
+NEXT
+--- datei beispiel.mid base64
+TVRoZAAAAAYAAAABAGBNVHJrAAAAOwD/WAQEAhgIAP9RAwehIADABQDBLgDCRgCSMGAAPGBgkUNAYJBMIIFAgjBAADxAAIFDQACATEAA/y8A
+--- erwartet
+spuren 1 ppq 96 tempo 120.0 dauer 2.0
+ereignisse 11
+0.0 0 192 1 5 0
+0.0 0 192 2 46 0
+0.0 0 192 3 70 0
+0.0 0 144 3 48 96
+0.0 0 144 3 60 96
+0.5 0 144 2 67 64
+1.0 0 144 1 76 32
+2.0 0 128 3 48 64
+2.0 0 128 3 60 64
+2.0 0 128 2 67 64
+2.0 0 128 1 76 64
+noten 4
+0.0 2.0 kanal 3 C3 96
+0.0 2.0 kanal 3 C4 96
+0.5 1.5 kanal 2 G4 64
+1.0 1.0 kanal 1 E5 32
+
+=== eine datei schreiben, byte fuer byte
+IMPORT "midi"
+DIM mf AS MIDI_FILE
+mf = MIDI_FILE_NEW(96)
+MIDI_FILE_SET_TEMPO(mf, 120)
+MIDI_FILE_SET_TRACK_NAME(mf, 1, "Bass")
+MIDI_FILE_ADD_NOTE(mf, 1, 1, 60, 100, 0, 1)
+MIDI_FILE_SAVE(mf, "neu.mid")
+DIM h AS STRING : h = UPPER$(BUFFER_TO_HEX$(READALL_BYTES("neu.mid")))
+DIM aus AS STRING : aus = ""
+DIM i AS INTEGER
+FOR i = 0 TO LEN(h) - 1 STEP 2
+    IF aus <> "" THEN aus = aus + " "
+    aus = aus + MID$(h, i, 2)
+NEXT
+PRINT aus
+--- erwartet
+4D 54 68 64 00 00 00 06 00 01 00 02 00 60 4D 54 72 6B 00 00 00 0B 00 FF 51 03 07 A1 20 00 FF 2F 00 4D 54 72 6B 00 00 00 14 00 FF 03 04 42 61 73 73 00 90 3C 64 60 80 3C 40 00 FF 2F 00
+
+=== schreiben und wieder lesen, mit tempowechsel
+IMPORT "midi"
+DIM mf AS MIDI_FILE
+mf = MIDI_FILE_NEW()
+MIDI_FILE_SET_TEMPO(mf, 120)
+' Ab dem dritten Viertel halb so schnell.
+MIDI_FILE_SET_TEMPO(mf, 60, 2)
+MIDI_FILE_SET_TRACK_NAME(mf, 1, "Melodie")
+MIDI_FILE_ADD_NOTE(mf, 1, 1, 60, 100, 0, 1)
+MIDI_FILE_ADD_NOTE(mf, 1, 1, 62, 90, 2, 0.5)
+MIDI_FILE_ADD_NOTE(mf, 2, 10, 36, 127, 3, 1)
+' Programmwechsel (ein Datenbyte) und ein Regler.
+MIDI_FILE_ADD_EVENT(mf, 1, 0, 192, 5)
+MIDI_FILE_ADD_EVENT(mf, 2, 0.5, 185, 7, 90)
+MIDI_FILE_SAVE(mf, "lied.mid")
+MIDI_FILE_FREE(mf)
+DIM g AS MIDI_FILE
+g = MIDI_FILE_LOAD("lied.mid")
+PRINT "spuren "; MIDI_FILE_TRACKS(g); " ppq "; MIDI_FILE_PPQ(g); " ["; MIDI_FILE_TRACK_NAME$(g, 1); "] ["; MIDI_FILE_TRACK_NAME$(g, 0); "]"
+PRINT "dauer "; MIDI_FILE_DURATION(g)
+DIM i AS INTEGER
+DIM t, dauer AS FLOAT
+DIM k, note, ans, sp AS INTEGER
+FOR i = 0 TO MIDI_FILE_NOTES(g) - 1
+    (t, dauer, k, note, ans, sp) = MIDI_FILE_NOTE(g, i)
+    PRINT t; " "; dauer; " "; k; " "; note; " "; ans; " spur "; sp
+NEXT
+DIM st, a, b AS INTEGER
+(t, sp, st, k, a, b) = MIDI_FILE_EVENT(g, 0)
+PRINT "erstes "; t; " "; sp; " "; st; " "; k; " "; a; " "; b
+(t, sp, st, k, a, b) = MIDI_FILE_EVENT(g, 2)
+PRINT "drittes "; t; " "; sp; " "; st; " "; k; " "; a; " "; b
+--- erwartet
+spuren 3 ppq 480 [Melodie] []
+dauer 3.0
+0.0 0.5 1 60 100 spur 1
+1.0 0.5 1 62 90 spur 1
+2.0 1.0 10 36 127 spur 2
+erstes 0.0 1 192 1 5 0
+drittes 0.25 2 176 10 7 90
+
+=== fehler werden gemeldet
+IMPORT "midi"
+DIM mf AS MIDI_FILE
+mf = MIDI_FILE_NEW(96)
+SUB probe(was AS STRING)
+    TRY
+        SELECT CASE was
+            CASE "fremd" : PRINT MIDI_FILE_LOAD("fremd.mid")
+            CASE "kurz" : PRINT MIDI_FILE_LOAD("kurz.mid")
+            CASE "fehlt" : PRINT MIDI_FILE_LOAD("gibt-es-nicht.mid")
+            CASE "ppq" : PRINT MIDI_FILE_NEW(10)
+            CASE "spur" : MIDI_FILE_ADD_NOTE(mf, 128, 1, 60, 100, 0, 1)
+            CASE "kanal" : MIDI_FILE_ADD_NOTE(mf, 0, 17, 60, 100, 0, 1)
+            CASE "anschlag" : MIDI_FILE_ADD_NOTE(mf, 0, 1, 60, 0, 0, 1)
+            CASE "dauer" : MIDI_FILE_ADD_NOTE(mf, 0, 1, 60, 100, 0, 0)
+            CASE "beginn" : MIDI_FILE_ADD_NOTE(mf, 0, 1, 60, 100, -1, 1)
+            CASE "status" : MIDI_FILE_ADD_EVENT(mf, 0, 0, 240, 1)
+            CASE "tempo" : MIDI_FILE_SET_TEMPO(mf, 1000)
+            CASE "note" : PRINT MIDI_FILE_NOTE(mf, 0)
+            CASE "handle" : PRINT MIDI_FILE_TRACKS(9)
+        END SELECT
+    CATCH e
+        IF was = "fehlt" THEN e = LEFT$(e, 34)
+        PRINT e
+    END TRY
+END SUB
+probe("fremd")
+probe("kurz")
+probe("fehlt")
+probe("ppq")
+probe("spur")
+probe("kanal")
+probe("anschlag")
+probe("dauer")
+probe("beginn")
+probe("status")
+probe("tempo")
+probe("note")
+probe("handle")
+--- datei fremd.mid
+RIFF und kein MIDI
+--- datei kurz.mid base64
+TVRoZAAAAAYAAAABAGBNVHJrAAAAOwD/WAQEAhgI
+--- erwartet
+MIDI_FILE_LOAD: fremd.mid: keine MIDI-Datei (der Kopf "MThd" fehlt)
+MIDI_FILE_LOAD: kurz.mid: Spur 0: die Datei ist abgeschnitten (8 von 59 Bytes)
+MIDI_FILE_LOAD: gibt-es-nicht.mid:
+MIDI_FILE_NEW: 10 Ticks je Viertel ausserhalb 24..32767
+MIDI_FILE_ADD_NOTE: Spur 128 ausserhalb 0..127
+MIDI_FILE_ADD_NOTE: Kanal muss zwischen 1 und 16 liegen, war 17
+MIDI_FILE_ADD_NOTE: Anschlag 0 ist ein Note-aus -- erwartet 1..127
+MIDI_FILE_ADD_NOTE: Dauer 0 -- erwartet mehr als 0 (in Vierteln)
+MIDI_FILE_ADD_NOTE: Beginn -1 -- erwartet eine Zahl ab 0 (in Vierteln)
+MIDI_FILE_ADD_EVENT: das Statusbyte muss zwischen 128 und 239 liegen (Kanalnachricht), war 240
+MIDI_FILE_SET_TEMPO: Tempo 1000 ausserhalb 4..999
+MIDI_FILE_NOTE: Note 0 gibt es nicht -- die Datei hat 0 (gezaehlt ab 0)
+MIDI_FILE_TRACKS: ungueltige/freigegebene MIDI_FILE 9
+
+=== ohne das midi-feature warnt der import nur zum teil
+' MIDI-Dateien gehen in jedem Bau -- die Warnung beim IMPORT sagt das,
+' statt das ganze Modul fuer fehlend zu erklaeren.
+IF MODULE_AVAILABLE("midi") THEN
+    PRINT "UEBERSPRINGEN: Bau mit dem midi-Feature -- keine Warnung zu pruefen"
+    EXIT(0)
+END IF
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "--check", "nutzt.dh")
+DIM aus AS STRING : aus = ""
+DIM leer AS INTEGER : leer = 0
+WHILE leer < 5
+    DIM z AS STRING : z = PROCESS_READ$(p)
+    IF z = "" THEN
+        IF NOT PROCESS_RUNNING(p) THEN leer = leer + 1
+        SLEEP(30)
+    ELSE
+        aus = aus + TRIM$(z)
+    END IF
+WEND
+PRINT INSTR(aus, "nur zum Teil enthalten -- MIDI-Dateien und MIDI_NOTE_NAME$/MIDI_NOTE_FREQ gehen") >= 0
+--- datei nutzt.dh
+IMPORT "midi"
+DIM mf AS MIDI_FILE
+mf = MIDI_FILE_NEW()
+--- erwartet
+TRUE

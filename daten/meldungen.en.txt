@@ -214,6 +214,7 @@ Der Ausdruck endet mitten drin -- geht er in der naechsten Zeile weiter, die Zei
 IMPORT: Datei nicht gefunden: {} (gesucht: {})	IMPORT: file not found: {} (searched: {})
 IMPORT: Lesefehler bei {}: {}	IMPORT: error reading {}: {}
 Hardware-Modul '{}' ist in diesem dhrt-Build nicht enthalten -- Funktionsaufrufe schlagen zur Laufzeit fehl. Neu bauen mit: python rust\build_runtime.py --hardware	Hardware module '{}' is not included in this dhrt build -- calls will fail at run time. Rebuild with: python rust\build_runtime.py --hardware
+Hardware-Modul 'midi' ist in diesem dhrt-Build nur zum Teil enthalten -- MIDI-Dateien und MIDI_NOTE_NAME$/MIDI_NOTE_FREQ gehen, Ein- und Ausgaenge nicht. Neu bauen mit: python rust\build_runtime.py --hardware	Hardware module 'midi' is only partly included in this dhrt build -- MIDI files and MIDI_NOTE_NAME$/MIDI_NOTE_FREQ work, inputs and outputs do not. Rebuild with: python rust\build_runtime.py --hardware
 {} kennt keine Klasse {}.{}	{} has no class {}.{}
 {} kennt keinen Namen {}.{}	{} has no name {}.{}
 {} steht in {}, und diese Datei gehoert nicht zum Namensraum {} -- was eine Datei des Namensraums ohne AS einbindet, bleibt draussen. Dort IMPORT "{}" AS {} schreiben.	{} is in {}, and that file does not belong to the namespace {} -- what a file of the namespace imports without AS stays outside. Write IMPORT "{}" AS {} there.
@@ -1905,3 +1906,76 @@ OSC_SEND: {} nicht aufloesbar	OSC_SEND: {} cannot be resolved
 {}: der Name darf nicht leer sein und keinen Punkt enthalten, nicht {}	{}: the name must not be empty or contain a dot, not {}
 MDNS_ANNOUNCE: Anschluss 5353 ist nicht zu bekommen -- {}	MDNS_ANNOUNCE: port 5353 cannot be had -- {}
 MDNS_ANNOUNCE: Gruppe 224.0.0.251 -- {}	MDNS_ANNOUNCE: group 224.0.0.251 -- {}
+{}: das Geraet meldet Ausnahme {} ({})	{}: the device reports exception {} ({})
+unerlaubte Funktion	illegal function
+unerlaubte Datenadresse	illegal data address
+unerlaubter Datenwert	illegal data value
+Fehler im Geraet	device failure
+angenommen, dauert noch	acknowledged, still working
+Geraet beschaeftigt	device busy
+Paritaetsfehler im Speicher	memory parity error
+Gateway: kein Weg zum Ziel	gateway: no path to the target
+Gateway: Zielgeraet antwortet nicht	gateway: target device does not respond
+unbekannte Ausnahme	unknown exception
+{}: leere Antwort	{}: empty answer
+{}: Antwort auf Funktion {} statt {}	{}: answer to function {} instead of {}
+{}: Antwort zu kurz	{}: answer too short
+{}: Antwort mit {} Bytes, erwartet {}	{}: answer with {} bytes, expected {}
+{}: Wortfolge {} -- erlaubt sind "ABCD", "CDAB", "BADC", "DCBA"	{}: word order {} -- allowed are "ABCD", "CDAB", "BADC", "DCBA"
+{}: "{}" ist kein Netzziel -- so: "tcp:192.168.1.60:502"	{}: "{}" is not a network target -- like this: "tcp:192.168.1.60:502"
+{}: Format {} -- so: "8N1", "8E1", "8O1", "8N2"	{}: format {} -- like this: "8N1", "8E1", "8O1", "8N2"
+MODBUS_RTU: Baudrate {} ausserhalb 300..4000000	MODBUS_RTU: baud rate {} outside 300..4000000
+MODBUS_RTU: serielle Anschluesse kennt diese Laufzeit nicht (gebaut ohne --hardware) -- ueber einen RTU-Umsetzer im Netz geht "tcp:host:port"	MODBUS_RTU: this runtime knows no serial ports (built without --hardware) -- through an RTU converter on the network, "tcp:host:port" works
+{}: Geraeteadresse {} ausserhalb 0..255	{}: device address {} outside 0..255
+{}: keine Antwort von Geraet {} nach {} ms	{}: no answer from device {} after {} ms
+{}: unverstaendliche Antwort (Funktion {})	{}: unintelligible answer (function {})
+{}: Antwort nach {} von {} Bytes abgebrochen	{}: answer broke off after {} of {} bytes
+{}: Pruefsumme der Antwort stimmt nicht (Stoerung auf der Leitung?)	{}: the checksum of the answer is wrong (interference on the line?)
+{}: Antwort von Geraet {} statt {}	{}: answer from device {} instead of {}
+{}: kein Modbus-TCP (Protokoll {})	{}: not Modbus TCP (protocol {})
+{}: Laenge {} im Kopf ist kein Modbus-TCP	{}: length {} in the header is not Modbus TCP
+{}: an Adresse 0 (an alle) antwortet niemand -- lesen geht nur von einem Geraet	{}: nobody answers at address 0 (to all) -- reading only works from one device
+{}: das Geraet bestaetigt etwas anderes als geschrieben	{}: the device confirms something other than what was written
+{}: Adresse {} ausserhalb 0..65535	{}: address {} outside 0..65535
+{}: Anzahl {} ausserhalb 1..{}	{}: count {} outside 1..{}
+{}: {} ab Adresse {} reicht ueber 65535 hinaus	{}: {} from address {} reaches beyond 65535
+{}: Registerwert {} ausserhalb -32768..65535	{}: register value {} outside -32768..65535
+{}: {} ms ausserhalb 10..60000	{}: {} ms outside 10..60000
+{}: Stelle {} und {} -- das Feld hat {} Register	{}: positions {} and {} -- the array has {} registers
+{}: an Stelle {} steht kein Registerwert ({})	{}: position {} holds no register value ({})
+{}: erwartet das Feld aus MODBUS_READ_HOLDING/_INPUT, nicht {}	{}: expects the array from MODBUS_READ_HOLDING/_INPUT, not {}
+{}: an Stelle {} steht kein Wahrheitswert ({})	{}: position {} holds no truth value ({})
+{}: {} passt nicht in 32 Bit	{}: {} does not fit into 32 bits
+HOTPLUG_LIST: die Art {} beobachtet diese Laufzeit nicht -- moeglich: {}	HOTPLUG_LIST: this runtime does not watch the kind {} -- possible: {}
+keine (gebaut ohne --hardware)	none (built without --hardware)
+HOTPLUG_INTERVAL: {} ms ausserhalb 100..10000	HOTPLUG_INTERVAL: {} ms outside 100..10000
+eine Zahl ist laenger als vier Bytes	a number is longer than four bytes
+Datei endet mitten in einer Zahl	file ends in the middle of a number
+Spur endet nach einer Zeitangabe	track ends after a time value
+Datenbyte {} ohne Statusbyte davor	data byte {} without a status byte before it
+Spur endet in einem Meta-Ereignis	track ends in a meta event
+Spur endet in einer SysEx-Nachricht	track ends in a SysEx message
+Statusbyte {} gehoert nicht in eine Datei	status byte {} does not belong in a file
+Spur endet in einer Nachricht	track ends in a message
+Nachricht {} mit Datenbyte ueber 127	message {} with a data byte above 127
+keine MIDI-Datei (der Kopf "MThd" fehlt)	not a MIDI file (the "MThd" header is missing)
+der Kopf der Datei ist zu kurz	the header of the file is too short
+Format {} gibt es nicht (0, 1 oder 2)	format {} does not exist (0, 1 or 2)
+Zeitteilung im Kopf ist ungueltig	time division in the header is invalid
+0 Ticks je Viertel im Kopf	0 ticks per quarter in the header
+Spur {}: die Datei ist abgeschnitten ({} von {} Bytes)	track {}: the file is cut off ({} of {} bytes)
+mehr als {} Spuren	more than {} tracks
+Spur {} ausserhalb 0..{}	track {} outside 0..{}
+{}: Spur {} ausserhalb 0..{}	{}: track {} outside 0..{}
+{}: die Datei zaehlt in SMPTE-Bildern, nicht in Schlaegen	{}: the file counts in SMPTE frames, not in beats
+{}: {} {} -- erwartet eine Zahl ab 0 (in Vierteln)	{}: {} {} -- expects a number from 0 (in quarter notes)
+{}: {} Ticks je Viertel ausserhalb 24..32767	{}: {} ticks per quarter outside 24..32767
+{}: Ereignis {} gibt es nicht -- die Datei hat {} (gezaehlt ab 0)	{}: there is no event {} -- the file has {} (counted from 0)
+{}: Note {} gibt es nicht -- die Datei hat {} (gezaehlt ab 0)	{}: there is no note {} -- the file has {} (counted from 0)
+{}: Anschlag 0 ist ein Note-aus -- erwartet 1..127	{}: velocity 0 is a note off -- expects 1..127
+{}: Dauer {} -- erwartet mehr als 0 (in Vierteln)	{}: duration {} -- expects more than 0 (in quarter notes)
+{}: das Statusbyte muss zwischen 128 und 239 liegen (Kanalnachricht), war {}	{}: the status byte must be between 128 and 239 (channel message), was {}
+{}: Tempo {} ausserhalb 4..999	{}: tempo {} outside 4..999
+MIDI_CLOCK_SEND: Tempo {} ausserhalb 1..999 (0 haelt die Uhr an)	MIDI_CLOCK_SEND: tempo {} outside 1..999 (0 stops the clock)
+{}: Beginn {} -- erwartet Sekunden ab 0	{}: start {} -- expects seconds from 0
+{}: {} Sechzehntel ausserhalb 0..16383	{}: {} sixteenths outside 0..16383

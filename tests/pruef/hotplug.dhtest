@@ -1,0 +1,94 @@
+' Ein- und Ausstecken (HOTPLUG_*, src/hotplug.rs). Mit DHRT_GERAETE liest
+' der Waechter die Listen aus einer Textdatei (art:name je Zeile) statt vom
+' System -- der Fall aendert die Datei und sieht die Meldungen. Ein Fall
+' vergleicht ohne Simulation mit den Listen, die SERIAL_PORTS und
+' MIDI_IN_NAME$ liefern; in einem Bau ohne die Features ueberspringt er sich.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== anstecken und abziehen wird gemeldet
+IMPORT "hotplug"
+SUB schreiben(zeilen AS STRING)
+    WRITEALL("geraete.txt", REPLACE$(zeilen, "|", CHR$(10)))
+END SUB
+SUB melden()
+    WHILE HOTPLUG_NEXT()
+        PRINT HOTPLUG_KIND$(); " "; HOTPLUG_NAME$(); " "; IIF(HOTPLUG_ADDED(), "angesteckt", "abgezogen")
+    WEND
+END SUB
+PRINT JOIN$(HOTPLUG_KINDS(), ",")
+PRINT "serial ["; JOIN$(HOTPLUG_LIST("serial"), ","); "] midi_out ["; JOIN$(HOTPLUG_LIST("midi_out"), ","); "]"
+' Was beim ersten Blick da ist, ist die Ausgangslage -- keine Meldung.
+PRINT "zu beginn "; HOTPLUG_NEXT()
+HOTPLUG_INTERVAL(100)
+schreiben("serial:COM3|serial:COM7|midi_in:Keyboard|# Kommentar|hid:046D:C52B Empfaenger|hid:046D:C52B Empfaenger")
+SLEEP(900)
+melden()
+PRINT "serial ["; JOIN$(HOTPLUG_LIST("serial"), ","); "] hid ["; JOIN$(HOTPLUG_LIST("hid"), ","); "]"
+schreiben("serial:COM7|midi_in:Keyboard")
+SLEEP(400)
+melden()
+PRINT "danach "; HOTPLUG_NEXT(); " ["; HOTPLUG_KIND$(); "]"
+--- umgebung
+DHRT_GERAETE={fall}/geraete.txt
+--- datei geraete.txt
+serial:COM3
+midi_out:Synth
+
+--- erwartet
+serial,midi_in,midi_out,hid
+serial [COM3] midi_out [Synth]
+zu beginn FALSE
+serial COM7 angesteckt
+midi_in Keyboard angesteckt
+midi_out Synth abgezogen
+hid 046D:C52B Empfaenger angesteckt
+serial [COM3,COM7] hid [046D:C52B Empfaenger]
+serial COM3 abgezogen
+hid 046D:C52B Empfaenger abgezogen
+danach FALSE []
+
+=== fehler werden gemeldet
+IMPORT "hotplug"
+TRY
+    PRINT HOTPLUG_LIST("usb")
+CATCH e
+    PRINT e
+END TRY
+TRY
+    HOTPLUG_INTERVAL(50)
+CATCH e
+    PRINT e
+END TRY
+--- umgebung
+DHRT_GERAETE={fall}/leer.txt
+--- datei leer.txt
+
+--- erwartet
+HOTPLUG_LIST: die Art "usb" beobachtet diese Laufzeit nicht -- moeglich: serial, midi_in, midi_out, hid
+HOTPLUG_INTERVAL: 50 ms ausserhalb 100..10000
+
+=== ohne simulation dieselben listen wie die module
+IMPORT "hotplug"
+IMPORT "midi" OPTIONAL
+IMPORT "serial" OPTIONAL
+DIM arten AS STRING : arten = "," + JOIN$(HOTPLUG_KINDS(), ",") + ","
+IF INSTR(arten, ",midi_in,") < 0 OR INSTR(arten, ",serial,") < 0 THEN
+    PRINT "UEBERSPRINGEN: Bau ohne midi und serial"
+    EXIT(0)
+END IF
+' MIDI-Eingaenge: dieselben Namen, geordnet.
+DIM namen AS ARRAY OF STRING : namen = []
+DIM i AS INTEGER
+FOR i = 0 TO MIDI_IN_COUNT() - 1
+    IF ARRAY_INDEXOF(namen, MIDI_IN_NAME$(i)) < 0 THEN ARRAY_PUSH(namen, MIDI_IN_NAME$(i))
+NEXT
+SORT(namen)
+PRINT "midi_in gleich "; JOIN$(namen, "|") = JOIN$(HOTPLUG_LIST("midi_in"), "|")
+' Serielle Anschluesse: SERIAL_PORTS trennt mit ", ".
+DIM s AS ARRAY OF STRING : s = []
+IF SERIAL_PORTS() <> "" THEN s = SPLIT$(SERIAL_PORTS(), ", ")
+SORT(s)
+PRINT "serial gleich "; JOIN$(s, "|") = JOIN$(HOTPLUG_LIST("serial"), "|")
+--- erwartet
+midi_in gleich TRUE
+serial gleich TRUE

@@ -23,7 +23,7 @@ use regex::Regex;
 /// ein `IMPORT "<modul>"` wird hier nur zu einem Kommentar.
 const MODULES: &[&str] = &[
     "animfsm", "astar", "audio", "bt", "camera", "chart", "cloud", "controller", "curves", "db", "ecs",
-    "firmata", "g3d", "gpio", "gui", "html", "httpd", "i2c", "imgfx", "ini", "input", "json", "m3d", "mdns", "midi", "mqtt", "net", "osc", "particles",
+    "firmata", "g3d", "gpio", "gui", "hotplug", "html", "httpd", "i2c", "imgfx", "ini", "input", "json", "m3d", "mdns", "midi", "modbus", "mqtt", "net", "osc", "particles",
     "geld", "pdf", "smtp", "xlsx", "xml",
     "physics", "physics2d", "physics3d", "regex", "save", "scene", "serial", "sprite",
     "spi", "tile_collide", "tiled", "timer", "tween", "ui", "usb", "vec2", "video", "webcam", "websocket", "wifi", "zeit",
@@ -73,7 +73,8 @@ const MODULE_TYPES: &[(&str, &[&str])] = &[
     ("physics2d", &["phys2d_world"]),
     ("physics3d", &["phys_world"]),
     ("save", &["save_handle"]),
-    ("midi", &["midi_in", "midi_out"]),
+    ("midi", &["midi_in", "midi_out", "midi_file"]),
+    ("modbus", &["modbus"]),
     ("serial", &["serial_handle"]),
     ("sprite", &["sprite"]),
     ("tile_collide", &["tiled_map"]),
@@ -249,6 +250,13 @@ pub fn hardware_missing_msg(module: &str) -> String {
         return format!(
             "Modul '{}' gibt es nur unter Linux (etwa auf dem Raspberry Pi) -- Funktionsaufrufe melden hier einen Fehler",
             module);
+    }
+    if module == "midi" {
+        // MIDI-Dateien und die Notenrechnung brauchen kein Geraet und gehen
+        // in jedem Bau -- nur Ein- und Ausgaenge fehlen.
+        return "Hardware-Modul 'midi' ist in diesem dhrt-Build nur zum Teil enthalten -- \
+                MIDI-Dateien und MIDI_NOTE_NAME$/MIDI_NOTE_FREQ gehen, Ein- und Ausgaenge nicht. \
+                Neu bauen mit: python rust\\build_runtime.py --hardware".to_string();
     }
     format!(
         "Hardware-Modul '{}' ist in diesem dhrt-Build nicht enthalten -- \

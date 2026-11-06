@@ -230,13 +230,15 @@ Full documentation lives in [docs/en/](docs/en/README.md) — the English transl
 | [`httpd`](docs/en/module-httpd.md) | the other direction: a small web server driven by the main loop — a control panel on the home network |
 | [`mqtt`](docs/en/module-mqtt.md) | the IoT world's pub/sub protocol — the way to reach an ESP32 **over Wi-Fi**; QoS 0/1, TLS (`mqtts://`) |
 | [`websocket`](docs/en/module-websocket.md), [`osc`](docs/en/module-osc.md), [`mdns`](docs/en/module-mdns.md) | WebSocket client and server, Open Sound Control (TouchOSC, Pure Data), and finding devices as `esp32.local` -- or announcing your own program there |
+| [`modbus`](docs/en/module-modbus.md) | Modbus TCP and RTU (RS-485, or RTU over the network): electricity meters, inverters, heating controllers, PLCs |
+| [`hotplug`](docs/en/module-hotplug.md) | be told when a serial port, MIDI device or USB HID device is plugged in or unplugged |
 | [`firmata`](docs/en/module-firmata.md) | drive Arduino/ESP32 pins, servos, I2C devices and stepper motors directly, over USB or WiFi (`tcp:host:port`), no sketch of your own needed |
 | [`gpio`, `i2c`, `spi`](docs/en/module-pins.md) | the Raspberry Pi's own pins (and those of any Linux board): GPIO with edge events, I2C sensors, SPI chips -- through the kernel's interfaces, so it works on Pi 3, 4 and 5 |
 | [Microphone](docs/en/module-mikrofon.md) (`MIC_*`) | level, pitch, spectrum and recording from the computer's input -- a tuner or a voice-controlled game |
 | [`webcam`](docs/en/module-webcam.md) | pictures from a camera into an `IMAGE` (V4L2, Media Foundation, AVFoundation) -- a mirror, a motion detector, a photo booth |
 | [`serial`](docs/en/module-serial.md) | raw COM connection for your own protocols — and in the IDE a **serial monitor with a plotter** (Alt+4) |
 | [`usb`](docs/en/module-usb.md) | USB HID: maker boards, programmers, custom controllers |
-| [`midi`](docs/en/module-midi.md) | read notes from a connected instrument and send some out |
+| [`midi`](docs/en/module-midi.md) | read notes from a connected instrument and send some out; follow or send MIDI clock; read, write and play `.mid` files |
 | [`bt`](docs/en/module-bt.md) | Bluetooth Low Energy: scan, connect, read/write characteristics |
 | [`wifi`](docs/en/module-wifi.md) | scan networks, connect, signal strength |
 

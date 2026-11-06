@@ -595,7 +595,7 @@ fn ui_preset_metrics(name: &str) -> Vec<(&'static str, i64)> {
 /// damit ein Tippfehler im DH-Programm NICHT die Runtime abstuerzen laesst,
 /// sondern einen klaren Laufzeitfehler liefert.
 /// Zahl der Befehlsfamilien in `Vm::familie_rufen`; die letzte sind die reinen.
-pub(crate) const BUILTIN_FAMILIEN: u8 = 33;
+pub(crate) const BUILTIN_FAMILIEN: u8 = 34;
 
 fn safe_call_builtin(name: &str, args: &[Value]) -> Option<Result<Value, String>> {
     use std::panic::{catch_unwind, AssertUnwindSafe};
@@ -1081,6 +1081,10 @@ pub struct Vm<'p> {
     #[cfg(feature = "net")]
     ws_verbindungen: Vec<Option<crate::websocket::Verbindung>>,
     osc_anschluesse: Vec<Option<crate::osc::Osc>>,
+    /// Modbus-Geraete (MODBUS_*) und gelesene/angelegte MIDI-Dateien.
+    modbus_geraete: Vec<Option<crate::modbus::Geraet>>,
+    midi_dateien: Vec<Option<crate::midifile::Datei>>,
+    hotplug_aktuell: Option<crate::hotplug::Ereignis>,
     mdns_dienste: Vec<crate::mdns::Dienst>,
     mdns_typ: String,
     mdns_antworter: Option<crate::mdns::Antworter>,
@@ -1274,6 +1278,9 @@ impl<'p> Vm<'p> {
             #[cfg(feature = "net")]
             ws_verbindungen: Vec::new(),
             osc_anschluesse: Vec::new(),
+            modbus_geraete: Vec::new(),
+            midi_dateien: Vec::new(),
+            hotplug_aktuell: None,
             mdns_dienste: Vec::new(),
             mdns_typ: String::new(),
             mdns_antworter: None,
@@ -2323,6 +2330,7 @@ impl<'p> Vm<'p> {
             30 => self.try_mikrofon(name, a),
             31 => self.try_webcam(name, a),
             32 => self.try_netzdienste(name, a),
+            33 => self.try_geraete(name, a),
             _ => match safe_call_builtin(name, a) {
                 Some(Ok(v)) => Ok(Some(v)),
                 Some(Err(e)) if e.starts_with("__UNKNOWN_BUILTIN__:") => Err(unknown_builtin_msg(name)),
@@ -6390,6 +6398,9 @@ impl<'p> Vm<'p> {
             }
             _ => {}
         }
+        if name.starts_with("midi_file_") && !matches!(name, "midi_file_play" | "midi_file_stop" | "midi_file_playing" | "midi_file_position") {
+            return self.try_midi_datei(name, a);
+        }
         #[cfg(feature = "midi")]
         { return self.try_midi_impl(name, a); }
         #[allow(unreachable_code)]
@@ -6578,10 +6589,190 @@ impl<'p> Vm<'p> {
         Self::handle_get_mut(&mut self.midi_outs, idx, "MIDI", "ungueltiges/geschlossenes MIDI_OUT")
     }
 
+    /// MIDI-Dateien (in jedem Bau -- nur das Abspielen braucht ein Geraet).
+    fn try_midi_datei(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        use crate::midifile::{Art, Datei};
+        macro_rules! datei { ($f:expr) => {
+            Self::handle_get_mut(&mut self.midi_dateien, bi_int(a, 0, $f)?, $f, "ungueltige/freigegebene MIDI_FILE")?
+        }; }
+        fn spur_nr(a: &[Value], i: usize, fn_: &str) -> R<usize> {
+            let k = bi_int(a, i, fn_)?;
+            if !(0..crate::midifile::MAX_SPUREN as i64).contains(&k) {
+                return Err(format!("{}: Spur {} ausserhalb 0..{}", fn_, k, crate::midifile::MAX_SPUREN - 1));
+            }
+            Ok(k as usize)
+        }
+        // Schlaege (Viertel, Kommazahl) -> Ticks der Datei.
+        fn tick(d: &Datei, schlag: f64, was: &str, fn_: &str) -> R<u64> {
+            let ppq = d.ppq().ok_or_else(|| format!("{}: die Datei zaehlt in SMPTE-Bildern, nicht in Schlaegen", fn_))?;
+            if !schlag.is_finite() || schlag < 0.0 || schlag > 1e7 {
+                return Err(format!("{}: {} {} -- erwartet eine Zahl ab 0 (in Vierteln)", fn_, was, schlag));
+            }
+            Ok((schlag * ppq as f64).round() as u64)
+        }
+        let v = match name {
+            "midi_file_new" => {
+                const F: &str = "MIDI_FILE_NEW";
+                let ppq = if a.is_empty() { 480 } else { bi_int(a, 0, F)? };
+                if !(24..=32767).contains(&ppq) { return Err(format!("{}: {} Ticks je Viertel ausserhalb 24..32767", F, ppq)); }
+                self.midi_dateien.push(Some(Datei::neu(ppq as u16)));
+                Value::Int((self.midi_dateien.len() - 1) as i64)
+            }
+            "midi_file_load" => {
+                const F: &str = "MIDI_FILE_LOAD";
+                let pfad = bi_str(a, 0, F)?;
+                let b = std::fs::read(pfad).map_err(|e| format!("{}: {}: {}", F, pfad, e))?;
+                let d = Datei::lesen(&b).map_err(|e| format!("{}: {}: {}", F, pfad, e))?;
+                self.midi_dateien.push(Some(d));
+                Value::Int((self.midi_dateien.len() - 1) as i64)
+            }
+            "midi_file_save" => {
+                const F: &str = "MIDI_FILE_SAVE";
+                let pfad = bi_str(a, 1, F)?.to_string();
+                let b = datei!(F).schreiben();
+                std::fs::write(&pfad, b).map_err(|e| format!("{}: {}: {}", F, pfad, e))?;
+                Value::Nil
+            }
+            "midi_file_free" => {
+                let i = bi_int(a, 0, "MIDI_FILE_FREE")? as usize;
+                if let Some(x) = self.midi_dateien.get_mut(i) { *x = None; }
+                Value::Nil
+            }
+            "midi_file_tracks" => Value::Int(datei!("MIDI_FILE_TRACKS").spuren.len() as i64),
+            "midi_file_ppq" => Value::Int(datei!("MIDI_FILE_PPQ").ppq().map(|p| p as i64).unwrap_or(0)),
+            "midi_file_duration" => Value::Float(datei!("MIDI_FILE_DURATION").dauer()),
+            "midi_file_tempo" => Value::Float(datei!("MIDI_FILE_TEMPO").anfangstempo()),
+            "midi_file_track_name$" | "midi_file_track_name" => {
+                const F: &str = "MIDI_FILE_TRACK_NAME$";
+                let k = spur_nr(a, 1, F)?;
+                Value::str_rc(datei!(F).spuren.get(k).map(|s| s.name.clone()).unwrap_or_default())
+            }
+            "midi_file_set_track_name" => {
+                const F: &str = "MIDI_FILE_SET_TRACK_NAME";
+                let k = spur_nr(a, 1, F)?;
+                let n = bi_str(a, 2, F)?.to_string();
+                datei!(F).spur(k)?.name = n;
+                Value::Nil
+            }
+            "midi_file_events" => Value::Int(datei!("MIDI_FILE_EVENTS").ereignis_zahl() as i64),
+            "midi_file_event" => {
+                const F: &str = "MIDI_FILE_EVENT";
+                let i = bi_int(a, 1, F)?;
+                let d = datei!(F);
+                let n = d.ereignis_zahl();
+                let (t, spur, m) = (if i >= 0 { d.ereignis(i as usize) } else { None }).ok_or_else(||
+                    format!("{}: Ereignis {} gibt es nicht -- die Datei hat {} (gezaehlt ab 0)", F, i, n))?;
+                Value::Tuple(Rc::new(vec![
+                    Value::Float(t), Value::Int(spur as i64), Value::Int((m[0] & 0xF0) as i64),
+                    Value::Int((m[0] & 0x0F) as i64 + 1), Value::Int(m.get(1).copied().unwrap_or(0) as i64),
+                    Value::Int(m.get(2).copied().unwrap_or(0) as i64),
+                ]))
+            }
+            "midi_file_notes" => Value::Int(datei!("MIDI_FILE_NOTES").noten_zahl() as i64),
+            "midi_file_note" => {
+                const F: &str = "MIDI_FILE_NOTE";
+                let i = bi_int(a, 1, F)?;
+                let d = datei!(F);
+                let n = d.noten_zahl();
+                let x = (if i >= 0 { d.note(i as usize) } else { None }).ok_or_else(||
+                    format!("{}: Note {} gibt es nicht -- die Datei hat {} (gezaehlt ab 0)", F, i, n))?;
+                Value::Tuple(Rc::new(vec![
+                    Value::Float(x.start), Value::Float(x.dauer), Value::Int(x.kanal as i64),
+                    Value::Int(x.note as i64), Value::Int(x.anschlag as i64), Value::Int(x.spur as i64),
+                ]))
+            }
+            "midi_file_add_note" => {
+                const F: &str = "MIDI_FILE_ADD_NOTE";
+                let k = spur_nr(a, 1, F)?;
+                let kanal = crate::midi::kanal_byte(bi_int(a, 2, F)?, F)?;
+                let note = crate::midi::sieben_bit(bi_int(a, 3, F)?, "Note", F)?;
+                let ans = crate::midi::sieben_bit(bi_int(a, 4, F)?, "Anschlag", F)?;
+                if ans == 0 { return Err(format!("{}: Anschlag 0 ist ein Note-aus -- erwartet 1..127", F)); }
+                let (beat, dauer) = (bi_num(a, 5, F)?, bi_num(a, 6, F)?);
+                let d = datei!(F);
+                let t0 = tick(d, beat, "Beginn", F)?;
+                let t1 = tick(d, beat + dauer, "Ende", F)?;
+                if dauer <= 0.0 { return Err(format!("{}: Dauer {} -- erwartet mehr als 0 (in Vierteln)", F, dauer)); }
+                d.hinzu(k, t0, Art::Kanal(vec![0x90 | kanal, note, ans]))?;
+                d.hinzu(k, t1.max(t0 + 1), Art::Kanal(vec![0x80 | kanal, note, 64]))?;
+                Value::Nil
+            }
+            "midi_file_add_event" => {
+                const F: &str = "MIDI_FILE_ADD_EVENT";
+                let k = spur_nr(a, 1, F)?;
+                let beat = bi_num(a, 2, F)?;
+                let st = bi_int(a, 3, F)?;
+                if !(0x80..=0xEF).contains(&st) {
+                    return Err(format!("{}: das Statusbyte muss zwischen 128 und 239 liegen (Kanalnachricht), war {}", F, st));
+                }
+                let d1 = crate::midi::sieben_bit(bi_int(a, 4, F)?, "Datenbyte 1", F)?;
+                let mut m = vec![st as u8, d1];
+                if !matches!(st & 0xF0, 0xC0 | 0xD0) {
+                    let d2 = if a.len() > 5 { bi_int(a, 5, F)? } else { 0 };
+                    m.push(crate::midi::sieben_bit(d2, "Datenbyte 2", F)?);
+                }
+                let d = datei!(F);
+                let t = tick(d, beat, "Zeitpunkt", F)?;
+                d.hinzu(k, t, Art::Kanal(m))?;
+                Value::Nil
+            }
+            "midi_file_set_tempo" => {
+                const F: &str = "MIDI_FILE_SET_TEMPO";
+                let bpm = bi_num(a, 1, F)?;
+                if !(4.0..=999.0).contains(&bpm) { return Err(format!("{}: Tempo {} ausserhalb 4..999", F, bpm)); }
+                let beat = if a.len() > 2 { bi_num(a, 2, F)? } else { 0.0 };
+                let d = datei!(F);
+                let t = tick(d, beat, "Zeitpunkt", F)?;
+                d.tempo_setzen(t, bpm)?;
+                Value::Nil
+            }
+            _ => return Ok(None),
+        };
+        Ok(Some(v))
+    }
+
     #[cfg(feature = "midi")]
     fn try_midi_impl(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         use crate::midi;
         let v = match name {
+            // --- Die Uhr ---
+            "midi_clock_bpm" => { let i = bi_int(a, 0, "MIDI_CLOCK_BPM")?; Value::Float(midi::takt_bpm(self.midi_in(i)?)) }
+            "midi_clock_running" => { let i = bi_int(a, 0, "MIDI_CLOCK_RUNNING")?; Value::Bool(midi::takt_laeuft(self.midi_in(i)?)) }
+            "midi_clock_ticks" => { let i = bi_int(a, 0, "MIDI_CLOCK_TICKS")?; Value::Int(midi::takt_ticks(self.midi_in(i)?)) }
+            "midi_clock_send" => {
+                let i = bi_int(a, 0, "MIDI_CLOCK_SEND")?;
+                let bpm = bi_num(a, 1, "MIDI_CLOCK_SEND")?;
+                midi::uhr_senden(self.midi_out(i)?, bpm)?;
+                Value::Nil
+            }
+            "midi_start" | "midi_stop" | "midi_continue" => {
+                let (b, f) = match name { "midi_start" => (0xFA, "MIDI_START"), "midi_stop" => (0xFC, "MIDI_STOP"), _ => (0xFB, "MIDI_CONTINUE") };
+                let i = bi_int(a, 0, f)?;
+                midi::send(self.midi_out(i)?, &[b])?;
+                Value::Nil
+            }
+            "midi_song_position" => {
+                const F: &str = "MIDI_SONG_POSITION";
+                let i = bi_int(a, 0, F)?;
+                let p = bi_int(a, 1, F)?;
+                if !(0..=16383).contains(&p) { return Err(format!("{}: {} Sechzehntel ausserhalb 0..16383", F, p)); }
+                midi::send(self.midi_out(i)?, &[0xF2, (p & 0x7F) as u8, (p >> 7) as u8])?;
+                Value::Nil
+            }
+            // --- Eine Datei abspielen ---
+            "midi_file_play" => {
+                const F: &str = "MIDI_FILE_PLAY";
+                let i = bi_int(a, 0, F)?;
+                let k = bi_int(a, 1, F)?;
+                let ab = if a.len() > 2 { bi_num(a, 2, F)? } else { 0.0 };
+                if !ab.is_finite() || ab < 0.0 { return Err(format!("{}: Beginn {} -- erwartet Sekunden ab 0", F, ab)); }
+                let ablauf = Self::handle_get_mut(&mut self.midi_dateien, k, F, "ungueltige/freigegebene MIDI_FILE")?.ablauf();
+                midi::datei_spielen(self.midi_out(i)?, ablauf, ab)?;
+                Value::Nil
+            }
+            "midi_file_stop" => { let i = bi_int(a, 0, "MIDI_FILE_STOP")?; midi::datei_halten(self.midi_out(i)?); Value::Nil }
+            "midi_file_playing" => { let i = bi_int(a, 0, "MIDI_FILE_PLAYING")?; Value::Bool(midi::datei_spielt(self.midi_out(i)?)) }
+            "midi_file_position" => { let i = bi_int(a, 0, "MIDI_FILE_POSITION")?; Value::Float(midi::datei_stand(self.midi_out(i)?)) }
             // --- Anschluesse finden ---
             "midi_in_count" => Value::Int(midi::in_count()?),
             "midi_out_count" => Value::Int(midi::out_count()?),
@@ -6724,6 +6915,211 @@ impl<'p> Vm<'p> {
         if name.starts_with("osc_") { return self.try_osc(name, a); }
         if name.starts_with("mdns_") { return self.try_mdns(name, a); }
         Ok(None)
+    }
+
+    // ===================================================================
+    // Modbus (MODBUS_*, in jedem Bau) und Ein-/Ausstecken (HOTPLUG_*)
+    // ===================================================================
+    fn try_geraete(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        if name.starts_with("modbus_") { return self.try_modbus(name, a); }
+        if name.starts_with("hotplug_") { return self.try_hotplug(name, a); }
+        Ok(None)
+    }
+
+    fn try_modbus(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        use crate::modbus;
+        macro_rules! geraet { ($f:expr) => {
+            Self::handle_get_mut(&mut self.modbus_geraete, bi_int(a, 0, $f)?, $f, "ungueltiges/geschlossenes MODBUS")?
+        }; }
+        fn int_opt(a: &[Value], i: usize, vorgabe: i64, fn_: &str) -> R<i64> {
+            if a.len() > i { bi_int(a, i, fn_) } else { Ok(vorgabe) }
+        }
+        fn folge(a: &[Value], i: usize, fn_: &str) -> R<[usize; 4]> {
+            let f = if a.len() > i { bi_str(a, i, fn_)?.to_string() } else { "ABCD".to_string() };
+            modbus::folge_lesen(&f, fn_)
+        }
+        fn bool_feld(v: Vec<bool>) -> Value {
+            let n = v.len() as i64;
+            let mut arr = crate::value::DhArray::new("boolean".to_string(), vec![n], || Value::Bool(false));
+            for (k, x) in v.into_iter().enumerate() { arr.cells.set(k, Value::Bool(x)); }
+            Value::Array(Rc::new(RefCell::new(arr)))
+        }
+        fn int_feld(v: Vec<i64>) -> Value {
+            let n = v.len() as i64;
+            let mut arr = crate::value::DhArray::new("integer".to_string(), vec![n], || Value::Int(0));
+            for (k, x) in v.into_iter().enumerate() { arr.cells.set(k, Value::Int(x)); }
+            Value::Array(Rc::new(RefCell::new(arr)))
+        }
+        // Zwei Register aus einem Feld ab Stelle i (zaehlt wie das Feld).
+        fn zwei(a: &[Value], fn_: &str) -> R<(u16, u16)> {
+            let i = bi_int(a, 1, fn_)?;
+            match a.first() {
+                Some(Value::Array(arr)) => {
+                    let arr = arr.borrow();
+                    let u = arr.unten_von(0);
+                    let k = i - u;
+                    let n = arr.cells.len() as i64;
+                    if k < 0 || k + 1 >= n {
+                        return Err(format!("{}: Stelle {} und {} -- das Feld hat {} Register", fn_, i, i + 1, n));
+                    }
+                    let lies = |k: i64| -> R<u16> {
+                        match arr.cells.get(k as usize) {
+                            Value::Int(x) if (-32768..=65535).contains(&x) => Ok(x as i32 as u16),
+                            v => Err(format!("{}: an Stelle {} steht kein Registerwert ({})", fn_, k + u, v.type_name())),
+                        }
+                    };
+                    Ok((lies(k)?, lies(k + 1)?))
+                }
+                Some(v) => Err(format!("{}: erwartet das Feld aus MODBUS_READ_HOLDING/_INPUT, nicht {}", fn_, v.type_name())),
+                None => Err(format!("{}: das Feld fehlt", fn_)),
+            }
+        }
+        let v = match name {
+            "modbus_tcp" => {
+                const F: &str = "MODBUS_TCP";
+                let host = bi_str(a, 0, F)?.to_string();
+                let g = modbus::tcp(&host, int_opt(a, 1, 502, F)?, int_opt(a, 2, 1, F)?)?;
+                self.modbus_geraete.push(Some(g));
+                Value::Int((self.modbus_geraete.len() - 1) as i64)
+            }
+            "modbus_rtu" => {
+                const F: &str = "MODBUS_RTU";
+                let ziel = bi_str(a, 0, F)?.to_string();
+                let baud = int_opt(a, 1, 9600, F)?;
+                let format = if a.len() > 2 { bi_str(a, 2, F)?.to_string() } else { "8N1".to_string() };
+                let g = modbus::rtu(&ziel, baud, &format, int_opt(a, 3, 1, F)?)?;
+                self.modbus_geraete.push(Some(g));
+                Value::Int((self.modbus_geraete.len() - 1) as i64)
+            }
+            "modbus_close" => {
+                let i = bi_int(a, 0, "MODBUS_CLOSE")? as usize;
+                if let Some(x) = self.modbus_geraete.get_mut(i) { *x = None; }
+                Value::Nil
+            }
+            "modbus_unit" => {
+                let e = modbus::einheit_pruefen(bi_int(a, 1, "MODBUS_UNIT")?, "MODBUS_UNIT")?;
+                geraet!("MODBUS_UNIT").einheit = e;
+                Value::Nil
+            }
+            "modbus_timeout" => {
+                let ms = bi_int(a, 1, "MODBUS_TIMEOUT")?;
+                if !(10..=60000).contains(&ms) { return Err(format!("MODBUS_TIMEOUT: {} ms ausserhalb 10..60000", ms)); }
+                geraet!("MODBUS_TIMEOUT").zeitgrenze = std::time::Duration::from_millis(ms as u64);
+                Value::Nil
+            }
+            "modbus_read_coils" | "modbus_read_discrete" => {
+                let (fc, f) = if name == "modbus_read_coils" { (1, "MODBUS_READ_COILS") } else { (2, "MODBUS_READ_DISCRETE") };
+                let (adr, n) = (bi_int(a, 1, f)?, bi_int(a, 2, f)?);
+                bool_feld(geraet!(f).bits(fc, adr, n, f)?)
+            }
+            "modbus_read_holding" | "modbus_read_input" => {
+                let (fc, f) = if name == "modbus_read_holding" { (3, "MODBUS_READ_HOLDING") } else { (4, "MODBUS_READ_INPUT") };
+                let (adr, n) = (bi_int(a, 1, f)?, bi_int(a, 2, f)?);
+                int_feld(geraet!(f).register(fc, adr, n, f)?.into_iter().map(|x| x as i64).collect())
+            }
+            "modbus_write_coil" => {
+                const F: &str = "MODBUS_WRITE_COIL";
+                let (adr, _) = modbus::bereich(bi_int(a, 1, F)?, 1, 1, F)?;
+                let an = bi_bool(a, 2, F)?;
+                geraet!(F).schreiben(modbus::pdu_spule(adr, an), F)?;
+                Value::Nil
+            }
+            "modbus_write_register" => {
+                const F: &str = "MODBUS_WRITE_REGISTER";
+                let (adr, _) = modbus::bereich(bi_int(a, 1, F)?, 1, 1, F)?;
+                let w = modbus::registerwert(bi_int(a, 2, F)?, F)?;
+                geraet!(F).schreiben(modbus::pdu_register(adr, w), F)?;
+                Value::Nil
+            }
+            "modbus_write_coils" | "modbus_write_registers" => {
+                let spulen = name == "modbus_write_coils";
+                let f = if spulen { "MODBUS_WRITE_COILS" } else { "MODBUS_WRITE_REGISTERS" };
+                let werte: Vec<Value> = match a.get(2) {
+                    Some(Value::Array(arr)) => { let arr = arr.borrow(); (0..arr.cells.len()).map(|k| arr.cells.get(k)).collect() }
+                    Some(v) => return Err(format!("{}: erwartet ein Feld, nicht {}", f, v.type_name())),
+                    None => return Err(format!("{}: das Feld fehlt", f)),
+                };
+                let (adr, _) = modbus::bereich(bi_int(a, 1, f)?, werte.len() as i64, if spulen { 1968 } else { 123 }, f)?;
+                let pdu = if spulen {
+                    let mut b = Vec::with_capacity(werte.len());
+                    for (k, w) in werte.iter().enumerate() {
+                        b.push(match w {
+                            Value::Bool(x) => *x,
+                            Value::Int(0) => false,
+                            Value::Int(1) => true,
+                            v => return Err(format!("{}: an Stelle {} steht kein Wahrheitswert ({})", f, k, v.type_name())),
+                        });
+                    }
+                    modbus::pdu_spulen(adr, &b)
+                } else {
+                    let mut r = Vec::with_capacity(werte.len());
+                    for (k, w) in werte.iter().enumerate() {
+                        match w {
+                            Value::Int(x) => r.push(modbus::registerwert(*x, f)?),
+                            v => return Err(format!("{}: an Stelle {} steht keine ganze Zahl ({})", f, k, v.type_name())),
+                        }
+                    }
+                    modbus::pdu_registers(adr, &r)
+                };
+                geraet!(f).schreiben(pdu, f)?;
+                Value::Nil
+            }
+            // --- Werte umrechnen ---
+            "modbus_int16" => {
+                let w = bi_int(a, 0, "MODBUS_INT16")?;
+                Value::Int(modbus::registerwert(w, "MODBUS_INT16")? as i16 as i64)
+            }
+            "modbus_int32" | "modbus_uint32" | "modbus_float" => {
+                let f = match name { "modbus_int32" => "MODBUS_INT32", "modbus_uint32" => "MODBUS_UINT32", _ => "MODBUS_FLOAT" };
+                let (r0, r1) = zwei(a, f)?;
+                let b = modbus::zwei_register(r0, r1, folge(a, 2, f)?);
+                match name {
+                    "modbus_int32" => Value::Int(i32::from_be_bytes(b) as i64),
+                    "modbus_uint32" => Value::Int(u32::from_be_bytes(b) as i64),
+                    _ => Value::Float(f32::from_be_bytes(b) as f64),
+                }
+            }
+            "modbus_int32_regs" | "modbus_float_regs" => {
+                let f = if name == "modbus_float_regs" { "MODBUS_FLOAT_REGS" } else { "MODBUS_INT32_REGS" };
+                let b = if name == "modbus_float_regs" {
+                    (bi_num(a, 0, f)? as f32).to_be_bytes()
+                } else {
+                    let n = bi_int(a, 0, f)?;
+                    if !(-2147483648..=4294967295).contains(&n) {
+                        return Err(format!("{}: {} passt nicht in 32 Bit", f, n));
+                    }
+                    (n as u32).to_be_bytes()
+                };
+                let r = modbus::als_register(b, folge(a, 1, f)?);
+                int_feld(vec![r[0] as i64, r[1] as i64])
+            }
+            _ => return Ok(None),
+        };
+        Ok(Some(v))
+    }
+
+    fn try_hotplug(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        use crate::hotplug;
+        fn text_feld(v: Vec<String>) -> Value {
+            let n = v.len() as i64;
+            let mut arr = crate::value::DhArray::new("string".to_string(), vec![n], || Value::str_rc(String::new()));
+            for (k, x) in v.into_iter().enumerate() { arr.cells.set(k, Value::str_rc(x)); }
+            Value::Array(Rc::new(RefCell::new(arr)))
+        }
+        let v = match name {
+            "hotplug_kinds" => text_feld(hotplug::arten().into_iter().map(String::from).collect()),
+            "hotplug_list" => text_feld(hotplug::aktuelle(bi_str(a, 0, "HOTPLUG_LIST")?)?),
+            "hotplug_interval" => { hotplug::intervall(bi_int(a, 0, "HOTPLUG_INTERVAL")?)?; Value::Nil }
+            "hotplug_next" => {
+                self.hotplug_aktuell = hotplug::naechstes();
+                Value::Bool(self.hotplug_aktuell.is_some())
+            }
+            "hotplug_kind$" | "hotplug_kind" => Value::str_rc(self.hotplug_aktuell.as_ref().map(|e| e.art.clone()).unwrap_or_default()),
+            "hotplug_name$" | "hotplug_name" => Value::str_rc(self.hotplug_aktuell.as_ref().map(|e| e.name.clone()).unwrap_or_default()),
+            "hotplug_added" => Value::Bool(self.hotplug_aktuell.as_ref().map(|e| e.dazu).unwrap_or(false)),
+            _ => return Ok(None),
+        };
+        Ok(Some(v))
     }
 
     #[cfg(feature = "net")]

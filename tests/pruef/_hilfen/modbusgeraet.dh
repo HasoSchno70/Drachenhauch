@@ -1,0 +1,204 @@
+' Ein Modbus-Geraet als Gegenstelle fuer tests/pruef/modbus.dhtest -- ein
+' eigener Prozess, weil MODBUS_* auf die Antwort WARTET (im selben Programm
+' kaeme der Server nie dran). Er meldet "PORT=n" auf stderr und bedient
+' Verbindungen nacheinander, bis 20 s lang keine kommt.
+'
+'   modbusgeraet.dh -- tcp|rtu [stoerung]
+'
+' Speicher: 100 Halteregister (Anfang 0), 64 Spulen (aus), Eingaenge an jeder
+' dritten Stelle an, Eingangsregister 1000 + Adresse; Geraeteadresse 1 (RTU
+' antwortet nur dieser). Dahinter: Ausnahme 2. Funktionen ausser 1..6, 15,
+' 16: Ausnahme 1. Die Pruefsumme (CRC-16) ist hier eigens nachgerechnet --
+' derselbe Algorithmus, aber nicht derselbe Code wie in der Laufzeit.
+'
+' Stoerungen: "stumm" (antwortet nie), "kaputt" (RTU: falsche Pruefsumme),
+' "fremd" (TCP: erst eine Antwort mit falscher Kennung, dann die richtige),
+' "kurz" (RTU: nur die Haelfte der Antwort).
+'
+' Jede Anfrage steht in Hex in "anfragen.txt" im Arbeitsordner.
+IMPORT "net"
+
+DIM mgModus AS STRING : mgModus = ARG$(0)
+DIM mgStoer AS STRING : mgStoer = ""
+IF ARGC() > 1 THEN mgStoer = ARG$(1)
+DIM mgReg[100] AS INTEGER
+DIM mgSpule[64] AS INTEGER
+DIM mgLog AS STRING : mgLog = ""
+
+FUNCTION h2$(n AS INTEGER) AS STRING
+    DIM z AS STRING : z = "0123456789ABCDEF"
+    RETURN MID$(z, (n \ 16) BAND 15, 1) + MID$(z, n BAND 15, 1)
+END FUNCTION
+
+FUNCTION hexVon$(b AS BUFFER, von AS INTEGER, bis AS INTEGER) AS STRING
+    DIM aus AS STRING : aus = ""
+    DIM i AS INTEGER
+    FOR i = von TO bis - 1
+        IF aus <> "" THEN aus = aus + " "
+        aus = aus + h2$(BUFFER_GET(b, i))
+    NEXT
+    RETURN aus
+END FUNCTION
+
+FUNCTION crc(b AS BUFFER, n AS INTEGER) AS INTEGER
+    DIM c AS INTEGER : c = &HFFFF
+    DIM i AS INTEGER
+    DIM k AS INTEGER
+    FOR i = 0 TO n - 1
+        c = c BXOR BUFFER_GET(b, i)
+        FOR k = 1 TO 8
+            IF (c BAND 1) = 1 THEN
+                c = (c SHR 1) BXOR &HA001
+            ELSE
+                c = c SHR 1
+            END IF
+        NEXT
+    NEXT
+    RETURN c
+END FUNCTION
+
+' Antwort-PDU (als Hex ohne Leerzeichen) auf eine Anfrage-PDU ab Stelle p.
+FUNCTION antwort$(b AS BUFFER, p AS INTEGER) AS STRING
+    DIM fc AS INTEGER : fc = BUFFER_GET(b, p)
+    DIM adr AS INTEGER : adr = BUFFER_GET(b, p + 1) * 256 + BUFFER_GET(b, p + 2)
+    DIM n AS INTEGER : n = BUFFER_GET(b, p + 3) * 256 + BUFFER_GET(b, p + 4)
+    DIM aus AS STRING
+    DIM i AS INTEGER
+    DIM w AS INTEGER
+    SELECT CASE fc
+        CASE 1, 2
+            IF adr + n > 64 THEN RETURN h2$(fc + 128) + "02"
+            DIM bytes AS INTEGER : bytes = (n + 7) \ 8
+            aus = h2$(fc) + h2$(bytes)
+            DIM k AS INTEGER
+            FOR k = 0 TO bytes - 1
+                DIM by AS INTEGER : by = 0
+                FOR i = 0 TO 7
+                    DIM s AS INTEGER : s = k * 8 + i
+                    IF s < n THEN
+                        DIM an AS BOOLEAN
+                        IF fc = 1 THEN
+                            an = mgSpule[adr + s] = 1
+                        ELSE
+                            an = ((adr + s) MOD 3) = 0
+                        END IF
+                        IF an THEN by = by BOR (1 SHL i)
+                    END IF
+                NEXT
+                aus = aus + h2$(by)
+            NEXT
+            RETURN aus
+        CASE 3, 4
+            IF adr + n > 100 THEN RETURN h2$(fc + 128) + "02"
+            aus = h2$(fc) + h2$(n * 2)
+            FOR i = 0 TO n - 1
+                IF fc = 3 THEN
+                    w = mgReg[adr + i]
+                ELSE
+                    w = 1000 + adr + i
+                END IF
+                aus = aus + h2$(w \ 256) + h2$(w BAND 255)
+            NEXT
+            RETURN aus
+        CASE 5
+            IF adr >= 64 THEN RETURN "8502"
+            IF n <> &HFF00 AND n <> 0 THEN RETURN "8503"
+            mgSpule[adr] = IIF(n = &HFF00, 1, 0)
+            RETURN REPLACE$(hexVon$(b, p, p + 5), " ", "")
+        CASE 6
+            IF adr >= 100 THEN RETURN "8602"
+            mgReg[adr] = n
+            RETURN REPLACE$(hexVon$(b, p, p + 5), " ", "")
+        CASE 15
+            IF adr + n > 64 THEN RETURN "8F02"
+            FOR i = 0 TO n - 1
+                mgSpule[adr + i] = (BUFFER_GET(b, p + 6 + i \ 8) SHR (i MOD 8)) BAND 1
+            NEXT
+            RETURN REPLACE$(hexVon$(b, p, p + 5), " ", "")
+        CASE 16
+            IF adr + n > 100 THEN RETURN "9002"
+            FOR i = 0 TO n - 1
+                mgReg[adr + i] = BUFFER_GET(b, p + 6 + 2 * i) * 256 + BUFFER_GET(b, p + 7 + 2 * i)
+            NEXT
+            RETURN REPLACE$(hexVon$(b, p, p + 5), " ", "")
+    END SELECT
+    RETURN h2$(fc + 128) + "01"
+END FUNCTION
+
+SUB senden(s AS NET_SOCKET, hex AS STRING)
+    NET_SEND(s, BUFFER_FROM_HEX(REPLACE$(hex, " ", "")))
+END SUB
+
+' Wie lang eine RTU-Anfrage ist, aus ihrem Anfang (-1 = noch zu wenig da).
+FUNCTION rtuLaenge(b AS BUFFER) AS INTEGER
+    IF BUFFER_LEN(b) < 2 THEN RETURN -1
+    DIM fc AS INTEGER : fc = BUFFER_GET(b, 1)
+    IF fc = 15 OR fc = 16 THEN
+        IF BUFFER_LEN(b) < 7 THEN RETURN -1
+        RETURN 9 + BUFFER_GET(b, 6)
+    END IF
+    RETURN 8
+END FUNCTION
+
+SUB bedienen(s AS NET_SOCKET)
+    DIM puf AS BUFFER : puf = BUFFER_NEW(0)
+    WHILE NET_IS_CONNECTED(s)
+        DIM neu AS BUFFER : neu = NET_RECV_BYTES(s, 4096)
+        IF BUFFER_LEN(neu) = 0 THEN
+            SLEEP(2)
+            CONTINUE
+        END IF
+        puf = BUFFER_CONCAT(puf, neu)
+        DIM weiter AS BOOLEAN : weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF mgModus = "tcp" AND BUFFER_LEN(puf) >= 7 THEN
+                DIM l AS INTEGER : l = 6 + BUFFER_GET(puf, 4) * 256 + BUFFER_GET(puf, 5)
+                IF BUFFER_LEN(puf) >= l THEN
+                    mgLog = mgLog + hexVon$(puf, 0, l) + CHR$(10)
+                    WRITEALL("anfragen.txt", mgLog)
+                    DIM pdu AS STRING : pdu = antwort$(puf, 7)
+                    DIM kopf AS STRING : kopf = hexVon$(puf, 0, 4) + h2$((LEN(pdu) \ 2 + 1) \ 256) + h2$((LEN(pdu) \ 2 + 1) BAND 255) + hexVon$(puf, 6, 7)
+                    IF mgStoer = "fremd" THEN
+                        DIM falsch AS INTEGER : falsch = (BUFFER_GET(puf, 0) * 256 + BUFFER_GET(puf, 1) + 7) BAND &HFFFF
+                        senden(s, h2$(falsch \ 256) + h2$(falsch BAND 255) + "00000003" + hexVon$(puf, 6, 7) + "8304")
+                    END IF
+                    IF mgStoer <> "stumm" THEN senden(s, kopf + pdu)
+                    puf = BUFFER_SLICE(puf, l, BUFFER_LEN(puf))
+                    weiter = TRUE
+                END IF
+            ELSEIF mgModus = "rtu" THEN
+                DIM rl AS INTEGER : rl = rtuLaenge(puf)
+                IF rl > 0 AND BUFFER_LEN(puf) >= rl THEN
+                    mgLog = mgLog + hexVon$(puf, 0, rl) + CHR$(10)
+                    WRITEALL("anfragen.txt", mgLog)
+                    DIM c AS INTEGER : c = crc(puf, rl - 2)
+                    DIM ok AS BOOLEAN : ok = (BUFFER_GET(puf, rl - 2) = (c BAND 255)) AND (BUFFER_GET(puf, rl - 1) = (c SHR 8))
+                    IF ok AND BUFFER_GET(puf, 0) = 1 AND mgStoer <> "stumm" THEN
+                        DIM r AS BUFFER : r = BUFFER_FROM_HEX("01" + antwort$(puf, 1))
+                        DIM rc AS INTEGER : rc = crc(r, BUFFER_LEN(r))
+                        IF mgStoer = "kaputt" THEN rc = rc BXOR 1
+                        r = BUFFER_CONCAT(r, BUFFER_FROM_HEX(h2$(rc BAND 255) + h2$(rc SHR 8)))
+                        IF mgStoer = "kurz" THEN r = BUFFER_SLICE(r, 0, BUFFER_LEN(r) \ 2)
+                        NET_SEND(s, r)
+                    END IF
+                    puf = BUFFER_SLICE(puf, rl, BUFFER_LEN(puf))
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    WEND
+END SUB
+
+DIM lst AS NET_LISTENER : lst = NET_TCP_LISTEN(0, "127.0.0.1")
+EPRINT("PORT=" + STR$(NET_LISTENER_PORT(lst)))
+DIM zuletzt AS INTEGER : zuletzt = MILLIS()
+WHILE MILLIS() - zuletzt < 20000
+    DIM s AS NET_SOCKET : s = NET_TCP_ACCEPT(lst)
+    IF s = NIL THEN
+        SLEEP(5)
+    ELSE
+        bedienen(s)
+        zuletzt = MILLIS()
+    END IF
+WEND

@@ -1,0 +1,42 @@
+' Geraete anstecken und abziehen: was gerade da ist, und was sich tut
+' (Modul hotplug). Einen Arduino, ein MIDI-Keyboard oder einen
+' USB-Controller anstecken -- nach spaetestens einer halben Sekunde steht er
+' im Protokoll. Welche Arten beobachtet werden, haengt am Bau (--hardware).
+IMPORT "hotplug"
+
+DIM protokoll AS ARRAY OF STRING : protokoll = []
+DIM arten AS ARRAY OF STRING : arten = HOTPLUG_KINDS()
+
+SCREEN(760, 480, "Geraete")
+SETFPS(30)
+WHILE NOT QUITREQUESTED()
+    WHILE HOTPLUG_NEXT()
+        DIM zeile AS STRING
+        zeile = TIME$() + "  " + IIF(HOTPLUG_ADDED(), "+ ", "- ") + HOTPLUG_KIND$() + "  " + HOTPLUG_NAME$()
+        ARRAY_PUSH(protokoll, zeile)
+        IF LEN(protokoll) > 8 THEN ARRAY_REMOVE_AT(protokoll, 0)
+    WEND
+
+    CLS(&H12161C)
+    IF LEN(arten) = 0 THEN
+        TEXT(20, 20, "Dieser Bau beobachtet keine Geraete -- gebaut ohne --hardware.", &HFF9070)
+    END IF
+    DIM y AS INTEGER : y = 20
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(arten) - 1
+        DIM liste AS ARRAY OF STRING : liste = HOTPLUG_LIST(arten[k])
+        TEXT(20, y, arten[k] + " (" + STR$(LEN(liste)) + ")", &H90C0FF)
+        DIM j AS INTEGER
+        FOR j = 0 TO MIN(LEN(liste), 4) - 1
+            TEXT(150, y, liste[j], &HE0E0E0)
+            y = y + 20
+        NEXT
+        IF LEN(liste) = 0 THEN y = y + 20
+        y = y + 8
+    NEXT
+    TEXT(20, 300, "Protokoll", &H8090A0)
+    FOR k = 0 TO LEN(protokoll) - 1
+        TEXT(20, 324 + k * 18, protokoll[k], IIF(INSTR(protokoll[k], " + ") >= 0, &H90E0A0, &HFFB080))
+    NEXT
+    FLIP()
+WEND

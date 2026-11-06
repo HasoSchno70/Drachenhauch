@@ -1,0 +1,106 @@
+' Modbus-Monitor: zehn Halteregister eines Geraets laufend anzeigen --
+' als Zahl, mit Vorzeichen, in Hex und paarweise als Kommazahl. Ein
+' Stromzaehler, Wechselrichter oder eine SPS im Netz (Modul modbus).
+'
+'   dhrt run examples/216_modbus_monitor.dh -- 192.168.1.60 [port [einheit [adresse]]]
+'
+' Ohne Geraet: "tcp:..."-Ziele gehen auch fuer RTU-Umsetzer, und ein Geraet
+' zum Ausprobieren gibt es als Software (diagslave, ModbusPal, pyModSlave).
+'   Pfeile hoch/runter  zehn Register weiter/zurueck
+'   W                   das erste angezeigte Register um eins erhoehen
+IMPORT "modbus"
+
+DIM host AS STRING : host = "192.168.1.60"
+DIM port AS INTEGER : port = 502
+DIM einheit AS INTEGER : einheit = 1
+DIM adresse AS INTEGER : adresse = 0
+IF ARGC() > 0 THEN host = ARG$(0)
+IF ARGC() > 1 THEN port = INT(VAL(ARG$(1)))
+IF ARGC() > 2 THEN einheit = INT(VAL(ARG$(2)))
+IF ARGC() > 3 THEN adresse = INT(VAL(ARG$(3)))
+
+DIM geraet AS MODBUS
+DIM verbunden AS BOOLEAN : verbunden = FALSE
+DIM werte AS ARRAY OF INTEGER : werte = []
+DIM meldung AS STRING : meldung = "verbinde ..."
+DIM letzterVersuch AS INTEGER : letzterVersuch = -10000
+DIM letztesLesen AS INTEGER : letztesLesen = 0
+DIM gelesen AS INTEGER : gelesen = 0
+
+SUB verbinden()
+    TRY
+        geraet = MODBUS_TCP(host, port, einheit)
+        MODBUS_TIMEOUT(geraet, 500)
+        verbunden = TRUE
+        meldung = "verbunden mit " + host + ":" + STR$(port) + ", Geraet " + STR$(einheit)
+    CATCH e
+        meldung = e
+    END TRY
+    ' Erst NACH dem Versuch: ein Verbindungsaufbau, der ins Leere geht,
+    ' dauert unter Windows rund zwei Sekunden -- vorher gemessen, kaeme der
+    ' naechste gleich hinterher, und das Fenster stuende.
+    letzterVersuch = MILLIS()
+END SUB
+
+SUB lesen()
+    letztesLesen = MILLIS()
+    TRY
+        werte = MODBUS_READ_HOLDING(geraet, adresse, 10)
+        gelesen = gelesen + 1
+    CATCH e
+        meldung = e
+        ' Eine Ausnahme des Geraets (falsche Adresse) laesst die Verbindung
+        ' stehen; alles andere heisst: neu verbinden.
+        IF INSTR(e, "Ausnahme") < 0 THEN
+            MODBUS_CLOSE(geraet)
+            verbunden = FALSE
+        END IF
+        werte = []
+    END TRY
+END SUB
+
+SCREEN(720, 420, "Modbus-Monitor")
+SETFPS(30)
+WHILE NOT QUITREQUESTED()
+    IF NOT verbunden AND MILLIS() - letzterVersuch > 2000 THEN verbinden()
+    IF verbunden AND MILLIS() - letztesLesen > 500 THEN lesen()
+    IF KEYHIT(KEY_DOWN) THEN
+        adresse = MIN(adresse + 10, 65526)
+        werte = []
+    END IF
+    IF KEYHIT(KEY_UP) THEN
+        adresse = MAX(adresse - 10, 0)
+        werte = []
+    END IF
+    IF KEYHIT("w") AND verbunden AND LEN(werte) > 0 THEN
+        TRY
+            MODBUS_WRITE_REGISTER(geraet, adresse, (werte[0] + 1) MOD 65536)
+            lesen()
+        CATCH e
+            meldung = e
+        END TRY
+    END IF
+
+    CLS(&H101820)
+    TEXT(20, 16, "Halteregister ab " + STR$(adresse) + "   (" + STR$(gelesen) + " mal gelesen)", &HE0E0E0)
+    TEXT(20, 44, "Adresse    Wert    mit Vorz.   Hex     als FLOAT (ABCD)", &H8090A0)
+    DIM i AS INTEGER
+    FOR i = 0 TO 9
+        DIM y AS INTEGER : y = 70 + i * 26
+        TEXT(20, y, STR$(adresse + i), &HA0A0B0)
+        IF i < LEN(werte) THEN
+            TEXT(110, y, STR$(werte[i]), &HFFFFFF)
+            TEXT(190, y, STR$(MODBUS_INT16(werte[i])), &HC0D0E0)
+            TEXT(300, y, "&H" + RIGHT$("000" + HEX$(werte[i]), 4), &HC0D0E0)
+            IF i MOD 2 = 0 AND i + 1 < LEN(werte) THEN
+                TEXT(390, y, FORMAT$(MODBUS_FLOAT(werte, i), "%.4f"), &H90E0A0)
+            END IF
+        ELSE
+            TEXT(110, y, "--", &H606070)
+        END IF
+    NEXT
+    TEXT(20, 350, meldung, IIF(verbunden, &H90C0FF, &HFF9070))
+    TEXT(20, 380, "Pfeile: weiter/zurueck   W: erstes Register +1", &H707080)
+    FLIP()
+WEND
+IF verbunden THEN MODBUS_CLOSE(geraet)
