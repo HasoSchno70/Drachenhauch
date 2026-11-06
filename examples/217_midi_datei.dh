@@ -1,0 +1,188 @@
+' MIDI-Datei als Klavierrolle -- lesen, ansehen, abspielen.
+'
+'   dhrt run examples/217_midi_datei.dh -- lied.mid
+'
+' Ohne Datei baut das Programm selbst ein kleines Stueck (MIDI_FILE_NEW und
+' MIDI_FILE_ADD_NOTE) -- so sieht man beide Richtungen. Gespielt wird mit
+' dem eingebauten Synthesizer: jede Note ein AUDIO_NOTE, auf einer Audio-Uhr
+' eine Sekunde voraus geplant (ein Bild sind 16 ms, das hoerte man). Mit
+' einem MIDI-Ausgang (Bau mit --hardware) spielt M die Datei stattdessen dort.
+'
+'   Leertaste  spielen / anhalten     Pfeile links/rechts  spulen
+'   S          als stueck.mid sichern  M  am ersten MIDI-Ausgang spielen
+IMPORT "midi"
+IMPORT "audio"
+
+DIM mf AS MIDI_FILE
+DIM name AS STRING
+IF ARGC() > 0 THEN
+    mf = MIDI_FILE_LOAD(ARGPATH$(0))
+    name = ARG$(0)
+ELSE
+    ' Ein Kanon in C: Melodie, darunter dieselbe zwei Takte spaeter, und ein Bass.
+    mf = MIDI_FILE_NEW()
+    MIDI_FILE_SET_TEMPO(mf, 96)
+    MIDI_FILE_SET_TRACK_NAME(mf, 1, "Melodie")
+    MIDI_FILE_SET_TRACK_NAME(mf, 2, "Bass")
+    DIM melodie AS ARRAY OF INTEGER : melodie = [60, 62, 64, 60, 60, 62, 64, 60, 64, 65, 67, 67, 64, 65, 67, 67]
+    DIM laenge AS ARRAY OF FLOAT : laenge = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 0, 1, 1, 2, 0]
+    DIM k AS INTEGER
+    DIM b AS FLOAT : b = 0
+    FOR k = 0 TO LEN(melodie) - 1
+        IF laenge[k] > 0 THEN
+            MIDI_FILE_ADD_NOTE(mf, 1, 1, melodie[k], 100, b, laenge[k] * 0.95)
+            MIDI_FILE_ADD_NOTE(mf, 1, 1, melodie[k] + 12, 70, b + 8, laenge[k] * 0.95)
+            b = b + laenge[k]
+        END IF
+    NEXT
+    FOR k = 0 TO 7
+        MIDI_FILE_ADD_NOTE(mf, 2, 2, IIF(k MOD 2 = 0, 36, 43), 90, k * 2, 1.8)
+    NEXT
+    name = "(selbst gebaut)"
+END IF
+
+DIM anzahl AS INTEGER : anzahl = MIDI_FILE_NOTES(mf)
+DIM beginn[MAX(anzahl, 1)] AS FLOAT
+DIM dauer[MAX(anzahl, 1)] AS FLOAT
+DIM ton[MAX(anzahl, 1)] AS INTEGER
+DIM kanal[MAX(anzahl, 1)] AS INTEGER
+DIM laut[MAX(anzahl, 1)] AS INTEGER
+DIM tief AS INTEGER : tief = 127
+DIM hoch AS INTEGER : hoch = 0
+DIM i AS INTEGER
+FOR i = 0 TO anzahl - 1
+    DIM t, d AS FLOAT
+    DIM ka, no, an, sp AS INTEGER
+    (t, d, ka, no, an, sp) = MIDI_FILE_NOTE(mf, i)
+    beginn[i] = t : dauer[i] = d : ton[i] = no : kanal[i] = ka : laut[i] = an
+    tief = MIN(tief, no) : hoch = MAX(hoch, no)
+NEXT
+IF anzahl = 0 THEN
+    tief = 60
+    hoch = 72
+END IF
+DIM gesamt AS FLOAT : gesamt = MIDI_FILE_DURATION(mf)
+
+' --- Abspielen ueber den eingebauten Synthesizer ---
+DIM uhr AS AUDIO_CLOCK
+DIM spielt AS BOOLEAN : spielt = FALSE
+DIM ab AS FLOAT : ab = 0          ' wo die Uhr losging (Sekunde im Stueck)
+DIM naechste AS INTEGER : naechste = 0
+DIM stand AS FLOAT : stand = 0
+
+FUNCTION wellenform$(k AS INTEGER) AS STRING
+    IF k = 10 THEN RETURN "noise"
+    IF k MOD 2 = 0 THEN RETURN "saw"
+    RETURN "triangle"
+END FUNCTION
+
+SUB anhalten()
+    IF spielt THEN AUDIO_CLOCK_REMOVE(uhr)
+    spielt = FALSE
+END SUB
+
+SUB starten(von AS FLOAT)
+    anhalten()
+    ab = CLAMP(von, 0.0, gesamt)
+    naechste = 0
+    WHILE naechste < anzahl AND beginn[naechste] < ab
+        naechste = naechste + 1
+    WEND
+    ' Eine Uhr in Millisekunden: AUDIO_PLAY_AT trifft den Tick genau.
+    uhr = AUDIO_CLOCK_NEW(1000)
+    AUDIO_CLOCK_START(uhr)
+    spielt = TRUE
+END SUB
+
+SUB planen()
+    IF NOT spielt THEN RETURN
+    stand = ab + AUDIO_CLOCK_TICKS(uhr) / 1000.0
+    ' Was in der naechsten Sekunde beginnt, jetzt an die Uhr haengen.
+    WHILE naechste < anzahl AND beginn[naechste] < stand + 1.0
+        DIM ms AS INTEGER : ms = INT(MAX(dauer[naechste], 0.05) * 1000)
+        DIM s AS SOUND
+        s = AUDIO_NOTE(wellenform$(kanal[naechste]), MIDI_NOTE_FREQ(ton[naechste]), ms, 5, 120, 0.6, 150, laut[naechste] / 127.0 * 0.25)
+        AUDIO_PLAY_AT(s, uhr, INT((beginn[naechste] - ab) * 1000))
+        naechste = naechste + 1
+    WEND
+    IF stand > gesamt + 0.3 THEN
+        anhalten()
+        stand = 0
+    END IF
+END SUB
+
+' --- Abspielen an einem MIDI-Ausgang (nur mit --hardware) ---
+DIM ausgang AS INTEGER : ausgang = -1
+FUNCTION ausgangOeffnen() AS STRING
+    TRY
+        IF MIDI_OUT_COUNT() = 0 THEN RETURN "kein MIDI-Ausgang"
+        IF ausgang < 0 THEN ausgang = MIDI_OUT_OPEN(0)
+        anhalten()
+        MIDI_FILE_PLAY(ausgang, mf, stand)
+        RETURN "spielt an " + MIDI_OUT_NAME$(0)
+    CATCH e
+        RETURN "MIDI: " + e
+    END TRY
+END FUNCTION
+
+SCREEN(960, 540, "MIDI-Datei")
+SETFPS(60)
+DIM meldung AS STRING : meldung = ""
+CONST LINKS = 40
+CONST OBEN = 60
+CONST UNTEN = 480
+DIM jeSekunde AS FLOAT : jeSekunde = 120
+WHILE NOT QUITREQUESTED()
+    IF KEYHIT(KEY_SPACE) THEN
+        IF spielt THEN anhalten() ELSE starten(stand)
+    END IF
+    IF KEYHIT(KEY_RIGHT) THEN starten(stand + 5)
+    IF KEYHIT(KEY_LEFT) THEN starten(stand - 5)
+    IF KEYHIT("s") THEN
+        MIDI_FILE_SAVE(mf, "stueck.mid")
+        meldung = "gesichert als " + CWD$() + "/stueck.mid"
+    END IF
+    IF KEYHIT("m") THEN meldung = ausgangOeffnen()
+    IF ausgang >= 0 THEN
+        IF MIDI_FILE_PLAYING(ausgang) THEN stand = MIDI_FILE_POSITION(ausgang)
+    END IF
+    planen()
+
+    CLS(&H14141C)
+    DIM zeilenH AS FLOAT : zeilenH = (UNTEN - OBEN) / MAX(hoch - tief + 1, 1)
+    DIM sichtAb AS FLOAT : sichtAb = stand - 2.0
+    ' Gitter: eine Linie je Sekunde, die C-Tasten heller.
+    DIM sek AS INTEGER
+    FOR sek = INT(sichtAb) TO INT(sichtAb + 8) + 1
+        DIM x AS INTEGER : x = LINKS + INT((sek - sichtAb) * jeSekunde)
+        IF x >= LINKS THEN LINE(x, OBEN, x, UNTEN, &H262634)
+    NEXT
+    DIM n AS INTEGER
+    FOR n = tief TO hoch
+        IF n MOD 12 = 0 THEN
+            DIM y AS INTEGER : y = UNTEN - INT((n - tief + 1) * zeilenH)
+            BOX(LINKS, y, 940, y + INT(zeilenH), &H1C1C28)
+            TEXT(4, y, MIDI_NOTE_NAME$(n), &H808090)
+        END IF
+    NEXT
+    ' Die Noten.
+    FOR i = 0 TO anzahl - 1
+        DIM x1 AS FLOAT : x1 = LINKS + (beginn[i] - sichtAb) * jeSekunde
+        DIM x2 AS FLOAT : x2 = x1 + MAX(dauer[i] * jeSekunde, 2)
+        IF x2 >= LINKS AND x1 <= 940 THEN
+            DIM yy AS INTEGER : yy = UNTEN - INT((ton[i] - tief + 1) * zeilenH)
+            DIM farbe AS INTEGER : farbe = IIF(kanal[i] = 10, &HE07050, IIF(kanal[i] MOD 2 = 0, &H50A0E0, &H70D080))
+            IF beginn[i] <= stand AND stand < beginn[i] + dauer[i] THEN farbe = &HFFE070
+            BOXROUND(INT(MAX(x1, LINKS)), yy, INT(MIN(x2, 940)), yy + MAX(INT(zeilenH) - 1, 2), 2, farbe)
+        END IF
+    NEXT
+    ' Wo es steht.
+    DIM xs AS INTEGER : xs = LINKS + INT((stand - sichtAb) * jeSekunde)
+    LINE(xs, OBEN - 6, xs, UNTEN + 6, &HFFFFFF)
+    TEXT(LINKS, 16, name + "   " + STR$(anzahl) + " Noten, " + STR$(MIDI_FILE_TRACKS(mf)) + " Spuren, " + FORMAT$(MIDI_FILE_TEMPO(mf), "%.0f") + " BPM", &HE0E0E0)
+    TEXT(LINKS, 36, FORMAT$(stand, "%.1f") + " / " + FORMAT$(gesamt, "%.1f") + " s", &HA0A0B0)
+    TEXT(LINKS, 500, "Leertaste spielen/anhalten   Pfeile spulen   S sichern   M MIDI-Ausgang", &H808090)
+    TEXT(LINKS, 518, meldung, &HB0D0FF)
+    FLIP()
+WEND
+anhalten()

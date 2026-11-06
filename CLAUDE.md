@@ -3469,6 +3469,70 @@ Pruefwerten aus RFC 6455 und OSC 1.0. Doku `docs/module-websocket.md`,
 (httpd + WebSocket + mDNS, mit curl und Node nachgefahren) und
 `examples/215_osc_fernbedienung.dh`, Lehrbuch Kapitel 73.
 
+## Modbus, MIDI-Uhr und .mid-Dateien, Ein-/Ausstecken (2026-11-06)
+
+Siebter Punkt der Bastler-Liste, eine neue Befehlsfamilie (`try_geraete`,
+Familie 33, `BUILTIN_FAMILIEN` = 34) fuer `modbus_`/`hotplug_`; MIDI bleibt
+in Familie 11. **`modbus`** (`modbus.rs`, in JEDEM Bau, Typ MODBUS):
+`MODBUS_TCP` (MBAP-Kopf, Kennung je Anfrage hochgezaehlt; eine Antwort mit
+fremder Kennung gehoert zu einer zu spaeten Frage und wird uebergangen) und
+`MODBUS_RTU` (seriell mit Feature `serial`, sonst `"tcp:host:port"` = RTU-
+Rahmen ueber einen Umsetzer im Netz -- so ist RTU auch ohne Geraet
+pruefbar). RTU kennt keine Laenge im Rahmen: `rtu_laenge` rechnet sie aus
+den ersten drei Bytes, vor jeder Anfrage wird der Eingang geleert, CRC-16
+der Antwort wird geprueft, Adresse 0 = an alle (Schreiben wartet nicht,
+Lesen ist ein Fehler). Funktionen 1..6, 15, 16, Bereiche VOR dem Senden
+geprueft (`bereich`: 2000/125/1968/123, nicht ueber 65535), Ausnahmen im
+Klartext (`ausnahme_text`). 32-Bit-Werte: `folge_lesen` (ABCD/CDAB/BADC/
+DCBA, `zwei_register`/`als_register`), `MODBUS_FLOAT/INT32/UINT32` lesen
+aus einem Feld ab einer Stelle (zaehlt wie das Feld, `unten_von`),
+`_REGS` liefert zwei Register zum Schreiben. Jeder Befehl WARTET auf die
+Antwort -- darum spielt die Pruefung das Geraet als eigenen Prozess
+(`tests/pruef/_hilfen/modbusgeraet.dh`, eigene CRC in Drachenhauch,
+Anfragen in Hex nach `anfragen.txt`, VOR der Antwort geschrieben;
+Stoerungen stumm/kaputt/fremd/kurz). **Falle im Beispiel:** ein
+Verbindungsaufbau ins Leere dauert unter Windows ~2 s -- wer den
+Wiederholungstakt VOR dem Versuch merkt, versucht in jedem Bild neu.
+
+**MIDI-Uhr** (`midi.rs`, `Takt` rein mit Rust-Tests): `in_open` laesst nur
+noch SysEx weg (vorher `Ignore::All`); F8/F1/FE gehen nur in den Takt (eigene
+`Instant`-Uhr im Rueckruf, midirs Zeitstempel hat keinen bekannten Anfang),
+FA/FB/FC/F2 zusaetzlich weiter in die Warteschlange -- wie vor 2026.43, als
+midir nur F1/F8/FE filterte. Tempo = Mittel der letzten 24 Abstaende, 0 nach
+0,5 s Stille, eine Pause ueber 1 s beginnt das Mittel neu.
+`MIDI_CLOCK_SEND` (`takte_schlagen`: Schlag n auf n * Abstand ab festem
+Anfang, faellt er mehr als einen Abstand zurueck, zaehlt er neu; Tempo per
+`AtomicU64`, ein neues Tempo ohne Neustart). Der Ausgang haelt die
+Verbindung jetzt hinter `Arc<Mutex>` (Uhr- und Spieler-Faden senden mit),
+`Drop` haelt beide Faeden an. **`.mid`-Dateien** (`midifile.rs`, ungated,
+Typ MIDI_FILE): lesen Format 0/1/2 mit laufendem Status (Meta/SysEx heben
+ihn auf), Tempo-Karte ueber alle Spuren, SMPTE (29 = 29,97); Noten gepaart
+(Note-aus beendet die AELTESTE offene derselben Spur/Kanal/Taste), alles nach
+aussen in Sekunden, Schreiben in Vierteln (Format 1, Tempo in Spur 0).
+Zur selben Zeit geordnet nach `rang`: Meta, Note-aus, Programm/Regler,
+Note-an -- beim Schreiben UND in der Ansicht (sonst klingt eine Note mit dem
+alten Programm bzw. schneidet sich eine wiederholte selbst ab).
+`MIDI_FILE_PLAY` spielt die Ansicht in einem Faden ab und schaltet beim
+Anhalten klingende Noten aus. Die IMPORT-Warnung fuer `midi` sagt in einem
+Bau ohne das Feature jetzt "nur zum Teil" (Dateien und Notenrechnung gehen).
+**`hotplug`** (`hotplug.rs`): ein Faden vergleicht alle 500 ms die Listen
+(serialport, midir, `usb::list`), geordnet und ohne Doppelte (ein HID-Geraet
+meldet sich je Schnittstelle), Ausgangslage beim ersten `HOTPLUG_`-Aufruf
+ohne Meldung, hoechstens 256 Meldungen; `DHRT_GERAETE=datei` (`art:name` je
+Zeile) ersetzt die Listen fuer Pruefungen. Tests `modbus.dhtest` (7),
+`midi_dateien.dhtest` (5, Beispieldatei der SMF-Spezifikation, Schreiben Byte
+fuer Byte), `hotplug.dhtest` (3), zwei Loopback-Faelle in
+`modules_midi.dhtest` (Uhr mit Tempowechsel, Abspielen samt Anhalten;
+loopMIDI), Rust-Tests mit den Beispielen der Spezifikationen; 13
+Verfaelschungen fallen je in ihrem Fall (die Tempo-Verfaelschung verdeckte
+anfangs die "Note-aus beim Anhalten" -- die Datei lief halb so schnell).
+Beispiele `216_modbus_monitor.dh`, `217_midi_datei.dh` (Klavierrolle,
+eingebauter Synthesizer auf einer Audio-Uhr), `218_geraete_melden.dh`; Doku
+`docs/module-modbus.md`, `module-hotplug.md`, `module-midi.md`, Buch
+Kapitel 76/77. **Ungeprueft:** RTU an einer echten seriellen Schnittstelle,
+jedes echte Modbus-Geraet, echtes An-/Abstecken (die Listen selbst stimmen
+hier mit COM1, loopMIDI und den HID-Geraeten ueberein).
+
 ## Dogfooding 15: Landkarte (2026-10-26)
 
 `examples/karten/`: `kern.dh` (Web-Mercator, Kachelnummern, Haversine,
