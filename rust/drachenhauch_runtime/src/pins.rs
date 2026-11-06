@@ -243,6 +243,7 @@ mod os {
     use std::os::fd::{AsRawFd, FromRawFd};
 
     #[repr(C)]
+    #[allow(dead_code)]
     struct ChipInfo { name: [u8; 32], label: [u8; 32], lines: u32 }
 
     #[repr(C)]
@@ -333,7 +334,6 @@ mod os {
 
     pub struct Chip {
         datei: File,
-        pub name: String,
         pub label: String,
         pub zahl: u32,
         linien: HashMap<u32, Linie>,
@@ -391,7 +391,7 @@ mod os {
             ioctl(datei.as_raw_fd(), GPIO_GET_CHIPINFO, &mut info)
                 .map_err(|e| format!("{F}: {pfad} ist kein GPIO-Chip ({e})"))?;
             Ok(Chip {
-                datei, name: text(&info.name), label: text(&info.label), zahl: info.lines,
+                datei, label: text(&info.label), zahl: info.lines,
                 linien: HashMap::new(), schlange: VecDeque::new(), letztes: None,
             })
         }
@@ -564,7 +564,7 @@ mod os {
 
     // ---------------- I2C ----------------
 
-    pub struct Bus { datei: File, funcs: u64, adr: i64, pub pfad: String }
+    pub struct Bus { datei: File, funcs: u64, adr: i64 }
 
     impl Bus {
         pub fn oeffnen(ziel: &str) -> Result<Bus, String> {
@@ -573,7 +573,7 @@ mod os {
             let datei = oeffnen_mit_hinweis(F, &pfad, "i2c")?;
             let mut funcs: libc::c_ulong = 0;
             ioctl(datei.as_raw_fd(), I2C_FUNCS, &mut funcs).map_err(|e| format!("{F}: {pfad} ist kein I2C-Bus ({e})"))?;
-            Ok(Bus { datei, funcs: funcs as u64, adr: -1, pfad })
+            Ok(Bus { datei, funcs: funcs as u64, adr: -1 })
         }
 
         fn adresse(&mut self, f: &str, adr: i64) -> Result<(), String> {
@@ -690,7 +690,7 @@ mod os {
 
     // ---------------- SPI ----------------
 
-    pub struct Spi { datei: File, hz: u32, pub pfad: String }
+    pub struct Spi { datei: File, hz: u32 }
 
     impl Spi {
         pub fn oeffnen(bus: i64, cs: i64, hz: i64, modus: i64) -> Result<Spi, String> {
@@ -701,7 +701,7 @@ mod os {
             bereich(F, "Modus", modus, 0, 3)?;
             let pfad = format!("/dev/spidev{bus}.{cs}");
             let datei = oeffnen_mit_hinweis(F, &pfad, "spi")?;
-            let mut s = Spi { datei, hz: hz as u32, pfad };
+            let mut s = Spi { datei, hz: hz as u32 };
             s.modus_setzen(F, modus)?;
             let mut bits: u8 = 8;
             ioctl(s.datei.as_raw_fd(), SPI_IOC_WR_BITS_PER_WORD, &mut bits).map_err(|e| format!("{F}: {e}"))?;
@@ -746,9 +746,9 @@ mod os {
 mod os {
     use super::*;
 
-    pub struct Chip { pub name: String, pub label: String, pub zahl: u32 }
-    pub struct Bus { pub pfad: String }
-    pub struct Spi { pub pfad: String }
+    pub struct Chip { pub label: String, pub zahl: u32 }
+    pub struct Bus;
+    pub struct Spi;
 
     fn nein<T>(f: &str) -> Result<T, String> { Err(format!("{f}: gibt es nur unter Linux (etwa auf dem Raspberry Pi)")) }
 

@@ -280,7 +280,8 @@ fn eingebaut() -> String {
     let mut an: Vec<&str> = Vec::new();
     let mut aus: Vec<&str> = Vec::new();
     for (name, da) in [
-        ("grafik", cfg!(feature = "graphics")),
+        // Der Bau fuer den Raspberry Pi zeichnet ueber OpenGL ES (Feature `gles`).
+        (if cfg!(feature = "gles") { "grafik (OpenGL ES)" } else { "grafik" }, cfg!(feature = "graphics")),
         ("dialoge", cfg!(feature = "dialogs")),
         ("tray", cfg!(feature = "tray")),
         ("video", cfg!(feature = "video")),

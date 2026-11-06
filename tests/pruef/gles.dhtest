@@ -1,0 +1,107 @@
+' Die Grafik-Wege, die im GLES-Bau (Feature `gles`, Raspberry Pi) anders
+' laufen als auf dem Desktop: Shader werden auf `#version 300 es` umgeschrieben,
+' Render-Ziele legt dhrt selbst an (raylibs Weg war unter OpenGL ES
+' "incomplete attachment", graphics.rs `render_ziel`), und das Zuruecklesen
+' eines Ziels geht ueber den Framebuffer statt glGetTexImage.
+'
+' Die Faelle gelten fuer JEDEN Bau mit Grafik -- auf dem Desktop pruefen sie
+' dasselbe ueber OpenGL 3.3. Die CI faehrt sie mit dem GLES-Bau auf dem
+' ARM-Laeufer (package.yml); ohne Fenster ueberspringen sie sich.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== dhrt --version nennt opengl es im gles-bau
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "--version")
+DIM aus AS STRING : aus = ""
+DIM leer AS INTEGER : leer = 0
+WHILE leer < 5
+    DIM z AS STRING : z = PROCESS_READ$(p)
+    IF z = "" THEN
+        IF NOT PROCESS_RUNNING(p) THEN leer = leer + 1
+        SLEEP(30)
+    ELSE
+        aus = aus + TRIM$(z) + " "
+    END IF
+WEND
+IF INSTR(aus, "OpenGL ES") < 0 THEN
+    PRINT "UEBERSPRINGEN: kein GLES-Bau"
+ELSE
+    PRINT "grafik ueber opengl es"
+END IF
+--- erwartet
+grafik ueber opengl es
+
+=== ein desktop-shader laeuft als postfx
+' #version 330 mit in/out und texture(): im GLES-Bau tauscht dhrt nur den
+' Kopf. Der Shader vertauscht Rot und Gruen -- ein gruenes Rechteck kommt rot
+' auf den Schirm, der schwarze Grund bleibt schwarz.
+SCREEN(160, 100, "gles", 1)
+DIM sh AS INTEGER
+sh = SHADER_LOAD(!"#version 330\nin vec2 fragTexCoord;\nin vec4 fragColor;\nuniform sampler2D texture0;\nout vec4 finalColor;\nvoid main() {\n    vec4 c = texture(texture0, fragTexCoord);\n    finalColor = vec4(c.g, c.r, c.b, 1.0);\n}\n")
+PRINT "geladen "; sh >= 0
+POSTFX(sh)
+WHILE NOT QUITREQUESTED()
+    CLS(&H000000)
+    BOX(40, 20, 120, 80, &H00FF00)
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=3
+--- erwartet
+geladen TRUE
+--- bild
+groesse 160 100
+80 50 #FF0000 +-12
+10 10 #000000 +-12
+
+=== ein render-ziel laesst sich zeichnen und zuruecklesen
+' Ein Ziel mit Inhalt, als Bild gelesen und auf den Schirm gestempelt.
+SCREEN(160, 100, "gles", 1)
+DIM rt AS INTEGER : rt = RENDERTARGET_NEW(64, 32)
+RENDERTARGET_BEGIN(rt)
+CLS(&H0000FF)
+BOX(0, 0, 31, 31, &HFF0000)
+RENDERTARGET_END()
+DIM b AS IMAGE : b = RENDERTARGET_IMAGE(rt)
+PRINT IMAGE_WIDTH(b), IMAGE_HEIGHT(b)
+PRINT HEX$(GETPIXEL(b, 10, 10)), HEX$(GETPIXEL(b, 50, 10))
+WHILE NOT QUITREQUESTED()
+    CLS(&H000000)
+    RENDERTARGET_DRAW(rt, 20, 20)
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=3
+--- erwartet
+64 32
+FF0000 FF
+--- bild
+30 30 #FF0000 +-12
+70 30 #0000FF +-12
+150 90 #000000 +-12
+
+=== hdr-umgebung mit skybox und pbr
+' Die IBL-Maps (Cubemaps, BRDF-Tabelle) legt dhrt ohne Anfangsdaten an --
+' im GLES-Bau mit Nullen (graphics.rs `leere_textur`). Eine spiegelnde
+' Kugel muss sich vom Himmel dahinter unterscheiden, der Himmel vom Schwarz.
+IMPORT "g3d"
+SCREEN(200, 120, "ibl", 1)
+LIGHT_ENABLE()
+LIGHT_ENV_HDR(ARG$(0), 1.0)
+SKYBOX(TRUE)
+DIM k AS INTEGER : k = MESH_SPHERE(1.0, 24, 24)
+MODEL_LIT(k)
+MODEL_PBR(k, 1.0, 0.1)
+WHILE NOT QUITREQUESTED()
+    CLS(&H000000)
+    CAMERA3D(0, 0, 4, 0, 0, 0, 45)
+    MODEL(k, 0, 0, 0, 1.0, &HFFFFFF)
+    FLIP()
+WEND
+--- argumente
+{sammlung}/../../examples/assets/ibl_env.hdr
+--- umgebung
+DHRT_FRAMES=4
+--- bild
+groesse 200 120
+100 60 <> 10 10
+10 10 nicht #000000 +-6
