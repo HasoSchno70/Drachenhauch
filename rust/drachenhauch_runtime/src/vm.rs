@@ -595,7 +595,7 @@ fn ui_preset_metrics(name: &str) -> Vec<(&'static str, i64)> {
 /// damit ein Tippfehler im DH-Programm NICHT die Runtime abstuerzen laesst,
 /// sondern einen klaren Laufzeitfehler liefert.
 /// Zahl der Befehlsfamilien in `Vm::familie_rufen`; die letzte sind die reinen.
-pub(crate) const BUILTIN_FAMILIEN: u8 = 30;
+pub(crate) const BUILTIN_FAMILIEN: u8 = 32;
 
 fn safe_call_builtin(name: &str, args: &[Value]) -> Option<Result<Value, String>> {
     use std::panic::{catch_unwind, AssertUnwindSafe};
@@ -631,6 +631,16 @@ fn ui_lighten(color: i64, factor: f64) -> i64 {
     let g = (g + (255.0 - g) * factor).min(255.0).max(0.0) as i64;
     let b = (b + (255.0 - b) * factor).min(255.0).max(0.0) as i64;
     (r << 16) | (g << 8) | b
+}
+
+/// Eine offene Kamera: der Faden, das IMAGE, in das ihre Bilder kommen,
+/// und ein Puffer, der zwischen Kamera und Bild hin und her getauscht wird.
+#[cfg(feature = "graphics")]
+struct WebcamZustand {
+    kamera: crate::webcam::Kamera,
+    bild: i64,
+    mass: (u32, u32),
+    px: Vec<u8>,
 }
 
 /// Ein geladenes Video: der Decoder, das IMAGE, in das jedes neue Bild geht,
@@ -1048,11 +1058,22 @@ pub struct Vm<'p> {
     // Modul video: je Griff ein Video samt seinem IMAGE und der Uhr.
     #[cfg(all(feature = "video", feature = "graphics"))]
     videos: Vec<Option<VideoZustand>>,
+    /// Offene Kameras (WEBCAM_OPEN), Tombstone-Plaetze wie bei den Videos.
+    #[cfg(feature = "graphics")]
+    webcams: Vec<Option<WebcamZustand>>,
     #[cfg(feature = "midi")]
     midi_outs: Vec<Option<crate::midi::Ausgang>>,
     #[cfg(feature = "serial")]
     serial_ports: Vec<Option<crate::serial::Port>>,
     firmata_boards: Vec<Option<crate::firmata::Board>>,
+    /// Der laufende Mikrofon-Eingang (MIC_START) und der Zustand von
+    /// MIC_FFT (Nachleuchten, Verstaerkung) -- getrennt von AUDIO_FFT.
+    #[cfg(feature = "graphics")]
+    mikrofon: Option<crate::mikrofon::Lauf>,
+    #[cfg(feature = "graphics")]
+    mic_baender: Vec<f32>,
+    #[cfg(feature = "graphics")]
+    mic_agc: f32,
     gpio_chips: Vec<Option<crate::pins::Chip>>,
     i2c_busse: Vec<Option<crate::pins::Bus>>,
     spi_geraete: Vec<Option<crate::pins::Spi>>,
@@ -1225,11 +1246,19 @@ impl<'p> Vm<'p> {
             midi_ins: Vec::new(),
             #[cfg(all(feature = "video", feature = "graphics"))]
             videos: Vec::new(),
+            #[cfg(feature = "graphics")]
+            webcams: Vec::new(),
             #[cfg(feature = "midi")]
             midi_outs: Vec::new(),
             #[cfg(feature = "serial")]
             serial_ports: Vec::new(),
             firmata_boards: Vec::new(),
+            #[cfg(feature = "graphics")]
+            mikrofon: None,
+            #[cfg(feature = "graphics")]
+            mic_baender: Vec::new(),
+            #[cfg(feature = "graphics")]
+            mic_agc: 1e-4,
             gpio_chips: Vec::new(),
             i2c_busse: Vec::new(),
             spi_geraete: Vec::new(),
@@ -2273,6 +2302,8 @@ impl<'p> Vm<'p> {
             28 => if name == "__ffi" { crate::ffi::vm_setzen(self); crate::ffi::rufen(a).map(Some) }
                   else { crate::ffi::zeiger_befehl(name, a).transpose() },
             29 => self.try_pins(name, a),
+            30 => self.try_mikrofon(name, a),
+            31 => self.try_webcam(name, a),
             _ => match safe_call_builtin(name, a) {
                 Some(Ok(v)) => Ok(Some(v)),
                 Some(Err(e)) if e.starts_with("__UNKNOWN_BUILTIN__:") => Err(unknown_builtin_msg(name)),
@@ -6654,6 +6685,236 @@ impl<'p> Vm<'p> {
     // Module gpio/i2c/spi: die Pins des Kernels (pins.rs). In jedem Bau;
     // ausserhalb von Linux meldet jeder Aufruf "nur unter Linux".
     // ===================================================================
+    // ===================================================================
+    // Mikrofon (MIC_*, src/mikrofon.rs): ein Eingang zur Zeit
+    // ===================================================================
+    // ===================================================================
+    // Modul webcam (src/webcam.rs): Bilder einer Kamera in ein IMAGE
+    // ===================================================================
+    fn try_webcam(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        if !name.starts_with("webcam_") { return Ok(None); }
+        #[cfg(feature = "graphics")]
+        { return self.try_webcam_impl(name, a); }
+        #[allow(unreachable_code)]
+        { let _ = a; Ok(None) }
+    }
+
+    #[cfg(feature = "graphics")]
+    fn webcam_z(&mut self, a: &[Value], f: &str) -> R<usize> {
+        let i = bi_int(a, 0, f)?;
+        match self.webcams.get(i.max(0) as usize) {
+            Some(Some(_)) if i >= 0 => Ok(i as usize),
+            _ => Err(format!("{}: ungueltige oder geschlossene WEBCAM {}", f, i)),
+        }
+    }
+
+    /// Ein neues Bild der Kamera ins IMAGE schreiben; TRUE, wenn eins kam.
+    /// Hat sich die Groesse geaendert, gibt es ein neues IMAGE (WEBCAM_IMAGE
+    /// liefert es).
+    #[cfg(feature = "graphics")]
+    fn webcam_holen(&mut self, i: usize) -> R<bool> {
+        let z = self.webcams[i].as_mut().unwrap();
+        let mut px = std::mem::take(&mut z.px);
+        let Some((b, h)) = z.kamera.neues(&mut px) else { z.px = px; return Ok(false) };
+        let (alt_bild, alt_mass) = (z.bild, z.mass);
+        let g = self.gfx.as_mut().ok_or("WEBCAM: kein Bild ohne Grafik")?;
+        let bild = if alt_bild >= 0 && alt_mass == (b, h) { alt_bild } else {
+            if alt_bild >= 0 { let _ = g.image_free(alt_bild); }
+            g.image_new(b as i32, h as i32, Some(0))?
+        };
+        let r = g.image_punkte_setzen(bild, &px);
+        let z = self.webcams[i].as_mut().unwrap();
+        z.bild = bild;
+        z.mass = (b, h);
+        z.px = px;
+        r.map(|_| true)
+    }
+
+    #[cfg(feature = "graphics")]
+    fn try_webcam_impl(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        use crate::webcam;
+        let v = match name {
+            "webcam_devices" => {
+                if !a.is_empty() { return Err(format!("WEBCAM_DEVICES: erwartet keine Argumente, erhalten {}", a.len())); }
+                let namen = webcam::geraete()?;
+                let n = namen.len() as i64;
+                let mut arr = crate::value::DhArray::new("string".to_string(), vec![n], || Value::str_rc(""));
+                for (k, s) in namen.into_iter().enumerate() { arr.cells.set(k, Value::str_rc(s)); }
+                Value::Array(Rc::new(RefCell::new(arr)))
+            }
+            "webcam_open" => {
+                const F: &str = "WEBCAM_OPEN";
+                if a.len() > 3 || a.len() == 2 {
+                    return Err(format!("{}: erwartet 0, 1 oder 3 Argumente (geraet$, breite, hoehe), erhalten {}", F, a.len()));
+                }
+                let wunsch = if a.is_empty() { String::new() } else { bi_str(a, 0, F)?.to_string() };
+                let (b, h) = if a.len() == 3 { (bi_int(a, 1, F)?, bi_int(a, 2, F)?) } else { (0, 0) };
+                if !(0..=8192).contains(&b) || !(0..=8192).contains(&h) {
+                    return Err(format!("{}: breite und hoehe muessen 0..8192 sein (0 = was die Kamera vorschlaegt)", F));
+                }
+                // Das Bild braucht die Grafik (ein IMAGE lebt auf der GPU):
+                // ohne SCREEN wird ein verstecktes Fenster angelegt, wie bei LOADIMAGE.
+                if self.gfx.is_none() {
+                    self.gfx = Some(crate::graphics::Graphics::new_headless()
+                        .map_err(|e| format!("{}: {}", F, e))?);
+                }
+                let kamera = webcam::oeffnen(&wunsch, b as u32, h as u32)?;
+                let mass = kamera.mass();
+                let g = self.gfx.as_mut().ok_or("WEBCAM_OPEN: kein Bild ohne Grafik")?;
+                let (mb, mh) = (mass.0.max(1), mass.1.max(1));
+                let bild = g.image_new(mb as i32, mh as i32, Some(0))?;
+                self.webcams.push(Some(WebcamZustand { kamera, bild, mass: (mb, mh), px: Vec::new() }));
+                Value::Int((self.webcams.len() - 1) as i64)
+            }
+            "webcam_close" => {
+                let i = self.webcam_z(a, "WEBCAM_CLOSE")?;
+                if let Some(z) = self.webcams[i].take() {
+                    if let Some(g) = self.gfx.as_mut() { let _ = g.image_free(z.bild); }
+                }
+                Value::Nil
+            }
+            "webcam_update" => { let i = self.webcam_z(a, "WEBCAM_UPDATE")?; Value::Bool(self.webcam_holen(i)?) }
+            "webcam_image" => {
+                let i = self.webcam_z(a, "WEBCAM_IMAGE")?;
+                self.webcam_holen(i)?;
+                Value::Int(self.webcams[i].as_ref().unwrap().bild)
+            }
+            "webcam_width" => { let i = self.webcam_z(a, "WEBCAM_WIDTH")?; Value::Int(self.webcams[i].as_ref().unwrap().mass.0 as i64) }
+            "webcam_height" => { let i = self.webcam_z(a, "WEBCAM_HEIGHT")?; Value::Int(self.webcams[i].as_ref().unwrap().mass.1 as i64) }
+            "webcam_frames" => { let i = self.webcam_z(a, "WEBCAM_FRAMES")?; Value::Int(self.webcams[i].as_ref().unwrap().kamera.bilder() as i64) }
+            "webcam_name$" => { let i = self.webcam_z(a, "WEBCAM_NAME$")?; Value::str_rc(self.webcams[i].as_ref().unwrap().kamera.name.clone()) }
+            "webcam_error$" => { let i = self.webcam_z(a, "WEBCAM_ERROR$")?; Value::str_rc(self.webcams[i].as_ref().unwrap().kamera.fehler().unwrap_or_default()) }
+            _ => return Ok(None),
+        };
+        Ok(Some(v))
+    }
+
+    fn try_mikrofon(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        if !name.starts_with("mic_") { return Ok(None); }
+        #[cfg(feature = "graphics")]
+        { return self.try_mikrofon_impl(name, a); }
+        #[allow(unreachable_code)]
+        { let _ = a; Ok(None) }
+    }
+
+    #[cfg(feature = "graphics")]
+    fn try_mikrofon_impl(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        use crate::mikrofon as mic;
+        fn float_feld(a: &[Value], f: &str) -> R<Rc<RefCell<crate::value::DhArray>>> {
+            let arr = match a.first() {
+                Some(Value::Array(x)) => x.clone(),
+                _ => return Err(format!("{}: erwartet ARRAY OF FLOAT", f)),
+            };
+            {
+                let b = arr.borrow();
+                if b.element_type != "float" || b.dims.len() != 1 {
+                    return Err(format!("{}: erwartet 1D ARRAY OF FLOAT", f));
+                }
+            }
+            Ok(arr)
+        }
+        fn keine_args(a: &[Value], f: &str) -> R<()> {
+            if a.is_empty() { Ok(()) } else { Err(format!("{}: erwartet keine Argumente, erhalten {}", f, a.len())) }
+        }
+        // Was nur mit laufendem Eingang einen Sinn hat: ohne ihn waere eine
+        // stille Null von "es ist leise" nicht zu unterscheiden.
+        macro_rules! lauf { ($f:expr) => {
+            match self.mikrofon.as_ref() {
+                Some(l) => l,
+                None => return Err(format!("{}: es laeuft kein Mikrofon -- erst MIC_START", $f)),
+            }
+        }; }
+        let v = match name {
+            "mic_devices" => {
+                keine_args(a, "MIC_DEVICES")?;
+                let namen = mic::geraete()?;
+                let n = namen.len() as i64;
+                let mut arr = crate::value::DhArray::new("string".to_string(), vec![n], || Value::str_rc(""));
+                for (k, s) in namen.into_iter().enumerate() { arr.cells.set(k, Value::str_rc(s)); }
+                Value::Array(Rc::new(RefCell::new(arr)))
+            }
+            "mic_start" => {
+                if a.len() > 1 { return Err(format!("MIC_START: erwartet 0..1 Argumente, erhalten {}", a.len())); }
+                let wunsch = if a.is_empty() { String::new() } else { bi_str(a, 0, "MIC_START")?.to_string() };
+                self.mikrofon = None;
+                self.mic_baender.clear();
+                self.mic_agc = 1e-4;
+                self.mikrofon = Some(mic::starten(&wunsch)?);
+                Value::Nil
+            }
+            "mic_stop" => { keine_args(a, "MIC_STOP")?; self.mikrofon = None; Value::Nil }
+            "mic_active" => { keine_args(a, "MIC_ACTIVE")?; Value::Bool(self.mikrofon.is_some() && mic::fehler().is_none()) }
+            "mic_error$" => { keine_args(a, "MIC_ERROR$")?; Value::str_rc(mic::fehler().unwrap_or_default()) }
+            "mic_device$" => { keine_args(a, "MIC_DEVICE$")?; Value::str_rc(self.mikrofon.as_ref().map(|l| l.name.clone()).unwrap_or_default()) }
+            "mic_rate" => { keine_args(a, "MIC_RATE")?; Value::Int(self.mikrofon.as_ref().map_or(0, |l| l.rate as i64)) }
+            "mic_level" => { keine_args(a, "MIC_LEVEL")?; lauf!("MIC_LEVEL"); Value::Float(mic::spitze_nehmen()) }
+            "mic_rms" => {
+                keine_args(a, "MIC_RMS")?;
+                // Die letzten 50 ms -- so lang wie ein Pegelmesser mittelt.
+                let n = (lauf!("MIC_RMS").rate as usize / 20).max(1);
+                Value::Float(mic::effektivwert(&mic::juengste(n)))
+            }
+            "mic_pitch" => {
+                keine_args(a, "MIC_PITCH")?;
+                let rate = lauf!("MIC_PITCH").rate;
+                Value::Float(mic::tonhoehe(&mic::juengste(mic::tonhoehe_werte(rate)), rate))
+            }
+            "mic_fft" => {
+                let arr = float_feld(a, "MIC_FFT")?;
+                lauf!("MIC_FFT");
+                let n = arr.borrow().cells.len();
+                let mut tmp = vec![0.0f32; n];
+                let proben = mic::juengste(crate::audio::FFT_N);
+                crate::audio::baender_rechnen(&proben, &mut self.mic_baender, &mut self.mic_agc, &mut tmp);
+                let mut b = arr.borrow_mut();
+                for i in 0..n { b.cells.set(i, Value::Float(tmp[i] as f64)); }
+                Value::Nil
+            }
+            "mic_wave" => {
+                let arr = float_feld(a, "MIC_WAVE")?;
+                lauf!("MIC_WAVE");
+                let n = arr.borrow().cells.len();
+                if n > mic::RING { return Err(format!("MIC_WAVE: hoechstens {} Werte, das Feld hat {}", mic::RING, n)); }
+                let werte = mic::juengste(n);
+                let mut b = arr.borrow_mut();
+                for i in 0..n { b.cells.set(i, Value::Float(werte[i] as f64)); }
+                Value::Nil
+            }
+            "mic_samples" => { keine_args(a, "MIC_SAMPLES")?; lauf!("MIC_SAMPLES"); Value::Int(mic::gesamt() as i64) }
+            "mic_record_start" => {
+                if a.len() > 1 { return Err(format!("MIC_RECORD_START: erwartet 0..1 Argumente, erhalten {}", a.len())); }
+                let sek = if a.is_empty() { 600.0 } else { bi_num(a, 0, "MIC_RECORD_START")? };
+                if !(sek > 0.0 && sek <= mic::MAX_SEKUNDEN) {
+                    return Err("MIC_RECORD_START: max_sekunden muss 0 < x <= 3600 sein".into());
+                }
+                let rate = lauf!("MIC_RECORD_START").rate;
+                mic::aufnahme_starten(rate, sek);
+                Value::Nil
+            }
+            "mic_recording" => { keine_args(a, "MIC_RECORDING")?; Value::Bool(self.mikrofon.is_some() && mic::aufnahme_laeuft()) }
+            "mic_record_stop" => {
+                keine_args(a, "MIC_RECORD_STOP")?;
+                let rate = lauf!("MIC_RECORD_STOP").rate;
+                let werte = mic::aufnahme_nehmen()
+                    .ok_or("MIC_RECORD_STOP: es laeuft keine Aufnahme -- erst MIC_RECORD_START")?;
+                let pcm: Vec<f64> = if werte.is_empty() { vec![0.0] } else { werte.iter().map(|&w| w as f64).collect() };
+                Value::Int(self.audio_mut()?.sound_aus_pcm(&pcm, rate))
+            }
+            "mic_record_save" => {
+                let pfad = bi_str(a, 0, "MIC_RECORD_SAVE")?.to_string();
+                if a.len() > 1 { return Err(format!("MIC_RECORD_SAVE: erwartet 1 Argument, erhalten {}", a.len())); }
+                let rate = lauf!("MIC_RECORD_SAVE").rate;
+                let werte = mic::aufnahme_nehmen()
+                    .ok_or("MIC_RECORD_SAVE: es laeuft keine Aufnahme -- erst MIC_RECORD_START")?;
+                std::fs::write(&pfad, mic::wav_bytes(&werte, rate))
+                    .map_err(|e| format!("MIC_RECORD_SAVE: '{}' -- {}", pfad, e))?;
+                Value::Int(werte.len() as i64)
+            }
+            _ => return Ok(None),
+        };
+        Ok(Some(v))
+    }
+
     fn try_pins(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         if !(name.starts_with("gpio_") || name.starts_with("i2c_") || name.starts_with("spi_")) { return Ok(None); }
         use crate::pins;

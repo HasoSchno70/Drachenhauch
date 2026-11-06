@@ -470,7 +470,7 @@ fn mh_state(h: &MusicHandle) -> PlaybackState {
 const TWO_PI: f32 = std::f32::consts::TAU;
 const PI64: f64 = std::f64::consts::PI;
 const RING: usize = 4096;     // Ringpuffer fuer Mono-Samples (vom Audio-Thread)
-const FFT_N: usize = 1024;    // FFT-Fenster
+pub(crate) const FFT_N: usize = 1024;    // FFT-Fenster
 
 // --- FFT-Tap -----------------------------------------------------------
 // Statt raylibs AttachAudioMixedProcessor haengen wir einen Effect an den
@@ -564,6 +564,43 @@ fn fft(re: &mut [f32], im: &mut [f32]) {
             i += len;
         }
         len <<= 1;
+    }
+}
+
+/// FFT_N Abtastwerte (die juengsten, aelteste zuerst) -> `out.len()`
+/// logarithmisch verteilte Band-Pegel 0..1, mit Nachleuchten (`baender`)
+/// und selbst nachgefuehrter Verstaerkung (`agc`). Eine Rechnung fuer
+/// AUDIO_FFT (der Mischer) und MIC_FFT (das Mikrofon).
+pub(crate) fn baender_rechnen(proben: &[f32], baender: &mut Vec<f32>, agc: &mut f32, out: &mut [f32]) {
+    let b = out.len();
+    if b == 0 || proben.len() < FFT_N { return; }
+    if baender.len() != b { *baender = vec![0.0; b]; }
+    let mut re = [0.0f32; FFT_N];
+    let mut im = [0.0f32; FFT_N];
+    for i in 0..FFT_N {
+        let w = 0.5 - 0.5 * (TWO_PI * i as f32 / (FFT_N as f32 - 1.0)).cos();
+        re[i] = proben[proben.len() - FFT_N + i] * w;
+    }
+    fft(&mut re, &mut im);
+    let half = FFT_N / 2;
+    let maxbin = half as f32;
+    let mut framemax = 0.0f32;
+    let mut raw = vec![0.0f32; b];
+    for j in 0..b {
+        let lo = (maxbin.powf(j as f32 / b as f32)) as usize;
+        let hi = (maxbin.powf((j + 1) as f32 / b as f32)) as usize;
+        let lo = lo.max(1);
+        let hi = hi.max(lo + 1).min(half);
+        let mut sum = 0.0f32;
+        for k in lo..hi { sum += (re[k] * re[k] + im[k] * im[k]).sqrt(); }
+        raw[j] = sum / (hi - lo) as f32;
+        if raw[j] > framemax { framemax = raw[j]; }
+    }
+    *agc = (*agc * 0.995).max(framemax).max(1e-4);
+    for j in 0..b {
+        let norm = (raw[j] / *agc).clamp(0.0, 1.0).sqrt();
+        baender[j] = norm.max(baender[j] * 0.80);
+        out[j] = baender[j];
     }
 }
 
@@ -1439,41 +1476,13 @@ resonance/reverb/distortion", other)),
     /// Fuellt `out` mit B logarithmisch verteilten Band-Pegeln (0..1).
     /// (Mathematik verbatim aus audio.rs.)
     pub fn fft_bands(&mut self, out: &mut [f32]) {
-        let b = out.len();
-        if b == 0 { return; }
-        if self.bands.len() != b { self.bands = vec![0.0; b]; }
-        let mut re = [0.0f32; FFT_N];
-        let mut im = [0.0f32; FFT_N];
+        let mut proben = [0.0f32; FFT_N];
         {
             let ring = SAMPLES.lock().unwrap_or_else(|e| e.into_inner());
             let start = (ring.pos + RING - FFT_N) % RING;
-            for i in 0..FFT_N {
-                let s = ring.buf[(start + i) % RING];
-                let w = 0.5 - 0.5 * (TWO_PI * i as f32 / (FFT_N as f32 - 1.0)).cos();
-                re[i] = s * w;
-            }
+            for (i, p) in proben.iter_mut().enumerate() { *p = ring.buf[(start + i) % RING]; }
         }
-        fft(&mut re, &mut im);
-        let half = FFT_N / 2;
-        let maxbin = half as f32;
-        let mut framemax = 0.0f32;
-        let mut raw = vec![0.0f32; b];
-        for j in 0..b {
-            let lo = (maxbin.powf(j as f32 / b as f32)) as usize;
-            let hi = (maxbin.powf((j + 1) as f32 / b as f32)) as usize;
-            let lo = lo.max(1);
-            let hi = hi.max(lo + 1).min(half);
-            let mut sum = 0.0f32;
-            for k in lo..hi { sum += (re[k] * re[k] + im[k] * im[k]).sqrt(); }
-            raw[j] = sum / (hi - lo) as f32;
-            if raw[j] > framemax { framemax = raw[j]; }
-        }
-        self.agc = (self.agc * 0.995).max(framemax).max(1e-4);
-        for j in 0..b {
-            let norm = (raw[j] / self.agc).clamp(0.0, 1.0).sqrt();
-            self.bands[j] = norm.max(self.bands[j] * 0.80);
-            out[j] = self.bands[j];
-        }
+        baender_rechnen(&proben, &mut self.bands, &mut self.agc, out);
     }
 
     // ================= Lo-Fi =================

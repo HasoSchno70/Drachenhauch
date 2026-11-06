@@ -179,6 +179,14 @@ jobs:
       # blieben bis 2026.42 Post-FX und RENDERTARGET schwarz (gcc-raylib,
       # graphics.rs `render_ziel`), und niemand sah es, weil diese Proben nur
       # unter Windows liefen.
+      # Eine simulierte Kamera fuer tests/pruef/webcam.dhtest: vivid, der
+      # Testtreiber des Kernels, gelesen ueber denselben V4L2-Weg wie eine
+      # echte Webcam. Geht es nicht, fehlt DH_TEST_WEBCAM und die Faelle
+      # ueberspringen sich.
+      - name: Simulierte Kamera (Linux)
+        if: runner.os == 'Linux'
+        run: sh tests/pruef/_hilfen/kamera_simulieren.sh >> "$GITHUB_ENV"
+
       - name: Grafik-Sammlungen (Linux)
         if: runner.os == 'Linux'
         run: |
@@ -186,7 +194,8 @@ jobs:
           xvfb-run -a -s "-screen 0 1920x1080x24" rust/drachenhauch_runtime/target/release/dhrt test \
             tests/pruef/gles.dhtest tests/pruef/g3d_licht.dhtest tests/pruef/m3d.dhtest \
             tests/pruef/shader_uniforms_geometry.dhtest tests/pruef/rendertarget_persistenz.dhtest \
-            tests/pruef/grafik_text_ausbau.dhtest tests/pruef/beispiele_gui_enden.dhtest tests/pruef/pins.dhtest
+            tests/pruef/grafik_text_ausbau.dhtest tests/pruef/beispiele_gui_enden.dhtest tests/pruef/pins.dhtest \
+            tests/pruef/webcam.dhtest tests/pruef/mikrofon.dhtest
 
       # Die macOS-Laeufer haben kein passendes OpenGL ("NSGL: Failed to find a
       # suitable pixel format", gemessen 2026-09-19) -- ein Fenster geht dort

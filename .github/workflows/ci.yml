@@ -276,10 +276,15 @@ jobs:
       - name: cargo check (+ tray)
         run: cargo check --locked --features "tray"
 
+      # Die Webcam dieses Systems (webcam.rs: V4L2, Media Foundation,
+      # AVFoundation) -- wie a11y ohne raylib.
+      - name: cargo check (+ webcam)
+        run: cargo check --locked --features "webcam"
+
       # Die Rust-#[test]s liefen bis 2026-09-06 NIRGENDS: die CI prueft nur
       # (cargo check), und lokal scheiterte `cargo test` an raylibs
       # MAX_PATH -- zwei kaputte Tests (gui.rs, gifschreiber.rs) lagen so
       # unbemerkt herum. Ohne Grafik-Feature, wie die Checks davor; die
       # Grafik-Tests laufen lokal mit CARGO_TARGET_DIR=C:/dht.
       - name: cargo test (ohne Grafik)
-        run: cargo test --locked --features "db pg mysql net http smtp pdf physik jit ffi"
+        run: cargo test --locked --features "db pg mysql net http smtp pdf physik jit ffi webcam"

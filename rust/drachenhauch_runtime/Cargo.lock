@@ -1328,6 +1328,7 @@ dependencies = [
  "accesskit_windows",
  "btleplug",
  "bytes",
+ "cpal",
  "cranelift-codegen",
  "cranelift-frontend",
  "cranelift-jit",
@@ -1383,6 +1384,7 @@ dependencies = [
  "xmrsplayer",
  "zbus 5.19.0",
  "zip",
+ "zune-jpeg",
 ]
 
 [[package]]

@@ -1,0 +1,46 @@
+' WAV-Dateien (16 Bit, ein Kanal) fuer die Mikrofon-Pruefungen: damit spielt
+' DHRT_MIKROFON ein Mikrofon, das einen bekannten Ton hoert -- die Laeufer der
+' CI haben keinen Eingang. Eingebunden ueber eine Beilage mit
+' IMPORT "{sammlung}/_hilfen/tonwav.dh".
+'
+' tonWav(ziel$, art$, hz, sekunden, lautstaerke, rate)
+'   art$: "sinus", "saege", "stille" oder "zwei" (hz, dann 3 * hz je halb)
+SUB tonWav(twZiel AS STRING, twArt AS STRING, twHz AS FLOAT, twSek AS FLOAT, twAmp AS FLOAT, twRate AS INTEGER)
+    DIM twN AS INTEGER : twN = INT(twRate * twSek)
+    DIM twB AS BUFFER : twB = BUFFER_NEW(44 + twN * 2)
+    DIM twK AS INTEGER
+    FOR twK = 0 TO 3
+        BUFFER_SET(twB, twK, ASC(MID$("RIFF", twK, 1)))
+        BUFFER_SET(twB, 8 + twK, ASC(MID$("WAVE", twK, 1)))
+        BUFFER_SET(twB, 12 + twK, ASC(MID$("fmt ", twK, 1)))
+        BUFFER_SET(twB, 36 + twK, ASC(MID$("data", twK, 1)))
+    NEXT
+    BUFFER_SET_U32(twB, 4, 36 + twN * 2)
+    BUFFER_SET_U32(twB, 16, 16)
+    BUFFER_SET_U16(twB, 20, 1)
+    BUFFER_SET_U16(twB, 22, 1)
+    BUFFER_SET_U32(twB, 24, twRate)
+    BUFFER_SET_U32(twB, 28, twRate * 2)
+    BUFFER_SET_U16(twB, 32, 2)
+    BUFFER_SET_U16(twB, 34, 16)
+    BUFFER_SET_U32(twB, 40, twN * 2)
+    DIM twI AS INTEGER
+    DIM twW AS FLOAT
+    FOR twI = 0 TO twN - 1
+        IF twArt = "sinus" THEN
+            twW = twAmp * SIN(TAU * twHz * twI / twRate)
+        ELSEIF twArt = "saege" THEN
+            twW = twAmp * (FRAC(twHz * twI / twRate) * 2.0 - 1.0)
+        ELSEIF twArt = "zwei" THEN
+            IF twI < twN \ 2 THEN
+                twW = twAmp * SIN(TAU * twHz * twI / twRate)
+            ELSE
+                twW = twAmp * SIN(TAU * 3.0 * twHz * twI / twRate)
+            END IF
+        ELSE
+            twW = 0.0
+        END IF
+        BUFFER_SET_I16(twB, 44 + twI * 2, INT(twW * 32767.0))
+    NEXT
+    WRITEALL_BYTES(twZiel, twB)
+END SUB

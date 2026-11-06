@@ -1,0 +1,197 @@
+' Webcam (Modul webcam, src/webcam.rs). Die Laeufer der CI haben keine
+' Kamera. Zwei Ersatzwege:
+'   DHRT_WEBCAM=test   eine "Testbild"-Kamera auf jedem System: acht
+'                      Farbbalken, darin ein schwarzes Quadrat (Kante h/4),
+'                      das je Bild 8 Punkte nach rechts wandert, 30 Bilder/s
+'   DH_TEST_WEBCAM     Linux: vivid, der Testtreiber des Kernels, gelesen ueber
+'                      denselben V4L2-Weg wie eine echte Kamera
+'                      (tests/pruef/_hilfen/kamera_simulieren.sh im Paketlauf)
+' Nicht geprueft: Media Foundation (Windows) und AVFoundation (macOS) mit
+' echter Kamera.
+' Nacheinander: die zwei vivid-Faelle oeffnen dieselbe Kamera, und eine
+' Kamera, die schon Bilder liefert, ist fuer den zweiten "belegt".
+' Format: docs/werkzeuge.md, dhrt test.
+--- seriell
+
+=== das testbild ist das einzige geraet
+IMPORT "webcam"
+SETENV("DHRT_WEBCAM", "test")
+DIM g AS ARRAY OF STRING
+g = WEBCAM_DEVICES()
+PRINT LEN(g); " "; g[0]
+DIM k AS WEBCAM
+k = WEBCAM_OPEN()
+PRINT WEBCAM_NAME$(k); " "; WEBCAM_WIDTH(k); " "; WEBCAM_HEIGHT(k); " ["; WEBCAM_ERROR$(k); "]"
+WEBCAM_CLOSE(k)
+k = WEBCAM_OPEN("test", 160, 120)
+PRINT WEBCAM_WIDTH(k); " "; WEBCAM_HEIGHT(k)
+--- erwartet
+1 Testbild
+Testbild 320 240 []
+160 120
+
+=== bilder kommen und werden gezaehlt
+IMPORT "webcam"
+SETENV("DHRT_WEBCAM", "test")
+DIM k AS WEBCAM
+k = WEBCAM_OPEN()
+SLEEP(250)
+PRINT "neu "; WEBCAM_UPDATE(k)
+' Gleich danach ist noch keins gekommen.
+PRINT "gleich danach "; WEBCAM_UPDATE(k)
+DIM n AS INTEGER : n = WEBCAM_FRAMES(k)
+PRINT "gezaehlt "; n >= 5 AND n <= 12
+SLEEP(200)
+PRINT "mehr "; WEBCAM_FRAMES(k) > n; " "; WEBCAM_UPDATE(k)
+--- erwartet
+neu TRUE
+gleich danach FALSE
+gezaehlt TRUE
+mehr TRUE TRUE
+
+=== das bild traegt die farbbalken
+IMPORT "webcam"
+SETENV("DHRT_WEBCAM", "test")
+DIM k AS WEBCAM
+k = WEBCAM_OPEN()
+SLEEP(150)
+DIM b AS IMAGE : b = WEBCAM_IMAGE(k)
+DIM x AS INTEGER
+DIM z AS STRING : z = ""
+FOR x = 0 TO 7
+    z = z + " " + HEX$(GETPIXEL(b, x * 40 + 20, 10))
+NEXT
+PRINT TRIM$(z)
+--- erwartet
+FFFFFF FFFF00 FFFF FF00 FF00FF FF0000 FF 0
+
+=== das quadrat wandert
+' Die linke Kante des Quadrats in der Mitte der Zeile 120: je Bild 8 Punkte
+' weiter -- zwei Bilder spaeter liegt sie weiter rechts, um ein Vielfaches von 8.
+IMPORT "webcam"
+SETENV("DHRT_WEBCAM", "test")
+FUNCTION kante(b AS IMAGE) AS INTEGER
+    DIM x AS INTEGER
+    FOR x = 0 TO 279
+        IF GETPIXEL(b, x, 120) = 0 THEN RETURN x
+    NEXT
+    RETURN -1
+END FUNCTION
+DIM k AS WEBCAM
+k = WEBCAM_OPEN()
+SLEEP(100)
+DIM a AS INTEGER : a = kante(WEBCAM_IMAGE(k))
+SLEEP(150)
+DIM e AS INTEGER : e = kante(WEBCAM_IMAGE(k))
+PRINT "gefunden "; a >= 0 AND e >= 0
+PRINT "weiter "; e > a; " "; (e - a) MOD 8 = 0
+--- erwartet
+gefunden TRUE
+weiter TRUE TRUE
+
+=== das bild im fenster
+IMPORT "webcam"
+SETENV("DHRT_WEBCAM", "test")
+DIM k AS WEBCAM
+k = WEBCAM_OPEN()
+SCREEN(320, 240, "kamera", 1)
+SLEEP(100)
+WHILE NOT QUITREQUESTED()
+    WEBCAM_UPDATE(k)
+    CLS(&H404040)
+    DRAWIMAGE(WEBCAM_IMAGE(k), 0, 0)
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=4
+--- bild
+groesse 320 240
+20 10 #FFFFFF +-8
+100 10 #00FFFF +-8
+300 10 #000000 +-8
+140 230 #00FF00 +-8
+
+=== ein unbekanntes geraet nennt die vorhandenen
+IMPORT "webcam"
+SETENV("DHRT_WEBCAM", "test")
+DIM k AS WEBCAM
+k = WEBCAM_OPEN("Studiokamera")
+--- fehler
+WEBCAM_OPEN: keine Kamera 'Studiokamera' -- es gibt: Testbild
+
+=== groesse und argumente werden geprueft
+IMPORT "webcam"
+SETENV("DHRT_WEBCAM", "test")
+DIM k AS WEBCAM
+TRY
+    k = WEBCAM_OPEN("", 640)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    k = WEBCAM_OPEN("", 640, -1)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+WEBCAM_OPEN: erwartet 0, 1 oder 3 Argumente (geraet$, breite, hoehe), erhalten 2
+WEBCAM_OPEN: breite und hoehe muessen 0..8192 sein (0 = was die Kamera vorschlaegt)
+
+=== nach close ist die kamera ungueltig
+IMPORT "webcam"
+SETENV("DHRT_WEBCAM", "test")
+DIM k AS WEBCAM
+k = WEBCAM_OPEN()
+WEBCAM_CLOSE(k)
+PRINT WEBCAM_UPDATE(k)
+--- fehler
+WEBCAM_UPDATE: ungueltige oder geschlossene WEBCAM 0
+
+=== sim: vivid ueber video4linux2
+IMPORT "webcam"
+IF GETENV$("DH_TEST_WEBCAM") = "" THEN
+    PRINT "UEBERSPRINGEN: kein vivid (tests/pruef/_hilfen/kamera_simulieren.sh)"
+    EXIT(0)
+END IF
+DIM g AS ARRAY OF STRING
+g = WEBCAM_DEVICES()
+PRINT "geraete "; LEN(g) >= 1
+DIM k AS WEBCAM
+k = WEBCAM_OPEN(GETENV$("DH_TEST_WEBCAM"), 640, 480)
+PRINT "groesse "; WEBCAM_WIDTH(k); " "; WEBCAM_HEIGHT(k)
+DIM t AS INTEGER : t = 0
+WHILE WEBCAM_FRAMES(k) < 5 AND t < 100
+    SLEEP(50) : t = t + 1
+WEND
+PRINT "bilder "; WEBCAM_FRAMES(k) >= 5; " ["; WEBCAM_ERROR$(k); "]"
+DIM b AS IMAGE : b = WEBCAM_IMAGE(k)
+' vivid zeigt Farbbalken: links hell, weiter rechts eine andere Farbe.
+DIM links AS INTEGER : links = GETPIXEL(b, 20, 240)
+DIM mitte AS INTEGER : mitte = GETPIXEL(b, 400, 240)
+PRINT "balken "; links <> mitte
+WEBCAM_CLOSE(k)
+--- erwartet
+geraete TRUE
+groesse 640 480
+bilder TRUE []
+balken TRUE
+
+=== sim: grosser wunsch faellt auf ein lesbares format zurueck
+' Bei grossen Bildern wird zuerst MJPEG verlangt -- vivid kann das nicht,
+' also kommt YUYV. Die Groesse bestimmt der Treiber.
+IMPORT "webcam"
+IF GETENV$("DH_TEST_WEBCAM") = "" THEN
+    PRINT "UEBERSPRINGEN: kein vivid (tests/pruef/_hilfen/kamera_simulieren.sh)"
+    EXIT(0)
+END IF
+DIM k AS WEBCAM
+k = WEBCAM_OPEN(GETENV$("DH_TEST_WEBCAM"), 1280, 720)
+DIM t AS INTEGER : t = 0
+WHILE WEBCAM_FRAMES(k) < 3 AND t < 100
+    SLEEP(50) : t = t + 1
+WEND
+PRINT "bilder "; WEBCAM_FRAMES(k) >= 3; " ["; WEBCAM_ERROR$(k); "]"
+PRINT "groesse "; WEBCAM_WIDTH(k) > 0 AND WEBCAM_HEIGHT(k) > 0
+--- erwartet
+bilder TRUE []
+groesse TRUE

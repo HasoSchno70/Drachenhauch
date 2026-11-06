@@ -569,6 +569,9 @@ pub const KEIN_FENSTER: &[&str] = &[
     "Failed to initialize Window",
     "Failed to initialize platform",
     "NoDefaultOutputDevice",
+    // Kira/cpal ohne Tonausgabe unter Linux (GitHubs Laeufer, 2026-11-06):
+    // ALSA meldet dort kein Standardgeraet, sondern ein nicht verfuegbares.
+    "Audio-Geraet konnte nicht initialisiert werden",
 ];
 
 #[derive(PartialEq, Clone, Copy)]

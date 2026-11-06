@@ -283,12 +283,22 @@ DIM t AS STRING : t = JOIN$(z, CHR$(10))
 PRINT "kommentar "; (INSTR(t, "<!--") >= 0)
 PRINT "jit "; (INSTR(t, "com.apple.security.cs.allow-jit") >= 0)
 PRINT "speicher "; (INSTR(t, "com.apple.security.cs.allow-unsigned-executable-memory") >= 0)
+' Ohne diese beiden liefert macOS einem Programm mit Hardened Runtime still
+' Stille vom Mikrofon und kein Bild von der Kamera -- ohne Rueckfrage.
+PRINT "mikrofon "; (INSTR(t, "com.apple.security.device.audio-input") >= 0)
+PRINT "kamera "; (INSTR(t, "com.apple.security.device.camera") >= 0)
+DIM pl AS STRING : pl = JOIN$(READLINES(ARG$(1)), CHR$(10))
+PRINT "begruendungen "; (INSTR(pl, "NSMicrophoneUsageDescription") >= 0); " "; (INSTR(pl, "NSCameraUsageDescription") >= 0)
 --- argumente
 {sammlung}/../../installer/posix/dhrt.entitlements
+{sammlung}/../../installer/posix/Info.plist
 --- erwartet
 kommentar FALSE
 jit TRUE
 speicher TRUE
+mikrofon TRUE
+kamera TRUE
+begruendungen TRUE TRUE
 
 === ein unbekanntes system ist ein fehler
 FUNCTION lauf$(p AS INTEGER) AS STRING

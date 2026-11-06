@@ -1847,3 +1847,33 @@ Modul '{}' gibt es nur unter Linux (etwa auf dem Raspberry Pi) -- Funktionsaufru
 Entprellzeit (ms)	debounce time (ms)
 Takt (Hz)	clock (Hz)
 Chip-Select	chip select
+{}: es laeuft kein Mikrofon -- erst MIC_START	{}: no microphone is running -- call MIC_START first
+MIC_START: dieser Rechner hat kein Mikrofon (kein Eingang gefunden)	MIC_START: this computer has no microphone (no input found)
+MIC_START: kein Eingang '{}' -- es gibt: {}	MIC_START: no input '{}' -- available: {}
+{}: die Eingaenge sind nicht lesbar -- {}	{}: the inputs cannot be read -- {}
+MIC_START: das Mikrofon nennt kein Format -- {}	MIC_START: the microphone reports no format -- {}
+MIC_START: das Mikrofon startet nicht -- {}	MIC_START: the microphone does not start -- {}
+MIC_START: das Mikrofon antwortet nicht (10 s)	MIC_START: the microphone does not answer (10 s)
+MIC_START: das Mikrofon liefert das Format {}, das dhrt nicht liest	MIC_START: the microphone delivers the format {}, which dhrt cannot read
+MIC_START: das Mikrofon laesst sich nicht oeffnen -- {}	MIC_START: the microphone cannot be opened -- {}
+MIC_START: im Browser gibt es noch kein Mikrofon	MIC_START: there is no microphone in the browser yet
+MIC_START: DHRT_MIKROFON '{}' ist leer	MIC_START: DHRT_MIKROFON '{}' is empty
+{}: es laeuft keine Aufnahme -- erst MIC_RECORD_START	{}: no recording is running -- call MIC_RECORD_START first
+MIC_RECORD_START: max_sekunden muss 0 < x <= 3600 sein	MIC_RECORD_START: max_sekunden must be 0 < x <= 3600
+MIC_WAVE: hoechstens {} Werte, das Feld hat {}	MIC_WAVE: at most {} values, the array has {}
+{}: erwartet keine Argumente, erhalten {}	{}: expected no arguments, got {}
+WEBCAM_OPEN: dieser Rechner hat keine Kamera (keine gefunden)	WEBCAM_OPEN: this computer has no camera (none found)
+WEBCAM_OPEN: keine Kamera '{}' -- es gibt: {}	WEBCAM_OPEN: no camera '{}' -- available: {}
+WEBCAM_OPEN: die Kamera antwortet nicht (10 s)	WEBCAM_OPEN: the camera does not answer (10 s)
+WEBCAM_OPEN: die Kamera ist weg	WEBCAM_OPEN: the camera is gone
+WEBCAM_OPEN: kein Zugriff auf {} -- der Benutzer muss in der Gruppe 'video' sein	WEBCAM_OPEN: no access to {} -- the user must be in the group 'video'
+WEBCAM_OPEN: {} ist belegt -- ein anderes Programm benutzt die Kamera	WEBCAM_OPEN: {} is busy -- another program is using the camera
+WEBCAM_OPEN: {} liefert kein Format, das dhrt liest (YUYV, MJPEG, RGB24, BGRX)	WEBCAM_OPEN: {} delivers no format dhrt can read (YUYV, MJPEG, RGB24, BGRX)
+WEBCAM_OPEN: die Kamera startet nicht -- {}	WEBCAM_OPEN: the camera does not start -- {}
+WEBCAM_OPEN: {} laesst sich nicht oeffnen -- {} (Datenschutz -> Kamera erlaubt?)	WEBCAM_OPEN: {} cannot be opened -- {} (privacy -> camera allowed?)
+WEBCAM_OPEN: {} laesst sich nicht oeffnen -- {}	WEBCAM_OPEN: {} cannot be opened -- {}
+WEBCAM_OPEN: der Zugriff auf die Kamera ist verweigert -- Systemeinstellungen -> Datenschutz & Sicherheit -> Kamera	WEBCAM_OPEN: access to the camera is denied -- System Settings -> Privacy & Security -> Camera
+{}: erwartet 0, 1 oder 3 Argumente (geraet$, breite, hoehe), erhalten {}	{}: expected 0, 1 or 3 arguments (geraet$, breite, hoehe), got {}
+{}: breite und hoehe muessen 0..8192 sein (0 = was die Kamera vorschlaegt)	{}: width and height must be 0..8192 (0 = what the camera suggests)
+{}: ungueltige oder geschlossene WEBCAM {}	{}: invalid or closed WEBCAM {}
+die Kamera liefert nicht mehr -- {}	the camera delivers no more -- {}

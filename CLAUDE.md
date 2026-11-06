@@ -3379,6 +3379,59 @@ Zeichenbilder, kein Umschreiben der Shader) fallen je in ihrem Fall.
 Doku `docs/raspberry-pi.md`, `docs/module-pins.md`, Beispiel
 `examples/211_raspberry_pi.dh`, Lehrbuch Kapitel 76.
 
+## Mikrofon und Webcam (2026-11-06)
+
+Fuenfter Punkt der Bastler-Liste. **Mikrofon** (`mikrofon.rs`, Befehle
+`MIC_*` im Modul `audio`): cpal (dieselbe 0.18.1 wie Kira, jetzt direkte
+Abhaengigkeit im graphics-Feature) in einem eigenen Faden -- ein cpal-Strom
+ist nicht ueberall `Send`, er lebt im Faden bis MIC_STOP; der Rueckruf mischt
+die Kanaele und schiebt die Werte in EINEN Puffer (`PUFFER`: Ring 8192,
+Spitze seit der letzten Frage, Aufnahme). `MIC_PITCH` = YIN (Differenz-
+funktion auf ihren laufenden Mittelwert bezogen, Schwelle 0,15, oertliches
+Minimum, parabolisch verfeinert; 50..2000 Hz, 0 bei Effektivwert < 0,01),
+`MIC_FFT` = dieselbe Rechnung wie AUDIO_FFT (`audio::baender_rechnen`,
+herausgeloest, eigener Zustand `mic_baender`/`mic_agc` in der VM),
+`MIC_RECORD_STOP` -> SOUND (braucht die Ausgabe), `MIC_RECORD_SAVE` -> WAV
+ohne Ausgabe. Ohne laufendes Mikrofon ist jede Abfrage ein Fehler (eine
+stille Null waere "es ist leise"). **`DHRT_MIKROFON=datei.wav`** spielt ein
+Mikrofon (einziges Geraet "Datei: name", Echtzeit, Schleife, derselbe Puffer)
+-- dieser Rechner hat keinen Eingang, die CI auch nicht. Tests
+`tests/pruef/mikrofon.dhtest` (13; Toene schreibt `_hilfen/tonwav.dh` als
+Bibliothek, eingebunden per Beilage), 4 Rust-Tests; vier Verfaelschungen
+(Spitze nie zurueck, Aufnahme ohne Grenze, Tonhoehe ohne Feinrechnung,
+Wellenform die aeltesten) fallen je in ihrem Fall -- die Tonhoehen-Probe
+musste dafuer auf 0,2 % bei 1250 Hz.
+
+**Webcam** (Modul `webcam`, `webcam.rs`, Typ WEBCAM): je System ein Weg in
+einem eigenen Faden, der RGBA in eine `Ablage` legt; `WEBCAM_UPDATE`/
+`WEBCAM_IMAGE` schreiben es in ein IMAGE (`image_punkte_setzen` wie beim
+Video; neue Groesse = neues IMAGE). Linux V4L2 (Strukturen mit const-Asserts:
+capability 104, format 208, requestbuffers 20, buffer 88; mmap, 4 Puffer,
+poll; YUYV/MJPG/RGB3/BGR3/XR24/AR24/BGR4, ueber 640x480 MJPEG zuerst),
+Windows Media Foundation (Source Reader mit VIDEO_PROCESSING nach RGB32,
+negativer Stride = unten zuerst), macOS AVFoundation ueber die
+Objective-C-Laufzeit (Delegat-Klasse `DHKameraZiel`, BGRA, Dispatch-Schlange).
+MJPEG ueber zune-jpeg (schon im Baum): **zune setzt die Standard-Huffman-
+Tafeln nur bei der Kennung "AVI1"** -- fehlt die DHT, kommt ein APP0 "AVI1"
+hinter den Anfang (`mjpeg_vorbereiten`; vom Rust-Test gefunden).
+**`DHRT_WEBCAM=test`** ersetzt alle Kameras durch "Testbild" (acht
+Farbbalken, ein Quadrat wandert 8 Punkte je Bild, 30/s). Eigenes Feature
+`webcam` (graphics schaltet es ein), damit die CI den Weg jedes Systems ohne
+raylib uebersetzt (`cargo check/test --features webcam` im rust-check);
+geprueft hier fuer Linux in der WSL und fuer macOS in einer Kopie ohne
+mimalloc (dessen C-Bau scheitert fuer fremde Ziele). Linux-Paketlauf:
+`tests/pruef/_hilfen/kamera_simulieren.sh` laedt **vivid** (Testtreiber des
+Kernels, linux-modules-extra) und setzt `DH_TEST_WEBCAM=vivid`. Tests
+`tests/pruef/webcam.dhtest` (10, zwei davon gegen vivid), 6 Rust-Tests.
+**Ungeprueft:** jede echte Kamera (dieser Rechner hat keine) und der
+cpal-Eingang mit echtem Mikrofon. macOS: Info.plist traegt
+NSMicrophone-/NSCameraUsageDescription, `dhrt.entitlements` die
+Berechtigungen `device.audio-input`/`device.camera` -- mit Hardened Runtime
+liefert macOS sonst still Stille bzw. kein Bild (Probe in
+`werkzeug_paket.dhtest`). Doku `docs/module-mikrofon.md`,
+`docs/module-webcam.md`, Beispiele `examples/212_stimmgeraet.dh`,
+`examples/213_webcam.dh`, Lehrbuch Kapitel 71 und 76.
+
 ## Dogfooding 15: Landkarte (2026-10-26)
 
 `examples/karten/`: `kern.dh` (Web-Mercator, Kachelnummern, Haversine,
