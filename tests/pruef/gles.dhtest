@@ -81,12 +81,30 @@ FF0000 FF
 
 === hdr-umgebung mit skybox und pbr
 ' Die IBL-Maps (Cubemaps, BRDF-Tabelle) legt dhrt ohne Anfangsdaten an --
-' im GLES-Bau mit Nullen (graphics.rs `leere_textur`). Eine spiegelnde
+' unter Linux mit Nullen (graphics.rs `leere_textur`). Eine spiegelnde
 ' Kugel muss sich vom Himmel dahinter unterscheiden, der Himmel vom Schwarz.
+' Die HDR-Datei schreibt der Fall selbst (flache RGBE-Zeilen, oben Himmel,
+' unten Boden) -- examples/assets/ibl_env.hdr ist ein Download und steht
+' nicht im Repository.
 IMPORT "g3d"
+DIM kopf AS STRING : kopf = !"#?RADIANCE\nFORMAT=32-bit_rle_rgbe\n\n-Y 8 +X 16\n"
+DIM bild AS BUFFER : bild = BUFFER_FROM_STRING(kopf)
+DIM n AS INTEGER : n = BUFFER_LEN(bild)
+bild = BUFFER_CONCAT(bild, BUFFER_NEW(16 * 8 * 4))
+DIM px AS INTEGER
+FOR px = 0 TO 16 * 8 - 1
+    DIM o AS INTEGER : o = n + px * 4
+    IF px < 16 * 4 THEN
+        BUFFER_SET(bild, o, 100) : BUFFER_SET(bild, o + 1, 150) : BUFFER_SET(bild, o + 2, 230)
+    ELSE
+        BUFFER_SET(bild, o, 80) : BUFFER_SET(bild, o + 1, 60) : BUFFER_SET(bild, o + 2, 40)
+    END IF
+    BUFFER_SET(bild, o + 3, 129)
+NEXT
+WRITEALL_BYTES("himmel.hdr", bild)
 SCREEN(200, 120, "ibl", 1)
 LIGHT_ENABLE()
-LIGHT_ENV_HDR(ARG$(0), 1.0)
+LIGHT_ENV_HDR("himmel.hdr", 1.0)
 SKYBOX(TRUE)
 DIM k AS INTEGER : k = MESH_SPHERE(1.0, 24, 24)
 MODEL_LIT(k)
@@ -97,8 +115,6 @@ WHILE NOT QUITREQUESTED()
     MODEL(k, 0, 0, 0, 1.0, &HFFFFFF)
     FLIP()
 WEND
---- argumente
-{sammlung}/../../examples/assets/ibl_env.hdr
 --- umgebung
 DHRT_FRAMES=4
 --- bild
