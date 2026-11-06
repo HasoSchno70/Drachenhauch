@@ -67,6 +67,20 @@ module.exports = (H) => [
     { out: ["20"] }),
   H.note("Der Alias ersetzt das Präfix für alle Funktionen und Typen des Moduls (J_PARSE, J_HANDLE …). Das funktioniert bei Modulen, deren Funktionen mit dem Modulnamen beginnen – also bei den allermeisten."),
 
+  H.h2("Ein Modul, das es nicht überall gibt: OPTIONAL"),
+  H.p("Ein paar Module stecken nicht in jedem Bau von Drachenhauch – die serielle Schnittstelle etwa nur in einem, der mit --hardware gebaut wurde. Ein Programm, das so ein Modul nur nutzt, wenn es da ist, schreibt OPTIONAL hinter den Import und fragt zur Laufzeit nach."),
+  H.cmd("IMPORT ... OPTIONAL · MODULE_AVAILABLE", 'IMPORT "modul" OPTIONAL   MODULE_AVAILABLE(modul$) AS BOOLEAN',
+    "Mit OPTIONAL gibt es keine Warnung, wenn das Modul in diesem Bau fehlt; an einer eigenen Datei fällt die Zeile still weg, wenn es die Datei nicht gibt. MODULE_AVAILABLE sagt, ob ein Modul da ist – damit wählt das Programm seinen Weg, statt beim ersten Aufruf abzubrechen.",
+    [
+      'IMPORT "serial" OPTIONAL',
+      '',
+      'IF MODULE_AVAILABLE("serial") THEN',
+      '    PRINT SERIAL_PORTS()',
+      'ELSE',
+      '    PRINT "ohne serielle Schnittstelle"',
+      'END IF',
+    ]),
+
   H.tip("Code sauber aufteilen", "Lagere zusammengehörige Bausteine in eigene Dateien aus: eine für Mathe-Helfer, eine für deine Spieler-Klasse, eine für die Gegner. Dein Hauptprogramm beginnt dann mit ein paar IMPORT-Zeilen und bleibt übersichtlich. So findest du dich auch in großen Projekten zurecht – und kannst eine bewährte Datei im nächsten Spiel einfach wiederverwenden."),
   H.p("Damit endet Teil II: Du beherrschst jetzt die ganze Sprache Drachenhauch – von Variablen über Schleifen und Funktionen bis zu Klassen, Coroutinen und Modulen. In den folgenden Teilen geht es um die eingebauten Befehle im Detail (Teil III), um Grafik, Sound und Spiele (Teil IV) und um die mitgelieferten Module (Teil V)."),
 ];

@@ -197,3 +197,179 @@ flags 26
 wille TRUE
 danach 02
 MQTT_WILL: das Topic darf nicht leer sein und keine Platzhalter (# +) enthalten
+
+=== qos 1 in beide richtungen und abmelden
+' Der Broker bestaetigt das PUBLISH mit PUBACK und schickt es mit QoS 1 und
+' Nummer 77 zurueck -- dann muss der Client seinerseits bestaetigen. Was beim
+' Broker ankam, steht in port.txt.log.
+IMPORT "start.dh"
+DIM h AS MQTT_HANDLE
+h = MQTT_CONNECT("127.0.0.1", brokerStarten(""), "dh-qos", 30)
+PRINT "abo "; MQTT_SUBSCRIBE(h, "a/b", 1)
+PRINT "gesendet "; MQTT_PUBLISH(h, "a/b", "eins", FALSE, 1)
+PRINT "offen "; MQTT_PENDING(h)
+PRINT "bestaetigt "; MQTT_FLUSH(h, 3000)
+PRINT "offen "; MQTT_PENDING(h)
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE NOT MQTT_NEXT_MESSAGE(h) AND MILLIS() - t0 < 3000
+    MQTT_UPDATE(h)
+    SLEEP(5)
+WEND
+PRINT MQTT_MESSAGE_TOPIC(h); " = "; MQTT_MESSAGE_PAYLOAD(h)
+PRINT "abgemeldet "; MQTT_UNSUBSCRIBE(h, "a/b")
+SLEEP(100)
+MQTT_UPDATE(h)
+MQTT_DISCONNECT(h)
+SLEEP(200)
+PRINT JOIN$(READLINES("port.txt.log"), " ")
+--- datei start.dh
+IMPORT "mqtt"
+DIM brokerProzess AS INTEGER
+FUNCTION brokerStarten(modus AS STRING) AS INTEGER
+    IF FILEEXISTS("port.txt") THEN DELETEFILE("port.txt")
+    brokerProzess = PROCESS_START("dhrt", "run", ARG$(0), "--", CWD$() + "/port.txt", modus)
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 15000
+        IF FILEEXISTS("port.txt") THEN
+            DIM z AS ARRAY OF STRING : z = READLINES("port.txt")
+            IF LEN(z) > 0 THEN
+                IF TRIM$(z[0]) <> "" THEN RETURN VAL(z[0])
+            END IF
+        END IF
+        SLEEP(10)
+    WEND
+    RETURN 0
+END FUNCTION
+
+--- argumente
+{sammlung}/_hilfen/mqttbroker.dh
+--- erwartet
+abo TRUE
+gesendet TRUE
+offen 1
+bestaetigt TRUE
+offen 0
+a/b = eins
+abgemeldet TRUE
+8/1 3/1 4/77 10 14
+
+=== ohne bestaetigung bleibt die nachricht offen
+IMPORT "start.dh"
+DIM h AS MQTT_HANDLE
+h = MQTT_CONNECT("127.0.0.1", brokerStarten("ohneack"), "dh-offen", 30)
+MQTT_PUBLISH(h, "a/b", "eins", FALSE, 1)
+MQTT_PUBLISH(h, "a/b", "zwei", FALSE, 1)
+MQTT_PUBLISH(h, "a/b", "null", FALSE, 0)
+DIM t0 AS INTEGER : t0 = MILLIS()
+PRINT "bestaetigt "; MQTT_FLUSH(h, 300)
+PRINT "gewartet "; MILLIS() - t0 >= 250
+PRINT "offen "; MQTT_PENDING(h)
+MQTT_DISCONNECT(h)
+--- datei start.dh
+IMPORT "mqtt"
+DIM brokerProzess AS INTEGER
+FUNCTION brokerStarten(modus AS STRING) AS INTEGER
+    IF FILEEXISTS("port.txt") THEN DELETEFILE("port.txt")
+    brokerProzess = PROCESS_START("dhrt", "run", ARG$(0), "--", CWD$() + "/port.txt", modus)
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 15000
+        IF FILEEXISTS("port.txt") THEN
+            DIM z AS ARRAY OF STRING : z = READLINES("port.txt")
+            IF LEN(z) > 0 THEN
+                IF TRIM$(z[0]) <> "" THEN RETURN VAL(z[0])
+            END IF
+        END IF
+        SLEEP(10)
+    WEND
+    RETURN 0
+END FUNCTION
+
+--- argumente
+{sammlung}/_hilfen/mqttbroker.dh
+--- erwartet
+bestaetigt FALSE
+gewartet TRUE
+offen 2
+
+=== qos 2 und falsche angaben sind fehler mit hinweis
+IMPORT "start.dh"
+DIM h AS MQTT_HANDLE
+h = MQTT_CONNECT("127.0.0.1", brokerStarten(""), "dh-fehler", 30)
+TRY
+    MQTT_PUBLISH(h, "a/b", "x", FALSE, 2)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    MQTT_SUBSCRIBE(h, "a/b", 5)
+CATCH e
+    PRINT e
+END TRY
+MQTT_DISCONNECT(h)
+TRY
+    MQTT_TLS_CA("gibt_es_nicht.pem")
+CATCH e
+    PRINT e
+END TRY
+--- datei start.dh
+IMPORT "mqtt"
+DIM brokerProzess AS INTEGER
+FUNCTION brokerStarten(modus AS STRING) AS INTEGER
+    IF FILEEXISTS("port.txt") THEN DELETEFILE("port.txt")
+    brokerProzess = PROCESS_START("dhrt", "run", ARG$(0), "--", CWD$() + "/port.txt", modus)
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 15000
+        IF FILEEXISTS("port.txt") THEN
+            DIM z AS ARRAY OF STRING : z = READLINES("port.txt")
+            IF LEN(z) > 0 THEN
+                IF TRIM$(z[0]) <> "" THEN RETURN VAL(z[0])
+            END IF
+        END IF
+        SLEEP(10)
+    WEND
+    RETURN 0
+END FUNCTION
+
+--- argumente
+{sammlung}/_hilfen/mqttbroker.dh
+--- erwartet
+MQTT_PUBLISH: QoS 2 kann dieser Client nicht -- 0 oder 1
+MQTT_SUBSCRIBE: QoS 5 gibt es nicht -- 0 oder 1
+MQTT_TLS_CA: die Datei gibt_es_nicht.pem gibt es nicht
+
+=== mqtts gegen einen broker ohne tls scheitert im klartext
+' Der Test-Broker spricht kein TLS: der Handschlag scheitert, und das sagt
+' die Meldung. Den gelungenen Weg pruefen die Rust-Tests in mqtt.rs mit einem
+' TLS-Broker und eigener CA.
+IMPORT "start.dh"
+DIM h AS MQTT_HANDLE
+TRY
+    h = MQTT_CONNECT("mqtts://127.0.0.1", brokerStarten(""), "dh-tls", 30)
+    PRINT "verbunden?"
+CATCH e
+    PRINT INSTR(e, "MQTT_CONNECT: TLS-Verbindung fehlgeschlagen") >= 0
+END TRY
+IF PROCESS_RUNNING(brokerProzess) THEN PROCESS_KILL(brokerProzess)
+--- datei start.dh
+IMPORT "mqtt"
+DIM brokerProzess AS INTEGER
+FUNCTION brokerStarten(modus AS STRING) AS INTEGER
+    IF FILEEXISTS("port.txt") THEN DELETEFILE("port.txt")
+    brokerProzess = PROCESS_START("dhrt", "run", ARG$(0), "--", CWD$() + "/port.txt", modus)
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 15000
+        IF FILEEXISTS("port.txt") THEN
+            DIM z AS ARRAY OF STRING : z = READLINES("port.txt")
+            IF LEN(z) > 0 THEN
+                IF TRIM$(z[0]) <> "" THEN RETURN VAL(z[0])
+            END IF
+        END IF
+        SLEEP(10)
+    WEND
+    RETURN 0
+END FUNCTION
+
+--- argumente
+{sammlung}/_hilfen/mqttbroker.dh
+--- erwartet
+TRUE

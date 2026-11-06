@@ -1,0 +1,5 @@
+Nur fuer den Rust-Test `tls_rundweg_mit_eigener_ca` in src/mqtt.rs:
+ca.pem ist eine eigene Test-CA (ihr Schluessel wurde nach dem Ausstellen
+geloescht), server.pem/server.key ein von ihr ausgestelltes Zertifikat fuer
+127.0.0.1 und localhost, gueltig bis 2126. Nirgends sonst benutzen.
+Erzeugt am 2026-11-05 mit openssl (prime256v1).

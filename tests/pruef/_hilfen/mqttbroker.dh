@@ -1,11 +1,16 @@
 ' Ein MQTT-3.1.1-Broker fuer modules_mqtt.dhtest, in Drachenhauch und ohne
 ' Code mit dem Rust-Client zu teilen -- gerade gross genug fuer einen Rundweg:
-' CONNECT -> CONNACK, PINGREQ -> PINGRESP, SUBSCRIBE -> SUBACK, jedes PUBLISH
-' geht an denselben Client zurueck, DISCONNECT beendet. Eine Verbindung.
-' Aufruf: dhrt run mqttbroker.dh -- PORTDATEI [stumm]
+' CONNECT -> CONNACK, PINGREQ -> PINGRESP, SUBSCRIBE -> SUBACK (mit dem
+' angefragten QoS), UNSUBSCRIBE -> UNSUBACK, jedes PUBLISH geht an denselben
+' Client zurueck (QoS 1 mit PUBACK vorweg und zurueck mit Nummer 77),
+' DISCONNECT beendet. Eine Verbindung.
+' Aufruf: dhrt run mqttbroker.dh -- PORTDATEI [stumm|ohneack]
 ' Das CONNECT-Paket landet als Hex in PORTDATEI.connect (fuer den letzten
-' Willen). Mit `stumm` beantwortet er keine PINGREQ -- so sieht ein Broker
-' aus, der ohne Abmeldung verschwunden ist (Strom weg, kein RST).
+' Willen), die Art jedes empfangenen Pakets als Zeile in PORTDATEI.log
+' (1 CONNECT, 3 PUBLISH/QoS, 4 PUBACK, 8 SUBSCRIBE, 10 UNSUBSCRIBE ...).
+' Mit `stumm` beantwortet er keine PINGREQ -- so sieht ein Broker aus, der
+' ohne Abmeldung verschwunden ist (Strom weg, kein RST). Mit `ohneack`
+' bestaetigt er kein PUBLISH.
 ' Nach 30 s ohne Verbindung beendet er sich selbst.
 IMPORT "net"
 
@@ -89,8 +94,15 @@ END FUNCTION
 DIM p AS BUFFER : p = paket()
 IF BUFFER_LEN(p) = 0 THEN EXIT(0)
 WRITEALL(ARG$(0) + ".connect", BUFFER_TO_HEX$(p))
-DIM stumm AS BOOLEAN : stumm = ARGC() > 1
-IF stumm THEN stumm = ARG$(1) = "stumm"
+DIM modus AS STRING : modus = ""
+IF ARGC() > 1 THEN modus = ARG$(1)
+DIM stumm AS BOOLEAN : stumm = modus = "stumm"
+DIM protokoll AS STRING : protokoll = ""
+
+SUB merken(z AS STRING)
+    protokoll = protokoll + z + CHR$(10)
+    WRITEALL(ARG$(0) + ".log", protokoll)
+END SUB
 ' CONNECT: der Inhalt ist hier gleich -- angenommen.
 NET_SEND(c, bytes(&H20, 2, 0, 0, 4))
 WHILE TRUE
@@ -98,16 +110,41 @@ WHILE TRUE
     IF BUFFER_LEN(p) = 0 THEN BREAK
     DIM art AS INTEGER : art = BUFFER_GET(p, 0) SHR 4
     DIM kl AS INTEGER : kl = kopflaenge(p)
+    DIM qos AS INTEGER : qos = (BUFFER_GET(p, 0) SHR 1) BAND 3
+    IF art = 3 THEN
+        merken("3/" + STR$(qos))
+    ELSEIF art = 4 THEN
+        merken("4/" + STR$(BUFFER_GET(p, kl) * 256 + BUFFER_GET(p, kl + 1)))
+    ELSEIF art = 8 THEN
+        merken("8/" + STR$(BUFFER_GET(p, BUFFER_LEN(p) - 1)))
+    ELSE
+        merken(STR$(art))
+    END IF
     IF art = 12 THEN
         IF NOT stumm THEN NET_SEND(c, bytes(&HD0, 0, 0, 0, 2))
     ELSEIF art = 8 THEN
-        ' SUBACK mit der Paketnummer aus dem SUBSCRIBE und QoS 0 -- das
-        ' fuenfte Byte (Rueckgabecode 0) steht schon im neuen Puffer; ein
-        ' angehaengtes weiteres liest der Client als Paket vom Typ 0.
-        NET_SEND(c, bytes(&H90, 3, BUFFER_GET(p, kl), BUFFER_GET(p, kl + 1), 5))
-    ELSEIF art = 3 THEN
+        ' SUBACK mit der Paketnummer aus dem SUBSCRIBE und dem angefragten
+        ' QoS (letztes Byte des SUBSCRIBE) als Rueckgabecode.
+        DIM sa AS BUFFER : sa = bytes(&H90, 3, BUFFER_GET(p, kl), BUFFER_GET(p, kl + 1), 5)
+        BUFFER_SET(sa, 4, BUFFER_GET(p, BUFFER_LEN(p) - 1))
+        NET_SEND(c, sa)
+    ELSEIF art = 10 THEN
+        NET_SEND(c, bytes(&HB0, 2, BUFFER_GET(p, kl), BUFFER_GET(p, kl + 1), 4))
+    ELSEIF art = 3 AND qos = 0 THEN
         ' Zurueck an den Absender, als QoS-0-PUBLISH
         BUFFER_SET(p, 0, &H30)
+        NET_SEND(c, p)
+    ELSEIF art = 3 THEN
+        ' QoS 1: Topic, dann die Paketnummer -- erst bestaetigen, dann mit
+        ' Nummer 77 zurueck (QoS 1, also muss der Client bestaetigen).
+        DIM tl AS INTEGER : tl = BUFFER_GET(p, kl) * 256 + BUFFER_GET(p, kl + 1)
+        DIM idpos AS INTEGER : idpos = kl + 2 + tl
+        IF modus <> "ohneack" THEN
+            NET_SEND(c, bytes(&H40, 2, BUFFER_GET(p, idpos), BUFFER_GET(p, idpos + 1), 4))
+        END IF
+        BUFFER_SET(p, 0, &H32)
+        BUFFER_SET(p, idpos, 0)
+        BUFFER_SET(p, idpos + 1, 77)
         NET_SEND(c, p)
     ELSEIF art = 14 THEN
         BREAK

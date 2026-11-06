@@ -10,27 +10,33 @@ IMPORT "mqtt"
 ```
 
 Nativ in dhrt (Feature `net` — bereits im Standard-Build enthalten, keine
-`--hardware`-Flag noetig, kein neues Cargo-Crate: reines `std::net` direkt
-gegen die OASIS-MQTT-3.1.1-Spezifikation implementiert).
+`--hardware`-Flag noetig), direkt gegen die OASIS-MQTT-3.1.1-Spezifikation
+implementiert; TLS über dasselbe rustls wie das Mail-Modul.
 
-## Bewusst nicht abgedeckt
+## Umfang
 
-Nur **QoS 0** (Publish/Subscribe ohne Ack-Handshake — QoS 1/2 bräuchten
-Packet-ID-Tracking + Retry-State-Machine), kein `UNSUBSCRIBE`, kein TLS
-(`mqtts://`). Der letzte Wille (`MQTT_WILL`) ist seit 2026-10-12 da. Für die typische Bastler-Nutzung
-(Sensor-Werte publizieren, auf Steuer-Topics subscriben gegen einen lokalen
-Broker wie Mosquitto) reicht QoS 0 vollständig — die meisten ESP32-Tutorials
-verwenden ohnehin QoS 0.
+**QoS 0 und 1** beim Senden und Empfangen, Abonnieren und Abmelden, der
+letzte Wille und **TLS** (`mqtts://`, auch mit eigener CA). Nicht dabei:
+**QoS 2** (vier Pakete je Nachricht, im Bastlerbereich kaum benutzt) und
+Sitzungen über eine Verbindung hinaus — „Clean Session" ist immer an, eine
+unbestätigte Nachricht wird also nicht von selbst neu geschickt. Für Sensor-
+Werte und Steuerbefehle gegen einen Broker wie Mosquitto reicht QoS 0; QoS 1
+nimmt man, wenn eine Nachricht sicher ankommen muss (ein Befehl, der einen
+Motor stoppt).
 
 ## Übersicht
 
 | Funktion | Rückgabe | Bedeutung |
 |---|---|---|
-| `MQTT_CONNECT(host$, port, client_id$[, keepalive_s[, user$[, pass$]]])` | MQTT_HANDLE | Verbindung zum Broker aufbauen (`keepalive_s` Vorgabe 60) |
+| `MQTT_CONNECT(host$, port, client_id$[, keepalive_s[, user$[, pass$]]])` | MQTT_HANDLE | Verbindung zum Broker aufbauen (`keepalive_s` Vorgabe 60); `mqtts://host` verbindet verschluesselt |
+| `MQTT_TLS_CA(pfad$)` | — | eigene CA (PEM-Datei) fuer jedes folgende `mqtts://`-Verbinden; `""` = wieder die oeffentlichen Wurzeln |
 | `MQTT_DISCONNECT(handle)` | — | Verbindung schliessen |
 | `MQTT_IS_CONNECTED(handle)` | BOOLEAN | steht die Verbindung noch? |
-| `MQTT_PUBLISH(handle, topic$, payload$[, retain])` | BOOLEAN | Nachricht auf ein Topic senden; `retain` laesst der Broker sie fuer spaetere Abonnenten aufheben. FALSE, wenn die Verbindung weg ist |
-| `MQTT_SUBSCRIBE(handle, topic$)` | BOOLEAN | Topic abonnieren -- eingehende Nachrichten holt danach `MQTT_UPDATE` ab. FALSE, wenn die Verbindung weg ist |
+| `MQTT_PUBLISH(handle, topic$, payload$[, retain[, qos]])` | BOOLEAN | Nachricht auf ein Topic senden; `retain` laesst der Broker sie fuer spaetere Abonnenten aufheben, `qos` 0 oder 1. FALSE, wenn die Verbindung weg ist |
+| `MQTT_SUBSCRIBE(handle, topic$[, qos])` | BOOLEAN | Topic abonnieren -- eingehende Nachrichten holt danach `MQTT_UPDATE` ab; `qos` 0 oder 1. FALSE, wenn die Verbindung weg ist |
+| `MQTT_UNSUBSCRIBE(handle, topic$)` | BOOLEAN | ein Abonnement beenden |
+| `MQTT_PENDING(handle)` | INTEGER | wie viele QoS-1-Nachrichten der Broker noch nicht bestaetigt hat |
+| `MQTT_FLUSH(handle[, ms])` | BOOLEAN | warten, bis alle QoS-1-Nachrichten bestaetigt sind (Vorgabe 2000 ms); FALSE, wenn die Zeit um ist |
 | `MQTT_WILL(topic$, inhalt$[, retain])` | — | der **letzte Wille** fuer das naechste `MQTT_CONNECT`: reisst die Verbindung ohne Abmeldung ab, veroeffentlicht der Broker diese Nachricht |
 | `MQTT_UPDATE(handle)` | — | **pro Frame aufrufen**: liest eingegangene Nachrichten ein und haelt die Verbindung mit PINGREQ am Leben |
 | `MQTT_NEXT_MESSAGE(handle)` | BOOLEAN | eine Nachricht weiterruecken; FALSE, wenn die Warteschlange leer ist |
@@ -140,6 +146,42 @@ IF verbunden THEN
 ELSEIF MILLIS() >= naechsterVersuch THEN
     verbinden()
 END IF
+```
+
+## QoS 1: sicher ankommen
+
+Mit QoS 1 bestätigt der Broker jede Nachricht. Bis dahin zählt sie in
+`MQTT_PENDING`; `MQTT_FLUSH` wartet darauf — nützlich in einem Programm, das
+eine Nachricht schickt und gleich endet. Abonniert man mit QoS 1, bestätigt
+der Client eingehende Nachrichten selbst. QoS 1 heißt „mindestens einmal":
+geht eine Bestätigung verloren, kommt dieselbe Nachricht ein zweites Mal.
+
+```basic
+IMPORT "mqtt"
+DIM h AS MQTT_HANDLE : h = MQTT_CONNECT("192.168.1.50", 1883, "werkstatt-steuerung")
+MQTT_PUBLISH(h, "werkstatt/motor", "stopp", FALSE, 1)
+IF NOT MQTT_FLUSH(h, 3000) THEN PRINT "nicht bestaetigt: "; MQTT_PENDING(h)
+MQTT_DISCONNECT(h)
+```
+
+Bricht die Verbindung ab, bevor die Bestätigung kam, schickt der Client die
+Nachricht nicht von selbst neu; `MQTT_PENDING` zeigt, ob etwas offen war.
+
+## Verschlüsselt: mqtts://
+
+`MQTT_CONNECT("mqtts://broker.example.com", 8883, ...)` verbindet über TLS
+(auch `ssl://`, `tls://`; `mqtt://` oder nur der Name = unverschlüsselt). Das
+Zertifikat des Brokers wird gegen die öffentlichen Wurzeln geprüft — so gehen
+HiveMQ Cloud, EMQX Cloud, AWS IoT. Ein Mosquitto mit selbst ausgestelltem
+Zertifikat braucht dessen CA: `MQTT_TLS_CA("ca.crt")` vor dem Verbinden, dann
+gilt NUR diese CA, bis `MQTT_TLS_CA("")` zurückstellt. Der Name in der
+Adresse muss im Zertifikat stehen (Name oder IP-Adresse).
+
+```basic
+IMPORT "mqtt"
+MQTT_TLS_CA("mosquitto-ca.crt")
+DIM h AS MQTT_HANDLE
+h = MQTT_CONNECT("mqtts://raspberrypi.local", 8883, "werkstatt", 60, "nutzer", "kennwort")
 ```
 
 ## Der letzte Wille

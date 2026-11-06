@@ -1,34 +1,48 @@
-' Direkte Arduino/ESP32-Pin-Steuerung ueber StandardFirmata (kein eigener
-' Sketch/Text-Protokoll noetig -- einmalig StandardFirmata hochladen).
-' Native Runtime (dhrt): mit 'python rust/build_runtime.py --hardware' bauen.
+' Direkte Arduino/ESP32-Steuerung ueber Firmata (kein eigener Sketch, kein
+' Text-Protokoll -- einmalig StandardFirmata hochladen).
 '
-' Liste aller verfuegbaren Ports anzeigen, dann (falls vorhanden) am ersten
-' Port Pin 13 (eingebaute LED auf vielen Boards) ein paar mal blinken lassen
-' und einen Analog-Kanal auslesen.
+'   dhrt run 147_firmata.dh                         erster serieller Port
+'   dhrt run 147_firmata.dh -- COM5                 dieser Port
+'   dhrt run 147_firmata.dh -- tcp:192.168.1.50:3030   StandardFirmataWiFi
+'
+' Zeigt die Firmware, laesst Pin 13 (eingebaute LED auf vielen Boards) ein
+' paar Mal blinken und liest den Analog-Kanal A0. Serielle Ports gibt es nur
+' in einem Bau mit 'python rust/build_runtime.py --hardware'; tcp: geht immer.
+' Servo, I2C und Schrittmotor: docs/module-firmata.md.
 
 IMPORT "firmata"
 
-DIM ports AS STRING
-ports = FIRMATA_PORTS()
-PRINT "Verfuegbare Ports: ", ports
-
-IF LEN(ports) = 0 THEN
-    PRINT "Kein serieller Port gefunden - Beispiel uebersprungen."
+DIM ziel AS STRING : ziel = ""
+IF ARGC() > 0 THEN
+    ziel = ARG$(0)
 ELSE
+    DIM ports AS STRING : ports = ""
+    TRY
+        ports = FIRMATA_PORTS()
+    CATCH e
+        PRINT e
+    END TRY
+    PRINT "Verfuegbare Ports: ", ports
+    ' INSTR zaehlt ab 0 und liefert -1, wenn nichts gefunden wird.
+    DIM komma AS INTEGER : komma = INSTR(ports, ",")
+    IF komma >= 0 THEN ports = LEFT$(ports, komma)
+    ziel = TRIM$(ports)
+END IF
+
+IF ziel = "" THEN
+    PRINT "Kein Board angegeben und kein serieller Port gefunden - Beispiel uebersprungen."
+ELSE
+    PRINT "Oeffne ", ziel, " ..."
+    ' Seriell wartet das ~2 s (viele Boards starten beim Oeffnen neu), ueber
+    ' das Netz nicht. Die Baudrate gilt nur seriell.
     DIM board AS FIRMATA_HANDLE
-    DIM first$ AS STRING
-    DIM komma AS INTEGER
+    board = FIRMATA_OPEN(ziel, 57600)
 
-    komma = INSTR(ports, ",")
-    IF komma > 0 THEN
-        first$ = LEFT$(ports, komma - 1)
-    ELSE
-        first$ = ports
-    END IF
-    first$ = TRIM$(first$)
-
-    PRINT "Oeffne ", first$, " mit 57600 Baud (blockiert ~2s fuer Arduino-Autoreset) ..."
-    board = FIRMATA_OPEN(first$, 57600)
+    TRY
+        PRINT "Firmware: ", FIRMATA_FIRMWARE$(board)
+    CATCH e
+        PRINT e
+    END TRY
 
     FIRMATA_PIN_MODE(board, 13, 1)   ' Pin 13 = OUTPUT
 
@@ -42,10 +56,15 @@ ELSE
     NEXT
 
     ' Kanal 0 = A0 -- Analog-Kanal, NICHT die digitale Pin-Nummer (siehe
-    ' docs/module-firmata.md fuer die Pin-vs-Kanal-Unterscheidung).
-    FIRMATA_UPDATE(board)
-    SLEEP(50)
-    FIRMATA_UPDATE(board)
+    ' docs/module-firmata.md fuer die Pin-vs-Kanal-Unterscheidung). Der
+    ' erste Aufruf schaltet die Meldung ein, der Wert kommt mit einem
+    ' spaeteren FIRMATA_UPDATE.
+    FIRMATA_ANALOG_READ(board, 0)
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 300
+        FIRMATA_UPDATE(board)
+        SLEEP(10)
+    WEND
     PRINT "A0: ", FIRMATA_ANALOG_READ(board, 0)
 
     FIRMATA_CLOSE(board)

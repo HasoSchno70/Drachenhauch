@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 2253,
+ "count": 2275,
  "builtins": [
   {
    "name": "ABS",
@@ -2793,6 +2793,48 @@
    "module": "firmata"
   },
   {
+   "name": "FIRMATA_FIRMWARE$",
+   "kind": "core",
+   "signature": "FIRMATA_FIRMWARE$(h) AS STRING",
+   "module": "firmata"
+  },
+  {
+   "name": "FIRMATA_I2C_CONFIG",
+   "kind": "core",
+   "signature": "FIRMATA_I2C_CONFIG(h [, verzoegerung_us: INTEGER])",
+   "module": "firmata"
+  },
+  {
+   "name": "FIRMATA_I2C_DATA",
+   "kind": "core",
+   "signature": "FIRMATA_I2C_DATA(h, adresse: INTEGER [, register: INTEGER]) AS ARRAY OF INTEGER",
+   "module": "firmata"
+  },
+  {
+   "name": "FIRMATA_I2C_READ",
+   "kind": "core",
+   "signature": "FIRMATA_I2C_READ(h, adresse: INTEGER, register: INTEGER, anzahl: INTEGER) AS ARRAY OF INTEGER",
+   "module": "firmata"
+  },
+  {
+   "name": "FIRMATA_I2C_REQUEST",
+   "kind": "core",
+   "signature": "FIRMATA_I2C_REQUEST(h, adresse: INTEGER, register: INTEGER, anzahl: INTEGER [, dauernd: BOOLEAN])",
+   "module": "firmata"
+  },
+  {
+   "name": "FIRMATA_I2C_STOP",
+   "kind": "core",
+   "signature": "FIRMATA_I2C_STOP(h, adresse: INTEGER)",
+   "module": "firmata"
+  },
+  {
+   "name": "FIRMATA_I2C_WRITE",
+   "kind": "core",
+   "signature": "FIRMATA_I2C_WRITE(h, adresse: INTEGER, bytes)",
+   "module": "firmata"
+  },
+  {
    "name": "FIRMATA_IS_OPEN",
    "kind": "core",
    "signature": "FIRMATA_IS_OPEN(h) AS BOOLEAN",
@@ -2801,7 +2843,7 @@
   {
    "name": "FIRMATA_OPEN",
    "kind": "core",
-   "signature": "FIRMATA_OPEN(port: STRING, baud: INTEGER) AS FIRMATA_HANDLE",
+   "signature": "FIRMATA_OPEN(ziel: STRING [, baud: INTEGER]) AS FIRMATA_HANDLE",
    "module": "firmata"
   },
   {
@@ -2814,6 +2856,72 @@
    "name": "FIRMATA_PORTS",
    "kind": "core",
    "signature": "FIRMATA_PORTS() AS STRING",
+   "module": "firmata"
+  },
+  {
+   "name": "FIRMATA_SERVO_ATTACH",
+   "kind": "core",
+   "signature": "FIRMATA_SERVO_ATTACH(h, pin: INTEGER [, min_us: INTEGER [, max_us: INTEGER]])",
+   "module": "firmata"
+  },
+  {
+   "name": "FIRMATA_SERVO_WRITE",
+   "kind": "core",
+   "signature": "FIRMATA_SERVO_WRITE(h, pin: INTEGER, winkel: INTEGER)",
+   "module": "firmata"
+  },
+  {
+   "name": "FIRMATA_STEPPER_ACCEL",
+   "kind": "core",
+   "signature": "FIRMATA_STEPPER_ACCEL(h, motor: INTEGER, schritte_je_s2: FLOAT)",
+   "module": "firmata"
+  },
+  {
+   "name": "FIRMATA_STEPPER_CONFIG",
+   "kind": "core",
+   "signature": "FIRMATA_STEPPER_CONFIG(h, motor: INTEGER, art: STRING, pin1: INTEGER, pin2: INTEGER [, pin3: INTEGER [, pin4: INTEGER]])",
+   "module": "firmata"
+  },
+  {
+   "name": "FIRMATA_STEPPER_MOVE",
+   "kind": "core",
+   "signature": "FIRMATA_STEPPER_MOVE(h, motor: INTEGER, schritte: INTEGER)",
+   "module": "firmata"
+  },
+  {
+   "name": "FIRMATA_STEPPER_POSITION",
+   "kind": "core",
+   "signature": "FIRMATA_STEPPER_POSITION(h, motor: INTEGER) AS INTEGER",
+   "module": "firmata"
+  },
+  {
+   "name": "FIRMATA_STEPPER_RUNNING",
+   "kind": "core",
+   "signature": "FIRMATA_STEPPER_RUNNING(h, motor: INTEGER) AS BOOLEAN",
+   "module": "firmata"
+  },
+  {
+   "name": "FIRMATA_STEPPER_SPEED",
+   "kind": "core",
+   "signature": "FIRMATA_STEPPER_SPEED(h, motor: INTEGER, schritte_je_s: FLOAT)",
+   "module": "firmata"
+  },
+  {
+   "name": "FIRMATA_STEPPER_STOP",
+   "kind": "core",
+   "signature": "FIRMATA_STEPPER_STOP(h, motor: INTEGER)",
+   "module": "firmata"
+  },
+  {
+   "name": "FIRMATA_STEPPER_TO",
+   "kind": "core",
+   "signature": "FIRMATA_STEPPER_TO(h, motor: INTEGER, ziel: INTEGER)",
+   "module": "firmata"
+  },
+  {
+   "name": "FIRMATA_STEPPER_ZERO",
+   "kind": "core",
+   "signature": "FIRMATA_STEPPER_ZERO(h, motor: INTEGER)",
    "module": "firmata"
   },
   {
@@ -8505,6 +8613,12 @@
    "module": "mqtt"
   },
   {
+   "name": "MQTT_FLUSH",
+   "kind": "core",
+   "signature": "MQTT_FLUSH(h[, ms: INTEGER]) AS BOOLEAN",
+   "module": "mqtt"
+  },
+  {
    "name": "MQTT_IS_CONNECTED",
    "kind": "core",
    "signature": "MQTT_IS_CONNECTED(h) AS BOOLEAN",
@@ -8529,15 +8643,33 @@
    "module": "mqtt"
   },
   {
+   "name": "MQTT_PENDING",
+   "kind": "core",
+   "signature": "MQTT_PENDING(h) AS INTEGER",
+   "module": "mqtt"
+  },
+  {
    "name": "MQTT_PUBLISH",
    "kind": "core",
-   "signature": "MQTT_PUBLISH(h, topic$, payload$[, retain: BOOLEAN]) AS BOOLEAN",
+   "signature": "MQTT_PUBLISH(h, topic$, payload$[, retain: BOOLEAN[, qos: INTEGER]]) AS BOOLEAN",
    "module": "mqtt"
   },
   {
    "name": "MQTT_SUBSCRIBE",
    "kind": "core",
-   "signature": "MQTT_SUBSCRIBE(h, topic$) AS BOOLEAN",
+   "signature": "MQTT_SUBSCRIBE(h, topic$[, qos: INTEGER]) AS BOOLEAN",
+   "module": "mqtt"
+  },
+  {
+   "name": "MQTT_TLS_CA",
+   "kind": "core",
+   "signature": "MQTT_TLS_CA(pfad$)",
+   "module": "mqtt"
+  },
+  {
+   "name": "MQTT_UNSUBSCRIBE",
+   "kind": "core",
+   "signature": "MQTT_UNSUBSCRIBE(h, topic$) AS BOOLEAN",
    "module": "mqtt"
   },
   {

@@ -1,0 +1,65 @@
+' Ein Firmata-Board als Gegenstelle im SELBEN Programm: es lauscht auf
+' einem freien Port, FIRMATA_OPEN("tcp:...") verbindet sich dorthin (so wie
+' mit StandardFirmataWiFi), und das Programm liest mit fbEmpfangen$, was
+' beim Board ankam, und schickt mit fbSenden Antworten zurueck -- in Hex,
+' damit die Erwartung die Bytes des Protokolls zeigt.
+' Eingebunden per Beilage: IMPORT "{sammlung}/_hilfen/firmataboard.dh"
+IMPORT "net"
+IMPORT "firmata"
+
+DIM fbLauscher AS NET_LISTENER
+DIM fbSock AS NET_SOCKET
+DIM fbH AS FIRMATA_HANDLE
+
+SUB fbStart()
+    fbLauscher = NET_TCP_LISTEN(0, "127.0.0.1")
+    fbH = FIRMATA_OPEN("tcp:127.0.0.1:" + STR$(NET_LISTENER_PORT(fbLauscher)))
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    fbSock = NET_TCP_ACCEPT(fbLauscher)
+    WHILE fbSock = NIL
+        IF MILLIS() - t0 > 5000 THEN THROW "firmataboard: keine Verbindung"
+        SLEEP(2)
+        fbSock = NET_TCP_ACCEPT(fbLauscher)
+    WEND
+END SUB
+
+' Alles, was seit dem letzten Mal ankam, als "F0 70 09 ...". Gelesen wird,
+' bis 40 ms nichts mehr kommt (hoechstens zwei Sekunden).
+FUNCTION fbEmpfangen$() AS STRING
+    DIM alles AS BUFFER : alles = BUFFER_NEW(0)
+    DIM ruhe AS INTEGER : ruhe = MILLIS()
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - ruhe < 40 AND MILLIS() - t0 < 2000
+        DIM b AS BUFFER : b = NET_RECV_BYTES(fbSock, 4096)
+        IF BUFFER_LEN(b) > 0 THEN
+            alles = BUFFER_CONCAT(alles, b)
+            ruhe = MILLIS()
+        ELSE
+            SLEEP(2)
+        END IF
+    WEND
+    DIM h AS STRING : h = UPPER$(BUFFER_TO_HEX$(alles))
+    DIM aus AS STRING : aus = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(h) - 1 STEP 2
+        IF aus <> "" THEN aus = aus + " "
+        aus = aus + MID$(h, i, 2)
+    NEXT
+    RETURN aus
+END FUNCTION
+
+' Bytes an das Programm, z.B. fbSenden("F0 77 68 00 3B 00 12 00 F7").
+SUB fbSenden(hex AS STRING)
+    NET_SEND(fbSock, BUFFER_FROM_HEX(REPLACE$(hex, " ", "")))
+END SUB
+
+' Ein Feld aus Zahlen als "18 255".
+FUNCTION fbFeld$(f AS ARRAY OF INTEGER) AS STRING
+    DIM aus AS STRING : aus = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(f) - 1
+        IF aus <> "" THEN aus = aus + " "
+        aus = aus + STR$(f[i])
+    NEXT
+    RETURN "[" + aus + "]"
+END FUNCTION

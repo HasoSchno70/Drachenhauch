@@ -297,7 +297,9 @@ pdf = ["dep:krilla", "schriften", "dep:rustybuzz"]
 schriften = ["dep:dejavu"]
 # 2D/3D-Starrkoerper-Physik (rapier) -- rund 1 MB.
 physik = ["dep:rapier2d", "dep:rapier3d"]
-net = []                       # nur std::net -- Gate dient dem Opt-out
+# std::net; dazu rustls+webpki-roots fuer MQTT ueber TLS (mqtts://) --
+# dieselben Crates, die smtp, pg und ureq ohnehin in den Baum bringen.
+net = ["dep:rustls", "dep:webpki-roots"]
 http = ["dep:ureq"]
 smtp = ["dep:rustls", "dep:webpki-roots"]
 serial = ["dep:serialport"]
