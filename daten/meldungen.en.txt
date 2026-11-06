@@ -1877,3 +1877,31 @@ WEBCAM_OPEN: der Zugriff auf die Kamera ist verweigert -- Systemeinstellungen ->
 {}: breite und hoehe muessen 0..8192 sein (0 = was die Kamera vorschlaegt)	{}: width and height must be 0..8192 (0 = what the camera suggests)
 {}: ungueltige oder geschlossene WEBCAM {}	{}: invalid or closed WEBCAM {}
 die Kamera liefert nicht mehr -- {}	the camera delivers no more -- {}
+WS_CONNECT: {} ist keine WebSocket-Adresse (ws://... oder wss://...)	WS_CONNECT: {} is not a WebSocket address (ws://... or wss://...)
+WS_CONNECT: {} -- ']' fehlt	WS_CONNECT: {} -- ']' is missing
+WS_CONNECT: {} -- der Port ist keine Zahl 0..65535	WS_CONNECT: {} -- the port is not a number 0..65535
+WS_CONNECT: {} -- der Rechner fehlt	WS_CONNECT: {} -- the host is missing
+WS_CONNECT: {} nicht aufloesbar (auch nicht ueber mDNS)	WS_CONNECT: {} cannot be resolved (not over mDNS either)
+WS_CONNECT: {} will kein WebSocket -- Antwort {}	WS_CONNECT: {} does not want a WebSocket -- answer {}
+WS_CONNECT: {} antwortet mit einem falschen Sec-WebSocket-Accept	WS_CONNECT: {} answers with a wrong Sec-WebSocket-Accept
+WS_CONNECT: TLS liess sich nicht einrichten: {}	WS_CONNECT: TLS could not be set up: {}
+WS_CONNECT: TLS-Verbindung fehlgeschlagen: {}	WS_CONNECT: TLS connection failed: {}
+WS_CONNECT: {} ist kein gueltiger Servername fuer TLS	WS_CONNECT: {} is not a valid server name for TLS
+WS_LISTEN: Port {} ausserhalb 0..65535	WS_LISTEN: port {} outside 0..65535
+{}: erwartet einen Text oder einen BUFFER, nicht {}	{}: expects a text or a BUFFER, not {}
+{}: hoechstens {} Bytes je Nachricht	{}: at most {} bytes per message
+{}: Code {} ist nicht erlaubt (1000 normal, 1001 weg, 4000..4999 eigene)	{}: code {} is not allowed (1000 normal, 1001 going away, 4000..4999 your own)
+ungueltiger/geschlossener WS_SERVER	invalid/closed WS_SERVER
+ungueltiger/geschlossener OSC	invalid/closed OSC
+OSC_OPEN: Port {} ausserhalb 0..65535	OSC_OPEN: port {} outside 0..65535
+{}: erwartet (osc, host$, port, adresse$, werte...)	{}: expects (osc, host$, port, adresse$, values...)
+{}: Port {} ausserhalb 1..65535	{}: port {} outside 1..65535
+{}: eine OSC-Adresse beginnt mit /, nicht {}	{}: an OSC address starts with /, not {}
+{}: Wert {} ist {} -- OSC kennt Zahlen, Texte, Wahrheitswerte und BUFFER	{}: value {} is {} -- OSC knows numbers, texts, truth values and BUFFER
+{}: Wert {} gibt es nicht -- die Nachricht hat {} (gezaehlt ab 0)	{}: there is no value {} -- the message has {} (counted from 0)
+OSC_SEND: {} nicht aufloesbar	OSC_SEND: {} cannot be resolved
+{}: Wartezeit {} ms ausserhalb 50..30000	{}: waiting time {} ms outside 50..30000
+{}: Dienst {} gibt es nicht -- die letzte Suche fand {} (gezaehlt ab 0)	{}: there is no service {} -- the last search found {} (counted from 0)
+{}: der Name darf nicht leer sein und keinen Punkt enthalten, nicht {}	{}: the name must not be empty or contain a dot, not {}
+MDNS_ANNOUNCE: Anschluss 5353 ist nicht zu bekommen -- {}	MDNS_ANNOUNCE: port 5353 cannot be had -- {}
+MDNS_ANNOUNCE: Gruppe 224.0.0.251 -- {}	MDNS_ANNOUNCE: group 224.0.0.251 -- {}

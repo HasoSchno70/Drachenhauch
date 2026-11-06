@@ -228,6 +228,7 @@ Vollständige Doku im [docs/](docs/README.md)-Ordner:
 | [`html`](docs/module-html.md) | HTTP GET/POST/Download + HTML auslesen |
 | [`httpd`](docs/module-httpd.md) | die andere Richtung: ein kleiner Webserver im Takt der Hauptschleife — Bedienoberfläche im Heimnetz |
 | [`mqtt`](docs/module-mqtt.md) | das Pub/Sub-Protokoll der IoT-Welt — der Weg zum ESP32 **über WLAN**; QoS 0/1, TLS (`mqtts://`) |
+| [`websocket`](docs/module-websocket.md), [`osc`](docs/module-osc.md), [`mdns`](docs/module-mdns.md) | WebSocket-Client und -Server, Open Sound Control (TouchOSC, Pure Data) und Geräte als `esp32.local` finden -- oder das eigene Programm dort ankündigen |
 | [`firmata`](docs/module-firmata.md) | Arduino-/ESP32-Pins, Servos, I2C-Geräte und Schrittmotoren direkt steuern, über USB oder WLAN (`tcp:host:port`), ohne eigenen Sketch |
 | [`gpio`, `i2c`, `spi`](docs/module-pins.md) | die Pins des Raspberry Pi selbst (und jedes Linux-Boards): GPIO mit Flanken-Ereignissen, I2C-Sensoren, SPI-Bausteine -- über die Schnittstellen des Kernels, darum auf Pi 3, 4 und 5 |
 | [Mikrofon](docs/module-mikrofon.md) (`MIC_*`) | Pegel, Tonhöhe, Spektrum und Aufnahme vom Eingang des Rechners -- ein Stimmgerät oder ein Spiel, das man mit der Stimme steuert |

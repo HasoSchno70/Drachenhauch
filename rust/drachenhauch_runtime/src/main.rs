@@ -93,6 +93,10 @@ mod html;
 mod net;
 #[cfg(feature = "net")]
 mod mqtt;
+#[cfg(feature = "net")]
+mod websocket;
+mod osc;
+mod mdns;
 mod farbraum;
 mod kalender;
 mod syntax;

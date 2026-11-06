@@ -1,0 +1,27 @@
+' Echo-Server fuer tests/pruef/websocket.dhtest: meldet "PORT=n" auf stderr,
+' nimmt EINE Verbindung an, schickt Text mit "echo:" und Binaeres
+' unveraendert zurueck und schliesst auf "ende" mit Code 4001 "tschuess".
+' Nach 20 s ohne Verbindung beendet er sich selbst.
+IMPORT "websocket"
+DIM weS AS WS_SERVER
+weS = WS_LISTEN(0, "127.0.0.1")
+EPRINT("PORT=" + STR$(WS_PORT(weS)))
+DIM weW AS WEBSOCKET : weW = -1
+DIM weT AS INTEGER : weT = MILLIS()
+WHILE weW < 0 AND MILLIS() - weT < 20000
+    weW = WS_ACCEPT(weS)
+    SLEEP(5)
+WEND
+IF weW < 0 THEN END
+WHILE WS_CONNECTED(weW)
+    WHILE WS_NEXT(weW)
+        IF WS_IS_BINARY(weW) THEN
+            WS_SEND(weW, WS_MESSAGE_BYTES(weW))
+        ELSEIF WS_MESSAGE$(weW) = "ende" THEN
+            WS_CLOSE(weW, 4001, "tschuess")
+        ELSE
+            WS_SEND(weW, "echo:" + WS_MESSAGE$(weW))
+        END IF
+    WEND
+    SLEEP(2)
+WEND

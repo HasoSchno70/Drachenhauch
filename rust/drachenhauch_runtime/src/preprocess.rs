@@ -23,10 +23,10 @@ use regex::Regex;
 /// ein `IMPORT "<modul>"` wird hier nur zu einem Kommentar.
 const MODULES: &[&str] = &[
     "animfsm", "astar", "audio", "bt", "camera", "chart", "cloud", "controller", "curves", "db", "ecs",
-    "firmata", "g3d", "gpio", "gui", "html", "httpd", "i2c", "imgfx", "ini", "input", "json", "m3d", "midi", "mqtt", "net", "particles",
+    "firmata", "g3d", "gpio", "gui", "html", "httpd", "i2c", "imgfx", "ini", "input", "json", "m3d", "mdns", "midi", "mqtt", "net", "osc", "particles",
     "geld", "pdf", "smtp", "xlsx", "xml",
     "physics", "physics2d", "physics3d", "regex", "save", "scene", "serial", "sprite",
-    "spi", "tile_collide", "tiled", "timer", "tween", "ui", "usb", "vec2", "video", "webcam", "wifi", "zeit",
+    "spi", "tile_collide", "tiled", "timer", "tween", "ui", "usb", "vec2", "video", "webcam", "websocket", "wifi", "zeit",
 ];
 
 /// Hardware-/IoT-Module hinter Cargo-Features (= die `--hardware`-Features in
@@ -55,6 +55,8 @@ const MODULE_TYPES: &[(&str, &[&str])] = &[
     ("i2c", &["i2c_bus"]),
     ("spi", &["spi_device"]),
     ("webcam", &["webcam"]),
+    ("websocket", &["websocket", "ws_server"]),
+    ("osc", &["osc"]),
     ("gui", &["gui_widget", "gui_window"]),
     ("json", &["json_handle"]),
     ("m3d", &["vec3", "vec4", "quat", "mat4"]),

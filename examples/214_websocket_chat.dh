@@ -1,0 +1,83 @@
+' Ein Chat fuer den Browser: httpd liefert die Seite aus, die Nachrichten
+' laufen ueber einen WebSocket-Server, und mDNS kuendigt das Ganze als
+' chat.local an (Module httpd, websocket, mdns).
+'
+'   Im Browser: http://localhost:8080/  -- von einem anderen Geraet im Netz:
+'   http://chat.local:8080/ (oder die Adresse dieses Rechners)
+'
+' Jede Nachricht geht an alle, die gerade verbunden sind. Das Fenster zeigt
+' mit, wer da ist und was geschrieben wurde.
+
+IMPORT "httpd"
+IMPORT "websocket"
+IMPORT "mdns"
+
+CONST WEBPORT = 8080
+CONST WSPORT = 8081
+
+DIM seite AS STRING
+seite = "<!doctype html><meta charset=utf-8><title>Drachenhauch-Chat</title>"
+seite = seite + "<style>body{font:16px sans-serif;max-width:40em;margin:2em auto}#log{height:20em;overflow:auto;border:1px solid #ccc;padding:.5em}</style>"
+seite = seite + "<h1>Drachenhauch-Chat</h1><div id=log></div><input id=t size=50 autofocus> <button onclick=s()>Senden</button>"
+seite = seite + "<script>const w=new WebSocket('ws://'+location.hostname+':" + STR$(WSPORT) + "/');"
+seite = seite + "w.onmessage=e=>{const p=document.createElement('p');p.textContent=e.data;log.appendChild(p);log.scrollTop=1e9};"
+seite = seite + "function s(){if(t.value){w.send(t.value);t.value=''}}t.onkeydown=e=>{if(e.key=='Enter')s()}</script>"
+
+DIM web AS HTTPD
+web = HTTPD_START(WEBPORT)
+DIM live AS WS_SERVER
+live = WS_LISTEN(WSPORT)
+DIM name AS STRING : name = "?"
+TRY
+    name = MDNS_ANNOUNCE("chat", "_http._tcp", WEBPORT, "pfad=/")
+CATCH e
+    name = "(mDNS geht hier nicht: " + e + ")"
+END TRY
+
+DIM leute AS ARRAY OF INTEGER
+leute = []
+DIM verlauf AS ARRAY OF STRING
+verlauf = []
+
+SUB alle(text AS STRING)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(leute) - 1
+        IF leute[i] >= 0 THEN WS_SEND(leute[i], text)
+    NEXT
+    ARRAY_PUSH(verlauf, text)
+    IF LEN(verlauf) > 14 THEN ARRAY_REMOVE_AT(verlauf, 0)
+END SUB
+
+SCREEN(640, 400, "Chat-Server")
+SETFPS(30)
+WHILE NOT QUITREQUESTED()
+    IF HTTPD_ACCEPT(web) THEN HTTPD_SEND(web, 200, "text/html; charset=utf-8", seite)
+    DIM neu AS WEBSOCKET : neu = WS_ACCEPT(live)
+    IF neu >= 0 THEN
+        ARRAY_PUSH(leute, neu)
+        alle("* jemand ist da (" + WS_PEER$(neu) + ")")
+    END IF
+    DIM i AS INTEGER
+    DIM da AS INTEGER : da = 0
+    FOR i = 0 TO LEN(leute) - 1
+        IF leute[i] >= 0 THEN
+            IF NOT WS_CONNECTED(leute[i]) THEN
+                leute[i] = -1
+                alle("* jemand ist gegangen")
+            ELSE
+                da = da + 1
+                WHILE WS_NEXT(leute[i])
+                    alle(LEFT$(WS_MESSAGE$(leute[i]), 200))
+                WEND
+            END IF
+        END IF
+    NEXT
+
+    CLS(&H18202C)
+    TEXT(16, 12, "http://localhost:" + STR$(WEBPORT) + "/   " + name, &HC0D0E0)
+    TEXT(16, 36, STR$(da) + " verbunden", &H80C080)
+    FOR i = 0 TO LEN(verlauf) - 1
+        TEXT(16, 70 + i * 22, verlauf[i], &HFFFFFF)
+    NEXT
+    FLIP()
+WEND

@@ -92,6 +92,9 @@ md-5 = "0.10"
 hmac = "0.12"
 uuid = { version = "1", features = ["v4"] }
 getrandom = "0.2"
+# mDNS-Antworter (src/mdns.rs): SO_REUSEADDR/-PORT auf 5353 neben dem
+# Antworter des Systems; dieselbe Fassung, die schon im Baum liegt.
+socket2 = { version = "0.6.5", features = ["all"] }
 # Grafik ist optional: der pure VM-Kern baut ohne C-Toolchain. Mit
 # `--features graphics` wird raylib eingebunden (braucht cmake + C-Compiler +
 # libclang fuer bindgen -- siehe rust/build_runtime.py).
