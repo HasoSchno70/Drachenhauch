@@ -110,6 +110,7 @@ entworfen, empfohlen; entschieden ist nichts davon.
 - **[Sprachserver + VS Code](lsp.md)** — `dhrt lsp`: dieselbe Diagnose in fremden Editoren, ohne Python
 - **[Eingabe aufzeichnen](automation.md)** — Demo-Modus, nachspielbare Fehlerberichte, automatische Spieltests
 - **[Web-Playground](web-playground.md)** — dhrt als WebAssembly, ein Link genügt
+- **[Raspberry Pi](raspberry-pi.md)** — das Paket für den Pi (64 Bit, Grafik über OpenGL ES), Pins direkt, Fehlersuche
 
 ### Interna
 

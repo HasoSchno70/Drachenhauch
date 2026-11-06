@@ -111,6 +111,7 @@ designed, recommended; none of it is decided.
 - **[Language server + VS Code](lsp.md)** — `dhrt lsp`: the same diagnostics in other editors, without Python
 - **[Recording input](automation.md)** — demo mode, replayable bug reports, automated game tests
 - **[Web playground](web-playground.md)** — dhrt as WebAssembly, a link is all it takes
+- **[Raspberry Pi](raspberry-pi.md)** — the package for the Pi (64 bit, graphics through OpenGL ES), pins directly, troubleshooting
 
 ### Internals
 
