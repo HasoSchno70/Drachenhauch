@@ -1,0 +1,42 @@
+' Helfer fuer tests/pruef/modbus.dhtest: den Port des gespielten Geraets
+' lesen ("PORT=n" auf stderr), Felder ausgeben und lesen, was beim Geraet
+' ankam.
+
+FUNCTION portVon(mhP AS INTEGER) AS INTEGER
+    DIM mhT AS INTEGER : mhT = MILLIS()
+    DIM mhZ AS STRING : mhZ = ""
+    WHILE MILLIS() - mhT < 10000
+        mhZ = mhZ + PROCESS_ERR$(mhP)
+        IF INSTR(mhZ, "PORT=") >= 0 THEN RETURN INT(VAL(MID$(mhZ, INSTR(mhZ, "PORT=") + 5)))
+        SLEEP(10)
+    WEND
+    RETURN -1
+END FUNCTION
+
+FUNCTION feld$(mhF AS ARRAY OF INTEGER) AS STRING
+    DIM mhA AS STRING : mhA = ""
+    DIM mhI AS INTEGER
+    FOR mhI = 0 TO LEN(mhF) - 1
+        IF mhA <> "" THEN mhA = mhA + " "
+        mhA = mhA + STR$(mhF[mhI])
+    NEXT
+    RETURN "[" + mhA + "]"
+END FUNCTION
+
+FUNCTION bits$(mhF AS ARRAY OF BOOLEAN) AS STRING
+    DIM mhA AS STRING : mhA = ""
+    DIM mhI AS INTEGER
+    FOR mhI = 0 TO LEN(mhF) - 1
+        mhA = mhA + IIF(mhF[mhI], "1", "0")
+    NEXT
+    RETURN mhA
+END FUNCTION
+
+' Was beim Geraet ankam (eine Anfrage je Zeile), ohne die letzte Leerzeile.
+' Das Geraet schreibt die Datei vor der Antwort -- wenn der Befehl
+' zurueckkam, steht sie also schon da.
+FUNCTION anfragen$() AS STRING
+    IF NOT FILEEXISTS("anfragen.txt") THEN RETURN ""
+    DIM mhZ AS ARRAY OF STRING : mhZ = READLINES("anfragen.txt")
+    RETURN TRIM$(JOIN$(mhZ, CHR$(10)))
+END FUNCTION

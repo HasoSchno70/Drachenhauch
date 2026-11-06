@@ -341,3 +341,144 @@ MIDI_OUT_CLOSE(aus)
 --- erwartet
 warten 1024
 aelteste ueberlebende 96
+
+=== die uhr geht hinaus und kommt wieder an
+' MIDI_CLOCK_SEND schickt 24 Takte je Viertel aus einem eigenen Faden;
+' der Eingang rechnet daraus das Tempo. Die Takte gehen NICHT in die
+' Warteschlange (sonst waere sie nach einer Minute voll), Start, Stopp und
+' Songposition schon (wie vor 2026.43).
+IMPORT "midi"
+DIM c AS INTEGER
+TRY
+    c = MIDI_OUT_COUNT()
+CATCH ohne
+    PRINT "UEBERSPRINGEN: Bau ohne das midi-Feature"
+    EXIT(0)
+END TRY
+DIM port AS STRING : port = ""
+DIM i AS INTEGER
+FOR i = 0 TO MIDI_IN_COUNT() - 1
+    DIM j AS INTEGER
+    FOR j = 0 TO MIDI_OUT_COUNT() - 1
+        IF port = "" AND MIDI_IN_NAME$(i) = MIDI_OUT_NAME$(j) THEN port = MIDI_IN_NAME$(i)
+    NEXT
+NEXT
+IF port = "" THEN
+    PRINT "UEBERSPRINGEN: kein virtueller MIDI-Loopback-Port vorhanden"
+    EXIT(0)
+END IF
+DIM ein AS MIDI_IN
+DIM aus AS MIDI_OUT
+FOR i = 0 TO MIDI_IN_COUNT() - 1
+    IF MIDI_IN_NAME$(i) = port THEN ein = MIDI_IN_OPEN(i)
+NEXT
+FOR i = 0 TO MIDI_OUT_COUNT() - 1
+    IF MIDI_OUT_NAME$(i) = port THEN aus = MIDI_OUT_OPEN(i)
+NEXT
+PRINT "vorher "; MIDI_CLOCK_RUNNING(ein); " "; MIDI_CLOCK_BPM(ein)
+MIDI_START(aus)
+MIDI_CLOCK_SEND(aus, 120)
+SLEEP(1000)
+DIM bpm AS FLOAT : bpm = MIDI_CLOCK_BPM(ein)
+PRINT "laeuft "; MIDI_CLOCK_RUNNING(ein); " tempo "; ABS(bpm - 120) < 3
+DIM t AS INTEGER : t = MIDI_CLOCK_TICKS(ein)
+PRINT "takte "; t >= 40 AND t <= 56
+' Neues Tempo ohne Neustart.
+MIDI_CLOCK_SEND(aus, 90)
+SLEEP(900)
+PRINT "neu "; ABS(MIDI_CLOCK_BPM(ein) - 90) < 3
+MIDI_STOP(aus)
+MIDI_CLOCK_SEND(aus, 0)
+SLEEP(700)
+PRINT "steht "; MIDI_CLOCK_RUNNING(ein); " "; MIDI_CLOCK_BPM(ein)
+MIDI_SONG_POSITION(aus, 16)
+SLEEP(200)
+PRINT "position "; MIDI_CLOCK_TICKS(ein)
+PRINT "warten "; MIDI_PENDING(ein)
+MIDI_IN_CLOSE(ein)
+MIDI_OUT_CLOSE(aus)
+--- erwartet
+vorher FALSE 0.0
+laeuft TRUE tempo TRUE
+takte TRUE
+neu TRUE
+steht FALSE 0.0
+position 96
+warten 3
+
+=== eine datei spielt in ihrer zeit und haelt sauber an
+IMPORT "midi"
+DIM c AS INTEGER
+TRY
+    c = MIDI_OUT_COUNT()
+CATCH ohne
+    PRINT "UEBERSPRINGEN: Bau ohne das midi-Feature"
+    EXIT(0)
+END TRY
+DIM port AS STRING : port = ""
+DIM i AS INTEGER
+FOR i = 0 TO MIDI_IN_COUNT() - 1
+    DIM j AS INTEGER
+    FOR j = 0 TO MIDI_OUT_COUNT() - 1
+        IF port = "" AND MIDI_IN_NAME$(i) = MIDI_OUT_NAME$(j) THEN port = MIDI_IN_NAME$(i)
+    NEXT
+NEXT
+IF port = "" THEN
+    PRINT "UEBERSPRINGEN: kein virtueller MIDI-Loopback-Port vorhanden"
+    EXIT(0)
+END IF
+DIM ein AS MIDI_IN
+DIM aus AS MIDI_OUT
+FOR i = 0 TO MIDI_IN_COUNT() - 1
+    IF MIDI_IN_NAME$(i) = port THEN ein = MIDI_IN_OPEN(i)
+NEXT
+FOR i = 0 TO MIDI_OUT_COUNT() - 1
+    IF MIDI_OUT_NAME$(i) = port THEN aus = MIDI_OUT_OPEN(i)
+NEXT
+DIM mf AS MIDI_FILE
+mf = MIDI_FILE_NEW()
+' 240 Schlaege je Minute: ein Viertel ist eine Viertelsekunde.
+MIDI_FILE_SET_TEMPO(mf, 240)
+MIDI_FILE_ADD_NOTE(mf, 0, 1, 60, 100, 0, 1)
+MIDI_FILE_ADD_NOTE(mf, 0, 1, 62, 100, 1, 1)
+MIDI_FILE_ADD_NOTE(mf, 0, 1, 64, 100, 2, 1)
+SUB melden(ein AS MIDI_IN)
+    WHILE MIDI_NEXT(ein)
+        PRINT IIF(MIDI_IS_NOTE_ON(ein), "an ", "aus "); MIDI_NOTE(ein); " "; MIDI_VELOCITY(ein)
+    WEND
+END SUB
+DIM t0 AS INTEGER : t0 = MILLIS()
+MIDI_FILE_PLAY(aus, mf)
+PRINT "spielt "; MIDI_FILE_PLAYING(aus)
+SLEEP(400)
+' Nach 0,4 s: die erste Note ist aus, die zweite an, die dritte noch nicht.
+melden(ein)
+WHILE MIDI_FILE_PLAYING(aus) AND MILLIS() - t0 < 3000
+    SLEEP(10)
+WEND
+DIM dauer AS INTEGER : dauer = MILLIS() - t0
+PRINT "fertig nach rund 0,75 s "; dauer >= 700 AND dauer < 1000; " stand "; MIDI_FILE_POSITION(aus) >= 0.74
+melden(ein)
+' Ab 0,2 s spielen (von der ersten Note kommt nur noch das Note-aus) und
+' mitten in der zweiten anhalten: sie geht aus.
+MIDI_FILE_PLAY(aus, mf, 0.2)
+SLEEP(100)
+MIDI_FILE_STOP(aus)
+SLEEP(150)
+melden(ein)
+PRINT "spielt "; MIDI_FILE_PLAYING(aus)
+MIDI_IN_CLOSE(ein)
+MIDI_OUT_CLOSE(aus)
+--- erwartet
+spielt TRUE
+an 60 100
+aus 60 64
+an 62 100
+fertig nach rund 0,75 s TRUE stand TRUE
+aus 62 64
+an 64 100
+aus 64 64
+aus 60 64
+an 62 100
+aus 62 0
+spielt FALSE

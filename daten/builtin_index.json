@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 2369,
+ "count": 2424,
  "builtins": [
   {
    "name": "ABS",
@@ -1285,6 +1285,162 @@
    "kind": "core",
    "signature": "MDNS_STOP()",
    "module": "mdns"
+  },
+  {
+   "name": "MODBUS_TCP",
+   "kind": "core",
+   "signature": "MODBUS_TCP(host$ [, port [, einheit]]) AS MODBUS",
+   "module": "modbus"
+  },
+  {
+   "name": "MODBUS_RTU",
+   "kind": "core",
+   "signature": "MODBUS_RTU(anschluss$ [, baud [, format$ [, einheit]]]) AS MODBUS",
+   "module": "modbus"
+  },
+  {
+   "name": "MODBUS_CLOSE",
+   "kind": "core",
+   "signature": "MODBUS_CLOSE(m)",
+   "module": "modbus"
+  },
+  {
+   "name": "MODBUS_UNIT",
+   "kind": "core",
+   "signature": "MODBUS_UNIT(m, einheit)",
+   "module": "modbus"
+  },
+  {
+   "name": "MODBUS_TIMEOUT",
+   "kind": "core",
+   "signature": "MODBUS_TIMEOUT(m, ms)",
+   "module": "modbus"
+  },
+  {
+   "name": "MODBUS_READ_COILS",
+   "kind": "core",
+   "signature": "MODBUS_READ_COILS(m, adresse, anzahl) AS ARRAY OF BOOLEAN",
+   "module": "modbus"
+  },
+  {
+   "name": "MODBUS_READ_DISCRETE",
+   "kind": "core",
+   "signature": "MODBUS_READ_DISCRETE(m, adresse, anzahl) AS ARRAY OF BOOLEAN",
+   "module": "modbus"
+  },
+  {
+   "name": "MODBUS_READ_HOLDING",
+   "kind": "core",
+   "signature": "MODBUS_READ_HOLDING(m, adresse, anzahl) AS ARRAY OF INTEGER",
+   "module": "modbus"
+  },
+  {
+   "name": "MODBUS_READ_INPUT",
+   "kind": "core",
+   "signature": "MODBUS_READ_INPUT(m, adresse, anzahl) AS ARRAY OF INTEGER",
+   "module": "modbus"
+  },
+  {
+   "name": "MODBUS_WRITE_COIL",
+   "kind": "core",
+   "signature": "MODBUS_WRITE_COIL(m, adresse, an)",
+   "module": "modbus"
+  },
+  {
+   "name": "MODBUS_WRITE_REGISTER",
+   "kind": "core",
+   "signature": "MODBUS_WRITE_REGISTER(m, adresse, wert)",
+   "module": "modbus"
+  },
+  {
+   "name": "MODBUS_WRITE_COILS",
+   "kind": "core",
+   "signature": "MODBUS_WRITE_COILS(m, adresse, werte)",
+   "module": "modbus"
+  },
+  {
+   "name": "MODBUS_WRITE_REGISTERS",
+   "kind": "core",
+   "signature": "MODBUS_WRITE_REGISTERS(m, adresse, werte)",
+   "module": "modbus"
+  },
+  {
+   "name": "MODBUS_INT16",
+   "kind": "core",
+   "signature": "MODBUS_INT16(wert) AS INTEGER",
+   "module": "modbus"
+  },
+  {
+   "name": "MODBUS_INT32",
+   "kind": "core",
+   "signature": "MODBUS_INT32(register, stelle [, folge$]) AS INTEGER",
+   "module": "modbus"
+  },
+  {
+   "name": "MODBUS_UINT32",
+   "kind": "core",
+   "signature": "MODBUS_UINT32(register, stelle [, folge$]) AS INTEGER",
+   "module": "modbus"
+  },
+  {
+   "name": "MODBUS_FLOAT",
+   "kind": "core",
+   "signature": "MODBUS_FLOAT(register, stelle [, folge$]) AS FLOAT",
+   "module": "modbus"
+  },
+  {
+   "name": "MODBUS_INT32_REGS",
+   "kind": "core",
+   "signature": "MODBUS_INT32_REGS(wert [, folge$]) AS ARRAY OF INTEGER",
+   "module": "modbus"
+  },
+  {
+   "name": "MODBUS_FLOAT_REGS",
+   "kind": "core",
+   "signature": "MODBUS_FLOAT_REGS(wert [, folge$]) AS ARRAY OF INTEGER",
+   "module": "modbus"
+  },
+  {
+   "name": "HOTPLUG_NEXT",
+   "kind": "core",
+   "signature": "HOTPLUG_NEXT() AS BOOLEAN",
+   "module": "hotplug"
+  },
+  {
+   "name": "HOTPLUG_KIND$",
+   "kind": "core",
+   "signature": "HOTPLUG_KIND$() AS STRING",
+   "module": "hotplug"
+  },
+  {
+   "name": "HOTPLUG_NAME$",
+   "kind": "core",
+   "signature": "HOTPLUG_NAME$() AS STRING",
+   "module": "hotplug"
+  },
+  {
+   "name": "HOTPLUG_ADDED",
+   "kind": "core",
+   "signature": "HOTPLUG_ADDED() AS BOOLEAN",
+   "module": "hotplug"
+  },
+  {
+   "name": "HOTPLUG_LIST",
+   "kind": "core",
+   "signature": "HOTPLUG_LIST(art$) AS ARRAY OF STRING",
+   "module": "hotplug"
+  },
+  {
+   "name": "HOTPLUG_KINDS",
+   "kind": "core",
+   "signature": "HOTPLUG_KINDS() AS ARRAY OF STRING",
+   "module": "hotplug"
+  },
+  {
+   "name": "HOTPLUG_INTERVAL",
+   "kind": "core",
+   "signature": "HOTPLUG_INTERVAL(ms)",
+   "module": "hotplug"
   },
   {
    "name": "MIC_DEVICES",
@@ -8838,6 +8994,180 @@
    "name": "MIDI_VELOCITY",
    "kind": "module",
    "signature": "MIDI_VELOCITY(h) AS INTEGER",
+   "module": "midi"
+  },
+  {
+   "name": "MIDI_CLOCK_BPM",
+   "kind": "module",
+   "signature": "MIDI_CLOCK_BPM(h) AS FLOAT",
+   "module": "midi"
+  },
+  {
+   "name": "MIDI_CLOCK_RUNNING",
+   "kind": "module",
+   "signature": "MIDI_CLOCK_RUNNING(h) AS BOOLEAN",
+   "module": "midi"
+  },
+  {
+   "name": "MIDI_CLOCK_TICKS",
+   "kind": "module",
+   "signature": "MIDI_CLOCK_TICKS(h) AS INTEGER",
+   "module": "midi"
+  },
+  {
+   "name": "MIDI_CLOCK_SEND",
+   "kind": "module",
+   "signature": "MIDI_CLOCK_SEND(h, bpm)",
+   "module": "midi"
+  },
+  {
+   "name": "MIDI_START",
+   "kind": "module",
+   "signature": "MIDI_START(h)",
+   "module": "midi"
+  },
+  {
+   "name": "MIDI_STOP",
+   "kind": "module",
+   "signature": "MIDI_STOP(h)",
+   "module": "midi"
+  },
+  {
+   "name": "MIDI_CONTINUE",
+   "kind": "module",
+   "signature": "MIDI_CONTINUE(h)",
+   "module": "midi"
+  },
+  {
+   "name": "MIDI_SONG_POSITION",
+   "kind": "module",
+   "signature": "MIDI_SONG_POSITION(h, sechzehntel)",
+   "module": "midi"
+  },
+  {
+   "name": "MIDI_FILE_NEW",
+   "kind": "module",
+   "signature": "MIDI_FILE_NEW([ticks_je_viertel]) AS MIDI_FILE",
+   "module": "midi"
+  },
+  {
+   "name": "MIDI_FILE_LOAD",
+   "kind": "module",
+   "signature": "MIDI_FILE_LOAD(pfad$) AS MIDI_FILE",
+   "module": "midi"
+  },
+  {
+   "name": "MIDI_FILE_SAVE",
+   "kind": "module",
+   "signature": "MIDI_FILE_SAVE(mf, pfad$)",
+   "module": "midi"
+  },
+  {
+   "name": "MIDI_FILE_FREE",
+   "kind": "module",
+   "signature": "MIDI_FILE_FREE(mf)",
+   "module": "midi"
+  },
+  {
+   "name": "MIDI_FILE_TRACKS",
+   "kind": "module",
+   "signature": "MIDI_FILE_TRACKS(mf) AS INTEGER",
+   "module": "midi"
+  },
+  {
+   "name": "MIDI_FILE_PPQ",
+   "kind": "module",
+   "signature": "MIDI_FILE_PPQ(mf) AS INTEGER",
+   "module": "midi"
+  },
+  {
+   "name": "MIDI_FILE_DURATION",
+   "kind": "module",
+   "signature": "MIDI_FILE_DURATION(mf) AS FLOAT",
+   "module": "midi"
+  },
+  {
+   "name": "MIDI_FILE_TEMPO",
+   "kind": "module",
+   "signature": "MIDI_FILE_TEMPO(mf) AS FLOAT",
+   "module": "midi"
+  },
+  {
+   "name": "MIDI_FILE_TRACK_NAME$",
+   "kind": "module",
+   "signature": "MIDI_FILE_TRACK_NAME$(mf, spur) AS STRING",
+   "module": "midi"
+  },
+  {
+   "name": "MIDI_FILE_SET_TRACK_NAME",
+   "kind": "module",
+   "signature": "MIDI_FILE_SET_TRACK_NAME(mf, spur, name$)",
+   "module": "midi"
+  },
+  {
+   "name": "MIDI_FILE_EVENTS",
+   "kind": "module",
+   "signature": "MIDI_FILE_EVENTS(mf) AS INTEGER",
+   "module": "midi"
+  },
+  {
+   "name": "MIDI_FILE_EVENT",
+   "kind": "module",
+   "signature": "MIDI_FILE_EVENT(mf, i) AS TUPLE",
+   "module": "midi"
+  },
+  {
+   "name": "MIDI_FILE_NOTES",
+   "kind": "module",
+   "signature": "MIDI_FILE_NOTES(mf) AS INTEGER",
+   "module": "midi"
+  },
+  {
+   "name": "MIDI_FILE_NOTE",
+   "kind": "module",
+   "signature": "MIDI_FILE_NOTE(mf, i) AS TUPLE",
+   "module": "midi"
+  },
+  {
+   "name": "MIDI_FILE_ADD_NOTE",
+   "kind": "module",
+   "signature": "MIDI_FILE_ADD_NOTE(mf, spur, kanal, note, anschlag, beginn, dauer)",
+   "module": "midi"
+  },
+  {
+   "name": "MIDI_FILE_ADD_EVENT",
+   "kind": "module",
+   "signature": "MIDI_FILE_ADD_EVENT(mf, spur, zeitpunkt, status, d1 [, d2])",
+   "module": "midi"
+  },
+  {
+   "name": "MIDI_FILE_SET_TEMPO",
+   "kind": "module",
+   "signature": "MIDI_FILE_SET_TEMPO(mf, bpm [, zeitpunkt])",
+   "module": "midi"
+  },
+  {
+   "name": "MIDI_FILE_PLAY",
+   "kind": "module",
+   "signature": "MIDI_FILE_PLAY(h, mf [, ab_sekunde])",
+   "module": "midi"
+  },
+  {
+   "name": "MIDI_FILE_STOP",
+   "kind": "module",
+   "signature": "MIDI_FILE_STOP(h)",
+   "module": "midi"
+  },
+  {
+   "name": "MIDI_FILE_PLAYING",
+   "kind": "module",
+   "signature": "MIDI_FILE_PLAYING(h) AS BOOLEAN",
+   "module": "midi"
+  },
+  {
+   "name": "MIDI_FILE_POSITION",
+   "kind": "module",
+   "signature": "MIDI_FILE_POSITION(h) AS FLOAT",
    "module": "midi"
   },
   {

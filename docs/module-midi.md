@@ -97,8 +97,11 @@ mehrere Nachrichten angekommen sein (ein Akkord sind schon drei).
 2. **Kanäle zählen hier ab 1**, wie auf jedem Gerätedisplay. Im Protokoll
    stehen 0..15; die Umrechnung macht das Modul.
 
-Uhr-, Active-Sensing- und SysEx-Nachrichten werden **weggelassen**. Ein
-Keyboard schickt davon Dutzende je Sekunde, und keine davon ist eine Note.
+SysEx wird **weggelassen**. Uhr-Takte, Zeitcode und Active Sensing kommen
+an, gehen aber nicht in die Warteschlange, sondern in die **Uhr** (unten) —
+ein Keyboard schickt davon Dutzende je Sekunde, und keine davon ist eine Note.
+Start, Stopp und Songposition stehen zusätzlich in der Warteschlange (wie vor
+2026.43).
 
 Der Puffer fasst **1024 unabgeholte Nachrichten**; läuft er über, fällt die
 älteste weg. Wer live spielt, will den aktuellen Anschlag sehen, nicht den von
@@ -126,6 +129,115 @@ Note, Anschlag und Reglerwerte müssen zwischen **0 und 127** liegen, Kanäle
 zwischen **1 und 16**. Ein größerer Wert setzte im Protokoll das Statusbit und
 würde als völlig andere Nachricht gelesen — deshalb wird er abgelehnt, statt
 still etwas anderes zu tun. Die Prüfung läuft **vor** dem Gerätezugriff.
+
+## Die Uhr
+
+Ein Sequencer, eine Drum-Machine oder eine DAW schickt 24 **Uhr-Takte** je
+Viertel, dazu Start, Stopp, Weiter und die Songposition. Der Eingang rechnet
+daraus Tempo und Stand:
+
+| Funktion | Wirkung |
+|---|---|
+| `MIDI_CLOCK_BPM(h)` → FLOAT | Tempo der Gegenseite in Schlägen je Minute, gemittelt über die letzten 24 Takte; 0, wenn seit einer halben Sekunde keiner kam |
+| `MIDI_CLOCK_RUNNING(h)` → BOOLEAN | nach Start oder Weiter bis Stopp |
+| `MIDI_CLOCK_TICKS(h)` → INTEGER | Takte seit Start (24 je Viertel; `\ 24` = Schlag); die Songposition setzt den Stand |
+
+```basic
+IMPORT "midi"
+DIM ein AS MIDI_IN
+ein = MIDI_IN_OPEN(0)
+WHILE TRUE
+    IF MIDI_CLOCK_RUNNING(ein) THEN
+        PRINT FORMAT$(MIDI_CLOCK_BPM(ein), "%.1f"); " BPM, Schlag "; MIDI_CLOCK_TICKS(ein) \ 24
+    END IF
+    SLEEP(250)
+WEND
+```
+
+Selbst die Uhr sein — für ein Gerät, das sich nach Drachenhauch richten soll:
+
+| Funktion | Wirkung |
+|---|---|
+| `MIDI_CLOCK_SEND(h, bpm)` | 24 Takte je Viertel aus einem eigenen Faden schicken (1..999); ein neues Tempo gilt ohne Neustart, 0 hält an |
+| `MIDI_START(h)` | Start (FA): das Gerät beginnt von vorn |
+| `MIDI_STOP(h)` | Stopp (FC) |
+| `MIDI_CONTINUE(h)` | Weiter (FB): ab der Stelle, wo es stand |
+| `MIDI_SONG_POSITION(h, sechzehntel)` | an eine Stelle springen (0..16383 Sechzehntel) |
+
+Der Faden rechnet jeden Takt von einem festen Anfang aus, nicht vom vorigen —
+so summiert sich keine Verspätung auf. Bleibt der Rechner länger stehen als
+ein Takt, zählt er neu, statt die Lücke im Eiltempo nachzuholen.
+
+## MIDI-Dateien
+
+`.mid`-Dateien lesen und schreiben geht **in jedem Bau** — ohne Gerät und ohne
+das Feature. Nach außen rechnet das Modul in **Sekunden** (lesen: Tempowechsel
+sind schon eingerechnet) und in **Vierteln** (schreiben):
+
+| Funktion | Wirkung |
+|---|---|
+| `MIDI_FILE_LOAD(pfad$)` → MIDI_FILE | eine Datei lesen (Format 0, 1 und 2) |
+| `MIDI_FILE_NEW([ticks_je_viertel])` → MIDI_FILE | eine leere Datei (Vorgabe 480) |
+| `MIDI_FILE_SAVE(mf, pfad$)` | schreiben (Format 1) |
+| `MIDI_FILE_FREE(mf)` | freigeben |
+| `MIDI_FILE_TRACKS(mf)` → INTEGER | Zahl der Spuren |
+| `MIDI_FILE_PPQ(mf)` → INTEGER | Ticks je Viertel; 0 bei einer Datei, die in SMPTE-Bildern zählt |
+| `MIDI_FILE_DURATION(mf)` → FLOAT | Länge in Sekunden |
+| `MIDI_FILE_TEMPO(mf)` → FLOAT | Tempo am Anfang (120 ohne Angabe) |
+| `MIDI_FILE_TRACK_NAME$(mf, spur)` → STRING | Name einer Spur |
+| `MIDI_FILE_NOTES(mf)` → INTEGER | Zahl der Noten (Note-an und Note-aus zusammengefasst) |
+| `MIDI_FILE_NOTE(mf, i)` → TUPLE | `(beginn, dauer, kanal, note, anschlag, spur)`, nach Beginn geordnet |
+| `MIDI_FILE_EVENTS(mf)` → INTEGER | Zahl der Kanalnachrichten über alle Spuren |
+| `MIDI_FILE_EVENT(mf, i)` → TUPLE | `(sekunde, spur, status, kanal, d1, d2)`, zeitlich geordnet; `status` wie `MIDI_STATUS` (144 = Note an) |
+| `MIDI_FILE_ADD_NOTE(mf, spur, kanal, note, anschlag, beginn, dauer)` | eine Note; Beginn und Dauer in Vierteln |
+| `MIDI_FILE_ADD_EVENT(mf, spur, zeitpunkt, status, d1 [, d2])` | eine andere Kanalnachricht (Programm 192, Regler 176, ...; Kanal im Statusbyte) |
+| `MIDI_FILE_SET_TEMPO(mf, bpm [, zeitpunkt])` | Tempo ab einem Zeitpunkt (Vorgabe 0) |
+| `MIDI_FILE_SET_TRACK_NAME(mf, spur, name$)` | eine Spur benennen |
+
+Spuren werden beim ersten Gebrauch angelegt (0..127). Der Tempoverlauf steht in
+Spur 0, wie es die meisten Programme erwarten.
+
+```basic
+IMPORT "midi"
+DIM mf AS MIDI_FILE
+mf = MIDI_FILE_LOAD("lied.mid")
+DIM t, dauer AS FLOAT
+DIM kanal, note, anschlag, spur, i AS INTEGER
+FOR i = 0 TO MIDI_FILE_NOTES(mf) - 1
+    (t, dauer, kanal, note, anschlag, spur) = MIDI_FILE_NOTE(mf, i)
+    PRINT FORMAT$(t, "%.2f"); " s  "; MIDI_NOTE_NAME$(note); "  "; FORMAT$(dauer, "%.2f"); " s"
+NEXT
+```
+
+```basic
+IMPORT "midi"
+DIM mf AS MIDI_FILE
+mf = MIDI_FILE_NEW()
+MIDI_FILE_SET_TEMPO(mf, 100)
+MIDI_FILE_SET_TRACK_NAME(mf, 1, "Melodie")
+DIM i AS INTEGER
+FOR i = 0 TO 7
+    MIDI_FILE_ADD_NOTE(mf, 1, 1, 60 + i * 2, 100, i * 0.5, 0.5)
+NEXT
+MIDI_FILE_SAVE(mf, "tonleiter.mid")
+```
+
+Ein Note-aus beendet die **älteste** offene Note derselben Taste, und zur
+selben Zeit schreibt das Modul erst Note-aus, dann Programm und Regler, zuletzt
+Note-an — sonst schnitte sich eine wiederholte Note selbst ab, oder sie klänge
+noch mit dem alten Programm.
+
+### Abspielen
+
+| Funktion | Wirkung |
+|---|---|
+| `MIDI_FILE_PLAY(h, mf [, ab_sekunde])` | die Datei an einem Ausgang abspielen, in einem eigenen Faden |
+| `MIDI_FILE_STOP(h)` | anhalten; noch klingende Noten gehen aus |
+| `MIDI_FILE_PLAYING(h)` → BOOLEAN | läuft sie noch? |
+| `MIDI_FILE_POSITION(h)` → FLOAT | wo sie steht, in Sekunden |
+
+Das Abspielen braucht das Feature `midi`; die Zeit hält der Faden, nicht die
+Bildschleife — ein Bild sind 16 ms, und das hört man.
 
 ## Umrechnen
 
@@ -169,8 +281,8 @@ Hardware bleiben willkommen.
 
 * **Kein SysEx** — weder senden noch empfangen. Gerätespezifische
   Klangdaten bleiben außen vor.
-* **Keine MIDI-Uhr, kein MIDI-Timecode.** Wer zu einer fremden Uhr laufen
-  will, findet in `audio` mit `AUDIO_CLOCK_*` eine eigene.
-* **Keine MIDI-Dateien** (`.mid`) lesen oder schreiben. Für Musik von der
-  Platte gibt es `PLAYMUSIC` (auch `.mod`/`.xm`) und den Tracker.
+* **Kein MIDI-Timecode** (MTC); die Uhr kennt nur Takte, Start und Stopp.
+* MIDI-Dateien: SysEx und Meta-Ereignisse außer Tempo und Spurname werden
+  gelesen und mitgeschrieben, aber nicht ausgewertet; schreiben nur in Vierteln
+  (nicht in SMPTE-Bildern).
 * **Kein virtueller Anschluss**, den andere Programme sehen.

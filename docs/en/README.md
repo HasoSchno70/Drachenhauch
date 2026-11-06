@@ -70,11 +70,13 @@ Each module is activated with `IMPORT "<name>"` and provides its own commands.
 | `physics2d` | Full 2D rigid-body solver (Rapier2D): stacking, throwing, rolling | [module-physics2d.md](module-physics2d.md) |
 | `physics3d` | Full 3D rigid-body solver (Rapier3D) | [module-physics3d.md](module-physics3d.md) |
 | `audio` (modulators) | LFO and tweener on the audio thread: tremolo, wobble, filter sweeps without per-frame recalculation | [module-audio-modulatoren.md](module-audio-modulatoren.md) |
-| `midi` | Read notes from a connected instrument and send notes out (`--hardware`) | [module-midi.md](module-midi.md) |
+| `midi` | Read notes from a connected instrument and send notes out (`--hardware`), MIDI clock, `.mid` files (in every build) | [module-midi.md](module-midi.md) |
 | `mqtt` | MQTT 3.1.1 client — the pub/sub protocol of the IoT/maker world | [module-mqtt.md](module-mqtt.md) |
 | `websocket` | WebSocket client (`ws://`, `wss://`) and server: a standing connection to a browser, ESP32 or game server | [module-websocket.md](module-websocket.md) |
 | `osc` | Open Sound Control over UDP: TouchOSC, Pure Data, SuperCollider, VJ programs | [module-osc.md](module-osc.md) |
 | `mdns` | Find devices by name (`esp32.local`), discover and announce services | [module-mdns.md](module-mdns.md) |
+| `modbus` | Modbus TCP and RTU: electricity meters, inverters, heating controllers, PLCs | [module-modbus.md](module-modbus.md) |
+| `hotplug` | Report when a serial, MIDI or HID device is plugged in or unplugged | [module-hotplug.md](module-hotplug.md) |
 | `httpd` | A small web server running in step with the main loop — a control panel on your home network | [module-httpd.md](module-httpd.md) |
 | `ini` | Settings files a human can edit — an INI file is a MAP | [module-ini.md](module-ini.md) |
 | `xml` | Read XML — data from other systems, with path navigation | [module-xml.md](module-xml.md) |

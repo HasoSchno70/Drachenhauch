@@ -229,13 +229,15 @@ Vollständige Doku im [docs/](docs/README.md)-Ordner:
 | [`httpd`](docs/module-httpd.md) | die andere Richtung: ein kleiner Webserver im Takt der Hauptschleife — Bedienoberfläche im Heimnetz |
 | [`mqtt`](docs/module-mqtt.md) | das Pub/Sub-Protokoll der IoT-Welt — der Weg zum ESP32 **über WLAN**; QoS 0/1, TLS (`mqtts://`) |
 | [`websocket`](docs/module-websocket.md), [`osc`](docs/module-osc.md), [`mdns`](docs/module-mdns.md) | WebSocket-Client und -Server, Open Sound Control (TouchOSC, Pure Data) und Geräte als `esp32.local` finden -- oder das eigene Programm dort ankündigen |
+| [`modbus`](docs/module-modbus.md) | Modbus TCP und RTU (RS-485, oder RTU über das Netz): Stromzähler, Wechselrichter, Heizungsregler, SPS |
+| [`hotplug`](docs/module-hotplug.md) | erfahren, wenn ein serieller Anschluss, ein MIDI-Gerät oder ein USB-HID-Gerät angesteckt oder abgezogen wird |
 | [`firmata`](docs/module-firmata.md) | Arduino-/ESP32-Pins, Servos, I2C-Geräte und Schrittmotoren direkt steuern, über USB oder WLAN (`tcp:host:port`), ohne eigenen Sketch |
 | [`gpio`, `i2c`, `spi`](docs/module-pins.md) | die Pins des Raspberry Pi selbst (und jedes Linux-Boards): GPIO mit Flanken-Ereignissen, I2C-Sensoren, SPI-Bausteine -- über die Schnittstellen des Kernels, darum auf Pi 3, 4 und 5 |
 | [Mikrofon](docs/module-mikrofon.md) (`MIC_*`) | Pegel, Tonhöhe, Spektrum und Aufnahme vom Eingang des Rechners -- ein Stimmgerät oder ein Spiel, das man mit der Stimme steuert |
 | [`webcam`](docs/module-webcam.md) | Bilder einer Kamera in ein `IMAGE` (V4L2, Media Foundation, AVFoundation) -- ein Spiegel, ein Bewegungsmelder, eine Fotobox |
 | [`serial`](docs/module-serial.md) | rohe COM-Verbindung für eigene Protokolle — und in der IDE ein **serieller Monitor mit Kurve** (Alt+4) |
 | [`usb`](docs/module-usb.md) | USB-HID: Bastelboards, Programmieradapter, eigene Controller |
-| [`midi`](docs/module-midi.md) | Noten von einem angeschlossenen Instrument lesen und welche hinausschicken |
+| [`midi`](docs/module-midi.md) | Noten von einem angeschlossenen Instrument lesen und welche hinausschicken; der MIDI-Uhr folgen oder sie senden; `.mid`-Dateien lesen, schreiben und abspielen |
 | [`bt`](docs/module-bt.md) | Bluetooth Low Energy: scannen, verbinden, Charakteristiken lesen/schreiben |
 | [`wifi`](docs/module-wifi.md) | Netze suchen, verbinden, Signalstärke |
 
