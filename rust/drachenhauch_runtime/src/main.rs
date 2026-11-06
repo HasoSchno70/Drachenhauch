@@ -31,6 +31,8 @@ mod flac_strom;
 mod sprache;
 #[cfg(feature = "graphics")]
 mod mikrofon;
+#[cfg(feature = "webcam")]
+mod webcam;
 // Im Browser gibt es weder cpal-Host noch Audio-Thread -- die Ausgabe laeuft
 // ueber emscriptens OpenAL (das intern WebAudio bedient).
 #[cfg(all(feature = "graphics", target_os = "emscripten"))]

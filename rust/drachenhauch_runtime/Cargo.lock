@@ -1384,6 +1384,7 @@ dependencies = [
  "xmrsplayer",
  "zbus 5.19.0",
  "zip",
+ "zune-jpeg",
 ]
 
 [[package]]

@@ -595,7 +595,7 @@ fn ui_preset_metrics(name: &str) -> Vec<(&'static str, i64)> {
 /// damit ein Tippfehler im DH-Programm NICHT die Runtime abstuerzen laesst,
 /// sondern einen klaren Laufzeitfehler liefert.
 /// Zahl der Befehlsfamilien in `Vm::familie_rufen`; die letzte sind die reinen.
-pub(crate) const BUILTIN_FAMILIEN: u8 = 31;
+pub(crate) const BUILTIN_FAMILIEN: u8 = 32;
 
 fn safe_call_builtin(name: &str, args: &[Value]) -> Option<Result<Value, String>> {
     use std::panic::{catch_unwind, AssertUnwindSafe};
@@ -631,6 +631,16 @@ fn ui_lighten(color: i64, factor: f64) -> i64 {
     let g = (g + (255.0 - g) * factor).min(255.0).max(0.0) as i64;
     let b = (b + (255.0 - b) * factor).min(255.0).max(0.0) as i64;
     (r << 16) | (g << 8) | b
+}
+
+/// Eine offene Kamera: der Faden, das IMAGE, in das ihre Bilder kommen,
+/// und ein Puffer, der zwischen Kamera und Bild hin und her getauscht wird.
+#[cfg(feature = "graphics")]
+struct WebcamZustand {
+    kamera: crate::webcam::Kamera,
+    bild: i64,
+    mass: (u32, u32),
+    px: Vec<u8>,
 }
 
 /// Ein geladenes Video: der Decoder, das IMAGE, in das jedes neue Bild geht,
@@ -1048,6 +1058,9 @@ pub struct Vm<'p> {
     // Modul video: je Griff ein Video samt seinem IMAGE und der Uhr.
     #[cfg(all(feature = "video", feature = "graphics"))]
     videos: Vec<Option<VideoZustand>>,
+    /// Offene Kameras (WEBCAM_OPEN), Tombstone-Plaetze wie bei den Videos.
+    #[cfg(feature = "graphics")]
+    webcams: Vec<Option<WebcamZustand>>,
     #[cfg(feature = "midi")]
     midi_outs: Vec<Option<crate::midi::Ausgang>>,
     #[cfg(feature = "serial")]
@@ -1233,6 +1246,8 @@ impl<'p> Vm<'p> {
             midi_ins: Vec::new(),
             #[cfg(all(feature = "video", feature = "graphics"))]
             videos: Vec::new(),
+            #[cfg(feature = "graphics")]
+            webcams: Vec::new(),
             #[cfg(feature = "midi")]
             midi_outs: Vec::new(),
             #[cfg(feature = "serial")]
@@ -2288,6 +2303,7 @@ impl<'p> Vm<'p> {
                   else { crate::ffi::zeiger_befehl(name, a).transpose() },
             29 => self.try_pins(name, a),
             30 => self.try_mikrofon(name, a),
+            31 => self.try_webcam(name, a),
             _ => match safe_call_builtin(name, a) {
                 Some(Ok(v)) => Ok(Some(v)),
                 Some(Err(e)) if e.starts_with("__UNKNOWN_BUILTIN__:") => Err(unknown_builtin_msg(name)),
@@ -6672,6 +6688,107 @@ impl<'p> Vm<'p> {
     // ===================================================================
     // Mikrofon (MIC_*, src/mikrofon.rs): ein Eingang zur Zeit
     // ===================================================================
+    // ===================================================================
+    // Modul webcam (src/webcam.rs): Bilder einer Kamera in ein IMAGE
+    // ===================================================================
+    fn try_webcam(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        if !name.starts_with("webcam_") { return Ok(None); }
+        #[cfg(feature = "graphics")]
+        { return self.try_webcam_impl(name, a); }
+        #[allow(unreachable_code)]
+        { let _ = a; Ok(None) }
+    }
+
+    #[cfg(feature = "graphics")]
+    fn webcam_z(&mut self, a: &[Value], f: &str) -> R<usize> {
+        let i = bi_int(a, 0, f)?;
+        match self.webcams.get(i.max(0) as usize) {
+            Some(Some(_)) if i >= 0 => Ok(i as usize),
+            _ => Err(format!("{}: ungueltige oder geschlossene WEBCAM {}", f, i)),
+        }
+    }
+
+    /// Ein neues Bild der Kamera ins IMAGE schreiben; TRUE, wenn eins kam.
+    /// Hat sich die Groesse geaendert, gibt es ein neues IMAGE (WEBCAM_IMAGE
+    /// liefert es).
+    #[cfg(feature = "graphics")]
+    fn webcam_holen(&mut self, i: usize) -> R<bool> {
+        let z = self.webcams[i].as_mut().unwrap();
+        let mut px = std::mem::take(&mut z.px);
+        let Some((b, h)) = z.kamera.neues(&mut px) else { z.px = px; return Ok(false) };
+        let (alt_bild, alt_mass) = (z.bild, z.mass);
+        let g = self.gfx.as_mut().ok_or("WEBCAM: kein Bild ohne Grafik")?;
+        let bild = if alt_bild >= 0 && alt_mass == (b, h) { alt_bild } else {
+            if alt_bild >= 0 { let _ = g.image_free(alt_bild); }
+            g.image_new(b as i32, h as i32, Some(0))?
+        };
+        let r = g.image_punkte_setzen(bild, &px);
+        let z = self.webcams[i].as_mut().unwrap();
+        z.bild = bild;
+        z.mass = (b, h);
+        z.px = px;
+        r.map(|_| true)
+    }
+
+    #[cfg(feature = "graphics")]
+    fn try_webcam_impl(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        use crate::webcam;
+        let v = match name {
+            "webcam_devices" => {
+                if !a.is_empty() { return Err(format!("WEBCAM_DEVICES: erwartet keine Argumente, erhalten {}", a.len())); }
+                let namen = webcam::geraete()?;
+                let n = namen.len() as i64;
+                let mut arr = crate::value::DhArray::new("string".to_string(), vec![n], || Value::str_rc(""));
+                for (k, s) in namen.into_iter().enumerate() { arr.cells.set(k, Value::str_rc(s)); }
+                Value::Array(Rc::new(RefCell::new(arr)))
+            }
+            "webcam_open" => {
+                const F: &str = "WEBCAM_OPEN";
+                if a.len() > 3 || a.len() == 2 {
+                    return Err(format!("{}: erwartet 0, 1 oder 3 Argumente (geraet$, breite, hoehe), erhalten {}", F, a.len()));
+                }
+                let wunsch = if a.is_empty() { String::new() } else { bi_str(a, 0, F)?.to_string() };
+                let (b, h) = if a.len() == 3 { (bi_int(a, 1, F)?, bi_int(a, 2, F)?) } else { (0, 0) };
+                if !(0..=8192).contains(&b) || !(0..=8192).contains(&h) {
+                    return Err(format!("{}: breite und hoehe muessen 0..8192 sein (0 = was die Kamera vorschlaegt)", F));
+                }
+                // Das Bild braucht die Grafik (ein IMAGE lebt auf der GPU):
+                // ohne SCREEN wird ein verstecktes Fenster angelegt, wie bei LOADIMAGE.
+                if self.gfx.is_none() {
+                    self.gfx = Some(crate::graphics::Graphics::new_headless()
+                        .map_err(|e| format!("{}: {}", F, e))?);
+                }
+                let kamera = webcam::oeffnen(&wunsch, b as u32, h as u32)?;
+                let mass = kamera.mass();
+                let g = self.gfx.as_mut().ok_or("WEBCAM_OPEN: kein Bild ohne Grafik")?;
+                let (mb, mh) = (mass.0.max(1), mass.1.max(1));
+                let bild = g.image_new(mb as i32, mh as i32, Some(0))?;
+                self.webcams.push(Some(WebcamZustand { kamera, bild, mass: (mb, mh), px: Vec::new() }));
+                Value::Int((self.webcams.len() - 1) as i64)
+            }
+            "webcam_close" => {
+                let i = self.webcam_z(a, "WEBCAM_CLOSE")?;
+                if let Some(z) = self.webcams[i].take() {
+                    if let Some(g) = self.gfx.as_mut() { let _ = g.image_free(z.bild); }
+                }
+                Value::Nil
+            }
+            "webcam_update" => { let i = self.webcam_z(a, "WEBCAM_UPDATE")?; Value::Bool(self.webcam_holen(i)?) }
+            "webcam_image" => {
+                let i = self.webcam_z(a, "WEBCAM_IMAGE")?;
+                self.webcam_holen(i)?;
+                Value::Int(self.webcams[i].as_ref().unwrap().bild)
+            }
+            "webcam_width" => { let i = self.webcam_z(a, "WEBCAM_WIDTH")?; Value::Int(self.webcams[i].as_ref().unwrap().mass.0 as i64) }
+            "webcam_height" => { let i = self.webcam_z(a, "WEBCAM_HEIGHT")?; Value::Int(self.webcams[i].as_ref().unwrap().mass.1 as i64) }
+            "webcam_frames" => { let i = self.webcam_z(a, "WEBCAM_FRAMES")?; Value::Int(self.webcams[i].as_ref().unwrap().kamera.bilder() as i64) }
+            "webcam_name$" => { let i = self.webcam_z(a, "WEBCAM_NAME$")?; Value::str_rc(self.webcams[i].as_ref().unwrap().kamera.name.clone()) }
+            "webcam_error$" => { let i = self.webcam_z(a, "WEBCAM_ERROR$")?; Value::str_rc(self.webcams[i].as_ref().unwrap().kamera.fehler().unwrap_or_default()) }
+            _ => return Ok(None),
+        };
+        Ok(Some(v))
+    }
+
     fn try_mikrofon(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         if !name.starts_with("mic_") { return Ok(None); }
         #[cfg(feature = "graphics")]

@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 2320,
+ "count": 2330,
  "builtins": [
   {
    "name": "ABS",
@@ -2803,6 +2803,66 @@
    "kind": "core",
    "signature": "EURO$(cent: INTEGER [, symbol$]) AS STRING",
    "module": "core"
+  },
+  {
+   "name": "WEBCAM_DEVICES",
+   "kind": "core",
+   "signature": "WEBCAM_DEVICES() AS ARRAY OF STRING",
+   "module": "webcam"
+  },
+  {
+   "name": "WEBCAM_OPEN",
+   "kind": "core",
+   "signature": "WEBCAM_OPEN([geraet$ [, breite, hoehe]]) AS WEBCAM",
+   "module": "webcam"
+  },
+  {
+   "name": "WEBCAM_CLOSE",
+   "kind": "core",
+   "signature": "WEBCAM_CLOSE(kamera)",
+   "module": "webcam"
+  },
+  {
+   "name": "WEBCAM_UPDATE",
+   "kind": "core",
+   "signature": "WEBCAM_UPDATE(kamera) AS BOOLEAN",
+   "module": "webcam"
+  },
+  {
+   "name": "WEBCAM_IMAGE",
+   "kind": "core",
+   "signature": "WEBCAM_IMAGE(kamera) AS IMAGE",
+   "module": "webcam"
+  },
+  {
+   "name": "WEBCAM_WIDTH",
+   "kind": "core",
+   "signature": "WEBCAM_WIDTH(kamera) AS INTEGER",
+   "module": "webcam"
+  },
+  {
+   "name": "WEBCAM_HEIGHT",
+   "kind": "core",
+   "signature": "WEBCAM_HEIGHT(kamera) AS INTEGER",
+   "module": "webcam"
+  },
+  {
+   "name": "WEBCAM_FRAMES",
+   "kind": "core",
+   "signature": "WEBCAM_FRAMES(kamera) AS INTEGER",
+   "module": "webcam"
+  },
+  {
+   "name": "WEBCAM_NAME$",
+   "kind": "core",
+   "signature": "WEBCAM_NAME$(kamera) AS STRING",
+   "module": "webcam"
+  },
+  {
+   "name": "WEBCAM_ERROR$",
+   "kind": "core",
+   "signature": "WEBCAM_ERROR$(kamera) AS STRING",
+   "module": "webcam"
   },
   {
    "name": "ZAHL$",
