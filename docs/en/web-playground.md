@@ -1,5 +1,13 @@
 # Web playground (dhrt → WebAssembly)
 
+> **As of 2026-11-07: the playground is on the website** as the
+> [Spielwiese](https://hasoschno70.github.io/Drachenhauch/spielwiese/index.html?lang=en),
+> in German and English (`?lang=de|en`, otherwise the browser's language). It
+> is built by the website workflow (`.github/workflows/website.yml`,
+> emscripten 6.0.0, demo `examples/webspiel/main.dh`), also for every pull
+> request that touches `web/`, the website or `Cargo.toml` -- the web build had
+> stopped compiling with 2026.43, and nobody noticed.
+
 > **As of 2026-10-13 (web round, example `examples/webspiel`):**
 > - **A normal font in the browser too.** `LOADFONT("sans", 32)` takes the
 >   built-in DejaVu font as on the desktop; the web build switches on the

@@ -1,5 +1,13 @@
 # Web-Playground (dhrt → WebAssembly)
 
+> **Stand 2026-11-07: der Playground steht auf der Website** als
+> [Spielwiese](https://hasoschno70.github.io/Drachenhauch/spielwiese/index.html?lang=de),
+> deutsch und englisch (`?lang=de|en`, sonst die Sprache des Browsers). Gebaut
+> wird er im Website-Lauf (`.github/workflows/website.yml`, emscripten 6.0.0,
+> Demo `examples/webspiel/main.dh`), auch für jeden Pull Request, der `web/`,
+> die Website oder `Cargo.toml` anfasst -- der Web-Bau übersetzte seit 2026.43
+> nicht mehr, und niemand sah es.
+
 > **Stand 2026-10-13 (Web-Runde, Beispiel `examples/webspiel`):**
 > - **Eine normale Schrift auch im Browser.** `LOADFONT("sans", 32)` nimmt die
 >   eingebaute DejaVu-Schrift wie auf dem Desktop; der Web-Bau schaltet dafür
