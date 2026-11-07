@@ -1,5 +1,18 @@
 [
   {
+    "file": "bastelzentrale/main.dh",
+    "title": "Bastelzentrale",
+    "desc": "Leitstand für Seriell, Arduino, MQTT, Modbus, Mikrofon, Kamera und Pi -- mit Handy-Seite.",
+    "frames": 120,
+    "umgebung": {
+      "DH_BZ_DEMO": "1",
+      "DH_BZ_MDNS": "0",
+      "DH_BZ_WEB": "0",
+      "DH_BZ_WS": "0",
+      "DH_BZ_OSC": "0"
+    }
+  },
+  {
     "file": "99_ibl_hdr.dh",
     "title": "HDR Image-Based Lighting",
     "desc": "Echtes HDR-Cubemap-IBL -- Metalle spiegeln die Umgebung.",
@@ -16,6 +29,21 @@
     "title": "Orbital",
     "desc": "Sonnensystem mit Tween-Pulsation, Kometen-Trails und HUD.",
     "frames": 150
+  },
+  {
+    "file": "213_webcam.dh",
+    "title": "Webcam",
+    "desc": "Kamerabild als Spiegel, mit Bewegungsmelder.",
+    "frames": 90,
+    "umgebung": {
+      "DHRT_WEBCAM": "test"
+    }
+  },
+  {
+    "file": "217_midi_datei.dh",
+    "title": "MIDI-Klavierrolle",
+    "desc": ".mid-Dateien lesen, schreiben und mit eigenem Synthesizer abspielen.",
+    "frames": 120
   },
   {
     "file": "93_shadows.dh",

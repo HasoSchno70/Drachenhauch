@@ -613,7 +613,7 @@ FOR i = 0 TO LEN(P) - 1
     IF LEFT$(P[i], 7) = "themen " THEN PRINT P[i]
 NEXT
 --- erwartet
-themen 16 beispiele 221
+themen 16 beispiele 222
 themen filter [tracker] 2
 
 === ein beispiel aus der themenliste oeffnen
@@ -776,3 +776,26 @@ NEXT
 bis zeile 11
 stapel Hauptprogramm:11
 debug pause 11
+
+=== werkzeuge bastelzentrale startet das beispiel im unterordner
+' Werkzeuge -> Bastelzentrale startet examples/bastelzentrale/main.dh als
+' eigenen Prozess (die Ports frei, ohne mDNS, damit nichts kollidiert).
+befehl("wz_bastel")
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- umgebung
+DHRT_FRAMES=20
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+DH_BZ_WEB=0
+DH_BZ_WS=0
+DH_BZ_OSC=0
+DH_BZ_MDNS=0
+--- nachher
+DIM P AS ARRAY OF STRING : P = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(P) - 1
+    IF LEFT$(P[i], 9) = "werkzeug " THEN PRINT P[i]
+NEXT
+--- erwartet
+werkzeug bastelzentrale/main.dh

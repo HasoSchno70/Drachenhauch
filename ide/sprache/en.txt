@@ -973,6 +973,8 @@ Alle geholten Plugins neu holen und einen neuen Stand annehmen (dhrt paket hole 
 Es gibt keine geholten Plugins.	There are no fetched plugins.
 Drachenhauch Studio	Drachenhauch Studio
 Werkzeug: Drachenhauch Studio	Tool: Drachenhauch Studio
+Bastelzentrale	Maker hub (Bastelzentrale)
+Werkzeug: Bastelzentrale	Tool: maker hub (Bastelzentrale)
 Drachenhauch Studio gestartet.	Drachenhauch Studio started.
 Im Drachenhauch Studio geöffnet: 	Opened in Drachenhauch Studio:
 Seriell	Serial

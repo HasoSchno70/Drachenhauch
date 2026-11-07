@@ -12,6 +12,11 @@
 ' Ohne Namen entstehen alle Bilder, mit Namen nur die genannten (z.B.
 ' `48_orbital`). Das Fenster steht dabei ausserhalb des Bildschirms.
 '
+' Ein Beispiel in einem Unterordner (`bastelzentrale/main.dh`) bekommt sein
+' Bild als `bastelzentrale_main.png`. Unter "umgebung" darf ein Eintrag
+' Umgebungsvariablen nennen, die nur sein Lauf bekommt -- so zeigt ein
+' Programm, das sonst auf ein Geraet wartet, seine Demo.
+'
 ' Bis 2026-09-15 gen_showcase_thumbs.py (PIL, LANCZOS). Verkleinert wird jetzt
 ' mit IMAGE_SCALE (bilinear) -- Punkt fuer Punkt gleich sind die Bilder damit
 ' nicht, aber so gross und so scharf wie vorher.
@@ -48,18 +53,22 @@ IF NOT FILEEXISTS(liste) THEN
 END IF
 DIM h AS JSON_HANDLE : h = JSON_PARSE("{""l"":" + JOIN$(READLINES(liste), CHR$(10)) + "}")
 
-FUNCTION erzeugen(datei AS STRING, bilder AS INTEGER) AS BOOLEAN
+FUNCTION bildName$(datei AS STRING) AS STRING
+    RETURN REPLACE$(LEFT$(datei, LEN(datei) - 3), "/", "_")
+END FUNCTION
+
+FUNCTION erzeugen(datei AS STRING, bilder AS INTEGER, umg AS MAP OF STRING) AS BOOLEAN
     DIM quelle AS STRING : quelle = beispiele + "/" + datei
     IF NOT FILEEXISTS(quelle) THEN
         PRINT "  ! Quelle fehlt: "; datei
         RETURN FALSE
     END IF
-    DIM name AS STRING : name = LEFT$(datei, LEN(datei) - 3)
+    DIM name AS STRING : name = bildName$(datei)
     DIM ordner AS STRING : ordner = beispiele + "/screenshots"
     IF NOT DIREXISTS(ordner) THEN MKDIR(ordner)
     DIM roh AS STRING : roh = ordner + "/_roh_" + name + ".png"
     IF FILEEXISTS(roh) THEN DELETEFILE(roh)
-    DIM p AS INTEGER : p = PROCESS_START("dhrt", "bild", quelle, roh, STR$(bilder))
+    DIM p AS INTEGER : p = PROCESS_START("dhrt", "bild", quelle, roh, STR$(bilder), umg)
     ' Laufend leeren; nach 60 s ist Schluss -- `dhrt bild` endet nach dem
     ' Bild, aber ein Beispiel kann schon vorher haengen.
     DIM t0 AS INTEGER : t0 = MILLIS()
@@ -94,9 +103,11 @@ END FUNCTION
 
 DIM dateien AS ARRAY OF STRING : dateien = []
 DIM zahlen AS ARRAY OF INTEGER : zahlen = []
+DIM umgebungen AS ARRAY OF INTEGER : umgebungen = []
 FOR i = 0 TO JSON_LEN(h, "l") - 1
     DIM d AS STRING : d = JSON_GET_STRING(h, "l." + STR$(i) + ".file")
-    IF genannt > 0 AND NOT MAPHAS(gewuenscht, LEFT$(d, LEN(d) - 3)) THEN CONTINUE
+    IF genannt > 0 AND NOT MAPHAS(gewuenscht, LEFT$(d, LEN(d) - 3)) AND NOT MAPHAS(gewuenscht, bildName$(d)) THEN CONTINUE
+    ARRAY_PUSH(umgebungen, i)
     ARRAY_PUSH(dateien, d)
     IF JSON_HAS(h, "l." + STR$(i) + ".frames") THEN ARRAY_PUSH(zahlen, JSON_GET_INT(h, "l." + STR$(i) + ".frames")) ELSE ARRAY_PUSH(zahlen, 120)
 NEXT
@@ -104,7 +115,15 @@ PRINT "Erzeuge "; LEN(dateien); " Vorschaubild(er) ..."
 DIM gut AS INTEGER : gut = 0
 FOR i = 0 TO LEN(dateien) - 1
     PRINT "- "; dateien[i]
-    IF erzeugen(dateien[i], zahlen[i]) THEN gut = gut + 1
+    DIM umg AS MAP OF STRING
+    DIM wo AS STRING : wo = "l." + STR$(umgebungen[i]) + ".umgebung"
+    IF JSON_HAS(h, wo) THEN
+        DIM schl AS STRING
+        FOR EACH schl IN JSON_KEYS(h, wo)
+            MAPPUT(umg, schl, JSON_GET_STRING(h, wo + "." + JSON_KEY$(schl)))
+        NEXT
+    END IF
+    IF erzeugen(dateien[i], zahlen[i], umg) THEN gut = gut + 1
 NEXT
 PRINT "Fertig: "; gut; "/"; LEN(dateien); " erzeugt."
 IF gut <> LEN(dateien) THEN EXIT(2)
