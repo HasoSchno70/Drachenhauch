@@ -3533,6 +3533,23 @@ Kapitel 76/77. **Ungeprueft:** RTU an einer echten seriellen Schnittstelle,
 jedes echte Modbus-Geraet, echtes An-/Abstecken (die Listen selbst stimmen
 hier mit COM1, loopMIDI und den HID-Geraeten ueberein).
 
+## Projektbaum nach Dateiart gefaerbt (2026-11-06)
+
+Wunsch des Nutzers: im Projektbaum der IDE war alles einfarbig. Neu
+`GUI_FILETREE_COLOR(baum, muster$, farbe)` (`DateiBaum::farben`, Muster wie
+beim Filter mit `;`, `"/"` meint Ordner, jedes andere Muster nur Dateien --
+ein Ordner `bilder.png` ist kein Bild; das erste passende gilt, ein schon
+gesetztes Muster behaelt seinen Platz, -1 nimmt es weg; `farbe_fuer` setzt
+`TreeNode::color`, das der Baum laengst zeichnete; in der `.dhform` als
+`filetree.farben`). Die IDE (`baumFarben`, aus `bereichsFarben`, also nach
+jedem Themawechsel): Ordner, `.dh`, Werkzeugdateien, `.dhtest`, Daten,
+Text, Bilder, Klaenge je eine Farbe (`B_*` in `codeFarben`, hell dunkler),
+in `farben.json` als `baum_ordner` ... `baum_klang`. Tests zwei Faelle in
+`gui_dateibaum.dhtest` (Bild: jede Farbe in genau ihrer Zeile, Ordner vor
+Dateien; Rundweg ueber GUI_TO_JSON -- das ist EINGERUECKT, verglichen wird
+ohne Leerraum), zwei in `werkzeug_ide_schriftzug.dhtest` (beide Themen,
+eigene Farben).
+
 ## Bastelzentrale (2026-11-06)
 
 Wunsch des Nutzers nach den sieben Bastler-Punkten: "ein super Programm fuer

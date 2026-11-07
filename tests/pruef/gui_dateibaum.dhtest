@@ -409,3 +409,88 @@ DHRT_FRAMES=26
 --- erwartet
 gewaehlt a50.dh
 oben liegt eine datei ab a40: TRUE
+
+=== farben je dateiart
+' GUI_FILETREE_COLOR: "/" meint Ordner, jedes andere Muster nur Dateien --
+' ein Ordner namens ordner.dh bleibt in der Ordnerfarbe. -1 nimmt eine Farbe
+' wieder weg. Geprueft am Bild: jede Farbe in genau ihrer Zeile.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+GUI_FONT(-1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 400, 300)
+DIM ft AS GUI_WIDGET : ft = GUI_FILETREE(w, 10, 10, 380, 250, "projekt")
+GUI_FILETREE_COLOR(ft, "/", &HFF0000)
+GUI_FILETREE_COLOR(ft, "*.dh", &H00FF00)
+GUI_FILETREE_COLOR(ft, "*.json;*.ini", &H0000FF)
+GUI_FILETREE_COLOR(ft, "*.ini", -1)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(BLACK)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei projekt/a.dh
+PRINT 1
+--- datei projekt/d.json
+{}
+--- datei projekt/e.ini
+x=1
+--- datei projekt/ordner.dh/x.txt
+x
+--- umgebung
+DHRT_FRAMES=3
+DHRT_SCREENSHOT={fall}/b.png
+--- nachher
+DIM b AS IMAGE : b = LOADIMAGE("b.png")
+DIM farben AS ARRAY OF INTEGER : farben = [&HFF0000, &H00FF00, &H0000FF]
+DIM namen AS ARRAY OF STRING : namen = ["ordner", "dh", "json"]
+DIM oben[3] AS INTEGER
+DIM unten[3] AS INTEGER
+DIM k, x, y AS INTEGER
+FOR k = 0 TO 2
+    oben[k] = 9999 : unten[k] = -1
+NEXT
+FOR y = 0 TO IMAGE_HEIGHT(b) - 1
+    FOR x = 0 TO 200
+        DIM p AS INTEGER : p = GETPIXEL(b, x, y) BAND &HFFFFFF
+        FOR k = 0 TO 2
+            IF p = farben[k] THEN
+                oben[k] = MIN(oben[k], y)
+                unten[k] = MAX(unten[k], y)
+            END IF
+        NEXT
+    NEXT
+NEXT
+FOR k = 0 TO 2
+    PRINT namen[k]; " da "; unten[k] >= 0; " eine zeile "; unten[k] - oben[k] < 20
+NEXT
+PRINT "reihenfolge "; unten[0] < oben[1] AND unten[1] < oben[2]
+--- erwartet
+ordner da TRUE eine zeile TRUE
+dh da TRUE eine zeile TRUE
+json da TRUE eine zeile TRUE
+reihenfolge TRUE
+
+=== die farben stehen in der dhform
+IMPORT "gui"
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 400, 300)
+DIM ft AS GUI_WIDGET : ft = GUI_FILETREE(w, 10, 10, 380, 250, ".")
+GUI_FILETREE_COLOR(ft, "/;*.dh", &H112233)
+DIM j AS STRING : j = GUI_TO_JSON(w)
+PRINT INSTR(j, "farben") >= 0
+DIM w2 AS GUI_WINDOW : w2 = GUI_FROM_JSON(j)
+DIM j2 AS STRING : j2 = GUI_TO_JSON(w2)
+' Die Datei ist eingerueckt -- verglichen wird ohne Leerraum.
+j2 = REPLACE$(REPLACE$(REPLACE$(j2, " ", ""), CHR$(10), ""), CHR$(13), "")
+PRINT INSTR(j2, "[" + CHR$(34) + "*.dh" + CHR$(34) + "," + STR$(&H112233) + "]") >= 0
+TRY
+    GUI_FILETREE_COLOR(ft, " ; ", 1)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+TRUE
+TRUE
+GUI_FILETREE_COLOR: kein Muster -- so: "*.dh", "*.json;*.ini" oder "/" fuer Ordner

@@ -227,6 +227,7 @@ IMPORT "gui"
 | `GUI_FILETREE_CHECKED(ft, pfad$)` / `GUI_FILETREE_SET_CHECKED(ft, pfad$, an)` | BOOLEAN / — | Haken an einem Weg lesen und setzen |
 | `GUI_FILETREE_CHECKED_COUNT(ft)` / `GUI_FILETREE_CHECKED_PATH$(ft, i)` | INTEGER / STRING | alle angehakten Wege, auch die gerade zugeklappten |
 | `GUI_FILETREE_ICONS(ft, ordnerbild, dateibild)` | — | Sinnbilder für Ordner und Dateien (-1 = keins) |
+| `GUI_FILETREE_COLOR(ft, muster$, farbe)` | — | Textfarbe je Dateiart: Muster wie beim Filter (`"*.json;*.ini"`), `"/"` für Ordner; das erste passende gilt, -1 nimmt die Farbe weg |
 | `GUI_TABCONTROL(win, x, y, w, h)` | GUI_WIDGET | Reiter **innerhalb** eines Fensters (Karteikasten) |
 | `GUI_TABCONTROL_ADD(tc, titel$)` | INTEGER | eine Seite anhängen, liefert ihre Nummer |
 | `GUI_TABCONTROL_ADD_WIDGET(tc, wdg, seite)` | — | ein Widget auf eine Seite legen; es behält seine Lage im Fenster |

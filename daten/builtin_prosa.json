@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 2375,
+ "count": 2376,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -665,6 +665,7 @@
   "GUI_FILETREE_CHECKED": "BOOLEAN / — — Haken an einem Weg lesen und setzen",
   "GUI_FILETREE_CHECKED_COUNT": "INTEGER / STRING alle angehakten Wege, auch die gerade zugeklappten",
   "GUI_FILETREE_CHECKED_PATH$": "INTEGER / STRING alle angehakten Wege, auch die gerade zugeklappten",
+  "GUI_FILETREE_COLOR": "Textfarbe je Dateiart: Muster wie beim Filter (\"*.json;*.ini\"), \"/\" für Ordner; das erste passende gilt, -1 nimmt die Farbe weg",
   "GUI_FILETREE_COUNT": "INTEGER / STRING die sichtbaren Zeilen zählen und lesen",
   "GUI_FILETREE_EXPAND": "einen Ordner auf- oder zuklappen",
   "GUI_FILETREE_FILTER": "welche Dateien er zeigt (*.dh;*.md, leer = alle)",
