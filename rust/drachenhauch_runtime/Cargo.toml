@@ -230,15 +230,19 @@ libloading = { version = "0.8", optional = true }
 # Heap-Bloecke (Rc + String), jedes Objekt, Feld und jede MAP mindestens
 # einer -- der Standard von Windows (HeapAlloc) kostete je Block ~20 ns.
 # Nicht im Web-Build (emscripten bringt seinen eigenen mit).
+# Webcam (WEBCAM_*, src/webcam.rs): MJPEG-Bilder entpacken -- dieselbe
+# Fassung, die krilla fuer JPEG im PDF mitbringt. Fuer ALLE Ziele: das
+# Feature webcam haengt an graphics, und graphics gilt auch im Web-Bau --
+# nur fuer den Desktop eingetragen uebersetzte dhrt.wasm seit 2026.43 nicht
+# mehr (gefunden, als der Web-Bau in den Website-Lauf kam).
+zune-jpeg = { version = "0.5.15", optional = true }
+
 [target.'cfg(not(target_os = "emscripten"))'.dependencies]
 mimalloc = { version = "0.1", default-features = false }
 # Mikrofon (MIC_*, src/mikrofon.rs): dieselbe cpal-Fassung, die Kira fuer die
 # Ausgabe mitbringt -- hier nur direkt benannt, fuer den Eingang. Im Web gibt
 # es kein cpal (Kira benutzt dort ein eigenes Backend).
 cpal = { version = "0.18.1", optional = true }
-# Webcam (WEBCAM_*, src/webcam.rs): MJPEG-Bilder entpacken -- dieselbe
-# Fassung, die krilla fuer JPEG im PDF mitbringt.
-zune-jpeg = { version = "0.5.15", optional = true }
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.62", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_Graphics_Printing", "Win32_Storage_Xps", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging", "Win32_Media_MediaFoundation", "Win32_UI_Input_Ime", "Win32_UI_Input_KeyboardAndMouse", "Win32_System_WinRT", "Win32_System_Console", "Win32_System_Com", "Win32_Globalization", "Foundation", "Foundation_Collections", "Media_Core", "Media_SpeechSynthesis", "Storage_Streams"] }
