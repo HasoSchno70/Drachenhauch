@@ -235,8 +235,11 @@ DIM TON_DEBUG AS INTEGER : TON_DEBUG = &H8C5BD6
 
 SUB bereichsFarben()
     DIM grund AS INTEGER : grund = GUI_THEME_GET("widget_bg")
-    DIM anteil AS FLOAT : anteil = 0.2
-    IF hell THEN anteil = 0.16
+    ' Ein HAUCH: mit 20 % standen Ausgabe tuerkis und Probleme braun neben
+    ' dem blauen Projekt, drei kraeftige Farben um den Code -- unruhig. Bei
+    ' 9 % erkennt man den Bereich noch, ohne dass er sich vordraengt.
+    DIM anteil AS FLOAT : anteil = 0.09
+    IF hell THEN anteil = 0.07
     GUI_SET_COLOR(baum, "bg", farbMisch(grund, TON_PROJEKT, anteil))
     GUI_SET_COLOR(lstGliederung, "bg", farbMisch(grund, TON_PROJEKT, anteil))
     GUI_SET_COLOR(lstWkZuletzt, "bg", farbMisch(grund, TON_PROJEKT, anteil))
@@ -246,6 +249,9 @@ SUB bereichsFarben()
     GUI_SET_COLOR(tfSeriell, "bg", farbMisch(grund, TON_AUSGABE, anteil))
     GUI_SET_COLOR(tfEingabe, "bg", farbMisch(grund, TON_AUSGABE, anteil))
     GUI_SET_COLOR(lstProbleme, "bg", farbMisch(grund, TON_PROBLEME, anteil))
+    ' Die Ueberschrift der Hilfe gedaempft: sie sagt, was darunter steht, und
+    ' soll nicht lauter sein als der Text selbst.
+    GUI_SET_COLOR(lblHilfeKopf, "fg", GUI_THEME_GET("muted_fg"))
     GUI_SET_COLOR(tblVars, "bg", farbMisch(grund, TON_DEBUG, anteil))
     protokoll("bereichsfarben " + COLOR_HEX$(farbMisch(grund, TON_AUSGABE, anteil)))
     baumFarben()
@@ -3007,8 +3013,8 @@ SUB layoutLeisten()
     IF b > 0 THEN
         GUI_SET_BOUNDS(lstProbleme, x, y, b, h \ 2 - 4)
         GUI_SET_BOUNDS(lblHilfeKopf, x, y + h \ 2, b, 18)
-        GUI_SET_BOUNDS(lblHilfe, x + 8, y + h \ 2 + 22, b - 8, h \ 2 - 22)
-        GUI_SET_WRAP(lblHilfe, MAX(40, b - 16))
+        GUI_SET_BOUNDS(lblHilfe, x, y + h \ 2 + 22, b, h \ 2 - 22)
+        GUI_SET_WRAP(lblHilfe, MAX(40, b - 8))
         (kx, ky, kb, kh) = GUI_DOCK_HEAD_RECT(win, "probleme")
         GUI_SET_BOUNDS(lblProbleme, kx + 8, ky + 2, MAX(40, kb - 8), 18)
     END IF
@@ -3207,11 +3213,15 @@ SUB reiterNeuSetzen()
     IF aktiverTab >= 0 THEN GUI_SET_ACTIVE_TAB(win, aktiverTab)
 END SUB
 
-' Den Schriftzug hinter ein Code-Feld legen (oder wegnehmen). Auf dem
-' hellen Thema etwas kraeftiger, dort verschluckt der Grund mehr.
+' Den Schriftzug hinter ein Code-Feld legen (oder wegnehmen). Ein
+' Wasserzeichen ist nur eins, solange man ueber ihm liest, ohne es zu
+' sehen: mit 22 bzw. 24 stand der Drache auf dem hellen Thema so kraeftig
+' hinter dem Code, dass die Buchstaben auf ihm flimmerten. Auf dem hellen
+' Thema ist er jetzt der LEISERE -- bunte Farbe auf Weiss faellt mehr auf
+' als auf Dunkelgrau.
 SUB wasserzeichenSetzen(ta AS GUI_WIDGET)
     IF wasserzeichenAn AND hgBild >= 0 THEN
-        GUI_TEXTAREA_BACKGROUND(ta, hgBild, IIF(hell, 24, 22))
+        GUI_TEXTAREA_BACKGROUND(ta, hgBild, IIF(hell, 10, 14))
     ELSE
         GUI_TEXTAREA_BACKGROUND(ta, -1)
     END IF
@@ -4911,7 +4921,7 @@ SUB pruefen()
     ' zu schicken fuellt die Liste mit Meldungen ueber etwas, das gar kein
     ' Programm ist.
     IF reiter[aktiverTab].pfad <> "" AND LOWER$(RIGHT$(reiter[aktiverTab].pfad, 3)) <> ".dh" THEN
-        GUI_SET_TEXT(lblProbleme, tr$("Probleme: -- (") + BASENAME(reiter[aktiverTab].pfad) + _
+        GUI_SET_TEXT(lblProbleme, "(" + BASENAME(reiter[aktiverTab].pfad) + _
                      " ist kein Drachenhauch)")
         gliederungLeeren()
         RETURN
@@ -4961,11 +4971,11 @@ SUB pruefen()
     IF fehlerEndeAn AND LEN(fh) > 0 THEN protokoll("fehlertexte " + STR$(LEN(fh)))
     IF problemModus = 0 THEN
         IF n = 0 THEN
-            GUI_SET_TEXT(lblProbleme, tr$("Probleme: keine"))
+            GUI_SET_TEXT(lblProbleme, tr$("keine"))
         ELSE
             DIM zusatz AS STRING : zusatz = ""
             IF hinweise > 0 THEN zusatz = ", " + STR$(hinweise) + IIF(hinweise = 1, " Hinweis", " Hinweise")
-            GUI_SET_TEXT(lblProbleme, tr$("Probleme: ") + STR$(fehler) + tr$(" Fehler, ") + STR$(n - fehler - hinweise) + tr$(" Warnungen") + zusatz)
+            GUI_SET_TEXT(lblProbleme, STR$(fehler) + tr$(" Fehler, ") + STR$(n - fehler - hinweise) + tr$(" Warnungen") + zusatz)
         END IF
     END IF
     ' Gezaehlt werden Fehler und Warnungen; Hinweise sind kein Problem.

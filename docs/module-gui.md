@@ -2548,9 +2548,19 @@ hoch die Fläche ist. Ein Knopf von 28 Pixeln darf sich damit wölben; eine
 Liste von 400 bekommt denselben Abstand über die ganze Höhe und sieht aus,
 als läge ein Schatten darüber. `verlauf_hoehe` sagt, ab wann es weniger
 wird: darüber nimmt die Stärke im Verhältnis ab, ein Fünftel bleibt stehen,
-damit eine hohe Fläche nicht ganz nach Papier aussieht.
+damit eine hohe Fläche nicht ganz nach Papier aussieht. Mit ihr werden auch
+die **Fase** (mit dem Quadrat des Anteils) und der **Fokusring** um eine hohe
+Fläche leiser -- eine helle Kante in voller Stärke über einer ganzen Leiste
+und ein zweiter Rahmen um ein großes Code-Feld wirken unruhig.
 `GUI_METRIC_SET("verlauf_hoehe", 120)` ist ein guter Anfang für eine
 Oberfläche mit großen Listen und Textfeldern.
+
+**Ohne Stufen.** Jeder Verlauf (Flächen der gui, `GRADIENTV`/`GRADIENTH`)
+wird Zeile für Zeile gegen eine eigene Schwelle gerundet (geordnete
+Zitterung, die drei Kanäle gegeneinander versetzt). Vorher stand ein flacher
+Verlauf über eine große Fläche als Bänder mit geraden Kanten da -- jede
+Stufe nur eine von 256, aber das Auge verstärkt die Kanten. Die Enden sind
+genau die genannten Farben, eine Fläche ohne Verlauf bleibt eine Farbe.
 
 **Erhaben und versenkt.** Knöpfe, Panels und Auswahlfelder sind erhaben
 (hell oben → dunkel unten, mit Glanz). Eingabefelder, Listen und der

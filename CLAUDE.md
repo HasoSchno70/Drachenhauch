@@ -3533,6 +3533,39 @@ Kapitel 76/77. **Ungeprueft:** RTU an einer echten seriellen Schnittstelle,
 jedes echte Modbus-Geraet, echtes An-/Abstecken (die Listen selbst stimmen
 hier mit COM1, loopMIDI und den HID-Geraeten ueberein).
 
+## Verlaeufe ohne Stufen, IDE ruhiger (2026-11-07)
+
+Wunsch des Nutzers: die Farbverlaeufe sahen mit ihren Abstufungen "nach
+Windows 95" aus. Ursache gemessen am Bildschirmfoto der IDE: `Cmd::RoundGradient`
+fuellte zwar zeilenweise, schnitt die Farbe aber auf ganze 8-Bit-Stufen ab,
+in allen drei Kanaelen im selben Moment -- auf der Ausgabe-Leiste Baender von
+15 Zeilen, in der Gliederung von 32, jede mit einer geraden Kante
+(Mach-Baender). Jetzt `graphics::verlauf_farbe`: je Zeile gegen eine eigene
+Schwelle einer 16er-Bayer-Folge gerundet (Lage auf dem Schirm, Kanaele um
+0/5/10 versetzt, Alpha um 3), die Enden sind genau `c1`/`c2`, gleiche
+Kanaele bleiben unberuehrt. Dieselbe Rechnung fuer `Cmd::GradientRect`
+(`GRADIENTV`/`GRADIENTH`, auch die Farbwaehler der gui), dort vorher raylibs
+GPU-Verlauf mit denselben Baendern. Nicht angefasst: `Gradient4`,
+`CircleGradient`, `Lichtfleck` (GPU-Dreiecke). Tests
+`tests/pruef/gui_verlauf_glatt.dhtest` (zaehlt "harte Kanten" = acht gleiche
+Zeilen, dann acht andere; die alte Laufzeit hat 23 bzw. 16) und drei
+Rust-Tests `verlauf_tests`.
+
+**Grosse Flaechen leiser** (an `verlauf_hoehe` gekoppelt, ohne die Metrik
+unveraendert): die Fase bekommt das QUADRAT von `verlauf_anteil` (eine
+helle Linie ueber einer Leiste von 200 Punkten war die Kante aus Windows
+95; Deckkraft nie unter 1, 0 hiesse deckend), der Fokusring den Anteil
+selbst (um das Code-Feld lag er als zweiter Rahmen um den ersten). Tests
+zwei Faelle in `gui_verlauf_hoehe.dhtest`, die alte Laufzeit faellt beide.
+
+**In der IDE** (`ide/ide.dh`, je mit Vorher/Nachher-Bild an den Nutzer):
+Bereichsfarben 20 -> 9 % (hell 16 -> 7 %; tuerkis, braun und blau um den
+Code waren unruhig; `werkzeug_ide_schriftzug.dhtest` mit den neuen Werten),
+der Schriftzug hinter dem Code 22/24 -> 14 (dunkel) / 10 (hell -- dort fiel
+er staerker auf), der Kopf der Probleme-Leiste ohne das doppelte
+"Probleme:" (der Reiter heisst schon so; drei Eintraege aus `en.txt` weg) und
+die Ueberschrift der Hilfe in `muted_fg`, buendig mit ihrem Text.
+
 ## Projektbaum nach Dateiart gefaerbt (2026-11-06)
 
 Wunsch des Nutzers: im Projektbaum der IDE war alles einfarbig. Neu

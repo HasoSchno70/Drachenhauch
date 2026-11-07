@@ -86,3 +86,80 @@ PRINT GUI_METRIC_GET("verlauf_hoehe")
 DHRT_FRAMES=2
 --- erwartet
 90
+
+=== die fase einer hohen flaeche ist leiser
+' Die Linie unter dem oberen Rand (Fase; ein Panel ist versenkt, dort ist
+' sie ein Schatten) in voller Staerke ueber einer ganzen Leiste ist die
+' Kante aus Windows 95. Mit der Metrik wird sie auf der hohen Flaeche
+' leiser, auf der kleinen bleibt sie. Gemessen wird, wie viel dunkler die
+' Linie ist als die Zeile darunter.
+IMPORT "gui"
+SCREEN(500, 500, "T", 1)
+GUI_THEME_PRESET("glas_dunkel")
+GUI_METRIC_SET("verlauf_hoehe", 120)
+GUI_METRIC_SET("gloss", 0)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 500, 500)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM klein AS GUI_WIDGET : klein = GUI_PANEL(w, 20, 20, 120, 40)
+DIM gross AS GUI_WIDGET : gross = GUI_PANEL(w, 200, 20, 120, 400)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=3
+DHRT_SCREENSHOT={fall}/b.png
+--- nachher
+DIM b AS IMAGE : b = LOADIMAGE("b.png")
+FUNCTION hub(x AS INTEGER) AS INTEGER
+    RETURN (GETPIXEL(b, x, 22) BAND 255) - (GETPIXEL(b, x, 21) BAND 255)
+END FUNCTION
+PRINT "klein deutlich "; hub(80) > 15
+PRINT "gross leiser "; hub(260) < hub(80) \ 2
+--- erwartet
+klein deutlich TRUE
+gross leiser TRUE
+
+=== der fokusring um eine hohe flaeche ist leiser
+' Um ein Code-Feld von 900 Punkten lag der Ring als zweiter Rahmen um den
+' ersten -- unruhig. Mit der Metrik bleibt um die hohe Flaeche ein Fuenftel,
+' um die kleine der volle Ring.
+IMPORT "gui"
+SCREEN(500, 500, "T", 1)
+GUI_THEME_PRESET("glas_dunkel")
+GUI_METRIC_SET("verlauf_hoehe", 120)
+GUI_METRIC_SET("uebergang", 0)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 500, 500)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(w, 200, 20, 200, 400, "")
+DIM tf AS GUI_WIDGET : tf = GUI_TEXTINPUT(w, 20, 20, 120, 28, "")
+DIM bild AS INTEGER
+WHILE NOT QUITREQUESTED()
+    bild = bild + 1
+    IF bild = 1 THEN GUI_FOCUS(ta)
+    IF bild = 4 THEN SAVESCREENSHOT("gross.png") : GUI_FOCUS(tf)
+    GUI_UPDATE()
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=8
+DHRT_SCREENSHOT={fall}/klein.png
+--- nachher
+DIM g AS IMAGE : g = LOADIMAGE("gross.png")
+DIM k AS IMAGE : k = LOADIMAGE("klein.png")
+' Blau des Rings ueber dem Fenstergrund des Themas (Blau 51).
+DIM ringGross AS INTEGER : ringGross = (GETPIXEL(g, 300, 17) BAND 255) - 51
+DIM ringKlein AS INTEGER : ringKlein = (GETPIXEL(k, 80, 17) BAND 255) - 51
+PRINT "klein deutlich "; ringKlein > 120
+PRINT "gross sichtbar "; ringGross > 10
+PRINT "gross leiser "; ringGross < ringKlein \ 3
+--- erwartet
+klein deutlich TRUE
+gross sichtbar TRUE
+gross leiser TRUE

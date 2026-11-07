@@ -203,7 +203,7 @@ NEXT
 PRINT "zuerst "; erst
 --- erwartet
 hinweise 1
-pr probleme Probleme: 0 Fehler, 0 Warnungen, 1 Hinweis
+pr probleme 0 Fehler, 0 Warnungen, 1 Hinweis
 korrektur angebot Zeile entfernen
 korrektur Zeile entfernen
 pr text SUB tu()/    PRINT(1)/END SUB/tu()

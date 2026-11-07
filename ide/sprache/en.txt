@@ -420,9 +420,6 @@ Kästchen im Projektbaum ausgeblendet -- Suche und Umbau gelten wieder dem ganze
 Keine Datei gewählt -- Strg+Klick sammelt, Umschalt+Klick spannt.	No file selected -- Ctrl+click collects, Shift+click spans.
  Datei(en) geöffnet.	 file(s) opened.
  Haken entfernt -- der Umbau geht wieder über das ganze Projekt.	 checks removed -- refactoring covers the whole project again.
-Probleme: -- (	Problems: -- (
-Probleme: keine	Problems: none
-Probleme: 	Problems: 
  Fehler, 	 errors, 
  Warnungen	 warnings
 Hier gibt es nichts zu korrigieren.	Nothing to fix here.

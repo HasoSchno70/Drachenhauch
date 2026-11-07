@@ -8627,9 +8627,7 @@ fn render_scene<D: RaylibDraw>(
                                 continue;
                             }
                             let t = if h > 1 { zeile as f32 / (h - 1) as f32 } else { 0.0 };
-                            let lerp = |a: u8, b: u8| (a as f32 + (b as f32 - a as f32) * t) as u8;
-                            let c = Color::new(lerp(c1.r, c2.r), lerp(c1.g, c2.g),
-                                               lerp(c1.b, c2.b), lerp(c1.a, c2.a));
+                            let c = verlauf_farbe(*c1, *c2, t, y + zeile);
                             d.draw_rectangle(x + einzug, y + zeile, breite, 1, c);
                         }
                     }
@@ -8704,8 +8702,24 @@ fn render_scene<D: RaylibDraw>(
                     Cmd::GradientRect(x1, y1, x2, y2, c1, c2, vertical) => {
                         let x = (*x1).min(*x2) * s; let y = (*y1).min(*y2) * s;
                         let w = ((x2 - x1).abs() + 1) * s; let h = ((y2 - y1).abs() + 1) * s;
-                        if *vertical { d.draw_rectangle_gradient_v(x, y, w, h, *c1, *c2); }
-                        else { d.draw_rectangle_gradient_h(x, y, w, h, *c1, *c2); }
+                        // Zeile fuer Zeile (bzw. Spalte fuer Spalte) mit
+                        // Zitterung statt raylibs Verlauf: der rundet jeden
+                        // Punkt auf die naechste 8-Bit-Stufe, und auf einer
+                        // grossen Flaeche stehen dann Baender mit harten
+                        // Kanten da (siehe `verlauf_farbe`).
+                        if c1 == c2 {
+                            d.draw_rectangle(x, y, w, h, *c1);
+                        } else if *vertical {
+                            for k in 0..h {
+                                let t = if h > 1 { k as f32 / (h - 1) as f32 } else { 0.0 };
+                                d.draw_rectangle(x, y + k, w, 1, verlauf_farbe(*c1, *c2, t, y + k));
+                            }
+                        } else {
+                            for k in 0..w {
+                                let t = if w > 1 { k as f32 / (w - 1) as f32 } else { 0.0 };
+                                d.draw_rectangle(x + k, y, 1, h, verlauf_farbe(*c1, *c2, t, x + k));
+                            }
+                        }
                     }
                     Cmd::Spline(pts, thick, col) => {
                         if pts.len() >= 2 {
@@ -8942,6 +8956,83 @@ fn neun_spannen(start: i32, laenge: i32, r: i32) -> ([i32; 3], [i32; 3]) {
 /// eingerueckt werden. `dy` ist der senkrechte Abstand zur Mitte des
 /// Eckenkreises (Zeilenmitte, daher die 0.5), der Einzug folgt daraus per
 /// Kreisgleichung.
+/// Schwellen einer geordneten Zitterung ueber 16 Zeilen (eindimensionale
+/// Bayer-Folge): aufeinander folgende Werte liegen weit auseinander, darum
+/// verteilen sich die aufgerundeten Zeilen gleichmaessig statt in Klumpen.
+const ZITTER16: [u8; 16] = [0, 8, 4, 12, 2, 10, 6, 14, 1, 9, 5, 13, 3, 11, 7, 15];
+
+/// Die Farbe einer Zeile (oder Spalte) in einem Verlauf von `c1` nach `c2`,
+/// `t` in 0..1, `pos` = ihre Lage auf dem Schirm.
+///
+/// **Warum nicht einfach runden:** ein Verlauf ueber 200 Punkte, der nur 20
+/// Stufen weit geht, bleibt ~10 Zeilen auf einer Stufe und springt dann um
+/// eine -- in allen drei Kanaelen im selben Augenblick. Jede Stufe fuer sich
+/// ist kaum zu sehen, aber das Auge verstaerkt die geraden Kanten zwischen
+/// ihnen (Mach-Baender), und die Flaeche sieht gestreift aus wie ein Bild
+/// mit 256 Farben. Hier wird je Zeile gegen eine eigene Schwelle gerundet:
+/// steht der Wert zu 30 % ueber einer Stufe, sind es auch 30 % der Zeilen,
+/// gleichmaessig verteilt -- eine Kante gibt es nicht mehr. Die drei Kanaele
+/// haben gegeneinander versetzte Schwellen, so geht die Helligkeit in
+/// Dritteln einer Stufe weiter statt in ganzen. Gleiche Farben an beiden
+/// Enden bleiben unveraendert, die Enden selbst sind genau `c1` und `c2`.
+pub(crate) fn verlauf_farbe(c1: Color, c2: Color, t: f32, pos: i32) -> Color {
+    let kanal = |a: u8, b: u8, versatz: i32| -> u8 {
+        if a == b { return a; }
+        let v = a as f32 + (b as f32 - a as f32) * t;
+        let schwelle = (ZITTER16[((pos + versatz) & 15) as usize] as f32 + 0.5) / 16.0;
+        (v + schwelle).floor().clamp(0.0, 255.0) as u8
+    };
+    Color::new(kanal(c1.r, c2.r, 0), kanal(c1.g, c2.g, 5), kanal(c1.b, c2.b, 10),
+               kanal(c1.a, c2.a, 3))
+}
+
+#[cfg(test)]
+mod verlauf_tests {
+    use super::*;
+    fn spalte(c1: Color, c2: Color, h: i32) -> Vec<Color> {
+        (0..h).map(|k| verlauf_farbe(c1, c2, k as f32 / (h - 1) as f32, k)).collect()
+    }
+    #[test]
+    fn enden_sind_genau_und_flaeche_bleibt_flach() {
+        let a = Color::new(70, 90, 117, 255);
+        let b = Color::new(53, 73, 102, 255);
+        let s = spalte(a, b, 180);
+        assert_eq!(s[0], a);
+        assert_eq!(s[179], b);
+        for c in spalte(a, a, 50) { assert_eq!(c, a); }
+    }
+    #[test]
+    fn mittel_folgt_dem_verlauf() {
+        // Je 16 Zeilen gemittelt liegt der Wert hoechstens eine halbe Stufe
+        // neben dem genauen -- abgeschnitten lag er im Mittel eine halbe
+        // Stufe darunter.
+        let a = Color::new(10, 10, 10, 255);
+        let b = Color::new(40, 40, 40, 255);
+        let h = 320;
+        let s = spalte(a, b, h);
+        for start in (0..h - 16).step_by(16) {
+            let mittel: f32 = s[start as usize..(start + 16) as usize].iter()
+                .map(|c| c.r as f32).sum::<f32>() / 16.0;
+            let genau = 10.0 + 30.0 * (start as f32 + 7.5) / (h - 1) as f32;
+            assert!((mittel - genau).abs() <= 0.5, "bei {start}: {mittel} gegen {genau}");
+        }
+    }
+    #[test]
+    fn keine_harte_kante() {
+        // Eine harte Kante: acht gleiche Zeilen, dann acht andere gleiche.
+        // Abgeschnittene Verlaeufe haben bei flachem Anstieg viele davon.
+        let a = Color::new(56, 76, 105, 255);
+        let b = Color::new(40, 60, 89, 255);
+        let s = spalte(a, b, 400);
+        for y in 8..392 {
+            let oben = &s[y - 8..y];
+            let unten = &s[y..y + 8];
+            let gleich = |z: &[Color]| z.iter().all(|c| *c == z[0]);
+            assert!(!(gleich(oben) && gleich(unten) && oben[0] != unten[0]), "Kante bei {y}");
+        }
+    }
+}
+
 fn ecken_einzug(r: i32, h: i32, zeile: i32) -> i32 {
     if r <= 0 {
         return 0;

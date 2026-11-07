@@ -2538,9 +2538,19 @@ tall the surface is. A button of 28 pixels may dome with it; a
 list of 400 gets the same difference over its whole height and looks
 as if a shadow lay over it. `verlauf_hoehe` says from when on it becomes
 less: above it the strength decreases proportionally, one fifth remains,
-so that a tall surface does not look completely like paper.
+so that a tall surface does not look completely like paper. With it the
+**bevel** (by the square of the share) and the **focus ring** around a tall
+surface become quieter too -- a light edge at full strength across a whole
+panel and a second frame around a large code field look restless.
 `GUI_METRIC_SET("verlauf_hoehe", 120)` is a good start for an
 interface with large lists and text inputs.
+
+**Without steps.** Every gradient (gui surfaces, `GRADIENTV`/`GRADIENTH`)
+is rounded row by row against a threshold of its own (ordered dithering,
+the three channels offset against each other). Before, a shallow gradient
+over a large surface showed as bands with straight edges -- each step only
+one in 256, but the eye amplifies the edges. The ends are exactly the given
+colours, a surface without a gradient stays one colour.
 
 **Raised and sunken.** Buttons, panels and selection fields are raised
 (light at the top → dark at the bottom, with gloss). Input fields, lists and the
