@@ -94,6 +94,8 @@ Source: "..\daten\bilder\*.png"; DestDir: "{app}\daten\bilder"; Flags: ignorever
 Source: "..\daten\video\*.mp4"; DestDir: "{app}\daten\video"; Flags: ignoreversion
 ; Die IDE selbst -- Quelltext, den der Nutzer lesen und aendern kann.
 Source: "..\ide\*.dh"; DestDir: "{app}\ide"; Flags: ignoreversion
+; ... und ihre Teile (ide\ide.dh bindet sie per IMPORT ein).
+Source: "..\ide\teile\*.dh"; DestDir: "{app}\ide\teile"; Flags: ignoreversion
 ; Das Drachenhauch Studio -- wie die IDE ein Drachenhauch-Programm samt
 ; seiner Stildatei; laufzeit.dh kopiert es in jedes Projekt, das es startet.
 Source: "..\studio\*.dh"; DestDir: "{app}\studio"; Flags: ignoreversion

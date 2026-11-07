@@ -228,6 +228,11 @@ SUB darf RETURN nicht mit Wert verwenden	A SUB must not use RETURN with a value
 FUNCTION braucht einen Wert bei RETURN	A FUNCTION needs a value with RETURN
 {} darf nicht innerhalb eines Unterprogramms oder Blocks stehen -- SUB, FUNCTION, CLASS, STRUCT und ENUM gehoeren auf die oberste Ebene des Programms	{} must not be inside a subroutine or block -- SUB, FUNCTION, CLASS, STRUCT and ENUM belong at the top level of the program
 Lokale Variable '{}' verdeckt die gleichnamige Konstante -- Drachenhauch ignoriert Gross-/Kleinschreibung. Innerhalb dieser Funktion meint der Name ab hier die Variable, nicht die Konstante.	Local variable '{}' hides the constant of the same name -- Drachenhauch ignores upper/lower case. Inside this function the name means the variable from here on, not the constant.
+{} '{}' verdeckt die gleichnamige Konstante -- Drachenhauch ignoriert Gross-/Kleinschreibung. {}	{} '{}' hides the constant of the same name -- Drachenhauch ignores upper/lower case. {}
+Feld	Field
+Parameter	Parameter
+In den Methoden der Klasse meint der Name das Feld, nicht die Konstante.	In the methods of the class the name means the field, not the constant.
+Innerhalb dieser Funktion meint der Name den Parameter, nicht die Konstante.	Inside this function the name means the parameter, not the constant.
 Der Index ist eine Kommazahl -- das bricht beim Laufen ab ('Array-Index muss INTEGER sein').{}	The index is a decimal number -- that stops the program when it runs ('Array index must be INTEGER').{}
 `/` liefert immer FLOAT; ganzzahlig teilt `\`.	`/` always gives a FLOAT; `\` divides as integers.
 Mit INT() abschneiden oder ROUND() runden.	Cut off with INT() or round with ROUND().

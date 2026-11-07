@@ -337,6 +337,71 @@ fn einfaches_dim(zeile: &str) -> Option<String> {
     Some(name)
 }
 
+/// Ein Parameter oder Feld, das eine Konstante verdeckt, ist oft harmlos:
+/// `SUB feuer(bx, by)` neben `CONST BX` benutzt die Konstante im Rumpf gar
+/// nicht. Gemeint war die Konstante nur, wenn der Name im Block auch ANDERS
+/// GESCHRIEBEN vorkommt (`n` und `N`, `nachladen` und `NACHLADEN`) -- der
+/// Lexer schreibt alles klein, darum geht das nur hier am Quelltext. Die
+/// Warnung fuer lokale Variablen bleibt, wie sie war. `source` = die
+/// gemergte Quelle, auf die sich die Zeilen der Warnungen beziehen.
+pub fn verdeckung_filtern(warns: Vec<(u32, String)>, source: &str) -> Vec<(u32, String)> {
+    if !warns.iter().any(|(_, m)| (m.starts_with("Parameter '") || m.starts_with("Feld '"))
+                                  && m.contains("' verdeckt die gleichnamige Konstante")) {
+        return warns;
+    }
+    let kx = KorrKontext::neu(source);
+    warns.into_iter().filter(|(z, m)| {
+        if !(m.starts_with("Parameter '") || m.starts_with("Feld '")) { return true; }
+        let Some(name) = verdeckter_name(m) else { return true };
+        let Some((von, bis)) = verdeck_block(&kx, *z as usize, m, &name) else { return true };
+        let schreibweisen: std::collections::HashSet<String> = crate::symbole::fundstellen(source, &name)
+            .into_iter().filter(|f| f.zeile >= von && f.zeile <= bis).map(|f| f.name).collect();
+        schreibweisen.len() > 1
+    }).collect()
+}
+
+/// Der Name aus "<wer> 'n' verdeckt die gleichnamige Konstante".
+fn verdeckter_name(meldung: &str) -> Option<String> {
+    let p = meldung.find("' verdeckt die gleichnamige Konstante")?;
+    let a = meldung[..p].rfind('\'')? + 1;
+    let n = &meldung[a..p];
+    if n.is_empty() || !n.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '$') { return None; }
+    Some(n.to_string())
+}
+
+/// Die Zeilen (1-basiert, einschliesslich), in denen der verdeckende Name
+/// gilt: beim Feld die Klasse, beim Parameter seine Funktion (die Meldung
+/// steht an deren Kopf -- bei einer Methode am Kopf der Klasse, dann die
+/// Methode darin, deren Kopf den Parameter nennt), bei der lokalen Variable
+/// das Unterprogramm um sie herum.
+fn verdeck_block(kx: &KorrKontext, ln: usize, meldung: &str, name: &str) -> Option<(usize, usize)> {
+    let b = kx.bereiche();
+    let fns = |x: &&crate::symbole::Bereich| matches!(x.art, "sub" | "function" | "property");
+    if meldung.starts_with("Feld ") {
+        return b.iter().find(|x| matches!(x.art, "class" | "struct") && x.zeile == ln).map(|x| (x.zeile, x.ende));
+    }
+    if meldung.starts_with("Parameter ") {
+        if let Some(x) = b.iter().filter(fns).find(|x| x.zeile == ln) { return Some((x.zeile, x.ende)); }
+        let klasse = b.iter().find(|x| matches!(x.art, "class" | "struct") && x.zeile == ln)?;
+        let wort = regex::Regex::new(&format!(r"(?i)\(.*\b{}\b", regex::escape(name))).ok()?;
+        return b.iter().filter(fns)
+            .filter(|x| x.zeile > klasse.zeile && x.ende <= klasse.ende)
+            .find(|x| kx.zeilen.get(x.zeile - 1).map_or(false, |k| wort.is_match(k)))
+            .map(|x| (x.zeile, x.ende));
+    }
+    b.iter().filter(fns).filter(|x| x.zeile <= ln && ln <= x.ende).max_by_key(|x| x.zeile).map(|x| (x.zeile, x.ende))
+}
+
+/// `nLokal` bzw. `vollFeld`, mit Zahl dahinter, solange der Name im Block
+/// schon vorkommt (Gross/klein egal, wie die Sprache).
+fn freier_name(kx: &KorrKontext, name: &str, von_z: usize, bis_z: usize, zusatz: &str) -> String {
+    let belegt = |k: &str| crate::symbole::fundstellen(kx.text, k).iter()
+        .any(|f| f.zeile >= von_z && f.zeile <= bis_z);
+    let basis = format!("{}{}", name, zusatz);
+    if !belegt(&basis) { return basis; }
+    (2..).map(|i| format!("{}{}", basis, i)).find(|k| !belegt(k)).unwrap()
+}
+
 /// Vorschlaege zu einer Meldung: (Titel, Aenderungen). Gelesen wird die
 /// MELDUNG, nicht der Uebersetzer -- sie sagt schon, was gemeint war
 /// ("Meintest du ...", "heisst in Drachenhauch ...", "nirgends ... angelegt").
@@ -402,6 +467,26 @@ pub fn korrekturen_mit(kx: &KorrKontext, z0: usize, von: usize, bis: usize, meld
                 // wird der Name so, wie er im Programm steht ("lSumme").
                 let v = kx.schreibweise(v);
                 aus.push((format!("Ersetzen durch {}", v), vec![(z0, von, bis, v)]));
+            }
+        }
+    }
+
+    // "Lokale Variable 'n' / Parameter 'n' / Feld 'voll' verdeckt die
+    // gleichnamige Konstante" -- umbenennen, aber NUR die Stellen, die genau
+    // so geschrieben sind wie die Variable, und nur in ihrem Block. Ein `N`
+    // daneben bleibt stehen und meint danach wieder die Konstante: genau das
+    // war in allen drei Faellen, die es gab, gemeint. Wer beide gleich
+    // geschrieben hat, bekommt dasselbe Verhalten wie vorher.
+    if let Some(name) = verdeckter_name(meldung) {
+        if let Some((von_z, bis_z)) = verdeck_block(kx, z0 + 1, meldung, &name) {
+            let neu = freier_name(kx, &name, von_z, bis_z,
+                if meldung.starts_with("Feld ") { "Feld" } else { "Lokal" });
+            let stellen: Vec<Aenderung> = crate::symbole::fundstellen(kx.text, &name).into_iter()
+                .filter(|f| f.name == name && f.zeile >= von_z && f.zeile <= bis_z)
+                .map(|f| (f.zeile - 1, f.spalte - 1, f.spalte_ende - 1, neu.clone()))
+                .collect();
+            if !stellen.is_empty() {
+                aus.push((format!("'{}' umbenennen in {}", name, neu), stellen));
             }
         }
     }
@@ -1550,6 +1635,67 @@ WEND";
         // Auf oberster Ebene gibt es nur die eine.
         let k = korrekturen("x = 1", 0, 0, 1, "'x' wird hier beschrieben, aber nirgends im Programm mit DIM oder CONST angelegt.");
         assert_eq!(k.len(), 1);
+    }
+
+    #[test]
+    fn verdeckte_konstante_nur_gleiche_schreibweise_umbenennen() {
+        let t = "CONST N = 10
+FUNCTION summe(n AS INTEGER) AS INTEGER
+    ' n ist neu
+    RETURN n + N
+END FUNCTION
+PRINT summe(1) + N";
+        let m = "Parameter 'n' verdeckt die gleichnamige Konstante -- Drachenhauch ignoriert Gross-/Kleinschreibung. Innerhalb dieser Funktion meint der Name den Parameter, nicht die Konstante.";
+        let k = korrekturen(t, 1, 0, 0, m);
+        assert_eq!(k.len(), 1);
+        assert_eq!(k[0].0, "'n' umbenennen in nLokal");
+        // Kopf und RETURN, nicht der Kommentar, nicht das grosse N.
+        assert_eq!(k[0].1, vec![(1, 15, 16, "nLokal".to_string()), (3, 11, 12, "nLokal".to_string())]);
+        // Feld einer Klasse: in der ganzen Klasse, Name schon belegt -> Zahl.
+        let t = "CONST VOLL = 3
+CLASS Box
+    DIM voll AS INTEGER
+    DIM vollFeld AS INTEGER
+    FUNCTION art() AS INTEGER
+        RETURN voll + VOLL
+    END FUNCTION
+END CLASS";
+        let m = "Feld 'voll' verdeckt die gleichnamige Konstante -- Drachenhauch ignoriert Gross-/Kleinschreibung. In den Methoden der Klasse meint der Name das Feld, nicht die Konstante.";
+        let k = korrekturen(t, 1, 0, 0, m);
+        assert_eq!(k[0].0, "'voll' umbenennen in vollFeld2");
+        assert_eq!(k[0].1.len(), 2);
+        // Parameter einer Methode: Meldung am Kopf der Klasse.
+        let t = "CONST N = 1
+CLASS A
+    SUB x()
+    END SUB
+    SUB y(n AS INTEGER)
+        PRINT(n)
+    END SUB
+END CLASS";
+        let m = "Parameter 'n' verdeckt die gleichnamige Konstante -- x";
+        let k = korrekturen(t, 1, 0, 0, m);
+        assert_eq!(k[0].1, vec![(4, 10, 11, "nLokal".to_string()), (5, 14, 15, "nLokal".to_string())]);
+    }
+
+    #[test]
+    fn verdeckung_nur_bei_anderer_schreibweise() {
+        let q = "CONST N = 1
+CONST BX = 0
+FUNCTION f(n AS INTEGER) AS INTEGER
+    RETURN n + N
+END FUNCTION
+SUB g(bx AS INTEGER)
+    PRINT(bx)
+END SUB";
+        let w = vec![
+            (3, "Parameter 'n' verdeckt die gleichnamige Konstante -- x".to_string()),
+            (6, "Parameter 'bx' verdeckt die gleichnamige Konstante -- x".to_string()),
+            (6, "etwas anderes".to_string()),
+        ];
+        let r = verdeckung_filtern(w, q);
+        assert_eq!(r.iter().map(|(z, _)| *z).collect::<Vec<_>>(), vec![3, 6]);
+        assert!(r[1].1 == "etwas anderes");
     }
 
     #[test]

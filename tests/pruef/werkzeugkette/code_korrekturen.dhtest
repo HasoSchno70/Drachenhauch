@@ -146,3 +146,60 @@ PRINT "korrektur da "; INSTR(r, "DIM unbekannt3999 AS INTEGER anlegen") >= 0
 --- erwartet
 flott TRUE
 korrektur da TRUE
+
+=== verdeckte konstante: nur bei anderer schreibweise, umbenennen stellt sie wieder her
+' Parameter und Felder, die eine Konstante verdecken: gewarnt wird nur, wenn
+' der Name im Block auch anders geschrieben steht (`n` und `N`) -- `bx` neben
+' CONST BX, das die Konstante gar nicht benutzt, bleibt still. Die Korrektur
+' benennt nur die Stellen in der Schreibweise der Variable um; danach meint
+' `N` wieder die Konstante, und die Warnung ist weg.
+IMPORT "json"
+DIM NL AS STRING : NL = CHR$(10)
+DIM q AS STRING : q = "CONST N = 10" + NL + "CONST BX = 0" + NL + "CONST VOLL = 3" + NL _
+    + "FUNCTION summe(n AS INTEGER) AS INTEGER" + NL + "    ' n neu" + NL + "    RETURN n + N" + NL + "END FUNCTION" + NL _
+    + "SUB feuer(bx AS INTEGER)" + NL + "    PRINT(bx)" + NL + "END SUB" + NL _
+    + "CLASS Box" + NL + "    DIM voll AS INTEGER" + NL + "    FUNCTION art() AS INTEGER" + NL + "        RETURN voll + VOLL" + NL + "    END FUNCTION" + NL + "END CLASS" + NL _
+    + "PRINT(summe(1))"
+FUNCTION pruefen(q AS STRING, anwenden AS BOOLEAN) AS STRING
+    DIM j AS JSON_HANDLE : j = JSON_PARSE("{" + CHR$(34) + "d" + CHR$(34) + ":" + CODE_CHECK$(q) + "}")
+    DIM i AS INTEGER
+    DIM neu AS STRING : neu = q
+    FOR i = 0 TO JSON_LEN(j, "d") - 1
+        DIM p AS STRING : p = "d." + STR$(i)
+        DIM m AS STRING : m = JSON_GET_STRING(j, p + ".meldung")
+        IF INSTR(m, "verdeckt") < 0 THEN CONTINUE
+        PRINT JSON_GET_INT(j, p + ".zeile"); " "; LEFT$(m, INSTR(m, " --"))
+        IF NOT JSON_HAS(j, p + ".korrekturen") THEN CONTINUE
+        DIM k AS STRING : k = p + ".korrekturen.0"
+        PRINT "  "; JSON_GET_STRING(j, k + ".titel"); " ("; JSON_LEN(j, k + ".aenderungen"); " Stellen)"
+        IF anwenden AND INSTR(m, "Parameter") >= 0 THEN
+            DIM z AS ARRAY OF STRING : z = SPLIT$(neu, NL)
+            DIM a AS INTEGER
+            FOR a = JSON_LEN(j, k + ".aenderungen") - 1 TO 0 STEP -1
+                DIM ap AS STRING : ap = k + ".aenderungen." + STR$(a)
+                DIM zi AS INTEGER : zi = JSON_GET_INT(j, ap + ".zeile") - 1
+                DIM sp AS INTEGER : sp = JSON_GET_INT(j, ap + ".spalte") - 1
+                z[zi] = LEFT$(z[zi], sp) + JSON_GET_STRING(j, ap + ".text") + MID$(z[zi], sp + JSON_GET_INT(j, ap + ".laenge"))
+            NEXT
+            neu = JOIN$(z, NL)
+        END IF
+    NEXT
+    RETURN neu
+END FUNCTION
+DIM danach AS STRING : danach = pruefen(q, TRUE)
+PRINT "== danach"
+PRINT SPLIT$(danach, NL)[3]
+PRINT SPLIT$(danach, NL)[4]
+PRINT SPLIT$(danach, NL)[5]
+DIM rest AS STRING : rest = pruefen(danach, FALSE)
+--- erwartet
+11 Feld 'voll' verdeckt die gleichnamige Konstante
+  'voll' umbenennen in vollFeld (2 Stellen)
+4 Parameter 'n' verdeckt die gleichnamige Konstante
+  'n' umbenennen in nLokal (2 Stellen)
+== danach
+FUNCTION summe(nLokal AS INTEGER) AS INTEGER
+    ' n neu
+    RETURN nLokal + N
+11 Feld 'voll' verdeckt die gleichnamige Konstante
+  'voll' umbenennen in vollFeld (2 Stellen)

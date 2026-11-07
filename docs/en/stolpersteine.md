@@ -343,6 +343,22 @@ reflections/mirror effects become possible.
 > go through this path at all and does not hide anything. Tests
 > `tests/pruef/sprache/variable_wie_builtin.dhtest`.
 
+### H4. A parameter or field hid a constant without a warning — ✅ FIXED (2026-11-07)
+> **`CONST N = 10` and `FUNCTION summe(n AS INTEGER) ... RETURN n + N`
+> silently computed `n + n`.** Names ignore upper/lower case, so the parameter
+> `n` hides the constant `N` inside the body. A local variable already got a
+> warning for this, parameters and class fields did not -- and that is
+> exactly how a bug sat in the duel example: the field `nachladen` hid
+> `CONST NACHLADEN`, `Self.nachladen = NACHLADEN` wrote the field into
+> itself, and the reload time never applied.
+> Now `--check` warns when the name also appears **spelled differently** in
+> the body or the class (`n` and `N`) -- only then was the constant meant;
+> `SUB feuer(bx AS INTEGER)` next to `CONST BX`, which never uses the
+> constant, stays quiet. The quick fix (Ctrl+.) renames the variable
+> (`nLokal`, `vollFeld`), but only the places in its spelling; `N` then
+> means the constant again. Tests
+> `tests/pruef/werkzeugkette/code_korrekturen.dhtest`.
+
 ## I — Switching from other BASICs and from Python (2026-09-21) — ✅ FIXED
 
 > Measured, not estimated: around 150 small programs written the way you

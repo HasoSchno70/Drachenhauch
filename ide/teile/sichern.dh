@@ -1,0 +1,655 @@
+' ide/teile/sichern.dh -- ein Teil der IDE (ide/ide.dh), dort per IMPORT
+' an genau dieser Stelle eingebunden: Absturz-Wiederherstellung, Beenden mit Rueckfrage, Menue-Symbole, Schnipsel-Geruester.
+' Kein eigenes Programm -- die Namen gehoeren der IDE.
+
+' --- Absturz-Wiederherstellung ---------------------------------------
+FUNCTION whEigen$() AS STRING
+    RETURN PATHJOIN(whOrdner, whKennung)
+END FUNCTION
+
+' Den Stand dieser IDE schreiben: je Reiter mit ungesicherten Aenderungen
+' Pfad und Text. `offen` = FALSE heisst "diese IDE laeuft nicht mehr" --
+' dann darf der naechste Start den Stand sofort anbieten, statt drei Takte
+' auf das ausbleibende Lebenszeichen zu warten. Geschrieben wird erst in
+' eine Nebendatei und dann umbenannt: ein Absturz MITTEN im Schreiben liesse
+' sonst einen halben Stand zurueck, und der waere genau der, den man braucht.
+SUB whSchreiben(offen AS BOOLEAN)
+    DIM h AS JSON_HANDLE : h = JSON_NEW_OBJECT()
+    JSON_SET_INT(h, "zeit", ZEIT_JETZT())
+    JSON_SET_BOOL(h, "offen", offen)
+    JSON_SET_JSON(h, "reiter", JSON_NEW_ARRAY())
+    DIM n AS INTEGER : n = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO tabAnzahl - 1
+        DIM txt AS STRING : txt = GUI_TEXT(reiter[i].feld)
+        IF txt <> reiter[i].gesichert THEN
+            DIM e AS JSON_HANDLE : e = JSON_NEW_OBJECT()
+            JSON_SET_STRING(e, "pfad", reiter[i].pfad)
+            JSON_SET_STRING(e, "text", txt)
+            JSON_APPEND_JSON(h, "reiter", e)
+            n = n + 1
+        END IF
+    NEXT
+    TRY
+        IF NOT DIREXISTS(whOrdner) THEN MKDIR(whOrdner)
+        IF NOT DIREXISTS(whEigen$()) THEN MKDIR(whEigen$())
+        DIM ziel AS STRING : ziel = PATHJOIN(whEigen$(), "stand.json")
+        DIM neben AS STRING : neben = PATHJOIN(whEigen$(), "stand.neu")
+        WRITEALL(neben, JSON_STRINGIFY(h))
+        RENAME(neben, ziel)
+        protokoll("sicherung " + STR$(n) + IIF(offen, "", " beendet"))
+    CATCH fehler
+        ' EINMAL sagen, nicht jeden Takt: ein schreibgeschuetztes Profil
+        ' soll die Arbeit nicht stoeren, aber man muss wissen, dass das
+        ' Netz fehlt.
+        IF NOT whGewarnt THEN
+            GUI_SET_TEXT(lblStatus, tr$("Wiederherstellung kann nicht sichern: ") + fehler)
+            whGewarnt = TRUE
+        END IF
+        protokoll("sicherung fehlgeschlagen")
+    END TRY
+END SUB
+
+' Verwaiste Staende anderer Laeufe einsammeln. Einer LEBT, solange er als
+' offen gilt und sein Lebenszeichen juenger als drei Takte ist -- den laesst
+' die Suche stehen, er gehoert einer IDE, die gerade laeuft. Ein verwaister
+' Stand ohne Reiter hat nichts zu bieten und wird still weggeraeumt.
+SUB whSuchen()
+    whFremd = []
+    IF NOT DIREXISTS(whOrdner) THEN RETURN
+    DIM name AS STRING
+    FOR EACH name IN DIRLIST(whOrdner)
+        DIM d AS STRING : d = PATHJOIN(whOrdner, name)
+        DIM st AS STRING : st = PATHJOIN(d, "stand.json")
+        DIM reiterZahl AS INTEGER : reiterZahl = -1
+        IF name <> whKennung AND FILEEXISTS(st) THEN
+            TRY
+                DIM h AS JSON_HANDLE : h = JSON_LOAD(st)
+                DIM lebt AS BOOLEAN
+                lebt = JSON_GET_BOOL(h, "offen") AND ZEIT_JETZT() - JSON_GET_INT(h, "zeit") < 3 * whTakt
+                IF NOT lebt THEN reiterZahl = JSON_LEN(h, "reiter")
+            CATCH fehler
+                ' unlesbar: liegen lassen -- vielleicht schreibt ihn gerade jemand
+                reiterZahl = -1
+            END TRY
+        END IF
+        IF reiterZahl = 0 THEN
+            TRY
+                RMDIR(d, TRUE)
+            CATCH fehler
+                protokoll("wiederherstellung nicht entfernbar " + name)
+            END TRY
+        ELSEIF reiterZahl > 0 THEN
+            ARRAY_PUSH(whFremd, d)
+        END IF
+    NEXT
+END SUB
+
+SUB whAnbieten()
+    whSuchen()
+    IF LEN(whFremd) = 0 THEN RETURN
+    DIM n AS INTEGER : n = 0
+    DIM namen AS STRING : namen = ""
+    DIM d AS STRING
+    FOR EACH d IN whFremd
+        TRY
+            DIM h AS JSON_HANDLE : h = JSON_LOAD(PATHJOIN(d, "stand.json"))
+            DIM k AS INTEGER
+            FOR k = 0 TO JSON_LEN(h, "reiter") - 1
+                DIM p AS STRING : p = JSON_GET_STRING(h, "reiter." + STR$(k) + ".pfad")
+                n = n + 1
+                IF n <= 6 THEN
+                    IF namen <> "" THEN namen = namen + ", "
+                    namen = namen + IIF(p = "", "(neu)", BASENAME(p))
+                END IF
+            NEXT
+        CATCH fehler
+            protokoll("wiederherstellung unlesbar " + BASENAME(d))
+        END TRY
+    NEXT
+    IF n = 0 THEN RETURN
+    IF n > 6 THEN namen = namen + " ..."
+    dlgWieder = GUI_DIALOG(tr$("Wiederherstellen"), STR$(n) + tr$(" ungesicherte Reiter aus einer Sitzung, die nicht sauber endete: ") + namen, tr$("Wiederherstellen|Verwerfen|Später"))
+    protokoll("wiederherstellung angeboten " + STR$(n))
+END SUB
+
+' Die angebotenen Staende als Reiter zurueckholen -- UNGESICHERT: die Datei
+' auf der Platte bleibt, wie sie war, bis man selbst sichert. Eine Datei
+' geht ueber tabOeffnen und nicht ueber dateiOeffnen, sonst oeffnete eine
+' als Text bearbeitete .dhform den Form-Designer statt ihres Textes.
+SUB whHolen()
+    DIM n AS INTEGER : n = 0
+    DIM d AS STRING
+    FOR EACH d IN whFremd
+        TRY
+            DIM h AS JSON_HANDLE : h = JSON_LOAD(PATHJOIN(d, "stand.json"))
+            DIM k AS INTEGER
+            FOR k = 0 TO JSON_LEN(h, "reiter") - 1
+                DIM p AS STRING : p = JSON_GET_STRING(h, "reiter." + STR$(k) + ".pfad")
+                DIM txt AS STRING : txt = JSON_GET_STRING(h, "reiter." + STR$(k) + ".text")
+                DIM ziel AS INTEGER : ziel = -1
+                DIM vorher AS INTEGER : vorher = tabAnzahl
+                IF p = "" THEN
+                    tabOeffnen("", "")
+                    IF tabAnzahl > vorher THEN ziel = tabAnzahl - 1
+                ELSE
+                    IF FILEEXISTS(p) THEN tabOeffnen(p, dateiLesen(p)) ELSE tabOeffnen(p, "")
+                    ziel = tabMitPfad(p)
+                END IF
+                IF ziel >= 0 THEN
+                    GUI_SET_TEXT(reiter[ziel].feld, txt)
+                    n = n + 1
+                    protokoll("wiederhergestellt " + IIF(p = "", "(neu)", p))
+                END IF
+            NEXT
+            RMDIR(d, TRUE)
+        CATCH fehler
+            protokoll("wiederherstellung fehlgeschlagen " + BASENAME(d))
+        END TRY
+    NEXT
+    whFremd = []
+    reiterNeuSetzen()
+    GUI_SET_TEXT(lblStatus, STR$(n) + tr$(" Reiter wiederhergestellt -- noch NICHT gesichert."))
+    ' Gleich in den eigenen Stand: stuerzt die IDE jetzt ab, waeren sie
+    ' sonst ein zweites Mal weg.
+    whSchreiben(TRUE)
+END SUB
+
+SUB whVerwerfen()
+    DIM d AS STRING
+    FOR EACH d IN whFremd
+        TRY
+            RMDIR(d, TRUE)
+        CATCH fehler
+            protokoll("wiederherstellung nicht entfernbar " + BASENAME(d))
+        END TRY
+    NEXT
+    whFremd = []
+    protokoll("wiederherstellung verworfen")
+END SUB
+
+' --- Beenden mit Rueckfrage ------------------------------------------
+FUNCTION ungesichert() AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO tabAnzahl - 1
+        IF reiter[i].geaendert() THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+DIM beenden AS BOOLEAN : beenden = FALSE
+
+SUB beendenAnfragen()
+    IF ungesichert() THEN
+        dlgSchliessen = GUI_DIALOG(tr$("Beenden"), tr$("Es gibt ungesicherte Änderungen."), tr$("Alle sichern|Verwerfen|Abbrechen"))
+        protokoll("rueckfrage beenden")
+    ELSE
+        beenden = TRUE
+    END IF
+END SUB
+
+' EIN Ort fuer jeden Befehl: Menue, Kuerzel, Palette und Knoepfe rufen ihn.
+SUB befehl(k AS STRING)
+    SELECT CASE k
+        CASE "neu" : tabOeffnen("", "")
+        CASE "oeffnen"
+            DIM p AS STRING : p = FILE_OPEN_DIALOG("Datei öffnen", "dh")
+            IF p <> "" THEN dateiOeffnen(p)
+        CASE "schnell" : schnellOeffnen()
+        CASE "todo" : projektSuchen("TODO", "FIXME")
+        CASE "blame" : blameZeigen()
+        CASE "diff" : gitZeigen("diff")
+        CASE "verlauf" : gitZeigen("log")
+        CASE "git_rand"
+            gitRandAn = NOT gitRandAn
+            GUI_MENU_CHECK(miGitRand, gitRandAn)
+            gitDateiStand = "-"
+            gitRandNachziehen(TRUE)
+            konfigSichern()
+        CASE "kommentar" : kommentarUmschalten()
+        CASE "duplizieren" : zeilenDuplizieren()
+        CASE "zeile_weg" : zeilenLoeschen()
+        CASE "hoch" : zeilenVerschieben(-1)
+        CASE "runter" : zeilenVerschieben(1)
+        CASE "einruecken" : einruecken(1)
+        CASE "ausruecken" : einruecken(-1)
+        CASE "format" : formatieren()
+        CASE "lesezeichen" : lesezeichenUmschalten()
+        CASE "lz_weiter" : lesezeichenSpringen(TRUE)
+        CASE "lz_zurueck" : lesezeichenSpringen(FALSE)
+        CASE "lz_liste" : lesezeichenListe()
+        CASE "regex"
+            regexAn = NOT regexAn
+            suchSchalterZeigen()
+            GUI_SET_TEXT(lblStatus, IIF(regexAn, tr$("Suche mit regulärem Ausdruck (z. B. ^SUB .*\\(\\))."), tr$("Suche als Teiltext.")))
+            konfigSichern()
+        CASE "wiederauf"
+            IF LEN(zuGemacht) = 0 THEN
+                GUI_SET_TEXT(lblStatus, tr$("Kein geschlossener Reiter zum Wiederholen."))
+            ELSE
+                DIM zurueck AS STRING : zurueck = ARRAY_POP(zuGemacht)
+                IF FILEEXISTS(zurueck) THEN dateiOeffnen(zurueck) ELSE GUI_SET_TEXT(lblStatus, tr$("Gibt es nicht mehr: ") + zurueck)
+                protokoll("wieder auf " + zurueck)
+            END IF
+        CASE "bedingung" : haltepunktBedingungFragen()
+        CASE "export" : exportieren()
+        CASE "groesser" : schriftSetzen(codeGroesse + 2)
+        CASE "kleiner" : schriftSetzen(codeGroesse - 2)
+        CASE "schrift_normal" : schriftSetzen(SCHRIFT_NORMAL)
+        CASE "kuerzel" : kuerzelZeigen()
+        CASE "schnipsel_eigen" : schnipselEigenOeffnen()
+        CASE "schnipsel_auswahl" : schnipselAuswahlFragen()
+        CASE "tasten" : tastenWaehlen()
+        CASE "tasten_zurueck" : tastenZuruecksetzen()
+        CASE "terminal" : terminalZeigen(NOT (terminalAn AND untenAn))
+        CASE "sprache" : spracheWechseln()
+        CASE "terminal_stopp" : terminalAbbrechen()
+        CASE "seriell" : serZeigen()
+        CASE "seriell_verbinden"
+            IF serVerbunden() THEN
+                serTrennen(tr$("getrennt"))
+            ELSE
+                serVerbinden(GUI_TEXT(ddSerPort))
+            END IF
+        CASE "sichern" : sichern(aktiverTab, FALSE)
+        CASE "sichern_unter" : sichern(aktiverTab, TRUE)
+        CASE "schliessen" : tabSchliessenFragen(aktiverTab)
+        CASE "beenden" : beendenAnfragen()
+        CASE "suchen" : sucheOeffnen(FALSE)
+        CASE "weiter" : trefferSpringen(TRUE)
+        CASE "zurueck_suchen" : trefferSpringen(FALSE)
+        CASE "ersetzen" : sucheOeffnen(TRUE)
+        ' Ohne offene Ersetzen-Leiste waere unklar, WOMIT ersetzt wird -- dann
+        ' geht sie erst einmal auf.
+        CASE "ersetzen_eins" : IF sucheOffen AND sucheMitErsetzen THEN ersetzenEinzeln() ELSE sucheOeffnen(TRUE)
+        CASE "ersetzen_alle" : IF sucheOffen AND sucheMitErsetzen THEN alleErsetzen() ELSE sucheOeffnen(TRUE)
+        CASE "gross_klein"
+            grossKlein = NOT grossKlein
+            suchSchalterZeigen()
+            GUI_SET_TEXT(lblStatus, IIF(grossKlein, tr$("Suche beachtet Groß/klein."), tr$("Suche ohne Rücksicht auf Groß/klein.")))
+            konfigSichern()
+        CASE "ganzes_wort"
+            ganzesWort = NOT ganzesWort
+            suchSchalterZeigen()
+            GUI_SET_TEXT(lblStatus, IIF(ganzesWort, tr$("Suche nur nach ganzen Wörtern."), tr$("Suche auch mitten im Wort.")))
+            konfigSichern()
+        CASE "ersetzen_projekt"
+            ersetzenZiel = "projekt"
+            dlgSuche = GUI_PROMPT(tr$("Im ganzen Projekt ersetzen"), tr$("Wonach suchen?"), suchtext)
+            schliessenNachDialog = TRUE
+        CASE "ausgabe_suchen" : dlgAusgabeSuche = GUI_PROMPT(tr$("Ausgabe durchsuchen"), tr$("Wonach?"), ausgabeSuchtext)
+        CASE "marke_naechste" : markeNaechste()
+        CASE "marken_enden" : markenAnZeilenenden()
+        CASE "erweitern" : auswahlErweitern()
+        CASE "herausloesen"
+            DIM hz1 AS INTEGER
+            DIM hz2 AS INTEGER
+            (hz1, hz2) = zeilenBereich(IIF(aktivesFeld() >= 0, aktivesFeld(), -1))
+            IF aktivesFeld() < 0 THEN
+                GUI_SET_TEXT(lblStatus, tr$("Kein Code-Feld offen."))
+            ELSEIF hz2 <= hz1 THEN
+                GUI_SET_TEXT(lblStatus, tr$("Erst mehrere Zeilen markieren."))
+                protokoll("herausgeloest 0")
+            ELSE
+                dlgHeraus = GUI_PROMPT(tr$("Herauslösen"), _
+                    STR$(hz2 - hz1 + 1) + " Zeilen in ein neues Unterprogramm. Wie soll es heißen?", "teil")
+            END IF
+        CASE "verkleinern" : auswahlVerkleinern()
+        CASE "zl_sortieren" : zeilenWerkzeug("sortieren")
+        CASE "zl_doppelte" : zeilenWerkzeug("doppelte")
+        CASE "zl_rand" : zeilenWerkzeug("rand")
+        CASE "vergleichen" : dateienVergleichen()
+        CASE "reiter_vergleich" : reiterVergleichen()
+        CASE "umb_projekt"
+            umbenennWort = wortUnterMarke$()
+            IF umbenennWort = "" THEN
+                GUI_SET_TEXT(lblStatus, tr$("Unter der Marke steht kein Wort."))
+            ELSE
+                dlgUmbProjekt = GUI_PROMPT(tr$("Im ganzen Projekt umbenennen"), _
+                    "'" + umbenennWort + "' überall im Projektordner ersetzen durch:", umbenennWort)
+            END IF
+        CASE "parameter" : parameterFragen()
+        CASE "aufrufer" : aufruferZeigen()
+        CASE "fundstellen" : fundstellenZeigen()
+        CASE "verschieben" : verschiebenFragen()
+        CASE "umbau_zurueck" : umbauZurueck()
+        CASE "umbau_wieder" : umbauWiederholen()
+        CASE "umbau_nach" : umbauNachbessern()
+        CASE "geruest" : geruestSetzen(NOT geruestAn)
+        CASE "klammern" : klammernSetzen(NOT klammernAn)
+        CASE "format_sichern"
+            formatSichernAn = NOT formatSichernAn
+            konfigSichern()
+            GUI_SET_TEXT(lblStatus, IIF(formatSichernAn, tr$("Beim Sichern formatieren an."), tr$("Beim Sichern formatieren aus.")))
+            protokoll("format sichern " + IIF(formatSichernAn, "an", "aus"))
+        CASE "andere_zu" : andereSchliessen()
+        CASE "linien" : linienSetzen(NOT linienAn)
+        CASE "blockkopf" : kopfSetzen(NOT kopfAn)
+        CASE "fehler_am_ende" : fehlerEndeSetzen(NOT fehlerEndeAn)
+        CASE "nav_zurueck" : navGehen(TRUE)
+        CASE "zl_verbinden" : zeilenVerbinden()
+        CASE "fall_gross" : fallAendern("gross")
+        CASE "fall_klein" : fallAendern("klein")
+        CASE "fall_anfang" : fallAendern("anfang")
+        CASE "klammer_farben"
+            klammerFarbenAn = NOT klammerFarbenAn
+            GUI_MENU_CHECK(miKlFarben, klammerFarbenAn)
+            faerbSchluessel = ""
+            GUI_SET_TEXT(lblStatus, IIF(klammerFarbenAn, tr$("Klammerpaare farbig an."), tr$("Klammerpaare farbig aus.")))
+            protokoll("klammer farben " + IIF(klammerFarbenAn, "an", "aus"))
+            konfigSichern()
+        CASE "treffer_ersetzen", "treffer_ersetzen_ctx" : trefferErsetzenFragen(FALSE)
+        CASE "treffer_einzeln" : trefferErsetzenFragen(TRUE)
+        CASE "treffer_springen" : problemAnspringen()
+        CASE "treffer_alle" : trefferAlleAnhaken(TRUE)
+        CASE "treffer_keine" : trefferAlleAnhaken(FALSE)
+        CASE "im_baum_zeigen" : IF aktiverTab >= 0 THEN imBaumZeigen(reiter[aktiverTab].pfad)
+        CASE "problem_vor" : problemSpringen(TRUE)
+        CASE "problem_zurueck" : problemSpringen(FALSE)
+        CASE "letzte_aenderung" : zurLetztenAenderung()
+        CASE "gesichert_vergleichen" : gesichertVergleichen(aktiverTab)
+        CASE "reiter_vergleichen" : gesichertVergleichen(GUI_TAB_CONTEXT(win))
+        CASE "code_ausschneiden" : codeZwischenablage("ausschneiden")
+        CASE "code_kopieren" : codeZwischenablage("kopieren")
+        CASE "code_einfuegen" : codeZwischenablage("einfuegen")
+        CASE "reiter_schliessen" : tabSchliessenFragen(GUI_TAB_CONTEXT(win))
+        CASE "reiter_andere" : reiterSchliessenAusser(GUI_TAB_CONTEXT(win), FALSE)
+        CASE "reiter_rechts" : reiterSchliessenAusser(GUI_TAB_CONTEXT(win), TRUE)
+        CASE "reiter_pfad"
+            DIM rpI AS INTEGER : rpI = GUI_TAB_CONTEXT(win)
+            IF rpI >= 0 AND rpI < tabAnzahl THEN
+                IF reiter[rpI].pfad <> "" THEN
+                    TRY
+                        CLIPBOARD_SET(reiter[rpI].pfad)
+                        GUI_SET_TEXT(lblStatus, tr$("Pfad kopiert: ") + reiter[rpI].pfad)
+                    CATCH e
+                        GUI_SET_TEXT(lblStatus, tr$("Zwischenablage nicht erreichbar."))
+                    END TRY
+                END IF
+            END IF
+        CASE "reiter_im_baum"
+            DIM rbI AS INTEGER : rbI = GUI_TAB_CONTEXT(win)
+            IF rbI >= 0 AND rbI < tabAnzahl THEN imBaumZeigen(reiter[rbI].pfad)
+        CASE "nav_vor" : navGehen(FALSE)
+        CASE "baum_neue_datei" : baumFragen("datei")
+        CASE "baum_neuer_ordner" : baumFragen("ordner")
+        CASE "baum_umbenennen" : baumFragen("umbenennen")
+        CASE "baum_loeschen" : baumLoeschenFragen()
+        CASE "baum_pfad" : baumPfadKopieren()
+        CASE "ausgabe_zeile_kopieren" : ausgabeKopieren(TRUE)
+        CASE "ausgabe_kopieren" : ausgabeKopieren(FALSE)
+        CASE "ausgabe_sichern"
+            DIM asPfad AS STRING : asPfad = FILE_SAVE_DIALOG(tr$("Ausgabe sichern"), "ausgabe.txt", "txt")
+            IF asPfad <> "" THEN ausgabeSichernNach(asPfad)
+        CASE "start_argumente" : startEinstellungFragen(FALSE)
+        CASE "start_umgebung" : startEinstellungFragen(TRUE)
+        CASE "neustart_sichern" : neustartSichernSetzen(NOT neustartSichernAn)
+        CASE "profil_waerme" : waermeSetzen(NOT waermeAn)
+        CASE "profil_waerme_weg" : waermeEntfernen()
+        CASE "aufrufzaehler" : zaehlerSetzen(NOT zaehlerAn)
+        CASE "git_fenster" : qvZeigen()
+        CASE "pakete" : pakZeigen()
+        CASE "paket_holen" : pakHolenFragen()
+        CASE "pakete_holen" : pakStarten("hole", [])
+        CASE "live" : liveSetzen(NOT liveAn)
+        CASE "pruefsammlung" : pruefsammlungStarten(FALSE)
+        CASE "prueffall" : pruefsammlungStarten(TRUE)
+        CASE "test_uebersicht" : testUebersichtZeigen()
+        CASE "neues_projekt" : neuProjektZeigen()
+        CASE "einfuehren" : einfuehrenFragen()
+        CASE "einsetzen" : variableEinsetzen()
+        CASE "sub_function" : subInFunction()
+        CASE "konflikt_meine" : konfliktLoesen(1)
+        CASE "konflikt_ihre" : konfliktLoesen(2)
+        CASE "konflikt_beide" : konfliktLoesen(3)
+        CASE "blame_zeile" : blameZeileSetzen(NOT blameZeileAn)
+        CASE "leiste"
+            leisteAn = NOT leisteAn
+            GUI_MENU_CHECK(miLeiste, leisteAn)
+            layout()
+            konfigSichern()
+            protokoll("leiste " + IIF(leisteAn, "an", "aus"))
+        CASE "vorschau_neu" : vorschauNeu()
+        CASE "zeile" : dlgZeile = GUI_PROMPT(tr$("Gehe zu Zeile"), tr$("Zeilennummer:"), "")
+        CASE "projekt" : dlgProjekt = GUI_PROMPT(tr$("Im Projekt suchen"), tr$("Wonach (alle .dh in ") + BASENAME(projektOrdner) + ")?", suchtext)
+        CASE "vervoll"
+            ' Steht die Liste schon (weil sie beim Tippen aufging), holt
+            ' Strg+Leer sie nur nach vorn -- ausgewaehlt wird mit den
+            ' Pfeilen und Enter.
+            IF vervollOffen THEN GUI_FOCUS(lstVervoll) ELSE vervollstaendigen(TRUE)
+        CASE "definition" : zurDefinition()
+        CASE "umbenennen" : umbenennenFragen()
+        CASE "korrektur" : korrekturZeigen()
+        CASE "schnipsel" : schnipselWaehlen()
+        CASE "einstellungen" : einstellungenZeigen()
+        CASE "befehle" : befehleZeigen()
+        CASE "peek" : peekZeigen()
+        CASE "symbole" : symbolVerzeichnis()
+        CASE "baum_oeffnen" : baumAuswahlOeffnen()
+        CASE "haken_weg" : hakenEntfernen()
+        CASE "baum_haken" : baumHakenSetzen(NOT baumHakenAn)
+        CASE "marken" : markenAufFundstellen()
+        CASE "palette" : paletteOeffnen()
+        CASE "start" : starten()
+        CASE "stopp" : stoppen()
+        CASE "neustart" : neuStarten()
+        CASE "pruefen" : problemModus = 0 : pruefen()
+        CASE "projekt_pruefen" : projektPruefenStarten()
+        CASE "debug" : debuggen()
+        CASE "haltepunkt" : haltepunktUmschalten()
+        CASE "weiter_d" : debugSchritt("continue")
+        CASE "anhalten" : debugAnhalten()
+        CASE "hp_liste" : haltepunkteListeZeigen()
+        CASE "drueber" : debugSchritt("step-over")
+        CASE "hinein" : debugSchritt("step-into")
+        CASE "heraus" : debugSchritt("step-out")
+        CASE "bis_marke" : bisZurMarke()
+        CASE "profil" : profilAufnehmen()
+        CASE "thema"
+            hell = NOT hell
+            GUI_MENU_CHECK(miThema, hell)
+            themaAnwenden()
+            protokoll("codefarben " + COLOR_HEX$(F_SCHLUESSEL))
+            konfigSichern()
+        CASE "farben_eigen" : farbenEigenOeffnen()
+        CASE "typ_hinweise" : typHinweiseSetzen(NOT typHinweiseAn)
+        CASE "parameter_namen"
+            paramNamenAn = NOT paramNamenAn
+            GUI_MENU_CHECK(miParamNamen, paramNamenAn)
+            IF paramNamenAn THEN
+                pruefen()
+            ELSEIF paramFeld >= 0 THEN
+                hinweiseZeigen(paramFeld)
+            END IF
+            GUI_SET_TEXT(lblStatus, IIF(paramNamenAn, tr$("Parameternamen an Aufrufen an."), tr$("Parameternamen an Aufrufen aus.")))
+            protokoll("parameter namen " + IIF(paramNamenAn, "an", "aus"))
+            konfigSichern()
+        CASE "einfuegen_einruecken"
+            einfuegenEinrueckenAn = NOT einfuegenEinrueckenAn
+            GUI_MENU_CHECK(miEinfEinr, einfuegenEinrueckenAn)
+            GUI_SET_TEXT(lblStatus, IIF(einfuegenEinrueckenAn, tr$("Beim Einfügen einrücken an."), tr$("Beim Einfügen einrücken aus.")))
+            protokoll("einfuegen einruecken " + IIF(einfuegenEinrueckenAn, "an", "aus"))
+            konfigSichern()
+        CASE "vollbild" : SET_FULLSCREEN(NOT WINDOW_IS_FULLSCREEN())
+        CASE "umbruch" : umbruchSetzen(NOT umbruchAn)
+        CASE "geteilt" : geteiltSetzen(NOT geteilt)
+        CASE "spiegel" : spiegelSetzen(NOT spiegelAn)
+        CASE "ausgabe_leeren"
+            ' Eine halbe Zeile, die noch auf ihren Umbruch wartet, geht mit --
+            ' sonst stuende ihr Rest nachher allein am Anfang.
+            GUI_LISTBOX_CLEAR(lstAusgabe)
+            ausgabeRest = ""
+            GUI_SET_TEXT(lblStatus, tr$("Ausgabe geleert."))
+            protokoll("ausgabe geleert")
+        CASE "seitenleiste" : leistenSetzen(NOT seitenAn, untenAn)
+        CASE "untere_leiste" : leistenSetzen(seitenAn, NOT untenAn)
+        CASE "minimap" : minimapSetzen(NOT minimapAn)
+        CASE "falten" : faltenUmschalten()
+        CASE "falten_alle" : faltenAlle(TRUE)
+        CASE "falten_auf" : faltenAlle(FALSE)
+        CASE "ueber" : ueberZeigen()
+        CASE "handbuch" : handbuch()
+        CASE "hb_ansicht" : handbuchAnsicht(NOT hbGesetzt)
+        CASE "drucken" : listingDrucken()
+        CASE "pdf" : listingAlsPdf()
+        CASE "wz_sfx" : werkzeugStarten("183_sfx_generator.dh")
+        CASE "wz_partikel" : werkzeugStarten("185_partikel_editor.dh")
+        CASE "wz_tilemap" : werkzeugStarten("187_tilemap_editor.dh")
+        CASE "wz_sprite" : werkzeugStarten("189_sprite_editor.dh")
+        CASE "wz_tracker" : werkzeugStarten("190_tracker.dh")
+        CASE "wz_form" : werkzeugStarten("197_form_designer.dh")
+        CASE "form_text" : formularAlsText()
+        CASE "wz_anim" : werkzeugStarten("198_anim_fsm_editor.dh")
+        CASE "wz_noten" : werkzeugStarten("199_notenblatt.dh")
+        CASE "wz_klassen" : klassendiagrammStarten()
+        CASE "wz_studio" : studioStarten("")
+        CASE "wz_bastel" : werkzeugStarten("bastelzentrale/main.dh")
+        CASE "beispiele" : beispieleOeffnen()
+        CASE "beispiele_themen" : themenZeigen()
+        CASE "ausdruck"
+            IF prozessArt = "debug" AND debugPause THEN GUI_FOCUS(tfEingabe) ELSE GUI_SET_TEXT(lblStatus, tr$("Der Debugger steht gerade nicht -- erst F7 und ein Halt."))
+        CASE "leisten_zurueck"
+            GUI_DOCK_SET_STATE(win, dockVorgabe)
+            layout()
+            konfigSichern()
+            protokoll("leisten zurueckgesetzt")
+        CASE "plugins_verwalten" : pluginsVerwalten()
+        CASE "plugins_neu" : pluginsNeuLaden()
+        CASE "plugin_anlegen" : pluginAnlegenFragen()
+        CASE "plugins_ordner"
+            IF NOT DIREXISTS(pluginOrdner$()) THEN MKDIR(pluginOrdner$())
+            OPENDOC(pluginOrdner$())
+        CASE ELSE
+            IF LEFT$(k, 7) = "plugin:" THEN pluginBefehl(k)
+    END SELECT
+END SUB
+
+' --- Symbole in den Menues --------------------------------------------
+' Seit Stand 26 dieselben eingebauten Sinnbilder wie in der Werkzeugleiste
+' (GUI_MENU_ICON mit einem NAMEN). Bis dahin malte die IDE hier 16x16-Bilder
+' aus Rechtecken -- in eigenen Farben, die zu keinem Thema passten, und in
+' einer Groesse, die die Leiste krumm strecken musste.
+SUB symbol(eintrag AS INTEGER, art AS STRING)
+    GUI_MENU_ICON(eintrag, art)
+END SUB
+
+symbol(miNeu, "neu") : symbol(miOeffnen, "oeffnen") : symbol(miSchnell, "oeffnen")
+symbol(miSichern, "sichern") : symbol(miSichernAls, "sichern")
+symbol(miDrucken, "drucken") : symbol(miPdf, "export")
+symbol(miSuchen, "suchen") : symbol(miWeiter, "suchen") : symbol(miErsetzen, "suchen")
+symbol(miProjekt, "suchen") : symbol(miTodo, "suchen") : symbol(miBlame, "info")
+symbol(miStart, "start") : symbol(miStopp, "stopp") : symbol(miPruefen, "pruefen")
+symbol(miDebug, "debug") : symbol(miHaltepunkt, "haltepunkt") : symbol(miBedingung, "haltepunkt")
+symbol(miExport, "export")
+symbol(miWzSfx, "werkzeug") : symbol(miWzPartikel, "werkzeug") : symbol(miWzTilemap, "werkzeug")
+symbol(miWzSprite, "werkzeug") : symbol(miWzTracker, "werkzeug") : symbol(miWzForm, "werkzeug") : symbol(miWzStudio, "werkzeug")
+symbol(miWzAnim, "werkzeug") : symbol(miWzNoten, "werkzeug") : symbol(miWzKlassen, "werkzeug") : symbol(miWzBastel, "werkzeug")
+symbol(miHandbuch, "handbuch") : symbol(miKuerzel, "handbuch")
+symbol(miUmbruch, "umbruch") : symbol(miLeiste, "menue")
+
+' Vorschaubilder, die es schon gibt, sofort zeigen.
+DIM kvs AS INTEGER
+protokoll("kacheln " + STR$(kachelAnzahl))
+FOR kvs = 0 TO kachelAnzahl - 1
+    kachelBildSetzen(kvs)
+NEXT
+
+' --- Schnipsel: die Geruester, die man staendig tippt -----------------
+' Der senkrechte Strich sagt, wohin die Schreibmarke danach gehoert.
+schnipsel("Spielschleife (SCREEN + Bildschleife)", "screen", "SCREEN(800, 600, " + CHR$(34) + "Spiel" + CHR$(34) + ", 1)" + NL + "SETFPS(60)" + NL + NL + "WHILE NOT QUITREQUESTED()" + NL + "    CLS(BLACK)" + NL + "    |" + NL + "    FLIP()" + NL + "WEND")
+schnipsel("FOR-Schleife", "for", "DIM i AS INTEGER" + NL + "FOR i = 0 TO |" + NL + NL + "NEXT")
+schnipsel("FOR EACH", "foreach", "DIM e AS STRING" + NL + "FOR EACH e IN |" + NL + NL + "NEXT")
+schnipsel("WHILE", "while", "WHILE |" + NL + NL + "WEND")
+schnipsel("IF ... ELSE", "if", "IF | THEN" + NL + NL + "ELSE" + NL + NL + "END IF")
+schnipsel("SELECT CASE", "select", "SELECT CASE |" + NL + "    CASE 1" + NL + NL + "    CASE ELSE" + NL + NL + "END SELECT")
+schnipsel("SUB", "sub", "SUB |()" + NL + NL + "END SUB")
+schnipsel("FUNCTION", "function", "FUNCTION |() AS INTEGER" + NL + "    RETURN 0" + NL + "END FUNCTION")
+schnipsel("CLASS mit Init", "class", "CLASS |" + NL + "    DIM wert AS INTEGER" + NL + NL + "    SUB Init()" + NL + "        Self.wert = 0" + NL + "    END SUB" + NL + "END CLASS")
+schnipsel("TRY ... CATCH", "try", "TRY" + NL + "    |" + NL + "CATCH e" + NL + "    PRINT " + CHR$(34) + "Fehler: " + CHR$(34) + " + e" + NL + "END TRY")
+schnipsel("CLASS mit Oberklasse (EXTENDS)", "extends", "CLASS | EXTENDS Basis" + NL + "    SUB Init()" + NL + "        SUPER.Init()" + NL + "    END SUB" + NL + "END CLASS")
+schnipsel("ABSTRACT-Methode (nur angekündigt)", "abstract", "ABSTRACT FUNCTION |() AS INTEGER")
+schnipsel("PROPERTY GET/SET", "property", "PROPERTY GET |() AS INTEGER" + NL + "    RETURN Self.wert" + NL + "END PROPERTY" + NL + NL + "PROPERTY SET wert(neu AS INTEGER)" + NL + "    Self.wert = neu" + NL + "END PROPERTY")
+schnipsel("TRY ... CATCH ... FINALLY", "finally", "TRY" + NL + "    |" + NL + "CATCH e" + NL + "    PRINT " + CHR$(34) + "Fehler: " + CHR$(34) + " + e" + NL + "FINALLY" + NL + NL + "END TRY")
+schnipsel("Lambda (Funktion als Wert)", "lambda", "DIM f AS FUNCREF" + NL + "f = FUNCTION(x) |")
+schnipsel("ENUM", "enum", "ENUM |" + NL + "    ERSTER" + NL + "    ZWEITER" + NL + "END ENUM")
+schnipsel("DO ... LOOP UNTIL", "do", "DO" + NL + "    |" + NL + "LOOP UNTIL fertig")
+schnipsel("Fremde Bibliothek (DECLARE ... LIB)", "declare", "DECLARE FUNCTION |name LIB " + CHR$(34) + "c" + CHR$(34) + " (s AS TEXT) AS ZEIGER")
+schnipsel("IMPORT als Namensraum", "importas", "IMPORT " + CHR$(34) + "|.dh" + CHR$(34) + " AS name")
+schnipsel("Datei zeilenweise lesen", "readlines", "DIM zeilen AS ARRAY OF STRING" + NL + "zeilen = READLINES(|)" + NL + "DIM z AS STRING" + NL + "FOR EACH z IN zeilen" + NL + "    PRINT z" + NL + "NEXT")
+schnipsel(tr$("gui-Fenster mit Knopf"), "gui", "IMPORT " + CHR$(34) + "gui" + CHR$(34) + NL + "DIM win AS GUI_WINDOW" + NL + "win = GUI_WINDOW(" + CHR$(34) + tr$("Fenster") + CHR$(34) + ", 60, 60, 320, 200)" + NL + "DIM knopf AS GUI_WIDGET" + NL + "knopf = GUI_BUTTON(win, " + CHR$(34) + tr$("Los") + CHR$(34) + ", 20, 20, 100, 30)" + NL + NL + "WHILE NOT QUITREQUESTED()" + NL + "    GUI_UPDATE()" + NL + "    IF GUI_CLICKED(knopf) THEN |" + NL + "    CLS(BLACK)" + NL + "    GUI_DRAW()" + NL + "    FLIP()" + NL + "WEND")
+schnipsel("Sprite mit Animation", "sprite", "DIM held AS SPRITE" + NL + "held = SPRITE_NEW(LOADIMAGE(|), 32, 32)" + NL + "SPRITE_ADD_ANIM(held, " + CHR$(34) + "lauf" + CHR$(34) + ", 0, 3, 8.0)" + NL + "SPRITE_PLAY(held, " + CHR$(34) + "lauf" + CHR$(34) + ")")
+
+' Die Tafel der Menuepunkte (siehe menueBefehl) -- hinter der Palette,
+' weil die Tastenbelegung die Vorgaben BEIDER braucht.
+menueBefehl(miNeu, "neu", "Strg+N") : menueBefehl(miOeffnen, "oeffnen", "Strg+O") : menueBefehl(miSichern, "sichern", "Strg+S")
+menueBefehl(miSichernAls, "sichern_unter", "") : menueBefehl(miSchliessen, "schliessen", "Strg+W") : menueBefehl(miBeenden, "beenden", "Strg+Q")
+menueBefehl(miSuchen, "suchen", "Strg+F") : menueBefehl(miWeiter, "weiter", "F3") : menueBefehl(miZurueckSuchen, "zurueck_suchen", "Umschalt+F3")
+menueBefehl(miErsetzen, "ersetzen", "Strg+H") : menueBefehl(miErsetzenEins, "ersetzen_eins", "Strg+Umschalt+1") : menueBefehl(miErsetzenAlle, "ersetzen_alle", "Strg+Alt+Enter")
+menueBefehl(miZeile, "zeile", "Strg+G") : menueBefehl(miProjekt, "projekt", "Strg+Umschalt+F") : menueBefehl(miVervoll, "vervoll", "Strg+Leer")
+menueBefehl(miImBaum, "im_baum_zeigen", "Strg+Alt+B")
+menueBefehl(miProbVor, "problem_vor", "Alt+F8") : menueBefehl(miProbZurueck, "problem_zurueck", "Umschalt+Alt+F8")
+menueBefehl(miLetzteAend, "letzte_aenderung", "Strg+Umschalt+Rueck") : menueBefehl(miGesVergleich, "gesichert_vergleichen", "")
+menueBefehl(miPTSpringen, "treffer_springen", "") : menueBefehl(miPTEinzeln, "treffer_einzeln", "") : menueBefehl(miPTAngehakt, "treffer_ersetzen_ctx", "")
+menueBefehl(miPTAlle, "treffer_alle", "") : menueBefehl(miPTKeine, "treffer_keine", "")
+menueBefehl(miNavZurueck, "nav_zurueck", "Strg+Alt+Links") : menueBefehl(miNavVor, "nav_vor", "Strg+Alt+Rechts")
+menueBefehl(miBNeuDatei, "baum_neue_datei", "") : menueBefehl(miBNeuOrdner, "baum_neuer_ordner", "") : menueBefehl(miBUmbenennen, "baum_umbenennen", "")
+menueBefehl(miBLoeschen, "baum_loeschen", "") : menueBefehl(miBPfad, "baum_pfad", "")
+menueBefehl(miAZeile, "ausgabe_zeile_kopieren", "") : menueBefehl(miAKopieren, "ausgabe_kopieren", "") : menueBefehl(miASichern, "ausgabe_sichern", "") : menueBefehl(miALeeren, "ausgabe_leeren", "")
+menueBefehl(miDefinition, "definition", "F12") : menueBefehl(miUmbenennen, "umbenennen", "Umschalt+F6") : menueBefehl(miKorrektur, "korrektur", "Strg+.")
+menueBefehl(miPlugVerwalten, "plugins_verwalten", "") : menueBefehl(miPlugNeu, "plugins_neu", "")
+menueBefehl(miPlugOrdner, "plugins_ordner", "") : menueBefehl(miPlugAnlegen, "plugin_anlegen", "") : menueBefehl(miLeistenZurueck, "leisten_zurueck", "")
+menueBefehl(miSchnipsel, "schnipsel", "Strg+J") : menueBefehl(miEinstellungen, "einstellungen", "Strg+U") : menueBefehl(miBefehle, "befehle", "Strg+F3")
+menueBefehl(miPeek, "peek", "Alt+F12") : menueBefehl(miSymbole, "symbole", "Strg+Umschalt+S") : menueBefehl(miErsProjekt, "ersetzen_projekt", "Strg+Umschalt+H")
+menueBefehl(miAusgabeSuche, "ausgabe_suchen", "Strg+Umschalt+A") : menueBefehl(miMarkeNaechste, "marke_naechste", "Strg+Umschalt+N") : menueBefehl(miMarkeEnden, "marken_enden", "Strg+Umschalt+I")
+menueBefehl(miErweitern, "erweitern", "Strg+Umschalt+Hoch") : menueBefehl(miHerausloesen, "herausloesen", "Strg+Umschalt+R") : menueBefehl(miVerkleinern, "verkleinern", "Strg+Umschalt+Runter")
+menueBefehl(miUmbProjekt, "umb_projekt", "Strg+Umschalt+F6") : menueBefehl(miParameter, "parameter", "Strg+Umschalt+U") : menueBefehl(miAufrufer, "aufrufer", "Umschalt+F12")
+menueBefehl(miFundstellen, "fundstellen", "Strg+Umschalt+F12") : menueBefehl(miVerschieben, "verschieben", "Strg+Umschalt+V") : menueBefehl(miUmbauZur, "umbau_zurueck", "Strg+Umschalt+Z")
+menueBefehl(miUmbauWdh, "umbau_wieder", "") : menueBefehl(miUmbauNach, "umbau_nach", "Strg+Umschalt+G") : menueBefehl(miVergleich, "vergleichen", "")
+menueBefehl(miReiterVgl, "reiter_vergleich", "") : menueBefehl(miZlVerbinden, "zl_verbinden", "") : menueBefehl(miFallGross, "fall_gross", "") : menueBefehl(miFallKlein, "fall_klein", "") : menueBefehl(miFallAnfang, "fall_anfang", "")
+menueBefehl(miKlFarben, "klammer_farben", "") : menueBefehl(miTrefferErs, "treffer_ersetzen", "")
+menueBefehl(miZlSort, "zl_sortieren", "") : menueBefehl(miZlDoppelt, "zl_doppelte", "")
+menueBefehl(miZlRand, "zl_rand", "") : menueBefehl(miAndereZu, "andere_zu", "Strg+Umschalt+W") : menueBefehl(miLinien, "linien", "")
+menueBefehl(miParamNamen, "parameter_namen", "") : menueBefehl(miEinfEinr, "einfuegen_einruecken", "")
+menueBefehl(miTypen, "typ_hinweise", "") : menueBefehl(miFarbenEigen, "farben_eigen", "")
+menueBefehl(miFehlerEnde, "fehler_am_ende", "") : menueBefehl(miKopf, "blockkopf", "") : menueBefehl(miWaerme, "profil_waerme", "") : menueBefehl(miZaehler, "aufrufzaehler", "") : menueBefehl(miQv, "git_fenster", "Strg+Alt+G") : menueBefehl(miPakete, "pakete", "Strg+Alt+P")
+menueBefehl(miLive, "live", "Strg+Alt+L") : menueBefehl(miPruefsammlung, "pruefsammlung", "Strg+Alt+F5") : menueBefehl(miPrueffall, "prueffall", "Strg+Alt+Umschalt+F5")
+menueBefehl(miTestUebersicht, "test_uebersicht", "Strg+Alt+T") : menueBefehl(miNeuProjekt, "neues_projekt", "Strg+Alt+N") : menueBefehl(miEinfuehren, "einfuehren", "Strg+Alt+V")
+menueBefehl(miEinsetzen, "einsetzen", "Strg+Alt+I") : menueBefehl(miSubFunc, "sub_function", "Strg+Alt+U") : menueBefehl(miKonfMeine, "konflikt_meine", "")
+menueBefehl(miKonfIhre, "konflikt_ihre", "") : menueBefehl(miKonfBeide, "konflikt_beide", "") : menueBefehl(miBlameZeile, "blame_zeile", "")
+menueBefehl(miLeiste, "leiste", "") : menueBefehl(miBaumOeffnen, "baum_oeffnen", "Strg+Umschalt+E") : menueBefehl(miHakenWeg, "haken_weg", "")
+menueBefehl(miBaumHaken, "baum_haken", "") : menueBefehl(miMarken, "marken", "Strg+Umschalt+L") : menueBefehl(miPalette, "palette", "Strg+Umschalt+P")
+menueBefehl(miStart, "start", "F5") : menueBefehl(miStopp, "stopp", "Umschalt+F5") : menueBefehl(miPruefen, "pruefen", "Umschalt+F7")
+menueBefehl(miPrjPruefen, "projekt_pruefen", "Strg+Umschalt+F7") : menueBefehl(miDebug, "debug", "F7") : menueBefehl(miHaltepunkt, "haltepunkt", "F9")
+menueBefehl(miAnhalten, "anhalten", "F6") : menueBefehl(miStartArgs, "start_argumente", "") : menueBefehl(miStartUmg, "start_umgebung", "") : menueBefehl(miNeustartSichern, "neustart_sichern", "")
+menueBefehl(miNeustart, "neustart", "Strg+Umschalt+F5") : menueBefehl(miHpListe, "hp_liste", "Strg+Umschalt+F9")
+menueBefehl(miProfil, "profil", "Strg+Umschalt+Y") : menueBefehl(miAusgabeLeer, "ausgabe_leeren", "") : menueBefehl(miThema, "thema", "")
+menueBefehl(miVollbild, "vollbild", "Alt+Enter") : menueBefehl(miUmbruch, "umbruch", "Alt+Z") : menueBefehl(miGeteilt, "geteilt", "Alt+G")
+menueBefehl(miSpiegel, "spiegel", "Alt+Umschalt+G") : menueBefehl(miSeiten, "seitenleiste", "Alt+1") : menueBefehl(miUnten, "untere_leiste", "Alt+2")
+menueBefehl(miMinimap, "minimap", "") : menueBefehl(miFalten, "falten", "F4") : menueBefehl(miFaltenAlle, "falten_alle", "Strg+F4")
+menueBefehl(miFaltenAuf, "falten_auf", "Umschalt+F4") : menueBefehl(miUeber, "ueber", "") : menueBefehl(miHandbuch, "handbuch", "F1")
+menueBefehl(miDrucken, "drucken", "Strg+P") : menueBefehl(miPdf, "pdf", "") : menueBefehl(miWzSfx, "wz_sfx", "")
+menueBefehl(miWzPartikel, "wz_partikel", "") : menueBefehl(miWzTilemap, "wz_tilemap", "") : menueBefehl(miWzSprite, "wz_sprite", "")
+menueBefehl(miWzTracker, "wz_tracker", "") : menueBefehl(miWzForm, "wz_form", "") : menueBefehl(miWzAnim, "wz_anim", "")
+menueBefehl(miWzNoten, "wz_noten", "") : menueBefehl(miWzKlassen, "wz_klassen", "") : menueBefehl(miWzStudio, "wz_studio", "") : menueBefehl(miWzBastel, "wz_bastel", "") : menueBefehl(miBeispiele, "beispiele", "") : menueBefehl(miThemen, "beispiele_themen", "")
+menueBefehl(miAusdruck, "ausdruck", "Strg+E") : menueBefehl(miSchnell, "schnell", "Strg+Umschalt+O") : menueBefehl(miTodo, "todo", "Strg+Umschalt+M")
+menueBefehl(miBlame, "blame", "Strg+Umschalt+B") : menueBefehl(miDiff, "diff", "Strg+Umschalt+D") : menueBefehl(miVerlauf, "verlauf", "")
+menueBefehl(miGitRand, "git_rand", "") : menueBefehl(miKommentar, "kommentar", "Strg+K") : menueBefehl(miDuplizieren, "duplizieren", "Strg+D")
+menueBefehl(miZeileWeg, "zeile_weg", "Strg+Umschalt+K") : menueBefehl(miHoch, "hoch", "Alt+Hoch") : menueBefehl(miRunter, "runter", "Alt+Runter")
+menueBefehl(miEinruecken, "einruecken", "Alt+Rechts") : menueBefehl(miAusruecken, "ausruecken", "Alt+Links") : menueBefehl(miFormat, "format", "Umschalt+Alt+F")
+menueBefehl(miLesezeichen, "lesezeichen", "Strg+F2") : menueBefehl(miLzWeiter, "lz_weiter", "F2") : menueBefehl(miLzZurueck, "lz_zurueck", "Umschalt+F2")
+menueBefehl(miLzListe, "lz_liste", "Alt+F2") : menueBefehl(miRegex, "regex", "") : menueBefehl(miGross, "gross_klein", "Alt+C")
+menueBefehl(miWort, "ganzes_wort", "Alt+W") : menueBefehl(miWiederauf, "wiederauf", "Strg+Umschalt+T") : menueBefehl(miBedingung, "bedingung", "Umschalt+F9")
+menueBefehl(miExport, "export", "Strg+F6") : menueBefehl(miGroesser, "groesser", "Strg+Plus") : menueBefehl(miKleiner, "kleiner", "Strg+Minus")
+menueBefehl(miNormal, "schrift_normal", "Strg+0") : menueBefehl(miKuerzel, "kuerzel", "Strg+F1") : menueBefehl(miWeiterD, "weiter_d", "F8", FALSE)
+menueBefehl(miDrueber, "drueber", "F10", FALSE) : menueBefehl(miHinein, "hinein", "F11", FALSE) : menueBefehl(miHeraus, "heraus", "Umschalt+F11", FALSE)
+menueBefehl(miBisMarke, "bis_marke", "Strg+F10", FALSE) : menueBefehl(miSchnipselEigen, "schnipsel_eigen", "") : menueBefehl(miSchnipselAuswahl, "schnipsel_auswahl", "")
+menueBefehl(miTerminal, "terminal", "Alt+3") : menueBefehl(miSeriell, "seriell", "Alt+4") : menueBefehl(miSprache, "sprache", "") : menueBefehl(miTasten, "tasten", "") : menueBefehl(miTastenZurueck, "tasten_zurueck", "")
+' Die Vorgabe der Kuerzel: was die Befehle bis hierher bekommen haben
+' (Plugins melden ihre spaeter an und haben ihre eigene).
+DIM bkv AS INTEGER
+FOR bkv = 0 TO LEN(befehle) - 1
+    befehle[bkv].vorgabe = befehle[bkv].kuerzel
+NEXT
+schnipselEingebautMerken()
+schnipselLaden()
+tastenAnwenden()

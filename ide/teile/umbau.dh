@@ -1,0 +1,2547 @@
+' ide/teile/umbau.dh -- ein Teil der IDE (ide/ide.dh), dort per IMPORT
+' an genau dieser Stelle eingebunden: Umbauten: herausloesen, Parameter, verschieben, Aufrufer, vergleichen, umbenennen, Vorschau in Schritten.
+' Kein eigenes Programm -- die Namen gehoeren der IDE.
+
+' --- Eine Auswahl in ein Unterprogramm herausloesen -------------------
+' Der erste Umbau, der mehr ist als ein Umbenennen. Die gewaehlten Zeilen
+' wandern in ein neues SUB am Dateiende, an ihrer Stelle steht der Aufruf.
+'
+' Was als PARAMETER mitmuss, steht nicht im Raten: globale Namen sieht ein
+' SUB ohnehin, also sind es genau die LOKALEN des umgebenden Unterprogramms,
+' die in den Zeilen vorkommen. Wird so einer darin auch ZUGEWIESEN, geht er
+' BYREF -- sonst kaeme der neue Wert nie zurueck, und das faellt erst beim
+' Laufen auf.
+' Wie viele FEHLER (keine Warnungen) ein Text hat -- fuer die Probe
+' hinterher: ein Umbau, der die Datei kaputt macht, soll das sagen.
+FUNCTION fehlerZahl(quelle AS STRING) AS INTEGER
+    DIM j AS JSON_HANDLE : j = JSON_PARSE(CODE_CHECK$(quelle, projektOrdner))
+    DIM n AS INTEGER : n = JSON_LEN(j, "")
+    DIM f AS INTEGER : f = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        IF JSON_GET_STRING(j, STR$(i) + ".schwere") = "fehler" THEN f = f + 1
+    NEXT
+    RETURN f
+END FUNCTION
+
+FUNCTION enthaeltWort(text AS STRING, wort AS STRING) AS BOOLEAN
+    DIM s AS INTEGER : s = INSTR(text, wort)
+    WHILE s >= 0
+        DIM davor AS BOOLEAN : davor = s > 0 AND istWortzeichen(MID$(text, s - 1, 1))
+        DIM danach AS BOOLEAN : danach = istWortzeichen(MID$(text, s + LEN(wort), 1))
+        IF NOT davor AND NOT danach THEN RETURN TRUE
+        s = INSTR(text, wort, s + 1)
+    WEND
+    RETURN FALSE
+END FUNCTION
+
+FUNCTION wirdZugewiesen(zeile AS STRING, wort AS STRING) AS BOOLEAN
+    DIM t AS STRING : t = LTRIM$(zeile)
+    IF LEFT$(t, LEN(wort)) <> wort THEN RETURN FALSE
+    IF istWortzeichen(MID$(t, LEN(wort), 1)) THEN RETURN FALSE     ' laengerer Name
+    DIM k AS INTEGER : k = LEN(wort)
+    ' Index und Feldzugriff gehoeren dazu: `a[i].x = 1` weist `a` zu.
+    WHILE k < LEN(t)
+        DIM c AS STRING : c = MID$(t, k, 1)
+        IF c = "=" THEN RETURN MID$(t, k + 1, 1) <> "="
+        IF c = " " OR c = "[" OR c = "]" OR c = "." OR c = "+" OR c = "-" OR istWortzeichen(c) THEN
+            k = k + 1
+        ELSE
+            RETURN FALSE
+        END IF
+    WEND
+    RETURN FALSE
+END FUNCTION
+
+' Das Unterprogramm, das die Zeile umschliesst: (von, bis) oder (-1, -1)
+' fuers Hauptprogramm. Die Bloecke kommen aus CODE_SYMBOLS$ -- dieselbe
+' Quelle wie Gliederung und Faltung.
+FUNCTION umgebendesUnterprogramm(quelle AS STRING, zeile AS INTEGER) AS TUPLE
+    DIM j AS JSON_HANDLE : j = JSON_PARSE(CODE_SYMBOLS$(quelle))
+    DIM n AS INTEGER : n = JSON_LEN(j, "")
+    DIM bv AS INTEGER : bv = -1
+    DIM bb AS INTEGER : bb = -1
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        DIM p AS STRING : p = STR$(i)
+        DIM v AS INTEGER : v = JSON_GET_INT(j, p + ".von")
+        DIM b AS INTEGER : b = JSON_GET_INT(j, p + ".bis")
+        IF v <= zeile AND zeile <= b AND (bv < 0 OR b - v < bb - bv) THEN
+            bv = v : bb = b
+        END IF
+        DIM m AS INTEGER
+        FOR m = 0 TO JSON_LEN(j, p + ".kinder") - 1
+            DIM pk AS STRING : pk = p + ".kinder." + STR$(m)
+            DIM kv AS INTEGER : kv = JSON_GET_INT(j, pk + ".von")
+            DIM kb AS INTEGER : kb = JSON_GET_INT(j, pk + ".bis")
+            IF kv <= zeile AND zeile <= kb AND (bv < 0 OR kb - kv < bb - bv) THEN
+                bv = kv : bb = kb
+            END IF
+        NEXT
+    NEXT
+    RETURN (bv, bb)
+END FUNCTION
+
+SUB herausloesen(name AS STRING)
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 OR name = "" THEN RETURN
+    DIM z1 AS INTEGER
+    DIM z2 AS INTEGER
+    (z1, z2) = zeilenBereich(ta)
+    DIM quelle AS STRING : quelle = GUI_TEXT(ta)
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(quelle, NL)
+    IF z2 < z1 OR z2 > LEN(zeilen) THEN RETURN
+    DIM block AS ARRAY OF STRING : block = zeilenHolen(zeilen, z1, z2)
+    ' Die Parameter: lokale DIMs des umgebenden Unterprogramms, die in den
+    ' gewaehlten Zeilen vorkommen.
+    DIM uv AS INTEGER
+    DIM ub AS INTEGER
+    (uv, ub) = umgebendesUnterprogramm(quelle, z1)
+    DIM pNamen AS ARRAY OF STRING : pNamen = []
+    DIM pTypen AS ARRAY OF STRING : pTypen = []
+    DIM pRef AS ARRAY OF INTEGER : pRef = []
+    DIM i AS INTEGER
+    IF uv > 0 THEN
+        FOR i = uv TO MIN(ub, LEN(zeilen))
+            IF i >= z1 AND i <= z2 THEN CONTINUE          ' die Auswahl selbst nicht
+            DIM t AS STRING : t = TRIM$(zeilen[i - 1])
+            IF LEFT$(UPPER$(t), 4) <> "DIM " THEN CONTINUE
+            DIM rest AS STRING : rest = TRIM$(MID$(t, 4))
+            DIM alsPos AS INTEGER : alsPos = INSTR(UPPER$(rest), " AS ")
+            IF alsPos < 0 THEN CONTINUE
+            DIM pn AS STRING : pn = TRIM$(LEFT$(rest, alsPos))
+            DIM pt AS STRING : pt = TRIM$(MID$(rest, alsPos + 4))
+            DIM dp AS INTEGER : dp = INSTR(pt, ":")
+            IF dp >= 0 THEN pt = TRIM$(LEFT$(pt, dp))
+            IF pn = "" OR INSTR(pn, "[") >= 0 THEN CONTINUE   ' Felder nicht
+            IF ARRAY_INDEXOF(pNamen, pn) >= 0 THEN CONTINUE
+            DIM gebraucht AS BOOLEAN : gebraucht = FALSE
+            DIM zugewiesen AS BOOLEAN : zugewiesen = FALSE
+            DIM bz AS STRING
+            FOR EACH bz IN block
+                IF enthaeltWort(bz, pn) THEN gebraucht = TRUE
+                IF wirdZugewiesen(bz, pn) THEN zugewiesen = TRUE
+            NEXT
+            IF NOT gebraucht THEN CONTINUE
+            ARRAY_PUSH(pNamen, pn) : ARRAY_PUSH(pTypen, pt)
+            ARRAY_PUSH(pRef, IIF(zugewiesen, 1, 0))
+        NEXT
+    END IF
+    ' Kopfzeile und Aufruf bauen.
+    DIM kopf AS STRING : kopf = "SUB " + name + "("
+    DIM ruf AS STRING : ruf = name + "("
+    FOR i = 0 TO LEN(pNamen) - 1
+        IF i > 0 THEN kopf = kopf + ", " : ruf = ruf + ", "
+        IF pRef[i] = 1 THEN kopf = kopf + "BYREF "
+        kopf = kopf + pNamen[i] + " AS " + pTypen[i]
+        ruf = ruf + pNamen[i]
+    NEXT
+    kopf = kopf + ")"
+    ruf = ruf + ")"
+    ' Die Zeilen um ihre gemeinsame Einrueckung nach links, dann vier nach
+    ' rechts: im neuen SUB fangen sie wieder bei null an.
+    DIM tiefe AS INTEGER : tiefe = -1
+    DIM bz2 AS STRING
+    FOR EACH bz2 IN block
+        IF TRIM$(bz2) = "" THEN CONTINUE
+        DIM e AS INTEGER : e = LEN(bz2) - LEN(LTRIM$(bz2))
+        IF tiefe < 0 OR e < tiefe THEN tiefe = e
+    NEXT
+    IF tiefe < 0 THEN tiefe = 0
+    DIM neuSub AS ARRAY OF STRING : neuSub = []
+    ARRAY_PUSH(neuSub, kopf)
+    FOR EACH bz2 IN block
+        IF TRIM$(bz2) = "" THEN
+            ARRAY_PUSH(neuSub, "")
+        ELSE
+            ARRAY_PUSH(neuSub, "    " + MID$(bz2, tiefe))
+        END IF
+    NEXT
+    ARRAY_PUSH(neuSub, "END SUB")
+    ' Der neue Text am Stueck: an der Stelle der Auswahl der Aufruf, am Ende
+    ' das Unterprogramm. Nicht zwei Aenderungen hintereinander im Feld --
+    ' die Vorschau will EINEN Text zum Vergleichen, und ein Strg+Z nimmt ihn
+    ' dann auch in einem Zug zurueck (frueher brauchte es zwei).
+    DIM neuZeilen AS ARRAY OF STRING : neuZeilen = []
+    DIM zi AS INTEGER
+    FOR zi = 1 TO LEN(zeilen)
+        IF zi = z1 THEN ARRAY_PUSH(neuZeilen, LEFT$(block[0], tiefe) + ruf)
+        IF zi >= z1 AND zi <= z2 THEN CONTINUE
+        ARRAY_PUSH(neuZeilen, zeilen[zi - 1])
+    NEXT
+    ARRAY_PUSH(neuZeilen, "")
+    DIM sz AS STRING
+    FOR EACH sz IN neuSub
+        ARRAY_PUSH(neuZeilen, sz)
+    NEXT
+    DIM neuText AS STRING : neuText = JOIN$(neuZeilen, NL)
+    ' Die Probe: eine unausgewogene Auswahl (das FOR drin, das NEXT nicht)
+    ' ergibt Code, der nicht mehr uebersetzt. Das soll dastehen, statt dass
+    ' man es beim naechsten Starten sucht.
+    DIM vorher AS INTEGER : vorher = fehlerZahl(quelle)
+    DIM nachher AS INTEGER : nachher = fehlerZahl(neuText)
+    DIM sagen AS STRING
+    sagen = STR$(LEN(block)) + " Zeilen -> SUB " + name + " mit " + _
+            STR$(LEN(pNamen)) + " Parameter(n). Strg+Z nimmt es zurück."
+    IF nachher > vorher THEN
+        sagen = "Achtung: " + STR$(nachher - vorher) + " Fehler mehr als vorher -- " + _
+                "war die Auswahl ausgewogen? Strg+Z nimmt es zurück."
+    END IF
+    umbauLeeren()
+    umbauVormerken(aktiverTab, reiter[aktiverTab].pfad, neuText)
+    umbauZeile = z1 : umbauSpalte = 1
+    umbauStarten("Herauslösen nach SUB " + name, sagen, _
+                 "herausgeloest " + name + " " + STR$(LEN(pNamen)) + " " + STR$(nachher - vorher))
+END SUB
+
+' --- Die Parameter eines Unterprogramms umsortieren -------------------
+' Der zweite Umbau, der mehr ist als ein Umbenennen -- und der erste, der
+' die AUFRUFE mitziehen muss: die Reihenfolge der Argumente ist die
+' Bedeutung, ein vergessener Aufruf uebergibt stumm das Falsche.
+'
+' Gearbeitet wird auf dem GANZEN Text, nicht Zeile fuer Zeile: ein Aufruf
+' darf ueber mehrere Zeilen gehen (`_` am Ende), und die Argumente werden
+' als Textstuecke VERTAUSCHT -- was zwischen ihnen steht, bleibt stehen.
+'
+' Die Definition selbst braucht keinen Sonderfall: `SUB name(` sieht fuer
+' den Sucher aus wie ein Aufruf, und ihre "Argumente" sind die Parameter.
+
+' Leerzeichen und Tabulatoren an den Enden weg -- ZEILENUMBRUECHE aber
+' nicht. Ein Argument darf ueber mehrere Zeilen gehen, und dann steht vor
+' dem Umbruch ein `_`; naehme man den Umbruch weg, stuende der
+' Fortsetzungsstrich mitten in der Zeile und die Datei uebersetzte nicht
+' mehr. TRIM$ kann das nicht, es nimmt jeden Leerraum.
+FUNCTION randWeg$(s AS STRING) AS STRING
+    DIM a AS INTEGER : a = 0
+    DIM b AS INTEGER : b = LEN(s)
+    WHILE a < b AND (MID$(s, a, 1) = " " OR MID$(s, a, 1) = CHR$(9))
+        a = a + 1
+    WEND
+    WHILE b > a AND (MID$(s, b - 1, 1) = " " OR MID$(s, b - 1, 1) = CHR$(9))
+        b = b - 1
+    WEND
+    RETURN MID$(s, a, b - a)
+END FUNCTION
+
+' Steht an `i` (0-basiert) das Wort `wort`, und zwar als ganzes Wort?
+FUNCTION wortAn(text AS STRING, i AS INTEGER, wort AS STRING) AS BOOLEAN
+    IF MID$(text, i, LEN(wort)) <> wort THEN RETURN FALSE
+    IF i > 0 AND istWortzeichen(MID$(text, i - 1, 1)) THEN RETURN FALSE
+    IF istWortzeichen(MID$(text, i + LEN(wort), 1)) THEN RETURN FALSE
+    RETURN TRUE
+END FUNCTION
+
+' Die Argumente eines Aufrufs, dessen `(` an `auf` steht: je Argument
+' Anfang und Ende (0-basiert, Ende ausschliesslich) in `von`/`bis`.
+' Liefert die Stelle der schliessenden Klammer, oder -1, wenn sie fehlt.
+'
+' Zeichenketten und Kommentare werden uebersprungen -- ein Komma in
+' `PRINT "a, b"` ist keine Argumentgrenze.
+FUNCTION argsZerlegen(text AS STRING, auf AS INTEGER, von AS ARRAY OF INTEGER, _
+                      bis AS ARRAY OF INTEGER) AS INTEGER
+    DIM tiefe AS INTEGER : tiefe = 1
+    DIM start AS INTEGER : start = auf + 1
+    DIM i AS INTEGER : i = auf + 1
+    DIM leer AS BOOLEAN : leer = TRUE          ' bisher nur Leerraum gesehen
+    WHILE i < LEN(text)
+        DIM c AS STRING : c = MID$(text, i, 1)
+        IF c = CHR$(34) THEN
+            DIM esc AS BOOLEAN : esc = i > 0 AND MID$(text, i - 1, 1) = "!"
+            i = i + 1
+            WHILE i < LEN(text) AND MID$(text, i, 1) <> CHR$(34)
+                IF esc AND MID$(text, i, 1) = "\" THEN i = i + 1
+                i = i + 1
+            WEND
+            leer = FALSE
+        ELSEIF c = "'" THEN
+            WHILE i < LEN(text) AND MID$(text, i, 1) <> NL
+                i = i + 1
+            WEND
+            CONTINUE
+        ELSEIF c = "(" OR c = "[" OR c = "{" THEN
+            tiefe = tiefe + 1 : leer = FALSE
+        ELSEIF c = ")" OR c = "]" OR c = "}" THEN
+            tiefe = tiefe - 1
+            IF tiefe = 0 THEN
+                IF NOT leer THEN
+                    ARRAY_PUSH(von, start) : ARRAY_PUSH(bis, i)
+                END IF
+                RETURN i
+            END IF
+            leer = FALSE
+        ELSEIF c = "," AND tiefe = 1 THEN
+            ARRAY_PUSH(von, start) : ARRAY_PUSH(bis, i)
+            start = i + 1
+            leer = TRUE
+        ELSEIF c <> " " AND c <> CHR$(9) AND c <> NL AND c <> "_" THEN
+            leer = FALSE
+        END IF
+        i = i + 1
+    WEND
+    RETURN -1
+END FUNCTION
+
+' Der Name des Unterprogramms, dessen Parameter gemeint sind, und die
+' Stelle seiner oeffnenden Klammer. Erst das Wort unter der Marke (so geht
+' es auch von einem Aufruf aus), sonst das Unterprogramm um die Marke.
+DIM paramName AS STRING : paramName = ""
+DIM paramArgs AS ARRAY OF STRING : paramArgs = []
+' Ein Platz der neuen Parameterliste: das alte Argument Nummer `alt`, oder
+' (alt = -1) ein NEUER Parameter mit Deklaration fuer die Definition und
+' Wert fuer jede Aufrufstelle -- `hp AS INTEGER = 0` und `0`. Bis
+' 2026-10-30 eine Zahlenliste, in der eine negative Zahl auf ein zweites
+' Feldpaar zeigte.
+CLASS ParamPlatz
+    DIM alt AS INTEGER
+    DIM decl AS STRING
+    DIM wert AS STRING
+    SUB Init(a AS INTEGER, d AS STRING, w AS STRING)
+        alt = a : decl = d : wert = w
+    END SUB
+    FUNCTION istNeu() AS BOOLEAN
+        RETURN alt < 0
+    END FUNCTION
+END CLASS
+DIM paramPlaetze AS ARRAY OF ParamPlatz : paramPlaetze = []
+
+FUNCTION defStelle(quelle AS STRING, name AS STRING) AS INTEGER
+    IF name = "" THEN RETURN -1
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(quelle, NL)
+    DIM pos AS INTEGER : pos = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(zeilen) - 1
+        DIM t AS STRING : t = UPPER$(TRIM$(zeilen[i]))
+        DIM kopf AS BOOLEAN : kopf = LEFT$(t, 4) = "SUB " OR LEFT$(t, 9) = "FUNCTION "
+        IF kopf THEN
+            DIM s AS INTEGER : s = INSTR(zeilen[i], name)
+            WHILE s >= 0
+                IF wortAn(zeilen[i], s, name) AND INSTR(MID$(zeilen[i], s + LEN(name)), "(") = 0 THEN
+                    RETURN pos + s + LEN(name)
+                END IF
+                s = INSTR(zeilen[i], name, s + 1)
+            WEND
+        END IF
+        pos = pos + LEN(zeilen[i]) + 1
+    NEXT
+    RETURN -1
+END FUNCTION
+
+SUB parameterFragen()
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN
+    DIM quelle AS STRING : quelle = GUI_TEXT(ta)
+    DIM name AS STRING : name = wortUnterMarke$()
+    DIM auf AS INTEGER : auf = defStelle(quelle, name)
+    DIM z AS INTEGER
+    DIM sp AS INTEGER
+    (z, sp) = GUI_TEXTAREA_CURSOR(ta)
+    IF auf < 0 THEN
+        ' Steht die Marke IN der Argumentliste, ist der Aufruf gemeint --
+        ' dieselbe Frage, die auch die Signaturhilfe stellt. Gerade bei einer
+        ' Methode steht man oft mitten in den Klammern.
+        DIM zeilenM AS ARRAY OF STRING : zeilenM = SPLIT$(quelle, NL)
+        IF z >= 1 AND z <= LEN(zeilenM) THEN
+            DIM rufName AS STRING
+            DIM rufSp AS INTEGER
+            DIM rufArg AS INTEGER
+            (rufName, rufSp, rufArg) = aufrufUmDieMarke(zeilenM[z - 1], sp)
+            IF rufName <> "" THEN
+                name = rufName
+                auf = defStelle(quelle, name)
+            END IF
+        END IF
+    END IF
+    IF auf < 0 THEN
+        ' Immer noch nichts: dann das Unterprogramm, in dem die Marke steht.
+        DIM uv AS INTEGER
+        DIM ub AS INTEGER
+        (uv, ub) = umgebendesUnterprogramm(quelle, z)
+        IF uv > 0 THEN
+            DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(quelle, NL)
+            DIM t AS STRING : t = TRIM$(zeilen[uv - 1])
+            DIM ab AS INTEGER : ab = IIF(LEFT$(UPPER$(t), 4) = "SUB ", 4, 9)
+            DIM rest AS STRING : rest = TRIM$(MID$(t, ab))
+            DIM kl AS INTEGER : kl = INSTR(rest, "(")
+            IF kl > 0 THEN
+                name = TRIM$(LEFT$(rest, kl))
+                auf = defStelle(quelle, name)
+            END IF
+        END IF
+    END IF
+    IF auf < 0 THEN
+        GUI_SET_TEXT(lblStatus, tr$("Parameter umsortieren: erst auf ein SUB oder eine FUNCTION stellen."))
+        protokoll("parameter 0")
+        RETURN
+    END IF
+    DIM pvon AS ARRAY OF INTEGER : pvon = []
+    DIM pbis AS ARRAY OF INTEGER : pbis = []
+    ' Auch ohne Parameter aufmachen: mit [+ Parameter] ist das der Weg, dem
+    ' Unterprogramm seinen ersten zu geben.
+    IF argsZerlegen(quelle, auf, pvon, pbis) < 0 THEN
+        GUI_SET_TEXT(lblStatus, tr$("Parameter: bei '") + name + tr$("' fehlt die schließende Klammer."))
+        protokoll("parameter 0")
+        RETURN
+    END IF
+    paramName = name
+    paramArgs = [] : paramPlaetze = []
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(pvon) - 1
+        DIM stueck AS STRING : stueck = TRIM$(MID$(quelle, pvon[k], pbis[k] - pvon[k]))
+        ARRAY_PUSH(paramArgs, stueck)
+        ARRAY_PUSH(paramPlaetze, NEW ParamPlatz(k, "", ""))
+    NEXT
+    parameterListe()
+    GUI_LISTBOX_SET_SELECTED(lstParam, 0)
+    ' Immer an dieselbe Stelle: ein Fenster, das dort aufgeht, wo man es
+    ' zuletzt hingeschoben hat, sucht man beim naechsten Mal.
+    GUI_WINDOW_SET_BOUNDS(winParam, 420, 200, 460, 320)
+    GUI_WINDOW_TITLE(winParam, tr$("Parameter von ") + name)
+    GUI_WINDOW_VISIBLE(winParam, TRUE)
+    GUI_FOCUS(lstParam)
+    protokoll("parameter " + STR$(LEN(paramArgs)))
+END SUB
+
+SUB parameterSchieben(richtung AS INTEGER)
+    DIM sel AS INTEGER : sel = GUI_LISTBOX_SELECTED(lstParam)
+    DIM ziel AS INTEGER : ziel = sel + richtung
+    IF sel < 0 OR ziel < 0 OR ziel >= LEN(paramPlaetze) THEN RETURN
+    DIM h AS ParamPlatz : h = paramPlaetze[sel]
+    paramPlaetze[sel] = paramPlaetze[ziel] : paramPlaetze[ziel] = h
+    parameterListe()
+    GUI_LISTBOX_SET_SELECTED(lstParam, ziel)
+END SUB
+
+' Alle Stellen, an denen `name` als AUFRUF steht (Name, dann `(`) --
+' geliefert werden die 0-basierten Stellen der oeffnenden Klammer.
+' Zeichenketten und Kommentare bleiben aussen vor.
+SUB aufrufStellen(quelle AS STRING, name AS STRING, stellen AS ARRAY OF INTEGER)
+    DIM i AS INTEGER : i = 0
+    WHILE i < LEN(quelle)
+        DIM c AS STRING : c = MID$(quelle, i, 1)
+        IF c = CHR$(34) THEN
+            i = i + 1
+            WHILE i < LEN(quelle) AND MID$(quelle, i, 1) <> CHR$(34)
+                i = i + 1
+            WEND
+        ELSEIF c = "'" THEN
+            WHILE i < LEN(quelle) AND MID$(quelle, i, 1) <> NL
+                i = i + 1
+            WEND
+        ELSEIF wortAn(quelle, i, name) THEN
+            DIM j AS INTEGER : j = i + LEN(name)
+            WHILE j < LEN(quelle) AND MID$(quelle, j, 1) = " "
+                j = j + 1
+            WEND
+            IF MID$(quelle, j, 1) = "(" THEN ARRAY_PUSH(stellen, j)
+            i = j - 1
+        END IF
+        i = i + 1
+    WEND
+END SUB
+
+' Die Argumente aller Aufrufe von `name` in `quelle` umbauen.
+'
+' `folge` sagt, woraus die neue Liste besteht: eine Zahl >= 0 ist die
+' Nummer des alten Arguments, eine negative steht fuer einen NEUEN
+' Parameter -- `-1` meint `neuDecl[0]`/`neuWert[0]`, `-2` den naechsten.
+' Zwei Texte je neuem Parameter, weil die DEFINITION eine Deklaration
+' braucht (`hp AS INTEGER = 0`) und der Aufruf einen Wert (`0`).
+'
+' `alteZahl` ist die Zahl der Parameter VORHER: nur Aufrufe mit genau so
+' vielen Argumenten werden angefasst.
+' `zaehler` kommt gefuellt zurueck: [0] geaenderte Stellen, [1] uebergangene.
+FUNCTION parameterInText$(quelle AS STRING, name AS STRING, plaetze AS ARRAY OF ParamPlatz, _
+                          alteZahl AS INTEGER, zaehler AS ARRAY OF INTEGER) AS STRING
+    DIM neu AS STRING : neu = quelle
+    DIM stellen AS ARRAY OF INTEGER : stellen = []
+    aufrufStellen(quelle, name, stellen)
+    ' Die Definition ist fuer den Sucher ein Aufruf wie jeder andere -- nur
+    ' bekommt sie die Deklarationen statt der Werte.
+    DIM defAuf AS INTEGER : defAuf = defStelle(quelle, name)
+    DIM geaendert AS INTEGER : geaendert = 0
+    DIM uebergangen AS INTEGER : uebergangen = 0
+    DIM k AS INTEGER
+    DIM s AS INTEGER
+    ' Von HINTEN nach vorn ersetzen: dann bleiben die Stellen davor gueltig.
+    FOR s = LEN(stellen) - 1 TO 0 STEP -1
+        DIM avon AS ARRAY OF INTEGER : avon = []
+        DIM abis AS ARRAY OF INTEGER : abis = []
+        DIM zu AS INTEGER : zu = argsZerlegen(quelle, stellen[s], avon, abis)
+        ' Nur Aufrufe mit genau so vielen Argumenten: wer einen Vorgabewert
+        ' weglaesst oder mit Namen uebergibt (`x: 1`), meint eine andere
+        ' Zuordnung -- die still umzustellen waere schlimmer als es zu lassen.
+        IF zu < 0 OR LEN(avon) <> alteZahl THEN
+            IF zu >= 0 AND LEN(avon) > 0 THEN uebergangen = uebergangen + 1
+            CONTINUE
+        END IF
+        DIM benannt AS BOOLEAN : benannt = FALSE
+        DIM stuecke AS ARRAY OF STRING : stuecke = []
+        FOR k = 0 TO LEN(avon) - 1
+            DIM roh AS STRING : roh = MID$(quelle, avon[k], abis[k] - avon[k])
+            IF INSTR(roh, ":") >= 0 THEN benannt = TRUE
+            ARRAY_PUSH(stuecke, roh)
+        NEXT
+        IF benannt THEN
+            uebergangen = uebergangen + 1
+            CONTINUE
+        END IF
+        DIM istDef AS BOOLEAN : istDef = stellen[s] = defAuf
+        DIM neuArgs AS ARRAY OF STRING : neuArgs = []
+        FOR k = 0 TO LEN(plaetze) - 1
+            IF plaetze[k].istNeu() THEN
+                ARRAY_PUSH(neuArgs, IIF(istDef, plaetze[k].decl, plaetze[k].wert))
+            ELSE
+                ARRAY_PUSH(neuArgs, randWeg$(stuecke[plaetze[k].alt]))
+            END IF
+        NEXT
+        neu = LEFT$(neu, avon[0]) + JOIN$(neuArgs, ", ") + MID$(neu, abis[LEN(abis) - 1])
+        geaendert = geaendert + 1
+    NEXT
+    ARRAY_PUSH(zaehler, geaendert)
+    ARRAY_PUSH(zaehler, uebergangen)
+    RETURN neu
+END FUNCTION
+
+' Hat ein ANDERER Reiter als `ausser` ungesicherte Aenderungen?
+FUNCTION andererUngesichert(ausser AS INTEGER) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO tabAnzahl - 1
+        IF i <> ausser AND reiter[i].pfad <> "" AND reiter[i].geaendert() THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+' Die Liste im Fenster neu aus `paramPlaetze` aufbauen.
+SUB parameterListe()
+    GUI_LISTBOX_CLEAR(lstParam)
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(paramPlaetze) - 1
+        IF paramPlaetze[k].istNeu() THEN
+            GUI_LISTBOX_ADD(lstParam, paramPlaetze[k].decl + "   [neu]")
+        ELSE
+            GUI_LISTBOX_ADD(lstParam, paramArgs[paramPlaetze[k].alt])
+        END IF
+    NEXT
+    GUI_SET_TEXT(lblParam, STR$(LEN(paramPlaetze)) + tr$(" Parameter (vorher ") + _
+                 STR$(LEN(paramArgs)) + ") -- die Aufrufe ziehen mit.")
+END SUB
+
+' Einen neuen Parameter aufnehmen. `text` ist eine Deklaration mit Wert,
+' also `hp AS INTEGER = 0`: die Definition bekommt sie ganz, jede
+' Aufrufstelle nur den Teil hinter dem Gleichheitszeichen.
+SUB parameterNeu(text AS STRING)
+    DIM t AS STRING : t = TRIM$(text)
+    DIM gl AS INTEGER : gl = INSTR(t, "=")
+    IF t = "" OR gl < 0 OR TRIM$(MID$(t, gl + 1)) = "" THEN
+        GUI_SET_TEXT(lblStatus, tr$("Neuer Parameter: bitte in der Form 'hp AS INTEGER = 0' -- ") + _
+                     "der Wert hinter dem = kommt an jede Aufrufstelle.")
+        RETURN
+    END IF
+    ARRAY_PUSH(paramPlaetze, NEW ParamPlatz(-1, t, TRIM$(MID$(t, gl + 1))))
+    parameterListe()
+    GUI_LISTBOX_SET_SELECTED(lstParam, LEN(paramPlaetze) - 1)
+    GUI_FOCUS(lstParam)
+    protokoll("parameter neu " + t)
+END SUB
+
+SUB parameterWeg()
+    DIM sel AS INTEGER : sel = GUI_LISTBOX_SELECTED(lstParam)
+    IF sel < 0 OR sel >= LEN(paramPlaetze) THEN RETURN
+    IF LEN(paramPlaetze) <= 1 THEN
+        GUI_SET_TEXT(lblStatus, tr$("Der letzte Parameter bleibt -- ein Unterprogramm ganz ohne ") + _
+                     "Klammerinhalt wäre ein anderer Umbau.")
+        RETURN
+    END IF
+    ARRAY_REMOVE_AT(paramPlaetze, sel)
+    parameterListe()
+    GUI_LISTBOX_SET_SELECTED(lstParam, MIN(sel, LEN(paramPlaetze) - 1))
+    GUI_FOCUS(lstParam)
+    protokoll("parameter weg " + STR$(sel))
+END SUB
+
+SUB parameterUebernehmen()
+    GUI_WINDOW_VISIBLE(winParam, FALSE)
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 OR paramName = "" THEN RETURN
+    DIM gleich AS BOOLEAN : gleich = LEN(paramPlaetze) = LEN(paramArgs)
+    DIM k AS INTEGER
+    IF gleich THEN
+        FOR k = 0 TO LEN(paramPlaetze) - 1
+            IF paramPlaetze[k].alt <> k THEN gleich = FALSE
+        NEXT
+    END IF
+    IF gleich THEN
+        GUI_SET_TEXT(lblStatus, tr$("Parameter umsortieren: nichts geändert."))
+        GUI_FOCUS(ta)
+        RETURN
+    END IF
+    ' Ein Unterprogramm wird selten nur in seiner eigenen Datei gerufen --
+    ' der Umbau geht darum durch ALLE .dh des Projektordners. Dort steht
+    ' aber nur, was gesichert ist.
+    IF andererUngesichert(aktiverTab) THEN
+        GUI_SET_TEXT(lblStatus, tr$("Erst sichern: ein anderer Reiter hat ungesicherte Änderungen."))
+        protokoll("parameter umgestellt -1 0")
+        GUI_FOCUS(ta)
+        RETURN
+    END IF
+    umbauLeeren()
+    ' Die Marke bleibt, wo sie war -- ein Umbau ueber die ganze Datei setzt
+    ' sie sonst ans ENDE, und der naechste Griff traefe nichts mehr.
+    DIM mz AS INTEGER
+    DIM ms AS INTEGER
+    (mz, ms) = GUI_TEXTAREA_CURSOR(ta)
+    umbauZeile = mz : umbauSpalte = ms
+    DIM alteZahl AS INTEGER : alteZahl = LEN(paramArgs)
+    DIM zaehler AS ARRAY OF INTEGER : zaehler = []
+    DIM neu AS STRING
+    neu = parameterInText$(GUI_TEXT(ta), paramName, paramPlaetze, alteZahl, zaehler)
+    DIM geaendert AS INTEGER : geaendert = zaehler[0]
+    DIM uebergangen AS INTEGER : uebergangen = zaehler[1]
+    umbauVormerken(aktiverTab, reiter[aktiverTab].pfad, neu)
+    ' Die uebrigen Dateien sammelt der Schritt-Laeufer (ESC bricht ab) --
+    ' bei vierhundert Dateien steht die IDE sonst lange genug, dass man sie
+    ' fuer haengend haelt. Die Zaehler dieser Datei gehen als Startwert mit.
+    laufZahl = alteZahl
+    laufStarten("parameter", paramName, "")
+    laufGeaendert = geaendert
+    laufUebergangen = uebergangen
+    GUI_FOCUS(ta)
+END SUB
+
+' --- Ein Unterprogramm in eine andere Datei verschieben ---------------
+' Der Umbau ueber DATEIgrenzen: die Zeilen wandern, und die Aufrufer
+' bekommen den IMPORT dazu, den sie dafuer brauchen. In Drachenhauch
+' fuegt `IMPORT "datei.dh"` den Text ein -- wer das Unterprogramm ruft,
+' muss die Datei also nennen, in der es jetzt steht. Ohne diesen Teil
+' waere das Verschieben ein Umbau, der die Uebersetzung kaputt macht.
+DIM verschName AS STRING : verschName = ""
+DIM verschVon AS INTEGER : verschVon = 0
+DIM verschBis AS INTEGER : verschBis = 0
+
+' Nennt `quelle` die Datei `datei` schon in einem IMPORT?
+FUNCTION importiert(quelle AS STRING, datei AS STRING) AS BOOLEAN
+    DIM klein AS STRING : klein = LOWER$(datei)
+    DIM zl AS STRING
+    FOR EACH zl IN SPLIT$(quelle, NL)
+        DIM t AS STRING : t = LOWER$(TRIM$(zl))
+        IF LEFT$(t, 7) <> "import " THEN CONTINUE
+        IF INSTR(t, klein) >= 0 THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+' Einen IMPORT einsetzen: hinter den letzten vorhandenen, sonst vor die
+' erste Zeile, die kein Kommentar und nicht leer ist. Ganz oben waere
+' falsch -- dort steht bei fast jeder Datei der Kopfkommentar.
+FUNCTION mitImport$(quelle AS STRING, datei AS STRING) AS STRING
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(quelle, NL)
+    DIM letzterImport AS INTEGER : letzterImport = -1
+    DIM ersteEchte AS INTEGER : ersteEchte = -1
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(zeilen) - 1
+        DIM t AS STRING : t = TRIM$(zeilen[i])
+        IF LEFT$(LOWER$(t), 7) = "import " THEN letzterImport = i
+        IF ersteEchte < 0 AND t <> "" AND LEFT$(t, 1) <> "'" THEN ersteEchte = i
+    NEXT
+    DIM wo AS INTEGER : wo = letzterImport + 1
+    IF letzterImport < 0 THEN wo = MAX(ersteEchte, 0)
+    ARRAY_INSERT(zeilen, wo, "IMPORT " + CHR$(34) + datei + CHR$(34))
+    RETURN JOIN$(zeilen, NL)
+END FUNCTION
+
+' Die CLASS, in der `zeile` steht: (name, von, bis) -- ("", 0, 0), wenn
+' keine. Eine Methode allein laesst sich nicht verschieben; ihre KLASSE
+' sehr wohl, und die ist dann gemeint.
+FUNCTION klasseUm(quelle AS STRING, zeile AS INTEGER) AS TUPLE
+    DIM j AS JSON_HANDLE : j = JSON_PARSE(CODE_SYMBOLS$(quelle))
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(j, "") - 1
+        DIM p AS STRING : p = STR$(i)
+        IF LOWER$(JSON_GET_STRING(j, p + ".art")) <> "class" THEN CONTINUE
+        DIM v AS INTEGER : v = JSON_GET_INT(j, p + ".von")
+        DIM b AS INTEGER : b = JSON_GET_INT(j, p + ".bis")
+        IF v <= zeile AND zeile <= b THEN RETURN (JSON_GET_STRING(j, p + ".name"), v, b)
+    NEXT
+    RETURN ("", 0, 0)
+END FUNCTION
+
+' Kommt `name` in der Zeile als ganzes Wort vor, ausserhalb von Kommentar
+' und Zeichenkette?
+'
+' Fuer die IMPORT-Frage ist das die richtige: eine Klasse wird nicht nur
+' mit `NEW Tier(` benutzt, sondern auch als `DIM t AS Tier` -- und ein
+' Unterprogramm kann als FUNCREF ohne Klammern dastehen.
+FUNCTION benutztWort(zeile AS STRING, name AS STRING) AS BOOLEAN
+    DIM i AS INTEGER : i = 0
+    WHILE i < LEN(zeile)
+        DIM c AS STRING : c = MID$(zeile, i, 1)
+        IF c = CHR$(34) THEN
+            i = i + 1
+            WHILE i < LEN(zeile) AND MID$(zeile, i, 1) <> CHR$(34)
+                i = i + 1
+            WEND
+        ELSEIF c = "'" THEN
+            RETURN FALSE
+        ELSEIF wortAn(zeile, i, name) THEN
+            RETURN TRUE
+        END IF
+        i = i + 1
+    WEND
+    RETURN FALSE
+END FUNCTION
+
+' Der Name, den eine CONST- oder DIM-Zeile auf oberster Ebene anlegt --
+' "" wenn die Zeile keine ist. Eine Zeile in einem Unterprogramm zaehlt
+' nicht: die ist dort lokal und woanders sinnlos.
+FUNCTION einzelzeileName$(quelle AS STRING, zeile AS INTEGER) AS STRING
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(quelle, NL)
+    IF zeile < 1 OR zeile > LEN(zeilen) THEN RETURN ""
+    DIM t AS STRING : t = TRIM$(zeilen[zeile - 1])
+    DIM gross AS STRING : gross = UPPER$(t)
+    DIM ab AS INTEGER : ab = -1
+    IF LEFT$(gross, 6) = "CONST " THEN ab = 6
+    IF LEFT$(gross, 4) = "DIM " THEN ab = 4
+    IF ab < 0 THEN RETURN ""
+    DIM rest AS STRING : rest = TRIM$(MID$(t, ab))
+    ' Der Name endet am ersten Zeichen, das keines mehr ist.
+    DIM i AS INTEGER : i = 0
+    WHILE i < LEN(rest) AND istWortzeichen(MID$(rest, i, 1))
+        i = i + 1
+    WEND
+    RETURN LEFT$(rest, i)
+END FUNCTION
+
+' Hat `quelle` ein Symbol namens `name`? Geliefert wird "SUB gruessen"
+' oder "", damit die Meldung sagen kann, WAS dort steht.
+FUNCTION symbolInDatei$(quelle AS STRING, name AS STRING) AS STRING
+    IF quelle = "" OR name = "" THEN RETURN ""
+    DIM klein AS STRING : klein = LOWER$(name)
+    DIM j AS JSON_HANDLE : j = JSON_PARSE(CODE_SYMBOLS$(quelle))
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(j, "") - 1
+        DIM p AS STRING : p = STR$(i)
+        IF LOWER$(JSON_GET_STRING(j, p + ".name")) = klein THEN
+            RETURN JSON_GET_STRING(j, p + ".art") + " " + JSON_GET_STRING(j, p + ".name")
+        END IF
+        DIM m AS INTEGER
+        FOR m = 0 TO JSON_LEN(j, p + ".kinder") - 1
+            DIM pk AS STRING : pk = p + ".kinder." + STR$(m)
+            IF LOWER$(JSON_GET_STRING(j, pk + ".name")) = klein THEN
+                RETURN JSON_GET_STRING(j, pk + ".name") + " (in " + _
+                       JSON_GET_STRING(j, p + ".name") + ")"
+            END IF
+        NEXT
+    NEXT
+    RETURN ""
+END FUNCTION
+
+SUB verschiebenFragen()
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 OR reiter[aktiverTab].pfad = "" THEN
+        GUI_SET_TEXT(lblStatus, tr$("Verschieben: diese Datei ist noch nicht gesichert."))
+        protokoll("verschieben 0")
+        RETURN
+    END IF
+    DIM quelle AS STRING : quelle = GUI_TEXT(ta)
+    DIM z AS INTEGER
+    DIM sp AS INTEGER
+    (z, sp) = GUI_TEXTAREA_CURSOR(ta)
+    ' Steht die Marke in einer KLASSE, ist die Klasse gemeint -- eine
+    ' Methode allein waere ohne sie kein Unterprogramm mehr.
+    DIM kName AS STRING
+    DIM kVon AS INTEGER
+    DIM kBis AS INTEGER
+    (kName, kVon, kBis) = klasseUm(quelle, z)
+    verschName = ""
+    DIM uv AS INTEGER
+    DIM ub AS INTEGER
+    IF kName <> "" THEN
+        verschName = kName : verschVon = kVon : verschBis = kBis
+    ELSE
+        (uv, ub) = umgebendesUnterprogramm(quelle, z)
+        ' Nicht IM Unterprogramm, aber auf seinem Namen? Dann ist es gemeint.
+        IF uv < 1 THEN
+            DIM wort AS STRING : wort = wortUnterMarke$()
+            DIM auf AS INTEGER : auf = defStelle(quelle, wort)
+            IF auf >= 0 THEN
+                DIM bis AS INTEGER : bis = 1 + LEN(SPLIT$(LEFT$(quelle, auf), NL)) - 1
+                (uv, ub) = umgebendesUnterprogramm(quelle, bis)
+            END IF
+        END IF
+        ' Auch eine CONST- oder DIM-Zeile ganz oben laesst sich verschieben:
+        ' die Einheit ist dann DIE ZEILE. Sie gehoert oft zu dem, was man
+        ' gerade woanders hinlegt, und von Hand kopiert man sie nach.
+        IF uv < 1 THEN
+            DIM eName AS STRING : eName = einzelzeileName$(quelle, z)
+            IF eName <> "" THEN
+                verschName = eName : verschVon = z : verschBis = z
+            END IF
+        END IF
+        IF uv < 1 AND verschName = "" THEN
+            GUI_SET_TEXT(lblStatus, tr$("Verschieben: erst in ein SUB, eine FUNCTION, eine CLASS ") + _
+                         "oder auf eine CONST-/DIM-Zeile stellen.")
+            protokoll("verschieben 0")
+            RETURN
+        END IF
+        IF uv >= 1 THEN
+            verschName = unterprogrammName$(quelle, uv)
+            verschVon = uv
+            verschBis = ub
+            IF verschName = "" THEN
+                GUI_SET_TEXT(lblStatus, tr$("Verschieben: hier steht kein Unterprogramm mit Namen."))
+                protokoll("verschieben 0")
+                RETURN
+            END IF
+        END IF
+    END IF
+    ' Die Zieldatei waehlen -- alle .dh des Projekts ausser dieser, und
+    ' ganz oben eine neue. Ohne die waere der erste Umzug in eine frische
+    ' Datei ein Umweg ueber Datei/Neu und Sichern.
+    waehlerListe = []
+    waehlerDazu("(neue Datei ...)", "*neu*", "")
+    DIM d AS STRING
+    FOR EACH d IN projektDateien("*.dh")
+        DIM pfad AS STRING : pfad = PATHJOIN(projektOrdner, d)
+        IF gleicherWeg(pfad, reiter[aktiverTab].pfad) THEN CONTINUE
+        waehlerDazu(d, pfad, "")
+    NEXT
+    waehlerOeffnen("verschieben", verschName + tr$(" verschieben nach ..."))
+END SUB
+
+SUB verschiebenNach(ziel AS STRING)
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 OR verschName = "" THEN RETURN
+    IF andererUngesichert(aktiverTab) THEN
+        GUI_SET_TEXT(lblStatus, tr$("Erst sichern: ein anderer Reiter hat ungesicherte Änderungen."))
+        protokoll("verschieben -1")
+        RETURN
+    END IF
+    DIM quelle AS STRING : quelle = GUI_TEXT(ta)
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(quelle, NL)
+    IF verschBis > LEN(zeilen) THEN RETURN
+    DIM block AS ARRAY OF STRING : block = zeilenHolen(zeilen, verschVon, verschBis)
+    ' Kommentarzeilen unmittelbar davor gehoeren dazu -- sie beschreiben
+    ' das Unterprogramm, und allein zurueckgelassen beschreiben sie nichts.
+    DIM kopf AS INTEGER : kopf = verschVon
+    WHILE kopf > 1 AND LEFT$(TRIM$(zeilen[kopf - 2]), 1) = "'"
+        kopf = kopf - 1
+    WEND
+    IF kopf < verschVon THEN block = zeilenHolen(zeilen, kopf, verschBis)
+    DIM zielName AS STRING : zielName = BASENAME(ziel)
+    DIM meinName AS STRING : meinName = BASENAME(reiter[aktiverTab].pfad)
+    umbauLeeren()
+    ' 1. Die Quelle: die Zeilen heraus, und wenn sie das Unterprogramm noch
+    '    ruft, den IMPORT der Zieldatei hinein.
+    DIM rest AS ARRAY OF STRING : rest = []
+    DIM i AS INTEGER
+    FOR i = 1 TO LEN(zeilen)
+        IF i >= kopf AND i <= verschBis THEN CONTINUE
+        ARRAY_PUSH(rest, zeilen[i - 1])
+    NEXT
+    DIM neuQuelle AS STRING : neuQuelle = JOIN$(rest, NL)
+    DIM ruftNoch AS BOOLEAN : ruftNoch = FALSE
+    DIM zl AS STRING
+    FOR EACH zl IN rest
+        IF benutztWort(zl, verschName) THEN ruftNoch = TRUE
+    NEXT
+    IF ruftNoch AND NOT importiert(neuQuelle, zielName) THEN
+        neuQuelle = mitImport$(neuQuelle, zielName)
+    END IF
+    umbauVormerken(aktiverTab, reiter[aktiverTab].pfad, neuQuelle)
+    ' 1b. Was der Block SELBST braucht: ruft er Unterprogramme, die in der
+    '     Quelle bleiben, muss die ZIELdatei die Quelle importieren. Sonst
+    '     wandert das Unterprogramm weg und findet seine Helfer nicht mehr.
+    DIM brauchtQuelle AS BOOLEAN : brauchtQuelle = FALSE
+    ' Die Namen, die in der Quelle BLEIBEN: Unterprogramme und Klassen
+    ' (CODE_SYMBOLS$) UND die Konstanten und globalen Variablen ganz oben --
+    ' die kennt CODE_SYMBOLS$ nicht, und `CONST MAXHP` ist genauso ein
+    ' Grund fuer den IMPORT wie ein Unterprogramm.
+    DIM bleibt AS ARRAY OF STRING : bleibt = []
+    DIM symVon AS ARRAY OF INTEGER : symVon = []
+    DIM symBis AS ARRAY OF INTEGER : symBis = []
+    DIM sym AS JSON_HANDLE : sym = JSON_PARSE(CODE_SYMBOLS$(neuQuelle))
+    DIM si AS INTEGER
+    FOR si = 0 TO JSON_LEN(sym, "") - 1
+        DIM sp AS STRING : sp = STR$(si)
+        ARRAY_PUSH(bleibt, JSON_GET_STRING(sym, sp + ".name"))
+        ARRAY_PUSH(symVon, JSON_GET_INT(sym, sp + ".von"))
+        ARRAY_PUSH(symBis, JSON_GET_INT(sym, sp + ".bis"))
+    NEXT
+    ' Nur Zeilen auf OBERSTER Ebene: ein `DIM i` in einem Unterprogramm ist
+    ' dort lokal und kein Grund fuer irgendeinen IMPORT.
+    DIM restZ AS INTEGER
+    FOR restZ = 1 TO LEN(rest)
+        DIM drin AS BOOLEAN : drin = FALSE
+        DIM sk AS INTEGER
+        FOR sk = 0 TO LEN(symVon) - 1
+            IF symVon[sk] <= restZ AND restZ <= symBis[sk] THEN drin = TRUE
+        NEXT
+        IF drin THEN CONTINUE
+        DIM eName AS STRING : eName = einzelzeileName$(neuQuelle, restZ)
+        IF eName <> "" THEN ARRAY_PUSH(bleibt, eName)
+    NEXT
+    DIM sname AS STRING
+    FOR EACH sname IN bleibt
+        IF sname = "" OR LOWER$(sname) = LOWER$(verschName) THEN CONTINUE
+        DIM bz AS STRING
+        FOR EACH bz IN block
+            IF benutztWort(bz, sname) THEN brauchtQuelle = TRUE
+        NEXT
+    NEXT
+    ' 2. Das Ziel: der Block ans Ende.
+    DIM zielText AS STRING : zielText = ""
+    TRY
+        zielText = JOIN$(READLINES(ziel), NL)
+    CATCH e
+        ' Eine neue Datei -- sie entsteht beim Uebernehmen.
+        zielText = "' " + BASENAME(ziel)
+    END TRY
+    DIM zielNeu AS STRING : zielNeu = zielText
+    IF TRIM$(zielNeu) <> "" THEN zielNeu = zielNeu + NL
+    zielNeu = zielNeu + NL + JOIN$(block, NL)
+    IF brauchtQuelle AND NOT importiert(zielNeu, meinName) THEN
+        zielNeu = mitImport$(zielNeu, meinName)
+    END IF
+    DIM zielTab AS INTEGER : zielTab = tabMitPfad(ziel)
+    umbauVormerken(zielTab, ziel, zielNeu)
+    ' Gibt es den Namen im ZIEL schon? Dann verdeckt einer den anderen --
+    ' und zwar ohne Uebersetzungsfehler, der zweite gewinnt einfach. Das
+    ' merkt man erst, wenn das Falsche laeuft.
+    DIM dort AS STRING : dort = symbolInDatei$(zielText, verschName)
+    IF dort <> "" THEN
+        umbauWarnung = "Achtung: " + zielName + " hat schon " + dort + _
+                       " -- danach stehen zwei gleichen Namens in einer Datei."
+    END IF
+    ' Die Probe wie beim Herausloesen: wird es dadurch schlimmer, soll das
+    ' dastehen, bevor jemand es beim naechsten Starten sucht.
+    DIM vorher AS INTEGER : vorher = fehlerZahl(quelle)
+    DIM nachher AS INTEGER : nachher = fehlerZahl(neuQuelle)
+    IF nachher > vorher THEN
+        umbauWarnung = "Achtung: " + STR$(nachher - vorher) + " Fehler mehr in " + meinName + _
+                       " -- benutzt das Unterprogramm etwas, das nur dort steht?"
+    END IF
+    ' 3. Alle anderen Dateien, die es rufen, brauchen den IMPORT auch --
+    '    gesammelt in Schritten (ESC bricht ab), wie bei den beiden anderen
+    '    projektweiten Umbauten. Der Rest der Meldung entsteht dort.
+    laufZiel = ziel
+    laufBlock = LEN(block)
+    laufStarten("verschieben", verschName, "")
+END SUB
+
+' --- Wer ruft das auf? (Umschalt+F12) ---------------------------------
+' Die Gegenrichtung zu "Zur Definition": alle Stellen, an denen das
+' Unterprogramm unter der Marke GERUFEN wird, ueber alle Dateien des
+' Projekts. Die Definition selbst steht nicht dabei -- sie ist kein Aufruf,
+' und wer sie sucht, hat F12.
+'
+' Als BAUM, nicht als Liste: unter jedem Aufruf stehen die Aufrufer des
+' Unterprogramms, in dem er steht. Wer wissen will, wie eine Funktion
+' ueberhaupt erreicht wird, sieht es damit in einem Bild statt in vier
+' Suchen.
+'
+' Gesucht wird ZEILENweise: in Drachenhauch enden Kommentar und
+' Zeichenkette an der Zeile, also ist eine Zeile fuer sich vollstaendig zu
+' lesen. Das spart die Umrechnung von Zeichenstelle zu Zeilennummer.
+FUNCTION aufrufInZeile(zeile AS STRING, name AS STRING) AS BOOLEAN
+    DIM t AS STRING : t = UPPER$(TRIM$(zeile))
+    IF LEFT$(t, 4) = "SUB " OR LEFT$(t, 9) = "FUNCTION " THEN RETURN FALSE
+    DIM i AS INTEGER : i = 0
+    WHILE i < LEN(zeile)
+        DIM c AS STRING : c = MID$(zeile, i, 1)
+        IF c = CHR$(34) THEN
+            i = i + 1
+            WHILE i < LEN(zeile) AND MID$(zeile, i, 1) <> CHR$(34)
+                i = i + 1
+            WEND
+        ELSEIF c = "'" THEN
+            RETURN FALSE
+        ELSEIF wortAn(zeile, i, name) THEN
+            DIM j AS INTEGER : j = i + LEN(name)
+            WHILE j < LEN(zeile) AND MID$(zeile, j, 1) = " "
+                j = j + 1
+            WEND
+            IF MID$(zeile, j, 1) = "(" THEN RETURN TRUE
+            ' Ohne Klammern ist es eine FUNCREF: der Name wird als WERT
+            ' weitergegeben (`GUI_ON_CLICK(knopf, malen)`, `f = malen`) und
+            ' spaeter gerufen. Wer wissen will, wie ein Unterprogramm
+            ' erreicht wird, muss genau diese Stelle sehen -- sie ist die
+            ' einzige, an der der Name ueberhaupt vorkommt.
+            IF nameAlsWert(zeile, i, name) THEN RETURN TRUE
+            i = j - 1
+        END IF
+        i = i + 1
+    WEND
+    RETURN FALSE
+END FUNCTION
+
+' Steht der Name an `i` als WERT da (FUNCREF), nicht als Aufruf?
+'
+' Ausgenommen ist, was ihn nur ERWAEHNT: die eigene Kopfzeile faengt der
+' Aufrufer ab, und nach einem Punkt steht ein Feldname (`held.malen` ohne
+' Klammern ist eine gebundene Methode -- die zaehlt, aber `x.malen` als
+' Feld nicht; das auseinanderzuhalten braucht Typen, die hier keiner hat).
+FUNCTION nameAlsWert(zeile AS STRING, i AS INTEGER, name AS STRING) AS BOOLEAN
+    IF i > 0 AND MID$(zeile, i - 1, 1) = "." THEN RETURN FALSE
+    ' Ein Wort, das nur in einer DIM-Zeile als TYP steht, ist keiner.
+    DIM t AS STRING : t = UPPER$(TRIM$(zeile))
+    IF LEFT$(t, 4) = "DIM " AND INSTR(t, " AS " + UPPER$(name)) >= 0 THEN RETURN FALSE
+    RETURN TRUE
+END FUNCTION
+
+' Der Name des Unterprogramms, in dem `zeile` steht -- "" fuers
+' Hauptprogramm.
+FUNCTION unterprogrammName$(quelle AS STRING, zeile AS INTEGER) AS STRING
+    DIM uv AS INTEGER
+    DIM ub AS INTEGER
+    (uv, ub) = umgebendesUnterprogramm(quelle, zeile)
+    IF uv < 1 THEN RETURN ""
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(quelle, NL)
+    IF uv > LEN(zeilen) THEN RETURN ""
+    DIM t AS STRING : t = TRIM$(zeilen[uv - 1])
+    DIM gross AS STRING : gross = UPPER$(t)
+    DIM ab AS INTEGER : ab = -1
+    IF LEFT$(gross, 4) = "SUB " THEN ab = 4
+    IF LEFT$(gross, 9) = "FUNCTION " THEN ab = 9
+    IF ab < 0 THEN RETURN ""
+    DIM rest AS STRING : rest = TRIM$(MID$(t, ab))
+    DIM kl AS INTEGER : kl = INSTR(rest, "(")
+    IF kl <= 0 THEN RETURN ""
+    RETURN TRIM$(LEFT$(rest, kl))
+END FUNCTION
+
+' Der Quelltext einer Projektdatei -- aus dem REITER, wenn sie offen ist.
+FUNCTION projektQuelle$(pfad AS STRING) AS STRING
+    DIM t AS INTEGER : t = tabMitPfad(pfad)
+    IF t >= 0 THEN RETURN GUI_TEXT(reiter[t].feld)
+    DIM q AS STRING : q = ""
+    TRY
+        q = dateiLesen(pfad)
+    CATCH e
+        q = ""
+    END TRY
+    RETURN q
+END FUNCTION
+
+' Je Knoten des Baums die Datei und die Zeile, zu der er gehoert.
+DIM aufrStellen AS ARRAY OF AufrufStelle : aufrStellen = []
+DIM aufrWahl AS INTEGER : aufrWahl = -1
+DIM aufrZahl AS INTEGER : aufrZahl = 0
+
+' Die Aufrufer von `name` unter `eltern` haengen, und darunter wieder deren
+' Aufrufer. `gesehen` bricht Kreise auf: ruft A das B und B das A, kaeme man
+' sonst nicht heraus. Ein Name steht darum hoechstens EINMAL im Baum.
+SUB aufruferAeste(name AS STRING, eltern AS INTEGER, tiefe AS INTEGER, gesehen AS ARRAY OF STRING)
+    IF tiefe > 3 OR name = "" OR aufrZahl >= 200 THEN RETURN
+    IF ARRAY_INDEXOF(gesehen, LOWER$(name)) >= 0 THEN RETURN
+    ARRAY_PUSH(gesehen, LOWER$(name))
+    DIM dateien AS ARRAY OF STRING : dateien = projektDateien("*.dh")
+    DIM d AS STRING
+    FOR EACH d IN dateien
+        DIM pfad AS STRING : pfad = PATHJOIN(projektOrdner, d)
+        DIM quelle AS STRING : quelle = projektQuelle$(pfad)
+        IF quelle = "" OR INSTR(quelle, name) < 0 THEN CONTINUE
+        DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(quelle, NL)
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(zeilen) - 1
+            IF aufrZahl >= 200 THEN BREAK
+            IF NOT aufrufInZeile(zeilen[i], name) THEN CONTINUE
+            DIM ober AS STRING : ober = unterprogrammName$(quelle, i + 1)
+            DIM wo AS STRING : wo = IIF(ober = "", "Hauptprogramm", ober)
+            DIM knoten AS INTEGER
+            DIM oft AS STRING : oft = laufZahl$(pfad, i + 1)
+            IF oft <> "" THEN aufrGemessen = aufrGemessen + 1
+            knoten = GUI_TREE_ADD(baumAufruf, eltern, d + ":" + STR$(i + 1) + _
+                                  "  (" + wo + ")" + oft + "   " + TRIM$(zeilen[i]))
+            ARRAY_PUSH(aufrStellen, NEW AufrufStelle(knoten, pfad, i + 1))
+            aufrZahl = aufrZahl + 1
+            IF tiefe = 0 THEN aufrDirekt = aufrDirekt + 1
+            aufruferAeste(ober, knoten, tiefe + 1, gesehen)
+        NEXT
+    NEXT
+END SUB
+
+' Wie oft diese Zeile im letzten Profillauf gelaufen ist -- "  [12x]" oder
+' "". Ohne Profillauf steht nichts da; eine Null waere eine Aussage, die
+' niemand gemessen hat.
+FUNCTION laufZahl$(pfad AS STRING, zeile AS INTEGER) AS STRING
+    IF profDatei = "" OR NOT gleicherWeg(pfad, profDatei) THEN RETURN ""
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(profHier) - 1
+        IF profHier[i].zeile = zeile THEN RETURN "  [" + STR$(profHier[i].anzahl) + "x]"
+    NEXT
+    RETURN ""
+END FUNCTION
+
+SUB aufruferZeigen()
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN
+    aufruferZeigenFuer(wortUnterMarke$())
+END SUB
+
+SUB aufruferZeigenFuer(name AS STRING)
+    IF name = "" THEN
+        GUI_SET_TEXT(lblStatus, tr$("Wer ruft das auf: unter der Marke steht kein Name."))
+        protokoll("aufrufer 0")
+        RETURN
+    END IF
+    GUI_TREE_CLEAR(baumAufruf)
+    aufrStellen = []
+    aufrZahl = 0 : aufrDirekt = 0 : aufrWahl = -1 : aufrGemessen = 0
+    DIM gesehen AS ARRAY OF STRING : gesehen = []
+    aufruferAeste(name, -1, 0, gesehen)
+    GUI_WINDOW_TITLE(winAufruf, tr$("Wer ruft ") + name + tr$(" auf?"))
+    DIM sagen AS STRING
+    IF aufrZahl = 0 THEN
+        sagen = "Niemand ruft '" + name + "' -- jedenfalls nicht in diesem Projektordner."
+    ELSE
+        sagen = STR$(aufrDirekt) + " Aufruf(e) unmittelbar, " + STR$(aufrZahl) + _
+                " Knoten im Baum. Ein Klick springt hin."
+    END IF
+    GUI_SET_TEXT(lblAufruf, sagen)
+    GUI_WINDOW_VISIBLE(winAufruf, TRUE)
+    GUI_FOCUS(baumAufruf)
+    GUI_SET_TEXT(lblStatus, sagen)
+    protokoll("aufrufer " + STR$(aufrDirekt))
+    protokoll("aufrufer baum " + STR$(aufrZahl))
+    IF aufrGemessen > 0 THEN protokoll("aufrufer gemessen " + STR$(aufrGemessen))
+END SUB
+
+' Ein Klick im Baum springt zur Stelle. Wie beim Projektbaum ueber die
+' Auswahl, nicht ueber einen Knopf -- ein Knopf mehr fuer etwas, das der
+' Klick schon meint.
+SUB aufruferAbfragen()
+    IF NOT GUI_WINDOW_SHOWN(winAufruf) THEN RETURN
+    DIM sel AS INTEGER : sel = GUI_TREE_SELECTED(baumAufruf)
+    IF sel < 0 OR sel = aufrWahl THEN RETURN
+    aufrWahl = sel
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(aufrStellen) - 1
+        IF aufrStellen[i].knoten <> sel THEN CONTINUE
+        dateiOeffnen(aufrStellen[i].pfad)
+        IF aktivesFeld() >= 0 THEN GUI_TEXTAREA_GOTO(aktivesFeld(), aufrStellen[i].zeile, 1)
+        protokoll("aufrufer sprung " + STR$(aufrStellen[i].zeile))
+        RETURN
+    NEXT
+END SUB
+
+' --- Zwei Reiter nebeneinander vergleichen ----------------------------
+' `git diff` zeigt den Unterschied als TEXT. Nebeneinander sieht man ihn
+' an der Stelle, an der er steht: die geteilte Ansicht geht an, und in
+' beiden Feldern bekommen die abweichenden Zeilen eine Marke.
+'
+' Verglichen wird ohne git -- die beiden Reiter muessen dafuer nicht
+' gesichert sein, und genau waehrend man tippt will man es wissen. Das
+' Verfahren ist die laengste gemeinsame Teilfolge (LCS): dieselbe Rechnung
+' wie bei diff, nur auf ZEILEN.
+DIM diffLinks AS ARRAY OF INTEGER : diffLinks = []
+DIM diffRechts AS ARRAY OF INTEGER : diffRechts = []
+DIM diffTabL AS INTEGER : diffTabL = -1
+DIM diffTabR AS INTEGER : diffTabR = -1
+
+SUB zeilenVergleichen(a AS ARRAY OF STRING, b AS ARRAY OF STRING)
+    diffLinks = []
+    diffRechts = []
+    DIM opArt AS ARRAY OF INTEGER : opArt = []
+    DIM opA AS ARRAY OF INTEGER : opA = []
+    DIM opB AS ARRAY OF INTEGER : opB = []
+    zeilenSchritte(a, b, opArt, opA, opB)
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(opArt) - 1
+        IF opArt[k] = 1 THEN ARRAY_PUSH(diffLinks, opA[k] + 1)
+        IF opArt[k] = 2 THEN ARRAY_PUSH(diffRechts, opB[k] + 1)
+    NEXT
+END SUB
+
+' Die Mitte nach Myers ("An O(ND) Difference Algorithm"): Zeit (n + m) * D
+' und Platz D * D bei D Unterschieden -- fuer eine grosse Datei mit wenigen
+' Aenderungen genau richtig, wo die Tabelle n * m Zellen braeuchte. Mehr als
+' MYERS_MAX Unterschiede: FALSE, nichts angehaengt (dann Zeile fuer Zeile).
+' Der Rueckweg braucht V jeder Runde; Runde d belegt die Plaetze ab d * d
+' in `spur` (k von -d bis d).
+CONST MYERS_MAX = 2000
+
+FUNCTION myersSchritte(alt AS ARRAY OF STRING, neu AS ARRAY OF STRING, vorn AS INTEGER, _
+                       n AS INTEGER, m AS INTEGER, opArt AS ARRAY OF INTEGER, _
+                       opA AS ARRAY OF INTEGER, opB AS ARRAY OF INTEGER) AS BOOLEAN
+    DIM off AS INTEGER : off = MYERS_MAX + 1
+    DIM v[2 * MYERS_MAX + 3] AS INTEGER
+    DIM spur AS ARRAY OF INTEGER : spur = []
+    DIM d AS INTEGER
+    DIM k AS INTEGER
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    DIM fertig AS INTEGER : fertig = -1
+    FOR d = 0 TO MIN(MYERS_MAX, n + m)
+        FOR k = -d TO d STEP 2
+            IF k = -d THEN
+                x = v[off + k + 1]
+            ELSEIF k <> d AND v[off + k - 1] < v[off + k + 1] THEN
+                x = v[off + k + 1]
+            ELSE
+                x = v[off + k - 1] + 1
+            END IF
+            y = x - k
+            WHILE x < n AND y < m
+                IF alt[vorn + x] <> neu[vorn + y] THEN BREAK
+                x = x + 1 : y = y + 1
+            WEND
+            v[off + k] = x
+            IF x >= n AND y >= m THEN fertig = d
+        NEXT
+        FOR k = -d TO d
+            ARRAY_PUSH(spur, v[off + k])
+        NEXT
+        IF fertig >= 0 THEN BREAK
+    NEXT
+    IF fertig < 0 THEN RETURN FALSE
+    ' Rueckweg von (n, m), die Schritte rueckwaerts gesammelt.
+    DIM rArt AS ARRAY OF INTEGER : rArt = []
+    DIM rA AS ARRAY OF INTEGER : rA = []
+    DIM rB AS ARRAY OF INTEGER : rB = []
+    x = n : y = m
+    FOR d = fertig TO 1 STEP -1
+        k = x - y
+        ' V der Runde d - 1: k' liegt bei spur[(d - 1) * (d - 1) + k' + d - 1].
+        DIM basis AS INTEGER : basis = (d - 1) * (d - 1) + d - 1
+        DIM vk AS INTEGER
+        IF k = -d THEN
+            vk = k + 1
+        ELSEIF k <> d AND spur[basis + k - 1] < spur[basis + k + 1] THEN
+            vk = k + 1
+        ELSE
+            vk = k - 1
+        END IF
+        DIM vx AS INTEGER : vx = spur[basis + vk]
+        DIM vy AS INTEGER : vy = vx - vk
+        WHILE x > vx AND y > vy
+            ARRAY_PUSH(rArt, 0) : ARRAY_PUSH(rA, vorn + x - 1) : ARRAY_PUSH(rB, vorn + y - 1)
+            x = x - 1 : y = y - 1
+        WEND
+        IF x = vx THEN
+            ARRAY_PUSH(rArt, 2) : ARRAY_PUSH(rA, vorn + x) : ARRAY_PUSH(rB, vorn + y - 1)
+        ELSE
+            ARRAY_PUSH(rArt, 1) : ARRAY_PUSH(rA, vorn + x - 1) : ARRAY_PUSH(rB, vorn + y)
+        END IF
+        x = vx : y = vy
+    NEXT
+    WHILE x > 0 AND y > 0
+        ARRAY_PUSH(rArt, 0) : ARRAY_PUSH(rA, vorn + x - 1) : ARRAY_PUSH(rB, vorn + y - 1)
+        x = x - 1 : y = y - 1
+    WEND
+    DIM q AS INTEGER
+    FOR q = LEN(rArt) - 1 TO 0 STEP -1
+        ARRAY_PUSH(opArt, rArt[q]) : ARRAY_PUSH(opA, rA[q]) : ARRAY_PUSH(opB, rB[q])
+    NEXT
+    RETURN TRUE
+END FUNCTION
+
+' Die Schritte von `alt` nach `neu`: 0 gleich, 1 nur alt, 2 nur neu, mit
+' den Zeilen (ab 0) in opA/opB. Die laengste gemeinsame Teilfolge braucht
+' eine Tabelle mit n*m Zellen -- darum fallen gemeinsamer Anfang und
+' gemeinsames Ende vorher weg, gerechnet wird nur ueber die Mitte. Vorher
+' ueber die ganzen Dateien und ab 1500 Zeilen Zeile fuer Zeile: eine einzige
+' eingefuegte Zeile oben liess in einer grossen Datei ALLES darunter als
+' geaendert erscheinen (Stresstest 2026-10-02). Zeile fuer Zeile geht es
+' jetzt nur noch, wenn die Mitte selbst so gross ist.
+SUB zeilenSchritte(alt AS ARRAY OF STRING, neu AS ARRAY OF STRING, opArt AS ARRAY OF INTEGER, _
+                   opA AS ARRAY OF INTEGER, opB AS ARRAY OF INTEGER)
+    DIM n AS INTEGER : n = LEN(alt)
+    DIM m AS INTEGER : m = LEN(neu)
+    DIM vorn AS INTEGER : vorn = 0
+    WHILE vorn < n AND vorn < m
+        IF alt[vorn] <> neu[vorn] THEN BREAK
+        vorn = vorn + 1
+    WEND
+    DIM hinten AS INTEGER : hinten = 0
+    WHILE hinten < n - vorn AND hinten < m - vorn
+        IF alt[n - 1 - hinten] <> neu[m - 1 - hinten] THEN BREAK
+        hinten = hinten + 1
+    WEND
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    FOR i = 0 TO vorn - 1
+        ARRAY_PUSH(opArt, 0) : ARRAY_PUSH(opA, i) : ARRAY_PUSH(opB, i)
+    NEXT
+    ' Die Mitte: alt[vorn .. ea), neu[vorn .. eb).
+    DIM ea AS INTEGER : ea = n - hinten
+    DIM eb AS INTEGER : eb = m - hinten
+    DIM n2 AS INTEGER : n2 = ea - vorn
+    DIM m2 AS INTEGER : m2 = eb - vorn
+    i = vorn : j = vorn
+    IF (n2 > 1500 OR m2 > 1500) AND myersSchritte(alt, neu, vorn, n2, m2, opArt, opA, opB) THEN
+        ' erledigt
+    ELSEIF n2 > 1500 OR m2 > 1500 THEN
+        ' Zu viele Unterschiede auch fuer Myers: Zeile fuer Zeile.
+        WHILE i < ea OR j < eb
+            IF i < ea AND j < eb THEN
+                IF alt[i] = neu[j] THEN
+                    ARRAY_PUSH(opArt, 0) : ARRAY_PUSH(opA, i) : ARRAY_PUSH(opB, j)
+                ELSE
+                    ARRAY_PUSH(opArt, 1) : ARRAY_PUSH(opA, i) : ARRAY_PUSH(opB, j)
+                    ARRAY_PUSH(opArt, 2) : ARRAY_PUSH(opA, i) : ARRAY_PUSH(opB, j)
+                END IF
+                i = i + 1 : j = j + 1
+            ELSEIF i < ea THEN
+                ARRAY_PUSH(opArt, 1) : ARRAY_PUSH(opA, i) : ARRAY_PUSH(opB, j) : i = i + 1
+            ELSE
+                ARRAY_PUSH(opArt, 2) : ARRAY_PUSH(opA, i) : ARRAY_PUSH(opB, j) : j = j + 1
+            END IF
+        WEND
+    ELSE
+        ' lcs[x * (m2 + 1) + y] = Laenge der laengsten gemeinsamen Teilfolge
+        ' ab alt[vorn + x] bzw. neu[vorn + y].
+        DIM lcs[(n2 + 1) * (m2 + 1)] AS INTEGER
+        DIM x AS INTEGER
+        DIM y AS INTEGER
+        FOR x = n2 - 1 TO 0 STEP -1
+            FOR y = m2 - 1 TO 0 STEP -1
+                IF alt[vorn + x] = neu[vorn + y] THEN
+                    lcs[x * (m2 + 1) + y] = lcs[(x + 1) * (m2 + 1) + y + 1] + 1
+                ELSE
+                    lcs[x * (m2 + 1) + y] = MAX(lcs[(x + 1) * (m2 + 1) + y], lcs[x * (m2 + 1) + y + 1])
+                END IF
+            NEXT
+        NEXT
+        x = 0 : y = 0
+        WHILE x < n2 OR y < m2
+            IF x < n2 AND y < m2 THEN
+                IF alt[vorn + x] = neu[vorn + y] THEN
+                    ARRAY_PUSH(opArt, 0) : ARRAY_PUSH(opA, vorn + x) : ARRAY_PUSH(opB, vorn + y)
+                    x = x + 1 : y = y + 1
+                ELSEIF lcs[(x + 1) * (m2 + 1) + y] >= lcs[x * (m2 + 1) + y + 1] THEN
+                    ARRAY_PUSH(opArt, 1) : ARRAY_PUSH(opA, vorn + x) : ARRAY_PUSH(opB, vorn + y) : x = x + 1
+                ELSE
+                    ARRAY_PUSH(opArt, 2) : ARRAY_PUSH(opA, vorn + x) : ARRAY_PUSH(opB, vorn + y) : y = y + 1
+                END IF
+            ELSEIF x < n2 THEN
+                ARRAY_PUSH(opArt, 1) : ARRAY_PUSH(opA, vorn + x) : ARRAY_PUSH(opB, vorn + y) : x = x + 1
+            ELSE
+                ARRAY_PUSH(opArt, 2) : ARRAY_PUSH(opA, vorn + x) : ARRAY_PUSH(opB, vorn + y) : y = y + 1
+            END IF
+        WEND
+    END IF
+    FOR i = 0 TO hinten - 1
+        ARRAY_PUSH(opArt, 0) : ARRAY_PUSH(opA, ea + i) : ARRAY_PUSH(opB, eb + i)
+    NEXT
+END SUB
+
+SUB reiterVergleichen()
+    IF tabAnzahl < 2 THEN
+        GUI_SET_TEXT(lblStatus, tr$("Vergleichen: dafür braucht es zwei offene Dateien."))
+        protokoll("reiter vergleich 0")
+        RETURN
+    END IF
+    IF NOT geteilt THEN geteiltSetzen(TRUE)
+    IF NOT geteilt THEN RETURN
+    diffTabL = linkerTab
+    diffTabR = aktiverTab
+    IF diffTabL = diffTabR THEN
+        GUI_SET_TEXT(lblStatus, tr$("Vergleichen: rechts einen anderen Reiter wählen."))
+        RETURN
+    END IF
+    zeilenVergleichen(SPLIT$(GUI_TEXT(reiter[diffTabL].feld), NL), _
+                      SPLIT$(GUI_TEXT(reiter[diffTabR].feld), NL))
+    ' Das linke Feld markieren wir hier -- markenNachziehen kuemmert sich
+    ' nur um das vordere.
+    DIM farbenL AS ARRAY OF INTEGER : farbenL = []
+    DIM x AS INTEGER
+    FOR EACH x IN diffLinks
+        ARRAY_PUSH(farbenL, &HE07070)
+    NEXT
+    GUI_TEXTAREA_MARKS(reiter[diffTabL].feld, diffLinks, farbenL)
+    markenSchluessel = ""
+    GUI_SET_TEXT(lblStatus, BASENAME(reiter[diffTabL].pfad) + tr$(" gegen ") + BASENAME(reiter[diffTabR].pfad) + _
+                 ": " + STR$(LEN(diffLinks)) + " Zeilen links, " + STR$(LEN(diffRechts)) + " rechts.")
+    protokoll("reiter vergleich " + STR$(LEN(diffLinks)) + " " + STR$(LEN(diffRechts)))
+END SUB
+
+SUB markenAnZeilenenden()
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN
+    DIM z1 AS INTEGER
+    DIM z2 AS INTEGER
+    (z1, z2) = zeilenBereich(ta)
+    IF z2 <= z1 THEN
+        GUI_SET_TEXT(lblStatus, tr$("Erst mehrere Zeilen markieren."))
+        protokoll("marken enden 0")
+        RETURN
+    END IF
+    GUI_TEXTAREA_CLEAR_CARETS(ta)
+    GUI_TEXTAREA_GOTO(ta, z1, SPALTE_ENDE)
+    DIM z AS INTEGER
+    FOR z = z1 + 1 TO z2
+        GUI_TEXTAREA_ADD_CARET(ta, z, SPALTE_ENDE)
+    NEXT
+    GUI_FOCUS(ta)
+    GUI_SET_TEXT(lblStatus, STR$(GUI_TEXTAREA_CARETS(ta)) + tr$(" Marken, je eine am Zeilenende."))
+    protokoll("marken enden " + STR$(GUI_TEXTAREA_CARETS(ta)))
+END SUB
+
+' --- Zeilen-Werkzeuge -------------------------------------------------
+' Sortieren, Doppelte entfernen, Leerraum am Ende weg: auf der Auswahl,
+' und ohne Auswahl auf der ganzen Datei -- eine einzelne Zeile zu
+' sortieren ergibt nichts. Geschrieben wird ueber zeilenErsetzen, damit
+' jeder Griff EIN Undo-Schritt bleibt.
+SUB zeilenWerkzeug(art AS STRING)
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN
+    DIM alle AS ARRAY OF STRING : alle = SPLIT$(GUI_TEXT(ta), NL)
+    DIM z1 AS INTEGER
+    DIM z2 AS INTEGER
+    (z1, z2) = zeilenBereich(ta)
+    IF z1 = z2 THEN
+        z1 = 1
+        z2 = LEN(alle)
+    END IF
+    DIM block AS ARRAY OF STRING : block = zeilenHolen(alle, z1, z2)
+    DIM raus AS ARRAY OF STRING : raus = []
+    DIM z AS STRING
+    IF art = "sortieren" THEN
+        FOR EACH z IN block
+            ARRAY_PUSH(raus, z)
+        NEXT
+        SORT(raus)
+    ELSEIF art = "doppelte" THEN
+        DIM gesehen AS MAP OF INTEGER : gesehen = {}
+        FOR EACH z IN block
+            IF NOT MAPHAS(gesehen, z) THEN
+                MAPPUT(gesehen, z, 1)
+                ARRAY_PUSH(raus, z)
+            END IF
+        NEXT
+    ELSE
+        FOR EACH z IN block
+            ARRAY_PUSH(raus, RTRIM$(z))
+        NEXT
+    END IF
+    zeilenErsetzen(ta, z1, z2, raus)
+    GUI_SET_TEXT(lblStatus, STR$(LEN(block)) + tr$(" Zeilen -> ") + STR$(LEN(raus)) + " (" + art + ").")
+    protokoll("zeilen " + art + " " + STR$(LEN(raus)))
+END SUB
+
+' --- Umbenennen im ganzen Projekt -------------------------------------
+' CODE_RENAME$ arbeitet auf EINEM Text und braucht eine Stelle, an der der
+' Name steht. In einer fremden Datei kennen wir sie nicht -- also werden
+' die Fundstellen der Reihe nach probiert, bis eine den Text wirklich
+' aendert. Eine Stelle in einem Kommentar oder in einer Zeichenkette
+' aendert nichts, und dann kommt eben die naechste dran.
+FUNCTION umbenennenInText$(quelle AS STRING, wort AS STRING, neu AS STRING) AS STRING
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(quelle, NL)
+    DIM versuche AS INTEGER : versuche = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(zeilen) - 1
+        DIM zl AS STRING : zl = zeilen[i]
+        DIM s AS INTEGER : s = INSTR(zl, wort)
+        WHILE s >= 0 AND versuche < 200
+            DIM davor AS BOOLEAN : davor = s > 0 AND istWortzeichen(MID$(zl, s - 1, 1))
+            DIM danach AS BOOLEAN : danach = istWortzeichen(MID$(zl, s + LEN(wort), 1))
+            IF NOT davor AND NOT danach THEN
+                versuche = versuche + 1
+                DIM ergebnis AS STRING : ergebnis = ""
+                TRY
+                    ergebnis = CODE_RENAME$(quelle, i + 1, s + 1, neu)
+                CATCH e
+                    ergebnis = ""
+                END TRY
+                IF ergebnis <> "" AND ergebnis <> quelle THEN RETURN ergebnis
+            END IF
+            s = INSTR(zl, wort, s + 1)
+        WEND
+    NEXT
+    RETURN quelle
+END FUNCTION
+
+' Gibt es `name` im Projekt schon als SUB, FUNCTION, CLASS oder Methode?
+' Liefert die Fundstelle als Text ("helfer.dh:12") oder "".
+'
+' Geprueft wird gegen den Symbolindex, nicht gegen den Uebersetzer: zwei
+' Unterprogramme desselben Namens sind kein Uebersetzungsfehler, das
+' zweite verdeckt das erste einfach. Genau das will man beim Umbenennen
+' vorher wissen.
+FUNCTION nameVergeben$(name AS STRING) AS STRING
+    symbolIndexBauen(TRUE)
+    DIM klein AS STRING : klein = LOWER$(name)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(symbole) - 1
+        IF LOWER$(symbole[i].name) = klein THEN
+            RETURN BASENAME(symbole[i].pfad) + ":" + STR$(symbole[i].zeile)
+        END IF
+    NEXT
+    RETURN ""
+END FUNCTION
+
+' Formulare mitziehen: eine `.dhform` nennt ihre Rueckrufe beim NAMEN
+' ("on_click": "malen"), und GUI_LOAD sucht sie spaeter unter genau dem.
+' Wer das Unterprogramm umbenennt und die Datei stehen laesst, hat einen
+' Knopf, der nichts mehr tut -- ohne Fehlermeldung, denn der Name wird
+' erst beim Klicken gesucht.
+'
+' Ersetzt wird im TEXT, nicht ueber das json-Modul: ein neu geschriebenes
+' JSON haette eine andere Form, und die Vorschau zeigte die ganze Datei als
+' geaendert statt der einen Zeile.
+SUB formulareNachziehen(alt AS STRING, neu AS STRING)
+    IF alt = "" OR neu = "" OR alt = neu THEN RETURN
+    DIM schluessel AS ARRAY OF STRING
+    schluessel = ["on_click", "on_change", "on_focus", "on_blur", "on_enter"]
+    DIM d AS STRING
+    FOR EACH d IN projektDateien("*.dhform")
+        DIM pfad AS STRING : pfad = PATHJOIN(projektOrdner, d)
+        DIM text AS STRING : text = ""
+        TRY
+            text = JOIN$(READLINES(pfad), NL)
+        CATCH e
+            text = ""
+        END TRY
+        IF text = "" THEN CONTINUE
+        DIM frisch AS STRING : frisch = text
+        DIM k AS STRING
+        FOR EACH k IN schluessel
+            DIM q AS STRING : q = CHR$(34)
+            frisch = REPLACE$(frisch, q + k + q + ": " + q + alt + q, _
+                                      q + k + q + ": " + q + neu + q)
+            frisch = REPLACE$(frisch, q + k + q + ":" + q + alt + q, _
+                                      q + k + q + ":" + q + neu + q)
+        NEXT
+        IF frisch <> text THEN umbauVormerken(tabMitPfad(pfad), pfad, frisch)
+    NEXT
+END SUB
+
+' --- Ein Umbau, der ueber viele Dateien geht, laeuft in Schritten -------
+' Das Sammeln der Aenderungen liest jede Datei des Projekts und laesst den
+' Umbenenner darueber laufen. In EINEM Bild erledigt, steht die IDE so
+' lange -- bei vierhundert Dateien lange genug, dass man sie fuer haengend
+' haelt, und abbrechen kann man nichts, was gar nicht erst zum Zeichnen
+' kommt.
+'
+' Darum je Bild ein Haeppchen: die Statuszeile zaehlt mit, ESC bricht ab.
+' Am Ende steht dieselbe Vorschau wie zuvor.
+CONST LAUF_PRO_BILD = 25
+DIM laufArt AS STRING : laufArt = ""      ' "" = nichts laeuft
+DIM laufDateien AS ARRAY OF STRING : laufDateien = []
+DIM laufIndex AS INTEGER : laufIndex = 0
+DIM laufAlt AS STRING : laufAlt = ""
+DIM laufNeu AS STRING : laufNeu = ""
+' Was die beiden anderen Arten (Parameter, Verschieben) unterwegs brauchen:
+' das Ziel, die alte Parameterzahl und die Zaehler.
+DIM laufZiel AS STRING : laufZiel = ""
+DIM laufBlock AS INTEGER : laufBlock = 0
+DIM laufZahl AS INTEGER : laufZahl = 0
+DIM laufGeaendert AS INTEGER : laufGeaendert = 0
+DIM laufUebergangen AS INTEGER : laufUebergangen = 0
+
+SUB laufStarten(art AS STRING, alt AS STRING, neu AS STRING)
+    laufArt = art
+    laufAlt = alt
+    laufNeu = neu
+    laufDateien = projektDateien("*.dh")
+    laufIndex = 0
+    laufGeaendert = 0
+    laufUebergangen = 0
+    ' NICHT `umbauLeeren` bei den Arten, die schon etwas vorgemerkt haben:
+    ' Parameter und Verschieben legen die eigene Datei (und die Zieldatei)
+    ' VOR dem Sammeln hin -- dort steht der Stand aus dem Reiter, den die
+    ' Platte gar nicht kennt.
+    IF art = "umbenennen" OR art = "ersetzen" THEN umbauLeeren()
+    GUI_SET_TEXT(lblStatus, tr$("Sammle ... 0 von ") + STR$(LEN(laufDateien)) + tr$(" Dateien (ESC bricht ab)"))
+END SUB
+
+SUB laufAbbrechen()
+    IF laufArt = "" THEN RETURN
+    laufArt = ""
+    umbauLeeren()
+    GUI_SET_TEXT(lblStatus, tr$("Abgebrochen -- nichts geändert."))
+    protokoll("umbau abgebrochen")
+END SUB
+
+' Ein Haeppchen; am Ende die Vorschau. Wird je Bild aus der Hauptschleife
+' gerufen.
+SUB laufSchritt()
+    IF laufArt = "" THEN RETURN
+    DIM bis AS INTEGER : bis = MIN(laufIndex + LAUF_PRO_BILD, LEN(laufDateien))
+    DIM i AS INTEGER
+    FOR i = laufIndex TO bis - 1
+        DIM pfad AS STRING : pfad = PATHJOIN(projektOrdner, laufDateien[i])
+        ' Ueber zeilenLesen: eine Datei in cp1252 fiel mit READLINES still
+        ' heraus -- ein Umbenennen ueber das Projekt liess sie unbemerkt aus.
+        DIM alt AS STRING : alt = dateiLesen(pfad)
+        IF alt = "" THEN CONTINUE
+        DIM frisch AS STRING : frisch = alt
+        IF laufArt = "parameter" THEN
+            ' Die eigene Datei ist schon vorgemerkt (dort steht der Stand
+            ' AUS DEM REITER, nicht der von der Platte).
+            IF gleicherWeg(pfad, reiter[aktiverTab].pfad) THEN CONTINUE
+            IF INSTR(alt, paramName) < 0 THEN CONTINUE
+            DIM z2 AS ARRAY OF INTEGER : z2 = []
+            frisch = parameterInText$(alt, paramName, paramPlaetze, laufZahl, z2)
+            laufGeaendert = laufGeaendert + z2[0]
+            laufUebergangen = laufUebergangen + z2[1]
+        ELSEIF laufArt = "verschieben" THEN
+            IF gleicherWeg(pfad, reiter[aktiverTab].pfad) THEN CONTINUE
+            IF gleicherWeg(pfad, laufZiel) THEN CONTINUE
+            IF NOT benutztWort(alt, verschName) THEN CONTINUE
+            frisch = mitImport$(alt, BASENAME(laufZiel))
+            IF frisch <> alt THEN laufGeaendert = laufGeaendert + 1
+        ELSEIF laufArt = "umbenennen" THEN
+            IF INSTR(alt, laufAlt) < 0 THEN CONTINUE
+            frisch = umbenennenInText$(alt, laufAlt, laufNeu)
+        ELSE
+            frisch = textErsetzen$(alt, laufAlt, laufNeu)
+        END IF
+        ' Auf die PLATTE, nicht in den Reiter: beide Umbauten arbeiten auf
+        ' den Dateien (sie brechen vorher ab, wenn ein Reiter ungesichert
+        ' ist), und umbauSchreiben zieht einen offenen Reiter nach.
+        IF frisch <> alt THEN umbauVormerken(-1, pfad, frisch)
+    NEXT
+    laufIndex = bis
+    IF laufIndex < LEN(laufDateien) THEN
+        GUI_SET_TEXT(lblStatus, tr$("Sammle ... ") + STR$(laufIndex) + tr$(" von ") + _
+                     STR$(LEN(laufDateien)) + " Dateien (ESC bricht ab)")
+        RETURN
+    END IF
+    ' Fertig gesammelt -- ab hier wie bisher. Die Statuszeile sagt es, sonst
+    ' stand dort neben der Vorschau weiter "Sammle ... 0 von 2 Dateien".
+    GUI_SET_TEXT(lblStatus, tr$("Gesammelt: ") + STR$(LEN(umbauZiele)) + tr$(" Datei(en) betroffen."))
+    DIM art AS STRING : art = laufArt
+    laufArt = ""
+    IF art = "parameter" THEN
+        DIM psagen AS STRING
+        psagen = "Parameter von " + paramName + ": " + STR$(laufGeaendert) + " Stelle(n) in " + _
+                 STR$(LEN(umbauZiele)) + " Datei(en)."
+        IF laufUebergangen > 0 THEN
+            psagen = psagen + " " + STR$(laufUebergangen) + " Aufruf(e) übergangen (andere Zahl " + _
+                     "von Argumenten oder mit Namen übergeben)."
+        END IF
+        umbauStarten("Parameter von " + paramName, psagen, _
+                     "parameter umgestellt " + STR$(laufGeaendert) + " " + STR$(laufUebergangen))
+        RETURN
+    END IF
+    IF art = "verschieben" THEN
+        DIM vsagen AS STRING
+        vsagen = verschName + " (" + STR$(laufBlock) + " Zeilen) nach " + BASENAME(laufZiel) + _
+                 ", " + STR$(LEN(umbauZiele)) + " Datei(en) betroffen."
+        IF laufGeaendert > 0 THEN
+            vsagen = vsagen + " " + STR$(laufGeaendert) + " davon bekommen den IMPORT dazu."
+        END IF
+        umbauStarten(verschName + " nach " + BASENAME(laufZiel), vsagen, _
+                     "verschieben " + verschName + " " + STR$(laufBlock) + " " + STR$(laufGeaendert))
+        RETURN
+    END IF
+    IF art = "umbenennen" THEN
+        formulareNachziehen(laufAlt, laufNeu)
+        umbauWarnung = umbenennEinwand$(laufAlt, laufNeu)
+        umbauStarten("'" + laufAlt + "' -> '" + laufNeu + "' im Projekt", _
+                     "'" + laufAlt + "' -> '" + laufNeu + "' in " + STR$(LEN(umbauZiele)) + " Datei(en).", _
+                     "projekt umbenannt " + STR$(LEN(umbauZiele)))
+    ELSE
+        umbauStarten("'" + laufAlt + "' -> '" + laufNeu + "' im Projekt", _
+                     "Ersetzt in " + STR$(LEN(umbauZiele)) + " Datei(en).", _
+                     "projekt ersetzt " + STR$(LEN(umbauZiele)))
+    END IF
+END SUB
+
+SUB umbenennenImProjekt(neu AS STRING)
+    IF projektUngesichert() THEN
+        GUI_SET_TEXT(lblStatus, tr$("Erst sichern: ein Reiter hat ungesicherte Änderungen."))
+        protokoll("projekt umbenannt -1")
+        RETURN
+    END IF
+    DIM wort AS STRING : wort = umbenennWort
+    IF wort = "" OR neu = "" OR wort = neu THEN RETURN
+    laufStarten("umbenennen", wort, neu)
+END SUB
+
+' --- Zwei Dateien vergleichen -----------------------------------------
+' `git diff --no-index` kann das auch fuer Dateien, die gar nicht in einem
+' Verzeichnis unter Versionsverwaltung liegen. Gezeigt wird es im selben
+' Fenster und mit derselben Faerbung wie git diff.
+SUB dateienVergleichen()
+    IF aktiverTab < 0 OR reiter[aktiverTab].pfad = "" THEN
+        GUI_SET_TEXT(lblStatus, tr$("Vergleichen: diese Datei ist noch nicht gesichert."))
+        RETURN
+    END IF
+    ' Steht im Projektbaum eine ANDERE Datei gewaehlt, ist sie gemeint --
+    ' sonst fragt der Datei-Dialog. Ein Dialog, den man jedes Mal bekommt,
+    ' auch wenn die Antwort schon dasteht, ist einer zu viel.
+    DIM anderer AS STRING : anderer = GUI_FILETREE_SELECTED$(baum)
+    IF anderer <> "" AND GUI_FILETREE_IS_DIR(baum) THEN anderer = ""
+    IF anderer <> "" AND gleicherWeg(anderer, reiter[aktiverTab].pfad) THEN anderer = ""
+    IF anderer = "" THEN anderer = FILE_OPEN_DIALOG("Womit vergleichen?", "dh")
+    IF anderer = "" THEN RETURN
+    DIM meiner AS STRING : meiner = reiter[aktiverTab].pfad
+    DIM text AS STRING : text = ""
+    TRY
+        text = SHELL_OUT$("git", "diff", "--no-index", "--no-color", "--", meiner, anderer)
+    CATCH e
+        text = ""
+    END TRY
+    IF TRIM$(text) = "" THEN
+        GUI_SET_TEXT(lblStatus, tr$("Kein Unterschied zu ") + BASENAME(anderer) + ".")
+        protokoll("vergleich 0")
+        RETURN
+    END IF
+    GUI_SET_TEXT(taGit, text)
+    GUI_WINDOW_TITLE(winGit, BASENAME(meiner) + tr$(" gegen ") + BASENAME(anderer))
+    GUI_SET_TEXT(lblGit, STR$(LEN(SPLIT$(text, NL))) + tr$(" Zeilen"))
+    GUI_WINDOW_VISIBLE(winGit, TRUE)
+    GUI_FOCUS(taGit)
+    gitFaerben()
+    protokoll("vergleich " + STR$(LEN(SPLIT$(text, NL))))
+END SUB
+
+SUB markenAufFundstellen()
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN
+    DIM wort AS STRING : wort = wortUnterMarke$()
+    IF wort = "" THEN
+        GUI_SET_TEXT(lblStatus, tr$("Unter der Marke steht kein Wort."))
+        RETURN
+    END IF
+    GUI_TEXTAREA_CLEAR_CARETS(ta)
+    ' GUI_TEXTAREA_FIND sucht Teiltexte -- aus `hp` wuerde sonst auch das
+    ' `hp` in `hpmax` eine Marke, und ein Tippen aenderte einen Namen, der
+    ' gar nicht gemeint war. Die Grenzen prueft die IDE selbst.
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(GUI_TEXT(ta), NL)
+    DIM erste AS BOOLEAN : erste = TRUE
+    DIM n AS INTEGER : n = 0
+    DIM tz AS INTEGER
+    DIM ts AS INTEGER
+    (tz, ts) = GUI_TEXTAREA_FIND(ta, wort, 1, 1, TRUE)
+    WHILE tz >= 0 AND n < 200
+        DIM zl AS STRING : zl = zeilen[tz - 1]
+        DIM davor AS BOOLEAN : davor = ts > 1 AND istWortzeichen(MID$(zl, ts - 2, 1))
+        DIM danach AS BOOLEAN : danach = istWortzeichen(MID$(zl, ts - 1 + LEN(wort), 1))
+        IF NOT davor AND NOT danach THEN
+            IF erste THEN
+                GUI_TEXTAREA_GOTO(ta, tz, ts)
+                erste = FALSE
+            ELSE
+                GUI_TEXTAREA_ADD_CARET(ta, tz, ts)
+            END IF
+            n = n + 1
+        END IF
+        (tz, ts) = GUI_TEXTAREA_FIND(ta, wort, tz, ts + LEN(wort), TRUE)
+    WEND
+    GUI_FOCUS(ta)
+    GUI_SET_TEXT(lblStatus, STR$(n) + tr$(" Marken auf '") + wort + tr$("' -- tippen ändert alle, ESC räumt sie weg."))
+    protokoll("marken " + STR$(n))
+END SUB
+
+' --- Der Umbau: erst zeigen, dann schreiben ---------------------------
+' Jeder Umbau geht diesen Weg: die neuen Texte vormerken (umbauVormerken),
+' dann `umbauStarten`. Ist die Vorschau an, zeigt sie den Unterschied und
+' fragt; ist sie aus, wird gleich geschrieben. Eine Stelle, an der ein
+' Umbau ankommt, und keine zwei Wege, die auseinanderlaufen koennen.
+SUB umbauLeeren()
+    umbauZiele = []
+    umbauZeile = 0 : umbauSpalte = 1
+    umbauWarnung = ""
+    umbauBefunde = []
+    ' Die Schritte (`op*`) bleiben stehen: sie sind die Grundlage fuers
+    ' Nachbessern, und der naechste Umbau baut sie ohnehin neu.
+END SUB
+
+' `tab` >= 0 schreibt in den Reiter (Undo bleibt), sonst in die Datei.
+SUB umbauVormerken(tab AS INTEGER, pfad AS STRING, neu AS STRING)
+    ARRAY_PUSH(umbauZiele, NEW UmbauZiel(tab, pfad, neu))
+END SUB
+
+' Der Text eines Eintrags, wie er JETZT ist -- das, wogegen verglichen wird.
+FUNCTION umbauAlt$(k AS INTEGER) AS STRING
+    IF umbauZiele[k].tab >= 0 THEN RETURN GUI_TEXT(reiter[umbauZiele[k].tab].feld)
+    ' Eine Datei, die es noch NICHT gibt, ist ein leerer Vorher-Stand --
+    ' beim Verschieben in eine neue Datei entsteht sie erst beim Uebernehmen.
+    DIM t AS STRING : t = ""
+    TRY
+        t = dateiLesen(umbauZiele[k].pfad)
+    CATCH e
+        t = ""
+    END TRY
+    RETURN t
+END FUNCTION
+
+' --- Der Unterschied als Folge von SCHRITTEN --------------------------
+' Bis Stand 19 war die Vorschau ein Text: schoen zu lesen, aber nichts, an
+' dem sich etwas abwaehlen liesse. Jetzt steht dahinter eine Liste von
+' Schritten -- je Zeile "bleibt", "faellt weg" oder "kommt dazu" --, und
+' zusammenhaengende Aenderungen bilden einen BLOCK. Ein ausgelassener Block
+' liefert beim Zusammenbauen die ALTE Zeile statt der neuen; der Text der
+' Datei entsteht also aus denselben Schritten, die man sieht.
+DIM opDatei AS ARRAY OF INTEGER : opDatei = []
+DIM opArt AS ARRAY OF INTEGER : opArt = []       ' 0 bleibt, 1 alt, 2 neu
+DIM opText AS ARRAY OF STRING : opText = []
+DIM opHunk AS ARRAY OF INTEGER : opHunk = []     ' -1 = kein Block
+DIM hunkAus AS ARRAY OF INTEGER : hunkAus = []   ' 1 = ausgelassen
+DIM zeigHunk AS ARRAY OF INTEGER : zeigHunk = [] ' je ANGEZEIGTER Zeile
+
+SUB opsLeeren()
+    opDatei = [] : opArt = [] : opText = [] : opHunk = []
+    hunkAus = [] : zeigHunk = []
+END SUB
+
+' Die Schritte einer Datei anhaengen und ihre Bloecke nummerieren.
+SUB opsBauen(k AS INTEGER, a AS ARRAY OF STRING, b AS ARRAY OF STRING)
+    DIM erste AS INTEGER : erste = LEN(opArt)
+    zeilenVergleichen(a, b)
+    DIM i AS INTEGER : i = 0
+    DIM j AS INTEGER : j = 0
+    DIM li AS INTEGER : li = 0
+    DIM ri AS INTEGER : ri = 0
+    WHILE i < LEN(a) OR j < LEN(b)
+        IF li < LEN(diffLinks) AND i < LEN(a) AND diffLinks[li] = i + 1 THEN
+            ARRAY_PUSH(opDatei, k) : ARRAY_PUSH(opArt, 1) : ARRAY_PUSH(opText, a[i])
+            ARRAY_PUSH(opHunk, -1)
+            i = i + 1 : li = li + 1
+        ELSEIF ri < LEN(diffRechts) AND j < LEN(b) AND diffRechts[ri] = j + 1 THEN
+            ARRAY_PUSH(opDatei, k) : ARRAY_PUSH(opArt, 2) : ARRAY_PUSH(opText, b[j])
+            ARRAY_PUSH(opHunk, -1)
+            j = j + 1 : ri = ri + 1
+        ELSEIF i < LEN(a) AND j < LEN(b) THEN
+            ARRAY_PUSH(opDatei, k) : ARRAY_PUSH(opArt, 0) : ARRAY_PUSH(opText, a[i])
+            ARRAY_PUSH(opHunk, -1)
+            i = i + 1 : j = j + 1
+        ELSE
+            BREAK
+        END IF
+    WEND
+    ' Jeder zusammenhaengende Lauf geaenderter Schritte ist ein Block.
+    DIM h AS INTEGER : h = -1
+    DIM n AS INTEGER
+    FOR n = erste TO LEN(opArt) - 1
+        IF opArt[n] = 0 THEN
+            h = -1
+            CONTINUE
+        END IF
+        IF h < 0 THEN
+            ARRAY_PUSH(hunkAus, 0)
+            h = LEN(hunkAus) - 1
+        END IF
+        opHunk[n] = h
+    NEXT
+END SUB
+
+' Der Text einer Datei, wie er mit der jetzigen Auswahl aussaehe.
+FUNCTION umbauTextAus$(k AS INTEGER) AS STRING
+    DIM raus AS ARRAY OF STRING : raus = []
+    DIM n AS INTEGER
+    FOR n = 0 TO LEN(opDatei) - 1
+        IF opDatei[n] <> k THEN CONTINUE
+        DIM aus AS BOOLEAN : aus = opHunk[n] >= 0 AND hunkAus[opHunk[n]] = 1
+        IF opArt[n] = 0 THEN ARRAY_PUSH(raus, opText[n])
+        IF opArt[n] = 1 AND aus THEN ARRAY_PUSH(raus, opText[n])
+        IF opArt[n] = 2 AND NOT aus THEN ARRAY_PUSH(raus, opText[n])
+    NEXT
+    RETURN JOIN$(raus, NL)
+END FUNCTION
+
+' Die Anzeige neu bauen -- und mit ihr die Texte, die geschrieben wuerden.
+' Beides aus derselben Quelle: was man sieht, ist was man bekommt.
+' So breit, wie der Schirm es zulaesst: 900 Punkte schnitten jede laengere
+' Zeile ab, und den Unterschied liest man ja gerade am Zeilenende. Die
+' linke obere Ecke und die Hoehe bleiben, damit die Knoepfe dort stehen,
+' wo man sie kennt.
+SUB umbauFensterSetzen()
+    DIM b AS INTEGER : b = MAX(900, schirmB() - 280)
+    GUI_WINDOW_SET_BOUNDS(winUmbau, 240, 90, b, 620)
+    protokoll("umbau fenster " + STR$(b) + " text " + STR$(GUI_GET_W(taUmbau)))
+END SUB
+
+SUB umbauAnzeigeBauen()
+    DIM zeilen AS ARRAY OF STRING : zeilen = []
+    zeigHunk = []
+    DIM minus AS INTEGER : minus = 0
+    DIM plus AS INTEGER : plus = 0
+    DIM ausgelassen AS INTEGER : ausgelassen = 0
+    DIM h AS INTEGER
+    FOR h = 0 TO LEN(hunkAus) - 1
+        IF hunkAus[h] = 1 THEN ausgelassen = ausgelassen + 1
+    NEXT
+    IF umbauWarnung <> "" THEN
+        ARRAY_PUSH(zeilen, "@@ " + umbauWarnung) : ARRAY_PUSH(zeigHunk, -1)
+        ARRAY_PUSH(zeilen, "") : ARRAY_PUSH(zeigHunk, -1)
+    END IF
+    DIM bf AS STRING
+    FOR EACH bf IN umbauBefunde
+        ARRAY_PUSH(zeilen, "@@ " + bf) : ARRAY_PUSH(zeigHunk, -1)
+    NEXT
+    IF LEN(umbauBefunde) > 0 THEN
+        ARRAY_PUSH(zeilen, "") : ARRAY_PUSH(zeigHunk, -1)
+    END IF
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(umbauZiele) - 1
+        umbauZiele[k].text = umbauTextAus$(k)
+        DIM name AS STRING : name = umbauZiele[k].pfad
+        IF name = "" AND umbauZiele[k].tab >= 0 THEN name = reiter[umbauZiele[k].tab].name$()
+        IF k > 0 THEN
+            ARRAY_PUSH(zeilen, "") : ARRAY_PUSH(zeigHunk, -1)
+        END IF
+        ARRAY_PUSH(zeilen, "--- " + BASENAME(name)) : ARRAY_PUSH(zeigHunk, -1)
+        ' Zusammenhang nur nahe an einer Aenderung: ein Unterschied von drei
+        ' Zeilen in einer Datei mit tausend soll drei Zeilen lang zu lesen sein.
+        DIM luecke AS BOOLEAN : luecke = FALSE
+        DIM n AS INTEGER
+        FOR n = 0 TO LEN(opDatei) - 1
+            IF opDatei[n] <> k THEN CONTINUE
+            DIM nah AS BOOLEAN : nah = FALSE
+            DIM d AS INTEGER
+            FOR d = MAX(0, n - 2) TO MIN(LEN(opArt) - 1, n + 2)
+                IF opDatei[d] = k AND opArt[d] <> 0 THEN nah = TRUE
+            NEXT
+            IF NOT nah THEN
+                luecke = TRUE
+                CONTINUE
+            END IF
+            IF luecke THEN
+                ARRAY_PUSH(zeilen, "@@ ...") : ARRAY_PUSH(zeigHunk, -1)
+                luecke = FALSE
+            END IF
+            DIM aus AS BOOLEAN : aus = opHunk[n] >= 0 AND hunkAus[opHunk[n]] = 1
+            DIM vor AS STRING : vor = " "
+            IF opArt[n] = 1 THEN vor = "-"
+            IF opArt[n] = 2 THEN vor = "+"
+            ' Ein ausgelassener Block traegt eine Tilde: er steht noch da,
+            ' zaehlt aber nicht mehr mit.
+            IF aus AND opArt[n] <> 0 THEN vor = "~"
+            IF opArt[n] = 1 AND NOT aus THEN minus = minus + 1
+            IF opArt[n] = 2 AND NOT aus THEN plus = plus + 1
+            ARRAY_PUSH(zeilen, vor + opText[n]) : ARRAY_PUSH(zeigHunk, opHunk[n])
+        NEXT
+    NEXT
+    GUI_SET_TEXT(taUmbau, JOIN$(zeilen, NL))
+    diffFaerben(taUmbau)
+    DIM zeile AS STRING
+    zeile = STR$(LEN(umbauZiele)) + " Datei(en), " + STR$(minus) + _
+            " Zeilen weniger, " + STR$(plus) + " mehr"
+    IF ausgelassen > 0 THEN zeile = zeile + ", " + STR$(ausgelassen) + " Block/Blöcke ausgelassen"
+    zeile = zeile + " -- Enter übernimmt, ESC verwirft."
+    IF umbauWarnung <> "" THEN zeile = umbauWarnung + "  |  " + zeile
+    GUI_SET_TEXT(lblUmbau, zeile)
+END SUB
+
+' Den Block unter der Marke auslassen oder wieder aufnehmen.
+SUB umbauBlockKippen()
+    IF NOT GUI_WINDOW_SHOWN(winUmbau) THEN RETURN
+    DIM z AS INTEGER
+    DIM sp AS INTEGER
+    (z, sp) = GUI_TEXTAREA_CURSOR(taUmbau)
+    IF z < 1 OR z > LEN(zeigHunk) THEN RETURN
+    DIM h AS INTEGER : h = zeigHunk[z - 1]
+    IF h < 0 THEN
+        GUI_SET_TEXT(lblStatus, tr$("Auslassen: erst auf eine geänderte Zeile stellen."))
+        protokoll("umbau block -1")
+        RETURN
+    END IF
+    hunkAus[h] = 1 - hunkAus[h]
+    umbauAnzeigeBauen()
+    GUI_TEXTAREA_GOTO(taUmbau, z, 1)
+    ' Der Fokus geht auf den Knopf, NICHT zurueck in die Anzeige: dort waere
+    ' Enter ein Zeilenumbruch im Unterschied statt des Uebernehmens. Die
+    ' Marke bleibt trotzdem stehen, ein zweiter Klick auf den Knopf nimmt
+    ' den Block wieder auf.
+    GUI_FOCUS(btnUmbauOk)
+    protokoll("umbau block " + STR$(h) + " " + IIF(hunkAus[h] = 1, "aus", "an"))
+END SUB
+
+SUB umbauStarten(titel AS STRING, meldung AS STRING, prot AS STRING)
+    IF LEN(umbauZiele) = 0 THEN
+        GUI_SET_TEXT(lblStatus, titel + tr$(": nichts zu tun."))
+        umbauLeeren()
+        RETURN
+    END IF
+    umbauMeldung = meldung
+    umbauProt = prot
+    IF NOT vorschauAn AND umbauWarnung = "" THEN
+        ' Ohne Vorschau wird trotzdem GEPRUEFT -- nur eben still. Bis Stand
+        ' 24 ging der Umbau ungesehen durch, und ob er die Uebersetzung
+        ' kaputt macht, sah man beim naechsten Starten. Bleibt alles heil,
+        ' wird geschrieben; kommen Fehler dazu, geht die Vorschau doch auf,
+        ' mit den Meldungen oben. Sie erscheint dann genau dann, wenn sie
+        ' etwas zu sagen hat.
+        DIM schlimm AS INTEGER : schlimm = umbauNeueFehler()
+        IF schlimm = 0 THEN
+            umbauSchreiben()
+            RETURN
+        END IF
+        umbauWarnung = "Der Umbau bringt " + STR$(schlimm) + " Fehler DAZU -- darum diese Vorschau."
+        protokoll("umbau einwand still " + STR$(schlimm))
+    END IF
+    opsLeeren()
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(umbauZiele) - 1
+        opsBauen(k, SPLIT$(umbauAlt$(k), NL), SPLIT$(umbauZiele[k].text, NL))
+    NEXT
+    GUI_LISTBOX_CLEAR(lstUmbau)
+    DIM ln AS INTEGER
+    FOR ln = 0 TO LEN(umbauZiele) - 1
+        DIM lname AS STRING : lname = umbauZiele[ln].pfad
+        IF lname = "" AND umbauZiele[ln].tab >= 0 THEN lname = reiter[umbauZiele[ln].tab].name$()
+        GUI_LISTBOX_ADD(lstUmbau, BASENAME(lname))
+        GUI_LISTBOX_SET_CHECKED(lstUmbau, ln, TRUE)
+    NEXT
+    umbauAnzeigeBauen()
+    GUI_WINDOW_TITLE(winUmbau, tr$("Vorschau: ") + titel)
+    umbauFensterSetzen()
+    GUI_WINDOW_VISIBLE(winUmbau, TRUE)
+    GUI_FOCUS(btnUmbauOk)
+    DIM pm AS INTEGER : pm = 0
+    DIM pp AS INTEGER : pp = 0
+    DIM po AS INTEGER
+    FOR po = 0 TO LEN(opArt) - 1
+        IF opArt[po] = 1 THEN pm = pm + 1
+        IF opArt[po] = 2 THEN pp = pp + 1
+    NEXT
+    protokoll("umbau vorschau " + STR$(LEN(umbauZiele)) + " " + STR$(pm) + " " + STR$(pp))
+    IF umbauWarnung <> "" THEN protokoll("umbau einwand")
+END SUB
+
+' Den zuletzt geschriebenen Umbau in EINEM Zug zurueckschreiben.
+'
+' Geschrieben wird auf denselben zwei Wegen wie beim Umbau selbst: in den
+' Reiter ueber Auswahl + INSERT (ein Undo-Schritt), sonst auf die Platte.
+' Danach ist der Vorrat leer -- zweimal zurueck gaebe es nur mit einem
+' Stapel, und einer reicht fuer das, was hier schiefgeht.
+' Ein Stand eines Umbaus: welcher Reiter, welche Datei. Hat die Datei einen
+' Weg, entscheidet der -- die Reiternummer von damals kann nach einem
+' Schliessen auf eine andere Datei zeigen.
+FUNCTION umbauReiter(tab AS INTEGER, pfad AS STRING) AS INTEGER
+    IF pfad <> "" THEN RETURN tabMitPfad(pfad)
+    IF tab >= 0 AND tab < tabAnzahl THEN RETURN tab
+    RETURN -1
+END FUNCTION
+
+' Der Text, der JETZT dort steht -- im Reiter, sonst in der Datei.
+' CHR$(0), wenn es ihn nicht mehr gibt.
+FUNCTION umbauJetzt$(tab AS INTEGER, pfad AS STRING) AS STRING
+    DIM t AS INTEGER : t = umbauReiter(tab, pfad)
+    IF t >= 0 THEN RETURN GUI_TEXT(reiter[t].feld)
+    IF pfad = "" THEN RETURN CHR$(0)
+    TRY
+        RETURN dateiLesen(pfad)
+    CATCH e
+        RETURN CHR$(0)
+    END TRY
+END FUNCTION
+
+' Gleich bis auf Umbrueche am Ende -- die Datei traegt einen, der Reiter nicht.
+FUNCTION gleichesEnde(a AS STRING, b AS STRING) AS BOOLEAN
+    WHILE RIGHT$(a, 1) = NL : a = LEFT$(a, LEN(a) - 1) : WEND
+    WHILE RIGHT$(b, 1) = NL : b = LEFT$(b, LEN(b) - 1) : WEND
+    RETURN a = b
+END FUNCTION
+
+DIM standAbgelehnt AS STRING
+SUB umbauStandSetzen(tab AS INTEGER, pfad AS STRING, text AS STRING)
+    DIM t AS INTEGER : t = umbauReiter(tab, pfad)
+    IF t >= 0 THEN
+        ' Offen: in den Reiter, Auswahl ueber alles + INSERT -- ein
+        ' Undo-Schritt dort, gesichert wird wie immer mit Strg+S.
+        DIM ta AS GUI_WIDGET : ta = reiter[t].feld
+        DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(GUI_TEXT(ta), NL)
+        DIM letzte AS INTEGER : letzte = LEN(zeilen)
+        GUI_TEXTAREA_SELECT(ta, 1, 1, letzte, LEN(zeilen[letzte - 1]) + 1)
+        GUI_TEXTAREA_INSERT(ta, text)
+        RETURN
+    END IF
+    IF pfad = "" THEN RETURN
+    ' Abgelehnt (schreibgeschuetzt, Ordner weg): genannt statt die IDE zu
+    ' beenden; die Aufrufer haengen `standAbgelehnt` an ihre Meldung.
+    TRY
+        WRITEALL(pfad, text + NL)
+    CATCH e
+        standAbgelehnt = standAbgelehnt + IIF(standAbgelehnt = "", "", ", ") + BASENAME(pfad)
+        protokoll("umbau nicht geschrieben " + BASENAME(pfad))
+    END TRY
+END SUB
+
+' Die Dateien einer Gruppe (ab `ab`, `n` Stueck), die seit dem Stand
+' `erwartet` geaendert wurden -- "" wenn keine.
+FUNCTION umbauGeaendert$(tabs AS ARRAY OF INTEGER, pfade AS ARRAY OF STRING, _
+                         erwartet AS ARRAY OF STRING, ab AS INTEGER, n AS INTEGER) AS STRING
+    DIM raus AS ARRAY OF STRING : raus = []
+    DIM k AS INTEGER
+    FOR k = ab TO ab + n - 1
+        IF NOT gleichesEnde(umbauJetzt$(tabs[k], pfade[k]), erwartet[k]) THEN
+            ARRAY_PUSH(raus, IIF(pfade[k] = "", "Unbenannt", BASENAME(pfade[k])))
+        END IF
+    NEXT
+    RETURN JOIN$(raus, ", ")
+END FUNCTION
+
+SUB umbauZurueck()
+    IF LEN(zurStapel) = 0 THEN
+        GUI_SET_TEXT(lblStatus, tr$("Kein Umbau zum Zurücknehmen."))
+        protokoll("umbau zurueck 0")
+        RETURN
+    END IF
+    ' Der LETZTE Umbau: seine Eintraege stehen am Ende der Felder.
+    DIM mz AS INTEGER : mz = 0
+    DIM ms AS INTEGER : ms = 1
+    IF aktivesFeld() >= 0 THEN (mz, ms) = GUI_TEXTAREA_CURSOR(aktivesFeld())
+    DIM st AS UmbauStand : st = zurStapel[LEN(zurStapel) - 1]
+    DIM n AS INTEGER : n = st.anzahl()
+    DIM zurWas AS STRING : zurWas = st.name
+    ' Seit dem Umbau geaendert? Dann GAR NICHTS zuruecknehmen -- halb
+    ' zurueckgenommen waere schlimmer als gar nicht.
+    DIM geaendert AS STRING : geaendert = umbauGeaendert$(st.tabs, st.pfade, st.nachher, 0, n)
+    IF geaendert <> "" THEN
+        GUI_SET_TEXT(lblStatus, tr$("Nicht zurückgenommen: seit dem Umbau geändert -- ") + geaendert + tr$(". Strg+Z im Reiter nimmt die eigenen Änderungen zurück."))
+        protokoll("umbau zurueck geaendert " + geaendert)
+        RETURN
+    END IF
+    DIM k AS INTEGER
+    standAbgelehnt = ""
+    FOR k = 0 TO n - 1
+        umbauStandSetzen(st.tabs[k], st.pfade[k], st.vorher[k])
+    NEXT
+    ARRAY_PUSH(wdhStapel, st)
+    ARRAY_POP(zurStapel)
+    reiterNeuSetzen()
+    symSchluessel = "-"
+    GUI_SET_TEXT(lblStatus, tr$("Zurückgenommen: ") + zurWas + " (" + STR$(n) + tr$(" Datei(en), ") + _
+                 STR$(LEN(zurStapel)) + " weitere im Vorrat)" + IIF(standAbgelehnt = "", "", tr$(" Nicht geschrieben: ") + standAbgelehnt))
+    protokoll("umbau zurueck " + STR$(n))
+    IF aktivesFeld() >= 0 THEN
+        IF mz > 0 THEN GUI_TEXTAREA_GOTO(aktivesFeld(), mz, ms)
+        GUI_FOCUS(aktivesFeld())
+    END IF
+END SUB
+
+' Einen zurueckgenommenen Umbau wieder anwenden -- mit derselben Probe in
+' der Gegenrichtung: steht nicht mehr der Stand von vor dem Umbau da, bleibt
+' alles, wie es ist.
+SUB umbauWiederholen()
+    IF LEN(wdhStapel) = 0 THEN
+        GUI_SET_TEXT(lblStatus, tr$("Kein zurückgenommener Umbau zum Wiederholen."))
+        protokoll("umbau wieder 0")
+        RETURN
+    END IF
+    DIM st AS UmbauStand : st = wdhStapel[LEN(wdhStapel) - 1]
+    DIM n AS INTEGER : n = st.anzahl()
+    DIM was AS STRING : was = st.name
+    DIM geaendert AS STRING : geaendert = umbauGeaendert$(st.tabs, st.pfade, st.vorher, 0, n)
+    IF geaendert <> "" THEN
+        GUI_SET_TEXT(lblStatus, tr$("Nicht wiederholt: seit dem Zurücknehmen geändert -- ") + geaendert + ".")
+        protokoll("umbau wieder geaendert " + geaendert)
+        RETURN
+    END IF
+    DIM k AS INTEGER
+    standAbgelehnt = ""
+    FOR k = 0 TO n - 1
+        umbauStandSetzen(st.tabs[k], st.pfade[k], st.nachher[k])
+    NEXT
+    ARRAY_PUSH(zurStapel, st)
+    ARRAY_POP(wdhStapel)
+    reiterNeuSetzen()
+    symSchluessel = "-"
+    GUI_SET_TEXT(lblStatus, tr$("Wiederholt: ") + was + " (" + STR$(n) + tr$(" Datei(en))") + IIF(standAbgelehnt = "", "", tr$(" Nicht geschrieben: ") + standAbgelehnt))
+    protokoll("umbau wieder " + STR$(n))
+END SUB
+
+' Den zuletzt uebernommenen Umbau noch einmal vorlegen.
+'
+' Ein ausgelassener Block laesst sich sonst nur zurueckholen, indem man den
+' ganzen Umbau zuruecknimmt und ihn von vorn macht. Hier stehen dieselben
+' Schritte wieder da, mit derselben Auswahl -- man kippt den einen Block
+' und uebernimmt; gerechnet wird aus den Schritten, nicht aus dem, was
+' gerade in der Datei steht.
+SUB umbauNachbessern()
+    IF LEN(opArt) = 0 OR LEN(umbauNach) = 0 THEN
+        GUI_SET_TEXT(lblStatus, tr$("Nachbessern: es liegt kein übernommener Umbau vor."))
+        protokoll("umbau nachbessern 0")
+        RETURN
+    END IF
+    umbauZiele = []
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(umbauNach) - 1
+        ARRAY_PUSH(umbauZiele, NEW UmbauZiel(umbauNach[k].tab, umbauNach[k].pfad, ""))
+    NEXT
+    umbauMeldung = "Nachgebessert: " + umbauNachWas
+    umbauProt = "umbau nachgebessert " + STR$(LEN(umbauZiele))
+    umbauWarnung = ""
+    umbauZeile = 0 : umbauSpalte = 1
+    GUI_LISTBOX_CLEAR(lstUmbau)
+    DIM ln AS INTEGER
+    FOR ln = 0 TO LEN(umbauZiele) - 1
+        DIM lname AS STRING : lname = umbauZiele[ln].pfad
+        IF lname = "" AND umbauZiele[ln].tab >= 0 THEN lname = reiter[umbauZiele[ln].tab].name$()
+        GUI_LISTBOX_ADD(lstUmbau, BASENAME(lname))
+        GUI_LISTBOX_SET_CHECKED(lstUmbau, ln, TRUE)
+    NEXT
+    umbauAnzeigeBauen()
+    GUI_WINDOW_TITLE(winUmbau, tr$("Nachbessern: ") + umbauNachWas)
+    umbauFensterSetzen()
+    GUI_WINDOW_VISIBLE(winUmbau, TRUE)
+    GUI_FOCUS(btnUmbauOk)
+    protokoll("umbau nachbessern " + STR$(LEN(umbauZiele)))
+END SUB
+
+' Den Umbau pruefen, BEVOR er geschrieben ist.
+'
+' Bis Stand 21 lief `dhrt --check` erst auf dem Ergebnis -- also erst,
+' nachdem die Dateien schon anders aussahen. Hier laeuft er ueber die
+' Texte, die geschrieben WUERDEN, mit der Blockauswahl von jetzt: wer einen
+' Block auslaesst und damit etwas kaputt macht, sieht es vor dem Schreiben.
+'
+' Gerechnet wird nur auf Verlangen: ein Umbau ueber zwoelf Dateien braeuchte
+' sonst zwoelf Uebersetzungslaeufe, ehe man den Unterschied ueberhaupt zu
+' sehen bekommt.
+SUB umbauPruefen()
+    IF LEN(umbauZiele) = 0 THEN RETURN
+    DIM summe AS INTEGER : summe = umbauZaehlen()
+    DIM sagen AS STRING
+    IF summe = 0 THEN
+        sagen = "Geprueft: kein Fehler in " + STR$(LEN(umbauZiele)) + " Datei(en)."
+    ELSE
+        sagen = "Geprueft: " + STR$(summe) + " Fehler -- sie stehen oben im Unterschied."
+    END IF
+    umbauAnzeigeBauen()
+    GUI_SET_TEXT(lblUmbau, sagen)
+    GUI_SET_TEXT(lblStatus, sagen)
+    protokoll("umbau geprueft " + STR$(summe))
+END SUB
+
+' Wie viele Fehler der Umbau DAZUBRINGT -- je Datei vorher gegen nachher.
+'
+' Nicht die absolute Zahl: eine Datei, die schon nicht uebersetzt, wuerde
+' sonst jeden Umbau in die Vorschau zwingen, obwohl er nichts damit zu tun
+' hat. Der stille Weg fragt darum hier, der Knopf in der Vorschau zaehlt
+' weiter absolut -- dort will man LESEN, was im Argen liegt.
+FUNCTION umbauNeueFehler() AS INTEGER
+    DIM summe AS INTEGER : summe = 0
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(umbauZiele) - 1
+        DIM name AS STRING : name = umbauZiele[k].pfad
+        IF name = "" AND umbauZiele[k].tab >= 0 THEN name = reiter[umbauZiele[k].tab].name$()
+        IF LOWER$(RIGHT$(name, 3)) <> ".dh" THEN CONTINUE
+        DIM vorher AS INTEGER : vorher = fehlerZahl(umbauAlt$(k))
+        DIM nachher AS INTEGER : nachher = fehlerZahl(umbauZiele[k].text)
+        IF nachher > vorher THEN summe = summe + (nachher - vorher)
+    NEXT
+    RETURN summe
+END FUNCTION
+
+' Die Texte, die geschrieben WUERDEN, durch den Uebersetzer schicken --
+' liefert die Zahl der Fehler und fuellt `umbauBefunde`. Zwei Aufrufer: der
+' Knopf in der Vorschau und der stille Weg ohne sie.
+FUNCTION umbauZaehlen() AS INTEGER
+    umbauBefunde = []
+    DIM summe AS INTEGER : summe = 0
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(umbauZiele) - 1
+        DIM name AS STRING : name = umbauZiele[k].pfad
+        IF name = "" AND umbauZiele[k].tab >= 0 THEN name = reiter[umbauZiele[k].tab].name$()
+        ' Nur .dh: eine .dhform ist JSON, da hat der Uebersetzer nichts zu
+        ' suchen (und meldete jede Zeile als Fehler).
+        IF LOWER$(RIGHT$(name, 3)) <> ".dh" THEN CONTINUE
+        DIM j AS JSON_HANDLE : j = JSON_PARSE(CODE_CHECK$(umbauZiele[k].text, projektOrdner))
+        DIM i AS INTEGER
+        FOR i = 0 TO JSON_LEN(j, "") - 1
+            DIM pp AS STRING : pp = STR$(i)
+            IF JSON_GET_STRING(j, pp + ".schwere") <> "fehler" THEN CONTINUE
+            ' WELCHER Fehler, nicht nur wie viele: eine Zahl sagt einem
+            ' nicht, ob man den Block wieder aufnehmen muss oder etwas
+            ' anderes vergessen hat.
+            ARRAY_PUSH(umbauBefunde, BASENAME(name) + ":" + _
+                       STR$(JSON_GET_INT(j, pp + ".zeile")) + ": " + _
+                       JSON_GET_STRING(j, pp + ".meldung"))
+            summe = summe + 1
+        NEXT
+    NEXT
+    RETURN summe
+END FUNCTION
+
+SUB umbauVerwerfen()
+    GUI_WINDOW_VISIBLE(winUmbau, FALSE)
+    umbauLeeren()
+    GUI_SET_TEXT(lblStatus, tr$("Umbau verworfen -- nichts geändert."))
+    protokoll("umbau verworfen")
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta >= 0 THEN GUI_FOCUS(ta)
+END SUB
+
+SUB umbauSchreiben()
+    ' ZUERST das Abgewaehlte heraus -- vor dem Ausblenden des Fensters (die
+    ' Kaestchen sitzen darin) und vor dem Vorrat zum Zuruecknehmen, sonst
+    ' schriebe ein Strg+Umschalt+Z eine Datei zurueck, die gar nicht
+    ' geaendert wurde.
+    IF GUI_WINDOW_SHOWN(winUmbau) THEN
+        DIM ab AS INTEGER
+        FOR ab = LEN(umbauZiele) - 1 TO 0 STEP -1
+            IF NOT GUI_LISTBOX_CHECKED(lstUmbau, ab) THEN
+                ARRAY_REMOVE_AT(umbauZiele, ab)
+            END IF
+        NEXT
+    END IF
+    GUI_WINDOW_VISIBLE(winUmbau, FALSE)
+    IF LEN(umbauZiele) = 0 THEN
+        GUI_SET_TEXT(lblStatus, tr$("Alles abgewählt -- nichts geändert."))
+        protokoll("umbau abgewaehlt alles")
+        umbauLeeren()
+        IF aktivesFeld() >= 0 THEN GUI_FOCUS(aktivesFeld())
+        RETURN
+    END IF
+    ' Den Stand VOR dem Umbau aufheben, bevor er ueberschrieben wird.
+    DIM neuStand AS UmbauStand : neuStand = NEW UmbauStand(umbauMeldung)
+    DIM v AS INTEGER
+    FOR v = 0 TO LEN(umbauZiele) - 1
+        neuStand.dazu(umbauZiele[v].tab, umbauZiele[v].pfad, umbauAlt$(v), umbauZiele[v].text)
+    NEXT
+    ARRAY_PUSH(zurStapel, neuStand)
+    wdhStapel = []
+    ' Der aelteste faellt heraus -- ein Vorrat, der mit jedem Umbau waechst,
+    ' haelt irgendwann das ganze Projekt in mehreren Fassungen.
+    WHILE LEN(zurStapel) > ZUR_MAX
+        ARRAY_REMOVE_AT(zurStapel, 0)
+    WEND
+    ' Abgelehnte Dateien (schreibgeschuetzt, Ordner weg) werden genannt, die
+    ' uebrigen trotzdem geschrieben. Ohne TRY beendete die erste abgelehnte
+    ' die IDE mitten im Umbau.
+    DIM abgelehnt AS STRING : abgelehnt = ""
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(umbauZiele) - 1
+        IF umbauZiele[k].tab >= 0 THEN
+            ' In den Reiter: Auswahl ueber alles + INSERT. GUI_SET_TEXT
+            ' leerte den Verlauf -- so nimmt EIN Strg+Z den Umbau zurueck.
+            DIM ta AS GUI_WIDGET : ta = reiter[umbauZiele[k].tab].feld
+            DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(GUI_TEXT(ta), NL)
+            DIM letzte AS INTEGER : letzte = LEN(zeilen)
+            GUI_TEXTAREA_SELECT(ta, 1, 1, letzte, LEN(zeilen[letzte - 1]) + 1)
+            GUI_TEXTAREA_INSERT(ta, umbauZiele[k].text)
+        ELSE
+            DIM geschrieben AS BOOLEAN : geschrieben = TRUE
+            TRY
+                WRITEALL(umbauZiele[k].pfad, umbauZiele[k].text + NL)
+            CATCH e
+                geschrieben = FALSE
+                abgelehnt = abgelehnt + IIF(abgelehnt = "", "", ", ") + BASENAME(umbauZiele[k].pfad)
+                protokoll("umbau nicht geschrieben " + BASENAME(umbauZiele[k].pfad))
+            END TRY
+            IF NOT geschrieben THEN CONTINUE
+            DIM t AS INTEGER : t = tabMitPfad(umbauZiele[k].pfad)
+            IF t >= 0 THEN
+                GUI_SET_TEXT(reiter[t].feld, umbauZiele[k].text)
+                reiter[t].gesichert = umbauZiele[k].text
+                reiter[t].letzterText = ""
+            END IF
+        END IF
+    NEXT
+    ' Eine Datei, die es vorher nicht gab, bekommt einen Reiter: sonst hat
+    ' der Umbau etwas angelegt, das niemand sieht, und man sucht es im
+    ' Projektbaum.
+    DIM neuDa AS INTEGER : neuDa = 0
+    DIM warTab AS INTEGER : warTab = aktiverTab
+    DIM nk2 AS INTEGER
+    FOR nk2 = 0 TO LEN(umbauZiele) - 1
+        IF umbauZiele[nk2].tab >= 0 OR umbauZiele[nk2].pfad = "" THEN CONTINUE
+        IF neuStand.vorher[nk2] <> "" THEN CONTINUE
+        dateiOeffnen(umbauZiele[nk2].pfad)
+        neuDa = neuDa + 1
+    NEXT
+    IF neuDa > 0 THEN
+        ' Vorn bleibt, woran man gearbeitet hat -- die neue Datei liegt
+        ' daneben. Sonst schriebe die Marke unten in eine fremde Datei.
+        IF warTab >= 0 AND warTab < tabAnzahl THEN
+            aktiverTab = warTab
+            GUI_SET_ACTIVE_TAB(win, aktiverTab)
+        END IF
+        protokoll("umbau neue datei " + STR$(neuDa))
+    END IF
+    DIM feld AS GUI_WIDGET : feld = aktivesFeld()
+    IF feld >= 0 THEN
+        IF umbauZeile > 0 THEN GUI_TEXTAREA_GOTO(feld, umbauZeile, umbauSpalte)
+        GUI_FOCUS(feld)
+    END IF
+    reiterNeuSetzen()
+    symSchluessel = "-"
+    ' Fuer das Nachbessern merken -- die Schritte selbst bleiben ohnehin
+    ' stehen, nur die Zuordnung zu den Dateien geht mit umbauLeeren weg.
+    umbauNach = [] : umbauNachWas = umbauMeldung
+    DIM nk AS INTEGER
+    FOR nk = 0 TO LEN(umbauZiele) - 1
+        ARRAY_PUSH(umbauNach, NEW UmbauZiel(umbauZiele[nk].tab, umbauZiele[nk].pfad, ""))
+    NEXT
+    IF abgelehnt = "" THEN
+        GUI_SET_TEXT(lblStatus, umbauMeldung)
+    ELSE
+        GUI_SET_TEXT(lblStatus, umbauMeldung + tr$(" Nicht geschrieben: ") + abgelehnt)
+    END IF
+    IF umbauProt <> "" THEN protokoll(umbauProt)
+    umbauLeeren()
+END SUB
+
+' --- Vererbung: wer eine Ueberschreibung umbenennt, zerreisst sie -------
+' Heisst eine Methode in der Oberklasse genauso, ist die Umbenennung in
+' EINER Klasse keine Umbenennung, sondern eine Trennung: die Ueberschreibung
+' greift nicht mehr, und zwar ohne Uebersetzungsfehler -- gerufen wird von
+' da an die Fassung der Oberklasse. Genau darum steht es in der Vorschau.
+CLASS KlassenInfo
+    DIM name AS STRING
+    DIM basis AS STRING             ' die Oberklasse, "" = keine
+    DIM datei AS STRING
+    DIM methoden AS STRING          ' "|name|name|", klein
+    SUB Init(n AS STRING, b AS STRING, d AS STRING, m AS STRING)
+        name = n : basis = b : datei = d : methoden = m
+    END SUB
+    FUNCTION hat(methode AS STRING) AS BOOLEAN
+        RETURN INSTR(methoden, "|" + LOWER$(methode) + "|") >= 0
+    END FUNCTION
+END CLASS
+DIM klassen AS ARRAY OF KlassenInfo : klassen = []
+
+' Alle Klassen des Projekts einlesen: Name, Oberklasse, Methoden.
+SUB klassenLesen()
+    klassen = []
+    DIM d AS STRING
+    FOR EACH d IN projektDateien("*.dh", TRUE)
+        DIM pfad AS STRING : pfad = PATHJOIN(projektOrdner, d)
+        DIM quelle AS STRING : quelle = projektQuelle$(pfad)
+        IF quelle = "" THEN CONTINUE
+        DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(quelle, NL)
+        DIM j AS JSON_HANDLE : j = JSON_PARSE(CODE_SYMBOLS$(quelle))
+        DIM i AS INTEGER
+        FOR i = 0 TO JSON_LEN(j, "") - 1
+            DIM p AS STRING : p = STR$(i)
+            IF LOWER$(JSON_GET_STRING(j, p + ".art")) <> "class" THEN CONTINUE
+            DIM name AS STRING : name = JSON_GET_STRING(j, p + ".name")
+            DIM von AS INTEGER : von = JSON_GET_INT(j, p + ".von")
+            ' Die Oberklasse steht nur im TEXT der Kopfzeile -- CODE_SYMBOLS$
+            ' kennt sie nicht.
+            DIM basis AS STRING : basis = ""
+            IF von >= 1 AND von <= LEN(zeilen) THEN basis = extendsName$(zeilen[von - 1])
+            DIM mm AS STRING : mm = "|"
+            DIM m AS INTEGER
+            FOR m = 0 TO JSON_LEN(j, p + ".kinder") - 1
+                mm = mm + LOWER$(JSON_GET_STRING(j, p + ".kinder." + STR$(m) + ".name")) + "|"
+            NEXT
+            ARRAY_PUSH(klassen, NEW KlassenInfo(name, basis, d, mm))
+        NEXT
+    NEXT
+END SUB
+
+' Der Name hinter EXTENDS in einer CLASS-Kopfzeile, "" ohne. Nur der Name:
+' ein Kommentar dahinter (`CLASS Hund EXTENDS Tier ' Haustier`) gehoerte
+' sonst mit zum Namen, und die Klasse fand ihre Oberklasse nicht.
+FUNCTION extendsName$(zeile AS STRING) AS STRING
+    DIM ex AS INTEGER : ex = INSTR(UPPER$(zeile), " EXTENDS ")
+    IF ex < 0 THEN RETURN ""
+    DIM rest AS STRING : rest = TRIM$(MID$(zeile, ex + 9))
+    DIM e AS INTEGER : e = 0
+    WHILE e < LEN(rest)
+        IF NOT istWortzeichen(MID$(rest, e, 1)) THEN BREAK
+        e = e + 1
+    WEND
+    RETURN LEFT$(rest, e)
+END FUNCTION
+
+FUNCTION klasseIndex(name AS STRING) AS INTEGER
+    DIM klein AS STRING : klein = LOWER$(name)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(klassen) - 1
+        IF LOWER$(klassen[i].name) = klein THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
+
+' Welche ANDERE Klasse derselben Familie hat eine Methode dieses Namens?
+' Geliefert wird "Tier (helfer.dh)" oder "". Gegangen wird nach oben ueber
+' EXTENDS und nach unten ueber alle, die davon erben -- eine Umbenennung
+' zerreisst die Verbindung in beide Richtungen gleichermassen.
+FUNCTION familieHatMethode$(klasse AS STRING, methode AS STRING) AS STRING
+    ' nach oben
+    DIM oben AS STRING : oben = klasse
+    DIM runde AS INTEGER : runde = 0
+    WHILE runde < 20
+        runde = runde + 1
+        DIM k AS INTEGER : k = klasseIndex(oben)
+        IF k < 0 OR klassen[k].basis = "" THEN BREAK
+        oben = klassen[k].basis
+        DIM o AS INTEGER : o = klasseIndex(oben)
+        IF o < 0 THEN BREAK
+        IF klassen[o].hat(methode) THEN RETURN klassen[o].name + " (" + klassen[o].datei + ")"
+    WEND
+    ' nach unten: alles, was (ueber Zwischenstufen) von `klasse` erbt
+    DIM unten AS ARRAY OF STRING : unten = [LOWER$(klasse)]
+    DIM gewachsen AS BOOLEAN : gewachsen = TRUE
+    DIM tiefe AS INTEGER : tiefe = 0
+    WHILE gewachsen AND tiefe < 20
+        gewachsen = FALSE
+        tiefe = tiefe + 1
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(klassen) - 1
+            IF klassen[i].basis = "" THEN CONTINUE
+            IF ARRAY_INDEXOF(unten, LOWER$(klassen[i].basis)) < 0 THEN CONTINUE
+            IF ARRAY_INDEXOF(unten, LOWER$(klassen[i].name)) >= 0 THEN CONTINUE
+            ARRAY_PUSH(unten, LOWER$(klassen[i].name))
+            gewachsen = TRUE
+            IF klassen[i].hat(methode) THEN RETURN klassen[i].name + " (" + klassen[i].datei + ")"
+        NEXT
+    WEND
+    RETURN ""
+END FUNCTION
+
+' Der Einwand zum Umbenennen von `wort` an der Marke -- "" wenn keiner.
+' Zwei Fragen: gibt es den neuen Namen schon, und zerreisst die Umbenennung
+' eine Ueberschreibung?
+FUNCTION umbenennEinwand$(alt AS STRING, neu AS STRING) AS STRING
+    DIM schon AS STRING : schon = nameVergeben$(neu)
+    IF schon <> "" THEN
+        RETURN "Achtung: '" + neu + "' gibt es im Projekt schon (" + schon + ")."
+    END IF
+    ' Nach der Klasse wird nicht an der MARKE gefragt -- die steht vielleicht
+    ' auf einem Aufruf, und der kann ueberall stehen. Gefragt wird, WELCHE
+    ' Klassen eine Methode dieses Namens haben.
+    klassenLesen()
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(klassen) - 1
+        IF NOT klassen[i].hat(alt) THEN CONTINUE
+        DIM wo AS STRING : wo = familieHatMethode$(klassen[i].name, alt)
+        IF wo = "" THEN CONTINUE
+        RETURN "Achtung: '" + alt + "' gibt es in " + klassen[i].name + " UND in " + wo + _
+               " -- wird nur eine umbenannt, greift die Überschreibung nicht mehr, " + _
+               "und zwar ohne Fehlermeldung."
+    NEXT
+    RETURN ""
+END FUNCTION
+
+' --- Umbenennen (Umschalt+F6) ----------------------------------------
+' Das Umbenennen selbst macht CODE_RENAME$: ganze Woerter, ohne Kommentare
+' und Zeichenketten. Die IDE fragt nur den neuen Namen und schreibt das
+' Ergebnis als EINEN Undo-Schritt zurueck (Auswahl ueber alles + INSERT --
+' GUI_SET_TEXT leerte den Verlauf).
+SUB umbenennenFragen()
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN
+    DIM alt AS STRING : alt = wortUnterMarke$()
+    IF alt = "" THEN
+        GUI_SET_TEXT(lblStatus, tr$("Umbenennen: unter der Marke steht kein Name."))
+        RETURN
+    END IF
+    (umbenennZeile, umbenennSpalte) = GUI_TEXTAREA_CURSOR(ta)
+    umbenennWort = alt
+    dlgUmbenennen = GUI_PROMPT(tr$("Umbenennen"), "'" + alt + tr$("' überall nennen in:"), alt)
+END SUB
+
+SUB umbenennenAusfuehren(neu AS STRING)
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN
+    DIM q AS STRING : q = GUI_TEXT(ta)
+    DIM neuText AS STRING : neuText = CODE_RENAME$(q, umbenennZeile, umbenennSpalte, neu)
+    IF neuText = "" THEN
+        GUI_SET_TEXT(lblStatus, tr$("Umbenennen: '") + neu + tr$("' geht nicht -- ein Name fängt mit Buchstabe oder _ an, und Schlüsselwörter und eingebaute Namen bleiben, wie sie sind."))
+        RETURN
+    END IF
+    IF neuText = q THEN
+        GUI_SET_TEXT(lblStatus, tr$("Umbenennen: nichts zu tun."))
+        RETURN
+    END IF
+    ' Die Zahl der Fundstellen sagt CODE_REFERENCES -- am ALTEN Text, denn
+    ' im neuen heisst der Name schon anders.
+    DIM n AS INTEGER : n = LEN(CODE_REFERENCES(q, umbenennZeile, umbenennSpalte))
+    umbauLeeren()
+    umbauVormerken(aktiverTab, reiter[aktiverTab].pfad, neuText)
+    umbauZeile = umbenennZeile : umbauSpalte = umbenennSpalte
+    formulareNachziehen(umbenennWort, neu)
+    umbauWarnung = umbenennEinwand$(umbenennWort, neu)
+    umbauStarten("Umbenennen in '" + neu + "'", _
+                 STR$(n) + " Stellen umbenannt in '" + neu + "'.", _
+                 "umbenannt " + STR$(n) + " " + neu)
+END SUB
