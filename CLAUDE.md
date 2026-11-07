@@ -3551,6 +3551,13 @@ GPU-Verlauf mit denselben Baendern. Nicht angefasst: `Gradient4`,
 Zeilen, dann acht andere; die alte Laufzeit hat 23 bzw. 16) und drei
 Rust-Tests `verlauf_tests`.
 
+**Grosse Flaechen leiser** (an `verlauf_hoehe` gekoppelt, ohne die Metrik
+unveraendert): die Fase bekommt das QUADRAT von `verlauf_anteil` (eine
+helle Linie ueber einer Leiste von 200 Punkten war die Kante aus Windows
+95; Deckkraft nie unter 1, 0 hiesse deckend), der Fokusring den Anteil
+selbst (um das Code-Feld lag er als zweiter Rahmen um den ersten). Tests
+zwei Faelle in `gui_verlauf_hoehe.dhtest`, die alte Laufzeit faellt beide.
+
 ## Bastelzentrale (2026-11-06)
 
 Wunsch des Nutzers nach den sieben Bastler-Punkten: "ein super Programm fuer

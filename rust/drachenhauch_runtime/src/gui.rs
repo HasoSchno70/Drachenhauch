@@ -12713,7 +12713,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         } else {
             g.box_fill(x1, y1, x2, y2, fill);
         }
-        self.bevel(g, x1, y1, x2, y2, rad, tief);
+        self.bevel(g, x1, y1, x2, y2, rad, tief, anteil);
         // Randbreite aus der Stildatei: 0 = kein Rand, mehr = Ringe nach innen.
         let breite = self.form_jetzt.get().rand.unwrap_or(1);
         for k in 0..breite.min((x2 - x1).min(y2 - y1) / 2) {
@@ -12791,16 +12791,29 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     /// Fase: eine helle Linie oben, eine dunkle unten. Die schmalste Zutat
     /// mit der groessten Wirkung -- sie trennt die Flaeche sichtbar vom
     /// Untergrund.
-    fn bevel(&self, g: &mut Graphics, x1: i32, y1: i32, x2: i32, y2: i32, rad: i32, tief: bool) {
+    ///
+    /// Auf einer HOHEN Flaeche (Metrik `verlauf_hoehe`) wird sie leiser, mit
+    /// dem Quadrat des Anteils, den auch Verlauf und Glanz bekommen: eine
+    /// helle Linie in voller Staerke ueber einer ganzen Liste ist die Kante
+    /// eines Knopfs aus Windows 95 -- auf einem Knopf richtig, auf einer
+    /// Leiste von 200 Punkten zu laut. Ohne die Metrik bleibt sie, wie sie war.
+    #[allow(clippy::too_many_arguments)]
+    fn bevel(&self, g: &mut Graphics, x1: i32, y1: i32, x2: i32, y2: i32, rad: i32, tief: bool,
+             anteil: f64) {
         if self.m_form("bevel") <= 0 || x2 - x1 < 4 {
             return;
         }
         let ein = rad.max(1);
+        // Deckkraft 0 hiesse in dhrt DECKEND -- leiser wird es bis 1.
+        let leiser = |a: i64, rgb: i64| -> i64 {
+            let a = ((a as f64) * anteil * anteil).round().max(1.0) as i64;
+            (a << 24) | rgb
+        };
         let (oben, unten) = if tief {
             // Versenkt: Schatten oben, Lichtkante unten.
-            (0x60000000u32 as i64, 0x38FFFFFFu32 as i64)
+            (leiser(0x60, 0x000000), leiser(0x38, 0xFFFFFF))
         } else {
-            (0x50FFFFFFu32 as i64, 0x40000000u32 as i64)
+            (leiser(0x50, 0xFFFFFF), leiser(0x40, 0x000000))
         };
         g.line(x1 + ein, y1 + 1, x2 - ein, y1 + 1, oben);
         g.line(x1 + ein, y2 - 1, x2 - ein, y2 - 1, unten);
@@ -21300,7 +21313,13 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             }
         }
         if wdg.fokus_t > 0.0 && wdg.kind.fokussierbar() {
-            g.rect(ax - 3, ay - 3, ax + w + 2, ay + h + 2, deckkraft(self.th("accent"), weich(wdg.fokus_t)));
+            // Um eine GROSSE Flaeche (Metrik `verlauf_hoehe`) leiser: dort
+            // liegt der Ring als zweiter Rahmen um den ersten, und um ein
+            // Code-Feld von 900 Punkten sieht das unruhig aus; die Schreibmarke
+            // zeigt den Fokus ohnehin. Ein Fuenftel bleibt immer stehen.
+            let leise = self.verlauf_anteil(h);
+            g.rect(ax - 3, ay - 3, ax + w + 2, ay + h + 2,
+                   deckkraft(self.th("accent"), weich(wdg.fokus_t) * leise));
         }
         // Fehlerrahmen der Formularpruefung: zwei Linien in Rot, direkt am
         // Rand -- der Fokusring liegt weiter aussen, beide bleiben sichtbar.
