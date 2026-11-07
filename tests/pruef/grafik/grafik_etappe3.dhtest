@@ -150,29 +150,6 @@ DHRT_FRAMES=60
 --- erwartet
 ferne TRUE
 
-=== warten auf eingabe macht die bilder langsam, bis es aus ist
-' Ohne Eingabe wartet FLIP bis zu 0,2 s; gemessen im Mittel rund 0,14 s
-' (der Weckfaden laeuft unabhaengig vom Bild). Abgeschaltet wieder ~16 ms.
-SCREEN(320, 200, "t")
-DIM i AS INTEGER
-DIM t0 AS FLOAT
-FOR i = 1 TO 3 : FLIP() : NEXT
-WINDOW_WAIT_EVENTS(0.2)
-FLIP()
-t0 = GET_TIME()
-FOR i = 1 TO 5 : FLIP() : NEXT
-PRINT "mit warten langsam "; (GET_TIME() - t0) / 5.0 > 0.08
-WINDOW_WAIT_EVENTS(0)
-FLIP()
-t0 = GET_TIME()
-FOR i = 1 TO 5 : FLIP() : NEXT
-PRINT "ohne warten schnell "; (GET_TIME() - t0) / 5.0 < 0.06
---- umgebung
-DHRT_FRAMES=100
---- erwartet
-mit warten langsam TRUE
-ohne warten schnell TRUE
-
 === echte pixelgroesse und maus-massstab
 ' Die Pixelgroesse ist die logische mal die Bildschirm-Skalierung. Mit
 ' MOUSE_OFFSET(-40, 0) und MOUSE_SCALE(0.5, 0.5) wird aus einer Maus bei

@@ -1,0 +1,36 @@
+' WINDOW_WAIT_EVENTS: ohne Eingabe wartet FLIP, bis etwas geschieht.
+' Eine eigene Sammlung und seriell, weil das Warten von JEDEM Ereignis am
+' Fenster geweckt wird -- im vollen Lauf tauchen daneben bis zu acht andere
+' Fenster auf und verschwinden, und das weckte es ab und zu vor der Zeit
+' ("mit warten langsam FALSE"). Bis 2026-11-07 in grafik/grafik_etappe3.dhtest.
+--- seriell
+
+=== warten auf eingabe macht die bilder langsam, bis es aus ist
+' Ohne Eingabe wartet FLIP bis zu 0,2 s; gemessen im Mittel rund 0,14 s
+' (der Weckfaden laeuft unabhaengig vom Bild). Abgeschaltet wieder ~16 ms.
+' Die zweite Zusage ist RELATIV: unter Last dauert ein Bild auch ohne
+' Warten laenger als 60 ms, eine feste Grenze passte dann nicht mehr --
+' das Warten bleibt trotzdem deutlich laenger.
+SCREEN(320, 200, "t")
+DIM i AS INTEGER
+DIM t0 AS FLOAT
+DIM mit AS FLOAT
+DIM ohne AS FLOAT
+FOR i = 1 TO 3 : FLIP() : NEXT
+WINDOW_WAIT_EVENTS(0.2)
+FLIP()
+t0 = GET_TIME()
+FOR i = 1 TO 5 : FLIP() : NEXT
+mit = (GET_TIME() - t0) / 5.0
+PRINT "mit warten langsam "; mit > 0.08
+WINDOW_WAIT_EVENTS(0)
+FLIP()
+t0 = GET_TIME()
+FOR i = 1 TO 5 : FLIP() : NEXT
+ohne = (GET_TIME() - t0) / 5.0
+PRINT "ohne warten hoechstens halb so lang "; ohne < mit / 2.0
+--- umgebung
+DHRT_FRAMES=100
+--- erwartet
+mit warten langsam TRUE
+ohne warten hoechstens halb so lang TRUE
