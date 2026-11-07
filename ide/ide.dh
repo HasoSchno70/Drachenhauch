@@ -230,6 +230,9 @@ SUB bereichsFarben()
     GUI_SET_COLOR(tfSeriell, "bg", farbMisch(grund, TON_AUSGABE, anteil))
     GUI_SET_COLOR(tfEingabe, "bg", farbMisch(grund, TON_AUSGABE, anteil))
     GUI_SET_COLOR(lstProbleme, "bg", farbMisch(grund, TON_PROBLEME, anteil))
+    ' Die Ueberschrift der Hilfe gedaempft: sie sagt, was darunter steht, und
+    ' soll nicht lauter sein als der Text selbst.
+    GUI_SET_COLOR(lblHilfeKopf, "fg", GUI_THEME_GET("muted_fg"))
     GUI_SET_COLOR(tblVars, "bg", farbMisch(grund, TON_DEBUG, anteil))
     protokoll("bereichsfarben " + COLOR_HEX$(farbMisch(grund, TON_AUSGABE, anteil)))
 END SUB
@@ -2976,8 +2979,8 @@ SUB layoutLeisten()
     IF b > 0 THEN
         GUI_SET_BOUNDS(lstProbleme, x, y, b, h \ 2 - 4)
         GUI_SET_BOUNDS(lblHilfeKopf, x, y + h \ 2, b, 18)
-        GUI_SET_BOUNDS(lblHilfe, x + 8, y + h \ 2 + 22, b - 8, h \ 2 - 22)
-        GUI_SET_WRAP(lblHilfe, MAX(40, b - 16))
+        GUI_SET_BOUNDS(lblHilfe, x, y + h \ 2 + 22, b, h \ 2 - 22)
+        GUI_SET_WRAP(lblHilfe, MAX(40, b - 8))
         (kx, ky, kb, kh) = GUI_DOCK_HEAD_RECT(win, "probleme")
         GUI_SET_BOUNDS(lblProbleme, kx + 8, ky + 2, MAX(40, kb - 8), 18)
     END IF
@@ -4884,7 +4887,7 @@ SUB pruefen()
     ' zu schicken fuellt die Liste mit Meldungen ueber etwas, das gar kein
     ' Programm ist.
     IF reiter[aktiverTab].pfad <> "" AND LOWER$(RIGHT$(reiter[aktiverTab].pfad, 3)) <> ".dh" THEN
-        GUI_SET_TEXT(lblProbleme, tr$("Probleme: -- (") + BASENAME(reiter[aktiverTab].pfad) + _
+        GUI_SET_TEXT(lblProbleme, "(" + BASENAME(reiter[aktiverTab].pfad) + _
                      " ist kein Drachenhauch)")
         gliederungLeeren()
         RETURN
@@ -4934,11 +4937,11 @@ SUB pruefen()
     IF fehlerEndeAn AND LEN(fh) > 0 THEN protokoll("fehlertexte " + STR$(LEN(fh)))
     IF problemModus = 0 THEN
         IF n = 0 THEN
-            GUI_SET_TEXT(lblProbleme, tr$("Probleme: keine"))
+            GUI_SET_TEXT(lblProbleme, tr$("keine"))
         ELSE
             DIM zusatz AS STRING : zusatz = ""
             IF hinweise > 0 THEN zusatz = ", " + STR$(hinweise) + IIF(hinweise = 1, " Hinweis", " Hinweise")
-            GUI_SET_TEXT(lblProbleme, tr$("Probleme: ") + STR$(fehler) + tr$(" Fehler, ") + STR$(n - fehler - hinweise) + tr$(" Warnungen") + zusatz)
+            GUI_SET_TEXT(lblProbleme, STR$(fehler) + tr$(" Fehler, ") + STR$(n - fehler - hinweise) + tr$(" Warnungen") + zusatz)
         END IF
     END IF
     ' Gezaehlt werden Fehler und Warnungen; Hinweise sind kein Problem.
