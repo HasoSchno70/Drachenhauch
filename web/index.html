@@ -11,6 +11,9 @@
     header { padding: 10px 16px; background: #1a2738;
              border-bottom: 1px solid #243a4d; }
     header h1 { font-size: 16px; margin: 0; color: #2de0e0; }
+    header #zurueck { float: right; color: #8fd8e0; text-decoration: none;
+                      font-size: 14px; }
+    header #zurueck:hover { color: #2de0e0; }
     header small { color: #7a8e96; }
     #wrap { display: flex; gap: 12px; padding: 12px; flex-wrap: wrap; }
     #editor { flex: 1 1 380px; min-width: 300px; }
@@ -44,13 +47,14 @@
 </head>
 <body>
   <header>
-    <h1>Drachenhauch — Web-Playground</h1>
-    <small>native Runtime <code>dhrt</code> als WebAssembly (experimentell)</small>
+    <a id="zurueck" hidden>← Drachenhauch</a>
+    <h1 data-t="titel">Drachenhauch — Web-Playground</h1>
+    <small data-t="untertitel">native Runtime <code>dhrt</code> als WebAssembly (experimentell)</small>
   </header>
 
   <div class="bar">
-    <button id="run" disabled>▶ Ausführen</button>
-    <button id="share" style="background:#1a2738;color:#2de0e0;border:1px solid #2de0e0;margin-left:6px;">🔗 Link teilen</button>
+    <button id="run" disabled data-t="ausfuehren">▶ Ausführen</button>
+    <button id="share" style="background:#1a2738;color:#2de0e0;border:1px solid #2de0e0;margin-left:6px;" data-t="teilen">🔗 Link teilen</button>
     <span id="status" class="note" style="padding:0 8px;">lade …</span>
     <span id="galerie" class="galerie"></span>
   </div>
@@ -58,7 +62,7 @@
   <div id="wrap">
     <div id="editor">
       <textarea id="src" spellcheck="false" autocomplete="off"
-                placeholder="Drachenhauch-Quelltext …"></textarea>
+                placeholder="Drachenhauch-Quelltext …" data-t-placeholder="platzhalter"></textarea>
     </div>
     <div id="stage">
       <canvas id="canvas" width="800" height="450" tabindex="-1"
@@ -67,7 +71,7 @@
     </div>
   </div>
 
-  <p class="note">
+  <p class="note" data-t="hinweis">
     Die Knöpfe oben laden je ein fertiges Beispiel und starten es sofort.
     <b>▶ Demo</b> lädt das Programm, mit dem dieser Build gemacht wurde (samt
     seinen Assets); die übrigen Beispiele laden bewusst keine Dateien und
@@ -83,8 +87,8 @@
     <code>docs/web-playground.md</code>.
   </p>
 
-  <script src="beispiele.js?v=1"></script>
-  <script src="playground.js?v=3"></script>
+  <script src="beispiele.js?v=2"></script>
+  <script src="playground.js?v=4"></script>
   <!-- Vom Build erzeugt; fehlt im Repo, bis `rust/build_wasm.py` lief.
 
        Beim Entwickeln (localhost) mit Zeitstempel geladen: der Browser haelt

@@ -5,8 +5,8 @@
 // LOADIMAGE/AUDIO_MUSIC_LOAD wuerde dort ins Leere greifen. Alles, was hier zu
 // sehen ist, rechnet die Runtime selbst aus.
 //
-// Neues Beispiel: Eintrag mit `name` (Knopfbeschriftung) und `src` (Quelle)
-// anhaengen. Kurz halten -- die Galerie soll zum Lesen einladen, nicht zum
+// Neues Beispiel: Eintrag mit `name` (Knopfbeschriftung), `name_en` (dieselbe
+// auf Englisch) und `src` (Quelle) anhaengen. Kurz halten -- die Galerie soll zum Lesen einladen, nicht zum
 // Scrollen.
 window.GB_BEISPIELE = [
   {
@@ -15,11 +15,14 @@ window.GB_BEISPIELE = [
     // NUR dieses Programm darf Dateien laden -- sein assets/-Ordner ist der,
     // der im Paket steckt.
     name: "▶ Demo",
+    name_en: "▶ Demo",
     datei: "program.dh",
     titel: "Das Programm laden, mit dem dieser Build gemacht wurde",
+    titel_en: "Load the program this build was made with",
   },
   {
     name: "Hallo",
+    name_en: "Hello",
     src: [
       'PRINT "Hallo Welt!"',
       'DIM i AS INTEGER',
@@ -30,6 +33,7 @@ window.GB_BEISPIELE = [
   },
   {
     name: "Plasma",
+    name_en: "Plasma",
     src: [
       "' Farbverlauf pro Pixelblock -- klassisches Demo-Motiv.",
       'SCREEN(320, 200, "Plasma", 2)',
@@ -51,6 +55,7 @@ window.GB_BEISPIELE = [
   },
   {
     name: "Sternenflug",
+    name_en: "Starfield",
     src: [
       "' PLOTS zeichnet alle Sterne in EINEM Aufruf statt in einer Schleife.",
       'SCREEN(480, 300, "Sterne", 1)',
@@ -86,6 +91,7 @@ window.GB_BEISPIELE = [
   },
   {
     name: "3D + Licht",
+    name_en: "3D + light",
     src: [
       "' Braucht WebGL 2 -- Beleuchtung und PBR laufen im Browser.",
       'IMPORT "g3d"',
@@ -113,6 +119,7 @@ window.GB_BEISPIELE = [
   },
   {
     name: "Physik",
+    name_en: "Physics",
     src: [
       "' Echte Starrkoerper-Physik (Rapier2D) -- Klick wirft einen Ball.",
       'IMPORT "physics2d"',
@@ -143,6 +150,7 @@ window.GB_BEISPIELE = [
   },
   {
     name: "Klang + Spektrum",
+    name_en: "Sound + spectrum",
     src: [
       "' Im Browser ist nichts zu HOEREN -- aber das Spektrum ist echt:",
       "' der Mix wird vollstaendig gerechnet, nur nicht ausgegeben.",

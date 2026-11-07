@@ -87,7 +87,7 @@ For a character that does not topple over: a dynamic box + `PHYS2D_LOCK_ROTATION
 id, TRUE)`, movement via `PHYS2D_SET_VEL` (set the horizontal component,
 leave the vertical one to the physics) and jumping via `PHYS2D_APPLY_IMPULSE(w, id, 0,
 -impuls)`. (For purely tile-based platformers,
-[`tile_collide`](../../CLAUDE.md)/`controller` remains the lighter choice — `physics2d` is
+[`tile_collide`](module-tile-collide.md)/`controller` remains the lighter choice — `physics2d` is
 for *real* dynamics: stacking, throwing, rolling, ragdolls, sandbox.)
 
 External type `PHYS2D_WORLD`. Implementation

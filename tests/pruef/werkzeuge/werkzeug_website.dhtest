@@ -205,3 +205,87 @@ genug verweise TRUE
 tote verweise 0
 verweise auf md 0
 llms.txt TRUE, voll TRUE
+
+=== die spielwiese kommt mit und wird verlinkt
+' --spielwiese ORDNER: der Bau aus rust/build_wasm.py (hier Attrappen) landet
+' in spielwiese/, Kopfleiste, Startseiten, llms.txt und sitemap verweisen in
+' der Sprache der Seite darauf; dhrt.data nur, wenn es eins gibt.
+--- programm ../../../tools/website.dh
+--- argumente
+--wurzel
+{fall}/repo
+--ziel
+{fall}/site
+--adresse
+https://example.org/dh
+--spielwiese
+{fall}/web
+--- datei repo/docs/en/README.md
+# Manual
+
+Intro.
+--- datei repo/docs/README.md
+# Handbuch
+
+Kurz.
+--- datei web/index.html
+<html>spielwiese</html>
+--- datei web/playground.js
+// js
+--- datei web/beispiele.js
+// beispiele
+--- datei web/dhrt.js
+// dhrt
+--- datei web/dhrt.wasm
+wasm
+--- datei web/program.dh
+PRINT 1
+--- nachher
+FUNCTION hat(datei AS STRING, teil AS STRING) AS BOOLEAN
+    RETURN INSTR(JOIN$(READLINES(datei), CHR$(10)), teil) >= 0
+END FUNCTION
+DIM q AS STRING : q = CHR$(34)
+PRINT "kopiert "; FILEEXISTS("site/spielwiese/dhrt.wasm") AND FILEEXISTS("site/spielwiese/index.html") AND FILEEXISTS("site/spielwiese/program.dh")
+PRINT "ohne datenpaket "; NOT FILEEXISTS("site/spielwiese/dhrt.data")
+PRINT "start en knopf "; hat("site/index.html", "href=" + q + "spielwiese/index.html?lang=en" + q + ">Try it in your browser")
+PRINT "start de knopf "; hat("site/de.html", "href=" + q + "spielwiese/index.html?lang=de" + q + ">Im Browser ausprobieren")
+PRINT "kopfleiste handbuch "; hat("site/en/index.html", "href=" + q + "../spielwiese/index.html?lang=en" + q + ">Try it")
+PRINT "llms "; hat("site/llms.txt", "https://example.org/dh/spielwiese/index.html?lang=en")
+PRINT "sitemap "; hat("site/sitemap.xml", "<loc>https://example.org/dh/spielwiese/index.html</loc>")
+--- erwartet
+kopiert TRUE
+ohne datenpaket TRUE
+start en knopf TRUE
+start de knopf TRUE
+kopfleiste handbuch TRUE
+llms TRUE
+sitemap TRUE
+
+=== ohne vollstaendigen bau gibt es keine spielwiese
+' Fehlt dhrt.wasm (build_wasm.py ohne Werkzeuge), bleibt die Website ohne
+' Spielwiese -- kein Knopf, hinter dem nichts liegt.
+--- programm ../../../tools/website.dh
+--- argumente
+--wurzel
+{fall}/repo
+--ziel
+{fall}/site
+--spielwiese
+{fall}/web
+--- datei repo/docs/en/README.md
+# Manual
+--- datei repo/docs/README.md
+# Handbuch
+--- datei web/index.html
+<html></html>
+--- datei web/playground.js
+// js
+--- nachher
+FUNCTION hat(datei AS STRING, teil AS STRING) AS BOOLEAN
+    RETURN INSTR(JOIN$(READLINES(datei), CHR$(10)), teil) >= 0
+END FUNCTION
+PRINT "kein ordner "; NOT DIREXISTS("site/spielwiese")
+PRINT "kein verweis "; NOT hat("site/index.html", "spielwiese") AND NOT hat("site/en/index.html", "spielwiese") AND NOT hat("site/llms.txt", "spielwiese")
+--- erwartet
+kein ordner TRUE
+kein verweis TRUE
