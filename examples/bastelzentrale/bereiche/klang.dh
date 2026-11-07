@@ -1,0 +1,260 @@
+' Bastelzentrale -- Klang: das Mikrofon als Messgeraet (Pegel, Ton mit
+' Notennamen, Spektrum) und MIDI (ankommende Noten, Tempo einer fremden Uhr,
+' eine eigene Uhr fuer Drumcomputer und Synthesizer).
+' Quelle "Demo" spielt eine kleine Tonleiter statt des Mikrofons.
+
+CONST KL_BAENDER = 32
+DIM ddKlMic AS GUI_WIDGET
+DIM btKlMic AS GUI_WIDGET
+DIM lbKlTon AS GUI_WIDGET
+DIM lbKlMidi AS GUI_WIDGET
+DIM ddKlIn AS GUI_WIDGET
+DIM btKlIn AS GUI_WIDGET
+DIM lbKlIn AS GUI_WIDGET
+DIM ddKlOut AS GUI_WIDGET
+DIM tgKlUhr AS GUI_WIDGET
+DIM slKlTempo AS GUI_WIDGET
+DIM lbKlTempo AS GUI_WIDGET
+DIM cKlPegel AS CHART
+DIM cKlTon AS CHART
+DIM rKlTon AS INTEGER
+DIM klBaender[KL_BAENDER] AS FLOAT
+DIM klAn AS BOOLEAN : klAn = FALSE
+DIM klDemo AS BOOLEAN : klDemo = FALSE
+DIM klPegel AS FLOAT : klPegel = 0.0
+DIM klHz AS FLOAT : klHz = 0.0
+DIM klNoteText AS STRING : klNoteText = "-"
+DIM klMidiDa AS BOOLEAN : klMidiDa = FALSE
+DIM klIn AS MIDI_IN
+DIM klInOffen AS BOOLEAN : klInOffen = FALSE
+DIM klOut AS MIDI_OUT
+DIM klOutOffen AS BOOLEAN : klOutOffen = FALSE
+DIM klLetzteNoteText AS STRING : klLetzteNoteText = "-"
+DIM klNoten AS INTEGER : klNoten = 0
+
+SUB klAufbau()
+    DIM b AS INTEGER : b = B_KLANG
+    schild(b, "Mikrofon", X0, Y0 + 6)
+    DIM geraete AS ARRAY OF STRING : geraete = ["Demo"]
+    TRY
+        DIM g AS STRING
+        FOR EACH g IN MIC_DEVICES()
+            ARRAY_PUSH(geraete, g)
+        NEXT
+    CATCH e
+    END TRY
+    ddKlMic = reg(b, GUI_DROPDOWN(win, X0 + 90, Y0, 320, 32, geraete))
+    GUI_DROPDOWN_SET_SELECTED(ddKlMic, 0)
+    btKlMic = knopf(b, "Start", X0 + 420, Y0, 110)
+    GUI_BUTTON_VARIANT(btKlMic, "primaer")
+    lbKlTon = schild(b, "Ton: -", X0 + 290, Y0 + 70)
+    GUI_SET_FONT_SIZE(lbKlTon, 30)
+
+    cKlPegel = diagramm("tacho", X0, Y0 + 48, 270, 240, "Pegel")
+    CHART_SET(cKlPegel, "einheit", " %")
+    CHART_SET_NUM(cKlPegel, "min", 0) : CHART_SET_NUM(cKlPegel, "max", 100)
+    CHART_SET_NUM(cKlPegel, "nachkomma", 0)
+    CHART_SET(cKlPegel, "wertanzeige", "pille")
+    CHART_ZONE(cKlPegel, 0, 60, RGB(70, 190, 110))
+    CHART_ZONE(cKlPegel, 60, 85, RGB(230, 180, 60))
+    CHART_ZONE(cKlPegel, 85, 100, RGB(230, 80, 60), "laut")
+    CHART_VALUE(cKlPegel, 0)
+    cKlTon = diagramm("linie", X0 + 290, Y0 + 130, 738, 158, "Tonhöhe (Hz)")
+    CHART_SET_NUM(cKlTon, "fenster", 240)
+    CHART_SET_NUM(cKlTon, "nachkomma", 0)
+    CHART_SET_FLAG(cKlTon, "treppe", TRUE)
+    rKlTon = CHART_SERIES(cKlTon, "Ton", RGB(240, 150, 70))
+
+    ' MIDI -- nur, wenn diese Laufzeit es kann.
+    lbKlMidi = schild(b, "MIDI", X0, Y0 + 512)
+    GUI_SET_FONT_SIZE(lbKlMidi, 18)
+    DIM ein AS ARRAY OF STRING : ein = []
+    DIM aus AS ARRAY OF STRING : aus = []
+    TRY
+        DIM i AS INTEGER
+        FOR i = 0 TO MIDI_IN_COUNT() - 1
+            ARRAY_PUSH(ein, MIDI_IN_NAME$(i))
+        NEXT
+        FOR i = 0 TO MIDI_OUT_COUNT() - 1
+            ARRAY_PUSH(aus, MIDI_OUT_NAME$(i))
+        NEXT
+        klMidiDa = TRUE
+    CATCH e
+        GUI_SET_TEXT(lbKlMidi, "MIDI: in dieser Laufzeit nicht dabei (mit --hardware bauen)")
+    END TRY
+    IF NOT klMidiDa THEN RETURN
+    schild(b, "Eingang", X0, Y0 + 552)
+    ddKlIn = reg(b, GUI_DROPDOWN(win, X0 + 80, Y0 + 546, 300, 32, ein))
+    GUI_DROPDOWN_PLACEHOLDER(ddKlIn, "kein MIDI-Eingang")
+    btKlIn = knopf(b, "Öffnen", X0 + 390, Y0 + 546, 100)
+    lbKlIn = schild(b, "", X0 + 510, Y0 + 552)
+    schild(b, "Ausgang", X0, Y0 + 602)
+    ddKlOut = reg(b, GUI_DROPDOWN(win, X0 + 80, Y0 + 596, 300, 32, aus))
+    GUI_DROPDOWN_PLACEHOLDER(ddKlOut, "kein MIDI-Ausgang")
+    tgKlUhr = reg(b, GUI_TOGGLE(win, "Uhr senden", X0 + 390, Y0 + 600, FALSE))
+    slKlTempo = reg(b, GUI_SLIDER(win, X0 + 530, Y0 + 602, 300, 60, 180, 120))
+    lbKlTempo = schild(b, "120 BPM", X0 + 840, Y0 + 602)
+END SUB
+
+FUNCTION klNotenname$(hz AS FLOAT) AS STRING
+    IF hz <= 0 THEN RETURN "-"
+    DIM genau AS FLOAT : genau = 69.0 + 12.0 * LOG(hz / 440.0, 2)
+    DIM n AS INTEGER : n = INT(ROUND(genau))
+    DIM cent AS INTEGER : cent = INT(ROUND((genau - n) * 100.0))
+    DIM t AS STRING : t = MIDI_NOTE_NAME$(n)
+    IF cent > 0 THEN t = t + " +" + STR$(cent)
+    IF cent < 0 THEN t = t + " " + STR$(cent)
+    RETURN t
+END FUNCTION
+
+SUB klMicUmschalten()
+    IF klAn THEN
+        IF NOT klDemo THEN MIC_STOP()
+        klAn = FALSE
+        klDemo = FALSE
+        GUI_SET_TEXT(btKlMic, "Start")
+        ereignis("Mikrofon: aus")
+        RETURN
+    END IF
+    DIM g AS STRING : g = GUI_DROPDOWN_TEXT(ddKlMic)
+    IF g = "Demo" THEN
+        klDemo = TRUE
+    ELSE
+        TRY
+            MIC_START(g)
+        CATCH e
+            ereignis("Mikrofon: " + e)
+            RETURN
+        END TRY
+    END IF
+    klAn = TRUE
+    GUI_SET_TEXT(btKlMic, "Stopp")
+    ereignis("Mikrofon: an (" + g + ")")
+END SUB
+
+SUB klTakt()
+    IF GUI_CLICKED(btKlMic) THEN klMicUmschalten()
+    IF klAn AND klDemo THEN
+        ' Eine Tonleiter, je Ton eine halbe Sekunde, mit einer Pause am Ende.
+        DIM t AS FLOAT : t = MILLIS() / 500.0
+        DIM schritt AS INTEGER : schritt = INT(t) MOD 10
+        DIM leiter AS ARRAY OF INTEGER : leiter = [0, 2, 4, 5, 7, 9, 11, 12, -1, -1]
+        IF leiter[schritt] < 0 THEN
+            klHz = 0.0
+            klPegel = 0.02 + 0.02 * RND()
+        ELSE
+            klHz = MIDI_NOTE_FREQ(60 + leiter[schritt])
+            klPegel = 0.55 * (1.0 - (t - INT(t)) * 0.6) + 0.05 * RND()
+        END IF
+        DIM i AS INTEGER
+        FOR i = 0 TO KL_BAENDER - 1
+            DIM spitze AS FLOAT : spitze = 0.0
+            IF klHz > 0 THEN spitze = MAX(0.0, 1.0 - ABS(i - LOG(klHz / 50.0, 2) * 4.0) / 3.0)
+            klBaender[i] = MAX(klBaender[i] * 0.85, spitze * klPegel * 1.6 + 0.04 * RND())
+        NEXT
+    ELSEIF klAn THEN
+        IF NOT MIC_ACTIVE() THEN
+            ereignis("Mikrofon: " + MIC_ERROR$())
+            klAn = FALSE
+            GUI_SET_TEXT(btKlMic, "Start")
+        ELSE
+            klPegel = MIC_LEVEL()
+            klHz = MIC_PITCH()
+            MIC_FFT(klBaender)
+        END IF
+    ELSE
+        klPegel = 0.0
+        klHz = 0.0
+    END IF
+    klNoteText = klNotenname$(klHz)
+    GUI_SET_TEXT(lbKlTon, "Ton: " + klNoteText + IIF(klHz > 0, "   (" + STR$(INT(klHz)) + " Hz)", ""))
+    CHART_VALUE(cKlPegel, klPegel * 100.0)
+    CHART_PUSH(cKlTon, rKlTon, klHz)
+    klMidiTakt()
+END SUB
+
+SUB klMidiTakt()
+    IF NOT klMidiDa THEN RETURN
+    IF GUI_CLICKED(btKlIn) AND GUI_DROPDOWN_SELECTED(ddKlIn) >= 0 THEN
+        IF klInOffen THEN MIDI_IN_CLOSE(klIn)
+        TRY
+            klIn = MIDI_IN_OPEN(GUI_DROPDOWN_SELECTED(ddKlIn))
+            klInOffen = TRUE
+            ereignis("MIDI: Eingang " + GUI_DROPDOWN_TEXT(ddKlIn) + " offen")
+        CATCH e
+            ereignis("MIDI: " + e)
+        END TRY
+    END IF
+    IF klInOffen THEN
+        WHILE MIDI_NEXT(klIn)
+            IF MIDI_IS_NOTE_ON(klIn) THEN
+                klNoten = klNoten + 1
+                klLetzteNoteText = MIDI_NOTE_NAME$(MIDI_NOTE(klIn)) + " (" + STR$(MIDI_VELOCITY(klIn)) + ")"
+            END IF
+        WEND
+        DIM bpm AS FLOAT : bpm = MIDI_CLOCK_BPM(klIn)
+        GUI_SET_TEXT(lbKlIn, STR$(klNoten) + " Noten, zuletzt " + klLetzteNoteText + IIF(bpm > 0, ", Uhr " + FORMAT$(bpm, "%.1f") + " BPM", ""))
+    END IF
+    IF GUI_CHANGED(slKlTempo) THEN
+        GUI_SET_TEXT(lbKlTempo, STR$(INT(GUI_VALUE(slKlTempo))) + " BPM")
+        IF klOutOffen THEN MIDI_CLOCK_SEND(klOut, INT(GUI_VALUE(slKlTempo)))
+    END IF
+    IF GUI_CLICKED(tgKlUhr) THEN
+        IF GUI_CHECKED(tgKlUhr) THEN
+            IF GUI_DROPDOWN_SELECTED(ddKlOut) < 0 THEN
+                ereignis("MIDI: erst einen Ausgang wählen")
+                GUI_SET_CHECKED(tgKlUhr, FALSE)
+            ELSE
+                TRY
+                    klOut = MIDI_OUT_OPEN(GUI_DROPDOWN_SELECTED(ddKlOut))
+                    klOutOffen = TRUE
+                    MIDI_START(klOut)
+                    MIDI_CLOCK_SEND(klOut, INT(GUI_VALUE(slKlTempo)))
+                    ereignis("MIDI: Uhr läuft mit " + STR$(INT(GUI_VALUE(slKlTempo))) + " BPM")
+                CATCH e
+                    ereignis("MIDI: " + e)
+                    GUI_SET_CHECKED(tgKlUhr, FALSE)
+                END TRY
+            END IF
+        ELSEIF klOutOffen THEN
+            MIDI_CLOCK_SEND(klOut, 0)
+            MIDI_STOP(klOut)
+            MIDI_OUT_CLOSE(klOut)
+            klOutOffen = FALSE
+            ereignis("MIDI: Uhr angehalten")
+        END IF
+    END IF
+END SUB
+
+SUB klZeichnen()
+    CHART_DRAW(cKlPegel)
+    CHART_DRAW(cKlTon)
+    ' Das Spektrum als Balken, unten dunkel, oben hell.
+    DIM sx AS INTEGER : sx = X0
+    DIM sy AS INTEGER : sy = Y0 + 300
+    DIM b AS INTEGER : b = INHALT_B \ KL_BAENDER
+    BOXROUND(sx, sy, sx + INHALT_B, sy + 196, 8, &H1C2230)
+    TEXT(sx + 12, sy + 8, "Spektrum", &H8FB8E8)
+    DIM i AS INTEGER
+    FOR i = 0 TO KL_BAENDER - 1
+        DIM h AS INTEGER : h = INT(CLAMP(klBaender[i], 0.0, 1.0) * 160)
+        IF h > 0 THEN BOX(sx + i * b + 3, sy + 190 - h, sx + (i + 1) * b - 3, sy + 190, RGB(80 + i * 5, 150, 240 - i * 4))
+    NEXT
+END SUB
+
+SUB klEnde()
+    IF klAn AND NOT klDemo THEN MIC_STOP()
+    IF klOutOffen THEN MIDI_CLOCK_SEND(klOut, 0)
+END SUB
+
+FUNCTION klMicZustand$() AS STRING
+    IF NOT klAn THEN RETURN "aus"
+    RETURN IIF(klDemo, "Demo", "an") + ", Pegel " + STR$(INT(klPegel * 100)) + " %, Ton " + klNoteText
+END FUNCTION
+
+FUNCTION klMidiZustand$() AS STRING
+    IF NOT klMidiDa THEN RETURN "in dieser Laufzeit nicht dabei"
+    DIM t AS STRING : t = IIF(klInOffen, "Eingang offen, " + STR$(klNoten) + " Noten", "kein Eingang offen")
+    IF klOutOffen THEN t = t + ", Uhr " + STR$(INT(GUI_VALUE(slKlTempo))) + " BPM"
+    RETURN t
+END FUNCTION

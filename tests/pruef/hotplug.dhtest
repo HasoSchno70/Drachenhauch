@@ -7,8 +7,12 @@
 
 === anstecken und abziehen wird gemeldet
 IMPORT "hotplug"
+' Ueber eine Nebendatei und Umbenennen: ein halb geschriebener Stand waere
+' fuer den Waechter ein Geraet, das kurz verschwindet (RENAME ersetzt die
+' alte Datei in einem Zug).
 SUB schreiben(zeilen AS STRING)
-    WRITEALL("geraete.txt", REPLACE$(zeilen, "|", CHR$(10)))
+    WRITEALL("geraete.neu", REPLACE$(zeilen, "|", CHR$(10)))
+    RENAME("geraete.neu", "geraete.txt")
 END SUB
 SUB melden()
     WHILE HOTPLUG_NEXT()

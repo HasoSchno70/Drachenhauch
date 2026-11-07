@@ -65,16 +65,32 @@ pub fn ordnen(mut v: Vec<String>) -> Vec<String> {
     v
 }
 
-fn liste(art: &str) -> Vec<String> {
+/// Die Namen einer Art aus dem Text einer Simulationsdatei (`art:name`).
+fn aus_text(text: &str, art: &str) -> Vec<String> {
+    ordnen(text.lines()
+        .filter_map(|z| z.trim().split_once(':'))
+        .filter(|(a, _)| a.trim() == art)
+        .map(|(_, n)| n.trim().to_string())
+        .filter(|n| !n.is_empty())
+        .collect())
+}
+
+/// Alle Arten auf einen Blick. Die Simulationsdatei wird dafuer EINMAL
+/// gelesen -- je Art einzeln gelesen, fiel ein Schreiben zwischen zwei
+/// Arten, und eine Runde meldete die eine Art schon nach, die andere noch
+/// vor dem Schreiben (gesehen auf dem macOS-Laeufer: das HID-Geraet war vor
+/// COM3 abgezogen).
+fn alle_listen(arten: Vec<&'static str>) -> Vec<(&'static str, Vec<String>)> {
     if let Some(datei) = simuliert() {
         let text = std::fs::read_to_string(&datei).unwrap_or_default();
-        let v = text.lines()
-            .filter_map(|z| z.trim().split_once(':'))
-            .filter(|(a, _)| a.trim() == art)
-            .map(|(_, n)| n.trim().to_string())
-            .filter(|n| !n.is_empty())
-            .collect();
-        return ordnen(v);
+        return arten.into_iter().map(|a| (a, aus_text(&text, a))).collect();
+    }
+    arten.into_iter().map(|a| (a, liste(a))).collect()
+}
+
+fn liste(art: &str) -> Vec<String> {
+    if let Some(datei) = simuliert() {
+        return aus_text(&std::fs::read_to_string(&datei).unwrap_or_default(), art);
     }
     let v: Vec<String> = match art {
         #[cfg(feature = "serial")]
@@ -100,7 +116,7 @@ fn liste(art: &str) -> Vec<String> {
 
 fn waechter() -> &'static Mutex<Waechter> {
     W.get_or_init(|| {
-        let stand = arten().into_iter().map(|a| (a, liste(a))).collect();
+        let stand = alle_listen(arten());
         let w = Mutex::new(Waechter { warteschlange: VecDeque::new(), stand, intervall_ms: 500 });
         std::thread::Builder::new()
             .name("drachenhauch-hotplug".into())
@@ -118,7 +134,7 @@ fn schauen() {
         // Erst ausserhalb der Sperre lesen (die Listen brauchen Millisekunden),
         // dann vergleichen.
         let arten: Vec<&'static str> = match w.lock() { Ok(g) => g.stand.iter().map(|(a, _)| *a).collect(), Err(_) => return };
-        let neu: Vec<(&'static str, Vec<String>)> = arten.into_iter().map(|a| (a, liste(a))).collect();
+        let neu = alle_listen(arten);
         let Ok(mut g) = w.lock() else { return };
         for (art, liste) in neu {
             let Some(k) = g.stand.iter().position(|(a, _)| *a == art) else { continue };

@@ -1,0 +1,204 @@
+' Bastelzentrale -- Seriell: ein Monitor mit Kurve. Eine Zeile aus lauter
+' Zahlen (oder `name:wert`) ist Daten und kommt in die Kurve, wie beim
+' Plotter der Arduino-IDE; alles andere steht nur in der Liste.
+' Quelle "Demo" spielt einen Sensor, der dreimal je Sekunde drei Werte schickt.
+
+DIM ddSePort AS GUI_WIDGET
+DIM ddSeBaud AS GUI_WIDGET
+DIM btSeVerbinden AS GUI_WIDGET
+DIM lsSeZeilen AS GUI_WIDGET
+DIM tfSeSenden AS GUI_WIDGET
+DIM btSeSenden AS GUI_WIDGET
+DIM cSeKurve AS CHART
+DIM sePort AS INTEGER : sePort = -1     ' Handle von SERIAL_OPEN, -1 = zu
+DIM seDemo AS BOOLEAN : seDemo = FALSE
+DIM seRest AS STRING : seRest = ""
+DIM seZeilen AS INTEGER : seZeilen = 0
+DIM seDemoZeit AS INTEGER : seDemoZeit = 0
+DIM seNamen AS ARRAY OF STRING : seNamen = []
+DIM seReihen AS ARRAY OF INTEGER : seReihen = []
+DIM seWerte AS ARRAY OF FLOAT : seWerte = []
+DIM seAnschlussListe AS ARRAY OF STRING : seAnschlussListe = []
+DIM seBaudListe AS ARRAY OF STRING
+seBaudListe = ["9600", "19200", "38400", "57600", "115200", "250000"]
+DIM seFarben AS ARRAY OF INTEGER
+seFarben = [RGB(240, 150, 70), RGB(90, 170, 240), RGB(120, 210, 120), RGB(220, 110, 200)]
+
+SUB seAufbau()
+    DIM b AS INTEGER : b = B_SERIELL
+    schild(b, "Anschluss", X0, Y0 + 6)
+    ddSePort = reg(b, GUI_DROPDOWN(win, X0 + 90, Y0, 240, 32, ["Demo"]))
+    GUI_DROPDOWN_SET_SELECTED(ddSePort, 0)
+    schild(b, "Baud", X0 + 350, Y0 + 6)
+    ddSeBaud = reg(b, GUI_DROPDOWN(win, X0 + 400, Y0, 120, 32, seBaudListe))
+    GUI_DROPDOWN_SET_SELECTED(ddSeBaud, 4)
+    btSeVerbinden = knopf(b, "Verbinden", X0 + 540, Y0, 130)
+    GUI_BUTTON_VARIANT(btSeVerbinden, "primaer")
+    lsSeZeilen = reg(b, GUI_LISTBOX(win, X0, Y0 + 48, 360, 600, []))
+    GUI_LISTBOX_PLACEHOLDER(lsSeZeilen, "Noch nichts empfangen -- erst verbinden.")
+    tfSeSenden = feld(b, X0, Y0 + 660, 260, "")
+    btSeSenden = knopf(b, "Senden", X0 + 270, Y0 + 660, 90)
+    cSeKurve = diagramm("linie", X0 + 380, Y0 + 48, 648, 648, "Kurve")
+    CHART_SET(cSeKurve, "legende", "oben")
+    CHART_SET_NUM(cSeKurve, "fenster", 300)
+    CHART_SET_NUM(cSeKurve, "nachkomma", 1)
+    seAnschluesse()
+END SUB
+
+' Die Liste der Anschluesse neu lesen ("Demo" steht immer vorn).
+SUB seAnschluesse()
+    seAnschlussListe = ["Demo"]
+    DIM p AS STRING
+    FOR EACH p IN HOTPLUG_LIST("serial")
+        ARRAY_PUSH(seAnschlussListe, p)
+    NEXT
+    DIM alt AS STRING : alt = GUI_DROPDOWN_TEXT(ddSePort)
+    GUI_SET_DROPDOWN(ddSePort, seAnschlussListe)
+    DIM k AS INTEGER : k = ARRAY_INDEXOF(seAnschlussListe, alt)
+    GUI_DROPDOWN_SET_SELECTED(ddSePort, MAX(k, 0))
+END SUB
+
+FUNCTION seOffen() AS BOOLEAN
+    RETURN seDemo OR sePort >= 0
+END FUNCTION
+
+SUB seTrennen()
+    IF sePort >= 0 THEN SERIAL_CLOSE(sePort)
+    sePort = -1
+    seDemo = FALSE
+    GUI_SET_TEXT(btSeVerbinden, "Verbinden")
+END SUB
+
+SUB seVerbinden()
+    DIM ziel AS STRING : ziel = GUI_DROPDOWN_TEXT(ddSePort)
+    IF ziel = "Demo" THEN
+        seDemo = TRUE
+    ELSEIF NOT MODULE_AVAILABLE("serial") THEN
+        ereignis("Seriell: diese Laufzeit ist ohne serielle Schnittstelle gebaut")
+        RETURN
+    ELSE
+        TRY
+            sePort = SERIAL_OPEN(ziel, VAL(GUI_DROPDOWN_TEXT(ddSeBaud)))
+        CATCH e
+            ereignis("Seriell: " + e)
+            RETURN
+        END TRY
+    END IF
+    seRest = ""
+    GUI_SET_TEXT(btSeVerbinden, "Trennen")
+    ereignis("Seriell: verbunden mit " + ziel)
+END SUB
+
+' Eine Zeile zerlegen: lauter Zahlen oder `name:wert` -> in die Kurve.
+SUB seZeile(z AS STRING)
+    seZeilen = seZeilen + 1
+    GUI_LISTBOX_ADD(lsSeZeilen, z, 0)
+    IF GUI_LISTBOX_COUNT(lsSeZeilen) > 500 THEN GUI_LISTBOX_REMOVE(lsSeZeilen, 500)
+    DIM t AS STRING : t = REPLACE$(REPLACE$(REPLACE$(z, ",", " "), ";", " "), ": ", ":")
+    DIM teile AS ARRAY OF STRING : teile = []
+    DIM w AS STRING
+    FOR EACH w IN SPLIT$(t, " ")
+        IF TRIM$(w) <> "" THEN ARRAY_PUSH(teile, TRIM$(w))
+    NEXT
+    IF LEN(teile) = 0 THEN RETURN
+    DIM namen AS ARRAY OF STRING : namen = []
+    DIM werte AS ARRAY OF FLOAT : werte = []
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(teile) - 1
+        DIM name AS STRING : name = "Wert " + STR$(i + 1)
+        DIM wert AS STRING : wert = teile[i]
+        DIM k AS INTEGER : k = INSTR(wert, ":")
+        IF k > 0 THEN
+            name = LEFT$(wert, k)
+            wert = MID$(wert, k + 1)
+        END IF
+        IF NOT ISNUMERIC(wert) THEN RETURN
+        ARRAY_PUSH(namen, name)
+        ARRAY_PUSH(werte, VAL(wert))
+    NEXT
+    ' Erst alle neuen Reihen anlegen, dann schieben -- eine Reihe beginnt mit
+    ' so vielen Nullen, wie das Diagramm schon Punkte hat; sonst laege jede
+    ' spaeter angelegte Reihe der Zeile um einen Punkt neben den anderen.
+    FOR i = 0 TO LEN(namen) - 1
+        IF ARRAY_INDEXOF(seNamen, namen[i]) < 0 AND LEN(seNamen) < 4 THEN
+            ARRAY_PUSH(seNamen, namen[i])
+            ARRAY_PUSH(seReihen, CHART_SERIES(cSeKurve, namen[i], seFarben[LEN(seNamen) - 1]))
+            ARRAY_PUSH(seWerte, 0.0)
+        END IF
+    NEXT
+    FOR i = 0 TO LEN(namen) - 1
+        DIM r AS INTEGER : r = ARRAY_INDEXOF(seNamen, namen[i])
+        IF r >= 0 THEN
+            CHART_PUSH(cSeKurve, seReihen[r], werte[i])
+            seWerte[r] = werte[i]
+        END IF
+    NEXT
+END SUB
+
+' Rohe Zeichen in Zeilen schneiden (CR LF oder LF).
+SUB seText(s AS STRING)
+    seRest = seRest + REPLACE$(s, CHR$(13), "")
+    DIM k AS INTEGER : k = INSTR(seRest, CHR$(10))
+    WHILE k >= 0
+        seZeile(LEFT$(seRest, k))
+        seRest = MID$(seRest, k + 1)
+        k = INSTR(seRest, CHR$(10))
+    WEND
+END SUB
+
+SUB seSenden(t AS STRING)
+    IF sePort >= 0 THEN
+        SERIAL_WRITE(sePort, t + CHR$(10))
+    ELSEIF seDemo THEN
+        seZeile("> " + t)
+    END IF
+END SUB
+
+SUB seTakt()
+    IF GUI_CLICKED(btSeVerbinden) THEN
+        IF seOffen() THEN
+            seTrennen()
+            ereignis("Seriell: getrennt")
+        ELSE
+            seVerbinden()
+        END IF
+    END IF
+    IF (GUI_CLICKED(btSeSenden) OR GUI_ENTERED(tfSeSenden)) AND GUI_TEXT(tfSeSenden) <> "" THEN
+        seSenden(GUI_TEXT(tfSeSenden))
+        GUI_SET_TEXT(tfSeSenden, "")
+    END IF
+    IF seDemo AND MILLIS() - seDemoZeit >= 300 THEN
+        seDemoZeit = MILLIS()
+        DIM s AS FLOAT : s = MILLIS() / 1000.0
+        seText("temp:" + FORMAT$(21.0 + 3.0 * SIN(s / 4.0), "%.1f") + " feuchte:" + FORMAT$(48.0 + 10.0 * COS(s / 7.0), "%.1f") + " licht:" + STR$(INT(500 + 300 * SIN(s / 2.0))) + CHR$(10))
+    END IF
+    IF sePort >= 0 THEN
+        TRY
+            DIM n AS INTEGER : n = SERIAL_AVAILABLE(sePort)
+            IF n > 0 THEN seText(SERIAL_READ(sePort, MIN(n, 65536)))
+        CATCH e
+            ereignis("Seriell: Verbindung verloren (" + e + ")")
+            seTrennen()
+        END TRY
+    END IF
+END SUB
+
+SUB seZeichnen()
+    CHART_DRAW(cSeKurve)
+END SUB
+
+FUNCTION seErsterWert() AS FLOAT
+    IF LEN(seWerte) = 0 THEN RETURN 0.0
+    RETURN seWerte[0]
+END FUNCTION
+
+FUNCTION seZustand$() AS STRING
+    IF NOT seOffen() THEN RETURN "nicht verbunden (" + STR$(LEN(seAnschlussListe) - 1) + " Anschlüsse)"
+    DIM q AS STRING : q = IIF(seDemo, "Demo", GUI_DROPDOWN_TEXT(ddSePort))
+    DIM t AS STRING : t = q + ", " + STR$(seZeilen) + " Zeilen"
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(seNamen) - 1
+        t = t + "  " + seNamen[i] + "=" + ZAHL$(seWerte[i], 1)
+    NEXT
+    RETURN t
+END FUNCTION

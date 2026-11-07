@@ -85,7 +85,7 @@ Details in the [manual](docs/en/README.md); how it got there is in the
 
 ## Download
 
-**[Download Drachenhauch](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — for Windows a single installer (about 58 MB), for macOS a `.dmg`, for Linux a `.tar.gz` (x86_64; for the [Raspberry Pi](docs/en/raspberry-pi.md) aarch64 from the next version on); currently version 2026.42.
+**[Download Drachenhauch](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — for Windows a single installer (about 58 MB), for macOS a `.dmg`, for Linux a `.tar.gz` (x86_64, and aarch64 for the [Raspberry Pi](docs/en/raspberry-pi.md)); currently version 2026.43.
 
 You do **not** need Python installed. It ships the complete development environment, the `dhrt` runtime, all 226 examples with their assets, the textbook in both languages as `.docx` and `.epub`, and the ESP32 skeleton. The Windows installer is unsigned, so SmartScreen will speak up on first launch; the macOS app is not notarised yet.
 
@@ -108,8 +108,8 @@ rust\drachenhauch_runtime\target\release\dhrt test tests\pruef         # all che
 
 | Edition | For printing (A4) | For e-readers |
 |---|---|---|
-| **English** — 542 pages | [Drachenhauch-Handbook.docx](buch-referenz/buch/Drachenhauch-Handbook.docx?raw=1) | [.epub](buch-referenz/buch/Drachenhauch-Handbook.epub?raw=1) |
-| **Deutsch** — 551 Seiten | [Drachenhauch-Lehrbuch.docx](buch-referenz/buch/Drachenhauch-Lehrbuch.docx?raw=1) | [.epub](buch-referenz/buch/Drachenhauch-Lehrbuch.epub?raw=1) |
+| **English** — 561 pages | [Drachenhauch-Handbook.docx](buch-referenz/buch/Drachenhauch-Handbook.docx?raw=1) | [.epub](buch-referenz/buch/Drachenhauch-Handbook.epub?raw=1) |
+| **Deutsch** — 570 Seiten | [Drachenhauch-Lehrbuch.docx](buch-referenz/buch/Drachenhauch-Lehrbuch.docx?raw=1) | [.epub](buch-referenz/buch/Drachenhauch-Lehrbuch.epub?raw=1) |
 
 Both languages come out of the **same** chapter sources (`content/NN_*.js`): the renderers are handed an `H` that puts every string through the catalogue `i18n/en.json` first. A second set of English chapter files would have drifted from the German inside a month — this way it cannot. If an entry is missing, the German sentence stays and the book still builds; `node fehlend.js en` counts what is still outstanding.
 
@@ -129,7 +129,7 @@ Full documentation lives in [docs/en/](docs/en/README.md) — the English transl
 - **[Standard built-ins](docs/en/builtins-core.md)** — math, strings, maps, file I/O, …
 - **[Graphics built-ins](docs/en/builtins-grafik.md)** — native runtime (dhrt/raylib), Z-layers, sprite atlas, asset preloader
 - **[Performance](docs/PERFORMANCE.md)** (German) — benchmark numbers + optimizations shipped (spec ops, inline caches, typed arrays, ECS bulk ops, …)
-- **Modules** — 48 of them, [table below](#modules)
+- **Modules** — 57 of them, [table below](#modules)
 - **[IDE](docs/en/ide.md)** — the development environment, written in Drachenhauch itself: tabs, project tree, completion, help on the word, snippets, multi-cursor, folding, split view, project-wide refactorings, **debugger** (incl. conditional breakpoints), **profiler**, git blame/diff, manual in a window, welcome page with an example gallery
 - **[Drachenhauch Studio](docs/en/studio.md)** (`studio/studio.dh`) — GUI applications in the style of Xojo: window designer with alignment guides, inspector, navigator, code per event, layout containers, custom controls, databases with queries, reports (PDF, print, preview), menus, timers, images, dialogs, project templates, German and English interface, start/build/debug; example project `examples/studio/rechnungen/`
 - **Tools** — all written in Drachenhauch, in the IDE under *Tools* or directly with `dhrt run examples/<file>`:
@@ -149,7 +149,7 @@ Full documentation lives in [docs/en/](docs/en/README.md) — the English transl
 
 ### Modules
 
-48 modules, available via `IMPORT "name"`. Each has its own page under
+57 modules, available via `IMPORT "name"`. Each has its own page under
 [docs/en/](docs/en/README.md#modules).
 
 **Game building blocks**
@@ -301,6 +301,7 @@ Built with `rust/build_wasm.py`; the harness lives in `web/`.
 | `nachtflug/main.dh` | **Nachtflug** — a demo: three minutes of uplifting trance in stereo (supersaw, piano, a formant choir, trance gate, a voice from speech synthesis), fully synthesised, on an audio clock; plus an ocean with aurora, a low flight, a light tunnel and a star nebula from fragment shaders and a galaxy of 2,600 light trails |
 | `lichterglanz/main.dh` | **Lichterglanz** — a Christmas demo: an Advent wreath leads through four chapters (a snowy half-timbered village, a Christmas market with a carousel turning on the audio clock, a winter forest where frost flowers grow with the melody, a sleigh ride past the moon) to Christmas Eve, where the tree decorates itself note by note to "Silent Night"; festive electronic music on the "Carol of the Bells" motif, real six-armed snow crystals, and snow that piles up at the bottom |
 | `chip8/main.dh` | **CHIP-8 emulator** — all 35 instructions, an assembler and a game of its own, keypad by position, afterglow against flicker |
+| `bastelzentrale/main.dh` | **maker control room** — serial monitor with plotter, Arduino over Firmata, MQTT, Modbus, microphone and MIDI clock, camera with motion detector, Raspberry Pi pins; every area runs without hardware on a demo source, plus a phone page (WebSocket, mDNS) and OSC |
 | `karten/main.dh` | **map** — OpenStreetMap tiles loaded in the background and kept on disk, place search, GPX track with elevation profile, markers, save as image or PDF, print |
 | `texteditor/main.dh` | **text editor** — tabs, find and replace, encoding and line endings kept on save |
 | `fotos/main.dh` | **photo viewer with GTK 3** — overview, single view, rotation from camera data, slideshow |

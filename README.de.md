@@ -86,7 +86,7 @@ Nachzulesen im [Handbuch](docs/README.md); wie es dazu kam, steht in der
 
 ## Herunterladen
 
-**[Drachenhauch herunterladen](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — für Windows ein Installer (rund 58 MB), für macOS eine `.dmg`, für Linux ein `.tar.gz` (x86_64; für den [Raspberry Pi](docs/raspberry-pi.md) ab der nächsten Fassung auch aarch64); aktuell Fassung 2026.42.
+**[Drachenhauch herunterladen](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — für Windows ein Installer (rund 58 MB), für macOS eine `.dmg`, für Linux ein `.tar.gz` (x86_64, und aarch64 für den [Raspberry Pi](docs/raspberry-pi.md)); aktuell Fassung 2026.43.
 
 Python muss dafür **nicht** installiert sein. Mit dabei sind die komplette Entwicklungsumgebung, die Runtime `dhrt`, alle 226 Beispiele samt Assets, beide Bücher (*Der Einstieg* und *Das Lehrbuch*, letzteres in beiden Sprachen) als `.docx` und `.epub` sowie das ESP32-Grundgerüst. Der Windows-Installer ist nicht signiert, SmartScreen meldet sich also beim ersten Start; die macOS-App ist noch nicht beglaubigt.
 
@@ -109,8 +109,8 @@ rust\drachenhauch_runtime\target\release\dhrt test tests\pruef         # alle Pr
 
 | Ausgabe | Zum Drucken (A4) | Fürs Lesegerät |
 |---|---|---|
-| **Deutsch** — 551 Seiten | [Drachenhauch-Lehrbuch.docx](buch-referenz/buch/Drachenhauch-Lehrbuch.docx?raw=1) | [.epub](buch-referenz/buch/Drachenhauch-Lehrbuch.epub?raw=1) |
-| **English** — 542 pages | [Drachenhauch-Handbook.docx](buch-referenz/buch/Drachenhauch-Handbook.docx?raw=1) | [.epub](buch-referenz/buch/Drachenhauch-Handbook.epub?raw=1) |
+| **Deutsch** — 570 Seiten | [Drachenhauch-Lehrbuch.docx](buch-referenz/buch/Drachenhauch-Lehrbuch.docx?raw=1) | [.epub](buch-referenz/buch/Drachenhauch-Lehrbuch.epub?raw=1) |
+| **English** — 561 pages | [Drachenhauch-Handbook.docx](buch-referenz/buch/Drachenhauch-Handbook.docx?raw=1) | [.epub](buch-referenz/buch/Drachenhauch-Handbook.epub?raw=1) |
 
 Beide Sprachen entstehen aus **denselben** Kapitelquellen (`content/NN_*.js`): die Renderer bekommen ein `H`, das jede Zeichenkette vorher durch den Katalog `i18n/en.json` schickt. Ein zweiter Satz englischer Kapiteldateien wäre binnen eines Monats vom deutschen abgedriftet — so kann er es nicht. Fehlt ein Eintrag, bleibt der deutsche Satz stehen und das Buch baut trotzdem; `node fehlend.js en` zählt, wo noch welche fehlen.
 
@@ -128,7 +128,7 @@ Vollständige Doku im [docs/](docs/README.md)-Ordner:
 - **[Standard-Built-ins](docs/builtins-core.md)** — Math, Strings, Maps, File-I/O, …
 - **[Grafik-Built-ins](docs/builtins-grafik.md)** — native Runtime (dhrt/raylib), Z-Layer, Sprite-Atlas, Asset-Preloader
 - **[Performance](docs/PERFORMANCE.md)** — Bench-Zahlen + umgesetzte Optimierungen (Spec-Ops, IC, Typed Arrays, ECS Bulk-Ops, …)
-- **Module** — 48 Stück, [Tabelle unten](#module)
+- **Module** — 57 Stück, [Tabelle unten](#module)
 - **[IDE](docs/ide.md)** — die Entwicklungsumgebung, selbst in Drachenhauch geschrieben: Reiter, Projektbaum, Vervollständigung, Hilfe zum Wort, Schnipsel, Mehrfach-Marken, Faltung, geteilte Ansicht, Umbauten über das ganze Projekt, **Debugger** (auch bedingte Haltepunkte), **Profiler**, git blame/diff, Handbuch im Fenster, Willkommensseite mit Beispiel-Galerie
 - **[Drachenhauch Studio](docs/studio.md)** (`studio/studio.dh`) — Anwendungen mit Oberfläche im Stil von Xojo: Fenster-Entwurf mit Ausrichtungslinien, Inspektor, Navigator, Code je Ereignis, Layout-Behälter, eigene Controls, Datenbanken mit Abfragen, Berichte (PDF, Druck, Vorschau), Menüs, Timer, Bilder, Dialoge, Projektvorlagen, deutsche und englische Oberfläche, Starten/Bauen/Debuggen; Beispielprojekt `examples/studio/rechnungen/`
 - **Werkzeuge** — alle in Drachenhauch geschrieben, in der IDE unter *Werkzeuge* oder direkt mit `dhrt run examples/<datei>`:
@@ -148,7 +148,7 @@ Vollständige Doku im [docs/](docs/README.md)-Ordner:
 
 ### Module
 
-48 Module, per `IMPORT "name"` verfügbar. Jedes hat eine eigene Seite unter
+57 Module, per `IMPORT "name"` verfügbar. Jedes hat eine eigene Seite unter
 [docs/](docs/README.md#module).
 
 **Spiel-Bausteine**
@@ -300,6 +300,7 @@ Gebaut wird mit `rust/build_wasm.py`, das Gerüst liegt in `web/`.
 | `nachtflug/main.dh` | **Nachtflug** — eine Demo: drei Minuten Uplifting Trance in Stereo (Supersaw, Klavier, Chor aus Formanten, Trance-Gate, eine Stimme aus der Sprachausgabe), ganz synthetisiert, auf einer Audio-Uhr; dazu Ozean mit Polarlicht, Tiefflug, Lichttunnel und Sternennebel aus Fragment-Shadern und eine Galaxie aus 2.600 Lichtspuren |
 | `lichterglanz/main.dh` | **Lichterglanz** — eine Weihnachtsdemo: der Adventskranz führt durch vier Kapitel (ein verschneites Fachwerkdorf, ein Weihnachtsmarkt mit einem Karussell auf der Audio-Uhr, ein Winterwald, in dem Eisblumen mit der Melodie wachsen, ein Schlittenflug vor dem Mond) zum Heiligabend, an dem sich der Baum Ton für Ton zu „Stille Nacht“ schmückt; festlich-elektronische Musik um das Motiv aus „Carol of the Bells“, echte sechsarmige Schneekristalle und Schnee, der unten liegen bleibt |
 | `chip8/main.dh` | **CHIP-8-Emulator** — alle 35 Befehle, Assembler und ein eigenes Spiel, Tastenfeld nach Lage, Nachleuchten gegen das Flackern |
+| `bastelzentrale/main.dh` | **Bastelzentrale** — ein Leitstand für Bastler: seriell mit Kurve, Arduino über Firmata, MQTT, Modbus, Mikrofon und MIDI-Uhr, Kamera mit Bewegungsmelder, Pins des Raspberry Pi; jeder Bereich läuft ohne Gerät mit einer Demo, dazu eine Seite für das Handy (WebSocket, mDNS) und OSC |
 | `karten/main.dh` | **Landkarte** — OpenStreetMap-Kacheln im Hintergrund geladen und auf der Platte gemerkt, Ortssuche, GPX-Spur mit Höhenprofil, Marker, als Bild oder PDF sichern, drucken |
 | `texteditor/main.dh` | **Texteditor** — Reiter, Suchen und Ersetzen, Kodierung und Zeilenenden bleiben beim Speichern |
 | `fotos/main.dh` | **Fotobetrachter mit GTK 3** — Übersicht, Einzelansicht, Drehen nach den Kameradaten, Diaschau |

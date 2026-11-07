@@ -1,0 +1,176 @@
+' Bastelzentrale -- Arduino ueber Firmata: Ausgaenge schalten, die sechs
+' Analogeingaenge ansehen, einen Servo stellen. Auf dem Board laeuft
+' StandardFirmata (seriell) oder StandardFirmataWiFi (`tcp:host:3030`).
+' Ziel "Demo" spielt ein Board, dessen Analogwerte langsam wandern.
+
+CONST AR_SERVO = 9
+DIM arPins AS ARRAY OF INTEGER : arPins = [2, 3, 4, 5, 6, 7, 13]
+DIM arAn AS ARRAY OF BOOLEAN : arAn = [FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE]
+DIM arAnalog AS ARRAY OF INTEGER : arAnalog = [0, 0, 0, 0, 0, 0]
+DIM arSchalter[7] AS GUI_WIDGET
+DIM ddArZiel AS GUI_WIDGET
+DIM btArVerbinden AS GUI_WIDGET
+DIM lbArFirmware AS GUI_WIDGET
+DIM slArServo AS GUI_WIDGET
+DIM lbArServo AS GUI_WIDGET
+DIM cArAnalog AS CHART
+DIM arH AS FIRMATA_HANDLE
+DIM arVerbunden AS BOOLEAN : arVerbunden = FALSE
+DIM arDemo AS BOOLEAN : arDemo = FALSE
+DIM arServo AS INTEGER : arServo = 90
+DIM arZielListe AS ARRAY OF STRING : arZielListe = []
+
+SUB arAufbau()
+    DIM b AS INTEGER : b = B_ARDUINO
+    schild(b, "Board", X0, Y0 + 6)
+    ddArZiel = reg(b, GUI_DROPDOWN(win, X0 + 70, Y0, 300, 32, ["Demo"]))
+    GUI_DROPDOWN_SET(ddArZiel, "bearbeitbar", 1)
+    GUI_DROPDOWN_PLACEHOLDER(ddArZiel, "COM3, /dev/ttyACM0 oder tcp:host:3030")
+    btArVerbinden = knopf(b, "Verbinden", X0 + 390, Y0, 130)
+    GUI_BUTTON_VARIANT(btArVerbinden, "primaer")
+    lbArFirmware = schild(b, "", X0 + 540, Y0 + 6)
+    schild(b, "Ausgänge", X0, Y0 + 60)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(arPins) - 1
+        arSchalter[i] = reg(b, GUI_TOGGLE(win, "Pin " + STR$(arPins[i]), X0 + 40, Y0 + 96 + i * 44, FALSE))
+    NEXT
+    schild(b, "Servo an Pin " + STR$(AR_SERVO), X0, Y0 + 420)
+    slArServo = reg(b, GUI_SLIDER(win, X0, Y0 + 450, 300, 0, 180, 90))
+    lbArServo = schild(b, "90°", X0 + 310, Y0 + 452)
+    cArAnalog = diagramm("balken", X0 + 380, Y0 + 60, 648, 420, "Analogeingänge")
+    CHART_SET_NUM(cArAnalog, "min", 0) : CHART_SET_NUM(cArAnalog, "max", 1023)
+    CHART_SET_NUM(cArAnalog, "nachkomma", 0)
+    CHART_SET(cArAnalog, "werte", "aussen")
+    FOR i = 0 TO 5
+        CHART_ADD(cArAnalog, "A" + STR$(i), 0, RGB(90, 170, 240))
+    NEXT
+    arAnschluesse()
+END SUB
+
+SUB arAnschluesse()
+    arZielListe = ["Demo"]
+    DIM p AS STRING
+    FOR EACH p IN HOTPLUG_LIST("serial")
+        ARRAY_PUSH(arZielListe, p)
+    NEXT
+    DIM alt AS STRING : alt = GUI_DROPDOWN_TEXT(ddArZiel)
+    GUI_SET_DROPDOWN(ddArZiel, arZielListe)
+    IF alt <> "" THEN
+        GUI_SET_TEXT(ddArZiel, alt)
+    ELSE
+        GUI_DROPDOWN_SET_SELECTED(ddArZiel, 0)
+    END IF
+END SUB
+
+SUB arVerbinden()
+    DIM ziel AS STRING : ziel = TRIM$(GUI_DROPDOWN_TEXT(ddArZiel))
+    IF ziel = "" OR LOWER$(ziel) = "demo" THEN
+        arDemo = TRUE
+        GUI_SET_TEXT(lbArFirmware, "Demo-Board")
+    ELSE
+        TRY
+            arH = FIRMATA_OPEN(ziel)
+        CATCH e
+            ereignis("Arduino: " + e)
+            RETURN
+        END TRY
+        GUI_SET_TEXT(lbArFirmware, FIRMATA_FIRMWARE$(arH))
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(arPins) - 1
+            FIRMATA_PIN_MODE(arH, arPins[i], 1)
+            FIRMATA_DIGITAL_WRITE(arH, arPins[i], arAn[i])
+        NEXT
+        FIRMATA_SERVO_ATTACH(arH, AR_SERVO)
+        FIRMATA_SERVO_WRITE(arH, AR_SERVO, arServo)
+    END IF
+    arVerbunden = TRUE
+    GUI_SET_TEXT(btArVerbinden, "Trennen")
+    ereignis("Arduino: verbunden mit " + IIF(arDemo, "Demo", ziel))
+END SUB
+
+SUB arTrennen()
+    IF arVerbunden AND NOT arDemo THEN FIRMATA_CLOSE(arH)
+    arVerbunden = FALSE
+    arDemo = FALSE
+    GUI_SET_TEXT(btArVerbinden, "Verbinden")
+    GUI_SET_TEXT(lbArFirmware, "")
+END SUB
+
+' Einen Ausgang schalten -- auch von der Handy-Seite und ueber OSC.
+SUB arPinSetzen(pin AS INTEGER, an AS BOOLEAN)
+    DIM i AS INTEGER : i = ARRAY_INDEXOF(arPins, pin)
+    IF i < 0 THEN RETURN
+    IF arAn[i] <> an THEN ereignis("Arduino: Pin " + STR$(pin) + IIF(an, " an", " aus"))
+    arAn[i] = an
+    GUI_SET_CHECKED(arSchalter[i], an)
+    IF arVerbunden AND NOT arDemo THEN FIRMATA_DIGITAL_WRITE(arH, pin, an)
+END SUB
+
+SUB arServoSetzen(w AS INTEGER)
+    arServo = CLAMP(w, 0, 180)
+    GUI_SET_VALUE(slArServo, arServo)
+    GUI_SET_TEXT(lbArServo, STR$(arServo) + "°")
+    IF arVerbunden AND NOT arDemo THEN FIRMATA_SERVO_WRITE(arH, AR_SERVO, arServo)
+END SUB
+
+SUB arTakt()
+    IF GUI_CLICKED(btArVerbinden) THEN
+        IF arVerbunden THEN
+            arTrennen()
+            ereignis("Arduino: getrennt")
+        ELSE
+            arVerbinden()
+        END IF
+    END IF
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(arPins) - 1
+        IF GUI_CHECKED(arSchalter[i]) <> arAn[i] THEN arPinSetzen(arPins[i], GUI_CHECKED(arSchalter[i]))
+    NEXT
+    IF GUI_CHANGED(slArServo) THEN arServoSetzen(INT(GUI_VALUE(slArServo)))
+    IF arDemo THEN
+        DIM s AS FLOAT : s = MILLIS() / 1000.0
+        FOR i = 0 TO 5
+            arAnalog[i] = INT(511.5 + 480.0 * SIN(s * (0.3 + i * 0.17) + i))
+        NEXT
+        ' Das Demo-Board hat einen Taster an A5: er "drueckt", solange Pin 13 leuchtet.
+        IF arAn[6] THEN arAnalog[5] = 1023
+    ELSEIF arVerbunden THEN
+        TRY
+            FIRMATA_UPDATE(arH)
+            FOR i = 0 TO 5
+                arAnalog[i] = FIRMATA_ANALOG_READ(arH, i)
+            NEXT
+        CATCH e
+            ereignis("Arduino: Verbindung verloren (" + e + ")")
+            arTrennen()
+        END TRY
+    END IF
+    FOR i = 0 TO 5
+        CHART_SET_POINT(cArAnalog, 0, i, arAnalog[i])
+    NEXT
+END SUB
+
+SUB arZeichnen()
+    CHART_DRAW(cArAnalog)
+    ' Neben jedem Schalter eine Lampe, die zeigt, was am Board anliegt.
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(arPins) - 1
+        DIM y AS INTEGER : y = Y0 + 96 + i * 44 + 14
+        CIRCLE(X0 + 16, y, 9, IIF(arAn[i], RGB(255, 210, 60), RGB(60, 64, 76)))
+    NEXT
+END SUB
+
+FUNCTION arZustand$() AS STRING
+    IF NOT arVerbunden THEN RETURN "nicht verbunden"
+    DIM t AS STRING : t = IIF(arDemo, "Demo", FIRMATA_FIRMWARE$(arH)) + ", an:"
+    DIM i AS INTEGER
+    DIM keiner AS BOOLEAN : keiner = TRUE
+    FOR i = 0 TO LEN(arPins) - 1
+        IF arAn[i] THEN
+            t = t + " " + STR$(arPins[i])
+            keiner = FALSE
+        END IF
+    NEXT
+    IF keiner THEN t = t + " -"
+    RETURN t + ", A0=" + STR$(arAnalog[0]) + ", Servo " + STR$(arServo) + "°"
+END FUNCTION

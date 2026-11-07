@@ -1,0 +1,174 @@
+' Bastelzentrale -- Modbus TCP: zehn Halteregister mitlesen und eins
+' schreiben, etwa an einer Wallbox, einem Wechselrichter oder einer SPS.
+' Ziel "Demo" spielt ein Geraet: Register 0 zaehlt, 1 ist eine Temperatur in
+' Zehnteln, 2 eine Leistung, 3..9 lassen sich beschreiben.
+
+CONST MB_ANZAHL = 10
+DIM tfMbHost AS GUI_WIDGET
+DIM tfMbPort AS GUI_WIDGET
+DIM tfMbEinheit AS GUI_WIDGET
+DIM tfMbAdresse AS GUI_WIDGET
+DIM btMbVerbinden AS GUI_WIDGET
+DIM tbMbRegister AS GUI_WIDGET
+DIM tfMbSchreibAdr AS GUI_WIDGET
+DIM tfMbSchreibWert AS GUI_WIDGET
+DIM btMbSchreiben AS GUI_WIDGET
+DIM cMbKurve AS CHART
+DIM rMbTemp AS INTEGER
+DIM rMbLeistung AS INTEGER
+DIM mbH AS MODBUS
+DIM mbVerbunden AS BOOLEAN : mbVerbunden = FALSE
+DIM mbDemo AS BOOLEAN : mbDemo = FALSE
+DIM mbStart AS INTEGER : mbStart = 0
+DIM mbLetzt AS INTEGER : mbLetzt = 0
+DIM mbFehler AS INTEGER : mbFehler = 0
+DIM mbRegister AS ARRAY OF INTEGER : mbRegister = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+DIM mbDemoReg AS ARRAY OF INTEGER : mbDemoReg = [0, 215, 0, 0, 0, 0, 0, 0, 0, 0]
+
+SUB mbAufbau()
+    DIM b AS INTEGER : b = B_MODBUS
+    schild(b, "Gerät", X0, Y0 + 6)
+    tfMbHost = feld(b, X0 + 56, Y0, 180, "Demo")
+    schild(b, "Port", X0 + 250, Y0 + 6)
+    tfMbPort = feld(b, X0 + 290, Y0, 70, "502")
+    schild(b, "Einheit", X0 + 375, Y0 + 6)
+    tfMbEinheit = feld(b, X0 + 435, Y0, 50, "1")
+    schild(b, "ab Register", X0 + 500, Y0 + 6)
+    tfMbAdresse = feld(b, X0 + 595, Y0, 60, "0")
+    btMbVerbinden = knopf(b, "Verbinden", X0 + 675, Y0, 130)
+    GUI_BUTTON_VARIANT(btMbVerbinden, "primaer")
+    tbMbRegister = reg(b, GUI_TABLE(win, X0, Y0 + 52, 440, 280, ["Register", "Wert", "mit Vorzeichen", "hex"], []))
+    GUI_TABLE_COL_WIDTHS(tbMbRegister, [90, 100, 140, 108])
+    DIM i AS INTEGER
+    FOR i = 0 TO MB_ANZAHL - 1
+        GUI_TABLE_ADD_ROW(tbMbRegister, [STR$(i), "-", "-", "-"])
+    NEXT
+    schild(b, "Register schreiben", X0, Y0 + 350)
+    schild(b, "Nr.", X0, Y0 + 386)
+    tfMbSchreibAdr = feld(b, X0 + 36, Y0 + 380, 70, "3")
+    schild(b, "Wert", X0 + 122, Y0 + 386)
+    tfMbSchreibWert = feld(b, X0 + 166, Y0 + 380, 90, "42")
+    btMbSchreiben = knopf(b, "Schreiben", X0 + 270, Y0 + 380, 120)
+    cMbKurve = diagramm("linie", X0 + 460, Y0 + 52, 568, 640, "Register 1 und 2")
+    CHART_SET(cMbKurve, "legende", "oben")
+    CHART_SET_NUM(cMbKurve, "fenster", 240)
+    CHART_SET_NUM(cMbKurve, "nachkomma", 1)
+    rMbTemp = CHART_SERIES(cMbKurve, "Temperatur °C (Reg. 1 / 10)", RGB(240, 150, 70))
+    rMbLeistung = CHART_SERIES(cMbKurve, "Leistung kW (Reg. 2 / 1000)", RGB(120, 210, 120))
+END SUB
+
+FUNCTION mbWert(i AS INTEGER) AS INTEGER
+    RETURN mbRegister[i]
+END FUNCTION
+
+SUB mbVerbinden()
+    DIM host AS STRING : host = TRIM$(GUI_TEXT(tfMbHost))
+    mbStart = MAX(0, INT(VAL(GUI_TEXT(tfMbAdresse))))
+    IF host = "" OR LOWER$(host) = "demo" THEN
+        mbDemo = TRUE
+    ELSE
+        TRY
+            mbH = MODBUS_TCP(host, VAL(GUI_TEXT(tfMbPort)), VAL(GUI_TEXT(tfMbEinheit)))
+            MODBUS_TIMEOUT(mbH, 500)
+        CATCH e
+            ereignis("Modbus: " + e)
+            RETURN
+        END TRY
+    END IF
+    mbVerbunden = TRUE
+    mbFehler = 0
+    GUI_SET_TEXT(btMbVerbinden, "Trennen")
+    DIM i AS INTEGER
+    FOR i = 0 TO MB_ANZAHL - 1
+        GUI_TABLE_SET_CELL(tbMbRegister, i, 0, STR$(mbStart + i))
+    NEXT
+    ereignis("Modbus: verbunden mit " + IIF(mbDemo, "Demo", host))
+END SUB
+
+SUB mbTrennen()
+    IF mbVerbunden AND NOT mbDemo THEN MODBUS_CLOSE(mbH)
+    mbVerbunden = FALSE
+    mbDemo = FALSE
+    GUI_SET_TEXT(btMbVerbinden, "Verbinden")
+END SUB
+
+SUB mbLesen()
+    IF mbDemo THEN
+        DIM s AS FLOAT : s = MILLIS() / 1000.0
+        mbDemoReg[0] = (mbDemoReg[0] + 1) MOD 65536
+        mbDemoReg[1] = INT(215 + 30 * SIN(s / 8.0))
+        mbDemoReg[2] = INT(3600 + 2400 * SIN(s / 5.0))
+        DIM i AS INTEGER
+        FOR i = 0 TO MB_ANZAHL - 1
+            mbRegister[i] = mbDemoReg[(mbStart + i) MOD MB_ANZAHL]
+        NEXT
+        RETURN
+    END IF
+    TRY
+        mbRegister = MODBUS_READ_HOLDING(mbH, mbStart, MB_ANZAHL)
+        mbFehler = 0
+    CATCH e
+        mbFehler = mbFehler + 1
+        IF mbFehler = 1 THEN ereignis("Modbus: " + e)
+        IF mbFehler >= 5 THEN
+            ereignis("Modbus: fünfmal keine Antwort -- getrennt")
+            mbTrennen()
+        END IF
+    END TRY
+END SUB
+
+SUB mbSchreiben(adr AS INTEGER, wert AS INTEGER)
+    IF NOT mbVerbunden THEN
+        ereignis("Modbus: erst verbinden, dann schreiben")
+        RETURN
+    END IF
+    IF mbDemo THEN
+        IF adr < 3 OR adr >= MB_ANZAHL THEN
+            ereignis("Modbus: das Demo-Gerät nimmt nur Register 3 bis 9 an")
+            RETURN
+        END IF
+        mbDemoReg[adr] = wert BAND 65535
+    ELSE
+        TRY
+            MODBUS_WRITE_REGISTER(mbH, adr, wert BAND 65535)
+        CATCH e
+            ereignis("Modbus: " + e)
+            RETURN
+        END TRY
+    END IF
+    ereignis("Modbus: Register " + STR$(adr) + " = " + STR$(wert))
+END SUB
+
+SUB mbTakt()
+    IF GUI_CLICKED(btMbVerbinden) THEN
+        IF mbVerbunden THEN
+            mbTrennen()
+            ereignis("Modbus: getrennt")
+        ELSE
+            mbVerbinden()
+        END IF
+    END IF
+    IF GUI_CLICKED(btMbSchreiben) THEN mbSchreiben(INT(VAL(GUI_TEXT(tfMbSchreibAdr))), INT(VAL(GUI_TEXT(tfMbSchreibWert))))
+    IF mbVerbunden AND MILLIS() - mbLetzt >= 500 THEN
+        mbLetzt = MILLIS()
+        mbLesen()
+        DIM i AS INTEGER
+        FOR i = 0 TO MB_ANZAHL - 1
+            DIM w AS INTEGER : w = mbRegister[i]
+            GUI_TABLE_SET_CELL(tbMbRegister, i, 1, STR$(w))
+            GUI_TABLE_SET_CELL(tbMbRegister, i, 2, STR$(MODBUS_INT16(w)))
+            GUI_TABLE_SET_CELL(tbMbRegister, i, 3, "&H" + RIGHT$("000" + HEX$(w), 4))
+        NEXT
+        CHART_PUSH(cMbKurve, rMbTemp, mbRegister[1] / 10.0)
+        CHART_PUSH(cMbKurve, rMbLeistung, mbRegister[2] / 1000.0)
+    END IF
+END SUB
+
+SUB mbZeichnen()
+    CHART_DRAW(cMbKurve)
+END SUB
+
+FUNCTION mbZustand$() AS STRING
+    IF NOT mbVerbunden THEN RETURN "nicht verbunden"
+    RETURN IIF(mbDemo, "Demo", GUI_TEXT(tfMbHost)) + ", Reg. " + STR$(mbStart) + " = " + STR$(mbRegister[0]) + ", Reg. " + STR$(mbStart + 1) + " = " + STR$(mbRegister[1])
+END FUNCTION

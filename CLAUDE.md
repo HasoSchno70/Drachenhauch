@@ -3550,6 +3550,34 @@ Dateien; Rundweg ueber GUI_TO_JSON -- das ist EINGERUECKT, verglichen wird
 ohne Leerraum), zwei in `werkzeug_ide_schriftzug.dhtest` (beide Themen,
 eigene Farben).
 
+## Bastelzentrale (2026-11-06)
+
+Wunsch des Nutzers nach den sieben Bastler-Punkten: "ein super Programm fuer
+Bastler mit allem, was wir jetzt gebaut haben" -- gewaehlt: ein Leitstand
+plus Handy-Seite. `examples/bastelzentrale/`: `main.dh` (Fenster ohne Rahmen,
+Seitenleiste, Statusleiste, Bildschleife; `reg(bereich, widget)` meldet jedes
+Widget einem Bereich, `bereichZeigen` blendet um, Diagramme zeichnet nur der
+aktive Bereich nach `GUI_DRAW(FALSE)`), je Bereich eine Datei in `bereiche/`
+mit `xxAufbau/xxTakt/xxZeichnen/xxZustand$` (Seriell mit Kurve, Arduino ueber
+Firmata, MQTT, Modbus TCP, Klang = Mikrofon + MIDI-Uhr, Kamera mit
+Bewegungsmelder, Pi-Pins), `bereiche/netz.dh` (httpd 8090, WebSocket 8091,
+OSC 8000, mDNS `bastelzentrale`; ein Befehlsweg `nzBefehl` fuer Seite,
+`/befehl?c=` und OSC; `/zustand` = derselbe JSON-Stand wie im WebSocket),
+`assets/handy.html` (Platzhalter `%%WSPORT%%`). **Jeder Bereich hat eine
+Demo-Quelle**, `DH_BZ_DEMO=1` oder [Alle Demos starten] verbindet alle;
+Ports ueber `DH_BZ_WEB/WS/OSC` (0 = frei), `DH_BZ_MDNS=0`, `DH_BZ_BEREICH`.
+Seriell/MIDI/gpio sind `IMPORT ... OPTIONAL`. **Keine Laufzeit-Aenderung.**
+Fallen: eine neue Diagrammreihe beginnt mit so vielen Nullen, wie das
+Diagramm Punkte hat -- erst alle Reihen einer Zeile anlegen, dann schieben;
+eine lokale `x0` in einer SUB verdeckt die Konstante `X0` (`--check` sagt
+es); `bereiche/*.dh` nimmt `dhrt_check.dhtest` aus wie Glutfadens ansicht/.
+**Beim Pruefen:** ein offener Browser-Tab mit der Seite verbindet sich alle
+2 s neu und zaehlt als zweites Handy. Tests
+`tests/pruef/beispiel_bastelzentrale.dhtest` (2: ein Bild je Bereich samt
+Probekamera und Lauflicht; die Bastelzentrale als Kind, der Fall ist Browser,
+Handy und OSC-App gegen dieselben Werte); sechs Verfaelschungen fallen je in
+ihrem Fall.
+
 ## Dogfooding 15: Landkarte (2026-10-26)
 
 `examples/karten/`: `kern.dh` (Web-Mercator, Kachelnummern, Haversine,

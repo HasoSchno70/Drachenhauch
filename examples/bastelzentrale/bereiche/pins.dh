@@ -1,0 +1,113 @@
+' Bastelzentrale -- die Pins des Raspberry Pi (Modul gpio, Linux).
+' Acht Ausgaenge und vier Eingaenge an der Stiftleiste, gezaehlt nach
+' BCM-Nummer. Ohne Pi laeuft der Bereich als Demo: die Eingaenge folgen dann
+' einem Lauflicht, damit man sieht, wie es aussieht.
+
+DIM piAusPins AS ARRAY OF INTEGER : piAusPins = [17, 18, 27, 22, 23, 24, 25, 4]
+DIM piEinPins AS ARRAY OF INTEGER : piEinPins = [5, 6, 13, 19]
+DIM piAus AS ARRAY OF BOOLEAN : piAus = [FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE]
+DIM piEin AS ARRAY OF BOOLEAN : piEin = [FALSE, FALSE, FALSE, FALSE]
+DIM piSchalter[8] AS GUI_WIDGET
+DIM lbPiInfo AS GUI_WIDGET
+DIM piChip AS GPIO_CHIP
+DIM piEcht AS BOOLEAN : piEcht = FALSE
+DIM piFlanken AS INTEGER : piFlanken = 0
+
+SUB piAufbau()
+    DIM b AS INTEGER : b = B_PINS
+    lbPiInfo = schild(b, "", X0, Y0 + 6)
+    TRY
+        IF MODULE_AVAILABLE("gpio") THEN
+            IF LEN(GPIO_CHIPS()) > 0 THEN
+                piChip = GPIO_OPEN()
+                piEcht = TRUE
+            END IF
+        END IF
+    CATCH e
+        ereignis("Raspberry Pi: " + e)
+    END TRY
+    IF piEcht THEN
+        GUI_SET_TEXT(lbPiInfo, "GPIO-Chip " + GPIO_LABEL$(piChip) + ", " + STR$(GPIO_COUNT(piChip)) + " Leitungen")
+        DIM k AS INTEGER
+        FOR k = 0 TO LEN(piEinPins) - 1
+            GPIO_MODE(piChip, piEinPins[k], "in", "up")
+            GPIO_WATCH(piChip, piEinPins[k], "both", 20)
+        NEXT
+    ELSE
+        GUI_SET_TEXT(lbPiInfo, "Kein Raspberry Pi gefunden -- Demo. Unter Linux auf dem Pi schalten die Knöpfe die echten Pins.")
+    END IF
+    schild(b, "Ausgänge (BCM)", X0, Y0 + 56)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(piAusPins) - 1
+        piSchalter[i] = reg(b, GUI_TOGGLE(win, "GPIO " + STR$(piAusPins[i]), X0 + 40, Y0 + 92 + i * 44, FALSE))
+    NEXT
+    schild(b, "Eingänge (BCM, mit Pull-up)", X0 + 360, Y0 + 56)
+END SUB
+
+SUB piSetzen(pin AS INTEGER, an AS BOOLEAN)
+    DIM i AS INTEGER : i = ARRAY_INDEXOF(piAusPins, pin)
+    IF i < 0 THEN RETURN
+    IF piAus[i] <> an THEN ereignis("Raspberry Pi: GPIO " + STR$(pin) + IIF(an, " an", " aus"))
+    piAus[i] = an
+    GUI_SET_CHECKED(piSchalter[i], an)
+    IF piEcht THEN
+        TRY
+            GPIO_WRITE(piChip, pin, an)
+        CATCH e
+            ereignis("Raspberry Pi: " + e)
+        END TRY
+    END IF
+END SUB
+
+SUB piTakt()
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(piAusPins) - 1
+        IF GUI_CHECKED(piSchalter[i]) <> piAus[i] THEN piSetzen(piAusPins[i], GUI_CHECKED(piSchalter[i]))
+    NEXT
+    IF piEcht THEN
+        WHILE GPIO_NEXT(piChip)
+            piFlanken = piFlanken + 1
+            DIM k AS INTEGER : k = ARRAY_INDEXOF(piEinPins, GPIO_EVENT_PIN(piChip))
+            IF k >= 0 THEN
+                ' Mit Pull-up heisst "gedrueckt" LOW.
+                piEin[k] = NOT GPIO_EVENT_RISING(piChip)
+                ereignis("Raspberry Pi: GPIO " + STR$(piEinPins[k]) + IIF(piEin[k], " gedrückt", " losgelassen"))
+            END IF
+        WEND
+    ELSE
+        ' Lauflicht hin und her: 0 1 2 3 2 1 0 ...
+        DIM schritt AS INTEGER : schritt = (MILLIS() \ 400) MOD 6
+        DIM licht AS INTEGER : licht = IIF(schritt < 4, schritt, 6 - schritt)
+        FOR i = 0 TO 3
+            piEin[i] = (i = licht)
+        NEXT
+    END IF
+END SUB
+
+SUB piZeichnen()
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(piAusPins) - 1
+        CIRCLE(X0 + 16, Y0 + 92 + i * 44 + 14, 9, IIF(piAus[i], RGB(120, 230, 120), RGB(60, 64, 76)))
+    NEXT
+    FOR i = 0 TO LEN(piEinPins) - 1
+        DIM y AS INTEGER : y = Y0 + 96 + i * 60
+        BOXROUND(X0 + 360, y, X0 + 620, y + 46, 8, &H1C2230)
+        CIRCLE(X0 + 386, y + 23, 13, IIF(piEin[i], RGB(255, 190, 60), RGB(60, 64, 76)))
+        TEXT(X0 + 412, y + 14, "GPIO " + STR$(piEinPins[i]) + IIF(piEin[i], "  gedrückt", ""), &HD0D8E0)
+    NEXT
+END SUB
+
+FUNCTION piZustand$() AS STRING
+    DIM t AS STRING : t = IIF(piEcht, "Pi", "Demo") + ", an:"
+    DIM i AS INTEGER
+    DIM keiner AS BOOLEAN : keiner = TRUE
+    FOR i = 0 TO LEN(piAusPins) - 1
+        IF piAus[i] THEN
+            t = t + " " + STR$(piAusPins[i])
+            keiner = FALSE
+        END IF
+    NEXT
+    IF keiner THEN t = t + " -"
+    IF piEcht THEN t = t + ", " + STR$(piFlanken) + " Flanken"
+    RETURN t
+END FUNCTION

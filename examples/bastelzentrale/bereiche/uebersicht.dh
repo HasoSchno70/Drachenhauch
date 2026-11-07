@@ -1,0 +1,126 @@
+' Bastelzentrale -- die Uebersicht: alle Bereiche auf einen Blick, eine
+' Kurve aus den wichtigsten Werten und die Liste der Ereignisse.
+
+DIM tbUe AS GUI_WIDGET
+DIM lsEreignisse AS GUI_WIDGET
+DIM cUeVerlauf AS CHART
+DIM cUePegel AS CHART
+DIM cUeAnalog AS CHART
+DIM rUeSeriell AS INTEGER
+DIM rUeAnalog AS INTEGER
+DIM rUeModbus AS INTEGER
+DIM ueTakt0 AS INTEGER : ueTakt0 = 0
+DIM btUeDemos AS GUI_WIDGET
+DIM lbUeHandy AS GUI_WIDGET
+
+' Die Zeilen der Tabelle: Bereich, Quelle, Zustand.
+DIM ueNamen AS ARRAY OF STRING
+ueNamen = ["Seriell", "Arduino", "MQTT", "Modbus", "Mikrofon", "MIDI", "Kamera", "Raspberry Pi", "Handy-Seite", "OSC"]
+
+SUB ueAufbau()
+    DIM b AS INTEGER : b = B_UEBERSICHT
+    tbUe = reg(b, GUI_TABLE(win, X0, Y0, 500, 286, ["Bereich", "Zustand"], []))
+    GUI_TABLE_COL_WIDTHS(tbUe, [110, 388])
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(ueNamen) - 1
+        GUI_TABLE_ADD_ROW(tbUe, [ueNamen[i], "-"])
+    NEXT
+    schild(b, "Ereignisse", X0, Y0 + 300)
+    lsEreignisse = reg(b, GUI_LISTBOX(win, X0, Y0 + 324, 500, 380, []))
+    GUI_LISTBOX_PLACEHOLDER(lsEreignisse, "Noch nichts passiert.")
+
+    cUeVerlauf = diagramm("linie", X0 + 520, Y0, 508, 300, "Verlauf")
+    CHART_SET(cUeVerlauf, "legende", "oben")
+    CHART_SET_NUM(cUeVerlauf, "fenster", 200)
+    CHART_SET_NUM(cUeVerlauf, "nachkomma", 1)
+    CHART_SET_FLAG(cUeVerlauf, "glatt", TRUE)
+    rUeSeriell = CHART_SERIES(cUeVerlauf, "Seriell (1. Wert)", RGB(240, 150, 70))
+    rUeAnalog = CHART_SERIES(cUeVerlauf, "Arduino A0 %", RGB(90, 170, 240))
+    rUeModbus = CHART_SERIES(cUeVerlauf, "Modbus Reg. 1", RGB(120, 210, 120))
+
+    cUePegel = diagramm("tacho", X0 + 520, Y0 + 320, 250, 230, "Mikrofon")
+    CHART_SET(cUePegel, "einheit", " %")
+    CHART_SET_NUM(cUePegel, "min", 0) : CHART_SET_NUM(cUePegel, "max", 100)
+    CHART_SET_NUM(cUePegel, "nachkomma", 0)
+    CHART_SET(cUePegel, "wertanzeige", "pille")
+    CHART_ZONE(cUePegel, 0, 60, RGB(70, 190, 110))
+    CHART_ZONE(cUePegel, 60, 85, RGB(230, 180, 60))
+    CHART_ZONE(cUePegel, 85, 100, RGB(230, 80, 60), "laut")
+    CHART_VALUE(cUePegel, 0)
+
+    cUeAnalog = diagramm("balken", X0 + 780, Y0 + 320, 248, 230, "Arduino analog")
+    CHART_SET_NUM(cUeAnalog, "min", 0) : CHART_SET_NUM(cUeAnalog, "max", 1023)
+    CHART_SET_NUM(cUeAnalog, "nachkomma", 0)
+    FOR i = 0 TO 5
+        CHART_ADD(cUeAnalog, "A" + STR$(i), 0, RGB(90, 170, 240))
+    NEXT
+    btUeDemos = knopf(b, "Alle Demos starten", X0 + 520, Y0 + 574, 240)
+    GUI_BUTTON_VARIANT(btUeDemos, "primaer")
+    schild(b, "Ohne Geräte: jeder Bereich spielt dann sein Gerät selbst.", X0 + 520, Y0 + 616)
+    lbUeHandy = schild(b, "", X0 + 520, Y0 + 646)
+END SUB
+
+' Jeden Bereich, der noch nichts offen hat, mit seiner Demo-Quelle verbinden.
+SUB ueAlleDemos()
+    IF NOT seOffen() THEN
+        GUI_DROPDOWN_SET_SELECTED(ddSePort, 0)
+        seVerbinden()
+    END IF
+    IF NOT arVerbunden THEN
+        GUI_SET_TEXT(ddArZiel, "Demo")
+        arVerbinden()
+    END IF
+    IF NOT mqVerbunden THEN
+        GUI_SET_TEXT(tfMqBroker, "Demo")
+        mqVerbinden()
+    END IF
+    IF NOT mbVerbunden THEN
+        GUI_SET_TEXT(tfMbHost, "Demo")
+        mbVerbinden()
+    END IF
+    IF NOT klAn THEN
+        GUI_DROPDOWN_SET_SELECTED(ddKlMic, 0)
+        klMicUmschalten()
+    END IF
+    IF NOT kaAn THEN
+        GUI_DROPDOWN_SET_SELECTED(ddKaGeraet, 0)
+        kaUmschalten()
+    END IF
+END SUB
+
+' Ein Ereignis oben in die Liste (gerufen aus `ereignis` in main.dh).
+SUB uiEreignis(t AS STRING)
+    GUI_LISTBOX_ADD(lsEreignisse, t, 0)
+    IF GUI_LISTBOX_COUNT(lsEreignisse) > 200 THEN GUI_LISTBOX_REMOVE(lsEreignisse, 200)
+END SUB
+
+SUB ueTakt()
+    IF GUI_CLICKED(btUeDemos) THEN ueAlleDemos()
+    IF MILLIS() - ueTakt0 < 250 THEN RETURN
+    GUI_SET_TEXT(lbUeHandy, "Handy: " + nzHandyZustand$())
+    ueTakt0 = MILLIS()
+    GUI_TABLE_SET_CELL(tbUe, 0, 1, seZustand$())
+    GUI_TABLE_SET_CELL(tbUe, 1, 1, arZustand$())
+    GUI_TABLE_SET_CELL(tbUe, 2, 1, mqZustand$())
+    GUI_TABLE_SET_CELL(tbUe, 3, 1, mbZustand$())
+    GUI_TABLE_SET_CELL(tbUe, 4, 1, klMicZustand$())
+    GUI_TABLE_SET_CELL(tbUe, 5, 1, klMidiZustand$())
+    GUI_TABLE_SET_CELL(tbUe, 6, 1, kaZustand$())
+    GUI_TABLE_SET_CELL(tbUe, 7, 1, piZustand$())
+    GUI_TABLE_SET_CELL(tbUe, 8, 1, nzHandyZustand$())
+    GUI_TABLE_SET_CELL(tbUe, 9, 1, nzOscZustand$())
+    CHART_PUSH(cUeVerlauf, rUeSeriell, seErsterWert())
+    CHART_PUSH(cUeVerlauf, rUeAnalog, arAnalog[0] * 100.0 / 1023.0)
+    CHART_PUSH(cUeVerlauf, rUeModbus, mbWert(1) / 10.0)
+    CHART_VALUE(cUePegel, klPegel * 100.0)
+    DIM i AS INTEGER
+    FOR i = 0 TO 5
+        CHART_SET_POINT(cUeAnalog, 0, i, arAnalog[i])
+    NEXT
+END SUB
+
+SUB ueZeichnen()
+    CHART_DRAW(cUeVerlauf)
+    CHART_DRAW(cUePegel)
+    CHART_DRAW(cUeAnalog)
+END SUB
