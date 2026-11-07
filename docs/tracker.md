@@ -228,7 +228,7 @@ gesichert ist. Sonst kommt die Frage **Sichern | Verwerfen | Abbrechen**.
 
 ## Was dieser Pilot in der Laufzeit freigelegt hat
 
-Er war der erste Editor mit einer **Zeitachse** (siehe CLAUDE.md, fünfter
+Er war der erste Editor mit einer **Zeitachse** (siehe `geschichte/werkzeuge.md`, fünfter
 Pilot) und brauchte drei Bausteine, die es vorher nicht gab:
 `AUDIO_NOTE` (eine gehaltene Note mit Sustain-**Pegel** und Ausklingen —
 `AUDIO_SFX` kennt nur drei Zeiten, Orgel und Klavier waren nicht zu

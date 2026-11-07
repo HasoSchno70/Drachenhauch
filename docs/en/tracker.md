@@ -225,7 +225,7 @@ whether they should be discarded.
 
 ## What this pilot uncovered in the runtime
 
-It was the first editor with a **timeline** (see CLAUDE.md, fifth pilot) and
+It was the first editor with a **timeline** (see `geschichte/werkzeuge.md`, fifth pilot) and
 needed three building blocks that did not exist before: `AUDIO_NOTE` (a held
 note with a sustain **level** and release — `AUDIO_SFX` only knows three
 times, organ and piano could not be told apart),

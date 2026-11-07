@@ -87,7 +87,7 @@ Für eine Spielfigur, die nicht umkippt: dynamische Box + `PHYS2D_LOCK_ROTATION(
 id, TRUE)`, Bewegung über `PHYS2D_SET_VEL` (horizontale Komponente setzen,
 vertikale aus der Physik lassen) und Sprung über `PHYS2D_APPLY_IMPULSE(w, id, 0,
 -impuls)`. (Für rein Tile-basierte Platformer bleibt
-[`tile_collide`](../CLAUDE.md)/`controller` die leichtere Wahl — `physics2d` ist
+[`tile_collide`](module-tile-collide.md)/`controller` die leichtere Wahl — `physics2d` ist
 für *echte* Dynamik: Stapeln, Werfen, Rollen, Ragdolls, Sandbox.)
 
 Externer Typ `PHYS2D_WORLD`. Implementierung

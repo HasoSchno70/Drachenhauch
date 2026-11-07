@@ -116,9 +116,9 @@ pub const GEDULDET: &[(&str, &str)] = &[
     ("ERROR_FILE$", "allzweck-roadmap.md: WP F, ausdruecklich gestrichen"),
     ("ERROR_TRACE$", "allzweck-roadmap.md: WP F, ausdruecklich gestrichen"),
     ("NAME", "CLAUDE.md: Platzhalter in der Builtin-Anleitung (`NAME(a, b [, c])`)"),
-    ("BITAND", "CLAUDE.md: als ENTFERNT beschrieben (heute der Operator BAND)"),
-    ("DECLARE_GLOBAL_SLOT", "CLAUDE.md: Bytecode-Opcode, kein Builtin"),
-    ("DECLARE_GLOBAL_CONST_SLOT", "CLAUDE.md: Bytecode-Opcode, kein Builtin"),
+    ("BITAND", "builtins-core.md/stolpersteine.md: als ENTFERNT beschrieben (heute der Operator BAND)"),
+    ("DECLARE_GLOBAL_SLOT", "entwurf-maschinencode.md, PERFORMANCE.md: Bytecode-Opcode, kein Builtin"),
+    ("DECLARE_GLOBAL_CONST_SLOT", "PERFORMANCE.md: Bytecode-Opcode, kein Builtin"),
 ];
 
 /// Bibliotheken in Drachenhauch, deren SUBs und FUNCTIONs das Handbuch wie

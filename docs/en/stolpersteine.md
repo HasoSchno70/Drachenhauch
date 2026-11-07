@@ -314,7 +314,7 @@ reflections/mirror effects become possible.
 > therefore does not go through `store_var`) initially stayed silent.
 >
 > Why this was more work than it sounds, and where the check deliberately stays coarse,
-> is in `docs/sprache.md` and in `CLAUDE.md`. The actual proof
+> is in `docs/sprache.md` and in `geschichte/sprache.md`. The actual proof
 > is the run over **all 384 `.dh` files in the repository** (0 reports) — and
 > that is exactly what found the two false alarms of the first versions: `DIM x[N] AS T` and
 > `CONST` inside a SUB. That is why it is now a test

@@ -314,7 +314,7 @@ Reflexionen/Mirror-Effekte.
 > deshalb nicht über `store_var` geht) blieben zunächst weiter still.
 >
 > Warum das mehr Arbeit war, als es klingt, und wo die Prüfung bewusst grob
-> bleibt, steht in `docs/sprache.md` und in `CLAUDE.md`. Der eigentliche Beleg
+> bleibt, steht in `docs/sprache.md` und in `geschichte/sprache.md`. Der eigentliche Beleg
 > ist der Lauf über **alle 384 `.dh`-Dateien des Repos** (0 Meldungen) — und
 > genau der fand die zwei Fehlalarme der ersten Fassungen: `DIM x[N] AS T` und
 > `CONST` innerhalb einer SUB. Er ist deshalb inzwischen ein Test
