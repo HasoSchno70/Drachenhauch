@@ -3533,6 +3533,24 @@ Kapitel 76/77. **Ungeprueft:** RTU an einer echten seriellen Schnittstelle,
 jedes echte Modbus-Geraet, echtes An-/Abstecken (die Listen selbst stimmen
 hier mit COM1, loopMIDI und den HID-Geraeten ueberein).
 
+## Verlaeufe ohne Stufen, IDE ruhiger (2026-11-07)
+
+Wunsch des Nutzers: die Farbverlaeufe sahen mit ihren Abstufungen "nach
+Windows 95" aus. Ursache gemessen am Bildschirmfoto der IDE: `Cmd::RoundGradient`
+fuellte zwar zeilenweise, schnitt die Farbe aber auf ganze 8-Bit-Stufen ab,
+in allen drei Kanaelen im selben Moment -- auf der Ausgabe-Leiste Baender von
+15 Zeilen, in der Gliederung von 32, jede mit einer geraden Kante
+(Mach-Baender). Jetzt `graphics::verlauf_farbe`: je Zeile gegen eine eigene
+Schwelle einer 16er-Bayer-Folge gerundet (Lage auf dem Schirm, Kanaele um
+0/5/10 versetzt, Alpha um 3), die Enden sind genau `c1`/`c2`, gleiche
+Kanaele bleiben unberuehrt. Dieselbe Rechnung fuer `Cmd::GradientRect`
+(`GRADIENTV`/`GRADIENTH`, auch die Farbwaehler der gui), dort vorher raylibs
+GPU-Verlauf mit denselben Baendern. Nicht angefasst: `Gradient4`,
+`CircleGradient`, `Lichtfleck` (GPU-Dreiecke). Tests
+`tests/pruef/gui_verlauf_glatt.dhtest` (zaehlt "harte Kanten" = acht gleiche
+Zeilen, dann acht andere; die alte Laufzeit hat 23 bzw. 16) und drei
+Rust-Tests `verlauf_tests`.
+
 ## Bastelzentrale (2026-11-06)
 
 Wunsch des Nutzers nach den sieben Bastler-Punkten: "ein super Programm fuer

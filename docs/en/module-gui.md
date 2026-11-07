@@ -2541,6 +2541,13 @@ so that a tall surface does not look completely like paper.
 `GUI_METRIC_SET("verlauf_hoehe", 120)` is a good start for an
 interface with large lists and text inputs.
 
+**Without steps.** Every gradient (gui surfaces, `GRADIENTV`/`GRADIENTH`)
+is rounded row by row against a threshold of its own (ordered dithering,
+the three channels offset against each other). Before, a shallow gradient
+over a large surface showed as bands with straight edges -- each step only
+one in 256, but the eye amplifies the edges. The ends are exactly the given
+colours, a surface without a gradient stays one colour.
+
 **Raised and sunken.** Buttons, panels and selection fields are raised
 (light at the top → dark at the bottom, with gloss). Input fields, lists and the
 progress trough are sunken: the gradient runs the other way and instead of the

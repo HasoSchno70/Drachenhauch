@@ -2551,6 +2551,13 @@ damit eine hohe Fläche nicht ganz nach Papier aussieht.
 `GUI_METRIC_SET("verlauf_hoehe", 120)` ist ein guter Anfang für eine
 Oberfläche mit großen Listen und Textfeldern.
 
+**Ohne Stufen.** Jeder Verlauf (Flächen der gui, `GRADIENTV`/`GRADIENTH`)
+wird Zeile für Zeile gegen eine eigene Schwelle gerundet (geordnete
+Zitterung, die drei Kanäle gegeneinander versetzt). Vorher stand ein flacher
+Verlauf über eine große Fläche als Bänder mit geraden Kanten da -- jede
+Stufe nur eine von 256, aber das Auge verstärkt die Kanten. Die Enden sind
+genau die genannten Farben, eine Fläche ohne Verlauf bleibt eine Farbe.
+
 **Erhaben und versenkt.** Knöpfe, Panels und Auswahlfelder sind erhaben
 (hell oben → dunkel unten, mit Glanz). Eingabefelder, Listen und der
 Fortschritts-Trog sind versenkt: der Verlauf läuft andersherum und statt der

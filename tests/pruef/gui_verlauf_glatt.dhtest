@@ -1,0 +1,146 @@
+' Verlaeufe ohne Stufen (2026-11-07, Wunsch des Nutzers: "die Farbverlaeufe
+' mit ihren sichtbaren Abstufungen erinnern stark an Windows-95-Zeiten").
+'
+' Ein Verlauf ueber 400 Zeilen, der nur 16 Stufen weit geht, blieb vorher
+' 25 Zeilen auf einer Stufe und sprang dann in allen drei Kanaelen um eine
+' -- das Auge sieht die geraden Kanten dazwischen als Streifen. Seither
+' rundet jede Zeile gegen ihre eigene Schwelle (`verlauf_farbe` in
+' graphics.rs), und eine "harte Kante" gibt es nicht mehr: acht gleiche
+' Zeilen, dann acht andere gleiche.
+'
+' Gezaehlt wird im Bildschirmfoto mit einem zweiten Programm (`--- nachher`).
+' Format: docs/werkzeuge.md.
+
+=== eine hohe gui-flaeche hat keine harten kanten
+IMPORT "gui"
+SCREEN(300, 480, "T", 1)
+GUI_THEME_PRESET("glas_dunkel")
+GUI_METRIC_SET("gradient", 16)
+GUI_METRIC_SET("gloss", 0)
+GUI_METRIC_SET("bevel", 0)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 300, 480)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM p AS GUI_WIDGET : p = GUI_PANEL(w, 20, 20, 200, 420)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=3
+DHRT_SCREENSHOT={fall}/b.png
+--- nachher
+DIM b AS IMAGE : b = LOADIMAGE("b.png")
+DIM f[420] AS INTEGER
+DIM y AS INTEGER
+FOR y = 0 TO 419
+    f[y] = GETPIXEL(b, 120, 22 + y)
+NEXT
+DIM kanten AS INTEGER
+DIM k AS INTEGER
+DIM gleich AS BOOLEAN
+FOR y = 8 TO 410
+    gleich = TRUE
+    FOR k = 1 TO 7
+        IF f[y - 8 + k] <> f[y - 8] THEN gleich = FALSE
+        IF f[y + k] <> f[y] THEN gleich = FALSE
+    NEXT
+    IF gleich AND f[y - 1] <> f[y] THEN kanten = kanten + 1
+NEXT
+' Der Verlauf geht ueberhaupt -- oben eine andere Farbe als unten.
+PRINT "verlauf "; (f[2] BAND 255) <> (f[415] BAND 255)
+PRINT "harte kanten "; kanten
+--- erwartet
+verlauf TRUE
+harte kanten 0
+
+=== gradientv ohne gui hat keine harten kanten
+SCREEN(300, 480, "T", 1)
+WHILE NOT QUITREQUESTED()
+    CLS(&H000000)
+    GRADIENTV(10, 10, 200, 459, &H203040, &H304050)
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=3
+DHRT_SCREENSHOT={fall}/b.png
+--- nachher
+DIM b AS IMAGE : b = LOADIMAGE("b.png")
+DIM f[450] AS INTEGER
+DIM y AS INTEGER
+FOR y = 0 TO 449
+    f[y] = GETPIXEL(b, 100, 10 + y)
+NEXT
+DIM kanten AS INTEGER
+DIM k AS INTEGER
+DIM gleich AS BOOLEAN
+FOR y = 8 TO 441
+    gleich = TRUE
+    FOR k = 1 TO 7
+        IF f[y - 8 + k] <> f[y - 8] THEN gleich = FALSE
+        IF f[y + k] <> f[y] THEN gleich = FALSE
+    NEXT
+    IF gleich AND f[y - 1] <> f[y] THEN kanten = kanten + 1
+NEXT
+' Die Enden sind genau die Farben, die das Programm nennt.
+PRINT "oben "; COLOR_HEX$(f[0])
+PRINT "unten "; COLOR_HEX$(f[449])
+PRINT "harte kanten "; kanten
+--- erwartet
+oben #203040
+unten #304050
+harte kanten 0
+
+=== gradienth zittert spaltenweise
+SCREEN(480, 100, "T", 1)
+WHILE NOT QUITREQUESTED()
+    CLS(&H000000)
+    GRADIENTH(10, 10, 459, 90, &H405060, &H304050)
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=3
+DHRT_SCREENSHOT={fall}/b.png
+--- nachher
+DIM b AS IMAGE : b = LOADIMAGE("b.png")
+DIM f[450] AS INTEGER
+DIM x AS INTEGER
+FOR x = 0 TO 449
+    f[x] = GETPIXEL(b, 10 + x, 50)
+NEXT
+DIM kanten AS INTEGER
+DIM k AS INTEGER
+DIM gleich AS BOOLEAN
+FOR x = 8 TO 441
+    gleich = TRUE
+    FOR k = 1 TO 7
+        IF f[x - 8 + k] <> f[x - 8] THEN gleich = FALSE
+        IF f[x + k] <> f[x] THEN gleich = FALSE
+    NEXT
+    IF gleich AND f[x - 1] <> f[x] THEN kanten = kanten + 1
+NEXT
+PRINT "links "; COLOR_HEX$(f[0])
+PRINT "rechts "; COLOR_HEX$(f[449])
+PRINT "harte kanten "; kanten
+--- erwartet
+links #405060
+rechts #304050
+harte kanten 0
+
+=== eine flaeche ohne verlauf bleibt eine farbe
+' Gegenprobe: die Zitterung darf nichts anfassen, was gar nicht verlaeuft.
+SCREEN(200, 200, "T", 1)
+WHILE NOT QUITREQUESTED()
+    CLS(&H000000)
+    GRADIENTV(10, 10, 189, 189, &H336699, &H336699)
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=3
+--- bild
+100 11 #336699
+100 100 #336699
+100 188 #336699
+--- erwartet
