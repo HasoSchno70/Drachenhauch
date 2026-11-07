@@ -21,9 +21,9 @@ PRINT "geschrieben: "; JSON_GET_STRING(j, "panel_layout"); " | "; JSON_GET_STRIN
 e = kern.einstellungenLaden(CWD$() + "/krumm.json")
 PRINT "krumm: '"; e.leistenStand; "' | '"; e.pluginsAus; "'"
 --- argumente
-{sammlung}/../../examples/glutfaden
+{sammlung}/../../../examples/glutfaden
 --- datei helfer.dh
-IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/../../../examples/glutfaden/kern/kern.dh" AS kern
 --- datei mit.json
 {"panel_layout": "{\"orte\":{}}", "plugins_disabled": "todo,probe"}
 --- datei krumm.json
@@ -57,11 +57,11 @@ ELSE
     PRINT "kopie gesichert: "; FILEEXISTS("kopie.pxs")
 END IF
 --- argumente
-{sammlung}/../../examples/glutfaden
+{sammlung}/../../../examples/glutfaden
 --- datei helfer.dh
-IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
-CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+IMPORT "{sammlung}/../../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../../examples/glutfaden/main.dh"
 --- datei app/Glutfaden/plugins/probe/plugin.dh
 IMPORT "dh_plugin.dh"
 PLUGIN_BEFEHL("zaehlen", "Farben zählen", "Strg+Alt+K")

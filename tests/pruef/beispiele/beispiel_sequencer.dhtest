@@ -19,7 +19,7 @@ an[0, 8] = TRUE
 wavSchreiben("x.wav", 1)
 PRINT "geschrieben"
 EXIT(0)
---- programm ../../examples/sequencer/main.dh nach DIM beenden AS BOOLEAN
+--- programm ../../../examples/sequencer/main.dh nach DIM beenden AS BOOLEAN
 --- erwartet
 geschrieben
 --- ton _programm/x.wav
@@ -39,7 +39,7 @@ swing = 50
 wavSchreiben("x.wav", 1)
 PRINT "geschrieben"
 EXIT(0)
---- programm ../../examples/sequencer/main.dh nach DIM beenden AS BOOLEAN
+--- programm ../../../examples/sequencer/main.dh nach DIM beenden AS BOOLEAN
 --- erwartet
 geschrieben
 --- ton _programm/x.wav
@@ -57,7 +57,7 @@ stumm[0] = TRUE
 wavSchreiben("x.wav", 1)
 PRINT "geschrieben"
 EXIT(0)
---- programm ../../examples/sequencer/main.dh nach DIM beenden AS BOOLEAN
+--- programm ../../../examples/sequencer/main.dh nach DIM beenden AS BOOLEAN
 --- erwartet
 geschrieben
 --- ton _programm/x.wav
@@ -89,7 +89,7 @@ PRINT tempo; " "; swing; " "; stumm[2]; " "; stumm[3]
 PRINT an[4, 0]; " "; ton[4, 0]; " "; an[4, 6]; " "; ton[4, 6]; " "; an[5, 15]; " "; ton[5, 15]; " "; an[4, 1]
 PRINT GUI_VALUE(slTempo); " "; GUI_CHECKED(stummKasten[2])
 EXIT(0)
---- programm ../../examples/sequencer/main.dh nach DIM beenden AS BOOLEAN
+--- programm ../../../examples/sequencer/main.dh nach DIM beenden AS BOOLEAN
 --- erwartet
 d.....m.........
 ...............y
@@ -106,7 +106,7 @@ TRUE 3 TRUE 12 TRUE 24 FALSE
 ' Prozent 0,72 bis 0,85; geprueft wird "laut genug und nicht ueber 1,0".
 DIM prBild AS INTEGER
 DIM prUeber AS BOOLEAN
---- programm ../../examples/sequencer/main.dh nach DIM beenden AS BOOLEAN
+--- programm ../../../examples/sequencer/main.dh nach DIM beenden AS BOOLEAN
 --- einschub nach pegelZeigen()
 prBild = prBild + 1
 IF prBild = 5 THEN mitschnittStarten()

@@ -32,9 +32,9 @@ NEXT
 PRINT "genug kapitel "; (JSON_LEN(d, "kapitel") > 30)
 PRINT "abweichend "; schief
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/einstieg.dh"
+IMPORT "{sammlung}/../_hilfen/einstieg.dh"
 --- erwartet
 genug kapitel TRUE
 abweichend 0
@@ -70,9 +70,9 @@ NEXT
 PRINT "genug verweise "; (zahl > 100)
 PRINT "geprueft"
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/einstieg.dh"
+IMPORT "{sammlung}/../_hilfen/einstieg.dh"
 --- erwartet
 genug verweise TRUE
 geprueft
@@ -84,9 +84,9 @@ DIM d AS JSON_HANDLE : d = kapitelExport(ARG$(0))
 PRINT "tips ohne rumpf "; JSON_LEN(d, "tips_ohne_rumpf")
 PRINT "befehle ohne text "; JSON_LEN(d, "cmds_ohne_text")
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/einstieg.dh"
+IMPORT "{sammlung}/../_hilfen/einstieg.dh"
 --- erwartet
 tips ohne rumpf 0
 befehle ohne text 0
@@ -98,9 +98,9 @@ PRINT "rueckgabe "; nlCode
 PRINT "genug codebloecke "; (zahlVor(nlAus, "Codebloecke") > 150)
 IF nlCode <> 0 THEN PRINT nlAus; nlErr
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/einstieg.dh"
+IMPORT "{sammlung}/../_hilfen/einstieg.dh"
 --- erwartet
 rueckgabe 0
 genug codebloecke TRUE
@@ -113,9 +113,9 @@ PRINT "rueckgabe "; nlCode
 PRINT "genug abdrucke "; (zahlVor(nlAus, "Abdrucke") > 10)
 IF nlCode <> 0 THEN PRINT nlAus; nlErr
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/einstieg.dh"
+IMPORT "{sammlung}/../_hilfen/einstieg.dh"
 --- erwartet
 rueckgabe 0
 genug abdrucke TRUE
@@ -129,9 +129,9 @@ PRINT "rueckgabe "; nlCode
 PRINT "genug ausgefuehrt "; (zahlVor(nlAus, "ausgefuehrt") >= 5)
 IF nlCode <> 0 THEN PRINT nlAus; nlErr
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/einstieg.dh"
+IMPORT "{sammlung}/../_hilfen/einstieg.dh"
 --- erwartet
 rueckgabe 0
 genug ausgefuehrt TRUE
@@ -163,7 +163,7 @@ FOR i = 0 TO 2
     END IF
 NEXT
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- erwartet
 Lehrbuch stimmt
 Galaga stimmt

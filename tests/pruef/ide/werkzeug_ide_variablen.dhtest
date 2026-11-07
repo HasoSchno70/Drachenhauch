@@ -5,7 +5,7 @@
 --- langsam
 === felder und objekte klappen auf und bleiben offen
 DIM prBild AS INTEGER : prBild = 0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach     IF GUI_DOUBLE_CLICKED(lstProbleme) THEN problemAnspringen()
 prBild = prBild + 1
 IF prBild = 10 THEN
@@ -32,7 +32,7 @@ spiel.dh
 --- umgebung
 DHRT_FRAMES=260
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 CLASS Held
@@ -61,7 +61,7 @@ offen held
 
 === ein fehler haelt an und zeigt die variablen von dort
 DIM prBild AS INTEGER : prBild = 0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach     IF GUI_DOUBLE_CLICKED(lstProbleme) THEN problemAnspringen()
 prBild = prBild + 1
 IF prBild = 10 THEN befehl("debug")
@@ -79,7 +79,7 @@ spiel.dh
 --- umgebung
 DHRT_FRAMES=260
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 DIM f[3] AS INTEGER

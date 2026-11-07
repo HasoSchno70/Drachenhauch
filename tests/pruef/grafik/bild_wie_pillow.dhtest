@@ -11,7 +11,7 @@ PRINT "klein "; bvAbweichung$(IMAGE_SCALE(q, 11, 8, "lanczos"), LOADIMAGE("klein
 PRINT "gross "; bvAbweichung$(IMAGE_SCALE(q, 47, 35, "lanczos"), LOADIMAGE("gross_lanczos.png"))
 PRINT "flach "; bvAbweichung$(IMAGE_SCALE(q, 31, 9, "LANCZOS"), LOADIMAGE("flach_lanczos.png"))
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/bildvergleich.dh"
+IMPORT "{sammlung}/../_hilfen/bildvergleich.dh"
 
 --- datei quelle.png base64
 iVBORw0KGgoAAAANSUhEUgAAAB8AAAAXCAIAAAB8nwMDAAAHb0lEQVR4nBXKW4hcZwEA4P//z387
@@ -166,7 +166,7 @@ PRINT "box "; bvAbweichung$(IMAGE_SCALE(q, 11, 8, "box"), LOADIMAGE("klein_box.p
 PRINT "hamming "; bvAbweichung$(IMAGE_SCALE(q, 11, 8, "hamming"), LOADIMAGE("klein_hamming.png"))
 PRINT "linear "; bvAbweichung$(IMAGE_SCALE(q, 31, 9, "linear"), LOADIMAGE("flach_linear.png"))
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/bildvergleich.dh"
+IMPORT "{sammlung}/../_hilfen/bildvergleich.dh"
 
 --- datei quelle.png base64
 iVBORw0KGgoAAAANSUhEUgAAAB8AAAAXCAIAAAB8nwMDAAAHb0lEQVR4nBXKW4hcZwEA4P//z387
@@ -277,7 +277,7 @@ IMPORT "helfer.dh"
 IMPORT "imgfx"
 PRINT bvAbweichung$(IMAGE_SCALE(LOADIMAGE("quelle_alpha.png"), 11, 8, "lanczos"), LOADIMAGE("alpha_lanczos.png"))
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/bildvergleich.dh"
+IMPORT "{sammlung}/../_hilfen/bildvergleich.dh"
 
 --- datei quelle_alpha.png base64
 iVBORw0KGgoAAAANSUhEUgAAAB8AAAAXCAYAAADz/ZRUAAAImElEQVR4nB3UW4xcdQGA8f8537n9
@@ -346,7 +346,7 @@ PRINT "saettigung 0 "; bvAbweichung$(IMAGE_ENHANCE(q, "saettigung", 0.0), LOADIM
 PRINT "saettigung 0.6 "; bvAbweichung$(IMAGE_ENHANCE(q, "saettigung", 0.6), LOADIMAGE("saettigung_0.6.png"))
 PRINT "farbe 1.7 "; bvAbweichung$(IMAGE_ENHANCE(q, "farbe", 1.7), LOADIMAGE("saettigung_1.7.png"))
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/bildvergleich.dh"
+IMPORT "{sammlung}/../_hilfen/bildvergleich.dh"
 
 --- datei quelle.png base64
 iVBORw0KGgoAAAANSUhEUgAAAB8AAAAXCAIAAAB8nwMDAAAHb0lEQVR4nBXKW4hcZwEA4P//z387
@@ -615,7 +615,7 @@ DIM q AS IMAGE : q = LOADIMAGE("quelle.png")
 DIM s AS STRING : s = bvAbweichung$(IMAGE_SCALE(q, 11, 8), LOADIMAGE("klein_lanczos.png"))
 PRINT LEFT$(s, 4); " "; INSTR(s, "abw 0 ") < 0
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/bildvergleich.dh"
+IMPORT "{sammlung}/../_hilfen/bildvergleich.dh"
 
 --- datei quelle.png base64
 iVBORw0KGgoAAAANSUhEUgAAAB8AAAAXCAIAAAB8nwMDAAAHb0lEQVR4nBXKW4hcZwEA4P//z387

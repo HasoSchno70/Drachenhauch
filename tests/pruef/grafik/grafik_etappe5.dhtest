@@ -43,7 +43,7 @@ PRINT "rest "; HEX$(GETPIXEL(c, 95, 35)); " "; GETALPHA(c, 95, 35)
 ' Ohne Schrift bleibt es beim alten Befehl.
 IMAGE_DRAW_TEXT(c, 5, 5, "x", 10, WHITE)
 --- argumente
-{sammlung}/../../circuitrunner/assets/font.ttf
+{sammlung}/../../../circuitrunner/assets/font.ttf
 --- umgebung
 DHRT_FRAMES=2
 --- erwartet
@@ -220,7 +220,7 @@ FOR i = 1 TO 8
     PRINT probe$(i)
 NEXT
 --- argumente
-{sammlung}/../../circuitrunner/assets/font.ttf
+{sammlung}/../../../circuitrunner/assets/font.ttf
 --- umgebung
 DHRT_FRAMES=2
 --- enthaelt

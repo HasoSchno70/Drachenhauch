@@ -13,7 +13,7 @@
 === doppelklick legt einen zustand an
 ' Doppelklick auf freie Flaeche (700,568) -> (700-290-75, 568-88-25) aufs Raster.
 AUTOMATION_PLAY("ev.txt")
---- programm ../../examples/198_anim_fsm_editor.dh nach SETFPS(60)
+--- programm ../../../examples/198_anim_fsm_editor.dh nach SETFPS(60)
 --- streichen WINDOW_MAXIMIZE()
 --- argumente
 neu.dhanim
@@ -66,7 +66,7 @@ laufzeit state
 
 === rechte maustaste zieht einen uebergang
 AUTOMATION_PLAY("ev.txt")
---- programm ../../examples/198_anim_fsm_editor.dh nach SETFPS(60)
+--- programm ../../../examples/198_anim_fsm_editor.dh nach SETFPS(60)
 --- streichen WINDOW_MAXIMIZE()
 --- argumente
 held.dhanim
@@ -93,7 +93,7 @@ e 62 1 341 0 0 0
 --- datei held.dhanim
 {
   "version": 1,
-  "sheet": "{sammlung}/../../examples/assets/hero_walk.png",
+  "sheet": "{sammlung}/../../../examples/assets/hero_walk.png",
   "frame_w": 16,
   "frame_h": 16,
   "scale": 5.0,
@@ -239,7 +239,7 @@ laufzeit fall
 
 === ziehen und rueckgaengig
 AUTOMATION_PLAY("ev.txt")
---- programm ../../examples/198_anim_fsm_editor.dh nach SETFPS(60)
+--- programm ../../../examples/198_anim_fsm_editor.dh nach SETFPS(60)
 --- streichen WINDOW_MAXIMIZE()
 --- argumente
 held.dhanim
@@ -270,7 +270,7 @@ e 82 1 341 0 0 0
 --- datei held.dhanim
 {
   "version": 1,
-  "sheet": "{sammlung}/../../examples/assets/hero_walk.png",
+  "sheet": "{sammlung}/../../../examples/assets/hero_walk.png",
   "frame_w": 16,
   "frame_h": 16,
   "scale": 5.0,
@@ -398,7 +398,7 @@ idle 120 176
 === entf loescht den zustand samt seinen uebergaengen
 ' fall haengt an zwei Uebergaengen (jump -> fall, fall -> idle).
 AUTOMATION_PLAY("ev.txt")
---- programm ../../examples/198_anim_fsm_editor.dh nach SETFPS(60)
+--- programm ../../../examples/198_anim_fsm_editor.dh nach SETFPS(60)
 --- streichen WINDOW_MAXIMIZE()
 --- argumente
 held.dhanim
@@ -421,7 +421,7 @@ e 62 1 341 0 0 0
 --- datei held.dhanim
 {
   "version": 1,
-  "sheet": "{sammlung}/../../examples/assets/hero_walk.png",
+  "sheet": "{sammlung}/../../../examples/assets/hero_walk.png",
   "frame_w": 16,
   "frame_h": 16,
   "scale": 5.0,
@@ -576,7 +576,7 @@ laufzeit idle
 === bedingung am pfeil hinzufuegen
 ' Klick auf den Pfeil idle -> run waehlt ihn, [+ Bedingung] haengt eine an.
 AUTOMATION_PLAY("ev.txt")
---- programm ../../examples/198_anim_fsm_editor.dh nach SETFPS(60)
+--- programm ../../../examples/198_anim_fsm_editor.dh nach SETFPS(60)
 --- streichen WINDOW_MAXIMIZE()
 --- argumente
 held.dhanim
@@ -601,7 +601,7 @@ e 72 1 341 0 0 0
 --- datei held.dhanim
 {
   "version": 1,
-  "sheet": "{sammlung}/../../examples/assets/hero_walk.png",
+  "sheet": "{sammlung}/../../../examples/assets/hero_walk.png",
   "frame_w": 16,
   "frame_h": 16,
   "scale": 5.0,
@@ -752,7 +752,7 @@ speed 1 idle
 
 === parameter anlegen
 AUTOMATION_PLAY("ev.txt")
---- programm ../../examples/198_anim_fsm_editor.dh nach SETFPS(60)
+--- programm ../../../examples/198_anim_fsm_editor.dh nach SETFPS(60)
 --- streichen WINDOW_MAXIMIZE()
 --- argumente
 held.dhanim
@@ -773,7 +773,7 @@ e 52 1 341 0 0 0
 --- datei held.dhanim
 {
   "version": 1,
-  "sheet": "{sammlung}/../../examples/assets/hero_walk.png",
+  "sheet": "{sammlung}/../../../examples/assets/hero_walk.png",
   "frame_w": 16,
   "frame_h": 16,
   "scale": 5.0,
@@ -914,7 +914,7 @@ laufzeit idle
 
 === f5 schreibt die vorschau und sie laeuft
 AUTOMATION_PLAY("ev.txt")
---- programm ../../examples/198_anim_fsm_editor.dh nach SETFPS(60)
+--- programm ../../../examples/198_anim_fsm_editor.dh nach SETFPS(60)
 --- streichen WINDOW_MAXIMIZE()
 --- argumente
 held.dhanim
@@ -929,7 +929,7 @@ e 22 1 294 0 0 0
 --- datei held.dhanim
 {
   "version": 1,
-  "sheet": "{sammlung}/../../examples/assets/hero_walk.png",
+  "sheet": "{sammlung}/../../../examples/assets/hero_walk.png",
   "frame_w": 16,
   "frame_h": 16,
   "scale": 5.0,
@@ -1077,7 +1077,7 @@ lauf 0
 ' die naechste, und so weiter -- je Stufe untereinander. Ein Schritt im
 ' Verlauf: Rueckgaengig stellt die alten Lagen wieder her.
 SET_WINDOW_POS(-3000, -3000)
---- programm ../../examples/198_anim_fsm_editor.dh nach SETFPS(60)
+--- programm ../../../examples/198_anim_fsm_editor.dh nach SETFPS(60)
 --- streichen WINDOW_MAXIMIZE()
 --- einschub nach FLIP()
 IF GETENV$("PR_FERTIG") = "" THEN
@@ -1097,7 +1097,7 @@ DHRT_FRAMES=4
 --- datei held.dhanim
 {
   "version": 1,
-  "sheet": "{sammlung}/../../examples/assets/hero_walk.png",
+  "sheet": "{sammlung}/../../../examples/assets/hero_walk.png",
   "frame_w": 16,
   "frame_h": 16,
   "scale": 5.0,
@@ -1222,7 +1222,7 @@ zurueck 120 176
 ' Zoom um einen Schirmpunkt: der Weltpunkt darunter bleibt, und Knoten
 ' werden an ihrer neuen Lage getroffen.
 SET_WINDOW_POS(-3000, -3000)
---- programm ../../examples/198_anim_fsm_editor.dh nach SETFPS(60)
+--- programm ../../../examples/198_anim_fsm_editor.dh nach SETFPS(60)
 --- streichen WINDOW_MAXIMIZE()
 --- einschub nach FLIP()
 IF GETENV$("PR_FERTIG") = "" THEN
@@ -1244,7 +1244,7 @@ DHRT_FRAMES=4
 --- datei held.dhanim
 {
   "version": 1,
-  "sheet": "{sammlung}/../../examples/assets/hero_walk.png",
+  "sheet": "{sammlung}/../../../examples/assets/hero_walk.png",
   "frame_w": 16,
   "frame_h": 16,
   "scale": 5.0,
@@ -1367,7 +1367,7 @@ grenze 2.5
 ' Ein Radschritt nach oben ueber dem Graphen vergroessert um 15 Prozent.
 SET_WINDOW_POS(-3000, -3000)
 DIM prN AS INTEGER
---- programm ../../examples/198_anim_fsm_editor.dh nach SETFPS(60)
+--- programm ../../../examples/198_anim_fsm_editor.dh nach SETFPS(60)
 --- streichen WINDOW_MAXIMIZE()
 --- datei _programm/ev.txt
 c 3
@@ -1386,7 +1386,7 @@ DHRT_FRAMES=20
 --- datei held.dhanim
 {
   "version": 1,
-  "sheet": "{sammlung}/../../examples/assets/hero_walk.png",
+  "sheet": "{sammlung}/../../../examples/assets/hero_walk.png",
   "frame_w": 16,
   "frame_h": 16,
   "scale": 5.0,
@@ -1507,7 +1507,7 @@ zoom 115
 ' Nach [Einpassen] liegt jeder Knoten ganz in der Flaeche zwischen den
 ' beiden Seitenleisten, unter der Werkzeugleiste und ueber der Statusleiste.
 SET_WINDOW_POS(-3000, -3000)
---- programm ../../examples/198_anim_fsm_editor.dh nach SETFPS(60)
+--- programm ../../../examples/198_anim_fsm_editor.dh nach SETFPS(60)
 --- streichen WINDOW_MAXIMIZE()
 --- einschub nach FLIP()
 IF GETENV$("PR_FERTIG") = "" THEN
@@ -1530,7 +1530,7 @@ DHRT_FRAMES=4
 --- datei held.dhanim
 {
   "version": 1,
-  "sheet": "{sammlung}/../../examples/assets/hero_walk.png",
+  "sheet": "{sammlung}/../../../examples/assets/hero_walk.png",
   "frame_w": 16,
   "frame_h": 16,
   "scale": 5.0,
@@ -1651,7 +1651,7 @@ drin TRUE groesser TRUE
 ' Ohne Wahl zeigt der Inspektor unten den Startzustand (idle, Bild 0) aus
 ' dem Blatt, zehnfach: die Figur steht mittig in der Flaeche ab x 948, y 562.
 SET_WINDOW_POS(-3000, -3000)
---- programm ../../examples/198_anim_fsm_editor.dh nach SETFPS(60)
+--- programm ../../../examples/198_anim_fsm_editor.dh nach SETFPS(60)
 --- streichen WINDOW_MAXIMIZE()
 --- argumente
 held.dhanim
@@ -1661,7 +1661,7 @@ DHRT_SCREENSHOT=bild.png
 --- datei held.dhanim
 {
   "version": 1,
-  "sheet": "{sammlung}/../../examples/assets/hero_walk.png",
+  "sheet": "{sammlung}/../../../examples/assets/hero_walk.png",
   "frame_w": 16,
   "frame_h": 16,
   "scale": 5.0,

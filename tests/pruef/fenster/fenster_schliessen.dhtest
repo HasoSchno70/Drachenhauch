@@ -32,9 +32,9 @@ TRUE FALSE
 IMPORT "helfer.dh"
 PRINT sende$(skript$(), "gui.dh", "esc", "")
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/fenstersender.dh"
+IMPORT "{sammlung}/../_hilfen/fenstersender.dh"
 FUNCTION skript$() AS STRING
-    RETURN "{sammlung}/_hilfen/fenstersender.ps1"
+    RETURN "{sammlung}/../_hilfen/fenstersender.ps1"
 END FUNCTION
 --- datei gui.dh
 IMPORT "gui"
@@ -58,9 +58,9 @@ zeit um
 IMPORT "helfer.dh"
 PRINT sende$(skript$(), "ohne.dh", "esc", "")
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/fenstersender.dh"
+IMPORT "{sammlung}/../_hilfen/fenstersender.dh"
 FUNCTION skript$() AS STRING
-    RETURN "{sammlung}/_hilfen/fenstersender.ps1"
+    RETURN "{sammlung}/../_hilfen/fenstersender.ps1"
 END FUNCTION
 --- datei ohne.dh
 SCREEN(300, 200, ARG$(0), 1)
@@ -79,9 +79,9 @@ beendet
 IMPORT "helfer.dh"
 PRINT sende$(skript$(), "gui.dh", "esc", "")
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/fenstersender.dh"
+IMPORT "{sammlung}/../_hilfen/fenstersender.dh"
 FUNCTION skript$() AS STRING
-    RETURN "{sammlung}/_hilfen/fenstersender.ps1"
+    RETURN "{sammlung}/../_hilfen/fenstersender.ps1"
 END FUNCTION
 --- datei gui.dh
 IMPORT "gui"
@@ -106,9 +106,9 @@ beendet
 IMPORT "helfer.dh"
 PRINT sende$(skript$(), "kreuz.dh", "kreuz", "")
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/fenstersender.dh"
+IMPORT "{sammlung}/../_hilfen/fenstersender.dh"
 FUNCTION skript$() AS STRING
-    RETURN "{sammlung}/_hilfen/fenstersender.ps1"
+    RETURN "{sammlung}/../_hilfen/fenstersender.ps1"
 END FUNCTION
 --- datei kreuz.dh
 SCREEN(300, 200, ARG$(0), 1)

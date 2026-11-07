@@ -27,13 +27,13 @@ DIM b AS BUFFER : b = phDatei("8", 4, 3, 16, "{\rtf1\ansi{\fonttbl{\f0\fnil Aria
 WRITEALL_BYTES("probe.pat", b)
 phZeigen(kern.patLaden("probe.pat", pal, sym))
 --- argumente
-{sammlung}/../../examples/glutfaden
+{sammlung}/../../../examples/glutfaden
 --- datei helfer.dh
-IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
-IMPORT "{sammlung}/_hilfen/glutfaden_pat.dh"
-IMPORT "{sammlung}/_hilfen/glutfaden_xsd.dh"
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
-CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+IMPORT "{sammlung}/../../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/../_hilfen/glutfaden_pat.dh"
+IMPORT "{sammlung}/../_hilfen/glutfaden_xsd.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../../examples/glutfaden/main.dh"
 --- erwartet
 fassung 8
 Probe 4x3 stoff 16.0 ebenen 2
@@ -65,13 +65,13 @@ PRINT "[" + kern.patRtfText$("{\rtf1\ansi{\fonttbl{\f0\fnil Arial;}}{\colortbl;\
 PRINT "[" + kern.patRtfText$("") + "]"
 PRINT "[" + kern.patRtfText$("ohne rtf") + "]"
 --- argumente
-{sammlung}/../../examples/glutfaden
+{sammlung}/../../../examples/glutfaden
 --- datei helfer.dh
-IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
-IMPORT "{sammlung}/_hilfen/glutfaden_pat.dh"
-IMPORT "{sammlung}/_hilfen/glutfaden_xsd.dh"
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
-CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+IMPORT "{sammlung}/../../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/../_hilfen/glutfaden_pat.dh"
+IMPORT "{sammlung}/../_hilfen/glutfaden_xsd.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../../examples/glutfaden/main.dh"
 --- erwartet
 [Hallo	Welt
 
@@ -92,13 +92,13 @@ DIM b AS BUFFER : b = phDatei("8", 1, 2, 14, "", "", "", 3, fa, gi, 0, "", "0000
 WRITEALL_BYTES("mein stueck.pat", b)
 phZeigen(kern.patLaden("mein stueck.pat", pal, sym))
 --- argumente
-{sammlung}/../../examples/glutfaden
+{sammlung}/../../../examples/glutfaden
 --- datei helfer.dh
-IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
-IMPORT "{sammlung}/_hilfen/glutfaden_pat.dh"
-IMPORT "{sammlung}/_hilfen/glutfaden_xsd.dh"
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
-CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+IMPORT "{sammlung}/../../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/../_hilfen/glutfaden_pat.dh"
+IMPORT "{sammlung}/../_hilfen/glutfaden_xsd.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../../examples/glutfaden/main.dh"
 --- erwartet
 fassung 8
 mein stueck 1x2 stoff 14.0 ebenen 1
@@ -141,13 +141,13 @@ versuch("zu gross", phDatei("8", 2001, 1, 14, "", "T", "", 3, fa, gi, 0, "", "")
 versuch("farbe kaputt", BUFFER_FROM_HEX(REPLACE$(UPPER$(BUFFER_TO_HEX$(gut)), "FFFFFFFF020000000200000002000000020000000200000002000000FFFFFFFF02000000", "EEFFFFFF020000000200000002000000020000000200000002000000FFFFFFFF02000000")))
 versuch("fehlt", BUFFER_FROM_STRING(""))
 --- argumente
-{sammlung}/../../examples/glutfaden
+{sammlung}/../../../examples/glutfaden
 --- datei helfer.dh
-IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
-IMPORT "{sammlung}/_hilfen/glutfaden_pat.dh"
-IMPORT "{sammlung}/_hilfen/glutfaden_xsd.dh"
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
-CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+IMPORT "{sammlung}/../../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/../_hilfen/glutfaden_pat.dh"
+IMPORT "{sammlung}/../_hilfen/glutfaden_xsd.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../../examples/glutfaden/main.dh"
 --- erwartet
 gut: gelesen
 kennung: PAT: keine PCStitch-Datei (die Kennung 'PCStitch' fehlt)
@@ -185,13 +185,13 @@ DIM b AS BUFFER : b = xhDatei(4, 3, 18, "Probe XSD", "Hans", "Notiz", 3, fa, sy,
 WRITEALL_BYTES("probe.xsd", b)
 xhZeigen(kern.xsdLaden("probe.xsd", pal, sym))
 --- argumente
-{sammlung}/../../examples/glutfaden
+{sammlung}/../../../examples/glutfaden
 --- datei helfer.dh
-IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
-IMPORT "{sammlung}/_hilfen/glutfaden_pat.dh"
-IMPORT "{sammlung}/_hilfen/glutfaden_xsd.dh"
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
-CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+IMPORT "{sammlung}/../../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/../_hilfen/glutfaden_pat.dh"
+IMPORT "{sammlung}/../_hilfen/glutfaden_xsd.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../../examples/glutfaden/main.dh"
 --- erwartet
 fassung 4.8.4.0
 Probe XSD 4x3 stoff 18.0 ebenen 2
@@ -264,13 +264,13 @@ versuch("satz fehlt", xhDatei(4, 3, 18, "T", "", "", 3, fa, sy, st, LEFT$(kl, 20
 versuch("joint unbekannt", xhDatei(4, 3, 18, "T", "", "", 3, fa, sy, st, kl, 1, ph16$(9) + phNull$(20)))
 versuch("zu gross", xhDatei(2001, 1, 18, "T", "", "", 3, fa, sy, st, kl, 7, jo))
 --- argumente
-{sammlung}/../../examples/glutfaden
+{sammlung}/../../../examples/glutfaden
 --- datei helfer.dh
-IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
-IMPORT "{sammlung}/_hilfen/glutfaden_pat.dh"
-IMPORT "{sammlung}/_hilfen/glutfaden_xsd.dh"
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
-CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+IMPORT "{sammlung}/../../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/../_hilfen/glutfaden_pat.dh"
+IMPORT "{sammlung}/../_hilfen/glutfaden_xsd.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../../examples/glutfaden/main.dh"
 --- erwartet
 gut: gelesen, 2 rueckstiche
 kennung: XSD: keine Pattern-Maker-Datei (die Kennung 0x0510 fehlt)
@@ -297,13 +297,13 @@ CATCH e
     PRINT e
 END TRY
 --- argumente
-{sammlung}/../../examples/glutfaden
+{sammlung}/../../../examples/glutfaden
 --- datei helfer.dh
-IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
-IMPORT "{sammlung}/_hilfen/glutfaden_pat.dh"
-IMPORT "{sammlung}/_hilfen/glutfaden_xsd.dh"
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
-CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+IMPORT "{sammlung}/../../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/../_hilfen/glutfaden_pat.dh"
+IMPORT "{sammlung}/../_hilfen/glutfaden_xsd.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../../examples/glutfaden/main.dh"
 --- erwartet
 DMC 310 / DMC 321 (1+1) | DMC | 310+321 | #652224 | TRUE
 DMC 310 / DMC 321 / Anchor 306 (1+2+1) | Blend | 310+321+306 | #A4542D
@@ -360,13 +360,13 @@ ELSE
     PRINT "fotos: "; FILEEXISTS("d_aus_pat.png"); " "; FILEEXISTS("d_aus_xsd.png"); " "; FILEEXISTS("d_diamond.png")
 END IF
 --- argumente
-{sammlung}/../../examples/glutfaden
+{sammlung}/../../../examples/glutfaden
 --- datei helfer.dh
-IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
-IMPORT "{sammlung}/_hilfen/glutfaden_pat.dh"
-IMPORT "{sammlung}/_hilfen/glutfaden_xsd.dh"
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
-CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+IMPORT "{sammlung}/../../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/../_hilfen/glutfaden_pat.dh"
+IMPORT "{sammlung}/../_hilfen/glutfaden_xsd.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../../examples/glutfaden/main.dh"
 --- erwartet
 rueckgabe 0
 pat: Aus PCStitch eingelesen -- Siche | ebenen 2 stiche 7 rueckstiche 3 datei leer TRUE
@@ -424,13 +424,13 @@ FOR EACH datei IN ["probe.pxs", ARG$(0) + "/daten/muster/demo_kreuzstich.pxs"]
     kern.modusWechseln(m, "diamond", pal) : zeigen(m, "diamond2")
 NEXT
 --- argumente
-{sammlung}/../../examples/glutfaden
+{sammlung}/../../../examples/glutfaden
 --- datei helfer.dh
-IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
-IMPORT "{sammlung}/_hilfen/glutfaden_pat.dh"
-IMPORT "{sammlung}/_hilfen/glutfaden_xsd.dh"
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
-CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+IMPORT "{sammlung}/../../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/../_hilfen/glutfaden_pat.dh"
+IMPORT "{sammlung}/../_hilfen/glutfaden_xsd.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../../examples/glutfaden/main.dh"
 --- datei probe.pxs
 {
   "format": "pysticky",
@@ -894,13 +894,13 @@ PRINT kern.farbeHinzufuegen(m, v, kern.neuesGarn("auch eigen", &H123456, "", "")
 PRINT kern.farbeHinzufuegen(m, v, kern.neuesGarn("anders", &H654321, "", ""), sy, FALSE, FALSE)
 PRINT "farben "; m.farbanzahl(); " | "; m.farben[0].garn.name; " | "; m.farben[1].garn.name
 --- argumente
-{sammlung}/../../examples/glutfaden
+{sammlung}/../../../examples/glutfaden
 --- datei helfer.dh
-IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
-IMPORT "{sammlung}/_hilfen/glutfaden_pat.dh"
-IMPORT "{sammlung}/_hilfen/glutfaden_xsd.dh"
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
-CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+IMPORT "{sammlung}/../../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/../_hilfen/glutfaden_pat.dh"
+IMPORT "{sammlung}/../_hilfen/glutfaden_xsd.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../../examples/glutfaden/main.dh"
 --- erwartet
 0
 0

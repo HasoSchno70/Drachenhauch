@@ -16,7 +16,7 @@
 --- langsam
 === ablegen und sichern
 AUTOMATION_PLAY("ev.txt")
---- programm ../../examples/197_form_designer.dh nach SETFPS(60)
+--- programm ../../../examples/197_form_designer.dh nach SETFPS(60)
 --- argumente
 neu.dhform
 --- umgebung
@@ -53,7 +53,7 @@ gesichert
 
 === verschieben und zweimal rueckgaengig
 AUTOMATION_PLAY("ev.txt")
---- programm ../../examples/197_form_designer.dh nach SETFPS(60)
+--- programm ../../../examples/197_form_designer.dh nach SETFPS(60)
 --- argumente
 neu.dhform
 --- umgebung
@@ -102,7 +102,7 @@ rueckgaengig 0
 
 === f5 schreibt das laufprogramm
 AUTOMATION_PLAY("ev.txt")
---- programm ../../examples/197_form_designer.dh nach SETFPS(60)
+--- programm ../../../examples/197_form_designer.dh nach SETFPS(60)
 --- argumente
 neu.dhform
 --- umgebung
@@ -134,7 +134,7 @@ GUI_WINDOW_CHROME(frm, FALSE)
 
 === eine bestehende form bleibt vollstaendig
 AUTOMATION_PLAY("ev.txt")
---- programm ../../examples/197_form_designer.dh nach SETFPS(60)
+--- programm ../../../examples/197_form_designer.dh nach SETFPS(60)
 --- argumente
 settings.dhform
 --- umgebung
@@ -193,7 +193,7 @@ WHILE PROCESS_RUNNING(pb) AND MILLIS() < bis
 WEND
 PRINT "lauf " + STR$(PROCESS_CODE(pb)) + " " + STR$(FILEEXISTS("code.png"))
 EXIT(0)
---- programm ../../examples/197_form_designer.dh nach protokoll("bereit")
+--- programm ../../../examples/197_form_designer.dh nach protokoll("bereit")
 --- argumente
 alles.dhform
 --- datei alles.dhform
@@ -263,7 +263,7 @@ GUI_SET_CHECKED(cbZellen, TRUE)
 inspektorUebernehmen()
 PRINT JSON_STRINGIFY(teilbaum(doc, "widgets.0.table"))
 EXIT(0)
---- programm ../../examples/197_form_designer.dh nach protokoll("bereit")
+--- programm ../../../examples/197_form_designer.dh nach protokoll("bereit")
 --- argumente
 t.dhform
 --- datei t.dhform
@@ -300,7 +300,7 @@ GUI_SET_TEXT(aLeer, "")
 inspektorUebernehmen()
 PRINT "leer "; JSON_HAS(doc, "widgets.1.table.leer_text")
 EXIT(0)
---- programm ../../examples/197_form_designer.dh nach protokoll("bereit")
+--- programm ../../../examples/197_form_designer.dh nach protokoll("bereit")
 --- argumente
 t.dhform
 --- datei t.dhform
@@ -331,7 +331,7 @@ GUI_SET_TEXT(aLeer, "")
 inspektorUebernehmen()
 PRINT "ab "; JSON_HAS(doc, "widgets.0.tree.bearbeitbar"); " "; JSON_HAS(doc, "widgets.0.tree.leer_text")
 EXIT(0)
---- programm ../../examples/197_form_designer.dh nach protokoll("bereit")
+--- programm ../../../examples/197_form_designer.dh nach protokoll("bereit")
 --- argumente
 t.dhform
 --- datei t.dhform
@@ -355,7 +355,7 @@ GUI_SET_TEXT(fStil, "")
 inspektorUebernehmen()
 PRINT "weg " + STR$(JSON_HAS(doc, wz$(0, "font_style")))
 EXIT(0)
---- programm ../../examples/197_form_designer.dh nach protokoll("bereit")
+--- programm ../../../examples/197_form_designer.dh nach protokoll("bereit")
 --- argumente
 t.dhform
 --- datei t.dhform
@@ -373,7 +373,7 @@ inspektorFuellen()
 inspektorUebernehmen()
 PRINT JSON_STRINGIFY(teilbaum(doc, "widgets.0.table"))
 EXIT(0)
---- programm ../../examples/197_form_designer.dh nach protokoll("bereit")
+--- programm ../../../examples/197_form_designer.dh nach protokoll("bereit")
 --- argumente
 t.dhform
 --- datei t.dhform
@@ -422,8 +422,8 @@ PRINT "arten " + STR$(LEN(arten))
 PRINT "fehlen[" + fehlen + "]"
 PRINT "gitter " + STR$(ARRAY_INDEXOF(palette, "grid") >= 0)
 --- argumente
-{sammlung}/../../rust/drachenhauch_runtime/src/gui.rs
-{sammlung}/../../examples/197_form_designer.dh
+{sammlung}/../../../rust/drachenhauch_runtime/src/gui.rs
+{sammlung}/../../../examples/197_form_designer.dh
 --- erwartet
 arten 33
 fehlen[]
@@ -525,7 +525,7 @@ anordnen("vert_w")
 zeige("zwei")
 PRINT GUI_TEXT(lblStatus)
 EXIT(0)
---- programm ../../examples/197_form_designer.dh nach protokoll("bereit")
+--- programm ../../../examples/197_form_designer.dh nach protokoll("bereit")
 --- argumente
 a.dhform
 --- datei a.dhform
@@ -555,7 +555,7 @@ Verteilen braucht mindestens drei gewaehlte Controls.
 ' leere Flaeche, der alle drei fasst; Pfeil rechts schiebt alle um ein
 ' Raster, Strg+S sichert.
 AUTOMATION_PLAY("ev.txt")
---- programm ../../examples/197_form_designer.dh nach SETFPS(60)
+--- programm ../../../examples/197_form_designer.dh nach SETFPS(60)
 --- argumente
 m.dhform
 --- umgebung
@@ -651,7 +651,7 @@ WHILE PROCESS_RUNNING(pb) AND MILLIS() < bis
 WEND
 PRINT "lauf " + STR$(PROCESS_CODE(pb))
 EXIT(0)
---- programm ../../examples/197_form_designer.dh nach protokoll("bereit")
+--- programm ../../../examples/197_form_designer.dh nach protokoll("bereit")
 --- argumente
 r.dhform
 --- datei r.dhform
@@ -678,7 +678,7 @@ lauf 0
 PRINT feldText$(0, "name"); " | "; feldText$(1, "name"); " "; feldText$(1, "reiter"); " | ["; feldText$(2, "reiter"); "]"
 PRINT JSON_STRINGIFY(teilbaum(doc, "widgets.0.tabctl.kinder"))
 EXIT(0)
---- programm ../../examples/197_form_designer.dh nach protokoll("bereit")
+--- programm ../../../examples/197_form_designer.dh nach protokoll("bereit")
 --- argumente
 g.dhform
 --- datei g.dhform
@@ -705,7 +705,7 @@ auswahlSetzen(1)
 inspektorFuellen()
 PRINT "beim knopf "; GUI_VISIBLE(cbFrei)
 EXIT(0)
---- programm ../../examples/197_form_designer.dh nach protokoll("bereit")
+--- programm ../../../examples/197_form_designer.dh nach protokoll("bereit")
 --- argumente
 k.dhform
 --- datei k.dhform
@@ -724,7 +724,7 @@ controlAnlegen(0, 40, 40)
 ersetzenAnfragen("neu")
 PRINT "frage "; dlgErsetzen <> 0; " controls "; anzahl()
 EXIT(0)
---- programm ../../examples/197_form_designer.dh nach DIM ersetzenMit AS STRING : ersetzenMit = ""
+--- programm ../../../examples/197_form_designer.dh nach DIM ersetzenMit AS STRING : ersetzenMit = ""
 --- erwartet
 frage TRUE controls 1
 
@@ -734,7 +734,7 @@ geaendert = FALSE
 ersetzenAnfragen("neu")
 PRINT "frage "; dlgErsetzen <> 0; " controls "; anzahl()
 EXIT(0)
---- programm ../../examples/197_form_designer.dh nach DIM ersetzenMit AS STRING : ersetzenMit = ""
+--- programm ../../../examples/197_form_designer.dh nach DIM ersetzenMit AS STRING : ersetzenMit = ""
 --- erwartet
 frage FALSE controls 0
 
@@ -746,7 +746,7 @@ frage FALSE controls 0
 ' (200, 120) auf dem Schirm bei (270 + 250, 60 + 150); ein Zug um 40 Punkte
 ' auf dem Schirm sind 32 in der Form.
 DIM prBild AS INTEGER : prBild = 0
---- programm ../../examples/197_form_designer.dh nach SETFPS(60)
+--- programm ../../../examples/197_form_designer.dh nach SETFPS(60)
 --- einschub nach     IF GUI_CLICKED(miZoomNull) THEN zoomStufe(0)
 prBild = prBild + 1
 IF prBild = 5 THEN
@@ -788,7 +788,7 @@ bewegt 0 232 120 100 28
 ' Rand. Geprueft am Bild: in den oberen Zeilen der Palette (dort steht die
 ' Leiste) endet die helle Schrift deutlich vor dem rechten Rand.
 DIM prBild AS INTEGER : prBild = 0
---- programm ../../examples/197_form_designer.dh nach SETFPS(60)
+--- programm ../../../examples/197_form_designer.dh nach SETFPS(60)
 --- einschub nach     IF GUI_CLICKED(miZoomNull) THEN zoomStufe(0)
 prBild = prBild + 1
 IF prBild = 20 THEN SAVESCREENSHOT("menue.png")

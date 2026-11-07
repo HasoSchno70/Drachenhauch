@@ -11,9 +11,9 @@
 IMPORT "helfer.dh"
 PRINT sende$(skript$(), "feld.dh", "tippe:f(x", "an")
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/fenstersender.dh"
+IMPORT "{sammlung}/../_hilfen/fenstersender.dh"
 FUNCTION skript$() AS STRING
-    RETURN "{sammlung}/_hilfen/fenstersender.ps1"
+    RETURN "{sammlung}/../_hilfen/fenstersender.ps1"
 END FUNCTION
 --- datei feld.dh
 IMPORT "gui"
@@ -47,9 +47,9 @@ gesendet
 IMPORT "helfer.dh"
 PRINT sende$(skript$(), "feld.dh", "tippe:f(x", "aus")
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/fenstersender.dh"
+IMPORT "{sammlung}/../_hilfen/fenstersender.dh"
 FUNCTION skript$() AS STRING
-    RETURN "{sammlung}/_hilfen/fenstersender.ps1"
+    RETURN "{sammlung}/../_hilfen/fenstersender.ps1"
 END FUNCTION
 --- datei feld.dh
 IMPORT "gui"
@@ -83,9 +83,9 @@ gesendet
 IMPORT "helfer.dh"
 PRINT sende$(skript$(), "feld.dh", "tippe:a = |anf|tippe:hi", "an")
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/fenstersender.dh"
+IMPORT "{sammlung}/../_hilfen/fenstersender.dh"
 FUNCTION skript$() AS STRING
-    RETURN "{sammlung}/_hilfen/fenstersender.ps1"
+    RETURN "{sammlung}/../_hilfen/fenstersender.ps1"
 END FUNCTION
 --- datei feld.dh
 IMPORT "gui"
@@ -119,9 +119,9 @@ gesendet
 IMPORT "helfer.dh"
 PRINT sende$(skript$(), "feld.dh", "tippe:ab|anf", "an")
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/fenstersender.dh"
+IMPORT "{sammlung}/../_hilfen/fenstersender.dh"
 FUNCTION skript$() AS STRING
-    RETURN "{sammlung}/_hilfen/fenstersender.ps1"
+    RETURN "{sammlung}/../_hilfen/fenstersender.ps1"
 END FUNCTION
 --- datei feld.dh
 IMPORT "gui"
@@ -155,9 +155,9 @@ gesendet
 IMPORT "helfer.dh"
 PRINT sende$(skript$(), "feld.dh", "anf", "imtext")
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/fenstersender.dh"
+IMPORT "{sammlung}/../_hilfen/fenstersender.dh"
 FUNCTION skript$() AS STRING
-    RETURN "{sammlung}/_hilfen/fenstersender.ps1"
+    RETURN "{sammlung}/../_hilfen/fenstersender.ps1"
 END FUNCTION
 --- datei feld.dh
 IMPORT "gui"
@@ -191,9 +191,9 @@ gesendet
 IMPORT "helfer.dh"
 PRINT sende$(skript$(), "feld.dh", "tippe:(", "vorwort")
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/fenstersender.dh"
+IMPORT "{sammlung}/../_hilfen/fenstersender.dh"
 FUNCTION skript$() AS STRING
-    RETURN "{sammlung}/_hilfen/fenstersender.ps1"
+    RETURN "{sammlung}/../_hilfen/fenstersender.ps1"
 END FUNCTION
 --- datei feld.dh
 IMPORT "gui"
@@ -227,9 +227,9 @@ gesendet
 IMPORT "helfer.dh"
 PRINT sende$(skript$(), "feld.dh", "tippe:(", "umschliessen")
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/fenstersender.dh"
+IMPORT "{sammlung}/../_hilfen/fenstersender.dh"
 FUNCTION skript$() AS STRING
-    RETURN "{sammlung}/_hilfen/fenstersender.ps1"
+    RETURN "{sammlung}/../_hilfen/fenstersender.ps1"
 END FUNCTION
 --- datei feld.dh
 IMPORT "gui"
@@ -263,9 +263,9 @@ gesendet
 IMPORT "helfer.dh"
 PRINT sende$(skript$(), "feld.dh", "tippe:x[|rueck", "an")
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/fenstersender.dh"
+IMPORT "{sammlung}/../_hilfen/fenstersender.dh"
 FUNCTION skript$() AS STRING
-    RETURN "{sammlung}/_hilfen/fenstersender.ps1"
+    RETURN "{sammlung}/../_hilfen/fenstersender.ps1"
 END FUNCTION
 --- datei feld.dh
 IMPORT "gui"
@@ -299,9 +299,9 @@ gesendet
 IMPORT "helfer.dh"
 PRINT sende$(skript$(), "feld.dh", "tippe:x[|rechts|rueck", "an")
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/fenstersender.dh"
+IMPORT "{sammlung}/../_hilfen/fenstersender.dh"
 FUNCTION skript$() AS STRING
-    RETURN "{sammlung}/_hilfen/fenstersender.ps1"
+    RETURN "{sammlung}/../_hilfen/fenstersender.ps1"
 END FUNCTION
 --- datei feld.dh
 IMPORT "gui"
@@ -335,9 +335,9 @@ gesendet
 IMPORT "helfer.dh"
 PRINT sende$(skript$(), "feld.dh", "tippe:()|anf|anf", "an")
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/fenstersender.dh"
+IMPORT "{sammlung}/../_hilfen/fenstersender.dh"
 FUNCTION skript$() AS STRING
-    RETURN "{sammlung}/_hilfen/fenstersender.ps1"
+    RETURN "{sammlung}/../_hilfen/fenstersender.ps1"
 END FUNCTION
 --- datei feld.dh
 IMPORT "gui"

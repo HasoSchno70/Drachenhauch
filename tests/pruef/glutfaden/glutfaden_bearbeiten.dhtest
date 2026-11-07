@@ -43,8 +43,8 @@ PRINT "typen "; e.stichArt(1, 1); " "; e.stichArt(2, 1); " "; e.stichArt(4, 4)
 ok = kern.stichSetzen(m, v, 5, 4, 1, kern.VIERTEL_OL)
 PRINT "perle als viertel "; e.stichArt(5, 4)
 --- datei k.dh
-IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
-IMPORT "{sammlung}/_hilfen/glutfaden.dh"
+IMPORT "{sammlung}/../../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/../_hilfen/glutfaden.dh"
 
 --- erwartet
 start [*Hintergrund:0] farben A=0 B=0 C=0 summe 0
@@ -109,8 +109,8 @@ WHILE v.kannZurueck()
 WEND
 PRINT "alles zurueck "; zustand$(m)
 --- datei k.dh
-IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
-IMPORT "{sammlung}/_hilfen/glutfaden.dh"
+IMPORT "{sammlung}/../../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/../_hilfen/glutfaden.dh"
 
 --- erwartet
 neu 1 [Hintergrund:1 *Ebene 2:2] farben A=1 B=2 C=0 summe 25004353
@@ -145,8 +145,8 @@ PRINT "nach unten in gesperrte "; kern.ebeneNachUnten(m, v, 1); " "; zustand$(m)
 ' ausserhalb und unbekannte Farbe
 PRINT "ausserhalb "; kern.stichSetzen(m, v, 6, 0, 0, kern.VOLL); " farbe 9 "; kern.stichSetzen(m, v, 0, 1, 9, kern.VOLL)
 --- datei k.dh
-IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
-IMPORT "{sammlung}/_hilfen/glutfaden.dh"
+IMPORT "{sammlung}/../../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/../_hilfen/glutfaden.dh"
 
 --- erwartet
 gesperrt setzen FALSE radieren FALSE
@@ -191,8 +191,8 @@ FOR i = 1 TO 3
 NEXT
 PRINT "symbole "; w.farben[0].symbol; " "; w.farben[1].symbol; " "; w.farben[2].symbol
 --- datei k.dh
-IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
-IMPORT "{sammlung}/_hilfen/glutfaden.dh"
+IMPORT "{sammlung}/../../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/../_hilfen/glutfaden.dh"
 
 --- erwartet
 doppelt 0 schritte 0
@@ -241,8 +241,8 @@ PRINT "innen offen "; v.istOffen(); " kann zurueck "; v.kannZurueck()
 v.beenden()
 PRINT "zu "; v.istOffen(); " oben "; v.textZurueck$()
 --- datei k.dh
-IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
-IMPORT "{sammlung}/_hilfen/glutfaden.dh"
+IMPORT "{sammlung}/../../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/../_hilfen/glutfaden.dh"
 
 --- erwartet
 geaendert TRUE

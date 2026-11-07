@@ -11,9 +11,9 @@
 --- langsam
 
 === die musik ist stereo und hat ihre form
---- programm ../../examples/nachtflug/main.dh
+--- programm ../../../examples/nachtflug/main.dh
 --- ersetzen IMPORT "musik.dh"
-IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
+IMPORT "{sammlung}/../../../examples/nachtflug/musik.dh"
 --- argumente
 --wav
 {fall}/nachtflug.wav
@@ -32,11 +32,11 @@ pegel 190000 191000 > 0.05
 pegel 280600 281400 < 0.005
 
 === intro ozean mit polarlicht
---- programm ../../examples/nachtflug/main.dh
+--- programm ../../../examples/nachtflug/main.dh
 --- ersetzen IMPORT "musik.dh"
-IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
+IMPORT "{sammlung}/../../../examples/nachtflug/musik.dh"
 --- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
-    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/nachtflug/assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../../examples/nachtflug/assets/shader/" + name + ".fs")
 --- argumente
 --fenster
 --ab
@@ -66,11 +66,11 @@ IMPORT "pruefen.dh"
 nicht schwarz TRUE, nicht weiss TRUE
 
 === tiefflug
---- programm ../../examples/nachtflug/main.dh
+--- programm ../../../examples/nachtflug/main.dh
 --- ersetzen IMPORT "musik.dh"
-IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
+IMPORT "{sammlung}/../../../examples/nachtflug/musik.dh"
 --- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
-    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/nachtflug/assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../../examples/nachtflug/assets/shader/" + name + ".fs")
 --- argumente
 --fenster
 --ab
@@ -99,11 +99,11 @@ IMPORT "pruefen.dh"
 nicht schwarz TRUE, nicht weiss TRUE
 
 === lichttunnel
---- programm ../../examples/nachtflug/main.dh
+--- programm ../../../examples/nachtflug/main.dh
 --- ersetzen IMPORT "musik.dh"
-IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
+IMPORT "{sammlung}/../../../examples/nachtflug/musik.dh"
 --- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
-    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/nachtflug/assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../../examples/nachtflug/assets/shader/" + name + ".fs")
 --- argumente
 --fenster
 --ab
@@ -132,11 +132,11 @@ IMPORT "pruefen.dh"
 nicht schwarz TRUE, nicht weiss TRUE
 
 === sternennebel
---- programm ../../examples/nachtflug/main.dh
+--- programm ../../../examples/nachtflug/main.dh
 --- ersetzen IMPORT "musik.dh"
-IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
+IMPORT "{sammlung}/../../../examples/nachtflug/musik.dh"
 --- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
-    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/nachtflug/assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../../examples/nachtflug/assets/shader/" + name + ".fs")
 --- argumente
 --fenster
 --ab
@@ -165,11 +165,11 @@ IMPORT "pruefen.dh"
 nicht schwarz TRUE, nicht weiss TRUE
 
 === galaxie aus wuerfeln
---- programm ../../examples/nachtflug/main.dh
+--- programm ../../../examples/nachtflug/main.dh
 --- ersetzen IMPORT "musik.dh"
-IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
+IMPORT "{sammlung}/../../../examples/nachtflug/musik.dh"
 --- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
-    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/nachtflug/assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../../examples/nachtflug/assets/shader/" + name + ".fs")
 --- argumente
 --fenster
 --ab
@@ -198,11 +198,11 @@ IMPORT "pruefen.dh"
 nicht schwarz TRUE, nicht weiss TRUE
 
 === erdaufgang im orbit
---- programm ../../examples/nachtflug/main.dh
+--- programm ../../../examples/nachtflug/main.dh
 --- ersetzen IMPORT "musik.dh"
-IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
+IMPORT "{sammlung}/../../../examples/nachtflug/musik.dh"
 --- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
-    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/nachtflug/assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../../examples/nachtflug/assets/shader/" + name + ".fs")
 --- argumente
 --fenster
 --ab
@@ -231,11 +231,11 @@ IMPORT "pruefen.dh"
 nicht schwarz TRUE, nicht weiss TRUE
 
 === wiedereintritt
---- programm ../../examples/nachtflug/main.dh
+--- programm ../../../examples/nachtflug/main.dh
 --- ersetzen IMPORT "musik.dh"
-IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
+IMPORT "{sammlung}/../../../examples/nachtflug/musik.dh"
 --- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
-    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/nachtflug/assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../../examples/nachtflug/assets/shader/" + name + ".fs")
 --- argumente
 --fenster
 --ab
@@ -264,11 +264,11 @@ IMPORT "pruefen.dh"
 nicht schwarz TRUE, nicht weiss TRUE
 
 === ueber den wolken
---- programm ../../examples/nachtflug/main.dh
+--- programm ../../../examples/nachtflug/main.dh
 --- ersetzen IMPORT "musik.dh"
-IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
+IMPORT "{sammlung}/../../../examples/nachtflug/musik.dh"
 --- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
-    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/nachtflug/assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../../examples/nachtflug/assets/shader/" + name + ".fs")
 --- argumente
 --fenster
 --ab
@@ -297,11 +297,11 @@ IMPORT "pruefen.dh"
 nicht schwarz TRUE, nicht weiss TRUE
 
 === kueste mit leuchtturm
---- programm ../../examples/nachtflug/main.dh
+--- programm ../../../examples/nachtflug/main.dh
 --- ersetzen IMPORT "musik.dh"
-IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
+IMPORT "{sammlung}/../../../examples/nachtflug/musik.dh"
 --- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
-    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/nachtflug/assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../../examples/nachtflug/assets/shader/" + name + ".fs")
 --- argumente
 --fenster
 --ab
@@ -330,11 +330,11 @@ IMPORT "pruefen.dh"
 nicht schwarz TRUE, nicht weiss TRUE
 
 === tagesanbruch auf dem meer
---- programm ../../examples/nachtflug/main.dh
+--- programm ../../../examples/nachtflug/main.dh
 --- ersetzen IMPORT "musik.dh"
-IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
+IMPORT "{sammlung}/../../../examples/nachtflug/musik.dh"
 --- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
-    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/nachtflug/assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../../examples/nachtflug/assets/shader/" + name + ".fs")
 --- argumente
 --fenster
 --ab
@@ -365,11 +365,11 @@ nicht schwarz TRUE, nicht weiss TRUE
 === der szenenwechsel geht durch licht
 ' kurz vor Takt 16 fuellt das Licht des Wechsels das Bild -- ohne den
 ' Uebergang waere es dort so dunkel wie der Ozean (Mittel um 30)
---- programm ../../examples/nachtflug/main.dh
+--- programm ../../../examples/nachtflug/main.dh
 --- ersetzen IMPORT "musik.dh"
-IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
+IMPORT "{sammlung}/../../../examples/nachtflug/musik.dh"
 --- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
-    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/nachtflug/assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../../examples/nachtflug/assets/shader/" + name + ".fs")
 --- argumente
 --fenster
 --ab
@@ -408,7 +408,7 @@ PRINT melodieAktiv(10); " "; melodieAktiv(20); " "; melodieAktiv(50); " "; melod
 ' im Wiedereintritt das Morgen-Motiv: es beginnt auf dem C (72)
 PRINT FORMAT$(tonBei(96 * 16), "%.2f"); " "; FORMAT$(tonHoehe, "%.2f")
 --- datei musik_hier.dh
-IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
+IMPORT "{sammlung}/../../../examples/nachtflug/musik.dh"
 --- erwartet
 1.00 0.50
 0.41
@@ -421,11 +421,11 @@ TRUE FALSE TRUE TRUE
 
 === der mitschnitt ist stereo
 ' nur mit Soundkarte: der Mitschnitt nimmt den Mischer auf
---- programm ../../examples/nachtflug/main.dh
+--- programm ../../../examples/nachtflug/main.dh
 --- ersetzen IMPORT "musik.dh"
-IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
+IMPORT "{sammlung}/../../../examples/nachtflug/musik.dh"
 --- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
-    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/nachtflug/assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../../examples/nachtflug/assets/shader/" + name + ".fs")
 --- argumente
 --fenster
 --ab
@@ -456,7 +456,7 @@ PRINT versatzBei(71); " "; versatzBei(72); " "; versatzBei(90)
 ' danach der Morgen in C-Dur (16..23), ueber den Wolken wieder die Nacht
 PRINT akkordNr(80); " "; akkordNr(111); " "; akkordNr(112); " "; akkTon(16, 0); " "; grundTon(16); " "; grundTon(23)
 --- datei musik_hier.dh
-IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
+IMPORT "{sammlung}/../../../examples/nachtflug/musik.dh"
 --- erwartet
 3 12 15
 57 59 33 35
@@ -467,11 +467,11 @@ IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
 ' kurz vor dem Ende steht der Schriftzug aus Funken ueber dem Wasser: im
 ' Streifen y 520..600 viele helle, warme Punkte (ohne Schwarm liegt dort
 ' dunkles Wasser)
---- programm ../../examples/nachtflug/main.dh
+--- programm ../../../examples/nachtflug/main.dh
 --- ersetzen IMPORT "musik.dh"
-IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
+IMPORT "{sammlung}/../../../examples/nachtflug/musik.dh"
 --- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
-    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/nachtflug/assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../../examples/nachtflug/assets/shader/" + name + ".fs")
 --- argumente
 --fenster
 --ab
@@ -500,11 +500,11 @@ schriftzug TRUE
 ' Sonne; dort darf nichts zu sehen sein (bis 2026-10-27 war die Deckkraft
 ' umgekehrt gerechnet, und die Wartenden bildeten ein helles Viereck).
 ' Verglichen wird dasselbe Bild mit und ohne Schwarm, nur um die Sonne.
---- programm ../../examples/nachtflug/main.dh
+--- programm ../../../examples/nachtflug/main.dh
 --- ersetzen IMPORT "musik.dh"
-IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
+IMPORT "{sammlung}/../../../examples/nachtflug/musik.dh"
 --- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
-    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/nachtflug/assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../../examples/nachtflug/assets/shader/" + name + ".fs")
 --- ersetzen     IF takt >= AB_AUS THEN schwarmZeichnen(takt, zeit)
     IF takt >= AB_AUS AND NOT FILEEXISTS(STARTDIR$() + "/ohne") THEN schwarmZeichnen(takt, zeit)
 --- argumente
@@ -542,11 +542,11 @@ wartende sichtbar FALSE
 === leicht laeuft mit weniger schritten
 ' --leicht nimmt in den Shadern gut die Haelfte der Schritte -- das Bild ist
 ' weiter weder schwarz noch weiss
---- programm ../../examples/nachtflug/main.dh
+--- programm ../../../examples/nachtflug/main.dh
 --- ersetzen IMPORT "musik.dh"
-IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
+IMPORT "{sammlung}/../../../examples/nachtflug/musik.dh"
 --- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
-    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/nachtflug/assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../../examples/nachtflug/assets/shader/" + name + ".fs")
 --- argumente
 --fenster
 --leicht
@@ -575,11 +575,11 @@ nicht schwarz TRUE, nicht weiss TRUE
 === die sonne geht im ausklang auf
 ' im Ausklang steigt die Sonne ueber den Horizont: ihr hellster Punkt liegt
 ' neun Takte spaeter deutlich hoeher im Bild (rechts neben dem Abspann)
---- programm ../../examples/nachtflug/main.dh
+--- programm ../../../examples/nachtflug/main.dh
 --- ersetzen IMPORT "musik.dh"
-IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
+IMPORT "{sammlung}/../../../examples/nachtflug/musik.dh"
 --- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
-    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/nachtflug/assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../../examples/nachtflug/assets/shader/" + name + ".fs")
 --- argumente
 --fenster
 --ab
@@ -626,11 +626,11 @@ steigt TRUE
 ' Ohne --stufe waehlt die Demo die Guete selbst: hier dauert jedes Bild
 ' kuenstlich 30 ms (unter 50 je Sekunde), also geht sie Stufe um Stufe bis 4
 ' herunter. Die Regel "unter fester Bildzahl Stufe 0" ist dafuer entfernt.
---- programm ../../examples/nachtflug/main.dh
+--- programm ../../../examples/nachtflug/main.dh
 --- ersetzen IMPORT "musik.dh"
-IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
+IMPORT "{sammlung}/../../../examples/nachtflug/musik.dh"
 --- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
-    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/nachtflug/assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../../examples/nachtflug/assets/shader/" + name + ".fs")
 --- ersetzen IF festeStufe < 0 AND GETENV$("DHRT_FRAMES") <> "" THEN festeStufe = 0
 ' (entfernt)
 --- ersetzen     gueteNachziehen(sh)
@@ -654,11 +654,11 @@ guete 0.45 massstab 0.5
 ' Gegenprobe: dieselben langsamen Bilder, aber mit DHRT_FRAMES (Pruefungen,
 ' Bildaufnahmen) gilt Stufe 0 -- die Bilder der anderen Faelle haengen so
 ' nicht an der Last des Rechners.
---- programm ../../examples/nachtflug/main.dh
+--- programm ../../../examples/nachtflug/main.dh
 --- ersetzen IMPORT "musik.dh"
-IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
+IMPORT "{sammlung}/../../../examples/nachtflug/musik.dh"
 --- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
-    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/nachtflug/assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../../examples/nachtflug/assets/shader/" + name + ".fs")
 --- ersetzen     gueteNachziehen(sh)
     SLEEP(30) : gueteNachziehen(sh)
 --- ersetzen     PRINT "Bilder je Sekunde: "; FORMAT$(bilder / MAX(0.001, GET_TIME() - start), "%.1f")
@@ -709,7 +709,7 @@ PRINT "alle eintraege gebaut "; bauPos = LEN(bauKey)
 PRINT "hoechstens 150 zugleich "; spitze <= 150
 EPRINT("zugleich hoechstens " + STR$(spitze))
 --- datei helfer.dh
-IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
+IMPORT "{sammlung}/../../../examples/nachtflug/musik.dh"
 --- erwartet
 vor dem start wenige TRUE
 nichts erst beim einsatz gebaut TRUE
@@ -724,6 +724,6 @@ WHILE vorbauen()
 WEND
 PRINT "alles gebaut "; bauPos = LEN(bauKey); ", mehr als 300 klaenge "; AUDIO_SOUND_COUNT() > 300
 --- datei helfer.dh
-IMPORT "{sammlung}/../../examples/nachtflug/musik.dh"
+IMPORT "{sammlung}/../../../examples/nachtflug/musik.dh"
 --- erwartet
 alles gebaut TRUE, mehr als 300 klaenge TRUE

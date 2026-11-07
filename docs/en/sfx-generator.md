@@ -119,11 +119,11 @@ you store wherever you like.
 
 ## Tests
 
-`tests/pruef/werkzeug_sfx.dhtest` drives real mouse clicks and keys from a
+`tests/pruef/werkzeuge/werkzeug_sfx.dhtest` drives real mouse clicks and keys from a
 recording: no control lies on top of another or past the edge, one drag is
 one step, back/forward via toolbar and keys, a dice roll and a preset are one
 step each, a new drag cuts off the way forward, random stays with the kind,
 mutating is one step, a click in the history brings a state back, the end
 point of the envelope can be dragged — and the DH code takes the pan along and
 passes `dhrt --check`. The prompt on closing is checked by
-`tests/pruef/werkzeug_kreuz.dhtest` with real window messages.
+`tests/pruef/werkzeuge/werkzeug_kreuz.dhtest` with real window messages.

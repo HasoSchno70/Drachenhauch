@@ -17,7 +17,7 @@
 === klick setzt eine viertelnote auf die mittellinie
 ' Mittellinie im Violinschluessel = H4 (MIDI 71); Beat 2, Viertel (Vorgabe).
 AUTOMATION_PLAY("ev.txt")
---- programm ../../examples/199_notenblatt.dh nach SETFPS(60)
+--- programm ../../../examples/199_notenblatt.dh nach SETFPS(60)
 --- streichen WINDOW_MAXIMIZE()
 --- argumente
 neu.json
@@ -69,7 +69,7 @@ note 2 1 71
 ' Achtel, die Ruecktaste nimmt die letzte Note weg, Pfeil hoch hebt die
 ' Note vor der Marke um einen Halbton. Alles ohne einen Klick.
 AUTOMATION_PLAY("ev.txt")
---- programm ../../examples/199_notenblatt.dh nach SETFPS(60)
+--- programm ../../../examples/199_notenblatt.dh nach SETFPS(60)
 --- streichen WINDOW_MAXIMIZE()
 --- argumente
 neu.json
@@ -133,7 +133,7 @@ note 2 1 77
 
 === zweiter klick entfernt und rechtsklick auch
 AUTOMATION_PLAY("ev.txt")
---- programm ../../examples/199_notenblatt.dh nach SETFPS(60)
+--- programm ../../../examples/199_notenblatt.dh nach SETFPS(60)
 --- streichen WINDOW_MAXIMIZE()
 --- argumente
 neu.json
@@ -193,7 +193,7 @@ noten 0
 
 === ziehen verschiebt und strg z holt zurueck
 AUTOMATION_PLAY("ev.txt")
---- programm ../../examples/199_notenblatt.dh nach SETFPS(60)
+--- programm ../../../examples/199_notenblatt.dh nach SETFPS(60)
 --- streichen WINDOW_MAXIMIZE()
 --- argumente
 neu.json
@@ -254,7 +254,7 @@ note 2 1 71
 
 === modus pause und bindebogen ueber die klappliste
 AUTOMATION_PLAY("ev.txt")
---- programm ../../examples/199_notenblatt.dh nach SETFPS(60)
+--- programm ../../../examples/199_notenblatt.dh nach SETFPS(60)
 --- streichen WINDOW_MAXIMIZE()
 --- argumente
 neu.json
@@ -341,7 +341,7 @@ boegen 1 0 2
 ' Eintrag 10: ein Radschritt ueber dem Popup, dann steht er in der letzten
 ' Zeile (y 419).
 AUTOMATION_PLAY("ev.txt")
---- programm ../../examples/199_notenblatt.dh nach SETFPS(60)
+--- programm ../../../examples/199_notenblatt.dh nach SETFPS(60)
 --- streichen WINDOW_MAXIMIZE()
 --- argumente
 neu.json
@@ -407,7 +407,7 @@ note 2 1 71
 
 === tracker export liefert das gitter des konverters
 AUTOMATION_PLAY("ev.txt")
---- programm ../../examples/199_notenblatt.dh nach SETFPS(60)
+--- programm ../../../examples/199_notenblatt.dh nach SETFPS(60)
 --- streichen WINDOW_MAXIMIZE()
 --- argumente
 demo.json
@@ -647,7 +647,7 @@ inst Fluegel (Piano)|Bass
 === leertaste spielt das stueck
 ' 18 Ereignisse, eines ist eine Pause.
 AUTOMATION_PLAY("ev.txt")
---- programm ../../examples/199_notenblatt.dh nach SETFPS(60)
+--- programm ../../../examples/199_notenblatt.dh nach SETFPS(60)
 --- streichen WINDOW_MAXIMIZE()
 --- argumente
 demo.json
@@ -826,7 +826,7 @@ spielt 17
 ' Die Saetze sind die von drachenhauch/score/convert.py fuer genau diese
 ' Datei. ESC im Kasten = Abbrechen: keine Datei, kein Tracker.
 AUTOMATION_PLAY("ev.txt")
---- programm ../../examples/199_notenblatt.dh nach SETFPS(60)
+--- programm ../../../examples/199_notenblatt.dh nach SETFPS(60)
 --- streichen WINDOW_MAXIMIZE()
 --- argumente
 klein.json
@@ -863,7 +863,7 @@ datei FALSE
 ' Kanal 0 ist Zelle fuer Zelle der von to_tracker_song (Akkord -> 67, die
 ' Note bei 3.9 fehlt, NOTE_OFF = -1, leer = null).
 AUTOMATION_PLAY("ev.txt")
---- programm ../../examples/199_notenblatt.dh nach SETFPS(60)
+--- programm ../../../examples/199_notenblatt.dh nach SETFPS(60)
 --- streichen WINDOW_MAXIMIZE()
 --- argumente
 klein.json
@@ -901,7 +901,7 @@ PRINT zeile
 ' wortlos weg). Gezeigt wird das Protokoll ab der gesetzten Note; "noten"
 ' schreibt das Programm beim Ende.
 AUTOMATION_PLAY("ev.txt")
---- programm ../../examples/199_notenblatt.dh nach SETFPS(60)
+--- programm ../../../examples/199_notenblatt.dh nach SETFPS(60)
 --- streichen WINDOW_MAXIMIZE()
 --- argumente
 neu.json
@@ -938,7 +938,7 @@ noten 1
 ' Wie oben, im Kasten aber Tab auf den zweiten Knopf ("Verwerfen") und Enter:
 ' jetzt entsteht das neue, leere Stueck.
 AUTOMATION_PLAY("ev.txt")
---- programm ../../examples/199_notenblatt.dh nach SETFPS(60)
+--- programm ../../../examples/199_notenblatt.dh nach SETFPS(60)
 --- streichen WINDOW_MAXIMIZE()
 --- argumente
 neu.json
@@ -978,7 +978,7 @@ noten 0
 ' Nichts geaendert: Strg+N ersetzt sofort, ohne Kasten. Das erste
 ' "neues stueck" ist der Start mit einer Datei, die es nicht gibt.
 AUTOMATION_PLAY("ev.txt")
---- programm ../../examples/199_notenblatt.dh nach SETFPS(60)
+--- programm ../../../examples/199_notenblatt.dh nach SETFPS(60)
 --- streichen WINDOW_MAXIMIZE()
 --- argumente
 neu.json

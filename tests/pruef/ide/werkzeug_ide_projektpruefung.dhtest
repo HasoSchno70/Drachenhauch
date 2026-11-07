@@ -8,7 +8,7 @@
 === alle dateien, import-fehler einmal, klick oeffnet
 DIM prBild AS INTEGER : prBild = 0
 DIM prFertig AS INTEGER : prFertig = 0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 60 THEN befehl("projekt_pruefen")
@@ -39,7 +39,7 @@ a.dh
 --- umgebung
 DHRT_FRAMES=400
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei a.dh
 PRINT("alles gut")

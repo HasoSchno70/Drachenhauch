@@ -1,5 +1,5 @@
 #!/bin/sh
-# Simulierte Pins fuer tests/pruef/pins.dhtest -- auf einem gewoehnlichen
+# Simulierte Pins fuer tests/pruef/geraete/pins.dhtest -- auf einem gewoehnlichen
 # Linux-Rechner ohne Raspberry Pi (die CI ruft es mit sudo-Rechten auf).
 #
 #   gpio-sim:  ein GPIO-Chip mit 32 Leitungen, Beschriftung "dhsim", Leitung

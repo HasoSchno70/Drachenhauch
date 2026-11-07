@@ -20,7 +20,7 @@ getroffen(kometen[1])
 kometen = ARRAY_FILTER(kometen, FUNCTION(k) k.lebt)
 PRINT "danach "; LEN(kometen); " kleine, punkte "; punkte
 EXIT(0)
---- programm ../../examples/kometen/main.dh nach SCENE_SWITCH("menue")
+--- programm ../../../examples/kometen/main.dh nach SCENE_SWITCH("menue")
 --- umgebung
 DHRT_FRAMES=60
 --- erwartet
@@ -56,7 +56,7 @@ kometen[0].vy = 0
 spielBild(1.0 / 60)
 PRINT "leben "; leben; " schutz "; schutz > 1
 EXIT(0)
---- programm ../../examples/kometen/main.dh nach SCENE_SWITCH("menue")
+--- programm ../../../examples/kometen/main.dh nach SCENE_SWITCH("menue")
 --- umgebung
 DHRT_FRAMES=60
 --- erwartet
@@ -73,7 +73,7 @@ DIM prB AS SAVE_HANDLE
 prB = SAVE_LOAD("bestenliste.json")
 PRINT "datei "; SAVE_GET_INT(prB, "platz1"); " "; SAVE_GET_INT(prB, "platz5")
 EXIT(0)
---- programm ../../examples/kometen/main.dh nach SCENE_SWITCH("menue")
+--- programm ../../../examples/kometen/main.dh nach SCENE_SWITCH("menue")
 --- umgebung
 DHRT_FRAMES=60
 --- erwartet
@@ -86,7 +86,7 @@ datei 80 5
 === was hinausfliegt, kommt gegenueber wieder herein
 PRINT umlauf(-50, 800, 16); " "; umlauf(830, 800, 16); " "; umlauf(400, 800, 16)
 EXIT(0)
---- programm ../../examples/kometen/main.dh nach SCENE_SWITCH("menue")
+--- programm ../../../examples/kometen/main.dh nach SCENE_SWITCH("menue")
 --- umgebung
 DHRT_FRAMES=60
 --- erwartet

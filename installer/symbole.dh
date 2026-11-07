@@ -10,7 +10,7 @@
 ' gibt es auf einem Bau-Rechner ohne Bildschirm nicht -- gemessen in der CI:
 ' Linux ohne DISPLAY, die macOS-Laeufer finden gar kein passendes OpenGL.
 ' Neu erzeugen nur, wenn sich das Logo aendert; ob die Dateien zum Logo
-' passen, prueft tests/pruef/werkzeug_paket.dhtest.
+' passen, prueft tests/pruef/werkzeuge/werkzeug_paket.dhtest.
 '
 ' .icns: "icns" + Gesamtlaenge, dann je Groesse Kennung + Laenge + PNG
 ' (ic08 = 256, ic09 = 512). PNG-Eintraege versteht macOS seit 10.7, und so

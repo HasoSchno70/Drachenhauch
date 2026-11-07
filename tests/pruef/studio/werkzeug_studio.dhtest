@@ -18,9 +18,9 @@ PRINT "fensterfelder "; LEN(slAnfang(log, "lage feld title ")) > 0
 PRINT "keine fehler "; INSTR(aus, "Laufzeitfehler") < 0
 IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- erwartet
 bereit TRUE
@@ -57,9 +57,9 @@ PRINT "geklickt "; slHat(log, "neu button Knopf1 112 88")
 PRINT "gezogen "; slHat(log, "neu textinput Textfeld1 208 184")
 IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- erwartet
 geklickt TRUE
@@ -88,9 +88,9 @@ FOR EACH z IN slAnfang(log, "bewegt ")
 NEXT
 IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- datei f.dhform
 {"title":"F","name":"F","w":520,"h":360,"widgets":[
@@ -125,9 +125,9 @@ END FUNCTION
 PRINT "linie bei 45 "; rosa(GETPIXEL(img, fx + 45, fy + 95))
 PRINT "nicht bei 60 "; NOT rosa(GETPIXEL(img, fx + 60, fy + 95))
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- datei f.dhform
 {"title":"F","name":"F","w":520,"h":360,"widgets":[
@@ -163,9 +163,9 @@ FOR EACH z IN slProtokoll(log)
 NEXT
 IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- datei f.dhform
 {"title":"F","name":"F","w":520,"h":360,"widgets":[
@@ -204,9 +204,9 @@ FOR EACH z IN slProtokoll(log)
 NEXT
 IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- erwartet
 neu button Knopf1 112 88
@@ -257,9 +257,9 @@ PRINT "text in der datei "; JSON_GET_STRING(d, "widgets.0.text")
 PRINT "name bleibt "; JSON_GET_STRING(d, "widgets.0.name")
 IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 IMPORT "json"
 slStudio = ARG$(0)
 --- datei f.dhform

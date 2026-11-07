@@ -35,9 +35,9 @@ PRINT "hoehe "; JSON_GET_INT(d, "h")
 PRINT "knopfOk "; JSON_GET_INT(d, "widgets.0.x"); " "; JSON_GET_INT(d, "widgets.0.y")
 IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 IMPORT "json"
 slStudio = ARG$(0)
 --- datei f.dhform
@@ -72,9 +72,9 @@ PRINT "knopfOk "; JSON_GET_INT(d, "widgets.0.x"); " "; JSON_GET_INT(d, "widgets.
 PRINT "titel "; JSON_GET_INT(d, "widgets.1.x"); " "; JSON_GET_INT(d, "widgets.1.y")
 IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 IMPORT "json"
 slStudio = ARG$(0)
 --- datei f.dhform

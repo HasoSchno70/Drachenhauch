@@ -20,11 +20,11 @@ PRINT "befund "; INSTR(PROBE_BEFUNDE$(CWD$() + "/haupt.dh"), "FIXME") >= 0
 PROBE_ENDE()
 PRINT "laeuft "; PROBE_LAEUFT()
 --- datei probe.dh
-IMPORT "{sammlung}/../../ide/dh_plugin_probe.dh"
+IMPORT "{sammlung}/../../../ide/dh_plugin_probe.dh"
 
 --- argumente
-{sammlung}/../../ide
-{sammlung}/../../examples/plugins
+{sammlung}/../../../ide
+{sammlung}/../../../examples/plugins
 --- erwartet
 TRUE
 TRUE
@@ -52,11 +52,11 @@ PRINT "danach "; PROBE_BEFUNDE$(d)
 PRINT "erlaubt "; TRIM$(READLINES("probe-daten/erlaubt.txt")[0])
 PROBE_ENDE()
 --- datei probe.dh
-IMPORT "{sammlung}/../../ide/dh_plugin_probe.dh"
+IMPORT "{sammlung}/../../../ide/dh_plugin_probe.dh"
 
 --- argumente
-{sammlung}/../../ide
-{sammlung}/../../examples/plugins
+{sammlung}/../../../ide
+{sammlung}/../../../examples/plugins
 --- erwartet
 TRUE
 TRUE
@@ -79,11 +79,11 @@ PRINT "baum "; PROBE_WIDGET$("klassen", "baum", "texte")
 PRINT "kopf "; PROBE_WIDGET$("klassen", "kopf", "text")
 PROBE_ENDE()
 --- datei probe.dh
-IMPORT "{sammlung}/../../ide/dh_plugin_probe.dh"
+IMPORT "{sammlung}/../../../ide/dh_plugin_probe.dh"
 
 --- argumente
-{sammlung}/../../ide
-{sammlung}/../../examples/plugins
+{sammlung}/../../../ide
+{sammlung}/../../../examples/plugins
 --- erwartet
 TRUE
 TRUE
@@ -107,7 +107,7 @@ DIM soll AS STRING : soll = "ide " + VERSION$() + " protokoll 3"
 PRINT "meldung "; (PROBE_MELDUNG$() = soll)
 PROBE_ENDE()
 --- datei probe.dh
-IMPORT "{sammlung}/../../ide/dh_plugin_probe.dh"
+IMPORT "{sammlung}/../../../ide/dh_plugin_probe.dh"
 
 --- datei mein.dh
 IMPORT "dh_plugin.dh"
@@ -133,7 +133,7 @@ WHILE PLUGIN_LAEUFT()
 WEND
 
 --- argumente
-{sammlung}/../../ide
+{sammlung}/../../../ide
 --- erwartet
 TRUE
 TRUE

@@ -9,7 +9,7 @@
 
 === rechtsklick im baum waehlt ohne zu oeffnen und legt eine datei an
 DIM prBild AS INTEGER : prBild = 0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 30 THEN
@@ -45,7 +45,7 @@ d.dh
 --- umgebung
 DHRT_FRAMES=200
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei c.dh
 PRINT "c"
@@ -73,13 +73,13 @@ protokoll("pr reiter " + BASENAME(reiter[aktiverTab].pfad) + " sauber " + STR$(G
 dateiOeffnen(PATHJOIN(projektOrdner, "lib/werkzeug.dh"))
 protokoll("pr zweiter reiter " + BASENAME(reiter[aktiverTab].pfad) + " reiter " + STR$(tabAnzahl))
 EXIT(0)
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- argumente
 haupt.dh
 --- umgebung
 DHRT_FRAMES=200
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei haupt.dh
 ' IMPORT "lib/helfer.dh" bleibt im Kommentar stehen
@@ -133,13 +133,13 @@ GUI_FILETREE_SELECT(baum, projektOrdner)
 baumLoeschenFragen()
 protokoll("pr dialog " + STR$(dlgBaumLoeschen >= 0))
 EXIT(0)
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- argumente
 weg.dh
 --- umgebung
 DHRT_FRAMES=200
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei weg.dh
 PRINT 1
@@ -173,13 +173,13 @@ baumAktion = "ordner"
 baumAusfuehren("unter")
 protokoll("pr ordner " + STR$(DIREXISTS(PATHJOIN(projektOrdner, "unter"))))
 EXIT(0)
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- argumente
 da.dh
 --- umgebung
 DHRT_FRAMES=200
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei da.dh
 PRINT 1
@@ -205,7 +205,7 @@ FUNCTION prStelle$() AS STRING
     (z, s) = GUI_TEXTAREA_CURSOR(reiter[aktiverTab].feld)
     RETURN BASENAME(reiter[aktiverTab].pfad) + ":" + STR$(z)
 END FUNCTION
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 20 THEN GUI_TEXTAREA_GOTO(reiter[aktiverTab].feld, 3, 1)
@@ -230,7 +230,7 @@ eins.dh
 --- umgebung
 DHRT_FRAMES=200
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- vorher
 DIM t AS STRING : t = ""
@@ -265,7 +265,7 @@ pr status Keine Stelle zum Vorwärtsgehen.
 
 === die ausgabe laesst sich filtern und sichern
 DIM prBild AS INTEGER : prBild = 0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 20 THEN befehl("start")
@@ -285,7 +285,7 @@ haupt.dh
 --- umgebung
 DHRT_FRAMES=200
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei haupt.dh
 PRINT "apfel 1"

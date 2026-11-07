@@ -131,7 +131,7 @@ END FUNCTION
 PRINT befehle("gefaltet.dh") = befehle("fertig.dh"); " "; befehle("gefaltet.dh") < befehle("offen.dh")
 PRINT hatKonstante("gefaltet.dh", 2); " "; hatKonstante("gefaltet.dh", 6)
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- datei fertig.dh
 CONST FAKTOR = 3
 DIM x AS INTEGER

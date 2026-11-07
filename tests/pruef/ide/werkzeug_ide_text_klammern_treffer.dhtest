@@ -25,13 +25,13 @@ GUI_TEXTAREA_GOTO(prTa, 2, 3)
 befehl("fall_gross")
 protokoll("pr wort |" + SPLIT$(GUI_TEXT(prTa), NL)[1] + "|")
 EXIT(0)
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- argumente
 haupt.dh
 --- umgebung
 DHRT_FRAMES=200
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei haupt.dh
 hallo welt_neu x2
@@ -61,13 +61,13 @@ FOR EACH prZ IN SPLIT$(GUI_TEXT(prTa), NL)
     protokoll("pr zeile |" + prZ + "|")
 NEXT
 EXIT(0)
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- argumente
 haupt.dh
 --- umgebung
 DHRT_FRAMES=200
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei haupt.dh
     x = f(a, _
@@ -112,7 +112,7 @@ FUNCTION prFarbe(z AS INTEGER, s AS INTEGER, f AS INTEGER) AS INTEGER
     DELETEFILE("prbild.png")
     RETURN n
 END FUNCTION
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 ' Die Marke ans Ende von Zeile 2 -- sonst faerbt das Paar um die Marke mit.
@@ -133,7 +133,7 @@ haupt.dh
 --- umgebung
 DHRT_FRAMES=150
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei haupt.dh
 x = f((1)) + g("(")
@@ -183,13 +183,13 @@ problemModus = 0
 trefferNachziehen()
 protokoll("pr danach haken " + STR$(trefferAn))
 EXIT(0)
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- argumente
 a.dh
 --- umgebung
 DHRT_FRAMES=200
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei a.dh
 DIM alt AS INTEGER : alt = 1

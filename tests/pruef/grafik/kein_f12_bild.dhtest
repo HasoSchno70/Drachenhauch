@@ -36,7 +36,7 @@ WHILE NOT QUITREQUESTED()
 WEND
 --- argumente
 DH-Kein-F12
-{sammlung}/_hilfen/fenstersender.ps1
+{sammlung}/../_hilfen/fenstersender.ps1
 --- system windows
 --- erwartet
 f12 kam an TRUE

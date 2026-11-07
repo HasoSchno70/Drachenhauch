@@ -7,7 +7,7 @@
 
 === bild beim ueberfahren, vorschau fuer bild und klang
 DIM prBild AS INTEGER : prBild = 0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach     IF GUI_DOUBLE_CLICKED(lstProbleme) THEN problemAnspringen()
 prBild = prBild + 1
 IF prBild = 40 THEN prZiel(1, 35, FALSE, FALSE)
@@ -32,7 +32,7 @@ main.dh
 --- umgebung
 DHRT_FRAMES=200
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei main.dh
 DIM b AS IMAGE : b = LOADIMAGE("bild.png")
@@ -40,7 +40,7 @@ PRINT "fertig"
 --- datei ton.wav
 kein wav
 --- datei _programm/hilfe.dh
-IMPORT "{sammlung}/_hilfen/idemaus.dh"
+IMPORT "{sammlung}/../_hilfen/idemaus.dh"
 --- vorher
 DIM b AS IMAGE : b = IMAGE_NEW(20, 10, RED)
 IMAGE_SAVE(b, "bild.png")

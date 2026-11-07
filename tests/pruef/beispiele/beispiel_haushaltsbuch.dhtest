@@ -36,7 +36,7 @@ laden()
 PRINT "nach dem loeschen "; GUI_TABLE_ROW_COUNT(tbl); " "; GUI_TEXT(lSumme)
 DB_CLOSE(kasse)
 EXIT(0)
---- programm ../../examples/haushaltsbuch/main.dh nach GUI_FOCUS(tfText)
+--- programm ../../../examples/haushaltsbuch/main.dh nach GUI_FOCUS(tfText)
 --- umgebung
 DHRT_FRAMES=60
 --- erwartet
@@ -52,7 +52,7 @@ nach dem loeschen 1 Summe: 1000,50 EUR
 PRINT inCent("19,99"); " "; inCent("0.1"); " "; inCent("1000")
 PRINT geld$(5); " | "; geld$(-1230); " | "; geld$(100000)
 EXIT(0)
---- programm ../../examples/haushaltsbuch/main.dh nach GUI_FOCUS(tfText)
+--- programm ../../../examples/haushaltsbuch/main.dh nach GUI_FOCUS(tfText)
 --- umgebung
 DHRT_FRAMES=60
 --- erwartet

@@ -20,7 +20,7 @@ PRINT feld$(ev, "value"); " "; feld$(ev, "type")
 DIM letzt AS INTEGER : letzt = LEN(ereignisse) - 1
 PRINT art$(letzt); " "; feld$(letzt, "reason")
 --- datei sitzung.dh
-IMPORT "{sammlung}/_hilfen/debugsitzung.dh"
+IMPORT "{sammlung}/../_hilfen/debugsitzung.dh"
 
 --- datei d.dh
 DIM x AS INTEGER
@@ -47,7 +47,7 @@ PRINT paar$(h4, "locals", "a"); " "; paar$(h4, "locals", "b")
 PRINT feld$(ersteMit("eval-result", 0), "value")
 PRINT art$(LEN(ereignisse) - 1)
 --- datei sitzung.dh
-IMPORT "{sammlung}/_hilfen/debugsitzung.dh"
+IMPORT "{sammlung}/../_hilfen/debugsitzung.dh"
 
 --- datei d.dh
 FUNCTION f(a AS INTEGER) AS INTEGER
@@ -80,7 +80,7 @@ FOR i = 0 TO LEN(ereignisse) - 1
     END IF
 NEXT
 --- datei sitzung.dh
-IMPORT "{sammlung}/_hilfen/debugsitzung.dh"
+IMPORT "{sammlung}/../_hilfen/debugsitzung.dh"
 
 --- datei d.dh
 DIM x AS INTEGER
@@ -108,7 +108,7 @@ PRINT INSTR(ausgaben$(), "Zahl: ") >= 0
 ' Leere Eingabe bei einem INTEGER-Ziel: sauberer Fehler an der INPUT-Zeile
 PRINT feld$(ersteMit("error", 0), "line")
 --- datei sitzung.dh
-IMPORT "{sammlung}/_hilfen/debugsitzung.dh"
+IMPORT "{sammlung}/../_hilfen/debugsitzung.dh"
 
 --- datei d.dh
 DIM n AS INTEGER
@@ -129,7 +129,7 @@ sitzung("d.dh", [weiter, weiter])
 PRINT INSTR(ausgaben$(), "[]") >= 0
 PRINT ersteMit("error", 0)
 --- datei sitzung.dh
-IMPORT "{sammlung}/_hilfen/debugsitzung.dh"
+IMPORT "{sammlung}/../_hilfen/debugsitzung.dh"
 
 --- datei d.dh
 DIM s AS STRING
@@ -153,7 +153,7 @@ PRINT INSTR(aus, "vorher") >= 0; " "; INSTR(aus, "nachher") >= 0
 PRINT INSTR(aus, "gelesen:") >= 0
 PRINT ersteMit("error", 0)
 --- datei sitzung.dh
-IMPORT "{sammlung}/_hilfen/debugsitzung.dh"
+IMPORT "{sammlung}/../_hilfen/debugsitzung.dh"
 
 --- datei d.dh
 DIM f AS FILE
@@ -202,7 +202,7 @@ PRINT feld$(s, "value"); " "; feld$(s, "type"); " "; feld$(s, "watches.0.value")
 DIM e AS INTEGER : e = ersteMit("paused", 11)
 PRINT paar$(e, "globals", "summe"); " "; feld$(e, "stack.0.name"); ":"; feld$(e, "stack.0.line"); " "; feld$(e, "stack.1.name") = ""
 --- datei sitzung.dh
-IMPORT "{sammlung}/_hilfen/debugsitzung.dh"
+IMPORT "{sammlung}/../_hilfen/debugsitzung.dh"
 
 --- datei p.dh
 DIM summe AS INTEGER
@@ -249,7 +249,7 @@ FOR i = 0 TO LEN(ereignisse) - 1
     IF art$(i) = "output" THEN PRINT "ausgabe "; TRIM$(feld$(i, "text"))
 NEXT
 --- datei sitzung.dh
-IMPORT "{sammlung}/_hilfen/debugsitzung.dh"
+IMPORT "{sammlung}/../_hilfen/debugsitzung.dh"
 
 --- datei d.dh
 CONST MAXI AS INTEGER = 5
@@ -292,7 +292,7 @@ FOR i = 0 TO LEN(ereignisse) - 1
     IF art$(i) = "finished" THEN PRINT "ende "; feld$(i, "reason")
 NEXT
 --- datei sitzung.dh
-IMPORT "{sammlung}/_hilfen/debugsitzung.dh"
+IMPORT "{sammlung}/../_hilfen/debugsitzung.dh"
 
 --- datei p.dh
 IMPORT "helfer.dh"
@@ -332,7 +332,7 @@ FOR i = 0 TO LEN(ereignisse) - 1
     END IF
 NEXT
 --- datei sitzung.dh
-IMPORT "{sammlung}/_hilfen/debugsitzung.dh"
+IMPORT "{sammlung}/../_hilfen/debugsitzung.dh"
 
 --- datei d.dh
 DIM x AS INTEGER
@@ -361,7 +361,7 @@ FOR i = 0 TO LEN(ereignisse) - 1
     IF art$(i) = "finished" THEN PRINT "ende "; feld$(i, "reason")
 NEXT
 --- datei sitzung.dh
-IMPORT "{sammlung}/_hilfen/debugsitzung.dh"
+IMPORT "{sammlung}/../_hilfen/debugsitzung.dh"
 
 --- datei lang.dh
 DIM i AS INTEGER
@@ -390,7 +390,7 @@ FOR i = 0 TO LEN(ereignisse) - 1
     IF art$(i) = "finished" THEN PRINT "ende "; feld$(i, "reason")
 NEXT
 --- datei sitzung.dh
-IMPORT "{sammlung}/_hilfen/debugsitzung.dh"
+IMPORT "{sammlung}/../_hilfen/debugsitzung.dh"
 
 --- datei lang.dh
 DIM i AS INTEGER
@@ -419,7 +419,7 @@ NEXT
 PRINT "halte "; n
 PRINT INSTR(ausgaben$(), "durch") < 0
 --- datei sitzung.dh
-IMPORT "{sammlung}/_hilfen/debugsitzung.dh"
+IMPORT "{sammlung}/../_hilfen/debugsitzung.dh"
 
 --- datei lang.dh
 DIM i AS INTEGER
@@ -447,7 +447,7 @@ FOR i = 0 TO LEN(ereignisse) - 1
 NEXT
 PRINT TRIM$(ausgaben$())
 --- datei sitzung.dh
-IMPORT "{sammlung}/_hilfen/debugsitzung.dh"
+IMPORT "{sammlung}/../_hilfen/debugsitzung.dh"
 
 --- datei ein.dh
 DIM n AS INTEGER
@@ -466,7 +466,7 @@ sitzung("p.dh", ["{" + q + "cmd" + q + ":" + q + "continue" + q + "}"])
 DIM e AS INTEGER : e = ersteMit("error", 0)
 PRINT BASENAME(feld$(e, "file")); ":"; feld$(e, "line")
 --- datei sitzung.dh
-IMPORT "{sammlung}/_hilfen/debugsitzung.dh"
+IMPORT "{sammlung}/../_hilfen/debugsitzung.dh"
 
 --- datei p.dh
 IMPORT "kaputt.dh"
@@ -493,7 +493,7 @@ FOR i = 0 TO LEN(ereignisse) - 1
     IF art$(i) <> "output" THEN PRINT TRIM$(art$(i) + " " + feld$(i, "line"))
 NEXT
 --- datei sitzung.dh
-IMPORT "{sammlung}/_hilfen/debugsitzung.dh"
+IMPORT "{sammlung}/../_hilfen/debugsitzung.dh"
 
 --- datei d.dh
 DIM x AS INTEGER
@@ -523,7 +523,7 @@ FOR i = 0 TO LEN(ereignisse) - 1
     IF LEFT$(art$(i), 4) = "eval" THEN PRINT art$(i); " ["; feld$(i, "id"); "] ["; feld$(i, "expr"); "] "; feld$(i, "value")
 NEXT
 --- datei sitzung.dh
-IMPORT "{sammlung}/_hilfen/debugsitzung.dh"
+IMPORT "{sammlung}/../_hilfen/debugsitzung.dh"
 
 --- datei d.dh
 DIM x AS INTEGER
@@ -551,7 +551,7 @@ FOR i = 0 TO LEN(ereignisse) - 1
     IF art$(i) = "eval-error" THEN PRINT "fehler "; LEFT$(feld$(i, "message"), 30)
 NEXT
 --- datei sitzung.dh
-IMPORT "{sammlung}/_hilfen/debugsitzung.dh"
+IMPORT "{sammlung}/../_hilfen/debugsitzung.dh"
 
 --- datei d.dh
 CLASS Held
@@ -593,7 +593,7 @@ FOR i = 0 TO JSON_LEN(k, "globals") - 1
     PRINT z
 NEXT
 --- datei sitzung.dh
-IMPORT "{sammlung}/_hilfen/debugsitzung.dh"
+IMPORT "{sammlung}/../_hilfen/debugsitzung.dh"
 
 --- datei d.dh
 CLASS Held
@@ -629,7 +629,7 @@ FOR i = 0 TO LEN(ereignisse) - 1
     IF art$(i) = "error" THEN PRINT "fehler "; feld$(i, "line")
 NEXT
 --- datei sitzung.dh
-IMPORT "{sammlung}/_hilfen/debugsitzung.dh"
+IMPORT "{sammlung}/../_hilfen/debugsitzung.dh"
 
 --- datei d.dh
 ' Ein Fehler, der abgefangen wird, haelt NICHT an.
@@ -696,7 +696,7 @@ FOR i = 0 TO LEN(ereignisse) - 1
     IF art$(i) = "finished" THEN PRINT "ende "; feld$(i, "reason")
 NEXT
 --- datei sitzung.dh
-IMPORT "{sammlung}/_hilfen/debugsitzung.dh"
+IMPORT "{sammlung}/../_hilfen/debugsitzung.dh"
 
 --- datei d.dh
 DIM i AS INTEGER
@@ -738,7 +738,7 @@ PRINT "genau 2: "; lauf("=2", "")
 PRINT "jedes 3: "; lauf("%3", "")
 PRINT "gerade, ab 2: "; lauf("2", "i MOD 2 = 0")
 --- datei sitzung.dh
-IMPORT "{sammlung}/_hilfen/debugsitzung.dh"
+IMPORT "{sammlung}/../_hilfen/debugsitzung.dh"
 
 --- datei d.dh
 DIM i AS INTEGER
@@ -776,7 +776,7 @@ FOR i = 0 TO JSON_LEN(k, "locals") - 1
     PRINT "l "; JSON_GET_STRING(k, "locals." + STR$(i) + ".name"); " "; JSON_GET_STRING(k, "locals." + STR$(i) + ".type")
 NEXT
 --- datei sitzung.dh
-IMPORT "{sammlung}/_hilfen/debugsitzung.dh"
+IMPORT "{sammlung}/../_hilfen/debugsitzung.dh"
 
 --- datei d.dh
 IMPORT "gui"
@@ -823,7 +823,7 @@ FOR i = 0 TO LEN(ereignisse) - 1
     END IF
 NEXT
 --- datei sitzung.dh
-IMPORT "{sammlung}/_hilfen/debugsitzung.dh"
+IMPORT "{sammlung}/../_hilfen/debugsitzung.dh"
 
 --- datei d.dh
 DIM x AS INTEGER

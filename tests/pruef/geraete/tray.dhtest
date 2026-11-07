@@ -15,9 +15,9 @@
 IMPORT "helfer.dh"
 PRINT sende$(skript$(), "kind.dh", "roh:32813:1:514;roh:32813:1:515;roh:32813:1:514", "")
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/fenstersender.dh"
+IMPORT "{sammlung}/../_hilfen/fenstersender.dh"
 FUNCTION skript$() AS STRING
-    RETURN "{sammlung}/_hilfen/fenstersender.ps1"
+    RETURN "{sammlung}/../_hilfen/fenstersender.ps1"
 END FUNCTION
 --- datei kind.dh
 SCREEN(200, 100, ARG$(0), 1)
@@ -53,9 +53,9 @@ weg FALSE
 IMPORT "helfer.dh"
 PRINT sende$(skript$(), "kind.dh", "roh:273:28929:0;roh:273:28935:0;roh:273:28930:0;roh:273:28928:0", "")
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/fenstersender.dh"
+IMPORT "{sammlung}/../_hilfen/fenstersender.dh"
 FUNCTION skript$() AS STRING
-    RETURN "{sammlung}/_hilfen/fenstersender.ps1"
+    RETURN "{sammlung}/../_hilfen/fenstersender.ps1"
 END FUNCTION
 --- datei kind.dh
 SCREEN(200, 100, ARG$(0), 1)
@@ -80,15 +80,15 @@ Beenden;Oeffnen;
 IMPORT "helfer.dh"
 PRINT sende$(skript$(), "kind.dh", "roh:32813:1:1029", "")
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/fenstersender.dh"
+IMPORT "{sammlung}/../_hilfen/fenstersender.dh"
 FUNCTION skript$() AS STRING
-    RETURN "{sammlung}/_hilfen/fenstersender.ps1"
+    RETURN "{sammlung}/../_hilfen/fenstersender.ps1"
 END FUNCTION
 --- datei kind.dh
 SCREEN(200, 100, ARG$(0), 1)
 SET_WINDOW_POS(-3000, -3000)
 PRINT "vorher "; TRAY_SHOWN()
-NOTIFY("Drachenhauch-Pruefung", "Diese Mitteilung kommt aus tests/pruef/tray.dhtest")
+NOTIFY("Drachenhauch-Pruefung", "Diese Mitteilung kommt aus tests/pruef/geraete/tray.dhtest")
 PRINT "danach "; TRAY_SHOWN()
 DIM geklickt AS BOOLEAN : geklickt = FALSE
 DIM t0 AS INTEGER : t0 = MILLIS()
@@ -185,12 +185,12 @@ t = ersetzt$(t, CHR$(10) + "TRAY_HIDE()", CHR$(10) + "PRINT " + CHR$(34) + "ende
 WRITEALL("kind.dh", t)
 PRINT sende$(skript$(), "kind.dh", "roh:32813:1:514;roh:32813:1:514;roh:273:28929:0;roh:273:28931:0", "")
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/fenstersender.dh"
+IMPORT "{sammlung}/../_hilfen/fenstersender.dh"
 FUNCTION skript$() AS STRING
-    RETURN "{sammlung}/_hilfen/fenstersender.ps1"
+    RETURN "{sammlung}/../_hilfen/fenstersender.ps1"
 END FUNCTION
 --- argumente
-{sammlung}/../../examples/209_pausenwecker.dh
+{sammlung}/../../../examples/209_pausenwecker.dh
 --- system windows
 --- erwartet
 gesendet

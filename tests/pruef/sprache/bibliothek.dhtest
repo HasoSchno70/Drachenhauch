@@ -20,7 +20,7 @@ PRINT "nicht gefunden "; (INSTR(dlErr, "nicht gefunden") >= 0)
 PRINT "nennt den eigenen ordner "; (INSTR(dlErr, "proj") >= 0)
 PRINT "nennt den benutzerordner "; (INSTR(dlErr, ".drachenhauch") >= 0)
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 SUB laufe(datei AS STRING, suchpfad AS STRING)
     SETENV("DH_PATH", suchpfad)
     SETENV("USERPROFILE", CWD$() + "/heim")
@@ -50,7 +50,7 @@ laufe("proj/haupt.dh", ordner$("lib"))
 PRINT "rueckgabe "; dlCode
 PRINT TRIM$(dlAus); TRIM$(dlErr)
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 SUB laufe(datei AS STRING, suchpfad AS STRING)
     SETENV("DH_PATH", suchpfad)
     SETENV("USERPROFILE", CWD$() + "/heim")
@@ -79,7 +79,7 @@ IMPORT "helfer.dh"
 laufe("proj/haupt.dh", ordner$("lib"))
 PRINT TRIM$(dlAus); TRIM$(dlErr)
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 SUB laufe(datei AS STRING, suchpfad AS STRING)
     SETENV("DH_PATH", suchpfad)
     SETENV("USERPROFILE", CWD$() + "/heim")
@@ -109,7 +109,7 @@ laufe("proj/zwei.dh", ordner$("lib") + dlPfadTrenner$() + ordner$("lib2"))
 PRINT "rueckgabe "; dlCode
 PRINT TRIM$(dlAus); TRIM$(dlErr)
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 SUB laufe(datei AS STRING, suchpfad AS STRING)
     SETENV("DH_PATH", suchpfad)
     SETENV("USERPROFILE", CWD$() + "/heim")
@@ -143,7 +143,7 @@ PRINT "lib2 vorn "; TRIM$(dlAus); TRIM$(dlErr)
 laufe("proj/haupt.dh", ordner$("lib") + dlPfadTrenner$() + ordner$("lib2"))
 PRINT "lib vorn "; TRIM$(dlAus); TRIM$(dlErr)
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 SUB laufe(datei AS STRING, suchpfad AS STRING)
     SETENV("DH_PATH", suchpfad)
     SETENV("USERPROFILE", CWD$() + "/heim")
@@ -176,7 +176,7 @@ laufe("proj/haupt.dh", "")
 PRINT "rueckgabe "; dlCode
 PRINT TRIM$(dlAus); TRIM$(dlErr)
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 SUB laufe(datei AS STRING, suchpfad AS STRING)
     SETENV("DH_PATH", suchpfad)
     SETENV("USERPROFILE", CWD$() + "/heim")
@@ -204,7 +204,7 @@ laufe("proj/tief.dh", ordner$("lib"))
 PRINT "rueckgabe "; dlCode
 PRINT TRIM$(dlAus); TRIM$(dlErr)
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 SUB laufe(datei AS STRING, suchpfad AS STRING)
     SETENV("DH_PATH", suchpfad)
     SETENV("USERPROFILE", CWD$() + "/heim")
@@ -237,7 +237,7 @@ laufe("proj/ns.dh", ordner$("lib"))
 PRINT "rueckgabe "; dlCode
 PRINT TRIM$(dlAus); TRIM$(dlErr)
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 SUB laufe(datei AS STRING, suchpfad AS STRING)
     SETENV("DH_PATH", suchpfad)
     SETENV("USERPROFILE", CWD$() + "/heim")
@@ -266,7 +266,7 @@ laufe("proj/j.dh", ordner$("lib"))
 PRINT "rueckgabe "; dlCode
 PRINT TRIM$(dlAus); TRIM$(dlErr)
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 SUB laufe(datei AS STRING, suchpfad AS STRING)
     SETENV("DH_PATH", suchpfad)
     SETENV("USERPROFILE", CWD$() + "/heim")

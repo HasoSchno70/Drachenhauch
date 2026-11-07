@@ -98,12 +98,12 @@ END SUB
 SUB prProbe()
     prSchreib("")
 END SUB
---- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- programm ../../../examples/187_tilemap_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
 --- ersetzen "assets/editor_tileset.png"
-"{sammlung}/../../examples/assets/editor_tileset.png"
+"{sammlung}/../../../examples/assets/editor_tileset.png"
 
 --- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
@@ -215,12 +215,12 @@ END SUB
 SUB prProbe()
     prSchreib("")
 END SUB
---- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- programm ../../../examples/187_tilemap_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
 --- ersetzen "assets/editor_tileset.png"
-"{sammlung}/../../examples/assets/editor_tileset.png"
+"{sammlung}/../../../examples/assets/editor_tileset.png"
 
 --- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
@@ -345,12 +345,12 @@ END SUB
 SUB prProbe()
     prSchreib("")
 END SUB
---- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- programm ../../../examples/187_tilemap_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
 --- ersetzen "assets/editor_tileset.png"
-"{sammlung}/../../examples/assets/editor_tileset.png"
+"{sammlung}/../../../examples/assets/editor_tileset.png"
 
 --- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
@@ -474,12 +474,12 @@ END SUB
 SUB prProbe()
     prSchreib("")
 END SUB
---- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- programm ../../../examples/187_tilemap_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
 --- ersetzen "assets/editor_tileset.png"
-"{sammlung}/../../examples/assets/editor_tileset.png"
+"{sammlung}/../../../examples/assets/editor_tileset.png"
 
 --- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
@@ -652,12 +652,12 @@ END SUB
 SUB prProbe()
     prSchreib("")
 END SUB
---- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- programm ../../../examples/187_tilemap_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
 --- ersetzen "assets/editor_tileset.png"
-"{sammlung}/../../examples/assets/editor_tileset.png"
+"{sammlung}/../../../examples/assets/editor_tileset.png"
 
 --- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
@@ -828,12 +828,12 @@ END SUB
 SUB prProbe()
     prSchreib("")
 END SUB
---- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- programm ../../../examples/187_tilemap_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
 --- ersetzen "assets/editor_tileset.png"
-"{sammlung}/../../examples/assets/editor_tileset.png"
+"{sammlung}/../../../examples/assets/editor_tileset.png"
 
 --- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
@@ -1010,12 +1010,12 @@ END SUB
 SUB prProbe()
     prSchreib("")
 END SUB
---- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- programm ../../../examples/187_tilemap_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
 --- ersetzen "assets/editor_tileset.png"
-"{sammlung}/../../examples/assets/editor_tileset.png"
+"{sammlung}/../../../examples/assets/editor_tileset.png"
 
 --- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
@@ -1192,12 +1192,12 @@ END SUB
 SUB prProbe()
     prSchreib("")
 END SUB
---- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- programm ../../../examples/187_tilemap_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
 --- ersetzen "assets/editor_tileset.png"
-"{sammlung}/../../examples/assets/editor_tileset.png"
+"{sammlung}/../../../examples/assets/editor_tileset.png"
 
 --- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
@@ -1374,12 +1374,12 @@ END SUB
 SUB prProbe()
     prSchreib("")
 END SUB
---- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- programm ../../../examples/187_tilemap_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
 --- ersetzen "assets/editor_tileset.png"
-"{sammlung}/../../examples/assets/editor_tileset.png"
+"{sammlung}/../../../examples/assets/editor_tileset.png"
 
 --- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
@@ -1556,12 +1556,12 @@ END SUB
 SUB prProbe()
     prSchreib("")
 END SUB
---- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- programm ../../../examples/187_tilemap_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
 --- ersetzen "assets/editor_tileset.png"
-"{sammlung}/../../examples/assets/editor_tileset.png"
+"{sammlung}/../../../examples/assets/editor_tileset.png"
 
 --- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
@@ -1738,12 +1738,12 @@ END SUB
 SUB prProbe()
     prSchreib("")
 END SUB
---- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- programm ../../../examples/187_tilemap_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
 --- ersetzen "assets/editor_tileset.png"
-"{sammlung}/../../examples/assets/editor_tileset.png"
+"{sammlung}/../../../examples/assets/editor_tileset.png"
 
 --- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
@@ -1920,12 +1920,12 @@ END SUB
 SUB prProbe()
     prSchreib("")
 END SUB
---- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- programm ../../../examples/187_tilemap_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
 --- ersetzen "assets/editor_tileset.png"
-"{sammlung}/../../examples/assets/editor_tileset.png"
+"{sammlung}/../../../examples/assets/editor_tileset.png"
 
 --- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
@@ -2103,12 +2103,12 @@ END SUB
 SUB prProbe()
     prSchreib("")
 END SUB
---- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- programm ../../../examples/187_tilemap_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
 --- ersetzen "assets/editor_tileset.png"
-"{sammlung}/../../examples/assets/editor_tileset.png"
+"{sammlung}/../../../examples/assets/editor_tileset.png"
 
 --- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
@@ -2286,12 +2286,12 @@ END SUB
 SUB prProbe()
     prSchreib("gewaehlt " + STR$(gewaehlt))
 END SUB
---- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- programm ../../../examples/187_tilemap_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
 --- ersetzen "assets/editor_tileset.png"
-"{sammlung}/../../examples/assets/editor_tileset.png"
+"{sammlung}/../../../examples/assets/editor_tileset.png"
 
 --- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
@@ -2471,12 +2471,12 @@ END SUB
 SUB prProbe()
     prSchreib("istObj " + STR$(IIF(istObjEbene(), 1, 0)) + " ebenen " + STR$(TILED_LAYER_COUNT(karte)) + " objAnz " + STR$(IIF(istObjEbene(), TILED_OBJECT_COUNT(karte, ebenenName$()), -1)) + " objSel " + STR$(objSel))
 END SUB
---- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- programm ../../../examples/187_tilemap_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
 --- ersetzen "assets/editor_tileset.png"
-"{sammlung}/../../examples/assets/editor_tileset.png"
+"{sammlung}/../../../examples/assets/editor_tileset.png"
 
 --- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
@@ -2584,12 +2584,12 @@ END SUB
 SUB prProbe()
     prSchreib("istObj " + STR$(IIF(istObjEbene(), 1, 0)) + " ebenen " + STR$(TILED_LAYER_COUNT(karte)) + " objAnz " + STR$(IIF(istObjEbene(), TILED_OBJECT_COUNT(karte, ebenenName$()), -1)) + " objSel " + STR$(objSel))
 END SUB
---- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- programm ../../../examples/187_tilemap_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
 --- ersetzen "assets/editor_tileset.png"
-"{sammlung}/../../examples/assets/editor_tileset.png"
+"{sammlung}/../../../examples/assets/editor_tileset.png"
 
 --- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
@@ -2699,12 +2699,12 @@ END SUB
 SUB prProbe()
     prSchreib("istObj " + STR$(IIF(istObjEbene(), 1, 0)) + " ebenen " + STR$(TILED_LAYER_COUNT(karte)) + " objAnz " + STR$(IIF(istObjEbene(), TILED_OBJECT_COUNT(karte, ebenenName$()), -1)) + " objSel " + STR$(objSel))
 END SUB
---- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- programm ../../../examples/187_tilemap_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
 --- ersetzen "assets/editor_tileset.png"
-"{sammlung}/../../examples/assets/editor_tileset.png"
+"{sammlung}/../../../examples/assets/editor_tileset.png"
 
 --- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
@@ -2887,12 +2887,12 @@ END SUB
 SUB prProbe()
     prSchreib("")
 END SUB
---- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- programm ../../../examples/187_tilemap_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
 --- ersetzen "assets/editor_tileset.png"
-"{sammlung}/../../examples/assets/editor_tileset.png"
+"{sammlung}/../../../examples/assets/editor_tileset.png"
 
 --- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
@@ -3072,12 +3072,12 @@ END SUB
 SUB prProbe()
     prSchreib("istObj " + STR$(IIF(istObjEbene(), 1, 0)) + " ebenen " + STR$(TILED_LAYER_COUNT(karte)) + " objAnz " + STR$(IIF(istObjEbene(), TILED_OBJECT_COUNT(karte, ebenenName$()), -1)) + " objSel " + STR$(objSel))
 END SUB
---- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- programm ../../../examples/187_tilemap_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
 --- ersetzen "assets/editor_tileset.png"
-"{sammlung}/../../examples/assets/editor_tileset.png"
+"{sammlung}/../../../examples/assets/editor_tileset.png"
 
 --- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
@@ -3188,12 +3188,12 @@ END SUB
 SUB prProbe()
     prSchreib("istObj " + STR$(IIF(istObjEbene(), 1, 0)) + " ebenen " + STR$(TILED_LAYER_COUNT(karte)) + " objAnz " + STR$(IIF(istObjEbene(), TILED_OBJECT_COUNT(karte, ebenenName$()), -1)) + " objSel " + STR$(objSel))
 END SUB
---- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- programm ../../../examples/187_tilemap_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
 --- ersetzen "assets/editor_tileset.png"
-"{sammlung}/../../examples/assets/editor_tileset.png"
+"{sammlung}/../../../examples/assets/editor_tileset.png"
 
 --- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
@@ -3304,12 +3304,12 @@ END SUB
 SUB prProbe()
     prSchreib("")
 END SUB
---- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- programm ../../../examples/187_tilemap_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
 --- ersetzen "assets/editor_tileset.png"
-"{sammlung}/../../examples/assets/editor_tileset.png"
+"{sammlung}/../../../examples/assets/editor_tileset.png"
 
 --- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
@@ -3487,18 +3487,18 @@ END SUB
 SUB prProbe()
     prSchreib("tsAnz " + STR$(tsAnz) + " tsAkt " + STR$(tsAkt) + " basisGid " + STR$(basisGid()))
 END SUB
---- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- programm ../../../examples/187_tilemap_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
 --- ersetzen "assets/editor_tileset.png"
-"{sammlung}/../../examples/assets/editor_tileset.png"
+"{sammlung}/../../../examples/assets/editor_tileset.png"
 
 --- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
 
 --- ersetzen FILE_OPEN_DIALOG("Tileset hinzufuegen", "png")
-"{sammlung}/../../examples/assets/tiles.png"
+"{sammlung}/../../../examples/assets/tiles.png"
 
 --- einschub nach FLIP()
 prBild = prBild + 1
@@ -3595,18 +3595,18 @@ END SUB
 SUB prProbe()
     prSchreib("tsAnz " + STR$(tsAnz) + " tsAkt " + STR$(tsAkt) + " basisGid " + STR$(basisGid()))
 END SUB
---- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- programm ../../../examples/187_tilemap_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
 --- ersetzen "assets/editor_tileset.png"
-"{sammlung}/../../examples/assets/editor_tileset.png"
+"{sammlung}/../../../examples/assets/editor_tileset.png"
 
 --- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
 
 --- ersetzen FILE_OPEN_DIALOG("Tileset hinzufuegen", "png")
-"{sammlung}/../../examples/assets/tiles.png"
+"{sammlung}/../../../examples/assets/tiles.png"
 
 --- einschub nach FLIP()
 prBild = prBild + 1
@@ -3706,18 +3706,18 @@ END SUB
 SUB prProbe()
     prSchreib("")
 END SUB
---- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- programm ../../../examples/187_tilemap_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
 --- ersetzen "assets/editor_tileset.png"
-"{sammlung}/../../examples/assets/editor_tileset.png"
+"{sammlung}/../../../examples/assets/editor_tileset.png"
 
 --- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
 
 --- ersetzen FILE_OPEN_DIALOG("Tileset hinzufuegen", "png")
-"{sammlung}/../../examples/assets/tiles.png"
+"{sammlung}/../../../examples/assets/tiles.png"
 
 --- einschub nach FLIP()
 prBild = prBild + 1
@@ -3891,18 +3891,18 @@ SUB prProbe()
     IF tsAkt = 1 THEN prMerke("zweites tileset war aktiv")
     prSchreib("tsAnz " + STR$(tsAnz) + " tsAkt " + STR$(tsAkt) + " basisGid " + STR$(basisGid()))
 END SUB
---- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- programm ../../../examples/187_tilemap_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
 --- ersetzen "assets/editor_tileset.png"
-"{sammlung}/../../examples/assets/editor_tileset.png"
+"{sammlung}/../../../examples/assets/editor_tileset.png"
 
 --- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
 
 --- ersetzen FILE_OPEN_DIALOG("Tileset hinzufuegen", "png")
-"{sammlung}/../../examples/assets/tiles.png"
+"{sammlung}/../../../examples/assets/tiles.png"
 
 --- einschub nach FLIP()
 prBild = prBild + 1
@@ -4004,18 +4004,18 @@ END SUB
 SUB prProbe()
     prSchreib("")
 END SUB
---- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- programm ../../../examples/187_tilemap_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
 --- ersetzen "assets/editor_tileset.png"
-"{sammlung}/../../examples/assets/editor_tileset.png"
+"{sammlung}/../../../examples/assets/editor_tileset.png"
 
 --- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
 
 --- ersetzen FILE_OPEN_DIALOG("Tileset hinzufuegen", "png")
-"{sammlung}/../../examples/assets/tiles.png"
+"{sammlung}/../../../examples/assets/tiles.png"
 
 --- einschub nach FLIP()
 prBild = prBild + 1
@@ -4150,12 +4150,12 @@ END SUB
 SUB prProbe()
     prSchreib("gewaehlt " + STR$(gewaehlt))
 END SUB
---- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- programm ../../../examples/187_tilemap_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
 --- ersetzen "assets/editor_tileset.png"
-"{sammlung}/../../examples/assets/editor_tileset.png"
+"{sammlung}/../../../examples/assets/editor_tileset.png"
 
 --- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
@@ -4270,12 +4270,12 @@ END SUB
 SUB prProbe()
     prSchreib("gewaehlt " + STR$(gewaehlt))
 END SUB
---- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- programm ../../../examples/187_tilemap_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
 --- ersetzen "assets/editor_tileset.png"
-"{sammlung}/../../examples/assets/editor_tileset.png"
+"{sammlung}/../../../examples/assets/editor_tileset.png"
 
 --- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
@@ -4383,12 +4383,12 @@ END SUB
 SUB prProbe()
     prSchreib("ebene " + STR$(ebene))
 END SUB
---- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- programm ../../../examples/187_tilemap_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
 --- ersetzen "assets/editor_tileset.png"
-"{sammlung}/../../examples/assets/editor_tileset.png"
+"{sammlung}/../../../examples/assets/editor_tileset.png"
 
 --- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
@@ -4563,12 +4563,12 @@ END SUB
 SUB prProbe()
     prSchreib("ebene " + STR$(ebene))
 END SUB
---- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- programm ../../../examples/187_tilemap_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
 --- ersetzen "assets/editor_tileset.png"
-"{sammlung}/../../examples/assets/editor_tileset.png"
+"{sammlung}/../../../examples/assets/editor_tileset.png"
 
 --- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
@@ -4743,12 +4743,12 @@ END SUB
 SUB prProbe()
     prSchreib("")
 END SUB
---- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- programm ../../../examples/187_tilemap_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
 --- ersetzen "assets/editor_tileset.png"
-"{sammlung}/../../examples/assets/editor_tileset.png"
+"{sammlung}/../../../examples/assets/editor_tileset.png"
 
 --- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
@@ -4928,12 +4928,12 @@ END SUB
 SUB prProbe()
     prSchreib("")
 END SUB
---- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- programm ../../../examples/187_tilemap_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
 --- ersetzen "assets/editor_tileset.png"
-"{sammlung}/../../examples/assets/editor_tileset.png"
+"{sammlung}/../../../examples/assets/editor_tileset.png"
 
 --- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
@@ -5120,12 +5120,12 @@ END SUB
 SUB prProbe()
     prSchreib("")
 END SUB
---- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- programm ../../../examples/187_tilemap_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
 --- ersetzen "assets/editor_tileset.png"
-"{sammlung}/../../examples/assets/editor_tileset.png"
+"{sammlung}/../../../examples/assets/editor_tileset.png"
 
 --- einschub nach FLIP()
 prBild = prBild + 1
@@ -5242,12 +5242,12 @@ SUB prProbe()
     IF prBild - prStart = 30 THEN prMerke("zurueck " + STR$(TILED_COUNT_GID(karte, 0, 1)))
     prSchreib("")
 END SUB
---- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- programm ../../../examples/187_tilemap_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
 --- ersetzen "assets/editor_tileset.png"
-"{sammlung}/../../examples/assets/editor_tileset.png"
+"{sammlung}/../../../examples/assets/editor_tileset.png"
 
 --- einschub nach FLIP()
 prBild = prBild + 1
@@ -5360,12 +5360,12 @@ SUB prProbe()
     END IF
     prSchreib("")
 END SUB
---- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- programm ../../../examples/187_tilemap_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
 --- ersetzen "assets/editor_tileset.png"
-"{sammlung}/../../examples/assets/editor_tileset.png"
+"{sammlung}/../../../examples/assets/editor_tileset.png"
 
 --- einschub nach FLIP()
 prBild = prBild + 1
@@ -5465,12 +5465,12 @@ SUB prProbe()
     IF prBild - prStart = 10 THEN prMerke("sichtbar " + IIF(TILED_LAYER_VISIBLE(karte, 0), "ja", "nein") + " ebene " + STR$(ebene) + " geaendert " + IIF(geaendert, "ja", "nein"))
     prSchreib("")
 END SUB
---- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- programm ../../../examples/187_tilemap_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
 --- ersetzen "assets/editor_tileset.png"
-"{sammlung}/../../examples/assets/editor_tileset.png"
+"{sammlung}/../../../examples/assets/editor_tileset.png"
 
 --- einschub nach FLIP()
 prBild = prBild + 1
@@ -5576,12 +5576,12 @@ SUB prProbe()
     IF prBild - prStart = 10 AND FILEEXISTS("ev.txt") THEN prMerke("verschoben " + IIF(panX > 1000 AND panY > 800, "ja", "nein") + " gemalt " + STR$(TILED_COUNT_GID(karte, 0, 1)))
     prSchreib("")
 END SUB
---- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- programm ../../../examples/187_tilemap_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
 --- ersetzen "assets/editor_tileset.png"
-"{sammlung}/../../examples/assets/editor_tileset.png"
+"{sammlung}/../../../examples/assets/editor_tileset.png"
 
 --- einschub nach FLIP()
 prBild = prBild + 1

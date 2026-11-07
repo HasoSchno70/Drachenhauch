@@ -35,11 +35,11 @@ bild 2: 0/0 [|]
 === die ide oeffnet eine abgelegte datei und macht einen ordner zum projekt
 ' Auch auf der Willkommensseite (kein Reiter offen) -- dort landet man, wenn
 ' man die App per Doppelklick auf eine Datei startet.
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- umgebung
 DHRT_FRAMES=90
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 DHRT_ABLEGEN={fall}/abgelegt.dh;{fall}/woanders
 --- datei abgelegt.dh

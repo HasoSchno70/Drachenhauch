@@ -22,9 +22,9 @@ DIM nl AS INTEGER : nl = BUFFER_GET_U16(b, 26)
 PRINT "erster eintrag "; BUFFER_TO_STRING$(BUFFER_SLICE(b, 30, 30 + nl))
 PRINT "inhalt "; ZIP_READ$(epub, "mimetype")
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/epub.dh"
+IMPORT "{sammlung}/../_hilfen/epub.dh"
 --- erwartet
 kopf TRUE
 gespeichert TRUE
@@ -53,9 +53,9 @@ FOR i = 0 TO LEN(namen) - 1
 NEXT
 PRINT "genug seiten "; (zahl > 50)
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/epub.dh"
+IMPORT "{sammlung}/../_hilfen/epub.dh"
 --- erwartet
 gegenprobe &: TRUE
 gegenprobe <: TRUE
@@ -102,9 +102,9 @@ FOR i = 0 TO LEN(namen) - 1
 NEXT
 PRINT "manifest-eintraege "; (XML_COUNT(opf, "manifest/item") > 50)
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/epub.dh"
+IMPORT "{sammlung}/../_hilfen/epub.dh"
 --- erwartet
 opf im archiv TRUE
 spine nicht leer TRUE
@@ -158,9 +158,9 @@ NEXT
 PRINT "verweise ins leere "; kaputt
 PRINT "bilder "; (bilder > 20); ", seiten "; (seiten > 150); ", stylesheets "; (css > 50)
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/epub.dh"
+IMPORT "{sammlung}/../_hilfen/epub.dh"
 --- erwartet
 verweise ins leere 0
 bilder TRUE, seiten TRUE, stylesheets TRUE
@@ -190,9 +190,9 @@ FOR i = 0 TO 2
 NEXT
 PRINT "als toc ausgezeichnet "; (INSTR(nav, "epub:type=" + CHR$(34) + "toc" + CHR$(34)) >= 0)
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/epub.dh"
+IMPORT "{sammlung}/../_hilfen/epub.dh"
 --- erwartet
 nav im manifest TRUE
 Vorwort: nav TRUE, ncx TRUE
@@ -222,9 +222,9 @@ FOR i = 0 TO LEN(bloecke) - 1
 NEXT
 PRINT "bloecke mit hintergrund gefunden "; (mitHintergrund > 0)
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/epub.dh"
+IMPORT "{sammlung}/../_hilfen/epub.dh"
 --- erwartet
 bloecke mit hintergrund gefunden TRUE
 
@@ -236,9 +236,9 @@ DIM css AS STRING : css = ZIP_READ$(epub, "OEBPS/styles/buch.css")
 PRINT "prefers-color-scheme "; (INSTR(css, "prefers-color-scheme: dark") >= 0)
 PRINT "color-scheme "; (INSTR(css, "color-scheme: light dark") >= 0)
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/epub.dh"
+IMPORT "{sammlung}/../_hilfen/epub.dh"
 --- erwartet
 prefers-color-scheme TRUE
 color-scheme TRUE

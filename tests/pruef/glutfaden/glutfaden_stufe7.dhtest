@@ -18,13 +18,13 @@ FOR s = kern.SP_ZEILEN TO kern.SP_DIAGONAL
     PRINT kern.spKennung$(s); ": "; geAbweichungen$(geLies$("plan_" + kern.spKennung$(s) + ".txt"), kern.stickplanText$(m, r))
 NEXT
 --- argumente
-{sammlung}/../../examples/glutfaden
+{sammlung}/../../../examples/glutfaden
 --- datei helfer.dh
-IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
-IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
-IMPORT "{sammlung}/_hilfen/pdftext.dh"
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
-CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+IMPORT "{sammlung}/../../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/../_hilfen/glutfaden_export.dh"
+IMPORT "{sammlung}/../_hilfen/pdftext.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../../examples/glutfaden/main.dh"
 --- datei plan_row_by_row.txt
 ============================================================
 STICKPLAN - Optimierte Stichreihenfolge
@@ -1154,13 +1154,13 @@ END SUB
 vergleichZeigen(m, 14, "vergleich_14.txt")
 vergleichZeigen(m, 18, "vergleich_18.txt")
 --- argumente
-{sammlung}/../../examples/glutfaden
+{sammlung}/../../../examples/glutfaden
 --- datei helfer.dh
-IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
-IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
-IMPORT "{sammlung}/_hilfen/pdftext.dh"
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
-CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+IMPORT "{sammlung}/../../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/../_hilfen/glutfaden_export.dh"
+IMPORT "{sammlung}/../_hilfen/pdftext.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../../examples/glutfaden/main.dh"
 --- datei vergleich_14.txt
 nearest | 274.8 | 4 | 600 | ★★★ Beste
 column | 1142.6 | 36 | 1034 | —
@@ -1185,13 +1185,13 @@ FOR EACH v IN [100.0, 104.9, 105.0, 114.9, 115.0, 129.9, 130.0, 500.0]
 NEXT
 PRINT "beste 0: "; kern.spBewertung$(0.0, 0.0)
 --- argumente
-{sammlung}/../../examples/glutfaden
+{sammlung}/../../../examples/glutfaden
 --- datei helfer.dh
-IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
-IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
-IMPORT "{sammlung}/_hilfen/pdftext.dh"
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
-CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+IMPORT "{sammlung}/../../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/../_hilfen/glutfaden_export.dh"
+IMPORT "{sammlung}/../_hilfen/pdftext.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../../examples/glutfaden/main.dh"
 --- erwartet
 100.0 ★★★ Beste
 104.9 ★★★ Beste
@@ -1266,13 +1266,13 @@ FOR EACH p IN r.pfade
     PRINT "brett farbe "; p.farbe; " stiche "; p.stiche(); " spruenge "; p.spruenge; ": "; nachbarPruefen$(p)
 NEXT
 --- argumente
-{sammlung}/../../examples/glutfaden
+{sammlung}/../../../examples/glutfaden
 --- datei helfer.dh
-IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
-IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
-IMPORT "{sammlung}/_hilfen/pdftext.dh"
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
-CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+IMPORT "{sammlung}/../../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/../_hilfen/glutfaden_export.dh"
+IMPORT "{sammlung}/../_hilfen/pdftext.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../../examples/glutfaden/main.dh"
 --- erwartet
 farbe 4 stiche 116: gueltig
 farbe 2 stiche 17: gueltig
@@ -1317,13 +1317,13 @@ zeigen(kern.spAusschnitt(sp, 0, 5, 3, 9))
 PRINT "schmal 0..1 x 0..9 (ohne 2,3 wird es ein sprung):"
 zeigen(kern.spAusschnitt(sp, 0, 0, 1, 9))
 --- argumente
-{sammlung}/../../examples/glutfaden
+{sammlung}/../../../examples/glutfaden
 --- datei helfer.dh
-IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
-IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
-IMPORT "{sammlung}/_hilfen/pdftext.dh"
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
-CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+IMPORT "{sammlung}/../../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/../_hilfen/glutfaden_export.dh"
+IMPORT "{sammlung}/../_hilfen/pdftext.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../../examples/glutfaden/main.dh"
 --- erwartet
 links oben 0..4 x 0..4:
   farbe 2: (0,0) (1,0) (2,0) distanz 2.000 spruenge 0
@@ -1354,13 +1354,13 @@ o.titel = "ab"
 DIM ab AS ARRAY OF STRING : ab = kern.pdfExportieren(m, "ab.pdf", o)
 PRINT geAbweichungen$(geLies$("pdf_pfad.txt"), JOIN$(ab, CHR$(10)) + CHR$(10))
 --- argumente
-{sammlung}/../../examples/glutfaden
+{sammlung}/../../../examples/glutfaden
 --- datei helfer.dh
-IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
-IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
-IMPORT "{sammlung}/_hilfen/pdftext.dh"
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
-CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+IMPORT "{sammlung}/../../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/../_hilfen/glutfaden_export.dh"
+IMPORT "{sammlung}/../_hilfen/pdftext.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../../examples/glutfaden/main.dh"
 --- datei pdf_pfad.txt
 S 30.0
 P Title1 | ✂ KREUZSTICH-MUSTER
@@ -1501,13 +1501,13 @@ o.stickpfad = TRUE
 m.modus = "diamond" : m.stoff = 10
 PRINT "diamond: "; zaehlen$(kern.pdfExportieren(m, "c.pdf", o))
 --- argumente
-{sammlung}/../../examples/glutfaden
+{sammlung}/../../../examples/glutfaden
 --- datei helfer.dh
-IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
-IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
-IMPORT "{sammlung}/_hilfen/pdftext.dh"
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
-CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+IMPORT "{sammlung}/../../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/../_hilfen/glutfaden_export.dh"
+IMPORT "{sammlung}/../_hilfen/pdftext.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../../examples/glutfaden/main.dh"
 --- erwartet
 vorgabe an: TRUE
 mit: Line:264 absatz 1
@@ -1547,13 +1547,13 @@ o.stickpfad = FALSE
 ab = kern.pdfExportieren(m, "b.pdf", o)
 PRINT "ohne: "; strom$("b.pdf")
 --- argumente
-{sammlung}/../../examples/glutfaden
+{sammlung}/../../../examples/glutfaden
 --- datei helfer.dh
-IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
-IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
-IMPORT "{sammlung}/_hilfen/pdftext.dh"
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
-CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+IMPORT "{sammlung}/../../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/../_hilfen/glutfaden_export.dh"
+IMPORT "{sammlung}/../_hilfen/pdftext.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../../examples/glutfaden/main.dh"
 --- erwartet
 spruenge 4 linien 182
 mit: [1.5 1.5 ]0 x4 | gs 182
@@ -1576,13 +1576,13 @@ ELSE
     PRINT "plan wie kern: "; geLies$("d_plan.txt") = kern.stickplanText$(kern.pxsLaden(ARG$(0) + "/daten/muster/demo_kreuzstich.pxs"), kern.stickpfadBerechnen(kern.pxsLaden(ARG$(0) + "/daten/muster/demo_kreuzstich.pxs"), kern.SP_NACHBAR, 18))
 END IF
 --- argumente
-{sammlung}/../../examples/glutfaden
+{sammlung}/../../../examples/glutfaden
 --- datei helfer.dh
-IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
-IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
-IMPORT "{sammlung}/_hilfen/pdftext.dh"
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
-CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+IMPORT "{sammlung}/../../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/../_hilfen/glutfaden_export.dh"
+IMPORT "{sammlung}/../_hilfen/pdftext.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../../examples/glutfaden/main.dh"
 --- erwartet
 rueckgabe 0
 dialog: Zeilenweise (Schlangenlinie) stoff 14 | 185 | 3 | 1190.4 | 38 | 1058 cm (10.6 m)

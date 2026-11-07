@@ -42,11 +42,11 @@ IMPORT "json"
 IMPORT "regex"
 IMPORT "imgfx"
 IMPORT "db"
-IMPORT "{sammlung}/../../studio/sprache.dh"
-IMPORT "{sammlung}/../../studio/bibliothek.dh"
-IMPORT "{sammlung}/../../studio/modell.dh"
-IMPORT "{sammlung}/../../studio/projekt.dh"
-IMPORT "{sammlung}/../../studio/datenbank.dh"
+IMPORT "{sammlung}/../../../studio/sprache.dh"
+IMPORT "{sammlung}/../../../studio/bibliothek.dh"
+IMPORT "{sammlung}/../../../studio/modell.dh"
+IMPORT "{sammlung}/../../../studio/projekt.dh"
+IMPORT "{sammlung}/../../../studio/datenbank.dh"
 SUB zeige(tab AS STRING)
     DIM db AS DB_CONN : db = DB_OPEN("daten.sqlite")
     DIM r AS DB_RESULT : r = DB_QUERY(db, "PRAGMA table_info(" + tab + ")")
@@ -116,11 +116,11 @@ IMPORT "json"
 IMPORT "regex"
 IMPORT "imgfx"
 IMPORT "db"
-IMPORT "{sammlung}/../../studio/sprache.dh"
-IMPORT "{sammlung}/../../studio/bibliothek.dh"
-IMPORT "{sammlung}/../../studio/modell.dh"
-IMPORT "{sammlung}/../../studio/projekt.dh"
-IMPORT "{sammlung}/../../studio/datenbank.dh"
+IMPORT "{sammlung}/../../../studio/sprache.dh"
+IMPORT "{sammlung}/../../../studio/bibliothek.dh"
+IMPORT "{sammlung}/../../../studio/modell.dh"
+IMPORT "{sammlung}/../../../studio/projekt.dh"
+IMPORT "{sammlung}/../../../studio/datenbank.dh"
 SUB zeige(tab AS STRING)
     DIM db AS DB_CONN : db = DB_OPEN("daten.sqlite")
     DIM r AS DB_RESULT : r = DB_QUERY(db, "PRAGMA table_info(" + tab + ")")
@@ -188,11 +188,11 @@ IMPORT "json"
 IMPORT "regex"
 IMPORT "imgfx"
 IMPORT "db"
-IMPORT "{sammlung}/../../studio/sprache.dh"
-IMPORT "{sammlung}/../../studio/bibliothek.dh"
-IMPORT "{sammlung}/../../studio/modell.dh"
-IMPORT "{sammlung}/../../studio/projekt.dh"
-IMPORT "{sammlung}/../../studio/datenbank.dh"
+IMPORT "{sammlung}/../../../studio/sprache.dh"
+IMPORT "{sammlung}/../../../studio/bibliothek.dh"
+IMPORT "{sammlung}/../../../studio/modell.dh"
+IMPORT "{sammlung}/../../../studio/projekt.dh"
+IMPORT "{sammlung}/../../../studio/datenbank.dh"
 --- erwartet
 []
 [] 1
@@ -272,11 +272,11 @@ IMPORT "json"
 IMPORT "regex"
 IMPORT "imgfx"
 IMPORT "db"
-IMPORT "{sammlung}/../../studio/sprache.dh"
-IMPORT "{sammlung}/../../studio/bibliothek.dh"
-IMPORT "{sammlung}/../../studio/modell.dh"
-IMPORT "{sammlung}/../../studio/projekt.dh"
-IMPORT "{sammlung}/../../studio/datenbank.dh"
+IMPORT "{sammlung}/../../../studio/sprache.dh"
+IMPORT "{sammlung}/../../../studio/bibliothek.dh"
+IMPORT "{sammlung}/../../../studio/modell.dh"
+IMPORT "{sammlung}/../../../studio/projekt.dh"
+IMPORT "{sammlung}/../../../studio/datenbank.dh"
 --- erwartet
 Anna Bremen 1999
   artikel
@@ -354,11 +354,11 @@ IMPORT "json"
 IMPORT "regex"
 IMPORT "imgfx"
 IMPORT "db"
-IMPORT "{sammlung}/../../studio/sprache.dh"
-IMPORT "{sammlung}/../../studio/bibliothek.dh"
-IMPORT "{sammlung}/../../studio/modell.dh"
-IMPORT "{sammlung}/../../studio/projekt.dh"
-IMPORT "{sammlung}/../../studio/datenbank.dh"
+IMPORT "{sammlung}/../../../studio/sprache.dh"
+IMPORT "{sammlung}/../../../studio/bibliothek.dh"
+IMPORT "{sammlung}/../../../studio/modell.dh"
+IMPORT "{sammlung}/../../../studio/projekt.dh"
+IMPORT "{sammlung}/../../../studio/datenbank.dh"
 --- erwartet
 []
   spalte kunden ort -> stadt
@@ -395,11 +395,11 @@ IMPORT "json"
 IMPORT "regex"
 IMPORT "imgfx"
 IMPORT "db"
-IMPORT "{sammlung}/../../studio/sprache.dh"
-IMPORT "{sammlung}/../../studio/bibliothek.dh"
-IMPORT "{sammlung}/../../studio/modell.dh"
-IMPORT "{sammlung}/../../studio/projekt.dh"
-IMPORT "{sammlung}/../../studio/datenbank.dh"
+IMPORT "{sammlung}/../../../studio/sprache.dh"
+IMPORT "{sammlung}/../../../studio/bibliothek.dh"
+IMPORT "{sammlung}/../../../studio/modell.dh"
+IMPORT "{sammlung}/../../../studio/projekt.dh"
+IMPORT "{sammlung}/../../../studio/datenbank.dh"
 --- erwartet
 anlegen []
 dateien TRUE FALSE
@@ -448,7 +448,7 @@ WHILE DB_NEXT(r)
 WEND
 DB_CLOSE(db)
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- vorher
 IMPORT "db"
 DIM db AS DB_CONN : db = DB_OPEN("proj/daten.sqlite")
@@ -457,7 +457,7 @@ DB_EXEC(db, "INSERT INTO kunden (name, ort) VALUES ('Anna', NULL)")
 DB_CLOSE(db)
 --- datei laeufer.dh
 IMPORT "db"
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- datei proj/projekt.dhstudio
 {"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"},{"art":"datenbank","name":"Daten","schema":"Daten.dhdb"}]}
@@ -530,7 +530,7 @@ DIM ky AS INTEGER
 (kx, ky) = slLage(log, "knoten Daten.stadt")
 PRINT "navigator "; kx > 0
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- vorher
 IMPORT "db"
 DIM db AS DB_CONN : db = DB_OPEN("proj/daten.sqlite")
@@ -540,7 +540,7 @@ DB_CLOSE(db)
 --- datei laeufer.dh
 IMPORT "db"
 IMPORT "json"
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- datei proj/projekt.dhstudio
 {"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"},{"art":"datenbank","name":"Daten","schema":"Daten.dhdb"}]}
@@ -597,10 +597,10 @@ FOR EACH z IN slProtokoll(log)
 NEXT
 PRINT TRIM$(folge)
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
 IMPORT "db"
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- datei proj/projekt.dhstudio
 {"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"},{"art":"datenbank","name":"Daten","schema":"Daten.dhdb"}]}
@@ -640,7 +640,7 @@ PRINT "daten mit "; slHat(log, "daten mit " + PATHJOIN(p + "/bau", "daten.sqlite
 SETENV("DHRT_FRAMES", "20")
 PRINT "exe "; TRIM$(REPLACE$(SHELL_OUT$(PATHJOIN(p + "/bau", exe)), CHR$(13), ""))
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- vorher
 IMPORT "db"
 DIM db AS DB_CONN : db = DB_OPEN("proj/daten.sqlite")
@@ -649,7 +649,7 @@ DB_EXEC(db, "INSERT INTO kunden (name) VALUES ('Anna')")
 DB_EXEC(db, "INSERT INTO kunden (name) VALUES ('Bert')")
 DB_CLOSE(db)
 --- datei laeufer.dh
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- datei proj/projekt.dhstudio
 {"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"},{"art":"datenbank","name":"Daten","schema":"Daten.dhdb"}]}

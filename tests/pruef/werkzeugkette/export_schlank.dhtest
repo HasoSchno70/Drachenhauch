@@ -15,7 +15,7 @@ PRINT "konsole: "; REPLACE$(TRIM$(lauf$(konsole$(), namen)), CHR$(10), " ")
 PRINT "spiel: "; REPLACE$(TRIM$(lauf$(spiel$(), namen)), CHR$(10), " ")
 PRINT "voll: ["; TRIM$(lauf$(EXEPATH$(), namen)); "]"
 --- datei lauf.dh
-IMPORT "{sammlung}/_hilfen/schlanklauf.dh"
+IMPORT "{sammlung}/../_hilfen/schlanklauf.dh"
 --- erwartet
 konsole: screen pdf_new phys2d_new waitkey gui_window audio_play
 spiel: db_open pdf_new
@@ -38,7 +38,7 @@ DB_EXEC(d, "INSERT INTO t VALUES (41)")
 DIM r AS DB_RESULT : r = DB_QUERY(d, "SELECT x + 1 FROM t")
 IF DB_NEXT(r) THEN PRINT "antwort "; DB_GET_INT(r, 0)
 --- datei lauf.dh
-IMPORT "{sammlung}/_hilfen/schlanklauf.dh"
+IMPORT "{sammlung}/../_hilfen/schlanklauf.dh"
 --- erwartet
 TRUE TRUE
 kleiner TRUE
@@ -52,7 +52,7 @@ PRINT INSTR(zeile$(aus, "Schlank:"), "dhrt-konsole") >= 0
 --- datei hallo.dh
 PRINT "hallo"
 --- datei lauf.dh
-IMPORT "{sammlung}/_hilfen/schlanklauf.dh"
+IMPORT "{sammlung}/../_hilfen/schlanklauf.dh"
 --- erwartet
 TRUE
 
@@ -81,7 +81,7 @@ FOR n = 1 TO 3
 NEXT
 PRINT "bilder "; n - 1
 --- datei lauf.dh
-IMPORT "{sammlung}/_hilfen/schlanklauf.dh"
+IMPORT "{sammlung}/../_hilfen/schlanklauf.dh"
 --- erwartet
 TRUE
 kleiner TRUE
@@ -105,7 +105,7 @@ SETFONT(f)
 CLS(BLUE) : TEXT(4, 4, "Größe", WHITE) : FLIP()
 PRINT "schrift "; f >= 0; " "; TEXT_WIDTH("Größe") > 0
 --- datei lauf.dh
-IMPORT "{sammlung}/_hilfen/schlanklauf.dh"
+IMPORT "{sammlung}/../_hilfen/schlanklauf.dh"
 --- erwartet
 TRUE
 schrift TRUE TRUE
@@ -123,7 +123,7 @@ SUB fenster()
 END SUB
 PRINT "nur konsole"
 --- datei lauf.dh
-IMPORT "{sammlung}/_hilfen/schlanklauf.dh"
+IMPORT "{sammlung}/../_hilfen/schlanklauf.dh"
 --- erwartet
 TRUE
 
@@ -143,7 +143,7 @@ PDF_TEXT(p, 20, 20, "Beleg")
 PDF_SAVE(p, "beleg.pdf")
 PRINT "pdf "; FILEEXISTS("beleg.pdf")
 --- datei lauf.dh
-IMPORT "{sammlung}/_hilfen/schlanklauf.dh"
+IMPORT "{sammlung}/../_hilfen/schlanklauf.dh"
 --- erwartet
 TRUE TRUE TRUE
 voll TRUE
@@ -158,7 +158,7 @@ PRINT "voll "; FILESIZE(PATHJOIN(CWD$(), "ziel/prog" + endung)) > FILESIZE(EXEPA
 --- datei prog.dh
 PRINT "hallo"
 --- datei lauf.dh
-IMPORT "{sammlung}/_hilfen/schlanklauf.dh"
+IMPORT "{sammlung}/../_hilfen/schlanklauf.dh"
 --- erwartet
 ohne meldung TRUE
 voll TRUE

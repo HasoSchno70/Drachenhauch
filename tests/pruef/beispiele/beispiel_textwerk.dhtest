@@ -10,7 +10,7 @@
 IMPORT "tw.dh"
 tw(["suche", "-n", "-i", "müller", "daten/utf8.csv", "daten/excel.csv"], "")
 --- argumente
-{sammlung}/../../examples/textwerk/main.dh
+{sammlung}/../../../examples/textwerk/main.dh
 --- datei tw.dh
 DIM twAus AS STRING
 DIM twErr AS STRING
@@ -51,7 +51,7 @@ rueckgabe 0
 IMPORT "tw.dh"
 tw(["suche", "nirgends", "daten/a.txt"], "")
 --- argumente
-{sammlung}/../../examples/textwerk/main.dh
+{sammlung}/../../../examples/textwerk/main.dh
 --- datei tw.dh
 DIM twCode AS INTEGER
 SUB tw(args AS ARRAY OF STRING, eingabe AS STRING)
@@ -74,7 +74,7 @@ rueckgabe 1 ausgabe []
 IMPORT "tw.dh"
 tw(["suche", "-r", "-l", "--glob", "*", "apfel", "daten"], "")
 --- argumente
-{sammlung}/../../examples/textwerk/main.dh
+{sammlung}/../../../examples/textwerk/main.dh
 --- datei tw.dh
 DIM twAus AS STRING
 DIM twCode AS INTEGER
@@ -117,7 +117,7 @@ rueckgabe 0
 IMPORT "tw.dh"
 tw(["suche", "-c", "apfel"], "apfel" + CHR$(10) + "birne" + CHR$(10) + "apfelmus" + CHR$(10))
 --- argumente
-{sammlung}/../../examples/textwerk/main.dh
+{sammlung}/../../../examples/textwerk/main.dh
 --- datei tw.dh
 SUB tw(args AS ARRAY OF STRING, eingabe AS STRING)
     DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", args)
@@ -143,7 +143,7 @@ END SUB
 IMPORT "tw.dh"
 tw(["csv", "daten/excel.csv", "--gruppe", "Kunde", "--summe", "Betrag"], "")
 --- argumente
-{sammlung}/../../examples/textwerk/main.dh
+{sammlung}/../../../examples/textwerk/main.dh
 --- datei tw.dh
 SUB tw(args AS ARRAY OF STRING, eingabe AS STRING)
     DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", args)
@@ -177,7 +177,7 @@ rueckgabe 0
 IMPORT "tw.dh"
 tw(["zaehle", "daten/a.txt", "daten/b.txt"], "")
 --- argumente
-{sammlung}/../../examples/textwerk/main.dh
+{sammlung}/../../../examples/textwerk/main.dh
 --- datei tw.dh
 SUB tw(args AS ARRAY OF STRING, eingabe AS STRING)
     DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", args)
@@ -213,7 +213,7 @@ tw(["suche", "-x", "apfel"])
 tw(["suche", "(offen"])
 tw(["gibtsnicht"])
 --- argumente
-{sammlung}/../../examples/textwerk/main.dh
+{sammlung}/../../../examples/textwerk/main.dh
 --- datei tw.dh
 SUB tw(args AS ARRAY OF STRING)
     DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", args)

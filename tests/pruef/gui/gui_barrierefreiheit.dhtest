@@ -222,7 +222,7 @@ PRINT "wert gesetzt "; (INSTR(leser, "WERT: Anna") >= 0)
 IF PROCESS_CODE(ps) <> 0 THEN PRINT leser
 PRINT kindAus;
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/uialeser.dh"
+IMPORT "{sammlung}/../_hilfen/uialeser.dh"
 --- datei formular.dh
 IMPORT "gui"
 SCREEN(400, 300, ARG$(0), 1)
@@ -315,7 +315,7 @@ DIM kindAus AS STRING : kindAus = auslesen$(kind, 40000)
 IF INSTR(auslesenFehler, "Kein Fenster moeglich") >= 0 THEN PRINT "UEBERSPRINGEN: kein Fenster moeglich"
 PRINT kindAus;
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/uialeser.dh"
+IMPORT "{sammlung}/../_hilfen/uialeser.dh"
 --- datei sprecher.dh
 SCREEN(400, 300, ARG$(0), 1)
 SET_WINDOW_POS(-3000, -3000)

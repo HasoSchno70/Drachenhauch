@@ -21,9 +21,9 @@
 IMPORT "helfer.dh"
 PRINT sende$(skript$(), "klick.dh", "mausweg", "")
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/fenstersender.dh"
+IMPORT "{sammlung}/../_hilfen/fenstersender.dh"
 FUNCTION skript$() AS STRING
-    RETURN "{sammlung}/_hilfen/fenstersender.ps1"
+    RETURN "{sammlung}/../_hilfen/fenstersender.ps1"
 END FUNCTION
 --- datei klick.dh
 IMPORT "gui"
@@ -68,9 +68,9 @@ geklickt
 IMPORT "helfer.dh"
 PRINT sende$(skript$(), "lage.dh", "mausweg", "")
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/fenstersender.dh"
+IMPORT "{sammlung}/../_hilfen/fenstersender.dh"
 FUNCTION skript$() AS STRING
-    RETURN "{sammlung}/_hilfen/fenstersender.ps1"
+    RETURN "{sammlung}/../_hilfen/fenstersender.ps1"
 END FUNCTION
 --- datei lage.dh
 SCREEN(300, 200, ARG$(0), 1)

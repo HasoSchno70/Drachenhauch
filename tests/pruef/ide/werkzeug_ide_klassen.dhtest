@@ -12,7 +12,7 @@ FOR prI = 0 TO GUI_LISTBOX_COUNT(lstGliederung) - 1
     PRINT "|"; GUI_LISTBOX_ITEM(lstGliederung, prI); "|"
 NEXT
 EXIT(0)
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- umgebung
 DHRT_FRAMES=300
 DH_IDE_WURZEL={fall}
@@ -38,7 +38,7 @@ NEXT
 ' Eine Klasse allein: nichts zu sagen.
 PRINT "allein "; MAPSIZE(ueberschreibTexte("CLASS A" + NL + "    SUB s()" + NL + "    END SUB" + NL + "END CLASS", []))
 EXIT(0)
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- umgebung
 DHRT_FRAMES=300
 DH_IDE_WURZEL={fall}
@@ -64,7 +64,7 @@ FOR EACH prSt IN zaehlStellen
     PRINT prSt.zeile; " "; prSt.name; ": "; prSt.text
 NEXT
 EXIT(0)
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- datei hund.dh
 CLASS Hund EXTENDS Tier
     FUNCTION laut() AS STRING
@@ -115,7 +115,7 @@ DIM prNeu AS STRING : prNeu = "CLASS Dackel EXTENDS Hund" + NL + "    SUB gehen(
 prF = [NEW UeQuelle("dackel.dh", CODE_CLASSES$(prNeu))]
 PRINT MAPGET(ueberschreibTexte(prQ, prF), "2")
 EXIT(0)
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- umgebung
 DHRT_FRAMES=300
 DH_IDE_WURZEL={fall}
@@ -138,7 +138,7 @@ FOR prI = 0 TO LEN(schnipselListe) - 1
 NEXT
 PRINT "doppelt "; prDoppelt
 EXIT(0)
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- umgebung
 DHRT_FRAMES=300
 DH_IDE_WURZEL={fall}
@@ -158,7 +158,7 @@ doppelt 0
 === ohne reiter und ohne lauf sind sichern und stoppen gesperrt
 PRINT "sichern "; GUI_TOOLBAR_ENABLED(leiste, wzSichern); " stoppen "; GUI_TOOLBAR_ENABLED(leiste, wzStopp); " starten "; GUI_TOOLBAR_ENABLED(leiste, wzSichern + 2)
 EXIT(0)
---- programm ../../ide/ide.dh nach DIM wzc AS INTEGER : wzc = GUI_TOOLBAR_CLICKED(leiste)
+--- programm ../../../ide/ide.dh nach DIM wzc AS INTEGER : wzc = GUI_TOOLBAR_CLICKED(leiste)
 --- umgebung
 DHRT_FRAMES=300
 DH_IDE_WURZEL={fall}
@@ -169,7 +169,7 @@ sichern FALSE stoppen FALSE starten TRUE
 === mit einem reiter laesst sich sichern
 PRINT "sichern "; GUI_TOOLBAR_ENABLED(leiste, wzSichern); " stoppen "; GUI_TOOLBAR_ENABLED(leiste, wzStopp)
 EXIT(0)
---- programm ../../ide/ide.dh nach DIM wzc AS INTEGER : wzc = GUI_TOOLBAR_CLICKED(leiste)
+--- programm ../../../ide/ide.dh nach DIM wzc AS INTEGER : wzc = GUI_TOOLBAR_CLICKED(leiste)
 --- datei a.dh
 PRINT "hallo"
 --- argumente
@@ -186,7 +186,7 @@ PRINT "massstab "; uiMassstab; " gui "; GUI_SCALE_GET()
 PRINT "breite "; schirmB() = INT(SCREENWIDTH() / 1.5); " "; GUI_GET_W(lstAusgabe) < SCREENWIDTH()
 PRINT "logisch "; logisch(300)
 EXIT(0)
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- datei _programm/ide.json
 {"massstab": 1.5}
 --- umgebung
@@ -214,7 +214,7 @@ PRINT "satz passt "; NOT GUI_VISIBLE(lblWkKuerzel) OR GUI_GET_Y(lblWkKuerzel) + 
 PRINT "probleme |"; GUI_TEXT(lblProbleme); "|"
 PRINT "zuletzt "; zuletztText$("C:/Spiele/neu/held.dh")
 EXIT(0)
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- datei _programm/ide.json
 {"karte": true}
 --- umgebung
@@ -240,7 +240,7 @@ schnipselLaden()
 prF = schnipselNr("for")
 PRINT "wieder: |"; schnipselListe[prF].herkunft; "| "; LEFT$(schnipselListe[prF].text, 16)
 EXIT(0)
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- umgebung
 DHRT_FRAMES=300
 DH_IDE_WURZEL={fall}
@@ -259,7 +259,7 @@ tastenAnwenden()
 DIM prB AS INTEGER : prB = befehlNr("plugin:probe:eins")
 PRINT "angewendet "; befehle[prB].kuerzel; " vorgabe "; befehle[prB].vorgabe
 EXIT(0)
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- umgebung
 DHRT_FRAMES=300
 DH_IDE_WURZEL={fall}

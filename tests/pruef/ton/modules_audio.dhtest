@@ -387,7 +387,7 @@ AUDIO_MUSIC_SEEK(5.0)
 SLEEP(800)
 PRINT "nach dem sprung " ; AUDIO_MUSIC_POSITION() > 4.0
 --- argumente
-{sammlung}/../../examples/assets/ambient.ogg
+{sammlung}/../../../examples/assets/ambient.ogg
 --- erwartet
 laeuft TRUE
 am anfang TRUE
@@ -405,6 +405,6 @@ CATCH e
     PRINT e
 END TRY
 --- argumente
-{sammlung}/../../examples/assets/demo.mod
+{sammlung}/../../../examples/assets/demo.mod
 --- enthaelt
 MOD-/XM-Musik laesst sich nicht auf eine Sekunde setzen

@@ -21,7 +21,7 @@ PRINT "gleich "; direkt = dlAus
 PRINT "codes "; direktCode; " "; dlCode
 PRINT "zeilen "; LEN(SPLIT$(TRIM$(direkt), CHR$(10)))
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- datei prog.dh
 CONST GRENZE = 3
 CONST TEXT_A AS STRING = "A"

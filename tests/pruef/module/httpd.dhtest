@@ -15,7 +15,7 @@ PRINT rumpf$(a)
 PRINT kopf$(a, "Content-Type")
 serverEnde()
 --- datei klient.dh
-IMPORT "{sammlung}/_hilfen/httpklient.dh"
+IMPORT "{sammlung}/../_hilfen/httpklient.dh"
 
 --- datei srv.dh
 IMPORT "httpd"
@@ -40,7 +40,7 @@ DIM port AS INTEGER : port = serverStarten("srv.dh")
 PRINT rumpf$(holen$(port, "GET", "/mess/raum", "", ""))
 serverEnde()
 --- datei klient.dh
-IMPORT "{sammlung}/_hilfen/httpklient.dh"
+IMPORT "{sammlung}/../_hilfen/httpklient.dh"
 
 --- datei srv.dh
 IMPORT "httpd"
@@ -64,7 +64,7 @@ DIM port AS INTEGER : port = serverStarten("srv.dh")
 PRINT rumpf$(holen$(port, "GET", "/x?raum=Wohn%20zimmer&grad=21", "", ""))
 serverEnde()
 --- datei klient.dh
-IMPORT "{sammlung}/_hilfen/httpklient.dh"
+IMPORT "{sammlung}/../_hilfen/httpklient.dh"
 
 --- datei srv.dh
 IMPORT "httpd"
@@ -88,7 +88,7 @@ DIM port AS INTEGER : port = serverStarten("srv.dh")
 PRINT rumpf$(holen$(port, "GET", "/x", "", ""))
 serverEnde()
 --- datei klient.dh
-IMPORT "{sammlung}/_hilfen/httpklient.dh"
+IMPORT "{sammlung}/../_hilfen/httpklient.dh"
 
 --- datei srv.dh
 IMPORT "httpd"
@@ -110,7 +110,7 @@ DIM port AS INTEGER : port = serverStarten("srv.dh")
 PRINT rumpf$(holen$(port, "POST", "/", "X-Test: wert", "a=1&b=2"))
 serverEnde()
 --- datei klient.dh
-IMPORT "{sammlung}/_hilfen/httpklient.dh"
+IMPORT "{sammlung}/../_hilfen/httpklient.dh"
 
 --- datei srv.dh
 IMPORT "httpd"
@@ -133,7 +133,7 @@ DIM port AS INTEGER : port = serverStarten("srv.dh")
 PRINT rumpf$(holen$(port, "GET", "/", "User-Agent: Drachenhauch-Test", ""))
 serverEnde()
 --- datei klient.dh
-IMPORT "{sammlung}/_hilfen/httpklient.dh"
+IMPORT "{sammlung}/../_hilfen/httpklient.dh"
 
 --- datei srv.dh
 IMPORT "httpd"
@@ -156,7 +156,7 @@ DIM a AS STRING : a = holen$(port, "GET", "/", "", "")
 PRINT status(a); " "; rumpf$(a)
 serverEnde()
 --- datei klient.dh
-IMPORT "{sammlung}/_hilfen/httpklient.dh"
+IMPORT "{sammlung}/../_hilfen/httpklient.dh"
 
 --- datei srv.dh
 IMPORT "httpd"
@@ -181,7 +181,7 @@ FOR i = 0 TO 2
 NEXT
 serverEnde()
 --- datei klient.dh
-IMPORT "{sammlung}/_hilfen/httpklient.dh"
+IMPORT "{sammlung}/../_hilfen/httpklient.dh"
 
 --- datei srv.dh
 IMPORT "httpd"
@@ -212,7 +212,7 @@ PRINT rumpf$(a)
 PRINT LEFT$(kopf$(a, "Content-Type"), 9)
 serverEnde()
 --- datei klient.dh
-IMPORT "{sammlung}/_hilfen/httpklient.dh"
+IMPORT "{sammlung}/../_hilfen/httpklient.dh"
 
 --- datei web/index.html
 <h1>Start</h1>
@@ -238,7 +238,7 @@ DIM port AS INTEGER : port = serverStarten("srv.dh")
 PRINT rumpf$(holen$(port, "GET", "/unter/a.txt", "", ""))
 serverEnde()
 --- datei klient.dh
-IMPORT "{sammlung}/_hilfen/httpklient.dh"
+IMPORT "{sammlung}/../_hilfen/httpklient.dh"
 
 --- datei web/unter/a.txt
 tief
@@ -268,7 +268,7 @@ PRINT status(a)
 PRINT INSTR(a, "GEHEIM") < 0
 serverEnde()
 --- datei klient.dh
-IMPORT "{sammlung}/_hilfen/httpklient.dh"
+IMPORT "{sammlung}/../_hilfen/httpklient.dh"
 
 --- datei geheim.txt
 GEHEIM
@@ -298,7 +298,7 @@ PRINT status(holen$(port, "GET", "/gibtsnicht.html", "", ""))
 serverEnde()
 PRINT "server: " + TRIM$(srvAusgabe)
 --- datei klient.dh
-IMPORT "{sammlung}/_hilfen/httpklient.dh"
+IMPORT "{sammlung}/../_hilfen/httpklient.dh"
 
 --- datei web/index.html
 <h1>Start</h1>
@@ -323,7 +323,7 @@ DIM port AS INTEGER : port = serverStarten("srv.dh")
 PRINT rumpf$(holen$(port, "GET", "/egal", "", ""))
 serverEnde()
 --- datei klient.dh
-IMPORT "{sammlung}/_hilfen/httpklient.dh"
+IMPORT "{sammlung}/../_hilfen/httpklient.dh"
 
 --- datei web/unter/a.txt
 tief
@@ -349,7 +349,7 @@ PRINT port > 0
 serverEnde()
 PRINT INSTR(srvFehler, "erst HTTPD_ACCEPT") >= 0
 --- datei klient.dh
-IMPORT "{sammlung}/_hilfen/httpklient.dh"
+IMPORT "{sammlung}/../_hilfen/httpklient.dh"
 
 --- datei srv.dh
 IMPORT "httpd"
@@ -369,7 +369,7 @@ PRINT port > 0
 serverEnde()
 PRINT INSTR(srvFehler, "keine Anfrage") >= 0
 --- datei klient.dh
-IMPORT "{sammlung}/_hilfen/httpklient.dh"
+IMPORT "{sammlung}/../_hilfen/httpklient.dh"
 
 --- datei srv.dh
 IMPORT "httpd"
@@ -400,7 +400,7 @@ PRINT PROCESS_CODE(p2) <> 0
 PRINT INSTR(fehler, "nicht belegbar") >= 0
 PROCESS_KILL(srvProzess)
 --- datei klient.dh
-IMPORT "{sammlung}/_hilfen/httpklient.dh"
+IMPORT "{sammlung}/../_hilfen/httpklient.dh"
 
 --- datei srv.dh
 IMPORT "httpd"

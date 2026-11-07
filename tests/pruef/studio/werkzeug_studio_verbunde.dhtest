@@ -50,11 +50,11 @@ IMPORT "json"
 IMPORT "regex"
 IMPORT "imgfx"
 IMPORT "db"
-IMPORT "{sammlung}/../../studio/sprache.dh"
-IMPORT "{sammlung}/../../studio/bibliothek.dh"
-IMPORT "{sammlung}/../../studio/modell.dh"
-IMPORT "{sammlung}/../../studio/projekt.dh"
-IMPORT "{sammlung}/../../studio/datenbank.dh"
+IMPORT "{sammlung}/../../../studio/sprache.dh"
+IMPORT "{sammlung}/../../../studio/bibliothek.dh"
+IMPORT "{sammlung}/../../../studio/modell.dh"
+IMPORT "{sammlung}/../../../studio/projekt.dh"
+IMPORT "{sammlung}/../../../studio/datenbank.dh"
 --- erwartet
 verweise kunde.name,kunde.ort
 mit nr,kunde,betrag,kunde.name,kunde.ort
@@ -89,7 +89,7 @@ FOR EACH z IN slAnfang(log, "ausgabe ")
     IF INSTR(z, "▶") < 0 AND INSTR(z, "■") < 0 AND INSTR(z, "WARNING") < 0 THEN PRINT z
 NEXT
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- vorher
 IMPORT "db"
 DIM db AS DB_CONN : db = DB_OPEN("proj/daten.sqlite")
@@ -99,7 +99,7 @@ DB_EXEC(db, "INSERT INTO kunden (name, ort) VALUES ('Anna', 'Bonn'), ('Bert', 'K
 DB_EXEC(db, "INSERT INTO rechnungen (nr, kunde, betrag) VALUES ('R1', 2, 1250), ('R2', 1, 200), ('R3', 3, 300), ('R4', NULL, 400)")
 DB_CLOSE(db)
 --- datei laeufer.dh
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- datei proj/projekt.dhstudio
 {"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"},{"art":"datenbank","name":"Daten","schema":"Daten.dhdb"}]}
@@ -187,10 +187,10 @@ PRINT "spalten "; JSON_GET_STRING(j, "widgets.0.studio_spalten")
 PRINT "kopf "; JSON_GET_STRING(j, "widgets.0.table.headers.0"); " "; JSON_GET_STRING(j, "widgets.0.table.headers.1"); " "; JSON_LEN(j, "widgets.0.table.headers")
 PRINT "sortieren "; JSON_GET_STRING(j, "widgets.0.studio_sortieren")
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
 IMPORT "json"
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- datei proj/projekt.dhstudio
 {"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"},{"art":"datenbank","name":"Daten","schema":"Daten.dhdb"}]}

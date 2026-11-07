@@ -194,7 +194,7 @@ SETENV("DHRT_OHNE_VERSCHMELZEN", "1")
 dlStarten(["--verschmolzen", "prog.dh"])
 PRINT "ohne: ["; TRIM$(dlAus); "]"
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- datei prog.dh
 SUB lauf(a AS INTEGER, b AS INTEGER)
     DIM c AS INTEGER

@@ -95,7 +95,7 @@ PRINT FIRMATA_ANALOG_READ(fbH, 0)
 FIRMATA_ANALOG_WRITE(fbH, 20, 300)
 PRINT "erweitert: " + fbEmpfangen$()
 --- datei board.dh
-IMPORT "{sammlung}/_hilfen/firmataboard.dh"
+IMPORT "{sammlung}/../_hilfen/firmataboard.dh"
 
 --- erwartet
 schreiben: F4 0D 01 91 20 00 91 30 00 91 10 00
@@ -125,7 +125,7 @@ CATCH e
     PRINT e
 END TRY
 --- datei board.dh
-IMPORT "{sammlung}/_hilfen/firmataboard.dh"
+IMPORT "{sammlung}/../_hilfen/firmataboard.dh"
 
 --- erwartet
 vorgabe: F0 70 09 20 04 60 12 F7
@@ -149,7 +149,7 @@ CATCH e
     PRINT e
 END TRY
 --- datei board.dh
-IMPORT "{sammlung}/_hilfen/firmataboard.dh"
+IMPORT "{sammlung}/../_hilfen/firmataboard.dh"
 
 --- erwartet
 erstes: F0 78 00 00 F7 F0 76 3C 00 00 00 2F 01 F7
@@ -174,7 +174,7 @@ CATCH e
 END TRY
 PRINT MILLIS() - t0 >= 900
 --- datei board.dh
-IMPORT "{sammlung}/_hilfen/firmataboard.dh"
+IMPORT "{sammlung}/../_hilfen/firmataboard.dh"
 
 --- erwartet
 [18 255]
@@ -206,7 +206,7 @@ PRINT "stopp: " + fbEmpfangen$()
 FIRMATA_I2C_REQUEST(fbH, &H2A5, 7, 1)
 PRINT "zehn bit: " + fbEmpfangen$()
 --- datei board.dh
-IMPORT "{sammlung}/_hilfen/firmataboard.dh"
+IMPORT "{sammlung}/../_hilfen/firmataboard.dh"
 
 --- erwartet
 frage: F0 78 00 00 F7 F0 76 48 10 02 00 F7
@@ -228,7 +228,7 @@ SLEEP(30)
 PRINT FIRMATA_FIRMWARE$(fbH)
 PRINT "gefragt: [" + fbEmpfangen$() + "]"
 --- datei board.dh
-IMPORT "{sammlung}/_hilfen/firmataboard.dh"
+IMPORT "{sammlung}/../_hilfen/firmataboard.dh"
 
 --- erwartet
 St 2.5
@@ -244,7 +244,7 @@ CATCH e
 END TRY
 PRINT "gefragt: " + fbEmpfangen$()
 --- datei board.dh
-IMPORT "{sammlung}/_hilfen/firmataboard.dh"
+IMPORT "{sammlung}/../_hilfen/firmataboard.dh"
 
 --- erwartet
 FIRMATA_FIRMWARE$: keine Antwort -- laeuft Firmata auf dem Board?
@@ -282,7 +282,7 @@ PRINT "halt: " + fbEmpfangen$()
 FIRMATA_STEPPER_CONFIG(fbH, 1, "vierdraht", 8, 9, 10, 11)
 PRINT "vier: " + fbEmpfangen$()
 --- datei board.dh
-IMPORT "{sammlung}/_hilfen/firmataboard.dh"
+IMPORT "{sammlung}/../_hilfen/firmataboard.dh"
 
 --- erwartet
 einrichten: F0 62 00 00 10 02 03 F7
@@ -323,7 +323,7 @@ CATCH e
     PRINT e
 END TRY
 --- datei board.dh
-IMPORT "{sammlung}/_hilfen/firmataboard.dh"
+IMPORT "{sammlung}/../_hilfen/firmataboard.dh"
 
 --- erwartet
 FIRMATA_STEPPER_MOVE: Motor 1 ist nicht eingerichtet -- erst FIRMATA_STEPPER_CONFIG
@@ -343,7 +343,7 @@ CATCH e
     PRINT e
 END TRY
 --- datei board.dh
-IMPORT "{sammlung}/_hilfen/firmataboard.dh"
+IMPORT "{sammlung}/../_hilfen/firmataboard.dh"
 
 --- erwartet
 FIRMATA_UPDATE: die Verbindung zum Board ist beendet
@@ -387,7 +387,7 @@ PRINT "rueckgabe "; PROCESS_CODE(p)
 PRINT INSTR(bekommen, "F40D01") >= 0
 PRINT INSTR(bekommen, "912000910000912000910000912000910000") >= 0
 --- argumente
-{sammlung}/../../examples/147_firmata.dh
+{sammlung}/../../../examples/147_firmata.dh
 --- erwartet
 Firmware:  StT 2.5
 A0:  426

@@ -20,7 +20,7 @@ DIM js AS STRING : js = JOIN$(READLINES(w + "playground.js"), CHR$(10))
 PRINT "schreibt program.dh "; INSTR(js, "/program.dh") >= 0
 PRINT "laedt neu "; INSTR(js, "location.reload") >= 0
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- erwartet
 canvas TRUE
 editor TRUE
@@ -36,7 +36,7 @@ PRINT "cfg "; INSTR(src, "target_os = " + CHR$(34) + "emscripten" + CHR$(34)) >=
 PRINT "quelle "; INSTR(src, "/program.dh" + CHR$(34)) >= 0
 PRINT "rueckfall "; INSTR(src, "/program.dhc") >= 0
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- erwartet
 cfg TRUE
 quelle TRUE
@@ -86,7 +86,7 @@ END IF
 PRINT TRIM$(aus)
 PRINT "rueckgabe "; PROCESS_CODE(p)
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- datei probe.py
 import contextlib, importlib.util, io, sys, tempfile
 from pathlib import Path

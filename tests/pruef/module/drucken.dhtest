@@ -221,7 +221,7 @@ PRINT "name steht links "; (ABS(pdfStelleXmm("Anna Berger") - 20.0) < 1.0)
 PRINT "betrag steht rechts "; (ABS(pdfStelleXmm("85,39") - sollX) < 1.0)
 PRINT "standard unveraendert "; (PRINTER_DEFAULT$() = vorher)
 --- datei leser.dh
-IMPORT "{sammlung}/_hilfen/pdftext.dh"
+IMPORT "{sammlung}/../_hilfen/pdftext.dh"
 --- system windows
 --- erwartet
 seiten 2
@@ -313,7 +313,7 @@ PRINT "gedreht "; gedreht
 PRINT "flaechen "; pdfWortZahl(w, "f") + pdfWortZahl(w, "f*") >= 2
 PRINT "standard unveraendert "; (PRINTER_DEFAULT$() = vorher)
 --- datei leser.dh
-IMPORT "{sammlung}/_hilfen/pdftext.dh"
+IMPORT "{sammlung}/../_hilfen/pdftext.dh"
 --- system windows
 --- erwartet
 text TRUE
@@ -389,7 +389,7 @@ NEXT
 PRINT "gefunden "; gefunden
 PRINT "standard unveraendert "; (PRINTER_DEFAULT$() = vorher)
 --- datei leser.dh
-IMPORT "{sammlung}/_hilfen/pdftext.dh"
+IMPORT "{sammlung}/../_hilfen/pdftext.dh"
 --- system windows
 --- erwartet
 strichelung 2 zu 1 TRUE

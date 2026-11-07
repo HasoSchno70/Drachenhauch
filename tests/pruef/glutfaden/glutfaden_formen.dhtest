@@ -70,7 +70,7 @@ FOR i = 0 TO LEN(fu) - 3 STEP 3
     zeile("fuellen " + STR$(fu[i]) + " " + STR$(fu[i + 1]) + " " + STR$(fu[i + 2]), kern.fuellung(e, fu[i], fu[i + 1], fu[i + 2]))
 NEXT
 --- datei k.dh
-IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/../../../examples/glutfaden/kern/kern.dh" AS kern
 
 --- erwartet
 linie 0 0 9 0 10 10001000 10011000 10021000 10031000 10041000 10051000 10061000 10071000 10081000 10091000

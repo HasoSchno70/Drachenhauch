@@ -8,7 +8,7 @@
 --- langsam
 === die vorschau ist breit und waechst mit dem fenster
 DIM prBild AS INTEGER : prBild = 0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 40 THEN
@@ -33,7 +33,7 @@ spiel.dh
 --- umgebung
 DHRT_FRAMES=200
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 zaehler = 1

@@ -29,7 +29,7 @@ PRINT BUFFER_LEN(pythonBytes("b''")), pythonText$("''") = ""
 pythonAusfuehren(!"def quadrat(a):\n    return a * a\n")
 PRINT pythonGanz("quadrat(12)")
 --- datei py.dh
-IMPORT "{sammlung}/../../examples/python/python.dh"
+IMPORT "{sammlung}/../../../examples/python/python.dh"
 ' Uebersprungen wird NUR, wenn kein Python da ist -- startet eins nicht,
 ' ist das ein Fehler, sonst verdeckte das Ueberspringen ihn.
 SUB pyOderUeberspringen()
@@ -85,7 +85,7 @@ END TRY
 ' Danach geht es weiter wie vorher.
 PRINT pythonGanz("6 * 7")
 --- datei py.dh
-IMPORT "{sammlung}/../../examples/python/python.dh"
+IMPORT "{sammlung}/../../../examples/python/python.dh"
 ' Uebersprungen wird NUR, wenn kein Python da ist -- startet eins nicht,
 ' ist das ein Fehler, sonst verdeckte das Ueberspringen ihn.
 SUB pyOderUeberspringen()
@@ -130,7 +130,7 @@ NEXT
 PRINT TRIM$(zeile)
 PRINT pythonZahl("np.frombuffer(roh, '<f8').mean()")
 --- datei py.dh
-IMPORT "{sammlung}/../../examples/python/python.dh"
+IMPORT "{sammlung}/../../../examples/python/python.dh"
 ' Uebersprungen wird NUR, wenn kein Python da ist -- startet eins nicht,
 ' ist das ein Fehler, sonst verdeckte das Ueberspringen ihn.
 SUB pyOderUeberspringen()
@@ -157,7 +157,7 @@ CATCH e
     PRINT e
 END TRY
 --- datei py.dh
-IMPORT "{sammlung}/../../examples/python/python.dh"
+IMPORT "{sammlung}/../../../examples/python/python.dh"
 ' Uebersprungen wird NUR, wenn kein Python da ist -- startet eins nicht,
 ' ist das ein Fehler, sonst verdeckte das Ueberspringen ihn.
 SUB pyOderUeberspringen()

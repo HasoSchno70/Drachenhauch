@@ -50,15 +50,15 @@ IMPORT "regex"
 IMPORT "imgfx"
 IMPORT "db"
 IMPORT "pdf"
-IMPORT "{sammlung}/../../studio/sprache.dh"
-IMPORT "{sammlung}/../../studio/bibliothek.dh"
-IMPORT "{sammlung}/../../studio/modell.dh"
-IMPORT "{sammlung}/../../studio/projekt.dh"
-IMPORT "{sammlung}/../../studio/datenbank.dh"
-IMPORT "{sammlung}/../../studio/berichte_laufzeit.dh"
-IMPORT "{sammlung}/../../studio/berichte.dh"
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
-IMPORT "{sammlung}/_hilfen/berichtprojekt.dh"
+IMPORT "{sammlung}/../../../studio/sprache.dh"
+IMPORT "{sammlung}/../../../studio/bibliothek.dh"
+IMPORT "{sammlung}/../../../studio/modell.dh"
+IMPORT "{sammlung}/../../../studio/projekt.dh"
+IMPORT "{sammlung}/../../../studio/datenbank.dh"
+IMPORT "{sammlung}/../../../studio/berichte_laufzeit.dh"
+IMPORT "{sammlung}/../../../studio/berichte.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/berichtprojekt.dh"
 --- erwartet
 gruppe 1
 berichtskopf 20 (1), seitenkopf 8 (2), gruppenkopf0 10 (3), gruppenkopf1 8 (0), detail 6 (2), gruppenfuss1 8 (0), gruppenfuss0 10 (3), seitenfuss 8 (1), berichtsfuss 10 (2)
@@ -125,10 +125,10 @@ PRINT brEl$(j, 3, 0)
 PRINT brEl$(j, 3, 2)
 IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
-IMPORT "{sammlung}/_hilfen/berichtprojekt.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/berichtprojekt.dh"
 IMPORT "json"
 slStudio = ARG$(0)
 --- erwartet
@@ -186,10 +186,10 @@ PRINT brEl$(j, 6, 2)
 PRINT brEl$(j, 3, 2)
 IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
-IMPORT "{sammlung}/_hilfen/berichtprojekt.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/berichtprojekt.dh"
 IMPORT "json"
 slStudio = ARG$(0)
 --- erwartet
@@ -246,10 +246,10 @@ PRINT brBaender$(j)
 PRINT brEl$(j, 3, 0)
 IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
-IMPORT "{sammlung}/_hilfen/berichtprojekt.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/berichtprojekt.dh"
 IMPORT "json"
 slStudio = ARG$(0)
 --- erwartet
@@ -326,10 +326,10 @@ PRINT brEl$(j, 2, 1)
 PRINT brEl$(j, 2, 2)
 IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
-IMPORT "{sammlung}/_hilfen/berichtprojekt.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/berichtprojekt.dh"
 IMPORT "json"
 slStudio = ARG$(0)
 --- erwartet
@@ -415,10 +415,10 @@ aus = aus + slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
 PRINT "nach strg+z "; slHat(log, "bericht gruppe dazu rechnung"); " "; slHat(log, "bericht rueckgaengig 0"); " "; JSON_LEN(brBericht(), "gruppen")
 IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
-IMPORT "{sammlung}/_hilfen/berichtprojekt.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/berichtprojekt.dh"
 IMPORT "json"
 slStudio = ARG$(0)
 --- erwartet

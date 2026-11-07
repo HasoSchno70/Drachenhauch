@@ -6,7 +6,7 @@
 === ganze sammlung, dann nur der fall unter der marke
 DIM prBild AS INTEGER : prBild = 0
 DIM prSchritt AS INTEGER : prSchritt = 0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 40 THEN befehl("pruefsammlung") : prSchritt = 1
@@ -35,7 +35,7 @@ proben.dhtest
 --- umgebung
 DHRT_FRAMES=900
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- vorher
 ' Die Sammlung schreibt der Fall selbst: ihre Zeilen beginnen mit === und
@@ -66,7 +66,7 @@ pr eintraege 0
 ' seit 2026-09-27; die Pruefsammlung jetzt auch.
 DIM prBild AS INTEGER : prBild = 0
 DIM prSchritt AS INTEGER : prSchritt = 0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 30 THEN
@@ -87,7 +87,7 @@ tests.dhtest
 --- umgebung
 DHRT_FRAMES=900
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei rechnen.dh
 FUNCTION mal(a AS INTEGER, b AS INTEGER) AS INTEGER
@@ -96,7 +96,7 @@ END FUNCTION
 --- vorher
 DIM q AS STRING : q = CHR$(34)
 DIM t AS ARRAY OF STRING
-t = ["=== mal rechnet", "IMPORT " + q + "r.dh" + q, "PRINT mal(6, 7)", "--- datei r.dh", "IMPORT " + q + "{sammlung}/rechnen.dh" + q, "", "--- erwartet", "42", ""]
+t = ["=== mal rechnet", "IMPORT " + q + "r.dh" + q, "PRINT mal(6, 7)", "--- datei r.dh", "IMPORT " + q + "{sammlung}/../rechnen.dh" + q, "", "--- erwartet", "42", ""]
 WRITEALL("tests.dhtest", JOIN$(t, CHR$(10)))
 --- nachher
 DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")

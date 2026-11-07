@@ -71,8 +71,8 @@ zeile("spiegel 9 9 4 2 5", kern.spiegelZellen(2, 5, 9, 9, 4))
 zeile("spiegel 9 9 4 4 4", kern.spiegelZellen(4, 4, 9, 9, 4))
 zeile("spiegel 9 9 4 8 1", kern.spiegelZellen(8, 1, 9, 9, 4))
 --- datei k.dh
-IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
-IMPORT "{sammlung}/_hilfen/glutfaden.dh"
+IMPORT "{sammlung}/../../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/../_hilfen/glutfaden.dh"
 
 --- erwartet
 vieleck 0 2,2 12,4 6,11 26 10021002 10021003 10031002 10031004 10031005 10041002 10041006 10041007 10051003 10051008 10051009 10061003 10061010 10061011 10071003 10071010 10081003 10081009 10091003 10091007 10091008 10101004 10101006 10111004 10111005 10121004
@@ -158,10 +158,10 @@ FOR EACH n IN [5, 20, 60]
     PRINT "selten "; n; " ["; JOIN$(kern.selteneErsetzungen(m, n), ","); "]"
 NEXT
 --- argumente
-{sammlung}/../../examples/glutfaden
+{sammlung}/../../../examples/glutfaden
 --- datei k.dh
-IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
-IMPORT "{sammlung}/_hilfen/glutfaden.dh"
+IMPORT "{sammlung}/../../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/../_hilfen/glutfaden.dh"
 
 --- erwartet
 FF0000 FE0000 0.207852
@@ -241,8 +241,8 @@ PRINT "lasso "; l.anzahl; " rechteck "; l.istRechteck
 DIM w AS kern.Auswahl : w = kern.auswahlVerschoben(l, 3, 0)
 PRINT "verschoben "; w.anzahl; " "; w.x0; "-"; w.x1
 --- datei k.dh
-IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
-IMPORT "{sammlung}/_hilfen/glutfaden.dh"
+IMPORT "{sammlung}/../../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/../_hilfen/glutfaden.dh"
 
 --- erwartet
 .. .. .. .. .. ..
@@ -317,8 +317,8 @@ kern.pxsSpeichern(m, pfad)
 DIM g AS kern.Muster : g = kern.pxsLaden(pfad)
 PRINT "geladen "; LEN(g.rueckstiche); " "; g.rueckstiche[3].x1; ","; g.rueckstiche[3].y1; " "; g.rueckstiche[3].x2; ","; g.rueckstiche[3].y2; " farbe "; g.rueckstiche[3].farbe
 --- datei k.dh
-IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
-IMPORT "{sammlung}/_hilfen/glutfaden.dh"
+IMPORT "{sammlung}/../../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/../_hilfen/glutfaden.dh"
 
 --- erwartet
 linien 1,1,4,3,11,1,8,3,1,9,4,7,11,9,8,7
@@ -356,8 +356,8 @@ PRINT "wieder offen "; kern.naechsterOffen(m, 0, -1, TRUE)
 ' markieren laesst die Stiche und Stichzahlen stehen
 PRINT "stiche "; m.farben[0].stichzahl
 --- datei k.dh
-IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
-IMPORT "{sammlung}/_hilfen/glutfaden.dh"
+IMPORT "{sammlung}/../../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/../_hilfen/glutfaden.dh"
 
 --- erwartet
 markiert 2
@@ -408,8 +408,8 @@ PRINT "neu: '"; kern.symbolSetzen(m, v, 0, "★"); "' "; m.farben[0].symbol; " o
 ok = v.zurueckNehmen(m)
 PRINT "zurueck "; m.farben[0].symbol
 --- datei k.dh
-IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
-IMPORT "{sammlung}/_hilfen/glutfaden.dh"
+IMPORT "{sammlung}/../../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/../_hilfen/glutfaden.dh"
 
 --- erwartet
 quellen ohne toleranz 0 mit 5 0,3

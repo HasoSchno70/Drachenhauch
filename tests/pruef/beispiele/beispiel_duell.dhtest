@@ -28,7 +28,7 @@ DIM prozesse AS ARRAY OF INTEGER : prozesse = []
 DIM ausgaben AS ARRAY OF STRING : ausgaben = []
 DIM fehler AS STRING
 FUNCTION starten(prog AS STRING, args AS ARRAY OF STRING) AS INTEGER
-    DIM p AS INTEGER : p = PROCESS_START("dhrt", ["run", "{sammlung}/../../examples/duell/" + prog, "--"] + args)
+    DIM p AS INTEGER : p = PROCESS_START("dhrt", ["run", "{sammlung}/../../../examples/duell/" + prog, "--"] + args)
     ARRAY_PUSH(prozesse, p) : ARRAY_PUSH(ausgaben, "")
     RETURN LEN(prozesse) - 1
 END FUNCTION
@@ -112,7 +112,7 @@ DIM prozesse AS ARRAY OF INTEGER : prozesse = []
 DIM ausgaben AS ARRAY OF STRING : ausgaben = []
 DIM fehler AS STRING
 FUNCTION starten(prog AS STRING, args AS ARRAY OF STRING) AS INTEGER
-    DIM p AS INTEGER : p = PROCESS_START("dhrt", ["run", "{sammlung}/../../examples/duell/" + prog, "--"] + args)
+    DIM p AS INTEGER : p = PROCESS_START("dhrt", ["run", "{sammlung}/../../../examples/duell/" + prog, "--"] + args)
     ARRAY_PUSH(prozesse, p) : ARRAY_PUSH(ausgaben, "")
     RETURN LEN(prozesse) - 1
 END FUNCTION
@@ -196,7 +196,7 @@ DIM prozesse AS ARRAY OF INTEGER : prozesse = []
 DIM ausgaben AS ARRAY OF STRING : ausgaben = []
 DIM fehler AS STRING
 FUNCTION starten(prog AS STRING, args AS ARRAY OF STRING) AS INTEGER
-    DIM p AS INTEGER : p = PROCESS_START("dhrt", ["run", "{sammlung}/../../examples/duell/" + prog, "--"] + args)
+    DIM p AS INTEGER : p = PROCESS_START("dhrt", ["run", "{sammlung}/../../../examples/duell/" + prog, "--"] + args)
     ARRAY_PUSH(prozesse, p) : ARRAY_PUSH(ausgaben, "")
     RETURN LEN(prozesse) - 1
 END FUNCTION
@@ -279,7 +279,7 @@ DIM prozesse AS ARRAY OF INTEGER : prozesse = []
 DIM ausgaben AS ARRAY OF STRING : ausgaben = []
 DIM fehler AS STRING
 FUNCTION starten(prog AS STRING, args AS ARRAY OF STRING) AS INTEGER
-    DIM p AS INTEGER : p = PROCESS_START("dhrt", ["run", "{sammlung}/../../examples/duell/" + prog, "--"] + args)
+    DIM p AS INTEGER : p = PROCESS_START("dhrt", ["run", "{sammlung}/../../../examples/duell/" + prog, "--"] + args)
     ARRAY_PUSH(prozesse, p) : ARRAY_PUSH(ausgaben, "")
     RETURN LEN(prozesse) - 1
 END FUNCTION
@@ -357,7 +357,7 @@ DIM prozesse AS ARRAY OF INTEGER : prozesse = []
 DIM ausgaben AS ARRAY OF STRING : ausgaben = []
 DIM fehler AS STRING
 FUNCTION starten(prog AS STRING, args AS ARRAY OF STRING) AS INTEGER
-    DIM p AS INTEGER : p = PROCESS_START("dhrt", ["run", "{sammlung}/../../examples/duell/" + prog, "--"] + args)
+    DIM p AS INTEGER : p = PROCESS_START("dhrt", ["run", "{sammlung}/../../../examples/duell/" + prog, "--"] + args)
     ARRAY_PUSH(prozesse, p) : ARRAY_PUSH(ausgaben, "")
     RETURN LEN(prozesse) - 1
 END FUNCTION

@@ -1,4 +1,4 @@
-' Das Beispiel-Dokument der Sprachserver-Faelle (tests/pruef/dhrt_lsp.dhtest).
+' Das Beispiel-Dokument der Sprachserver-Faelle (tests/pruef/werkzeugkette/dhrt_lsp.dhtest).
 FUNCTION quelle$() AS STRING
     DIM z AS STRING : z = CHR$(10)
     RETURN "' Spieler-Klasse" + z + _

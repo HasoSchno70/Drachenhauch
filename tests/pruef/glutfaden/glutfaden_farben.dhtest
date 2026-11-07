@@ -26,8 +26,8 @@ ELSE
     NEXT
 END IF
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
-CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../../examples/glutfaden/main.dh"
 --- erwartet
 rueckgabe 0
 dunkel:

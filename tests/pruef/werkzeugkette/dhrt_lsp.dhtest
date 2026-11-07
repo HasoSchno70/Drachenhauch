@@ -30,7 +30,7 @@ PRINT "ausloeser "; JSON_LEN(h, c + "completionProvider.triggerCharacters"); " "
 ' shutdown + exit muss den Prozess beenden.
 PRINT "rueckgabe "; lsCode
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/lspklient.dh"
+IMPORT "{sammlung}/../_hilfen/lspklient.dh"
 --- erwartet
 hover TRUE
 definition TRUE
@@ -51,7 +51,7 @@ PRINT "anzahl "; JSON_LEN(d, p)
 PRINT "schwere "; JSON_GET_INT(d, p + ".0.severity"); ", quelle "; JSON_GET_STRING(d, p + ".0.source")
 PRINT "zeile "; JSON_GET_INT(d, p + ".0.range.start.line")
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/lspklient.dh"
+IMPORT "{sammlung}/../_hilfen/lspklient.dh"
 --- erwartet
 anzahl 1
 schwere 1, quelle drachenhauch
@@ -71,8 +71,8 @@ PRINT "nach didOpen "; JSON_LEN(lsDiagnose(0), "params.diagnostics")
 PRINT "nach didChange "; JSON_LEN(lsDiagnose(1), "params.diagnostics")
 PRINT "nach didClose "; JSON_LEN(lsDiagnose(2), "params.diagnostics")
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/lspklient.dh"
-IMPORT "{sammlung}/_hilfen/lspquelle.dh"
+IMPORT "{sammlung}/../_hilfen/lspklient.dh"
+IMPORT "{sammlung}/../_hilfen/lspquelle.dh"
 --- erwartet
 nach didOpen 0
 nach didChange 1
@@ -90,7 +90,7 @@ lsEnde()
 DIM d AS JSON_HANDLE : d = lsDiagnose(0)
 PRINT "anzahl "; JSON_LEN(d, "params.diagnostics"); ", zeile "; JSON_GET_INT(d, "params.diagnostics.0.range.start.line")
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/lspklient.dh"
+IMPORT "{sammlung}/../_hilfen/lspklient.dh"
 --- datei helfer2.dh
 SUB gruss()
     PRINT 1
@@ -125,8 +125,8 @@ FOR k = 0 TO LEN(zeilen) - 1
 NEXT
 PRINT "fundstellen "; liste
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/lspklient.dh"
-IMPORT "{sammlung}/_hilfen/lspquelle.dh"
+IMPORT "{sammlung}/../_hilfen/lspklient.dh"
+IMPORT "{sammlung}/../_hilfen/lspquelle.dh"
 --- erwartet
 definition file:///tmp/test.dh 7:9
 im kommentar null
@@ -149,8 +149,8 @@ PRINT "signatur "; (INSTR(JSON_GET_STRING(h, "result.contents.value"), "FUNCTION
 PRINT "kommentar als doku "; (INSTR(JSON_GET_STRING(lsAntwort(b), "result.contents.value"), "Spieler-Klasse") >= 0)
 PRINT "leerzeichen "; JSON_TYPE(lsAntwort(c), "result")
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/lspklient.dh"
-IMPORT "{sammlung}/_hilfen/lspquelle.dh"
+IMPORT "{sammlung}/../_hilfen/lspklient.dh"
+IMPORT "{sammlung}/../_hilfen/lspquelle.dh"
 --- erwartet
 art markdown
 signatur TRUE
@@ -186,7 +186,7 @@ FOR k = 0 TO 3
     PRINT namen[k]; " "; gefunden
 NEXT
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/lspklient.dh"
+IMPORT "{sammlung}/../_hilfen/lspklient.dh"
 --- erwartet
 ABS TRUE
 STR$ TRUE
@@ -210,8 +210,8 @@ DIM h AS JSON_HANDLE : h = lsAntwort(b)
 DIM alle AS STRING : alle = beschriftungen$(h, "pri")
 PRINT "pri: print "; (INSTR(alle, "|PRINT|") >= 0); ", private "; (INSTR(alle, "|PRIVATE|") >= 0)
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/lspklient.dh"
-IMPORT "{sammlung}/_hilfen/lspquelle.dh"
+IMPORT "{sammlung}/../_hilfen/lspklient.dh"
+IMPORT "{sammlung}/../_hilfen/lspquelle.dh"
 ' Alle Beschriftungen als |a|b|; eine, die nicht mit dem Praefix beginnt,
 ' steht mit "FREMD:" davor in der Ausgabe.
 FUNCTION beschriftungen$(h AS JSON_HANDLE, praefix AS STRING) AS STRING
@@ -270,9 +270,9 @@ NEXT
 PRINT "schluesselwoerter gelesen "; (gesehen > 50)
 PRINT "tasten, farben, konstanten "; MAPHAS(labels, "KEY_SPACE"); " "; MAPHAS(labels, "RED"); " "; MAPHAS(labels, "PI")
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/lspklient.dh"
+IMPORT "{sammlung}/../_hilfen/lspklient.dh"
 --- erwartet
 schluesselwoerter gelesen TRUE
 tasten, farben, konstanten TRUE TRUE TRUE
@@ -305,8 +305,8 @@ FOR k = 0 TO JSON_LEN(h, "result") - 1
     PRINT
 NEXT
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/lspklient.dh"
-IMPORT "{sammlung}/_hilfen/lspquelle.dh"
+IMPORT "{sammlung}/../_hilfen/lspklient.dh"
+IMPORT "{sammlung}/../_hilfen/lspquelle.dh"
 --- erwartet
 Player art 5, bis zeile 6, kinder Init
 add art 12, bis zeile 9
@@ -326,7 +326,7 @@ lsEnde()
 PRINT "vorher "; JSON_TYPE(lsAntwort(a), "result"); ", nachher "; JSON_TYPE(lsAntwort(b), "result")
 PRINT "rueckgabe "; lsCode
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/lspklient.dh"
+IMPORT "{sammlung}/../_hilfen/lspklient.dh"
 --- erwartet
 vorher null, nachher null
 rueckgabe 0
@@ -351,7 +351,7 @@ FOR n = 0 TO JSON_LEN(a, "result") - 1
     PRINT JSON_GET_STRING(a, p + ".title"); " / "; JSON_GET_STRING(a, p + ".kind")
 NEXT
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/lspklient.dh"
+IMPORT "{sammlung}/../_hilfen/lspklient.dh"
 --- erwartet
 faehig TRUE
 Ersetzen durch zaehler / quickfix
@@ -378,7 +378,7 @@ FOR k = 0 TO JSON_LEN(h, "result") - 1
 NEXT
 PRINT "mitglieder "; namen
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/lspklient.dh"
+IMPORT "{sammlung}/../_hilfen/lspklient.dh"
 --- datei q.dh
 CLASS Tier
     ' Rufname.

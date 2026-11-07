@@ -19,7 +19,7 @@ PRINT "ausserhalb "; zielOk
 zielSuchen(0, 10, 0, 0, 1, 0)
 PRINT "himmel "; zielOk
 EXIT(0)
---- programm ../../examples/werkstatt3d/main.dh nach ' --- Hauptschleife -------------------------------------------------------
+--- programm ../../../examples/werkstatt3d/main.dh nach ' --- Hauptschleife -------------------------------------------------------
 --- umgebung
 DHRT_FRAMES=5
 --- erwartet
@@ -46,7 +46,7 @@ PRINT "gelb weg "; klotzBei(3, 0, 3) < 0; " "; anz
 rueckgaengig()
 PRINT "leerer verlauf "; anz
 EXIT(0)
---- programm ../../examples/werkstatt3d/main.dh nach ' --- Hauptschleife -------------------------------------------------------
+--- programm ../../../examples/werkstatt3d/main.dh nach ' --- Hauptschleife -------------------------------------------------------
 --- umgebung
 DHRT_FRAMES=5
 --- erwartet
@@ -65,7 +65,7 @@ laden()
 PRINT "geladen "; anz; " lila da "; kf[klotzBei(-4, 0, 4)]
 PRINT "datei "; LEN(READLINES("bau.txt"))
 EXIT(0)
---- programm ../../examples/werkstatt3d/main.dh nach ' --- Hauptschleife -------------------------------------------------------
+--- programm ../../../examples/werkstatt3d/main.dh nach ' --- Hauptschleife -------------------------------------------------------
 --- umgebung
 DHRT_FRAMES=5
 --- erwartet
@@ -86,7 +86,7 @@ prK = koerper[klotzBei(6, 3, 0)]
 PRINT "gefallen "; PHYS3D_BODY_Y(welt, prK) < 0.7
 PRINT "platte steht "; ABS(PHYS3D_BODY_Y(welt, koerper[0]) - 0.5) < 0.05
 EXIT(0)
---- programm ../../examples/werkstatt3d/main.dh nach ' --- Hauptschleife -------------------------------------------------------
+--- programm ../../../examples/werkstatt3d/main.dh nach ' --- Hauptschleife -------------------------------------------------------
 --- umgebung
 DHRT_FRAMES=5
 --- erwartet
@@ -96,7 +96,7 @@ platte steht TRUE
 
 === das ganze programm laeuft und zeichnet
 ' leer: der Einschub ist ein Kommentar, das Programm laeuft wie gestartet
---- programm ../../examples/werkstatt3d/main.dh nach ' --- Hauptschleife -------------------------------------------------------
+--- programm ../../../examples/werkstatt3d/main.dh nach ' --- Hauptschleife -------------------------------------------------------
 --- umgebung
 DHRT_FRAMES=30
 --- erwartet
@@ -105,7 +105,7 @@ groesse 1100 700
 
 === der einsturz zeichnet mit kanten
 einstuerzen()
---- programm ../../examples/werkstatt3d/main.dh nach ' --- Hauptschleife -------------------------------------------------------
+--- programm ../../../examples/werkstatt3d/main.dh nach ' --- Hauptschleife -------------------------------------------------------
 --- umgebung
 DHRT_FRAMES=20
 --- erwartet

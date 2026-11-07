@@ -288,7 +288,7 @@ MODEL_INSTANCED: tint-Array ist kuerzer als die Matrizen (2 < 3)
 ' Echter Render-Pfad durch DrawMeshInstanced: die Demo laeuft zwei Bilder und
 ' schreibt ein Bildschirmfoto.
 ' (Bis Stufe 45 in test_m3d.py.)
---- programm ../../examples/104_instancing.dh
+--- programm ../../../examples/104_instancing.dh
 --- umgebung
 DHRT_FRAMES=2
 --- bild

@@ -6,7 +6,7 @@
 
 === auswahl als variable einfuehren
 DIM prBild AS INTEGER : prBild = 0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 40 THEN
@@ -26,7 +26,7 @@ a.dh
 --- umgebung
 DHRT_FRAMES=200
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei a.dh
 DIM breite AS INTEGER : breite = 20
@@ -49,7 +49,7 @@ pr text DIM breite AS INTEGER : breite = 20 / DIM summe AS INTEGER : summe = bre
 
 === variable einsetzen
 DIM prBild AS INTEGER : prBild = 0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 40 THEN
@@ -71,7 +71,7 @@ a.dh
 --- umgebung
 DHRT_FRAMES=200
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei a.dh
 SUB eins(a AS INTEGER)
@@ -109,7 +109,7 @@ pr text SUB eins(a AS INTEGER) /     DIM b AS INTEGER : b = 7 /     PRINT((a + 1
 
 === sub in function umwandeln, auch in anderen dateien
 DIM prBild AS INTEGER : prBild = 0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 40 THEN
@@ -132,7 +132,7 @@ main.dh
 --- umgebung
 DHRT_FRAMES=200
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei main.dh
 SUB doppelt(n AS INTEGER, BYREF r AS INTEGER)

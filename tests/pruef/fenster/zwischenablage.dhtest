@@ -52,7 +52,7 @@ END IF
 PROCESS_CLOSE(p)
 --- system windows
 --- argumente
-{sammlung}/_hilfen/zwischenablage_blocker.ps1
+{sammlung}/../_hilfen/zwischenablage_blocker.ps1
 --- umgebung
 DHRT_ZWISCHENABLAGE=system
 --- erwartet
@@ -81,7 +81,7 @@ CLIPBOARD_SET("kommt nicht an")
 PRINT "haette nicht laufen duerfen"
 --- system windows
 --- argumente
-{sammlung}/_hilfen/zwischenablage_blocker.ps1
+{sammlung}/../_hilfen/zwischenablage_blocker.ps1
 --- umgebung
 DHRT_ZWISCHENABLAGE=system
 --- fehler
@@ -112,7 +112,7 @@ PRINT "gelesen: [" + CLIPBOARD_GET() + "]"
 PRINT "und das Programm laeuft weiter"
 --- system windows
 --- argumente
-{sammlung}/_hilfen/zwischenablage_blocker.ps1
+{sammlung}/../_hilfen/zwischenablage_blocker.ps1
 --- umgebung
 DHRT_ZWISCHENABLAGE=system
 --- erwartet

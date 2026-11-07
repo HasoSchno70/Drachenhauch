@@ -17,11 +17,11 @@
 --- langsam
 === ein verwaister stand wird angeboten und wiederhergestellt
 IF FILEEXISTS("ev.txt") THEN AUTOMATION_PLAY("ev.txt")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- umgebung
 DHRT_FRAMES=150
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 PRINT 1
@@ -110,11 +110,11 @@ datei unberuehrt PRINT 1
 
 === verwerfen raeumt den stand weg
 IF FILEEXISTS("ev.txt") THEN AUTOMATION_PLAY("ev.txt")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- umgebung
 DHRT_FRAMES=80
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei _programm/ev.txt
 c 4
@@ -167,11 +167,11 @@ staende 0
 
 === spaeter laesst den stand liegen
 IF FILEEXISTS("ev.txt") THEN AUTOMATION_PLAY("ev.txt")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- umgebung
 DHRT_FRAMES=80
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei _programm/ev.txt
 c 2
@@ -214,11 +214,11 @@ staende alt
 === der stand einer laufenden ide wird nicht angefasst
 ' Lebenszeichen von eben, als offen markiert: das ist eine zweite IDE, die
 ' gerade laeuft. Sie darf weder angeboten noch weggeraeumt werden.
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- umgebung
 DHRT_FRAMES=60
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- vorher
 IMPORT "json"
@@ -256,11 +256,11 @@ staende lebt
 ' sein Lebenszeichen ist alt. Der leere Stand daneben hat nichts zu bieten
 ' und verschwindet ohne Frage.
 IF FILEEXISTS("ev.txt") THEN AUTOMATION_PLAY("ev.txt")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- umgebung
 DHRT_FRAMES=80
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei _programm/ev.txt
 c 2
@@ -305,13 +305,13 @@ staende absturz
 === ohne aenderungen verschwindet der eigene stand beim ende
 ' Das Lebenszeichen entsteht gleich beim Start (auch ohne ungesicherte
 ' Reiter), und ein Ende ohne ungesicherte Reiter raeumt es wieder weg.
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=60
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 PRINT 1

@@ -73,7 +73,7 @@ END SUB
 pruefe("build_runtime.py")
 pruefe("build_wasm.py")
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- erwartet
 build_runtime.py importe 7, fremde: keine
 build_wasm.py importe 6, fremde: keine

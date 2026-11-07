@@ -107,9 +107,9 @@ SUB prProbe()
         EXIT(0)
     END IF
 END SUB
---- programm ../../examples/feedleser/main.dh nach SETFPS(60)
+--- programm ../../../examples/feedleser/main.dh nach SETFPS(60)
 --- ersetzen CONST STANDARD = "https://www.tagesschau.de/xml/rss2/|https://www.heise.de/rss/heise-atom.xml"
-DIM prSrv AS INTEGER : prSrv = PROCESS_START("dhrt", "run", "{sammlung}/_hilfen/gegenserver.dh", "--", "dateien", "0", "-", CWD$() + "/port.txt")
+DIM prSrv AS INTEGER : prSrv = PROCESS_START("dhrt", "run", "{sammlung}/../_hilfen/gegenserver.dh", "--", "dateien", "0", "-", CWD$() + "/port.txt")
 DIM prT0 AS INTEGER : prT0 = MILLIS()
 WHILE NOT FILEEXISTS("port.txt") AND MILLIS() - prT0 < 15000
     SLEEP(20)

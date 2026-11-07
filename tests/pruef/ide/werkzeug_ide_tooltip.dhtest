@@ -13,7 +13,7 @@
 --- langsam
 === verweilen zeigt die hilfe zum eigenen unterprogramm
 DIM prBild AS INTEGER : prBild = 0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach     IF GUI_DOUBLE_CLICKED(lstProbleme) THEN problemAnspringen()
 prBild = prBild + 1
 IF prBild = 40 THEN prZiel(5, 3, FALSE, FALSE)
@@ -25,7 +25,7 @@ spiel.dh
 --- umgebung
 DHRT_FRAMES=170
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 ' Malt einen Stern.
@@ -35,7 +35,7 @@ END SUB
 malen()
 PRINT "ende"
 --- datei _programm/hilfe.dh
-IMPORT "{sammlung}/_hilfen/idemaus.dh"
+IMPORT "{sammlung}/../_hilfen/idemaus.dh"
 --- nachher
 DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
 DIM i AS INTEGER
@@ -51,7 +51,7 @@ probe zeile 1
 ' Gegenprobe: eine Zeile, die auf ein Wort MIT Hilfe endet (`stern`), die
 ' Maus rechts hinter dem Text -- dort zeigt sie auf nichts.
 DIM prBild AS INTEGER : prBild = 0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach     IF GUI_DOUBLE_CLICKED(lstProbleme) THEN problemAnspringen()
 prBild = prBild + 1
 IF prBild = 40 THEN prZiel(8, 0, FALSE, FALSE)
@@ -63,7 +63,7 @@ spiel.dh
 --- umgebung
 DHRT_FRAMES=170
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 ' Malt einen Stern.
@@ -75,7 +75,7 @@ PRINT "ende"
 DIM stern AS INTEGER : stern = 1
 PRINT stern
 --- datei _programm/hilfe.dh
-IMPORT "{sammlung}/_hilfen/idemaus.dh"
+IMPORT "{sammlung}/../_hilfen/idemaus.dh"
 --- nachher
 DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
 DIM i AS INTEGER
@@ -88,7 +88,7 @@ probe zeile 1
 
 === strg klick springt zur definition
 DIM prBild AS INTEGER : prBild = 0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach     IF GUI_DOUBLE_CLICKED(lstProbleme) THEN problemAnspringen()
 prBild = prBild + 1
 IF prBild = 40 THEN prZiel(5, 3, TRUE, TRUE)
@@ -100,7 +100,7 @@ spiel.dh
 --- umgebung
 DHRT_FRAMES=170
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 ' Malt einen Stern.
@@ -110,7 +110,7 @@ END SUB
 malen()
 PRINT "ende"
 --- datei _programm/hilfe.dh
-IMPORT "{sammlung}/_hilfen/idemaus.dh"
+IMPORT "{sammlung}/../_hilfen/idemaus.dh"
 --- nachher
 DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
 DIM i AS INTEGER
@@ -126,7 +126,7 @@ probe zeile 2
 ' Gegenprobe: derselbe Klick ohne Strg -- die Marke steht danach im Wort
 ' (Zeile 5), gesprungen wird nicht.
 DIM prBild AS INTEGER : prBild = 0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach     IF GUI_DOUBLE_CLICKED(lstProbleme) THEN problemAnspringen()
 prBild = prBild + 1
 IF prBild = 40 THEN prZiel(5, 3, FALSE, TRUE)
@@ -138,7 +138,7 @@ spiel.dh
 --- umgebung
 DHRT_FRAMES=170
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 ' Malt einen Stern.
@@ -148,7 +148,7 @@ END SUB
 malen()
 PRINT "ende"
 --- datei _programm/hilfe.dh
-IMPORT "{sammlung}/_hilfen/idemaus.dh"
+IMPORT "{sammlung}/../_hilfen/idemaus.dh"
 --- nachher
 DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
 DIM i AS INTEGER

@@ -3,7 +3,7 @@
 ' Staenden bleiben dort nur die, die ein git-Repository brauchen, im Bild
 ' Farbbaender zaehlen oder zwei Laeufe hintereinander machen.
 '
-' Aufbau wie tests/pruef/werkzeug_ide.dhtest: die IDE als Kopie in _programm/,
+' Aufbau wie tests/pruef/ide/werkzeug_ide.dhtest: die IDE als Kopie in _programm/,
 ' Aufnahme und Zwischenablage ueber einen Einschub hinter SETFPS(60), gelesen
 ' mit `--- nachher`. Eine Voreinstellung (regex, autosichern, geruest) kommt
 ' als Beilage _programm/ide.json. Mausklicks treffen feste Lagen: Projektbaum
@@ -16,13 +16,13 @@
 ' heraus. Ohne das Geruest aus Stand 13 -- sonst stuende noch `END SUB` dahinter.
 AUTOMATION_PLAY("ev.txt")
 CLIPBOARD_SET("END")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=180
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 SUB a()
@@ -118,13 +118,13 @@ zeige("spiel.dh")
 ' verlaesst. Strg+Leer holt sie herein, Enter uebernimmt.
 AUTOMATION_PLAY("ev.txt")
 CLIPBOARD_SET("SCR")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=220
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 
@@ -219,13 +219,13 @@ datei beginnt mit SCREEN TRUE
 === suche mit regulaerem ausdruck ueber die palette
 AUTOMATION_PLAY("ev.txt")
 CLIPBOARD_SET("Suchen mit regulaerem Ausdruck")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=300
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 PRINT 1
@@ -334,13 +334,13 @@ palette regex TRUE
 ' `^SUB` findet die Zeile in a.dh, nicht die eingerueckte in spiel.dh.
 AUTOMATION_PLAY("ev.txt")
 CLIPBOARD_SET("^SUB")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=200
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 PRINT 1
@@ -438,13 +438,13 @@ letzte suche 1 TRUE
 === lesezeichen springt ueber dateien
 AUTOMATION_PLAY("ev.txt")
 CLIPBOARD_SET("zwei")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=240
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 PRINT 1
@@ -542,13 +542,13 @@ gesprungen TRUE
 
 === geschlossenen reiter wieder oeffnen
 AUTOMATION_PLAY("ev.txt")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=180
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 PRINT 1
@@ -640,13 +640,13 @@ zweimal geoeffnet TRUE
 ' Eine FOR-Schleife ist kein Symbol -- ueber die Einrueckung laesst sie sich
 ' trotzdem falten.
 AUTOMATION_PLAY("ev.txt")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=180
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 DIM i AS INTEGER
@@ -732,13 +732,13 @@ falte 2 zu TRUE
 
 === symbolspur nennt klasse und methode
 AUTOMATION_PLAY("ev.txt")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=160
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 CLASS Held
@@ -826,13 +826,13 @@ spur TRUE
 ' Die Pfadleiste liegt ueber dem Code (x ab 220, y 93..113); der erste Teil,
 ' die Datei, springt nach Zeile 1.
 AUTOMATION_PLAY("ev.txt")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=200
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 CLASS Held
@@ -924,13 +924,13 @@ pfad sprung 1 TRUE
 
 === definition hier zeigen
 AUTOMATION_PLAY("ev.txt")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=170
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 SUB gruessen()
@@ -1021,13 +1021,13 @@ peek 1 TRUE
 
 === eingebaute befehle nachschlagen
 AUTOMATION_PLAY("ev.txt")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=150
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 PRINT 1
@@ -1110,13 +1110,13 @@ ueber tausend TRUE
 
 === einstellungen gehen auf
 AUTOMATION_PLAY("ev.txt")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=150
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 PRINT 1
@@ -1199,13 +1199,13 @@ einstellungen auf TRUE
 === automatisch sichern nach der eingestellten ruhe
 AUTOMATION_PLAY("ev.txt")
 CLIPBOARD_SET("X")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=240
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 PRINT 1
@@ -1293,13 +1293,13 @@ datei beginnt mit X TRUE
 ' Die Gegenprobe zum Fall davor.
 AUTOMATION_PLAY("ev.txt")
 CLIPBOARD_SET("X")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=240
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 PRINT 1
@@ -1383,13 +1383,13 @@ nicht gesichert TRUE
 
 === der tabulator klappt einen schnipsel auf
 AUTOMATION_PLAY("ev.txt")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=200
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 PRINT 1
@@ -1484,13 +1484,13 @@ kuerzel weg TRUE
 === ohne kuerzel rueckt der tabulator ein
 ' Die Gegenprobe: hinter einem Wort, das kein Kuerzel ist.
 AUTOMATION_PLAY("ev.txt")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=200
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 PRINT 1
@@ -1581,13 +1581,13 @@ eingerueckt TRUE
 
 === zur definition findet sie in einer anderen datei
 AUTOMATION_PLAY("ev.txt")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=190
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 gruessen()
@@ -1682,13 +1682,13 @@ symbol helfer.dh 2 TRUE
 
 === peek zeigt eine definition aus einer anderen datei
 AUTOMATION_PLAY("ev.txt")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=190
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 gruessen()
@@ -1785,13 +1785,13 @@ helfer nicht geoeffnet TRUE
 
 === symbolverzeichnis springt zum gewaehlten
 AUTOMATION_PLAY("ev.txt")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=200
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 gruessen()
@@ -1886,13 +1886,13 @@ symbol helfer.dh 2 TRUE
 ' Strg+Klick sammelt im Projektbaum (Zeilen ab y = 128, je 22 Punkte),
 ' Strg+Umschalt+E oeffnet alles Gewaehlte.
 AUTOMATION_PLAY("ev.txt")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- argumente
 a_eins.dh
 --- umgebung
 DHRT_FRAMES=220
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei a_eins.dh
 PRINT 1
@@ -2000,13 +2000,13 @@ c_drei offen TRUE
 ' Die Gegenprobe: dieselben Klicks ohne das Kuerzel -- nur die zuerst
 ' angeklickte Datei ist offen.
 AUTOMATION_PLAY("ev.txt")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- argumente
 a_eins.dh
 --- umgebung
 DHRT_FRAMES=180
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei a_eins.dh
 PRINT 1
@@ -2107,13 +2107,13 @@ nur a_eins offen TRUE
 === marke auf die naechste fundstelle
 ' EINE Marke dazu, nicht gleich alle; die Suche laeuft um.
 AUTOMATION_PLAY("ev.txt")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=190
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 DIM punkte AS INTEGER
@@ -2222,13 +2222,13 @@ marke naechste 3 TRUE
 ' Vorschau uebernehmen.
 AUTOMATION_PLAY("ev.txt")
 CLIPBOARD_SET("hallo")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- argumente
 a.dh
 --- umgebung
 DHRT_FRAMES=270
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei a.dh
 PRINT hallo
@@ -2334,13 +2334,13 @@ b ohne hallo TRUE
 ' Sichern ueberschreiben -- also bricht es ab.
 AUTOMATION_PLAY("ev.txt")
 CLIPBOARD_SET("hallo")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- argumente
 a.dh
 --- umgebung
 DHRT_FRAMES=230
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei a.dh
 PRINT hallo
@@ -2435,13 +2435,13 @@ hallo bleibt TRUE
 === ausgabe durchsuchen
 AUTOMATION_PLAY("ev.txt")
 CLIPBOARD_SET("nadel")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=260
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 PRINT "eins"
@@ -2535,13 +2535,13 @@ ausgabe treffer 3 TRUE
 
 === andere reiter schliessen
 AUTOMATION_PLAY("ev.txt")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- argumente
 a_eins.dh
 --- umgebung
 DHRT_FRAMES=250
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei a_eins.dh
 PRINT 1
@@ -2655,13 +2655,13 @@ andere zu 2 TRUE
 ' Der Kasten fragt die Laufzeit selbst (VERSION$).
 AUTOMATION_PLAY("ev.txt")
 CLIPBOARD_SET("Ueber ..")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=200
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 PRINT 1
@@ -2753,13 +2753,13 @@ fassung TRUE
 === einrueckungslinien lassen sich abschalten
 AUTOMATION_PLAY("ev.txt")
 CLIPBOARD_SET("Einrueckungslinien")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=200
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 IF a THEN
@@ -2853,13 +2853,13 @@ linien aus TRUE
 ' Ohne Auswahl gilt die ganze Datei.
 AUTOMATION_PLAY("ev.txt")
 CLIPBOARD_SET("Zeilen sortieren")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=230
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 ' c
@@ -2960,13 +2960,13 @@ zeilen sortieren 3 TRUE
 === doppelte zeilen entfernen
 AUTOMATION_PLAY("ev.txt")
 CLIPBOARD_SET("Doppelte Zeilen")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=230
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 ' a
@@ -3068,13 +3068,13 @@ zeilen doppelte 2 TRUE
 ' ans Ende, EIN Strg+V schreibt in beide.
 AUTOMATION_PLAY("ev.txt")
 CLIPBOARD_SET("!")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=230
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 eins
@@ -3181,13 +3181,13 @@ marken enden 2 TRUE
 === im ganzen projekt umbenennen
 AUTOMATION_PLAY("ev.txt")
 CLIPBOARD_SET("winken")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=280
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 gruessen()
@@ -3298,13 +3298,13 @@ definition TRUE
 ' Datei-Dialog auf, den niemand beantwortet.
 AUTOMATION_PLAY("ev.txt")
 CLIPBOARD_SET("Mit einer anderen")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- argumente
 a_eins.dh
 --- umgebung
 DHRT_FRAMES=320
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei a_eins.dh
 PRINT 1
@@ -3414,13 +3414,13 @@ vergleich TRUE
 ' Knoepfe 30 breit, 2 Punkte Luft, Trenner 11, erster bei x = 4:
 ' neu, oeffnen, sichern, Trenner, dann start.
 AUTOMATION_PLAY("ev.txt")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=260
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 PRINT "aus der Leiste"
@@ -3506,13 +3506,13 @@ beendet 0 TRUE
 
 === der umbruch knopf kippt mit dem menue
 AUTOMATION_PLAY("ev.txt")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=160
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 PRINT 1
@@ -3599,13 +3599,13 @@ umbruch gemerkt TRUE
 === die leiste laesst sich abschalten
 AUTOMATION_PLAY("ev.txt")
 CLIPBOARD_SET("Werkzeugleiste")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=200
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 PRINT 1
@@ -3700,7 +3700,7 @@ leiste aus TRUE
 ' DH_IDE_KONFIG ist hier ABSOLUT: der Vorschau-Ordner haengt an ihrem Ordner, und
 ' `dhrt bild` wechselt ins Verzeichnis des Beispiels -- relativ laege das Bild
 ' unter wurzel/examples/vorschau/.
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- umgebung
 DHRT_FRAMES=400
 DH_IDE_LOG=ide.log
@@ -3792,7 +3792,7 @@ vorschau fertig 0 TRUE
 
 === eine kachel oeffnet ihr beispiel
 AUTOMATION_PLAY("ev.txt")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- umgebung
 DHRT_FRAMES=260
 DH_IDE_LOG=ide.log
@@ -3881,13 +3881,13 @@ kachel 09_shapes.dh TRUE
 
 === auswahl waechst an den bloecken
 AUTOMATION_PLAY("ev.txt")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=280
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 IF a THEN
@@ -4005,13 +4005,13 @@ erweitern Block 1-4 TRUE
 
 === auswahl verkleinern geht den weg zurueck
 AUTOMATION_PLAY("ev.txt")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=220
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 IF a THEN
@@ -4115,13 +4115,13 @@ verkleinert TRUE
 ' Was zugewiesen wird, geht BYREF; die gesicherte Datei uebersetzt noch.
 AUTOMATION_PLAY("ev.txt")
 CLIPBOARD_SET("summiere")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=310
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 SUB rechne()
@@ -4266,13 +4266,13 @@ check []
 ' Die Gegenprobe: das FOR in der Auswahl, das NEXT nicht.
 AUTOMATION_PLAY("ev.txt")
 CLIPBOARD_SET("halb")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=290
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 SUB rechne()
@@ -4391,13 +4391,13 @@ kaputt gemeldet TRUE
 === zwei reiter nebeneinander vergleichen
 AUTOMATION_PLAY("ev.txt")
 CLIPBOARD_SET("Zwei Reiter")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- argumente
 a_eins.dh
 --- umgebung
 DHRT_FRAMES=250
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei a_eins.dh
 PRINT 1
@@ -4506,7 +4506,7 @@ geteilt TRUE
 AUTOMATION_PLAY("ev.txt")
 CLIPBOARD_SET("winken")
 DIM prBild AS INTEGER : prBild = 0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 260 THEN
@@ -4518,7 +4518,7 @@ unter/../spiel.dh
 --- umgebung
 DHRT_FRAMES=280
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 gruessen()

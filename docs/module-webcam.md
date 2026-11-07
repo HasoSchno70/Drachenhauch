@@ -108,7 +108,7 @@ mit wenigen Bildern je Sekunde. MJPEG-Bilder, denen die Huffman-Tafel fehlt
 `DHRT_WEBCAM=test` ersetzt alle Kameras durch eine **Testbild**-Kamera: acht
 Farbbalken (weiß, gelb, türkis, grün, violett, rot, blau, schwarz), darin
 ein schwarzes Quadrat, das je Bild 8 Punkte nach rechts wandert, 30 Bilder
-je Sekunde, 320 × 240 oder die gewünschte Größe. `tests/pruef/webcam.dhtest`
+je Sekunde, 320 × 240 oder die gewünschte Größe. `tests/pruef/geraete/webcam.dhtest`
 prüft damit alles außer dem Weg des Systems; unter Linux liest es zusätzlich
 `vivid`, den Testtreiber des Kernels — über denselben Weg wie eine echte
 Kamera.

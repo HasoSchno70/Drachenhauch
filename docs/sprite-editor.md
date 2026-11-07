@@ -282,7 +282,7 @@ Aussage über das Spiel. Die Datei lädt `ANIM_FSM_LOAD` so, wie sie ist; die
 
 ## Prüfung
 
-Die Zusagen dieser Seite prüft [`tests/pruef/werkzeug_sprite.dhtest`](../tests/pruef/werkzeug_sprite.dhtest)
+Die Zusagen dieser Seite prüft [`tests/pruef/werkzeuge/werkzeug_sprite.dhtest`](../tests/pruef/werkzeuge/werkzeug_sprite.dhtest)
 mit echten Mauswegen über die Aufnahme-Wiedergabe: Auswahl, Lasso und
 Zauberstab, Verschieben, Paletten gegen einen fremden Leser, Statistik,
 Zuschneiden, Bereiche, DH-Code und `.dhanim` (gestartet bzw. von der Laufzeit

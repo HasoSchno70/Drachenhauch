@@ -73,9 +73,9 @@ WEND
 PRINT "code "; PROCESS_CODE(k)
 IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- datei proj/projekt.dhstudio
 {"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"control","name":"Zaehler"},{"art":"fenster","name":"Hauptfenster"}]}
@@ -152,9 +152,9 @@ FOR EACH z IN slAnfang(log, "lage teil ")
     PRINT z
 NEXT
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- datei proj/projekt.dhstudio
 {"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"control","name":"Zaehler"},{"art":"fenster","name":"Hauptfenster"}]}
@@ -216,10 +216,10 @@ DIM d AS JSON_HANDLE : d = JSON_PARSE(JOIN$(READLINES(p + "/Hauptfenster.dhform"
 PRINT "widgets "; JSON_LEN(d, "widgets")
 PRINT "instanz "; JSON_GET_STRING(d, "widgets.1.kind"); " "; JSON_GET_STRING(d, "widgets.1.studio_control"); " "; JSON_GET_STRING(d, "widgets.1.name"); " "; JSON_GET_INT(d, "widgets.1.w"); " "; JSON_GET_INT(d, "widgets.1.h")
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
 IMPORT "json"
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- datei proj/projekt.dhstudio
 {"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"control","name":"Zaehler"},{"art":"fenster","name":"Hauptfenster"}]}
@@ -255,9 +255,9 @@ slStarten(log, CWD$() + "/ev.txt", slBild + 10, p)
 PRINT "gewaehlt "; slHat(log, "gewaehlt 1 1")
 PRINT "nie ein teil "; LEN(slAnfang(log, "gewaehlt 2")) + LEN(slAnfang(log, "gewaehlt 3")) + LEN(slAnfang(log, "gewaehlt 4")) = 0
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- datei proj/projekt.dhstudio
 {"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"control","name":"Zaehler"},{"art":"fenster","name":"Hauptfenster"}]}
@@ -323,9 +323,9 @@ WEND
 PRINT "code "; PROCESS_CODE(k)
 IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- datei proj/projekt.dhstudio
 {"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"control","name":"Zaehler"},{"art":"fenster","name":"Hauptfenster"}]}
@@ -397,9 +397,9 @@ FOR EACH z IN slAnfang(log, "ereignisdialog ")
     PRINT z
 NEXT
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- datei proj/projekt.dhstudio
 {"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"control","name":"Zaehler"},{"art":"fenster","name":"Hauptfenster"}]}
@@ -480,9 +480,9 @@ WEND
 PRINT "code "; PROCESS_CODE(k)
 IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- datei proj/projekt.dhstudio
 {"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"control","name":"Zwei"},{"art":"control","name":"Zaehler"},{"art":"control","name":"Schleife"},{"art":"fenster","name":"Hauptfenster"}]}
@@ -579,9 +579,9 @@ FOR EACH z IN slAnfang(log, "lage teil ")
     PRINT z
 NEXT
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- datei proj/projekt.dhstudio
 {"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"control","name":"Zwei"},{"art":"control","name":"Zaehler"},{"art":"control","name":"Schleife"},{"art":"fenster","name":"Hauptfenster"}]}
@@ -634,9 +634,9 @@ FOR EACH ziel IN ["Zwei", "Zaehler"]
     PRINT "["; zl[LEN(zl) - 1]; "]"
 NEXT
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- datei proj/projekt.dhstudio
 {"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"},{"art":"control","name":"Zwei"},{"art":"control","name":"Zaehler"}]}
@@ -705,10 +705,10 @@ PRINT "dateien "; FILEEXISTS(p + "/Zahl.dhform"); " "; FILEEXISTS(p + "/Zaehler.
 PRINT "projekt "; INSTR(JOIN$(READLINES(p + "/projekt.dhstudio"), ""), CHR$(34) + "Zahl" + CHR$(34)) >= 0
 IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
 IMPORT "json"
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- datei proj/projekt.dhstudio
 {"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"},{"art":"control","name":"Zaehler"}]}
@@ -745,9 +745,9 @@ slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
 PRINT "leer weg "; slHat(log, "element weg Leer")
 PRINT "dateien "; FILEEXISTS(p + "/Leer.dhform"); " "; FILEEXISTS(p + "/Zaehler.dhform")
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- datei proj/projekt.dhstudio
 {"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"},{"art":"control","name":"Zwei"},{"art":"control","name":"Zaehler"},{"art":"control","name":"Leer"}]}

@@ -31,10 +31,10 @@ PRINT "modul "; LEN(methoden); " "; methoden[2].name; " gleich "; codeSetzen$(w)
 IMPORT "json"
 IMPORT "regex"
 IMPORT "imgfx"
-IMPORT "{sammlung}/../../studio/sprache.dh"
-IMPORT "{sammlung}/../../studio/bibliothek.dh"
-IMPORT "{sammlung}/../../studio/modell.dh"
-IMPORT "{sammlung}/../../studio/projekt.dh"
+IMPORT "{sammlung}/../../../studio/sprache.dh"
+IMPORT "{sammlung}/../../../studio/bibliothek.dh"
+IMPORT "{sammlung}/../../../studio/modell.dh"
+IMPORT "{sammlung}/../../../studio/projekt.dh"
 --- datei Kunde.dh
 ' Ein Kunde mit Namen.
 CLASS Kunde EXTENDS Person
@@ -88,10 +88,10 @@ PRINT e.dekl
 IMPORT "json"
 IMPORT "regex"
 IMPORT "imgfx"
-IMPORT "{sammlung}/../../studio/sprache.dh"
-IMPORT "{sammlung}/../../studio/bibliothek.dh"
-IMPORT "{sammlung}/../../studio/modell.dh"
-IMPORT "{sammlung}/../../studio/projekt.dh"
+IMPORT "{sammlung}/../../../studio/sprache.dh"
+IMPORT "{sammlung}/../../../studio/bibliothek.dh"
+IMPORT "{sammlung}/../../../studio/modell.dh"
+IMPORT "{sammlung}/../../../studio/projekt.dh"
 --- erwartet
 start_Klick | SUB start_Klick()
 knopf10_Klick
@@ -128,10 +128,10 @@ PRINT "fehlt ["; projektLaden$(CWD$()); "]"
 IMPORT "json"
 IMPORT "regex"
 IMPORT "imgfx"
-IMPORT "{sammlung}/../../studio/sprache.dh"
-IMPORT "{sammlung}/../../studio/bibliothek.dh"
-IMPORT "{sammlung}/../../studio/modell.dh"
-IMPORT "{sammlung}/../../studio/projekt.dh"
+IMPORT "{sammlung}/../../../studio/sprache.dh"
+IMPORT "{sammlung}/../../../studio/bibliothek.dh"
+IMPORT "{sammlung}/../../../studio/modell.dh"
+IMPORT "{sammlung}/../../../studio/projekt.dh"
 --- erwartet
 dateien TRUETRUETRUETRUETRUE
 gitignore _studio/
@@ -176,9 +176,9 @@ FOR EACH z IN READLINES(p + "/Hauptfenster.dh")
 NEXT
 IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- datei proj/projekt.dhstudio
 {"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"}]}
@@ -237,9 +237,9 @@ FOR EACH z IN READLINES(p + "/Hauptfenster.dh")
 NEXT
 IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- datei proj/projekt.dhstudio
 {"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"}]}
@@ -285,9 +285,9 @@ DIM z AS ARRAY OF STRING : z = slAnfang(log, "vorn ")
 PRINT "danach "; z[LEN(z) - 1]
 IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- datei proj/projekt.dhstudio
 {"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"}]}
@@ -339,9 +339,9 @@ NEXT
 PRINT "layout "; FILEEXISTS(p + "/Fenster1.dhform")
 IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 IMPORT "json"
 slStudio = ARG$(0)
 --- erwartet
@@ -394,9 +394,9 @@ FOR EACH z IN READLINES(p + "/Hauptfenster.dh")
 NEXT
 IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- datei proj/projekt.dhstudio
 {"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"}]}

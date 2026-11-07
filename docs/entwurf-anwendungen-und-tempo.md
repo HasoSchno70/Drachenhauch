@@ -67,7 +67,7 @@ ebenfalls an, statt jedes Mal neu zu kopieren. Die Speicherprüfung von
 `STORE_LOCAL`/`STORE_GLOBAL_SLOT` ist ein Makro (`passend!`); als Funktion
 wurde sie nicht eingebettet und kostete gemessen 25 %.
 
-Prüfstein: `tests/pruef/zeichenketten_anhaengen.dhtest` -- auf der alten
+Prüfstein: `tests/pruef/sprache/zeichenketten_anhaengen.dhtest` -- auf der alten
 Laufzeit fallen genau die Tempo-Fälle.
 
 **Felder, Elemente, MAP-Werte und BYREF (2026-10-20).** Was oben noch
@@ -125,7 +125,7 @@ genauso viel wie einer vorn — der Rust-Compiler verzweigt dort nicht linear.
 Teuer war allein die Kette der 27 Familien davor. Was bleibt (~24 ns je
 Aufruf gegen ~13 ns in CPython), ist Aufrufaufwand (`catch_unwind`,
 Argumentprüfung), kein Suchen mehr. Prüfstein:
-`tests/pruef/builtin_familien.dhtest` (Gegenprobe: ohne die
+`tests/pruef/laufzeit/builtin_familien.dhtest` (Gegenprobe: ohne die
 `SORT`-Ausnahme fällt der erste Fall).
 
 ### 1c. Funktionsaufrufe
@@ -152,7 +152,7 @@ Zwischen-`Vec`. Größerer Schritt, später: ein Frame-Stapel statt Rekursion
 | eigene Funktion `leer(i)` | 80 ms | 66 ms |
 | Methode `z.holen()` | 96 ms | 86 ms |
 
-Prüfstein `tests/pruef/aufrufe.dhtest` (14; auf der alten Laufzeit gleich,
+Prüfstein `tests/pruef/laufzeit/aufrufe.dhtest` (14; auf der alten Laufzeit gleich,
 Gegenprobe ohne Namensvergleich im Merkplatz: der Fall mit wechselnden
 Klassen an derselben Stelle fällt). Der Rest des Abstands zu CPython
 (`fib(30)` 56 ms) liegt im rekursiven `exec → run_frame → dispatch` je
@@ -196,7 +196,7 @@ Zugriffe, so schnell wie ein lokales. Weil ein Zugriff vor dem `DIM` damit
 die Meldung des leeren Platzes traf (vorher klar „Variable 'feld' nicht
 deklariert“), trägt das Programm jetzt die Namen der Plätze
 (`Program::global_names`), und die Meldung nennt die Variable. Prüfstein
-`tests/pruef/globale_felder.dhtest`. Übrig von Punkt 1: `LOAD_NAME`/
+`tests/pruef/sprache/globale_felder.dhtest`. Übrig von Punkt 1: `LOAD_NAME`/
 `STORE_NAME` gibt es noch für FOR-EACH- und CATCH-Variablen im Hauptprogramm.
 
 **`dispatch` verkleinert (2026-09-24):** der Stapelrahmen der zentralen
@@ -213,7 +213,7 @@ gedacht -- bei der IDE (10 198 Zeilen) kostete das Bauen des .dhc-JSON
 noch für `--export`, `--dumpbc` und .dhc-Dateien. Beide Wege gehen durch
 `model::func_bauen`/`programm_bauen`. Dazu sucht `add_const` Dubletten über
 einen Index statt linear. Start der IDE: 128 → 98 ms. Prüfstein
-`tests/pruef/direkt_und_dhc.dhtest` (dasselbe Programm direkt und als .dhc;
+`tests/pruef/laufzeit/direkt_und_dhc.dhtest` (dasselbe Programm direkt und als .dhc;
 Gegenprobe ohne Vorgabewerte im direkten Weg fällt -- die erste Fassung des
 Tests prüfte sie gar nicht, weil CALL_USER Vorgabewerte beim Übersetzen
 einsetzt).
@@ -223,7 +223,7 @@ einsetzt).
 der VM (`vm::konstant_rechnen`); `x + 2 * FAKTOR` kostet so viel wie `x + 6`
 (225 → 150 ms je 10 Mio.). Eigene Ganzzahl-Befehle lohnen sich nicht: die
 allgemeinen Befehle prüfen den Ganzzahl-Fall schon zuerst, eine einfache
-Schleife liegt bei ~3 ns je Befehl. Prüfstein `tests/pruef/konstanten_falten.dhtest`.
+Schleife liegt bei ~3 ns je Befehl. Prüfstein `tests/pruef/sprache/konstanten_falten.dhtest`.
 
 **Punkt 3 zum größten Teil erledigt (2026-09-24):** der Aufwand steckte nicht
 im Namen des Feldes, sondern in der Frage „ist das eine PROPERTY?“, die jeder

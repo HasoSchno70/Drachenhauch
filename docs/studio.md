@@ -672,28 +672,28 @@ geerbte mit einer anderen Zahl von Parametern überschreibt.
 | `DH_STUDIO_TEMPO=1` | schreibt (mit `DH_STUDIO_LOG`) je Bild `tempo <ms>`: wie lange das Studio gerechnet hat, ohne das Warten auf das nächste Bild |
 | `DH_STUDIO_OEFFNEN=element[.tabelle]` | öffnet beim Start ein Element wie ein Klick im Navigator (bei einer Datenbank auf Wunsch eine Tabelle) |
 
-Die Prüfsammlungen `tests/pruef/werkzeug_studio.dhtest` (Stufe 1) und
-`tests/pruef/werkzeug_studio2.dhtest` (Stufe 2) starten das Studio zweimal:
+Die Prüfsammlungen `tests/pruef/studio/werkzeug_studio.dhtest` (Stufe 1) und
+`tests/pruef/studio/werkzeug_studio2.dhtest` (Stufe 2) starten das Studio zweimal:
 einmal zum Messen, einmal mit echten Klicks und Tasten. Das Projektmodell
 (`studio/projekt.dh`) prüfen sie auch ohne Fenster.
-`tests/pruef/werkzeug_studio3.dhtest` (Stufe 3) drückt F5 und Strg+B, lässt
+`tests/pruef/studio/werkzeug_studio3.dhtest` (Stufe 3) drückt F5 und Strg+B, lässt
 das erzeugte Programm mit einem Klick laufen und prüft, an welcher Methode
-und Zeile ein Fehler landet. `tests/pruef/werkzeug_studio4.dhtest` (Stufe 4)
+und Zeile ein Fehler landet. `tests/pruef/studio/werkzeug_studio4.dhtest` (Stufe 4)
 legt Timer und Menüs an, lässt das erzeugte Programm Fragen, ein modales
 Fenster, Timer, Menükürzel und ein Bild durchlaufen und hält im Debugger.
-`tests/pruef/werkzeug_studio_datenbank.dhtest` prüft die Datenbanken: den
+`tests/pruef/studio/werkzeug_studio_datenbank.dhtest` prüft die Datenbanken: den
 Kern ohne Fenster (an der Datei, wie SQLite sie sieht), das erzeugte
 Programm an einer älteren Datei und das Studio mit echten Klicks in beide
-Gitter, F5 und Bauen; `tests/pruef/werkzeug_studio_datenbank2.dhtest` die
+Gitter, F5 und Bauen; `tests/pruef/studio/werkzeug_studio_datenbank2.dhtest` die
 Bindung: Methoden und Listen im erzeugten Fenster samt Klick auf eine Zeile,
 Spalten ins Fenster ziehen und doppelklicken, die Auswahlen im Inspektor;
-`tests/pruef/werkzeug_studio_datenbank3.dhtest` Verweise, Bedingung,
+`tests/pruef/studio/werkzeug_studio_datenbank3.dhtest` Verweise, Bedingung,
 Sortierung, Suchfeld und Abfragen: den Kern, das erzeugte Fenster und das
 Studio mit echten Klicks im Reiter, im Navigator und im Inspektor;
-`tests/pruef/werkzeug_studio_datenbank4.dhtest` Bildspalten (Kern, erzeugtes
+`tests/pruef/studio/werkzeug_studio_datenbank4.dhtest` Bildspalten (Kern, erzeugtes
 Fenster samt Bild in der Tabellenzelle, „Bild …“ und Ziehen im Studio) und
-`tests/pruef/werkzeug_studio_verbunde.dhtest` Verbunde über Verweise;
-`tests/pruef/werkzeug_studio_berichte.dhtest` Berichte (Auslegung samt
+`tests/pruef/studio/werkzeug_studio_verbunde.dhtest` Verbunde über Verweise;
+`tests/pruef/studio/werkzeug_studio_berichte.dhtest` Berichte (Auslegung samt
 Summen und Seiten, F5 mit Parametern, Reiter und Vorschau),
-`tests/pruef/werkzeug_studio_berichte2.dhtest` ihren Entwurf (ablegen,
+`tests/pruef/studio/werkzeug_studio_berichte2.dhtest` ihren Entwurf (ablegen,
 ziehen, Griffe, Spalten, Eigenschaften, Bänder und Gruppen, Rückgängig).

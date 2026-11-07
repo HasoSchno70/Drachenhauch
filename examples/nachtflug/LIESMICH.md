@@ -154,6 +154,6 @@ Die Shader-Szenen rechnen das ganze Bild im Fragment-Shader (`POSTFX`); was
 das Programm vorher zeichnet (die Schrift), legt der Shader obenauf.
 Gezeichnet wird in 1280×720, im Vollbild skaliert die Laufzeit hoch.
 
-Geprüft in `tests/pruef/beispiel_nachtflug.dhtest`: die Musik an der
+Geprüft in `tests/pruef/beispiele/beispiel_nachtflug.dhtest`: die Musik an der
 ausgeschriebenen WAV (Stereo, Länge, Pegel), jede Szene an einem
 Bildschirmfoto.

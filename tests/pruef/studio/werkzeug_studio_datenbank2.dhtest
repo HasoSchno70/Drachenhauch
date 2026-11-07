@@ -31,7 +31,7 @@ FOR EACH z IN slAnfang(log, "ausgabe ")
     IF INSTR(z, "▶") < 0 AND INSTR(z, "■") < 0 AND INSTR(z, "WARNING") < 0 THEN PRINT z
 NEXT
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- vorher
 IMPORT "db"
 DIM db AS DB_CONN : db = DB_OPEN("proj/daten.sqlite")
@@ -40,7 +40,7 @@ DB_EXEC(db, "INSERT INTO kunden (name, umsatz, aktiv) VALUES ('Anna', 1250, 1)")
 DB_EXEC(db, "INSERT INTO kunden (name, umsatz, aktiv) VALUES ('Bert', NULL, 0)")
 DB_CLOSE(db)
 --- datei laeufer.dh
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- datei proj/projekt.dhstudio
 {"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"},{"art":"datenbank","name":"Daten","schema":"Daten.dhdb"}]}
@@ -124,7 +124,7 @@ FOR i = 0 TO JSON_LEN(j, "widgets") - 1
     PRINT "  "; JSON_GET_STRING(j, w + ".kind"); " "; JSON_GET_STRING(j, w + ".name"); IIF(JSON_HAS(j, w + ".bind"), " bind=" + JSON_GET_STRING(j, w + ".bind"), ""); IIF(JSON_HAS(j, w + ".zahlen"), " zahlen=" + STR$(JSON_GET_INT(j, w + ".zahlen")), "")
 NEXT
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- vorher
 IMPORT "db"
 DIM db AS DB_CONN : db = DB_OPEN("proj/daten.sqlite")
@@ -133,7 +133,7 @@ DB_EXEC(db, "INSERT INTO kunden (name, umsatz, aktiv) VALUES ('Anna', 1250, 1)")
 DB_CLOSE(db)
 --- datei laeufer.dh
 IMPORT "json"
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- datei proj/projekt.dhstudio
 {"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"},{"art":"datenbank","name":"Daten","schema":"Daten.dhdb"}]}
@@ -188,10 +188,10 @@ DIM j AS JSON_HANDLE : j = JSON_LOAD(p + "/Hauptfenster.dhform")
 PRINT "tabelle "; JSON_GET_STRING(j, "studio_tabelle")
 PRINT "feld "; JSON_GET_STRING(j, "widgets.2.name"); " "; JSON_GET_STRING(j, "widgets.2.bind"); " y="; JSON_GET_INT(j, "widgets.2.y"); " text "; JSON_GET_STRING(j, "widgets.1.text")
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
 IMPORT "json"
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- datei proj/projekt.dhstudio
 {"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"},{"art":"datenbank","name":"Daten","schema":"Daten.dhdb"}]}
@@ -267,10 +267,10 @@ PRINT "tabelle "; JSON_GET_STRING(j, "studio_tabelle")
 PRINT "quelle "; JSON_GET_STRING(j, "widgets.0.studio_quelle")
 PRINT "kopf "; JSON_GET_STRING(j, "widgets.0.table.headers.0"); " "; JSON_GET_STRING(j, "widgets.0.table.headers.1")
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
 IMPORT "json"
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- datei proj/projekt.dhstudio
 {"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"},{"art":"datenbank","name":"Daten","schema":"Daten.dhdb"}]}

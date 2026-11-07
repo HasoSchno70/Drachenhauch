@@ -47,7 +47,7 @@ PRINT "nennt fall und zeile "; (INSTR(dlAus, "FEHL  Zeile 5: stimmt nicht: Ausga
 PRINT "ausgebliebener fehler faellt auf "; (INSTR(dlAus, "Zeile 13: faellt nicht obwohl es sollte: ein Fehler war erwartet") >= 0)
 PRINT "bilanz "; (INSTR(dlAus, "2 von 4 Faellen") >= 0)
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 rueckgabe 1
 nennt fall und zeile TRUE
@@ -92,7 +92,7 @@ dlStarten(["test", "s.dhtest", "--filter", "Beilage"])
 PRINT "gefiltert rueckgabe "; dlCode
 PRINT "gefiltert ein fall "; (INSTR(dlAus, "1 Faelle") >= 0)
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 rueckgabe 1
 nur der kaputte faellt TRUE
@@ -114,7 +114,7 @@ dlStarten(["test", "s.dhtest"])
 PRINT "rueckgabe "; dlCode
 PRINT "sagt was los ist "; (INSTR(dlAus + dlErr, "gibt es schon") >= 0)
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 rueckgabe 1
 sagt was los ist TRUE
@@ -138,7 +138,7 @@ PRINT "mit rueckgabe "; dlCode
 PRINT "mit laeuft "; (INSTR(dlAus, "1 Faelle") >= 0)
 PRINT "mit nennt "; (INSTR(dlAus, "langsam s") >= 0)
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 ohne rueckgabe 0
 ohne laeuft TRUE

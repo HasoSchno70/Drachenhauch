@@ -27,7 +27,7 @@ WHILE NOT QUITREQUESTED()
     FLIP()
 WEND
 --- argumente
-{sammlung}/_hilfen/fensterlage.ps1
+{sammlung}/../_hilfen/fensterlage.ps1
 --- system windows
 --- erwartet
 vorn False
@@ -53,7 +53,7 @@ WHILE NOT QUITREQUESTED()
     FLIP()
 WEND
 --- argumente
-{sammlung}/_hilfen/fensterlage.ps1
+{sammlung}/../_hilfen/fensterlage.ps1
 --- system windows
 --- umgebung
 DHRT_OHNE_EINGABE=0

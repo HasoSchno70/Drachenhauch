@@ -13,7 +13,7 @@
 
 === rechtsklick ins code-feld setzt einen haltepunkt an der stelle
 DIM prBild AS INTEGER : prBild = 0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 30 THEN
@@ -53,7 +53,7 @@ haupt.dh
 --- umgebung
 DHRT_FRAMES=150
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei haupt.dh
 PRINT 1
@@ -74,7 +74,7 @@ pr haltepunkt haupt.dh 3
 
 === rechtsklick auf einen reiter schliesst die anderen, ungesicherte bleiben
 DIM prBild AS INTEGER : prBild = 0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 20 THEN
@@ -101,7 +101,7 @@ a_eins.dh
 --- umgebung
 DHRT_FRAMES=150
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei a_eins.dh
 PRINT 1
@@ -122,7 +122,7 @@ pr reiter b_zwei.dh c_drei.dh vorn b_zwei.dh
 
 === rechts davon schliessen und im baum zeigen ueber den reiter
 DIM prBild AS INTEGER : prBild = 0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 20 THEN
@@ -157,7 +157,7 @@ a_eins.dh
 --- umgebung
 DHRT_FRAMES=150
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei a_eins.dh
 PRINT 1
@@ -184,13 +184,13 @@ imBaumZeigen("C:/gibt/es/nicht/x.dh")
 protokoll("pr status " + GUI_TEXT(lblStatus))
 befehl("im_baum_zeigen")
 EXIT(0)
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- argumente
 a_eins.dh
 --- umgebung
 DHRT_FRAMES=150
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei a_eins.dh
 PRINT 1

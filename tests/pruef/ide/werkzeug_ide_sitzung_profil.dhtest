@@ -9,7 +9,7 @@
 --- langsam
 === das profil zeigt zeilen der importierten datei und springt dorthin
 DIM prBild AS INTEGER : prBild = 0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach     IF GUI_DOUBLE_CLICKED(lstProbleme) THEN problemAnspringen()
 prBild = prBild + 1
 IF prBild = 30 THEN befehl("profil")
@@ -35,7 +35,7 @@ spiel.dh
 --- umgebung
 DHRT_FRAMES=200
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 IMPORT "helfer.dh"
@@ -61,7 +61,7 @@ sprung helfer.dh 3
 ' Die importierte Datei ist geaendert, aber nicht gesichert, und steht in
 ' einem anderen Reiter -- der Lauf muss die neue Fassung sehen.
 DIM prBild AS INTEGER : prBild = 0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach     IF GUI_DOUBLE_CLICKED(lstProbleme) THEN problemAnspringen()
 prBild = prBild + 1
 IF prBild = 20 THEN
@@ -81,7 +81,7 @@ spiel.dh
 --- umgebung
 DHRT_FRAMES=170
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 IMPORT "helfer.dh"
@@ -120,13 +120,13 @@ FOR prI = 0 TO LEN(lesezeichen) - 1
     protokoll("probe lz " + BASENAME(lesezeichen[prI].pfad) + " " + STR$(lesezeichen[prI].zeile))
 NEXT
 EXIT(0)
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=60
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 DIM x AS INTEGER
@@ -149,13 +149,13 @@ lz spiel.dh 3
 protokoll("probe projekt " + BASENAME(projektOrdner) + " tabs " + STR$(tabAnzahl))
 protokoll("probe status " + LEFT$(GUI_TEXT(lblStatus), 8))
 EXIT(0)
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- argumente
 unterordner
 --- umgebung
 DHRT_FRAMES=60
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei unterordner/a.dh
 PRINT "a"
@@ -175,13 +175,13 @@ status Projekt:
 gitRandNachziehen(TRUE)
 protokoll("probe repo " + STR$(gitRepo(projektOrdner)) + " " + STR$(gitRepo(wurzel)))
 EXIT(0)
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=60
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 PRINT "a"
@@ -204,7 +204,7 @@ DIM prBild AS INTEGER : prBild = 0
 DIM prMax AS FLOAT : prMax = 0.0
 DIM prLetzt AS FLOAT : prLetzt = 0.0
 DIM prEnde AS INTEGER : prEnde = 0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 DIM prJ AS FLOAT : prJ = GET_TIME()
@@ -227,7 +227,7 @@ p.dh
 --- umgebung
 DHRT_FRAMES=6000
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- vorher
 DIM t AS ARRAY OF STRING : t = ["DIM s AS INTEGER : s = 0"]
@@ -255,7 +255,7 @@ pr zeilen 20002 absteigend TRUE flott TRUE
 ' Gruppen stehen absteigend nach Zeit, und es geht flott (grob: 2 s).
 DIM prBild AS INTEGER : prBild = 0
 DIM prEnde AS INTEGER : prEnde = 0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 30 THEN befehl("profil")
@@ -286,7 +286,7 @@ f.dh
 --- umgebung
 DHRT_FRAMES=6000
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- vorher
 DIM t AS ARRAY OF STRING : t = []

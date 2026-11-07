@@ -10,13 +10,13 @@
 
 === plus minus rad und null
 AUTOMATION_PLAY("ev.txt")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=150
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 PRINT "hallo"

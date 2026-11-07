@@ -40,8 +40,8 @@ FOR i = 0 TO LEN(namen) - 1
 NEXT
 PRINT gut; " von "; LEN(namen); " laufen"
 --- argumente
-{sammlung}/../../examples
+{sammlung}/../../../examples
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 23 von 23 laufen

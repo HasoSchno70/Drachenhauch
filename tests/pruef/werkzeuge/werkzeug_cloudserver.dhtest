@@ -107,10 +107,10 @@ a = holen$(port, "DELETE", "/save/p1", AUTH, "")
 PRINT "falsche methode "; status(a)
 PROCESS_KILL(srvProzess)
 --- datei klient.dh
-IMPORT "{sammlung}/_hilfen/httpklient.dh"
+IMPORT "{sammlung}/../_hilfen/httpklient.dh"
 
 --- datei srv.dh
-IMPORT "{sammlung}/../../cloudserver/server.dh"
+IMPORT "{sammlung}/../../../cloudserver/server.dh"
 
 --- erwartet
 port gemeldet TRUE
@@ -156,10 +156,10 @@ PRINT LEFT$(r, 26); "..."
 PROCESS_KILL(srvProzess)
 PRINT "warnung "; INSTR(srvFehler, "OHNE Auth") >= 0
 --- datei klient.dh
-IMPORT "{sammlung}/_hilfen/httpklient.dh"
+IMPORT "{sammlung}/../_hilfen/httpklient.dh"
 
 --- datei srv.dh
-IMPORT "{sammlung}/../../cloudserver/server.dh"
+IMPORT "{sammlung}/../../../cloudserver/server.dh"
 
 --- erwartet
 200
@@ -182,10 +182,10 @@ a = holen$(port, "GET", "/save/p1", "", "")
 PRINT "abgewiesen "; status(a); " origin="; kopf$(a, "Access-Control-Allow-Origin"); " typ="; kopf$(a, "Content-Type")
 PROCESS_KILL(srvProzess)
 --- datei klient.dh
-IMPORT "{sammlung}/_hilfen/httpklient.dh"
+IMPORT "{sammlung}/../_hilfen/httpklient.dh"
 
 --- datei srv.dh
-IMPORT "{sammlung}/../../cloudserver/server.dh"
+IMPORT "{sammlung}/../../../cloudserver/server.dh"
 
 --- erwartet
 vorabfrage 200 origin=* kopfzeilen=X-Api-Key, Content-Type methoden=GET, POST, OPTIONS
@@ -216,10 +216,10 @@ CLOUD_CONFIGURE("http://127.0.0.1:" + STR$(port), "falsch")
 PRINT CLOUD_SAVE("spieler1", "x"); " "; CLOUD_LAST_ERROR$() <> ""
 PROCESS_KILL(srvProzess)
 --- datei klient.dh
-IMPORT "{sammlung}/_hilfen/httpklient.dh"
+IMPORT "{sammlung}/../_hilfen/httpklient.dh"
 
 --- datei srv.dh
-IMPORT "{sammlung}/../../cloudserver/server.dh"
+IMPORT "{sammlung}/../../../cloudserver/server.dh"
 
 --- erwartet
 ||
@@ -248,10 +248,10 @@ PRINT rumpf$(holen$(port, "GET", "/leaderboard/b/top", "X-Api-Key: k", ""))
 PRINT INSTR(rumpf$(holen$(port, "GET", "/save/p1", "X-Api-Key: k", "")), "gemerkt") >= 0
 PROCESS_KILL(srvProzess)
 --- datei klient.dh
-IMPORT "{sammlung}/_hilfen/httpklient.dh"
+IMPORT "{sammlung}/../_hilfen/httpklient.dh"
 
 --- datei srv.dh
-IMPORT "{sammlung}/../../cloudserver/server.dh"
+IMPORT "{sammlung}/../../../cloudserver/server.dh"
 
 --- erwartet
 {"entries":[{"name":"anna","score":7.0}]}

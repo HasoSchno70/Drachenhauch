@@ -107,7 +107,7 @@ cameras send them) get the standard table.
 `DHRT_WEBCAM=test` replaces all cameras by a **test picture** camera: eight
 colour bars (white, yellow, cyan, green, magenta, red, blue, black) with a
 black square that moves 8 points to the right per picture, 30 pictures per
-second, 320 × 240 or the requested size. `tests/pruef/webcam.dhtest` tests
+second, 320 × 240 or the requested size. `tests/pruef/geraete/webcam.dhtest` tests
 everything except the system's path with it; under Linux it also reads
 `vivid`, the kernel's test driver — through the same path as a real camera.
 

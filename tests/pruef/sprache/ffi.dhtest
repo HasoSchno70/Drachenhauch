@@ -285,8 +285,8 @@ DECLARE FUNCTION abs LIB "c" (x AS LONG) AS LONG
 DECLARE FUNCTION GetCurrentProcessId LIB "kernel32" () AS ULONG
 PRINT strlen("Drachenhauch"), abs(-3), GetCurrentProcessId() > 0
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
-IMPORT "{sammlung}/_hilfen/exportlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/exportlauf.dh"
 --- system windows
 --- erwartet
 export 0
@@ -333,8 +333,8 @@ nur ein Platzhalter
 --- datei libungenutzt.so
 nur ein Platzhalter
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
-IMPORT "{sammlung}/_hilfen/exportlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/exportlauf.dh"
 --- erwartet
 export 0
 mitgekommen ist die des systems: TRUE
@@ -801,8 +801,8 @@ ELSE
     PRINT dlAus;
 END IF
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
-CONST BEISPIEL = "{sammlung}/../../examples/207_gtk.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../../examples/207_gtk.dh"
 --- erwartet
 rueckgabe 0
 Hallo, Drache! (2. Gruss)

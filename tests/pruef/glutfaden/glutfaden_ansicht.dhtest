@@ -19,9 +19,9 @@ ELSE
     PRINT "eingepasst: "; punkte("s_eingepasst.png", &HA9152C) > 200
 END IF
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
-IMPORT "{sammlung}/_hilfen/glutfaden_bild.dh"
-CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/glutfaden_bild.dh"
+CONST BEISPIEL = "{sammlung}/../../../examples/glutfaden/main.dh"
 --- erwartet
 rueckgabe 0
 geladen: TRUE, eingepasst: TRUE
@@ -55,9 +55,9 @@ ELSE
     PRINT "halb: rein "; punkte("b_halb.png", &H0097E1) < 50; " gemischt "; punkte("b_halb.png", &H7DC8EB) > 1000
 END IF
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
-IMPORT "{sammlung}/_hilfen/glutfaden_bild.dh"
-CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/glutfaden_bild.dh"
+CONST BEISPIEL = "{sammlung}/../../../examples/glutfaden/main.dh"
 --- erwartet
 rueckgabe 0
 geladen: TRUE farben 6 geaendert FALSE
@@ -108,9 +108,9 @@ ELSE
     PRINT "haken: "; gruenePunkte("d_fortschritt.png") - gruenePunkte("d_rueckstich.png") > 400
 END IF
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
-IMPORT "{sammlung}/_hilfen/glutfaden_bild.dh"
-CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/glutfaden_bild.dh"
+CONST BEISPIEL = "{sammlung}/../../../examples/glutfaden/main.dh"
 --- erwartet
 rueckgabe 0
 geladen: TRUE blau 6 stiche 185
@@ -156,9 +156,9 @@ ELSE
     PRINT "navy: "; punkte("d_importiert.png", &H1B1B2C) > 8000
 END IF
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
-IMPORT "{sammlung}/_hilfen/glutfaden_bild.dh"
-CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/glutfaden_bild.dh"
+CONST BEISPIEL = "{sammlung}/../../../examples/glutfaden/main.dh"
 --- erwartet
 rueckgabe 0
 dialog: TRUE bild 256x256
@@ -193,9 +193,9 @@ ELSE
     PRINT "fotos: "; FILEEXISTS("d_exportdialog.png"); " "; FILEEXISTS("d_aus_oxs.png")
 END IF
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
-IMPORT "{sammlung}/_hilfen/glutfaden_bild.dh"
-CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/glutfaden_bild.dh"
+CONST BEISPIEL = "{sammlung}/../../../examples/glutfaden/main.dh"
 --- erwartet
 rueckgabe 0
 dialog: zeilen je format 9 3 2 0 2 papiere 6 entsprechungen 15

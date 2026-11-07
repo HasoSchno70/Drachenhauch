@@ -36,7 +36,7 @@ FUNCTION prBlau(z AS INTEGER) AS INTEGER
     DELETEFILE("prbild.png")
     RETURN n
 END FUNCTION
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 40 THEN pruefen()
@@ -58,7 +58,7 @@ haupt.dh
 --- umgebung
 DHRT_FRAMES=150
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei haupt.dh
 DIM punkte AS ARRAY OF INTEGER : punkte = [3, 1, 2]
@@ -99,13 +99,13 @@ protokoll("pr hell " + COLOR_HEX$(F_SCHLUESSEL) + " " + COLOR_HEX$(TON_PROJEKT) 
 befehl("thema")
 protokoll("pr wieder dunkel " + COLOR_HEX$(F_SCHLUESSEL))
 EXIT(0)
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- argumente
 haupt.dh
 --- umgebung
 DHRT_FRAMES=200
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei haupt.dh
 PRINT 1
@@ -150,13 +150,13 @@ GUI_SET_TEXT(reiter[aktiverTab].feld, REPLACE$(prT, JSON_GET_STRING(prJ, "dunkel
 befehl("sichern")
 protokoll("pr nachher " + COLOR_HEX$(F_SCHLUESSEL) + " meldungen " + STR$(LEN(farbMeldungen)))
 EXIT(0)
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- argumente
 haupt.dh
 --- umgebung
 DHRT_FRAMES=200
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei haupt.dh
 PRINT 1

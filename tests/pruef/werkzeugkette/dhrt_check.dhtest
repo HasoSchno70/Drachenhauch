@@ -19,7 +19,7 @@ PRINT "rueckgabe "; dlCode
 d = dlCheck(!"PRINT \"a\"\nFOR i = 1 TO\n")
 PRINT "parse "; JSON_LEN(d, "d"); " "; JSON_GET_STRING(d, "d.0.phase"); " Zeile "; JSON_GET_INT(d, "d.0.line")
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 sauber 0
 rueckgabe 0
@@ -44,7 +44,7 @@ WRITEALL("teil.dh", !"SUB g()\n    PRINT 1 +\nEND SUB\n")
 d = dlCheck(!"' eins\n' zwei\nIMPORT \"teil.dh\"\n")
 PRINT BASENAME(JSON_GET_STRING(d, "d.0.file")); " Zeile "; JSON_GET_INT(d, "d.0.line"); " "; JSON_GET_STRING(d, "d.0.phase")
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 teil.dh Zeile 4 Unbekanntes Builtin 'GIBTSNICHT_
 haupt Zeile 2 Unbekanntes Builtin 'UNBEKANNT_Y
@@ -59,7 +59,7 @@ PRINT "nennt BREAK "; (INSTR(JSON_GET_STRING(d, "d.0.message"), "BREAK") >= 0)
 d = dlCheck(!"PRINT 1\nRETURN 5\n")
 PRINT "return "; JSON_GET_STRING(d, "d.0.phase"); " Zeile "; JSON_GET_INT(d, "d.0.line")
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 break 1 compile Zeile 2
 nennt BREAK TRUE
@@ -77,7 +77,7 @@ PRINT "nennt den namen "; (INSTR(JSON_GET_STRING(d, "d.0.message"), "NOTAREALBUI
 d = dlCheck(!"DIM x AS FLOAT\nx = FLT(3)\nPRINT INT(x)\n")
 PRINT "echte builtins still "; JSON_LEN(d, "d")
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 anzahl 1
 art warning compile Zeile 2
@@ -101,7 +101,7 @@ ELSE
     PRINT "nennt den ausweg "; (INSTR(m, "--hardware") >= 0)
 END IF
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 anzahl 1
 art warning Zeile 1
@@ -112,7 +112,7 @@ nennt den ausweg TRUE
 ' Ein Name, zwei Typen -- der Fehler faellt sonst weit entfernt auf
 ' ("Array-Index muss INTEGER sein, erhalten FLOAT") und ist dort nicht mehr
 ' seiner Ursache zuzuordnen. Bis 2026-10 eine Warnung, seitdem ein Fehler
-' (tests/pruef/dim_typwechsel.dhtest).
+' (tests/pruef/sprache/dim_typwechsel.dhtest).
 IMPORT "helfer.dh"
 IMPORT "json"
 FUNCTION dimWarnungen(quelle AS STRING) AS ARRAY OF STRING
@@ -145,7 +145,7 @@ PRINT "in der funktion "; LEN(f); " "; (INSTR(f[0], "Funktion") >= 0)
 DIM a AS ARRAY OF STRING : a = dimWarnungen(!"DIM z[3] AS INTEGER\nDIM z AS INTEGER\nPRINT z\n")
 PRINT "feld lesbar "; LEN(a); " "; (INSTR(a[0], "ARRAY OF INTEGER") >= 0)
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 anzahl 1
 nennt beide typen TRUE
@@ -174,7 +174,7 @@ PRINT "gleicher typ "; dimWarnungen(!"DIM i AS INTEGER\nDIM i AS INTEGER\nPRINT 
 PRINT "in der schleife "; dimWarnungen(!"DIM n AS INTEGER\nFOR n = 1 TO 3\n    DIM k AS INTEGER\n    k = n\nNEXT\nPRINT k\n")
 PRINT "lokal verdeckt global "; dimWarnungen(!"DIM a AS INTEGER\nSUB f()\n    DIM a AS FLOAT\n    PRINT a\nEND SUB\nf()\nPRINT a\n")
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 gleicher typ 0
 in der schleife 0
@@ -208,7 +208,7 @@ NEXT
 SORT(namen)
 PRINT "auch die fehlende "; JOIN$(namen, " ")
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 eine datei []
 zwei zeilen 2
@@ -288,9 +288,9 @@ PRINT "fehler "; fehler
 PRINT "unbekannte builtins "; unbekannt
 PRINT "doppelte dims "; doppelt
 --- argumente
-{sammlung}/../../examples
+{sammlung}/../../../examples
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 genug dateien TRUE
 teile von programmen uebergangen TRUE
@@ -350,9 +350,9 @@ FOR i = 0 TO LEN(zeilen) - 1
 NEXT
 PRINT "falschmeldungen "; funde
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 genug dateien TRUE
 falschmeldungen 0

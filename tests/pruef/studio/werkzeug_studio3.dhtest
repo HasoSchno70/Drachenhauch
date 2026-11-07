@@ -35,10 +35,10 @@ PRINT "zeilen "; LEN(karteMeth) = LEN(t) - 1
 IMPORT "json"
 IMPORT "regex"
 IMPORT "imgfx"
-IMPORT "{sammlung}/../../studio/sprache.dh"
-IMPORT "{sammlung}/../../studio/bibliothek.dh"
-IMPORT "{sammlung}/../../studio/modell.dh"
-IMPORT "{sammlung}/../../studio/projekt.dh"
+IMPORT "{sammlung}/../../../studio/sprache.dh"
+IMPORT "{sammlung}/../../../studio/bibliothek.dh"
+IMPORT "{sammlung}/../../../studio/modell.dh"
+IMPORT "{sammlung}/../../../studio/projekt.dh"
 --- datei Haupt.dh
 CLASS Haupt EXTENDS Haupt_Basis
     DIM n AS INTEGER
@@ -132,9 +132,9 @@ WEND
 PRINT "code "; PROCESS_CODE(k)
 IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- datei proj/projekt.dhstudio
 {"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"}]}
@@ -198,9 +198,9 @@ FOR EACH z IN slAnfang(log, "ausgabe Laufzeitfehler")
     PRINT z
 NEXT
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- datei proj/projekt.dhstudio
 {"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"}]}
@@ -254,9 +254,9 @@ FOR EACH z IN slAnfang(log, "angesprungen ")
     PRINT z
 NEXT
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- datei proj/projekt.dhstudio
 {"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"}]}
@@ -306,9 +306,9 @@ NEXT
 SETENV("DHRT_FRAMES", "20")
 PRINT "lauf "; TRIM$(REPLACE$(SHELL_OUT$(PATHJOIN(p + "/bau", exe)), CHR$(13), ""))
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- datei proj/projekt.dhstudio
 {"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"}]}

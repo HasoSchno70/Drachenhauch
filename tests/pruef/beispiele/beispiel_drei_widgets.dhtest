@@ -26,7 +26,7 @@ IF prBild = 5 THEN
     EXIT(0)
 END IF
 prBild = prBild + 1
---- programm ../../examples/200_gui_akkordeon_assistent.dh nach     GUI_UPDATE()
+--- programm ../../../examples/200_gui_akkordeon_assistent.dh nach     GUI_UPDATE()
 --- einschub nach SETFPS(60)
 DIM prBild AS INTEGER : prBild = 0
 --- umgebung
@@ -61,7 +61,7 @@ IF prBild = 4 THEN
     EXIT(0)
 END IF
 prBild = prBild + 1
---- programm ../../examples/200_gui_akkordeon_assistent.dh nach     GUI_UPDATE()
+--- programm ../../../examples/200_gui_akkordeon_assistent.dh nach     GUI_UPDATE()
 --- einschub nach SETFPS(60)
 DIM prBild AS INTEGER : prBild = 0
 --- umgebung
@@ -93,7 +93,7 @@ IF prBild = 5 THEN
     EXIT(0)
 END IF
 prBild = prBild + 1
---- programm ../../examples/200_gui_akkordeon_assistent.dh nach     GUI_UPDATE()
+--- programm ../../../examples/200_gui_akkordeon_assistent.dh nach     GUI_UPDATE()
 --- einschub nach SETFPS(60)
 DIM prBild AS INTEGER : prBild = 0
 --- umgebung
@@ -113,7 +113,7 @@ IF prBild = 12 THEN
     EXIT(0)
 END IF
 prBild = prBild + 1
---- programm ../../examples/200_gui_akkordeon_assistent.dh nach     GUI_UPDATE()
+--- programm ../../../examples/200_gui_akkordeon_assistent.dh nach     GUI_UPDATE()
 --- einschub nach SETFPS(60)
 DIM prBild AS INTEGER : prBild = 0
 AUTOMATION_PLAY(GETENV$("DHRT_START_DIR") + "/ev.txt")

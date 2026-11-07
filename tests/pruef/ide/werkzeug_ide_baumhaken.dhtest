@@ -18,13 +18,13 @@ NEXT
 projektBeschriften()
 protokoll("probe text " + MID$(GUI_TEXT(lblProjekt), INSTR(GUI_TEXT(lblProjekt), "--"), 99))
 EXIT(0)
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- argumente
 c.dh
 --- umgebung
 DHRT_FRAMES=300
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei c.dh
 PRINT "c"
@@ -55,13 +55,13 @@ protokoll("probe haken " + STR$(GUI_FILETREE_CHECKED_COUNT(baum)))
 befehl("baum_haken")
 protokoll("probe aus " + STR$(baumHakenAn) + " haken " + STR$(GUI_FILETREE_CHECKED_COUNT(baum)) + " dateien " + STR$(LEN(projektDateien("*.dh"))))
 EXIT(0)
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- argumente
 c.dh
 --- umgebung
 DHRT_FRAMES=300
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei c.dh
 PRINT "c"

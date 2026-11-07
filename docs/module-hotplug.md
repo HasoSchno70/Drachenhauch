@@ -64,7 +64,7 @@ Einstecken. Ein HID-Gerät mit mehreren Schnittstellen zählt einmal.
 
 Zum Prüfen ohne Gerät: `DHRT_GERAETE=datei` liest die Listen aus einer
 Textdatei statt vom System, eine Zeile je Gerät als `art:name`. Wer die Datei
-ändert, sieht die Meldungen (`tests/pruef/hotplug.dhtest`).
+ändert, sieht die Meldungen (`tests/pruef/geraete/hotplug.dhtest`).
 
 **Nicht geprüft:** echtes An- und Abstecken. Unter macOS sieht CoreMIDI neue
 MIDI-Geräte womöglich erst, wenn das Programm ein Fenster hat (die

@@ -1,4 +1,4 @@
-' Helfer fuer tests/pruef/websocket.dhtest: den Port eines gestarteten
+' Helfer fuer tests/pruef/geraete/websocket.dhtest: den Port eines gestarteten
 ' Servers lesen (er meldet "PORT=n" auf stderr) und auf eine Antwort warten.
 
 FUNCTION portVon(whP AS INTEGER) AS INTEGER

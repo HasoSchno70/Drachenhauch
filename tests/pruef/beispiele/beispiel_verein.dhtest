@@ -16,10 +16,10 @@
 IMPORT "../ablauf.dh"
 vaAblauf()
 EXIT(0)
---- programm ../../examples/verein/main.dh nach DIM beenden AS BOOLEAN
+--- programm ../../../examples/verein/main.dh nach DIM beenden AS BOOLEAN
 --- datei ablauf.dh
-IMPORT "{sammlung}/_hilfen/verein_ablauf.dh"
-IMPORT "{sammlung}/_hilfen/pdftext.dh"
+IMPORT "{sammlung}/../_hilfen/verein_ablauf.dh"
+IMPORT "{sammlung}/../_hilfen/pdftext.dh"
 --- erwartet
 ohne namen FALSE Der Name fehlt.
 plz kurz FALSE Eine Postleitzahl hat fünf Ziffern.
@@ -69,10 +69,10 @@ db = DB_OPEN(ziel) : art = DB_KIND$(db) : tabellenAnlegen()
 IMPORT "../ablauf.dh"
 vaAblauf()
 EXIT(0)
---- programm ../../examples/verein/main.dh nach DIM beenden AS BOOLEAN
+--- programm ../../../examples/verein/main.dh nach DIM beenden AS BOOLEAN
 --- datei ablauf.dh
-IMPORT "{sammlung}/_hilfen/verein_ablauf.dh"
-IMPORT "{sammlung}/_hilfen/pdftext.dh"
+IMPORT "{sammlung}/../_hilfen/verein_ablauf.dh"
+IMPORT "{sammlung}/../_hilfen/pdftext.dh"
 --- erwartet
 ohne namen FALSE Der Name fehlt.
 plz kurz FALSE Eine Postleitzahl hat fünf Ziffern.
@@ -122,10 +122,10 @@ db = DB_OPEN(ziel) : art = DB_KIND$(db) : tabellenAnlegen()
 IMPORT "../ablauf.dh"
 vaAblauf()
 EXIT(0)
---- programm ../../examples/verein/main.dh nach DIM beenden AS BOOLEAN
+--- programm ../../../examples/verein/main.dh nach DIM beenden AS BOOLEAN
 --- datei ablauf.dh
-IMPORT "{sammlung}/_hilfen/verein_ablauf.dh"
-IMPORT "{sammlung}/_hilfen/pdftext.dh"
+IMPORT "{sammlung}/../_hilfen/verein_ablauf.dh"
+IMPORT "{sammlung}/../_hilfen/pdftext.dh"
 --- erwartet
 ohne namen FALSE Der Name fehlt.
 plz kurz FALSE Eine Postleitzahl hat fünf Ziffern.

@@ -7169,7 +7169,7 @@ ELSE
     PRINT dlAus
 END IF
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- datei prog.dh
 FUNCTION rein(a AS INTEGER, b AS FLOAT) AS FLOAT
     RETURN a * b

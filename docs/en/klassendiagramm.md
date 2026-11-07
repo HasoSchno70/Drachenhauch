@@ -36,4 +36,4 @@ well as `pakete/` and `target/`, stay out, as with the IDE's refactorings.
 If the same class name appears in two files, the first one counts. An
 ancestor the project does not know is shown small above the box.
 
-Tested in `tests/pruef/werkzeug_klassendiagramm.dhtest`.
+Tested in `tests/pruef/werkzeuge/werkzeug_klassendiagramm.dhtest`.

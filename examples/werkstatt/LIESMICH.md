@@ -52,6 +52,6 @@ Ein echtes Board schickt dieselben Topics; das Grundgerüst dafür liegt in
   Bild; die Automatik schaltet den Lüfter zwei Grad unter der Grenze wieder
   ab, sonst ginge er im Takt der Messungen an und aus.
 
-Geprüft wird es in `tests/pruef/beispiel_werkstatt.dhtest`: ohne Broker,
+Geprüft wird es in `tests/pruef/beispiele/beispiel_werkstatt.dhtest`: ohne Broker,
 Alarm und Aufzeichnung, die Lüfter-Automatik gegen einen Test-Broker, der
 dann wegbricht, und der letzte Wille des Sensors am Draht.

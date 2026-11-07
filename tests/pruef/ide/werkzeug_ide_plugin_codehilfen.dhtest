@@ -27,7 +27,7 @@ END FUNCTION
 FUNCTION prZeile$(z AS INTEGER) AS STRING
     RETURN SPLIT$(GUI_TEXT(aktivesFeld()), NL)[z - 1]
 END FUNCTION
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach protokoll("bereit")
 IMPORT "hilfe.dh"
 --- einschub nach glanzStartNachziehen()
@@ -81,7 +81,7 @@ haupt.dh
 --- umgebung
 DHRT_FRAMES=1000
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei haupt.dh
 ' Das ist der Standart
@@ -90,9 +90,9 @@ PRINT "seperat"
 PRINT 1
 
 --- datei _programm/hilfe.dh
-IMPORT "{sammlung}/_hilfen/idemaus.dh"
+IMPORT "{sammlung}/../_hilfen/idemaus.dh"
 --- datei _programm/plugins/schreibweise/plugin.dh
-IMPORT "{sammlung}/../../examples/plugins/schreibweise/plugin.dh"
+IMPORT "{sammlung}/../../../examples/plugins/schreibweise/plugin.dh"
 --- nachher
 DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
 DIM i AS INTEGER

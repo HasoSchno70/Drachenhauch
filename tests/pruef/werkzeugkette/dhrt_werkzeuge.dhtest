@@ -17,7 +17,7 @@ PRINT "beginnt mit dhrt "; (LEFT$(dlAus, 5) = "dhrt ")
 ' ansieht -- die Meldung kam sonst erst beim ersten Aufruf.
 PRINT "nennt die teile "; (INSTR(dlAus, "dabei:") >= 0)
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 rueckgabe 0
 beginnt mit dhrt TRUE
@@ -47,9 +47,9 @@ dlStarten(["--version"])
 PRINT "laufzeit "; (TRIM$(SPLIT$(dlAus, CHR$(10))[0]) = "dhrt " + kurz)
 PRINT "version$ "; (VERSION$() = kurz)
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 cargo gelesen TRUE
 laufzeit TRUE
@@ -65,7 +65,7 @@ FOR i = 0 TO LEN(woerter) - 1
     PRINT woerter[i]; " "; (INSTR(dlAus, woerter[i]) >= 0)
 NEXT
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 rueckgabe 0
 run TRUE
@@ -84,7 +84,7 @@ PRINT "zweimal ok "; dlZaehle(dlAus, "  ok ")
 PRINT "bilanz "; (INSTR(dlAus, "2 Datei(en), 2 ok, 0 mit Fehlern") >= 0)
 --- verzeichnis ordner
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 rueckgabe 0
 zweimal ok 2
@@ -101,7 +101,7 @@ PRINT "bilanz "; (INSTR(dlAus, "1 ok, 1 mit Fehlern") >= 0)
 PRINT "nennt die zusage "; (INSTR(dlAus, "Rechnen") >= 0)
 --- verzeichnis ordner
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 rueckgabe 1
 bilanz TRUE
@@ -117,7 +117,7 @@ PRINT "eine datei "; (INSTR(dlAus, "1 Datei(en)") >= 0)
 PRINT "ohne normal.dh "; (INSTR(dlAus, "normal.dh") < 0)
 --- verzeichnis ordner/eins/zwei
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 rueckgabe 0
 eine datei TRUE
@@ -131,7 +131,7 @@ dlStarten(["test", CWD$() + "/anders.dh"])
 PRINT "rueckgabe "; dlCode
 PRINT "bilanz "; (INSTR(dlAus, "1 Datei(en), 1 ok") >= 0)
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 rueckgabe 0
 bilanz TRUE
@@ -147,7 +147,7 @@ PRINT "weg: rueckgabe "; dlCode
 PRINT "weg: meldet sich "; (INSTR(dlErr, "gibt es nicht") >= 0)
 --- verzeichnis leer
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 leer: rueckgabe 0
 leer: meldet sich TRUE
@@ -165,7 +165,7 @@ PRINT "rueckgabe "; dlCode
 PRINT "unter 30 s "; (MILLIS() - t0 < 30000)
 --- verzeichnis ordner
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 rueckgabe 0
 unter 30 s TRUE
@@ -186,9 +186,9 @@ PRINT "ohne fehler "; (INSTR(dlAus, "0 mit Fehlern") >= 0)
 ' macOS nur "rueckgabe 1" da.
 IF dlCode <> 0 THEN PRINT dlAus; dlErr
 --- argumente
-{sammlung}/../../buch-tippspiel/code
+{sammlung}/../../../buch-tippspiel/code
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 rueckgabe 0
 ohne fehler TRUE
@@ -200,7 +200,7 @@ dlStarten(["fmt", CWD$() + "/a.dh"])
 PRINT "rueckgabe "; dlCode
 PRINT "|" + REPLACE$(dlText$("a.dh"), CHR$(10), "|")
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 rueckgabe 0
 |DIM i AS INTEGER|FOR i = 1 TO 3|    PRINT i|NEXT|
@@ -217,7 +217,7 @@ PRINT "Left$ "; (INSTR(neu, "Left$") >= 0)
 PRINT "text "; (INSTR(neu, CHR$(34) + "das end vom lied" + CHR$(34)) >= 0)
 PRINT "kommentar "; (INSTR(neu, "hier steht auch ein for") >= 0)
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 meinWert TRUE
 Left$ TRUE
@@ -233,7 +233,7 @@ WRITEALL("a.dh", !"DIM n AS INTEGER\nn = 5\nPRINT f\"Wert {n}\"\n")
 dlStarten(["fmt", CWD$() + "/a.dh"])
 PRINT "klein geblieben "; (INSTR(dlText$("a.dh"), "f" + CHR$(34) + "Wert {n}" + CHR$(34)) >= 0)
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 klein geblieben TRUE
 
@@ -248,7 +248,7 @@ dlStarten(["fmt", "--einruecken", CWD$() + "/b.dh"])
 PRINT "rueckgabe "; dlCode
 PRINT "|" + REPLACE$(dlText$("b.dh"), CHR$(10), "|")
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 acht leerzeichen bleiben TRUE
 rueckgabe 0
@@ -262,7 +262,7 @@ WRITEALL("a.dh", !"DIM x AS INTEGER\nx = 1\nSELECT CASE x\nCASE 1\nPRINT 1\nCASE
 dlStarten(["fmt", "--einruecken", CWD$() + "/a.dh"])
 PRINT "|" + REPLACE$(dlText$("a.dh"), CHR$(10), "|")
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 |DIM x AS INTEGER|x = 1|SELECT CASE x|    CASE 1|        PRINT 1|    CASE ELSE|        PRINT 0|END SELECT|
 
@@ -280,7 +280,7 @@ PRINT "ausrichtung erhalten "; (INSTR(neu, "           2) = 2 THEN") >= 0)
 DIM ende AS STRING : ende = !"NEXT\nPRINT 9\n"
 PRINT "ebene laeuft nicht weg "; (RIGHT$(neu, LEN(ende)) = ende)
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 |DIM x AS INTEGER|IF x = 1 THEN x = 2|PRINT x|
 ausrichtung erhalten TRUE
@@ -298,7 +298,7 @@ dlStarten(["fmt", "--pruefen", CWD$() + "/b.dh"])
 PRINT "sauber: rueckgabe "; dlCode
 PRINT "sauber: still "; (TRIM$(dlAus) = "")
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 rueckgabe 1
 meldet sich TRUE
@@ -316,7 +316,7 @@ PRINT "rueckgabe "; dlCode
 PRINT "unveraendert "; (dlText$("a.dh") = quelle)
 PRINT "sagt es "; (INSTR(dlErr, "unveraendert") >= 0)
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 rueckgabe 2
 unveraendert TRUE
@@ -351,9 +351,9 @@ NEXT
 PRINT "geprueft "; (gezaehlt > 150)
 PRINT "unruhig "; unruhig
 --- argumente
-{sammlung}/../../examples
+{sammlung}/../../../examples
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 geprueft TRUE
 unruhig 0
@@ -371,7 +371,7 @@ PRINT "zweite zeile "; (INSTR(dlAus, "Liefert immer einen positiven Wert.") >= 0
 PRINT "dateikopf "; (INSTR(dlAus, "Kleine Sammlung fuer Streckenrechnung.") >= 0)
 PRINT "ohne privates "; (INSTR(dlAus, "pruefe") < 0)
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 rueckgabe 0
 signatur TRUE
@@ -393,7 +393,7 @@ FOR i = 0 TO LEN(woerter) - 1
     PRINT woerter[i]; " "; (INSTR(dlAus, woerter[i]) >= 0)
 NEXT
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 ohne datei: rueckgabe 2
 ohne datei: verwendung TRUE

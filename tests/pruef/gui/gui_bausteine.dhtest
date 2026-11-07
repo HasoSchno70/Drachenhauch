@@ -518,7 +518,7 @@ e 4 2 257 0 0 0
 e 6 1 257 0 0 0
 
 --- umgebung
-DHRT_SCHRIFT_ORDNER={sammlung}/../../examples/assets
+DHRT_SCHRIFT_ORDNER={sammlung}/../../../examples/assets
 DHRT_FRAMES=20
 --- erwartet
 eintraege 1 erster roboto_medium

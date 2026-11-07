@@ -125,7 +125,7 @@ event per frame**, so very long recordings fill up at some point (raylib then
 silently stops recording).
 
 **Limit of the testing:** playback is tested automatically
-([tests/pruef/automation.dhtest](../../tests/pruef/automation.dhtest) writes
+([tests/pruef/fenster/automation.dhtest](../../tests/pruef/fenster/automation.dhtest) writes
 recording files itself and checks that `KEYPRESSED`/`MOUSEX`/`MOUSE_HIT`
 return exactly the recorded values). For recording, it is verified that real
 input is captured and written in the right format — the round trip “record

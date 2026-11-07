@@ -43,7 +43,7 @@ FUNCTION prFarbig(z AS INTEGER, rot AS BOOLEAN) AS INTEGER
     DELETEFILE("prbild.png")
     RETURN n
 END FUNCTION
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 40 THEN pruefen()
@@ -61,7 +61,7 @@ haupt.dh
 --- umgebung
 DHRT_FRAMES=150
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei haupt.dh
 DIM a AS INTEGER
@@ -118,7 +118,7 @@ FUNCTION prFarbig(z AS INTEGER, rot AS BOOLEAN) AS INTEGER
     DELETEFILE("prbild.png")
     RETURN n
 END FUNCTION
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 40 THEN pruefen()
@@ -132,7 +132,7 @@ haupt.dh
 --- umgebung
 DHRT_FRAMES=150
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei haupt.dh
 PRINT 1
@@ -157,7 +157,7 @@ pr zeile 1 rot 0
 ' (dieselbe Zeile noch einmal) und schreibt sie in die ide.json. Die
 ' Umgebung bekommt NUR das gestartete Programm.
 DIM prBild AS INTEGER : prBild = 0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 20 THEN
@@ -181,7 +181,7 @@ haupt.dh
 --- umgebung
 DHRT_FRAMES=200
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei haupt.dh
 PRINT ARGC(); " ["; ARG$(0); "] ["; ARG$(1); "]"
@@ -206,7 +206,7 @@ gemerkt haupt.dh | eins "zwei drei" | DH_PROBE_STUFE=7
 
 === sichern startet ein laufendes programm neu
 DIM prBild AS INTEGER : prBild = 0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 20 THEN
@@ -231,7 +231,7 @@ haupt.dh
 --- umgebung
 DHRT_FRAMES=260
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei haupt.dh
 PRINT "erste fassung"
@@ -255,7 +255,7 @@ pr laeuft TRUE
 
 === ohne den schalter startet sichern nicht neu
 DIM prBild AS INTEGER : prBild = 0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 20 THEN befehl("start")
@@ -277,7 +277,7 @@ haupt.dh
 --- umgebung
 DHRT_FRAMES=260
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei haupt.dh
 PRINT "erste fassung"

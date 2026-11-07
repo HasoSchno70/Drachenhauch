@@ -71,14 +71,14 @@ IMPORT "regex"
 IMPORT "imgfx"
 IMPORT "db"
 IMPORT "pdf"
-IMPORT "{sammlung}/../../studio/sprache.dh"
-IMPORT "{sammlung}/../../studio/bibliothek.dh"
-IMPORT "{sammlung}/../../studio/modell.dh"
-IMPORT "{sammlung}/../../studio/projekt.dh"
-IMPORT "{sammlung}/../../studio/datenbank.dh"
-IMPORT "{sammlung}/../../studio/berichte_laufzeit.dh"
-IMPORT "{sammlung}/../../studio/berichte.dh"
-IMPORT "{sammlung}/_hilfen/pdftext.dh"
+IMPORT "{sammlung}/../../../studio/sprache.dh"
+IMPORT "{sammlung}/../../../studio/bibliothek.dh"
+IMPORT "{sammlung}/../../../studio/modell.dh"
+IMPORT "{sammlung}/../../../studio/projekt.dh"
+IMPORT "{sammlung}/../../../studio/datenbank.dh"
+IMPORT "{sammlung}/../../../studio/berichte_laufzeit.dh"
+IMPORT "{sammlung}/../../../studio/berichte.dh"
+IMPORT "{sammlung}/../_hilfen/pdftext.dh"
 --- erwartet
 parameter ab
 db Daten
@@ -139,14 +139,14 @@ IMPORT "regex"
 IMPORT "imgfx"
 IMPORT "db"
 IMPORT "pdf"
-IMPORT "{sammlung}/../../studio/sprache.dh"
-IMPORT "{sammlung}/../../studio/bibliothek.dh"
-IMPORT "{sammlung}/../../studio/modell.dh"
-IMPORT "{sammlung}/../../studio/projekt.dh"
-IMPORT "{sammlung}/../../studio/datenbank.dh"
-IMPORT "{sammlung}/../../studio/berichte_laufzeit.dh"
-IMPORT "{sammlung}/../../studio/berichte.dh"
-IMPORT "{sammlung}/_hilfen/pdftext.dh"
+IMPORT "{sammlung}/../../../studio/sprache.dh"
+IMPORT "{sammlung}/../../../studio/bibliothek.dh"
+IMPORT "{sammlung}/../../../studio/modell.dh"
+IMPORT "{sammlung}/../../../studio/projekt.dh"
+IMPORT "{sammlung}/../../../studio/datenbank.dh"
+IMPORT "{sammlung}/../../../studio/berichte_laufzeit.dh"
+IMPORT "{sammlung}/../../../studio/berichte.dh"
+IMPORT "{sammlung}/../_hilfen/pdftext.dh"
 --- erwartet
 19: TRUE TRUE
 7: TRUE TRUE
@@ -226,14 +226,14 @@ IMPORT "regex"
 IMPORT "imgfx"
 IMPORT "db"
 IMPORT "pdf"
-IMPORT "{sammlung}/../../studio/sprache.dh"
-IMPORT "{sammlung}/../../studio/bibliothek.dh"
-IMPORT "{sammlung}/../../studio/modell.dh"
-IMPORT "{sammlung}/../../studio/projekt.dh"
-IMPORT "{sammlung}/../../studio/datenbank.dh"
-IMPORT "{sammlung}/../../studio/berichte_laufzeit.dh"
-IMPORT "{sammlung}/../../studio/berichte.dh"
-IMPORT "{sammlung}/_hilfen/pdftext.dh"
+IMPORT "{sammlung}/../../../studio/sprache.dh"
+IMPORT "{sammlung}/../../../studio/bibliothek.dh"
+IMPORT "{sammlung}/../../../studio/modell.dh"
+IMPORT "{sammlung}/../../../studio/projekt.dh"
+IMPORT "{sammlung}/../../../studio/datenbank.dh"
+IMPORT "{sammlung}/../../../studio/berichte_laufzeit.dh"
+IMPORT "{sammlung}/../../../studio/berichte.dh"
+IMPORT "{sammlung}/../_hilfen/pdftext.dh"
 --- erwartet
 bildspalten foto
 puffer 3 zeilen 4
@@ -279,7 +279,7 @@ WHILE leer < 5
 WEND
 PRINT "check "; TRIM$(aus)
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- vorher
 IMPORT "db"
 DIM db AS DB_CONN : db = DB_OPEN("proj/daten.sqlite")
@@ -317,8 +317,8 @@ CLASS Hauptfenster EXTENDS Hauptfenster_Basis
     END SUB
 END CLASS
 --- datei laeufer.dh
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
-IMPORT "{sammlung}/_hilfen/pdftext.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/pdftext.dh"
 slStudio = ARG$(0)
 --- erwartet
 ausgabe pdf gesichert
@@ -368,7 +368,7 @@ FOR EACH z IN slProtokoll(log)
     END IF
 NEXT
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- vorher
 IMPORT "db"
 DIM db AS DB_CONN : db = DB_OPEN("proj/daten.sqlite")
@@ -397,7 +397,7 @@ END CLASS
 CLASS Hauptfenster EXTENDS Hauptfenster_Basis
 END CLASS
 --- datei laeufer.dh
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- erwartet
 vorn bericht Liste

@@ -244,7 +244,7 @@ kind `pingpong`.
 
 ## Tested
 
-`tests/pruef/werkzeug_tracker.dhtest` operates the tracker as if by hand
+`tests/pruef/werkzeuge/werkzeug_tracker.dhtest` operates the tracker as if by hand
 (recording via `AUTOMATION_PLAY`) and checks three results that Drachenhauch
 reads itself: the **file** (json module, with the keys the Qt version read;
 plus two files written by the Qt version), the **WAV** (length, notes, stereo

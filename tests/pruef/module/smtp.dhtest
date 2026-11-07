@@ -102,7 +102,7 @@ PRINT mimeWoerter$(mimeKopf$(n, "Subject"))
 PRINT mimeArt$(n)
 PRINT BUFFER_TO_STRING$(mimeInhalt(n))
 --- datei mime_leser.dh
-IMPORT "{sammlung}/_hilfen/mime.dh"
+IMPORT "{sammlung}/../_hilfen/mime.dh"
 
 --- erwartet
 ich@beispiel.de
@@ -125,7 +125,7 @@ DIM n AS STRING : n = SMTP_MESSAGE$(m)
 PRINT INSTR(mimeKopf$(n, "Subject"), "ü") < 0
 PRINT mimeWoerter$(mimeKopf$(n, "Subject"))
 --- datei mime_leser.dh
-IMPORT "{sammlung}/_hilfen/mime.dh"
+IMPORT "{sammlung}/../_hilfen/mime.dh"
 
 --- erwartet
 TRUE
@@ -155,7 +155,7 @@ NEXT
 PRINT laengste <= 78
 PRINT mimeWoerter$(mimeKopf$(n, "Subject")) = lang
 --- datei mime_leser.dh
-IMPORT "{sammlung}/_hilfen/mime.dh"
+IMPORT "{sammlung}/../_hilfen/mime.dh"
 
 --- erwartet
 TRUE
@@ -172,7 +172,7 @@ SMTP_SUBJECT(m, "Test")
 SMTP_TEXT(m, "Hallo")
 PRINT mimeKopf$(SMTP_MESSAGE$(m), "From")
 --- datei mime_leser.dh
-IMPORT "{sammlung}/_hilfen/mime.dh"
+IMPORT "{sammlung}/../_hilfen/mime.dh"
 
 --- erwartet
 Abteilung Zahlen <ich@beispiel.de>
@@ -195,7 +195,7 @@ FOR i = 0 TO LEN(t) - 1
     PRINT mimeArt$(t[i]); " "; BUFFER_TO_STRING$(mimeInhalt(t[i]))
 NEXT
 --- datei mime_leser.dh
-IMPORT "{sammlung}/_hilfen/mime.dh"
+IMPORT "{sammlung}/../_hilfen/mime.dh"
 
 --- erwartet
 multipart/alternative
@@ -229,7 +229,7 @@ FOR i = 0 TO LEN(t) - 1
 NEXT
 PRINT anzahl
 --- datei mime_leser.dh
-IMPORT "{sammlung}/_hilfen/mime.dh"
+IMPORT "{sammlung}/../_hilfen/mime.dh"
 
 --- erwartet
 multipart/mixed
@@ -254,7 +254,7 @@ FOR i = 0 TO LEN(t) - 1
     IF mimeDateiname$(t[i]) <> "" THEN PRINT mimeDateiname$(t[i]); " "; mimeArt$(t[i])
 NEXT
 --- datei mime_leser.dh
-IMPORT "{sammlung}/_hilfen/mime.dh"
+IMPORT "{sammlung}/../_hilfen/mime.dh"
 
 --- erwartet
 bericht.pdf application/pdf
@@ -284,7 +284,7 @@ FOR i = 0 TO LEN(t) - 1
     END IF
 NEXT
 --- datei mime_leser.dh
-IMPORT "{sammlung}/_hilfen/mime.dh"
+IMPORT "{sammlung}/../_hilfen/mime.dh"
 
 --- erwartet
 2048 TRUE
@@ -304,7 +304,7 @@ PRINT mimeHat(n, "Bcc")
 PRINT INSTR(n, "heimlich") < 0
 PRINT mimeHat(n, "To")
 --- datei mime_leser.dh
-IMPORT "{sammlung}/_hilfen/mime.dh"
+IMPORT "{sammlung}/../_hilfen/mime.dh"
 
 --- erwartet
 FALSE
@@ -326,7 +326,7 @@ PRINT REGEX_TEST(mimeKopf$(n, "Date"), "^(Mon|Tue|Wed|Thu|Fri|Sat|Sun), \d{1,2} 
 DIM id AS STRING : id = mimeKopf$(n, "Message-ID")
 PRINT LEFT$(id, 1) = "<" AND RIGHT$(id, 13) = "@beispiel.de>"
 --- datei mime_leser.dh
-IMPORT "{sammlung}/_hilfen/mime.dh"
+IMPORT "{sammlung}/../_hilfen/mime.dh"
 
 --- erwartet
 TRUE
@@ -353,13 +353,13 @@ PRINT mimeKopf$(d, "Subject")
 PRINT BUFFER_TO_STRING$(mimeInhalt(d))
 beenden()
 --- datei mime_leser.dh
-IMPORT "{sammlung}/_hilfen/mime.dh"
+IMPORT "{sammlung}/../_hilfen/mime.dh"
 
 --- datei gegen.dh
-IMPORT "{sammlung}/_hilfen/smtpstart.dh"
+IMPORT "{sammlung}/../_hilfen/smtpstart.dh"
 
 --- argumente
-{sammlung}/_hilfen/smtpserver.dh
+{sammlung}/../_hilfen/smtpserver.dh
 --- erwartet
 raus
 TRUE
@@ -385,10 +385,10 @@ PRINT befehl("RCPT TO:<heimlich@beispiel.de>")
 PRINT LEN(daten$()) > 0 AND INSTR(daten$(), "heimlich") < 0
 beenden()
 --- datei gegen.dh
-IMPORT "{sammlung}/_hilfen/smtpstart.dh"
+IMPORT "{sammlung}/../_hilfen/smtpstart.dh"
 
 --- argumente
-{sammlung}/_hilfen/smtpserver.dh
+{sammlung}/../_hilfen/smtpserver.dh
 --- erwartet
 TRUE
 TRUE
@@ -416,10 +416,10 @@ FOR i = 0 TO LEN(b) - 1
 NEXT
 beenden()
 --- datei gegen.dh
-IMPORT "{sammlung}/_hilfen/smtpstart.dh"
+IMPORT "{sammlung}/../_hilfen/smtpstart.dh"
 
 --- argumente
-{sammlung}/_hilfen/smtpserver.dh
+{sammlung}/../_hilfen/smtpserver.dh
 --- erwartet
 |hans|geheim
 
@@ -446,10 +446,10 @@ FOR i = 0 TO LEN(b) - 3
 NEXT
 beenden()
 --- datei gegen.dh
-IMPORT "{sammlung}/_hilfen/smtpstart.dh"
+IMPORT "{sammlung}/../_hilfen/smtpstart.dh"
 
 --- argumente
-{sammlung}/_hilfen/smtpserver.dh
+{sammlung}/../_hilfen/smtpserver.dh
 --- erwartet
 AUTH LOGIN
 hans
@@ -475,10 +475,10 @@ CATCH e
 END TRY
 beenden()
 --- datei gegen.dh
-IMPORT "{sammlung}/_hilfen/smtpstart.dh"
+IMPORT "{sammlung}/../_hilfen/smtpstart.dh"
 
 --- argumente
-{sammlung}/_hilfen/smtpserver.dh
+{sammlung}/../_hilfen/smtpserver.dh
 --- erwartet
 TRUE
 
@@ -503,10 +503,10 @@ NEXT
 PRINT auth; " "; befehl("QUIT")
 beenden()
 --- datei gegen.dh
-IMPORT "{sammlung}/_hilfen/smtpstart.dh"
+IMPORT "{sammlung}/../_hilfen/smtpstart.dh"
 
 --- argumente
-{sammlung}/_hilfen/smtpserver.dh
+{sammlung}/../_hilfen/smtpserver.dh
 --- erwartet
 0 TRUE
 
@@ -528,10 +528,10 @@ CATCH e
 END TRY
 beenden()
 --- datei gegen.dh
-IMPORT "{sammlung}/_hilfen/smtpstart.dh"
+IMPORT "{sammlung}/../_hilfen/smtpstart.dh"
 
 --- argumente
-{sammlung}/_hilfen/smtpserver.dh
+{sammlung}/../_hilfen/smtpserver.dh
 --- erwartet
 TRUE
 
@@ -554,9 +554,9 @@ CATCH e
 END TRY
 beenden()
 --- datei gegen.dh
-IMPORT "{sammlung}/_hilfen/smtpstart.dh"
+IMPORT "{sammlung}/../_hilfen/smtpstart.dh"
 
 --- argumente
-{sammlung}/_hilfen/smtpserver.dh
+{sammlung}/../_hilfen/smtpserver.dh
 --- erwartet
 TRUE

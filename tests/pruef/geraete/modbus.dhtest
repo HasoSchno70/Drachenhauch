@@ -26,9 +26,9 @@ PRINT feld$(MODBUS_READ_INPUT(m, 5, 2))
 MODBUS_CLOSE(m)
 PRINT anfragen$()
 --- datei geraet.dh
-IMPORT "{sammlung}/_hilfen/modbusgeraet.dh"
+IMPORT "{sammlung}/../_hilfen/modbusgeraet.dh"
 --- datei hilfe.dh
-IMPORT "{sammlung}/_hilfen/modbushilfe.dh"
+IMPORT "{sammlung}/../_hilfen/modbushilfe.dh"
 --- erwartet
 [0 0 0 1234]
 [1 2 65535 65534]
@@ -77,9 +77,9 @@ END TRY
 MODBUS_CLOSE(m)
 PRINT anfragen$()
 --- datei geraet.dh
-IMPORT "{sammlung}/_hilfen/modbusgeraet.dh"
+IMPORT "{sammlung}/../_hilfen/modbusgeraet.dh"
 --- datei hilfe.dh
-IMPORT "{sammlung}/_hilfen/modbushilfe.dh"
+IMPORT "{sammlung}/../_hilfen/modbushilfe.dh"
 --- erwartet
 [10 0 0 0 0 0 0 0 0 0]
 0001
@@ -111,9 +111,9 @@ END TRY
 ' Danach geht es weiter.
 PRINT feld$(MODBUS_READ_HOLDING(m, 98, 2))
 --- datei geraet.dh
-IMPORT "{sammlung}/_hilfen/modbusgeraet.dh"
+IMPORT "{sammlung}/../_hilfen/modbusgeraet.dh"
 --- datei hilfe.dh
-IMPORT "{sammlung}/_hilfen/modbushilfe.dh"
+IMPORT "{sammlung}/../_hilfen/modbushilfe.dh"
 --- erwartet
 MODBUS_READ_HOLDING: das Geraet meldet Ausnahme 2 (unerlaubte Datenadresse)
 MODBUS_WRITE_COIL: das Geraet meldet Ausnahme 2 (unerlaubte Datenadresse)
@@ -145,9 +145,9 @@ probe("rtu", "stumm")
 probe("rtu", "kaputt")
 probe("rtu", "kurz")
 --- datei geraet.dh
-IMPORT "{sammlung}/_hilfen/modbusgeraet.dh"
+IMPORT "{sammlung}/../_hilfen/modbusgeraet.dh"
 --- datei hilfe.dh
-IMPORT "{sammlung}/_hilfen/modbushilfe.dh"
+IMPORT "{sammlung}/../_hilfen/modbushilfe.dh"
 --- erwartet
 stumm: MODBUS_READ_HOLDING: keine Antwort von Geraet 1 nach 300 ms
 fremd: [0 0]
@@ -173,7 +173,7 @@ PRINT MODBUS_UINT32(MODBUS_INT32_REGS(-1), 0)
 PRINT MODBUS_INT32(MODBUS_INT32_REGS(305419896, "CDAB"), 0, "CDAB")
 PRINT MODBUS_INT16(65535); " "; MODBUS_INT16(32767); " "; MODBUS_INT16(32768)
 --- datei hilfe.dh
-IMPORT "{sammlung}/_hilfen/modbushilfe.dh"
+IMPORT "{sammlung}/../_hilfen/modbushilfe.dh"
 --- erwartet
 [17142 59769]
 [59769 17142]
@@ -254,9 +254,9 @@ probe("spulenwert")
 ' Nichts davon ging hinaus.
 PRINT "[" + anfragen$() + "]"
 --- datei geraet.dh
-IMPORT "{sammlung}/_hilfen/modbusgeraet.dh"
+IMPORT "{sammlung}/../_hilfen/modbusgeraet.dh"
 --- datei hilfe.dh
-IMPORT "{sammlung}/_hilfen/modbushilfe.dh"
+IMPORT "{sammlung}/../_hilfen/modbushilfe.dh"
 --- erwartet
 MODBUS_READ_HOLDING: Anzahl 126 ausserhalb 1..125
 MODBUS_READ_COILS: Anzahl 2001 ausserhalb 1..2000

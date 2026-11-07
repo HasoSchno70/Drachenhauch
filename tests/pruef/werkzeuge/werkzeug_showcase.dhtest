@@ -46,7 +46,7 @@ PRINT "rohbild weg "; NOT FILEEXISTS("wurzel/examples/screenshots/_roh_09_shapes
 DIM b AS BUFFER : b = READALL_BYTES("wurzel/examples/screenshots/09_shapes.png")
 PRINT "farbtyp "; BUFFER_GET(b, 25)
 --- argumente
-{sammlung}/../../tools/showcase_bilder.dh
+{sammlung}/../../../tools/showcase_bilder.dh
 --- datei wurzel/examples/showcase.json
 [
  {"file": "09_shapes.dh", "title": "Formen", "desc": "Ein Kasten.", "frames": 5},
@@ -97,7 +97,7 @@ PRINT aus
 PRINT "rueckgabe "; PROCESS_CODE(p)
 PRINT "bild "; FILEEXISTS("wurzel/examples/screenshots/09_shapes.png")
 --- argumente
-{sammlung}/../../tools/showcase_bilder.dh
+{sammlung}/../../../tools/showcase_bilder.dh
 --- datei wurzel/examples/showcase.json
 [
  {"file": "09_shapes.dh", "title": "Formen", "desc": "Ein Kasten.", "frames": 5},
@@ -117,7 +117,7 @@ bild FALSE
 === die ide zeigt die showcase-liste mit den mitgelieferten bildern
 ' Das Bild unter examples/screenshots/ ist da -- dann laeuft fuer diese Kachel
 ' kein `dhrt bild`; fuer die zweite ohne Bild schon.
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- umgebung
 DHRT_FRAMES=400
 DH_IDE_LOG=ide.log
@@ -169,7 +169,7 @@ vorschau-ordner ohne 09 TRUE
 
 === eine showcase-kachel oeffnet ihr beispiel
 AUTOMATION_PLAY("ev.txt")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- umgebung
 DHRT_FRAMES=260
 DH_IDE_LOG=ide.log
@@ -209,7 +209,7 @@ kachel 09 TRUE
 === das mausrad blaettert durch die kacheln
 ' 32 Kacheln sind acht Reihen; so viele passen unter die Begruessung nicht.
 AUTOMATION_PLAY("ev.txt")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- umgebung
 DHRT_FRAMES=260
 DH_IDE_LOG=ide.log
@@ -264,7 +264,7 @@ reihe 1 TRUE
 ' blaetterten die Kacheln darunter trotzdem mit.
 ' 32 Kacheln sind acht Reihen; so viele passen unter die Begruessung nicht.
 AUTOMATION_PLAY("ev.txt")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach protokoll("bereit")
 handbuch()
 protokoll("handbuch offen " + STR$(GUI_WINDOW_AT(350, 440) = winHandbuch))

@@ -7,7 +7,7 @@
 DIM prBild AS INTEGER : prBild = 0
 DIM prSchritt AS INTEGER : prSchritt = 0
 DIM prWarte AS INTEGER : prWarte = 0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 40 THEN befehl("live") : prSchritt = 1
@@ -35,7 +35,7 @@ bild.dh
 --- umgebung
 DHRT_FRAMES=1200
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei bild.dh
 SCREEN(200, 100, "B", 1)
@@ -70,7 +70,7 @@ kopie am ende FALSE
 DIM prBild AS INTEGER : prBild = 0
 DIM prX0 AS INTEGER
 DIM prY0 AS INTEGER
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 30 THEN befehl("live")
@@ -108,7 +108,7 @@ bild.dh
 --- umgebung
 DHRT_FRAMES=400
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei bild.dh
 SCREEN(200, 100, "B", 1)
@@ -133,7 +133,7 @@ pr verschoben -80 80
 ' einer, den es nicht mehr gibt), beendete die Vorschau die ganze IDE.
 ' Jetzt steht der Grund im Vorschaufenster.
 DIM prBild AS INTEGER : prBild = 0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 30 THEN
@@ -149,7 +149,7 @@ bild.dh
 --- umgebung
 DHRT_FRAMES=400
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei bild.dh
 SCREEN(200, 100, "B", 1)

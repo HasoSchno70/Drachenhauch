@@ -97,7 +97,7 @@ END SUB
 SUB prProbe(k AS INTEGER)
     IF k = 9 THEN prMerke("uPos " + STR$(uPos) + " uAnz " + STR$(uAnz))
 END SUB
---- programm ../../examples/185_partikel_editor.dh nach SETFPS(60)
+--- programm ../../../examples/185_partikel_editor.dh nach SETFPS(60)
 --- einschub nach FLIP()
 prBild = prBild + 1
 IF prBild = 3 THEN
@@ -201,7 +201,7 @@ END SUB
 SUB prProbe(k AS INTEGER)
     IF k = 40 THEN prMerke("bewegt " + prJa$(INT(p(P_GY)) <> prMerk) + " uAnz " + STR$(uAnz) + " uPos " + STR$(uPos))
 END SUB
---- programm ../../examples/185_partikel_editor.dh nach SETFPS(60)
+--- programm ../../../examples/185_partikel_editor.dh nach SETFPS(60)
 --- einschub nach FLIP()
 prBild = prBild + 1
 IF prBild = 3 THEN
@@ -307,7 +307,7 @@ SUB prProbe(k AS INTEGER)
     IF k = 20 THEN prMerke("nach dem zug bewegt " + prJa$(INT(p(P_GY)) <> prMerk) + " uPos " + STR$(uPos))
     IF k = 44 THEN prMerke("wie vorher " + prJa$(INT(p(P_GY)) = prMerk) + " uPos " + STR$(uPos))
 END SUB
---- programm ../../examples/185_partikel_editor.dh nach SETFPS(60)
+--- programm ../../../examples/185_partikel_editor.dh nach SETFPS(60)
 --- einschub nach FLIP()
 prBild = prBild + 1
 IF prBild = 3 THEN
@@ -415,7 +415,7 @@ SUB prProbe(k AS INTEGER)
     IF k = 26 THEN WRITEALL("zug.txt", STR$(INT(p(P_GY))))
     IF k = 56 THEN prMerke("wie nach dem zug " + prJa$(STR$(INT(p(P_GY))) = READLINES("zug.txt")[0]) + " uPos " + STR$(uPos))
 END SUB
---- programm ../../examples/185_partikel_editor.dh nach SETFPS(60)
+--- programm ../../../examples/185_partikel_editor.dh nach SETFPS(60)
 --- einschub nach FLIP()
 prBild = prBild + 1
 IF prBild = 3 THEN
@@ -522,7 +522,7 @@ SUB prProbe(k AS INTEGER)
     IF k = 34 THEN prMerke("z wie vorher " + prJa$(INT(p(P_GY)) = prMerk) + " uPos " + STR$(uPos))
     IF k = 46 THEN prMerke("y bewegt " + prJa$(INT(p(P_GY)) <> prMerk) + " uPos " + STR$(uPos))
 END SUB
---- programm ../../examples/185_partikel_editor.dh nach SETFPS(60)
+--- programm ../../../examples/185_partikel_editor.dh nach SETFPS(60)
 --- einschub nach FLIP()
 prBild = prBild + 1
 IF prBild = 3 THEN
@@ -628,7 +628,7 @@ SUB prProbe(k AS INTEGER)
     IF k = 30 THEN prMerke("preset " + STR$(GUI_LISTBOX_SELECTED(liste)) + " uAnz " + STR$(uAnz) + " uPos " + STR$(uPos))
     IF k = 52 THEN prMerke("zurueck wie vorher " + prJa$(INT(p(P_GY)) = prMerk) + " rot wie vorher " + prJa$(STR$(INT(p(P_R1))) = READLINES("rot.txt")[0]))
 END SUB
---- programm ../../examples/185_partikel_editor.dh nach SETFPS(60)
+--- programm ../../../examples/185_partikel_editor.dh nach SETFPS(60)
 --- einschub nach FLIP()
 prBild = prBild + 1
 IF prBild = 3 THEN
@@ -735,7 +735,7 @@ END SUB
 SUB prProbe(k AS INTEGER)
     IF k = 60 THEN prMerke("uPos " + STR$(uPos) + " uAnz " + STR$(uAnz))
 END SUB
---- programm ../../examples/185_partikel_editor.dh nach SETFPS(60)
+--- programm ../../../examples/185_partikel_editor.dh nach SETFPS(60)
 --- einschub nach FLIP()
 prBild = prBild + 1
 IF prBild = 3 THEN
@@ -837,7 +837,7 @@ END SUB
 SUB prProbe(k AS INTEGER)
     ' nichts
 END SUB
---- programm ../../examples/185_partikel_editor.dh nach SETFPS(60)
+--- programm ../../../examples/185_partikel_editor.dh nach SETFPS(60)
 --- einschub nach FLIP()
 prBild = prBild + 1
 IF prBild = 3 THEN
@@ -945,7 +945,7 @@ SUB prProbe(k AS INTEGER)
         prMerke("paare " + prJa$(p(P_VXMIN) <= p(P_VXMAX) AND p(P_VYMIN) <= p(P_VYMAX) AND p(P_LMIN) <= p(P_LMAX) AND p(P_SMIN) <= p(P_SMAX)))
     END IF
 END SUB
---- programm ../../examples/185_partikel_editor.dh nach SETFPS(60)
+--- programm ../../../examples/185_partikel_editor.dh nach SETFPS(60)
 --- einschub nach FLIP()
 prBild = prBild + 1
 IF prBild = 3 THEN
@@ -1069,7 +1069,7 @@ SUB prProbe(k AS INTEGER)
         prMerke("nah " + prJa$(nah) + " einiges anders " + prJa$(anders >= 5) + " uAnz " + STR$(uAnz))
     END IF
 END SUB
---- programm ../../examples/185_partikel_editor.dh nach SETFPS(60)
+--- programm ../../../examples/185_partikel_editor.dh nach SETFPS(60)
 --- einschub nach FLIP()
 prBild = prBild + 1
 IF prBild = 3 THEN
@@ -1176,7 +1176,7 @@ SUB prProbe(k AS INTEGER)
     IF k = 18 THEN prMerke("farbe anders " + prJa$(STR$(GUI_PICKED_COLOR(wahl1)) <> READLINES("vorher.txt")[0]) + " uAnz " + STR$(uAnz))
     IF k = 30 THEN prMerke("zurueck " + prJa$(STR$(GUI_PICKED_COLOR(wahl1)) = READLINES("vorher.txt")[0]) + " uPos " + STR$(uPos))
 END SUB
---- programm ../../examples/185_partikel_editor.dh nach SETFPS(60)
+--- programm ../../../examples/185_partikel_editor.dh nach SETFPS(60)
 --- einschub nach FLIP()
 prBild = prBild + 1
 IF prBild = 3 THEN
@@ -1196,7 +1196,7 @@ DHRT_FRAMES=36
 ' ueberschrieb die Anfangsfarbe. Jetzt eigene Schluessel; der Dateidialog ist
 ' durch einen festen Namen ersetzt.
 SET_WINDOW_POS(-3000, -3000)
---- programm ../../examples/185_partikel_editor.dh nach SETFPS(60)
+--- programm ../../../examples/185_partikel_editor.dh nach SETFPS(60)
 --- ersetzen datei = FILE_SAVE_DIALOG("Einstellung sichern", "partikel.ini", "ini")
 datei = "probe.ini"
 --- einschub nach FLIP()
@@ -1225,7 +1225,7 @@ Rot=10
 Gruen=200
 Blau=30
 modus=pixel
---- programm ../../examples/185_partikel_editor.dh nach SETFPS(60)
+--- programm ../../../examples/185_partikel_editor.dh nach SETFPS(60)
 --- ersetzen datei = FILE_OPEN_DIALOG("Einstellung laden", "ini")
 datei = "../alt.ini"
 --- einschub nach FLIP()

@@ -6,7 +6,7 @@
 ' Ein Eintrag im Inhalt springt zum Abschnitt; ein Verweis oeffnet ein
 ' anderes Dokument; Zurueck bringt Dokument UND Stelle wieder, Vor das andere.
 DIM prN AS INTEGER : prN = 0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prN = prN + 1
 IF prN = 5 THEN handbuchZeigen("aaa.md", 1)
@@ -258,7 +258,7 @@ pr vor bbb.md 0
 ' Der Titel "Zweiter Teil" steht schon im Inhaltsverzeichnis oben; die
 ' Textsuche von frueher landete dort. Die Marke gehoert der Ueberschrift.
 DIM prN AS INTEGER : prN = 0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prN = prN + 1
 IF prN = 5 THEN handbuchZeigen("ccc.md", 1)
@@ -544,7 +544,7 @@ pr abschnitt 3
 ' die Treffer mit Zeilennummer; ein Klick oeffnet das Dokument an der
 ' Stelle. "Inhalt" holt das Inhaltsverzeichnis zurueck.
 DIM prN AS INTEGER : prN = 0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prN = prN + 1
 IF prN = 5 THEN handbuchZeigen("aaa.md", 1)
@@ -607,7 +607,7 @@ pr inhalt 1 Beta In allen
 ' ungesicherten Reiter mit dem Code an, "Starten" laesst ihn laufen, ohne
 ' nach einem Namen zu fragen.
 DIM prN AS INTEGER : prN = 0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prN = prN + 1
 IF prN = 5 THEN handbuchZeigen("aaa.md", 1)
@@ -678,7 +678,7 @@ pr ausgabe hallo aus dem handbuch
 ' `Code` (Text-Farbe) wie der Editor -- gezaehlt im Bild, innerhalb des
 ' Feldes. Gegenprobe: ohne hbQuelleFaerben ist beides 0.
 DIM prN AS INTEGER : prN = 0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prN = prN + 1
 IF prN = 5 THEN handbuchZeigen("aaa.md", 1)

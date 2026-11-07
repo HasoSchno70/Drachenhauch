@@ -5,7 +5,7 @@
 ' treffen, jede Sprungmarke eine Ueberschrift.
 
 === markdown wird zu html
---- programm ../../tools/website.dh
+--- programm ../../../tools/website.dh
 --- argumente
 --wurzel
 {fall}/repo
@@ -117,10 +117,10 @@ robots TRUE
 ' Baut die Seite aus dem Repository und folgt jedem href/src, das nicht
 ' nach draussen zeigt: die Datei muss es geben, eine Sprungmarke als id in
 ' ihr. Dazu: keine Seite verweist noch auf eine .md-Datei daneben.
---- programm ../../tools/website.dh
+--- programm ../../../tools/website.dh
 --- argumente
 --wurzel
-{sammlung}/../..
+{sammlung}/../../..
 --ziel
 {fall}/site
 --- nachher

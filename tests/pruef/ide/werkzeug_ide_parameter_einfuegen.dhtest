@@ -19,13 +19,13 @@ NEXT
 befehl("parameter_namen")
 protokoll("pr aus " + STR$(paramNamenAn))
 EXIT(0)
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- argumente
 haupt.dh
 --- umgebung
 DHRT_FRAMES=200
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei haupt.dh
 SUB kreis(x AS INTEGER, y AS INTEGER, r AS INTEGER)
@@ -79,13 +79,13 @@ FOR prI = 0 TO LEN(paramHinweise) - 1
 NEXT
 protokoll("pr flott " + STR$(prD < 1.0))
 EXIT(0)
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- argumente
 gross.dh
 --- umgebung
 DHRT_FRAMES=200
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- vorher
 DIM t AS ARRAY OF STRING : t = []
@@ -116,7 +116,7 @@ DIM prBild AS INTEGER : prBild = 0
 FUNCTION prText$() AS STRING
     RETURN REPLACE$(GUI_TEXT(reiter[aktiverTab].feld), NL, "/")
 END FUNCTION
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 20 THEN
@@ -141,7 +141,7 @@ haupt.dh
 --- umgebung
 DHRT_FRAMES=150
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei haupt.dh
 SUB s()
@@ -172,13 +172,13 @@ GUI_TEXTAREA_GOTO(prT, 4, 11)
 befehl("code_einfuegen")
 protokoll("pr aus |" + REPLACE$(GUI_TEXT(prT), NL, "/") + "|")
 EXIT(0)
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- argumente
 haupt.dh
 --- umgebung
 DHRT_FRAMES=200
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei haupt.dh
     x = f(
@@ -207,13 +207,13 @@ GUI_TEXTAREA_SELECT(prT, 2, 1, 2, 1000000)
 befehl("code_einfuegen")
 protokoll("pr spalte0 |" + REPLACE$(GUI_TEXT(prT), NL, "/") + "|")
 EXIT(0)
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- argumente
 haupt.dh
 --- umgebung
 DHRT_FRAMES=200
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei haupt.dh
 SUB s()
@@ -242,13 +242,13 @@ FOR prI = 0 TO LEN(paramHinweise) - 1
     protokoll("pr param " + STR$(paramHinweise[prI].zeile) + " " + paramHinweise[prI].text)
 NEXT
 EXIT(0)
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- argumente
 haupt.dh
 --- umgebung
 DHRT_FRAMES=200
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei haupt.dh
 CLASS Aa
@@ -296,13 +296,13 @@ FOR prI = 0 TO LEN(paramHinweise) - 1
     protokoll("pr param " + STR$(paramHinweise[prI].zeile) + " " + paramHinweise[prI].text)
 NEXT
 EXIT(0)
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- argumente
 haupt.dh
 --- umgebung
 DHRT_FRAMES=200
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei haupt.dh
 CLASS Aa
@@ -351,13 +351,13 @@ DIM prZeilen AS ARRAY OF STRING : prZeilen = SPLIT$(GUI_TEXT(reiter[0].feld), NL
 protokoll("pr zeile " + prZeilen[11])
 protokoll("pr markiert " + GUI_TEXTAREA_SELECTION$(reiter[0].feld))
 EXIT(0)
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- argumente
 haupt.dh
 --- umgebung
 DHRT_FRAMES=200
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei haupt.dh
 CLASS Aa

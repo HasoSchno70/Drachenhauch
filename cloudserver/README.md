@@ -108,7 +108,7 @@ ein Problem wäre.
 ## Tests
 
 ```
-dhrt test tests/pruef/werkzeug_cloudserver.dhtest
+dhrt test tests/pruef/werkzeuge/werkzeug_cloudserver.dhtest
 ```
 
 Startet den Server als eigenen Prozess mit einer frischen SQLite-Datei je

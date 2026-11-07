@@ -197,7 +197,7 @@ SUB prProbe(k AS INTEGER)
         prSchreib("werkzeug " + STR$(werkzeug) + " selN " + STR$(selN) + " " + STR$(selB) + "x" + STR$(selH))
     END IF
 END SUB
---- programm ../../examples/189_sprite_editor.dh nach SETFPS(60)
+--- programm ../../../examples/189_sprite_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
@@ -392,7 +392,7 @@ SUB prProbe(k AS INTEGER)
         prSchreib("strich da " + prJa$(prG >= 20) + " genau das gemalte " + prJa$(selN = prG) + " selH " + STR$(selH))
     END IF
 END SUB
---- programm ../../examples/189_sprite_editor.dh nach SETFPS(60)
+--- programm ../../../examples/189_sprite_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
@@ -591,7 +591,7 @@ SUB prProbe(k AS INTEGER)
         prSchreib("selN " + STR$(selN) + " " + STR$(selB) + "x" + STR$(selH))
     END IF
 END SUB
---- programm ../../examples/189_sprite_editor.dh nach SETFPS(60)
+--- programm ../../../examples/189_sprite_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
@@ -792,7 +792,7 @@ SUB prProbe(k AS INTEGER)
         prSchreib("selN " + STR$(selN))
     END IF
 END SUB
---- programm ../../examples/189_sprite_editor.dh nach SETFPS(60)
+--- programm ../../../examples/189_sprite_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
@@ -987,7 +987,7 @@ SUB prProbe(k AS INTEGER)
         prSchreib("werkzeug " + STR$(werkzeug) + " rahmen " + STR$(selB) + "x" + STR$(selH) + " im band " + prJa$(selN >= 150 AND selN <= 260) + " kleiner als rahmen " + prJa$(selN < selB * selH))
     END IF
 END SUB
---- programm ../../examples/189_sprite_editor.dh nach SETFPS(60)
+--- programm ../../../examples/189_sprite_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
@@ -1180,7 +1180,7 @@ SUB prProbe(k AS INTEGER)
         prSchreib("auswahl steht " + prJa$(selN > 100) + " loecher " + STR$(prL))
     END IF
 END SUB
---- programm ../../examples/189_sprite_editor.dh nach SETFPS(60)
+--- programm ../../../examples/189_sprite_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
@@ -1376,7 +1376,7 @@ SUB prProbe(k AS INTEGER)
         prSchreib("auswahl steht " + prJa$(selN > 100) + " innen gemalt " + prJa$(prG > 0) + " draussen " + STR$(prD) + " begrenzt " + prJa$(prG < 32))
     END IF
 END SUB
---- programm ../../examples/189_sprite_editor.dh nach SETFPS(60)
+--- programm ../../../examples/189_sprite_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
@@ -1572,7 +1572,7 @@ SUB prProbe(k AS INTEGER)
         prSchreib("auswahl steht " + prJa$(selN > 100) + " innen leer " + prJa$(prD = prG) + " aussen steht " + prJa$(prG >= 15 AND prG < 32))
     END IF
 END SUB
---- programm ../../examples/189_sprite_editor.dh nach SETFPS(60)
+--- programm ../../../examples/189_sprite_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
@@ -1774,7 +1774,7 @@ SUB prProbe(k AS INTEGER)
         prSchreib("selN " + STR$(selN) + " gemalt " + STR$(prG))
     END IF
 END SUB
---- programm ../../examples/189_sprite_editor.dh nach SETFPS(60)
+--- programm ../../../examples/189_sprite_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
@@ -1975,7 +1975,7 @@ SUB prProbe(k AS INTEGER)
         prSchreib("werkzeug " + STR$(werkzeug) + " bei " + STR$(selX) + "," + STR$(selY) + " rahmen " + STR$(selB) + "x" + STR$(selH) + " gleiche zahl " + prJa$(selN = prA) + " gemalt " + STR$(prG))
     END IF
 END SUB
---- programm ../../examples/189_sprite_editor.dh nach SETFPS(60)
+--- programm ../../../examples/189_sprite_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
@@ -2170,7 +2170,7 @@ SUB prProbe(k AS INTEGER)
         prSchreib("selN " + STR$(selN) + " gemalt " + STR$(prG))
     END IF
 END SUB
---- programm ../../examples/189_sprite_editor.dh nach SETFPS(60)
+--- programm ../../../examples/189_sprite_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
@@ -2364,7 +2364,7 @@ SUB prProbe(k AS INTEGER)
         prSchreib("pal0 " + STR$(pal[0]) + " pal15 " + STR$(pal[15]))
     END IF
 END SUB
---- programm ../../examples/189_sprite_editor.dh nach SETFPS(60)
+--- programm ../../../examples/189_sprite_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
@@ -2583,7 +2583,7 @@ END SUB
 SUB prProbe(k AS INTEGER)
     IF k >= 12 THEN prSchreib("")
 END SUB
---- programm ../../examples/189_sprite_editor.dh nach SETFPS(60)
+--- programm ../../../examples/189_sprite_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
@@ -2810,7 +2810,7 @@ SUB prProbe(k AS INTEGER)
         prSchreib("pal0 " + STR$(pal[0]) + " pal15 " + STR$(pal[15]))
     END IF
 END SUB
---- programm ../../examples/189_sprite_editor.dh nach SETFPS(60)
+--- programm ../../../examples/189_sprite_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
@@ -3029,7 +3029,7 @@ SUB prProbe(k AS INTEGER)
         prSchreib("dreifach eingepasst " + prJa$(zoom = MAX(1, MIN(32, MIN((cw - 40) \ (32 * 3), (ch - 40) \ (32 * 3))))) + " passt " + prJa$(zoom * 32 * 3 <= cw) + " herausgezoomt " + prJa$(zoom < prA))
     END IF
 END SUB
---- programm ../../examples/189_sprite_editor.dh nach SETFPS(60)
+--- programm ../../../examples/189_sprite_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
@@ -3224,7 +3224,7 @@ SUB prProbe(k AS INTEGER)
         prSchreib("gemalt " + STR$(prG))
     END IF
 END SUB
---- programm ../../examples/189_sprite_editor.dh nach SETFPS(60)
+--- programm ../../../examples/189_sprite_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
@@ -3461,7 +3461,7 @@ END SUB
 SUB prProbe(k AS INTEGER)
     IF k >= 88 THEN prSchreib("")
 END SUB
---- programm ../../examples/189_sprite_editor.dh nach SETFPS(60)
+--- programm ../../../examples/189_sprite_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
@@ -3683,7 +3683,7 @@ SUB prProbe(k AS INTEGER)
         prSchreib(STR$(gw) + "x" + STR$(gh) + " gemalt " + STR$(prG))
     END IF
 END SUB
---- programm ../../examples/189_sprite_editor.dh nach SETFPS(60)
+--- programm ../../../examples/189_sprite_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
@@ -3879,7 +3879,7 @@ SUB prProbe(k AS INTEGER)
         prSchreib(STR$(gw) + "x" + STR$(gh) + " gemalt " + STR$(prG))
     END IF
 END SUB
---- programm ../../examples/189_sprite_editor.dh nach SETFPS(60)
+--- programm ../../../examples/189_sprite_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
@@ -4074,7 +4074,7 @@ SUB prProbe(k AS INTEGER)
         prSchreib(STR$(gw) + "x" + STR$(gh) + " gemalt " + STR$(prG))
     END IF
 END SUB
---- programm ../../examples/189_sprite_editor.dh nach SETFPS(60)
+--- programm ../../../examples/189_sprite_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
@@ -4280,7 +4280,7 @@ SUB prProbe(k AS INTEGER)
         prSchreib("weg " + STR$(anzAnim) + " " + STR$(aktAnim))
     END IF
 END SUB
---- programm ../../examples/189_sprite_editor.dh nach SETFPS(60)
+--- programm ../../../examples/189_sprite_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
@@ -4478,7 +4478,7 @@ SUB prProbe(k AS INTEGER)
         prSchreib(STR$(anzBild) + " bilder " + STR$(anzAnim) + " bereich " + STR$(anVon[0]) + ".." + STR$(anBis[0]))
     END IF
 END SUB
---- programm ../../examples/189_sprite_editor.dh nach SETFPS(60)
+--- programm ../../../examples/189_sprite_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
@@ -4678,7 +4678,7 @@ END SUB
 SUB prProbe(k AS INTEGER)
     IF k >= 39 THEN prSchreib("")
 END SUB
---- programm ../../examples/189_sprite_editor.dh nach SETFPS(60)
+--- programm ../../../examples/189_sprite_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
@@ -4900,7 +4900,7 @@ END SUB
 SUB prProbe(k AS INTEGER)
     IF k >= 24 THEN prSchreib("")
 END SUB
---- programm ../../examples/189_sprite_editor.dh nach SETFPS(60)
+--- programm ../../../examples/189_sprite_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
@@ -5123,7 +5123,7 @@ END SUB
 SUB prProbe(k AS INTEGER)
     IF k >= 32 THEN prSchreib("")
 END SUB
---- programm ../../examples/189_sprite_editor.dh nach SETFPS(60)
+--- programm ../../../examples/189_sprite_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
@@ -5359,7 +5359,7 @@ END SUB
 SUB prProbe(k AS INTEGER)
     IF k >= 26 THEN prSchreib("")
 END SUB
---- programm ../../examples/189_sprite_editor.dh nach SETFPS(60)
+--- programm ../../../examples/189_sprite_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
@@ -5592,7 +5592,7 @@ END SUB
 SUB prProbe(k AS INTEGER)
     IF k >= 32 THEN prSchreib("")
 END SUB
---- programm ../../examples/189_sprite_editor.dh nach SETFPS(60)
+--- programm ../../../examples/189_sprite_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
@@ -5830,7 +5830,7 @@ END SUB
 SUB prProbe(k AS INTEGER)
     IF k >= 32 THEN prSchreib("")
 END SUB
---- programm ../../examples/189_sprite_editor.dh nach SETFPS(60)
+--- programm ../../../examples/189_sprite_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
@@ -6071,7 +6071,7 @@ SUB prProbe(k AS INTEGER)
         prSchreib("bilder " + STR$(anzBild) + " namLen " + STR$(LEN(bildName[aktBild])))
     END IF
 END SUB
---- programm ../../examples/189_sprite_editor.dh nach SETFPS(60)
+--- programm ../../../examples/189_sprite_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
@@ -6282,7 +6282,7 @@ SUB prProbe(k AS INTEGER)
         prSchreib("nachher " + STR$(gw) + "x" + STR$(gh))
     END IF
 END SUB
---- programm ../../examples/189_sprite_editor.dh nach SETFPS(60)
+--- programm ../../../examples/189_sprite_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
@@ -6492,7 +6492,7 @@ SUB prProbe(k AS INTEGER)
         prSchreib("masse gleich " + prJa$(gw = prB AND gh = prC) + " ecken " + prEcken$())
     END IF
 END SUB
---- programm ../../examples/189_sprite_editor.dh nach SETFPS(60)
+--- programm ../../../examples/189_sprite_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
@@ -6691,7 +6691,7 @@ SUB prProbe(k AS INTEGER)
         prSchreib("masse gleich " + prJa$(gw = prB AND gh = prC) + " ecken " + prEcken$())
     END IF
 END SUB
---- programm ../../examples/189_sprite_editor.dh nach SETFPS(60)
+--- programm ../../../examples/189_sprite_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
@@ -6890,7 +6890,7 @@ SUB prProbe(k AS INTEGER)
         prSchreib("masse gleich " + prJa$(gw = prB AND gh = prC) + " ecken " + prEcken$())
     END IF
 END SUB
---- programm ../../examples/189_sprite_editor.dh nach SETFPS(60)
+--- programm ../../../examples/189_sprite_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
@@ -7089,7 +7089,7 @@ SUB prProbe(k AS INTEGER)
         prSchreib("masse gleich " + prJa$(gw = prB AND gh = prC) + " ecken " + prEcken$())
     END IF
 END SUB
---- programm ../../examples/189_sprite_editor.dh nach SETFPS(60)
+--- programm ../../../examples/189_sprite_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
@@ -7290,7 +7290,7 @@ SUB prProbe(k AS INTEGER)
         prSchreib("masse gleich " + prJa$(gw = prB AND gh = prC) + " ecken " + prEcken$() + " gleich viel " + prJa$(prG = prE4))
     END IF
 END SUB
---- programm ../../examples/189_sprite_editor.dh nach SETFPS(60)
+--- programm ../../../examples/189_sprite_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
@@ -7487,7 +7487,7 @@ SUB prProbe(k AS INTEGER)
         prSchreib("uAnz " + STR$(uAnz))
     END IF
 END SUB
---- programm ../../examples/189_sprite_editor.dh nach SETFPS(60)
+--- programm ../../../examples/189_sprite_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
@@ -7680,7 +7680,7 @@ SUB prProbe(k AS INTEGER)
         prSchreib("ms0 " + STR$(bildMs[0]) + " dauer0 " + STR$(dauerMs(0)))
     END IF
 END SUB
---- programm ../../examples/189_sprite_editor.dh nach SETFPS(60)
+--- programm ../../../examples/189_sprite_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
@@ -7874,7 +7874,7 @@ SUB prProbe(k AS INTEGER)
         prSchreib("gesetzt " + prJa$(bildMs[0] > 0) + " gilt " + prJa$(dauerMs(0) = bildMs[0]))
     END IF
 END SUB
---- programm ../../examples/189_sprite_editor.dh nach SETFPS(60)
+--- programm ../../../examples/189_sprite_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
@@ -8070,7 +8070,7 @@ END SUB
 SUB prProbe(k AS INTEGER)
     IF k >= 50 THEN prSchreib("")
 END SUB
---- programm ../../examples/189_sprite_editor.dh nach SETFPS(60)
+--- programm ../../../examples/189_sprite_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
@@ -8290,7 +8290,7 @@ SUB prProbe(k AS INTEGER)
         prSchreib("zurueck " + prJa$(bildMs[0] = prA))
     END IF
 END SUB
---- programm ../../examples/189_sprite_editor.dh nach SETFPS(60)
+--- programm ../../../examples/189_sprite_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
@@ -8502,7 +8502,7 @@ SUB prProbe(k AS INTEGER)
         prSchreib("zurueck " + STR$(anzAnim))
     END IF
 END SUB
---- programm ../../examples/189_sprite_editor.dh nach SETFPS(60)
+--- programm ../../../examples/189_sprite_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
@@ -8744,7 +8744,7 @@ SUB prProbe(k AS INTEGER)
                   " angelegt " + STR$(prAngelegt()) + " letzte " + STR$(GETALPHA(ebene[63, 7], 0, 0)))
     END IF
 END SUB
---- programm ../../examples/189_sprite_editor.dh nach SETFPS(60)
+--- programm ../../../examples/189_sprite_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
@@ -8973,7 +8973,7 @@ SUB prProbe(k AS INTEGER)
                   STR$(prGemalt(1, 0)) + " rand " + STR$(GETALPHA(ebene[1, 0], 47, 39)))
     END IF
 END SUB
---- programm ../../examples/189_sprite_editor.dh nach SETFPS(60)
+--- programm ../../../examples/189_sprite_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
@@ -9208,7 +9208,7 @@ SUB prProbe(k AS INTEGER)
         prSchreib("ebenen " + STR$(anzEb) + " gemalt " + STR$(prGemalt(0, 1)))
     END IF
 END SUB
---- programm ../../examples/189_sprite_editor.dh nach SETFPS(60)
+--- programm ../../../examples/189_sprite_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
@@ -9431,7 +9431,7 @@ SUB prProbe(k AS INTEGER)
         prSchreib("bilder " + STR$(anzBild) + " gemalt " + STR$(prGemalt(1, 0)))
     END IF
 END SUB
---- programm ../../examples/189_sprite_editor.dh nach SETFPS(60)
+--- programm ../../../examples/189_sprite_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
@@ -9630,7 +9630,7 @@ SUB prProbe(k AS INTEGER)
     END IF
     IF k = 8 THEN prSchreib("geladen " + STR$(ebDeck[0]) + " regler " + STR$(INT(GUI_VALUE(slDeck) + 0.5)) + " ungesichert " + IIF(ungesichert, "ja", "nein"))
 END SUB
---- programm ../../examples/189_sprite_editor.dh nach SETFPS(60)
+--- programm ../../../examples/189_sprite_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
@@ -9823,7 +9823,7 @@ SUB prProbe(k AS INTEGER)
     IF k = 10 THEN prMerke("vorher " + STR$(aktBild) + " von " + STR$(anzBild))
     IF k >= 18 THEN prSchreib("jetzt " + STR$(aktBild) + " liste " + STR$(GUI_LISTBOX_SELECTED(lstBild)))
 END SUB
---- programm ../../examples/189_sprite_editor.dh nach SETFPS(60)
+--- programm ../../../examples/189_sprite_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
@@ -10018,7 +10018,7 @@ SUB prProbe(k AS INTEGER)
     IF k = 18 THEN prMerke("zuletzt " + STR$(LEN(zuFarben)) + " vorn " + COLOR_HEX$(zuFarben[0]) + " dann " + COLOR_HEX$(zuFarben[1]))
     IF k >= 28 THEN prSchreib("farbe " + COLOR_HEX$(farbe))
 END SUB
---- programm ../../examples/189_sprite_editor.dh nach SETFPS(60)
+--- programm ../../../examples/189_sprite_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
@@ -10207,7 +10207,7 @@ END SUB
 SUB prProbe(k AS INTEGER)
     IF k >= 8 THEN prSchreib("werkzeug " + STR$(werkzeug) + " " + wzName[werkzeug])
 END SUB
---- programm ../../examples/189_sprite_editor.dh nach SETFPS(60)
+--- programm ../../../examples/189_sprite_editor.dh nach SETFPS(60)
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 

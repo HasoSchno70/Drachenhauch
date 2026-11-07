@@ -28,7 +28,7 @@ c8V[2] = 250
 op(&H7210)
 PRINT "7XNN "; c8V[2]; " vf bleibt "; c8V[15]
 --- datei hilfe.dh
-IMPORT "{sammlung}/_hilfen/chip8.dh"
+IMPORT "{sammlung}/../_hilfen/chip8.dh"
 --- erwartet
 8XY4 44 vf 1
 8XY5 246 vf 0
@@ -59,7 +59,7 @@ c8V[15] = 7 : c8V[0] = 12 : c8V[1] = 10
 op(&H8012)
 PRINT "cosmac and "; c8V[0]; " vf "; c8V[15]
 --- datei hilfe.dh
-IMPORT "{sammlung}/_hilfen/chip8.dh"
+IMPORT "{sammlung}/../_hilfen/chip8.dh"
 --- erwartet
 chip-48 shr 64 vf 1
 chip-48 shl 2 vf 1
@@ -99,7 +99,7 @@ c8V[2] = 5
 op(&HF218)
 PRINT "ton "; c8Ton
 --- datei hilfe.dh
-IMPORT "{sammlung}/_hilfen/chip8.dh"
+IMPORT "{sammlung}/../_hilfen/chip8.dh"
 --- erwartet
 bcd 234
 fx55 789 i 310
@@ -135,7 +135,7 @@ PRINT "5XY0 gleich "; c8Hex$(c8PC, 3)
 op(&H9010)
 PRINT "9XY0 gleich "; c8Hex$(c8PC, 3)
 --- datei hilfe.dh
-IMPORT "{sammlung}/_hilfen/chip8.dh"
+IMPORT "{sammlung}/../_hilfen/chip8.dh"
 --- erwartet
 1NNN 456
 call 400 sp 1 zurueck 202
@@ -178,7 +178,7 @@ c8V[2] = 66
 op(&HD231)
 PRINT "lage laeuft um "; zeile$(0)
 --- datei hilfe.dh
-IMPORT "{sammlung}/_hilfen/chip8.dh"
+IMPORT "{sammlung}/../_hilfen/chip8.dh"
 --- erwartet
 0 oben 11110000 .. 0000 mitte 10010000 .. 0000 vf 0
 nochmal geloescht 00000000 .. 0000 vf 1
@@ -199,7 +199,7 @@ c8Taste[7] = 0
 c8Schritt()
 PRINT "losgelassen "; c8Wartet; " v3 "; c8V[3]
 --- datei hilfe.dh
-IMPORT "{sammlung}/_hilfen/chip8.dh"
+IMPORT "{sammlung}/../_hilfen/chip8.dh"
 --- erwartet
 wartet 3 pc 202
 ohne taste 3
@@ -222,7 +222,7 @@ DIM k AS INTEGER
 FOR k = 1 TO 17 : c8Schritt() : NEXT
 PRINT c8Fehler; " sp "; c8SP
 --- datei hilfe.dh
-IMPORT "{sammlung}/_hilfen/chip8.dh"
+IMPORT "{sammlung}/../_hilfen/chip8.dh"
 --- erwartet
 RET ohne CALL 00EE bei 200
 steht TRUE pc 200
@@ -252,7 +252,7 @@ DIM k AS INTEGER
 FOR k = 0 TO BUFFER_LEN(asmCode) - 1 : t = t + c8Hex$(BUFFER_GET(asmCode, k), 2) : NEXT
 PRINT t
 --- datei hilfe.dh
-IMPORT "{sammlung}/_hilfen/chip8.dh"
+IMPORT "{sammlung}/../_hilfen/chip8.dh"
 --- erwartet
 [] 26
 00E0600A6A2AA216D0A25010F355F3658406B3002200A0FF1234
@@ -267,7 +267,7 @@ PRINT asmUebersetzen$("DRW V0, V1")
 PRINT asmUebersetzen$("LD VG, 1")
 PRINT asmUebersetzen$("DB #1G")
 --- datei hilfe.dh
-IMPORT "{sammlung}/_hilfen/chip8.dh"
+IMPORT "{sammlung}/../_hilfen/chip8.dh"
 --- erwartet
 Zeile 2: unbekannter Befehl 'MOVE'
 Zeile 1: unbekannte Marke 'nirgends'
@@ -302,9 +302,9 @@ c8Taste[4] = 0
 bilder(2000)
 PRINT "vorbei: leben "; c8V[6]; " wartet "; c8Wartet >= 0; " fehler ["; c8Fehler; "]"
 --- argumente
-{sammlung}/../../examples/chip8/faenger.c8s
+{sammlung}/../../../examples/chip8/faenger.c8s
 --- datei hilfe.dh
-IMPORT "{sammlung}/_hilfen/chip8.dh"
+IMPORT "{sammlung}/../_hilfen/chip8.dh"
 --- erwartet
 [] TRUE
 rechts 56
@@ -332,7 +332,7 @@ IF NOT FILEEXISTS("chip8.png") THEN
 END IF
 PRINT "rueckgabe "; PROCESS_CODE(p)
 --- argumente
-{sammlung}/../../examples/chip8/main.dh
+{sammlung}/../../../examples/chip8/main.dh
 --- bild chip8.png
 groesse 768 412
 18 6 #B4FF8C +-40
@@ -367,7 +367,7 @@ IF NOT FILEEXISTS("acht.png") THEN
 END IF
 PRINT "rueckgabe "; PROCESS_CODE(p)
 --- argumente
-{sammlung}/../../examples/chip8/main.dh
+{sammlung}/../../../examples/chip8/main.dh
 --- bild acht.png
 126 126 #B4FF8C +-40
 138 138 #0C120E +-20

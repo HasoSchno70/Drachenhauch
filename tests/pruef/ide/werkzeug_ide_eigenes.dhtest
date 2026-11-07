@@ -8,7 +8,7 @@
 ' "zaehl" ist neu, "for" ersetzt den eingebauten, "a b" ist kein Wort (bleibt,
 ' aber ohne Kuerzel), ein leerer Schnipsel faellt weg.
 DIM prBild AS INTEGER : prBild = 0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 20 THEN
@@ -35,7 +35,7 @@ WRITEALL("_programm/schnipsel.txt", JOIN$(t, CHR$(10)) + CHR$(10))
 --- umgebung
 DHRT_FRAMES=200
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- nachher
 DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
@@ -59,7 +59,7 @@ pr text DIM z AS INTEGER/z = z + 1
 ' die Datei im Reiter geaendert und gesichert: der neue gilt sofort, und
 ' der Projektordner bleibt, wo er war.
 DIM prBild AS INTEGER : prBild = 0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 20 THEN
@@ -80,7 +80,7 @@ END IF
 --- umgebung
 DHRT_FRAMES=200
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- nachher
 DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
@@ -109,7 +109,7 @@ pr projekt gleich TRUE
 ' Ein unbekannter Befehl und ein falsches Kuerzel werden gemeldet, suchen
 ' behaelt dann Strg+F.
 DIM prBild AS INTEGER : prBild = 0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 20 THEN
@@ -124,7 +124,7 @@ END IF
 --- umgebung
 DHRT_FRAMES=200
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- nachher
 DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
@@ -149,7 +149,7 @@ pr sichern Strg+S.
 ' schon. Gegenprobe ohne tasten.json im naechsten Fall.
 AUTOMATION_PLAY("ev.txt")
 DIM prBild AS INTEGER : prBild = 0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 30 OR prBild = 70 OR prBild = 120 THEN protokoll("pr reiter " + STR$(tabAnzahl))
@@ -170,7 +170,7 @@ e 92 1 78 0 0 0
 --- umgebung
 DHRT_FRAMES=130
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- nachher
 DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
@@ -186,7 +186,7 @@ pr reiter 1
 === gegenprobe ohne datei: strg+n legt an
 AUTOMATION_PLAY("ev.txt")
 DIM prBild AS INTEGER : prBild = 0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 30 OR prBild = 70 THEN protokoll("pr reiter " + STR$(tabAnzahl))
@@ -201,7 +201,7 @@ e 42 1 341 0 0 0
 --- umgebung
 DHRT_FRAMES=90
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- nachher
 DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
@@ -215,7 +215,7 @@ pr reiter 1
 
 === aendern schreibt die datei, vorgabe und zuruecksetzen raeumen auf
 DIM prBild AS INTEGER : prBild = 0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 20 THEN
@@ -232,7 +232,7 @@ END IF
 --- umgebung
 DHRT_FRAMES=200
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- nachher
 DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")

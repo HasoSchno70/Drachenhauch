@@ -4,7 +4,7 @@
 ' ueber der Programmkopie. Format: docs/werkzeuge.md, dhrt test.
 
 === cp1252 und crlf bleiben beim speichern
---- programm ../../examples/texteditor/main.dh nach DIM ok AS BOOLEAN
+--- programm ../../../examples/texteditor/main.dh nach DIM ok AS BOOLEAN
 --- einschub nach DIM ok AS BOOLEAN
 DIM prI AS INTEGER : prI = oeffnen("../w.txt")
 PRINT dokKod[prI]; " "; dokCrlf[prI]; " "; GUI_STATUSBAR_TEXT$(status, 0)
@@ -31,7 +31,7 @@ Nicht gespeichert:
 5a65696c652065696e730d0a4dfc6c6c657220313220800d0a
 
 === bom bleibt und binaeres wird nicht geoeffnet
---- programm ../../examples/texteditor/main.dh nach DIM ok AS BOOLEAN
+--- programm ../../../examples/texteditor/main.dh nach DIM ok AS BOOLEAN
 --- einschub nach DIM ok AS BOOLEAN
 DIM prI AS INTEGER : prI = oeffnen("../b.txt")
 PRINT dokKod[prI]; " "; kodName$(dokKod[prI]); " "; dokCrlf[prI]
@@ -56,7 +56,7 @@ Nicht geöffnet: keine Textdatei (Nullbytes)
 2
 
 === suchen springt weiter und faengt oben wieder an
---- programm ../../examples/texteditor/main.dh nach DIM ok AS BOOLEAN
+--- programm ../../../examples/texteditor/main.dh nach DIM ok AS BOOLEAN
 --- einschub nach DIM ok AS BOOLEAN
 DIM prI AS INTEGER : prI = oeffnen("../t.txt")
 DIM prA AS INTEGER, prB AS INTEGER, prC AS INTEGER, prD AS INTEGER
@@ -99,7 +99,7 @@ ARRAY_PUSH(prE, "e 16 6 0 0 0 0") : ARRAY_PUSH(prE, "e 17 5 0 0 0 0")
 WRITEALL("../ev.txt", JOIN$(prE, CHR$(10)) + CHR$(10))
 AUTOMATION_PLAY("../ev.txt")
 DIM prBild AS INTEGER
---- programm ../../examples/texteditor/main.dh nach DIM ok AS BOOLEAN
+--- programm ../../../examples/texteditor/main.dh nach DIM ok AS BOOLEAN
 --- einschub nach     FLIP()
     prBild = prBild + 1
     IF prBild = 5 OR prBild = 9 OR prBild = 13 OR prBild = 20 THEN

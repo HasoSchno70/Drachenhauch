@@ -7,7 +7,7 @@
 === ein klick rollt dorthin, die marke bleibt
 DIM prBild AS INTEGER : prBild = 0
 DIM prP AS INTEGER : prP = 1
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 60 THEN
@@ -44,7 +44,7 @@ lang.dh
 --- umgebung
 DHRT_FRAMES=150
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei _programm/ide.json
 {"karte": true}
@@ -75,7 +75,7 @@ sprung stimmt TRUE
 === ziehen laesst den ausschnitt folgen
 DIM prBild AS INTEGER : prBild = 0
 DIM prP AS INTEGER : prP = 1
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 60 THEN
@@ -135,7 +135,7 @@ lang.dh
 --- umgebung
 DHRT_FRAMES=150
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei _programm/ide.json
 {"karte": true}

@@ -7,7 +7,7 @@
 '  liest einen Punkt im Schluessel als Pfad). Texte mit Werten gehen durch
 '  trf$("Gesichert: {0}", [name]): uebersetzt wird der Text OHNE die Werte,
 '  sonst kennte die Tafel ihn nie. Was sie nicht kennt, bleibt deutsch;
-'  tests/pruef/werkzeug_studio_englisch.dhtest prueft, dass keiner fehlt.
+'  tests/pruef/studio/werkzeug_studio_englisch.dhtest prueft, dass keiner fehlt.
 '
 '  Was NICHT uebersetzt wird: die Namen der Ereignisse (Klick, Geaendert ...)
 '  -- sie sind Teil der Methodennamen im Projekt, und ein Projekt muss in

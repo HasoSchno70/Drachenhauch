@@ -27,9 +27,9 @@ PRINT slAnfang(log, "behaelter Zeile1")[0]
 PRINT "das gewicht nimmt den rest "; slBreite(log, "feldSuche") > 300
 IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 ' Breite aus "lage control NAME x y w h" (die letzte Nennung).
 FUNCTION slBreite(log AS STRING, name AS STRING) AS INTEGER
@@ -86,9 +86,9 @@ DIM fry AS INTEGER
 PRINT "untereinander "; k1y < fry AND ABS(k1x - frx) < 2
 IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- datei f.dhform
 {"title":"Fenster1","name":"Fenster1","x":0,"y":0,"w":600,"h":400,"movable":true,"closable":true,"visible":true,"resizable":true,"widgets":[{"kind":"button","name":"knopfA","text":"Neu","x":0,"y":0,"w":90,"h":30},{"kind":"button","name":"knopfB","text":"Oeffnen","x":0,"y":0,"w":90,"h":30},{"kind":"textinput","name":"feldSuche","text":"","x":0,"y":0,"w":120,"h":30},{"kind":"layout","name":"Zeile1","x":20,"y":20,"w":560,"h":44,"anchor":"lrt","layout":{"art":"zeile","kinder":[[0,0],[1,0],[2,1]],"abstand":6}},{"kind":"layout","name":"Spalte1","x":20,"y":90,"w":240,"h":200,"layout":{"art":"spalte","kinder":[],"abstand":6}},{"kind":"label","name":"frei","text":"frei","x":320,"y":120,"w":100,"h":20}]}
@@ -131,9 +131,9 @@ DIM b AS ARRAY OF STRING : b = slAnfang(log, "behaelter Zeile1")
 PRINT b[LEN(b) - 1]
 IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- datei f.dhform
 {"title":"Fenster1","name":"Fenster1","x":0,"y":0,"w":600,"h":400,"movable":true,"closable":true,"visible":true,"resizable":true,"widgets":[{"kind":"button","name":"knopfA","text":"Neu","x":0,"y":0,"w":90,"h":30},{"kind":"button","name":"knopfB","text":"Oeffnen","x":0,"y":0,"w":90,"h":30},{"kind":"textinput","name":"feldSuche","text":"","x":0,"y":0,"w":120,"h":30},{"kind":"layout","name":"Zeile1","x":20,"y":20,"w":560,"h":44,"anchor":"lrt","layout":{"art":"zeile","kinder":[[0,0],[1,0],[2,1]],"abstand":6}},{"kind":"layout","name":"Spalte1","x":20,"y":90,"w":240,"h":200,"layout":{"art":"spalte","kinder":[],"abstand":6}},{"kind":"label","name":"frei","text":"frei","x":320,"y":120,"w":100,"h":20}]}
@@ -194,9 +194,9 @@ DIM ky AS INTEGER
 PRINT "knopfA steht noch "; kx > 0
 IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- datei f.dhform
 {"title":"Fenster1","name":"Fenster1","x":0,"y":0,"w":600,"h":400,"movable":true,"closable":true,"visible":true,"resizable":true,"widgets":[{"kind":"button","name":"knopfA","text":"Neu","x":0,"y":0,"w":90,"h":30},{"kind":"button","name":"knopfB","text":"Oeffnen","x":0,"y":0,"w":90,"h":30},{"kind":"textinput","name":"feldSuche","text":"","x":0,"y":0,"w":120,"h":30},{"kind":"layout","name":"Zeile1","x":20,"y":20,"w":560,"h":44,"anchor":"lrt","layout":{"art":"zeile","kinder":[[0,0],[1,0],[2,1]],"abstand":6}},{"kind":"layout","name":"Spalte1","x":20,"y":90,"w":240,"h":200,"layout":{"art":"spalte","kinder":[],"abstand":6}},{"kind":"label","name":"frei","text":"frei","x":320,"y":120,"w":100,"h":20}]}
@@ -233,9 +233,9 @@ PRINT "anordnung "; LEN(slAnfang(log, "lage feld layout.art ")) > 0
 PRINT "links einmal "; LEN(slAnfang(log, "lage feld x "))
 IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- datei f.dhform
 {"title":"Fenster1","name":"Fenster1","x":0,"y":0,"w":600,"h":400,"movable":true,"closable":true,"visible":true,"resizable":true,"widgets":[{"kind":"button","name":"knopfA","text":"Neu","x":0,"y":0,"w":90,"h":30},{"kind":"button","name":"knopfB","text":"Oeffnen","x":0,"y":0,"w":90,"h":30},{"kind":"textinput","name":"feldSuche","text":"","x":0,"y":0,"w":120,"h":30},{"kind":"layout","name":"Zeile1","x":20,"y":20,"w":560,"h":44,"anchor":"lrt","layout":{"art":"zeile","kinder":[[0,0],[1,0],[2,1]],"abstand":6}},{"kind":"layout","name":"Spalte1","x":20,"y":90,"w":240,"h":200,"layout":{"art":"spalte","kinder":[],"abstand":6}},{"kind":"label","name":"frei","text":"frei","x":320,"y":120,"w":100,"h":20}]}
@@ -290,9 +290,9 @@ WEND
 PRINT "code "; PROCESS_CODE(k)
 IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- datei proj/projekt.dhstudio
 {"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"}]}
@@ -353,9 +353,9 @@ DIM b AS ARRAY OF STRING : b = slAnfang(log, "behaelter Spalte1")
 PRINT b[LEN(b) - 1]
 IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 ' Ein Klick mit gehaltener Umschalttaste.
 SUB umschaltKlick(x AS INTEGER, y AS INTEGER)
@@ -407,9 +407,9 @@ DIM kby AS INTEGER
 PRINT "nebeneinander wie vorher "; kay = kby AND kb - ka = bx - ax
 IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 SUB umschaltKlick(x AS INTEGER, y AS INTEGER)
     slHin(x, y)
@@ -482,9 +482,9 @@ DIM sy AS INTEGER
 PRINT "nach rechts geschoben "; nx > bx + 100
 IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- datei f.dhform
 {"title":"Fenster1","name":"Fenster1","x":0,"y":0,"w":600,"h":400,"movable":true,"closable":true,"visible":true,"resizable":true,"widgets":[{"kind":"button","name":"knopfA","text":"Neu","x":0,"y":0,"w":96,"h":30},{"kind":"button","name":"knopfB","text":"Oeffnen","x":0,"y":0,"w":96,"h":30},{"kind":"textinput","name":"feldSuche","text":"","x":0,"y":0,"w":120,"h":30},{"kind":"layout","name":"Zeile1","x":24,"y":24,"w":560,"h":40,"layout":{"art":"zeile","kinder":[[0,0],[1,0],[2,0]],"abstand":8}}]}
@@ -525,9 +525,9 @@ FOR EACH z IN staende
 NEXT
 IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- datei f.dhform
 {"title":"Fenster1","name":"Fenster1","x":0,"y":0,"w":600,"h":400,"movable":true,"closable":true,"visible":true,"resizable":true,"widgets":[{"kind":"button","name":"knopfA","text":"Neu","x":0,"y":0,"w":96,"h":30},{"kind":"button","name":"knopfB","text":"Oeffnen","x":0,"y":0,"w":96,"h":30},{"kind":"textinput","name":"feldSuche","text":"","x":0,"y":0,"w":120,"h":30},{"kind":"layout","name":"Zeile1","x":24,"y":24,"w":560,"h":40,"layout":{"art":"zeile","kinder":[[0,0],[-1,1],[1,0],[2,0]],"abstand":8}}]}

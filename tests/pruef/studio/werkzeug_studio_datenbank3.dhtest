@@ -57,11 +57,11 @@ IMPORT "json"
 IMPORT "regex"
 IMPORT "imgfx"
 IMPORT "db"
-IMPORT "{sammlung}/../../studio/sprache.dh"
-IMPORT "{sammlung}/../../studio/bibliothek.dh"
-IMPORT "{sammlung}/../../studio/modell.dh"
-IMPORT "{sammlung}/../../studio/projekt.dh"
-IMPORT "{sammlung}/../../studio/datenbank.dh"
+IMPORT "{sammlung}/../../../studio/sprache.dh"
+IMPORT "{sammlung}/../../../studio/bibliothek.dh"
+IMPORT "{sammlung}/../../../studio/modell.dh"
+IMPORT "{sammlung}/../../../studio/projekt.dh"
+IMPORT "{sammlung}/../../../studio/datenbank.dh"
 --- erwartet
 []
 []
@@ -115,7 +115,7 @@ WHILE DB_NEXT(r)
 WEND
 DB_CLOSE(db)
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- vorher
 IMPORT "db"
 DIM db AS DB_CONN : db = DB_OPEN("proj/daten.sqlite")
@@ -129,7 +129,7 @@ DB_EXEC(db, "INSERT INTO rechnungen (betrag, kunde) VALUES (1000, 3)")
 DB_CLOSE(db)
 --- datei laeufer.dh
 IMPORT "db"
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- datei proj/projekt.dhstudio
 {"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"},{"art":"datenbank","name":"Daten","schema":"Daten.dhdb"}]}
@@ -250,7 +250,7 @@ DIM ky AS INTEGER
 (kx, ky) = slLage(log, "knoten Daten.?abfrage1")
 PRINT "navigator "; kx > 0
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- vorher
 IMPORT "db"
 DIM db AS DB_CONN : db = DB_OPEN("proj/daten.sqlite")
@@ -260,7 +260,7 @@ DB_EXEC(db, "INSERT INTO kunden (name, ort) VALUES ('Bert', 'Bonn')")
 DB_CLOSE(db)
 --- datei laeufer.dh
 IMPORT "json"
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- datei proj/projekt.dhstudio
 {"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"},{"art":"datenbank","name":"Daten","schema":"Daten.dhdb"}]}
@@ -316,7 +316,7 @@ FOR i = 0 TO JSON_LEN(j, "widgets") - 1
     PRINT "  "; JSON_GET_STRING(j, w + ".kind"); " "; JSON_GET_STRING(j, w + ".name"); IIF(JSON_HAS(j, w + ".bind"), " bind=" + JSON_GET_STRING(j, w + ".bind"), ""); IIF(JSON_HAS(j, w + ".studio_quelle"), " quelle=" + JSON_GET_STRING(j, w + ".studio_quelle"), ""); IIF(JSON_HAS(j, w + ".studio_spalten"), " spalten=" + JSON_GET_STRING(j, w + ".studio_spalten"), ""); IIF(JSON_HAS(j, w + ".table.headers"), " kopf=" + JSON_STRINGIFY(JSON_GET_JSON(j, w + ".table.headers")), "")
 NEXT
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- vorher
 IMPORT "db"
 DIM db AS DB_CONN : db = DB_OPEN("proj/daten.sqlite")
@@ -325,7 +325,7 @@ DB_EXEC(db, "CREATE TABLE rechnungen (id INTEGER PRIMARY KEY, betrag INTEGER, ku
 DB_CLOSE(db)
 --- datei laeufer.dh
 IMPORT "json"
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- datei proj/projekt.dhstudio
 {"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"},{"art":"datenbank","name":"Daten","schema":"Daten.dhdb"}]}
@@ -377,7 +377,7 @@ FOR i = 0 TO JSON_LEN(j, "widgets") - 1
     PRINT "  "; JSON_GET_STRING(j, w + ".kind"); " "; JSON_GET_STRING(j, w + ".name"); IIF(JSON_HAS(j, w + ".bind"), " bind=" + JSON_GET_STRING(j, w + ".bind"), ""); IIF(JSON_HAS(j, w + ".studio_quelle"), " quelle=" + JSON_GET_STRING(j, w + ".studio_quelle"), ""); IIF(JSON_HAS(j, w + ".studio_spalten"), " spalten=" + JSON_GET_STRING(j, w + ".studio_spalten"), ""); IIF(JSON_HAS(j, w + ".table.headers"), " kopf=" + JSON_STRINGIFY(JSON_GET_JSON(j, w + ".table.headers")), "")
 NEXT
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- vorher
 IMPORT "db"
 DIM db AS DB_CONN : db = DB_OPEN("proj/daten.sqlite")
@@ -386,7 +386,7 @@ DB_EXEC(db, "CREATE TABLE rechnungen (id INTEGER PRIMARY KEY, betrag INTEGER, ku
 DB_CLOSE(db)
 --- datei laeufer.dh
 IMPORT "json"
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- datei proj/projekt.dhstudio
 {"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"},{"art":"datenbank","name":"Daten","schema":"Daten.dhdb"}]}
@@ -437,7 +437,7 @@ DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT kunde, typeof(kunde) FROM rechnung
 IF DB_NEXT(r) THEN PRINT "wert "; DB_GET_STRING(r, 0); " "; DB_GET_STRING(r, 1)
 DB_CLOSE(db)
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- vorher
 IMPORT "db"
 DIM db AS DB_CONN : db = DB_OPEN("proj/daten.sqlite")
@@ -448,7 +448,7 @@ DB_CLOSE(db)
 --- datei laeufer.dh
 IMPORT "db"
 IMPORT "json"
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- datei proj/projekt.dhstudio
 {"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"},{"art":"datenbank","name":"Daten","schema":"Daten.dhdb"}]}
@@ -523,7 +523,7 @@ DIM j AS JSON_HANDLE : j = JSON_LOAD(p + "/Hauptfenster.dhform")
 PRINT "sortieren "; JSON_GET_STRING(j, "widgets.0.studio_sortieren")
 PRINT "bedingung "; JSON_GET_STRING(j, "widgets.0.studio_filter")
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- vorher
 IMPORT "db"
 DIM db AS DB_CONN : db = DB_OPEN("proj/daten.sqlite")
@@ -531,7 +531,7 @@ DB_EXEC(db, "CREATE TABLE kunden (id INTEGER PRIMARY KEY, name TEXT NOT NULL DEF
 DB_CLOSE(db)
 --- datei laeufer.dh
 IMPORT "json"
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- datei proj/projekt.dhstudio
 {"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"},{"art":"datenbank","name":"Daten","schema":"Daten.dhdb"}]}

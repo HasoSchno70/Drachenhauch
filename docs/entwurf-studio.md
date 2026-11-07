@@ -10,9 +10,9 @@ aber mit der Laufzeit `dhrt`. Sie ersetzt den Form-Designer
 * *Der Name ist „Drachenhauch Studio“.*
 
 **Stand:** Stufe 1 bis 4 sind gebaut (2026-11-01, Ordner `studio/`, Handbuch
-[studio.md](studio.md), Prüfungen `tests/pruef/werkzeug_studio.dhtest`,
-`tests/pruef/werkzeug_studio2.dhtest`, `tests/pruef/werkzeug_studio3.dhtest` und
-`tests/pruef/werkzeug_studio4.dhtest`).
+[studio.md](studio.md), Prüfungen `tests/pruef/studio/werkzeug_studio.dhtest`,
+`tests/pruef/studio/werkzeug_studio2.dhtest`, `tests/pruef/studio/werkzeug_studio3.dhtest` und
+`tests/pruef/studio/werkzeug_studio4.dhtest`).
 Für Stufe 2 kamen in die Laufzeit schließbare Reiter im Reiterwerk
 (`GUI_TABCONTROL_SET "schliessbar"`, `GUI_TABCONTROL_CLOSED`) und
 `GUI_TREE_ITEM_RECT`. Für Stufe 3 kopiert `dhrt --export` keine importierten

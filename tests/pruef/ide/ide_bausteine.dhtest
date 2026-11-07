@@ -2,7 +2,7 @@
 ' laufender Ausgabe (PROCESS_*), Hover/Vervollstaendigung aus dhrt (CODE_*,
 ' dieselben Funktionen wie `dhrt lsp`) und die Befehle des Textbereichs
 ' (Marke, Auswahl, Suchen, Einfuegen). Die IDE selbst pruefen
-' tests/pruef/werkzeug_ide.dhtest und tests/test_ide.py. Bis Stufe 34 stand
+' tests/pruef/ide/werkzeug_ide.dhtest und tests/test_ide.py. Bis Stufe 34 stand
 ' das in tests/test_ide_bausteine.py.
 '
 ' Die Textbereich-Befehle brauchen ein Fenster (GOTO rechnet mit der

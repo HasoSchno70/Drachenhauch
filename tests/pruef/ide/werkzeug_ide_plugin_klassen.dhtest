@@ -29,7 +29,7 @@ FUNCTION prBaumText$() AS STRING
     WEND
     RETURN t
 END FUNCTION
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- einschub nach glanzStartNachziehen()
 prB = prB + 1
 IF prSchritt = 0 AND LEN(plugLeisten) > 0 THEN
@@ -69,7 +69,7 @@ a.dh
 --- umgebung
 DHRT_FRAMES=1000
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei a.dh
 ' Ein Tier
@@ -91,8 +91,8 @@ CLASS Hund EXTENDS Tier
 END CLASS
 
 --- datei _programm/plugins/klassen/plugin.dh
-CHDIR("{sammlung}/../../examples/plugins/klassen")
-IMPORT "{sammlung}/../../examples/plugins/klassen/plugin.dh"
+CHDIR("{sammlung}/../../../examples/plugins/klassen")
+IMPORT "{sammlung}/../../../examples/plugins/klassen/plugin.dh"
 
 --- nachher
 DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
@@ -116,7 +116,7 @@ DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0))
 WHILE PROCESS_RUNNING(p) AND MILLIS() - t0 < 20000 : SLEEP(20) : WEND
 PRINT "rueckgabe "; PROCESS_CODE(p); " schnell "; MILLIS() - t0 < 1500
 --- argumente
-{sammlung}/../../examples/plugins/klassen/plugin.dh
-{sammlung}/../../ide
+{sammlung}/../../../examples/plugins/klassen/plugin.dh
+{sammlung}/../../../ide
 --- erwartet
 rueckgabe 0 schnell TRUE

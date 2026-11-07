@@ -26,8 +26,8 @@ PRINT "ohne eigenen pfad: "; INSTR(READALL$(OPENFILE("paket.lock.json", "r")), C
 dlStarten(["paket", "liste"])
 PRINT LEFT$(TRIM$(dlAus), 30)
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
-IMPORT "{sammlung}/_hilfen/pakete.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/pakete.dh"
 --- erwartet
 geholt spielkiste  (../libs/spielkiste) / 0
 laeuft: 42
@@ -54,8 +54,8 @@ PRINT dlCode; " neu: "; READLINES("pakete/kiste/a.dh")[0]
 dlStarten(["paket", "hole"])
 PRINT "danach wieder ruhig: "; dlCode
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
-IMPORT "{sammlung}/_hilfen/pakete.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/pakete.dh"
 --- erwartet
 1 TRUE TRUE
 alt: PRINT 1
@@ -83,8 +83,8 @@ CHDIR("projekt")
 dlStarten(["paket", "hole"])
 PRINT "anderer inhalt: "; dlCode
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
-IMPORT "{sammlung}/_hilfen/pakete.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/pakete.dh"
 --- erwartet
 andere bytes: TRUE
 gleicher inhalt: 0
@@ -119,10 +119,10 @@ dlStarten(["paket", "hole", basis + "/gibtsnicht.zip"])
 PRINT "404: "; dlCode; " "; INSTR(dlErr, "gibtsnicht.zip") >= 0
 PROCESS_KILL(srv)
 --- argumente
-{sammlung}/_hilfen/gegenserver.dh
+{sammlung}/../_hilfen/gegenserver.dh
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
-IMPORT "{sammlung}/_hilfen/pakete.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/pakete.dh"
 --- erwartet
 0 TRUE FALSE
 0
@@ -146,8 +146,8 @@ datei("main.dh", "IMPORT " + Q + "oben/oben.dh" + Q + NL + "PRINT oben$()")
 dlStarten(["main.dh"])
 PRINT TRIM$(dlAus)
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
-IMPORT "{sammlung}/_hilfen/pakete.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/pakete.dh"
 --- erwartet
 geholt oben  (../libs/oben) | geholt basis  (../basis1)
 eigenes paket: TRUE
@@ -166,8 +166,8 @@ DELETEFILE("kiste/k.dh")
 dlStarten(["main.dh"])
 PRINT TRIM$(dlAus)
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
-IMPORT "{sammlung}/_hilfen/pakete.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/pakete.dh"
 --- erwartet
 daneben
 paket
@@ -183,8 +183,8 @@ CHDIR("projekt")
 dlStarten(["paket", "hole", "../libs/a"])
 PRINT dlCode; " "; INSTR(dlErr, "Kreis in den Abhaengigkeiten") >= 0
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
-IMPORT "{sammlung}/_hilfen/pakete.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/pakete.dh"
 --- erwartet
 1 TRUE
 
@@ -196,8 +196,8 @@ CHDIR("projekt")
 dlStarten(["paket", "hole", "../boese.zip"])
 PRINT dlCode; " "; FILEEXISTS("pakete/boese/gut.dh"); " "; FILEEXISTS("../raus.dh"); " "; FILEEXISTS("raus.dh")
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
-IMPORT "{sammlung}/_hilfen/pakete.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/pakete.dh"
 --- erwartet
 0 TRUE FALSE FALSE
 
@@ -220,8 +220,8 @@ PRINT "entfernt: "; dlCode; " "; DIREXISTS("pakete/werkzeug"); " "; JSON_HAS(JSO
 dlStarten(["paket", "entferne", "werkzeug"])
 PRINT "zweimal: "; dlCode
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
-IMPORT "{sammlung}/_hilfen/pakete.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/pakete.dh"
 --- erwartet
 ohne paket.json: 1 TRUE
 ohne stand: 1 TRUE
@@ -244,8 +244,8 @@ PRINT "fehlt: "; dlCode; " "; INSTR(dlErr, "gibts-nicht") >= 0
 dlStarten(["paket", "-C"])
 PRINT "ohne ordner: "; dlCode; " "; INSTR(dlErr, "-C braucht einen Ordner") >= 0
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
-IMPORT "{sammlung}/_hilfen/pakete.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/pakete.dh"
 --- erwartet
 geholt: 0 TRUE TRUE FALSE
 liste: kiste  ../libs/kiste

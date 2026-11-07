@@ -125,9 +125,9 @@ klicks 2
 IMPORT "helfer.dh"
 PRINT sende$(skript$(), "knopf.dh", "klicks:10:0", "")
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/fenstersender.dh"
+IMPORT "{sammlung}/../_hilfen/fenstersender.dh"
 FUNCTION skript$() AS STRING
-    RETURN "{sammlung}/_hilfen/fenstersender.ps1"
+    RETURN "{sammlung}/../_hilfen/fenstersender.ps1"
 END FUNCTION
 --- datei knopf.dh
 IMPORT "gui"
@@ -157,9 +157,9 @@ knopf 10 hit 10
 IMPORT "helfer.dh"
 PRINT sende$(skript$(), "knopf.dh", "klicks:10:40", "")
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/fenstersender.dh"
+IMPORT "{sammlung}/../_hilfen/fenstersender.dh"
 FUNCTION skript$() AS STRING
-    RETURN "{sammlung}/_hilfen/fenstersender.ps1"
+    RETURN "{sammlung}/../_hilfen/fenstersender.ps1"
 END FUNCTION
 --- datei knopf.dh
 IMPORT "gui"
@@ -245,9 +245,9 @@ hit 1 unten 3 los 1
 IMPORT "helfer.dh"
 PRINT sende$(skript$(), "taste.dh", "tasten:10:0", "")
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/fenstersender.dh"
+IMPORT "{sammlung}/../_hilfen/fenstersender.dh"
 FUNCTION skript$() AS STRING
-    RETURN "{sammlung}/_hilfen/fenstersender.ps1"
+    RETURN "{sammlung}/../_hilfen/fenstersender.ps1"
 END FUNCTION
 --- datei taste.dh
 SCREEN(300, 200, ARG$(0), 1)
@@ -269,9 +269,9 @@ hit 10
 IMPORT "helfer.dh"
 PRINT sende$(skript$(), "taste.dh", "tasten:10:40", "")
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/fenstersender.dh"
+IMPORT "{sammlung}/../_hilfen/fenstersender.dh"
 FUNCTION skript$() AS STRING
-    RETURN "{sammlung}/_hilfen/fenstersender.ps1"
+    RETURN "{sammlung}/../_hilfen/fenstersender.ps1"
 END FUNCTION
 --- datei taste.dh
 SCREEN(300, 200, ARG$(0), 1)

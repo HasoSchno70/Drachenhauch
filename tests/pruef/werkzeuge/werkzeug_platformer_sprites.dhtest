@@ -86,9 +86,9 @@ PRINT "sheet.json "; bytegleich("plat/sheet.json", ARG$(1) + "/sheet.json")
 PRINT "player.png "; abweichend("assets/player.png", ARG$(2) + "/player.png")
 PRINT "player_atlas.json "; bytegleich("assets/player_atlas.json", ARG$(2) + "/player_atlas.json")
 --- argumente
-{sammlung}/../../examples/platformer/make_sprites.dh
-{sammlung}/../../examples/platformer
-{sammlung}/../../examples/assets
+{sammlung}/../../../examples/platformer/make_sprites.dh
+{sammlung}/../../../examples/platformer
+{sammlung}/../../../examples/assets
 --- erwartet
   8 animierte Figuren (.png + .gif)
   Master-Sheet: sheet.png (10x5 = 44 Sprites) + sheet.json

@@ -16,7 +16,7 @@ FUNCTION prListe$(a AS ARRAY OF INTEGER) AS STRING
     NEXT
     RETURN t
 END FUNCTION
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 20 THEN befehl("profil") : prSchritt = 1
@@ -55,7 +55,7 @@ PRINT s
 --- umgebung
 DHRT_FRAMES=900
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- nachher
 DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")

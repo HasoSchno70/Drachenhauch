@@ -16,13 +16,13 @@
 ' Ohne Schalter: Teiltext, Gross/klein egal -- fuenf Treffer.
 AUTOMATION_PLAY("ev.txt")
 CLIPBOARD_SET("hp")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=260
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 DIM hp AS INTEGER
@@ -96,13 +96,13 @@ suche zahl 2 von 5
 ' Die Schalter bleiben in der ide.json.
 AUTOMATION_PLAY("ev.txt")
 CLIPBOARD_SET("hp")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=250
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 DIM hp AS INTEGER
@@ -176,7 +176,7 @@ gemerkt TRUE TRUE
 ' Strg+Umschalt+1 ersetzt die ersten beiden, das HP bleibt.
 AUTOMATION_PLAY("ev.txt")
 CLIPBOARD_SET("hp")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach protokoll("bereit")
 ersatztext = "leben"
 ganzesWort = TRUE
@@ -185,7 +185,7 @@ spiel.dh
 --- umgebung
 DHRT_FRAMES=220
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 DIM hp AS INTEGER
@@ -262,7 +262,7 @@ ersetzt einzeln zeile 1|ersetzt einzeln zeile 3
 ' steht nach Strg+Z auf keinem Treffer), springt der erste Druck nur hin.
 AUTOMATION_PLAY("ev.txt")
 CLIPBOARD_SET("hp")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach protokoll("bereit")
 ersatztext = "leben"
 ganzesWort = TRUE
@@ -271,7 +271,7 @@ spiel.dh
 --- umgebung
 DHRT_FRAMES=260
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 DIM hp AS INTEGER
@@ -352,7 +352,7 @@ einzeln TRUE
 ' das Protokoll.
 AUTOMATION_PLAY("ev.txt")
 CLIPBOARD_SET("hp")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach protokoll("bereit")
 ersatztext = "x"
 grossKlein = TRUE
@@ -361,7 +361,7 @@ spiel.dh
 --- umgebung
 DHRT_FRAMES=210
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 DIM hp AS INTEGER
@@ -437,7 +437,7 @@ gesichert TRUE
 ' Mit Ausdruck gilt `\2 = \1` als Rueckverweis auf die Gruppen.
 AUTOMATION_PLAY("ev.txt")
 CLIPBOARD_SET("(\w+) = (\d+)")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach protokoll("bereit")
 ersatztext = "\2 = \1"
 regexAn = TRUE
@@ -446,7 +446,7 @@ spiel.dh
 --- umgebung
 DHRT_FRAMES=190
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 DIM hp AS INTEGER
@@ -516,7 +516,7 @@ ersetzt 1
 ' Ohne Ausdruck ist `a\1` kein Rueckverweis, sondern genau dieser Text.
 AUTOMATION_PLAY("ev.txt")
 CLIPBOARD_SET("hp")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach protokoll("bereit")
 ersatztext = "a\1"
 ganzesWort = TRUE
@@ -525,7 +525,7 @@ spiel.dh
 --- umgebung
 DHRT_FRAMES=190
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 DIM hp AS INTEGER
@@ -594,7 +594,7 @@ ersetzt 3
 === ungueltiger ausdruck sagt es statt zu schweigen
 AUTOMATION_PLAY("ev.txt")
 CLIPBOARD_SET("(")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach protokoll("bereit")
 regexAn = TRUE
 --- argumente
@@ -602,7 +602,7 @@ spiel.dh
 --- umgebung
 DHRT_FRAMES=140
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 DIM hp AS INTEGER
@@ -658,13 +658,13 @@ treffer keine
 === esc im suchfeld schliesst die leiste
 AUTOMATION_PLAY("ev.txt")
 CLIPBOARD_SET("hp")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=140
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 DIM hp AS INTEGER
@@ -720,7 +720,7 @@ suche offen|suche zahl |suche zahl 1 von 5|suche zu
 ' findet dort nichts, in spiel.dh die drei Zeilen mit dem ganzen Wort.
 AUTOMATION_PLAY("ev.txt")
 CLIPBOARD_SET("hp")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach protokoll("bereit")
 ganzesWort = TRUE
 --- argumente
@@ -728,7 +728,7 @@ spiel.dh
 --- umgebung
 DHRT_FRAMES=140
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 DIM hp AS INTEGER
@@ -795,7 +795,7 @@ FUNCTION prName$(f AS GUI_WIDGET) AS STRING
     IF f = btnSuZurueck THEN RETURN "zurueck"
     RETURN "anderes"
 END FUNCTION
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 30 THEN
@@ -816,7 +816,7 @@ spiel.dh
 --- umgebung
 DHRT_FRAMES=200
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 DIM hp AS INTEGER
@@ -840,7 +840,7 @@ pr ohne ersetzen zurueck
 ' verdeckt). Zwei Bilder derselben Leiste, einmal mit, einmal ohne Karte:
 ' im Streifen der Karte muessen sie gleich sein.
 DIM prBild AS INTEGER
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach     trefferNachziehen()
     prBild = prBild + 1
     IF prBild = 5 THEN minimapSetzen(TRUE)
@@ -871,7 +871,7 @@ spiel.dh
 --- umgebung
 DHRT_FRAMES=70
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 ' eine lange Zeile, damit die Karte etwas zu zeigen hat ...................................
@@ -906,7 +906,7 @@ anders 0
 ' ESC bricht ab, und eine offene Datei kommt aus ihrem Reiter.
 DIM prBild AS INTEGER : prBild = 0
 DIM prFertig AS INTEGER : prFertig = 0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 30 THEN
@@ -934,7 +934,7 @@ haupt.dh
 --- umgebung
 DHRT_FRAMES=600
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- vorher
 DIM i AS INTEGER
@@ -965,13 +965,13 @@ projektSuchen("PRINT", "")
 WHILE suchLauf : suchSchritt() : WEND
 protokoll("pr " + STR$(GUI_LISTBOX_COUNT(lstProbleme)) + " " + STR$(INSTR(GUI_TEXT(lblProbleme), "bei 500 abgebrochen") >= 0))
 EXIT(0)
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- argumente
 viel.dh
 --- umgebung
 DHRT_FRAMES=100
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- vorher
 DIM t AS STRING : t = ""

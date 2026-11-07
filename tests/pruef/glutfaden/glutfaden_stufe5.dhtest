@@ -20,10 +20,10 @@ PRINT "demo: "; geVergleich$(kern.oxsText$(d), geLies$("demo.oxs"))
 kern.oxsSpeichern(m, "aus.oxs")
 PRINT "datei ohne cr: "; INSTR(geLies$("aus.oxs"), CHR$(13)) < 0; " endet mit chart: "; RIGHT$(geLies$("aus.oxs"), 8) = "</chart>"
 --- argumente
-{sammlung}/../../examples/glutfaden
+{sammlung}/../../../examples/glutfaden
 --- datei helfer.dh
-IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
-IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
+IMPORT "{sammlung}/../../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/../_hilfen/glutfaden_export.dh"
 
 --- datei probe.pxs
 {
@@ -704,10 +704,10 @@ PRINT "probe: "; geVergleich$(geMuster$(g.muster), geLies$("gelesen.txt")); " wa
 ' bekannte Garne kommen aus der Palette (DMC 310 hat dort eine andere Farbe)
 PRINT "aus der palette: "; kern.farbeAlsHex$(g.muster.farben[0].garn.farbe); " blend "; g.muster.farben[3].garn.istBlend()
 --- argumente
-{sammlung}/../../examples/glutfaden
+{sammlung}/../../../examples/glutfaden
 --- datei helfer.dh
-IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
-IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
+IMPORT "{sammlung}/../../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/../_hilfen/glutfaden_export.dh"
 
 --- datei probe_pysticky.oxs
 <?xml version='1.0' encoding='utf-8'?>
@@ -846,10 +846,10 @@ FOR EACH w IN g.warnungen
 NEXT
 PRINT geVergleich$(t, geLies$("krumm_py.txt"))
 --- argumente
-{sammlung}/../../examples/glutfaden
+{sammlung}/../../../examples/glutfaden
 --- datei helfer.dh
-IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
-IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
+IMPORT "{sammlung}/../../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/../_hilfen/glutfaden_export.dh"
 
 --- datei krumm.oxs
 <?xml version="1.0" encoding="UTF-8"?>
@@ -956,10 +956,10 @@ CATCH e
     PRINT e
 END TRY
 --- argumente
-{sammlung}/../../examples/glutfaden
+{sammlung}/../../../examples/glutfaden
 --- datei helfer.dh
-IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
-IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
+IMPORT "{sammlung}/../../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/../_hilfen/glutfaden_export.dh"
 
 --- datei probe.pxs
 {
@@ -1348,10 +1348,10 @@ DIM sym AS ARRAY OF STRING : sym = kern.symboleLaden(ARG$(0) + "/daten/symbole.t
 DIM m AS kern.Muster : m = kern.pxsLaden("probe.pxs")
 PRINT geVergleich$(geExport$(m, pal), geLies$("ref.txt"))
 --- argumente
-{sammlung}/../../examples/glutfaden
+{sammlung}/../../../examples/glutfaden
 --- datei helfer.dh
-IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
-IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
+IMPORT "{sammlung}/../../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/../_hilfen/glutfaden_export.dh"
 
 --- datei probe.pxs
 {
@@ -1782,10 +1782,10 @@ DIM sym AS ARRAY OF STRING : sym = kern.symboleLaden(ARG$(0) + "/daten/symbole.t
 DIM m AS kern.Muster : m = kern.pxsLaden(ARG$(0) + "/daten/muster/demo_kreuzstich.pxs")
 PRINT geVergleich$(geExport$(m, pal), geLies$("ref.txt"))
 --- argumente
-{sammlung}/../../examples/glutfaden
+{sammlung}/../../../examples/glutfaden
 --- datei helfer.dh
-IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
-IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
+IMPORT "{sammlung}/../../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/../_hilfen/glutfaden_export.dh"
 
 --- datei ref.txt
 stoff Aida 14
@@ -1905,10 +1905,10 @@ m.modus = "diamond"
 m.stoff = 9
 PRINT geVergleich$(geExport$(m, pal), geLies$("ref.txt"))
 --- argumente
-{sammlung}/../../examples/glutfaden
+{sammlung}/../../../examples/glutfaden
 --- datei helfer.dh
-IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
-IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
+IMPORT "{sammlung}/../../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/../_hilfen/glutfaden_export.dh"
 
 --- datei ref.txt
 stoff 2.8 mm Round
@@ -1982,10 +1982,10 @@ DIM p AS kern.Muster : p = kern.pxsLaden("probe.pxs")
 kern.bildExportieren(p, "probe.png", 20, FALSE, FALSE)
 PRINT "probe: "; mitten(p, "probe.png", "probe_py_nackt.png")
 --- argumente
-{sammlung}/../../examples/glutfaden
+{sammlung}/../../../examples/glutfaden
 --- datei helfer.dh
-IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
-IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
+IMPORT "{sammlung}/../../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/../_hilfen/glutfaden_export.dh"
 
 --- datei probe.pxs
 {
@@ -2523,10 +2523,10 @@ NEXT
 ' die Perle hat ihren Glanzpunkt: oben links heller als die Mitte
 PRINT "glanz: "; GETPIXEL(a, 3 * 20 + 7, 4 * 20 + 7) <> GETPIXEL(a, 3 * 20 + 10, 4 * 20 + 12)
 --- argumente
-{sammlung}/../../examples/glutfaden
+{sammlung}/../../../examples/glutfaden
 --- datei helfer.dh
-IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
-IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
+IMPORT "{sammlung}/../../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/../_hilfen/glutfaden_export.dh"
 
 --- datei probe.pxs
 {
@@ -2996,10 +2996,10 @@ DIM ob AS INTEGER : ob = GETPIXEL(r, 5 * 20 + 10, 5 * 20 + 4)
 DIM un AS INTEGER : un = GETPIXEL(r, 5 * 20 + 10, 5 * 20 + 16)
 PRINT "drill oben heller: "; kern.rotAnteil(ob) + kern.gruenAnteil(ob) + kern.blauAnteil(ob) > kern.rotAnteil(un) + kern.gruenAnteil(un) + kern.blauAnteil(un); " rand stoff: "; HEX$(GETPIXEL(r, 5 * 20, 5 * 20))
 --- argumente
-{sammlung}/../../examples/glutfaden
+{sammlung}/../../../examples/glutfaden
 --- datei helfer.dh
-IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
-IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
+IMPORT "{sammlung}/../../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/../_hilfen/glutfaden_export.dh"
 
 --- datei probe.pxs
 {
@@ -3394,10 +3394,10 @@ DIM ab AS ARRAY OF STRING : ab = kern.pdfExportieren(m, "aus.pdf", o)
 PRINT geAbweichungen$(geLies$("probe.txt"), JOIN$(ab, CHR$(10)) + CHR$(10))
 PRINT "datei "; FILEEXISTS("aus.pdf"); " seiten "; ab[LEN(ab) - 1]
 --- argumente
-{sammlung}/../../examples/glutfaden
+{sammlung}/../../../examples/glutfaden
 --- datei helfer.dh
-IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
-IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
+IMPORT "{sammlung}/../../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/../_hilfen/glutfaden_export.dh"
 
 --- datei probe.pxs
 {
@@ -3851,10 +3851,10 @@ DIM ab AS ARRAY OF STRING : ab = kern.pdfExportieren(m, "aus.pdf", o)
 PRINT geAbweichungen$(geLies$("demo_a3.txt"), JOIN$(ab, CHR$(10)) + CHR$(10))
 PRINT "datei "; FILEEXISTS("aus.pdf"); " seiten "; ab[LEN(ab) - 1]
 --- argumente
-{sammlung}/../../examples/glutfaden
+{sammlung}/../../../examples/glutfaden
 --- datei helfer.dh
-IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
-IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
+IMPORT "{sammlung}/../../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/../_hilfen/glutfaden_export.dh"
 
 --- datei demo_a3.txt
 S 30.0
@@ -3930,10 +3930,10 @@ DIM ab AS ARRAY OF STRING : ab = kern.pdfExportieren(m, "aus.pdf", o)
 PRINT geAbweichungen$(geLies$("demo_dp.txt"), JOIN$(ab, CHR$(10)) + CHR$(10))
 PRINT "datei "; FILEEXISTS("aus.pdf"); " seiten "; ab[LEN(ab) - 1]
 --- argumente
-{sammlung}/../../examples/glutfaden
+{sammlung}/../../../examples/glutfaden
 --- datei helfer.dh
-IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
-IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
+IMPORT "{sammlung}/../../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/../_hilfen/glutfaden_export.dh"
 
 --- datei demo_dp.txt
 S 30.0
@@ -4001,10 +4001,10 @@ DIM ab AS ARRAY OF STRING : ab = kern.pdfExportieren(m, "aus.pdf", o)
 PRINT geAbweichungen$(geLies$("demo_mys.txt"), JOIN$(ab, CHR$(10)) + CHR$(10))
 PRINT "datei "; FILEEXISTS("aus.pdf"); " seiten "; ab[LEN(ab) - 1]
 --- argumente
-{sammlung}/../../examples/glutfaden
+{sammlung}/../../../examples/glutfaden
 --- datei helfer.dh
-IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
-IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
+IMPORT "{sammlung}/../../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/../_hilfen/glutfaden_export.dh"
 
 --- datei demo_mys.txt
 S 30.0
@@ -4095,10 +4095,10 @@ DIM ab AS ARRAY OF STRING : ab = kern.pdfExportieren(m, "aus.pdf", o)
 PRINT geAbweichungen$(geLies$("demo_ueb.txt"), JOIN$(ab, CHR$(10)) + CHR$(10))
 PRINT "datei "; FILEEXISTS("aus.pdf"); " seiten "; ab[LEN(ab) - 1]
 --- argumente
-{sammlung}/../../examples/glutfaden
+{sammlung}/../../../examples/glutfaden
 --- datei helfer.dh
-IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
-IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
+IMPORT "{sammlung}/../../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/../_hilfen/glutfaden_export.dh"
 
 --- datei demo_ueb.txt
 S 30.0
@@ -4255,10 +4255,10 @@ w = pdfWoerter()
 PRINT "mit wasserzeichen: ca "; pdfWortZahl(w, "/ca"); " formulare je seite "; pdfWortZahl(w, "Do") = LEN(s)
 PRINT "a3 "; INSTR(JOIN$(w, " "), "/MediaBox [0 0 841.8898 1190.5511 ]") >= 0
 --- argumente
-{sammlung}/../../examples/glutfaden
+{sammlung}/../../../examples/glutfaden
 --- datei helfer.dh
-IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
-IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
+IMPORT "{sammlung}/../../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/../_hilfen/glutfaden_export.dh"
 
 --- datei probe.pxs
 {
@@ -4633,7 +4633,7 @@ IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
 }
 
 --- datei pdftext.dh
-IMPORT "{sammlung}/_hilfen/pdftext.dh"
+IMPORT "{sammlung}/../_hilfen/pdftext.dh"
 
 --- erwartet
 endung TRUE
@@ -4660,10 +4660,10 @@ CATCH e
 END TRY
 PRINT "datei "; FILEEXISTS("x.pdf")
 --- argumente
-{sammlung}/../../examples/glutfaden
+{sammlung}/../../../examples/glutfaden
 --- datei helfer.dh
-IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
-IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
+IMPORT "{sammlung}/../../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/../_hilfen/glutfaden_export.dh"
 
 --- datei probe.pxs
 {
@@ -5055,10 +5055,10 @@ DIM ab AS ARRAY OF STRING : ab = kern.pdfExportieren(m, "aus.pdf", o)
 PRINT geAbweichungen$(geLies$("breit.txt"), JOIN$(ab, CHR$(10)) + CHR$(10))
 PRINT "datei "; FILEEXISTS("aus.pdf"); " seiten "; ab[LEN(ab) - 1]
 --- argumente
-{sammlung}/../../examples/glutfaden
+{sammlung}/../../../examples/glutfaden
 --- datei helfer.dh
-IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
-IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
+IMPORT "{sammlung}/../../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/../_hilfen/glutfaden_export.dh"
 
 --- datei breit.pxs
 {
@@ -5398,10 +5398,10 @@ o.datum = "16.10.2026" : o.paletten = pal
 kern.htmlExportieren(m, "probe", o)
 PRINT geAbweichungen$(geLies$("probe.html.ref"), geLies$("probe.html"))
 --- argumente
-{sammlung}/../../examples/glutfaden
+{sammlung}/../../../examples/glutfaden
 --- datei helfer.dh
-IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
-IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
+IMPORT "{sammlung}/../../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/../_hilfen/glutfaden_export.dh"
 
 --- datei probe.pxs
 {
@@ -6188,10 +6188,10 @@ m.modus = "diamond" : m.stoff = 8
 kern.htmlExportieren(m, "probe_dp", o)
 PRINT geAbweichungen$(geLies$("probe_dp.html.ref"), geLies$("probe_dp.html"))
 --- argumente
-{sammlung}/../../examples/glutfaden
+{sammlung}/../../../examples/glutfaden
 --- datei helfer.dh
-IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
-IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
+IMPORT "{sammlung}/../../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/../_hilfen/glutfaden_export.dh"
 
 --- datei probe.pxs
 {
@@ -6938,10 +6938,10 @@ o.ueberlappung = 3 : o.kreuz = ["Anchor"]
 kern.htmlExportieren(m, "breit", o)
 PRINT geAbweichungen$(geLies$("breit.html.ref"), geLies$("breit.html"))
 --- argumente
-{sammlung}/../../examples/glutfaden
+{sammlung}/../../../examples/glutfaden
 --- datei helfer.dh
-IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
-IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
+IMPORT "{sammlung}/../../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/../_hilfen/glutfaden_export.dh"
 
 --- datei breit.pxs
 {
@@ -7744,10 +7744,10 @@ o.mystery = TRUE : o.ueberlappung = 2
 kern.htmlExportieren(m, "breit_mys", o)
 PRINT geAbweichungen$(geLies$("breit_mys.html.ref"), geLies$("breit_mys.html"))
 --- argumente
-{sammlung}/../../examples/glutfaden
+{sammlung}/../../../examples/glutfaden
 --- datei helfer.dh
-IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
-IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
+IMPORT "{sammlung}/../../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/../_hilfen/glutfaden_export.dh"
 
 --- datei breit.pxs
 {
@@ -8483,10 +8483,10 @@ DIM px AS kern.Muster : px = kern.musterAusJson(JSON_GET_JSON(JSON_PARSE(ZIP_REA
 PRINT "pxs "; px.breite; "x"; px.hoehe; " "; LEN(px.farben)
 PRINT ZIP_READ$("alt.zip", "LIESMICH.txt")
 --- argumente
-{sammlung}/../../examples/glutfaden
+{sammlung}/../../../examples/glutfaden
 --- datei helfer.dh
-IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
-IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
+IMPORT "{sammlung}/../../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/../_hilfen/glutfaden_export.dh"
 
 --- datei probe.pxs
 {
@@ -8903,10 +8903,10 @@ IMAGE_SAVE(b, "bild.png")
 e = kern.paketExportieren(m, "dp.zip", "", FALSE, pal)
 PRINT JOIN$(ZIP_LIST("dp.zip"), ", "); " | fehlt "; LEN(e.fehlt)
 --- argumente
-{sammlung}/../../examples/glutfaden
+{sammlung}/../../../examples/glutfaden
 --- datei helfer.dh
-IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
-IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
+IMPORT "{sammlung}/../../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/../_hilfen/glutfaden_export.dh"
 
 --- datei probe.pxs
 {

@@ -34,9 +34,9 @@ PRINT "datei nicht geschrieben "; (FILETIME(original) = zeit AND FILESIZE(origin
 ' Sonst bliebe nach jedem Lauf eine .db im examples-Ordner liegen.
 PRINT "arbeitskopie weg "; (NOT FILEEXISTS(kopie))
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 IMPORT "db"
 FUNCTION zustand$(pfad AS STRING) AS STRING
     DIM c AS DB_CONN : c = DB_OPEN(pfad)
@@ -72,7 +72,7 @@ DIM a AS STRING : a = zustand$("quelle.db")
 PRINT "zeilen da "; (a <> "")
 PRINT "gleich "; (zustand$("kopie.db") = a)
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- datei helfer.dh
 IMPORT "db"
 FUNCTION zustand$(pfad AS STRING) AS STRING

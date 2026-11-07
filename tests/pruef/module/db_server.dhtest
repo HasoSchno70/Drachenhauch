@@ -71,7 +71,7 @@ PRINT DB_COL_COUNT(r), DB_COL_NAME(r, 1), DB_NEXT(r)
 DB_EXEC(c, "DROP TABLE " + t)
 DB_CLOSE(c)
 --- datei hilfe.dh
-IMPORT "{sammlung}/_hilfen/dbserver.dh"
+IMPORT "{sammlung}/../_hilfen/dbserver.dh"
 --- erwartet
 TRUE
 1
@@ -113,7 +113,7 @@ PRINT namen
 PRINT DB_EXEC(c, "UPDATE " + t + " SET menge = ? WHERE name <> ?", 5, "a")
 DB_EXEC(c, "DROP TABLE " + t)
 --- datei hilfe.dh
-IMPORT "{sammlung}/_hilfen/dbserver.dh"
+IMPORT "{sammlung}/../_hilfen/dbserver.dh"
 --- erwartet
 1
 1
@@ -148,7 +148,7 @@ CATCH e
     PRINT e
 END TRY
 --- datei hilfe.dh
-IMPORT "{sammlung}/_hilfen/dbserver.dh"
+IMPORT "{sammlung}/../_hilfen/dbserver.dh"
 --- erwartet
 DB_EXEC:  TRUE
 DB_QUERY: die Abfrage hat 2 Platzhalter, uebergeben sind 1 Werte
@@ -186,7 +186,7 @@ CATCH e
 END TRY
 DB_EXEC(c, "DROP TABLE " + t)
 --- datei hilfe.dh
-IMPORT "{sammlung}/_hilfen/dbserver.dh"
+IMPORT "{sammlung}/../_hilfen/dbserver.dh"
 --- erwartet
 54 4
 DB_QUERY_START:
@@ -218,7 +218,7 @@ CATCH e
     PRINT e
 END TRY
 --- datei hilfe.dh
-IMPORT "{sammlung}/_hilfen/dbserver.dh"
+IMPORT "{sammlung}/../_hilfen/dbserver.dh"
 --- erwartet
 TRUE TRUE FALSE
 DB_OPEN: sslmode=gibts gibt es nicht (disable, prefer, require, verify-full)
@@ -251,7 +251,7 @@ PRINT GUI_FORM_LOAD(w, c, t, id), GUI_TEXT(name), GUI_TEXT(menge)
 PRINT GUI_FORM_LOAD(w, c, t, 999)
 DB_EXEC(c, "DROP TABLE " + t)
 --- datei hilfe.dh
-IMPORT "{sammlung}/_hilfen/dbserver.dh"
+IMPORT "{sammlung}/../_hilfen/dbserver.dh"
 --- erwartet
 1 2
 1
@@ -273,8 +273,8 @@ versionAblauf(c, fremd, t)
 gleichAblauf(c, t)
 DB_EXEC(c, "DROP TABLE " + t)
 --- datei hilfe.dh
-IMPORT "{sammlung}/_hilfen/dbserver.dh"
-IMPORT "{sammlung}/_hilfen/formversion.dh"
+IMPORT "{sammlung}/../_hilfen/dbserver.dh"
+IMPORT "{sammlung}/../_hilfen/formversion.dh"
 --- erwartet
 angelegt TRUE stand 1
 gespeichert TRUE stand 2
@@ -328,7 +328,7 @@ PRINT DB_COL_COUNT(r), DB_COL_NAME(r, 1), DB_NEXT(r)
 DB_EXEC(c, "DROP TABLE " + t)
 DB_CLOSE(c)
 --- datei hilfe.dh
-IMPORT "{sammlung}/_hilfen/dbserver.dh"
+IMPORT "{sammlung}/../_hilfen/dbserver.dh"
 --- erwartet
 TRUE
 1
@@ -370,7 +370,7 @@ PRINT namen
 PRINT DB_EXEC(c, "UPDATE " + t + " SET menge = ? WHERE name <> ?", 5, "a")
 DB_EXEC(c, "DROP TABLE " + t)
 --- datei hilfe.dh
-IMPORT "{sammlung}/_hilfen/dbserver.dh"
+IMPORT "{sammlung}/../_hilfen/dbserver.dh"
 --- erwartet
 1
 1
@@ -405,7 +405,7 @@ CATCH e
     PRINT e
 END TRY
 --- datei hilfe.dh
-IMPORT "{sammlung}/_hilfen/dbserver.dh"
+IMPORT "{sammlung}/../_hilfen/dbserver.dh"
 --- erwartet
 DB_EXEC:  TRUE
 DB_QUERY: die Abfrage hat 2 Platzhalter, uebergeben sind 1 Werte
@@ -443,7 +443,7 @@ CATCH e
 END TRY
 DB_EXEC(c, "DROP TABLE " + t)
 --- datei hilfe.dh
-IMPORT "{sammlung}/_hilfen/dbserver.dh"
+IMPORT "{sammlung}/../_hilfen/dbserver.dh"
 --- erwartet
 54 4
 DB_QUERY_START:
@@ -475,7 +475,7 @@ CATCH e
     PRINT e
 END TRY
 --- datei hilfe.dh
-IMPORT "{sammlung}/_hilfen/dbserver.dh"
+IMPORT "{sammlung}/../_hilfen/dbserver.dh"
 --- erwartet
 TRUE TRUE FALSE
 DB_OPEN: sslmode=gibts gibt es nicht (disable, prefer, require, verify-full)
@@ -508,7 +508,7 @@ PRINT GUI_FORM_LOAD(w, c, t, id), GUI_TEXT(name), GUI_TEXT(menge)
 PRINT GUI_FORM_LOAD(w, c, t, 999)
 DB_EXEC(c, "DROP TABLE " + t)
 --- datei hilfe.dh
-IMPORT "{sammlung}/_hilfen/dbserver.dh"
+IMPORT "{sammlung}/../_hilfen/dbserver.dh"
 --- erwartet
 1 2
 1
@@ -530,8 +530,8 @@ versionAblauf(c, fremd, t)
 gleichAblauf(c, t)
 DB_EXEC(c, "DROP TABLE " + t)
 --- datei hilfe.dh
-IMPORT "{sammlung}/_hilfen/dbserver.dh"
-IMPORT "{sammlung}/_hilfen/formversion.dh"
+IMPORT "{sammlung}/../_hilfen/dbserver.dh"
+IMPORT "{sammlung}/../_hilfen/formversion.dh"
 --- erwartet
 angelegt TRUE stand 1
 gespeichert TRUE stand 2
@@ -584,7 +584,7 @@ DB_NEXT(r)
 PRINT DB_GET_STRING(r, 0)
 DB_EXEC(c, "DROP TABLE " + t)
 --- datei hilfe.dh
-IMPORT "{sammlung}/_hilfen/dbserver.dh"
+IMPORT "{sammlung}/../_hilfen/dbserver.dh"
 --- erwartet
 TRUE
 zwei 4 ? ein ? hier

@@ -32,7 +32,7 @@ DIM neu AS BUFFER : neu = READALL_BYTES("katalog.json")
 DIM soll AS BUFFER : soll = READALL_BYTES("erwartet.json")
 PRINT "byte-gleich "; BUFFER_LEN(neu) = BUFFER_LEN(soll) AND BUFFER_TO_HEX$(neu) = BUFFER_TO_HEX$(soll)
 --- argumente
-{sammlung}/../../buch-referenz/buch/i18n/apply.dh
+{sammlung}/../../../buch-referenz/buch/i18n/apply.dh
 --- datei patch.json
 {"Satz eins.": "Sentence one.", "Zwei \"Zitate\" und ä": "Two \"quotes\" and ä\n", "Gibts nicht": "x", "Leer": "Empty \\ slash /"}
 
@@ -64,8 +64,8 @@ DIM neu AS BUFFER : neu = READALL_BYTES("kopie.json")
 DIM alt AS BUFFER : alt = READALL_BYTES(ARG$(1))
 PRINT "byte-gleich "; BUFFER_LEN(neu) = BUFFER_LEN(alt) AND BUFFER_TO_HEX$(neu) = BUFFER_TO_HEX$(alt)
 --- argumente
-{sammlung}/../../buch-referenz/buch/i18n/apply.dh
-{sammlung}/../../buch-referenz/buch/i18n/en.json
+{sammlung}/../../../buch-referenz/buch/i18n/apply.dh
+{sammlung}/../../../buch-referenz/buch/i18n/en.json
 --- datei leer.json
 {}
 
@@ -76,7 +76,7 @@ byte-gleich TRUE
 === shoot im referenzbuch nimmt ein bild auf
 ' Die Kopie des Werkzeugs liegt in _programm/, ihre figures/ und images/
 ' also daneben. 480x320 mit Skalierung 4 ergibt 1920x1280.
---- programm ../../buch-referenz/buch/shoot.dh
+--- programm ../../../buch-referenz/buch/shoot.dh
 --- argumente
 mini
 --- datei _programm/figures/mini.dh
@@ -99,7 +99,7 @@ groesse 1920 1280
 ' Ohne Namen: alles aus figures/ plus jedes Kapitelprogramm mit eigener
 ' Schleife; ein lineares Programm (ohne WHILE) wird uebergangen. Aus
 ' kap05_1_lauf wird ../code/kap05/1_lauf.dh.
---- programm ../../buch-einstieg/buch/shoot.dh
+--- programm ../../../buch-einstieg/buch/shoot.dh
 --- datei _programm/figures/kap01_1_bild.dh
 SCREEN(640, 400)
 WHILE TRUE

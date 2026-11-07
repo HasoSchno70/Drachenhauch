@@ -32,7 +32,7 @@ PRINT "letzte ausgabe "; (INSTR(dlAus, "zuletzt: angefangen") >= 0)
 PRINT "der andere lief "; (INSTR(dlAus, "1 von 2 Faellen") >= 0)
 PRINT "nicht gewartet "; (MILLIS() - t0 < 20000)
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 rueckgabe 1
 genannt TRUE
@@ -60,7 +60,7 @@ PRINT "rueckgabe "; dlCode
 PRINT "eigene grenze reicht "; (INSTR(dlAus, "darf laenger") < 0)
 PRINT "kopf gilt "; (INSTR(dlAus, "darf nicht: Zeitgrenze von 1 s ueberschritten") >= 0)
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 rueckgabe 1
 eigene grenze reicht TRUE
@@ -89,7 +89,7 @@ SLEEP(1000)
 b = READALL$("puls.txt")
 PRINT "kind steht "; (a = b)
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- datei kind.dh
 WHILE TRUE
     WRITEALL(ARG$(0), STR$(MILLIS()))
@@ -115,7 +115,7 @@ WRITEALL("haengt_pruefung.dh", "WHILE TRUE : SLEEP(50) : WEND" + CHR$(10))
 dlStarten(["test", "--zeitgrenze", "1", "haengt_pruefung.dh"])
 PRINT "pruefprogramm "; dlCode; " "; (INSTR(dlAus, "Zeitgrenze von 1 s ueberschritten (Pruefprogramm)") >= 0)
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 nachher TRUE
 pruefprogramm 1 TRUE
@@ -137,7 +137,7 @@ PRINT "ohne "; dlCode
 dlStarten(["test", "--zeitgrenze", "bald", "s.dhtest"])
 PRINT "falsch "; dlCode; " "; (INSTR(dlErr, "ganze Sekunden") >= 0)
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 eine sekunde 1 TRUE
 ohne 0

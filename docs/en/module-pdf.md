@@ -160,7 +160,7 @@ PRINT PRINTER_DEFAULT$() : PRINT PRINTERS()                ' for a dialog of you
   the PDF itself.
 - **`zieldatei`** (target file) is meant for printers that write into a file —
   "Microsoft Print to PDF" then does **not** ask. That is exactly how
-  `tests/pruef/drucken.dhtest` checks printing: through a real driver,
+  `tests/pruef/module/drucken.dhtest` checks printing: through a real driver,
   read back with our own reader `tests/pruef/_hilfen/pdftext.dh` —
   the text of both pages and, from the text matrices, the position of the
   right-aligned amount. Measured: two pages in ~0.9 s.

@@ -65,7 +65,7 @@ DIM traegt AS FLOAT : traegt = (8 * 1024 * 1024 - 81388) / 6625
 PRINT "passt in 8 MB "; (grenze <= traegt * 0.85)
 IF grenze > traegt * 0.85 THEN PRINT "MAX_CALL_DEPTH "; grenze; ", ein 8-MB-Stack traegt ~"; INT(traegt)
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- erwartet
 gefunden TRUE
 passt in 8 MB TRUE
@@ -85,7 +85,7 @@ PRINT "macos-flag "; (INSTR(txt, "stack_size") >= 0)
 PRINT "nur fuer das programm "; (INSTR(txt, "rustc-link-arg-bins") >= 0)
 PRINT "keine alte config.toml "; NOT FILEEXISTS(ARG$(0) + "/rust/drachenhauch_runtime/.cargo/config.toml")
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- erwartet
 build.rs da TRUE
 windows-flag TRUE

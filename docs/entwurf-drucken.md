@@ -8,7 +8,7 @@
 > [module-pdf.md](module-pdf.md#drucken-und-vorschau). Prüfstein 1, gemessen:
 > zwei Seiten durch „Microsoft Print to PDF“ in eine Datei in ~0,9 s, und im
 > Ergebnis stehen Nummer, Name und der rechtsbündige Betrag an seiner Stelle
-> (`tests/pruef/drucken.dhtest`; gelesen wird die Datei des Treibers seit
+> (`tests/pruef/module/drucken.dhtest`; gelesen wird die Datei des Treibers seit
 > 2026-09-20 mit dem eigenen Leser `tests/pruef/_hilfen/pdftext.dh` statt mit
 > PyMuPDF). Die Rechnungsverwaltung hat einen Druckdialog aus
 > Bordmitteln (Klappliste der Drucker, Kopien, Vorschau) und „PDF öffnen“.

@@ -56,10 +56,10 @@ DIM d AS JSON_HANDLE : d = JSON_PARSE(JOIN$(READLINES(p + "/Hauptfenster.dhform"
 PRINT "widgets "; JSON_LEN(d, "widgets")
 PRINT "timer "; JSON_LEN(d, "timer"); " "; JSON_GET_STRING(d, "timer.0.name"); " "; JSON_GET_INT(d, "timer.0.intervall"); " "; JSON_GET_BOOL(d, "timer.0.aktiv"); " "; JSON_GET_BOOL(d, "timer.0.wiederholen")
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
 IMPORT "json"
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- datei proj/projekt.dhstudio
 {"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"}]}
@@ -100,10 +100,10 @@ PRINT "geloescht "; slHat(log, "geloescht timer takt")
 DIM d AS JSON_HANDLE : d = JSON_PARSE(JOIN$(READLINES(p + "/Hauptfenster.dhform"), CHR$(10)))
 PRINT "timer "; JSON_LEN(d, "timer")
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
 IMPORT "json"
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- datei proj/projekt.dhstudio
 {"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"}]}
@@ -157,10 +157,10 @@ NEXT
 DIM d AS JSON_HANDLE : d = JSON_PARSE(JOIN$(READLINES(p + "/Hauptfenster.dhform"), CHR$(10)))
 PRINT "datei "; JSON_GET_STRING(d, "menus.0.label"); " / "; JSON_GET_STRING(d, "menus.0.items.0.label"); " / "; JSON_GET_STRING(d, "menus.0.items.0.name")
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
 IMPORT "json"
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- datei proj/projekt.dhstudio
 {"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"}]}
@@ -235,11 +235,11 @@ DIM f AS IMAGE : f = LOADIMAGE(CWD$() + "/f.png")
 DIM px AS INTEGER : px = GETPIXEL(f, 260, 191)
 PRINT "bild gelb "; (px SHR 16) BAND 255 > 200 AND (px BAND 255) < 100
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
 IMPORT "json"
 IMPORT "imgfx"
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- datei proj/projekt.dhstudio
 {"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"},{"art":"fenster","name":"Info"}]}
@@ -342,9 +342,9 @@ FOR EACH z IN slProtokoll(log)
     IF LEFT$(z, 11) = "haltepunkt " OR LEFT$(z, 11) = "angehalten " OR LEFT$(z, 6) = "debug " OR LEFT$(z, 9) = "variable " OR z = "ausgabe x ist 42" THEN PRINT z
 NEXT
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- datei proj/projekt.dhstudio
 {"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"}]}
@@ -414,9 +414,9 @@ FOR EACH z IN READLINES(p + "/Hauptfenster.dh")
     IF INSTR(z, "Self.") >= 0 THEN PRINT "|"; TRIM$(z)
 NEXT
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- datei proj/projekt.dhstudio
 {"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"}]}
@@ -473,11 +473,11 @@ PRINT "kopiert "; FILEEXISTS(p + "/bilder/rot.png")
 DIM d AS JSON_HANDLE : d = JSON_PARSE(JOIN$(READLINES(p + "/Hauptfenster.dhform"), CHR$(10)))
 PRINT "control "; JSON_GET_STRING(d, "widgets.0.studio_bild")
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
 IMPORT "json"
 IMPORT "imgfx"
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- datei proj/projekt.dhstudio
 {"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"}]}
@@ -529,9 +529,9 @@ FOR EACH z IN SPLIT(aus, CHR$(10))
     IF z <> "" AND LEFT$(z, 8) <> "WARNING:" THEN PRINT z
 NEXT
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- datei proj/projekt.dhstudio
 {"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"}]}

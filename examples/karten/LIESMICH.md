@@ -56,5 +56,5 @@ darum auf jeder Karte und in jedem PDF.
   auf der Platte merken, im Speicher begrenzen.
 * `main.dh` -- Fenster, Zeichnen, Maus, Suche, Ausfuhr.
 
-Geprüft in `tests/pruef/beispiel_karten.dhtest` -- mit einem eigenen
+Geprüft in `tests/pruef/beispiele/beispiel_karten.dhtest` -- mit einem eigenen
 Kachelserver auf 127.0.0.1, nie gegen die echten Server.

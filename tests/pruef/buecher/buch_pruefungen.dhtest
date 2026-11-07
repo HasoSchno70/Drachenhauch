@@ -33,9 +33,9 @@ PRINT "befehle ohne signatur "; JSON_LEN(h, "cmds_ohne_sig")
 ' Eine Ueberschrift ueber 70 Zeichen ist meist ein verrutschter Absatz.
 PRINT "zu lange zwischenueberschriften "; JSON_LEN(h, "lange_h2")
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/nodelauf.dh"
+IMPORT "{sammlung}/../_hilfen/nodelauf.dh"
 --- erwartet
 genug kapitel TRUE
 tips ohne rumpf 0
@@ -78,9 +78,9 @@ FOR i = 0 TO JSON_LEN(h, "verweise") - 1
 NEXT
 PRINT "verweise ins leere "; tot
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/nodelauf.dh"
+IMPORT "{sammlung}/../_hilfen/nodelauf.dh"
 --- erwartet
 genug kapitel TRUE
 genug verweise TRUE
@@ -106,7 +106,7 @@ NEXT
 PRINT "geprueft "; (LEN(dateien) > 50)
 PRINT "kapitelnummern "; treffer
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- erwartet
 geprueft TRUE
 kapitelnummern 0
@@ -127,9 +127,9 @@ PRINT "ohne befund "; (INSTR(nlAus, "0 mit Befund") >= 0)
 ' Erfolg, weil er nichts zu pruefen fand.
 PRINT "genug bloecke "; (zahlVor(nlAus, "Codebloecke") > 800)
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/nodelauf.dh"
+IMPORT "{sammlung}/../_hilfen/nodelauf.dh"
 --- erwartet
 rueckgabe 0
 ohne befund TRUE
@@ -153,9 +153,9 @@ PRINT "ohne befund "; (INSTR(nlAus, "0 mit Befund") >= 0)
 ' Bruchstueck weg. Auf dieser Maschine sind es 212.
 PRINT "genug ausgefuehrt "; (zahlVor(nlAus, "ausgefuehrt") > 100)
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/nodelauf.dh"
+IMPORT "{sammlung}/../_hilfen/nodelauf.dh"
 --- erwartet
 rueckgabe 0
 ohne befund TRUE
@@ -174,7 +174,7 @@ PRINT arity$("SCREENWIDTH()")
 PRINT "["; arity$("PLOTS(xs, ys, farbe, ...)"); "]"
 PRINT arity$("LEN(s$) → INTEGER")
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/signatur.dh"
+IMPORT "{sammlung}/../_hilfen/signatur.dh"
 --- erwartet
 2,3
 6,8
@@ -209,7 +209,7 @@ z = formenJeBefehl("RANGE(ende)   RANGE(start, ende)", bekannt)
 PRINT z[0]; " -> "; arity$(MID$(z[0], INSTR(z[0], "|") + 1))
 PRINT "familie "; LEN(formenJeBefehl("ECS_FILL_FLOAT/INT(w, ziel$, wert)", bekannt))
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/signatur.dh"
+IMPORT "{sammlung}/../_hilfen/signatur.dh"
 --- erwartet
 TEMPDIR$|TEMPDIR$()
 TEMPFILE$|TEMPFILE$([praefix$[, endung$]])
@@ -273,10 +273,10 @@ NEXT
 PRINT "genug verglichen "; (geprueft > 500)
 PRINT "abweichungen "; befund
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/nodelauf.dh"
-IMPORT "{sammlung}/_hilfen/signatur.dh"
+IMPORT "{sammlung}/../_hilfen/nodelauf.dh"
+IMPORT "{sammlung}/../_hilfen/signatur.dh"
 --- erwartet
 genug eintraege TRUE
 genug verglichen TRUE

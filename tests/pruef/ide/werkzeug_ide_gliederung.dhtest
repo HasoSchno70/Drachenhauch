@@ -35,7 +35,7 @@ SUB prStand(was AS STRING)
     (z, s) = GUI_TEXTAREA_CURSOR(aktivesFeld())
     PRINT was ; " zeile " ; z ; " markiert [" ; GUI_TEXTAREA_SELECTION$(aktivesFeld()) ; "] fokus feld " ; GUI_FOCUSED() = aktivesFeld()
 END SUB
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach     trefferNachziehen()
     ' erst zaehlen, wenn die Gliederung gefuellt ist (0,6 s nach dem Laden)
     IF prBild > 0 OR GUI_LISTBOX_COUNT(lstGliederung) = 2 THEN prBild = prBild + 1
@@ -49,7 +49,7 @@ spiel.dh
 --- umgebung
 DHRT_FRAMES=400
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 ' eine Datei mit zwei Unterprogrammen
@@ -76,7 +76,7 @@ SUB prStand(was AS STRING)
     (z, s) = GUI_TEXTAREA_CURSOR(aktivesFeld())
     PRINT was ; " zeile " ; z ; " fokus liste " ; GUI_FOCUSED() = lstGliederung ; " fokus feld " ; GUI_FOCUSED() = aktivesFeld()
 END SUB
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach     trefferNachziehen()
     IF prBild > 0 OR GUI_LISTBOX_COUNT(lstGliederung) = 2 THEN prBild = prBild + 1
     IF prBild = 1 THEN GUI_FOCUS(lstGliederung) : GUI_LISTBOX_SET_SELECTED(lstGliederung, 0)
@@ -95,7 +95,7 @@ spiel.dh
 --- umgebung
 DHRT_FRAMES=400
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 ' eine Datei mit zwei Unterprogrammen

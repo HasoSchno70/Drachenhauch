@@ -25,8 +25,8 @@ PRINT "groessen "; GUI_DOCK_GET_SIZE(w, "links"); " "; GUI_DOCK_GET_SIZE(w, "unt
 GUI_SET_BOUNDS(daListe[3], 10, 424, 384, 174)
 PRINT "getroffen wird die vordere liste "; GUI_HIT_TEST(100, 480) = daListe[2]
 --- datei hilfe.dh
-IMPORT "{sammlung}/_hilfen/dockmaus.dh"
-IMPORT "{sammlung}/_hilfen/dockaufbau.dh"
+IMPORT "{sammlung}/../_hilfen/dockmaus.dh"
+IMPORT "{sammlung}/../_hilfen/dockaufbau.dh"
 --- umgebung
 DHRT_FRAMES=2
 --- erwartet
@@ -67,8 +67,8 @@ WHILE NOT QUITREQUESTED()
     FLIP()
 WEND
 --- datei hilfe.dh
-IMPORT "{sammlung}/_hilfen/dockmaus.dh"
-IMPORT "{sammlung}/_hilfen/dockaufbau.dh"
+IMPORT "{sammlung}/../_hilfen/dockmaus.dh"
+IMPORT "{sammlung}/../_hilfen/dockaufbau.dh"
 --- umgebung
 DHRT_FRAMES=60
 --- erwartet
@@ -104,8 +104,8 @@ WHILE NOT QUITREQUESTED()
     FLIP()
 WEND
 --- datei hilfe.dh
-IMPORT "{sammlung}/_hilfen/dockmaus.dh"
-IMPORT "{sammlung}/_hilfen/dockaufbau.dh"
+IMPORT "{sammlung}/../_hilfen/dockmaus.dh"
+IMPORT "{sammlung}/../_hilfen/dockaufbau.dh"
 --- umgebung
 DHRT_FRAMES=60
 --- erwartet
@@ -136,8 +136,8 @@ WHILE NOT QUITREQUESTED()
     FLIP()
 WEND
 --- datei hilfe.dh
-IMPORT "{sammlung}/_hilfen/dockmaus.dh"
-IMPORT "{sammlung}/_hilfen/dockaufbau.dh"
+IMPORT "{sammlung}/../_hilfen/dockmaus.dh"
+IMPORT "{sammlung}/../_hilfen/dockaufbau.dh"
 --- umgebung
 DHRT_FRAMES=60
 --- erwartet
@@ -169,8 +169,8 @@ WHILE NOT QUITREQUESTED()
     FLIP()
 WEND
 --- datei hilfe.dh
-IMPORT "{sammlung}/_hilfen/dockmaus.dh"
-IMPORT "{sammlung}/_hilfen/dockaufbau.dh"
+IMPORT "{sammlung}/../_hilfen/dockmaus.dh"
+IMPORT "{sammlung}/../_hilfen/dockaufbau.dh"
 --- umgebung
 DHRT_FRAMES=60
 --- erwartet
@@ -197,8 +197,8 @@ WHILE NOT QUITREQUESTED()
     FLIP()
 WEND
 --- datei hilfe.dh
-IMPORT "{sammlung}/_hilfen/dockmaus.dh"
-IMPORT "{sammlung}/_hilfen/dockaufbau.dh"
+IMPORT "{sammlung}/../_hilfen/dockmaus.dh"
+IMPORT "{sammlung}/../_hilfen/dockaufbau.dh"
 --- umgebung
 DHRT_FRAMES=60
 --- erwartet
@@ -236,8 +236,8 @@ WHILE NOT QUITREQUESTED()
     FLIP()
 WEND
 --- datei hilfe.dh
-IMPORT "{sammlung}/_hilfen/dockmaus.dh"
-IMPORT "{sammlung}/_hilfen/dockaufbau.dh"
+IMPORT "{sammlung}/../_hilfen/dockmaus.dh"
+IMPORT "{sammlung}/../_hilfen/dockaufbau.dh"
 --- umgebung
 DHRT_FRAMES=60
 --- erwartet
@@ -279,8 +279,8 @@ GUI_DOCK_SET_STATE(w2, stand)
 GUI_DOCK_PANEL(w2, "probleme", "Probleme", "links")
 PRINT "spaeter angemeldet "; GUI_DOCK_WHERE$(w2, "probleme")
 --- datei hilfe.dh
-IMPORT "{sammlung}/_hilfen/dockmaus.dh"
-IMPORT "{sammlung}/_hilfen/dockaufbau.dh"
+IMPORT "{sammlung}/../_hilfen/dockmaus.dh"
+IMPORT "{sammlung}/../_hilfen/dockaufbau.dh"
 --- umgebung
 DHRT_FRAMES=2
 --- erwartet
@@ -320,8 +320,8 @@ WHILE NOT QUITREQUESTED()
     FLIP()
 WEND
 --- datei hilfe.dh
-IMPORT "{sammlung}/_hilfen/dockmaus.dh"
-IMPORT "{sammlung}/_hilfen/dockaufbau.dh"
+IMPORT "{sammlung}/../_hilfen/dockmaus.dh"
+IMPORT "{sammlung}/../_hilfen/dockaufbau.dh"
 --- umgebung
 DHRT_FRAMES=60
 --- erwartet
@@ -358,8 +358,8 @@ WHILE NOT QUITREQUESTED()
     FLIP()
 WEND
 --- datei hilfe.dh
-IMPORT "{sammlung}/_hilfen/dockmaus.dh"
-IMPORT "{sammlung}/_hilfen/dockaufbau.dh"
+IMPORT "{sammlung}/../_hilfen/dockmaus.dh"
+IMPORT "{sammlung}/../_hilfen/dockaufbau.dh"
 --- umgebung
 DHRT_FRAMES=4
 --- erwartet
@@ -393,8 +393,8 @@ WHILE NOT QUITREQUESTED()
     FLIP()
 WEND
 --- datei hilfe.dh
-IMPORT "{sammlung}/_hilfen/dockmaus.dh"
-IMPORT "{sammlung}/_hilfen/dockaufbau.dh"
+IMPORT "{sammlung}/../_hilfen/dockmaus.dh"
+IMPORT "{sammlung}/../_hilfen/dockaufbau.dh"
 --- umgebung
 DHRT_FRAMES=4
 --- erwartet
@@ -416,8 +416,8 @@ CLS(&H101820)
 GUI_DRAW()
 FLIP()
 --- datei hilfe.dh
-IMPORT "{sammlung}/_hilfen/dockmaus.dh"
-IMPORT "{sammlung}/_hilfen/dockaufbau.dh"
+IMPORT "{sammlung}/../_hilfen/dockmaus.dh"
+IMPORT "{sammlung}/../_hilfen/dockaufbau.dh"
 --- bild
 300 330 nicht #C03030 +-60
 300 100 #C03030 +-60
@@ -434,8 +434,8 @@ CLS(&H101820)
 GUI_DRAW()
 FLIP()
 --- datei hilfe.dh
-IMPORT "{sammlung}/_hilfen/dockmaus.dh"
-IMPORT "{sammlung}/_hilfen/dockaufbau.dh"
+IMPORT "{sammlung}/../_hilfen/dockmaus.dh"
+IMPORT "{sammlung}/../_hilfen/dockaufbau.dh"
 --- bild
 300 330 #C03030 +-60
 

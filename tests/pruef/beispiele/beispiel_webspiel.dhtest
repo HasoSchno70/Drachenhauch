@@ -15,7 +15,7 @@ FOR prK = 0 TO 2
 NEXT
 AUTOMATION_PLAY("../ev.txt")
 DIM prBild AS INTEGER
---- programm ../../examples/webspiel/main.dh nach listeLaden()
+--- programm ../../../examples/webspiel/main.dh nach listeLaden()
 --- einschub nach     FLIP()
     prBild = prBild + 1
     IF prBild = 8 OR prBild = 14 OR prBild = 20 OR prBild = 26 THEN
@@ -60,7 +60,7 @@ FOR prK = 0 TO JSON_LEN(liste, "") - 1
     PRINT JSON_GET_STRING(liste, STR$(prK) + ".name"); " "; JSON_GET_INT(liste, STR$(prK) + ".punkte")
 NEXT
 EXIT(0)
---- programm ../../examples/webspiel/main.dh nach listeLaden()
+--- programm ../../../examples/webspiel/main.dh nach listeLaden()
 --- erwartet
 Platz fuer 20: 5 Platz fuer 250: 2
 Emil 400

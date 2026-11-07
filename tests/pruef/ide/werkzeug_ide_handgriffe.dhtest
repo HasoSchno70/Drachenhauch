@@ -1,10 +1,10 @@
 ' Die IDE in Drachenhauch (ide/ide.dh): Handgriffe aus der Uebersicht vom
 ' 2026-09-23 -- Klammern schliessen und was danach kam.
 '
-' Aufbau wie tests/pruef/werkzeug_ide.dhtest: die IDE als Kopie in _programm/,
+' Aufbau wie tests/pruef/ide/werkzeug_ide.dhtest: die IDE als Kopie in _programm/,
 ' der Einschub steht hinter `protokoll("bereit")` (dort ist alles angelegt
 ' und `befehl` rufbar), gelesen wird mit `--- nachher` aus Protokoll und
-' ide.json. Das Tippen selbst prueft tests/pruef/gui_klammern.dhtest an der
+' ide.json. Das Tippen selbst prueft tests/pruef/gui/gui_klammern.dhtest an der
 ' Laufzeit -- hier geht es um die Einstellung.
 
 --- langsam
@@ -12,13 +12,13 @@
 PRINT "vorher " ; klammernAn
 befehl("klammern")
 PRINT "nachher " ; klammernAn
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=20
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 PRINT 1
@@ -39,13 +39,13 @@ gemerkt FALSE
 
 === die gemerkte einstellung gilt beim naechsten start
 PRINT "an " ; klammernAn
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=20
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 PRINT 1
@@ -56,13 +56,13 @@ an FALSE
 
 === beim sichern formatieren
 befehl("sichern")
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=20
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 FOR i = 1 TO 2
@@ -90,13 +90,13 @@ formatiert 1
 
 === ohne die einstellung bleibt der text wie er ist
 befehl("sichern")
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=20
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 FOR i = 1 TO 2
@@ -126,13 +126,13 @@ formatiert 0
 sichernOhneFormat = TRUE
 befehl("sichern")
 sichernOhneFormat = FALSE
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=20
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 FOR i = 1 TO 2
@@ -160,13 +160,13 @@ formatiert 0
 
 === was sich nicht lesen laesst wird gesichert wie es dasteht
 befehl("sichern")
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=20
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 FOR i = 1 TO 2
@@ -197,13 +197,13 @@ formatiert 0
 ' jeder Schreibweise, nicht in Zeichenketten, Kommentaren oder `punktestand`.
 GUI_TEXTAREA_GOTO(aktivesFeld(), 2, 3)
 befehl("fundstellen")
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=20
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 DIM punkte AS INTEGER
@@ -235,13 +235,13 @@ GUI_UPDATE()
 befehl("sichern")
 PRINT "fokus-feld ist die ansicht " ; aktivesFeld() = taSpiegel
 befehl("spiegel")
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=20
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 PRINT 1
@@ -275,13 +275,13 @@ PRINT "ausgabe sichtbar " ; GUI_VISIBLE(lstAusgabe)
 befehl("start")
 PRINT "nach dem start " ; GUI_VISIBLE(lstAusgabe)
 befehl("seitenleiste")
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=20
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 PRINT 1
@@ -329,13 +329,13 @@ profilTabelleFuellen()
 PRINT "sprung " ; profilZeilen[0] ; " " ; profilZeilen[1]
 GUI_SET_CHECKED(cbProfilFunk, FALSE)
 profilTabelleFuellen()
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=20
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 PRINT 1
@@ -365,13 +365,13 @@ ausgabe("zwei")
 PRINT "vorher " ; GUI_LISTBOX_COUNT(lstAusgabe)
 befehl("ausgabe_leeren")
 PRINT "nachher " ; GUI_LISTBOX_COUNT(lstAusgabe)
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=20
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 PRINT 1
@@ -389,13 +389,13 @@ IF NOT FILEEXISTS("lauf1") THEN
     GUI_TEXTAREA_FOLD(reiter[0].feld, 2, TRUE)
     konfigSichern()
 END IF
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=150
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 PRINT 1
@@ -433,13 +433,13 @@ GUI_TEXTAREA_SELECT(reiter[0].feld, 2, 3, 3, 2)
 p = listingPdf(TRUE)
 PDF_SAVE(p, "auswahl.pdf")
 PDF_CLOSE(p)
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=20
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 PRINT 1
@@ -447,7 +447,7 @@ PRINT 2
 PRINT 3
 PRINT 4
 --- datei _programm/lesen.dh
-IMPORT "{sammlung}/_hilfen/pdftext.dh"
+IMPORT "{sammlung}/../_hilfen/pdftext.dh"
 --- nachher
 IMPORT "json"
 IMPORT "_programm/lesen.dh"
@@ -472,13 +472,13 @@ zeile 4 fehlt TRUE
 ' Die Zeilen des Baums bleiben, wo sie waren (Klicklagen der anderen
 ' Faelle); gezaehlt werden die sichtbaren Dateien.
 GUI_SET_TEXT(tfBaumFilter, "HELD")
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=20
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 PRINT 1
@@ -504,13 +504,13 @@ umbauZiele = [] : ARRAY_PUSH(umbauZiele, NEW UmbauZiel(-1, PATHJOIN(projektOrdne
 umbauSchreiben()
 WRITEALL(PATHJOIN(projektOrdner, "b.dh"), "PRINT " + CHR$(34) + "spaeter" + CHR$(34) + NL)
 umbauZurueck()
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=20
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 PRINT 1
@@ -534,13 +534,13 @@ umbauZurueck()
 PRINT "nach dem zuruecknehmen " ; READLINES(PATHJOIN(projektOrdner, "b.dh"))[0]
 umbauWiederholen()
 umbauWiederholen()
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=20
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 PRINT 1
@@ -593,18 +593,18 @@ FOR EACH f IN DIRLIST(ord, "*.dh")
 NEXT
 PRINT "themen " ; JSON_LEN(h, "t") ; " doppelt " ; doppelt ; " fehlt " ; fehlt ; " ohne " ; ohne
 --- argumente
-{sammlung}
+{sammlung}/..
 --- erwartet
 themen 16 doppelt 0 fehlt 0 ohne 0
 
 === beispiele nach themen: liste, filter, oeffnen
 themenZeigen()
 GUI_SET_TEXT(tfThemenFilter, "tracker")
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- umgebung
 DHRT_FRAMES=20
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- nachher
 DIM P AS ARRAY OF STRING : P = READLINES("_programm/ide.log")
@@ -624,11 +624,11 @@ GUI_LISTBOX_SET_SELECTED(lstThemen, GUI_LISTBOX_VIEW_ROW(lstThemen, 1))
 themenOeffnen(FALSE)
 PRINT "sichtbar " ; GUI_WINDOW_SHOWN(winThemen)
 PRINT "reiter " ; BASENAME(reiter[aktiverTab].pfad)
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- umgebung
 DHRT_FRAMES=20
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- enthaelt
 sichtbar FALSE
@@ -644,11 +644,11 @@ FOR EACH d IN ["14_strings.dh", "35_serial.dh", "32_coinquest.dh", "47_collision
     PRINT beispielBeschreibung$(PATHJOIN(ord, d), d)
 NEXT
 PRINT beispielBeschreibung$(PATHJOIN(ord, "gibtsnicht.dh"), "gibtsnicht.dh")
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- umgebung
 DHRT_FRAMES=20
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- enthaelt
 String-Funktionen: LEFT$, RIGHT$, MID$, INSTR, SPLIT$, JOIN$, REPLACE$, TRIM$
@@ -664,13 +664,13 @@ GUI_TEXTAREA_GOTO(aktivesFeld(), 4, 1)
 befehl("haltepunkt")
 watchListe = ["n * 10", "summe"]
 befehl("debug")
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=240
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 DIM summe AS INTEGER
@@ -710,13 +710,13 @@ befehl("debug")
         debugSetzen("n", "100")
         befehl("weiter_d")
     END IF
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=300
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 DIM summe AS INTEGER
@@ -746,13 +746,13 @@ ueberwachen summe=200
 === bis zur marke startet den debugger und haelt dort
 GUI_TEXTAREA_GOTO(aktivesFeld(), 11, 1)
 befehl("bis_marke")
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=240
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 DIM summe AS INTEGER
@@ -781,11 +781,11 @@ debug pause 11
 ' Werkzeuge -> Bastelzentrale startet examples/bastelzentrale/main.dh als
 ' eigenen Prozess (die Ports frei, ohne mDNS, damit nichts kollidiert).
 befehl("wz_bastel")
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- umgebung
 DHRT_FRAMES=20
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 DH_BZ_WEB=0
 DH_BZ_WS=0

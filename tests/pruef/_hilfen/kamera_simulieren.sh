@@ -1,5 +1,5 @@
 #!/bin/sh
-# Eine simulierte Kamera fuer tests/pruef/webcam.dhtest -- auf einem
+# Eine simulierte Kamera fuer tests/pruef/geraete/webcam.dhtest -- auf einem
 # gewoehnlichen Linux-Rechner ohne Webcam (der Paketlauf ruft es mit
 # sudo-Rechten auf).
 #

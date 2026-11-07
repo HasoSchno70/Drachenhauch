@@ -83,7 +83,7 @@ PRINT "doppelt "; doppelt
 PRINT "verwaist "; verwaist
 PRINT "falsch "; falsch
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- erwartet
 genug texte TRUE
 fehlt 0
@@ -103,9 +103,9 @@ FOR EACH z IN slAnfang(log, "probe ")
 NEXT
 IF aus <> "" THEN PRINT aus
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- erwartet
 probe sprache en
@@ -133,9 +133,9 @@ FOR EACH z IN slAnfang(log, "probe ")
 NEXT
 IF aus <> "" THEN PRINT aus
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- erwartet
 probe sprache de
@@ -174,9 +174,9 @@ PRINT "zurueck "; JSON_GET_STRING(JSON_LOAD(CWD$() + "/studio.json"), "sprache")
 sprachLauf("1")
 PRINT "wieder "; slHat(log, "probe sprache de")
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- erwartet
 umgeschaltet TRUE
@@ -216,9 +216,9 @@ SETENV("DH_IDE_KONFIG", CWD$() + "/profil/ide.json")
 SETENV("APPDATA", CWD$() + "/leer")
 PRINT "der ide gefolgt "; welche$()
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- erwartet
 dhrt_lang en

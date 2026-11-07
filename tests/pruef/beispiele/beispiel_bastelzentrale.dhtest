@@ -37,10 +37,10 @@ FOR k = 0 TO 3
 NEXT
 PRINT "lampen an "; an
 --- datei dhrtlauf.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 
 --- argumente
-{sammlung}/../../examples/bastelzentrale/main.dh
+{sammlung}/../../../examples/bastelzentrale/main.dh
 --- erwartet
 0 0 TRUE
 1 0 TRUE
@@ -143,7 +143,7 @@ PRINT "osc "; JSON_GET_STRING(s, "zustand.9.1")
 WS_CLOSE(ws)
 PROCESS_KILL(p)
 --- argumente
-{sammlung}/../../examples/bastelzentrale/main.dh
+{sammlung}/../../../examples/bastelzentrale/main.dh
 --- erwartet
 seite TRUE TRUE TRUE
 befehl ok

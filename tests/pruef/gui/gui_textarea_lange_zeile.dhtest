@@ -73,7 +73,7 @@ PRINT "font rechts "; vergleich(TRUE, 9000)
 ' schon mit 2026.18. Verglichen wird darum nur mit geladener Schrift (dem
 ' Weg, der aufaddiert, und dem des Code-Felds der IDE).
 --- argumente
-{sammlung}/../../circuitrunner/assets/font.ttf
+{sammlung}/../../../circuitrunner/assets/font.ttf
 --- erwartet
 font anfang anders 0 text da TRUE
 font rechts anders 0 text da TRUE
@@ -116,7 +116,7 @@ PRINT "font anfang flott "; dauer(TRUE, 1) < 0.3
 PRINT "font rechts flott "; dauer(TRUE, 25000) < 0.3
 PRINT "eingebaut anfang flott "; dauer(FALSE, 1) < 0.3
 --- argumente
-{sammlung}/../../circuitrunner/assets/font.ttf
+{sammlung}/../../../circuitrunner/assets/font.ttf
 --- erwartet
 zeichen TRUE
 font anfang flott TRUE
@@ -175,7 +175,7 @@ WHILE NOT QUITREQUESTED()
     letzt = GET_TIME()
 WEND
 --- argumente
-{sammlung}/../../circuitrunner/assets/font.ttf
+{sammlung}/../../../circuitrunner/assets/font.ttf
 --- erwartet
 pos zeile 1 weit rechts TRUE flott TRUE
 klick zeile 1 an der stelle TRUE flott TRUE

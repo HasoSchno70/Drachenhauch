@@ -18,7 +18,7 @@ PRINT "nach dem sub 31: "; bkZeilen(31, 3)
 PRINT "kopf oben 1: "; bkZeilen(1, 3)
 PRINT "ohne bloecke: "; bkOhneBloecke(10)
 --- datei bk.dh
-IMPORT "{sammlung}/_hilfen/blockkopf.dh"
+IMPORT "{sammlung}/../_hilfen/blockkopf.dh"
 
 --- umgebung
 DHRT_FRAMES=40
@@ -40,7 +40,7 @@ GUI_FOCUS(bkTa)
 PRINT bkKlick(10, 3, 1)
 PRINT bkKlick(10, 0, 1)
 --- datei bk.dh
-IMPORT "{sammlung}/_hilfen/blockkopf.dh"
+IMPORT "{sammlung}/../_hilfen/blockkopf.dh"
 
 --- umgebung
 DHRT_FRAMES=200
@@ -58,7 +58,7 @@ GUI_FOCUS(bkTa)
 PRINT "mit "; bkMarke(12, 13, 3)
 PRINT "ohne "; bkMarke(12, 13, 0)
 --- datei bk.dh
-IMPORT "{sammlung}/_hilfen/blockkopf.dh"
+IMPORT "{sammlung}/../_hilfen/blockkopf.dh"
 
 --- umgebung
 DHRT_FRAMES=60
@@ -74,7 +74,7 @@ bkBauen()
 PRINT "mit "; bkGrundAnders(10, 3)
 PRINT "ohne "; bkGrundAnders(10, 0)
 --- datei bk.dh
-IMPORT "{sammlung}/_hilfen/blockkopf.dh"
+IMPORT "{sammlung}/../_hilfen/blockkopf.dh"
 
 --- umgebung
 DHRT_FRAMES=60

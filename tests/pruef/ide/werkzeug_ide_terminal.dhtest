@@ -9,7 +9,7 @@
 DIM prBild AS INTEGER : prBild = 0
 DIM prSchritt AS INTEGER : prSchritt = 0
 DIM prBefehle AS ARRAY OF STRING
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 20 THEN
@@ -43,7 +43,7 @@ eins
 --- umgebung
 DHRT_FRAMES=1200
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- nachher
 DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
@@ -104,7 +104,7 @@ pr ort unter
 === abbrechen beendet einen laufenden befehl
 DIM prBild AS INTEGER : prBild = 0
 DIM prStart AS INTEGER : prStart = 0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 20 THEN
@@ -123,7 +123,7 @@ END IF
 --- umgebung
 DHRT_FRAMES=900
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- nachher
 DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
@@ -146,7 +146,7 @@ pr knopf FALSE schnell TRUE
 DIM prBild AS INTEGER : prBild = 0
 DIM prSchritt AS INTEGER : prSchritt = 0
 DIM prBefehle AS ARRAY OF STRING
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 20 THEN
@@ -168,7 +168,7 @@ eins
 --- umgebung
 DHRT_FRAMES=600
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- nachher
 DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
@@ -190,7 +190,7 @@ terminal zeile Windows_NT
 DIM prBild AS INTEGER : prBild = 0
 DIM prMax AS FLOAT : prMax = 0.0
 DIM prLetzt AS FLOAT : prLetzt = 0.0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 20 THEN befehl("terminal")
@@ -214,7 +214,7 @@ END IF
 --- system windows
 --- umgebung
 DHRT_FRAMES=6000
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei viel.dh
 DIM i AS INTEGER

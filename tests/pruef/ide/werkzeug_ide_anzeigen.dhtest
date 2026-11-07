@@ -14,7 +14,7 @@
 === gliederung, statusleiste und hilfe zum wort
 DIM prBild AS INTEGER : prBild = 0
 DIM prHilfeA AS STRING
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 60 THEN
@@ -51,7 +51,7 @@ a.dh
 --- umgebung
 DHRT_FRAMES=1100
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei a.dh
 SUB malen()

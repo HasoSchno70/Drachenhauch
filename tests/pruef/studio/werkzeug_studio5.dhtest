@@ -13,7 +13,7 @@
 === eine dhstudio aus der ide geht im studio auf
 DIM prB AS INTEGER
 DIM prSchritt AS INTEGER
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- einschub nach glanzStartNachziehen()
 prB = prB + 1
 IF prSchritt = 0 AND prB > 5 THEN
@@ -39,7 +39,7 @@ a.dh
 --- umgebung
 DHRT_FRAMES=1000
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 DH_STUDIO_LOG={fall}/studio.log
 DH_STUDIO_GROESSE=1200x800
@@ -63,7 +63,7 @@ pr projekt geladen proj 2 0
 === werkzeuge drachenhauch studio nimmt den projektordner, wenn er ein studio-projekt ist
 DIM prB AS INTEGER
 DIM prSchritt AS INTEGER
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- einschub nach glanzStartNachziehen()
 prB = prB + 1
 IF prSchritt = 0 AND prB > 5 THEN
@@ -89,7 +89,7 @@ Hauptfenster.dh
 --- umgebung
 DHRT_FRAMES=1000
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 DH_STUDIO_LOG={fall}/studio.log
 DH_STUDIO_GROESSE=1200x800
@@ -137,9 +137,9 @@ WHILE MILLIS() - t0 < 30000 AND gesehen = ""
 WEND
 PROCESS_KILL(studioProz)
 EXIT(0)
---- programm ../../examples/197_form_designer.dh nach protokoll("bereit")
+--- programm ../../../examples/197_form_designer.dh nach protokoll("bereit")
 --- umgebung
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_STUDIO_LOG={fall}/studio.log
 DH_STUDIO_GROESSE=1200x800
 --- datei form.dhform

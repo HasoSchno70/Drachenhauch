@@ -51,9 +51,9 @@ DIM vlDb AS STRING : vlDb = PATHJOIN(DIRNAME(ARG$(0)), "vorlagen/3_datenbank")
 PRINT "vorlage unberuehrt "; FILEEXISTS(PATHJOIN(vlDb, "projekt.dhstudio")) AND NOT DIREXISTS(PATHJOIN(vlDb, "_studio"))
 IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- erwartet
 vier vorlagen TRUE
@@ -106,9 +106,9 @@ FOR EACH v IN ["1_leer", "2_formular", "3_datenbank", "4_zeichnen"]
     IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
 NEXT
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- erwartet
 1_leer geprueft TRUE beendet TRUE check []
@@ -155,9 +155,9 @@ FOR EACH v IN ["1_leer", "2_formular", "3_datenbank", "4_zeichnen"]
     IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
 NEXT
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- erwartet
 1_leer geprueft TRUE beendet TRUE check []
@@ -220,7 +220,7 @@ FOR EACH v IN DIRLIST(PATHJOIN(wurzel, "en"))
 NEXT
 PRINT "englisch "; n
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- erwartet
 1_leer gleich TRUE
 2_formular gleich TRUE

@@ -151,7 +151,7 @@ while building the recovery. This needed two things in the runtime:
 test run, and **ESC no longer ends a program with gui**
 (see `docs/builtins-grafik.md`) -- before, an ESC in a dialog closed the
 whole IDE, including unsaved work. Tests
-`tests/pruef/werkzeug_ide_schliessen.dhtest` (real `WM_CLOSE` via
+`tests/pruef/ide/werkzeug_ide_schliessen.dhtest` (real `WM_CLOSE` via
 PowerShell).
 
 ## What it is built from
@@ -525,7 +525,7 @@ as well. These building blocks came with it:
   The switch happens at the next start (`sprache` in the `ide.json`,
   `DH_IDE_SPRACHE=en` overrides). Every display text goes through `tr$("...")`,
   the table is in `ide/sprache/en.txt` (per line German, tab,
-  English); `tests/pruef/werkzeug_ide_englisch.dhtest` reports every text without
+  English); `tests/pruef/ide/werkzeug_ide_englisch.dhtest` reports every text without
   a translation. The runtime's messages follow: the IDE sets
   `DHRT_LANG=en`, so check messages, hints and the errors of
   started programs come in English, as far as the catalogue knows them (see
@@ -719,13 +719,13 @@ tab was unsaved), `aufrufer <anzahl>`,
 `wiederherstellung angeboten <anzahl>|verworfen|spaeter`,
 `wiederhergestellt <pfad>|(neu)`, `farbfeld <stelle>`, `farbe <wert>`, `leistenknopf <befehl>`, `statusfeld <nr>`, `pfad sprung <zeile>`, `ende`. This way the test collections see what it
 has done; keys come in via `AUTOMATION_PLAY` (F5 starts, F7
-checks). Stages 1 to 5 are tested by `tests/pruef/werkzeug_ide.dhtest` without
-Python, stages 6 to 12 by `tests/pruef/werkzeug_ide_6_12.dhtest`,
-stages 13 to 25 by `tests/pruef/werkzeug_ide_13_25.dhtest`, whatever needs several runs,
+checks). Stages 1 to 5 are tested by `tests/pruef/ide/werkzeug_ide.dhtest` without
+Python, stages 6 to 12 by `tests/pruef/ide/werkzeug_ide_6_12.dhtest`,
+stages 13 to 25 by `tests/pruef/ide/werkzeug_ide_13_25.dhtest`, whatever needs several runs,
 a git repository or an image measurement by
-`tests/pruef/werkzeug_ide_sonderfaelle.dhtest`, the crash recovery by
-`tests/pruef/werkzeug_ide_wiederherstellung.dhtest`, the building blocks individually by
-`tests/pruef/ide_bausteine.dhtest`. Since stage 38 none of the cases is
+`tests/pruef/ide/werkzeug_ide_sonderfaelle.dhtest`, the crash recovery by
+`tests/pruef/ide/werkzeug_ide_wiederherstellung.dhtest`, the building blocks individually by
+`tests/pruef/ide/ide_bausteine.dhtest`. Since stage 38 none of the cases is
 in pytest any more: the PDF listing too is in the special cases, its packed
 pages are unpacked by `BUFFER_INFLATE`.
 

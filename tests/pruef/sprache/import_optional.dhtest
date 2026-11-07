@@ -10,7 +10,7 @@ IMPORT "json"
 DIM d AS JSON_HANDLE : d = dlCheck(!"IMPORT \"serial\" OPTIONAL\nIF MODULE_AVAILABLE(\"serial\") THEN PRINT SERIAL_PORTS()\nPRINT 1\n")
 PRINT "befunde "; JSON_LEN(d, "d")
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 befunde 0
 
@@ -28,7 +28,7 @@ ELSE
     PRINT "beide "; JSON_LEN(b, "d"); " Zeile "; JSON_GET_INT(b, "d.0.line")
 END IF
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 schlicht 1 Zeile 1
 beide 1 Zeile 2
@@ -39,7 +39,7 @@ dlStarten(["run", CWD$() + "/prog.dh"])
 PRINT "aus "; TRIM$(dlAus); " code "; dlCode
 PRINT "stderr leer "; (TRIM$(dlErr) = "")
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- datei prog.dh
 IMPORT "serial" OPTIONAL
 IMPORT "usb" OPTIONAL
@@ -64,7 +64,7 @@ PRINT "quatsch "; MODULE_AVAILABLE("quatsch")
 PRINT "serial passt "; (MODULE_AVAILABLE("serial") = (INSTR(dabei, "seriell") >= 0))
 PRINT "firmata "; MODULE_AVAILABLE("firmata")
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 json TRUE JSON TRUE
 quatsch FALSE

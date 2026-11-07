@@ -5,7 +5,7 @@
 ' Format: docs/werkzeuge.md, dhrt test.
 
 === beispieldaten schreibt eine woche
---- programm ../../examples/messdaten/beispieldaten.dh
+--- programm ../../../examples/messdaten/beispieldaten.dh
 --- argumente
 daten.csv
 600
@@ -28,7 +28,7 @@ FOR prI = 0 TO 2 * 1440 - 1
 NEXT
 CLOSEFILE(prF)
 datei = "m.csv"
---- programm ../../examples/messdaten/main.dh nach DIM datei AS STRING : datei = "messdaten.csv"
+--- programm ../../../examples/messdaten/main.dh nach DIM datei AS STRING : datei = "messdaten.csv"
 --- einschub nach DIM beenden AS BOOLEAN
 PRINT LEFT$(GUI_TEXT(lbDatei), 14)
 PRINT GUI_TEXT(lbStatistik)

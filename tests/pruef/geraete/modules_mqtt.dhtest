@@ -65,7 +65,7 @@ MQTT_DISCONNECT(h)
 PRINT "connected after disconnect: ", MQTT_IS_CONNECTED(h)
 IF PROCESS_RUNNING(brokerProzess) THEN PROCESS_KILL(brokerProzess)
 --- argumente
-{sammlung}/_hilfen/mqttbroker.dh
+{sammlung}/../_hilfen/mqttbroker.dh
 --- erwartet
 connected:  TRUE
 topic:  sensors/temp
@@ -109,7 +109,7 @@ PRINT "publish "; MQTT_PUBLISH(h, "a/b", "y"); " subscribe "; MQTT_SUBSCRIBE(h, 
 MQTT_UPDATE(h)
 PRINT "update ohne fehler"
 --- argumente
-{sammlung}/_hilfen/mqttbroker.dh
+{sammlung}/../_hilfen/mqttbroker.dh
 --- erwartet
 vorher TRUE TRUE TRUE
 nachher FALSE schnell TRUE
@@ -147,7 +147,7 @@ DIM dauer AS INTEGER : dauer = MILLIS() - t0
 PRINT "weg "; NOT MQTT_IS_CONNECTED(h); " nach mehr als 2 s "; dauer > 2000; " vor 6 s "; dauer < 6000
 IF PROCESS_RUNNING(brokerProzess) THEN PROCESS_KILL(brokerProzess)
 --- argumente
-{sammlung}/_hilfen/mqttbroker.dh
+{sammlung}/../_hilfen/mqttbroker.dh
 --- erwartet
 weg TRUE nach mehr als 2 s TRUE vor 6 s TRUE
 
@@ -191,7 +191,7 @@ CATCH e
     PRINT e
 END TRY
 --- argumente
-{sammlung}/_hilfen/mqttbroker.dh
+{sammlung}/../_hilfen/mqttbroker.dh
 --- erwartet
 flags 26
 wille TRUE
@@ -242,7 +242,7 @@ FUNCTION brokerStarten(modus AS STRING) AS INTEGER
 END FUNCTION
 
 --- argumente
-{sammlung}/_hilfen/mqttbroker.dh
+{sammlung}/../_hilfen/mqttbroker.dh
 --- erwartet
 abo TRUE
 gesendet TRUE
@@ -285,7 +285,7 @@ FUNCTION brokerStarten(modus AS STRING) AS INTEGER
 END FUNCTION
 
 --- argumente
-{sammlung}/_hilfen/mqttbroker.dh
+{sammlung}/../_hilfen/mqttbroker.dh
 --- erwartet
 bestaetigt FALSE
 gewartet TRUE
@@ -331,7 +331,7 @@ FUNCTION brokerStarten(modus AS STRING) AS INTEGER
 END FUNCTION
 
 --- argumente
-{sammlung}/_hilfen/mqttbroker.dh
+{sammlung}/../_hilfen/mqttbroker.dh
 --- erwartet
 MQTT_PUBLISH: QoS 2 kann dieser Client nicht -- 0 oder 1
 MQTT_SUBSCRIBE: QoS 5 gibt es nicht -- 0 oder 1
@@ -370,6 +370,6 @@ FUNCTION brokerStarten(modus AS STRING) AS INTEGER
 END FUNCTION
 
 --- argumente
-{sammlung}/_hilfen/mqttbroker.dh
+{sammlung}/../_hilfen/mqttbroker.dh
 --- erwartet
 TRUE

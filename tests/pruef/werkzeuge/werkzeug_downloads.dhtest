@@ -51,8 +51,8 @@ DIM aus3 AS STRING : aus3 = lauf$(r)
 PRINT PROCESS_CODE(r); " "; letzte$(aus3)
 PROCESS_KILL(srv)
 --- argumente
-{sammlung}/_hilfen/gegenserver.dh
-{sammlung}/../../examples/assets
+{sammlung}/../_hilfen/gegenserver.dh
+{sammlung}/../../../examples/assets
 --- erwartet
 cybermatic 0 OK (0 KB). Musik: Alexandr Zhelanov, CC-BY 4.0. /a/cybermatic
 hdri 0 OK (0 KB). HDRI: Poly Haven, CC0. /a/hdri
@@ -99,8 +99,8 @@ PRINT lauf$(q)
 PRINT "rueckgabe "; PROCESS_CODE(q)
 PROCESS_KILL(srv)
 --- argumente
-{sammlung}/_hilfen/gegenserver.dh
-{sammlung}/../../fireplace/assets/download.dh
+{sammlung}/../_hilfen/gegenserver.dh
+{sammlung}/../../../fireplace/assets/download.dh
 --- erwartet
 Lade fireplace.jpg ...
   OK (0 KB)
@@ -157,8 +157,8 @@ PRINT "rueckgabe "; PROCESS_CODE(q); ", abgelehnt "; LEN(SPLIT$(aus, "sieht nich
 PRINT "dateien "; LEN(DIRLIST("fehl"))
 PROCESS_KILL(srv)
 --- argumente
-{sammlung}/_hilfen/gegenserver.dh
-{sammlung}/../../dhdemo/download_music.dh
+{sammlung}/../_hilfen/gegenserver.dh
+{sammlung}/../../../dhdemo/download_music.dh
 --- erwartet
   ok stardust_jam.mod (0 KB)
   ok silicon_dancer.mod (0 KB)

@@ -267,7 +267,7 @@ PDF_FONT(p, "mono", 10)
 PDF_TEXT(p, 20, 20, "Summe 1.234,56 € ✓")
 PDF_SAVE(p, "a.pdf")
 --- datei pdftext.dh
-IMPORT "{sammlung}/_hilfen/pdftext.dh"
+IMPORT "{sammlung}/../_hilfen/pdftext.dh"
 
 --- nachher
 IMPORT "pdftext.dh"
@@ -366,7 +366,7 @@ PDF_POLYGON_FILL(p, [20.0, 40, 30], [100.0, 100, 120])
 PDF_POLYGON(p, [60, 80, 80, 60], [100, 100, 120, 120])
 PDF_SAVE(p, "a.pdf")
 --- datei pdftext.dh
-IMPORT "{sammlung}/_hilfen/pdftext.dh"
+IMPORT "{sammlung}/../_hilfen/pdftext.dh"
 
 --- nachher
 IMPORT "pdftext.dh"
@@ -404,7 +404,7 @@ PDF_OPACITY(p, 1)
 PDF_RECT_FILL(p, 20, 20, 10, 10)
 PDF_SAVE(p, "a.pdf")
 --- datei pdftext.dh
-IMPORT "{sammlung}/_hilfen/pdftext.dh"
+IMPORT "{sammlung}/../_hilfen/pdftext.dh"
 
 --- nachher
 IMPORT "pdftext.dh"
@@ -453,7 +453,7 @@ PDF_TEXT(p, 50, 100, "Schraeg", 30)
 PDF_TEXT(p, 50, 100, "Gerade")
 PDF_SAVE(p, "a.pdf")
 --- datei pdftext.dh
-IMPORT "{sammlung}/_hilfen/pdftext.dh"
+IMPORT "{sammlung}/../_hilfen/pdftext.dh"
 
 --- nachher
 IMPORT "pdftext.dh"
@@ -548,7 +548,7 @@ PDF_DASH(p, 3)
 PDF_CIRCLE(p, 100, 200, 10)
 PDF_SAVE(p, "a.pdf")
 --- datei pdftext.dh
-IMPORT "{sammlung}/_hilfen/pdftext.dh"
+IMPORT "{sammlung}/../_hilfen/pdftext.dh"
 
 --- nachher
 IMPORT "pdftext.dh"

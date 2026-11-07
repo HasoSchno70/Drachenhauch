@@ -101,7 +101,7 @@ MODBUS_WRITE_REGISTERS(wr, 40000, MODBUS_FLOAT_REGS(21.5, "CDAB"))
 
 The frames (checksum, Modbus TCP header, all eight functions, exceptions,
 word orders) are checked by Rust tests against the examples of the
-specification. The test collection `tests/pruef/modbus.dhtest` runs a device
+specification. The test collection `tests/pruef/geraete/modbus.dhtest` runs a device
 played in Drachenhauch that recomputes its checksum itself and records every
 request in hex — so the line is checked byte by byte, for TCP and for RTU
 over the network, including exceptions, timeout, wrong checksum, a cut-off

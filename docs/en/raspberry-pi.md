@@ -84,6 +84,6 @@ The feature `gles` replaces `graphics`; the pins need none.
 The CI builds the package on a GitHub ARM machine and runs light, shadows,
 PBR with an HDR environment, instancing, shaders, post-FX, render targets
 and programs with a window there under `xvfb` with Mesa (llvmpipe, OpenGL ES
-3.2) (`tests/pruef/gles.dhtest` and more). It tests the pins against the
+3.2) (`tests/pruef/grafik/gles.dhtest` and more). It tests the pins against the
 kernel's simulators. On a real Raspberry Pi Drachenhauch is **untested** —
 its graphics driver (V3D) is a different one from llvmpipe.

@@ -903,7 +903,7 @@ END FUNCTION
 ' Englisch). Keine JSON-Datei: das json-Modul liest einen Punkt im Schluessel
 ' als Pfad, und "Oeffnen ..." hat drei. Was die Tabelle nicht kennt, bleibt
 ' deutsch -- ein fehlender Eintrag ist ein Schoenheitsfehler, kein Absturz;
-' tests/pruef/werkzeug_ide_englisch.dhtest prueft, dass keiner fehlt.
+' tests/pruef/ide/werkzeug_ide_englisch.dhtest prueft, dass keiner fehlt.
 ' Gewechselt wird beim naechsten Start: die Fenster sind dann schon gebaut.
 DIM sprache AS STRING : sprache = "de"
 sprache = kText("sprache", sprache)
@@ -2204,7 +2204,7 @@ DIM einstOffen AS BOOLEAN : einstOffen = FALSE
 ' --- Beispiele nach Themen ---------------------------------------------
 ' Zweihundert Beispiele, nach Nummer sortiert, sagen nicht, wo man
 ' anfangen soll. Die Themen stehen in examples/kategorien.json (jedes
-' Beispiel genau einmal -- tests/pruef/werkzeug_ide_handgriffe.dhtest
+' Beispiel genau einmal -- tests/pruef/ide/werkzeug_ide_handgriffe.dhtest
 ' prueft das), die Beschreibung ist die erste Kommentarzeile des Beispiels.
 ' EINE Liste mit Gruppenkoepfen: der Filter sucht so ueber alle Themen,
 ' und ein Thema bleibt sichtbar, solange darin etwas passt.

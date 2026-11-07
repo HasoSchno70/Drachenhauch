@@ -18,15 +18,15 @@
 SETWINDOWTITLE(ARG$(1))
 GUI_SET_TEXT(reiter[0].feld, "PRINT 2")
 DIM prSender AS INTEGER : prSender = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ARG$(2), ARG$(1), "kreuz")
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- argumente
 spiel.dh
 DH-IDE-Kreuz-ungesichert
-{sammlung}/_hilfen/fenstersender.ps1
+{sammlung}/../_hilfen/fenstersender.ps1
 --- umgebung
 DHRT_FRAMES=480
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 PRINT 1
@@ -57,15 +57,15 @@ datei unveraendert PRINT 1
 ' IDE endet lange vor dem Bildlimit.
 SETWINDOWTITLE(ARG$(1))
 DIM prSender AS INTEGER : prSender = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ARG$(2), ARG$(1), "kreuz")
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- argumente
 spiel.dh
 DH-IDE-Kreuz-sauber
-{sammlung}/_hilfen/fenstersender.ps1
+{sammlung}/../_hilfen/fenstersender.ps1
 --- umgebung
 DHRT_FRAMES=480
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 PRINT 1

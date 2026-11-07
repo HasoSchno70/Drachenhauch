@@ -14,7 +14,7 @@
 DIM prB AS INTEGER
 DIM prSchritt AS INTEGER
 DIM prSeit AS INTEGER
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- einschub nach glanzStartNachziehen()
 prB = prB + 1
 IF prSchritt = 0 AND LEN(plugBefehle) > 0 AND LEN(plugLeisten) > 0 AND LEN(plugSchnipsel) > 0 AND LEN(plugFaerbungen) > 0 THEN
@@ -55,7 +55,7 @@ haupt.dh
 --- umgebung
 DHRT_FRAMES=900
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei haupt.dh
 PRINT 1
@@ -105,7 +105,7 @@ pr befund Zeile 2: [test] zweite Zeile
 === ein klick in die leiste kommt beim plugin an
 DIM prB AS INTEGER
 DIM prSchritt AS INTEGER
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- einschub nach glanzStartNachziehen()
 prB = prB + 1
 IF prSchritt = 0 AND LEN(plugLeisten) > 0 THEN
@@ -125,7 +125,7 @@ IF prB > 600 THEN protokoll("pr zeit um bei schritt " + STR$(prSchritt)) : EXIT(
 --- umgebung
 DHRT_FRAMES=900
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei _programm/plugins/test/plugin.dh
 IMPORT "dh_plugin.dh"
@@ -152,7 +152,7 @@ pr status geklickt leiste/knopf
 ' die Leiste ist zu.
 DIM prB AS INTEGER
 DIM prSchritt AS INTEGER
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- einschub nach glanzStartNachziehen()
 prB = prB + 1
 IF prSchritt = 0 AND LEN(plugBefehle) > 0 AND LEN(plugLeisten) > 0 THEN
@@ -169,7 +169,7 @@ IF prB > 600 THEN protokoll("pr zeit um bei schritt " + STR$(prSchritt)) : EXIT(
 --- umgebung
 DHRT_FRAMES=900
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei _programm/plugins/test/plugin.dh
 IMPORT "dh_plugin.dh"
@@ -195,14 +195,14 @@ pr leiste zu TRUE
 pr ide laeuft weiter TRUE
 
 === ein abgeschaltetes plugin startet nicht
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- einschub nach glanzStartNachziehen()
 protokoll("pr zustand " + plugins[0].zustand + " leitung " + STR$(plugins[0].leitung))
 EXIT(0)
 --- umgebung
 DHRT_FRAMES=60
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei _programm/ide.json
 {"plugins_aus": ["test"]}

@@ -11,7 +11,7 @@
 === steckbrief mitgelieferte und die verwaltung
 DIM prB AS INTEGER
 DIM prSchritt AS INTEGER
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- einschub nach glanzStartNachziehen()
 prB = prB + 1
 IF prSchritt = 0 AND prB > 30 THEN
@@ -37,7 +37,7 @@ haupt.dh
 --- umgebung
 DHRT_FRAMES=700
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei haupt.dh
 PRINT 1
@@ -87,7 +87,7 @@ da.txt TRUE
 ' Ein eigenes Plugin namens "todo" verdeckt das mitgelieferte: es steht
 ' einmal in der Liste, als eigenes.
 DIM prB AS INTEGER
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- einschub nach glanzStartNachziehen()
 prB = prB + 1
 IF prB = 20 THEN
@@ -97,7 +97,7 @@ END IF
 --- umgebung
 DHRT_FRAMES=100
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei _programm/plugins/todo/plugin.dh
 IMPORT "dh_plugin.dh"
@@ -117,7 +117,7 @@ pr todo 3 FALSE  eigen TRUE
 === die vorlage legt ein lauffaehiges plugin an
 DIM prB AS INTEGER
 DIM prSchritt AS INTEGER
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- einschub nach glanzStartNachziehen()
 prB = prB + 1
 IF prSchritt = 0 AND prB > 10 THEN
@@ -143,7 +143,7 @@ IF prB > 600 THEN protokoll("pr zeit um " + STR$(prSchritt)) : EXIT(0)
 --- umgebung
 DHRT_FRAMES=700
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- nachher
 DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
@@ -191,7 +191,7 @@ verdorben 1 fehl
 === ein plugin ersetzt einen bereich und setzt die auswahl
 DIM prB AS INTEGER
 DIM prSchritt AS INTEGER
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- einschub nach glanzStartNachziehen()
 prB = prB + 1
 IF prSchritt = 0 AND pluginBefehlNr("plugin:text:los") >= 0 THEN
@@ -214,7 +214,7 @@ a.dh
 --- umgebung
 DHRT_FRAMES=700
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei a.dh
 PRINT 1
@@ -256,7 +256,7 @@ pr auswahl PRINT
 ' Plugins. Sein Befehl meldet, welche IDE es begruesst hat.
 DIM prB AS INTEGER
 DIM prSchritt AS INTEGER
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- einschub nach glanzStartNachziehen()
 prB = prB + 1
 IF prSchritt = 0 AND pluginBefehlNr("plugin:farben:fassung") >= 0 THEN
@@ -279,7 +279,7 @@ a.dh
 --- umgebung
 DHRT_FRAMES=700
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei a.dh
 PRINT rotk
@@ -315,7 +315,7 @@ pr status TRUE
 ' in plugins/pakete/geholt/ und laeuft als eigenes; Entfernen nimmt es weg.
 DIM prB AS INTEGER
 DIM prSchritt AS INTEGER
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- einschub nach glanzStartNachziehen()
 prB = prB + 1
 IF prSchritt = 0 AND prB > 10 THEN
@@ -338,7 +338,7 @@ IF prB > 900 THEN protokoll("pr zeit um " + STR$(prSchritt)) : EXIT(0)
 --- umgebung
 DHRT_FRAMES=1000
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei quelle/geholt/plugin.dh
 IMPORT "dh_plugin.dh"
@@ -381,7 +381,7 @@ FUNCTION prFassung$() AS STRING
     IF k < 0 THEN RETURN "-"
     RETURN plugins[k].fassung + " " + plugins[k].zustand
 END FUNCTION
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- einschub nach glanzStartNachziehen()
 prB = prB + 1
 IF prSchritt = 0 AND prB > 10 THEN
@@ -410,7 +410,7 @@ IF prB > 1500 THEN protokoll("pr zeit um " + STR$(prSchritt) + " " + prFassung$(
 --- umgebung
 DHRT_FRAMES=1600
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- nachher
 DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")

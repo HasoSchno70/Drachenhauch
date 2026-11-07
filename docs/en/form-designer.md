@@ -247,7 +247,7 @@ left out. Not (or no longer) available:
 
 ## Testing
 
-[`tests/pruef/werkzeug_formdesigner.dhtest`](../../tests/pruef/werkzeug_formdesigner.dhtest)
+[`tests/pruef/werkzeuge/werkzeug_formdesigner.dhtest`](../../tests/pruef/werkzeuge/werkzeug_formdesigner.dhtest)
 (`dhrt test`): one case drops a button with a real click, saves with Ctrl+S
 and reads the file with the json module; one drags a control and undoes
 twice; one checks the F5 run program; one that foreign fields of an existing

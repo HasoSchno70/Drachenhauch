@@ -2510,7 +2510,7 @@ themes can be switched via the menu.
   hit test/enumeration) is supported — see the section above.
 - **Headless/graphical**: `GUI_UPDATE`/`GUI_DRAW` need an active
   `SCREEN`. Construction, state, geometry and hit test are tested headless
-  (`tests/pruef/gui_runtime.dhtest`).
+  (`tests/pruef/gui/gui_runtime.dhtest`).
 
 
 ## A sculpted look: the glass themes

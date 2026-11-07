@@ -22,9 +22,9 @@ PRINT "ueber 100 bloecke "; (zahlVor(alles, " Codebloecke") > 100)
 IF dlCode <> 0 THEN PRINT alles
 PRINT "rueckgabe "; dlCode
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 ' Die Zahl direkt vor einem Wort ("1234 Codebloecke").
 FUNCTION zahlVor(text AS STRING, wort AS STRING) AS INTEGER
     DIM wo AS INTEGER : wo = INSTR(text, wort)
@@ -56,9 +56,9 @@ WRITEALL(fall + "/probe/kaputt.md", "```basic" + CHR$(10) + "DIM x AS" + CHR$(10
 dlStarten(["pruef", "bloecke", fall + "/probe"])
 PRINT "mit kaputt: rueckgabe "; dlCode; ", zeile genannt "; (INSTR(dlAus + dlErr, "kaputt.md:2") >= 0)
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 ohne kaputt: rueckgabe 0, zwei bloecke TRUE
 mit kaputt: rueckgabe 1, zeile genannt TRUE
@@ -91,7 +91,7 @@ NEXT
 ' Die Schranke: ohne sie waere ein Muster, das nichts mehr trifft, gruen.
 PRINT "links gefunden "; (geprueft > 50)
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- erwartet
 links gefunden TRUE
 
@@ -119,7 +119,7 @@ FOR i = 0 TO LEN(alle) - 1
 NEXT
 PRINT "dokumente "; (LEN(alle) > 20); ", fehlen "; fehlen
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- erwartet
 dokumente TRUE, fehlen 0
 
@@ -135,9 +135,9 @@ dlStarten(["pruef", "namen", ".", "--nur", "CLAUDE.md"])
 IF dlCode <> 0 THEN PRINT dlAus; dlErr
 PRINT "CLAUDE.md: rueckgabe "; dlCode
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 docs: rueckgabe 0
 CLAUDE.md: rueckgabe 0
@@ -156,9 +156,9 @@ PRINT "rueckgabe "; dlCode
 PRINT "erfundener befehl gemeldet "; (INSTR(alles, "GIBTSNICHT_XY") >= 0)
 PRINT "print nicht gemeldet "; (INSTR(befunde, "PRINT") < 0)
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 rueckgabe 1
 erfundener befehl gemeldet TRUE
@@ -176,9 +176,9 @@ dlStarten(["pruef", "konstanten"])
 IF dlCode <> 0 THEN PRINT dlAus; dlErr
 PRINT "konstanten: rueckgabe "; dlCode
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 zaehlungen: rueckgabe 0
 konstanten: rueckgabe 0
@@ -211,9 +211,9 @@ dlStarten(["pruef", "beispiele", fall + "/repo"])
 PRINT "mit streudatei: "; TRIM$(dlAus)
 PRINT "der glob saehe "; LEN(DIRLIST(fall + "/repo/examples", "*.dh"))
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 ' git im Arbeitsordner; "commit -m zwei" als dritter Teil wird zerlegt.
 FUNCTION git(a AS STRING, b AS STRING, c AS STRING) AS BOOLEAN
     DIM p AS INTEGER
@@ -260,9 +260,9 @@ dlStarten(["pruef", "pfade", ".", "--nur", "CLAUDE.md"])
 IF dlCode <> 0 THEN PRINT dlAus; dlErr
 PRINT "CLAUDE.md: rueckgabe "; dlCode
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 docs: rueckgabe 0
 CLAUDE.md: rueckgabe 0
@@ -295,9 +295,9 @@ PRINT "rueckgabe "; dlCode; ", befunde "; befunde
 PRINT "toter link "; (INSTR(alles, "gibtsnicht.py") >= 0)
 PRINT "geduldeter pfad als link "; (INSTR(alles, "[...](drachenhauch/interpreter.py)") >= 0)
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 rueckgabe 1, befunde 2
 toter link TRUE
@@ -321,7 +321,7 @@ DIM text AS STRING : text = BUFFER_TO_STRING$(READALL_BYTES(ext + "/" + pfad))
 PRINT "kennt neue befehle "; (INSTR(text, "SPEAK_SOUND") >= 0 AND INSTR(text, "GUI_ANNOUNCE") >= 0)
 PRINT "kennt woerter und tasten "; (INSTR(text, "WHILE") >= 0 AND INSTR(text, "KEY_SPACE") >= 0)
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- erwartet
 verweis syntaxes/drachenhauch.tmLanguage.json
 datei da TRUE
@@ -356,9 +356,9 @@ dlStarten(["doku", "prosa", "--pruefen"])
 IF dlCode <> 0 THEN PRINT dlAus; dlErr
 PRINT "prosa: rueckgabe "; dlCode
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 grammatik: rueckgabe 0
 prosa: rueckgabe 0
@@ -415,7 +415,7 @@ FOR i = 0 TO LEN(namen) - 1
 NEXT
 PRINT "eintraege "; (LEN(namen) > 1000); ", fremd "; fremd; ", markdown "; schrott; ", abgeschnitten "; offen
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- erwartet
 eintraege TRUE, fremd 0, markdown 0, abgeschnitten 0
 
@@ -443,7 +443,7 @@ FOR i = 0 TO gesamt - 1
 NEXT
 PRINT "abdeckung ueber 45 % "; (mit * 100 > gesamt * 45)
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- erwartet
 abs in beiden TRUE
 hover zeigt die tabelle TRUE
@@ -470,7 +470,7 @@ FOR i = 0 TO n - 1
 NEXT
 PRINT "ohne parameternamen: "; TRIM$(ohne)
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- erwartet
 ohne parameternamen: GUI_RULE
 
@@ -489,9 +489,9 @@ PRINT "rueckgabe "; dlCode
 DIM n AS INTEGER : n = VAL(dlAus)
 PRINT "dokumente "; (n > 70)
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 rueckgabe 0
 dokumente TRUE
@@ -518,7 +518,7 @@ FOR i = 0 TO LEN(alle) - 1
 NEXT
 PRINT "dokumente "; (LEN(alle) > 70); ", fehlen "; fehlen
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- erwartet
 dokumente TRUE, fehlen 0
 
@@ -549,7 +549,7 @@ FOR i = 0 TO gesamt - 1
 NEXT
 PRINT "abdeckung ueber 45 % "; (mit * 100 > gesamt * 45)
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- erwartet
 englisch TRUE deutsch FALSE
 ohne: englisch FALSE deutsch TRUE

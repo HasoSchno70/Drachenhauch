@@ -19,7 +19,7 @@ foto("echt", "", "    TEXT(10, 10, " + CHR$(34) + "ä 12,50 € Ω Я ő ł" + C
 foto("frage", "", "    TEXT(10, 10, " + CHR$(34) + "ä 12,50 ? ? ? ? ?" + CHR$(34) + ")" + CHR$(10))
 PRINT "unterschiede ueber 30 "; (unterschiede("echt.png", "frage.png") > 30)
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 ' Ein Programm mit Kopf und Bildschleife schreiben und ueber `dhrt bild`
 ' fotografieren (drittes Bild). Ohne Fenster ueberspringt sich der Fall.
 SUB foto(name AS STRING, rumpf AS STRING, schleife AS STRING)
@@ -74,7 +74,7 @@ foto("pua", "", "    TEXT(10, 10, " + CHR$(34) + "€ ä  b" + CHR$(34) + ")"
 foto("frage", "", "    TEXT(10, 10, " + CHR$(34) + "€ ä ? b" + CHR$(34) + ")" + CHR$(10))
 PRINT "unterschiede "; unterschiede("pua.png", "frage.png")
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 ' Ein Programm mit Kopf und Bildschleife schreiben und ueber `dhrt bild`
 ' fotografieren (drittes Bild). Ohne Fenster ueberspringt sich der Fall.
 SUB foto(name AS STRING, rumpf AS STRING, schleife AS STRING)
@@ -127,7 +127,7 @@ foto("frage", "", "    TEXT(10, 10, " + CHR$(34) + "ä ??? ?? ?" + CHR$(34) + ")
 PRINT "unterschiede ueber 100 "; (unterschiede("cjk.png", "frage.png") > 100)
 PRINT "mehr tinte als fragezeichen "; (tinte("cjk.png") > tinte("frage.png"))
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 ' Ein Programm mit Kopf und Bildschleife schreiben und ueber `dhrt bild`
 ' fotografieren (drittes Bild). Ohne Fenster ueberspringt sich der Fall.
 SUB foto(name AS STRING, rumpf AS STRING, schleife AS STRING)
@@ -190,7 +190,7 @@ CATCH e
     PRINT "unbekannter block "; (INSTR(e, "unbekannter Schriftblock") >= 0); ", nennt die gueltigen "; (INSTR(e, "kyrillisch") >= 0)
 END TRY
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 ' Ein Programm mit Kopf und Bildschleife schreiben und ueber `dhrt bild`
 ' fotografieren (drittes Bild). Ohne Fenster ueberspringt sich der Fall.
 SUB foto(name AS STRING, rumpf AS STRING, schleife AS STRING)
@@ -284,7 +284,7 @@ foto("typo", "", "    TEXT(10, 10, " + CHR$(34) + "„Silver“ – ‚x‘ …"
 foto("ascii", "", "    TEXT(10, 10, " + CHR$(34) + CHR$(34) + CHR$(34) + "Silver" + CHR$(34) + CHR$(34) + " - 'x' ..." + CHR$(34) + ")" + CHR$(10))
 PRINT "gleich "; unterschiede("typo.png", "ascii.png")
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 ' Ein Programm mit Kopf und Bildschleife schreiben und ueber `dhrt bild`
 ' fotografieren (drittes Bild). Ohne Fenster ueberspringt sich der Fall.
 SUB foto(name AS STRING, rumpf AS STRING, schleife AS STRING)
@@ -340,7 +340,7 @@ foto("e", "", "    TEXT(10, 10, " + CHR$(34) + "Noch viel mehr Text, kostet nur 
 DIM n AS INTEGER : n = unterschiede("euro.png", "e.png")
 PRINT "etwas anders "; n > 0; ", aber nur am zeichen "; n < 200
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 ' Ein Programm mit Kopf und Bildschleife schreiben und ueber `dhrt bild`
 ' fotografieren (drittes Bild). Ohne Fenster ueberspringt sich der Fall.
 SUB foto(name AS STRING, rumpf AS STRING, schleife AS STRING)

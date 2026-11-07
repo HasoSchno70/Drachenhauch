@@ -18,7 +18,7 @@ PRINT "ergebnis "; JSON_GET_INT(h, "ergebnis")
 ' "HAUPTPROGRAMM" -- und ein Auftrag wuerde jedes Mal das ganze Spiel starten.
 PRINT "ausgabe leer "; (JSON_GET_STRING(h, "ausgabe") = "")
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 FUNCTION letzteZeile$(t AS STRING) AS STRING
     DIM z AS ARRAY OF STRING : z = SPLIT$(TRIM$(t), CHR$(10))
     RETURN z[LEN(z) - 1]
@@ -59,7 +59,7 @@ DIM h AS JSON_HANDLE : h = JSON_PARSE(letzteZeile$(dlAus))
 PRINT "ergebnis "; JSON_GET_INT(h, "ergebnis")
 PRINT "ausgabe "; TRIM$(JSON_GET_STRING(h, "ausgabe"))
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 FUNCTION letzteZeile$(t AS STRING) AS STRING
     DIM z AS ARRAY OF STRING : z = SPLIT$(TRIM$(t), CHR$(10))
     RETURN z[LEN(z) - 1]
@@ -87,7 +87,7 @@ dlStarten(["call", CWD$() + "/c.dh", "Gruss", "welt"])
 h = JSON_PARSE(letzteZeile$(dlAus))
 PRINT "text "; JSON_GET_STRING(h, "ergebnis")
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 FUNCTION letzteZeile$(t AS STRING) AS STRING
     DIM z AS ARRAY OF STRING : z = SPLIT$(TRIM$(t), CHR$(10))
     RETURN z[LEN(z) - 1]
@@ -119,7 +119,7 @@ DIM fehler AS STRING : fehler = JSON_GET_STRING(h, "fehler")
 PRINT "erklaert die lage "; (INSTR(fehler, "Hauptprogramm laeuft dabei NICHT") >= 0)
 PRINT "nennt den ausweg "; (INSTR(fehler, "Parameter") >= 0)
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 FUNCTION letzteZeile$(t AS STRING) AS STRING
     DIM z AS ARRAY OF STRING : z = SPLIT$(TRIM$(t), CHR$(10))
     RETURN z[LEN(z) - 1]
@@ -146,7 +146,7 @@ DIM fehler AS STRING : fehler = JSON_GET_STRING(h, "fehler")
 PRINT "sagt es "; (INSTR(fehler, "gibt es nicht") >= 0)
 PRINT "die bekannten daneben "; (INSTR(fehler, "doppelt") >= 0)
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 FUNCTION letzteZeile$(t AS STRING) AS STRING
     DIM z AS ARRAY OF STRING : z = SPLIT$(TRIM$(t), CHR$(10))
     RETURN z[LEN(z) - 1]
@@ -173,7 +173,7 @@ FOR i = 0 TO LEN(namen) - 1
     PRINT namen[i]; " "; JSON_HAS(h, "ok")
 NEXT
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 FUNCTION letzteZeile$(t AS STRING) AS STRING
     DIM z AS ARRAY OF STRING : z = SPLIT$(TRIM$(t), CHR$(10))
     RETURN z[LEN(z) - 1]

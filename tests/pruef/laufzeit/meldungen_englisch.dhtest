@@ -87,7 +87,7 @@ FOR i = 0 TO LEN(proben) - 1
     PRINT TRIM$(REPLACE$(dlErr, CHR$(13), ""))
 NEXT
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 Runtime error in p.dh:1: BUFFER_NEW: size -1 is negative
 Runtime error in p.dh:1: MAPGET: key 'x' is not in the map
@@ -126,7 +126,7 @@ FOR i = 0 TO LEN(proben) - 1
     PRINT TRIM$(REPLACE$(dlErr, CHR$(13), ""))
 NEXT
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 Runtime error in p.dh:2: GUI_SCALE: the factor must be between 0.5 and 4.0 -- usage: GUI_SCALE(faktor)
 Runtime error in p.dh:2: GUI_TEXTAREA_SET: the widget is not a GUI_TEXTAREA
@@ -156,7 +156,7 @@ SETENV("DHRT_LANG", "en")
 dlStarten(["--check", "probe.dh"])
 PRINT "englisch "; (INSTR(dlAus, "'x' is declared as INTEGER, the right side is STRING. That stops the program when it runs ('expected INTEGER, got STRING'). Convert to a number with VAL().") >= 0)
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 deutsch TRUE
 englisch TRUE
@@ -202,7 +202,7 @@ dlStarten(["test", "s.dhtest"])
 PRINT "rueckgabe "; dlCode
 IF dlCode <> 0 THEN PRINT dlAus
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 rueckgabe 0
 
@@ -219,9 +219,9 @@ PRINT "ueber 400 vorlagen "; (VAL(alles) > 400)
 IF dlCode <> 0 THEN PRINT alles
 PRINT "rueckgabe "; dlCode
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 ueber 400 vorlagen TRUE
 rueckgabe 0

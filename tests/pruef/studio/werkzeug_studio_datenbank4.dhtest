@@ -44,11 +44,11 @@ IMPORT "json"
 IMPORT "regex"
 IMPORT "imgfx"
 IMPORT "db"
-IMPORT "{sammlung}/../../studio/sprache.dh"
-IMPORT "{sammlung}/../../studio/bibliothek.dh"
-IMPORT "{sammlung}/../../studio/modell.dh"
-IMPORT "{sammlung}/../../studio/projekt.dh"
-IMPORT "{sammlung}/../../studio/datenbank.dh"
+IMPORT "{sammlung}/../../../studio/sprache.dh"
+IMPORT "{sammlung}/../../../studio/bibliothek.dh"
+IMPORT "{sammlung}/../../../studio/modell.dh"
+IMPORT "{sammlung}/../../../studio/projekt.dh"
+IMPORT "{sammlung}/../../../studio/datenbank.dh"
 --- erwartet
 abgleich []
   id INTEGER []
@@ -99,7 +99,7 @@ FOR by = 0 TO IMAGE_HEIGHT(bild) - 1 STEP 2
 NEXT
 PRINT "rot im bild "; rot > 0
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- vorher
 IMPORT "db"
 DIM db AS DB_CONN : db = DB_OPEN("proj/daten.sqlite")
@@ -108,7 +108,7 @@ DB_EXEC(db, "INSERT INTO produkte (name, foto) VALUES (?, ?)", "Tasse", READALL_
 DB_EXEC(db, "INSERT INTO produkte (name, foto) VALUES ('Teller', NULL)")
 DB_CLOSE(db)
 --- datei laeufer.dh
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- datei proj/rot.png base64
 iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAE0lEQVR4nGP4z8DwnwGM/zMwAAAf7gP9NRsAMwAAAABJRU5ErkJggg==
@@ -229,7 +229,7 @@ DB_CLOSE(db)
 DIM j AS JSON_HANDLE : j = JSON_LOAD(p + "/Hauptfenster.dhform")
 PRINT "feld "; JSON_GET_STRING(j, "widgets.1.kind"); " "; JSON_GET_STRING(j, "widgets.1.name"); " "; JSON_GET_STRING(j, "widgets.1.studio_bildspalte"); " bind "; JSON_HAS(j, "widgets.1.bind")
 --- argumente
-{sammlung}/../../studio/studio.dh
+{sammlung}/../../../studio/studio.dh
 --- vorher
 IMPORT "db"
 DIM db AS DB_CONN : db = DB_OPEN("proj/daten.sqlite")
@@ -239,7 +239,7 @@ DB_CLOSE(db)
 --- datei laeufer.dh
 IMPORT "json"
 IMPORT "db"
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- datei blau.png base64
 iVBORw0KGgoAAAANSUhEUgAAAAMAAAABCAIAAACUgoPjAAAADUlEQVR4nGNgYPgPQQAL/gL+kc2Z/gAAAABJRU5ErkJggg==

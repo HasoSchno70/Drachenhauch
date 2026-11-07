@@ -46,7 +46,7 @@ ELSE
     NEXT
 END IF
 --- datei helfer.dh
-IMPORT "{sammlung}/../../examples/glutfaden/gtk/gtk.dh"
+IMPORT "{sammlung}/../../../examples/glutfaden/gtk/gtk.dh"
 --- erwartet
 fein runter: schritt 1.0 | richtung gemeldet FALSE
 fein hoch: schritt -1.0 | richtung gemeldet FALSE
@@ -73,6 +73,6 @@ FOR EACH d IN DIRLIST_REC(GETENV$("GLUT"), "*.dh")
 NEXT
 PRINT "aufrufe gesehen: "; gefunden > 0
 --- umgebung
-GLUT={sammlung}/../../examples/glutfaden
+GLUT={sammlung}/../../../examples/glutfaden
 --- erwartet
 aufrufe gesehen: TRUE

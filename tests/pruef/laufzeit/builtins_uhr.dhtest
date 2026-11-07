@@ -76,7 +76,7 @@ d = dlCheck("DIM x AS BOOLEAN" + z + "IF FALSE THEN x = GUI_CONFIRM(" + CHR$(34)
 ' Die Gegenprobe im Fall: ein viertes Argument meldet --check sehr wohl.
 PRINT "vier argumente gemeldet "; (JSON_LEN(d, "d") > 0)
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 drei argumente: 0 meldungen
 vier argumente gemeldet TRUE

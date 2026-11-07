@@ -29,20 +29,20 @@ FOR EACH e IN elemente
 NEXT
 PRINT "projektdatei "; projektJson$() = JOIN$(READLINES(PATHJOIN(o, PROJEKT_DATEI)), CHR$(10))
 --- argumente
-{sammlung}/../../examples/studio/rechnungen
+{sammlung}/../../../examples/studio/rechnungen
 --- datei modell_imp.dh
 IMPORT "json"
 IMPORT "regex"
 IMPORT "imgfx"
 IMPORT "db"
 IMPORT "pdf"
-IMPORT "{sammlung}/../../studio/sprache.dh"
-IMPORT "{sammlung}/../../studio/bibliothek.dh"
-IMPORT "{sammlung}/../../studio/modell.dh"
-IMPORT "{sammlung}/../../studio/projekt.dh"
-IMPORT "{sammlung}/../../studio/datenbank.dh"
-IMPORT "{sammlung}/../../studio/berichte_laufzeit.dh"
-IMPORT "{sammlung}/../../studio/berichte.dh"
+IMPORT "{sammlung}/../../../studio/sprache.dh"
+IMPORT "{sammlung}/../../../studio/bibliothek.dh"
+IMPORT "{sammlung}/../../../studio/modell.dh"
+IMPORT "{sammlung}/../../../studio/projekt.dh"
+IMPORT "{sammlung}/../../../studio/datenbank.dh"
+IMPORT "{sammlung}/../../../studio/berichte_laufzeit.dh"
+IMPORT "{sammlung}/../../../studio/berichte.dh"
 --- erwartet
 laden []
 elemente 10 start Hauptfenster
@@ -139,11 +139,11 @@ PRINT "netto "; INSTR(pdf, "Netto" + CHR$(10) + "350,70") >= 0; " 19 "; INSTR(pd
 pdf = JOIN$(pdfSeiten(p + "/_studio/probe2.pdf"), CHR$(10))
 PRINT "nur 7 "; INSTR(pdf, "MwSt 7 %" + CHR$(10) + "0,01") >= 0; " ohne 19 "; INSTR(pdf, "MwSt 19 %") < 0; " gesamt "; INSTR(pdf, "0,21") >= 0
 --- argumente
-{sammlung}/../../studio/studio.dh
-{sammlung}/../../examples/studio/rechnungen
+{sammlung}/../../../studio/studio.dh
+{sammlung}/../../../examples/studio/rechnungen
 --- datei laeufer.dh
-IMPORT "{sammlung}/_hilfen/studiolauf.dh"
-IMPORT "{sammlung}/_hilfen/pdftext.dh"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/pdftext.dh"
 slStudio = ARG$(0)
 --- datei probe_teil.dh
 ' --- Die Beispieldaten, die der erste Start angelegt hat.

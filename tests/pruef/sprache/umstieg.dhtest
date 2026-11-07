@@ -888,7 +888,7 @@ PRINT "ohne flip: "; INSTR(dlErr, "FLIP() fehlt") >= 0
 dlStarten(["run", "mit.dh"])
 PRINT "mit flip:  "; INSTR(dlErr, "FLIP() fehlt") >= 0
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- datei ohne.dh
 SCREEN(40, 30, "Probe")
 BOX(0, 0, 10, 10, RED)

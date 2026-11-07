@@ -16,8 +16,8 @@ ELSE
     IF dlErr <> "" THEN PRINT "stderr: "; dlErr
 END IF
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
-CONST BEISPIEL = "{sammlung}/../../examples/fotos/main.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../../examples/fotos/main.dh"
 --- vorher
 ' Drei Bilder, eine kaputte Datei und eine, die kein Bild ist. b.jpg ist
 ' 400 x 100 gespeichert und traegt in den Kameradaten "um 90 Grad drehen"

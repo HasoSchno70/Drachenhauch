@@ -6,7 +6,7 @@
 
 === leere flaechen sagen etwas und alles passt
 DIM prBild AS INTEGER : prBild = 0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 5 THEN
@@ -31,7 +31,7 @@ spiel.dh
 --- umgebung
 DHRT_FRAMES=60
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 x = 1

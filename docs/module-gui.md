@@ -2520,7 +2520,7 @@ Themen umschalten.
   Hit-Test/Enumeration) wird unterstützt — siehe Abschnitt oben.
 - **Headless/grafisch**: `GUI_UPDATE`/`GUI_DRAW` brauchen einen aktiven
   `SCREEN`. Konstruktion, State, Geometrie und Hit-Test sind headless getestet
-  (`tests/pruef/gui_runtime.dhtest`).
+  (`tests/pruef/gui/gui_runtime.dhtest`).
 
 
 ## Plastischer Look: die Glas-Themen

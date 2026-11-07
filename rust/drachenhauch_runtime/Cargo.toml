@@ -2,7 +2,7 @@
 name = "drachenhauch_runtime"
 # Die EINZIGE Stelle, die die Fassung nennt (bis 2026-09-21 standen
 # pyproject.toml und drachenhauch/__init__.py daneben). `dhrt --version`
-# und VERSION$() geben sie aus, tests/pruef/dhrt_werkzeuge.dhtest prueft
+# und VERSION$() geben sie aus, tests/pruef/werkzeugkette/dhrt_werkzeuge.dhtest prueft
 # das. (Cargo verlangt drei Stellen, das Projekt nennt sich "2026.43".)
 version = "2026.43.0"
 edition = "2021"

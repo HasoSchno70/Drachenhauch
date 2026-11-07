@@ -17,13 +17,13 @@
 ' der zweite Lauf mit einer Datei, die es nicht gibt, stellt sie wieder her.
 ' Das Protokoll haengt an -- beide Laeufe stehen darin.
 IF FILEEXISTS("ev.txt") THEN AUTOMATION_PLAY("ev.txt")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=60
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 PRINT 1
@@ -136,13 +136,13 @@ zweites oeffnen ist spiel.dh TRUE
 ' Alt+Z im ersten Lauf; das `--- zwischen` nimmt die Aufnahme weg, damit der
 ' zweite Lauf den Umbruch nicht wieder ausschaltet -- und danach steht er noch.
 IF FILEEXISTS("ev.txt") THEN AUTOMATION_PLAY("ev.txt")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=90
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 PRINT 1
@@ -262,13 +262,13 @@ zweimal gestartet TRUE
 ' Fallordner. Der dritte bekommt die Reiter SEINES Ordners, nicht die zuletzt
 ' offenen -- zugleich die Gegenprobe zur globalen Sitzung aus Stand 4.
 IF FILEEXISTS("ev.txt") THEN AUTOMATION_PLAY("ev.txt")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- argumente
 eins.dh
 --- umgebung
 DHRT_FRAMES=60
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei eins.dh
 PRINT 1
@@ -389,13 +389,13 @@ zwei.dh nicht im dritten lauf TRUE
 === git blame listet wer welche zeile geschrieben hat
 ' Das Repository legt `--- vorher` an (git init/add/commit).
 IF FILEEXISTS("ev.txt") THEN AUTOMATION_PLAY("ev.txt")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=140
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 PRINT 1
@@ -532,13 +532,13 @@ blame 3 TRUE
 ' Eingecheckt, dann geaendert: zwei geaenderte Zeilen am Rand (`git diff -U0`),
 ' und Strg+Umschalt+D zeigt den Unterschied.
 IF FILEEXISTS("ev.txt") THEN AUTOMATION_PLAY("ev.txt")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=160
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 PRINT 1
@@ -679,13 +679,13 @@ diff mit zeilen TRUE
 === git diff ohne aenderung sagt es
 ' Die Gegenprobe: nichts geaendert.
 IF FILEEXISTS("ev.txt") THEN AUTOMATION_PLAY("ev.txt")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=160
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 PRINT 1
@@ -823,13 +823,13 @@ git rand 0 TRUE
 ' &HFFD070 -- drei Zeilen (1, 2, 4), in Zeile 4 zwei Woerter, `mehr` NICHT.
 ' Das Leseprogramm liest das Bildschirmfoto selbst (LOADIMAGE + GETPIXEL).
 IF FILEEXISTS("ev.txt") THEN AUTOMATION_PLAY("ev.txt")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=160
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 DHRT_SCREENSHOT={fall}/bild.png
 --- datei spiel.dh
@@ -1007,13 +1007,13 @@ zwei woerter in zeile 4 TRUE
 ' darin das Farbfeld (&HFF8800) und schreibt eine Aufnahme mit einem Klick
 ' auf seine Mitte, der zweite Lauf spielt sie ab.
 IF FILEEXISTS("ev.txt") THEN AUTOMATION_PLAY("ev.txt")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=200
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 DHRT_SCREENSHOT={fall}/bild.png
 --- datei spiel.dh
@@ -1156,13 +1156,13 @@ farbfeld TRUE
 ' Inhalt stehen Glyphennummern -- gelesen wird mit pdftext.dh, nicht mit PyMuPDF.
 IF FILEEXISTS("ev.txt") THEN AUTOMATION_PLAY("ev.txt")
 CLIPBOARD_SET("pdf")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- argumente
 spiel.dh
 --- umgebung
 DHRT_FRAMES=150
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- vorher
 DIM t AS STRING : t = ""

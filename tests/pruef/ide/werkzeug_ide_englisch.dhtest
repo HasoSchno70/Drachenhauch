@@ -38,7 +38,7 @@ NEXT
 PRINT "genug texte "; gesehen > 700
 PRINT "fehlt "; fehlt
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- erwartet
 genug texte TRUE
 fehlt 0
@@ -46,7 +46,7 @@ fehlt 0
 === englisch: menue, palette, knoepfe, kuerzel
 AUTOMATION_PLAY("ev.txt")
 DIM prBild AS INTEGER : prBild = 0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 20 THEN
@@ -79,7 +79,7 @@ e 42 1 341 0 0 0
 --- umgebung
 DHRT_FRAMES=200
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- nachher
 DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
@@ -99,7 +99,7 @@ pr ohne uebersetzung 0
 
 === deutsch bleibt deutsch, der wechsel kommt beim naechsten start
 DIM prBild AS INTEGER : prBild = 0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 20 THEN
@@ -114,7 +114,7 @@ END IF
 --- umgebung
 DHRT_FRAMES=200
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- nachher
 IMPORT "json"
@@ -137,7 +137,7 @@ gemerkt en
 ' "Ctrl+Shift+O" ist dieselbe Taste wie die Vorgabe "Strg+Umschalt+O" von
 ' "Open file in project" -- die verliert sie.
 DIM prBild AS INTEGER : prBild = 0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 20 THEN
@@ -152,7 +152,7 @@ END IF
 --- umgebung
 DHRT_FRAMES=200
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- nachher
 DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
@@ -170,7 +170,7 @@ pr schnell .
 ' wo es sie gibt; was nur deutsch vorliegt (die Entwuerfe), kommt deutsch.
 ' Die Suche ueber alle Dokumente sucht im Englischen.
 DIM prBild AS INTEGER : prBild = 0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 10 THEN handbuchZeigen("aaa.md", 1)
@@ -220,7 +220,7 @@ pr suche 'translated': 1 Treffer in 1 Dokumenten
 
 === deutsch: das handbuch bleibt deutsch, auch wenn es docs/en gibt
 DIM prBild AS INTEGER : prBild = 0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 10 THEN handbuchZeigen("aaa.md", 1)

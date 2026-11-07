@@ -5,7 +5,7 @@
 
 === vormerken, uebergeben, verwerfen
 DIM prBild AS INTEGER : prBild = 0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 40 THEN befehl("git_fenster")
@@ -28,7 +28,7 @@ a.dh
 --- umgebung
 DHRT_FRAMES=200
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- vorher
 FUNCTION git(a AS STRING, b AS STRING, c AS STRING, d AS STRING) AS INTEGER
@@ -107,7 +107,7 @@ b PRINT(2)
 ' einer Zeilengrenze gekuerzt, mit einem Satz dazu.
 DIM prBild AS INTEGER : prBild = 0
 DIM prD AS FLOAT : prD = 0.0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 40 THEN
@@ -132,7 +132,7 @@ klein.dh
 --- umgebung
 DHRT_FRAMES=200
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- vorher
 FUNCTION git(a AS STRING, b AS STRING, c AS STRING, d AS STRING) AS INTEGER

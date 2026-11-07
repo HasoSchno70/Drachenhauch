@@ -11,7 +11,7 @@ PRINT "hell "; COLOR_HEX$(F_SCHLUESSEL); " "; COLOR_HEX$(F_TEXT)
 befehl("thema")
 PRINT "wieder dunkel "; COLOR_HEX$(F_SCHLUESSEL)
 EXIT(0)
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- umgebung
 DHRT_FRAMES=300
 DH_IDE_WURZEL={fall}
@@ -24,7 +24,7 @@ wieder dunkel #2BC4E8
 === das helle thema aus der einstellung bringt die hellen codefarben mit
 PRINT "hell "; hell; " "; COLOR_HEX$(F_SCHLUESSEL)
 EXIT(0)
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- datei _programm/ide.json
 {"hell": true}
 --- umgebung
@@ -56,7 +56,7 @@ FOR prY = 0 TO SCREENHEIGHT() - 1 STEP 4
     NEXT
 NEXT
 WRITEALL("rechteck.txt", STR$(prX1) + " " + STR$(prY1) + " " + STR$(prX2) + " " + STR$(prY2))
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- umgebung
 DHRT_FRAMES=30
 DHRT_SCREENSHOT={fall}/bild.png
@@ -97,7 +97,7 @@ PRINT "sichern unter handbuch "; (GUI_GET_Y(spAuto) >= GUI_GET_Y(spHbGr) + GUI_G
 PRINT "knopf unter sichern "; (GUI_GET_Y(btnEinstZu) >= GUI_GET_Y(spAuto) + GUI_GET_H(spAuto))
 PRINT "knopf im fenster "; (GUI_GET_Y(btnEinstZu) + GUI_GET_H(btnEinstZu) + 30 <= GUI_WINDOW_GET_H(winEinst))
 EXIT(0)
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- umgebung
 DHRT_FRAMES=300
 DH_IDE_LOG=ide.log
@@ -122,7 +122,7 @@ handbuchschrift 20
 === eine gesicherte schriftgroesse gilt beim naechsten start
 PRINT "listen "; listenGroesse; " handbuch "; handbuchGroesse
 EXIT(0)
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- datei _programm/ide.json
 {"listen_schrift": 12, "handbuch_schrift": 24}
 --- umgebung
@@ -148,7 +148,7 @@ prAus = prAus + "hinweis darunter " + STR$(GUI_GET_Y(lblMassHinweis) >= GUI_GET_
 prAus = prAus + "im fenster " + STR$(GUI_GET_X(ddMass) + GUI_GET_W(ddMass) <= GUI_WINDOW_GET_W(winEinst)) + CHR$(10)
 WRITEALL("aus.txt", prAus)
 EXIT(0)
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- datei _programm/ide.json
 {"massstab": 1.0}
 --- umgebung
@@ -187,7 +187,7 @@ PRINT GUI_TEXT(lblMassHinweis)
 ' Ein krummer Wert von Hand faellt auf die naechste Stufe.
 PRINT "1,4 -> "; massStufe(1.4); "  0 -> "; massStufe(0.0); "  9 -> "; massStufe(9.0)
 EXIT(0)
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- datei _programm/ide.json
 {"massstab": 1.25}
 --- umgebung
@@ -209,7 +209,7 @@ paletteOeffnen()
 paletteFuellen("oeffnen")
 PRINT "palette "; (GUI_LISTBOX_COUNT(lstPalette) > 0); " "; GUI_LISTBOX_ITEM(lstPalette, 0)
 EXIT(0)
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- umgebung
 DHRT_FRAMES=300
 DH_IDE_WURZEL={fall}
@@ -227,7 +227,7 @@ befehl("ueber")
 protokoll("probe offen " + STR$(GUI_WINDOW_SHOWN(winUeber)))
 protokoll("probe text " + LEFT$(GUI_TEXT(lblUeber), 16))
 AUTOMATION_PLAY("ev.txt")
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- datei _programm/ev.txt
 c 2
 e 10 2 257 0 0 0
@@ -236,7 +236,7 @@ e 11 1 257 0 0 0
 --- umgebung
 DHRT_FRAMES=40
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- nachher
 DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
@@ -254,7 +254,7 @@ ueber zu
 befehl("ueber")
 protokoll("probe offen " + STR$(GUI_WINDOW_SHOWN(winUeber)))
 EXIT(0)
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- umgebung
 DHRT_FRAMES=300
 DH_IDE_LOG=ide.log

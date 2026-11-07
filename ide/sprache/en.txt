@@ -1,7 +1,7 @@
 # Englische Oberflaeche der IDE: je Zeile der deutsche Text, ein Tabulator,
 # der englische. Leerzeichen am Anfang und Ende gehoeren dazu (Textstuecke
 # werden zusammengesetzt). Neue Texte in ide.dh: tr$("...") und hier eine Zeile;
-# tests/pruef/werkzeug_ide_englisch.dhtest meldet, was fehlt. Zeilen ohne
+# tests/pruef/ide/werkzeug_ide_englisch.dhtest meldet, was fehlt. Zeilen ohne
 # Tabulator (wie diese) sind Kommentare.
 Schreibmarke auf einen Befehl oder Namen stellen -- hier steht dann, was er tut und wie er aufgerufen wird.	Put the cursor on a command or name -- this shows what it does and how it is called.
 Drachenhauch	Drachenhauch

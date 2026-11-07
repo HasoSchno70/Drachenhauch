@@ -39,9 +39,9 @@ WEND
 PRINT "zu "; WS_CONNECTED(w); " "; WS_CLOSE_CODE(w); " "; WS_CLOSE_REASON$(w)
 PRINT "senden danach "; WS_SEND(w, "noch was")
 --- datei hilfe.dh
-IMPORT "{sammlung}/_hilfen/wshilfe.dh"
+IMPORT "{sammlung}/../_hilfen/wshilfe.dh"
 --- datei echo.dh
-IMPORT "{sammlung}/_hilfen/wsecho.dh"
+IMPORT "{sammlung}/../_hilfen/wsecho.dh"
 --- erwartet
 verbunden TRUE
 TRUE
@@ -175,9 +175,9 @@ WHILE WS_CONNECTED(w) AND MILLIS() - t < 5000
 WEND
 PRINT "weg "; WS_CONNECTED(w); " "; WS_CLOSE_CODE(w)
 --- datei hilfe.dh
-IMPORT "{sammlung}/_hilfen/wshilfe.dh"
+IMPORT "{sammlung}/../_hilfen/wshilfe.dh"
 --- datei echo.dh
-IMPORT "{sammlung}/_hilfen/wsecho.dh"
+IMPORT "{sammlung}/../_hilfen/wsecho.dh"
 --- erwartet
 echo:a
 weg FALSE 1006
@@ -221,9 +221,9 @@ WHILE leer < 5
 WEND
 PRINT aus
 --- datei hilfe.dh
-IMPORT "{sammlung}/_hilfen/wshilfe.dh"
+IMPORT "{sammlung}/../_hilfen/wshilfe.dh"
 --- datei echo.dh
-IMPORT "{sammlung}/_hilfen/wsecho.dh"
+IMPORT "{sammlung}/../_hilfen/wsecho.dh"
 --- erwartet
 echo:vom browser|binaer 3|4001 tschuess
 

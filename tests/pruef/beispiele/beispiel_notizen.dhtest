@@ -29,7 +29,7 @@ DB_CLOSE_RESULT(prR)
 loeschen()
 PRINT "nach dem loeschen "; GUI_LISTBOX_COUNT(lst); " "; GUI_LISTBOX_ITEM(lst, 0)
 EXIT(0)
---- programm ../../examples/notizen/main.dh nach status("Bereit.")
+--- programm ../../../examples/notizen/main.dh nach status("Bereit.")
 --- umgebung
 DHRT_FRAMES=60
 --- erwartet
@@ -55,7 +55,7 @@ PRINT "nur fett "; ungesichert(); " "; GUI_TEXTAREA_MARKDOWN$(ta)
 oeffnen(aktuell)
 PRINT "neu geoeffnet "; ungesichert()
 EXIT(0)
---- programm ../../examples/notizen/main.dh nach status("Bereit.")
+--- programm ../../../examples/notizen/main.dh nach status("Bereit.")
 --- umgebung
 DHRT_FRAMES=60
 --- erwartet
@@ -71,7 +71,7 @@ PRINT titelVon$("", "  erste Zeile" + CHR$(10) + "zweite")
 PRINT titelVon$("", "")
 PRINT titelVon$("", REPEAT$("a", 60))
 EXIT(0)
---- programm ../../examples/notizen/main.dh nach status("Bereit.")
+--- programm ../../../examples/notizen/main.dh nach status("Bereit.")
 --- umgebung
 DHRT_FRAMES=60
 --- erwartet
@@ -91,11 +91,11 @@ NEXT
 GUI_SET_TEXT(ta, "kurz" + CHR$(10) + RTRIM$(prLang))
 pdfSchreiben("notiz.pdf")
 EXIT(0)
---- programm ../../examples/notizen/main.dh nach status("Bereit.")
+--- programm ../../../examples/notizen/main.dh nach status("Bereit.")
 --- umgebung
 DHRT_FRAMES=60
 --- datei leser.dh
-IMPORT "{sammlung}/_hilfen/pdftext.dh"
+IMPORT "{sammlung}/../_hilfen/pdftext.dh"
 --- nachher
 IMPORT "leser.dh"
 DIM s AS ARRAY OF STRING

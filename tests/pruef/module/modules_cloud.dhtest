@@ -34,7 +34,7 @@ PRINT CLOUD_SAVE("spieler1", "{""gold"": 42}")
 PRINT CLOUD_LOAD("spieler1")
 PROCESS_KILL(VAL(srv[1]))
 --- argumente
-{sammlung}/_hilfen/gegenserver.dh
+{sammlung}/../_hilfen/gegenserver.dh
 --- erwartet
 TRUE
 {"gold": 42}
@@ -67,7 +67,7 @@ PRINT "["; CLOUD_LOAD("niemand"); "]"
 PRINT "["; CLOUD_LAST_ERROR$(); "]"
 PROCESS_KILL(VAL(srv[1]))
 --- argumente
-{sammlung}/_hilfen/gegenserver.dh
+{sammlung}/../_hilfen/gegenserver.dh
 --- erwartet
 []
 []
@@ -101,7 +101,7 @@ CLOUD_SAVE("p", "v2")
 PRINT CLOUD_LOAD("p")
 PROCESS_KILL(VAL(srv[1]))
 --- argumente
-{sammlung}/_hilfen/gegenserver.dh
+{sammlung}/../_hilfen/gegenserver.dh
 --- erwartet
 v2
 
@@ -133,7 +133,7 @@ PRINT "["; CLOUD_LOAD("p"); "]"
 PRINT CLOUD_LAST_ERROR$() <> ""
 PROCESS_KILL(VAL(srv[1]))
 --- argumente
-{sammlung}/_hilfen/gegenserver.dh
+{sammlung}/../_hilfen/gegenserver.dh
 --- erwartet
 []
 TRUE
@@ -166,7 +166,7 @@ CLOUD_SAVE("p", "ok")
 PRINT CLOUD_LOAD("p")
 PROCESS_KILL(VAL(srv[1]))
 --- argumente
-{sammlung}/_hilfen/gegenserver.dh
+{sammlung}/../_hilfen/gegenserver.dh
 --- erwartet
 ok
 
@@ -206,7 +206,7 @@ FOR i = 0 TO LEN(top) - 1
 NEXT
 PROCESS_KILL(VAL(srv[1]))
 --- argumente
-{sammlung}/_hilfen/gegenserver.dh
+{sammlung}/../_hilfen/gegenserver.dh
 --- erwartet
 3
 bert 250.0
@@ -245,7 +245,7 @@ top = LEADERBOARD_FETCH("hs", 5)
 PRINT top[0][1]
 PROCESS_KILL(VAL(srv[1]))
 --- argumente
-{sammlung}/_hilfen/gegenserver.dh
+{sammlung}/../_hilfen/gegenserver.dh
 --- erwartet
 TRUE
 FALSE
@@ -283,7 +283,7 @@ top = LEADERBOARD_FETCH("speedrun", 5, TRUE)
 PRINT top[0][1]
 PROCESS_KILL(VAL(srv[1]))
 --- argumente
-{sammlung}/_hilfen/gegenserver.dh
+{sammlung}/../_hilfen/gegenserver.dh
 --- erwartet
 58.9
 
@@ -316,6 +316,6 @@ top = LEADERBOARD_FETCH("leer", 10)
 PRINT LEN(top)
 PROCESS_KILL(VAL(srv[1]))
 --- argumente
-{sammlung}/_hilfen/gegenserver.dh
+{sammlung}/../_hilfen/gegenserver.dh
 --- erwartet
 0

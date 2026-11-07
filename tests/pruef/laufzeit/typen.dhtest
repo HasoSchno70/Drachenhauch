@@ -14,7 +14,7 @@ IMPORT "helfer.dh"
 dlStarten(["--typen", "prog.dh"])
 PRINT dlAus
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- datei prog.dh
 CLASS Tier
     DIM name AS STRING
@@ -104,7 +104,7 @@ WRITEALL("richtig.dhc", dlAus)
 dlStarten([CWD$() + "/richtig.dhc"])
 PRINT "unveraendert "; TRIM$(dlAus)
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 probe drin TRUE
 rueckgabe TRUE

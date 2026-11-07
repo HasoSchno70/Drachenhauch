@@ -91,7 +91,7 @@ END SUB
 FUNCTION prJa$(b AS BOOLEAN) AS STRING
     RETURN IIF(b, "ja", "nein")
 END FUNCTION
---- programm ../../examples/196_rechnungen.dh nach SETFPS(60)
+--- programm ../../../examples/196_rechnungen.dh nach SETFPS(60)
 --- einschub nach GUI_WINDOW_CHROME(win, FALSE)
 DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(win, 0, 0, 1, 1)
 
@@ -210,7 +210,7 @@ END SUB
 FUNCTION prJa$(b AS BOOLEAN) AS STRING
     RETURN IIF(b, "ja", "nein")
 END FUNCTION
---- programm ../../examples/196_rechnungen.dh nach SETFPS(60)
+--- programm ../../../examples/196_rechnungen.dh nach SETFPS(60)
 --- einschub nach GUI_WINDOW_CHROME(win, FALSE)
 DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(win, 0, 0, 1, 1)
 
@@ -240,7 +240,7 @@ FUNCTION prZeile$(id AS INTEGER) AS STRING
     IF DB_NEXT(r) THEN RETURN DB_GET_STRING(r, 0) + "/" + STR$(DB_GET_INT(r, 1)) + "/" + STR$(DB_GET_INT(r, 2)) + "/" + DB_GET_STRING(r, 3) + "/" + DB_GET_STRING(r, 4)
     RETURN "(keine)"
 END FUNCTION
---- programm ../../examples/196_rechnungen.dh nach SETFPS(60)
+--- programm ../../../examples/196_rechnungen.dh nach SETFPS(60)
 --- einschub nach FLIP()
 prBild = prBild + 1
 IF prBild = 2 THEN
@@ -356,7 +356,7 @@ SUB prFall()
     prKlick(12, prMx(bKSpeichern), prMy(bKSpeichern))
     prAbspielen()
 END SUB
---- programm ../../examples/196_rechnungen.dh nach SETFPS(60)
+--- programm ../../../examples/196_rechnungen.dh nach SETFPS(60)
 --- einschub nach GUI_WINDOW_CHROME(win, FALSE)
 DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(win, 0, 0, 1, 1)
 
@@ -475,7 +475,7 @@ SUB prFall()
     prKlick(3, prMx(bKSpeichern), prMy(bKSpeichern))
     prAbspielen()
 END SUB
---- programm ../../examples/196_rechnungen.dh nach SETFPS(60)
+--- programm ../../../examples/196_rechnungen.dh nach SETFPS(60)
 --- einschub nach GUI_WINDOW_CHROME(win, FALSE)
 DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(win, 0, 0, 1, 1)
 
@@ -595,7 +595,7 @@ SUB prFall()
     prKlick(21, prMx(bKSpeichern), prMy(bKSpeichern))
     prAbspielen()
 END SUB
---- programm ../../examples/196_rechnungen.dh nach SETFPS(60)
+--- programm ../../../examples/196_rechnungen.dh nach SETFPS(60)
 --- einschub nach GUI_WINDOW_CHROME(win, FALSE)
 DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(win, 0, 0, 1, 1)
 
@@ -719,7 +719,7 @@ SUB prFall()
     prTaste(18, 256, 0)
     prAbspielen()
 END SUB
---- programm ../../examples/196_rechnungen.dh nach SETFPS(60)
+--- programm ../../../examples/196_rechnungen.dh nach SETFPS(60)
 --- einschub nach GUI_WINDOW_CHROME(win, FALSE)
 DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(win, 0, 0, 1, 1)
 
@@ -819,7 +819,7 @@ SUB prFall()
     prKlick(3, GUI_CANVAS_X(nullpunkt) + GUI_GET_X(tKunden) + 60, GUI_CANVAS_Y(nullpunkt) + GUI_GET_Y(tKunden) + 52)
     prAbspielen()
 END SUB
---- programm ../../examples/196_rechnungen.dh nach SETFPS(60)
+--- programm ../../../examples/196_rechnungen.dh nach SETFPS(60)
 --- einschub nach GUI_WINDOW_CHROME(win, FALSE)
 DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(win, 0, 0, 1, 1)
 
@@ -915,7 +915,7 @@ END SUB
 FUNCTION prJa$(b AS BOOLEAN) AS STRING
     RETURN IIF(b, "ja", "nein")
 END FUNCTION
---- programm ../../examples/196_rechnungen.dh nach SETFPS(60)
+--- programm ../../../examples/196_rechnungen.dh nach SETFPS(60)
 --- einschub nach GUI_WINDOW_CHROME(win, FALSE)
 DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(win, 0, 0, 1, 1)
 
@@ -1017,7 +1017,7 @@ SUB prFall()
     prKlick(8, prMx(bRPdf), prMy(bRPdf))
     prAbspielen()
 END SUB
---- programm ../../examples/196_rechnungen.dh nach SETFPS(60)
+--- programm ../../../examples/196_rechnungen.dh nach SETFPS(60)
 --- einschub nach GUI_WINDOW_CHROME(win, FALSE)
 DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(win, 0, 0, 1, 1)
 
@@ -1403,7 +1403,7 @@ SUB prFall()
     prKlick(13, prMx(bRSpeichern), prMy(bRSpeichern))
     prAbspielen()
 END SUB
---- programm ../../examples/196_rechnungen.dh nach SETFPS(60)
+--- programm ../../../examples/196_rechnungen.dh nach SETFPS(60)
 --- einschub nach GUI_WINDOW_CHROME(win, FALSE)
 DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(win, 0, 0, 1, 1)
 
@@ -1526,7 +1526,7 @@ SUB prFall()
     prKlick(3, prMx(bRSpeichern), prMy(bRSpeichern))
     prAbspielen()
 END SUB
---- programm ../../examples/196_rechnungen.dh nach SETFPS(60)
+--- programm ../../../examples/196_rechnungen.dh nach SETFPS(60)
 --- einschub nach GUI_WINDOW_CHROME(win, FALSE)
 DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(win, 0, 0, 1, 1)
 
@@ -1647,7 +1647,7 @@ SUB prFall()
     prTaste(14, 257, 0)
     prAbspielen()
 END SUB
---- programm ../../examples/196_rechnungen.dh nach SETFPS(60)
+--- programm ../../../examples/196_rechnungen.dh nach SETFPS(60)
 --- einschub nach GUI_WINDOW_CHROME(win, FALSE)
 DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(win, 0, 0, 1, 1)
 
@@ -1773,7 +1773,7 @@ SUB prFall()
     prTaste(3, 69, 341)
     prAbspielen()
 END SUB
---- programm ../../examples/196_rechnungen.dh nach SETFPS(60)
+--- programm ../../../examples/196_rechnungen.dh nach SETFPS(60)
 --- einschub nach GUI_WINDOW_CHROME(win, FALSE)
 DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(win, 0, 0, 1, 1)
 
@@ -1878,7 +1878,7 @@ END SUB
 FUNCTION prJa$(b AS BOOLEAN) AS STRING
     RETURN IIF(b, "ja", "nein")
 END FUNCTION
---- programm ../../examples/196_rechnungen.dh nach SETFPS(60)
+--- programm ../../../examples/196_rechnungen.dh nach SETFPS(60)
 --- einschub nach GUI_WINDOW_CHROME(win, FALSE)
 DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(win, 0, 0, 1, 1)
 
@@ -1890,7 +1890,7 @@ prSchreib("")
 --- umgebung
 DHRT_FRAMES=2
 --- argumente
-{sammlung}/../../examples/196_rechnung_fenster.dh
+{sammlung}/../../../examples/196_rechnung_fenster.dh
 --- nachher
 IMPORT "net"
 DIM kind AS STRING : kind = TRIM$(READLINES("_programm/kind.txt")[0])

@@ -20,7 +20,7 @@ SETWINDOWTITLE(ARG$(1))
 GUI_FOCUS(reiter[0].feld)
 GUI_TEXTAREA_GOTO(reiter[0].feld, 2, 100)
 DIM prSender AS INTEGER : prSender = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ARG$(2), ARG$(1), "tippe:GUI_WI")
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- einschub nach     trefferNachziehen()
     IF vervollOffen AND NOT prGesehen THEN
         prGesehen = TRUE
@@ -39,11 +39,11 @@ DIM prGesehen AS BOOLEAN : prGesehen = FALSE
 --- argumente
 spiel.dh
 DH-IDE-Vorschlag
-{sammlung}/_hilfen/fenstersender.ps1
+{sammlung}/../_hilfen/fenstersender.ps1
 --- umgebung
 DHRT_FRAMES=400
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 IMPORT "gui"
@@ -65,7 +65,7 @@ SETWINDOWTITLE(ARG$(1))
 GUI_FOCUS(reiter[0].feld)
 GUI_TEXTAREA_GOTO(reiter[0].feld, 2, 100)
 DIM prSender AS INTEGER : prSender = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ARG$(2), ARG$(1), "tippe:GUI_WI")
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- einschub nach     trefferNachziehen()
     IF vervollOffen AND vervollWort = "GUI_WI" AND NOT prGesehen THEN
         ' erst wenn alles getippt ist -- jedes Zeichen setzt die Liste neu an die Marke
@@ -96,11 +96,11 @@ DIM prBild AS INTEGER
 --- argumente
 spiel.dh
 DH-IDE-Vorschlag
-{sammlung}/_hilfen/fenstersender.ps1
+{sammlung}/../_hilfen/fenstersender.ps1
 --- umgebung
 DHRT_FRAMES=400
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 IMPORT "gui"
@@ -182,7 +182,7 @@ nachher oben b TRUE fokus im feld TRUE
 ' aendert den Wortanfang wie ein getippter Buchstabe -- die Liste ging bei
 ' jedem Klick in ein Wort ab drei Buchstaben auf. Sie gehoert zum Tippen.
 DIM prBild AS INTEGER : prBild = 0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 40 THEN
@@ -198,7 +198,7 @@ spiel.dh
 --- umgebung
 DHRT_FRAMES=200
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 IMPORT "gui"
@@ -219,7 +219,7 @@ pr offen nach dem setzen FALSE
 ' mit dem letzten Wort auf ("SUB" aus END SUB). Getippt ist nur, was den
 ' Text um ein Zeichen verlaengert.
 DIM prBild AS INTEGER : prBild = 0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 40 THEN
@@ -236,7 +236,7 @@ spiel.dh
 --- umgebung
 DHRT_FRAMES=200
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 IMPORT "gui"
@@ -259,7 +259,7 @@ pr offen nach dem einfuegen FALSE
 ' Liste und Hilfe jetzt erst, wenn das Wort 0,25 s ruht. Geprueft: direkt
 ' nach dem Tippen ist die Liste noch zu, eine halbe Sekunde spaeter offen.
 DIM prBild AS INTEGER : prBild = 0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 30 THEN
@@ -279,7 +279,7 @@ gross.dh
 --- umgebung
 DHRT_FRAMES=300
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- vorher
 DIM z AS ARRAY OF STRING : z = []
@@ -311,7 +311,7 @@ SETWINDOWTITLE(ARG$(1))
 GUI_FOCUS(reiter[0].feld)
 GUI_TEXTAREA_GOTO(reiter[0].feld, 7, 1)
 DIM prSender AS INTEGER : prSender = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ARG$(2), ARG$(1), "tippe:s.")
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- einschub nach     trefferNachziehen()
     IF vervollOffen AND NOT prGesehen THEN
         prGesehen = TRUE
@@ -327,11 +327,11 @@ DIM prGesehen AS BOOLEAN : prGesehen = FALSE
 --- argumente
 spiel.dh
 DH-IDE-Vorschlag
-{sammlung}/_hilfen/fenstersender.ps1
+{sammlung}/../_hilfen/fenstersender.ps1
 --- umgebung
 DHRT_FRAMES=400
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 CLASS Held
@@ -358,7 +358,7 @@ SETWINDOWTITLE(ARG$(1))
 GUI_FOCUS(reiter[0].feld)
 GUI_TEXTAREA_GOTO(reiter[0].feld, 2, 1)
 DIM prSender AS INTEGER : prSender = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ARG$(2), ARG$(1), "tippe:' ja.")
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- einschub nach     trefferNachziehen()
     IF vervollOffen THEN prOffen = prOffen + 1
     prBild = prBild + 1
@@ -369,11 +369,11 @@ DIM prBild AS INTEGER : prBild = 0
 --- argumente
 spiel.dh
 DH-IDE-Vorschlag
-{sammlung}/_hilfen/fenstersender.ps1
+{sammlung}/../_hilfen/fenstersender.ps1
 --- umgebung
 DHRT_FRAMES=400
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 DIM s AS INTEGER

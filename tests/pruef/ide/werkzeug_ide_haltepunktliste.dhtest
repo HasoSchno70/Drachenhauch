@@ -5,7 +5,7 @@
 --- langsam
 === ein abgeschalteter haltepunkt haelt nicht und bleibt gemerkt
 DIM prBild AS INTEGER : prBild = 0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach     IF GUI_DOUBLE_CLICKED(lstProbleme) THEN problemAnspringen()
 prBild = prBild + 1
 IF prBild = 10 AND NOT FILEEXISTS("zweiter.txt") THEN
@@ -38,7 +38,7 @@ spiel.dh
 --- umgebung
 DHRT_FRAMES=260
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 DIM x AS INTEGER
@@ -64,7 +64,7 @@ probe gemerkt 4 TRUE
 
 === im halt zeigt das ueberfahren den wert samt mitgliedskette
 DIM prBild AS INTEGER : prBild = 0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach     IF GUI_DOUBLE_CLICKED(lstProbleme) THEN problemAnspringen()
 prBild = prBild + 1
 IF prBild = 10 THEN
@@ -83,7 +83,7 @@ spiel.dh
 --- umgebung
 DHRT_FRAMES=240
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 CLASS Held
@@ -108,7 +108,7 @@ probe tooltip TRUE
 
 === protokollpunkt schreibt in die ausgabe und trefferzahl haelt spaeter
 DIM prBild AS INTEGER : prBild = 0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach     IF GUI_DOUBLE_CLICKED(lstProbleme) THEN problemAnspringen()
 prBild = prBild + 1
 IF prBild = 10 THEN
@@ -132,7 +132,7 @@ spiel.dh
 --- umgebung
 DHRT_FRAMES=220
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 DIM i AS INTEGER
@@ -160,7 +160,7 @@ probe ausgabe » spiel.dh:4  i = 3
 
 === neu starten und der hinweis bei aenderungen im debugger
 DIM prBild AS INTEGER : prBild = 0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach     IF GUI_DOUBLE_CLICKED(lstProbleme) THEN problemAnspringen()
 prBild = prBild + 1
 IF prBild = 10 THEN befehl("debug")
@@ -175,7 +175,7 @@ spiel.dh
 --- umgebung
 DHRT_FRAMES=260
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 DIM x AS INTEGER

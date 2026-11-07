@@ -26,7 +26,7 @@ anordnen()
 lagenLaden()
 PRINT "lage gemerkt "; kX[prH]; " "; kY[prH]
 EXIT(0)
---- programm ../../examples/210_klassendiagramm.dh nach lagenLaden()
+--- programm ../../../examples/210_klassendiagramm.dh nach lagenLaden()
 --- argumente
 .
 --- umgebung
@@ -73,7 +73,7 @@ DIM prH AS INTEGER : prH = klasseNr("Hund")
 inDerIdeOeffnen(prH, zeileBei(prH, kY[prH] + oy + KOPF_H + 4 + ZEILE_H + 2))
 inDerIdeOeffnen(prH, zeileBei(prH, kY[prH] + oy + 5))
 EXIT(0)
---- programm ../../examples/210_klassendiagramm.dh nach lagenLaden()
+--- programm ../../../examples/210_klassendiagramm.dh nach lagenLaden()
 --- argumente
 tiere.dh
 --- umgebung
@@ -95,7 +95,7 @@ tiere.dh|3
 === das diagramm im bild
 ' Kopfzeilen in ihren Farben (Klasse blau, Struct gruen), darunter die
 ' Kinder; die Kaesten stehen an der Lage der Anordnung (40, 40).
---- programm ../../examples/210_klassendiagramm.dh
+--- programm ../../../examples/210_klassendiagramm.dh
 ' nur das Werkzeug
 --- argumente
 .
@@ -123,7 +123,7 @@ END STRUCT
 ' das echte Klassendiagramm mit dem Projektordner.
 DIM prB AS INTEGER
 DIM prSchritt AS INTEGER
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- einschub nach glanzStartNachziehen()
 prB = prB + 1
 IF prSchritt = 0 AND prB > 5 THEN
@@ -148,7 +148,7 @@ a.dh
 --- umgebung
 DHRT_FRAMES=700
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei a.dh
 PRINT 1

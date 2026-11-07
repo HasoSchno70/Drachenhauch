@@ -129,7 +129,7 @@ END SUB
 SUB prProbe(k AS INTEGER)
     ' nichts
 END SUB
---- programm ../../examples/183_sfx_generator.dh nach SETFPS(60)
+--- programm ../../../examples/183_sfx_generator.dh nach SETFPS(60)
 --- einschub nach FLIP()
 prBild = prBild + 1
 IF prBild = 3 THEN
@@ -229,7 +229,7 @@ END SUB
 SUB prProbe(k AS INTEGER)
     IF k = 9 THEN prMerke("uPos " + STR$(uPos) + " uAnz " + STR$(uAnz))
 END SUB
---- programm ../../examples/183_sfx_generator.dh nach SETFPS(60)
+--- programm ../../../examples/183_sfx_generator.dh nach SETFPS(60)
 --- einschub nach FLIP()
 prBild = prBild + 1
 IF prBild = 3 THEN
@@ -334,7 +334,7 @@ END SUB
 SUB prProbe(k AS INTEGER)
     IF k = 40 THEN prMerke("bewegt " + prJa$(INT(GUI_VALUE(regler[P_FREQ])) <> prMerk) + " uAnz " + STR$(uAnz) + " uPos " + STR$(uPos))
 END SUB
---- programm ../../examples/183_sfx_generator.dh nach SETFPS(60)
+--- programm ../../../examples/183_sfx_generator.dh nach SETFPS(60)
 --- einschub nach FLIP()
 prBild = prBild + 1
 IF prBild = 3 THEN
@@ -442,7 +442,7 @@ SUB prProbe(k AS INTEGER)
     IF k = 44 THEN prMerke("zurueck wie vorher " + prJa$(INT(GUI_VALUE(regler[P_FREQ])) = prMerk) + " uPos " + STR$(uPos))
     IF k = 62 THEN prMerke("vor wie nach dem zug " + prJa$(STR$(INT(GUI_VALUE(regler[P_FREQ]))) = READLINES("zug.txt")[0]) + " uPos " + STR$(uPos))
 END SUB
---- programm ../../examples/183_sfx_generator.dh nach SETFPS(60)
+--- programm ../../../examples/183_sfx_generator.dh nach SETFPS(60)
 --- einschub nach FLIP()
 prBild = prBild + 1
 IF prBild = 3 THEN
@@ -550,7 +550,7 @@ SUB prProbe(k AS INTEGER)
     IF k = 34 THEN prMerke("z wie vorher " + prJa$(INT(GUI_VALUE(regler[P_FREQ])) = prMerk) + " uPos " + STR$(uPos))
     IF k = 46 THEN prMerke("y bewegt " + prJa$(INT(GUI_VALUE(regler[P_FREQ])) <> prMerk) + " uPos " + STR$(uPos))
 END SUB
---- programm ../../examples/183_sfx_generator.dh nach SETFPS(60)
+--- programm ../../../examples/183_sfx_generator.dh nach SETFPS(60)
 --- einschub nach FLIP()
 prBild = prBild + 1
 IF prBild = 3 THEN
@@ -655,7 +655,7 @@ SUB prProbe(k AS INTEGER)
     IF k = 30 THEN prMerke("wurf uAnz " + STR$(uAnz) + " uPos " + STR$(uPos))
     IF k = 52 THEN prMerke("zurueck wie vorher " + prJa$(INT(GUI_VALUE(regler[P_FREQ])) = prMerk))
 END SUB
---- programm ../../examples/183_sfx_generator.dh nach SETFPS(60)
+--- programm ../../../examples/183_sfx_generator.dh nach SETFPS(60)
 --- einschub nach FLIP()
 prBild = prBild + 1
 IF prBild = 3 THEN
@@ -762,7 +762,7 @@ SUB prProbe(k AS INTEGER)
     IF k = 30 THEN prMerke("preset " + STR$(GUI_LISTBOX_SELECTED(liste)) + " uAnz " + STR$(uAnz) + " uPos " + STR$(uPos))
     IF k = 52 THEN prMerke("zurueck wie vorher " + prJa$(INT(GUI_VALUE(regler[P_FREQ])) = prMerk) + " welle wie vorher " + prJa$(STR$(GUI_DROPDOWN_SELECTED(waehlWave)) = READLINES("welle.txt")[0]))
 END SUB
---- programm ../../examples/183_sfx_generator.dh nach SETFPS(60)
+--- programm ../../../examples/183_sfx_generator.dh nach SETFPS(60)
 --- einschub nach FLIP()
 prBild = prBild + 1
 IF prBild = 3 THEN
@@ -869,7 +869,7 @@ END SUB
 SUB prProbe(k AS INTEGER)
     IF k = 60 THEN prMerke("uPos " + STR$(uPos) + " uAnz " + STR$(uAnz))
 END SUB
---- programm ../../examples/183_sfx_generator.dh nach SETFPS(60)
+--- programm ../../../examples/183_sfx_generator.dh nach SETFPS(60)
 --- einschub nach FLIP()
 prBild = prBild + 1
 IF prBild = 3 THEN
@@ -975,7 +975,7 @@ SUB prProbe(k AS INTEGER)
         prMerke("schritt " + uName[uPos] + " uAnz " + STR$(uAnz))
     END IF
 END SUB
---- programm ../../examples/183_sfx_generator.dh nach SETFPS(60)
+--- programm ../../../examples/183_sfx_generator.dh nach SETFPS(60)
 --- einschub nach FLIP()
 prBild = prBild + 1
 IF prBild = 3 THEN
@@ -1083,7 +1083,7 @@ SUB prProbe(k AS INTEGER)
         prMerke("schritt " + uName[uPos] + " uAnz " + STR$(uAnz))
     END IF
 END SUB
---- programm ../../examples/183_sfx_generator.dh nach SETFPS(60)
+--- programm ../../../examples/183_sfx_generator.dh nach SETFPS(60)
 --- einschub nach FLIP()
 prBild = prBild + 1
 IF prBild = 3 THEN
@@ -1189,7 +1189,7 @@ SUB prProbe(k AS INTEGER)
     IF k = 25 THEN prMerke("nach der vorlage " + wf$() + " uAnz " + STR$(uAnz) + " uPos " + STR$(uPos))
     IF k = 50 THEN prMerke("zurueckgeholt " + wf$() + " frequenz wie vorher " + prJa$(INT(GUI_VALUE(regler[P_FREQ])) = prMerk) + " uAnz " + STR$(uAnz) + " uPos " + STR$(uPos))
 END SUB
---- programm ../../examples/183_sfx_generator.dh nach SETFPS(60)
+--- programm ../../../examples/183_sfx_generator.dh nach SETFPS(60)
 --- einschub nach FLIP()
 prBild = prBild + 1
 IF prBild = 3 THEN
@@ -1294,7 +1294,7 @@ SUB prProbe(k AS INTEGER)
     IF k = 30 THEN prMerke("laenger " + prJa$(INT(GUI_VALUE(regler[P_DECAY])) > prMerk + 15) + " attack bleibt " + prJa$(INT(GUI_VALUE(regler[P_ATTACK])) = 0))
     IF k = 30 THEN prMerke("schritt " + uName[uPos] + " uAnz " + STR$(uAnz))
 END SUB
---- programm ../../examples/183_sfx_generator.dh nach SETFPS(60)
+--- programm ../../../examples/183_sfx_generator.dh nach SETFPS(60)
 --- einschub nach FLIP()
 prBild = prBild + 1
 IF prBild = 3 THEN
@@ -1316,7 +1316,7 @@ DHRT_FRAMES=55
 ' dass `dhrt --check` den Code ohne Befund nimmt.
 SET_WINDOW_POS(-3000, -3000)
 DIM prBild AS INTEGER : prBild = 0
---- programm ../../examples/183_sfx_generator.dh nach SETFPS(60)
+--- programm ../../../examples/183_sfx_generator.dh nach SETFPS(60)
 --- einschub nach FLIP()
 prBild = prBild + 1
 IF prBild = 3 THEN GUI_SET_VALUE(regler[P_PAN], -0.5)
@@ -1338,7 +1338,7 @@ END SUB
 zeigen("links.dh")
 zeigen("mitte.dh")
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 FUNCTION dlCheckEine(pfad AS STRING) AS STRING
     dlStarten(["--check", pfad])
     RETURN dlAus

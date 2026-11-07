@@ -48,7 +48,7 @@ PRINT "versatz "; ABS(VAL(b[0]) - VAL(a[0]) - 19800) <= 2
 PRINT "utc "; a[1]; " "; a[2]
 PRINT "indien "; b[1]; " "; b[2]
 --- datei lauf.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- system posix
 --- erwartet
 versatz TRUE

@@ -48,7 +48,7 @@ gleitet; rechts oben stehen Ping und verlorene Pakete.
 - Bleibt der Gast drei Sekunden still oder bricht die Verbindung ab, wartet
   der Wirt auf den nächsten. Ein zweiter Gast bekommt eine Absage.
 
-Geprüft wird es in `tests/pruef/beispiel_duell.dhtest`: Wirt und Gast als
+Geprüft wird es in `tests/pruef/beispiele/beispiel_duell.dhtest`: Wirt und Gast als
 zwei Prozesse ohne Fenster (`--bot N --ohne-fenster`), einmal über
 `127.0.0.1`, einmal über das Relay, dazu ein hart beendeter Gast und eine
 Absage. Am Ende muss das Schiff des Gastes bei beiden genau gleich stehen.

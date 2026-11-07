@@ -114,7 +114,7 @@ Kachelzahl: nur damit laesst sich die naechste GID ausrechnen.
 **Geschrieben wird echtes Tiled-JSON** — eingebettete Tilesets, `type: "map"`,
 Kacheldaten als Zahlenliste. Nachgeprueft ist das nicht am eigenen Leser, sondern
 an einem **fremden**: dem json-Modul, das die Datei nach den Regeln des
-Tiled-Formats liest (`tests/pruef/tiled_schreiben.dhtest`; bis 2026-09-14 war
+Tiled-Formats liest (`tests/pruef/module/tiled_schreiben.dhtest`; bis 2026-09-14 war
 es das Datenmodell des inzwischen gelöschten Qt-Editors `dhtilemap`). Ein Format, das nur sein
 eigener Schreiber wieder liest, ist nicht geprueft, sondern nur in sich stimmig.
 

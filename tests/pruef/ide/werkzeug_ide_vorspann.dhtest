@@ -12,11 +12,11 @@
 --- langsam
 === der vorspann laeuft bis zum ende und dann kommt die ide
 EXIT(0)
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- umgebung
 DHRT_FRAMES=900
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 DH_IDE_VORSPANN=1
 --- nachher
@@ -31,11 +31,11 @@ bereit
 
 === ein klick ueberspringt ihn
 AUTOMATION_PLAY("ev.txt")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- umgebung
 DHRT_FRAMES=400
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 DH_IDE_VORSPANN=1
 --- datei _programm/ev.txt
@@ -62,11 +62,11 @@ bereit TRUE
 
 === ein testlauf ohne den schalter zeigt ihn nicht
 EXIT(0)
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- umgebung
 DHRT_FRAMES=300
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- nachher
 DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
@@ -87,11 +87,11 @@ IF GUI_CHECKED(cbVorspann) THEN protokoll("probe kaestchen an") ELSE protokoll("
 GUI_SET_CHECKED(cbVorspann, TRUE)
 einstellungenNachziehen()
 EXIT(0)
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- umgebung
 DHRT_FRAMES=300
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 DH_IDE_VORSPANN=1
 --- datei _programm/ide.json
@@ -115,11 +115,11 @@ wieder an TRUE
 ' Welcher Vorspann laeuft, steht als `vorspann_datei` in der ide.json. Das
 ' Bildlimit beendet ihn nach fuenf Bildern -- hier zaehlt nur, WELCHER lief.
 EXIT(0)
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- umgebung
 DHRT_FRAMES=5
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 DH_IDE_VORSPANN=1
 --- datei _programm/ide.json
@@ -135,11 +135,11 @@ film vorspann_2.mp4
 
 === abwechselnd kommt bei jedem start der naechste
 EXIT(0)
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- umgebung
 DHRT_FRAMES=5
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 DH_IDE_VORSPANN=1
 --- datei _programm/ide.json
@@ -166,11 +166,11 @@ NEXT
 GUI_DROPDOWN_SET_SELECTED(ddVorspann, 1)
 einstellungenNachziehen()
 EXIT(0)
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- umgebung
 DHRT_FRAMES=300
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- nachher
 DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")

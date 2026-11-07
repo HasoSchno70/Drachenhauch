@@ -6,7 +6,7 @@
 
 === zaehlt ueber das projekt, klick zeigt die aufrufer
 DIM prBild AS INTEGER : prBild = 0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 60 THEN pruefen()
@@ -28,7 +28,7 @@ haupt.dh
 --- umgebung
 DHRT_FRAMES=150
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei haupt.dh
 SUB malen()
@@ -71,7 +71,7 @@ pr aus -1
 ' Zaehler doppelt -- sie gehoert keinem Reiter, also zaehlte neben ihrem
 ' eigenen Text auch noch die gesicherte Datei auf der Platte.
 DIM prBild AS INTEGER : prBild = 0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 50 THEN befehl("spiegel")
@@ -92,7 +92,7 @@ haupt.dh
 --- umgebung
 DHRT_FRAMES=150
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei haupt.dh
 SUB malen()
@@ -117,7 +117,7 @@ pr rechts malen: 2 Aufrufe
 ' Text verglichen liess die Zaehlung die eigene Datei auf der Platte nicht
 ' aus und zaehlte jeden Aufruf doppelt.
 DIM prBild AS INTEGER : prBild = 0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 40 THEN
@@ -133,7 +133,7 @@ unter/../haupt.dh
 --- umgebung
 DHRT_FRAMES=150
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei haupt.dh
 rechnen()
@@ -163,7 +163,7 @@ DIM prBild AS INTEGER : prBild = 0
 DIM prMax AS FLOAT : prMax = 0.0
 DIM prLetzt AS FLOAT : prLetzt = 0.0
 DIM prGelesen AS INTEGER : prGelesen = 0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 DIM prJ AS FLOAT : prJ = GET_TIME()
@@ -194,7 +194,7 @@ haupt.dh
 --- umgebung
 DHRT_FRAMES=800
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- vorher
 DIM d AS INTEGER
@@ -235,13 +235,13 @@ FOR prK = 0 TO LEN(zaehlStellen) - 1
 NEXT
 protokoll("pr flott " + STR$(prD < 1.2))
 EXIT(0)
---- programm ../../ide/ide.dh nach protokoll("bereit")
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
 --- argumente
 viele.dh
 --- umgebung
 DHRT_FRAMES=200
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- vorher
 DIM z AS ARRAY OF STRING : z = []

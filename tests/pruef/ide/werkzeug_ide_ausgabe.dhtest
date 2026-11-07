@@ -17,7 +17,7 @@
 ' Ordner des Programms, nicht zum Projekt.
 DIM prBild AS INTEGER : prBild = 0
 AUTOMATION_PLAY("ev.txt")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach     IF GUI_DOUBLE_CLICKED(lstProbleme) THEN problemAnspringen()
 prBild = prBild + 1
 IF prBild = 90 THEN
@@ -38,7 +38,7 @@ sub/spiel.dh
 --- umgebung
 DHRT_FRAMES=230
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei sub/spiel.dh
 PRINT "los"
@@ -67,7 +67,7 @@ probe spiel.dh 3
 ' gibt. Ein neuer Reiter geht auf, die Marke steht in Zeile 2.
 DIM prBild AS INTEGER : prBild = 0
 AUTOMATION_PLAY("ev.txt")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach     IF GUI_DOUBLE_CLICKED(lstProbleme) THEN problemAnspringen()
 prBild = prBild + 1
 IF prBild = 90 THEN
@@ -88,7 +88,7 @@ spiel.dh
 --- umgebung
 DHRT_FRAMES=230
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 PRINT "vorher"
@@ -117,7 +117,7 @@ probe helfer.dh 2
 ' Gegenprobe: die Ausgabe des Programms selbst nennt keine Stelle.
 DIM prBild AS INTEGER : prBild = 0
 AUTOMATION_PLAY("ev.txt")
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach     IF GUI_DOUBLE_CLICKED(lstProbleme) THEN problemAnspringen()
 prBild = prBild + 1
 IF prBild = 90 THEN
@@ -138,7 +138,7 @@ spiel.dh
 --- umgebung
 DHRT_FRAMES=230
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei spiel.dh
 PRINT "hallo"
@@ -169,7 +169,7 @@ probe spiel.dh 1 keine stelle
 DIM prBild AS INTEGER : prBild = 0
 DIM prMax AS FLOAT : prMax = 0.0
 DIM prLetzt AS FLOAT : prLetzt = 0.0
---- programm ../../ide/ide.dh nach SETFPS(60)
+--- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 30 THEN befehl("start") : prLetzt = GET_TIME()
@@ -191,7 +191,7 @@ viel.dh
 --- umgebung
 DHRT_FRAMES=6000
 DH_IDE_LOG=ide.log
-DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_WURZEL={sammlung}/../../..
 DH_IDE_KONFIG=ide.json
 --- datei viel.dh
 DIM i AS INTEGER

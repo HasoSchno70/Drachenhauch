@@ -63,7 +63,7 @@ p = PROCESS_START("dhrt", "run", ARG$(0), "--", CWD$() + "/buch-tippspiel", "--n
 PRINT lauf$(p)
 PRINT JOIN$(READLINES("buch-tippspiel/buch/toc_pages.json"), CHR$(10))
 --- argumente
-{sammlung}/../../tools/buch_bauen.dh
+{sammlung}/../../../tools/buch_bauen.dh
 --- erwartet
 [de] Inhaltsverzeichnis-Seiten gemessen: 3 / 4 -- Buch hat 5 Seiten
 stderr: WARN: keine Seite gefunden fuer: Fehlt
@@ -123,7 +123,7 @@ DIM a AS IMAGE : a = LOADIMAGE("buch-einstieg/buch/images/a_klein.png")
 PRINT "groesse "; IMAGEWIDTH(a); "x"; IMAGEHEIGHT(a)
 PRINT "links "; COLOR_HEX$(GETPIXEL(a, 100, 100)); " rechts "; COLOR_HEX$(GETPIXEL(a, 1400, 500))
 --- argumente
-{sammlung}/../../tools/buch_bauen.dh
+{sammlung}/../../../tools/buch_bauen.dh
 --- erwartet
 vorher a breite 100 farbart 6
 vorher b breite 1600 farbart 2

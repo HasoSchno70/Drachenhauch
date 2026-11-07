@@ -38,7 +38,7 @@ END SUB
 FUNCTION prJa$(b AS BOOLEAN) AS STRING
     RETURN IIF(b, "ja", "nein")
 END FUNCTION
---- programm ../../examples/190_tracker.dh nach SETFPS(60)
+--- programm ../../../examples/190_tracker.dh nach SETFPS(60)
 --- einschub nach FLIP()
 IF bildNr = 2 THEN
     DIM n AS INTEGER : n = GUI_WINDOW_WIDGET_COUNT(win)
@@ -104,7 +104,7 @@ END SUB
 FUNCTION prJa$(b AS BOOLEAN) AS STRING
     RETURN IIF(b, "ja", "nein")
 END FUNCTION
---- programm ../../examples/190_tracker.dh nach SETFPS(60)
+--- programm ../../../examples/190_tracker.dh nach SETFPS(60)
 --- einschub nach FLIP()
 prSchreib("n00 " + STR$(note[patAkt, 0, 0]) + " n01 " + STR$(note[patAkt, 0, 1]) + " curR " + STR$(curR) + " dirty " + prJa$(dirty))
 
@@ -144,7 +144,7 @@ END SUB
 FUNCTION prJa$(b AS BOOLEAN) AS STRING
     RETURN IIF(b, "ja", "nein")
 END FUNCTION
---- programm ../../examples/190_tracker.dh nach SETFPS(60)
+--- programm ../../../examples/190_tracker.dh nach SETFPS(60)
 --- einschub nach FLIP()
 prSchreib("n01 " + STR$(note[patAkt, 0, 1]) + " n00 " + STR$(note[patAkt, 0, 0]))
 
@@ -191,7 +191,7 @@ END SUB
 FUNCTION prJa$(b AS BOOLEAN) AS STRING
     RETURN IIF(b, "ja", "nein")
 END FUNCTION
---- programm ../../examples/190_tracker.dh nach SETFPS(60)
+--- programm ../../../examples/190_tracker.dh nach SETFPS(60)
 --- einschub nach FLIP()
 IF bildNr = 3 THEN
     DIM x AS INTEGER : x = GUI_CANVAS_X(gitter) + RH_W + 1 * CELL_W + CELL_W \ 2
@@ -236,7 +236,7 @@ END SUB
 FUNCTION prJa$(b AS BOOLEAN) AS STRING
     RETURN IIF(b, "ja", "nein")
 END FUNCTION
---- programm ../../examples/190_tracker.dh nach SETFPS(60)
+--- programm ../../../examples/190_tracker.dh nach SETFPS(60)
 --- einschub nach FLIP()
 prSchreib("uPos " + STR$(uPos) + " uAnz " + STR$(uAnz))
 
@@ -268,7 +268,7 @@ END SUB
 FUNCTION prJa$(b AS BOOLEAN) AS STRING
     RETURN IIF(b, "ja", "nein")
 END FUNCTION
---- programm ../../examples/190_tracker.dh nach SETFPS(60)
+--- programm ../../../examples/190_tracker.dh nach SETFPS(60)
 --- einschub nach FLIP()
 IF note[patAkt, 0, 0] = 60 AND note[patAkt, 0, 1] = -2 AND uAnz = 3 THEN prEinmal("zwischen", "uPos " + STR$(uPos))
 prSchreib("n00 " + STR$(note[patAkt, 0, 0]) + " n01 " + STR$(note[patAkt, 0, 1]) + " uPos " + STR$(uPos))
@@ -324,7 +324,7 @@ END SUB
 FUNCTION prJa$(b AS BOOLEAN) AS STRING
     RETURN IIF(b, "ja", "nein")
 END FUNCTION
---- programm ../../examples/190_tracker.dh nach SETFPS(60)
+--- programm ../../../examples/190_tracker.dh nach SETFPS(60)
 --- einschub nach FLIP()
 prSchreib("curC " + STR$(curC) + " curR " + STR$(curR))
 
@@ -374,7 +374,7 @@ END SUB
 FUNCTION prJa$(b AS BOOLEAN) AS STRING
     RETURN IIF(b, "ja", "nein")
 END FUNCTION
---- programm ../../examples/190_tracker.dh nach SETFPS(60)
+--- programm ../../../examples/190_tracker.dh nach SETFPS(60)
 --- einschub nach FLIP()
 IF bildNr = 3 THEN
     CLIPBOARD_SET("Refrain")
@@ -428,7 +428,7 @@ END SUB
 FUNCTION prJa$(b AS BOOLEAN) AS STRING
     RETURN IIF(b, "ja", "nein")
 END FUNCTION
---- programm ../../examples/190_tracker.dh nach SETFPS(60)
+--- programm ../../../examples/190_tracker.dh nach SETFPS(60)
 --- einschub nach FLIP()
 IF bildNr = 3 THEN
     patternNeu(FALSE)
@@ -475,7 +475,7 @@ END SUB
 FUNCTION prJa$(b AS BOOLEAN) AS STRING
     RETURN IIF(b, "ja", "nein")
 END FUNCTION
---- programm ../../examples/190_tracker.dh nach SETFPS(60)
+--- programm ../../../examples/190_tracker.dh nach SETFPS(60)
 --- einschub nach FLIP()
 IF selAn AND curR = 1 THEN prMerke("auswahl gesehen")
 prSchreib("n10 " + STR$(note[patAkt, 1, 0]) + " n11 " + STR$(note[patAkt, 1, 1]) + " n00 " + STR$(note[patAkt, 0, 0]) + " n01 " + STR$(note[patAkt, 0, 1]))
@@ -545,7 +545,7 @@ END SUB
 FUNCTION prJa$(b AS BOOLEAN) AS STRING
     RETURN IIF(b, "ja", "nein")
 END FUNCTION
---- programm ../../examples/190_tracker.dh nach SETFPS(60)
+--- programm ../../../examples/190_tracker.dh nach SETFPS(60)
 --- einschub nach FLIP()
 prSchreib("n00 " + STR$(note[patAkt, 0, 0]))
 
@@ -627,7 +627,7 @@ END SUB
 FUNCTION prJa$(b AS BOOLEAN) AS STRING
     RETURN IIF(b, "ja", "nein")
 END FUNCTION
---- programm ../../examples/190_tracker.dh nach SETFPS(60)
+--- programm ../../../examples/190_tracker.dh nach SETFPS(60)
 --- einschub nach FLIP()
 prSchreib("")
 
@@ -701,7 +701,7 @@ END SUB
 FUNCTION prJa$(b AS BOOLEAN) AS STRING
     RETURN IIF(b, "ja", "nein")
 END FUNCTION
---- programm ../../examples/190_tracker.dh nach SETFPS(60)
+--- programm ../../../examples/190_tracker.dh nach SETFPS(60)
 --- einschub nach FLIP()
 prSchreib(STR$(kanaele) + " " + STR$(bpm) + " " + STR$(patAnz) + " " + STR$(orderAnz) + " | " + STR$(note[patAkt, 0, 0]) + " " + STR$(vol[patAkt, 0, 0]) + " " + STR$(slide[patAkt, 0, 0]) + " " + STR$(fx[patAkt, 0, 0]) + " " + STR$(fxp[patAkt, 0, 0]) + " " + STR$(inst[patAkt, 0, 0]) + " | " + STR$(instAnz))
 
@@ -739,7 +739,7 @@ END SUB
 FUNCTION prJa$(b AS BOOLEAN) AS STRING
     RETURN IIF(b, "ja", "nein")
 END FUNCTION
---- programm ../../examples/190_tracker.dh nach SETFPS(60)
+--- programm ../../../examples/190_tracker.dh nach SETFPS(60)
 --- einschub nach FLIP()
 prSchreib("")
 
@@ -796,7 +796,7 @@ END SUB
 FUNCTION prJa$(b AS BOOLEAN) AS STRING
     RETURN IIF(b, "ja", "nein")
 END FUNCTION
---- programm ../../examples/190_tracker.dh nach SETFPS(60)
+--- programm ../../../examples/190_tracker.dh nach SETFPS(60)
 --- einschub nach FLIP()
 prSchreib("")
 
@@ -839,7 +839,7 @@ END SUB
 FUNCTION prJa$(b AS BOOLEAN) AS STRING
     RETURN IIF(b, "ja", "nein")
 END FUNCTION
---- programm ../../examples/190_tracker.dh nach SETFPS(60)
+--- programm ../../../examples/190_tracker.dh nach SETFPS(60)
 --- einschub nach FLIP()
 prSchreib("")
 
@@ -898,7 +898,7 @@ END SUB
 FUNCTION prJa$(b AS BOOLEAN) AS STRING
     RETURN IIF(b, "ja", "nein")
 END FUNCTION
---- programm ../../examples/190_tracker.dh nach SETFPS(60)
+--- programm ../../../examples/190_tracker.dh nach SETFPS(60)
 --- einschub nach FLIP()
 prSchreib("")
 
@@ -968,7 +968,7 @@ END SUB
 FUNCTION prJa$(b AS BOOLEAN) AS STRING
     RETURN IIF(b, "ja", "nein")
 END FUNCTION
---- programm ../../examples/190_tracker.dh nach SETFPS(60)
+--- programm ../../../examples/190_tracker.dh nach SETFPS(60)
 --- einschub nach FLIP()
 IF bildNr > 10 AND bildNr < 110 THEN
     IF NOT spielt THEN prMerke("stand zwischendurch still")
@@ -1015,7 +1015,7 @@ END SUB
 FUNCTION prJa$(b AS BOOLEAN) AS STRING
     RETURN IIF(b, "ja", "nein")
 END FUNCTION
---- programm ../../examples/190_tracker.dh nach SETFPS(60)
+--- programm ../../../examples/190_tracker.dh nach SETFPS(60)
 --- einschub nach FLIP()
 IF bildNr > 10 THEN prMerke("pattern " + STR$(patAkt))
 prSchreib("")
@@ -1041,7 +1041,7 @@ DHRT_FRAMES=120
 ' Jetzt kommen sie Byte fuer Byte wieder heraus; die Anzeige nennt ihre Art,
 ' der Name in der Datei nicht.
 SET_WINDOW_POS(-3000, -3000)
---- programm ../../examples/190_tracker.dh nach SETFPS(60)
+--- programm ../../../examples/190_tracker.dh nach SETFPS(60)
 --- einschub nach bildNr = bildNr + 1
 IF bildNr = 3 THEN ladeDatei("qt.json")
 IF bildNr = 4 THEN WRITEALL("anzeige.txt", instName$(0) + CHR$(10) + instName$(1) + CHR$(10) + instName$(2) + CHR$(10))
@@ -1081,7 +1081,7 @@ Harfe-Keymap [keymap]
 ' Rechteck -- es traegt keine Wellenform, und "square" ist die Vorgabe. In der
 ' WAV ist Reihe 0 still, Reihe 8 (1000 ms) klingt, und die Anzeige sagt es.
 SET_WINDOW_POS(-3000, -3000)
---- programm ../../examples/190_tracker.dh nach SETFPS(60)
+--- programm ../../../examples/190_tracker.dh nach SETFPS(60)
 --- einschub nach bildNr = bildNr + 1
 IF bildNr = 3 THEN
     ladeDatei("qt.json")
@@ -1195,7 +1195,7 @@ DIM ord AS JSON_HANDLE : ord = JSON_NEW_ARRAY()
 JSON_APPEND_INT(ord, "", 0)
 JSON_SET_JSON(h, "order", ord)
 WRITEALL("_programm/lied.json", JSON_STRINGIFY(h))
---- programm ../../examples/190_tracker.dh nach SETFPS(60)
+--- programm ../../../examples/190_tracker.dh nach SETFPS(60)
 --- einschub nach bildNr = bildNr + 1
 IF bildNr = 3 THEN
     ladeDatei("lied.json")
@@ -1256,7 +1256,7 @@ Zonen [keymap]
 ' Sample. Dann das Sample kopieren: die Kopie ist ebenfalls eines, mit denselben
 ' Samples -- sonst waere Kopieren der neue Weg, Daten zu verlieren.
 SET_WINDOW_POS(-3000, -3000)
---- programm ../../examples/190_tracker.dh nach SETFPS(60)
+--- programm ../../../examples/190_tracker.dh nach SETFPS(60)
 --- einschub nach bildNr = bildNr + 1
 IF bildNr = 3 THEN ladeDatei("qt.json")
 IF bildNr = 4 THEN curC = 1 : instrumentEntfernen()

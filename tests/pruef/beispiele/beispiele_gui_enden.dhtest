@@ -71,7 +71,7 @@ FOR i = 0 TO LEN(namen) - 1
     PRINT namen[i]; " endet"
 NEXT
 --- argumente
-{sammlung}/../../examples
+{sammlung}/../../../examples
 --- erwartet
 155_gui_glas endet
 156_gui_alle_widgets endet

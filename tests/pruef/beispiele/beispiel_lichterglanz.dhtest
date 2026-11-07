@@ -11,9 +11,9 @@
 --- langsam
 
 === die musik ist stereo und hat ihre form
---- programm ../../examples/lichterglanz/main.dh
+--- programm ../../../examples/lichterglanz/main.dh
 --- ersetzen IMPORT "musik.dh"
-IMPORT "{sammlung}/../../examples/lichterglanz/musik.dh"
+IMPORT "{sammlung}/../../../examples/lichterglanz/musik.dh"
 --- argumente
 --wav
 {fall}/lichterglanz.wav
@@ -31,11 +31,11 @@ pegel 199000 200000 > 0.02
 pegel 232000 235000 < 0.03
 
 === adventskranz mit der ersten kerze
---- programm ../../examples/lichterglanz/main.dh
+--- programm ../../../examples/lichterglanz/main.dh
 --- ersetzen IMPORT "musik.dh"
-IMPORT "{sammlung}/../../examples/lichterglanz/musik.dh"
+IMPORT "{sammlung}/../../../examples/lichterglanz/musik.dh"
 --- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
-    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/lichterglanz/assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../../examples/lichterglanz/assets/shader/" + name + ".fs")
 --- argumente
 --fenster
 --ab
@@ -65,11 +65,11 @@ IMPORT "pruefen.dh"
 nicht schwarz TRUE, nicht weiss TRUE
 
 === das dorf im schnee
---- programm ../../examples/lichterglanz/main.dh
+--- programm ../../../examples/lichterglanz/main.dh
 --- ersetzen IMPORT "musik.dh"
-IMPORT "{sammlung}/../../examples/lichterglanz/musik.dh"
+IMPORT "{sammlung}/../../../examples/lichterglanz/musik.dh"
 --- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
-    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/lichterglanz/assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../../examples/lichterglanz/assets/shader/" + name + ".fs")
 --- argumente
 --fenster
 --ab
@@ -99,11 +99,11 @@ IMPORT "pruefen.dh"
 nicht schwarz TRUE, nicht weiss TRUE
 
 === der weihnachtsmarkt
---- programm ../../examples/lichterglanz/main.dh
+--- programm ../../../examples/lichterglanz/main.dh
 --- ersetzen IMPORT "musik.dh"
-IMPORT "{sammlung}/../../examples/lichterglanz/musik.dh"
+IMPORT "{sammlung}/../../../examples/lichterglanz/musik.dh"
 --- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
-    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/lichterglanz/assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../../examples/lichterglanz/assets/shader/" + name + ".fs")
 --- argumente
 --fenster
 --ab
@@ -133,11 +133,11 @@ IMPORT "pruefen.dh"
 nicht schwarz TRUE, nicht weiss TRUE
 
 === der winterwald
---- programm ../../examples/lichterglanz/main.dh
+--- programm ../../../examples/lichterglanz/main.dh
 --- ersetzen IMPORT "musik.dh"
-IMPORT "{sammlung}/../../examples/lichterglanz/musik.dh"
+IMPORT "{sammlung}/../../../examples/lichterglanz/musik.dh"
 --- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
-    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/lichterglanz/assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../../examples/lichterglanz/assets/shader/" + name + ".fs")
 --- argumente
 --fenster
 --ab
@@ -167,11 +167,11 @@ IMPORT "pruefen.dh"
 nicht schwarz TRUE, nicht weiss TRUE
 
 === eisblumen auf dem see
---- programm ../../examples/lichterglanz/main.dh
+--- programm ../../../examples/lichterglanz/main.dh
 --- ersetzen IMPORT "musik.dh"
-IMPORT "{sammlung}/../../examples/lichterglanz/musik.dh"
+IMPORT "{sammlung}/../../../examples/lichterglanz/musik.dh"
 --- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
-    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/lichterglanz/assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../../examples/lichterglanz/assets/shader/" + name + ".fs")
 --- argumente
 --fenster
 --ab
@@ -201,11 +201,11 @@ IMPORT "pruefen.dh"
 nicht schwarz TRUE, nicht weiss TRUE
 
 === der schlittenflug
---- programm ../../examples/lichterglanz/main.dh
+--- programm ../../../examples/lichterglanz/main.dh
 --- ersetzen IMPORT "musik.dh"
-IMPORT "{sammlung}/../../examples/lichterglanz/musik.dh"
+IMPORT "{sammlung}/../../../examples/lichterglanz/musik.dh"
 --- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
-    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/lichterglanz/assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../../examples/lichterglanz/assets/shader/" + name + ".fs")
 --- argumente
 --fenster
 --ab
@@ -235,11 +235,11 @@ IMPORT "pruefen.dh"
 nicht schwarz TRUE, nicht weiss TRUE
 
 === die stube am heiligabend
---- programm ../../examples/lichterglanz/main.dh
+--- programm ../../../examples/lichterglanz/main.dh
 --- ersetzen IMPORT "musik.dh"
-IMPORT "{sammlung}/../../examples/lichterglanz/musik.dh"
+IMPORT "{sammlung}/../../../examples/lichterglanz/musik.dh"
 --- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
-    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/lichterglanz/assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../../examples/lichterglanz/assets/shader/" + name + ".fs")
 --- argumente
 --fenster
 --ab
@@ -269,11 +269,11 @@ IMPORT "pruefen.dh"
 nicht schwarz TRUE, nicht weiss TRUE
 
 === der stern geht auf
---- programm ../../examples/lichterglanz/main.dh
+--- programm ../../../examples/lichterglanz/main.dh
 --- ersetzen IMPORT "musik.dh"
-IMPORT "{sammlung}/../../examples/lichterglanz/musik.dh"
+IMPORT "{sammlung}/../../../examples/lichterglanz/musik.dh"
 --- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
-    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/lichterglanz/assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../../examples/lichterglanz/assets/shader/" + name + ".fs")
 --- argumente
 --fenster
 --ab
@@ -303,11 +303,11 @@ IMPORT "pruefen.dh"
 nicht schwarz TRUE, nicht weiss TRUE
 
 === abspann mit dem lichterschwarm
---- programm ../../examples/lichterglanz/main.dh
+--- programm ../../../examples/lichterglanz/main.dh
 --- ersetzen IMPORT "musik.dh"
-IMPORT "{sammlung}/../../examples/lichterglanz/musik.dh"
+IMPORT "{sammlung}/../../../examples/lichterglanz/musik.dh"
 --- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
-    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/lichterglanz/assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../../examples/lichterglanz/assets/shader/" + name + ".fs")
 --- argumente
 --fenster
 --ab
@@ -350,7 +350,7 @@ PRINT FORMAT$(tonBei(AB_STUBE * 16), "%.2f"); " "; FORMAT$(tonHoehe, "%.2f")
 ' zwei Strophen enden genau um Mitternacht
 PRINT AB_STUBE * 16 + 2 * SN_STROPHE = AB_MITTERNACHT * 16
 --- datei musik_hier.dh
-IMPORT "{sammlung}/../../examples/lichterglanz/musik.dh"
+IMPORT "{sammlung}/../../../examples/lichterglanz/musik.dh"
 --- erwartet
 46 144 144
 0 1 47 92
@@ -366,7 +366,7 @@ FOR s = 0 TO 15
 NEXT
 PRINT
 --- datei musik_hier.dh
-IMPORT "{sammlung}/../../examples/lichterglanz/musik.dh"
+IMPORT "{sammlung}/../../../examples/lichterglanz/musik.dh"
 --- erwartet
 70 0 69 70 67 0 70 0 69 70 67 0 70 0 69 70 
 
@@ -379,7 +379,7 @@ PRINT akkordNr(8); " "; akkordNr(26); " "; akkordNr(70); " "; akkordNr(78); " ";
 PRINT akkTon(0, 0); " "; akkTon(8, 0); " "; versatzBei(69); " "; versatzBei(70); " "; versatzBei(78)
 PRINT treibt(10); " "; treibt(16); " "; treibt(30); " "; treibt(50); " "; treibt(65); " "; treibt(80)
 --- datei musik_hier.dh
-IMPORT "{sammlung}/../../examples/lichterglanz/musik.dh"
+IMPORT "{sammlung}/../../../examples/lichterglanz/musik.dh"
 --- erwartet
 4 16 11 24 16
 55 57 0 2 0
@@ -388,11 +388,11 @@ FALSE TRUE TRUE FALSE TRUE FALSE
 === der schnee bleibt liegen
 ' Ab Takt 12 im Dorf, gut 15 Sekunden: am unteren Rand waechst eine Decke,
 ' und die nahen Flocken sind Kristalle (sechs Arme mit Seitenaesten)
---- programm ../../examples/lichterglanz/main.dh
+--- programm ../../../examples/lichterglanz/main.dh
 --- ersetzen IMPORT "musik.dh"
-IMPORT "{sammlung}/../../examples/lichterglanz/musik.dh"
+IMPORT "{sammlung}/../../../examples/lichterglanz/musik.dh"
 --- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
-    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../examples/lichterglanz/assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../../examples/lichterglanz/assets/shader/" + name + ".fs")
 --- ersetzen musikStoppen()
 musikStoppen()
 DIM pruefMax AS FLOAT
@@ -442,7 +442,7 @@ PRINT "alle eintraege gebaut "; bauPos = LEN(bauKey)
 PRINT "hoechstens 150 zugleich "; spitze <= 150
 EPRINT("zugleich hoechstens " + STR$(spitze))
 --- datei helfer.dh
-IMPORT "{sammlung}/../../examples/lichterglanz/musik.dh"
+IMPORT "{sammlung}/../../../examples/lichterglanz/musik.dh"
 --- erwartet
 vor dem start wenige TRUE
 nichts erst beim einsatz gebaut TRUE
@@ -456,6 +456,6 @@ WHILE vorbauen()
 WEND
 PRINT "alles gebaut "; bauPos = LEN(bauKey); ", mehr als 250 klaenge "; AUDIO_SOUND_COUNT() > 250
 --- datei helfer.dh
-IMPORT "{sammlung}/../../examples/lichterglanz/musik.dh"
+IMPORT "{sammlung}/../../../examples/lichterglanz/musik.dh"
 --- erwartet
 alles gebaut TRUE, mehr als 250 klaenge TRUE

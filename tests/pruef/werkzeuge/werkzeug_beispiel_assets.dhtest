@@ -28,8 +28,8 @@ DIM neu AS BUFFER : neu = READALL_BYTES("demo.mod")
 DIM alt AS BUFFER : alt = READALL_BYTES(ARG$(1))
 PRINT BUFFER_LEN(neu) = BUFFER_LEN(alt) AND BUFFER_TO_HEX$(neu) = BUFFER_TO_HEX$(alt)
 --- argumente
-{sammlung}/../../examples/assets/make_demo_mod.dh
-{sammlung}/../../examples/assets/demo.mod
+{sammlung}/../../../examples/assets/make_demo_mod.dh
+{sammlung}/../../../examples/assets/demo.mod
 --- erwartet
 demo.mod geschrieben: 3876 Bytes, 2 Patterns, Order [0, 1, 0, 1]
 rueckgabe 0
@@ -62,8 +62,8 @@ DIM neu AS BUFFER : neu = READALL_BYTES("pluck.wav")
 DIM alt AS BUFFER : alt = READALL_BYTES(ARG$(1))
 PRINT BUFFER_LEN(neu) = BUFFER_LEN(alt) AND BUFFER_TO_HEX$(neu) = BUFFER_TO_HEX$(alt)
 --- argumente
-{sammlung}/../../examples/assets/make_pluck_sample.dh
-{sammlung}/../../examples/assets/pluck.wav
+{sammlung}/../../../examples/assets/make_pluck_sample.dh
+{sammlung}/../../../examples/assets/pluck.wav
 --- erwartet
 pluck.wav: 11025 Frames @ 22050 Hz, Grundton 220.0 Hz
 rueckgabe 0

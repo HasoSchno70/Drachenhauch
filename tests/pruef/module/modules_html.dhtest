@@ -163,7 +163,7 @@ PRINT HTTP_STATUS()
 PRINT HTTP_HEADER("X-Demo")
 PROCESS_KILL(VAL(srv[1]))
 --- argumente
-{sammlung}/_hilfen/gegenserver.dh
+{sammlung}/../_hilfen/gegenserver.dh
 --- erwartet
 Hello world
 200
@@ -199,7 +199,7 @@ CATCH e
 END TRY
 PROCESS_KILL(VAL(srv[1]))
 --- argumente
-{sammlung}/_hilfen/gegenserver.dh
+{sammlung}/../_hilfen/gegenserver.dh
 --- enthaelt
 fehler: HTTP 404
 
@@ -229,7 +229,7 @@ DIM basis AS STRING : basis = srv[0]
 PRINT HTTP_POST(basis + "/echo", "name=Anna&age=30")
 PROCESS_KILL(VAL(srv[1]))
 --- argumente
-{sammlung}/_hilfen/gegenserver.dh
+{sammlung}/../_hilfen/gegenserver.dh
 --- erwartet
 echo: name=Anna&age=30
 
@@ -260,7 +260,7 @@ PRINT HTTP_DOWNLOAD(basis + "/file", "dl.bin")
 PRINT BUFFER_TO_HEX$(READALL_BYTES("dl.bin"))
 PROCESS_KILL(VAL(srv[1]))
 --- argumente
-{sammlung}/_hilfen/gegenserver.dh
+{sammlung}/../_hilfen/gegenserver.dh
 --- erwartet
 7
 00010274657374
@@ -295,7 +295,7 @@ CATCH e
 END TRY
 PROCESS_KILL(VAL(srv[1]))
 --- argumente
-{sammlung}/_hilfen/gegenserver.dh
+{sammlung}/../_hilfen/gegenserver.dh
 --- enthaelt
 fehler: HTTP-Fehler beim Lesen des Response-Body
 
@@ -330,7 +330,7 @@ END TRY
 PRINT "datei da "; FILEEXISTS("dl.bin")
 PROCESS_KILL(VAL(srv[1]))
 --- argumente
-{sammlung}/_hilfen/gegenserver.dh
+{sammlung}/../_hilfen/gegenserver.dh
 --- enthaelt
 fehler: HTTP_DOWNLOAD: Verbindung beim Lesen abgebrochen
 datei da FALSE
@@ -369,7 +369,7 @@ PRINT HTTP_HEADER("X-Demo")
 PRINT runden > 100
 PROCESS_KILL(VAL(srv[1]))
 --- argumente
-{sammlung}/_hilfen/gegenserver.dh
+{sammlung}/../_hilfen/gegenserver.dh
 --- erwartet
 spaet aber da
 200
@@ -408,7 +408,7 @@ PRINT HTTP_READY(h)
 PRINT HTTP_RESULT(h)
 PROCESS_KILL(VAL(srv[1]))
 --- argumente
-{sammlung}/_hilfen/gegenserver.dh
+{sammlung}/../_hilfen/gegenserver.dh
 --- erwartet
 TRUE
 TRUE
@@ -451,7 +451,7 @@ PRINT MILLIS() - t0 < 550
 PRINT HTTP_PENDING()
 PROCESS_KILL(VAL(srv[1]))
 --- argumente
-{sammlung}/_hilfen/gegenserver.dh
+{sammlung}/../_hilfen/gegenserver.dh
 --- enthaelt
 2
 a: spaet aber da
@@ -490,7 +490,7 @@ CATCH e
 END TRY
 PROCESS_KILL(VAL(srv[1]))
 --- argumente
-{sammlung}/_hilfen/gegenserver.dh
+{sammlung}/../_hilfen/gegenserver.dh
 --- erwartet
 fehler: HTTP_RESULT: Abruf 0 ist nicht fertig (oder schon abgeholt) -- erst HTTP_READY(0) abfragen
 
@@ -526,7 +526,7 @@ HTTP_CANCEL(h)
 PRINT "ende"
 PROCESS_KILL(VAL(srv[1]))
 --- argumente
-{sammlung}/_hilfen/gegenserver.dh
+{sammlung}/../_hilfen/gegenserver.dh
 --- erwartet
 TRUE
 0
@@ -566,7 +566,7 @@ PRINT a <> b
 HTTP_CANCEL(b)
 PROCESS_KILL(VAL(srv[1]))
 --- argumente
-{sammlung}/_hilfen/gegenserver.dh
+{sammlung}/../_hilfen/gegenserver.dh
 --- erwartet
 TRUE
 
@@ -604,6 +604,6 @@ CATCH e
 END TRY
 PROCESS_KILL(VAL(srv[1]))
 --- argumente
-{sammlung}/_hilfen/gegenserver.dh
+{sammlung}/../_hilfen/gegenserver.dh
 --- enthaelt
 fehler: HTTP 404

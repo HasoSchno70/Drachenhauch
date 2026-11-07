@@ -114,7 +114,7 @@ tile count: only with it can the next GID be computed.
 **What gets written is real Tiled JSON** — embedded tilesets, `type: "map"`,
 tile data as a list of numbers. This is verified not against its own reader, but
 against a **foreign** one: the json module, which reads the file by the rules of the
-Tiled format (`tests/pruef/tiled_schreiben.dhtest`; until 2026-09-14 it was
+Tiled format (`tests/pruef/module/tiled_schreiben.dhtest`; until 2026-09-14 it was
 the data model of the since-deleted Qt editor `dhtilemap`). A format that only its
 own writer can read back is not verified, merely self-consistent.
 

@@ -16,9 +16,9 @@
 IMPORT "helfer.dh"
 kapitelLauf(ARG$(0), "kap01/fenster.dh", 30)
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/buchlauf.dh"
+IMPORT "{sammlung}/../_hilfen/buchlauf.dh"
 --- erwartet
 rueckgabe 0
 ohne laufzeitfehler TRUE
@@ -29,9 +29,9 @@ ohne warnung TRUE
 IMPORT "helfer.dh"
 kapitelLauf(ARG$(0), "kap02/daten.dh", 0)
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/buchlauf.dh"
+IMPORT "{sammlung}/../_hilfen/buchlauf.dh"
 --- erwartet
 rueckgabe 0
 ohne laufzeitfehler TRUE
@@ -42,9 +42,9 @@ ohne warnung TRUE
 IMPORT "helfer.dh"
 kapitelLauf(ARG$(0), "kap03/regel.dh", 0)
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/buchlauf.dh"
+IMPORT "{sammlung}/../_hilfen/buchlauf.dh"
 --- erwartet
 rueckgabe 0
 ohne laufzeitfehler TRUE
@@ -55,9 +55,9 @@ ohne warnung TRUE
 IMPORT "helfer.dh"
 kapitelLauf(ARG$(0), "kap04/spielplan.dh", 30)
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/buchlauf.dh"
+IMPORT "{sammlung}/../_hilfen/buchlauf.dh"
 --- erwartet
 rueckgabe 0
 ohne laufzeitfehler TRUE
@@ -68,9 +68,9 @@ ohne warnung TRUE
 IMPORT "helfer.dh"
 kapitelLauf(ARG$(0), "kap05/tipps.dh", 30)
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/buchlauf.dh"
+IMPORT "{sammlung}/../_hilfen/buchlauf.dh"
 --- erwartet
 rueckgabe 0
 ohne laufzeitfehler TRUE
@@ -81,9 +81,9 @@ ohne warnung TRUE
 IMPORT "helfer.dh"
 kapitelLauf(ARG$(0), "kap06/punkte.dh", 30)
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/buchlauf.dh"
+IMPORT "{sammlung}/../_hilfen/buchlauf.dh"
 --- erwartet
 rueckgabe 0
 ohne laufzeitfehler TRUE
@@ -94,9 +94,9 @@ ohne warnung TRUE
 IMPORT "helfer.dh"
 kapitelLauf(ARG$(0), "kap07/rangliste.dh", 30)
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/buchlauf.dh"
+IMPORT "{sammlung}/../_hilfen/buchlauf.dh"
 --- erwartet
 rueckgabe 0
 ohne laufzeitfehler TRUE
@@ -107,9 +107,9 @@ ohne warnung TRUE
 IMPORT "helfer.dh"
 kapitelLauf(ARG$(0), "kap08/zeit.dh", 30)
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/buchlauf.dh"
+IMPORT "{sammlung}/../_hilfen/buchlauf.dh"
 --- erwartet
 rueckgabe 0
 ohne laufzeitfehler TRUE
@@ -120,9 +120,9 @@ ohne warnung TRUE
 IMPORT "helfer.dh"
 kapitelLauf(ARG$(0), "kap09/netz.dh", 30)
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/buchlauf.dh"
+IMPORT "{sammlung}/../_hilfen/buchlauf.dh"
 --- erwartet
 rueckgabe 0
 ohne laufzeitfehler TRUE
@@ -133,9 +133,9 @@ ohne warnung TRUE
 IMPORT "helfer.dh"
 kapitelLauf(ARG$(0), "kap10/robust.dh", 30)
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/buchlauf.dh"
+IMPORT "{sammlung}/../_hilfen/buchlauf.dh"
 --- erwartet
 rueckgabe 0
 ohne laufzeitfehler TRUE
@@ -146,9 +146,9 @@ ohne warnung TRUE
 IMPORT "helfer.dh"
 kapitelLauf(ARG$(0), "kap11/sicherung.dh", 30)
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/buchlauf.dh"
+IMPORT "{sammlung}/../_hilfen/buchlauf.dh"
 --- erwartet
 rueckgabe 0
 ohne laufzeitfehler TRUE
@@ -159,9 +159,9 @@ ohne warnung TRUE
 IMPORT "helfer.dh"
 kapitelLauf(ARG$(0), "kap12/politur.dh", 30)
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/buchlauf.dh"
+IMPORT "{sammlung}/../_hilfen/buchlauf.dh"
 --- erwartet
 rueckgabe 0
 ohne laufzeitfehler TRUE
@@ -172,9 +172,9 @@ ohne warnung TRUE
 IMPORT "helfer.dh"
 kapitelLauf(ARG$(0), "kap13/weitergeben.dh", 0)
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/buchlauf.dh"
+IMPORT "{sammlung}/../_hilfen/buchlauf.dh"
 --- erwartet
 rueckgabe 0
 ohne laufzeitfehler TRUE
@@ -185,9 +185,9 @@ ohne warnung TRUE
 IMPORT "helfer.dh"
 kapitelLauf(ARG$(0), "tippspiel.dh", 30)
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/buchlauf.dh"
+IMPORT "{sammlung}/../_hilfen/buchlauf.dh"
 --- erwartet
 rueckgabe 0
 ohne laufzeitfehler TRUE
@@ -205,9 +205,9 @@ PRINT "alles gruen "; (INSTR(blAus, "ALLES GRUEN") >= 0)
 PRINT "rueckgabe "; blCode
 IF blCode <> 0 OR INSTR(blAus, "ALLES GRUEN") < 0 THEN PRINT blAus; blErr
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/buchlauf.dh"
+IMPORT "{sammlung}/../_hilfen/buchlauf.dh"
 --- erwartet
 alles gruen TRUE
 rueckgabe 0
@@ -223,9 +223,9 @@ PRINT "alles gruen "; (INSTR(blAus, "ALLES GRUEN") >= 0)
 PRINT "rueckgabe "; blCode
 IF blCode <> 0 OR INSTR(blAus, "ALLES GRUEN") < 0 THEN PRINT blAus; blErr
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/buchlauf.dh"
+IMPORT "{sammlung}/../_hilfen/buchlauf.dh"
 --- erwartet
 alles gruen TRUE
 rueckgabe 0
@@ -246,7 +246,7 @@ FOR i = 0 TO LEN(folge) - 1
 NEXT
 PRINT "geprueft "; LEN(folge)
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- erwartet
 geprueft 9
 
@@ -263,7 +263,7 @@ FOR nr = 1 TO 13
 NEXT
 PRINT "fehlend "; fehlt
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- erwartet
 fehlend 0
 
@@ -293,7 +293,7 @@ FOR i = 0 TO LEN(namen) - 1
 NEXT
 PRINT "bilder gefunden "; (zahl > 5)
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- erwartet
 skript da TRUE
 bilder gefunden TRUE
@@ -321,7 +321,7 @@ FOR nr = 1 TO 13
 NEXT
 PRINT "geprueft"
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- erwartet
 geprueft
 
@@ -351,9 +351,9 @@ PRINT "kein bild fehlt "; (INSTR(alles, "Bild fehlt") < 0)
 PRINT "docx da "; FILEEXISTS(fall + "/Drachenhauch-Tippspiel.docx")
 IF nlCode <> 0 THEN PRINT alles
 --- argumente
-{sammlung}/../..
+{sammlung}/../../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/nodelauf.dh"
+IMPORT "{sammlung}/../_hilfen/nodelauf.dh"
 --- erwartet
 rueckgabe 0
 geschrieben TRUE
@@ -366,7 +366,7 @@ docx da TRUE
 ' macOS-Rechner der CI brach es ab und liess den ganzen Lauf fallen. Jetzt
 ' sagt es "uebersprungen" und endet mit 0. Der Server wird dafuer auf einen
 ' Namen umgebogen, den es nicht gibt (.invalid, RFC 6761).
---- programm ../../buch-tippspiel/code/abruf_pruefung.dh
+--- programm ../../../buch-tippspiel/code/abruf_pruefung.dh
 --- ersetzen CONST URL AS STRING = "https://api.openligadb.de/getmatchdata/bl1/2026"
 CONST URL AS STRING = "https://api.openligadb.invalid/getmatchdata/bl1/2026"
 --- enthaelt
@@ -376,7 +376,7 @@ UEBERSPRUNGEN -- OpenLigaDB nicht erreichbar:
 ' Gegenprobe: nur ein Fehler VOM NETZ heisst uebersprungen. Ein falsch
 ' benutztes HTTP_RESULT (kein Abruf mit dieser Nummer) bricht weiter ab --
 ' sonst wuerde das TRY jeden echten Fehler unsichtbar machen.
---- programm ../../buch-tippspiel/code/abruf_pruefung.dh
+--- programm ../../../buch-tippspiel/code/abruf_pruefung.dh
 --- ersetzen DIM antwort AS STRING : antwort = HTTP_GET(URL)
 DIM antwort AS STRING : antwort = HTTP_RESULT(99)
 --- fehler

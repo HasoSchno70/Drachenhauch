@@ -247,7 +247,7 @@ DB_EXEC(c, "CREATE TABLE mitglied (id INTEGER PRIMARY KEY AUTOINCREMENT, name TE
 versionAblauf(c, fremd, "mitglied")
 gleichAblauf(c, "mitglied")
 --- datei hilfe.dh
-IMPORT "{sammlung}/_hilfen/formversion.dh"
+IMPORT "{sammlung}/../_hilfen/formversion.dh"
 --- erwartet
 angelegt TRUE stand 1
 gespeichert TRUE stand 2

@@ -46,7 +46,7 @@ schickt nur, wenn er der neueste ist.
   Blöcke und Kommentar-Doku aus dem Text, mit Kommentaren und Zeichenketten
   ausgeblendet; bewusst kein Lexer, weil ein Sprachserver halb getippten Text
   sieht.
-* Prüfstein: `tests/pruef/dhrt_lsp.dhtest` fährt den echten Prozess über stdio
+* Prüfstein: `tests/pruef/werkzeugkette/dhrt_lsp.dhtest` fährt den echten Prozess über stdio
   (Fähigkeiten, Diagnose, Definition, Hover, Vervollständigung, Fundstellen,
   Gliederung, kaputte Rahmung, sauberes Ende); dazu Rust-Tests in beiden
   Dateien.

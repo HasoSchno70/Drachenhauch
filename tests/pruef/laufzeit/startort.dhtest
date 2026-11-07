@@ -28,7 +28,7 @@ PRINT "start=" + STARTDIR$()
 --- datei daten/obst.txt
 apfel
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 lauf 0
 arg=daten/obst.txt
@@ -49,7 +49,7 @@ PRINT "pfad=" + ARGPATH$(0)
 --- datei daten/obst.txt
 apfel
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 lauf 0
 unveraendert TRUE
@@ -75,8 +75,8 @@ PRINT "start=" + STARTDIR$()
 --- datei daten/obst.txt
 apfel
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
-IMPORT "{sammlung}/_hilfen/exportlauf.dh"
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/exportlauf.dh"
 --- erwartet
 export 0
 da=TRUE

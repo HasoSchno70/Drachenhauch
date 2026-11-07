@@ -332,7 +332,7 @@ IF GlobalMemoryStatusEx(m) THEN PRINT "frei: "; m.frei \ 1048576; " MB"
 On Linux and macOS, `struct utsname` (for `uname`) has fields of fixed width,
 65 bytes on Linux and 256 on macOS -- the layout depends on the system there.
 You give the function the larger struct and afterwards read through the layout
-of the system (`tests/pruef/ffi_struct.dhtest` shows how).
+of the system (`tests/pruef/sprache/ffi_struct.dhtest` shows how).
 
 ### Arrays of structs and structs in classes
 
@@ -886,4 +886,4 @@ Cranelift -- the same library that also generates the machine code; it
 places the arguments according to the system's C calling convention. Design and
 decisions: [entwurf-ffi.md](../entwurf-ffi.md) (German), source code
 `rust/drachenhauch_runtime/src/ffi.rs`, tests
-`tests/pruef/ffi.dhtest`.
+`tests/pruef/sprache/ffi.dhtest`.

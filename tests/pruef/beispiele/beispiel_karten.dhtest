@@ -43,7 +43,7 @@ mkLat = [] : mkLon = [] : mkName = []
 sp2 = gpxLesen(g)
 PRINT LEN(mkName); " "; mkName[0]
 --- datei kern.dh
-IMPORT "{sammlung}/../../examples/karten/kern.dh"
+IMPORT "{sammlung}/../../../examples/karten/kern.dh"
 
 --- datei probe.gpx
 <?xml version="1.0" encoding="UTF-8"?>
@@ -163,11 +163,11 @@ SUB prProbe()
             EXIT(0)
     END SELECT
 END SUB
---- programm ../../examples/karten/main.dh nach SETFONT(schrift, 16)
+--- programm ../../../examples/karten/main.dh nach SETFONT(schrift, 16)
 --- ersetzen IMPORT "kern.dh"
-IMPORT "{sammlung}/../../examples/karten/kern.dh"
+IMPORT "{sammlung}/../../../examples/karten/kern.dh"
 --- ersetzen IMPORT "kacheln.dh"
-IMPORT "{sammlung}/../../examples/karten/kacheln.dh"
+IMPORT "{sammlung}/../../../examples/karten/kacheln.dh"
 --- einschub nach     kachelnPumpen()
     prProbe()
 --- argumente
@@ -176,7 +176,7 @@ IMPORT "{sammlung}/../../examples/karten/kacheln.dh"
 --ort
 52.5163,13.3777,10
 --- umgebung
-KARTEN_SERVER={sammlung}/_hilfen/gegenserver.dh
+KARTEN_SERVER={sammlung}/../_hilfen/gegenserver.dh
 --- erwartet
 netz: mitte stimmt TRUE, von der platte 0, fehler 0
 zwischenspeicher hat 10/550/335: TRUE
@@ -219,11 +219,11 @@ SUB prProbe()
         EXIT(0)
     END IF
 END SUB
---- programm ../../examples/karten/main.dh nach SETFONT(schrift, 16)
+--- programm ../../../examples/karten/main.dh nach SETFONT(schrift, 16)
 --- ersetzen IMPORT "kern.dh"
-IMPORT "{sammlung}/../../examples/karten/kern.dh"
+IMPORT "{sammlung}/../../../examples/karten/kern.dh"
 --- ersetzen IMPORT "kacheln.dh"
-IMPORT "{sammlung}/../../examples/karten/kacheln.dh"
+IMPORT "{sammlung}/../../../examples/karten/kacheln.dh"
 --- einschub nach     kachelnPumpen()
     prProbe()
 --- argumente
@@ -232,7 +232,7 @@ IMPORT "{sammlung}/../../examples/karten/kacheln.dh"
 --ort
 52.5163,13.3777,10
 --- umgebung
-KARTEN_SERVER={sammlung}/_hilfen/gegenserver.dh
+KARTEN_SERVER={sammlung}/../_hilfen/gegenserver.dh
 --- erwartet
 berlin laeuft: 4
 abgebrochen 4, aus dem netz 0, hoechstens zugleich 4, offen = laufend TRUE
@@ -277,19 +277,19 @@ SUB prProbe()
     WRITEALL("probe.txt", JOIN$(prAus, CHR$(10)) + CHR$(10))
     EXIT(0)
 END SUB
---- programm ../../examples/karten/main.dh nach SETFONT(schrift, 16)
+--- programm ../../../examples/karten/main.dh nach SETFONT(schrift, 16)
 --- ersetzen IMPORT "kern.dh"
-IMPORT "{sammlung}/../../examples/karten/kern.dh"
+IMPORT "{sammlung}/../../../examples/karten/kern.dh"
 --- ersetzen IMPORT "kacheln.dh"
-IMPORT "{sammlung}/../../examples/karten/kacheln.dh"
+IMPORT "{sammlung}/../../../examples/karten/kacheln.dh"
 --- einschub nach     kachelnPumpen()
     prProbe()
 --- argumente
-{sammlung}/../../examples/karten/teufelsberg.gpx
+{sammlung}/../../../examples/karten/teufelsberg.gpx
 --daten
 {fall}/daten
 --- datei leser.dh
-IMPORT "{sammlung}/_hilfen/pdftext.dh"
+IMPORT "{sammlung}/../_hilfen/pdftext.dh"
 --- nachher
 IMPORT "leser.dh"
 IMPORT "json"
@@ -358,11 +358,11 @@ SUB prProbe()
         EXIT(0)
     END IF
 END SUB
---- programm ../../examples/karten/main.dh nach SETFONT(schrift, 16)
+--- programm ../../../examples/karten/main.dh nach SETFONT(schrift, 16)
 --- ersetzen IMPORT "kern.dh"
-IMPORT "{sammlung}/../../examples/karten/kern.dh"
+IMPORT "{sammlung}/../../../examples/karten/kern.dh"
 --- ersetzen IMPORT "kacheln.dh"
-IMPORT "{sammlung}/../../examples/karten/kacheln.dh"
+IMPORT "{sammlung}/../../../examples/karten/kacheln.dh"
 --- einschub nach     kachelnPumpen()
     prProbe()
 --- argumente

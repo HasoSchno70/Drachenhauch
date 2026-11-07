@@ -10,7 +10,7 @@
 
 === ohne broker laeuft das dashboard weiter und sagt es
 DIM prBild AS INTEGER
---- programm ../../examples/werkstatt/main.dh nach DIM beenden AS BOOLEAN
+--- programm ../../../examples/werkstatt/main.dh nach DIM beenden AS BOOLEAN
 --- argumente
 127.0.0.1:1
 --- einschub nach FLIP()
@@ -30,7 +30,7 @@ DIM prBild AS INTEGER
 DIM prMeldung AS STRING
 GUI_SET_VALUE(slGrenze, 24)
 aufnahme(TRUE)
---- programm ../../examples/werkstatt/main.dh nach DIM beenden AS BOOLEAN
+--- programm ../../../examples/werkstatt/main.dh nach DIM beenden AS BOOLEAN
 --- argumente
 127.0.0.1:1
 --- ersetzen NOTIFY("Werkstatt", "Temperatur " + ZAHL$(temp, 1) + " °C über " + ZAHL$(grenze, 1) + " °C")
@@ -69,9 +69,9 @@ zeit;temperatur;feuchte;licht;strom
 ' der Fall, was das Dashboard gesendet hat. Danach stirbt der Broker: bis
 ' 2026.30 warf MQTT_UPDATE dann (10054), und das Dashboard endete.
 DIM prBild AS INTEGER
---- programm ../../examples/werkstatt/main.dh nach DIM beenden AS BOOLEAN
+--- programm ../../../examples/werkstatt/main.dh nach DIM beenden AS BOOLEAN
 --- argumente
-{sammlung}/_hilfen/mqttbroker.dh
+{sammlung}/../_hilfen/mqttbroker.dh
 --- einschub nach SETFPS(60)
 ' Den Test-Broker starten und das Dashboard auf ihn zeigen lassen.
 DIM prGesendet AS STRING
@@ -134,9 +134,9 @@ PRINT "flags "; MID$(hex, 18, 2)
 PRINT "wille "; INSTR(hex, "0010776572" + "6B73746174742F737461747573" + "00076F66666C696E65") > 0
 IF PROCESS_RUNNING(b) THEN PROCESS_KILL(b)
 --- argumente
-{sammlung}/_hilfen/mqttbroker.dh
+{sammlung}/../_hilfen/mqttbroker.dh
 --- datei sensor.dh
-IMPORT "{sammlung}/../../examples/werkstatt/sensor.dh"
+IMPORT "{sammlung}/../../../examples/werkstatt/sensor.dh"
 --- erwartet
 flags 26
 wille TRUE
