@@ -33,12 +33,12 @@ CLASS Schiff
     DIM vy AS FLOAT
     DIM winkel AS FLOAT
     DIM leben AS INTEGER
-    DIM nachladen AS FLOAT
+    DIM ladezeit AS FLOAT
     DIM schild AS FLOAT         ' Sekunden unverwundbar nach einem Treffer
 
     SUB setzen(px AS FLOAT, py AS FLOAT, w AS FLOAT)
         Self.x = px : Self.y = py : Self.vx = 0 : Self.vy = 0
-        Self.winkel = w : Self.nachladen = 0 : Self.schild = 1.5
+        Self.winkel = w : Self.ladezeit = 0 : Self.schild = 1.5
     END SUB
 
     ' Ein Schritt mit einer Eingabe. Liefert TRUE, wenn das Schiff schiesst --
@@ -59,10 +59,10 @@ CLASS Schiff
         END IF
         Self.x = umlauf(Self.x + Self.vx * DT, ARENA_B)
         Self.y = umlauf(Self.y + Self.vy * DT, ARENA_H)
-        IF Self.nachladen > 0 THEN Self.nachladen = Self.nachladen - DT
+        IF Self.ladezeit > 0 THEN Self.ladezeit = Self.ladezeit - DT
         IF Self.schild > 0 THEN Self.schild = Self.schild - DT
-        IF (e BAND E_SCHUSS) <> 0 AND Self.nachladen <= 0 AND Self.leben > 0 THEN
-            Self.nachladen = NACHLADEN
+        IF (e BAND E_SCHUSS) <> 0 AND Self.ladezeit <= 0 AND Self.leben > 0 THEN
+            Self.ladezeit = NACHLADEN
             RETURN TRUE
         END IF
         RETURN FALSE
