@@ -1650,7 +1650,7 @@ PRINT summe(1) + N";
         assert_eq!(k.len(), 1);
         assert_eq!(k[0].0, "'n' umbenennen in nLokal");
         // Kopf und RETURN, nicht der Kommentar, nicht das grosse N.
-        assert_eq!(k[0].1, vec![(1, 13, 14, "nLokal".to_string()), (3, 11, 12, "nLokal".to_string())]);
+        assert_eq!(k[0].1, vec![(1, 15, 16, "nLokal".to_string()), (3, 11, 12, "nLokal".to_string())]);
         // Feld einer Klasse: in der ganzen Klasse, Name schon belegt -> Zahl.
         let t = "CONST VOLL = 3
 CLASS Box
