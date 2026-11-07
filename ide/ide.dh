@@ -3176,11 +3176,15 @@ SUB reiterNeuSetzen()
     IF aktiverTab >= 0 THEN GUI_SET_ACTIVE_TAB(win, aktiverTab)
 END SUB
 
-' Den Schriftzug hinter ein Code-Feld legen (oder wegnehmen). Auf dem
-' hellen Thema etwas kraeftiger, dort verschluckt der Grund mehr.
+' Den Schriftzug hinter ein Code-Feld legen (oder wegnehmen). Ein
+' Wasserzeichen ist nur eins, solange man ueber ihm liest, ohne es zu
+' sehen: mit 22 bzw. 24 stand der Drache auf dem hellen Thema so kraeftig
+' hinter dem Code, dass die Buchstaben auf ihm flimmerten. Auf dem hellen
+' Thema ist er jetzt der LEISERE -- bunte Farbe auf Weiss faellt mehr auf
+' als auf Dunkelgrau.
 SUB wasserzeichenSetzen(ta AS GUI_WIDGET)
     IF wasserzeichenAn AND hgBild >= 0 THEN
-        GUI_TEXTAREA_BACKGROUND(ta, hgBild, IIF(hell, 24, 22))
+        GUI_TEXTAREA_BACKGROUND(ta, hgBild, IIF(hell, 10, 14))
     ELSE
         GUI_TEXTAREA_BACKGROUND(ta, -1)
     END IF
