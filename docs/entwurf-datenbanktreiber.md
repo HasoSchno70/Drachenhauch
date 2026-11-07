@@ -11,7 +11,7 @@
 > uebersetzt), Werte im Textformat gebunden (der Server wandelt) und
 > binaer gelesen (`numeric`/`DECIMAL` genau als Text), `DB_PING` fuer die
 > Verbindung, und `DB_QUERY_START` nimmt dasselbe Ziel. Geprueft gegen
-> echte Server (`tests/pruef/db_server.dhtest`, jeder Ablauf gegen beide mit
+> echte Server (`tests/pruef/module/db_server.dhtest`, jeder Ablauf gegen beide mit
 > derselben Erwartung; die CI startet sie auf dem Linux-Laeufer).
 
 *Untersuchung, keine Umsetzung.* Drachenhauch spricht heute genau eine

@@ -119,7 +119,7 @@ DH-Code in einem eigenen Fenster. Hier ist jede eigene Einstellung eine eigene
 
 ## Tests
 
-`tests/pruef/werkzeug_partikel.dhtest` fährt echte Mausklicks und Tasten über
+`tests/pruef/werkzeuge/werkzeug_partikel.dhtest` fährt echte Mausklicks und Tasten über
 eine Aufnahme: ein Zug ist ein Schritt, Zurück nimmt den ganzen Zug zurück und
 Vor holt ihn wieder, Strg+Z/Strg+Y tun dasselbe wie die Knöpfe, eine
 Werkseinstellung ist ein Schritt, ein neuer Zug schneidet den Vor-Weg ab, und
@@ -127,4 +127,4 @@ der erste Eintrag der Vorlagen ist anklickbar (früher lagen die Knöpfe
 darauf). Dazu Zufall (andere Werte, ein Schritt, Paare richtig herum),
 Mutieren (nah am Vorigen), ein Zug im Farbwähler samt Zurück, und die `.ini`
 mit beiden Farben getrennt sowie eine alte Datei. Die Rückfrage beim Schließen prüft
-`tests/pruef/werkzeug_kreuz.dhtest` mit echten Fensternachrichten.
+`tests/pruef/werkzeuge/werkzeug_kreuz.dhtest` mit echten Fensternachrichten.

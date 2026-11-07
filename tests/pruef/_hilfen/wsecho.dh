@@ -1,4 +1,4 @@
-' Echo-Server fuer tests/pruef/websocket.dhtest: meldet "PORT=n" auf stderr,
+' Echo-Server fuer tests/pruef/geraete/websocket.dhtest: meldet "PORT=n" auf stderr,
 ' nimmt EINE Verbindung an, schickt Text mit "echo:" und Binaeres
 ' unveraendert zurueck und schliesst auf "ende" mit Code 4001 "tschuess".
 ' Nach 20 s ohne Verbindung beendet er sich selbst.

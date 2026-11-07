@@ -183,7 +183,7 @@ PROBE_ENDE()
 | `PROBE_BEFUNDE$(datei$)`, `PROBE_LETZTE$(art$)`, `PROBE_ANZAHL()` | Befunde einer Datei, die letzte Nachricht einer Art, alle Nachrichten |
 | `PROBE_ENDE()`, `PROBE_LAEUFT()` | `ende` schicken und warten, bis das Plugin sich beendet |
 
-Die mitgelieferten Plugins sind so geprüft (`tests/pruef/plugin_probe.dhtest`).
+Die mitgelieferten Plugins sind so geprüft (`tests/pruef/werkzeugkette/plugin_probe.dhtest`).
 Ein Plugin aus der Vorlage bringt seine Prüfung schon mit: `test.dhtest`
 neben der `plugin.dh`, mit `DH_PATH` auf den Ordner der IDE (dort liegen
 `dh_plugin.dh` und die Probe). Laufen lässt man sie mit Strg+Alt+F5, wenn

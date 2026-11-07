@@ -14,7 +14,7 @@
 ' Gebaut wird auf dem System, fuer das das Paket ist (tar behaelt die
 ' Ausfuehrungsrechte, hdiutil gibt es nur auf dem Mac). Der Ordner allein
 ' entsteht ueberall -- `--ohne-archiv`; so prueft ihn die Sammlung
-' tests/pruef/werkzeug_paket.dhtest auch unter Windows.
+' tests/pruef/werkzeuge/werkzeug_paket.dhtest auch unter Windows.
 
 
 FUNCTION aufWindows() AS BOOLEAN

@@ -1,0 +1,429 @@
+' Rund um Plugins in der echten IDE: der Steckbrief (plugin.json), die
+' mitgelieferten Plugins aus examples/plugins/ (aus, bis man sie anhakt),
+' der Datenordner je Plugin, die Vorlage "Neues Plugin" und die Textbefehle
+' PLUGIN_ERSETZEN und PLUGIN_AUSWAHL_SETZEN.
+'
+' Die ide.json liegt in _programm; eigene Plugins daneben unter
+' _programm/plugins/, die mitgelieferten findet die IDE ueber
+' DH_IDE_WURZEL in examples/plugins/.
+--- langsam
+
+=== steckbrief mitgelieferte und die verwaltung
+DIM prB AS INTEGER
+DIM prSchritt AS INTEGER
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
+--- einschub nach glanzStartNachziehen()
+prB = prB + 1
+IF prSchritt = 0 AND prB > 30 THEN
+    pluginsVerwalten()
+    DIM prI AS INTEGER
+    FOR prI = 0 TO GUI_LISTBOX_COUNT(lstPlug) - 1
+        protokoll("pr zeile " + GUI_LISTBOX_ITEM(lstPlug, prI) + " | " + STR$(GUI_LISTBOX_CHECKED(lstPlug, prI)))
+    NEXT
+    protokoll("pr zustand neu " + plugins[pluginNr("zukunft")].zustand)
+    ' Ein mitgeliefertes anhaken: es startet und steht in plugins_an.
+    DIM prK AS INTEGER : prK = pluginNr("todo")
+    GUI_LISTBOX_SET_CHECKED(lstPlug, prK, TRUE)
+    prSchritt = 1
+END IF
+IF prSchritt = 1 AND prB > 40 THEN
+    protokoll("pr todo " + plugins[pluginNr("todo")].zustand + " an " + STR$(pluginAn("todo")))
+    protokoll("pr datenordner " + STR$(DIREXISTS("plugin-daten/meins")))
+    EXIT(0)
+END IF
+IF prB > 600 THEN protokoll("pr zeit um") : EXIT(0)
+--- argumente
+haupt.dh
+--- umgebung
+DHRT_FRAMES=700
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+--- datei haupt.dh
+PRINT 1
+
+--- datei _programm/plugins/meins/plugin.dh
+IMPORT "dh_plugin.dh"
+' Schreibt in seinen Datenordner, damit man sieht, dass es ihn hat.
+WRITEALL(PATHJOIN(PLUGIN_DATENORDNER$(), "da.txt"), "ja")
+WHILE PLUGIN_LAEUFT()
+    IF PLUGIN_EREIGNIS$() = "ende" THEN EXIT(0)
+WEND
+
+--- datei _programm/plugins/meins/plugin.json
+{"name": "Mein Plugin", "fassung": "2.0", "beschreibung": "Zum Probieren.", "autor": "Ich", "ide": "2026.1"}
+
+--- datei _programm/plugins/zukunft/plugin.dh
+IMPORT "dh_plugin.dh"
+WHILE PLUGIN_LAEUFT()
+    IF PLUGIN_EREIGNIS$() = "ende" THEN EXIT(0)
+WEND
+
+--- datei _programm/plugins/zukunft/plugin.json
+{"name": "Aus der Zukunft", "ide": "9999.1"}
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 8) = "plugins " OR LEFT$(L[i], 13) = "mitgeliefert " OR INSTR(L[i], " braucht ") >= 0 THEN PRINT L[i]
+NEXT
+PRINT "da.txt "; FILEEXISTS("_programm/plugin-daten/meins/da.txt")
+--- erwartet
+plugin zukunft braucht 9999.1
+plugins 2
+mitgeliefert 3
+pr zeile Mein Plugin 2.0 | TRUE
+pr zeile Aus der Zukunft | TRUE
+pr zeile Klassen 1.0 (mitgeliefert) | FALSE
+pr zeile Schreibweise 1.0 (mitgeliefert) | FALSE
+pr zeile Todos 1.0 (mitgeliefert) | FALSE
+pr zustand neu braucht IDE 9999.1
+pr todo läuft an TRUE
+pr datenordner TRUE
+da.txt TRUE
+
+=== ein eigenes plugin hat vorrang vor einem mitgelieferten
+' Ein eigenes Plugin namens "todo" verdeckt das mitgelieferte: es steht
+' einmal in der Liste, als eigenes.
+DIM prB AS INTEGER
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
+--- einschub nach glanzStartNachziehen()
+prB = prB + 1
+IF prB = 20 THEN
+    protokoll("pr todo " + STR$(LEN(plugins)) + " " + STR$(plugins[pluginNr("todo")].mitgeliefert) + " " + plugins[pluginNr("todo")].pfad)
+    EXIT(0)
+END IF
+--- umgebung
+DHRT_FRAMES=100
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+--- datei _programm/plugins/todo/plugin.dh
+IMPORT "dh_plugin.dh"
+WHILE PLUGIN_LAEUFT()
+    IF PLUGIN_EREIGNIS$() = "ende" THEN EXIT(0)
+WEND
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " THEN PRINT LEFT$(L[i], 16); " eigen "; INSTR(L[i], "examples") < 0
+NEXT
+--- erwartet
+pr todo 3 FALSE  eigen TRUE
+
+=== die vorlage legt ein lauffaehiges plugin an
+DIM prB AS INTEGER
+DIM prSchritt AS INTEGER
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
+--- einschub nach glanzStartNachziehen()
+prB = prB + 1
+IF prSchritt = 0 AND prB > 10 THEN
+    protokoll("pr krumm " + STR$(pluginAnlegen("a b")))
+    protokoll("pr angelegt " + STR$(pluginAnlegen("probe")))
+    protokoll("pr nochmal " + STR$(pluginAnlegen("probe")))
+    protokoll("pr dateien " + STR$(FILEEXISTS("plugins/probe/plugin.dh")) + " " + STR$(FILEEXISTS("plugins/probe/plugin.json")) + " " + STR$(FILEEXISTS("plugins/probe/leiste.dhform")) + " " + STR$(FILEEXISTS("plugins/probe/test.dhtest")))
+    protokoll("pr vorn " + BASENAME(reiter[aktiverTab].pfad))
+    prSchritt = 1
+END IF
+' Gestartet: Befehl, Kontext und Leiste sind angemeldet.
+IF prSchritt = 1 AND pluginBefehlNr("plugin:probe:zaehlen") >= 0 AND ctxNr("plugin:probe:zaehlen") >= 0 AND LEN(plugLeisten) > 0 THEN
+    ' Die Marke auf "zaehlen" in "SUB zaehlen()" (Zeile 5), dann der Befehl.
+    GUI_TEXTAREA_GOTO(aktivesFeld(), 5, 7)
+    befehl("plugin:probe:zaehlen")
+    prSchritt = 2
+END IF
+IF prSchritt = 2 AND INSTR(GUI_TEXT(GUI_WINDOW_WIDGET(plugLeisten[0].fenster, 0)), " mal") >= 0 THEN
+    protokoll("pr leiste " + GUI_TEXT(GUI_WINDOW_WIDGET(plugLeisten[0].fenster, 0)))
+    EXIT(0)
+END IF
+IF prB > 600 THEN protokoll("pr zeit um " + STR$(prSchritt)) : EXIT(0)
+--- umgebung
+DHRT_FRAMES=700
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 15) = "plugin anlegen " OR LEFT$(L[i], 16) = "plugin angelegt " THEN PRINT L[i]
+NEXT
+' Die angelegte Pruefung laeuft durch -- und faellt, wenn das Plugin etwas
+' anderes in seine Leiste schreibt (sonst pruefte sie nichts).
+FUNCTION pruefung$() AS STRING
+    DIM p AS INTEGER : p = PROCESS_START("dhrt", "test", "_programm/plugins/probe/test.dhtest")
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    WHILE leer < 5
+        DIM z AS STRING : z = PROCESS_READ$(p)
+        IF z = "" THEN
+            IF NOT PROCESS_RUNNING(p) THEN leer = leer + 1
+            SLEEP(30)
+        ELSE
+            aus = aus + z
+            leer = 0
+        END IF
+    WEND
+    DIM r AS STRING : r = STR$(PROCESS_CODE(p))
+    IF INSTR(aus, "1 Faelle, 1 ok") >= 0 THEN r = r + " ok" ELSE r = r + " fehl"
+    RETURN r
+END FUNCTION
+PRINT "pruefung "; pruefung$()
+DIM c AS STRING : c = JOIN$(READLINES("_programm/plugins/probe/plugin.dh"), CHR$(10))
+WRITEALL("_programm/plugins/probe/plugin.dh", REPLACE$(c, CHR$(34) + " mal" + CHR$(34), CHR$(34) + " Stellen" + CHR$(34)))
+PRINT "verdorben "; pruefung$()
+--- erwartet
+plugin anlegen krumm a b
+pr krumm FALSE
+plugin angelegt probe
+pr angelegt TRUE
+plugin anlegen gibt es probe
+pr nochmal FALSE
+pr dateien TRUE TRUE TRUE TRUE
+pr vorn plugin.dh
+pr leiste zaehlen: 6 mal
+pruefung 0 ok
+verdorben 1 fehl
+
+=== ein plugin ersetzt einen bereich und setzt die auswahl
+DIM prB AS INTEGER
+DIM prSchritt AS INTEGER
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
+--- einschub nach glanzStartNachziehen()
+prB = prB + 1
+IF prSchritt = 0 AND pluginBefehlNr("plugin:text:los") >= 0 THEN
+    befehl("plugin:text:los")
+    prSchritt = 1
+END IF
+IF prSchritt = 1 AND aktiverTab >= 0 THEN
+    IF BASENAME(reiter[aktiverTab].pfad) = "b.dh" AND INSTR(GUI_TEXT(aktivesFeld()), "NEU") >= 0 THEN
+        protokoll("pr b " + REPLACE$(GUI_TEXT(aktivesFeld()), NL, " / "))
+        ' Zurueck zu a.dh: ersetzt und ausgewaehlt?
+        dateiOeffnen(PATHJOIN(projektOrdner, "a.dh"))
+        protokoll("pr a " + REPLACE$(GUI_TEXT(aktivesFeld()), NL, " / "))
+        protokoll("pr auswahl " + GUI_TEXTAREA_SELECTION$(aktivesFeld()))
+        EXIT(0)
+    END IF
+END IF
+IF prB > 600 THEN protokoll("pr zeit um " + STR$(prSchritt)) : EXIT(0)
+--- argumente
+a.dh
+--- umgebung
+DHRT_FRAMES=700
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+--- datei a.dh
+PRINT 1
+PRINT 2
+
+--- datei b.dh
+' alt
+PRINT 3
+
+--- datei _programm/plugins/text/plugin.dh
+IMPORT "dh_plugin.dh"
+PLUGIN_BEFEHL("los", "Los")
+WHILE PLUGIN_LAEUFT()
+    SELECT CASE PLUGIN_EREIGNIS$()
+        CASE "befehl"
+            ' Im Reiter vorn (a.dh): "PRINT" in Zeile 1 durch "HALLO", dann
+            ' "PRINT" in Zeile 2 auswaehlen; danach in b.dh die erste Zeile.
+            PLUGIN_ERSETZEN(1, 1, 1, 6, "HALLO")
+            PLUGIN_AUSWAHL_SETZEN(2, 1, 2, 6)
+            PLUGIN_ERSETZEN(1, 1, 1, 6, "' NEU", PATHJOIN(PLUGIN_PROJEKT$(), "b.dh"))
+        CASE "ende"
+            EXIT(0)
+    END SELECT
+WEND
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " THEN PRINT L[i]
+NEXT
+--- erwartet
+pr b ' NEU / PRINT 3
+pr a HALLO 1 / PRINT 2
+pr auswahl PRINT
+
+=== vorschlaege eines plugins und die begruessung
+' Die Laufzeit kennt "rotk" nicht -- die Liste oeffnet die Antwort des
+' Plugins. Sein Befehl meldet, welche IDE es begruesst hat.
+DIM prB AS INTEGER
+DIM prSchritt AS INTEGER
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
+--- einschub nach glanzStartNachziehen()
+prB = prB + 1
+IF prSchritt = 0 AND pluginBefehlNr("plugin:farben:fassung") >= 0 THEN
+    befehl("plugin:farben:fassung")
+    GUI_TEXTAREA_GOTO(aktivesFeld(), 1, 11)
+    vervollstaendigen(FALSE)
+    prSchritt = 1
+END IF
+IF prSchritt = 1 AND vervollHat("rotkehlchen") THEN
+    protokoll("pr liste offen " + STR$(vervollOffen) + " " + GUI_LISTBOX_ITEM(lstVervoll, 0))
+    prSchritt = 2
+END IF
+IF prSchritt = 2 AND LEFT$(GUI_TEXT(lblStatus), 4) = "ide " THEN
+    protokoll("pr status " + STR$(GUI_TEXT(lblStatus) = "ide " + VERSION$() + " 3"))
+    EXIT(0)
+END IF
+IF prB > 600 THEN protokoll("pr zeit um " + STR$(prSchritt)) : EXIT(0)
+--- argumente
+a.dh
+--- umgebung
+DHRT_FRAMES=700
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+--- datei a.dh
+PRINT rotk
+
+--- datei _programm/plugins/farben/plugin.dh
+IMPORT "dh_plugin.dh"
+PLUGIN_BEFEHL("fassung", "Fassung")
+PLUGIN_HOERE("vervollstaendigen")
+WHILE PLUGIN_LAEUFT()
+    SELECT CASE PLUGIN_EREIGNIS$()
+        CASE "vervollstaendigen"
+            IF PLUGIN_WERT$() = "rotk" THEN PLUGIN_VORSCHLAEGE(["rotkehlchen"]) ELSE PLUGIN_VORSCHLAEGE([])
+        CASE "befehl"
+            PLUGIN_MELDUNG("ide " + PLUGIN_IDE_FASSUNG$() + " " + STR$(PLUGIN_PROTOKOLL()))
+        CASE "ende"
+            EXIT(0)
+    END SELECT
+WEND
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 19) = "plugin vorschlaege " THEN PRINT L[i]
+NEXT
+--- erwartet
+plugin vorschlaege farben 1
+pr liste offen TRUE rotkehlchen
+pr status TRUE
+
+=== ein plugin holen und wieder entfernen
+' Geholt wird aus einem Ordner im Fallordner (dhrt paket): das Plugin landet
+' in plugins/pakete/geholt/ und laeuft als eigenes; Entfernen nimmt es weg.
+DIM prB AS INTEGER
+DIM prSchritt AS INTEGER
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
+--- einschub nach glanzStartNachziehen()
+prB = prB + 1
+IF prSchritt = 0 AND prB > 10 THEN
+    pluginHolenStarten(["hole", PATHJOIN(projektOrdner, "quelle/geholt")])
+    prSchritt = 1
+END IF
+IF prSchritt = 1 AND pluginNr("geholt") >= 0 THEN
+    DIM prK AS INTEGER : prK = pluginNr("geholt")
+    IF plugins[prK].zustand = "läuft" THEN
+        protokoll("pr geholt " + plugins[prK].titel + " geholt " + STR$(plugins[prK].geholt) + " " + STR$(FILEEXISTS("plugins/pakete/geholt/plugin.dh")) + " " + STR$(FILEEXISTS("plugins/paket.lock.json")))
+        pluginHolenStarten(["entferne", "geholt"])
+        prSchritt = 2
+    END IF
+END IF
+IF prSchritt = 2 AND plugHolProz < 0 AND pluginNr("geholt") < 0 THEN
+    protokoll("pr entfernt " + STR$(DIREXISTS("plugins/pakete/geholt")))
+    EXIT(0)
+END IF
+IF prB > 900 THEN protokoll("pr zeit um " + STR$(prSchritt)) : EXIT(0)
+--- umgebung
+DHRT_FRAMES=1000
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+--- datei quelle/geholt/plugin.dh
+IMPORT "dh_plugin.dh"
+WHILE PLUGIN_LAEUFT()
+    IF PLUGIN_EREIGNIS$() = "ende" THEN EXIT(0)
+WEND
+
+--- datei quelle/geholt/plugin.json
+{"name": "Geholtes Plugin", "fassung": "0.3"}
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 14) = "plugin holen 0" THEN PRINT L[i]
+NEXT
+--- erwartet
+plugin holen 0
+pr geholt Geholtes Plugin geholt TRUE TRUE TRUE
+plugin holen 0
+pr entfernt FALSE
+
+=== ein plugin ueber http holen und aktualisieren
+' Ein ZIP wie von GitHub (mit Oberordner geholt-1.0/) ueber HTTP vom
+' Gegenserver: Holen, ein geaenderter Inhalt ist ohne --erneuern ein Fehler
+' und das alte bleibt, Aktualisieren nimmt den neuen Stand an.
+DIM prB AS INTEGER
+DIM prSchritt AS INTEGER
+DIM prSrv AS INTEGER
+DIM prBasis AS STRING
+DIM prHolen AS INTEGER
+SUB prZip(fassung AS STRING)
+    IF NOT DIREXISTS("srv") THEN MKDIR("srv")
+    DIM q AS STRING : q = CHR$(34)
+    DIM code AS STRING : code = "IMPORT " + q + "dh_plugin.dh" + q + NL + "WHILE PLUGIN_LAEUFT()" + NL + "    IF PLUGIN_EREIGNIS$() = " + q + "ende" + q + " THEN EXIT(0)" + NL + "WEND" + NL
+    ZIP_WRITE("srv/geholt.zip", ["geholt-1.0/plugin.dh", "geholt-1.0/plugin.json"], [code, "{" + q + "name" + q + ": " + q + "Netz" + q + ", " + q + "fassung" + q + ": " + q + fassung + q + "}"])
+END SUB
+FUNCTION prFassung$() AS STRING
+    DIM k AS INTEGER : k = pluginNr("geholt")
+    IF k < 0 THEN RETURN "-"
+    RETURN plugins[k].fassung + " " + plugins[k].zustand
+END FUNCTION
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
+--- einschub nach glanzStartNachziehen()
+prB = prB + 1
+IF prSchritt = 0 AND prB > 10 THEN
+    prZip("1.0")
+    prSrv = PROCESS_START("dhrt", "run", GETENV$("DH_IDE_WURZEL") + "/tests/pruef/_hilfen/gegenserver.dh", "--", "dateien", "0", "-", CWD$() + "/port.txt")
+    prSchritt = 1
+ELSEIF prSchritt = 1 AND FILEEXISTS("port.txt") THEN
+    prBasis = "http://127.0.0.1:" + TRIM$(READLINES("port.txt")[0])
+    pluginHolenStarten(["hole", prBasis + "/srv/geholt.zip"])
+    prSchritt = 2
+ELSEIF prSchritt = 2 AND plugHolProz < 0 AND prFassung$() = "1.0 läuft" THEN
+    protokoll("pr geholt " + prFassung$() + " lock " + STR$(INSTR(JOIN$(READLINES("plugins/paket.lock.json"), " "), "sha256") >= 0) + " oberordner " + STR$(DIREXISTS("plugins/pakete/geholt/geholt-1.0")))
+    prZip("1.1")
+    pluginHolenStarten(["hole"])
+    prSchritt = 3
+ELSEIF prSchritt = 3 AND plugHolProz < 0 THEN
+    protokoll("pr ohne erneuern " + prFassung$())
+    pluginsAktualisieren()
+    prSchritt = 4
+ELSEIF prSchritt = 4 AND plugHolProz < 0 AND prFassung$() = "1.1 läuft" THEN
+    protokoll("pr aktualisiert " + prFassung$())
+    PROCESS_KILL(prSrv)
+    EXIT(0)
+END IF
+IF prB > 1500 THEN protokoll("pr zeit um " + STR$(prSchritt) + " " + prFassung$()) : PROCESS_KILL(prSrv) : EXIT(0)
+--- umgebung
+DHRT_FRAMES=1600
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 13) = "plugin holen " THEN
+        IF LEFT$(L[i], 19) <> "plugin holen start " THEN PRINT L[i]
+    END IF
+NEXT
+--- erwartet
+plugin holen 0
+pr geholt 1.0 läuft lock TRUE oberordner FALSE
+plugin holen 1
+pr ohne erneuern 1.0 läuft
+plugin holen 0
+pr aktualisiert 1.1 läuft

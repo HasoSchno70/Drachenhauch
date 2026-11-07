@@ -11,7 +11,7 @@
 //! startet die IDE darin -- genau wie der Starter unter Linux.
 //!
 //! Der Pfad wird nur am Aufbau erkannt, nicht am System: so laesst sich der
-//! Weg auch unter Windows pruefen (tests/pruef/werkzeug_paket.dhtest baut das
+//! Weg auch unter Windows pruefen (tests/pruef/werkzeuge/werkzeug_paket.dhtest baut das
 //! Bundle und startet dessen dhrt). Ein normaler `dhrt`-Aufruf ohne Argumente
 //! liegt nie in so einem Ordner und meldet weiter "Verwendung: ...".
 use std::path::{Path, PathBuf};

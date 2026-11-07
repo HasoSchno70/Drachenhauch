@@ -143,7 +143,7 @@ button.
 
 ## Tests
 
-`tests/pruef/werkzeug_animfsm.dhtest` drives the editor with real clicks
+`tests/pruef/werkzeuge/werkzeug_animfsm.dhtest` drives the editor with real clicks
 from a recording: a double-click creates a state, the right mouse button
 drags a transition, dragging and pressing `Strg+Z` (Ctrl+Z) twice, `Entf`
 (Del) including transitions, a condition via the inspector, a new parameter,
@@ -156,7 +156,7 @@ exactly what the case checks after `Entf`. Plus arranging (positions by
 level and undo), zooming around a fixed point including hit testing, a real
 wheel step, fitting and the animation in the inspector as an image probe. The
 prompt on the close button is
-checked by `tests/pruef/werkzeug_kreuz.dhtest` with real window messages.
+checked by `tests/pruef/werkzeuge/werkzeug_kreuz.dhtest` with real window messages.
 
 ## What the Qt editor had and 198 lacks
 

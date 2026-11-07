@@ -1,0 +1,383 @@
+' Zwei Handgriffe der IDE:
+' (1) Parameternamen an Aufrufen: hinter einer Zeile mit einem Aufruf mit
+'     mindestens zwei Argumenten, davon einem festen, stehen die Namen der
+'     Parameter (eigene SUBs und eingebaute Befehle) -- so viele, wie
+'     Argumente dastehen, ohne Typ (`APPENDFILE(p: STRING, ...)` im Index
+'     wird `p, text`); ein einziges Argument (SETFPS(60)) bekommt keinen
+'     Hinweis; abschaltbar.
+' (2) Beim Einfuegen einruecken: ein mehrzeiliger Block bekommt die
+'     Einrueckung der Stelle, an der er landet; Strg+Z nimmt erst das
+'     Einruecken zurueck; abschaltbar.
+--- langsam
+
+=== parameternamen an aufrufen mit festen argumenten
+pruefen()
+DIM prI AS INTEGER
+FOR prI = 0 TO LEN(paramHinweise) - 1
+    protokoll("pr param " + STR$(paramHinweise[prI].zeile) + " " + paramHinweise[prI].text)
+NEXT
+befehl("parameter_namen")
+protokoll("pr aus " + STR$(paramNamenAn))
+EXIT(0)
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+haupt.dh
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+--- datei haupt.dh
+SUB kreis(x AS INTEGER, y AS INTEGER, r AS INTEGER)
+    PRINT x
+END SUB
+kreis(100, 50, 20)
+DIM a AS INTEGER : a = 1
+kreis(a, a, a)
+PRINT "kreis(1, 2, 3)"
+PRINT MID$("abc", 1, 1)
+SETFPS(60)
+SCREEN(320, 200, "T")
+CIRCLE(10, 20, 5)
+APPENDFILE("a.txt", "x")
+kreis(5, _
+      6, 7)
+
+--- nachher
+IMPORT "json"
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 16) = "parameter namen " THEN PRINT L[i]
+NEXT
+DIM k AS JSON_HANDLE : k = JSON_LOAD("_programm/ide.json")
+PRINT "gemerkt "; JSON_GET_BOOL(k, "parameter_namen")
+--- erwartet
+pr param 4 x, y, r
+pr param 8 s, start, n
+pr param 10 w, h, titel
+pr param 11 x, y, r
+pr param 12 p, text
+pr param 13 x, y, r
+parameter namen aus
+pr aus FALSE
+gemerkt FALSE
+
+=== parameternamen in einer datei mit 100000 zeilen ohne stillstand
+' Stresstest 2026-10-02: das Sammeln las jede Klammer, jeden Namen und jedes
+' Argument mit MID$ aus dem GANZEN Text -- MID$ kostet so viel, wie die
+' Stelle weit hinten liegt, also quadratisch: 100000 eingefuegte Zeilen
+' hielten die IDE beim naechsten Pruefen 1,8 s fest, nur hierfuer. Jetzt auf
+' der Zeile. Geprueft: die Hinweise ganz hinten stimmen (auch ein Aufruf
+' ueber zwei Zeilen), und es geht flott (grob: 1 s).
+DIM prT AS FLOAT : prT = GET_TIME()
+parameterSammeln(reiter[aktiverTab].feld)
+DIM prD AS FLOAT : prD = GET_TIME() - prT
+DIM prI AS INTEGER
+FOR prI = 0 TO LEN(paramHinweise) - 1
+    protokoll("pr param " + STR$(paramHinweise[prI].zeile) + " " + paramHinweise[prI].text)
+NEXT
+protokoll("pr flott " + STR$(prD < 1.0))
+EXIT(0)
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+gross.dh
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+--- vorher
+DIM t AS ARRAY OF STRING : t = []
+ARRAY_PUSH(t, "SUB kreis(x AS INTEGER, y AS INTEGER, r AS INTEGER)")
+ARRAY_PUSH(t, "END SUB")
+ARRAY_PUSH(t, "DIM x AS INTEGER")
+DIM i AS INTEGER
+FOR i = 1 TO 100000
+    ARRAY_PUSH(t, "x = x + " + STR$(i))
+NEXT
+ARRAY_PUSH(t, "kreis(1, 2, 3)")
+ARRAY_PUSH(t, "kreis(7, _")
+ARRAY_PUSH(t, "      4, x)")
+WRITEALL("gross.dh", JOIN$(t, CHR$(10)) + CHR$(10))
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " THEN PRINT L[i]
+NEXT
+--- erwartet
+pr param 100004 x, y, r
+pr param 100005 x, y, r
+pr flott TRUE
+
+=== strg v rueckt den block an seine stelle ein, strg z nimmt es zurueck
+DIM prBild AS INTEGER : prBild = 0
+FUNCTION prText$() AS STRING
+    RETURN REPLACE$(GUI_TEXT(reiter[aktiverTab].feld), NL, "/")
+END FUNCTION
+--- programm ../../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 20 THEN
+    CLIPBOARD_SET("FOR i = 1 TO 3" + NL + "        PRINT i" + NL + "    NEXT")
+    ' Zeile 4 traegt acht Leerzeichen (eine Beilage verloere sie).
+    GUI_SET_TEXT(reiter[aktiverTab].feld, "SUB s()" + NL + "    IF TRUE THEN" + NL + "        PRINT 1" + NL + "        " + NL + "    END IF" + NL + "END SUB")
+    GUI_FOCUS(reiter[aktiverTab].feld)
+    GUI_TEXTAREA_GOTO(reiter[aktiverTab].feld, 4, 9)
+    ' Strg+V, spaeter Strg+Z
+    WRITEALL("prtaste.txt", "c 9" + CHR$(10) + "e 0 1 340 0 0" + CHR$(10) + _
+             "e 4 2 341 0 0" + CHR$(10) + "e 5 2 86 0 0" + CHR$(10) + "e 7 1 86 0 0" + CHR$(10) + "e 8 1 341 0 0" + CHR$(10) + _
+             "e 30 2 341 0 0" + CHR$(10) + "e 31 2 90 0 0" + CHR$(10) + "e 33 1 90 0 0" + CHR$(10) + "e 34 1 341 0 0" + CHR$(10) + CHR$(10))
+    AUTOMATION_PLAY("prtaste.txt")
+END IF
+IF prBild = 40 THEN protokoll("pr eingefuegt |" + prText$() + "|")
+IF prBild = 70 THEN
+    protokoll("pr nach z |" + prText$() + "|")
+    EXIT(0)
+END IF
+--- argumente
+haupt.dh
+--- umgebung
+DHRT_FRAMES=150
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+--- datei haupt.dh
+SUB s()
+    IF TRUE THEN
+        PRINT 1
+
+    END IF
+END SUB
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 22) = "eingefuegt eingerueckt" THEN PRINT L[i]
+NEXT
+--- erwartet
+eingefuegt eingerueckt 3 8
+pr eingefuegt |SUB s()/    IF TRUE THEN/        PRINT 1/        FOR i = 1 TO 3/            PRINT i/        NEXT/    END IF/END SUB|
+pr nach z |SUB s()/    IF TRUE THEN/        PRINT 1/        FOR i = 1 TO 3/        PRINT i/    NEXT/    END IF/END SUB|
+
+=== mitten in der zeile und abgeschaltet
+DIM prT AS GUI_WIDGET : prT = reiter[aktiverTab].feld
+CLIPBOARD_SET("a," + NL + "  b)")
+GUI_TEXTAREA_GOTO(prT, 1, 11)
+befehl("code_einfuegen")
+protokoll("pr mitten |" + REPLACE$(GUI_TEXT(prT), NL, "/") + "|")
+befehl("einfuegen_einruecken")
+GUI_TEXTAREA_GOTO(prT, 4, 11)
+befehl("code_einfuegen")
+protokoll("pr aus |" + REPLACE$(GUI_TEXT(prT), NL, "/") + "|")
+EXIT(0)
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+haupt.dh
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+--- datei haupt.dh
+    x = f(
+    y = 1
+    z = g(
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 22) = "eingefuegt eingerueckt" OR LEFT$(L[i], 20) = "einfuegen einruecken" THEN PRINT L[i]
+NEXT
+--- erwartet
+eingefuegt eingerueckt 2 4
+pr mitten |    x = f(a,/    b)/    y = 1/    z = g(|
+einfuegen einruecken aus
+pr aus |    x = f(a,/    b)/    y = 1/    z = g(a,/  b)|
+
+=== in spalte 0 bleibt der block wie kopiert
+' Beim Dogfooding 2026-09-30 gefunden: eine ganze Zeile markiert (Ende,
+' Umschalt+Pos1) und einen eingerueckten Block darueber gesetzt -- IF, ELSE
+' und END IF landeten in Spalte 0, der Rumpf eingerueckt. In Spalte 0 sagt
+' nichts, wohin der Block gehoert; er bleibt, wie er kopiert wurde.
+DIM prT AS GUI_WIDGET : prT = reiter[aktiverTab].feld
+CLIPBOARD_SET("    IF a THEN" + NL + "        b = 1" + NL + "    ELSE" + NL + "        b = 2" + NL + "    END IF")
+GUI_TEXTAREA_SELECT(prT, 2, 1, 2, 1000000)
+befehl("code_einfuegen")
+protokoll("pr spalte0 |" + REPLACE$(GUI_TEXT(prT), NL, "/") + "|")
+EXIT(0)
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+haupt.dh
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+--- datei haupt.dh
+SUB s()
+    x = 1
+END SUB
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 22) = "eingefuegt eingerueckt" THEN PRINT L[i]
+NEXT
+--- erwartet
+pr spalte0 |SUB s()/    IF a THEN/        b = 1/    ELSE/        b = 2/    END IF/END SUB|
+
+=== parameternamen aus der kopfzeile und bei doppelten namen
+' Seit 2026-10-24 liest das Sammeln die Parameter einer eigenen Funktion aus
+' ihrer Kopfzeile (`kopfZeilenSammeln`), statt die ganze Datei per Hover zu
+' fragen, und fragt eingebaute Befehle nur mit ihrem Namen. Steht ein Name
+' zweimal da (Methoden zweier Klassen), entscheidet weiter der Hover an der
+' Stelle des Aufrufs. Die Erwartung ist die Ausgabe des Baus davor.
+' (Methodenaufrufe wie `ob.setz(3, 4)` nehmen seit 2026-10-24 die Namen
+' ihrer Klasse -- der Fall danach.)
+pruefen()
+DIM prI AS INTEGER
+FOR prI = 0 TO LEN(paramHinweise) - 1
+    protokoll("pr param " + STR$(paramHinweise[prI].zeile) + " " + paramHinweise[prI].text)
+NEXT
+EXIT(0)
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+haupt.dh
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+--- datei haupt.dh
+CLASS Aa
+    SUB setz(a AS INTEGER, b AS INTEGER)
+        PRINT a
+    END SUB
+END CLASS
+CLASS Bb
+    SUB setz(p AS INTEGER, q AS INTEGER)
+        PRINT p
+    END SUB
+END CLASS
+FUNCTION fmt$(text AS STRING, breite AS INTEGER = 8) AS STRING
+    RETURN text
+END FUNCTION
+SUB leer()
+    PRINT 1
+END SUB
+DIM oa AS Aa : oa = NEW Aa()
+DIM ob AS Bb : ob = NEW Bb()
+oa.setz(1, 2)
+PRINT fmt$("x", 3)
+PRINT LEFT$("abc", 2)
+leer()
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 9) = "pr param " THEN PRINT L[i]
+NEXT
+--- erwartet
+pr param 19 a, b
+pr param 20 text, breite
+pr param 21 s, n
+
+=== methodenaufrufe nehmen die parameter ihrer klasse
+' Zwei Klassen mit einer Methode `setz`, eine dritte erbt sie von Bb. Ueber
+' den Namen allein bekaeme jeder Aufruf die Namen von Aa (die erste `setz`
+' im Text). Jetzt kommen alle Methodenaufrufe aus EINEM Uebersetzungslauf
+' (CODE_METHOD_CALLS$), je aus der Klasse des Objekts.
+pruefen()
+DIM prI AS INTEGER
+FOR prI = 0 TO LEN(paramHinweise) - 1
+    protokoll("pr param " + STR$(paramHinweise[prI].zeile) + " " + paramHinweise[prI].text)
+NEXT
+EXIT(0)
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+haupt.dh
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+--- datei haupt.dh
+CLASS Aa
+    SUB setz(a AS INTEGER, b AS INTEGER)
+        PRINT a
+    END SUB
+END CLASS
+CLASS Bb
+    SUB setz(pWert AS INTEGER, qWert AS INTEGER)
+        PRINT pWert
+    END SUB
+END CLASS
+CLASS Cc EXTENDS Bb
+END CLASS
+DIM oa AS Aa : oa = NEW Aa()
+DIM ob AS Bb : ob = NEW Bb()
+DIM oc AS Cc : oc = NEW Cc()
+oa.setz(1, 2)
+ob.setz(3, 4)
+oc.setz(5, 6)
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 9) = "pr param " THEN PRINT L[i]
+NEXT
+--- erwartet
+pr param 16 a, b
+pr param 17 pWert, qWert
+pr param 18 pWert, qWert
+
+=== vervollstaendigen hinter dem punkt setzt die platzhalter der klasse
+' `ob.se` vervollstaendigt zu `setz` und bekommt die Argumente als
+' Platzhalter -- die von Bb, nicht die der ersten `setz` im Text (Aa).
+GUI_FOCUS(reiter[0].feld)
+GUI_TEXTAREA_GOTO(reiter[0].feld, 12, 1)
+GUI_TEXTAREA_INSERT(reiter[0].feld, "ob.se")
+vervollstaendigen(TRUE)
+DIM prK AS INTEGER
+FOR prK = 0 TO GUI_LISTBOX_COUNT(lstVervoll) - 1
+    IF GUI_LISTBOX_ITEM(lstVervoll, prK) = "setz" THEN GUI_LISTBOX_SET_SELECTED(lstVervoll, prK)
+NEXT
+vervollUebernehmen()
+DIM prZeilen AS ARRAY OF STRING : prZeilen = SPLIT$(GUI_TEXT(reiter[0].feld), NL)
+protokoll("pr zeile " + prZeilen[11])
+protokoll("pr markiert " + GUI_TEXTAREA_SELECTION$(reiter[0].feld))
+EXIT(0)
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+haupt.dh
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+--- datei haupt.dh
+CLASS Aa
+    SUB setz(a AS INTEGER, b AS INTEGER)
+        PRINT a
+    END SUB
+END CLASS
+CLASS Bb
+    SUB setz(pWert AS INTEGER, qWert AS INTEGER)
+        PRINT pWert
+    END SUB
+END CLASS
+DIM ob AS Bb : ob = NEW Bb()
+' Ende
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " THEN PRINT L[i]
+NEXT
+--- erwartet
+pr zeile ob.setz(pWert, qWert)' Ende
+pr markiert pWert

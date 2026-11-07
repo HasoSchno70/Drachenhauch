@@ -118,7 +118,7 @@ straight to the clipboard.
 
 ## Tests
 
-`tests/pruef/werkzeug_partikel.dhtest` drives real mouse clicks and keys from
+`tests/pruef/werkzeuge/werkzeug_partikel.dhtest` drives real mouse clicks and keys from
 a recording: one drag is one step, Back undoes the whole drag and Forward
 brings it back, Ctrl+Z/Ctrl+Y do the same as the buttons, a preset is one
 step, a new drag cuts off the way forward, and the first entry of the presets
@@ -126,4 +126,4 @@ is clickable (the buttons used to lie on top of it). Plus random (other
 values, one step, pairs the right way round), mutate (close to the previous
 one), a drag in the colour picker with undo, and the `.ini` with both colours
 separate as well as an old file. The prompt on closing is
-checked by `tests/pruef/werkzeug_kreuz.dhtest` with real window messages.
+checked by `tests/pruef/werkzeuge/werkzeug_kreuz.dhtest` with real window messages.

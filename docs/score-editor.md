@@ -131,7 +131,7 @@ schreibt nichts.
 
 ## Tests
 
-`tests/pruef/werkzeug_notenblatt.dhtest` fährt das Werkzeug mit echten
+`tests/pruef/werkzeuge/werkzeug_notenblatt.dhtest` fährt das Werkzeug mit echten
 Klicks und Tasten über die Eingabe-Wiedergabe: Note setzen, entfernen,
 ziehen und Strg+Z, Pause und Bindebogen über die Klappliste, zweite Spur mit
 Instrument, Abspielen. Der Tracker-Export wird am Demo-Stück (Akkord,

@@ -20,8 +20,8 @@ jobs:
   # Seit 2026-09-21 OHNE pytest, mypy und pip (docs/entwurf-python-abbau.md,
   # 7.7 Punkt 6): geprueft wird nur noch ueber `dhrt test tests/pruef`. Python
   # bleibt allein fuer den Bauschritt (`rust/build_runtime.py`, nur
-  # Standardbibliothek -- `tests/pruef/bauskripte.dhtest` haelt das fest) und
-  # fuer die Probe von `rust/build_wasm.py` in `tests/pruef/build_wasm.dhtest`.
+  # Standardbibliothek -- `tests/pruef/werkzeugkette/bauskripte.dhtest` haelt das fest) und
+  # fuer die Probe von `rust/build_wasm.py` in `tests/pruef/werkzeugkette/build_wasm.dhtest`.
   # Die Qt-Editoren und ihre pytest-Dateien sind damit NICHT mehr geprueft;
   # sie fallen im Loeschschritt (Punkt 7).
   #
@@ -84,14 +84,14 @@ jobs:
           workspaces: rust/drachenhauch_runtime
 
       # --laufzeiten baut die zwei kleinen Laufzeiten mit -- ohne sie
-      # uebersprange sich tests/pruef/export_schlank.dhtest.
+      # uebersprange sich tests/pruef/werkzeugkette/export_schlank.dhtest.
       - name: dhrt bauen (Runtime fuer die Pruefsammlungen)
         run: python rust/build_runtime.py --laufzeiten
 
       # Die Pruefsammlungen laufen DIREKT, nicht ueber pytest: bis 2026-09-20
       # rief `tests/test_dhrt_test.py` sie als Anker auf, und die Datei faellt
       # mit dem Python-Teil weg (Weg D). Das FORMAT der Sammlungen prueft
-      # seither `tests/pruef/dhrt_test_format.dhtest` -- sie pruefen sich also
+      # seither `tests/pruef/werkzeugkette/dhrt_test_format.dhtest` -- sie pruefen sich also
       # selbst.
       #
       # `DH_OHNE_AUDIO=1`: das setzte bisher conftest.py fuer die pytest-Laeufe,
@@ -179,18 +179,18 @@ jobs:
       # Feature-Liste muss den Modulen folgen, die `tests/` abfragt. Fehlt
       # eines, laeuft dhrt zwar, aber jeder Aufruf des Moduls meldet "ohne das
       # Feature gebaut" -- 26 Fehler in `tests/test_smtp.py` (heute
-      # `tests/pruef/smtp.dhtest`), die es nur auf
+      # `tests/pruef/module/smtp.dhtest`), die es nur auf
       # posix gab, weil der Windows-Job ueber `build_runtime.py` baut und das
       # Skript den ganzen Daten-Tier mitnimmt. Wer hier ein Feature ergaenzt,
       # gleicht am besten gegen `feats` in `rust/build_runtime.py` ab.
       # `tray` ohne Grafik: `dhrt pruef tray` laesst das Symbol des Systems
       # hier echt durchlaufen (Linux gegen einen eigenen dbus-daemon, macOS
-      # mit echten AppKit-Objekten) -- tests/pruef/tray.dhtest ruft es auf.
+      # mit echten AppKit-Objekten) -- tests/pruef/geraete/tray.dhtest ruft es auf.
       - name: dhrt bauen (ohne Grafik)
         working-directory: rust/drachenhauch_runtime
         run: cargo build --release --locked --features "db pg mysql net http smtp pdf physik jit ffi tray"
 
-      # PostgreSQL und MySQL fuer tests/pruef/db_server.dhtest: auf dem
+      # PostgreSQL und MySQL fuer tests/pruef/module/db_server.dhtest: auf dem
       # Linux-Laeufer liegen beide schon, nur nicht gestartet (MySQL mit dem
       # Kennwort root fuer root). Die Sammlung findet sie ueber DH_TEST_PG /
       # DH_TEST_MYSQL; ohne die Variablen ueberspringt sie sich (macOS,
@@ -206,7 +206,7 @@ jobs:
           echo "DH_TEST_PG=postgres://dh:dhtest@localhost:5432/dhtest" >> "$GITHUB_ENV"
           echo "DH_TEST_MYSQL=mysql://dh:dhtest@localhost:3306/dhtest" >> "$GITHUB_ENV"
 
-      # Simulierte Pins fuer tests/pruef/pins.dhtest (gpio-sim, i2c-stub aus
+      # Simulierte Pins fuer tests/pruef/geraete/pins.dhtest (gpio-sim, i2c-stub aus
       # dem Kernel des Laeufers): das Skript schreibt DH_TEST_GPIO,
       # DH_TEST_GPIO_SIM und DH_TEST_I2C fuer die folgenden Schritte. Geht
       # etwas nicht, fehlt die Variable und die Faelle ueberspringen sich.

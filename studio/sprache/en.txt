@@ -2,7 +2,7 @@
 # ein Tabulator, der englische. Leerzeichen am Anfang und Ende gehoeren dazu.
 # {0}, {1} ... sind Werte, die trf$ nach dem Uebersetzen einsetzt -- sie
 # muessen in beiden Spalten stehen. Neue Texte im Studio: tr$("...") bzw.
-# trf$("...", [...]) und hier eine Zeile; tests/pruef/werkzeug_studio_englisch.dhtest
+# trf$("...", [...]) und hier eine Zeile; tests/pruef/studio/werkzeug_studio_englisch.dhtest
 # meldet, was fehlt. Zeilen ohne Tabulator (wie diese) sind Kommentare.
 #
 # --- Bibliothek: Gruppen, Namen, Grundnamen der Controls, Vorgaben --------

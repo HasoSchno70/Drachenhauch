@@ -176,7 +176,7 @@ Zelle 160), dann `anim_base()` in der Engine erweitern.
 | `download_sfx.dh`, `download_music.dh` | Soundeffekte und Musik neu laden |
 | `levels/*.json` | Level-Sets (im Menü wählbar) |
 
-Tests: `tests/pruef/werkzeug_circuitrunner.dhtest` -- die Engine selbst
+Tests: `tests/pruef/werkzeuge/werkzeug_circuitrunner.dhtest` -- die Engine selbst
 (Monster-Reihenfolge/-Tempo, Bestzeiten, Passwort, Hinweissteine) und die
 Werkzeuge (Konverter-Rundweg, Demo-Schema und -Datei, Downloads gegen einen
 Gegenserver).

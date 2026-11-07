@@ -179,7 +179,7 @@ Neither blocks (`severity:"warning"`), both show up as markers in the editor:
   scope). The comparison ignores upper and lower case, because Drachenhauch
   does not distinguish them. Logic: `compiler.rs::warn_dim_typ_wechsel`
   (state per `Ctx`, so automatically separate per function), tests
-  `tests/pruef/dhrt_check.dhtest`.
+  `tests/pruef/werkzeugkette/dhrt_check.dhtest`.
 
 **Full native port COMPLETE (2026-06-03):** all 12 modules that were
 previously Python-only now run natively in dhrt. Only the editors still needed
@@ -541,7 +541,7 @@ The same limit **without an environment variable**:
 PROGRAM — `PROCESS_START` strips `DHRT_FRAMES` from its children so that a
 launched game does not die after N frames. A program that never asks
 `QUITREQUESTED()` keeps running anyway: **that is exactly how you spot it**
-(`tests/pruef/beispiele_gui_enden.dhtest`).
+(`tests/pruef/beispiele/beispiele_gui_enden.dhtest`).
 
 #### Contact sheet: checking a SEQUENCE instead of a moment
 
@@ -1044,7 +1044,7 @@ footer **backwards** and extracts the bytecode.
 > field plausible? payload valid UTF-8?), so that a chance occurrence of the
 > eight bytes in the signature block or in the JSON does not lead it astray.
 > Secured by Rust `#[test]`s in `main.rs` and
-> [tests/pruef/dhrt_export.dhtest](../../tests/pruef/dhrt_export.dhtest).
+> [tests/pruef/werkzeugkette/dhrt_export.dhtest](../../tests/pruef/werkzeugkette/dhrt_export.dhtest).
 >
 > **Only whoever holds the file can sign it.** A certificate of the
 > Drachenhauch publisher does not help exported games — they are created on
@@ -1094,7 +1094,7 @@ machine code stays in both: without it programs would compute up to a hundred
 times slower. The small ones are built with `python rust/build_runtime.py
 --laufzeiten`; the installer and the packages for macOS and Linux ship them.
 Checked in
-[tests/pruef/export_schlank.dhtest](../../tests/pruef/export_schlank.dhtest).
+[tests/pruef/werkzeugkette/export_schlank.dhtest](../../tests/pruef/werkzeugkette/export_schlank.dhtest).
 
 ```
 dhrt --export werkzeug.dh --schlank

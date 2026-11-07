@@ -207,7 +207,7 @@ Rahmen ab. Nicht unter Profiler/Debugger/Stop (die fuehren einen Stapel je
 `exec`). Dazu bindet `bind_params` im haeufigsten Fall die Parameter direkt,
 statt jeden Platz erst mit seiner Vorgabe zu belegen. Gemessen: ein leerer
 Aufruf 41 -> 29 ns, `aufrufe.dh` (fib) 0,85 gegen Schritt 1. Tests
-`tests/pruef/rahmenstapel.dhtest` (Erwartungen = Ausgabe des Baus davor; die
+`tests/pruef/laufzeit/rahmenstapel.dhtest` (Erwartungen = Ausgabe des Baus davor; die
 erste Fassung nannte bei einem Fehler drei Ebenen tief die Zeile des
 Aufrufers -- gefunden von genau diesem Vergleich).
 
@@ -285,7 +285,7 @@ dort sind die Variablen global (M4 Punkt 1). Ueber alle `.dh` des Repos:
 haeufigsten Gruende, in der VM zu bleiben, sind STRING (701, nur der erste
 Grund zaehlt), globale Variablen (488) und eingebaute Befehle (95).
 
-Pruefung: `tests/pruef/jit.dhtest` (jeder Randfall zweimal, Erwartung =
+Pruefung: `tests/pruef/laufzeit/jit.dhtest` (jeder Randfall zweimal, Erwartung =
 Ausgabe der VM; Gegenprobe: ohne die MOD-Korrektur bzw. ohne die
 Ueberlaufpruefung beim Multiplizieren fallen genau die Maschinencode-Faelle),
 die ganze Suite unter `DHRT_JIT=immer` (lokal `--schnell`: 3580 ok, 0 fehl),
@@ -463,7 +463,7 @@ ein gemeinsames Merkfeld 1,05; alles in eigene Funktionen 1,03, aber dann
 Weg (dieselbe Klasse wie zuletzt) in `dispatch`, der Rest in
 `member_laden`/`member_setzen` -- `objekte.dh` 0,76, `ganzzahl.dh` 1,04,
 alles andere 0,98..1,03. Es ist Codelage, keine Arbeit: die Schleife
-fasst nichts davon an. Pruefung `tests/pruef/objektlage.dhtest` (8, auf
+fasst nichts davon an. Pruefung `tests/pruef/sprache/objektlage.dhtest` (8, auf
 dem Bau davor ebenso gruen): eine Stelle mit zwei Klassen, deren Felder
 verschieden liegen, Vererbung, ein neu deklariertes Feld, PROPERTY und Feld
 an derselben Stelle, Methoden an einer Stelle mit wechselnden Klassen,

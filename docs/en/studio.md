@@ -659,28 +659,28 @@ a different number of parameters.
 | `DH_STUDIO_TEMPO=1` | writes (with `DH_STUDIO_LOG`) `tempo <ms>` per frame: how long the studio computed, without waiting for the next frame |
 | `DH_STUDIO_OEFFNEN=element[.table]` | opens an element at start like a click in the navigator (for a database optionally a table) |
 
-The test collections `tests/pruef/werkzeug_studio.dhtest` (stage 1) and
-`tests/pruef/werkzeug_studio2.dhtest` (stage 2) start the studio twice: once
+The test collections `tests/pruef/studio/werkzeug_studio.dhtest` (stage 1) and
+`tests/pruef/studio/werkzeug_studio2.dhtest` (stage 2) start the studio twice: once
 to measure, once with real clicks and keys. They also test the project model
 (`studio/projekt.dh`) without a window.
-`tests/pruef/werkzeug_studio3.dhtest` (stage 3) presses F5 and Ctrl+B, runs
+`tests/pruef/studio/werkzeug_studio3.dhtest` (stage 3) presses F5 and Ctrl+B, runs
 the generated program with a click and checks at which method and line an
-error lands. `tests/pruef/werkzeug_studio4.dhtest` (stage 4) creates timers
+error lands. `tests/pruef/studio/werkzeug_studio4.dhtest` (stage 4) creates timers
 and menus, runs the generated program through questions, a modal window,
 timers, a menu shortcut and an image, and halts in the debugger.
-`tests/pruef/werkzeug_studio_datenbank.dhtest` tests the databases: the core
+`tests/pruef/studio/werkzeug_studio_datenbank.dhtest` tests the databases: the core
 without a window (on the file, as SQLite sees it), the generated program on
 an older file, and the studio with real clicks into both grids, F5 and
-building; `tests/pruef/werkzeug_studio_datenbank2.dhtest` tests binding:
+building; `tests/pruef/studio/werkzeug_studio_datenbank2.dhtest` tests binding:
 methods and lists in the generated window including a click on a row,
 dragging and double-clicking columns into the window, and the choices in the
-inspector; `tests/pruef/werkzeug_studio_datenbank3.dhtest` tests references,
+inspector; `tests/pruef/studio/werkzeug_studio_datenbank3.dhtest` tests references,
 condition, sorting, search field and queries: the core, the generated window
 and the studio with real clicks in the tab, the navigator and the inspector;
-`tests/pruef/werkzeug_studio_datenbank4.dhtest` tests image columns (core,
+`tests/pruef/studio/werkzeug_studio_datenbank4.dhtest` tests image columns (core,
 generated window including the picture in the table cell, "Image …" and
-dragging in the studio) and `tests/pruef/werkzeug_studio_verbunde.dhtest`
-joins through references; `tests/pruef/werkzeug_studio_berichte.dhtest` tests
+dragging in the studio) and `tests/pruef/studio/werkzeug_studio_verbunde.dhtest`
+joins through references; `tests/pruef/studio/werkzeug_studio_berichte.dhtest` tests
 reports (layout with sums and pages, F5 with parameters, tab and preview),
-`tests/pruef/werkzeug_studio_berichte2.dhtest` their design (placing,
+`tests/pruef/studio/werkzeug_studio_berichte2.dhtest` their design (placing,
 dragging, handles, columns, properties, bands and groups, undo).

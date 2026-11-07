@@ -36,4 +36,4 @@ sowie `pakete/` und `target/` bleiben draußen, wie bei den Umbauten der IDE.
 Steht derselbe Klassenname in zwei Dateien, gilt der erste. Eine Vorfahrin,
 die das Projekt nicht kennt, steht klein über dem Kasten.
 
-Geprüft wird in `tests/pruef/werkzeug_klassendiagramm.dhtest`.
+Geprüft wird in `tests/pruef/werkzeuge/werkzeug_klassendiagramm.dhtest`.

@@ -174,7 +174,7 @@ Beide blockieren nicht (`severity:"warning"`), beide zeigen im Editor als Marker
   Geltungsbereich). Vergleich ohne Rücksicht auf Groß-/Kleinschreibung, weil
   Drachenhauch sie nicht unterscheidet. Logik: `compiler.rs::warn_dim_typ_wechsel`
   (Zustand je `Ctx`, also automatisch pro Funktion getrennt), Tests
-  `tests/pruef/dhrt_check.dhtest`.
+  `tests/pruef/werkzeugkette/dhrt_check.dhtest`.
 
 **Voll-Native-Portierung KOMPLETT (2026-06-03):** alle 12 zuvor Python-only-
 Module laufen jetzt nativ in dhrt. Nur die Editoren brauchten damals noch
@@ -530,7 +530,7 @@ Das braucht, wer aus einem PROGRAMM heraus prüft — `PROCESS_START` nimmt
 seinen Kindern `DHRT_FRAMES` ab, damit ein gestartetes Spiel nicht nach N
 Bildern stirbt. Ein Programm, das `QUITREQUESTED()` gar nicht fragt, läuft
 trotzdem weiter: **genau daran erkennt man es**
-(`tests/pruef/beispiele_gui_enden.dhtest`).
+(`tests/pruef/beispiele/beispiele_gui_enden.dhtest`).
 
 #### Kontaktbogen: einen ABLAUF pruefen statt eines Augenblicks
 
@@ -1009,7 +1009,7 @@ extrahiert den Bytecode.
 > vorn und prüft jeden Kandidaten (Längenfeld plausibel? Nutzlast gültiges
 > UTF-8?), damit ein zufälliges Vorkommen der acht Bytes im Signaturblock oder
 > im JSON nicht in die Irre führt. Abgesichert durch Rust-`#[test]`s in `main.rs`
-> und [tests/pruef/dhrt_export.dhtest](../tests/pruef/dhrt_export.dhtest).
+> und [tests/pruef/werkzeugkette/dhrt_export.dhtest](../tests/pruef/werkzeugkette/dhrt_export.dhtest).
 >
 > **Signieren kann nur, wer die Datei in der Hand hat.** Ein Zertifikat des
 > Drachenhauch-Herausgebers hilft exportierten Spielen nicht — die entstehen auf
@@ -1056,7 +1056,7 @@ Der Export sagt, welche er genommen hat (`Schlank: dhrt-konsole (16,1 MB statt
 Maschinencode bleibt in beiden: ohne ihn rechneten Programme bis zu hundertmal
 langsamer. Gebaut werden die kleinen mit `python rust/build_runtime.py
 --laufzeiten`; der Installer und die Pakete für macOS und Linux bringen sie mit.
-Geprüft in [tests/pruef/export_schlank.dhtest](../tests/pruef/export_schlank.dhtest).
+Geprüft in [tests/pruef/werkzeugkette/export_schlank.dhtest](../tests/pruef/werkzeugkette/export_schlank.dhtest).
 
 ```
 dhrt --export werkzeug.dh --schlank

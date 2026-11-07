@@ -1,4 +1,4 @@
-' Helfer fuer tests/pruef/db_server.dhtest: das Ziel eines Testservers aus
+' Helfer fuer tests/pruef/module/db_server.dhtest: das Ziel eines Testservers aus
 ' der Umgebung (DH_TEST_PG, DH_TEST_MYSQL) -- ohne sie ueberspringt sich der
 ' Fall -- und eine Tabelle mit eigenem Namen, damit Faelle, die gleichzeitig
 ' laufen, einander nichts wegnehmen.

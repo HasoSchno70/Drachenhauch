@@ -332,7 +332,7 @@ IF GlobalMemoryStatusEx(m) THEN PRINT "frei: "; m.frei \ 1048576; " MB"
 Auf Linux und macOS hat `struct utsname` (für `uname`) Felder fester Breite,
 65 Bytes unter Linux und 256 unter macOS -- die Lage hängt dort am System.
 Man gibt der Funktion den größeren Struct und liest danach durch die Lage
-des Systems (`tests/pruef/ffi_struct.dhtest` zeigt es).
+des Systems (`tests/pruef/sprache/ffi_struct.dhtest` zeigt es).
 
 ### Felder von Structs und Structs in Klassen
 
@@ -891,4 +891,4 @@ Cranelift -- derselben Bibliothek, die auch den Maschinencode erzeugt; er
 legt die Argumente nach der C-Aufrufkonvention des Systems ab. Entwurf und
 Entscheidungen: [entwurf-ffi.md](entwurf-ffi.md), Quelltext
 `rust/drachenhauch_runtime/src/ffi.rs`, Prüfungen
-`tests/pruef/ffi.dhtest`.
+`tests/pruef/sprache/ffi.dhtest`.

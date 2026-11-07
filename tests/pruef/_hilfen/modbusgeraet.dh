@@ -1,4 +1,4 @@
-' Ein Modbus-Geraet als Gegenstelle fuer tests/pruef/modbus.dhtest -- ein
+' Ein Modbus-Geraet als Gegenstelle fuer tests/pruef/geraete/modbus.dhtest -- ein
 ' eigener Prozess, weil MODBUS_* auf die Antwort WARTET (im selben Programm
 ' kaeme der Server nie dran). Er meldet "PORT=n" auf stderr und bedient
 ' Verbindungen nacheinander, bis 20 s lang keine kommt.

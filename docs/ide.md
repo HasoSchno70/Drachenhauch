@@ -151,7 +151,7 @@ beim Bau der Wiederherstellung. Dazu brauchte es zwei Dinge in der Laufzeit:
 Testlaufs mitzuzählen, und **ESC beendet ein Programm mit gui nicht mehr**
 (siehe `docs/builtins-grafik.md`) -- vorher schloss ein ESC im Dialog die
 ganze IDE, samt ungesicherter Arbeit. Tests
-`tests/pruef/werkzeug_ide_schliessen.dhtest` (echtes `WM_CLOSE` über
+`tests/pruef/ide/werkzeug_ide_schliessen.dhtest` (echtes `WM_CLOSE` über
 PowerShell).
 
 ## Woraus sie gebaut ist
@@ -526,7 +526,7 @@ bekäme. Diese Bausteine kamen mit ihr:
   Gewechselt wird beim nächsten Start (`sprache` in der `ide.json`,
   `DH_IDE_SPRACHE=en` übersteuert). Jeder Anzeigetext geht durch `tr$("...")`,
   die Tabelle steht in `ide/sprache/en.txt` (je Zeile Deutsch, Tabulator,
-  Englisch); `tests/pruef/werkzeug_ide_englisch.dhtest` meldet jeden Text ohne
+  Englisch); `tests/pruef/ide/werkzeug_ide_englisch.dhtest` meldet jeden Text ohne
   Übersetzung. Die Meldungen der Laufzeit folgen: die IDE setzt
   `DHRT_LANG=en`, also kommen Prüfmeldungen, Hinweise und die Fehler
   gestarteter Programme englisch, soweit der Katalog sie kennt (siehe
@@ -720,13 +720,13 @@ anderer Reiter war ungesichert), `aufrufer <anzahl>`,
 `wiederherstellung angeboten <anzahl>|verworfen|spaeter`,
 `wiederhergestellt <pfad>|(neu)`, `farbfeld <stelle>`, `farbe <wert>`, `leistenknopf <befehl>`, `statusfeld <nr>`, `pfad sprung <zeile>`, `ende`. So sehen die Prüfsammlungen, was sie
 getan hat; Tasten kommen über `AUTOMATION_PLAY` herein (F5 startet, F7
-prüft). Die Stände 1 bis 5 prüft `tests/pruef/werkzeug_ide.dhtest` ohne
-Python, die Stände 6 bis 12 `tests/pruef/werkzeug_ide_6_12.dhtest`, die
-Stände 13 bis 25 `tests/pruef/werkzeug_ide_13_25.dhtest`, was mehrere Läufe,
+prüft). Die Stände 1 bis 5 prüft `tests/pruef/ide/werkzeug_ide.dhtest` ohne
+Python, die Stände 6 bis 12 `tests/pruef/ide/werkzeug_ide_6_12.dhtest`, die
+Stände 13 bis 25 `tests/pruef/ide/werkzeug_ide_13_25.dhtest`, was mehrere Läufe,
 ein git-Repository oder eine Bildmessung braucht
-`tests/pruef/werkzeug_ide_sonderfaelle.dhtest`, die Absturz-Wiederherstellung
-`tests/pruef/werkzeug_ide_wiederherstellung.dhtest`, die Bausteine einzeln
-`tests/pruef/ide_bausteine.dhtest`. Seit Stand 38 ist keiner der Fälle mehr
+`tests/pruef/ide/werkzeug_ide_sonderfaelle.dhtest`, die Absturz-Wiederherstellung
+`tests/pruef/ide/werkzeug_ide_wiederherstellung.dhtest`, die Bausteine einzeln
+`tests/pruef/ide/ide_bausteine.dhtest`. Seit Stand 38 ist keiner der Fälle mehr
 in pytest: auch das PDF-Listing liegt in den Sonderfällen, seine gepackten
 Seiten entpackt `BUFFER_INFLATE`.
 

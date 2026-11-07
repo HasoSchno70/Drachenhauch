@@ -29,7 +29,7 @@ fehlt: seriell, usb, bluetooth, wlan (neu bauen mit: python rust/build_runtime.p
 The version comes from `rust/drachenhauch_runtime/Cargo.toml` (written there
 with three parts; `2026.13.0` is `2026.13` to the outside world); until
 2026-09-21 `pyproject.toml` and the Python version stood next to it.
-`tests/pruef/dhrt_werkzeuge.dhtest` checks that the runtime reports what is
+`tests/pruef/werkzeugkette/dhrt_werkzeuge.dhtest` checks that the runtime reports what is
 written there.
 
 ## `dhrt bild` — a picture of the running program
@@ -192,7 +192,7 @@ Whoever tests the real clipboard sets `DHRT_ZWISCHENABLAGE=system` in
 `--- umgebung` (as `zwischenablage.dhtest` does).
 
 **Testing tools without Python** (since stage 32): this is how the form
-designer's tests run in `tests/pruef/werkzeug_formdesigner.dhtest`. Two ways
+designer's tests run in `tests/pruef/werkzeuge/werkzeug_formdesigner.dhtest`. Two ways
 side by side — real clicks through a recording (insertion
 `AUTOMATION_PLAY("ev.txt")` after `SETFPS(60)`, fixture file
 `--- datei _programm/ev.txt`), or directly through the tool's subroutines
@@ -219,16 +219,16 @@ neu button 248 184
 ```
 
 Since stage 33 the animation FSM editor and the score editor run this way too
-(`tests/pruef/werkzeug_animfsm.dhtest`, `tests/pruef/werkzeug_notenblatt.dhtest`):
+(`tests/pruef/werkzeuge/werkzeug_animfsm.dhtest`, `tests/pruef/werkzeuge/werkzeug_notenblatt.dhtest`):
 the copy without `WINDOW_MAXIMIZE()` (`--- streichen`), and what was saved is
 read by a `--- nachher` program — for the animation editor the runtime itself
 (load, set up, one step), for the tracker export a fixed grid.
-Since stage 34 the IDE as well (`tests/pruef/werkzeug_ide.dhtest`, states 1
+Since stage 34 the IDE as well (`tests/pruef/ide/werkzeug_ide.dhtest`, states 1
 to 5): the `nachher` program reads its log with `READLINES` and checks exact
 lines, orders and counts — `--- inhalt` only searches for substrings, and
 `geprueft 1` would also be found in `geprueft 10`. States 6 to 12 follow in
-`tests/pruef/werkzeug_ide_6_12.dhtest`, 13 to 25 in
-`tests/pruef/werkzeug_ide_13_25.dhtest` (a text with quotation marks or a line
+`tests/pruef/ide/werkzeug_ide_6_12.dhtest`, 13 to 25 in
+`tests/pruef/ide/werkzeug_ide_13_25.dhtest` (a text with quotation marks or a line
 break gets into the reading program through `CHR$(34)`/`CHR$(10)` there —
 neither is allowed inside a string); an IDE preset comes in there as the
 fixture file `ide.json` in `_programm/`. **Trap:** a tool that derives further
@@ -326,8 +326,8 @@ alternative would be to **invent** the expected lines — green and worthless.
 The summary names files and cases:
 
 ```text
-  ok      tests\pruef\coroutines.dhtest  (13 Faelle, 0.61s)
-  FEHLER  tests\pruef\array_literal.dhtest  (1 von 23 Faellen, 0.90s)
+  ok      tests\pruef\sprache\coroutines.dhtest  (13 Faelle, 0.61s)
+  FEHLER  tests\pruef\sprache\array_literal.dhtest  (1 von 23 Faellen, 0.90s)
           FEHL  Zeile 61: leeres Feld: Ausgabezeile 1: erwartet '0', erhalten '1'
 
 2 Datei(en), 1 ok, 1 mit Fehlern; 36 Faelle, 35 ok, 1 fehl, 0 uebersprungen  (1.52s)
@@ -335,7 +335,7 @@ The summary names files and cases:
 
 The project's collections live under `tests/pruef/`; the CI calls
 `dhrt test tests/pruef` directly (until 2026-09-20 through a pytest anchor).
-The format itself is checked by `tests/pruef/dhrt_test_format.dhtest` — on a
+The format itself is checked by `tests/pruef/werkzeugkette/dhrt_test_format.dhtest` — on a
 collection the case writes, with expected messages, line numbers and summary.
 
 ## `dhrt fmt` — writing consistently

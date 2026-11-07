@@ -178,7 +178,7 @@ Vergleich der beiden ist die Prüfung, dass Stufe 2 dasselbe rechnet.
 
 ## 9. Prüfungen
 
-Eine Sammlung `tests/pruef/feld_untergrenze.dhtest`, jeder Fall mit und ohne
+Eine Sammlung `tests/pruef/sprache/feld_untergrenze.dhtest`, jeder Fall mit und ohne
 Maschinencode:
 
 * Anlegen, Lesen, Schreiben an beiden Rändern; ein Index davor und dahinter
@@ -241,7 +241,7 @@ entschieden:
 * Der Maschinencode lehnt Felder mit Untergrenze ab (`feld_beschreiben`,
   `feld_passt`, `gfeld_lesen`, und statisch beim DECLARE_ARRAY_NAME mit
   Bereich).
-* Prueft `tests/pruef/feld_untergrenze.dhtest` (20 Faelle, VM und
+* Prueft `tests/pruef/sprache/feld_untergrenze.dhtest` (20 Faelle, VM und
   Maschinencode mit derselben Erwartung, ein .dhc von 2026.38). Gegenprobe:
   ohne den Abzug in `flat_index` fallen 12 der 20.
 

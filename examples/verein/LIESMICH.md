@@ -45,7 +45,7 @@ es neu an.
 - **Beitragsliste:** ein `LEFT JOIN` über die Zahlungen des Jahres, die
   Beträge rechtsbündig über `PDF_TEXT_WIDTH`.
 
-Geprüft wird es in `tests/pruef/beispiel_verein.dhtest`: derselbe Ablauf
+Geprüft wird es in `tests/pruef/beispiele/beispiel_verein.dhtest`: derselbe Ablauf
 (anlegen, ein Kollege speichert dazwischen, überschreiben, neu laden, ein
 Kollege löscht, Zahlung, Liste) gegen SQLite, PostgreSQL und MySQL mit
 derselben Erwartung.

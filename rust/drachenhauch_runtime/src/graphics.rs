@@ -1902,7 +1902,7 @@ impl Graphics {
     ///
     /// `DHRT_KEIN_FENSTER` tut so, als ginge keins: auf einem Rechner mit
     /// Bildschirm ist der Weg sonst nicht zu pruefen
-    /// (tests/pruef/kein_fenster.dhtest). Der echte Weg laeuft im Paket-Lauf
+    /// (tests/pruef/laufzeit/kein_fenster.dhtest). Der echte Weg laeuft im Paket-Lauf
     /// der CI (package.yml: Linux ohne xvfb, macOS ohne OpenGL).
     fn fenster_bauen(builder: raylib::RaylibBuilder) -> Result<(RaylibHandle, RaylibThread), String> {
         // Der Schalter loest DENSELBEN Panic aus wie raylib-rs, und zwar an

@@ -194,7 +194,7 @@ Was die Qt-Fassung konnte und dieser Editor nicht:
 
 ## Prüfung
 
-`tests/pruef/werkzeug_tilemap.dhtest` fährt den Editor mit echten Klicks und
+`tests/pruef/werkzeuge/werkzeug_tilemap.dhtest` fährt den Editor mit echten Klicks und
 Tasten: DH-Code samt Bild des erzeugten Renderers (leere und gemalte Karte),
 das Deuten der Eigenschaftswerte, `solid` setzen und entfernen, Objekt-Ebenen
 (ziehen, klicken, wählen, `Entf`), mehrere Tilesets mit Pipette und

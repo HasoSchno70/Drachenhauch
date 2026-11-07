@@ -7,7 +7,7 @@ This page collects what you bring along from other languages and what it is
 called here. Most of it the compiler tells you itself as soon as you write it
 the way you are used to.
 
-All cases below are checked in `tests/pruef/umstieg.dhtest`.
+All cases below are checked in `tests/pruef/sprache/umstieg.dhtest`.
 
 ## What simply works
 

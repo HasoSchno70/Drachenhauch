@@ -44,7 +44,7 @@ follows, and only sends if it is the newest.
   blocks and comment docs from the text, with comments and strings blanked
   out; deliberately not a lexer, because a language server sees half-typed
   text.
-* Touchstone: `tests/pruef/dhrt_lsp.dhtest` drives the real process over
+* Touchstone: `tests/pruef/werkzeugkette/dhrt_lsp.dhtest` drives the real process over
   stdio (capabilities, diagnostics, definition, hover, completion,
   occurrences, outline, broken framing, clean shutdown); plus Rust tests in
   both files.

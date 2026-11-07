@@ -85,6 +85,6 @@ Das Feature `gles` ersetzt `graphics`; die Pins brauchen keines.
 Das Paket baut die CI auf einem ARM-Rechner von GitHub und fährt dort unter
 `xvfb` mit Mesa (llvmpipe, OpenGL ES 3.2) Licht, Schatten, PBR mit
 HDR-Umgebung, Instancing, Shader, Post-FX, Render-Ziele und Programme mit
-Fenster (`tests/pruef/gles.dhtest` und weitere). Die Pins prüft sie gegen
+Fenster (`tests/pruef/grafik/gles.dhtest` und weitere). Die Pins prüft sie gegen
 die Simulatoren des Kernels. Auf einem echten Raspberry Pi ist Drachenhauch
 **ungeprüft** — sein Grafiktreiber (V3D) ist ein anderer als llvmpipe.

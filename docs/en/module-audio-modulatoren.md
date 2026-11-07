@@ -103,7 +103,7 @@ stays at the last value. If you want a fixed value again, set it directly
 
 - `examples/150_audio_modulatoren.dh` — auto-wah with a switchable waveform
   and a tweener on the reverb, with a spectrum display.
-- `tests/pruef/audio_modulators.dhtest` — the core test **measures** through
+- `tests/pruef/ton/audio_modulators.dhtest` — the core test **measures** through
   the FFT tap that the treble share of the output really fluctuates (measured:
   without modulation 0.065–0.218, with modulation 0.736–0.830; the threshold
   0.45 lies in the middle). A counter-check without modulation makes sure the

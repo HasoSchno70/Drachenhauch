@@ -1,0 +1,186 @@
+' Quellcodeverwaltung in der IDE (Strg+Alt+G): git status als Liste mit
+' Kaestchen (vorgemerkt = im Index), Uebergeben mit Nachricht, Verwerfen
+' einer Aenderung. Das Repository legt ein `--- vorher` an; `_programm/`
+' (die IDE-Kopie) steht in der .gitignore.
+
+=== vormerken, uebergeben, verwerfen
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 40 THEN befehl("git_fenster")
+IF prBild = 42 THEN
+    DIM prI AS INTEGER
+    FOR prI = 0 TO LEN(qvEintraege) - 1
+        protokoll("pr datei " + qvEintraege[prI].pfad + " " + GUI_LISTBOX_ITEM(lstQv, prI))
+        IF qvEintraege[prI].pfad = "a.dh" THEN GUI_LISTBOX_SET_CHECKED(lstQv, prI, TRUE)
+    NEXT
+END IF
+IF prBild = 46 THEN
+    qvUebergeben()
+    GUI_SET_TEXT(tfQvNachricht, "zweiter stand")
+    qvUebergeben()
+END IF
+IF prBild = 48 THEN qvVerwerfen("b.dh")
+IF prBild = 50 THEN EXIT(0)
+--- argumente
+a.dh
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+--- vorher
+FUNCTION git(a AS STRING, b AS STRING, c AS STRING, d AS STRING) AS INTEGER
+    DIM p AS INTEGER
+    IF d <> "" THEN
+        p = PROCESS_START("git", a, b, c, d)
+    ELSEIF c <> "" THEN
+        p = PROCESS_START("git", a, b, c)
+    ELSE
+        p = PROCESS_START("git", a, b)
+    END IF
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    WHILE PROCESS_RUNNING(p) AND MILLIS() < bis
+        SLEEP(20)
+    WEND
+    RETURN PROCESS_CODE(p)
+END FUNCTION
+WRITEALL(".gitignore", "_programm/" + CHR$(10))
+WRITEALL("a.dh", "PRINT(1)" + CHR$(10))
+WRITEALL("b.dh", "PRINT(2)" + CHR$(10))
+IF git("init", "-q", "", "") <> 0 THEN EXIT(3)
+IF git("config", "user.name", "Test", "") <> 0 THEN EXIT(4)
+IF git("config", "user.email", "t@t", "") <> 0 THEN EXIT(5)
+IF git("add", ".", "", "") <> 0 THEN EXIT(6)
+IF git("commit", "-q", "-m", "erst") <> 0 THEN EXIT(7)
+WRITEALL("a.dh", "PRINT(10)" + CHR$(10))
+WRITEALL("b.dh", "PRINT(20)" + CHR$(10))
+WRITEALL("neu.dh", "PRINT(3)" + CHR$(10))
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 3) = "qv " THEN PRINT L[i]
+NEXT
+FUNCTION lauf$(a AS STRING, b AS STRING, c AS STRING) AS STRING
+    DIM p AS INTEGER : p = PROCESS_START("git", a, b, c)
+    DIM t AS STRING : t = ""
+    DIM leer AS INTEGER : leer = 0
+    WHILE leer < 5
+        DIM s AS STRING : s = PROCESS_READ$(p)
+        IF s = "" AND NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1 : SLEEP(30)
+        ELSE
+            t = t + s
+        END IF
+    WEND
+    RETURN TRIM$(REPLACE$(t, CHR$(13), ""))
+END FUNCTION
+PRINT "letzte "; lauf$("log", "-1", "--pretty=%s")
+PRINT "status "; lauf$("status", "--porcelain", "-uall")
+PRINT "b "; TRIM$(READLINES("b.dh")[0])
+--- erwartet
+qv 3 0
+pr datei a.dh a.dh
+pr datei b.dh b.dh
+pr datei neu.dh neu.dh
+qv vorgemerkt a.dh
+qv 3 1
+qv commit ohne nachricht
+qv 2 0
+qv commit zweiter stand
+qv 1 0
+qv verworfen b.dh
+letzte zweiter stand
+status ?? nachher.dh
+?? neu.dh
+b PRINT(2)
+
+=== grosse und binaere dateien im unterschied
+' Stresstest 2026-10-02: der Unterschied zeigte eine neue Datei ganz und
+' eine Aenderung so lang, wie git sie liefert -- und beim Oeffnen des
+' Fensters steht die erste Datei schon gewaehlt. Eine 20-MB-Protokolldatei
+' ganz oben hielt die IDE sekundenlang fest, und jedes Bild danach zerlegte
+' 20 MB. Jetzt: eine neue Datei ueber 512 KB steht nur mit ihrer Groesse da,
+' eine binaere (mit Nullbyte) als binaer, und ein langer Unterschied ist an
+' einer Zeilengrenze gekuerzt, mit einem Satz dazu.
+DIM prBild AS INTEGER : prBild = 0
+DIM prD AS FLOAT : prD = 0.0
+--- programm ../../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 40 THEN
+    DIM prT AS FLOAT : prT = GET_TIME()
+    befehl("git_fenster")
+    prD = GET_TIME() - prT
+END IF
+IF prBild = 44 THEN
+    DIM prI AS INTEGER
+    FOR prI = 0 TO LEN(qvEintraege) - 1
+        DIM prU AS FLOAT : prU = GET_TIME()
+        qvDiffZeigen(prI)
+        DIM prText AS STRING : prText = GUI_TEXT(taQvDiff)
+        DIM prZ AS ARRAY OF STRING : prZ = SPLIT$(prText, NL)
+        protokoll("pr " + qvEintraege[prI].pfad + " kurz " + STR$(LEN(prText) < 600000) + " flott " + STR$(GET_TIME() - prU < 0.5) + " schluss " + LEFT$(prZ[LEN(prZ) - 1], 31))
+    NEXT
+    protokoll("pr fenster flott " + STR$(prD < 0.5))
+    EXIT(0)
+END IF
+--- argumente
+klein.dh
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+--- vorher
+FUNCTION git(a AS STRING, b AS STRING, c AS STRING, d AS STRING) AS INTEGER
+    DIM p AS INTEGER
+    IF d <> "" THEN
+        p = PROCESS_START("git", a, b, c, d)
+    ELSEIF c <> "" THEN
+        p = PROCESS_START("git", a, b, c)
+    ELSE
+        p = PROCESS_START("git", a, b)
+    END IF
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    WHILE PROCESS_RUNNING(p) AND MILLIS() < bis
+        SLEEP(20)
+    WEND
+    RETURN PROCESS_CODE(p)
+END FUNCTION
+WRITEALL(".gitignore", "_programm/" + CHR$(10))
+WRITEALL("klein.dh", "PRINT(1)" + CHR$(10))
+DIM z AS ARRAY OF STRING : z = []
+DIM i AS INTEGER
+FOR i = 1 TO 100000
+    ARRAY_PUSH(z, "zeile " + STR$(i))
+NEXT
+WRITEALL("daten.txt", JOIN$(z, CHR$(10)) + CHR$(10))
+IF git("init", "-q", "", "") <> 0 THEN EXIT(3)
+IF git("config", "user.name", "Test", "") <> 0 THEN EXIT(4)
+IF git("config", "user.email", "t@t", "") <> 0 THEN EXIT(5)
+IF git("config", "core.autocrlf", "false", "") <> 0 THEN EXIT(8)
+IF git("add", ".", "", "") <> 0 THEN EXIT(6)
+IF git("commit", "-q", "-m", "erst") <> 0 THEN EXIT(7)
+' Jede Zeile geaendert: der Unterschied ist doppelt so lang wie die Datei.
+FOR i = 0 TO LEN(z) - 1
+    z[i] = "neu " + z[i]
+NEXT
+WRITEALL("daten.txt", JOIN$(z, CHR$(10)) + CHR$(10))
+WRITEALL("0gross.log", REPEAT$("protokollzeile mit etwas text darin" + CHR$(10), 600000))
+WRITEALL("1bild.bin", "kopf" + CHR$(0) + CHR$(1) + CHR$(2) + "rest")
+WRITEALL("2neu.dh", "PRINT(3)" + CHR$(10))
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " THEN PRINT L[i]
+NEXT
+--- erwartet
+pr daten.txt kurz TRUE flott TRUE schluss ~ gekürzt: der Unterschied ist 
+pr 0gross.log kurz TRUE flott TRUE schluss +++ 0gross.log (neu, 21093 KB -
+pr 1bild.bin kurz TRUE flott TRUE schluss +++ 1bild.bin (neu, binär)
+pr 2neu.dh kurz TRUE flott TRUE schluss +PRINT(3)
+pr fenster flott TRUE

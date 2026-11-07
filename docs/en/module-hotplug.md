@@ -64,7 +64,7 @@ HID device with several interfaces counts once.
 
 For testing without a device: `DHRT_GERAETE=datei` reads the lists from a text
 file instead of the system, one line per device as `art:name`. Changing the
-file produces the reports (`tests/pruef/hotplug.dhtest`).
+file produces the reports (`tests/pruef/geraete/hotplug.dhtest`).
 
 **Not tested:** real plugging and unplugging. On macOS, CoreMIDI may only see
 new MIDI devices once the program has a window (the event loop then runs);

@@ -203,6 +203,6 @@ SPI_CLOSE(adc)
 Without a Pi: the CI loads the kernel's simulators (`gpio-sim` for GPIO,
 `i2c-stub` for I2C) on an ordinary Linux machine and runs writing, reading,
 resistors, edges with their time, I2C registers and the scan against them
-(`tests/pruef/pins.dhtest`). There is no simulator for SPI: what is tested is
+(`tests/pruef/geraete/pins.dhtest`). There is no simulator for SPI: what is tested is
 the layout of the requests and the messages. On a real Raspberry Pi the module
 is **untested**.

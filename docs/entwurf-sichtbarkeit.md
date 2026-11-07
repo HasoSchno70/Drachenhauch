@@ -32,7 +32,7 @@ Hebel:
   und `docs/` als HTML, `llms.txt` (Kurzfassung für Sprachmodelle nach
   llmstxt.org) und `llms-full.txt` (das ganze englische Handbuch), dazu
   `sitemap.xml` und `robots.txt`. Geprüft in
-  `tests/pruef/werkzeug_website.dhtest` (jeder Verweis jeder Seite trifft).
+  `tests/pruef/werkzeuge/werkzeug_website.dhtest` (jeder Verweis jeder Seite trifft).
 
 **Noch einzuschalten (Einstellung des Repositorys):** Pages mit der Quelle
 "GitHub Actions"; danach die Homepage-Angabe des Repositorys auf die

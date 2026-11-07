@@ -178,7 +178,7 @@ PROBE_ENDE()
 | `PROBE_BEFUNDE$(datei$)`, `PROBE_LETZTE$(art$)`, `PROBE_ANZAHL()` | findings of a file, the last message of a kind, all messages |
 | `PROBE_ENDE()`, `PROBE_LAEUFT()` | send `ende` and wait until the plugin has quit |
 
-The bundled plugins are tested this way (`tests/pruef/plugin_probe.dhtest`).
+The bundled plugins are tested this way (`tests/pruef/werkzeugkette/plugin_probe.dhtest`).
 A plugin from the template already brings its test: `test.dhtest` next to
 the `plugin.dh`, with `DH_PATH` pointing to the IDE's folder (where
 `dh_plugin.dh` and the probe live). Run it with Ctrl+Alt+F5 while it is in

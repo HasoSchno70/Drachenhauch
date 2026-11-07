@@ -1,0 +1,158 @@
+' Das Beispiel examples/bastelzentrale: ein Leitstand fuer Seriell, Arduino
+' (Firmata), MQTT, Modbus, Mikrofon/MIDI, Kamera und die Pins des Raspberry Pi,
+' dazu eine Seite fuer das Handy ueber httpd + WebSocket, mDNS und OSC.
+'
+' Alles laeuft mit DH_BZ_DEMO=1 ohne Geraete: jeder Bereich spielt seins.
+' Die Bastelzentrale laeuft als eigener Prozess, der Fall ist der Gegenueber
+' -- Browser, Handy, OSC-App. mDNS bleibt aus (DH_BZ_MDNS=0), damit kein Lauf
+' etwas im Heimnetz ankuendigt.
+--- seriell
+--- langsam
+
+=== jeder bereich zeichnet sich
+' Je Bereich ein Bild nach 90 Bildern. Geprueft am Bild: die Probekamera
+' zeigt ihren weissen Balken in der Vorschau, und vom Lauflicht der
+' Pi-Eingaenge (Demo) leuchtet genau eine Lampe.
+IMPORT "dhrtlauf.dh"
+SETENV("DH_BZ_DEMO", "1")
+SETENV("DH_BZ_MDNS", "0")
+SETENV("DH_BZ_WEB", "0")
+SETENV("DH_BZ_WS", "0")
+SETENV("DH_BZ_OSC", "0")
+DIM b AS INTEGER
+FOR b = 0 TO 7
+    SETENV("DH_BZ_BEREICH", STR$(b))
+    DIM ziel AS STRING : ziel = CWD$() + "/b" + STR$(b) + ".png"
+    dlStarten(["bild", ARG$(0), ziel, "90"])
+    PRINT b; " "; dlCode; " "; FILEEXISTS(ziel)
+    IF dlCode <> 0 THEN PRINT dlErr
+NEXT
+DIM kam AS IMAGE : kam = LOADIMAGE(CWD$() + "/b6.png")
+PRINT "testbild weiss "; GETPIXEL(kam, 300, 300) = &HFFFFFF
+DIM pins AS IMAGE : pins = LOADIMAGE(CWD$() + "/b7.png")
+DIM an AS INTEGER : an = 0
+DIM k AS INTEGER
+FOR k = 0 TO 3
+    IF GETPIXEL(pins, 622, 183 + 60 * k) = RGB(255, 190, 60) THEN an = an + 1
+NEXT
+PRINT "lampen an "; an
+--- datei dhrtlauf.dh
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
+
+--- argumente
+{sammlung}/../../../examples/bastelzentrale/main.dh
+--- erwartet
+0 0 TRUE
+1 0 TRUE
+2 0 TRUE
+3 0 TRUE
+4 0 TRUE
+5 0 TRUE
+6 0 TRUE
+7 0 TRUE
+testbild weiss TRUE
+lampen an 1
+
+=== handy seite websocket und osc steuern dasselbe
+' Die Seite liefert sich mit dem richtigen WebSocket-Port aus; ein Befehl
+' ueber /befehl, einer ueber den WebSocket und zwei ueber OSC landen alle im
+' Stand, den /zustand und der WebSocket melden.
+IMPORT "html"
+IMPORT "json"
+IMPORT "websocket"
+IMPORT "osc"
+SETENV("DH_BZ_DEMO", "1")
+SETENV("DH_BZ_MDNS", "0")
+SETENV("DH_BZ_WEB", "48190")
+SETENV("DH_BZ_WS", "48191")
+SETENV("DH_BZ_OSC", "48192")
+CONST BASIS = "http://127.0.0.1:48190"
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", "--bilder", "3000", ARG$(0))
+
+FUNCTION holen$(pfad AS STRING) AS STRING
+    RETURN HTTP_GET(BASIS + pfad)
+END FUNCTION
+FUNCTION stand() AS JSON_HANDLE
+    RETURN JSON_PARSE(holen$("/zustand"))
+END FUNCTION
+
+' Warten, bis die Seite antwortet.
+DIM da AS BOOLEAN : da = FALSE
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE NOT da AND MILLIS() - t0 < 30000 AND PROCESS_RUNNING(p)
+    TRY
+        holen$("/zustand")
+        da = TRUE
+    CATCH e
+        SLEEP(200)
+    END TRY
+WEND
+IF NOT da THEN
+    PRINT "die Bastelzentrale antwortet nicht"
+    PRINT PROCESS_READ$(p); PROCESS_ERR$(p)
+    EXIT(1)
+END IF
+
+DIM seite AS STRING : seite = holen$("/")
+PRINT "seite "; INSTR(seite, "<title>Bastelzentrale</title>") >= 0; " "; INSTR(seite, "const WSPORT = 48191;") >= 0; " "; INSTR(seite, "%%") < 0
+PRINT "befehl "; holen$("/befehl?c=" + URL_ENCODE("pin 13 1"))
+PRINT "falsch "; holen$("/befehl?c=" + URL_ENCODE("tanzen 1"))
+DIM s AS JSON_HANDLE : s = stand()
+PRINT "pin 13 "; JSON_GET_INT(s, "pins.6.p"); " "; JSON_GET_BOOL(s, "pins.6.an"); " taster a5 "; JSON_GET_INT(s, "analog.5")
+
+DIM ws AS WEBSOCKET : ws = WS_CONNECT("ws://127.0.0.1:48191/")
+DIM erste AS STRING : erste = ""
+t0 = MILLIS()
+WHILE erste = "" AND MILLIS() - t0 < 5000
+    IF WS_NEXT(ws) THEN erste = WS_MESSAGE$(ws)
+    SLEEP(20)
+WEND
+DIM w AS JSON_HANDLE : w = JSON_PARSE(erste)
+PRINT "websocket "; JSON_LEN(w, "analog"); " "; JSON_LEN(w, "pins"); " "; JSON_LEN(w, "gpio"); " "; JSON_LEN(w, "modbus")
+WS_SEND(ws, "servo 120")
+WS_SEND(ws, "unsinn")
+DIM fehler AS STRING : fehler = ""
+t0 = MILLIS()
+WHILE fehler = "" AND MILLIS() - t0 < 5000
+    WHILE WS_NEXT(ws)
+        DIM m AS STRING : m = WS_MESSAGE$(ws)
+        IF INSTR(m, CHR$(34) + "fehler" + CHR$(34)) >= 0 THEN fehler = m
+    WEND
+    SLEEP(20)
+WEND
+PRINT "fehler "; JSON_GET_STRING(JSON_PARSE(fehler), "fehler")
+
+DIM o AS OSC : o = OSC_OPEN(0)
+OSC_SEND(o, "127.0.0.1", 48192, "/gpio/17", 1)
+OSC_SEND(o, "127.0.0.1", 48192, "/mqtt/werkstatt/licht", "an")
+SLEEP(600)
+s = stand()
+DIM th AS STRING : th = ""
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(s, "themen") - 1
+    IF JSON_GET_STRING(s, "themen." + STR$(i) + ".0") = "werkstatt/licht" THEN th = JSON_GET_STRING(s, "themen." + STR$(i) + ".1")
+NEXT
+PRINT "servo "; JSON_GET_INT(s, "servo"); " gpio 17 "; JSON_GET_BOOL(s, "gpio.0.an"); " mqtt "; th
+OSC_SEND(o, "127.0.0.1", 48192, "/servo", 0.25)
+SLEEP(600)
+s = stand()
+PRINT "servo "; JSON_GET_INT(s, "servo")
+PRINT "demo seriell "; JSON_LEN(s, "seriell"); " modbus 1 "; JSON_GET_INT(s, "modbus.1") > 100
+PRINT "zustand "; JSON_GET_STRING(s, "zustand.8.0"); " handys "; JSON_GET_INT(s, "handys")
+PRINT "osc "; JSON_GET_STRING(s, "zustand.9.1")
+WS_CLOSE(ws)
+PROCESS_KILL(p)
+--- argumente
+{sammlung}/../../../examples/bastelzentrale/main.dh
+--- erwartet
+seite TRUE TRUE TRUE
+befehl ok
+falsch unbekannt: tanzen 1
+pin 13 13 TRUE taster a5 1023
+websocket 6 7 8 10
+fehler unbekannt: unsinn
+servo 120 gpio 17 TRUE mqtt an
+servo 45
+demo seriell 3 modbus 1 TRUE
+zustand Handy-Seite handys 1
+osc Port 48192, 3 Nachrichten

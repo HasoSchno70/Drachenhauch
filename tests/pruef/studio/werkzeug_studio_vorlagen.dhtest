@@ -1,0 +1,229 @@
+' Drachenhauch Studio: neues Projekt aus einer Vorlage (studio/vorlagen/).
+' Strg+Umschalt+N oeffnet die Auswahl; das Projekt daraus ist nicht gesichert,
+' Sichern (und F5) fragt nach einem Ordner -- in Pruefungen DH_STUDIO_ORDNER.
+' Die Vorlage selbst wird nie beschrieben.
+
+--- langsam
+=== aus der vorlage adressbuch: anlegen, starten, sichern
+IMPORT "laeufer.dh"
+SETENV("DH_STUDIO_ORDNER", CWD$() + "/neu")
+SETENV("DH_STUDIO_LAUF_BILDER", "30")
+MKDIR(CWD$() + "/neu")
+' Erster Lauf: nur die Auswahl oeffnen und die Lagen der Zeilen messen.
+DIM m AS STRING : m = CWD$() + "/m.log"
+slHin(10, 10)
+slWarten(6)
+slMit([341, 340], 78)
+slWarten(12)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+slStarten(m, CWD$() + "/ev.txt", slBild + 10, "")
+DIM vx AS INTEGER
+DIM vy AS INTEGER
+(vx, vy) = slLage(m, "vorlage Adressbuch mit Datenbank")
+PRINT "vier vorlagen "; slHat(m, "vorlagendialog Leer,Formular mit Eingaben,Adressbuch mit Datenbank,Zeichenfläche mit Timer")
+' Zweiter Lauf: Zeile doppelt anklicken, dann F5.
+slZeilen = [] : slBild = 0
+slHin(10, 10)
+slWarten(6)
+slMit([341, 340], 78)
+slWarten(12)
+slHin(vx, vy)
+slHin(vx, vy)
+slRunter()
+slHoch()
+slRunter()
+slHoch()
+slWarten(10)
+slTaste(294)
+slWarten(160)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = slStarten(log, CWD$() + "/ev.txt", slBild + 20, "")
+PRINT "aus vorlage "; slHat(log, "neues projekt aus vorlage 3_datenbank")
+PRINT "gesichert "; LEN(slAnfang(log, "gesichert ")) > 0
+PRINT "beendet "; slHat(log, "beendet 0")
+DIM d AS STRING
+FOR EACH d IN ["projekt.dhstudio", "App.dh", "Datenbank.dh", "Hauptfenster.dh", "Hauptfenster.dhform", "_studio/main.dh"]
+    PRINT d; " "; FILEEXISTS(CWD$() + "/neu/" + d)
+NEXT
+' Die Vorlage bleibt, wie sie ist: kein _studio, keine Datenbank darin.
+DIM vlDb AS STRING : vlDb = PATHJOIN(DIRNAME(ARG$(0)), "vorlagen/3_datenbank")
+PRINT "vorlage unberuehrt "; FILEEXISTS(PATHJOIN(vlDb, "projekt.dhstudio")) AND NOT DIREXISTS(PATHJOIN(vlDb, "_studio"))
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- erwartet
+vier vorlagen TRUE
+aus vorlage TRUE
+gesichert TRUE
+beendet TRUE
+projekt.dhstudio TRUE
+App.dh TRUE
+Datenbank.dh TRUE
+Hauptfenster.dh TRUE
+Hauptfenster.dhform TRUE
+_studio/main.dh TRUE
+vorlage unberuehrt TRUE
+
+=== jede vorlage uebersetzt und laeuft
+' Jede Vorlage kopiert, im Studio geoeffnet, F5: geprueft ohne Fehler, das
+' Programm endet sauber, der erzeugte Code meldet nichts.
+IMPORT "laeufer.dh"
+SETENV("DH_STUDIO_LAUF_BILDER", "30")
+DIM quelle AS STRING : quelle = PATHJOIN(DIRNAME(ARG$(0)), "vorlagen")
+slHin(10, 10)
+slWarten(10)
+slTaste(294)
+slWarten(160)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+DIM v AS STRING
+FOR EACH v IN ["1_leer", "2_formular", "3_datenbank", "4_zeichnen"]
+    DIM ziel AS STRING : ziel = CWD$() + "/" + v
+    MKDIR(ziel)
+    DIM f AS STRING
+    FOR EACH f IN DIRLIST(quelle + "/" + v)
+        COPYFILE(quelle + "/" + v + "/" + f, ziel + "/" + f)
+    NEXT
+    DIM log AS STRING : log = CWD$() + "/" + v + ".log"
+    DIM aus AS STRING : aus = slStarten(log, CWD$() + "/ev.txt", slBild + 20, ziel)
+    DIM c AS INTEGER : c = PROCESS_START("dhrt", "--check", ziel + "/_studio/main.dh")
+    DIM cz AS STRING : cz = ""
+    DIM leer AS INTEGER : leer = 0
+    WHILE leer < 5
+        DIM ct AS STRING : ct = PROCESS_READ$(c)
+        IF ct <> "" THEN
+            cz = cz + TRIM$(REPLACE$(ct, CHR$(13), ""))
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(c) THEN
+            leer = leer + 1
+            SLEEP(30)
+        END IF
+    WEND
+    PRINT v; " geprueft "; slHat(log, "geprueft 0 0"); " beendet "; slHat(log, "beendet 0"); " check "; cz
+    IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+NEXT
+--- argumente
+{sammlung}/../../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- erwartet
+1_leer geprueft TRUE beendet TRUE check []
+2_formular geprueft TRUE beendet TRUE check []
+3_datenbank geprueft TRUE beendet TRUE check []
+4_zeichnen geprueft TRUE beendet TRUE check []
+
+=== jede englische vorlage uebersetzt und laeuft
+' Dasselbe fuer die englischen Vorlagen (vorlagen/en), mit dem Studio auf
+' Englisch.
+IMPORT "laeufer.dh"
+SETENV("DH_STUDIO_SPRACHE", "en")
+SETENV("DH_STUDIO_LAUF_BILDER", "30")
+DIM quelle AS STRING : quelle = PATHJOIN(DIRNAME(ARG$(0)), "vorlagen/en")
+slHin(10, 10)
+slWarten(10)
+slTaste(294)
+slWarten(160)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+DIM v AS STRING
+FOR EACH v IN ["1_leer", "2_formular", "3_datenbank", "4_zeichnen"]
+    DIM ziel AS STRING : ziel = CWD$() + "/" + v
+    MKDIR(ziel)
+    DIM f AS STRING
+    FOR EACH f IN DIRLIST(quelle + "/" + v)
+        COPYFILE(quelle + "/" + v + "/" + f, ziel + "/" + f)
+    NEXT
+    DIM log AS STRING : log = CWD$() + "/" + v + ".log"
+    DIM aus AS STRING : aus = slStarten(log, CWD$() + "/ev.txt", slBild + 20, ziel)
+    DIM c AS INTEGER : c = PROCESS_START("dhrt", "--check", ziel + "/_studio/main.dh")
+    DIM cz AS STRING : cz = ""
+    DIM leer AS INTEGER : leer = 0
+    WHILE leer < 5
+        DIM ct AS STRING : ct = PROCESS_READ$(c)
+        IF ct <> "" THEN
+            cz = cz + TRIM$(REPLACE$(ct, CHR$(13), ""))
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(c) THEN
+            leer = leer + 1
+            SLEEP(30)
+        END IF
+    WEND
+    PRINT v; " geprueft "; slHat(log, "geprueft 0 0"); " beendet "; slHat(log, "beendet 0"); " check "; cz
+    IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+NEXT
+--- argumente
+{sammlung}/../../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- erwartet
+1_leer geprueft TRUE beendet TRUE check []
+2_formular geprueft TRUE beendet TRUE check []
+3_datenbank geprueft TRUE beendet TRUE check []
+4_zeichnen geprueft TRUE beendet TRUE check []
+
+=== die englischen vorlagen sind dieselben projekte
+' Je Vorlage auf Deutsch und auf Englisch: dieselben Elemente, dieselben
+' Controls in derselben Reihenfolge und Lage, dieselben Layouts, Regeln und
+' Timer, gleich viele Methoden -- nur Namen und Texte duerfen anders sein.
+' Faellt ein Fall hier, ist eine Vorlage geaendert worden und die andere nicht.
+IMPORT "json"
+DIM wurzel AS STRING : wurzel = PATHJOIN(DIRNAME(ARG$(0)), "vorlagen")
+FUNCTION aufbau$(ordner AS STRING) AS STRING
+    DIM p AS JSON_HANDLE : p = JSON_LOAD(PATHJOIN(ordner, "projekt.dhstudio"))
+    DIM aus AS STRING : aus = ""
+    DIM i AS INTEGER
+    DIM methoden AS INTEGER : methoden = 0
+    FOR i = 0 TO JSON_LEN(p, "elemente") - 1
+        DIM e AS STRING : e = "elemente." + STR$(i)
+        aus = aus + JSON_GET_STRING(p, e + ".art") + ";"
+        IF JSON_HAS(p, e + ".code") THEN
+            IF FILEEXISTS(PATHJOIN(ordner, JSON_GET_STRING(p, e + ".code"))) THEN
+                DIM z AS STRING
+                FOR EACH z IN READLINES(PATHJOIN(ordner, JSON_GET_STRING(p, e + ".code")))
+                    IF REGEX_TEST(TRIM$(z), "^(SUB|FUNCTION) ") THEN methoden = methoden + 1
+                NEXT
+            END IF
+        END IF
+        IF JSON_HAS(p, e + ".layout") THEN
+            DIM d AS JSON_HANDLE : d = JSON_LOAD(PATHJOIN(ordner, JSON_GET_STRING(p, e + ".layout")))
+            aus = aus + "w" + STR$(JSON_GET_INT(d, "w")) + "h" + STR$(JSON_GET_INT(d, "h")) + ";"
+            IF JSON_HAS(d, "timer") THEN aus = aus + "timer" + STR$(JSON_LEN(d, "timer")) + ";"
+            DIM k AS INTEGER
+            FOR k = 0 TO JSON_LEN(d, "widgets") - 1
+                DIM w AS STRING : w = "widgets." + STR$(k)
+                aus = aus + JSON_GET_STRING(d, w + ".kind") + "@" + STR$(JSON_GET_INT(d, w + ".x")) + "," + STR$(JSON_GET_INT(d, w + ".y")) + "," + STR$(JSON_GET_INT(d, w + ".w")) + "," + STR$(JSON_GET_INT(d, w + ".h"))
+                IF JSON_HAS(d, w + ".layout") THEN aus = aus + JSON_STRINGIFY(JSON_GET_JSON(d, w + ".layout"))
+                IF JSON_HAS(d, w + ".rules") THEN aus = aus + "r" + STR$(JSON_LEN(d, w + ".rules"))
+                IF JSON_HAS(d, w + ".variant") THEN aus = aus + JSON_GET_STRING(d, w + ".variant")
+                IF JSON_HAS(d, w + ".anchor") THEN aus = aus + JSON_GET_STRING(d, w + ".anchor")
+                aus = aus + ";"
+            NEXT
+        END IF
+    NEXT
+    RETURN aus + "m" + STR$(methoden)
+END FUNCTION
+DIM v AS STRING
+FOR EACH v IN ["1_leer", "2_formular", "3_datenbank", "4_zeichnen"]
+    DIM de AS STRING : de = aufbau$(PATHJOIN(wurzel, v))
+    DIM en AS STRING : en = aufbau$(PATHJOIN(wurzel, "en/" + v))
+    PRINT v; " gleich "; de = en
+    IF de <> en THEN PRINT "  de "; de : PRINT "  en "; en
+NEXT
+' Der englische Ordner hat jede Vorlage und eine eigene vorlage.txt.
+DIM n AS INTEGER : n = 0
+FOR EACH v IN DIRLIST(PATHJOIN(wurzel, "en"))
+    IF FILEEXISTS(PATHJOIN(wurzel, "en/" + v + "/vorlage.txt")) THEN n = n + 1
+NEXT
+PRINT "englisch "; n
+--- argumente
+{sammlung}/../../../studio/studio.dh
+--- erwartet
+1_leer gleich TRUE
+2_formular gleich TRUE
+3_datenbank gleich TRUE
+4_zeichnen gleich TRUE
+englisch 4

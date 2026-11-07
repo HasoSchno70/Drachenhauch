@@ -445,5 +445,5 @@ just as with `TEXT`.
 - Implementation: [`rust/drachenhauch_runtime/src/chart.rs`](../../rust/drachenhauch_runtime/src/chart.rs)
   (data model + drawing), built-ins in `builtins.rs`, `CHART_DRAW` in `vm.rs`
 - Demo: [`examples/154_chart.dh`](../../examples/154_chart.dh)
-- Tests: [`tests/pruef/modules_chart.dhtest`](../../tests/pruef/modules_chart.dhtest) +
+- Tests: [`tests/pruef/module/modules_chart.dhtest`](../../tests/pruef/module/modules_chart.dhtest) +
   Rust `#[test]`s in `chart.rs`

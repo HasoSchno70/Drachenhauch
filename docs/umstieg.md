@@ -7,7 +7,7 @@ Diese Seite sammelt, was man aus anderen Sprachen mitbringt, und wie es hier
 heißt. Das meiste davon sagt dir auch der Übersetzer selbst, sobald du es so
 schreibst, wie du es gewohnt bist.
 
-Alle Fälle unten sind in `tests/pruef/umstieg.dhtest` geprüft.
+Alle Fälle unten sind in `tests/pruef/sprache/umstieg.dhtest` geprüft.
 
 ## Was einfach geht
 

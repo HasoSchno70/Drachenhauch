@@ -143,7 +143,7 @@ rechte Taste.
 
 ## Tests
 
-`tests/pruef/werkzeug_animfsm.dhtest` fährt den Editor mit echten Klicks
+`tests/pruef/werkzeuge/werkzeug_animfsm.dhtest` fährt den Editor mit echten Klicks
 über eine Aufnahme: Doppelklick legt einen Zustand an, die rechte Maustaste
 zieht einen Übergang, Ziehen und zweimal `Strg+Z`, `Entf` samt Übergängen,
 eine Bedingung über den Inspektor, ein neuer Parameter, und `F5` schreibt
@@ -156,7 +156,7 @@ und genau das prüft der Fall nach `Entf`. Dazu Anordnen (Lagen nach Stufen
 und Rückgängig), Zoomen um einen festen Punkt samt Treffertest, ein echter
 Radschritt, Einpassen und die Animation im Inspektor als Bildprobe. Die
 Rückfrage beim Kreuz prüft
-`tests/pruef/werkzeug_kreuz.dhtest` mit echten Fensternachrichten.
+`tests/pruef/werkzeuge/werkzeug_kreuz.dhtest` mit echten Fensternachrichten.
 
 ## Was der Qt-Editor hatte und 198 fehlt
 

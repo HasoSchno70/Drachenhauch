@@ -244,7 +244,7 @@ weggelassen ist. Nicht (oder nicht mehr) vorhanden:
 
 ## Prüfung
 
-[`tests/pruef/werkzeug_formdesigner.dhtest`](../tests/pruef/werkzeug_formdesigner.dhtest)
+[`tests/pruef/werkzeuge/werkzeug_formdesigner.dhtest`](../tests/pruef/werkzeuge/werkzeug_formdesigner.dhtest)
 (`dhrt test`): ein Fall legt per echtem Klick einen Button ab, sichert mit
 Strg+S und liest die Datei mit dem json-Modul; einer zieht ein Control und
 nimmt zweimal zurück; einer prüft das F5-Laufprogramm; einer, dass fremde

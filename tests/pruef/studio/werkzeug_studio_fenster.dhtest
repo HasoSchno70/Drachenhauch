@@ -1,0 +1,87 @@
+' Drachenhauch Studio: Zahlen im Inspektor tippen und das entworfene Fenster
+' am Griff groesser ziehen. Bis 2026.40 ging beides nicht -- das Drehfeld
+' der Laufzeit nahm keine getippten Zahlen, und das Fenster hatte keinen
+' Griff (die Groesse liess sich nur mit den Pfeilen des Inspektors aendern).
+' Jeder Fall: ein erster Lauf misst, ein zweiter spielt echte Klicks und
+' Tasten ab (_hilfen/studiolauf.dh); gelesen wird die gesicherte .dhform.
+
+--- langsam
+=== eine breite im inspektor tippen
+' Das Fenster ist gewaehlt (Start), Klick ins Feld Breite, Strg+V mit 720,
+' Enter, Strg+S.
+IMPORT "laeufer.dh"
+SETENV("DH_STUDIO_ABLAGE", "720")
+DIM m AS STRING : m = CWD$() + "/m.log"
+slStarten(m, "", 8, CWD$() + "/f.dhform")
+DIM wx AS INTEGER
+DIM wy AS INTEGER
+(wx, wy) = slLage(m, "feld w")
+slHin(10, 10)
+slKlick(wx, wy)
+slWarten(4)
+slMit([341], 86)
+slWarten(4)
+slTaste(257)
+slWarten(6)
+slMit([341], 83)
+slWarten(10)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = slStarten(log, CWD$() + "/ev.txt", slBild + 20, CWD$() + "/f.dhform")
+DIM d AS JSON_HANDLE : d = JSON_PARSE(JOIN$(READLINES(CWD$() + "/f.dhform"), CHR$(10)))
+PRINT "breite "; JSON_GET_INT(d, "w")
+PRINT "hoehe "; JSON_GET_INT(d, "h")
+' Enter uebernimmt -- der rechts unten verankerte Knopf rueckt um 120 mit.
+PRINT "knopfOk "; JSON_GET_INT(d, "widgets.0.x"); " "; JSON_GET_INT(d, "widgets.0.y")
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+IMPORT "json"
+slStudio = ARG$(0)
+--- datei f.dhform
+{"title":"Fenster1","name":"Fenster1","x":0,"y":0,"w":600,"h":400,"movable":true,"closable":true,"visible":true,"resizable":true,"widgets":[{"kind":"button","name":"knopfOk","text":"OK","x":500,"y":350,"w":80,"h":30,"anchor":"rb"},{"kind":"label","name":"titel","text":"Hallo","x":20,"y":20,"w":100,"h":20}]}
+
+--- erwartet
+breite 720
+hoehe 400
+knopfOk 620 350
+
+=== das fenster am griff groesser ziehen, ein verankerter knopf geht mit
+' Die Ecke um 80 nach rechts und 40 nach unten: 680 x 440. knopfOk klebt
+' rechts unten (Anker "rb") und rueckt um denselben Weg, titel bleibt.
+IMPORT "laeufer.dh"
+DIM m AS STRING : m = CWD$() + "/m.log"
+slStarten(m, "", 8, CWD$() + "/f.dhform")
+DIM gx AS INTEGER
+DIM gy AS INTEGER
+(gx, gy) = slLage(m, "fenstergriff")
+slHin(10, 10)
+slZug(gx, gy, gx + 80, gy + 40, 12, TRUE)
+slWarten(8)
+slMit([341], 83)
+slWarten(10)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = slStarten(log, CWD$() + "/ev.txt", slBild + 20, CWD$() + "/f.dhform")
+PRINT "gezogen "; slHat(log, "fenstergroesse 680 440")
+DIM d AS JSON_HANDLE : d = JSON_PARSE(JOIN$(READLINES(CWD$() + "/f.dhform"), CHR$(10)))
+PRINT "fenster "; JSON_GET_INT(d, "w"); " "; JSON_GET_INT(d, "h")
+PRINT "knopfOk "; JSON_GET_INT(d, "widgets.0.x"); " "; JSON_GET_INT(d, "widgets.0.y"); " "; JSON_GET_INT(d, "widgets.0.w")
+PRINT "titel "; JSON_GET_INT(d, "widgets.1.x"); " "; JSON_GET_INT(d, "widgets.1.y")
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+IMPORT "json"
+slStudio = ARG$(0)
+--- datei f.dhform
+{"title":"Fenster1","name":"Fenster1","x":0,"y":0,"w":600,"h":400,"movable":true,"closable":true,"visible":true,"resizable":true,"widgets":[{"kind":"button","name":"knopfOk","text":"OK","x":500,"y":350,"w":80,"h":30,"anchor":"rb"},{"kind":"label","name":"titel","text":"Hallo","x":20,"y":20,"w":100,"h":20}]}
+
+--- erwartet
+gezogen TRUE
+fenster 680 440
+knopfOk 580 390 80
+titel 20 20

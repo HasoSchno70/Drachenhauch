@@ -1,0 +1,243 @@
+' Der serielle Monitor der IDE (Alt+4, 2026-11-04). Ein echtes Geraet gibt es
+' auf den Pruefrechnern nicht -- der Monitor nimmt darum auch
+' `tcp:host:port`, und der Einschub spielt das Geraet: er lauscht, nimmt die
+' Verbindung an, schickt Zeilen und liest, was der Monitor sendet.
+--- langsam
+
+=== netzbruecke: zeilen, rest ohne ende, senden, trennen
+DIM prBild AS INTEGER : prBild = 0
+DIM prLauscher AS NET_LISTENER
+DIM prGeraet AS NET_SOCKET
+DIM prAn AS BOOLEAN : prAn = FALSE
+DIM prBekommen AS STRING : prBekommen = ""
+--- programm ../../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 20 THEN
+    prLauscher = NET_TCP_LISTEN(0, "127.0.0.1")
+    befehl("seriell")
+    protokoll("pr vorn " + STR$(GUI_DOCK_SHOWN(win, "seriell")))
+    GUI_SET_TEXT(ddSerPort, "tcp:127.0.0.1:" + STR$(NET_LISTENER_PORT(prLauscher)))
+    befehl("seriell_verbinden")
+END IF
+IF prBild > 20 AND NOT prAn THEN
+    prGeraet = NET_TCP_ACCEPT(prLauscher)
+    IF NET_IS_CONNECTED(prGeraet) THEN
+        prAn = TRUE
+        NET_SEND(prGeraet, "hallo" + CHR$(13) + CHR$(10) + "zwei" + CHR$(10))
+    END IF
+END IF
+IF prBild = 40 THEN
+    GUI_SET_TEXT(tfSeriell, "LED an")
+    serSenden(GUI_TEXT(tfSeriell))
+    GUI_DROPDOWN_SET_SELECTED(ddSerEnde, 3)
+    serSenden("aus")
+END IF
+' Erst nach dem Senden: eine Eingabeaufforderung ohne Zeilenende. Unter Last
+' liefe die halbe Sekunde sonst schon vor Bild 40 ab.
+IF prBild = 45 THEN NET_SEND(prGeraet, "Eingabe> ")
+IF prAn AND prBild > 40 AND prBild < 100 THEN prBekommen = prBekommen + NET_RECV(prGeraet, 1000)
+IF prBild = 100 THEN
+    protokoll("pr bekommen " + REPLACE$(REPLACE$(prBekommen, CHR$(13), "<CR>"), CHR$(10), "<LF>"))
+    protokoll("pr eingabefeld leer " + STR$(GUI_TEXT(tfSeriell) = ""))
+    NET_CLOSE(prGeraet)
+END IF
+IF prBild = 130 THEN
+    protokoll("pr verbunden " + STR$(serVerbunden()) + " knopf " + GUI_TEXT(btnSerVerbinden))
+    protokoll("pr zeilen " + STR$(GUI_LISTBOX_COUNT(lstSeriell)))
+    EXIT(0)
+END IF
+--- umgebung
+DHRT_FRAMES=400
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM z AS STRING
+FOR EACH z IN L
+    ' Der Port wechselt mit jedem Lauf.
+    IF LEFT$(z, 19) = "seriell verbunden t" THEN z = "seriell verbunden tcp:127.0.0.1:PORT"
+    IF LEFT$(z, 30) = "seriell zeile [verbunden mit t" THEN z = "seriell zeile [verbunden mit tcp:127.0.0.1:PORT]"
+    ' Ein Leerzeichen am Ende gehoert zur Eingabeaufforderung -- sichtbar machen.
+    IF RIGHT$(z, 1) = " " THEN z = LEFT$(z, LEN(z) - 1) + "<leer>"
+    IF LEFT$(z, 3) = "pr " OR (LEFT$(z, 8) = "seriell " AND LEFT$(z, 14) <> "seriell ports " AND LEFT$(z, 14) <> "seriell kurve ") THEN PRINT z
+NEXT
+--- erwartet
+seriell gezeigt
+pr vorn TRUE
+seriell zeile [verbunden mit tcp:127.0.0.1:PORT]
+seriell verbunden tcp:127.0.0.1:PORT
+seriell zeile hallo
+seriell zeile zwei
+seriell zeile > LED an
+seriell gesendet LED an
+seriell zeile > aus
+seriell gesendet aus
+seriell zeile Eingabe><leer>
+pr bekommen LED an<LF>aus<CR><LF>
+pr eingabefeld leer TRUE
+seriell zeile [Verbindung beendet]
+seriell getrennt Verbindung beendet
+pr verbunden FALSE knopf Verbinden
+pr zeilen 7
+
+=== kurve: welche zeilen zahlen sind und wie sie gezeichnet werden
+' Zahlen getrennt durch Leerraum, Komma oder Semikolon, wahlweise mit Namen;
+' ein anderes Wort macht aus der Zeile Text. Eine Reihe traegt ihren letzten
+' Wert weiter, wenn eine Zeile sie nicht nennt. Gezeichnet wird ins Bild der
+' Leiste -- je Reihe in ihrer Farbe.
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 20 THEN
+    befehl("seriell")
+    DIM prZ AS STRING
+    FOR EACH prZ IN ["12 34", "Hallo Welt 3", "temp:21.5, feuchte: 40", "Temp: 22", "-0.5;1e3", "", "x 1", "7,8,9"]
+        DIM vorher AS INTEGER : vorher = serKGesamt
+        serKurveLesen(prZ)
+        protokoll("pr zeile '" + prZ + "' daten " + STR$(serKGesamt > vorher))
+    NEXT
+    protokoll("pr reihen " + JOIN$(serKNamen, "|"))
+    protokoll("pr ab " + JOIN$(serKAb, "|"))
+    DIM prR AS INTEGER
+    DIM prT AS STRING : prT = ""
+    FOR prR = 0 TO LEN(serKNamen) - 1
+        prT = prT + " " + serKNamen[prR] + "=" + STR$(serKWert[prR * SER_PUNKTE + (serKGesamt - 1) MOD SER_PUNKTE])
+    NEXT
+    protokoll("pr zuletzt" + prT)
+END IF
+IF prBild = 40 THEN
+    ' Je Reihe ihre Farbe irgendwo im Bild -- und eine Farbe, die keine Reihe
+    ' hat, nirgends.
+    DIM prF AS INTEGER
+    FOR prF = 0 TO 5
+        DIM prDa AS BOOLEAN : prDa = FALSE
+        DIM prX AS INTEGER
+        DIM prY AS INTEGER
+        FOR prX = 0 TO IMAGE_WIDTH(serBild) - 1
+            FOR prY = 0 TO IMAGE_HEIGHT(serBild) - 1
+                IF (GETPIXEL(serBild, prX, prY) BAND &HFFFFFF) = serFarbe(prF) THEN prDa = TRUE : BREAK
+            NEXT
+            IF prDa THEN BREAK
+        NEXT
+        protokoll("pr farbe " + STR$(prF) + " " + STR$(prDa))
+    NEXT
+    protokoll("pr bild breit " + STR$(IMAGE_WIDTH(serBild) > 100))
+    serLeeren()
+    protokoll("pr nach leeren " + STR$(LEN(serKNamen)) + " " + STR$(serKGesamt))
+    EXIT(0)
+END IF
+--- umgebung
+DHRT_FRAMES=400
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM z AS STRING
+DIM kurve AS STRING : kurve = ""
+FOR EACH z IN L
+    IF LEFT$(z, 3) = "pr " THEN PRINT z
+    IF LEFT$(z, 14) = "seriell kurve " THEN kurve = z
+NEXT
+PRINT "zuletzt gezeichnet: " + kurve
+--- erwartet
+pr zeile '12 34' daten TRUE
+pr zeile 'Hallo Welt 3' daten FALSE
+pr zeile 'temp:21.5, feuchte: 40' daten TRUE
+pr zeile 'Temp: 22' daten TRUE
+pr zeile '-0.5;1e3' daten TRUE
+pr zeile '' daten FALSE
+pr zeile 'x 1' daten FALSE
+pr zeile '7,8,9' daten TRUE
+pr reihen 1|2|temp|feuchte|Temp|3
+pr ab 0|0|1|1|2|4
+pr zuletzt 1=7.0 2=8.0 temp=21.5 feuchte=40.0 Temp=22.0 3=9.0
+pr farbe 0 TRUE
+pr farbe 1 TRUE
+pr farbe 2 TRUE
+pr farbe 3 TRUE
+pr farbe 4 TRUE
+pr farbe 5 TRUE
+pr bild breit TRUE
+pr nach leeren 0 0
+zuletzt gezeichnet: seriell kurve 6 5
+
+=== der monitor gibt den port frei, wenn das programm ihn oeffnet
+' Ein Geraet gibt es hier nicht -- der Fall setzt den Zustand "haelt einen
+' Port", den ein [Verbinden] hinterliesse. Ein Programm ohne SERIAL_OPEN laesst
+' ihn stehen; eins mit gibt ihn frei, und nach seinem Ende verbindet sich
+' der Monitor wieder (hier: versucht es und meldet, dass es nicht geht).
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 20 THEN
+    WRITEALL("ohne.dh", "PRINT 1")
+    WRITEALL("mit.dh", "IMPORT " + CHR$(34) + "serial" + CHR$(34) + " OPTIONAL" + NL + "' h = SERIAL_OPEN(" + CHR$(34) + "COM9" + CHR$(34) + ", 9600)" + NL + "PRINT 2")
+    JSON_SET_STRING(konfig, "seriell_ziel", "COM98")
+    serArt = 1 : serPort = 7
+    serVorStart(CWD$() + "/ohne.dh")
+    protokoll("pr ohne: haelt " + STR$(serVerbunden()) + " wieder " + STR$(serWieder))
+    serVorStart(CWD$() + "/mit.dh")
+    protokoll("pr mit: haelt " + STR$(serVerbunden()) + " wieder " + STR$(serWieder))
+END IF
+IF prBild = 30 THEN
+    ' Kein Programm laeuft -- im naechsten Bild verbindet der Monitor neu.
+    protokoll("pr danach wieder " + STR$(serWieder))
+    EXIT(0)
+END IF
+--- umgebung
+DHRT_FRAMES=400
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM z AS STRING
+FOR EACH z IN L
+    ' Ohne Feature seriell sagt der Monitor das; mit ihm meldet er, dass
+    ' COM98 nicht aufgeht -- beides ist ein Versuch, wieder zu verbinden.
+    IF LEFT$(z, 16) = "seriell meldung " THEN
+        PRINT "seriell meldung: versucht " + STR$(INSTR(z, "nur tcp:host:port") >= 0 OR INSTR(z, "nicht öffnen") >= 0)
+    ELSEIF LEFT$(z, 3) = "pr " OR LEFT$(z, 17) = "seriell getrennt " THEN
+        PRINT z
+    END IF
+NEXT
+--- erwartet
+pr ohne: haelt TRUE wieder FALSE
+seriell getrennt für das Programm freigegeben, danach wieder verbunden
+pr mit: haelt FALSE wieder TRUE
+seriell meldung: versucht TRUE
+pr danach wieder FALSE
+
+=== ohne ziel und mit krummem netzziel: eine meldung, keine verbindung
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 20 THEN
+    serVerbinden("")
+    serVerbinden("tcp:ohneport")
+    serSenden("hallo")
+    protokoll("pr verbunden " + STR$(serVerbunden()))
+    EXIT(0)
+END IF
+--- umgebung
+DHRT_FRAMES=400
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM z AS STRING
+FOR EACH z IN L
+    IF LEFT$(z, 3) = "pr " OR LEFT$(z, 16) = "seriell meldung " THEN PRINT z
+NEXT
+--- erwartet
+seriell meldung Erst einen Port wählen (oder tcp:host:port eintragen).
+seriell meldung Netzziel: tcp:host:port, etwa tcp:192.168.1.40:23
+seriell meldung Nicht verbunden -- erst [Verbinden].
+pr verbunden FALSE

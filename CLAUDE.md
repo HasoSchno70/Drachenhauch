@@ -307,7 +307,7 @@ Drachenhauch-Programme. **Python gibt es nur noch in zwei Bauskripten**
 > BILD gezeigt** -- der Test dazu prueft jetzt alle 35 Rechtecke paarweise
 > und gegen den Fensterrand. Tests `tests/test_pilot_tracker.py` (17, mit
 > fremden Lesern fuer JSON, WAV und DH-Code; der DH-Code wird gestartet, nicht
-> nur uebersetzt), `tests/pruef/audio_note_mix.dhtest`.
+> nur uebersetzt), `tests/pruef/ton/audio_note_mix.dhtest`.
 >
 > **Der sechste Pilot ist keine Werkzeug-Portierung, sondern eine
 > Geschaeftsanwendung** (2026-09-05, `examples/196_rechnungen.dh`, 1100
@@ -417,7 +417,7 @@ Drachenhauch-Programme. **Python gibt es nur noch in zwei Bauskripten**
 > **`GUI_DRAW_WINDOW(win)`** -- ein Fenster noch einmal, ueber allem, was
 > inzwischen im Bild steht, samt Schleier wenn es das modale ist. Der
 > Schleier liegt jetzt in EINER Routine (`schleier`), damit die zwei Wege
-> nicht auseinanderlaufen. Tests `tests/pruef/gui_draw_window.dhtest` mit der
+> nicht auseinanderlaufen. Tests `tests/pruef/gui/gui_draw_window.dhtest` mit der
 > Gegenprobe IM Test: derselbe Ablauf einmal mit und einmal ohne den Aufruf,
 > geprueft am Punkt in der Fenstermitte.
 >
@@ -534,7 +534,8 @@ daten/                       # builtin_index/docs/prosa.json (in dhrt eingebette
 ide/ide.dh                   # die IDE, in Drachenhauch
 examples/*.dh                # Demos; 183..199 sind die Werkzeuge (Sprite, Tracker, ...)
 installer/                   # bauen.dh, paket.dh, Drachenhauch-IDE.iss, lizenzen.dh
-tests/pruef/*.dhtest         # die Pruefsammlungen (dhrt test tests/pruef)
+tests/pruef/<thema>/*.dhtest # die Pruefsammlungen nach Themen (dhrt test tests/pruef,
+                             # Ordner in tests/pruef/LIESMICH.md), _hilfen/ gemeinsam
 tools/*.dh, tools/*.js       # Buch-Bau, Showcase-Bilder, Buch-Exporte (Node)
 docs/                        # Handbuch (die IDE liest es fuer F1)
 vscode-drachenhauch/         # VS-Code-Erweiterung (startet dhrt lsp)
@@ -568,7 +569,7 @@ Builtins leben in `rust/drachenhauch_runtime/src/builtins.rs` (pure) bzw. `vm.rs
    sondern ins passende `docs/module-*.md` (Tabellenzeile
    ``| `NAME(args)` | was es tut |``); `dhrt doku prosa` sammelt
    sie nach `daten/builtin_prosa.json` ein, und
-   `tests/pruef/doku_pruefungen.dhtest` haelt beides synchron. `builtin_docs.json`
+   `tests/pruef/werkzeugkette/doku_pruefungen.dhtest` haelt beides synchron. `builtin_docs.json`
    ist fuer ausfuehrlichere Texte da und gewinnt, wo es einen Eintrag hat.
    Beide Dateien bettet dhrt fuer `dhrt lsp` ein -> nach einer Aenderung neu
    bauen. **Alle drei liegen in `daten/`** (bis 2026-09-17 in
@@ -589,13 +590,13 @@ Builtins leben in `rust/drachenhauch_runtime/src/builtins.rs` (pure) bzw. `vm.rs
 
 ### Modul `gui` (Retained-Mode-GUI)
 
-Persistente Fenster/Widgets (externe Typen `GUI_WINDOW`/`GUI_WIDGET` via `register_type`). Aufbau einmalig, pro Frame `GUI_UPDATE()` + `GUI_DRAW()`; Events per Polling (`GUI_CLICKED`/`CHECKED`/`VALUE`/`TEXT`/`HOVERED`) **oder** FUNCREF-Callbacks (`GUI_ON_CLICK`/`GUI_ON_CHANGE`). Widgets: Button, Label, Checkbox, Slider, TextInput, Panel, **Separator** (`GUI_SEPARATOR` — Trennlinie), **GroupBox** (`GUI_GROUPBOX` — gerahmte Gruppe mit eingelassenem Titel), **Table** (`GUI_TABLE` — professionelle Tabelle: fixierte Kopfzeile, V/H-Scroll, persistente Zeilen-Selektion. **Zellmodell** (`Cell` in gui.rs): jede Zelle mit eigener Vorder-/Hintergrundfarbe, Ausrichtung und ART (`text`/`bild`/`haken`/`balken`/`knopf`) — `GUI_TABLE_SET_CELL/CELL_COLOR/CELL_ALIGN/CELL_KIND/CELL_IMAGE/CELL_VALUE`, dazu `GUI_TABLE_ROW_COLOR` (ganze Zeile) + `GUI_TABLE_COL_ALIGN`. Farben in drei Stufen Zelle>Zeile>Zebra, -1 = nicht gesetzt; Auswahl/Hover liegen HALBDURCHSICHTIG darüber, sonst deckte eine Zellfarbe sie zu. **Spaltenzahl frei** = breiteste Angabe (`TableState::n_cols`) — kürzere Zeilen sind leer, keine Reihenfolge-Pflicht mehr (vorher war jede Abweichung ein Fehler, und Zeilen-vor-Kopf umging die Prüfung und crashte das Zeichnen). **Sortieren** per Kopfklick (2. Klick dreht um, Pfeil zeigt es an) — ZAHLENWEISE wenn beide Zellen Zahlen sind, sonst Text; `GUI_TABLE_SORT/SORT_COL/SORT_DESC`. **Filterzeile** im Kopf (`GUI_TABLE_SET(t,"filterzeile",1)`) — Teiltext je Spalte, case-insensitiv, UND-verknüpft; `GUI_TABLE_FILTER/GET_FILTER`. **Spaltenbreiten ziehbar** (Kopfkante, ±4px Fangbereich). **WICHTIG — Datenzeile vs. Ansicht:** Sortieren/Filtern stellen die Daten NIE um, sie bauen nur `view: Vec<usize>`; alle Zeilenangaben nach außen sind DATENzeilen (eine gemerkte Nummer bleibt gültig), sichtbare Reihenfolge über `GUI_TABLE_VIEW_COUNT/VIEW_ROW`. Einstellungen über EINEN Setter `GUI_TABLE_SET(key$,wert)` wie bei `chart`. Layout aus einer Quelle `table_geom` für Hit-Test + Zeichnen. Doku `docs/module-gui.md`, Demos `examples/157_gui_tabelle.dh` + `examples/158_gui_tabelle_sqlite.dh` (an einer echten SQLite-DB: lesen/sortieren/filtern/UPDATE beim Bearbeiten/DELETE in einer Transaktion; **arbeitet auf einer Kopie via `VACUUM INTO`**, die Originaldatei wird nur gelesen -- Test `tests/pruef/beispiel_sqlite_tabelle.dhtest` sichert genau diese Zusage ab). Muster fuer DB-Anbindung: DB ist die Wahrheit, Tabelle die Ansicht; je Zeile die id merken (Sortieren/Filtern stellen Datenzeilen nicht um); beim Mehrfach-Loeschen ERST alle ids einsammeln, dann loeschen. **Zellen bearbeiten:** Doppelklick auf eine Textzelle einer per `GUI_TABLE_COL_EDIT` freigegebenen Spalte oeffnet ein Eingabefeld IN der Zelle (Enter uebernimmt, ESC nimmt zurueck, Klick woanders uebernimmt); `GUI_TABLE_EDITING_ROW/COL` fragen den Zustand ab. Arbeitskopie `edit_text` -- die Zelle wird ERST beim Bestaetigen geschrieben, sonst koennte ESC nichts zuruecknehmen und jede Taste wuerde Sortierung/Filter neu anwerfen (die Zeile spraenge beim Tippen weg). Doppelklick-Erkennung im Gui (`last_click`, zeitbasiert via `g.get_time()`, 0.4 s + max 4 px Versatz); `editing_table` merkt die Tabelle, damit ein Klick woanders in O(1) uebernimmt statt einen verwaisten Editor stehen zu lassen. **ESC-Falle:** benutzt das Programm ESC zum Beenden, muss es `GUI_TABLE_EDITING_ROW < 0` abfragen. **Feste Spalten** (`GUI_TABLE_SET(t,"feste_spalten",n)`): die ersten n scrollen waagerecht nicht mit. ALLES was Spalten verortet geht ueber EINE Quelle -- `col_x` (Lage) + `col_clip` (sichtbarer Bereich), von Treffertest UND Zeichnen benutzt; ein fester Block waere sonst der sicherste Weg, beide auseinander laufen zu lassen. **Mehrfachauswahl** (`mehrfachauswahl`-Schalter, aus per Vorgabe): Strg+Klick schaltet eine Zeile um, Umschalt+Klick waehlt den Bereich ab dem Anker -- in der SICHTBAREN Reihenfolge (ueber Datenzeilen traefe es bei sortierter Tabelle etwas anderes); `GUI_TABLE_SEL_COUNT/SEL_ROW/IS_SELECTED/SELECT/CLEAR_SELECTION`. `GUI_TABLE_SELECTED` bleibt die zuletzt angeklickte Zeile (Rueckwaertskompatibilitaet), beim Zeilen-Loeschen ruecken alle Auswahl-Indizes dahinter auf. **Spalten umsortieren** (`spalten_verschiebbar`, per Vorgabe AUS): Kopfzelle seitwaerts ziehen, Tausch sobald sie ueber die Mitte des Nachbarn kommt. Klick und Zug sind DIESELBE Geste -- erst beim Loslassen entscheidet sich, ob sortiert (keine Bewegung) oder verschoben wurde (>= 5 px); ohne das wuerde jedes Verschieben nebenbei sortieren. Wie bei den Zeilen werden die DATEN nicht umgestellt: `col_order` bildet nur Anzeige-Position -> Datenspalte ab, `TGeom.col_widths` steht in ANZEIGE-Reihenfolge, `pos_at` liefert die Position und `col_at` die Datenspalte. `TableState::order()` bereinigt+ergaenzt die Liste bei JEDEM Abruf, damit eine spaeter dazugekommene Spalte nicht unter den Tisch faellt. `GUI_TABLE_MOVE_COL/COL_AT/COL_POS/RESET_COLS`; Reihenfolge + feste Spalten werden im .dhform gespeichert. **Textauswahl in der Zelle:** der Zell-Editor benutzt DIESELBE Routine wie das TextInput-Widget (`Gui::einzeiler_tasten`, aus `edit_textinput` herausgeloest) -- Markieren per Umschalt+Navigation oder Maus-Ziehen, Strg+A/C/V/X, Pos1/Ende. Beim Oeffnen ist alles markiert (erstes Tippen ersetzt). **Gotcha:** der oeffnende Doppelklick darf NICHT als Marke-setzen zaehlen -- `edit_maus_sperre` sperrt die Maus, bis die Taste einmal los war; ohne das hob derselbe Klick die Markierung sofort wieder auf (Ruecktaste loeschte dann ein Zeichen statt des Inhalts). Klicks IM Eingabefeld sind sowohl in `handle_press` als auch in `table_press` ausgenommen, sonst schlossen sie den Editor. Das Feld-Rechteck wird aus `table_geom` GERECHNET (`edit_cell_rect`), nicht beim Zeichnen gemerkt -- `draw_cell` ist `&self`, und eine zweite nachgefuehrte Quelle liefe auseinander. Zeilengruppen gibt es als Baumtabelle (`GUI_TREETABLE`, siehe unten)), **Radio** (`GUI_RADIO(win,group$,text,x,y)` — Gruppen mit gegenseitigem Ausschluss, `GUI_RADIO_SELECTED`), **Dropdown/ComboBox** (`GUI_DROPDOWN(win,x,y,w,h,items)` — aufklappendes Popup über allen Widgets, `GUI_DROPDOWN_SELECTED/TEXT/SET_SELECTED`, `GUI_SET_DROPDOWN`; bearbeitbar per `GUI_DROPDOWN_SET(dd, "bearbeitbar", 1)`, siehe unten), **ProgressBar** (`GUI_PROGRESS`, Wert via `GUI_SET_VALUE` 0..1). **Laufzeit-Manipulation** (`GUI_SET_BOUNDS`/`GUI_GET_X/Y/W/H`, `GUI_DESTROY`, `GUI_SET_VISIBLE`/`GUI_VISIBLE`, `GUI_KIND`, `GUI_FOCUS`, `GUI_HIT_TEST`, Window-Pendants + `GUI_WINDOW_WIDGET_COUNT/WIDGET`-Enumeration; Tombstone-Handles bleiben stabil) + **Serialisierung** (`GUI_SAVE/LOAD` Datei, `GUI_TO_JSON/FROM_JSON` String) — Basis für dynamische UIs + WYSIWYG-Editor. **Farbe als Text** `COLOR_HEX$(farbe)` / `COLOR_FROM_HEX(text$)` (core): vorher konnte ein Programm Hex-Text GAR NICHT in eine Farbe wandeln -- `VAL("&HFF8800")` ist 0, und `&H`-Literale gibt es nur im Quelltext. Kurzform `#F80` wird verdoppelt; Deckkraft 0 (= deckend) laesst `COLOR_HEX$` weg.
+Persistente Fenster/Widgets (externe Typen `GUI_WINDOW`/`GUI_WIDGET` via `register_type`). Aufbau einmalig, pro Frame `GUI_UPDATE()` + `GUI_DRAW()`; Events per Polling (`GUI_CLICKED`/`CHECKED`/`VALUE`/`TEXT`/`HOVERED`) **oder** FUNCREF-Callbacks (`GUI_ON_CLICK`/`GUI_ON_CHANGE`). Widgets: Button, Label, Checkbox, Slider, TextInput, Panel, **Separator** (`GUI_SEPARATOR` — Trennlinie), **GroupBox** (`GUI_GROUPBOX` — gerahmte Gruppe mit eingelassenem Titel), **Table** (`GUI_TABLE` — professionelle Tabelle: fixierte Kopfzeile, V/H-Scroll, persistente Zeilen-Selektion. **Zellmodell** (`Cell` in gui.rs): jede Zelle mit eigener Vorder-/Hintergrundfarbe, Ausrichtung und ART (`text`/`bild`/`haken`/`balken`/`knopf`) — `GUI_TABLE_SET_CELL/CELL_COLOR/CELL_ALIGN/CELL_KIND/CELL_IMAGE/CELL_VALUE`, dazu `GUI_TABLE_ROW_COLOR` (ganze Zeile) + `GUI_TABLE_COL_ALIGN`. Farben in drei Stufen Zelle>Zeile>Zebra, -1 = nicht gesetzt; Auswahl/Hover liegen HALBDURCHSICHTIG darüber, sonst deckte eine Zellfarbe sie zu. **Spaltenzahl frei** = breiteste Angabe (`TableState::n_cols`) — kürzere Zeilen sind leer, keine Reihenfolge-Pflicht mehr (vorher war jede Abweichung ein Fehler, und Zeilen-vor-Kopf umging die Prüfung und crashte das Zeichnen). **Sortieren** per Kopfklick (2. Klick dreht um, Pfeil zeigt es an) — ZAHLENWEISE wenn beide Zellen Zahlen sind, sonst Text; `GUI_TABLE_SORT/SORT_COL/SORT_DESC`. **Filterzeile** im Kopf (`GUI_TABLE_SET(t,"filterzeile",1)`) — Teiltext je Spalte, case-insensitiv, UND-verknüpft; `GUI_TABLE_FILTER/GET_FILTER`. **Spaltenbreiten ziehbar** (Kopfkante, ±4px Fangbereich). **WICHTIG — Datenzeile vs. Ansicht:** Sortieren/Filtern stellen die Daten NIE um, sie bauen nur `view: Vec<usize>`; alle Zeilenangaben nach außen sind DATENzeilen (eine gemerkte Nummer bleibt gültig), sichtbare Reihenfolge über `GUI_TABLE_VIEW_COUNT/VIEW_ROW`. Einstellungen über EINEN Setter `GUI_TABLE_SET(key$,wert)` wie bei `chart`. Layout aus einer Quelle `table_geom` für Hit-Test + Zeichnen. Doku `docs/module-gui.md`, Demos `examples/157_gui_tabelle.dh` + `examples/158_gui_tabelle_sqlite.dh` (an einer echten SQLite-DB: lesen/sortieren/filtern/UPDATE beim Bearbeiten/DELETE in einer Transaktion; **arbeitet auf einer Kopie via `VACUUM INTO`**, die Originaldatei wird nur gelesen -- Test `tests/pruef/beispiele/beispiel_sqlite_tabelle.dhtest` sichert genau diese Zusage ab). Muster fuer DB-Anbindung: DB ist die Wahrheit, Tabelle die Ansicht; je Zeile die id merken (Sortieren/Filtern stellen Datenzeilen nicht um); beim Mehrfach-Loeschen ERST alle ids einsammeln, dann loeschen. **Zellen bearbeiten:** Doppelklick auf eine Textzelle einer per `GUI_TABLE_COL_EDIT` freigegebenen Spalte oeffnet ein Eingabefeld IN der Zelle (Enter uebernimmt, ESC nimmt zurueck, Klick woanders uebernimmt); `GUI_TABLE_EDITING_ROW/COL` fragen den Zustand ab. Arbeitskopie `edit_text` -- die Zelle wird ERST beim Bestaetigen geschrieben, sonst koennte ESC nichts zuruecknehmen und jede Taste wuerde Sortierung/Filter neu anwerfen (die Zeile spraenge beim Tippen weg). Doppelklick-Erkennung im Gui (`last_click`, zeitbasiert via `g.get_time()`, 0.4 s + max 4 px Versatz); `editing_table` merkt die Tabelle, damit ein Klick woanders in O(1) uebernimmt statt einen verwaisten Editor stehen zu lassen. **ESC-Falle:** benutzt das Programm ESC zum Beenden, muss es `GUI_TABLE_EDITING_ROW < 0` abfragen. **Feste Spalten** (`GUI_TABLE_SET(t,"feste_spalten",n)`): die ersten n scrollen waagerecht nicht mit. ALLES was Spalten verortet geht ueber EINE Quelle -- `col_x` (Lage) + `col_clip` (sichtbarer Bereich), von Treffertest UND Zeichnen benutzt; ein fester Block waere sonst der sicherste Weg, beide auseinander laufen zu lassen. **Mehrfachauswahl** (`mehrfachauswahl`-Schalter, aus per Vorgabe): Strg+Klick schaltet eine Zeile um, Umschalt+Klick waehlt den Bereich ab dem Anker -- in der SICHTBAREN Reihenfolge (ueber Datenzeilen traefe es bei sortierter Tabelle etwas anderes); `GUI_TABLE_SEL_COUNT/SEL_ROW/IS_SELECTED/SELECT/CLEAR_SELECTION`. `GUI_TABLE_SELECTED` bleibt die zuletzt angeklickte Zeile (Rueckwaertskompatibilitaet), beim Zeilen-Loeschen ruecken alle Auswahl-Indizes dahinter auf. **Spalten umsortieren** (`spalten_verschiebbar`, per Vorgabe AUS): Kopfzelle seitwaerts ziehen, Tausch sobald sie ueber die Mitte des Nachbarn kommt. Klick und Zug sind DIESELBE Geste -- erst beim Loslassen entscheidet sich, ob sortiert (keine Bewegung) oder verschoben wurde (>= 5 px); ohne das wuerde jedes Verschieben nebenbei sortieren. Wie bei den Zeilen werden die DATEN nicht umgestellt: `col_order` bildet nur Anzeige-Position -> Datenspalte ab, `TGeom.col_widths` steht in ANZEIGE-Reihenfolge, `pos_at` liefert die Position und `col_at` die Datenspalte. `TableState::order()` bereinigt+ergaenzt die Liste bei JEDEM Abruf, damit eine spaeter dazugekommene Spalte nicht unter den Tisch faellt. `GUI_TABLE_MOVE_COL/COL_AT/COL_POS/RESET_COLS`; Reihenfolge + feste Spalten werden im .dhform gespeichert. **Textauswahl in der Zelle:** der Zell-Editor benutzt DIESELBE Routine wie das TextInput-Widget (`Gui::einzeiler_tasten`, aus `edit_textinput` herausgeloest) -- Markieren per Umschalt+Navigation oder Maus-Ziehen, Strg+A/C/V/X, Pos1/Ende. Beim Oeffnen ist alles markiert (erstes Tippen ersetzt). **Gotcha:** der oeffnende Doppelklick darf NICHT als Marke-setzen zaehlen -- `edit_maus_sperre` sperrt die Maus, bis die Taste einmal los war; ohne das hob derselbe Klick die Markierung sofort wieder auf (Ruecktaste loeschte dann ein Zeichen statt des Inhalts). Klicks IM Eingabefeld sind sowohl in `handle_press` als auch in `table_press` ausgenommen, sonst schlossen sie den Editor. Das Feld-Rechteck wird aus `table_geom` GERECHNET (`edit_cell_rect`), nicht beim Zeichnen gemerkt -- `draw_cell` ist `&self`, und eine zweite nachgefuehrte Quelle liefe auseinander. Zeilengruppen gibt es als Baumtabelle (`GUI_TREETABLE`, siehe unten)), **Radio** (`GUI_RADIO(win,group$,text,x,y)` — Gruppen mit gegenseitigem Ausschluss, `GUI_RADIO_SELECTED`), **Dropdown/ComboBox** (`GUI_DROPDOWN(win,x,y,w,h,items)` — aufklappendes Popup über allen Widgets, `GUI_DROPDOWN_SELECTED/TEXT/SET_SELECTED`, `GUI_SET_DROPDOWN`; bearbeitbar per `GUI_DROPDOWN_SET(dd, "bearbeitbar", 1)`, siehe unten), **ProgressBar** (`GUI_PROGRESS`, Wert via `GUI_SET_VALUE` 0..1). **Laufzeit-Manipulation** (`GUI_SET_BOUNDS`/`GUI_GET_X/Y/W/H`, `GUI_DESTROY`, `GUI_SET_VISIBLE`/`GUI_VISIBLE`, `GUI_KIND`, `GUI_FOCUS`, `GUI_HIT_TEST`, Window-Pendants + `GUI_WINDOW_WIDGET_COUNT/WIDGET`-Enumeration; Tombstone-Handles bleiben stabil) + **Serialisierung** (`GUI_SAVE/LOAD` Datei, `GUI_TO_JSON/FROM_JSON` String) — Basis für dynamische UIs + WYSIWYG-Editor. **Farbe als Text** `COLOR_HEX$(farbe)` / `COLOR_FROM_HEX(text$)` (core): vorher konnte ein Programm Hex-Text GAR NICHT in eine Farbe wandeln -- `VAL("&HFF8800")` ist 0, und `&H`-Literale gibt es nur im Quelltext. Kurzform `#F80` wird verdoppelt; Deckkraft 0 (= deckend) laesst `COLOR_HEX$` weg.
 
 **Farbwaehler + Datumswaehler** (2026-08-30, gefunden beim Partikel-Piloten -- `gui` hatte keinen Farbwaehler): `GUI_COLORPICKER`/`GUI_PICKED_COLOR`/`GUI_SET_PICKED_COLOR` und `GUI_DATEPICKER`/`GUI_DATE`/`GUI_SET_DATE`. Datumsformat `JJJJ-MM-TT` wie `DATE$()` -- zwei Formate waeren eine Stolperfalle; ein neuer Waehler zeigt HEUTE. Rechenkerne als eigene Module mit Rust-`#[test]`s, bewusst OHNE Widget: `farbraum.rs` (RGB<->HSV, Rundweg ueber 4096 Farben geprueft) und `kalender.rs` (Schaltjahre, Monatslaengen, Zellers Wochentag). **Der Farbwaehler speichert HSV, nicht RGB** -- bei Schwarz ist der Ton unbestimmt, bei Grau die Saettigung; wer zurueckrechnet, verliert sie und der Zeiger springt. Geometrie je Widget aus EINER Quelle (`cp_geom`/`dp_geom`), von Zeichnen und Treffertest gemeinsam benutzt; `cp_drag` merkt, ob die Geste im Feld oder im Streifen begann (sonst springt die Farbe beim Ziehen ueber die Grenze). **Falle beim Zeichnen:** Alpha 0 bedeutet DECKEND -- der Verlauf durchsichtig->schwarz beginnt bei 0x01000000, mit 0x000000 war das Feld schlicht schwarz. **Erweiterungen:** `GUI_COLORPICKER_SET(cp,"alpha",1)` blendet einen Deckkraft-Streifen ein (auf Schachbrett-Grund, sonst sieht man dem Verlauf nicht an wo er durchsichtig wird); `GUI_PICKED_COLOR` liefert dann 0xAARRGGBB statt 0xRRGGBB -- ohne den Schalter bleibt es bei sechs Stellen, damit bestehende Programme unveraendert bleiben. **Deckkraft geht 1..255, nicht 0** (oberstes Byte 0 = deckend). `GUI_DATE_RANGE(dp,von$,bis$)` (leer = keine Grenze; ein Datum ausserhalb wird sofort hereingezogen, gesperrte Tage nehmen weder Klick noch Taste an) und `GUI_DATEPICKER_SET(dp,"wochenbeginn",n)` (0=Montag..6=Sonntag -- eine feste Wahl waere fuer die halbe Welt falsch). Vier Blaetterbereiche im Kopf (Jahr/Monat je Richtung), Umschalt+Bild = Jahressprung. `cp_drag` merkt jetzt die ZONE (0 Feld / 1 Ton / 2 Deckkraft) statt eines Schalters.
 
-Doku `docs/module-gui.md`, Demo `examples/186_farbe_und_datum.dh`, Tests `tests/pruef/gui_waehler.dhtest` + Tastatur in `tests/pruef/gui_tastatur.dhtest`.
+Doku `docs/module-gui.md`, Demo `examples/186_farbe_und_datum.dh`, Tests `tests/pruef/gui/gui_waehler.dhtest` + Tastatur in `tests/pruef/gui/gui_tastatur.dhtest`.
 
-**Grosse Dateien im Code-Feld:** `GUI_TEXTAREA_VIEW(ta)` -> TUPLE `(erste_zeile, zeilen, start_zeichen, laenge_zeichen)` -- damit faerbt ein Programm nur den SICHTBAREN Ausschnitt. **Gemessen je Tastendruck:** 3000 Zeilen 26 ms -> 0,2 ms; 10000 Zeilen 88 ms -> 0,8 ms; 30000 Zeilen 272 ms -> 2,1 ms. Der Engpass beim ganze-Datei-Weg ist NICHT das Zeichnen (konstant ~0,4 ms, nur sichtbare Zeilen) und nicht `SYNTAX_SPANS` (2,4 ms bei 3000 Zeilen), sondern die BASIC-Schleife Art->Farbe ueber 16500 Abschnitte (17,6 ms; mit einer MAP statt vier IF-Vergleichen 9 ms). Der Ausschnitt ist nicht nur schneller, sondern auch RICHTIG, weil Kommentare und Zeichenketten in Drachenhauch an der ZEILE enden -- bei Blockkommentaren waere das die Falle. Tests `tests/pruef/gui_textarea_view.dhtest`.
+**Grosse Dateien im Code-Feld:** `GUI_TEXTAREA_VIEW(ta)` -> TUPLE `(erste_zeile, zeilen, start_zeichen, laenge_zeichen)` -- damit faerbt ein Programm nur den SICHTBAREN Ausschnitt. **Gemessen je Tastendruck:** 3000 Zeilen 26 ms -> 0,2 ms; 10000 Zeilen 88 ms -> 0,8 ms; 30000 Zeilen 272 ms -> 2,1 ms. Der Engpass beim ganze-Datei-Weg ist NICHT das Zeichnen (konstant ~0,4 ms, nur sichtbare Zeilen) und nicht `SYNTAX_SPANS` (2,4 ms bei 3000 Zeilen), sondern die BASIC-Schleife Art->Farbe ueber 16500 Abschnitte (17,6 ms; mit einer MAP statt vier IF-Vergleichen 9 ms). Der Ausschnitt ist nicht nur schneller, sondern auch RICHTIG, weil Kommentare und Zeichenketten in Drachenhauch an der ZEILE enden -- bei Blockkommentaren waere das die Falle. Tests `tests/pruef/gui/gui_textarea_view.dhtest`.
 
 **Eigene Schrift gilt fuer die ganze gui:** `SETFONT(handle)` setzt die aktive Schrift, und jedes Widget ohne eigene folgt ihr (`wfont` = `font_wahl(w.font, g.active_font())`). **Falle:** `SETFONT` uebernimmt auch die GROESSE, mit der `LOADFONT(pfad, groesse)` den Zeichensatz gebaut hat -- nach einem SETFONT ist der Text also womoeglich groesser/kleiner als vorher. Doku `docs/module-gui.md` (Abschnitt Eigene Schrift).
 
@@ -619,11 +620,11 @@ Zeichnens auch als aktive -- vorher mass `text_width_at` mit der aktiven
 und zeichnete mit `schrift`, eine eigene Diagrammschrift sass also schief.
 `GUI_FONT(-1)` schaltet alle drei auf die Pixelschrift.
 
-**TEXTAREA als Code-Feld** (2026-08-30): `GUI_TEXTAREA_SPANS(ta, starts, laengen, farben)` faerbt Zeichen-Abschnitte ein, `SYNTAX_SPANS(quelltext$)` -> TUPLE `(starts, laengen, arten)` zerlegt Drachenhauch-Quelltext (Arten: kommentar/text/zahl/schluessel/name/operator), `GUI_TEXTAREA_SET(ta, key$, wert)` mit `zeilennummern`/`aktive_zeile`/`tab_fuegt_ein`/`tabbreite`. **Der Hervorheber (`syntax.rs`) ist bewusst KEIN Lexer** -- der lexer.rs wirft Kommentare weg, expandiert f-Strings und bricht bei Fehlern ab; ein Editor sieht halb getippten Text und muss ihn trotzdem darstellen (offene Zeichenkette endet an der ZEILE, sonst faerbt ein Anfuehrungszeichen den Rest der Datei). Die Wortliste teilen sich beide ueber `lexer::keyword`. **Zwei Fallen:** (1) Farbige Laeufe werden ueber die Breite des VORSPANNS positioniert, nicht durch Addieren der Laufbreiten -- eine Textbreite enthaelt den Abstand ZWISCHEN Zeichen, aber keinen dahinter, also klebten die Woerter an jeder Farbgrenze zusammen; ausserdem rechnen Schreibmarke und Auswahl schon so. (2) Die Nummernspalte verschiebt ALLES, was eine Spalte verortet -> eine Quelle `ta_gutter()`, die Zeichnen, Treffertest und Schreibmarke gemeinsam fragen; der Text wird auf den Bereich rechts davon geclippt, sonst laeuft eine waagerecht gescrollte Zeile in die Zahlen. `scroll` ist beim TextArea die erste sichtbare ZEILE, `scroll_x` der Versatz in PIXELN. `GUI_SET_TEXT` loescht die Abschnitte (sie gehoerten zum alten Text). `tab_fuegt_ein` per Vorgabe AUS -- sonst kaeme man im Formular nicht mehr aus dem Feld heraus; an, rueckt TAB bis zur naechsten SPALTE ein. Doku `docs/module-gui.md`, Demo `examples/184_codefeld.dh`, Tests `tests/pruef/syntax_spans.dhtest` + 12 Rust-`#[test]`s in `syntax.rs` + Tabulator in `tests/pruef/gui_tastatur.dhtest`.
+**TEXTAREA als Code-Feld** (2026-08-30): `GUI_TEXTAREA_SPANS(ta, starts, laengen, farben)` faerbt Zeichen-Abschnitte ein, `SYNTAX_SPANS(quelltext$)` -> TUPLE `(starts, laengen, arten)` zerlegt Drachenhauch-Quelltext (Arten: kommentar/text/zahl/schluessel/name/operator), `GUI_TEXTAREA_SET(ta, key$, wert)` mit `zeilennummern`/`aktive_zeile`/`tab_fuegt_ein`/`tabbreite`. **Der Hervorheber (`syntax.rs`) ist bewusst KEIN Lexer** -- der lexer.rs wirft Kommentare weg, expandiert f-Strings und bricht bei Fehlern ab; ein Editor sieht halb getippten Text und muss ihn trotzdem darstellen (offene Zeichenkette endet an der ZEILE, sonst faerbt ein Anfuehrungszeichen den Rest der Datei). Die Wortliste teilen sich beide ueber `lexer::keyword`. **Zwei Fallen:** (1) Farbige Laeufe werden ueber die Breite des VORSPANNS positioniert, nicht durch Addieren der Laufbreiten -- eine Textbreite enthaelt den Abstand ZWISCHEN Zeichen, aber keinen dahinter, also klebten die Woerter an jeder Farbgrenze zusammen; ausserdem rechnen Schreibmarke und Auswahl schon so. (2) Die Nummernspalte verschiebt ALLES, was eine Spalte verortet -> eine Quelle `ta_gutter()`, die Zeichnen, Treffertest und Schreibmarke gemeinsam fragen; der Text wird auf den Bereich rechts davon geclippt, sonst laeuft eine waagerecht gescrollte Zeile in die Zahlen. `scroll` ist beim TextArea die erste sichtbare ZEILE, `scroll_x` der Versatz in PIXELN. `GUI_SET_TEXT` loescht die Abschnitte (sie gehoerten zum alten Text). `tab_fuegt_ein` per Vorgabe AUS -- sonst kaeme man im Formular nicht mehr aus dem Feld heraus; an, rueckt TAB bis zur naechsten SPALTE ein. Doku `docs/module-gui.md`, Demo `examples/184_codefeld.dh`, Tests `tests/pruef/werkzeugkette/syntax_spans.dhtest` + 12 Rust-`#[test]`s in `syntax.rs` + Tabulator in `tests/pruef/gui/gui_tastatur.dhtest`.
 
-**Dialog IM Fenster** `GUI_DIALOG(titel$, text$[, stil$])` -> GUI_WINDOW, `GUI_ANSWER(dlg)` (0 offen / 1 OK-Ja / 2 Abbrechen-Nein), `GUI_MODAL()`. **NICHT verwechseln mit `GUI_MESSAGE`/`GUI_CONFIRM`** -- das sind die schon vorhandenen NATIVEN, BLOCKIERENDEN OS-Kaesten (rfd, `filedialog.rs`, Feature `dialogs`, im Web-Bau nicht da). `GUI_DIALOG` ist der Kasten im eigenen Thema/Massstab, blockiert NICHT (gui ist ein Polling-Toolkit; ein blockierender Dialog muesste mitten im Bild des Aufrufers eine eigene Zeichenschleife drehen und dessen Layer-/Render-Ziel-Zustand uebernehmen). Die Antwort gilt GENAU EIN BILD, wie `GUI_CLICKED` -- eine Antwort ist ein Ereignis, kein Zustand; danach ist das Fenster zerstoert (Tombstone-Handle bleibt gueltig). Modalitaet wird in `handle_press` UND `menu_input` durchgesetzt (`modal: Option<usize>`), sonst waere es nur ein Fenster obenauf; dazu ein Schleier in `draw` -- ohne sichtbares Zeichen klickt man in den Hintergrund und wundert sich. Stil-Woerter absichtlich dieselben wie bei `GUI_CONFIRM` (`ok`/`janein`). **Falle:** Widget-Koordinaten sind relativ zum INHALTsbereich, die Fensterhoehe nicht -- ohne den `title_h`-Zuschlag rutscht die Knopfreihe unter den Rand. Doku `docs/module-gui.md`, Tests `tests/pruef/gui_dialog.dhtest` (die Modalitaet mit Gegenprobe: derselbe Klick trifft ohne Dialog). **Ein Fenster ueber einer Zeichenflaeche braucht `GUI_DRAW_WINDOW(win)`** -- `GUI_DRAW` zeichnet Fenster und Zeichenflaechen in EINEM Durchgang, und der Inhalt einer Zeichenflaeche entsteht per Bauart DANACH (das Programm malt selbst hinein). Ohne den zusaetzlichen Aufruf ist ein Dialog mitten auf der Flaeche unsichtbar: er sperrt die Eingabe und ist nicht zu sehen, das Programm wirkt eingefroren. Ein zweites `GUI_DRAW` hilft NICHT (es zeichnet Fenster-Hintergrund und Zeichenflaechen neu). Ein unsichtbares oder zerstoertes Fenster zeichnet nichts, ist aber kein Fehler -- der Aufruf darf unbedingt in der Bildschleife stehen. Tests `tests/pruef/gui_draw_window.dhtest` (bis 2026-09-16 pytest mit Pillow; seither `--- bild`, die Faelle mit und ohne Aufruf stehen als Paare). **Kontextmenue und Tooltip liegen ueber ALLEN Fenstern** und haben dasselbe Problem -- der Tooltip folgt der Maus und landet also staendig ueber einer Zeichenflaeche: dafuer `GUI_DRAW_TOP()`, und `GUI_DRAW(FALSE)` laesst die Schicht beim Hauptdurchgang weg. Zweimal zeichnen waere hier KEIN Ersatz: Tooltip und Kontextmenue haben einen halbdurchsichtigen Schlagschatten, der uebereinander dunkler wird -- und zwar nur dort, wo das eigene Zeichnen die erste Fassung nicht zugedeckt hat, also genau an einer Kante. Bei Fenstern (`GUI_DRAW_WINDOW`) bleibt genau das ein bekannter Rest: ein Fenster, das nur teilweise unter dem selbst Gezeichneten liegt, bekommt seinen Glanz dort zweimal.
+**Dialog IM Fenster** `GUI_DIALOG(titel$, text$[, stil$])` -> GUI_WINDOW, `GUI_ANSWER(dlg)` (0 offen / 1 OK-Ja / 2 Abbrechen-Nein), `GUI_MODAL()`. **NICHT verwechseln mit `GUI_MESSAGE`/`GUI_CONFIRM`** -- das sind die schon vorhandenen NATIVEN, BLOCKIERENDEN OS-Kaesten (rfd, `filedialog.rs`, Feature `dialogs`, im Web-Bau nicht da). `GUI_DIALOG` ist der Kasten im eigenen Thema/Massstab, blockiert NICHT (gui ist ein Polling-Toolkit; ein blockierender Dialog muesste mitten im Bild des Aufrufers eine eigene Zeichenschleife drehen und dessen Layer-/Render-Ziel-Zustand uebernehmen). Die Antwort gilt GENAU EIN BILD, wie `GUI_CLICKED` -- eine Antwort ist ein Ereignis, kein Zustand; danach ist das Fenster zerstoert (Tombstone-Handle bleibt gueltig). Modalitaet wird in `handle_press` UND `menu_input` durchgesetzt (`modal: Option<usize>`), sonst waere es nur ein Fenster obenauf; dazu ein Schleier in `draw` -- ohne sichtbares Zeichen klickt man in den Hintergrund und wundert sich. Stil-Woerter absichtlich dieselben wie bei `GUI_CONFIRM` (`ok`/`janein`). **Falle:** Widget-Koordinaten sind relativ zum INHALTsbereich, die Fensterhoehe nicht -- ohne den `title_h`-Zuschlag rutscht die Knopfreihe unter den Rand. Doku `docs/module-gui.md`, Tests `tests/pruef/gui/gui_dialog.dhtest` (die Modalitaet mit Gegenprobe: derselbe Klick trifft ohne Dialog). **Ein Fenster ueber einer Zeichenflaeche braucht `GUI_DRAW_WINDOW(win)`** -- `GUI_DRAW` zeichnet Fenster und Zeichenflaechen in EINEM Durchgang, und der Inhalt einer Zeichenflaeche entsteht per Bauart DANACH (das Programm malt selbst hinein). Ohne den zusaetzlichen Aufruf ist ein Dialog mitten auf der Flaeche unsichtbar: er sperrt die Eingabe und ist nicht zu sehen, das Programm wirkt eingefroren. Ein zweites `GUI_DRAW` hilft NICHT (es zeichnet Fenster-Hintergrund und Zeichenflaechen neu). Ein unsichtbares oder zerstoertes Fenster zeichnet nichts, ist aber kein Fehler -- der Aufruf darf unbedingt in der Bildschleife stehen. Tests `tests/pruef/gui/gui_draw_window.dhtest` (bis 2026-09-16 pytest mit Pillow; seither `--- bild`, die Faelle mit und ohne Aufruf stehen als Paare). **Kontextmenue und Tooltip liegen ueber ALLEN Fenstern** und haben dasselbe Problem -- der Tooltip folgt der Maus und landet also staendig ueber einer Zeichenflaeche: dafuer `GUI_DRAW_TOP()`, und `GUI_DRAW(FALSE)` laesst die Schicht beim Hauptdurchgang weg. Zweimal zeichnen waere hier KEIN Ersatz: Tooltip und Kontextmenue haben einen halbdurchsichtigen Schlagschatten, der uebereinander dunkler wird -- und zwar nur dort, wo das eigene Zeichnen die erste Fassung nicht zugedeckt hat, also genau an einer Kante. Bei Fenstern (`GUI_DRAW_WINDOW`) bleibt genau das ein bekannter Rest: ein Fenster, das nur teilweise unter dem selbst Gezeichneten liegt, bekommt seinen Glanz dort zweimal.
 
-**Anzeige-Massstab** `GUI_SCALE(faktor)` (0.5..4.0) + `GUI_SCALE_GET()`: alle gui-Masse sind feste Pixel, auf einem 4K-Schirm mit 200 % wurde eine Oberflaeche darum halb so gross wie gedacht. Der Faktor multipliziert JEDE Laenge, die HINEINgeht (Fenster-/Widget-Geometrie, Metriken, die 15 Layout-Konstanten via `sk()`, Spaltenbreiten, Zeilenhoehen, Schriftgroesse); nach aussen bleibt alles LOGISCH (`unsk()` in den Gettern und in `widget_json`/`to_json`) -- sonst wuechse eine `.dhform` bei jedem Speichern um den Faktor weiter. EINZIGE Ausnahme: `GUI_HIT_TEST` spricht Bildschirm-Pixel (die Maus liefert nichts anderes). **Muss vor dem ersten Fenster kommen** -- danach Fehler, weil Bestehendes nur naeherungsweise umzurechnen waere. **Zwei Fallen, die erst das gerenderte Bild zeigte:** (1) `g.text`/`g.text_width` in der Fenster-Chrome (Titel/Menue/Reiter/Popup/Tooltip) kannten den Massstab nicht -> `ctext`/`ctext_width`/`ctext_height`, und die Editier-Helfer massen unskaliert, waehrend `wtext` skaliert zeichnete (Schreibmarke und Auswahl sassen auf halber Strecke) -> Buendel `Mass{size,font}` durch die statischen Helfer. (2) Die senkrechte Zentrierung stand als Literal `(h - 14) / 2` im Code -- bei Massstab 2 sass der Text zu tief und wurde vom Clip-Rechteck abgeschnitten -> `self.wsize(g,wdg)`. `GUI_LOAD`/`GUI_FROM_JSON` umgehen `add_widget` und brauchen den Massstab eigens. Doku `docs/module-gui.md` (Abschnitt Massstab), Tests `tests/pruef/gui_massstab.dhtest`.
+**Anzeige-Massstab** `GUI_SCALE(faktor)` (0.5..4.0) + `GUI_SCALE_GET()`: alle gui-Masse sind feste Pixel, auf einem 4K-Schirm mit 200 % wurde eine Oberflaeche darum halb so gross wie gedacht. Der Faktor multipliziert JEDE Laenge, die HINEINgeht (Fenster-/Widget-Geometrie, Metriken, die 15 Layout-Konstanten via `sk()`, Spaltenbreiten, Zeilenhoehen, Schriftgroesse); nach aussen bleibt alles LOGISCH (`unsk()` in den Gettern und in `widget_json`/`to_json`) -- sonst wuechse eine `.dhform` bei jedem Speichern um den Faktor weiter. EINZIGE Ausnahme: `GUI_HIT_TEST` spricht Bildschirm-Pixel (die Maus liefert nichts anderes). **Muss vor dem ersten Fenster kommen** -- danach Fehler, weil Bestehendes nur naeherungsweise umzurechnen waere. **Zwei Fallen, die erst das gerenderte Bild zeigte:** (1) `g.text`/`g.text_width` in der Fenster-Chrome (Titel/Menue/Reiter/Popup/Tooltip) kannten den Massstab nicht -> `ctext`/`ctext_width`/`ctext_height`, und die Editier-Helfer massen unskaliert, waehrend `wtext` skaliert zeichnete (Schreibmarke und Auswahl sassen auf halber Strecke) -> Buendel `Mass{size,font}` durch die statischen Helfer. (2) Die senkrechte Zentrierung stand als Literal `(h - 14) / 2` im Code -- bei Massstab 2 sass der Text zu tief und wurde vom Clip-Rechteck abgeschnitten -> `self.wsize(g,wdg)`. `GUI_LOAD`/`GUI_FROM_JSON` umgehen `add_widget` und brauchen den Massstab eigens. Doku `docs/module-gui.md` (Abschnitt Massstab), Tests `tests/pruef/gui/gui_massstab.dhtest`.
 
 **`GUI_CLICKED` gilt auch fuer Kaestchen, Kippschalter und Radioknoepfe** (seit
 2026-09-01). Vorher war es dort STUMM -- immer FALSE, ohne Fehler; zwei von zwei
@@ -631,7 +632,7 @@ Programmen, die es versucht haben (die Piloten 187 und 189), hatten damit einen
 toten Schalter. Ein Knopf setzt sein Flag beim LOSLASSEN, ein Kaestchen kippt
 schon beim DRUECKEN -- fuer den Abfragenden ist beides "in diesem Bild
 angeklickt", und beides meldet genau ein Bild lang. Der Zustand kommt weiter aus
-`GUI_CHECKED`. Tests `tests/pruef/gui_clicked_schalter.dhtest` (mit Gegenprobe:
+`GUI_CHECKED`. Tests `tests/pruef/gui/gui_clicked_schalter.dhtest` (mit Gegenprobe:
 danebengeklickt meldet nichts).
 
 **Popover, Toast, Infoleiste, Suchfeld, Vorschlaege** (2026-10-31, Paket 1
@@ -656,7 +657,7 @@ werden danach ueberschattet. Die Lage des Textes im Textfeld geht ueber
 `ti_rechtsklick`). Tasten: `feld_tasten` vor `edit_textinput`, `pop_esc`
 vor dem Abbrechen-Knopf, beide setzen `liste_taste`. Farbteile im Vorschlag
 werden ueber die Breite des GANZEN Textes minus den Rest gelegt. Tests
-`tests/pruef/gui_ueberlagerung.dhtest` (18; neun Verfaelschungen fallen je in
+`tests/pruef/gui/gui_ueberlagerung.dhtest` (18; neun Verfaelschungen fallen je in
 ihrem Fall). **Testfalle:** die Wiedergabe beginnt beim ERSTEN Ereignis --
 ein spaeter Klick braucht ein Ereignis in Bild 0 davor.
 
@@ -678,7 +679,7 @@ nicht aus `stil_misch` -- sonst blendete er doppelt. Schrift ueber
 Themenfarben (`bg: accent`) werden erst beim Zeichnen aufgeloest und
 folgen einem Themenwechsel. Die Knopfart zaehlt als Klasse. `GUI_GET_COLOR`
 liefert die Farbe des jetzigen Zustands ohne Ueberblenden (-1 = Thema).
-`.dhform` `name`/`klassen`. Tests `tests/pruef/gui_stildatei.dhtest` (12;
+`.dhform` `name`/`klassen`. Tests `tests/pruef/gui/gui_stildatei.dhtest` (12;
 sechs Verfaelschungen fallen je in ihrem Fall), Rust-Tests in
 `gui_stil.rs`. Nachfahren, Uebergang je Farbe und `window#name` kamen mit
 dem Rest (unten). **Zweite Stufe (selber Tag): Form je
@@ -738,7 +739,7 @@ von `layout_pass` (feste Widgets sofort, nach Inhalt ueber `inhalt_mass` ->
 `gruppe_anwenden`). Schriftwahl: ein Dialog aus gewoehnlichen Widgets
 (`SchriftWahl`, Filter und Vorschau in `schriftwahl_pass`), die Wahl
 bleibt im Tombstone lesbar; `DHRT_SCHRIFT_ORDNER` fuer Pruefungen. Tests
-`tests/pruef/gui_bausteine.dhtest` (15; zwoelf Verfaelschungen fallen je in
+`tests/pruef/gui/gui_bausteine.dhtest` (15; zwoelf Verfaelschungen fallen je in
 ihrem Fall -- der Kreisel erst mit dem Ring-Fall, weil der Balken seine
 laufende Flaeche ebenfalls in Akzentfarbe malt).
 
@@ -763,7 +764,7 @@ Programms vor) oder Umschalt+F10 (`rs_tasten`, neben `menue_tasten`)
 oeffnet ein Menue mit Vorschlaegen und "ignorieren"; ein Vorschlag ist ein
 Undo-Schritt mit on_change; solange es offen ist, gehoeren ihm die Tasten
 (auch Enter/ESC -- Standard- und Abbrechen-Knopf liegen hinter derselben Sperre).
-Passwortfelder pruefen nie. Tests `tests/pruef/rechtschreibung.dhtest`
+Passwortfelder pruefen nie. Tests `tests/pruef/module/rechtschreibung.dhtest`
 (Hunspell-Beilagen, ein Fall mit der Windows-Pruefung samt Emoji vorn),
 Rust-Tests in beiden Dateien.
 
@@ -793,7 +794,7 @@ Zeile von rechts nach links zeichnet `rtl_bunt` Stueck fuer Stueck roh
 (`zeilen_farben` aus `zeile_bunt` herausgeloest), Inline-Formate fallen dort
 weg. Neu `TEXT_VISUAL$(text$ [, richtung$])`. Bewusst nicht: volle
 Textformung, Ausrichtung nach Richtung, Hinweise/Farbfelder (logische Lage),
-pdf. Tests `tests/pruef/schreibrichtung.dhtest` (7; Bilder als Paar gegen
+pdf. Tests `tests/pruef/grafik/schreibrichtung.dhtest` (7; Bilder als Paar gegen
 LRO-erzwungene Reihenfolge; fuenf Verfaelschungen fallen je in ihrem Fall --
 die erste Fassung der Zeichen-Verfaelschung traf `visuell` statt
 `visuell_string` und blieb gruen), 10 Rust-Tests.
@@ -838,10 +839,10 @@ die verlassene aus; zurueck auf die ausblendende = dort weiter) als
 dazu `Menu::auf_t` (Aufrollen, auch Untermenues; zu = sofort, zuruecksetzen).
 Die Liste traegt ihre Maus-Zeile in `Widget::zeile_jetzt` -- eine schlichte
 Liste hat keinen ListState, der sie halten koennte, und haette ihr
-Ueberfahren sonst verloren. Tests `tests/pruef/gui_liste_bedienung.dhtest`.
-Tests `tests/pruef/gui_uebergaenge.dhtest` (15,
+Ueberfahren sonst verloren. Tests `tests/pruef/gui/gui_liste_bedienung.dhtest`.
+Tests `tests/pruef/gui/gui_uebergaenge.dhtest` (15,
 Bildproben; Gegenprobe mit `uebergang` 0 bzw. dem Bau davor) und in
-`tests/pruef/gui_akkordeon.dhtest` "das aufklappen waechst ueber die zeit"
+`tests/pruef/gui/gui_akkordeon.dhtest` "das aufklappen waechst ueber die zeit"
 (Gegenprobe faellt); zwei alte Faelle dort brauchen seither `uebergang` 0
 bzw. klicken spaeter ins Kind.
 
@@ -863,7 +864,7 @@ drueckte den Abbrechen-Knopf des Fensters -- die Liste war im selben Bild
 danach nicht mehr "am Bearbeiten", und die Fensterregel griff trotzdem;
 `Gui::liste_taste` merkt sich, dass die Taste schon verbraucht ist (vom Test
 gefunden). F2 gilt nur, wenn kein Menue-Kuerzel die Taste genommen hat (die
-IDE legt F2 auf die Lesezeichen). Tests `tests/pruef/gui_liste_bedienung.dhtest`
+IDE legt F2 auf die Lesezeichen). Tests `tests/pruef/gui/gui_liste_bedienung.dhtest`
 (20; gegen den Bau davor fallen alle 12, die Neues pruefen).
 
 **Tabelle bequem wie die Liste** (selber Tag, Zeilenmodus): Doppelklick und
@@ -882,13 +883,13 @@ text$)` (Leer-Hinweis, `.dhform` `leer_text`). Rollbalken zum Ziehen hatte
 die Tabelle schon. **Testfalle:** das Tippen fasst Tasten innerhalb einer
 Sekunde ECHTER Zeit zu einem Wort -- ohne Fenster laufen 30 Bilder in
 Bruchteilen davon, "b, b, k" wurde "bbk"; getrennte Woerter brauchen eigene
-Faelle. Tests `tests/pruef/gui_tabelle_bedienung.dhtest` (13; gegen den Bau
+Faelle. Tests `tests/pruef/gui/gui_tabelle_bedienung.dhtest` (13; gegen den Bau
 davor fallen die 10, die Neues pruefen). Im **Form-Designer** (197): Kaestchen "Umbenennen mit
 F2" bei der Liste (`list.bearbeitbar`, abgewaehlt wird der Schluessel
 ENTFERNT) und Feld "Leer-Hinweis" bei der Tabelle (`table.leer_text`), beides
 im DH-Code (`GUI_LISTBOX_SET ... "bearbeitbar"`, `GUI_TABLE_PLACEHOLDER`);
 Uebernehmen/Aktiviert/Hinweis ruecken dafuer eine Zeile tiefer. Tests in
-`tests/pruef/werkzeug_formdesigner.dhtest` (Inspektor-Fall + der
+`tests/pruef/werkzeuge/werkzeug_formdesigner.dhtest` (Inspektor-Fall + der
 DH-Code-Fall mit allen Arten; gegen den alten Designer fallen beide).
 
 **Baum bequem wie die Liste** (selber Tag): Rollbalken (derselbe
@@ -904,7 +905,7 @@ Klick-daneben, Fokus-weg und die Enter/ESC-Sperre zusammen) und
 `GUI_TREE_PLACEHOLDER`. **Nicht beim Dateibaum**: sein Name ist ein
 Dateiname, `GUI_TREE_EDIT` ist dort ein Fehler mit Hinweis auf `RENAME`.
 Form-Designer: Kaestchen und Feld auch fuer den Baum (`tree.bearbeitbar`,
-`tree.leer_text`). Tests `tests/pruef/gui_baum_bedienung.dhtest` (14; gegen den
+`tree.leer_text`). Tests `tests/pruef/gui/gui_baum_bedienung.dhtest` (14; gegen den
 Bau davor fallen 13, der Endstand-Fall nicht) und ein Baum-Fall in
 `werkzeug_formdesigner.dhtest`.
 
@@ -920,7 +921,7 @@ Auswahl sofort und feuerte on_change. Beim Oeffnen steht die Auswahl markiert
 in der MITTE. Zu waehlt Tippen gleich (`dd_tippen`). Neu
 `GUI_DROPDOWN_PLACEHOLDER` (gedaempft, solange `sel` < 0; `.dhform`
 `placeholder`), im Form-Designer ein Feld "Platzhalter". Tests
-`tests/pruef/gui_klappliste_bedienung.dhtest` (10; gegen den Bau davor fallen 8,
+`tests/pruef/gui/gui_klappliste_bedienung.dhtest` (10; gegen den Bau davor fallen 8,
 die zwei uebrigen pruefen, was gleich bleiben soll). Folge: ein Test, der einen Eintrag
 jenseits der zehnten Zeile an fester Lage anklickte (Notenblatt, Instrument
 "Glocke" = Eintrag 10), rollt jetzt erst einen Radschritt.
@@ -935,7 +936,7 @@ aus: in `popup_chain` (Kontextmenue links/ueber der Maus, Untermenue links vom
 Eltern, Leistenmenue nach links; `Gui::schirm_b/schirm_h`). **Die Falle:**
 gezeichnet wurde mit den ROHEN Lagen (`context_open`, `sub_chain`), nur der
 Treffertest ging ueber `popup_chain` -- beide Zeichenstellen gehen jetzt
-darueber. Tests `tests/pruef/gui_menue_bedienung.dhtest` (8; gegen den Bau
+darueber. Tests `tests/pruef/gui/gui_menue_bedienung.dhtest` (8; gegen den Bau
 davor fallen alle 8).
 
 **Code-Feld bequem wie die Liste** (selber Tag, Textbereich): **Doppelklick
@@ -950,7 +951,7 @@ bleibt unveraendert), gegriffen im Hover-Durchlauf VOR dem Editieren
 (`farbfeld_zug` sperrt den Druck fuer die Schreibmarke), gezogen ueber
 `Gui::tabar_zug`; `rad_stand` haelt die Ansicht gegen die Schreibmarke.
 **Weiches Rad** in Zeilenschritten (`roll_ist/roll_setze` kennen `scroll` des
-Textbereichs). Tests `tests/pruef/gui_codefeld_bedienung.dhtest` (9; die
+Textbereichs). Tests `tests/pruef/gui/gui_codefeld_bedienung.dhtest` (9; die
 Klicklagen sucht die Beilage `stelle.dh` zur Laufzeit mit
 `GUI_TEXTAREA_POS_AT` -- `GUI_TEXTAREA_VIEW` zaehlt die erste Zeile ab 0).
 
@@ -975,7 +976,7 @@ breiter, und Marke, Auswahl, Klick messen am ungeformten Text. Markdown
 (`markdown_aus`/`markdown_ein`): Marken SCHALTEN um, geschrieben werden nur
 Wechsel, fett+kursiv in einem Zug (`**` gefolgt von `*` liest sich als `***`
 = beide kippen -- mit Umschalten stimmt das trotzdem), `\` fuer `* ~ \ <u>`.
-Tests `tests/pruef/gui_textfeld_formate.dhtest` (12; Gegenprobe ohne
+Tests `tests/pruef/gui/gui_textfeld_formate.dhtest` (12; Gegenprobe ohne
 Klickzaehlung, ohne Rechtsklick, mit Tippstil, der nie verfaellt: genau die
 5 betroffenen fallen), Rust-Tests `formate_tests`. Getter des Texts ist
 `GUI_TEXT`, nicht `GUI_GET_TEXT`.
@@ -995,9 +996,9 @@ sonst saessen alle bisherigen Klicklagen daneben), Palette. **Getippt wird
 im Test mit echten WM_CHAR-Nachrichten** (`fenstersender.ps1` kennt jetzt
 Folgen `tippe:...|anf|rueck|links|rechts`; GLFW nimmt die Taste aus dem
 SCANCODE im lParam) -- eine Aufnahme fuellt die Zeichenwarteschlange nicht.
-Tests `tests/pruef/gui_klammern.dhtest` (10; jeder Fall kann nur MIT Paaren
+Tests `tests/pruef/gui/gui_klammern.dhtest` (10; jeder Fall kann nur MIT Paaren
 bestehen -- die erste Fassung tippte `f(x)` ganz aus und waere ohne sie
-genauso gruen gewesen), `tests/pruef/werkzeug_ide_handgriffe.dhtest`.
+genauso gruen gewesen), `tests/pruef/ide/werkzeug_ide_handgriffe.dhtest`.
 
 **Dieselbe Datei nebeneinander** (selber Tag, vierter Punkt; zweiter und
 dritter: Formatieren beim Sichern -- aus per Vorgabe, nie beim
@@ -1015,7 +1016,7 @@ eigene Geschichte und nahm die Aenderung der anderen nicht zurueck. Die
 IDE: `taSpiegel` links, bei jedem Einschalten `feldEinrichten`, folgt dem
 Reiter (`spiegelNachziehen` je Bild), eigener Faerbe-Riegel
 (`spiegelFaerbSchl`), `aktivesFeld()` meint die Ansicht, wenn sie den Fokus
-hat. Tests `tests/pruef/gui_teilen.dhtest` (5; der Strg+Z-Fall besteht nur
+hat. Tests `tests/pruef/gui/gui_teilen.dhtest` (5; der Strg+Z-Fall besteht nur
 mit der Umleitung) und in `werkzeug_ide_handgriffe.dhtest`.
 Die uebrigen Punkte derselben Liste, alle in der IDE und in
 `werkzeug_ide_handgriffe.dhtest`: **Seitenleiste/untere Leiste** (Alt+1/2,
@@ -1056,7 +1057,7 @@ mit. DH-Code: `GUI_TABCONTROL_ADD` je Seite, die Zuordnungen NACH allen
 Controls (`dhVarNamen`). Dazu Kaestchen *Tippen erlaubt* (Combobox) und
 **[Neu]/[Oeffnen] fragen bei Ungesichertem** (`ersetzenAnfragen`, wie im
 Notenblatt; bis dahin warfen sie es wortlos weg). Tests sieben Faelle in
-`tests/pruef/werkzeug_formdesigner.dhtest`; fuenf Verfaelschungen fallen je in
+`tests/pruef/werkzeuge/werkzeug_formdesigner.dhtest`; fuenf Verfaelschungen fallen je in
 ihrem Fall.
 
 **Debugger: Aufrufstapel, Ueberwachen, bis zur Marke, Wert setzen**
@@ -1076,7 +1077,7 @@ Doppelklick auf eine Variable = `GUI_PROMPT` -> `debugSetzen`, Strg+F10 =
 ersten Halt eingeloest). **Nebenfund in der gui:** F10 oeffnete die
 Menueleiste auch, wenn ein Menue-Kuerzel die Taste schon genommen hatte (die
 IDE: F10 = Schritt drueber) und mit Strg -- jetzt nur ohne Strg/Umschalt und
-ohne gefeuertes Kuerzel. Tests zwei Faelle in `tests/pruef/dhrt_debug.dhtest`
+ohne gefeuertes Kuerzel. Tests zwei Faelle in `tests/pruef/werkzeugkette/dhrt_debug.dhtest`
 (Protokoll), drei in `werkzeug_ide_handgriffe.dhtest`; drei Verfaelschungen
 der IDE (ohne Stapel, `debugBis` uebergangen, Setzen ohne Wirkung) fallen je
 in ihrem Fall.
@@ -1099,39 +1100,39 @@ Abbrechen-Knopf -- jetzt verbraucht (`liste_taste`). `.dhform`
 `bearbeitbar`. `fenstersender.ps1` kennt dafuer `auf/ab/enter/escape` in
 Folgen, und Taste runter/hoch liegen 160 statt 80 ms auseinander (unter Last
 kamen beide im selben Bild an, raylib sah keinen Druck). Tests
-`tests/pruef/gui_combobox.dhtest` (10; drei Verfaelschungen -- Enter nimmt
+`tests/pruef/gui/gui_combobox.dhtest` (10; drei Verfaelschungen -- Enter nimmt
 jeden Vorschlag, ESC nicht verbraucht, Abgleich mit Gross/klein -- lassen
 je ihre Faelle fallen).
 
-**Text und Formular** (2026-09-04, Punkt 1 des gui-Ausbaus -- Ziel: dass Drachenhauch genannt wird, wenn jemand fragt, womit er eine Anwendung schreiben soll): `GUI_SET_ALIGN(wdg, links|mitte|rechts)` fuer Beschriftung/Knopf/Textfeld; `GUI_SET_WRAP(label, breite)` bricht an Wortgrenzen um, die HOEHE folgt dem Text -- gemessen in `umbruch_layout` (in GUI_UPDATE, weil nur dort Graphics und Schreibzugriff zusammenkommen; das Zeichnen ist `&self`); `GUI_TEXTINPUT_SET(tf, key$, wert)` mit `passwort` (Punkte statt Zeichen -- Treffertest und Rollen messen an den PUNKTEN, sonst sitzt die Schreibmarke neben dem Text), `nur_lesen`, `maxlaenge` (schneidet ab, auch beim Einfuegen), `zahlen` (1 ganz, 2 Komma; Zwischenstand `-` erlaubt, sonst liesse sich keine negative Zahl tippen); `GUI_ENTERED`/`GUI_ON_ENTER`; **Strg+Z/Y in Textfeld und Textbereich** (Anschlaege innerhalb 0,8 s = EIN Schritt; `GUI_SET_TEXT` leert den Verlauf); `GUI_WINDOW_DEFAULT`/`GUI_WINDOW_CANCEL` (Enter/ESC druecken den Knopf -- aber die Taste gehoert zuerst dem Widget mit Fokus: Knopf/Kaestchen nehmen Enter selbst, Textbereich macht einen Umbruch, Zelle in Bearbeitung ihr Ende; aus einem TEXTFELD heraus ist Enter das Abschicken; der Standard-Knopf traegt den Akzent als Rahmen). Alles in der `.dhform` (auch der Tooltip -- der fehlte dort bisher) und im Form-Designer (Inspector + Codegen). **Testfalle:** raylibs Wiedergabe legt Tasten in die Tastenwarteschlange, aber KEINE Zeichen in die Zeichenwarteschlange -- Tests tippen ueber die Zwischenablage mit Strg+V, das laeuft durch dieselben Filter. Tests `tests/pruef/gui_text_formular.dhtest`, Doku `docs/module-gui.md`.
+**Text und Formular** (2026-09-04, Punkt 1 des gui-Ausbaus -- Ziel: dass Drachenhauch genannt wird, wenn jemand fragt, womit er eine Anwendung schreiben soll): `GUI_SET_ALIGN(wdg, links|mitte|rechts)` fuer Beschriftung/Knopf/Textfeld; `GUI_SET_WRAP(label, breite)` bricht an Wortgrenzen um, die HOEHE folgt dem Text -- gemessen in `umbruch_layout` (in GUI_UPDATE, weil nur dort Graphics und Schreibzugriff zusammenkommen; das Zeichnen ist `&self`); `GUI_TEXTINPUT_SET(tf, key$, wert)` mit `passwort` (Punkte statt Zeichen -- Treffertest und Rollen messen an den PUNKTEN, sonst sitzt die Schreibmarke neben dem Text), `nur_lesen`, `maxlaenge` (schneidet ab, auch beim Einfuegen), `zahlen` (1 ganz, 2 Komma; Zwischenstand `-` erlaubt, sonst liesse sich keine negative Zahl tippen); `GUI_ENTERED`/`GUI_ON_ENTER`; **Strg+Z/Y in Textfeld und Textbereich** (Anschlaege innerhalb 0,8 s = EIN Schritt; `GUI_SET_TEXT` leert den Verlauf); `GUI_WINDOW_DEFAULT`/`GUI_WINDOW_CANCEL` (Enter/ESC druecken den Knopf -- aber die Taste gehoert zuerst dem Widget mit Fokus: Knopf/Kaestchen nehmen Enter selbst, Textbereich macht einen Umbruch, Zelle in Bearbeitung ihr Ende; aus einem TEXTFELD heraus ist Enter das Abschicken; der Standard-Knopf traegt den Akzent als Rahmen). Alles in der `.dhform` (auch der Tooltip -- der fehlte dort bisher) und im Form-Designer (Inspector + Codegen). **Testfalle:** raylibs Wiedergabe legt Tasten in die Tastenwarteschlange, aber KEINE Zeichen in die Zeichenwarteschlange -- Tests tippen ueber die Zwischenablage mit Strg+V, das laeuft durch dieselben Filter. Tests `tests/pruef/gui/gui_text_formular.dhtest`, Doku `docs/module-gui.md`.
 
-**Menues** (2026-09-04, Punkt 2 des gui-Ausbaus): `GUI_MENU_ITEM(menu, label$[, kuerzel$])` / `GUI_MENU_SHORTCUT` -- Kuerzel werden als Text geschrieben (`Strg+S`, `Alt+Enter`, `F5`, `Entf`, deutsch oder englisch; `kuerzel_parsen` in gui.rs mit Rust-Tests, unbekannte Taste = Fehler beim Anlegen statt eines still stummen Kuerzels) und jedes Bild geprueft (`kuerzel_pruefen`), auch bei geschlossenem Menue -- **seit 2026-09-07 in ALLEN sichtbaren Fenstern**: zuerst im Fokus-Fenster, dann in den uebrigen von oben nach unten (Form-Designer, Anim-FSM und Notenblatt mussten sich vorher nach jedem Knopf im Nebenfenster den Fokus zurueckholen, sonst war Strg+S stumm -- dreimal derselbe Fund, dreimal zuerst vom Test gesehen); das Fokus-Fenster gewinnt bei gleichem Kuerzel, ein modales laesst nur seine eigenen zu, ein Entwurfsfenster (`GUI_WINDOW_DESIGN`) zaehlt nicht; die Modifier muessen GENAU passen, und **ohne Strg/Alt gehoert die Taste dem Textfeld mit Fokus** (ein `Entf`-Kuerzel loescht dort ein Zeichen) -- AUSSER F1..F12 (`ist_funktionstaste`, seit 2026-09-06: die IDE in Drachenhauch startete per F5 nie, weil das Code-Feld den Fokus hatte). `GUI_SUBMENU` (beliebig tief; `sub_chain` = offene Untermenues, `untermenues_folgen` oeffnet beim Ueberfahren und schliesst NICHT, wenn die Maus neben allen Popups ist -- sonst klappt es beim schraegen Hinueberfahren zu; ein Untermenue ist nie Kontextmenue, `Menu::unter`), `GUI_MENU_CHECK`/`GUI_MENU_CHECKED` (Klick oder Kuerzel kippt), `GUI_MENU_ENABLE` (gesperrt = kein Klick, kein Kuerzel), `GUI_MENU_ICON`, `GUI_MENU_TEXT`. Popup-Layout aus EINER Quelle `popup_layout` (Treffertest + Zeichnen). In der `.dhform` verschachtelt (`items` am Eintrag, `shortcut`, `checkable`/`checked`); der Form-Designer bearbeitet Menues nicht, schreibt sie aber jetzt in den DH-Code (`_gb_menus`). **Testfalle:** raylib meldet beim Lesen mancher Aufnahmedateien "Issue reading line to buffer" auf stdout, die Ereignisse kommen trotzdem an -- Tests filtern `WARNING:`-Zeilen. Tests `tests/pruef/gui_menu_ausbau.dhtest`, Beispiel `examples/129_gui_menu.dh`.
+**Menues** (2026-09-04, Punkt 2 des gui-Ausbaus): `GUI_MENU_ITEM(menu, label$[, kuerzel$])` / `GUI_MENU_SHORTCUT` -- Kuerzel werden als Text geschrieben (`Strg+S`, `Alt+Enter`, `F5`, `Entf`, deutsch oder englisch; `kuerzel_parsen` in gui.rs mit Rust-Tests, unbekannte Taste = Fehler beim Anlegen statt eines still stummen Kuerzels) und jedes Bild geprueft (`kuerzel_pruefen`), auch bei geschlossenem Menue -- **seit 2026-09-07 in ALLEN sichtbaren Fenstern**: zuerst im Fokus-Fenster, dann in den uebrigen von oben nach unten (Form-Designer, Anim-FSM und Notenblatt mussten sich vorher nach jedem Knopf im Nebenfenster den Fokus zurueckholen, sonst war Strg+S stumm -- dreimal derselbe Fund, dreimal zuerst vom Test gesehen); das Fokus-Fenster gewinnt bei gleichem Kuerzel, ein modales laesst nur seine eigenen zu, ein Entwurfsfenster (`GUI_WINDOW_DESIGN`) zaehlt nicht; die Modifier muessen GENAU passen, und **ohne Strg/Alt gehoert die Taste dem Textfeld mit Fokus** (ein `Entf`-Kuerzel loescht dort ein Zeichen) -- AUSSER F1..F12 (`ist_funktionstaste`, seit 2026-09-06: die IDE in Drachenhauch startete per F5 nie, weil das Code-Feld den Fokus hatte). `GUI_SUBMENU` (beliebig tief; `sub_chain` = offene Untermenues, `untermenues_folgen` oeffnet beim Ueberfahren und schliesst NICHT, wenn die Maus neben allen Popups ist -- sonst klappt es beim schraegen Hinueberfahren zu; ein Untermenue ist nie Kontextmenue, `Menu::unter`), `GUI_MENU_CHECK`/`GUI_MENU_CHECKED` (Klick oder Kuerzel kippt), `GUI_MENU_ENABLE` (gesperrt = kein Klick, kein Kuerzel), `GUI_MENU_ICON`, `GUI_MENU_TEXT`. Popup-Layout aus EINER Quelle `popup_layout` (Treffertest + Zeichnen). In der `.dhform` verschachtelt (`items` am Eintrag, `shortcut`, `checkable`/`checked`); der Form-Designer bearbeitet Menues nicht, schreibt sie aber jetzt in den DH-Code (`_gb_menus`). **Testfalle:** raylib meldet beim Lesen mancher Aufnahmedateien "Issue reading line to buffer" auf stdout, die Ereignisse kommen trotzdem an -- Tests filtern `WARNING:`-Zeilen. Tests `tests/pruef/gui/gui_menu_ausbau.dhtest`, Beispiel `examples/129_gui_menu.dh`.
 
-**Listen** (2026-09-04, Punkt 3 des gui-Ausbaus): Eintraege einzeln (`GUI_LISTBOX_ADD/REMOVE/CLEAR/COUNT/ITEM/SET_ITEM/MOVE`, auch fuer Klapplisten -- vorher ging nur `GUI_SET_LISTBOX` als Ganzes; die Auswahl rueckt beim Einfuegen/Loeschen davor MIT, sie meint denselben Eintrag), `GUI_LISTBOX_SET(lb, "kaestchen"|"mehrfachauswahl", 1)`, `GUI_LISTBOX_ICON/COLOR` je Eintrag, `GUI_LISTBOX_CHECKED/SET_CHECKED`, Mehrfachauswahl mit denselben Abfragen wie die Tabelle (`IS_SELECTED/SELECT/SEL_COUNT/SEL_ROW/CLEAR_SELECTION`; Strg+Klick sammelt, Umschalt+Klick spannt vom Anker, ein Pfeil setzt die Menge auf eine Zeile), `GUI_DOUBLE_CLICKED` (bisher nur Listen). Zusatzzustand in `ListState` (`Widget::list`, nur bei Bedarf angelegt -- eine schlichte Liste bleibt, was sie war; `sync` haelt die Vektoren mit `items` gleich lang). **Ein Klick aufs Kaestchen kippt NUR den Haken**, die Auswahl bleibt -- sonst waehlte man beim Abhaken jedes Mal um. `handle_press` hat kein `g`, Strg/Umschalt kommen deshalb ueber `tasten_mod`, das `update` vor dem Druck fuellt. In der `.dhform` unter `list` (Sinnbilder nicht -- Textur-Handles). Designer: zwei Schalter im Inspector, Codegen. Tests `tests/pruef/gui_listen.dhtest` (Klicks mit Strg/Umschalt echt eingespeist; der Versatz kommt aus einer Zeichenflaeche bei (0,0)), Beispiel `examples/192_gui_listen.dh`.
+**Listen** (2026-09-04, Punkt 3 des gui-Ausbaus): Eintraege einzeln (`GUI_LISTBOX_ADD/REMOVE/CLEAR/COUNT/ITEM/SET_ITEM/MOVE`, auch fuer Klapplisten -- vorher ging nur `GUI_SET_LISTBOX` als Ganzes; die Auswahl rueckt beim Einfuegen/Loeschen davor MIT, sie meint denselben Eintrag), `GUI_LISTBOX_SET(lb, "kaestchen"|"mehrfachauswahl", 1)`, `GUI_LISTBOX_ICON/COLOR` je Eintrag, `GUI_LISTBOX_CHECKED/SET_CHECKED`, Mehrfachauswahl mit denselben Abfragen wie die Tabelle (`IS_SELECTED/SELECT/SEL_COUNT/SEL_ROW/CLEAR_SELECTION`; Strg+Klick sammelt, Umschalt+Klick spannt vom Anker, ein Pfeil setzt die Menge auf eine Zeile), `GUI_DOUBLE_CLICKED` (bisher nur Listen). Zusatzzustand in `ListState` (`Widget::list`, nur bei Bedarf angelegt -- eine schlichte Liste bleibt, was sie war; `sync` haelt die Vektoren mit `items` gleich lang). **Ein Klick aufs Kaestchen kippt NUR den Haken**, die Auswahl bleibt -- sonst waehlte man beim Abhaken jedes Mal um. `handle_press` hat kein `g`, Strg/Umschalt kommen deshalb ueber `tasten_mod`, das `update` vor dem Druck fuellt. In der `.dhform` unter `list` (Sinnbilder nicht -- Textur-Handles). Designer: zwei Schalter im Inspector, Codegen. Tests `tests/pruef/gui/gui_listen.dhtest` (Klicks mit Strg/Umschalt echt eingespeist; der Versatz kommt aus einer Zeichenflaeche bei (0,0)), Beispiel `examples/192_gui_listen.dh`.
 
-**Dialoge** (2026-09-04, Punkt 4 des gui-Ausbaus): `GUI_DIALOG(t, x, "Speichern|Verwerfen|Abbrechen")` -- eigene Knoepfe (1..5), die Antwort ist die NUMMER des Knopfs; Enter = der erste, ESC/Schliessen = der letzte (Systemdialog-Konvention). `dialog_auswerten` zaehlt Knoepfe statt auf den Text "Nein" zu pruefen; Enter/ESC laufen ueber die Standard-/Abbrechen-Knoepfe aus Punkt 1 (`default_btn`/`cancel_btn`). `GUI_PROMPT(t, x[, vorgabe[, knoepfe]])` = derselbe Dialog mit Textfeld (Fokus im Feld, Vorgabe markiert), `GUI_DIALOG_TEXT` liest ihn auch nach der Antwort (Tombstone-Fenster behaelt seine Widgets). `GUI_WINDOW_MODAL(win, an)` schaltet ein EIGENES Fenster modal -- `dialog_auswerten` nimmt Nicht-Dialoge aus (sonst beendete jeder Knopf darin das Fenster) und gibt frei, wenn das Fenster ausgeblendet oder zerstoert wird. Gemeinsamer Kern `dialog_frei`. Tests `tests/pruef/gui_dialoge_ausbau.dhtest` (die Knopflage kommt aus einer 1x1-Zeichenflaeche IM Dialog), Beispiel `examples/193_gui_dialoge.dh`.
+**Dialoge** (2026-09-04, Punkt 4 des gui-Ausbaus): `GUI_DIALOG(t, x, "Speichern|Verwerfen|Abbrechen")` -- eigene Knoepfe (1..5), die Antwort ist die NUMMER des Knopfs; Enter = der erste, ESC/Schliessen = der letzte (Systemdialog-Konvention). `dialog_auswerten` zaehlt Knoepfe statt auf den Text "Nein" zu pruefen; Enter/ESC laufen ueber die Standard-/Abbrechen-Knoepfe aus Punkt 1 (`default_btn`/`cancel_btn`). `GUI_PROMPT(t, x[, vorgabe[, knoepfe]])` = derselbe Dialog mit Textfeld (Fokus im Feld, Vorgabe markiert), `GUI_DIALOG_TEXT` liest ihn auch nach der Antwort (Tombstone-Fenster behaelt seine Widgets). `GUI_WINDOW_MODAL(win, an)` schaltet ein EIGENES Fenster modal -- `dialog_auswerten` nimmt Nicht-Dialoge aus (sonst beendete jeder Knopf darin das Fenster) und gibt frei, wenn das Fenster ausgeblendet oder zerstoert wird. Gemeinsamer Kern `dialog_frei`. Tests `tests/pruef/gui/gui_dialoge_ausbau.dhtest` (die Knopflage kommt aus einer 1x1-Zeichenflaeche IM Dialog), Beispiel `examples/193_gui_dialoge.dh`.
 
-**Layout** (2026-09-04, Punkt 5 des gui-Ausbaus): `GUI_AUTOSIZE(wdg)` und `0` als Breite/Hoehe beim Anlegen = Mass nach Inhalt (`auto_w`/`auto_h`, gemessen im `layout_pass` in GUI_UPDATE; `GUI_SET_BOUNDS` hebt es auf). `GUI_LAYOUT(win, zeile|spalte|raster:N, x, y, w, h)` = neue Widget-Art `Kind::Layout` mit `LayoutState` (Kinder als Widget-Indizes, -1 = `GUI_LAYOUT_SPACER`), `GUI_LAYOUT_ADD(layout, wdg[, gewicht])` (Gewicht 0 = eigene Groesse, sonst Anteil am Rest; ein Widget in hoechstens EINEM Behaelter, kein Kreis), `GUI_LAYOUT_SET` (abstand, rand, ausrichtung, dehnen, rahmen). `layout_anwenden` laeuft je Bild von jedem WURZEL-Behaelter rekursiv; Beschriftungen darin werden immer exakt gemessen (die `GUI_LABEL`-Schaetzung `chars*8` stimmte fuer Zeilen nie). **Ein Behaelter ist Luft fuer Klicks** -- aus den drei Treffertests (Hover, Druck, `GUI_HIT_TEST`) ausgenommen, sonst schluckte er die Klicks seiner Kinder, die in der Reihenfolge NACH ihm kommen; nicht fokussierbar. Anker gelten fuer den Behaelter, die Kinder bekommen ihre Lage von ihm (relayout setzt sie, der naechste layout_pass korrigiert). In der `.dhform`: `layout` mit `kinder` als `[Index, Gewicht]`; der Form-Designer fuehrt die Kinder intern an NAMEN (`layout_von`/`layout_zuordnen`, Umrechnung nur an der Dateigrenze -- so ueberleben Zuordnungen Loeschen und Umsortieren ohne Index-Buchfuehrung), Paletteneintrag, Inspector (Art/Masse am Behaelter, "Layout"+"Gewicht" an jedem Control), Codegen. Bewusst NICHT: Constraints, Mindestgroessen. Tests `tests/pruef/gui_layout.dhtest` (headless ueber GUI_GET_X/Y/W/H), Beispiel `examples/194_gui_layout.dh`.
+**Layout** (2026-09-04, Punkt 5 des gui-Ausbaus): `GUI_AUTOSIZE(wdg)` und `0` als Breite/Hoehe beim Anlegen = Mass nach Inhalt (`auto_w`/`auto_h`, gemessen im `layout_pass` in GUI_UPDATE; `GUI_SET_BOUNDS` hebt es auf). `GUI_LAYOUT(win, zeile|spalte|raster:N, x, y, w, h)` = neue Widget-Art `Kind::Layout` mit `LayoutState` (Kinder als Widget-Indizes, -1 = `GUI_LAYOUT_SPACER`), `GUI_LAYOUT_ADD(layout, wdg[, gewicht])` (Gewicht 0 = eigene Groesse, sonst Anteil am Rest; ein Widget in hoechstens EINEM Behaelter, kein Kreis), `GUI_LAYOUT_SET` (abstand, rand, ausrichtung, dehnen, rahmen). `layout_anwenden` laeuft je Bild von jedem WURZEL-Behaelter rekursiv; Beschriftungen darin werden immer exakt gemessen (die `GUI_LABEL`-Schaetzung `chars*8` stimmte fuer Zeilen nie). **Ein Behaelter ist Luft fuer Klicks** -- aus den drei Treffertests (Hover, Druck, `GUI_HIT_TEST`) ausgenommen, sonst schluckte er die Klicks seiner Kinder, die in der Reihenfolge NACH ihm kommen; nicht fokussierbar. Anker gelten fuer den Behaelter, die Kinder bekommen ihre Lage von ihm (relayout setzt sie, der naechste layout_pass korrigiert). In der `.dhform`: `layout` mit `kinder` als `[Index, Gewicht]`; der Form-Designer fuehrt die Kinder intern an NAMEN (`layout_von`/`layout_zuordnen`, Umrechnung nur an der Dateigrenze -- so ueberleben Zuordnungen Loeschen und Umsortieren ohne Index-Buchfuehrung), Paletteneintrag, Inspector (Art/Masse am Behaelter, "Layout"+"Gewicht" an jedem Control), Codegen. Bewusst NICHT: Constraints, Mindestgroessen. Tests `tests/pruef/gui/gui_layout.dhtest` (headless ueber GUI_GET_X/Y/W/H), Beispiel `examples/194_gui_layout.dh`.
 
-**Feinschliff** (2026-09-05, Punkt 6 und Abschluss des gui-Ausbaus): `GUI_VSLIDER(win, x, y, h, min, max, default)` (Slider mit `vert`, Wert waechst nach oben; `drag_slider` bekommt jetzt auch `my`), `GUI_PROGRESS_SET(p, "unbestimmt", 1)` (Band aus `g.get_time()`), `GUI_IMAGE_MODE` (strecken/einpassen/fuellen/mitte/kacheln, `draw_bild` mit Clip), `GUI_TREE_ICON/COLOR` (TreeNode `icon`/`color`; sobald ein Knoten ein Sinnbild hat, rueckt JEDE Zeile ein), **rollendes Panel** `GUI_PANEL_ADD/REMOVE/SCROLL/SCROLL_GET` (`PanelState` am Panel, `panel_von` am Kind -- je Bild in `panel_pass` gesetzt, durch Layouts hindurch; der Scroll ist NUR ein Blick-Versatz in `abs_rect`, die Kinder behalten ihre Fensterlage; `im_panel_sichtbar` nimmt Herausgerolltes aus Hover/Druck/GUI_HIT_TEST; ein rollendes Panel ist wie ein Layout Luft fuer Klicks, weil `handle_press` den ERSTEN Treffer nimmt und das Panel vor seinen Kindern liegt; Mausrad NACH den Kindern abgefragt, weil `pop_mouse_wheel` nur einmal liefert; kein Panel im Panel), **Ziehen** `GUI_DRAGGABLE/DROP_TARGET` + `GUI_DRAGGING/DROPPED/DROP_TEXT/DROP_SOURCE/DRAG_INDEX/DROP_INDEX` (`DragState` ab 5 px Bewegung, `DropInfo` transient wie `clicked`; Nutzlast = Listenzeile/Baumknoten/Widget-Text; innerhalb derselben Liste sortiert `ablegen` selbst um; Schatten + Ablage-Rahmen in `draw_top`), **Cursorformen** `cursor_pass` (setzt nur bei Wechsel und nimmt nur zurueck, was sie selbst war -- `MOUSE_CURSOR` nach GUI_UPDATE gewinnt; `GUI_CURSORS(FALSE)` aus; nicht testbar, raylib liest die Form nicht zurueck). `.dhform`: `vertical`, `indeterminate`, `mode`, `draggable`, `drop_target`, `panel{kinder,scroll}`; Designer: Inspector-Felder + "Panel"-Zuordnung ueber dieselbe Namens-Buchfuehrung wie Layout (`layout_von(c, "panel")`), Codegen. Tests `tests/pruef/gui_punkt6.dhtest` (Zuege echt eingespeist; Mausrad = Ereignis 8 mit params[1] = y), Beispiel `examples/195_gui_feinschliff.dh`.
+**Feinschliff** (2026-09-05, Punkt 6 und Abschluss des gui-Ausbaus): `GUI_VSLIDER(win, x, y, h, min, max, default)` (Slider mit `vert`, Wert waechst nach oben; `drag_slider` bekommt jetzt auch `my`), `GUI_PROGRESS_SET(p, "unbestimmt", 1)` (Band aus `g.get_time()`), `GUI_IMAGE_MODE` (strecken/einpassen/fuellen/mitte/kacheln, `draw_bild` mit Clip), `GUI_TREE_ICON/COLOR` (TreeNode `icon`/`color`; sobald ein Knoten ein Sinnbild hat, rueckt JEDE Zeile ein), **rollendes Panel** `GUI_PANEL_ADD/REMOVE/SCROLL/SCROLL_GET` (`PanelState` am Panel, `panel_von` am Kind -- je Bild in `panel_pass` gesetzt, durch Layouts hindurch; der Scroll ist NUR ein Blick-Versatz in `abs_rect`, die Kinder behalten ihre Fensterlage; `im_panel_sichtbar` nimmt Herausgerolltes aus Hover/Druck/GUI_HIT_TEST; ein rollendes Panel ist wie ein Layout Luft fuer Klicks, weil `handle_press` den ERSTEN Treffer nimmt und das Panel vor seinen Kindern liegt; Mausrad NACH den Kindern abgefragt, weil `pop_mouse_wheel` nur einmal liefert; kein Panel im Panel), **Ziehen** `GUI_DRAGGABLE/DROP_TARGET` + `GUI_DRAGGING/DROPPED/DROP_TEXT/DROP_SOURCE/DRAG_INDEX/DROP_INDEX` (`DragState` ab 5 px Bewegung, `DropInfo` transient wie `clicked`; Nutzlast = Listenzeile/Baumknoten/Widget-Text; innerhalb derselben Liste sortiert `ablegen` selbst um; Schatten + Ablage-Rahmen in `draw_top`), **Cursorformen** `cursor_pass` (setzt nur bei Wechsel und nimmt nur zurueck, was sie selbst war -- `MOUSE_CURSOR` nach GUI_UPDATE gewinnt; `GUI_CURSORS(FALSE)` aus; nicht testbar, raylib liest die Form nicht zurueck). `.dhform`: `vertical`, `indeterminate`, `mode`, `draggable`, `drop_target`, `panel{kinder,scroll}`; Designer: Inspector-Felder + "Panel"-Zuordnung ueber dieselbe Namens-Buchfuehrung wie Layout (`layout_von(c, "panel")`), Codegen. Tests `tests/pruef/gui/gui_punkt6.dhtest` (Zuege echt eingespeist; Mausrad = Ereignis 8 mit params[1] = y), Beispiel `examples/195_gui_feinschliff.dh`.
 
-**Mindestmasse und Formularpruefung** (2026-09-05, aus dem sechsten Piloten): `GUI_SET_MIN_SIZE(wdg, w, h)` -- ein gewichtetes Kind im Behaelter faellt nie darunter (die Zeile laeuft lieber ueber), ein verankertes Widget schrumpft nicht darunter; `GUI_LAYOUT_MIN_W/H(layout)` = Mass des Inhalts (`min_mass`, rekursiv; feste Kinder mit ihrer NATUERLICHEN Groesse `nat_w/nat_h` -- `w/h` tragen nach dem ersten Durchlauf die gedehnte Groesse, daraus liesse sich kein Minimum ableiten; gewichtete mit ihrem Mindestmass), der Wert fuer `WINDOW_MIN_SIZE`. **Formularpruefung:** `GUI_RULE(feld, art$[, a, b][, muster$][, meldung$])` (pflicht/zahl/ganz/bereich/laenge/email/datum/muster; an Klappliste und Kaestchen nur pflicht; die Argumentzahl haengt an der Art, der letzte Text ist die Meldung), `GUI_VALIDATE(win)` (Zahl der Fehler, prueft nur sichtbare + bedienbare Felder -- ein Fehler auf einem anderen Reiter waere einer ohne Ausweg; erstes falsches Feld bekommt den Fokus), `GUI_VALIDATE_WIDGET`, `GUI_ERROR/SET_ERROR/CLEAR_ERRORS`, `GUI_ERROR_LABEL` (Beschriftung zeigt die Meldung; `fehler_setzen` ist die EINE Stelle), `GUI_VALIDATE_LIVE` (beim Verlassen des Feldes, nicht je Anschlag), `GUI_RULES_CLEAR`. Roter Doppelrahmen am Feld, Meldung im Tooltip vor dem Hilfetext. **Leer laesst jede Regel ausser pflicht durch** -- sonst hiesse "bereich 1 10" zugleich "Pflichtfeld". Reine Regel-Logik `regel_pruefen` mit Rust-Tests; die regex-Fehlermeldung ist mehrzeilig, nur die letzte Zeile kommt in die Meldung. `.dhform`: `min_w/min_h`, `rules`, `error_label`; Designer: zwei Drehfelder + Zeile "Regeln" (`regeln_parsen`/`regeln_text`, Tippfehler werden uebergangen), Codegen. Bewusst NICHT: eigene Regel als FUNCREF (Programm prueft nach GUI_VALIDATE selbst und meldet ueber GUI_SET_ERROR). Der Pilot 196 benutzt beides statt seiner Handarbeit. Tests `tests/pruef/gui_pruefung.dhtest`, Mindestmasse in `tests/pruef/gui_layout.dhtest`.
+**Mindestmasse und Formularpruefung** (2026-09-05, aus dem sechsten Piloten): `GUI_SET_MIN_SIZE(wdg, w, h)` -- ein gewichtetes Kind im Behaelter faellt nie darunter (die Zeile laeuft lieber ueber), ein verankertes Widget schrumpft nicht darunter; `GUI_LAYOUT_MIN_W/H(layout)` = Mass des Inhalts (`min_mass`, rekursiv; feste Kinder mit ihrer NATUERLICHEN Groesse `nat_w/nat_h` -- `w/h` tragen nach dem ersten Durchlauf die gedehnte Groesse, daraus liesse sich kein Minimum ableiten; gewichtete mit ihrem Mindestmass), der Wert fuer `WINDOW_MIN_SIZE`. **Formularpruefung:** `GUI_RULE(feld, art$[, a, b][, muster$][, meldung$])` (pflicht/zahl/ganz/bereich/laenge/email/datum/muster; an Klappliste und Kaestchen nur pflicht; die Argumentzahl haengt an der Art, der letzte Text ist die Meldung), `GUI_VALIDATE(win)` (Zahl der Fehler, prueft nur sichtbare + bedienbare Felder -- ein Fehler auf einem anderen Reiter waere einer ohne Ausweg; erstes falsches Feld bekommt den Fokus), `GUI_VALIDATE_WIDGET`, `GUI_ERROR/SET_ERROR/CLEAR_ERRORS`, `GUI_ERROR_LABEL` (Beschriftung zeigt die Meldung; `fehler_setzen` ist die EINE Stelle), `GUI_VALIDATE_LIVE` (beim Verlassen des Feldes, nicht je Anschlag), `GUI_RULES_CLEAR`. Roter Doppelrahmen am Feld, Meldung im Tooltip vor dem Hilfetext. **Leer laesst jede Regel ausser pflicht durch** -- sonst hiesse "bereich 1 10" zugleich "Pflichtfeld". Reine Regel-Logik `regel_pruefen` mit Rust-Tests; die regex-Fehlermeldung ist mehrzeilig, nur die letzte Zeile kommt in die Meldung. `.dhform`: `min_w/min_h`, `rules`, `error_label`; Designer: zwei Drehfelder + Zeile "Regeln" (`regeln_parsen`/`regeln_text`, Tippfehler werden uebergangen), Codegen. Bewusst NICHT: eigene Regel als FUNCREF (Programm prueft nach GUI_VALIDATE selbst und meldet ueber GUI_SET_ERROR). Der Pilot 196 benutzt beides statt seiner Handarbeit. Tests `tests/pruef/gui/gui_pruefung.dhtest`, Mindestmasse in `tests/pruef/gui/gui_layout.dhtest`.
 
-**Zeilenumbruch und Datenbindung** (2026-09-05, die letzten zwei Punkte der Lueckenliste): `GUI_TEXTAREA_SET(ta, "umbruch", 1)` -- der Textbereich bricht an Wortgrenzen um (`ta_rows` = EINE Quelle sichtbarer Zeilen `(logische Zeile, von, bis)` fuer Zeichnen, Klick, Pfeile, Schreibmarke und Scroll; `ta_row_of`: am Umbruch gehoert die Marke zur NEUEN Zeile; Pos1/Ende/Pfeile laufen in sichtbaren Zeilen; Zeilennummern nur an der ersten Zeile eines Absatzes; `GUI_TEXTAREA_VIEW` zaehlt weiter logische Zeilen; `scroll_x` bleibt 0). Test-Falle: es gibt keine Schreibmarken-Abfrage -- ein eingefuegtes `#` (Strg+V) verraet die Lage, und nach GUI_SET_TEXT steht die Marke am ENDE, also erst sechsmal Pfeil hoch. **Datenbindung:** `GUI_BIND(wdg, schluessel$[, formular$])`, `GUI_FORM_GET/SET/CLEAR/CLEAN/CHANGED(win[, formular$])`, `GUI_FORM_LOAD/SAVE(win, db, tabelle$, id[, formular$])` (in vm.rs, weil nur die VM db UND gui hat; `#[cfg(feature = "db")]`; Spalte heisst `id`; Tabellen- und Schluesselnamen nur `[A-Za-z0-9_]`). `wert_text` (Vergleich/MAP) und `wert_typisiert` (Datenbank: Zahlenfeld -> Zahl, ausser fuehrende Null wie eine PLZ -> Text; Kaestchen -> BOOL; Klappliste -> Index; Regler -> FLOAT), `wert_setzen` tolerant ("ja"/1/TRUE, Eintragstext oder Index). `Window.form_stand` = sauberer Stand (beim Binden, nach SET/LOAD/SAVE/CLEAR/CLEAN). Der Pilot 196 laedt/speichert Kunden ueber die Bindung (keine Spaltenliste mehr) und nutzt sie beim Artikel nur fuer "geaendert?", weil er Preis und MwSt umrechnet. `.dhform`: `wrap_text`, `bind`, `form`; Designer: Felder "Bindung"/"Formular", Kaestchen "Zeilenumbruch", Codegen. Bewusst NICHT: Listen an Tabellen binden, Fremdschluessel, Verbunde. Tests `tests/pruef/gui_bindung.dhtest` (bis 2026-09-16 pytest mit sqlite3; seither liest ein zweiter Prozess die Datei mit `typeof()`), `tests/pruef/gui_umbruch.dhtest` (seriell).
+**Zeilenumbruch und Datenbindung** (2026-09-05, die letzten zwei Punkte der Lueckenliste): `GUI_TEXTAREA_SET(ta, "umbruch", 1)` -- der Textbereich bricht an Wortgrenzen um (`ta_rows` = EINE Quelle sichtbarer Zeilen `(logische Zeile, von, bis)` fuer Zeichnen, Klick, Pfeile, Schreibmarke und Scroll; `ta_row_of`: am Umbruch gehoert die Marke zur NEUEN Zeile; Pos1/Ende/Pfeile laufen in sichtbaren Zeilen; Zeilennummern nur an der ersten Zeile eines Absatzes; `GUI_TEXTAREA_VIEW` zaehlt weiter logische Zeilen; `scroll_x` bleibt 0). Test-Falle: es gibt keine Schreibmarken-Abfrage -- ein eingefuegtes `#` (Strg+V) verraet die Lage, und nach GUI_SET_TEXT steht die Marke am ENDE, also erst sechsmal Pfeil hoch. **Datenbindung:** `GUI_BIND(wdg, schluessel$[, formular$])`, `GUI_FORM_GET/SET/CLEAR/CLEAN/CHANGED(win[, formular$])`, `GUI_FORM_LOAD/SAVE(win, db, tabelle$, id[, formular$])` (in vm.rs, weil nur die VM db UND gui hat; `#[cfg(feature = "db")]`; Spalte heisst `id`; Tabellen- und Schluesselnamen nur `[A-Za-z0-9_]`). `wert_text` (Vergleich/MAP) und `wert_typisiert` (Datenbank: Zahlenfeld -> Zahl, ausser fuehrende Null wie eine PLZ -> Text; Kaestchen -> BOOL; Klappliste -> Index; Regler -> FLOAT), `wert_setzen` tolerant ("ja"/1/TRUE, Eintragstext oder Index). `Window.form_stand` = sauberer Stand (beim Binden, nach SET/LOAD/SAVE/CLEAR/CLEAN). Der Pilot 196 laedt/speichert Kunden ueber die Bindung (keine Spaltenliste mehr) und nutzt sie beim Artikel nur fuer "geaendert?", weil er Preis und MwSt umrechnet. `.dhform`: `wrap_text`, `bind`, `form`; Designer: Felder "Bindung"/"Formular", Kaestchen "Zeilenumbruch", Codegen. Bewusst NICHT: Listen an Tabellen binden, Fremdschluessel, Verbunde. Tests `tests/pruef/gui/gui_bindung.dhtest` (bis 2026-09-16 pytest mit sqlite3; seither liest ein zweiter Prozess die Datei mit `typeof()`), `tests/pruef/gui/gui_umbruch.dhtest` (seriell).
 
-**Drucken und OPENDOC** (2026-09-05, Wege A und C aus `docs/entwurf-drucken.md`): das pdf-Modul zeichnet seine Befehle jetzt AUF (`pdf::Op` je Seite, parallel zum Inhaltsstrom) und spielt sie auf drei Ziele: `PDF_SAVE` (wie immer), `PDF_PRINT(p[, drucker$[, kopien[, zieldatei$]]])` und `PDF_PREVIEW(p, seite[, breite_px]) -> IMAGE` (graphics.rs, raylibs Standardschrift). `drucken.rs` (ungated): Windows = GDI ueber das `windows`-Crate (schon im Baum, jetzt direkte Abhaengigkeit unter `[target.'cfg(windows)']` mit Gdi/Printing/Xps/Shell-Features) -- `CreateDCW` auf den Drucker, `StartDocW` mit `lpszOutput` = zieldatei, mm -> Geraeteeinheiten ueber `GetDeviceCaps`, `PHYSICALOFFSET` abgezogen, `TA_TOP` weil unser y die Oberkante ist, Schriften Helvetica->Arial/Times->Times New Roman/Courier->Courier New; `EnumPrintersW` Level 4, `GetDefaultPrinterW`; macOS/Linux = `lp -d -n` mit temporaerer PDF, `lpstat -a/-d`, zieldatei = die PDF selbst. `OPENDOC(pfad$)` = ShellExecute/open/xdg-open mit Endungsliste (kein Programmstarter). **Gemessen:** zwei Seiten durch "Microsoft Print to PDF" in eine Datei ~0,9 s; im Ergebnis stehen Text und der rechtsbuendige Betrag an seiner Stelle (Test `tests/pruef/drucken.dhtest`, laeuft auch auf dem Windows-Runner der CI, weil Windows den Drucker mitbringt; gelesen mit dem eigenen Leser `tests/pruef/_hilfen/pdftext.dh`). Kopien = der Auftrag n-mal, nicht DEVMODE. Bewusst NICHT: fremde PDFs drucken, nativer Druckdialog, Duplex/Papierfach. Pilot 196: Druckdialog aus Bordmitteln (Klappliste PRINTERS, Kopien, PDF_PREVIEW auf GUI_IMAGE) + "PDF oeffnen".
+**Drucken und OPENDOC** (2026-09-05, Wege A und C aus `docs/entwurf-drucken.md`): das pdf-Modul zeichnet seine Befehle jetzt AUF (`pdf::Op` je Seite, parallel zum Inhaltsstrom) und spielt sie auf drei Ziele: `PDF_SAVE` (wie immer), `PDF_PRINT(p[, drucker$[, kopien[, zieldatei$]]])` und `PDF_PREVIEW(p, seite[, breite_px]) -> IMAGE` (graphics.rs, raylibs Standardschrift). `drucken.rs` (ungated): Windows = GDI ueber das `windows`-Crate (schon im Baum, jetzt direkte Abhaengigkeit unter `[target.'cfg(windows)']` mit Gdi/Printing/Xps/Shell-Features) -- `CreateDCW` auf den Drucker, `StartDocW` mit `lpszOutput` = zieldatei, mm -> Geraeteeinheiten ueber `GetDeviceCaps`, `PHYSICALOFFSET` abgezogen, `TA_TOP` weil unser y die Oberkante ist, Schriften Helvetica->Arial/Times->Times New Roman/Courier->Courier New; `EnumPrintersW` Level 4, `GetDefaultPrinterW`; macOS/Linux = `lp -d -n` mit temporaerer PDF, `lpstat -a/-d`, zieldatei = die PDF selbst. `OPENDOC(pfad$)` = ShellExecute/open/xdg-open mit Endungsliste (kein Programmstarter). **Gemessen:** zwei Seiten durch "Microsoft Print to PDF" in eine Datei ~0,9 s; im Ergebnis stehen Text und der rechtsbuendige Betrag an seiner Stelle (Test `tests/pruef/module/drucken.dhtest`, laeuft auch auf dem Windows-Runner der CI, weil Windows den Drucker mitbringt; gelesen mit dem eigenen Leser `tests/pruef/_hilfen/pdftext.dh`). Kopien = der Auftrag n-mal, nicht DEVMODE. Bewusst NICHT: fremde PDFs drucken, nativer Druckdialog, Duplex/Papierfach. Pilot 196: Druckdialog aus Bordmitteln (Klappliste PRINTERS, Kopien, PDF_PREVIEW auf GUI_IMAGE) + "PDF oeffnen".
 
 **Das pdf-Modul schreibt ueber krilla** (2026-09-14, auf Frage des Nutzers nach Rust-Bibliotheken wie typst): nicht typst selbst -- ein ganzes Satzsystem mit eigener Markup-Sprache passte nicht zur Befehlsfolge PDF_TEXT/PDF_LINE --, sondern **krilla**, die Bibliothek, mit der typst seine PDFs schreibt. Vorher standen in `pdf.rs` 440 Zeilen Handarbeit, die nur die vierzehn Standardschriften ohne Einbetten und nur cp1252 konnten, dazu `pdf_masse.rs` aus einem PyMuPDF-Skript. Jetzt: die Seiten zeichnen weiter nur `Op`s auf, `bauen()` spielt sie auf ein `krilla::Document` (von oben gezaehlt wie krilla selbst, Text-Y + Schriftgroesse = Grundlinie). **Schriften eingebettet und beschnitten**: eingebaut DejaVu Sans/Serif/Sans Mono in je vier Schnitten (Crate `dejavu`, 5,1 MB Schriftdaten im Bau) als `sans`/`serif`/`mono[-fett|-kursiv|-fett-kursiv]`, `helvetica`/`times`/`courier` bleiben Namen dafuer; `symbol`/`zapfdingbats` sind ein Fehler mit Hinweis. Neu `PDF_FONT_LOAD(p, pfad$, name$)`. **Text ist Unicode**; ein Zeichen, das die Schrift nicht hat, ist ein Fehler (`rustybuzz::Face::glyph_index`), kein leeres Kaestchen. **`PDF_TEXT_WIDTH` formt mit rustybuzz genau wie krillas `draw_text`** (Unterschneidung eingeschlossen) -- gegen PyMuPDF auf denselben Dateien nachgemessen: Serif/Mono gleich auf vier Stellen, `sans` schmaler um die Unterschneidungspaare. **Weiter reproduzierbar**: krilla schreibt kein Datum und bildet die Dokumentkennung aus dem Inhalt (Rust-Test + `--- nochmal`-Fall). **Folge fuer Tests**: im Inhaltsstrom stehen Glyphennummern statt Text; zwei Werkzeug-Sammlungen und `pdf.dhtest` lesen deshalb ueber `pdftext.dh` (Beilage, in Drachenhauch: Objekte, Seitenbaum, Ressourcen, ToUnicode-Tabellen, TJ-Zeichenketten) statt BUFFER_INFLATE + INSTR; Gegenprobe mit falschem Suchwort faellt. GDI-Druck bildet sans/serif/mono auf Arial/Times New Roman/Courier New ab, geladene Schriften auf Arial. Doku `docs/module-pdf.md`, Buch `79_dokumente.js`. **Stolpersteine beim Leser:** `VAL("3 0 R")` ist 0 (fuehrende Zahl selbst lesen), und eine MAP laesst sich nicht verschachtelt abfragen (`tabellen[akt]` ist ein Fehler) -- ein flacher Schluessel `schrift:glyph`.
 
-**Fenster als Prozess** (2026-09-05, Weg B aus `docs/entwurf-native-fenster.md`): `WINDOW_OPEN(datei$[, args...])` startet einen zweiten `dhrt run` mit eigenem SCREEN (`fenster.rs`, ungated wie `hintergrund.rs`); Kanal = TCP auf 127.0.0.1, Port ueber `DHRT_ELTERN_PORT`, NICHT stdin/stdout (das Kind darf weiter PRINT); `WINDOW_SEND/RECV$/ALIVE/CLOSE`, im Kind `PARENT_SEND/RECV$/ALIVE` (Verbindung beim ersten PARENT_*-Aufruf; `PARENT_ALIVE` = FALSE ohne Eltern, damit dasselbe Programm allein laeuft). `Leitung` teilen sich beide Seiten: begrenzte Warteschlange (1024, aelteste faellt weg, wie MIDI), vor der Verbindung Gesendetes wird vorgemerkt, eine Nachricht ist EINE Zeile (Umbruch = Fehler); faellt die Verbindung, beendet sich das Kind (`std::process::exit`); `Drop` der Eltern killt die Kinder. WINDOW_OPEN nimmt dem Kind `DHRT_FRAMES`/`DHRT_SCREENSHOT`/`DHRT_CONTACT*` aus der Umgebung -- sonst stuerbe es in Tests nach N Bildern. Gemessen: 0,4 s bis zum ersten Bild, 1000 Nachrichten im Schub ~60 ms, EINE Runde 17-50 ms = ein bis drei Bilder des Kindes (es liest einmal je Bild; der Entwurf verlangte < 5 ms fuer den Kanal, und der Kanal schafft das -- die Bildschleife nicht). Kein geteilter Zustand, wie TASK_START. Pilot: `196_rechnung_fenster.dh` (64 Zeilen) + Strg+F in 196. Tests `tests/pruef/fenster_prozess.dhtest` (seriell, zwei Prozesse) + Rust-Tests in fenster.rs.
+**Fenster als Prozess** (2026-09-05, Weg B aus `docs/entwurf-native-fenster.md`): `WINDOW_OPEN(datei$[, args...])` startet einen zweiten `dhrt run` mit eigenem SCREEN (`fenster.rs`, ungated wie `hintergrund.rs`); Kanal = TCP auf 127.0.0.1, Port ueber `DHRT_ELTERN_PORT`, NICHT stdin/stdout (das Kind darf weiter PRINT); `WINDOW_SEND/RECV$/ALIVE/CLOSE`, im Kind `PARENT_SEND/RECV$/ALIVE` (Verbindung beim ersten PARENT_*-Aufruf; `PARENT_ALIVE` = FALSE ohne Eltern, damit dasselbe Programm allein laeuft). `Leitung` teilen sich beide Seiten: begrenzte Warteschlange (1024, aelteste faellt weg, wie MIDI), vor der Verbindung Gesendetes wird vorgemerkt, eine Nachricht ist EINE Zeile (Umbruch = Fehler); faellt die Verbindung, beendet sich das Kind (`std::process::exit`); `Drop` der Eltern killt die Kinder. WINDOW_OPEN nimmt dem Kind `DHRT_FRAMES`/`DHRT_SCREENSHOT`/`DHRT_CONTACT*` aus der Umgebung -- sonst stuerbe es in Tests nach N Bildern. Gemessen: 0,4 s bis zum ersten Bild, 1000 Nachrichten im Schub ~60 ms, EINE Runde 17-50 ms = ein bis drei Bilder des Kindes (es liest einmal je Bild; der Entwurf verlangte < 5 ms fuer den Kanal, und der Kanal schafft das -- die Bildschleife nicht). Kein geteilter Zustand, wie TASK_START. Pilot: `196_rechnung_fenster.dh` (64 Zeilen) + Strg+F in 196. Tests `tests/pruef/fenster/fenster_prozess.dhtest` (seriell, zwei Prozesse) + Rust-Tests in fenster.rs.
 
-**Barrierefreiheit** (2026-09-06, Wege A und C aus `docs/entwurf-barrierefreiheit.md`): gemessen vor dem Bau hatte ein dhrt-Fenster im UIA-Baum NULL Nachkommen -- fuer Bildschirmleser, Lupe und Sprachsteuerung ein Titel und sonst nichts. Jetzt schiebt das gui-Modul je Bild einen vollstaendigen Baum an **AccessKit** (`a11y.rs`; Crates `accesskit` 0.25 + `accesskit_windows` 0.35, im `graphics`-Feature): `Gui::a11y_baum` (Fenster als Group/Dialog, Widgets mit Rolle nach `Kind`, Menueleiste, Reiter, Listeneintraege, Tabellenzeilen/-zellen, Baumknoten; Knoten-Nummern in `a11y::ids`, eine Quelle fuer Bauen und Zerlegen), `Gui::a11y_aktion` (Focus/Click/SetValue/Increment/Expand auf DENSELBEN Wegen wie Maus und Tastatur, damit `GUI_CLICKED`/`on_click`/`on_change` feuern). **Drei Fallen:** (1) der Windows-Adapter verlangt ein Fenster, das noch nie sichtbar war -- `graphics.rs` legt es deshalb IMMER versteckt an (`builder.hidden()`), haengt den Adapter ein und zeigt es dann; (2) die Aktivierungs-Anfrage kommt in der Fensterprozedur (raylibs EndDrawing), wo die gui nicht greifbar ist -- der Handler antwortet `None` und merkt sich nur, dass gefragt wurde; laut Vertrag muss dann das naechste `update_if_active` einen VOLLEN Baum liefern (GUI_UPDATE tut das, FLIP schickt ohne gui einen Baum nur mit dem Fenster); (3) **LNK2005 `CloseWindow`/`ShowCursor`**: raylibs C-Funktionen heissen wie user32-Exporte, und die Import-Bibliothek des `windows`-Crates stand im Link vor raylib -- mit ZWEI windows-Fassungen (0.61 fuers Drucken, 0.62 aus AccessKit) brach der Link; dhrt ist deshalb auf `windows` 0.62 gehoben, eine Fassung, und es linkt. Beschriftung eines Eingabefelds = die Beschriftung links daneben oder darueber (`a11y_beschriftung`, `labelled_by`), sonst der Tooltip. Baum nur, wenn ein Hilfsprogramm fragt (`a11y_aktiv`). Neu: `GUI_ANNOUNCE(text$[, dringend])` (Live-Knoten; wechselndes Leerzeichen, damit dieselbe Ansage zweimal eine Aenderung ist), `GUI_SCREENREADER()`, `GUI_SET_TAB_INDEX(wdg, n)` (Index > 0 zuerst, Rest in Anlege-Reihenfolge; `.dhform` `tab_index`, Designer-Drehfeld). Weg A dazu: **Menueleiste per F10 oder Alt allein** (`menue_tasten`, `menu_cursor` im tiefsten offenen Menue, Pfeile/Enter/ESC; solange ein Leistenmenue offen ist, gehoeren die Tasten dem Menue; Alt+X loescht den Alt-Merker ueber `key_any_pressed_except_alt`), **Tooltip bei Tastaturfokus** (`tip_fokus`, unter dem Widget, die Maus gewinnt), helles Thema: gedaempfter Text 2,76:1 -> 6,3:1, Akzent 3,8 -> 5,6:1. **Pruefstein:** `tests/pruef/gui_barrierefreiheit.dhtest` (bis 2026-09-17 pytest) laesst einen FREMDEN Leser (UIA aus PowerShell, `System.Windows.Automation`, keine neue Abhaengigkeit) Namen zaehlen, den Knopf klicken, Text setzen, Fokus setzen -- laeuft auch auf dem Windows-Runner. Bewusst NICHT (noch): Schreibmarke zeichenweise, `ui`-Modul, Web. SPEAK (Weg B) kam am selben Tag, siehe unten. Pilot 196 sagt seine Statuszeile an. **macOS/Linux-Adapter (selber Tag):** `a11y.rs` hat je System einen `mod plattform` mit EINEM Vertrag (`neu/aktiv/aktionen/senden/fenster_lage/fenster_fokus`) -- macOS `accesskit_macos::SubclassingAdapter::for_window` auf GLFWs `NSWindow` nach `add_focus_forwarder_to_window_class("GLFWWindow")`, Fokus ueber `update_view_focus_state`; Linux `accesskit_unix::Adapter::new` (Handler muessen `Send` sein, D-Bus-Faden; `DeactivationHandler` setzt `aktiv` zurueck), Lage/Fokus meldet `a11y_bild_ende` je FLIP bei Aenderung (`set_root_window_bounds`, aussen = innen, unter Wayland 0/0). Damit sich das OHNE raylib fuer ein fremdes Ziel pruefen laesst, ist `a11y` ein eigenes Feature (graphics schaltet es ein; `mod a11y` mit `#[allow(dead_code)]`): `cargo check --features a11y --target aarch64-apple-darwin` bzw. `x86_64-unknown-linux-gnu` (rustup-Ziele nachinstalliert), und die CI macht denselben Check je Laeufer. Uebersetzt, nicht gelaufen -- kein Mac, kein Linux hier; die Doku sagt das. Nicht fuer emscripten (das ist auch `unix`): eigener cfg-Ausschluss.
+**Barrierefreiheit** (2026-09-06, Wege A und C aus `docs/entwurf-barrierefreiheit.md`): gemessen vor dem Bau hatte ein dhrt-Fenster im UIA-Baum NULL Nachkommen -- fuer Bildschirmleser, Lupe und Sprachsteuerung ein Titel und sonst nichts. Jetzt schiebt das gui-Modul je Bild einen vollstaendigen Baum an **AccessKit** (`a11y.rs`; Crates `accesskit` 0.25 + `accesskit_windows` 0.35, im `graphics`-Feature): `Gui::a11y_baum` (Fenster als Group/Dialog, Widgets mit Rolle nach `Kind`, Menueleiste, Reiter, Listeneintraege, Tabellenzeilen/-zellen, Baumknoten; Knoten-Nummern in `a11y::ids`, eine Quelle fuer Bauen und Zerlegen), `Gui::a11y_aktion` (Focus/Click/SetValue/Increment/Expand auf DENSELBEN Wegen wie Maus und Tastatur, damit `GUI_CLICKED`/`on_click`/`on_change` feuern). **Drei Fallen:** (1) der Windows-Adapter verlangt ein Fenster, das noch nie sichtbar war -- `graphics.rs` legt es deshalb IMMER versteckt an (`builder.hidden()`), haengt den Adapter ein und zeigt es dann; (2) die Aktivierungs-Anfrage kommt in der Fensterprozedur (raylibs EndDrawing), wo die gui nicht greifbar ist -- der Handler antwortet `None` und merkt sich nur, dass gefragt wurde; laut Vertrag muss dann das naechste `update_if_active` einen VOLLEN Baum liefern (GUI_UPDATE tut das, FLIP schickt ohne gui einen Baum nur mit dem Fenster); (3) **LNK2005 `CloseWindow`/`ShowCursor`**: raylibs C-Funktionen heissen wie user32-Exporte, und die Import-Bibliothek des `windows`-Crates stand im Link vor raylib -- mit ZWEI windows-Fassungen (0.61 fuers Drucken, 0.62 aus AccessKit) brach der Link; dhrt ist deshalb auf `windows` 0.62 gehoben, eine Fassung, und es linkt. Beschriftung eines Eingabefelds = die Beschriftung links daneben oder darueber (`a11y_beschriftung`, `labelled_by`), sonst der Tooltip. Baum nur, wenn ein Hilfsprogramm fragt (`a11y_aktiv`). Neu: `GUI_ANNOUNCE(text$[, dringend])` (Live-Knoten; wechselndes Leerzeichen, damit dieselbe Ansage zweimal eine Aenderung ist), `GUI_SCREENREADER()`, `GUI_SET_TAB_INDEX(wdg, n)` (Index > 0 zuerst, Rest in Anlege-Reihenfolge; `.dhform` `tab_index`, Designer-Drehfeld). Weg A dazu: **Menueleiste per F10 oder Alt allein** (`menue_tasten`, `menu_cursor` im tiefsten offenen Menue, Pfeile/Enter/ESC; solange ein Leistenmenue offen ist, gehoeren die Tasten dem Menue; Alt+X loescht den Alt-Merker ueber `key_any_pressed_except_alt`), **Tooltip bei Tastaturfokus** (`tip_fokus`, unter dem Widget, die Maus gewinnt), helles Thema: gedaempfter Text 2,76:1 -> 6,3:1, Akzent 3,8 -> 5,6:1. **Pruefstein:** `tests/pruef/gui/gui_barrierefreiheit.dhtest` (bis 2026-09-17 pytest) laesst einen FREMDEN Leser (UIA aus PowerShell, `System.Windows.Automation`, keine neue Abhaengigkeit) Namen zaehlen, den Knopf klicken, Text setzen, Fokus setzen -- laeuft auch auf dem Windows-Runner. Bewusst NICHT (noch): Schreibmarke zeichenweise, `ui`-Modul, Web. SPEAK (Weg B) kam am selben Tag, siehe unten. Pilot 196 sagt seine Statuszeile an. **macOS/Linux-Adapter (selber Tag):** `a11y.rs` hat je System einen `mod plattform` mit EINEM Vertrag (`neu/aktiv/aktionen/senden/fenster_lage/fenster_fokus`) -- macOS `accesskit_macos::SubclassingAdapter::for_window` auf GLFWs `NSWindow` nach `add_focus_forwarder_to_window_class("GLFWWindow")`, Fokus ueber `update_view_focus_state`; Linux `accesskit_unix::Adapter::new` (Handler muessen `Send` sein, D-Bus-Faden; `DeactivationHandler` setzt `aktiv` zurueck), Lage/Fokus meldet `a11y_bild_ende` je FLIP bei Aenderung (`set_root_window_bounds`, aussen = innen, unter Wayland 0/0). Damit sich das OHNE raylib fuer ein fremdes Ziel pruefen laesst, ist `a11y` ein eigenes Feature (graphics schaltet es ein; `mod a11y` mit `#[allow(dead_code)]`): `cargo check --features a11y --target aarch64-apple-darwin` bzw. `x86_64-unknown-linux-gnu` (rustup-Ziele nachinstalliert), und die CI macht denselben Check je Laeufer. Uebersetzt, nicht gelaufen -- kein Mac, kein Linux hier; die Doku sagt das. Nicht fuer emscripten (das ist auch `unix`): eigener cfg-Ausschluss.
 
-**Sprachausgabe `SPEAK`** (2026-09-06, Weg C aus `docs/entwurf-speak.md`, `sprache.rs`): gemessen vor dem Bau -- Windows hat ZWEI Sprachausgaben: SAPI (`ISpVoice`, spricht am Mischer vorbei, nur die alten Desktopstimmen Hedda/Zira) und WinRT `Windows.Media.SpeechSynthesis` (Stefan, Katja, Hedda; liefert einen **WAV-Strom**, mono 16 kHz, 14 Woerter in 35 ms beim ersten und 12-13 ms bei jedem weiteren Mal). Der Unterschied entschied den Weg: **eine gesprochene Zeile ist ein `SOUND`** (`Audio::sound_aus_pcm` = derselbe Weg wie `AUDIO_NOTE`, samt Lo-Fi und 5-ms-Flanken), sie laeuft auf einem eigenen Bus `speech` (nur Lautstaerke, keine Effektkette; `AUDIO_BUS_VOLUME/GET_VOLUME` und `AUDIO_PUSH/POP` kennen ihn), und `SPEAK_SOUND` gibt sie heraus (raeumlich per `AUDIO_PLAY_ON`, mischen, `AUDIO_SAVE_WAV`). Befehle: `SPEAK(text$[, unterbrechen])`, `SPEAK_STOP`, `SPEAKING`, `SPEAK_WAIT`, `SPEAK_VOICE` (unbekannt = Fehler mit der Liste), `SPEAK_VOICES`, `SPEAK_RATE` (0.5..2.0), `SPEAK_SOUND`. **Die Warteschlange braucht kein Polling:** ein angehaengter Satz geht mit `StartTime::Delayed(rest)` an Kira (wie `AUDIO_PLAY_AT`), `Sprecher` merkt sich nur das geplante Ende, `SPEAKING()` vergleicht mit der Uhr -- ein Konsolenprogramm, das in `INPUT` haengt, hoert seine Saetze trotzdem nacheinander. Die Handles der gesprochenen Zeilen liegen in `Audio::speech_handles`, NICHT im Slot: `AUDIO_PLAY` auf demselben Slot stoppt die alte Instanz, ein zweites `SPEAK("Treffer")` darf das erste nicht abschneiden. Vorrat je (Text, Stimme, Tempo) mit 64 Plaetzen, der aelteste nicht laufende faellt weg; ein per `UNLOADSOUND` freigegebener Vorratsklang wird neu gerechnet (`sound_lebt`). **Bildschirmleser zuerst:** `SPEAK` fragt `g.a11y_aktiv()` -- laeuft ein Hilfsprogramm, geht der Satz als Ansage in den Baum (`Gui::announce` UND `Graphics::a11y_ansagen`; der Fenster-Baum, den FLIP ohne GUI_UPDATE schickt, traegt dafuer jetzt den Ansage-Knoten), `SPEAKING()` bleibt FALSE; `GUI_SCREENREADER()` fragt seither das Fenster direkt und stimmt auch ohne gui. **Zwei Fallen:** (1) `SynthesizeTextToStreamAsync` gibt es im `windows`-Crate nur mit `Media_Core` UND `Storage_Streams` (der Fehler sagt "Methode nicht gefunden", nicht "Feature fehlt"); (2) WinRT braucht einen angemeldeten Faden -- unter GLFW ist der Hauptfaden schon STA (RoInitialize meldet RPC_E_CHANGED_MODE, ignoriert), ein Konsolenprogramm ohne Fenster hat nichts, darum `RoInitialize(MULTITHREADED)` vor jedem Zugriff. `.join()` der IAsyncOperation wartet auf ein Win32-Ereignis, die Synthese liefert von einem Threadpool-Faden -- kein Deadlock im STA. macOS `say -o --file-format=WAVE --data-format=LEI16@22050` (Text ueber stdin, damit er mit `-` beginnen darf), Linux `espeak-ng --stdout --stdin -v <LANG>` -- beide ungeprueft, beide mit Fehler samt Installationshinweis, wenn das Werkzeug fehlt. Eigener WAV-Leser (`wav_lesen`, PCM 8/16/24/32 + Float, Kanaele gemittelt, Datenlaenge ueber das Ende = bis zum Ende, weil `--stdout` sie nicht nachtraegt) mit Rust-Tests. Pruefstein `tests/pruef/speak.dhtest` (WAV im `--- nachher` Byte fuer Byte gelesen: mono, Huellkurve; Vorrat; angehaengt dauert > 1,6x unterbrochen; unbekannte Stimme -- dieser Fall war in der pytest-Fassung bis 2026-09-16 IMMER uebersprungen, weil die Hilfsfunktion "nicht gefunden" als fehlende Sprachausgabe wertete) und in `tests/pruef/gui_barrierefreiheit.dhtest` der fremde UIA-Leser, der in einem Programm OHNE gui die Ansage als Text-Knoten findet. Bewusst NICHT: SSML, Wortgrenzen-Ereignisse, mitgelieferte Stimme (piper, 60 MB), SAPI.
+**Sprachausgabe `SPEAK`** (2026-09-06, Weg C aus `docs/entwurf-speak.md`, `sprache.rs`): gemessen vor dem Bau -- Windows hat ZWEI Sprachausgaben: SAPI (`ISpVoice`, spricht am Mischer vorbei, nur die alten Desktopstimmen Hedda/Zira) und WinRT `Windows.Media.SpeechSynthesis` (Stefan, Katja, Hedda; liefert einen **WAV-Strom**, mono 16 kHz, 14 Woerter in 35 ms beim ersten und 12-13 ms bei jedem weiteren Mal). Der Unterschied entschied den Weg: **eine gesprochene Zeile ist ein `SOUND`** (`Audio::sound_aus_pcm` = derselbe Weg wie `AUDIO_NOTE`, samt Lo-Fi und 5-ms-Flanken), sie laeuft auf einem eigenen Bus `speech` (nur Lautstaerke, keine Effektkette; `AUDIO_BUS_VOLUME/GET_VOLUME` und `AUDIO_PUSH/POP` kennen ihn), und `SPEAK_SOUND` gibt sie heraus (raeumlich per `AUDIO_PLAY_ON`, mischen, `AUDIO_SAVE_WAV`). Befehle: `SPEAK(text$[, unterbrechen])`, `SPEAK_STOP`, `SPEAKING`, `SPEAK_WAIT`, `SPEAK_VOICE` (unbekannt = Fehler mit der Liste), `SPEAK_VOICES`, `SPEAK_RATE` (0.5..2.0), `SPEAK_SOUND`. **Die Warteschlange braucht kein Polling:** ein angehaengter Satz geht mit `StartTime::Delayed(rest)` an Kira (wie `AUDIO_PLAY_AT`), `Sprecher` merkt sich nur das geplante Ende, `SPEAKING()` vergleicht mit der Uhr -- ein Konsolenprogramm, das in `INPUT` haengt, hoert seine Saetze trotzdem nacheinander. Die Handles der gesprochenen Zeilen liegen in `Audio::speech_handles`, NICHT im Slot: `AUDIO_PLAY` auf demselben Slot stoppt die alte Instanz, ein zweites `SPEAK("Treffer")` darf das erste nicht abschneiden. Vorrat je (Text, Stimme, Tempo) mit 64 Plaetzen, der aelteste nicht laufende faellt weg; ein per `UNLOADSOUND` freigegebener Vorratsklang wird neu gerechnet (`sound_lebt`). **Bildschirmleser zuerst:** `SPEAK` fragt `g.a11y_aktiv()` -- laeuft ein Hilfsprogramm, geht der Satz als Ansage in den Baum (`Gui::announce` UND `Graphics::a11y_ansagen`; der Fenster-Baum, den FLIP ohne GUI_UPDATE schickt, traegt dafuer jetzt den Ansage-Knoten), `SPEAKING()` bleibt FALSE; `GUI_SCREENREADER()` fragt seither das Fenster direkt und stimmt auch ohne gui. **Zwei Fallen:** (1) `SynthesizeTextToStreamAsync` gibt es im `windows`-Crate nur mit `Media_Core` UND `Storage_Streams` (der Fehler sagt "Methode nicht gefunden", nicht "Feature fehlt"); (2) WinRT braucht einen angemeldeten Faden -- unter GLFW ist der Hauptfaden schon STA (RoInitialize meldet RPC_E_CHANGED_MODE, ignoriert), ein Konsolenprogramm ohne Fenster hat nichts, darum `RoInitialize(MULTITHREADED)` vor jedem Zugriff. `.join()` der IAsyncOperation wartet auf ein Win32-Ereignis, die Synthese liefert von einem Threadpool-Faden -- kein Deadlock im STA. macOS `say -o --file-format=WAVE --data-format=LEI16@22050` (Text ueber stdin, damit er mit `-` beginnen darf), Linux `espeak-ng --stdout --stdin -v <LANG>` -- beide ungeprueft, beide mit Fehler samt Installationshinweis, wenn das Werkzeug fehlt. Eigener WAV-Leser (`wav_lesen`, PCM 8/16/24/32 + Float, Kanaele gemittelt, Datenlaenge ueber das Ende = bis zum Ende, weil `--stdout` sie nicht nachtraegt) mit Rust-Tests. Pruefstein `tests/pruef/ton/speak.dhtest` (WAV im `--- nachher` Byte fuer Byte gelesen: mono, Huellkurve; Vorrat; angehaengt dauert > 1,6x unterbrochen; unbekannte Stimme -- dieser Fall war in der pytest-Fassung bis 2026-09-16 IMMER uebersprungen, weil die Hilfsfunktion "nicht gefunden" als fehlende Sprachausgabe wertete) und in `tests/pruef/gui/gui_barrierefreiheit.dhtest` der fremde UIA-Leser, der in einem Programm OHNE gui die Ansage als Text-Knoten findet. Bewusst NICHT: SSML, Wortgrenzen-Ereignisse, mitgelieferte Stimme (piper, 60 MB), SAPI.
 
-**Fremde Schriften, Euro, Eingabemethoden** (2026-09-06, Wege A und B aus `docs/entwurf-eingabemethoden.md`): gemessen vor dem Bau war der Speicher Unicode, die ANZEIGE Latin-1 -- `zeichensatz()` in graphics.rs backte 246 Zeichen ohne `€`, ohne Latin Extended, Griechisch, Kyrillisch, CJK, Emoji; auch eine per LOADFONT geladene japanische Schrift bekam nur diese. Jetzt: (1) Grundvorrat ASCII..Kyrillisch + Interpunktion + `€` (~1000 Glyphen, Start +50 ms); (2) **Glyphen auf Zuruf** -- `glyphen_pruefen` merkt beim Aufzeichnen/Messen Codepunkte ohne Glyphe (`glyphen_fehlend`, RefCell weil Messen `&self` ist), `ausweich_nachladen` am FLIP-Anfang backt je Datei EINEN Eintrag (`Vec<Ausweich>`, Index 0 = Grundschrift, unveraendert) mit der Vereinigung aller bisher gebrauchten Zeichen (`ausweich_datei_fuer` waehlt die Datei je Block: msgothic.ttc/malgun.ttf/seguiemj.ttf/segoeui.ttf; macOS Arial Unicode; Linux Noto CJK), was keine Datei liefert -> `glyphen_unmoeglich`; Zeichnen UND Messen zerlegen einen Text in Laeufe je Font (`text_laeufe`, `zeichne_text`, `breite_mit` -- EINE Aufteilung, sonst misst ein Layout etwas anderes); (3) `LOADFONT(pfad$, groesse[, zeichen$])` mit Blocknamen (`BLOECKE`, deutsch/englisch) oder Zeichenkette (`zeichen_aus_namen`), Grundvorrat immer dabei; (4) **Schriftsammlungen .ttc**: raylib (stb ab Versatz 0) liest sie nicht und tauschte STILL gegen die Bitmapschrift -- `ttc_erste_schrift` loest die erste Schrift heraus (Tabellenverzeichnis kopieren, Versaetze neu), alles laeuft ueber `schrift_laden` + `LoadFontFromMemory`; eine Ersatzschrift ist jetzt ein Fehler (`keine_ersatzschrift`, Textur-ID der Standardschrift). Auf dieser Maschine gibt es KEIN CJK-.ttf, nur .ttc -- ohne (4) blieb CJK ein `?`. (5) Tipp-Warteschlange 16 -> 256 ueber `CFLAGS=-DMAX_CHAR_PRESSED_QUEUE=256` in build_runtime.py (cmake uebernimmt CFLAGS; nachgesehen im CMakeCache von raylib-sys). Weg B: `Gui::schreibmarke` (dieselbe Rechnung wie das Zeichnen der Marke) -> `Graphics::ime_position` -> `ImmSetCompositionWindow`/`ImmSetCandidateWindow` (Feature `Win32_UI_Input_Ime`), nur bei Aenderung; ohne IME hier nicht messbar. **Gemessen:** erstes Bild mit Kanji+Hangul+Emoji+Hebraeisch ~100 ms, weiteres Kanji ~15 ms. Tests `tests/pruef/schriften_vorrat.dhtest` (Bildvergleich echt gegen `?` ueber `dhrt bild` + GETPIXEL, Gegenprobe U+E000; bis 2026-09-16 pytest mit Pillow). Bewusst NICHT: Textformung/RTL, Farb-Emoji, Wahl der Schrift INNERHALB einer Sammlung. **Weg C (Vorschau im Feld) kam am selben Tag nach:** `ime.rs` (cfg windows) haengt per `SetWindowLongPtrW` einen zweiten Subclass an raylibs GLFW-Fenster (Kette ruft den Vorgaenger, also AccessKit), nimmt `WM_IME_STARTCOMPOSITION`/`COMPOSITION`/`ENDCOMPOSITION` selbst (dann entsteht das Systemfenster der IME gar nicht) und verschluckt `WM_IME_CHAR` (das Ergebnis kommt ueber `GCS_RESULTSTR`, sonst kaeme alles doppelt) -- NUR solange `feld_aktiv` (gui-Textfeld mit Fokus, von der VM je Bild gesetzt), sonst laeuft alles durch wie bisher (INKEY$, ui-Modul). Zustand in einem `static Mutex` (die Fensterprozedur ist eine freie `extern "system"`-Funktion), `abholen()` je Bild VOR `gui.update`: `Gui::ime_ergebnis` (Einfuegen an der Marke durch Hoechstlaenge/Zahlenfilter, Undo, on_change), `Gui::ime_vorschau` (Widget-Felder `vorschau`/`vorschau_marke`, transient), `anzeige_mit_vorschau` = EINE Quelle fuer Zeichnen, Unterstreichen, Schreibmarke und die Meldung an die IME. Waehrend einer Umwandlung filtert die IME die Tasten (GLFW: `VK_PROCESSKEY` -> kein Ereignis, win32_window.c:776). Ohne installierte IME NICHT gemessen -- Rust-Test `ime_ergebnis_und_vorschau` deckt die Zeichenkettenseite.
+**Fremde Schriften, Euro, Eingabemethoden** (2026-09-06, Wege A und B aus `docs/entwurf-eingabemethoden.md`): gemessen vor dem Bau war der Speicher Unicode, die ANZEIGE Latin-1 -- `zeichensatz()` in graphics.rs backte 246 Zeichen ohne `€`, ohne Latin Extended, Griechisch, Kyrillisch, CJK, Emoji; auch eine per LOADFONT geladene japanische Schrift bekam nur diese. Jetzt: (1) Grundvorrat ASCII..Kyrillisch + Interpunktion + `€` (~1000 Glyphen, Start +50 ms); (2) **Glyphen auf Zuruf** -- `glyphen_pruefen` merkt beim Aufzeichnen/Messen Codepunkte ohne Glyphe (`glyphen_fehlend`, RefCell weil Messen `&self` ist), `ausweich_nachladen` am FLIP-Anfang backt je Datei EINEN Eintrag (`Vec<Ausweich>`, Index 0 = Grundschrift, unveraendert) mit der Vereinigung aller bisher gebrauchten Zeichen (`ausweich_datei_fuer` waehlt die Datei je Block: msgothic.ttc/malgun.ttf/seguiemj.ttf/segoeui.ttf; macOS Arial Unicode; Linux Noto CJK), was keine Datei liefert -> `glyphen_unmoeglich`; Zeichnen UND Messen zerlegen einen Text in Laeufe je Font (`text_laeufe`, `zeichne_text`, `breite_mit` -- EINE Aufteilung, sonst misst ein Layout etwas anderes); (3) `LOADFONT(pfad$, groesse[, zeichen$])` mit Blocknamen (`BLOECKE`, deutsch/englisch) oder Zeichenkette (`zeichen_aus_namen`), Grundvorrat immer dabei; (4) **Schriftsammlungen .ttc**: raylib (stb ab Versatz 0) liest sie nicht und tauschte STILL gegen die Bitmapschrift -- `ttc_erste_schrift` loest die erste Schrift heraus (Tabellenverzeichnis kopieren, Versaetze neu), alles laeuft ueber `schrift_laden` + `LoadFontFromMemory`; eine Ersatzschrift ist jetzt ein Fehler (`keine_ersatzschrift`, Textur-ID der Standardschrift). Auf dieser Maschine gibt es KEIN CJK-.ttf, nur .ttc -- ohne (4) blieb CJK ein `?`. (5) Tipp-Warteschlange 16 -> 256 ueber `CFLAGS=-DMAX_CHAR_PRESSED_QUEUE=256` in build_runtime.py (cmake uebernimmt CFLAGS; nachgesehen im CMakeCache von raylib-sys). Weg B: `Gui::schreibmarke` (dieselbe Rechnung wie das Zeichnen der Marke) -> `Graphics::ime_position` -> `ImmSetCompositionWindow`/`ImmSetCandidateWindow` (Feature `Win32_UI_Input_Ime`), nur bei Aenderung; ohne IME hier nicht messbar. **Gemessen:** erstes Bild mit Kanji+Hangul+Emoji+Hebraeisch ~100 ms, weiteres Kanji ~15 ms. Tests `tests/pruef/grafik/schriften_vorrat.dhtest` (Bildvergleich echt gegen `?` ueber `dhrt bild` + GETPIXEL, Gegenprobe U+E000; bis 2026-09-16 pytest mit Pillow). Bewusst NICHT: Textformung/RTL, Farb-Emoji, Wahl der Schrift INNERHALB einer Sammlung. **Weg C (Vorschau im Feld) kam am selben Tag nach:** `ime.rs` (cfg windows) haengt per `SetWindowLongPtrW` einen zweiten Subclass an raylibs GLFW-Fenster (Kette ruft den Vorgaenger, also AccessKit), nimmt `WM_IME_STARTCOMPOSITION`/`COMPOSITION`/`ENDCOMPOSITION` selbst (dann entsteht das Systemfenster der IME gar nicht) und verschluckt `WM_IME_CHAR` (das Ergebnis kommt ueber `GCS_RESULTSTR`, sonst kaeme alles doppelt) -- NUR solange `feld_aktiv` (gui-Textfeld mit Fokus, von der VM je Bild gesetzt), sonst laeuft alles durch wie bisher (INKEY$, ui-Modul). Zustand in einem `static Mutex` (die Fensterprozedur ist eine freie `extern "system"`-Funktion), `abholen()` je Bild VOR `gui.update`: `Gui::ime_ergebnis` (Einfuegen an der Marke durch Hoechstlaenge/Zahlenfilter, Undo, on_change), `Gui::ime_vorschau` (Widget-Felder `vorschau`/`vorschau_marke`, transient), `anzeige_mit_vorschau` = EINE Quelle fuer Zeichnen, Unterstreichen, Schreibmarke und die Meldung an die IME. Waehrend einer Umwandlung filtert die IME die Tasten (GLFW: `VK_PROCESSKEY` -> kein Ereignis, win32_window.c:776). Ohne installierte IME NICHT gemessen -- Rust-Test `ime_ergebnis_und_vorschau` deckt die Zeichenkettenseite.
 
-**Bedienung ohne Maus** (seit 2026-08-30): `TAB`/`SHIFT+TAB` laeuft durch ALLE bedienbaren Widgets (vorher nur TextInput/TextArea -- ein Fenster ohne Textfeld war per Tastatur gar nicht bedienbar); Leertaste/Enter loest aus, Pfeile verstellen Werte bzw. bewegen Auswahlen, `ESC` schliesst eine offene Klappliste. EINE Quelle dafuer ist `Kind::fokussierbar()` -- Tab-Zyklus, Klick-Fokus und Fokus-Ring fragen alle dort. Der Ring (Akzentfarbe, 2 px ausserhalb) wird an EINER Stelle am Ende von `draw_widget` gezeichnet; ohne sichtbaren Fokus waere die Navigation wertlos. Abfragbar mit `GUI_FOCUSED()` (-1 = keins), Gegenstueck zu `GUI_FOCUS`. Weil damit auch Knopf/Kaestchen/Klappliste Fokus fuehren, feuern `on_focus`/`on_blur` dort jetzt ebenfalls -- der Form-Designer bietet sie entsprechend an (`_FOKUS` in formdesigner/document.py). Tests `tests/pruef/gui_tastatur.dhtest` (echte Tasten via Automation-Wiedergabe, darum in `_SERIELL`). Window-Drag an der Titelleiste, Z-Order (Klick bringt nach vorne), Fokus, Schliessen-Button, **resizeable Fenster** (`GUI_WINDOW_RESIZABLE` — am unteren-rechten Griff ziehbar, `GUI_WINDOW_SET_MIN_SIZE`/`MAX_SIZE` als Grenzen; in `.dhform`-JSON als `resizable`/`min_w`/`min_h`/`max_w`/`max_h`) + **Control-Anchoring** (`GUI_SET_ANCHOR(wdg, "lrtb")` — Reflow beim Resize: Widgets kleben an Kanten/dehnen sich; in JSON als `anchor`-Edge-String) + **randlos** (`GUI_WINDOW_CHROME(win, an)` — ohne Titelleiste/Rahmen, damit eine Form das OS-Fenster füllt; der Form-Designer-Run koppelt die Form so ans native OS-Fenster). **Widgets werden auf den Fenster-Innenbereich geclippt.** Cyan-Theme (programmierbar). Konstruktoren/Getter sind `@builtin`, nur `GUI_UPDATE`/`GUI_DRAW` sind `graphics_builtin`. Komplement zum Immediate-Mode-`ui`-Modul (dort `UI_WINDOW_BEGIN/END` + `UI_TABLE` mit `UI_TABLE_SELECTED`/`SET_SELECTED`/`HEADER_CLICK`). Doku `docs/module-gui.md`, Demos `examples/45_gui.dh` + `examples/81_table_select.dh` + **`examples/156_gui_alle_widgets.dh`** (alle 22 Widget-Arten in EINER Vollbild-Anwendung, jedes mit echter Aufgabe: Baum filtert Tabelle, Tabellenzeile fuellt Editor, Regler formen die Kurve auf der Zeichenflaeche -- der schnellste Weg, eine Widget-Art in Aktion zu sehen), Tests `tests/test_gui_*.py`.
+**Bedienung ohne Maus** (seit 2026-08-30): `TAB`/`SHIFT+TAB` laeuft durch ALLE bedienbaren Widgets (vorher nur TextInput/TextArea -- ein Fenster ohne Textfeld war per Tastatur gar nicht bedienbar); Leertaste/Enter loest aus, Pfeile verstellen Werte bzw. bewegen Auswahlen, `ESC` schliesst eine offene Klappliste. EINE Quelle dafuer ist `Kind::fokussierbar()` -- Tab-Zyklus, Klick-Fokus und Fokus-Ring fragen alle dort. Der Ring (Akzentfarbe, 2 px ausserhalb) wird an EINER Stelle am Ende von `draw_widget` gezeichnet; ohne sichtbaren Fokus waere die Navigation wertlos. Abfragbar mit `GUI_FOCUSED()` (-1 = keins), Gegenstueck zu `GUI_FOCUS`. Weil damit auch Knopf/Kaestchen/Klappliste Fokus fuehren, feuern `on_focus`/`on_blur` dort jetzt ebenfalls -- der Form-Designer bietet sie entsprechend an (`_FOKUS` in formdesigner/document.py). Tests `tests/pruef/gui/gui_tastatur.dhtest` (echte Tasten via Automation-Wiedergabe, darum in `_SERIELL`). Window-Drag an der Titelleiste, Z-Order (Klick bringt nach vorne), Fokus, Schliessen-Button, **resizeable Fenster** (`GUI_WINDOW_RESIZABLE` — am unteren-rechten Griff ziehbar, `GUI_WINDOW_SET_MIN_SIZE`/`MAX_SIZE` als Grenzen; in `.dhform`-JSON als `resizable`/`min_w`/`min_h`/`max_w`/`max_h`) + **Control-Anchoring** (`GUI_SET_ANCHOR(wdg, "lrtb")` — Reflow beim Resize: Widgets kleben an Kanten/dehnen sich; in JSON als `anchor`-Edge-String) + **randlos** (`GUI_WINDOW_CHROME(win, an)` — ohne Titelleiste/Rahmen, damit eine Form das OS-Fenster füllt; der Form-Designer-Run koppelt die Form so ans native OS-Fenster). **Widgets werden auf den Fenster-Innenbereich geclippt.** Cyan-Theme (programmierbar). Konstruktoren/Getter sind `@builtin`, nur `GUI_UPDATE`/`GUI_DRAW` sind `graphics_builtin`. Komplement zum Immediate-Mode-`ui`-Modul (dort `UI_WINDOW_BEGIN/END` + `UI_TABLE` mit `UI_TABLE_SELECTED`/`SET_SELECTED`/`HEADER_CLICK`). Doku `docs/module-gui.md`, Demos `examples/45_gui.dh` + `examples/81_table_select.dh` + **`examples/156_gui_alle_widgets.dh`** (alle 22 Widget-Arten in EINER Vollbild-Anwendung, jedes mit echter Aufgabe: Baum filtert Tabelle, Tabellenzeile fuellt Editor, Regler formen die Kurve auf der Zeichenflaeche -- der schnellste Weg, eine Widget-Art in Aktion zu sehen), Tests `tests/test_gui_*.py`.
 
 
 **Module sind in dhrt/Rust implementiert** (`rust/drachenhauch_runtime/src/<modul>.rs` +
@@ -1160,27 +1161,27 @@ Endung schreiben: `IMPORT "json.dh"`.
 | Modul | Funktionen (Auswahl) | Externer Typ |
 |---|---|---|
 | `json` | `JSON_PARSE/LOAD/STRINGIFY`, `JSON_GET_STRING/INT/FLOAT/BOOL`, `JSON_GET_JSON` (Teilbaum als Kopie), Pfad-Notation `"user.name"` / `"items.0"`; ein Punkt im Schluessel als `\.`, `JSON_KEY$(name)` maskiert einen Namen aus `JSON_KEYS` | `JSON_HANDLE` |
-| `db` | SQLite, **PostgreSQL und MySQL** (Features `pg`/`mysql`, seit 2026-10-06): `DB_OPEN` entscheidet am Ziel (`postgres://`, `mysql://`, sonst Datei), alles andere gleich. `DB_OPEN/CLOSE`, `DB_EXEC/QUERY` mit `?`-Binding (fuer PostgreSQL zu `$n` uebersetzt, `db::platzhalter_pg`, ausser in Texten/Bezeichnern/Kommentaren und wenn das SQL selbst `$1` schreibt), `DB_NEXT`, `DB_GET_*`, `DB_BEGIN/COMMIT/ROLLBACK`, `DB_KIND$`, `DB_PING`. `db::Verbindung` (Enum) traegt alle drei; PostgreSQL bindet im TEXTformat (Server wandelt) und liest binaer (`pg::dekodieren`, `numeric`/`DECIMAL` genau als `DbVal::Zahl`), TLS rustls+ring (`sslmode` prefer/require/disable/verify-full; ohne verify wird jedem Zertifikat geglaubt wie bei psql), MySQL ueber `rustls-tls-ring` (kein aws-lc). Der MySQL-Treiber versucht nur die ERSTE Adresse eines Namens -- `localhost` = `::1` -- darum probiert `my::oeffnen` die weiteren selbst. Tests `tests/pruef/db_server.dhtest` (jeder Ablauf gegen beide Server mit derselben Erwartung; Server aus `DH_TEST_PG`/`DH_TEST_MYSQL`, die CI startet beide auf dem Linux-Laeufer, sonst uebersprungen) | `DB_CONN`, `DB_RESULT` |
+| `db` | SQLite, **PostgreSQL und MySQL** (Features `pg`/`mysql`, seit 2026-10-06): `DB_OPEN` entscheidet am Ziel (`postgres://`, `mysql://`, sonst Datei), alles andere gleich. `DB_OPEN/CLOSE`, `DB_EXEC/QUERY` mit `?`-Binding (fuer PostgreSQL zu `$n` uebersetzt, `db::platzhalter_pg`, ausser in Texten/Bezeichnern/Kommentaren und wenn das SQL selbst `$1` schreibt), `DB_NEXT`, `DB_GET_*`, `DB_BEGIN/COMMIT/ROLLBACK`, `DB_KIND$`, `DB_PING`. `db::Verbindung` (Enum) traegt alle drei; PostgreSQL bindet im TEXTformat (Server wandelt) und liest binaer (`pg::dekodieren`, `numeric`/`DECIMAL` genau als `DbVal::Zahl`), TLS rustls+ring (`sslmode` prefer/require/disable/verify-full; ohne verify wird jedem Zertifikat geglaubt wie bei psql), MySQL ueber `rustls-tls-ring` (kein aws-lc). Der MySQL-Treiber versucht nur die ERSTE Adresse eines Namens -- `localhost` = `::1` -- darum probiert `my::oeffnen` die weiteren selbst. Tests `tests/pruef/module/db_server.dhtest` (jeder Ablauf gegen beide Server mit derselben Erwartung; Server aus `DH_TEST_PG`/`DH_TEST_MYSQL`, die CI startet beide auf dem Linux-Laeufer, sonst uebersprungen) | `DB_CONN`, `DB_RESULT` |
 | `tween` | **Kein `TWEEN_UPDATE`** (Absicht, keine Luecke): ein Tween rechnet seinen Wert bei jedem Abruf aus `MILLIS()` aus, laeuft also in ECHTER Zeit weiter statt bildgetrieben wie `timer`/`input`/`gui`. Folgen: bei einbrechender Bildrate SPRINGT er statt langsamer zu werden, und unter `AUTOMATION_PLAY` ist er nicht reproduzierbar (`timer` ist es). Werteinterpolation. 13 Easings (`linear`, `out_bounce`, `out_elastic`, …), Pause/Resume/Reverse | `TWEEN` |
-| `timer` | Geplante Aktionen ohne MILLIS-Buchführung: `TIMER_AFTER/EVERY(ms, fnref)` → ID (FUNCREF-Callbacks, parameterlos), `TIMER_UPDATE()` pro Frame feuert die fälligen (Muster wie INPUT_UPDATE/GUI_UPDATE; EVERY max. 1×/Update, kein Aufhol-Burst), `TIMER_CANCEL/ACTIVE/COUNT/CLEAR` (Tombstone-stabile IDs). Plus `COOLDOWN(id$, ms)` — String-ID-Ratenbegrenzer (TRUE wenn frei, startet dann die Sperre; braucht kein UPDATE). Konsolen-tauglich (kein Grafik-Bezug; `rust/drachenhauch_runtime/src/timer.rs` + `try_timer` in vm.rs). Doku `docs/module-timer.md`, Demo `examples/113_timer.dh`, Tests `tests/pruef/modules_timer.dhtest`. | — |
+| `timer` | Geplante Aktionen ohne MILLIS-Buchführung: `TIMER_AFTER/EVERY(ms, fnref)` → ID (FUNCREF-Callbacks, parameterlos), `TIMER_UPDATE()` pro Frame feuert die fälligen (Muster wie INPUT_UPDATE/GUI_UPDATE; EVERY max. 1×/Update, kein Aufhol-Burst), `TIMER_CANCEL/ACTIVE/COUNT/CLEAR` (Tombstone-stabile IDs). Plus `COOLDOWN(id$, ms)` — String-ID-Ratenbegrenzer (TRUE wenn frei, startet dann die Sperre; braucht kein UPDATE). Konsolen-tauglich (kein Grafik-Bezug; `rust/drachenhauch_runtime/src/timer.rs` + `try_timer` in vm.rs). Doku `docs/module-timer.md`, Demo `examples/113_timer.dh`, Tests `tests/pruef/module/modules_timer.dhtest`. | — |
 | `imgfx` | `IMAGE_SCALE/ROTATE/FLIP/TINT/COPY` — immutable, geben neues IMAGE zurück. **`IMAGE_SCALE` glaettet bilinear** (raylib `ImageResize`); fuer Pixelgrafik `IMAGE_SCALE_NN` (Nearest-Neighbour, `ImageResizeNN`) — Demo `examples/152_pixelart_skalierung.dh` | — |
 | `particles` | Emitter mit Velocity/Lifetime/Gravity/Color/Size/Fade. `PARTICLE_EMIT/UPDATE/DRAW`. NumPy-vektorisiert. **Render-Modi** `PARTICLE_SET_MODE` (`circle`/`pixel`/`square`/`streak`/`glow` — `glow` wird in `PARTICLE_DRAW` (vm.rs) aktuell identisch zu `circle` gerendert, kein additives Blending im Recording-Modell; fuer echtes additives Leuchten `BLEND_MODE("add")` um die `PARTICLE_DRAW`-Aufrufe legen) + **Farbverlauf** `PARTICLE_SET_COLOR_END` (Start→End ueber die Lebenszeit, z.B. Feuer gelb→rot). | `PARTICLE_SYSTEM` |
 | `physics` | Pure Functions: AABB-/Circle-Collision, Distance, Reflect, Normalize, Ray-Cast (Box+Circle). Kein State. Auch **3D-Mathematik ohne Physik-Welt**: `PHYSICS_SPHERE_SPHERE(x1,y1,z1,r1, x2,y2,z2,r2)` (Kugel-Naeherung), `PHYSICS_DISTANCE3`; dazu `PHYSICS_POINT_TRI(px,py, ax,ay, bx,by, cx,cy)` (Punkt im Dreieck, baryzentrisch — unabhaengig vom Umlaufsinn). Plus **Broadphase** (`PHYSICS_BROAD_NEW/ADD/QUERY/PAIR_A/PAIR_B`): O(n)-Kollisionspaare fuer viele Kreis-Entities (Uniform-Grid, nativ via `gb_native`). | `PHYSICS_BROAD` |
-| `physics3d` | **Echte 3D-Starrkoerper-Physik via Rapier3D** (voller Solver: Schwerkraft, Integration, Kollisionsaufloesung, Restitution/Reibung — kein blosses Kollisions-Toolkit wie `physics`). `PHYS3D_NEW`, `PHYS3D_SET_GRAVITY`, `PHYS3D_ADD_BOX`/`PHYS3D_ADD_SPHERE(..., dynamic, bounce)`, `PHYS3D_STEP(w, dt)`, `PHYS3D_BODY_X/Y/Z` + `BODY_QX/QY/QZ/QW` (Quaternion -> `MAT4_TRS`/`MODEL_MATRIX`), `PHYS3D_SET_VEL`/`APPLY_IMPULSE`/`SET_POS`/`REMOVE`/`COUNT`. Koerper-Index stabil (Tombstones). Rapier3D ist pure-Rust (nalgebra) -> ungated in dhrt. Demo `examples/107_physics3d.dh`, Tests `tests/pruef/physics3d.dhtest`. | `PHYS_WORLD` |
-| `physics2d` | **Echte 2D-Starrkoerper-Physik via Rapier2D** (voller Solver wie `physics3d`, nur 2D — fuer Stapeln/Werfen/Rollen/Sandbox; nicht zu verwechseln mit `physics` = nur Kollisions-Mathe). `PHYS2D_NEW`, `PHYS2D_SET_GRAVITY(w,gx,gy)`, `PHYS2D_ADD_BOX(w,x,y,hw,hh,dynamic,bounce)`/`PHYS2D_ADD_CIRCLE(w,x,y,r,...)`, `PHYS2D_STEP(w,dt)`, `PHYS2D_BODY_X/Y/ANGLE/VX/VY`, `PHYS2D_SET_VEL`/`APPLY_IMPULSE`/`SET_POS`/`LOCK_ROTATION`/**`SET_DYNAMIC`**/`IS_DYNAMIC`/`REMOVE`/`COUNT` (`SET_DYNAMIC` schaltet statisch<->dynamisch um -- fuer Aufbauten, die erst stehen und dann zusammenfallen). **Bildschirm-Konvention** (Y unten, Default-Gravitation 0/980), `length_unit=100` fuer Pixel-Stabilitaet; Box-Maße = Halb-Extents; `dynamic`-Flag akzeptiert TRUE/FALSE oder 1/0 (Helfer `need_flag`). Koerper-Index stabil (Tombstones). Rapier2D pure-Rust -> ungated. Doku `docs/module-physics2d.md`, Demo `examples/112_physics2d.dh`, Tests `tests/pruef/physics2d.dhtest`. | `PHYS2D_WORLD` |
+| `physics3d` | **Echte 3D-Starrkoerper-Physik via Rapier3D** (voller Solver: Schwerkraft, Integration, Kollisionsaufloesung, Restitution/Reibung — kein blosses Kollisions-Toolkit wie `physics`). `PHYS3D_NEW`, `PHYS3D_SET_GRAVITY`, `PHYS3D_ADD_BOX`/`PHYS3D_ADD_SPHERE(..., dynamic, bounce)`, `PHYS3D_STEP(w, dt)`, `PHYS3D_BODY_X/Y/Z` + `BODY_QX/QY/QZ/QW` (Quaternion -> `MAT4_TRS`/`MODEL_MATRIX`), `PHYS3D_SET_VEL`/`APPLY_IMPULSE`/`SET_POS`/`REMOVE`/`COUNT`. Koerper-Index stabil (Tombstones). Rapier3D ist pure-Rust (nalgebra) -> ungated in dhrt. Demo `examples/107_physics3d.dh`, Tests `tests/pruef/module/physics3d.dhtest`. | `PHYS_WORLD` |
+| `physics2d` | **Echte 2D-Starrkoerper-Physik via Rapier2D** (voller Solver wie `physics3d`, nur 2D — fuer Stapeln/Werfen/Rollen/Sandbox; nicht zu verwechseln mit `physics` = nur Kollisions-Mathe). `PHYS2D_NEW`, `PHYS2D_SET_GRAVITY(w,gx,gy)`, `PHYS2D_ADD_BOX(w,x,y,hw,hh,dynamic,bounce)`/`PHYS2D_ADD_CIRCLE(w,x,y,r,...)`, `PHYS2D_STEP(w,dt)`, `PHYS2D_BODY_X/Y/ANGLE/VX/VY`, `PHYS2D_SET_VEL`/`APPLY_IMPULSE`/`SET_POS`/`LOCK_ROTATION`/**`SET_DYNAMIC`**/`IS_DYNAMIC`/`REMOVE`/`COUNT` (`SET_DYNAMIC` schaltet statisch<->dynamisch um -- fuer Aufbauten, die erst stehen und dann zusammenfallen). **Bildschirm-Konvention** (Y unten, Default-Gravitation 0/980), `length_unit=100` fuer Pixel-Stabilitaet; Box-Maße = Halb-Extents; `dynamic`-Flag akzeptiert TRUE/FALSE oder 1/0 (Helfer `need_flag`). Koerper-Index stabil (Tombstones). Rapier2D pure-Rust -> ungated. Doku `docs/module-physics2d.md`, Demo `examples/112_physics2d.dh`, Tests `tests/pruef/module/physics2d.dhtest`. | `PHYS2D_WORLD` |
 | `camera` | World-Translation+Zoom+**Rotation** für **alle** Drawing-Befehle. `CAMERA_SET/RESET/FOLLOW`, `CAMERA_SET_ROTATION`/`CAMERA_ROTATION`, `CAMERA_S2W_X/Y`. Rotation dreht nur Positionen (um die Bildschirm-Mitte), keine automatische Kontur-Rotation von Formen/Sprites — siehe `docs/module-camera.md`. | — |
 | `sprite` | Animiertes Sheet-basiertes Sprite. Position+Velocity, benannte Animationen mit FPS, `PLAY`/`PLAY_ONCE`, Flip, AABB-Kollision | `SPRITE` |
-| `animfsm` | **Animations-State-Machine** (Unity-Mecanim-Stil), datengetrieben aus `.dhanim`-JSON (Editor `dhanim`): States (an Sprite-Anim gebunden) + Parameter (`bool`/`float`/`int`/`trigger`) + Transitions mit Bedingungen (`gt`/`lt`/`eq`/…, Any-State `*`, `wait_finished` für one-shot). `ANIM_FSM_LOAD/SETUP/UPDATE(fsm,sprite,dt)/SET_*/TRIGGER/STATE/FORCE`. Doku `docs/module-animfsm.md`, Demo `examples/111_anim_fsm.dh`, Tests `tests/pruef/animfsm.dhtest`. | `ANIM_FSM` |
+| `animfsm` | **Animations-State-Machine** (Unity-Mecanim-Stil), datengetrieben aus `.dhanim`-JSON (Editor `dhanim`): States (an Sprite-Anim gebunden) + Parameter (`bool`/`float`/`int`/`trigger`) + Transitions mit Bedingungen (`gt`/`lt`/`eq`/…, Any-State `*`, `wait_finished` für one-shot). `ANIM_FSM_LOAD/SETUP/UPDATE(fsm,sprite,dt)/SET_*/TRIGGER/STATE/FORCE`. Doku `docs/module-animfsm.md`, Demo `examples/111_anim_fsm.dh`, Tests `tests/pruef/module/animfsm.dhtest`. | `ANIM_FSM` |
 | `ui` | Immediate-Mode-UI. `UI_LABEL`, `UI_BUTTON`, `UI_CHECKBOX`, `UI_SLIDER` mit String-IDs für State. Pflicht: `UI_END_FRAME()` vor `FLIP()`. **Plastischer Look wie `gui`:** Themen `glas_dunkel`/`glas_hell` + Metriken `gradient`/`gloss`/`bevel`/`corner_radius` (0 = flach, alle alten Themen unveraendert); ein Preset setzt Farben UND Plastik. Gemeinsame Flaechen-Routine `ui_flaeche` in vm.rs (erhaben/versenkt). **Gotcha:** die Plastik-Werte muessen VOR `self.gfx.as_mut()` gelesen werden -- der Aufruf leiht `self` veraenderlich aus, danach ist `self.ui_state` nicht mehr lesbar (daher `UiPlastik` als Buendel). | — |
 | `scene` | Stack-basierter Scene-Manager. `SCENE_PUSH/POP/SWITCH/CURRENT`, pro-Scene-Daten via `SCENE_SET_INT/FLOAT/STRING/BOOL` + `_OR`-Variante. | — |
 | `save` | Persistente Save-Slots, JSON-Backend, Versionsfeld. `SAVE_NEW/LOAD/LOAD_OR_NEW/WRITE`, `SAVE_SET/GET_INT/FLOAT/STRING/BOOL`. | `SAVE_HANDLE` |
 | `astar` | A*-Pathfinding auf Tile-Grid. `ASTAR_NEW/SET_WALL/FIND/PATH_X/PATH_Y`. Manhattan/Euclid/Chebyshev, Diagonal-Toggle, Anti-Cornercutting. | `ASTAR_GRID` |
 | `vec2` | 2D-Vektor mit Operator-Overloading (`+`, `-`, `*`, `/`, `=`, `<>`). `VEC2_NEW/X/Y/LENGTH/NORMALIZE/DOT/CROSS/DISTANCE/LERP/PERP/REFLECT/ANGLE/FROM_ANGLE`. Immutable. | `VEC2` |
-| `m3d` | 3D-Mathe: **VEC3/VEC4/QUAT/MAT4** (immutable, Operator-Overloading `+ - * / = <>`, inkl. `mat*mat`/`mat*vec`/`quat*quat`). Quaternionen (`QUAT_FROM_AXIS_ANGLE/EULER/SLERP/ROTATE_VEC3`), Matrizen (`MAT4_TRS/MUL/INVERT/LOOKAT/PERSPECTIVE/ORTHO/...`, column-major). Rendering via **`MODEL_MATRIX(handle, mat[, tint])`** (hierarchische Transforms/Bones/Gizmos) + **`MODEL_INSTANCED(handle, mats[, tint[, anzahl]])`** -- `tint` darf eine Farbe ODER ein `ARRAY OF INTEGER` sein (eine Farbe je Matrix); auch dann **EIN Draw-Call**: raylibs `DrawMeshInstanced` uebertraegt nur Matrizen, darum reist die Farbe (RGBA 0..1) in der untersten Zeile der Matrix mit (bei Lage/Drehung/Groesse immer 0 0 0 1), INST_VS liest sie und setzt die Zeile zurueck (`instanz_farben` in graphics.rs; seit 2026-10-27, vorher ein Draw-Call je verschiedener Farbe; 2600 Farben 653 -> 2380 Bilder/s). Echtes GPU-Instancing: dasselbe Mesh mit N MAT4-Welt-Matrizen aus einem `ARRAY OF MAT4`/`TUPLE` in EINEM Draw-Call via raylib `DrawMeshInstanced`; eigener schlanker Instancing-Shader mit Ambient+bis-4-Lichtern, kein PBR/IBL/Schatten/Normal-Maps) + **`CAMERA3D_VIEW/PROJECTION(mat)`** (Ortho/Custom-Frustum) — native-only (dhrt). Doku `docs/module-m3d.md`, Demos `examples/103_m3d.dh` + `examples/104_instancing.dh`, Tests `tests/pruef/m3d.dhtest`. | `VEC3`/`VEC4`/`QUAT`/`MAT4` |
+| `m3d` | 3D-Mathe: **VEC3/VEC4/QUAT/MAT4** (immutable, Operator-Overloading `+ - * / = <>`, inkl. `mat*mat`/`mat*vec`/`quat*quat`). Quaternionen (`QUAT_FROM_AXIS_ANGLE/EULER/SLERP/ROTATE_VEC3`), Matrizen (`MAT4_TRS/MUL/INVERT/LOOKAT/PERSPECTIVE/ORTHO/...`, column-major). Rendering via **`MODEL_MATRIX(handle, mat[, tint])`** (hierarchische Transforms/Bones/Gizmos) + **`MODEL_INSTANCED(handle, mats[, tint[, anzahl]])`** -- `tint` darf eine Farbe ODER ein `ARRAY OF INTEGER` sein (eine Farbe je Matrix); auch dann **EIN Draw-Call**: raylibs `DrawMeshInstanced` uebertraegt nur Matrizen, darum reist die Farbe (RGBA 0..1) in der untersten Zeile der Matrix mit (bei Lage/Drehung/Groesse immer 0 0 0 1), INST_VS liest sie und setzt die Zeile zurueck (`instanz_farben` in graphics.rs; seit 2026-10-27, vorher ein Draw-Call je verschiedener Farbe; 2600 Farben 653 -> 2380 Bilder/s). Echtes GPU-Instancing: dasselbe Mesh mit N MAT4-Welt-Matrizen aus einem `ARRAY OF MAT4`/`TUPLE` in EINEM Draw-Call via raylib `DrawMeshInstanced`; eigener schlanker Instancing-Shader mit Ambient+bis-4-Lichtern, kein PBR/IBL/Schatten/Normal-Maps) + **`CAMERA3D_VIEW/PROJECTION(mat)`** (Ortho/Custom-Frustum) — native-only (dhrt). Doku `docs/module-m3d.md`, Demos `examples/103_m3d.dh` + `examples/104_instancing.dh`, Tests `tests/pruef/grafik/m3d.dhtest`. | `VEC3`/`VEC4`/`QUAT`/`MAT4` |
 | `input` | Action-basiertes Input-Mapping mit Edge-Detection. `INPUT_BIND/UNBIND/UPDATE`, `INPUT_HELD/PRESSED/RELEASED/AXIS/BOUND`. Multi-Key-Bindings. **Gamepad-Support**: `JOY_BUTTON_A..Y`, `JOY_DPAD_*` als Bind-Codes, `INPUT_JOY_AXIS(slot, "left_x")` mit Deadzone. | — |
 | `regex` | Python-kompatible Pattern-Matching. `REGEX_MATCH/TEST/FIND/FIND_ALL/REPLACE/REPLACE_ONCE/SPLIT`. Pattern-Cache fuer wiederholte Aufrufe. | — |
 | `audio` | Erweiterte Audio-API (nativ in dhrt ueber **Kira**/cpal -- eigener Audio-Thread, vom Game-Loop entkoppelt; loeste 2026-06-13 raylib-Audio ab, `rust/drachenhauch_runtime/src/audio.rs`). Channels, Pause/Resume/Fade (native Kira-Tweens), Stereo-Pan, Music-Position (lesen `AUDIO_MUSIC_POSITION`, setzen **`AUDIO_MUSIC_SEEK(sekunden)`** -- der Sprung wirkt erst nach ~0,3-0,4 s, weil der Stream seinen Vorlauf zu Ende spielt; **MOD/XM koennen es nicht** und melden das: ihre Zeitachse sind Pattern/Zeilen, die Sekunden bis dorthin haengen an Tempowechseln im Stueck. Ohne laufende Musik ist es ein FEHLER -- anders als bei PAUSE/RESUME, wo ein Nicht-Treffer nichts verliert, fiele hier ein `LOAD : SEEK : PLAY` lautlos auf Position 0 zurueck). Tone-Generation (`AUDIO_TONE`/`AUDIO_NOISE`) mit Sine/Square/Saw/Triangle/Noise. **`AUDIO_SFX`** -- prozeduraler sfxr-Stil-Synth (Waveform + Pitch-Slide + ADSR + Vibrato + optionale `stereo_width` fuer breiten Stereo-Sound; geteilte Mathematik in drachenhauch/synth.py; der SFX-Generator `dhsfx` exportiert solche Aufrufe, Pan via `AUDIO_PAN`). Liefert kompatible `SOUND`-Objekte (auch fuer `PLAYSOUND` nutzbar). **Tracker-Module** `.mod`/`.xm` laufen ueber `PLAYMUSIC`/`AUDIO_MUSIC_LOAD` in **Echtzeit gestreamt** (Kira-Custom-`Sound` `ModuleSound` pollt den reinen Rust-Player `xmrs`/`xmrsplayer` auf dem Audio-Thread; sofort geladen, exaktes Endlos-Loopen, Pitch-Resampler + Volume-Ramp im Sound, Steuerung via `Arc<ModShared>`-Atomics, Modul geleakt + im Drop freigegeben) -- echter 4-Kanal-Amiga-Sound, Demo `examples/115_modplayer.dh`. **Sampler `SAMPLE_*`** (Amiga/Paula-Prinzip): `SAMPLE_LOAD(pfad$)->SAMPLE`, `SAMPLE_PLAY(sample, halbtoene, vol[, dur_ms])->AUDIO_CHANNEL` (Resampling per linearer Interpolation = Tonhoehe wie Geschwindigkeit; resampelte Noten gecacht), `SAMPLE_SET_LOOP(s, a, e[, "pingpong"])`/`SAMPLE_LEN`, dazu `SAMPLE_FROM_BUFFER` (16-Bit-PCM) und `SAMPLE_NOTE` (Note als SOUND mit AUDIO_NOTE-Huellkurve, fuer AUDIO_PLAY_AT/MIX). One-Shot (dur<=0) fuer Drums/Hits, dur>0 + Loop-Region fuer gehaltene Noten. Reine Resampling-Mathematik = freie `resample()` in audio.rs (Rust-`#[test]`); Demo `examples/116_sampler.dh`. **Paula-Lo-Fi** `AUDIO_LOFI(an[, bits[, cutoff_hz]])` -- Bit-Crush (Default 8-bit) + LED-Tiefpass (Default 3300 Hz) fuer NEU synthetisierte Sounds (TONE/NOISE/SFX/SAMPLE_PLAY; Cache wird geleert); pure `lofi_chain()` mit Rust-`#[test]`. **Mixer-Busse** `AUDIO_BUS_VOLUME(bus$, vol)`/`AUDIO_BUS_GET_VOLUME(bus$)` mit `bus$` = `sfx`/`music`/`master` -- SFX-/Musik-Master getrennt (Kira-Sub-Tracks: SFX/Sampler/Synth -> sfx_track, Musik -> music_track, beide -> Main mit dem FFT-Tap; Bus×Sound-Volume multiplizieren). **Echtzeit-Effekte je Bus** (Kira-Effektkette am Track, live steuerbar, kein Buffer-Bake): `AUDIO_FILTER(bus$, cutoff_hz[, resonance])` (Tiefpass, SID/Acid-Sweep), `AUDIO_REVERB(bus$, mix[, feedback[, damping]])` (Hall), `AUDIO_DELAY(bus$, mix[, feedback[, time_ms]])` (Echo, eigener Ringpuffer-Effekt -> Zeit zur Laufzeit aenderbar, 1..4000 ms), `AUDIO_DISTORTION(bus$, amount[, mix])` (Overdrive/Fuzz), `AUDIO_COMPRESSOR(bus$, threshold_db, ratio[, makeup_db])` (Dynamik, ratio<=1=aus), `AUDIO_EQ(bus$, freq_hz, gain_db[, q])` (Glocken-EQ, gain 0=transparent); Signalfluss EQ->Filter->Distortion->Compressor->Reverb->Delay, neutral bis aktiviert, Demo `examples/117_audiofx.dh`. **Clock** `AUDIO_CLOCK_NEW(ticks_per_second)->AUDIO_CLOCK` (Kira-Uhr fuer sample-genaues Musik-/Rhythmus-Timing; startet pausiert) + `AUDIO_CLOCK_START/PAUSE/STOP/REMOVE`, `AUDIO_CLOCK_TICKING`/`AUDIO_CLOCK_TICKS`, `AUDIO_CLOCK_SET_SPEED` -- und **`AUDIO_PLAY_AT(sound, clock, ticks[, volume[, loops]])`**: Sound-Start exakt auf einen Clock-Tick geplant, getrieben vom Kira-Audio-Thread selbst (KEIN Polling/Update-Call noetig -- anders als das frame-getriebene `timer`-Modul). BPM->ticks_per_second rechnet der Aufrufer selbst um (`bpm / 60.0 * subdivisions`). Ticking-Status wird im Wrapper selbst mitgefuehrt (nicht direkt Kiras `ClockHandle::ticking()`), weil Kira das nur asynchron per Audio-Thread-Kommando spiegelt -- eine Abfrage direkt nach START/STOP koennte sonst kurz den alten Wert zeigen. **Nicht-lineare Easings** fuer Fades/Slides: optionaler trailing `easing$`-Parameter (`"linear"` Default/`"in"`/`"out"`/`"inout"`, quadratisch) bei `AUDIO_PLAY` (fade_in_ms), `AUDIO_STOP` (fade_out_ms), `AUDIO_PAN_SLIDE` (dauer_ms), `AUDIO_MUSIC_PLAY`/`AUDIO_MUSIC_STOP` (fade_in/out_ms) -- vorher liefen alle Tweens linear, obwohl Kira `Easing::{In,Out,InOut}Powi` eingebaut hat. Interner Helfer `FadeCurve` (audio.rs) konvertiert zu `kira::Easing` fuer den Kira-Tween-Pfad (Stream/Static-Sounds) UND dupliziert dieselbe Kurven-Mathematik als reine `apply()`-Funktion fuer den MOD/XM-Modul-Fade (eigener Atomics-Ramp in `ModShared`, kein Kira-Tween beteiligt) -- beide Pfade klingen dadurch identisch. Rust-`#[test]`s verifizieren die Kurven-Mathematik gegen Kiras eigene Formel. **Raeumliches Audio (Listener/Emitter):** `AUDIO_LISTENER_NEW(x,y,z)->AUDIO_LISTENER` ("Ohr" der Szene, z.B. Kamera-/Spielerposition; unrotiert blickt -Z), `AUDIO_LISTENER_SET_POSITION`/`AUDIO_LISTENER_SET_ORIENTATION(listener, yaw_grad)` (nur Y-Achsen-Yaw -- deckt die typische Top-Down-/3rd-Person-Kamera ab, ohne BASIC-Nutzern volle Quaternionen zuzumuten) + `AUDIO_LISTENER_REMOVE`; `AUDIO_EMITTER_NEW(listener,x,y,z[,min_dist[,max_dist]])->AUDIO_EMITTER` (ein raeumlicher Kira-Sub-Track, an einen Listener + Position gebunden; Kira berechnet Panning + lineare Lautstaerke-Abnahme zwischen min_dist=laut/max_dist=lautlos komplett selbst -- keine eigene DSP) + `AUDIO_EMITTER_SET_POSITION`/`AUDIO_EMITTER_REMOVE`; **`AUDIO_PLAY_ON(sound,emitter[,loops[,volume[,fade_in_ms[,easing$]]]])->AUDIO_CHANNEL`** startet einen Sound auf dem Emitter-Track statt dem flachen SFX-Bus -- der zurueckgegebene `AUDIO_CHANNEL` ist danach identisch mit `AUDIO_PAUSE`/`STOP`/`VOLUME`/... steuerbar (`StaticSoundHandle` unterscheidet nicht, von welchem Track-Typ es kommt). Listener/Emitter im selben Tombstone-Vec-Pattern wie Clocks (Kira kennt weder `remove_listener()` noch `remove_spatial_sub_track()` -- nur Handle-Drop). `mint`-Crate (winzige, abhaengigkeitsfrei Interop-Structs) baut die Position/Rotation-Werte fuer Kiras API, ohne `glam` direkt einzubinden. Rust-`#[test]`s verifizieren `yaw_quat()` (Einheits-Quaternion, korrekte Komponenten). Demo `examples/139_audio_spatial.dh`. **Modulatoren (LFO + Tweener):** `AUDIO_LFO_NEW(wellenform$, hz [, amplitude [, mitte]])` -> `AUDIO_MOD` (`sine`/`triangle`/`saw`/`pulse`), `AUDIO_LFO_SET`, `AUDIO_LFO_WAVEFORM`; `AUDIO_TWEENER_NEW([start])` + `AUDIO_TWEENER_TO(mod, ziel, dauer_ms [, easing$])`; gebunden per `AUDIO_MODULATE(bus$, ziel$, mod, min, max)` mit ziel$ = **`volume`** (Tremolo) / **`pan`** (Auto-Pan) / `filter` / `resonance` / `reverb` / `distortion`; dazu `AUDIO_BUS_PAN(bus$, pos)` fuer eine feste Bus-Balance (-1..+1) -- vorher liess sich nur ein EINZELNER Kanal pannen, entfernt per `AUDIO_MOD_REMOVE`. Der Wertebereich des Modulators (LFO: -1..+1 bei Standard-Amplitude) wird auf `min..max` abgebildet. **Der Punkt daran:** Kira faehrt sie auf dem AUDIO-Thread -- Tremolo, Vibrato, Wobble-Bass, Auto-Pan und Filter-Sweeps laufen sample-genau weiter, auch wenn die Bildrate einbricht, und das DH-Programm rechnet pro Frame NICHTS nach. LFO und Tweener teilen sich den Handle-Typ `AUDIO_MOD`; ein LFO-Aufruf auf einem Tweener (und umgekehrt) meldet das im Klartext. Doku `docs/module-audio-modulatoren.md`, Demo `examples/150_audio_modulatoren.dh`. | `AUDIO_CHANNEL`, `SAMPLE`, `AUDIO_CLOCK`, `AUDIO_LISTENER`, `AUDIO_EMITTER`, `AUDIO_MOD` |
-**Noten und Mischen** (2026-09-04, gefunden beim Tracker-Piloten): `AUDIO_NOTE(wf$, freq, dauer_ms, attack, decay, sustain, release, vol[, vib_depth, vib_speed, detune_cents, slide_halbtoene])` -- eine gehaltene Note mit echter ADSR (Sustain-PEGEL, Release haengt hinten an, Laenge = dauer + release), Detune-Schicht und Portamento in Halbtoenen; `AUDIO_SFX` kann das nicht, es kennt nur drei Zeiten. `AUDIO_SOUND_NEW(dauer_ms)` (Stille), `AUDIO_SOUND_MIX(ziel, quelle, offset_ms[, vol[, pan]])` (addieren, NICHT geklemmt, ohne pan bleiben die Kanaele der Quelle), `AUDIO_SOUND_NORMALIZE(sound[, spitze])` (liefert den Faktor) -- damit wird aus vielen Klaengen eine WAV. Rechenkern `build_note_buffer` mit Rust-Tests an der nachgemessenen Huellkurve; Tests `tests/pruef/audio_note_mix.dhtest`.
+**Noten und Mischen** (2026-09-04, gefunden beim Tracker-Piloten): `AUDIO_NOTE(wf$, freq, dauer_ms, attack, decay, sustain, release, vol[, vib_depth, vib_speed, detune_cents, slide_halbtoene])` -- eine gehaltene Note mit echter ADSR (Sustain-PEGEL, Release haengt hinten an, Laenge = dauer + release), Detune-Schicht und Portamento in Halbtoenen; `AUDIO_SFX` kann das nicht, es kennt nur drei Zeiten. `AUDIO_SOUND_NEW(dauer_ms)` (Stille), `AUDIO_SOUND_MIX(ziel, quelle, offset_ms[, vol[, pan]])` (addieren, NICHT geklemmt, ohne pan bleiben die Kanaele der Quelle), `AUDIO_SOUND_NORMALIZE(sound[, spitze])` (liefert den Faktor) -- damit wird aus vielen Klaengen eine WAV. Rechenkern `build_note_buffer` mit Rust-Tests an der nachgemessenen Huellkurve; Tests `tests/pruef/ton/audio_note_mix.dhtest`.
 
 **FLAC** (2026-09-21, Frage des Nutzers): als Klang ging es immer, als MUSIK mit Schleife (die
 Vorgabe von `AUDIO_MUSIC_PLAY`) blieb es STUMM -- Kira meldete nichts, der Klang stand nur auf
@@ -1191,14 +1192,14 @@ vom Dateiende stehen und das naechste Lesen endet mit `UnexpectedEof`. Nachgeste
 Symphonia allein (lesen bis Ende, seek 0, lesen -> 1 Paket, dann Fehler). Ausweg: eigener
 Kira-`Decoder` `src/flac_strom.rs`, der vor jedem Sprung die Datei NEU oeffnet; `musik_strom`
 in audio.rs nimmt ihn fuer alles mit der Kennung `fLaC`, sonst bleibt Kiras Weg. `symphonia`
-ist dafuer direkte Abhaengigkeit (dieselbe 0.6 wie in Kira). Tests `tests/pruef/audio_flac.dhtest`
+ist dafuer direkte Abhaengigkeit (dieselbe 0.6 wie in Kira). Tests `tests/pruef/ton/audio_flac.dhtest`
 (4: Beilagen aus einem kleinen FLAC-Schreiber ausserhalb der Laufzeit -- es gab hier kein
 ffmpeg/flac --, mono und stereo Punkt fuer Punkt gegen die Sinusformel, Musik muss
 zurueckspringen, kaputte Datei ist ein Fehler).
 
-**Klang anschauen/sichern** (am SOUND-Handle, gilt also fuer TONE/NOISE/SFX/geladene Dateien): `AUDIO_SOUND_WAVE(sound, anzahl)` -> ARRAY OF FLOAT (je Abschnitt das Sample mit dem GROESSTEN BETRAG samt Vorzeichen -- gemittelt hebt sich eine Schwingung gegen null auf und die Anzeige zeigt einen Strich) und `AUDIO_SAVE_WAV(sound, pfad$[, bits])` (16 signed / 8 unsigned, so will es die WAV-Spezifikation; Mono bleibt einkanalig, Stereo erst wenn sich die Kanaele unterscheiden). **Falle, die erst das Nachmessen zeigte:** die Lautstaerke steckt schon in den Frames (`make_data_mono`), `slot.vol` obendrauf machte aus 0.7 eine 0.49 -- und `slot.vol` ist ohnehin die ABSPIEL-Lautstaerke des letzten AUDIO_PLAY. Gebaut fuer den SFX-Generator `examples/183_sfx_generator.dh`, Tests `tests/pruef/audio_sound_io.dhtest` (WAVs mit `--- ton` bzw. ueber ihre Bytes gegengelesen -- ein Format, das nur der eigene Schreiber liest, ist nicht geprueft).
+**Klang anschauen/sichern** (am SOUND-Handle, gilt also fuer TONE/NOISE/SFX/geladene Dateien): `AUDIO_SOUND_WAVE(sound, anzahl)` -> ARRAY OF FLOAT (je Abschnitt das Sample mit dem GROESSTEN BETRAG samt Vorzeichen -- gemittelt hebt sich eine Schwingung gegen null auf und die Anzeige zeigt einen Strich) und `AUDIO_SAVE_WAV(sound, pfad$[, bits])` (16 signed / 8 unsigned, so will es die WAV-Spezifikation; Mono bleibt einkanalig, Stereo erst wenn sich die Kanaele unterscheiden). **Falle, die erst das Nachmessen zeigte:** die Lautstaerke steckt schon in den Frames (`make_data_mono`), `slot.vol` obendrauf machte aus 0.7 eine 0.49 -- und `slot.vol` ist ohnehin die ABSPIEL-Lautstaerke des letzten AUDIO_PLAY. Gebaut fuer den SFX-Generator `examples/183_sfx_generator.dh`, Tests `tests/pruef/ton/audio_sound_io.dhtest` (WAVs mit `--- ton` bzw. ueber ihre Bytes gegengelesen -- ein Format, das nur der eigene Schreiber liest, ist nicht geprueft).
 
-| `chart` | **Diagramme.** `CHART_NEW(art$,x,y,b,h)` -> `CHART` mit art$ = `kuchen`/`donut` (Kuchen/Ring), `balken` (senkrecht/waagerecht, gruppiert/gestapelt), `linie`/`flaeche` (Verlaufskurven, gleitendes Fenster fuer Live-Werte), `tacho` (Rundskala mit Zeiger `nadel`/`balken`/`pfeil`, Farbzonen via `CHART_ZONE`). Daten kurz (`CHART_ADD(c,name$,wert[,farbe])`) oder voll (`CHART_SERIES` + `CHART_DATA`/`CHART_PUSH`/`CHART_SET_POINT`); dazu `CHART_GET/COUNT/SERIES_COUNT/LABEL/CLEAR/BOUNDS/STAT`. **Stil ueber vier String-Setter statt ~40 Builtins:** `CHART_SET` (Text), `CHART_SET_NUM` (Zahlen), `CHART_SET_COLOR` (Farben), `CHART_SET_FLAG` (Schalter) -- Schluessel-Tabellen `KEYS_STR/NUM/COLOR/FLAG` in `chart.rs`, unbekannter Schluessel = Fehler, der die gueltigen auflistet. `CHART_THEME` (dunkel/hell/neon/pastell) + `CHART_PALETTE`. **Alpha/Schatten/Verlaeufe:** alle Farben nehmen `RGBA()` (0xAARRGGBB, Alpha 0 = DECKEND -- Helfer `with_alpha`/`scale_rgb` heben das vorher an); `deckkraft`/`flaeche_deckkraft` als globale Regler, `schatten`+`schatten_weich` (gestaffelte Kopien, raylib hat keinen Formen-Weichzeichner) mit `schatten_daten` auch fuer Balken/Segmente/Zeiger, `verlauf` (Hintergrund) und `verlauf_daten` (Balken/Flaeche senkrecht, Kuchen als abgedunkeltes Innenband = Naeherung, kein Radialverlauf). `animation` + `CHART_UPDATE(c, DELTA())` laesst Werte nachziehen -- **ohne Animation zeichnet `draw` direkt die echten Werte** (`anzeige()`), sonst waere CHART_UPDATE auch ohne Animationswunsch Pflicht. Nur `CHART_DRAW` braucht ein Fenster (in `vm.rs`), alles andere ist pure. Neues Zeichen-Primitiv dafuer: `Cmd::Ring` (raylib `draw_ring`) deckt Kuchenstueck/Donut/Tacho-Bogen ab, plus `text_width_at` (Breite bei expliziter Groesse). **Farbe `0` ist SCHWARZ, nicht "Palette"** -- dafuer `-1` bzw. Argument weglassen. **Sechs Arten** (nicht vier): dazu `leiste`/`bar_gauge` (liegende oder stehende Leiste mit wanderndem Marker) und `led`/`lampen` (diskrete Zellen, leuchten bis zum Wert) -- beide einwertig wie der Tacho, teilen sich dessen Farbzonen. Sie setzen `ausrichtung` selbst auf `waagerecht`, weil die Vorgabe `senkrecht` nur fuer Balkendiagramme richtig ist. **Skalen-Farbverlauf** ist eine EIGENE Farbrolle (`skala_von`/`skala_mitte`/`skala_bis`, rot->gelb->gruen je Thema) -- NICHT die Palette: die ist kategorial und ergibt interpoliert einen Regenbogen ohne Richtung. Farbzonen schlagen den Verlauf. **Tacho-Gestaltung:** `zifferblatt` = `ring`/`segmente`/`striche`/`baender`, `blatt_teile`/`blatt_luecke`/`blatt_dicke`, `fassung` (metallischer Ring aus gestaffelten Ringen -- ein Verlauf ENTLANG eines Kreises geht mit `ring` nicht), `CHART_ZONE(..., name$)` beschriftet die Zone entlang des Bogens (untere Haelfte wird gedreht), `wertanzeige` = `aus`/`innen`/`pille`/`blase`/`am_zeiger` (Pille nimmt die Farbe der getroffenen Zone). Der Tacho haengt allein an `wertanzeige` -- ihn zusaetzlich an `werte` zu koppeln liess ihn stumm, weil das per Vorgabe `aus` ist. **Maus:** `CHART_DRAW` wertet sie selbst aus (kein Zusatzaufruf) -> `CHART_HOVER`/`_SERIES`/`_LABEL$`/`_VALUE`, `CHART_CLICKED`/`_SERIES`; Schalter `hover`/`tooltip`, Zahlen `hover_tempo`/`hover_weite`/`hover_glanz`. Damit die Maus nicht neben dem trifft, was zu sehen ist, liegt die Geometrie an EINER Stelle (`kuchen_geom`/`kuchen_stuecke`/`achsen_geom`/`balken_geom`/`legende_abzug`), die Treffertest UND Zeichnen benutzen. Die Hervorhebung mischt gegen WEISS statt RGB zu skalieren -- beim Skalieren klemmt der groesste Kanal bei 255 und hervorgehobenes Orange wurde gelb. **Linien:** `punktform` (kreis/quadrat/raute/dreieck), `treppe`, `strich` (Strichlaenge; Phase laeuft ueber den GANZEN Zug weiter, sonst verdichtet sich das Muster bei engen Stuetzpunkten), `fadenkreuz`. `glatt`+`treppe` schliessen sich aus, die Treppe gewinnt. Doku `docs/module-chart.md`, Demo `examples/154_chart.dh`, Tests `tests/pruef/modules_chart.dhtest` + Rust-`#[test]`s. | `CHART` |
+| `chart` | **Diagramme.** `CHART_NEW(art$,x,y,b,h)` -> `CHART` mit art$ = `kuchen`/`donut` (Kuchen/Ring), `balken` (senkrecht/waagerecht, gruppiert/gestapelt), `linie`/`flaeche` (Verlaufskurven, gleitendes Fenster fuer Live-Werte), `tacho` (Rundskala mit Zeiger `nadel`/`balken`/`pfeil`, Farbzonen via `CHART_ZONE`). Daten kurz (`CHART_ADD(c,name$,wert[,farbe])`) oder voll (`CHART_SERIES` + `CHART_DATA`/`CHART_PUSH`/`CHART_SET_POINT`); dazu `CHART_GET/COUNT/SERIES_COUNT/LABEL/CLEAR/BOUNDS/STAT`. **Stil ueber vier String-Setter statt ~40 Builtins:** `CHART_SET` (Text), `CHART_SET_NUM` (Zahlen), `CHART_SET_COLOR` (Farben), `CHART_SET_FLAG` (Schalter) -- Schluessel-Tabellen `KEYS_STR/NUM/COLOR/FLAG` in `chart.rs`, unbekannter Schluessel = Fehler, der die gueltigen auflistet. `CHART_THEME` (dunkel/hell/neon/pastell) + `CHART_PALETTE`. **Alpha/Schatten/Verlaeufe:** alle Farben nehmen `RGBA()` (0xAARRGGBB, Alpha 0 = DECKEND -- Helfer `with_alpha`/`scale_rgb` heben das vorher an); `deckkraft`/`flaeche_deckkraft` als globale Regler, `schatten`+`schatten_weich` (gestaffelte Kopien, raylib hat keinen Formen-Weichzeichner) mit `schatten_daten` auch fuer Balken/Segmente/Zeiger, `verlauf` (Hintergrund) und `verlauf_daten` (Balken/Flaeche senkrecht, Kuchen als abgedunkeltes Innenband = Naeherung, kein Radialverlauf). `animation` + `CHART_UPDATE(c, DELTA())` laesst Werte nachziehen -- **ohne Animation zeichnet `draw` direkt die echten Werte** (`anzeige()`), sonst waere CHART_UPDATE auch ohne Animationswunsch Pflicht. Nur `CHART_DRAW` braucht ein Fenster (in `vm.rs`), alles andere ist pure. Neues Zeichen-Primitiv dafuer: `Cmd::Ring` (raylib `draw_ring`) deckt Kuchenstueck/Donut/Tacho-Bogen ab, plus `text_width_at` (Breite bei expliziter Groesse). **Farbe `0` ist SCHWARZ, nicht "Palette"** -- dafuer `-1` bzw. Argument weglassen. **Sechs Arten** (nicht vier): dazu `leiste`/`bar_gauge` (liegende oder stehende Leiste mit wanderndem Marker) und `led`/`lampen` (diskrete Zellen, leuchten bis zum Wert) -- beide einwertig wie der Tacho, teilen sich dessen Farbzonen. Sie setzen `ausrichtung` selbst auf `waagerecht`, weil die Vorgabe `senkrecht` nur fuer Balkendiagramme richtig ist. **Skalen-Farbverlauf** ist eine EIGENE Farbrolle (`skala_von`/`skala_mitte`/`skala_bis`, rot->gelb->gruen je Thema) -- NICHT die Palette: die ist kategorial und ergibt interpoliert einen Regenbogen ohne Richtung. Farbzonen schlagen den Verlauf. **Tacho-Gestaltung:** `zifferblatt` = `ring`/`segmente`/`striche`/`baender`, `blatt_teile`/`blatt_luecke`/`blatt_dicke`, `fassung` (metallischer Ring aus gestaffelten Ringen -- ein Verlauf ENTLANG eines Kreises geht mit `ring` nicht), `CHART_ZONE(..., name$)` beschriftet die Zone entlang des Bogens (untere Haelfte wird gedreht), `wertanzeige` = `aus`/`innen`/`pille`/`blase`/`am_zeiger` (Pille nimmt die Farbe der getroffenen Zone). Der Tacho haengt allein an `wertanzeige` -- ihn zusaetzlich an `werte` zu koppeln liess ihn stumm, weil das per Vorgabe `aus` ist. **Maus:** `CHART_DRAW` wertet sie selbst aus (kein Zusatzaufruf) -> `CHART_HOVER`/`_SERIES`/`_LABEL$`/`_VALUE`, `CHART_CLICKED`/`_SERIES`; Schalter `hover`/`tooltip`, Zahlen `hover_tempo`/`hover_weite`/`hover_glanz`. Damit die Maus nicht neben dem trifft, was zu sehen ist, liegt die Geometrie an EINER Stelle (`kuchen_geom`/`kuchen_stuecke`/`achsen_geom`/`balken_geom`/`legende_abzug`), die Treffertest UND Zeichnen benutzen. Die Hervorhebung mischt gegen WEISS statt RGB zu skalieren -- beim Skalieren klemmt der groesste Kanal bei 255 und hervorgehobenes Orange wurde gelb. **Linien:** `punktform` (kreis/quadrat/raute/dreieck), `treppe`, `strich` (Strichlaenge; Phase laeuft ueber den GANZEN Zug weiter, sonst verdichtet sich das Muster bei engen Stuetzpunkten), `fadenkreuz`. `glatt`+`treppe` schliessen sich aus, die Treppe gewinnt. Doku `docs/module-chart.md`, Demo `examples/154_chart.dh`, Tests `tests/pruef/module/modules_chart.dhtest` + Rust-`#[test]`s. | `CHART` |
 | `curves` | Animation-Kurven (komplementaer zu `tween`'s Easings): `CURVE_BEZIER/BEZIER2`, `CURVE_CATMULL/CATMULL2`, `CURVE_HERMITE`, `CURVE_LERP`, `CURVE_SMOOTHSTEP`, `CURVE_SMOOTHERSTEP`. Pure Functions, kein State. | — |
 | `net` | TCP + UDP via stdlib-Sockets (cross-platform). Default non-blocking fuer Game-Loops. `NET_TCP_LISTEN/ACCEPT/CONNECT`, `NET_SEND/RECV`, `NET_UDP_BIND/SEND/RECV`. Encoding: UTF-8. | `NET_LISTENER`, `NET_SOCKET`, `NET_UDP` |
 | `midi` | Noten von einem angeschlossenen Instrument lesen und welche hinausschicken. Feature `midi` (Crate `midir`: WinMM/ALSA/CoreMIDI), also nur in `--hardware`-Bauten -- **ausser** `MIDI_NOTE_NAME$`/`MIDI_NOTE_FREQ`, die nur umrechnen und darum ungegatet in `midi.rs` stehen (samt Rust-`#[test]`s; nur so ist der nuetzlichste Teil auch auf einer Maschine ohne Anschluss pruefbar). Auflisten `MIDI_IN_COUNT/NAME$`, oeffnen `MIDI_IN_OPEN` -> `MIDI_IN`, empfangen ueber das Cursor-Muster von `db`/`mqtt` (`MIDI_NEXT` + `MIDI_NOTE/VELOCITY/CHANNEL/IS_NOTE_ON`), senden `MIDI_NOTE_ON/OFF/CC/SEND`. **Zwei Protokoll-Eigenheiten:** die meisten Instrumente schicken Note-AUS als Note-AN mit Anschlag 0 (`MIDI_IS_NOTE_OFF` faengt beide, sonst enden Toene nie), und Kanaele zaehlen nach aussen 1..16 statt 0..15. Die Entschluesselung eingehender Nachrichten arbeitet ueber ROHE BYTES statt ueber den Geraetetyp (`status_von`/`kanal_von`/`ist_note_aus`/... in midi.rs, die `&Eingang`-Fassungen sind Einzeiler darueber) -- haenge sie am Geraet, ist sie ohne Instrument NIRGENDS pruefbar, so ist sie es ueberall: neun ungegatete Rust-`#[test]`s mit erfundenen Nachrichten decken beide Note-aus-Formen, Kanal 1/16, Regler, leere und zu kurze Nachricht ab. Der Rueckruf laeuft auf midirs eigenem Faden in eine Warteschlange mit **1024** Plaetzen; beim Ueberlauf faellt die AELTESTE weg (wer live spielt, will den aktuellen Anschlag). Uhr/Active-Sensing/SysEx werden weggelassen. **Nicht umgesetzt:** SysEx, MIDI-Uhr/Timecode, `.mid`-Dateien, virtuelle Anschluesse. **Der ganze Kreis ist geprueft** -- Tests, die einen VIRTUELLEN Loopback-Port benutzen (loopMIDI, `winget install TobiasErichsen.loopMIDI`; ein Port unter dem Portnamen als Ein- UND Ausgang, genau daran erkannt, sonst uebersprungen). Damit sind Note-an-mit-Anschlag-0 und der 1024er-Deckel samt aelteste-faellt-weg belegt statt behauptet -- ein Keyboard braucht es dafuer nicht. Doku `docs/module-midi.md`, Demo `examples/181_midi.dh`. | `MIDI_IN`, `MIDI_OUT` |
@@ -1210,7 +1211,7 @@ zurueckspringen, kaputte Datei ist ein Fehler).
 | `firmata` | Direkte Arduino/ESP32-**Pin-Steuerung** ueber StandardFirmata (kein eigener Sketch/Text-Protokoll noetig -- einmalig StandardFirmata hochladen). Leitung seriell (Feature `serial`) ODER `tcp:host:port` (StandardFirmataWiFi, Port 3030) -- darum in JEDEM Bau. `FIRMATA_PORTS/OPEN/CLOSE/IS_OPEN/FIRMWARE$`, `FIRMATA_PIN_MODE`, `FIRMATA_DIGITAL_WRITE/READ`, `FIRMATA_ANALOG_WRITE/READ`, `FIRMATA_SERVO_*`, `FIRMATA_I2C_*`, `FIRMATA_STEPPER_*` (AccelStepperFirmata, braucht ConfigurableFirmata), `FIRMATA_UPDATE` (Pro-Frame-Polling wie `INPUT_UPDATE`/`TIMER_UPDATE`). Kein OneWire/Encoder. **Zwei Nummerierungen** (echte Protokoll-Eigenheit): Schreiben nimmt die rohe digitale Pin-Nummer, `FIRMATA_ANALOG_READ` nimmt den Analog-**Kanal** (A0=0, A1=1, ...) -- nicht dieselbe Zahl fuer denselben physischen Pin. Doku `docs/module-firmata.md`, Demo `examples/147_firmata.dh`. | `FIRMATA_HANDLE` |
 | `usb` | USB-HID via `hidapi`. Maker-Boards, Programmer, Custom-Controller. `USB_LIST/OPEN/READ/WRITE/PRODUCT`. | `USB_HANDLE` |
 | `wifi` | WiFi-Management (Windows-only via `netsh wlan`). `WIFI_SCAN/CONNECT/DISCONNECT/CURRENT/SIGNAL/PROFILES`. | — |
-| `tiled` | Tiled-Maps (JSON-Format, kein TMX) **lesen, aendern, anlegen und schreiben**. `TILED_LOAD`, Layer-/Tile-/Object-Access, Per-Tile/Per-Object-Custom-Properties (`solid`, `damage`, ...). Industriestandard fuer 2D-Level-Design. Plus **Bulk-Ops** fuer Generierung/Editor: `TILED_FILL_RECT`, `TILED_REPLACE`, `TILED_COUNT_GID`, `TILED_FLOOD_FILL` (Bucket-Fill). **Schreiben (2026-08-31, gefunden beim Tilemap-Piloten -- das Modul war bis dahin ein reiner Leser):** `TILED_NEW`, `TILED_ADD_LAYER`, `TILED_ADD_TILESET`, `TILED_TILESET_TILES`, `TILED_SAVE`, dazu `TILED_LAYER_RENAME` / `TILED_LAYER_VISIBLE` / `TILED_LAYER_SET_VISIBLE` / `TILED_REMOVE_LAYER` / **`TILED_MOVE_LAYER`** (die Reihenfolge der Ebenen IST ihre ZEICHENreihenfolge -- die erste liegt hinten, Umsortieren aendert also das Bild; herausnehmen und einsetzen, nicht tauschen, weil ein Tausch bei einem Sprung ueber mehrere Stellen etwas anderes waere). **Die `firstgid` vergibt die Laufzeit selbst** (deshalb braucht `TILED_ADD_TILESET` die Kachelzahl) -- sie von Hand setzen zu lassen waere die unangenehmste Fehlerquelle des Formats: ueberlappende Bereiche zerstoeren stillschweigend die Zuordnung ALLER Kacheln, ohne Fehlermeldung. **Die Sichtbarkeit einer Ebene ist nicht nur Anzeige**, Tiled speichert sie -- ohne den Setter liess sich eine ausgeblendete Ebene gar nicht so sichern. Der Namensindex (Name -> Position) wird bei Umbenennen/Entfernen neu aufgebaut, sonst zeigt ein stehengebliebener Eintrag stumm auf die Nachbar-Ebene. **Geprueft wird der Schreiber an einem FREMDEN Leser** (drachenhauch/tilemap/document.py, dem Modell des Qt-Editors), nicht am eigenen -- ein Format, das nur sein Schreiber wieder liest, ist nicht geprueft, sondern nur in sich stimmig. **Objekt-Ebenen und Eigenschaften anlegen (2026-09-02):** `TILED_ADD_OBJECT_LAYER`, `TILED_ADD_OBJECT`, `TILED_TILE_SET_PROP`/`REMOVE_PROP`, `TILED_OBJECT_SET_PROP`/`REMOVE_PROP` -- bis dahin konnte das Modul beides nur LESEN, also liess sich im Programm kein Spawn-Punkt setzen und keiner Kachel `solid` mitgeben. Der SCHREIBER war schon vollstaendig (`speichern` gab objectgroup und tiles aus), es gab nur nichts zu schreiben. **EIN Setzer je Ziel statt vier:** die Leser muessen typisiert sein (dort sagt der Aufrufer, was er erwartet), der Wert traegt seinen Typ beim Schreiben schon mit sich; ARRAY/MAP/Handles werden abgelehnt, weil Tiled genau vier Arten kennt. Adressiert wird ueber die GID wie beim Lesen, samt Flip-Bit-Maskierung -- sonst legte eine gespiegelte Kachel ihre Eigenschaft woanders ab. Geprueft gegen den FREMDEN Leser (`tests/pruef/tiled_objekte_eigenschaften.dhtest`). Objekte lassen sich auch wieder **entfernen und aendern** (`TILED_REMOVE_OBJECT`, `TILED_OBJECT_SET_NAME`/`SET_TYPE`/`SET_RECT` -- alle vier Masse auf einmal, weil Verschieben und Groessenaendern in einem Editor dieselbe Geste sind). Und `TILED_TILE_PROP_KEYS`/`TILED_OBJECT_PROP_KEYS` zaehlen die Schluessel AUF -- ohne sie liess sich nicht anzeigen, was eine Kachel hat (`TILED_TILE_HAS_PROP` beantwortet nur eine Frage, die man schon kennt); sortiert, weil die Ablage eine HashMap ist. **Zwei Schreiberfehler (2026-09-14):** `nextobjectid` stand fest auf 1 und die Objekt-Kennungen zaehlten je EBENE ab 1 -- Tiled vergab beim Bearbeiten doppelte Kennungen. Jetzt traegt jedes Objekt eine kartenweite `id` (`TiledMap::next_object_id`, beim Laden ueber `kennungen_ordnen` eindeutig gemacht, auch fuer alte Dateien mit Doppelten), und `nextobjectid` liegt ueber allen. Und die Eigenschaften (Kachel wie Objekt) kamen in HashMap-Reihenfolge heraus, dieselbe Karte zweimal gesichert gab zwei Dateien -- jetzt nach Namen sortiert, `tiles` nach Kachelnummer (`eigenschaften_json`/`kacheln_json`). Nicht angelegt werden koennen: isometrische/unendliche Karten und Objekte, die keine Rechtecke sind (Polygon, Ellipse). Doku `docs/module-tiled.md`, Editor `examples/187_tilemap_editor.dh`, Tests `tests/pruef/tiled_schreiben.dhtest`. | `TILED_MAP` |
+| `tiled` | Tiled-Maps (JSON-Format, kein TMX) **lesen, aendern, anlegen und schreiben**. `TILED_LOAD`, Layer-/Tile-/Object-Access, Per-Tile/Per-Object-Custom-Properties (`solid`, `damage`, ...). Industriestandard fuer 2D-Level-Design. Plus **Bulk-Ops** fuer Generierung/Editor: `TILED_FILL_RECT`, `TILED_REPLACE`, `TILED_COUNT_GID`, `TILED_FLOOD_FILL` (Bucket-Fill). **Schreiben (2026-08-31, gefunden beim Tilemap-Piloten -- das Modul war bis dahin ein reiner Leser):** `TILED_NEW`, `TILED_ADD_LAYER`, `TILED_ADD_TILESET`, `TILED_TILESET_TILES`, `TILED_SAVE`, dazu `TILED_LAYER_RENAME` / `TILED_LAYER_VISIBLE` / `TILED_LAYER_SET_VISIBLE` / `TILED_REMOVE_LAYER` / **`TILED_MOVE_LAYER`** (die Reihenfolge der Ebenen IST ihre ZEICHENreihenfolge -- die erste liegt hinten, Umsortieren aendert also das Bild; herausnehmen und einsetzen, nicht tauschen, weil ein Tausch bei einem Sprung ueber mehrere Stellen etwas anderes waere). **Die `firstgid` vergibt die Laufzeit selbst** (deshalb braucht `TILED_ADD_TILESET` die Kachelzahl) -- sie von Hand setzen zu lassen waere die unangenehmste Fehlerquelle des Formats: ueberlappende Bereiche zerstoeren stillschweigend die Zuordnung ALLER Kacheln, ohne Fehlermeldung. **Die Sichtbarkeit einer Ebene ist nicht nur Anzeige**, Tiled speichert sie -- ohne den Setter liess sich eine ausgeblendete Ebene gar nicht so sichern. Der Namensindex (Name -> Position) wird bei Umbenennen/Entfernen neu aufgebaut, sonst zeigt ein stehengebliebener Eintrag stumm auf die Nachbar-Ebene. **Geprueft wird der Schreiber an einem FREMDEN Leser** (drachenhauch/tilemap/document.py, dem Modell des Qt-Editors), nicht am eigenen -- ein Format, das nur sein Schreiber wieder liest, ist nicht geprueft, sondern nur in sich stimmig. **Objekt-Ebenen und Eigenschaften anlegen (2026-09-02):** `TILED_ADD_OBJECT_LAYER`, `TILED_ADD_OBJECT`, `TILED_TILE_SET_PROP`/`REMOVE_PROP`, `TILED_OBJECT_SET_PROP`/`REMOVE_PROP` -- bis dahin konnte das Modul beides nur LESEN, also liess sich im Programm kein Spawn-Punkt setzen und keiner Kachel `solid` mitgeben. Der SCHREIBER war schon vollstaendig (`speichern` gab objectgroup und tiles aus), es gab nur nichts zu schreiben. **EIN Setzer je Ziel statt vier:** die Leser muessen typisiert sein (dort sagt der Aufrufer, was er erwartet), der Wert traegt seinen Typ beim Schreiben schon mit sich; ARRAY/MAP/Handles werden abgelehnt, weil Tiled genau vier Arten kennt. Adressiert wird ueber die GID wie beim Lesen, samt Flip-Bit-Maskierung -- sonst legte eine gespiegelte Kachel ihre Eigenschaft woanders ab. Geprueft gegen den FREMDEN Leser (`tests/pruef/module/tiled_objekte_eigenschaften.dhtest`). Objekte lassen sich auch wieder **entfernen und aendern** (`TILED_REMOVE_OBJECT`, `TILED_OBJECT_SET_NAME`/`SET_TYPE`/`SET_RECT` -- alle vier Masse auf einmal, weil Verschieben und Groessenaendern in einem Editor dieselbe Geste sind). Und `TILED_TILE_PROP_KEYS`/`TILED_OBJECT_PROP_KEYS` zaehlen die Schluessel AUF -- ohne sie liess sich nicht anzeigen, was eine Kachel hat (`TILED_TILE_HAS_PROP` beantwortet nur eine Frage, die man schon kennt); sortiert, weil die Ablage eine HashMap ist. **Zwei Schreiberfehler (2026-09-14):** `nextobjectid` stand fest auf 1 und die Objekt-Kennungen zaehlten je EBENE ab 1 -- Tiled vergab beim Bearbeiten doppelte Kennungen. Jetzt traegt jedes Objekt eine kartenweite `id` (`TiledMap::next_object_id`, beim Laden ueber `kennungen_ordnen` eindeutig gemacht, auch fuer alte Dateien mit Doppelten), und `nextobjectid` liegt ueber allen. Und die Eigenschaften (Kachel wie Objekt) kamen in HashMap-Reihenfolge heraus, dieselbe Karte zweimal gesichert gab zwei Dateien -- jetzt nach Namen sortiert, `tiles` nach Kachelnummer (`eigenschaften_json`/`kacheln_json`). Nicht angelegt werden koennen: isometrische/unendliche Karten und Objekte, die keine Rechtecke sind (Polygon, Ellipse). Doku `docs/module-tiled.md`, Editor `examples/187_tilemap_editor.dh`, Tests `tests/pruef/module/tiled_schreiben.dhtest`. | `TILED_MAP` |
 | `tile_collide` | Box-vs-Tilemap-Kollision. `TILE_SWEEP_X/Y` mit separat-Achsen-Sweep-Pattern. Solid-Detection via `solid`-Property (mit Convention-Fallback). Klassische Platformer-Physik. Sweep nativ via `gb_native.TileCollider` (Solid-Maske einmal gespiegelt+gecacht), sonst Python-`_sweep_axis`. | — |
 | `controller` | Character-Controller mit Coyote-Time, Jump-Buffer, Variable-Jump-Height. `CHAR_NEW/SET_INPUT/UPDATE`, `CHAR_X/Y/VX/VY`, `CHAR_ON_GROUND/WALL_LEFT/RIGHT`. Konfigurable Move-Speed, Jump-Velocity, Gravity, Coyote/Buffer-Frames, Variable-Jump-Cut. | `CHAR_CONTROLLER` |
 | `g3d` | **3D-Grafik** (`dhrt`, Grafik-Feature — ohne `--no-graphics`-Build). Immediate-Primitive: `CAMERA3D`, `CUBE`/`CUBE_WIRES`, `SPHERE`/`SPHERE_WIRES`, `CYLINDER` (Kegel via r_oben=0), `PLANE`, `LINE3D`, `POINT3D`, `GRID3D`. **3D-Modelle** (wiederverwendbare MODEL-Handles): `LOADMODEL` (OBJ/GLTF), prozedural `MESH_CUBE/SPHERE/CYLINDER/TORUS/KNOT/PLANE` + `MESH_HEIGHTMAP` (Terrain aus Graustufen-Image), zeichnen via `MODEL`/`MODEL_EX` (Achsen-Rotation)/`MODEL_WIRES`, `MODEL_TEXTURE` (Diffuse-Map aus LOADIMAGE). **Skelett-Animation** (geriggte GLTF/IQM): `MODEL_LOAD_ANIMS(pfad$)` -> ANIM_SET (Integer-Handle), `MODEL_ANIM_COUNT/NAME/FRAMES`, `MODEL_ANIMATE(modell, set, anim_idx, frame)` setzt die Pose (frame loopt). Nutzt seit raylib-rs 6.0 dessen RAII-`ModelAnimations`-Collection (`load_model_animations`/`update_model_animation`; Unload automatisch im `Drop` -- loeste den fruehreren rohen-FFI-Workaround ab, der noetig war weil der 5.x-Wrapper die Structs flach kopierte und dann `UnloadModelAnimations` rief -> Use-after-free). **`MODEL_ANIMATE_BLEND(modell, set, anim_a, frame_a, anim_b, frame_b, blend)`** (neu in raylib 6.0 via `UpdateModelAnimationEx`): blendet weich zwischen zwei Animationen desselben Sets (`blend` 0.0=ganz A .. 1.0=ganz B), z.B. fuer Walk->Run-Uebergaenge statt hartem Anim-Wechsel. Demo `examples/108_skeletal_anim.dh` (CC0-Modell via `examples/assets/download_robot.dh`). **Billboards** `BILLBOARD` (Textur zeigt zur Kamera) + **Ray-Kollision/Picking** `RAY_HIT_BOX`/`RAY_HIT_SPHERE` (Distanz oder -1) und `PICK_BOX`/`PICK_SPHERE` (Mausstrahl, Klick-Selektion). **Picking auf echter Flaeche** (nicht nur Huellkoerper): `RAY_HIT_TRI(ursprung, richtung, 3 Punkte)`/`RAY_HIT_QUAD(ursprung, richtung, 4 Punkte)` + `PICK_TRI`/`PICK_QUAD` — Bodenkacheln, Wandstuecke, frei schwebende Panels. Ohne Backface-Culling (eine Flaeche trifft auch von hinten); die Vierecks-Punkte muessen **reihum** liegen; die Richtung wird vor dem Test normalisiert (sonst waere die Distanz in Vielfachen der Richtungslaenge, raylibs Rohverhalten). Demo `examples/151_picking_flaechen.dh`. **Beleuchtung** (PBR/Cook-Torrance, bis 4 Lichter): `LIGHT_ENABLE`/`LIGHT_AMBIENT`/`LIGHT_DIRECTIONAL`/`LIGHT_POINT`/`LIGHT_SET_POS/COLOR/ENABLED` + `MODEL_LIT(modell)` + `MODEL_PBR(modell, metalness, roughness)` (eingebetteter GGX-Shader) + `MODEL_EMISSIVE(modell, farbe, staerke)` (Eigenleuchten pro Modell — durchschlaegt den Fog; mit Bloom-`POSTFX` echter Neon-Glow, Demo `examples/110_emissive_glow.dh`) + `LIGHT_FOG(farbe, dichte)` (Tiefen-Fog) + `LIGHT_ENV(himmel, boden, intensitaet)` (analytisches IBL — Metalle spiegeln die Umgebung) + `LIGHT_ENV_HDR(pfad$ [, intensitaet])` (**echtes HDR-Cubemap-IBL**: laedt ein equirect-.hdr, berechnet Irradiance/Prefilter/BRDF-LUT-Maps, `useIBLMaps`-Gate; analytischer `LIGHT_ENV`-Pfad bleibt Fallback) + `SKYBOX(an)` (zeichnet die HDR-Umgebung als sichtbaren 3D-Hintergrund — env-Cubemap auf einen kamerazentrierten Wuerfel, ohne Depth-Write). **Schatten** `SHADOW_ENABLE([res])`/`SHADOW_AREA(groesse,dist)`/`SHADOW_TARGET(x,y,z)` (Shadow-Mapping via Depth-FBO + PCF; erstes directional Light wirft Schatten, MODEL_LIT-Modelle werfen+empfangen). **Normal-Mapping** `MODEL_TEXTURE_NORMAL(modell,bild)` (TBN-basiert, MODEL_LIT erzeugt Tangenten; useNormalMap-Gate -> lit Modelle ohne Map unveraendert). **Kamera-Modi** `CAMERA3D_UPDATE(mode)` (1=free/2=orbital/3=first_person/4=third_person, raylib UpdateCamera) + Getter `CAMERA3D_X/Y/Z`/`CAMERA3D_TARGET_X/Y/Z`. Render via raylib `begin_mode3D` beim FLIP (3D zuerst, 2D-HUD obenauf). Doku `docs/rust-runtime.md` (Schritt 6), Demos `examples/82_3d_intro.dh`, `88_3d_models.dh`, `90_billboards_picking.dh`, `91_lighting.dh`, `92_fog.dh`, `93_shadows.dh`, `94_normalmap.dh`, `95_pbr.dh`, `96_ibl.dh`, `99_ibl_hdr.dh`. | — |
@@ -1230,19 +1231,19 @@ zurueckspringen, kaputte Datei ist ein Fehler).
 | Clip-Rechteck | `SCISSOR(x,y,b,h)` / `SCISSOR_END()` / `SCISSOR_DEPTH()` -- Zeichnen auf ein Rechteck beschraenken. Ein **Stapel**: innen wird mit aussen GESCHNITTEN. Die Mechanik lag laengst in `graphics.rs` (`push_clip`/`pop_clip`, vom `gui`-Modul benutzt) und war nur nicht herausgefuehrt; neu sind die drei Builtins plus ein Zaehler, damit ein SCISSOR_END zu viel ein Fehler ist statt dem Umgebenden seinen Clip wegzunehmen. Vorher blieb dafuer nur ein RENDERTARGET. | — |
 | Blend-Modes | `BLEND_MODE(modus$)` — `"alpha"`/`"add"`/`"mult"`/`"subtract"` fuer folgende Draws (Glow via additiv). **Nur native** (raylib `BeginBlendMode`); Tree-Walker konsolen-only -> wirft "nur dhrt". | — |
 | Prozedurale Texturen | **Nur native** (raylib `GenImage*`): `GENTEX_PERLIN(w,h,skala)`, `GENTEX_GRADIENT(w,h,c1,c2,vertikal)`, `GENTEX_CHECKED(w,h,fx,fy,c1,c2)`, `GENTEX_COLOR(w,h,c)`, **`GENTEX_RADIAL(w,h,inner,outer[,density])`** (radialer Verlauf Mitte→Rand — weiche Glows/Lichter/Vignetten, additiv gezeichnet) -> IMAGE-Handle (mit `DRAWIMAGE`/`DRAWIMAGEROT` nutzbar). Demo `examples/101_blend_gentex.dh`. | — |
-| Clipboard / Drag&Drop | **Nur native**: `CLIPBOARD_GET()->STRING` / `CLIPBOARD_SET(text$)` (System-Zwischenablage), `FILES_DROPPED()->INTEGER` (Anzahl gedroppter Dateien dieses Frame, unter macOS auch die vom Finder uebergebenen; seit 2026-09-19 je Bild EINMAL eingesammelt -- vorher verbrauchte der erste Aufruf die Liste) + `FILE_DROPPED(i)->STRING` (Pfad). Tree-Walker konsolen-only -> wirft "nur dhrt". **Die Zwischenablage gehoert jeweils EINEM Prozess** (2026-09-20): wer sie nicht bekommt, erfuhr davon NICHTS -- `glfwSetClipboardString` gibt void zurueck, raylib-rs' Result sagt nur, ob der Text ein Nullbyte enthielt. `CLIPBOARD_SET` liest jetzt ZURUECK und wiederholt (vier Versuche, 150 ms Pause -- gemessen deckt das ~700 ms Blockade ab und gibt nach 711 ms auf), danach ist es ein FEHLER statt Schweigen; sonst stuende beim naechsten Einfuegen der ALTE Inhalt da und der Schaden zeigte sich woanders. **Schlimmer war `CLIPBOARD_GET`: es STUERZTE AB** (0xC0000005) -- GLFW liefert NULL, und raylib-rs macht `CStr::from_ptr` darauf ungeprueft; jetzt ueber `raylib::ffi::GetClipboardText` mit NULL-Pruefung (`clipboard_text_roh`), leer ist die Antwort. Das traf JEDES Programm mit Strg+C/V. **Zwei Zahlen, die ueberraschen:** EIN `SetClipboardText` kostet gegen eine gehaltene Zwischenablage 261 ms (GLFWs drei `Sleep(1)` haengen an Windows' Timer-Granularitaet), und eine 5-ms-Pause beim Wiederholen bringt NICHTS -- die Folgeversuche laufen ins Leere. Tests `tests/pruef/zwischenablage.dhtest` (4, seriell; der Blocker haelt sie per OpenClipboard ECHT fest). **Der Test war dreimal gruen und wertlos**, bevor er etwas pruefte: mit festem Text (stand vom vorigen Lauf noch drin) und mit `MILLIS()` (= Zeit seit PROGRAMMstart, und der Ablauf dauert jedes Mal gleich lang) -- erst `UUID4$` ist eindeutig. | — |
-| Render-Targets | **Nur native:** `RENDERTARGET_NEW(w,h[,behalten])->INTEGER` (Off-Screen-Render-Ziel; `behalten`=TRUE laesst den Inhalt ueber das Bild hinaus stehen -> **echte Rueckkopplung/Schweife**, `RENDERTARGET_CLEAR(rt[,farbe])` raeumt es von Hand), `RENDERTARGET_BEGIN(rt)` / `RENDERTARGET_END()` (folgende Draws ins Ziel — pro Frame transparent gecleart), `RENDERTARGET_DRAW(rt,x,y[,skala[,tint]])` (Ziel als Bild stempeln). dhrt: eigener Command-Buffer pro Target, beim FLIP vor der Hauptszene auf die RenderTexture gerendert (y-flip); Tree-Walker konsolen-only -> wirft "nur dhrt". Demo `examples/102_render_target.dh`. *Grenze:* RtDraw innerhalb eines anderen Targets = No-Op -- ein Target kann sich also auch NICHT selbst zeichnen. Schweife entstehen ueber `behalten`=TRUE plus Verblassen mit `BLEND_MODE("mult")` + Vollbild-`BOX` in dunklem Grau (Rezept + Tests: `tests/pruef/rendertarget_persistenz.dhtest`). | — |
-| Zustand sichern | `GFX_PUSH()` / `GFX_POP()` — Zeichenzustand auf einen Stapel legen und zurueckholen: 2D-Kamera+Ruetteln, aktive Layer, Hintergrundfarbe, Licht (Ambient/Nebel/alle Lichtquellen), Umgebung (`LIGHT_ENV`, IBL-Schalter, `SKYBOX`), Schatten (an/Bereich/Ziel), 3D-Kamera samt View-/Projektions-Ueberschreibung, Schrift und `POSTFX`. **Nicht** enthalten: geladene Ressourcen (bleiben geladen — POP schaltet nur ihre Benutzung zurueck), die Schatten-AUFLOESUNG (haengt am allozierten Tiefenpuffer) und der Blend-Modus (ohnehin nur ein Bild lang gueltig). Analog `AUDIO_PUSH()` / `AUDIO_POP()` fuer alle Bus-Einstellungen (Lautstaerke, Balance, Filter, Hall, Echo, Verzerrer, Kompressor, EQ) — eine laufende `AUDIO_MODULATE`-Bindung wird dabei abgeloest, weil das Zurueckschreiben denselben Kira-Parameter beschreibt (empirisch belegt in `tests/pruef/gfx_push_pop.dhtest`). `GFX_DEPTH`/`AUDIO_DEPTH` liefern die Stapeltiefe, ein POP ohne PUSH ist ein Fehler. **Der Grund:** dieser Zustand ist global, und eine vergessene Ruecknahme faellt erst Szenen spaeter auf. | — |
+| Clipboard / Drag&Drop | **Nur native**: `CLIPBOARD_GET()->STRING` / `CLIPBOARD_SET(text$)` (System-Zwischenablage), `FILES_DROPPED()->INTEGER` (Anzahl gedroppter Dateien dieses Frame, unter macOS auch die vom Finder uebergebenen; seit 2026-09-19 je Bild EINMAL eingesammelt -- vorher verbrauchte der erste Aufruf die Liste) + `FILE_DROPPED(i)->STRING` (Pfad). Tree-Walker konsolen-only -> wirft "nur dhrt". **Die Zwischenablage gehoert jeweils EINEM Prozess** (2026-09-20): wer sie nicht bekommt, erfuhr davon NICHTS -- `glfwSetClipboardString` gibt void zurueck, raylib-rs' Result sagt nur, ob der Text ein Nullbyte enthielt. `CLIPBOARD_SET` liest jetzt ZURUECK und wiederholt (vier Versuche, 150 ms Pause -- gemessen deckt das ~700 ms Blockade ab und gibt nach 711 ms auf), danach ist es ein FEHLER statt Schweigen; sonst stuende beim naechsten Einfuegen der ALTE Inhalt da und der Schaden zeigte sich woanders. **Schlimmer war `CLIPBOARD_GET`: es STUERZTE AB** (0xC0000005) -- GLFW liefert NULL, und raylib-rs macht `CStr::from_ptr` darauf ungeprueft; jetzt ueber `raylib::ffi::GetClipboardText` mit NULL-Pruefung (`clipboard_text_roh`), leer ist die Antwort. Das traf JEDES Programm mit Strg+C/V. **Zwei Zahlen, die ueberraschen:** EIN `SetClipboardText` kostet gegen eine gehaltene Zwischenablage 261 ms (GLFWs drei `Sleep(1)` haengen an Windows' Timer-Granularitaet), und eine 5-ms-Pause beim Wiederholen bringt NICHTS -- die Folgeversuche laufen ins Leere. Tests `tests/pruef/fenster/zwischenablage.dhtest` (4, seriell; der Blocker haelt sie per OpenClipboard ECHT fest). **Der Test war dreimal gruen und wertlos**, bevor er etwas pruefte: mit festem Text (stand vom vorigen Lauf noch drin) und mit `MILLIS()` (= Zeit seit PROGRAMMstart, und der Ablauf dauert jedes Mal gleich lang) -- erst `UUID4$` ist eindeutig. | — |
+| Render-Targets | **Nur native:** `RENDERTARGET_NEW(w,h[,behalten])->INTEGER` (Off-Screen-Render-Ziel; `behalten`=TRUE laesst den Inhalt ueber das Bild hinaus stehen -> **echte Rueckkopplung/Schweife**, `RENDERTARGET_CLEAR(rt[,farbe])` raeumt es von Hand), `RENDERTARGET_BEGIN(rt)` / `RENDERTARGET_END()` (folgende Draws ins Ziel — pro Frame transparent gecleart), `RENDERTARGET_DRAW(rt,x,y[,skala[,tint]])` (Ziel als Bild stempeln). dhrt: eigener Command-Buffer pro Target, beim FLIP vor der Hauptszene auf die RenderTexture gerendert (y-flip); Tree-Walker konsolen-only -> wirft "nur dhrt". Demo `examples/102_render_target.dh`. *Grenze:* RtDraw innerhalb eines anderen Targets = No-Op -- ein Target kann sich also auch NICHT selbst zeichnen. Schweife entstehen ueber `behalten`=TRUE plus Verblassen mit `BLEND_MODE("mult")` + Vollbild-`BOX` in dunklem Grau (Rezept + Tests: `tests/pruef/grafik/rendertarget_persistenz.dhtest`). | — |
+| Zustand sichern | `GFX_PUSH()` / `GFX_POP()` — Zeichenzustand auf einen Stapel legen und zurueckholen: 2D-Kamera+Ruetteln, aktive Layer, Hintergrundfarbe, Licht (Ambient/Nebel/alle Lichtquellen), Umgebung (`LIGHT_ENV`, IBL-Schalter, `SKYBOX`), Schatten (an/Bereich/Ziel), 3D-Kamera samt View-/Projektions-Ueberschreibung, Schrift und `POSTFX`. **Nicht** enthalten: geladene Ressourcen (bleiben geladen — POP schaltet nur ihre Benutzung zurueck), die Schatten-AUFLOESUNG (haengt am allozierten Tiefenpuffer) und der Blend-Modus (ohnehin nur ein Bild lang gueltig). Analog `AUDIO_PUSH()` / `AUDIO_POP()` fuer alle Bus-Einstellungen (Lautstaerke, Balance, Filter, Hall, Echo, Verzerrer, Kompressor, EQ) — eine laufende `AUDIO_MODULATE`-Bindung wird dabei abgeloest, weil das Zurueckschreiben denselben Kira-Parameter beschreibt (empirisch belegt in `tests/pruef/grafik/gfx_push_pop.dhtest`). `GFX_DEPTH`/`AUDIO_DEPTH` liefern die Stapeltiefe, ein POP ohne PUSH ist ein Fehler. **Der Grund:** dieser Zustand ist global, und eine vergessene Ruecknahme faellt erst Szenen spaeter auf. | — |
 | Fenster-Zustand | `WINDOW_FOCUSED()` (Spiel pausieren, wenn der Nutzer wegklickt), `WINDOW_MINIMIZED/MAXIMIZED/HIDDEN()`, `WINDOW_IS_FULLSCREEN()`, `WINDOW_FOCUS()` (nach vorne holen), `WINDOW_OPACITY(0..1)` (ganzes Fenster durchscheinend), **`WINDOW_ICON(bild)`** — ohne das trug jedes exportierte Spiel das raylib-Standardsymbol. `WINDOW_DPI_X/Y()` = Bildschirm-Skalierung (1.0 normal, 2.0 HiDPI/Retina — ohne sie weiss ein Programm nicht, ob seine Pixelgroessen auf dem Zielgeraet winzig herauskommen). `GET_TIME()` = monotone Sekunden seit Programmstart. `OPENURL(adresse$)` oeffnet den Standardbrowser — **bewusst auf http/https begrenzt**, weil raylib die Zeichenkette an die Shell weiterreicht und ein `file:`-Schema sonst ein Weg waere, aus einem DH-Programm Beliebiges zu starten. | — |
 | Kompression | `COMPRESS$(text$)` / `DECOMPRESS$(gepackt$)` — DEFLATE, Ergebnis Base64 (DH-Strings sind UTF-8, roher Deflate-Output waere keins). Typisch ~9x kleiner bei Savegame-artigem Text; passt ueberall dorthin, wo heute schon `BASE64_ENCODE`-Ausgaben stehen. **Ungated** (miniz_oxide statt raylibs CompressData) — laeuft also auch in Konsolen-Programmen ohne Fenster. | — |
-| Bild HERSTELLEN | `IMAGE_NEW(b, h [, farbe])` (**ohne Farbe vollstaendig durchsichtig** -- ueber eine FARBE ist das gar nicht auszudruecken, weil Deckkraft 0 als DECKEND gilt; `GENTEX_COLOR` kann es deshalb nicht), `IMAGE_CLEAR(bild [, x, y, b, h])` (Radierer -- SCHREIBT die Durchsichtigkeit, mischte es, waere es ein Nichts-Tun), `IMAGE_DRAW_IMAGE(ziel, quelle, x, y [, qx, qy, qb, qh] [, faerbung])` (Ebenen verrechnen, Ausschnitt einsetzen), `GETALPHA(bild, x, y)` (0..255, -1 ausserhalb -- noetig, weil `GETPIXEL` eine FARBE liefert und ein durchsichtiger Punkt dort als deckendes Schwarz ankaeme), `IMAGE_FREE(bild)` (Bild + Grafikspeicher-Textur freigeben -- gemessen 1200 Kopien zu 256x256: **393 MB gegen 91 MB**. Das Handle wird danach NICHT neu vergeben, jede weitere Benutzung meldet sich im Klartext statt still auf ein fremdes Bild zu zeigen; `GETPIXEL`/`GETALPHA` bleiben bei -1. Der Pfad-Cache von `LOADIMAGE` wird mitgeraeumt. **Weiss nichts von** Texturen, die per `MODEL_TEXTURE` an ein Modell gingen -- raylibs `Texture2D` ist ein Struct ohne Zaehlung. **Nicht anlegen ist billiger als anlegen und freigeben**), `IMAGE_SAVE_GIF(bilder, pfad$ [, fps_oder_dauern [, wiederholen [, anzahl]]])` (**bewegtes GIF** aus einem `ARRAY OF IMAGE`; raylib kann GIFs nur LESEN. **Das dritte Argument ist ZWEIERLEI:** eine Zahl sind Bilder je Sekunde fuer alle, ein FELD ist die Dauer JE BILD in Millisekunden. GIF kann das von Haus aus, und eine Bildfolge braucht es -- eine Pose wird gehalten, der Lauf dazwischen nicht. Dass die EINHEIT wechselt, ist Absicht: ein einzelnes Bild hat keine Bildrate, es hat eine Dauer; `[4, 12]` als "250 ms, dann 83 ms" zu lesen waere die schlechtere Zumutung. Zu wenige Zeiten sind ein FEHLER -- die letzte stillschweigend zu wiederholen waere eine Vermutung, und eine falsche Zeit sieht man dem GIF nicht an, man merkt sie nur. Ueber die pure-Rust-Crate `gif` -- ein LZW-Kodierer von Hand ist die Art Code, die auf den ersten Blick stimmt und im Randfall still etwas Falsches liefert. **Farbtafel EXAKT bei bis zu 255 Farben** -- ein Verfahren, das immer zusammenfasst, haette schon ein Vier-Farben-Sprite verfaelscht; darueber wird reduziert. Durchsichtigkeit nur ganz/gar nicht (Schwelle 128), EINE Leinwand fuer alle Bilder (abweichende Groesse = Fehler, nicht beschneiden), Dauer auf >= 2 Hundertstel geklemmt weil Betrachter darunter still ihre eigene nehmen. `anzahl` = wie viele Plaetze des Feldes gelten, sonst sind die leeren Plaetze eines `DIM b[16]` ein Fehler. Reine Kodier-Logik in `gifschreiber.rs` mit 8 Rust-`#[test]`s -- sie kennt raylib nicht und ist damit fuer sich pruefbar), `IMAGE_SAVE(bild, pfad$)` (png/bmp/jpg/tga; unbekannte Endung wird abgelehnt, raylib taete sonst still nichts; ob geschrieben wurde, sagt nur die Datei -- die Bindung wirft das Erfolgs-Flag weg). **Der Anlass:** ein IMAGE war eine Einbahnstrasse -- hineinzeichnen ja, aber nicht herstellen; Ton hatte seit dem SFX-Piloten `AUDIO_SAVE_WAV`, Bild gar nichts. **Nicht dabei:** Bilder ueber die Zwischenablage (raylibs `GetClipboardImage` gibt es nur unter Windows). Doku `docs/module-imgfx.md`, Demo `examples/188_bild_erzeugen.dh`, Tests `tests/pruef/image_io.dhtest`. | — |
+| Bild HERSTELLEN | `IMAGE_NEW(b, h [, farbe])` (**ohne Farbe vollstaendig durchsichtig** -- ueber eine FARBE ist das gar nicht auszudruecken, weil Deckkraft 0 als DECKEND gilt; `GENTEX_COLOR` kann es deshalb nicht), `IMAGE_CLEAR(bild [, x, y, b, h])` (Radierer -- SCHREIBT die Durchsichtigkeit, mischte es, waere es ein Nichts-Tun), `IMAGE_DRAW_IMAGE(ziel, quelle, x, y [, qx, qy, qb, qh] [, faerbung])` (Ebenen verrechnen, Ausschnitt einsetzen), `GETALPHA(bild, x, y)` (0..255, -1 ausserhalb -- noetig, weil `GETPIXEL` eine FARBE liefert und ein durchsichtiger Punkt dort als deckendes Schwarz ankaeme), `IMAGE_FREE(bild)` (Bild + Grafikspeicher-Textur freigeben -- gemessen 1200 Kopien zu 256x256: **393 MB gegen 91 MB**. Das Handle wird danach NICHT neu vergeben, jede weitere Benutzung meldet sich im Klartext statt still auf ein fremdes Bild zu zeigen; `GETPIXEL`/`GETALPHA` bleiben bei -1. Der Pfad-Cache von `LOADIMAGE` wird mitgeraeumt. **Weiss nichts von** Texturen, die per `MODEL_TEXTURE` an ein Modell gingen -- raylibs `Texture2D` ist ein Struct ohne Zaehlung. **Nicht anlegen ist billiger als anlegen und freigeben**), `IMAGE_SAVE_GIF(bilder, pfad$ [, fps_oder_dauern [, wiederholen [, anzahl]]])` (**bewegtes GIF** aus einem `ARRAY OF IMAGE`; raylib kann GIFs nur LESEN. **Das dritte Argument ist ZWEIERLEI:** eine Zahl sind Bilder je Sekunde fuer alle, ein FELD ist die Dauer JE BILD in Millisekunden. GIF kann das von Haus aus, und eine Bildfolge braucht es -- eine Pose wird gehalten, der Lauf dazwischen nicht. Dass die EINHEIT wechselt, ist Absicht: ein einzelnes Bild hat keine Bildrate, es hat eine Dauer; `[4, 12]` als "250 ms, dann 83 ms" zu lesen waere die schlechtere Zumutung. Zu wenige Zeiten sind ein FEHLER -- die letzte stillschweigend zu wiederholen waere eine Vermutung, und eine falsche Zeit sieht man dem GIF nicht an, man merkt sie nur. Ueber die pure-Rust-Crate `gif` -- ein LZW-Kodierer von Hand ist die Art Code, die auf den ersten Blick stimmt und im Randfall still etwas Falsches liefert. **Farbtafel EXAKT bei bis zu 255 Farben** -- ein Verfahren, das immer zusammenfasst, haette schon ein Vier-Farben-Sprite verfaelscht; darueber wird reduziert. Durchsichtigkeit nur ganz/gar nicht (Schwelle 128), EINE Leinwand fuer alle Bilder (abweichende Groesse = Fehler, nicht beschneiden), Dauer auf >= 2 Hundertstel geklemmt weil Betrachter darunter still ihre eigene nehmen. `anzahl` = wie viele Plaetze des Feldes gelten, sonst sind die leeren Plaetze eines `DIM b[16]` ein Fehler. Reine Kodier-Logik in `gifschreiber.rs` mit 8 Rust-`#[test]`s -- sie kennt raylib nicht und ist damit fuer sich pruefbar), `IMAGE_SAVE(bild, pfad$)` (png/bmp/jpg/tga; unbekannte Endung wird abgelehnt, raylib taete sonst still nichts; ob geschrieben wurde, sagt nur die Datei -- die Bindung wirft das Erfolgs-Flag weg). **Der Anlass:** ein IMAGE war eine Einbahnstrasse -- hineinzeichnen ja, aber nicht herstellen; Ton hatte seit dem SFX-Piloten `AUDIO_SAVE_WAV`, Bild gar nichts. **Nicht dabei:** Bilder ueber die Zwischenablage (raylibs `GetClipboardImage` gibt es nur unter Windows). Doku `docs/module-imgfx.md`, Demo `examples/188_bild_erzeugen.dh`, Tests `tests/pruef/grafik/image_io.dhtest`. | — |
 | Bild-Verarbeitung (Ausbau) | `IMAGE_CONVOLVE(bild, kern)` — freie Faltung mit quadratischem, ungerade-seitigem Kern als flachem `ARRAY OF FLOAT` (Schaerfen, Kanten, Praegen; `IMAGE_BLUR` kann nur Gauss). `IMAGE_ALPHA_MASK/CROP/PREMULTIPLY` (weiche Raender, eng zuschneiden, dunkle Saeume beim Skalieren vermeiden). `IMAGE_DITHER(bild, r,g,b,a)` — **nur 5,6,5,0 / 5,5,5,1 / 4,4,4,4**; raylib warnt bei allem anderen bloss und liefert ein Bild mit ungueltigem Format (Textur wird schwarz), deshalb hier hart abgelehnt. `IMAGE_PALETTE(bild, max)` -> `ARRAY OF INTEGER` der haeufigsten Farben. | — |
 | Textur-Generatoren (Ausbau) | `GENTEX_CELLULAR(w,h,kachel)` (Voronoi/Zellrauschen — Steinboden, Risse), `GENTEX_NOISE(w,h,anteil)` (Weissrauschen — Sternenfelder, Korn), `GENTEX_GRADIENT_BOX(w,h,dichte,c1,c2)` (rechteckiger Verlauf von innen nach aussen — Vignetten; das eckige Gegenstueck zu `GENTEX_RADIAL`). | — |
 | Bitmap-Fonts | `LOADFONT_IMAGE(bild, trennfarbe, erstes_zeichen)` — Pixel-Schrift aus einem PNG, dessen Zeichen durch die Trennfarbe getrennt sind. Bleibt bewusst ungefiltert (nearest), damit Pixel-Schrift pixelig bleibt — anders als `LOADFONT` (TTF), das bilinear glaettet. `TEXT_LINE_SPACING(px)` fuer mehrzeiligen Text. **Nicht umgesetzt:** animierte GIFs (`LoadImageAnim` liefert nur Bild 0 nutzbar, raylib-rs macht `Image` readonly) und `GetClipboardImage` (Windows-only) — Begruendungen stehen im Quelltext. | — |
 | Shader-Uniforms (Ausbau) | `SHADER_SET_ARRAY(sh, name$, werte)` fuellt ein `uniform float[]` aus einem `ARRAY OF FLOAT` (Lichtpositionen, Verlaufsstufen — vorher liess sich pro Aufruf nur EIN Wert setzen). `SHADER_SET_TEXTURE(sh, name$, bild)` belegt einen **zweiten Sampler** (Masken, Paletten-LUTs, Ueberblendungen). `SHADER_SET_MATRIX(sh, name$, mat)` nimmt eine `MAT4` aus `m3d`. **Wichtig:** raylibs `SetShaderValueTexture` ruft intern `glUniform1i` und wirkt damit auf das GERADE AKTIVE Programm — ausserhalb von `BeginShaderMode` landet die Zuweisung am falschen Shader und der Sampler bleibt schwarz. dhrt merkt sie deshalb vor und setzt sie beim Zeichnen (`shader_textures` in graphics.rs). | — |
 | Linien-/Polygon-Geometrie | Im `physics`-Modul, pure Functions ohne Fenster: `PHYSICS_LINES_HIT` (schneiden sich zwei **Strecken**?) mit `PHYSICS_LINES_X/Y` fuer den Schnittpunkt (**NAN** wenn es keinen gibt — erst HIT fragen), `PHYSICS_POINT_LINE(px,py, ax,ay, bx,by, dicke)`, `PHYSICS_CIRCLE_LINE`, und `PHYSICS_POINT_POLY(px, py, xs, ys)` (Strahl-Verfahren, funktioniert auch bei konkaven Polygonen). | — |
 | Eingabe-Flanken | **"genau in DIESEM Frame"** statt "wird gehalten": `MOUSE_HIT(n)`/`MOUSE_RELEASED(n)`, `KEYHIT(c)`/`KEYRELEASED(c)`, `KEYREPEAT(c)` (+ System-Auto-Repeat), `JOYSTICK_HIT/RELEASED(idx,btn)`. **Achtung:** `MOUSEBUTTON` und `KEYPRESSED` melden weiterhin *gehalten* — die Namen sind historisch und behalten ihre Bedeutung. Dazu `JOYSTICK_ANY_BUTTON()` (zuletzt gedrueckter Knopf, -1 = keiner — fuer Belegungsdialoge) und `JOYSTICK_AXIS_COUNT(idx)`. **Belegungsdialoge auch fuer die Tastatur:** `KEY_ANY_HIT()` (Code der zuletzt gedrueckten Taste, -1 = keine) + `KEY_NAME$(code)` (Anzeigename; GLFW kennt nur die druckbaren und die layout-abhaengig, fuer Sondertasten hat dhrt eine eigene Tabelle: `LEER`/`LINKS`/`UMSCHALT`/`F5`/…). `JOYSTICK_MAPPINGS(sdl_db$)` laedt SDL-GameControllerDB-Zeilen nach. **Neue Tastencodes** (vorher gab es dafuer GAR KEINE Konstante, „Sprint mit Umschalt" war nicht abfragbar): `KEY_LSHIFT/RSHIFT`, `KEY_LCTRL/RCTRL`, `KEY_LALT/RALT`, `KEY_LSUPER/RSUPER`, `KEY_CAPSLOCK`, `KEY_INSERT/DELETE/HOME/END/PAGEUP/PAGEDOWN`, Ziffernblock `KEY_KP0..KEY_KP9` + `KEY_KP_ENTER/PLUS/MINUS/MULTIPLY/DIVIDE/PERIOD` (in `vm.rs` DEFAULT_KEYS -- seit 2026-09-21 die einzige Liste). | — |
-| Eingabe aufzeichnen/abspielen | `AUTOMATION_RECORD(datei$)` / `AUTOMATION_STOP()` (schreibt die Datei, liefert die Anzahl) / `AUTOMATION_PLAY(datei$)` + `AUTOMATION_RECORDING/PLAYING/FRAME/COUNT` — raylibs Automation-Events (Tasten/Maus/Rad/Gamepad/Touch je Frame). Fuer Demo-/Attract-Modus, nachspielbare Fehlerberichte, automatische Spieltests. Eingespeist wird in `automation_tick()` am **Ende jedes FLIP** (direkt nach dem Einlesen der echten Eingabe -> aufgezeichnete Werte gewinnen; ein Ereignis aus Aufnahme-Frame N wirkt im Durchlauf N+1). Die Liste liegt in einer **Box**, weil `SetAutomationEventList` sich einen rohen Zeiger merkt. Aufnahme und Wiedergabe schliessen sich aus (raylib spielt waehrend einer Aufnahme nichts ab -> klare Fehlermeldung). Aufgezeichnet wird die EINGABE, nicht der Ablauf: Startzustand zuruecksetzen, `RANDOMIZE` festnageln, pro Frame statt pro Sekunde rechnen. **`KEY_ANY_HIT` blendet aus, was die laufende Wiedergabe selbst einspeist** (`auto_injected_keys` in graphics.rs) -- raylib legt eingespeiste Tasten auch in seine "zuletzt gedrueckt"-Warteschlange, ohne den Filter braeche ein Attract-Modus ("Demo endet bei Tastendruck") an seiner eigenen Demo ab; `KEYHIT`/`KEYPRESSED` sehen sie weiterhin, `JOYSTICK_ANY_BUTTON` ist nicht betroffen. **Die Wiedergabe HAELT die Mausposition** (2026-09-20): raylib zeichnet eine Position NUR auf, wenn sie sich geaendert hat (`rcore.c`: "only saved if changed") -- zwischen zwei solchen Ereignissen sagt die Aufnahme "die Maus steht still", und was die Wiedergabe nicht selbst setzt, gehoert dem Rechner: schon ein Fenster, das unter dem Zeiger auftaucht oder verschwindet, schickt unter Windows ein WM_MOUSEMOVE, und GLFW schreibt damit raylibs Mausposition um. Ein aufgezeichneter Klick steht aber in drei Bildern (Position, Taste runter, Taste hoch), und ein gui-Knopf zaehlt ihn erst beim LOSLASSEN auf sich selbst -- **der Klick kam an und blieb wirkungslos**; die Bildzaehlung stimmte dabei die ganze Zeit (`automation_tick` zaehlt FLIPs, nicht Zeit). `automation_tick` spielt deshalb das zuletzt gespielte Positions-Ereignis in jedem Bild erneut ab, in dem die Aufnahme keine neue Position nennt -- dasselbe Ereignis noch einmal, weil `PlayAutomationEvent` fuer diesen Typ nur raylibs `currentPosition` schreibt und KEINEN echten Zeiger bewegt (anders als `MOUSE_SET_POS` -> `SetMousePosition`). **Das war die Ursache dafuer, dass `dhrt test tests/pruef` bei jedem Lauf ANDERE Klick-Faelle fallen liess, waehrend jeder einzeln gruen war** -- nicht die Last: bei acht gleichzeitigen Fenstern ueberdecken sie sich staendig, und jedes Auftauchen ist so ein Ereignis. Gemessen am Notenblatt-Fall "zweite spur und instrument": allein und ohne jede Last 3 von 10 Fehlschlaege, mit bewegtem Zeiger ueber dem Fenster 15 von 20, danach 0 von 20; im Fehl-Lauf standen 129 von 140 Bildern auf fremder Lage, in jedem gruenen null. `--hardware` macht keinen Unterschied (18 von 20 gegen 15 von 20 unter derselben Stoerung). Ueber vier volle Laeufe: 11 und 8 Fehl vorher, 6 und 4 nachher -- die 4 sind vorbestehende, in JEDEM Lauf fallende Faelle (zwei Buch, zwei werkzeug_paket). **Folge fuer ein Programm, das selbst `MOUSE_SET_POS` ruft:** im selben Bild gewinnt es weiter, die Lage bleibt aber nicht stehen -- sobald es aufhoert zu setzen, zieht die Aufnahme sie im naechsten Bild zurueck (gemessen). Tests `tests/pruef/automation_mausstand.dhtest`: gestoert wird mit einer ECHTEN Fensternachricht (PostMessage WM_MOUSEMOVE, Nachricht "mausweg" in `_hilfen/fenstersender.ps1`), nicht mit `MOUSE_SET_POS` -- das bewegte den Zeiger des Nutzers mit; der zweite Fall ist die Gegenprobe, dass die Nachricht ankommt. **`--- seriell` haette es nicht geheilt** -- die zweite Flake-Ursache derselben Suite (die geteilte System-Zwischenablage) traf einen Fall, der seriell markiert IST. Doku `docs/automation.md`, Demo `examples/153_automation.dh`, Tests `tests/pruef/automation.dhtest` (schreiben die Aufnahmedatei selbst — raylibs Textformat). | — |
+| Eingabe aufzeichnen/abspielen | `AUTOMATION_RECORD(datei$)` / `AUTOMATION_STOP()` (schreibt die Datei, liefert die Anzahl) / `AUTOMATION_PLAY(datei$)` + `AUTOMATION_RECORDING/PLAYING/FRAME/COUNT` — raylibs Automation-Events (Tasten/Maus/Rad/Gamepad/Touch je Frame). Fuer Demo-/Attract-Modus, nachspielbare Fehlerberichte, automatische Spieltests. Eingespeist wird in `automation_tick()` am **Ende jedes FLIP** (direkt nach dem Einlesen der echten Eingabe -> aufgezeichnete Werte gewinnen; ein Ereignis aus Aufnahme-Frame N wirkt im Durchlauf N+1). Die Liste liegt in einer **Box**, weil `SetAutomationEventList` sich einen rohen Zeiger merkt. Aufnahme und Wiedergabe schliessen sich aus (raylib spielt waehrend einer Aufnahme nichts ab -> klare Fehlermeldung). Aufgezeichnet wird die EINGABE, nicht der Ablauf: Startzustand zuruecksetzen, `RANDOMIZE` festnageln, pro Frame statt pro Sekunde rechnen. **`KEY_ANY_HIT` blendet aus, was die laufende Wiedergabe selbst einspeist** (`auto_injected_keys` in graphics.rs) -- raylib legt eingespeiste Tasten auch in seine "zuletzt gedrueckt"-Warteschlange, ohne den Filter braeche ein Attract-Modus ("Demo endet bei Tastendruck") an seiner eigenen Demo ab; `KEYHIT`/`KEYPRESSED` sehen sie weiterhin, `JOYSTICK_ANY_BUTTON` ist nicht betroffen. **Die Wiedergabe HAELT die Mausposition** (2026-09-20): raylib zeichnet eine Position NUR auf, wenn sie sich geaendert hat (`rcore.c`: "only saved if changed") -- zwischen zwei solchen Ereignissen sagt die Aufnahme "die Maus steht still", und was die Wiedergabe nicht selbst setzt, gehoert dem Rechner: schon ein Fenster, das unter dem Zeiger auftaucht oder verschwindet, schickt unter Windows ein WM_MOUSEMOVE, und GLFW schreibt damit raylibs Mausposition um. Ein aufgezeichneter Klick steht aber in drei Bildern (Position, Taste runter, Taste hoch), und ein gui-Knopf zaehlt ihn erst beim LOSLASSEN auf sich selbst -- **der Klick kam an und blieb wirkungslos**; die Bildzaehlung stimmte dabei die ganze Zeit (`automation_tick` zaehlt FLIPs, nicht Zeit). `automation_tick` spielt deshalb das zuletzt gespielte Positions-Ereignis in jedem Bild erneut ab, in dem die Aufnahme keine neue Position nennt -- dasselbe Ereignis noch einmal, weil `PlayAutomationEvent` fuer diesen Typ nur raylibs `currentPosition` schreibt und KEINEN echten Zeiger bewegt (anders als `MOUSE_SET_POS` -> `SetMousePosition`). **Das war die Ursache dafuer, dass `dhrt test tests/pruef` bei jedem Lauf ANDERE Klick-Faelle fallen liess, waehrend jeder einzeln gruen war** -- nicht die Last: bei acht gleichzeitigen Fenstern ueberdecken sie sich staendig, und jedes Auftauchen ist so ein Ereignis. Gemessen am Notenblatt-Fall "zweite spur und instrument": allein und ohne jede Last 3 von 10 Fehlschlaege, mit bewegtem Zeiger ueber dem Fenster 15 von 20, danach 0 von 20; im Fehl-Lauf standen 129 von 140 Bildern auf fremder Lage, in jedem gruenen null. `--hardware` macht keinen Unterschied (18 von 20 gegen 15 von 20 unter derselben Stoerung). Ueber vier volle Laeufe: 11 und 8 Fehl vorher, 6 und 4 nachher -- die 4 sind vorbestehende, in JEDEM Lauf fallende Faelle (zwei Buch, zwei werkzeug_paket). **Folge fuer ein Programm, das selbst `MOUSE_SET_POS` ruft:** im selben Bild gewinnt es weiter, die Lage bleibt aber nicht stehen -- sobald es aufhoert zu setzen, zieht die Aufnahme sie im naechsten Bild zurueck (gemessen). Tests `tests/pruef/fenster/automation_mausstand.dhtest`: gestoert wird mit einer ECHTEN Fensternachricht (PostMessage WM_MOUSEMOVE, Nachricht "mausweg" in `_hilfen/fenstersender.ps1`), nicht mit `MOUSE_SET_POS` -- das bewegte den Zeiger des Nutzers mit; der zweite Fall ist die Gegenprobe, dass die Nachricht ankommt. **`--- seriell` haette es nicht geheilt** -- die zweite Flake-Ursache derselben Suite (die geteilte System-Zwischenablage) traf einen Fall, der seriell markiert IST. Doku `docs/automation.md`, Demo `examples/153_automation.dh`, Tests `tests/pruef/fenster/automation.dhtest` (schreiben die Aufnahmedatei selbst — raylibs Textformat). | — |
 | Maus-Blick + Cursor | `MOUSE_DELTA_X/Y()` (relative Bewegung — bei `MOUSE_LOCK` stehen MOUSEX/MOUSEY still, nur das Delta bewegt sich noch), `MOUSE_SET_POS(x,y)`, `MOUSE_ON_SCREEN()`, `MOUSEWHEEL_X/Y()` (Rad in **beiden** Achsen und als Kommazahl — `MOUSEWHEEL` liefert nur vertikal + ganzzahlig, feine Touchpad-Schritte fielen darin auf 0), `MOUSE_CURSOR(form$)` mit `default`/`ibeam`/`crosshair`/`hand`/`resize_ew`/`resize_ns`/`resize_nwse`/`resize_nesw`/`resize_all`/`not_allowed`. | — |
 | Touch + Gesten | `TOUCH_COUNT()`, `TOUCH_X/Y(i)`, `TOUCH_ID(i)` (stabile Finger-Kennung ueber Frames). `GESTURE$()` liefert einen **Namen** statt einer Zahl: `tap`/`doubletap`/`hold`/`drag`/`swipe_left|right|up|down`/`pinch_in`/`pinch_out` (`""` = keine). Dazu `GESTURE_DRAG_X/Y/ANGLE`, `GESTURE_PINCH_X/Y/ANGLE`, `GESTURE_HOLD_TIME()`. Demo `examples/149_input_edges.dh`. | — |
 | Game-Loop | `DELTA()` — Sekunden seit letztem `FLIP` (framerate-unabhaengige Bewegung: `x = x + speed * DELTA()`). `FPS()` / `SETFPS(n)` (Ziel-Framerate, 0 = ungedrosselt). `SET_FULLSCREEN(an)`, `SETWINDOWTITLE(s$)`, `SAVESCREENSHOT(pfad$)`. **Natives OS-Fenster** (das SCREEN-Fenster selbst): `WINDOW_RESIZABLE(an)` (vom OS aus groessenveraenderbar), `WINDOW_MIN_SIZE(w,h)`/`WINDOW_MAX_SIZE(w,h)`, `WINDOW_MAXIMIZE/MINIMIZE/RESTORE()`, `WINDOW_RESIZED()->BOOL`; `SCREENWIDTH()`/`SCREENHEIGHT()` liefern die **live**-Groesse (waechst mit dem Fenster). Demo `examples/106_windows.dh`. Nativ in dhrt (raylib). | — |
@@ -1366,7 +1367,7 @@ Details: docs/rust-runtime.md.
   Weglassen). Beide Lexer (`lexer.rs` `scan_escape`, `lexer.py`
   `_scan_escape`), Hervorheber (`syntax.rs`, `highlighter.py`) und die
   VS-Code-Grammatik kennen es; Paritaets-Schnipsel in
-  tests/test_rust_lexer_parity.py, Sammlung `tests/pruef/zeichenketten_escape.dhtest`,
+  tests/test_rust_lexer_parity.py, Sammlung `tests/pruef/sprache/zeichenketten_escape.dhtest`,
   Doku `docs/sprache.md` (Strings).
 - **Umstieg aus anderen BASICs** (seit 2026-09-21): `DIM x AS T = wert`,
   `EXIT FOR/DO/WHILE/SUB`, `END` allein, `END WHILE`, `SWAP`, `LET`, `?`,
@@ -1376,7 +1377,7 @@ Details: docs/rust-runtime.md.
   sagt die Meldung, wie es hier heisst (`umstieg.rs`,
   `Parser::umsteiger_hinweis`). `swap`/`let`/`exit`/`do` sind KONTEXTUELL,
   keine Schluesselwoerter. Uebersicht `docs/umstieg.md`, Details
-  `docs/stolpersteine.md` I, Tests `tests/pruef/umstieg.dhtest`.
+  `docs/stolpersteine.md` I, Tests `tests/pruef/sprache/umstieg.dhtest`.
   Fuenfte Runde (2026-09-23): **Zeichnen ohne SCREEN tat still nichts**
   (jetzt ein Fehler, `vm::ist_schirmbefehl`), **gezeichnet ohne FLIP** sagt am
   Programmende einen Satz, ein **unbekannter Befehl schlaegt den echten Namen
@@ -1409,7 +1410,7 @@ Details: docs/rust-runtime.md.
   hinab (`globale_unterbloecke`), NICHT in SUB/FUNCTION/CLASS -- die haben
   eigene Plaetze. Nebenertrag: die Kollisions-Erkennung sah bis dahin nur
   Geschwister und liess `CONST Modus` oben + `DIM modus` im Block durch.
-  Doku `docs/stolpersteine.md` H1, Tests `tests/pruef/name_collision.dhtest`.
+  Doku `docs/stolpersteine.md` H1, Tests `tests/pruef/sprache/name_collision.dhtest`.
 - **Eine Variable darf heissen wie ein Builtin, und der Aufruf meint den
   Builtin** (seit 2026-09-04): `DIM deg AS FLOAT : deg = DEG(w)`,
   `len = LEN(s)`. Vorher lief jeder Variablenname vor einer Klammer ueber
@@ -1419,7 +1420,7 @@ Details: docs/rust-runtime.md.
   FUNCREF-Variable ruft weiter die Variable (und der Sonderfall "Typ
   unbekannt", zweimal verschieden deklariert); die FOR-EACH-Laufvariable
   laeuft gar nicht ueber diesen Weg und verdeckt nicht.
-  Doku `docs/stolpersteine.md` H3, Tests `tests/pruef/variable_wie_builtin.dhtest`.
+  Doku `docs/stolpersteine.md` H3, Tests `tests/pruef/sprache/variable_wie_builtin.dhtest`.
 - **Tastencodes: Buchstaben gehen in BEIDER Schreibweise.** `KEY_A`..`KEY_Z`
   (= 97..122, SDL-Zaehlung) ist die klare Form; `ASC("s")` und `ASC("S")`
   meinen seit 2026-08-31 dieselbe Taste. Vorher galten nur die kleinen, und
@@ -1427,7 +1428,7 @@ Details: docs/rust-runtime.md.
   des Tilemap-Editors tot, ohne Fehler oder Warnung. Ein totes Kuerzel sieht
   aus wie ein vergessener Aufruf, man sucht den Fehler also im eigenen
   Programm. Umsetzung in `map_key` (graphics.rs), Test
-  `tests/pruef/automation.dhtest`
+  `tests/pruef/fenster/automation.dhtest`
   (der hielt vorher das GEGENTEIL fest -- er nannte es in seiner eigenen
   Beschreibung schon einen "Fehler, der beim Schreiben nicht auffaellt").
 - **`dhrt --check` meldet seit 2026-09-03 auch Tippfehler in Variablennamen.**
@@ -1464,7 +1465,7 @@ Details: docs/rust-runtime.md.
   Fehlalarm (`CONST` INNERHALB einer SUB) tauchte erst am Buch-Beispiel
   `tippspiel.dh` auf, nachdem die 208 examples sauber waren.
   Dieser Lauf ist inzwischen ein TEST
-  (`tests/pruef/dhrt_check.dhtest`, Fall "kein programm des repos meldet einen
+  (`tests/pruef/werkzeugkette/dhrt_check.dhtest`, Fall "kein programm des repos meldet einen
   unbekannten namen")
   -- von Hand gelaufen faengt er den naechsten uebersehenen DIM-Zweig nicht.
   **Drei Wege enden in dem Rueckfall, nicht zwei:** `load_var`/`store_var` --
@@ -1472,7 +1473,7 @@ Details: docs/rust-runtime.md.
   `store_var`, es braucht den Zwischenspeicher fuer Feld-/Index-Ziele). Beide
   liefen anfangs an der Erfassung vorbei und blieben still, obwohl die VM ihr
   Ziel in genau demselben Verzeichnis sucht.
-  Tests `tests/pruef/check_unbekannte_namen.dhtest`.
+  Tests `tests/pruef/laufzeit/check_unbekannte_namen.dhtest`.
 - **Neue Builtins/Sprach-Features NUR in dhrt** (`rust/drachenhauch_runtime/src/`):
   Builtin → `builtins.rs`/`vm.rs`; Sprach-Feature → `lexer.rs`/`parser.rs`/
   `ast.rs`/`compiler.rs`/`vm.rs`. Es gibt KEINE „beide Pfade"/Tree-Walker-Parität
@@ -1535,7 +1536,7 @@ Pfade in der `paket.json` eines Pakets gelten ab seinem HERKUNFTSordner;
 Kreise erkennt der aufgeloeste Ort (`schluessel`). Beim Holen wird nichts
 ausgefuehrt, entpackt ueber `zipdatei::entpacke` (Zip-Slip-Schutz). Die
 Ausgaben von `dhrt paket` sind deutsch wie die anderen CLI-Werkzeuge. Tests
-`tests/pruef/paket.dhtest` (9; HTTP ueber `gegenserver.dh` Modus `dateien`,
+`tests/pruef/werkzeugkette/paket.dhtest` (9; HTTP ueber `gegenserver.dh` Modus `dateien`,
 der von `DHRT_START_DIR` aus liefert, weil `dhrt run` in den Ordner der
 Quelle wechselt).
 **In der IDE (2026-10-05):** Fenster `winPak` (Datei -> Pakete des
@@ -1550,7 +1551,7 @@ bzw. meinen nur eigenen Code -- das naechste Holen ueberschriebe Aenderungen
 dort); lesende Stellen fragen `projektDateien(muster, TRUE)`
 (Symbolverzeichnis, `hatByref`, `klassenLesen`, Datei im Projekt oeffnen).
 Eine geoeffnete Paketdatei sagt das in der Statuszeile (`paketVon$`). Tests
-`tests/pruef/werkzeug_ide_pakete.dhtest` (3; die Paketquelle liegt unter
+`tests/pruef/ide/werkzeug_ide_pakete.dhtest` (3; die Paketquelle liegt unter
 `_quelle/`, sonst faende das Symbolverzeichnis die Funktion auch ohne Paket
 -- so blieb die erste Gegenprobe gruen), ein `-C`-Fall in `paket.dhtest`;
 sechs Verfaelschungen der IDE fallen je in ihrem Fall.
@@ -1612,7 +1613,7 @@ Vervollstaendigung). **Gegenproben:** eine Verfaelschung der Rueckgabe-
 Erweiterung oder SINGLE-als-FLOAT IM Uebergang faellt unter x86-64 nicht
 (das Register haelt die unteren Bits richtig) -- geprueft wird an
 `zahl_platz`/`platz_wert` und in den Rust-Tests. Tests
-`tests/pruef/ffi.dhtest` (39; Windows kernel32/user32, sonst die C-Bibliothek
+`tests/pruef/sprache/ffi.dhtest` (39; Windows kernel32/user32, sonst die C-Bibliothek
 auf allen drei Systemen), Rust-Tests in ffi.rs und symbole.rs, Beispiel
 `examples/206_fremde_bibliotheken.dh`, Lehrbuch `79c_bibliotheken.js`.
 **Stufe 2 (2026-10-06):** `TEXT_AUS_ZEIGER$(z [, breit])`,
@@ -1659,7 +1660,7 @@ hinteren, festen Groessen, `struct_feldtyp`; je Dimension ein Eintrag in
 (Tupel (Puffer, Stelle), `struct_zeiger` -> `__ffi`), `FOR EACH` liefert
 Kopien und verbietet, ein Feld der Laufvariable zu schreiben
 (`foreach_kopien`). Nicht: Index direkt auf einem Aufruf (Meldung). Tests
-`tests/pruef/ffi_struct.dhtest`, Rust-Tests in cstruct.rs.
+`tests/pruef/sprache/ffi_struct.dhtest`, Rust-Tests in cstruct.rs.
 **GTK (2026-10-06):** `LIB "a.dll|liba.so.0"` (mehrere Namen, `dateinamen`
 zerlegt an `|`), `LIB name` mit einer CONST (Vorsatz `ffi::LIB_CONST`,
 eingesetzt in `register_ffi` aus `konst_werte`, umbenannt in
@@ -1692,7 +1693,7 @@ hat) und einen Hilfscode in Python, der nie wirft (Fehler nach `_dh_fehler`).
 **Falle fuer Bibliotheken:** kurze lokale Namen (`n`, `h`, `b`) verdecken
 Konstanten des importierenden Programms -- darum dort lange Namen. Beispiel
 `examples/208_python.dh` (Spektrum mit numpy oder reinem Python), Tests
-`tests/pruef/python_einbetten.dhtest` (uebersprungen nur ohne Python, nicht
+`tests/pruef/sprache/python_einbetten.dhtest` (uebersprungen nur ohne Python, nicht
 wenn es nicht startet) und zwei `$`-Faelle in ffi.dhtest; gegen einen Bau
 ohne `$NAME` fallen alle fuenf.
 **Structs als Wert (2026-10-06):** `BYVAL p AS Punkt` (ohne BYVAL bleibt es
@@ -1711,7 +1712,7 @@ ausgerichtet, Laden ueber das Ende eines 12-Byte-Structs bleibt im
 Speicher). Nicht: hinter `...`, HFA ohne freie V-Register (eine Meldung). Rust-Tests rufen `extern "C"`-Funktionen mit
 `#[repr(C)]`-Structs auf (Rust haelt die C-Konvention -- der Vergleich auf
 allen drei CI-Systemen), `plaene_je_konvention` prueft alle drei Plaene auf
-jedem System; Sammlung `tests/pruef/ffi_struct_wert.dhtest` (div/lldiv,
+jedem System; Sammlung `tests/pruef/sprache/ffi_struct_wert.dhtest` (div/lldiv,
 csqrt/cabs(f), PtInRect, CoreGraphics).
 **Im Rueckruf (2026-10-07):** `FUNCTION(BYVAL p AS Punkt) AS Punkt`; Parser
 `{name}`, Signatur `{lage}` (`ffi::rueckruf_lesen` -> `RrTeil`). Der
@@ -1802,7 +1803,7 @@ zaehlt Kinder ab `LBOUND`, `--check` warnt bei festem Index ausserhalb fester
 Grenzen (`Ctx::feste_grenzen`; gesammelt in `grenz_warnungen` und erst am
 Ende des Bereichs ausgegeben, nur wenn das Feld dort nie ersetzt wird und
 nie an einen Aufruf geht -- `grenz_frei`). Tests
-`tests/pruef/feld_untergrenze.dhtest` (27).
+`tests/pruef/sprache/feld_untergrenze.dhtest` (27).
 
 ## Index und Feld auf dem Ergebnis eines Aufrufs (2026-10-09)
 
@@ -1819,7 +1820,7 @@ Original. Der Parser nimmt dafuer Aufrufe in die linke Seite
 noch `[` oder `.` -- `f(1) = 2` bleibt der alte Fehler; `assign_from_lvalue`
 baut `Node::Call` in die Kette). `+=`/`++` darauf ist eine Meldung
 (`ziel_ist_aufruf`): der Aufruf liefe zweimal. Tests
-`tests/pruef/index_auf_aufruf.dhtest` (11; gegen 2026.25 fallen 8, ohne den
+`tests/pruef/sprache/index_auf_aufruf.dhtest` (11; gegen 2026.25 fallen 8, ohne den
 Zwischenspeicher die 4 Faelle, die die Aufrufe zaehlen).
 
 ## Dogfooding: Notizzettel (2026-10-09)
@@ -1898,7 +1899,7 @@ an `self.rl.is_*` (Ausnahme: das Abholen im FLIP selbst). Die Wiedergabe
 zaehlt ihre Maus- und Tastenereignisse mit, damit ein Druck im selben Bild
 der Aufnahme dasselbe ist wie einer von aussen. Bekannte Grenze: zwei
 verschluckte Klicks in DIREKT aufeinanderfolgenden Bildern sieht die gui als
-einen (MOUSE_HIT zaehlt beide). Tests `tests/pruef/klick_im_selben_bild.dhtest`
+einen (MOUSE_HIT zaehlt beide). Tests `tests/pruef/fenster/klick_im_selben_bild.dhtest`
 (9; gegen 2026.18 fallen die 5 neuen, die 4 Gegenproben nicht; echte
 Nachrichten ueber `fenstersender.ps1` `klicks:N:MS`/`tasten:N:MS`),
 Rust-Tests in flanken.rs.
@@ -2119,7 +2120,7 @@ Knopf in der Kopfleiste, die Leinwand zeichnet ganze Stiche als Drills.
 Dialog Strg+B bzw. [Blend...] neben der Garnsuche. **Fund:**
 `farbeHinzufuegen` legte einen Blend mit anderem Strangverhaeltnis still auf
 den vorhandenen zusammen. `--probe-stufe6`, Sammlung
-`tests/pruef/glutfaden_stufe6.dhtest`.
+`tests/pruef/glutfaden/glutfaden_stufe6.dhtest`.
 
 **Stufe 7: der Stickpfad** (2026-10-17). `kern/stickpfad.dh` = PyStickys
 `stitch_path_optimizer`: zeilenweise (Schlange je Zeile), naechster Nachbar
@@ -2150,7 +2151,7 @@ Pfad steht beim Oeffnen schon da, kein Faden, Meldungen unten statt Kasten.
 `PDF_DASH(p, strich_mm [, luecke_mm])` fuer Linien und Umrisse, im PDF
 (krilla `StrokeDash`), im Windows-Druck (geometrischer GDI-Stift) und in
 `PDF_PREVIEW` (die Folge laeuft ueber die Ecken weiter). `--probe-stufe7`
-(Punktproben an den PNGs), Sammlung `tests/pruef/glutfaden_stufe7.dhtest`
+(Punktproben an den PNGs), Sammlung `tests/pruef/glutfaden/glutfaden_stufe7.dhtest`
 (9; neun Verfaelschungen des Kerns und acht des Dialogs fallen je in ihrem
 Fall). **Stolperstein:** ein eben sichtbar gemachtes Widget hat im selben
 Schritt noch keine Groesse -- `gtkFoto` gleich danach meldet
@@ -2186,7 +2187,7 @@ verdeckte Stiche). Oberflaeche `ansicht/analysedialoge.dh`: Knopf
 und CSV, auch Strg+Umschalt+G; Heatmap; Aehnliche Farben; Farbenblindheit
 als Auswahl -- nur `lwRgb` der Zeichenflaeche, die Seitenleiste bleibt wie
 in PySticky). Der Reiter Einkaufsliste kam mit Stufe 9.
-`--probe-stufe8`, Sammlung `tests/pruef/glutfaden_stufe8.dhtest` (8; 13
+`--probe-stufe8`, Sammlung `tests/pruef/glutfaden/glutfaden_stufe8.dhtest` (8; 13
 Verfaelschungen des Kerns und 8 der Oberflaeche fallen je in ihrem Fall).
 
 **Stufe 9: planen und Vorrat** (2026-10-17). `kern/planung.dh` nach
@@ -2230,7 +2231,7 @@ Vorrat hat kein Kuerzel. **Stolperstein im Layout:** zwei dehnbare Spalten
 in einer Zeile teilen den Platz nach ihrer Textlaenge, die Spalten danach
 stehen in jeder Zeile woanders -- `pdReihe` setzt `max_width_chars` 1.
 `--probe-stufe9` (Einstellungsordner ueber APPDATA/HOME umgesetzt), Sammlung
-`tests/pruef/glutfaden_stufe9.dhtest` (7; elf Verfaelschungen von Kern und
+`tests/pruef/glutfaden/glutfaden_stufe9.dhtest` (7; elf Verfaelschungen von Kern und
 Oberflaeche fallen je in ihrem Fall).
 
 **Stufe 10: Muster anlegen und verwalten** (2026-10-17). `kern/verwalten.dh`
@@ -2267,7 +2268,7 @@ dabei steckt in der Laufzeit** (siehe Dogfooding 12, Punkt 5): ein Fehler im
 Zeichnen der Vorschau machte jedes spaetere Zeichnen kaputt. Foto-Falle: ein
 eben umgelegtes Kaestchen erscheint im Foto noch leer (GTK blendet es ein),
 der Zustand stimmt. `--probe-stufe10`, Sammlung
-`tests/pruef/glutfaden_stufe10.dhtest` (6; zwoelf Verfaelschungen von Kern
+`tests/pruef/glutfaden/glutfaden_stufe10.dhtest` (6; zwoelf Verfaelschungen von Kern
 und Oberflaeche fallen je in ihrem Fall).
 
 **Stufe 11: Farb-Harmonien und Muster-Bibliothek** (2026-10-17).
@@ -2304,7 +2305,7 @@ jetzt dieselbe Warnung wie bei zwei DIM, mit der Zeile des CATCH. (2)
 keine Breite; `adLeeren` ist nur fuer Listen (an einer GtkBox lauter
 Gtk-CRITICAL, und nichts wird entfernt); die Dialoge sind hell, gezeichnete
 Karten brauchen helle Farben. `--probe-stufe11` (Ordner "sammlung" neben dem
-Arbeitsordner ueber STARTDIR$), Sammlung `tests/pruef/glutfaden_stufe11.dhtest`
+Arbeitsordner ueber STARTDIR$), Sammlung `tests/pruef/glutfaden/glutfaden_stufe11.dhtest`
 (5; vierzehn Verfaelschungen fallen je in ihrem Fall -- der Gleichstand erst
 mit einer eigenen Palette aus zwei gleichen Farben).
 
@@ -2335,7 +2336,7 @@ Mio. Punkte mit Rueckfrage) und schreibt mit derselben Einstellung wie die
 Ansicht. Diamond Painting: nur Stoff/Pixel, ohne Stoff-Auswahl. **Pruefen
 ohne Qt-Glyphen:** Qts Offscreen-Plattform zeichnet die meisten Symbole als
 leere Kaestchen -- der Symbolplan wird darum an einem Muster ohne Symbole
-verglichen. Sammlung `tests/pruef/glutfaden_stufe12.dhtest` (3: Qt-Farben,
+verglichen. Sammlung `tests/pruef/glutfaden/glutfaden_stufe12.dhtest` (3: Qt-Farben,
 zehn Bilder gegen PySticky mit Grenze je Bild, die Probe samt "Export =
 vbPng" und "der Punkt unter der Maus bleibt"); acht Verfaelschungen fallen
 je in ihrem Fall.
@@ -2382,7 +2383,7 @@ Datei-Dialoge. **Automatisch sichern** (`ansicht/autosichern.dh`):
 + RENAME; ohne Prozessnummer eine zufaellige Sitzung mit Lebenszeichen
 (`.lebt`, alle 30 s) -- angeboten wird beim Start nur, was seit drei Takten
 stumm ist, beim Oeffnen ein Stand neuer als die Datei. Sammlung
-`tests/pruef/glutfaden_stufe13.dhtest` (6: PySticky-Referenz 712 Zeilen,
+`tests/pruef/glutfaden/glutfaden_stufe13.dhtest` (6: PySticky-Referenz 712 Zeilen,
 JSON, Kuerzel, Export, Probe samt Rasterfarben im Bild, drei Startlaeufe);
 21 Verfaelschungen fallen je in ihrem Fall.
 
@@ -2414,7 +2415,7 @@ Zuruecknehmen und Wiederholen stellten die Farbliste um, nicht aber die
 Nummer der aktuellen Farbe -- nach Sortieren und Strg+Z war aus Gelb Blau
 geworden; `werkzeugZurueck`/`Vor` suchen sie jetzt ueber Symbol, Garnname
 und Farbe wieder (`wzFarbeWiederfinden`). Sammlung
-`tests/pruef/glutfaden_stufe14.dhtest` (4: PySticky-Referenz 64 Zeilen,
+`tests/pruef/glutfaden/glutfaden_stufe14.dhtest` (4: PySticky-Referenz 64 Zeilen,
 wobei Ablaeufe mit Verschieben nur Farben und Rueckstiche vergleichen; das
 Bild bleibt bei neun Umordnungen samt gesperrter Ebene und Strg+Z/Strg+Y;
 Loeschen/Zusammenfuehren als ein Schritt; die Probe); elf Verfaelschungen
@@ -2445,7 +2446,7 @@ lwX/lwY/lwZelle setzt; abschaltbar (Strg+Umschalt+L/U, Einstellungen),
 gemerkt als `show_rulers`/`show_minimap` (PySticky merkt Docks im
 Fensterzustand). Start- und Endfarbe wandern bei Farben verwalten und
 Rueckgaengig mit wie die aktuelle Farbe (`wzKennungen`). Die Kuerzel-Tafel
-hat damit 54 Befehle. Sammlung `tests/pruef/glutfaden_stufe15.dhtest` (3:
+hat damit 54 Befehle. Sammlung `tests/pruef/glutfaden/glutfaden_stufe15.dhtest` (3:
 PySticky-Referenz 132 Zeilen, die Minikarte als MD5; Randfaelle des
 Verlaufs; die Probe samt Lineal-Marke im Foto -- gezaehlt nur im Streifen
 des linken Lineals, die Marke ist halbdurchsichtig und die Statuszeile
@@ -2487,7 +2488,7 @@ die Statuszeile gibt (Gtk-CRITICAL); (3) wieder "alloc_needed": die
 Farbleiste setzt ihre Groesse nur bei Aenderung. Die Fotoproben vor Stufe
 16 verbergen die Farbleiste (`fbProbeAus`) -- sie zaehlen Farben im
 Bereich der Zeichenflaeche, und die Leiste zeigt dieselben. Kuerzel-Tafel
-56 Befehle. Sammlung `tests/pruef/glutfaden_stufe16.dhtest` (3: Kern, Probe
+56 Befehle. Sammlung `tests/pruef/glutfaden/glutfaden_stufe16.dhtest` (3: Kern, Probe
 samt Rot im Foto, zwei Startlaeufe ohne Muster); 14 Verfaelschungen
 fallen je in ihrem Fall. **Dazu:** `gtkFoto` ruft vor dem Zeichnen
 `gtk_container_check_resize` auf das Fenster -- GTK vermisst im Takt der
@@ -2528,7 +2529,7 @@ liegen in `daten/symbolnamen.txt`, einmal aus Pythons `unicodedata`
 erzeugt -- die Laufzeit hat keine Unicode-Namen), gegen PySticky
 aufgezeichnet (32 Anfragen gleich); ein Symbol einer anderen Farbe wird
 abgewiesen und der Dialog bleibt offen. Kuerzel-Tafel 57 Befehle (Stufe 13
-neu erzeugt). Sammlung `tests/pruef/glutfaden_stufe17.dhtest` (4: Info und
+neu erzeugt). Sammlung `tests/pruef/glutfaden/glutfaden_stufe17.dhtest` (4: Info und
 Suche gegen PySticky, Grenzen der Texte samt Schritten, Probe); 17
 Verfaelschungen fallen je in ihrem Fall -- "fremde Zaehlung hinten
 angehaengt" blieb im ersten Anlauf gruen, weil die Probe nur 25 ct
@@ -2563,7 +2564,7 @@ der Stufe 15 fiel unter voller Last (2 von 2, allein nie) -- ein Fenster,
 das unter dem Zeiger auf- oder zugeht, schickt Bewegungen, und
 `lwBewegung` setzte damit den laufenden Zug um. Waehrend einer Probe
 uebergeht die Leinwand jetzt die echte Maus (`lwOhneMaus`), danach zwei
-volle Laeufe gruen. Sammlung `tests/pruef/glutfaden_stufe18.dhtest` (3:
+volle Laeufe gruen. Sammlung `tests/pruef/glutfaden/glutfaden_stufe18.dhtest` (3:
 gegen PySticky, Grenzen samt Abweichungen und Schritten, Probe); 13
 Verfaelschungen fallen je in ihrem Fall.
 
@@ -2599,7 +2600,7 @@ auf dem Blatt). `druckenNach` schreibt dieselbe Seite ohne Dialog als PDF
 vorher blieben ihre Kinder fuer immer unsichtbar. Kuerzel-Tafel 70 (elf ohne
 Vorgabe). Die Repo-Pruefung in `dhrt_check.dhtest` laesst
 `examples/glutfaden/ansicht/` aus: das sind Teile von main.dh, kein eigenes
-Programm. Sammlung `tests/pruef/glutfaden_stufe19.dhtest` (4: Export gegen
+Programm. Sammlung `tests/pruef/glutfaden/glutfaden_stufe19.dhtest` (4: Export gegen
 PySticky, Lesen samt Rundweg und Grenzen, Drucklage und Einstellungen,
 Probe); 16 Verfaelschungen fallen je in ihrem Fall -- zwei erst, nachdem
 die Probe die Lage des DRUCKAUFTRAGS (nicht die Rechnung des Kerns) und die
@@ -2642,7 +2643,7 @@ Einstellungsreiter). Die Probe vergleicht die Leinwand als Bild mit sich
 selbst (`v20Bild` + Punktvergleich) statt fester Pixel. **Formatgrenze:**
 eine `--- datei`-Beilage darf kein Leerzeichen im Namen tragen -- die Datei
 "mit leer.pxs" legt der Fall selbst an. Sammlung
-`tests/pruef/glutfaden_stufe20.dhtest` (4); Stufe 13 mit 75 Kuerzeln. Von 19
+`tests/pruef/glutfaden/glutfaden_stufe20.dhtest` (4); Stufe 13 mit 75 Kuerzeln. Von 19
 Verfaelschungen fallen 18; die neunzehnte (Sperre in `ebeneLeeren` weg)
 faengt `zellenAufEbene` mit derselben Pruefung ab. Eine fiel erst nach
 einem Nachtrag: ohne das Uebernehmen vor dem Abbau ging getippter Text bei
@@ -2681,7 +2682,7 @@ unabhaengig vom Thema). **Proben, die an der Installation haengen, sind
 vermieden:** die Ablage-Meldung nennt die gefundenen Formate, die Stufe-20-
 Probe prueft nur ihren Anfang; die Stufe-21-Probe benutzt TIFF, einen
 Standardlader von GdkPixbuf. Kuerzel-Tafel 76. Sammlung
-`tests/pruef/glutfaden_stufe21.dhtest` (3); Stufen 13 und 20 nachgezogen; 18
+`tests/pruef/glutfaden/glutfaden_stufe21.dhtest` (3); Stufen 13 und 20 nachgezogen; 18
 Verfaelschungen fallen je in ihrem Fall.
 
 **Stufe 22: Kleinigkeiten aus PySticky** (2026-10-18). **Laufende
@@ -2711,7 +2712,7 @@ AUS**, PySticky: an -- dort daempft dann jede Farbwahl alle anderen Farben,
 was ohne die Einstellung zu kennen wie ein Fehler aussieht) und
 `stitch_timer_enabled`. **"Neu in Glutfaden"** am Logo-Knopf (der jetzt ein
 Menue zeigt: Ueber, Neu, Tastenkuerzel), Inhalt in `daten/neuigkeiten.txt`
-(`kern.neuigkeitenLesen`). Sammlung `tests/pruef/glutfaden_stufe22.dhtest` (3,
+(`kern.neuigkeitenLesen`). Sammlung `tests/pruef/glutfaden/glutfaden_stufe22.dhtest` (3,
 der erste gegen PySticky: 23 Zuege auf zwei Mustern, Entscheidung und
 Ausfuehrung gleich); Stufe 13 nachgezogen. 24 von 25 Verfaelschungen fallen;
 die 25. (`eigenerOrdner$` nimmt eine Datei als Ordner) ist gleichwertig, weil
@@ -2747,7 +2748,7 @@ rollbaren Bereich mit natuerlicher Breite; sie waechst mit jeder Stufe und
 darf die Fenstergroesse nicht mehr bestimmen. Und: `daten/neuigkeiten.txt`
 waechst mit jeder Stufe -- die Stufe-22-Proben suchen ihren eigenen
 Abschnitt, statt Zahl und Reihenfolge festzuhalten. Sammlung
-`tests/pruef/glutfaden_stufe23.dhtest` (3, der erste ruft PyStickys
+`tests/pruef/glutfaden/glutfaden_stufe23.dhtest` (3, der erste ruft PyStickys
 `snap_position`, `_brush_cells` und `_handle_gesture` mit Stellvertretern auf:
 gleich); Stufen 13 und 20 nachgezogen; 20 von 20 Verfaelschungen fallen.
 
@@ -2776,7 +2777,7 @@ zusammengesetztes Deutsch ("Vor dem {0} sichern?", "wird {1}gestickt")
 laesst sich nicht uebersetzen -- ganze Saetze je Fall
 (`ungesichertFrage$`); (3) Schriftnamen wurden mit eingepackt.
 `daten/neuigkeiten.en.txt` fuer Englisch. Sammlung
-`tests/pruef/glutfaden_sprache.dhtest` (3): der erste liest den QUELLTEXT
+`tests/pruef/glutfaden/glutfaden_sprache.dhtest` (3): der erste liest den QUELLTEXT
 (jedes Literal in tr$/trf$ und jeder Name der Kuerzel-Tafel steht in der
 Tafel, gleiche Platzhalter, keine verwaisten oder doppelten Eintraege, kein
 tr$ mit {0}, kein trf$ ohne) -- ein fehlender Eintrag ist sonst unsichtbar,
@@ -2899,7 +2900,7 @@ Baum. (3) **`GUI_CHANGED` auf einem Baum war stumm**, wenn ein Knoten
 gewaehlt wurde -- der Abdruck (`Gui::abdruck`) kannte die Auswahl des
 Baums nicht (sie liegt in `TreeState`); `pluginWert$` liefert fuer einen
 Baum den gewaehlten Knoten. `PLUGIN_OEFFNEN` ohne Pfad springt im Reiter
-vorn (ungesicherter Text). Tests `tests/pruef/werkzeug_ide_plugin_klassen.dhtest`
+vorn (ungesicherter Text). Tests `tests/pruef/ide/werkzeug_ide_plugin_klassen.dhtest`
 (2: das Plugin aus examples/ in der echten IDE mit echtem Klick, Filter,
 Kopfzeile; allein gestartet endet es gleich), Rust-Test
 `klassen_mit_mitgliedern_ohne_uebersetzen`; Gegenproben (ohne Baum in
@@ -2929,7 +2930,7 @@ angemeldet und geoeffnet; das Muster zaehlt das Wort an der Marke).
 **Text aendern:** `PLUGIN_ERSETZEN(z, s, bz, bs, text$ [, datei$])` und
 `PLUGIN_AUSWAHL_SETZEN` (Nachricht `tue` mit `ersetzen`/`waehlen`, SELECT +
 INSERT = ein Undo-Schritt, mit Datei wird sie erst geoeffnet). Tests
-`tests/pruef/werkzeug_ide_plugin_oekosystem.dhtest` (4); sieben
+`tests/pruef/ide/werkzeug_ide_plugin_oekosystem.dhtest` (4); sieben
 Verfaelschungen fallen.
 
 ## Klassendiagramm (2026-10-25)
@@ -2949,7 +2950,7 @@ Pruefformat:** Text hinter `--- programm` (und den anderen Koepfen ohne
 Inhalt) wurde stillschweigend uebergangen -- der Quelltext eines neuen
 Falls lief so nie, und der Fall schwieg; jetzt ein Fehler, Leerzeilen und
 Kommentare bleiben erlaubt (alle 444 Sammlungen lesen sich weiter ein).
-Tests `tests/pruef/werkzeug_klassendiagramm.dhtest` (4: Ebenen, Lagen,
+Tests `tests/pruef/werkzeuge/werkzeug_klassendiagramm.dhtest` (4: Ebenen, Lagen,
 Sprungwunsch, Bild, die IDE ueber einen echten Werkzeug-Prozess), Rust-Test
 `text_hinter_programm_ist_ein_fehler`; sechs Verfaelschungen fallen.
 
@@ -2977,7 +2978,7 @@ wenn Nummer UND Stelle noch stimmen (`pluginHoverAntwort`) -- die IDE wartet
 nicht. **Falle beim Testen:** steht die Maus auf einem Befund, enthaelt der
 Tooltip schon dessen Meldung und "Strg+. schlaegt eine Korrektur vor." --
 ein Warten auf ein Wort aus der Meldung kam zu frueh. Tests
-`tests/pruef/werkzeug_ide_plugin_codehilfen.dhtest` (echte Maus ueber
+`tests/pruef/ide/werkzeug_ide_plugin_codehilfen.dhtest` (echte Maus ueber
 `_hilfen/idemaus.dh`; Gegenprobe Zeichenkette ohne Hover); vier
 Verfaelschungen fallen, die Pruefung der Stelle bei der Antwort ist
 ungedeckt (der Test bewegt die Maus nicht vor der Antwort weg).
@@ -3006,7 +3007,7 @@ IDE nichts kannte (`vervollFensterZeigen` herausgeloest). **Holen:**
 dritter Ort `plugins/pakete/<name>/` (`plugGeholt`), Knoepfe Holen/Entfernen
 in der Verwaltung -> `dhrt paket -C <pluginOrdner> hole <quelle>` bzw.
 `entferne` als Prozess `plugHolProz`, danach `pluginsNeuLaden`. Tests
-`tests/pruef/plugin_probe.dhtest` (4: die drei mitgelieferten Plugins und
+`tests/pruef/werkzeugkette/plugin_probe.dhtest` (4: die drei mitgelieferten Plugins und
 ein eigenes, ohne IDE) und zwei Faelle mehr in
 `werkzeug_ide_plugin_oekosystem.dhtest`; fuenf Verfaelschungen (ohne
 Begruessung, ohne Frage, ohne `pakete`, Probe ohne Antworten, Bibliothek
@@ -3093,7 +3094,7 @@ will INTEGER-Felder). **Falle:** `DH_OHNE_AUDIO` kennt die Laufzeit nicht --
 ohne `tonDa()` haette das Startbild die Bilder der Szenen-Pruefungen
 verbraucht. **Falle:** `fragTexCoord.y` zaehlt hier
 nach oben -- kein `uv.y = -uv.y`. Etwa 60 Bilder je Sekunde in 1280x720.
-Tests `tests/pruef/beispiel_nachtflug.dhtest` (7: die WAV mit `--- ton`,
+Tests `tests/pruef/beispiele/beispiel_nachtflug.dhtest` (7: die WAV mit `--- ton`,
 jede Szene am Bildschirmfoto); ein kaputter Shader und eine Fassung ohne
 Panorama fallen. **Sechste Runde (2026-10-27, Wunsch des Nutzers):** der
 Rueckweg zur Erde, 148 statt 92 Takte (4:41): Orbit-Breakdown (80..96,
@@ -3196,7 +3197,7 @@ ausgeblendet. **Zwei Fallen beim Bau:** ein hohles Zimmer als
 `-sdBox` ist von aussen negativ (die Kamera vor dem Fenster sah nur Himmel)
 -- eine Schale aus zwei Kisten; und ein Richtungsvektor, der nur fast
 normiert ist (1.002), macht den Mond fuenfmal groesser, weil `dot` dann
-ueber 1 geht. Tests `tests/pruef/beispiel_lichterglanz.dhtest` (16: WAV,
+ueber 1 geht. Tests `tests/pruef/beispiele/beispiel_lichterglanz.dhtest` (16: WAV,
 neun Szenenbilder, Stille Nacht und Kugeln, Glockenmotiv, Harmonie,
 liegender Schnee, sparsam samt Gegenprobe).
 
@@ -3217,7 +3218,7 @@ eingefaerbt; Verweise auf andere Dateien gehen zu GitHub, Bilder zu
 raw.githubusercontent), `llms.txt`/`llms-full.txt`, `sitemap.xml`,
 `robots.txt`. **`SYNTAX_SPANS` gehoert seither zu den CODE_-Befehlen
 (`try_hintergrund`) statt zur Grafik** -- ohne Fenster war es "im Rust-Kern
-noch nicht verfuegbar". Tests `tests/pruef/werkzeug_website.dhtest`
+noch nicht verfuegbar". Tests `tests/pruef/werkzeuge/werkzeug_website.dhtest`
 (Markdown-Stuecke an Beilagen; am echten Handbuch trifft jeder der ~1450
 lokalen Verweise samt Marke -- mit falscher Markenregel 135 tote). Was
 ausserhalb des Repositorys zu tun ist: `docs/entwurf-sichtbarkeit.md`.
@@ -3254,8 +3255,8 @@ CI, bis dahin auch die macOS-/Linux-Pakete) beim Start. Neu
 auf; an einer `.dh`-Datei faellt die Zeile weg, wenn es sie nicht gibt) und
 **`MODULE_AVAILABLE(modul$)`** (`preprocess::modul_verfuegbar`). Die Pakete
 fuer macOS/Linux bauen seither mit `serial midi` (Linux: `libudev-dev`).
-Tests `tests/pruef/import_optional.dhtest` (6; vier Verfaelschungen fallen
-je in ihrem Fall) und `tests/pruef/werkzeug_ide_seriell.dhtest` (4: ein
+Tests `tests/pruef/sprache/import_optional.dhtest` (6; vier Verfaelschungen fallen
+je in ihrem Fall) und `tests/pruef/ide/werkzeug_ide_seriell.dhtest` (4: ein
 Einschub spielt das Geraet ueber `NET_TCP_LISTEN(0)` + `NET_LISTENER_PORT`;
 fuenf Verfaelschungen der IDE fallen je in ihrem Fall). Mit echtem Arduino
 ungeprueft.
@@ -3286,7 +3287,7 @@ fuenften Byte (kein Zweierkomplement, wie firmata.js), Kommazahlen als
 "fertig" (0x0A) setzt `stepper_laeuft` zurueck. Beispiel 147 nimmt das Ziel
 als Argument -- dabei fiel ein alter Fehler auf: `INSTR(ports, ",") > 0` und
 `LEFT$(ports, komma - 1)` machten aus "COM3,COM4" "COM" (INSTR zaehlt ab 0,
--1 = nicht da). Tests `tests/pruef/modules_firmata.dhtest` (15): das Board
+-1 = nicht da). Tests `tests/pruef/geraete/modules_firmata.dhtest` (15): das Board
 spielt `_hilfen/firmataboard.dh` im SELBEN Programm (`NET_TCP_LISTEN`, dann
 `FIRMATA_OPEN("tcp:...")`, dann `NET_TCP_ACCEPT` -- die Verbindung steht
 schon im Rueckstau) und vergleicht die Bytes in Hex; Beispiel 147 als
@@ -3342,7 +3343,7 @@ ein gelesener Eingang; `GPIO_WATCH` + `GPIO_NEXT`/`GPIO_EVENT_*` holen
 Flanken mit Kernel-Zeit (Schlange 1024, aelteste faellt weg), entprellt auf
 Wunsch der Kernel. Die ioctl-Strukturen haben `const`-Asserts auf die
 Groessen des Kernels (die Groesse steckt in der Nummer). Tests
-`tests/pruef/pins.dhtest` (11): Faelle "sim" gegen `gpio-sim` und `i2c-stub`,
+`tests/pruef/geraete/pins.dhtest` (11): Faelle "sim" gegen `gpio-sim` und `i2c-stub`,
 die `tests/pruef/_hilfen/pins_simulieren.sh` auf dem Linux-Laeufer der CI
 einrichtet (DH_TEST_GPIO/_GPIO_SIM/_I2C; ohne sie ueberspringen sie sich --
 lokal geht es nicht, der WSL-Kern hat beides nicht); 6 Rust-Tests.
@@ -3374,7 +3375,7 @@ Punkt -- kein fester Versatz bildet das nach); zwei Bildproben
 unter GLES und stehen nicht im ARM-Lauf. Vergleich ueber 122 Grafik-
 Sammlungen: Linux-GL und Linux-GLES fallen danach exakt gleich (die
 uebrigen Unterschiede zu Windows sind Linux-Eigenheiten). Tests
-`tests/pruef/gles.dhtest` (4); drei Gegenproben (NULL-Textur, leere
+`tests/pruef/grafik/gles.dhtest` (4); drei Gegenproben (NULL-Textur, leere
 Zeichenbilder, kein Umschreiben der Shader) fallen je in ihrem Fall.
 Doku `docs/raspberry-pi.md`, `docs/module-pins.md`, Beispiel
 `examples/211_raspberry_pi.dh`, Lehrbuch Kapitel 76.
@@ -3396,7 +3397,7 @@ ohne Ausgabe. Ohne laufendes Mikrofon ist jede Abfrage ein Fehler (eine
 stille Null waere "es ist leise"). **`DHRT_MIKROFON=datei.wav`** spielt ein
 Mikrofon (einziges Geraet "Datei: name", Echtzeit, Schleife, derselbe Puffer)
 -- dieser Rechner hat keinen Eingang, die CI auch nicht. Tests
-`tests/pruef/mikrofon.dhtest` (13; Toene schreibt `_hilfen/tonwav.dh` als
+`tests/pruef/ton/mikrofon.dhtest` (13; Toene schreibt `_hilfen/tonwav.dh` als
 Bibliothek, eingebunden per Beilage), 4 Rust-Tests; vier Verfaelschungen
 (Spitze nie zurueck, Aufnahme ohne Grenze, Tonhoehe ohne Feinrechnung,
 Wellenform die aeltesten) fallen je in ihrem Fall -- die Tonhoehen-Probe
@@ -3422,7 +3423,7 @@ geprueft hier fuer Linux in der WSL und fuer macOS in einer Kopie ohne
 mimalloc (dessen C-Bau scheitert fuer fremde Ziele). Linux-Paketlauf:
 `tests/pruef/_hilfen/kamera_simulieren.sh` laedt **vivid** (Testtreiber des
 Kernels, linux-modules-extra) und setzt `DH_TEST_WEBCAM=vivid`. Tests
-`tests/pruef/webcam.dhtest` (10, zwei davon gegen vivid), 6 Rust-Tests.
+`tests/pruef/geraete/webcam.dhtest` (10, zwei davon gegen vivid), 6 Rust-Tests.
 **Ungeprueft:** jede echte Kamera (dieser Rechner hat keine) und der
 cpal-Eingang mit echtem Mikrofon. macOS: Info.plist traegt
 NSMicrophone-/NSCameraUsageDescription, `dhrt.entitlements` die
@@ -3458,7 +3459,7 @@ SO_REUSEADDR/-PORT, Feature `all`, schon im Baum); Wiederholung nach 0/300/
 direkt mit Kennung, wenn die Frage nicht von 5353 kam, sonst an die Gruppe,
 meldet sich beim Ankuendigen einmal von selbst und zieht beim Stopp mit
 TTL 0 zurueck. **`DHRT_MDNS_PORT=n`** laesst beides ueber 127.0.0.1:n
-laufen. Tests `tests/pruef/websocket.dhtest` (7: Gegenserver
+laufen. Tests `tests/pruef/geraete/websocket.dhtest` (7: Gegenserver
 `_hilfen/wsecho.dh` als Prozess, roher Client ueber net mit dem
 RFC-Schluessel, **Node ab 22 als fremder Client**), `osc.dhtest` (5:
 Leitungsformat Byte fuer Byte gegen die Spezifikation, von Hand gebaute
@@ -3547,7 +3548,7 @@ Kanaele bleiben unberuehrt. Dieselbe Rechnung fuer `Cmd::GradientRect`
 (`GRADIENTV`/`GRADIENTH`, auch die Farbwaehler der gui), dort vorher raylibs
 GPU-Verlauf mit denselben Baendern. Nicht angefasst: `Gradient4`,
 `CircleGradient`, `Lichtfleck` (GPU-Dreiecke). Tests
-`tests/pruef/gui_verlauf_glatt.dhtest` (zaehlt "harte Kanten" = acht gleiche
+`tests/pruef/gui/gui_verlauf_glatt.dhtest` (zaehlt "harte Kanten" = acht gleiche
 Zeilen, dann acht andere; die alte Laufzeit hat 23 bzw. 16) und drei
 Rust-Tests `verlauf_tests`.
 
@@ -3606,7 +3607,7 @@ eine lokale `x0` in einer SUB verdeckt die Konstante `X0` (`--check` sagt
 es); `bereiche/*.dh` nimmt `dhrt_check.dhtest` aus wie Glutfadens ansicht/.
 **Beim Pruefen:** ein offener Browser-Tab mit der Seite verbindet sich alle
 2 s neu und zaehlt als zweites Handy. Tests
-`tests/pruef/beispiel_bastelzentrale.dhtest` (2: ein Bild je Bereich samt
+`tests/pruef/beispiele/beispiel_bastelzentrale.dhtest` (2: ein Bild je Bereich samt
 Probekamera und Lauflicht; die Bastelzentrale als Kind, der Fall ist Browser,
 Handy und OSC-App gegen dieselben Werte); sechs Verfaelschungen fallen je in
 ihrem Fall.
@@ -3634,10 +3635,10 @@ war bei negativen Zahlen nicht `a`; **`\` rundet jetzt nach unten wie FLOOR**
 Notizen von 2026.38. Das Handbuch sagte ausserdem, `\` nehme Kommazahlen --
 es ist ein Fehler. (2) Die imgfx-Doku nannte `IMAGE_FROM_BUFFER`/`_TO_BUFFER`
 "core, kein IMPORT", `--check` verlangt `IMPORT "imgfx"`. Tests
-`tests/pruef/beispiel_karten.dhtest` (5: Kern gegen JavaScript, Kacheln vom
+`tests/pruef/beispiele/beispiel_karten.dhtest` (5: Kern gegen JavaScript, Kacheln vom
 Gegenserver am Bild der Ausfuhr samt Platte und Vergessen, Abbruch mit
 langsamem Server, Spur/Marker/Bild/PDF, echte Maus aus einer Aufnahme) und
-`tests/pruef/ganzzahl_division.dhtest` (VM, Falten, Maschinencode mit
+`tests/pruef/sprache/ganzzahl_division.dhtest` (VM, Falten, Maschinencode mit
 DHRT_JIT=immer, Fehler); acht Verfaelschungen des Beispiels und die alte
 Laufzeit bzw. ein Bau mit altem Maschinencode fallen je in ihrem Fall.
 
@@ -3659,7 +3660,7 @@ rechnete dann (ein Schritt kostete 4 statt 2 Bilder). **Falle:**
 `dhrt bild` wechselt in den Ordner des Programms -- ein relatives Ziel
 landet dort, im Repository; immer `CWD$() + "/..."`. Argumente hinter `--`
 reicht `dhrt bild` an das Programm weiter. Tests
-`tests/pruef/beispiel_chip8.dhtest` (12; drei Verfaelschungen des Kerns
+`tests/pruef/beispiele/beispiel_chip8.dhtest` (12; drei Verfaelschungen des Kerns
 fallen je in ihrem Fall), Helfer `_hilfen/chip8.dh`.
 
 ## Ton-Werkzeuge ueberarbeitet (2026-10-29)
@@ -3726,7 +3727,7 @@ Music eingebettet (`schriften.rs`, `daten/schriften/`, 124 KB; der
 PDF-Fehlertext nennt sie mit, die OFL steht in den Drittanbieter-Lizenzen
 ueber `installer/lizenzen.dh`). Die drei Werkzeuge benutzen alles davon; die
 Kopie der Schrift in `examples/assets/` ist weg. Tests
-`tests/pruef/schrift_bausteine.dhtest` (8; gegen 2026.37 fallen 7, der
+`tests/pruef/grafik/schrift_bausteine.dhtest` (8; gegen 2026.37 fallen 7, der
 achte ist die Gegenprobe ohne GUI_FONT).
 
 ## Grafik-Editoren aufgefrischt (2026-10-29)
@@ -3745,7 +3746,7 @@ Sinnbilder (`stift`, `radierer`, `fuellen`, `linie`, `rechteck`, `ellipse`,
 `wuerfel`, `raster`, `auge`, `auge_zu`, `spiegeln`, `drehen`) und
 `DRAWIMAGEPARTEX(..., farbe)` -- das zehnte Argument toent, sein Alpha ist
 die Deckkraft (`Cmd::TexturePartExTint`); ein elftes ist jetzt ein Fehler
-(2026.37 schluckte es still). Tests `tests/pruef/drawimagepartex.dhtest`.
+(2026.37 schluckte es still). Tests `tests/pruef/grafik/drawimagepartex.dhtest`.
 
 **Partikel:** Farbwaehler statt sechs RGB-Reglern (`p(idx)`/`setzeP` fuehren
 die Farben weiter als sechs Anteile, damit Vorlagen, Verlauf und `.ini`
@@ -3809,7 +3810,7 @@ jedem Bild seines Nachgleitens** (der Abdruck nahm `value`, das waehrend
 der Animation wandert -- jetzt zaehlt nur `checked`); **die gewaehlte
 Zeile eines Baums war im hellen Thema unlesbar** (dunkle Schrift auf der
 Auswahl -- jetzt `lesbar_auf` wie bei der Liste). Tests
-`tests/pruef/werkzeug_studio.dhtest` (7, echte Klicks: Ablegen per Klick
+`tests/pruef/studio/werkzeug_studio.dhtest` (7, echte Klicks: Ablegen per Klick
 und Zug, Einrasten samt rosa Linie im Bild, Griff, Anordnen,
 Rueckgaengig/Wiederholen, Inspektor; Helfer `_hilfen/studiolauf.dh`
 misst in einem ersten Lauf und baut daraus die Aufnahme), je ein Fall in
@@ -3854,7 +3855,7 @@ geschlossen wird nichts; `.dhform` `tabctl.schliessbar`) und
 `GUI_TREE_ITEM_RECT(tree, node)` (wie die Listenzeile, fuer echte Klicks
 in den Navigator). Fehler am Code und Vervollstaendigung kommen mit Stufe
 3 (brauchen die erzeugten Basisklassen). Tests
-`tests/pruef/werkzeug_studio2.dhtest` (8: drei ohne Fenster am
+`tests/pruef/studio/werkzeug_studio2.dhtest` (8: drei ohne Fenster am
 Projektmodell, fuenf mit echten Klicks -- Navigator oeffnet Methode und
 getippter Code landet in der Datei, Doppelklick legt ein Ereignis an,
 Kreuz schliesst, Fenster und Methode hinzufuegen, Umbenennen im Inspektor),
@@ -3892,7 +3893,7 @@ der Export kopierte jede per IMPORT eingebundene `.dh` als "referenzierte
 Datei" neben die Exe -- der ganze Quelltext lag mit im Bau; jetzt
 uebergeht `bundle_referenced_assets` IMPORT-Zeilen (Rust-Test
 `export_kopiert_importierte_quellen_nicht`). Tests
-`tests/pruef/werkzeug_studio3.dhtest` (5: Zeilenkarte ohne Fenster, F5
+`tests/pruef/studio/werkzeug_studio3.dhtest` (5: Zeilenkarte ohne Fenster, F5
 erzeugt + `--check` leer + ein Klick im erzeugten Programm ruft das
 Ereignis, Laufzeitfehler an Methode/Zeile trotz anders geschriebener Datei,
 Uebersetzungsfehler haelt an + Klick in die Problemliste springt "am Ende",
@@ -3940,7 +3941,7 @@ Stapel, F10/F11/Umschalt+F11, Umschalt+F5 beendet. **Falle:** ein
 gesperrter Menuepunkt nimmt auch sein Kuerzel nicht an -- `debugKnoepfe`
 gibt Schritt/Hinein/Heraus beim Halt frei, sonst ging F10 ins Leere (vom
 Test gefunden). Die Menueleiste verschiebt den Inhalt um 26 Punkte (auch im
-erzeugten Programm). Tests `tests/pruef/werkzeug_studio4.dhtest` (5: Timer
+erzeugten Programm). Tests `tests/pruef/studio/werkzeug_studio4.dhtest` (5: Timer
 aus der Bibliothek ueber Suche + Doppelklick, Timer waehlen/Inspektor/Entf,
 Menue-Editor, das erzeugte Programm mit Frage + Enter, modalem Fenster,
 Timer, Strg+H und Bild-Pixel, Debugger mit Halt/Schritt/Weiter); zehn
@@ -3981,7 +3982,7 @@ Argument mit dem Projektordner, wenn dort `projekt.dhstudio` liegt),
 **Form-Designer 197**: Datei -> Im Drachenhauch Studio oeffnen
 (Strg+Umschalt+O, `studioPfad$`: DH_IDE_WURZEL, neben der Laufzeit,
 macOS-Resources, `../studio`), ohne Datei ein Hinweis in der Statuszeile.
-Tests `tests/pruef/werkzeug_studio5.dhtest` (3; das gestartete Studio
+Tests `tests/pruef/studio/werkzeug_studio5.dhtest` (3; das gestartete Studio
 erbt `DH_STUDIO_LOG`, der Fall wartet auf "projekt geladen" und beendet
 es), Zeilen in `werkzeug_paket.dhtest` (Linux-Ordner, macOS-Bundle,
 install.sh, `--studio` mit der echten Laufzeit). Der Installer baut mit
@@ -4004,7 +4005,7 @@ anderer Parameterzahl ueberschreibt (gefunden am Beispiel: `SUB
 zeigen(kid)` verdeckte `StudioFenster.Zeigen()`; `Init` ausgenommen, Zeile
 = eine vor der ersten Anweisung des Rumpfs). Die Repo-Durchlaeufe in
 `dhrt_check.dhtest` lassen Ordner mit `projekt.dhstudio` aus. Tests
-`tests/pruef/werkzeug_studio_beispiel.dhtest` (2: Rundweg durch das Modell;
+`tests/pruef/studio/werkzeug_studio_beispiel.dhtest` (2: Rundweg durch das Modell;
 F5 im Studio + `--check` + eine Probe, die statt `studioLauf` die Teile
 direkt aufruft -- Daten, Rundung, UNIQUE-Rollback, Liste, PDF, CSV,
 Bindung, Regeln, RechnungFenster), ein Fall in
@@ -4030,7 +4031,7 @@ dafuer eindeutig werden ("Wiederholt sich" fuer den Timer, "Anhalten" am
 Debugger -- sonst hiessen Redo/Repeat bzw. Quit/Stop gleich). Der Testhelfer
 `studiolauf.dh` setzt `DH_STUDIO_KONFIG` in den Fallordner ("-" = keine).
 `DH_STUDIO_SPRACHPROBE=1` oeffnet jeden Dialog und protokolliert Texte und
-fehlende Uebersetzungen. Tests `tests/pruef/werkzeug_studio_englisch.dhtest`
+fehlende Uebersetzungen. Tests `tests/pruef/studio/werkzeug_studio_englisch.dhtest`
 (5: Tafel gegen den Quelltext, Probe englisch/deutsch, Umschalten, Herkunft
 der Sprache); acht Verfaelschungen fallen je in ihrem Fall.
 
@@ -4055,7 +4056,7 @@ behaelter, erster)`; das Fenster legt je Instanz ein Objekt an, ruft je Bild
 `studioLegen` (Teile nach Ankern, `studioAchse` = `teilLage`) und
 `studioTakt`, `Geoeffnet` der Controls vor dem des Fensters, `Zumachen`
 setzt `studioOffen` der Controls zurueck. Reihenfolge: Controls vor App und
-Fenstern. Tests `tests/pruef/werkzeug_studio_controls.dhtest` (4: zwei
+Fenstern. Tests `tests/pruef/studio/werkzeug_studio_controls.dhtest` (4: zwei
 Instanzen im erzeugten Programm, eine in einer Zeile gestreckt; Vorschau
 nach Ankern; Ablegen aus der Bibliothek; Klick auf einen Teil waehlt die
 Instanz); sieben Verfaelschungen fallen je in ihrem Fall.
@@ -4135,7 +4136,7 @@ vor ihnen) -- kein Knopf auf einer Seite meldete GUI_CLICKED, kein Feld
 bekam per Klick den Fokus; der Kommentar "unter den Koepfen gehoert die
 Flaeche den Kindern" stand im Press-Zweig, der erst nach dem Treffer kam.
 Jetzt in `luft_fuer_kinder`. Tests
-`tests/pruef/werkzeug_studio_datenbank.dhtest` (8: Kern, Neuaufbau mit
+`tests/pruef/studio/werkzeug_studio_datenbank.dhtest` (8: Kern, Neuaufbau mit
 fremden Spalten, Werte je Art, erzeugtes Programm an aelterer Datei,
 Projekt lesen/schreiben, Klicks ins Daten- und Spalten-Gitter, F5 + Bauen;
 elf Verfaelschungen fallen je in ihrem Fall), ein Fall in
@@ -4162,7 +4163,7 @@ oder Spalte oeffnet erst beim LOSLASSEN den Reiter (sonst waere das Layout
 weg, bevor der Zug beginnt), mit Tasten gewaehlt sofort. Inspektor-Gruppe
 Daten mit Auswahlen aus dem Projekt (`datenWahlFuellen`, Eintrag 0 =
 "(keine)" = Schluessel weg); eine Datenquelle setzt den Tabellenkopf im
-Entwurf (`quellKopfSetzen`). Tests `tests/pruef/werkzeug_studio_datenbank2.dhtest`
+Entwurf (`quellKopfSetzen`). Tests `tests/pruef/studio/werkzeug_studio_datenbank2.dhtest`
 (4: Methoden + Listen + ein Klick, den das erzeugte Programm selbst per
 Aufnahme macht; Tabelle ziehen + F5; Doppelklick neben einer fremden
 Tabelle; Auswahlen im Inspektor per Tastatur); zwoelf Verfaelschungen fallen
@@ -4194,7 +4195,7 @@ der Quelle), `studio_absteigend`, `studio_filter` (an der Datei geprueft,
 `filterPruefen` -> GUI_SET_ERROR), `studio_suchfeld` (Textfelder des
 Fensters). **Testfalle:** Knoten unter dem sichtbaren Navigator haben eine
 Lage im Protokoll, nehmen aber keinen Klick an -- Projekte in Tests klein
-halten. Tests `tests/pruef/werkzeug_studio_datenbank3.dhtest` (7); 16
+halten. Tests `tests/pruef/studio/werkzeug_studio_datenbank3.dhtest` (7); 16
 Verfaelschungen fallen je in ihrem Fall (Sortieren erst mit Testdaten, bei
 denen Name und id verschieden ordnen). **Umbenennen im gebauten Programm:**
 `dbUmbenennungMerken` haengt je Umbenennung `{art, tabelle, alt, neu}` an
@@ -4579,7 +4580,7 @@ und `_korrektur` liefen so parallel) und ist jetzt ein Fehler. Nebenfund:
 die Schnellkorrektur der IDE merkte sich eine NUMMER in `probKorr`, die jede
 Pruefung neu baut -- aenderte sich der Text bei offener Auswahl, brach Enter
 mit einem JSON-Fehler ab; jetzt gilt ein Angebot nur fuer seinen Text
-(`korrAngebote`/`korrText`). Tests `tests/pruef/stillfenster.dhtest`
+(`korrAngebote`/`korrText`). Tests `tests/pruef/laufzeit/stillfenster.dhtest`
 (fremder Leser: Vordergrund, Treffer in der Mitte, WS_EX_TRANSPARENT; die
 Vordergrund-Frage schwankt ohne den Schalter, darum die Gegenprobe am Stil)
 und ein Fall in `werkzeug_ide_korrektur.dhtest`.
@@ -4602,7 +4603,7 @@ Ausgabezeilen). **Die Nachkommen sind der Punkt:** in der Gegenprobe ohne `/T`
 lebte das Kind des Falls weiter und hielt die geerbte Ausgabeleitung des
 Laeufers offen -- die Pipeline hing, bis es von Hand beendet war. Gemessen:
 ein voller Lauf mit `--zeitgrenze 60` hat keinen Fall darueber, die Vorgabe
-laesst das Fuenffache. Tests `tests/pruef/dhrt_test_zeitgrenze.dhtest` (5,
+laesst das Fuenffache. Tests `tests/pruef/werkzeugkette/dhrt_test_zeitgrenze.dhtest` (5,
 seriell; die Kinder-Probe ueber eine Pulsdatei), Rust-Test
 `zeitgrenze_im_kopf_und_je_fall`. Nebenbefund: `input_polish` "printable key
 uses the keyboard layout" faellt auch EINZELN sporadisch ('Á' statt 'A', etwa
@@ -4807,7 +4808,7 @@ und der Rest schlicht (`plus_kette`, `add_store_ziel`). `Value::str_rc` nimmt
 `impl Into<String>` -- ein fertiger `String` geht ohne Kopie hinein. **Falle:**
 die Typpruefung beim Speichern (`passend!`) MUSS ein Makro bleiben; als
 Funktion wurde sie nicht eingebettet und `z = z + i` war 25 % langsamer.
-Tests `tests/pruef/zeichenketten_anhaengen.dhtest`, Doku
+Tests `tests/pruef/sprache/zeichenketten_anhaengen.dhtest`, Doku
 `docs/entwurf-anwendungen-und-tempo.md` (1a).
 
 **Felder, Elemente, MAP-Werte, BYREF (2026-10-20):** `k.text = k.text + e`,
@@ -4845,7 +4846,7 @@ der Name in `builtin_rufen` vom Merken ausgenommen werden -- wie `SORT`
 (FUNCREF -> `try_array_hof`, Wahrheitswert -> reiner Befehl). Neue Familie =
 neue Nummer in `familie_rufen` UND `BUILTIN_FAMILIEN` anpassen. Eine Nummer
 je Befehl lohnt nicht: gemessen kostet Arm 494 des grossen `match` so viel wie
-Arm 10. Tests `tests/pruef/builtin_familien.dhtest`.
+Arm 10. Tests `tests/pruef/laufzeit/builtin_familien.dhtest`.
 
 ## Speicher und kleine Wege (2026-10-21)
 
@@ -4867,7 +4868,7 @@ Compilers; Wahrheitswerte wie CONTAINS bewusst nicht). (4)
 `Value::str_stueck`: MID$/LEFT$/RIGHT$/CHR$ liefern ein einzelnes
 ASCII-Zeichen und "" aus einer Tafel je Faden statt neu angelegt. Teilen ist
 harmlos, angehaengt wird an Ort und Stelle nur ohne zweiten Halter. Tests
-`tests/pruef/array_literal.dhtest` (letzter Fall).
+`tests/pruef/sprache/array_literal.dhtest` (letzter Fall).
 
 ## Globale Felder ueber Plaetze (2026-09-24)
 
@@ -4882,7 +4883,7 @@ ein NEUES Feld an. Ein leerer Platz meldet sich mit dem Namen der Variable
 (`Program::global_names`, vom Compiler als `global_names` im .dhc,
 `Vm::global_ungesetzt`) -- der Name steht HINTER dem alten Text, weil
 `task.dhtest`/`dhrt_call.dhtest` ihn pruefen. Tests
-`tests/pruef/globale_felder.dhtest`.
+`tests/pruef/sprache/globale_felder.dhtest`.
 
 ## Felder und PROPERTYs von Objekten (2026-09-24)
 
@@ -4899,7 +4900,7 @@ weg. `Self.n = Self.n + 1`: 78 -> 55 ms je Million, PROPERTY 178 -> 111 ms.
 Sperre vor `coerce` (`Self.naechster = Self`). Offen: CALL_METHOD sucht die
 Methode je Aufruf ueber die Kette und legt per `split_off` eine neue
 Argumentliste an (wie jeder Funktionsaufruf). Tests
-`tests/pruef/objektfelder.dhtest` (auf beiden Laufzeiten gleich; Gegenprobe
+`tests/pruef/sprache/objektfelder.dhtest` (auf beiden Laufzeiten gleich; Gegenprobe
 mit falscher Aufloesung bzw. ohne Kette: 3 Faelle fallen).
 
 ## Feste Lage der Objektfelder (2026-09-25, M4 Schritt 4a)
@@ -4915,7 +4916,7 @@ nicht der Klassenname. Wer ein Feld liest oder schreibt, geht ueber
 `feld_platz`; eine PROPERTY darf NIE in den Merkplatz. `objekte.dh`
 125 -> 95 ms; `ganzzahl.dh` +4 % durch die Codelage (gemessen, drei
 Aufteilungen probiert, siehe `docs/entwurf-maschinencode.md` M4). Tests
-`tests/pruef/objektlage.dhtest`.
+`tests/pruef/sprache/objektlage.dhtest`.
 
 ## Aufrufe ohne Zwischenliste, Methoden mit Merkplatz (2026-09-24)
 
@@ -4931,7 +4932,7 @@ wird ueber den NAMEN (`ClassInfo::name`), weil jedes Objekt eine eigene Kopie
 des Klassennamens traegt. **Der Namensvergleich ist die Sicherung** --
 ohne ihn ruft an einer Stelle mit wechselnden Klassen jedes Objekt die
 Methode der ersten (Gegenprobe im Test). fib(30) 280 -> 228 ms, Methode
-96 -> 86 ms. Tests `tests/pruef/aufrufe.dhtest`.
+96 -> 86 ms. Tests `tests/pruef/laufzeit/aufrufe.dhtest`.
 
 ## Konstanten falten (2026-09-24)
 
@@ -4950,7 +4951,7 @@ nie einsetzen); ein lokaler Platz oder ein Feld gleichen Namens verdeckt.
 jetzt CONSTs mit festem Wert; `GLOBAL_UNGESETZT` sagt das. `x + 2 * FAKTOR`:
 225 -> 150 ms je 10 Mio. **Nebenbefund, nicht angefasst:** `statischer_typ`
 nimmt fuer `/` immer FLOAT an, die Laufzeit liefert bei glatter Teilung aber
-INTEGER (`480 / 2` = 240). Tests `tests/pruef/konstanten_falten.dhtest`.
+INTEGER (`480 / 2` = 240). Tests `tests/pruef/sprache/konstanten_falten.dhtest`.
 
 ## `dhrt run` ohne JSON-Umweg (2026-09-24)
 
@@ -4964,7 +4965,7 @@ UEBERNOMMEN, nicht kopiert); daraus macht `zu_json` das .dhc-JSON (`--export`,
 Elemente, Merkplaetze, Aufruf-Indizes, PROPERTY-Tabellen) -- wer dort etwas
 nachtraegt, muss es nur einmal tun. `add_const` sucht Dubletten ueber
 `Ctx::const_index` (JSON-Text als Schluessel) statt linear. IDE-Start
-128 -> 98 ms. Tests `tests/pruef/direkt_und_dhc.dhtest` -- **Falle beim
+128 -> 98 ms. Tests `tests/pruef/laufzeit/direkt_und_dhc.dhtest` -- **Falle beim
 Testen:** Vorgabewerte eines direkten Funktionsaufrufs setzt der Compiler
 beim Uebersetzen ein, `param_defaults` wird nur bei Methoden/FUNCREF gelesen;
 der Fall braucht darum beides, sonst prueft er das Feld gar nicht.
@@ -5013,7 +5014,7 @@ Probelauf, 284 Proben). `dhrt --typen datei.dh` listet je Ausdruck den Typ.
 sagt X, der Wert ist Y" abbricht -- **wer `typ_von` aendert, laesst
 `dhrt test tests/pruef` damit laufen**; das ist der Beleg, nicht die
 Beispiele. Ueber `examples/` sind 76 % der Ausdruecke getypt. Tests
-`tests/pruef/typen.dhtest` (samt Gegenprobe der Probe ueber ein verfaelschtes
+`tests/pruef/laufzeit/typen.dhtest` (samt Gegenprobe der Probe ueber ein verfaelschtes
 .dhc), Rust-Tests in `typen.rs`.
 
 ## `/` liefert immer FLOAT (2026-09-24, Entscheidung des Nutzers)
@@ -5028,7 +5029,7 @@ volle Testlauf fand im Bestand keine Stelle, die am alten Verhalten hing;
 geaendert wurden Erwartungen (`4` -> `4.0`), ein Pixel-Mittelpunkt in
 `gebundene_methoden_gui.dhtest` (jetzt `\`) und der Satz im Referenzbuch
 (`11_operatoren.js` samt `en.json`). Doku `docs/sprache.md`,
-`docs/stolpersteine.md` D1. Tests `tests/pruef/div_and_float_display.dhtest`.
+`docs/stolpersteine.md` D1. Tests `tests/pruef/sprache/div_and_float_display.dhtest`.
 
 ## Superinstruktionen (2026-09-24, M2 Schritt 1)
 
@@ -5047,7 +5048,7 @@ listet die Stellen. fib 0,86, Ganzzahl-Schleife 0,88. **Gemessen und
 verworfen:** Typangabe als Byte statt Text (kein Effekt) und eine eigene
 kleine Schleife fuer die haeufigsten Befehle (20 % langsamer bei gemischtem
 Code) -- Einzelheiten `docs/entwurf-maschinencode.md` M2. Tests
-`tests/pruef/verschmelzen.dhtest` (jeder Fall mit und ohne; Gegenprobe: ohne
+`tests/pruef/laufzeit/verschmelzen.dhtest` (jeder Fall mit und ohne; Gegenprobe: ohne
 Typpruefung beim globalen Speichern faellt "umwandeln beim speichern").
 
 ## Rahmenstapel (2026-09-25, M2 Schritt 2)
@@ -5062,7 +5063,7 @@ Rahmen ab (`rahmen_verlassen`) und nimmt die Fehlerzeile aus der Funktion,
 in der der Fehler FIEL -- nicht aus der, mit der `dispatch` betreten wurde.
 EXIT/Stop raeumen alle Rahmen oberhalb der Basis ab. `bind_params` bindet
 den Normalfall direkt. Leerer Aufruf 41 -> 29 ns, fib 0,85. Tests
-`tests/pruef/rahmenstapel.dhtest` (Erwartung = Ausgabe des Baus davor).
+`tests/pruef/laufzeit/rahmenstapel.dhtest` (Erwartung = Ausgabe des Baus davor).
 **Methoden (CALL_METHOD) bewusst NICHT auf dem Rahmenstapel** -- gemessen:
 das je Rahmen gefuehrte `Self` machte jeden Befehl in `dispatch` teurer
 (freier Aufruf 30 -> 35..40 ns, fib 1,07..1,09) fuer 2 ns je Methode.
@@ -5260,7 +5261,7 @@ Verweis, Farbfeld ...), Graphics setzt beim FLIP (`zeiger_anwenden`, nur bei
 Wechsel). `MOUSE_CURSOR` bleibt stehen und hat Vorrang, `"auto"` gibt an die
 gui zurueck; `GUI_SET_CURSOR(wdg, form$)`, `MOUSE_CURSOR_GET$()`. Neue Stellen
 bekommen ihren Zeiger aus derselben Geometrie wie Treffertest und Zeichnen.
-Tests `tests/pruef/gui_mauszeiger.dhtest`.
+Tests `tests/pruef/gui/gui_mauszeiger.dhtest`.
 **Eigene Zeigerbilder (Teil 3):** raylib kennt nur zehn Formen. Dazu kommen
 `warten`/`arbeitet`/`hilfe` -- unter Windows die echten Systemzeiger ueber
 einen Subclass, der `WM_SETCURSOR` vor GLFW beantwortet (`systemzeiger.rs`;
@@ -5286,8 +5287,8 @@ bild, deckkraft)` (Cmd `TextureRectTint`). **Fund:** `GUI_RICHTEXT_FIND` und
 erst in GUI_UPDATE) -- jetzt vorgemerkt (`satz_aktuell`, `ziel_suche`),
 FIND liefert dann 0. Die IDE: Handbuch mit Inhaltsverzeichnis, Vor/Zurueck,
 Farben des Editors; Einstellungen "Schrift der Oberflaeche" (Vorgabe 18) und
-"Schriftzug hinter dem Code". Tests `tests/pruef/gui_gesetzter_text_gestaltung.dhtest`,
-`tests/pruef/werkzeug_ide_handbuch.dhtest`.
+"Schriftzug hinter dem Code". Tests `tests/pruef/gui/gui_gesetzter_text_gestaltung.dhtest`,
+`tests/pruef/ide/werkzeug_ide_handbuch.dhtest`.
 
 **Codeknoepfe, Suche ueber alle Dokumente, farbiger Quelltext (2026-09-27):**
 `GUI_RICHTEXT_CODE_BUTTONS(rt, "Kopieren|Starten")` legt einen Streifen
@@ -5305,7 +5306,7 @@ Quelltext-Ansicht in `codeFont`, eingefaerbt von `hbQuelleFaerben`.
 **Testfalle:** "In neuen Reiter" holt das Hauptfenster nach vorn, danach
 treffen Klicks das Handbuch nicht mehr -- und Knopflagen haengen an
 Schriftbreiten; die Tests klicken darum immer den RECHTEN Knopf und stellen
-die Reihenfolge vorher um. Tests `tests/pruef/gui_richtext_codeknoepfe.dhtest`
+die Reihenfolge vorher um. Tests `tests/pruef/gui/gui_richtext_codeknoepfe.dhtest`
 und drei Faelle in `werkzeug_ide_handbuch.dhtest`.
 
 **Karte zum Anklicken, Schnellkorrektur (2026-09-28):** die
@@ -5324,7 +5325,7 @@ Kopf des Unterprogramms bzw. vor den Block auf oberster Ebene -- in einer
 Schleife setzte es die Variable jede Runde zurueck; der Typ ist aus dem Wert
 geraten (`typ_raten`). Die IDE: Strg+. (Kuerzel `.`/`,` versteht
 `kuerzel_parsen` seither), Waehler `paletteArt = "korrektur"`, angewendet
-ueber SELECT + INSERT von hinten. Tests `tests/pruef/gui_textarea_scroll.dhtest`,
+ueber SELECT + INSERT von hinten. Tests `tests/pruef/gui/gui_textarea_scroll.dhtest`,
 `code_korrekturen.dhtest`, `werkzeug_ide_karte.dhtest`,
 `werkzeug_ide_korrektur.dhtest`, ein codeAction-Fall in `dhrt_lsp.dhtest`,
 Rust-Tests `korrekturen_aus_der_meldung`, `typ_raten_aus_dem_wert`,
@@ -5367,8 +5368,8 @@ Zeilen, darum wird gerechnet, bis die Liste stehen bleibt.
 `GUI_TEXTAREA_SELECT`/`GOTO` zentrieren die Marke und sind davon
 unberuehrt. Die IDE: Ansicht -> Mitlaufender Blockkopf (ide.json
 `blockkopf`, an per Vorgabe, drei Koepfe). Tests
-`tests/pruef/gui_blockkopf.dhtest` (4, je mit Gegenprobe ohne Koepfe),
-`tests/pruef/werkzeug_ide_blockkopf.dhtest`.
+`tests/pruef/gui/gui_blockkopf.dhtest` (4, je mit Gegenprobe ohne Koepfe),
+`tests/pruef/ide/werkzeug_ide_blockkopf.dhtest`.
 
 **Ganzes Projekt pruefen (2026-09-29):** Strg+Umschalt+F7 in der IDE
 (`projektPruefenStarten`/`-Schritt`, 8 Dateien je Bild, ESC bricht ab,
@@ -5377,7 +5378,7 @@ Eine Meldung "in lib.dh:2 -> ..." (Fehler in einer importierten Datei, von
 jeder importierenden gemeldet) wird auf ihre eigene Stelle umgeschrieben
 und ueber (kanonischer Pfad, Zeile, Meldung) nur einmal gezeigt; Hinweise
 zaehlen nicht. Protokoll `projekt geprueft F W betroffen dateien`. Test
-`tests/pruef/werkzeug_ide_projektpruefung.dhtest` (ohne das Entdoppeln
+`tests/pruef/ide/werkzeug_ide_projektpruefung.dhtest` (ohne das Entdoppeln
 faellt er).
 
 **Aufrufzaehler, Pruefsammlungen in der IDE (2026-09-29):** hinter jeder
@@ -5703,7 +5704,7 @@ Inhalt bekommt nur einen Hauch, nichts wird dunkler). Die IDE nimmt
 `Graphics::lichtfleck`: Ringe aus Dreiecken mit Farbe je Ecke ueber rlgl
 (Profil `lichtfleck_anteil`: fast flach, Kosinus-Rand auf genau null),
 Rueckseiten-Verwerfen dafuer aus -- gestapelte Ellipsen zeigten Stufen.
-Tests zwei Faelle in `tests/pruef/gui_glanz.dhtest` (Bildvergleich gegen
+Tests zwei Faelle in `tests/pruef/gui/gui_glanz.dhtest` (Bildvergleich gegen
 dasselbe Fenster ohne Licht; der Rahmen-Fall sucht die hellste Stelle je
 Kante statt fester Pixel -- die Lage haengt an der Bildzeit); Gegenproben
 ohne Lampen- bzw. Rahmen-Zweig fallen.
@@ -5749,7 +5750,7 @@ Gast und kamen beim Zeichnen danach -- jetzt holt `draw` die obere Schicht
 `dock_hat_angedockte` (nicht bei Zoom), auch GUI_DRAW_WINDOW; `topmost_at`,
 `window_at`, `hit_test` ueberspringen einen Gast, den eine schwebende
 Leiste verdeckt (`dock_gast_verdeckt`). 27 Befehle `GUI_DOCK*`,
-Tests `tests/pruef/gui_dock.dhtest` (17, Aufbau in `_hilfen/dockaufbau.dh`,
+Tests `tests/pruef/gui/gui_dock.dhtest` (17, Aufbau in `_hilfen/dockaufbau.dh`,
 Mauswege `_hilfen/dockmaus.dh`; vier Verfaelschungen fallen je in ihrem
 Fall -- die erste Fassung des Ausblende-Falls war wertlos, weil die hintere
 Liste ohne Rechteck gar nicht unter der vorderen lag), 4 Rust-Tests.
@@ -5780,7 +5781,7 @@ beendet, geprueft), Fragen/Antworten, Befunde in `pruefen`, Schnipsel in
 (hinter `konfigFalsch`), weil Sitzung/Schnipsel sie beim Start lesen.
 `dhrt pruef namen` kennt die SUBs/FUNCTIONs aus `pruef::BIBLIOTHEKEN`
 (`ide/dh_plugin.dh`). Beispiel `examples/plugins/todo/`, Tests
-`tests/pruef/werkzeug_ide_plugins.dhtest` (4; drei Verfaelschungen fallen).
+`tests/pruef/ide/werkzeug_ide_plugins.dhtest` (4; drei Verfaelschungen fallen).
 
 **Glutfaden Stufe 26 (selber Tag): Leisten und Plugins.** `ansicht/leisten.dh`:
 vier GtkNotebooks einer Gruppe (`gtk_notebook_set_group_name`, Reiter
@@ -5808,7 +5809,7 @@ Kuerzeln, Ereignisse gesichert/geoeffnet/geaendert, neu in `dh_plugin.dh`
 `PLUGIN_MUSTER$` und `PLUGIN_STICHE` (ein Schritt ueber
 `kern.zellenSetzenJe`), ausgeschaltet ueber `plugins_disabled`. Eine Frage
 wird auch bei einem Fehler beantwortet. Tests
-`tests/pruef/glutfaden_stufe26.dhtest` (2; echtes Plugin; sechs
+`tests/pruef/glutfaden/glutfaden_stufe26.dhtest` (2; echtes Plugin; sechs
 Verfaelschungen fallen); die Befehlstafel hat 80 Eintraege.
 
 **Fund in der Laufzeit dabei (Maschinencode + FFI-Rueckrufe):** ein
@@ -5820,7 +5821,7 @@ NIL"). `gerufenes_harmlos` lehnt jetzt Gerufenes ab, das einen Rueckruf
 VERGIBT (eine Konstante mit Rueckruf-Signatur, `ffi::signatur_mit_rueckruf`)
 oder `__ffi` ruft, sobald Rueckrufe vergeben sind; und ein Bereich, der vorher
 gebaut wurde und `__ffi` erreicht (`erreicht_ffi`, `Schleife::ffi_gerufen`),
-wird beim naechsten Eintritt verworfen. Faelle in `tests/pruef/ffi.dhtest`
+wird beim naechsten Eintritt verworfen. Faelle in `tests/pruef/sprache/ffi.dhtest`
 ("ein bereich ruft eine funktion, die einen rueckruf vergibt", "... gebaut
 bevor ein rueckruf vergeben war" -- `signal`/`raise` der C-Bibliothek, die
 sich einen Rueckruf merkt); gegen den Bau davor fallen beide.
@@ -5892,7 +5893,7 @@ bit-identisch.
 
 Use-Cases: Cutscene-DSL, prozedurale Generation, Boss-Patterns, NPC-Dialoge.
 Doku-Demo [examples/98_coroutines.dh](examples/98_coroutines.dh), Tests
-`tests/pruef/coroutines.dhtest` (Pruefsammlung fuer `dhrt test`, seit 2026-09-07 -- vorher tests/pruef/coroutines.dhtest).
+`tests/pruef/sprache/coroutines.dhtest` (Pruefsammlung fuer `dhrt test`, seit 2026-09-07 -- vorher tests/pruef/sprache/coroutines.dhtest).
 
 ## Input-Mapping (Modul `input`)
 
@@ -5984,7 +5985,7 @@ DO : i = i + 1 : LOOP UNTIL i >= 5
   Schluesselwoerter: `DIM dO AS INTEGER` gibt es in `examples/127_filedialog.dh`,
   und ein neues Keyword haette das gebrochen. `DO` zaehlt nur als Schleife,
   wenn WHILE/UNTIL/Zeilenende folgt. Bedingung oben UND unten ist ein Fehler.
-- Tests: `tests/pruef/sprach_symmetrie.dhtest` (18 Faelle, `dhrt test`; bis 2026-09-07 tests/pruef/sprach_symmetrie.dhtest).
+- Tests: `tests/pruef/sprache/sprach_symmetrie.dhtest` (18 Faelle, `dhrt test`; bis 2026-09-07 tests/pruef/sprache/sprach_symmetrie.dhtest).
 
 ## Laufzeit-Typtest: `IS` + `TYPEOF`
 
@@ -6011,7 +6012,7 @@ PRINT t IS NOT NIL   ' TRUE
   anderen Typnamen umschreiben kann (`x IS mathe.Punkt`). Der Compiler prueft
   den Namen und emittiert `__is_typ(wert, "name")`; die Vererbungskette laeuft
   `Vm::try_typtest` (vm.rs) ab -- die kennt nur die VM, darum nicht in
-  builtins.rs. Kein neuer Opcode. Tests: `tests/pruef/typtest.dhtest`.
+  builtins.rs. Kein neuer Opcode. Tests: `tests/pruef/sprache/typtest.dhtest`.
 
 ## Function References (FUNCREF)
 
@@ -6067,7 +6068,7 @@ Nach aussen ist das ein ganz normales FUNCREF (`TYPEOF` sagt `FUNCREF`,
   (beides `vm.rs`). Was `gui`/`timer` speichern, ist ein `Rueckruf`
   (`value.rs`): Name **und** optionaler Empfaenger -- der Name muss bleiben,
   weil `gui.rs` ihn in die `.dhform` schreibt. Gefeuert wird ueber den einen
-  Helfer `Vm::rueckruf_rufen`. Tests: `tests/pruef/gebundene_methoden.dhtest`
+  Helfer `Vm::rueckruf_rufen`. Tests: `tests/pruef/sprache/gebundene_methoden.dhtest`
   (inkl. echtem GUI-Klick per Automation-Wiedergabe).
 
 **Lambdas** (seit 2026-10-04, Schreibweise von VB.NET): `FUNCTION(x) x * 2`
@@ -6091,7 +6092,7 @@ fuer Lambdas (kein `.dhform`-Eintrag). Dazu `ARRAY_MAP/FILTER/REDUCE/FIND`
 (`Vm::array_mit_funktion`, Familie `try_array_hof`) und der Aufruf eines
 WERTES (`a[i]()`, `f(1)(2)`, CALL_VALUE). Schleifen mit Lambdas bleiben in
 der VM (der Maschinencode kennt CALL_VALUE nicht). Doku `docs/sprache.md`
-(Funktionen als Werte), Tests `tests/pruef/lambda.dhtest`.
+(Funktionen als Werte), Tests `tests/pruef/sprache/lambda.dhtest`.
 
 **Implementierung:**
 - Type-Token `FUNCREF`. AST braucht keinen neuen Node -- bare Identifier
@@ -7199,15 +7200,15 @@ Ihre Nachfolger sind Drachenhauch-Programme, in der IDE unter *Werkzeuge*:
 
 | Werkzeug | Programm | Handbuch | Pruefung |
 |---|---|---|---|
-| SFX-Generator | `examples/183_sfx_generator.dh` | `docs/sfx-generator.md` | `tests/pruef/werkzeug_sfx.dhtest` |
-| Partikel-Editor | `examples/185_partikel_editor.dh` | `docs/particle-editor.md` | `tests/pruef/werkzeug_partikel.dhtest` |
-| Tilemap-Editor | `examples/187_tilemap_editor.dh` | `docs/tilemap-editor.md` | `tests/pruef/werkzeug_tilemap.dhtest` |
-| Sprite-Editor | `examples/189_sprite_editor.dh` | `docs/sprite-editor.md` | `tests/pruef/werkzeug_sprite.dhtest` |
-| Tracker | `examples/190_tracker.dh` | `docs/tracker.md` | `tests/pruef/werkzeug_tracker.dhtest` |
-| Form-Designer | `examples/197_form_designer.dh` | `docs/form-designer.md` | `tests/pruef/werkzeug_formdesigner.dhtest` |
-| Anim-FSM-Editor | `examples/198_anim_fsm_editor.dh` | `docs/anim-editor.md` | `tests/pruef/werkzeug_animfsm.dhtest` |
-| Notenblatt | `examples/199_notenblatt.dh` | `docs/score-editor.md` | `tests/pruef/werkzeug_notenblatt.dhtest` |
-| Klassendiagramm | `examples/210_klassendiagramm.dh` | `docs/klassendiagramm.md` | `tests/pruef/werkzeug_klassendiagramm.dhtest` |
+| SFX-Generator | `examples/183_sfx_generator.dh` | `docs/sfx-generator.md` | `tests/pruef/werkzeuge/werkzeug_sfx.dhtest` |
+| Partikel-Editor | `examples/185_partikel_editor.dh` | `docs/particle-editor.md` | `tests/pruef/werkzeuge/werkzeug_partikel.dhtest` |
+| Tilemap-Editor | `examples/187_tilemap_editor.dh` | `docs/tilemap-editor.md` | `tests/pruef/werkzeuge/werkzeug_tilemap.dhtest` |
+| Sprite-Editor | `examples/189_sprite_editor.dh` | `docs/sprite-editor.md` | `tests/pruef/werkzeuge/werkzeug_sprite.dhtest` |
+| Tracker | `examples/190_tracker.dh` | `docs/tracker.md` | `tests/pruef/werkzeuge/werkzeug_tracker.dhtest` |
+| Form-Designer | `examples/197_form_designer.dh` | `docs/form-designer.md` | `tests/pruef/werkzeuge/werkzeug_formdesigner.dhtest` |
+| Anim-FSM-Editor | `examples/198_anim_fsm_editor.dh` | `docs/anim-editor.md` | `tests/pruef/werkzeuge/werkzeug_animfsm.dhtest` |
+| Notenblatt | `examples/199_notenblatt.dh` | `docs/score-editor.md` | `tests/pruef/werkzeuge/werkzeug_notenblatt.dhtest` |
+| Klassendiagramm | `examples/210_klassendiagramm.dh` | `docs/klassendiagramm.md` | `tests/pruef/werkzeuge/werkzeug_klassendiagramm.dhtest` |
 
 Jedes Handbuch nennt am Ende, was die Qt-Fassung zusaetzlich konnte. [Neu] und [Oeffnen] im Notenblatt fragen
 seit 2026-09-21 bei ungesicherten Aenderungen nach (PR #211; hier stand bis
@@ -7231,7 +7232,7 @@ Begruendung je Eintrag; `pfade` prueft Inline-Code UND Markdown-Links, die
 Duldung gilt nur fuer Inline-Code). `--pruefen` bei `doku` = schreibt nichts,
 Rueckgabe 1 bei Abweichung -- so haengen `builtin_prosa.json` und die
 VS-Code-Grammatik an der Suite; `dhrt pruef` laeuft dort ebenfalls (seit
-2026-09-16 alles in `tests/pruef/doku_pruefungen.dhtest`, vorher vier
+2026-09-16 alles in `tests/pruef/werkzeugkette/doku_pruefungen.dhtest`, vorher vier
 pytest-Dateien). **Geloescht:**
 `drachenhauch/lsp/`, `drachenhauch/doku.py`, `tools/gen_builtin_prosa.py`,
 `tools/pruef_docs.py`, `tools/pruef_doku_aussagen.py`,
@@ -7273,7 +7274,7 @@ sonst waren Strg+S/F5 nach dem ersten Ablegen tot; (3) `JSON_TYPE` sagt nur
 `number` -- beim Kopieren eines Teilbaums eine ganze Zahl ganz lassen, sonst
 liest `GUI_FROM_JSON` aus `48.0` kein x mehr; (4) `CONST RASTER` und
 `FUNCTION raster` kollidieren (Namen sind schreibungsunabhaengig). Tests
-`tests/pruef/werkzeug_formdesigner.dhtest` (seit Stufe 32; bis dahin test_pilot_formdesigner.py -- echte Klicks ueber die Wiedergabe:
+`tests/pruef/werkzeuge/werkzeug_formdesigner.dhtest` (seit Stufe 32; bis dahin test_pilot_formdesigner.py -- echte Klicks ueber die Wiedergabe:
 Palette -> Form -> Strg+S, Datei gelesen mit `FormDoc.load`, dem Modell des
 Qt-Designers; Ziehen + zweimal Strg+Z; F5-Laufprogramm uebersetzt;
 Entwurfsmodus mit Gegenprobe). In der IDE unter Werkzeuge, im Installer
@@ -7307,7 +7308,7 @@ Inspektor gibt dessen Fenster den Fokus, und Kuerzel galten nur im
 Fokus-Fenster -- `fokusZurueck` nach jedem Knopf, sonst war Strg+S nach
 `+ Bedingung` stumm (der Test sah es: die Datei blieb alt). Seit die Kuerzel
 in allen Fenstern gelten (siehe Menues unten), ist der Umweg wieder draussen.
-Tests `tests/pruef/werkzeug_animfsm.dhtest` (7, seriell; bis Stufe 33 pytest): Doppelklick, Rechtsziehen,
+Tests `tests/pruef/werkzeuge/werkzeug_animfsm.dhtest` (7, seriell; bis Stufe 33 pytest): Doppelklick, Rechtsziehen,
 Ziehen + Strg+Z, Entf (der Laufzeit-Leser ist hier die Pruefung -- ein
 stehengebliebener Uebergang laedt nicht), Bedingung ueber den Inspektor
 mit Wirkungsprobe (speed 10 -> run, speed 1 -> idle), Parameter, F5-Vorschau
@@ -7337,7 +7338,7 @@ Dateiargument. Drei fremde Leser: `ScoreDoc.load_json`, `Song.load_json`,
 `to_tracker_song`. **Fallen:** `STEP` ist ein Schluesselwort (kein `CONST
 STEP`); `GUI_MODAL()` liefert einen Wahrheitswert, kein Handle; Klapplisten
 in Tests: Eintrag k liegt bei y + 24 + k * 22 + 11 unter dem Feld. Tests
-`tests/pruef/werkzeug_notenblatt.dhtest` (7, seriell; seit Stufe 33 ohne
+`tests/pruef/werkzeuge/werkzeug_notenblatt.dhtest` (7, seriell; seit Stufe 33 ohne
 Python -- das Tracker-Gitter ist dort ein fester, von `to_tracker_song`
 aufgezeichneter Stand). Schluesselwechsel rueckt die
 Noten ohne Dialog um Oktaven heran und sagt es (Strg+Z nimmt es zurueck).
@@ -7362,7 +7363,7 @@ Verzeichnis, die Faelle einer Datei laufen parallel (bis 8 Faeden);
 wie in conftest.py. Doku `docs/werkzeuge.md`. **Die Sammlungen liegen unter
 `tests/pruef/`**; die CI ruft `dhrt test tests/pruef` direkt auf (bis
 2026-09-20 ueber einen pytest-Anker), das Format
-prueft `tests/pruef/dhrt_test_format.dhtest` am echten Laeufer. **Umgezogen und
+prueft `tests/pruef/werkzeugkette/dhrt_test_format.dhtest` am echten Laeufer. **Umgezogen und
 aus `tests/` geloescht: 73 pytest-Dateien, 74 Sammlungen mit 1540 Faellen**
 (Stand 2026-09-07, `dhrt test tests/pruef` laeuft sie in ~6 s; die 74. ist
 `rekursionstiefe.dhtest`, dessen pytest-Datei mit drei Tests bleibt, die
@@ -7489,7 +7490,7 @@ Ort des Aufrufers hinterlegt dhrt seit 2026-09-06 als `DHRT_START_DIR`
 ihn fuer Projektbaum und relatives Argument; `ARG$` ist 0-basiert (`ARG$(0)` = erstes Argument nach `--`);
 `GUI_WINDOW_VISIBLE` hat keinen Getter -> eigenes Flag fuer das
 Vervollstaendigungs-Fenster; eine Wiedergabe-Taste bleibt gedrueckt, bis
-KEY_UP kommt (F5 = 294, F7 = 296). Tests: `tests/pruef/ide_bausteine.dhtest`
+KEY_UP kommt (F5 = 294, F7 = 296). Tests: `tests/pruef/ide/ide_bausteine.dhtest`
 (Bausteine einzeln, Fenster ausserhalb des Schirms; bis Stufe 34 pytest) und `tests/test_ide.py`
 (die IDE ueber `DH_IDE_LOG` + `AUTOMATION_PLAY`, seriell). Offen: Debugger/
 Profiler-Fenster, Suche im Projekt, Befehlspalette, Handbuch, Drucken,
@@ -7559,7 +7560,7 @@ Konstante `N` -- Namen sind schreibungsunabhaengig, die Schleife `n < N` lief
 nie, jedes Level war leer; `--check` hatte es als Warnung gesagt. (2) Die
 Zeichentabelle des Demo-Bauers ist eine Zeichenkette mit `INSTR`, keine MAP:
 `O`/`o`, `B`/`b`, `L`/`l`, `T`/`t`, `M`/`m`, `P`/`p` meinen verschiedene
-Kacheln. Tests: sieben neue Faelle in `tests/pruef/werkzeug_circuitrunner.dhtest`
+Kacheln. Tests: sieben neue Faelle in `tests/pruef/werkzeuge/werkzeug_circuitrunner.dhtest`
 -- der Konverter an einer .dat, die der Fall selbst schreibt (zweiter
 RLE-Schreiber), Lynx-Kennung, fremde Datei, fehlende Argumente; der Demo-Bauer
 gegen das Schema UND byte-gleich gegen die eingecheckte Datei; beide Downloads
@@ -7595,7 +7596,7 @@ Deckung weicht je Kachel um hoechstens 6 % ab, die mittlere Farbe nur bei den
 Kacheln mit weichem Schein (bis 35 je Kanal -- PIL verwischt gegen
 durchsichtiges Schwarz und dunkelt den Rand ab, raylibs Weichzeichner nicht).
 `tiles.dhsprite` entsteht nicht mehr (das Format des Qt-Sprite-Editors) und ist
-mit `make_tiles.py` geloescht. Tests `tests/pruef/image_formen.dhtest` (7,
+mit `make_tiles.py` geloescht. Tests `tests/pruef/grafik/image_formen.dhtest` (7,
 Gegenprobe ohne die Aufrufe: 7 von 7 fallen) und ein Fall "kachelsatz wird
 gezeichnet" in `werkzeug_circuitrunner.dhtest`.
 
@@ -7609,7 +7610,7 @@ Mindestgroessen und Meldungen wie zuvor; dhdemo laedt in eine `.teil`-Datei und
 speichert nur, was die XM- oder MOD-Kennung traegt. Optionale Argumente
 (Adresse, Ziel, Mindestgroesse) sind fuer Pruefungen da. Der Gegenserver stellt
 im echo-Modus Pfaden ab `/xm` "Extended Module: " voran, damit der Erfolgsweg
-pruefbar ist. Tests `tests/pruef/werkzeug_downloads.dhtest` (3; Gegenprobe mit
+pruefbar ist. Tests `tests/pruef/werkzeuge/werkzeug_downloads.dhtest` (3; Gegenprobe mit
 kaputten Kopien -- Mindestgroesse ignoriert, Namen vertauscht, Kennung nicht
 geprueft: 3 von 3 fallen). **Stolperstein beim Testschreiben:** in
 `PRINT PROCESS_CODE(p); lauf$(p)` wird der Rueckgabewert VOR dem Warten gelesen
@@ -7624,7 +7625,7 @@ reichen fuer alle Multiplikationen, `BAND &HFFFFFFFF` maskiert auch negative
 Zwischenwerte richtig; Pythons `int()` rundet Richtung null, `INT` ab.
 **Zwei Stolpersteine:** ein Feld von Feldern (`DIM a[4] AS ARRAY OF INTEGER`)
 uebersetzt nicht, und eine MAP laesst sich nicht mit `m[schluessel]` lesen --
-`MAPGET`. Tests `tests/pruef/werkzeug_beispiel_assets.dhtest` (2; Gegenprobe
+`MAPGET`. Tests `tests/pruef/werkzeuge/werkzeug_beispiel_assets.dhtest` (2; Gegenprobe
 mit einer anderen Periode bzw. Saat 43: beide fallen).
 **Level-Werkzeuge von Pyramid Pusher (selber Tag):**
 `pyramid_pusher/levels/_authoring/make_levels.dh` (die 12 eigenen Level samt
@@ -7636,7 +7637,7 @@ eingecheckten `.xsb` Byte fuer Byte; in `02_skinner_classics.xsb` aendert sich
 nur die Kopfzeile, die das Werkzeug nennt. Die Quelle traegt 40 Latin-1-Bytes (je ein
 `é` = 0xE9 in den 40 Copyright-Zeilen, die das Werkzeug ueberspringt) -- gelesen
 mit `READLINES(pfad, "latin1")`, als UTF-8 waere die Datei nicht lesbar. Tests
-`tests/pruef/werkzeug_pyramid_levels.dhtest` (3, darunter ein per
+`tests/pruef/werkzeuge/werkzeug_pyramid_levels.dhtest` (3, darunter ein per
 `--- ersetzen` unloesbar gemachter Level, der nicht geschrieben werden darf;
 Gegenprobe: geaenderter Titel, Loeser sagt immer "ok", Sortierung ohne
 Set-Nummer -- 3 von 3 fallen).
@@ -7651,7 +7652,7 @@ Kacheln sind gleich. Der Rest liegt in Vielecken, dem abgerundeten Fass und dem
 Holzring -- PIL rastert dort anders als `leinwand.rs`. Das Blatt ist mit dem
 neuen Programm neu geschrieben; die Tilemap-Pruefungen zaehlen nur Farben
 gegeneinander und haengen nicht an den alten Punkten. Test
-`tests/pruef/werkzeug_beispiel_bilder.dhtest` (Punkt fuer Punkt gegen das
+`tests/pruef/werkzeuge/werkzeug_beispiel_bilder.dhtest` (Punkt fuer Punkt gegen das
 eingecheckte Blatt; Gegenprobe mit Zugabe 0.0 fuer gefuellte Ellipsen: 193
 Punkte weichen ab, der Fall faellt).
 **Buch-Sprites (selber Tag):** `buch-galaga/assets/make_sprites.dh` und
@@ -7664,7 +7665,7 @@ nicht mehr, die eingecheckten bleiben liegen. **Die Lehrbilder im Einstiegsbuch
 sind nicht die Ausgabe des Werkzeugs:** `make_book.py` (`prepare_images`) hat
 sie fuer den Druck auf RGB gebracht und ganzzahlig auf mindestens 1500 Punkte
 Breite vergroessert (4x und 3x) -- der Test vergroessert genauso und vergleicht
-dann. Tests zwei Faelle in `tests/pruef/werkzeug_beispiel_bilder.dhtest`
+dann. Tests zwei Faelle in `tests/pruef/werkzeuge/werkzeug_beispiel_bilder.dhtest`
 (Gegenprobe: eine geaenderte Palettenfarbe bzw. ein Punkt im Schiff -- beide
 fallen).
 **Plattformer-Sprites (selber Tag):** `examples/platformer/make_sprites.dh`
@@ -7678,7 +7679,7 @@ Master-Sheet weichen nur Stern (85 Punkte) und Fahne (9) ab, beide PIL-Vielecke;
 ein nachgebautes Pillow-Scanline mit acht Varianten traf keinen genau, und im
 Bild sind es einzelne Randpunkte. GIFs (je Bild 120 ms) und der Kontaktbogen
 (Schrift der Laufzeit) sind neu geschrieben, die `.dhsprite`-Dateien nicht mehr.
-Test `tests/pruef/werkzeug_platformer_sprites.dhtest`.
+Test `tests/pruef/werkzeuge/werkzeug_platformer_sprites.dhtest`.
 **Pyramid-Pusher-Kunst (selber Tag):** `pyramid_pusher/assets/gen_art.dh` statt
 `gen_art.py` (PIL + numpy). Die Koernung kam aus `np.random.default_rng(seed)
 .integers(lo, hi)`, und die ist nachgebaut statt ersetzt: SeedSequence (hashmix
@@ -7690,7 +7691,7 @@ acht 16-Bit-Stuecken, 32-Bit-Produkte gehen ueber `mal32`. Dazu Pythons
 Punkt gleich, samt Held-Sheet und 512er-Lichtmaske (0,7 s); der Stern (PIL-Vieleck)
 weicht an 17 Randpunkten ab -- mit abgeschnittenen Eckpunkten, mit Kommazahlen
 waren es 55. Eingecheckt ist nur der neue Stern, die uebrigen PNGs sind
-unveraendert. Test `tests/pruef/werkzeug_pyramid_art.dhtest` (alle 16 Bilder
+unveraendert. Test `tests/pruef/werkzeuge/werkzeug_pyramid_art.dhtest` (alle 16 Bilder
 gegen die eingecheckten; die ersten Zuege zweier Startwerte gegen numpys Zahlen).
 **Cloud-Server (2026-09-15):** `cloudserver/server.dh` statt des
 Flask-`server.py` -- `httpd` + `db` + `json`, dieselben Pfade, Fehlercodes und
@@ -7706,7 +7707,7 @@ Unix-Kommazahl), und die CORS-Vorabfrage `OPTIONS` wird VOR der
 Schluesselpruefung beantwortet -- der Browser schickt dabei keinen `X-Api-Key`,
 die Flask-Fassung wies sie mit gesetztem Schluessel ab. Der Port geht als
 `PORT=...` per EPRINT hinaus (Port 0 = frei). Test
-`tests/pruef/werkzeug_cloudserver.dhtest` (5: alle Zusagen aus `test_server.py`
+`tests/pruef/werkzeuge/werkzeug_cloudserver.dhtest` (5: alle Zusagen aus `test_server.py`
 und mehr gegen EINEN Server, offener Modus mit Warnung, CORS an Vorabfrage und
 Abweisung, das `cloud`-Modul Ende zu Ende, Neustart mit derselben Datenbank);
 Gegenprobe ohne Schluesselpruefung: 3 von 5 fallen, ohne die Kopfzeilen der
@@ -7716,7 +7717,7 @@ Damit laeuft bei den Spielen nichts mehr ueber Python. Im selben Zug
 Ausgabe in derselben Form; ohne `--dhrt` misst er die Laufzeit, die ihn
 ausfuehrt). Die Ausgabe des Kindes wird waehrend des Laufs geleert -- ein voller
 Puffer hielte es an und verfaelschte die Zeit. Test
-`tests/pruef/werkzeug_bench.dhtest` (Form der Ausgabe plus Fehlerlauf;
+`tests/pruef/werkzeuge/werkzeug_bench.dhtest` (Form der Ausgabe plus Fehlerlauf;
 Gegenprobe ohne Pruefung des Rueckgabewerts faellt).
 **Buch-Werkzeuge (selber Tag):** `buch-referenz/buch/shoot.dh`,
 `buch-einstieg/buch/shoot.dh` und `buch-referenz/buch/i18n/apply.dh` statt der
@@ -7733,10 +7734,10 @@ deutsche Saetze mit PUNKT, und das json-Modul liest einen Punkt als Pfad.
 `QUITREQUESTED()`, ein Programm mit `WHILE TRUE` sicherte sein Bild und lief
 endlos weiter -- der Aufrufer wartete ewig (so haengte der erste Testlauf 300 s).
 `dhrt bild` setzt jetzt `DHRT_BILD_ENDE`, und graphics.rs beendet den Prozess
-direkt nach dem gesicherten Bild. Tests `tests/pruef/werkzeug_buch.dhtest`
+direkt nach dem gesicherten Bild. Tests `tests/pruef/werkzeuge/werkzeug_buch.dhtest`
 (apply gegen Node-Referenz und leerer Patch auf eine Kopie von `en.json`, beide
-shoot-Werkzeuge an Beilagen) und `tests/pruef/dhrt_bild.dhtest` (der Test aus
-`test_dhrt_werkzeuge.py`, seit 2026-09-16 `tests/pruef/dhrt_werkzeuge.dhtest`, plus der `WHILE TRUE`-Fall).
+shoot-Werkzeuge an Beilagen) und `tests/pruef/werkzeugkette/dhrt_bild.dhtest` (der Test aus
+`test_dhrt_werkzeuge.py`, seit 2026-09-16 `tests/pruef/werkzeugkette/dhrt_werkzeuge.dhtest`, plus der `WHILE TRUE`-Fall).
 **Buch-Build (selber Tag):** `tools/buch_bauen.dh -- <buchordner> [--lang de|en]`
 ersetzt die vier `make_book.py` (PyMuPDF + PIL). Ein Werkzeug fuer alle vier
 Buecher, je Buch Dateiname, Sprachen und Messart in einer Tabelle; Referenz- und
@@ -7757,7 +7758,7 @@ Referenzbuch beim `.docx`). **Dafuer neu in der Laufzeit:
 (PNG-Farbart 2): Druckdienste lehnen ein PNG mit Alphakanal ab, auch wenn jeder
 Punkt deckend ist; die Deckkraft wird weggelassen, nicht verrechnet
 (`--nur-bilder` legt darum vorher auf Weiss). Test
-`tests/pruef/werkzeug_buch_bauen.dhtest` (Messen an einem PDF aus dem
+`tests/pruef/werkzeuge/werkzeug_buch_bauen.dhtest` (Messen an einem PDF aus dem
 pdf-Modul: Ueberschrift gegen fruehere Erwaehnung, Gross/klein, fehlender Titel,
 beide Messarten; Bilder: Farbart, Breite, Weiss unter Durchsichtigem, fertiges
 Bild unberuehrt). PyMuPDF ist am 2026-09-20 ganz aus
@@ -7777,13 +7778,13 @@ bis zu 32, blaettert per Mausrad reihenweise (`kacheln reihe N`), nimmt
 faellt ohne Liste auf die acht festen Kacheln zurueck (Geometrie der ersten
 Karte unveraendert -- der alte Klick-Test trifft weiter). **Falle:** `LEN` auf
 einer MAP ist ein Laufzeitfehler, gezaehlt wird selbst. Tests
-`tests/pruef/werkzeug_showcase.dhtest` (5; Gegenprobe mit Alpha/Breite 400
+`tests/pruef/werkzeuge/werkzeug_showcase.dhtest` (5; Gegenprobe mit Alpha/Breite 400
 und ohne showcase.json: die jeweiligen Faelle fallen).
 
 **Die dhrt-Werkzeuge pruefen sich selbst (2026-09-16, Weg D):**
 `tests/test_dhrt_werkzeuge.py` (31 Tests) und `tests/test_dhrt_call.py` (9) sind
-geloescht; ihre Faelle stehen in `tests/pruef/dhrt_werkzeuge.dhtest` (21) und
-`tests/pruef/dhrt_call.dhtest` (6). Gestartet wird dhrt als Kind ueber den neuen
+geloescht; ihre Faelle stehen in `tests/pruef/werkzeugkette/dhrt_werkzeuge.dhtest` (21) und
+`tests/pruef/werkzeugkette/dhrt_call.dhtest` (6). Gestartet wird dhrt als Kind ueber den neuen
 Helfer `tests/pruef/_hilfen/dhrtlauf.dh` (`dlStarten(["fmt", ...])` fuellt
 `dlAus`/`dlErr`/`dlCode`; `PROCESS_START` nimmt seine Argumente einzeln, ein
 Feld laesst sich nicht ausbreiten -- daher die Staffel nach der Argumentzahl bis
@@ -7800,7 +7801,7 @@ Debugger).
 
 **Dieselbe Runde, die Buch-Pruefungen:** `test_buch_struktur.py`,
 `test_buch_verweise.py` und `test_buch_code.py` sind geloescht; ihre Faelle
-stehen in `tests/pruef/buch_pruefungen.dhtest` (5). Die Kapitel sind
+stehen in `tests/pruef/buecher/buch_pruefungen.dhtest` (5). Die Kapitel sind
 JavaScript-Module -- gestartet werden die Werkzeuge unter `tools/` und
 `buch-referenz/buch/` ueber `tests/pruef/_hilfen/nodelauf.dh`
 (`nlStarten(ordner, skript)` laeuft IM Ordner, weil sie ihre Dateien relativ
@@ -7810,14 +7811,14 @@ als uebersprungen -- **dafuer kann sich ein Fall seit dieser Runde selbst
 ueberspringen** (die Zeile auf stdout oder stderr, `bewerten` in
 pruefsammlung.rs, Doku `docs/werkzeuge.md`): fuer fremde Werkzeuge, die nicht
 ueberall liegen. Die Alternative waere, die erwarteten Zeilen zu ERFINDEN --
-gruen und wertlos. Dazu test_beispiele_gui_enden.py (pytest) -> `tests/pruef/beispiele_gui_enden.dhtest`
+gruen und wertlos. Dazu test_beispiele_gui_enden.py (pytest) -> `tests/pruef/beispiele/beispiele_gui_enden.dhtest`
 (zehn Fenster-Programme, 8 s) -- und dafuer **`dhrt run --bilder N`**: dieselbe
 Grenze wie `DHRT_FRAMES`, nur als Schalter, weil `PROCESS_START` seinen Kindern
 die Variable abnimmt (sonst stuerbe ein gestartetes Spiel nach N Bildern). Ein
 Programm mit `WHILE TRUE` laeuft trotzdem weiter -- genau daran erkennt man es;
 die Gegenprobe (eine Zeile im Beispiel umgestellt) laesst den Fall nach 25 s
 fallen.
-Dazu test_dhrt_check.py (pytest, 18 Tests) -> `tests/pruef/dhrt_check.dhtest`
+Dazu test_dhrt_check.py (pytest, 18 Tests) -> `tests/pruef/werkzeugkette/dhrt_check.dhtest`
 (9): die Diagnosen von `dhrt --check` samt Zeilennummern, die Warnungen
 (unbekanntes Builtin, Hardware-IMPORT, doppeltes DIM mit anderem Typ -- seit
 2026-09-30 auch mit gleichem Typ im selben Block, Faelle in
@@ -7837,7 +7838,7 @@ Der Durchlauf laesst `.claude` jetzt aus (wie `target`, `.venv`, `node_modules`)
 
 **Import-Suchpfad und Dateisystem (2026-09-16, Weg D):** zwei Dateien, die
 beim Umzug von 2026-09-08 als "nicht uebertragbar" liegen blieben, gehen mit
-den Mitteln von heute. `tests/pruef/bibliothek.dhtest` (9) startet das
+den Mitteln von heute. `tests/pruef/sprache/bibliothek.dhtest` (9) startet das
 Programm als Kind und setzt `DH_PATH`, `USERPROFILE` und `HOME` per SETENV --
 der Benutzerordner zeigt dabei IMMER in den Fallordner, sonst entschiede eine
 Bibliothek auf dem Rechner des Pruefenden mit. Der Pfadtrenner kommt aus
@@ -7845,7 +7846,7 @@ Bibliothek auf dem Rechner des Pruefenden mit. Der Pfadtrenner kommt aus
 Betriebssystem gibt es nicht; ein Windows-Pfad traegt den Doppelpunkt hinter
 dem Laufwerk). In tests/test_bibliothek.py bleiben nur die drei Tests der
 PYTHON-Aufloesung, die die Qt-Editoren fuer die Zeilen-Herkunft brauchen.
-`tests/pruef/dateisystem.dhtest` (15) ersetzt die pytest-Datei ganz: die
+`tests/pruef/module/dateisystem.dhtest` (15) ersetzt die pytest-Datei ganz: die
 fnmatch-Zusagen stehen als festes Ergebnis fuer den Baum der Beilagen, die
 Listen werden vor der Ausgabe sortiert, und "welche Datei ist neuer" wartet
 1,1 s zwischen Beilage und neuer Datei statt die Zeit auf 1970 zu setzen
@@ -7855,7 +7856,7 @@ uebrigen Faelle haengen nicht an der verfaelschten Stelle.
 
 **Die Doku-Pruefungen ohne Python (2026-09-16, Weg D):** test_doku_aussagen,
 test_docs_codebloecke, test_vscode_grammatik und test_builtin_prosa (pytest)
-sind geloescht; ihre Faelle stehen in `tests/pruef/doku_pruefungen.dhtest`
+sind geloescht; ihre Faelle stehen in `tests/pruef/werkzeugkette/doku_pruefungen.dhtest`
 (14). Jeder Fall bekommt die Repo-Wurzel als Argument und macht `CHDIR`
 dorthin, bevor er `dhrt pruef`/`dhrt doku --pruefen` startet -- beide suchen
 die Wurzel vom Arbeitsordner aus, und ein Kind erbt ihn. Proben mit eigenen
@@ -7870,7 +7871,7 @@ Codeblock, verwaistes Dokument, veraenderte Grammatik): genau die sechs
 betroffenen Faelle fallen.
 
 **Drei gui-Bildtests ohne Python (2026-09-16, Weg D):**
-test_gui_draw_window (9 Faelle nach `tests/pruef/gui_draw_window.dhtest`),
+test_gui_draw_window (9 Faelle nach `tests/pruef/gui/gui_draw_window.dhtest`),
 test_gui_bindung (5, `gui_bindung.dhtest`) und test_gui_table_frozen_edge (1,
 `gui_tabelle_kante.dhtest`) sind geloescht -- vor einer Woche galten sie als
 "nicht uebertragbar". Der Vergleich zweier Laeufe ist ein Paar von Faellen mit
@@ -7889,9 +7890,9 @@ Commit gestartet. Sie greift nur bei UEBERLAPPUNG -- kommt die doppelte Meldung
 erst nach dem Ende des ersten Laufs, laeuft der zweite trotzdem.
 
 **Beispiele ohne Python (2026-09-16, Weg D):** test_examples (pytest) ->
-`tests/pruef/beispiele_laufen.dhtest` (23 Konsolen-Beispiele als Kind: Rueckgabe
+`tests/pruef/beispiele/beispiele_laufen.dhtest` (23 Konsolen-Beispiele als Kind: Rueckgabe
 0 und nicht leere Ausgabe, mehr ist bei Zeit/Zufall/Dateien keine Zusage) und
-test_beispiel_sqlite_tabelle (pytest) -> `tests/pruef/beispiel_sqlite_tabelle.dhtest`
+test_beispiel_sqlite_tabelle (pytest) -> `tests/pruef/beispiele/beispiel_sqlite_tabelle.dhtest`
 (Demo 158 mit `dhrt run --bilder 20`: Zeilen, Dateizeit und Groesse des
 Originals unveraendert, Arbeitskopie weg; VACUUM INTO kopiert alles).
 `pyramid_pusher.db` ist nicht versioniert -- ohne sie ueberspringt sich der
@@ -7900,9 +7901,9 @@ Aufraeumen fallen; "Original unberuehrt" ist bewusst NICHT gegengeprueft, weil
 die Mutation die echte Spielstand-Datenbank beschriebe.
 
 **SPEAK und der Sprachserver ohne Python (2026-09-16, Weg D):**
-test_speak (pytest) -> `tests/pruef/speak.dhtest` (10, seriell; die WAV liest ein
+test_speak (pytest) -> `tests/pruef/ton/speak.dhtest` (10, seriell; die WAV liest ein
 `--- nachher` ueber ihre Bytes) und test_dhrt_lsp (pytest) ->
-`tests/pruef/dhrt_lsp.dhtest` (11). Der LSP-Client `_hilfen/lspklient.dh`
+`tests/pruef/werkzeugkette/dhrt_lsp.dhtest` (11). Der LSP-Client `_hilfen/lspklient.dh`
 schickt alle Anfragen, beendet den Server mit shutdown/exit und zerlegt DANACH:
 `PROCESS_READ$` liest zeilenweise, ein LSP-Rumpf endet nicht mit einem Umbruch
 und kaeme sonst erst mit der naechsten Kopfzeile. Zerlegt wird an den
@@ -7917,7 +7918,7 @@ Gegenproben: vier bzw. drei Verfaelschungen, jede faellt.
 
 **Drucken teilweise ohne Python (2026-09-16, Weg D):** Druckerliste,
 `PDF_PREVIEW` (am Bild mit GETPIXEL) und die Fehlermeldungen von `PDF_PRINT`
-und `OPENDOC` stehen in `tests/pruef/drucken.dhtest` (4). In
+und `OPENDOC` stehen in `tests/pruef/module/drucken.dhtest` (4). In
 der pytest-Datei blieb NUR der Druck durch den echten Treiber
 "Microsoft Print to PDF": dessen Datei ist kein PDF von dhrt, und der Leser
 in Drachenhauch (`pdftext.dh`) kannte nur krilla-PDFs und keine Textlagen --
@@ -7927,9 +7928,9 @@ der Druckbefehle koennte echt drucken.
 
 **Export, Uhr und Firmata ohne Python (2026-09-17, Weg D):**
 test_rust_export, test_export_assets und test_export_signierbar (pytest) ->
-`tests/pruef/dhrt_export.dhtest` (6), test_builtins_uhr (pytest) ->
-`tests/pruef/builtins_uhr.dhtest` (6), test_firmata_module (pytest) ->
-`tests/pruef/modules_firmata.dhtest` (2). Die exportierte Exe startet der
+`tests/pruef/werkzeugkette/dhrt_export.dhtest` (6), test_builtins_uhr (pytest) ->
+`tests/pruef/laufzeit/builtins_uhr.dhtest` (6), test_firmata_module (pytest) ->
+`tests/pruef/geraete/modules_firmata.dhtest` (2). Die exportierte Exe startet der
 Helfer `_hilfen/exportlauf.dh`; die "blanke Laufzeit" der Gegenprobe ist die
 Exe ohne ihre Nutzlast (Laenge aus dem Footer) -- so braucht der Fall den
 Pfad der laufenden dhrt nicht, und die Datei behaelt ihr Ausfuehrungsrecht.
@@ -7943,9 +7944,9 @@ der Fall fragt jetzt `dhrt --check`, mit vier Argumenten als Gegenprobe.
 Ueberschreiben scheitert mit os error 1224 -- je Variante eine eigene Kopie.
 
 **Barrierefreiheit, Rekursionstiefe und ENUM-Bereiche (2026-09-17, Weg D):**
-test_gui_barrierefreiheit (pytest) -> `tests/pruef/gui_barrierefreiheit.dhtest`
+test_gui_barrierefreiheit (pytest) -> `tests/pruef/gui/gui_barrierefreiheit.dhtest`
 (7, seriell) und test_rekursionstiefe (pytest) -> zwei Faelle mehr in
-`tests/pruef/rekursionstiefe.dhtest`, die `vm.rs` und `build.rs` lesen. Der
+`tests/pruef/laufzeit/rekursionstiefe.dhtest`, die `vm.rs` und `build.rs` lesen. Der
 fremde UIA-Leser laeuft weiter als PowerShell-Skript (Beilage), nur gestartet
 per `PROCESS_START`; das Formular ist ein zweiter dhrt als Kind, und weil
 `PROCESS_START` keine Prozessnummer nennt, sucht PowerShell das Fenster ueber
@@ -7960,16 +7961,16 @@ in der IDE (sie liest dieselben Bereiche ueber `CODE_SYMBOLS$`): ein ENUM
 laesst sich falten und steht in der Pfadleiste, solange die Marke darin
 steht. Rust-Tests `enum_als_block_und_als_kurzform` und in
 `gliederung_verschachtelt_und_enum` (Gegenprobe ohne `END ENUM`: beide
-fallen), `tests/pruef/dhrt_lsp.dhtest` prueft das Ende mit.
+fallen), `tests/pruef/werkzeugkette/dhrt_lsp.dhtest` prueft das Ende mit.
 
 **Die Buecher ohne Python (2026-09-17, Weg D):** fuenf pytest-Dateien, vier
 Sammlungen. Signaturen im Referenzbuch gegen `builtin_index.json` -> drei Faelle
-mehr in `tests/pruef/buch_pruefungen.dhtest` (`_hilfen/signatur.dh` baut
+mehr in `tests/pruef/buecher/buch_pruefungen.dhtest` (`_hilfen/signatur.dh` baut
 `arity` und `formen_je_befehl` als Zeichen-Scanner nach -- das regex-Modul
 kennt keine Treffer mit mehreren Gruppen). Tippspiel-Band ->
-`tests/pruef/buch_tippspiel.dhtest` (21: jeder Kapitelstand als Kopie, die
+`tests/pruef/buecher/buch_tippspiel.dhtest` (21: jeder Kapitelstand als Kopie, die
 Pruefprogramme, Buch-Skript und docx-Build in den Fallordner). Einstiegsbuch ->
-`tests/pruef/buch_einstieg.dhtest` (7). EPUB -> `tests/pruef/buch_epub.dhtest`
+`tests/pruef/buecher/buch_einstieg.dhtest` (7). EPUB -> `tests/pruef/buecher/buch_epub.dhtest`
 (7: der erste lokale ZIP-Kopf roh gelesen, OPF mit dem xml-Modul). **Zwei
 Funde:** (1) die Zerleger-Probe war in pytest wertlos -- ohne die
 Schraegstrich-Regel blieb `ECS_FILL_FLOAT/INT(...)` leer, weil `INT` in der
@@ -7997,7 +7998,7 @@ Wellenform, `square` ist die Vorgabe, und es klang als Rechteck; Wiedergabe,
 WAV und Vorhoeren ueberspringen es jetzt. Dafuer fehlte im json-Modul das
 Gegenstueck zu `JSON_SET_JSON`: neu **`JSON_GET_JSON(h, pfad$)`** (Teilbaum als
 eigenes Dokument, eine Kopie; zwei Faelle in `json_schreiben.dhtest`). Tests
-drei Faelle in `tests/pruef/werkzeug_tracker.dhtest` an einer Beilage, die
+drei Faelle in `tests/pruef/werkzeuge/werkzeug_tracker.dhtest` an einer Beilage, die
 `Song.save_json` der Qt-Fassung geschrieben hat; Gegenprobe mit drei
 verfaelschten Tracker-Kopien (Sichern als synth, nicht stumm, nicht
 mitgetragen) -- jede laesst genau ihre Faelle fallen.
@@ -8021,7 +8022,7 @@ herausgeloest). Im Piloten: Zonen `zSamp/zLo/zHi/zRoot`, je Instrument die
 Liste `iZonen`; **die Zonen gehoeren ihrem INHALT** (`zonenVon`, Schluessel
 aus Rate, Tasten, Loop und Base64): Rueckgaengig laedt den ganzen Song neu,
 und ein SAMPLE laesst sich nicht freigeben -- je Schritt neu dekodieren
-kostete Zeit und Speicher. Tests `tests/pruef/sample_note.dhtest` (14:
+kostete Zeit und Speicher. Tests `tests/pruef/ton/sample_note.dhtest` (14:
 Tonhoehe an den Nulldurchgaengen, Loop-Arten an einer Rampe, Huellkurve) und
 in `werkzeug_tracker.dhtest` ein Lied, das der Fall im `--- vorher` selbst
 baut (Sinus mit bekannter Frequenz, Keymap mit stiller und Loop-Zone).
@@ -8040,7 +8041,7 @@ fehlender Pan faellt niemandem auf -- der kopierte Code klang schlicht anders
 als die Vorschau daneben. Jetzt kommt ein lauffaehiges Stueck heraus (IMPORT,
 `DIM snd AS SOUND`, der Aufruf, dann `PLAYSOUND` bzw. `AUDIO_PLAY` +
 `AUDIO_PAN` mit derselben Rechnung wie das Vorhoeren). Test: ein Fall in
-`tests/pruef/werkzeug_sfx.dhtest` prueft die Zeilen UND laesst `dhrt --check`
+`tests/pruef/werkzeuge/werkzeug_sfx.dhtest` prueft die Zeilen UND laesst `dhrt --check`
 ueber den erzeugten Code laufen; Gegenprobe mit zwei verfaelschten Kopien
 (ohne Pan-Zweig, ohne IMPORT) -- beide fallen. Faktor 1,18 -> 1,21.
 
@@ -8080,7 +8081,7 @@ Qt-`.dhsprite`-Dateien muessen NICHT mehr aufgehen -- nur der Nutzer hat den
 Qt-Sprite-Editor benutzt; die 14 im Repo (Galaga, Plattformer, PNG daneben)
 fallen mit dem Qt-Editor. (c) **`rust/build_runtime.py` und
 `rust/build_wasm.py` bleiben Python -- nur mit der Standardbibliothek.** Wer
-dort ein `import` ergaenzt, muss es in `tests/pruef/bauskripte.dhtest` in die
+dort ein `import` ergaenzt, muss es in `tests/pruef/werkzeugkette/bauskripte.dhtest` in die
 feste Liste eintragen (`__future__`, `os`, `platform`, `subprocess`, `sys`,
 `pathlib`, `shutil`); ein Paket von aussen oder ein Modul aus `drachenhauch/`
 laesst den Fall fallen. So bleibt "Python ist weg" wahr bis auf diese
@@ -8108,7 +8109,7 @@ Fensters beendet die IDE OHNE Rueckfrage -- die Schleife endet an
 `QUITREQUESTED()`, ungesicherte Arbeit war wortlos weg. Jetzt bleibt der
 Stand dann als beendet liegen und kommt beim naechsten Start zurueck; die
 Rueckfrage beim Kreuz kam am selben Tag (naechster Absatz). Tests
-`tests/pruef/werkzeug_ide_wiederherstellung.dhtest` (6); Gegenprobe mit
+`tests/pruef/ide/werkzeug_ide_wiederherstellung.dhtest` (6); Gegenprobe mit
 sieben Verfaelschungen, jede faellt -- im ersten Anlauf fiel "kein Takt"
 NICHT, weil die letzte Sicherung beim Ende dieselbe Protokollzeile schrieb
 wie der Takt; sie heisst jetzt `sicherung N beendet`.
@@ -8130,8 +8131,8 @@ kann das pruefen:** eingespielte Tasten (`INPUT_KEY_DOWN`) laufen am
 GLFW-Tastenrueckruf vorbei, in dem raylib die Beenden-Taste prueft -- die
 Tests schicken darum ECHTE Windows-Nachrichten (PostMessage WM_KEYDOWN/
 WM_CLOSE, `tests/pruef/_hilfen/fenstersender.ps1`, Fenster ueber einen
-Titel mit Kennung). Tests `tests/pruef/fenster_schliessen.dhtest` (5) und
-`tests/pruef/werkzeug_ide_schliessen.dhtest` (2); Gegenproben: ohne den
+Titel mit Kennung). Tests `tests/pruef/fenster/fenster_schliessen.dhtest` (5) und
+`tests/pruef/ide/werkzeug_ide_schliessen.dhtest` (2); Gegenproben: ohne den
 ESC-Wechsel bzw. mit `quit_requested` statt `close_requested` fallen genau
 die zwei betroffenen Faelle, mit der alten IDE-Schleife beide IDE-Faelle.
 Die Werkzeuge 183-199 zogen einen Tag spaeter nach (siehe unten).
@@ -8145,7 +8146,7 @@ wird relativ zum Ordner des GELAUFENEN Programms gesucht (dhrt wechselt
 dorthin, seine Meldungen sind relativ dazu), dann im Projekt; vor `.dh:`
 steht beliebiger Text und der Name darf Leerzeichen tragen -- genommen wird
 das laengste Stueck aus Woertern davor, das es als Datei gibt. Kein neuer
-Baustein in dhrt. Tests `tests/pruef/werkzeug_ide_ausgabe.dhtest` (3:
+Baustein in dhrt. Tests `tests/pruef/ide/werkzeug_ide_ausgabe.dhtest` (3:
 Programm in `sub/`, Import aus `mit leer/`, Gegenprobe ohne Stelle); drei
 Gegenproben (ohne die Abfrage, ohne Zusammenfuegen ueber Leerzeichen, ohne
 den Programmordner) lassen genau ihre Faelle fallen. **Falle beim Test:**
@@ -8169,8 +8170,8 @@ mit Strg 0 liefert; `MOUSEWHEEL_Y` sieht den Wert weiter. (3) **`Plus`/`Minus`
 im Kuerzel** (`Strg+Plus`, `Strg++`, `Strg+-`): raylib benennt Tasten nach
 der US-Lage, das deutsche "+" liegt auf "]", das "-" auf "/" -- `K_PLUS`/
 `K_MINUS` treffen darum beide Belegungen und den Ziffernblock
-(`kuerzel_taste`). Tests `tests/pruef/gui_zoom_rad.dhtest` (4),
-`tests/pruef/werkzeug_ide_zoom.dhtest` (1), Rust-Test `plus_und_minus`.
+(`kuerzel_taste`). Tests `tests/pruef/gui/gui_zoom_rad.dhtest` (4),
+`tests/pruef/ide/werkzeug_ide_zoom.dhtest` (1), Rust-Test `plus_und_minus`.
 
 **Tooltip beim Ueberfahren und Strg+Klick zur Definition (2026-09-19,
 vierter Punkt der Stufe A):** neu in der Laufzeit **`GUI_TEXTAREA_POS_AT(ta,
@@ -8186,8 +8187,8 @@ springt beim LOSLASSEN**, nicht beim Druecken: der Textbereich setzt die
 Marke selbst beim Druck und zieht sie, solange die Taste haengt, als
 Auswahl hinter der Maus her -- ein Sprung beim Druecken stand im naechsten
 Bild wieder an der Klickstelle (der erste Testlauf zeigte es). Tests
-`tests/pruef/gui_textarea_pos.dhtest` (2, ohne feste Pixellagen: abgetastet,
-nur die Wechsel ausgegeben) und `tests/pruef/werkzeug_ide_tooltip.dhtest`
+`tests/pruef/gui/gui_textarea_pos.dhtest` (2, ohne feste Pixellagen: abgetastet,
+nur die Wechsel ausgegeben) und `tests/pruef/ide/werkzeug_ide_tooltip.dhtest`
 (4; der Helfer `_hilfen/idemaus.dh` sucht die Lage des Worts mit POS_AT und
 schreibt die Aufnahme selbst). **Zwei Fallen beim Gegenproben:** (1) die
 Verfaelschung "hinter dem Zeilenende das letzte Zeichen" blieb erst gruen,
@@ -8216,8 +8217,8 @@ sperrt der Druck den ganzen Zug (`farbfeld_zug`, wie beim Farbfeld). Gesehen
 hat es erst der IDE-Fall; der Laufzeit-Fall war zweimal zu schwach: die Marke
 stand vorher schon auf der angeklickten Zeile, und gefragt wurde nur im
 Druck-Bild. Jetzt steht sie auf Zeile 4 und wird nach dem Loslassen gelesen
--- gegen den alten Bau faellt er. Tests `tests/pruef/gui_rand_klick.dhtest`
-(3) und `tests/pruef/werkzeug_ide_haltepunkt.dhtest` (3: links + Debugger
+-- gegen den alten Bau faellt er. Tests `tests/pruef/gui/gui_rand_klick.dhtest`
+(3) und `tests/pruef/ide/werkzeug_ide_haltepunkt.dhtest` (3: links + Debugger
 haelt in 3 bei Marke in 1, zweimal = aus, rechts + Bedingung per
 Zwischenablage haelt genau einmal; Helfer `prRand` in
 `_hilfen/idemaus.dh`); ohne den Aufruf in der IDE fallen alle drei.
@@ -8245,11 +8246,11 @@ die Zeichen vor dem Suchbeginn noch sieht (Gegenprobe: mit abgeschnittenem
 Text faellt der Wortgrenzen-Fall). (2) **Ein Textbereich zeigt seine
 Auswahl auch OHNE Fokus**, gedaempft -- die Leiste nimmt dem Feld den
 Fokus, und der markierte Treffer war unsichtbar (gesehen erst im Bild).
-Tests `tests/pruef/werkzeug_ide_suche.dhtest` (10; fuenf Verfaelschungen
+Tests `tests/pruef/ide/werkzeug_ide_suche.dhtest` (10; fuenf Verfaelschungen
 der IDE -- ohne Wortgrenze, immer ohne Gross/klein, Ersatz unmaskiert,
 Ersetzen ohne Trefferpruefung, Lage per INSTR -- lassen je genau ihre
-Faelle fallen), drei Faelle in `tests/pruef/modules_regex.dhtest`,
-`tests/pruef/gui_auswahl_ohne_fokus.dhtest` (2, als Paar; gegen den alten
+Faelle fallen), drei Faelle in `tests/pruef/module/modules_regex.dhtest`,
+`tests/pruef/gui/gui_auswahl_ohne_fokus.dhtest` (2, als Paar; gegen den alten
 Bau faellt der erste). **Falle beim Schreiben der Tests:** `\\2` in einem
 Bash-Heredoc kam als Steuerzeichen `\x02` an -- sogar in der Erwartung,
 die damit falsch UND unsichtbar war; Rueckstriche gehoeren in eine
@@ -8273,7 +8274,7 @@ Qt-Fassung zeigte sie nur als Hinweis. **Dabei fiel eine Abweichung auf:**
 (`start_row >= total_rows`), der Pilot an der Pattern-ZAHL -- eine Note,
 die hinter das Ende rundet, landete dort in einer Zeile jenseits von
 `rows` und fiel beim Ausgeben still weg; jetzt dieselbe Bedingung samt
-Warnung. Tests: zwei Faelle mehr in `tests/pruef/werkzeug_notenblatt.dhtest`
+Warnung. Tests: zwei Faelle mehr in `tests/pruef/werkzeuge/werkzeug_notenblatt.dhtest`
 (ein kleines Stueck, bei dem alle vier Regeln greifen: ESC schreibt
 nichts, Enter schreibt das Gitter von `to_tracker_song`), der Demo-Fall
 prueft die zwei Warnungen des Demo-Stuecks und drueckt Enter; die
@@ -8300,7 +8301,7 @@ Sprite-Groesse (bei 1024 x 1024 200 MB, bevor ein Punkt gemalt ist), und
 Zuschneiden/Statistik gehen Punkt fuer Punkt -- gemessen am vollen Mass
 Zuschneiden 1 s (je Bild EINMAL ueber die zusammengerechneten Ebenen statt
 je Ebene, sonst acht Mal so viele Abfragen), Statistik 2 s. Tests: vier
-Faelle mehr in `tests/pruef/werkzeug_sprite.dhtest` (70 x [Neu] Bild und
+Faelle mehr in `tests/pruef/werkzeuge/werkzeug_sprite.dhtest` (70 x [Neu] Bild und
 10 x [Neu] Ebene ergeben 64 und 8 mit 512 angelegten Plaetzen, vorher genau
 einer; ein zurueckgelassener Platz kommt nach dem Groesse-Aendern leer und
 in 48x40 zurueck; ein wieder angelegtes Bild und eine wieder angelegte
@@ -8328,7 +8329,7 @@ ESC-Abfrage muss NACH `GUI_UPDATE` stehen -- davor oeffnete dieselbe Taste
 den Kasten, und das GUI_UPDATE desselben Bildes nahm sie gleich als
 "Abbrechen" (der Kasten war nie zu sehen); und VOR der Auswertung der
 Antwort, sonst oeffnet die abbrechende Taste ihn im selben Bild wieder.
-Tests `tests/pruef/werkzeug_kreuz.dhtest` (24, echte Fensternachrichten ueber
+Tests `tests/pruef/werkzeuge/werkzeug_kreuz.dhtest` (24, echte Fensternachrichten ueber
 `_hilfen/fenstersender.ps1`; je Werkzeug ungesichert fragt / gesichert endet
 sofort, ESC fuer 185/187/189, SFX zurueckgestellt, Sprite ein Verlaufsschritt).
 Gegenprobe gegen die alten Werkzeuge: alle 13 Faelle mit ungesicherter Arbeit
@@ -8366,7 +8367,7 @@ das erste Feld von `Graphics` und schloss beim Abraeumen das Fenster samt
 GL-Kontext, bevor Schriften und Texturen freigegeben wurden; Mesa stuerzte
 daran ab (gdb im CI-Lauf: drop(Graphics) -> UnloadFont -> rlUnloadTexture),
 Windows verzeiht es. Jetzt ist es das letzte Feld,
-`tests/pruef/grafik_aufraeumen.dhtest` haelt die Reihenfolge fest
+`tests/pruef/grafik/grafik_aufraeumen.dhtest` haelt die Reihenfolge fest
 (Gegenprobe mit der alten: faellt), und der Paket-Lauf laesst ein
 Fensterprogramm unter xvfb mit Rueckgabe 0 enden. **Gemessen im
 Paket-Lauf:** Linux (x86_64) 22 MB, install.sh in ein frisches HOME, die IDE
@@ -8379,7 +8380,7 @@ Fassung 2026.27). Bekannt offen: eine `.dh` per
 Doppelklick im Finder oeffnete die IDE nicht mit der Datei (seit demselben
 Tag behoben, siehe "Dateien vom Finder" unten), keine
 Beglaubigung (Notarisierung); ein gescheitertes Fenster endete in einem
-Panic -- seit demselben Tag eine Meldung (naechster Absatz). Tests `tests/pruef/werkzeug_paket.dhtest`
+Panic -- seit demselben Tag eine Meldung (naechster Absatz). Tests `tests/pruef/werkzeuge/werkzeug_paket.dhtest`
 (8: Linux-Ordner, macOS-Bundle samt .icns-Eintraegen, Symbole passen zum
 Logo, unbekanntes System, install.sh ein/aus mit fremdem dhrt, der Starter
 mit der echten Laufzeit zweimal, `DH_IDE_BEISPIELE` mit Gegenprobe); sieben
@@ -8408,7 +8409,7 @@ Fassung gab einfach `Err` zurueck und haette am `catch_unwind` vorbei
 geprueft. Der echte Fall laeuft im Paket-Lauf (Linux ohne xvfb, macOS ohne
 OpenGL). "Kein Fenster moeglich" steht in beiden Erkennungslisten fuer
 Maschinen ohne Bildschirm (`pruefsammlung::KEIN_FENSTER`, `conftest.py`).
-Tests `tests/pruef/kein_fenster.dhtest` (4, geben die Meldung nie selbst aus,
+Tests `tests/pruef/laufzeit/kein_fenster.dhtest` (4, geben die Meldung nie selbst aus,
 sonst hielte der Laeufer sie fuer eine Maschine ohne Bildschirm); drei
 Verfaelschungen (ohne `catch_unwind`, Hook nicht stumm, Bildbefehl ohne
 eigenen Namen) lassen je genau ihre Faelle fallen.
@@ -8442,7 +8443,7 @@ Weg ueber LaunchServices wie der Doppelklick) liefert den Pfad in der Laufzeit
 ab -- durch den Shell-Starter und dessen `exec` hindurch. Dass die IDE ihn
 dann als Reiter zeigt, ist auf einem echten Mac ungeprueft (die Laeufer haben
 kein Fenster); unter Windows zeigt es der Test. Tests
-`tests/pruef/abgelegte_dateien.dhtest` (2) plus zwei Zeilen in
+`tests/pruef/fenster/abgelegte_dateien.dhtest` (2) plus zwei Zeilen in
 `werkzeug_paket.dhtest`, Rust-Test `warteschlange_liefert_einmal`; vier
 Verfaelschungen (Liste nicht je Bild geleert, Finder-Warteschlange nicht
 abgeholt, IDE ohne Abfrage, Ordner wie Datei) lassen je genau ihre Faelle
@@ -8483,14 +8484,14 @@ UEBERLEBT (`docs/entwurf-python-abbau.md` 7.6) -- alle vier sind jetzt
 Sammlungen, **keine ist aufgegeben worden**. (1) `test_dhrt_test.py`: der
 Anker laeuft in der CI direkt (`dhrt test tests/pruef`, neuer Schritt VOR
 pytest in beiden Job-Familien), das Format prueft
-`tests/pruef/dhrt_test_format.dhtest` (3). **Die innere Sammlung schreibt
+`tests/pruef/werkzeugkette/dhrt_test_format.dhtest` (3). **Die innere Sammlung schreibt
 jeder Fall SELBST** (`WRITEALL` + `JOIN$`) statt als `--- datei`-Beilage:
 ihre Zeilen beginnen mit `===` und `---`, und der aeussere Laeufer haelt
 jede solche Zeile fuer seinen eigenen Trenner. (2) `test_drucken.py`:
-`tests/pruef/drucken.dhtest` (+1, `--- system windows`, ueberspringt sich
+`tests/pruef/module/drucken.dhtest` (+1, `--- system windows`, ueberspringt sich
 ohne "Microsoft Print to PDF"). (3) `test_os_builtins.py`:
-`tests/pruef/os_builtins.dhtest` (+2). (4) `test_midi_module.py`:
-`tests/pruef/modules_midi.dhtest` (+6, Selbst-Ueberspringen je Stufe --
+`tests/pruef/laufzeit/os_builtins.dhtest` (+2). (4) `test_midi_module.py`:
+`tests/pruef/geraete/modules_midi.dhtest` (+6, Selbst-Ueberspringen je Stufe --
 Feature, Ausgang, Loopback-Port).
 
 **Neu dafuer `EXEPATH$()`** (builtins.rs neben `CWD$`): der Pfad der
@@ -8600,7 +8601,7 @@ geordnet (so vergleicht pathlib unter Windows), und ein Text wird wie Pythons
 den abschliessenden Umbruch, den der MPL-Volltext braucht) und wie `strip()`
 beschnitten. `THIRD-PARTY-NOTICES-IDE.txt` ist erzeugt und gitignoriert wie ihr
 Qt-Gegenstueck -- `bauen.dh` schreibt sie vor jedem Verpacken neu. Tests
-`tests/pruef/werkzeug_installer.dhtest` (3, mit erfundener `cargo metadata` und
+`tests/pruef/werkzeuge/werkzeug_installer.dhtest` (3, mit erfundener `cargo metadata` und
 Attrappe statt cargo; Gegenprobe ohne Kleinschreibung beim Sortieren faellt).
 **Falle:** es gibt keinen Befehl fuer den Namen des Betriebssystems -- `bauen.dh`
 sucht darum einfach beide Dateinamen (`dhrt.exe`, `dhrt`).
@@ -8612,7 +8613,7 @@ wird eine KOPIE der Laufzeit (`<ausgabe>/stufe/dhrt.exe`, an ISCC als
 `/DDhrtQuelle`) -- die gebaute laeuft womoeglich gerade als `bauen.dh` --, dann
 der Installer; ein Fehlschlag bricht VOR ISCC ab statt nur zu warnen. Tests mit
 Attrappen fuer ISCC/signtool (`.cmd`, die `PROCESS_START` direkt startet) in
-`tests/pruef/werkzeug_installer.dhtest`; vier Verfaelschungen fallen.
+`tests/pruef/werkzeuge/werkzeug_installer.dhtest`; vier Verfaelschungen fallen.
 **Nur was git kennt (2026-11-01):** examples/ und esp32/ gehen mit allen
 Unterordnern ins Paket -- im Arbeitsordner lagen dort 21,7 MB gitignorierter
 Downloads (Installer 2026.39 zuerst 80 statt 60 MB; fruehere Fassungen
@@ -8633,7 +8634,7 @@ die Deinstallation zeigten darum das nackte Programm. Der Installer legt jetzt
 `<wurzel>/daten/bilder/`: das Logo als `WINDOW_ICON`, der Schriftzug steht auf
 der Willkommensseite statt des Titels als Text (vorab auf 240x112 skaliert,
 der Satz rechts daneben, alles ab den Knoepfen bleibt an seiner Stelle); ohne
-die Dateien bleibt es beim Text. Tests `tests/pruef/werkzeug_ide_schriftzug.dhtest`
+die Dateien bleibt es beim Text. Tests `tests/pruef/ide/werkzeug_ide_schriftzug.dhtest`
 (3) und zwei Zeilen in `werkzeug_paket.dhtest`.
 **Video und der Vorspann der IDE (2026-09-23, Wunsch des Nutzers):** neues
 Modul `video` (Feature `video`, auf dem Desktop immer dabei) -- MP4 ueber die
@@ -8652,7 +8653,7 @@ Zugabe. Kein Ton, nur H.264. Die IDE spielt `daten/video/vorspann.mp4` vor
 allem anderen (Taste/Klick ueberspringt, Kreuz beendet, Einstellung
 `vorspann`); ein Testlauf mit `DHRT_FRAMES` zeigt ihn nur mit
 `DH_IDE_VORSPANN=1`. Installer und Pakete nehmen `daten/video` mit. Tests
-`tests/pruef/video.dhtest` (8), `tests/pruef/werkzeug_ide_vorspann.dhtest` (4;
+`tests/pruef/grafik/video.dhtest` (8), `tests/pruef/ide/werkzeug_ide_vorspann.dhtest` (4;
 mit der Maus -- `KEY_ANY_HIT` blendet eingespielte Tasten aus). Doku
 `docs/module-video.md`.
 
@@ -8665,7 +8666,7 @@ Zeile NUR, wenn der Satz sichtlich weitergeht (Bindestrich, Komma, offene
 Klammer, Kleinbuchstabe) -- sonst holte ein Titel ohne Punkt ("Coin Quest")
 die naechste Zeile mit; ein Satzende braucht zwei Buchstaben vor dem Punkt
 (`z.B.` endet nichts). Tests vier Faelle in
-`tests/pruef/werkzeug_ide_handgriffe.dhtest`, darunter die Vollstaendigkeit
+`tests/pruef/ide/werkzeug_ide_handgriffe.dhtest`, darunter die Vollstaendigkeit
 der JSON gegen `DIRLIST`.
 
 **Kachel als Widget, Mausrad, Bereichsfarben (2026-09-21, Hinweise des
@@ -8689,7 +8690,7 @@ blaettert nur, wenn dort `win` oben liegt. (3) **Bereichsfarben**
 (`bereichsFarben` in ide.dh): Projekt/Gliederung/Zuletzt blau, Ausgabe und
 Eingabe gruen, Probleme orange, Debugger violett -- `GUI_SET_COLOR(..., "bg")`
 aus `GUI_THEME_GET("widget_bg")` gemischt (dunkel 20 %, hell 16 %), nach jedem
-Themawechsel neu. Tests `tests/pruef/gui_kachel.dhtest` (6), ein Fall in
+Themawechsel neu. Tests `tests/pruef/gui/gui_kachel.dhtest` (6), ein Fall in
 `werkzeug_showcase.dhtest` (Rad unter dem Handbuch; ohne die Fensterfrage
 faellt er) und einer in `werkzeug_ide_schriftzug.dhtest` (Farbwert beider
 Themen).
@@ -8718,8 +8719,8 @@ Einstellungen: Listen (Gliederung, Ausgabe, Probleme; Vorgabe 18) und
 Handbuch (16), in der ide.json `listen_schrift`/`handbuch_schrift`. (7)
 **Info-Fenster mit Bild**: ein eigenes Fenster (`winUeber`) statt
 `GUI_DIALOG` -- Symbol, Schriftzug, Text, OK (Enter/ESC). Tests
-`tests/pruef/gui_liste_farben.dhtest` (4, Farben im Bild, Gegenprobe ohne
-Abschnitte, Zeilenhoehe ueber Bild ab), `tests/pruef/werkzeug_ide_lesbarkeit.dhtest`
+`tests/pruef/gui/gui_liste_farben.dhtest` (4, Farben im Bild, Gegenprobe ohne
+Abschnitte, Zeilenhoehe ueber Bild ab), `tests/pruef/ide/werkzeug_ide_lesbarkeit.dhtest`
 (8; die Gliederungsprobe sucht das Rechteck der Liste per `GUI_HIT_TEST`,
 weil sonst die Schluesselwort-Farbe der Werkzeugleiste mitzaehlte), Rust-Test
 `kontrast_nach_wcag`; sechs Verfaelschungen der IDE fallen je in ihrem Fall.
@@ -8752,7 +8753,7 @@ wirklich fett sind). Das Messen (`text_width_stil`, `&self`) kennt nur schon
 geladene Schnitte -- darum laedt `Gui::schnitte_laden` sie in GUI_UPDATE vor
 dem Setzen, und `wfont` gibt der gui den Schnitt-Handle, damit Schreibmarke
 und Auswahl mit der Schrift messen, die dasteht. GFX_PUSH/POP nimmt den Stil
-mit. Tests `tests/pruef/schriftstil.dhtest` (7: Stil-Rundweg samt PUSH/POP,
+mit. Tests `tests/pruef/grafik/schriftstil.dhtest` (7: Stil-Rundweg samt PUSH/POP,
 Fehler, eingebaute Schrift ohne Schnitte, Segoe mit Schnitten und Tahoma ohne
 Kursiv, der Ersatz am Bild -- mehr Punkte, Neigung ueber die mittlere x-Lage
 oben gegen unten, Linien --, Widget samt `.dhform`, Widget-Linie im Bild),
@@ -8789,7 +8790,7 @@ Sortieren oder Filtern anstiess -- der Lader baute `view` nie
 (`ts.rebuild_view()` fehlte); Fall "eine geladene flache tabelle zeigt ihre
 zeilen". Form-Designer: drei Palettenarten (Baumtabelle als `table` mit
 `baum`), Abschnitte/Schritte im Feld "Eintraege", DH-Code. Tests
-`tests/pruef/gui_akkordeon.dhtest` (6), `gui_assistent.dhtest` (7, einer davon liest den geladenen Assistenten -- der erste Satz Faelle pruefte nur das Schreiben, und die Verfaelschung des Lesers blieb gruen),
+`tests/pruef/gui/gui_akkordeon.dhtest` (6), `gui_assistent.dhtest` (7, einer davon liest den geladenen Assistenten -- der erste Satz Faelle pruefte nur das Schreiben, und die Verfaelschung des Lesers blieb gruen),
 `gui_baumtabelle.dhtest` (7); zehn Verfaelschungen der Laufzeit (ohne
 Kinder-Ausnahme, ohne Mitwandern, ohne Pruefung, ohne Vorfahren im Filter,
 Kinder beim Entfernen nach oben, ohne Dreieck, drei .dhform-Schluessel,
@@ -8802,7 +8803,7 @@ gesperrt). **Der Fund dabei steckt in der Laufzeit:** die Knoepfe des
 Assistenten waren fest 112 Punkte breit, in einem 298 Punkte breiten lag
 Abbrechen halb ueber Zurueck -- gesehen nur im BILD. `wz_geom` teilt jetzt
 die Breite (hoechstens 112, mindestens 40). Tests
-`tests/pruef/beispiel_drei_widgets.dhtest` (4: Eintrag ueber den
+`tests/pruef/beispiele/beispiel_drei_widgets.dhtest` (4: Eintrag ueber den
 Assistenten samt Pflichtfeld und Bereich, Ordner ohne Groesse, Filter,
 echter Klick auf einen Akkordeon-Kopf), ein Fall mehr in
 `gui_assistent.dhtest` (Klick bei x 190 trifft Zurueck; mit festen Knoepfen
@@ -8810,7 +8811,7 @@ lag dort Weiter) und das Beispiel in `beispiele_gui_enden.dhtest`.
 
 **Stufe 53 (2026-09-14):** die CIRCUIT-RUNNER-Engine ohne Python -- die fuenf
 Engine-Tests aus `test_circuitrunner.py` stehen in
-`tests/pruef/werkzeug_circuitrunner.dhtest`; in pytest bleiben nur die drei
+`tests/pruef/werkzeuge/werkzeug_circuitrunner.dhtest`; in pytest bleiben nur die drei
 Tests der Python-Werkzeuge `convert_dat.py` und `make_demo_levels.py`, und die
 Datei steht nicht mehr in `_BRAUCHT_GRAFIK`. pytest hatte die Engine-Quelle
 vor `WHILE NOT QUITREQUESTED()` abgeschnitten und in einem Ordner mit den
@@ -8837,7 +8838,7 @@ sind geloescht, aus `test_midi_module.py` sind sieben Tests gezogen. **Debugger:
 `tests/pruef/_hilfen/debugsitzung.dh` startet `dhrt debug` per PROCESS_START,
 schreibt die JSON-Kommandos, schliesst stdin und liest die Ereignisse mit dem
 json-Modul (`art$`, `feld$`, `paar$` fuer globals/locals, `ersteMit`,
-`ausgaben$`); `tests/pruef/dhrt_debug.dhtest` (6). **VM-Haertung:** das Geruest
+`ausgaben$`); `tests/pruef/werkzeugkette/dhrt_debug.dhtest` (6). **VM-Haertung:** das Geruest
 kommt von `dhrt --dumpbc`, `JSON_SET_JSON` setzt `main.code` auf ADD mit leerem
 Stapel, der Fall startet es als `.dhc` und prueft Rueckgabe, Meldung und dass
 kein Panic kam (`vm_haertung.dhtest`, 2). **MIDI:** Registrierung, Handle-Typen,
@@ -8876,8 +8877,8 @@ Broker).
 **Stufe 50 (2026-09-14):** zwei grosse Golden-Dateien, die beim Umzug von
 2026-09-08 stehen geblieben waren -- `test_language_extensions.py` (59 Tests)
 und `test_dhrt_builtins.py` (34, einige mit mehreren Laeufen) sind geloescht.
-Neu `tests/pruef/sprach_erweiterungen.dhtest` (52 Faelle) und
-`tests/pruef/dhrt_builtins.dhtest` (44); die drei Tests, die nur das
+Neu `tests/pruef/sprache/sprach_erweiterungen.dhtest` (52 Faelle) und
+`tests/pruef/werkzeugkette/dhrt_builtins.dhtest` (44); die drei Tests, die nur das
 Befehlsverzeichnis fragten (TIMER, JOYSTICK_*, INKEY$/WAITKEY), sind ein Fall in
 `builtin_registrierung.dhtest`. Ein Generator zog Quelltext und Zusagen aus dem
 Syntaxbaum, liess jedes Programm laufen, pruefte `==`/`in`/`raises` am echten
@@ -8892,7 +8893,7 @@ fallen; die 7 uebrigen sind die Lexer-, Parser- und Compile-Fehler, die vor
 jeder Zeile des Programms abbrechen.
 
 **Stufe 49 (2026-09-14):** die letzte der Restdateien aus Stufe 44 bis 48 --
-`test_smtp.py` ist geloescht, ihre 18 Tests stehen in `tests/pruef/smtp.dhtest`
+`test_smtp.py` ist geloescht, ihre 18 Tests stehen in `tests/pruef/module/smtp.dhtest`
 (jetzt 26 Faelle). Zwei Helfer unter `tests/pruef/_hilfen/`: **`smtpserver.dh`**,
 der `_MiniServer` in Drachenhauch (eine Verbindung; Faehigkeiten, Anmeldung und
 Empfaenger ueber Argumente; Befehle nach `befehle.txt`, die Nachricht nach
@@ -9008,11 +9009,11 @@ prueft das Python-`preprocess` der Editoren, nicht dhrt. Verweise auf die
 geloeschten Dateien in CLAUDE.md, `docs/` und drei Kommentaren nachgezogen --
 darunter der Hinweis, die PDF-Schriftmasse wuerden in `test_pdf.py` gegen
 PyMuPDF gemessen: das tut seit 2026-09-08 ein Golden mit PyMuPDFs Werten in
-`tests/pruef/pdf.dhtest`.
+`tests/pruef/module/pdf.dhtest`.
 
 **Stufe 43 (2026-09-13):** der Sprite-Pilot ohne Python -- und damit hat
 KEIN Werkzeug in Drachenhauch mehr einen pytest-Test.
-`tests/pruef/werkzeug_sprite.dhtest` (41 Faelle), die pytest-Datei
+`tests/pruef/werkzeuge/werkzeug_sprite.dhtest` (41 Faelle), die pytest-Datei
 `test_pilot_sprite_auswahl.py` geloescht. Kein neues Formatstueck; die
 zweizeiligen Ersetzungen der pytest-Fassung (`GUI_WINDOW_VISIBLE(winGr, FALSE)`
 plus `DIM grOffen`, weil die erste Zeile dreimal vorkommt) ersetzen jetzt die
@@ -9034,7 +9035,7 @@ links oben vor der Wandlung, Bereich vor [Neu]) stehen jeweils als eigene
 Probe-Zeile, damit ein Endstand nicht zufaellig stimmt.
 
 **Stufe 42 (2026-09-13):** der Tilemap-Pilot ohne Python --
-`tests/pruef/werkzeug_tilemap.dhtest` (32 Faelle), die pytest-Datei
+`tests/pruef/werkzeuge/werkzeug_tilemap.dhtest` (32 Faelle), die pytest-Datei
 `test_pilot_tilemap.py` geloescht. **Neues Formatstueck `--- ersetzen ALT`**: der Rest der Kopfzeile
 muss GENAU EINMAL im Programm stehen und wird durch den Block ersetzt
 (`{sammlung}`/`{fall}` gelten; `pruefsammlung::ersetzen_einmal`, Rust-Test
@@ -9057,7 +9058,7 @@ pytest) nur den Endstand `tsAkt 0`, der ohne jede Eingabe auch stimmt; er
 merkt sich jetzt, dass das zweite Tileset zwischendurch aktiv war.
 
 **Stufe 41 (2026-09-13):** der Rechnungen-Pilot ohne Python --
-`tests/pruef/werkzeug_rechnungen.dhtest` (14 Faelle; die zwei Pruefungen, die
+`tests/pruef/werkzeuge/werkzeug_rechnungen.dhtest` (14 Faelle; die zwei Pruefungen, die
 in pytest je EIN Test mit zwei Laeufen waren, sind jetzt je zwei Faelle),
 `tests/test_pilot_rechnungen.py` geloescht. Die vier fremden Leser sind
 ersetzt: Pythons `sqlite3` durch das db-Modul im `--- nachher`, PyMuPDF durch
@@ -9076,7 +9077,7 @@ Alle 14 Faelle waren beim ersten Lauf gruen -- die Gegenprobe ohne
 Start, Geldrechnung, Fenstergroesse, Rechnungsfenster) brauchen keine.
 
 **Stufe 40 (2026-09-13):** der Tracker-Pilot ohne Python --
-`tests/pruef/werkzeug_tracker.dhtest` (17 Faelle), `tests/test_pilot_tracker.py`
+`tests/pruef/werkzeuge/werkzeug_tracker.dhtest` (17 Faelle), `tests/test_pilot_tracker.py`
 geloescht. Ohne neues Formatstueck: ein Einschub hinter `FLIP()` schreibt je
 Bild `probe.txt`, ein zweiter hinter `bildNr = bildNr + 1` ruft die
 Unterprogramme des Piloten (`zelleSetzen`, `ladeDatei`, `wavRendern`,
@@ -9093,8 +9094,8 @@ Gegenprobe ohne `AUTOMATION_PLAY`: alle 9 Faelle mit Eingaben fallen, die
 uebrigen 8 rufen den Piloten direkt und brauchen keine.
 
 **Stufe 39 (2026-09-13):** SFX- und Partikel-Pilot ohne Python --
-`tests/pruef/werkzeug_sfx.dhtest` und `werkzeug_partikel.dhtest` (je 8), dazu
-`tests/pruef/builtin_registrierung.dhtest` fuer die 14 kleinen pytest-Dateien,
+`tests/pruef/werkzeuge/werkzeug_sfx.dhtest` und `werkzeug_partikel.dhtest` (je 8), dazu
+`tests/pruef/laufzeit/builtin_registrierung.dhtest` fuer die 14 kleinen pytest-Dateien,
 die nur fragten, ob Fenster-/Monitor-/Dialogbefehle im Verzeichnis stehen
 (68 Namen ueber `CODE_COMPLETE`, mit Gegenprobe). 16 pytest-Dateien geloescht.
 **Neues Formatstueck `--- einschub nach MARKE`** (mehrere erlaubt): die
@@ -9121,11 +9122,11 @@ den einen Test: **`BUFFER_DEFLATE(b [, format$])` / `BUFFER_INFLATE(b [,
 format$])`** auf rohen Bytes, Vorgabe `"zlib"` (PDF, PNG, Netz), `"roh"` wie in
 ZIP; kaputte Daten und ein unbekanntes Format sind Fehler, entpackt wird
 hoechstens 512 MB (`decompress_to_vec_zlib_with_limit`). Der Fall in
-`tests/pruef/werkzeug_ide_sonderfaelle.dhtest` schreibt die 140 Zeilen im
+`tests/pruef/ide/werkzeug_ide_sonderfaelle.dhtest` schreibt die 140 Zeilen im
 `--- vorher`, zaehlt die Seitenobjekte (`/Type /Page /Parent` -- `/Type /Page`
 allein traefe auch `/Pages`) und entpackt die Inhaltsstroeme. **Falle:** die
 Suche nach `stream\n` muss HINTER dem letzten `endstream` weitergehen, sonst
-trifft sie `endstream\nendobj`. Tests `tests/pruef/buffer.dhtest` (+4, darunter
+trifft sie `endstream\nendobj`. Tests `tests/pruef/module/buffer.dhtest` (+4, darunter
 ein von Pythons `zlib` gepackter Strom als fremder Schreiber).
 
 **Stufe 37 (2026-09-13):** die Sonderfaelle der IDE ohne Python -- und dafuer
@@ -9146,7 +9147,7 @@ liefe ein zweiter mit anderer Bildzahl; Hilfsprogramme durch `hilfslauf`. Der
 Einschub spielt die Aufnahme nur ab, wenn es sie gibt
 (`IF FILEEXISTS("ev.txt") THEN AUTOMATION_PLAY("ev.txt")`). Die Hervorhebung
 zaehlt ihre Farbbaender jetzt in Drachenhauch (`LOADIMAGE` + `GETPIXEL` gehen
-ohne Fenster). Neue Sammlung `tests/pruef/werkzeug_ide_sonderfaelle.dhtest` (8);
+ohne Fenster). Neue Sammlung `tests/pruef/ide/werkzeug_ide_sonderfaelle.dhtest` (8);
 in `tests/test_ide.py` bleibt **nur das PDF-Listing** -- das pdf-Modul packt
 seine Seiten mit FlateDecode, ein Leser in Drachenhauch saehe den Text nicht.
 **Zwei Gegenproben:** ohne `AUTOMATION_PLAY` fallen alle 6 Faelle mit Aufnahme;
@@ -9162,7 +9163,7 @@ Parse-Fehler, `EPRINT("text")` geht. Rust-Test
 `vorher_zwischen_nochmal_in_ihrer_reihenfolge`.
 
 **Stufe 36 (2026-09-13):** die Staende 13 bis 25 der IDE ohne Python -- 58
-Faelle nach `tests/pruef/werkzeug_ide_13_25.dhtest`; in `tests/test_ide.py`
+Faelle nach `tests/pruef/ide/werkzeug_ide_13_25.dhtest`; in `tests/test_ide.py`
 bleiben **9 Sonderfaelle** (PDF-Listing mit PyMuPDF, Sitzung/Umbruch/Sitzung
 je Projekt mit zwei IDE-Laeufen, git blame und zweimal git diff mit
 Repository, die Hervorhebung als Farbbaender im Bild, das Farbfeld mit einem
@@ -9187,7 +9188,7 @@ er bekam 1800 s. (Seit 2026-09-20 ruft die CI `dhrt test tests/pruef` direkt
 auf, ohne Zeitgrenze von pytest.)
 
 **Stufe 35 (2026-09-13):** die Staende 6 bis 12 der IDE ohne Python -- 43
-Faelle aus `tests/test_ide.py` nach `tests/pruef/werkzeug_ide_6_12.dhtest`
+Faelle aus `tests/test_ide.py` nach `tests/pruef/ide/werkzeug_ide_6_12.dhtest`
 (eigene Datei, `--- seriell`; die Laeufer nehmen seriell markierte Dateien
 nacheinander, die Zwischenablage bleibt also ungeteilt), 67 bleiben. Neu im
 Umgang, nicht im Format: eine **Voreinstellung der IDE** (`regex`,
@@ -9213,9 +9214,9 @@ schwach.
 **Stufe 34 (2026-09-13):** die IDE selbst, erster grosser Teil ohne
 Python -- ohne neues Formatstueck, alles mit dem aus Stufe 32/33.
 test_ide_bausteine.py ist geloescht (12 Faelle in
-`tests/pruef/ide_bausteine.dhtest`: PROCESS_*, CODE_* als Golden der
+`tests/pruef/ide/ide_bausteine.dhtest`: PROCESS_*, CODE_* als Golden der
 JSON-Ausgabe, Textbereich-Befehle), aus `tests/test_ide.py` sind die 31 Faelle
-der Staende 1 bis 5 nach `tests/pruef/werkzeug_ide.dhtest` gezogen (110
+der Staende 1 bis 5 nach `tests/pruef/ide/werkzeug_ide.dhtest` gezogen (110
 bleiben). **Das Protokoll liest ein `--- nachher`-Programm**
 (`READLINES("_programm/ide.log")` + `hat`/`zahl`/`erste$`/`alle$`/`endet`),
 nicht `--- inhalt` -- das sucht Teiltexte, und `geprueft 1` stuende auch in
@@ -9234,8 +9235,8 @@ schwach.
 
 **Stufe 33 (2026-09-13):** die naechsten zwei Werkzeuge ohne Python --
 `test_pilot_animfsm.py` und `test_pilot_notenblatt.py` sind geloescht, ihre
-Faelle stehen in `tests/pruef/werkzeug_animfsm.dhtest` und
-`tests/pruef/werkzeug_notenblatt.dhtest` (je 7). Dafuer drei Stuecke im
+Faelle stehen in `tests/pruef/werkzeuge/werkzeug_animfsm.dhtest` und
+`tests/pruef/werkzeuge/werkzeug_notenblatt.dhtest` (je 7). Dafuer drei Stuecke im
 Format: **`--- streichen ZEILE`** nimmt die erste genau so lautende Zeile aus
 der Programmkopie (`WINDOW_MAXIMIZE()` -- sonst treffen die Klicks keine
 festen Lagen; fehlt die Zeile, ist der Fall ein Fehler), **`--- nachher`**
@@ -9269,7 +9270,7 @@ dem Fallordner als Arbeitsordner -- er ist damit `DHRT_START_DIR`, also das
 `AUTOMATION_PLAY` hinter `SETFPS(60)`) oder direkt ueber seine
 Unterprogramme (Einschub hinter der Bereit-Zeile, endet mit `EXIT(0)`) --
 der zweite prueft die Logik ohne Bildschirmlagen. **Als Beleg umgezogen:**
-test_pilot_formdesigner.py -> `tests/pruef/werkzeug_formdesigner.dhtest`
+test_pilot_formdesigner.py -> `tests/pruef/werkzeuge/werkzeug_formdesigner.dhtest`
 (10 Faelle; der DH-Code-Fall ruft `dhCode$()`, laesst `dhrt --check` und
 `dhrt bild` als Prozesse laufen; der Palette-Fall liest gui.rs mit
 `READLINES`). Stolperstein beim Schreiben: `READALL$` nimmt ein FILE-Handle,
@@ -9293,7 +9294,7 @@ als Aufruf, ohne `GUI_LOAD`, Texte mit Umbruch als `!"..."`, sich selbst
 messende Konstruktoren mit `GUI_SET_BOUNDS` hinterher, das Bild
 uebersprungen. Die IDE: **eine `.dhform` oeffnet den Designer** (`werkzeugMit`,
 `dhrt run 197 -- datei`), als Text ueber die Befehlspalette ("Formular als
-Text oeffnen"). Tests: vier neue in test_pilot_formdesigner.py (seit Stufe 32 in `tests/pruef/werkzeug_formdesigner.dhtest`) --
+Text oeffnen"). Tests: vier neue in test_pilot_formdesigner.py (seit Stufe 32 in `tests/pruef/werkzeuge/werkzeug_formdesigner.dhtest`) --
 lesen mit `json`, nicht mit dem Qt-Modell; der DH-Code-Test legt JEDE Art an
 und laesst den Code durch `--check` und einen Lauf; zwei in `tests/test_ide.py`.
 
@@ -9329,7 +9330,7 @@ Kaestchen "Zellmodus" + Codegen. Die IDE: das Profil ist ein Gitter
 und nagelte nach dem ersten Klick ins Profil die Marke fest. Sichtbar wurde
 es erst, als Pfeile im Gitter eine Zeile waehlten und ein fremder Test
 (Aufrufer-Baum) rot wurde; `--check` sagt dazu nichts. Die uebrigen
--1-Builtins in IDE und Beispielen vergleichen alle mit `>= 0`. Tests `tests/pruef/gui_gitter.dhtest` (6, darunter
+-1-Builtins in IDE und Beispielen vergleichen alle mit `>= 0`. Tests `tests/pruef/gui/gui_gitter.dhtest` (6, darunter
 die Pfeiltasten in einer gewoehnlichen Tabelle), ein Rust-Test.
 
 **Stufe 29 (2026-09-13):** das Handbuch bedienbar, als Ausbau von
@@ -9350,7 +9351,7 @@ hebt die Auswahl auf. Gezeichnet wird je Lauf der Teil im Bereich, an seinen
 Zeichen gemessen, dazu die Luecke zwischen zwei Laeufen -- sonst saehe eine
 Auswahl ueber drei Woerter aus wie drei. Die IDE: Weiter/Zurueck-Knoepfe,
 Enter/Umschalt+Enter, Zahl der Fundstellen, Protokoll `hbsuche`. Tests
-`tests/pruef/gui_gesetzter_text_auswahl.dhtest` (4, der Mauszug
+`tests/pruef/gui/gui_gesetzter_text_auswahl.dhtest` (4, der Mauszug
 geometriefrei: von vor der ersten bis hinter die letzte Zeile = alles, gegen
 SELECT_ALL), einer in `tests/test_ide.py`.
 
@@ -9378,7 +9379,7 @@ zu Zeile) | Umbruch (Klick = umschalten); die Symbolspur ist eine Pfadleiste
 Protokollzeile `spur ...` blieb, zwei Tests lesen ihr letztes Element.
 **Stolperstein beim Schreiben der Tests:** `--- nicht enthaelt` gibt es im
 dhtest-Format nicht; eine Gegenprobe gehoert in `--- erwartet` mit
-Ausgaben ohne Bildnummer. Tests `tests/pruef/gui_leisten.dhtest` (7),
+Ausgaben ohne Bildnummer. Tests `tests/pruef/gui/gui_leisten.dhtest` (7),
 ein Rust-Test, einer in `tests/test_ide.py`; Form-Designer-Palette 30.
 
 **Stufe 27 (2026-09-13):** zwei Fragen des Nutzers -- koennen Knoepfe
@@ -9410,7 +9411,7 @@ dunkelblauer Auswahl) -- gesehen nur im Bild; die Schrift einer gewaehlten
 Zeile folgt jetzt ihrem Grund. Die IDE nutzt beides: Palette mit
 Zusatztext (Kuerzel/Ordner rechts statt angehaengt), Uebernehmen/Drucken/
 Neue Datei als `primaer`, Debugger-Stopp als `gefahr`. Tests
-`tests/pruef/gui_liste_komfort.dhtest` (9), `tests/pruef/gui_knopfarten.dhtest`
+`tests/pruef/gui/gui_liste_komfort.dhtest` (9), `tests/pruef/gui/gui_knopfarten.dhtest`
 (3, darunter eine Bildprobe).
 
 **Stufe 26 (2026-09-13):** der Hinweis des Nutzers -- die Werkzeugleiste
@@ -9443,7 +9444,7 @@ geschrieben, und raylibs Aufnahme-Leser verliert die LETZTE Zeile** --
 meist das Loslassen. Zwei Faelle ("Trenner", "Wegziehen") waren dadurch
 gruen, ohne je geklickt zu haben, weil dort ohnehin nichts passieren
 sollte; `docs/werkzeuge.md` sagt es jetzt. Tests
-`tests/pruef/gui_werkzeugleiste.dhtest` (9, darunter eine Bildprobe),
+`tests/pruef/gui/gui_werkzeugleiste.dhtest` (9, darunter eine Bildprobe),
 2 Rust-Tests, 2 in `tests/test_ide.py`.
 
 **Stufe 25 (2026-09-12):** zwei Widgets aus der eigenen Lueckenliste -- und
@@ -9478,7 +9479,7 @@ und **alle vier Umbauten sammeln in Schritten**. **Der Stolperstein dieser
 Runde, gefunden von einem Test aus Stand 24:** das Baum-Kaestchen sass
 zwischen Dreieck und Namen, also dort, wo man klickt, um eine Datei zu
 oeffnen -- es steht jetzt GANZ LINKS (`tree_kast_w`). Tests
-`tests/pruef/gui_gesetzter_text.dhtest` (7), `tests/pruef/gui_uhrzeit.dhtest`
+`tests/pruef/gui/gui_gesetzter_text.dhtest` (7), `tests/pruef/gui/gui_uhrzeit.dhtest`
 (6), vier neue in `tests/test_ide.py`.
 
 **Stufe 24 (2026-09-12):** kein Punkt aus der eigenen Liste, sondern die
@@ -9512,7 +9513,7 @@ und Schluessel ist weg); im Form-Designer ist das Reiterwerk Palette,
 Vorschau und DH-Code, die Seiten-Zuordnung der Controls aber nicht.
 `docs/module-gui.md` sagt am Ende, was der gui weiter FEHLT (Zeitwaehler,
 gesetzter Text, Akkordeon, Pfadleiste, Baum mit Spalten). Tests
-`tests/pruef/gui_dateibaum.dhtest` (13), `tests/pruef/gui_reiterwerk.dhtest`
+`tests/pruef/gui/gui_dateibaum.dhtest` (13), `tests/pruef/gui/gui_reiterwerk.dhtest`
 (7), zwei neue in `tests/test_ide.py`.
 
 **Stufe 23 (2026-09-12):** die drei Punkte nach Stand 22. **Der Baum zeigt
@@ -9629,7 +9630,7 @@ naechste Griff traf dann nichts mehr; `parameterUebernehmen` und
 `umbauZurueck` merken sie sich jetzt. **Aufrufer kennen FUNCREF:** ein Name
 OHNE Klammern (`f = malen`, `GUI_ON_CLICK(knopf, malen)`) ist die Stelle,
 an der entschieden wird, dass er spaeter laeuft. Tests
-`tests/pruef/gui_verlauf_hoehe.dhtest` (4, am Bild gemessen) und 4 neue in
+`tests/pruef/gui/gui_verlauf_hoehe.dhtest` (4, am Bild gemessen) und 4 neue in
 `tests/test_ide.py`.
 
 **Stufe 17 (2026-09-12):** die drei Punkte nach Stand 16. **Klassen
@@ -9676,7 +9677,7 @@ Zwischenablage ein (im Test stand danach ein `#` mitten im verschobenen
 Block). `kuerzel_gefeuert` galt seit Stufe 12 nur fuer die Navigation, nicht
 fuer den Strg-Block (A/C/X/V) und nicht fuer Strg+Z/Y -- also haette auch
 das neue Strg+Umschalt+Z nebenbei ein Redo ausgeloest. Gegenprobe gefahren
-(Waechter entfernt -> Test rot). Tests: `tests/pruef/gui_menu_ausbau.dhtest`
+(Waechter entfernt -> Test rot). Tests: `tests/pruef/gui/gui_menu_ausbau.dhtest`
 (+1) und 7 neue in `tests/test_ide.py`.
 
 **Stufe 15 (2026-09-12):** die drei Punkte nach Stand 14 -- und die erste
@@ -9714,7 +9715,7 @@ WORTLOS mit (jetzt `tabSchliessenFragen` mit Sichern/Verwerfen/Abbrechen),
 und beim Schliessen eines Reiters LINKS vom aktiven ruecken die uebrigen
 auf -- `aktiverTab` zeigte danach auf die Datei daneben (mit Strg+W nie
 aufgefallen, weil es immer den vorderen schliesst). Tests
-`tests/pruef/gui_reiter_kreuz.dhtest` (5, mit Gegenprobe) und 4 in
+`tests/pruef/gui/gui_reiter_kreuz.dhtest` (5, mit Gegenprobe) und 4 in
 `tests/test_ide.py`.
 
 **Stufe 14 (2026-09-12):** die drei Punkte nach Stand 13.
@@ -9746,7 +9747,7 @@ Projektsuche; die Definition steht nicht dabei. Gesucht wird ZEILENweise,
 weil Kommentar und Zeichenkette in Drachenhauch an der Zeile enden -- damit
 ist eine Zeile fuer sich vollstaendig zu lesen und die Umrechnung
 Zeichenstelle -> Zeilennummer faellt weg. Tests
-`tests/pruef/gui_tab_meldet.dhtest` (4, mit Gegenprobe) und 5 neue in
+`tests/pruef/gui/gui_tab_meldet.dhtest` (4, mit Gegenprobe) und 5 neue in
 `tests/test_ide.py`. **docs/ide.md hat jetzt eine Uebersichtstabelle der
 Staende** -- welcher Stand was brachte, gefolgt von dem, was sie HEUTE kann.
 
@@ -9784,7 +9785,7 @@ Sonderfall, `SUB name(` sieht fuer den Sucher aus wie ein Aufruf. Ein
 Aufruf mit anderer Argumentzahl (weggelassener Vorgabewert) oder mit
 BENANNTEN Argumenten wird uebergangen und gezaehlt -- ihn still
 umzustellen waere schlimmer als es zu lassen. Tests
-`tests/pruef/gui_geruest.dhtest` (10, mit Gegenprobe ohne die Listen) und
+`tests/pruef/gui/gui_geruest.dhtest` (10, mit Gegenprobe ohne die Listen) und
 6 neue in `tests/test_ide.py`; die Knopflagen des Parameter-Fensters
 rechnet der Test aus der festen Fensterlage plus `title_h` = 30 (Glas).
 
@@ -9811,7 +9812,7 @@ und der Textbereich verarbeitete DIESELBE Taste noch einmal --
 hoch, also sah der Befehl eine andere Auswahl als die markierte. Ein
 Kuerzel, das gefeuert hat, nimmt dem Feld die Taste jetzt weg
 (`kuerzel_gefeuert` in gui.rs). Ein Fall in
-`tests/pruef/gui_menu_ausbau.dhtest` haelt es fest (Kuerzel feuert, die
+`tests/pruef/gui/gui_menu_ausbau.dhtest` haelt es fest (Kuerzel feuert, die
 Marke bleibt stehen); dazu 5 neue in `tests/test_ide.py` -- das
 Herausloesen geprueft an der gesicherten Datei UND daran, dass sie noch
 uebersetzt.
@@ -9844,7 +9845,7 @@ HAENGT im Test (180 s Zeitgrenze) -- der Vergleich nimmt darum die im
 Projektbaum gewaehlte Datei, und der Dialog ist nur der Rueckfall.
 Dazu: `LOADIMAGE` merkt sich den PFAD; ein neu erzeugtes Vorschaubild kaeme
 ohne `IMAGE_FREE` als das alte zurueck.
-Tests: `dhrt bild` in `tests/pruef/dhrt_bild.dhtest`, vier neue in
+Tests: `dhrt bild` in `tests/pruef/werkzeugkette/dhrt_bild.dhtest`, vier neue in
 `tests/test_ide.py` (darunter die Vorschau mit einem eigenen
 Beispiel-Ordner und einer Farbprobe im erzeugten PNG).
 
@@ -9871,7 +9872,7 @@ fremden Datei kennt man sie nicht. Statt zu raten, wo ein Vorkommen
 KEIN Kommentar ist, werden die Fundstellen der Reihe nach probiert, bis
 eine den Text wirklich aendert. Eine Stelle im Kommentar aendert nichts,
 und dann kommt eben die naechste dran.
-Tests `tests/pruef/gui_spaltenauswahl.dhtest` (6, mit Alt-Zug ueber echte
+Tests `tests/pruef/gui/gui_spaltenauswahl.dhtest` (6, mit Alt-Zug ueber echte
 Maus-Ereignisse) und 5 neue in `tests/test_ide.py`.
 
 **Stufe 9 (2026-09-11):** die Restliste gegen die Qt-IDE abgearbeitet --
@@ -9901,7 +9902,7 @@ einen ZWEITEN Reiter. Jetzt vergleicht `wegGleich$` in einer Schreibweise;
 Gross/klein bleibt, wie es ist, weil das unter Linux zwei verschiedene
 Dateien waeren. Gesehen hat es der Test "andere Reiter schliessen": er
 zaehlte 3 statt 2.
-Tests `tests/pruef/gui_einzugslinien.dhtest` (4, drei Bildproben mit
+Tests `tests/pruef/gui/gui_einzugslinien.dhtest` (4, drei Bildproben mit
 Gegenprobe) und 7 neue in `tests/test_ide.py`.
 
 **Stufe 8 (2026-09-11):** die Liste aus Stufe 7 abgearbeitet. **Zwei
@@ -9933,8 +9934,8 @@ Datei oeffnet. `baumFuellen` merkt sich jetzt die Dateiliste und laesst den
 Baum stehen, wenn sie dieselbe ist. Beim SAMMELN wird ausserdem nicht
 geoeffnet (nur bei genau einer Auswahl, und wenn es die angeklickte ist),
 sonst kaeme mit jedem Strg+Klick ein Reiter dazu.
-Tests `tests/pruef/gui_abkuerzungen.dhtest` (5, mit Gegenprobe ohne die
-Liste), `tests/pruef/gui_baum_mehrfach.dhtest` (6, Klicks echt
+Tests `tests/pruef/gui/gui_abkuerzungen.dhtest` (5, mit Gegenprobe ohne die
+Liste), `tests/pruef/gui/gui_baum_mehrfach.dhtest` (6, Klicks echt
 eingespeist) und 7 neue in `tests/test_ide.py`.
 
 **Stufe 7 (2026-09-09):** die Liste aus Stufe 6 abgearbeitet. **Ein
@@ -9965,7 +9966,7 @@ ersten Start steht der Schluessel noch nicht in der Datei und die Zeile
 laeuft gar nicht, beim zweiten bricht sie mit "Slot leer" ab. Gefunden
 hat es der Farbfeld-Test, weil er ZWEIMAL laeuft (der erste Lauf sagt,
 wo das Feld liegt -- die Geometrie steht erst zur Laufzeit fest).
-Tests `tests/pruef/gui_farbfelder.dhtest` (5, drei davon Bildproben mit
+Tests `tests/pruef/gui/gui_farbfelder.dhtest` (5, drei davon Bildproben mit
 Gegenprobe) und 7 neue in `tests/test_ide.py`.
 
 **Stufe 6 (2026-09-09):** die Liste aus Stufe 5 abgearbeitet, Schwerpunkt
@@ -10000,7 +10001,7 @@ falsch herum einfach FALSE; der Faltschluessel stand auf "" -- das ist die
 echte Gliederung einer Datei ohne SUB, und gerade sie bekam damit nie
 faltbare Bloecke; eine neue Protokollzeile mit dem Dateinamen brach einen
 gruenen Test aus Stand 4; und MID$/INSTR zaehlen ab 0 (siehe Stufe 5).
-Tests `tests/pruef/gui_auto_einzug.dhtest` (8, mit Gegenprobe ohne den
+Tests `tests/pruef/gui/gui_auto_einzug.dhtest` (8, mit Gegenprobe ohne den
 Schalter) und 10 neue in `tests/test_ide.py`, darunter die Hervorhebung
 AM BILD mit Gegenprobe (`mehr` bleibt aus).
 
@@ -10049,8 +10050,8 @@ alles gedrueckt und jeder weitere Kuerzel-Test schweigt; die Wiedergabe
 setzt beim ERSTEN Ereignis an, egal welche Nummer es traegt;
 GUI_TEXTAREA_FIND sucht Teiltexte (aus `hp` wurde auch das in `hpmax` eine
 Marke); und eine neue Protokollzeile mit demselben ersten Wort brach einen
-gruenen Test aus Stand 3. Tests `tests/pruef/gui_faltung.dhtest` (16, mit
-zwei Bildproben samt Gegenprobe), `tests/pruef/gui_mehrfachmarken.dhtest`
+gruenen Test aus Stand 3. Tests `tests/pruef/gui/gui_faltung.dhtest` (16, mit
+zwei Bildproben samt Gegenprobe), `tests/pruef/gui/gui_mehrfachmarken.dhtest`
 (6, seriell) und 12 neue in `tests/test_ide.py`.
 
 **Stufe 4 (2026-09-09, die Handgriffe des Alltags):** gemessen an den
@@ -10088,8 +10089,8 @@ lesen, nicht den Rueckgabewert). Tests `tests/test_ide.py` (7 neue,
 seriell: Kommentar und Duplizieren ueber die gesicherte Datei, Formatieren,
 bedingter Haltepunkt mit Gegenprobe -- GENAU ein Halt statt fuenf --,
 Export laeuft die erzeugte Exe, Gliederung + Waehler, Sitzung ueber zwei
-Laeufe), `tests/pruef/code_format.dhtest`, Auswahlbereich in
-`tests/pruef/ide_bausteine.dhtest`. Offen gegen die Qt-IDE: Markdown gerendert,
+Laeufe), `tests/pruef/werkzeugkette/code_format.dhtest`, Auswahlbereich in
+`tests/pruef/ide/ide_bausteine.dhtest`. Offen gegen die Qt-IDE: Markdown gerendert,
 Faltung, Minimap, geteilter Editor, Mehrfach-Marken, Schnipsel,
 Signaturhilfe, Umbenennen, Git-Blame, Sitzung je Projekt.
 
@@ -10117,7 +10118,7 @@ Symbole ueber den Kommentarblock ueber der Definition. Vervollstaendigung:
 Index (`compiler::builtin_eintraege`), `lexer::KEYWORDS` (neue Liste, Test
 haelt sie an `keyword()` fest -- 75 Eintraege), Farben/Tasten aus vm.rs, PI/TAU,
 eigene Definitionen. Tests: Rust-`#[test]`s in beiden Dateien +
-`tests/pruef/dhrt_lsp.dhtest` (echter Prozess ueber
+`tests/pruef/werkzeugkette/dhrt_lsp.dhtest` (echter Prozess ueber
 stdio, Client `_hilfen/lspklient.dh`; prueft nebenbei die KEYWORDS aus
 `tokens.py` gegen die Vervollstaendigung; bis 2026-09-16 pytest). Der
 Qt-Editor benutzt weiter seine Python-Bausteine (`symbols.py`,
@@ -10143,7 +10144,7 @@ genauso, `.dhc` läuft weiter den direkten VM-Pfad). Debug-Einstiege
 AST bzw. gemergte Quelle aus bzw. führen ohne chdir aus (Dev/Parity).
 Parity: tests/test_rust_lexer_parity.py
 (215) + tests/test_rust_preprocess_parity.py (8)
-+ [`tests/pruef/rust_run_parity.dhtest`](tests/pruef/rust_run_parity.dhtest) (2) = 225.
++ [`tests/pruef/laufzeit/rust_run_parity.dhtest`](tests/pruef/laufzeit/rust_run_parity.dhtest) (2) = 225.
 **Parser- und Compiler-Parity gibt es NICHT MEHR** (dieser Absatz nannte lange
 beide, mit 107 bzw. 71 Tests): sie verglichen gegen den Python-Parser und
 -Compiler, und die sind mit Stufe B gelöscht. Das Compiler-Gate ist stattdessen Output-Parität — siehe unten.
@@ -10209,7 +10210,7 @@ Compiler ist **nicht** Python geblieben: seit dem Rust-Frontend kompiliert der
 Playground die Quelle selbst, **Pyodide braucht es nicht**.
 
 Doku/Grenzen: [docs/web-playground.md](docs/web-playground.md).
-Tests [`tests/pruef/build_wasm.dhtest`](tests/pruef/build_wasm.dhtest) (Geruest/Harness,
+Tests [`tests/pruef/werkzeugkette/build_wasm.dhtest`](tests/pruef/werkzeugkette/build_wasm.dhtest) (Geruest/Harness,
 nicht der emscripten-Build; bis 2026-09-21 pytest).
 
 ## Build und Test (Kurzform)

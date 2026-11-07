@@ -118,4 +118,4 @@ die Flamme hinein, sonst ein Lichtkreis aus der Mitte.
   nach unten, sichtbar ist jede, deren Ton schon erklungen ist; die
   Lichterkette ist eine Schraube um den Baum.
 
-Musik und Szenen prüft `tests/pruef/beispiel_lichterglanz.dhtest`.
+Musik und Szenen prüft `tests/pruef/beispiele/beispiel_lichterglanz.dhtest`.

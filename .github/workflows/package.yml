@@ -147,7 +147,7 @@ jobs:
           test $RC -eq 2
           grep -q "SCREEN: Kein Fenster moeglich -- es gibt keinen Bildschirm" "$RUNNER_TEMP/ohne.txt"
           ! grep -q "panicked" "$RUNNER_TEMP/ohne.txt"
-          rust/drachenhauch_runtime/target/release/dhrt test tests/pruef/kein_fenster.dhtest
+          rust/drachenhauch_runtime/target/release/dhrt test tests/pruef/laufzeit/kein_fenster.dhtest
 
       - name: Paket ausprobieren (Linux)
         if: runner.os == 'Linux'
@@ -168,7 +168,7 @@ jobs:
 
       - name: Sammlung werkzeug_paket (Linux, mit Grafik)
         if: runner.os == 'Linux'
-        run: xvfb-run -a -s "-screen 0 1920x1080x24" rust/drachenhauch_runtime/target/release/dhrt test tests/pruef/werkzeug_paket.dhtest tests/pruef/grafik_aufraeumen.dhtest
+        run: xvfb-run -a -s "-screen 0 1920x1080x24" rust/drachenhauch_runtime/target/release/dhrt test tests/pruef/werkzeuge/werkzeug_paket.dhtest tests/pruef/grafik/grafik_aufraeumen.dhtest
 
       # Grafik-Sammlungen mit echtem Fenster unter xvfb (Mesa): Licht,
       # Schatten, PBR mit HDR-Umgebung, Instancing, Shader, Post-FX,
@@ -179,7 +179,7 @@ jobs:
       # blieben bis 2026.42 Post-FX und RENDERTARGET schwarz (gcc-raylib,
       # graphics.rs `render_ziel`), und niemand sah es, weil diese Proben nur
       # unter Windows liefen.
-      # Eine simulierte Kamera fuer tests/pruef/webcam.dhtest: vivid, der
+      # Eine simulierte Kamera fuer tests/pruef/geraete/webcam.dhtest: vivid, der
       # Testtreiber des Kernels, gelesen ueber denselben V4L2-Weg wie eine
       # echte Webcam. Geht es nicht, fehlt DH_TEST_WEBCAM und die Faelle
       # ueberspringen sich.
@@ -192,10 +192,10 @@ jobs:
         run: |
           rust/drachenhauch_runtime/target/release/dhrt --version
           xvfb-run -a -s "-screen 0 1920x1080x24" rust/drachenhauch_runtime/target/release/dhrt test \
-            tests/pruef/gles.dhtest tests/pruef/g3d_licht.dhtest tests/pruef/m3d.dhtest \
-            tests/pruef/shader_uniforms_geometry.dhtest tests/pruef/rendertarget_persistenz.dhtest \
-            tests/pruef/grafik_text_ausbau.dhtest tests/pruef/beispiele_gui_enden.dhtest tests/pruef/pins.dhtest \
-            tests/pruef/webcam.dhtest tests/pruef/mikrofon.dhtest
+            tests/pruef/grafik/gles.dhtest tests/pruef/grafik/g3d_licht.dhtest tests/pruef/grafik/m3d.dhtest \
+            tests/pruef/grafik/shader_uniforms_geometry.dhtest tests/pruef/grafik/rendertarget_persistenz.dhtest \
+            tests/pruef/grafik/grafik_text_ausbau.dhtest tests/pruef/beispiele/beispiele_gui_enden.dhtest tests/pruef/geraete/pins.dhtest \
+            tests/pruef/geraete/webcam.dhtest tests/pruef/ton/mikrofon.dhtest
 
       # Die macOS-Laeufer haben kein passendes OpenGL ("NSGL: Failed to find a
       # suitable pixel format", gemessen 2026-09-19) -- ein Fenster geht dort
@@ -286,7 +286,7 @@ jobs:
 
       - name: Sammlung werkzeug_paket (macOS, mit Grafik)
         if: runner.os == 'macOS'
-        run: rust/drachenhauch_runtime/target/release/dhrt test tests/pruef/werkzeug_paket.dhtest
+        run: rust/drachenhauch_runtime/target/release/dhrt test tests/pruef/werkzeuge/werkzeug_paket.dhtest
 
       - name: Pakete hochladen
         if: always()

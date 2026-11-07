@@ -1,0 +1,373 @@
+' Drei Handgriffe der IDE:
+' (1) Naechstes/voriges Problem (Alt+F8, Umschalt+Alt+F8): die Marke springt
+'     zum naechsten Fehler bzw. zur naechsten Warnung (Hinweise nicht), am
+'     Ende wieder von vorn.
+' (2) Zur letzten Aenderung (Strg+Umschalt+Ruecktaste), auch ueber Dateien;
+'     Strg+Alt+Links fuehrt zurueck.
+' (3) Mit gesicherter Fassung vergleichen: Unterschied Reiter gegen Platte
+'     als diff, von dort sichern oder verwerfen.
+--- langsam
+
+=== naechstes und voriges problem, auch per alt f8
+DIM prBild AS INTEGER : prBild = 0
+FUNCTION prStelle$() AS STRING
+    DIM z AS INTEGER
+    DIM s AS INTEGER
+    (z, s) = GUI_TEXTAREA_CURSOR(reiter[aktiverTab].feld)
+    RETURN STR$(z) + ":" + STR$(s)
+END FUNCTION
+--- programm ../../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 20 THEN
+    pruefen()
+    GUI_TEXTAREA_GOTO(reiter[aktiverTab].feld, 1, 1)
+    befehl("problem_vor") : protokoll("pr vor " + prStelle$())
+    befehl("problem_vor") : protokoll("pr vor " + prStelle$())
+    befehl("problem_vor") : protokoll("pr vor " + prStelle$())
+    befehl("problem_zurueck") : protokoll("pr zurueck " + prStelle$())
+    protokoll("pr status " + GUI_TEXT(lblStatus))
+    GUI_TEXTAREA_GOTO(reiter[aktiverTab].feld, 3, 1)
+    ' Alt+F8 als echte Tasten
+    WRITEALL("prtaste.txt", "c 5" + CHR$(10) + "e 0 1 340 0 0" + CHR$(10) + "e 4 2 342 0 0" + CHR$(10) + _
+             "e 5 2 297 0 0" + CHR$(10) + "e 7 1 297 0 0" + CHR$(10) + "e 8 1 342 0 0" + CHR$(10) + CHR$(10))
+    AUTOMATION_PLAY("prtaste.txt")
+END IF
+IF prBild = 40 THEN
+    protokoll("pr taste " + prStelle$())
+    EXIT(0)
+END IF
+--- argumente
+haupt.dh
+--- umgebung
+DHRT_FRAMES=150
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+--- datei haupt.dh
+DIM a AS INTEGER
+zaehlr = 1
+a = 2
+anzahll = 3
+PRINT a
+SUB s()
+    DIM ungenutzt AS INTEGER
+END SUB
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 8) = "problem " THEN PRINT L[i]
+NEXT
+--- erwartet
+problem 2 1
+pr vor 2:1
+problem 4 1
+pr vor 4:1
+problem 2 1
+pr vor 2:1
+problem 4 1
+pr zurueck 4:1
+pr status Zeile 4: 'anzahll' wird hier beschrieben, aber nirgends im Programm mit DIM oder CONST angelegt. Beim Laufen bricht diese Zeile ab ("Variable 'anzahll' nicht deklariert").
+problem 4 1
+pr taste 4:1
+
+=== zur letzten aenderung ueber dateien und zurueck
+DIM prBild AS INTEGER : prBild = 0
+FUNCTION prStelle$() AS STRING
+    DIM z AS INTEGER
+    DIM s AS INTEGER
+    (z, s) = GUI_TEXTAREA_CURSOR(reiter[aktiverTab].feld)
+    RETURN BASENAME(reiter[aktiverTab].pfad) + ":" + STR$(z)
+END FUNCTION
+--- programm ../../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 20 THEN
+    GUI_TEXTAREA_GOTO(reiter[aktiverTab].feld, 3, 8)
+    GUI_TEXTAREA_INSERT(reiter[aktiverTab].feld, "0")
+END IF
+IF prBild = 24 THEN dateiOeffnen(PATHJOIN(projektOrdner, "b.dh"))
+IF prBild = 28 THEN
+    protokoll("pr jetzt " + prStelle$())
+    ' Strg+Umschalt+Ruecktaste als echte Tasten
+    WRITEALL("prtaste.txt", "c 7" + CHR$(10) + "e 0 1 340 0 0" + CHR$(10) + "e 4 2 341 0 0" + CHR$(10) + "e 4 2 340 0 0" + CHR$(10) + _
+             "e 5 2 259 0 0" + CHR$(10) + "e 7 1 259 0 0" + CHR$(10) + "e 8 1 340 0 0" + CHR$(10) + "e 8 1 341 0 0" + CHR$(10) + CHR$(10))
+    AUTOMATION_PLAY("prtaste.txt")
+END IF
+IF prBild = 50 THEN
+    protokoll("pr nach sprung " + prStelle$())
+    befehl("nav_zurueck")
+END IF
+IF prBild = 54 THEN
+    protokoll("pr zurueck " + prStelle$())
+    EXIT(0)
+END IF
+--- argumente
+a.dh
+--- umgebung
+DHRT_FRAMES=150
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+--- datei a.dh
+PRINT 1
+PRINT 2
+PRINT 3
+PRINT 4
+--- datei b.dh
+PRINT "b"
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 16) = "letzte aenderung" THEN PRINT L[i]
+NEXT
+--- erwartet
+pr jetzt b.dh:1
+letzte aenderung a.dh 3
+pr nach sprung a.dh:3
+pr zurueck b.dh:1
+
+=== vergleichen zeigt den unterschied, verwerfen holt die datei zurueck
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 20 THEN
+    DIM prT AS GUI_WIDGET : prT = reiter[aktiverTab].feld
+    GUI_SET_TEXT(prT, "eins" + NL + "ZWEI" + NL + "drei" + NL + "vier neu")
+    befehl("gesichert_vergleichen")
+    DIM prZ AS STRING
+    FOR EACH prZ IN SPLIT$(GUI_TEXT(taVgl), NL)
+        protokoll("pr diff |" + prZ + "|")
+    NEXT
+    protokoll("pr kopf " + GUI_TEXT(lblVgl))
+END IF
+IF prBild = 26 THEN
+    ' [Verwerfen] suchen und anklicken.
+    DIM prX AS INTEGER : prX = -1
+    DIM prY AS INTEGER : prY = -1
+    DIM prXX AS INTEGER
+    DIM prYY AS INTEGER
+    FOR prYY = 0 TO SCREENHEIGHT() - 1 STEP 4
+        FOR prXX = 0 TO SCREENWIDTH() - 1 STEP 4
+            IF prX < 0 AND GUI_HIT_TEST(prXX, prYY) = btnVglVerwerfen THEN prX = prXX + 8 : prY = prYY + 6
+        NEXT
+    NEXT
+    WRITEALL("prmaus.txt", "c 4" + CHR$(10) + "e 0 7 " + STR$(prX) + " " + STR$(prY) + " 0" + CHR$(10) + "e 6 7 " + STR$(prX) + " " + STR$(prY) + " 0" + CHR$(10) + _
+             "e 8 6 0 0 0" + CHR$(10) + "e 10 5 0 0 0" + CHR$(10) + CHR$(10))
+    AUTOMATION_PLAY("prmaus.txt")
+END IF
+IF prBild = 50 THEN
+    protokoll("pr nachher |" + REPLACE$(GUI_TEXT(reiter[aktiverTab].feld), NL, "/") + "| sauber " + STR$(GUI_TEXT(reiter[aktiverTab].feld) = reiter[aktiverTab].gesichert) + " fenster " + STR$(GUI_WINDOW_SHOWN(winVgl)))
+    befehl("gesichert_vergleichen")
+    protokoll("pr status " + GUI_TEXT(lblStatus))
+    EXIT(0)
+END IF
+--- argumente
+haupt.dh
+--- umgebung
+DHRT_FRAMES=150
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+--- datei haupt.dh
+eins
+zwei
+drei
+vier
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 9) = "vergleich" THEN PRINT L[i]
+NEXT
+--- erwartet
+vergleich +2 -2
+pr diff |--- haupt.dh (gesichert)|
+pr diff |+++ haupt.dh (im Reiter)|
+pr diff |@@ -1,4 +1,4 @@|
+pr diff | eins|
+pr diff |-zwei|
+pr diff |+ZWEI|
+pr diff | drei|
+pr diff |-vier|
+pr diff |+vier neu|
+pr kopf haupt.dh: 2 Zeile(n) dazu, 2 weg (gegenüber der Datei auf der Platte)
+vergleich verworfen
+pr nachher |eins/zwei/drei/vier| sauber TRUE fenster FALSE
+vergleich gleich
+pr status haupt.dh: keine ungesicherten Änderungen.
+
+=== vergleichen und sichern schreibt die datei
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 20 THEN
+    GUI_SET_TEXT(reiter[aktiverTab].feld, "neu")
+    befehl("gesichert_vergleichen")
+END IF
+IF prBild = 26 THEN
+    DIM prX AS INTEGER : prX = -1
+    DIM prY AS INTEGER : prY = -1
+    DIM prXX AS INTEGER
+    DIM prYY AS INTEGER
+    FOR prYY = 0 TO SCREENHEIGHT() - 1 STEP 4
+        FOR prXX = 0 TO SCREENWIDTH() - 1 STEP 4
+            IF prX < 0 AND GUI_HIT_TEST(prXX, prYY) = btnVglSichern THEN prX = prXX + 8 : prY = prYY + 6
+        NEXT
+    NEXT
+    WRITEALL("prmaus.txt", "c 4" + CHR$(10) + "e 0 7 " + STR$(prX) + " " + STR$(prY) + " 0" + CHR$(10) + "e 6 7 " + STR$(prX) + " " + STR$(prY) + " 0" + CHR$(10) + _
+             "e 8 6 0 0 0" + CHR$(10) + "e 10 5 0 0 0" + CHR$(10) + CHR$(10))
+    AUTOMATION_PLAY("prmaus.txt")
+END IF
+IF prBild = 50 THEN EXIT(0)
+--- argumente
+haupt.dh
+--- umgebung
+DHRT_FRAMES=150
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+--- datei haupt.dh
+alt
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 9) = "vergleich" THEN PRINT L[i]
+NEXT
+DIM z AS STRING
+FOR EACH z IN READLINES("haupt.dh")
+    PRINT "datei |"; z
+NEXT
+--- erwartet
+vergleich +1 -1
+vergleich gesichert
+datei |neu
+
+=== eine zeile oben in einer grossen datei ist ein schritt
+' Stresstest 2026-10-02: beide Vergleiche (Reiter gegen Platte, zwei Reiter)
+' rechneten die laengste gemeinsame Teilfolge ueber die GANZEN Dateien und
+' wichen ab 1500 Zeilen auf Zeile-fuer-Zeile aus -- eine eingefuegte Zeile
+' oben liess dann alles darunter als geaendert erscheinen. Jetzt fallen
+' gemeinsamer Anfang und gemeinsames Ende vorher weg. Geprueft an 5000
+' Zeilen, und an 300 zufaelligen kleinen Aenderungen: die Schritte ergeben
+' beide Texte wieder, und es sind so viele gleiche Zeilen wie die volle
+' Tabelle findet (der Wegfall kostet nichts an Genauigkeit).
+DIM prAlt AS ARRAY OF STRING : prAlt = []
+DIM prI AS INTEGER
+FOR prI = 1 TO 5000
+    ARRAY_PUSH(prAlt, "zeile " + STR$(prI))
+NEXT
+DIM prNeu AS ARRAY OF STRING : prNeu = ["NEU"]
+FOR prI = 0 TO LEN(prAlt) - 1
+    ARRAY_PUSH(prNeu, prAlt[prI])
+NEXT
+prNeu[2500] = "mitte geaendert"
+DIM prD AS ARRAY OF STRING : prD = SPLIT$(diffText$(prAlt, prNeu, "x.dh"), NL)
+DIM prPlus AS INTEGER : prPlus = 0
+DIM prMinus AS INTEGER : prMinus = 0
+FOR prI = 2 TO LEN(prD) - 1
+    IF LEFT$(prD[prI], 1) = "+" THEN prPlus = prPlus + 1
+    IF LEFT$(prD[prI], 1) = "-" THEN prMinus = prMinus + 1
+NEXT
+protokoll("pr diff plus " + STR$(prPlus) + " minus " + STR$(prMinus))
+FUNCTION prListe$(v AS ARRAY OF INTEGER) AS STRING
+    DIM r AS STRING : r = ""
+    DIM q AS INTEGER
+    FOR q = 0 TO LEN(v) - 1
+        IF q > 0 THEN r = r + ","
+        r = r + STR$(v[q])
+    NEXT
+    RETURN r
+END FUNCTION
+zeilenVergleichen(prAlt, prNeu)
+protokoll("pr links " + prListe$(diffLinks) + " rechts " + prListe$(diffRechts))
+' Zufallsprobe gegen die volle Tabelle.
+FUNCTION prLcs(a AS ARRAY OF STRING, b AS ARRAY OF STRING) AS INTEGER
+    DIM n AS INTEGER : n = LEN(a)
+    DIM m AS INTEGER : m = LEN(b)
+    DIM t[(n + 1) * (m + 1)] AS INTEGER
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR x = n - 1 TO 0 STEP -1
+        FOR y = m - 1 TO 0 STEP -1
+            IF a[x] = b[y] THEN
+                t[x * (m + 1) + y] = t[(x + 1) * (m + 1) + y + 1] + 1
+            ELSE
+                t[x * (m + 1) + y] = MAX(t[(x + 1) * (m + 1) + y], t[x * (m + 1) + y + 1])
+            END IF
+        NEXT
+    NEXT
+    RETURN t[0]
+END FUNCTION
+RANDOMIZE(7)
+DIM prFalsch AS INTEGER : prFalsch = 0
+DIM prMyers AS INTEGER : prMyers = 0
+DIM prR AS INTEGER
+FOR prR = 1 TO 300
+    DIM pa AS ARRAY OF STRING : pa = []
+    DIM pb AS ARRAY OF STRING : pb = []
+    DIM pk AS INTEGER
+    FOR pk = 1 TO INT(RND() * 12)
+        ARRAY_PUSH(pa, CHR$(97 + INT(RND() * 3)))
+    NEXT
+    FOR pk = 0 TO LEN(pa) - 1
+        DIM pw AS FLOAT : pw = RND()
+        IF pw < 0.15 THEN
+            ARRAY_PUSH(pb, CHR$(97 + INT(RND() * 3)))
+        ELSEIF pw < 0.25 THEN
+            CONTINUE
+        END IF
+        ARRAY_PUSH(pb, pa[pk])
+    NEXT
+    IF RND() < 0.3 THEN ARRAY_PUSH(pb, "a")
+    DIM oArt AS ARRAY OF INTEGER : oArt = []
+    DIM oA AS ARRAY OF INTEGER : oA = []
+    DIM oB AS ARRAY OF INTEGER : oB = []
+    zeilenSchritte(pa, pb, oArt, oA, oB)
+    DIM ra AS ARRAY OF STRING : ra = []
+    DIM rb AS ARRAY OF STRING : rb = []
+    DIM gleich AS INTEGER : gleich = 0
+    FOR pk = 0 TO LEN(oArt) - 1
+        IF oArt[pk] <> 2 THEN ARRAY_PUSH(ra, pa[oA[pk]])
+        IF oArt[pk] <> 1 THEN ARRAY_PUSH(rb, pb[oB[pk]])
+        IF oArt[pk] = 0 THEN gleich = gleich + 1
+    NEXT
+    IF JOIN$(ra, "|") <> JOIN$(pa, "|") OR JOIN$(rb, "|") <> JOIN$(pb, "|") OR gleich <> prLcs(pa, pb) THEN prFalsch = prFalsch + 1
+    ' Dasselbe fuer Myers, das sonst erst bei grossen Mitten rechnet.
+    oArt = [] : oA = [] : oB = [] : ra = [] : rb = [] : gleich = 0
+    IF NOT myersSchritte(pa, pb, 0, LEN(pa), LEN(pb), oArt, oA, oB) THEN prMyers = prMyers + 1
+    FOR pk = 0 TO LEN(oArt) - 1
+        IF oArt[pk] <> 2 THEN ARRAY_PUSH(ra, pa[oA[pk]])
+        IF oArt[pk] <> 1 THEN ARRAY_PUSH(rb, pb[oB[pk]])
+        IF oArt[pk] = 0 THEN gleich = gleich + 1
+    NEXT
+    IF JOIN$(ra, "|") <> JOIN$(pa, "|") OR JOIN$(rb, "|") <> JOIN$(pb, "|") OR gleich <> prLcs(pa, pb) THEN prMyers = prMyers + 1
+NEXT
+protokoll("pr zufall falsch " + STR$(prFalsch) + " myers falsch " + STR$(prMyers))
+EXIT(0)
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+a.dh
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+--- datei a.dh
+PRINT 1
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " THEN PRINT L[i]
+NEXT
+--- erwartet
+pr diff plus 2 minus 1
+pr links 2500 rechts 1,2501
+pr zufall falsch 0 myers falsch 0

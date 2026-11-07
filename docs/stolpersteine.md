@@ -16,7 +16,7 @@ Reihenfolge ≈ nach Nutzen/Aufwand. Erledigtes am Ende.
 > Parser disambiguiert jetzt: FOR nach dem ersten Ausdruck = List-Comprehension,
 > sonst Array-Literal. Opcode `BUILD_ARRAY` (117), Element-Typ aus den Werten
 > (int/float/string/boolean/any). Leeres `[]` -> Hinweis auf `DIM ... AS ARRAY OF T`.
-> Tests: `tests/pruef/array_literal.dhtest` (`dhrt test`). (Historischer Text unten zur Doku.)
+> Tests: `tests/pruef/sprache/array_literal.dhtest` (`dhrt test`). (Historischer Text unten zur Doku.)
 ```basic
 DIM a AS ARRAY OF INTEGER
 a = [1, 2, 3]      ' -> Parse-Fehler (7): Erwartet FOR in List-Comprehension
@@ -31,7 +31,7 @@ als Array-Literal werten (`[1,2,3]` → `ARRAY OF INTEGER`, Typ aus den Elemente
 ### A2. `NIL` ist kein Literal  —  ✅ BEHOBEN (commit f4c8b78)
 > NIL ist jetzt ein Keyword-Literal (lexer/parser/compiler in dhrt + Python-Front-End
 > fuer Editor/Paritaet). `x = NIL`, `x <> NIL`, `IS_NIL(NIL)` funktionieren; das in der
-> db-Doku versprochene NIL→NULL-Binding klappt nun wirklich. Tests: `tests/pruef/nil_literal.dhtest`.
+> db-Doku versprochene NIL→NULL-Binding klappt nun wirklich. Tests: `tests/pruef/sprache/nil_literal.dhtest`.
 ```basic
 IF o = NIL THEN ...        ' -> Laufzeitfehler: Variable 'nil' nicht deklariert (DIM fehlt?)
 IF o <> NIL THEN ...       ' dito
@@ -53,7 +53,7 @@ das db-NULL-Binding möglich. Größter „Vertrag-vs-Realität"-Punkt.
 ### B1. „Stufe 3e: DIM-Typ 'vec2' noch nicht unterstuetzt" bei fehlendem IMPORT  —  ✅ BEHOBEN (commit f4c8b78)
 > Jetzt: `Unbekannter Typ 'vec2' -- fehlt IMPORT "vec2"?` (bei mehreren Modulen werden
 > alle Kandidaten genannt). Kein „Stufe 3e"-Leak mehr in der DIM-Typ-Meldung.
-> `preprocess::modules_for_type` + `compiler::unknown_dim_type_msg`. Tests: `tests/pruef/dim_type_error.dhtest`.
+> `preprocess::modules_for_type` + `compiler::unknown_dim_type_msg`. Tests: `tests/pruef/sprache/dim_type_error.dhtest`.
 ```basic
 DIM v AS VEC2              ' ohne vorheriges IMPORT "vec2"
 ' -> Compile-Fehler: Stufe 3e: DIM-Typ 'vec2' noch nicht unterstuetzt
@@ -74,7 +74,7 @@ user-facing Meldungen nach „Stufe Nx"-Lecks absuchen.
 
 ### C1. `NET_UDP_LAST_FROM` liefert STRING, nicht TUPLE  *(Doku diese Session gefixt)*
 dhrt gibt `"host:port"` als STRING zurück (so auch der Golden-Test
-`tests/pruef/modules_net.dhtest`), die alte `docs/module-net.md` versprach ein
+`tests/pruef/geraete/modules_net.dhtest`), die alte `docs/module-net.md` versprach ein
 `TUPLE (host, port)`. **Doku wurde an die Realität angeglichen.**
 **Optional offen:** Für Ergonomie könnte die Engine stattdessen ein echtes
 Tupel liefern (dann `peer[0]`/`peer[1]` direkt) — würde Test + Doku-Rückbau
@@ -103,7 +103,7 @@ verlangen. Aktuell konsistent, also kein Muss.
 > kein `4.0`-Bruch, Buch unverändert). Stattdessen weist die Fehlermeldung beim Zuweisen
 > eines FLOAT-`/`-Ergebnisses an eine INTEGER-Variable jetzt auf `\` (Ganzzahl-Division)
 > bzw. `INT()/ROUND()` hin — der eigentliche Schmerzpunkt ist damit adressiert, ohne
-> Kompatibilität zu brechen. Test: `tests/pruef/div_and_float_display.dhtest`.
+> Kompatibilität zu brechen. Test: `tests/pruef/sprache/div_and_float_display.dhtest`.
 ```basic
 PRINT 8 / 2     ' 4     (glatt -> INTEGER)
 PRINT 9 / 2     ' 4.5   (nicht glatt -> FLOAT)
@@ -118,7 +118,7 @@ aber ein echter Stolperstein.
 > Allgemeine Float-Ausgabe ist korrekt (kürzeste round-trip-Form) und bleibt. Der einzige
 > echte Wart — f32-gestützte **Audio-Lautstärken** (`0.800000011920929`) — ist gefixt:
 > `AUDIO_BUS_GET_VOLUME`/`AUDIO_GET_VOLUME`/`AUDIO_MUSIC_GET_VOLUME` runden auf 6 Stellen
-> → `0.8`. Test: `tests/pruef/div_and_float_display.dhtest`. (Analyse unten.)
+> → `0.8`. Test: `tests/pruef/sprache/div_and_float_display.dhtest`. (Analyse unten.)
 > **Befund nach Prüfung:** dhrts `fmt_float` nutzt bereits die *kürzeste round-trip-fähige*
 > Darstellung (Rust-Display ≈ Python-`repr`). `0.1+0.2 -> 0.30000000000000004` und
 > `CURVE_SMOOTHERSTEP -> 0.16308000000000003` sind die **kürzest mögliche exakte** Form —
@@ -170,7 +170,7 @@ gefunden" `LBOUND - 1`, bei einem Feld ab 0 also wie immer `-1`.
 > im Standard-Build mitgeliefert (zieht schwere Deps: tokio/btleplug/hidapi/
 > windows). `preprocess.rs`: `missing_hardware_modules` / `missing_hardware_imports_with_lines`
 > / `hardware_missing_msg`; verdrahtet in `main.rs` `compile_source` (run) +
-> `check_source` (Editor). Test: `tests/pruef/dhrt_check.dhtest` (Fall "ein hardware-import warnt schon beim import").
+> `check_source` (Editor). Test: `tests/pruef/werkzeugkette/dhrt_check.dhtest` (Fall "ein hardware-import warnt schon beim import").
 
 `IMPORT "wifi"` (serial/usb/bt ebenso) wird vom Preprocessor akzeptiert (stehen
 in `KNOWN_MODULES`), aber **jeder** Funktionsaufruf wirft erst zur Laufzeit
@@ -215,7 +215,7 @@ nicht, dass `band` ein reserviertes Wort ist. (Historischer Text.)
 > Builtins (der Index ist vollständig). Interne `__`-Builtins ausgenommen.
 > Folge: ein neues dhrt-Builtin, das man im `builtin_index.json` zu ergänzen
 > vergisst, fällt ab sofort auf. **Drift-Schutz-Test**
-> `tests/pruef/dhrt_check.dhtest` prüft, dass KEIN Beispiel ein Builtin
+> `tests/pruef/werkzeugkette/dhrt_check.dhtest` prüft, dass KEIN Beispiel ein Builtin
 > nutzt, das nicht im Index steht — er fand sofort **10 echte, aber unindizierte
 > Builtins** (`CAMERA_ORBIT`, `WORLD_TO_SCREEN_X/Y`, `SCREEN_TO_WORLD_DIR_X/Y/Z`,
 > `RAY_HIT_MODEL`, `PICK_MODEL`, `GETPIXEL`, `CIRCLEOUTLINE` — alle aus
@@ -291,7 +291,7 @@ Reflexionen/Mirror-Effekte.
 > durch — jetzt nicht mehr.
 >
 > Gefunden im Sprite-Editor (`DIM pi` in der Hauptschleife). Tests:
-> `tests/pruef/name_collision.dhtest`.
+> `tests/pruef/sprache/name_collision.dhtest`.
 
 ### H2. `dhrt --check` meldete keinen einzigen Tippfehler im Variablennamen — ✅ BEHOBEN
 > **`DIM zaehler` oben, `zaehlr = zaehlr + 1` in einer SUB** — `--check` lieferte
@@ -318,9 +318,9 @@ Reflexionen/Mirror-Effekte.
 > ist der Lauf über **alle 384 `.dh`-Dateien des Repos** (0 Meldungen) — und
 > genau der fand die zwei Fehlalarme der ersten Fassungen: `DIM x[N] AS T` und
 > `CONST` innerhalb einer SUB. Er ist deshalb inzwischen ein Test
-> (`tests/pruef/dhrt_check.dhtest`), nicht mehr ein Aufruf von Hand.
+> (`tests/pruef/werkzeugkette/dhrt_check.dhtest`), nicht mehr ein Aufruf von Hand.
 >
-> Tests: `tests/pruef/check_unbekannte_namen.dhtest`, `tests/pruef/dhrt_check.dhtest`.
+> Tests: `tests/pruef/laufzeit/check_unbekannte_namen.dhtest`, `tests/pruef/werkzeugkette/dhrt_check.dhtest`.
 
 ---
 
@@ -341,7 +341,7 @@ Reflexionen/Mirror-Effekte.
 > dieses Namens ruft weiter die Variable (dort könnte sie gemeint sein);
 > die Meldung sagt das jetzt dazu. Die FOR-EACH-Laufvariable läuft gar
 > nicht über diesen Weg und verdeckt nicht. Tests
-> `tests/pruef/variable_wie_builtin.dhtest`.
+> `tests/pruef/sprache/variable_wie_builtin.dhtest`.
 
 ## I — Umstieg aus anderen BASICs und aus Python (2026-09-21) — ✅ BEHOBEN
 
@@ -351,7 +351,7 @@ Reflexionen/Mirror-Effekte.
 > sagte — meist „Erwartet Zeilenende" (`GOTO oben`, `LOCATE 1, 1`,
 > `EXIT FOR`, `SWAP a, b`, `DIM a AS INTEGER = 5`) — oder liefen still falsch.
 > Übersicht für Nutzer: [umstieg.md](umstieg.md); Tests
-> `tests/pruef/umstieg.dhtest` (68 Fälle).
+> `tests/pruef/sprache/umstieg.dhtest` (68 Fälle).
 >
 > **Still falsch, jetzt behoben:**
 > - **Ein Name allein als Anweisung tat nichts.** `meineSub` (ohne Klammern)

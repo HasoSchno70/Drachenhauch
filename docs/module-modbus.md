@@ -101,7 +101,7 @@ MODBUS_WRITE_REGISTERS(wr, 40000, MODBUS_FLOAT_REGS(21.5, "CDAB"))
 
 Die Rahmen (Prüfsumme, Kopf von Modbus TCP, alle acht Funktionen, Ausnahmen,
 Wortfolgen) prüfen Rust-Tests gegen die Beispiele der Spezifikation. Die
-Prüfsammlung `tests/pruef/modbus.dhtest` lässt ein gespieltes Gerät in
+Prüfsammlung `tests/pruef/geraete/modbus.dhtest` lässt ein gespieltes Gerät in
 Drachenhauch laufen, das seine Prüfsumme selbst nachrechnet und jede Anfrage
 in Hex festhält — so ist die Leitung Byte für Byte geprüft, für TCP und für
 RTU über das Netz, samt Ausnahmen, Zeitgrenze, falscher Prüfsumme,

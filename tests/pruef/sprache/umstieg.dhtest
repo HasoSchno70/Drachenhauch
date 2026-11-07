@@ -1,0 +1,1040 @@
+' Umstieg aus QBasic, FreeBASIC, VB und Python (2026-09-21). Was man von dort
+' mitbringt, geht entweder (EXIT FOR, SWAP, LET, END, DIM x AS T = wert,
+' INPUT "..."; x, m["k"], LEN(map), a + [x], VAL("&HFF") ...) oder bekommt
+' eine Meldung, die sagt, wie es hier heisst -- statt "Erwartet Zeilenende".
+' Format: docs/werkzeuge.md.
+
+
+=== dim mit startwert
+DIM a AS INTEGER = 5
+DIM s AS STRING = "Hallo"
+DIM f AS ARRAY OF INTEGER = [1, 2, 3]
+PRINT a; " "; s; " "; LEN(f)
+--- erwartet
+5 Hallo 3
+
+=== dim mit startwert in einer sub laeuft bei jedem aufruf
+SUB s()
+    DIM t AS INTEGER = 1
+    t = t + 1
+    PRINT t
+END SUB
+s()
+s()
+--- erwartet
+2
+2
+
+=== der startwert laeuft durch die typpruefung
+DIM i AS INTEGER = "fuenf"
+--- fehler
+Erwartet INTEGER, erhalten STRING
+
+=== ein startwert gilt fuer eine variable
+DIM a, b AS INTEGER = 3
+--- fehler
+Ein Startwert gilt fuer genau eine Variable
+
+=== mehrere namen mit einem typ sind alle von diesem typ
+' Anders als in VB6, wo `Dim a, i As Integer` nur i zur Ganzzahl macht.
+DIM a, i, z AS INTEGER
+PRINT TYPEOF(a); " "; TYPEOF(i); " "; TYPEOF(z); " "; a + i + z
+--- erwartet
+INTEGER INTEGER INTEGER 0
+
+=== verschiedene typen in einer dim-zeile
+DIM b AS INTEGER, s AS STRING
+DIM x, y AS FLOAT, name AS STRING = "Ada", n AS INTEGER = 3
+DIM feld[3] AS INTEGER, tab[2, 2] AS STRING
+PRINT TYPEOF(b); " "; TYPEOF(s); " "; TYPEOF(x); " "; TYPEOF(y)
+PRINT name; " "; n; " "; LEN(feld); " "; TYPEOF(tab[1, 1])
+SUB innen()
+    DIM p, q AS STRING, r AS BOOLEAN = TRUE
+    PRINT "["; p; q; "] "; r
+END SUB
+innen()
+--- erwartet
+INTEGER STRING FLOAT FLOAT
+Ada 3 3 STRING
+[] TRUE
+
+=== ein startwert in einer spaeteren gruppe gilt auch nur fuer eine
+DIM n AS INTEGER, a, b AS STRING = "x"
+--- fehler
+Ein Startwert gilt fuer genau eine Variable
+
+=== der startwert jeder gruppe laeuft durch die typpruefung
+DIM s AS STRING = "a", i AS INTEGER = "fuenf"
+--- fehler
+Erwartet INTEGER, erhalten STRING
+
+=== eine gruppe ohne typ sagt wie es heisst
+DIM n AS INTEGER, rest
+--- fehler
+jede Variable braucht einen Typ
+
+=== ein feld bekommt keinen startwert in der dim-zeile
+CLASS K
+    DIM hp AS INTEGER = 100
+END CLASS
+--- fehler
+SUB Init()
+
+=== exit for do while und sub
+DIM i AS INTEGER
+FOR i = 1 TO 10
+    IF i = 3 THEN EXIT FOR
+NEXT
+PRINT i
+DIM n AS INTEGER
+DO
+    n = n + 1
+    IF n = 4 THEN EXIT DO
+LOOP
+PRINT n
+WHILE TRUE
+    n = n + 1
+    EXIT WHILE
+WEND
+PRINT n
+SUB s()
+    PRINT "a"
+    EXIT SUB
+    PRINT "b"
+END SUB
+s()
+--- erwartet
+3
+4
+5
+a
+
+=== exit verlaesst nur die passende schleife
+DIM i AS INTEGER
+DIM j AS INTEGER
+FOR i = 1 TO 3
+    WHILE j < 5
+        EXIT FOR
+    WEND
+NEXT
+--- fehler
+die innerste Schleife ist aber eine WHILE-Schleife
+
+=== exit sub ausserhalb
+EXIT SUB
+--- fehler
+EXIT SUB steht in keinem Unterprogramm
+
+=== exit function sagt return
+FUNCTION f() AS INTEGER
+    EXIT FUNCTION
+END FUNCTION
+--- fehler
+RETURN wert
+
+=== exit als befehl bleibt exit
+PRINT "a"
+EXIT(0)
+PRINT "b"
+--- erwartet
+a
+
+=== end allein beendet das programm
+DIM x AS INTEGER = 1
+IF x = 1 THEN
+    PRINT "vor"
+    END
+END IF
+PRINT "nach"
+--- erwartet
+vor
+
+=== end im einzeiler
+IF TRUE THEN PRINT "a" : END
+PRINT "nie"
+--- erwartet
+a
+
+=== end while wie wend
+DIM i AS INTEGER
+WHILE i < 3
+    i = i + 1
+END WHILE
+PRINT i
+--- erwartet
+3
+
+=== swap
+DIM a AS INTEGER = 1
+DIM b AS INTEGER = 2
+SWAP a, b
+PRINT a; b
+DIM f AS ARRAY OF STRING = ["x", "y", "z"]
+SWAP f[0], f[2]
+PRINT f[0]; f[2]
+--- erwartet
+21
+zx
+
+=== swap und let bleiben namen
+DIM swap AS INTEGER = 4
+DIM let AS INTEGER
+let = swap + 1
+PRINT let
+--- erwartet
+5
+
+=== let wird uebergangen
+DIM x AS INTEGER
+LET x = 5
+LET x += 1
+PRINT x
+--- erwartet
+6
+
+=== fragezeichen ist print
+? "hallo"; 1 + 1
+--- erwartet
+hallo2
+
+=== input mit semikolon haengt ein fragezeichen an
+DIM n AS STRING
+INPUT "Name"; n
+PRINT "[" + n + "]"
+--- eingabe
+Anna
+--- erwartet
+Name? [Anna]
+
+=== ein name allein ruft die sub
+SUB hallo()
+    PRINT "hallo"
+END SUB
+hallo
+' MILLIS statt CLS: derselbe Beweis (ein Name allein ruft den Befehl), aber
+' ohne Fenster -- CLS zeichnet und verlangt seit der fuenften Runde ein SCREEN.
+MILLIS
+--- erwartet
+hallo
+
+=== ein name allein bleibt bei einer variablen stumm
+DIM x AS INTEGER
+x
+PRINT "ok"
+--- erwartet
+ok
+
+=== map mit eckigen klammern
+DIM m AS MAP OF INTEGER
+m["a"] = 1
+m["b"] = 2
+m["a"] += 5
+PRINT m["a"]; " "; m["b"]; " "; LEN(m)
+--- erwartet
+6 2 2
+
+=== map mit eckigen klammern prueft den werttyp
+DIM m AS MAP OF INTEGER
+m["a"] = "x"
+--- fehler
+Erwartet INTEGER, erhalten STRING
+
+=== fehlender map-schluessel nennt maphas
+DIM m AS MAP OF INTEGER
+PRINT m["weg"]
+--- fehler
+Schluessel 'weg' nicht in der MAP -- vorher mit MAPHAS
+
+=== ein feld ohne groesse ist leer statt nil
+DIM a AS ARRAY OF INTEGER
+PRINT LEN(a)
+ARRAY_PUSH(a, 7)
+PRINT a[0]; LEN(a)
+SUB s()
+    DIM b AS ARRAY OF STRING
+    ARRAY_PUSH(b, "x")
+    PRINT LEN(b)
+END SUB
+s()
+s()
+CLASS K
+    DIM teile AS ARRAY OF STRING
+END CLASS
+DIM k AS K
+k = NEW K()
+ARRAY_PUSH(k.teile, "y")
+PRINT LEN(k.teile)
+--- erwartet
+0
+71
+1
+1
+1
+
+=== felder mit plus verbinden
+DIM a AS ARRAY OF INTEGER = [1, 2]
+a = a + [3]
+PRINT LEN(a); a[2]
+DIM f AS ARRAY OF FLOAT = [1.5]
+f = f + [2]
+PRINT f[1]
+--- erwartet
+33
+2.0
+
+=== felder verschiedener art verbinden ist ein fehler
+DIM a AS ARRAY OF INTEGER = [1]
+a = a + ["x"]
+--- fehler
+'+' verbindet nur Felder mit gleichem Elementtyp -- hier ARRAY OF INTEGER und ARRAY OF STRING
+
+=== val liest die zahl am anfang
+PRINT VAL("12abc"); " "; VAL("3 Aepfel"); " "; VAL("1e3"); " "; VAL("-4"); " "; VAL(" .5"); " "; VAL("abc"); " "; VAL("3e")
+--- erwartet
+12 3 1000.0 -4 0.5 0 3
+
+=== val liest hex oktal und binaer
+PRINT VAL("&HFF"); " "; VAL("&hff"); " "; VAL("0x10"); " "; VAL("&B101"); " "; VAL("0b11"); " "; VAL("&O17"); " "; VAL("-&H10"); " "; VAL("0b")
+--- erwartet
+255 255 16 5 3 15 -16 0
+
+=== randomize nimmt eine kommazahl
+RANDOMIZE(TIMER())
+RANDOMIZE(12.5)
+PRINT "ok"
+--- erwartet
+ok
+
+=== instr mit start vorne sagt wo er steht
+PRINT INSTR(3, "Hallo", "l")
+--- fehler
+die Startstelle steht in Drachenhauch HINTEN
+
+=== len auf einer zahl
+PRINT LEN(12345)
+--- fehler
+LEN(STR$(zahl))
+
+
+=== goto
+DIM i AS INTEGER
+oben:
+i = i + 1
+IF i < 3 THEN GOTO oben
+--- fehler
+GOTO und GOSUB gibt es in Drachenhauch nicht
+
+=== gosub
+GOSUB unterprogramm
+--- fehler
+SUB name() ... END SUB
+
+=== zeilennummern
+10 PRINT "a"
+--- fehler
+Zeilennummern gibt es in Drachenhauch nicht
+
+=== befehl ohne klammern
+LOCATE 1, 1
+--- fehler
+Befehle und SUBs bekommen ihre Werte in Klammern: LOCATE(...)
+
+=== redim
+DIM a[5] AS INTEGER
+REDIM a[10]
+--- fehler
+REDIM gibt es nicht
+
+=== type
+TYPE Punkt
+    x AS INTEGER
+END TYPE
+--- fehler
+STRUCT ... END STRUCT
+
+=== def fn
+DEF FN q(x) = x * x
+--- fehler
+DEF FN gibt es nicht
+
+=== on error
+ON ERROR GOTO fehler
+--- fehler
+TRY ... CATCH
+
+=== line input
+DIM s AS STRING
+LINE INPUT s
+--- fehler
+LINE INPUT gibt es nicht
+
+=== print using
+PRINT USING "##.##"; 3.14159
+--- fehler
+PRINT USING gibt es nicht
+
+=== open mit dateinummer
+OPEN "t.txt" FOR OUTPUT AS #1
+--- fehler
+OPENFILE
+
+=== else if in zwei woertern
+DIM x AS INTEGER
+IF x = 1 THEN
+    PRINT "1"
+ELSE IF x = 0 THEN
+    PRINT "0"
+END IF
+--- fehler
+ELSEIF bedingung THEN
+
+=== elseif im einzeiler
+DIM x AS INTEGER
+IF x = 1 THEN PRINT "1" ELSEIF x = 0 THEN PRINT "0"
+--- fehler
+ELSEIF geht nur im mehrzeiligen IF
+
+=== endif in einem wort
+DIM x AS INTEGER
+IF x = 0 THEN
+    PRINT 1
+ENDIF
+--- fehler
+END IF schreibt man in zwei Woertern
+
+=== mid als zuweisung
+DIM s AS STRING = "Hallo"
+MID$(s, 1, 1) = "e"
+--- fehler
+2: Parse-Fehler (1): MID$ kann nichts ersetzen
+
+=== gleichheitszeichen als anweisung zeigt auf die eigene zeile
+DIM a AS INTEGER
+a + 1 = 2
+PRINT a
+--- fehler
+2: Parse-Fehler (1): '=' als Anweisung
+
+=== dim shared
+DIM SHARED g AS INTEGER
+--- fehler
+DIM SHARED gibt es in Drachenhauch nicht
+
+=== dim mit runden klammern
+DIM a(10) AS INTEGER
+--- fehler
+DIM a[10] AS INTEGER
+
+=== dim ohne typ
+DIM name$
+--- fehler
+DIM name$ AS STRING
+
+=== string mit fester laenge
+DIM s AS STRING * 10
+--- fehler
+Texte haben in Drachenhauch keine feste Laenge
+
+=== typzeichen
+DIM x AS INTEGER
+x% = 3
+--- fehler
+Typ-Zeichen wie '%' hinter einem Namen gibt es nicht
+
+=== prozent als rest
+PRINT 7 % 3
+--- fehler
+Den Rest einer Division liefert MOD
+
+=== ungleich mit ausrufezeichen
+PRINT 1 != 2
+--- fehler
+Ungleich schreibt man in Drachenhauch <>
+
+=== doppeltes gleichheitszeichen
+PRINT 1 == 1
+--- fehler
+Verglichen wird mit EINEM =
+
+=== raute als kommentar
+PRINT 1 # kommentar
+--- fehler
+Kommentare beginnen mit ' (Hochkomma)
+
+=== doppelschraegstrich als kommentar
+PRINT 1 // kommentar
+--- fehler
+nicht mit //
+
+=== und-zeichen verbindet keine texte
+PRINT "a" & "b"
+--- fehler
+'&' verbindet hier keine Texte -- das macht +
+
+=== xor
+PRINT TRUE XOR FALSE
+--- fehler
+XOR gibt es nicht -- fuer Bits BXOR
+
+=== funktionsname als rueckgabe
+FUNCTION doppelt(x AS INTEGER) AS INTEGER
+    doppelt = x * 2
+END FUNCTION
+PRINT doppelt(3)
+--- fehler
+liefert eine FUNCTION ihren Wert mit RETURN
+
+=== sub in einer sub
+SUB aussen()
+    SUB innen()
+    END SUB
+END SUB
+--- fehler
+Eine SUB darf nicht innerhalb eines Unterprogramms oder Blocks stehen
+
+=== typnamen anderer sprachen
+DIM d AS DOUBLE
+--- fehler
+Unbekannter Typ 'DOUBLE' -- Kommazahlen heissen in Drachenhauch FLOAT
+
+=== long
+DIM d AS LONG
+--- fehler
+ganze Zahlen heissen in Drachenhauch INTEGER
+
+=== feld von feldern
+DIM a[3] AS ARRAY OF INTEGER
+--- fehler
+Felder von Feldern gibt es nicht -- zweidimensional: DIM g[3, 4] AS INTEGER
+
+=== befehl ohne klammern als wert
+DIM r AS FLOAT
+r = RND
+--- fehler
+RND ist ein Befehl -- aufgerufen wird er mit Klammern: RND()
+
+=== befehle anderer basics beim laufen
+PRINT UCASE$("abc")
+--- fehler
+Unbekannter Befehl 'UCASE$' -- dhrt kennt ihn nicht (Tippfehler?) -- heisst in Drachenhauch UPPER$(text)
+
+=== namen fuer ordner und argumente aus anderen sprachen
+' Konsolen-Runde (2026-10-11): auf ISDIR schlug die Meldung CHDIR, ISSTR,
+' MKDIR vor -- DIREXISTS stand nicht darunter.
+PRINT ISDIR(".")
+--- fehler
+heisst in Drachenhauch DIREXISTS(pfad)
+
+=== command$ aus qbasic
+PRINT COMMAND$
+--- fehler
+ARGPATH$(n)
+
+=== befehle anderer basics beim uebersetzen
+PRINT "vorher"
+PRINT FIX(3)
+--- stderr
+FIX: INT rundet ab
+--- fehler
+Unbekannter Befehl 'FIX'
+
+=== and auf zwei ganzzahlen warnt
+DIM a AS INTEGER = 6
+DIM b AS INTEGER = 3
+PRINT a AND b
+PRINT a BAND b
+PRINT a > 1 AND b > 1
+--- stderr
+AND verknuepft hier zwei Ganzzahlen
+--- erwartet
+3
+2
+TRUE
+
+=== step 0 ist ein fehler statt eines absturzes
+' Bis 2026-09-22 stuerzte dhrt hier mit einem Rust-Panic ab.
+DIM i AS INTEGER
+FOR i = 1 TO 3 STEP 0
+NEXT
+--- fehler
+STEP 0 kommt nie ans Ende
+
+=== step als kommazahl braucht eine float-laufvariable
+DIM i AS INTEGER
+FOR i = 0 TO 1 STEP 0.5
+NEXT
+--- fehler
+DIM i AS FLOAT vor der Schleife
+
+=== step als kommazahl mit float-laufvariable laeuft
+DIM f AS FLOAT
+FOR f = 0 TO 1 STEP 0.5
+    PRINT f
+NEXT
+--- erwartet
+0.0
+0.5
+1.0
+
+=== eof am dateiende
+WRITEALL("t.txt", "a" + CHR$(10) + CHR$(10) + "c")
+DIM f AS FILE
+f = OPENFILE("t.txt", "r")
+WHILE NOT EOF(f)
+    PRINT "[" + READLINE(f) + "]"
+WEND
+CLOSEFILE(f)
+--- erwartet
+[a]
+[]
+[c]
+
+=== readall mit pfad
+WRITEALL("t.txt", "eins" + CHR$(10) + "zwei")
+PRINT READALL$("t.txt")
+--- erwartet
+eins
+zwei
+
+=== call und byval werden uebergangen
+SUB s(BYVAL x AS INTEGER)
+    x = x + 1
+    PRINT x
+END SUB
+DIM a AS INTEGER = 1
+CALL s(a)
+PRINT a
+--- erwartet
+2
+1
+
+=== optional sagt vorgabewert
+SUB s(OPTIONAL x AS INTEGER)
+END SUB
+--- fehler
+x AS INTEGER = 0
+
+=== sub new sagt init
+CLASS K
+    SUB New()
+    END SUB
+END CLASS
+--- fehler
+SUB Init(...)
+
+=== me sagt self
+CLASS K
+    DIM x AS INTEGER
+    SUB setze()
+        Me.x = 3
+    END SUB
+END CLASS
+DIM k AS K
+k = NEW K()
+k.setze()
+--- fehler
+die eigene Instanz heisst in Drachenhauch Self
+
+=== catch mit as
+TRY
+    THROW "x"
+CATCH e AS STRING
+END TRY
+--- fehler
+CATCH meldung -- ohne AS
+
+=== funktion ohne klammern in einer rechnung
+FUNCTION zwei() AS INTEGER
+    RETURN 2
+END FUNCTION
+PRINT zwei + 1
+--- fehler
+'zwei' ist eine FUNCTION ohne Klammern, also nur ihr Name -- aufrufen mit zwei()
+
+=== text stellenweise aendern
+DIM s AS STRING = "abc"
+s[0] = "x"
+--- fehler
+Texte lassen sich nicht stellenweise aendern
+
+=== text gegen zahl warnt
+DIM s AS STRING = "5"
+DIM n AS INTEGER = 5
+PRINT s = n
+PRINT VAL(s) = n
+--- stderr
+'=' vergleicht Text mit Zahl -- das ist immer FALSE
+--- erwartet
+FALSE
+TRUE
+
+=== wahrheitswert gegen zahl warnt
+DIM b AS BOOLEAN = TRUE
+PRINT b = 1
+--- stderr
+'=' vergleicht Wahrheitswert mit Zahl
+--- erwartet
+FALSE
+
+=== tab und spc
+PRINT SPC(3)
+--- fehler
+heisst in Drachenhauch SPACE$(anzahl)
+
+=== methode ohne klammern ruft auf
+' Bis 2026-09-22 entstand hier still eine gebundene Methode, die niemand rief.
+CLASS A
+    DIM n AS INTEGER
+    SUB zaehle()
+        n = n + 1
+    END SUB
+END CLASS
+DIM a AS A
+a = NEW A()
+a.zaehle
+a.zaehle()
+PRINT a.n
+--- erwartet
+2
+
+=== feld ohne klammern bleibt ein feld
+CLASS A
+    DIM n AS INTEGER
+END CLASS
+DIM a AS A
+a = NEW A()
+a.n
+PRINT "ok"
+--- erwartet
+ok
+
+=== screen mit modusnummer
+SCREEN 12
+--- fehler
+SCREEN(breite, hoehe, "Titel")
+
+=== line in qbasic-schreibweise
+LINE (0, 0)-(10, 10), RED
+--- fehler
+LINE(x1, y1, x2, y2, farbe)
+
+=== circle in qbasic-schreibweise
+CIRCLE (50, 50), 10, RED
+--- fehler
+CIRCLE(x, y, radius, farbe)
+
+=== pset color und keydown
+PRINT KEYDOWN(1)
+--- fehler
+gehalten: KEYPRESSED(KEY_A)
+
+=== import ohne anfuehrungszeichen
+IMPORT json
+--- fehler
+IMPORT braucht Anfuehrungszeichen: IMPORT "json"
+
+=== inherits
+CLASS A
+END CLASS
+CLASS B INHERITS A
+END CLASS
+--- fehler
+CLASS Hund EXTENDS Tier
+
+=== public im klassenkoerper
+CLASS A
+    PUBLIC x AS INTEGER
+END CLASS
+--- fehler
+PUBLIC gibt es nicht
+
+=== feld ohne dim
+CLASS A
+    x AS INTEGER
+END CLASS
+--- fehler
+Felder werden mit DIM angelegt: DIM x AS
+
+=== zeichenkette ueber zwei zeilen
+DIM s AS STRING = "a
+b"
+--- fehler
+das Anfuehrungszeichen am Ende fehlt
+
+=== ausdruck endet am zeilenende
+DIM x AS INTEGER = 1
+IF x = 1 AND
+    x < 3 THEN PRINT "ok"
+--- fehler
+die Zeile mit _ beenden
+
+=== fehlendes bild nennt datei und ordner
+DIM b AS IMAGE
+b = LOADIMAGE("gibtsnicht.png")
+--- fehler
+LOADIMAGE: Datei 'gibtsnicht.png' nicht gefunden
+
+=== anfuehrungszeichen in einer zeichenkette
+' Typisch bei JSON von Hand: die Zeichenkette endet am \" -- der Rueckstrich
+' bleibt in einer normalen Zeichenkette woertlich.
+IMPORT "json"
+DIM j AS JSON_HANDLE
+j = JSON_PARSE("{\"a\": 1}")
+--- fehler
+Ein Anfuehrungszeichen IN einer Zeichenkette braucht ein ! davor
+
+=== mit ausrufezeichen geht dieselbe zeile
+IMPORT "json"
+DIM j AS JSON_HANDLE
+j = JSON_PARSE(!"{\"a\": 1}")
+PRINT JSON_GET_INT(j, "a")
+--- erwartet
+1
+
+=== eine sub liefert keinen wert
+SUB s()
+END SUB
+DIM x AS INTEGER
+x = s()
+--- fehler
+'s' ist eine SUB und liefert keinen Wert
+
+=== die meldung nennt die form des befehls
+IMPORT "json"
+DIM j AS JSON_HANDLE
+j = JSON_PARSE("[1]")
+PRINT JSON_GET_INT(j)
+--- fehler
+Aufruf: JSON_GET_INT(h: ?, path: STRING)
+
+=== zeit-teile und andere namen
+IMPORT "zeit"
+PRINT ZEIT_JAHR(ZEIT_JETZT())
+--- fehler
+ZEIT_TEIL(zeit, "jahr")
+
+=== eine sub mit yield ist eine coroutine und liefert ein handle
+SUB ticker()
+    YIELD 1
+    YIELD 2
+END SUB
+DIM c AS COROUTINE
+c = ticker()
+PRINT CORO_RESUME(c); CORO_RESUME(c)
+--- erwartet
+12
+
+=== zeichnen ohne fenster
+' Ohne SCREEN legt ein Bildbefehl ein VERSTECKTES Fenster an (fuer den
+' GL-Kontext). Wer darin auf den Schirm zeichnet, sah nie ein Bild -- und
+' bekam kein Wort dazu.
+BOX(0, 0, 10, 10, RED)
+--- fehler
+BOX: es gibt noch kein Fenster -- vor dem ersten Zeichenbefehl SCREEN(breite, hoehe, "Titel") aufrufen
+
+=== flip ohne fenster
+FLIP()
+--- fehler
+FLIP: es gibt noch kein Fenster
+
+=== cls ohne fenster
+CLS()
+--- fehler
+CLS: es gibt noch kein Fenster
+
+=== mit screen zeichnet dieselbe zeile
+SCREEN(40, 30, "Probe")
+CLS(BLUE)
+BOX(0, 0, 10, 10, RED)
+FLIP()
+PRINT "gezeichnet"
+--- erwartet
+gezeichnet
+
+=== ein bild entsteht auch ohne fenster
+' Die Gegenprobe zur Fenster-Pflicht: IMAGE_*/imgfx brauchen keinen Schirm,
+' sie zeichnen in ein Bild. Das darf die Pruefung nicht mitnehmen.
+IMPORT "imgfx"
+DIM b AS IMAGE
+b = IMAGE_NEW(8, 8, RED)
+IMAGE_FILL_RECT(b, 0, 0, 4, 4, GREEN)
+PRINT GETPIXEL(b, 1, 1) = GREEN
+--- erwartet
+TRUE
+
+=== gezeichnet aber nie gezeigt
+SCREEN(40, 30, "Probe")
+BOX(0, 0, 10, 10, RED)
+PRINT "fertig"
+--- erwartet
+fertig
+--- stderr
+FLIP() fehlt
+
+=== der hinweis kommt nur ohne flip
+' Gegenprobe im Fall: dasselbe Programm einmal mit und einmal ohne FLIP,
+' beide als Kind gestartet -- anders ist "der Satz steht NICHT da" nicht zu
+' pruefen (eine Erwartung sagt nur, was drinsteht).
+IMPORT "helfer.dh"
+dlStarten(["run", "ohne.dh"])
+' Gefragt wird der RUECKGABEWERT, nicht der Meldungstext: ein Bau ohne Grafik
+' sagt "im Rust-Kern noch nicht verfuegbar", eine Maschine ohne Bildschirm
+' "Kein Fenster moeglich" -- beide Male ist am Hinweis nichts zu pruefen.
+IF dlCode <> 0 THEN
+    PRINT "UEBERSPRINGEN: das Kind konnte nicht zeichnen"
+    EXIT(0)
+END IF
+PRINT "ohne flip: "; INSTR(dlErr, "FLIP() fehlt") >= 0
+dlStarten(["run", "mit.dh"])
+PRINT "mit flip:  "; INSTR(dlErr, "FLIP() fehlt") >= 0
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
+--- datei ohne.dh
+SCREEN(40, 30, "Probe")
+BOX(0, 0, 10, 10, RED)
+PRINT "fertig"
+--- datei mit.dh
+SCREEN(40, 30, "Probe")
+BOX(0, 0, 10, 10, RED)
+FLIP()
+PRINT "fertig"
+--- erwartet
+ohne flip: TRUE
+mit flip:  FALSE
+
+=== vertipptes builtin schlaegt den echten namen vor
+CIRLCE(1, 1, 1, RED)
+--- fehler
+Meintest du CIRCLE?
+
+=== ausgelassenes wort im befehlsnamen
+IMPORT "particles"
+DIM p AS PARTICLE_SYSTEM
+p = PARTICLE_NEW(10, 10)
+--- fehler
+Meintest du PARTICLE_SYSTEM_NEW
+
+=== anderer name aus einem anderen basic
+PRINT MAKEDIR("neu")
+--- fehler
+Meintest du MKDIR?
+
+=== kein vorschlag wenn nichts passt
+PRINT GLIBBERWURST(1)
+--- fehler
+Unbekannter Befehl 'GLIBBERWURST'
+
+=== dateiname statt geladenem klang
+PLAYSOUND("sprung.wav")
+--- fehler
+ein Dateiname ist noch kein Klang: erst `x = LOADSOUND("sprung.wav")`, dann `PLAYSOUND(x, ...)`
+
+=== dateiname statt geladenem bild
+SCREEN(40, 30, "Probe")
+DRAWIMAGE("held.png", 0, 0)
+--- fehler
+ein Dateiname ist noch kein Bild: erst `x = LOADIMAGE("held.png")`
+
+=== fehlender klang nennt datei und ordner
+DIM s AS SOUND
+s = LOADSOUND("gibtsnicht.wav")
+--- fehler
+LOADSOUND: Datei 'gibtsnicht.wav' nicht gefunden (gesucht relativ zu
+
+=== fehlende musik nennt datei und ordner
+PLAYMUSIC("gibtsnicht.ogg")
+--- fehler
+AUDIO_MUSIC_LOAD: Datei 'gibtsnicht.ogg' nicht gefunden (gesucht relativ zu
+
+=== eine klasse braucht NEW
+CLASS Spieler
+    DIM hp AS INTEGER
+END CLASS
+DIM p AS Spieler
+p.hp = 100
+--- fehler
+eine Klasse muss mit NEW angelegt werden (p = NEW Klasse())
+
+=== ein struct nicht
+STRUCT Punkt
+    DIM x AS INTEGER
+END STRUCT
+DIM p AS Punkt
+p.x = 3
+PRINT p.x
+--- erwartet
+3
+
+=== eine datei ohne OPENFILE
+DIM f AS FILE
+WRITELINE(f, "x")
+--- fehler
+WRITELINE: die Datei ist nicht geoeffnet -- f = OPENFILE("name.txt", "w")
+
+=== ein feld zaehlt ab null
+DIM a[3] AS INTEGER
+PRINT a[3]
+--- fehler
+Felder zaehlen ab 0: DIM a[3] hat a[0] bis a[2]
+
+=== weit daneben ohne den zaehl-hinweis
+DIM a[3] AS INTEGER
+PRINT a[99]
+--- fehler
+Index 99 ausserhalb [0..2] in Dimension 1
+
+=== eine taste als buchstabe
+' Bis 2026.27 ein Fehler mit dem Hinweis auf KEY_A -- seither meint ein
+' Buchstabe die Taste, auf der er steht (taste_nach_buchstabe.dhtest).
+SCREEN(40, 30, "Probe")
+PRINT KEYHIT("a")
+--- erwartet
+FALSE
+
+=== eine farbe aus hex-text
+PRINT RGB("FF0000")
+--- fehler
+eine Farbe aus Hex-Text kommt aus COLOR_FROM_HEX("FF0000"); im Quelltext geht auch &HFF0000
+
+=== dateiname statt geladenem blatt
+IMPORT "sprite"
+DIM s AS SPRITE
+s = SPRITE_NEW("held.png", 16, 16)
+--- fehler
+ein Dateiname ist noch kein Bild: erst `x = LOADIMAGE("held.png")`, dann `SPRITE_NEW(x, ...)`
+
+=== eine zuweisung kopiert kein feld
+' Kein Fehler, sondern eine Eigenschaft -- aber eine, die man kennen muss:
+' `b = a` gibt demselben Feld einen zweiten Namen. Die Kopie ist `a[:]`.
+DIM a AS ARRAY OF INTEGER = [1, 2]
+DIM b AS ARRAY OF INTEGER
+b = a
+b[0] = 9
+DIM c AS ARRAY OF INTEGER
+c = a[:]
+c[0] = 7
+PRINT a[0]; " "; b[0]; " "; c[0]
+--- erwartet
+9 9 7
+
+=== ein themenname an gui_theme nennt gui_theme_preset
+' GUI_THEME nimmt nur die Akzentfarbe -- wer "glas_hell" schreibt, meint
+' GUI_THEME_PRESET (Vereinsverwaltung, 2026-10-12). Vorher nur "erwartet
+' INTEGER (Arg 1)".
+IMPORT "gui"
+GUI_THEME("glas_hell")
+--- fehler
+GUI_THEME: erwartet INTEGER (Arg 1) -- ein ganzes Thema setzt GUI_THEME_PRESET("glas_hell"); GUI_THEME nimmt nur die Akzentfarbe
+
+=== dim hinter then sagt wie es geht
+' Texteditor-Runde, 2026-10-14: vorher nur "Unerwartetes Token DIM".
+DIM a AS INTEGER
+IF a = 0 THEN DIM b AS INTEGER : b = 1
+--- fehler
+DIM geht nicht hinter THEN/ELSE -- die Variable vor dem IF anlegen
+
+=== for im einzeiligen if sagt wie es geht
+DIM i AS INTEGER
+IF TRUE THEN FOR i = 1 TO 3 : PRINT i : NEXT
+--- fehler
+FOR geht nicht im einzeiligen IF -- IF ... THEN, dann FOR auf eigener Zeile, am Ende END IF

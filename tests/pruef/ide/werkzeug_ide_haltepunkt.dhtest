@@ -1,0 +1,489 @@
+' Haltepunkt per Klick in die Nummernspalte (ide/ide.dh, 2026-09-19,
+' fuenfter Punkt der Stufe A): links schaltet um wie F9, rechts fragt nach
+' einer Bedingung wie Umschalt+F9 -- fuer die ANGEKLICKTE Zeile, die Marke
+' bleibt stehen.
+'
+' Ein Einschub in der Bildschleife sucht in Bild 40 mit GUI_TEXTAREA_POS_AT
+' die Zeile und das erste Zeichen und klickt zehn Punkte davor
+' (_hilfen/idemaus.dh, prRand); die weiteren Tasten haengen an derselben
+' Aufnahme. Aufnahme: 7 Maus, 6/5 Maustaste runter/hoch (0 links,
+' 1 rechts), 2/1 Taste runter/hoch; 296 F7, 297 F8, 341 Strg, 86 V, 257 Enter.
+' Format: docs/werkzeuge.md, dhrt test.
+
+--- langsam
+=== links setzt den haltepunkt, der debugger haelt dort
+' Die Marke steht nach dem Oeffnen in Zeile 1 und bleibt dort; F7 haelt
+' dann in Zeile 3, nicht in Zeile 1 (ohne Haltepunkt stuende er in 1).
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../../ide/ide.dh nach SETFPS(60)
+--- einschub nach     IF GUI_DOUBLE_CLICKED(lstProbleme) THEN problemAnspringen()
+prBild = prBild + 1
+IF prBild = 40 THEN prRand(3, 0, "e 60 2 296 0 0" + CHR$(10) + "e 62 1 296 0 0" + CHR$(10) + "e 200 2 297 0 0" + CHR$(10) + "e 202 1 297 0 0" + CHR$(10), 4)
+IF prBild = 70 THEN prProbe()
+--- einschub nach protokoll("bereit")
+IMPORT "hilfe.dh"
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=400
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT "a"
+PRINT "b"
+PRINT "c"
+--- datei _programm/hilfe.dh
+IMPORT "{sammlung}/../_hilfen/idemaus.dh"
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+FUNCTION hat(z AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+FUNCTION alle$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    DIM r AS STRING : r = ""
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN
+            IF r <> "" THEN r = r + "|"
+            r = r + L[i]
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+PRINT alle$("ziel ")
+PRINT alle$("rand ")
+PRINT alle$("haltepunkt ")
+PRINT alle$("probe ")
+PRINT alle$("debug pause ")
+PRINT "debug beendet "; hat("debug beendet")
+--- erwartet
+ziel gefunden
+rand klick 3
+haltepunkt 3 an
+probe zeile 1
+debug pause 3
+debug beendet TRUE
+
+=== ein zweiter klick nimmt ihn weg
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../../ide/ide.dh nach SETFPS(60)
+--- einschub nach     IF GUI_DOUBLE_CLICKED(lstProbleme) THEN problemAnspringen()
+prBild = prBild + 1
+IF prBild = 40 THEN prRand(2, 0, "e 20 6 0 0 0" + CHR$(10) + "e 22 5 0 0 0" + CHR$(10), 2)
+--- einschub nach protokoll("bereit")
+IMPORT "hilfe.dh"
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=110
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT "a"
+PRINT "b"
+--- datei _programm/hilfe.dh
+IMPORT "{sammlung}/../_hilfen/idemaus.dh"
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+FUNCTION hat(z AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+FUNCTION alle$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    DIM r AS STRING : r = ""
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN
+            IF r <> "" THEN r = r + "|"
+            r = r + L[i]
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+PRINT alle$("rand ")
+PRINT alle$("haltepunkt ")
+--- erwartet
+rand klick 2|rand klick 2
+haltepunkt 2 an|haltepunkt 2 aus
+
+=== rechts fragt nach der bedingung
+' Die Bedingung kommt ueber die Zwischenablage (Strg+V in den Kasten, Enter);
+' ohne sie hielte der Debugger fuenfmal in Zeile 3.
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../../ide/ide.dh nach SETFPS(60)
+--- einschub nach     IF GUI_DOUBLE_CLICKED(lstProbleme) THEN problemAnspringen()
+prBild = prBild + 1
+IF prBild = 40 THEN prRand(3, 1, "e 30 2 341 0 0" + CHR$(10) + "e 30 2 86 0 0" + CHR$(10) + "e 32 1 86 0 0" + CHR$(10) + "e 32 1 341 0 0" + CHR$(10) + "e 50 2 257 0 0" + CHR$(10) + "e 52 1 257 0 0" + CHR$(10) + "e 80 2 296 0 0" + CHR$(10) + "e 82 1 296 0 0" + CHR$(10) + "e 230 2 297 0 0" + CHR$(10) + "e 232 1 297 0 0" + CHR$(10), 10)
+--- einschub nach protokoll("bereit")
+IMPORT "hilfe.dh"
+CLIPBOARD_SET("i = 3")
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=430
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+DIM i AS INTEGER
+FOR i = 1 TO 5
+PRINT i
+NEXT
+--- datei _programm/hilfe.dh
+IMPORT "{sammlung}/../_hilfen/idemaus.dh"
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+FUNCTION hat(z AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+FUNCTION alle$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    DIM r AS STRING : r = ""
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN
+            IF r <> "" THEN r = r + "|"
+            r = r + L[i]
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+PRINT alle$("rand ")
+PRINT alle$("haltepunkt ")
+PRINT alle$("debug pause ")
+PRINT "debug beendet "; hat("debug beendet")
+--- erwartet
+rand rechts 3
+haltepunkt 3 bedingt i = 3
+debug pause 3
+debug beendet TRUE
+
+=== haltepunkte in einer importierten datei halten dort
+' Bis 2026-09-27 zaehlte der Debugger Zeilen der zusammengefuegten Quelle
+' und die IDE schickte nur Haltepunkte der gestarteten Datei: beide Haltepunkte
+' hier hielten nie. Der auf dem SUB-Kopf rutscht in die erste Zeile mit Code.
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../../ide/ide.dh nach SETFPS(60)
+--- einschub nach     IF GUI_DOUBLE_CLICKED(lstProbleme) THEN problemAnspringen()
+prBild = prBild + 1
+IF prBild = 30 THEN
+    haltepunktUmschaltenIn(reiter[aktiverTab].pfad, 4)
+    haltepunktUmschaltenIn(PATHJOIN(DIRNAME(reiter[aktiverTab].pfad), "helfer.dh"), 2)
+    befehl("debug")
+END IF
+IF (prBild = 150 OR prBild = 230) AND debugPause THEN befehl("weiter_d")
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=340
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+IMPORT "helfer.dh"
+DIM x AS INTEGER
+x = 1
+x = 2
+hallo()
+PRINT x
+--- datei helfer.dh
+' eine Hilfe
+SUB hallo()
+    PRINT "hallo"
+END SUB
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+FUNCTION alle$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    DIM r AS STRING : r = ""
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN
+            IF r <> "" THEN r = r + "|"
+            r = r + L[i]
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+PRINT alle$("haltepunkt ")
+PRINT alle$("debug ")
+--- erwartet
+haltepunkt 4 an|haltepunkt 2 an|haltepunkt verschoben 2 3
+debug gestartet|debug pause 4|debug pause 3|debug datei helfer.dh|debug beendet
+
+=== ein haltepunkt wandert mit seiner zeile
+' Eine Zeile ueber dem Haltepunkt eingefuegt: der rote Punkt rutscht mit,
+' und der Debugger haelt an der Zeile, die gemeint war -- vorher blieb er
+' auf seiner Nummer und hielt eine Zeile zu frueh.
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../../ide/ide.dh nach SETFPS(60)
+--- einschub nach     IF GUI_DOUBLE_CLICKED(lstProbleme) THEN problemAnspringen()
+prBild = prBild + 1
+IF prBild = 30 THEN haltepunktUmschaltenIn(reiter[aktiverTab].pfad, 3)
+IF prBild = 40 THEN
+    GUI_TEXTAREA_SELECT(reiter[aktiverTab].feld, 1, 1, 1, 1)
+    GUI_TEXTAREA_INSERT(reiter[aktiverTab].feld, "PRINT " + CHR$(34) + "neu" + CHR$(34) + CHR$(10))
+END IF
+IF prBild = 60 THEN
+    sichern(aktiverTab, FALSE)
+    befehl("debug")
+END IF
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=240
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT "a"
+PRINT "b"
+PRINT "c"
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+FUNCTION alle$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    DIM r AS STRING : r = ""
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN
+            IF r <> "" THEN r = r + "|"
+            r = r + L[i]
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+PRINT alle$("marken gewandert")
+PRINT alle$("debug pause")
+--- erwartet
+marken gewandert 4
+debug pause 4
+
+=== input im debugger nimmt die eingabezeile
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../../ide/ide.dh nach SETFPS(60)
+--- einschub nach     IF GUI_DOUBLE_CLICKED(lstProbleme) THEN problemAnspringen()
+prBild = prBild + 1
+IF prBild = 30 THEN befehl("debug")
+IF prBild = 100 AND debugPause THEN befehl("weiter_d")
+IF prBild = 170 AND debugEingabe THEN
+    GUI_SET_TEXT(tfEingabe, "21")
+    eingabeSenden()
+END IF
+IF prBild = 250 THEN
+    DIM prK AS INTEGER
+    FOR prK = 0 TO GUI_LISTBOX_COUNT(lstAusgabe) - 1
+        IF INSTR(GUI_LISTBOX_ITEM(lstAusgabe, prK), "doppelt 42") >= 0 THEN protokoll("gefunden doppelt")
+    NEXT
+END IF
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=260
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+DIM n AS INTEGER
+INPUT "Zahl"; n
+PRINT "doppelt "; n * 2
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+FUNCTION alle$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    DIM r AS STRING : r = ""
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN
+            IF r <> "" THEN r = r + "|"
+            r = r + L[i]
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+PRINT alle$("debug ")
+PRINT alle$("gefunden")
+--- erwartet
+debug gestartet|debug pause 1|debug eingabe 2|debug eingabe gesendet|debug beendet
+gefunden doppelt
+
+=== anhalten haelt ein laufendes programm
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../../ide/ide.dh nach SETFPS(60)
+--- einschub nach     IF GUI_DOUBLE_CLICKED(lstProbleme) THEN problemAnspringen()
+prBild = prBild + 1
+IF prBild = 30 THEN befehl("debug")
+IF prBild = 100 AND debugPause THEN befehl("weiter_d")
+IF prBild = 140 THEN befehl("anhalten")
+IF prBild = 200 AND debugPause THEN befehl("stopp")
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=280
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+DIM i AS INTEGER
+WHILE TRUE
+    SLEEP(5)
+    i = i + 1
+WEND
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM n AS INTEGER : n = 0
+DIM a AS BOOLEAN : a = FALSE
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 12) = "debug pause " THEN n = n + 1
+    IF L[i] = "anhalten" THEN a = TRUE
+NEXT
+PRINT a; " "; n
+--- erwartet
+TRUE 2
+
+=== ein haltepunkt in einer fremden datei meldet nicht haelt nie
+' Beim Dogfooding 2026-09-30: die Statuszeile sagte "Haltepunkt haelt nie
+' ... test.dh:5" -- ein Haltepunkt aus einem ganz anderen Projekt. Die IDE
+' schickt alle Haltepunkte; einer in einer Datei, die das Programm nicht
+' enthaelt, ist kein Befund (`in_program` FALSE). Einer ohne Code darunter in
+' der eigenen Datei bleibt es.
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../../ide/ide.dh nach SETFPS(60)
+--- einschub nach     IF GUI_DOUBLE_CLICKED(lstProbleme) THEN problemAnspringen()
+prBild = prBild + 1
+IF prBild = 30 THEN
+    hpNeu(PATHJOIN(projektOrdner, "anders.dh"), 1, "")
+    hpNeu(reiter[aktiverTab].pfad, 99, "")
+    befehl("debug")
+END IF
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=300
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT "a"
+PRINT "b"
+PRINT "c"
+--- datei anders.dh
+PRINT "gehoert nicht dazu"
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 15) = "haltepunkt nie " THEN PRINT L[i]
+NEXT
+--- erwartet
+haltepunkt nie spiel.dh:99
+
+=== nach weiter holt die ide das programmfenster nach vorn
+' Beim Dogfooding gefunden: nach "Weiter" (F8) lag das Programmfenster
+' hinter der IDE -- ein Programm im Hintergrund darf sich unter Windows
+' nicht selbst nach vorn holen. Die IDE holt es mit PROCESS_FRONT; ein
+' Einzelschritt tut das nicht (das Fenster sprang sonst bei jedem F10).
+' Beim ersten Weiter (zum Haltepunkt) gibt es noch kein Fenster: FALSE,
+' das Kind bekommt nur die Erlaubnis fuer sein erstes.
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../../ide/ide.dh nach SETFPS(60)
+--- einschub nach     IF GUI_DOUBLE_CLICKED(lstProbleme) THEN problemAnspringen()
+prBild = prBild + 1
+IF prBild = 40 THEN
+    GUI_TEXTAREA_GOTO(reiter[aktiverTab].feld, 3, 1)
+    haltepunktUmschalten()
+    WRITEALL("prtasten.txt", "c 6" + CHR$(10) + "e 0 2 296 0 0" + CHR$(10) + "e 2 1 296 0 0" + CHR$(10) + "e 100 2 299 0 0" + CHR$(10) + "e 102 1 299 0 0" + CHR$(10) + "e 160 2 297 0 0" + CHR$(10) + "e 162 1 297 0 0" + CHR$(10) + CHR$(10))
+    AUTOMATION_PLAY("prtasten.txt")
+END IF
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=500
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+SCREEN(160, 100, "Spiel", 1)
+SET_WINDOW_POS(-3000, -3000)
+PRINT "halt"
+PRINT "schritt"
+DIM i AS INTEGER
+FOR i = 1 TO 120
+    CLS(0) : FLIP()
+NEXT
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 12) = "debug pause " OR LEFT$(L[i], 14) = "programm vorn " THEN PRINT L[i]
+NEXT
+--- erwartet
+programm vorn FALSE
+debug pause 3
+debug pause 4
+programm vorn TRUE
+
+=== ein halt 900 aufrufe tief bleibt flott
+' Stresstest 2026-10-02: der Aufrufstapel fragte je Eintrag mit SAMEFILE die
+' Platte, ob er in der Hauptdatei liegt -- 900 Eintraege kosteten 140 ms je
+' Halt, und die Marken fragten es in jedem Bild noch einmal. Jetzt merkt
+' sich die IDE die Antwort fuer den Halt (gleicheDatei). Geprueft: der echte
+' Debugger haelt 900 Aufrufe tief und der Stapel hat alle Eintraege; und ein
+' Stapel mit 900 Eintraegen ist flott gezeigt (grob: 50 ms, vorher 140).
+DIM prBild AS INTEGER : prBild = 0
+DIM prFertig AS BOOLEAN : prFertig = FALSE
+--- programm ../../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 20 THEN haltepunktUmschaltenIn(reiter[aktiverTab].pfad, 4) : befehl("debug")
+IF prBild > 20 AND NOT prFertig AND debugPause AND debugZeile = 4 THEN
+    prFertig = TRUE
+    protokoll("pr stapel " + STR$(GUI_TABLE_ROW_COUNT(tblStapel)) + " oben " + GUI_TABLE_GET_CELL(tblStapel, 0, 0))
+    DIM prT AS ARRAY OF STRING : prT = []
+    DIM prI AS INTEGER
+    FOR prI = 1 TO 900
+        ARRAY_PUSH(prT, "{" + jsonText$("name") + ":" + jsonText$("tief") + "," + jsonText$("line") + ":" + STR$(prI) + "," + jsonText$("file") + ":" + jsonText$(prozessDatei) + "}")
+    NEXT
+    DIM prJ AS JSON_HANDLE : prJ = JSON_PARSE("{" + jsonText$("stack") + ":[" + JOIN$(prT, ",") + "]}")
+    DIM prZ AS FLOAT : prZ = GET_TIME()
+    stapelZeigen(prJ)
+    protokoll("pr flott " + STR$(GET_TIME() - prZ < 0.05) + " zeilen " + STR$(GUI_TABLE_ROW_COUNT(tblStapel)))
+    befehl("stopp")
+END IF
+IF prBild = 400 OR (prFertig AND prozess < 0) THEN EXIT(0)
+--- argumente
+tief.dh
+--- umgebung
+DHRT_FRAMES=2000
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+--- datei tief.dh
+FUNCTION tief(n AS INTEGER) AS INTEGER
+    IF n = 0 THEN
+        DIM unten AS INTEGER : unten = 1
+        PRINT "unten"
+        RETURN 0
+    END IF
+    RETURN tief(n - 1) + 1
+END FUNCTION
+PRINT tief(900)
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " THEN PRINT L[i]
+NEXT
+--- erwartet
+pr stapel 902 oben tief
+pr flott TRUE zeilen 900

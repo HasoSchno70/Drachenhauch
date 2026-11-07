@@ -1,0 +1,227 @@
+' Das Drachenhauch Studio auf Englisch: jeder Anzeigetext geht durch tr$ bzw.
+' trf$, die Tafel steht in studio/sprache/en.txt. Geprueft wird, dass sie
+' vollstaendig ist, dass die Oberflaeche samt Dialogen wirklich englisch wird
+' (die Sprachprobe DH_STUDIO_SPRACHPROBE oeffnet jeden Dialog und zaehlt
+' Texte ohne Uebersetzung), dass die deutsche unberuehrt bleibt und woher das
+' Studio seine Sprache nimmt.
+--- langsam
+
+=== jeder eingepackte text hat eine uebersetzung
+' Aus studio/*.dh: tr$("...") und trf$("...") ausserhalb von Kommentaren,
+' die Gruppen und Feldnamen des Inspektors und von jedem Baustein Gruppe,
+' Name, Grundname, Text, Eintraege/Spaltenkoepfe und Beschreibung.
+DIM studio AS STRING : studio = DIRNAME(ARG$(0))
+DIM tab AS MAP OF STRING : tab = {}
+DIM doppelt AS INTEGER : doppelt = 0
+DIM z AS STRING
+FOR EACH z IN READLINES(PATHJOIN(studio, "sprache/en.txt"))
+    DIM t AS INTEGER : t = INSTR(z, CHR$(9))
+    IF t > 0 THEN
+        IF MAPHAS(tab, LEFT$(z, t)) THEN
+            doppelt = doppelt + 1
+            PRINT "doppelt: "; LEFT$(z, t)
+        END IF
+        MAPPUT(tab, LEFT$(z, t), MID$(z, t + 1))
+    END IF
+NEXT
+DIM gesehen AS MAP OF INTEGER : gesehen = {}
+DIM fehlt AS INTEGER : fehlt = 0
+SUB pruefe(w AS STRING)
+    MAPPUT(gesehen, w, 1)
+    IF NOT MAPHAS(tab, w) THEN
+        fehlt = fehlt + 1
+        PRINT "fehlt: "; w
+    END IF
+END SUB
+DIM q AS STRING : q = CHR$(34)
+DIM st AS STRING : st = q + "([^" + q + "]*)" + q
+DIM falsch AS INTEGER : falsch = 0
+DIM datei AS STRING
+FOR EACH datei IN DIRLIST(studio)
+    IF RIGHT$(datei, 3) <> ".dh" THEN CONTINUE
+    FOR EACH z IN READLINES(PATHJOIN(studio, datei))
+        IF LEFT$(TRIM$(z), 1) = "'" THEN CONTINUE
+        DIM w AS STRING
+        FOR EACH w IN REGEX_FIND_ALL(z, "\btr\$\(" + st)
+            pruefe(w)
+            IF INSTR(w, "{0}") >= 0 THEN falsch = falsch + 1 : PRINT "tr$ mit Platzhalter: "; w
+        NEXT
+        FOR EACH w IN REGEX_FIND_ALL(z, "\btrf\$\(" + st)
+            pruefe(w)
+            IF INSTR(w, "{0}") < 0 THEN falsch = falsch + 1 : PRINT "trf$ ohne Platzhalter: "; w
+        NEXT
+        FOR EACH w IN REGEX_FIND_ALL(z, "inspGruppe\(" + st)
+            pruefe(w)
+        NEXT
+        FOR EACH w IN REGEX_FIND_ALL(z, "inspZeile\(" + q + "[^" + q + "]*" + q + ", " + q + "[^" + q + "]*" + q + ", " + st)
+            pruefe(w)
+        NEXT
+        IF LEFT$(TRIM$(z), 9) = "baustein(" THEN
+            DIM a AS ARRAY OF STRING : a = REGEX_FIND_ALL(z, st)
+            pruefe(a[0]) : pruefe(a[2]) : pruefe(a[3]) : pruefe(a[6])
+            IF a[4] <> "" THEN pruefe(a[4])
+            IF INSTR(a[5], "'items'") >= 0 OR INSTR(a[5], "'headers'") >= 0 THEN pruefe(a[5])
+        END IF
+    NEXT
+NEXT
+' Die Auswahl "wahlindex" und die Anordnung "fluss" stehen nicht als Literal da.
+pruefe("Anfang;Mitte;Ende") : pruefe("Fluss") : pruefe("ein eigenes Control dieses Projekts")
+' Gleiche Platzhalter auf beiden Seiten, und nichts in der Tafel, das niemand fragt.
+DIM k AS STRING
+DIM verwaist AS INTEGER : verwaist = 0
+FOR EACH k IN MAPKEYS(tab)
+    IF NOT MAPHAS(gesehen, k) THEN verwaist = verwaist + 1 : PRINT "verwaist: "; k
+    DIM n AS INTEGER
+    FOR n = 0 TO 3
+        DIM ph AS STRING : ph = "{" + STR$(n) + "}"
+        IF (INSTR(k, ph) >= 0) <> (INSTR(MAPGET(tab, k), ph) >= 0) THEN falsch = falsch + 1 : PRINT "platzhalter: "; k
+    NEXT
+NEXT
+PRINT "genug texte "; MAPSIZE(gesehen) > 400
+PRINT "fehlt "; fehlt
+PRINT "doppelt "; doppelt
+PRINT "verwaist "; verwaist
+PRINT "falsch "; falsch
+--- argumente
+{sammlung}/../../../studio/studio.dh
+--- erwartet
+genug texte TRUE
+fehlt 0
+doppelt 0
+verwaist 0
+falsch 0
+
+=== englisch: oberflaeche, dialoge, vorlagen, meldungen der laufzeit
+IMPORT "laeufer.dh"
+SETENV("DH_STUDIO_SPRACHPROBE", "1")
+SETENV("DH_STUDIO_SPRACHE", "en")
+DIM log AS STRING : log = CWD$() + "/p.log"
+DIM aus AS STRING : aus = slStarten(log, "", 40, "")
+DIM z AS STRING
+FOR EACH z IN slAnfang(log, "probe ")
+    PRINT z
+NEXT
+IF aus <> "" THEN PRINT aus
+--- argumente
+{sammlung}/../../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- erwartet
+probe sprache en
+probe dhrt_lang [en]
+probe status New project. Drag controls from the library into the window.
+probe bibliothek Buttons and switches | Button
+probe inspektor Window
+probe name MainWindow
+probe pruefen Expected END IF, reached the end of the program
+probe ereignis Runs after it has been built. The method is called Geoeffnet.
+probe element TRUE
+probe menue No menu yet. [+ Menu] creates one.
+probe vorlagen Empty,Form with fields,Address book with a database,Canvas with a timer
+probe vorlage The app and an empty window -- drag controls in from the library.
+probe fehlt 0
+
+=== deutsch bleibt deutsch
+IMPORT "laeufer.dh"
+SETENV("DH_STUDIO_SPRACHPROBE", "1")
+DIM log AS STRING : log = CWD$() + "/p.log"
+DIM aus AS STRING : aus = slStarten(log, "", 40, "")
+DIM z AS STRING
+FOR EACH z IN slAnfang(log, "probe ")
+    PRINT z
+NEXT
+IF aus <> "" THEN PRINT aus
+--- argumente
+{sammlung}/../../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- erwartet
+probe sprache de
+probe dhrt_lang []
+probe status Neues Projekt. Bausteine aus der Bibliothek ins Fenster ziehen.
+probe bibliothek Knöpfe und Schalter | Knopf
+probe inspektor Fenster
+probe name Hauptfenster
+probe pruefen END IF erwartet, Programmende erreicht
+probe ereignis Läuft nachdem es aufgebaut ist. Die Methode heißt Geoeffnet.
+probe element TRUE
+probe menue Noch kein Menü. [+ Menü] legt eins an.
+probe vorlagen Leer,Formular mit Eingaben,Adressbuch mit Datenbank,Zeichenfläche mit Timer
+probe vorlage Die App und ein leeres Fenster -- Bausteine aus der Bibliothek hineinziehen.
+probe fehlt 0
+
+=== der menuepunkt schaltet um, die sprache gilt beim naechsten start
+' Erst deutsch; "wechseln" schreibt studio.json, der naechste Start ist
+' englisch, noch einmal wechseln macht ihn wieder deutsch.
+IMPORT "laeufer.dh"
+IMPORT "json"
+DIM log AS STRING : log = CWD$() + "/p.log"
+DIM aus AS STRING
+SUB sprachLauf(was AS STRING)
+    SETENV("DH_STUDIO_SPRACHPROBE", was)
+    aus = slStarten(log, "", 40, "")
+    IF aus <> "" THEN PRINT aus
+END SUB
+sprachLauf("wechseln")
+PRINT "umgeschaltet "; slHat(log, "sprache en")
+PRINT "datei "; JSON_GET_STRING(JSON_LOAD(CWD$() + "/studio.json"), "sprache")
+sprachLauf("1")
+PRINT "danach "; slHat(log, "probe sprache en")
+sprachLauf("wechseln")
+PRINT "zurueck "; JSON_GET_STRING(JSON_LOAD(CWD$() + "/studio.json"), "sprache")
+sprachLauf("1")
+PRINT "wieder "; slHat(log, "probe sprache de")
+--- argumente
+{sammlung}/../../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- erwartet
+umgeschaltet TRUE
+datei en
+danach TRUE
+zurueck de
+wieder TRUE
+
+=== woher die sprache kommt
+' Ohne eigene Einstellung folgt das Studio der IDE (ide.json neben
+' studio.json) und sonst DHRT_LANG; die eigene Einstellung geht beiden vor.
+' Mit DH_STUDIO_KONFIG woanders wird die ide.json nicht gefragt.
+IMPORT "laeufer.dh"
+DIM log AS STRING : log = CWD$() + "/p.log"
+SETENV("DH_STUDIO_SPRACHPROBE", "1")
+FUNCTION welche$() AS STRING
+    DIM aus AS STRING : aus = slStarten(log, "", 40, "")
+    IF aus <> "" THEN PRINT aus
+    IF slHat(log, "probe sprache en") THEN RETURN "en"
+    IF slHat(log, "probe sprache de") THEN RETURN "de"
+    RETURN "?"
+END FUNCTION
+MKDIR(CWD$() + "/profil")
+' DHRT_LANG allein
+SETENV("DHRT_LANG", "en")
+PRINT "dhrt_lang "; welche$()
+' die eigene Einstellung geht vor
+WRITEALL(CWD$() + "/studio.json", "{" + CHR$(34) + "sprache" + CHR$(34) + ": " + CHR$(34) + "de" + CHR$(34) + "}")
+PRINT "eigene vor dhrt_lang "; welche$()
+SETENV("DHRT_LANG", "")
+' die ide.json im Ordner der Einstellungen (APPDATA): nur ohne DH_STUDIO_KONFIG
+WRITEALL(CWD$() + "/profil/ide.json", "{" + CHR$(34) + "sprache" + CHR$(34) + ": " + CHR$(34) + "en" + CHR$(34) + "}")
+SETENV("DH_STUDIO_KONFIG", CWD$() + "/profil/studio.json")
+PRINT "mit konfig ohne ide "; welche$()
+SETENV("DH_STUDIO_KONFIG", "-")
+SETENV("DH_IDE_KONFIG", CWD$() + "/profil/ide.json")
+SETENV("APPDATA", CWD$() + "/leer")
+PRINT "der ide gefolgt "; welche$()
+--- argumente
+{sammlung}/../../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- erwartet
+dhrt_lang en
+eigene vor dhrt_lang de
+mit konfig ohne ide de
+der ide gefolgt en

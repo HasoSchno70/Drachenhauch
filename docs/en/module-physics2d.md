@@ -93,4 +93,4 @@ for *real* dynamics: stacking, throwing, rolling, ragdolls, sandbox.)
 External type `PHYS2D_WORLD`. Implementation
 `rust/drachenhauch_runtime/src/physics2d.rs` (pure Rust, ungated), demo
 [examples/112_physics2d.dh](../../examples/112_physics2d.dh), tests
-`tests/pruef/physics2d.dhtest`.
+`tests/pruef/module/physics2d.dhtest`.

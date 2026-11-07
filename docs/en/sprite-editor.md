@@ -291,7 +291,7 @@ empty — when which state changes into which is a statement about the game.
 ## Testing
 
 The promises of this page are checked by
-[`tests/pruef/werkzeug_sprite.dhtest`](../../tests/pruef/werkzeug_sprite.dhtest)
+[`tests/pruef/werkzeuge/werkzeug_sprite.dhtest`](../../tests/pruef/werkzeuge/werkzeug_sprite.dhtest)
 with real mouse paths via recording playback: selection, lasso and magic
 wand, moving, palettes against a foreign reader, statistics, cropping,
 ranges, DH code and `.dhanim` (started or loaded by the runtime), atlas

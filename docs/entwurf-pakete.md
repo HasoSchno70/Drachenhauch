@@ -4,7 +4,7 @@ Stand 2026-10-04. Punkt „Kein Paketverzeichnis“ aus
 [entwurf-anwendungen-und-tempo.md](entwurf-anwendungen-und-tempo.md).
 
 **Gebaut** am selben Tag (`rust/drachenhauch_runtime/src/paket.rs`, Handbuch
-[pakete.md](pakete.md), Tests `tests/pruef/paket.dhtest`). Beim Bauen kam
+[pakete.md](pakete.md), Tests `tests/pruef/werkzeugkette/paket.dhtest`). Beim Bauen kam
 dazu bzw. wich ab:
 
 - **Die Pruefsumme geht ueber den entpackten Inhalt**, nicht ueber die

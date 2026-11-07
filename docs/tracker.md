@@ -247,7 +247,7 @@ die Art `pingpong`.
 
 ## Geprüft
 
-`tests/pruef/werkzeug_tracker.dhtest` bedient den Tracker wie von Hand
+`tests/pruef/werkzeuge/werkzeug_tracker.dhtest` bedient den Tracker wie von Hand
 (Aufnahme über `AUTOMATION_PLAY`) und prüft an drei Ergebnissen, die
 Drachenhauch selbst liest: die **Datei** (json-Modul, mit den Schlüsseln,
 die die Qt-Fassung las; dazu zwei Dateien, die die Qt-Fassung geschrieben

@@ -429,10 +429,10 @@ umgezogen, keiner ist aufgegeben worden:**
 
 | Datei | prüfte | wohin |
 |---|---|---|
-| `test_dhrt_test.py` | Anker: `dhrt test tests/pruef`; das Format der Sammlungen | die CI ruft den Anker direkt auf; das Format prüft `tests/pruef/dhrt_test_format.dhtest` an einer Sammlung, die der Fall selbst schreibt (als Beilage ginge es nicht: ihre `===`/`---`-Zeilen wären die Trenner der äußeren) |
-| `test_drucken.py` | Druck durch „Microsoft Print to PDF", gelesen mit PyMuPDF | `tests/pruef/drucken.dhtest`; der eigene Leser `tests/pruef/_hilfen/pdftext.dh` liest jetzt auch **fremde** PDFs und liefert die Textstellen mit — der Betrag wird an seiner mm-Lage geprüft statt über PyMuPDFs Textkästen |
-| `test_os_builtins.py` (2) | PRINT/EPRINT-Reihenfolge in einem Strom; `SHELL_OUT$` mit der eigenen Exe | `tests/pruef/os_builtins.dhtest`; beides hing am selben Loch — ein Programm kannte den Pfad der laufenden Laufzeit nicht. Dafür neu **`EXEPATH$()`**; die Ströme führt eine Shell-Umleitung zusammen (in einer Skriptdatei, weil `SHELL` Anführungszeichen als `\"` weitergibt) |
-| `test_midi_module.py` | echter und Loopback-MIDI-Anschluss | `tests/pruef/modules_midi.dhtest`, mit Selbst-Überspringen je Stufe (Feature, Ausgang, Loopback-Port) |
+| `test_dhrt_test.py` | Anker: `dhrt test tests/pruef`; das Format der Sammlungen | die CI ruft den Anker direkt auf; das Format prüft `tests/pruef/werkzeugkette/dhrt_test_format.dhtest` an einer Sammlung, die der Fall selbst schreibt (als Beilage ginge es nicht: ihre `===`/`---`-Zeilen wären die Trenner der äußeren) |
+| `test_drucken.py` | Druck durch „Microsoft Print to PDF", gelesen mit PyMuPDF | `tests/pruef/module/drucken.dhtest`; der eigene Leser `tests/pruef/_hilfen/pdftext.dh` liest jetzt auch **fremde** PDFs und liefert die Textstellen mit — der Betrag wird an seiner mm-Lage geprüft statt über PyMuPDFs Textkästen |
+| `test_os_builtins.py` (2) | PRINT/EPRINT-Reihenfolge in einem Strom; `SHELL_OUT$` mit der eigenen Exe | `tests/pruef/laufzeit/os_builtins.dhtest`; beides hing am selben Loch — ein Programm kannte den Pfad der laufenden Laufzeit nicht. Dafür neu **`EXEPATH$()`**; die Ströme führt eine Shell-Umleitung zusammen (in einer Skriptdatei, weil `SHELL` Anführungszeichen als `\"` weitergibt) |
+| `test_midi_module.py` | echter und Loopback-MIDI-Anschluss | `tests/pruef/geraete/modules_midi.dhtest`, mit Selbst-Überspringen je Stufe (Feature, Ausgang, Loopback-Port) |
 
 `test_dhrun_chooser.py`, `test_seriell_liste.py` und
 `test_testbefehle_stimmen.py` prüfen Python-Werkzeuge oder pytest selbst
@@ -442,7 +442,7 @@ prüft die Reihenfolge von PRINT und LOG_* in einem Strom -- eine
 Eigenschaft von `dhrt`, nicht von Python --, und `test_build_wasm.py`
 prüft `rust/build_wasm.py`, das nach (c) bleibt, samt Web-Harness und
 dem emscripten-Einstieg in `main.rs`. Beide stehen seither in
-`tests/pruef/pruefen.dhtest` und `tests/pruef/build_wasm.dhtest`; die
+`tests/pruef/laufzeit/pruefen.dhtest` und `tests/pruef/werkzeugkette/build_wasm.dhtest`; die
 Logik des Bauskripts prüft dort ein Python-Kind mit der
 Standardbibliothek (`python3`, `python` oder der Launcher `py` -- unter
 Windows können die ersten beiden Platzhalter aus WindowsApps sein, die
@@ -463,7 +463,7 @@ sich nicht starten lassen).
    siehe (d).
 4. **Verteilung:** ~~der Python-freie Installer übernimmt Bücher,
    ESP32-Sketche, Signierung und das Aufräumen der alten Installation~~ --
-   am 21.09. (`installer/README.md`, `tests/pruef/werkzeug_installer.dhtest`).
+   am 21.09. (`installer/README.md`, `tests/pruef/werkzeuge/werkzeug_installer.dhtest`).
    **Entschieden am 21.09.: er ersetzt die Qt-Fassung NICHT** -- beide
    bleiben nebeneinander installierbar, bis Punkt 7 die Qt-Fassung löscht;
    ~~macOS und Linux brauchen einen eigenen Weg oder bleiben vorerst ohne
@@ -498,17 +498,17 @@ Sample-Instrumenten. Keiner der Punkte rettet also Daten; es geht nur
 darum, was beim Arbeiten fehlen würde.
 
 * **Stufe A, vor dem Abschalten der Qt-Fassung:** in der IDE
-  ~~Absturz-Wiederherstellung~~ (18.09., `tests/pruef/werkzeug_ide_wiederherstellung.dhtest`),
-  ~~Klick auf `datei:zeile` in der Ausgabe~~ (18.09., `tests/pruef/werkzeug_ide_ausgabe.dhtest`), ~~Zoom mit
-  Strg+Rad und Strg+Plus/Minus/0~~ (18.09., `tests/pruef/werkzeug_ide_zoom.dhtest`), ~~Tooltip beim Überfahren und Strg+Klick
-  zur Definition~~ (19.09., `tests/pruef/werkzeug_ide_tooltip.dhtest`), ~~Haltepunkt per Klick in die
-  Nummernspalte~~ (19.09., `tests/pruef/werkzeug_ide_haltepunkt.dhtest`), ~~Suchen mit
+  ~~Absturz-Wiederherstellung~~ (18.09., `tests/pruef/ide/werkzeug_ide_wiederherstellung.dhtest`),
+  ~~Klick auf `datei:zeile` in der Ausgabe~~ (18.09., `tests/pruef/ide/werkzeug_ide_ausgabe.dhtest`), ~~Zoom mit
+  Strg+Rad und Strg+Plus/Minus/0~~ (18.09., `tests/pruef/ide/werkzeug_ide_zoom.dhtest`), ~~Tooltip beim Überfahren und Strg+Klick
+  zur Definition~~ (19.09., `tests/pruef/ide/werkzeug_ide_tooltip.dhtest`), ~~Haltepunkt per Klick in die
+  Nummernspalte~~ (19.09., `tests/pruef/ide/werkzeug_ide_haltepunkt.dhtest`), ~~Suchen mit
   Groß/klein und ganzem Wort samt einzeln ersetzen~~ (19.09.,
-  `tests/pruef/werkzeug_ide_suche.dhtest`); im Notenblatt die
+  `tests/pruef/ide/werkzeug_ide_suche.dhtest`); im Notenblatt die
   ~~Warnungen beim Umrechnen in den Tracker~~ (19.09.,
-  `tests/pruef/werkzeug_notenblatt.dhtest`); im Sprite-Editor ~~die festen
+  `tests/pruef/werkzeuge/werkzeug_notenblatt.dhtest`); im Sprite-Editor ~~die festen
   Grenzen anheben (16 Bilder, 128 px, 4 Ebenen)~~ (19.09., jetzt 64 Bilder,
-  256 px, 8 Ebenen; `tests/pruef/werkzeug_sprite.dhtest`). Damit ist Stufe A
+  256 px, 8 Ebenen; `tests/pruef/werkzeuge/werkzeug_sprite.dhtest`). Damit ist Stufe A
   erledigt.
 * **Stufe B, wenn es fehlt:** Fundstellen beliebiger Namen, Dateien ins
   Fenster ziehen, Klammern automatisch schließen; Tilemap: Kachelgröße aus
@@ -559,7 +559,7 @@ laufende `dhrt.exe` nicht selbst); Skripte des Betriebssystems hießen alles
 zweimal, als PowerShell und bash, samt der 350 Zeilen emscripten-Einrichtung;
 eine Cargo-Konfiguration mit `[env]` deckt nur feste Werte ab, nicht die
 Suche nach cmake und libclang -- und `rekursionstiefe.dhtest` hält fest,
-dass es sie nicht gibt. **Die Grenze prüft `tests/pruef/bauskripte.dhtest`:**
+dass es sie nicht gibt. **Die Grenze prüft `tests/pruef/werkzeugkette/bauskripte.dhtest`:**
 jede `import`-Zeile beider Skripte muss ein Modul aus einer festen Liste
 nennen (`__future__`, `os`, `platform`, `subprocess`, `sys`, `pathlib`,
 `shutil`); ein Paket von außen, ein Modul aus `drachenhauch/` oder ein
@@ -568,5 +568,5 @@ Standardbibliothek“ -- wer ein Modul ergänzt, sieht dabei, dass er die
 Grenze berührt. Gegenprobe an den echten Skripten: `numpy`, ein Modul aus
 `drachenhauch/`, ein relativer Import, eine Komma-Zeile mit `requests` und
 ein eingerückter Import in einer Funktion -- jeder lässt den Fall fallen.
-Die Logik von `build_wasm.py` prüft seit 21.09. `tests/pruef/build_wasm.dhtest`
+Die Logik von `build_wasm.py` prüft seit 21.09. `tests/pruef/werkzeugkette/build_wasm.dhtest`
 über ein Python-Kind (7.6).

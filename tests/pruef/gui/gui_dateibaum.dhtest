@@ -1,0 +1,621 @@
+' Der Dateibaum (GUI_FILETREE) -- ein Baum, der seine Knoten selbst von der
+' Platte holt. Geprueft wird, was nach aussen sichtbar ist: welche Wege er
+' zeigt, was die Einstellungen daran aendern, dass Auswahl und Haken am WEG
+' haengen und nicht an der Knotennummer, und dass ein Klick waehlt, ein
+' Doppelklick oeffnet. Format: docs/werkzeuge.md, dhrt test.
+
+=== der baum liest den ordner selbst
+' Ordner zuerst, dann die Dateien -- und was in `lib` liegt, wird gar nicht
+' erst gelesen, solange der Ast zu ist.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM ft AS GUI_WIDGET : ft = GUI_FILETREE(w, 20, 20, 200, 200, "projekt")
+DIM i AS INTEGER
+PRINT GUI_FILETREE_COUNT(ft)
+FOR i = 0 TO GUI_FILETREE_COUNT(ft) - 1
+    PRINT BASENAME(GUI_FILETREE_PATH$(ft, i))
+NEXT
+--- datei projekt/b.dh
+PRINT 1
+--- datei projekt/a.dh
+PRINT 2
+--- datei projekt/lib/c.dh
+PRINT 3
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+3
+lib
+a.dh
+b.dh
+
+=== aufklappen holt die kinder nach
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM ft AS GUI_WIDGET : ft = GUI_FILETREE(w, 20, 20, 200, 200, "projekt")
+GUI_FILETREE_EXPAND(ft, "lib", TRUE)
+DIM i AS INTEGER
+PRINT GUI_FILETREE_COUNT(ft)
+FOR i = 0 TO GUI_FILETREE_COUNT(ft) - 1
+    PRINT BASENAME(GUI_FILETREE_PATH$(ft, i))
+NEXT
+GUI_FILETREE_EXPAND(ft, "lib", FALSE)
+PRINT GUI_FILETREE_COUNT(ft)
+--- datei projekt/a.dh
+PRINT 1
+--- datei projekt/lib/c.dh
+PRINT 2
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+3
+lib
+c.dh
+a.dh
+2
+
+=== der filter entscheidet, was zu sehen ist
+' Ordner bleiben immer stehen -- was darin liegt, weiss man erst, wenn man
+' hineinsieht.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM ft AS GUI_WIDGET : ft = GUI_FILETREE(w, 20, 20, 200, 200, "projekt")
+PRINT GUI_FILETREE_COUNT(ft)
+GUI_FILETREE_FILTER(ft, "*.dh")
+PRINT GUI_FILETREE_COUNT(ft)
+GUI_FILETREE_FILTER(ft, "*.dh;*.json")
+PRINT GUI_FILETREE_COUNT(ft)
+GUI_FILETREE_SET(ft, "nur_ordner", 1)
+PRINT GUI_FILETREE_COUNT(ft)
+--- datei projekt/a.dh
+PRINT 1
+--- datei projekt/daten.json
+{}
+--- datei projekt/liesmich.md
+Text
+--- verzeichnis projekt/lib
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+4
+2
+3
+1
+
+=== uebergangen wird, was man nicht sehen will
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM ft AS GUI_WIDGET : ft = GUI_FILETREE(w, 20, 20, 200, 200, "projekt")
+PRINT GUI_FILETREE_COUNT(ft)
+GUI_FILETREE_SKIP(ft, "target;_*")
+PRINT GUI_FILETREE_COUNT(ft)
+GUI_FILETREE_SET(ft, "verborgene", 1)
+PRINT GUI_FILETREE_COUNT(ft)
+--- datei projekt/a.dh
+PRINT 1
+--- datei projekt/target/gebaut.dh
+PRINT 2
+--- datei projekt/_alt/x.dh
+PRINT 3
+--- datei projekt/.git/kopf
+ref
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+3
+1
+2
+
+=== auswahl und haken haengen am weg, nicht an der nummer
+' Ein aufgeklappter Ordner DAVOR schiebt jede Nummer dahinter -- an der
+' Auswahl darf das nichts aendern.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM ft AS GUI_WIDGET : ft = GUI_FILETREE(w, 20, 20, 200, 200, "projekt")
+GUI_TREE_SET(ft, "kaestchen", 1)
+GUI_FILETREE_SELECT(ft, "bbb/zwei.dh")
+GUI_FILETREE_SET_CHECKED(ft, "bbb/zwei.dh", TRUE)
+PRINT BASENAME(GUI_FILETREE_SELECTED$(ft)) ; " " ; GUI_FILETREE_IS_DIR(ft)
+GUI_FILETREE_EXPAND(ft, "aaa", TRUE)
+PRINT BASENAME(GUI_FILETREE_SELECTED$(ft)) ; " " ; GUI_FILETREE_CHECKED(ft, "bbb/zwei.dh")
+' Zugeklappt faellt die Auswahl weg (wie in jedem Dateimanager) -- der HAKEN
+' bleibt, er war eine Entscheidung.
+GUI_FILETREE_EXPAND(ft, "bbb", FALSE)
+PRINT "[" ; GUI_FILETREE_SELECTED$(ft) ; "]" ; " " ; GUI_FILETREE_CHECKED_COUNT(ft)
+PRINT BASENAME(GUI_FILETREE_CHECKED_PATH$(ft, 0))
+--- datei projekt/aaa/eins.dh
+PRINT 1
+--- datei projekt/bbb/zwei.dh
+PRINT 2
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+zwei.dh FALSE
+zwei.dh TRUE
+[] 1
+zwei.dh
+
+=== ein ordner meldet sich als ordner
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM ft AS GUI_WIDGET : ft = GUI_FILETREE(w, 20, 20, 200, 200, "projekt")
+PRINT GUI_FILETREE_IS_DIR(ft, "lib") ; " " ; GUI_FILETREE_IS_DIR(ft, "a.dh")
+GUI_FILETREE_SELECT(ft, "lib")
+PRINT GUI_FILETREE_IS_DIR(ft) ; " " ; BASENAME(GUI_FILETREE_ROOT$(ft))
+--- datei projekt/a.dh
+PRINT 1
+--- verzeichnis projekt/lib
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+TRUE FALSE
+TRUE projekt
+
+=== eine neue wurzel ist ein neuer baum
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM ft AS GUI_WIDGET : ft = GUI_FILETREE(w, 20, 20, 200, 200, "eins")
+PRINT GUI_FILETREE_COUNT(ft) ; " " ; BASENAME(GUI_FILETREE_PATH$(ft, 0))
+GUI_FILETREE_SET_ROOT(ft, "zwei")
+PRINT GUI_FILETREE_COUNT(ft) ; " " ; BASENAME(GUI_FILETREE_PATH$(ft, 0))
+--- datei eins/a.dh
+PRINT 1
+--- datei zwei/b.dh
+PRINT 2
+--- datei zwei/c.dh
+PRINT 3
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+1 a.dh
+2 b.dh
+
+=== auffrischen zeigt eine neue datei von selbst
+' Ohne Takt bleibt der Baum stehen -- das ist die Gegenprobe unten.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM ft AS GUI_WIDGET : ft = GUI_FILETREE(w, 20, 20, 200, 200, "projekt")
+GUI_FILETREE_SET(ft, "auffrischen", 10)
+DIM f AS INTEGER
+FOR f = 1 TO 12
+    IF f = 3 THEN WRITEALL("projekt/neu.dh", "PRINT 9")
+    GUI_UPDATE()
+    IF f = 2 OR f = 12 THEN PRINT GUI_FILETREE_COUNT(ft)
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- datei projekt/a.dh
+PRINT 1
+--- umgebung
+DHRT_FRAMES=14
+--- erwartet
+1
+2
+
+=== ohne takt bleibt der baum stehen
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM ft AS GUI_WIDGET : ft = GUI_FILETREE(w, 20, 20, 200, 200, "projekt")
+DIM f AS INTEGER
+FOR f = 1 TO 12
+    IF f = 3 THEN WRITEALL("projekt/neu.dh", "PRINT 9")
+    GUI_UPDATE()
+    IF f = 12 THEN PRINT GUI_FILETREE_COUNT(ft)
+    GUI_DRAW()
+    FLIP()
+NEXT
+GUI_FILETREE_REFRESH(ft)
+PRINT GUI_FILETREE_COUNT(ft)
+--- datei projekt/a.dh
+PRINT 1
+--- umgebung
+DHRT_FRAMES=14
+--- erwartet
+1
+2
+
+=== ein klick waehlt, ein doppelklick oeffnet
+' Die Lagen wie im Baum-Test: eine Zeile ist 22 Punkte hoch, die erste
+' beginnt bei y = 54. Zeile 0 ist `a.dh`, Zeile 1 `b.dh`.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
+DIM ft AS GUI_WIDGET : ft = GUI_FILETREE(w, 20, 20, 200, 200, "projekt")
+DIM f AS INTEGER
+FOR f = 1 TO 20
+    GUI_UPDATE()
+    IF GUI_FILETREE_ACTIVATED$(ft) <> "" THEN PRINT "auf: " + BASENAME(GUI_FILETREE_ACTIVATED$(ft))
+    IF f = 7 THEN PRINT "gewaehlt: " + BASENAME(GUI_FILETREE_SELECTED$(ft))
+    IF f = 20 THEN PRINT "zuletzt: " + BASENAME(GUI_FILETREE_SELECTED$(ft))
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- datei projekt/a.dh
+PRINT 1
+--- datei projekt/b.dh
+PRINT 2
+--- datei ev.txt
+# Klick auf Zeile 0, dann Doppelklick auf Zeile 1
+c 16
+e 3 7 131 64 0 0
+e 4 7 131 64 0 0
+e 4 6 0 0 0 0
+e 5 5 0 0 0 0
+e 10 7 131 86 0 0
+e 11 7 131 86 0 0
+e 11 6 0 0 0 0
+e 12 5 0 0 0 0
+e 13 6 0 0 0 0
+e 14 5 0 0 0 0
+--- umgebung
+DHRT_FRAMES=22
+--- erwartet
+gewaehlt: a.dh
+auf: b.dh
+zuletzt: b.dh
+
+=== ein klick aufs kaestchen kippt nur den haken
+' Gegenprobe im Fall selbst: die Auswahl steht danach immer noch auf der
+' Zeile davor -- sonst waehlte man beim Abhaken jedes Mal um.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
+DIM tr AS GUI_WIDGET : tr = GUI_TREE(w, 20, 20, 200, 120)
+GUI_TREE_ADD(tr, -1, "eins")
+GUI_TREE_ADD(tr, -1, "zwei")
+GUI_TREE_SET(tr, "kaestchen", 1)
+DIM f AS INTEGER
+FOR f = 1 TO 20
+    GUI_UPDATE()
+    IF f = 8 OR f = 19 THEN PRINT STR$(GUI_TREE_SELECTED(tr)) + " " + STR$(GUI_TREE_CHECKED(tr, 0)) + " " + STR$(GUI_TREE_CHECKED(tr, 1))
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- datei ev.txt
+# Klick auf Zeile 0 (Text), dann aufs Kaestchen von Zeile 1 -- es steht
+# GANZ LINKS, vor dem Auf-/Zuklapp-Dreieck (ax + 2, 16 breit).
+c 16
+e 3 7 160 64 0 0
+e 4 7 160 64 0 0
+e 4 6 0 0 0 0
+e 5 5 0 0 0 0
+e 14 7 36 86 0 0
+e 15 7 36 86 0 0
+e 15 6 0 0 0 0
+e 16 5 0 0 0 0
+--- umgebung
+DHRT_FRAMES=22
+--- erwartet
+0 FALSE FALSE
+0 FALSE TRUE
+
+=== haken setzen und abfragen ueber die befehle
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM tr AS GUI_WIDGET : tr = GUI_TREE(w, 20, 20, 200, 120)
+GUI_TREE_ADD(tr, -1, "eins")
+GUI_TREE_ADD(tr, -1, "zwei")
+GUI_TREE_SET(tr, "kaestchen", 1)
+PRINT GUI_TREE_CHECKED(tr, 0)
+GUI_TREE_SET_CHECKED(tr, 0, TRUE)
+PRINT GUI_TREE_CHECKED(tr, 0) ; " " ; GUI_TREE_CHECKED(tr, 1)
+GUI_TREE_SET_CHECKED(tr, 0, FALSE)
+PRINT GUI_TREE_CHECKED(tr, 0)
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+FALSE
+TRUE FALSE
+FALSE
+
+=== ein baum ohne datei ist kein dateibaum
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM tr AS GUI_WIDGET : tr = GUI_TREE(w, 20, 20, 200, 120)
+TRY
+    PRINT GUI_FILETREE_COUNT(tr)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    GUI_FILETREE_SET(tr, "quatsch", 1)
+CATCH e
+    PRINT e
+END TRY
+--- umgebung
+DHRT_FRAMES=1
+--- enthaelt
+ist kein Dateibaum
+
+=== select rollt die gewaehlte zeile ins bild
+' 60 Dateien in einem niedrigen Baum: nach GUI_FILETREE_SELECT auf eine
+' weit unten steht sie im Bild -- ein Klick auf die OBERSTE sichtbare Zeile
+' trifft dann eine Datei kurz davor, nicht die erste.
+IMPORT "gui"
+SCREEN(300, 200, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM i AS INTEGER
+MKDIR("viele")
+FOR i = 0 TO 59
+    WRITEALL(PATHJOIN("viele", "a" + RIGHT$("0" + STR$(i), 2) + ".dh"), "")
+NEXT
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 300, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM ft AS GUI_WIDGET : ft = GUI_FILETREE(w, 0, 0, 200, 120, "viele")
+GUI_UPDATE()
+GUI_FILETREE_SELECT(ft, PATHJOIN("viele", "a50.dh"))
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    IF n = 3 THEN PRINT "gewaehlt "; BASENAME(GUI_FILETREE_SELECTED$(ft))
+    IF n = 20 THEN
+        DIM b AS STRING : b = BASENAME(GUI_FILETREE_SELECTED$(ft))
+        PRINT "oben liegt eine datei ab a40: "; b >= "a40.dh" AND b < "a50.dh"
+    END IF
+    CLS(0) : GUI_DRAW() : FLIP()
+WEND
+--- datei ev.txt
+c 4
+e 0 7 60 8 0 0
+e 8 7 60 8 0 0
+e 10 6 0 0 0 0
+e 12 5 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=26
+--- erwartet
+gewaehlt a50.dh
+oben liegt eine datei ab a40: TRUE
+
+=== farben je dateiart
+' GUI_FILETREE_COLOR: "/" meint Ordner, jedes andere Muster nur Dateien --
+' ein Ordner namens ordner.dh bleibt in der Ordnerfarbe. -1 nimmt eine Farbe
+' wieder weg. Geprueft am Bild: jede Farbe in genau ihrer Zeile.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+GUI_FONT(-1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 400, 300)
+DIM ft AS GUI_WIDGET : ft = GUI_FILETREE(w, 10, 10, 380, 250, "projekt")
+GUI_FILETREE_COLOR(ft, "/", &HFF0000)
+GUI_FILETREE_COLOR(ft, "*.dh", &H00FF00)
+GUI_FILETREE_COLOR(ft, "*.json;*.ini", &H0000FF)
+GUI_FILETREE_COLOR(ft, "*.ini", -1)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(BLACK)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei projekt/a.dh
+PRINT 1
+--- datei projekt/d.json
+{}
+--- datei projekt/e.ini
+x=1
+--- datei projekt/ordner.dh/x.txt
+x
+--- umgebung
+DHRT_FRAMES=3
+DHRT_SCREENSHOT={fall}/b.png
+--- nachher
+DIM b AS IMAGE : b = LOADIMAGE("b.png")
+DIM farben AS ARRAY OF INTEGER : farben = [&HFF0000, &H00FF00, &H0000FF]
+DIM namen AS ARRAY OF STRING : namen = ["ordner", "dh", "json"]
+DIM oben[3] AS INTEGER
+DIM unten[3] AS INTEGER
+DIM k, x, y AS INTEGER
+FOR k = 0 TO 2
+    oben[k] = 9999 : unten[k] = -1
+NEXT
+FOR y = 0 TO IMAGE_HEIGHT(b) - 1
+    FOR x = 0 TO 200
+        DIM p AS INTEGER : p = GETPIXEL(b, x, y) BAND &HFFFFFF
+        FOR k = 0 TO 2
+            IF p = farben[k] THEN
+                oben[k] = MIN(oben[k], y)
+                unten[k] = MAX(unten[k], y)
+            END IF
+        NEXT
+    NEXT
+NEXT
+FOR k = 0 TO 2
+    PRINT namen[k]; " da "; unten[k] >= 0; " eine zeile "; unten[k] - oben[k] < 20
+NEXT
+PRINT "reihenfolge "; unten[0] < oben[1] AND unten[1] < oben[2]
+--- erwartet
+ordner da TRUE eine zeile TRUE
+dh da TRUE eine zeile TRUE
+json da TRUE eine zeile TRUE
+reihenfolge TRUE
+
+=== die farben stehen in der dhform
+IMPORT "gui"
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 400, 300)
+DIM ft AS GUI_WIDGET : ft = GUI_FILETREE(w, 10, 10, 380, 250, ".")
+GUI_FILETREE_COLOR(ft, "/;*.dh", &H112233)
+DIM j AS STRING : j = GUI_TO_JSON(w)
+PRINT INSTR(j, "farben") >= 0
+DIM w2 AS GUI_WINDOW : w2 = GUI_FROM_JSON(j)
+DIM j2 AS STRING : j2 = GUI_TO_JSON(w2)
+' Die Datei ist eingerueckt -- verglichen wird ohne Leerraum.
+j2 = REPLACE$(REPLACE$(REPLACE$(j2, " ", ""), CHR$(10), ""), CHR$(13), "")
+PRINT INSTR(j2, "[" + CHR$(34) + "*.dh" + CHR$(34) + "," + STR$(&H112233) + "]") >= 0
+TRY
+    GUI_FILETREE_COLOR(ft, " ; ", 1)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+TRUE
+TRUE
+GUI_FILETREE_COLOR: kein Muster -- so: "*.dh", "*.json;*.ini" oder "/" fuer Ordner
+
+=== nach art sortiert die dateien eines ordners
+' GUI_FILETREE_SET "nach_art": die Dateien in der Reihenfolge der Muster von
+' GUI_FILETREE_ICON, erst darin nach dem Namen; was kein Muster trifft,
+' kommt zuletzt. Ordner bleiben vorn. Ohne den Schalter alphabetisch.
+IMPORT "gui"
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 400, 300)
+DIM ft AS GUI_WIDGET : ft = GUI_FILETREE(w, 10, 10, 380, 250, "projekt")
+GUI_FILETREE_ICON(ft, "/", "ordner")
+GUI_FILETREE_ICON(ft, "*.dh", "datei_code")
+GUI_FILETREE_ICON(ft, "*.dhtest", "datei_test")
+GUI_FILETREE_ICON(ft, "*.json", "datei_daten")
+SUB zeigen()
+    DIM t AS STRING : t = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO GUI_FILETREE_COUNT(ft) - 1
+        t = t + BASENAME(GUI_FILETREE_PATH$(ft, i)) + " "
+    NEXT
+    PRINT TRIM$(t)
+END SUB
+zeigen()
+GUI_FILETREE_SET(ft, "nach_art", 1)
+zeigen()
+--- datei projekt/a.json
+{}
+--- datei projekt/b.dhtest
+x
+--- datei projekt/c.dh
+PRINT 1
+--- datei projekt/d.txt
+x
+--- datei projekt/z.dh
+PRINT 2
+--- datei projekt/lib/e.dh
+PRINT 3
+--- erwartet
+lib a.json b.dhtest c.dh d.txt z.dh
+lib c.dh z.dh b.dhtest a.json d.txt
+
+=== sinnbilder je dateiart stehen in der dhform
+' Muster, Sinnbild und "nach_art" ueberleben GUI_TO_JSON/GUI_FROM_JSON; ""
+' nimmt ein Sinnbild weg, ein unbekannter Name ist ein Fehler, der die
+' bekannten nennt. GUI_TREE_ICON nimmt statt eines Bildes auch einen Namen.
+IMPORT "gui"
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 400, 300)
+DIM ft AS GUI_WIDGET : ft = GUI_FILETREE(w, 10, 10, 380, 250, ".")
+GUI_FILETREE_ICON(ft, "/", "ordner")
+GUI_FILETREE_ICON(ft, "*.dh;*.txt", "datei_code")
+GUI_FILETREE_ICON(ft, "*.txt", "")
+GUI_FILETREE_SET(ft, "nach_art", 1)
+DIM j AS STRING : j = GUI_TO_JSON(GUI_FROM_JSON(GUI_TO_JSON(w)))
+j = REPLACE$(REPLACE$(REPLACE$(j, " ", ""), CHR$(10), ""), CHR$(13), "")
+DIM q AS STRING : q = CHR$(34)
+PRINT INSTR(j, "[" + q + "*.dh" + q + "," + q + "datei_code" + q + "]") >= 0
+PRINT INSTR(j, q + "*.txt" + q + "," + q) < 0
+PRINT INSTR(j, q + "nach_art" + q + ":true") >= 0
+TRY
+    GUI_FILETREE_ICON(ft, "*.dh", "kuerbis")
+CATCH e
+    PRINT LEFT$(e, 62)
+END TRY
+DIM tr AS GUI_WIDGET : tr = GUI_TREE(w, 10, 10, 200, 200)
+DIM k AS INTEGER : k = GUI_TREE_ADD(tr, -1, "Wurzel")
+GUI_TREE_ICON(tr, k, "datei_bild")
+PRINT INSTR(REPLACE$(GUI_TO_JSON(w), " ", ""), q + "sym" + q + ":" + q + "datei_bild" + q) >= 0
+--- erwartet
+TRUE
+TRUE
+TRUE
+GUI_FILETREE_ICON: Sinnbild 'kuerbis' gibt es nicht -- bekannt
+TRUE
+
+=== das sinnbild steht vor dem namen in dessen farbe
+' Zwei gleiche Baeume nebeneinander, der rechte mit Sinnbildern: das Sinnbild
+' steht dort, wo sonst der Name beginnt, in der Farbe des Namens -- es gibt
+' mehr Rot, und der Name endet weiter rechts.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+GUI_FONT(-1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 400, 300)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM links AS GUI_WIDGET : links = GUI_FILETREE(w, 0, 10, 190, 250, "projekt")
+DIM rechts AS GUI_WIDGET : rechts = GUI_FILETREE(w, 200, 10, 190, 250, "projekt")
+GUI_FILETREE_COLOR(links, "/", &HFF0000)
+GUI_FILETREE_COLOR(rechts, "/", &HFF0000)
+GUI_FILETREE_ICON(rechts, "/", "ordner")
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(BLACK)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei projekt/lib/x.dh
+PRINT 1
+--- umgebung
+DHRT_FRAMES=3
+DHRT_SCREENSHOT={fall}/b.png
+--- nachher
+DIM b AS IMAGE : b = LOADIMAGE("b.png")
+DIM erster[2] AS INTEGER
+DIM letzter[2] AS INTEGER
+DIM rot[2] AS INTEGER
+DIM s, x, y AS INTEGER
+FOR s = 0 TO 1
+    erster[s] = 9999
+    FOR y = 0 TO 60
+        FOR x = 0 TO 189
+            IF (GETPIXEL(b, s * 200 + x, y) BAND &HFFFFFF) = &HFF0000 THEN
+                erster[s] = MIN(erster[s], x)
+                letzter[s] = MAX(letzter[s], x)
+                rot[s] = rot[s] + 1
+            END IF
+        NEXT
+    NEXT
+NEXT
+PRINT "beide rot "; erster[0] < 9999 AND erster[1] < 9999
+PRINT "name rueckt nach rechts "; letzter[1] > letzter[0] + 10
+PRINT "mehr rot "; rot[1] > rot[0]
+--- erwartet
+beide rot TRUE
+name rueckt nach rechts TRUE
+mehr rot TRUE

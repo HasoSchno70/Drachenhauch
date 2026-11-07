@@ -288,7 +288,7 @@ geht als BUFFER. **Nicht** (noch; seit 2026-10-07 doch, siehe unten): Struct als
 Struct und `DIM x[n] AS` Struct (ein Feld von Structs ist ein Struct mit
 einem Feld davon), Bitfelder, Struct als Wert übergeben. Das Modul braucht
 das Feature `ffi` nicht -- es fasst nur den eigenen Puffer an und taugt so
-auch für Dateiformate. Geprüft in `tests/pruef/ffi_struct.dhtest` (10) und
+auch für Dateiformate. Geprüft in `tests/pruef/sprache/ffi_struct.dhtest` (10) und
 mit Rust-Tests der Lage; Gegenproben ohne Ausrichtung bzw. ohne
 Laufzeit-Index lassen vier Fälle fallen.
 
@@ -334,7 +334,7 @@ System V (Achtergruppen INTEGER/SSE, MEMORY über Cranelifts
 V-Registern, bis 16 Bytes in X-Registern, sonst Zeiger, Rückgabe über X8 mit
 `StructReturn`). Die Rust-Tests rufen `extern "C"`-Funktionen mit
 `#[repr(C)]`-Structs -- Rust hält sich an die C-Konvention, darum sind sie
-auf jedem CI-System der Vergleich --, dazu `tests/pruef/ffi_struct_wert.dhtest`
+auf jedem CI-System der Vergleich --, dazu `tests/pruef/sprache/ffi_struct_wert.dhtest`
 mit `div`/`lldiv`, `csqrt`/`cabs` (komplexe Zahlen reisen wie ein Struct aus
 zwei Kommazahlen), `PtInRect` und CoreGraphics. Gegenprobe: unter Windows
 jeden Struct als Zeiger -- drei Rust-Tests und zwei Fälle fallen. Nicht:
@@ -397,7 +397,7 @@ x86-64** ist ein Feld aus einem `__va_list_tag` (`gp_offset`, `fp_offset`,
 als Zeiger auf eine Kopie reist -- mit beiden Offsets 0 liest `va_arg` ab
 `__stack`. Linux-ARM ist nach dem ABI gebaut, aber ungeprueft (die CI hat
 kein Linux-ARM). Ein Rust-Test ruft `vsprintf` der echten C-Bibliothek
-(in der CI auf allen drei Systemen), dazu `tests/pruef/ffi.dhtest` mit
+(in der CI auf allen drei Systemen), dazu `tests/pruef/sprache/ffi.dhtest` mit
 `vsprintf` und `wvsprintfA`. Gegenprobe: Kommazahlen als SINGLE abgelegt --
 Rust-Test und Fall fallen. Nicht: `VALIST` in einem Rueckruf (der Rueckruf
 muesste `va_arg` nachbauen), als Rueckgabe oder mit BYREF.

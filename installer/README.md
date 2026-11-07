@@ -35,7 +35,7 @@ aus `cargo metadata` (mit den ausgelieferten Features) samt ihren
 LICENSE-/COPYING-/NOTICE-Texten, dazu den MPL-2.0-Volltext. Python-Pakete und Qt
 stehen **nicht** darin — in dieser Distribution steckt keins von beidem. Der
 Rust-Abschnitt entsteht Byte für Byte wie der von `gen_notices.py` (nachgemessen
-an allen 370 Crates); Tests: `tests/pruef/werkzeug_installer.dhtest`.
+an allen 370 Crates); Tests: `tests/pruef/werkzeuge/werkzeug_installer.dhtest`.
 
 Die Verknuepfungen starten `dhrt.exe run "{app}\ide\ide.dh"` mit dem
 Beispielordner als Arbeitsverzeichnis; `.dh`-Dateien oeffnen sich in der
@@ -65,7 +65,7 @@ IDE (`-- "%1"`).
   sollte und es nicht ist, fiele erst beim Nutzer auf. Ohne `DH_SIGN_CERT`
   sagt der Bau am Ende "Nicht signiert".
 
-Geprueft in `tests/pruef/werkzeug_installer.dhtest` mit Attrappen fuer ISCC
+Geprueft in `tests/pruef/werkzeuge/werkzeug_installer.dhtest` mit Attrappen fuer ISCC
 und signtool (welche Datei, in welcher Reihenfolge, Fingerabdruck gegen
 `.pfx`, Abbruch vor ISCC); ein echter Bau mit Inno Setup packt die sechs
 Buecher und den Sketch nachweislich ein. Die AppId ist eine eigene (nicht die der früheren Qt-Fassung): ein Rechner,
@@ -101,7 +101,7 @@ kopiert die Beispiele beim Start nach `Dokumente/Drachenhauch/examples` (nur,
 was fehlt) und oeffnet die IDE dort. Die Symbole liegen fertig in `installer/symbole/`; neu erzeugen mit
 `dhrt run installer/symbole.dh`, wenn sich das Logo aendert. Gebaut und
 ausprobiert werden beide Pakete im Paket-Lauf der CI (`package.yml`, Job
-`paket-ohne-python`); Tests `tests/pruef/werkzeug_paket.dhtest`.
+`paket-ohne-python`); Tests `tests/pruef/werkzeuge/werkzeug_paket.dhtest`.
 Die macOS-Laeufer der CI haben kein OpenGL, ein Fenster geht dort nicht auf.
 **Auf einem echten Mac laeuft das Paket** (vom Nutzer am 2026-10-11 mit
 Fassung 2026.27 ausprobiert); beglaubigt ist es noch nicht (siehe unten).
@@ -161,7 +161,7 @@ kopieren, Datei vom Finder).
 ## Voraussetzungen
 
 - **Rust** (`cargo`) und ein beliebiges **Python 3** für `rust/build_runtime.py`
-  — nur die Standardbibliothek, ohne venv (`tests/pruef/bauskripte.dhtest`
+  — nur die Standardbibliothek, ohne venv (`tests/pruef/werkzeugkette/bauskripte.dhtest`
   hält das fest).
 - **Windows:** Inno Setup 6 (`ISCC.exe` unter `C:\Program Files (x86)\Inno Setup 6\`
   oder über die Umgebungsvariable `ISCC`). Fehlt es, bleibt es bei der
@@ -174,7 +174,7 @@ kopieren, Datei vom Finder).
 `.github/workflows/package.yml` (manuell, Actions-Tab → „Run workflow“) baut
 die Pakete für macOS und Linux MIT Grafik und probiert sie aus: unter Linux
 entpacken, `install.sh`, die IDE unter xvfb starten, die Sammlung
-`tests/pruef/werkzeug_paket.dhtest` mit dieser Laufzeit; unter macOS das `.dmg`
+`tests/pruef/werkzeuge/werkzeug_paket.dhtest` mit dieser Laufzeit; unter macOS das `.dmg`
 einhängen, Signatur und Aufbau prüfen. Den Windows-Installer baut er nicht —
 Inno Setup haben die Läufer nicht.
 

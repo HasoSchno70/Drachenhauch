@@ -1,4 +1,4 @@
-' Helfer fuer tests/pruef/modbus.dhtest: den Port des gespielten Geraets
+' Helfer fuer tests/pruef/geraete/modbus.dhtest: den Port des gespielten Geraets
 ' lesen ("PORT=n" auf stderr), Felder ausgeben und lesen, was beim Geraet
 ' ankam.
 

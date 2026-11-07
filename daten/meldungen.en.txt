@@ -1462,7 +1462,7 @@ GUI_TREE_EXPAND: ungueltige Knoten-id {}	GUI_TREE_EXPAND: invalid node id {}
 GUI_TREE_CHECKED: ungueltige Knoten-id {}	GUI_TREE_CHECKED: invalid node id {}
 GUI_TREE_SET_CHECKED: ungueltige Knoten-id {}	GUI_TREE_SET_CHECKED: invalid node id {}
 {}: Widget ist kein Dateibaum (GUI_FILETREE)	{}: widget is not a file tree (GUI_FILETREE)
-GUI_FILETREE_SET: unbekannte Einstellung '{}' (gueltig: ordner_zuerst, verborgene, nur_ordner, mehrfachauswahl, kaestchen, auffrischen)	GUI_FILETREE_SET: unknown setting '{}' (valid: ordner_zuerst, verborgene, nur_ordner, mehrfachauswahl, kaestchen, auffrischen)
+GUI_FILETREE_SET: unbekannte Einstellung '{}' (gueltig: ordner_zuerst, verborgene, nur_ordner, nach_art, klick_klappt, mehrfachauswahl, kaestchen, auffrischen)	GUI_FILETREE_SET: unknown setting '{}' (valid: ordner_zuerst, verborgene, nur_ordner, nach_art, klick_klappt, mehrfachauswahl, kaestchen, auffrischen)
 {}: Widget ist kein Reiterwerk (GUI_TABCONTROL)	{}: widget is not a tab control (GUI_TABCONTROL)
 GUI_TABCONTROL_SET_PAGE: Seite {} gibt es nicht	GUI_TABCONTROL_SET_PAGE: there is no page {}
 GUI_TABCONTROL_SET_TITLE: Seite {} gibt es nicht	GUI_TABCONTROL_SET_TITLE: there is no page {}
@@ -1980,3 +1980,4 @@ MIDI_CLOCK_SEND: Tempo {} ausserhalb 1..999 (0 haelt die Uhr an)	MIDI_CLOCK_SEND
 {}: Beginn {} -- erwartet Sekunden ab 0	{}: start {} -- expects seconds from 0
 {}: {} Sechzehntel ausserhalb 0..16383	{}: {} sixteenths outside 0..16383
 GUI_FILETREE_COLOR: kein Muster -- so: "*.dh", "*.json;*.ini" oder "/" fuer Ordner	GUI_FILETREE_COLOR: no pattern -- like this: "*.dh", "*.json;*.ini" or "/" for folders
+GUI_FILETREE_ICON: kein Muster -- so: "*.dh", "*.json;*.ini" oder "/" fuer Ordner	GUI_FILETREE_ICON: no pattern -- like this: "*.dh", "*.json;*.ini" or "/" for folders

@@ -1,0 +1,838 @@
+' Der Debugger `dhrt debug`: Kommandos als JSON-Zeilen auf stdin, Ereignisse
+' (paused/output/eval-result/error/finished) als JSON-Zeilen auf stdout.
+' Bis Stufe 52 (2026-09-14) tests/test_dhrt_debug.py; hier treibt
+' _hilfen/debugsitzung.dh die Sitzung per PROCESS_START und liest die
+' Ereignisse mit dem json-Modul.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== haltepunkt globale auswertung stopp
+IMPORT "sitzung.dh"
+sitzung("d.dh", ["{" + CHR$(34) + "cmd" + CHR$(34) + ":" + CHR$(34) + "set-breakpoints" + CHR$(34) + "," + CHR$(34) + "lines" + CHR$(34) + ":[3]}", _
+    "{" + CHR$(34) + "cmd" + CHR$(34) + ":" + CHR$(34) + "continue" + CHR$(34) + "}", _
+    "{" + CHR$(34) + "cmd" + CHR$(34) + ":" + CHR$(34) + "eval" + CHR$(34) + "," + CHR$(34) + "expr" + CHR$(34) + ":" + CHR$(34) + "x * 2" + CHR$(34) + "}", _
+    "{" + CHR$(34) + "cmd" + CHR$(34) + ":" + CHR$(34) + "stop" + CHR$(34) + "}"])
+' Erster Halt vor Zeile 1, dann am Haltepunkt mit x = 5
+PRINT art$(0); " "; feld$(0, "line")
+DIM h3 AS INTEGER : h3 = ersteMit("paused", 3)
+PRINT h3 >= 0; " "; paar$(h3, "globals", "x")
+DIM ev AS INTEGER : ev = ersteMit("eval-result", 0)
+PRINT feld$(ev, "value"); " "; feld$(ev, "type")
+DIM letzt AS INTEGER : letzt = LEN(ereignisse) - 1
+PRINT art$(letzt); " "; feld$(letzt, "reason")
+--- datei sitzung.dh
+IMPORT "{sammlung}/../_hilfen/debugsitzung.dh"
+
+--- datei d.dh
+DIM x AS INTEGER
+x = 5
+PRINT x
+
+--- erwartet
+paused 1
+TRUE 5
+10 INTEGER
+finished stopped
+
+=== lokale einer funktion beim namen
+IMPORT "sitzung.dh"
+DIM q AS STRING : q = CHR$(34)
+sitzung("d.dh", ["{" + q + "cmd" + q + ":" + q + "set-breakpoints" + q + "," + q + "lines" + q + ":[4]}", _
+    "{" + q + "cmd" + q + ":" + q + "continue" + q + "}", _
+    "{" + q + "cmd" + q + ":" + q + "eval" + q + "," + q + "expr" + q + ":" + q + "a + b" + q + "}", _
+    "{" + q + "cmd" + q + ":" + q + "continue" + q + "}"])
+' Halt auf RETURN b: b ist schon gesetzt, Tiefe 2 = in der Funktion
+DIM h4 AS INTEGER : h4 = ersteMit("paused", 4)
+PRINT h4 >= 0; " "; feld$(h4, "depth")
+PRINT paar$(h4, "locals", "a"); " "; paar$(h4, "locals", "b")
+PRINT feld$(ersteMit("eval-result", 0), "value")
+PRINT art$(LEN(ereignisse) - 1)
+--- datei sitzung.dh
+IMPORT "{sammlung}/../_hilfen/debugsitzung.dh"
+
+--- datei d.dh
+FUNCTION f(a AS INTEGER) AS INTEGER
+  DIM b AS INTEGER
+  b = a + 1
+  RETURN b
+END FUNCTION
+DIM r AS INTEGER
+r = f(10)
+PRINT r
+
+--- erwartet
+TRUE 2
+10 11
+21
+finished
+
+=== schritt ueber geht zeile fuer zeile
+IMPORT "sitzung.dh"
+DIM q AS STRING : q = CHR$(34)
+sitzung("d.dh", ["{" + q + "cmd" + q + ":" + q + "step-over" + q + "}", _
+    "{" + q + "cmd" + q + ":" + q + "step-over" + q + "}", _
+    "{" + q + "cmd" + q + ":" + q + "stop" + q + "}"])
+DIM i AS INTEGER
+DIM n AS INTEGER : n = 0
+FOR i = 0 TO LEN(ereignisse) - 1
+    IF art$(i) = "paused" AND n < 3 THEN
+        PRINT feld$(i, "line")
+        n = n + 1
+    END IF
+NEXT
+--- datei sitzung.dh
+IMPORT "{sammlung}/../_hilfen/debugsitzung.dh"
+
+--- datei d.dh
+DIM x AS INTEGER
+x = 1
+x = 2
+x = 3
+
+--- erwartet
+1
+2
+3
+
+=== input zerstoert das protokoll nicht
+' Waehrend einer Sitzung gehoert stdin dem Kommando-Protokoll und stdout den
+' Ereignissen. INPUT schrieb seinen Prompt frueher ROH mitten ins JSON und
+' stahl dem Debugger eine Kommandozeile; jetzt geht der Prompt als output
+' hinaus und INPUT bekommt eine leere Zeile.
+IMPORT "sitzung.dh"
+DIM q AS STRING : q = CHR$(34)
+DIM weiter AS STRING : weiter = "{" + q + "cmd" + q + ":" + q + "continue" + q + "}"
+sitzung("d.dh", [weiter, weiter, weiter])
+' Jede Zeile war JSON -- sonst haette JSON_PARSE schon abgebrochen.
+PRINT INSTR(ausgaben$(), "vorher" + CHR$(10)) >= 0
+PRINT INSTR(ausgaben$(), "Zahl: ") >= 0
+' Leere Eingabe bei einem INTEGER-Ziel: sauberer Fehler an der INPUT-Zeile
+PRINT feld$(ersteMit("error", 0), "line")
+--- datei sitzung.dh
+IMPORT "{sammlung}/../_hilfen/debugsitzung.dh"
+
+--- datei d.dh
+DIM n AS INTEGER
+PRINT "vorher"
+INPUT "Zahl: ", n
+PRINT "nachher"
+
+--- erwartet
+TRUE
+TRUE
+3
+
+=== input auf string liefert leerstring
+IMPORT "sitzung.dh"
+DIM q AS STRING : q = CHR$(34)
+DIM weiter AS STRING : weiter = "{" + q + "cmd" + q + ":" + q + "continue" + q + "}"
+sitzung("d.dh", [weiter, weiter])
+PRINT INSTR(ausgaben$(), "[]") >= 0
+PRINT ersteMit("error", 0)
+--- datei sitzung.dh
+IMPORT "{sammlung}/../_hilfen/debugsitzung.dh"
+
+--- datei d.dh
+DIM s AS STRING
+INPUT "Name: ", s
+PRINT "[" + s + "]"
+
+--- erwartet
+TRUE
+-1
+
+=== stdin handle stiehlt dem debugger nichts
+' Dieselbe Sperre wie bei INPUT, fuer STDIN(): das Programm bekommt einen Strom,
+' der sofort zu Ende ist -- die Filterschleife laeuft null mal, statt die
+' Sitzung aus dem Tritt zu bringen.
+IMPORT "sitzung.dh"
+DIM q AS STRING : q = CHR$(34)
+DIM weiter AS STRING : weiter = "{" + q + "cmd" + q + ":" + q + "continue" + q + "}"
+sitzung("d.dh", [weiter, weiter, weiter])
+DIM aus AS STRING : aus = ausgaben$()
+PRINT INSTR(aus, "vorher") >= 0; " "; INSTR(aus, "nachher") >= 0
+PRINT INSTR(aus, "gelesen:") >= 0
+PRINT ersteMit("error", 0)
+--- datei sitzung.dh
+IMPORT "{sammlung}/../_hilfen/debugsitzung.dh"
+
+--- datei d.dh
+DIM f AS FILE
+DIM z AS STRING
+PRINT "vorher"
+f = STDIN()
+WHILE NOT ENDOFFILE(f)
+    z = READLINE(f)
+    PRINT "gelesen: " + z
+WEND
+PRINT "nachher"
+
+--- erwartet
+TRUE TRUE
+FALSE
+-1
+
+=== aufrufstapel ueberwachen setzen und bis zeile
+' Stapel innen zuerst (die aeussere Zeile ist die des Aufrufs), die
+' ueberwachten Ausdruecke bei jedem Halt, "set" wandelt wie eine Zuweisung,
+' "run-to" haelt einmal an der Zeile.
+IMPORT "sitzung.dh"
+DIM q AS STRING : q = CHR$(34)
+FUNCTION cmd$(c AS STRING, rest AS STRING) AS STRING
+    DIM s AS STRING : s = "{" + q + "cmd" + q + ":" + q + c + q
+    IF rest <> "" THEN s = s + "," + rest
+    RETURN s + "}"
+END FUNCTION
+sitzung("p.dh", [cmd$("set-breakpoints", q + "lines" + q + ":[4]"), _
+    cmd$("set-watches", q + "exprs" + q + ":[" + q + "n * 10" + q + "," + q + "summe" + q + "," + q + "gibtsnicht" + q + "]"), _
+    cmd$("continue", ""), _
+    cmd$("set", q + "name" + q + ":" + q + "n" + q + "," + q + "value" + q + ":" + q + "100" + q), _
+    cmd$("continue", ""), _
+    cmd$("set-breakpoints", q + "lines" + q + ":[]"), _
+    cmd$("run-to", q + "line" + q + ":11"), _
+    cmd$("continue", "")])
+DIM i AS INTEGER
+FOR i = 0 TO LEN(ereignisse) - 1
+    IF art$(i) <> "output" THEN PRINT TRIM$(art$(i) + " " + feld$(i, "line"))
+NEXT
+DIM h AS INTEGER : h = ersteMit("paused", 4)
+PRINT feld$(h, "stack.0.name"); ":"; feld$(h, "stack.0.line"); " "; feld$(h, "stack.1.name"); ":"; feld$(h, "stack.1.line")
+PRINT feld$(h, "watches.0.expr"); "="; feld$(h, "watches.0.value"); " "; feld$(h, "watches.1.value"); " "; feld$(h, "watches.2.error")
+DIM s AS INTEGER : s = ersteMit("set-result", 0)
+PRINT feld$(s, "value"); " "; feld$(s, "type"); " "; feld$(s, "watches.0.value"); " "; paar$(s, "locals", "n")
+DIM e AS INTEGER : e = ersteMit("paused", 11)
+PRINT paar$(e, "globals", "summe"); " "; feld$(e, "stack.0.name"); ":"; feld$(e, "stack.0.line"); " "; feld$(e, "stack.1.name") = ""
+--- datei sitzung.dh
+IMPORT "{sammlung}/../_hilfen/debugsitzung.dh"
+
+--- datei p.dh
+DIM summe AS INTEGER
+FUNCTION doppelt(n AS INTEGER) AS INTEGER
+    DIM r AS INTEGER
+    r = n * 2
+    RETURN r
+END FUNCTION
+DIM i AS INTEGER
+FOR i = 1 TO 3
+    summe = summe + doppelt(i)
+NEXT
+PRINT summe
+
+--- erwartet
+paused 1
+breakpoints
+watches
+paused 4
+set-result
+paused 4
+breakpoints
+paused 11
+finished
+doppelt:4 __main__:9
+n * 10=10 0 eval: 'gibtsnicht' nicht gefunden
+100 INTEGER 1000 100
+210 __main__:11 TRUE
+
+=== setzen wandelt und weist zurueck
+IMPORT "sitzung.dh"
+DIM q AS STRING : q = CHR$(34)
+FUNCTION setze$(name AS STRING, wert AS STRING) AS STRING
+    RETURN "{" + q + "cmd" + q + ":" + q + "set" + q + "," + q + "name" + q + ":" + q + name + q + "," + q + "value" + q + ":" + q + wert + q + "}"
+END FUNCTION
+sitzung("d.dh", ["{" + q + "cmd" + q + ":" + q + "set-breakpoints" + q + "," + q + "lines" + q + ":[4]}", _
+    "{" + q + "cmd" + q + ":" + q + "continue" + q + "}", _
+    setze$("maxi", "6"), setze$("gibtsnicht", "1"), setze$("x", "\" + q + "abc\" + q), setze$("x", "7 * 3"), _
+    "{" + q + "cmd" + q + ":" + q + "continue" + q + "}"])
+DIM i AS INTEGER
+FOR i = 0 TO LEN(ereignisse) - 1
+    IF art$(i) = "set-error" THEN PRINT "fehler "; feld$(i, "message")
+    IF art$(i) = "set-result" THEN PRINT "gesetzt "; feld$(i, "name"); " "; feld$(i, "value")
+    IF art$(i) = "output" THEN PRINT "ausgabe "; TRIM$(feld$(i, "text"))
+NEXT
+--- datei sitzung.dh
+IMPORT "{sammlung}/../_hilfen/debugsitzung.dh"
+
+--- datei d.dh
+CONST MAXI AS INTEGER = 5
+DIM x AS INTEGER
+x = 1
+PRINT x
+
+--- erwartet
+fehler set: 'maxi' nicht gefunden
+fehler set: 'gibtsnicht' nicht gefunden
+fehler x: Erwartet INTEGER, erhalten STRING
+gesetzt x 21
+ausgabe 21
+
+=== mit import halten zeilen und haltepunkte in der richtigen datei
+' Bis 2026-09-27 zaehlte der Debugger Zeilen der GEMERGTEN Quelle: mit
+' einem IMPORT am Anfang hielt er "in Zeile 7" statt 3, und ein Haltepunkt
+' in Zeile 4 traf nie. Jetzt spricht er (Datei, Zeile); ein Haltepunkt auf
+' dem SUB-Kopf rutscht in die erste Zeile mit Code.
+IMPORT "sitzung.dh"
+DIM q AS STRING : q = CHR$(34)
+' Schraegstriche: ein Rueckstrich waere im JSON ein Escape.
+DIM haupt AS STRING : haupt = REPLACE$(CWD$(), CHR$(92), "/") + "/p.dh"
+DIM helfer AS STRING : helfer = REPLACE$(CWD$(), CHR$(92), "/") + "/helfer.dh"
+sitzung("p.dh", ["{" + q + "cmd" + q + ":" + q + "set-breakpoints" + q + "," + q + "breakpoints" + q + ":[{" _
+    + q + "file" + q + ":" + q + haupt + q + "," + q + "line" + q + ":4},{" _
+    + q + "file" + q + ":" + q + helfer + q + "," + q + "line" + q + ":2}]}", _
+    "{" + q + "cmd" + q + ":" + q + "continue" + q + "}", _
+    "{" + q + "cmd" + q + ":" + q + "continue" + q + "}", _
+    "{" + q + "cmd" + q + ":" + q + "continue" + q + "}"])
+DIM i AS INTEGER
+FOR i = 0 TO LEN(ereignisse) - 1
+    IF art$(i) = "paused" THEN PRINT "halt "; BASENAME(feld$(i, "file")); ":"; feld$(i, "line"); "  "; feld$(i, "stack.0.name"); " "; BASENAME(feld$(i, "stack.1.file")); ":"; feld$(i, "stack.1.line")
+    IF art$(i) = "breakpoints" THEN
+        DIM k AS INTEGER
+        FOR k = 0 TO 1
+            PRINT "hp "; BASENAME(feld$(i, "breakpoints." + STR$(k) + ".file")); ":"; feld$(i, "breakpoints." + STR$(k) + ".line"); " -> "; feld$(i, "breakpoints." + STR$(k) + ".actual")
+        NEXT
+    END IF
+    IF art$(i) = "finished" THEN PRINT "ende "; feld$(i, "reason")
+NEXT
+--- datei sitzung.dh
+IMPORT "{sammlung}/../_hilfen/debugsitzung.dh"
+
+--- datei p.dh
+IMPORT "helfer.dh"
+DIM x AS INTEGER
+x = 1
+x = 2
+hallo()
+PRINT x
+
+--- datei helfer.dh
+' eine Hilfe
+SUB hallo()
+    PRINT "hallo"
+END SUB
+
+--- erwartet
+halt p.dh:2  __main__ :
+hp p.dh:4 -> 4
+hp helfer.dh:2 -> 3
+halt p.dh:4  __main__ :
+halt helfer.dh:3  hallo p.dh:5
+ende done
+
+=== haltepunkt ohne code rutscht nach unten oder haelt nie
+IMPORT "sitzung.dh"
+DIM q AS STRING : q = CHR$(34)
+sitzung("d.dh", ["{" + q + "cmd" + q + ":" + q + "set-breakpoints" + q + "," + q + "lines" + q + ":[2,4,99]}", _
+    "{" + q + "cmd" + q + ":" + q + "stop" + q + "}"])
+DIM i AS INTEGER
+FOR i = 0 TO LEN(ereignisse) - 1
+    IF art$(i) = "breakpoints" THEN
+        DIM k AS INTEGER
+        FOR k = 0 TO 2
+            DIM p AS STRING : p = "breakpoints." + STR$(k)
+            PRINT feld$(i, p + ".line"); " -> "; feld$(i, p + ".actual"); " "; JSON_GET_BOOL(JSON_PARSE(ereignisse[i]), p + ".verified")
+        NEXT
+    END IF
+NEXT
+--- datei sitzung.dh
+IMPORT "{sammlung}/../_hilfen/debugsitzung.dh"
+
+--- datei d.dh
+DIM x AS INTEGER
+' ein Kommentar
+
+x = 5
+PRINT x
+
+--- erwartet
+2 -> 4 TRUE
+4 -> 4 TRUE
+99 -> 0 FALSE
+
+=== waehrend des laufens gesetzt haelt sofort
+' Mit "now" gilt ein set-breakpoints auch waehrend das Programm laeuft --
+' vorher las der Debugger nur im Halt, und ein Programm, das nie hielt, sah
+' einen neuen Haltepunkt nie.
+IMPORT "sitzung.dh"
+DIM q AS STRING : q = CHR$(34)
+sitzung("lang.dh", ["{" + q + "cmd" + q + ":" + q + "continue" + q + "}", _
+    "{" + q + "cmd" + q + ":" + q + "set-breakpoints" + q + "," + q + "now" + q + ":true," + q + "lines" + q + ":[4]}", _
+    "{" + q + "cmd" + q + ":" + q + "stop" + q + "}"])
+DIM i AS INTEGER
+FOR i = 0 TO LEN(ereignisse) - 1
+    IF art$(i) = "paused" THEN PRINT "halt "; feld$(i, "line")
+    IF art$(i) = "finished" THEN PRINT "ende "; feld$(i, "reason")
+NEXT
+--- datei sitzung.dh
+IMPORT "{sammlung}/../_hilfen/debugsitzung.dh"
+
+--- datei lang.dh
+DIM i AS INTEGER
+FOR i = 1 TO 200
+    SLEEP(5)
+    i = i
+NEXT
+PRINT "durch"
+
+--- erwartet
+halt 1
+halt 4
+ende stopped
+
+=== ohne now gilt ein vorab geschicktes set-breakpoints dem naechsten halt
+' Die Gegenprobe: dasselbe ohne "now" -- ein Skript, das alles vorab
+' schickt, meint den Halt nach dem continue, und es gibt keinen.
+IMPORT "sitzung.dh"
+DIM q AS STRING : q = CHR$(34)
+sitzung("lang.dh", ["{" + q + "cmd" + q + ":" + q + "continue" + q + "}", _
+    "{" + q + "cmd" + q + ":" + q + "set-breakpoints" + q + "," + q + "lines" + q + ":[4]}", _
+    "{" + q + "cmd" + q + ":" + q + "stop" + q + "}"])
+DIM i AS INTEGER
+FOR i = 0 TO LEN(ereignisse) - 1
+    IF art$(i) = "paused" THEN PRINT "halt "; feld$(i, "line")
+    IF art$(i) = "finished" THEN PRINT "ende "; feld$(i, "reason")
+NEXT
+--- datei sitzung.dh
+IMPORT "{sammlung}/../_hilfen/debugsitzung.dh"
+
+--- datei lang.dh
+DIM i AS INTEGER
+FOR i = 1 TO 20
+    SLEEP(1)
+    i = i
+NEXT
+PRINT "durch"
+
+--- erwartet
+halt 1
+ende done
+
+=== pause haelt ein laufendes programm an
+IMPORT "sitzung.dh"
+DIM q AS STRING : q = CHR$(34)
+sitzung("lang.dh", ["{" + q + "cmd" + q + ":" + q + "continue" + q + "}", _
+    "{" + q + "cmd" + q + ":" + q + "pause" + q + "}", _
+    "{" + q + "cmd" + q + ":" + q + "stop" + q + "}"])
+DIM n AS INTEGER : n = 0
+DIM i AS INTEGER
+FOR i = 0 TO LEN(ereignisse) - 1
+    IF art$(i) = "paused" THEN n = n + 1
+    IF art$(i) = "finished" THEN PRINT "ende "; feld$(i, "reason")
+NEXT
+PRINT "halte "; n
+PRINT INSTR(ausgaben$(), "durch") < 0
+--- datei sitzung.dh
+IMPORT "{sammlung}/../_hilfen/debugsitzung.dh"
+
+--- datei lang.dh
+DIM i AS INTEGER
+FOR i = 1 TO 200
+    SLEEP(5)
+    i = i
+NEXT
+PRINT "durch"
+
+--- erwartet
+ende stopped
+halte 2
+TRUE
+
+=== input wartet auf die eingabe des debuggers
+' Bis 2026-09-27 bekam INPUT unter dem Debugger immer "".
+IMPORT "sitzung.dh"
+DIM q AS STRING : q = CHR$(34)
+sitzung("ein.dh", ["{" + q + "cmd" + q + ":" + q + "continue" + q + "}", _
+    "{" + q + "cmd" + q + ":" + q + "input" + q + "," + q + "text" + q + ":" + q + "21" + q + "}"])
+DIM i AS INTEGER
+FOR i = 0 TO LEN(ereignisse) - 1
+    IF art$(i) = "input" THEN PRINT "eingabe in "; feld$(i, "line")
+    IF art$(i) = "finished" THEN PRINT "ende "; feld$(i, "reason")
+NEXT
+PRINT TRIM$(ausgaben$())
+--- datei sitzung.dh
+IMPORT "{sammlung}/../_hilfen/debugsitzung.dh"
+
+--- datei ein.dh
+DIM n AS INTEGER
+INPUT "Zahl"; n
+PRINT n * 2
+
+--- erwartet
+eingabe in 2
+ende done
+Zahl? 42
+
+=== ein fehler in einer importierten datei nennt sie
+IMPORT "sitzung.dh"
+DIM q AS STRING : q = CHR$(34)
+sitzung("p.dh", ["{" + q + "cmd" + q + ":" + q + "continue" + q + "}"])
+DIM e AS INTEGER : e = ersteMit("error", 0)
+PRINT BASENAME(feld$(e, "file")); ":"; feld$(e, "line")
+--- datei sitzung.dh
+IMPORT "{sammlung}/../_hilfen/debugsitzung.dh"
+
+--- datei p.dh
+IMPORT "kaputt.dh"
+PRINT "los"
+kaputt()
+
+--- datei kaputt.dh
+SUB kaputt()
+    DIM a[2] AS INTEGER
+    a[5] = 1
+END SUB
+
+--- erwartet
+kaputt.dh:3
+
+=== bis zur zeile ohne haltestelle sagt es und bleibt stehen
+IMPORT "sitzung.dh"
+DIM q AS STRING : q = CHR$(34)
+sitzung("d.dh", ["{" + q + "cmd" + q + ":" + q + "run-to" + q + "," + q + "line" + q + ":50}", _
+    "{" + q + "cmd" + q + ":" + q + "run-to" + q + "," + q + "line" + q + ":2}", _
+    "{" + q + "cmd" + q + ":" + q + "continue" + q + "}"])
+DIM i AS INTEGER
+FOR i = 0 TO LEN(ereignisse) - 1
+    IF art$(i) <> "output" THEN PRINT TRIM$(art$(i) + " " + feld$(i, "line"))
+NEXT
+--- datei sitzung.dh
+IMPORT "{sammlung}/../_hilfen/debugsitzung.dh"
+
+--- datei d.dh
+DIM x AS INTEGER
+' Kommentar
+x = 5
+PRINT x
+
+--- erwartet
+paused 1
+run-to-error 50
+paused 3
+finished
+
+=== eval mit id gibt id und ausdruck zurueck
+' Ein Editor, der Tooltip-Werte und die Eingabezeile ueber dasselbe eval
+' fragt, erkennt die Antwort an der id.
+IMPORT "sitzung.dh"
+DIM q AS STRING : q = CHR$(34)
+sitzung("d.dh", ["{" + q + "cmd" + q + ":" + q + "set-breakpoints" + q + "," + q + "lines" + q + ":[3]}", _
+    "{" + q + "cmd" + q + ":" + q + "continue" + q + "}", _
+    "{" + q + "cmd" + q + ":" + q + "eval" + q + "," + q + "expr" + q + ":" + q + "x" + q + "," + q + "id" + q + ":" + q + "hover" + q + "}", _
+    "{" + q + "cmd" + q + ":" + q + "eval" + q + "," + q + "expr" + q + ":" + q + "gibtsnicht" + q + "," + q + "id" + q + ":" + q + "hover" + q + "}", _
+    "{" + q + "cmd" + q + ":" + q + "eval" + q + "," + q + "expr" + q + ":" + q + "x + 1" + q + "}", _
+    "{" + q + "cmd" + q + ":" + q + "stop" + q + "}"])
+DIM i AS INTEGER
+FOR i = 0 TO LEN(ereignisse) - 1
+    IF LEFT$(art$(i), 4) = "eval" THEN PRINT art$(i); " ["; feld$(i, "id"); "] ["; feld$(i, "expr"); "] "; feld$(i, "value")
+NEXT
+--- datei sitzung.dh
+IMPORT "{sammlung}/../_hilfen/debugsitzung.dh"
+
+--- datei d.dh
+DIM x AS INTEGER
+x = 5
+PRINT x
+
+--- erwartet
+eval-result [hover] [x] 5
+eval-error [hover] [gibtsnicht] 
+eval-result [] [] 6
+
+=== eval kennt felder und indizes aber keine aufrufe
+IMPORT "sitzung.dh"
+DIM q AS STRING : q = CHR$(34)
+FUNCTION ev$(ausdruck AS STRING) AS STRING
+    RETURN "{" + q + "cmd" + q + ":" + q + "eval" + q + "," + q + "expr" + q + ":" + q + REPLACE$(ausdruck, q, "\" + q) + q + "}"
+END FUNCTION
+sitzung("d.dh", ["{" + q + "cmd" + q + ":" + q + "set-breakpoints" + q + "," + q + "lines" + q + ":[9]}", _
+    "{" + q + "cmd" + q + ":" + q + "continue" + q + "}", _
+    ev$("held.hp * 2"), ev$("f[1] + m[" + q + "a" + q + "]"), ev$("held.gibts"), ev$("zweimal(3)"), _
+    "{" + q + "cmd" + q + ":" + q + "stop" + q + "}"])
+DIM i AS INTEGER
+FOR i = 0 TO LEN(ereignisse) - 1
+    IF art$(i) = "eval-result" THEN PRINT "wert "; feld$(i, "value")
+    IF art$(i) = "eval-error" THEN PRINT "fehler "; LEFT$(feld$(i, "message"), 30)
+NEXT
+--- datei sitzung.dh
+IMPORT "{sammlung}/../_hilfen/debugsitzung.dh"
+
+--- datei d.dh
+CLASS Held
+    DIM hp AS INTEGER
+END CLASS
+DIM held AS Held : held = NEW Held()
+held.hp = 7
+DIM f AS ARRAY OF INTEGER : f = [4, 5, 6]
+DIM m AS MAP OF INTEGER : m = {"a": 9}
+FUNCTION zweimal(n AS INTEGER) AS INTEGER : RETURN n * 2 : END FUNCTION
+PRINT held.hp
+
+--- erwartet
+wert 14
+wert 14
+fehler eval: Held hat kein Feld 'gibt
+fehler eval: Ausdruck nicht unterstue
+
+=== variablen tragen ihre kinder und klassen ihren namen
+' Felder, Objekte und MAPs klappen in der IDE auf -- der Debugger liefert
+' die Inhalte mit, je Ebene hoechstens 100, und nennt die Klasse, wie sie
+' geschrieben wurde (der Parser fuehrt sie klein).
+IMPORT "sitzung.dh"
+DIM q AS STRING : q = CHR$(34)
+sitzung("d.dh", ["{" + q + "cmd" + q + ":" + q + "set-breakpoints" + q + "," + q + "lines" + q + ":[12]}", _
+    "{" + q + "cmd" + q + ":" + q + "continue" + q + "}", _
+    "{" + q + "cmd" + q + ":" + q + "stop" + q + "}"])
+DIM h AS INTEGER : h = ersteMit("paused", 12)
+DIM k AS JSON_HANDLE : k = JSON_PARSE(ereignisse[h])
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(k, "globals") - 1
+    DIM p AS STRING : p = "globals." + STR$(i)
+    DIM z AS STRING : z = JSON_GET_STRING(k, p + ".name") + " " + JSON_GET_STRING(k, p + ".type") + " " + JSON_GET_STRING(k, p + ".value")
+    IF JSON_HAS(k, p + ".children") THEN
+        z = z + " | " + STR$(JSON_LEN(k, p + ".children")) + ": " + JSON_GET_STRING(k, p + ".children.0.name") + "=" + JSON_GET_STRING(k, p + ".children.0.value")
+        DIM letzt AS INTEGER : letzt = JSON_LEN(k, p + ".children") - 1
+        z = z + " ... " + JSON_GET_STRING(k, p + ".children." + STR$(letzt) + ".name") + "=" + JSON_GET_STRING(k, p + ".children." + STR$(letzt) + ".value")
+    END IF
+    PRINT z
+NEXT
+--- datei sitzung.dh
+IMPORT "{sammlung}/../_hilfen/debugsitzung.dh"
+
+--- datei d.dh
+CLASS Held
+    DIM hp AS INTEGER
+    DIM name AS STRING
+END CLASS
+DIM held AS Held : held = NEW Held()
+held.hp = 7 : held.name = "Ada"
+DIM gross[150] AS INTEGER
+DIM m AS MAP OF INTEGER : m = {"a": 1, "b": 2}
+DIM t AS TUPLE : t = (1, "zwei")
+DIM i AS INTEGER
+FOR i = 0 TO 149 : gross[i] = i : NEXT
+PRINT held.hp
+
+--- erwartet
+gross ARRAY <ARRAY[150] OF INTEGER> | 101: [0]=0 ... ...=50 weitere
+held Held <Held> | 2: hp=7 ... name=Ada
+i INTEGER 150
+m MAP <MAP[2] OF INTEGER> | 2: "a"=1 ... "b"=2
+t TUPLE (1, zwei) | 2: [0]=1 ... [1]=zwei
+
+=== ein nicht abgefangener fehler haelt an seiner stelle an
+IMPORT "sitzung.dh"
+DIM q AS STRING : q = CHR$(34)
+sitzung("d.dh", ["{" + q + "cmd" + q + ":" + q + "continue" + q + "}", _
+    "{" + q + "cmd" + q + ":" + q + "eval" + q + "," + q + "expr" + q + ":" + q + "i * 10" + q + "}", _
+    "{" + q + "cmd" + q + ":" + q + "continue" + q + "}"])
+DIM i AS INTEGER
+FOR i = 0 TO LEN(ereignisse) - 1
+    IF art$(i) = "paused" THEN PRINT "halt "; feld$(i, "line"); " ["; feld$(i, "reason"); "] "; paar$(i, "locals", "i"); " "; feld$(i, "stack.0.name")
+    IF art$(i) = "eval-result" THEN PRINT "wert "; feld$(i, "value")
+    IF art$(i) = "error" THEN PRINT "fehler "; feld$(i, "line")
+NEXT
+--- datei sitzung.dh
+IMPORT "{sammlung}/../_hilfen/debugsitzung.dh"
+
+--- datei d.dh
+' Ein Fehler, der abgefangen wird, haelt NICHT an.
+TRY
+    THROW "harmlos"
+CATCH e
+    PRINT "gefangen"
+END TRY
+SUB fuellen()
+    DIM f[3] AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO 5
+        f[i] = i
+    NEXT
+END SUB
+fuellen()
+
+--- erwartet
+halt 2 []  __main__
+halt 11 [error] 3 fuellen
+wert 30
+fehler 11
+
+=== ein grafikfenster bleibt im halt ansprechbar
+' Waehrend der Debugger auf Kommandos wartet, holt er alle 50 ms die
+' Fensternachrichten ab -- sonst meldete Windows das Fenster nach wenigen
+' Sekunden als "reagiert nicht" (vorher gemessen: Responding False).
+DIM q AS STRING : q = CHR$(34)
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "debug", CWD$() + "/fenster.dh")
+PROCESS_WRITE(p, "{" + q + "cmd" + q + ":" + q + "set-breakpoints" + q + "," + q + "lines" + q + ":[4]}" + CHR$(10))
+PROCESS_WRITE(p, "{" + q + "cmd" + q + ":" + q + "continue" + q + "}" + CHR$(10))
+SLEEP(7000)
+DIM ps AS STRING : ps = "Get-Process dhrt | Where-Object { $_.MainWindowTitle -eq 'Halt-Pruefung' } | ForEach-Object { $_.Responding }"
+DIM antwort AS STRING : antwort = TRIM$(SHELL_OUT$("powershell", "-NoProfile", "-Command", ps))
+PROCESS_WRITE(p, "{" + q + "cmd" + q + ":" + q + "stop" + q + "}" + CHR$(10))
+SLEEP(300)
+IF PROCESS_RUNNING(p) THEN PROCESS_KILL(p)
+IF antwort = "" THEN
+    PRINT "UEBERSPRINGEN: kein Fenster gefunden"
+ELSE
+    PRINT "ansprechbar "; antwort
+END IF
+--- datei fenster.dh
+SCREEN(320, 200, "Halt-Pruefung")
+DIM n AS INTEGER
+WHILE NOT QUITREQUESTED()
+    n = n + 1
+    CLS(RGB(20, 40, 80))
+    FLIP()
+WEND
+--- system windows
+--- erwartet
+ansprechbar True
+
+=== ein protokollpunkt schreibt statt anzuhalten
+IMPORT "sitzung.dh"
+DIM q AS STRING : q = CHR$(34)
+sitzung("d.dh", ["{" + q + "cmd" + q + ":" + q + "set-breakpoints" + q + "," + q + "breakpoints" + q + ":[{" + q + "line" + q + ":4," + q + "log" + q + ":" + q + "i = {i}, s = {s}, {{x}} {gibts}" + q + "}]}", _
+    "{" + q + "cmd" + q + ":" + q + "continue" + q + "}"])
+DIM i AS INTEGER
+FOR i = 0 TO LEN(ereignisse) - 1
+    IF art$(i) = "log" THEN PRINT feld$(i, "line"); ": "; feld$(i, "text")
+    IF art$(i) = "paused" THEN PRINT "halt "; feld$(i, "line")
+    IF art$(i) = "finished" THEN PRINT "ende "; feld$(i, "reason")
+NEXT
+--- datei sitzung.dh
+IMPORT "{sammlung}/../_hilfen/debugsitzung.dh"
+
+--- datei d.dh
+DIM i AS INTEGER
+DIM s AS INTEGER
+FOR i = 1 TO 3
+    s = s + i
+NEXT
+PRINT s
+
+--- erwartet
+halt 1
+4: i = 1, s = 0, {x} {? eval: 'gibts' nicht gefunden}
+4: i = 2, s = 1, {x} {? eval: 'gibts' nicht gefunden}
+4: i = 3, s = 3, {x} {? eval: 'gibts' nicht gefunden}
+ende done
+
+=== trefferzahl ab genau und jedes
+' "3" = ab dem 3. Mal, "=2" = nur beim 2., "%3" = jedes 3. Mal; gezaehlt
+' wird nur, wenn die Bedingung stimmt.
+IMPORT "sitzung.dh"
+DIM q AS STRING : q = CHR$(34)
+FUNCTION lauf(hits AS STRING, bed AS STRING) AS STRING
+    ereignisse = []
+    DIM b AS STRING : b = "{" + q + "line" + q + ":4," + q + "hits" + q + ":" + q + hits + q
+    IF bed <> "" THEN b = b + "," + q + "condition" + q + ":" + q + bed + q
+    sitzung("d.dh", ["{" + q + "cmd" + q + ":" + q + "set-breakpoints" + q + "," + q + "breakpoints" + q + ":[" + b + "}]}", _
+        "{" + q + "cmd" + q + ":" + q + "continue" + q + "}", "{" + q + "cmd" + q + ":" + q + "continue" + q + "}", _
+        "{" + q + "cmd" + q + ":" + q + "continue" + q + "}", "{" + q + "cmd" + q + ":" + q + "continue" + q + "}", _
+        "{" + q + "cmd" + q + ":" + q + "continue" + q + "}"])
+    DIM r AS STRING : r = ""
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(ereignisse) - 1
+        IF art$(k) = "paused" AND feld$(k, "line") = "4" THEN r = r + " " + paar$(k, "globals", "i")
+    NEXT
+    RETURN TRIM$(r)
+END FUNCTION
+PRINT "ab 3: "; lauf("3", "")
+PRINT "genau 2: "; lauf("=2", "")
+PRINT "jedes 3: "; lauf("%3", "")
+PRINT "gerade, ab 2: "; lauf("2", "i MOD 2 = 0")
+--- datei sitzung.dh
+IMPORT "{sammlung}/../_hilfen/debugsitzung.dh"
+
+--- datei d.dh
+DIM i AS INTEGER
+DIM s AS INTEGER
+FOR i = 1 TO 7
+    s = s + i
+NEXT
+
+--- erwartet
+ab 3: 3 4 5 6 7
+genau 2: 2
+jedes 3: 3 6
+gerade, ab 2: 4 6
+
+=== variablen heissen wie geschrieben und handles tragen ihren typ
+' Beim Dogfooding 2026-09-30: die Variablenliste zeigte `btnadd` statt
+' `btnAdd` und GUI_WIDGET/DB_CONN als INTEGER -- ein Handle ist zur Laufzeit
+' eine Ganzzahl, angezeigt wird jetzt der angesagte Typ. Feldnamen einer
+' Instanz ebenso. Sortiert wird ohne Ruecksicht auf Gross/klein.
+IMPORT "sitzung.dh"
+DIM q AS STRING : q = CHR$(34)
+sitzung("d.dh", ["{" + q + "cmd" + q + ":" + q + "set-breakpoints" + q + "," + q + "lines" + q + ":[11]}", _
+    "{" + q + "cmd" + q + ":" + q + "continue" + q + "}", _
+    "{" + q + "cmd" + q + ":" + q + "stop" + q + "}"])
+DIM h AS INTEGER : h = ersteMit("paused", 11)
+DIM k AS JSON_HANDLE : k = JSON_PARSE(ereignisse[h])
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(k, "globals") - 1
+    DIM p AS STRING : p = "globals." + STR$(i)
+    DIM z AS STRING : z = "g " + JSON_GET_STRING(k, p + ".name") + " " + JSON_GET_STRING(k, p + ".type")
+    IF JSON_HAS(k, p + ".children") THEN z = z + " | " + JSON_GET_STRING(k, p + ".children.0.name")
+    PRINT z
+NEXT
+FOR i = 0 TO JSON_LEN(k, "locals") - 1
+    PRINT "l "; JSON_GET_STRING(k, "locals." + STR$(i) + ".name"); " "; JSON_GET_STRING(k, "locals." + STR$(i) + ".type")
+NEXT
+--- datei sitzung.dh
+IMPORT "{sammlung}/../_hilfen/debugsitzung.dh"
+
+--- datei d.dh
+IMPORT "gui"
+CLASS Posten
+    DIM betragCent AS INTEGER
+END CLASS
+DIM btnAdd AS GUI_WIDGET
+DIM lSumme AS INTEGER : lSumme = 3
+DIM einPosten AS Posten : einPosten = NEW Posten()
+DIM keinPosten AS Posten
+SUB zeigen(nr AS INTEGER)
+    DIM zeileNr AS INTEGER : zeileNr = nr
+    PRINT zeileNr
+END SUB
+zeigen(4)
+
+--- erwartet
+g btnAdd GUI_WIDGET
+g einPosten Posten | betragCent
+g keinPosten Posten
+g lSumme INTEGER
+l nr INTEGER
+l zeileNr INTEGER
+
+=== ein haltepunkt in einer fremden datei ist kein befund
+' Die IDE schickt die Haltepunkte ALLER Dateien, die sie kennt. Einer in
+' einer Datei, die das Programm nicht enthaelt, haelt nie -- `in_program`
+' FALSE, die IDE meldet ihn nicht. Einer ohne Code darunter in einer Datei
+' des Programms ist ein Befund (`in_program` TRUE).
+IMPORT "sitzung.dh"
+DIM q AS STRING : q = CHR$(34)
+DIM fremd AS STRING : fremd = REPLACE$(CWD$(), "\", "/") + "/anders.dh"
+sitzung("d.dh", ["{" + q + "cmd" + q + ":" + q + "set-breakpoints" + q + "," + q + "breakpoints" + q + ":[{" + q + "file" + q + ":" + q + fremd + q + "," + q + "line" + q + ":1},{" + q + "line" + q + ":99}]}", _
+    "{" + q + "cmd" + q + ":" + q + "stop" + q + "}"])
+DIM i AS INTEGER
+FOR i = 0 TO LEN(ereignisse) - 1
+    IF art$(i) = "breakpoints" THEN
+        DIM j AS JSON_HANDLE : j = JSON_PARSE(ereignisse[i])
+        DIM b AS INTEGER
+        FOR b = 0 TO JSON_LEN(j, "breakpoints") - 1
+            DIM p AS STRING : p = "breakpoints." + STR$(b)
+            PRINT BASENAME(JSON_GET_STRING(j, p + ".file")); " "; JSON_GET_INT(j, p + ".line"); " "; JSON_GET_BOOL(j, p + ".verified"); " "; JSON_GET_BOOL(j, p + ".in_program")
+        NEXT
+    END IF
+NEXT
+--- datei sitzung.dh
+IMPORT "{sammlung}/../_hilfen/debugsitzung.dh"
+
+--- datei d.dh
+DIM x AS INTEGER
+x = 5
+PRINT x
+
+--- datei anders.dh
+PRINT "gehoert nicht dazu"
+
+--- erwartet
+anders.dh 1 FALSE FALSE
+d.dh 99 FALSE TRUE

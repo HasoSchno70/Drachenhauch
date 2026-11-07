@@ -1,0 +1,8255 @@
+' Maschinencode (M3..M5, docs/entwurf-maschinencode.md, src/jit.rs). Jeder
+' Fall steht zweimal: in der VM (DHRT_JIT=aus) und mit Maschinencode --
+' die Erwartung ist dieselbe, und sie ist die Ausgabe der VM. Gibt der
+' Maschinencode bei einem Fehler auf, rechnet die VM den Aufruf nach; darum
+' stimmen auch Meldung und Zeile ueberein.
+' Format: docs/werkzeuge.md.
+
+=== rechnen mit ueberlauf wird in der zeile gemeldet
+FUNCTION mal(a AS INTEGER, b AS INTEGER) AS INTEGER
+    DIM r AS INTEGER
+    r = a * b
+    RETURN r + 1
+END FUNCTION
+FUNCTION aussen(a AS INTEGER) AS INTEGER
+    RETURN mal(a, a) - 1
+END FUNCTION
+PRINT aussen(1000)
+TRY
+    PRINT aussen(4000000000)
+CATCH e
+    PRINT "gefangen: "; e; " zeile "; ERROR_LINE()
+END TRY
+PRINT aussen(3)
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+1000000
+gefangen: Ganzzahl-Ueberlauf bei '*' (INTEGER ist 64-bit; Wertebereich ueberschritten) zeile 3
+9
+
+=== rechnen mit ueberlauf wird in der zeile gemeldet (maschinencode)
+FUNCTION mal(a AS INTEGER, b AS INTEGER) AS INTEGER
+    DIM r AS INTEGER
+    r = a * b
+    RETURN r + 1
+END FUNCTION
+FUNCTION aussen(a AS INTEGER) AS INTEGER
+    RETURN mal(a, a) - 1
+END FUNCTION
+PRINT aussen(1000)
+TRY
+    PRINT aussen(4000000000)
+CATCH e
+    PRINT "gefangen: "; e; " zeile "; ERROR_LINE()
+END TRY
+PRINT aussen(3)
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+1000000
+gefangen: Ganzzahl-Ueberlauf bei '*' (INTEGER ist 64-bit; Wertebereich ueberschritten) zeile 3
+9
+--- stderr
+jit: 2 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
+
+=== teilen durch null in allen formen
+FUNCTION t1(a AS INTEGER, b AS INTEGER) AS FLOAT
+    RETURN a / b
+END FUNCTION
+FUNCTION t2(a AS INTEGER, b AS INTEGER) AS INTEGER
+    RETURN a \ b
+END FUNCTION
+FUNCTION t3(a AS INTEGER, b AS INTEGER) AS INTEGER
+    RETURN a MOD b
+END FUNCTION
+FUNCTION t4(a AS FLOAT, b AS FLOAT) AS FLOAT
+    RETURN a MOD b
+END FUNCTION
+FUNCTION t5(a AS FLOAT, b AS FLOAT) AS FLOAT
+    RETURN a / b
+END FUNCTION
+PRINT t1(7, 2); " "; t2(7, 2); " "; t3(7, 2); " "; t4(7.5, 2.0); " "; t5(1.0, 4.0)
+TRY
+    PRINT t1(1, 0)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PRINT t2(1, 0)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PRINT t3(1, 0)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PRINT t4(1.0, 0.0)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PRINT t5(1.0, -0.0)
+CATCH e
+    PRINT e
+END TRY
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+3.5 3 1 1.5 0.25
+Division durch 0
+Integer-Division durch 0
+MOD durch 0
+MOD durch 0
+Division durch 0
+
+=== teilen durch null in allen formen (maschinencode)
+FUNCTION t1(a AS INTEGER, b AS INTEGER) AS FLOAT
+    RETURN a / b
+END FUNCTION
+FUNCTION t2(a AS INTEGER, b AS INTEGER) AS INTEGER
+    RETURN a \ b
+END FUNCTION
+FUNCTION t3(a AS INTEGER, b AS INTEGER) AS INTEGER
+    RETURN a MOD b
+END FUNCTION
+FUNCTION t4(a AS FLOAT, b AS FLOAT) AS FLOAT
+    RETURN a MOD b
+END FUNCTION
+FUNCTION t5(a AS FLOAT, b AS FLOAT) AS FLOAT
+    RETURN a / b
+END FUNCTION
+PRINT t1(7, 2); " "; t2(7, 2); " "; t3(7, 2); " "; t4(7.5, 2.0); " "; t5(1.0, 4.0)
+TRY
+    PRINT t1(1, 0)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PRINT t2(1, 0)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PRINT t3(1, 0)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PRINT t4(1.0, 0.0)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PRINT t5(1.0, -0.0)
+CATCH e
+    PRINT e
+END TRY
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+3.5 3 1 1.5 0.25
+Division durch 0
+Integer-Division durch 0
+MOD durch 0
+MOD durch 0
+Division durch 0
+--- stderr
+jit: 5 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
+
+=== kleinste zahl durch minus eins
+FUNCTION q(a AS INTEGER, b AS INTEGER) AS INTEGER
+    RETURN a \ b
+END FUNCTION
+FUNCTION r(a AS INTEGER, b AS INTEGER) AS INTEGER
+    RETURN a MOD b
+END FUNCTION
+FUNCTION n(a AS INTEGER) AS INTEGER
+    RETURN -a
+END FUNCTION
+DIM m AS INTEGER : m = -9223372036854775807 - 1
+PRINT q(m, 2); " "; r(m, 3); " "; n(m + 1)
+TRY
+    PRINT q(m, -1)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PRINT r(m, -1)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PRINT n(m)
+CATCH e
+    PRINT e
+END TRY
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+-4611686018427387904 1 9223372036854775807
+Ganzzahl-Ueberlauf bei '\' (INTEGER ist 64-bit; Wertebereich ueberschritten)
+Ganzzahl-Ueberlauf bei 'MOD' (INTEGER ist 64-bit; Wertebereich ueberschritten)
+Ganzzahl-Ueberlauf bei '-' (INTEGER ist 64-bit; Wertebereich ueberschritten)
+
+=== kleinste zahl durch minus eins (maschinencode)
+FUNCTION q(a AS INTEGER, b AS INTEGER) AS INTEGER
+    RETURN a \ b
+END FUNCTION
+FUNCTION r(a AS INTEGER, b AS INTEGER) AS INTEGER
+    RETURN a MOD b
+END FUNCTION
+FUNCTION n(a AS INTEGER) AS INTEGER
+    RETURN -a
+END FUNCTION
+DIM m AS INTEGER : m = -9223372036854775807 - 1
+PRINT q(m, 2); " "; r(m, 3); " "; n(m + 1)
+TRY
+    PRINT q(m, -1)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PRINT r(m, -1)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PRINT n(m)
+CATCH e
+    PRINT e
+END TRY
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+-4611686018427387904 1 9223372036854775807
+Ganzzahl-Ueberlauf bei '\' (INTEGER ist 64-bit; Wertebereich ueberschritten)
+Ganzzahl-Ueberlauf bei 'MOD' (INTEGER ist 64-bit; Wertebereich ueberschritten)
+Ganzzahl-Ueberlauf bei '-' (INTEGER ist 64-bit; Wertebereich ueberschritten)
+--- stderr
+jit: 3 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
+
+=== mod folgt dem vorzeichen des teilers
+FUNCTION r(a AS INTEGER, b AS INTEGER) AS INTEGER
+    RETURN a MOD b
+END FUNCTION
+FUNCTION rf(a AS FLOAT, b AS FLOAT) AS FLOAT
+    RETURN a MOD b
+END FUNCTION
+FUNCTION g(a AS INTEGER, b AS INTEGER) AS INTEGER
+    RETURN a \ b
+END FUNCTION
+PRINT r(-17, 5); " "; r(17, -5); " "; r(-17, -5); " "; r(17, 5); " "; r(-15, 5)
+PRINT rf(-7.5, 2.0); " "; rf(7.5, -2.0); " "; rf(-7.5, -2.0)
+PRINT g(-7, 2); " "; g(7, -2); " "; g(-7, -2)
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+3 -3 -2 2 0
+0.5 -0.5 -1.5
+-4 -4 3
+
+=== mod folgt dem vorzeichen des teilers (maschinencode)
+FUNCTION r(a AS INTEGER, b AS INTEGER) AS INTEGER
+    RETURN a MOD b
+END FUNCTION
+FUNCTION rf(a AS FLOAT, b AS FLOAT) AS FLOAT
+    RETURN a MOD b
+END FUNCTION
+FUNCTION g(a AS INTEGER, b AS INTEGER) AS INTEGER
+    RETURN a \ b
+END FUNCTION
+PRINT r(-17, 5); " "; r(17, -5); " "; r(-17, -5); " "; r(17, 5); " "; r(-15, 5)
+PRINT rf(-7.5, 2.0); " "; rf(7.5, -2.0); " "; rf(-7.5, -2.0)
+PRINT g(-7, 2); " "; g(7, -2); " "; g(-7, -2)
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+3 -3 -2 2 0
+0.5 -0.5 -1.5
+-4 -4 3
+--- stderr
+jit: 3 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
+
+=== nan vergleiche und gleichheit
+FUNCTION nan() AS FLOAT
+    DIM gross AS FLOAT
+    DIM k AS INTEGER
+    gross = 1.0
+    FOR k = 1 TO 400
+        gross = gross * 1000.0
+    NEXT
+    RETURN gross - gross
+END FUNCTION
+FUNCTION gleich(a AS FLOAT, b AS FLOAT) AS BOOLEAN
+    RETURN a = b
+END FUNCTION
+FUNCTION ungleich(a AS FLOAT, b AS FLOAT) AS BOOLEAN
+    RETURN a <> b
+END FUNCTION
+FUNCTION kleiner(a AS FLOAT, b AS FLOAT) AS BOOLEAN
+    RETURN a < b
+END FUNCTION
+FUNCTION gemischt(a AS INTEGER, b AS FLOAT) AS BOOLEAN
+    RETURN a = b AND a <= b AND NOT (a > b)
+END FUNCTION
+DIM x AS FLOAT : x = nan()
+PRINT gleich(x, x); " "; ungleich(x, x); " "; gleich(2.0, 2.0); " "; gemischt(2, 2.0); " "; gemischt(2, 2.5)
+TRY
+    PRINT kleiner(x, 1.0)
+CATCH e
+    PRINT e
+END TRY
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+FALSE TRUE TRUE TRUE FALSE
+Vergleich mit NaN
+
+=== nan vergleiche und gleichheit (maschinencode)
+FUNCTION nan() AS FLOAT
+    DIM gross AS FLOAT
+    DIM k AS INTEGER
+    gross = 1.0
+    FOR k = 1 TO 400
+        gross = gross * 1000.0
+    NEXT
+    RETURN gross - gross
+END FUNCTION
+FUNCTION gleich(a AS FLOAT, b AS FLOAT) AS BOOLEAN
+    RETURN a = b
+END FUNCTION
+FUNCTION ungleich(a AS FLOAT, b AS FLOAT) AS BOOLEAN
+    RETURN a <> b
+END FUNCTION
+FUNCTION kleiner(a AS FLOAT, b AS FLOAT) AS BOOLEAN
+    RETURN a < b
+END FUNCTION
+FUNCTION gemischt(a AS INTEGER, b AS FLOAT) AS BOOLEAN
+    RETURN a = b AND a <= b AND NOT (a > b)
+END FUNCTION
+DIM x AS FLOAT : x = nan()
+PRINT gleich(x, x); " "; ungleich(x, x); " "; gleich(2.0, 2.0); " "; gemischt(2, 2.0); " "; gemischt(2, 2.5)
+TRY
+    PRINT kleiner(x, 1.0)
+CATCH e
+    PRINT e
+END TRY
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+FALSE TRUE TRUE TRUE FALSE
+Vergleich mit NaN
+--- stderr
+jit: 5 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
+
+=== kommazahl in eine ganze zahl
+FUNCTION halb(a AS INTEGER) AS INTEGER
+    DIM h AS INTEGER
+    h = a / 2
+    RETURN h
+END FUNCTION
+FUNCTION rueck(a AS FLOAT) AS INTEGER
+    RETURN a
+END FUNCTION
+PRINT halb(8); " "; rueck(3.0); " "; rueck(-0.0)
+TRY
+    PRINT halb(7)
+CATCH e
+    PRINT LEFT$(e, 45)
+END TRY
+TRY
+    PRINT rueck(10000000000000000000.0)
+CATCH e
+    PRINT e
+END TRY
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+4 3 0
+Zuweisung an 'h': FLOAT 3.5 passt nicht verlu
+RETURN von rueck: Ganzzahl-Ueberlauf bei 'Zuweisung' (INTEGER ist 64-bit; Wertebereich ueberschritten)
+
+=== kommazahl in eine ganze zahl (maschinencode)
+FUNCTION halb(a AS INTEGER) AS INTEGER
+    DIM h AS INTEGER
+    h = a / 2
+    RETURN h
+END FUNCTION
+FUNCTION rueck(a AS FLOAT) AS INTEGER
+    RETURN a
+END FUNCTION
+PRINT halb(8); " "; rueck(3.0); " "; rueck(-0.0)
+TRY
+    PRINT halb(7)
+CATCH e
+    PRINT LEFT$(e, 45)
+END TRY
+TRY
+    PRINT rueck(10000000000000000000.0)
+CATCH e
+    PRINT e
+END TRY
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+4 3 0
+Zuweisung an 'h': FLOAT 3.5 passt nicht verlu
+RETURN von rueck: Ganzzahl-Ueberlauf bei 'Zuweisung' (INTEGER ist 64-bit; Wertebereich ueberschritten)
+--- stderr
+jit: 2 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
+
+=== funktion ohne return liefert nil
+FUNCTION vielleicht(a AS INTEGER) AS INTEGER
+    IF a > 0 THEN RETURN a * 2
+END FUNCTION
+FUNCTION kette(a AS INTEGER) AS INTEGER
+    RETURN vielleicht(a) + 1
+END FUNCTION
+PRINT vielleicht(4); " "; kette(4)
+PRINT TYPEOF(vielleicht(-1))
+TRY
+    PRINT kette(-1)
+CATCH e
+    PRINT LEFT$(e, 30)
+END TRY
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+8 9
+NIL
+Operator '+' erwartet Zahlen, 
+
+=== funktion ohne return liefert nil (maschinencode)
+FUNCTION vielleicht(a AS INTEGER) AS INTEGER
+    IF a > 0 THEN RETURN a * 2
+END FUNCTION
+FUNCTION kette(a AS INTEGER) AS INTEGER
+    RETURN vielleicht(a) + 1
+END FUNCTION
+PRINT vielleicht(4); " "; kette(4)
+PRINT TYPEOF(vielleicht(-1))
+TRY
+    PRINT kette(-1)
+CATCH e
+    PRINT LEFT$(e, 30)
+END TRY
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+8 9
+NIL
+Operator '+' erwartet Zahlen, 
+--- stderr
+jit: 2 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
+
+=== rekursion bis zur grenze
+FUNCTION tief(n AS INTEGER) AS INTEGER
+    IF n = 0 THEN RETURN 0
+    RETURN tief(n - 1) + 1
+END FUNCTION
+FUNCTION ewig(n AS INTEGER) AS INTEGER
+    RETURN ewig(n + 1)
+END FUNCTION
+PRINT tief(900)
+TRY
+    PRINT ewig(0)
+CATCH e
+    PRINT LEFT$(e, 33)
+END TRY
+PRINT tief(10)
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+900
+Maximale Aufruftiefe (1000) ueber
+10
+
+=== rekursion bis zur grenze (maschinencode)
+FUNCTION tief(n AS INTEGER) AS INTEGER
+    IF n = 0 THEN RETURN 0
+    RETURN tief(n - 1) + 1
+END FUNCTION
+FUNCTION ewig(n AS INTEGER) AS INTEGER
+    RETURN ewig(n + 1)
+END FUNCTION
+PRINT tief(900)
+TRY
+    PRINT ewig(0)
+CATCH e
+    PRINT LEFT$(e, 33)
+END TRY
+PRINT tief(10)
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+900
+Maximale Aufruftiefe (1000) ueber
+10
+--- stderr
+jit: 2 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
+
+=== schleifen, auswahl und wahrheitswerte
+FUNCTION summe(n AS INTEGER, schritt AS INTEGER) AS INTEGER
+    DIM s AS INTEGER
+    DIM i AS INTEGER
+    FOR i = n TO 1 STEP schritt
+        s = s + i
+    NEXT
+    FOR i = 1 TO n
+        IF i MOD 3 = 0 OR i = 7 AND NOT (i > 50) THEN s = s + 1
+    NEXT
+    RETURN s
+END FUNCTION
+FUNCTION stufe(x AS FLOAT) AS INTEGER
+    SELECT CASE x
+        CASE IS < 0.0
+            RETURN -1
+        CASE 0.0 TO 10.0
+            RETURN 1
+        CASE ELSE
+            RETURN 2
+    END SELECT
+END FUNCTION
+FUNCTION wahr(a AS INTEGER, b AS BOOLEAN) AS BOOLEAN
+    DIM r AS BOOLEAN
+    r = NOT b
+    WHILE a > 0
+        r = NOT r
+        a = a - 1
+    WEND
+    RETURN r
+END FUNCTION
+FUNCTION wieder(n AS INTEGER) AS INTEGER
+    DIM k AS INTEGER
+    REPEAT
+        k = k + n
+    UNTIL k > 20
+    RETURN k
+END FUNCTION
+PRINT summe(10, -2); " "; summe(20, -1); " "; stufe(-3.5); stufe(4); stufe(10.5); " "; wahr(3, TRUE); " "; wahr(2, TRUE); " "; wieder(6)
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+34 217 -112 TRUE FALSE 24
+
+=== schleifen, auswahl und wahrheitswerte (maschinencode)
+FUNCTION summe(n AS INTEGER, schritt AS INTEGER) AS INTEGER
+    DIM s AS INTEGER
+    DIM i AS INTEGER
+    FOR i = n TO 1 STEP schritt
+        s = s + i
+    NEXT
+    FOR i = 1 TO n
+        IF i MOD 3 = 0 OR i = 7 AND NOT (i > 50) THEN s = s + 1
+    NEXT
+    RETURN s
+END FUNCTION
+FUNCTION stufe(x AS FLOAT) AS INTEGER
+    SELECT CASE x
+        CASE IS < 0.0
+            RETURN -1
+        CASE 0.0 TO 10.0
+            RETURN 1
+        CASE ELSE
+            RETURN 2
+    END SELECT
+END FUNCTION
+FUNCTION wahr(a AS INTEGER, b AS BOOLEAN) AS BOOLEAN
+    DIM r AS BOOLEAN
+    r = NOT b
+    WHILE a > 0
+        r = NOT r
+        a = a - 1
+    WEND
+    RETURN r
+END FUNCTION
+FUNCTION wieder(n AS INTEGER) AS INTEGER
+    DIM k AS INTEGER
+    REPEAT
+        k = k + n
+    UNTIL k > 20
+    RETURN k
+END FUNCTION
+PRINT summe(10, -2); " "; summe(20, -1); " "; stufe(-3.5); stufe(4); stufe(10.5); " "; wahr(3, TRUE); " "; wahr(2, TRUE); " "; wieder(6)
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+34 217 -112 TRUE FALSE 24
+--- stderr
+jit: 4 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
+
+=== for am ende des zahlenbereichs
+FUNCTION bis(n AS INTEGER) AS INTEGER
+    DIM i AS INTEGER
+    DIM z AS INTEGER
+    FOR i = n TO 9223372036854775807
+        z = z + 1
+    NEXT
+    RETURN z
+END FUNCTION
+TRY
+    PRINT bis(9223372036854775805)
+CATCH e
+    PRINT e
+END TRY
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+Ganzzahl-Ueberlauf bei '+' (INTEGER ist 64-bit; Wertebereich ueberschritten)
+
+=== for am ende des zahlenbereichs (maschinencode)
+FUNCTION bis(n AS INTEGER) AS INTEGER
+    DIM i AS INTEGER
+    DIM z AS INTEGER
+    FOR i = n TO 9223372036854775807
+        z = z + 1
+    NEXT
+    RETURN z
+END FUNCTION
+TRY
+    PRINT bis(9223372036854775805)
+CATCH e
+    PRINT e
+END TRY
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+Ganzzahl-Ueberlauf bei '+' (INTEGER ist 64-bit; Wertebereich ueberschritten)
+--- stderr
+jit: 1 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
+jit: 1 mal mitten in einer Schleife ausgestiegen
+
+=== argumente werden wie in der vm gewandelt
+FUNCTION f(x AS FLOAT, n AS INTEGER, b AS BOOLEAN) AS FLOAT
+    IF b THEN RETURN x * n
+    RETURN x + n
+END FUNCTION
+FUNCTION rufer(k AS INTEGER) AS FLOAT
+    RETURN f(k, 3, k > 2) + f(0.5, k, FALSE)
+END FUNCTION
+SUB nichts(a AS INTEGER)
+    DIM b AS INTEGER
+    b = a + 1
+END SUB
+FUNCTION mit_sub(a AS INTEGER) AS INTEGER
+    nichts(a)
+    RETURN a
+END FUNCTION
+PRINT f(2, 3, TRUE); " "; f(2.5, 4.0, FALSE); " "; rufer(1); " "; rufer(5); " "; mit_sub(9)
+TRY
+    PRINT f(1.0, 2.5, TRUE)
+CATCH e
+    PRINT LEFT$(e, 40)
+END TRY
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+6.0 6.5 5.5 20.5 9
+Parameter 'n' von f: FLOAT 2.5 passt nic
+
+=== argumente werden wie in der vm gewandelt (maschinencode)
+FUNCTION f(x AS FLOAT, n AS INTEGER, b AS BOOLEAN) AS FLOAT
+    IF b THEN RETURN x * n
+    RETURN x + n
+END FUNCTION
+FUNCTION rufer(k AS INTEGER) AS FLOAT
+    RETURN f(k, 3, k > 2) + f(0.5, k, FALSE)
+END FUNCTION
+SUB nichts(a AS INTEGER)
+    DIM b AS INTEGER
+    b = a + 1
+END SUB
+FUNCTION mit_sub(a AS INTEGER) AS INTEGER
+    nichts(a)
+    RETURN a
+END FUNCTION
+PRINT f(2, 3, TRUE); " "; f(2.5, 4.0, FALSE); " "; rufer(1); " "; rufer(5); " "; mit_sub(9)
+TRY
+    PRINT f(1.0, 2.5, TRUE)
+CATCH e
+    PRINT LEFT$(e, 40)
+END TRY
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+6.0 6.5 5.5 20.5 9
+Parameter 'n' von f: FLOAT 2.5 passt nic
+--- stderr
+jit: 4 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
+
+=== mehrfach aufgeben geht auf die vm ueber
+FUNCTION heikel(a AS INTEGER) AS INTEGER
+    RETURN 100 \ a
+END FUNCTION
+DIM i AS INTEGER
+DIM fehler AS INTEGER
+DIM summe AS INTEGER
+FOR i = -12 TO 12
+    TRY
+        summe = summe + heikel(i MOD 3)
+    CATCH e
+        fehler = fehler + 1
+    END TRY
+NEXT
+PRINT summe; " "; fehler
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+1200 9
+
+=== mehrfach aufgeben geht auf die vm ueber (maschinencode)
+FUNCTION heikel(a AS INTEGER) AS INTEGER
+    RETURN 100 \ a
+END FUNCTION
+DIM i AS INTEGER
+DIM fehler AS INTEGER
+DIM summe AS INTEGER
+FOR i = -12 TO 12
+    TRY
+        summe = summe + heikel(i MOD 3)
+    CATCH e
+        fehler = fehler + 1
+    END TRY
+NEXT
+PRINT summe; " "; fehler
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+1200 9
+--- stderr
+jit: Schleife an Stelle 13 in __main__ bleibt in der VM: TRY/THROW; mit Werten: TRY/THROW
+jit: 1 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
+jit: 23 Runden in der VM -- Stelle 13 in __main__: TRY/THROW; mit Werten: TRY/THROW
+
+=== globale werden erst nach dem aufruf uebernommen
+DIM zaehler AS INTEGER
+DIM summe AS FLOAT
+DIM an AS BOOLEAN
+SUB schritt(k AS INTEGER)
+    zaehler = zaehler + 1
+    summe = summe + k * 0.5
+    IF zaehler > 5 THEN an = TRUE
+END SUB
+FUNCTION lauf(n AS INTEGER) AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 1 TO n
+        schritt(i)
+    NEXT
+    RETURN zaehler
+END FUNCTION
+PRINT lauf(10); " "; summe; " "; an
+zaehler = 9223372036854775806
+TRY
+    PRINT lauf(3)
+CATCH e
+    PRINT "fehler: "; LEFT$(e, 30)
+END TRY
+PRINT zaehler; " "; summe
+zaehler = 0
+PRINT lauf(2); " "; zaehler
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+10 27.5 TRUE
+fehler: Ganzzahl-Ueberlauf bei '+' (IN
+9223372036854775807 28.0
+2 2
+
+=== globale werden erst nach dem aufruf uebernommen (maschinencode)
+DIM zaehler AS INTEGER
+DIM summe AS FLOAT
+DIM an AS BOOLEAN
+SUB schritt(k AS INTEGER)
+    zaehler = zaehler + 1
+    summe = summe + k * 0.5
+    IF zaehler > 5 THEN an = TRUE
+END SUB
+FUNCTION lauf(n AS INTEGER) AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 1 TO n
+        schritt(i)
+    NEXT
+    RETURN zaehler
+END FUNCTION
+PRINT lauf(10); " "; summe; " "; an
+zaehler = 9223372036854775806
+TRY
+    PRINT lauf(3)
+CATCH e
+    PRINT "fehler: "; LEFT$(e, 30)
+END TRY
+PRINT zaehler; " "; summe
+zaehler = 0
+PRINT lauf(2); " "; zaehler
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+10 27.5 TRUE
+fehler: Ganzzahl-Ueberlauf bei '+' (IN
+9223372036854775807 28.0
+2 2
+--- stderr
+jit: 2 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
+
+=== globale vor ihrem dim
+FUNCTION lies() AS INTEGER
+    RETURN spaet + 1
+END FUNCTION
+TRY
+    PRINT lies()
+CATCH e
+    PRINT LEFT$(e, 40)
+END TRY
+DIM spaet AS INTEGER
+spaet = 41
+PRINT lies()
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+Zugriff auf eine globale Variable, die n
+42
+
+=== globale vor ihrem dim (maschinencode)
+FUNCTION lies() AS INTEGER
+    RETURN spaet + 1
+END FUNCTION
+TRY
+    PRINT lies()
+CATCH e
+    PRINT LEFT$(e, 40)
+END TRY
+DIM spaet AS INTEGER
+spaet = 41
+PRINT lies()
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+Zugriff auf eine globale Variable, die n
+42
+--- stderr
+jit: 1 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
+
+=== for ueber eine globale laufvariable
+DIM k AS INTEGER
+DIM spur AS INTEGER
+SUB zaehle(n AS INTEGER)
+    FOR k = n TO 1 STEP -2
+        spur = spur * 10 + k
+    NEXT
+END SUB
+zaehle(7)
+PRINT k; " "; spur
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+0 7531
+
+=== for ueber eine globale laufvariable (maschinencode)
+DIM k AS INTEGER
+DIM spur AS INTEGER
+SUB zaehle(n AS INTEGER)
+    FOR k = n TO 1 STEP -2
+        spur = spur * 10 + k
+    NEXT
+END SUB
+zaehle(7)
+PRINT k; " "; spur
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+0 7531
+--- stderr
+jit: 1 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
+
+=== umwandeln beim schreiben in globale
+DIM gf AS FLOAT
+DIM gi AS INTEGER
+SUB setze(a AS INTEGER, b AS FLOAT)
+    gf = a
+    gi = b
+END SUB
+setze(3, 4.0)
+PRINT gf; " "; TYPEOF(gf); " "; gi; " "; TYPEOF(gi)
+TRY
+    setze(5, 2.5)
+CATCH e
+    PRINT LEFT$(e, 35)
+END TRY
+PRINT gf; " "; gi
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+3.0 FLOAT 4 INTEGER
+Zuweisung an 'gi': FLOAT 2.5 passt 
+5.0 4
+
+=== umwandeln beim schreiben in globale (maschinencode)
+DIM gf AS FLOAT
+DIM gi AS INTEGER
+SUB setze(a AS INTEGER, b AS FLOAT)
+    gf = a
+    gi = b
+END SUB
+setze(3, 4.0)
+PRINT gf; " "; TYPEOF(gf); " "; gi; " "; TYPEOF(gi)
+TRY
+    setze(5, 2.5)
+CATCH e
+    PRINT LEFT$(e, 35)
+END TRY
+PRINT gf; " "; gi
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+3.0 FLOAT 4 INTEGER
+Zuweisung an 'gi': FLOAT 2.5 passt 
+5.0 4
+--- stderr
+jit: 1 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
+
+=== mehrere funktionen teilen einen schatten
+DIM stand AS INTEGER
+FUNCTION plus(n AS INTEGER) AS INTEGER
+    stand = stand + n
+    RETURN stand
+END FUNCTION
+FUNCTION doppelt() AS INTEGER
+    DIM a AS INTEGER
+    a = plus(3)
+    stand = stand * 2
+    RETURN a + plus(1) + stand
+END FUNCTION
+stand = 10
+PRINT doppelt(); " "; stand
+stand = stand + 100
+PRINT plus(0); " "; doppelt(); " "; stand
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+67 27
+127 652 261
+
+=== mehrere funktionen teilen einen schatten (maschinencode)
+DIM stand AS INTEGER
+FUNCTION plus(n AS INTEGER) AS INTEGER
+    stand = stand + n
+    RETURN stand
+END FUNCTION
+FUNCTION doppelt() AS INTEGER
+    DIM a AS INTEGER
+    a = plus(3)
+    stand = stand * 2
+    RETURN a + plus(1) + stand
+END FUNCTION
+stand = 10
+PRINT doppelt(); " "; stand
+stand = stand + 100
+PRINT plus(0); " "; doppelt(); " "; stand
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+67 27
+127 652 261
+--- stderr
+jit: 2 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
+
+=== konstante zur laufzeit
+CONST BASIS AS INTEGER = LEN("abcd")
+CONST FAKTOR = LEN("xy")
+FUNCTION mal(n AS INTEGER) AS INTEGER
+    RETURN n * BASIS
+END FUNCTION
+FUNCTION mal2(n AS INTEGER) AS INTEGER
+    RETURN n * FAKTOR
+END FUNCTION
+PRINT mal(3); " "; mal2(3)
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+12 6
+
+=== konstante zur laufzeit (maschinencode)
+CONST BASIS AS INTEGER = LEN("abcd")
+CONST FAKTOR = LEN("xy")
+FUNCTION mal(n AS INTEGER) AS INTEGER
+    RETURN n * BASIS
+END FUNCTION
+FUNCTION mal2(n AS INTEGER) AS INTEGER
+    RETURN n * FAKTOR
+END FUNCTION
+PRINT mal(3); " "; mal2(3)
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+12 6
+--- stderr
+jit: 1 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
+
+=== hochzaehlen vor einem fehler zaehlt einmal
+DIM zaehler AS INTEGER
+DIM teiler AS INTEGER
+FUNCTION kaputt(n AS INTEGER) AS INTEGER
+    zaehler = zaehler + 1
+    RETURN n \ teiler
+END FUNCTION
+teiler = 2
+PRINT kaputt(10); " "; zaehler
+teiler = 0
+TRY
+    PRINT kaputt(10)
+CATCH e
+    PRINT e
+END TRY
+PRINT zaehler
+teiler = 5
+PRINT kaputt(10); " "; zaehler
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+5 1
+Integer-Division durch 0
+2
+2 3
+
+=== hochzaehlen vor einem fehler zaehlt einmal (maschinencode)
+DIM zaehler AS INTEGER
+DIM teiler AS INTEGER
+FUNCTION kaputt(n AS INTEGER) AS INTEGER
+    zaehler = zaehler + 1
+    RETURN n \ teiler
+END FUNCTION
+teiler = 2
+PRINT kaputt(10); " "; zaehler
+teiler = 0
+TRY
+    PRINT kaputt(10)
+CATCH e
+    PRINT e
+END TRY
+PRINT zaehler
+teiler = 5
+PRINT kaputt(10); " "; zaehler
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+5 1
+Integer-Division durch 0
+2
+2 3
+--- stderr
+jit: 1 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
+
+=== schleife im hauptprogramm
+DIM s AS FLOAT
+DIM z AS INTEGER
+DIM i AS INTEGER
+FOR i = 1 TO 100000
+    s = s + i * 0.5
+    IF i MOD 7 = 0 THEN z = z + i
+NEXT
+PRINT s; " "; z; " "; i
+DIM k AS INTEGER : k = 1
+WHILE k < 1000000
+    k = k * 3
+WEND
+PRINT k
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+2500025000.0 714264285 100001
+1594323
+
+=== schleife im hauptprogramm (maschinencode)
+DIM s AS FLOAT
+DIM z AS INTEGER
+DIM i AS INTEGER
+FOR i = 1 TO 100000
+    s = s + i * 0.5
+    IF i MOD 7 = 0 THEN z = z + i
+NEXT
+PRINT s; " "; z; " "; i
+DIM k AS INTEGER : k = 1
+WHILE k < 1000000
+    k = k * 3
+WEND
+PRINT k
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+2500025000.0 714264285 100001
+1594323
+--- stderr
+jit: 0 Funktionen, 2 Schleifen, 2 Schleifenlaeufe
+
+=== schleife in einer funktion mit ausgabe
+FUNCTION zaehle(n AS INTEGER) AS INTEGER
+    DIM a AS INTEGER
+    DIM b AS FLOAT
+    DIM j AS INTEGER
+    PRINT "los"
+    FOR j = 1 TO n
+        a = a + j
+        b = b + 1.5
+    NEXT
+    PRINT "fertig "; b
+    RETURN a
+END FUNCTION
+PRINT zaehle(1000); " "; zaehle(3)
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+los
+fertig 1500.0
+los
+fertig 4.5
+500500 6
+
+=== schleife in einer funktion mit ausgabe (maschinencode)
+FUNCTION zaehle(n AS INTEGER) AS INTEGER
+    DIM a AS INTEGER
+    DIM b AS FLOAT
+    DIM j AS INTEGER
+    PRINT "los"
+    FOR j = 1 TO n
+        a = a + j
+        b = b + 1.5
+    NEXT
+    PRINT "fertig "; b
+    RETURN a
+END FUNCTION
+PRINT zaehle(1000); " "; zaehle(3)
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+los
+fertig 1500.0
+los
+fertig 4.5
+500500 6
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 2 Schleifenlaeufe
+
+=== ueberlauf mitten in der schleife
+DIM zaehler AS INTEGER
+DIM x AS INTEGER : x = 1
+DIM i AS INTEGER
+TRY
+    FOR i = 1 TO 100
+        zaehler = zaehler + 1
+        x = x * 3
+    NEXT
+CATCH e
+    PRINT e; " zeile "; ERROR_LINE()
+END TRY
+PRINT zaehler; " "; i; " "; x
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+Ganzzahl-Ueberlauf bei '*' (INTEGER ist 64-bit; Wertebereich ueberschritten) zeile 7
+40 40 4052555153018976267
+
+=== ueberlauf mitten in der schleife (maschinencode)
+DIM zaehler AS INTEGER
+DIM x AS INTEGER : x = 1
+DIM i AS INTEGER
+TRY
+    FOR i = 1 TO 100
+        zaehler = zaehler + 1
+        x = x * 3
+    NEXT
+CATCH e
+    PRINT e; " zeile "; ERROR_LINE()
+END TRY
+PRINT zaehler; " "; i; " "; x
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+Ganzzahl-Ueberlauf bei '*' (INTEGER ist 64-bit; Wertebereich ueberschritten) zeile 7
+40 40 4052555153018976267
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
+jit: 1 mal mitten in einer Schleife ausgestiegen
+
+=== break und continue verlassen die schleife
+DIM i AS INTEGER
+DIM s AS INTEGER
+FOR i = 1 TO 1000
+    IF i MOD 2 = 0 THEN CONTINUE
+    IF i > 500 THEN BREAK
+    s = s + i
+NEXT
+PRINT s; " "; i
+DIM w AS INTEGER
+WHILE TRUE
+    w = w + 3
+    IF w > 100 THEN BREAK
+WEND
+PRINT w
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+62500 501
+102
+
+=== break und continue verlassen die schleife (maschinencode)
+DIM i AS INTEGER
+DIM s AS INTEGER
+FOR i = 1 TO 1000
+    IF i MOD 2 = 0 THEN CONTINUE
+    IF i > 500 THEN BREAK
+    s = s + i
+NEXT
+PRINT s; " "; i
+DIM w AS INTEGER
+WHILE TRUE
+    w = w + 3
+    IF w > 100 THEN BREAK
+WEND
+PRINT w
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+62500 501
+102
+--- stderr
+jit: 0 Funktionen, 2 Schleifen, 2 Schleifenlaeufe
+
+=== verschachtelte schleifen
+DIM a AS INTEGER
+DIM b AS INTEGER
+DIM s AS INTEGER
+FOR a = 1 TO 300
+    FOR b = a TO 300
+        s = s + a * b MOD 11
+    NEXT
+NEXT
+PRINT s; " "; a; " "; b
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+205549 301 301
+
+=== verschachtelte schleifen (maschinencode)
+DIM a AS INTEGER
+DIM b AS INTEGER
+DIM s AS INTEGER
+FOR a = 1 TO 300
+    FOR b = a TO 300
+        s = s + a * b MOD 11
+    NEXT
+NEXT
+PRINT s; " "; a; " "; b
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+205549 301 301
+--- stderr
+jit: 0 Funktionen, 2 Schleifen, 2 Schleifenlaeufe
+
+=== schleife mit einem text bleibt in der vm
+SUB lauf(start AS INTEGER)
+    DIM t AS STRING
+    DIM i AS INTEGER
+    DIM r AS INTEGER
+    r = start
+    FOR i = 1 TO 50
+        r = r + i
+    NEXT
+    PRINT r
+    FOR i = 1 TO 3
+        t = t + "x"
+    NEXT
+    PRINT t; " "; r
+END SUB
+lauf(4)
+lauf(5)
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+1279
+xxx 1279
+1280
+xxx 1280
+
+=== schleife mit einem text bleibt in der vm (maschinencode)
+SUB lauf(start AS INTEGER)
+    DIM t AS STRING
+    DIM i AS INTEGER
+    DIM r AS INTEGER
+    r = start
+    FOR i = 1 TO 50
+        r = r + i
+    NEXT
+    PRINT r
+    FOR i = 1 TO 3
+        t = t + "x"
+    NEXT
+    PRINT t; " "; r
+END SUB
+lauf(4)
+lauf(5)
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+1279
+xxx 1279
+1280
+xxx 1280
+--- stderr
+jit: 0 Funktionen, 2 Schleifen, 4 Schleifenlaeufe
+
+=== schleife ruft reine und unreine funktionen
+FUNCTION quadrat(n AS INTEGER) AS INTEGER
+    RETURN n * n
+END FUNCTION
+FUNCTION laut(n AS INTEGER) AS INTEGER
+    IF n = 3 THEN PRINT "drei"
+    RETURN n
+END FUNCTION
+DIM i AS INTEGER
+DIM s AS INTEGER
+FOR i = 1 TO 100
+    s = s + quadrat(i)
+NEXT
+PRINT s
+s = 0
+FOR i = 1 TO 5
+    s = s + laut(i)
+NEXT
+PRINT s
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+338350
+drei
+15
+
+=== schleife ruft reine und unreine funktionen (maschinencode)
+FUNCTION quadrat(n AS INTEGER) AS INTEGER
+    RETURN n * n
+END FUNCTION
+FUNCTION laut(n AS INTEGER) AS INTEGER
+    IF n = 3 THEN PRINT "drei"
+    RETURN n
+END FUNCTION
+DIM i AS INTEGER
+DIM s AS INTEGER
+FOR i = 1 TO 100
+    s = s + quadrat(i)
+NEXT
+PRINT s
+s = 0
+FOR i = 1 TO 5
+    s = s + laut(i)
+NEXT
+PRINT s
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+338350
+drei
+15
+--- stderr
+jit: 1 Funktionen, 2 Schleifen, 2 Schleifenlaeufe
+
+=== global in der schleife und danach in einer funktion
+DIM stand AS INTEGER
+DIM i AS INTEGER
+FUNCTION doppelt() AS INTEGER
+    stand = stand * 2
+    RETURN stand
+END FUNCTION
+FOR i = 1 TO 1000
+    stand = stand + 1
+    IF stand MOD 100 = 0 THEN stand = stand + doppelt() - stand
+NEXT
+PRINT stand; " "; doppelt()
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+1000 2000
+
+=== global in der schleife und danach in einer funktion (maschinencode)
+DIM stand AS INTEGER
+DIM i AS INTEGER
+FUNCTION doppelt() AS INTEGER
+    stand = stand * 2
+    RETURN stand
+END FUNCTION
+FOR i = 1 TO 1000
+    stand = stand + 1
+    IF stand MOD 100 = 0 THEN stand = stand + doppelt() - stand
+NEXT
+PRINT stand; " "; doppelt()
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+1000 2000
+--- stderr
+jit: 1 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== schleife ruft eine funktion mit global und laeuft ueber
+DIM zaehler AS INTEGER
+FUNCTION plus() AS INTEGER
+    zaehler = zaehler + 1
+    RETURN zaehler
+END FUNCTION
+DIM x AS INTEGER : x = 1
+DIM y AS INTEGER
+DIM i AS INTEGER
+TRY
+    FOR i = 1 TO 100
+        y = plus()
+        x = x * 3
+    NEXT
+CATCH e
+    PRINT e
+END TRY
+PRINT zaehler; " "; y; " "; i
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+Ganzzahl-Ueberlauf bei '*' (INTEGER ist 64-bit; Wertebereich ueberschritten)
+40 40 40
+
+=== schleife ruft eine funktion mit global und laeuft ueber (maschinencode)
+DIM zaehler AS INTEGER
+FUNCTION plus() AS INTEGER
+    zaehler = zaehler + 1
+    RETURN zaehler
+END FUNCTION
+DIM x AS INTEGER : x = 1
+DIM y AS INTEGER
+DIM i AS INTEGER
+TRY
+    FOR i = 1 TO 100
+        y = plus()
+        x = x * 3
+    NEXT
+CATCH e
+    PRINT e
+END TRY
+PRINT zaehler; " "; y; " "; i
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+Ganzzahl-Ueberlauf bei '*' (INTEGER ist 64-bit; Wertebereich ueberschritten)
+40 40 40
+--- stderr
+jit: 1 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
+
+=== feld fuellen und summieren
+DIM a[1000] AS INTEGER
+DIM i AS INTEGER
+FOR i = 0 TO 999
+    a[i] = (i * 7919) MOD 1003
+NEXT
+DIM s AS INTEGER
+FOR i = 0 TO 999
+    s = s + a[i]
+NEXT
+PRINT s; " "; a[0]; " "; a[999]
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+501873 0 420
+
+=== feld fuellen und summieren (maschinencode)
+DIM a[1000] AS INTEGER
+DIM i AS INTEGER
+FOR i = 0 TO 999
+    a[i] = (i * 7919) MOD 1003
+NEXT
+DIM s AS INTEGER
+FOR i = 0 TO 999
+    s = s + a[i]
+NEXT
+PRINT s; " "; a[0]; " "; a[999]
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+501873 0 420
+--- stderr
+jit: 0 Funktionen, 2 Schleifen, 2 Schleifenlaeufe
+
+=== feld von kommazahlen
+DIM f[100] AS FLOAT
+DIM i AS INTEGER
+FOR i = 0 TO 99
+    f[i] = i
+NEXT
+DIM s AS FLOAT
+FOR i = 0 TO 99
+    s = s + f[i] / 4 + i * 0.5
+NEXT
+f[3] = f[3] + 0.25
+PRINT s; " "; f[3]; " "; f[99]
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+3712.5 3.25 99.0
+
+=== feld von kommazahlen (maschinencode)
+DIM f[100] AS FLOAT
+DIM i AS INTEGER
+FOR i = 0 TO 99
+    f[i] = i
+NEXT
+DIM s AS FLOAT
+FOR i = 0 TO 99
+    s = s + f[i] / 4 + i * 0.5
+NEXT
+f[3] = f[3] + 0.25
+PRINT s; " "; f[3]; " "; f[99]
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+3712.5 3.25 99.0
+--- stderr
+jit: 0 Funktionen, 2 Schleifen, 2 Schleifenlaeufe
+
+=== zwei dimensionen
+DIM g[20, 30] AS INTEGER
+DIM x AS INTEGER
+DIM y AS INTEGER
+FOR y = 0 TO 19
+    FOR x = 0 TO 29
+        g[y, x] = y * 100 + x
+    NEXT
+NEXT
+DIM s AS INTEGER
+FOR y = 0 TO 19
+    FOR x = 0 TO 29
+        s = s + g[y, x]
+    NEXT
+NEXT
+PRINT s; " "; g[19, 29]; " "; g[3, 7]
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+578700 1929 307
+
+=== zwei dimensionen (maschinencode)
+DIM g[20, 30] AS INTEGER
+DIM x AS INTEGER
+DIM y AS INTEGER
+FOR y = 0 TO 19
+    FOR x = 0 TO 29
+        g[y, x] = y * 100 + x
+    NEXT
+NEXT
+DIM s AS INTEGER
+FOR y = 0 TO 19
+    FOR x = 0 TO 29
+        s = s + g[y, x]
+    NEXT
+NEXT
+PRINT s; " "; g[19, 29]; " "; g[3, 7]
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+578700 1929 307
+--- stderr
+jit: 0 Funktionen, 4 Schleifen, 4 Schleifenlaeufe
+
+=== index ausserhalb mitten in der schleife
+DIM a[10] AS INTEGER
+DIM i AS INTEGER
+DIM n AS INTEGER
+TRY
+    FOR i = 0 TO 20
+        a[i] = a[i] + 1
+        n = n + 1
+    NEXT
+CATCH e
+    PRINT e
+END TRY
+DIM s AS INTEGER
+FOR i = 0 TO 9
+    s = s + a[i]
+NEXT
+PRINT s; " "; n
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+Index 10 ausserhalb [0..9] in Dimension 1 -- Felder zaehlen ab 0: DIM a[10] hat a[0] bis a[9]
+10 10
+
+=== index ausserhalb mitten in der schleife (maschinencode)
+DIM a[10] AS INTEGER
+DIM i AS INTEGER
+DIM n AS INTEGER
+TRY
+    FOR i = 0 TO 20
+        a[i] = a[i] + 1
+        n = n + 1
+    NEXT
+CATCH e
+    PRINT e
+END TRY
+DIM s AS INTEGER
+FOR i = 0 TO 9
+    s = s + a[i]
+NEXT
+PRINT s; " "; n
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+Index 10 ausserhalb [0..9] in Dimension 1 -- Felder zaehlen ab 0: DIM a[10] hat a[0] bis a[9]
+10 10
+--- stderr
+jit: 0 Funktionen, 2 Schleifen, 1 Schleifenlaeufe
+jit: 1 mal mitten in einer Schleife ausgestiegen
+
+=== ueberlauf mit vorgaenger im feld
+DIM a[30] AS INTEGER
+DIM i AS INTEGER
+a[0] = 1
+TRY
+    FOR i = 1 TO 29
+        a[i] = a[i - 1] * 7
+    NEXT
+CATCH e
+    PRINT e
+END TRY
+PRINT i; " "; a[22]; " "; a[23]; " "; a[29]
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+Ganzzahl-Ueberlauf bei '*' (INTEGER ist 64-bit; Wertebereich ueberschritten)
+23 3909821048582988049 0 0
+
+=== ueberlauf mit vorgaenger im feld (maschinencode)
+DIM a[30] AS INTEGER
+DIM i AS INTEGER
+a[0] = 1
+TRY
+    FOR i = 1 TO 29
+        a[i] = a[i - 1] * 7
+    NEXT
+CATCH e
+    PRINT e
+END TRY
+PRINT i; " "; a[22]; " "; a[23]; " "; a[29]
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+Ganzzahl-Ueberlauf bei '*' (INTEGER ist 64-bit; Wertebereich ueberschritten)
+23 3909821048582988049 0 0
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
+jit: 1 mal mitten in einer Schleife ausgestiegen
+
+=== krumme zahl in ein ganzzahlfeld
+DIM a[5] AS INTEGER
+DIM i AS INTEGER
+TRY
+    FOR i = 0 TO 4
+        a[i] = i * 0.5 + i
+    NEXT
+CATCH e
+    PRINT e
+END TRY
+PRINT a[0]; " "; a[1]; " "; a[2]; " "; i
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+Array-Element: FLOAT 1.5 passt nicht verlustfrei in INTEGER -- fuer ganzzahlige Division \ statt / nehmen, sonst mit INT()/ROUND() runden
+0 0 0 1
+
+=== krumme zahl in ein ganzzahlfeld (maschinencode)
+DIM a[5] AS INTEGER
+DIM i AS INTEGER
+TRY
+    FOR i = 0 TO 4
+        a[i] = i * 0.5 + i
+    NEXT
+CATCH e
+    PRINT e
+END TRY
+PRINT a[0]; " "; a[1]; " "; a[2]; " "; i
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+Array-Element: FLOAT 1.5 passt nicht verlustfrei in INTEGER -- fuer ganzzahlige Division \ statt / nehmen, sonst mit INT()/ROUND() runden
+0 0 0 1
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
+jit: 1 mal mitten in einer Schleife ausgestiegen
+
+=== division durch null mitten im ausdruck
+DIM a[10] AS INTEGER
+DIM i AS INTEGER
+DIM s AS INTEGER
+DIM t AS INTEGER
+FOR i = 0 TO 9 : a[i] = i + 1 : NEXT
+TRY
+    FOR i = 0 TO 9
+        t = 7 - i
+        s = s + a[i] * (100 \ t)
+    NEXT
+CATCH e
+    PRINT e
+END TRY
+PRINT s; " "; i; " "; t
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+Integer-Division durch 0
+1371 7 0
+
+=== division durch null mitten im ausdruck (maschinencode)
+DIM a[10] AS INTEGER
+DIM i AS INTEGER
+DIM s AS INTEGER
+DIM t AS INTEGER
+FOR i = 0 TO 9 : a[i] = i + 1 : NEXT
+TRY
+    FOR i = 0 TO 9
+        t = 7 - i
+        s = s + a[i] * (100 \ t)
+    NEXT
+CATCH e
+    PRINT e
+END TRY
+PRINT s; " "; i; " "; t
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+Integer-Division durch 0
+1371 7 0
+--- stderr
+jit: 0 Funktionen, 2 Schleifen, 1 Schleifenlaeufe
+jit: 1 mal mitten in einer Schleife ausgestiegen
+
+=== fehler im feld ohne try
+DIM a[5] AS INTEGER
+DIM i AS INTEGER
+FOR i = 0 TO 5
+    a[i] = i
+NEXT
+PRINT "nie"
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+--- fehler
+Index 5 ausserhalb [0..4] in Dimension 1 -- Felder zaehlen ab 0: DIM a[5] hat a[0] bis a[4]
+
+=== fehler im feld ohne try (maschinencode)
+DIM a[5] AS INTEGER
+DIM i AS INTEGER
+FOR i = 0 TO 5
+    a[i] = i
+NEXT
+PRINT "nie"
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+--- fehler
+Index 5 ausserhalb [0..4] in Dimension 1 -- Felder zaehlen ab 0: DIM a[5] hat a[0] bis a[4]
+
+=== feld in einer funktion
+FUNCTION summe(n AS INTEGER) AS INTEGER
+    DIM a[n] AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        a[i] = i * i
+    NEXT
+    DIM s AS INTEGER
+    FOR i = 0 TO n - 1
+        s = s + a[i]
+    NEXT
+    RETURN s
+END FUNCTION
+PRINT summe(10); " "; summe(100)
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+285 328350
+
+=== feld in einer funktion (maschinencode)
+FUNCTION summe(n AS INTEGER) AS INTEGER
+    DIM a[n] AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        a[i] = i * i
+    NEXT
+    DIM s AS INTEGER
+    FOR i = 0 TO n - 1
+        s = s + a[i]
+    NEXT
+    RETURN s
+END FUNCTION
+PRINT summe(10); " "; summe(100)
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+285 328350
+--- stderr
+jit: 0 Funktionen, 2 Schleifen, 4 Schleifenlaeufe
+
+=== feld als parameter
+FUNCTION summe(a AS ARRAY OF FLOAT) AS FLOAT
+    DIM s AS FLOAT
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(a) - 1
+        s = s + a[i]
+    NEXT
+    RETURN s
+END FUNCTION
+DIM f[8] AS FLOAT
+DIM i AS INTEGER
+FOR i = 0 TO 7 : f[i] = i / 2 : NEXT
+PRINT summe(f)
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+14.0
+
+=== feld als parameter (maschinencode)
+FUNCTION summe(a AS ARRAY OF FLOAT) AS FLOAT
+    DIM s AS FLOAT
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(a) - 1
+        s = s + a[i]
+    NEXT
+    RETURN s
+END FUNCTION
+DIM f[8] AS FLOAT
+DIM i AS INTEGER
+FOR i = 0 TO 7 : f[i] = i / 2 : NEXT
+PRINT summe(f)
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+14.0
+--- stderr
+jit: 0 Funktionen, 2 Schleifen, 2 Schleifenlaeufe
+
+=== zwei namen fuer ein feld
+DIM a[10] AS INTEGER
+DIM b AS ARRAY OF INTEGER
+b = a
+DIM i AS INTEGER
+FOR i = 1 TO 9
+    b[i] = a[i - 1] + 2
+NEXT
+PRINT a[9]; " "; b[9]
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+18 18
+
+=== zwei namen fuer ein feld (maschinencode)
+DIM a[10] AS INTEGER
+DIM b AS ARRAY OF INTEGER
+b = a
+DIM i AS INTEGER
+FOR i = 1 TO 9
+    b[i] = a[i - 1] + 2
+NEXT
+PRINT a[9]; " "; b[9]
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+18 18
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== feld waechst zwischen zwei laeufen
+DIM a[1] AS INTEGER
+DIM runde AS INTEGER
+DIM i AS INTEGER
+DIM s AS INTEGER
+FOR runde = 1 TO 50
+    ARRAY_PUSH(a, runde)
+    s = 0
+    FOR i = 0 TO LEN(a) - 1
+        s = s + a[i]
+    NEXT
+NEXT
+PRINT s; " "; LEN(a)
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+1275 51
+
+=== feld waechst zwischen zwei laeufen (maschinencode)
+DIM a[1] AS INTEGER
+DIM runde AS INTEGER
+DIM i AS INTEGER
+DIM s AS INTEGER
+FOR runde = 1 TO 50
+    ARRAY_PUSH(a, runde)
+    s = 0
+    FOR i = 0 TO LEN(a) - 1
+        s = s + a[i]
+    NEXT
+NEXT
+PRINT s; " "; LEN(a)
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+1275 51
+--- stderr
+jit: 0 Funktionen, 2 Schleifen, 2 Schleifenlaeufe
+
+=== schleife mit feld ruft reine funktion
+FUNCTION quadrat(x AS INTEGER) AS INTEGER
+    RETURN x * x
+END FUNCTION
+DIM a[50] AS INTEGER
+DIM i AS INTEGER
+FOR i = 0 TO 49
+    a[i] = quadrat(i) + a[i]
+NEXT
+PRINT a[7]; " "; a[49]
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+49 2401
+
+=== schleife mit feld ruft reine funktion (maschinencode)
+FUNCTION quadrat(x AS INTEGER) AS INTEGER
+    RETURN x * x
+END FUNCTION
+DIM a[50] AS INTEGER
+DIM i AS INTEGER
+FOR i = 0 TO 49
+    a[i] = quadrat(i) + a[i]
+NEXT
+PRINT a[7]; " "; a[49]
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+49 2401
+--- stderr
+jit: 1 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== schleife mit feld ruft funktion, die globale schreibt
+DIM zaehler AS INTEGER
+FUNCTION weiter() AS INTEGER
+    zaehler = zaehler + 1
+    RETURN zaehler
+END FUNCTION
+DIM a[20] AS INTEGER
+DIM i AS INTEGER
+FOR i = 0 TO 19
+    a[i] = weiter() * 2
+NEXT
+PRINT a[19]; " "; zaehler
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+40 20
+
+=== schleife mit feld ruft funktion, die globale schreibt (maschinencode)
+DIM zaehler AS INTEGER
+FUNCTION weiter() AS INTEGER
+    zaehler = zaehler + 1
+    RETURN zaehler
+END FUNCTION
+DIM a[20] AS INTEGER
+DIM i AS INTEGER
+FOR i = 0 TO 19
+    a[i] = weiter() * 2
+NEXT
+PRINT a[19]; " "; zaehler
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+40 20
+--- stderr
+jit: Schleife an Stelle 15 in __main__ bleibt in der VM: schreibt in ein Feld (oder rechnet mit Werten) und ruft eine Funktion, die globale Variablen schreibt
+jit: 1 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
+jit: 18 Runden in der VM -- Stelle 15 in __main__: schreibt in ein Feld (oder rechnet mit Werten) und ruft eine Funktion, die globale Variablen schreibt
+
+=== feld von texten bleibt in der vm
+DIM t[5] AS STRING
+DIM i AS INTEGER
+FOR i = 0 TO 4
+    t[i] = "x" + STR$(i)
+NEXT
+PRINT t[4]
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+x4
+
+=== feld von texten bleibt in der vm (maschinencode)
+DIM t[5] AS STRING
+DIM i AS INTEGER
+FOR i = 0 TO 4
+    t[i] = "x" + STR$(i)
+NEXT
+PRINT t[4]
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+x4
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== globaler zaehler und aussteigen
+DIM zaehler AS INTEGER
+DIM a[10] AS INTEGER
+DIM i AS INTEGER
+TRY
+    FOR i = 0 TO 30
+        zaehler = zaehler + 2
+        a[i] = zaehler
+    NEXT
+CATCH e
+    PRINT e
+END TRY
+PRINT zaehler; " "; a[9]; " "; i
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+Index 10 ausserhalb [0..9] in Dimension 1 -- Felder zaehlen ab 0: DIM a[10] hat a[0] bis a[9]
+22 20 10
+
+=== globaler zaehler und aussteigen (maschinencode)
+DIM zaehler AS INTEGER
+DIM a[10] AS INTEGER
+DIM i AS INTEGER
+TRY
+    FOR i = 0 TO 30
+        zaehler = zaehler + 2
+        a[i] = zaehler
+    NEXT
+CATCH e
+    PRINT e
+END TRY
+PRINT zaehler; " "; a[9]; " "; i
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+Index 10 ausserhalb [0..9] in Dimension 1 -- Felder zaehlen ab 0: DIM a[10] hat a[0] bis a[9]
+22 20 10
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
+jit: 1 mal mitten in einer Schleife ausgestiegen
+
+=== feld liest am index ausserhalb
+DIM a[4] AS INTEGER
+DIM i AS INTEGER
+DIM s AS INTEGER
+FOR i = 0 TO 3 : a[i] = 10 : NEXT
+TRY
+    FOR i = 0 TO 10
+        s = s + a[i]
+    NEXT
+CATCH e
+    PRINT e
+END TRY
+PRINT s; " "; i
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+Index 4 ausserhalb [0..3] in Dimension 1 -- Felder zaehlen ab 0: DIM a[4] hat a[0] bis a[3]
+40 4
+
+=== feld liest am index ausserhalb (maschinencode)
+DIM a[4] AS INTEGER
+DIM i AS INTEGER
+DIM s AS INTEGER
+FOR i = 0 TO 3 : a[i] = 10 : NEXT
+TRY
+    FOR i = 0 TO 10
+        s = s + a[i]
+    NEXT
+CATCH e
+    PRINT e
+END TRY
+PRINT s; " "; i
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+Index 4 ausserhalb [0..3] in Dimension 1 -- Felder zaehlen ab 0: DIM a[4] hat a[0] bis a[3]
+40 4
+--- stderr
+jit: 0 Funktionen, 2 Schleifen, 1 Schleifenlaeufe
+jit: 1 mal mitten in einer Schleife ausgestiegen
+
+=== aussteigen in einer funktion mit locals
+FUNCTION f(grenze AS INTEGER) AS INTEGER
+    DIM a[5] AS INTEGER
+    DIM i AS INTEGER
+    DIM n AS INTEGER
+    TRY
+        FOR i = 0 TO grenze
+            a[i] = i * 3
+            n = n + 1
+        NEXT
+    CATCH e
+        PRINT e
+    END TRY
+    RETURN n * 1000 + i * 10 + a[4]
+END FUNCTION
+PRINT f(10); " "; f(3)
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+Index 5 ausserhalb [0..4] in Dimension 1 -- Felder zaehlen ab 0: DIM a[5] hat a[0] bis a[4]
+5062 4040
+
+=== aussteigen in einer funktion mit locals (maschinencode)
+FUNCTION f(grenze AS INTEGER) AS INTEGER
+    DIM a[5] AS INTEGER
+    DIM i AS INTEGER
+    DIM n AS INTEGER
+    TRY
+        FOR i = 0 TO grenze
+            a[i] = i * 3
+            n = n + 1
+        NEXT
+    CATCH e
+        PRINT e
+    END TRY
+    RETURN n * 1000 + i * 10 + a[4]
+END FUNCTION
+PRINT f(10); " "; f(3)
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+Index 5 ausserhalb [0..4] in Dimension 1 -- Felder zaehlen ab 0: DIM a[5] hat a[0] bis a[4]
+5062 4040
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+jit: 1 mal mitten in einer Schleife ausgestiegen
+
+=== objekte in einem feld bewegen
+CLASS Teil
+    DIM x AS FLOAT
+    DIM vx AS FLOAT
+    DIM n AS INTEGER
+END CLASS
+DIM teile[20] AS Teil
+DIM i AS INTEGER
+FOR i = 0 TO 19
+    teile[i] = NEW Teil()
+    teile[i].vx = i * 0.25
+NEXT
+DIM r AS INTEGER
+FOR r = 1 TO 5
+    FOR EACH t IN teile
+        t.x = t.x + t.vx
+        t.n = t.n + 1
+        IF t.x > 10.0 THEN t.vx = 0.0 - t.vx
+    NEXT
+NEXT
+PRINT teile[19].x; " "; teile[19].vx; " "; teile[3].n; " "; t.x
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+4.75 -4.75 5 4.75
+
+=== objekte in einem feld bewegen (maschinencode)
+CLASS Teil
+    DIM x AS FLOAT
+    DIM vx AS FLOAT
+    DIM n AS INTEGER
+END CLASS
+DIM teile[20] AS Teil
+DIM i AS INTEGER
+FOR i = 0 TO 19
+    teile[i] = NEW Teil()
+    teile[i].vx = i * 0.25
+NEXT
+DIM r AS INTEGER
+FOR r = 1 TO 5
+    FOR EACH t IN teile
+        t.x = t.x + t.vx
+        t.n = t.n + 1
+        IF t.x > 10.0 THEN t.vx = 0.0 - t.vx
+    NEXT
+NEXT
+PRINT teile[19].x; " "; teile[19].vx; " "; teile[3].n; " "; t.x
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+4.75 -4.75 5 4.75
+--- stderr
+jit: Schleife an Stelle 14 in __main__ bleibt in der VM: Objekt; mit Werten: Objekt
+jit: Schleife an Stelle 37 in __main__ bleibt in der VM: mit Werten: Mitglieder in der inneren Schleife 49..86
+jit: 0 Funktionen, 1 Schleifen, 5 Schleifenlaeufe
+jit: 18 Runden in der VM -- Stelle 14 in __main__: Objekt; mit Werten: Objekt
+jit: 3 Runden in der VM -- Stelle 37 in __main__: mit Werten: Mitglieder in der inneren Schleife 49..86
+
+=== self-felder in einer schleife einer methode
+CLASS Konto
+    DIM stand AS INTEGER
+    DIM zins AS FLOAT
+    DIM verlauf AS FLOAT
+    SUB jahre(n AS INTEGER)
+        DIM j AS INTEGER
+        FOR j = 1 TO n
+            stand = stand + 10
+            Self.verlauf = Self.verlauf + stand * zins
+        NEXT
+    END SUB
+END CLASS
+DIM k AS Konto : k = NEW Konto()
+k.zins = 0.5
+k.jahre(4)
+k.jahre(3)
+PRINT k.stand; " "; k.verlauf
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+70 140.0
+
+=== self-felder in einer schleife einer methode (maschinencode)
+CLASS Konto
+    DIM stand AS INTEGER
+    DIM zins AS FLOAT
+    DIM verlauf AS FLOAT
+    SUB jahre(n AS INTEGER)
+        DIM j AS INTEGER
+        FOR j = 1 TO n
+            stand = stand + 10
+            Self.verlauf = Self.verlauf + stand * zins
+        NEXT
+    END SUB
+END CLASS
+DIM k AS Konto : k = NEW Konto()
+k.zins = 0.5
+k.jahre(4)
+k.jahre(3)
+PRINT k.stand; " "; k.verlauf
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+70 140.0
+--- stderr
+jit: 1 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
+
+=== verschiedene klassen in einem tupel
+CLASS A
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+END CLASS
+CLASS B
+    DIM y AS INTEGER
+    DIM x AS INTEGER
+END CLASS
+DIM a1 AS A : a1 = NEW A() : a1.x = 1 : a1.y = 2
+DIM a2 AS A : a2 = NEW A() : a2.x = 3 : a2.y = 4
+DIM b1 AS B : b1 = NEW B() : b1.x = 10 : b1.y = 20
+DIM s AS INTEGER
+DIM r AS INTEGER
+FOR r = 1 TO 3
+    FOR EACH o IN (a1, a2, b1, a1, a2, a2)
+        s = s + o.x * 100 + o.y
+        o.x = o.x + 1
+    NEXT
+NEXT
+PRINT s; " "; a1.x; " "; a2.x; " "; b1.x; " "; b1.y
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+11808 7 12 13 20
+
+=== verschiedene klassen in einem tupel (maschinencode)
+CLASS A
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+END CLASS
+CLASS B
+    DIM y AS INTEGER
+    DIM x AS INTEGER
+END CLASS
+DIM a1 AS A : a1 = NEW A() : a1.x = 1 : a1.y = 2
+DIM a2 AS A : a2 = NEW A() : a2.x = 3 : a2.y = 4
+DIM b1 AS B : b1 = NEW B() : b1.x = 10 : b1.y = 20
+DIM s AS INTEGER
+DIM r AS INTEGER
+FOR r = 1 TO 3
+    FOR EACH o IN (a1, a2, b1, a1, a2, a2)
+        s = s + o.x * 100 + o.y
+        o.x = o.x + 1
+    NEXT
+NEXT
+PRINT s; " "; a1.x; " "; a2.x; " "; b1.x; " "; b1.y
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+11808 7 12 13 20
+--- stderr
+jit: Schleife an Stelle 39 in __main__ bleibt in der VM: mit Werten: Mitglieder in der inneren Schleife 57..85
+jit: 0 Funktionen, 1 Schleifen, 3 Schleifenlaeufe
+jit: 3 mal mitten in einer Schleife ausgestiegen
+jit: 1 Runden in der VM -- Stelle 39 in __main__: mit Werten: Mitglieder in der inneren Schleife 57..85
+
+=== property in der schleife bleibt in der vm
+CLASS P
+    DIM _w AS INTEGER
+    PROPERTY GET w() AS INTEGER
+        RETURN Self._w * 2
+    END PROPERTY
+    PROPERTY SET w(v AS INTEGER)
+        Self._w = v
+    END PROPERTY
+END CLASS
+DIM p AS P : p = NEW P()
+DIM i AS INTEGER
+FOR i = 1 TO 5
+    p.w = p.w + i
+NEXT
+PRINT p.w
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+114
+
+=== property in der schleife bleibt in der vm (maschinencode)
+CLASS P
+    DIM _w AS INTEGER
+    PROPERTY GET w() AS INTEGER
+        RETURN Self._w * 2
+    END PROPERTY
+    PROPERTY SET w(v AS INTEGER)
+        Self._w = v
+    END PROPERTY
+END CLASS
+DIM p AS P : p = NEW P()
+DIM i AS INTEGER
+FOR i = 1 TO 5
+    p.w = p.w + i
+NEXT
+PRINT p.w
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+114
+--- stderr
+jit: 2 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== objekt in einem feld eines objekts
+CLASS Punkt
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+END CLASS
+CLASS Figur
+    DIM pos AS Punkt
+    DIM schritte AS INTEGER
+END CLASS
+DIM f AS Figur : f = NEW Figur()
+f.pos = NEW Punkt()
+DIM i AS INTEGER
+FOR i = 1 TO 10
+    f.pos.x = f.pos.x + i
+    f.pos.y = f.pos.y - 1
+    f.schritte = f.schritte + 1
+NEXT
+PRINT f.pos.x; " "; f.pos.y; " "; f.schritte
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+55 -10 10
+
+=== objekt in einem feld eines objekts (maschinencode)
+CLASS Punkt
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+END CLASS
+CLASS Figur
+    DIM pos AS Punkt
+    DIM schritte AS INTEGER
+END CLASS
+DIM f AS Figur : f = NEW Figur()
+f.pos = NEW Punkt()
+DIM i AS INTEGER
+FOR i = 1 TO 10
+    f.pos.x = f.pos.x + i
+    f.pos.y = f.pos.y - 1
+    f.schritte = f.schritte + 1
+NEXT
+PRINT f.pos.x; " "; f.pos.y; " "; f.schritte
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+55 -10 10
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== fehler mitten in der schleife mit objekten auf dem stapel
+CLASS Z
+    DIM a AS INTEGER
+    DIM d AS INTEGER
+    DIM q AS INTEGER
+END CLASS
+DIM zs[6] AS Z
+DIM i AS INTEGER
+FOR i = 0 TO 5
+    zs[i] = NEW Z()
+    zs[i].a = (i + 1) * 12
+    zs[i].d = 3 - i
+NEXT
+DIM n AS INTEGER
+TRY
+    FOR EACH z IN zs
+        z.q = z.a \ z.d + n
+        n = n + 1
+    NEXT
+CATCH e
+    PRINT e
+END TRY
+PRINT n; " "; zs[0].q; " "; zs[2].q; " "; zs[3].q; " "; z.a
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+Integer-Division durch 0
+3 4 38 0 48
+
+=== fehler mitten in der schleife mit objekten auf dem stapel (maschinencode)
+CLASS Z
+    DIM a AS INTEGER
+    DIM d AS INTEGER
+    DIM q AS INTEGER
+END CLASS
+DIM zs[6] AS Z
+DIM i AS INTEGER
+FOR i = 0 TO 5
+    zs[i] = NEW Z()
+    zs[i].a = (i + 1) * 12
+    zs[i].d = 3 - i
+NEXT
+DIM n AS INTEGER
+TRY
+    FOR EACH z IN zs
+        z.q = z.a \ z.d + n
+        n = n + 1
+    NEXT
+CATCH e
+    PRINT e
+END TRY
+PRINT n; " "; zs[0].q; " "; zs[2].q; " "; zs[3].q; " "; z.a
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+Integer-Division durch 0
+3 4 38 0 48
+--- stderr
+jit: Schleife an Stelle 14 in __main__ bleibt in der VM: Objekt; mit Werten: Objekt
+jit: 0 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
+jit: 1 mal mitten in einer Schleife ausgestiegen
+jit: 4 Runden in der VM -- Stelle 14 in __main__: Objekt; mit Werten: Objekt
+
+=== objekt als local einer funktion
+CLASS Summe
+    DIM wert AS INTEGER
+    DIM zahl AS INTEGER
+END CLASS
+FUNCTION rechne(n AS INTEGER) AS INTEGER
+    DIM s AS Summe
+    s = NEW Summe()
+    DIM i AS INTEGER
+    FOR i = 1 TO n
+        s.wert = s.wert + i * i
+        s.zahl = s.zahl + 1
+    NEXT
+    RETURN s.wert * 1000 + s.zahl
+END FUNCTION
+PRINT rechne(10); " "; rechne(3)
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+385010 14003
+
+=== objekt als local einer funktion (maschinencode)
+CLASS Summe
+    DIM wert AS INTEGER
+    DIM zahl AS INTEGER
+END CLASS
+FUNCTION rechne(n AS INTEGER) AS INTEGER
+    DIM s AS Summe
+    s = NEW Summe()
+    DIM i AS INTEGER
+    FOR i = 1 TO n
+        s.wert = s.wert + i * i
+        s.zahl = s.zahl + 1
+    NEXT
+    RETURN s.wert * 1000 + s.zahl
+END FUNCTION
+PRINT rechne(10); " "; rechne(3)
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+385010 14003
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 2 Schleifenlaeufe
+
+=== tupel von zahlen
+DIM s AS INTEGER
+DIM r AS INTEGER
+FOR r = 1 TO 4
+    FOR EACH x IN (3, 5, 7, 11)
+        s = s + x * r
+    NEXT
+NEXT
+PRINT s; " "; x
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+260 11
+
+=== tupel von zahlen (maschinencode)
+DIM s AS INTEGER
+DIM r AS INTEGER
+FOR r = 1 TO 4
+    FOR EACH x IN (3, 5, 7, 11)
+        s = s + x * r
+    NEXT
+NEXT
+PRINT s; " "; x
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+260 11
+--- stderr
+jit: Schleife an Stelle 12 in __main__ bleibt in der VM: Befehl 68; mit Werten: zwei Wege treffen sich an Stelle 28 mit verschiedenen Arten
+jit: 0 Funktionen, 1 Schleifen, 4 Schleifenlaeufe
+jit: 2 Runden in der VM -- Stelle 12 in __main__: Befehl 68; mit Werten: zwei Wege treffen sich an Stelle 28 mit verschiedenen Arten
+
+=== gemischte zahlen in einem tupel
+DIM s AS FLOAT
+DIM r AS INTEGER
+FOR r = 1 TO 3
+    FOR EACH x IN (1, 2.5, 3, 4.5)
+        s = s + x
+    NEXT
+NEXT
+PRINT s
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+33.0
+
+=== gemischte zahlen in einem tupel (maschinencode)
+DIM s AS FLOAT
+DIM r AS INTEGER
+FOR r = 1 TO 3
+    FOR EACH x IN (1, 2.5, 3, 4.5)
+        s = s + x
+    NEXT
+NEXT
+PRINT s
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+33.0
+--- stderr
+jit: Schleife an Stelle 12 in __main__ bleibt in der VM: Befehl 68; mit Werten: zwei Wege treffen sich an Stelle 28 mit verschiedenen Arten
+jit: 0 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
+jit: 6 mal mitten in einer Schleife ausgestiegen
+jit: 1 Runden in der VM -- Stelle 12 in __main__: Befehl 68; mit Werten: zwei Wege treffen sich an Stelle 28 mit verschiedenen Arten
+
+=== objekt in eine globale variable
+CLASS Teil
+    DIM wert AS INTEGER
+END CLASS
+DIM teile[5] AS Teil
+DIM i AS INTEGER
+FOR i = 0 TO 4
+    teile[i] = NEW Teil()
+    teile[i].wert = (i * 7) MOD 5
+NEXT
+DIM bester AS Teil
+bester = teile[0]
+DIM r AS INTEGER
+FOR r = 1 TO 2
+    FOR i = 0 TO 4
+        IF teile[i].wert > bester.wert THEN bester = teile[i]
+    NEXT
+NEXT
+bester.wert = bester.wert + 100
+PRINT bester.wert; " "; teile[0].wert; " "; teile[1].wert; " "; teile[2].wert
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+104 0 2 104
+
+=== objekt in eine globale variable (maschinencode)
+CLASS Teil
+    DIM wert AS INTEGER
+END CLASS
+DIM teile[5] AS Teil
+DIM i AS INTEGER
+FOR i = 0 TO 4
+    teile[i] = NEW Teil()
+    teile[i].wert = (i * 7) MOD 5
+NEXT
+DIM bester AS Teil
+bester = teile[0]
+DIM r AS INTEGER
+FOR r = 1 TO 2
+    FOR i = 0 TO 4
+        IF teile[i].wert > bester.wert THEN bester = teile[i]
+    NEXT
+NEXT
+bester.wert = bester.wert + 100
+PRINT bester.wert; " "; teile[0].wert; " "; teile[1].wert; " "; teile[2].wert
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+104 0 2 104
+--- stderr
+jit: Schleife an Stelle 14 in __main__ bleibt in der VM: Objekt; mit Werten: Objekt
+jit: 0 Funktionen, 2 Schleifen, 2 Schleifenlaeufe
+jit: 3 Runden in der VM -- Stelle 14 in __main__: Objekt; mit Werten: Objekt
+
+=== objektfeld schreiben mit aufruf, der globale schreibt
+CLASS Teil
+    DIM n AS INTEGER
+END CLASS
+DIM zaehler AS INTEGER
+FUNCTION weiter() AS INTEGER
+    zaehler = zaehler + 1
+    RETURN zaehler
+END FUNCTION
+DIM t AS Teil : t = NEW Teil()
+DIM i AS INTEGER
+FOR i = 1 TO 10
+    t.n = t.n + weiter()
+NEXT
+PRINT t.n; " "; zaehler
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+55 10
+
+=== objektfeld schreiben mit aufruf, der globale schreibt (maschinencode)
+CLASS Teil
+    DIM n AS INTEGER
+END CLASS
+DIM zaehler AS INTEGER
+FUNCTION weiter() AS INTEGER
+    zaehler = zaehler + 1
+    RETURN zaehler
+END FUNCTION
+DIM t AS Teil : t = NEW Teil()
+DIM i AS INTEGER
+FOR i = 1 TO 10
+    t.n = t.n + weiter()
+NEXT
+PRINT t.n; " "; zaehler
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+55 10
+--- stderr
+jit: Schleife an Stelle 15 in __main__ bleibt in der VM: schreibt in ein Feld (oder rechnet mit Werten) und ruft eine Funktion, die globale Variablen schreibt
+jit: 1 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
+jit: 8 Runden in der VM -- Stelle 15 in __main__: schreibt in ein Feld (oder rechnet mit Werten) und ruft eine Funktion, die globale Variablen schreibt
+
+=== unterklasse an der stelle der oberklasse
+CLASS Tier
+    DIM beine AS INTEGER
+END CLASS
+CLASS Hund EXTENDS Tier
+    DIM bellt AS INTEGER
+END CLASS
+DIM t1 AS Tier : t1 = NEW Tier() : t1.beine = 2
+DIM h1 AS Hund : h1 = NEW Hund() : h1.beine = 4
+DIM s AS INTEGER
+DIM r AS INTEGER
+FOR r = 1 TO 3
+    FOR EACH w IN (t1, h1, t1, h1)
+        s = s + w.beine
+        w.beine = w.beine + 1
+    NEXT
+NEXT
+PRINT s; " "; t1.beine; " "; h1.beine
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+66 8 10
+
+=== unterklasse an der stelle der oberklasse (maschinencode)
+' Tier und Hund im selben Tupel: seit 2026-10-22 eine Familie (Weg F) --
+' vorher stieg der Code bei jedem zweiten Element aus (6 Mal, 0 Laeufe).
+CLASS Tier
+    DIM beine AS INTEGER
+END CLASS
+CLASS Hund EXTENDS Tier
+    DIM bellt AS INTEGER
+END CLASS
+DIM t1 AS Tier : t1 = NEW Tier() : t1.beine = 2
+DIM h1 AS Hund : h1 = NEW Hund() : h1.beine = 4
+DIM s AS INTEGER
+DIM r AS INTEGER
+FOR r = 1 TO 3
+    FOR EACH w IN (t1, h1, t1, h1)
+        s = s + w.beine
+        w.beine = w.beine + 1
+    NEXT
+NEXT
+PRINT s; " "; t1.beine; " "; h1.beine
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+66 8 10
+--- stderr
+jit: Schleife an Stelle 24 in __main__ bleibt in der VM: mit Werten: Mitglieder in der inneren Schleife 40..62
+jit: 0 Funktionen, 1 Schleifen, 3 Schleifenlaeufe
+jit: 1 Runden in der VM -- Stelle 24 in __main__: mit Werten: Mitglieder in der inneren Schleife 40..62
+
+=== text anhaengen in einer schleife
+DIM s AS STRING
+DIM i AS INTEGER
+FOR i = 0 TO 999
+    s = s + CHR$(97 + i MOD 26)
+NEXT
+DIM z AS INTEGER
+FOR i = 0 TO LEN(s) - 1
+    IF MID$(s, i, 1) = "c" THEN z = z + 1
+NEXT
+PRINT LEN(s); " "; z; " "; LEFT$(s, 5); " "; RIGHT$(s, 3)
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+1000 39 abcde jkl
+
+=== text anhaengen in einer schleife (maschinencode)
+DIM s AS STRING
+DIM i AS INTEGER
+FOR i = 0 TO 999
+    s = s + CHR$(97 + i MOD 26)
+NEXT
+DIM z AS INTEGER
+FOR i = 0 TO LEN(s) - 1
+    IF MID$(s, i, 1) = "c" THEN z = z + 1
+NEXT
+PRINT LEN(s); " "; z; " "; LEFT$(s, 5); " "; RIGHT$(s, 3)
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+1000 39 abcde jkl
+--- stderr
+jit: 0 Funktionen, 2 Schleifen, 2 Schleifenlaeufe
+
+=== ein zweiter name auf den text sieht das anhaengen nicht
+DIM s AS STRING : s = "ab"
+DIM t AS STRING
+DIM i AS INTEGER
+FOR i = 1 TO 5
+    t = s
+    s = s + STR$(i)
+    s = s + "-"
+NEXT
+PRINT s; " "; t
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+ab1-2-3-4-5- ab1-2-3-4-
+
+=== ein zweiter name auf den text sieht das anhaengen nicht (maschinencode)
+DIM s AS STRING : s = "ab"
+DIM t AS STRING
+DIM i AS INTEGER
+FOR i = 1 TO 5
+    t = s
+    s = s + STR$(i)
+    s = s + "-"
+NEXT
+PRINT s; " "; t
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+ab1-2-3-4-5- ab1-2-3-4-
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== map schreiben und lesen in schleifen
+DIM m AS MAP OF INTEGER
+DIM i AS INTEGER
+FOR i = 0 TO 499
+    MAPPUT(m, "k" + STR$(i MOD 50), i)
+NEXT
+DIM z AS INTEGER
+FOR i = 0 TO 49
+    z = z + MAPGET(m, "k" + STR$(i))
+NEXT
+PRINT z; " "; MAPSIZE(m)
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+23725 50
+
+=== map schreiben und lesen in schleifen (maschinencode)
+DIM m AS MAP OF INTEGER
+DIM i AS INTEGER
+FOR i = 0 TO 499
+    MAPPUT(m, "k" + STR$(i MOD 50), i)
+NEXT
+DIM z AS INTEGER
+FOR i = 0 TO 49
+    z = z + MAPGET(m, "k" + STR$(i))
+NEXT
+PRINT z; " "; MAPSIZE(m)
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+23725 50
+--- stderr
+jit: 0 Funktionen, 2 Schleifen, 2 Schleifenlaeufe
+
+=== map mit eckigen klammern
+DIM m AS MAP OF INTEGER : m = {}
+DIM w AS STRING
+DIM i AS INTEGER
+FOR i = 0 TO 99
+    w = "w" + STR$(i MOD 7)
+    IF MAPHAS(m, w) THEN
+        m[w] = m[w] + 1
+    ELSE
+        m[w] = 1
+    END IF
+NEXT
+PRINT m["w0"]; " "; m["w6"]
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+15 14
+
+=== map mit eckigen klammern (maschinencode)
+DIM m AS MAP OF INTEGER : m = {}
+DIM w AS STRING
+DIM i AS INTEGER
+FOR i = 0 TO 99
+    w = "w" + STR$(i MOD 7)
+    IF MAPHAS(m, w) THEN
+        m[w] = m[w] + 1
+    ELSE
+        m[w] = 1
+    END IF
+NEXT
+PRINT m["w0"]; " "; m["w6"]
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+15 14
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== fehler mitten in der schleife mit text auf dem stapel
+DIM s AS STRING
+DIM i AS INTEGER
+DIM n AS INTEGER
+TRY
+    FOR i = 1 TO 20
+        s = s + STR$(i) + MID$("abcdefghij", 10 \ (7 - i), 1)
+        n = n + 1
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e; " zeile "; ERROR_LINE()
+END TRY
+PRINT s; " "; n; " "; i
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+gefangen: Integer-Division durch 0 zeile 6
+1b2c3c4d5f6 6 7
+
+=== fehler mitten in der schleife mit text auf dem stapel (maschinencode)
+DIM s AS STRING
+DIM i AS INTEGER
+DIM n AS INTEGER
+TRY
+    FOR i = 1 TO 20
+        s = s + STR$(i) + MID$("abcdefghij", 10 \ (7 - i), 1)
+        n = n + 1
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e; " zeile "; ERROR_LINE()
+END TRY
+PRINT s; " "; n; " "; i
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+gefangen: Integer-Division durch 0 zeile 6
+1b2c3c4d5f6 6 7
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
+jit: 1 mal mitten in einer Schleife ausgestiegen
+
+=== fehler eines befehls mitten in der schleife
+DIM m AS MAP OF INTEGER
+MAPPUT(m, "a", 1) : MAPPUT(m, "b", 2)
+DIM z AS INTEGER
+DIM i AS INTEGER
+DIM k AS STRING
+TRY
+    FOR i = 0 TO 5
+        k = CHR$(97 + i)
+        z = z + MAPGET(m, k) * 10
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e; " zeile "; ERROR_LINE()
+END TRY
+PRINT z; " "; i; " "; k
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+gefangen: MAPGET: Schluessel 'c' nicht in Map zeile 9
+30 2 c
+
+=== fehler eines befehls mitten in der schleife (maschinencode)
+DIM m AS MAP OF INTEGER
+MAPPUT(m, "a", 1) : MAPPUT(m, "b", 2)
+DIM z AS INTEGER
+DIM i AS INTEGER
+DIM k AS STRING
+TRY
+    FOR i = 0 TO 5
+        k = CHR$(97 + i)
+        z = z + MAPGET(m, k) * 10
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e; " zeile "; ERROR_LINE()
+END TRY
+PRINT z; " "; i; " "; k
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+gefangen: MAPGET: Schluessel 'c' nicht in Map zeile 9
+30 2 c
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
+jit: 1 mal mitten in einer Schleife ausgestiegen
+
+=== text in eine getypte variable
+DIM m AS MAP OF INTEGER
+MAPPUT(m, "a", 7)
+DIM t AS STRING
+DIM f AS FLOAT
+DIM i AS INTEGER
+FOR i = 1 TO 3
+    f = f + VAL("2")
+    t = t + "x"
+NEXT
+PRINT t; " "; f; " "; TYPEOF(f)
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+xxx 6.0 FLOAT
+
+=== text in eine getypte variable (maschinencode)
+DIM m AS MAP OF INTEGER
+MAPPUT(m, "a", 7)
+DIM t AS STRING
+DIM f AS FLOAT
+DIM i AS INTEGER
+FOR i = 1 TO 3
+    f = f + VAL("2")
+    t = t + "x"
+NEXT
+PRINT t; " "; f; " "; TYPEOF(f)
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+xxx 6.0 FLOAT
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== eine zahl in eine textvariable ist ein fehler
+DIM w AS TUPLE
+w = ("a", "b", 7)
+DIM t AS STRING
+DIM i AS INTEGER
+FOR i = 0 TO 2
+    t = t + "-"
+    t = w[i]
+NEXT
+PRINT t
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+--- fehler
+Zuweisung an 't': Erwartet STRING, erhalten INTEGER
+
+=== eine zahl in eine textvariable ist ein fehler (maschinencode)
+DIM w AS TUPLE
+w = ("a", "b", 7)
+DIM t AS STRING
+DIM i AS INTEGER
+FOR i = 0 TO 2
+    t = t + "-"
+    t = w[i]
+NEXT
+PRINT t
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+--- fehler
+Zuweisung an 't': Erwartet STRING, erhalten INTEGER
+
+=== zahlen aus text in getypte variablen
+DIM f AS FLOAT
+DIM n AS INTEGER
+DIM i AS INTEGER
+DIM teile AS STRING : teile = "1.5 2 3.25 4"
+FOR i = 1 TO 100
+    f = f + VAL(MID$(teile, (i MOD 4) * 0, 3))
+    n = n + LEN(STR$(i))
+NEXT
+PRINT f; " "; n
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+150.0 192
+
+=== zahlen aus text in getypte variablen (maschinencode)
+DIM f AS FLOAT
+DIM n AS INTEGER
+DIM i AS INTEGER
+DIM teile AS STRING : teile = "1.5 2 3.25 4"
+FOR i = 1 TO 100
+    f = f + VAL(MID$(teile, (i MOD 4) * 0, 3))
+    n = n + LEN(STR$(i))
+NEXT
+PRINT f; " "; n
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+150.0 192
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== text vergleichen und sortieren
+DIM w AS STRING : w = "zebra"
+DIM k AS STRING : k = "zebra"
+DIM i AS INTEGER
+DIM z AS INTEGER
+DIM s AS STRING
+FOR i = 0 TO 25
+    s = CHR$(97 + i) + "x"
+    IF s < w THEN z = z + 1
+    IF s <> k THEN z = z + 100
+    IF s >= "mx" THEN k = s
+    IF s < "mx" THEN z = z + 10000
+NEXT
+PRINT z; " "; k
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+122625 zx
+
+=== text vergleichen und sortieren (maschinencode)
+DIM w AS STRING : w = "zebra"
+DIM k AS STRING : k = "zebra"
+DIM i AS INTEGER
+DIM z AS INTEGER
+DIM s AS STRING
+FOR i = 0 TO 25
+    s = CHR$(97 + i) + "x"
+    IF s < w THEN z = z + 1
+    IF s <> k THEN z = z + 100
+    IF s >= "mx" THEN k = s
+    IF s < "mx" THEN z = z + 10000
+NEXT
+PRINT z; " "; k
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+122625 zx
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== text in einem feld
+DIM a[5] AS STRING
+DIM i AS INTEGER
+FOR i = 0 TO 49
+    a[i MOD 5] = a[i MOD 5] + CHR$(65 + i MOD 26)
+NEXT
+PRINT a[0]; " "; a[4]
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+AFKPUZEJOT EJOTYDINSX
+
+=== text in einem feld (maschinencode)
+DIM a[5] AS STRING
+DIM i AS INTEGER
+FOR i = 0 TO 49
+    a[i MOD 5] = a[i MOD 5] + CHR$(65 + i MOD 26)
+NEXT
+PRINT a[0]; " "; a[4]
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+AFKPUZEJOT EJOTYDINSX
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== text in einer funktion
+FUNCTION wiederholt(t AS STRING, n AS INTEGER) AS STRING
+    DIM r AS STRING
+    DIM i AS INTEGER
+    FOR i = 1 TO n
+        r = r + t
+        IF LEN(r) > 20 THEN r = MID$(r, 1, 10)
+    NEXT
+    RETURN r
+END FUNCTION
+PRINT wiederholt("abc", 30); " "; wiederholt("x", 3)
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+abcabaaaaaabcabcabc xxx
+
+=== text in einer funktion (maschinencode)
+FUNCTION wiederholt(t AS STRING, n AS INTEGER) AS STRING
+    DIM r AS STRING
+    DIM i AS INTEGER
+    FOR i = 1 TO n
+        r = r + t
+        IF LEN(r) > 20 THEN r = MID$(r, 1, 10)
+    NEXT
+    RETURN r
+END FUNCTION
+PRINT wiederholt("abc", 30); " "; wiederholt("x", 3)
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+abcabaaaaaabcabcabc xxx
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 2 Schleifenlaeufe
+jit: 1 mal mitten in einer Schleife ausgestiegen
+
+=== globaler text aus einer funktion geschrieben
+DIM protokoll AS STRING
+SUB merke(t AS STRING)
+    protokoll = protokoll + t + ";"
+END SUB
+DIM i AS INTEGER
+DIM s AS STRING
+FOR i = 1 TO 5
+    s = s + STR$(i)
+    merke(s)
+NEXT
+PRINT protokoll
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+1;12;123;1234;12345;
+
+=== globaler text aus einer funktion geschrieben (maschinencode)
+DIM protokoll AS STRING
+SUB merke(t AS STRING)
+    protokoll = protokoll + t + ";"
+END SUB
+DIM i AS INTEGER
+DIM s AS STRING
+FOR i = 1 TO 5
+    s = s + STR$(i)
+    merke(s)
+NEXT
+PRINT protokoll
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+1;12;123;1234;12345;
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== upper und replace als methoden
+DIM s AS STRING : s = "abc"
+DIM r AS STRING
+DIM i AS INTEGER
+FOR i = 1 TO 4
+    r = r + s.upper() + REPLACE$(s, "b", STR$(i))
+NEXT
+PRINT r
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+ABCa1cABCa2cABCa3cABCa4c
+
+=== upper und replace als methoden (maschinencode)
+DIM s AS STRING : s = "abc"
+DIM r AS STRING
+DIM i AS INTEGER
+FOR i = 1 TO 4
+    r = r + s.upper() + REPLACE$(s, "b", STR$(i))
+NEXT
+PRINT r
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+ABCa1cABCa2cABCa3cABCa4c
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== befehle einer familie der vm in einer schleife
+IMPORT "zeit"
+DIM start AS INTEGER : start = ZEIT_AUS_TEILEN(2026, 3, 1)
+DIM s AS INTEGER
+DIM w AS STRING
+DIM i AS INTEGER
+FOR i = 0 TO 99
+    s = s + ZEIT_TEIL(ZEIT_PLUS(start, i * 7200), "stunde") + ZEIT_WOCHENTAG(start + i * 86400)
+    IF i MOD 25 = 0 THEN w = w + ZEIT_TEXT(ZEIT_PLUS(start, i * 86400)) + ";"
+NEXT
+PRINT s
+PRINT w
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+1468
+2026-03-01 00:00:00;2026-03-26 00:00:00;2026-04-20 00:00:00;2026-05-15 00:00:00;
+
+=== befehle einer familie der vm in einer schleife (maschinencode)
+IMPORT "zeit"
+DIM start AS INTEGER : start = ZEIT_AUS_TEILEN(2026, 3, 1)
+DIM s AS INTEGER
+DIM w AS STRING
+DIM i AS INTEGER
+FOR i = 0 TO 99
+    s = s + ZEIT_TEIL(ZEIT_PLUS(start, i * 7200), "stunde") + ZEIT_WOCHENTAG(start + i * 86400)
+    IF i MOD 25 = 0 THEN w = w + ZEIT_TEXT(ZEIT_PLUS(start, i * 86400)) + ";"
+NEXT
+PRINT s
+PRINT w
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+1468
+2026-03-01 00:00:00;2026-03-26 00:00:00;2026-04-20 00:00:00;2026-05-15 00:00:00;
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== befehl einer familie scheitert mitten in der schleife
+IMPORT "scene"
+SCENE_PUSH("a") : SCENE_PUSH("b") : SCENE_PUSH("c")
+DIM n AS INTEGER
+DIM i AS INTEGER
+TRY
+    FOR i = 1 TO 10
+        n = n + SCENE_DEPTH()
+        SCENE_POP()
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e; " zeile "; ERROR_LINE()
+END TRY
+PRINT n; " "; i; " "; SCENE_DEPTH()
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+gefangen: SCENE_POP: Stack ist bereits leer zeile 8
+6 4 0
+
+=== befehl einer familie scheitert mitten in der schleife (maschinencode)
+IMPORT "scene"
+SCENE_PUSH("a") : SCENE_PUSH("b") : SCENE_PUSH("c")
+DIM n AS INTEGER
+DIM i AS INTEGER
+TRY
+    FOR i = 1 TO 10
+        n = n + SCENE_DEPTH()
+        SCENE_POP()
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e; " zeile "; ERROR_LINE()
+END TRY
+PRINT n; " "; i; " "; SCENE_DEPTH()
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+gefangen: SCENE_POP: Stack ist bereits leer zeile 8
+6 4 0
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
+jit: 1 mal mitten in einer Schleife ausgestiegen
+
+=== befehl einer familie scheitert ohne try
+IMPORT "scene"
+SCENE_PUSH("a")
+DIM n AS INTEGER
+DIM i AS INTEGER
+FOR i = 1 TO 10
+    n = n + 1
+    SCENE_POP()
+NEXT
+PRINT n
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+--- fehler
+SCENE_POP: Stack ist bereits leer
+
+=== befehl einer familie scheitert ohne try (maschinencode)
+IMPORT "scene"
+SCENE_PUSH("a")
+DIM n AS INTEGER
+DIM i AS INTEGER
+FOR i = 1 TO 10
+    n = n + 1
+    SCENE_POP()
+NEXT
+PRINT n
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+--- fehler
+SCENE_POP: Stack ist bereits leer
+
+=== timer_update in der schleife bleibt in der vm
+IMPORT "timer"
+DIM g AS INTEGER
+DIM summe AS INTEGER
+SUB merk()
+    summe = summe + g
+END SUB
+DIM f AS FUNCREF : f = merk
+DIM i AS INTEGER
+FOR i = 1 TO 20
+    g = i * 10
+    TIMER_AFTER(0, f)
+    TIMER_UPDATE()
+NEXT
+PRINT summe; " "; g
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+2100 200
+
+=== timer_update in der schleife bleibt in der vm (maschinencode)
+IMPORT "timer"
+DIM g AS INTEGER
+DIM summe AS INTEGER
+SUB merk()
+    summe = summe + g
+END SUB
+DIM f AS FUNCREF : f = merk
+DIM i AS INTEGER
+FOR i = 1 TO 20
+    g = i * 10
+    TIMER_AFTER(0, f)
+    TIMER_UPDATE()
+NEXT
+PRINT summe; " "; g
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+2100 200
+--- stderr
+jit: Schleife an Stelle 16 in __main__ bleibt in der VM: globale Variable, die keine Zahl ist; mit Werten: eingebauter Befehl TIMER_UPDATE (ruft Drachenhauch-Code oder braucht die Zeile)
+jit: 1 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
+jit: 18 Runden in der VM -- Stelle 16 in __main__: globale Variable, die keine Zahl ist; mit Werten: eingebauter Befehl TIMER_UPDATE (ruft Drachenhauch-Code oder braucht die Zeile)
+
+=== coroutine in der schleife bleibt in der vm
+DIM g AS INTEGER
+FUNCTION gen() AS INTEGER
+    WHILE TRUE
+        YIELD g * 2
+    WEND
+    RETURN 0
+END FUNCTION
+DIM c AS COROUTINE : c = gen()
+DIM s AS INTEGER
+DIM i AS INTEGER
+FOR i = 1 TO 10
+    g = i
+    s = s + CORO_RESUME(c)
+NEXT
+PRINT s; " "; g
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+110 10
+
+=== coroutine in der schleife bleibt in der vm (maschinencode)
+DIM g AS INTEGER
+FUNCTION gen() AS INTEGER
+    WHILE TRUE
+        YIELD g * 2
+    WEND
+    RETURN 0
+END FUNCTION
+DIM c AS COROUTINE : c = gen()
+DIM s AS INTEGER
+DIM i AS INTEGER
+FOR i = 1 TO 10
+    g = i
+    s = s + CORO_RESUME(c)
+NEXT
+PRINT s; " "; g
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+110 10
+--- stderr
+jit: Schleife an Stelle 16 in __main__ bleibt in der VM: globale Variable, die keine Zahl ist; mit Werten: eingebauter Befehl CORO_RESUME (ruft Drachenhauch-Code oder braucht die Zeile)
+jit: Schleife an Stelle 0 in gen bleibt in der VM: Befehl 115; mit Werten: Befehl 115
+jit: 0 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
+jit: 8 Runden in der VM -- Stelle 16 in __main__: globale Variable, die keine Zahl ist; mit Werten: eingebauter Befehl CORO_RESUME (ruft Drachenhauch-Code oder braucht die Zeile)
+jit: 8 Runden in der VM -- Stelle 0 in gen: Befehl 115; mit Werten: Befehl 115
+
+=== methode in einer schleife
+CLASS Zaehler
+    DIM n AS INTEGER
+    DIM schritt AS INTEGER
+    SUB weiter()
+        Self.n = Self.n + Self.schritt
+    END SUB
+    FUNCTION doppelt(x AS INTEGER) AS INTEGER
+        RETURN x * 2 + Self.n
+    END FUNCTION
+END CLASS
+DIM z AS Zaehler : z = NEW Zaehler()
+z.schritt = 3
+DIM s AS INTEGER
+DIM i AS INTEGER
+FOR i = 1 TO 100
+    z.weiter()
+    s = s + z.doppelt(i) MOD 1000
+NEXT
+PRINT z.n; " "; s
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+300 25250
+
+=== methode in einer schleife (maschinencode)
+CLASS Zaehler
+    DIM n AS INTEGER
+    DIM schritt AS INTEGER
+    SUB weiter()
+        Self.n = Self.n + Self.schritt
+    END SUB
+    FUNCTION doppelt(x AS INTEGER) AS INTEGER
+        RETURN x * 2 + Self.n
+    END FUNCTION
+END CLASS
+DIM z AS Zaehler : z = NEW Zaehler()
+z.schritt = 3
+DIM s AS INTEGER
+DIM i AS INTEGER
+FOR i = 1 TO 100
+    z.weiter()
+    s = s + z.doppelt(i) MOD 1000
+NEXT
+PRINT z.n; " "; s
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+300 25250
+--- stderr
+jit: 2 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== methode liest eine globale des bereichs
+DIM faktor AS INTEGER
+CLASS Rechner
+    DIM summe AS INTEGER
+    SUB dazu(x AS INTEGER)
+        Self.summe = Self.summe + x * faktor
+    END SUB
+END CLASS
+DIM r AS Rechner : r = NEW Rechner()
+DIM i AS INTEGER
+FOR i = 1 TO 50
+    faktor = i MOD 4
+    r.dazu(i)
+NEXT
+PRINT r.summe; " "; faktor
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+1901 2
+
+=== methode liest eine globale des bereichs (maschinencode)
+DIM faktor AS INTEGER
+CLASS Rechner
+    DIM summe AS INTEGER
+    SUB dazu(x AS INTEGER)
+        Self.summe = Self.summe + x * faktor
+    END SUB
+END CLASS
+DIM r AS Rechner : r = NEW Rechner()
+DIM i AS INTEGER
+FOR i = 1 TO 50
+    faktor = i MOD 4
+    r.dazu(i)
+NEXT
+PRINT r.summe; " "; faktor
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+1901 2
+--- stderr
+jit: 1 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== methode liest eine andere globale
+DIM faktor AS INTEGER : faktor = 3
+CLASS Rechner
+    DIM summe AS INTEGER
+    SUB dazu(x AS INTEGER)
+        Self.summe = Self.summe + x * faktor
+    END SUB
+END CLASS
+DIM r AS Rechner : r = NEW Rechner()
+DIM i AS INTEGER
+FOR i = 1 TO 50
+    r.dazu(i)
+NEXT
+PRINT r.summe
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+3825
+
+=== methode liest eine andere globale (maschinencode)
+DIM faktor AS INTEGER : faktor = 3
+CLASS Rechner
+    DIM summe AS INTEGER
+    SUB dazu(x AS INTEGER)
+        Self.summe = Self.summe + x * faktor
+    END SUB
+END CLASS
+DIM r AS Rechner : r = NEW Rechner()
+DIM i AS INTEGER
+FOR i = 1 TO 50
+    r.dazu(i)
+NEXT
+PRINT r.summe
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+3825
+--- stderr
+jit: 1 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== zwei klassen mit derselben methode
+DIM zaehler AS INTEGER
+CLASS Hund
+    FUNCTION laut() AS INTEGER
+        RETURN 1
+    END FUNCTION
+END CLASS
+CLASS Katze
+    FUNCTION laut() AS INTEGER
+        zaehler = zaehler + 100
+        RETURN 2
+    END FUNCTION
+END CLASS
+DIM tiere AS TUPLE
+tiere = (NEW Hund(), NEW Katze(), NEW Hund())
+DIM s AS INTEGER
+DIM i AS INTEGER
+FOR i = 0 TO 29
+    zaehler = zaehler + 1
+    s = s + tiere[i MOD 3].laut()
+NEXT
+PRINT s; " "; zaehler
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+40 1030
+
+=== zwei klassen mit derselben methode (maschinencode)
+DIM zaehler AS INTEGER
+CLASS Hund
+    FUNCTION laut() AS INTEGER
+        RETURN 1
+    END FUNCTION
+END CLASS
+CLASS Katze
+    FUNCTION laut() AS INTEGER
+        zaehler = zaehler + 100
+        RETURN 2
+    END FUNCTION
+END CLASS
+DIM tiere AS TUPLE
+tiere = (NEW Hund(), NEW Katze(), NEW Hund())
+DIM s AS INTEGER
+DIM i AS INTEGER
+FOR i = 0 TO 29
+    zaehler = zaehler + 1
+    s = s + tiere[i MOD 3].laut()
+NEXT
+PRINT s; " "; zaehler
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+40 1030
+--- stderr
+jit: 2 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+jit: 10 mal mitten in einer Schleife ausgestiegen
+
+=== methoden von text und map in einer schleife
+DIM m AS MAP OF INTEGER : m = {}
+DIM s AS STRING : s = "ab"
+DIM r AS STRING
+DIM i AS INTEGER
+FOR i = 1 TO 4
+    r = r + s.upper() + STR$(s.length())
+    m.put("k" + STR$(i), i * i)
+    s = s + "c"
+NEXT
+PRINT r; " "; m.size(); " "; m.get("k3")
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+AB2ABC3ABCC4ABCCC5 4 9
+
+=== methoden von text und map in einer schleife (maschinencode)
+DIM m AS MAP OF INTEGER : m = {}
+DIM s AS STRING : s = "ab"
+DIM r AS STRING
+DIM i AS INTEGER
+FOR i = 1 TO 4
+    r = r + s.upper() + STR$(s.length())
+    m.put("k" + STR$(i), i * i)
+    s = s + "c"
+NEXT
+PRINT r; " "; m.size(); " "; m.get("k3")
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+AB2ABC3ABCC4ABCCC5 4 9
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== fehler in einer methode mitten in der schleife
+CLASS Konto
+    DIM stand AS INTEGER
+    SUB abheben(b AS INTEGER)
+        Self.stand = Self.stand - b
+        IF Self.stand < 0 THEN THROW "Konto leer bei " + STR$(Self.stand)
+    END SUB
+END CLASS
+DIM k AS Konto : k = NEW Konto()
+k.stand = 10
+DIM i AS INTEGER
+TRY
+    FOR i = 1 TO 10
+        k.abheben(3)
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e; " zeile "; ERROR_LINE()
+END TRY
+PRINT k.stand; " "; i
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+gefangen: Konto leer bei -2 zeile 5
+-2 4
+
+=== fehler in einer methode mitten in der schleife (maschinencode)
+CLASS Konto
+    DIM stand AS INTEGER
+    SUB abheben(b AS INTEGER)
+        Self.stand = Self.stand - b
+        IF Self.stand < 0 THEN THROW "Konto leer bei " + STR$(Self.stand)
+    END SUB
+END CLASS
+DIM k AS Konto : k = NEW Konto()
+k.stand = 10
+DIM i AS INTEGER
+TRY
+    FOR i = 1 TO 10
+        k.abheben(3)
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e; " zeile "; ERROR_LINE()
+END TRY
+PRINT k.stand; " "; i
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+gefangen: Konto leer bei -2 zeile 5
+-2 4
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
+jit: 1 mal mitten in einer Schleife ausgestiegen
+
+=== methode auf nil in der schleife
+CLASS Ding
+    DIM n AS INTEGER
+    SUB tick()
+        Self.n = Self.n + 1
+    END SUB
+END CLASS
+DIM dinge AS TUPLE
+DIM leer AS Ding
+dinge = (NEW Ding(), NEW Ding(), leer)
+DIM i AS INTEGER
+TRY
+    FOR i = 0 TO 5
+        dinge[i MOD 3].tick()
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+PRINT i
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+gefangen: Methodenaufruf '.tick' bei NIL-Referenz -- die Variable ist noch NIL: eine Klasse muss mit NEW angelegt werden (p = NEW Klasse())
+2
+
+=== methode auf nil in der schleife (maschinencode)
+CLASS Ding
+    DIM n AS INTEGER
+    SUB tick()
+        Self.n = Self.n + 1
+    END SUB
+END CLASS
+DIM dinge AS TUPLE
+DIM leer AS Ding
+dinge = (NEW Ding(), NEW Ding(), leer)
+DIM i AS INTEGER
+TRY
+    FOR i = 0 TO 5
+        dinge[i MOD 3].tick()
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+PRINT i
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+gefangen: Methodenaufruf '.tick' bei NIL-Referenz -- die Variable ist noch NIL: eine Klasse muss mit NEW angelegt werden (p = NEW Klasse())
+2
+--- stderr
+jit: 1 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
+jit: 1 mal mitten in einer Schleife ausgestiegen
+
+=== methode ruft eine funcref und bleibt in der vm
+DIM g AS INTEGER
+FUNCTION plus(x AS INTEGER) AS INTEGER
+    RETURN x + g
+END FUNCTION
+CLASS Werk
+    DIM f AS FUNCREF
+    FUNCTION los(x AS INTEGER) AS INTEGER
+        DIM h AS FUNCREF
+        h = Self.f
+        RETURN h(x)
+    END FUNCTION
+END CLASS
+DIM w AS Werk : w = NEW Werk()
+w.f = plus
+DIM s AS INTEGER
+DIM i AS INTEGER
+FOR i = 1 TO 10
+    g = i
+    s = s + w.los(i)
+NEXT
+PRINT s
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+110
+
+=== methode ruft eine funcref und bleibt in der vm (maschinencode)
+DIM g AS INTEGER
+FUNCTION plus(x AS INTEGER) AS INTEGER
+    RETURN x + g
+END FUNCTION
+CLASS Werk
+    DIM f AS FUNCREF
+    FUNCTION los(x AS INTEGER) AS INTEGER
+        DIM h AS FUNCREF
+        h = Self.f
+        RETURN h(x)
+    END FUNCTION
+END CLASS
+DIM w AS Werk : w = NEW Werk()
+w.f = plus
+DIM s AS INTEGER
+DIM i AS INTEGER
+FOR i = 1 TO 10
+    g = i
+    s = s + w.los(i)
+NEXT
+PRINT s
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+110
+--- stderr
+jit: Schleife an Stelle 19 in __main__ bleibt in der VM: ruft eine Funktion, die in der VM bleibt; mit Werten: Methode los: los ruft FUNCREF
+jit: 1 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
+jit: 8 Runden in der VM -- Stelle 19 in __main__: ruft eine Funktion, die in der VM bleibt; mit Werten: Methode los: los ruft FUNCREF
+
+=== langer text neu zusammengesetzt
+DIM s AS STRING
+DIM t AS STRING
+DIM i AS INTEGER
+FOR i = 1 TO 5000
+    s = s + CHR$(65 + i MOD 26)
+    t = s + "!"
+NEXT
+PRINT LEN(s); " "; LEN(t); " "; RIGHT$(t, 3)
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+5000 5001 HI!
+
+=== langer text neu zusammengesetzt (maschinencode)
+DIM s AS STRING
+DIM t AS STRING
+DIM i AS INTEGER
+FOR i = 1 TO 5000
+    s = s + CHR$(65 + i MOD 26)
+    t = s + "!"
+NEXT
+PRINT LEN(s); " "; LEN(t); " "; RIGHT$(t, 3)
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+5000 5001 HI!
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== methodenrumpf aus der vm gerufen
+CLASS Punkt
+    DIM x AS FLOAT
+    DIM y AS FLOAT
+    SUB schieben(dx AS FLOAT, dy AS FLOAT)
+        Self.x = Self.x + dx
+        Self.y = Self.y + dy
+    END SUB
+    FUNCTION laenge2() AS FLOAT
+        RETURN Self.x * Self.x + Self.y * Self.y
+    END FUNCTION
+    FUNCTION rechts(grenze AS FLOAT) AS BOOLEAN
+        RETURN Self.x > grenze
+    END FUNCTION
+END CLASS
+DIM p AS Punkt : p = NEW Punkt()
+DIM i AS INTEGER
+FOR i = 1 TO 5
+    p.schieben(1.5, -0.5)
+    PRINT p.laenge2(); " "; p.rechts(4.0)
+NEXT
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+2.5 FALSE
+10.0 FALSE
+22.5 TRUE
+40.0 TRUE
+62.5 TRUE
+
+=== methodenrumpf aus der vm gerufen (maschinencode)
+CLASS Punkt
+    DIM x AS FLOAT
+    DIM y AS FLOAT
+    SUB schieben(dx AS FLOAT, dy AS FLOAT)
+        Self.x = Self.x + dx
+        Self.y = Self.y + dy
+    END SUB
+    FUNCTION laenge2() AS FLOAT
+        RETURN Self.x * Self.x + Self.y * Self.y
+    END FUNCTION
+    FUNCTION rechts(grenze AS FLOAT) AS BOOLEAN
+        RETURN Self.x > grenze
+    END FUNCTION
+END CLASS
+DIM p AS Punkt : p = NEW Punkt()
+DIM i AS INTEGER
+FOR i = 1 TO 5
+    p.schieben(1.5, -0.5)
+    PRINT p.laenge2(); " "; p.rechts(4.0)
+NEXT
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+2.5 FALSE
+10.0 FALSE
+22.5 TRUE
+40.0 TRUE
+62.5 TRUE
+--- stderr
+jit: 3 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== ueberschriebene hilfsmethode gewinnt
+CLASS Tier
+    DIM n AS INTEGER
+    FUNCTION laut() AS INTEGER
+        RETURN 1
+    END FUNCTION
+    SUB rufen()
+        Self.n = Self.n + laut()
+    END SUB
+END CLASS
+CLASS Hund EXTENDS Tier
+    FUNCTION laut() AS INTEGER
+        RETURN 10
+    END FUNCTION
+END CLASS
+DIM t AS Tier : t = NEW Tier()
+DIM h AS Hund : h = NEW Hund()
+DIM i AS INTEGER
+FOR i = 1 TO 20
+    t.rufen()
+    h.rufen()
+NEXT
+PRINT t.n; " "; h.n
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+20 200
+
+=== ueberschriebene hilfsmethode gewinnt (maschinencode)
+CLASS Tier
+    DIM n AS INTEGER
+    FUNCTION laut() AS INTEGER
+        RETURN 1
+    END FUNCTION
+    SUB rufen()
+        Self.n = Self.n + laut()
+    END SUB
+END CLASS
+CLASS Hund EXTENDS Tier
+    FUNCTION laut() AS INTEGER
+        RETURN 10
+    END FUNCTION
+END CLASS
+DIM t AS Tier : t = NEW Tier()
+DIM h AS Hund : h = NEW Hund()
+DIM i AS INTEGER
+FOR i = 1 TO 20
+    t.rufen()
+    h.rufen()
+NEXT
+PRINT t.n; " "; h.n
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+20 200
+--- stderr
+jit: 4 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== geerbte methode auf der unterklasse
+CLASS Basis
+    DIM wert AS INTEGER
+    SUB mehr(x AS INTEGER)
+        Self.wert = Self.wert + x
+    END SUB
+END CLASS
+CLASS Kind EXTENDS Basis
+    DIM extra AS INTEGER
+END CLASS
+DIM k AS Kind : k = NEW Kind()
+DIM b AS Basis : b = NEW Basis()
+DIM i AS INTEGER
+FOR i = 1 TO 30
+    k.mehr(i)
+    b.mehr(2)
+NEXT
+PRINT k.wert; " "; b.wert; " "; k.extra
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+465 60 0
+
+=== geerbte methode auf der unterklasse (maschinencode)
+CLASS Basis
+    DIM wert AS INTEGER
+    SUB mehr(x AS INTEGER)
+        Self.wert = Self.wert + x
+    END SUB
+END CLASS
+CLASS Kind EXTENDS Basis
+    DIM extra AS INTEGER
+END CLASS
+DIM k AS Kind : k = NEW Kind()
+DIM b AS Basis : b = NEW Basis()
+DIM i AS INTEGER
+FOR i = 1 TO 30
+    k.mehr(i)
+    b.mehr(2)
+NEXT
+PRINT k.wert; " "; b.wert; " "; k.extra
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+465 60 0
+--- stderr
+jit: 2 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== methode gibt auf nach einer feldschreibung
+CLASS Zins
+    DIM zaehler AS INTEGER
+    DIM betrag AS INTEGER
+    SUB verdoppeln()
+        Self.zaehler = Self.zaehler + 1
+        Self.betrag = Self.betrag * 1000
+    END SUB
+END CLASS
+DIM z AS Zins : z = NEW Zins()
+z.betrag = 7
+DIM i AS INTEGER
+TRY
+    FOR i = 1 TO 20
+        z.verdoppeln()
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e; " zeile "; ERROR_LINE()
+END TRY
+PRINT z.zaehler; " "; z.betrag; " "; i
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+gefangen: Ganzzahl-Ueberlauf bei '*' (INTEGER ist 64-bit; Wertebereich ueberschritten) zeile 6
+7 7000000000000000000 7
+
+=== methode gibt auf nach einer feldschreibung (maschinencode)
+CLASS Zins
+    DIM zaehler AS INTEGER
+    DIM betrag AS INTEGER
+    SUB verdoppeln()
+        Self.zaehler = Self.zaehler + 1
+        Self.betrag = Self.betrag * 1000
+    END SUB
+END CLASS
+DIM z AS Zins : z = NEW Zins()
+z.betrag = 7
+DIM i AS INTEGER
+TRY
+    FOR i = 1 TO 20
+        z.verdoppeln()
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e; " zeile "; ERROR_LINE()
+END TRY
+PRINT z.zaehler; " "; z.betrag; " "; i
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+gefangen: Ganzzahl-Ueberlauf bei '*' (INTEGER ist 64-bit; Wertebereich ueberschritten) zeile 6
+7 7000000000000000000 7
+--- stderr
+jit: 1 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
+jit: 1 mal mitten in einer Schleife ausgestiegen
+
+=== methode ruft methode eines anderen objekts
+CLASS Rad
+    DIM umdrehungen AS INTEGER
+    SUB drehen(n AS INTEGER)
+        Self.umdrehungen = Self.umdrehungen + n
+    END SUB
+END CLASS
+CLASS Auto
+    DIM vorne AS Rad
+    DIM hinten AS Rad
+    DIM km AS INTEGER
+    SUB fahren(n AS INTEGER)
+        Self.vorne.drehen(n)
+        Self.hinten.drehen(n * 2)
+        Self.km = Self.km + n
+    END SUB
+END CLASS
+DIM a AS Auto : a = NEW Auto()
+a.vorne = NEW Rad()
+a.hinten = NEW Rad()
+DIM i AS INTEGER
+FOR i = 1 TO 10
+    a.fahren(i)
+NEXT
+PRINT a.km; " "; a.vorne.umdrehungen; " "; a.hinten.umdrehungen
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+55 55 110
+
+=== methode ruft methode eines anderen objekts (maschinencode)
+CLASS Rad
+    DIM umdrehungen AS INTEGER
+    SUB drehen(n AS INTEGER)
+        Self.umdrehungen = Self.umdrehungen + n
+    END SUB
+END CLASS
+CLASS Auto
+    DIM vorne AS Rad
+    DIM hinten AS Rad
+    DIM km AS INTEGER
+    SUB fahren(n AS INTEGER)
+        Self.vorne.drehen(n)
+        Self.hinten.drehen(n * 2)
+        Self.km = Self.km + n
+    END SUB
+END CLASS
+DIM a AS Auto : a = NEW Auto()
+a.vorne = NEW Rad()
+a.hinten = NEW Rad()
+DIM i AS INTEGER
+FOR i = 1 TO 10
+    a.fahren(i)
+NEXT
+PRINT a.km; " "; a.vorne.umdrehungen; " "; a.hinten.umdrehungen
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+55 55 110
+--- stderr
+jit: 2 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== methode mit globaler zahl
+DIM schritte AS INTEGER
+CLASS Laeufer
+    DIM weg AS INTEGER
+    SUB schritt(n AS INTEGER)
+        Self.weg = Self.weg + n
+        schritte = schritte + 1
+    END SUB
+END CLASS
+DIM l AS Laeufer : l = NEW Laeufer()
+DIM i AS INTEGER
+FOR i = 1 TO 25
+    l.schritt(i MOD 4)
+NEXT
+PRINT l.weg; " "; schritte
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+37 25
+
+=== methode mit globaler zahl (maschinencode)
+DIM schritte AS INTEGER
+CLASS Laeufer
+    DIM weg AS INTEGER
+    SUB schritt(n AS INTEGER)
+        Self.weg = Self.weg + n
+        schritte = schritte + 1
+    END SUB
+END CLASS
+DIM l AS Laeufer : l = NEW Laeufer()
+DIM i AS INTEGER
+FOR i = 1 TO 25
+    l.schritt(i MOD 4)
+NEXT
+PRINT l.weg; " "; schritte
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+37 25
+--- stderr
+jit: Schleife an Stelle 15 in __main__ bleibt in der VM: schreibt in ein Feld (oder rechnet mit Werten) und ruft eine Funktion, die globale Variablen schreibt
+jit: 1 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
+jit: 23 Runden in der VM -- Stelle 15 in __main__: schreibt in ein Feld (oder rechnet mit Werten) und ruft eine Funktion, die globale Variablen schreibt
+
+=== methode aus der vm gibt auf nach einer feldschreibung
+CLASS Zins
+    DIM zaehler AS INTEGER
+    DIM betrag AS INTEGER
+    SUB verdoppeln()
+        Self.zaehler = Self.zaehler + 1
+        Self.betrag = Self.betrag * 1000
+    END SUB
+END CLASS
+DIM z AS Zins : z = NEW Zins()
+z.betrag = 7
+DIM i AS INTEGER
+TRY
+    FOR i = 1 TO 20
+        z.verdoppeln()
+        PRINT z.zaehler;
+    NEXT
+CATCH e
+    PRINT
+    PRINT "gefangen: "; e; " zeile "; ERROR_LINE()
+END TRY
+PRINT z.zaehler; " "; z.betrag
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+123456
+gefangen: Ganzzahl-Ueberlauf bei '*' (INTEGER ist 64-bit; Wertebereich ueberschritten) zeile 6
+7 7000000000000000000
+
+=== methode aus der vm gibt auf nach einer feldschreibung (maschinencode)
+CLASS Zins
+    DIM zaehler AS INTEGER
+    DIM betrag AS INTEGER
+    SUB verdoppeln()
+        Self.zaehler = Self.zaehler + 1
+        Self.betrag = Self.betrag * 1000
+    END SUB
+END CLASS
+DIM z AS Zins : z = NEW Zins()
+z.betrag = 7
+DIM i AS INTEGER
+TRY
+    FOR i = 1 TO 20
+        z.verdoppeln()
+        PRINT z.zaehler;
+    NEXT
+CATCH e
+    PRINT
+    PRINT "gefangen: "; e; " zeile "; ERROR_LINE()
+END TRY
+PRINT z.zaehler; " "; z.betrag
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+123456
+gefangen: Ganzzahl-Ueberlauf bei '*' (INTEGER ist 64-bit; Wertebereich ueberschritten) zeile 6
+7 7000000000000000000
+--- stderr
+jit: 1 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
+jit: 1 mal mitten in einer Schleife ausgestiegen
+
+=== ueberschreibung aus der vm gerufen
+CLASS Tier
+    DIM n AS INTEGER
+    FUNCTION laut() AS INTEGER
+        RETURN 1
+    END FUNCTION
+    SUB rufen()
+        Self.n = Self.n + laut()
+    END SUB
+END CLASS
+CLASS Hund EXTENDS Tier
+    FUNCTION laut() AS INTEGER
+        RETURN 10
+    END FUNCTION
+END CLASS
+DIM t AS Tier : t = NEW Tier()
+DIM h AS Hund : h = NEW Hund()
+DIM i AS INTEGER
+FOR i = 1 TO 3
+    t.rufen()
+    h.rufen()
+    PRINT t.n; " "; h.n
+NEXT
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+1 10
+2 20
+3 30
+
+=== ueberschreibung aus der vm gerufen (maschinencode)
+CLASS Tier
+    DIM n AS INTEGER
+    FUNCTION laut() AS INTEGER
+        RETURN 1
+    END FUNCTION
+    SUB rufen()
+        Self.n = Self.n + laut()
+    END SUB
+END CLASS
+CLASS Hund EXTENDS Tier
+    FUNCTION laut() AS INTEGER
+        RETURN 10
+    END FUNCTION
+END CLASS
+DIM t AS Tier : t = NEW Tier()
+DIM h AS Hund : h = NEW Hund()
+DIM i AS INTEGER
+FOR i = 1 TO 3
+    t.rufen()
+    h.rufen()
+    PRINT t.n; " "; h.n
+NEXT
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+1 10
+2 20
+3 30
+--- stderr
+jit: 4 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== zahlbefehle in einer schleife
+DIM s AS FLOAT
+DIM n AS INTEGER
+DIM i AS INTEGER
+FOR i = -6 TO 6
+    s = s + ABS(i) + ABS(i * 0.5) + SQR(ABS(i)) + INT(i / 4) + FLT(i)
+    s = s + SIN(i) + COS(i) + TAN(i * 0.1) + ATAN(i) + EXP(i * 0.25)
+    s = s + ATAN2(i, 3) + HYPOT(i, 4) + DEG(i) + RAD(i) + FRAC(i * 0.37)
+    s = s + LERP(i, 10, 0.25)
+    n = n + FLOOR(i * 0.7) + CEIL(i * 0.7) + ROUND(i * 0.5) + SGN(i) + SIGN(i * 0.1)
+    n = n + INT(i) + FLOOR(i) + MIN(i, 2) + MAX(i, -2) + MIN(i, 3, -1) + CLAMP(i, -3, 4)
+    s = s + MIN(i * 1.5, 2.5) + MAX(i * 1.5, -2.5) + CLAMP(i * 1.5, -3.0, 4.0)
+NEXT
+PRINT s; " "; n
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+205.82026601929695 -25
+
+=== zahlbefehle in einer schleife (maschinencode)
+DIM s AS FLOAT
+DIM n AS INTEGER
+DIM i AS INTEGER
+FOR i = -6 TO 6
+    s = s + ABS(i) + ABS(i * 0.5) + SQR(ABS(i)) + INT(i / 4) + FLT(i)
+    s = s + SIN(i) + COS(i) + TAN(i * 0.1) + ATAN(i) + EXP(i * 0.25)
+    s = s + ATAN2(i, 3) + HYPOT(i, 4) + DEG(i) + RAD(i) + FRAC(i * 0.37)
+    s = s + LERP(i, 10, 0.25)
+    n = n + FLOOR(i * 0.7) + CEIL(i * 0.7) + ROUND(i * 0.5) + SGN(i) + SIGN(i * 0.1)
+    n = n + INT(i) + FLOOR(i) + MIN(i, 2) + MAX(i, -2) + MIN(i, 3, -1) + CLAMP(i, -3, 4)
+    s = s + MIN(i * 1.5, 2.5) + MAX(i * 1.5, -2.5) + CLAMP(i * 1.5, -3.0, 4.0)
+NEXT
+PRINT s; " "; n
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+205.82026601929695 -25
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== runden zur geraden zahl und abschneiden
+DIM i AS INTEGER
+FOR i = -5 TO 5
+    PRINT ROUND(i + 0.5); " "; INT(i + 0.5); " "; FLOOR(i - 0.5); " "; CEIL(i - 0.5); " "; FRAC(i - 0.25)
+NEXT
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+-4 -5 -6 -5 -0.25
+-4 -4 -5 -4 -0.25
+-2 -3 -4 -3 -0.25
+-2 -2 -3 -2 -0.25
+0 -1 -2 -1 -0.25
+0 0 -1 0 -0.25
+2 1 0 1 0.75
+2 2 1 2 0.75
+4 3 2 3 0.75
+4 4 3 4 0.75
+6 5 4 5 0.75
+
+=== runden zur geraden zahl und abschneiden (maschinencode)
+DIM i AS INTEGER
+FOR i = -5 TO 5
+    PRINT ROUND(i + 0.5); " "; INT(i + 0.5); " "; FLOOR(i - 0.5); " "; CEIL(i - 0.5); " "; FRAC(i - 0.25)
+NEXT
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+-4 -5 -6 -5 -0.25
+-4 -4 -5 -4 -0.25
+-2 -3 -4 -3 -0.25
+-2 -2 -3 -2 -0.25
+0 -1 -2 -1 -0.25
+0 0 -1 0 -0.25
+2 1 0 1 0.75
+2 2 1 2 0.75
+4 3 2 3 0.75
+4 4 3 4 0.75
+6 5 4 5 0.75
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== int einer grossen ganzzahl geht ueber komma
+DIM x AS INTEGER
+DIM i AS INTEGER
+x = 9007199254740993
+DIM a AS INTEGER
+DIM b AS INTEGER
+DIM c AS INTEGER
+FOR i = 1 TO 4
+    a = a + INT(x) - 9007199254740000
+    b = b + FLOOR(x) - 9007199254740000
+    c = c + ABS(-x) - 9007199254740000
+    x = x + 1
+NEXT
+PRINT a; " "; b; " "; c
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+3978 3978 3978
+
+=== int einer grossen ganzzahl geht ueber komma (maschinencode)
+DIM x AS INTEGER
+DIM i AS INTEGER
+x = 9007199254740993
+DIM a AS INTEGER
+DIM b AS INTEGER
+DIM c AS INTEGER
+FOR i = 1 TO 4
+    a = a + INT(x) - 9007199254740000
+    b = b + FLOOR(x) - 9007199254740000
+    c = c + ABS(-x) - 9007199254740000
+    x = x + 1
+NEXT
+PRINT a; " "; b; " "; c
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+3978 3978 3978
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== sqr einer negativen zahl in der schleife
+DIM s AS FLOAT
+DIM i AS INTEGER
+TRY
+    FOR i = 3 TO -3 STEP -1
+        s = s + SQR(i)
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e; " zeile "; ERROR_LINE()
+END TRY
+PRINT s; " "; i
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+gefangen: SQR von negativer Zahl zeile 5
+4.146264369941973 -1
+
+=== sqr einer negativen zahl in der schleife (maschinencode)
+DIM s AS FLOAT
+DIM i AS INTEGER
+TRY
+    FOR i = 3 TO -3 STEP -1
+        s = s + SQR(i)
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e; " zeile "; ERROR_LINE()
+END TRY
+PRINT s; " "; i
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+gefangen: SQR von negativer Zahl zeile 5
+4.146264369941973 -1
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
+jit: 1 mal mitten in einer Schleife ausgestiegen
+
+=== abs von min in der schleife
+DIM x AS INTEGER
+DIM n AS INTEGER
+DIM i AS INTEGER
+x = -9223372036854775806
+TRY
+    FOR i = 1 TO 5
+        n = ABS(x)
+        x = x - 1
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+PRINT n; " "; i
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+gefangen: ABS: Ganzzahl-Ueberlauf (INTEGER ist 64-bit; Wertebereich ueberschritten)
+9223372036854775807 3
+
+=== abs von min in der schleife (maschinencode)
+DIM x AS INTEGER
+DIM n AS INTEGER
+DIM i AS INTEGER
+x = -9223372036854775806
+TRY
+    FOR i = 1 TO 5
+        n = ABS(x)
+        x = x - 1
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+PRINT n; " "; i
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+gefangen: ABS: Ganzzahl-Ueberlauf (INTEGER ist 64-bit; Wertebereich ueberschritten)
+9223372036854775807 3
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
+jit: 1 mal mitten in einer Schleife ausgestiegen
+
+=== int ausserhalb und log und asin
+DIM f AS FLOAT
+DIM n AS INTEGER
+DIM i AS INTEGER
+f = 1.0
+TRY
+    FOR i = 1 TO 100
+        n = INT(f)
+        f = f * 1000.0
+    NEXT
+CATCH e
+    PRINT "int: "; e; " "; i
+END TRY
+DIM s AS FLOAT
+f = 3.0
+TRY
+    FOR i = 1 TO 10
+        s = s + LOG(f)
+        f = f - 1.0
+    NEXT
+CATCH e
+    PRINT "log: "; e; " "; s; " "; i
+END TRY
+s = 0.0
+f = 0.5
+TRY
+    FOR i = 1 TO 10
+        s = s + ASIN(f) + ACOS(f)
+        f = f + 0.25
+    NEXT
+CATCH e
+    PRINT "asin: "; e; " "; s; " "; i
+END TRY
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+int: INT: Ganzzahl-Ueberlauf (INTEGER ist 64-bit; Wertebereich ueberschritten) 8
+log: LOG: Argument muss > 0 sein 1.791759469228055 4
+asin: ASIN: Argument muss in [-1, 1] liegen 4.71238898038469 4
+
+=== int ausserhalb und log und asin (maschinencode)
+DIM f AS FLOAT
+DIM n AS INTEGER
+DIM i AS INTEGER
+f = 1.0
+TRY
+    FOR i = 1 TO 100
+        n = INT(f)
+        f = f * 1000.0
+    NEXT
+CATCH e
+    PRINT "int: "; e; " "; i
+END TRY
+DIM s AS FLOAT
+f = 3.0
+TRY
+    FOR i = 1 TO 10
+        s = s + LOG(f)
+        f = f - 1.0
+    NEXT
+CATCH e
+    PRINT "log: "; e; " "; s; " "; i
+END TRY
+s = 0.0
+f = 0.5
+TRY
+    FOR i = 1 TO 10
+        s = s + ASIN(f) + ACOS(f)
+        f = f + 0.25
+    NEXT
+CATCH e
+    PRINT "asin: "; e; " "; s; " "; i
+END TRY
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+int: INT: Ganzzahl-Ueberlauf (INTEGER ist 64-bit; Wertebereich ueberschritten) 8
+log: LOG: Argument muss > 0 sein 1.791759469228055 4
+asin: ASIN: Argument muss in [-1, 1] liegen 4.71238898038469 4
+--- stderr
+jit: 0 Funktionen, 3 Schleifen, 0 Schleifenlaeufe
+jit: 3 mal mitten in einer Schleife ausgestiegen
+
+=== min und max mit gemischten arten
+DIM i AS INTEGER
+DIM s AS STRING
+FOR i = 0 TO 4
+    s = s + STR$(MIN(i, 2.5)) + " " + STR$(MAX(i * 1.0, 2)) + ";"
+NEXT
+PRINT s
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+0 2;1 2;2 2.0;2.5 3.0;2.5 4.0;
+
+=== min und max mit gemischten arten (maschinencode)
+DIM i AS INTEGER
+DIM s AS STRING
+FOR i = 0 TO 4
+    s = s + STR$(MIN(i, 2.5)) + " " + STR$(MAX(i * 1.0, 2)) + ";"
+NEXT
+PRINT s
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+0 2;1 2;2 2.0;2.5 3.0;2.5 4.0;
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== deg und rad bis aufs letzte bit
+DIM s AS STRING
+DIM i AS INTEGER
+FOR i = -4 TO 4
+    s = s + STR$(DEG(i * 3.7)) + " " + STR$(RAD(i * 3.7)) + " " + STR$(LERP(i * 0.3, 7.1, 0.37)) + ";"
+NEXT
+PRINT s
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+-847.9775367936184 -0.25830872929516074 1.8709999999999998;-635.9831525952138 -0.1937315469713706 2.06;-423.9887683968092 -0.12915436464758037 2.2489999999999997;-211.9943841984046 -0.06457718232379019 2.438;0.0 0.0 2.627;211.9943841984046 0.06457718232379019 2.816;423.9887683968092 0.12915436464758037 3.005;635.9831525952138 0.1937315469713706 3.1939999999999995;847.9775367936184 0.25830872929516074 3.383;
+
+=== deg und rad bis aufs letzte bit (maschinencode)
+DIM s AS STRING
+DIM i AS INTEGER
+FOR i = -4 TO 4
+    s = s + STR$(DEG(i * 3.7)) + " " + STR$(RAD(i * 3.7)) + " " + STR$(LERP(i * 0.3, 7.1, 0.37)) + ";"
+NEXT
+PRINT s
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+-847.9775367936184 -0.25830872929516074 1.8709999999999998;-635.9831525952138 -0.1937315469713706 2.06;-423.9887683968092 -0.12915436464758037 2.2489999999999997;-211.9943841984046 -0.06457718232379019 2.438;0.0 0.0 2.627;211.9943841984046 0.06457718232379019 2.816;423.9887683968092 0.12915436464758037 3.005;635.9831525952138 0.1937315469713706 3.1939999999999995;847.9775367936184 0.25830872929516074 3.383;
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== zahlbefehle in einer funktion
+FUNCTION weg(x AS FLOAT, y AS FLOAT) AS FLOAT
+    RETURN SQR(x * x + y * y) + ABS(x) - FLOOR(y)
+END FUNCTION
+FUNCTION wurzelsumme(n AS INTEGER) AS FLOAT
+    DIM s AS FLOAT
+    DIM i AS INTEGER
+    FOR i = n TO -1 STEP -1
+        s = s + SQR(i)
+    NEXT
+    RETURN s
+END FUNCTION
+DIM i AS INTEGER
+FOR i = 1 TO 3
+    PRINT weg(i, i * 0.5)
+NEXT
+PRINT wurzelsumme(3)
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+2.118033988749895
+3.23606797749979
+5.354101966249685
+--- fehler
+SQR von negativer Zahl
+
+=== zahlbefehle in einer funktion (maschinencode)
+FUNCTION weg(x AS FLOAT, y AS FLOAT) AS FLOAT
+    RETURN SQR(x * x + y * y) + ABS(x) - FLOOR(y)
+END FUNCTION
+FUNCTION wurzelsumme(n AS INTEGER) AS FLOAT
+    DIM s AS FLOAT
+    DIM i AS INTEGER
+    FOR i = n TO -1 STEP -1
+        s = s + SQR(i)
+    NEXT
+    RETURN s
+END FUNCTION
+DIM i AS INTEGER
+FOR i = 1 TO 3
+    PRINT weg(i, i * 0.5)
+NEXT
+PRINT wurzelsumme(3)
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+2.118033988749895
+3.23606797749979
+5.354101966249685
+--- fehler
+SQR von negativer Zahl
+
+=== not auf einen wert in der schleife
+DIM m AS MAP OF INTEGER
+DIM s AS STRING
+DIM i AS INTEGER
+MAPPUT(m, "k3", 3)
+MAPPUT(m, "k5", 5)
+FOR i = 0 TO 6
+    IF NOT MAPHAS(m, "k" + STR$(i)) THEN s = s + "-" ELSE s = s + "+"
+    IF NOT STR$(i) = "4" THEN s = s + "a"
+NEXT
+PRINT s
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+-a-a-a+a-+a-a
+
+=== not auf einen wert in der schleife (maschinencode)
+DIM m AS MAP OF INTEGER
+DIM s AS STRING
+DIM i AS INTEGER
+MAPPUT(m, "k3", 3)
+MAPPUT(m, "k5", 5)
+FOR i = 0 TO 6
+    IF NOT MAPHAS(m, "k" + STR$(i)) THEN s = s + "-" ELSE s = s + "+"
+    IF NOT STR$(i) = "4" THEN s = s + "a"
+NEXT
+PRINT s
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+-a-a-a+a-+a-a
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== not auf text zahl und nil als wert
+DIM s AS STRING
+DIM t AS STRING
+DIM i AS INTEGER
+DIM m AS MAP OF STRING
+MAPPUT(m, "a", "")
+MAPPUT(m, "b", "x")
+FOR i = 0 TO 3
+    t = MID$("ab  ", i, 1)
+    s = s + STR$(NOT t) + " " + STR$(NOT MAPGETOR(m, t, "y")) + " " + STR$(NOT VAL(STR$(i - 1))) + ";"
+NEXT
+PRINT s
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+FALSE TRUE FALSE;FALSE FALSE TRUE;FALSE FALSE FALSE;FALSE FALSE FALSE;
+
+=== not auf text zahl und nil als wert (maschinencode)
+DIM s AS STRING
+DIM t AS STRING
+DIM i AS INTEGER
+DIM m AS MAP OF STRING
+MAPPUT(m, "a", "")
+MAPPUT(m, "b", "x")
+FOR i = 0 TO 3
+    t = MID$("ab  ", i, 1)
+    s = s + STR$(NOT t) + " " + STR$(NOT MAPGETOR(m, t, "y")) + " " + STR$(NOT VAL(STR$(i - 1))) + ";"
+NEXT
+PRINT s
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+FALSE TRUE FALSE;FALSE FALSE TRUE;FALSE FALSE FALSE;FALSE FALSE FALSE;
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== spielschleife mit not und vorbelegten namen
+DIM runde AS INTEGER
+DIM s AS FLOAT
+DIM n AS INTEGER
+DIM log AS STRING
+FUNCTION fertig(r AS INTEGER) AS BOOLEAN
+    RETURN r >= 5
+END FUNCTION
+DIM m AS MAP OF INTEGER
+MAPPUT(m, "x", 1)
+WHILE NOT fertig(runde) AND NOT MAPHAS(m, STR$(runde))
+    n = n + RED + KEY_ESCAPE + KEY_SPACE - WHITE + BLUE
+    s = s + PI * runde + TAU
+    log = log + STR$(runde)
+    runde = runde + 1
+WEND
+PRINT n; " "; s; " "; log
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+-326105 62.83185307179586 01234
+
+=== spielschleife mit not und vorbelegten namen (maschinencode)
+DIM runde AS INTEGER
+DIM s AS FLOAT
+DIM n AS INTEGER
+DIM log AS STRING
+FUNCTION fertig(r AS INTEGER) AS BOOLEAN
+    RETURN r >= 5
+END FUNCTION
+DIM m AS MAP OF INTEGER
+MAPPUT(m, "x", 1)
+WHILE NOT fertig(runde) AND NOT MAPHAS(m, STR$(runde))
+    n = n + RED + KEY_ESCAPE + KEY_SPACE - WHITE + BLUE
+    s = s + PI * runde + TAU
+    log = log + STR$(runde)
+    runde = runde + 1
+WEND
+PRINT n; " "; s; " "; log
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+-326105 62.83185307179586 01234
+--- stderr
+jit: 1 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== vorbelegte namen in einer funktion
+FUNCTION kreis(r AS FLOAT) AS FLOAT
+    RETURN PI * r * r + TAU
+END FUNCTION
+FUNCTION farbe(i AS INTEGER) AS INTEGER
+    IF i MOD 2 = 0 THEN RETURN RED
+    RETURN GREEN + DARKBLUE
+END FUNCTION
+DIM i AS INTEGER
+DIM s AS FLOAT
+DIM n AS INTEGER
+FOR i = 1 TO 4
+    s = s + kreis(i)
+    n = n + farbe(i)
+NEXT
+PRINT s; " "; n
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+119.38052083641213 33554176
+
+=== vorbelegte namen in einer funktion (maschinencode)
+FUNCTION kreis(r AS FLOAT) AS FLOAT
+    RETURN PI * r * r + TAU
+END FUNCTION
+FUNCTION farbe(i AS INTEGER) AS INTEGER
+    IF i MOD 2 = 0 THEN RETURN RED
+    RETURN GREEN + DARKBLUE
+END FUNCTION
+DIM i AS INTEGER
+DIM s AS FLOAT
+DIM n AS INTEGER
+FOR i = 1 TO 4
+    s = s + kreis(i)
+    n = n + farbe(i)
+NEXT
+PRINT s; " "; n
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+119.38052083641213 33554176
+--- stderr
+jit: 2 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== print in der schleife mit trennern
+DIM i AS INTEGER
+DIM s AS FLOAT
+DIM t AS STRING
+FOR i = 1 TO 4
+    s = s + SQR(i)
+    t = t + CHR$(64 + i)
+    PRINT i; " "; s, t; "|"
+    PRINT i, i * 2, i * 0.5
+    PRINT
+    PRINT "ende"; i;
+NEXT
+PRINT
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+1 1.0 A|
+1 2 0.5
+
+ende12 2.414213562373095 AB|
+2 4 1.0
+
+ende23 4.146264369941973 ABC|
+3 6 1.5
+
+ende34 6.146264369941973 ABCD|
+4 8 2.0
+
+ende4
+
+=== print in der schleife mit trennern (maschinencode)
+DIM i AS INTEGER
+DIM s AS FLOAT
+DIM t AS STRING
+FOR i = 1 TO 4
+    s = s + SQR(i)
+    t = t + CHR$(64 + i)
+    PRINT i; " "; s, t; "|"
+    PRINT i, i * 2, i * 0.5
+    PRINT
+    PRINT "ende"; i;
+NEXT
+PRINT
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+1 1.0 A|
+1 2 0.5
+
+ende12 2.414213562373095 AB|
+2 4 1.0
+
+ende23 4.146264369941973 ABC|
+3 6 1.5
+
+ende34 6.146264369941973 ABCD|
+4 8 2.0
+
+ende4
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== print dann fehler in derselben runde
+DIM i AS INTEGER
+DIM s AS FLOAT
+TRY
+    FOR i = 3 TO -3 STEP -1
+        PRINT "vorher "; i
+        s = s + SQR(i)
+        PRINT "nachher "; s
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+PRINT i
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+vorher 3
+nachher 1.7320508075688772
+vorher 2
+nachher 3.1462643699419726
+vorher 1
+nachher 4.146264369941973
+vorher 0
+nachher 4.146264369941973
+vorher -1
+gefangen: SQR von negativer Zahl
+-1
+
+=== print dann fehler in derselben runde (maschinencode)
+DIM i AS INTEGER
+DIM s AS FLOAT
+TRY
+    FOR i = 3 TO -3 STEP -1
+        PRINT "vorher "; i
+        s = s + SQR(i)
+        PRINT "nachher "; s
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+PRINT i
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+vorher 3
+nachher 1.7320508075688772
+vorher 2
+nachher 3.1462643699419726
+vorher 1
+nachher 4.146264369941973
+vorher 0
+nachher 4.146264369941973
+vorher -1
+gefangen: SQR von negativer Zahl
+-1
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
+jit: 1 mal mitten in einer Schleife ausgestiegen
+
+=== print mit einer funktion, die globale schreibt
+DIM zaehler AS INTEGER
+SUB zaehle()
+    zaehler = zaehler + 1
+END SUB
+DIM i AS INTEGER
+DIM s AS FLOAT
+TRY
+    FOR i = 2 TO -2 STEP -1
+        zaehle()
+        PRINT "runde "; i; " "; zaehler
+        s = s + SQR(i)
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+PRINT zaehler
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+runde 2 1
+runde 1 2
+runde 0 3
+runde -1 4
+gefangen: SQR von negativer Zahl
+4
+
+=== print mit einer funktion, die globale schreibt (maschinencode)
+DIM zaehler AS INTEGER
+SUB zaehle()
+    zaehler = zaehler + 1
+END SUB
+DIM i AS INTEGER
+DIM s AS FLOAT
+TRY
+    FOR i = 2 TO -2 STEP -1
+        zaehle()
+        PRINT "runde "; i; " "; zaehler
+        s = s + SQR(i)
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+PRINT zaehler
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+runde 2 1
+runde 1 2
+runde 0 3
+runde -1 4
+gefangen: SQR von negativer Zahl
+4
+--- stderr
+jit: Schleife an Stelle 13 in __main__ bleibt in der VM: schreibt in ein Feld (oder rechnet mit Werten) und ruft eine Funktion, die globale Variablen schreibt
+jit: 1 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
+jit: 2 Runden in der VM -- Stelle 13 in __main__: schreibt in ein Feld (oder rechnet mit Werten) und ruft eine Funktion, die globale Variablen schreibt
+
+=== print von werten aller art
+DIM m AS MAP OF INTEGER
+DIM i AS INTEGER
+DIM b AS BOOLEAN
+MAPPUT(m, "a", 1)
+FOR i = 0 TO 2
+    b = i MOD 2 = 0
+    PRINT b; " "; MAPHAS(m, "a"); " "; STR$(i) + "x"; " "; i / 2
+NEXT
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+TRUE TRUE 0x 0.0
+FALSE TRUE 1x 0.5
+TRUE TRUE 2x 1.0
+
+=== print von werten aller art (maschinencode)
+DIM m AS MAP OF INTEGER
+DIM i AS INTEGER
+DIM b AS BOOLEAN
+MAPPUT(m, "a", 1)
+FOR i = 0 TO 2
+    b = i MOD 2 = 0
+    PRINT b; " "; MAPHAS(m, "a"); " "; STR$(i) + "x"; " "; i / 2
+NEXT
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+TRUE TRUE 0x 0.0
+FALSE TRUE 1x 0.5
+TRUE TRUE 2x 1.0
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== handle als zahl lesen
+DIM b AS IMAGE
+DIM k AS SOUND
+DIM i AS INTEGER
+DIM s AS INTEGER
+b = 5
+k = 7
+FOR i = 1 TO 6
+    s = s + b * i - k
+NEXT
+PRINT s; " "; b; " "; k
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+63 5 7
+
+=== handle als zahl lesen (maschinencode)
+DIM b AS IMAGE
+DIM k AS SOUND
+DIM i AS INTEGER
+DIM s AS INTEGER
+b = 5
+k = 7
+FOR i = 1 TO 6
+    s = s + b * i - k
+NEXT
+PRINT s; " "; b; " "; k
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+63 5 7
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== handle schreiben bleibt in der vm und zaehlt runden
+DIM b AS IMAGE
+DIM i AS INTEGER
+DIM s AS INTEGER
+b = 5
+FOR i = 1 TO 6
+    b = b + 1
+    s = s + b
+NEXT
+PRINT s; " "; b
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+51 11
+
+=== handle schreiben bleibt in der vm und zaehlt runden (maschinencode)
+DIM b AS IMAGE
+DIM i AS INTEGER
+DIM s AS INTEGER
+b = 5
+FOR i = 1 TO 6
+    b = b + 1
+    s = s + b
+NEXT
+PRINT s; " "; b
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+51 11
+--- stderr
+jit: Schleife an Stelle 15 in __main__ bleibt in der VM: Platz 1 hat den Typ 'image'; mit Werten: Platz 1 hat den Typ 'image'
+jit: 0 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
+jit: 4 Runden in der VM -- Stelle 15 in __main__: Platz 1 hat den Typ 'image'; mit Werten: Platz 1 hat den Typ 'image'
+
+=== befehl in einem seltenen zweig wird spaet gebunden
+IMPORT "json"
+DIM h AS JSON_HANDLE
+DIM i AS INTEGER
+DIM s AS INTEGER
+DIM t AS STRING
+h = JSON_PARSE("[4, 7]")
+FOR i = 1 TO 30
+    t = t + "."
+    IF i MOD 10 = 0 THEN s = s + JSON_GET_INT(h, "1") * i
+    IF i = 25 THEN s = s + LEN(STR$(i * 1000))
+NEXT
+PRINT s; " "; LEN(t)
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+425 30
+
+=== befehl in einem seltenen zweig wird spaet gebunden (maschinencode)
+IMPORT "json"
+DIM h AS JSON_HANDLE
+DIM i AS INTEGER
+DIM s AS INTEGER
+DIM t AS STRING
+h = JSON_PARSE("[4, 7]")
+FOR i = 1 TO 30
+    t = t + "."
+    IF i MOD 10 = 0 THEN s = s + JSON_GET_INT(h, "1") * i
+    IF i = 25 THEN s = s + LEN(STR$(i * 1000))
+NEXT
+PRINT s; " "; LEN(t)
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+425 30
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+jit: 2 mal mitten in einer Schleife ausgestiegen
+
+=== verbotene familie im seltenen zweig steigt jedes mal aus
+DIM vergleiche AS INTEGER
+FUNCTION absteigend(a AS INTEGER, b AS INTEGER) AS INTEGER
+    vergleiche = vergleiche + 1
+    RETURN b - a
+END FUNCTION
+DIM f[4] AS INTEGER
+DIM i AS INTEGER
+DIM s AS STRING
+DIM cmp AS FUNCREF
+cmp = absteigend
+f[0] = 3 : f[1] = 9 : f[2] = 1 : f[3] = 5
+FOR i = 1 TO 12
+    s = s + "."
+    IF i MOD 4 = 0 THEN
+        SORT(f, cmp)
+        s = s + STR$(f[0]) + "/" + STR$(vergleiche)
+    END IF
+NEXT
+PRINT s
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+....9/5....9/8....9/11
+
+=== verbotene familie im seltenen zweig steigt jedes mal aus (maschinencode)
+DIM vergleiche AS INTEGER
+FUNCTION absteigend(a AS INTEGER, b AS INTEGER) AS INTEGER
+    vergleiche = vergleiche + 1
+    RETURN b - a
+END FUNCTION
+DIM f[4] AS INTEGER
+DIM i AS INTEGER
+DIM s AS STRING
+DIM cmp AS FUNCREF
+cmp = absteigend
+f[0] = 3 : f[1] = 9 : f[2] = 1 : f[3] = 5
+FOR i = 1 TO 12
+    s = s + "."
+    IF i MOD 4 = 0 THEN
+        SORT(f, cmp)
+        s = s + STR$(f[0]) + "/" + STR$(vergleiche)
+    END IF
+NEXT
+PRINT s
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+....9/5....9/8....9/11
+--- stderr
+jit: 1 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
+jit: 3 mal mitten in einer Schleife ausgestiegen
+
+=== fehler eines spaet gebundenen befehls
+IMPORT "json"
+DIM h AS JSON_HANDLE
+DIM i AS INTEGER
+DIM s AS STRING
+h = JSON_PARSE("[4, 7]")
+TRY
+    FOR i = 1 TO 10
+        s = s + "."
+        IF i = 6 THEN s = s + STR$(JSON_GET_INT(h, "9"))
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e; " zeile "; ERROR_LINE()
+END TRY
+PRINT s; " "; i
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+gefangen: JSON_GET_INT: Pfad '9' nicht aufloesbar zeile 9
+...... 6
+
+=== fehler eines spaet gebundenen befehls (maschinencode)
+IMPORT "json"
+DIM h AS JSON_HANDLE
+DIM i AS INTEGER
+DIM s AS STRING
+h = JSON_PARSE("[4, 7]")
+TRY
+    FOR i = 1 TO 10
+        s = s + "."
+        IF i = 6 THEN s = s + STR$(JSON_GET_INT(h, "9"))
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e; " zeile "; ERROR_LINE()
+END TRY
+PRINT s; " "; i
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+gefangen: JSON_GET_INT: Pfad '9' nicht aufloesbar zeile 9
+...... 6
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
+jit: 1 mal mitten in einer Schleife ausgestiegen
+
+=== dim in einem seltenen zweig ist ein fester ausgang
+DIM i AS INTEGER
+DIM s AS INTEGER
+DIM t AS STRING
+FOR i = 1 TO 40
+    s = s + i
+    IF i = 10 THEN
+        DIM name AS STRING
+        name = "x"
+    END IF
+    IF i > 10 THEN t = t + name
+NEXT
+PRINT s; " "; LEN(t)
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+820 30
+
+=== dim in einem seltenen zweig ist ein fester ausgang (maschinencode)
+DIM i AS INTEGER
+DIM s AS INTEGER
+DIM t AS STRING
+FOR i = 1 TO 40
+    s = s + i
+    IF i = 10 THEN
+        DIM name AS STRING
+        name = "x"
+    END IF
+    IF i > 10 THEN t = t + name
+NEXT
+PRINT s; " "; LEN(t)
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+820 30
+--- stderr
+jit: 0 Funktionen, 2 Schleifen, 1 Schleifenlaeufe
+jit: 1 mal mitten in einer Schleife ausgestiegen
+jit: 1 mal neu gebaut, weil eine globale Variable dazukam
+
+=== dim in einem nie genommenen zweig
+DIM i AS INTEGER
+DIM s AS INTEGER
+FOR i = 1 TO 20
+    s = s + i * 2
+    IF i > 100 THEN
+        DIM nie AS STRING
+        nie = "y"
+    END IF
+NEXT
+PRINT s
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+420
+
+=== dim in einem nie genommenen zweig (maschinencode)
+DIM i AS INTEGER
+DIM s AS INTEGER
+FOR i = 1 TO 20
+    s = s + i * 2
+    IF i > 100 THEN
+        DIM nie AS STRING
+        nie = "y"
+    END IF
+NEXT
+PRINT s
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+420
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== seltenes dim neben try bleibt in der vm
+DIM i AS INTEGER
+DIM s AS INTEGER
+FOR i = 1 TO 12
+    s = s + i
+    IF i = 4 THEN
+        DIM spaeter AS INTEGER
+        spaeter = 7
+    END IF
+    IF i > 4 THEN s = s + spaeter
+    IF i = 11 THEN
+        TRY
+            THROW "x"
+        CATCH e
+            s = s + 1000
+        END TRY
+    END IF
+NEXT
+PRINT s
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+1134
+
+=== seltenes dim neben try bleibt in der vm (maschinencode)
+DIM i AS INTEGER
+DIM s AS INTEGER
+FOR i = 1 TO 12
+    s = s + i
+    IF i = 4 THEN
+        DIM spaeter AS INTEGER
+        spaeter = 7
+    END IF
+    IF i > 4 THEN s = s + spaeter
+    IF i = 11 THEN
+        TRY
+            THROW "x"
+        CATCH e
+            s = s + 1000
+        END TRY
+    END IF
+NEXT
+PRINT s
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+1134
+--- stderr
+jit: Schleife an Stelle 12 in __main__ bleibt in der VM: TRY/THROW; mit Werten: TRY/THROW
+jit: 0 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
+jit: 10 Runden in der VM -- Stelle 12 in __main__: TRY/THROW; mit Werten: TRY/THROW
+
+=== funktion liest ein globales feld
+DIM tab[10] AS INTEGER
+DIM i AS INTEGER
+FOR i = 0 TO 9
+    tab[i] = i * i
+NEXT
+FUNCTION nimm(k AS INTEGER) AS INTEGER
+    RETURN tab[k MOD 10]
+END FUNCTION
+DIM s AS INTEGER
+FOR i = 0 TO 200
+    s = s + nimm(i)
+NEXT
+PRINT s
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+5700
+
+=== funktion liest ein globales feld (maschinencode)
+DIM tab[10] AS INTEGER
+DIM i AS INTEGER
+FOR i = 0 TO 9
+    tab[i] = i * i
+NEXT
+FUNCTION nimm(k AS INTEGER) AS INTEGER
+    RETURN tab[k MOD 10]
+END FUNCTION
+DIM s AS INTEGER
+FOR i = 0 TO 200
+    s = s + nimm(i)
+NEXT
+PRINT s
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+5700
+--- stderr
+jit: 1 Funktionen, 2 Schleifen, 2 Schleifenlaeufe
+
+=== funktion liest ein globales feld mit drei indizes
+DIM form[3, 4, 16] AS INTEGER
+DIM a AS INTEGER
+DIM b AS INTEGER
+DIM c AS INTEGER
+FOR a = 0 TO 2
+    FOR b = 0 TO 3
+        FOR c = 0 TO 15
+            form[a, b, c] = (a * 7 + b * 3 + c) MOD 5
+        NEXT
+    NEXT
+NEXT
+FUNCTION zelle(k AS INTEGER, r AS INTEGER, dx AS INTEGER, dy AS INTEGER) AS INTEGER
+    RETURN form[k, r, dy * 4 + dx]
+END FUNCTION
+DIM s AS INTEGER
+FOR a = 0 TO 2
+    FOR b = 0 TO 3
+        FOR c = 0 TO 3
+            s = s + zelle(a, b, c, 3 - c) * (c + 1)
+        NEXT
+    NEXT
+NEXT
+PRINT s
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+245
+
+=== funktion liest ein globales feld mit drei indizes (maschinencode)
+DIM form[3, 4, 16] AS INTEGER
+DIM a AS INTEGER
+DIM b AS INTEGER
+DIM c AS INTEGER
+FOR a = 0 TO 2
+    FOR b = 0 TO 3
+        FOR c = 0 TO 15
+            form[a, b, c] = (a * 7 + b * 3 + c) MOD 5
+        NEXT
+    NEXT
+NEXT
+FUNCTION zelle(k AS INTEGER, r AS INTEGER, dx AS INTEGER, dy AS INTEGER) AS INTEGER
+    RETURN form[k, r, dy * 4 + dx]
+END FUNCTION
+DIM s AS INTEGER
+FOR a = 0 TO 2
+    FOR b = 0 TO 3
+        FOR c = 0 TO 3
+            s = s + zelle(a, b, c, 3 - c) * (c + 1)
+        NEXT
+    NEXT
+NEXT
+PRINT s
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+245
+--- stderr
+jit: 1 Funktionen, 6 Schleifen, 6 Schleifenlaeufe
+
+=== funktion liest ein globales kommazahlfeld
+DIM stufen[8] AS FLOAT
+DIM i AS INTEGER
+FOR i = 0 TO 7
+    stufen[i] = i * 0.25 + 0.125
+NEXT
+FUNCTION fband(k AS INTEGER) AS FLOAT
+    RETURN stufen[k MOD 8] * 2.0
+END FUNCTION
+DIM s AS FLOAT
+FOR i = 0 TO 100
+    s = s + fband(i)
+NEXT
+PRINT s
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+198.25
+
+=== funktion liest ein globales kommazahlfeld (maschinencode)
+DIM stufen[8] AS FLOAT
+DIM i AS INTEGER
+FOR i = 0 TO 7
+    stufen[i] = i * 0.25 + 0.125
+NEXT
+FUNCTION fband(k AS INTEGER) AS FLOAT
+    RETURN stufen[k MOD 8] * 2.0
+END FUNCTION
+DIM s AS FLOAT
+FOR i = 0 TO 100
+    s = s + fband(i)
+NEXT
+PRINT s
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+198.25
+--- stderr
+jit: 1 Funktionen, 2 Schleifen, 2 Schleifenlaeufe
+
+=== funktion liest ein globales feld ausserhalb
+DIM tab[4] AS INTEGER
+tab[2] = 5
+FUNCTION nimm(k AS INTEGER) AS INTEGER
+    RETURN tab[k]
+END FUNCTION
+DIM i AS INTEGER
+DIM s AS INTEGER
+TRY
+    FOR i = 0 TO 10
+        s = s + nimm(i)
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+PRINT i; " "; s
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+gefangen: Index 4 ausserhalb [0..3] in Dimension 1 -- Felder zaehlen ab 0: DIM a[4] hat a[0] bis a[3]
+4 5
+
+=== funktion liest ein globales feld ausserhalb (maschinencode)
+DIM tab[4] AS INTEGER
+tab[2] = 5
+FUNCTION nimm(k AS INTEGER) AS INTEGER
+    RETURN tab[k]
+END FUNCTION
+DIM i AS INTEGER
+DIM s AS INTEGER
+TRY
+    FOR i = 0 TO 10
+        s = s + nimm(i)
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+PRINT i; " "; s
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+gefangen: Index 4 ausserhalb [0..3] in Dimension 1 -- Felder zaehlen ab 0: DIM a[4] hat a[0] bis a[3]
+4 5
+--- stderr
+jit: 1 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
+jit: 1 mal mitten in einer Schleife ausgestiegen
+
+=== funktion sieht aenderungen am globalen feld
+DIM tab[5] AS INTEGER
+FUNCTION nimm(k AS INTEGER) AS INTEGER
+    RETURN tab[k]
+END FUNCTION
+DIM i AS INTEGER
+DIM s AS INTEGER
+FOR i = 0 TO 40
+    tab[i MOD 5] = tab[i MOD 5] + i
+    s = s + nimm((i + 2) MOD 5)
+NEXT
+PRINT s; " "; tab[0]; " "; tab[4]
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+2124 180 172
+
+=== funktion sieht aenderungen am globalen feld (maschinencode)
+DIM tab[5] AS INTEGER
+FUNCTION nimm(k AS INTEGER) AS INTEGER
+    RETURN tab[k]
+END FUNCTION
+DIM i AS INTEGER
+DIM s AS INTEGER
+FOR i = 0 TO 40
+    tab[i MOD 5] = tab[i MOD 5] + i
+    s = s + nimm((i + 2) MOD 5)
+NEXT
+PRINT s; " "; tab[0]; " "; tab[4]
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+2124 180 172
+--- stderr
+jit: 1 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== globales feld von zahlen ohne groesse
+DIM werte AS ARRAY OF INTEGER
+DIM i AS INTEGER
+FOR i = 1 TO 6
+    ARRAY_PUSH(werte, i * 3)
+NEXT
+FUNCTION w(k AS INTEGER) AS INTEGER
+    RETURN werte[k MOD 6]
+END FUNCTION
+DIM s AS INTEGER
+FOR i = 0 TO 50
+    s = s + w(i)
+NEXT
+PRINT s
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+522
+
+=== globales feld von zahlen ohne groesse (maschinencode)
+DIM werte AS ARRAY OF INTEGER
+DIM i AS INTEGER
+FOR i = 1 TO 6
+    ARRAY_PUSH(werte, i * 3)
+NEXT
+FUNCTION w(k AS INTEGER) AS INTEGER
+    RETURN werte[k MOD 6]
+END FUNCTION
+DIM s AS INTEGER
+FOR i = 0 TO 50
+    s = s + w(i)
+NEXT
+PRINT s
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+522
+--- stderr
+jit: 1 Funktionen, 2 Schleifen, 2 Schleifenlaeufe
+
+=== rgb in einer funktion
+FUNCTION farbe(p AS FLOAT, hell AS FLOAT) AS INTEGER
+    DIM r AS INTEGER
+    DIM g AS INTEGER
+    DIM b AS INTEGER
+    r = INT((0.5 + 0.5 * SIN(p)) * hell * 255.0)
+    g = INT((0.5 + 0.5 * SIN(p + 2.094)) * hell * 255.0)
+    b = INT((0.5 + 0.5 * SIN(p + 4.188)) * hell * 255.0)
+    RETURN RGB(MIN(255, r), MIN(255, g), MIN(255, b))
+END FUNCTION
+DIM i AS INTEGER
+DIM s AS INTEGER
+FOR i = 0 TO 100
+    s = (s + farbe(i * 0.1, 0.9)) MOD 1000003
+NEXT
+PRINT s; " "; HEX$(farbe(1.0, 1.0))
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+94680 EA850E
+
+=== rgb in einer funktion (maschinencode)
+FUNCTION farbe(p AS FLOAT, hell AS FLOAT) AS INTEGER
+    DIM r AS INTEGER
+    DIM g AS INTEGER
+    DIM b AS INTEGER
+    r = INT((0.5 + 0.5 * SIN(p)) * hell * 255.0)
+    g = INT((0.5 + 0.5 * SIN(p + 2.094)) * hell * 255.0)
+    b = INT((0.5 + 0.5 * SIN(p + 4.188)) * hell * 255.0)
+    RETURN RGB(MIN(255, r), MIN(255, g), MIN(255, b))
+END FUNCTION
+DIM i AS INTEGER
+DIM s AS INTEGER
+FOR i = 0 TO 100
+    s = (s + farbe(i * 0.1, 0.9)) MOD 1000003
+NEXT
+PRINT s; " "; HEX$(farbe(1.0, 1.0))
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+94680 EA850E
+--- stderr
+jit: 1 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== rgba mit deckkraft null wird eins
+DIM i AS INTEGER
+DIM s AS INTEGER
+FOR i = 0 TO 20
+    s = (s + RGBA(i, 255 - i, i * 2, i MOD 3)) MOD 1000003
+NEXT
+PRINT s; " "; HEX$(RGBA(1, 2, 3, 0)); " "; HEX$(RGBA(1, 2, 3, 255))
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+840696 1010203 FF010203
+
+=== rgba mit deckkraft null wird eins (maschinencode)
+DIM i AS INTEGER
+DIM s AS INTEGER
+FOR i = 0 TO 20
+    s = (s + RGBA(i, 255 - i, i * 2, i MOD 3)) MOD 1000003
+NEXT
+PRINT s; " "; HEX$(RGBA(1, 2, 3, 0)); " "; HEX$(RGBA(1, 2, 3, 255))
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+840696 1010203 FF010203
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== rgb ausserhalb des bereichs
+DIM i AS INTEGER
+DIM s AS INTEGER
+TRY
+    FOR i = 250 TO 260
+        s = (s + RGB(i, 0, 0)) MOD 1000003
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+PRINT i; " "; s
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+gefangen: RGB-Werte muessen 0..255 sein
+256 286743
+
+=== rgb ausserhalb des bereichs (maschinencode)
+DIM i AS INTEGER
+DIM s AS INTEGER
+TRY
+    FOR i = 250 TO 260
+        s = (s + RGB(i, 0, 0)) MOD 1000003
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+PRINT i; " "; s
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+gefangen: RGB-Werte muessen 0..255 sein
+256 286743
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
+jit: 1 mal mitten in einer Schleife ausgestiegen
+
+=== rgb mit negativem anteil
+FUNCTION f(k AS INTEGER) AS INTEGER
+    RETURN RGB(10, k, 20)
+END FUNCTION
+DIM i AS INTEGER
+DIM s AS INTEGER
+TRY
+    FOR i = 3 TO -3 STEP -1
+        s = s + f(i)
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+PRINT i; " "; s
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+gefangen: RGB-Werte muessen 0..255 sein
+-1 2623056
+
+=== rgb mit negativem anteil (maschinencode)
+FUNCTION f(k AS INTEGER) AS INTEGER
+    RETURN RGB(10, k, 20)
+END FUNCTION
+DIM i AS INTEGER
+DIM s AS INTEGER
+TRY
+    FOR i = 3 TO -3 STEP -1
+        s = s + f(i)
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+PRINT i; " "; s
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+gefangen: RGB-Werte muessen 0..255 sein
+-1 2623056
+--- stderr
+jit: 1 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
+jit: 1 mal mitten in einer Schleife ausgestiegen
+
+=== schleife ruft eine funktion mit textbefehl ueber die vm
+FUNCTION kurz$(i AS INTEGER) AS STRING
+    RETURN LEFT$(STR$(i * 7), 2)
+END FUNCTION
+DIM i AS INTEGER
+DIM s AS INTEGER
+DIM t AS STRING
+FOR i = 1 TO 30
+    s = s + LEN(kurz$(i)) + i
+    t = kurz$(i)
+NEXT
+PRINT s; " "; t
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+524 21
+
+=== schleife ruft eine funktion mit textbefehl ueber die vm (maschinencode)
+FUNCTION kurz$(i AS INTEGER) AS STRING
+    RETURN LEFT$(STR$(i * 7), 2)
+END FUNCTION
+DIM i AS INTEGER
+DIM s AS INTEGER
+DIM t AS STRING
+FOR i = 1 TO 30
+    s = s + LEN(kurz$(i)) + i
+    t = kurz$(i)
+NEXT
+PRINT s; " "; t
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+524 21
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== sub ueber die vm schreibt eine fremde globale
+DIM zaehler AS INTEGER
+DIM protokoll AS STRING
+SUB notiere(k AS INTEGER)
+    zaehler = zaehler + k
+    protokoll = protokoll + STR$(k) + ","
+END SUB
+DIM i AS INTEGER
+DIM s AS INTEGER
+FOR i = 1 TO 8
+    s = s + i * 2
+    notiere(i)
+NEXT
+PRINT s; " "; zaehler; " "; protokoll
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+72 36 1,2,3,4,5,6,7,8,
+
+=== sub ueber die vm schreibt eine fremde globale (maschinencode)
+DIM zaehler AS INTEGER
+DIM protokoll AS STRING
+SUB notiere(k AS INTEGER)
+    zaehler = zaehler + k
+    protokoll = protokoll + STR$(k) + ","
+END SUB
+DIM i AS INTEGER
+DIM s AS INTEGER
+FOR i = 1 TO 8
+    s = s + i * 2
+    notiere(i)
+NEXT
+PRINT s; " "; zaehler; " "; protokoll
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+72 36 1,2,3,4,5,6,7,8,
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== funktion ueber die vm beruehrt eine globale des bereichs
+DIM s AS INTEGER
+DIM t AS STRING
+SUB mehr(k AS INTEGER)
+    s = s + k * 100
+    t = t + "x"
+END SUB
+DIM i AS INTEGER
+FOR i = 1 TO 6
+    s = s + 1
+    mehr(i)
+NEXT
+PRINT s; " "; t
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+2106 xxxxxx
+
+=== funktion ueber die vm beruehrt eine globale des bereichs (maschinencode)
+DIM s AS INTEGER
+DIM t AS STRING
+SUB mehr(k AS INTEGER)
+    s = s + k * 100
+    t = t + "x"
+END SUB
+DIM i AS INTEGER
+FOR i = 1 TO 6
+    s = s + 1
+    mehr(i)
+NEXT
+PRINT s; " "; t
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+2106 xxxxxx
+--- stderr
+jit: Schleife an Stelle 13 in __main__ bleibt in der VM: ruft eine Funktion, die in der VM bleibt; mit Werten: Funktion mehr: mehr beruehrt die Globale 's' des Bereichs
+jit: 0 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
+jit: 4 Runden in der VM -- Stelle 13 in __main__: ruft eine Funktion, die in der VM bleibt; mit Werten: Funktion mehr: mehr beruehrt die Globale 's' des Bereichs
+
+=== funktion ueber die vm mit argumenten in reihenfolge
+FUNCTION teil$(a AS STRING, von AS INTEGER, laenge AS INTEGER) AS STRING
+    RETURN MID$(a, von, laenge)
+END FUNCTION
+DIM i AS INTEGER
+DIM t AS STRING
+FOR i = 0 TO 5
+    t = t + teil$("abcdefghij", i, 2) + "|"
+NEXT
+PRINT t
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+ab|bc|cd|de|ef|fg|
+
+=== funktion ueber die vm mit argumenten in reihenfolge (maschinencode)
+FUNCTION teil$(a AS STRING, von AS INTEGER, laenge AS INTEGER) AS STRING
+    RETURN MID$(a, von, laenge)
+END FUNCTION
+DIM i AS INTEGER
+DIM t AS STRING
+FOR i = 0 TO 5
+    t = t + teil$("abcdefghij", i, 2) + "|"
+NEXT
+PRINT t
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+ab|bc|cd|de|ef|fg|
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== funktion ueber die vm wirft mitten in der schleife
+DIM protokoll AS STRING
+FUNCTION pruefe(k AS INTEGER) AS INTEGER
+    protokoll = protokoll + STR$(k) + ";"
+    IF k = 4 THEN THROW "vier geht nicht"
+    RETURN LEN(STR$(k)) + k
+END FUNCTION
+DIM i AS INTEGER
+DIM s AS INTEGER
+TRY
+    FOR i = 1 TO 9
+        s = s + pruefe(i)
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+PRINT i; " "; s; " "; protokoll
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+gefangen: vier geht nicht
+4 9 1;2;3;4;
+
+=== funktion ueber die vm wirft mitten in der schleife (maschinencode)
+DIM protokoll AS STRING
+FUNCTION pruefe(k AS INTEGER) AS INTEGER
+    protokoll = protokoll + STR$(k) + ";"
+    IF k = 4 THEN THROW "vier geht nicht"
+    RETURN LEN(STR$(k)) + k
+END FUNCTION
+DIM i AS INTEGER
+DIM s AS INTEGER
+TRY
+    FOR i = 1 TO 9
+        s = s + pruefe(i)
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+PRINT i; " "; s; " "; protokoll
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+gefangen: vier geht nicht
+4 9 1;2;3;4;
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
+jit: 1 mal mitten in einer Schleife ausgestiegen
+
+=== funktion ueber die vm mit laufzeitfehler
+FUNCTION stelle$(a AS STRING, k AS INTEGER) AS STRING
+    DIM f[3] AS INTEGER
+    f[k] = 1
+    RETURN a + STR$(k)
+END FUNCTION
+DIM i AS INTEGER
+DIM t AS STRING
+TRY
+    FOR i = 0 TO 5
+        t = t + stelle$("n", i)
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+PRINT i; " "; t
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+gefangen: Index 3 ausserhalb [0..2] in Dimension 1 -- Felder zaehlen ab 0: DIM a[3] hat a[0] bis a[2]
+3 n0n1n2
+
+=== funktion ueber die vm mit laufzeitfehler (maschinencode)
+FUNCTION stelle$(a AS STRING, k AS INTEGER) AS STRING
+    DIM f[3] AS INTEGER
+    f[k] = 1
+    RETURN a + STR$(k)
+END FUNCTION
+DIM i AS INTEGER
+DIM t AS STRING
+TRY
+    FOR i = 0 TO 5
+        t = t + stelle$("n", i)
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+PRINT i; " "; t
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+gefangen: Index 3 ausserhalb [0..2] in Dimension 1 -- Felder zaehlen ab 0: DIM a[3] hat a[0] bis a[2]
+3 n0n1n2
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
+jit: 1 mal mitten in einer Schleife ausgestiegen
+
+=== funktion ueber die vm ruft sich selbst
+FUNCTION kette$(n AS INTEGER) AS STRING
+    IF n <= 0 THEN RETURN ""
+    RETURN STR$(n) + kette$(n - 1)
+END FUNCTION
+DIM i AS INTEGER
+DIM t AS STRING
+FOR i = 1 TO 5
+    t = t + kette$(i) + "/"
+NEXT
+PRINT t
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+1/21/321/4321/54321/
+
+=== funktion ueber die vm ruft sich selbst (maschinencode)
+FUNCTION kette$(n AS INTEGER) AS STRING
+    IF n <= 0 THEN RETURN ""
+    RETURN STR$(n) + kette$(n - 1)
+END FUNCTION
+DIM i AS INTEGER
+DIM t AS STRING
+FOR i = 1 TO 5
+    t = t + kette$(i) + "/"
+NEXT
+PRINT t
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+1/21/321/4321/54321/
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== byref-funktion bleibt beim aufruf der vm
+SUB verdopple(BYREF x AS INTEGER, s AS STRING)
+    x = x * 2 + LEN(s)
+END SUB
+DIM i AS INTEGER
+DIM w AS INTEGER
+DIM t AS STRING
+w = 1
+FOR i = 1 TO 5
+    t = t + "a"
+    verdopple(w, t)
+NEXT
+PRINT w; " "; t
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+89 aaaaa
+
+=== byref-funktion bleibt beim aufruf der vm (maschinencode)
+SUB verdopple(BYREF x AS INTEGER, s AS STRING)
+    x = x * 2 + LEN(s)
+END SUB
+DIM i AS INTEGER
+DIM w AS INTEGER
+DIM t AS STRING
+w = 1
+FOR i = 1 TO 5
+    t = t + "a"
+    verdopple(w, t)
+NEXT
+PRINT w; " "; t
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+89 aaaaa
+--- stderr
+jit: Schleife an Stelle 15 in __main__ bleibt in der VM: globale Variable, die keine Zahl ist; mit Werten: Funktion verdopple hat BYREF-Parameter
+jit: 0 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
+jit: 3 Runden in der VM -- Stelle 15 in __main__: globale Variable, die keine Zahl ist; mit Werten: Funktion verdopple hat BYREF-Parameter
+
+=== sub ueber die vm liefert nichts
+DIM ablage AS STRING
+SUB lege(t AS STRING)
+    ablage = t + ablage
+END SUB
+DIM i AS INTEGER
+DIM t AS STRING
+FOR i = 1 TO 4
+    t = STR$(i)
+    lege(t)
+NEXT
+PRINT ablage; " "; t
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+4321 4
+
+=== sub ueber die vm liefert nichts (maschinencode)
+DIM ablage AS STRING
+SUB lege(t AS STRING)
+    ablage = t + ablage
+END SUB
+DIM i AS INTEGER
+DIM t AS STRING
+FOR i = 1 TO 4
+    t = STR$(i)
+    lege(t)
+NEXT
+PRINT ablage; " "; t
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+4321 4
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== funktion ueber die vm hat selbst eine schleife
+FUNCTION reihe$(t AS STRING, n AS INTEGER) AS STRING
+    DIM j AS INTEGER
+    DIM r AS STRING
+    FOR j = 1 TO n
+        r = r + t + STR$(j)
+    NEXT
+    RETURN r
+END FUNCTION
+DIM i AS INTEGER
+DIM s AS STRING
+FOR i = 1 TO 5
+    s = s + reihe$("x", i) + "/"
+NEXT
+PRINT s
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+x1/x1x2/x1x2x3/x1x2x3x4/x1x2x3x4x5/
+
+=== funktion ueber die vm hat selbst eine schleife (maschinencode)
+FUNCTION reihe$(t AS STRING, n AS INTEGER) AS STRING
+    DIM j AS INTEGER
+    DIM r AS STRING
+    FOR j = 1 TO n
+        r = r + t + STR$(j)
+    NEXT
+    RETURN r
+END FUNCTION
+DIM i AS INTEGER
+DIM s AS STRING
+FOR i = 1 TO 5
+    s = s + reihe$("x", i) + "/"
+NEXT
+PRINT s
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+x1/x1x2/x1x2x3/x1x2x3x4/x1x2x3x4x5/
+--- stderr
+jit: 0 Funktionen, 2 Schleifen, 5 Schleifenlaeufe
+
+=== tupel aus einer funktion auspacken
+FUNCTION farbe(p AS FLOAT) AS TUPLE
+    RETURN (INT(p * 10) MOD 256, INT(p * 20) MOD 256, INT(p * 30) MOD 256)
+END FUNCTION
+DIM i AS INTEGER
+DIM r AS INTEGER
+DIM g AS INTEGER
+DIM b AS INTEGER
+DIM s AS INTEGER
+FOR i = 1 TO 40
+    (r, g, b) = farbe(i * 1.5)
+    s = s + r * 3 + g * 2 + b
+NEXT
+PRINT s; " "; r; " "; g; " "; b
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+30072 88 176 8
+
+=== tupel aus einer funktion auspacken (maschinencode)
+FUNCTION farbe(p AS FLOAT) AS TUPLE
+    RETURN (INT(p * 10) MOD 256, INT(p * 20) MOD 256, INT(p * 30) MOD 256)
+END FUNCTION
+DIM i AS INTEGER
+DIM r AS INTEGER
+DIM g AS INTEGER
+DIM b AS INTEGER
+DIM s AS INTEGER
+FOR i = 1 TO 40
+    (r, g, b) = farbe(i * 1.5)
+    s = s + r * 3 + g * 2 + b
+NEXT
+PRINT s; " "; r; " "; g; " "; b
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+30072 88 176 8
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== tupel in der reihenfolge der ziele
+DIM i AS INTEGER
+DIM a AS INTEGER
+DIM b AS STRING
+DIM c AS FLOAT
+DIM t AS STRING
+FOR i = 1 TO 4
+    (a, b, c) = (i, STR$(i * 2), i / 4)
+    t = t + STR$(a) + b + STR$(c) + "|"
+NEXT
+PRINT t
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+120.25|240.5|360.75|481.0|
+
+=== tupel in der reihenfolge der ziele (maschinencode)
+DIM i AS INTEGER
+DIM a AS INTEGER
+DIM b AS STRING
+DIM c AS FLOAT
+DIM t AS STRING
+FOR i = 1 TO 4
+    (a, b, c) = (i, STR$(i * 2), i / 4)
+    t = t + STR$(a) + b + STR$(c) + "|"
+NEXT
+PRINT t
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+120.25|240.5|360.75|481.0|
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== tupel bauen und weitergeben
+FUNCTION summe(t AS TUPLE) AS INTEGER
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    (x, y) = t
+    RETURN x * 10 + y
+END FUNCTION
+DIM i AS INTEGER
+DIM s AS INTEGER
+DIM p AS TUPLE
+FOR i = 1 TO 6
+    p = (i, i + 1)
+    s = s + summe(p)
+NEXT
+PRINT s; " "; p
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+237 (6, 7)
+
+=== tupel bauen und weitergeben (maschinencode)
+FUNCTION summe(t AS TUPLE) AS INTEGER
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    (x, y) = t
+    RETURN x * 10 + y
+END FUNCTION
+DIM i AS INTEGER
+DIM s AS INTEGER
+DIM p AS TUPLE
+FOR i = 1 TO 6
+    p = (i, i + 1)
+    s = s + summe(p)
+NEXT
+PRINT s; " "; p
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+237 (6, 7)
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== tupel mit falscher laenge
+FUNCTION paar(k AS INTEGER) AS TUPLE
+    IF k = 3 THEN RETURN (k, k, k)
+    RETURN (k, k * 2)
+END FUNCTION
+DIM i AS INTEGER
+DIM a AS INTEGER
+DIM b AS INTEGER
+DIM s AS INTEGER
+TRY
+    FOR i = 1 TO 6
+        (a, b) = paar(i)
+        s = s + a + b
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+PRINT i; " "; s
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+gefangen: Tupel-Destructuring: 2 Ziele, aber Tupel hat 3 Element(e)
+3 9
+
+=== tupel mit falscher laenge (maschinencode)
+FUNCTION paar(k AS INTEGER) AS TUPLE
+    IF k = 3 THEN RETURN (k, k, k)
+    RETURN (k, k * 2)
+END FUNCTION
+DIM i AS INTEGER
+DIM a AS INTEGER
+DIM b AS INTEGER
+DIM s AS INTEGER
+TRY
+    FOR i = 1 TO 6
+        (a, b) = paar(i)
+        s = s + a + b
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+PRINT i; " "; s
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+gefangen: Tupel-Destructuring: 2 Ziele, aber Tupel hat 3 Element(e)
+3 9
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
+jit: 1 mal mitten in einer Schleife ausgestiegen
+
+=== tupel mit falschem typ fuer ein ziel
+FUNCTION paar(k AS INTEGER) AS TUPLE
+    IF k = 4 THEN RETURN (1.5, "x")
+    RETURN (k, STR$(k))
+END FUNCTION
+DIM i AS INTEGER
+DIM a AS INTEGER
+DIM b AS STRING
+DIM t AS STRING
+TRY
+    FOR i = 1 TO 6
+        (a, b) = paar(i)
+        t = t + b + STR$(a)
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+PRINT i; " "; t
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+gefangen: Zuweisung an 'a': FLOAT 1.5 passt nicht verlustfrei in INTEGER -- fuer ganzzahlige Division \ statt / nehmen, sonst mit INT()/ROUND() runden
+4 112233
+
+=== tupel mit falschem typ fuer ein ziel (maschinencode)
+FUNCTION paar(k AS INTEGER) AS TUPLE
+    IF k = 4 THEN RETURN (1.5, "x")
+    RETURN (k, STR$(k))
+END FUNCTION
+DIM i AS INTEGER
+DIM a AS INTEGER
+DIM b AS STRING
+DIM t AS STRING
+TRY
+    FOR i = 1 TO 6
+        (a, b) = paar(i)
+        t = t + b + STR$(a)
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+PRINT i; " "; t
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+gefangen: Zuweisung an 'a': FLOAT 1.5 passt nicht verlustfrei in INTEGER -- fuer ganzzahlige Division \ statt / nehmen, sonst mit INT()/ROUND() runden
+4 112233
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
+jit: 1 mal mitten in einer Schleife ausgestiegen
+
+=== felder von objekten als werte lesen und setzen
+CLASS Flocke
+    DIM x AS FLOAT
+    DIM name AS STRING
+END CLASS
+DIM teile[5] AS Flocke
+DIM i AS INTEGER
+DIM k AS INTEGER
+FOR i = 0 TO 4
+    teile[i] = NEW Flocke()
+    teile[i].x = i * 1.5
+NEXT
+DIM t AS STRING
+FOR k = 1 TO 3
+    FOR i = 0 TO 4
+        teile[i].x = teile[i].x + k
+        teile[i].name = teile[i].name + STR$(i)
+    NEXT
+NEXT
+FOR i = 0 TO 4
+    t = t + STR$(teile[i].x) + ":" + teile[i].name + " "
+NEXT
+PRINT t
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+6.0:000 7.5:111 9.0:222 10.5:333 12.0:444 
+
+=== felder von objekten als werte lesen und setzen (maschinencode)
+CLASS Flocke
+    DIM x AS FLOAT
+    DIM name AS STRING
+END CLASS
+DIM teile[5] AS Flocke
+DIM i AS INTEGER
+DIM k AS INTEGER
+FOR i = 0 TO 4
+    teile[i] = NEW Flocke()
+    teile[i].x = i * 1.5
+NEXT
+DIM t AS STRING
+FOR k = 1 TO 3
+    FOR i = 0 TO 4
+        teile[i].x = teile[i].x + k
+        teile[i].name = teile[i].name + STR$(i)
+    NEXT
+NEXT
+FOR i = 0 TO 4
+    t = t + STR$(teile[i].x) + ":" + teile[i].name + " "
+NEXT
+PRINT t
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+6.0:000 7.5:111 9.0:222 10.5:333 12.0:444 
+--- stderr
+jit: Schleife an Stelle 15 in __main__ bleibt in der VM: Objekt; mit Werten: Objekt
+jit: Schleife an Stelle 38 in __main__ bleibt in der VM: mit Werten: Mitglieder in der inneren Schleife 48..68
+jit: 0 Funktionen, 2 Schleifen, 4 Schleifenlaeufe
+jit: 3 Runden in der VM -- Stelle 15 in __main__: Objekt; mit Werten: Objekt
+jit: 1 Runden in der VM -- Stelle 38 in __main__: mit Werten: Mitglieder in der inneren Schleife 48..68
+
+=== property als wert in der schleife
+DIM zugriffe AS INTEGER
+CLASS Konto
+    DIM _stand AS INTEGER
+    PROPERTY GET stand() AS INTEGER
+        zugriffe = zugriffe + 1
+        RETURN Self._stand
+    END PROPERTY
+    PROPERTY SET stand(v AS INTEGER)
+        IF v < 0 THEN v = 0
+        Self._stand = v
+    END PROPERTY
+END CLASS
+DIM ks[3] AS Konto
+DIM i AS INTEGER
+DIM r AS INTEGER
+FOR i = 0 TO 2
+    ks[i] = NEW Konto()
+NEXT
+DIM t AS STRING
+FOR r = 1 TO 4
+    FOR i = 0 TO 2
+        ks[i].stand = ks[i].stand + i - 1
+        t = t + STR$(ks[i].stand)
+    NEXT
+NEXT
+PRINT t; " "; zugriffe
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+001002003004 24
+
+=== property als wert in der schleife (maschinencode)
+DIM zugriffe AS INTEGER
+CLASS Konto
+    DIM _stand AS INTEGER
+    PROPERTY GET stand() AS INTEGER
+        zugriffe = zugriffe + 1
+        RETURN Self._stand
+    END PROPERTY
+    PROPERTY SET stand(v AS INTEGER)
+        IF v < 0 THEN v = 0
+        Self._stand = v
+    END PROPERTY
+END CLASS
+DIM ks[3] AS Konto
+DIM i AS INTEGER
+DIM r AS INTEGER
+FOR i = 0 TO 2
+    ks[i] = NEW Konto()
+NEXT
+DIM t AS STRING
+FOR r = 1 TO 4
+    FOR i = 0 TO 2
+        ks[i].stand = ks[i].stand + i - 1
+        t = t + STR$(ks[i].stand)
+    NEXT
+NEXT
+PRINT t; " "; zugriffe
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+001002003004 24
+--- stderr
+jit: Schleife an Stelle 16 in __main__ bleibt in der VM: Objekt; mit Werten: Objekt
+jit: Schleife an Stelle 32 in __main__ bleibt in der VM: mit Werten: Mitglieder in der inneren Schleife 42..61
+jit: 2 Funktionen, 1 Schleifen, 4 Schleifenlaeufe
+jit: 2 Runden in der VM -- Stelle 32 in __main__: mit Werten: Mitglieder in der inneren Schleife 42..61
+jit: 1 Runden in der VM -- Stelle 16 in __main__: Objekt; mit Werten: Objekt
+
+=== property beruehrt eine globale des bereichs
+DIM summe AS INTEGER
+CLASS Zaehler
+    DIM _n AS INTEGER
+    PROPERTY GET n() AS INTEGER
+        summe = summe + 1000
+        RETURN Self._n
+    END PROPERTY
+END CLASS
+DIM zs[2] AS Zaehler
+DIM i AS INTEGER
+DIM t AS STRING
+zs[0] = NEW Zaehler()
+zs[1] = NEW Zaehler()
+FOR i = 1 TO 6
+    summe = summe + 1
+    t = t + STR$(zs[i MOD 2].n)
+NEXT
+PRINT summe; " "; t
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+6006 000000
+
+=== property beruehrt eine globale des bereichs (maschinencode)
+DIM summe AS INTEGER
+CLASS Zaehler
+    DIM _n AS INTEGER
+    PROPERTY GET n() AS INTEGER
+        summe = summe + 1000
+        RETURN Self._n
+    END PROPERTY
+END CLASS
+DIM zs[2] AS Zaehler
+DIM i AS INTEGER
+DIM t AS STRING
+zs[0] = NEW Zaehler()
+zs[1] = NEW Zaehler()
+FOR i = 1 TO 6
+    summe = summe + 1
+    t = t + STR$(zs[i MOD 2].n)
+NEXT
+PRINT summe; " "; t
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+6006 000000
+--- stderr
+jit: Schleife an Stelle 24 in __main__ bleibt in der VM: globale Variable, die keine Zahl ist; mit Werten: PROPERTY n: __get_n beruehrt die Globale 'summe' des Bereichs
+jit: 1 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
+jit: 4 Runden in der VM -- Stelle 24 in __main__: globale Variable, die keine Zahl ist; mit Werten: PROPERTY n: __get_n beruehrt die Globale 'summe' des Bereichs
+
+=== mitglied von nil mitten in der schleife
+CLASS Punkt
+    DIM x AS INTEGER
+END CLASS
+DIM ps[4] AS Punkt
+DIM i AS INTEGER
+DIM t AS STRING
+ps[0] = NEW Punkt()
+ps[1] = NEW Punkt()
+ps[3] = NEW Punkt()
+TRY
+    FOR i = 0 TO 3
+        ps[i].x = i * 10
+        t = t + STR$(ps[i].x) + ","
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+PRINT i; " "; t
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+gefangen: Zuweisung an '.x' bei NIL-Referenz -- die Variable ist noch NIL: eine Klasse muss mit NEW angelegt werden (p = NEW Klasse())
+2 0,10,
+
+=== mitglied von nil mitten in der schleife (maschinencode)
+CLASS Punkt
+    DIM x AS INTEGER
+END CLASS
+DIM ps[4] AS Punkt
+DIM i AS INTEGER
+DIM t AS STRING
+ps[0] = NEW Punkt()
+ps[1] = NEW Punkt()
+ps[3] = NEW Punkt()
+TRY
+    FOR i = 0 TO 3
+        ps[i].x = i * 10
+        t = t + STR$(ps[i].x) + ","
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+PRINT i; " "; t
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+gefangen: Zuweisung an '.x' bei NIL-Referenz -- die Variable ist noch NIL: eine Klasse muss mit NEW angelegt werden (p = NEW Klasse())
+2 0,10,
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
+jit: 1 mal mitten in einer Schleife ausgestiegen
+
+=== setter wirft mitten in der schleife
+DIM protokoll AS STRING
+CLASS Wert
+    DIM _v AS INTEGER
+    PROPERTY GET v() AS INTEGER
+        RETURN Self._v
+    END PROPERTY
+    PROPERTY SET v(neu AS INTEGER)
+        protokoll = protokoll + STR$(neu) + ";"
+        IF neu > 3 THEN THROW "zu gross"
+        Self._v = neu
+    END PROPERTY
+END CLASS
+DIM ws[2] AS Wert
+DIM i AS INTEGER
+DIM t AS STRING
+ws[0] = NEW Wert()
+ws[1] = NEW Wert()
+TRY
+    FOR i = 1 TO 6
+        ws[i MOD 2].v = i
+        t = t + STR$(ws[i MOD 2].v)
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+PRINT i; " "; t; " "; protokoll
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+gefangen: zu gross
+4 123 1;2;3;4;
+
+=== setter wirft mitten in der schleife (maschinencode)
+DIM protokoll AS STRING
+CLASS Wert
+    DIM _v AS INTEGER
+    PROPERTY GET v() AS INTEGER
+        RETURN Self._v
+    END PROPERTY
+    PROPERTY SET v(neu AS INTEGER)
+        protokoll = protokoll + STR$(neu) + ";"
+        IF neu > 3 THEN THROW "zu gross"
+        Self._v = neu
+    END PROPERTY
+END CLASS
+DIM ws[2] AS Wert
+DIM i AS INTEGER
+DIM t AS STRING
+ws[0] = NEW Wert()
+ws[1] = NEW Wert()
+TRY
+    FOR i = 1 TO 6
+        ws[i MOD 2].v = i
+        t = t + STR$(ws[i MOD 2].v)
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+PRINT i; " "; t; " "; protokoll
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+gefangen: zu gross
+4 123 1;2;3;4;
+--- stderr
+jit: 1 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
+jit: 1 mal mitten in einer Schleife ausgestiegen
+
+=== falscher typ fuer ein feld als wert
+CLASS Box
+    DIM n AS INTEGER
+    DIM s AS STRING
+END CLASS
+DIM bs[2] AS Box
+DIM i AS INTEGER
+DIM t AS STRING
+bs[0] = NEW Box()
+bs[1] = NEW Box()
+TRY
+    FOR i = 1 TO 5
+        bs[i MOD 2].s = STR$(i)
+        IF i = 4 THEN bs[i MOD 2].n = 2.5 ELSE bs[i MOD 2].n = i
+        t = t + bs[i MOD 2].s + STR$(bs[i MOD 2].n)
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+PRINT i; " "; t
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+gefangen: Zuweisung an box.n: FLOAT 2.5 passt nicht verlustfrei in INTEGER -- fuer ganzzahlige Division \ statt / nehmen, sonst mit INT()/ROUND() runden
+4 112233
+
+=== falscher typ fuer ein feld als wert (maschinencode)
+CLASS Box
+    DIM n AS INTEGER
+    DIM s AS STRING
+END CLASS
+DIM bs[2] AS Box
+DIM i AS INTEGER
+DIM t AS STRING
+bs[0] = NEW Box()
+bs[1] = NEW Box()
+TRY
+    FOR i = 1 TO 5
+        bs[i MOD 2].s = STR$(i)
+        IF i = 4 THEN bs[i MOD 2].n = 2.5 ELSE bs[i MOD 2].n = i
+        t = t + bs[i MOD 2].s + STR$(bs[i MOD 2].n)
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+PRINT i; " "; t
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+gefangen: Zuweisung an box.n: FLOAT 2.5 passt nicht verlustfrei in INTEGER -- fuer ganzzahlige Division \ statt / nehmen, sonst mit INT()/ROUND() runden
+4 112233
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
+jit: 1 mal mitten in einer Schleife ausgestiegen
+
+=== for mit kommazahl als grenze
+DIM i AS INTEGER
+DIM k AS INTEGER
+DIM s AS INTEGER
+FOR k = 1 TO 20
+    FOR i = 0 TO k / 2
+        s = s + i
+    NEXT
+NEXT
+PRINT s; " "; i
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+385 11
+
+=== for mit kommazahl als grenze (maschinencode)
+DIM i AS INTEGER
+DIM k AS INTEGER
+DIM s AS INTEGER
+FOR k = 1 TO 20
+    FOR i = 0 TO k / 2
+        s = s + i
+    NEXT
+NEXT
+PRINT s; " "; i
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+385 11
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== for rueckwaerts mit kommazahl als grenze
+DIM i AS INTEGER
+DIM k AS INTEGER
+DIM s AS INTEGER
+FOR k = 1 TO 12
+    FOR i = 10 TO k / 3 STEP -1
+        s = s + i * k
+    NEXT
+NEXT
+PRINT s; " "; i
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+4005 3
+
+=== for rueckwaerts mit kommazahl als grenze (maschinencode)
+DIM i AS INTEGER
+DIM k AS INTEGER
+DIM s AS INTEGER
+FOR k = 1 TO 12
+    FOR i = 10 TO k / 3 STEP -1
+        s = s + i * k
+    NEXT
+NEXT
+PRINT s; " "; i
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+4005 3
+--- stderr
+jit: 0 Funktionen, 2 Schleifen, 2 Schleifenlaeufe
+
+=== for mit einem wert als grenze
+DIM m AS MAP OF FLOAT
+DIM i AS INTEGER
+DIM k AS INTEGER
+DIM s AS INTEGER
+DIM t AS STRING
+m["breite"] = 9.0
+FOR k = 1 TO 5
+    t = t + STR$(k)
+    FOR i = 0 TO m["breite"] / k
+        s = s + i
+    NEXT
+NEXT
+PRINT s; " "; i; " "; t
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+65 2 12345
+
+=== for mit einem wert als grenze (maschinencode)
+DIM m AS MAP OF FLOAT
+DIM i AS INTEGER
+DIM k AS INTEGER
+DIM s AS INTEGER
+DIM t AS STRING
+m["breite"] = 9.0
+FOR k = 1 TO 5
+    t = t + STR$(k)
+    FOR i = 0 TO m["breite"] / k
+        s = s + i
+    NEXT
+NEXT
+PRINT s; " "; i; " "; t
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+65 2 12345
+--- stderr
+jit: 0 Funktionen, 2 Schleifen, 2 Schleifenlaeufe
+
+=== for mit einer grenze, die keine zahl ist
+DIM grenzen AS TUPLE
+DIM i AS INTEGER
+DIM k AS INTEGER
+DIM s AS INTEGER
+DIM t AS STRING
+grenzen = (4, 6, 5, "x", 7)
+TRY
+    FOR k = 0 TO 4
+        t = t + STR$(k)
+        FOR i = 0 TO grenzen[k]
+            s = s + i
+        NEXT
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+PRINT s; " "; k; " "; t
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+gefangen: Vergleich nicht moeglich: INTEGER / STRING
+46 3 0123
+
+=== for mit einer grenze, die keine zahl ist (maschinencode)
+DIM grenzen AS TUPLE
+DIM i AS INTEGER
+DIM k AS INTEGER
+DIM s AS INTEGER
+DIM t AS STRING
+grenzen = (4, 6, 5, "x", 7)
+TRY
+    FOR k = 0 TO 4
+        t = t + STR$(k)
+        FOR i = 0 TO grenzen[k]
+            s = s + i
+        NEXT
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+PRINT s; " "; k; " "; t
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+gefangen: Vergleich nicht moeglich: INTEGER / STRING
+46 3 0123
+--- stderr
+jit: 0 Funktionen, 2 Schleifen, 1 Schleifenlaeufe
+jit: 1 mal mitten in einer Schleife ausgestiegen
+
+=== wert in ein getyptes local einer sub
+SUB rechne(t AS TUPLE)
+    DIM i AS INTEGER
+    DIM n AS INTEGER
+    DIM s AS STRING
+    DIM summe AS INTEGER
+    FOR i = 0 TO 4
+        n = t[i]
+        s = s + STR$(n)
+        summe = summe + n
+    NEXT
+    PRINT s; " "; summe
+END SUB
+rechne((1, 2, 3, 4, 5))
+TRY
+    rechne((1, 2, 2.5, 4, 5))
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+12345 15
+gefangen: Zuweisung an 'n': FLOAT 2.5 passt nicht verlustfrei in INTEGER -- fuer ganzzahlige Division \ statt / nehmen, sonst mit INT()/ROUND() runden
+
+=== wert in ein getyptes local einer sub (maschinencode)
+SUB rechne(t AS TUPLE)
+    DIM i AS INTEGER
+    DIM n AS INTEGER
+    DIM s AS STRING
+    DIM summe AS INTEGER
+    FOR i = 0 TO 4
+        n = t[i]
+        s = s + STR$(n)
+        summe = summe + n
+    NEXT
+    PRINT s; " "; summe
+END SUB
+rechne((1, 2, 3, 4, 5))
+TRY
+    rechne((1, 2, 2.5, 4, 5))
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+12345 15
+gefangen: Zuweisung an 'n': FLOAT 2.5 passt nicht verlustfrei in INTEGER -- fuer ganzzahlige Division \ statt / nehmen, sonst mit INT()/ROUND() runden
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+jit: 1 mal mitten in einer Schleife ausgestiegen
+
+=== zahl in ein text-local einer sub
+SUB rechne(t AS TUPLE)
+    DIM i AS INTEGER
+    DIM w AS STRING
+    DIM s AS STRING
+    FOR i = 0 TO 3
+        w = t[i]
+        s = s + w + ","
+    NEXT
+    PRINT s
+END SUB
+rechne(("a", "b", "c", "d"))
+TRY
+    rechne(("a", "b", 3, "d"))
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+a,b,c,d,
+gefangen: Zuweisung an 'w': Erwartet STRING, erhalten INTEGER
+
+=== zahl in ein text-local einer sub (maschinencode)
+SUB rechne(t AS TUPLE)
+    DIM i AS INTEGER
+    DIM w AS STRING
+    DIM s AS STRING
+    FOR i = 0 TO 3
+        w = t[i]
+        s = s + w + ","
+    NEXT
+    PRINT s
+END SUB
+rechne(("a", "b", "c", "d"))
+TRY
+    rechne(("a", "b", 3, "d"))
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+a,b,c,d,
+gefangen: Zuweisung an 'w': Erwartet STRING, erhalten INTEGER
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+jit: 1 mal mitten in einer Schleife ausgestiegen
+
+=== welche funktionen uebersetzt werden
+' `dhrt --jit` nennt je Funktion "uebersetzt" oder den Grund, warum sie in
+' der VM bleibt. Ohne diesen Fall bliebe die Sammlung auch gruen, wenn der
+' Maschinencode still gar nichts mehr uebersetzte. Ein Bau ohne das Feature
+' `jit` kennt den Schalter nicht und ueberspringt sich.
+IMPORT "helfer.dh"
+dlStarten(["--jit", "prog.dh"])
+IF INSTR(dlAus, "uebersetzt") < 0 AND INSTR(dlAus, "VM:") < 0 THEN
+    PRINT "UEBERSPRINGEN: Bau ohne Maschinencode"
+ELSE
+    PRINT dlAus
+END IF
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
+--- datei prog.dh
+FUNCTION rein(a AS INTEGER, b AS FLOAT) AS FLOAT
+    RETURN a * b
+END FUNCTION
+FUNCTION ruft(a AS INTEGER) AS FLOAT
+    RETURN rein(a, 0.5) + 1
+END FUNCTION
+FUNCTION druckt(a AS INTEGER) AS INTEGER
+    PRINT a
+    RETURN a
+END FUNCTION
+FUNCTION ueber(a AS INTEGER) AS INTEGER
+    RETURN druckt(a) + 1
+END FUNCTION
+FUNCTION text(a AS STRING) AS INTEGER
+    RETURN LEN(a)
+END FUNCTION
+DIM g AS INTEGER
+DIM name$ AS STRING
+FUNCTION global_(a AS INTEGER) AS INTEGER
+    RETURN a + g
+END FUNCTION
+FUNCTION namenslaenge(a AS INTEGER) AS INTEGER
+    IF a > 0 THEN name$ = "x"
+    RETURN 3
+END FUNCTION
+PRINT ruft(3)
+
+--- erwartet
+rein: uebersetzt
+ruft: uebersetzt
+druckt: VM: Ausgabe (PRINT)
+ueber: VM: ruft druckt, das in der VM bleibt
+text: VM: Platz 0 hat den Typ 'string'
+global_: uebersetzt
+namenslaenge: VM: Konstante STRING ist keine Zahl
+
+=== potenz im maschinencode
+' `^` (2026-10-10, Dogfooding): mit einer Kommazahl dabei powf wie vm::pow,
+' INTEGER ^ feste Ganzzahl 0..16 als Ganzzahl mit Ueberlaufpruefung (der
+' Ueberlauf steigt aus, die VM meldet ihn). Vorher blieb jede Funktion und
+' Schleife mit `^` in der VM.
+FUNCTION quadrat(x AS FLOAT) AS FLOAT
+    RETURN x ^ 2
+END FUNCTION
+FUNCTION wurzel(x AS FLOAT) AS FLOAT
+    RETURN x ^ 0.5
+END FUNCTION
+FUNCTION ganz(r AS INTEGER) AS INTEGER
+    RETURN r ^ 2 + r ^ 0
+END FUNCTION
+FUNCTION gross(r AS INTEGER) AS INTEGER
+    RETURN r ^ 16
+END FUNCTION
+FUNCTION halb(r AS INTEGER) AS FLOAT
+    RETURN r ^ 0.5
+END FUNCTION
+PRINT quadrat(1.5); " "; quadrat(-3); " "; wurzel(2); " "; ganz(-7); " "; halb(9)
+PRINT gross(2); " "; gross(-3)
+TRY
+    PRINT gross(20)
+CATCH e
+    PRINT e; " zeile "; ERROR_LINE()
+END TRY
+DIM s AS FLOAT
+DIM t AS INTEGER
+DIM i AS INTEGER
+FOR i = 1 TO 1000
+    s = s + (i * 0.25 - 3) ^ 2
+    t = t + (i MOD 7) ^ 3
+NEXT
+PRINT s; " "; t
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+2.25 9.0 1.4142135623730951 50 3.0
+65536 43046721
+Ganzzahl-Ueberlauf bei '^' (INTEGER ist 64-bit; Wertebereich ueberschritten) zeile 15
+20122843.75 63063
+
+=== potenz im maschinencode (maschinencode)
+FUNCTION quadrat(x AS FLOAT) AS FLOAT
+    RETURN x ^ 2
+END FUNCTION
+FUNCTION wurzel(x AS FLOAT) AS FLOAT
+    RETURN x ^ 0.5
+END FUNCTION
+FUNCTION ganz(r AS INTEGER) AS INTEGER
+    RETURN r ^ 2 + r ^ 0
+END FUNCTION
+FUNCTION gross(r AS INTEGER) AS INTEGER
+    RETURN r ^ 16
+END FUNCTION
+FUNCTION halb(r AS INTEGER) AS FLOAT
+    RETURN r ^ 0.5
+END FUNCTION
+PRINT quadrat(1.5); " "; quadrat(-3); " "; wurzel(2); " "; ganz(-7); " "; halb(9)
+PRINT gross(2); " "; gross(-3)
+TRY
+    PRINT gross(20)
+CATCH e
+    PRINT e; " zeile "; ERROR_LINE()
+END TRY
+DIM s AS FLOAT
+DIM t AS INTEGER
+DIM i AS INTEGER
+FOR i = 1 TO 1000
+    s = s + (i * 0.25 - 3) ^ 2
+    t = t + (i MOD 7) ^ 3
+NEXT
+PRINT s; " "; t
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+2.25 9.0 1.4142135623730951 50 3.0
+65536 43046721
+Ganzzahl-Ueberlauf bei '^' (INTEGER ist 64-bit; Wertebereich ueberschritten) zeile 11
+20122843.75 63063
+--- stderr
+jit: 5 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== und und oder ueber objektfelder im wertemodus
+' Im Wertemodus treffen sich bei `IF e.lebt AND e.x > 20` ein Wert (das
+' Feld) und ein Wahrheitswert an derselben Stapelstelle -- vorher "zwei Wege
+' treffen sich mit verschiedenen Arten", die Schleife blieb in der VM. Dazu
+' ein Wert als Argument einer uebersetzten Funktion (umlauf(e.x, ...)).
+CLASS K
+    DIM lebt AS BOOLEAN
+    DIM x AS FLOAT
+    DIM r AS INTEGER
+    DIM name AS STRING
+END CLASS
+FUNCTION umlauf(v AS FLOAT, grenze AS FLOAT, rand AS FLOAT) AS FLOAT
+    IF v > grenze + rand THEN RETURN v - grenze - 2 * rand
+    RETURN v
+END FUNCTION
+DIM ks AS ARRAY OF K
+DIM i AS INTEGER
+FOR i = 1 TO 30
+    DIM k AS K
+    k = NEW K()
+    k.lebt = i MOD 3 <> 0
+    k.x = i * 7.5
+    k.r = i MOD 4
+    k.name = "k" + STR$(i)
+    ARRAY_PUSH(ks, k)
+NEXT
+DIM n AS INTEGER
+DIM m AS INTEGER
+DIM namen AS STRING
+DIM r AS INTEGER
+FOR r = 1 TO 50
+    DIM e AS K
+    FOR EACH e IN ks
+        IF e.lebt AND e.x > 20 THEN n += 1
+        IF e.lebt OR e.x < 3 THEN m += 1
+        e.x = umlauf(e.x + 1.5, 200, e.r)
+        IF r = 1 AND e.x > 150 AND e.lebt THEN namen = namen + e.name + ","
+    NEXT
+NEXT
+PRINT n; " "; m; " "; ks[0].x; " "; ks[29].x; " "; namen
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+897 1011 82.5 96.0 k20,k22,k23,k25,k26,
+
+=== und und oder ueber objektfelder im wertemodus (maschinencode)
+CLASS K
+    DIM lebt AS BOOLEAN
+    DIM x AS FLOAT
+    DIM r AS INTEGER
+    DIM name AS STRING
+END CLASS
+FUNCTION umlauf(v AS FLOAT, grenze AS FLOAT, rand AS FLOAT) AS FLOAT
+    IF v > grenze + rand THEN RETURN v - grenze - 2 * rand
+    RETURN v
+END FUNCTION
+DIM ks AS ARRAY OF K
+DIM i AS INTEGER
+FOR i = 1 TO 30
+    DIM k AS K
+    k = NEW K()
+    k.lebt = i MOD 3 <> 0
+    k.x = i * 7.5
+    k.r = i MOD 4
+    k.name = "k" + STR$(i)
+    ARRAY_PUSH(ks, k)
+NEXT
+DIM n AS INTEGER
+DIM m AS INTEGER
+DIM namen AS STRING
+DIM r AS INTEGER
+FOR r = 1 TO 50
+    DIM e AS K
+    FOR EACH e IN ks
+        IF e.lebt AND e.x > 20 THEN n += 1
+        IF e.lebt OR e.x < 3 THEN m += 1
+        e.x = umlauf(e.x + 1.5, 200, e.r)
+        IF r = 1 AND e.x > 150 AND e.lebt THEN namen = namen + e.name + ","
+    NEXT
+NEXT
+PRINT n; " "; m; " "; ks[0].x; " "; ks[29].x; " "; namen
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+897 1011 82.5 96.0 k20,k22,k23,k25,k26,
+--- stderr
+jit: 1 Funktionen, 1 Schleifen, 50 Schleifenlaeufe
+
+=== bit-operatoren in funktion und schleife
+' Farben zerlegen und zusammensetzen -- getypt in einer Funktion, mit einem
+' Wert (Text-Feld) in der Schleife (Wertemodus). Vorher blieb alles mit
+' BAND/BOR/SHL/SHR in der VM (Glutfaden, 2026-10-15).
+FUNCTION mische(f AS INTEGER, g AS INTEGER) AS INTEGER
+    DIM r AS INTEGER : r = (((f SHR 16) BAND 255) + ((g SHR 16) BAND 255)) \ 2
+    DIM gr AS INTEGER : gr = (((f SHR 8) BAND 255) + ((g SHR 8) BAND 255)) \ 2
+    DIM b AS INTEGER : b = ((f BAND 255) + (g BAND 255)) \ 2
+    RETURN (r SHL 16) BOR (gr SHL 8) BOR b BOR &HFF000000
+END FUNCTION
+FUNCTION kippen(x AS INTEGER) AS INTEGER
+    RETURN (BNOT x) BXOR &H0F
+END FUNCTION
+PRINT HEX$(mische(&HFF0000, &H0000FF)); " "; kippen(5); " "; -8 SHR 1; " "; 1 SHL 62
+DIM namen AS ARRAY OF STRING : namen = ["a", "bb", "ccc"]
+DIM w AS ARRAY OF INTEGER : w = [3, 5, 6]
+DIM s AS INTEGER, i AS INTEGER, k AS INTEGER
+FOR k = 1 TO 999
+    FOR i = 0 TO 2
+        s = (s BXOR (w[i] SHL (LEN(namen[i]) * 3))) BAND &HFFFFFF
+    NEXT
+NEXT
+PRINT s
+' Schiebeweite ausserhalb: dieselbe Meldung in derselben Zeile
+FUNCTION schieben(x AS INTEGER, n AS INTEGER) AS INTEGER
+    RETURN x SHL n
+END FUNCTION
+PRINT schieben(1, 10)
+TRY
+    PRINT schieben(1, 64)
+CATCH e
+    PRINT "gefangen: "; e; " zeile "; ERROR_LINE()
+END TRY
+TRY
+    DIM t AS STRING : t = "x"
+    FOR i = 0 TO 1
+        s = s BAND namen[i]
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+FF7F007F -11 -4 4611686018427387904
+3416
+1024
+gefangen: SHL: Schiebeweite muss 0..63 sein, erhalten 64 zeile 25
+gefangen: BAND erwartet INTEGER, erhalten INTEGER / STRING
+
+=== bit-operatoren in funktion und schleife (maschinencode)
+' Wie oben, mit Maschinencode: dieselbe Ausgabe, und die Funktionen und
+' Schleifen sind wirklich uebersetzt (die Bilanz zaehlt sie).
+FUNCTION mische(f AS INTEGER, g AS INTEGER) AS INTEGER
+    DIM r AS INTEGER : r = (((f SHR 16) BAND 255) + ((g SHR 16) BAND 255)) \ 2
+    DIM gr AS INTEGER : gr = (((f SHR 8) BAND 255) + ((g SHR 8) BAND 255)) \ 2
+    DIM b AS INTEGER : b = ((f BAND 255) + (g BAND 255)) \ 2
+    RETURN (r SHL 16) BOR (gr SHL 8) BOR b BOR &HFF000000
+END FUNCTION
+FUNCTION kippen(x AS INTEGER) AS INTEGER
+    RETURN (BNOT x) BXOR &H0F
+END FUNCTION
+PRINT HEX$(mische(&HFF0000, &H0000FF)); " "; kippen(5); " "; -8 SHR 1; " "; 1 SHL 62
+DIM namen AS ARRAY OF STRING : namen = ["a", "bb", "ccc"]
+DIM w AS ARRAY OF INTEGER : w = [3, 5, 6]
+DIM s AS INTEGER, i AS INTEGER, k AS INTEGER
+FOR k = 1 TO 999
+    FOR i = 0 TO 2
+        s = (s BXOR (w[i] SHL (LEN(namen[i]) * 3))) BAND &HFFFFFF
+    NEXT
+NEXT
+PRINT s
+' Schiebeweite ausserhalb: dieselbe Meldung in derselben Zeile
+FUNCTION schieben(x AS INTEGER, n AS INTEGER) AS INTEGER
+    RETURN x SHL n
+END FUNCTION
+PRINT schieben(1, 10)
+TRY
+    PRINT schieben(1, 64)
+CATCH e
+    PRINT "gefangen: "; e; " zeile "; ERROR_LINE()
+END TRY
+TRY
+    DIM t AS STRING : t = "x"
+    FOR i = 0 TO 1
+        s = s BAND namen[i]
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+FF7F007F -11 -4 4611686018427387904
+3416
+1024
+gefangen: SHL: Schiebeweite muss 0..63 sein, erhalten 64 zeile 24
+gefangen: BAND erwartet INTEGER, erhalten INTEGER / STRING
+--- stderr
+jit: 3 Funktionen, 2 Schleifen, 2 Schleifenlaeufe
+
+=== objekte verschiedener unterklassen in einem feld
+' Weg F (docs/entwurf-schnittstellen.md): Kreis, Rechteck und Quadrat (zwei
+' Stufen) in einem ARRAY OF Form. Der Maschinencode fasst sie als Familie
+' und verteilt den Aufruf ueber die Lage; das Basisfeld n liegt bei allen
+' auf demselben Platz. Bis 2026-10-22 stieg er bei jedem Element einer
+' zweiten Klasse aus (hier 1000 Mal, 0 Laeufe).
+CLASS Form
+    DIM n AS INTEGER
+    ABSTRACT FUNCTION flaeche() AS FLOAT
+END CLASS
+CLASS Kreis EXTENDS Form
+    DIM r AS FLOAT
+    FUNCTION flaeche() AS FLOAT
+        RETURN 3.0 * r * r
+    END FUNCTION
+END CLASS
+CLASS Rechteck EXTENDS Form
+    DIM a AS FLOAT
+    DIM b AS FLOAT
+    FUNCTION flaeche() AS FLOAT
+        RETURN a * b
+    END FUNCTION
+END CLASS
+CLASS Quadrat EXTENDS Rechteck
+    FUNCTION flaeche() AS FLOAT
+        RETURN a * a
+    END FUNCTION
+END CLASS
+DIM formen AS ARRAY OF Form : formen = []
+DIM i AS INTEGER
+FOR i = 0 TO 29
+    SELECT CASE i MOD 3
+        CASE 0
+            DIM k AS Kreis : k = NEW Kreis() : k.r = i : k.n = 1
+            ARRAY_PUSH(formen, k)
+        CASE 1
+            DIM e AS Rechteck : e = NEW Rechteck() : e.a = i : e.b = 2 : e.n = 2
+            ARRAY_PUSH(formen, e)
+        CASE ELSE
+            DIM q AS Quadrat : q = NEW Quadrat() : q.a = i : q.n = 3
+            ARRAY_PUSH(formen, q)
+    END SELECT
+NEXT
+DIM summe AS FLOAT : summe = 0
+DIM zahl AS INTEGER : zahl = 0
+DIM runde AS INTEGER
+FOR runde = 1 TO 50
+    FOR i = 0 TO LEN(formen) - 1
+        summe = summe + formen[i].flaeche()
+        zahl = zahl + formen[i].n
+    NEXT
+NEXT
+PRINT summe; " "; zahl
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+556500.0 3000
+
+=== objekte verschiedener unterklassen in einem feld (maschinencode)
+CLASS Form
+    DIM n AS INTEGER
+    ABSTRACT FUNCTION flaeche() AS FLOAT
+END CLASS
+CLASS Kreis EXTENDS Form
+    DIM r AS FLOAT
+    FUNCTION flaeche() AS FLOAT
+        RETURN 3.0 * r * r
+    END FUNCTION
+END CLASS
+CLASS Rechteck EXTENDS Form
+    DIM a AS FLOAT
+    DIM b AS FLOAT
+    FUNCTION flaeche() AS FLOAT
+        RETURN a * b
+    END FUNCTION
+END CLASS
+CLASS Quadrat EXTENDS Rechteck
+    FUNCTION flaeche() AS FLOAT
+        RETURN a * a
+    END FUNCTION
+END CLASS
+DIM formen AS ARRAY OF Form : formen = []
+DIM i AS INTEGER
+FOR i = 0 TO 29
+    SELECT CASE i MOD 3
+        CASE 0
+            DIM k AS Kreis : k = NEW Kreis() : k.r = i : k.n = 1
+            ARRAY_PUSH(formen, k)
+        CASE 1
+            DIM e AS Rechteck : e = NEW Rechteck() : e.a = i : e.b = 2 : e.n = 2
+            ARRAY_PUSH(formen, e)
+        CASE ELSE
+            DIM q AS Quadrat : q = NEW Quadrat() : q.a = i : q.n = 3
+            ARRAY_PUSH(formen, q)
+    END SELECT
+NEXT
+DIM summe AS FLOAT : summe = 0
+DIM zahl AS INTEGER : zahl = 0
+DIM runde AS INTEGER
+FOR runde = 1 TO 50
+    FOR i = 0 TO LEN(formen) - 1
+        summe = summe + formen[i].flaeche()
+        zahl = zahl + formen[i].n
+    NEXT
+NEXT
+PRINT summe; " "; zahl
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+556500.0 3000
+--- stderr
+jit: 4 Funktionen, 1 Schleifen, 50 Schleifenlaeufe
+
+=== eine klasse kommt nach dem bauen dazu
+' Die Familie entsteht beim Bauen aus dem, was im Feld steht. Kommt danach
+' ein Objekt einer weiteren Klasse dazu, passt keine Lage: der Code steigt
+' aus, und die naechste Schleife baut die Familie mit drei Klassen.
+CLASS Form
+    ABSTRACT FUNCTION ecken() AS INTEGER
+END CLASS
+CLASS Kreis EXTENDS Form
+    FUNCTION ecken() AS INTEGER
+        RETURN 0
+    END FUNCTION
+END CLASS
+CLASS Quadrat EXTENDS Form
+    FUNCTION ecken() AS INTEGER
+        RETURN 4
+    END FUNCTION
+END CLASS
+CLASS Dreieck EXTENDS Form
+    FUNCTION ecken() AS INTEGER
+        RETURN 3
+    END FUNCTION
+END CLASS
+FUNCTION zaehle(xs AS ARRAY OF Form) AS INTEGER
+    DIM s AS INTEGER : s = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(xs) - 1
+        s = s + xs[i].ecken()
+    NEXT
+    RETURN s
+END FUNCTION
+DIM formen AS ARRAY OF Form : formen = []
+DIM i AS INTEGER
+FOR i = 1 TO 40
+    IF i MOD 2 = 0 THEN ARRAY_PUSH(formen, NEW Kreis()) ELSE ARRAY_PUSH(formen, NEW Quadrat())
+NEXT
+DIM runde AS INTEGER
+DIM ges AS INTEGER : ges = 0
+FOR runde = 1 TO 20
+    ges = ges + zaehle(formen)
+NEXT
+PRINT ges
+' Jetzt kommt eine Klasse dazu, die beim Bauen nicht im Feld stand.
+ARRAY_PUSH(formen, NEW Dreieck())
+ges = 0
+FOR runde = 1 TO 20
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(formen) - 1
+        ges = ges + formen[j].ecken()
+    NEXT
+NEXT
+PRINT ges
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+1600
+1660
+
+=== eine klasse kommt nach dem bauen dazu (maschinencode)
+CLASS Form
+    ABSTRACT FUNCTION ecken() AS INTEGER
+END CLASS
+CLASS Kreis EXTENDS Form
+    FUNCTION ecken() AS INTEGER
+        RETURN 0
+    END FUNCTION
+END CLASS
+CLASS Quadrat EXTENDS Form
+    FUNCTION ecken() AS INTEGER
+        RETURN 4
+    END FUNCTION
+END CLASS
+CLASS Dreieck EXTENDS Form
+    FUNCTION ecken() AS INTEGER
+        RETURN 3
+    END FUNCTION
+END CLASS
+FUNCTION zaehle(xs AS ARRAY OF Form) AS INTEGER
+    DIM s AS INTEGER : s = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(xs) - 1
+        s = s + xs[i].ecken()
+    NEXT
+    RETURN s
+END FUNCTION
+DIM formen AS ARRAY OF Form : formen = []
+DIM i AS INTEGER
+FOR i = 1 TO 40
+    IF i MOD 2 = 0 THEN ARRAY_PUSH(formen, NEW Kreis()) ELSE ARRAY_PUSH(formen, NEW Quadrat())
+NEXT
+DIM runde AS INTEGER
+DIM ges AS INTEGER : ges = 0
+FOR runde = 1 TO 20
+    ges = ges + zaehle(formen)
+NEXT
+PRINT ges
+' Jetzt kommt eine Klasse dazu, die beim Bauen nicht im Feld stand.
+ARRAY_PUSH(formen, NEW Dreieck())
+ges = 0
+FOR runde = 1 TO 20
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(formen) - 1
+        ges = ges + formen[j].ecken()
+    NEXT
+NEXT
+PRINT ges
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+1600
+1660
+--- stderr
+jit: 4 Funktionen, 4 Schleifen, 23 Schleifenlaeufe
+
+=== familie mit verschiedener rueckgabe feld oder property
+' Liefert dieselbe Methode in den Klassen Verschiedenes (INTEGER/FLOAT),
+' deklariert eine Unterklasse ein Feld mit anderem Typ neu oder hat sie eine
+' PROPERTY gleichen Namens, gibt es keine Familie -- der Bereich laeuft im
+' Wertemodus, das Ergebnis ist das der VM.
+CLASS Basis
+    DIM n AS INTEGER
+    DIM w AS INTEGER
+    FUNCTION wert() AS INTEGER
+        RETURN n
+    END FUNCTION
+END CLASS
+CLASS A EXTENDS Basis
+    FUNCTION wert() AS INTEGER
+        RETURN n * 2
+    END FUNCTION
+END CLASS
+CLASS B EXTENDS Basis
+    DIM w AS FLOAT
+    PROPERTY GET n() AS INTEGER
+        RETURN 100
+    END PROPERTY
+    FUNCTION wert() AS FLOAT
+        RETURN 0.5
+    END FUNCTION
+END CLASS
+DIM xs AS ARRAY OF Basis : xs = []
+DIM i AS INTEGER
+FOR i = 1 TO 10
+    DIM a AS A : a = NEW A() : a.n = i : a.w = i
+    ARRAY_PUSH(xs, a)
+    DIM b AS B : b = NEW B() : b.w = 1.5
+    ARRAY_PUSH(xs, b)
+NEXT
+DIM s AS FLOAT : s = 0
+DIM t AS FLOAT : t = 0
+DIM u AS INTEGER : u = 0
+DIM r AS INTEGER
+FOR r = 1 TO 5
+    FOR i = 0 TO LEN(xs) - 1
+        s = s + xs[i].wert()
+        t = t + xs[i].w
+        u = u + xs[i].n
+    NEXT
+NEXT
+PRINT s; " "; t; " "; u
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+575.0 350.0 5275
+
+=== familie mit verschiedener rueckgabe feld oder property (maschinencode)
+CLASS Basis
+    DIM n AS INTEGER
+    DIM w AS INTEGER
+    FUNCTION wert() AS INTEGER
+        RETURN n
+    END FUNCTION
+END CLASS
+CLASS A EXTENDS Basis
+    FUNCTION wert() AS INTEGER
+        RETURN n * 2
+    END FUNCTION
+END CLASS
+CLASS B EXTENDS Basis
+    DIM w AS FLOAT
+    PROPERTY GET n() AS INTEGER
+        RETURN 100
+    END PROPERTY
+    FUNCTION wert() AS FLOAT
+        RETURN 0.5
+    END FUNCTION
+END CLASS
+DIM xs AS ARRAY OF Basis : xs = []
+DIM i AS INTEGER
+FOR i = 1 TO 10
+    DIM a AS A : a = NEW A() : a.n = i : a.w = i
+    ARRAY_PUSH(xs, a)
+    DIM b AS B : b = NEW B() : b.w = 1.5
+    ARRAY_PUSH(xs, b)
+NEXT
+DIM s AS FLOAT : s = 0
+DIM t AS FLOAT : t = 0
+DIM u AS INTEGER : u = 0
+DIM r AS INTEGER
+FOR r = 1 TO 5
+    FOR i = 0 TO LEN(xs) - 1
+        s = s + xs[i].wert()
+        t = t + xs[i].w
+        u = u + xs[i].n
+    NEXT
+NEXT
+PRINT s; " "; t; " "; u
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+575.0 350.0 5275
+--- stderr
+jit: 4 Funktionen, 1 Schleifen, 5 Schleifenlaeufe
+
+=== mehr als vier klassen bilden keine familie
+' Eine Familie hat hoechstens vier Klassen (FAMILIE_MAX); bei fuenf bleibt
+' es beim alten Weg: aussteigen, die VM rechnet.
+CLASS F
+    FUNCTION z() AS INTEGER
+        RETURN 0
+    END FUNCTION
+END CLASS
+CLASS F1 EXTENDS F
+    FUNCTION z() AS INTEGER
+        RETURN 1
+    END FUNCTION
+END CLASS
+CLASS F2 EXTENDS F
+    FUNCTION z() AS INTEGER
+        RETURN 2
+    END FUNCTION
+END CLASS
+CLASS F3 EXTENDS F
+    FUNCTION z() AS INTEGER
+        RETURN 3
+    END FUNCTION
+END CLASS
+CLASS F4 EXTENDS F
+    FUNCTION z() AS INTEGER
+        RETURN 4
+    END FUNCTION
+END CLASS
+DIM xs AS ARRAY OF F : xs = []
+DIM i AS INTEGER
+FOR i = 0 TO 49
+    SELECT CASE i MOD 5
+        CASE 0 : ARRAY_PUSH(xs, NEW F())
+        CASE 1 : ARRAY_PUSH(xs, NEW F1())
+        CASE 2 : ARRAY_PUSH(xs, NEW F2())
+        CASE 3 : ARRAY_PUSH(xs, NEW F3())
+        CASE ELSE : ARRAY_PUSH(xs, NEW F4())
+    END SELECT
+NEXT
+DIM s AS INTEGER : s = 0
+DIM r AS INTEGER
+FOR r = 1 TO 10
+    FOR i = 0 TO 49
+        s = s + xs[i].z()
+    NEXT
+NEXT
+PRINT s
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+1000
+
+=== mehr als vier klassen bilden keine familie (maschinencode)
+CLASS F
+    FUNCTION z() AS INTEGER
+        RETURN 0
+    END FUNCTION
+END CLASS
+CLASS F1 EXTENDS F
+    FUNCTION z() AS INTEGER
+        RETURN 1
+    END FUNCTION
+END CLASS
+CLASS F2 EXTENDS F
+    FUNCTION z() AS INTEGER
+        RETURN 2
+    END FUNCTION
+END CLASS
+CLASS F3 EXTENDS F
+    FUNCTION z() AS INTEGER
+        RETURN 3
+    END FUNCTION
+END CLASS
+CLASS F4 EXTENDS F
+    FUNCTION z() AS INTEGER
+        RETURN 4
+    END FUNCTION
+END CLASS
+DIM xs AS ARRAY OF F : xs = []
+DIM i AS INTEGER
+FOR i = 0 TO 49
+    SELECT CASE i MOD 5
+        CASE 0 : ARRAY_PUSH(xs, NEW F())
+        CASE 1 : ARRAY_PUSH(xs, NEW F1())
+        CASE 2 : ARRAY_PUSH(xs, NEW F2())
+        CASE 3 : ARRAY_PUSH(xs, NEW F3())
+        CASE ELSE : ARRAY_PUSH(xs, NEW F4())
+    END SELECT
+NEXT
+DIM s AS INTEGER : s = 0
+DIM r AS INTEGER
+FOR r = 1 TO 10
+    FOR i = 0 TO 49
+        s = s + xs[i].z()
+    NEXT
+NEXT
+PRINT s
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+1000
+--- stderr
+jit: 400 mal mitten in einer Schleife ausgestiegen
+
+=== variable und feld vom typ der oberklasse
+' Eine lokale Variable `AS Form` und ein Feld `form AS Form` halten Kreise
+' und Quadrate. Seit Weg B laesst die Laufzeit dort nur Form und Unterklassen
+' zu; darum hat ein solcher Platz im Maschinencode die Familie der Klasse
+' (familie_des_typs). Vorher stieg der Code bei jedem Objekt einer anderen
+' Klasse als der deklarierten aus (hier 780 Mal). Ein NIL im Feld laesst
+' aussteigen, die VM rechnet weiter.
+CLASS Form
+    DIM n AS INTEGER
+    ABSTRACT FUNCTION flaeche() AS FLOAT
+END CLASS
+CLASS Kreis EXTENDS Form
+    DIM r AS FLOAT
+    FUNCTION flaeche() AS FLOAT
+        RETURN 3.0 * r * r
+    END FUNCTION
+END CLASS
+CLASS Quadrat EXTENDS Form
+    DIM a AS FLOAT
+    FUNCTION flaeche() AS FLOAT
+        RETURN a * a
+    END FUNCTION
+END CLASS
+CLASS Teil
+    DIM form AS Form
+END CLASS
+DIM formen AS ARRAY OF Form : formen = []
+DIM teile AS ARRAY OF Teil : teile = []
+DIM i AS INTEGER
+FOR i = 0 TO 39
+    DIM t AS Teil : t = NEW Teil()
+    IF i MOD 2 = 0 THEN
+        DIM k AS Kreis : k = NEW Kreis() : k.r = i : k.n = 1
+        ARRAY_PUSH(formen, k) : t.form = k
+    ELSE
+        DIM q AS Quadrat : q = NEW Quadrat() : q.a = i : q.n = 2
+        ARRAY_PUSH(formen, q) : t.form = q
+    END IF
+    ARRAY_PUSH(teile, t)
+NEXT
+SUB ueber_variable()
+    DIM f AS Form
+    DIM s AS FLOAT : s = 0
+    DIM z AS INTEGER : z = 0
+    DIM r AS INTEGER
+    DIM j AS INTEGER
+    FOR r = 1 TO 20
+        FOR j = 0 TO LEN(formen) - 1
+            f = formen[j]
+            s = s + f.flaeche()
+            z = z + f.n
+        NEXT
+    NEXT
+    PRINT "variable: "; s; " "; z
+END SUB
+ueber_variable()
+DIM s2 AS FLOAT : s2 = 0
+DIM r2 AS INTEGER
+FOR r2 = 1 TO 20
+    FOR i = 0 TO LEN(teile) - 1
+        s2 = s2 + teile[i].form.flaeche()
+    NEXT
+NEXT
+PRINT "feld: "; s2
+' Ein NIL mitten im Feld: der Code steigt aus, die VM rechnet weiter.
+teile[7].form = NIL
+DIM nil_seen AS INTEGER : nil_seen = 0
+FOR i = 0 TO LEN(teile) - 1
+    IF teile[i].form IS NIL THEN
+        nil_seen = nil_seen + 1
+    ELSE
+        s2 = s2 + teile[i].form.flaeche()
+    END IF
+NEXT
+PRINT "mit nil: "; s2; " "; nil_seen
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+variable: 806000.0 1200
+feld: 806000.0
+mit nil: 846251.0 1
+
+=== variable und feld vom typ der oberklasse (maschinencode)
+CLASS Form
+    DIM n AS INTEGER
+    ABSTRACT FUNCTION flaeche() AS FLOAT
+END CLASS
+CLASS Kreis EXTENDS Form
+    DIM r AS FLOAT
+    FUNCTION flaeche() AS FLOAT
+        RETURN 3.0 * r * r
+    END FUNCTION
+END CLASS
+CLASS Quadrat EXTENDS Form
+    DIM a AS FLOAT
+    FUNCTION flaeche() AS FLOAT
+        RETURN a * a
+    END FUNCTION
+END CLASS
+CLASS Teil
+    DIM form AS Form
+END CLASS
+DIM formen AS ARRAY OF Form : formen = []
+DIM teile AS ARRAY OF Teil : teile = []
+DIM i AS INTEGER
+FOR i = 0 TO 39
+    DIM t AS Teil : t = NEW Teil()
+    IF i MOD 2 = 0 THEN
+        DIM k AS Kreis : k = NEW Kreis() : k.r = i : k.n = 1
+        ARRAY_PUSH(formen, k) : t.form = k
+    ELSE
+        DIM q AS Quadrat : q = NEW Quadrat() : q.a = i : q.n = 2
+        ARRAY_PUSH(formen, q) : t.form = q
+    END IF
+    ARRAY_PUSH(teile, t)
+NEXT
+SUB ueber_variable()
+    DIM f AS Form
+    DIM s AS FLOAT : s = 0
+    DIM z AS INTEGER : z = 0
+    DIM r AS INTEGER
+    DIM j AS INTEGER
+    FOR r = 1 TO 20
+        FOR j = 0 TO LEN(formen) - 1
+            f = formen[j]
+            s = s + f.flaeche()
+            z = z + f.n
+        NEXT
+    NEXT
+    PRINT "variable: "; s; " "; z
+END SUB
+ueber_variable()
+DIM s2 AS FLOAT : s2 = 0
+DIM r2 AS INTEGER
+FOR r2 = 1 TO 20
+    FOR i = 0 TO LEN(teile) - 1
+        s2 = s2 + teile[i].form.flaeche()
+    NEXT
+NEXT
+PRINT "feld: "; s2
+' Ein NIL mitten im Feld: der Code steigt aus, die VM rechnet weiter.
+teile[7].form = NIL
+DIM nil_seen AS INTEGER : nil_seen = 0
+FOR i = 0 TO LEN(teile) - 1
+    IF teile[i].form IS NIL THEN
+        nil_seen = nil_seen + 1
+    ELSE
+        s2 = s2 + teile[i].form.flaeche()
+    END IF
+NEXT
+PRINT "mit nil: "; s2; " "; nil_seen
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+variable: 806000.0 1200
+feld: 806000.0
+mit nil: 846251.0 1
+--- stderr
+jit: 3 Funktionen, 3 Schleifen, 41 Schleifenlaeufe
+
+=== fremde klasse in einer variable der oberklasse
+' Weg B gilt auch im Maschinencode: das Auto in einer Variable AS Form ist
+' derselbe Fehler mit derselben Meldung.
+CLASS Form
+    ABSTRACT FUNCTION n() AS INTEGER
+END CLASS
+CLASS Kreis EXTENDS Form
+    FUNCTION n() AS INTEGER
+        RETURN 1
+    END FUNCTION
+END CLASS
+CLASS Auto
+END CLASS
+DIM f AS Form
+DIM s AS INTEGER : s = 0
+DIM i AS INTEGER
+FOR i = 1 TO 100
+    IF i = 70 THEN
+        f = NEW Auto()
+    ELSE
+        f = NEW Kreis()
+    END IF
+    s = s + f.n()
+NEXT
+PRINT s
+--- umgebung
+DHRT_JIT=aus
+--- fehler
+Zuweisung an 'f': Erwartet FORM (oder eine Unterklasse), erhalten AUTO
+
+=== fremde klasse in einer variable der oberklasse (maschinencode)
+CLASS Form
+    ABSTRACT FUNCTION n() AS INTEGER
+END CLASS
+CLASS Kreis EXTENDS Form
+    FUNCTION n() AS INTEGER
+        RETURN 1
+    END FUNCTION
+END CLASS
+CLASS Auto
+END CLASS
+DIM f AS Form
+DIM s AS INTEGER : s = 0
+DIM i AS INTEGER
+FOR i = 1 TO 100
+    IF i = 70 THEN
+        f = NEW Auto()
+    ELSE
+        f = NEW Kreis()
+    END IF
+    s = s + f.n()
+NEXT
+PRINT s
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- fehler
+Zuweisung an 'f': Erwartet FORM (oder eine Unterklasse), erhalten AUTO
+
+=== variable mit fuenf moeglichen klassen
+' Mehr als vier Klassen (FAMILIE_MAX): der Platz bekommt keine Familie, der
+' Code steigt aus wie bisher, das Ergebnis ist das der VM.
+CLASS F
+    FUNCTION z() AS INTEGER
+        RETURN 0
+    END FUNCTION
+END CLASS
+CLASS F1 EXTENDS F
+    FUNCTION z() AS INTEGER
+        RETURN 1
+    END FUNCTION
+END CLASS
+CLASS F2 EXTENDS F
+    FUNCTION z() AS INTEGER
+        RETURN 2
+    END FUNCTION
+END CLASS
+CLASS F3 EXTENDS F
+    FUNCTION z() AS INTEGER
+        RETURN 3
+    END FUNCTION
+END CLASS
+CLASS F4 EXTENDS F
+    FUNCTION z() AS INTEGER
+        RETURN 4
+    END FUNCTION
+END CLASS
+DIM xs AS ARRAY OF F : xs = []
+DIM i AS INTEGER
+FOR i = 0 TO 99
+    SELECT CASE i MOD 5
+        CASE 0 : ARRAY_PUSH(xs, NEW F())
+        CASE 1 : ARRAY_PUSH(xs, NEW F1())
+        CASE 2 : ARRAY_PUSH(xs, NEW F2())
+        CASE 3 : ARRAY_PUSH(xs, NEW F3())
+        CASE ELSE : ARRAY_PUSH(xs, NEW F4())
+    END SELECT
+NEXT
+SUB lauf()
+    DIM x AS F
+    DIM s AS INTEGER : s = 0
+    DIM r AS INTEGER
+    DIM j AS INTEGER
+    FOR r = 1 TO 10
+        FOR j = 0 TO LEN(xs) - 1
+            x = xs[j]
+            s = s + x.z()
+        NEXT
+    NEXT
+    PRINT s
+END SUB
+lauf()
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+2000
+
+=== variable mit fuenf moeglichen klassen (maschinencode)
+CLASS F
+    FUNCTION z() AS INTEGER
+        RETURN 0
+    END FUNCTION
+END CLASS
+CLASS F1 EXTENDS F
+    FUNCTION z() AS INTEGER
+        RETURN 1
+    END FUNCTION
+END CLASS
+CLASS F2 EXTENDS F
+    FUNCTION z() AS INTEGER
+        RETURN 2
+    END FUNCTION
+END CLASS
+CLASS F3 EXTENDS F
+    FUNCTION z() AS INTEGER
+        RETURN 3
+    END FUNCTION
+END CLASS
+CLASS F4 EXTENDS F
+    FUNCTION z() AS INTEGER
+        RETURN 4
+    END FUNCTION
+END CLASS
+DIM xs AS ARRAY OF F : xs = []
+DIM i AS INTEGER
+FOR i = 0 TO 99
+    SELECT CASE i MOD 5
+        CASE 0 : ARRAY_PUSH(xs, NEW F())
+        CASE 1 : ARRAY_PUSH(xs, NEW F1())
+        CASE 2 : ARRAY_PUSH(xs, NEW F2())
+        CASE 3 : ARRAY_PUSH(xs, NEW F3())
+        CASE ELSE : ARRAY_PUSH(xs, NEW F4())
+    END SELECT
+NEXT
+SUB lauf()
+    DIM x AS F
+    DIM s AS INTEGER : s = 0
+    DIM r AS INTEGER
+    DIM j AS INTEGER
+    FOR r = 1 TO 10
+        FOR j = 0 TO LEN(xs) - 1
+            x = xs[j]
+            s = s + x.z()
+        NEXT
+    NEXT
+    PRINT s
+END SUB
+lauf()
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+2000
+--- stderr
+jit: 20 mal mitten in einer Schleife ausgestiegen

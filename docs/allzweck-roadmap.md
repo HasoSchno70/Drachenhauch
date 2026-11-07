@@ -100,7 +100,7 @@ darum zuerst (geteilter Helfer `flush_out`, den sich `flush_and_prompt` für
 starten — der Bundle-Zweig setzt seine eigenen). Profiler und Debugger melden
 `EXIT` nicht mehr als Fehler.
 
-Tests: `tests/pruef/os_builtins.dhtest` (30; bis 2026-09-08 pytest, die
+Tests: `tests/pruef/laufzeit/os_builtins.dhtest` (30; bis 2026-09-08 pytest, die
 letzten zwei Fälle — PRINT/EPRINT in einem Strom und `SHELL_OUT$` auf die
 eigene Exe — kamen am 2026-09-20 nach, als es mit `EXEPATH$()` einen Weg zur
 laufenden Programmdatei gab). Beispiel: `examples/161_werkzeug.dh` — ein `wc`-artiges Werkzeug
@@ -155,7 +155,7 @@ Dateien) und ZIP in WP J.
 bestehendem Code plötzlich ein Fehler. `PRINT puffer` zeigt nur die Länge, nicht
 den Inhalt.
 
-Tests: `tests/pruef/buffer.dhtest` (48). Beispiel: `examples/162_binaerdatei.dh` —
+Tests: `tests/pruef/module/buffer.dhtest` (48). Beispiel: `examples/162_binaerdatei.dh` —
 liest Breite/Höhe und die Blockliste aus einer echten PNG-Datei ohne
 Bildbibliothek und schreibt/liest ein eigenes Binärformat. Doku:
 `docs/builtins-core.md`, Abschnitt „Bytes (BUFFER)".
@@ -212,7 +212,7 @@ ersetzt der geteilte Helfer `http_antwort` den vorher viermal wortgleichen
 Block; mit `HTTP_BYTES` kam eine fünfte Sache dazu, die jeder Pfad tun muss.
 `Abrufe::start` nimmt jetzt eine `Anfrage` statt nur einer URL.
 
-Tests: `tests/pruef/http_request.dhtest` (gegen einen Spiegel-Server in Drachenhauch,
+Tests: `tests/pruef/module/http_request.dhtest` (gegen einen Spiegel-Server in Drachenhauch,
 der zurückmeldet was ankam — am Rückgabewert allein sähe man nicht, ob eine
 Kopfzeile rausging). Beispiel: `examples/163_rest_api.dh` gegen httpbin.org.
 Doku: `docs/module-html.md`.
@@ -251,7 +251,7 @@ in der Lockfile (über `ureq`/`rustls`). Alles **ungated** — ein
 Konsolenprogramm, das eine Prüfsumme bildet, soll nicht das `http`-Feature
 brauchen.
 
-Tests: `tests/pruef/krypto.dhtest` (33), gegen die Vektoren aus den Normen
+Tests: `tests/pruef/module/krypto.dhtest` (33), gegen die Vektoren aus den Normen
 (FIPS 180-4, RFC 1321, RFC 4231) bzw. gegen Pythons `hashlib`/`hmac` — eine
 Prüfsumme, die nur mit sich selbst übereinstimmt, wäre wertlos. Beispiel:
 `examples/164_signatur.dh` (Webhook prüfen, Token würfeln, Datei-Prüfsumme).
@@ -302,7 +302,7 @@ zahlen soll — der Test auf das erste Byte des Namens hält die Kosten für all
 anderen Builtins bei einem Byte-Vergleich. `LOG_*` teilt sich `flush_out` mit
 `EPRINT`/`SHELL` aus WP A.
 
-Tests: `tests/pruef/pruefen.dhtest`. Beispiel: `examples/165_pruefen.dh`.
+Tests: `tests/pruef/laufzeit/pruefen.dhtest`. Beispiel: `examples/165_pruefen.dh`.
 Doku: `docs/builtins-core.md`, Abschnitt „Prüfen und Melden".
 
 ## WP F — Fehler, die man behandeln kann (✅ ERLEDIGT 2026-08-17)
@@ -357,7 +357,7 @@ Mitgezogen: der **Python-Parser** (`drachenhauch/parser.py`, `ast_nodes.py`,
 `tokens.py`) — er dient dem Editor/LSP, und `test_rust_parser_parity.py`
 vergleicht beide ASTs Feld für Feld.
 
-Tests: `tests/pruef/finally.dhtest` (25). Beispiel: `examples/166_aufraeumen.dh`.
+Tests: `tests/pruef/sprache/finally.dhtest` (25). Beispiel: `examples/166_aufraeumen.dh`.
 Doku: `docs/sprache.md`, Abschnitt „Try / Catch / Throw".
 
 ## WP G — Vererbung rund machen (✅ ERLEDIGT 2026-08-17)
@@ -402,7 +402,7 @@ Mitgezogen: der **Python-Parser** (`parser.py`, `ast_nodes.py`) —
 `test_rust_parser_parity.py` vergleicht beide ASTs Feld für Feld, `ClassDecl`
 hat jetzt in beiden ein `abstracts`.
 
-Tests: `tests/pruef/vererbung.dhtest` (20). Beispiel: `examples/167_vererbung.dh`.
+Tests: `tests/pruef/sprache/vererbung.dhtest` (20). Beispiel: `examples/167_vererbung.dh`.
 Doku: `docs/sprache.md`, Abschnitt „Klassen und Strukturen".
 
 ## WP H — Nebenläufigkeit (✅ ERLEDIGT — Hintergrund-Aufträge 2026-08-17, `TASK_*` 2026-08-19)
@@ -454,7 +454,7 @@ Vorgabewert. Das ist keine Beschränkung, die man nebenbei einführt.
 Beides ist eine eigene Entscheidung, keine Fleißarbeit — darum bleibt der Punkt
 offen und ehrlich als offen markiert.
 
-Tests: `tests/pruef/hintergrund.dhtest` (17), darunter der Beleg, dass ein Auftrag
+Tests: `tests/pruef/laufzeit/hintergrund.dhtest` (17), darunter der Beleg, dass ein Auftrag
 die offene Transaktion des Programms **nicht** sieht (eigene Verbindung).
 Beispiel: `examples/168_hintergrund.dh` — Abfrage und Prozess laufen, die
 Hauptschleife dreht sich 692 mal weiter. Doku: `docs/module-db.md`,
@@ -476,7 +476,7 @@ Hauptschleife dreht sich 692 mal weiter. Doku: `docs/module-db.md`,
 > zeigen auf die Datei, die der Nutzer vor sich hat — statt in die gemergte
 > Quelle. Dafür liefert `preprocess` eine Zeilen-Herkunftstabelle mit, die
 > zugleich Schritt 1 des Bauwegs für I.1 ist. Tests:
-> `tests/pruef/import_meldungen.dhtest`.
+> `tests/pruef/sprache/import_meldungen.dhtest`.
 
 `IMPORT "datei.dh"` ist textuelles Inkludieren in einen flachen globalen
 Namensraum, in dem bereits **1316 Builtins** liegen. `IMPORT ... AS alias` ist
@@ -539,7 +539,7 @@ als Ausgangspunkt:
       Kommando-Kanal des Debuggers. Eine Debug-Sitzung mit `INPUT` lief danach
       aus dem Tritt. Beide Wächter deckten nur den Profiler ab, nicht den
       Debugger (`flush_and_prompt`, `read_input_line` in `vm.rs`). Behoben,
-      zwei Faelle in `tests/pruef/dhrt_debug.dhtest` halten es fest
+      zwei Faelle in `tests/pruef/werkzeugkette/dhrt_debug.dhtest` halten es fest
 
 ## Python-Parser entfernt (✅ ERLEDIGT 2026-08-19)
 

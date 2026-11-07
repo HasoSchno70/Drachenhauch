@@ -1,0 +1,268 @@
+' Modbus (MODBUS_*, src/modbus.rs). Die Gegenstelle ist ein gespieltes
+' Geraet in Drachenhauch (_hilfen/modbusgeraet.dh) als eigener Prozess: die
+' Befehle warten auf die Antwort, im selben Programm kaeme der Server nie
+' dran. Es rechnet seine Pruefsumme selbst nach und schreibt jede Anfrage in
+' Hex nach anfragen.txt -- so prueft der Fall die Bytes auf der Leitung, nicht
+' nur, dass die Laufzeit ihre eigenen Rahmen versteht. RTU laeuft ueber
+' "tcp:host:port" (RTU-Rahmen ueber das Netz); seriell braucht es ein Geraet.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== tcp: register und spulen lesen und schreiben
+IMPORT "modbus"
+IMPORT "hilfe.dh"
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", "geraet.dh", "--", "tcp")
+DIM m AS MODBUS
+m = MODBUS_TCP("127.0.0.1", portVon(p))
+MODBUS_WRITE_REGISTER(m, 3, 1234)
+MODBUS_WRITE_REGISTERS(m, 10, [1, 2, 65535, -2])
+PRINT feld$(MODBUS_READ_HOLDING(m, 0, 4))
+PRINT feld$(MODBUS_READ_HOLDING(m, 10, 4))
+PRINT MODBUS_INT16(MODBUS_READ_HOLDING(m, 13, 1)[0])
+MODBUS_WRITE_COIL(m, 2, TRUE)
+MODBUS_WRITE_COILS(m, 8, [TRUE, FALSE, TRUE, TRUE, FALSE, FALSE, TRUE, TRUE, TRUE])
+PRINT bits$(MODBUS_READ_COILS(m, 0, 18))
+PRINT bits$(MODBUS_READ_DISCRETE(m, 0, 7))
+PRINT feld$(MODBUS_READ_INPUT(m, 5, 2))
+MODBUS_CLOSE(m)
+PRINT anfragen$()
+--- datei geraet.dh
+IMPORT "{sammlung}/../_hilfen/modbusgeraet.dh"
+--- datei hilfe.dh
+IMPORT "{sammlung}/../_hilfen/modbushilfe.dh"
+--- erwartet
+[0 0 0 1234]
+[1 2 65535 65534]
+-2
+001000001011001110
+1001001
+[1005 1006]
+00 01 00 00 00 06 01 06 00 03 04 D2
+00 02 00 00 00 0F 01 10 00 0A 00 04 08 00 01 00 02 FF FF FF FE
+00 03 00 00 00 06 01 03 00 00 00 04
+00 04 00 00 00 06 01 03 00 0A 00 04
+00 05 00 00 00 06 01 03 00 0D 00 01
+00 06 00 00 00 06 01 05 00 02 FF 00
+00 07 00 00 00 09 01 0F 00 08 00 09 02 CD 01
+00 08 00 00 00 06 01 01 00 00 00 12
+00 09 00 00 00 06 01 02 00 00 00 07
+00 0A 00 00 00 06 01 04 00 05 00 02
+
+=== rtu ueber das netz, mit pruefsumme
+IMPORT "modbus"
+IMPORT "hilfe.dh"
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", "geraet.dh", "--", "rtu")
+DIM m AS MODBUS
+m = MODBUS_RTU("tcp:127.0.0.1:" + STR$(portVon(p)))
+MODBUS_WRITE_REGISTER(m, 0, 10)
+PRINT feld$(MODBUS_READ_HOLDING(m, 0, 10))
+MODBUS_WRITE_COIL(m, 63, TRUE)
+PRINT bits$(MODBUS_READ_COILS(m, 60, 4))
+' Ein anderes Geraet am selben Bus antwortet nicht.
+MODBUS_UNIT(m, 7)
+MODBUS_TIMEOUT(m, 200)
+TRY
+    PRINT feld$(MODBUS_READ_HOLDING(m, 0, 1))
+CATCH e
+    PRINT e
+END TRY
+' An alle (Adresse 0) wartet nicht auf eine Antwort.
+MODBUS_UNIT(m, 0)
+MODBUS_WRITE_REGISTER(m, 5, 1)
+SLEEP(300)
+TRY
+    PRINT feld$(MODBUS_READ_HOLDING(m, 0, 1))
+CATCH e
+    PRINT e
+END TRY
+MODBUS_CLOSE(m)
+PRINT anfragen$()
+--- datei geraet.dh
+IMPORT "{sammlung}/../_hilfen/modbusgeraet.dh"
+--- datei hilfe.dh
+IMPORT "{sammlung}/../_hilfen/modbushilfe.dh"
+--- erwartet
+[10 0 0 0 0 0 0 0 0 0]
+0001
+MODBUS_READ_HOLDING: keine Antwort von Geraet 7 nach 200 ms
+MODBUS_READ_HOLDING: an Adresse 0 (an alle) antwortet niemand -- lesen geht nur von einem Geraet
+01 06 00 00 00 0A 09 CD
+01 03 00 00 00 0A C5 CD
+01 05 00 3F FF 00 BC 36
+01 01 00 3C 00 04 FD C5
+07 03 00 00 00 01 84 6C
+00 06 00 05 00 01 59 DA
+
+=== das geraet meldet ausnahmen
+IMPORT "modbus"
+IMPORT "hilfe.dh"
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", "geraet.dh", "--", "tcp")
+DIM m AS MODBUS
+m = MODBUS_TCP("127.0.0.1", portVon(p))
+TRY
+    PRINT feld$(MODBUS_READ_HOLDING(m, 98, 5))
+CATCH e
+    PRINT e
+END TRY
+TRY
+    MODBUS_WRITE_COIL(m, 64, TRUE)
+CATCH e
+    PRINT e
+END TRY
+' Danach geht es weiter.
+PRINT feld$(MODBUS_READ_HOLDING(m, 98, 2))
+--- datei geraet.dh
+IMPORT "{sammlung}/../_hilfen/modbusgeraet.dh"
+--- datei hilfe.dh
+IMPORT "{sammlung}/../_hilfen/modbushilfe.dh"
+--- erwartet
+MODBUS_READ_HOLDING: das Geraet meldet Ausnahme 2 (unerlaubte Datenadresse)
+MODBUS_WRITE_COIL: das Geraet meldet Ausnahme 2 (unerlaubte Datenadresse)
+[0 0]
+
+=== gestoerte leitungen
+IMPORT "modbus"
+IMPORT "hilfe.dh"
+SUB probe(art AS STRING, stoerung AS STRING)
+    DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", "geraet.dh", "--", art, stoerung)
+    DIM m AS MODBUS
+    IF art = "tcp" THEN
+        m = MODBUS_TCP("127.0.0.1", portVon(p))
+    ELSE
+        m = MODBUS_RTU("tcp:127.0.0.1:" + STR$(portVon(p)))
+    END IF
+    MODBUS_TIMEOUT(m, 300)
+    TRY
+        PRINT stoerung; ": "; feld$(MODBUS_READ_HOLDING(m, 0, 2))
+    CATCH e
+        PRINT stoerung; ": "; e
+    END TRY
+    MODBUS_CLOSE(m)
+    PROCESS_KILL(p)
+END SUB
+probe("tcp", "stumm")
+probe("tcp", "fremd")
+probe("rtu", "stumm")
+probe("rtu", "kaputt")
+probe("rtu", "kurz")
+--- datei geraet.dh
+IMPORT "{sammlung}/../_hilfen/modbusgeraet.dh"
+--- datei hilfe.dh
+IMPORT "{sammlung}/../_hilfen/modbushilfe.dh"
+--- erwartet
+stumm: MODBUS_READ_HOLDING: keine Antwort von Geraet 1 nach 300 ms
+fremd: [0 0]
+stumm: MODBUS_READ_HOLDING: keine Antwort von Geraet 1 nach 300 ms
+kaputt: MODBUS_READ_HOLDING: Pruefsumme der Antwort stimmt nicht (Stoerung auf der Leitung?)
+kurz: MODBUS_READ_HOLDING: Antwort nach 4 von 9 Bytes abgebrochen
+
+=== 32-bit-werte in zwei registern
+IMPORT "modbus"
+IMPORT "hilfe.dh"
+' 123.456 als float32 ist 42 F6 E9 79; die Hersteller legen die Bytes
+' verschieden in die zwei Register.
+PRINT feld$(MODBUS_FLOAT_REGS(123.456))
+PRINT feld$(MODBUS_FLOAT_REGS(123.456, "CDAB"))
+PRINT feld$(MODBUS_FLOAT_REGS(123.456, "BADC"))
+PRINT feld$(MODBUS_FLOAT_REGS(123.456, "DCBA"))
+DIM r AS ARRAY OF INTEGER : r = [7, 17142, 59769]
+PRINT FORMAT$(MODBUS_FLOAT(r, 1), "%.3f")
+PRINT FORMAT$(MODBUS_FLOAT([59769, 17142], 0, "cdab"), "%.3f")
+PRINT feld$(MODBUS_INT32_REGS(-100000))
+PRINT MODBUS_INT32(MODBUS_INT32_REGS(-100000), 0)
+PRINT MODBUS_UINT32(MODBUS_INT32_REGS(-1), 0)
+PRINT MODBUS_INT32(MODBUS_INT32_REGS(305419896, "CDAB"), 0, "CDAB")
+PRINT MODBUS_INT16(65535); " "; MODBUS_INT16(32767); " "; MODBUS_INT16(32768)
+--- datei hilfe.dh
+IMPORT "{sammlung}/../_hilfen/modbushilfe.dh"
+--- erwartet
+[17142 59769]
+[59769 17142]
+[63042 31209]
+[31209 63042]
+123.456
+123.456
+[65534 31072]
+-100000
+4294967295
+305419896
+-1 32767 -32768
+
+=== fehler werden gemeldet
+IMPORT "modbus"
+SUB probe(was AS STRING)
+    TRY
+        SELECT CASE was
+            CASE "port" : PRINT MODBUS_TCP("127.0.0.1", 0)
+            CASE "einheit" : PRINT MODBUS_TCP("127.0.0.1", 502, 300)
+            CASE "ziel" : PRINT MODBUS_RTU("tcp:127.0.0.1")
+            CASE "format" : PRINT MODBUS_RTU("COM9", 9600, "8X1")
+            CASE "folge" : PRINT MODBUS_FLOAT_REGS(1.0, "ABDC")
+            CASE "feld" : PRINT MODBUS_FLOAT([1], 0)
+            CASE "wert" : PRINT MODBUS_INT16(70000)
+            CASE "handle" : MODBUS_TIMEOUT(5, 100)
+        END SELECT
+    CATCH e
+        PRINT e
+    END TRY
+END SUB
+probe("port")
+probe("einheit")
+probe("ziel")
+probe("format")
+probe("folge")
+probe("feld")
+probe("wert")
+probe("handle")
+--- erwartet
+MODBUS_TCP: Port 0 ausserhalb 1..65535
+MODBUS_TCP: Geraeteadresse 300 ausserhalb 0..255
+MODBUS_RTU: "tcp:127.0.0.1" ist kein Netzziel -- so: "tcp:192.168.1.60:502"
+MODBUS_RTU: Format "8X1" -- so: "8N1", "8E1", "8O1", "8N2"
+MODBUS_FLOAT_REGS: Wortfolge "ABDC" -- erlaubt sind "ABCD", "CDAB", "BADC", "DCBA"
+MODBUS_FLOAT: Stelle 0 und 1 -- das Feld hat 1 Register
+MODBUS_INT16: Registerwert 70000 ausserhalb -32768..65535
+MODBUS_TIMEOUT: ungueltiges/geschlossenes MODBUS 5
+
+=== bereiche werden vor dem senden geprueft
+IMPORT "modbus"
+IMPORT "hilfe.dh"
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", "geraet.dh", "--", "tcp")
+DIM m AS MODBUS
+m = MODBUS_TCP("127.0.0.1", portVon(p))
+SUB probe(was AS STRING)
+    TRY
+        SELECT CASE was
+            CASE "anzahl" : PRINT feld$(MODBUS_READ_HOLDING(m, 0, 126))
+            CASE "spulen" : PRINT bits$(MODBUS_READ_COILS(m, 0, 2001))
+            CASE "ende" : PRINT feld$(MODBUS_READ_HOLDING(m, 65530, 10))
+            CASE "adresse" : MODBUS_WRITE_REGISTER(m, -1, 0)
+            CASE "registerwert" : MODBUS_WRITE_REGISTERS(m, 0, [1, 70000])
+            CASE "leer" : MODBUS_WRITE_COILS(m, 0, [])
+            CASE "spulenwert" : MODBUS_WRITE_COILS(m, 0, [1, 2])
+        END SELECT
+    CATCH e
+        PRINT e
+    END TRY
+END SUB
+probe("anzahl")
+probe("spulen")
+probe("ende")
+probe("adresse")
+probe("registerwert")
+probe("leer")
+probe("spulenwert")
+' Nichts davon ging hinaus.
+PRINT "[" + anfragen$() + "]"
+--- datei geraet.dh
+IMPORT "{sammlung}/../_hilfen/modbusgeraet.dh"
+--- datei hilfe.dh
+IMPORT "{sammlung}/../_hilfen/modbushilfe.dh"
+--- erwartet
+MODBUS_READ_HOLDING: Anzahl 126 ausserhalb 1..125
+MODBUS_READ_COILS: Anzahl 2001 ausserhalb 1..2000
+MODBUS_READ_HOLDING: 10 ab Adresse 65530 reicht ueber 65535 hinaus
+MODBUS_WRITE_REGISTER: Adresse -1 ausserhalb 0..65535
+MODBUS_WRITE_REGISTERS: Registerwert 70000 ausserhalb -32768..65535
+MODBUS_WRITE_COILS: Anzahl 0 ausserhalb 1..1968
+MODBUS_WRITE_COILS: an Stelle 1 steht kein Wahrheitswert (INTEGER)
+[]

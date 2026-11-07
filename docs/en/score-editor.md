@@ -130,7 +130,7 @@ beat. Up to eight warnings are shown ("… und k weitere", … and k more).
 
 ## Tests
 
-`tests/pruef/werkzeug_notenblatt.dhtest` drives the tool with real clicks and
+`tests/pruef/werkzeuge/werkzeug_notenblatt.dhtest` drives the tool with real clicks and
 keys via input playback: place a note, remove it, drag it and Ctrl+Z, rest
 and slur via the dropdown, a second track with an instrument, playback. The
 tracker export is compared cell by cell on the demo piece (chord, staccato, a

@@ -9,7 +9,7 @@
 > (`ARRAY_OF_TYPE`). Die Laufzeit nimmt in einem Platz vom Typ
 > einer Klasse nur noch NIL und Instanzen der Klasse oder einer Unterklasse,
 > `--check` warnt, wo es sicher nie passt; Prüfsammlung
-> `tests/pruef/klassentypen.dhtest`. Im Bestand hat das nichts gebrochen
+> `tests/pruef/sprache/klassentypen.dhtest`. Im Bestand hat das nichts gebrochen
 > (575 `.dh`-Dateien ohne neue Warnung, alle Sammlungen grün). Ein Fall in
 > `compiler_warnungen.dhtest` hielt das alte Durchreichen fest und ist
 > umgestellt. Der Rest des Textes ist der Entwurf, wie er zur Entscheidung

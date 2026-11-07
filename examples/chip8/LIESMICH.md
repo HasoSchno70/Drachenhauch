@@ -38,7 +38,7 @@ Der Kern schafft gut eine Million Befehle je Sekunde; ein CHIP-8 braucht
 etwa tausend. Die Vorgabe sind 15 je Bild (900 je Sekunde).
 
 Entstanden beim Dogfooding am 2026-10-24. Geprüft wird in
-`tests/pruef/beispiel_chip8.dhtest`: jeder Befehl einzeln mit Übertrag und
+`tests/pruef/beispiele/beispiel_chip8.dhtest`: jeder Befehl einzeln mit Übertrag und
 Borgen, beide Eigenheiten, Zeichnen mit Rand, Warten auf eine Taste bis zum
 Loslassen, die Fehler, der Assembler Byte für Byte, das Spiel ohne Fenster
 und das Fenster über `dhrt bild`.

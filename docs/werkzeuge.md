@@ -27,7 +27,7 @@ fehlt: seriell, usb, bluetooth, wlan (neu bauen mit: python rust/build_runtime.p
 
 Die Fassung kommt aus `rust/drachenhauch_runtime/Cargo.toml` (dort mit drei
 Stellen, `2026.13.0` heißt nach außen `2026.13`); bis 2026-09-21 standen
-`pyproject.toml` und die Python-Fassung daneben. `tests/pruef/dhrt_werkzeuge.dhtest`
+`pyproject.toml` und die Python-Fassung daneben. `tests/pruef/werkzeugkette/dhrt_werkzeuge.dhtest`
 prüft, dass die Laufzeit meldet, was dort steht.
 
 ## `dhrt bild` — ein Bild vom laufenden Programm
@@ -188,7 +188,7 @@ den Text des anderen ein. Wer die echte Ablage prüft, setzt
 `DHRT_ZWISCHENABLAGE=system` in `--- umgebung` (so `zwischenablage.dhtest`).
 
 **Werkzeuge ohne Python prüfen** (seit Stufe 32): so laufen die Tests des
-Form-Designers in `tests/pruef/werkzeug_formdesigner.dhtest`. Zwei Wege
+Form-Designers in `tests/pruef/werkzeuge/werkzeug_formdesigner.dhtest`. Zwei Wege
 nebeneinander — echte Klicks über eine Aufnahme (Einschub
 `AUTOMATION_PLAY("ev.txt")` hinter `SETFPS(60)`, Beilage
 `--- datei _programm/ev.txt`), oder direkt über die Unterprogramme des
@@ -214,16 +214,16 @@ neu button 248 184
 ```
 
 Seit Stufe 33 laufen so auch der Anim-FSM-Editor und das Notenblatt
-(`tests/pruef/werkzeug_animfsm.dhtest`, `tests/pruef/werkzeug_notenblatt.dhtest`):
+(`tests/pruef/werkzeuge/werkzeug_animfsm.dhtest`, `tests/pruef/werkzeuge/werkzeug_notenblatt.dhtest`):
 die Kopie ohne `WINDOW_MAXIMIZE()` (`--- streichen`), und was gesichert wurde,
 liest ein `--- nachher`-Programm — beim Anim-Editor die Laufzeit selbst
 (laden, aufsetzen, ein Schritt), beim Tracker-Export ein festes Gitter.
-Seit Stufe 34 auch die IDE (`tests/pruef/werkzeug_ide.dhtest`, Stände 1 bis 5):
+Seit Stufe 34 auch die IDE (`tests/pruef/ide/werkzeug_ide.dhtest`, Stände 1 bis 5):
 das `nachher`-Programm liest ihr Protokoll mit `READLINES` und prüft genaue
 Zeilen, Reihenfolgen und Zählungen — `--- inhalt` sucht nur Teiltexte, und
 `geprueft 1` stünde auch in `geprueft 10`. Die Stände 6 bis 12 folgen in
-`tests/pruef/werkzeug_ide_6_12.dhtest`, 13 bis 25 in
-`tests/pruef/werkzeug_ide_13_25.dhtest` (ein Text mit Anführungszeichen oder
+`tests/pruef/ide/werkzeug_ide_6_12.dhtest`, 13 bis 25 in
+`tests/pruef/ide/werkzeug_ide_13_25.dhtest` (ein Text mit Anführungszeichen oder
 Zeilenumbruch kommt dort über `CHR$(34)`/`CHR$(10)` ins Leseprogramm — in
 einer Zeichenkette ist beides nicht erlaubt); eine Voreinstellung der IDE kommt dort
 als Beilage `ide.json` in `_programm/`. **Falle:** ein Werkzeug, das aus einem
@@ -318,8 +318,8 @@ git, cargo); die Alternative wäre, die erwarteten Zeilen zu **erfinden** — gr
 und wertlos. Die Bilanz nennt Dateien und Fälle:
 
 ```text
-  ok      tests\pruef\coroutines.dhtest  (13 Faelle, 0.61s)
-  FEHLER  tests\pruef\array_literal.dhtest  (1 von 23 Faellen, 0.90s)
+  ok      tests\pruef\sprache\coroutines.dhtest  (13 Faelle, 0.61s)
+  FEHLER  tests\pruef\sprache\array_literal.dhtest  (1 von 23 Faellen, 0.90s)
           FEHL  Zeile 61: leeres Feld: Ausgabezeile 1: erwartet '0', erhalten '1'
 
 2 Datei(en), 1 ok, 1 mit Fehlern; 36 Faelle, 35 ok, 1 fehl, 0 uebersprungen  (1.52s)
@@ -327,7 +327,7 @@ und wertlos. Die Bilanz nennt Dateien und Fälle:
 
 Die Sammlungen des Projekts liegen unter `tests/pruef/`; die CI ruft
 `dhrt test tests/pruef` direkt auf (bis 2026-09-20 über einen pytest-Anker).
-Das Format selbst prüft `tests/pruef/dhrt_test_format.dhtest` — an einer
+Das Format selbst prüft `tests/pruef/werkzeugkette/dhrt_test_format.dhtest` — an einer
 Sammlung, die der Fall schreibt, mit erwarteten Meldungen, Zeilennummern und
 Bilanz.
 

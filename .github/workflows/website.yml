@@ -5,7 +5,7 @@
 # Gebaut wird nur der Kern von dhrt (ohne Grafik und Ton) -- das Werkzeug
 # braucht nur Zeichenketten, Dateien und SYNTAX_SPANS. Der Lauf gehoert NICHT
 # zu den Pflicht-Pruefungen von main; ob die Verweise stimmen, prueft
-# tests/pruef/werkzeug_website.dhtest in der normalen CI.
+# tests/pruef/werkzeuge/werkzeug_website.dhtest in der normalen CI.
 #
 # Voraussetzung: in den Einstellungen des Repositorys steht Pages auf
 # "GitHub Actions" als Quelle.

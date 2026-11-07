@@ -168,7 +168,7 @@ laufen weiter den direkten VM-Pfad. Die Front-End-Kette ist in
 das **ohne** chdir läuft — Dev-/Parity-Einstieg).
 
 Gate: stdout von `dhrt run` == Python-Tree-Walker mit demselben chdir
-([`tests/pruef/rust_run_parity.dhtest`](../tests/pruef/rust_run_parity.dhtest), 2 Tests:
+([`tests/pruef/laufzeit/rust_run_parity.dhtest`](../tests/pruef/laufzeit/rust_run_parity.dhtest), 2 Tests:
 relativer Laufzeit-Datei-Zugriff + Quellcode- + Modul-IMPORT, sowie der
 `dhrt <datei.dh>`-Auto-Detect). Graphics-Smoke-Test (raylib) headless verifiziert.
 
@@ -181,7 +181,7 @@ Portierung erreicht.
   selbst → `.dhc` und hängt den Payload (`<gbc><u64 len><DHRTPAY1>`) an eine
   Kopie der eigenen Runtime-Exe — eine eigenständige `.exe`, ohne Python (der
   frühere Weg über `dhrun.py`/`export.py` ist entfernt). `assets/` neben der Quelle wird mitkopiert. Test
-  [`tests/pruef/dhrt_export.dhtest`](../tests/pruef/dhrt_export.dhtest)
+  [`tests/pruef/werkzeugkette/dhrt_export.dhtest`](../tests/pruef/werkzeugkette/dhrt_export.dhtest)
   (exportiert, startet die Exe, vergleicht ihre Ausgabe).
 - **Aliasierte Modul-IMPORTs** `IMPORT "json" AS j`: `preprocess::compile_env`
   liefert neben den externen Typen (inkl. aliasierter wie `j_handle`/`v`) eine

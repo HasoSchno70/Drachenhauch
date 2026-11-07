@@ -131,5 +131,5 @@ Später: Dropdown, ListBox, Tabs, RadioGroup, modale Dialoge.
 
 ## Test-/Doku-Hinweise
 - Builtins laufen in allen drei Pfaden identisch → wo nicht-grafisch testbar
-  (State/Hit-Test), `run_all` in `tests/pruef/three_paths.dhtest` nutzen.
+  (State/Hit-Test), `run_all` in `tests/pruef/laufzeit/three_paths.dhtest` nutzen.
 - Neue Module in der CLAUDE.md-Modul-Tabelle + eine eigene Sektion ergänzen.

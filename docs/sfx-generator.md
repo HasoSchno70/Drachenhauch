@@ -118,12 +118,12 @@ Klang eine eigene `.ini`, die man ablegt, wo man will.
 
 ## Tests
 
-`tests/pruef/werkzeug_sfx.dhtest` fährt echte Mausklicks und Tasten über eine
+`tests/pruef/werkzeuge/werkzeug_sfx.dhtest` fährt echte Mausklicks und Tasten über eine
 Aufnahme: kein Bedienelement liegt auf einem anderen oder über dem Rand, ein
 Zug ist ein Schritt, Zurück/Vor über Werkzeugleiste und Tasten, Würfelwurf und
 Vorlage sind je ein Schritt, ein neuer Zug schneidet den Vor-Weg ab, Zufall
 bleibt bei der Art, Mutieren ist ein Schritt, ein Klick in den Verlauf holt
 einen Stand zurück, der Endpunkt der Hüllkurve lässt sich ziehen — und der
 DH-Code nimmt den Pan mit und läuft durch `dhrt --check`. Die Rückfrage beim
-Schließen prüft `tests/pruef/werkzeug_kreuz.dhtest` mit echten
+Schließen prüft `tests/pruef/werkzeuge/werkzeug_kreuz.dhtest` mit echten
 Fensternachrichten.

@@ -194,7 +194,7 @@ What the Qt version could do and this editor cannot:
 
 ## Testing
 
-`tests/pruef/werkzeug_tilemap.dhtest` drives the editor with real clicks and
+`tests/pruef/werkzeuge/werkzeug_tilemap.dhtest` drives the editor with real clicks and
 keys: DH code including the image of the generated renderer (empty and
 painted map), the interpretation of property values, setting and removing
 `solid`, object layers (drag, click, select, `Entf`), several tilesets with
