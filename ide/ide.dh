@@ -1554,6 +1554,9 @@ CLASS Kachel
     DIM bilderZahl AS INTEGER
     DIM karte AS GUI_WIDGET
     DIM textur AS IMAGE
+    ' Umgebung fuer den Lauf, der das Vorschaubild macht ("umgebung" in der
+    ' Liste) -- so zeigt ein Programm, das auf ein Geraet wartet, seine Demo.
+    DIM umgebung AS MAP OF STRING
     SUB Init(d AS STRING, n AS STRING, b AS STRING, z AS INTEGER)
         datei = d : name = n : beschr = b : bilderZahl = z
         karte = -1 : textur = -1
@@ -1572,6 +1575,12 @@ IF FILEEXISTS(showcasePfad) THEN
             DIM scBilder AS INTEGER : scBilder = 90
             IF JSON_HAS(scListe, scWo + "frames") THEN scBilder = JSON_GET_INT(scListe, scWo + "frames")
             ARRAY_PUSH(kacheln, NEW Kachel(JSON_GET_STRING(scListe, scWo + "file"), JSON_GET_STRING(scListe, scWo + "title"), scBeschr, scBilder))
+            IF JSON_HAS(scListe, scWo + "umgebung") THEN
+                DIM scSchl AS STRING
+                FOR EACH scSchl IN JSON_KEYS(scListe, scWo + "umgebung")
+                    MAPPUT(kacheln[LEN(kacheln) - 1].umgebung, scSchl, JSON_GET_STRING(scListe, scWo + "umgebung." + JSON_KEY$(scSchl)))
+                NEXT
+            END IF
         NEXT
     CATCH scFehler
         ' Eine kaputte Liste darf die IDE nicht aufhalten: dann die acht.
@@ -2628,13 +2637,19 @@ DIM vorschauFertig AS INTEGER : vorschauFertig = 0
 ' nachzusehen waere ein Dutzend Betriebssystem-Aufrufe je Sechzigstel.
 DIM vorschauRuhe AS BOOLEAN : vorschauRuhe = FALSE
 
+' Ein Beispiel im Unterordner (`bastelzentrale/main.dh`) heisst als Bild
+' `bastelzentrale_main.png` -- wie bei tools/showcase_bilder.dh.
+FUNCTION kachelBildName$(i AS INTEGER) AS STRING
+    RETURN REPLACE$(REPLACE$(kacheln[i].datei, ".dh", ""), "/", "_") + ".png"
+END FUNCTION
+
 FUNCTION vorschauPfad$(i AS INTEGER) AS STRING
-    RETURN PATHJOIN(vorschauOrdner, REPLACE$(kacheln[i].datei, ".dh", "") + ".png")
+    RETURN PATHJOIN(vorschauOrdner, kachelBildName$(i))
 END FUNCTION
 
 ' Das mitgelieferte Bild aus examples/screenshots/ (tools/showcase_bilder.dh).
 FUNCTION showcaseBild$(i AS INTEGER) AS STRING
-    RETURN PATHJOIN(beispielOrdner, "screenshots/" + REPLACE$(kacheln[i].datei, ".dh", "") + ".png")
+    RETURN PATHJOIN(beispielOrdner, "screenshots/" + kachelBildName$(i))
 END FUNCTION
 
 ' Das Bild an seine Kachel haengen. Eine alte Textur wird vorher
@@ -2676,7 +2691,7 @@ SUB vorschauNachziehen()
         DIM quelle AS STRING : quelle = PATHJOIN(beispielOrdner, kacheln[i].datei)
         IF NOT FILEEXISTS(quelle) THEN CONTINUE
         IF NOT DIREXISTS(vorschauOrdner) THEN MKDIR(vorschauOrdner)
-        vorschauLauf = PROCESS_START("dhrt", "bild", quelle, vorschauPfad$(i), STR$(kacheln[i].bilderZahl))
+        vorschauLauf = PROCESS_START("dhrt", "bild", quelle, vorschauPfad$(i), STR$(kacheln[i].bilderZahl), kacheln[i].umgebung)
         vorschauIdx = i
         GUI_SET_TEXT(lblStatus, tr$("Vorschau: ") + kacheln[i].name + " ...")
         protokoll("vorschau " + kacheln[i].datei)
