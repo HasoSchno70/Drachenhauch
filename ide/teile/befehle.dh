@@ -1,0 +1,1199 @@
+' ide/teile/befehle.dh -- ein Teil der IDE (ide/ide.dh), dort per IMPORT
+' an genau dieser Stelle eingebunden: Menue-Tafel, Tastenbelegung, eigene Schnipsel, Terminal, serieller Monitor, Profil im Code.
+' Kein eigenes Programm -- die Namen gehoeren der IDE.
+
+' --- Menue und Befehl: EINE Tafel (seit 2026-09-29) -----------------------
+' Jeder Menuepunkt, der einen Befehl ruft, steht hier mit seiner Kennung und
+' dem Kuerzel, mit dem er angelegt wurde. Aus derselben Tafel feuern die
+' Klicks (menueKlicks) und liest die eigene Tastenbelegung, welcher
+' Menuepunkt zu einem Befehl gehoert -- bis dahin standen 136 einzelne
+' IF-Zeilen in der Bildschleife, und ein Kuerzel liess sich nur im
+' Quelltext aendern. `klickt` = FALSE: der Klick wird woanders abgefragt
+' (zusammen mit einem Knopf), der Punkt steht nur fuers Kuerzel hier.
+CLASS Menuepunkt
+    DIM item AS INTEGER             ' der Menuepunkt (GUI_MENU_ITEM)
+    DIM kennung AS STRING           ' der Befehl, den er ruft
+    DIM vorgabe AS STRING           ' das Kuerzel, mit dem er angelegt wurde
+    DIM jetzt AS STRING             ' das Kuerzel, das er gerade hat (tasten.json)
+    DIM klickt AS BOOLEAN
+    SUB Init(i AS INTEGER, k AS STRING, kz AS STRING, kl AS BOOLEAN)
+        item = i : kennung = k : vorgabe = kz : jetzt = kz : klickt = kl
+    END SUB
+END CLASS
+DIM menuepunkte AS ARRAY OF Menuepunkt : menuepunkte = []
+
+SUB menueBefehl(item AS INTEGER, kennung AS STRING, kuerzel AS STRING, klickt AS BOOLEAN = TRUE)
+    ARRAY_PUSH(menuepunkte, NEW Menuepunkt(item, kennung, kuerzel, klickt))
+END SUB
+
+' Gibt es einen Menuepunkt fuer diesen Befehl?
+FUNCTION hatMenuepunkt(kennung AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(menuepunkte) - 1
+        IF menuepunkte[i].kennung = kennung THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+SUB menueKlicks()
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(menuepunkte) - 1
+        IF menuepunkte[i].klickt THEN
+            IF GUI_CLICKED(menuepunkte[i].item) THEN befehl(menuepunkte[i].kennung)
+        END IF
+    NEXT
+END SUB
+
+' --- Eigene Tastenbelegung (tasten.json neben der ide.json) --------------
+' Die Datei nennt nur, was ANDERS ist: {"kennung": "Strg+Alt+K", ...}, leer
+' heisst "kein Kuerzel". Geht ein Kuerzel an einen Befehl, der es nicht
+' hatte, verliert es der, dem es vorher gehoerte -- zwei Befehle auf einer
+' Taste feuerten beide, und welcher gewinnt, saehe man nicht.
+DIM tastenMeldungen AS ARRAY OF STRING : tastenMeldungen = []
+DIM tastenKennung AS STRING : tastenKennung = ""
+
+' Der Ordner der ide.json -- "." bei einem Pfad ohne Ordner (die Tests
+' setzen DH_IDE_KONFIG=ide.json), sonst liefe MKDIR("") in einen Fehler.
+FUNCTION konfigOrdner$() AS STRING
+    DIM d AS STRING : d = DIRNAME(konfigPfad)
+    IF d = "" THEN d = "."
+    IF NOT DIREXISTS(d) THEN MKDIR(d)
+    RETURN d
+END FUNCTION
+
+FUNCTION tastenPfad$() AS STRING
+    RETURN PATHJOIN(konfigOrdner$(), "tasten.json")
+END FUNCTION
+
+' Zwei Schreibweisen desselben Kuerzels ("Umschalt+Strg+K", "ctrl+shift+k")
+' sind dasselbe Kuerzel -- verglichen wird in dieser einen Form.
+FUNCTION kuerzelForm$(k AS STRING) AS STRING
+    DIM t AS STRING : t = LOWER$(REPLACE$(TRIM$(k), " ", ""))
+    IF t = "" THEN RETURN ""
+    IF RIGHT$(t, 2) = "++" THEN t = LEFT$(t, LEN(t) - 2) + "+plus"
+    IF t = "+" THEN t = "plus"
+    DIM teile AS ARRAY OF STRING : teile = SPLIT$(t, "+")
+    DIM taste AS STRING : taste = teile[LEN(teile) - 1]
+    IF taste = "-" THEN taste = "minus"
+    IF taste = "space" OR taste = "leertaste" THEN taste = "leer"
+    IF taste = "del" OR taste = "delete" THEN taste = "entf"
+    ' Englische Tastennamen wie die Anzeige auf Englisch (kz$) sie schreibt.
+    SELECT CASE taste
+        CASE "up" : taste = "hoch"
+        CASE "down" : taste = "runter"
+        CASE "left" : taste = "links"
+        CASE "right" : taste = "rechts"
+        CASE "home" : taste = "pos1"
+        CASE "end" : taste = "ende"
+        CASE "ins", "insert" : taste = "einfg"
+        CASE "pageup" : taste = "bildauf"
+        CASE "pagedown" : taste = "bildab"
+        CASE "backspace" : taste = "rueck"
+        CASE "escape" : taste = "esc"
+        CASE "return" : taste = "enter"
+    END SELECT
+    DIM strg AS BOOLEAN : strg = FALSE
+    DIM alt AS BOOLEAN : alt = FALSE
+    DIM ums AS BOOLEAN : ums = FALSE
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(teile) - 2
+        DIM m AS STRING : m = teile[i]
+        IF m = "strg" OR m = "ctrl" OR m = "control" THEN strg = TRUE
+        IF m = "alt" THEN alt = TRUE
+        IF m = "umschalt" OR m = "shift" THEN ums = TRUE
+    NEXT
+    RETURN IIF(strg, "strg+", "") + IIF(alt, "alt+", "") + IIF(ums, "umschalt+", "") + taste
+END FUNCTION
+
+SUB tastenMelden(m AS STRING)
+    ARRAY_PUSH(tastenMeldungen, m)
+    ausgabe("Tastenbelegung: " + m)
+    protokoll("tasten meldung " + m)
+END SUB
+
+' Alles auf die Vorgabe, dann die Datei darueber. Ohne das Zuruecksetzen
+' bliebe ein Kuerzel stehen, das aus der Datei gestrichen wurde.
+SUB tastenAnwenden()
+    tastenMeldungen = []
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(menuepunkte) - 1
+        IF menuepunkte[i].jetzt <> menuepunkte[i].vorgabe THEN
+            GUI_MENU_SHORTCUT(menuepunkte[i].item, kz$(menuepunkte[i].vorgabe))
+            menuepunkte[i].jetzt = menuepunkte[i].vorgabe
+        END IF
+    NEXT
+    FOR i = 0 TO LEN(befehle) - 1
+        befehle[i].kuerzel = befehle[i].vorgabe
+    NEXT
+    DIM gesetzt AS INTEGER : gesetzt = 0
+    IF FILEEXISTS(tastenPfad$()) THEN
+        DIM j AS JSON_HANDLE
+        DIM gelesen AS BOOLEAN : gelesen = TRUE
+        TRY
+            j = JSON_LOAD(tastenPfad$())
+        CATCH e
+            gelesen = FALSE
+            tastenMelden("tasten.json lässt sich nicht lesen: " + e)
+        END TRY
+        ' Oben muss ein Objekt stehen -- JSON_KEYS wirft sonst, und eine
+        ' Liste in der tasten.json beendete die IDE beim Start.
+        IF gelesen THEN
+            IF JSON_TYPE(j, "") <> "object" THEN
+                gelesen = FALSE
+                tastenMelden("tasten.json: erwartet { Befehl: Kuerzel, ... }")
+            END IF
+        END IF
+        IF gelesen THEN
+            DIM k AS STRING
+            FOR EACH k IN JSON_KEYS(j, "")
+                IF JSON_TYPE(j, k) <> "string" THEN
+                    tastenMelden(k + ": das Kürzel muss als Text stehen, z. B. " + CHR$(34) + "Strg+Alt+K" + CHR$(34))
+                ELSEIF tastenEins(k, TRIM$(JSON_GET_STRING(j, k))) THEN
+                    gesetzt = gesetzt + 1
+                END IF
+            NEXT
+        END IF
+    END IF
+    protokoll("tasten angewendet " + STR$(gesetzt) + " " + STR$(LEN(tastenMeldungen)))
+    IF LEN(tastenMeldungen) > 0 THEN GUI_SET_TEXT(lblStatus, tr$("Tastenbelegung: ") + STR$(LEN(tastenMeldungen)) + tr$(" Hinweis(e) -- siehe Ausgabe."))
+END SUB
+
+' Ein Eintrag der Datei. TRUE, wenn er gilt.
+FUNCTION tastenEins(k AS STRING, neu AS STRING) AS BOOLEAN
+    DIM idx AS INTEGER : idx = befehlNr(k)
+    DIM i AS INTEGER
+    DIM treffer AS INTEGER : treffer = 0
+    FOR i = 0 TO LEN(menuepunkte) - 1
+        IF menuepunkte[i].kennung = k THEN
+            TRY
+                GUI_MENU_SHORTCUT(menuepunkte[i].item, neu)
+            CATCH e
+                tastenMelden(k + ": " + CHR$(34) + neu + CHR$(34) + " ist kein Kürzel, das die IDE kennt (" + e + ")")
+                RETURN FALSE
+            END TRY
+            menuepunkte[i].jetzt = neu
+            treffer = treffer + 1
+        END IF
+    NEXT
+    IF treffer = 0 THEN
+        IF idx < 0 THEN
+            tastenMelden(k + ": diesen Befehl gibt es nicht")
+        ELSE
+            tastenMelden(k + ": " + befehle[idx].name + " hat keinen Menüpunkt, sein Kürzel lässt sich nicht ändern")
+        END IF
+        RETURN FALSE
+    END IF
+    IF idx >= 0 THEN befehle[idx].kuerzel = neu
+    ' Wem gehoerte das Kuerzel vorher?
+    DIM form AS STRING : form = kuerzelForm$(neu)
+    IF form = "" THEN RETURN TRUE
+    FOR i = 0 TO LEN(menuepunkte) - 1
+        IF menuepunkte[i].kennung <> k AND kuerzelForm$(menuepunkte[i].jetzt) = form THEN
+            GUI_MENU_SHORTCUT(menuepunkte[i].item, "")
+            menuepunkte[i].jetzt = ""
+            DIM andere AS INTEGER : andere = befehlNr(menuepunkte[i].kennung)
+            DIM andererName AS STRING : andererName = menuepunkte[i].kennung
+            IF andere >= 0 THEN
+                befehle[andere].kuerzel = ""
+                andererName = befehle[andere].name
+            END IF
+            tastenMelden(neu + " gehörte vorher zu " + CHR$(34) + andererName + CHR$(34) + " -- der hat jetzt keins mehr")
+        END IF
+    NEXT
+    RETURN TRUE
+END FUNCTION
+
+' Hilfe -> Tastenkuerzel aendern: erst den Befehl waehlen (nur die mit
+' Menuepunkt -- die anderen haben keinen Ort fuer ein Kuerzel), dann fragen.
+SUB tastenWaehlen()
+    waehlerListe = []
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(befehle) - 1
+        IF hatMenuepunkt(befehle[i].kennung) THEN
+            waehlerDazu(befehle[i].name, befehle[i].kennung, befehle[i].kuerzel)
+        END IF
+    NEXT
+    waehlerOeffnen("tasten", tr$("Tastenkürzel ändern: Befehl wählen"))
+END SUB
+
+SUB tastenFragen(k AS STRING)
+    DIM idx AS INTEGER : idx = befehlNr(k)
+    IF idx < 0 THEN RETURN
+    tastenKennung = k
+    dlgTasten = GUI_PROMPT(tr$("Tastenkürzel"), tr$("Neues Kürzel für ") + CHR$(34) + befehle[idx].name + CHR$(34) + tr$(" (z. B. Strg+Alt+K; leer = keins):"), befehle[idx].kuerzel)
+END SUB
+
+' In die Datei schreiben und neu anwenden. Wer die Vorgabe zurueckstellt,
+' bekommt keinen Eintrag -- die Datei bleibt so klein wie die Abweichung.
+SUB tastenSetzen(k AS STRING, neu AS STRING)
+    DIM j AS JSON_HANDLE : j = JSON_PARSE("{}")
+    IF FILEEXISTS(tastenPfad$()) THEN
+        TRY
+            j = JSON_LOAD(tastenPfad$())
+        CATCH e
+            j = JSON_PARSE("{}")
+        END TRY
+    END IF
+    DIM idx AS INTEGER : idx = befehlNr(k)
+    IF idx >= 0 AND kuerzelForm$(neu) = kuerzelForm$(befehle[idx].vorgabe) THEN
+        IF JSON_HAS(j, k) THEN JSON_REMOVE(j, k)
+    ELSE
+        JSON_SET_STRING(j, k, neu)
+    END IF
+    WRITEALL(tastenPfad$(), JSON_STRINGIFY(j) + NL)
+    tastenAnwenden()
+    IF idx >= 0 THEN
+        DIM zeigen AS STRING : zeigen = befehle[idx].kuerzel
+        IF zeigen = "" THEN zeigen = "keins"
+        IF LEN(tastenMeldungen) = 0 THEN GUI_SET_TEXT(lblStatus, befehle[idx].name + ": " + zeigen)
+    END IF
+    protokoll("tasten gesetzt " + k + " " + neu)
+END SUB
+
+SUB tastenZuruecksetzen()
+    IF FILEEXISTS(tastenPfad$()) THEN DELETEFILE(tastenPfad$())
+    tastenAnwenden()
+    GUI_SET_TEXT(lblStatus, tr$("Alle Tastenkürzel wieder wie ausgeliefert."))
+END SUB
+
+' --- Eigene Schnipsel (schnipsel.txt neben der ide.json) ------------------
+' Ein Textformat statt JSON: ein Schnipsel ist mehrzeiliger Code, und in
+' JSON stuende er als eine Zeile voller \n. Jeder beginnt mit
+'   === Name | kuerzel
+' und reicht bis zum naechsten. Ein eigenes Kuerzel, das es schon gibt,
+' ERSETZT den eingebauten Schnipsel -- wer "for" anders haben will, soll
+' nicht zwei Eintraege fuer dasselbe Wort bekommen.
+DIM schnipselEingebaut AS ARRAY OF SchnipselEintrag : schnipselEingebaut = []
+
+FUNCTION schnipselPfad$() AS STRING
+    RETURN PATHJOIN(konfigOrdner$(), "schnipsel.txt")
+END FUNCTION
+
+SUB schnipselEingebautMerken()
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(schnipselListe) - 1
+        ARRAY_PUSH(schnipselEingebaut, schnipselListe[i])
+    NEXT
+END SUB
+
+SUB eigenerSchnipsel(name AS STRING, abk AS STRING, text AS STRING)
+    DIM anzeige AS STRING : anzeige = schnipselAnzeige$(name, abk)
+    DIM k AS INTEGER : k = -1
+    IF abk <> "" THEN k = schnipselNr(abk)
+    IF k >= 0 THEN
+        ' Ersetzt wird der Eintrag der LISTE -- schnipselLaden legt ihn als
+        ' Kopie an, die eingebauten im Vorrat bleiben unberuehrt.
+        schnipselListe[k].name = anzeige
+        schnipselListe[k].text = text
+        schnipselListe[k].herkunft = "eigen, ersetzt"
+    ELSE
+        ARRAY_PUSH(schnipselListe, NEW SchnipselEintrag(anzeige, abk, text, "eigen"))
+    END IF
+END SUB
+
+SUB schnipselLaden()
+    ' KOPIEN, keine geteilten Objekte: ein eigener Schnipsel mit demselben
+    ' Kuerzel ersetzt den Eintrag an Ort und Stelle (eigenerSchnipsel) -- mit
+    ' demselben Objekt aenderte das den Vorrat, und nach dem naechsten Laden
+    ' waere der eingebaute weg.
+    schnipselListe = []
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(schnipselEingebaut) - 1
+        DIM se AS SchnipselEintrag : se = schnipselEingebaut[i]
+        ARRAY_PUSH(schnipselListe, NEW SchnipselEintrag(se.name, se.abk, se.text, ""))
+    NEXT
+    ' Schnipsel der Plugins (PLUGIN_SCHNIPSEL) vor den eigenen -- ein eigener
+    ' mit demselben Kuerzel ersetzt sie wie die eingebauten.
+    FOR i = 0 TO LEN(plugSchnipsel) - 1
+        DIM sp AS SchnipselEintrag : sp = plugSchnipsel[i]
+        ARRAY_PUSH(schnipselListe, NEW SchnipselEintrag(sp.name, sp.abk, sp.text, sp.herkunft))
+    NEXT
+    DIM eigene AS INTEGER : eigene = 0
+    DIM fehler AS INTEGER : fehler = 0
+    IF FILEEXISTS(schnipselPfad$()) THEN
+        DIM zeilen AS ARRAY OF STRING : zeilen = READLINES(schnipselPfad$())
+        DIM name AS STRING : name = ""
+        DIM abk AS STRING : abk = ""
+        DIM koerper AS ARRAY OF STRING : koerper = []
+        DIM offen AS BOOLEAN : offen = FALSE
+        DIM nr AS INTEGER
+        FOR nr = 0 TO LEN(zeilen)
+            DIM z AS STRING : z = ""
+            DIM kopf AS BOOLEAN : kopf = TRUE
+            IF nr < LEN(zeilen) THEN
+                z = REPLACE$(zeilen[nr], CHR$(13), "")
+                kopf = LEFT$(z, 4) = "=== "
+            END IF
+            IF kopf THEN
+                ' den vorigen abschliessen: Leerzeilen am Ende gehoeren nicht dazu
+                IF offen THEN
+                    WHILE LEN(koerper) > 0 AND TRIM$(koerper[LEN(koerper) - 1]) = ""
+                        ARRAY_POP(koerper)
+                    WEND
+                    IF LEN(koerper) = 0 THEN
+                        protokoll("eigene schnipsel meldung leer " + name)
+                        fehler = fehler + 1
+                    ELSE
+                        eigenerSchnipsel(name, abk, JOIN$(koerper, NL))
+                        eigene = eigene + 1
+                    END IF
+                END IF
+                offen = FALSE
+                IF nr < LEN(zeilen) THEN
+                    DIM k AS STRING : k = TRIM$(MID$(z, 4))
+                    DIM p AS INTEGER : p = INSTR(k, "|")
+                    abk = ""
+                    name = k
+                    IF p >= 0 THEN
+                        name = TRIM$(LEFT$(k, p))
+                        abk = TRIM$(MID$(k, p + 1))
+                    END IF
+                    IF abk <> "" AND NOT REGEX_TEST(abk, "^[A-Za-z_][A-Za-z0-9_]*$") THEN
+                        ' Das Kuerzel wird am Tabulator als WORT gelesen --
+                        ' mit Leerzeichen oder Punkt traefe es nie.
+                        protokoll("eigene schnipsel meldung kuerzel " + abk)
+                        GUI_SET_TEXT(lblStatus, tr$("Schnipsel ") + CHR$(34) + name + CHR$(34) + tr$(": das Kürzel ") + CHR$(34) + abk + CHR$(34) + tr$(" ist kein Wort -- nur über Strg+J erreichbar."))
+                        fehler = fehler + 1
+                        abk = ""
+                    END IF
+                    IF name = "" THEN name = IIF(abk = "", "Schnipsel", abk)
+                    koerper = []
+                    offen = TRUE
+                END IF
+            ELSEIF offen THEN
+                ARRAY_PUSH(koerper, z)
+            END IF
+        NEXT
+    END IF
+    protokoll("eigene schnipsel " + STR$(eigene) + " " + STR$(fehler))
+END SUB
+
+CONST SCHNIPSEL_VORLAGE = "' Eigene Schnipsel der IDE. Jeder beginnt mit einer Kopfzeile" + CHR$(10) + "'   === Name | kuerzel" + CHR$(10) + "' und reicht bis zur nächsten. Kürzel plus Tabulator klappt ihn im Code" + CHR$(10) + "' auf (wie for + Tab), Strg+J listet alle. Ein | im Text ist die Stelle," + CHR$(10) + "' an der danach die Schreibmarke steht. Ein eigenes Kürzel, das es schon" + CHR$(10) + "' gibt, ersetzt den eingebauten Schnipsel. Nach dem Sichern gilt die Datei." + CHR$(10) + CHR$(10)
+
+SUB schnipselEigenOeffnen()
+    DIM p AS STRING : p = schnipselPfad$()
+    IF NOT FILEEXISTS(p) THEN
+        WRITEALL(p, SCHNIPSEL_VORLAGE + "=== Zähler hochzählen | zaehl" + NL + "zaehler = zaehler + |" + NL)
+        schnipselLaden()
+    END IF
+    tabOeffnen(p, dateiLesen(p))
+    GUI_SET_TEXT(lblStatus, tr$("Eigene Schnipsel -- nach dem Sichern (Strg+S) gelten sie."))
+    protokoll("eigene schnipsel datei")
+END SUB
+
+SUB schnipselAuswahlFragen()
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN
+    IF GUI_TEXTAREA_SELECTION$(ta) = "" THEN
+        GUI_SET_TEXT(lblStatus, tr$("Erst den Code markieren, der zum Schnipsel werden soll."))
+        RETURN
+    END IF
+    dlgSchnipsel = GUI_PROMPT(tr$("Auswahl als Schnipsel"), tr$("Name | Kürzel (das Kürzel plus Tabulator setzt ihn ein):"), tr$("Mein Schnipsel | mein"))
+END SUB
+
+SUB schnipselAuswahlSichern(eingabe AS STRING)
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN
+    DIM text AS STRING : text = REPLACE$(GUI_TEXTAREA_SELECTION$(ta), CHR$(13), "")
+    IF TRIM$(text) = "" OR TRIM$(eingabe) = "" THEN RETURN
+    DIM p AS STRING : p = schnipselPfad$()
+    DIM alt AS STRING : alt = ""
+    IF FILEEXISTS(p) THEN
+        alt = JOIN$(READLINES(p), NL)
+        IF alt <> "" THEN alt = alt + NL
+    ELSE
+        alt = SCHNIPSEL_VORLAGE
+    END IF
+    IF RIGHT$(text, 1) = NL THEN text = LEFT$(text, LEN(text) - 1)
+    WRITEALL(p, alt + "=== " + TRIM$(eingabe) + NL + text + NL)
+    schnipselLaden()
+    ' Steht die Datei in einem Reiter, soll er nicht den alten Stand halten.
+    DIM i AS INTEGER
+    FOR i = 0 TO tabAnzahl - 1
+        IF gleicherWeg(reiter[i].pfad, p) AND NOT reiter[i].geaendert() THEN
+            DIM neuT AS STRING : neuT = JOIN$(READLINES(p), NL)
+            GUI_SET_TEXT(reiter[i].feld, neuT)
+            reiter[i].gesichert = neuT
+        END IF
+    NEXT
+    GUI_SET_TEXT(lblStatus, tr$("Als Schnipsel gesichert: ") + TRIM$(eingabe))
+    protokoll("eigene schnipsel gesichert " + TRIM$(eingabe))
+END SUB
+
+' --- Terminal (Alt+3) ------------------------------------------------------
+' Jeder Befehl laeuft als eigener Prozess (cmd /C bzw. sh) im Ordner des
+' Terminals -- keine dauerhafte Shell: deren Eingabeaufforderung kaeme ohne
+' Zeilenende und bliebe in der zeilenweisen Lesung haengen. Das Skript
+' meldet am Ende den Ordner, in dem es stand; so wirkt `cd` wie gewohnt
+' (auch `cd ..`, `cd /d`), Umgebungsvariablen aus `set` dagegen nicht.
+CONST TERM_MARKE = "__DH_TERMINAL_ORT__"
+DIM termWindows AS BOOLEAN : termWindows = GETENV$("COMSPEC") <> ""
+DIM termOrt AS STRING : termOrt = ""
+DIM termRest AS STRING : termRest = ""
+DIM termFehlRest AS STRING : termFehlRest = ""
+DIM termSkript AS STRING : termSkript = ""
+' Abgebrochen: der Code (-1) sagt dann nichts, "[abgebrochen]" steht schon da.
+DIM termAbgebrochen AS BOOLEAN : termAbgebrochen = FALSE
+DIM termVerlauf AS ARRAY OF STRING : termVerlauf = []
+DIM termVerlaufPos AS INTEGER : termVerlaufPos = 0
+
+SUB terminalZeigen(an AS BOOLEAN)
+    terminalAn = an
+    IF an AND NOT untenAn THEN leistenSetzen(seitenAn, TRUE)
+    GUI_DOCK_ACTIVATE(win, IIF(an, "terminal", "ausgabe"))
+    GUI_MENU_CHECK(miTerminal, an)
+    layout()
+    IF an THEN
+        terminalOrtZeigen()
+        GUI_FOCUS(tfEingabe)
+    END IF
+    protokoll("terminal " + IIF(an, "an", "aus"))
+END SUB
+
+FUNCTION terminalOrt$() AS STRING
+    IF termOrt = "" OR NOT DIREXISTS(termOrt) THEN
+        termOrt = projektOrdner
+        IF termOrt = "" OR NOT DIREXISTS(termOrt) THEN termOrt = startOrdner
+    END IF
+    RETURN termOrt
+END FUNCTION
+
+SUB terminalOrtZeigen()
+    IF termProz >= 0 THEN
+        GUI_SET_TEXT(lblStatus, tr$("Terminal: läuft -- Enter schickt eine Eingabe, [Abbrechen] beendet."))
+    ELSE
+        GUI_SET_TEXT(lblStatus, tr$("Terminal: ") + terminalOrt$())
+    END IF
+END SUB
+
+SUB terminalZeile(z AS STRING, farbe AS INTEGER)
+    GUI_LISTBOX_ADD(lstTerminal, z)
+    IF farbe <> -1 THEN GUI_LISTBOX_COLOR(lstTerminal, GUI_LISTBOX_COUNT(lstTerminal) - 1, farbe)
+    IF GUI_LISTBOX_COUNT(lstTerminal) > TERMINAL_MAX THEN GUI_LISTBOX_REMOVE(lstTerminal, 0)
+    GUI_LISTBOX_SET_SELECTED(lstTerminal, GUI_LISTBOX_COUNT(lstTerminal) - 1)
+    protokoll("terminal zeile " + z)
+END SUB
+
+' Einfache Anfuehrung fuer sh: ' wird zu '\''.
+FUNCTION shWort$(s AS STRING) AS STRING
+    RETURN "'" + REPLACE$(s, "'", "'\''") + "'"
+END FUNCTION
+
+SUB terminalEingabe(t AS STRING)
+    GUI_SET_TEXT(tfEingabe, "")
+    IF termProz >= 0 THEN
+        ' Ein laufender Befehl bekommt die Zeile als Eingabe.
+        PROCESS_WRITE(termProz, t + NL)
+        terminalZeile("< " + t, F_KOMMENTAR)
+        RETURN
+    END IF
+    DIM b AS STRING : b = TRIM$(t)
+    IF b = "" THEN RETURN
+    IF LEN(termVerlauf) = 0 THEN
+        ARRAY_PUSH(termVerlauf, b)
+    ELSEIF termVerlauf[LEN(termVerlauf) - 1] <> b THEN
+        ARRAY_PUSH(termVerlauf, b)
+    END IF
+    termVerlaufPos = LEN(termVerlauf)
+    terminalZeile(terminalOrt$() + "> " + b, F_SCHLUESSEL)
+    IF LOWER$(b) = "cls" OR LOWER$(b) = "clear" THEN
+        GUI_LISTBOX_CLEAR(lstTerminal)
+        RETURN
+    END IF
+    terminalStarten(b)
+END SUB
+
+' Schleifenvariablen der Eingabeaufforderung fuer die .cmd-Datei
+' verdoppeln: interaktiv heisst es `for %f in (*) do echo %f`, in einer
+' Skriptdatei `%%f` -- sonst bricht cmd ab ("f" kann syntaktisch an
+' dieser Stelle nicht verarbeitet werden). Verdoppelt wird nur ein `%`
+' vor EINEM Buchstaben, hinter dem kein Wortzeichen und kein `%` steht;
+' `%PATH%` und ein bewusst geschriebenes `%%x%%` bleiben, wie sie sind.
+FUNCTION cmdSchleifenvariablen$(b AS STRING) AS STRING
+    DIM aus AS STRING : aus = ""
+    DIM n AS INTEGER : n = LEN(b)
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        DIM c AS STRING : c = MID$(b, i, 1)
+        aus = aus + c
+        IF c <> "%" THEN CONTINUE
+        IF i > 0 THEN
+            IF MID$(b, i - 1, 1) = "%" THEN CONTINUE
+        END IF
+        IF i + 1 >= n THEN CONTINUE
+        DIM buch AS STRING : buch = MID$(b, i + 1, 1)
+        ' %~nxf (Teile des Namens) ist immer eine Schleifenvariable.
+        IF buch = "~" THEN
+            aus = aus + "%"
+            CONTINUE
+        END IF
+        IF NOT REGEX_TEST(buch, "^[A-Za-z]$") THEN CONTINUE
+        IF i + 2 < n THEN
+            IF REGEX_TEST(MID$(b, i + 2, 1), "^[A-Za-z0-9_%]$") THEN CONTINUE
+        END IF
+        aus = aus + "%"
+    NEXT
+    RETURN aus
+END FUNCTION
+
+SUB terminalStarten(b AS STRING)
+    DIM ordner AS STRING : ordner = konfigOrdner$()
+    ' Absolut und unter Windows mit Rueckstrichen: cmd /C nimmt "./x.cmd" nicht.
+    IF termSkript = "" THEN
+        termSkript = PATHJOIN(REALPATH$(ordner), "terminal_" + LEFT$(UUID4$(), 8) + IIF(termWindows, ".cmd", ".sh"))
+        IF termWindows THEN termSkript = REPLACE$(termSkript, "/", CHR$(92))
+    END IF
+    DIM text AS STRING
+    IF termWindows THEN
+        ' chcp 65001: sonst kaemen die Umlaute von dir & Co. in der
+        ' OEM-Codeseite an. errorlevel wird VOR dem Echo gemerkt.
+        DIM crlf AS STRING : crlf = CHR$(13) + CHR$(10)
+        text = "@echo off" + crlf + "chcp 65001 >nul" + crlf + "cd /d " + CHR$(34) + terminalOrt$() + CHR$(34) + crlf + cmdSchleifenvariablen$(b) + crlf
+        text = text + "set __dh_e=%errorlevel%" + crlf + "echo " + TERM_MARKE + "%cd%" + crlf + "exit /b %__dh_e%" + crlf
+        WRITEALL(termSkript, text)
+        termProz = PROCESS_START("cmd", "/Q", "/D", "/C", termSkript)
+    ELSE
+        text = "cd " + shWort$(terminalOrt$()) + " || exit 1" + NL + b + NL
+        text = text + "__dh_e=$?" + NL + "echo " + TERM_MARKE + "$(pwd)" + NL + "exit $__dh_e" + NL
+        WRITEALL(termSkript, text)
+        termProz = PROCESS_START("sh", termSkript)
+    END IF
+    termRest = "" : termFehlRest = ""
+    protokoll("terminal start " + b)
+    layout()
+    terminalOrtZeigen()
+END SUB
+
+' Zeilen verteilen: die Marke setzt den Ort, alles andere kommt in die Liste.
+' Einmal zerlegt (zeilenAbtrennen) -- je Zeile den Rest zu kopieren hielt
+' die IDE bei 200000 Zeilen 25 Sekunden in einem Bild fest. Mehr Zeilen,
+' als die Liste behaelt: nur die letzten; die Marke mit dem Ordner wird
+' trotzdem gelesen, sie steht ohnehin am Ende.
+CONST TERMINAL_MAX = 3000
+SUB termVerteilen(text AS STRING, fehler AS BOOLEAN, ende AS BOOLEAN)
+    DIM rest AS STRING : rest = IIF(fehler, termFehlRest, termRest)
+    DIM zeilen AS ARRAY OF STRING : zeilen = zeilenAbtrennen(rest, text)
+    IF ende AND rest <> "" THEN
+        ARRAY_PUSH(zeilen, rest)
+        rest = ""
+    END IF
+    ' Erst die Ortsmarke heraus, dann kuerzen: sie steht nicht in der Liste,
+    ' und mitgezaehlt blieben von einem grossen Stueck, das mit ihr endet,
+    ' nur TERMINAL_MAX - 1 Zeilen stehen (gefunden im Prueflauf zu 2026.19).
+    DIM zeig AS ARRAY OF STRING : zeig = []
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(zeilen) - 1
+        IF LEFT$(zeilen[i], LEN(TERM_MARKE)) = TERM_MARKE THEN
+            termOrt = TRIM$(MID$(zeilen[i], LEN(TERM_MARKE)))
+        ELSE
+            ARRAY_PUSH(zeig, zeilen[i])
+        END IF
+    NEXT
+    DIM ab AS INTEGER : ab = 0
+    IF LEN(zeig) > TERMINAL_MAX THEN
+        GUI_LISTBOX_CLEAR(lstTerminal)
+        ab = LEN(zeig) - TERMINAL_MAX
+    END IF
+    FOR i = ab TO LEN(zeig) - 1
+        terminalZeile(zeig[i], IIF(fehler, F_ZAHL, -1))
+    NEXT
+    IF fehler THEN termFehlRest = rest ELSE termRest = rest
+END SUB
+
+SUB terminalNachziehen()
+    IF termProz < 0 THEN RETURN
+    termVerteilen(PROCESS_READ$(termProz), FALSE, FALSE)
+    termVerteilen(PROCESS_ERR$(termProz), TRUE, FALSE)
+    IF PROCESS_RUNNING(termProz) THEN RETURN
+    ' Wie beim Programmlauf: lesen, bis fuenf Abfragen leer sind -- das Kind
+    ' kann fertig sein, bevor sein Lesefaden die letzte Zeile abgelegt hat.
+    DIM leer AS INTEGER : leer = 0
+    WHILE leer < 5
+        DIM a AS STRING : a = PROCESS_READ$(termProz)
+        DIM f AS STRING : f = PROCESS_ERR$(termProz)
+        IF a = "" AND f = "" THEN
+            leer = leer + 1
+            SLEEP(10)
+        ELSE
+            termVerteilen(a, FALSE, FALSE)
+            termVerteilen(f, TRUE, FALSE)
+            leer = 0
+        END IF
+    WEND
+    termVerteilen("", FALSE, TRUE)
+    termVerteilen("", TRUE, TRUE)
+    DIM code AS INTEGER : code = PROCESS_CODE(termProz)
+    PROCESS_CLOSE(termProz)
+    termProz = -1
+    IF code <> 0 AND NOT termAbgebrochen THEN terminalZeile("[beendet mit Code " + STR$(code) + "]", F_ZAHL)
+    termAbgebrochen = FALSE
+    protokoll("terminal fertig " + STR$(code) + " " + BASENAME(termOrt))
+    layout()
+    IF terminalAn THEN terminalOrtZeigen()
+END SUB
+
+SUB terminalAbbrechen()
+    IF termProz < 0 THEN
+        GUI_SET_TEXT(lblStatus, tr$("Im Terminal läuft nichts."))
+        RETURN
+    END IF
+    PROCESS_KILL(termProz)
+    termAbgebrochen = TRUE
+    terminalZeile("[abgebrochen]", F_ZAHL)
+    protokoll("terminal abgebrochen")
+END SUB
+
+' Pfeil hoch/runter in der Eingabezeile blaettert durch die Befehle.
+SUB terminalVerlaufTasten()
+    IF NOT terminalAn OR termProz >= 0 OR GUI_FOCUSED() <> tfEingabe THEN RETURN
+    IF LEN(termVerlauf) = 0 THEN RETURN
+    IF KEYHIT(KEY_UP) THEN
+        termVerlaufPos = MAX(0, termVerlaufPos - 1)
+        GUI_SET_TEXT(tfEingabe, termVerlauf[termVerlaufPos])
+    ELSEIF KEYHIT(KEY_DOWN) THEN
+        termVerlaufPos = MIN(LEN(termVerlauf), termVerlaufPos + 1)
+        IF termVerlaufPos >= LEN(termVerlauf) THEN
+            GUI_SET_TEXT(tfEingabe, "")
+        ELSE
+            GUI_SET_TEXT(tfEingabe, termVerlauf[termVerlaufPos])
+        END IF
+    END IF
+END SUB
+
+
+' --- Serieller Monitor (Alt+4, seit 2026-11-04) ----------------------------
+' Liest eine serielle Schnittstelle (ein Arduino, ein ESP32 am USB) Zeile
+' fuer Zeile mit und schickt Text hinaus. Das Ziel ist ein Port (COM3,
+' /dev/ttyUSB0) oder `tcp:host:port` -- eine Netzbruecke, wie sie ein ESP32
+' im WLAN anbietet; ueber denselben Weg prueft sich der Monitor ohne Geraet.
+' Zeilen, die nur aus Zahlen bestehen (`12 34`, `temp:21.5,feuchte:40`),
+' zeichnet die Kurve -- dieselbe Regel wie der Plotter der Arduino-IDE.
+' Die Schnittstelle gehoert immer nur einem: startet F5 ein Programm, das
+' SERIAL_OPEN oder FIRMATA_OPEN aufruft, gibt der Monitor sie frei und
+' verbindet sich danach wieder.
+CONST SER_MAX_ZEILEN = 3000
+CONST SER_PUNKTE = 600
+CONST SER_REIHEN = 8
+' 0 = getrennt, 1 = seriell, 2 = tcp
+DIM serArt AS INTEGER : serArt = 0
+DIM serPort AS INTEGER : serPort = -1
+DIM serSock AS NET_SOCKET
+DIM serRest AS STRING : serRest = ""
+DIM serRestZeit AS FLOAT : serRestZeit = 0.0
+DIM serWieder AS BOOLEAN : serWieder = FALSE
+DIM serPortListe AS STRING : serPortListe = "-"
+DIM serPortFaellig AS FLOAT : serPortFaellig = 0.0
+' Die Kurve: je Reihe ein Ring mit SER_PUNKTE Werten. serKGesamt zaehlt alle
+' Zeilen mit Zahlen seit dem Leeren, serKAb die erste, in der eine Reihe
+' vorkam (vorher hat sie keinen Wert und wird nicht gezeichnet).
+DIM serKNamen AS ARRAY OF STRING : serKNamen = []
+DIM serKAb AS ARRAY OF INTEGER : serKAb = []
+DIM serKWert[SER_REIHEN * SER_PUNKTE] AS FLOAT
+DIM serKGesamt AS INTEGER : serKGesamt = 0
+DIM serKNeu AS BOOLEAN : serKNeu = TRUE
+DIM serKBilder AS INTEGER : serKBilder = 0
+DIM serBildB AS INTEGER : serBildB = 0
+DIM serBildH AS INTEGER : serBildH = 0
+
+FUNCTION serVerbunden() AS BOOLEAN
+    RETURN serArt <> 0
+END FUNCTION
+
+SUB serZeigen()
+    IF NOT untenAn THEN leistenSetzen(seitenAn, TRUE)
+    GUI_DOCK_ACTIVATE(win, "seriell")
+    serPortsAuffrischen()
+    layout()
+    GUI_FOCUS(IIF(serVerbunden(), tfSeriell, ddSerPort))
+    protokoll("seriell gezeigt")
+END SUB
+
+' Die Ports neu einlesen -- nur wenn sich die Liste geaendert hat, sonst
+' haelt die Klappliste ihren Text und ihre Markierung.
+SUB serPortsAuffrischen()
+    DIM liste AS STRING : liste = ""
+    IF MODULE_AVAILABLE("serial") THEN
+        TRY
+            liste = SERIAL_PORTS()
+        CATCH portFehler
+            liste = ""
+        END TRY
+    END IF
+    IF liste = serPortListe THEN RETURN
+    serPortListe = liste
+    DIM eintraege AS ARRAY OF STRING : eintraege = []
+    DIM p AS STRING
+    IF liste <> "" THEN
+        FOR EACH p IN SPLIT(liste, ",")
+            IF TRIM$(p) <> "" THEN ARRAY_PUSH(eintraege, TRIM$(p))
+        NEXT
+    END IF
+    DIM t AS STRING : t = GUI_TEXT(ddSerPort)
+    GUI_SET_DROPDOWN(ddSerPort, eintraege)
+    ' Ohne gewaehlten Port der erste gefundene -- meist der einzige.
+    IF t = "" AND LEN(eintraege) > 0 THEN t = eintraege[0]
+    GUI_SET_TEXT(ddSerPort, t)
+    protokoll("seriell ports " + STR$(LEN(eintraege)))
+END SUB
+
+FUNCTION serBaud() AS INTEGER
+    RETURN VAL(GUI_DROPDOWN_TEXT(ddSerBaud))
+END FUNCTION
+
+SUB serVerbinden(ziel AS STRING)
+    ziel = TRIM$(ziel)
+    IF serVerbunden() THEN serTrennen("")
+    IF ziel = "" THEN
+        serMeldung(tr$("Erst einen Port wählen (oder tcp:host:port eintragen)."))
+        RETURN
+    END IF
+    serRest = ""
+    IF LOWER$(LEFT$(ziel, 4)) = "tcp:" THEN
+        ' tcp:host:port -- der Port steht hinter dem LETZTEN Doppelpunkt,
+        ' damit auch eine IPv6-Adresse geht.
+        DIM rest AS STRING : rest = MID$(ziel, 4)
+        DIM k AS INTEGER : k = INSTRREV(rest, ":")
+        IF k <= 0 THEN
+            serMeldung(tr$("Netzziel: tcp:host:port, etwa tcp:192.168.1.40:23"))
+            RETURN
+        END IF
+        DIM wirt AS STRING : wirt = LEFT$(rest, k)
+        DIM nr AS INTEGER : nr = VAL(MID$(rest, k + 1))
+        TRY
+            serSock = NET_TCP_CONNECT(wirt, nr)
+            serArt = 2
+        CATCH netzFehler
+            serMeldung(tr$("Keine Verbindung: ") + netzFehler)
+            RETURN
+        END TRY
+    ELSE
+        IF NOT MODULE_AVAILABLE("serial") THEN
+            serMeldung(tr$("Diese Laufzeit ist ohne serielle Schnittstelle gebaut -- nur tcp:host:port geht."))
+            RETURN
+        END IF
+        TRY
+            serPort = SERIAL_OPEN(ziel, serBaud())
+            SERIAL_TIMEOUT(serPort, 0.0)
+            serArt = 1
+        CATCH oeffnenFehler
+            serMeldung(tr$("Port lässt sich nicht öffnen: ") + oeffnenFehler)
+            RETURN
+        END TRY
+    END IF
+    JSON_SET_STRING(konfig, "seriell_ziel", ziel)
+    GUI_SET_TEXT(btnSerVerbinden, tr$("Trennen"))
+    GUI_BUTTON_VARIANT(btnSerVerbinden, "gefahr")
+    serZeile("[" + tr$("verbunden mit ") + ziel + "]", F_KOMMENTAR)
+    GUI_FOCUS(tfSeriell)
+    protokoll("seriell verbunden " + ziel)
+END SUB
+
+SUB serTrennen(grund AS STRING)
+    IF serArt = 1 THEN
+        TRY
+            SERIAL_CLOSE(serPort)
+        CATCH zuFehler
+        END TRY
+        serPort = -1
+    ELSEIF serArt = 2 THEN
+        TRY
+            NET_CLOSE(serSock)
+        CATCH zuFehler2
+        END TRY
+    END IF
+    IF serArt = 0 THEN RETURN
+    serArt = 0
+    IF serRest <> "" THEN serZeile(serRest, -1) : serRest = ""
+    GUI_SET_TEXT(btnSerVerbinden, tr$("Verbinden"))
+    GUI_BUTTON_VARIANT(btnSerVerbinden, "primaer")
+    IF grund <> "" THEN serZeile("[" + grund + "]", F_KOMMENTAR)
+    protokoll("seriell getrennt " + grund)
+END SUB
+
+SUB serMeldung(t AS STRING)
+    GUI_SET_TEXT(lblStatus, t)
+    protokoll("seriell meldung " + t)
+END SUB
+
+' Eine Zeile in die Liste (ohne Zeilenende). -1 = Grundfarbe.
+SUB serZeile(z AS STRING, farbe AS INTEGER)
+    DIM zeig AS STRING : zeig = z
+    IF GUI_CHECKED(chkSerZeit) THEN zeig = MID$(TIME$(), 0, 8) + "  " + z
+    GUI_LISTBOX_ADD(lstSeriell, zeig)
+    DIM n AS INTEGER : n = GUI_LISTBOX_COUNT(lstSeriell)
+    IF farbe <> -1 THEN GUI_LISTBOX_COLOR(lstSeriell, n - 1, farbe)
+    IF n > SER_MAX_ZEILEN THEN GUI_LISTBOX_REMOVE(lstSeriell, 0) : n = n - 1
+    ' Mitlaufen, solange man nicht weiter oben eine Zeile gewaehlt hat.
+    IF GUI_LISTBOX_SELECTED(lstSeriell) >= n - 2 OR GUI_LISTBOX_SELECTED(lstSeriell) < 0 THEN
+        GUI_LISTBOX_SET_SELECTED(lstSeriell, n - 1)
+        GUI_LISTBOX_SCROLL_TO(lstSeriell, n - 1)
+    END IF
+    protokoll("seriell zeile " + z)
+END SUB
+
+' Empfangenes in Zeilen zerlegen; der angefangene Rest wartet auf sein Ende.
+SUB serText(t AS STRING)
+    IF t = "" THEN RETURN
+    serRest = serRest + t
+    serRestZeit = GET_TIME()
+    DIM k AS INTEGER : k = INSTR(serRest, CHR$(10))
+    WHILE k >= 0
+        DIM z AS STRING : z = LEFT$(serRest, k)
+        IF RIGHT$(z, 1) = CHR$(13) THEN z = LEFT$(z, LEN(z) - 1)
+        serRest = MID$(serRest, k + 1)
+        serZeile(z, -1)
+        serKurveLesen(z)
+        k = INSTR(serRest, CHR$(10))
+    WEND
+END SUB
+
+' Eine Zeile als Werte der Kurve lesen: Zahlen, getrennt durch Leerraum,
+' Komma oder Semikolon, wahlweise mit Namen (`temp:21.5`). Steht irgendein
+' anderes Wort darin, ist es keine Datenzeile.
+SUB serKurveLesen(z AS STRING)
+    DIM t AS STRING : t = TRIM$(REGEX_REPLACE(z, ":\s+", ":"))
+    IF t = "" THEN RETURN
+    DIM teile AS ARRAY OF STRING : teile = REGEX_SPLIT(t, "[\s,;]+")
+    DIM namen AS ARRAY OF STRING : namen = []
+    DIM werte AS ARRAY OF FLOAT : werte = []
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(teile) - 1
+        DIM s AS STRING : s = teile[i]
+        IF s = "" THEN CONTINUE
+        DIM name AS STRING : name = STR$(LEN(werte) + 1)
+        DIM k AS INTEGER : k = INSTRREV(s, ":")
+        IF k > 0 THEN name = LEFT$(s, k) : s = MID$(s, k + 1)
+        IF NOT REGEX_TEST(s, "^[-+]?([0-9]+\.?[0-9]*|\.[0-9]+)([eE][-+]?[0-9]+)?$") THEN RETURN
+        ARRAY_PUSH(namen, name)
+        ARRAY_PUSH(werte, VAL(s))
+    NEXT
+    IF LEN(werte) = 0 THEN RETURN
+    DIM platz AS INTEGER : platz = serKGesamt MOD SER_PUNKTE
+    ' Jede Reihe traegt ihren letzten Wert weiter, wenn die Zeile sie nicht
+    ' nennt -- sonst risse die Kurve bei jeder kuerzeren Zeile ab.
+    DIM r AS INTEGER
+    FOR r = 0 TO LEN(serKNamen) - 1
+        IF serKGesamt > serKAb[r] THEN serKWert[r * SER_PUNKTE + platz] = serKWert[r * SER_PUNKTE + (serKGesamt - 1) MOD SER_PUNKTE]
+    NEXT
+    FOR i = 0 TO LEN(werte) - 1
+        r = ARRAY_INDEXOF(serKNamen, namen[i])
+        IF r < 0 THEN
+            IF LEN(serKNamen) >= SER_REIHEN THEN CONTINUE
+            ARRAY_PUSH(serKNamen, namen[i])
+            ARRAY_PUSH(serKAb, serKGesamt)
+            r = LEN(serKNamen) - 1
+        END IF
+        serKWert[r * SER_PUNKTE + platz] = werte[i]
+    NEXT
+    serKGesamt = serKGesamt + 1
+    serKNeu = TRUE
+END SUB
+
+SUB serLeeren()
+    GUI_LISTBOX_CLEAR(lstSeriell)
+    serKNamen = [] : serKAb = [] : serKGesamt = 0 : serKNeu = TRUE
+    protokoll("seriell geleert")
+END SUB
+
+SUB serSenden(t AS STRING)
+    IF NOT serVerbunden() THEN
+        serMeldung(tr$("Nicht verbunden -- erst [Verbinden]."))
+        RETURN
+    END IF
+    DIM ende AS STRING : ende = ""
+    SELECT CASE GUI_DROPDOWN_SELECTED(ddSerEnde)
+        CASE 1 : ende = CHR$(10)
+        CASE 2 : ende = CHR$(13)
+        CASE 3 : ende = CHR$(13) + CHR$(10)
+    END SELECT
+    TRY
+        IF serArt = 1 THEN
+            SERIAL_WRITE(serPort, t + ende)
+        ELSE
+            NET_SEND(serSock, t + ende)
+        END IF
+    CATCH sendFehler
+        serTrennen(tr$("Verbindung verloren"))
+        RETURN
+    END TRY
+    serZeile("> " + t, F_SCHLUESSEL)
+    GUI_SET_TEXT(tfSeriell, "")
+    protokoll("seriell gesendet " + t)
+END SUB
+
+' Je Bild: lesen, was da ist; ein angefangener Rest ohne Zeilenende kommt
+' nach einer halben Sekunde trotzdem (eine Eingabeaufforderung wie "> ").
+SUB seriellNachziehen()
+    IF serArt = 1 THEN
+        TRY
+            DIM n AS INTEGER : n = SERIAL_AVAILABLE(serPort)
+            IF n > 0 THEN serText(SERIAL_READ(serPort, MIN(n, 65536)))
+        CATCH leseFehler
+            serTrennen(tr$("Verbindung verloren"))
+        END TRY
+    ELSEIF serArt = 2 THEN
+        DIM tn AS STRING : tn = NET_RECV(serSock, 65536)
+        IF tn <> "" THEN serText(tn)
+        IF tn = "" AND NOT NET_IS_CONNECTED(serSock) THEN serTrennen(tr$("Verbindung beendet"))
+    END IF
+    IF serRest <> "" AND GET_TIME() - serRestZeit > 0.5 THEN
+        DIM rz AS STRING : rz = serRest
+        serRest = ""
+        serZeile(rz, -1)
+        serKurveLesen(rz)
+    END IF
+    IF serWieder AND prozess < 0 THEN
+        serWieder = FALSE
+        serVerbinden(kText("seriell_ziel", ""))
+    END IF
+    IF NOT GUI_DOCK_SHOWN(win, "seriell") THEN RETURN
+    IF NOT serVerbunden() AND GET_TIME() >= serPortFaellig THEN
+        serPortFaellig = GET_TIME() + 2.0
+        serPortsAuffrischen()
+    END IF
+    IF GUI_CLICKED(btnSerVerbinden) THEN
+        IF serVerbunden() THEN
+            serTrennen(tr$("getrennt"))
+        ELSE
+            serVerbinden(GUI_TEXT(ddSerPort))
+        END IF
+    END IF
+    IF GUI_ENTERED(ddSerPort) AND NOT serVerbunden() THEN serVerbinden(GUI_TEXT(ddSerPort))
+    IF GUI_ENTERED(tfSeriell) THEN serSenden(GUI_TEXT(tfSeriell))
+    IF GUI_CLICKED(btnSerLeeren) THEN serLeeren()
+    IF GUI_CLICKED(chkSerKurve) THEN
+        JSON_SET_BOOL(konfig, "seriell_kurve", GUI_CHECKED(chkSerKurve))
+        layout()
+        serKNeu = TRUE
+    END IF
+    IF GUI_CLICKED(miSerKopieren) THEN
+        DIM alle AS ARRAY OF STRING : alle = []
+        DIM i AS INTEGER
+        FOR i = 0 TO GUI_LISTBOX_COUNT(lstSeriell) - 1
+            ARRAY_PUSH(alle, GUI_LISTBOX_ITEM(lstSeriell, i))
+        NEXT
+        TRY
+            CLIPBOARD_SET(JOIN$(alle, NL))
+            serMeldung(STR$(LEN(alle)) + tr$(" Zeilen kopiert."))
+        CATCH ablageFehler
+            serMeldung(ablageFehler)
+        END TRY
+    END IF
+    serBaudMerken()
+    ' Die Kurve hoechstens jedes dritte Bild neu -- hundert Zeilen je
+    ' Sekunde brauchen kein Bild je Zeile.
+    serKBilder = serKBilder + 1
+    IF serKNeu AND serKBilder >= 3 AND GUI_CHECKED(chkSerKurve) THEN
+        serKBilder = 0
+        serKNeu = FALSE
+        serKurveZeichnen()
+    END IF
+END SUB
+
+SUB serBaudMerken()
+    IF kInt("seriell_baud", -1) <> serBaud() THEN JSON_SET_INT(konfig, "seriell_baud", serBaud())
+    IF kInt("seriell_ende", -1) <> GUI_DROPDOWN_SELECTED(ddSerEnde) THEN JSON_SET_INT(konfig, "seriell_ende", GUI_DROPDOWN_SELECTED(ddSerEnde))
+    IF kBool("seriell_zeit", NOT GUI_CHECKED(chkSerZeit)) <> GUI_CHECKED(chkSerZeit) THEN JSON_SET_BOOL(konfig, "seriell_zeit", GUI_CHECKED(chkSerZeit))
+END SUB
+
+' Gibt der Monitor die Schnittstelle fuer ein Programm frei? Nur wenn er
+' einen PORT haelt (eine Netzbruecke stoert niemanden) und das Programm sie
+' selbst oeffnet.
+SUB serVorStart(datei AS STRING)
+    IF serArt <> 1 OR NOT FILEEXISTS(datei) THEN RETURN
+    DIM q AS STRING : q = UPPER$(JOIN$(READLINES(datei), NL))
+    IF INSTR(q, "SERIAL_OPEN") < 0 AND INSTR(q, "FIRMATA_OPEN") < 0 THEN RETURN
+    serTrennen(tr$("für das Programm freigegeben, danach wieder verbunden"))
+    serWieder = TRUE
+END SUB
+
+FUNCTION serFarbe(r AS INTEGER) AS INTEGER
+    DIM farben AS ARRAY OF INTEGER : farben = [&H4FC3F7, &HFFB74D, &H81C784, &HF06292, &HBA68C8, &HFFF176, &H4DB6AC, &HE57373]
+    IF hell THEN farben = [&H1565C0, &HE65100, &H2E7D32, &HC2185B, &H6A1B9A, &H9E7D00, &H00796B, &HC62828]
+    RETURN farben[r MOD LEN(farben)]
+END FUNCTION
+
+SUB serKurveZeichnen()
+    DIM b AS INTEGER : b = GUI_GET_W(imgSeriell)
+    DIM h AS INTEGER : h = GUI_GET_H(imgSeriell)
+    IF b < 40 OR h < 30 THEN RETURN
+    DIM grund AS INTEGER : grund = farbMisch(GUI_THEME_GET("widget_bg"), TON_AUSGABE, IIF(hell, 0.08, 0.12))
+    IF b <> serBildB OR h <> serBildH THEN
+        DIM neu AS IMAGE : neu = IMAGE_NEW(b, h, grund)
+        GUI_SET_IMAGE(imgSeriell, neu)
+        IMAGE_FREE(serBild)
+        serBild = neu
+        serBildB = b : serBildH = h
+    END IF
+    IMAGE_FILL_RECT(serBild, 0, 0, b - 1, h - 1, grund)
+    DIM schrift AS INTEGER : schrift = GUI_THEME_GET("text_fg")
+    DIM leise AS INTEGER : leise = farbMisch(grund, schrift, 0.2)
+    DIM achse AS INTEGER : achse = farbMisch(grund, schrift, 0.6)
+    DIM gr AS INTEGER : gr = 13
+    DIM links AS INTEGER : links = 52
+    DIM oben AS INTEGER : oben = 22
+    DIM pb AS INTEGER : pb = b - links - 8
+    DIM ph AS INTEGER : ph = h - oben - 8
+    IF pb < 10 OR ph < 10 THEN RETURN
+    ' Sichtbar: die letzten SER_PUNKTE Zeilen.
+    DIM erste AS INTEGER : erste = MAX(0, serKGesamt - SER_PUNKTE)
+    DIM tief AS FLOAT : tief = 0.0
+    DIM hoch AS FLOAT : hoch = 0.0
+    DIM da AS BOOLEAN : da = FALSE
+    DIM r AS INTEGER
+    DIM i AS INTEGER
+    FOR r = 0 TO LEN(serKNamen) - 1
+        FOR i = MAX(erste, serKAb[r]) TO serKGesamt - 1
+            DIM w AS FLOAT : w = serKWert[r * SER_PUNKTE + i MOD SER_PUNKTE]
+            IF NOT da THEN tief = w : hoch = w : da = TRUE
+            tief = MIN(tief, w) : hoch = MAX(hoch, w)
+        NEXT
+    NEXT
+    IF NOT da THEN
+        serText2(serBild, links, oben + ph \ 2 - 8, tr$("Noch keine Zahlenzeilen -- etwa: 12 34 oder temp:21.5"), gr, achse)
+        protokoll("seriell kurve 0 0")
+        RETURN
+    END IF
+    IF hoch - tief < 0.000001 THEN tief = tief - 1.0 : hoch = hoch + 1.0
+    DIM rand AS FLOAT : rand = (hoch - tief) * 0.05
+    tief = tief - rand : hoch = hoch + rand
+    ' Gitter: vier Linien mit ihrem Wert links daneben.
+    DIM g AS INTEGER
+    FOR g = 0 TO 4
+        DIM gy AS INTEGER : gy = oben + (ph * g) \ 4
+        IMAGE_FILL_RECT(serBild, links, gy, links + pb - 1, gy, leise)
+        DIM gw AS FLOAT : gw = hoch - (hoch - tief) * g / 4.0
+        serText2(serBild, 2, gy - 7, serZahl$(gw, hoch - tief), gr, achse)
+    NEXT
+    ' Je Reihe ein Linienzug und ihr Name oben in ihrer Farbe.
+    DIM lx AS INTEGER : lx = links
+    FOR r = 0 TO LEN(serKNamen) - 1
+        DIM ab AS INTEGER : ab = MAX(erste, serKAb[r])
+        DIM xs AS ARRAY OF FLOAT : xs = []
+        DIM ys AS ARRAY OF FLOAT : ys = []
+        FOR i = ab TO serKGesamt - 1
+            ARRAY_PUSH(xs, links + (i - erste) * (pb - 1) / (SER_PUNKTE - 1.0))
+            ARRAY_PUSH(ys, oben + ph - 1 - (serKWert[r * SER_PUNKTE + i MOD SER_PUNKTE] - tief) * (ph - 1) / (hoch - tief))
+        NEXT
+        IF LEN(xs) = 1 THEN ARRAY_PUSH(xs, xs[0] + 1.0) : ARRAY_PUSH(ys, ys[0])
+        IF LEN(xs) >= 2 THEN IMAGE_POLYLINE(serBild, xs, ys, 2.0, serFarbe(r))
+        DIM nt AS STRING : nt = serKNamen[r] + " " + serZahl$(serKWert[r * SER_PUNKTE + (serKGesamt - 1) MOD SER_PUNKTE], hoch - tief)
+        IMAGE_FILL_RECT(serBild, lx, 6, lx + 9, 15, serFarbe(r))
+        serText2(serBild, lx + 13, 3, nt, gr, schrift)
+        lx = lx + 13 + LEN(nt) * 8 + 14
+    NEXT
+    protokoll("seriell kurve " + STR$(LEN(serKNamen)) + " " + STR$(serKGesamt - erste))
+END SUB
+
+' Eine Zahl fuer die Achse: so viele Stellen, wie der Bereich braucht.
+FUNCTION serZahl$(w AS FLOAT, bereich AS FLOAT) AS STRING
+    IF bereich >= 100.0 THEN RETURN FORMAT$(w, "%.0f")
+    IF bereich >= 1.0 THEN RETURN FORMAT$(w, "%.1f")
+    RETURN FORMAT$(w, "%.3f")
+END FUNCTION
+
+' Text in das Bild der Kurve -- in der Schrift der Oberflaeche, wenn es sie gibt.
+SUB serText2(bild AS IMAGE, x AS INTEGER, y AS INTEGER, t AS STRING, gr AS INTEGER, farbe AS INTEGER)
+    IF uiFont >= 0 THEN
+        IMAGE_DRAW_TEXT(bild, x, y, t, gr, farbe, uiFont)
+    ELSE
+        IMAGE_DRAW_TEXT(bild, x, y, t, gr, farbe)
+    END IF
+END SUB
+
+
+' --- Profil im Code (seit 2026-09-29) -----------------------------------
+' Nach Strg+Umschalt+Y steht die Messung nicht nur in der Tabelle, sondern
+' im Code selbst: ein Band hinter jeder gemessenen Zeile, von blassgelb
+' (wenig) bis kraeftig rot (die teuerste Zeile), und an den 30 teuersten die
+' Zahlen am Zeilenende. Die Farben wandern beim Tippen mit
+' (GUI_TEXTAREA_LINE_COLORS); die Zahlen haengen an ihnen. Gemessen ist,
+' was gelaufen ist -- nach groesseren Aenderungen stimmt es nicht mehr, dann
+' neu messen oder "Profil im Code entfernen".
+' Farbe zu einem Anteil an der teuersten Zeile (0..1): Gelb nach Rot, die
+' Deckkraft waechst mit -- eine kalte Zeile soll kaum auffallen.
+FUNCTION waermeFarbe(h AS FLOAT) AS INTEGER
+    h = MAX(0.0, MIN(1.0, h))
+    DIM gruen AS INTEGER : gruen = INT(208 - 176 * h)
+    DIM blau AS INTEGER : blau = INT(64 - 16 * h)
+    DIM deck AS INTEGER : deck = INT(24 + 120 * h)
+    RETURN (deck SHL 24) BOR (255 SHL 16) BOR (gruen SHL 8) BOR blau
+END FUNCTION
+
+' Die Waerme EINES Reiters aus der letzten Messung setzen (oder wegnehmen).
+SUB waermeFeld(t AS INTEGER)
+    IF t < 0 OR t >= tabAnzahl THEN RETURN
+    DIM ta AS GUI_WIDGET : ta = reiter[t].feld
+    ' die alten Eintraege dieses Feldes weg
+    DIM i AS INTEGER
+    waermeHinweise = ARRAY_FILTER(waermeHinweise, FUNCTION(w) w.feld <> ta)
+    DIM zl AS ARRAY OF INTEGER : zl = []
+    DIM fa AS ARRAY OF INTEGER : fa = []
+    DIM pfad AS STRING : pfad = reiter[t].pfad
+    IF waermeAn AND waermeDaten AND pfad <> "" THEN
+        DIM hoechst AS FLOAT : hoechst = 0.0
+        FOR i = 0 TO LEN(profMessung) - 1
+            hoechst = MAX(hoechst, profMessung[i].zeit)
+        NEXT
+        ' Die Messung ist nach Zeit absteigend: die ersten 30 bekommen Zahlen.
+        FOR i = 0 TO LEN(profMessung) - 1
+            DIM wm AS ProfilZeile : wm = profMessung[i]
+            IF NOT gleicherWeg(wm.datei, pfad) THEN CONTINUE
+            IF wm.zeit <= 0.0 OR hoechst <= 0.0 THEN CONTINUE
+            ARRAY_PUSH(zl, wm.zeile)
+            ARRAY_PUSH(fa, waermeFarbe(wm.zeit / hoechst))
+            DIM text AS STRING : text = ""
+            IF i < 30 THEN
+                text = FORMAT$(wm.zeit * 1000.0, "%.2f") + " ms"
+                IF profGesamt > 0.0 THEN text = text + "  " + FORMAT$(wm.zeit / profGesamt * 100.0, "%.1f") + " %"
+                text = text + "  " + STR$(wm.anzahl) + "x"
+            END IF
+            ARRAY_PUSH(waermeHinweise, NEW WaermeHinweis(ta, LEN(zl) - 1, text))
+        NEXT
+    END IF
+    GUI_TEXTAREA_LINE_COLORS(ta, zl, fa)
+    hinweiseZeigen(ta)
+    IF LEN(zl) > 0 THEN protokoll("waerme " + BASENAME(pfad) + " " + STR$(LEN(zl)))
+END SUB
+
+SUB waermeAnwenden()
+    DIM t AS INTEGER
+    FOR t = 0 TO tabAnzahl - 1
+        waermeFeld(t)
+    NEXT
+END SUB
+
+SUB waermeSetzen(an AS BOOLEAN)
+    waermeAn = an
+    GUI_MENU_CHECK(miWaerme, an)
+    waermeAnwenden()
+    IF an AND NOT waermeDaten THEN
+        GUI_SET_TEXT(lblStatus, tr$("Profil im Code an -- es erscheint nach einer Messung (Strg+Umschalt+Y)."))
+    ELSE
+        GUI_SET_TEXT(lblStatus, IIF(an, tr$("Profil im Code an."), tr$("Profil im Code aus.")))
+    END IF
+    protokoll("waerme " + IIF(an, "an", "aus"))
+    konfigSichern()
+END SUB
+
+' Die Messung vergessen: Farben und Zahlen weg, die Tabelle bleibt.
+SUB waermeEntfernen()
+    waermeDaten = FALSE
+    waermeAnwenden()
+    GUI_SET_TEXT(lblStatus, tr$("Profil aus dem Code entfernt."))
+    protokoll("waerme entfernt")
+END SUB
+
+' Die Sprache wechselt beim naechsten Start -- die Fenster sind gebaut,
+' und jede Beschriftung einzeln nachzuziehen hiesse, jede zweimal zu kennen.
+SUB spracheWechseln()
+    DIM neu AS STRING : neu = IIF(englisch, "de", "en")
+    JSON_SET_STRING(konfig, "sprache", neu)
+    konfigSichern()
+    IF neu = "en" THEN
+        GUI_SET_TEXT(lblStatus, "Beim nächsten Start ist die Oberfläche englisch. / The interface will be English at the next start.")
+    ELSE
+        GUI_SET_TEXT(lblStatus, "The interface will be German at the next start. / Beim nächsten Start ist die Oberfläche deutsch.")
+    END IF
+    protokoll("sprache " + neu)
+END SUB

@@ -25,7 +25,16 @@ SUB pruefe(w AS STRING)
     END IF
 END SUB
 DIM muster AS ARRAY OF STRING : muster = ["tr\$\(" + CHR$(34) + "([^" + CHR$(34) + "]*)" + CHR$(34) + "\)", "paletteEintrag\(" + CHR$(34) + "([^" + CHR$(34) + "]*)" + CHR$(34), "wzKnopf\(" + CHR$(34) + "[^" + CHR$(34) + "]*" + CHR$(34) + ", " + CHR$(34) + "([^" + CHR$(34) + "]*)" + CHR$(34), "CONST HILFE_LEER = " + CHR$(34) + "([^" + CHR$(34) + "]*)" + CHR$(34)]
-FOR EACH z IN READLINES(wurzel + "/ide/ide.dh")
+' Die IDE und ihre Teile (ide/teile/, per IMPORT eingebunden).
+DIM quelle AS ARRAY OF STRING : quelle = READLINES(wurzel + "/ide/ide.dh")
+DIM teil AS STRING
+FOR EACH teil IN DIRLIST(wurzel + "/ide/teile", "*.dh")
+    DIM tz AS STRING
+    FOR EACH tz IN READLINES(PATHJOIN(wurzel + "/ide/teile", teil))
+        ARRAY_PUSH(quelle, tz)
+    NEXT
+NEXT
+FOR EACH z IN quelle
     IF LEFT$(TRIM$(z), 1) = "'" THEN CONTINUE
     DIM m AS STRING
     FOR EACH m IN muster

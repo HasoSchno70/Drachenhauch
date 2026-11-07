@@ -196,6 +196,27 @@ pub fn einschieben(programm: &str, nach: Option<&str>, einschub: &str) -> Result
 }
 
 /// `{sammlung}` und `{fall}` in Umgebung und Argumenten ersetzen.
+/// Die Quelldateien, die ein Programm per `IMPORT "x.dh"` einbindet (relative
+/// Pfade, wie sie dastehen). `--- programm` kopiert sie mit nach
+/// `_programm/`, samt dem, was diese wiederum einbinden -- sonst liesse sich
+/// ein Programm aus mehreren Dateien (die IDE) nicht pruefen. Eingebaute
+/// Module (`IMPORT "json"`) und absolute Pfade zaehlen nicht.
+pub fn importierte_dateien(text: &str) -> Vec<String> {
+    let mut aus = Vec::new();
+    for zeile in text.lines() {
+        let t = zeile.trim_start();
+        if t.len() < 7 || !t[..6].eq_ignore_ascii_case("IMPORT") { continue; }
+        let rest = t[6..].trim_start();
+        let Some(rest) = rest.strip_prefix('"') else { continue };
+        let Some(ende) = rest.find('"') else { continue };
+        let pfad = &rest[..ende];
+        let p = std::path::Path::new(pfad);
+        if !pfad.to_ascii_lowercase().ends_with(".dh") || p.is_absolute() || pfad.contains('{') { continue; }
+        aus.push(pfad.to_string());
+    }
+    aus
+}
+
 pub fn platzhalter(text: &str, sammlung: &str, fall: &str) -> String {
     text.replace("{sammlung}", sammlung).replace("{fall}", fall)
 }
@@ -1026,6 +1047,16 @@ fn bewerten_roh(fall: &Fall, code: i32, stdout: &str, stderr: &str, ohne_grafik:
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn importierte_dateien_nur_relative_dh() {
+        let t = "IMPORT \"gui\"
+  import \"teile/a.dh\" AS a
+IMPORT \"../b.dh\" ' x
+IMPORT \"{sammlung}/c.dh\"
+PRINT 1";
+        assert_eq!(super::importierte_dateien(t), vec!["teile/a.dh".to_string(), "../b.dh".to_string()]);
+    }
+
     use super::*;
 
     const BEISPIEL: &str = "' Kopf\n=== eins\nPRINT 1\n--- erwartet\n1\n=== zwei\nPRINT 1 \\ 0\n--- fehler\nDivision\n=== drei\nPRINT \"a\"\nPRINT \"b\"\n--- enthaelt\nb\n--- datei karte.json\n{\"x\": 1}\n--- umgebung\nDHRT_FRAMES=1\n";

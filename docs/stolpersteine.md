@@ -343,6 +343,22 @@ Reflexionen/Mirror-Effekte.
 > nicht über diesen Weg und verdeckt nicht. Tests
 > `tests/pruef/sprache/variable_wie_builtin.dhtest`.
 
+### H4. Ein Parameter oder Feld verdeckte eine Konstante, ohne Warnung — ✅ BEHOBEN (2026-11-07)
+> **`CONST N = 10` und `FUNCTION summe(n AS INTEGER) ... RETURN n + N`
+> rechnete still `n + n`.** Namen kennen keine Groß-/Kleinschreibung, der
+> Parameter `n` verdeckt im Rumpf die Konstante `N`. Für eine lokale
+> Variable gab es dazu schon eine Warnung, für Parameter und Klassenfelder
+> nicht -- und genau so lag im Duell-Beispiel ein Fehler: das Feld
+> `nachladen` verdeckte `CONST NACHLADEN`, `Self.nachladen = NACHLADEN`
+> schrieb das Feld in sich selbst, die Nachladezeit wirkte nie.
+> Jetzt warnt `--check`, wenn der Name im Rumpf bzw. in der Klasse auch
+> **anders geschrieben** vorkommt (`n` und `N`) -- nur dann war die
+> Konstante gemeint; `SUB feuer(bx AS INTEGER)` neben `CONST BX`, das die
+> Konstante gar nicht benutzt, bleibt still. Die Schnellkorrektur (Strg+.)
+> benennt die Variable um (`nLokal`, `vollFeld`), aber nur die Stellen in
+> ihrer Schreibweise; `N` meint danach wieder die Konstante. Tests
+> `tests/pruef/werkzeugkette/code_korrekturen.dhtest`.
+
 ## I — Umstieg aus anderen BASICs und aus Python (2026-09-21) — ✅ BEHOBEN
 
 > Gemessen, nicht geschätzt: rund 150 kleine Programme so geschrieben, wie man

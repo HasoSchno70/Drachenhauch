@@ -1,0 +1,1411 @@
+' ide/teile/marken.dh -- ein Teil der IDE (ide/ide.dh), dort per IMPORT
+' an genau dieser Stelle eingebunden: Haltepunkte, git blame, Lesezeichen, Hilfe zum Wort, Tooltip, abgelegte Dateien, Vervollstaendigen, Signatur-Platzhalter.
+' Kein eigenes Programm -- die Namen gehoeren der IDE.
+
+' --- Haltepunkte und Marken in der Nummernspalte ---------------------
+' --- Wer hat das geschrieben? (git blame) -----------------------------
+' Die Trefferliste unten rechts, wie die Projektsuche -- ein eigener
+' Bereich waere ein zweites Panel fuer dieselbe Frage "welche Zeile?".
+' `git blame` laeuft synchron ueber SHELL_OUT$: eine Datei dauert
+' Millisekunden, und ein eigener Prozess mit Warteschlange waere hier
+' mehr Buchfuehrung als Nutzen.
+SUB blameZeigen()
+    IF aktiverTab < 0 THEN RETURN
+    DIM pfad AS STRING : pfad = reiter[aktiverTab].pfad
+    IF pfad = "" THEN
+        GUI_SET_TEXT(lblStatus, tr$("Git-Blame: die Datei ist noch nicht gesichert."))
+        RETURN
+    END IF
+    DIM ausgabe AS STRING : ausgabe = ""
+    TRY
+        ausgabe = SHELL_OUT$("git", "-C", DIRNAME(pfad), "blame", "--date=short", "-w", "--", BASENAME(pfad))
+    CATCH e
+        ausgabe = ""
+    END TRY
+    IF TRIM$(ausgabe) = "" THEN
+        GUI_SET_TEXT(lblStatus, tr$("Git-Blame: keine Antwort -- liegt die Datei in einem git-Verzeichnis, und ist `git` da?"))
+        protokoll("blame 0")
+        RETURN
+    END IF
+    GUI_LISTBOX_CLEAR(lstProbleme)
+    DIM funde AS ARRAY OF CodeStelle : funde = []
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(ausgabe, NL)
+    DIM n AS INTEGER : n = 0
+    DIM z AS STRING
+    FOR EACH z IN zeilen
+        z = RTRIM$(z)
+        IF z = "" THEN CONTINUE
+        ' Format: <hash> (<Wer>  <Datum> <Zeile>) <Quelltext>
+        DIM auf AS INTEGER : auf = INSTR(z, "(")
+        DIM zu AS INTEGER : zu = INSTR(z, ")")
+        IF auf < 0 OR zu <= auf THEN CONTINUE
+        DIM kopf AS STRING : kopf = TRIM$(MID$(z, auf + 1, zu - auf - 1))
+        DIM felder AS ARRAY OF STRING : felder = SPLIT$(kopf, " ")
+        DIM nr AS INTEGER : nr = 0
+        DIM wer AS STRING : wer = ""
+        DIM datum AS STRING : datum = ""
+        DIM k AS INTEGER
+        FOR k = 0 TO LEN(felder) - 1
+            IF felder[k] = "" THEN CONTINUE
+            IF k = LEN(felder) - 1 THEN
+                nr = INT(VAL(felder[k]))
+            ELSEIF LEN(felder[k]) = 10 AND MID$(felder[k], 4, 1) = "-" THEN
+                datum = felder[k]
+            ELSE
+                wer = TRIM$(wer + " " + felder[k])
+            END IF
+        NEXT
+        IF nr <= 0 THEN CONTINUE
+        n = n + 1
+        ARRAY_PUSH(funde, NEW CodeStelle(BASENAME(pfad), nr, 1))
+        GUI_LISTBOX_ADD(lstProbleme, PADL$(STR$(nr), 5) + "  " + datum + "  " + wer + "  " + TRIM$(MID$(z, zu + 1, LEN(z))))
+    NEXT
+    fundstellen = funde
+    problemModus = 1
+    GUI_SET_TEXT(lblProbleme, tr$("git blame ") + BASENAME(pfad) + ": " + STR$(n) + tr$(" Zeilen -- Umschalt+F7 zeigt wieder die Probleme"))
+    protokoll("blame " + STR$(n))
+END SUB
+
+' `git` fuer die aktive Datei laufen lassen -- leer, wenn es nicht geht.
+' Synchron ueber SHELL_OUT$: eine Datei dauert Millisekunden.
+' Liegt ein Ordner in einem git-Repository? Einmal je Ordner gefragt und
+' gemerkt. Ausserhalb faellt `git diff` in den Vergleich zweier Dateien
+' und schreibt seine Hilfe auf die Konsole -- bei JEDEM Sichern.
+DIM gitRepoOrdner AS STRING : gitRepoOrdner = "-"
+DIM gitRepoJa AS BOOLEAN : gitRepoJa = FALSE
+FUNCTION gitRepo(ordner AS STRING) AS BOOLEAN
+    IF ordner = gitRepoOrdner THEN RETURN gitRepoJa
+    gitRepoOrdner = ordner
+    gitRepoJa = FALSE
+    ' Ohne Prozess: `.git` aufwaerts suchen (ein Ordner, oder in einem
+    ' Arbeitsbaum eine Datei).
+    DIM d AS STRING : d = ordner
+    DIM schritte AS INTEGER : schritte = 0
+    WHILE d <> "" AND schritte < 64
+        IF DIREXISTS(PATHJOIN(d, ".git")) OR FILEEXISTS(PATHJOIN(d, ".git")) THEN gitRepoJa = TRUE : EXIT WHILE
+        DIM oben AS STRING : oben = DIRNAME(d)
+        IF oben = d THEN EXIT WHILE
+        d = oben
+        schritte = schritte + 1
+    WEND
+    RETURN gitRepoJa
+END FUNCTION
+
+FUNCTION gitAusgabe$(erst AS STRING, zweit AS STRING, dritt AS STRING) AS STRING
+    IF aktiverTab < 0 THEN RETURN ""
+    DIM pfad AS STRING : pfad = reiter[aktiverTab].pfad
+    IF pfad = "" THEN RETURN ""
+    TRY
+        IF dritt = "" THEN
+            RETURN SHELL_OUT$("git", "-C", DIRNAME(pfad), erst, zweit, "--", BASENAME(pfad))
+        END IF
+        RETURN SHELL_OUT$("git", "-C", DIRNAME(pfad), erst, zweit, dritt, "--", BASENAME(pfad))
+    CATCH e
+        RETURN ""
+    END TRY
+END FUNCTION
+
+' Diff und Verlauf im selben Fenster: es ist dieselbe Frage ("was ist mit
+' dieser Datei passiert?"), nur einmal seit dem letzten Sichern und einmal
+' ueber die Zeit.
+SUB gitZeigen(art AS STRING)
+    IF aktiverTab < 0 OR reiter[aktiverTab].pfad = "" THEN
+        GUI_SET_TEXT(lblStatus, tr$("git: die Datei ist noch nicht gesichert."))
+        RETURN
+    END IF
+    DIM text AS STRING
+    IF art = "diff" THEN
+        text = gitAusgabe$("diff", "--no-color", "")
+        IF TRIM$(text) = "" THEN text = gitAusgabe$("diff", "--no-color", "--staged")
+    ELSE
+        text = gitAusgabe$("log", "--no-color", "--pretty=format:%h  %ad  %an%n    %s%n")
+    END IF
+    IF TRIM$(text) = "" THEN
+        GUI_SET_TEXT(lblStatus, IIF(art = "diff", tr$("git diff: keine Änderungen an dieser Datei."), tr$("git log: kein Verlauf -- liegt sie in einem git-Verzeichnis?")))
+        protokoll("git " + art + " 0")
+        RETURN
+    END IF
+    GUI_SET_TEXT(taGit, text)
+    GUI_WINDOW_TITLE(winGit, IIF(art = "diff", tr$("Änderungen"), tr$("Verlauf")) + ": " + BASENAME(reiter[aktiverTab].pfad))
+    GUI_SET_TEXT(lblGit, STR$(LEN(SPLIT$(text, NL))) + tr$(" Zeilen"))
+    GUI_WINDOW_VISIBLE(winGit, TRUE)
+    GUI_FOCUS(taGit)
+    gitFaerben()
+    protokoll("git " + art + " " + STR$(LEN(SPLIT$(text, NL))))
+END SUB
+
+' Ein Diff liest sich nur mit Farbe: Zugaenge gruen, Abgaenge rot, die
+' @@-Koepfe blau. Zeilenweise ueber die Abschnitte, wie im Code-Feld.
+SUB gitFaerben()
+    diffFaerben(taGit)
+END SUB
+
+' Dieselbe Faerbung fuer das git-Fenster und die Umbau-Vorschau: ein
+' Unterschied sieht ueberall gleich aus, sonst muss man ihn zweimal lernen.
+SUB diffFaerben(ta AS GUI_WIDGET)
+    DIM text AS STRING : text = GUI_TEXT(ta)
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(text, NL)
+    DIM s AS ARRAY OF INTEGER : s = []
+    DIM l AS ARRAY OF INTEGER : l = []
+    DIM f AS ARRAY OF INTEGER : f = []
+    DIM pos AS INTEGER : pos = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(zeilen) - 1
+        DIM z AS STRING : z = zeilen[i]
+        DIM farbe AS INTEGER : farbe = -1
+        IF LEFT$(z, 2) = "@@" THEN
+            farbe = &H60B0E0
+        ELSEIF LEFT$(z, 3) = "+++" OR LEFT$(z, 3) = "---" THEN
+            farbe = &H90A0B0
+        ELSEIF LEFT$(z, 1) = "+" THEN
+            farbe = &H70D080
+        ELSEIF LEFT$(z, 1) = "-" THEN
+            farbe = &HE07070
+        ELSEIF LEFT$(z, 1) = "~" THEN
+            farbe = &H707880        ' ausgelassen: steht da, zaehlt nicht
+        ELSEIF LEN(z) >= 7 AND MID$(z, 7, 1) = " " AND LEFT$(z, 1) <> " " THEN
+            farbe = &HE0C060        ' die Kennung einer Uebergabe im Verlauf
+        END IF
+        IF farbe >= 0 AND LEN(z) > 0 THEN
+            ARRAY_PUSH(s, pos) : ARRAY_PUSH(l, LEN(z)) : ARRAY_PUSH(f, farbe)
+        END IF
+        pos = pos + LEN(z) + 1
+    NEXT
+    GUI_TEXTAREA_SPANS(ta, s, l, f)
+END SUB
+
+' Die geaenderten Zeilen am Rand: `git diff -U0` nennt sie in den
+' @@-Koepfen (`@@ -alt,n +neu,m @@`). Nur die NEUE Seite zaehlt -- was
+' geloescht wurde, steht in der Datei nicht mehr.
+DIM gitZeilen AS ARRAY OF INTEGER : gitZeilen = []
+DIM gitDateiStand AS STRING : gitDateiStand = "-"
+
+SUB gitRandNachziehen(erzwingen AS BOOLEAN)
+    IF aktiverTab < 0 THEN RETURN
+    DIM pfad AS STRING : pfad = reiter[aktiverTab].pfad
+    IF NOT gitRandAn OR pfad = "" THEN
+        IF LEN(gitZeilen) > 0 THEN gitZeilen = [] : markenSchluessel = ""
+        RETURN
+    END IF
+    ' Nur nach dem Sichern oder Oeffnen neu fragen: ein Prozessstart je
+    ' Bild waere die IDE zum Stillstand gebracht.
+    DIM stand AS STRING : stand = pfad + "|" + STR$(LEN(reiter[aktiverTab].gesichert))
+    IF NOT erzwingen AND stand = gitDateiStand THEN RETURN
+    gitDateiStand = stand
+    IF NOT gitRepo(DIRNAME(pfad)) THEN
+        IF LEN(gitZeilen) > 0 THEN gitZeilen = [] : markenSchluessel = ""
+        RETURN
+    END IF
+    DIM text AS STRING : text = gitAusgabe$("diff", "--no-color", "-U0")
+    DIM neu AS ARRAY OF INTEGER : neu = []
+    DIM z AS STRING
+    FOR EACH z IN SPLIT$(text, NL)
+        IF LEFT$(z, 2) <> "@@" THEN CONTINUE
+        DIM p AS INTEGER : p = INSTR(z, "+")
+        IF p < 0 THEN CONTINUE
+        DIM rest AS STRING : rest = MID$(z, p + 1, LEN(z))
+        DIM ende AS INTEGER : ende = INSTR(rest, " ")
+        IF ende >= 0 THEN rest = LEFT$(rest, ende)
+        DIM komma AS INTEGER : komma = INSTR(rest, ",")
+        DIM von AS INTEGER : von = INT(VAL(IIF(komma >= 0, LEFT$(rest, komma), rest)))
+        DIM anzahl AS INTEGER : anzahl = 1
+        IF komma >= 0 THEN anzahl = INT(VAL(MID$(rest, komma + 1, LEN(rest))))
+        DIM k AS INTEGER
+        FOR k = 0 TO MIN(anzahl, 2000) - 1
+            ARRAY_PUSH(neu, von + k)
+        NEXT
+    NEXT
+    gitZeilen = neu
+    markenSchluessel = ""
+    protokoll("git rand " + STR$(LEN(neu)))
+END SUB
+
+SUB hpNeu(pfad AS STRING, z AS INTEGER, bed AS STRING)
+    ARRAY_PUSH(haltepunkte, NEW Haltepunkt(pfad, z, bed))
+END SUB
+
+SUB hpEntfernen(k AS INTEGER)
+    ARRAY_REMOVE_AT(haltepunkte, k)
+END SUB
+
+' Kurzformen fuer die Liste und die Pruefsammlungen.
+FUNCTION hpTreffer$(k AS INTEGER) AS STRING
+    RETURN haltepunkte[k].treffer
+END FUNCTION
+
+FUNCTION hpLog$(k AS INTEGER) AS STRING
+    RETURN haltepunkte[k].log
+END FUNCTION
+
+FUNCTION hpIstAktiv(k AS INTEGER) AS BOOLEAN
+    RETURN haltepunkte[k].aktiv
+END FUNCTION
+
+FUNCTION haltepunktIndex(pfad AS STRING, zeile AS INTEGER) AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(haltepunkte) - 1
+        IF haltepunkte[i].datei = pfad AND haltepunkte[i].zeile = zeile THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
+
+SUB haltepunktUmschalten()
+    IF aktiverTab < 0 THEN RETURN
+    DIM z AS INTEGER
+    DIM s AS INTEGER
+    (z, s) = GUI_TEXTAREA_CURSOR(reiter[aktiverTab].feld)
+    haltepunktUmschaltenIn(reiter[aktiverTab].pfad, z)
+END SUB
+
+' Derselbe Schalter fuer eine BESTIMMTE Zeile -- F9 nimmt die der Marke,
+' ein Klick in die Nummernspalte die angeklickte (die Marke bleibt dabei,
+' wo sie ist).
+SUB haltepunktUmschaltenIn(pfad AS STRING, z AS INTEGER)
+    IF pfad = "" THEN GUI_SET_TEXT(lblStatus, tr$("Erst sichern -- Haltepunkte gehören zu einer Datei.")) : RETURN
+    DIM k AS INTEGER : k = haltepunktIndex(pfad, z)
+    IF k >= 0 THEN
+        hpEntfernen(k)
+        protokoll("haltepunkt " + STR$(z) + " aus")
+    ELSE
+        hpNeu(pfad, z, "")
+        protokoll("haltepunkt " + STR$(z) + " an")
+    END IF
+    ' Laeuft der Debugger, gilt es sofort -- auch waehrend des Laufens und
+    ' auch fuer eine importierte Datei.
+    IF prozessArt = "debug" AND prozess >= 0 THEN debugHaltepunkteSenden()
+END SUB
+
+' Umschalt+F9: ein Haltepunkt, der nur haelt, wenn ein Ausdruck wahr ist
+' (`i = 3`, `hp < 10`). Der Debugger-Kern kennt das schon (`conditions` im
+' set-breakpoints-Kommando), die IDE fragt nur nach dem Ausdruck.
+SUB haltepunktBedingungFragen()
+    IF aktiverTab < 0 THEN RETURN
+    DIM z AS INTEGER
+    DIM s AS INTEGER
+    (z, s) = GUI_TEXTAREA_CURSOR(reiter[aktiverTab].feld)
+    haltepunktBedingungFragenIn(reiter[aktiverTab].pfad, z)
+END SUB
+
+SUB haltepunktBedingungFragenIn(pfad AS STRING, z AS INTEGER)
+    IF pfad = "" THEN GUI_SET_TEXT(lblStatus, tr$("Erst sichern -- Haltepunkte gehören zu einer Datei.")) : RETURN
+    bedingungZeile = z
+    bedingungPfad = pfad
+    DIM vorgabe AS STRING : vorgabe = ""
+    DIM k AS INTEGER : k = haltepunktIndex(pfad, bedingungZeile)
+    IF k >= 0 THEN vorgabe = haltepunkte[k].bedingung
+    dlgBedingung = GUI_PROMPT(tr$("Bedingter Haltepunkt"), tr$("Halten in Zeile ") + STR$(bedingungZeile) + tr$(", wenn (leer = immer):"), vorgabe)
+END SUB
+
+SUB haltepunktBedingungSetzen(ausdruck AS STRING)
+    DIM pfad AS STRING : pfad = bedingungPfad
+    IF pfad = "" THEN RETURN
+    DIM k AS INTEGER : k = haltepunktIndex(pfad, bedingungZeile)
+    IF k < 0 THEN
+        hpNeu(pfad, bedingungZeile, TRIM$(ausdruck))
+    ELSE
+        haltepunkte[k].bedingung = TRIM$(ausdruck)
+    END IF
+    IF TRIM$(ausdruck) = "" THEN
+        protokoll("haltepunkt " + STR$(bedingungZeile) + " an")
+    ELSE
+        protokoll("haltepunkt " + STR$(bedingungZeile) + " bedingt " + TRIM$(ausdruck))
+    END IF
+    markenSchluessel = ""
+    IF prozessArt = "debug" AND prozess >= 0 THEN debugHaltepunkteSenden()
+END SUB
+
+' --- Haltepunkt-Liste --------------------------------------------------
+' Eine Zeile Quelltext -- aus dem offenen Reiter, sonst von der Platte.
+FUNCTION zeileAusDatei$(pfad AS STRING, z AS INTEGER) AS STRING
+    DIM text AS STRING : text = ""
+    DIM t AS INTEGER : t = tabMitPfad(pfad)
+    IF t >= 0 THEN
+        text = GUI_TEXT(reiter[t].feld)
+    ELSE
+        TRY
+            text = dateiLesen(pfad)
+        CATCH e
+            RETURN ""
+        END TRY
+    END IF
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(text, NL)
+    IF z >= 1 AND z <= LEN(zeilen) THEN RETURN TRIM$(zeilen[z - 1])
+    RETURN ""
+END FUNCTION
+
+SUB haltepunkteListeZeigen()
+    hpListeStand = "-"
+    haltepunkteListeFuellen()
+    GUI_WINDOW_VISIBLE(winHp, TRUE)
+    GUI_FOCUS(lstHp)            ' holt das Fenster vor das Hauptfenster
+    protokoll("haltepunkte liste " + STR$(LEN(haltepunkte)))
+END SUB
+
+' Neu fuellen, wenn sich etwas geaendert hat (auch von aussen: F9 im Code,
+' ein gerutschter Haltepunkt) -- die Auswahl bleibt stehen.
+SUB haltepunkteListeFuellen()
+    DIM stand AS STRING : stand = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(haltepunkte) - 1
+        stand = stand + haltepunkte[i].datei + ":" + STR$(haltepunkte[i].zeile) + ":" + haltepunkte[i].bedingung + ":" + IIF(hpIstAktiv(i), "1", "0") + ":" + hpTreffer$(i) + ":" + hpLog$(i) + "|"
+    NEXT
+    IF stand = hpListeStand THEN RETURN
+    hpListeStand = stand
+    DIM wahl AS INTEGER : wahl = GUI_LISTBOX_SELECTED(lstHp)
+    GUI_LISTBOX_CLEAR(lstHp)
+    DIM dateien AS ARRAY OF STRING : dateien = []
+    FOR i = 0 TO LEN(haltepunkte) - 1
+        DIM eintrag AS STRING : eintrag = BASENAME(haltepunkte[i].datei) + ":" + STR$(haltepunkte[i].zeile)
+        IF haltepunkte[i].bedingung <> "" THEN eintrag = eintrag + "   wenn " + haltepunkte[i].bedingung
+        IF hpTreffer$(i) <> "" THEN eintrag = eintrag + "   Treffer " + hpTreffer$(i)
+        IF hpLog$(i) <> "" THEN eintrag = eintrag + "   schreibt: " + hpLog$(i)
+        GUI_LISTBOX_ADD(lstHp, eintrag)
+        GUI_LISTBOX_SET_CHECKED(lstHp, i, hpIstAktiv(i))
+        GUI_LISTBOX_DETAIL(lstHp, i, zeileAusDatei$(haltepunkte[i].datei, haltepunkte[i].zeile))
+        IF ARRAY_INDEXOF(dateien, haltepunkte[i].datei) < 0 THEN ARRAY_PUSH(dateien, haltepunkte[i].datei)
+    NEXT
+    IF wahl >= 0 AND wahl < LEN(haltepunkte) THEN GUI_LISTBOX_SET_SELECTED(lstHp, wahl)
+    GUI_SET_TEXT(lblHp, STR$(LEN(haltepunkte)) + IIF(LEN(haltepunkte) = 1, tr$(" Haltepunkt in "), tr$(" Haltepunkte in ")) + STR$(LEN(dateien)) + IIF(LEN(dateien) = 1, tr$(" Datei"), tr$(" Dateien")) + tr$(" -- das Kästchen schaltet einen an und aus, Doppelklick springt hin"))
+END SUB
+
+' Trefferzahl setzen: nur lesbare Angaben, sonst sagt es die Statuszeile.
+SUB haltepunktTrefferSetzen(k AS INTEGER, text AS STRING)
+    IF k < 0 OR k >= LEN(haltepunkte) THEN RETURN
+    DIM t AS STRING : t = TRIM$(text)
+    IF t <> "" AND NOT REGEX_TEST(t, "^(%|>=|==|=)?\s*[1-9][0-9]*$") THEN
+        GUI_SET_TEXT(lblStatus, tr$("Trefferzahl: eine Zahl ab 1, davor wahlweise = oder % (") + t + tr$(" passt nicht)."))
+        RETURN
+    END IF
+    haltepunkte[k].treffer = t
+    protokoll("haltepunkt " + STR$(haltepunkte[k].zeile) + " treffer " + t)
+END SUB
+
+SUB haltepunktLogSetzen(k AS INTEGER, text AS STRING)
+    IF k < 0 OR k >= LEN(haltepunkte) THEN RETURN
+    haltepunkte[k].log = TRIM$(text)
+    protokoll("haltepunkt " + STR$(haltepunkte[k].zeile) + " schreibt " + TRIM$(text))
+END SUB
+
+' Nach jeder Aenderung: Marken neu, und ein laufender Debugger erfaehrt es.
+SUB haltepunkteGeaendert()
+    markenSchluessel = ""
+    IF prozessArt = "debug" AND prozess >= 0 THEN debugHaltepunkteSenden()
+END SUB
+
+SUB haltepunkteListeNachziehen()
+    IF NOT GUI_WINDOW_SHOWN(winHp) THEN RETURN
+    haltepunkteListeFuellen()
+    DIM i AS INTEGER
+    DIM anders AS BOOLEAN : anders = FALSE
+    FOR i = 0 TO MIN(GUI_LISTBOX_COUNT(lstHp), LEN(haltepunkte)) - 1
+        IF GUI_LISTBOX_CHECKED(lstHp, i) <> hpIstAktiv(i) THEN
+            haltepunkte[i].aktiv = GUI_LISTBOX_CHECKED(lstHp, i)
+            protokoll("haltepunkt " + STR$(haltepunkte[i].zeile) + IIF(haltepunkte[i].aktiv, " eingeschaltet", " ausgeschaltet"))
+            anders = TRUE
+        END IF
+    NEXT
+    DIM w AS INTEGER : w = GUI_LISTBOX_SELECTED(lstHp)
+    IF GUI_DOUBLE_CLICKED(lstHp) OR GUI_CLICKED(btnHpSpringen) THEN
+        IF w >= 0 AND w < LEN(haltepunkte) THEN
+            dateiOeffnen(haltepunkte[w].datei)
+            DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+            IF ta >= 0 THEN GUI_TEXTAREA_GOTO(ta, haltepunkte[w].zeile, 1) : GUI_FOCUS(ta)
+            protokoll("haltepunkt sprung " + BASENAME(haltepunkte[w].datei) + " " + STR$(haltepunkte[w].zeile))
+        END IF
+    END IF
+    IF GUI_CLICKED(btnHpBed) AND w >= 0 AND w < LEN(haltepunkte) THEN haltepunktBedingungFragenIn(haltepunkte[w].datei, haltepunkte[w].zeile)
+    IF GUI_CLICKED(btnHpTreffer) AND w >= 0 AND w < LEN(haltepunkte) THEN
+        hpBearbeitet = w
+        dlgTreffer = GUI_PROMPT(tr$("Trefferzahl"), tr$("Halten in ") + BASENAME(haltepunkte[w].datei) + ":" + STR$(haltepunkte[w].zeile) + tr$(" erst ... (5 = ab dem 5. Mal, =5 genau, %5 jedes 5. Mal, leer = immer):"), hpTreffer$(w))
+    END IF
+    IF GUI_CLICKED(btnHpLog) AND w >= 0 AND w < LEN(haltepunkte) THEN
+        hpBearbeitet = w
+        dlgLog = GUI_PROMPT(tr$("Protokollpunkt"), tr$("Statt anzuhalten schreiben (Ausdrücke in {}, z. B. i = {i}; leer = anhalten):"), hpLog$(w))
+    END IF
+    IF dlgTreffer <> 0 THEN
+        DIM at AS INTEGER : at = GUI_ANSWER(dlgTreffer)
+        IF at = 1 THEN haltepunktTrefferSetzen(hpBearbeitet, GUI_DIALOG_TEXT(dlgTreffer)) : anders = TRUE
+        IF at <> 0 THEN dlgTreffer = 0
+    END IF
+    IF dlgLog <> 0 THEN
+        DIM al AS INTEGER : al = GUI_ANSWER(dlgLog)
+        IF al = 1 THEN haltepunktLogSetzen(hpBearbeitet, GUI_DIALOG_TEXT(dlgLog)) : anders = TRUE
+        IF al <> 0 THEN dlgLog = 0
+    END IF
+    IF GUI_CLICKED(btnHpWeg) AND w >= 0 AND w < LEN(haltepunkte) THEN
+        protokoll("haltepunkt " + STR$(haltepunkte[w].zeile) + " aus")
+        hpEntfernen(w)
+        anders = TRUE
+    END IF
+    IF GUI_CLICKED(btnHpAn) OR GUI_CLICKED(btnHpAus) THEN
+        DIM an AS BOOLEAN : an = GUI_CLICKED(btnHpAn)
+        FOR i = 0 TO LEN(haltepunkte) - 1
+            haltepunkte[i].aktiv = an
+        NEXT
+        protokoll("haltepunkte alle " + IIF(an, "an", "aus"))
+        anders = TRUE
+    END IF
+    IF GUI_CLICKED(btnHpAlleWeg) THEN
+        haltepunkte = []
+        protokoll("haltepunkte alle entfernt")
+        anders = TRUE
+    END IF
+    IF anders THEN
+        haltepunkteListeFuellen()
+        haltepunkteGeaendert()
+    END IF
+END SUB
+
+' --- Lesezeichen -------------------------------------------------------
+FUNCTION lesezeichenIndex(pfad AS STRING, zeile AS INTEGER) AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(lesezeichen) - 1
+        IF lesezeichen[i].gleich(pfad, zeile) THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
+
+SUB lesezeichenUmschalten()
+    IF aktiverTab < 0 THEN RETURN
+    DIM pfad AS STRING : pfad = reiter[aktiverTab].pfad
+    DIM z AS INTEGER
+    DIM s AS INTEGER
+    (z, s) = GUI_TEXTAREA_CURSOR(reiter[aktiverTab].feld)
+    DIM k AS INTEGER : k = lesezeichenIndex(pfad, z)
+    IF k >= 0 THEN
+        ARRAY_REMOVE_AT(lesezeichen, k)
+        protokoll("lesezeichen " + STR$(z) + " aus")
+    ELSE
+        ARRAY_PUSH(lesezeichen, NEW CodeStelle(pfad, z, 1))
+        protokoll("lesezeichen " + STR$(z) + " an")
+    END IF
+    markenSchluessel = ""
+END SUB
+
+' F2: zum naechsten Lesezeichen hinter der Marke, am Ende wieder von vorn.
+' Lesezeichen der Reihe nach -- ueber DATEIEN hinweg: erst die restlichen
+' in dieser Datei, dann die naechste Datei, die eins hat. Ein Lesezeichen,
+' das man nur in seiner Datei wiederfindet, ist eins zu wenig.
+SUB lesezeichenSpringen(vorwaerts AS BOOLEAN)
+    IF aktiverTab < 0 THEN RETURN
+    IF LEN(lesezeichen) = 0 THEN
+        GUI_SET_TEXT(lblStatus, tr$("Kein Lesezeichen gesetzt -- Strg+F2 setzt eins."))
+        RETURN
+    END IF
+    DIM pfad AS STRING : pfad = reiter[aktiverTab].pfad
+    DIM z AS INTEGER
+    DIM s AS INTEGER
+    (z, s) = GUI_TEXTAREA_CURSOR(reiter[aktiverTab].feld)
+    ' Alle Marken in EINE Reihenfolge bringen: erst nach Datei, dann nach
+    ' Zeile. So ist "das naechste" auch ueber die Dateigrenze eindeutig.
+    DIM reihe AS ARRAY OF INTEGER : reihe = []
+    DIM i AS INTEGER
+    DIM k AS INTEGER
+    FOR i = 0 TO LEN(lesezeichen) - 1
+        DIM platz AS INTEGER : platz = LEN(reihe)
+        FOR k = 0 TO LEN(reihe) - 1
+            DIM j AS INTEGER : j = reihe[k]
+            IF lesezeichen[j].pfad > lesezeichen[i].pfad OR (lesezeichen[j].pfad = lesezeichen[i].pfad AND lesezeichen[j].zeile > lesezeichen[i].zeile) THEN
+                platz = k
+                BREAK
+            END IF
+        NEXT
+        ARRAY_INSERT(reihe, platz, i)
+    NEXT
+    ' Wo stehen wir in dieser Reihe?
+    DIM hier AS INTEGER : hier = -1
+    FOR k = 0 TO LEN(reihe) - 1
+        DIM m AS INTEGER : m = reihe[k]
+        IF lesezeichen[m].pfad < pfad OR (lesezeichen[m].pfad = pfad AND lesezeichen[m].zeile <= z) THEN hier = k
+    NEXT
+    DIM ziel AS INTEGER
+    IF vorwaerts THEN
+        ziel = (hier + 1) MOD LEN(reihe)
+    ELSE
+        ziel = hier
+        IF ziel < 0 THEN ziel = 0
+        ' Steht die Marke GENAU auf einem Lesezeichen, ist "zurueck" das
+        ' davor -- sonst kaeme man nie von der Stelle.
+        DIM h AS INTEGER : h = reihe[ziel]
+        IF lesezeichen[h].pfad = pfad AND lesezeichen[h].zeile = z THEN ziel = ziel - 1
+        IF ziel < 0 THEN ziel = LEN(reihe) - 1
+    END IF
+    DIM t AS INTEGER : t = reihe[ziel]
+    IF lesezeichen[t].pfad <> pfad THEN
+        IF NOT FILEEXISTS(lesezeichen[t].pfad) THEN
+            GUI_SET_TEXT(lblStatus, tr$("Die Datei des Lesezeichens gibt es nicht mehr: ") + lesezeichen[t].pfad)
+            RETURN
+        END IF
+        dateiOeffnen(lesezeichen[t].pfad)
+    END IF
+    GUI_TEXTAREA_GOTO(aktivesFeld(), lesezeichen[t].zeile, 1)
+    GUI_FOCUS(aktivesFeld())
+    ' Nur die Zeile ins Protokoll: welche Datei, sagt die "geoeffnet"-Zeile
+    ' davor, wenn der Sprung ueber die Grenze ging.
+    protokoll("lesezeichen sprung " + STR$(lesezeichen[t].zeile))
+END SUB
+
+' Alle Lesezeichen in der Liste unten rechts -- dieselbe wie Suche und
+' blame; ein eigenes Panel fuer dieselbe Frage waere eins zu viel.
+SUB lesezeichenListe()
+    GUI_LISTBOX_CLEAR(lstProbleme)
+    DIM funde AS ARRAY OF CodeStelle : funde = []
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(lesezeichen) - 1
+        ARRAY_PUSH(funde, lesezeichen[i])
+        DIM text AS STRING : text = ""
+        TRY
+            DIM zeilen AS ARRAY OF STRING : zeilen = READLINES(lesezeichen[i].pfad)
+            IF lesezeichen[i].zeile <= LEN(zeilen) THEN text = TRIM$(zeilen[lesezeichen[i].zeile - 1])
+        CATCH e
+            text = ""
+        END TRY
+        GUI_LISTBOX_ADD(lstProbleme, BASENAME(lesezeichen[i].pfad) + ":" + STR$(lesezeichen[i].zeile) + ": " + text)
+    NEXT
+    fundstellen = funde
+    problemModus = 1
+    GUI_SET_TEXT(lblProbleme, STR$(LEN(funde)) + tr$(" Lesezeichen -- Umschalt+F7 zeigt wieder die Probleme"))
+    protokoll("lesezeichen liste " + STR$(LEN(sz)))
+END SUB
+
+' Ein Lichtstreif ueber das Hauptfenster, wenn er eingeschaltet ist.
+' Ein Testlauf (DHRT_FRAMES) bekommt ihn nur mit DH_IDE_GLANZ=1 -- sonst
+' laege er ueber den Bildproben der ersten Sekunden.
+' Der Streif beim Start zieht erst ab dem vierten Bild (`glanzStartIn`,
+' gesetzt am Ende des Starts): die ersten Bilder brauchen je 50 ms
+' (Einfaerben, Schriften), und ein Streif, der dabei schon laeuft, ruckelt
+' gleich am Anfang.
+DIM glanzStartIn AS INTEGER : glanzStartIn = 0
+SUB glanzStartNachziehen()
+    IF glanzStartIn <= 0 THEN RETURN
+    glanzStartIn = glanzStartIn - 1
+    IF glanzStartIn = 0 THEN lichtstreif(2200)
+END SUB
+
+SUB lichtstreif(dauer AS INTEGER)
+    IF NOT glanzAn THEN RETURN
+    IF GETENV$("DHRT_FRAMES") <> "" AND GETENV$("DH_IDE_GLANZ") <> "1" THEN RETURN
+    GUI_WINDOW_GLOW_SET(win, "art", "rahmen")
+    GUI_WINDOW_GLOW_SET(win, "richtung", "links")
+    GUI_WINDOW_GLOW(win, &HFFB050, dauer)
+    IF GETENV$("DH_IDE_GLANZ") = "1" THEN protokoll("glanz " + STR$(dauer))
+END SUB
+
+' Haben sich die Marken im Feld verschoben (Zeilen darueber eingefuegt
+' oder geloescht), ziehen Haltepunkte und Lesezeichen mit -- sonst laege
+' der rote Punkt nach dem Tippen auf einer fremden Zeile, und der Debugger
+' hielte dort.
+SUB markenZurueckholen(ta AS GUI_WIDGET, pfad AS STRING)
+    IF ta <> markenFeld OR pfad <> markenPfad OR LEN(markenGesetzt) = 0 THEN RETURN
+    DIM jetzt AS ARRAY OF INTEGER : jetzt = GUI_TEXTAREA_MARKS_GET(ta)
+    IF LEN(jetzt) <> LEN(markenGesetzt) THEN RETURN
+    DIM k AS INTEGER
+    DIM anders AS BOOLEAN : anders = FALSE
+    FOR k = 0 TO LEN(jetzt) - 1
+        IF jetzt[k] = markenGesetzt[k].zeile THEN CONTINUE
+        DIM i AS INTEGER : i = markenGesetzt[k].idx
+        IF markenGesetzt[k].art = "h" AND i < LEN(haltepunkte) THEN
+            haltepunkte[i].zeile = jetzt[k] : anders = TRUE
+        ELSEIF markenGesetzt[k].art = "l" AND i < LEN(lesezeichen) THEN
+            lesezeichen[i].zeile = jetzt[k] : anders = TRUE
+        END IF
+        markenGesetzt[k].zeile = jetzt[k]
+    NEXT
+    IF anders THEN
+        DIM liste AS STRING : liste = ""
+        FOR k = 0 TO LEN(haltepunkte) - 1
+            liste = liste + " " + STR$(haltepunkte[k].zeile)
+        NEXT
+        protokoll("marken gewandert" + liste)
+    END IF
+END SUB
+
+SUB markenNachziehen()
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN
+    DIM pfad AS STRING : pfad = reiter[aktiverTab].pfad
+    markenZurueckholen(ta, pfad)
+    DIM zeilen AS ARRAY OF INTEGER : zeilen = []
+    DIM farben AS ARRAY OF INTEGER : farben = []
+    DIM arten AS ARRAY OF STRING : arten = []
+    DIM idx AS ARRAY OF INTEGER : idx = []
+    DIM schl AS STRING : schl = pfad + "|"
+    ' Reihenfolge = Vorrang: die angehaltene Zeile vor dem Haltepunkt vor dem
+    ' Fehler vor dem Lesezeichen. Ein bedingter Haltepunkt ist violett.
+    IF prozessArt = "debug" AND debugPause AND debugZeile > 0 AND pfad <> "" THEN
+        IF gleicheDatei(debugDatei, pfad) THEN
+            ARRAY_PUSH(zeilen, debugZeile) : ARRAY_PUSH(farben, &HFFD040) : schl = schl + "p" + STR$(debugZeile)
+            ARRAY_PUSH(arten, "p") : ARRAY_PUSH(idx, 0)
+        END IF
+    END IF
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(haltepunkte) - 1
+        IF haltepunkte[i].datei = pfad THEN
+            ARRAY_PUSH(zeilen, haltepunkte[i].zeile)
+            IF NOT hpIstAktiv(i) THEN
+                ARRAY_PUSH(farben, &H7A7A86)
+            ELSEIF hpLog$(i) <> "" THEN
+                ARRAY_PUSH(farben, &H40A8E0)
+            ELSEIF haltepunkte[i].bedingung = "" AND hpTreffer$(i) = "" THEN
+                ARRAY_PUSH(farben, &HE05050)
+            ELSE
+                ARRAY_PUSH(farben, &HC060E0)
+            END IF
+            schl = schl + "h" + STR$(haltepunkte[i].zeile) + haltepunkte[i].bedingung + IIF(hpIstAktiv(i), "", "-") + hpTreffer$(i) + "~" + hpLog$(i)
+            ARRAY_PUSH(arten, "h") : ARRAY_PUSH(idx, i)
+        END IF
+    NEXT
+    FOR i = 0 TO LEN(problemZeilen) - 1
+        IF i < LEN(problemHinweis) THEN
+            IF problemHinweis[i] THEN CONTINUE
+        END IF
+        ARRAY_PUSH(zeilen, problemZeilen[i]) : ARRAY_PUSH(farben, &HD08040) : schl = schl + "f" + STR$(problemZeilen[i])
+        ARRAY_PUSH(arten, "f") : ARRAY_PUSH(idx, i)
+    NEXT
+    FOR i = 0 TO LEN(lesezeichen) - 1
+        IF lesezeichen[i].pfad = pfad THEN
+            ARRAY_PUSH(zeilen, lesezeichen[i].zeile) : ARRAY_PUSH(farben, &H5090E0) : schl = schl + "l" + STR$(lesezeichen[i].zeile)
+            ARRAY_PUSH(arten, "l") : ARRAY_PUSH(idx, i)
+        END IF
+    NEXT
+    ' Der Vergleich zweier Reiter: die abweichenden Zeilen des VORDEREN.
+    IF aktiverTab = diffTabR THEN
+        FOR i = 0 TO LEN(diffRechts) - 1
+            ARRAY_PUSH(zeilen, diffRechts[i]) : ARRAY_PUSH(farben, &HE07070) : schl = schl + "v" + STR$(diffRechts[i])
+            ARRAY_PUSH(arten, "v") : ARRAY_PUSH(idx, i)
+        NEXT
+    END IF
+    ' Geaenderte Zeilen ganz zuletzt: sie sind die schwaechste Aussage und
+    ' sollen keinen Haltepunkt zudecken.
+    FOR i = 0 TO LEN(gitZeilen) - 1
+        ARRAY_PUSH(zeilen, gitZeilen[i]) : ARRAY_PUSH(farben, &H50A070) : schl = schl + "g" + STR$(gitZeilen[i])
+        ARRAY_PUSH(arten, "g") : ARRAY_PUSH(idx, i)
+    NEXT
+    IF schl = markenSchluessel AND ta = markenFeld THEN RETURN
+    markenSchluessel = schl
+    GUI_TEXTAREA_MARKS(ta, zeilen, farben)
+    markenFeld = ta : markenPfad = pfad
+    ' Nur gueltige Zeilen stehen im Feld (GUI_TEXTAREA_MARKS laesst < 1 weg).
+    markenGesetzt = []
+    FOR i = 0 TO LEN(zeilen) - 1
+        IF zeilen[i] >= 1 THEN ARRAY_PUSH(markenGesetzt, NEW GesetzteMarke(arten[i], idx[i], zeilen[i]))
+    NEXT
+END SUB
+
+' --- Hilfe zum Wort unter der Marke ----------------------------------
+' Der Aufruf, in dem die Marke gerade steht: rueckwaerts durch die Zeile,
+' Klammern zaehlen. Liefert (name, spalte_des_namens, argumentnummer);
+' name leer heisst: die Marke steht in keiner Argumentliste.
+FUNCTION aufrufUmDieMarke(zeile AS STRING, spalte AS INTEGER) AS TUPLE
+    ' MID$ zaehlt ab 0, `spalte` ab 1: die Marke steht VOR Zeichen spalte-1.
+    ' Erst zaehlen, wie viele Anfuehrungszeichen links von ihr stehen -- eine
+    ' ungerade Zahl heisst: die Marke steht in einer Zeichenkette, und dort
+    ' ist jede Klammer nur ein Zeichen.
+    ' Jenseits von Spalte 5000 keine Signaturhilfe: das Zaehlen ab dem
+    ' Zeilenanfang kostete in einer Datenzeile mit 270000 Zeichen bei jedem
+    ' Tastendruck Zeit, und so weit rechts tippt niemand einen Aufruf.
+    IF spalte > 5000 THEN RETURN ("", 0, 0)
+    DIM q AS INTEGER : q = 0
+    DIM k AS INTEGER
+    FOR k = 0 TO spalte - 2
+        IF MID$(zeile, k, 1) = CHR$(34) THEN q = q + 1
+    NEXT
+    IF q MOD 2 = 1 THEN RETURN ("", 0, 0)
+    DIM tiefe AS INTEGER : tiefe = 0
+    DIM arg AS INTEGER : arg = 0
+    DIM inText AS BOOLEAN : inText = FALSE
+    DIM i AS INTEGER : i = spalte - 2
+    WHILE i >= 0
+        DIM c AS STRING : c = MID$(zeile, i, 1)
+        IF c = CHR$(34) THEN
+            inText = NOT inText
+        ELSEIF NOT inText THEN
+            IF c = ")" THEN
+                tiefe = tiefe + 1
+            ELSEIF c = "(" THEN
+                IF tiefe = 0 THEN
+                    ' Gefunden: der Name links davon.
+                    DIM e AS INTEGER : e = i - 1
+                    WHILE e >= 0 AND MID$(zeile, e, 1) = " " : e = e - 1 : WEND
+                    DIM a AS INTEGER : a = e
+                    WHILE a >= 0 AND istWortzeichen(MID$(zeile, a, 1)) : a = a - 1 : WEND
+                    IF e > a THEN RETURN (MID$(zeile, a + 1, e - a), a + 2, arg)
+                    RETURN ("", 0, 0)
+                END IF
+                tiefe = tiefe - 1
+            ELSEIF c = "," AND tiefe = 0 THEN
+                arg = arg + 1
+            END IF
+        END IF
+        i = i - 1
+    WEND
+    RETURN ("", 0, 0)
+END FUNCTION
+
+' Signatur des Aufrufs, in dem die Marke steht -- "" wenn keiner.
+FUNCTION signaturHilfe$(ta AS GUI_WIDGET, z AS INTEGER, s AS INTEGER) AS STRING
+    DIM name AS STRING
+    DIM spalte AS INTEGER
+    DIM arg AS INTEGER
+    (name, spalte, arg) = aufrufUmDieMarke(zeileVon$(ta, z), s)
+    IF name = "" THEN RETURN ""
+    DIM md AS STRING : md = CODE_HOVER$(GUI_TEXT(ta), z, spalte, codeBasis$())
+    IF md = "" THEN RETURN ""
+    ' Die erste Zeile im Codeblock ist die Signatur.
+    md = REPLACE$(md, "```drachenhauch" + NL, "")
+    md = REPLACE$(md, "```", "")
+    DIM erste AS STRING : erste = TRIM$(SPLIT$(TRIM$(md), NL)[0])
+    IF erste = "" THEN RETURN ""
+    RETURN erste + "   -- Argument " + STR$(arg + 1)
+END FUNCTION
+
+' Eine Meldung in der Statusleiste verschwindet nach einer Weile von selbst.
+' Sie blieb sonst stehen, bis die naechste kam -- "Keine Definition zu
+' 'AS'" stand noch da, als der naechste Sprung laengst geklappt hatte.
+CONST STATUS_DAUER = 12.0
+DIM statusAlt AS STRING : statusAlt = ""
+DIM statusZeit AS FLOAT : statusZeit = 0.0
+SUB statusNachziehen()
+    DIM t AS STRING : t = GUI_TEXT(lblStatus)
+    IF t <> statusAlt THEN
+        statusAlt = t
+        statusZeit = GET_TIME()
+    ELSEIF t <> "" AND GET_TIME() - statusZeit > STATUS_DAUER THEN
+        GUI_SET_TEXT(lblStatus, "")
+        statusAlt = ""
+    END IF
+END SUB
+
+SUB hilfeNachziehen()
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN
+    DIM z AS INTEGER
+    DIM s AS INTEGER
+    (z, s) = GUI_TEXTAREA_CURSOR(ta)
+    ' Nicht nur die Stelle: auch das Feld und die Textlaenge -- sonst blieb
+    ' nach einem Reiterwechsel (Marke in beiden in 1:1) oder nach Tippen und
+    ' Rueckgaengig an derselben Stelle die Hilfe zum vorigen Wort stehen.
+    DIM laenge AS INTEGER : laenge = LEN(GUI_TEXT(ta))
+    DIM marke AS STRING : marke = STR$(ta) + ":" + STR$(z) + ":" + STR$(s) + ":" + STR$(laenge)
+    IF marke = letzteMarke THEN RETURN
+    ' In einer grossen Datei erst, wenn die Marke kurz ruht: CODE_HOVER$
+    ' liest den ganzen Text, bei 20000 Zeilen gut 10 ms -- bei JEDEM Zeichen
+    ' getippt halbierte das die Bildrate (Stresstest 2026-10-02). Die
+    ' Stelle in der Statusleiste geht sofort.
+    IF laenge > 50000 THEN
+        IF marke <> hilfeKandidat THEN
+            hilfeKandidat = marke
+            hilfeFaellig = GET_TIME() + 0.25
+            GUI_STATUSBAR_SET(lblStatus, sfPos, tr$("Zeile ") + STR$(z) + tr$(", Spalte ") + STR$(s))
+            RETURN
+        END IF
+        IF GET_TIME() < hilfeFaellig THEN RETURN
+    END IF
+    letzteMarke = marke
+    GUI_STATUSBAR_SET(lblStatus, sfPos, tr$("Zeile ") + STR$(z) + tr$(", Spalte ") + STR$(s))
+    ' Steht die Marke in einer Argumentliste, gilt die Signatur des Aufrufs:
+    ' dort steht sie auf einem Komma oder einer Zahl, und die Hilfe zum Wort
+    ' schwiege genau dann, wenn man sie braucht.
+    DIM sig AS STRING : sig = signaturHilfe$(ta, z, s)
+    IF sig <> "" THEN
+        GUI_SET_TEXT(lblHilfe, sig)
+        protokoll("signatur " + sig)
+        RETURN
+    END IF
+    DIM md AS STRING : md = CODE_HOVER$(GUI_TEXT(ta), z, s, codeBasis$())
+    ' Die Markdown-Zaeune weglassen -- die Beschriftung zeigt Text.
+    md = REPLACE$(md, "```drachenhauch" + NL, "")
+    md = REPLACE$(md, NL + "```", "")
+    md = REPLACE$(md, "```", "")
+    IF TRIM$(md) = "" THEN md = tr$(HILFE_LEER)
+    GUI_SET_TEXT(lblHilfe, md)
+END SUB
+
+' --- Tooltip beim Ueberfahren und Strg+Klick zur Definition -----------
+' Die Maus zeigt auf ein Wort: nach kurzer Ruhe steht seine Hilfe als
+' Tooltip daneben -- dieselbe wie unten rechts fuer das Wort unter der
+' Marke, nur ohne die Marke dorthin zu setzen. Gesetzt wird der Tooltip des
+' Code-Felds; die gui zeigt ihn nach ihrer eigenen Ruhezeit und nimmt ihn
+' bei jeder Bewegung weg, er steht also nie neben dem falschen Wort.
+' Strg+Klick springt zur Definition (wie F12), und solange Strg gehalten
+' ist, zeigt der Zeiger ueber einem Wort die Hand.
+DIM tippStelle AS STRING : tippStelle = ""
+DIM tippGefragt AS BOOLEAN : tippGefragt = FALSE
+DIM tippFeld AS GUI_WIDGET : tippFeld = -1
+DIM tippRuhe AS INTEGER : tippRuhe = 0
+DIM tippMx AS INTEGER : tippMx = -1
+DIM tippMy AS INTEGER : tippMy = -1
+DIM tippHand AS BOOLEAN : tippHand = FALSE
+DIM tippSprung AS STRING : tippSprung = ""
+DIM tippSprungZ AS INTEGER : tippSprungZ = 0
+DIM tippSprungS AS INTEGER : tippSprungS = 0
+CONST TIPP_RUHE = 8                  ' Bilder, bevor die Hilfe gefragt wird
+CONST TIPP_BREITE = 72               ' Zeichen je Tooltip-Zeile
+CONST TIPP_ZEILEN = 14
+
+' Das Wort, auf dessen Zeichen s (ab 1) die Maus steht, samt seiner
+' Anfangsspalte -- ("", 0), wenn dort kein Wortzeichen steht.
+FUNCTION wortBeiZeichen(zeile AS STRING, s AS INTEGER) AS TUPLE
+    IF s < 1 OR s > LEN(zeile) THEN RETURN ("", 0)
+    IF NOT istWortzeichen(MID$(zeile, s - 1, 1)) THEN RETURN ("", 0)
+    DIM a AS INTEGER : a = s - 1
+    DIM e AS INTEGER : e = s
+    WHILE a > 0 AND istWortzeichen(MID$(zeile, a - 1, 1)) : a = a - 1 : WEND
+    WHILE e < LEN(zeile) AND istWortzeichen(MID$(zeile, e, 1)) : e = e + 1 : WEND
+    RETURN (MID$(zeile, a, e - a), a + 1)
+END FUNCTION
+
+' Die Hilfe als Tooltip-Text: ohne Markdown-Zaeune, an Wortgrenzen
+' umbrochen (ein Tooltip bricht selbst nicht um und liefe sonst ueber den
+' Schirm) und gekuerzt -- wer mehr will, hat F1.
+FUNCTION tippText$(md AS STRING) AS STRING
+    md = REPLACE$(md, "```drachenhauch" + NL, "")
+    md = REPLACE$(md, NL + "```", "")
+    md = REPLACE$(md, "```", "")
+    md = TRIM$(md)
+    IF md = "" THEN RETURN ""
+    DIM raus AS STRING : raus = ""
+    DIM zahl AS INTEGER : zahl = 0
+    DIM absatz AS STRING
+    FOR EACH absatz IN SPLIT$(md, NL)
+        DIM rest AS STRING : rest = RTRIM$(absatz)
+        DO
+            DIM stueck AS STRING : stueck = rest
+            IF LEN(rest) > TIPP_BREITE THEN
+                DIM schnitt AS INTEGER : schnitt = TIPP_BREITE
+                WHILE schnitt > 20 AND MID$(rest, schnitt, 1) <> " " : schnitt = schnitt - 1 : WEND
+                IF schnitt <= 20 THEN schnitt = TIPP_BREITE
+                stueck = LEFT$(rest, schnitt)
+                rest = LTRIM$(MID$(rest, schnitt))
+            ELSE
+                rest = ""
+            END IF
+            IF zahl >= TIPP_ZEILEN THEN RETURN raus + NL + "..."
+            IF raus <> "" THEN raus = raus + NL
+            raus = raus + stueck
+            zahl = zahl + 1
+        LOOP UNTIL rest = ""
+    NEXT
+    RETURN raus
+END FUNCTION
+
+SUB tippWeg()
+    IF tippFeld >= 0 THEN GUI_TOOLTIP(tippFeld, "")
+    tippFeld = -1
+    tippWertAusdruck = ""
+END SUB
+
+' Werte beim Ueberfahren: steht der Debugger in der Datei unter der Maus,
+' fragt die IDE den Ausdruck ab (`eval` mit `id` "hover") und setzt die
+' Antwort oben in den Tooltip. Die Antwort kommt ein, zwei Bilder spaeter
+' ueber debugEreignis -- bis dahin steht die Hilfe allein da.
+DIM tippWertAusdruck AS STRING : tippWertAusdruck = ""
+DIM tippWertFeld AS GUI_WIDGET : tippWertFeld = -1
+DIM tippDoku AS STRING : tippDoku = ""
+
+FUNCTION debugWertMoeglich() AS BOOLEAN
+    IF prozessArt <> "debug" OR NOT debugPause OR prozess < 0 OR aktiverTab < 0 THEN RETURN FALSE
+    IF reiter[aktiverTab].pfad = "" THEN RETURN FALSE
+    RETURN gleicheDatei(debugDatei, reiter[aktiverTab].pfad)
+END FUNCTION
+
+' Das Wort samt davorstehender Mitglieds-Kette: bei `spieler.hp` unter der
+' Maus auf `hp` der ganze Ausdruck. Nie mit Klammern -- ein Aufruf haette
+' Nebenwirkungen, und die sollen nicht beim blossen Hinsehen passieren.
+FUNCTION ausdruckBeiWort$(zeile AS STRING, wort AS STRING, anfang AS INTEGER) AS STRING
+    DIM a AS INTEGER : a = anfang - 1          ' 0-basiert, erstes Zeichen des Worts
+    DIM ende AS INTEGER : ende = a + LEN(wort)
+    WHILE a >= 2
+        IF MID$(zeile, a - 1, 1) <> "." THEN EXIT WHILE
+        IF NOT istWortzeichen(MID$(zeile, a - 2, 1)) THEN EXIT WHILE
+        DIM b AS INTEGER : b = a - 2
+        WHILE b > 0 AND istWortzeichen(MID$(zeile, b - 1, 1)) : b = b - 1 : WEND
+        a = b
+    WEND
+    RETURN MID$(zeile, a, ende - a)
+END FUNCTION
+
+SUB debugWertFragen(ta AS GUI_WIDGET, ausdruck AS STRING, doku AS STRING)
+    tippWertAusdruck = ausdruck
+    tippWertFeld = ta
+    tippDoku = doku
+    PROCESS_WRITE(prozess, "{" + jsonText$("cmd") + ":" + jsonText$("eval") + "," + jsonText$("expr") + ":" + jsonText$(ausdruck) + "," + jsonText$("id") + ":" + jsonText$("hover") + "}" + NL)
+END SUB
+
+SUB wertTooltip(ausdruck AS STRING, wert AS STRING, typ AS STRING)
+    IF ausdruck <> tippWertAusdruck OR tippWertFeld < 0 THEN RETURN
+    DIM w AS STRING : w = wert
+    IF LEN(w) > 160 THEN w = LEFT$(w, 157) + "..."
+    DIM text AS STRING : text = ausdruck + " = " + w + "   (" + typ + ")"
+    IF tippDoku <> "" THEN text = text + NL + NL + tippDoku
+    GUI_TOOLTIP(tippWertFeld, text)
+    tippFeld = tippWertFeld
+    protokoll("wert " + ausdruck + " = " + wert)
+END SUB
+
+SUB mausNachziehen(ta AS GUI_WIDGET)
+    IF ta < 0 THEN RETURN
+    DIM mx AS INTEGER : mx = MOUSEX()
+    DIM my AS INTEGER : my = MOUSEY()
+    DIM strg AS BOOLEAN : strg = KEYPRESSED(KEY_LCTRL) OR KEYPRESSED(KEY_RCTRL)
+    DIM z AS INTEGER
+    DIM s AS INTEGER
+    (z, s) = GUI_TEXTAREA_POS_AT(ta, mx, my)
+    ' Liegt ein Fenster davor (Dialog, Palette), zeigt die Maus nicht auf den Code.
+    IF NOT GUI_HOVERED(ta) THEN z = 0
+    DIM wort AS STRING : wort = ""
+    DIM anfang AS INTEGER : anfang = 0
+    DIM bildWeg AS STRING : bildWeg = ""
+    IF z > 0 THEN
+        DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(GUI_TEXT(ta), NL)
+        IF z <= LEN(zeilen) THEN
+            (wort, anfang) = wortBeiZeichen(zeilen[z - 1], s)
+            bildWeg = bildPfadBei$(ta, zeilen[z - 1], s)
+        END IF
+    END IF
+    bildTippNachziehen(bildWeg, mx, my)
+
+    ' Strg+Klick: gesprungen wird beim LOSLASSEN -- beim Druecken setzt der
+    ' Textbereich selbst die Marke, und solange die Taste haengt, zieht er
+    ' sie als Auswahl hinter der Maus her; ein Sprung beim Druecken stuende
+    ' im naechsten Bild wieder an der Klickstelle.
+    IF strg AND MOUSE_HIT(0) AND wort <> "" THEN
+        tippSprung = wort : tippSprungZ = z : tippSprungS = s
+    END IF
+    IF tippSprung <> "" AND MOUSE_RELEASED(0) THEN
+        DIM ziel AS STRING : ziel = tippSprung
+        tippSprung = ""
+        GUI_TEXTAREA_SELECT(ta, tippSprungZ, tippSprungS, tippSprungZ, tippSprungS)
+        protokoll("strg klick " + ziel)
+        tippWeg()
+        zurDefinition()
+        RETURN
+    END IF
+    DIM hand AS BOOLEAN : hand = strg AND wort <> ""
+    IF hand THEN
+        MOUSE_CURSOR("hand")
+    ELSEIF tippHand THEN
+        ' Die Hand des Programms bleibt stehen, bis es sie zurueckgibt --
+        ' danach entscheidet wieder die gui (Textstrich, Pfeil ...).
+        MOUSE_CURSOR("auto")
+    END IF
+    tippHand = hand
+
+    IF mx <> tippMx OR my <> tippMy THEN
+        tippRuhe = 0
+    ELSE
+        tippRuhe = tippRuhe + 1
+    END IF
+    tippMx = mx : tippMy = my
+    ' Steht die Maus auf einer unterstrichenen Stelle, gehoert die Meldung in
+    ' den Tooltip -- auch ueber einer Klammer, wo es kein Wort gibt.
+    DIM meldung AS STRING : meldung = meldungBei$(ta, z, s)
+    DIM stelle AS STRING : stelle = ""
+    IF wort <> "" THEN stelle = STR$(ta) + ":" + STR$(z) + ":" + STR$(anfang)
+    IF meldung <> "" THEN stelle = STR$(ta) + ":" + STR$(z) + ":m" + meldung
+    IF stelle <> tippStelle THEN
+        tippStelle = stelle
+        tippGefragt = FALSE
+        tippWeg()
+    END IF
+    IF stelle = "" OR tippGefragt OR tippRuhe < TIPP_RUHE THEN RETURN
+    tippGefragt = TRUE
+    DIM text AS STRING : text = ""
+    IF wort <> "" THEN text = tippText$(CODE_HOVER$(GUI_TEXT(ta), z, anfang, codeBasis$()))
+    IF meldung <> "" THEN
+        text = tippText$(meldung) + IIF(text <> "", NL + NL + text, "")
+        protokoll("tooltip meldung " + LEFT$(meldung, 30))
+    END IF
+    IF debugWertMoeglich() AND wort <> "" THEN
+        DIM wz AS ARRAY OF STRING : wz = SPLIT$(GUI_TEXT(ta), NL)
+        debugWertFragen(ta, ausdruckBeiWort$(wz[z - 1], wort, anfang), text)
+    END IF
+    pluginHoverFragen(ta, z, anfang, wort, text)
+    IF text = "" THEN RETURN
+    GUI_TOOLTIP(ta, text)
+    tippFeld = ta
+    protokoll("tooltip " + wort)
+END SUB
+
+' --- Abgelegte Dateien ---------------------------------------------------
+' Ins Fenster gezogen oder vom Finder uebergeben (macOS: Doppelklick auf eine
+' .dh, "Oeffnen mit" -- die Laufzeit reicht beides als FILES_DROPPED weiter,
+' siehe finder.rs). Eine Datei geht ueber dieselbe Weiche wie ein Klick im
+' Projektbaum, ein Ordner wird das Projekt. FILES_DROPPED gilt nur EIN Bild:
+' ist gerade ein Kasten offen, warten die Pfade, bis er zu ist -- ein Reiter,
+' der hinter einer Rueckfrage aufgeht, gehoerte zu keiner Antwort.
+DIM abgelegtWartend AS ARRAY OF STRING : abgelegtWartend = []
+SUB abgelegteNachziehen()
+    DIM i AS INTEGER
+    FOR i = 0 TO FILES_DROPPED() - 1
+        ARRAY_PUSH(abgelegtWartend, FILE_DROPPED(i))
+    NEXT
+    IF LEN(abgelegtWartend) = 0 OR GUI_MODAL() THEN RETURN
+    DIM liste AS ARRAY OF STRING : liste = abgelegtWartend
+    abgelegtWartend = []
+    FOR i = 0 TO LEN(liste) - 1
+        protokoll("abgelegt " + BASENAME(liste[i]))
+        IF DIREXISTS(liste[i]) THEN
+            projektOrdner = liste[i]
+            baumFuellen()
+            GUI_SET_TEXT(lblStatus, tr$("Projekt: ") + liste[i])
+            protokoll("projekt " + projektOrdner)
+        ELSE
+            dateiOeffnen(liste[i])
+        END IF
+    NEXT
+END SUB
+
+' --- Haltepunkt per Klick in die Nummernspalte ---------------------------
+' Links schaltet ihn um wie F9, rechts fragt nach einer Bedingung wie
+' Umschalt+F9 -- beides fuer die ANGEKLICKTE Zeile, die Marke bleibt stehen.
+' Jeder offene Reiter wird gefragt: in der geteilten Ansicht sind zwei zu
+' sehen, und ein Klick links gehoert der Datei links.
+SUB randKlicksNachziehen()
+    DIM t AS INTEGER
+    FOR t = 0 TO tabAnzahl - 1
+        DIM hz AS INTEGER : hz = GUI_TEXTAREA_HINT_CLICKED(reiter[t].feld)
+        IF hz > 0 THEN zaehlerKlick(reiter[t].feld, hz)
+        DIM z AS INTEGER : z = GUI_TEXTAREA_GUTTER_CLICKED(reiter[t].feld)
+        IF z > 0 THEN
+            protokoll("rand klick " + STR$(z))
+            haltepunktUmschaltenIn(reiter[t].pfad, z)
+        END IF
+        z = GUI_TEXTAREA_GUTTER_CLICKED(reiter[t].feld, 1)
+        IF z > 0 THEN
+            protokoll("rand rechts " + STR$(z))
+            haltepunktBedingungFragenIn(reiter[t].pfad, z)
+        END IF
+    NEXT
+END SUB
+
+' --- Vervollstaendigen -------------------------------------------------
+' `fokus` entscheidet, wer danach die Tasten bekommt. Beim Tippen bleibt
+' die Marke im Code-Feld -- sonst tippte man in die Liste weiter; Strg+Leer
+' holt sie dann herein, wenn man etwas auswaehlen will.
+SUB vervollstaendigen(fokus AS BOOLEAN)
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN
+    DIM z AS INTEGER
+    DIM s AS INTEGER
+    (z, s) = GUI_TEXTAREA_CURSOR(ta)
+    DIM q AS STRING : q = GUI_TEXT(ta)
+    DIM namen AS ARRAY OF STRING
+    namen = CODE_COMPLETE(q, z, s, codeBasis$())
+    ' Laenge des Praefixes links der Marke -- so viel wird beim Uebernehmen ersetzt.
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(q, NL)
+    DIM zeile AS STRING : zeile = zeilen[z - 1]
+    DIM k AS INTEGER : k = s - 1
+    vervollPraefixLaenge = 0
+    WHILE k > 0
+        DIM c AS STRING : c = MID$(zeile, k - 1, 1)
+        IF NOT (c = "_" OR (c >= "a" AND c <= "z") OR (c >= "A" AND c <= "Z") OR (c >= "0" AND c <= "9")) THEN BREAK
+        vervollPraefixLaenge = vervollPraefixLaenge + 1
+        k = k - 1
+    WEND
+    GUI_LISTBOX_CLEAR(lstVervoll)
+    DIM i AS INTEGER
+    ' Von selbst hinter einem Punkt nur, wenn Mitglieder kamen: weiss der
+    ' Uebersetzer die Klasse nicht, kommt die ganze Liste -- die soll nicht
+    ' hinter jedem Satzpunkt in einem Kommentar aufgehen.
+    IF NOT fokus AND nachPunkt() AND LEN(namen) > 100 THEN RETURN
+    FOR i = 0 TO MIN(LEN(namen), 200) - 1
+        GUI_LISTBOX_ADD(lstVervoll, namen[i])
+    NEXT
+    ' Plugins tragen spaeter bei (pluginVervollAntwort).
+    pluginVervollFragen(z, s, vorschlagWort$())
+    IF LEN(namen) = 0 THEN RETURN
+    GUI_LISTBOX_SET_SELECTED(lstVervoll, 0)
+    vervollFensterZeigen(fokus)
+END SUB
+
+' Die Liste an der Schreibmarke zeigen: darunter, und wenn dort kein Platz
+' ist, darueber.
+SUB vervollFensterZeigen(fokus AS BOOLEAN)
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN
+    DIM vx AS INTEGER : vx = breiteLinks + 40
+    DIM vy AS INTEGER : vy = 120
+    DIM mx AS INTEGER
+    DIM my AS INTEGER
+    DIM mh AS INTEGER
+    (mx, my, mh) = GUI_TEXTAREA_CARET_XY(ta)
+    IF mx >= 0 THEN
+        vx = MAX(0, MIN(mx, schirmB() - 330))
+        vy = my + mh + 2
+        IF vy + 240 > schirmH() THEN vy = MAX(0, my - 242)
+    END IF
+    GUI_WINDOW_SET_BOUNDS(winVervoll, vx, vy, 320, 240)
+    GUI_WINDOW_VISIBLE(winVervoll, TRUE)
+    ' Nach vorn -- auch wenn der Fokus beim Tippen im Code bleibt. Ohne das
+    ' lag die Liste hinter dem Hauptfenster und ging nur mit Strg+Leer auf
+    ' (dort holt der Fokus sie nach vorn).
+    GUI_WINDOW_FRONT(winVervoll)
+    protokoll("vorschlag offen " + STR$(vx) + " " + STR$(vy))
+    vervollOffen = TRUE
+    vervollWort = vorschlagWort$()
+    IF fokus THEN GUI_FOCUS(lstVervoll)
+END SUB
+
+SUB vervollSchliessen()
+    IF NOT vervollOffen THEN RETURN
+    GUI_WINDOW_VISIBLE(winVervoll, FALSE)
+    vervollOffen = FALSE
+    vervollWort = ""
+END SUB
+
+' Beim Tippen von selbst: ab drei Zeichen zeigt die Liste, was passt. Der
+' Fokus bleibt im Code-Feld -- die Liste ist ein Vorschlag, keine Sperre.
+SUB vervollNachziehen()
+    ' Nur beim TIPPEN: ein Klick mitten in ein vorhandenes Wort (oder ein
+    ' Pfeil dorthin) aendert den Wortanfang auch -- und oeffnete die Liste
+    ' bei jedem Klick in ein Wort ab drei Buchstaben, seit sie sichtbar ist.
+    DIM getippt AS BOOLEAN : getippt = vervollGetippt
+    vervollGetippt = FALSE
+    IF NOT vorschlagAn OR aktiverTab < 0 OR paletteOffen THEN RETURN
+    DIM wort AS STRING : wort = vorschlagWort$()
+    ' Grosse Datei: die Liste kommt erst, wenn das Wort kurz ruht --
+    ' CODE_COMPLETE liest den ganzen Text, bei 20000 Zeilen gut 10 ms je
+    ' getipptem Zeichen (Stresstest 2026-10-02). Weitergetippt = neu warten,
+    ' die Marke woanders hin = nicht mehr warten.
+    DIM freigegeben AS BOOLEAN : freigegeben = FALSE
+    IF vervollWartet THEN
+        IF getippt THEN
+            vervollKandidat = wort
+            vervollFaellig = GET_TIME() + 0.25
+            RETURN
+        END IF
+        IF wort <> vervollKandidat THEN
+            vervollWartet = FALSE
+        ELSEIF GET_TIME() < vervollFaellig THEN
+            RETURN
+        ELSE
+            vervollWartet = FALSE
+            getippt = TRUE
+            freigegeben = TRUE
+            vervollWort = ""
+        END IF
+    END IF
+    IF wort = vervollAus THEN RETURN
+    vervollAus = "-"
+    IF LEN(wort) < 3 AND LEFT$(wort, 1) <> "." THEN
+        vervollSchliessen()
+        RETURN
+    END IF
+    IF wort = vervollWort THEN RETURN
+    IF NOT getippt THEN
+        ' Die Marke steht jetzt woanders -- eine offene Liste gehoerte zum
+        ' vorigen Wort.
+        vervollSchliessen()
+        RETURN
+    END IF
+    IF GUI_FOCUSED() <> aktivesFeld() THEN RETURN
+    IF NOT freigegeben AND LEN(GUI_TEXT(aktivesFeld())) > 50000 THEN
+        vervollWartet = TRUE
+        vervollKandidat = wort
+        vervollFaellig = GET_TIME() + 0.25
+        RETURN
+    END IF
+    vervollstaendigen(FALSE)
+END SUB
+
+' --- Signatur-Platzhalter und der dreifache Tabulator ------------------
+' Wer `CIRCLE` vervollstaendigt, bekommt `CIRCLE(x, y, r)` mit `x`
+' markiert: tippen ersetzt es, Tabulator geht zum naechsten. Die Namen
+' stehen in der Signatur -- dieselbe, die die Statuszeile zeigt.
+'
+' Gemerkt wird dafuer NICHTS als ein Schalter. Wo der naechste Platzhalter
+' steht, rechnet der Sprung jedes Mal neu aus dem Text: eine Buchfuehrung
+' ueber Stellen liefe beim ersten Tippen auseinander, und genau tippen
+' will man ja.
+DIM platzhalterAn AS BOOLEAN : platzhalterAn = FALSE
+
+' Die Argumentnamen einer Signatur, oder ein leeres Feld.
+' Optionales (alles ab `[`) faellt weg -- ein Platzhalter, den man meist
+' wieder loescht, ist keiner.
+FUNCTION signaturArgs(quelle AS STRING, z AS INTEGER, s AS INTEGER, mitOptionalen AS BOOLEAN = FALSE, basis AS STRING = "") AS ARRAY OF STRING
+    DIM leer AS ARRAY OF STRING : leer = []
+    DIM md AS STRING : md = ""
+    TRY
+        ' Mit Ordner kennt der Hover hinter `objekt.` die Klasse -- dafuer
+        ' uebersetzt er den Text, also nur, wo es um EINE Stelle geht.
+        IF basis <> "" THEN md = CODE_HOVER$(quelle, z, s, basis) ELSE md = CODE_HOVER$(quelle, z, s)
+    CATCH e
+        RETURN leer
+    END TRY
+    IF md = "" THEN RETURN leer
+    ' Die erste Zeile im Code-Block ist die Signatur.
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(md, NL)
+    DIM sig AS STRING : sig = ""
+    DIM zl AS STRING
+    FOR EACH zl IN zeilen
+        IF LEFT$(zl, 3) = "```" OR TRIM$(zl) = "" THEN CONTINUE
+        sig = TRIM$(zl)
+        BREAK
+    NEXT
+    RETURN signaturNamen(sig, mitOptionalen)
+END FUNCTION
+
+' Die Parameternamen aus einer Signaturzeile (`NAME(a, b [, c])` aus dem
+' Hover, oder die Kopfzeile einer SUB/FUNCTION aus dem Quelltext).
+FUNCTION signaturNamen(sig AS STRING, mitOptionalen AS BOOLEAN) AS ARRAY OF STRING
+    DIM leer AS ARRAY OF STRING : leer = []
+    DIM auf AS INTEGER : auf = INSTR(sig, "(")
+    DIM zu AS INTEGER : zu = INSTR(sig, ")")
+    IF auf < 0 OR zu < auf THEN RETURN leer
+    DIM innen AS STRING : innen = MID$(sig, auf + 1, zu - auf - 1)
+    DIM opt AS INTEGER : opt = INSTR(innen, "[")
+    ' Fuer einen Hinweis zaehlen die optionalen mit (ohne Klammern) -- ein
+    ' Aufruf mit drei Argumenten und zwei Namen daneben fuehrte in die Irre.
+    IF mitOptionalen THEN
+        innen = REPLACE$(REPLACE$(innen, "[", ""), "]", "")
+    ELSEIF opt >= 0 THEN
+        innen = LEFT$(innen, opt)
+    END IF
+    IF TRIM$(innen) = "" THEN RETURN leer
+    ' `NAME(*args)` und `NAME(6..8 Argumente)` sind keine Namen.
+    IF INSTR(innen, "*") >= 0 OR INSTR(innen, "Argumente") >= 0 THEN RETURN leer
+    DIM raus AS ARRAY OF STRING : raus = []
+    DIM stueck AS STRING
+    FOR EACH stueck IN SPLIT$(innen, ",")
+        DIM t AS STRING : t = TRIM$(stueck)
+        IF LEFT$(UPPER$(t), 6) = "BYREF " THEN t = TRIM$(MID$(t, 6))
+        DIM als AS INTEGER : als = INSTR(UPPER$(t), " AS ")
+        IF als >= 0 THEN t = TRIM$(LEFT$(t, als))
+        ' Die gepflegten Texte schreiben `n: INTEGER` -- der Typ gehoert
+        ' nicht zum Namen (sonst stand `SETFPS(n: INTEGER)` neben
+        ' `GUI_LABEL(win, text$, ...)`).
+        DIM dp AS INTEGER : dp = INSTR(t, ":")
+        IF dp >= 0 THEN t = TRIM$(LEFT$(t, dp))
+        DIM gl AS INTEGER : gl = INSTR(t, "=")
+        IF gl >= 0 THEN t = TRIM$(LEFT$(t, gl))
+        IF t = "" THEN RETURN leer
+        ARRAY_PUSH(raus, t)
+    NEXT
+    RETURN raus
+END FUNCTION
+
+' Den naechsten Platzhalter des Aufrufs um die Marke markieren.
+' FALSE heisst: hier ist keiner mehr, der Tabulator soll etwas anderes tun.
+FUNCTION platzhalterSprung() AS BOOLEAN
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN FALSE
+    DIM z AS INTEGER
+    DIM s AS INTEGER
+    (z, s) = GUI_TEXTAREA_CURSOR(ta)
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(GUI_TEXT(ta), NL)
+    IF z < 1 OR z > LEN(zeilen) THEN RETURN FALSE
+    DIM zeile AS STRING : zeile = zeilen[z - 1]
+    DIM name AS STRING
+    DIM sp AS INTEGER
+    DIM arg AS INTEGER
+    (name, sp, arg) = aufrufUmDieMarke(zeile, s)
+    IF name = "" THEN RETURN FALSE
+    ' `sp` ist die 1-basierte Spalte des Namens, `argsZerlegen` rechnet
+    ' 0-basiert -- die Klammer steht hinter dem Namen.
+    DIM auf AS INTEGER : auf = sp - 1 + LEN(name)
+    WHILE auf < LEN(zeile) AND MID$(zeile, auf, 1) = " "
+        auf = auf + 1
+    WEND
+    IF MID$(zeile, auf, 1) <> "(" THEN RETURN FALSE
+    DIM von AS ARRAY OF INTEGER : von = []
+    DIM bis AS ARRAY OF INTEGER : bis = []
+    DIM zu AS INTEGER : zu = argsZerlegen(zeile, auf, von, bis)
+    IF zu < 0 THEN RETURN FALSE
+    DIM k AS INTEGER : k = arg + 1
+    IF k >= LEN(von) THEN
+        ' Hinter dem letzten: die Marke hinter die Klammer, Schalter aus.
+        GUI_TEXTAREA_GOTO(ta, z, zu + 2)
+        RETURN FALSE
+    END IF
+    GUI_TEXTAREA_SELECT(ta, z, randLinks(zeile, von[k]) + 1, z, bis[k] + 1)
+    protokoll("platzhalter " + STR$(k + 1) + " von " + STR$(LEN(von)))
+    RETURN TRUE
+END FUNCTION
+
+' Der erste Nicht-Leerraum ab `p` (0-basiert) -- damit die Markierung nicht
+' das Leerzeichen hinter dem Komma mitnimmt.
+FUNCTION randLinks(zeile AS STRING, p AS INTEGER) AS INTEGER
+    DIM i AS INTEGER : i = p
+    WHILE i < LEN(zeile) AND (MID$(zeile, i, 1) = " " OR MID$(zeile, i, 1) = CHR$(9))
+        i = i + 1
+    WEND
+    RETURN i
+END FUNCTION
+
+' Der Tabulator, alle drei Bedeutungen in ihrer Reihenfolge.
+SUB tabulator()
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN
+    ' 1. Steht ein Platzhalter an, geht es zum naechsten.
+    IF platzhalterAn THEN
+        IF platzhalterSprung() THEN RETURN
+        platzhalterAn = FALSE
+    END IF
+    ' 2. Eine Abkuerzung links der Marke klappt ihren Schnipsel auf.
+    DIM wort AS STRING : wort = LOWER$(wortAnfang$())
+    IF wort <> "" THEN
+        DIM k AS INTEGER : k = schnipselNr(wort)
+        IF k >= 0 THEN
+            schnipselEinfuegen(k, LEN(schnipselListe[k].abk))
+            RETURN
+        END IF
+    END IF
+    ' 3. Sonst einruecken. Mehrere Zeilen markiert: der ganze Block --
+    ' frueher ersetzte der Tabulator die Auswahl durch Leerzeichen.
+    DIM z1 AS INTEGER
+    DIM s1 AS INTEGER
+    DIM z2 AS INTEGER
+    DIM s2 AS INTEGER
+    (z1, s1, z2, s2) = GUI_TEXTAREA_SELECTION_RANGE(ta)
+    IF z2 > z1 THEN
+        einruecken(1)
+        RETURN
+    END IF
+    ' Bis zur naechsten Spalte, nicht stur vier Leerzeichen: sonst steht die
+    ' Einrueckung schief, sobald man mitten in der Zeile tabbt.
+    DIM z AS INTEGER
+    DIM s AS INTEGER
+    (z, s) = GUI_TEXTAREA_CURSOR(ta)
+    DIM n AS INTEGER : n = 4 - ((s - 1) MOD 4)
+    GUI_TEXTAREA_INSERT(ta, SPACE$(n))
+END SUB
+
+SUB vervollUebernehmen()
+    DIM sel AS INTEGER : sel = GUI_LISTBOX_SELECTED(lstVervoll)
+    vervollSchliessen()
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN
+    IF sel >= 0 THEN
+        DIM z AS INTEGER
+        DIM s AS INTEGER
+        (z, s) = GUI_TEXTAREA_CURSOR(ta)
+        DIM name AS STRING : name = GUI_LISTBOX_ITEM(lstVervoll, sel)
+        ' Hinter `AS` steht ein TYP: `DIM w AS GUI_WINDOW(title, ...)` waere
+        ' ein Fehler, obwohl es einen Befehl dieses Namens gibt. Folgt schon
+        ' eine Klammer, kaeme sie doppelt.
+        DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(GUI_TEXT(ta), NL)
+        DIM vor AS STRING : vor = LEFT$(zeilen[z - 1], s - 1 - vervollPraefixLaenge)
+        DIM nach AS STRING : nach = MID$(zeilen[z - 1], s - 1, 1)
+        DIM ohneGeruest AS BOOLEAN : ohneGeruest = REGEX_TEST(vor, "(?i)\bAS\s+$") OR nach = "("
+        GUI_TEXTAREA_SELECT(ta, z, s - vervollPraefixLaenge, z, s)
+        GUI_TEXTAREA_INSERT(ta, name)
+        protokoll("vervollstaendigt " + name)
+        ' Hat der Name eine Signatur mit Argumenten, kommt sie als Geruest
+        ' mit -- und der erste Platzhalter ist markiert.
+        DIM nz AS INTEGER
+        DIM ns AS INTEGER
+        (nz, ns) = GUI_TEXTAREA_CURSOR(ta)
+        DIM args AS ARRAY OF STRING : args = []
+        IF NOT ohneGeruest THEN args = signaturArgs(GUI_TEXT(ta), nz, MAX(1, ns - 1), FALSE, IIF(RIGHT$(vor, 1) = ".", codeBasis$(), ""))
+        IF LEN(args) > 0 THEN
+            GUI_TEXTAREA_INSERT(ta, "(" + JOIN$(args, ", ") + ")")
+            GUI_TEXTAREA_SELECT(ta, nz, ns + 1, nz, ns + 1 + LEN(args[0]))
+            platzhalterAn = TRUE
+            GUI_SET_TEXT(lblStatus, name + ": " + STR$(LEN(args)) + _
+                         " Argument(e) -- tippen ersetzt, Tabulator geht zum nächsten.")
+            protokoll("platzhalter 1 von " + STR$(LEN(args)))
+        END IF
+    END IF
+    GUI_FOCUS(ta)
+END SUB

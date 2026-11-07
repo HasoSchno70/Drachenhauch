@@ -1311,6 +1311,37 @@ fn sammlung_laufen(exe: &std::path::Path, pfad: &std::path::Path, filter: Option
                         let _ = std::fs::create_dir_all(&pdir);
                         let name = orig.file_name().map(|n| n.to_os_string()).unwrap_or_else(|| "programm.dh".into());
                         let ziel = pdir.join(name);
+                        // Was das Programm per IMPORT einbindet, kommt mit, am
+                        // selben Platz relativ zur Kopie -- auch das, was diese
+                        // Dateien einbinden. Nur innerhalb des Fallordners;
+                        // eine Beilage gleichen Namens wird danach geschrieben
+                        // und gewinnt.
+                        let mut offen: Vec<(std::path::PathBuf, std::path::PathBuf, String)> =
+                            vec![(orig.parent().map(|p| p.to_path_buf()).unwrap_or_default(), pdir.clone(), neu.clone())];
+                        let mut gesehen: std::collections::HashSet<std::path::PathBuf> = Default::default();
+                        while let Some((von_dir, nach_dir, inhalt)) = offen.pop() {
+                            for rel in pruefsammlung::importierte_dateien(&inhalt) {
+                                let q = von_dir.join(&rel);
+                                let z = nach_dir.join(&rel);
+                                let Ok(qk) = std::fs::canonicalize(&q) else { continue };
+                                if !gesehen.insert(qk) { continue; }
+                                let Ok(t) = std::fs::read_to_string(&q) else { continue };
+                                // ".." von Hand aufloesen: nichts ausserhalb des
+                                // Fallordners anlegen, auch keinen Ordner.
+                                let mut norm = std::path::PathBuf::new();
+                                for k in z.components() {
+                                    match k { std::path::Component::ParentDir => { norm.pop(); }
+                                              std::path::Component::CurDir => {}
+                                              k => norm.push(k) }
+                                }
+                                if !norm.starts_with(&dir) { continue; }
+                                let z = norm;
+                                if let Some(e) = z.parent() { let _ = std::fs::create_dir_all(e); }
+                                std::fs::write(&z, &t).map_err(|e| e.to_string())?;
+                                offen.push((q.parent().map(|p| p.to_path_buf()).unwrap_or_default(),
+                                            z.parent().map(|p| p.to_path_buf()).unwrap_or_default(), t));
+                            }
+                        }
                         std::fs::write(&ziel, neu).map_err(|e| e.to_string())?;
                         ziel
                     }
@@ -1825,6 +1856,7 @@ fn compile_source_mit<T>(raw_source: &str, base: &std::path::Path, label: &str,
     }
     match uebersetze(&ast, &ext_types, &aliases, &module, &herkunft, label) {
         Ok((j, warns)) => {
+            let warns = lsp::verdeckung_filtern(warns, &source);
             // Nicht-fatale Compile-Warnungen (z.B. unbekanntes Builtin) vor dem
             // Lauf auf stderr -- der Lauf geht weiter, schlaegt aber spaeter ggf.
             // beim Aufruf fehl.
@@ -2154,6 +2186,7 @@ fn check_source_roh(raw_source: &str, base: &std::path::Path, label: &str) -> Ve
         // der Editor das schon auf der IMPORT-Zeile markiert (nicht erst beim
         // Lauf). Leer, wenn kein solches Modul importiert wird.
         Ok((_, warns)) => {
+            let warns = lsp::verdeckung_filtern(warns, &source);
             let mut diags: Vec<serde_json::Value> =
                 preprocess::missing_hardware_imports_with_lines(raw_source).into_iter()
                     .map(|(line, m)| serde_json::json!({

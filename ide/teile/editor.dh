@@ -1,0 +1,1473 @@
+' ide/teile/editor.dh -- ein Teil der IDE (ide/ide.dh), dort per IMPORT
+' an genau dieser Stelle eingebunden: Reiter, Einstellungen-Fenster, Nachschlagen, Peek, Farbwaehler, geteilte Ansicht, Karte, Faltung, Projektbaum.
+' Kein eigenes Programm -- die Namen gehoeren der IDE.
+
+' --- Reiter ------------------------------------------------------------
+SUB reiterNeuSetzen()
+    DIM titel[MAX(tabAnzahl, 1)] AS STRING
+    DIM i AS INTEGER
+    FOR i = 0 TO tabAnzahl - 1
+        DIM t AS STRING
+        t = reiter[i].name$()
+        IF reiter[i].geaendert() THEN t = t + " *"
+        titel[i] = t
+    NEXT
+    IF tabAnzahl = 0 THEN titel[0] = "Drachenhauch"
+    GUI_TABS(win, titel)
+    IF aktiverTab >= 0 THEN GUI_SET_ACTIVE_TAB(win, aktiverTab)
+END SUB
+
+' Den Schriftzug hinter ein Code-Feld legen (oder wegnehmen). Ein
+' Wasserzeichen ist nur eins, solange man ueber ihm liest, ohne es zu
+' sehen: mit 22 bzw. 24 stand der Drache auf dem hellen Thema so kraeftig
+' hinter dem Code, dass die Buchstaben auf ihm flimmerten. Auf dem hellen
+' Thema ist er jetzt der LEISERE -- bunte Farbe auf Weiss faellt mehr auf
+' als auf Dunkelgrau.
+SUB wasserzeichenSetzen(ta AS GUI_WIDGET)
+    IF wasserzeichenAn AND hgBild >= 0 THEN
+        GUI_TEXTAREA_BACKGROUND(ta, hgBild, IIF(hell, 10, 14))
+    ELSE
+        GUI_TEXTAREA_BACKGROUND(ta, -1)
+    END IF
+END SUB
+
+SUB wasserzeichenAlle()
+    DIM i AS INTEGER
+    FOR i = 0 TO tabAnzahl - 1
+        wasserzeichenSetzen(reiter[i].feld)
+    NEXT
+    IF taSpiegel >= 0 THEN wasserzeichenSetzen(taSpiegel)
+    protokoll("wasserzeichen " + IIF(wasserzeichenAn AND hgBild >= 0, "an", "aus"))
+END SUB
+
+SUB uiSchrift(groesse AS INTEGER)
+    uiGroesse = MAX(12, MIN(22, groesse))
+    IF uiFont >= 0 THEN TEXT_SIZE(uiGroesse)
+    protokoll("uischrift " + STR$(uiGroesse))
+END SUB
+
+SUB feldEinrichten(ta AS GUI_WIDGET)
+    wasserzeichenSetzen(ta)
+    IF codeFont >= 0 THEN GUI_SET_FONT(ta, codeFont)
+    GUI_SET_FONT_SIZE(ta, codeGroesse)
+    GUI_TEXTAREA_SET(ta, "zeilennummern", 1)
+    GUI_TEXTAREA_SET(ta, "aktive_zeile", 1)
+    GUI_TEXTAREA_SET(ta, "tab_fuegt_ein", 1)
+    GUI_TEXTAREA_SET(ta, "tabbreite", 4)
+    GUI_TEXTAREA_SET(ta, "umbruch", IIF(umbruchAn, 1, 0))
+    GUI_TEXTAREA_SET(ta, "einzugslinien", IIF(linienAn, 1, 0))
+    GUI_TEXTAREA_SET(ta, "kopfzeilen", IIF(kopfAn, 3, 0))
+    GUI_TEXTAREA_SET(ta, "hinweise_klickbar", 1)
+    ' Einrueckung beim Umbruch: die Laufzeit uebernimmt die der laufenden
+    ' Zeile, die Woerter der SPRACHE kommen von hier. `THEN` steht in der
+    ' Ende-Liste, weil `IF x THEN y = 1` sonst auch einruecken wuerde.
+    GUI_TEXTAREA_SET(ta, "auto_einzug", 1)
+    ' Der Tabulator klappt einen Schnipsel auf, wenn sein Kuerzel links der
+    ' Marke steht -- sonst rueckt er ein wie immer.
+    ' Der Tabulator gehoert seit Stand 14 der IDE: er hat drei Bedeutungen
+    ' (zum naechsten Platzhalter, Schnipsel aufklappen, einruecken), und nur
+    ' sie kennt die Reihenfolge. Darum `tab_meldet` statt GUI_TEXTAREA_ABBREV
+    ' -- das Feld entschiede sonst die ersten beiden selbst.
+    GUI_TEXTAREA_SET(ta, "tab_meldet", 1)
+    GUI_TEXTAREA_INDENT_WORDS(ta, _
+        ["SUB", "FUNCTION", "CLASS", "STRUCT", "PROPERTY", "OPERATOR", "FOR", _
+         "WHILE", "REPEAT", "DO", "SELECT", "CASE", "TRY", "WITH", "ELSE", _
+         "ELSEIF", "ELIF", "CATCH", "FINALLY", "ENUM"], _
+        ["THEN"], _
+        ["END", "NEXT", "WEND", "UNTIL", "LOOP", "ELSE", "ELSEIF", "ELIF", _
+         "CATCH", "FINALLY", "CASE"])
+    geruestSetzenAn(ta)
+    klammernSetzenAn(ta)
+END SUB
+
+SUB klammernSetzenAn(ta AS GUI_WIDGET)
+    GUI_TEXTAREA_PAIRS(ta, IIF(klammernAn, "()[]{}" + CHR$(34) + CHR$(34), ""))
+END SUB
+
+SUB klammernSetzen(an AS BOOLEAN)
+    klammernAn = an
+    DIM i AS INTEGER
+    FOR i = 0 TO tabAnzahl - 1
+        klammernSetzenAn(reiter[i].feld)
+    NEXT
+    konfigSichern()
+    GUI_SET_TEXT(lblStatus, IIF(an, tr$("Klammern schließen an."), tr$("Klammern schließen aus.")))
+    protokoll("klammern " + IIF(an, "an", "aus"))
+END SUB
+
+' Das Geruest, das mitwaechst: wer `IF x > 0 THEN` schreibt und Enter
+' drueckt, bekommt das `END IF` gleich mit und steht dazwischen.
+'
+' Die Paare stehen HIER und nicht in der Laufzeit -- sie kennt keine
+' Sprache. `CASE`, `ELSE` und `ELSEIF` fehlen mit Absicht: sie ruecken zwar
+' ein, schliessen aber nichts, ihr `END` gehoert dem `SELECT` bzw. `IF`
+' darueber. `REPEAT` bekommt `UNTIL TRUE`, weil ein nacktes `UNTIL` nicht
+' uebersetzt -- ein Geruest, das den Fehlerstrich anwirft, ist keins.
+SUB geruestSetzenAn(ta AS GUI_WIDGET)
+    IF NOT geruestAn THEN
+        GUI_TEXTAREA_CLOSE_WORDS(ta, [], [])
+        RETURN
+    END IF
+    GUI_TEXTAREA_CLOSE_WORDS(ta, _
+        ["IF", "SUB", "FUNCTION", "CLASS", "STRUCT", "PROPERTY", "OPERATOR", _
+         "FOR", "WHILE", "REPEAT", "DO", "SELECT", "TRY", "WITH", "ENUM"], _
+        ["END IF", "END SUB", "END FUNCTION", "END CLASS", "END STRUCT", _
+         "END PROPERTY", "END OPERATOR", "NEXT", "WEND", "UNTIL TRUE", "LOOP", _
+         "END SELECT", "END TRY", "END WITH", "END ENUM"])
+END SUB
+
+SUB geruestSetzen(an AS BOOLEAN)
+    geruestAn = an
+    DIM i AS INTEGER
+    FOR i = 0 TO tabAnzahl - 1
+        geruestSetzenAn(reiter[i].feld)
+    NEXT
+    konfigSichern()
+    GUI_SET_TEXT(lblStatus, IIF(an, tr$("Gerüst beim Tippen an."), tr$("Gerüst beim Tippen aus.")))
+    protokoll("geruest " + IIF(an, "an", "aus"))
+END SUB
+
+' Einrueckungslinien: ein Strich je Stufe, unter dem Text. Wie der Umbruch
+' fuer ALLE Reiter.
+SUB linienSetzen(an AS BOOLEAN)
+    linienAn = an
+    GUI_MENU_CHECK(miLinien, an)
+    DIM i AS INTEGER
+    FOR i = 0 TO tabAnzahl - 1
+        GUI_TEXTAREA_SET(reiter[i].feld, "einzugslinien", IIF(an, 1, 0))
+    NEXT
+    GUI_SET_TEXT(lblStatus, IIF(an, tr$("Einrückungslinien an."), tr$("Einrückungslinien aus.")))
+    protokoll("linien " + IIF(an, "an", "aus"))
+    konfigSichern()
+END SUB
+
+' Mitlaufender Blockkopf, wie die Linien fuer ALLE Reiter (und die
+' geteilte Ansicht). Welche Zeilen Bloecke sind, sagt dieselbe Liste wie
+' fuer die Faltung.
+SUB kopfSetzen(an AS BOOLEAN)
+    kopfAn = an
+    GUI_MENU_CHECK(miKopf, an)
+    DIM i AS INTEGER
+    FOR i = 0 TO tabAnzahl - 1
+        GUI_TEXTAREA_SET(reiter[i].feld, "kopfzeilen", IIF(an, 3, 0))
+    NEXT
+    IF taSpiegel >= 0 THEN GUI_TEXTAREA_SET(taSpiegel, "kopfzeilen", IIF(an, 3, 0))
+    GUI_SET_TEXT(lblStatus, IIF(an, tr$("Mitlaufender Blockkopf an."), tr$("Mitlaufender Blockkopf aus.")))
+    protokoll("blockkopf " + IIF(an, "an", "aus"))
+    konfigSichern()
+END SUB
+
+' Der Umbruch gilt fuer ALLE Reiter, nicht nur den vorderen -- ein Schalter,
+' der je Datei etwas anderes tut, ist einer, den man vergisst.
+SUB umbruchSetzen(an AS BOOLEAN)
+    umbruchAn = an
+    GUI_MENU_CHECK(miUmbruch, an)
+    ' Der Knopf in der Leiste kippt sich beim Klick selbst -- gesetzt wird er
+    ' trotzdem hier, damit Menue, Kuerzel und Einstellungen ihn mitnehmen.
+    GUI_TOOLBAR_SET_CHECKED(leiste, wzUmbruch, an)
+    DIM i AS INTEGER
+    FOR i = 0 TO tabAnzahl - 1
+        GUI_TEXTAREA_SET(reiter[i].feld, "umbruch", IIF(an, 1, 0))
+    NEXT
+    GUI_SET_TEXT(lblStatus, IIF(an, tr$("Zeilenumbruch an."), tr$("Zeilenumbruch aus.")))
+    GUI_STATUSBAR_SET(lblStatus, sfUmbruch, IIF(an, tr$("Umbruch an"), tr$("Umbruch aus")))
+    konfigSichern()
+END SUB
+
+' --- Einstellungen ----------------------------------------------------
+' Was im Ueber-Kasten steht. Die Fassung kommt von der LAUFZEIT (VERSION$),
+' nicht aus einem Text im Quelltext -- der stand hier auf "Stand 7", als die
+' IDE laengst weiter war.
+FUNCTION ueberText$() AS STRING
+    RETURN "Drachenhauch-IDE -- geschrieben in Drachenhauch." + NL + _
+           "Laufzeit: dhrt " + VERSION$() + NL + _
+           "Handbuch: " + docsOrdner + NL + _
+           "Beispiele: " + beispielOrdner
+END FUNCTION
+
+' Das Info-Fenster: Symbol und Schriftzug aus daten/bilder, darunter der
+' Text. Ein eigenes Fenster statt GUI_DIALOG, weil ein Dialog nur Text kennt.
+DIM winUeber AS GUI_WINDOW : winUeber = GUI_WINDOW(tr$("Über Drachenhauch"), 400, 150, 480, 330)
+GUI_WINDOW_VISIBLE(winUeber, FALSE)
+DIM ueberBilder AS INTEGER : ueberBilder = 0
+IF FILEEXISTS(PATHJOIN(bilderOrdner, "logo.png")) THEN
+    DIM imgUeberLogo AS GUI_WIDGET
+    imgUeberLogo = GUI_IMAGE(winUeber, 16, 16, 112, 112, IMAGE_SCALE(LOADIMAGE(PATHJOIN(bilderOrdner, "logo.png")), 112, 112))
+    ueberBilder = ueberBilder + 1
+END IF
+IF FILEEXISTS(PATHJOIN(bilderOrdner, "schriftzug.png")) THEN
+    DIM imgUeberZug AS GUI_WIDGET
+    imgUeberZug = GUI_IMAGE(winUeber, 144, 16, 300, 140, bildEingepasst(PATHJOIN(bilderOrdner, "schriftzug.png"), 300, 140))
+    GUI_IMAGE_MODE(imgUeberZug, "mitte")
+    ueberBilder = ueberBilder + 1
+END IF
+DIM lblUeber AS GUI_WIDGET : lblUeber = GUI_LABEL(winUeber, "", 16, 168)
+GUI_SET_WRAP(lblUeber, 448)
+DIM btnUeberOk AS GUI_WIDGET : btnUeberOk = GUI_BUTTON(winUeber, tr$("OK"), 364, 256, 100, 30)
+GUI_WINDOW_DEFAULT(winUeber, btnUeberOk)
+GUI_WINDOW_CANCEL(winUeber, btnUeberOk)
+DIM ueberOffen AS BOOLEAN : ueberOffen = FALSE
+
+SUB ueberZeigen()
+    GUI_SET_TEXT(lblUeber, ueberText$())
+    GUI_WINDOW_SET_BOUNDS(winUeber, (schirmB() - 480) \ 2, 150, 480, 330)
+    GUI_WINDOW_VISIBLE(winUeber, TRUE)
+    GUI_WINDOW_MODAL(winUeber, TRUE)
+    GUI_FOCUS(btnUeberOk)
+    ueberOffen = TRUE
+    protokoll("ueber " + VERSION$())
+    protokoll("ueber bilder " + STR$(ueberBilder))
+END SUB
+
+' Die Vorspann-Videos: jede .mp4 in daten/video, nach Namen.
+FUNCTION vorspannListe() AS ARRAY OF STRING
+    DIM raus AS ARRAY OF STRING : raus = []
+    ' FILEEXISTS kennt nur Dateien -- ein fehlender Ordner ist ein Fehler
+    ' von DIRLIST, und dann gibt es eben keinen Vorspann.
+    TRY
+        DIM n AS STRING
+        FOR EACH n IN DIRLIST(vorspannOrdner, "*.mp4")
+            ARRAY_PUSH(raus, BASENAME(n))
+        NEXT
+    CATCH e
+        RETURN raus
+    END TRY
+    SORT(raus)
+    RETURN raus
+END FUNCTION
+
+' Wie ein Vorspann in der Auswahl heisst: der Dateiname ohne Endung,
+' "_" als Leerzeichen, vorn gross -- "vorspann_2.mp4" wird "Vorspann 2".
+FUNCTION vorspannName$(datei AS STRING) AS STRING
+    DIM n AS STRING : n = datei
+    IF LOWER$(RIGHT$(n, 4)) = ".mp4" THEN n = LEFT$(n, LEN(n) - 4)
+    n = REPLACE$(n, "_", " ")
+    IF n = "" THEN RETURN datei
+    RETURN UPPER$(LEFT$(n, 1)) + MID$(n, 1, LEN(n))
+END FUNCTION
+
+' Ein Video auf der ganzen Flaeche, eingepasst (schwarze Raender, wo das
+' Seitenverhaeltnis nicht passt). Jede Taste und jeder Klick
+' ueberspringt, das Kreuz liefert "kreuz". Kann dieser Bau keine Videos
+' oder ist die Datei kaputt, steht es im Protokoll, und es geht weiter.
+FUNCTION vorspannSpielen(pfad AS STRING) AS STRING
+    DIM vspWeg AS STRING : vspWeg = ""
+    TRY
+        DIM vsp AS VIDEO : vsp = VIDEO_LOAD(pfad)
+        VIDEO_PLAY(vsp)
+        WHILE vspWeg = ""
+            IF WINDOW_CLOSE_REQUESTED() THEN vspWeg = "kreuz"
+            IF QUITREQUESTED() AND vspWeg = "" THEN vspWeg = "ende"
+            IF KEY_ANY_HIT() >= 0 OR MOUSE_HIT(0) OR MOUSE_HIT(1) THEN vspWeg = "uebersprungen"
+            DIM vsb AS INTEGER : vsb = SCREENWIDTH()
+            DIM vsh AS INTEGER : vsh = SCREENHEIGHT()
+            DIM vsm AS FLOAT : vsm = MIN(vsb / VIDEO_WIDTH(vsp), vsh / VIDEO_HEIGHT(vsp))
+            DIM vw AS INTEGER : vw = INT(VIDEO_WIDTH(vsp) * vsm)
+            DIM vh AS INTEGER : vh = INT(VIDEO_HEIGHT(vsp) * vsm)
+            CLS(0)
+            VIDEO_DRAW(vsp, (vsb - vw) \ 2, (vsh - vh) \ 2, vw, vh)
+            FLIP()
+            IF VIDEO_DONE(vsp) AND vspWeg = "" THEN vspWeg = "zu ende"
+        WEND
+        protokoll("vorspann " + vspWeg + " bei bild " + STR$(VIDEO_FRAME(vsp)))
+        VIDEO_FREE(vsp)
+    CATCH e
+        protokoll("vorspann fehler " + e)
+    END TRY
+    RETURN vspWeg
+END FUNCTION
+
+' Die Klappliste der Einstellungen: jeder Vorspann, dann "Abwechselnd".
+SUB vorspannAuswahlFuellen()
+    GUI_LISTBOX_CLEAR(ddVorspann)
+    DIM liste AS ARRAY OF STRING : liste = vorspannListe()
+    DIM n AS STRING
+    DIM wahl AS INTEGER : wahl = 0
+    DIM i AS INTEGER : i = 0
+    FOR EACH n IN liste
+        GUI_LISTBOX_ADD(ddVorspann, vorspannName$(n))
+        IF LOWER$(n) = LOWER$(vorspannDatei) THEN wahl = i
+        i = i + 1
+    NEXT
+    GUI_LISTBOX_ADD(ddVorspann, "Abwechselnd")
+    IF LOWER$(vorspannDatei) = "abwechselnd" THEN wahl = LEN(liste)
+    GUI_DROPDOWN_SET_SELECTED(ddVorspann, wahl)
+    vorspannWahlStand = wahl
+END SUB
+
+' Die Stufe der Klappliste, die einem Massstab am naechsten liegt (0 =
+' "wie das System"). Ein krummer Wert von Hand faellt auf die naechste.
+FUNCTION massStufe(m AS FLOAT) AS INTEGER
+    IF m <= 0.0 THEN RETURN 0
+    DIM best AS INTEGER : best = 1
+    DIM k AS INTEGER
+    FOR k = 2 TO LEN(MASS_STUFEN) - 1
+        IF ABS(MASS_STUFEN[k] - m) < ABS(MASS_STUFEN[best] - m) THEN best = k
+    NEXT
+    RETURN best
+END FUNCTION
+
+FUNCTION prozent$(m AS FLOAT) AS STRING
+    RETURN STR$(INT(m * 100.0 + 0.5)) + " %"
+END FUNCTION
+
+SUB massHinweisSetzen()
+    DIM t AS STRING : t = tr$("Jetzt: ") + prozent$(uiMassstab)
+    DIM soll AS FLOAT : soll = massEinst
+    IF soll <= 0.0 THEN soll = MAX(0.5, MIN(4.0, INT(WINDOW_DPI_X() * 4.0 + 0.5) / 4.0))
+    IF ABS(soll - uiMassstab) > 0.01 THEN t = t + tr$(" -- nach dem Neustart: ") + prozent$(soll)
+    GUI_SET_TEXT(lblMassHinweis, t)
+END SUB
+
+SUB einstellungenZeigen()
+    GUI_SET_CHECKED(cbHell, hell)
+    GUI_SET_CHECKED(cbUmbruch, umbruchAn)
+    GUI_SET_CHECKED(cbKarte, minimapAn)
+    GUI_SET_CHECKED(cbGit, gitRandAn)
+    GUI_SET_CHECKED(cbRegex, regexAn)
+    GUI_SET_CHECKED(cbVorschlag, vorschlagAn)
+    GUI_SET_CHECKED(cbLinien, linienAn)
+    GUI_SET_CHECKED(cbGeruest, geruestAn)
+    GUI_SET_CHECKED(cbVorschau, vorschauAn)
+    GUI_SET_CHECKED(cbKlammern, klammernAn)
+    GUI_SET_CHECKED(cbFormatSichern, formatSichernAn)
+    GUI_SET_CHECKED(cbVorspann, vorspannAn)
+    GUI_SET_CHECKED(cbGlanz, glanzAn)
+    GUI_SET_CHECKED(cbBaumHaken, baumHakenAn)
+    GUI_SET_CHECKED(cbWasser, wasserzeichenAn)
+    GUI_SET_VALUE(spUi, uiGroesse)
+    massWahlStand = massStufe(massEinst)
+    GUI_DROPDOWN_SET_SELECTED(ddMass, massWahlStand)
+    massHinweisSetzen()
+    vorspannAuswahlFuellen()
+    GUI_SET_VALUE(spSchrift, codeGroesse)
+    GUI_SET_VALUE(spListen, listenGroesse)
+    GUI_SET_VALUE(spHbGr, handbuchGroesse)
+    GUI_SET_VALUE(spAuto, autoSichern)
+    ' Die linke Kante bleibt, wo sie war: die zweite Spalte waechst nach rechts.
+    GUI_WINDOW_SET_BOUNDS(winEinst, (schirmB() - 420) \ 2, 150, 820, 530)
+    GUI_WINDOW_VISIBLE(winEinst, TRUE)
+    einstOffen = TRUE
+    GUI_FOCUS(cbHell)
+    protokoll("einstellungen auf")
+END SUB
+
+' Die Schalter wirken SOFORT, ohne [Uebernehmen]: ein Thema, das man erst
+' nach dem Schliessen sieht, waehlt man blind.
+SUB einstellungenNachziehen()
+    IF NOT einstOffen THEN RETURN
+    IF GUI_CHECKED(cbHell) <> hell THEN befehl("thema")
+    IF GUI_CHECKED(cbUmbruch) <> umbruchAn THEN umbruchSetzen(GUI_CHECKED(cbUmbruch))
+    IF GUI_CHECKED(cbKarte) <> minimapAn THEN minimapSetzen(GUI_CHECKED(cbKarte))
+    IF GUI_CHECKED(cbGit) <> gitRandAn THEN befehl("git_rand")
+    IF GUI_CHECKED(cbRegex) <> regexAn THEN befehl("regex")
+    IF GUI_CHECKED(cbVorschlag) <> vorschlagAn THEN
+        vorschlagAn = GUI_CHECKED(cbVorschlag)
+        IF NOT vorschlagAn THEN vervollSchliessen()
+        konfigSichern()
+    END IF
+    IF GUI_CHECKED(cbLinien) <> linienAn THEN linienSetzen(GUI_CHECKED(cbLinien))
+    IF GUI_CHECKED(cbGeruest) <> geruestAn THEN geruestSetzen(GUI_CHECKED(cbGeruest))
+    IF GUI_CHECKED(cbKlammern) <> klammernAn THEN klammernSetzen(GUI_CHECKED(cbKlammern))
+    IF GUI_CHECKED(cbFormatSichern) <> formatSichernAn THEN befehl("format_sichern")
+    IF GUI_CHECKED(cbVorspann) <> vorspannAn THEN
+        vorspannAn = GUI_CHECKED(cbVorspann)
+        konfigSichern()
+        protokoll("vorspann " + IIF(vorspannAn, "an", "aus"))
+    END IF
+    IF GUI_DROPDOWN_SELECTED(ddVorspann) <> vorspannWahlStand AND GUI_DROPDOWN_SELECTED(ddVorspann) >= 0 THEN
+        vorspannWahlStand = GUI_DROPDOWN_SELECTED(ddVorspann)
+        DIM vl AS ARRAY OF STRING : vl = vorspannListe()
+        IF vorspannWahlStand < LEN(vl) THEN vorspannDatei = vl[vorspannWahlStand] ELSE vorspannDatei = "abwechselnd"
+        konfigSichern()
+        protokoll("vorspann wahl " + vorspannDatei)
+    END IF
+    IF GUI_CLICKED(btnVorspannSehen) THEN
+        DIM vl2 AS ARRAY OF STRING : vl2 = vorspannListe()
+        IF LEN(vl2) > 0 THEN
+            DIM vi AS INTEGER : vi = GUI_DROPDOWN_SELECTED(ddVorspann)
+            ' "Abwechselnd" zeigt den, der beim naechsten Start kaeme.
+            IF vi < 0 OR vi >= LEN(vl2) THEN vi = (vorspannZuletzt + 1) MOD LEN(vl2)
+            IF vi < 0 THEN vi = 0
+            IF vorspannSpielen(PATHJOIN(vorspannOrdner, vl2[vi])) = "kreuz" THEN beendenAnfragen()
+        END IF
+    END IF
+    IF GUI_CHECKED(cbBaumHaken) <> baumHakenAn THEN baumHakenSetzen(GUI_CHECKED(cbBaumHaken))
+    IF GUI_CHECKED(cbWasser) <> wasserzeichenAn THEN
+        wasserzeichenAn = GUI_CHECKED(cbWasser)
+        wasserzeichenAlle()
+        konfigSichern()
+    END IF
+    IF INT(GUI_VALUE(spUi)) <> uiGroesse THEN
+        uiSchrift(INT(GUI_VALUE(spUi)))
+        konfigSichern()
+    END IF
+    IF GUI_DROPDOWN_SELECTED(ddMass) <> massWahlStand AND GUI_DROPDOWN_SELECTED(ddMass) >= 0 THEN
+        massWahlStand = GUI_DROPDOWN_SELECTED(ddMass)
+        massEinst = MASS_STUFEN[massWahlStand]
+        konfigSichern()
+        massHinweisSetzen()
+        protokoll("massstab " + FORMAT$(massEinst, "%.2f"))
+    END IF
+    IF GUI_CHECKED(cbGlanz) <> glanzAn THEN
+        glanzAn = GUI_CHECKED(cbGlanz)
+        konfigSichern()
+        IF glanzAn THEN lichtstreif(1800)
+        protokoll("glanz " + IIF(glanzAn, "an", "aus"))
+    END IF
+    IF GUI_CHECKED(cbVorschau) <> vorschauAn THEN
+        vorschauAn = GUI_CHECKED(cbVorschau)
+        konfigSichern()
+        protokoll("umbau schalter " + IIF(vorschauAn, "an", "aus"))
+    END IF
+    IF INT(GUI_VALUE(spSchrift)) <> codeGroesse THEN schriftSetzen(INT(GUI_VALUE(spSchrift)))
+    IF INT(GUI_VALUE(spListen)) <> listenGroesse THEN
+        listenSchrift(INT(GUI_VALUE(spListen)))
+        konfigSichern()
+    END IF
+    IF INT(GUI_VALUE(spHbGr)) <> handbuchGroesse THEN
+        handbuchSchrift(INT(GUI_VALUE(spHbGr)))
+        konfigSichern()
+    END IF
+    IF INT(GUI_VALUE(spAuto)) <> autoSichern THEN
+        autoSichern = INT(GUI_VALUE(spAuto))
+        konfigSichern()
+        protokoll("autosichern " + STR$(autoSichern))
+    END IF
+END SUB
+
+' --- Eingebaute Befehle nachschlagen ----------------------------------
+' Die Liste kommt aus CODE_COMPLETE mit leerem Text: das sind alle Namen,
+' die die Vervollstaendigung ueberhaupt kennt. Die Beschreibung holt
+' derselbe CODE_HOVER$ wie die Statuszeile -- ueber einen Text, der nur
+' aus dem Namen besteht.
+SUB befehleFuellen(filter AS STRING)
+    IF LEN(alleBefehle) = 0 THEN alleBefehle = CODE_COMPLETE("", 1, 1)
+    GUI_LISTBOX_CLEAR(lstBefehle)
+    gezeigteBefehle = []
+    DIM klein AS STRING : klein = LOWER$(filter)
+    DIM b AS STRING
+    FOR EACH b IN alleBefehle
+        IF LEN(gezeigteBefehle) >= 400 THEN BREAK
+        IF klein = "" OR passtUnscharf(b, klein) THEN
+            GUI_LISTBOX_ADD(lstBefehle, b)
+            ARRAY_PUSH(gezeigteBefehle, b)
+        END IF
+    NEXT
+    GUI_SET_TEXT(lblBefehlZahl, STR$(LEN(gezeigteBefehle)) + tr$(" von ") + STR$(LEN(alleBefehle)))
+    IF LEN(gezeigteBefehle) > 0 THEN GUI_LISTBOX_SET_SELECTED(lstBefehle, 0)
+    befehlWahlZuletzt = -2
+END SUB
+
+SUB befehleZeigen()
+    GUI_SET_TEXT(tfBefehlFilter, "")
+    befehlFilterZuletzt = ""
+    befehleFuellen("")
+    GUI_WINDOW_VISIBLE(winBefehle, TRUE)
+    GUI_FOCUS(tfBefehlFilter)
+    protokoll("befehle " + STR$(LEN(alleBefehle)))
+END SUB
+
+SUB befehleNachziehen()
+    IF NOT GUI_WINDOW_SHOWN(winBefehle) THEN RETURN
+    IF GUI_TEXT(tfBefehlFilter) <> befehlFilterZuletzt THEN
+        befehlFilterZuletzt = GUI_TEXT(tfBefehlFilter)
+        befehleFuellen(befehlFilterZuletzt)
+    END IF
+    DIM sel AS INTEGER : sel = GUI_LISTBOX_SELECTED(lstBefehle)
+    IF sel = befehlWahlZuletzt THEN RETURN
+    befehlWahlZuletzt = sel
+    IF sel < 0 OR sel >= LEN(gezeigteBefehle) THEN RETURN
+    DIM name AS STRING : name = gezeigteBefehle[sel]
+    DIM md AS STRING : md = CODE_HOVER$(name, 1, 1)
+    md = REPLACE$(md, "```drachenhauch" + NL, "")
+    md = REPLACE$(md, "```", "")
+    IF TRIM$(md) = "" THEN md = name + NL + NL + "(keine Beschreibung -- meist ein Schlüsselwort der Sprache)"
+    GUI_SET_TEXT(taBefehlDoku, TRIM$(md))
+END SUB
+
+SUB befehlEinfuegen()
+    DIM sel AS INTEGER : sel = GUI_LISTBOX_SELECTED(lstBefehle)
+    IF sel < 0 OR sel >= LEN(gezeigteBefehle) THEN RETURN
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN
+    GUI_WINDOW_VISIBLE(winBefehle, FALSE)
+    GUI_FOCUS(ta)
+    GUI_TEXTAREA_INSERT(ta, gezeigteBefehle[sel])
+    protokoll("befehl eingefuegt " + gezeigteBefehle[sel])
+END SUB
+
+' --- Definition hier zeigen (Peek) -------------------------------------
+' Zehn Zeilen um die Definition, ohne die Datei zu verlassen. Wer doch
+' hin will, hat den Knopf -- das ist F12.
+SUB peekZeigen()
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN
+    DIM z AS INTEGER
+    DIM s AS INTEGER
+    (z, s) = GUI_TEXTAREA_CURSOR(ta)
+    DIM q AS STRING : q = GUI_TEXT(ta)
+    DIM dz AS INTEGER
+    DIM ds AS INTEGER
+    (dz, ds) = CODE_DEFINITION(q, z, s)
+    peekPfad = ""
+    IF dz < 1 THEN
+        ' Nicht in dieser Datei -- der Symbolindex sieht das ganze Projekt.
+        DIM k AS INTEGER : k = symbolSuchen(wortUnterMarke$())
+        IF k < 0 THEN
+            GUI_SET_TEXT(lblStatus, tr$("Keine Definition zu '") + wortUnterMarke$() + tr$("' -- auch nicht im Projekt."))
+            RETURN
+        END IF
+        peekPfad = symbole[k].pfad
+        dz = symbole[k].zeile
+        DIM offen AS INTEGER : offen = tabMitPfad(peekPfad)
+        IF offen >= 0 THEN
+            q = GUI_TEXT(reiter[offen].feld)
+        ELSE
+            q = dateiLesen(peekPfad)
+        END IF
+    END IF
+    peekZeile = dz
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(q, NL)
+    DIM von AS INTEGER : von = MAX(1, dz - 1)
+    DIM bis AS INTEGER : bis = MIN(LEN(zeilen), dz + 9)
+    DIM text AS STRING : text = ""
+    DIM i AS INTEGER
+    FOR i = von TO bis
+        text = text + PADL$(STR$(i), 5) + "  " + zeilen[i - 1] + NL
+    NEXT
+    GUI_SET_TEXT(taPeek, text)
+    GUI_SET_TEXT(lblPeek, wortUnterMarke$() + " -- " + IIF(peekPfad = "", "", BASENAME(peekPfad) + ", ") + tr$("Zeile ") + STR$(dz))
+    GUI_WINDOW_SET_BOUNDS(winPeek, (schirmB() - 720) \ 2, 240, 720, 300)
+    GUI_WINDOW_VISIBLE(winPeek, TRUE)
+    GUI_FOCUS(taPeek)
+    ' Die Datei steht nur dann dabei, wenn es eine ANDERE ist -- sonst
+    ' haette eine neue Zeilenform die Proben von Stand 7 gebrochen.
+    protokoll("peek " + STR$(dz) + IIF(peekPfad = "", "", " " + BASENAME(peekPfad)))
+END SUB
+
+' --- Farbwaehler am Literal -------------------------------------------
+SUB farbfeldNachziehen()
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN
+    DIM k AS INTEGER : k = GUI_TEXTAREA_SWATCH_CLICKED(ta)
+    IF k < 0 OR k >= LEN(farbStellen) THEN RETURN
+    farbStart = farbStellen[k]
+    farbLaenge = farbLaengen[k]
+    DIM q AS STRING : q = GUI_TEXT(ta)
+    DIM roh AS STRING : roh = MID$(q, farbStart + 2, farbLaenge - 2)
+    IF LEN(roh) = 8 THEN roh = RIGHT$(roh, 6)
+    GUI_SET_PICKED_COLOR(cpFarbe, COLOR_FROM_HEX("#" + roh))
+    GUI_SET_TEXT(lblFarbe, "&H" + roh)
+    GUI_WINDOW_SET_BOUNDS(winFarbe, (schirmB() - 320) \ 2, 200, 320, 300)
+    GUI_WINDOW_VISIBLE(winFarbe, TRUE)
+    GUI_FOCUS(cpFarbe)
+    protokoll("farbfeld " + STR$(farbStart))
+END SUB
+
+SUB farbeUebernehmen()
+    GUI_WINDOW_VISIBLE(winFarbe, FALSE)
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 OR farbStart < 0 THEN RETURN
+    DIM neu AS STRING : neu = "&H" + UPPER$(RIGHT$(COLOR_HEX$(GUI_PICKED_COLOR(cpFarbe)), 6))
+    ' Aus der Zeichenstelle wieder Zeile und Spalte machen -- GUI_TEXTAREA_SELECT
+    ' rechnet in Zeilen, die Abschnitte in Zeichen.
+    DIM q AS STRING : q = GUI_TEXT(ta)
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(LEFT$(q, farbStart), NL)
+    DIM z AS INTEGER : z = LEN(zeilen)
+    DIM s AS INTEGER : s = LEN(zeilen[z - 1]) + 1
+    GUI_TEXTAREA_SELECT(ta, z, s, z, s + farbLaenge)
+    GUI_TEXTAREA_INSERT(ta, neu)
+    GUI_FOCUS(ta)
+    faerbSchluessel = "-"
+    GUI_SET_TEXT(lblStatus, tr$("Farbe: ") + neu)
+    protokoll("farbe " + neu)
+    farbStart = -1
+END SUB
+
+' --- Geteilte Ansicht -------------------------------------------------
+' Links ein zweiter Reiter, rechts der aktive. Beide sind ECHTE Code-Felder;
+' zwei Ansichten auf DIESELBE Datei waeren ein Abgleich, den man bei jedem
+' Anschlag fuehren muesste -- und GUI_SET_TEXT leerte dabei jedes Mal den
+' Verlauf und schoebe die Marke ans Ende.
+SUB geteiltSetzen(an AS BOOLEAN)
+    IF an AND spiegelAn THEN spiegelSetzen(FALSE)
+    IF an AND tabAnzahl < 2 THEN
+        GUI_SET_TEXT(lblStatus, tr$("Geteilte Ansicht: dafür braucht es zwei offene Dateien."))
+        RETURN
+    END IF
+    IF NOT an AND linkerTab >= 0 AND linkerTab < tabAnzahl THEN
+        ' Zurueck auf seinen eigenen Reiter -- sonst bliebe das Feld
+        ' ueber allen Reitern stehen.
+        GUI_SET_TAB(reiter[linkerTab].feld, linkerTab)
+    END IF
+    geteilt = an
+    IF an THEN
+        linkerTab = IIF(aktiverTab = 0, 1, 0)
+        ' -1 heisst "auf jedem Reiter sichtbar" -- nur so stehen zwei
+        ' Felder gleichzeitig im Bild.
+        GUI_SET_TAB(reiter[linkerTab].feld, -1)
+    ELSE
+        linkerTab = -1
+    END IF
+    GUI_MENU_CHECK(miGeteilt, geteilt)
+    layout()
+    GUI_SET_TEXT(lblStatus, IIF(geteilt, tr$("Geteilt: links ") + BASENAME(reiter[linkerTab].pfad), tr$("Geteilte Ansicht aus.")))
+    ' Die Lagen mitschreiben: dass der Befehl LIEF, sagt nichts darueber, ob
+    ' die beiden Felder auch nebeneinander liegen.
+    IF geteilt THEN
+        protokoll("geteilt " + STR$(linkerTab) + " x " + STR$(GUI_GET_X(reiter[linkerTab].feld)) + "+" + STR$(GUI_GET_W(reiter[linkerTab].feld)) + " " + STR$(GUI_GET_X(reiter[aktiverTab].feld)) + "+" + STR$(GUI_GET_W(reiter[aktiverTab].feld)))
+    ELSE
+        protokoll("geteilt aus")
+    END IF
+END SUB
+
+' Der linke Reiter darf nicht derselbe sein wie der aktive -- ein Widget
+' kann nicht zweimal im Bild stehen. Beim Wechsel tauschen die beiden.
+SUB geteiltNachziehen(vorher AS INTEGER)
+    IF NOT geteilt THEN RETURN
+    IF linkerTab <> aktiverTab THEN RETURN
+    IF vorher < 0 OR vorher >= tabAnzahl OR vorher = aktiverTab THEN
+        geteiltSetzen(FALSE)
+        RETURN
+    END IF
+    GUI_SET_TAB(reiter[linkerTab].feld, linkerTab)
+    linkerTab = vorher
+    GUI_SET_TAB(reiter[linkerTab].feld, -1)
+    layout()
+END SUB
+
+' --- Dieselbe Datei nebeneinander ---------------------------------------
+' Die geteilte Ansicht zeigt zwei REITER. Hier ist es EINE Datei: das
+' zweite Feld ist eine Ansicht auf das Feld des aktiven Reiters, und die
+' Laufzeit gleicht den Text ab (GUI_TEXTAREA_SHARE) -- ohne GUI_SET_TEXT,
+' also ohne den Verlauf zu leeren oder die Marke ans Ende zu schieben.
+SUB spiegelSetzen(an AS BOOLEAN)
+    IF an AND aktiverTab < 0 THEN
+        GUI_SET_TEXT(lblStatus, tr$("Dieselbe Datei nebeneinander: dafür braucht es eine offene Datei."))
+        RETURN
+    END IF
+    IF an AND geteilt THEN geteiltSetzen(FALSE)
+    spiegelAn = an
+    IF an THEN
+        IF taSpiegel < 0 THEN taSpiegel = GUI_TEXTAREA(win, 0, 0, 10, 10)
+        ' Bei JEDEM Einschalten: Schrift, Umbruch, Linien und Paare stehen
+        ' seit dem letzten Mal womoeglich anders.
+        feldEinrichten(taSpiegel)
+        GUI_SET_TAB(taSpiegel, -1)
+        GUI_SET_VISIBLE(taSpiegel, TRUE)
+        spiegelBesitzer = reiter[aktiverTab].feld
+        GUI_TEXTAREA_SHARE(taSpiegel, spiegelBesitzer)
+        spiegelFaerbSchl = ""
+    ELSEIF taSpiegel >= 0 THEN
+        GUI_TEXTAREA_SHARE(taSpiegel, -1)
+        GUI_SET_VISIBLE(taSpiegel, FALSE)
+        spiegelBesitzer = -1
+        IF aktiverTab >= 0 THEN GUI_FOCUS(reiter[aktiverTab].feld)
+    END IF
+    GUI_MENU_CHECK(miSpiegel, spiegelAn)
+    layout()
+    IF spiegelAn THEN
+        GUI_SET_TEXT(lblStatus, tr$("Dieselbe Datei nebeneinander: ") + BASENAME(reiter[aktiverTab].pfad))
+        protokoll("spiegel an x " + STR$(GUI_GET_X(taSpiegel)) + "+" + STR$(GUI_GET_W(taSpiegel)) + " " + STR$(GUI_GET_X(reiter[aktiverTab].feld)) + "+" + STR$(GUI_GET_W(reiter[aktiverTab].feld)))
+    ELSE
+        GUI_SET_TEXT(lblStatus, tr$("Zweite Ansicht aus."))
+        protokoll("spiegel aus")
+    END IF
+END SUB
+
+' Je Bild: folgt die zweite Ansicht noch dem aktiven Reiter? Nach einem
+' Reiterwechsel zeigt sie die neue Datei, ohne offenen Reiter geht sie aus.
+SUB spiegelNachziehen()
+    IF NOT spiegelAn THEN RETURN
+    IF aktiverTab < 0 OR aktiverTab >= tabAnzahl THEN
+        spiegelSetzen(FALSE)
+        RETURN
+    END IF
+    IF reiter[aktiverTab].feld = spiegelBesitzer THEN RETURN
+    spiegelBesitzer = reiter[aktiverTab].feld
+    GUI_TEXTAREA_SHARE(taSpiegel, spiegelBesitzer)
+    spiegelFaerbSchl = ""
+    layout()
+    protokoll("spiegel folgt " + STR$(aktiverTab))
+END SUB
+
+' --- Uebersichtskarte --------------------------------------------------
+' Eine Zeile ist ein Strich, so breit wie sie lang ist; der sichtbare
+' Ausschnitt liegt als heller Kasten darueber. Rechts am Rand stehen Fehler
+' (rot) und Warnungen (gelb), links die Zeile der Schreibmarke. Ein Klick
+' rollt die Stelle in die Mitte, Ziehen laesst den Ausschnitt folgen -- die
+' Marke bleibt dabei, wo sie ist, wie beim Mausrad.
+SUB minimapZeichnen()
+    IF NOT minimapAn THEN kartenZug = FALSE : RETURN
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN
+    DIM cx AS INTEGER : cx = GUI_CANVAS_X(karte)
+    DIM cy AS INTEGER : cy = GUI_CANVAS_Y(karte)
+    DIM cw AS INTEGER : cw = GUI_CANVAS_W(karte)
+    DIM ch AS INTEGER : ch = GUI_CANVAS_H(karte)
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(GUI_TEXT(ta), NL)
+    DIM n AS INTEGER : n = LEN(zeilen)
+    IF n = 0 OR ch < 4 THEN RETURN
+    ' So viele Zeilen wie Platz ist, sonst zusammengefasst: bei 3000 Zeilen
+    ' und 600 Punkten Hoehe steht eine Zeile fuer fuenf.
+    DIM proZeile AS INTEGER : proZeile = MAX(1, (n + ch - 1) \ ch)
+    DIM y AS INTEGER : y = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1 STEP proZeile
+        DIM zt AS STRING : zt = zeilen[i]
+        DIM roh AS STRING : roh = LTRIM$(zt)
+        IF roh <> "" THEN
+            ' Wort fuer Wort statt ein Strich je Zeile: so sieht man in der
+            ' Karte, WO in der Datei man ist -- ein gleichmaessiger Balken
+            ' sieht ueberall gleich aus.
+            DIM einzugX AS INTEGER : einzugX = MIN(cw \ 3, (LEN(zt) - LEN(roh)) * 2)
+            DIM x AS INTEGER : x = cx + 4 + einzugX
+            DIM grund AS INTEGER : grund = &H60708A
+            IF LEFT$(roh, 1) = "'" THEN grund = F_KOMMENTAR
+            DIM wt AS STRING
+            FOR EACH wt IN SPLIT$(roh, " ")
+                DIM bw AS INTEGER : bw = LEN(wt) * 2
+                IF wt <> "" AND x < cx + cw - 7 THEN
+                    BOX(x, cy + y, MIN(x + bw - 2, cx + cw - 7), cy + y, grund)
+                END IF
+                x = x + bw + 2
+            NEXT
+        END IF
+        y = y + 1
+        IF y >= ch THEN BREAK
+    NEXT
+    ' Der sichtbare Ausschnitt als heller Rahmen.
+    DIM erste AS INTEGER
+    DIM sicht AS INTEGER
+    DIM von AS INTEGER
+    DIM laenge AS INTEGER
+    (erste, sicht, von, laenge) = GUI_TEXTAREA_VIEW(ta)
+    DIM y0 AS INTEGER : y0 = cy + erste \ proZeile
+    DIM y1 AS INTEGER : y1 = cy + MIN(ch - 1, (erste + sicht) \ proZeile)
+    DIM ueber AS BOOLEAN
+    ueber = MOUSEX() >= cx AND MOUSEX() < cx + cw AND MOUSEY() >= cy AND MOUSEY() < cy + ch
+    ueber = ueber AND GUI_WINDOW_AT(MOUSEX(), MOUSEY()) = win
+    BOX(cx + 1, y0, cx + cw - 2, y1, IIF(ueber OR kartenZug, &H30FFFFFF, &H20FFFFFF))
+    RECT(cx + 1, y0, cx + cw - 2, y1, &H60A8C8E0)
+    ' Die Zeile der Schreibmarke links, Fehler und Warnungen rechts am Rand
+    ' -- mindestens zwei Punkte hoch, sonst uebersieht man sie.
+    DIM mz AS INTEGER
+    DIM ms AS INTEGER
+    (mz, ms) = GUI_TEXTAREA_CURSOR(ta)
+    DIM my AS INTEGER : my = cy + MIN(ch - 2, (mz - 1) \ proZeile)
+    BOX(cx, my, cx + 2, my + 1, &HE0E0E0)
+    IF ta = probFeld THEN
+        DIM pk AS INTEGER
+        FOR pk = 0 TO LEN(probleme) - 1
+            IF probleme[pk].hinweis THEN CONTINUE
+            DIM py AS INTEGER : py = cy + MIN(ch - 3, (probleme[pk].zeile - 1) \ proZeile)
+            BOX(cx + cw - 5, py, cx + cw - 2, py + 2, IIF(probleme[pk].fehler, &HE84848, &HE0B040))
+        NEXT
+    END IF
+    ' Klick und Zug. Die Leinwand nimmt selbst keine Klicks an, der
+    ' Treffertest ist von Hand -- und nur, wenn kein anderes Fenster (etwa
+    ' das Handbuch) darueber liegt.
+    IF MOUSE_HIT(0) AND ueber THEN kartenZug = TRUE : kartenZiel = -1
+    IF kartenZug THEN
+        DIM ziel AS INTEGER : ziel = MAX(1, MIN(n, (MOUSEY() - cy) * proZeile + 1))
+        IF ziel <> kartenZiel THEN
+            kartenZiel = ziel
+            ' Die Stelle in die MITTE: oben stuende sie am Rand der Ansicht.
+            GUI_TEXTAREA_SCROLL(ta, MAX(1, ziel - sicht \ 2))
+        END IF
+        IF NOT MOUSEBUTTON(0) THEN
+            kartenZug = FALSE
+            protokoll("karte sprung " + STR$(kartenZiel))
+        END IF
+    END IF
+END SUB
+
+SUB minimapSetzen(an AS BOOLEAN)
+    minimapAn = an
+    GUI_MENU_CHECK(miMinimap, an)
+    layout()
+    konfigSichern()
+    protokoll("karte " + IIF(an, "an", "aus"))
+END SUB
+
+' --- Faltung ----------------------------------------------------------
+SUB faltenUmschalten()
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN
+    IF faltSchluessel = "-" THEN gliederungFuellen(GUI_TEXT(ta))
+    DIM z AS INTEGER
+    DIM s AS INTEGER
+    (z, s) = GUI_TEXTAREA_CURSOR(ta)
+    DIM zu AS BOOLEAN : zu = GUI_TEXTAREA_FOLD(ta, z)
+    GUI_FOCUS(ta)
+    protokoll("falte " + STR$(z) + IIF(zu, " zu", " auf"))
+END SUB
+
+SUB faltenAlle(zu AS BOOLEAN)
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN
+    IF faltSchluessel = "-" THEN gliederungFuellen(GUI_TEXT(ta))
+    DIM n AS INTEGER : n = GUI_TEXTAREA_FOLD_ALL(ta, zu)
+    GUI_FOCUS(ta)
+    GUI_SET_TEXT(lblStatus, IIF(zu, STR$(n) + tr$(" Blöcke zugeklappt."), tr$("Alles aufgeklappt.")))
+    protokoll("falten alle " + STR$(n))
+END SUB
+
+FUNCTION dateiLesen(pfad AS STRING) AS STRING
+    RETURN JOIN$(zeilenLesen(pfad), NL)
+END FUNCTION
+
+' Die EINE Stelle, an der die IDE Textdateien liest. READLINES verlangt
+' UTF-8 und wirft sonst -- und ohne TRY beendete eine einzige Datei aus
+' einem alten Windows-Programm (cp1252) die ganze IDE: beim Oeffnen, bei
+' der Suche im Projekt und schon beim Zaehlen der Aufrufe, das jede
+' Projektdatei liest. Kein UTF-8: cp1252, notfalls latin1 (nimmt jedes
+' Byte). Laesst sich die Datei gar nicht lesen (weg, gesperrt), kommt eine
+' leere Liste, und `leseFehler` sagt warum -- wer daraus einen Reiter
+' macht, muss das fragen, sonst ueberschriebe ein Sichern die Datei mit
+' nichts. `leseKodierung` nennt, wie zuletzt gelesen wurde.
+DIM leseFehler AS STRING
+DIM leseKodierung AS STRING
+FUNCTION zeilenLesen(pfad AS STRING) AS ARRAY OF STRING
+    DIM z AS ARRAY OF STRING : z = []
+    leseFehler = ""
+    leseKodierung = "utf8"
+    TRY
+        z = READLINES(pfad)
+        RETURN z
+    CATCH e
+        IF INSTR(e, "UTF-8") < 0 THEN
+            leseFehler = e
+            RETURN z
+        END IF
+    END TRY
+    DIM k AS STRING
+    FOR EACH k IN ("cp1252", "latin1")
+        TRY
+            z = READLINES(pfad, k)
+            leseKodierung = k
+            RETURN z
+        CATCH e2
+            leseFehler = e2
+        END TRY
+    NEXT
+    RETURN []
+END FUNCTION
+
+' Derselbe Weg, EINE Schreibweise. Von der Kommandozeile kommt er mit
+' Rueckstrichen, aus PATHJOIN mit Schraegstrichen -- verglichen wurde bis
+' hierher wortwoertlich, und dieselbe Datei bekam aus dem Projektbaum einen
+' ZWEITEN Reiter. Gross/klein bleibt, wie es ist: unter Linux sind es zwei
+' verschiedene Dateien.
+FUNCTION wegGleich$(pfad AS STRING) AS STRING
+    RETURN REPLACE$(pfad, CHR$(92), "/")
+END FUNCTION
+
+' Die Faltung eines Reiters merken -- unter dem Weg der Datei, ein Reiter
+' ohne Weg hat nichts, woran sie sich wiederfinden liesse. Nichts gefaltet
+' heisst: der Eintrag faellt weg. Hoechstens 100 Dateien, die zuletzt
+' gemerkte zuerst.
+SUB faltenMerken(i AS INTEGER)
+    IF i < 0 OR i >= tabAnzahl THEN RETURN
+    IF reiter[i].pfad = "" THEN RETURN
+    ' Noch nicht zurueckgeholt (der Reiter war nie vorn): die gemerkte
+    ' Faltung gilt weiter -- das Feld selbst hat ja noch keine.
+    IF reiter[i].faltenOffen <> "" THEN RETURN
+    DIM z AS ARRAY OF INTEGER : z = GUI_TEXTAREA_FOLDS(reiter[i].feld)
+    DIM teile AS ARRAY OF STRING : teile = []
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(z) - 1
+        ARRAY_PUSH(teile, STR$(z[k]))
+    NEXT
+    DIM weg AS STRING : weg = wegGleich$(reiter[i].pfad)
+    DIM neu AS ARRAY OF GemerkteFaltung : neu = []
+    IF LEN(teile) > 0 THEN ARRAY_PUSH(neu, NEW GemerkteFaltung(weg, JOIN$(teile, ",")))
+    FOR k = 0 TO LEN(faltungen) - 1
+        IF faltungen[k].pfad <> weg AND LEN(neu) < 100 THEN ARRAY_PUSH(neu, faltungen[k])
+    NEXT
+    faltungen = neu
+END SUB
+
+FUNCTION gemerkteFalten$(pfad AS STRING) AS STRING
+    IF pfad = "" THEN RETURN ""
+    DIM weg AS STRING : weg = wegGleich$(pfad)
+    DIM f AS GemerkteFaltung
+    FOR EACH f IN faltungen
+        IF f.pfad = weg THEN RETURN f.zeilen
+    NEXT
+    RETURN ""
+END FUNCTION
+
+' Nachdem der aktive Reiter seine faltbaren Bloecke bekommen hat: die
+' gemerkte Faltung wieder zuklappen. Eine Zeile, die inzwischen keinen
+' Block mehr anfaengt (die Datei wurde woanders geaendert), bleibt offen.
+SUB faltenZurueck(ta AS GUI_WIDGET)
+    IF aktiverTab < 0 OR ta <> reiter[aktiverTab].feld THEN RETURN
+    IF reiter[aktiverTab].faltenOffen = "" THEN RETURN
+    DIM zs AS STRING
+    DIM n AS INTEGER : n = 0
+    FOR EACH zs IN SPLIT$(reiter[aktiverTab].faltenOffen, ",")
+        TRY
+            ' FOLD liefert, ob die Zeile jetzt zu ist (FALSE: kein Block dort).
+            IF GUI_TEXTAREA_FOLD(ta, INT(VAL(zs)), TRUE) THEN n = n + 1
+        CATCH e
+        END TRY
+    NEXT
+    reiter[aktiverTab].faltenOffen = ""
+    protokoll("falten wieder " + STR$(n))
+END SUB
+
+DIM reiterPlatz AS STRING : reiterPlatz = ""
+SUB tabOeffnen(pfad AS STRING, inhalt AS STRING)
+    ' Schon offen? Dann nur hin -- auch bei vollen Reitern. Die Grenze stand
+    ' bis 2026-10-02 VOR dieser Frage: bei 12 Reitern meldete ein Sprung in
+    ' eine offene Datei (Baum, Problemliste, Ausgabe, Debugger, F12)
+    ' "Hoechstens 12", und der Aufrufer setzte die Marke im falschen Feld.
+    DIM i AS INTEGER
+    IF pfad <> "" THEN
+        FOR i = 0 TO tabAnzahl - 1
+            IF wegGleich$(reiter[i].pfad) = wegGleich$(pfad) THEN
+                aktiverTab = i
+                reiterNeuSetzen()
+                GUI_FOCUS(reiter[i].feld)
+                RETURN
+            END IF
+        NEXT
+        ' Derselbe Weg anders geschrieben: der Debugger meldet den langen
+        ' Namen ("Hans Gaming"), das Projekt kennt vielleicht den kurzen
+        ' (HANSGA~1), oder ein Weg traegt "..". tabMitPfad fragt die Platte
+        ' -- sonst stand die Datei zweimal als Reiter da.
+        i = tabMitPfad(pfad)
+        IF i >= 0 THEN
+            aktiverTab = i
+            reiterNeuSetzen()
+            GUI_FOCUS(reiter[i].feld)
+            RETURN
+        END IF
+    END IF
+    IF tabAnzahl >= MAX_TABS THEN
+        ' Platz machen: der erste Reiter ohne ungesicherte Aenderungen, der
+        ' nicht vorn ist (Strg+Umschalt+T holt ihn zurueck). Sind alle
+        ' geaendert, bleibt es bei der Meldung.
+        DIM frei AS INTEGER : frei = -1
+        FOR i = 0 TO tabAnzahl - 1
+            IF frei < 0 AND i <> aktiverTab AND NOT reiter[i].geaendert() THEN frei = i
+        NEXT
+        IF frei < 0 THEN
+            GUI_SET_TEXT(lblStatus, tr$("Höchstens ") + STR$(MAX_TABS) + tr$(" Reiter -- erst einen schließen."))
+            RETURN
+        END IF
+        reiterPlatz = IIF(reiter[frei].pfad = "", tr$("(neu)"), BASENAME(reiter[frei].pfad))
+        protokoll("reiter platz " + reiterPlatz)
+        tabSchliessen(frei)
+    END IF
+    DIM ta AS GUI_WIDGET
+    ta = GUI_TEXTAREA(win, 0, 0, 10, 10)
+    feldEinrichten(ta)
+    GUI_SET_TEXT(ta, inhalt)
+    GUI_SET_TAB(ta, tabAnzahl)
+    reiter[tabAnzahl] = NEW Reiter()
+    reiter[tabAnzahl].pfad = pfad
+    reiter[tabAnzahl].feld = ta
+    reiter[tabAnzahl].gesichert = inhalt
+    reiter[tabAnzahl].letzterText = ""
+    reiter[tabAnzahl].faltenOffen = gemerkteFalten$(pfad)
+    aktiverTab = tabAnzahl
+    tabAnzahl = tabAnzahl + 1
+    reiterNeuSetzen()
+    layout()
+    GUI_FOCUS(ta)
+    GUI_TEXTAREA_GOTO(ta, 1, 1)
+    pruefungFaellig = GET_TIME()
+    protokoll("geoeffnet " + pfad)
+    IF waermeDaten THEN waermeFeld(tabAnzahl - 1)
+    IF pfad <> "" THEN pluginEreignis("geoeffnet", pfad)
+END SUB
+
+' Eine .dhform oeffnet seit Stand 31 den Form-Designer in Drachenhauch
+' (examples/197_form_designer.dh) -- als Text nur auf ausdruecklichen Wunsch
+' (Befehlspalette), weil man ein Formular sonst im JSON statt am Bild baut.
+DIM letzteForm AS STRING : letzteForm = ""
+DIM formAlsText AS BOOLEAN : formAlsText = FALSE
+
+SUB dateiOeffnen(pfad AS STRING)
+    IF NOT FILEEXISTS(pfad) THEN
+        GUI_SET_TEXT(lblStatus, tr$("Gibt es nicht: ") + pfad)
+        RETURN
+    END IF
+    ' Ein Studio-Projekt geht im Drachenhauch Studio auf (studio/).
+    IF LOWER$(RIGHT$(pfad, 9)) = ".dhstudio" THEN
+        studioStarten(pfad)
+        RETURN
+    END IF
+    IF LOWER$(RIGHT$(pfad, 7)) = ".dhform" AND NOT formAlsText THEN
+        letzteForm = pfad
+        werkzeugMit("197_form_designer.dh", pfad)
+        GUI_SET_TEXT(lblStatus, tr$("Im Form-Designer geöffnet: ") + BASENAME(pfad) + tr$(" -- als Text: Befehlspalette, 'Formular als Text öffnen'"))
+        RETURN
+    END IF
+    ' Bilder und Klaenge zeigt die IDE selbst -- man will sehen bzw. hoeren,
+    ' was das Programm laedt, ohne ein zweites Programm.
+    IF assetArt$(pfad) <> "" THEN
+        assetZeigen(pfad)
+        RETURN
+    END IF
+    ' Was der Editor nicht bearbeiten kann, gibt er ans System weiter --
+    ' ein PNG im Code-Feld waere Kauderwelsch.
+    IF NOT istText(pfad) THEN
+        TRY
+            OPENDOC(pfad)
+            GUI_SET_TEXT(lblStatus, tr$("Mit dem Programm des Systems geöffnet: ") + BASENAME(pfad))
+        CATCH e
+            GUI_SET_TEXT(lblStatus, tr$("Lässt sich nicht öffnen: ") + BASENAME(pfad))
+        END TRY
+        protokoll("extern " + BASENAME(pfad))
+        RETURN
+    END IF
+    DIM inhalt AS STRING : inhalt = dateiLesen(pfad)
+    IF leseFehler <> "" THEN
+        GUI_SET_TEXT(lblStatus, tr$("Lässt sich nicht lesen: ") + leseFehler)
+        protokoll("nicht lesbar " + BASENAME(pfad))
+        RETURN
+    END IF
+    DIM kodierung AS STRING : kodierung = leseKodierung
+    tabOeffnen(pfad, inhalt)
+    ' Kein Platz (alle Reiter geaendert): die Meldung bleibt stehen, und
+    ' nichts tut so, als waere die Datei offen.
+    IF tabMitPfad(pfad) < 0 THEN RETURN
+    ' Der Projektordner wandert NUR, wenn die Datei ausserhalb liegt. Sonst
+    ' machte ein Klick auf `lib/mehr.dh` den Unterordner zum Projekt, und
+    ' der Baum zeigte danach die halbe Arbeit nicht mehr.
+    IF NOT imProjekt(pfad) THEN projektOrdner = DIRNAME(pfad)
+    baumFuellen()
+    zuletztMerken(pfad)
+    IF reiterPlatz <> "" THEN
+        GUI_SET_TEXT(lblStatus, pfad + "  --  " + tr$("Höchstens ") + STR$(MAX_TABS) + tr$(" Reiter, geschlossen: ") + reiterPlatz)
+        reiterPlatz = ""
+    ELSEIF paketVon$(pfad) <> "" THEN
+        GUI_SET_TEXT(lblStatus, tr$("Datei aus dem Paket ") + paketVon$(pfad) + tr$(" -- Änderungen gehen beim nächsten Holen verloren: ") + pfad)
+        protokoll("paketdatei " + paketVon$(pfad))
+    ELSEIF kodierung = "utf8" THEN
+        GUI_SET_TEXT(lblStatus, pfad)
+    ELSE
+        GUI_SET_TEXT(lblStatus, tr$("Kein UTF-8, als ") + kodierung + tr$(" gelesen -- Sichern schreibt UTF-8: ") + pfad)
+        protokoll("gelesen als " + kodierung)
+    END IF
+END SUB
+
+' Liegt die Datei im Projektordner? Erst am Text, dann ueber die Platte:
+' derselbe Ordner kommt als kurzer und als langer Name an (der Debugger
+' meldet den langen), und am Text allein zog das Projekt beim ersten Halt
+' in einer importierten Datei in deren Ordner um.
+FUNCTION imProjekt(pfad AS STRING) AS BOOLEAN
+    IF projektOrdner = "" THEN RETURN FALSE
+    IF LEFT$(wegGleich$(pfad), LEN(wegGleich$(projektOrdner))) = wegGleich$(projektOrdner) THEN RETURN TRUE
+    DIM o AS STRING : o = wegGleich$(REALPATH$(projektOrdner))
+    DIM d AS STRING : d = wegGleich$(REALPATH$(pfad))
+    IF o = "" OR d = "" THEN RETURN FALSE
+    IF RIGHT$(o, 1) <> "/" THEN o = o + "/"
+    RETURN LEFT$(d, LEN(o)) = o
+END FUNCTION
+
+FUNCTION aktivesFeld() AS GUI_WIDGET
+    IF aktiverTab < 0 THEN RETURN -1
+    ' Steht die Marke in der zweiten Ansicht derselben Datei, meint jeder
+    ' Befehl sie -- ihre Marke ist die, die man gerade sieht. Der Text ist
+    ' derselbe, geschrieben wird ueber GUI_TEXTAREA_INSERT und die Laufzeit
+    ' gleicht ab.
+    IF spiegelAn AND taSpiegel >= 0 AND GUI_FOCUSED() = taSpiegel THEN RETURN taSpiegel
+    RETURN reiter[aktiverTab].feld
+END FUNCTION
+
+FUNCTION sichern(i AS INTEGER, alsNeu AS BOOLEAN) AS BOOLEAN
+    IF i < 0 THEN RETURN FALSE
+    DIM pfad AS STRING : pfad = reiter[i].pfad
+    IF pfad = "" OR alsNeu THEN
+        pfad = FILE_SAVE_DIALOG("Sichern unter", "programm.dh", "dh")
+        IF pfad = "" THEN RETURN FALSE
+    END IF
+    DIM text AS STRING : text = GUI_TEXT(reiter[i].feld)
+    ' Formatieren beim Sichern: nur Drachenhauch-Quelltext, nie beim
+    ' automatischen Sichern. Der Formatierer arbeitet auf Tokens: eine halbe
+    ' Anweisung rueckt er ein wie jede andere, nur was sich gar nicht lesen
+    ' laesst (eine offene Zeichenkette) laesst er stehen -- dann wird
+    ' gesichert, was dasteht.
+    IF formatSichernAn AND NOT sichernOhneFormat AND LOWER$(RIGHT$(pfad, 3)) = ".dh" THEN
+        DIM geformt AS STRING : geformt = CODE_FORMAT$(text)
+        IF geformt <> "" THEN
+            IF RIGHT$(text, 1) = NL THEN geformt = geformt + NL
+            IF geformt <> text THEN
+                feldAustauschen(reiter[i].feld, text, geformt)
+                text = geformt
+                protokoll("beim sichern formatiert")
+            END IF
+        END IF
+    END IF
+    ' Die Datei endet mit einem Umbruch (dateiLesen laesst ihn weg, das Feld
+    ' kennt ihn nicht) -- sonst verloere jede gesicherte Datei ihre letzte
+    ' Zeile im Diff ("no newline at end of file"). Bis Stand 3 war das so.
+    DIM inhalt AS STRING : inhalt = text
+    IF inhalt <> "" AND RIGHT$(inhalt, 1) <> NL THEN inhalt = inhalt + NL
+    DIM warDa AS BOOLEAN : warDa = FILEEXISTS(pfad)
+    ' Die Platte kann ablehnen (schreibgeschuetzt, Ordner weg, kein Recht).
+    ' Ohne TRY beendete das die ganze IDE samt der ungesicherten Arbeit in
+    ' ALLEN Reitern. Erst nach dem Schreiben gilt der Reiter als gesichert
+    ' und traegt den neuen Weg.
+    TRY
+        WRITEALL(pfad, inhalt)
+    CATCH e
+        GUI_SET_TEXT(lblStatus, tr$("Sichern ging nicht: ") + e)
+        protokoll("sichern fehlgeschlagen " + pfad)
+        RETURN FALSE
+    END TRY
+    reiter[i].pfad = pfad
+    reiter[i].gesichert = text
+    ' Nur der Eintrag DIESER Datei ist veraltet -- den ganzen Zaehl-Cache zu
+    ' leeren hiess, dass in einem Projekt mit 2000 Dateien jedes Strg+S beim
+    ' naechsten Pruefen alle neu las (0,8 s Stillstand, Stresstest
+    ' 2026-10-02). Eine NEUE Datei aendert die Dateiliste.
+    zaehlVergessen(pfad)
+    IF NOT warDa THEN zaehlDateienAlt = TRUE
+    paramCache = {}
+    blameCache = {}
+    blameMarkeZeile = -1
+    reiterNeuSetzen()
+    zuletztMerken(pfad)
+    GUI_SET_TEXT(lblStatus, tr$("Gesichert: ") + pfad)
+    protokoll("gesichert " + pfad)
+    ' Beim Sichern neu starten: nur ein laufendes F5-Programm (Debugger und
+    ' Profil haben einen Zustand, den man nicht nebenbei wegwirft), nur fuer
+    ' Drachenhauch-Quelltext, nie beim automatischen Sichern.
+    IF neustartSichernAn AND prozess >= 0 AND prozessArt = "run" AND neustartArt = "" _
+       AND NOT sichernOhneFormat AND LOWER$(RIGHT$(pfad, 3)) = ".dh" THEN
+        neustartArt = "run"
+        neustartDatei = prozessDatei
+        neustartVomSichern = TRUE
+        protokoll("neustart beim sichern")
+        stoppen()
+    END IF
+    pluginEreignis("gesichert", pfad)
+    ' Eigene Schnipsel und Tastenbelegung gelten, sobald sie gesichert sind --
+    ' und sie liegen neben der ide.json, nicht im Projekt: der Projektordner
+    ' bleibt, wo er war.
+    IF gleicherWeg(pfad, schnipselPfad$()) THEN
+        schnipselLaden()
+        RETURN TRUE
+    END IF
+    IF gleicherWeg(pfad, tastenPfad$()) THEN
+        tastenAnwenden()
+        RETURN TRUE
+    END IF
+    IF gleicherWeg(pfad, farbenPfad$()) THEN
+        themaAnwenden()
+        RETURN TRUE
+    END IF
+    IF DIRNAME(pfad) <> projektOrdner THEN
+        projektOrdner = DIRNAME(pfad)
+        baumFuellen()
+    END IF
+    RETURN TRUE
+END FUNCTION
+
+' Alle Reiter ausser dem vorderen zumachen. Von HINTEN nach vorn, damit die
+' Nummern der noch offenen gueltig bleiben -- tabSchliessen rueckt sie auf.
+SUB andereSchliessen()
+    IF aktiverTab < 0 THEN RETURN
+    DIM behalten AS GUI_WIDGET : behalten = reiter[aktiverTab].feld
+    DIM weg AS INTEGER : weg = 0
+    DIM i AS INTEGER
+    FOR i = tabAnzahl - 1 TO 0 STEP -1
+        IF reiter[i].feld <> behalten THEN
+            tabSchliessen(i)
+            weg = weg + 1
+        END IF
+    NEXT
+    GUI_SET_TEXT(lblStatus, STR$(weg) + tr$(" Reiter geschlossen."))
+    protokoll("andere zu " + STR$(weg))
+END SUB
+
+' Einen Reiter schliessen -- mit Rueckfrage, wenn er Ungesichertes
+' traegt. Vorher nahm Strg+W die Aenderungen wortlos mit; beim Kreuz
+' faellt das noch mehr ins Gewicht, weil man es aus Versehen trifft.
+SUB tabSchliessenFragen(i AS INTEGER)
+    IF i < 0 OR i >= tabAnzahl THEN RETURN
+    IF NOT reiter[i].geaendert() THEN
+        tabSchliessen(i)
+        RETURN
+    END IF
+    tabZuIndex = i
+    DIM wie AS STRING : wie = reiter[i].name$()
+    dlgTabZu = GUI_DIALOG(tr$("Schließen"), wie + tr$(" hat ungesicherte Änderungen."), _
+                          "Sichern|Verwerfen|Abbrechen")
+END SUB
+
+SUB tabSchliessen(i AS INTEGER)
+    IF i < 0 OR i >= tabAnzahl THEN RETURN
+    ' Den Pfad merken: Strg+Umschalt+T holt ihn zurueck. Nur gesicherte
+    ' Dateien -- ein leerer Reiter haette nichts, was wiederzufinden waere.
+    IF reiter[i].pfad <> "" THEN ARRAY_PUSH(zuGemacht, reiter[i].pfad)
+    ' Die Reiter ruecken auf, der linke der geteilten Ansicht zeigte danach
+    ' auf eine andere Datei -- lieber ganz aus als still auf die falsche.
+    IF geteilt THEN geteiltSetzen(FALSE)
+    faltenMerken(i)
+    GUI_DESTROY(reiter[i].feld)
+    DIM k AS INTEGER
+    FOR k = i TO tabAnzahl - 2
+        reiter[k] = reiter[k + 1]
+        GUI_SET_TAB(reiter[k].feld, k)
+    NEXT
+    reiter[tabAnzahl - 1] = NEW Reiter()
+    tabAnzahl = tabAnzahl - 1
+    ' Faellt ein Reiter LINKS vom aktiven weg, ruecken die anderen auf --
+    ' dieselbe Nummer meinte danach die Datei daneben. Mit Strg+W fiel das
+    ' nie auf (es schliesst immer den vorderen), mit dem Kreuz sofort.
+    IF i < aktiverTab THEN aktiverTab = aktiverTab - 1
+    IF aktiverTab >= tabAnzahl THEN aktiverTab = tabAnzahl - 1
+    reiterNeuSetzen()
+    layout()
+    GUI_LISTBOX_CLEAR(lstProbleme)
+    protokoll("geschlossen " + STR$(i))
+    ' Der letzte Reiter ist zu: gefuellt wird die Gliederung nur beim
+    ' Pruefen eines Reiters, ohne Reiter bliebe sie stehen und zeigte die
+    ' Unterprogramme einer Datei, die nicht mehr offen ist.
+    IF tabAnzahl = 0 THEN
+        GUI_SET_TEXT(lblProbleme, "")
+        gliederungLeeren()
+    END IF
+END SUB
+
+' --- Projektbaum -------------------------------------------------------
+DIM baumLetzteWahl AS STRING : baumLetzteWahl = ""
+DIM hakenStand AS INTEGER : hakenStand = 0
+
+' Alle Dateien des Projekts mit diesem Muster -- AUCH in Unterordnern.
+'
+' Ein Projekt ist selten ein flacher Ordner; ein Umbau, der `lib/` nicht
+' sieht, laesst die halbe Arbeit liegen. Uebergangen werden Ordner, die mit
+' `.` oder `_` anfangen, dazu `target` und `__pycache__`: dort liegt
+' Erzeugtes, kein Quelltext, und ein Bau-Ordner kann zehntausend Dateien
+' haben.
+'
+' Auch `pakete/` gehoert nicht dazu: dort liegt fremder Code, den
+' `dhrt paket hole` beim naechsten Mal ueberschreibt -- ein Umbau ueber das
+' ganze Projekt darf da nicht hineinschreiben, und Projektsuche und
+' Projekt-Pruefung meinen die eigene Arbeit. Wer nur LIEST (Zur Definition,
+' Datei oeffnen, Vererbung), fragt mit `mitPaketen` = TRUE.
+FUNCTION projektDateien(muster AS STRING, mitPaketen AS BOOLEAN = FALSE) AS ARRAY OF STRING
+    DIM roh AS ARRAY OF STRING : roh = []
+    TRY
+        roh = DIRLIST_REC(projektOrdner, muster)
+    CATCH e
+        roh = []
+    END TRY
+    DIM raus AS ARRAY OF STRING : raus = []
+    DIM d AS STRING
+    FOR EACH d IN roh
+        DIM gut AS BOOLEAN : gut = TRUE
+        DIM teil AS STRING
+        DIM teile AS ARRAY OF STRING : teile = SPLIT$(d, "/")
+        DIM ti AS INTEGER
+        FOR ti = 0 TO LEN(teile) - 2          ' der Dateiname selbst zaehlt nicht
+            teil = teile[ti]
+            IF LEFT$(teil, 1) = "." OR LEFT$(teil, 1) = "_" THEN gut = FALSE
+            IF teil = "target" OR teil = "__pycache__" THEN gut = FALSE
+            IF teil = "pakete" AND NOT mitPaketen THEN gut = FALSE
+        NEXT
+        IF gut THEN ARRAY_PUSH(raus, d)
+    NEXT
+    ' Sind im Baum Dateien ANGEHAKT, ist das Projekt genau diese Auswahl.
+    ' Eine Umbenennung soll man auf drei Dateien beschraenken koennen, ohne
+    ' dafuer einen zweiten Ordner anzulegen -- und weil ALLES hier durchgeht
+    ' (Umbauten, Projektsuche, Symbolverzeichnis), gilt die Einschraenkung
+    ' ueberall gleich. Damit sie niemandem entgeht, sagt die Beschriftung
+    ' ueber dem Baum, wie viele angehakt sind.
+    IF GUI_FILETREE_CHECKED_COUNT(baum) = 0 THEN RETURN raus
+    DIM gewaehlt AS ARRAY OF STRING : gewaehlt = []
+    DIM hi AS INTEGER
+    FOR hi = 0 TO GUI_FILETREE_CHECKED_COUNT(baum) - 1
+        ARRAY_PUSH(gewaehlt, wegGleich$(GUI_FILETREE_CHECKED_PATH$(baum, hi)))
+    NEXT
+    ' Ein angehakter ORDNER nimmt alles darunter mit -- bis 2026-09-27 zaehlte
+    ' nur der genaue Weg einer Datei, ein Ordner-Haken machte das Projekt
+    ' also LEER: die Projektsuche fand nichts, und es sah aus, als taete der
+    ' Haken nichts.
+    DIM nur AS ARRAY OF STRING : nur = []
+    FOR EACH d IN raus
+        DIM voll AS STRING : voll = wegGleich$(PATHJOIN(projektOrdner, d))
+        DIM drin AS BOOLEAN : drin = ARRAY_INDEXOF(gewaehlt, voll) >= 0
+        DIM g AS STRING
+        FOR EACH g IN gewaehlt
+            IF NOT drin AND LEFT$(voll, LEN(g) + 1) = g + "/" THEN drin = TRUE
+        NEXT
+        IF drin THEN ARRAY_PUSH(nur, d)
+    NEXT
+    RETURN nur
+END FUNCTION
+
+' Was im Projektbaum steht. Quelltext zuerst, dann was dazugehoert --
+' Formulare und Sprites bearbeitet man mit den Werkzeugen, Daten liest man
+' nach, und ein Bild will man wenigstens ansehen koennen.
+CONST BAUM_MUSTER = "*.dh;*.dhstudio;*.dhform;*.dhsprite;*.dhanim;*.dhtest;*.json;*.md;*.txt;*.csv;*.ini;*.png;*.wav;*.ogg"
+' Uebergangen wird, wo Erzeugtes liegt: ein Bau-Ordner kann zehntausend
+' Dateien haben. Namen, die mit `.` anfangen, laesst der Baum von sich aus
+' weg (Einstellung `verborgene`).
+CONST BAUM_AUSNAHMEN = "target;__pycache__;_*"
+GUI_FILETREE_FILTER(baum, BAUM_MUSTER)
+
+' Der Filtertext wird in jedes Endungsmuster gesetzt: aus `*.dh` wird
+' `*held*.dh` -- so bleibt es bei den Dateiarten, die der Baum zeigt.
+SUB baumFilterNachziehen()
+    DIM t AS STRING : t = TRIM$(GUI_TEXT(tfBaumFilter))
+    IF t = baumFilterZuletzt THEN RETURN
+    baumFilterZuletzt = t
+    IF t = "" THEN
+        GUI_FILETREE_FILTER(baum, BAUM_MUSTER)
+    ELSE
+        DIM teile AS ARRAY OF STRING : teile = []
+        DIM m AS STRING
+        FOR EACH m IN SPLIT$(BAUM_MUSTER, ";")
+            ARRAY_PUSH(teile, "*" + t + "*" + MID$(m, 1, LEN(m)))
+        NEXT
+        GUI_FILETREE_FILTER(baum, JOIN$(teile, ";"))
+    END IF
+    DIM n AS INTEGER : n = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO GUI_FILETREE_COUNT(baum) - 1
+        IF NOT GUI_FILETREE_IS_DIR(baum, GUI_FILETREE_PATH$(baum, i)) THEN n = n + 1
+    NEXT
+    protokoll("baumfilter [" + t + "] " + STR$(n))
+END SUB
+GUI_FILETREE_SKIP(baum, BAUM_AUSNAHMEN)
+' Alle zwei Sekunden nachsehen: eine Datei, die ein anderes Programm
+' anlegt (oder der Export), steht damit von selbst im Baum. Bis Stand 23
+' sah man sie erst nach dem naechsten Oeffnen.
+GUI_FILETREE_SET(baum, "auffrischen", 2000)
+' Ein Klick auf einen Ordner klappt ihn um -- das schmale Dreieck allein zu
+' treffen ist eine Zumutung, und ein Klick, der scheinbar nichts tut, sieht
+' nach einem Fehler aus.
+GUI_FILETREE_SET(baum, "klick_klappt", 1)
+baumSymbole()
+' Haken am Baum: was angehakt ist, IST das Projekt (siehe projektDateien).
+GUI_FILETREE_SET(baum, "kaestchen", IIF(baumHakenAn, 1, 0))
+IF baumHakenAn THEN GUI_TOOLTIP(baum, baumHakenTipp$())
+
+' Laesst sich die Datei im Editor bearbeiten? Alles andere geht an das
+' Programm des Systems (ein PNG im Code-Feld waere Kauderwelsch).
+FUNCTION istText(pfad AS STRING) AS BOOLEAN
+    DIM e AS STRING : e = LOWER$(pfad)
+    IF RIGHT$(e, 4) = ".png" OR RIGHT$(e, 4) = ".wav" OR RIGHT$(e, 4) = ".ogg" THEN RETURN FALSE
+    IF RIGHT$(e, 9) = ".dhsprite" THEN RETURN FALSE
+    RETURN TRUE
+END FUNCTION
+
+SUB baumFuellen()
+    ' Gerufen nach allem, was Dateien anlegt, umbenennt oder loescht -- die
+    ' gemerkte Dateiliste der Aufrufzaehlung gilt dann nicht mehr.
+    zaehlDateienAlt = TRUE
+    ' Der Baum holt sich die Namen selbst -- hier steht nur noch, WO er
+    ' suchen soll. Ein Wurzelwechsel raeumt Auswahl und offene Aeste weg,
+    ' ein Auffrischen laesst beide stehen: sonst verloere man beim Oeffnen
+    ' einer Datei gerade die Mehrfachauswahl, die man einsammelt.
+    IF NOT gleicherWeg(GUI_FILETREE_ROOT$(baum), projektOrdner) THEN
+        GUI_FILETREE_SET_ROOT(baum, projektOrdner)
+        baumLetzteWahl = ""
+    ELSE
+        GUI_FILETREE_REFRESH(baum)
+    END IF
+    projektBeschriften()
+END SUB
+
+FUNCTION baumHakenTipp$() AS STRING
+    RETURN "Haken: Projektsuche, Umbenennen, Ersetzen und Symbolverzeichnis gelten dann nur für die angehakten Dateien und Ordner. Ohne Haken: das ganze Projekt."
+END FUNCTION
+
+' Die Kaestchen ein- oder ausblenden. Beim Ausblenden fallen die Haken weg --
+' eine Einschraenkung, die man nicht mehr sieht, waere eine Falle.
+SUB baumHakenSetzen(an AS BOOLEAN)
+    IF NOT an AND GUI_FILETREE_CHECKED_COUNT(baum) > 0 THEN hakenEntfernen()
+    baumHakenAn = an
+    GUI_FILETREE_SET(baum, "kaestchen", IIF(an, 1, 0))
+    GUI_TOOLTIP(baum, IIF(an, baumHakenTipp$(), ""))
+    GUI_MENU_CHECK(miBaumHaken, an)
+    konfigSichern()
+    IF an THEN
+        GUI_SET_TEXT(lblStatus, tr$("Kästchen im Projektbaum: was angehakt ist, begrenzt Projektsuche und Umbauten."))
+    ELSE
+        GUI_SET_TEXT(lblStatus, tr$("Kästchen im Projektbaum ausgeblendet -- Suche und Umbau gelten wieder dem ganzen Projekt."))
+    END IF
+    protokoll("baum haken " + IIF(an, "an", "aus"))
+END SUB
+
+' Was ueber dem Baum steht. Angehakte Dateien schraenken JEDEN Umbau ein --
+' das darf man nicht uebersehen, also steht es dort, wo man ohnehin hinsieht.
+SUB projektBeschriften()
+    DIM n AS INTEGER : n = GUI_FILETREE_CHECKED_COUNT(baum)
+    IF n = 0 THEN
+        GUI_SET_TEXT(lblProjekt, BASENAME(projektOrdner))
+    ELSE
+        GUI_SET_TEXT(lblProjekt, BASENAME(projektOrdner) + tr$(" -- Suche/Umbau nur in ") + STR$(n) + tr$(" angehakten"))
+    END IF
+END SUB
+
+' Alle gewaehlten Dateien oeffnen (Strg+Umschalt+E).
+SUB baumAuswahlOeffnen()
+    DIM n AS INTEGER : n = GUI_FILETREE_SEL_COUNT(baum)
+    IF n < 1 THEN
+        GUI_SET_TEXT(lblStatus, tr$("Keine Datei gewählt -- Strg+Klick sammelt, Umschalt+Klick spannt."))
+        RETURN
+    END IF
+    ' Erst alle Wege einsammeln, dann oeffnen: dateiOeffnen frischt den Baum
+    ' auf, und ein Ordner darin ist keine Datei.
+    DIM pfade AS ARRAY OF STRING : pfade = []
+    DIM k AS INTEGER
+    FOR k = 0 TO n - 1
+        DIM p0 AS STRING : p0 = GUI_FILETREE_SEL_PATH$(baum, k)
+        IF p0 <> "" AND NOT GUI_FILETREE_IS_DIR(baum, p0) THEN ARRAY_PUSH(pfade, p0)
+    NEXT
+    DIM p AS STRING
+    FOR EACH p IN pfade
+        dateiOeffnen(p)
+    NEXT
+    GUI_SET_TEXT(lblStatus, STR$(LEN(pfade)) + tr$(" Datei(en) geöffnet."))
+    protokoll("baum offen " + STR$(LEN(pfade)))
+END SUB
+
+' Alle Haken abraeumen -- das Projekt ist danach wieder der ganze Ordner.
+SUB hakenEntfernen()
+    DIM n AS INTEGER : n = GUI_FILETREE_CHECKED_COUNT(baum)
+    ' Von HINTEN nach vorn: jedes Abhaken nimmt einen Weg aus der Liste,
+    ' vorwaerts uebersprungen man damit jeden zweiten.
+    DIM i AS INTEGER
+    FOR i = n - 1 TO 0 STEP -1
+        GUI_FILETREE_SET_CHECKED(baum, GUI_FILETREE_CHECKED_PATH$(baum, i), FALSE)
+    NEXT
+    hakenStand = 0
+    projektBeschriften()
+    GUI_SET_TEXT(lblStatus, STR$(n) + tr$(" Haken entfernt -- der Umbau geht wieder über das ganze Projekt."))
+    protokoll("haken weg " + STR$(n))
+END SUB
+
+SUB baumAbfragen()
+    ' Die Haken entscheiden, was "das Projekt" heisst -- das gehoert sofort
+    ' in die Beschriftung, nicht erst beim naechsten Neuaufbau des Baums.
+    IF GUI_FILETREE_CHECKED_COUNT(baum) <> hakenStand THEN
+        hakenStand = GUI_FILETREE_CHECKED_COUNT(baum)
+        projektBeschriften()
+        protokoll("haken " + STR$(hakenStand))
+    END IF
+    DIM weg AS STRING : weg = GUI_FILETREE_SELECTED$(baum)
+    IF weg = "" OR weg = baumLetzteWahl THEN RETURN
+    baumLetzteWahl = weg
+    ' Ein Rechtsklick waehlt nur (fuer das Kontextmenue), er oeffnet nichts.
+    IF MOUSE_HIT(1) THEN RETURN
+    ' Ein Ordner ist kein Reiter -- ein Klick darauf klappt ihn auf, mehr
+    ' soll er nicht tun.
+    IF GUI_FILETREE_IS_DIR(baum) THEN RETURN
+    ' Beim SAMMELN wird nicht geoeffnet -- sonst kaeme mit jedem Strg+Klick
+    ' ein Reiter dazu, den niemand wollte. Geoeffnet wird nur, wenn genau
+    ' eine Zeile gewaehlt ist und es die angeklickte ist (beim Abwaehlen
+    ' zeigt die angeklickte woanders hin als die eine uebriggebliebene).
+    IF GUI_FILETREE_SEL_COUNT(baum) <> 1 OR GUI_FILETREE_SEL_PATH$(baum, 0) <> weg THEN RETURN
+    dateiOeffnen(weg)
+END SUB
