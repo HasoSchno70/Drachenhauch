@@ -93,6 +93,13 @@ jobs:
           echo 'int main(void){return 0;}' > /tmp/leer.c
           emcc /tmp/leer.c -o /tmp/leer.js
           export BINDGEN_EXTRA_CLANG_ARGS="--sysroot=$EMSDK/upstream/emscripten/cache/sysroot"
+          # rust-cache bringt target/ mit -- samt der CMake-Ablage von
+          # raylib-sys, die den emsdk-Pfad des VORIGEN Laufs festhaelt
+          # (_temp/<zufall>/emsdk-main, jeder Lauf ein anderer). Ohne das
+          # Abraeumen faellt jeder Lauf nach dem ersten mit "emcc is not a
+          # full path to an existing compiler tool".
+          cargo clean --release --manifest-path rust/drachenhauch_runtime/Cargo.toml \
+            --target wasm32-unknown-emscripten -p raylib-sys
           python3 rust/build_wasm.py "$SPIELWIESE_DEMO" web
           # build_wasm.py endet ohne Werkzeuge mit 0 und einem Hinweis -- hier
           # waere das ein stiller Ausfall: die Website kaeme ohne Spielwiese.
