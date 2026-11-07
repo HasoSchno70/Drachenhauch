@@ -98,7 +98,7 @@ IMPORT "gui"
 | `GUI_VSLIDER(win, x, y, h, min, max, default)` | GUI_WIDGET | **vertical slider** — `h` is the length, the value grows upwards |
 | `GUI_PROGRESS_SET(progress, "unbestimmt", 1)` | — | a running band instead of a value, for anything whose duration is unknown |
 | `GUI_IMAGE_MODE(image, modus$)` / `GUI_IMAGE_MODE_GET(image)` | — / STRING | `strecken` (stretch, default), `einpassen` (fit), `fuellen` (fill), `mitte` (centre), `kacheln` (tile) |
-| `GUI_TREE_ICON(tree, node, bild)` / `GUI_TREE_COLOR(tree, node, farbe)` | — | icon and text colour per tree node |
+| `GUI_TREE_ICON(tree, node, bild)` / `GUI_TREE_COLOR(tree, node, farbe)` | — | icon and text colour per tree node; instead of an image also the name of a built-in icon (`"ordner"`), `""` removes it |
 | `GUI_PANEL_ADD(panel, wdg)` / `GUI_PANEL_REMOVE` / `GUI_PANEL_SCROLL(panel, y)` / `GUI_PANEL_SCROLL_GET(panel)` | — | a **panel that scrolls its children** (mouse wheel, scroll bar) — see [Finishing touches](#finishing-touches-slider-progress-image-tree-panel-dragging) |
 | `GUI_DRAGGABLE(wdg, an)` / `GUI_DROP_TARGET(wdg, an)` | — | **dragging between widgets**: source and drop target |
 | `GUI_DRAGGING()` / `GUI_DROPPED(wdg)` / `GUI_DROP_TEXT()` / `GUI_DROP_SOURCE()` / `GUI_DRAG_INDEX()` / `GUI_DROP_INDEX()` | GUI_WIDGET / BOOL / STRING / GUI_WIDGET / INTEGER / INTEGER | current drag, drop in this frame, what was dragged, from where, which row, onto which row |
@@ -212,7 +212,7 @@ IMPORT "gui"
 | `GUI_TREE_CHECKED(tree, node)` | BOOLEAN | is the check mark set on this node (only with `kaestchen`)? |
 | `GUI_TREE_SET_CHECKED(tree, node, an)` | — | set or remove the check mark |
 | `GUI_FILETREE(win, x, y, w, h, wurzel$ = ".")` | GUI_WIDGET | file tree: fetches its nodes from disk itself, each folder only when it is expanded |
-| `GUI_FILETREE_SET(ft, key$, wert)` | — | `ordner_zuerst` (folders first), `verborgene` (hidden files), `nur_ordner` (folders only), `mehrfachauswahl` (multi-select), `kaestchen` (checkboxes), `klick_klappt` (click expands), `auffrischen` (refresh, milliseconds, 0 = never) |
+| `GUI_FILETREE_SET(ft, key$, wert)` | — | `ordner_zuerst` (folders first), `verborgene` (hidden files), `nur_ordner` (folders only), `mehrfachauswahl` (multi-select), `kaestchen` (checkboxes), `klick_klappt` (click expands), `nach_art` (files of a folder in the order of the `GUI_FILETREE_ICON` patterns, else `GUI_FILETREE_COLOR`, then by name), `auffrischen` (refresh, milliseconds, 0 = never) |
 | `GUI_FILETREE_FILTER(ft, muster$)` | — | which files it shows (`*.dh;*.md`, empty = all) |
 | `GUI_FILETREE_SKIP(ft, namen$)` | — | names or patterns it skips — folders and files alike (`target;__pycache__;_*`) |
 | `GUI_FILETREE_SET_ROOT(ft, pfad$)` / `GUI_FILETREE_ROOT$(ft)` | — / STRING | set and read the root folder |
@@ -228,6 +228,7 @@ IMPORT "gui"
 | `GUI_FILETREE_CHECKED_COUNT(ft)` / `GUI_FILETREE_CHECKED_PATH$(ft, i)` | INTEGER / STRING | all checked paths, including those currently collapsed |
 | `GUI_FILETREE_ICONS(ft, ordnerbild, dateibild)` | — | icons for folders and files (-1 = none) |
 | `GUI_FILETREE_COLOR(ft, muster$, farbe)` | — | text colour per file type: patterns as with the filter (`"*.json;*.ini"`), `"/"` for folders; the first match wins, -1 removes the colour |
+| `GUI_FILETREE_ICON(ft, muster$, sinnbild$)` | — | built-in icon per file type, same rule as the colour, drawn in the colour of the name; a folder with `"ordner"` shows `"ordner_offen"` when expanded, `""` removes it |
 | `GUI_TABCONTROL(win, x, y, w, h)` | GUI_WIDGET | tabs **inside** a window (card index) |
 | `GUI_TABCONTROL_ADD(tc, titel$)` | INTEGER | append a page, returns its number |
 | `GUI_TABCONTROL_ADD_WIDGET(tc, wdg, seite)` | — | put a widget on a page; it keeps its position in the window |
@@ -1002,7 +1003,9 @@ Breakpoint carry their own colour. `GUI_ICON_BUTTON`, `GUI_SET_ICON` and
 `runter`, `menue`, `aktualisieren`, and for paint tools and editors
 `stift`, `radierer`, `fuellen`, `linie`, `rechteck`, `ellipse`, `pipette`,
 `auswahl`, `lasso`, `zauberstab`, `verschieben`, `spruehen`, `wuerfel`,
-`raster`, `auge`, `auge_zu`, `spiegeln`, `drehen`.
+`raster`, `auge`, `auge_zu`, `spiegeln`, `drehen`, and for file types in
+trees `ordner`, `ordner_offen`, `datei_code`, `datei_test`, `datei_bild`,
+`datei_daten`, `datei_text`, `datei_ton`, `datei_form`.
 
 An unknown name is an **error** that lists the known ones — a silently empty
 button would only be noticed when someone looks for it. Whoever wants their

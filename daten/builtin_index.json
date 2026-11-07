@@ -4803,6 +4803,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_FILETREE_ICON",
+   "kind": "core",
+   "signature": "GUI_FILETREE_ICON(ft, muster$, sinnbild$)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_FILETREE_COLOR",
    "kind": "core",
    "signature": "GUI_FILETREE_COLOR(baum, muster$, farbe)",

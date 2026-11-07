@@ -1482,6 +1482,9 @@ struct TreeNode {
     has_children: bool,
     icon: i64,    // Textur-Handle, -1 = keins
     color: i64,   // Textfarbe, -1 = Thema
+    /// Eingebautes Sinnbild (GUI_TREE_ICON mit Namen, GUI_FILETREE_ICON),
+    /// leer = keins. Gezeichnet in der Farbe des Knotens.
+    sym: String,
 }
 
 /// Der DATEIbaum (GUI_FILETREE): ein Baum, der seine Knoten selbst aus dem
@@ -1515,6 +1518,12 @@ struct DateiBaum {
     /// Textfarbe je Muster (GUI_FILETREE_COLOR), in der Reihenfolge, in der
     /// sie gesetzt wurden -- das erste passende gilt. "/" meint Ordner.
     farben: Vec<(String, i64)>,
+    /// Sinnbild je Muster (GUI_FILETREE_ICON), dieselbe Regel wie die Farben.
+    symbole: Vec<(String, String)>,
+    /// Dateien eines Ordners nach ihrer ART ordnen (GUI_FILETREE_SET
+    /// "nach_art"): in der Reihenfolge, in der die Muster der Sinnbilder
+    /// (ersatzweise der Farben) gesetzt wurden, erst darin nach dem Namen.
+    nach_art: bool,
 }
 
 impl DateiBaum {
@@ -1535,6 +1544,27 @@ impl DateiBaum {
         self.farben.iter()
             .find(|(m, _)| if m == "/" { ist_ordner } else { !ist_ordner && crate::builtins::passt_muster(name, m) })
             .map(|(_, f)| *f).unwrap_or(-1)
+    }
+    /// Rang einer Datei fuer "nach_art": die Stelle des ersten passenden
+    /// Musters, was keins trifft, kommt zuletzt. Ordner haben keinen Rang.
+    fn art_rang(&self, name: &str) -> usize {
+        let muster: Vec<&String> = if self.symbole.is_empty() {
+            self.farben.iter().map(|(m, _)| m).collect()
+        } else {
+            self.symbole.iter().map(|(m, _)| m).collect()
+        };
+        muster.iter().filter(|m| m.as_str() != "/")
+            .position(|m| crate::builtins::passt_muster(name, m))
+            .unwrap_or(usize::MAX)
+    }
+    /// Das Sinnbild eines Eintrags nach derselben Regel. Ein aufgeklappter
+    /// Ordner mit dem Sinnbild "ordner" zeigt "ordner_offen" -- man sieht
+    /// dem Baum an, was offen ist, auch ohne auf das Dreieck zu schauen.
+    fn symbol_fuer(&self, name: &str, ist_ordner: bool, offen: bool) -> String {
+        let s = self.symbole.iter()
+            .find(|(m, _)| if m == "/" { ist_ordner } else { !ist_ordner && crate::builtins::passt_muster(name, m) })
+            .map(|(_, s)| s.clone()).unwrap_or_default();
+        if offen && s == "ordner" { "ordner_offen".to_string() } else { s }
     }
 }
 
@@ -1586,12 +1616,17 @@ fn dateibaum_sammeln(d: &DateiBaum, rel: &str, eltern: i32, ebene: i32,
     }
     liste.sort_by(|a, b| {
         if d.ordner_zuerst && a.1 != b.1 { return b.1.cmp(&a.1); }
+        if d.nach_art && !a.1 && !b.1 {
+            let (ra, rb) = (d.art_rang(&a.0), d.art_rang(&b.0));
+            if ra != rb { return ra.cmp(&rb); }
+        }
         a.0.to_lowercase().cmp(&b.0.to_lowercase()).then(a.0.cmp(&b.0))
     });
     for (name, ist_ordner) in liste {
         let weg = if rel.is_empty() { name.clone() } else { format!("{}/{}", rel, name) };
         let farbe = d.farbe_fuer(&name, ist_ordner);
         let auf = ist_ordner && d.offen.iter().any(|o| o == &weg);
+        let sym = d.symbol_fuer(&name, ist_ordner, auf);
         if eltern >= 0 { nodes[eltern as usize].has_children = true; }
         nodes.push(TreeNode {
             label: name, parent: eltern, level: ebene, expanded: auf,
@@ -1601,6 +1636,7 @@ fn dateibaum_sammeln(d: &DateiBaum, rel: &str, eltern: i32, ebene: i32,
             has_children: ist_ordner,
             icon: if ist_ordner { d.bild_ordner } else { d.bild_datei },
             color: farbe,
+            sym,
         });
         pfade.push(weg.clone());
         ordner.push(ist_ordner);
@@ -1925,6 +1961,9 @@ pub const SINNBILDER: &[&str] = &[
     "stift", "radierer", "fuellen", "linie", "rechteck", "ellipse",
     "pipette", "auswahl", "lasso", "zauberstab", "verschieben", "spruehen",
     "wuerfel", "raster", "auge", "auge_zu", "spiegeln", "drehen",
+    // Dateiarten fuer Baeume und Listen (2026-11-07)
+    "ordner", "ordner_offen", "datei_code", "datei_test", "datei_bild",
+    "datei_daten", "datei_text", "datei_ton", "datei_form",
 ];
 
 fn sinnbild_pruefen(name: &str, fn_: &str) -> Result<String, String> {
@@ -1960,7 +1999,66 @@ fn sinnbild(g: &mut Graphics, name: &str, x: i32, y: i32, s: i32, c: i64, gesper
         let ri = (ro - w.round() as i32).max(0);
         g.ring(px(cx), py(cy), ri, ro, von, bis, c, true);
     };
+    // Eine gefuellte Flaeche, halb durchsichtig in der Strichfarbe -- gibt
+    // Ordner und Fenstern Koerper, ohne sie zu Kloetzen zu machen.
+    let hauch = deckkraft(c, 0.28);
+    // Ein Blatt mit Eselsohr, der Grund der Dateiarten.
+    let blatt = |g: &mut Graphics| {
+        zug(g, &[(3.5, 1.5), (9.5, 1.5), (12.5, 4.5), (12.5, 14.5), (3.5, 14.5), (3.5, 1.5)], t, c);
+        zug(g, &[(9.5, 1.5), (9.5, 4.5), (12.5, 4.5)], t, c);
+    };
     match name {
+        "ordner" => {
+            g.box_fill(px(1.5), py(4.5), px(14.5), py(13.5), hauch);
+            zug(g, &[(1.5, 4.5), (1.5, 2.5), (6.0, 2.5), (7.5, 4.5)], t, c);
+            zug(g, &[(1.5, 4.5), (14.5, 4.5), (14.5, 13.5), (1.5, 13.5), (1.5, 4.5)], t, c);
+        }
+        "ordner_offen" => {
+            zug(g, &[(1.5, 13.5), (1.5, 2.5), (6.0, 2.5), (7.5, 4.5), (13.0, 4.5), (13.0, 7.0)], t, c);
+            g.triangle(px(1.5), py(13.5), px(4.0), py(7.0), px(15.0), py(7.0), hauch);
+            g.triangle(px(1.5), py(13.5), px(15.0), py(7.0), px(12.5), py(13.5), hauch);
+            zug(g, &[(1.5, 13.5), (4.0, 7.0), (15.0, 7.0), (12.5, 13.5), (1.5, 13.5)], t, c);
+        }
+        "datei_code" => {
+            blatt(g);
+            zug(g, &[(6.5, 7.5), (5.0, 9.75), (6.5, 12.0)], t, c);
+            zug(g, &[(9.5, 7.5), (11.0, 9.75), (9.5, 12.0)], t, c);
+        }
+        "datei_test" => {
+            blatt(g);
+            zug(g, &[(5.0, 9.5), (7.0, 11.5), (11.0, 7.0)], t * 1.15, c);
+        }
+        "datei_text" => {
+            blatt(g);
+            zug(g, &[(5.5, 7.0), (10.5, 7.0)], t, c);
+            zug(g, &[(5.5, 9.5), (10.5, 9.5)], t, c);
+            zug(g, &[(5.5, 12.0), (9.0, 12.0)], t, c);
+        }
+        "datei_bild" => {
+            zug(g, &[(1.5, 2.5), (14.5, 2.5), (14.5, 13.5), (1.5, 13.5), (1.5, 2.5)], t, c);
+            g.triangle(px(2.5), py(12.5), px(6.5), py(7.5), px(10.5), py(12.5), hauch);
+            zug(g, &[(2.5, 12.5), (6.5, 7.5), (9.0, 10.5), (11.0, 8.5), (13.5, 12.5)], t, c);
+            kreis(g, 11.0, 5.5, 1.6, 1.6 * f + 1.0, c);
+        }
+        "datei_daten" => {
+            g.box_fill(px(1.5), py(2.5), px(14.5), py(6.0), hauch);
+            zug(g, &[(1.5, 2.5), (14.5, 2.5), (14.5, 13.5), (1.5, 13.5), (1.5, 2.5)], t, c);
+            zug(g, &[(1.5, 6.0), (14.5, 6.0)], t, c);
+            zug(g, &[(1.5, 9.75), (14.5, 9.75)], t, c);
+            zug(g, &[(6.0, 2.5), (6.0, 13.5)], t, c);
+        }
+        "datei_ton" => {
+            kreis(g, 5.0, 12.0, 2.4, 2.4 * f + 1.0, c);
+            zug(g, &[(7.2, 12.0), (7.2, 2.0)], t, c);
+            zug(g, &[(7.2, 2.0), (12.0, 4.0), (12.0, 7.0)], t, c);
+        }
+        "datei_form" => {
+            g.box_fill(px(1.5), py(2.5), px(14.5), py(5.5), hauch);
+            zug(g, &[(1.5, 2.5), (14.5, 2.5), (14.5, 13.5), (1.5, 13.5), (1.5, 2.5)], t, c);
+            zug(g, &[(1.5, 5.5), (14.5, 5.5)], t, c);
+            zug(g, &[(4.0, 8.5), (12.0, 8.5)], t, c);
+            zug(g, &[(8.0, 11.0), (12.0, 11.0)], t, c);
+        }
         "neu" | "datei" => {
             zug(g, &[(3.5, 1.5), (9.5, 1.5), (12.5, 4.5), (12.5, 14.5), (3.5, 14.5), (3.5, 1.5)], t, c);
             zug(g, &[(9.5, 1.5), (9.5, 4.5), (12.5, 4.5)], t, c);
@@ -6278,7 +6376,7 @@ impl Gui {
     fn baum_text_x(&self, t: &TreeState, ax: i32, k: usize) -> i32 {
         let level = t.nodes[k].level;
         let mut x = ax + 4 + self.tree_kast_w(t) + level * self.sk(TREE_INDENT) + self.sk(TREE_TOGGLE_W) + 2;
-        if t.nodes.iter().any(|n| n.icon >= 0) { x += self.sk(TREE_ROW_H) - 4 + 3; }
+        if t.nodes.iter().any(|n| n.icon >= 0 || !n.sym.is_empty()) { x += self.sk(TREE_ROW_H) - 4 + 3; }
         x
     }
     fn baum_edit_rect(&self, wi: usize, i: usize) -> Option<(i32, i32, i32, i32)> {
@@ -7046,7 +7144,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         }
         let level = if parent < 0 { 0 } else { t.nodes[parent as usize].level + 1 };
         if parent >= 0 { t.nodes[parent as usize].has_children = true; }
-        t.nodes.push(TreeNode { label, parent: parent as i32, level, expanded: false, has_children: false, icon: -1, color: -1 });
+        t.nodes.push(TreeNode { label, parent: parent as i32, level, expanded: false, has_children: false, icon: -1, color: -1, sym: String::new() });
         t.sync();
         Ok((t.nodes.len() - 1) as i64)
     }
@@ -7249,6 +7347,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             // einen Ordner klappt ihn um. Ohne das tut ein Klick auf eine
             // Ordnerzeile scheinbar nichts -- nur das schmale Dreieck wirkt.
             "klick_klappt" | "click_expands" => t.datei.as_mut().unwrap().klick_klappt = an,
+            "nach_art" | "by_type" => t.datei.as_mut().unwrap().nach_art = an,
             "mehrfachauswahl" | "multi" => { t.multi = an; t.sync(); }
             "kaestchen" | "checkboxes" => t.kaestchen = an,
             // In MILLISEKUNDEN, wie ueberall sonst -- innen in Sekunden, weil
@@ -7258,7 +7357,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 t.datei.as_mut().unwrap().naechste = 0.0;
             }
             _ => return Err(format!("GUI_FILETREE_SET: unbekannte Einstellung '{}' (gueltig: \
-                ordner_zuerst, verborgene, nur_ordner, mehrfachauswahl, kaestchen, auffrischen)", key)),
+                ordner_zuerst, verborgene, nur_ordner, nach_art, klick_klappt, mehrfachauswahl, kaestchen, auffrischen)", key)),
         }
         dateibaum_neu(t);
         Ok(())
@@ -7425,6 +7524,28 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 Some(k) if farbe < 0 => { d.farben.remove(k); }
                 Some(k) => d.farben[k].1 = farbe,
                 None if farbe >= 0 => d.farben.push((m, farbe)),
+                None => {}
+            }
+        }
+        dateibaum_neu(t); Ok(())
+    }
+
+    /// Ein eingebautes Sinnbild je Dateiart, nach derselben Regel wie
+    /// GUI_FILETREE_COLOR ("/" = Ordner, das erste passende gilt). "" nimmt
+    /// es weg. Ein Bild aus GUI_FILETREE_ICONS geht vor.
+    pub fn filetree_icon(&mut self, h: i64, muster: &str, name: &str) -> Result<(), String> {
+        let sym = if name.trim().is_empty() { String::new() } else { sinnbild_pruefen(name, "GUI_FILETREE_ICON")? };
+        let t = self.ft_mut(h, "GUI_FILETREE_ICON")?;
+        let liste = Self::ft_liste(muster);
+        if liste.is_empty() {
+            return Err("GUI_FILETREE_ICON: kein Muster -- so: \"*.dh\", \"*.json;*.ini\" oder \"/\" fuer Ordner".to_string());
+        }
+        let d = t.datei.as_mut().unwrap();
+        for m in liste {
+            match d.symbole.iter().position(|(x, _)| *x == m) {
+                Some(k) if sym.is_empty() => { d.symbole.remove(k); }
+                Some(k) => d.symbole[k].1 = sym.clone(),
+                None if !sym.is_empty() => d.symbole.push((m, sym.clone())),
                 None => {}
             }
         }
@@ -11647,10 +11768,17 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         }
         if let Some(t) = &w.tree {
             o["tree"] = serde_json::json!({
-                "nodes": t.nodes.iter().map(|n| serde_json::json!({
-                    "label": n.label, "parent": n.parent, "level": n.level,
-                    "expanded": n.expanded, "has_children": n.has_children,
-                })).collect::<Vec<_>>(),
+                "nodes": t.nodes.iter().map(|n| {
+                    let mut o = serde_json::json!({
+                        "label": n.label, "parent": n.parent, "level": n.level,
+                        "expanded": n.expanded, "has_children": n.has_children,
+                    });
+                    // Farbe und Sinnbild nur, wenn gesetzt -- alte Dateien
+                    // bleiben so, wie sie waren.
+                    if n.color >= 0 { o["color"] = serde_json::json!(n.color); }
+                    if !n.sym.is_empty() { o["sym"] = serde_json::json!(n.sym); }
+                    o
+                }).collect::<Vec<_>>(),
                 "selected": t.selected,
                 "multi": t.multi,
             });
@@ -11671,6 +11799,11 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     o["filetree"]["farben"] = serde_json::json!(d.farben.iter()
                         .map(|(m, f)| serde_json::json!([m, f])).collect::<Vec<_>>());
                 }
+                if !d.symbole.is_empty() {
+                    o["filetree"]["symbole"] = serde_json::json!(d.symbole.iter()
+                        .map(|(m, s)| serde_json::json!([m, s])).collect::<Vec<_>>());
+                }
+                if d.nach_art { o["filetree"]["nach_art"] = serde_json::json!(true); }
             }
         }
         if w.kind == Kind::TimePicker {
@@ -12012,6 +12145,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                         has_children: nj["has_children"].as_bool().unwrap_or(false),
                         icon: -1,   // Textur-Handles stehen nicht in der Datei
                         color: nj["color"].as_i64().unwrap_or(-1),
+                        sym: nj["sym"].as_str().filter(|s| SINNBILDER.contains(s)).unwrap_or("").to_string(),
                     }).collect();
                 }
                 ts.selected = tj["selected"].as_i64().unwrap_or(-1) as i32;
@@ -12033,6 +12167,12 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     farben: fj["farben"].as_array().map(|a| a.iter().filter_map(|p| {
                         Some((p.get(0)?.as_str()?.to_string(), p.get(1)?.as_i64()?))
                     }).collect()).unwrap_or_default(),
+                    symbole: fj["symbole"].as_array().map(|a| a.iter().filter_map(|p| {
+                        let s = p.get(1)?.as_str()?;
+                        if !SINNBILDER.contains(&s) { return None; }
+                        Some((p.get(0)?.as_str()?.to_string(), s.to_string()))
+                    }).collect()).unwrap_or_default(),
+                    nach_art: fj["nach_art"].as_bool().unwrap_or(false),
                     ..Default::default()
                 }));
                 ts.selected = -1;
@@ -17992,7 +18132,20 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         if node < 0 || node >= t.nodes.len() as i64 {
             return Err(format!("GUI_TREE_ICON: ungueltige Knoten-id {}", node));
         }
-        t.nodes[node as usize].icon = tex.max(-1); Ok(())
+        t.nodes[node as usize].icon = tex.max(-1);
+        t.nodes[node as usize].sym.clear();
+        Ok(())
+    }
+    /// Dasselbe mit einem eingebauten Sinnbild statt eines Bildes.
+    pub fn tree_icon_sym(&mut self, h: i64, node: i64, name: &str) -> Result<(), String> {
+        let sym = if name.trim().is_empty() { String::new() } else { sinnbild_pruefen(name, "GUI_TREE_ICON")? };
+        let t = self.tree_mut(h, "GUI_TREE_ICON")?;
+        if node < 0 || node >= t.nodes.len() as i64 {
+            return Err(format!("GUI_TREE_ICON: ungueltige Knoten-id {}", node));
+        }
+        t.nodes[node as usize].icon = -1;
+        t.nodes[node as usize].sym = sym;
+        Ok(())
     }
     pub fn tree_color(&mut self, h: i64, node: i64, farbe: i64) -> Result<(), String> {
         let t = self.tree_mut(h, "GUI_TREE_COLOR")?;
@@ -21882,7 +22035,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         let fg = self.txt_col(wdg);
         let acc = self.acc_col(wdg);
         let scroll = t.scroll;
-        let hat_icon = t.nodes.iter().any(|n| n.icon >= 0);
+        let hat_icon = t.nodes.iter().any(|n| n.icon >= 0 || !n.sym.is_empty());
         let isz = self.sk(TREE_ROW_H) - 4;
         // Mit Rollbalken enden die Zeilen vor ihm.
         let bar = self.list_bar_geom(wi, idx);
@@ -21941,16 +22094,23 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     g.box_fill(bx + 2, by + 2, bx + cs - 3, by + cs - 3, acc);
                 }
             }
-            if hat_icon {
-                // Platz fuer das Sinnbild bekommt JEDE Zeile, sobald eine
-                // eines hat -- sonst staenden die Namen versetzt.
-                if node.icon >= 0 { g.draw_image_rect(node.icon, lx, ry + 2, isz, isz); }
-                lx += isz + 3;
-            }
             // Auf der Auswahl folgt die Schrift dem GRUND, wie in der Liste --
             // im hellen Thema stand sonst dunkle Schrift auf dunkelblauer Zeile
             // (gesehen im Navigator des Studios).
             let farbe = if markiert { lesbar_auf(shade(acc, -110)) } else if node.color >= 0 { node.color } else { fg };
+            if hat_icon {
+                // Platz fuer das Sinnbild bekommt JEDE Zeile, sobald eine
+                // eines hat -- sonst staenden die Namen versetzt.
+                if node.icon >= 0 {
+                    g.draw_image_rect(node.icon, lx, ry + 2, isz, isz);
+                } else if !node.sym.is_empty() {
+                    // Ein eingebautes Sinnbild in der Farbe des Namens, etwas
+                    // kleiner als die Zeile, damit es nicht an den Nachbarn klebt.
+                    let s = (isz - 2).max(8);
+                    sinnbild(g, &node.sym, lx + (isz - s) / 2, ry + (self.sk(TREE_ROW_H) - s) / 2, s, farbe, true);
+                }
+                lx += isz + 3;
+            }
             self.wtext(g, wdg, lx, ry + (self.sk(TREE_ROW_H) - self.wsize(g, wdg)).max(0) / 2, node.label.clone(), farbe);
             if teil { g.pop_clip(); }
         }

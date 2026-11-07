@@ -9582,7 +9582,16 @@ impl<'p> Vm<'p> {
             "gui_cursors" => { self.gui.cursors(gbool(a,0,"GUI_CURSORS")?); Value::Nil }
             "gui_set_cursor" => { self.gui.set_cursor(gi(a,0,"GUI_SET_CURSOR")?, &gs(a,1,"GUI_SET_CURSOR")?)?; Value::Nil }
             "gui_get_cursor$" | "gui_get_cursor" => Value::str_rc(self.gui.get_cursor(gi(a,0,"GUI_GET_CURSOR$")?)?),
-            "gui_tree_icon" => { self.gui.tree_icon(gi(a,0,"GUI_TREE_ICON")?, gi(a,1,"GUI_TREE_ICON")?, gi(a,2,"GUI_TREE_ICON")?)?; Value::Nil }
+            "gui_tree_icon" => {
+                // Ein Bild (Handle) oder der Name eines eingebauten Sinnbilds.
+                if let Some(Value::Str(n)) = a.get(2) {
+                    let n = n.to_string();
+                    self.gui.tree_icon_sym(gi(a,0,"GUI_TREE_ICON")?, gi(a,1,"GUI_TREE_ICON")?, &n)?;
+                } else {
+                    self.gui.tree_icon(gi(a,0,"GUI_TREE_ICON")?, gi(a,1,"GUI_TREE_ICON")?, gi(a,2,"GUI_TREE_ICON")?)?;
+                }
+                Value::Nil
+            }
             "gui_tree_color" => { self.gui.tree_color(gi(a,0,"GUI_TREE_COLOR")?, gi(a,1,"GUI_TREE_COLOR")?, gi(a,2,"GUI_TREE_COLOR")?)?; Value::Nil }
             "gui_panel_add" => { self.gui.panel_add(gi(a,0,"GUI_PANEL_ADD")?, gi(a,1,"GUI_PANEL_ADD")?)?; Value::Nil }
             "gui_panel_remove" => { self.gui.panel_remove(gi(a,0,"GUI_PANEL_REMOVE")?, gi(a,1,"GUI_PANEL_REMOVE")?)?; Value::Nil }
@@ -10231,6 +10240,7 @@ impl<'p> Vm<'p> {
             "gui_treetable_level" => Value::Int(self.gui.treetable_level(gi(a,0,"GUI_TREETABLE_LEVEL")?, gi(a,1,"GUI_TREETABLE_LEVEL")?)?),
             "gui_treetable_set_parent" => { self.gui.treetable_set_parent(gi(a,0,"GUI_TREETABLE_SET_PARENT")?, gi(a,1,"GUI_TREETABLE_SET_PARENT")?, gi(a,2,"GUI_TREETABLE_SET_PARENT")?)?; Value::Nil }
             "gui_filetree_color" => { self.gui.filetree_color(gi(a,0,"GUI_FILETREE_COLOR")?, &gs(a,1,"GUI_FILETREE_COLOR")?, gi(a,2,"GUI_FILETREE_COLOR")?)?; Value::Nil }
+            "gui_filetree_icon" => { self.gui.filetree_icon(gi(a,0,"GUI_FILETREE_ICON")?, &gs(a,1,"GUI_FILETREE_ICON")?, &gs(a,2,"GUI_FILETREE_ICON")?)?; Value::Nil }
             "gui_filetree_icons" => { self.gui.filetree_icons(gi(a,0,"GUI_FILETREE_ICONS")?, gi(a,1,"GUI_FILETREE_ICONS")?, gi(a,2,"GUI_FILETREE_ICONS")?)?; Value::Nil }
             "gui_update" => {
                 {

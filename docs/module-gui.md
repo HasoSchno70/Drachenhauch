@@ -98,7 +98,7 @@ IMPORT "gui"
 | `GUI_VSLIDER(win, x, y, h, min, max, default)` | GUI_WIDGET | **senkrechter Schieber** — `h` ist die Länge, der Wert wächst nach oben |
 | `GUI_PROGRESS_SET(progress, "unbestimmt", 1)` | — | laufendes Band statt Wert, für alles, dessen Dauer man nicht kennt |
 | `GUI_IMAGE_MODE(image, modus$)` / `GUI_IMAGE_MODE_GET(image)` | — / STRING | `strecken` (Vorgabe), `einpassen`, `fuellen`, `mitte`, `kacheln` |
-| `GUI_TREE_ICON(tree, node, bild)` / `GUI_TREE_COLOR(tree, node, farbe)` | — | Sinnbild und Textfarbe je Baumknoten |
+| `GUI_TREE_ICON(tree, node, bild)` / `GUI_TREE_COLOR(tree, node, farbe)` | — | Sinnbild und Textfarbe je Baumknoten; statt eines Bildes auch der Name eines eingebauten Sinnbilds (`"ordner"`), `""` nimmt es weg |
 | `GUI_PANEL_ADD(panel, wdg)` / `GUI_PANEL_REMOVE` / `GUI_PANEL_SCROLL(panel, y)` / `GUI_PANEL_SCROLL_GET(panel)` | — | ein **Panel, das seine Kinder rollt** (Mausrad, Rollbalken) — siehe [Feinschliff](#feinschliff-schieber-fortschritt-bild-baum-panel-ziehen) |
 | `GUI_DRAGGABLE(wdg, an)` / `GUI_DROP_TARGET(wdg, an)` | — | **Ziehen zwischen Widgets**: Quelle und Ablage |
 | `GUI_DRAGGING()` / `GUI_DROPPED(wdg)` / `GUI_DROP_TEXT()` / `GUI_DROP_SOURCE()` / `GUI_DRAG_INDEX()` / `GUI_DROP_INDEX()` | GUI_WIDGET / BOOL / STRING / GUI_WIDGET / INTEGER / INTEGER | laufender Zug, Ablage in diesem Bild, was gezogen wurde, woher, welche Zeile, auf welche Zeile |
@@ -212,7 +212,7 @@ IMPORT "gui"
 | `GUI_TREE_CHECKED(tree, node)` | BOOLEAN | ist der Haken an diesem Knoten gesetzt (nur mit `kaestchen`)? |
 | `GUI_TREE_SET_CHECKED(tree, node, an)` | — | Haken setzen oder wegnehmen |
 | `GUI_FILETREE(win, x, y, w, h, wurzel$ = ".")` | GUI_WIDGET | Dateibaum: holt seine Knoten selbst von der Platte, jeden Ordner erst beim Aufklappen |
-| `GUI_FILETREE_SET(ft, key$, wert)` | — | `ordner_zuerst`, `verborgene`, `nur_ordner`, `mehrfachauswahl`, `kaestchen`, `klick_klappt`, `auffrischen` (Millisekunden, 0 = nie) |
+| `GUI_FILETREE_SET(ft, key$, wert)` | — | `ordner_zuerst`, `verborgene`, `nur_ordner`, `mehrfachauswahl`, `kaestchen`, `klick_klappt`, `nach_art` (Dateien eines Ordners nach der Reihenfolge der Muster von `GUI_FILETREE_ICON`, ersatzweise `GUI_FILETREE_COLOR`, erst darin nach dem Namen), `auffrischen` (Millisekunden, 0 = nie) |
 | `GUI_FILETREE_FILTER(ft, muster$)` | — | welche Dateien er zeigt (`*.dh;*.md`, leer = alle) |
 | `GUI_FILETREE_SKIP(ft, namen$)` | — | Namen oder Muster, die er überspringt — Ordner wie Dateien (`target;__pycache__;_*`) |
 | `GUI_FILETREE_SET_ROOT(ft, pfad$)` / `GUI_FILETREE_ROOT$(ft)` | — / STRING | Wurzelordner setzen und lesen |
@@ -228,6 +228,7 @@ IMPORT "gui"
 | `GUI_FILETREE_CHECKED_COUNT(ft)` / `GUI_FILETREE_CHECKED_PATH$(ft, i)` | INTEGER / STRING | alle angehakten Wege, auch die gerade zugeklappten |
 | `GUI_FILETREE_ICONS(ft, ordnerbild, dateibild)` | — | Sinnbilder für Ordner und Dateien (-1 = keins) |
 | `GUI_FILETREE_COLOR(ft, muster$, farbe)` | — | Textfarbe je Dateiart: Muster wie beim Filter (`"*.json;*.ini"`), `"/"` für Ordner; das erste passende gilt, -1 nimmt die Farbe weg |
+| `GUI_FILETREE_ICON(ft, muster$, sinnbild$)` | — | eingebautes Sinnbild je Dateiart, nach derselben Regel wie die Farbe, gezeichnet in der Farbe des Namens; ein Ordner mit `"ordner"` zeigt aufgeklappt `"ordner_offen"`, `""` nimmt es weg |
 | `GUI_TABCONTROL(win, x, y, w, h)` | GUI_WIDGET | Reiter **innerhalb** eines Fensters (Karteikasten) |
 | `GUI_TABCONTROL_ADD(tc, titel$)` | INTEGER | eine Seite anhängen, liefert ihre Nummer |
 | `GUI_TABCONTROL_ADD_WIDGET(tc, wdg, seite)` | — | ein Widget auf eine Seite legen; es behält seine Lage im Fenster |
@@ -1004,7 +1005,9 @@ Dieselben Namen nehmen `GUI_ICON_BUTTON`, `GUI_SET_ICON` und
 `runter`, `menue`, `aktualisieren`, und für Malwerkzeuge und Editoren
 `stift`, `radierer`, `fuellen`, `linie`, `rechteck`, `ellipse`, `pipette`,
 `auswahl`, `lasso`, `zauberstab`, `verschieben`, `spruehen`, `wuerfel`,
-`raster`, `auge`, `auge_zu`, `spiegeln`, `drehen`.
+`raster`, `auge`, `auge_zu`, `spiegeln`, `drehen`, und für Dateiarten in
+Bäumen `ordner`, `ordner_offen`, `datei_code`, `datei_test`, `datei_bild`,
+`datei_daten`, `datei_text`, `datei_ton`, `datei_form`.
 
 Ein unbekannter Name ist ein **Fehler**, der die bekannten aufzählt — ein
 still leerer Knopf fiele erst auf, wenn jemand ihn sucht. Wer ein eigenes

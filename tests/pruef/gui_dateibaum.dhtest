@@ -494,3 +494,128 @@ END TRY
 TRUE
 TRUE
 GUI_FILETREE_COLOR: kein Muster -- so: "*.dh", "*.json;*.ini" oder "/" fuer Ordner
+
+=== nach art sortiert die dateien eines ordners
+' GUI_FILETREE_SET "nach_art": die Dateien in der Reihenfolge der Muster von
+' GUI_FILETREE_ICON, erst darin nach dem Namen; was kein Muster trifft,
+' kommt zuletzt. Ordner bleiben vorn. Ohne den Schalter alphabetisch.
+IMPORT "gui"
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 400, 300)
+DIM ft AS GUI_WIDGET : ft = GUI_FILETREE(w, 10, 10, 380, 250, "projekt")
+GUI_FILETREE_ICON(ft, "/", "ordner")
+GUI_FILETREE_ICON(ft, "*.dh", "datei_code")
+GUI_FILETREE_ICON(ft, "*.dhtest", "datei_test")
+GUI_FILETREE_ICON(ft, "*.json", "datei_daten")
+SUB zeigen()
+    DIM t AS STRING : t = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO GUI_FILETREE_COUNT(ft) - 1
+        t = t + BASENAME(GUI_FILETREE_PATH$(ft, i)) + " "
+    NEXT
+    PRINT TRIM$(t)
+END SUB
+zeigen()
+GUI_FILETREE_SET(ft, "nach_art", 1)
+zeigen()
+--- datei projekt/a.json
+{}
+--- datei projekt/b.dhtest
+x
+--- datei projekt/c.dh
+PRINT 1
+--- datei projekt/d.txt
+x
+--- datei projekt/z.dh
+PRINT 2
+--- datei projekt/lib/e.dh
+PRINT 3
+--- erwartet
+lib a.json b.dhtest c.dh d.txt z.dh
+lib c.dh z.dh b.dhtest a.json d.txt
+
+=== sinnbilder je dateiart stehen in der dhform
+' Muster, Sinnbild und "nach_art" ueberleben GUI_TO_JSON/GUI_FROM_JSON; ""
+' nimmt ein Sinnbild weg, ein unbekannter Name ist ein Fehler, der die
+' bekannten nennt. GUI_TREE_ICON nimmt statt eines Bildes auch einen Namen.
+IMPORT "gui"
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 400, 300)
+DIM ft AS GUI_WIDGET : ft = GUI_FILETREE(w, 10, 10, 380, 250, ".")
+GUI_FILETREE_ICON(ft, "/", "ordner")
+GUI_FILETREE_ICON(ft, "*.dh;*.txt", "datei_code")
+GUI_FILETREE_ICON(ft, "*.txt", "")
+GUI_FILETREE_SET(ft, "nach_art", 1)
+DIM j AS STRING : j = GUI_TO_JSON(GUI_FROM_JSON(GUI_TO_JSON(w)))
+j = REPLACE$(REPLACE$(REPLACE$(j, " ", ""), CHR$(10), ""), CHR$(13), "")
+DIM q AS STRING : q = CHR$(34)
+PRINT INSTR(j, "[" + q + "*.dh" + q + "," + q + "datei_code" + q + "]") >= 0
+PRINT INSTR(j, q + "*.txt" + q + "," + q) < 0
+PRINT INSTR(j, q + "nach_art" + q + ":true") >= 0
+TRY
+    GUI_FILETREE_ICON(ft, "*.dh", "kuerbis")
+CATCH e
+    PRINT LEFT$(e, 62)
+END TRY
+DIM tr AS GUI_WIDGET : tr = GUI_TREE(w, 10, 10, 200, 200)
+DIM k AS INTEGER : k = GUI_TREE_ADD(tr, -1, "Wurzel")
+GUI_TREE_ICON(tr, k, "datei_bild")
+PRINT INSTR(REPLACE$(GUI_TO_JSON(w), " ", ""), q + "sym" + q + ":" + q + "datei_bild" + q) >= 0
+--- erwartet
+TRUE
+TRUE
+TRUE
+GUI_FILETREE_ICON: Sinnbild 'kuerbis' gibt es nicht -- bekannt
+TRUE
+
+=== das sinnbild steht vor dem namen in dessen farbe
+' Zwei gleiche Baeume nebeneinander, der rechte mit Sinnbildern: das Sinnbild
+' steht dort, wo sonst der Name beginnt, in der Farbe des Namens -- es gibt
+' mehr Rot, und der Name endet weiter rechts.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+GUI_FONT(-1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 400, 300)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM links AS GUI_WIDGET : links = GUI_FILETREE(w, 0, 10, 190, 250, "projekt")
+DIM rechts AS GUI_WIDGET : rechts = GUI_FILETREE(w, 200, 10, 190, 250, "projekt")
+GUI_FILETREE_COLOR(links, "/", &HFF0000)
+GUI_FILETREE_COLOR(rechts, "/", &HFF0000)
+GUI_FILETREE_ICON(rechts, "/", "ordner")
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(BLACK)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei projekt/lib/x.dh
+PRINT 1
+--- umgebung
+DHRT_FRAMES=3
+DHRT_SCREENSHOT={fall}/b.png
+--- nachher
+DIM b AS IMAGE : b = LOADIMAGE("b.png")
+DIM erster[2] AS INTEGER
+DIM letzter[2] AS INTEGER
+DIM rot[2] AS INTEGER
+DIM s, x, y AS INTEGER
+FOR s = 0 TO 1
+    erster[s] = 9999
+    FOR y = 0 TO 60
+        FOR x = 0 TO 189
+            IF (GETPIXEL(b, s * 200 + x, y) BAND &HFFFFFF) = &HFF0000 THEN
+                erster[s] = MIN(erster[s], x)
+                letzter[s] = MAX(letzter[s], x)
+                rot[s] = rot[s] + 1
+            END IF
+        NEXT
+    NEXT
+NEXT
+PRINT "beide rot "; erster[0] < 9999 AND erster[1] < 9999
+PRINT "name rueckt nach rechts "; letzter[1] > letzter[0] + 10
+PRINT "mehr rot "; rot[1] > rot[0]
+--- erwartet
+beide rot TRUE
+name rueckt nach rechts TRUE
+mehr rot TRUE
