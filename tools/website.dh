@@ -3,6 +3,7 @@
 ' llms-full.txt, sitemap.xml und robots.txt.
 '
 '     dhrt run tools/website.dh -- [--wurzel REPO] [--ziel ORDNER] [--adresse URL]
+'                                    [--spielwiese ORDNER]
 '
 ' Ohne Angaben: das Repository, in dem dieses Werkzeug liegt, und als Ziel
 ' `_site` darin. Gebaut wird von `.github/workflows/website.yml` und auf
@@ -18,6 +19,12 @@
 ' Das Handbuch: veroeffentlicht wird jede Datei aus docs/en und ihr deutsches
 ' Gegenstueck -- die Entwuerfe, Audits und Fassungsnotizen bleiben im
 ' Repository. Verweise auf andere Dateien des Repositorys zeigen auf GitHub.
+'
+' Die Spielwiese: mit --spielwiese ORDNER (ein Ordner, in dem
+' rust/build_wasm.py den Playground gebaut hat, also web/) kommt er nach
+' spielwiese/ in die Website, und Kopfleiste, Startseiten und llms.txt
+' verweisen darauf. Ohne den Bau gibt es keinen Verweis -- ein Knopf, hinter
+' dem nichts liegt, waere schlechter als keiner.
 
 IMPORT "regex"
 
@@ -27,6 +34,7 @@ CONST ROH = "https://raw.githubusercontent.com/HasoSchno70/Drachenhauch/main/"
 DIM wurzel AS STRING
 DIM ziel AS STRING
 DIM adresse AS STRING : adresse = "https://hasoschno70.github.io/Drachenhauch/"
+DIM spielwiese AS STRING
 DIM ai AS INTEGER
 WHILE ai < ARGC()
     SELECT CASE ARG$(ai)
@@ -36,6 +44,8 @@ WHILE ai < ARGC()
             ai = ai + 1 : ziel = ARGPATH$(ai)
         CASE "--adresse"
             ai = ai + 1 : adresse = ARG$(ai)
+        CASE "--spielwiese"
+            ai = ai + 1 : spielwiese = ARGPATH$(ai)
     END SELECT
     ai = ai + 1
 WEND
@@ -44,6 +54,24 @@ WEND
 IF wurzel = "" THEN wurzel = REALPATH$(PATHJOIN(CWD$(), ".."))
 IF ziel = "" THEN ziel = PATHJOIN(wurzel, "_site")
 IF NOT ENDSWITH(adresse, "/") THEN adresse = adresse + "/"
+' Die Spielwiese gilt nur, wenn der Bau wirklich daliegt.
+DIM SPIELWIESE_DATEIEN AS ARRAY OF STRING : SPIELWIESE_DATEIEN = ["index.html", "playground.js", "beispiele.js", "dhrt.js", "dhrt.wasm", "program.dh"]
+DIM mitSpielwiese AS BOOLEAN
+IF spielwiese <> "" THEN
+    mitSpielwiese = TRUE
+    DIM si AS INTEGER
+    FOR si = 0 TO LEN(SPIELWIESE_DATEIEN) - 1
+        IF NOT FILEEXISTS(PATHJOIN(spielwiese, SPIELWIESE_DATEIEN[si])) THEN
+            PRINT "Spielwiese: "; SPIELWIESE_DATEIEN[si]; " fehlt in "; spielwiese; " -- ohne Spielwiese weiter"
+            mitSpielwiese = FALSE
+            EXIT FOR
+        END IF
+    NEXT
+END IF
+' Verweis auf die Spielwiese, in der Sprache der Seite
+FUNCTION spielwieseUrl$(zurWurzel AS STRING, sprache AS STRING) AS STRING
+    RETURN zurWurzel + "spielwiese/index.html?lang=" + sprache
+END FUNCTION
 
 ' --- Kleinigkeiten ---------------------------------------------------------
 FUNCTION esc$(s AS STRING) AS STRING
@@ -573,6 +601,7 @@ FUNCTION kopf$(sprache AS STRING, titel AS STRING, beschreibung AS STRING, pfad 
     DIM handbuch AS STRING : handbuch = zurWurzel + sprache + "/index.html"
     h = h + "<header class=" + q + "leiste" + q + "><a class=" + q + "marke" + q + " href=" + q + zurWurzel + IIF(sprache = "en", "index.html", "de.html") + q + "><img src=" + q + zurWurzel + "bilder/logo.png" + q + " alt=" + q + q + " width=" + q + "28" + q + " height=" + q + "28" + q + ">Drachenhauch</a><nav>"
     h = h + "<a href=" + q + handbuch + q + ">" + IIF(sprache = "en", "Manual", "Handbuch") + "</a>"
+    IF mitSpielwiese THEN h = h + "<a href=" + q + spielwieseUrl$(zurWurzel, sprache) + q + ">" + IIF(sprache = "en", "Try it", "Ausprobieren") + "</a>"
     h = h + "<a href=" + q + REPO + "/releases/latest" + q + ">Download</a>"
     h = h + "<a href=" + q + REPO + q + ">GitHub</a>"
     IF andere <> "" THEN h = h + "<a class=" + q + "sprache" + q + " href=" + q + zurWurzel + andere + q + " hreflang=" + q + IIF(sprache = "en", "de", "en") + q + ">" + IIF(sprache = "en", "Deutsch", "English") + "</a>"
@@ -660,13 +689,13 @@ SUB startseite(sprache AS STRING)
         h = h + "<h1>A modern BASIC for games and desktop applications</h1>" + CHR$(10)
         h = h + "<p><strong>Drachenhauch</strong> (German for <em>dragon's breath</em>) is a programming language for writing <strong>2D and 3D games and desktop applications with a GUI</strong> — and the command-line tools and small services that go with them. It comes with its own IDE, form designer and sprite, tilemap and sound editors, and turns a program into a standalone <code>.exe</code> with one command. Windows, macOS and Linux, and the browser via WebAssembly.</p>" + CHR$(10)
         h = h + "<p>A BASIC in the spirit of QB64, FreeBASIC or Blitz Basic, with the batteries of PICO-8 or LÖVE for games and the forms and tables of Visual Basic for applications — easy to start with, strict enough to grow up with.</p>" + CHR$(10)
-        h = h + "<p class=" + q + "knoepfe" + q + "><a class=" + q + "knopf" + q + " href=" + q + REPO + "/releases/latest" + q + ">Download</a><a class=" + q + "knopf zweit" + q + " href=" + q + "en/index.html" + q + ">Read the manual</a><a class=" + q + "knopf zweit" + q + " href=" + q + "en/umstieg.html" + q + ">Coming from another BASIC?</a></p>" + CHR$(10)
+        h = h + "<p class=" + q + "knoepfe" + q + ">" + IIF(mitSpielwiese, "<a class=" + q + "knopf" + q + " href=" + q + spielwieseUrl$("", "en") + q + ">Try it in your browser</a>", "") + "<a class=" + q + IIF(mitSpielwiese, "knopf zweit", "knopf") + q + " href=" + q + REPO + "/releases/latest" + q + ">Download</a><a class=" + q + "knopf zweit" + q + " href=" + q + "en/index.html" + q + ">Read the manual</a><a class=" + q + "knopf zweit" + q + " href=" + q + "en/umstieg.html" + q + ">Coming from another BASIC?</a></p>" + CHR$(10)
     ELSE
         h = h + "<p class=" + q + "spruch" + q + ">Feuer frei für deine Ideen.</p>" + CHR$(10)
         h = h + "<h1>Ein modernes BASIC für Spiele und Anwendungen</h1>" + CHR$(10)
         h = h + "<p><strong>Drachenhauch</strong> ist eine Programmiersprache für <strong>2D- und 3D-Spiele und Anwendungen mit grafischer Oberfläche</strong> — und für die Kommandozeilen-Werkzeuge und kleinen Dienste, die dazugehören. Mit eigener Entwicklungsumgebung, Form-Designer, Sprite-, Karten- und Klang-Editoren; ein Befehl macht aus einem Programm eine eigenständige <code>.exe</code>. Windows, macOS und Linux und als WebAssembly im Browser.</p>" + CHR$(10)
         h = h + "<p>Ein BASIC im Geist von QB64, FreeBASIC oder Blitz Basic, mit dem Werkzeugkasten von PICO-8 oder LÖVE für Spiele und den Formularen und Tabellen von Visual Basic für Anwendungen — leicht anzufangen, streng genug, um damit zu wachsen.</p>" + CHR$(10)
-        h = h + "<p class=" + q + "knoepfe" + q + "><a class=" + q + "knopf" + q + " href=" + q + REPO + "/releases/latest" + q + ">Herunterladen</a><a class=" + q + "knopf zweit" + q + " href=" + q + "de/index.html" + q + ">Zum Handbuch</a><a class=" + q + "knopf zweit" + q + " href=" + q + "de/umstieg.html" + q + ">Umstieg aus einem anderen BASIC</a></p>" + CHR$(10)
+        h = h + "<p class=" + q + "knoepfe" + q + ">" + IIF(mitSpielwiese, "<a class=" + q + "knopf" + q + " href=" + q + spielwieseUrl$("", "de") + q + ">Im Browser ausprobieren</a>", "") + "<a class=" + q + IIF(mitSpielwiese, "knopf zweit", "knopf") + q + " href=" + q + REPO + "/releases/latest" + q + ">Herunterladen</a><a class=" + q + "knopf zweit" + q + " href=" + q + "de/index.html" + q + ">Zum Handbuch</a><a class=" + q + "knopf zweit" + q + " href=" + q + "de/umstieg.html" + q + ">Umstieg aus einem anderen BASIC</a></p>" + CHR$(10)
     END IF
     h = h + "</section>" + CHR$(10)
     h = h + "<section><pre><code class=" + q + "language-basic" + q + ">" + code$(BEISPIEL, "basic") + "</code></pre></section>" + CHR$(10)
@@ -731,7 +760,9 @@ FUNCTION llms$() AS STRING
     t = t + "- Built-in modules for 2D/3D graphics, sound and music, physics, GUI (windows, forms, tables, form designer), SQLite/PostgreSQL/MySQL, PDF and printing, networking, HTTP, MQTT, serial ports and MIDI." + nl
     t = t + "- Keywords and built-in names are case-insensitive; string escapes only in `!" + CHR$(34) + "...\n" + CHR$(34) + "` strings; `MID$` and `INSTR` count from 0." + nl
     t = t + "- Open source under the MIT or Apache 2.0 license; programs written with it may be distributed and sold, including the runtime." + nl
-    t = t + "- Source code and releases: " + REPO + nl + nl
+    t = t + "- Source code and releases: " + REPO + nl
+    IF mitSpielwiese THEN t = t + "- Try it without installing: " + adresse + "spielwiese/index.html?lang=en (the runtime as WebAssembly, compiles and runs Drachenhauch in the browser)" + nl
+    t = t + nl
     t = t + "## Manual" + nl + nl
     DIM i AS INTEGER
     FOR i = 0 TO LEN(namen) - 1
@@ -772,6 +803,18 @@ WRITEALL(PATHJOIN(ziel, "llms-full.txt"), voll)
 WRITEALL(PATHJOIN(ziel, "robots.txt"), "User-agent: *" + CHR$(10) + "Allow: /" + CHR$(10) + CHR$(10) + "Sitemap: " + adresse + "sitemap.xml" + CHR$(10))
 WRITEALL(PATHJOIN(ziel, ".nojekyll"), "")
 
+' Die Spielwiese
+IF mitSpielwiese THEN
+    ordnerAnlegen(PATHJOIN(ziel, "spielwiese"))
+    DIM sk AS INTEGER
+    FOR sk = 0 TO LEN(SPIELWIESE_DATEIEN) - 1
+        COPYFILE(PATHJOIN(spielwiese, SPIELWIESE_DATEIEN[sk]), PATHJOIN(ziel, "spielwiese", SPIELWIESE_DATEIEN[sk]))
+    NEXT
+    ' das Datenpaket gibt es nur, wenn das Programm des Baus assets/ hat
+    IF FILEEXISTS(PATHJOIN(spielwiese, "dhrt.data")) THEN COPYFILE(PATHJOIN(spielwiese, "dhrt.data"), PATHJOIN(ziel, "spielwiese", "dhrt.data"))
+    ARRAY_PUSH(gebaut, "spielwiese/index.html")
+END IF
+
 ' Bilder: Logo, Schriftzug, die Beispiele der Startseite
 SUB bildKopieren(von AS STRING, nach AS STRING)
     IF FILEEXISTS(von) THEN COPYFILE(von, PATHJOIN(ziel, "bilder", nach))
@@ -794,4 +837,4 @@ NEXT
 sm = sm + "</urlset>" + CHR$(10)
 WRITEALL(PATHJOIN(ziel, "sitemap.xml"), sm)
 
-PRINT "Website: "; LEN(gebaut); " Seiten ("; LEN(namen); " Handbuchseiten je Sprache) -> "; ziel
+PRINT "Website: "; LEN(gebaut); " Seiten ("; LEN(namen); " Handbuchseiten je Sprache"; IIF(mitSpielwiese, ", mit Spielwiese", ""); ") -> "; ziel

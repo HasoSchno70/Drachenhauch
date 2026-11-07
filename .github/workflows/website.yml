@@ -2,10 +2,24 @@
 # tools/website.dh baut aus docs/ das Handbuch als HTML samt Startseiten,
 # llms.txt und sitemap.xml, GitHub Pages veroeffentlicht es.
 #
-# Gebaut wird nur der Kern von dhrt (ohne Grafik und Ton) -- das Werkzeug
-# braucht nur Zeichenketten, Dateien und SYNTAX_SPANS. Der Lauf gehoert NICHT
-# zu den Pflicht-Pruefungen von main; ob die Verweise stimmen, prueft
-# tests/pruef/werkzeuge/werkzeug_website.dhtest in der normalen CI.
+# Dazu die Spielwiese: dhrt als WebAssembly (rust/build_wasm.py), damit man
+# Drachenhauch im Browser ausprobieren kann, ohne etwas zu installieren. Der
+# Web-Bau lief bis dahin nirgends automatisch -- und uebersetzte seit 2026.43
+# nicht mehr, ohne dass es jemand gesehen hat. Jetzt baut ihn jeder Lauf
+# hier, auch fuer einen Pull Request, der den Web-Teil anfasst (dort ohne
+# Veroeffentlichen).
+#
+# Fuer tools/website.dh selbst genuegt der Kern von dhrt (ohne Grafik und
+# Ton) -- das Werkzeug braucht nur Zeichenketten, Dateien und SYNTAX_SPANS.
+# Der Lauf gehoert NICHT zu den Pflicht-Pruefungen von main; ob die Verweise
+# stimmen, prueft tests/pruef/werkzeuge/werkzeug_website.dhtest in der
+# normalen CI.
+#
+# Neu gebaut wird bei Aenderungen an Doku, Website und Web-Teil und von
+# Hand (Actions -> Website -> Run workflow) -- nach einer Fassung lohnt der
+# Handgriff, damit die Spielwiese deren Laufzeit bekommt. Ein Lauf fuer das
+# Ereignis "release" fiele an der Regel von Pages, nur von main zu
+# veroeffentlichen.
 #
 # Voraussetzung: in den Einstellungen des Repositorys steht Pages auf
 # "GitHub Actions" als Quelle.
@@ -20,6 +34,17 @@ on:
       - "tools/website.dh"
       - "daten/bilder/**"
       - "examples/screenshots/**"
+      - "examples/webspiel/**"
+      - "web/**"
+      - "rust/build_wasm.py"
+      - "rust/drachenhauch_runtime/Cargo.toml"
+      - ".github/workflows/website.yml"
+  pull_request:
+    paths:
+      - "tools/website.dh"
+      - "web/**"
+      - "rust/build_wasm.py"
+      - "rust/drachenhauch_runtime/Cargo.toml"
       - ".github/workflows/website.yml"
   workflow_dispatch:
 
@@ -29,8 +54,12 @@ permissions:
   id-token: write
 
 concurrency:
-  group: website
+  group: website-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
+
+env:
+  # das Programm, das der Knopf "Demo" der Spielwiese laedt
+  SPIELWIESE_DEMO: examples/webspiel/main.dh
 
 jobs:
   bauen:
@@ -39,6 +68,8 @@ jobs:
       - uses: actions/checkout@v7
 
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-emscripten
 
       - name: Rust-Abhaengigkeiten cachen
         uses: Swatinem/rust-cache@v2
@@ -49,15 +80,37 @@ jobs:
         working-directory: rust/drachenhauch_runtime
         run: cargo build --release --locked
 
+      - name: emscripten einrichten
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: 6.0.0
+          actions-cache-folder: emsdk-cache
+
+      - name: Spielwiese bauen (dhrt als WebAssembly)
+        run: |
+          # Die Kopfdateien der Sysroot entstehen erst beim ersten Uebersetzen
+          # -- bindgen (raylib-sys) braucht sie vorher.
+          echo 'int main(void){return 0;}' > /tmp/leer.c
+          emcc /tmp/leer.c -o /tmp/leer.js
+          export BINDGEN_EXTRA_CLANG_ARGS="--sysroot=$EMSDK/upstream/emscripten/cache/sysroot"
+          python3 rust/build_wasm.py "$SPIELWIESE_DEMO" web
+          # build_wasm.py endet ohne Werkzeuge mit 0 und einem Hinweis -- hier
+          # waere das ein stiller Ausfall: die Website kaeme ohne Spielwiese.
+          test -f web/dhrt.wasm
+          test -f web/dhrt.js
+          ls -la web
+
       - name: Website bauen
-        run: rust/drachenhauch_runtime/target/release/dhrt run tools/website.dh -- --ziel _site
+        run: rust/drachenhauch_runtime/target/release/dhrt run tools/website.dh -- --ziel _site --spielwiese web
 
       - uses: actions/upload-pages-artifact@v3
+        if: github.event_name != 'pull_request'
         with:
           path: _site
 
   veroeffentlichen:
     needs: bauen
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
