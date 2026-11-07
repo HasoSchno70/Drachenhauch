@@ -3558,6 +3558,14 @@ helle Linie ueber einer Leiste von 200 Punkten war die Kante aus Windows
 selbst (um das Code-Feld lag er als zweiter Rahmen um den ersten). Tests
 zwei Faelle in `gui_verlauf_hoehe.dhtest`, die alte Laufzeit faellt beide.
 
+**In der IDE** (`ide/ide.dh`, je mit Vorher/Nachher-Bild an den Nutzer):
+Bereichsfarben 20 -> 9 % (hell 16 -> 7 %; tuerkis, braun und blau um den
+Code waren unruhig; `werkzeug_ide_schriftzug.dhtest` mit den neuen Werten),
+der Schriftzug hinter dem Code 22/24 -> 14 (dunkel) / 10 (hell -- dort fiel
+er staerker auf), der Kopf der Probleme-Leiste ohne das doppelte
+"Probleme:" (der Reiter heisst schon so; drei Eintraege aus `en.txt` weg) und
+die Ueberschrift der Hilfe in `muted_fg`, buendig mit ihrem Text.
+
 ## Bastelzentrale (2026-11-06)
 
 Wunsch des Nutzers nach den sieben Bastler-Punkten: "ein super Programm fuer
