@@ -1,0 +1,1078 @@
+' ide/teile/handbuch.dh -- ein Teil der IDE (ide/ide.dh), dort per IMPORT
+' an genau dieser Stelle eingebunden: Handbuch, Drucken, Werkzeuge.
+' Kein eigenes Programm -- die Namen gehoeren der IDE.
+
+' --- Handbuch: docs/*.md im Fenster -----------------------------------
+FUNCTION wortUnterMarke$() AS STRING
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN ""
+    DIM z AS INTEGER
+    DIM s AS INTEGER
+    (z, s) = GUI_TEXTAREA_CURSOR(ta)
+    DIM zeile AS STRING : zeile = zeileVon$(ta, z)
+    ' Spalte ist 1-basiert und steht HINTER dem Zeichen links der Marke.
+    DIM a AS INTEGER : a = s - 1
+    DIM e AS INTEGER : e = s - 1
+    WHILE a > 0 AND istWortzeichen(MID$(zeile, a - 1, 1)) : a = a - 1 : WEND
+    WHILE e < LEN(zeile) AND istWortzeichen(MID$(zeile, e, 1)) : e = e + 1 : WEND
+    RETURN MID$(zeile, a, e - a)
+END FUNCTION
+
+FUNCTION wortSpalte(ta AS GUI_WIDGET) AS INTEGER
+    IF ta < 0 THEN RETURN 0
+    DIM z AS INTEGER
+    DIM s AS INTEGER
+    (z, s) = GUI_TEXTAREA_CURSOR(ta)
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(GUI_TEXT(ta), NL)
+    IF z < 1 OR z > LEN(zeilen) THEN RETURN 0
+    DIM zeile AS STRING : zeile = zeilen[z - 1]
+    DIM a AS INTEGER : a = s - 1
+    WHILE a > 0 AND istWortzeichen(MID$(zeile, a - 1, 1)) : a = a - 1 : WEND
+    RETURN a + 1
+END FUNCTION
+
+FUNCTION istWortzeichen(c AS STRING) AS BOOLEAN
+    IF c = "" THEN RETURN FALSE
+    RETURN c = "_" OR c = "$" OR (c >= "a" AND c <= "z") OR (c >= "A" AND c <= "Z") OR (c >= "0" AND c <= "9")
+END FUNCTION
+
+' Wo ein Dokument liegt: mit englischer Oberflaeche die Uebersetzung in
+' docs/en, wenn es sie gibt, sonst das deutsche. Die Liste der Dokumente
+' bleibt die deutsche -- sie ist vollstaendig; die Entwuerfe und Notizen zur
+' Entwicklung gibt es nur auf Deutsch.
+FUNCTION docPfad$(name AS STRING) AS STRING
+    IF englisch THEN
+        DIM en AS STRING : en = PATHJOIN(docsOrdner, "en", name)
+        IF FILEEXISTS(en) THEN RETURN en
+    END IF
+    RETURN PATHJOIN(docsOrdner, name)
+END FUNCTION
+
+SUB handbuchDokumente()
+    IF LEN(docNamen) > 0 THEN RETURN
+    docNamen = DIRLIST(docsOrdner, "*.md")
+    GUI_SET_DROPDOWN(ddDoku, docNamen)
+END SUB
+
+' --- Handbuch gesetzt statt roh ---------------------------------------
+' Das Setzen macht seit Stand 25 `GUI_RICHTEXT`. Was hier stand, waren 180
+' Zeilen, die Ueberschriften, Aufzaehlungen, Codebloecke und Tabellen selbst
+' auf eine Zeichenflaeche malten -- samt der Einschraenkungen, die im
+' Kommentar dazu standen: fett und kursiv fielen weg, ein Verweis wurde zu
+' Text, und eine Tabelle wurde zur Begriffsliste, weil Spalten einen zweiten
+' Durchlauf gebraucht haetten. Das Widget kann alle drei.
+
+' Zu der Stelle rollen, an der die QUELLZEILE `zeile` gesetzt wurde --
+' gesucht wird nach ihrem Inhalt, denn Zeilennummern kennt der Satz nicht.
+SUB hbZuZeile(zeile AS INTEGER)
+    GUI_RICHTEXT_SCROLL(rtHandbuch, 0)
+    IF zeile <= 1 THEN RETURN
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(GUI_TEXT(taHandbuch), NL)
+    IF zeile - 1 >= LEN(zeilen) THEN RETURN
+    ' Ein Wort reicht nicht (zu haeufig), die ganze Zeile trifft nach dem
+    ' Umbruch womoeglich keine gesetzte Zeile -- die ersten Woerter sind der
+    ' Kompromiss, der in der Praxis trifft.
+    DIM roh AS STRING : roh = TRIM$(REPLACE$(REPLACE$(zeilen[zeile - 1], "#", ""), "*", ""))
+    IF LEN(roh) > 40 THEN roh = LEFT$(roh, 40)
+    IF TRIM$(roh) = "" THEN RETURN
+    GUI_RICHTEXT_FIND(rtHandbuch, TRIM$(roh), -1)
+END SUB
+
+SUB handbuchAnsicht(gesetzt AS BOOLEAN)
+    hbGesetzt = gesetzt
+    GUI_SET_VISIBLE(rtHandbuch, gesetzt)
+    GUI_SET_VISIBLE(taHandbuch, NOT gesetzt)
+    GUI_SET_TEXT(btnHbAnsicht, IIF(gesetzt, tr$("Quelltext"), tr$("Gesetzt")))
+    protokoll("hbansicht " + IIF(gesetzt, "gesetzt", "quelltext"))
+END SUB
+
+' Die Masse des Handbuchfensters: es waechst mit dem Schirm (hoechstens
+' 1500 x 1000), die linke obere Ecke bleibt -- dann bleibt auch jede Lage im
+' Fenster gleich, egal wie gross der Schirm ist. Nach einem Ziehen am Griff
+' ruft die Bildschleife es mit der neuen Groesse.
+SUB handbuchLayout()
+    DIM b AS INTEGER : b = GUI_WINDOW_GET_W(winHandbuch)
+    DIM h AS INTEGER : h = GUI_WINDOW_GET_H(winHandbuch)
+    IF NOT GUI_WINDOW_SHOWN(winHandbuch) THEN
+        b = MAX(900, MIN(1500, schirmB() - HB_X - 40))
+        h = MAX(500, MIN(1000, schirmH() - HB_Y - 40))
+        GUI_WINDOW_SET_BOUNDS(winHandbuch, HB_X, HB_Y, b, h)
+    END IF
+    hbMassStand = STR$(b) + "x" + STR$(h)
+    ' Inhaltshoehe: das Fenster ohne Titelleiste, abzueglich Kopfzeile (46)
+    ' und Meldungszeile (30).
+    DIM ih AS INTEGER : ih = h - 34 - 46 - 30
+    DIM tb AS INTEGER : tb = b - HB_INHALT_B - 32
+    GUI_SET_BOUNDS(lstHbInhalt, 8, 46, HB_INHALT_B, ih)
+    GUI_SET_BOUNDS(rtHandbuch, HB_INHALT_B + 16, 46, tb, ih)
+    GUI_SET_BOUNDS(taHandbuch, HB_INHALT_B + 16, 46, tb, ih)
+    GUI_SET_BOUNDS(lblHbStand, 8, 46 + ih + 6, b - 24, 22)
+    GUI_SET_BOUNDS(btnHbAnsicht, b - 16 - 104, 8, 104, 28)
+END SUB
+
+' --- Suche ueber alle Dokumente -----------------------------------------
+' Ein Stueck der Zeile um die Fundstelle, ohne Markdown-Zeichen -- eine
+' Zeile aus einer Tabelle waere sonst vor allem Striche.
+FUNCTION hbAusschnitt$(zeile AS STRING, klein AS STRING) AS STRING
+    DIM t AS STRING : t = TRIM$(zeile)
+    ' In einer Tabellenzeile zaehlt die Zelle mit dem Treffer.
+    IF LEFT$(t, 1) = "|" THEN
+        DIM zelle AS STRING
+        FOR EACH zelle IN SPLIT$(t, "|")
+            IF INSTR(LOWER$(zelle), klein) >= 0 THEN t = TRIM$(zelle) : BREAK
+        NEXT
+    END IF
+    t = REPLACE$(REPLACE$(t, "`", ""), "**", "")
+    WHILE LEFT$(t, 1) = "#" OR LEFT$(t, 1) = ">" OR LEFT$(t, 1) = "-"
+        t = TRIM$(MID$(t, 1, LEN(t)))
+    WEND
+    ' Kurz genug fuer die Spalte -- rechts steht noch die Zeilennummer.
+    IF LEN(t) <= 34 THEN RETURN t
+    DIM p AS INTEGER : p = INSTR(LOWER$(t), klein)
+    DIM a AS INTEGER : a = MAX(0, p - 10)
+    IF a + 34 > LEN(t) THEN a = MAX(0, LEN(t) - 34)
+    DIM r AS STRING : r = MID$(t, a, 34)
+    IF a > 0 THEN r = "…" + r
+    IF a + 34 < LEN(t) THEN r = r + "…"
+    RETURN r
+END FUNCTION
+
+SUB hbSucheAlle()
+    DIM gesucht AS STRING : gesucht = TRIM$(GUI_TEXT(tfHbSuche))
+    IF gesucht = "" THEN GUI_SET_TEXT(lblHbStand, tr$("Erst einen Suchtext eingeben.")) : RETURN
+    handbuchDokumente()
+    DIM klein AS STRING : klein = LOWER$(gesucht)
+    DIM eintraege AS ARRAY OF STRING : eintraege = []
+    DIM details AS ARRAY OF STRING : details = []
+    hbTreffer = []
+    DIM treffer AS INTEGER : treffer = 0
+    DIM dokumente AS INTEGER : dokumente = 0
+    DIM voll AS BOOLEAN : voll = FALSE
+    DIM d AS STRING
+    FOR EACH d IN docNamen
+        IF voll THEN BREAK
+        DIM zeilen AS ARRAY OF STRING : zeilen = zeilenLesen(docPfad$(d))
+        DIM kopf AS BOOLEAN : kopf = FALSE
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(zeilen) - 1
+            IF INSTR(LOWER$(zeilen[i]), klein) >= 0 THEN
+                IF NOT kopf THEN
+                    ARRAY_PUSH(eintraege, d) : ARRAY_PUSH(details, "")
+                    ARRAY_PUSH(hbTreffer, NEW HandbuchTreffer(d, 0))
+                    kopf = TRUE
+                    dokumente = dokumente + 1
+                END IF
+                ARRAY_PUSH(eintraege, "   " + hbAusschnitt$(zeilen[i], klein))
+                ARRAY_PUSH(details, STR$(i + 1))
+                ARRAY_PUSH(hbTreffer, NEW HandbuchTreffer(d, i + 1))
+                treffer = treffer + 1
+                ' Mehr liest niemand -- und die Liste bliebe bedienbar.
+                IF treffer >= 500 THEN
+                    voll = TRUE
+                    BREAK
+                END IF
+            END IF
+        NEXT
+    NEXT
+    hbTrModus = TRUE
+    hbTrNadel = gesucht
+    hbTrWahl = -1
+    GUI_SET_LISTBOX(lstHbInhalt, eintraege)
+    GUI_LISTBOX_SET_SELECTED(lstHbInhalt, -1)
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(eintraege) - 1
+        IF hbTreffer[k].zeile = 0 THEN
+            GUI_LISTBOX_HEADER(lstHbInhalt, k, TRUE)
+        ELSE
+            GUI_LISTBOX_DETAIL(lstHbInhalt, k, details[k])
+            GUI_LISTBOX_TIP(lstHbInhalt, k, hbTreffer[k].datei + ", Zeile " + details[k])
+        END IF
+    NEXT
+    GUI_LISTBOX_PLACEHOLDER(lstHbInhalt, tr$("Kein Treffer"))
+    GUI_SET_TEXT(btnHbAlle, tr$("Inhalt"))
+    GUI_TOOLTIP(btnHbAlle, tr$("Zurück zum Inhaltsverzeichnis des Dokuments"))
+    DIM st AS STRING : st = "'" + gesucht + "': " + STR$(treffer) + " Treffer in " + STR$(dokumente) + " Dokumenten"
+    IF voll THEN st = st + " (nach 500 abgebrochen)"
+    GUI_SET_TEXT(lblHbStand, st)
+    protokoll("hballe " + STR$(treffer) + " " + STR$(dokumente))
+END SUB
+
+' Zurueck zum Inhaltsverzeichnis des offenen Dokuments.
+SUB hbSucheAlleEnde()
+    hbTrModus = FALSE
+    GUI_LISTBOX_PLACEHOLDER(lstHbInhalt, tr$("Keine Überschriften"))
+    GUI_SET_TEXT(btnHbAlle, tr$("In allen"))
+    GUI_TOOLTIP(btnHbAlle, tr$("In allen Dokumenten des Handbuchs suchen -- die Treffer stehen links"))
+    hbInhaltFuellen()
+END SUB
+
+' --- Knoepfe an den Codebloecken ----------------------------------------
+' Kopieren, in einen neuen Reiter oder gleich starten. Gestartet wird eine
+' Datei neben der ide.json -- ein Reiter ohne Namen wuerde erst nach einem
+' Namen fragen, und ein Beispiel will man ausprobieren, nicht ablegen.
+SUB hbCodeAktion(aktion AS STRING, code AS STRING)
+    DIM n AS INTEGER : n = LEN(SPLIT$(RTRIM$(code), NL))
+    protokoll("hbcode " + aktion + " " + STR$(n))
+    IF aktion = "Kopieren" THEN
+        TRY
+            CLIPBOARD_SET(code)
+            GUI_SET_TEXT(lblHbStand, tr$("Beispiel kopiert (") + STR$(n) + tr$(" Zeilen)."))
+        CATCH e
+            GUI_SET_TEXT(lblHbStand, tr$("Die Zwischenablage ist gerade belegt -- noch einmal versuchen."))
+        END TRY
+    ELSEIF aktion = "In neuen Reiter" THEN
+        DIM vorher AS INTEGER : vorher = tabAnzahl
+        tabOeffnen("", code)
+        ' Als ungesichert markieren -- sonst ginge es beim Schliessen wortlos weg.
+        IF tabAnzahl > vorher THEN reiter[aktiverTab].gesichert = ""
+    ELSEIF aktion = "Starten" THEN
+        DIM pfad AS STRING : pfad = PATHJOIN(DIRNAME(konfigPfad), "handbuch_beispiel.dh")
+        TRY
+            WRITEALL(pfad, code)
+        CATCH e
+            GUI_SET_TEXT(lblHbStand, tr$("Konnte das Beispiel nicht ablegen: ") + e)
+            RETURN
+        END TRY
+        IF prozessStartenDatei("run", pfad) THEN protokoll("gestartet " + prozessDatei)
+    END IF
+END SUB
+
+' Die Quelltext-Ansicht eingefaerbt: Ueberschriften, Code, Verweise und
+' Auszeichnungen, Codebloecke wie im Editor. Einmal beim Laden -- der Text
+' aendert sich dort nicht.
+SUB hbQuelleFaerben()
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(GUI_TEXT(taHandbuch), NL)
+    DIM s AS ARRAY OF INTEGER : s = []
+    DIM l AS ARRAY OF INTEGER : l = []
+    DIM f AS ARRAY OF INTEGER : f = []
+    DIM off AS INTEGER : off = 0
+    DIM imCode AS BOOLEAN : imCode = FALSE
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(zeilen) - 1
+        DIM z AS STRING : z = zeilen[i]
+        DIM t AS STRING : t = TRIM$(z)
+        DIM n AS INTEGER : n = LEN(z)
+        IF LEFT$(t, 3) = "```" THEN
+            ARRAY_PUSH(s, off) : ARRAY_PUSH(l, n) : ARRAY_PUSH(f, F_KOMMENTAR)
+            imCode = NOT imCode
+        ELSEIF imCode THEN
+            DIM cs AS ARRAY OF INTEGER
+            DIM cl AS ARRAY OF INTEGER
+            DIM ca AS ARRAY OF STRING
+            (cs, cl, ca) = SYNTAX_SPANS(z)
+            DIM k AS INTEGER
+            FOR k = 0 TO LEN(cs) - 1
+                ARRAY_PUSH(s, off + cs[k]) : ARRAY_PUSH(l, cl[k]) : ARRAY_PUSH(f, farbeFuer(ca[k]))
+            NEXT
+        ELSEIF LEFT$(t, 1) = "#" THEN
+            ARRAY_PUSH(s, off) : ARRAY_PUSH(l, n) : ARRAY_PUSH(f, F_SCHLUESSEL)
+        ELSE
+            ' Zeichen am Zeilenanfang: Aufzaehlung, Zitat, Tabelle.
+            DIM vorn AS INTEGER : vorn = n - LEN(LTRIM$(z))
+            IF LEFT$(t, 2) = "- " OR LEFT$(t, 2) = "* " OR LEFT$(t, 1) = ">" OR LEFT$(t, 1) = "|" THEN
+                ARRAY_PUSH(s, off + vorn) : ARRAY_PUSH(l, 1) : ARRAY_PUSH(f, F_OPERATOR)
+            END IF
+            ' Inline: `code`, **fett**, [Verweis](ziel), Tabellenstriche.
+            DIM p AS INTEGER : p = 0
+            WHILE p < n
+                DIM ch AS STRING : ch = MID$(z, p, 1)
+                IF ch = "`" THEN
+                    DIM e AS INTEGER : e = INSTR(MID$(z, p + 1, n), "`")
+                    IF e < 0 THEN BREAK
+                    ARRAY_PUSH(s, off + p) : ARRAY_PUSH(l, e + 2) : ARRAY_PUSH(f, F_TEXT)
+                    p = p + e + 2
+                ELSEIF ch = "*" AND MID$(z, p + 1, 1) = "*" THEN
+                    DIM e2 AS INTEGER : e2 = INSTR(MID$(z, p + 2, n), "**")
+                    IF e2 < 0 THEN p = p + 2 : CONTINUE
+                    ARRAY_PUSH(s, off + p) : ARRAY_PUSH(l, e2 + 4) : ARRAY_PUSH(f, F_ZAHL)
+                    p = p + e2 + 4
+                ELSEIF ch = "[" THEN
+                    DIM e3 AS INTEGER : e3 = INSTR(MID$(z, p, n), "](")
+                    DIM e4 AS INTEGER : e4 = -1
+                    IF e3 > 0 THEN e4 = INSTR(MID$(z, p + e3, n), ")")
+                    IF e3 <= 0 OR e4 < 0 THEN p = p + 1 : CONTINUE
+                    ARRAY_PUSH(s, off + p) : ARRAY_PUSH(l, e3 + e4 + 1) : ARRAY_PUSH(f, F_SCHLUESSEL)
+                    p = p + e3 + e4 + 1
+                ELSEIF ch = "|" THEN
+                    ARRAY_PUSH(s, off + p) : ARRAY_PUSH(l, 1) : ARRAY_PUSH(f, F_OPERATOR)
+                    p = p + 1
+                ELSE
+                    p = p + 1
+                END IF
+            WEND
+        END IF
+        off = off + n + 1
+    NEXT
+    GUI_TEXTAREA_SPANS(taHandbuch, s, l, f)
+END SUB
+
+' Die Codebloecke im Handbuch in den Farben des Editors.
+SUB hbFarben()
+    GUI_RICHTEXT_SET(rtHandbuch, "farbe_kommentar", F_KOMMENTAR)
+    GUI_RICHTEXT_SET(rtHandbuch, "farbe_text", F_TEXT)
+    GUI_RICHTEXT_SET(rtHandbuch, "farbe_zahl", F_ZAHL)
+    GUI_RICHTEXT_SET(rtHandbuch, "farbe_schluessel", F_SCHLUESSEL)
+    GUI_RICHTEXT_SET(rtHandbuch, "farbe_operator", F_OPERATOR)
+    GUI_RICHTEXT_SET(rtHandbuch, "farbe_name", F_GRUND)
+END SUB
+
+' Das Inhaltsverzeichnis aus den Ueberschriften. Die erste Ebene in der
+' Akzentfarbe, die weiteren eingerueckt.
+SUB hbInhaltFuellen()
+    DIM titel AS ARRAY OF STRING : titel = GUI_RICHTEXT_HEADINGS(rtHandbuch)
+    DIM ebene AS ARRAY OF INTEGER : ebene = GUI_RICHTEXT_HEADING_LEVELS(rtHandbuch)
+    DIM eintraege AS ARRAY OF STRING : eintraege = []
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(titel) - 1
+        ARRAY_PUSH(eintraege, SPACE$((ebene[i] - 1) * 3) + titel[i])
+    NEXT
+    GUI_SET_LISTBOX(lstHbInhalt, eintraege)
+    ' Eine stehengebliebene Auswahl des vorigen Dokuments saehe im naechsten
+    ' Bild aus wie ein Klick -- und schriebe einen falschen Schritt in den Verlauf.
+    GUI_LISTBOX_SET_SELECTED(lstHbInhalt, -1)
+    FOR i = 0 TO LEN(titel) - 1
+        IF ebene[i] = 1 THEN GUI_LISTBOX_COLOR(lstHbInhalt, i, GUI_THEME_GET("accent"))
+        ' Lange Titel passen nicht in die Spalte -- der ganze steht im Tooltip.
+        GUI_LISTBOX_TIP(lstHbInhalt, i, titel[i])
+    NEXT
+    hbInhaltWahl = -1
+    hbInhaltHalt = -1
+    protokoll("hbinhalt " + STR$(LEN(titel)))
+END SUB
+
+' Den jetzigen Ort vor einem Sprung merken; ein neuer Sprung loescht das
+' Vorwaerts, wie im Browser.
+SUB hbMerken()
+    IF docLetzteWahl < 0 OR docLetzteWahl >= LEN(docNamen) THEN RETURN
+    IF NOT GUI_WINDOW_SHOWN(winHandbuch) THEN RETURN
+    ARRAY_PUSH(hbZurueck, NEW HandbuchStand(docNamen[docLetzteWahl], GUI_RICHTEXT_SCROLL_GET(rtHandbuch)))
+    hbVor = []
+END SUB
+
+' Zurueck (rueck = TRUE) oder vorwaerts im Verlauf.
+SUB hbVerlauf(rueck AS BOOLEAN)
+    IF rueck AND LEN(hbZurueck) = 0 THEN RETURN
+    IF NOT rueck AND LEN(hbVor) = 0 THEN RETURN
+    DIM jetzt AS STRING : jetzt = docNamen[docLetzteWahl]
+    DIM js AS INTEGER : js = GUI_RICHTEXT_SCROLL_GET(rtHandbuch)
+    DIM ziel AS HandbuchStand
+    IF rueck THEN
+        ziel = ARRAY_POP(hbZurueck)
+        ARRAY_PUSH(hbVor, NEW HandbuchStand(jetzt, js))
+    ELSE
+        ziel = ARRAY_POP(hbVor)
+        ARRAY_PUSH(hbZurueck, NEW HandbuchStand(jetzt, js))
+    END IF
+    DIM d AS STRING : d = ziel.datei
+    DIM sc AS INTEGER : sc = ziel.scroll
+    IF d <> jetzt THEN handbuchLaden(d, 1)
+    GUI_RICHTEXT_SCROLL(rtHandbuch, sc)
+    hbInhaltHalt = -1
+    protokoll("hbverlauf " + IIF(rueck, "zurueck ", "vor ") + d + " " + STR$(sc))
+END SUB
+
+' Inhaltsverzeichnis und Text gehen miteinander: ein Klick in die Liste
+' springt, und beim Lesen folgt die Markierung dem Abschnitt, in dem man
+' steht. Nach einem Klick bleibt die angeklickte Zeile markiert, bis der
+' Text wirklich gerollt wird -- am Ende eines Dokuments laege sonst der
+' obere Rand in einem frueheren Abschnitt, und die Markierung spraenge zurueck.
+SUB hbInhaltNachziehen()
+    IF NOT GUI_WINDOW_SHOWN(winHandbuch) THEN RETURN
+    DIM mass AS STRING : mass = STR$(GUI_WINDOW_GET_W(winHandbuch)) + "x" + STR$(GUI_WINDOW_GET_H(winHandbuch))
+    IF mass <> hbMassStand THEN handbuchLayout()
+    DIM k AS INTEGER : k = GUI_LISTBOX_SELECTED(lstHbInhalt)
+    IF hbTrModus THEN
+        IF k >= 0 AND k <> hbTrWahl AND k < LEN(hbTreffer) THEN
+            hbTrWahl = k
+            IF hbTreffer[k].zeile > 0 THEN
+                handbuchZeigen(hbTreffer[k].datei, hbTreffer[k].zeile)
+                GUI_RICHTEXT_MARK_ALL(rtHandbuch, hbTrNadel)
+                protokoll("hbtreffer " + hbTreffer[k].datei + " " + STR$(hbTreffer[k].zeile))
+            END IF
+        END IF
+        RETURN
+    END IF
+    IF k >= 0 AND k <> hbInhaltWahl THEN
+        hbMerken()
+        GUI_RICHTEXT_GOTO_HEADING(rtHandbuch, k)
+        hbInhaltWahl = k
+        hbInhaltHalt = -2
+        protokoll("hbinhalt sprung " + STR$(k))
+        RETURN
+    END IF
+    DIM sc AS INTEGER : sc = GUI_RICHTEXT_SCROLL_GET(rtHandbuch)
+    IF hbInhaltHalt = -2 THEN hbInhaltHalt = sc : RETURN
+    IF hbInhaltHalt >= 0 AND sc = hbInhaltHalt THEN RETURN
+    hbInhaltHalt = -1
+    DIM a AS INTEGER : a = GUI_RICHTEXT_HEADING_AT(rtHandbuch)
+    IF a <> hbInhaltWahl THEN
+        hbInhaltWahl = a
+        GUI_LISTBOX_SET_SELECTED(lstHbInhalt, a)
+        IF a >= 0 THEN GUI_LISTBOX_SCROLL_TO(lstHbInhalt, a)
+    END IF
+END SUB
+
+SUB handbuchZeigen(datei AS STRING, zeile AS INTEGER)
+    handbuchDokumente()
+    ' Ein anderes Dokument ist ein Schritt im Verlauf.
+    IF docLetzteWahl >= 0 AND docLetzteWahl < LEN(docNamen) THEN
+        IF docNamen[docLetzteWahl] <> datei THEN hbMerken()
+    END IF
+    handbuchLaden(datei, zeile)
+END SUB
+
+SUB handbuchLaden(datei AS STRING, zeile AS INTEGER)
+    handbuchDokumente()
+    DIM i AS INTEGER
+    DIM k AS INTEGER : k = -1
+    FOR i = 0 TO LEN(docNamen) - 1
+        IF docNamen[i] = datei THEN k = i
+    NEXT
+    IF k < 0 THEN GUI_SET_TEXT(lblStatus, tr$("Kein Handbuch gefunden in ") + docsOrdner) : RETURN
+    GUI_SET_TEXT(taHandbuch, dateiLesen(docPfad$(datei)))
+    GUI_DROPDOWN_SET_SELECTED(ddDoku, k)
+    docLetzteWahl = k
+    GUI_SET_TEXT(lblHbStand, "")
+    handbuchLayout()
+    GUI_WINDOW_VISIBLE(winHandbuch, TRUE)
+    GUI_TEXTAREA_GOTO(taHandbuch, MAX(zeile, 1), 1)
+    GUI_RICHTEXT_SET_TEXT(rtHandbuch, GUI_TEXT(taHandbuch))
+    hbQuelleFaerben()
+    IF NOT hbTrModus THEN hbInhaltFuellen()
+    ' Die gesetzte Ansicht kennt keine Zeilennummern: gerollt wird zu dem,
+    ' was in der Zeile STEHT. Das trifft die Stelle genauer als jede
+    ' Umrechnung Zeile -> Punkte, denn wie hoch eine Zeile gesetzt wird,
+    ' weiss nur der Satz.
+    hbZuZeile(MAX(zeile, 1))
+    handbuchAnsicht(hbGesetzt)
+    GUI_FOCUS(taHandbuch)            ' holt das Fenster nach vorn
+    protokoll("handbuch " + datei + " " + STR$(zeile))
+END SUB
+
+' F1: das Wort unter der Marke in allen Dokumenten suchen; das Dokument mit
+' den meisten Fundstellen in Codeschrift (`WORT) gewinnt, sonst Klartext.
+SUB handbuch()
+    handbuchDokumente()
+    IF LEN(docNamen) = 0 THEN GUI_SET_TEXT(lblStatus, tr$("Kein Handbuch gefunden in ") + docsOrdner) : RETURN
+    DIM wort AS STRING : wort = wortUnterMarke$()
+    IF wort = "" THEN handbuchZeigen("README.md", 1) : RETURN
+    DIM klein AS STRING : klein = LOWER$(wort)
+    DIM besteDatei AS STRING : besteDatei = ""
+    DIM besteZeile AS INTEGER : besteZeile = 1
+    DIM besteZahl AS INTEGER : besteZahl = 0
+    DIM d AS STRING
+    FOR EACH d IN docNamen
+        DIM zeilen AS ARRAY OF STRING : zeilen = zeilenLesen(docPfad$(d))
+        DIM zahl AS INTEGER : zahl = 0
+        DIM erste AS INTEGER : erste = 0
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(zeilen) - 1
+            DIM lz AS STRING : lz = LOWER$(zeilen[i])
+            IF LEFT$(lz, LEN(klein) + 3) = "| `" + klein THEN
+                ' die Tabellenzeile, die den Befehl BESCHREIBT -- das Referenzdokument
+                zahl = zahl + 10
+                IF erste = 0 THEN erste = i + 1
+            ELSEIF INSTR(lz, "`" + klein) >= 0 THEN
+                zahl = zahl + 2
+                IF erste = 0 THEN erste = i + 1
+            ELSEIF INSTR(lz, klein) >= 0 THEN
+                zahl = zahl + 1
+                IF erste = 0 THEN erste = i + 1
+            END IF
+        NEXT
+        IF zahl > besteZahl THEN besteZahl = zahl : besteDatei = d : besteZeile = erste
+    NEXT
+    IF besteDatei = "" THEN
+        GUI_SET_TEXT(lblStatus, "'" + wort + tr$("' steht in keinem Dokument."))
+        handbuchZeigen("README.md", 1)
+        RETURN
+    END IF
+    GUI_SET_TEXT(tfHbSuche, wort)
+    handbuchZeigen(besteDatei, besteZeile)
+END SUB
+
+' Einem Verweis im Handbuch folgen. Ein Dokument oeffnet das Handbuch, eine
+' Sprungmarke rollt im selben, alles andere sagt nur, wohin es zeigt -- ein
+' Klick, der wortlos nichts tut, sieht nach einem Fehler aus.
+SUB handbuchVerweis(ziel AS STRING)
+    DIM z AS STRING : z = ziel
+    ' `docs/ide.md#abschnitt` -- die Marke abtrennen.
+    DIM marke AS STRING : marke = ""
+    DIM r AS INTEGER : r = INSTR(z, "#")
+    IF r >= 0 THEN
+        marke = MID$(z, r + 1, LEN(z))
+        z = LEFT$(z, r)
+    END IF
+    IF z = "" THEN
+        ' Nur eine Marke: im selben Dokument suchen. Die Marken von Markdown
+        ' sind kleingeschrieben und mit Strichen -- gesucht wird nach der
+        ' Ueberschrift, also mit Leerzeichen.
+        hbMerken()
+        hbZurMarke(marke)
+        RETURN
+    END IF
+    DIM name AS STRING : name = BASENAME(z)
+    IF RIGHT$(LOWER$(name), 3) = ".md" AND FILEEXISTS(docPfad$(name)) THEN
+        handbuchZeigen(name, 1)
+        IF marke <> "" THEN hbZurMarke(marke)
+        RETURN
+    END IF
+    GUI_SET_TEXT(lblHbStand, tr$("Verweis: ") + ziel)
+    protokoll("hbverweis " + ziel)
+END SUB
+
+' Die Sprungmarke einer Ueberschrift, wie GitHub sie bildet: klein,
+' Leerzeichen werden Striche, Satzzeichen fallen weg (Buchstaben samt
+' Umlauten, Ziffern, `-` und `_` bleiben). Aus "Sprite-Atlas + Batch-Draw"
+' wird "sprite-atlas--batch-draw" -- zwei Striche, weil beide Leerzeichen
+' bleiben und nur das Plus wegfaellt.
+FUNCTION hbMarke$(titel AS STRING) AS STRING
+    DIM t AS STRING : t = LOWER$(TRIM$(titel))
+    DIM raus AS STRING : raus = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(t) - 1
+        DIM c AS STRING : c = MID$(t, i, 1)
+        IF c = " " THEN
+            raus = raus + "-"
+        ELSEIF c = "-" OR c = "_" OR (c >= "0" AND c <= "9") OR UPPER$(c) <> c THEN
+            raus = raus + c
+        END IF
+    NEXT
+    RETURN raus
+END FUNCTION
+
+' Zu einer Sprungmarke rollen: die Ueberschrift, deren Marke genau passt.
+' Bis 2026-09-27 suchte das den Text der Marke mit Leerzeichen statt
+' Strichen -- und traf die ERSTE Stelle, an der er stand, oft die Zeile im
+' Inhaltsverzeichnis oben statt der Ueberschrift. Gibt es keine passende
+' Ueberschrift (eine Marke von Hand im Text), bleibt es bei der Suche.
+SUB hbZurMarke(marke AS STRING)
+    DIM titel AS ARRAY OF STRING : titel = GUI_RICHTEXT_HEADINGS(rtHandbuch)
+    DIM gesucht AS STRING : gesucht = LOWER$(marke)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(titel) - 1
+        IF hbMarke$(titel[i]) = gesucht THEN
+            GUI_RICHTEXT_GOTO_HEADING(rtHandbuch, i)
+            protokoll("hbmarke " + marke + " " + STR$(i))
+            RETURN
+        END IF
+    NEXT
+    GUI_RICHTEXT_FIND(rtHandbuch, REPLACE$(marke, "-", " "), -1)
+    protokoll("hbmarke " + marke + " suche")
+END SUB
+
+' Weiter- und zuruecksuchen, mit Umlauf. In der gesetzten Ansicht sucht das
+' Widget selbst (es allein kennt seinen Satz), markiert die Fundstelle und
+' hebt alle anderen schwach hervor -- seit Stand 29; davor rollte es nur zur
+' ersten, und wer die dritte wollte, musste scrollen.
+SUB handbuchSuchen(vorwaerts AS BOOLEAN)
+    DIM gesucht AS STRING : gesucht = GUI_TEXT(tfHbSuche)
+    IF gesucht = "" THEN GUI_RICHTEXT_MARK_ALL(rtHandbuch, "") : RETURN
+    IF hbGesetzt THEN
+        DIM anzahl AS INTEGER : anzahl = GUI_RICHTEXT_MARK_ALL(rtHandbuch, gesucht)
+        DIM y AS INTEGER
+        IF vorwaerts THEN
+            y = GUI_RICHTEXT_FIND_NEXT(rtHandbuch, gesucht)
+        ELSE
+            y = GUI_RICHTEXT_FIND_PREV(rtHandbuch, gesucht)
+        END IF
+        IF y < 0 THEN GUI_SET_TEXT(lblHbStand, "'" + gesucht + tr$("' nicht in diesem Dokument")) : RETURN
+        GUI_SET_TEXT(lblHbStand, docNamen[docLetzteWahl] + " -- " + STR$(anzahl) + tr$(" Fundstellen"))
+        protokoll("hbsuche " + STR$(y) + " " + STR$(anzahl) + " " + GUI_RICHTEXT_SELECTION$(rtHandbuch))
+        RETURN
+    END IF
+    DIM z AS INTEGER
+    DIM s AS INTEGER
+    (z, s) = GUI_TEXTAREA_CURSOR(taHandbuch)
+    DIM tz AS INTEGER : tz = -1
+    DIM ts AS INTEGER
+    IF vorwaerts THEN
+        (tz, ts) = GUI_TEXTAREA_FIND(taHandbuch, gesucht, z, s + 1)
+        IF tz < 0 THEN (tz, ts) = GUI_TEXTAREA_FIND(taHandbuch, gesucht, 1, 1)
+    ELSE
+        ' Rueckwaerts: die letzte Fundstelle VOR der Auswahl, sonst die letzte
+        ' ueberhaupt. GUI_TEXTAREA_FIND kennt nur eine Richtung.
+        DIM az AS INTEGER
+        DIM as1 AS INTEGER
+        DIM ez AS INTEGER
+        DIM es AS INTEGER
+        (az, as1, ez, es) = GUI_TEXTAREA_SELECTION_RANGE(taHandbuch)
+        IF az < 0 THEN az = z : as1 = s
+        DIM fz AS INTEGER
+        DIM fs AS INTEGER
+        DIM lz AS INTEGER : lz = -1
+        DIM ls AS INTEGER
+        (fz, fs) = GUI_TEXTAREA_FIND(taHandbuch, gesucht, 1, 1)
+        DIM erste AS BOOLEAN : erste = TRUE
+        WHILE fz > 0
+            IF NOT erste AND fz = lz AND fs = ls THEN BREAK
+            erste = FALSE
+            IF fz < az OR (fz = az AND fs < as1) THEN tz = fz : ts = fs
+            lz = fz : ls = fs
+            DIM nz AS INTEGER
+            DIM ns AS INTEGER
+            (nz, ns) = GUI_TEXTAREA_FIND(taHandbuch, gesucht, fz, fs + 1)
+            IF nz < fz OR (nz = fz AND ns <= fs) THEN BREAK
+            fz = nz : fs = ns
+        WEND
+        IF tz < 0 THEN tz = lz : ts = ls
+    END IF
+    IF tz < 0 THEN GUI_SET_TEXT(lblHbStand, "'" + gesucht + tr$("' nicht in diesem Dokument")) : RETURN
+    GUI_TEXTAREA_GOTO(taHandbuch, tz, ts)
+    GUI_TEXTAREA_SELECT(taHandbuch, tz, ts, tz, ts + LEN(gesucht))
+    GUI_SET_TEXT(lblHbStand, docNamen[docLetzteWahl] + tr$(" -- Zeile ") + STR$(tz))
+END SUB
+
+' --- Listing drucken / als PDF (pdf-Modul) -----------------------------
+' Die Optionen aus dem Druckdialog uebernehmen und merken -- auch die PDF
+' daneben nimmt sie, ob der Dialog offen war oder nicht.
+SUB druckOptionenLesen()
+    druckGroesse = MAX(6, MIN(16, INT(GUI_VALUE(spDruckGr))))
+    druckRand = MAX(10, MIN(40, INT(GUI_VALUE(spDruckRand))))
+    druckNummern = GUI_CHECKED(cbDruckNr)
+    konfigSichern()
+END SUB
+
+' Das Listing als PDF. Schrift, Rand und Zeilennummern aus den
+' Druckoptionen; `nurAuswahl` nimmt die ganzen Zeilen der Auswahl (mit
+' ihren echten Nummern). Mit den Vorgaben (9 pt, 20 mm) ist es genau das
+' Listing von vorher: 66 Zeilen je Seite, 3,9 mm Abstand.
+FUNCTION listingPdf(nurAuswahl AS BOOLEAN) AS PDF
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    DIM name AS STRING : name = "Unbenannt"
+    IF reiter[aktiverTab].pfad <> "" THEN name = BASENAME(reiter[aktiverTab].pfad)
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(GUI_TEXT(ta), NL)
+    DIM von AS INTEGER : von = 0
+    DIM bis AS INTEGER : bis = LEN(zeilen) - 1
+    IF nurAuswahl AND GUI_TEXTAREA_SELECTION$(ta) <> "" THEN
+        DIM z1 AS INTEGER
+        DIM s1 AS INTEGER
+        DIM z2 AS INTEGER
+        DIM s2 AS INTEGER
+        (z1, s1, z2, s2) = GUI_TEXTAREA_SELECTION_RANGE(ta)
+        ' Endet die Auswahl in Spalte 1 einer Zeile, gehoert die nicht dazu.
+        IF s2 = 1 AND z2 > z1 THEN z2 = z2 - 1
+        von = z1 - 1 : bis = z2 - 1
+        name = name + " (Zeilen " + STR$(z1) + "-" + STR$(z2) + ")"
+    END IF
+    DIM p AS PDF : p = PDF_NEW()
+    PDF_TITLE(p, name)
+    DIM rand AS FLOAT : rand = druckRand
+    DIM zeilenH AS FLOAT : zeilenH = druckGroesse * 3.9 / 9.0
+    PDF_FONT(p, "courier", druckGroesse)
+    ' Eine Monospace-Schrift: ein Zeichen misst so viel wie jedes andere.
+    DIM zeichenB AS FLOAT : zeichenB = PDF_TEXT_WIDTH(p, "M")
+    DIM vorB AS INTEGER : vorB = IIF(druckNummern, 7, 0)
+    DIM breite AS INTEGER : breite = MAX(20, INT((210.0 - 2.0 * rand) / zeichenB) - vorB)
+    DIM jeSeite AS INTEGER : jeSeite = MAX(10, INT((297.0 - 2.0 * rand) / zeilenH) + 1)
+    DIM reihe AS INTEGER : reihe = jeSeite
+    DIM seite AS INTEGER : seite = 0
+    DIM i AS INTEGER
+    FOR i = von TO bis
+        DIM rest AS STRING : rest = REPLACE$(zeilen[i], CHR$(9), "    ")
+        DIM nummer AS STRING : nummer = RIGHT$("     " + STR$(i + 1), 5)
+        DIM ersteHaelfte AS BOOLEAN : ersteHaelfte = TRUE
+        REPEAT
+            IF reihe >= jeSeite THEN
+                ' PDF_NEW bringt die erste Seite schon mit -- ein PDF_PAGE davor
+                ' liesse ein leeres Blatt vorn (so war es zuerst).
+                IF seite > 0 THEN PDF_PAGE(p)
+                seite = seite + 1
+                PDF_FONT(p, "helvetica", 9)
+                PDF_TEXT(p, rand, rand - 8.0, name + "   Seite " + STR$(seite))
+                PDF_LINE(p, rand, rand - 5.0, 210.0 - rand, rand - 5.0)
+                PDF_FONT(p, "courier", druckGroesse)
+                reihe = 0
+            END IF
+            DIM stueck AS STRING : stueck = LEFT$(rest, breite)
+            rest = MID$(rest, LEN(stueck))
+            DIM vorspann AS STRING : vorspann = ""
+            IF druckNummern THEN vorspann = IIF(ersteHaelfte, nummer + "  ", "       ")
+            TRY
+                PDF_TEXT(p, rand, rand + 2.0 + reihe * zeilenH, vorspann + stueck)
+            CATCH e
+                ' Ein Zeichen, das die Schrift nicht hat -- die Zeile kommt gekennzeichnet.
+                PDF_TEXT(p, rand, rand + 2.0 + reihe * zeilenH, vorspann + "[Zeile mit einem Zeichen, das die Schrift nicht hat]")
+            END TRY
+            reihe = reihe + 1
+            ersteHaelfte = FALSE
+        UNTIL rest = ""
+    NEXT
+    protokoll("listing " + STR$(bis - von + 1) + " zeilen " + STR$(seite) + " seiten je " + STR$(jeSeite) + " breite " + STR$(breite))
+    RETURN p
+END FUNCTION
+
+SUB listingAlsPdf()
+    IF aktiverTab < 0 THEN RETURN
+    DIM pfad AS STRING : pfad = reiter[aktiverTab].pfad
+    IF pfad = "" THEN GUI_SET_TEXT(lblStatus, tr$("Erst sichern -- die PDF kommt neben die Quelle.")) : RETURN
+    DIM ziel AS STRING : ziel = pfad
+    IF LOWER$(RIGHT$(ziel, 3)) = ".dh" THEN ziel = LEFT$(ziel, LEN(ziel) - 3)
+    ziel = ziel + ".pdf"
+    DIM p AS PDF : p = listingPdf(FALSE)
+    PDF_SAVE(p, ziel)
+    GUI_SET_TEXT(lblStatus, tr$("PDF geschrieben: ") + ziel + " (" + STR$(PDF_PAGE_COUNT(p)) + tr$(" Seiten)"))
+    PDF_CLOSE(p)
+    protokoll("pdf " + ziel)
+END SUB
+
+' Strg+P oeffnet den Druckdialog: Drucker (Standard vorgewaehlt), Kopien,
+' oder doch als PDF. Ohne Drucker gibt es gleich den PDF-Weg.
+SUB listingDrucken()
+    IF aktiverTab < 0 THEN RETURN
+    druckerNamen = PRINTERS()
+    IF LEN(druckerNamen) = 0 THEN GUI_SET_TEXT(lblStatus, tr$("Kein Drucker eingerichtet -- nimm 'Listing als PDF'.")) : RETURN
+    GUI_SET_DROPDOWN(ddDrucker, druckerNamen)
+    DIM k AS INTEGER : k = ARRAY_INDEXOF(druckerNamen, PRINTER_DEFAULT$())
+    GUI_DROPDOWN_SET_SELECTED(ddDrucker, MAX(k, 0))
+    ' "Nur die Auswahl" gibt es nur, wenn etwas ausgewaehlt ist.
+    DIM hatAuswahl AS BOOLEAN : hatAuswahl = GUI_TEXTAREA_SELECTION$(aktivesFeld()) <> ""
+    GUI_SET_ENABLED(cbDruckAuswahl, hatAuswahl)
+    GUI_SET_CHECKED(cbDruckAuswahl, hatAuswahl AND GUI_CHECKED(cbDruckAuswahl))
+    GUI_WINDOW_SET_BOUNDS(winDruck, (schirmB() - 400) \ 2, (schirmH() - 270) \ 2, 400, 270)
+    GUI_WINDOW_VISIBLE(winDruck, TRUE)
+    GUI_FOCUS(btnDruckOk)              ' holt das Fenster nach vorn
+END SUB
+
+SUB druckenAusfuehren()
+    GUI_WINDOW_VISIBLE(winDruck, FALSE)
+    IF aktiverTab < 0 THEN RETURN
+    DIM sel AS INTEGER : sel = GUI_DROPDOWN_SELECTED(ddDrucker)
+    IF sel < 0 OR sel >= LEN(druckerNamen) THEN RETURN
+    DIM drucker AS STRING : drucker = druckerNamen[sel]
+    DIM kopien AS INTEGER : kopien = MAX(1, INT(GUI_VALUE(spKopien)))
+    druckOptionenLesen()
+    DIM p AS PDF : p = listingPdf(GUI_CHECKED(cbDruckAuswahl))
+    TRY
+        PDF_PRINT(p, drucker, kopien)
+        GUI_SET_TEXT(lblStatus, tr$("Gedruckt auf ") + drucker + " (" + STR$(PDF_PAGE_COUNT(p)) + tr$(" Seiten, ") + STR$(kopien) + "x)")
+        protokoll("gedruckt " + drucker + " " + STR$(kopien))
+    CATCH e
+        GUI_SET_TEXT(lblStatus, tr$("Drucken: ") + e)
+    END TRY
+    PDF_CLOSE(p)
+    GUI_FOCUS(aktivesFeld())
+END SUB
+
+' Strg+F1: alle Befehle mit Kuerzel im Handbuch-Fenster.
+SUB kuerzelZeigen()
+    ' Als Markdown-Tabelle: so steht sie auch in der gesetzten Ansicht da
+    ' (bis 2026-09-26 kam sie nur ins Quelltext-Feld und die gesetzte Ansicht
+    ' zeigte weiter das vorige Dokument).
+    DIM text AS STRING : text = tr$("# Tastenkürzel der IDE") + NL + NL + tr$("| Kürzel | Befehl |") + NL + "|---|---|" + NL
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(befehle) - 1
+        IF befehle[i].kuerzel <> "" THEN text = text + "| `" + befehle[i].kuerzel + "` | " + befehle[i].name + " |" + NL
+    NEXT
+    text = text + NL + tr$("## Im Code-Feld") + NL + NL + tr$("Tab rückt bis zur nächsten Spalte ein, Strg+Z/Y nimmt zurück und wiederholt, Strg+A/C/V/X wie üblich, Pos1/Ende, Bild auf/ab.") + NL + NL
+    text = text + tr$("Alle Befehle ohne Kürzel stehen in der Befehlspalette (`Strg+Umschalt+P`).") + NL
+    GUI_SET_TEXT(taHandbuch, text)
+    GUI_RICHTEXT_SET_TEXT(rtHandbuch, text)
+    hbInhaltFuellen()
+    GUI_SET_TEXT(lblHbStand, tr$("Tastenkürzel"))
+    handbuchLayout()
+    GUI_WINDOW_VISIBLE(winHandbuch, TRUE)
+    GUI_TEXTAREA_GOTO(taHandbuch, 1, 1)
+    GUI_FOCUS(taHandbuch)
+    protokoll("kuerzel " + STR$(LEN(befehle)))
+END SUB
+
+' --- Werkzeuge: die Begleit-Editoren in Drachenhauch --------------------
+SUB werkzeugStarten(datei AS STRING)
+    werkzeugMit(datei, "")
+END SUB
+
+' Ein Werkzeug mit einer Datei starten (`dhrt run werkzeug -- datei`).
+SUB werkzeugMit(datei AS STRING, arg AS STRING)
+    DIM pfad AS STRING : pfad = PATHJOIN(beispielOrdner, datei)
+    IF NOT FILEEXISTS(pfad) THEN
+        GUI_SET_TEXT(lblStatus, tr$("Nicht gefunden: ") + pfad)
+        protokoll("werkzeug fehlt " + datei)
+        RETURN
+    END IF
+    IF arg = "" THEN
+        ARRAY_PUSH(werkzeuge, PROCESS_START("dhrt", "run", pfad))
+        GUI_SET_TEXT(lblStatus, tr$("Gestartet: ") + datei)
+        protokoll("werkzeug " + datei)
+    ELSE
+        ARRAY_PUSH(werkzeuge, PROCESS_START("dhrt", "run", pfad, "--", arg))
+        protokoll("werkzeug " + datei + " " + BASENAME(arg))
+    END IF
+END SUB
+
+' Das Drachenhauch Studio (studio/studio.dh neben ide/) -- mit einem Projekt
+' (`projekt.dhstudio` oder sein Ordner), sonst mit dem des Projektordners,
+' wenn er eins ist, sonst leer.
+SUB studioStarten(arg AS STRING)
+    DIM pfad AS STRING : pfad = PATHJOIN(wurzel, "studio/studio.dh")
+    IF NOT FILEEXISTS(pfad) THEN
+        GUI_SET_TEXT(lblStatus, tr$("Nicht gefunden: ") + pfad)
+        protokoll("studio fehlt")
+        RETURN
+    END IF
+    DIM ziel AS STRING : ziel = arg
+    IF ziel = "" AND projektOrdner <> "" THEN
+        IF FILEEXISTS(PATHJOIN(projektOrdner, "projekt.dhstudio")) THEN ziel = PATHJOIN(projektOrdner, "projekt.dhstudio")
+    END IF
+    IF ziel = "" THEN
+        ARRAY_PUSH(werkzeuge, PROCESS_START("dhrt", "run", pfad))
+        GUI_SET_TEXT(lblStatus, tr$("Drachenhauch Studio gestartet."))
+        protokoll("studio")
+    ELSE
+        ARRAY_PUSH(werkzeuge, PROCESS_START("dhrt", "run", pfad, "--", ziel))
+        GUI_SET_TEXT(lblStatus, tr$("Im Drachenhauch Studio geöffnet: ") + BASENAME(DIRNAME(ziel)))
+        protokoll("studio " + BASENAME(ziel))
+    END IF
+END SUB
+
+' Befehlspalette: das zuletzt im Designer geoeffnete Formular als Text.
+SUB formularAlsText()
+    IF letzteForm = "" THEN
+        GUI_SET_TEXT(lblStatus, tr$("Noch kein Formular geöffnet -- erst eine .dhform im Projektbaum wählen."))
+        RETURN
+    END IF
+    formAlsText = TRUE
+    dateiOeffnen(letzteForm)
+    formAlsText = FALSE
+END SUB
+
+' Das Klassendiagramm des Projekts (examples/210_klassendiagramm.dh); ohne
+' Projektordner das der Datei vorn.
+SUB klassendiagrammStarten()
+    DIM ziel AS STRING : ziel = projektOrdner
+    IF ziel = "" AND aktiverTab >= 0 THEN ziel = reiter[aktiverTab].pfad
+    IF ziel = "" THEN
+        GUI_SET_TEXT(lblStatus, tr$("Erst ein Projekt oder eine Datei öffnen."))
+        RETURN
+    END IF
+    werkzeugMit("210_klassendiagramm.dh", ziel)
+    GUI_SET_TEXT(lblStatus, tr$("Klassendiagramm gestartet -- Doppelklick auf einen Kasten springt hierher."))
+END SUB
+
+' Eine Zeile aus der Ausgabe eines Werkzeugs. "DH_IDE_OEFFNEN|pfad|zeile"
+' oeffnet die Datei an der Stelle (so springt das Klassendiagramm in den
+' Code); alles andere wird uebergangen -- frueher las niemand die Ausgabe.
+SUB werkzeugZeile(z AS STRING)
+    z = TRIM$(REPLACE$(z, CHR$(13), ""))
+    IF LEFT$(z, 15) <> "DH_IDE_OEFFNEN|" THEN RETURN
+    DIM teile AS ARRAY OF STRING : teile = SPLIT$(MID$(z, 15), "|")
+    IF LEN(teile) < 2 THEN RETURN
+    ' Gibt es die Datei nicht, darf die Marke im Reiter vorn nicht wandern.
+    IF NOT FILEEXISTS(teile[0]) THEN
+        GUI_SET_TEXT(lblStatus, tr$("Gibt es nicht: ") + teile[0])
+        protokoll("werkzeug oeffnet fehlt " + BASENAME(teile[0]))
+        RETURN
+    END IF
+    dateiOeffnen(teile[0])
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    DIM zl AS INTEGER : zl = VAL(teile[1])
+    IF ta >= 0 AND zl > 0 THEN GUI_TEXTAREA_GOTO(ta, zl, 1)
+    WINDOW_FOCUS()
+    protokoll("werkzeug oeffnet " + BASENAME(teile[0]) + " " + STR$(zl))
+END SUB
+
+SUB werkzeugeAufraeumen()
+    DIM i AS INTEGER : i = 0
+    WHILE i < LEN(werkzeuge)
+        ' Was ein Werkzeug schreibt, abholen -- sonst fuellt sich die
+        ' Leitung, und ein Sprungwunsch kaeme nie an.
+        DIM roh AS STRING : roh = PROCESS_READ$(werkzeuge[i])
+        IF roh <> "" THEN
+            DIM wz AS STRING
+            FOR EACH wz IN SPLIT$(roh, NL)
+                werkzeugZeile(wz)
+            NEXT
+        END IF
+        IF PROCESS_RUNNING(werkzeuge[i]) THEN
+            i = i + 1
+        ELSE
+            PROCESS_CLOSE(werkzeuge[i])
+            ARRAY_REMOVE_AT(werkzeuge, i)
+        END IF
+    WEND
+END SUB
+
+' Die Beschreibung eines Beispiels aus seinem Kopfkommentar: die erste
+' Kommentarzeile mit Buchstaben in den ersten acht Zeilen -- ohne Zierlinien
+' (`' =====`), ohne `=== ... ===`, ohne ein vorangestelltes `DRACHENHAUCH --`,
+' den Dateinamen oder die Nummer. Bricht sie mitten im Satz ab, kommt die
+' naechste Kommentarzeile dazu (hoechstens zwei); was ueber 100 Zeichen
+' geht, endet am letzten Satz- oder Kommaende davor. Interne Vermerke wie
+' `(WP H)`, `(Batch 1)` oder `(Weg B, ...)` sagen einem Leser nichts.
+FUNCTION kopfZeile$(zeile AS STRING) AS STRING
+    DIM z AS STRING : z = TRIM$(zeile)
+    IF LEFT$(z, 1) <> "'" THEN RETURN ""
+    z = TRIM$(MID$(z, 1, LEN(z)))
+    z = REGEX_REPLACE(z, "\s+", " ")
+    WHILE LEFT$(z, 1) = "=" OR LEFT$(z, 1) = "-" : z = TRIM$(MID$(z, 1, LEN(z))) : WEND
+    WHILE RIGHT$(z, 1) = "=" : z = TRIM$(LEFT$(z, LEN(z) - 1)) : WEND
+    IF NOT REGEX_TEST(z, "[A-Za-zÄÖÜäöüß]") THEN RETURN ""
+    RETURN z
+END FUNCTION
+
+FUNCTION beispielBeschreibung$(pfad AS STRING, datei AS STRING) AS STRING
+    DIM zeilen AS ARRAY OF STRING
+    TRY
+        zeilen = READLINES(pfad)
+    CATCH e
+        RETURN datei
+    END TRY
+    DIM stamm AS STRING : stamm = LEFT$(datei, LEN(datei) - 3)
+    DIM nummer AS STRING : nummer = LEFT$(stamm, MAX(0, INSTR(stamm, "_")))
+    DIM i AS INTEGER
+    FOR i = 0 TO MIN(LEN(zeilen), 8) - 1
+        DIM z AS STRING : z = kopfZeile$(zeilen[i])
+        IF z = "" THEN CONTINUE
+        IF UPPER$(LEFT$(z, 16)) = "DRACHENHAUCH -- " THEN z = TRIM$(MID$(z, 16, LEN(z)))
+        DIM vor AS STRING
+        FOR EACH vor IN [datei + " -- ", datei + " - ", nummer + " -- ", nummer + " - "]
+            IF vor <> " -- " AND vor <> " - " AND LEFT$(z, LEN(vor)) = vor THEN z = TRIM$(MID$(z, LEN(vor), LEN(z)))
+        NEXT
+        IF z = datei OR z = "" THEN CONTINUE
+        ' Fortsetzung: nur eine Kommentarzeile mit Text gleich dahinter (ein
+        ' eingerueckter Block wie eine Befehlsliste zaehlt nicht).
+        DIM dazu AS INTEGER : dazu = 0
+        WHILE dazu < 2 AND i + 1 + dazu < LEN(zeilen) AND NOT REGEX_TEST(z, "[.:!?)" + CHR$(34) + "]$")
+            DIM roh AS STRING : roh = zeilen[i + 1 + dazu]
+            IF LEFT$(roh, 2) <> "' " OR MID$(roh, 2, 1) = " " THEN EXIT WHILE
+            DIM weiter AS STRING : weiter = kopfZeile$(roh)
+            IF weiter = "" THEN EXIT WHILE
+            ' Nur, wo der Satz sichtlich weitergeht -- ein Titel ohne Punkt
+            ' ("Coin Quest") nimmt sonst die naechste Zeile mit, die etwas
+            ' ganz anderes sagt.
+            DIM offen AS BOOLEAN : offen = LEN(z) - LEN(REPLACE$(z, "(", "")) > LEN(z) - LEN(REPLACE$(z, ")", ""))
+            IF NOT (RIGHT$(z, 1) = "-" OR RIGHT$(z, 1) = "," OR offen OR REGEX_TEST(weiter, "^[a-zäöü]")) THEN EXIT WHILE
+            ' Am Zeilenende getrenntes Wort (`Hindernis-` / `Boxen`) ohne Leerzeichen.
+            IF REGEX_TEST(z, "[A-Za-zÄÖÜäöüß]-$") THEN z = z + weiter ELSE z = z + " " + weiter
+            dazu = dazu + 1
+        WEND
+        z = REGEX_REPLACE(z, "\s*\((WP [A-Z][^)]*|Batch [^)]*|Weg B[^)]*|[a-z]+ter Editor-Pilot|sechster Pilot)\)", "")
+        IF LEN(z) > 100 THEN
+            DIM satz AS INTEGER : satz = -1
+            DIM komma AS INTEGER : komma = -1
+            DIM k AS INTEGER
+            FOR k = 20 TO 99
+                ' Ein Satzende, keine Abkuerzung: vor dem Punkt zwei Buchstaben
+                ' (`z.B.` endet nichts).
+                IF MID$(z, k, 2) = ". " AND REGEX_TEST(MID$(z, k - 2, 2), "^[A-Za-zÄÖÜäöüß]{2}$") THEN satz = k
+                IF MID$(z, k, 2) = ", " THEN komma = k
+            NEXT
+            IF satz > 0 THEN
+                z = LEFT$(z, satz + 1)
+            ELSEIF komma > 0 THEN
+                z = LEFT$(z, komma)
+            ELSE
+                z = LEFT$(z, 97) + "..."
+            END IF
+        END IF
+        WHILE RIGHT$(z, 1) = "," OR RIGHT$(z, 1) = ";" : z = TRIM$(LEFT$(z, LEN(z) - 1)) : WEND
+        ' Eine offene Klammer am Ende (die Fortsetzung kam nicht mit): weg damit.
+        DIM auf AS INTEGER : auf = LEN(z) - LEN(REPLACE$(z, "(", ""))
+        DIM zu AS INTEGER : zu = LEN(z) - LEN(REPLACE$(z, ")", ""))
+        IF auf > zu THEN
+            DIM ab AS INTEGER : ab = -1
+            DIM q AS INTEGER
+            FOR q = 0 TO LEN(z) - 2
+                IF MID$(z, q, 2) = " (" THEN ab = q
+            NEXT
+            IF ab > 0 THEN z = TRIM$(LEFT$(z, ab))
+        END IF
+        RETURN TRIM$(z)
+    NEXT
+    RETURN stamm
+END FUNCTION
+
+SUB themenZeigen()
+    DIM k AS JSON_HANDLE
+    DIM gut AS BOOLEAN : gut = TRUE
+    TRY
+        k = JSON_PARSE("{" + CHR$(34) + "t" + CHR$(34) + ": " + JOIN$(READLINES(PATHJOIN(beispielOrdner, "kategorien.json")), NL) + "}")
+    CATCH e
+        gut = FALSE
+    END TRY
+    IF NOT gut THEN
+        GUI_SET_TEXT(lblStatus, tr$("Keine Themenliste: ") + PATHJOIN(beispielOrdner, "kategorien.json") + tr$(" fehlt."))
+        protokoll("themen fehlen")
+        RETURN
+    END IF
+    GUI_LISTBOX_CLEAR(lstThemen)
+    DIM themen AS INTEGER : themen = JSON_LEN(k, "t")
+    DIM zahl AS INTEGER : zahl = 0
+    DIM t AS INTEGER
+    FOR t = 0 TO themen - 1
+        DIM pt AS STRING : pt = "t." + STR$(t)
+        DIM n AS INTEGER : n = JSON_LEN(k, pt + ".dateien")
+        DIM kopf AS INTEGER : kopf = GUI_LISTBOX_ADD(lstThemen, JSON_GET_STRING(k, pt + ".name"))
+        GUI_LISTBOX_HEADER(lstThemen, kopf, TRUE)
+        DIM d AS INTEGER
+        FOR d = 0 TO n - 1
+            DIM datei AS STRING : datei = JSON_GET_STRING(k, pt + ".dateien." + STR$(d))
+            DIM pfad AS STRING : pfad = PATHJOIN(beispielOrdner, datei)
+            ' Eine Liste, die auf fehlende Dateien zeigt, wird nicht zur Falle:
+            ' was es nicht gibt, steht nicht da.
+            IF NOT FILEEXISTS(pfad) THEN CONTINUE
+            DIM ix AS INTEGER : ix = GUI_LISTBOX_ADD(lstThemen, beispielBeschreibung$(pfad, datei))
+            GUI_LISTBOX_DETAIL(lstThemen, ix, LEFT$(datei, LEN(datei) - 3))
+            GUI_LISTBOX_SET_DATA(lstThemen, ix, datei)
+            GUI_LISTBOX_TIP(lstThemen, ix, datei)
+            zahl = zahl + 1
+        NEXT
+        GUI_LISTBOX_DETAIL(lstThemen, kopf, STR$(n))
+    NEXT
+    GUI_SET_TEXT(tfThemenFilter, "")
+    themenFilterZuletzt = ""
+    GUI_LISTBOX_FILTER(lstThemen, "")
+    GUI_SET_TEXT(lblThemen, STR$(zahl) + tr$(" Beispiele in ") + STR$(themen) + tr$(" Themen"))
+    GUI_WINDOW_SET_BOUNDS(winThemen, MAX(0, (schirmB() - 760) \ 2), 80, 760, 620)
+    GUI_WINDOW_VISIBLE(winThemen, TRUE)
+    GUI_FOCUS(tfThemenFilter)          ' holt das Fenster nach vorn
+    protokoll("themen " + STR$(themen) + " beispiele " + STR$(zahl))
+END SUB
+
+' Je Bild, solange das Fenster offen ist: Filter, Oeffnen, Starten.
+SUB themenNachziehen()
+    IF NOT GUI_WINDOW_SHOWN(winThemen) THEN RETURN
+    DIM f AS STRING : f = TRIM$(GUI_TEXT(tfThemenFilter))
+    IF f <> themenFilterZuletzt THEN
+        themenFilterZuletzt = f
+        GUI_LISTBOX_FILTER(lstThemen, f)
+        protokoll("themen filter [" + f + "] " + STR$(GUI_LISTBOX_VIEW_COUNT(lstThemen)))
+    END IF
+    ' Enter im Filterfeld nimmt den ersten Treffer.
+    IF GUI_ENTERED(tfThemenFilter) THEN
+        DIM v AS INTEGER
+        FOR v = 0 TO GUI_LISTBOX_VIEW_COUNT(lstThemen) - 1
+            DIM zeile AS INTEGER : zeile = GUI_LISTBOX_VIEW_ROW(lstThemen, v)
+            IF GUI_LISTBOX_DATA$(lstThemen, zeile) <> "" THEN
+                GUI_LISTBOX_SET_SELECTED(lstThemen, zeile)
+                themenOeffnen(FALSE)
+                RETURN
+            END IF
+        NEXT
+    END IF
+    IF GUI_DOUBLE_CLICKED(lstThemen) OR GUI_CLICKED(btnThemenOeffnen) THEN themenOeffnen(FALSE)
+    IF GUI_CLICKED(btnThemenStart) THEN themenOeffnen(TRUE)
+    IF GUI_CLICKED(btnThemenZu) THEN GUI_WINDOW_VISIBLE(winThemen, FALSE)
+END SUB
+
+SUB themenOeffnen(starten AS BOOLEAN)
+    DIM sel AS INTEGER : sel = GUI_LISTBOX_SELECTED(lstThemen)
+    IF sel < 0 THEN RETURN
+    DIM datei AS STRING : datei = GUI_LISTBOX_DATA$(lstThemen, sel)
+    IF datei = "" THEN RETURN          ' ein Themenkopf
+    GUI_WINDOW_VISIBLE(winThemen, FALSE)
+    dateiOeffnen(PATHJOIN(beispielOrdner, datei))
+    protokoll("themen offen " + datei)
+    IF starten THEN befehl("start")
+END SUB
+
+SUB beispieleOeffnen()
+    IF NOT FILEEXISTS(PATHJOIN(beispielOrdner, "01_hello.dh")) THEN
+        GUI_SET_TEXT(lblStatus, tr$("Keine Beispiele in ") + beispielOrdner)
+        RETURN
+    END IF
+    projektOrdner = beispielOrdner
+    baumFuellen()
+    GUI_SET_TEXT(lblStatus, tr$("Projekt: ") + beispielOrdner)
+    protokoll("projekt " + projektOrdner)
+END SUB

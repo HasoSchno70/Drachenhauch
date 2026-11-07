@@ -1,0 +1,933 @@
+' ide/teile/debugger.dh -- ein Teil der IDE (ide/ide.dh), dort per IMPORT
+' an genau dieser Stelle eingebunden: Debugger (dhrt debug) und Profil (dhrt profile).
+' Kein eigenes Programm -- die Namen gehoeren der IDE.
+
+' --- Debugger: Client von `dhrt debug` (JSON-Zeilen: stdin Kommandos,
+' stdout Ereignisse). Kommandos nimmt das Kind nur an, solange es steht.
+' Ob zwei Wege dieselbe Datei meinen -- SAMEFILE fragt die Platte (0,15 ms
+' je Frage), und der Debugger fragt das je Stapeleintrag und je Bild: bei
+' 900 Stapeleintraegen kostete ein Halt 150 ms (Stresstest 2026-10-02).
+' Die Antworten gelten fuer einen Halt; jeder neue Halt und jeder Start
+' fangen neu an, damit eine umbenannte Datei nicht alt beantwortet wird.
+DIM sfMerk AS MAP OF BOOLEAN : sfMerk = {}
+
+FUNCTION gleicheDatei(a AS STRING, b AS STRING) AS BOOLEAN
+    DIM schl AS STRING : schl = a + "|" + b
+    IF MAPHAS(sfMerk, schl) THEN RETURN MAPGET(sfMerk, schl)
+    DIM ja AS BOOLEAN : ja = SAMEFILE(a, b)
+    MAPPUT(sfMerk, schl, ja)
+    RETURN ja
+END FUNCTION
+
+SUB debuggen()
+    IF NOT prozessStarten("debug") THEN RETURN
+    sfMerk = {}
+    debugPause = FALSE : debugErst = TRUE : debugZeile = 0
+    debugDatei = prozessDatei : debugErstWarten = FALSE : debugEingabe = FALSE
+    GUI_SET_TEXT(lblDebug, tr$("Debugger: läuft ..."))
+    GUI_TABLE_CLEAR(tblVars)
+    debugPanelZeigen(TRUE)
+    protokoll("debug gestartet")
+END SUB
+
+SUB debugSenden(cmd AS STRING)
+    IF prozess < 0 OR prozessArt <> "debug" THEN RETURN
+    PROCESS_WRITE(prozess, "{" + CHR$(34) + "cmd" + CHR$(34) + ":" + CHR$(34) + cmd + CHR$(34) + "}" + NL)
+    IF cmd = "continue" THEN programmNachVorn()
+END SUB
+
+' Laeuft das Programm wieder frei (Weiter, bis zur Marke), gehoert sein
+' Fenster nach vorn -- sonst lag es nach dem Halt hinter der IDE. Bei
+' einem Einzelschritt nicht: der haelt gleich wieder, und das Fenster
+' sprang bei jedem F10 hin und her. Ein Programm im Hintergrund darf sich
+' nicht selbst nach vorn holen, darum tut es die IDE.
+SUB programmNachVorn()
+    IF prozess < 0 OR prozessArt <> "debug" THEN RETURN
+    protokoll("programm vorn " + STR$(PROCESS_FRONT(prozess)))
+END SUB
+
+' Ein Text als JSON-Zeichenkette (mit Anfuehrungszeichen).
+FUNCTION jsonText$(s AS STRING) AS STRING
+    DIM j AS STRING : j = REPLACE$(s, "\", "\\")
+    j = REPLACE$(j, CHR$(34), "\" + CHR$(34))
+    RETURN CHR$(34) + j + CHR$(34)
+END FUNCTION
+
+' Alle Haltepunkte, JEDER Datei -- eine importierte Datei gehoert zum
+' Programm, und das Kind ordnet sie selbst zu. `now` laesst sie auch
+' waehrend des Laufens gelten, nicht erst beim naechsten Halt.
+SUB debugHaltepunkteSenden()
+    IF prozess < 0 OR prozessArt <> "debug" THEN RETURN
+    DIM teile AS ARRAY OF STRING : teile = []
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(haltepunkte) - 1
+        IF NOT hpIstAktiv(i) THEN CONTINUE
+        DIM e AS STRING : e = "{" + jsonText$("file") + ":" + jsonText$(haltepunkte[i].datei) + "," + jsonText$("line") + ":" + STR$(haltepunkte[i].zeile)
+        IF haltepunkte[i].bedingung <> "" THEN e = e + "," + jsonText$("condition") + ":" + jsonText$(haltepunkte[i].bedingung)
+        IF hpTreffer$(i) <> "" THEN e = e + "," + jsonText$("hits") + ":" + jsonText$(hpTreffer$(i))
+        IF hpLog$(i) <> "" THEN e = e + "," + jsonText$("log") + ":" + jsonText$(hpLog$(i))
+        ARRAY_PUSH(teile, e + "}")
+    NEXT
+    PROCESS_WRITE(prozess, "{" + jsonText$("cmd") + ":" + jsonText$("set-breakpoints") + "," + jsonText$("now") + ":true," + jsonText$("breakpoints") + ":[" + JOIN$(teile, ",") + "]}" + NL)
+END SUB
+
+' F6: ein laufendes Programm an der naechsten Zeile anhalten.
+SUB debugAnhalten()
+    IF prozessArt <> "debug" OR prozess < 0 THEN
+        GUI_SET_TEXT(lblStatus, tr$("Anhalten geht nur im Debugger -- F7 startet ihn."))
+        RETURN
+    END IF
+    IF debugPause THEN RETURN
+    debugSenden("pause")
+    protokoll("anhalten")
+END SUB
+
+' Die Antwort auf die Haltepunkte: wo sie wirklich halten. Rutscht einer
+' (Zeile ohne Code), wandert der rote Punkt mit; haelt einer nie, sagt es
+' die Statuszeile, statt dass man vergeblich auf ihn wartet.
+SUB haltepunkteBestaetigt(j AS JSON_HANDLE)
+    DIM nie AS ARRAY OF STRING : nie = []
+    DIM k AS INTEGER
+    FOR k = 0 TO JSON_LEN(j, "breakpoints") - 1
+        DIM p AS STRING : p = "breakpoints." + STR$(k)
+        DIM datei AS STRING : datei = JSON_GET_STRING(j, p + ".file")
+        DIM z AS INTEGER : z = JSON_GET_INT(j, p + ".line")
+        IF NOT JSON_GET_BOOL(j, p + ".verified") THEN
+            ' Ein Haltepunkt in einer Datei, die das Programm gar nicht
+            ' enthaelt (ein anderes Projekt, eine nicht importierte Datei),
+            ' haelt natuerlich nie -- das ist kein Befund. Geschickt werden
+            ' die Haltepunkte ALLER Dateien, weil erst der Debugger weiss,
+            ' was importiert ist.
+            DIM dazu AS BOOLEAN : dazu = TRUE
+            IF JSON_HAS(j, p + ".in_program") THEN dazu = JSON_GET_BOOL(j, p + ".in_program")
+            IF dazu THEN ARRAY_PUSH(nie, BASENAME(datei) + ":" + STR$(z))
+            CONTINUE
+        END IF
+        DIM echt AS INTEGER : echt = JSON_GET_INT(j, p + ".actual")
+        IF echt = z THEN CONTINUE
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(haltepunkte) - 1
+            IF haltepunkte[i].zeile = z AND gleicheDatei(haltepunkte[i].datei, datei) THEN
+                IF haltepunktIndex(haltepunkte[i].datei, echt) >= 0 THEN
+                    ' Dort steht schon einer: dieser faellt weg.
+                    hpEntfernen(i)
+                ELSE
+                    haltepunkte[i].zeile = echt
+                END IF
+                protokoll("haltepunkt verschoben " + STR$(z) + " " + STR$(echt))
+                markenSchluessel = ""
+                EXIT FOR
+            END IF
+        NEXT
+    NEXT
+    IF LEN(nie) > 0 THEN
+        GUI_SET_TEXT(lblStatus, tr$("Haltepunkt hält nie (dort und darunter steht kein Code): ") + JOIN$(nie, ", "))
+        protokoll("haltepunkt nie " + JOIN$(nie, ", "))
+    END IF
+    IF debugErstWarten THEN
+        debugErstWarten = FALSE
+        ' Steht schon ein Haltepunkt HIER, bleibt es stehen; gibt es gar
+        ' keinen, der haelt, auch -- sonst liefe es durch und man saehe nichts.
+        DIM hier AS BOOLEAN : hier = FALSE
+        DIM gueltig AS INTEGER : gueltig = 0
+        FOR k = 0 TO JSON_LEN(j, "breakpoints") - 1
+            DIM q AS STRING : q = "breakpoints." + STR$(k)
+            IF JSON_GET_BOOL(j, q + ".verified") THEN
+                gueltig = gueltig + 1
+                IF JSON_GET_INT(j, q + ".actual") = debugZeile AND gleicheDatei(JSON_GET_STRING(j, q + ".file"), debugDatei) THEN hier = TRUE
+            END IF
+        NEXT
+        IF gueltig > 0 AND NOT hier THEN
+            debugErstHalt = ""
+            debugSenden("continue")
+            RETURN
+        END IF
+        IF debugErstHalt <> "" THEN
+            DIM h AS JSON_HANDLE : h = JSON_PARSE(debugErstHalt)
+            debugErstHalt = ""
+            debugHaltZeigen(h)
+        END IF
+    END IF
+END SUB
+
+' Ein Schritt-Kommando: nur, wenn das Kind steht.
+SUB debugSchritt(cmd AS STRING)
+    IF prozessArt <> "debug" OR NOT debugPause THEN
+        GUI_SET_TEXT(lblStatus, tr$("Der Debugger steht gerade nicht -- F7 startet ihn, F9 setzt einen Haltepunkt."))
+        RETURN
+    END IF
+    debugSenden(cmd)
+    debugPause = FALSE
+    debugWerteLoeschen()
+    GUI_SET_TEXT(lblDebug, tr$("Debugger: läuft ..."))
+END SUB
+
+SUB variablenZeigen(j AS JSON_HANDLE)
+    ' Welche Eintraege offen sind, gilt ueber den Halt hinaus -- gemerkt
+    ' an ihrem Weg (`held`, `held.waffe`, `f[3]`), nicht an der Zeilennummer.
+    DIM r AS INTEGER
+    IF LEN(varPfade) > 0 THEN
+        varOffen = []
+        FOR r = 0 TO MIN(LEN(varPfade), GUI_TABLE_ROW_COUNT(tblVars)) - 1
+            IF GUI_TREETABLE_EXPANDED(tblVars, r) THEN ARRAY_PUSH(varOffen, varPfade[r])
+        NEXT
+    END IF
+    GUI_TABLE_CLEAR(tblVars)
+    varPfade = []
+    DIM bereich AS STRING
+    FOR EACH bereich IN ("locals", "globals")
+        IF NOT JSON_HAS(j, bereich) THEN CONTINUE
+        DIM wo AS STRING : wo = "lokal"
+        IF bereich = "globals" THEN wo = "global"
+        variablenEbene(j, bereich, -1, "", wo)
+    NEXT
+    FOR r = 0 TO LEN(varPfade) - 1
+        IF ARRAY_INDEXOF(varOffen, varPfade[r]) >= 0 THEN GUI_TREETABLE_EXPAND(tblVars, r, TRUE)
+    NEXT
+END SUB
+
+' Eine Ebene der Variablenliste samt ihren Kindern.
+SUB variablenEbene(j AS JSON_HANDLE, pfad AS STRING, eltern AS INTEGER, vor AS STRING, wo AS STRING)
+    DIM n AS INTEGER : n = JSON_LEN(j, pfad)
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        DIM p AS STRING : p = pfad + "." + STR$(i)
+        DIM name AS STRING : name = JSON_GET_STRING(j, p + ".name")
+        DIM zeile AS INTEGER : zeile = GUI_TREETABLE_ADD(tblVars, eltern, [name, JSON_GET_STRING(j, p + ".type"), JSON_GET_STRING(j, p + ".value"), IIF(eltern < 0, wo, "")])
+        ' Der Weg wie ein Ausdruck: Feld mit Punkt, Index/Schluessel ohne.
+        DIM weg AS STRING : weg = name
+        IF vor <> "" THEN weg = IIF(LEFT$(name, 1) = "[" OR LEFT$(name, 1) = CHR$(34), vor + name, vor + "." + name)
+        WHILE LEN(varPfade) < zeile : ARRAY_PUSH(varPfade, "") : WEND
+        IF zeile < LEN(varPfade) THEN varPfade[zeile] = weg ELSE ARRAY_PUSH(varPfade, weg)
+        IF JSON_HAS(j, p + ".children") THEN variablenEbene(j, p + ".children", zeile, weg, wo)
+    NEXT
+END SUB
+
+SUB debugEreignis(zeile AS STRING)
+    IF LEFT$(zeile, 1) <> "{" THEN ausgabe(zeile) : RETURN
+    DIM j AS JSON_HANDLE : j = JSON_PARSE(zeile)
+    DIM ev AS STRING : ev = JSON_GET_STRING(j, "event")
+    SELECT CASE ev
+        CASE "output"
+            ausgabeVerteilen(JSON_GET_STRING(j, "text"))
+        CASE "paused"
+            debugZeile = JSON_GET_INT(j, "line")
+            debugDatei = prozessDatei
+            IF JSON_HAS(j, "file") THEN
+                IF JSON_GET_STRING(j, "file") <> "" THEN debugDatei = JSON_GET_STRING(j, "file")
+            END IF
+            debugEingabe = FALSE
+            IF debugErst THEN
+                ' Der erste Halt ist die erste Zeile: jetzt kennt das Kind
+                ' seine Haltepunkte. Ob es bis dorthin weiterlaeuft, sagt
+                ' seine Antwort (haltepunkteBestaetigt) -- bis dahin wartet
+                ' dieser Halt.
+                debugErst = FALSE
+                debugHaltepunkteSenden()
+                debugWatchesSenden()
+                IF debugBis > 0 THEN
+                    debugRunTo(debugBis)
+                    debugBis = 0
+                    RETURN
+                END IF
+                IF LEN(haltepunkte) > 0 THEN
+                    debugErstWarten = TRUE
+                    debugErstHalt = zeile
+                    RETURN
+                END IF
+            END IF
+            debugHaltZeigen(j)
+        CASE "breakpoints"
+            haltepunkteBestaetigt(j)
+        CASE "log"
+            ' Ein Protokollpunkt: eine Zeile in die Ausgabe, angehalten wird nicht.
+            ausgabe("» " + BASENAME(JSON_GET_STRING(j, "file")) + ":" + STR$(JSON_GET_INT(j, "line")) + "  " + JSON_GET_STRING(j, "text"))
+            protokoll("log " + JSON_GET_STRING(j, "text"))
+        CASE "run-to-error"
+            ' Es steht noch -- "bis zur Marke" hat nichts gefunden.
+            debugPause = TRUE
+            GUI_SET_TEXT(lblDebug, tr$("Debugger steht in Zeile ") + STR$(debugZeile))
+            GUI_SET_TEXT(lblStatus, tr$("Bis zur Marke: ") + JSON_GET_STRING(j, "message") + ".")
+            protokoll("bis zeile fehlt " + STR$(JSON_GET_INT(j, "line")))
+        CASE "input"
+            debugEingabe = TRUE
+            GUI_SET_TEXT(lblDebug, tr$("Debugger: das Programm wartet auf eine Eingabe (Zeile ") + STR$(JSON_GET_INT(j, "line")) + tr$(") -- unten eintippen, Enter"))
+            GUI_FOCUS(tfEingabe)
+            protokoll("debug eingabe " + STR$(JSON_GET_INT(j, "line")))
+        CASE "finished"
+            ausgabe("-- Debugger: " + JSON_GET_STRING(j, "reason"))
+            protokoll("debug beendet")
+        CASE "error"
+            debugZeile = JSON_GET_INT(j, "line")
+            DIM fdatei AS STRING : fdatei = prozessDatei
+            IF JSON_HAS(j, "file") THEN
+                IF JSON_GET_STRING(j, "file") <> "" THEN fdatei = JSON_GET_STRING(j, "file")
+            END IF
+            ausgabe("-- Fehler in " + BASENAME(fdatei) + ":" + STR$(debugZeile) + ": " + JSON_GET_STRING(j, "message"))
+            ' Dorthin, wo es passiert ist -- auch in einer importierten Datei.
+            IF debugZeile > 0 THEN
+                dateiOeffnen(fdatei)
+                DIM tf2 AS GUI_WIDGET : tf2 = aktivesFeld()
+                IF tf2 >= 0 THEN GUI_TEXTAREA_GOTO(tf2, debugZeile, 1)
+            END IF
+            protokoll("debug fehler " + STR$(debugZeile))
+        CASE "eval-result"
+            IF JSON_HAS(j, "id") THEN
+                IF JSON_GET_STRING(j, "id") = "hover" THEN
+                    wertTooltip(JSON_GET_STRING(j, "expr"), JSON_GET_STRING(j, "value"), JSON_GET_STRING(j, "type"))
+                    RETURN
+                END IF
+            END IF
+            ausgabe("= " + JSON_GET_STRING(j, "value") + "   (" + JSON_GET_STRING(j, "type") + ")")
+            protokoll("eval " + JSON_GET_STRING(j, "value"))
+        CASE "eval-error"
+            ' Ein Wort unter der Maus, das keinen Wert hat (Schluesselwort,
+            ' Befehl), ist kein Fehler, den man sehen muesste.
+            IF JSON_HAS(j, "id") THEN RETURN
+            ausgabe("Fehler: " + JSON_GET_STRING(j, "message"))
+        CASE "watches"
+            watchesZeigen(j)
+        CASE "set-result"
+            variablenZeigen(j)
+            watchesZeigen(j)
+            GUI_SET_TEXT(lblStatus, JSON_GET_STRING(j, "name") + " = " + JSON_GET_STRING(j, "value"))
+            protokoll("gesetzt " + JSON_GET_STRING(j, "name") + " " + JSON_GET_STRING(j, "value"))
+        CASE "set-error"
+            GUI_SET_TEXT(lblStatus, JSON_GET_STRING(j, "message"))
+            protokoll("setzen fehler " + JSON_GET_STRING(j, "message"))
+    END SELECT
+END SUB
+
+' Ein Halt: Variablen, Stapel, Ueberwachen, und die Datei an der Zeile.
+SUB debugHaltZeigen(j AS JSON_HANDLE)
+    debugPause = TRUE
+    sfMerk = {}
+    ' Beim Halt gehoert die IDE nach vorn: man will die Zeile sehen, und
+    ' das Programmfenster lag sonst ueber dem Code. Das Programm gibt dafuer
+    ' beim Halt den Vordergrund frei (dhrt debug).
+    WINDOW_FOCUS()
+    variablenZeigen(j)
+    stapelZeigen(j)
+    watchesZeigen(j)
+    DIM wo AS STRING : wo = "Zeile " + STR$(debugZeile)
+    IF NOT gleicheDatei(debugDatei, prozessDatei) THEN wo = BASENAME(debugDatei) + ", " + wo
+    GUI_SET_TEXT(lblDebug, tr$("Debugger steht in ") + wo + tr$(" (Tiefe ") + STR$(JSON_GET_INT(j, "depth")) + ")")
+    ' Ein Halt am FEHLER: Variablen so, wie sie beim Fehler waren; weiter
+    ' geht es nicht mehr, F8 beendet.
+    IF JSON_HAS(j, "reason") THEN
+        IF JSON_GET_STRING(j, "reason") = "error" THEN
+            GUI_SET_TEXT(lblDebug, tr$("Fehler in ") + wo + ": " + JSON_GET_STRING(j, "message") + tr$("  -- F8 beendet"))
+            protokoll("debug fehlerhalt " + STR$(debugZeile))
+        END IF
+    END IF
+    dateiOeffnen(debugDatei)
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta >= 0 THEN GUI_TEXTAREA_GOTO(ta, debugZeile, 1)
+    IF ta >= 0 THEN debugWerteZeigen(ta, j)
+    markenSchluessel = ""
+    protokoll("debug pause " + STR$(debugZeile))
+    IF NOT gleicheDatei(debugDatei, prozessDatei) THEN protokoll("debug datei " + BASENAME(debugDatei))
+END SUB
+
+' Werte im Code: hinter jede Zeile vom Kopf des Unterprogramms (oder
+' hoechstens 60 Zeilen davor) bis zur Haltezeile, welche Variablen darin
+' vorkommen und was sie gerade haben -- lokal vor global, wie das Programm
+' sie sieht. Kommentare und Zeichenketten zaehlen nicht; je Zeile hoechstens
+' vier, ein langer Wert wird gekuerzt.
+SUB debugWerteZeigen(ta AS GUI_WIDGET, j AS JSON_HANDLE)
+    debugWerteLoeschen()
+    DIM werte AS MAP OF STRING : werte = {}
+    DIM bereich AS STRING
+    FOR EACH bereich IN ("globals", "locals")
+        IF NOT JSON_HAS(j, bereich) THEN CONTINUE
+        DIM i AS INTEGER
+        FOR i = 0 TO JSON_LEN(j, bereich) - 1
+            DIM p AS STRING : p = bereich + "." + STR$(i)
+            DIM wert AS STRING : wert = JSON_GET_STRING(j, p + ".value")
+            IF LEN(wert) > 30 THEN wert = LEFT$(wert, 29) + "…"
+            MAPPUT(werte, LOWER$(JSON_GET_STRING(j, p + ".name")), wert)
+        NEXT
+    NEXT
+    IF MAPSIZE(werte) = 0 THEN RETURN
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(GUI_TEXT(ta), NL)
+    DIM nr AS ARRAY OF INTEGER : nr = []
+    DIM txt AS ARRAY OF STRING : txt = []
+    DIM z AS INTEGER
+    FOR z = MIN(debugZeile, LEN(zeilen)) TO MAX(1, debugZeile - 60) STEP -1
+        DIM zeile AS STRING : zeile = zeilen[z - 1]
+        DIM teile AS ARRAY OF STRING : teile = []
+        DIM gesehen AS ARRAY OF STRING : gesehen = []
+        DIM wort AS STRING : wort = ""
+        DIM im_text AS BOOLEAN : im_text = FALSE
+        DIM k AS INTEGER
+        FOR k = 0 TO LEN(zeile)
+            DIM c AS STRING : c = ""
+            IF k < LEN(zeile) THEN c = MID$(zeile, k, 1)
+            IF c = CHR$(34) THEN im_text = NOT im_text
+            IF NOT im_text AND c = "'" THEN c = "" : k = LEN(zeile)
+            IF NOT im_text AND c <> "" AND wortzeichenAn(zeile, k) THEN
+                wort = wort + c
+            ELSE
+                IF wort <> "" THEN
+                    DIM klein AS STRING : klein = LOWER$(wort)
+                    IF MAPHAS(werte, klein) AND ARRAY_INDEXOF(gesehen, klein) < 0 AND LEN(teile) < 4 THEN
+                        ARRAY_PUSH(gesehen, klein)
+                        ARRAY_PUSH(teile, wort + " = " + MAPGET(werte, klein))
+                    END IF
+                END IF
+                wort = ""
+            END IF
+        NEXT
+        IF LEN(teile) > 0 THEN ARRAY_PUSH(nr, z) : ARRAY_PUSH(txt, JOIN$(teile, "   "))
+        DIM kopf AS STRING : kopf = UPPER$(LTRIM$(zeile))
+        IF LEFT$(kopf, 4) = "SUB " OR LEFT$(kopf, 9) = "FUNCTION " OR LEFT$(kopf, 9) = "PROPERTY " THEN BREAK
+    NEXT
+    GUI_TEXTAREA_HINTS(ta, nr, txt)
+    werteFeld = ta
+    protokoll("codewerte " + STR$(LEN(nr)))
+    DIM wi AS INTEGER
+    FOR wi = 0 TO LEN(nr) - 1
+        protokoll("codewert " + STR$(nr[wi]) + ": " + txt[wi])
+    NEXT
+END SUB
+
+SUB debugWerteLoeschen()
+    IF werteFeld < 0 THEN RETURN
+    GUI_TEXTAREA_HINTS(werteFeld, [], [])
+    DIM war AS GUI_WIDGET : war = werteFeld
+    werteFeld = -1
+    ' Die Aufrufzaehler standen an derselben Stelle -- sie kommen zurueck.
+    zaehlerSetzen_(war)
+END SUB
+
+' Der Aufrufstapel: innen oben. Das Hauptprogramm heisst im Kind
+' "__main__" -- hier heisst es, wie man es nennt.
+SUB stapelZeigen(j AS JSON_HANDLE)
+    GUI_TABLE_CLEAR(tblStapel)
+    stapelStellen = []
+    IF NOT JSON_HAS(j, "stack") THEN RETURN
+    DIM teile AS ARRAY OF STRING : teile = []
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(j, "stack") - 1
+        DIM p AS STRING : p = "stack." + STR$(i)
+        DIM name AS STRING : name = JSON_GET_STRING(j, p + ".name")
+        IF name = "" OR LEFT$(name, 2) = "__" THEN name = "Hauptprogramm"
+        DIM sdatei AS STRING : sdatei = prozessDatei
+        IF JSON_HAS(j, p + ".file") THEN
+            IF JSON_GET_STRING(j, p + ".file") <> "" THEN sdatei = JSON_GET_STRING(j, p + ".file")
+        END IF
+        ARRAY_PUSH(stapelStellen, NEW CodeStelle(sdatei, JSON_GET_INT(j, p + ".line"), 1))
+        DIM szeile AS STRING : szeile = STR$(JSON_GET_INT(j, p + ".line"))
+        ' Die Zeile zuerst: in der schmalen Spalte schnitt "mathe.dh:10" genau
+        ' die Zahl ab, um die es geht.
+        IF NOT gleicheDatei(sdatei, prozessDatei) THEN szeile = szeile + "  " + BASENAME(sdatei)
+        GUI_TABLE_ADD_ROW(tblStapel, [name, szeile])
+        ARRAY_PUSH(teile, name + ":" + STR$(JSON_GET_INT(j, p + ".line")))
+    NEXT
+    protokoll("stapel " + JOIN$(teile, " "))
+END SUB
+
+SUB watchesZeigen(j AS JSON_HANDLE)
+    GUI_TABLE_CLEAR(tblWatch)
+    IF NOT JSON_HAS(j, "watches") THEN RETURN
+    DIM teile AS ARRAY OF STRING : teile = []
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(j, "watches") - 1
+        DIM p AS STRING : p = "watches." + STR$(i)
+        DIM wert AS STRING
+        IF JSON_HAS(j, p + ".error") THEN
+            wert = "? " + JSON_GET_STRING(j, p + ".error")
+        ELSE
+            wert = JSON_GET_STRING(j, p + ".value")
+        END IF
+        GUI_TABLE_ADD_ROW(tblWatch, [JSON_GET_STRING(j, p + ".expr"), wert])
+        ARRAY_PUSH(teile, JSON_GET_STRING(j, p + ".expr") + "=" + wert)
+    NEXT
+    protokoll("ueberwachen " + JOIN$(teile, " | "))
+END SUB
+
+' Die Liste an das Kind -- es liest nur, solange es steht; was waehrend
+' des Laufens kommt, liest es beim naechsten Halt und antwortet dann.
+SUB debugWatchesSenden()
+    IF prozess < 0 OR prozessArt <> "debug" THEN RETURN
+    DIM teile AS ARRAY OF STRING : teile = []
+    DIM w AS STRING
+    FOR EACH w IN watchListe
+        ARRAY_PUSH(teile, jsonText$(w))
+    NEXT
+    PROCESS_WRITE(prozess, "{" + jsonText$("cmd") + ":" + jsonText$("set-watches") + "," + jsonText$("exprs") + ":[" + JOIN$(teile, ",") + "]}" + NL)
+END SUB
+
+' Eine Variable im Halt setzen -- der Wert ist ein Ausdruck, das Kind
+' rechnet ihn aus und wandelt ihn wie bei einer Zuweisung.
+SUB debugSetzen(name AS STRING, wert AS STRING)
+    IF prozessArt <> "debug" OR NOT debugPause OR prozess < 0 THEN RETURN
+    PROCESS_WRITE(prozess, "{" + jsonText$("cmd") + ":" + jsonText$("set") + "," + jsonText$("name") + ":" + jsonText$(name) + "," + jsonText$("value") + ":" + jsonText$(wert) + "}" + NL)
+END SUB
+
+SUB debugRunTo(zeile AS INTEGER)
+    DIM datei AS STRING : datei = prozessDatei
+    IF aktiverTab >= 0 THEN
+        IF reiter[aktiverTab].pfad <> "" THEN datei = reiter[aktiverTab].pfad
+    END IF
+    PROCESS_WRITE(prozess, "{" + jsonText$("cmd") + ":" + jsonText$("run-to") + "," + jsonText$("line") + ":" + STR$(zeile) + "," + jsonText$("file") + ":" + jsonText$(datei) + "}" + NL)
+    programmNachVorn()
+    debugPause = FALSE
+    debugWerteLoeschen()
+    GUI_SET_TEXT(lblDebug, tr$("Debugger: läuft bis Zeile ") + STR$(zeile) + " ...")
+    protokoll("bis zeile " + STR$(zeile))
+END SUB
+
+' Bis zur Zeile mit der Schreibmarke: im Halt sofort, ohne laufenden
+' Debugger startet er ihn und laeuft beim ersten Halt dorthin. Ein
+' Haltepunkt davor haelt trotzdem -- wie in jeder anderen Umgebung.
+SUB bisZurMarke()
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN
+    DIM m AS TUPLE : m = GUI_TEXTAREA_CURSOR(ta)
+    DIM z AS INTEGER : z = m[0]
+    IF prozessArt = "debug" AND prozess >= 0 THEN
+        IF NOT debugPause THEN
+            GUI_SET_TEXT(lblStatus, tr$("Der Debugger läuft gerade -- erst im Halt geht es bis zur Marke."))
+            RETURN
+        END IF
+        debugRunTo(z)
+        RETURN
+    END IF
+    IF prozess >= 0 THEN RETURN
+    debugBis = z
+    debuggen()
+END SUB
+
+' Je Bild: einen Ausdruck aufnehmen (Enter im Feld), einen entfernen,
+' einen Doppelklick auf eine Variable (neuer Wert) oder auf den Stapel
+' (dorthin springen) auswerten.
+SUB debugPanelNachziehen()
+    IF GUI_ENTERED(tfWatch) THEN
+        DIM neu AS STRING : neu = TRIM$(GUI_TEXT(tfWatch))
+        IF neu <> "" THEN
+            ARRAY_PUSH(watchListe, neu)
+            GUI_SET_TEXT(tfWatch, "")
+            protokoll("ueberwachen neu " + neu)
+            IF prozessArt = "debug" AND prozess >= 0 THEN
+                debugWatchesSenden()
+            ELSE
+                GUI_TABLE_ADD_ROW(tblWatch, [neu, ""])
+            END IF
+        END IF
+    END IF
+    IF GUI_CLICKED(btnWatchWeg) THEN
+        DIM k AS INTEGER : k = GUI_TABLE_SELECTED(tblWatch)
+        IF k >= 0 AND k < LEN(watchListe) THEN
+            DIM rest AS ARRAY OF STRING : rest = []
+            DIM i AS INTEGER
+            FOR i = 0 TO LEN(watchListe) - 1
+                IF i <> k THEN ARRAY_PUSH(rest, watchListe[i])
+            NEXT
+            watchListe = rest
+            GUI_TABLE_REMOVE_ROW(tblWatch, k)
+            protokoll("ueberwachen weg " + STR$(LEN(watchListe)))
+            IF prozessArt = "debug" AND prozess >= 0 THEN debugWatchesSenden()
+        END IF
+    END IF
+    IF GUI_DOUBLE_CLICKED(tblVars) THEN
+        DIM r AS INTEGER : r = GUI_TABLE_SELECTED(tblVars)
+        ' Setzen geht nur fuer eine ganze Variable -- ein Feld darin nicht.
+        IF r >= 0 AND GUI_TREETABLE_PARENT(tblVars, r) >= 0 THEN
+            GUI_SET_TEXT(lblStatus, tr$("Setzen geht nur für eine ganze Variable, nicht für ein Feld darin."))
+            r = -1
+        END IF
+        IF r >= 0 AND prozessArt = "debug" AND debugPause THEN
+            setzenName = GUI_TABLE_GET_CELL(tblVars, r, 0)
+            dlgSetzen = GUI_PROMPT(tr$("Wert setzen"), tr$("Neuer Wert für ") + setzenName + tr$(" (ein Ausdruck):"), GUI_TABLE_GET_CELL(tblVars, r, 2))
+        END IF
+    END IF
+    IF GUI_DOUBLE_CLICKED(tblStapel) THEN
+        DIM sr AS INTEGER : sr = GUI_TABLE_SELECTED(tblStapel)
+        IF sr >= 0 AND sr < LEN(stapelStellen) THEN
+            DIM zl AS INTEGER : zl = stapelStellen[sr].zeile
+            ' Die Zeile gehoert zu IHRER Datei -- ein Aufruf aus einer
+            ' importierten Datei steht nicht im Reiter, der gerade vorn ist.
+            IF NOT gleicheDatei(stapelStellen[sr].pfad, reiter[aktiverTab].pfad) THEN dateiOeffnen(stapelStellen[sr].pfad)
+            DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+            IF ta >= 0 AND zl > 0 THEN GUI_TEXTAREA_GOTO(ta, zl, 1)
+            protokoll("stapel sprung " + STR$(zl))
+        END IF
+    END IF
+    IF dlgSetzen <> 0 THEN
+        DIM a AS INTEGER : a = GUI_ANSWER(dlgSetzen)
+        IF a = 1 THEN
+            DIM wert AS STRING : wert = GUI_DIALOG_TEXT(dlgSetzen)
+            dlgSetzen = 0
+            debugSetzen(setzenName, wert)
+        ELSEIF a = 2 THEN
+            dlgSetzen = 0
+        END IF
+    END IF
+END SUB
+
+' --- Profil: `dhrt profile` liefert am Ende EINE JSON-Zeile --------------
+SUB profilAufnehmen()
+    IF prozessStarten("profile") THEN protokoll("profil gestartet")
+END SUB
+
+' Vergleiche fuer SORT (stabil: bei Gleichstand bleibt die Folge der
+' Messung bzw. des Auftretens). Teurer zuerst.
+FUNCTION profZeileVergleich(a AS ProfilZeile, b AS ProfilZeile) AS INTEGER
+    IF b.zeit > a.zeit THEN RETURN 1
+    IF b.zeit < a.zeit THEN RETURN -1
+    RETURN 0
+END FUNCTION
+
+FUNCTION profGruppeVergleich(a AS ProfilGruppe, b AS ProfilGruppe) AS INTEGER
+    IF b.zeit > a.zeit THEN RETURN 1
+    IF b.zeit < a.zeit THEN RETURN -1
+    RETURN 0
+END FUNCTION
+
+' Groessere Bereiche zuerst -- jeder kleinere ueberschreibt danach seine
+' Zeilen, so gewinnt der innerste.
+FUNCTION profBereichVergleich(a AS ProfilBereich, b AS ProfilBereich) AS INTEGER
+    IF b.bis - b.von > a.bis - a.von THEN RETURN 1
+    IF b.bis - b.von < a.bis - a.von THEN RETURN -1
+    RETURN 0
+END FUNCTION
+
+SUB profilAnzeigen(zeile AS STRING)
+    DIM j AS JSON_HANDLE : j = JSON_PARSE(zeile)
+    ausgabeVerteilen(JSON_GET_STRING(j, "output"))
+    DIM gesamt AS FLOAT : gesamt = JSON_GET_FLOAT(j, "total_time")
+    DIM n AS INTEGER : n = JSON_LEN(j, "lines")
+    DIM i AS INTEGER
+    profMessung = []
+    FOR i = 0 TO n - 1
+        DIM p AS STRING : p = "lines." + STR$(i)
+        ' Die Hauptdatei heisst wie beim Start, eine importierte kanonisch.
+        DIM zd AS STRING : zd = prozessDatei
+        IF JSON_HAS(j, p + ".file") THEN
+            IF JSON_GET_STRING(j, p + ".file") <> prozessDatei AND JSON_GET_STRING(j, p + ".file") <> "" THEN zd = JSON_GET_STRING(j, p + ".file")
+        END IF
+        profMessungDazu(JSON_GET_INT(j, p + ".line"), JSON_GET_INT(j, p + ".count"), JSON_GET_FLOAT(j, p + ".time"), zd)
+    NEXT
+    ' Nach Zeit absteigend -- die teuerste Zeile zuerst (SORT ist stabil;
+    ' die Auswahlsortierung frueherer Staende war quadratisch, ein Programm
+    ' mit 20000 Zeilen hielt die IDE 13,7 s fest, Stresstest 2026-10-02).
+    SORT(profMessung, profZeileVergleich)
+    ' Die Quelle zur Messung: der offene Reiter, sonst die Datei -- ohne sie
+    ' gaebe es weder den Quelltext je Zeile noch die Funktionen.
+    DIM quelle AS ARRAY OF STRING : quelle = []
+    DIM tq AS INTEGER : tq = tabMitPfad(prozessDatei)
+    IF tq >= 0 THEN
+        quelle = SPLIT$(GUI_TEXT(reiter[tq].feld), NL)
+    ELSE
+        TRY
+            quelle = SPLIT$(dateiLesen(prozessDatei), NL)
+        CATCH e
+            quelle = []
+        END TRY
+    END IF
+    profLeseDatei = ""
+    profGesamt = gesamt
+    profQuelle = quelle
+    profilTabelleFuellen()
+    ' Fuer die Aufrufer-Liste aufheben: WIE OFT eine Zeile gelaufen ist.
+    ' Wer wissen will, welcher Weg der heisse ist, sieht es dann im Baum,
+    ' statt Aufrufstellen und Profil im Kopf zusammenzubringen.
+    profDatei = prozessDatei
+    profHier = []
+    FOR i = 0 TO n - 1
+        IF profMessung[i].datei = prozessDatei THEN ARRAY_PUSH(profHier, profMessung[i])
+    NEXT
+    GUI_SET_TEXT(lblProfil, BASENAME(prozessDatei) + ": " + FORMAT$(gesamt * 1000.0, "%.2f") + tr$(" ms gesamt, ") + STR$(n) + tr$(" Zeilen gemessen"))
+    IF JSON_HAS(j, "error") THEN
+        DIM fd AS STRING : fd = prozessDatei
+        IF JSON_HAS(j, "error_file") THEN
+            IF JSON_GET_STRING(j, "error_file") <> "" THEN fd = JSON_GET_STRING(j, "error_file")
+        END IF
+        ausgabe("-- Fehler in " + BASENAME(fd) + ":" + STR$(JSON_GET_INT(j, "error_line")) + ": " + JSON_GET_STRING(j, "error"))
+    END IF
+    waermeDaten = TRUE
+    waermeAnwenden()
+    GUI_WINDOW_VISIBLE(winProfil, TRUE)
+    GUI_FOCUS(tblProfil)          ' holt das Fenster vor das Hauptfenster
+    protokoll("profil " + STR$(n))
+END SUB
+
+' Die Tabelle aus der Messung: je Zeile (die teuersten 300) oder je
+' Funktion. Eine Zeile gehoert zur INNERSTEN Funktion, die sie umschliesst
+' (eine Methode zu ihrer Klasse als `Klasse.methode`), alles ausserhalb zum
+' Hauptprogramm. Ein Klick springt zur Zeile bzw. zum Kopf der Funktion.
+SUB profilTabelleFuellen()
+    GUI_TABLE_CLEAR(tblProfil)
+    DIM pz AS ARRAY OF INTEGER : pz = []
+    DIM n AS INTEGER : n = LEN(profMessung)
+    DIM i AS INTEGER
+    IF NOT GUI_CHECKED(cbProfilFunk) THEN
+        GUI_TABLE_HEADERS(tblProfil, [tr$("Zeile"), tr$("Anzahl"), "ms", tr$("Anteil"), tr$("Quelltext")])
+        GUI_TABLE_COL_WIDTHS(tblProfil, [110, 70, 70, 70, 300])
+        DIM pd AS ARRAY OF STRING : pd = []
+        FOR i = 0 TO MIN(n, 300) - 1
+            DIM pm AS ProfilZeile : pm = profMessung[i]
+            DIM anteil AS STRING : anteil = "-"
+            IF profGesamt > 0.0 THEN anteil = FORMAT$(pm.zeit / profGesamt * 100.0, "%.1f") + " %"
+            DIM q AS STRING : q = profZeileText$(pm.datei, pm.zeile)
+            DIM zs AS STRING : zs = STR$(pm.zeile)
+            ' Die Zeile zuerst, wie im Aufrufstapel: "mathe.dh:10" verlor in
+            ' der schmalen Spalte genau die Zahl.
+            IF NOT gleicherWeg(pm.datei, prozessDatei) THEN zs = zs + "  " + BASENAME(pm.datei)
+            GUI_TABLE_ADD_ROW(tblProfil, [zs, STR$(pm.anzahl), FORMAT$(pm.zeit * 1000.0, "%.2f"), anteil, q])
+            ARRAY_PUSH(pz, pm.zeile) : ARRAY_PUSH(pd, pm.datei)
+        NEXT
+        profilZeilen = pz : profilDateien = pd
+        protokoll("profiltabelle zeilen " + STR$(LEN(pz)))
+        RETURN
+    END IF
+    profBereiche = []
+    ' Die Bereiche JEDER gemessenen Datei, je mit ihrer Datei gemerkt.
+    DIM dateien AS ARRAY OF STRING : dateien = []
+    FOR i = 0 TO n - 1
+        IF ARRAY_INDEXOF(dateien, profMessung[i].datei) < 0 THEN ARRAY_PUSH(dateien, profMessung[i].datei)
+    NEXT
+    DIM di AS INTEGER
+    FOR di = 0 TO LEN(dateien) - 1
+        DIM text AS STRING
+        IF dateien[di] = prozessDatei THEN
+            text = JOIN$(profQuelle, NL)
+        ELSE
+            TRY
+                text = dateiLesen(dateien[di])
+            CATCH e
+                text = ""
+            END TRY
+        END IF
+        DIM j AS JSON_HANDLE : j = JSON_PARSE("{" + CHR$(34) + "s" + CHR$(34) + ": " + CODE_SYMBOLS$(text) + "}")
+        profilBereiche(j, "s", "", dateien[di])
+    NEXT
+    DIM gruppen AS ARRAY OF ProfilGruppe : gruppen = []
+    ' Zeile -> innerster Bereich, EINMAL aufgebaut: die groessten Bereiche
+    ' zuerst, jeder kleinere ueberschreibt seine Zeilen. Vorher ging jede
+    ' gemessene Zeile alle Bereiche durch und suchte ihre Gruppe mit
+    ' ARRAY_INDEXOF, sortiert wurde per Auswahl -- bei 2000 Unterprogrammen
+    ' 2,9 s in einem Bild (Stresstest 2026-10-02).
+    DIM innen AS MAP OF INTEGER : innen = {}
+    DIM nachGroesse AS ARRAY OF ProfilBereich : nachGroesse = ARRAY_COPY(profBereiche)
+    SORT(nachGroesse, profBereichVergleich)
+    DIM pb AS ProfilBereich
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(nachGroesse) - 1
+        pb = nachGroesse[k]
+        DIM zz AS INTEGER
+        FOR zz = pb.von TO pb.bis
+            MAPPUT(innen, pb.datei + "|" + STR$(zz), k)
+        NEXT
+    NEXT
+    DIM gNr AS MAP OF INTEGER : gNr = {}
+    FOR i = 0 TO n - 1
+        DIM pm2 AS ProfilZeile : pm2 = profMessung[i]
+        DIM name AS STRING : name = "(Hauptprogramm)"
+        IF pm2.datei <> prozessDatei THEN name = "(" + BASENAME(pm2.datei) + ")"
+        DIM von AS INTEGER : von = 1
+        DIM schl AS STRING : schl = pm2.datei + "|" + STR$(pm2.zeile)
+        IF MAPHAS(innen, schl) THEN
+            pb = nachGroesse[MAPGET(innen, schl)]
+            name = pb.name : von = pb.von
+            IF pm2.datei <> prozessDatei THEN name = BASENAME(pm2.datei) + ": " + name
+        END IF
+        IF NOT MAPHAS(gNr, name) THEN
+            ARRAY_PUSH(gruppen, NEW ProfilGruppe(name, pm2.datei, von))
+            MAPPUT(gNr, name, LEN(gruppen) - 1)
+        END IF
+        DIM gr AS ProfilGruppe : gr = gruppen[MAPGET(gNr, name)]
+        gr.zeilen = gr.zeilen + 1
+        gr.zeit = gr.zeit + pm2.zeit
+    NEXT
+    ' Nach Zeit absteigend (bei gleicher Zeit in der Folge des Auftretens).
+    SORT(gruppen, profGruppeVergleich)
+    GUI_TABLE_HEADERS(tblProfil, [tr$("Funktion"), tr$("ab Zeile"), tr$("Zeilen"), "ms", tr$("Anteil")])
+    GUI_TABLE_COL_WIDTHS(tblProfil, [240, 80, 70, 90, 80])
+    DIM gDatei AS ARRAY OF STRING : gDatei = []
+    DIM m AS INTEGER : m = LEN(gruppen)
+    DIM a AS INTEGER
+    FOR a = 0 TO m - 1
+        DIM g AS ProfilGruppe : g = gruppen[a]
+        DIM ant AS STRING : ant = "-"
+        IF profGesamt > 0.0 THEN ant = FORMAT$(g.zeit / profGesamt * 100.0, "%.1f") + " %"
+        GUI_TABLE_ADD_ROW(tblProfil, [g.name, STR$(g.von), STR$(g.zeilen), FORMAT$(g.zeit * 1000.0, "%.2f"), ant])
+        ARRAY_PUSH(pz, g.von) : ARRAY_PUSH(gDatei, g.datei)
+        protokoll("profiltabelle funktion " + g.name + " " + STR$(g.zeilen))
+    NEXT
+    profilZeilen = pz : profilDateien = gDatei
+    protokoll("profiltabelle funktionen " + STR$(m))
+END SUB
+
+' Der Quelltext einer gemessenen Zeile -- aus der Hauptdatei (so, wie sie
+' im Editor steht) oder aus einer importierten, die einmal gelesen und
+' behalten wird, solange die naechste Zeile aus derselben kommt.
+FUNCTION profZeileText$(datei AS STRING, z AS INTEGER) AS STRING
+    IF datei = prozessDatei THEN
+        IF z >= 1 AND z <= LEN(profQuelle) THEN RETURN TRIM$(profQuelle[z - 1])
+        RETURN ""
+    END IF
+    IF datei <> profLeseDatei THEN
+        profLeseDatei = datei
+        TRY
+            profLeseZeilen = SPLIT$(dateiLesen(datei), NL)
+        CATCH e
+            profLeseZeilen = []
+        END TRY
+    END IF
+    IF z >= 1 AND z <= LEN(profLeseZeilen) THEN RETURN TRIM$(profLeseZeilen[z - 1])
+    RETURN ""
+END FUNCTION
+
+' Die Funktionsbereiche aus CODE_SYMBOLS$ einsammeln, Methoden als
+' `Klasse.methode`.
+SUB profilBereiche(j AS JSON_HANDLE, pfad AS STRING, vor AS STRING, datei AS STRING)
+    DIM n AS INTEGER : n = JSON_LEN(j, pfad)
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        DIM p AS STRING : p = pfad + "." + STR$(i)
+        DIM art AS STRING : art = JSON_GET_STRING(j, p + ".art")
+        DIM name AS STRING : name = JSON_GET_STRING(j, p + ".name")
+        IF art = "function" OR art = "sub" THEN
+            ARRAY_PUSH(profBereiche, NEW ProfilBereich(vor + name, JSON_GET_INT(j, p + ".von"), JSON_GET_INT(j, p + ".bis"), datei))
+        END IF
+        IF JSON_LEN(j, p + ".kinder") > 0 THEN
+            profilBereiche(j, p + ".kinder", IIF(art = "class", vor + name + ".", vor), datei)
+        END IF
+    NEXT
+END SUB
+
+SUB profilAnspringen()
+    DIM r AS INTEGER : r = GUI_TABLE_SELECTED(tblProfil)
+    IF r < 0 OR r >= LEN(profilZeilen) THEN RETURN
+    IF r < LEN(profilDateien) THEN dateiOeffnen(profilDateien[r]) ELSE dateiOeffnen(prozessDatei)
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta >= 0 THEN GUI_TEXTAREA_GOTO(ta, profilZeilen[r], 1) : GUI_FOCUS(ta)
+END SUB
+
+' stdout des Kindes: beim Lauf Text, beim Debugger Ereignisse, beim Profil
+' am Ende die eine JSON-Zeile -- alles zeilenweise, halbe Zeilen warten.
+SUB stdoutVerteilen(text AS STRING)
+    IF text = "" THEN RETURN
+    IF prozessArt = "run" THEN ausgabeVerteilen(text) : RETURN
+    DIM z AS STRING
+    FOR EACH z IN zeilenAbtrennen(prozessRest, text)
+        IF prozessArt = "debug" THEN
+            debugEreignis(z)
+        ELSEIF LEFT$(z, 1) = "{" AND INSTR(z, CHR$(34) + "total_time" + CHR$(34)) >= 0 THEN
+            ' die eine Ergebniszeile des Profilers (Schluessel sortiert, also
+            ' nicht am Anfang zu erkennen)
+            profilAnzeigen(z)
+        ELSE
+            ausgabe(z)
+        END IF
+    NEXT
+END SUB
+
+SUB prozessNachsehen()
+    IF prozess < 0 THEN RETURN
+    IF stoppFrist > 0 AND GET_TIME() > stoppFrist THEN
+        stoppFrist = 0
+        IF PROCESS_RUNNING(prozess) THEN PROCESS_KILL(prozess)
+    END IF
+    stdoutVerteilen(PROCESS_READ$(prozess))
+    DIM err AS STRING : err = PROCESS_ERR$(prozess)
+    IF err <> "" THEN ausgabeVerteilen(err)
+    IF NOT PROCESS_RUNNING(prozess) THEN
+        ' Das Kind kann schon beendet sein, bevor sein Lesefaden die letzte
+        ' Zeile abgelegt hat -- beim Debugger ist das oft das `finished`.
+        ' Einmal lesen liess es dann fallen (der Neustart-Test wackelte so);
+        ' gelesen wird, bis fuenf Abfragen hintereinander leer sind.
+        DIM leerIn AS INTEGER : leerIn = 0
+        WHILE leerIn < 5
+            DIM restA AS STRING : restA = PROCESS_READ$(prozess)
+            DIM restE AS STRING : restE = PROCESS_ERR$(prozess)
+            IF restE <> "" THEN ausgabeVerteilen(restE)
+            IF restA = "" AND restE = "" THEN
+                leerIn = leerIn + 1
+                SLEEP(10)
+            ELSE
+                IF restA <> "" THEN stdoutVerteilen(restA)
+                leerIn = 0
+            END IF
+        WEND
+        IF prozessRest <> "" THEN stdoutVerteilen(NL)
+        IF ausgabeRest <> "" THEN ausgabe(ausgabeRest) : ausgabeRest = ""
+        DIM code AS INTEGER : code = PROCESS_CODE(prozess)
+        PROCESS_CLOSE(prozess)
+        prozess = -1
+        IF prozessArt = "debug" THEN
+            debugPause = FALSE : debugZeile = 0
+            debugWerteLoeschen()
+            debugPanelZeigen(FALSE)
+        END IF
+        IF fertigNachStopp THEN
+            GUI_SET_TEXT(lblAusgabe, tr$("Ausgabe: gestoppt"))
+            protokoll("gestoppt")
+        ELSE
+            GUI_SET_TEXT(lblAusgabe, tr$("Ausgabe: beendet mit Code ") + STR$(code))
+            protokoll("beendet " + STR$(code))
+        END IF
+        fertigNachStopp = FALSE
+        stoppFrist = 0
+        prozessArt = ""
+        pluginEreignis("beendet", prozessDatei)
+        IF neustartArt <> "" THEN neustartAusfuehren()
+    END IF
+END SUB
+
+' Strg+Umschalt+F5: laeuft etwas, wird es gestoppt und danach dasselbe
+' Programm in derselben Art neu gestartet; laeuft nichts, ein normaler Start.
+SUB neuStarten()
+    IF prozess < 0 THEN
+        starten()
+        RETURN
+    END IF
+    neustartArt = prozessArt
+    neustartDatei = prozessDatei
+    protokoll("neustart " + neustartArt)
+    stoppen()
+END SUB
+
+SUB neustartAusfuehren()
+    DIM art AS STRING : art = neustartArt
+    neustartArt = ""
+    ' Vom Sichern ausgeloest: dieselbe Datei wieder starten, ohne den
+    ' Reiter zu wechseln -- gesichert wurde vielleicht eine importierte Datei,
+    ' an der man weiterarbeiten will.
+    IF neustartVomSichern THEN
+        neustartVomSichern = FALSE
+        IF prozessStartenDatei("run", neustartDatei) THEN protokoll("gestartet " + prozessDatei)
+        RETURN
+    END IF
+    IF neustartDatei <> "" THEN dateiOeffnen(neustartDatei)
+    SELECT CASE art
+        CASE "debug" : debuggen()
+        CASE "profile" : profilAufnehmen()
+        CASE ELSE : starten()
+    END SELECT
+END SUB
+
+' Geaendert, waehrend der Debugger laeuft: das laufende Programm kennt noch
+' die alten Zeilen -- einmal sagen, statt dass Haltepunkte scheinbar
+' daneben halten. Vor dem Start war alles gesichert, eine Aenderung an einem
+' benannten Reiter ist also eine danach.
+SUB debugAenderungNachsehen()
+    IF prozessArt <> "debug" OR prozess < 0 THEN
+        debugGeaendertGesagt = FALSE
+        RETURN
+    END IF
+    IF debugGeaendertGesagt THEN RETURN
+    DIM t AS INTEGER
+    FOR t = 0 TO tabAnzahl - 1
+        IF reiter[t].pfad <> "" THEN
+            IF reiter[t].geaendert() THEN
+                debugGeaendertGesagt = TRUE
+                GUI_SET_TEXT(lblStatus, BASENAME(reiter[t].pfad) + tr$(" geändert, während der Debugger läuft -- das Programm kennt noch die alten Zeilen. Strg+Umschalt+F5 startet neu."))
+                protokoll("debug geaendert " + BASENAME(reiter[t].pfad))
+                RETURN
+            END IF
+        END IF
+    NEXT
+END SUB

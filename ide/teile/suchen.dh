@@ -1,0 +1,699 @@
+' ide/teile/suchen.dh -- ein Teil der IDE (ide/ide.dh), dort per IMPORT
+' an genau dieser Stelle eingebunden: Suchen und Ersetzen, Suchleiste, Handgriffe im Text, Ausgabe durchsuchen, Auswahl erweitern.
+' Kein eigenes Programm -- die Namen gehoeren der IDE.
+
+' --- Suchen / Ersetzen / Zeile ----------------------------------------
+' JEDE Suche der IDE geht durch EIN Muster: der Suchtext woertlich
+' (maskiert) oder als regulaerer Ausdruck, fuer ganze Woerter zwischen `\b`,
+' ohne Gross/klein mit `(?i)`. Liefen Suchleiste, Projektsuche und
+' Ersetzen im Projekt getrennte Wege, faende die eine etwas anderes als die
+' andere -- und genau das war vorher so: das Ersetzen im Feld suchte ohne
+' Ruecksicht auf den Regex-Schalter.
+FUNCTION suchMuster$(text AS STRING) AS STRING
+    IF text = "" THEN RETURN ""
+    DIM m AS STRING : m = IIF(regexAn, text, REGEX_ESCAPE$(text))
+    IF ganzesWort THEN m = "\b(?:" + m + ")\b"
+    IF NOT grossKlein THEN m = "(?i)" + m
+    RETURN m
+END FUNCTION
+
+' Passt die Zeile? Fuer die Projektsuche und das Zaehlen vor dem Ersetzen.
+FUNCTION passtSuche(zeile AS STRING, muster AS STRING) AS BOOLEAN
+    IF muster = "" THEN RETURN FALSE
+    TRY
+        RETURN REGEX_TEST(zeile, suchMuster$(muster))
+    CATCH e
+        RETURN FALSE
+    END TRY
+END FUNCTION
+
+' Ersetzen Zeile fuer Zeile -- dieselbe Einheit wie die Trefferliste, sonst
+' hiesse `^` beim Ersetzen etwas anderes als beim Suchen. Woertlich (ohne
+' Ausdruck) bekommt der Ersatz verdoppelte Rueckstriche: REGEX_REPLACE liest
+' `\1` als Gruppe, und wer woertlich `\1` einsetzen will, meint das nicht.
+FUNCTION textErsetzen$(text AS STRING, gesucht AS STRING, ersatz AS STRING) AS STRING
+    DIM m AS STRING : m = suchMuster$(gesucht)
+    IF m = "" THEN RETURN text
+    DIM r AS STRING : r = IIF(regexAn, ersatz, REPLACE$(ersatz, "\", "\\"))
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(text, NL)
+    DIM i AS INTEGER
+    TRY
+        FOR i = 0 TO LEN(zeilen) - 1
+            zeilen[i] = REGEX_REPLACE(zeilen[i], m, r)
+        NEXT
+    CATCH e
+        RETURN text
+    END TRY
+    RETURN JOIN$(zeilen, NL)
+END FUNCTION
+
+' --- Die Suchleiste (seit 2026-09-19) ---------------------------------
+' Statt zwei Eingabe-Kaesten hintereinander ein Fenster, das offen bleibt:
+' Suchfeld mit Weiter/Zurueck und Trefferzahl, die drei Schalter, und in der
+' Ersetzen-Form ein Ersatzfeld mit [Ersetzen] (EINE Stelle, dann die
+' naechste) und [Alle]. Tippen springt sofort zum ersten Treffer ab der
+' Stelle, an der die Leiste aufging; der Fokus bleibt dabei im Suchfeld.
+' Die Treffer eines Feldes: Zeile, Spalte (ab 1 wie GUI_TEXTAREA_SELECT) und
+' Laenge -- gerechnet, wenn sich Muster, Feld oder Text geaendert haben.
+CLASS Fundort
+    DIM zeile AS INTEGER
+    DIM spalte AS INTEGER
+    DIM laenge AS INTEGER
+    SUB Init(z AS INTEGER, sp AS INTEGER, l AS INTEGER)
+        zeile = z : spalte = sp : laenge = l
+    END SUB
+END CLASS
+DIM fundorte AS ARRAY OF Fundort : fundorte = []
+DIM trefferFehler AS BOOLEAN : trefferFehler = FALSE
+DIM trefferMusterAlt AS STRING : trefferMusterAlt = "-"
+DIM trefferFeldAlt AS GUI_WIDGET : trefferFeldAlt = -2
+DIM trefferTextAlt AS STRING : trefferTextAlt = ""
+CONST TREFFER_HOECHSTENS = 20000
+
+SUB trefferAktuell(ta AS GUI_WIDGET)
+    DIM m AS STRING : m = ""
+    IF ta >= 0 THEN m = suchMuster$(suchtext)
+    DIM t AS STRING : t = ""
+    IF ta >= 0 THEN t = GUI_TEXT(ta)
+    IF m = trefferMusterAlt AND ta = trefferFeldAlt AND t = trefferTextAlt THEN RETURN
+    trefferMusterAlt = m : trefferFeldAlt = ta : trefferTextAlt = t
+    fundorte = []
+    trefferFehler = FALSE
+    IF m = "" THEN RETURN
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(t, NL)
+    DIM z AS INTEGER
+    FOR z = 0 TO LEN(zeilen) - 1
+        DIM ab AS INTEGER : ab = 0
+        WHILE ab <= LEN(zeilen[z]) AND LEN(fundorte) < TREFFER_HOECHSTENS
+            DIM p AS INTEGER
+            DIM l AS INTEGER
+            TRY
+                (p, l) = REGEX_FIND_POS(zeilen[z], m, ab)
+            CATCH e
+                trefferFehler = TRUE
+                RETURN
+            END TRY
+            IF p < 0 THEN BREAK
+            ' Ein leerer Treffer (`x*` auf einer Zeile ohne x) markiert
+            ' nichts -- er zaehlt nicht und schiebt nur weiter.
+            IF l > 0 THEN
+                ARRAY_PUSH(fundorte, NEW Fundort(z + 1, p + 1, l))
+            END IF
+            ab = p + MAX(l, 1)
+        WEND
+    NEXT
+END SUB
+
+' Der naechste Treffer: vorwaerts der erste, der bei (z, s) oder dahinter
+' anfaengt, rueckwaerts der letzte davor -- mit Umlauf am Dateiende.
+FUNCTION trefferIndex(z AS INTEGER, s AS INTEGER, vorwaerts AS BOOLEAN) AS INTEGER
+    DIM n AS INTEGER : n = LEN(fundorte)
+    IF n = 0 THEN RETURN -1
+    DIM k AS INTEGER
+    IF vorwaerts THEN
+        FOR k = 0 TO n - 1
+            IF fundorte[k].zeile > z OR (fundorte[k].zeile = z AND fundorte[k].spalte >= s) THEN RETURN k
+        NEXT
+        RETURN 0
+    END IF
+    FOR k = n - 1 TO 0 STEP -1
+        IF fundorte[k].zeile < z OR (fundorte[k].zeile = z AND fundorte[k].spalte < s) THEN RETURN k
+    NEXT
+    RETURN n - 1
+END FUNCTION
+
+' Welcher Treffer ist gerade GENAU markiert? -1 = keiner.
+FUNCTION trefferMarkiert(ta AS GUI_WIDGET) AS INTEGER
+    DIM z1 AS INTEGER
+    DIM s1 AS INTEGER
+    DIM z2 AS INTEGER
+    DIM s2 AS INTEGER
+    (z1, s1, z2, s2) = GUI_TEXTAREA_SELECTION_RANGE(ta)
+    IF z1 <> z2 THEN RETURN -1
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(fundorte) - 1
+        IF fundorte[k].zeile = z1 AND fundorte[k].spalte = s1 AND fundorte[k].spalte + fundorte[k].laenge = s2 THEN RETURN k
+        IF fundorte[k].zeile > z1 THEN RETURN -1
+    NEXT
+    RETURN -1
+END FUNCTION
+
+SUB trefferMarkieren(ta AS GUI_WIDGET, k AS INTEGER)
+    GUI_TEXTAREA_SELECT(ta, fundorte[k].zeile, fundorte[k].spalte, fundorte[k].zeile, fundorte[k].spalte + fundorte[k].laenge)
+    protokoll("treffer " + STR$(k + 1) + " von " + STR$(LEN(fundorte)) + " zeile " + STR$(fundorte[k].zeile) + _
+              " spalte " + STR$(fundorte[k].spalte))
+END SUB
+
+' F3 / Umschalt+F3 / Enter im Suchfeld. Vorwaerts ab dem ENDE der Auswahl
+' (ein markierter Treffer ist damit erledigt), rueckwaerts ab ihrem Anfang.
+' Den Fokus holt es nur ins Code-Feld, wenn die Leiste zu ist -- aus dem
+' Suchfeld heraus will man mit Enter weiter springen, nicht ins Feld tippen.
+FUNCTION trefferSpringen(vorwaerts AS BOOLEAN) AS BOOLEAN
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 OR suchtext = "" THEN RETURN FALSE
+    trefferAktuell(ta)
+    IF LEN(fundorte) = 0 THEN
+        IF trefferFehler THEN
+            GUI_SET_TEXT(lblStatus, tr$("Ungültiger Ausdruck: ") + suchtext)
+        ELSE
+            GUI_SET_TEXT(lblStatus, tr$("Nicht gefunden: ") + suchtext)
+        END IF
+        protokoll("treffer keine")
+        RETURN FALSE
+    END IF
+    DIM z1 AS INTEGER
+    DIM s1 AS INTEGER
+    DIM z2 AS INTEGER
+    DIM s2 AS INTEGER
+    (z1, s1, z2, s2) = GUI_TEXTAREA_SELECTION_RANGE(ta)
+    DIM k AS INTEGER
+    IF vorwaerts THEN k = trefferIndex(z2, s2, TRUE) ELSE k = trefferIndex(z1, s1, FALSE)
+    trefferMarkieren(ta, k)
+    IF NOT sucheOffen THEN GUI_FOCUS(ta)
+    RETURN TRUE
+END FUNCTION
+
+' Steht der Fokus in der Suchleiste? ESC schliesst sie nur dann -- im
+' Code-Feld raeumt ESC die weiteren Schreibmarken weg, und das soll es weiter.
+FUNCTION imSuchfenster() AS BOOLEAN
+    DIM f AS GUI_WIDGET : f = GUI_FOCUSED()
+    RETURN f = tfSuche OR f = tfErsatz OR f = btnSuWeiter OR f = btnSuZurueck OR f = btnSuErsetzen _
+        OR f = btnSuAlle OR f = cbSuGross OR f = cbSuWort OR f = cbSuAusdruck
+END FUNCTION
+
+SUB suchSchalterZeigen()
+    GUI_MENU_CHECK(miRegex, regexAn)
+    GUI_MENU_CHECK(miGross, grossKlein)
+    GUI_MENU_CHECK(miWort, ganzesWort)
+    GUI_SET_CHECKED(cbSuAusdruck, regexAn)
+    GUI_SET_CHECKED(cbSuGross, grossKlein)
+    GUI_SET_CHECKED(cbSuWort, ganzesWort)
+END SUB
+
+SUB sucheOeffnen(mitErsetzen AS BOOLEAN)
+    sucheMitErsetzen = mitErsetzen
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta >= 0 THEN
+        ' Eine Auswahl in EINER Zeile ist das, wonach man suchen will. Im
+        ' Ausdrucksmodus maskiert -- sonst suchte `a.b` auch `axb`.
+        DIM sel AS STRING : sel = GUI_TEXTAREA_SELECTION$(ta)
+        IF sel <> "" AND INSTR(sel, NL) < 0 THEN suchtext = IIF(regexAn, REGEX_ESCAPE$(sel), sel)
+        DIM z2 AS INTEGER
+        DIM s2 AS INTEGER
+        (sucheAnkerZ, sucheAnkerS, z2, s2) = GUI_TEXTAREA_SELECTION_RANGE(ta)
+    END IF
+    GUI_SET_TEXT(tfSuche, suchtext)
+    GUI_SET_TEXT(tfErsatz, ersatztext)
+    suchSchalterZeigen()
+    GUI_SET_VISIBLE(tfErsatz, mitErsetzen)
+    GUI_SET_VISIBLE(btnSuErsetzen, mitErsetzen)
+    GUI_SET_VISIBLE(btnSuAlle, mitErsetzen)
+    GUI_WINDOW_TITLE(winSuche, IIF(mitErsetzen, tr$("Suchen und ersetzen"), tr$("Suchen")))
+    GUI_WINDOW_SET_BOUNDS(winSuche, MAX(0, schirmB() - 500), 104, 480, IIF(mitErsetzen, 146, 112))
+    GUI_WINDOW_VISIBLE(winSuche, TRUE)
+    sucheOffen = TRUE
+    GUI_FOCUS(tfSuche)
+    faerbSchluessel = ""
+    sucheZahlAlt = "-"
+    protokoll("suche offen" + IIF(mitErsetzen, " ersetzen", ""))
+END SUB
+
+SUB sucheSchliessen()
+    GUI_WINDOW_VISIBLE(winSuche, FALSE)
+    sucheOffen = FALSE
+    faerbSchluessel = ""
+    IF aktivesFeld() >= 0 THEN GUI_FOCUS(aktivesFeld())
+    protokoll("suche zu")
+END SUB
+
+' Ersetzen: ist GENAU ein Treffer markiert, wird er ersetzt; danach -- oder
+' wenn keiner markiert war -- geht es zum naechsten. So sieht man jede
+' Stelle, bevor sie sich aendert.
+SUB ersetzenEinzeln()
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 OR suchtext = "" THEN RETURN
+    trefferAktuell(ta)
+    DIM k AS INTEGER : k = trefferMarkiert(ta)
+    IF k >= 0 THEN
+        DIM neu AS STRING : neu = ersatztext
+        IF regexAn THEN
+            ' Gruppen (`\1`) gelten auch beim einzelnen Ersetzen.
+            TRY
+                neu = REGEX_REPLACE_ONCE(GUI_TEXTAREA_SELECTION$(ta), suchMuster$(suchtext), ersatztext)
+            CATCH e
+                neu = ersatztext
+            END TRY
+        END IF
+        GUI_TEXTAREA_INSERT(ta, neu)
+        protokoll("ersetzt einzeln zeile " + STR$(fundorte[k].zeile))
+    END IF
+    trefferSpringen(TRUE)
+END SUB
+
+' Alle auf einmal, als EIN Schritt fuer Strg+Z (Auswahl ueber alles plus
+' INSERT); die Marke bleibt in ihrer Zeile.
+SUB alleErsetzen()
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 OR suchtext = "" THEN RETURN
+    trefferAktuell(ta)
+    DIM n AS INTEGER : n = LEN(fundorte)
+    IF n = 0 THEN
+        GUI_SET_TEXT(lblStatus, IIF(trefferFehler, tr$("Ungültiger Ausdruck: "), tr$("Nicht gefunden: ")) + suchtext)
+        protokoll("ersetzt 0")
+        RETURN
+    END IF
+    DIM cz AS INTEGER
+    DIM cs AS INTEGER
+    (cz, cs) = GUI_TEXTAREA_CURSOR(ta)
+    DIM neu AS STRING : neu = textErsetzen$(GUI_TEXT(ta), suchtext, ersatztext)
+    GUI_TEXTAREA_SELECT(ta, 1, 1, 1000000, 1000000)
+    GUI_TEXTAREA_INSERT(ta, neu)
+    GUI_TEXTAREA_GOTO(ta, cz, 1)
+    GUI_SET_TEXT(lblStatus, STR$(n) + tr$(" mal ersetzt."))
+    protokoll("ersetzt " + STR$(n))
+END SUB
+
+' Je Bild, solange die Leiste offen ist.
+SUB sucheNachziehen()
+    IF NOT GUI_WINDOW_SHOWN(winSuche) THEN
+        ' mit dem Kreuz des Fensters geschlossen
+        sucheOffen = FALSE
+        faerbSchluessel = ""
+        protokoll("suche zu")
+        RETURN
+    END IF
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF GUI_TEXT(tfSuche) <> suchtext THEN
+        suchtext = GUI_TEXT(tfSuche)
+        faerbSchluessel = ""
+        ' Beim Tippen zum ersten Treffer ab der Stelle, an der die Leiste
+        ' aufging -- nicht ab dem letzten Treffer, sonst liefe die Auswahl
+        ' mit jedem Buchstaben weiter nach unten.
+        IF ta >= 0 THEN
+            trefferAktuell(ta)
+            IF LEN(fundorte) > 0 THEN trefferMarkieren(ta, trefferIndex(sucheAnkerZ, sucheAnkerS, TRUE))
+        END IF
+    END IF
+    ersatztext = GUI_TEXT(tfErsatz)
+    IF GUI_CLICKED(cbSuGross) AND GUI_CHECKED(cbSuGross) <> grossKlein THEN befehl("gross_klein")
+    IF GUI_CLICKED(cbSuWort) AND GUI_CHECKED(cbSuWort) <> ganzesWort THEN befehl("ganzes_wort")
+    IF GUI_CLICKED(cbSuAusdruck) AND GUI_CHECKED(cbSuAusdruck) <> regexAn THEN befehl("regex")
+    DIM zurueck AS BOOLEAN : zurueck = KEYPRESSED(KEY_LSHIFT) OR KEYPRESSED(KEY_RSHIFT)
+    IF GUI_ENTERED(tfSuche) THEN trefferSpringen(NOT zurueck)
+    IF GUI_CLICKED(btnSuWeiter) THEN trefferSpringen(TRUE)
+    IF GUI_CLICKED(btnSuZurueck) THEN trefferSpringen(FALSE)
+    IF GUI_ENTERED(tfErsatz) OR GUI_CLICKED(btnSuErsetzen) THEN ersetzenEinzeln()
+    IF GUI_CLICKED(btnSuAlle) THEN alleErsetzen()
+    IF KEYHIT(KEY_ESCAPE) AND imSuchfenster() THEN
+        sucheSchliessen()
+        RETURN
+    END IF
+    ' Die Trefferzahl: "3 von 12", wenn einer markiert ist.
+    DIM zahl AS STRING : zahl = ""
+    IF ta >= 0 AND suchtext <> "" THEN
+        trefferAktuell(ta)
+        IF trefferFehler THEN
+            zahl = "Ausdruck ungueltig"
+        ELSEIF LEN(fundorte) = 0 THEN
+            zahl = "keine Treffer"
+        ELSE
+            DIM k AS INTEGER : k = trefferMarkiert(ta)
+            IF k >= 0 THEN zahl = STR$(k + 1) + " von " + STR$(LEN(fundorte)) ELSE zahl = STR$(LEN(fundorte)) + " Treffer"
+        END IF
+    END IF
+    IF zahl <> sucheZahlAlt THEN
+        sucheZahlAlt = zahl
+        GUI_SET_TEXT(lblSuZahl, zahl)
+        protokoll("suche zahl " + zahl)
+    END IF
+END SUB
+
+SUB zurDefinition()
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN
+    DIM z AS INTEGER
+    DIM s AS INTEGER
+    (z, s) = GUI_TEXTAREA_CURSOR(ta)
+    DIM dz AS INTEGER
+    DIM ds AS INTEGER
+    (dz, ds) = CODE_DEFINITION(GUI_TEXT(ta), z, s)
+    IF dz < 1 THEN
+        ' CODE_DEFINITION sieht nur DIESEN Text -- was hier fehlt, steht
+        ' vielleicht in einer anderen Datei des Projekts.
+        DIM k AS INTEGER : k = symbolSuchen(wortUnterMarke$())
+        IF k >= 0 THEN
+            symbolAnspringen(k)
+            RETURN
+        END IF
+        GUI_SET_TEXT(lblStatus, tr$("Keine Definition zu '") + wortUnterMarke$() + tr$("' -- auch nicht im Projekt."))
+        RETURN
+    END IF
+    ' Auch der Erfolg sagt es -- sonst stuende die Meldung eines vorigen
+    ' Fehlschlags noch da und behauptete das Gegenteil.
+    GUI_SET_TEXT(lblStatus, tr$("Definition von '") + wortUnterMarke$() + tr$("' in Zeile ") + STR$(dz) + ".")
+    GUI_TEXTAREA_GOTO(ta, dz, ds)
+END SUB
+
+' --- Handgriffe im Text: Kommentar, Zeilen, Einrueckung, Formatieren -------
+' Alle arbeiten auf ganzen ZEILEN: der Auswahl, sonst der Zeile der Marke.
+' Geschrieben wird ueber SELECT + INSERT, damit jeder Handgriff ein eigener
+' Undo-Schritt bleibt (GUI_SET_TEXT wuerde den Verlauf leeren).
+CONST SPALTE_ENDE = 1000000          ' GUI_TEXTAREA_SELECT klemmt ans Zeilenende
+
+FUNCTION zeilenBereich(ta AS GUI_WIDGET) AS TUPLE
+    DIM z1 AS INTEGER
+    DIM s1 AS INTEGER
+    DIM z2 AS INTEGER
+    DIM s2 AS INTEGER
+    (z1, s1, z2, s2) = GUI_TEXTAREA_SELECTION_RANGE(ta)
+    ' Endet die Auswahl am Anfang einer Zeile, gehoert die nicht mehr dazu.
+    IF z2 > z1 AND s2 = 1 THEN z2 = z2 - 1
+    RETURN (z1, z2)
+END FUNCTION
+
+FUNCTION zeilenHolen(alle AS ARRAY OF STRING, z1 AS INTEGER, z2 AS INTEGER) AS ARRAY OF STRING
+    DIM block AS ARRAY OF STRING : block = []
+    DIM i AS INTEGER
+    FOR i = z1 - 1 TO z2 - 1
+        IF i >= 0 AND i < LEN(alle) THEN ARRAY_PUSH(block, alle[i])
+    NEXT
+    RETURN block
+END FUNCTION
+
+' --- Mehrere Schreibmarken --------------------------------------------
+' Alt+Klick legt eine Marke dazu (das kann der Textbereich selbst), ESC
+' raeumt sie weg. Hier kommt der Griff dazu, den man wirklich braucht: eine
+' Marke auf JEDE Stelle, an der das Wort unter der Marke steht -- danach
+' aendert ein Tippen sie alle auf einmal.
+' --- Die Ausgabe durchsuchen ------------------------------------------
+' Ein laufendes Programm schreibt hunderte Zeilen; die eine, die man sucht,
+' findet man sonst nur durch Scrollen. Gesucht wird AB der gewaehlten Zeile
+' weiter -- derselbe Aufruf noch einmal ist "weitersuchen".
+SUB ausgabeSuchen(ab AS INTEGER)
+    DIM n AS INTEGER : n = GUI_LISTBOX_COUNT(lstAusgabe)
+    IF n = 0 THEN
+        GUI_SET_TEXT(lblStatus, tr$("Die Ausgabe ist leer."))
+        RETURN
+    END IF
+    DIM klein AS STRING : klein = LOWER$(ausgabeSuchtext)
+    DIM i AS INTEGER
+    FOR i = MAX(0, ab) TO n - 1
+        IF INSTR(LOWER$(GUI_LISTBOX_ITEM(lstAusgabe, i)), klein) >= 0 THEN
+            GUI_LISTBOX_SET_SELECTED(lstAusgabe, i)
+            GUI_SET_TEXT(lblStatus, tr$("Ausgabe, Zeile ") + STR$(i + 1) + ": " + GUI_LISTBOX_ITEM(lstAusgabe, i))
+            protokoll("ausgabe treffer " + STR$(i + 1))
+            RETURN
+        END IF
+    NEXT
+    GUI_SET_TEXT(lblStatus, tr$("Nicht in der Ausgabe: ") + ausgabeSuchtext + tr$(" (ab Zeile ") + STR$(MAX(0, ab) + 1) + ")")
+    protokoll("ausgabe treffer 0")
+END SUB
+
+' --- Von der Ausgabe an die Stelle ------------------------------------
+' Meldungen der Laufzeit nennen ihre Stelle als `datei.dh:zeile:` --
+' "Laufzeitfehler in spiel.dh:3: ...", "lib.dh:1: Parse-Fehler ...". Ein
+' Doppelklick (oder Enter) auf so eine Zeile oeffnet die Datei dort.
+' Der Name kann Leerzeichen tragen (C:\Users\Hans Gaming\x.dh), und davor
+' steht beliebiger Text: genommen wird das LAENGSTE Stueck vor ".dh:", das
+' es als Datei gibt -- gesucht neben dem gelaufenen Programm (dhrt wechselt
+' dorthin, seine Meldungen sind relativ dazu), dann im Projekt.
+' Eine Zahl aus Text als INTEGER, begrenzt: INT laeuft bei mehr als 64 Bit
+' ueber und bricht ab -- "Gehe zu Zeile" mit 99999999999999999999 oder so
+' eine Zeilennummer in der Ausgabe beendeten die IDE.
+FUNCTION ganzeZahl(t AS STRING) AS INTEGER
+    DIM v AS FLOAT : v = VAL(t)
+    IF v > 1000000000.0 THEN RETURN 1000000000
+    IF v < -1000000000.0 THEN RETURN -1000000000
+    RETURN INT(v)
+END FUNCTION
+
+FUNCTION ausgabeOrt(zeile AS STRING) AS TUPLE
+    DIM p AS INTEGER : p = INSTR(LOWER$(zeile), ".dh:")
+    WHILE p >= 0
+        DIM rest AS STRING : rest = MID$(zeile, p + 4)
+        DIM ziffern AS INTEGER : ziffern = 0
+        WHILE ziffern < LEN(rest) AND INSTR("0123456789", MID$(rest, ziffern, 1)) >= 0
+            ziffern = ziffern + 1
+        WEND
+        IF ziffern > 0 THEN
+            DIM nr AS INTEGER : nr = ganzeZahl(LEFT$(rest, ziffern))
+            DIM vorn AS STRING : vorn = LEFT$(zeile, p) + ".dh"
+            DIM teile AS ARRAY OF STRING : teile = SPLIT$(vorn, " ")
+            DIM gefunden AS STRING : gefunden = ""
+            DIM kand AS STRING : kand = ""
+            DIM i AS INTEGER
+            FOR i = LEN(teile) - 1 TO 0 STEP -1
+                IF kand = "" THEN kand = teile[i] ELSE kand = teile[i] + " " + kand
+                DIM w AS STRING : w = ausgabeWeg$(kand)
+                IF w <> "" THEN gefunden = w
+            NEXT
+            IF gefunden <> "" AND nr >= 1 THEN RETURN (gefunden, nr)
+        END IF
+        DIM weiter AS INTEGER : weiter = INSTR(LOWER$(MID$(zeile, p + 4)), ".dh:")
+        IF weiter < 0 THEN p = -1 ELSE p = p + 4 + weiter
+    WEND
+    RETURN ("", 0)
+END FUNCTION
+
+' Ein Name aus einer Meldung als vorhandene Datei, sonst "".
+FUNCTION ausgabeWeg$(name AS STRING) AS STRING
+    IF name = "" THEN RETURN ""
+    IF MID$(name, 1, 1) = ":" OR LEFT$(name, 1) = "/" OR LEFT$(name, 1) = "\" THEN
+        IF FILEEXISTS(name) THEN RETURN name
+        RETURN ""
+    END IF
+    IF prozessDatei <> "" THEN
+        DIM a AS STRING : a = PATHJOIN(DIRNAME(prozessDatei), name)
+        IF FILEEXISTS(a) THEN RETURN a
+    END IF
+    IF projektOrdner <> "" THEN
+        DIM b AS STRING : b = PATHJOIN(projektOrdner, name)
+        IF FILEEXISTS(b) THEN RETURN b
+    END IF
+    RETURN ""
+END FUNCTION
+
+SUB ausgabeAnspringen()
+    DIM sel AS INTEGER : sel = GUI_LISTBOX_SELECTED(lstAusgabe)
+    IF sel < 0 THEN RETURN
+    DIM pfad AS STRING
+    DIM nr AS INTEGER
+    (pfad, nr) = ausgabeOrt(GUI_LISTBOX_ITEM(lstAusgabe, sel))
+    IF pfad = "" THEN
+        GUI_SET_TEXT(lblStatus, tr$("Diese Zeile nennt keine Stelle."))
+        RETURN
+    END IF
+    dateiOeffnen(pfad)
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN
+    GUI_TEXTAREA_GOTO(ta, nr, 1)
+    GUI_FOCUS(ta)
+    protokoll("ausgabe sprung " + BASENAME(pfad) + " " + STR$(nr))
+END SUB
+
+' --- Eine Marke auf die NAECHSTE Fundstelle ---------------------------
+' Strg+Umschalt+L setzt sie auf alle auf einmal. Schrittweise ist das
+' andere, oft bessere Werkzeug: man sieht jede Stelle, bevor sie dazukommt.
+DIM mcWort AS STRING : mcWort = ""
+DIM mcZeile AS INTEGER : mcZeile = 0
+DIM mcSpalte AS INTEGER : mcSpalte = 0
+
+' Die naechste Fundstelle ab (vonZ, vonS) als (zeile, spalte), sonst (-1, -1).
+' GANZE Woerter: GUI_TEXTAREA_FIND sucht Teiltexte, und aus `hp` waere sonst
+' auch das in `hpmax` eine Marke.
+FUNCTION naechsteFundstelle(ta AS GUI_WIDGET, wort AS STRING, vonZ AS INTEGER, vonS AS INTEGER) AS TUPLE
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(GUI_TEXT(ta), NL)
+    DIM tz AS INTEGER
+    DIM ts AS INTEGER
+    (tz, ts) = GUI_TEXTAREA_FIND(ta, wort, vonZ, vonS, TRUE)
+    WHILE tz >= 1 AND tz <= LEN(zeilen)
+        DIM zl AS STRING : zl = zeilen[tz - 1]
+        DIM davor AS BOOLEAN : davor = ts > 1 AND istWortzeichen(MID$(zl, ts - 2, 1))
+        DIM danach AS BOOLEAN : danach = istWortzeichen(MID$(zl, ts - 1 + LEN(wort), 1))
+        IF NOT davor AND NOT danach THEN RETURN (tz, ts)
+        (tz, ts) = GUI_TEXTAREA_FIND(ta, wort, tz, ts + 1, TRUE)
+    WEND
+    RETURN (-1, -1)
+END FUNCTION
+
+SUB markeNaechste()
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN
+    DIM wort AS STRING : wort = wortUnterMarke$()
+    IF wort = "" THEN
+        GUI_SET_TEXT(lblStatus, tr$("Unter der Marke steht kein Wort."))
+        RETURN
+    END IF
+    DIM z AS INTEGER
+    DIM s AS INTEGER
+    (z, s) = GUI_TEXTAREA_CURSOR(ta)
+    ' Ein anderes Wort faengt von vorn an -- sonst suchte man mitten in der
+    ' Datei weiter nach etwas, das man gerade erst angeklickt hat. Die
+    ' fuehrende Marke rueckt dabei an den ANFANG des Wortes: von dort sucht
+    ' die naechste Runde weiter, und jede Marke steht an derselben Stelle
+    ' ihres Wortes.
+    IF wort <> mcWort THEN
+        mcWort = wort
+        GUI_TEXTAREA_CLEAR_CARETS(ta)
+        DIM anf AS INTEGER : anf = wortSpalte(ta)
+        IF anf > 0 THEN
+            GUI_TEXTAREA_GOTO(ta, z, anf)
+            s = anf
+        END IF
+        mcZeile = z
+        mcSpalte = s
+    END IF
+    DIM vorher AS INTEGER : vorher = GUI_TEXTAREA_CARETS(ta)
+    DIM tz AS INTEGER
+    DIM ts AS INTEGER
+    (tz, ts) = naechsteFundstelle(ta, wort, mcZeile, mcSpalte + 1)
+    ' Nichts mehr dahinter: von vorn.
+    IF tz < 0 THEN (tz, ts) = naechsteFundstelle(ta, wort, 1, 1)
+    IF tz < 0 THEN
+        GUI_SET_TEXT(lblStatus, "'" + wort + tr$("' steht nur an dieser einen Stelle."))
+        mcWort = ""
+        protokoll("marke naechste 0")
+        RETURN
+    END IF
+    mcZeile = tz
+    mcSpalte = ts
+    GUI_TEXTAREA_ADD_CARET(ta, tz, ts)
+    DIM jetzt AS INTEGER : jetzt = GUI_TEXTAREA_CARETS(ta)
+    ' Dieselbe Stelle noch einmal ist keine neue Marke -- dann sind alle
+    ' Fundstellen schon markiert, und das sagen wir, statt stumm zu kreisen.
+    IF jetzt = vorher THEN
+        GUI_SET_TEXT(lblStatus, tr$("Jede Fundstelle von '") + wort + tr$("' hat eine Marke (") + STR$(jetzt) + ").")
+    ELSE
+        GUI_SET_TEXT(lblStatus, STR$(jetzt) + tr$(" Marken auf '") + wort + "'.")
+    END IF
+    protokoll("marke naechste " + STR$(jetzt))
+END SUB
+
+' --- Ersetzen im ganzen Projekt ---------------------------------------
+' Wortwoertlich, oder mit regulaerem Ausdruck, wenn der Schalter an ist --
+' dieselbe Wahl wie bei der Suche. Gearbeitet wird auf den DATEIEN; ein
+' Reiter mit ungesicherten Aenderungen bricht ab, statt sie zu ueberschreiben.
+FUNCTION projektErsetzenZaehlen(gesucht AS STRING) AS TUPLE
+    DIM dateien AS ARRAY OF STRING : dateien = projektDateien("*.dh")
+    DIM stellen AS INTEGER : stellen = 0
+    DIM wieViele AS INTEGER : wieViele = 0
+    DIM d AS STRING
+    FOR EACH d IN dateien
+        DIM zeilen AS ARRAY OF STRING : zeilen = zeilenLesen(PATHJOIN(projektOrdner, d))
+        DIM hier AS INTEGER : hier = 0
+        DIM z AS STRING
+        FOR EACH z IN zeilen
+            IF passtSuche(z, gesucht) THEN hier = hier + 1
+        NEXT
+        IF hier > 0 THEN
+            stellen = stellen + hier
+            wieViele = wieViele + 1
+        END IF
+    NEXT
+    RETURN (stellen, wieViele)
+END FUNCTION
+
+FUNCTION projektUngesichert() AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO tabAnzahl - 1
+        IF reiter[i].pfad <> "" AND reiter[i].geaendert() THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+SUB projektErsetzenAusfuehren()
+    laufStarten("ersetzen", suchtext, ersatztext)
+END SUB
+
+' --- Marke an jedes Zeilenende der Auswahl ----------------------------
+' Der Griff, mit dem man eine Liste in einem Zug umschreibt: markieren,
+' Strg+Umschalt+I, tippen -- und jede Zeile bekommt dasselbe ans Ende.
+' --- Die Auswahl am Block entlang erweitern ---------------------------
+' Strg+Umschalt+Hoch nimmt jeweils die naechstgroessere Klammer: das Wort,
+' die Zeile, der Block darum, dessen Elternblock, zuletzt die ganze Datei.
+' Strg+Umschalt+Runter geht denselben Weg zurueck -- dafuer merkt sich ein
+' Stapel jede Stufe, statt sie neu zu erraten.
+DIM erwZ1 AS ARRAY OF INTEGER : erwZ1 = []
+DIM erwS1 AS ARRAY OF INTEGER : erwS1 = []
+DIM erwZ2 AS ARRAY OF INTEGER : erwZ2 = []
+DIM erwS2 AS ARRAY OF INTEGER : erwS2 = []
+
+SUB erweiternMerken(z1 AS INTEGER, s1 AS INTEGER, z2 AS INTEGER, s2 AS INTEGER)
+    ARRAY_PUSH(erwZ1, z1) : ARRAY_PUSH(erwS1, s1)
+    ARRAY_PUSH(erwZ2, z2) : ARRAY_PUSH(erwS2, s2)
+END SUB
+
+' Der engste Block, der die Zeile ENTHAELT und groesser ist als der
+' angegebene Bereich. -1, wenn es keinen mehr gibt.
+FUNCTION blockUm(zeile AS INTEGER, hatZ1 AS INTEGER, hatZ2 AS INTEGER) AS INTEGER
+    DIM beste AS INTEGER : beste = -1
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(blockVon) - 1
+        IF blockVon[i] > zeile OR blockBis[i] < zeile THEN CONTINUE
+        ' Echt groesser als das, was schon markiert ist
+        IF blockVon[i] >= hatZ1 AND blockBis[i] <= hatZ2 THEN CONTINUE
+        IF beste < 0 THEN
+            beste = i
+        ELSEIF blockBis[i] - blockVon[i] < blockBis[beste] - blockVon[beste] THEN
+            beste = i
+        END IF
+    NEXT
+    RETURN beste
+END FUNCTION
+
+SUB auswahlErweitern()
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN
+    DIM z1 AS INTEGER
+    DIM s1 AS INTEGER
+    DIM z2 AS INTEGER
+    DIM s2 AS INTEGER
+    (z1, s1, z2, s2) = GUI_TEXTAREA_SELECTION_RANGE(ta)
+    erweiternMerken(z1, s1, z2, s2)
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(GUI_TEXT(ta), NL)
+    DIM was AS STRING : was = ""
+    IF z1 = z2 AND s1 = s2 THEN
+        ' Nichts markiert: das Wort unter der Marke.
+        DIM wort AS STRING : wort = wortUnterMarke$()
+        DIM anf AS INTEGER : anf = wortSpalte(ta)
+        IF wort <> "" AND anf > 0 THEN
+            GUI_TEXTAREA_SELECT(ta, z1, anf, z1, anf + LEN(wort))
+            was = "Wort"
+        ELSE
+            GUI_TEXTAREA_SELECT(ta, z1, 1, z1, SPALTE_ENDE)
+            was = "Zeile"
+        END IF
+    ELSEIF z1 = z2 AND NOT (s1 = 1 AND s2 >= LEN(zeilen[z1 - 1]) + 1) THEN
+        GUI_TEXTAREA_SELECT(ta, z1, 1, z1, SPALTE_ENDE)
+        was = "Zeile"
+    ELSE
+        DIM b AS INTEGER : b = blockUm(z1, z1, z2)
+        IF b >= 0 THEN
+            GUI_TEXTAREA_SELECT(ta, blockVon[b], 1, blockBis[b], SPALTE_ENDE)
+            was = "Block " + STR$(blockVon[b]) + "-" + STR$(blockBis[b])
+        ELSEIF z1 > 1 OR z2 < LEN(zeilen) THEN
+            GUI_TEXTAREA_SELECT(ta, 1, 1, LEN(zeilen), SPALTE_ENDE)
+            was = "ganze Datei"
+        ELSE
+            GUI_SET_TEXT(lblStatus, tr$("Größer geht es nicht."))
+            protokoll("erweitern ende")
+            RETURN
+        END IF
+    END IF
+    GUI_FOCUS(ta)
+    GUI_SET_TEXT(lblStatus, tr$("Auswahl: ") + was)
+    protokoll("erweitern " + was)
+END SUB
+
+SUB auswahlVerkleinern()
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 OR LEN(erwZ1) = 0 THEN
+        GUI_SET_TEXT(lblStatus, tr$("Nichts zum Zurückgehen -- erst erweitern."))
+        RETURN
+    END IF
+    DIM k AS INTEGER : k = LEN(erwZ1) - 1
+    GUI_TEXTAREA_SELECT(ta, erwZ1[k], erwS1[k], erwZ2[k], erwS2[k])
+    ARRAY_POP(erwZ1) : ARRAY_POP(erwS1) : ARRAY_POP(erwZ2) : ARRAY_POP(erwS2)
+    GUI_FOCUS(ta)
+    protokoll("verkleinern " + STR$(LEN(erwZ1)))
+END SUB

@@ -1,0 +1,1458 @@
+' ide/teile/plugins.dh -- ein Teil der IDE (ide/ide.dh), dort per IMPORT
+' an genau dieser Stelle eingebunden: Plugins: Leitung, Leisten, Verwaltung, Vorlage, Holen.
+' Kein eigenes Programm -- die Namen gehoeren der IDE.
+
+' --- Befehlspalette und Datei-Waehler ------------------------------------
+' EINE Liste aller Befehle mit Kuerzel: Palette, Tastenkuerzel-Uebersicht.
+' --- Plugins (seit 2026-10-24, docs/ide-plugins.md) -----------------------
+' Ein Plugin ist ein eigenes Programm (plugins/<name>/plugin.dh neben der
+' ide.json); die IDE startet es mit WINDOW_OPEN und spricht ueber dessen
+' Leitung mit ihm -- eine JSON-Zeile je Nachricht, die Seite des Plugins
+' steht in ide/dh_plugin.dh. Ein Plugin, das abstuerzt oder haengt, reisst
+' die IDE nicht mit: sein Zustand wird "abgestuerzt", seine Leisten gehen zu,
+' seine Befehle werden gesperrt.
+FUNCTION pluginOrdner$() AS STRING
+    RETURN PATHJOIN(konfigOrdner$(), "plugins")
+END FUNCTION
+
+' Abgeschaltet ist, was in der ide.json unter "plugins_aus" steht.
+FUNCTION pluginAus(name AS STRING) AS BOOLEAN
+    IF NOT JSON_HAS(konfig, "plugins_aus") THEN RETURN FALSE
+    IF JSON_TYPE(konfig, "plugins_aus") <> "array" THEN RETURN FALSE
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(konfig, "plugins_aus") - 1
+        DIM p AS STRING : p = "plugins_aus." + STR$(i)
+        IF JSON_TYPE(konfig, p) = "string" THEN
+            IF LOWER$(JSON_GET_STRING(konfig, p)) = LOWER$(name) THEN RETURN TRUE
+        END IF
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+SUB pluginAusSetzen(name AS STRING, aus AS BOOLEAN)
+    DIM liste AS JSON_HANDLE : liste = JSON_PARSE("[]")
+    IF JSON_HAS(konfig, "plugins_aus") THEN
+        IF JSON_TYPE(konfig, "plugins_aus") = "array" THEN
+            DIM i AS INTEGER
+            FOR i = 0 TO JSON_LEN(konfig, "plugins_aus") - 1
+                DIM p AS STRING : p = "plugins_aus." + STR$(i)
+                IF JSON_TYPE(konfig, p) = "string" THEN
+                    IF LOWER$(JSON_GET_STRING(konfig, p)) <> LOWER$(name) THEN JSON_APPEND_STRING(liste, "", JSON_GET_STRING(konfig, p))
+                END IF
+            NEXT
+        END IF
+    END IF
+    IF aus THEN JSON_APPEND_STRING(liste, "", name)
+    JSON_SET_JSON(konfig, "plugins_aus", liste)
+    konfigSichern()
+END SUB
+
+' Die Bibliothek dh_plugin.dh liegt neben der IDE; DH_PATH zeigt dorthin,
+' damit ein Plugin schlicht IMPORT "dh_plugin.dh" schreibt. Ein Kind erbt
+' die Umgebung beim Start.
+FUNCTION pluginBibOrdner$() AS STRING
+    DIM bib AS STRING : bib = CWD$()
+    IF NOT FILEEXISTS(PATHJOIN(bib, "dh_plugin.dh")) THEN bib = PATHJOIN(wurzel, "ide")
+    RETURN bib
+END FUNCTION
+
+SUB pluginPfadSetzen()
+    DIM bib AS STRING : bib = pluginBibOrdner$()
+    DIM trenner AS STRING : trenner = IIF(MID$(bib, 1, 1) = ":", ";", ":")
+    DIM alt AS STRING : alt = GETENV$("DH_PATH")
+    IF INSTR(alt, bib) >= 0 THEN RETURN
+    SETENV("DH_PATH", IIF(alt = "", bib, bib + trenner + alt))
+END SUB
+
+' Die mitgelieferten Plugins: examples/plugins/ (kommen mit dem Installer).
+FUNCTION pluginMitOrdner$() AS STRING
+    IF beispielOrdner = "" THEN RETURN ""
+    RETURN PATHJOIN(beispielOrdner, "plugins")
+END FUNCTION
+
+' Ein mitgeliefertes Plugin laeuft nur, wenn es in "plugins_an" steht.
+FUNCTION pluginAn(name AS STRING) AS BOOLEAN
+    IF NOT JSON_HAS(konfig, "plugins_an") THEN RETURN FALSE
+    IF JSON_TYPE(konfig, "plugins_an") <> "array" THEN RETURN FALSE
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(konfig, "plugins_an") - 1
+        DIM p AS STRING : p = "plugins_an." + STR$(i)
+        IF JSON_TYPE(konfig, p) = "string" THEN
+            IF LOWER$(JSON_GET_STRING(konfig, p)) = LOWER$(name) THEN RETURN TRUE
+        END IF
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+SUB pluginAnSetzen(name AS STRING, an AS BOOLEAN)
+    DIM liste AS JSON_HANDLE : liste = JSON_PARSE("[]")
+    IF JSON_HAS(konfig, "plugins_an") THEN
+        IF JSON_TYPE(konfig, "plugins_an") = "array" THEN
+            DIM i AS INTEGER
+            FOR i = 0 TO JSON_LEN(konfig, "plugins_an") - 1
+                DIM p AS STRING : p = "plugins_an." + STR$(i)
+                IF JSON_TYPE(konfig, p) = "string" THEN
+                    IF LOWER$(JSON_GET_STRING(konfig, p)) <> LOWER$(name) THEN JSON_APPEND_STRING(liste, "", JSON_GET_STRING(konfig, p))
+                END IF
+            NEXT
+        END IF
+    END IF
+    IF an THEN JSON_APPEND_STRING(liste, "", name)
+    JSON_SET_JSON(konfig, "plugins_an", liste)
+    konfigSichern()
+END SUB
+
+' Soll das Plugin laufen? Eigene: ja, ausser abgeschaltet; mitgelieferte:
+' nur angehakt.
+FUNCTION pluginGewollt(k AS INTEGER) AS BOOLEAN
+    IF plugins[k].mitgeliefert THEN RETURN pluginAn(plugins[k].name)
+    RETURN NOT pluginAus(plugins[k].name)
+END FUNCTION
+
+SUB pluginGewolltSetzen(k AS INTEGER, an AS BOOLEAN)
+    IF plugins[k].mitgeliefert THEN pluginAnSetzen(plugins[k].name, an) ELSE pluginAusSetzen(plugins[k].name, NOT an)
+END SUB
+
+' Fassungen wie "2026.36" der Reihe nach vergleichen: -1, 0, 1.
+FUNCTION fassungVergleich(a AS STRING, b AS STRING) AS INTEGER
+    DIM ta AS ARRAY OF STRING : ta = SPLIT$(a, ".")
+    DIM tb AS ARRAY OF STRING : tb = SPLIT$(b, ".")
+    DIM i AS INTEGER
+    FOR i = 0 TO MAX(LEN(ta), LEN(tb)) - 1
+        DIM x AS INTEGER : x = 0
+        DIM y AS INTEGER : y = 0
+        IF i < LEN(ta) THEN x = VAL(ta[i])
+        IF i < LEN(tb) THEN y = VAL(tb[i])
+        IF x < y THEN RETURN -1
+        IF x > y THEN RETURN 1
+    NEXT
+    RETURN 0
+END FUNCTION
+
+' Den Steckbrief lesen: plugin.json neben plugin.dh. Fehlt er oder ist er
+' krumm, gelten der Ordnername und leere Angaben -- ein Plugin laeuft auch
+' ohne.
+SUB pluginSteckbrief(pl AS Plugin, ordner AS STRING)
+    DIM sb AS STRING : sb = PATHJOIN(ordner, "plugin.json")
+    IF NOT FILEEXISTS(sb) THEN RETURN
+    TRY
+        DIM j AS JSON_HANDLE : j = JSON_LOAD(sb)
+        IF JSON_HAS(j, "name") THEN pl.titel = JSON_GET_STRING(j, "name")
+        IF JSON_HAS(j, "fassung") THEN pl.fassung = JSON_GET_STRING(j, "fassung")
+        IF JSON_HAS(j, "beschreibung") THEN pl.info = JSON_GET_STRING(j, "beschreibung")
+        IF JSON_HAS(j, "autor") THEN pl.autor = JSON_GET_STRING(j, "autor")
+        IF JSON_HAS(j, "ide") THEN pl.ideMin = JSON_GET_STRING(j, "ide")
+    CATCH e
+        protokoll("plugin " + pl.name + " steckbrief unlesbar")
+    END TRY
+END SUB
+
+' Alle Plugins eines Ordners anmelden; ein Name, den es schon gibt, zaehlt
+' nicht -- ein eigenes Plugin verdeckt so ein mitgeliefertes gleichen Namens.
+SUB pluginsAusOrdner(ordner AS STRING, mit AS BOOLEAN, geholt AS BOOLEAN = FALSE)
+    IF ordner = "" THEN RETURN
+    IF NOT DIREXISTS(ordner) THEN RETURN
+    DIM namen AS ARRAY OF STRING : namen = DIRLIST(ordner)
+    SORT(namen)
+    DIM n AS STRING
+    FOR EACH n IN namen
+        DIM pfad AS STRING : pfad = PATHJOIN(PATHJOIN(ordner, n), "plugin.dh")
+        IF LEFT$(n, 1) = "." OR NOT FILEEXISTS(pfad) THEN CONTINUE
+        IF pluginNr(n) >= 0 THEN CONTINUE
+        DIM pl AS Plugin : pl = NEW Plugin(n, pfad, mit, geholt)
+        pluginSteckbrief(pl, PATHJOIN(ordner, n))
+        ARRAY_PUSH(plugins, pl)
+        IF pluginGewollt(LEN(plugins) - 1) THEN pluginStarten(LEN(plugins) - 1)
+    NEXT
+END SUB
+
+SUB pluginsStarten()
+    pluginPfadSetzen()
+    pluginsAusOrdner(pluginOrdner$(), FALSE)
+    ' Geholte (dhrt paket) zaehlen zu den eigenen.
+    pluginsAusOrdner(PATHJOIN(pluginOrdner$(), "pakete"), FALSE, TRUE)
+    ' Gezaehlt werden die eigenen; die mitgelieferten in einer eigenen Zeile.
+    protokoll("plugins " + STR$(LEN(plugins)))
+    DIM eigene AS INTEGER : eigene = LEN(plugins)
+    pluginsAusOrdner(pluginMitOrdner$(), TRUE)
+    protokoll("mitgeliefert " + STR$(LEN(plugins) - eigene))
+END SUB
+
+' Der Ordner, in den ein Plugin schreiben darf (Einstellungen, Listen): neben
+' der ide.json, je Plugin einer. Sein eigener Ordner kann schreibgeschuetzt
+' sein -- ein mitgeliefertes liegt im Beispiel-Ordner.
+FUNCTION pluginDaten$(name AS STRING) AS STRING
+    RETURN PATHJOIN(PATHJOIN(konfigOrdner$(), "plugin-daten"), name)
+END FUNCTION
+
+SUB pluginStarten(k AS INTEGER)
+    IF plugins[k].laeuft() THEN RETURN
+    ' Braucht es eine neuere IDE, startet es nicht -- es liefe womoeglich
+    ' gegen Nachrichten, die diese IDE nicht kennt.
+    IF plugins[k].ideMin <> "" AND fassungVergleich(plugins[k].ideMin, VERSION$()) > 0 THEN
+        plugins[k].zustand = tr$("braucht IDE ") + plugins[k].ideMin
+        protokoll("plugin " + plugins[k].name + " braucht " + plugins[k].ideMin)
+        RETURN
+    END IF
+    TRY
+        DIM daten AS STRING : daten = pluginDaten$(plugins[k].name)
+        IF NOT DIREXISTS(PATHJOIN(konfigOrdner$(), "plugin-daten")) THEN MKDIR(PATHJOIN(konfigOrdner$(), "plugin-daten"))
+        IF NOT DIREXISTS(daten) THEN MKDIR(daten)
+        ' Das Kind erbt die Umgebung beim Start (PLUGIN_DATENORDNER$) -- als
+        ' voller Pfad, denn es laeuft in seinem eigenen Ordner, und der
+        ' Konfig-Ordner ist bei einer ide.json ohne Ordner nur ".".
+        SETENV("DH_PLUGIN_DATEN", REALPATH$(daten))
+        plugins[k].leitung = WINDOW_OPEN(plugins[k].pfad)
+        ' Die erste Nachricht: Fassung des Protokolls und der IDE. Vor der
+        ' Verbindung Gesendetes merkt sich die Leitung vor.
+        DIM hallo AS JSON_HANDLE : hallo = JSON_PARSE("{}")
+        JSON_SET_STRING(hallo, "art", "hallo")
+        JSON_SET_INT(hallo, "protokoll", PLUGIN_PROTOKOLL_FASSUNG)
+        JSON_SET_STRING(hallo, "ide", VERSION$())
+        WINDOW_SEND(plugins[k].leitung, JSON_STRINGIFY(hallo))
+        plugins[k].zustand = "läuft"
+        plugins[k].hoert = ";"
+        protokoll("plugin " + plugins[k].name + " gestartet")
+    CATCH e
+        plugins[k].zustand = "Fehler: " + e
+        protokoll("plugin " + plugins[k].name + " fehler " + e)
+    END TRY
+END SUB
+
+' Beenden: "ende" schicken, dann die Leitung zu. Leisten gehen zu, Befehle
+' werden gesperrt -- ein neuer Start meldet sie wieder an.
+SUB pluginStoppen(k AS INTEGER, zustand AS STRING)
+    IF plugins[k].laeuft() THEN
+        TRY
+            WINDOW_SEND(plugins[k].leitung, "{" + CHR$(34) + "art" + CHR$(34) + ":" + CHR$(34) + "ende" + CHR$(34) + "}")
+            WINDOW_CLOSE(plugins[k].leitung)
+        CATCH e
+        END TRY
+    END IF
+    plugins[k].leitung = -1
+    plugins[k].zustand = zustand
+    DIM vor AS STRING : vor = "plugin:" + plugins[k].name + ":"
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(plugBefehle) - 1
+        IF LEFT$(plugBefehle[i].kennung, LEN(vor)) = vor THEN GUI_MENU_ENABLE(plugBefehle[i].item, FALSE)
+    NEXT
+    ' Ein Menue wird Eintraege nicht wieder los -- gesperrt, und ein Neustart
+    ' gibt sie frei (pluginKontextAnmelden).
+    FOR i = 0 TO LEN(ctxEintraege) - 1
+        IF LEFT$(ctxEintraege[i].kennung, LEN(vor)) = vor THEN GUI_MENU_ENABLE(ctxEintraege[i].item, FALSE)
+    NEXT
+    DIM lv AS STRING : lv = "plugin." + plugins[k].name + "."
+    FOR i = 0 TO LEN(plugLeisten) - 1
+        IF LEFT$(plugLeisten[i].name, LEN(lv)) = lv THEN GUI_DOCK_SHOW(win, plugLeisten[i].name, FALSE)
+    NEXT
+    ' Befunde, Schnipsel und Faerbungen des Plugins gelten nicht mehr.
+    DIM bk AS STRING
+    FOR EACH bk IN MAPKEYS(plugBefunde)
+        IF LEFT$(bk, LEN(plugins[k].name) + 1) = plugins[k].name + "|" THEN MAPREMOVE(plugBefunde, bk)
+    NEXT
+    pluginSchnipselWeg(plugins[k].name)
+    pluginFaerbungWeg(plugins[k].name)
+    protokoll("plugin " + plugins[k].name + " " + zustand)
+END SUB
+
+SUB pluginsBeenden()
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(plugins) - 1
+        IF plugins[k].laeuft() THEN pluginStoppen(k, "aus")
+    NEXT
+END SUB
+
+SUB pluginsNeuLaden()
+    pluginsBeenden()
+    plugins = []
+    pluginsStarten()
+    GUI_SET_TEXT(lblStatus, tr$("Plugins neu geladen: ") + STR$(LEN(plugins)))
+    IF GUI_WINDOW_SHOWN(winPlug) THEN pluginListeFuellen()
+END SUB
+
+FUNCTION pluginNr(name AS STRING) AS INTEGER
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(plugins) - 1
+        IF plugins[k].name = name THEN RETURN k
+    NEXT
+    RETURN -1
+END FUNCTION
+
+SUB pluginSenden(k AS INTEGER, j AS JSON_HANDLE)
+    IF k < 0 OR NOT plugins[k].laeuft() THEN RETURN
+    TRY
+        WINDOW_SEND(plugins[k].leitung, JSON_STRINGIFY(j))
+    CATCH e
+    END TRY
+END SUB
+
+' Ein Ereignis an alle, die es hoeren wollen (PLUGIN_HOERE).
+SUB pluginEreignis(name AS STRING, datei AS STRING)
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(plugins) - 1
+        IF NOT plugins[k].laeuft() THEN CONTINUE
+        IF NOT plugins[k].hoertAuf(name) THEN CONTINUE
+        DIM j AS JSON_HANDLE : j = JSON_PARSE("{}")
+        JSON_SET_STRING(j, "art", "ereignis")
+        JSON_SET_STRING(j, "name", name)
+        JSON_SET_STRING(j, "datei", datei)
+        pluginSenden(k, j)
+    NEXT
+END SUB
+
+' "plugin:<plugin>:<id>" -- ausgeloest ueber Menue, Kuerzel oder Palette.
+SUB pluginBefehl(kennung AS STRING)
+    DIM rest AS STRING : rest = MID$(kennung, 7)
+    DIM t AS INTEGER : t = INSTR(rest, ":")
+    IF t < 0 THEN RETURN
+    DIM k AS INTEGER : k = pluginNr(LEFT$(rest, t))
+    IF k < 0 THEN RETURN
+    IF NOT plugins[k].laeuft() THEN
+        GUI_SET_TEXT(lblStatus, tr$("Das Plugin läuft nicht: ") + plugins[k].name)
+        RETURN
+    END IF
+    DIM j AS JSON_HANDLE : j = JSON_PARSE("{}")
+    JSON_SET_STRING(j, "art", "befehl")
+    JSON_SET_STRING(j, "id", MID$(rest, t + 1))
+    ' Aus dem Kontextmenue meint ein Befehl meist das Wort, auf das geklickt
+    ' wurde -- der Rechtsklick hat die Marke dorthin gesetzt.
+    JSON_SET_STRING(j, "wert", wortAnDerMarke$())
+    pluginSenden(k, j)
+    protokoll("plugin befehl " + kennung)
+END SUB
+
+' Je Bild: Nachrichten der Plugins lesen (hoechstens 50 je Plugin, sonst
+' haelt ein geschwaetziges Plugin die IDE an), Abstuerze erkennen, Klicks
+' und Aenderungen in ihren Leisten weitergeben.
+SUB pluginsNachziehen()
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(plugins) - 1
+        IF NOT plugins[k].laeuft() THEN CONTINUE
+        DIM zaehl AS INTEGER : zaehl = 0
+        WHILE zaehl < 50
+            DIM z AS STRING : z = ""
+            TRY
+                z = WINDOW_RECV$(plugins[k].leitung)
+            CATCH e
+                z = ""
+            END TRY
+            IF z = "" THEN BREAK
+            pluginNachricht(k, z)
+            zaehl = zaehl + 1
+            IF NOT plugins[k].laeuft() THEN BREAK
+        WEND
+        IF plugins[k].laeuft() THEN
+            IF NOT WINDOW_ALIVE(plugins[k].leitung) THEN pluginStoppen(k, "abgestürzt")
+        END IF
+    NEXT
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(plugLeisten) - 1
+        IF NOT GUI_DOCK_SHOWN(win, plugLeisten[i].name) THEN CONTINUE
+        DIM pw AS INTEGER : pw = plugLeisten[i].fenster
+        DIM teile AS ARRAY OF STRING : teile = SPLIT$(plugLeisten[i].name, ".")
+        IF LEN(teile) < 3 THEN CONTINUE
+        DIM pk AS INTEGER : pk = pluginNr(teile[1])
+        IF pk < 0 THEN CONTINUE
+        DIM leisteId AS STRING : leisteId = MID$(plugLeisten[i].name, LEN(teile[0]) + LEN(teile[1]) + 2)
+        DIM wi AS INTEGER
+        FOR wi = 0 TO GUI_WINDOW_WIDGET_COUNT(pw) - 1
+            DIM h AS GUI_WIDGET : h = GUI_WINDOW_WIDGET(pw, wi)
+            IF GUI_CLICKED(h) THEN pluginWidgetEreignis(pk, "klick", leisteId, wi, "")
+            IF GUI_CHANGED(h) THEN pluginWidgetEreignis(pk, "geaendert", leisteId, wi, pluginWert$(h))
+        NEXT
+    NEXT
+END SUB
+
+FUNCTION pluginWert$(h AS GUI_WIDGET) AS STRING
+    SELECT CASE LOWER$(GUI_KIND(h))
+        CASE "checkbox", "toggle", "radio" : RETURN IIF(GUI_CHECKED(h), "TRUE", "FALSE")
+        CASE "slider", "spinner", "knob", "progress" : RETURN STR$(GUI_VALUE(h))
+        CASE "listbox" : RETURN STR$(GUI_LISTBOX_SELECTED(h))
+        CASE "dropdown" : RETURN STR$(GUI_DROPDOWN_SELECTED(h))
+        CASE "tree" : RETURN STR$(GUI_TREE_SELECTED(h))
+    END SELECT
+    RETURN GUI_TEXT(h)
+END FUNCTION
+
+SUB pluginWidgetEreignis(k AS INTEGER, art AS STRING, leiste AS STRING, widget AS INTEGER, wert AS STRING)
+    DIM j AS JSON_HANDLE : j = JSON_PARSE("{}")
+    JSON_SET_STRING(j, "art", art)
+    JSON_SET_STRING(j, "leiste", leiste)
+    JSON_SET_INT(j, "widget", widget)
+    JSON_SET_STRING(j, "wert", wert)
+    pluginSenden(k, j)
+END SUB
+
+FUNCTION plugText$(j AS JSON_HANDLE, k AS STRING) AS STRING
+    IF NOT JSON_HAS(j, k) THEN RETURN ""
+    IF JSON_TYPE(j, k) = "string" THEN RETURN JSON_GET_STRING(j, k)
+    IF JSON_TYPE(j, k) = "number" THEN RETURN STR$(JSON_GET_INT(j, k))
+    RETURN ""
+END FUNCTION
+
+FUNCTION plugZahl(j AS JSON_HANDLE, k AS STRING) AS INTEGER
+    IF NOT JSON_HAS(j, k) THEN RETURN 0
+    IF JSON_TYPE(j, k) <> "number" THEN RETURN 0
+    RETURN JSON_GET_INT(j, k)
+END FUNCTION
+
+' Eine Nachricht eines Plugins. Was nicht stimmt, steht im Protokoll und in
+' der Ausgabe -- ein Fehler im Plugin ist nicht der Fehler der IDE.
+SUB pluginNachricht(k AS INTEGER, zeile AS STRING)
+    DIM j AS JSON_HANDLE
+    TRY
+        j = JSON_PARSE(zeile)
+    CATCH e
+        protokoll("plugin " + plugins[k].name + " unlesbar")
+        RETURN
+    END TRY
+    DIM art AS STRING : art = plugText$(j, "art")
+    TRY
+        SELECT CASE art
+            CASE "befehl" : pluginBefehlAnmelden(k, j)
+            CASE "kontext" : pluginKontextAnmelden(k, j)
+            CASE "hover" : pluginHoverAntwort(k, j)
+            CASE "vorschlaege" : pluginVervollAntwort(k, j)
+            CASE "leiste" : pluginLeisteAnmelden(k, j)
+            CASE "hoere"
+                DIM ev AS STRING : ev = plugText$(j, "ereignis")
+                IF NOT plugins[k].hoertAuf(ev) THEN plugins[k].hoert = plugins[k].hoert + ev + ";"
+            CASE "setze" : pluginSetze(k, j)
+            CASE "liste" : pluginListe(k, j)
+            CASE "baum" : pluginBaum(k, j)
+            CASE "frage" : pluginAntwort(k, j)
+            CASE "tue" : pluginTue(k, j)
+            CASE "befunde"
+                MAPPUT(plugBefunde, plugins[k].name + "|" + wegGleich$(plugText$(j, "datei")), JSON_STRINGIFY(JSON_GET_JSON(j, "liste")))
+                pruefungFaellig = GET_TIME()
+            CASE "schnipsel"
+                ARRAY_PUSH(plugSchnipsel, NEW SchnipselEintrag(plugText$(j, "name"), plugText$(j, "kuerzel"), _
+                                                        plugText$(j, "text"), "Plugin " + plugins[k].name))
+                schnipselLaden()
+            CASE "faerbung"
+                ARRAY_PUSH(plugFaerbungen, NEW Faerbung(plugins[k].name, LOWER$(plugText$(j, "endung")), _
+                                                        plugText$(j, "muster"), plugZahl(j, "farbe")))
+                faerbSchluessel = ""
+            CASE ELSE
+                protokoll("plugin " + plugins[k].name + " unbekannt " + art)
+        END SELECT
+    CATCH e
+        protokoll("plugin " + plugins[k].name + " fehler " + e)
+        ausgabe("[" + plugins[k].name + "] " + e)
+    END TRY
+END SUB
+
+FUNCTION pluginBefehlNr(kennung AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(plugBefehle) - 1
+        IF plugBefehle[i].kennung = kennung THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
+
+FUNCTION pluginLeisteNr(name AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(plugLeisten) - 1
+        IF plugLeisten[i].name = name THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
+
+SUB pluginBefehlAnmelden(k AS INTEGER, j AS JSON_HANDLE)
+    DIM kennung AS STRING : kennung = "plugin:" + plugins[k].name + ":" + plugText$(j, "id")
+    DIM titel AS STRING : titel = plugText$(j, "titel")
+    DIM kuerzel AS STRING : kuerzel = plugText$(j, "kuerzel")
+    DIM i AS INTEGER : i = pluginBefehlNr(kennung)
+    IF i >= 0 THEN
+        ' Neu gestartet: derselbe Menuepunkt, wieder bedienbar.
+        GUI_MENU_ENABLE(plugBefehle[i].item, TRUE)
+        GUI_MENU_TEXT(plugBefehle[i].item, titel)
+        RETURN
+    END IF
+    DIM item AS INTEGER
+    IF kuerzel = "" THEN
+        item = GUI_MENU_ITEM(mPlugins, titel)
+    ELSE
+        item = GUI_MENU_ITEM(mPlugins, titel, kz$(kuerzel))
+    END IF
+    ARRAY_PUSH(plugBefehle, NEW PluginMenuepunkt(kennung, item))
+    menueBefehl(item, kennung, kuerzel)
+    paletteEintrag(titel, kennung, kuerzel)
+    protokoll("plugin befehl angemeldet " + kennung)
+END SUB
+
+SUB pluginLeisteAnmelden(k AS INTEGER, j AS JSON_HANDLE)
+    DIM name AS STRING : name = "plugin." + plugins[k].name + "." + plugText$(j, "id")
+    DIM bereich AS STRING : bereich = plugText$(j, "bereich")
+    IF bereich = "" THEN bereich = "rechts"
+    DIM pw AS INTEGER : pw = GUI_FROM_JSON(JSON_STRINGIFY(JSON_GET_JSON(j, "form")))
+    DIM i AS INTEGER : i = pluginLeisteNr(name)
+    IF i >= 0 THEN
+        ' Neu gestartet: das alte Fenster weg, das neue an seinen Platz.
+        GUI_WINDOW_DESTROY(plugLeisten[i].fenster)
+        plugLeisten[i].fenster = pw
+        GUI_DOCK_TITLE(win, name, plugText$(j, "titel"))
+        GUI_DOCK_SHOW(win, name, TRUE)
+    ELSE
+        GUI_DOCK_PANEL(win, name, plugText$(j, "titel"), bereich)
+        ARRAY_PUSH(plugLeisten, NEW PluginLeiste(name, pw))
+    END IF
+    GUI_DOCK_WINDOW(win, name, pw)
+    layout()
+    protokoll("plugin leiste " + name + " " + GUI_DOCK_WHERE$(win, name))
+END SUB
+
+FUNCTION pluginLeisteFenster(k AS INTEGER, j AS JSON_HANDLE) AS INTEGER
+    DIM i AS INTEGER : i = pluginLeisteNr("plugin." + plugins[k].name + "." + plugText$(j, "leiste"))
+    IF i < 0 THEN RETURN -1
+    RETURN plugLeisten[i].fenster
+END FUNCTION
+
+SUB pluginSetze(k AS INTEGER, j AS JSON_HANDLE)
+    DIM pw AS INTEGER : pw = pluginLeisteFenster(k, j)
+    IF pw < 0 THEN RETURN
+    DIM nr AS INTEGER : nr = plugZahl(j, "widget")
+    IF nr < 0 OR nr >= GUI_WINDOW_WIDGET_COUNT(pw) THEN RETURN
+    DIM h AS GUI_WIDGET : h = GUI_WINDOW_WIDGET(pw, nr)
+    DIM wert AS STRING : wert = plugText$(j, "wert")
+    DIM wahr AS BOOLEAN : wahr = UPPER$(wert) = "TRUE" OR wert = "1"
+    SELECT CASE plugText$(j, "was")
+        CASE "text" : GUI_SET_TEXT(h, wert)
+        CASE "checked" : GUI_SET_CHECKED(h, wahr)
+        CASE "value" : GUI_SET_VALUE(h, VAL(wert))
+        CASE "enabled" : GUI_SET_ENABLED(h, wahr)
+        CASE "visible" : GUI_SET_VISIBLE(h, wahr)
+        CASE "selected"
+            SELECT CASE LOWER$(GUI_KIND(h))
+                CASE "dropdown" : GUI_DROPDOWN_SET_SELECTED(h, VAL(wert))
+                CASE "tree" : GUI_TREE_SET_SELECTED(h, VAL(wert))
+                CASE ELSE : GUI_LISTBOX_SET_SELECTED(h, VAL(wert))
+            END SELECT
+    END SELECT
+END SUB
+
+SUB pluginListe(k AS INTEGER, j AS JSON_HANDLE)
+    DIM pw AS INTEGER : pw = pluginLeisteFenster(k, j)
+    IF pw < 0 THEN RETURN
+    DIM nr AS INTEGER : nr = plugZahl(j, "widget")
+    IF nr < 0 OR nr >= GUI_WINDOW_WIDGET_COUNT(pw) THEN RETURN
+    DIM h AS GUI_WIDGET : h = GUI_WINDOW_WIDGET(pw, nr)
+    DIM eintraege AS ARRAY OF STRING : eintraege = []
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(j, "eintraege") - 1
+        ARRAY_PUSH(eintraege, JSON_GET_STRING(j, "eintraege." + STR$(i)))
+    NEXT
+    IF LOWER$(GUI_KIND(h)) = "dropdown" THEN GUI_SET_DROPDOWN(h, eintraege) ELSE GUI_SET_LISTBOX(h, eintraege)
+END SUB
+
+' Einen Baum der Leiste fuellen: je Eintrag eine Ebene (0 = oben) und ein
+' Text, in der Reihenfolge, in der sie unter einander stehen. Ein Knoten
+' haengt am letzten davor mit kleinerer Ebene; seine Nummer ist die Stelle
+' in der Liste, und dieselbe Nummer kommt bei "geaendert" als Wert zurueck.
+SUB pluginBaum(k AS INTEGER, j AS JSON_HANDLE)
+    DIM pw AS INTEGER : pw = pluginLeisteFenster(k, j)
+    IF pw < 0 THEN RETURN
+    DIM nr AS INTEGER : nr = plugZahl(j, "widget")
+    IF nr < 0 OR nr >= GUI_WINDOW_WIDGET_COUNT(pw) THEN RETURN
+    DIM h AS GUI_WIDGET : h = GUI_WINDOW_WIDGET(pw, nr)
+    IF LOWER$(GUI_KIND(h)) <> "tree" THEN RETURN
+    GUI_TREE_CLEAR(h)
+    DIM eltern AS ARRAY OF INTEGER : eltern = []
+    DIM auf AS BOOLEAN : auf = TRUE
+    IF JSON_HAS(j, "auf") THEN auf = JSON_GET_BOOL(j, "auf")
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(j, "texte") - 1
+        DIM ebene AS INTEGER : ebene = MAX(0, JSON_GET_INT(j, "ebenen." + STR$(i)))
+        ' Ein Sprung um mehrere Ebenen haengt am tiefsten vorhandenen.
+        WHILE LEN(eltern) > ebene : ARRAY_POP(eltern) : WEND
+        DIM oben AS INTEGER : oben = -1
+        IF LEN(eltern) > 0 THEN oben = eltern[LEN(eltern) - 1]
+        DIM knoten AS INTEGER : knoten = GUI_TREE_ADD(h, oben, JSON_GET_STRING(j, "texte." + STR$(i)))
+        IF oben >= 0 THEN GUI_TREE_EXPAND(h, oben, auf)
+        ARRAY_PUSH(eltern, knoten)
+    NEXT
+END SUB
+
+' Das Wort an der Schreibmarke des Feldes vorn ("" = keins).
+FUNCTION wortAnDerMarke$() AS STRING
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN ""
+    DIM mz AS INTEGER
+    DIM ms AS INTEGER
+    (mz, ms) = GUI_TEXTAREA_CURSOR(ta)
+    DIM zl AS ARRAY OF STRING : zl = SPLIT$(GUI_TEXT(ta), NL)
+    IF mz < 1 OR mz > LEN(zl) THEN RETURN ""
+    DIM w AS STRING
+    DIM a AS INTEGER
+    (w, a) = wortBeiZeichen(zl[mz - 1], ms)
+    ' Hinter dem Wort (die Marke steht oft direkt dahinter) zaehlt es auch.
+    IF w = "" AND ms > 1 THEN (w, a) = wortBeiZeichen(zl[mz - 1], ms - 1)
+    RETURN w
+END FUNCTION
+
+' Ein Eintrag im Kontextmenue des Code-Felds (PLUGIN_KONTEXT). Er loest
+' denselben Weg aus wie ein Befehl ("plugin:<name>:<id>"); bei einem
+' Neustart des Plugins wird der alte Eintrag wieder bedienbar.
+SUB pluginKontextAnmelden(k AS INTEGER, j AS JSON_HANDLE)
+    DIM kennung AS STRING : kennung = "plugin:" + plugins[k].name + ":" + plugText$(j, "id")
+    DIM titel AS STRING : titel = plugText$(j, "titel")
+    DIM i AS INTEGER : i = ctxNr(kennung)
+    IF i >= 0 THEN
+        GUI_MENU_ENABLE(ctxEintraege[i].item, TRUE)
+        GUI_MENU_TEXT(ctxEintraege[i].item, titel)
+        RETURN
+    END IF
+    IF NOT plugKontextTrenner THEN
+        GUI_MENU_SEPARATOR(ctxCode)
+        plugKontextTrenner = TRUE
+    END IF
+    ctxEintrag(ctxCode, titel, kennung)
+    protokoll("plugin kontext angemeldet " + kennung)
+END SUB
+
+' Beim Ueberfahren: alle Plugins, die "hover" hoeren, bekommen Wort und
+' Stelle. Die Antwort kommt Bilder spaeter (pluginHoverAntwort) und haengt
+' sich an den Tooltip, wenn die Maus noch dort steht -- ein Plugin, das
+' nicht antwortet, haelt so nichts auf.
+SUB pluginHoverFragen(ta AS GUI_WIDGET, z AS INTEGER, sp AS INTEGER, wort AS STRING, text AS STRING)
+    plugHoverStelle = ""
+    IF wort = "" THEN RETURN
+    DIM k AS INTEGER
+    DIM gefragt AS BOOLEAN : gefragt = FALSE
+    FOR k = 0 TO LEN(plugins) - 1
+        IF NOT plugins[k].laeuft() THEN CONTINUE
+        IF NOT plugins[k].hoertAuf("hover") THEN CONTINUE
+        IF NOT gefragt THEN plugHoverNr = plugHoverNr + 1
+        gefragt = TRUE
+        DIM j AS JSON_HANDLE : j = JSON_PARSE("{}")
+        JSON_SET_STRING(j, "art", "hover")
+        JSON_SET_INT(j, "nr", plugHoverNr)
+        JSON_SET_STRING(j, "wert", wort)
+        JSON_SET_INT(j, "zeile", z)
+        JSON_SET_INT(j, "spalte", sp)
+        DIM d AS STRING : d = ""
+        IF aktiverTab >= 0 THEN d = reiter[aktiverTab].pfad
+        JSON_SET_STRING(j, "datei", d)
+        pluginSenden(k, j)
+    NEXT
+    IF NOT gefragt THEN RETURN
+    plugHoverStelle = tippStelle
+    plugHoverFeld = ta
+    plugHoverText = text
+END SUB
+
+' Beim Vervollstaendigen: alle Plugins, die "vervollstaendigen" hoeren,
+' bekommen den Wortanfang und die Stelle. Gefragt wird auch, wenn die Laufzeit
+' nichts weiss -- die erste Antwort oeffnet die Liste dann selbst.
+SUB pluginVervollFragen(z AS INTEGER, sp AS INTEGER, wort AS STRING)
+    plugVervollWort = ""
+    DIM k AS INTEGER
+    DIM gefragt AS BOOLEAN : gefragt = FALSE
+    FOR k = 0 TO LEN(plugins) - 1
+        IF NOT plugins[k].laeuft() THEN CONTINUE
+        IF NOT plugins[k].hoertAuf("vervollstaendigen") THEN CONTINUE
+        IF NOT gefragt THEN plugVervollNr = plugVervollNr + 1
+        gefragt = TRUE
+        DIM j AS JSON_HANDLE : j = JSON_PARSE("{}")
+        JSON_SET_STRING(j, "art", "vervollstaendigen")
+        JSON_SET_INT(j, "nr", plugVervollNr)
+        JSON_SET_STRING(j, "wert", wort)
+        JSON_SET_INT(j, "zeile", z)
+        JSON_SET_INT(j, "spalte", sp)
+        DIM d AS STRING : d = ""
+        IF aktiverTab >= 0 THEN d = reiter[aktiverTab].pfad
+        JSON_SET_STRING(j, "datei", d)
+        pluginSenden(k, j)
+    NEXT
+    IF gefragt THEN plugVervollWort = wort
+END SUB
+
+FUNCTION vervollHat(e AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO GUI_LISTBOX_COUNT(lstVervoll) - 1
+        IF GUI_LISTBOX_ITEM(lstVervoll, i) = e THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+' Die Vorschlaege eines Plugins: nur zur letzten Frage und nur, wenn an der
+' Marke noch derselbe Wortanfang steht. Doppelte fallen weg.
+SUB pluginVervollAntwort(k AS INTEGER, j AS JSON_HANDLE)
+    IF plugZahl(j, "nr") <> plugVervollNr OR plugVervollWort = "" THEN RETURN
+    IF vorschlagWort$() <> plugVervollWort THEN RETURN
+    IF NOT JSON_HAS(j, "eintraege") THEN RETURN
+    DIM neu AS INTEGER : neu = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(j, "eintraege") - 1
+        DIM e AS STRING : e = JSON_GET_STRING(j, "eintraege." + STR$(i))
+        IF e = "" OR vervollHat(e) THEN CONTINUE
+        GUI_LISTBOX_ADD(lstVervoll, e)
+        neu = neu + 1
+    NEXT
+    IF neu = 0 THEN RETURN
+    IF NOT vervollOffen THEN
+        GUI_LISTBOX_SET_SELECTED(lstVervoll, 0)
+        vervollFensterZeigen(FALSE)
+    END IF
+    protokoll("plugin vorschlaege " + plugins[k].name + " " + STR$(neu))
+END SUB
+
+SUB pluginHoverAntwort(k AS INTEGER, j AS JSON_HANDLE)
+    DIM t AS STRING : t = TRIM$(plugText$(j, "text"))
+    IF t = "" OR plugZahl(j, "nr") <> plugHoverNr THEN RETURN
+    IF plugHoverStelle = "" OR plugHoverStelle <> tippStelle THEN RETURN
+    DIM teil AS STRING : teil = tippText$(t)
+    IF plugHoverText = "" THEN plugHoverText = teil ELSE plugHoverText = plugHoverText + NL + NL + teil
+    GUI_TOOLTIP(plugHoverFeld, plugHoverText)
+    tippFeld = plugHoverFeld
+    protokoll("plugin hover " + plugins[k].name + " " + LEFT$(t, 40))
+END SUB
+
+SUB pluginAntwort(k AS INTEGER, j AS JSON_HANDLE)
+    DIM a AS JSON_HANDLE : a = JSON_PARSE("{}")
+    JSON_SET_STRING(a, "art", "antwort")
+    JSON_SET_INT(a, "nr", plugZahl(j, "nr"))
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    DIM wert AS STRING : wert = ""
+    SELECT CASE plugText$(j, "was")
+        CASE "text" : IF ta >= 0 THEN wert = GUI_TEXT(ta)
+        CASE "datei" : IF aktiverTab >= 0 THEN wert = reiter[aktiverTab].pfad
+        CASE "auswahl" : IF ta >= 0 THEN wert = GUI_TEXTAREA_SELECTION$(ta)
+        CASE "projekt" : wert = projektOrdner
+        CASE "wort" : wert = wortAnDerMarke$()
+        CASE "marke"
+            IF ta >= 0 THEN
+                DIM mz AS INTEGER
+                DIM ms AS INTEGER
+                (mz, ms) = GUI_TEXTAREA_CURSOR(ta)
+                wert = STR$(mz) + "," + STR$(ms)
+            END IF
+    END SELECT
+    JSON_SET_STRING(a, "wert", wert)
+    pluginSenden(k, a)
+END SUB
+
+SUB pluginTue(k AS INTEGER, j AS JSON_HANDLE)
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    SELECT CASE plugText$(j, "was")
+        CASE "einfuegen" : IF ta >= 0 THEN GUI_TEXTAREA_INSERT(ta, plugText$(j, "text"))
+        CASE "meldung" : GUI_SET_TEXT(lblStatus, plugText$(j, "text"))
+        CASE "ausgabe" : ausgabe(plugText$(j, "text"))
+        CASE "ersetzen", "waehlen"
+            ' Mit Datei erst dorthin (oeffnet sie, wenn noetig), ohne der Reiter vorn.
+            IF plugText$(j, "datei") <> "" THEN dateiOeffnen(plugText$(j, "datei"))
+            ta = aktivesFeld()
+            IF ta < 0 THEN RETURN
+            DIM z1 AS INTEGER : z1 = MAX(1, plugZahl(j, "zeile"))
+            DIM s1 AS INTEGER : s1 = MAX(1, plugZahl(j, "spalte"))
+            DIM z2 AS INTEGER : z2 = plugZahl(j, "bis_zeile")
+            DIM s2 AS INTEGER : s2 = plugZahl(j, "bis_spalte")
+            IF z2 < 1 THEN z2 = z1
+            IF s2 < 1 THEN s2 = s1
+            GUI_TEXTAREA_SELECT(ta, z1, s1, z2, s2)
+            ' Auswahl + INSERT: ein Schritt fuer Strg+Z.
+            IF plugText$(j, "was") = "ersetzen" THEN GUI_TEXTAREA_INSERT(ta, plugText$(j, "text"))
+            GUI_FOCUS(ta)
+        CASE "oeffnen"
+            ' Ohne Datei: die Zeile im Reiter vorn (ein ungesicherter Text).
+            IF plugText$(j, "datei") <> "" THEN dateiOeffnen(plugText$(j, "datei"))
+            DIM zl AS INTEGER : zl = plugZahl(j, "zeile")
+            ta = aktivesFeld()
+            IF ta >= 0 AND zl > 0 THEN GUI_TEXTAREA_GOTO(ta, zl, 1)
+    END SELECT
+END SUB
+
+' Die Befunde aller Plugins fuer eine Datei hinten an die Meldungen von
+' CODE_CHECK$ (`liste`, ein JSON-Feld), in derselben Form: Zeile, Spalte,
+' Laenge, Meldung mit dem Namen des Plugins davor, Schwere, Korrekturen.
+' Ohne Spalte gilt die Zeile ohne Einrueckung, wie bei der Laufzeit.
+SUB pluginBefundeAnhaengen(datei AS STRING, liste AS JSON_HANDLE, text AS STRING)
+    IF datei = "" OR LEN(MAPKEYS(plugBefunde)) = 0 THEN RETURN
+    DIM d AS STRING : d = wegGleich$(datei)
+    DIM tz AS ARRAY OF STRING : tz = SPLIT$(text, NL)
+    DIM bk AS STRING
+    FOR EACH bk IN MAPKEYS(plugBefunde)
+        DIM t AS INTEGER : t = INSTR(bk, "|")
+        IF MID$(bk, t + 1) <> d THEN CONTINUE
+        DIM bl AS JSON_HANDLE : bl = JSON_PARSE(MAPGET(plugBefunde, bk))
+        DIM i AS INTEGER
+        FOR i = 0 TO JSON_LEN(bl, "") - 1
+            DIM p AS STRING : p = STR$(i)
+            DIM z AS INTEGER : z = plugZahl(bl, p + ".zeile")
+            DIM sp AS INTEGER : sp = plugZahl(bl, p + ".spalte")
+            DIM ln AS INTEGER : ln = plugZahl(bl, p + ".laenge")
+            IF sp < 1 AND z >= 1 AND z <= LEN(tz) THEN
+                DIM zt AS STRING : zt = RTRIM$(REPLACE$(tz[z - 1], CHR$(13), ""))
+                sp = LEN(zt) - LEN(LTRIM$(zt)) + 1
+                ln = MAX(1, LEN(LTRIM$(zt)))
+            END IF
+            IF sp < 1 THEN sp = 1
+            IF ln < 1 THEN ln = 1
+            DIM b AS JSON_HANDLE : b = JSON_PARSE("{}")
+            JSON_SET_INT(b, "zeile", z)
+            JSON_SET_INT(b, "spalte", sp)
+            JSON_SET_INT(b, "laenge", ln)
+            JSON_SET_STRING(b, "meldung", "[" + LEFT$(bk, t) + "] " + plugText$(bl, p + ".meldung"))
+            DIM sw AS STRING : sw = LOWER$(plugText$(bl, p + ".schwere"))
+            JSON_SET_STRING(b, "schwere", IIF(sw = "fehler" OR sw = "hinweis", sw, "warnung"))
+            IF JSON_HAS(bl, p + ".korrekturen") THEN JSON_SET_JSON(b, "korrekturen", JSON_GET_JSON(bl, p + ".korrekturen"))
+            JSON_APPEND_JSON(liste, "", b)
+        NEXT
+    NEXT
+END SUB
+
+SUB pluginSchnipselWeg(name AS STRING)
+    DIM i AS INTEGER : i = LEN(plugSchnipsel) - 1
+    DIM weg AS BOOLEAN : weg = FALSE
+    WHILE i >= 0
+        IF plugSchnipsel[i].herkunft = "Plugin " + name THEN
+            ARRAY_REMOVE_AT(plugSchnipsel, i)
+            weg = TRUE
+        END IF
+        i = i - 1
+    WEND
+    IF weg THEN schnipselLaden()
+END SUB
+
+SUB pluginFaerbungWeg(name AS STRING)
+    DIM i AS INTEGER : i = LEN(plugFaerbungen) - 1
+    WHILE i >= 0
+        IF plugFaerbungen[i].vonPlugin = name THEN ARRAY_REMOVE_AT(plugFaerbungen, i)
+        i = i - 1
+    WEND
+    faerbSchluessel = ""
+END SUB
+
+' Ein Feld einer Dateiart, fuer die ein Plugin Regeln angemeldet hat: deren
+' Treffer im Ausschnitt faerben, zeilenweise wie die Suche. FALSE heisst:
+' keine Regel, die Faerbung fuer Drachenhauch gilt.
+FUNCTION pluginFaerben(ta AS GUI_WIDGET, stueck AS STRING, von AS INTEGER) AS BOOLEAN
+    IF LEN(plugFaerbungen) = 0 THEN RETURN FALSE
+    DIM pfad AS STRING : pfad = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO tabAnzahl - 1
+        IF reiter[i].feld = ta THEN pfad = reiter[i].pfad
+    NEXT
+    DIM pkt AS INTEGER : pkt = INSTRREV(pfad, ".")
+    IF pkt < 0 THEN RETURN FALSE
+    DIM endung AS STRING : endung = LOWER$(MID$(pfad, pkt))
+    DIM s2 AS ARRAY OF INTEGER : s2 = []
+    DIM l2 AS ARRAY OF INTEGER : l2 = []
+    DIM f2 AS ARRAY OF INTEGER : f2 = []
+    DIM treffer AS BOOLEAN : treffer = FALSE
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(stueck, NL)
+    FOR i = 0 TO LEN(plugFaerbungen) - 1
+        IF plugFaerbungen[i].endung <> endung THEN CONTINUE
+        treffer = TRUE
+        DIM off AS INTEGER : off = 0
+        DIM zi AS INTEGER
+        FOR zi = 0 TO LEN(zeilen) - 1
+            DIM ab AS INTEGER : ab = 0
+            DIM wie AS INTEGER : wie = 0
+            WHILE ab <= LEN(zeilen[zi]) AND wie < 200
+                DIM sp AS INTEGER
+                DIM sl AS INTEGER
+                TRY
+                    (sp, sl) = REGEX_FIND_POS(zeilen[zi], plugFaerbungen[i].muster, ab)
+                CATCH fe
+                    sp = -1
+                END TRY
+                IF sp < 0 THEN BREAK
+                IF sl > 0 THEN
+                    ARRAY_PUSH(s2, von + off + sp) : ARRAY_PUSH(l2, sl) : ARRAY_PUSH(f2, plugFaerbungen[i].farbe)
+                END IF
+                ab = sp + MAX(sl, 1)
+                wie = wie + 1
+            WEND
+            off = off + LEN(zeilen[zi]) + 1
+        NEXT
+    NEXT
+    IF NOT treffer THEN RETURN FALSE
+    GUI_TEXTAREA_SPANS(ta, s2, l2, f2)
+    RETURN TRUE
+END FUNCTION
+
+' --- Plugins verwalten (Plugins -> Plugins verwalten ...) -------------------
+DIM winPlug AS GUI_WINDOW : winPlug = GUI_WINDOW(tr$("Plugins"), 260, 120, 560, 420)
+GUI_WINDOW_CLOSABLE(winPlug, TRUE)
+DIM lblPlugInfo AS GUI_WIDGET : lblPlugInfo = GUI_LABEL(winPlug, tr$("Haken = beim Start laden. Mitgelieferte sind aus, bis man sie anhakt."), 12, 10)
+DIM lstPlug AS GUI_WIDGET : lstPlug = GUI_LISTBOX(winPlug, 12, 34, 536, 250, [])
+GUI_LISTBOX_SET(lstPlug, "kaestchen", 1)
+GUI_LISTBOX_PLACEHOLDER(lstPlug, tr$("Keine Plugins -- „Neues Plugin ...“ legt eins an."))
+DIM btnPlugNeu AS GUI_WIDGET : btnPlugNeu = GUI_BUTTON(winPlug, tr$("Neu laden"), 12, 296, 120, 30)
+DIM btnPlugOrdner AS GUI_WIDGET : btnPlugOrdner = GUI_BUTTON(winPlug, tr$("Ordner öffnen"), 142, 296, 140, 30)
+DIM btnPlugAnlegen AS GUI_WIDGET : btnPlugAnlegen = GUI_BUTTON(winPlug, tr$("Neues Plugin ..."), 292, 296, 126, 30)
+DIM btnPlugHolen AS GUI_WIDGET : btnPlugHolen = GUI_BUTTON(winPlug, tr$("Holen ..."), 12, 336, 120, 30)
+GUI_TOOLTIP(btnPlugHolen, tr$("Ein Plugin aus github:nutzer/repo@stand, einer https-Adresse oder einem Ordner holen (dhrt paket)"))
+DIM btnPlugEntfernen AS GUI_WIDGET : btnPlugEntfernen = GUI_BUTTON(winPlug, tr$("Entfernen"), 142, 336, 140, 30)
+GUI_TOOLTIP(btnPlugEntfernen, tr$("Das gewählte geholte Plugin entfernen"))
+DIM btnPlugAktuell AS GUI_WIDGET : btnPlugAktuell = GUI_BUTTON(winPlug, tr$("Aktualisieren"), 292, 336, 126, 30)
+GUI_TOOLTIP(btnPlugAktuell, tr$("Alle geholten Plugins neu holen und einen neuen Stand annehmen (dhrt paket hole --erneuern)"))
+DIM btnPlugZu AS GUI_WIDGET : btnPlugZu = GUI_BUTTON(winPlug, tr$("Schließen"), 428, 296, 120, 30)
+GUI_WINDOW_CANCEL(winPlug, btnPlugZu)
+GUI_WINDOW_VISIBLE(winPlug, FALSE)
+
+SUB pluginListeFuellen()
+    GUI_LISTBOX_CLEAR(lstPlug)
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(plugins) - 1
+        DIM zeile AS STRING : zeile = plugins[k].titel
+        IF plugins[k].fassung <> "" THEN zeile = zeile + " " + plugins[k].fassung
+        IF plugins[k].mitgeliefert THEN zeile = zeile + tr$(" (mitgeliefert)")
+        IF plugins[k].geholt THEN zeile = zeile + tr$(" (geholt)")
+        DIM z AS INTEGER : z = GUI_LISTBOX_ADD(lstPlug, zeile)
+        GUI_LISTBOX_DETAIL(lstPlug, z, plugins[k].zustand)
+        GUI_LISTBOX_SET_CHECKED(lstPlug, z, pluginGewollt(k))
+        DIM tipp AS STRING : tipp = plugins[k].info
+        IF plugins[k].autor <> "" THEN tipp = tipp + IIF(tipp = "", "", NL) + tr$("Von: ") + plugins[k].autor
+        tipp = tipp + IIF(tipp = "", "", NL) + plugins[k].pfad
+        GUI_LISTBOX_TIP(lstPlug, z, tipp)
+    NEXT
+END SUB
+
+' --- Neues Plugin aus der Vorlage -------------------------------------------
+DIM dlgPlugName AS GUI_WINDOW : dlgPlugName = 0
+
+SUB pluginAnlegenFragen()
+    dlgPlugName = GUI_PROMPT(tr$("Neues Plugin"), tr$("Name des Plugins (Buchstaben, Ziffern, _ und -):"), "mein_plugin")
+END SUB
+
+SUB pluginAnlegenNachziehen()
+    IF dlgPlugName = 0 THEN RETURN
+    DIM a AS INTEGER : a = GUI_ANSWER(dlgPlugName)
+    IF a = 0 THEN RETURN
+    DIM name AS STRING : name = TRIM$(GUI_DIALOG_TEXT(dlgPlugName))
+    dlgPlugName = 0
+    IF a = 1 THEN pluginAnlegen(name)
+END SUB
+
+' Legt plugins/<name>/ mit plugin.dh, plugin.json, leiste.dhform und test.dhtest an,
+' oeffnet plugin.dh und startet das Plugin. FALSE, wenn der Name krumm ist
+' oder den Ordner gibt.
+FUNCTION pluginAnlegen(name AS STRING) AS BOOLEAN
+    IF name = "" OR NOT REGEX_TEST(name, "^[A-Za-z0-9_-]+$") THEN
+        GUI_SET_TEXT(lblStatus, tr$("Ein Plugin-Name besteht aus Buchstaben, Ziffern, _ und -."))
+        protokoll("plugin anlegen krumm " + name)
+        RETURN FALSE
+    END IF
+    DIM ordner AS STRING : ordner = PATHJOIN(pluginOrdner$(), name)
+    IF DIREXISTS(ordner) THEN
+        GUI_SET_TEXT(lblStatus, tr$("Das Plugin gibt es schon: ") + ordner)
+        protokoll("plugin anlegen gibt es " + name)
+        RETURN FALSE
+    END IF
+    IF NOT DIREXISTS(pluginOrdner$()) THEN MKDIR(pluginOrdner$())
+    MKDIR(ordner)
+    DIM q AS STRING : q = CHR$(34)
+    DIM sb AS JSON_HANDLE : sb = JSON_PARSE("{}")
+    JSON_SET_STRING(sb, "name", name)
+    JSON_SET_STRING(sb, "fassung", "0.1")
+    JSON_SET_STRING(sb, "beschreibung", tr$("Was das Plugin tut."))
+    JSON_SET_STRING(sb, "autor", "")
+    JSON_SET_STRING(sb, "ide", VERSION$())
+    WRITEALL(PATHJOIN(ordner, "plugin.json"), JSON_STRINGIFY(sb) + NL)
+    DIM form AS STRING : form = "{" + q + "title" + q + ": " + q + name + q + ", " + q + "w" + q + ": 240, " + q + "h" + q + ": 160, " + q + "chrome" + q + ": false, " + q + "widgets" + q + ": [" + NL
+    form = form + "  {" + q + "kind" + q + ": " + q + "label" + q + ", " + q + "name" + q + ": " + q + "kopf" + q + ", " + q + "text" + q + ": " + q + name + q + ", " + q + "x" + q + ": 6, " + q + "y" + q + ": 6, " + q + "w" + q + ": 228, " + q + "h" + q + ": 18, " + q + "anchor" + q + ": " + q + "lrt" + q + "}," + NL
+    form = form + "  {" + q + "kind" + q + ": " + q + "button" + q + ", " + q + "name" + q + ": " + q + "knopf" + q + ", " + q + "text" + q + ": " + q + "Wort zählen" + q + ", " + q + "x" + q + ": 6, " + q + "y" + q + ": 30, " + q + "w" + q + ": 140, " + q + "h" + q + ": 28}" + NL
+    form = form + "]}" + NL
+    WRITEALL(PATHJOIN(ordner, "leiste.dhform"), form)
+    DIM c AS STRING : c = "' Plugin " + q + name + q + " -- angelegt aus der Vorlage der IDE." + NL
+    c = c + "' Handbuch: docs/ide-plugins.md. Nach einer Aenderung: Plugins -> Plugins neu laden." + NL
+    c = c + "IMPORT " + q + "dh_plugin.dh" + q + NL + NL
+    c = c + "SUB zaehlen()" + NL
+    c = c + "    DIM text AS STRING : text = PLUGIN_TEXT$()" + NL
+    c = c + "    DIM wort AS STRING : wort = PLUGIN_WORT$()" + NL
+    c = c + "    IF wort = " + q + q + " THEN" + NL
+    c = c + "        PLUGIN_MELDUNG(" + q + "An der Schreibmarke steht kein Wort." + q + ")" + NL
+    c = c + "        RETURN" + NL
+    c = c + "    END IF" + NL
+    c = c + "    DIM n AS INTEGER : n = LEN(REGEX_FIND_ALL(text, " + q + "\b" + q + " + wort + " + q + "\b" + q + "))" + NL
+    c = c + "    PLUGIN_SETZE(" + q + "leiste" + q + ", " + q + "kopf" + q + ", " + q + "text" + q + ", wort + " + q + ": " + q + " + STR$(n) + " + q + " mal" + q + ")" + NL
+    c = c + "END SUB" + NL + NL
+    c = c + "PLUGIN_BEFEHL(" + q + "zaehlen" + q + ", " + q + "Wort an der Marke zählen" + q + ")" + NL
+    c = c + "PLUGIN_KONTEXT(" + q + "zaehlen" + q + ", " + q + "Wie oft steht das Wort hier?" + q + ")" + NL
+    c = c + "PLUGIN_LEISTE(" + q + "leiste" + q + ", " + q + name + q + ", " + q + "leiste.dhform" + q + ", " + q + "rechts" + q + ")" + NL + NL
+    c = c + "WHILE PLUGIN_LAEUFT()" + NL
+    c = c + "    SELECT CASE PLUGIN_EREIGNIS$()" + NL
+    c = c + "        CASE " + q + "befehl" + q + NL
+    c = c + "            IF PLUGIN_ID$() = " + q + "zaehlen" + q + " THEN zaehlen()" + NL
+    c = c + "        CASE " + q + "klick" + q + NL
+    c = c + "            IF PLUGIN_WIDGET$() = " + q + "knopf" + q + " THEN zaehlen()" + NL
+    c = c + "        CASE " + q + "ende" + q + NL
+    c = c + "            EXIT(0)" + NL
+    c = c + "    END SELECT" + NL
+    c = c + "WEND" + NL
+    WRITEALL(PATHJOIN(ordner, "plugin.dh"), c)
+    ' Eine Pruefung mit der Schein-IDE (ide/dh_plugin_probe.dh): sie laeuft
+    ' ohne Fenster und ohne IDE, mit dhrt test oder Strg+Alt+F5. DH_PATH
+    ' zeigt auf den Ordner dieser IDE, dort liegen dh_plugin.dh und die Probe.
+    DIM t AS STRING : t = "' Pruefung des Plugins " + q + name + q + " mit der Schein-IDE (dh_plugin_probe.dh)." + NL
+    t = t + "' Laufen lassen: dhrt test <dieser Ordner>, in der IDE Strg+Alt+F5." + NL
+    t = t + "' Handbuch: docs/ide-plugins.md, Abschnitt " + q + "Ein Plugin pruefen" + q + "." + NL + NL
+    t = t + "=== das wort an der marke wird gezaehlt" + NL
+    t = t + "IMPORT " + q + "dh_plugin_probe.dh" + q + NL
+    t = t + "PROBE_SETZE_TEXT(" + q + "a = 1" + q + " + CHR$(10) + " + q + "PRINT a + a" + q + " + CHR$(10), CWD$() + " + q + "/haupt.dh" + q + ", 2, 7)" + NL
+    t = t + "PRINT PROBE_START(ARG$(0) + " + q + "/plugin.dh" + q + ")" + NL
+    t = t + "PRINT PROBE_WARTEN(" + q + "leiste" + q + ")" + NL
+    t = t + "PROBE_BEFEHL(" + q + "zaehlen" + q + ")" + NL
+    t = t + "PRINT PROBE_WARTEN(" + q + "setze" + q + ")" + NL
+    t = t + "PRINT PROBE_WIDGET$(" + q + "leiste" + q + ", " + q + "kopf" + q + ", " + q + "text" + q + ")" + NL
+    t = t + "PROBE_ENDE()" + NL
+    t = t + "--- argumente" + NL + "{sammlung}" + NL
+    t = t + "--- umgebung" + NL + "DH_PATH=" + REALPATH$(pluginBibOrdner$()) + NL
+    t = t + "--- erwartet" + NL + "TRUE" + NL + "TRUE" + NL + "TRUE" + NL + "a: 3 mal" + NL
+    WRITEALL(PATHJOIN(ordner, "test.dhtest"), t)
+    protokoll("plugin angelegt " + name)
+    ' Anmelden und starten wie beim Start der IDE, dann zum Bearbeiten oeffnen.
+    pluginsAusOrdner(pluginOrdner$(), FALSE)
+    IF GUI_WINDOW_SHOWN(winPlug) THEN pluginListeFuellen()
+    dateiOeffnen(PATHJOIN(ordner, "plugin.dh"))
+    GUI_SET_TEXT(lblStatus, tr$("Plugin angelegt: ") + ordner)
+    RETURN TRUE
+END FUNCTION
+
+SUB pluginsVerwalten()
+    IF LEN(plugins) = 0 THEN pluginsStarten()
+    pluginListeFuellen()
+    GUI_WINDOW_VISIBLE(winPlug, TRUE)
+    GUI_FOCUS(lstPlug)
+END SUB
+
+' Je Bild, solange das Fenster offen ist.
+' --- Plugins holen (dhrt paket in den Plugin-Ordner) -------------------------
+DIM dlgPlugQuelle AS GUI_WINDOW : dlgPlugQuelle = 0
+
+SUB pluginHolenFragen()
+    dlgPlugQuelle = GUI_PROMPT(tr$("Plugin holen"), tr$("Quelle (github:nutzer/repo@stand, https-Adresse oder Ordner), dahinter wahlweise --als name:"), "github:")
+END SUB
+
+' `dhrt paket -C <plugin-ordner> ...` als Prozess -- das Plugin landet in
+' plugins/pakete/<name>/, Quelle und Pruefsumme in paket.json und
+' paket.lock.json daneben.
+SUB pluginHolenStarten(mehr AS ARRAY OF STRING)
+    IF plugHolProz >= 0 THEN
+        GUI_SET_TEXT(lblStatus, tr$("dhrt paket läuft noch."))
+        RETURN
+    END IF
+    IF NOT DIREXISTS(pluginOrdner$()) THEN MKDIR(pluginOrdner$())
+    ' Ein laufendes geholtes Plugin hat seinen Ordner als Arbeitsordner, und
+    ' Windows ersetzt keinen Ordner, der in Gebrauch ist -- Aktualisieren
+    ' und Entfernen scheiterten sonst. Danach startet pluginHolenNachziehen
+    ' alle neu, auch nach einem Fehler (dann laeuft das alte weiter).
+    DIM gk AS INTEGER
+    FOR gk = 0 TO LEN(plugins) - 1
+        IF plugins[gk].geholt AND plugins[gk].laeuft() THEN pluginStoppen(gk, "aus")
+    NEXT
+    DIM a AS ARRAY OF STRING : a = ["paket", "-C", pluginOrdner$()]
+    DIM m AS STRING
+    FOR EACH m IN mehr
+        ARRAY_PUSH(a, m)
+    NEXT
+    ausgabe("dhrt " + JOIN$(a, " "))
+    plugHolProz = PROCESS_START("dhrt", a)
+    PROCESS_CLOSE_INPUT(plugHolProz)
+    protokoll("plugin holen start " + JOIN$(mehr, " "))
+END SUB
+
+' Alle geholten Plugins neu holen. Ohne --erneuern ist ein geaenderter
+' Inhalt ein Fehler (die Pruefsumme passt nicht) -- hier ist er gewollt: ein
+' Plugin von einem Zweig (github:nutzer/repo@main) bekommt so den neuen Stand.
+SUB pluginsAktualisieren()
+    IF NOT FILEEXISTS(PATHJOIN(pluginOrdner$(), "paket.json")) THEN
+        GUI_SET_TEXT(lblStatus, tr$("Es gibt keine geholten Plugins."))
+        RETURN
+    END IF
+    pluginHolenStarten(["hole", "--erneuern"])
+END SUB
+
+SUB pluginHolenNachziehen()
+    IF dlgPlugQuelle <> 0 THEN
+        DIM aq AS INTEGER : aq = GUI_ANSWER(dlgPlugQuelle)
+        IF aq <> 0 THEN
+            DIM q AS STRING : q = TRIM$(GUI_DIALOG_TEXT(dlgPlugQuelle))
+            dlgPlugQuelle = 0
+            IF aq = 1 AND q <> "" THEN
+                DIM teile AS ARRAY OF STRING : teile = ["hole"]
+                DIM w AS STRING
+                FOR EACH w IN SPLIT$(q, " ")
+                    IF w <> "" THEN ARRAY_PUSH(teile, w)
+                NEXT
+                pluginHolenStarten(teile)
+            END IF
+        END IF
+    END IF
+    IF plugHolProz < 0 THEN RETURN
+    DIM aus AS STRING : aus = PROCESS_READ$(plugHolProz) + PROCESS_ERR$(plugHolProz)
+    IF aus <> "" THEN
+        DIM zl AS STRING
+        FOR EACH zl IN SPLIT$(aus, NL)
+            IF TRIM$(zl) <> "" THEN ausgabe(TRIM$(REPLACE$(zl, CHR$(13), "")))
+        NEXT
+    END IF
+    IF PROCESS_RUNNING(plugHolProz) THEN RETURN
+    ' Bis zu fuenf leere Abfragen: die letzte Zeile kommt womoeglich nach.
+    DIM leer AS INTEGER : leer = 0
+    WHILE leer < 5
+        DIM rest AS STRING : rest = PROCESS_READ$(plugHolProz) + PROCESS_ERR$(plugHolProz)
+        IF rest = "" THEN
+            leer = leer + 1
+        ELSE
+            ausgabe(TRIM$(REPLACE$(rest, CHR$(13), "")))
+        END IF
+        SLEEP(20)
+    WEND
+    DIM code AS INTEGER : code = PROCESS_CODE(plugHolProz)
+    PROCESS_CLOSE(plugHolProz)
+    plugHolProz = -1
+    protokoll("plugin holen " + STR$(code))
+    pluginsNeuLaden()
+    GUI_SET_TEXT(lblStatus, IIF(code = 0, tr$("Plugins: fertig -- neu geladen."), tr$("Plugins holen fehlgeschlagen -- siehe Ausgabe.")))
+END SUB
+
+SUB pluginsVerwaltenNachziehen()
+    pluginAnlegenNachziehen()
+    pluginHolenNachziehen()
+    IF NOT GUI_WINDOW_SHOWN(winPlug) THEN RETURN
+    IF GUI_CLICKED(btnPlugZu) THEN GUI_WINDOW_VISIBLE(winPlug, FALSE) : RETURN
+    IF GUI_CLICKED(btnPlugNeu) THEN pluginsNeuLaden()
+    IF GUI_CLICKED(btnPlugOrdner) THEN befehl("plugins_ordner")
+    IF GUI_CLICKED(btnPlugAnlegen) THEN befehl("plugin_anlegen")
+    IF GUI_CLICKED(btnPlugHolen) THEN pluginHolenFragen()
+    IF GUI_CLICKED(btnPlugAktuell) THEN pluginsAktualisieren()
+    IF GUI_CLICKED(btnPlugEntfernen) THEN
+        DIM wk AS INTEGER : wk = GUI_LISTBOX_SELECTED(lstPlug)
+        IF wk >= 0 AND wk < LEN(plugins) THEN
+            IF plugins[wk].geholt THEN
+                pluginHolenStarten(["entferne", plugins[wk].name])
+            ELSE
+                GUI_SET_TEXT(lblStatus, tr$("Entfernen geht nur bei geholten Plugins -- eigene liegen im Plugin-Ordner."))
+            END IF
+        END IF
+    END IF
+    DIM k AS INTEGER
+    FOR k = 0 TO MIN(LEN(plugins), GUI_LISTBOX_COUNT(lstPlug)) - 1
+        DIM an AS BOOLEAN : an = GUI_LISTBOX_CHECKED(lstPlug, k)
+        IF an <> pluginGewollt(k) THEN
+            pluginGewolltSetzen(k, an)
+            IF an THEN pluginStarten(k) ELSE pluginStoppen(k, "aus")
+            GUI_LISTBOX_DETAIL(lstPlug, k, plugins[k].zustand)
+        END IF
+    NEXT
+END SUB
+
+SUB paletteEintrag(name AS STRING, kennung AS STRING, kuerzel AS STRING)
+    ARRAY_PUSH(befehle, NEW BefehlEintrag(tr$(name), kennung, kz$(kuerzel)))
+END SUB
+
+paletteEintrag("Neu", "neu", "Strg+N") : paletteEintrag("Öffnen ...", "oeffnen", "Strg+O")
+paletteEintrag("Datei im Projekt öffnen ...", "schnell", "Strg+Umschalt+O")
+paletteEintrag("Sichern", "sichern", "Strg+S") : paletteEintrag("Sichern unter ...", "sichern_unter", "")
+paletteEintrag("Reiter schließen", "schliessen", "Strg+W") : paletteEintrag("Suchen ...", "suchen", "Strg+F")
+paletteEintrag("Weitersuchen", "weiter", "F3") : paletteEintrag("Ersetzen ...", "ersetzen", "Strg+H")
+paletteEintrag("Gehe zu Zeile ...", "zeile", "Strg+G") : paletteEintrag("Im Projekt suchen ...", "projekt", "Strg+Umschalt+F")
+paletteEintrag("TODO / FIXME im Projekt", "todo", "Strg+Umschalt+M")
+paletteEintrag("Vervollständigen", "vervoll", "Strg+Leer") : paletteEintrag("Zur Definition", "definition", "F12")
+paletteEintrag("Kommentar umschalten", "kommentar", "Strg+K") : paletteEintrag("Zeile duplizieren", "duplizieren", "Strg+D")
+paletteEintrag("Zeile löschen", "zeile_weg", "Strg+Umschalt+K")
+paletteEintrag("Zeilen nach oben", "hoch", "Alt+Hoch") : paletteEintrag("Zeilen nach unten", "runter", "Alt+Runter")
+paletteEintrag("Einrücken", "einruecken", "Alt+Rechts") : paletteEintrag("Ausrücken", "ausruecken", "Alt+Links")
+paletteEintrag("Dokument formatieren", "format", "Umschalt+Alt+F")
+paletteEintrag("Lesezeichen setzen/entfernen", "lesezeichen", "Strg+F2") : paletteEintrag("Nächstes Lesezeichen", "lz_weiter", "F2")
+paletteEintrag("Voriges Lesezeichen", "lz_zurueck", "Umschalt+F2")
+paletteEintrag("Alle Lesezeichen", "lz_liste", "Alt+F2")
+paletteEintrag("Suchen mit regulärem Ausdruck", "regex", "")
+paletteEintrag("Suchen: Groß/klein beachten", "gross_klein", "Alt+C")
+paletteEintrag("Suchen: nur ganze Wörter", "ganzes_wort", "Alt+W")
+paletteEintrag("Rückwärts suchen", "zurueck_suchen", "Umschalt+F3")
+paletteEintrag("Ersetzen und weiter", "ersetzen_eins", "Strg+Umschalt+1")
+paletteEintrag("Alle ersetzen", "ersetzen_alle", "Strg+Alt+Enter")
+paletteEintrag("Geschlossenen Reiter wieder öffnen", "wiederauf", "Strg+Umschalt+T")
+paletteEintrag("Starten", "start", "F5") : paletteEintrag("Stoppen", "stopp", "Umschalt+F5") : paletteEintrag("Neu starten", "neustart", "Strg+Umschalt+F5") : paletteEintrag("Prüfen", "pruefen", "Umschalt+F7")
+paletteEintrag("Ganzes Projekt prüfen", "projekt_pruefen", "Strg+Umschalt+F7")
+paletteEintrag("Debuggen", "debug", "F7") : paletteEintrag("Haltepunkt setzen/entfernen", "haltepunkt", "F9")
+paletteEintrag("Bedingter Haltepunkt ...", "bedingung", "Umschalt+F9")
+paletteEintrag("Alle Haltepunkte", "hp_liste", "Strg+Umschalt+F9") : paletteEintrag("Anhalten", "anhalten", "F6") : paletteEintrag("Weiter", "weiter_d", "F8") : paletteEintrag("Schritt drüber", "drueber", "F10")
+paletteEintrag("Schritt hinein", "hinein", "F11") : paletteEintrag("Schritt heraus", "heraus", "Umschalt+F11")
+paletteEintrag("Bis zur Marke laufen", "bis_marke", "Strg+F10")
+paletteEintrag("Profil aufnehmen", "profil", "Strg+Umschalt+Y")
+paletteEintrag("Als eigenständiges Programm exportieren", "export", "Strg+F6")
+paletteEintrag("Umbenennen ...", "umbenennen", "Umschalt+F6")
+paletteEintrag("Schnellkorrektur ...", "korrektur", "Strg+.")
+paletteEintrag("Wer hat das geschrieben (git blame)", "blame", "Strg+Umschalt+B")
+paletteEintrag("Was habe ich geändert (git diff)", "diff", "Strg+Umschalt+D")
+paletteEintrag("Verlauf dieser Datei (git log)", "verlauf", "")
+paletteEintrag("Geänderte Zeilen am Rand", "git_rand", "")
+paletteEintrag("Schnipsel einfügen ...", "schnipsel", "Strg+J")
+paletteEintrag("Einstellungen ...", "einstellungen", "Strg+U")
+paletteEintrag("Eingebaute Befehle nachschlagen ...", "befehle", "Strg+F3")
+' Plugins und das Dock -- hinten, damit "oeffnen" in der Palette zuerst
+' das Oeffnen einer Datei findet.
+paletteEintrag("Plugins verwalten ...", "plugins_verwalten", "") : paletteEintrag("Plugins neu laden", "plugins_neu", "")
+paletteEintrag("Plugin-Ordner öffnen", "plugins_ordner", "") : paletteEintrag("Neues Plugin ...", "plugin_anlegen", "") : paletteEintrag("Leisten zurücksetzen", "leisten_zurueck", "")
+paletteEintrag("Definition hier zeigen", "peek", "Alt+F12")
+paletteEintrag("Symbol im Projekt suchen ...", "symbole", "Strg+Umschalt+S")
+paletteEintrag("Im ganzen Projekt ersetzen ...", "ersetzen_projekt", "Strg+Umschalt+H")
+paletteEintrag("Ausgabe durchsuchen ...", "ausgabe_suchen", "Strg+Umschalt+A")
+paletteEintrag("Marke auf die nächste Fundstelle", "marke_naechste", "Strg+Umschalt+N")
+paletteEintrag("Marke an jedes Zeilenende der Auswahl", "marken_enden", "Strg+Umschalt+I")
+paletteEintrag("Auswahl in ein Unterprogramm herauslösen ...", "herausloesen", "Strg+Umschalt+R")
+paletteEintrag("Auswahl erweitern", "erweitern", "Strg+Umschalt+Hoch")
+paletteEintrag("Auswahl verkleinern", "verkleinern", "Strg+Umschalt+Runter")
+paletteEintrag("Im ganzen Projekt umbenennen ...", "umb_projekt", "Strg+Umschalt+F6")
+paletteEintrag("Parameter umsortieren ...", "parameter", "Strg+Umschalt+U")
+paletteEintrag("Wer ruft das auf?", "aufrufer", "Umschalt+F12")
+paletteEintrag("Alle Fundstellen im Projekt", "fundstellen", "Strg+Umschalt+F12")
+paletteEintrag("Unterprogramm verschieben ...", "verschieben", "Strg+Umschalt+V")
+paletteEintrag("Letzten Umbau zurücknehmen", "umbau_zurueck", "Strg+Umschalt+Z")
+paletteEintrag("Zurückgenommenen Umbau wiederholen", "umbau_wieder", "")
+paletteEintrag("Letzten Umbau nachbessern", "umbau_nach", "Strg+Umschalt+G")
+paletteEintrag("Gerüst beim Tippen", "geruest", "")
+paletteEintrag("Klammern automatisch schließen", "klammern", "")
+paletteEintrag("Beim Sichern formatieren", "format_sichern", "")
+paletteEintrag("Mit einer anderen Datei vergleichen ...", "vergleichen", "")
+paletteEintrag("Zwei Reiter nebeneinander vergleichen", "reiter_vergleich", "")
+paletteEintrag("Zeilen sortieren", "zl_sortieren", "")
+paletteEintrag("Zeilen verbinden", "zl_verbinden", "")
+paletteEintrag("GROSSBUCHSTABEN", "fall_gross", "")
+paletteEintrag("kleinbuchstaben", "fall_klein", "")
+paletteEintrag("Anfangsbuchstaben Groß", "fall_anfang", "")
+paletteEintrag("Klammerpaare farbig", "klammer_farben", "")
+paletteEintrag("Angehakte Suchtreffer ersetzen ...", "treffer_ersetzen", "")
+paletteEintrag("Doppelte Zeilen entfernen", "zl_doppelte", "")
+paletteEintrag("Leerraum am Zeilenende entfernen", "zl_rand", "")
+paletteEintrag("Andere Reiter schließen", "andere_zu", "Strg+Umschalt+W")
+paletteEintrag("Einrückungslinien", "linien", "")
+paletteEintrag("Mitlaufender Blockkopf", "blockkopf", "")
+paletteEintrag("Fehlertext am Zeilenende", "fehler_am_ende", "")
+paletteEintrag("Typ-Hinweise", "typ_hinweise", "")
+paletteEintrag("Parameternamen an Aufrufen", "parameter_namen", "")
+paletteEintrag("Beim Einfügen einrücken", "einfuegen_einruecken", "")
+paletteEintrag("Eigene Farben bearbeiten", "farben_eigen", "")
+paletteEintrag("Zurück zur vorigen Stelle", "nav_zurueck", "Strg+Alt+Links")
+paletteEintrag("Im Projektbaum zeigen", "im_baum_zeigen", "Strg+Alt+B")
+paletteEintrag("Nächstes Problem", "problem_vor", "Alt+F8")
+paletteEintrag("Voriges Problem", "problem_zurueck", "Umschalt+Alt+F8")
+paletteEintrag("Zur letzten Änderung", "letzte_aenderung", "Strg+Umschalt+Rueck")
+paletteEintrag("Mit gesicherter Fassung vergleichen ...", "gesichert_vergleichen", "")
+paletteEintrag("Vorwärts", "nav_vor", "Strg+Alt+Rechts")
+paletteEintrag("Neue Datei im Projekt ...", "baum_neue_datei", "")
+paletteEintrag("Neuer Ordner im Projekt ...", "baum_neuer_ordner", "")
+paletteEintrag("Datei im Projektbaum umbenennen ...", "baum_umbenennen", "")
+paletteEintrag("Datei im Projektbaum löschen ...", "baum_loeschen", "")
+paletteEintrag("Pfad kopieren", "baum_pfad", "")
+paletteEintrag("Ausgabe sichern ...", "ausgabe_sichern", "")
+paletteEintrag("Angezeigte Zeilen der Ausgabe kopieren", "ausgabe_kopieren", "")
+paletteEintrag("Startargumente ...", "start_argumente", "")
+paletteEintrag("Umgebung für den Start ...", "start_umgebung", "")
+paletteEintrag("Beim Sichern neu starten", "neustart_sichern", "")
+paletteEintrag("Profil im Code ein/aus", "profil_waerme", "") : paletteEintrag("Profil im Code entfernen", "profil_waerme_weg", "")
+paletteEintrag("Aufrufzähler über Unterprogrammen", "aufrufzaehler", "")
+paletteEintrag("Quellcodeverwaltung (git)", "git_fenster", "Strg+Alt+G")
+paletteEintrag("Pakete des Projekts", "pakete", "Strg+Alt+P")
+paletteEintrag("Paket holen ...", "paket_holen", "")
+paletteEintrag("Alle Pakete holen", "pakete_holen", "")
+paletteEintrag("Live-Vorschau", "live", "Strg+Alt+L")
+paletteEintrag("Prüfsammlung ausführen", "pruefsammlung", "Strg+Alt+F5")
+paletteEintrag("Diesen Prüffall ausführen", "prueffall", "Strg+Alt+Umschalt+F5")
+paletteEintrag("Prüfsammlungen im Überblick", "test_uebersicht", "Strg+Alt+T")
+paletteEintrag("Neues Projekt aus Vorlage", "neues_projekt", "Strg+Alt+N")
+paletteEintrag("Auswahl als Variable einführen", "einfuehren", "Strg+Alt+V")
+paletteEintrag("Variable einsetzen", "einsetzen", "Strg+Alt+I")
+paletteEintrag("SUB in FUNCTION umwandeln", "sub_function", "Strg+Alt+U")
+paletteEintrag("Konflikt: meine Fassung nehmen", "konflikt_meine", "")
+paletteEintrag("Konflikt: ihre Fassung nehmen", "konflikt_ihre", "")
+paletteEintrag("Konflikt: beide nehmen", "konflikt_beide", "")
+paletteEintrag("Wer hat diese Zeile geschrieben (am Zeilenende)", "blame_zeile", "")
+paletteEintrag("Werkzeugleiste", "leiste", "")
+paletteEintrag("Vorschaubilder neu erzeugen", "vorschau_neu", "")
+paletteEintrag("Gewählte Dateien öffnen", "baum_oeffnen", "Strg+Umschalt+E")
+paletteEintrag("Haken im Projektbaum entfernen", "haken_weg", "") : paletteEintrag("Kästchen im Projektbaum ein/aus", "baum_haken", "")
+paletteEintrag("Marke auf jede Fundstelle des Wortes", "marken", "Strg+Umschalt+L")
+paletteEintrag("Block zuklappen/aufklappen", "falten", "F4")
+paletteEintrag("Alles zuklappen", "falten_alle", "Strg+F4") : paletteEintrag("Alles aufklappen", "falten_auf", "Umschalt+F4")
+paletteEintrag("Geteilte Ansicht", "geteilt", "Alt+G") : paletteEintrag("Übersichtskarte", "minimap", "")
+paletteEintrag("Dieselbe Datei nebeneinander", "spiegel", "Alt+Umschalt+G")
+paletteEintrag("Seitenleiste ein/aus", "seitenleiste", "Alt+1")
+paletteEintrag("Ausgabe leeren", "ausgabe_leeren", "")
+paletteEintrag("Untere Leiste ein/aus", "untere_leiste", "Alt+2")
+paletteEintrag("Zeilenumbruch", "umbruch", "Alt+Z")
+paletteEintrag("Helles Thema", "thema", "") : paletteEintrag("Vollbild", "vollbild", "Alt+Enter")
+paletteEintrag("Schrift größer", "groesser", "Strg+Plus") : paletteEintrag("Schrift kleiner", "kleiner", "Strg+Minus")
+paletteEintrag("Schrift normal", "schrift_normal", "Strg+0")
+paletteEintrag("Über ...", "ueber", "") : paletteEintrag("Beenden", "beenden", "Strg+Q")
+paletteEintrag("Handbuch: gesetzt oder Quelltext", "hb_ansicht", "")
+paletteEintrag("Handbuch", "handbuch", "F1") : paletteEintrag("Tastenkürzel", "kuerzel", "Strg+F1")
+paletteEintrag("Formular als Text öffnen", "form_text", "")
+paletteEintrag("Listing drucken ...", "drucken", "Strg+P")
+paletteEintrag("Listing als PDF neben die Quelle", "pdf", "")
+paletteEintrag("Werkzeug: SFX-Generator", "wz_sfx", "") : paletteEintrag("Werkzeug: Partikel-Editor", "wz_partikel", "")
+paletteEintrag("Werkzeug: Tilemap-Editor", "wz_tilemap", "") : paletteEintrag("Werkzeug: Sprite-Editor", "wz_sprite", "")
+paletteEintrag("Werkzeug: Tracker", "wz_tracker", "") : paletteEintrag("Werkzeug: Form-Designer", "wz_form", "") : paletteEintrag("Werkzeug: Anim-FSM-Editor", "wz_anim", "") : paletteEintrag("Werkzeug: Notenblatt", "wz_noten", "") : paletteEintrag("Werkzeug: Klassendiagramm", "wz_klassen", "") : paletteEintrag("Werkzeug: Drachenhauch Studio", "wz_studio", "") : paletteEintrag("Werkzeug: Bastelzentrale", "wz_bastel", "") : paletteEintrag("Beispiele als Projekt öffnen", "beispiele", "") : paletteEintrag("Beispiele nach Themen ...", "beispiele_themen", "")
+paletteEintrag("Ausdruck im Debugger auswerten", "ausdruck", "Strg+E")
+paletteEintrag("Eigene Schnipsel bearbeiten", "schnipsel_eigen", "") : paletteEintrag("Auswahl als Schnipsel sichern ...", "schnipsel_auswahl", "")
+paletteEintrag("Tastenkürzel ändern ...", "tasten", "") : paletteEintrag("Tastenkürzel zurücksetzen", "tasten_zurueck", "")
+paletteEintrag("Sprache der Oberfläche: Deutsch/English", "sprache", "") : paletteEintrag("Terminal ein/aus", "terminal", "Alt+3") : paletteEintrag("Terminal: laufenden Befehl abbrechen", "terminal_stopp", "") : paletteEintrag("Serieller Monitor", "seriell", "Alt+4") : paletteEintrag("Serieller Monitor: verbinden/trennen", "seriell_verbinden", "")
+
+' Unscharfer Filter: der Text als Teil ODER seine Zeichen der Reihe nach
+' ("spred" findet "189_sprite_editor.dh").
+' Wer "oeffnen" tippt, meint "öffnen" -- beide Seiten ohne Umlaute
+' vergleichen, dann trifft jede Schreibweise.
+FUNCTION ohneUmlaute$(s AS STRING) AS STRING
+    DIM r AS STRING : r = LOWER$(s)
+    r = REPLACE$(r, "ä", "ae") : r = REPLACE$(r, "ö", "oe") : r = REPLACE$(r, "ü", "ue")
+    r = REPLACE$(r, "Ä", "ae") : r = REPLACE$(r, "Ö", "oe") : r = REPLACE$(r, "Ü", "ue")
+    RETURN REPLACE$(r, "ß", "ss")
+END FUNCTION
+
+FUNCTION passtUnscharf(name AS STRING, roh AS STRING) AS BOOLEAN
+    IF roh = "" THEN RETURN TRUE
+    DIM filter AS STRING : filter = ohneUmlaute$(roh)
+    DIM n AS STRING : n = ohneUmlaute$(name)
+    IF INSTR(n, filter) >= 0 THEN RETURN TRUE
+    DIM k AS INTEGER : k = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(n) - 1
+        IF MID$(n, i, 1) = MID$(filter, k, 1) THEN k = k + 1
+        IF k >= LEN(filter) THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+SUB paletteFuellen(filter AS STRING)
+    GUI_LISTBOX_CLEAR(lstPalette)
+    DIM sichtbar AS ARRAY OF STRING : sichtbar = []
+    DIM klein AS STRING : klein = LOWER$(filter)
+    ' Zwei Durchgaenge: erst was den Text am Stueck enthaelt, dann was ihn nur
+    ' Buchstabe fuer Buchstabe hat. Sonst gewann "Profil im Code entfernen"
+    ' vor "Listing als PDF", wer "pdf" tippte -- nur weil es weiter oben steht.
+    DIM i AS INTEGER
+    DIM gang AS INTEGER
+    DIM ff AS STRING : ff = ohneUmlaute$(klein)
+    ' Die Namen ohne Umlaute einmal je Oeffnen statt je Tastendruck und
+    ' Durchgang, und "Buchstabe fuer Buchstabe" als Ausdruck (a.*b.*c) statt
+    ' einer MID$-Schleife: bei 20000 Dateien hakte jeder Tastendruck
+    ' (Stresstest 2026-10-02). Dieselbe Frage wie passtUnscharf.
+    FOR i = 0 TO LEN(waehlerListe) - 1
+        IF waehlerListe[i].norm = "" THEN waehlerListe[i].norm = ohneUmlaute$(waehlerListe[i].name + " " + waehlerListe[i].detail)
+    NEXT
+    DIM muster AS STRING : muster = "(?s)"
+    FOR i = 0 TO LEN(ff) - 1
+        IF i > 0 THEN muster = muster + ".*"
+        muster = muster + REGEX_ESCAPE$(MID$(ff, i, 1))
+    NEXT
+    FOR gang = 1 TO 2
+        FOR i = 0 TO LEN(waehlerListe) - 1
+            DIM amStueck AS BOOLEAN : amStueck = INSTR(waehlerListe[i].norm, ff) >= 0
+            IF (gang = 1 AND amStueck) OR (gang = 2 AND NOT amStueck AND REGEX_TEST(waehlerListe[i].norm, muster)) THEN
+                DIM pz AS INTEGER : pz = GUI_LISTBOX_ADD(lstPalette, waehlerListe[i].name)
+                IF waehlerListe[i].detail <> "" THEN GUI_LISTBOX_DETAIL(lstPalette, pz, waehlerListe[i].detail)
+                ARRAY_PUSH(sichtbar, waehlerListe[i].kennung)
+            END IF
+        NEXT
+    NEXT
+    paletteSichtbar = sichtbar
+    IF LEN(sichtbar) > 0 THEN GUI_LISTBOX_SET_SELECTED(lstPalette, 0)
+END SUB
+
+SUB waehlerOeffnen(art AS STRING, titel AS STRING)
+    paletteArt = art
+    GUI_WINDOW_TITLE(winPalette, titel)
+    GUI_SET_TEXT(tfPalette, "")
+    paletteLetzterFilter = "-"
+    GUI_WINDOW_SET_BOUNDS(winPalette, (schirmB() - 440) \ 2, 80, 440, 340)
+    GUI_WINDOW_VISIBLE(winPalette, TRUE)
+    paletteOffen = TRUE
+    GUI_FOCUS(tfPalette)
+END SUB
+
+SUB paletteOeffnen()
+    waehlerListe = []
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(befehle) - 1
+        DIM n AS STRING : n = befehle[i].name
+        waehlerDazu(n, befehle[i].kennung, befehle[i].kuerzel)
+    NEXT
+    waehlerOeffnen("befehl", tr$("Befehle"))
+END SUB
+
+' Strg+Umschalt+O: die .dh des Projektordners und die zuletzt geoeffneten.
+SUB schnellOeffnen()
+    waehlerListe = []
+    DIM d AS STRING
+    FOR EACH d IN projektDateien("*.dh", TRUE)
+        waehlerDazu(d, PATHJOIN(projektOrdner, d), "")
+    NEXT
+    FOR EACH d IN zuletzt
+        IF waehlerNr(d) < 0 THEN
+            waehlerDazu(BASENAME(d), d, DIRNAME(d))
+        END IF
+    NEXT
+    waehlerOeffnen("datei", tr$("Datei öffnen: ") + BASENAME(projektOrdner))
+END SUB
+
+SUB paletteSchliessen()
+    GUI_WINDOW_VISIBLE(winPalette, FALSE)
+    paletteOffen = FALSE
+    GUI_FOCUS(aktivesFeld())
+END SUB
+
+SUB paletteAusfuehren()
+    DIM sel AS INTEGER : sel = GUI_LISTBOX_SELECTED(lstPalette)
+    IF sel < 0 AND LEN(paletteSichtbar) > 0 THEN sel = 0
+    paletteSchliessen()
+    IF sel < 0 OR sel >= LEN(paletteSichtbar) THEN RETURN
+    IF paletteArt = "schnipsel" THEN
+        schnipselEinfuegen(INT(VAL(paletteSichtbar[sel])))
+    ELSEIF paletteArt = "symbol" THEN
+        symbolAnspringen(INT(VAL(paletteSichtbar[sel])))
+    ELSEIF paletteArt = "verschieben" THEN
+        IF paletteSichtbar[sel] = "*neu*" THEN
+            dlgVerschNeu = GUI_PROMPT(tr$("Neue Datei"), tr$("Wie soll sie heißen?"), "helfer.dh")
+        ELSE
+            verschiebenNach(paletteSichtbar[sel])
+        END IF
+    ELSEIF paletteArt = "tasten" THEN
+        tastenFragen(paletteSichtbar[sel])
+    ELSEIF paletteArt = "korrektur" THEN
+        korrekturAnwenden(paletteSichtbar[sel])
+    ELSEIF paletteArt = "datei" THEN
+        protokoll("schnell " + paletteSichtbar[sel])
+        dateiOeffnen(paletteSichtbar[sel])
+    ELSE
+        protokoll("palette " + paletteSichtbar[sel])
+        befehl(paletteSichtbar[sel])
+    END IF
+END SUB
+
+SUB eingabeSenden()
+    DIM t AS STRING : t = GUI_TEXT(tfEingabe)
+    IF terminalAn THEN
+        terminalEingabe(t)
+        RETURN
+    END IF
+    IF prozess < 0 THEN
+        GUI_SET_TEXT(lblStatus, tr$("Kein Programm läuft."))
+        RETURN
+    END IF
+    IF prozessArt = "debug" THEN
+        ' Wartet das Programm in einem INPUT, geht die Zeile dorthin.
+        IF debugEingabe THEN
+            PROCESS_WRITE(prozess, "{" + jsonText$("cmd") + ":" + jsonText$("input") + "," + jsonText$("text") + ":" + jsonText$(t) + "}" + NL)
+            debugEingabe = FALSE
+            ausgabe("> " + t)
+            GUI_SET_TEXT(tfEingabe, "")
+            GUI_SET_TEXT(lblDebug, tr$("Debugger: läuft ..."))
+            protokoll("debug eingabe gesendet")
+            RETURN
+        END IF
+        ' Im Halt ist die Eingabezeile die Ausdruck-Auswertung.
+        IF NOT debugPause THEN GUI_SET_TEXT(lblStatus, tr$("Der Debugger steht gerade nicht.")) : RETURN
+        PROCESS_WRITE(prozess, "{" + jsonText$("cmd") + ":" + jsonText$("eval") + "," + jsonText$("expr") + ":" + jsonText$(t) + "}" + NL)
+        ausgabe("? " + t)
+        GUI_SET_TEXT(tfEingabe, "")
+        RETURN
+    END IF
+    PROCESS_WRITE(prozess, t + NL)
+    ausgabe("> " + t)
+    GUI_SET_TEXT(tfEingabe, "")
+END SUB

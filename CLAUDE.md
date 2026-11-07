@@ -30,7 +30,9 @@ rust/drachenhauch_runtime/   # die Runtime dhrt (Rust/raylib/Kira)
 rust/build_runtime.py        # Bau der Runtime (Python 3, nur Standardbibliothek)
 rust/build_wasm.py           # Bau fuer den Browser (dito)
 daten/                       # builtin_index/docs/prosa.json, meldungen.en.txt (eingebettet), bilder/, schriften/
-ide/ide.dh                   # die IDE, in Drachenhauch; ide/sprache/en.txt = englische Oberflaeche
+ide/ide.dh                   # die IDE, in Drachenhauch: Zustand, Fenster, Hauptschleife
+  teile/*.dh                 # ihre Unterprogramme nach Themen (per IMPORT an Ort und Stelle)
+  sprache/en.txt             # englische Oberflaeche
 studio/                      # Drachenhauch Studio (Xojo-artige IDE)
 examples/*.dh                # Demos; 183..199 die Werkzeuge; Unterordner = groessere Programme
 installer/                   # bauen.dh, paket.dh, Drachenhauch-IDE.iss, lizenzen.dh, posix/, symbole/
@@ -135,8 +137,10 @@ Einheitsmatrix, `VEC2` = Nullvektor; `model::neutrales_element`).
 
 ## Sprache: was man wissen muss
 
-- **Namen ohne Groß/klein.** Eine lokale `n` verdeckt `CONST N`, ein Feld
-  `voll` die Konstante `VOLL` (`--check` warnt). Vorbelegte Namen (`red`, `pi`,
+- **Namen ohne Groß/klein.** Eine lokale `n` verdeckt `CONST N`, ebenso ein
+  Parameter oder ein Feld `voll` die Konstante `VOLL`. `--check` warnt (bei
+  Parametern und Feldern nur, wenn der Name im Block auch anders geschrieben
+  vorkommt, `lsp::verdeckung_filtern`); Strg+. benennt die Variable um. Vorbelegte Namen (`red`, `pi`,
   `KEY_*`) dürfen als Variable verschattet werden; eine Variable darf heißen wie
   ein Builtin, `LEN(s)` meint dann trotzdem den Builtin.
 - **`MID$`/`INSTR`/`INSTRREV` zählen ab 0**, nicht gefunden = -1.
@@ -267,7 +271,11 @@ Einzelheiten stehen in der Geschichte des Bereichs.
 - Kreuz und ESC: `WINDOW_CLOSE_REQUESTED()` fragt bei Ungesichertem nach;
   `QUITREQUESTED()` ohne Kreuz ist das Bildlimit eines Testlaufs.
 - Die Kopien der Werkzeuge in Prüfungen laufen in `_programm/` -- Ordner mit
-  `_` übergeht die IDE beim Durchsuchen.
+  `_` übergeht die IDE beim Durchsuchen. `--- programm` kopiert per
+  `IMPORT "x.dh"` eingebundene Dateien mit, aber `--- einschub nach`,
+  `--- ersetzen` und `--- streichen` wirken nur auf die Hauptdatei: Marken,
+  an denen Tests der IDE ansetzen, gehören nach `ide/ide.dh`, nicht in
+  `ide/teile/`.
 
 **Plattformen und Pakete**
 - Unter macOS ist dhrt selbst das Hauptprogramm des Bundles (`appstart.rs`),

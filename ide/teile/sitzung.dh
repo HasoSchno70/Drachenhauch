@@ -1,0 +1,472 @@
+' ide/teile/sitzung.dh -- ein Teil der IDE (ide/ide.dh), dort per IMPORT
+' an genau dieser Stelle eingebunden: Einstellungen, Sitzung, zuletzt geoeffnete Dateien.
+' Kein eigenes Programm -- die Namen gehoeren der IDE.
+
+' --- Einstellungen, Sitzung, zuletzt geoeffnet -----------------------
+SUB konfigSichern()
+    ' Die Anordnung der Leisten (wo, wie gross, welcher Reiter vorn).
+    TRY
+        JSON_SET_JSON(konfig, "dock", JSON_PARSE(GUI_DOCK_STATE$(win)))
+    CATCH dockFehler
+    END TRY
+    JSON_SET_BOOL(konfig, "hell", hell)
+    JSON_SET_INT(konfig, "schrift", codeGroesse)
+    JSON_SET_INT(konfig, "listen_schrift", listenGroesse)
+    JSON_SET_INT(konfig, "handbuch_schrift", handbuchGroesse)
+    JSON_SET_BOOL(konfig, "umbruch", umbruchAn)
+    JSON_SET_BOOL(konfig, "karte", minimapAn)
+    JSON_SET_BOOL(konfig, "git_rand", gitRandAn)
+    JSON_SET_BOOL(konfig, "regex", regexAn)
+    JSON_SET_BOOL(konfig, "gross_klein", grossKlein)
+    JSON_SET_BOOL(konfig, "ganzes_wort", ganzesWort)
+    JSON_SET_BOOL(konfig, "vorschlag", vorschlagAn)
+    JSON_SET_BOOL(konfig, "linien", linienAn)
+    JSON_SET_BOOL(konfig, "blockkopf", kopfAn)
+    JSON_SET_BOOL(konfig, "klammer_farben", klammerFarbenAn)
+    JSON_SET_BOOL(konfig, "profil_waerme", waermeAn)
+    JSON_SET_BOOL(konfig, "aufrufzaehler", zaehlerAn)
+    JSON_SET_BOOL(konfig, "fehler_am_ende", fehlerEndeAn)
+    JSON_SET_BOOL(konfig, "typ_hinweise", typHinweiseAn)
+    JSON_SET_BOOL(konfig, "parameter_namen", paramNamenAn)
+    JSON_SET_BOOL(konfig, "einfuegen_einruecken", einfuegenEinrueckenAn)
+    JSON_SET_BOOL(konfig, "neustart_beim_sichern", neustartSichernAn)
+    JSON_SET_JSON(konfig, "start", JSON_PARSE("[]"))
+    DIM sti AS INTEGER
+    FOR sti = 0 TO LEN(startListe) - 1
+        DIM stE AS JSON_HANDLE : stE = JSON_NEW_OBJECT()
+        JSON_SET_STRING(stE, "datei", startListe[sti].datei)
+        JSON_SET_STRING(stE, "argumente", startListe[sti].argumente)
+        JSON_SET_STRING(stE, "umgebung", startListe[sti].umgebung)
+        JSON_APPEND_JSON(konfig, "start", stE)
+    NEXT
+    JSON_SET_BOOL(konfig, "geruest", geruestAn)
+    JSON_SET_BOOL(konfig, "klammern", klammernAn)
+    JSON_SET_BOOL(konfig, "vorspann", vorspannAn)
+    JSON_SET_STRING(konfig, "vorspann_datei", vorspannDatei)
+    JSON_SET_BOOL(konfig, "glanz", glanzAn)
+    JSON_SET_BOOL(konfig, "wasserzeichen", wasserzeichenAn)
+    JSON_SET_INT(konfig, "ui_schrift", uiGroesse)
+    JSON_SET_FLOAT(konfig, "massstab", massEinst)
+    JSON_SET_BOOL(konfig, "baum_haken", baumHakenAn)
+    JSON_SET_BOOL(konfig, "format_sichern", formatSichernAn)
+    JSON_SET_BOOL(konfig, "umbau_vorschau", vorschauAn)
+    JSON_SET_BOOL(konfig, "leiste", leisteAn)
+    JSON_SET_BOOL(konfig, "seitenleiste", seitenAn)
+    JSON_SET_BOOL(konfig, "untere_leiste", untenAn)
+    JSON_SET_INT(konfig, "druck_groesse", druckGroesse)
+    JSON_SET_INT(konfig, "druck_rand", druckRand)
+    JSON_SET_BOOL(konfig, "druck_nummern", druckNummern)
+    JSON_SET_INT(konfig, "autosichern", autoSichern)
+    JSON_SET_JSON(konfig, "zuletzt", JSON_PARSE("[]"))
+    DIM p AS STRING
+    FOR EACH p IN zuletzt
+        JSON_APPEND_STRING(konfig, "zuletzt", p)
+    NEXT
+    JSON_SET_JSON(konfig, "sitzung", JSON_PARSE("[]"))
+    DIM i AS INTEGER
+    FOR i = 0 TO tabAnzahl - 1
+        IF reiter[i].pfad <> "" THEN JSON_APPEND_STRING(konfig, "sitzung", reiter[i].pfad)
+        faltenMerken(i)
+    NEXT
+    ' Haltepunkte und Lesezeichen ueberleben den Neustart (bis 2026-09-27
+    ' musste man sie nach jedem Start neu setzen).
+    JSON_SET_JSON(konfig, "haltepunkte", JSON_NEW_ARRAY())
+    DIM hk AS INTEGER
+    FOR hk = 0 TO LEN(haltepunkte) - 1
+        DIM hpE AS JSON_HANDLE : hpE = JSON_NEW_OBJECT()
+        JSON_SET_STRING(hpE, "datei", haltepunkte[hk].datei)
+        JSON_SET_INT(hpE, "zeile", haltepunkte[hk].zeile)
+        IF haltepunkte[hk].bedingung <> "" THEN JSON_SET_STRING(hpE, "bedingung", haltepunkte[hk].bedingung)
+        IF NOT hpIstAktiv(hk) THEN JSON_SET_BOOL(hpE, "aktiv", FALSE)
+        IF hpTreffer$(hk) <> "" THEN JSON_SET_STRING(hpE, "treffer", hpTreffer$(hk))
+        IF hpLog$(hk) <> "" THEN JSON_SET_STRING(hpE, "log", hpLog$(hk))
+        JSON_APPEND_JSON(konfig, "haltepunkte", hpE)
+    NEXT
+    JSON_SET_JSON(konfig, "lesezeichen", JSON_NEW_ARRAY())
+    FOR hk = 0 TO LEN(lesezeichen) - 1
+        DIM lzE AS JSON_HANDLE : lzE = JSON_NEW_OBJECT()
+        JSON_SET_STRING(lzE, "datei", lesezeichen[hk].pfad)
+        JSON_SET_INT(lzE, "zeile", lesezeichen[hk].zeile)
+        JSON_APPEND_JSON(konfig, "lesezeichen", lzE)
+    NEXT
+    JSON_SET_JSON(konfig, "falten_pfade", JSON_PARSE("[]"))
+    JSON_SET_JSON(konfig, "falten_zeilen", JSON_PARSE("[]"))
+    DIM fi AS INTEGER
+    FOR fi = 0 TO LEN(faltungen) - 1
+        JSON_APPEND_STRING(konfig, "falten_pfade", faltungen[fi].pfad)
+        JSON_APPEND_STRING(konfig, "falten_zeilen", faltungen[fi].zeilen)
+    NEXT
+    JSON_SET_INT(konfig, "aktiv", aktiverTab)
+    ' Dieselbe Sitzung noch einmal unter dem PROJEKTordner: wer an zwei
+    ' Sachen arbeitet, will beim Wechsel nicht die Reiter der anderen
+    ' wiederfinden. Der laufende Ordner kommt nach vorn, alte fallen hinten
+    ' heraus -- eine Datei, die jeden je besuchten Ordner behaelt, waechst
+    ' fuer immer.
+    DIM offen AS ARRAY OF STRING : offen = []
+    DIM pi AS INTEGER
+    FOR pi = 0 TO tabAnzahl - 1
+        IF reiter[pi].pfad <> "" THEN ARRAY_PUSH(offen, reiter[pi].pfad)
+    NEXT
+    DIM alt AS INTEGER : alt = projektNr(projektOrdner)
+    IF alt >= 0 THEN ARRAY_REMOVE_AT(projekte, alt)
+    ARRAY_INSERT(projekte, 0, NEW ProjektSitzung(projektOrdner, JOIN$(offen, "|"), aktiverTab))
+    WHILE LEN(projekte) > PROJEKTE_MAX
+        ARRAY_POP(projekte)
+    WEND
+    JSON_SET_JSON(konfig, "projekte", JSON_NEW_ARRAY())
+    DIM pk AS INTEGER
+    FOR pk = 0 TO LEN(projekte) - 1
+        DIM e AS JSON_HANDLE : e = JSON_NEW_OBJECT()
+        JSON_SET_STRING(e, "ordner", projekte[pk].ordner)
+        JSON_SET_INT(e, "aktiv", projekte[pk].aktiv)
+        JSON_SET_JSON(e, "sitzung", JSON_NEW_ARRAY())
+        DIM sp AS STRING
+        IF projekte[pk].dateien <> "" THEN
+            FOR EACH sp IN SPLIT$(projekte[pk].dateien, "|")
+                JSON_APPEND_STRING(e, "sitzung", sp)
+            NEXT
+        END IF
+        JSON_APPEND_JSON(konfig, "projekte", e)
+    NEXT
+    TRY
+        MKDIR(DIRNAME(konfigPfad))
+        WRITEALL(konfigPfad, JSON_STRINGIFY(konfig))
+    CATCH e
+        ' ein schreibgeschuetztes Profil ist kein Grund, die Arbeit zu stoeren
+    END TRY
+END SUB
+
+' Ein Eintrag der Liste: Name, dahinter der Ordner -- unter Windows mit
+' Rueckstrichen. Die Liste sammelt Wege aus dem Dialog (`\`), aus PATHJOIN
+' (`/`) und von der Kommandozeile; gemischt sah dieselbe Ablage nach zwei
+' verschiedenen aus.
+FUNCTION zuletztText$(pfad AS STRING) AS STRING
+    DIM ordner AS STRING : ordner = DIRNAME(pfad)
+    IF MID$(ordner, 1, 1) = ":" THEN ordner = REPLACE$(ordner, "/", CHR$(92))
+    RETURN BASENAME(pfad) + "   (" + ordner + ")"
+END FUNCTION
+
+SUB zuletztAnzeigen()
+    DIM k AS INTEGER
+    FOR k = 0 TO ZULETZT_MAX - 1
+        IF k < LEN(zuletzt) THEN
+            GUI_MENU_TEXT(miZuletzt[k], zuletztText$(zuletzt[k]))
+            GUI_MENU_ENABLE(miZuletzt[k], TRUE)
+        ELSE
+            GUI_MENU_TEXT(miZuletzt[k], "-")
+            GUI_MENU_ENABLE(miZuletzt[k], FALSE)
+        END IF
+    NEXT
+    GUI_LISTBOX_CLEAR(lstWkZuletzt)
+    FOR k = 0 TO LEN(zuletzt) - 1
+        GUI_LISTBOX_ADD(lstWkZuletzt, zuletztText$(zuletzt[k]))
+    NEXT
+END SUB
+
+SUB zuletztMerken(pfad AS STRING)
+    IF pfad = "" THEN RETURN
+    DIM k AS INTEGER : k = ARRAY_INDEXOF(zuletzt, pfad)
+    IF k >= 0 THEN ARRAY_REMOVE_AT(zuletzt, k)
+    ARRAY_INSERT(zuletzt, 0, pfad)
+    WHILE LEN(zuletzt) > ZULETZT_MAX : ARRAY_REMOVE_AT(zuletzt, LEN(zuletzt) - 1) : WEND
+    zuletztAnzeigen()
+    konfigSichern()
+END SUB
+
+SUB schriftSetzen(groesse AS INTEGER)
+    codeGroesse = MAX(10, MIN(32, groesse))
+    DIM i AS INTEGER
+    FOR i = 0 TO tabAnzahl - 1
+        GUI_SET_FONT_SIZE(reiter[i].feld, codeGroesse)
+    NEXT
+    GUI_SET_TEXT(lblStatus, tr$("Schrift: ") + STR$(codeGroesse) + tr$(" px"))
+    ' Das Drehfeld der Einstellungen mitziehen -- sind sie offen, setzte es
+    ' die Schrift sonst im naechsten Bild auf seinen alten Wert zurueck.
+    GUI_SET_VALUE(spSchrift, codeGroesse)
+    protokoll("schrift " + STR$(codeGroesse))
+    konfigSichern()
+END SUB
+
+SUB listenSchrift(groesse AS INTEGER)
+    listenGroesse = MAX(10, MIN(32, groesse))
+    GUI_SET_FONT_SIZE(lstGliederung, listenGroesse)
+    GUI_SET_FONT_SIZE(lstAusgabe, listenGroesse)
+    GUI_SET_FONT_SIZE(lstTerminal, listenGroesse)
+    GUI_SET_FONT_SIZE(lstProbleme, listenGroesse)
+    protokoll("listenschrift " + STR$(listenGroesse))
+END SUB
+
+SUB handbuchSchrift(groesse AS INTEGER)
+    handbuchGroesse = MAX(10, MIN(32, groesse))
+    GUI_SET_FONT_SIZE(rtHandbuch, handbuchGroesse)
+    GUI_SET_FONT_SIZE(taHandbuch, handbuchGroesse)
+    protokoll("handbuchschrift " + STR$(handbuchGroesse))
+END SUB
+
+' Strg+Rad zoomt die Code-Felder, ein Punkt je Schritt -- ueberall im
+' Fenster, nicht nur ueber dem Code: wer zoomt, sieht auf den Text, nicht
+' auf die Maus. Die gui rollt mit gedrueckter Strg-Taste nichts (die
+' Laufzeit laesst das Rad dann dem Programm), der Inhalt springt also nicht.
+SUB radZoom()
+    IF NOT (KEYPRESSED(KEY_LCTRL) OR KEYPRESSED(KEY_RCTRL)) THEN RETURN
+    DIM r AS FLOAT : r = MOUSEWHEEL_Y()
+    IF r > 0 THEN schriftSetzen(codeGroesse + 1)
+    IF r < 0 THEN schriftSetzen(codeGroesse - 1)
+END SUB
+
+SUB debugPanelZeigen(an AS BOOLEAN)
+    debugSichtbar = an
+    ' Der Reiter "Debugger" steht neben "Probleme" und ist nur da, solange
+    ' der Debugger laeuft; er kommt dabei nach vorn. Bei ausgeblendeter
+    ' unterer Leiste bleibt sie aus.
+    GUI_DOCK_SHOW(win, "debugger", an)
+    IF NOT an THEN GUI_DOCK_ACTIVATE(win, "probleme")
+    GUI_DOCK_AREA(win, "unten", untenAn)
+END SUB
+
+' Die Inhalte der Leisten in ihre Rechtecke (GUI_DOCK_RECT). Eine Leiste,
+' die gerade nicht zu sehen ist, hat ein leeres Rechteck -- ihre Widgets
+' blendet das Dock ohnehin aus. Was im Kopf neben den Reitern steht (Filter,
+' Zaehler, Abbrechen), kommt in dessen freien Teil (GUI_DOCK_HEAD_RECT).
+SUB layoutLeisten()
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    DIM b AS INTEGER
+    DIM h AS INTEGER
+    DIM kx AS INTEGER
+    DIM ky AS INTEGER
+    DIM kb AS INTEGER
+    DIM kh AS INTEGER
+    GUI_DOCK_TITLE(win, "projekt", GUI_TEXT(lblProjekt))
+    GUI_DOCK_TITLE(win, "gliederung", GUI_TEXT(lblGliederung))
+    (x, y, b, h) = GUI_DOCK_RECT(win, "projekt")
+    IF b > 0 THEN
+        GUI_SET_BOUNDS(baum, x, y, b, h)
+        (kx, ky, kb, kh) = GUI_DOCK_HEAD_RECT(win, "projekt")
+        GUI_SET_VISIBLE(tfBaumFilter, kb >= 60)
+        GUI_SET_BOUNDS(tfBaumFilter, kx + 4, ky, MAX(40, kb - 4), kh)
+    END IF
+    (x, y, b, h) = GUI_DOCK_RECT(win, "gliederung")
+    IF b > 0 THEN GUI_SET_BOUNDS(lstGliederung, x, y, b, h)
+    (x, y, b, h) = GUI_DOCK_RECT(win, "ausgabe")
+    IF b > 0 THEN
+        GUI_SET_BOUNDS(lstAusgabe, x, y, b, h)
+        (kx, ky, kb, kh) = GUI_DOCK_HEAD_RECT(win, "ausgabe")
+        GUI_SET_BOUNDS(lblAusgabe, kx + 8, ky + 2, MAX(40, kb - 196), 18)
+        GUI_SET_BOUNDS(tfAusgabeFilter, kx + kb - 180, ky, 180, kh)
+        GUI_SET_VISIBLE(tfAusgabeFilter, kb >= 220)
+    END IF
+    (x, y, b, h) = GUI_DOCK_RECT(win, "terminal")
+    IF b > 0 THEN
+        GUI_SET_BOUNDS(lstTerminal, x, y, b, h)
+        (kx, ky, kb, kh) = GUI_DOCK_HEAD_RECT(win, "terminal")
+        GUI_SET_BOUNDS(btnTermStopp, kx + kb - 90, ky + 1, 90, kh - 2)
+    END IF
+    GUI_SET_VISIBLE(btnTermStopp, termProz >= 0)
+    (x, y, b, h) = GUI_DOCK_RECT(win, "seriell")
+    IF b > 0 THEN
+        (kx, ky, kb, kh) = GUI_DOCK_HEAD_RECT(win, "seriell")
+        DIM sx AS INTEGER : sx = kx + 4
+        GUI_SET_BOUNDS(ddSerPort, sx, ky, 170, kh) : sx = sx + 176
+        GUI_SET_BOUNDS(ddSerBaud, sx, ky, 96, kh) : sx = sx + 102
+        GUI_SET_BOUNDS(btnSerVerbinden, sx, ky + 1, 96, kh - 2) : sx = sx + 108
+        GUI_SET_BOUNDS(chkSerKurve, sx, ky + 2, 80, kh - 4) : sx = sx + 84
+        GUI_SET_BOUNDS(chkSerZeit, sx, ky + 2, 70, kh - 4) : sx = sx + 74
+        GUI_SET_BOUNDS(btnSerLeeren, sx, ky + 1, 70, kh - 2)
+        DIM sh AS INTEGER : sh = MAX(10, h - 28)
+        DIM kurveZeigen AS BOOLEAN : kurveZeigen = GUI_CHECKED(chkSerKurve) AND b >= 360
+        DIM lb AS INTEGER : lb = IIF(kurveZeigen, b * 45 \ 100, b)
+        GUI_SET_BOUNDS(lstSeriell, x, y, lb, sh)
+        GUI_SET_BOUNDS(imgSeriell, x + lb + 6, y, MAX(10, b - lb - 6), sh)
+        GUI_SET_VISIBLE(imgSeriell, kurveZeigen)
+        GUI_SET_BOUNDS(tfSeriell, x, y + sh + 4, MAX(40, b - 136), 22)
+        GUI_SET_BOUNDS(ddSerEnde, x + b - 130, y + sh + 4, 130, 22)
+    END IF
+    (x, y, b, h) = GUI_DOCK_RECT(win, "probleme")
+    IF b > 0 THEN
+        GUI_SET_BOUNDS(lstProbleme, x, y, b, h \ 2 - 4)
+        GUI_SET_BOUNDS(lblHilfeKopf, x, y + h \ 2, b, 18)
+        GUI_SET_BOUNDS(lblHilfe, x, y + h \ 2 + 22, b, h \ 2 - 22)
+        GUI_SET_WRAP(lblHilfe, MAX(40, b - 8))
+        (kx, ky, kb, kh) = GUI_DOCK_HEAD_RECT(win, "probleme")
+        GUI_SET_BOUNDS(lblProbleme, kx + 8, ky + 2, MAX(40, kb - 8), 18)
+    END IF
+    (x, y, b, h) = GUI_DOCK_RECT(win, "debugger")
+    IF b > 0 THEN
+        (kx, ky, kb, kh) = GUI_DOCK_HEAD_RECT(win, "debugger")
+        GUI_SET_BOUNDS(lblDebug, kx + 8, ky + 2, MAX(40, kb - 8), 18)
+        GUI_SET_BOUNDS(btnWeiter, x, y, 100, 26)
+        GUI_SET_BOUNDS(btnDrueber, x + 106, y, 108, 26)
+        GUI_SET_BOUNDS(btnHinein, x + 220, y, 104, 26)
+        GUI_SET_BOUNDS(btnHeraus, x + 330, y, 70, 26)
+        GUI_SET_BOUNDS(btnStoppD, x + 406, y, 60, 26)
+        GUI_SET_BOUNDS(btnBisMarke, x + 472, y, 84, 26)
+        ' Variablen links, Stapel und Ueberwachen rechts uebereinander.
+        DIM vw AS INTEGER : vw = (b * 55) \ 100
+        DIM hh AS INTEGER : hh = MAX(60, h - 32)
+        GUI_SET_BOUNDS(tblVars, x, y + 32, vw, hh)
+        DIM rx AS INTEGER : rx = x + vw + 6
+        DIM rw AS INTEGER : rw = MAX(60, b - vw - 6)
+        DIM sh AS INTEGER : sh = MAX(30, (hh - 32) \ 2)
+        GUI_SET_BOUNDS(tblStapel, rx, y + 32, rw, sh)
+        GUI_SET_BOUNDS(tblWatch, rx, y + 36 + sh, rw, MAX(30, hh - sh - 36))
+        GUI_SET_BOUNDS(tfWatch, rx, y + 32 + hh - 26, MAX(30, rw - 86), 26)
+        GUI_SET_BOUNDS(btnWatchWeg, rx + rw - 80, y + 32 + hh - 26, 80, 26)
+    END IF
+END SUB
+
+SUB leistenSetzen(seiten AS BOOLEAN, unten AS BOOLEAN)
+    seitenAn = seiten
+    untenAn = unten
+    GUI_MENU_CHECK(miSeiten, seitenAn)
+    GUI_MENU_CHECK(miUnten, untenAn)
+    layout()
+    konfigSichern()
+    protokoll("leisten seite " + IIF(seitenAn, "an", "aus") + " unten " + IIF(untenAn, "an", "aus") + " code " + STR$(GUI_GET_X(aktivesFeldOderWk())) + "+" + STR$(GUI_GET_W(aktivesFeldOderWk())) + " hoch " + STR$(GUI_GET_H(aktivesFeldOderWk())))
+END SUB
+
+' Fuers Protokoll: das Code-Feld, oder ohne Reiter die Willkommensseite --
+' beide stehen auf derselben Flaeche.
+FUNCTION aktivesFeldOderWk() AS GUI_WIDGET
+    IF aktiverTab >= 0 THEN RETURN reiter[aktiverTab].feld
+    RETURN lblWkTitel
+END FUNCTION
+
+SUB layout()
+    DIM w AS INTEGER : w = schirmB()
+    DIM h AS INTEGER : h = schirmH()
+    GUI_WINDOW_SET_BOUNDS(win, 0, 0, w, h)
+    ' Widget-Koordinaten zaehlen ab dem INHALT: Menueleiste und Reiterleiste
+    ' liegen darueber (zusammen 56 px) und gehen von der Hoehe ab -- sonst
+    ' rutschen Eingabezeile und Status unter den Fensterrand (Stand 1 tat das).
+    ' Seit es GUI_WINDOW_CONTENT_H gibt, sagt die Laufzeit, wie hoch Menue-
+    ' und Reiterleiste sind -- fest 56 stimmte nur bei der Vorgabeschrift.
+    DIM hi AS INTEGER : hi = GUI_WINDOW_CONTENT_H(win)
+    DIM oben AS INTEGER : oben = 4
+    ' Die Werkzeugleiste liegt ueber allem anderen und nimmt sich ihre Hoehe.
+    DIM leisteH AS INTEGER : leisteH = 0
+    IF leisteAn THEN leisteH = 34
+    GUI_SET_VISIBLE(leiste, leisteAn)
+    IF leisteAn THEN GUI_SET_BOUNDS(leiste, 0, oben - 4, w, 36)
+    DIM statusH AS INTEGER : statusH = 24
+    DIM eingabeH AS INTEGER : eingabeH = 30
+    oben = oben + leisteH
+    ' Das Dock nimmt alles zwischen Werkzeugleiste und Eingabezeile: links
+    ' und rechts die Seitenleisten, unten Ausgabe und Probleme, die Mitte
+    ' bleibt dem Code. Wo eine Leiste steht, weiss das Dock (der Nutzer kann
+    ' sie verschieben); was in ihr steht, verteilt layoutLeisten.
+    DIM ey AS INTEGER : ey = hi - statusH - eingabeH - 4
+    GUI_DOCK(win, 0, oben, w, MAX(80, ey - 4 - oben))
+    GUI_DOCK_AREA(win, "links", seitenAn)
+    GUI_DOCK_AREA(win, "rechts", seitenAn)
+    GUI_DOCK_AREA(win, "unten", untenAn)
+    layoutLeisten()
+    DIM cx AS INTEGER
+    DIM cy AS INTEGER
+    DIM cw AS INTEGER
+    DIM mitteH AS INTEGER
+    (cx, cy, cw, mitteH) = GUI_DOCK_CENTER(win)
+    ' Ohne Leiste links bzw. rechts bekommt der Code 8 Punkte Rand -- mit
+    ' Leiste liegt der Rand schon in deren Bereich.
+    DIM ex AS INTEGER : ex = IIF(GUI_DOCK_AREA_SHOWN(win, "links"), cx, cx + 8)
+    DIM ew AS INTEGER : ew = IIF(GUI_DOCK_AREA_SHOWN(win, "rechts"), cx + cw, cx + cw - 8) - ex
+    ' Die Spur steht ueber dem Code und nimmt sich 20 Punkte von seiner Hoehe.
+    DIM spurH AS INTEGER : spurH = 20
+    GUI_SET_BOUNDS(lblSpur, ex, oben - 1, ew, 20)
+    GUI_SET_VISIBLE(lblSpur, tabAnzahl > 0)
+    oben = oben + spurH
+    mitteH = mitteH - spurH
+    ' Die Uebersichtskarte nimmt sich einen Streifen am rechten Rand -- nur
+    ' mit einem Reiter; auf der Willkommensseite stuende sie leer da.
+    DIM karteDa AS BOOLEAN : karteDa = minimapAn AND tabAnzahl > 0
+    DIM kartenB AS INTEGER : kartenB = 0
+    IF karteDa THEN kartenB = 92
+    GUI_SET_VISIBLE(karte, karteDa)
+    IF karteDa THEN GUI_SET_BOUNDS(karte, ex + ew - kartenB, oben, kartenB - 6, mitteH)
+    ew = ew - kartenB
+    ' Geteilt: der linke Reiter bekommt die linke Haelfte, alle anderen die
+    ' rechte -- so hat jede Haelfte ein ECHTES Feld, keine Spiegelung.
+    DIM halbeB AS INTEGER : halbeB = (ew - 6) \ 2
+    DIM i AS INTEGER
+    IF spiegelAn AND taSpiegel >= 0 THEN GUI_SET_BOUNDS(taSpiegel, ex, oben, halbeB, mitteH)
+    FOR i = 0 TO tabAnzahl - 1
+        IF geteilt AND linkerTab >= 0 AND linkerTab < tabAnzahl AND i = linkerTab THEN
+            GUI_SET_BOUNDS(reiter[i].feld, ex, oben, halbeB, mitteH)
+        ELSEIF spiegelAn THEN
+            GUI_SET_BOUNDS(reiter[i].feld, ex + halbeB + 6, oben, ew - halbeB - 6, mitteH)
+        ELSEIF geteilt AND linkerTab >= 0 AND linkerTab < tabAnzahl THEN
+            GUI_SET_BOUNDS(reiter[i].feld, ex + halbeB + 6, oben, ew - halbeB - 6, mitteH)
+        ELSE
+            GUI_SET_BOUNDS(reiter[i].feld, ex, oben, ew, mitteH)
+        END IF
+    NEXT
+    ' Willkommensseite auf derselben Flaeche
+    DIM wx AS INTEGER : wx = ex + 40
+    GUI_SET_BOUNDS(lblWkTitel, wx, oben + 30, ew - 80, 44)
+    IF wkSchriftzug THEN
+        ' Schriftzug links oben, der Satz daneben -- darunter bleibt alles,
+        ' wo es war (Knoepfe ab oben + 130).
+        GUI_SET_BOUNDS(imgWkTitel, wx, oben + 10, WK_BILD_B, WK_BILD_H)
+        GUI_SET_BOUNDS(lblWkUnter, wx + WK_BILD_B + 20, oben + 52, MAX(120, ew - 80 - WK_BILD_B - 20), 18)
+        GUI_SET_WRAP(lblWkUnter, MAX(120, ew - 80 - WK_BILD_B - 20))
+    ELSE
+        GUI_SET_BOUNDS(lblWkUnter, wx, oben + 84, ew - 80, 18)
+        GUI_SET_WRAP(lblWkUnter, ew - 80)
+    END IF
+    GUI_SET_BOUNDS(btnWkNeu, wx, oben + 130, 130, 30)
+    GUI_SET_BOUNDS(btnWkOeffnen, wx + 140, oben + 130, 150, 30)
+    GUI_SET_BOUNDS(btnWkBeispiele, wx + 300, oben + 130, 180, 30)
+    GUI_SET_BOUNDS(btnWkThemen, wx + 490, oben + 130, 190, 30)
+    ' Die Kacheln: vier nebeneinander, so viele Reihen wie Platz ist; was
+    ' nicht passt, blaettert das Mausrad heran (kachelVersatz).
+    GUI_SET_BOUNDS(lblKacheln, wx, oben + 176, ew - 80, 18)
+    DIM kb AS INTEGER : kb = MIN(190, (ew - 80 - 3 * 12) \ 4)
+    ' Hoehe: Bild 16:10 der Innenbreite (6 Punkte Rand), Titel, und mit
+    ' Beschreibung zwei Zeilen in der Schrift der IDE -- die Kachel kuerzt,
+    ' was darueber hinausgeht, und der Tooltip sagt den Rest.
+    DIM khb AS INTEGER : khb = (kb - 12) * 10 \ 16
+    DIM kh AS INTEGER : kh = khb + 40
+    IF kachelMitText THEN kh = kh + 2 * (TEXT_HEIGHT() + 3)
+    DIM reihenGesamt AS INTEGER : reihenGesamt = (kachelAnzahl + 3) \ 4
+    DIM reihen AS INTEGER : reihen = 0
+    IF kb >= 110 THEN reihen = MIN(reihenGesamt, MAX(0, (mitteH - 420) \ (kh + 10)))
+    ' Ohne Beschreibungen (die acht von frueher) bleibt es bei zwei Reihen.
+    IF NOT kachelMitText THEN reihen = MIN(2, reihen)
+    kachelVersatz = MAX(0, MIN(kachelVersatz, reihenGesamt - reihen))
+    IF reihen <> kachelReihenSichtbar THEN protokoll("kacheln sichtbar " + STR$(reihen) + " von " + STR$(reihenGesamt))
+    kachelReihenSichtbar = reihen
+    kfX = wx : kfY = oben + 198 : kfB = ew - 80 : kfH = reihen * (kh + 10)
+    DIM kk AS INTEGER
+    FOR kk = 0 TO kachelAnzahl - 1
+        DIM kReihe AS INTEGER : kReihe = kk \ 4 - kachelVersatz
+        DIM sichtbar AS BOOLEAN : sichtbar = tabAnzahl = 0 AND kReihe >= 0 AND kReihe < reihen
+        GUI_SET_VISIBLE(kacheln[kk].karte, sichtbar)
+        IF sichtbar THEN
+            DIM kx AS INTEGER : kx = wx + (kk MOD 4) * (kb + 12)
+            DIM ky AS INTEGER : ky = oben + 198 + kReihe * (kh + 10)
+            GUI_SET_BOUNDS(kacheln[kk].karte, kx, ky, kb, kh)
+        END IF
+    NEXT
+    IF reihen > 0 AND reihen < reihenGesamt THEN
+        GUI_SET_TEXT(lblKacheln, tr$("Showcase -- ein Klick öffnet das Beispiel  (Reihe ") + STR$(kachelVersatz + 1) + "-" + STR$(kachelVersatz + reihen) + tr$(" von ") + STR$(reihenGesamt) + tr$(", Mausrad blättert)"))
+    ELSE
+        GUI_SET_TEXT(lblKacheln, tr$("Showcase -- ein Klick öffnet das Beispiel"))
+    END IF
+    GUI_SET_VISIBLE(lblKacheln, tabAnzahl = 0 AND reihen > 0)
+    DIM nachKacheln AS INTEGER : nachKacheln = oben + 198 + reihen * (kh + 10) + 8
+    IF reihen = 0 THEN nachKacheln = oben + 180
+    GUI_SET_BOUNDS(lblWkZuletzt, wx, nachKacheln, ew - 80, 18)
+    ' Der Satz unter der Liste bricht um -- seine Zeilen gehen von der Liste
+    ' ab (mit 70 Punkten fest lief er bei der groesseren Schrift unten hinaus).
+    DIM kzB AS INTEGER : kzB = MIN(ew - 80, 620)
+    DIM kzH AS INTEGER : kzH = (TEXT_WIDTH(GUI_TEXT(lblWkKuerzel)) \ MAX(1, kzB - 40) + 1) * (TEXT_HEIGHT() + 4)
+    DIM zlH AS INTEGER : zlH = MAX(60, MIN(200, oben + mitteH - nachKacheln - 34 - kzH - 8))
+    GUI_SET_BOUNDS(lstWkZuletzt, wx, nachKacheln + 22, kzB, zlH)
+    GUI_SET_BOUNDS(lblWkKuerzel, wx, nachKacheln + 34 + zlH, kzB, 18)
+    GUI_SET_WRAP(lblWkKuerzel, kzB)
+    wkKuerzelPasst = nachKacheln + 34 + zlH + kzH <= oben + mitteH
+    willkommenZeigen(tabAnzahl = 0)
+    GUI_SET_BOUNDS(tfEingabe, 8, ey, w - 108, 26)
+    GUI_SET_BOUNDS(btnEingabe, w - 92, ey, 84, 26)
+    GUI_SET_BOUNDS(lblStatus, 0, hi - statusH, w, statusH)
+END SUB
