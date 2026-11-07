@@ -1348,6 +1348,18 @@ impl Compiler {
             "Lokale Variable '{}' verdeckt die gleichnamige Konstante -- Drachenhauch ignoriert Gross-/Kleinschreibung. Innerhalb dieser Funktion meint der Name ab hier die Variable, nicht die Konstante.", name)));
     }
 
+    /// Dasselbe fuer einen PARAMETER und ein Klassenfeld. Beide verdecken die
+    /// Konstante im ganzen Rumpf, und bis 2026-11-07 meldete das niemand:
+    /// `CONST N = 10` und `FUNCTION summe(n AS INTEGER) ... RETURN n + N`
+    /// rechnete still `n + n` (Circuit Runner, Kometen und Glutfaden sind
+    /// genau daran je einmal gestolpert). `zeile` = Kopfzeile der Funktion
+    /// bzw. der Klasse -- ein Parameter hat keine eigene.
+    fn warn_verdeckt(&mut self, name: &str, zeile: u32, wer: &str, wo: &str) {
+        if !self.global_consts.contains(&name.to_lowercase()) { return; }
+        self.warnings.push((zeile, format!(
+            "{} '{}' verdeckt die gleichnamige Konstante -- Drachenhauch ignoriert Gross-/Kleinschreibung. {}", wer, name, wo)));
+    }
+
     /// Typ so schreiben, wie er im Quelltext steht (`array:INTEGER` ->
     /// `ARRAY OF INTEGER`) -- die interne Schreibweise sagt einem Nutzer nichts.
     /// Wie die LAUFZEIT den Typ eines Wertes nennt ("erhalten ..."): ein Feld
@@ -5165,6 +5177,12 @@ impl Compiler {
         self.class_lines.insert(name.to_string(), zeile);
         let mut field_infos = Vec::new();
         for f in fields {
+            if let Node::Dim { name: fname, .. } = f {
+                self.warn_verdeckt(fname, zeile, "Feld",
+                    "In den Methoden der Klasse meint der Name das Feld, nicht die Konstante.");
+            }
+        }
+        for f in fields {
             if let Node::Dim { name: fname, type_name, array_dims } = f {
                 // Ein STRUCT ... LAYOUT C als Feld: ein eigener Puffer je
                 // Objekt; mit Groesse ein Feld von Structs (`punkt[]`).
@@ -5267,6 +5285,11 @@ impl Compiler {
                 let zeile = self.class_lines.get(&cname).copied().unwrap_or(0);
                 self.warn_fehlendes_return(&format!("{}.{}", Self::typ_klartext(&cname), mname),
                                            rt, body, zeile);
+            }
+            let kopf = self.class_lines.get(&cname).copied().unwrap_or(0);
+            for p in params {
+                self.warn_verdeckt(&p.name, kopf, "Parameter",
+                    "Innerhalb dieser Funktion meint der Name den Parameter, nicht die Konstante.");
             }
             for p in params {
                 let slot = ctx.local_types.len();
@@ -5372,6 +5395,11 @@ impl Compiler {
                      ihren Wert mit RETURN: RETURN ergebnis (statt {} = ergebnis)", name, name, name));
             }
             self.warn_fehlendes_return(name, rt, body, zeile);
+        }
+        let kopf = self.fn_lines.get(name).copied().unwrap_or(0);
+        for p in params {
+            self.warn_verdeckt(&p.name, kopf, "Parameter",
+                "Innerhalb dieser Funktion meint der Name den Parameter, nicht die Konstante.");
         }
         for p in params {
             let slot = ctx.local_types.len();

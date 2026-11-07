@@ -1825,6 +1825,7 @@ fn compile_source_mit<T>(raw_source: &str, base: &std::path::Path, label: &str,
     }
     match uebersetze(&ast, &ext_types, &aliases, &module, &herkunft, label) {
         Ok((j, warns)) => {
+            let warns = lsp::verdeckung_filtern(warns, &source);
             // Nicht-fatale Compile-Warnungen (z.B. unbekanntes Builtin) vor dem
             // Lauf auf stderr -- der Lauf geht weiter, schlaegt aber spaeter ggf.
             // beim Aufruf fehl.
@@ -2154,6 +2155,7 @@ fn check_source_roh(raw_source: &str, base: &std::path::Path, label: &str) -> Ve
         // der Editor das schon auf der IMPORT-Zeile markiert (nicht erst beim
         // Lauf). Leer, wenn kein solches Modul importiert wird.
         Ok((_, warns)) => {
+            let warns = lsp::verdeckung_filtern(warns, &source);
             let mut diags: Vec<serde_json::Value> =
                 preprocess::missing_hardware_imports_with_lines(raw_source).into_iter()
                     .map(|(line, m)| serde_json::json!({
