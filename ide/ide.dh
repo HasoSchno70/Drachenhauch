@@ -271,6 +271,22 @@ SUB baumFarben()
     protokoll("baumfarben " + COLOR_HEX$(B_ORDNER) + " " + COLOR_HEX$(B_DH))
 END SUB
 
+' Sinnbilder je Dateiart, in derselben Reihenfolge wie die Farben. Mit
+' "nach_art" stehen die Dateien eines Ordners auch in dieser Reihenfolge:
+' erst der Quelltext, dann Formulare und Sprites, dann Pruefsammlungen,
+' Daten, Text, Bilder und Klaenge -- nicht mehr alles alphabetisch gemischt.
+SUB baumSymbole()
+    GUI_FILETREE_ICON(baum, "/", "ordner")
+    GUI_FILETREE_ICON(baum, "*.dh", "datei_code")
+    GUI_FILETREE_ICON(baum, "*.dhstudio;*.dhform;*.dhsprite;*.dhanim;*.dhreport;*.dhdb", "datei_form")
+    GUI_FILETREE_ICON(baum, "*.dhtest", "datei_test")
+    GUI_FILETREE_ICON(baum, "*.json;*.csv;*.ini;*.xml;*.db", "datei_daten")
+    GUI_FILETREE_ICON(baum, "*.md;*.txt", "datei_text")
+    GUI_FILETREE_ICON(baum, "*.png;*.jpg;*.bmp;*.gif", "datei_bild")
+    GUI_FILETREE_ICON(baum, "*.wav;*.ogg;*.mp3;*.flac;*.mod;*.xm;*.mid", "datei_ton")
+    GUI_FILETREE_SET(baum, "nach_art", 1)
+END SUB
+
 SUB themaFeinschliff()
     GUI_METRIC_SET("gradient", 9)
     GUI_METRIC_SET("gloss", 12)
@@ -4559,6 +4575,7 @@ GUI_FILETREE_SET(baum, "auffrischen", 2000)
 ' treffen ist eine Zumutung, und ein Klick, der scheinbar nichts tut, sieht
 ' nach einem Fehler aus.
 GUI_FILETREE_SET(baum, "klick_klappt", 1)
+baumSymbole()
 ' Haken am Baum: was angehakt ist, IST das Projekt (siehe projektDateien).
 GUI_FILETREE_SET(baum, "kaestchen", IIF(baumHakenAn, 1, 0))
 IF baumHakenAn THEN GUI_TOOLTIP(baum, baumHakenTipp$())
