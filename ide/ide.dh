@@ -142,6 +142,18 @@ DIM F_SUCHTREFFER AS INTEGER : F_SUCHTREFFER = &HFF8AD0    ' die Treffer der off
 
 ' Typ-Hinweise hinter der Zeile (CODE_TYPES$), gedaempft blau.
 DIM F_TYP AS INTEGER : F_TYP = &H7FA6C8
+
+' Der Projektbaum nach Dateiart (GUI_FILETREE_COLOR): Ordner, Quelltext,
+' Dateien der Werkzeuge, Pruefsammlungen, Daten, Text, Bilder, Klaenge --
+' sonst steht alles in derselben Farbe und das Auge sucht nach der Endung.
+DIM B_ORDNER AS INTEGER : B_ORDNER = &HE8C468
+DIM B_DH AS INTEGER : B_DH = &H6FC3F0
+DIM B_WERKZEUG AS INTEGER : B_WERKZEUG = &HE89A5A
+DIM B_TEST AS INTEGER : B_TEST = &H8FD98C
+DIM B_DATEN AS INTEGER : B_DATEN = &HD8A0E8
+DIM B_TEXT AS INTEGER : B_TEXT = &HC0C8D4
+DIM B_BILD AS INTEGER : B_BILD = &HF08AB0
+DIM B_KLANG AS INTEGER : B_KLANG = &H7FD8C8
 SUB codeFarben(licht AS BOOLEAN)
     IF licht THEN
         F_GRUND = &H1E2530 : F_KOMMENTAR = &H3D7A2E : F_TEXT = &HA5570A
@@ -159,6 +171,13 @@ SUB codeFarben(licht AS BOOLEAN)
         F_KLAMMER1 = &HF0C040 : F_KLAMMER2 = &HD878E0 : F_KLAMMER3 = &H40A8F8
     END IF
     TON_PROJEKT = &H3B7BD8 : TON_AUSGABE = &H2E9E62 : TON_PROBLEME = &HD98B2B : TON_DEBUG = &H8C5BD6
+    IF licht THEN
+        B_ORDNER = &H8A5E00 : B_DH = &H0B5FA0 : B_WERKZEUG = &HA8500C : B_TEST = &H2A7A30
+        B_DATEN = &H83379A : B_TEXT = &H4B5563 : B_BILD = &HA82A62 : B_KLANG = &H107468
+    ELSE
+        B_ORDNER = &HE8C468 : B_DH = &H6FC3F0 : B_WERKZEUG = &HE89A5A : B_TEST = &H8FD98C
+        B_DATEN = &HD8A0E8 : B_TEXT = &HC0C8D4 : B_BILD = &HF08AB0 : B_KLANG = &H7FD8C8
+    END IF
 END SUB
 
 SCREEN(1280, 800, "Drachenhauch", 1)
@@ -235,6 +254,21 @@ SUB bereichsFarben()
     GUI_SET_COLOR(lblHilfeKopf, "fg", GUI_THEME_GET("muted_fg"))
     GUI_SET_COLOR(tblVars, "bg", farbMisch(grund, TON_DEBUG, anteil))
     protokoll("bereichsfarben " + COLOR_HEX$(farbMisch(grund, TON_AUSGABE, anteil)))
+    baumFarben()
+END SUB
+
+' Die Farben des Projektbaums je Dateiart -- nach jedem Themawechsel neu,
+' weil sie am Thema haengen. Das erste passende Muster gilt.
+SUB baumFarben()
+    GUI_FILETREE_COLOR(baum, "/", B_ORDNER)
+    GUI_FILETREE_COLOR(baum, "*.dh", B_DH)
+    GUI_FILETREE_COLOR(baum, "*.dhstudio;*.dhform;*.dhsprite;*.dhanim;*.dhreport;*.dhdb", B_WERKZEUG)
+    GUI_FILETREE_COLOR(baum, "*.dhtest", B_TEST)
+    GUI_FILETREE_COLOR(baum, "*.json;*.csv;*.ini;*.xml;*.db", B_DATEN)
+    GUI_FILETREE_COLOR(baum, "*.md;*.txt", B_TEXT)
+    GUI_FILETREE_COLOR(baum, "*.png;*.jpg;*.bmp;*.gif", B_BILD)
+    GUI_FILETREE_COLOR(baum, "*.wav;*.ogg;*.mp3;*.flac;*.mod;*.xm;*.mid", B_KLANG)
+    protokoll("baumfarben " + COLOR_HEX$(B_ORDNER) + " " + COLOR_HEX$(B_DH))
 END SUB
 
 SUB themaFeinschliff()
@@ -7185,6 +7219,14 @@ SUB eigeneFarben(licht AS BOOLEAN)
             CASE "ausgabe" : TON_AUSGABE = f
             CASE "probleme" : TON_PROBLEME = f
             CASE "debugger" : TON_DEBUG = f
+            CASE "baum_ordner" : B_ORDNER = f
+            CASE "baum_dh" : B_DH = f
+            CASE "baum_werkzeug" : B_WERKZEUG = f
+            CASE "baum_test" : B_TEST = f
+            CASE "baum_daten" : B_DATEN = f
+            CASE "baum_text" : B_TEXT = f
+            CASE "baum_bild" : B_BILD = f
+            CASE "baum_klang" : B_KLANG = f
             CASE ELSE : bekannt = FALSE
         END SELECT
         IF bekannt THEN
@@ -7218,8 +7260,8 @@ END SUB
 FUNCTION farbVorlageTeil$(licht AS BOOLEAN) AS STRING
     codeFarben(licht)
     DIM q AS STRING : q = CHR$(34)
-    DIM namen AS ARRAY OF STRING : namen = ["grund", "kommentar", "text", "zahl", "schluessel", "operator", "fundstelle", "klammer", "klammer1", "klammer2", "klammer3", "suchtreffer", "typ", "projekt", "ausgabe", "probleme", "debugger"]
-    DIM werte AS ARRAY OF INTEGER : werte = [F_GRUND, F_KOMMENTAR, F_TEXT, F_ZAHL, F_SCHLUESSEL, F_OPERATOR, F_FUNDSTELLE, F_KLAMMER, F_KLAMMER1, F_KLAMMER2, F_KLAMMER3, F_SUCHTREFFER, F_TYP, TON_PROJEKT, TON_AUSGABE, TON_PROBLEME, TON_DEBUG]
+    DIM namen AS ARRAY OF STRING : namen = ["grund", "kommentar", "text", "zahl", "schluessel", "operator", "fundstelle", "klammer", "klammer1", "klammer2", "klammer3", "suchtreffer", "typ", "projekt", "ausgabe", "probleme", "debugger", "baum_ordner", "baum_dh", "baum_werkzeug", "baum_test", "baum_daten", "baum_text", "baum_bild", "baum_klang"]
+    DIM werte AS ARRAY OF INTEGER : werte = [F_GRUND, F_KOMMENTAR, F_TEXT, F_ZAHL, F_SCHLUESSEL, F_OPERATOR, F_FUNDSTELLE, F_KLAMMER, F_KLAMMER1, F_KLAMMER2, F_KLAMMER3, F_SUCHTREFFER, F_TYP, TON_PROJEKT, TON_AUSGABE, TON_PROBLEME, TON_DEBUG, B_ORDNER, B_DH, B_WERKZEUG, B_TEST, B_DATEN, B_TEXT, B_BILD, B_KLANG]
     DIM t AS STRING : t = "  " + q + IIF(licht, "hell", "dunkel") + q + ": {" + NL
     DIM i AS INTEGER
     FOR i = 0 TO LEN(namen) - 1

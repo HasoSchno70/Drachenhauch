@@ -3566,6 +3566,23 @@ er staerker auf), der Kopf der Probleme-Leiste ohne das doppelte
 "Probleme:" (der Reiter heisst schon so; drei Eintraege aus `en.txt` weg) und
 die Ueberschrift der Hilfe in `muted_fg`, buendig mit ihrem Text.
 
+## Projektbaum nach Dateiart gefaerbt (2026-11-06)
+
+Wunsch des Nutzers: im Projektbaum der IDE war alles einfarbig. Neu
+`GUI_FILETREE_COLOR(baum, muster$, farbe)` (`DateiBaum::farben`, Muster wie
+beim Filter mit `;`, `"/"` meint Ordner, jedes andere Muster nur Dateien --
+ein Ordner `bilder.png` ist kein Bild; das erste passende gilt, ein schon
+gesetztes Muster behaelt seinen Platz, -1 nimmt es weg; `farbe_fuer` setzt
+`TreeNode::color`, das der Baum laengst zeichnete; in der `.dhform` als
+`filetree.farben`). Die IDE (`baumFarben`, aus `bereichsFarben`, also nach
+jedem Themawechsel): Ordner, `.dh`, Werkzeugdateien, `.dhtest`, Daten,
+Text, Bilder, Klaenge je eine Farbe (`B_*` in `codeFarben`, hell dunkler),
+in `farben.json` als `baum_ordner` ... `baum_klang`. Tests zwei Faelle in
+`gui_dateibaum.dhtest` (Bild: jede Farbe in genau ihrer Zeile, Ordner vor
+Dateien; Rundweg ueber GUI_TO_JSON -- das ist EINGERUECKT, verglichen wird
+ohne Leerraum), zwei in `werkzeug_ide_schriftzug.dhtest` (beide Themen,
+eigene Farben).
+
 ## Bastelzentrale (2026-11-06)
 
 Wunsch des Nutzers nach den sieben Bastler-Punkten: "ein super Programm fuer

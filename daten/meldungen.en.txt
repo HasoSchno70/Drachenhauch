@@ -1979,3 +1979,4 @@ Spur {} ausserhalb 0..{}	track {} outside 0..{}
 MIDI_CLOCK_SEND: Tempo {} ausserhalb 1..999 (0 haelt die Uhr an)	MIDI_CLOCK_SEND: tempo {} outside 1..999 (0 stops the clock)
 {}: Beginn {} -- erwartet Sekunden ab 0	{}: start {} -- expects seconds from 0
 {}: {} Sechzehntel ausserhalb 0..16383	{}: {} sixteenths outside 0..16383
+GUI_FILETREE_COLOR: kein Muster -- so: "*.dh", "*.json;*.ini" oder "/" fuer Ordner	GUI_FILETREE_COLOR: no pattern -- like this: "*.dh", "*.json;*.ini" or "/" for folders

@@ -10230,6 +10230,7 @@ impl<'p> Vm<'p> {
             "gui_treetable_parent" => Value::Int(self.gui.treetable_parent(gi(a,0,"GUI_TREETABLE_PARENT")?, gi(a,1,"GUI_TREETABLE_PARENT")?)?),
             "gui_treetable_level" => Value::Int(self.gui.treetable_level(gi(a,0,"GUI_TREETABLE_LEVEL")?, gi(a,1,"GUI_TREETABLE_LEVEL")?)?),
             "gui_treetable_set_parent" => { self.gui.treetable_set_parent(gi(a,0,"GUI_TREETABLE_SET_PARENT")?, gi(a,1,"GUI_TREETABLE_SET_PARENT")?, gi(a,2,"GUI_TREETABLE_SET_PARENT")?)?; Value::Nil }
+            "gui_filetree_color" => { self.gui.filetree_color(gi(a,0,"GUI_FILETREE_COLOR")?, &gs(a,1,"GUI_FILETREE_COLOR")?, gi(a,2,"GUI_FILETREE_COLOR")?)?; Value::Nil }
             "gui_filetree_icons" => { self.gui.filetree_icons(gi(a,0,"GUI_FILETREE_ICONS")?, gi(a,1,"GUI_FILETREE_ICONS")?, gi(a,2,"GUI_FILETREE_ICONS")?)?; Value::Nil }
             "gui_update" => {
                 {
