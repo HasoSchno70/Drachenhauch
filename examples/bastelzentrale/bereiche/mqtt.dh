@@ -1,0 +1,138 @@
+' Bastelzentrale -- MQTT: an einem Broker mitlesen und senden. Broker
+' "Demo" spielt ein Haus voller Sensoren; was man sendet, kommt dort wie bei
+' einem Broker mit Abo auf `#` zurueck.
+
+DIM tfMqBroker AS GUI_WIDGET
+DIM tfMqPort AS GUI_WIDGET
+DIM tfMqAbo AS GUI_WIDGET
+DIM btMqVerbinden AS GUI_WIDGET
+DIM tbMqLetzte AS GUI_WIDGET
+DIM lsMqVerlauf AS GUI_WIDGET
+DIM tfMqTopic AS GUI_WIDGET
+DIM tfMqText AS GUI_WIDGET
+DIM btMqSenden AS GUI_WIDGET
+DIM mqH AS MQTT_HANDLE
+DIM mqVerbunden AS BOOLEAN : mqVerbunden = FALSE
+DIM mqDemo AS BOOLEAN : mqDemo = FALSE
+DIM mqZahl AS INTEGER : mqZahl = 0
+DIM mqDemoZeit AS INTEGER : mqDemoZeit = 0
+DIM mqDemoSchritt AS INTEGER : mqDemoSchritt = 0
+DIM mqTopics AS ARRAY OF STRING : mqTopics = []
+DIM mqLetzte AS STRING : mqLetzte = ""
+
+SUB mqAufbau()
+    DIM b AS INTEGER : b = B_MQTT
+    schild(b, "Broker", X0, Y0 + 6)
+    tfMqBroker = feld(b, X0 + 70, Y0, 220, "Demo")
+    schild(b, "Port", X0 + 300, Y0 + 6)
+    tfMqPort = feld(b, X0 + 345, Y0, 70, "1883")
+    GUI_TEXTINPUT_SET(tfMqPort, "zahlen", 1)
+    schild(b, "Abo", X0 + 430, Y0 + 6)
+    tfMqAbo = feld(b, X0 + 470, Y0, 200, "#")
+    btMqVerbinden = knopf(b, "Verbinden", X0 + 690, Y0, 130)
+    GUI_BUTTON_VARIANT(btMqVerbinden, "primaer")
+    schild(b, "Letzter Stand je Topic", X0, Y0 + 52)
+    tbMqLetzte = reg(b, GUI_TABLE(win, X0, Y0 + 76, 500, 560, ["Topic", "Wert", "Zeit"], []))
+    GUI_TABLE_COL_WIDTHS(tbMqLetzte, [230, 160, 108])
+    GUI_TABLE_PLACEHOLDER(tbMqLetzte, "Noch keine Nachricht.")
+    schild(b, "Verlauf", X0 + 520, Y0 + 52)
+    lsMqVerlauf = reg(b, GUI_LISTBOX(win, X0 + 520, Y0 + 76, 508, 560, []))
+    schild(b, "Senden", X0, Y0 + 664)
+    tfMqTopic = feld(b, X0 + 70, Y0 + 658, 300, "werkstatt/licht")
+    tfMqText = feld(b, X0 + 380, Y0 + 658, 300, "an")
+    btMqSenden = knopf(b, "Senden", X0 + 690, Y0 + 658, 130)
+END SUB
+
+' Eine Nachricht verbuchen: Tabelle (eine Zeile je Topic) und Verlauf.
+SUB mqAnkunft(topic AS STRING, text AS STRING)
+    mqZahl = mqZahl + 1
+    mqLetzte = topic + " = " + text
+    DIM i AS INTEGER : i = ARRAY_INDEXOF(mqTopics, topic)
+    IF i < 0 THEN
+        ARRAY_PUSH(mqTopics, topic)
+        GUI_TABLE_ADD_ROW(tbMqLetzte, [topic, text, LEFT$(TIME$(), 8)])
+    ELSE
+        GUI_TABLE_SET_CELL(tbMqLetzte, i, 1, text)
+        GUI_TABLE_SET_CELL(tbMqLetzte, i, 2, LEFT$(TIME$(), 8))
+    END IF
+    GUI_LISTBOX_ADD(lsMqVerlauf, LEFT$(TIME$(), 8) + "  " + topic + " = " + text, 0)
+    IF GUI_LISTBOX_COUNT(lsMqVerlauf) > 300 THEN GUI_LISTBOX_REMOVE(lsMqVerlauf, 300)
+END SUB
+
+SUB mqVerbinden()
+    DIM broker AS STRING : broker = TRIM$(GUI_TEXT(tfMqBroker))
+    IF broker = "" OR LOWER$(broker) = "demo" THEN
+        mqDemo = TRUE
+    ELSE
+        TRY
+            mqH = MQTT_CONNECT(broker, VAL(GUI_TEXT(tfMqPort)), "bastelzentrale-" + STR$(INT(RND() * 100000)))
+            MQTT_SUBSCRIBE(mqH, GUI_TEXT(tfMqAbo))
+        CATCH e
+            ereignis("MQTT: " + e)
+            RETURN
+        END TRY
+    END IF
+    mqVerbunden = TRUE
+    GUI_SET_TEXT(btMqVerbinden, "Trennen")
+    ereignis("MQTT: verbunden mit " + IIF(mqDemo, "Demo", broker))
+END SUB
+
+SUB mqTrennen()
+    IF mqVerbunden AND NOT mqDemo THEN MQTT_DISCONNECT(mqH)
+    mqVerbunden = FALSE
+    mqDemo = FALSE
+    GUI_SET_TEXT(btMqVerbinden, "Verbinden")
+END SUB
+
+' Senden -- auch von der Handy-Seite.
+SUB mqSenden(topic AS STRING, text AS STRING)
+    IF NOT mqVerbunden THEN
+        ereignis("MQTT: erst verbinden, dann senden")
+        RETURN
+    END IF
+    IF mqDemo THEN
+        mqAnkunft(topic, text)
+    ELSE
+        MQTT_PUBLISH(mqH, topic, text)
+    END IF
+END SUB
+
+SUB mqTakt()
+    IF GUI_CLICKED(btMqVerbinden) THEN
+        IF mqVerbunden THEN
+            mqTrennen()
+            ereignis("MQTT: getrennt")
+        ELSE
+            mqVerbinden()
+        END IF
+    END IF
+    IF GUI_CLICKED(btMqSenden) OR GUI_ENTERED(tfMqText) THEN mqSenden(GUI_TEXT(tfMqTopic), GUI_TEXT(tfMqText))
+    IF mqDemo AND MILLIS() - mqDemoZeit >= 700 THEN
+        mqDemoZeit = MILLIS()
+        mqDemoSchritt = mqDemoSchritt + 1
+        DIM s AS FLOAT : s = MILLIS() / 1000.0
+        SELECT CASE mqDemoSchritt MOD 4
+            CASE 0 : mqAnkunft("werkstatt/temperatur", FORMAT$(19.0 + 2.0 * SIN(s / 9.0), "%.1f"))
+            CASE 1 : mqAnkunft("garten/feuchte", STR$(INT(40 + 15 * SIN(s / 13.0))))
+            CASE 2 : mqAnkunft("flur/tuer", IIF((mqDemoSchritt \ 4) MOD 3 = 0, "offen", "zu"))
+            CASE 3 : mqAnkunft("keller/pumpe/strom", FORMAT$(0.4 + 0.3 * ABS(SIN(s / 5.0)), "%.2f"))
+        END SELECT
+    END IF
+    IF mqVerbunden AND NOT mqDemo THEN
+        MQTT_UPDATE(mqH)
+        WHILE MQTT_NEXT_MESSAGE(mqH)
+            mqAnkunft(MQTT_MESSAGE_TOPIC(mqH), MQTT_MESSAGE_PAYLOAD(mqH))
+        WEND
+        IF NOT MQTT_IS_CONNECTED(mqH) THEN
+            ereignis("MQTT: Verbindung verloren")
+            mqTrennen()
+        END IF
+    END IF
+END SUB
+
+FUNCTION mqZustand$() AS STRING
+    IF NOT mqVerbunden THEN RETURN "nicht verbunden"
+    DIM t AS STRING : t = IIF(mqDemo, "Demo", GUI_TEXT(tfMqBroker)) + ", " + STR$(mqZahl) + " Nachrichten"
+    IF mqLetzte <> "" THEN t = t + ", zuletzt " + mqLetzte
+    RETURN t
+END FUNCTION
