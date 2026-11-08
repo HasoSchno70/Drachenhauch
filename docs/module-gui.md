@@ -2398,6 +2398,7 @@ stabil (Löschen markiert nur als „tot", verschiebt keine Indizes).
 | `GUI_SET_BOUNDS(wdg, x, y, w, h)` | Widget verschieben/skalieren (fenster-relativ) |
 | `GUI_GET_X/Y/W/H(wdg)` → INTEGER | aktuelle Maße lesen |
 | `GUI_SET_VISIBLE(wdg, an)` / `GUI_VISIBLE(wdg)` → BOOLEAN | ein-/ausblenden (unsichtbar = nicht gezeichnet, nicht interaktiv) |
+| `GUI_SHOWN(wdg)` → BOOLEAN | ist es jetzt zu sehen? Zählt anders als `GUI_VISIBLE` auch das Fenster und verdeckte Reiterseiten (Fenster und Reiterwerk) mit -- eine Zeichenfläche auf einer Seite im Hintergrund zeichnet damit nicht |
 | `GUI_DESTROY(wdg)` | Widget entfernen (Handle wird ungültig, andere bleiben gültig) |
 | `GUI_KIND(wdg)` → STRING | `"button"`/`"label"`/`"checkbox"`/`"slider"`/`"textinput"`/`"panel"`/`"table"` |
 | `GUI_FOCUS(wdg)` | Tastatur-Fokus setzen (z.B. auf ein TextInput); `GUI_FOCUS(-1)` gibt ihn frei, die Tasten gehören dann dem Programm |

@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/en und dem englischen Buch von `dhrt doku prosa` -- NICHT von Hand aendern. Der Hover nimmt sie mit DHRT_LANG=en.",
- "count": 2371,
+ "count": 2372,
  "docs": {
   "ABS": "Absolute value.",
   "ACOS": "Arc sine/cosine (x in [-1, 1])",
@@ -874,6 +874,7 @@
   "GUI_SET_VALUE": "set the slider value (gets clamped)",
   "GUI_SET_VISIBLE": "show/hide (invisible = not drawn, not interactive)",
   "GUI_SET_WRAP": "wrap a label at word boundaries at breite pixels (0 = off); the height follows the text",
+  "GUI_SHOWN": "is it on screen right now? Unlike GUI_VISIBLE it also accounts for the window and hidden tab pages (window tabs and tab controls) -- a canvas on a page in the background can skip drawing",
   "GUI_SIZE_GROUP": "all widgets of a group get the same size, the largest (breite width, hoehe height, beide both; group \"\" = leave)",
   "GUI_SKIN": "Puts artwork of your own under a whole kind of widget (“button”, “panel” …).",
   "GUI_SLIDER": "GUI_WIDGET — value slider",

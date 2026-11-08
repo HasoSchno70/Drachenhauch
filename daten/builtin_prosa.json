@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 2379,
+ "count": 2380,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -875,6 +875,7 @@
   "GUI_SET_VALUE": "Slider-Wert setzen (wird geclamped)",
   "GUI_SET_VISIBLE": "ein-/ausblenden (unsichtbar = nicht gezeichnet, nicht interaktiv)",
   "GUI_SET_WRAP": "Beschriftung bei breite Pixeln an Wortgrenzen umbrechen (0 = aus); die Höhe folgt dem Text",
+  "GUI_SHOWN": "ist es jetzt zu sehen? Zählt anders als GUI_VISIBLE auch das Fenster und verdeckte Reiterseiten (Fenster und Reiterwerk) mit -- eine Zeichenfläche auf einer Seite im Hintergrund zeichnet damit nicht",
   "GUI_SIZE_GROUP": "alle Widgets einer Gruppe bekommen dasselbe Maß, das größte (breite, hoehe, beide; Gruppe \"\" = heraus)",
   "GUI_SKIN": "Legt eine eigene Grafik unter eine ganze Widget-Art („button“, „panel“ …).",
   "GUI_SLIDER": "GUI_WIDGET — Wert-Schieber",

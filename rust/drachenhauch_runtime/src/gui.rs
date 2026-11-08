@@ -10806,6 +10806,22 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     pub fn widget_visible(&self, h: i64) -> Result<bool, String> {
         let w = self.wdg(h, "GUI_VISIBLE")?; Ok(w.alive && w.visible)
     }
+    /// GUI_SHOWN: ist das Widget jetzt zu sehen? Anders als GUI_VISIBLE zaehlen
+    /// das Fenster, die Seite des Fensters und jeder Reiter-/Akkordeon-Behaelter
+    /// darueber mit -- eine Zeichenflaeche auf einer verdeckten Reiterseite
+    /// soll nicht zeichnen.
+    pub fn widget_gezeigt(&self, h: i64) -> Result<bool, String> {
+        let mut w = self.wdg(h, "GUI_SHOWN")?;
+        let (wi, _) = Self::dec_widget(h);
+        let win = &self.windows[wi];
+        if !win.alive || !win.visible { return Ok(false); }
+        for _ in 0..64 {
+            if !self.widget_shown(wi, w) { return Ok(false); }
+            if w.tc_von < 0 { return Ok(true); }
+            match win.widgets.get(w.tc_von as usize) { Some(tc) => w = tc, None => return Ok(true) }
+        }
+        Ok(true)
+    }
     pub fn kind_name(&self, h: i64) -> Result<&'static str, String> {
         Ok(self.wdg(h, "GUI_KIND")?.kind.as_str())
     }

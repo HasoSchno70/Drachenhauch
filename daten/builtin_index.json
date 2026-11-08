@@ -7107,6 +7107,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_SHOWN",
+   "kind": "core",
+   "signature": "GUI_SHOWN(wdg)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_VSLIDER",
    "kind": "core",
    "signature": "GUI_VSLIDER(win, x, y, h, min, max, default)",

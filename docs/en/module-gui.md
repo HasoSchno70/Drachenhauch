@@ -2388,6 +2388,7 @@ stable while doing so (deleting only marks as "dead", it does not shift any indi
 | `GUI_SET_BOUNDS(wdg, x, y, w, h)` | move/resize a widget (relative to the window) |
 | `GUI_GET_X/Y/W/H(wdg)` → INTEGER | read the current dimensions |
 | `GUI_SET_VISIBLE(wdg, an)` / `GUI_VISIBLE(wdg)` → BOOLEAN | show/hide (invisible = not drawn, not interactive) |
+| `GUI_SHOWN(wdg)` → BOOLEAN | is it on screen right now? Unlike `GUI_VISIBLE` it also accounts for the window and hidden tab pages (window tabs and tab controls) -- a canvas on a page in the background can skip drawing |
 | `GUI_DESTROY(wdg)` | remove a widget (the handle becomes invalid, others stay valid) |
 | `GUI_KIND(wdg)` → STRING | `"button"`/`"label"`/`"checkbox"`/`"slider"`/`"textinput"`/`"panel"`/`"table"` |
 | `GUI_FOCUS(wdg)` | set the keyboard focus (e.g. on a TextInput); `GUI_FOCUS(-1)` releases it, the keys then belong to the program |

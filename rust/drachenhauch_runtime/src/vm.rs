@@ -9847,6 +9847,7 @@ impl<'p> Vm<'p> {
             "gui_destroy" => { self.gui.destroy(gi(a,0,"GUI_DESTROY")?)?; Value::Nil }
             "gui_set_visible" => { self.gui.set_widget_visible(gi(a,0,"GUI_SET_VISIBLE")?, gbool(a,1,"GUI_SET_VISIBLE")?)?; Value::Nil }
             "gui_visible" => Value::Bool(self.gui.widget_visible(gi(a,0,"GUI_VISIBLE")?)?),
+            "gui_shown" => Value::Bool(self.gui.widget_gezeigt(gi(a,0,"GUI_SHOWN")?)?),
             "gui_kind" => Value::str_rc(self.gui.kind_name(gi(a,0,"GUI_KIND")?)?),
             "gui_focus" => { self.gui.focus(gi(a,0,"GUI_FOCUS")?)?; Value::Nil }
             "gui_focused" => Value::Int(self.gui.focused()),
