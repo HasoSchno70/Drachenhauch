@@ -157,6 +157,10 @@ CLASS StudioControl
     SUB Groesse()
     END SUB
 
+    ' In jedem Bild, nach den Ereignissen seiner Teile.
+    SUB Takt()
+    END SUB
+
     ' Je Bild: die Teile zum Behaelter.
     SUB studioLegen()
         IF NOT Self.studioOffen THEN RETURN
@@ -263,6 +267,11 @@ CLASS StudioFenster
 
     ' Wenn sich die Groesse des Fensters geaendert hat.
     SUB Groesse()
+    END SUB
+
+    ' In jedem Bild, nach den Ereignissen seiner Controls -- fuer alles, was
+    ' das Fenster selbst abfragen will (Kontextmenue, eigene Tasten ...).
+    SUB Takt()
     END SUB
 
     ' Eine Taste, solange das Fenster vorn ist und kein Eingabefeld sie
@@ -377,6 +386,7 @@ FUNCTION studioBild() AS BOOLEAN
             CONTINUE
         END IF
         f.studioTakt()
+        IF f.studioOffen AND NOT studioEnde THEN f.Takt()
         IF f.studioOffen THEN
             IF GUI_WINDOW_GET_W(f.studioWin) <> f.studioWarB OR GUI_WINDOW_GET_H(f.studioWin) <> f.studioWarH THEN
                 f.studioWarB = GUI_WINDOW_GET_W(f.studioWin)

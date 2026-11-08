@@ -690,3 +690,5 @@ Text|Sinnbild|Tipp je Knopf, durch Semikolon getrennt; - = Trenner, ~ = Lücke	T
 Text|Breite[|links,mitte,rechts[|klick]] je Feld, durch Semikolon getrennt; Breite 0 = der Rest	Text|width[|links,mitte,rechts[|klick]] per field, separated by semicolons; width 0 = the rest
 wenn ein Knopf der Leiste gedrückt wird (seine Nummer ab 0)	when a button of the bar is pressed (its number from 0)
 wenn ein klickbares Feld angeklickt wird (seine Nummer ab 0)	when a clickable field is clicked (its number from 0)
+in jedem Bild, nach den Ereignissen seiner Controls -- für alles, was es abfragen will	in every frame, after the events of its controls -- for whatever it wants to poll
+wenn eine Zelle angeklickt wird (Datenzeile und Spalte, auch auf einen Knopf in der Zelle)	when a cell is clicked (data row and column, also on a button in the cell)

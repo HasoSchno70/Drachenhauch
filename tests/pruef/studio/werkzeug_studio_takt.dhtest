@@ -1,0 +1,102 @@
+' Drachenhauch Studio: das Ereignis Takt (Fenster und eigenes Control, je
+' Bild) und Zelle(zeile, spalte) der Tabelle -- gefunden beim Port der
+' Kuehlschrank-App: ein Klick auf -1/+1 in der schon gewaehlten Zeile kam
+' nirgends an (die Tabelle meldete nur Geaendert und Doppelklick), und ein
+' Kontextmenue liess sich nur im Code bauen, aber nirgends abfragen.
+' Format: docs/werkzeuge.md, dhrt test.
+
+--- langsam
+=== zelle meldet zeile und spalte, takt laeuft je bild in fenster und control
+' F5 erzeugt das Programm; die Probe klickt zweimal in Zeile 1, Spalte 1 (eine
+' Knopf-Zelle) -- beim zweiten Mal ist die Zeile schon gewaehlt, Geaendert
+' kommt dann nicht mehr, Zelle schon.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+slHin(10, 10)
+slWarten(10)
+slTaste(294)
+slWarten(150)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+SETENV("DH_STUDIO_LAUF_BILDER", "20")
+DIM log AS STRING : log = CWD$() + "/s.log"
+slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+PRINT "erzeugt "; LEN(slAnfang(log, "erzeugt ")) = 1
+DIM neu AS ARRAY OF STRING : neu = []
+DIM s AS STRING
+FOR EACH s IN READLINES(p + "/_studio/main.dh")
+    IF LEFT$(s, 11) = "studioLauf(" THEN ARRAY_PUSH(neu, "AUTOMATION_PLAY(" + CHR$(34) + "klick.txt" + CHR$(34) + ")")
+    ARRAY_PUSH(neu, s)
+NEXT
+WRITEALL(p + "/_studio/probe.dh", JOIN$(neu, CHR$(10)) + CHR$(10))
+WRITEALL(p + "/_studio/klick.txt", "c 8" + CHR$(10) + "e 0 7 245 72 0 0" + CHR$(10) + "e 5 7 245 72 0 0" + CHR$(10) + "e 10 6 0 0 0 0" + CHR$(10) + "e 12 5 0 0 0 0" + CHR$(10) + "e 20 7 245 72 0 0" + CHR$(10) + "e 25 7 245 72 0 0" + CHR$(10) + "e 30 6 0 0 0 0" + CHR$(10) + "e 32 5 0 0 0 0" + CHR$(10))
+DIM k AS INTEGER : k = PROCESS_START("dhrt", "run", "--bilder", "45", p + "/_studio/probe.dh")
+DIM leer AS INTEGER : leer = 0
+WHILE leer < 5
+    DIM t AS STRING : t = PROCESS_READ$(k)
+    IF t <> "" THEN
+        DIM zeile AS STRING
+        FOR EACH zeile IN SPLIT(REPLACE$(t, CHR$(13), ""), CHR$(10))
+            IF zeile <> "" AND LEFT$(zeile, 8) <> "WARNING:" AND LEFT$(zeile, 5) <> "INFO:" THEN PRINT zeile
+        NEXT
+        leer = 0
+    ELSEIF NOT PROCESS_RUNNING(k) THEN
+        leer = leer + 1
+        SLEEP(30)
+    END IF
+WEND
+PRINT "code "; PROCESS_CODE(k)
+--- argumente
+{sammlung}/../../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"control","name":"Zaehler"},{"art":"fenster","name":"Hauptfenster"}]}
+--- datei proj/Zaehler.dhform
+{"title":"Zaehler","name":"Zaehler","w":100,"h":30,"widgets":[{"kind":"label","name":"anzeige","text":"0","x":0,"y":0,"w":100,"h":30}]}
+--- datei proj/Zaehler.dh
+CLASS Zaehler EXTENDS Zaehler_Basis
+    DIM n AS INTEGER
+
+    SUB Takt()
+        Self.n = Self.n + 1
+        IF Self.n = 3 THEN PRINT "control takt 3"
+    END SUB
+END CLASS
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":420,"h":300,"widgets":[
+{"kind":"table","name":"tabelle","x":20,"y":20,"w":300,"h":200,"table":{"headers":["Name","Aktion"],"rows":[["Milch","-1"],["Brot","-1"]],"col_widths":[150,150],"selected":-1}},
+{"kind":"studio_control","studio_control":"Zaehler","name":"zaehler1","x":20,"y":240,"w":100,"h":30}]}
+--- datei proj/Hauptfenster.dh
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+    DIM bilder AS INTEGER
+
+    SUB Geoeffnet()
+        GUI_TABLE_CELL_KIND(Self.tabelle, 0, 1, "knopf")
+        GUI_TABLE_CELL_KIND(Self.tabelle, 1, 1, "knopf")
+    END SUB
+
+    SUB tabelle_Zelle(zeile AS INTEGER, spalte AS INTEGER)
+        PRINT "zelle "; zeile; " "; spalte; " "; GUI_TABLE_GET_CELL(Self.tabelle, zeile, 0)
+    END SUB
+
+    SUB tabelle_Geaendert()
+        PRINT "geaendert "; GUI_TABLE_SELECTED(Self.tabelle)
+    END SUB
+
+    SUB Takt()
+        Self.bilder = Self.bilder + 1
+        IF Self.bilder = 3 THEN PRINT "fenster takt 3"
+    END SUB
+END CLASS
+--- datei proj/App.dh
+CLASS App EXTENDS StudioApp
+END CLASS
+--- erwartet
+erzeugt TRUE
+control takt 3
+fenster takt 3
+geaendert 1
+zelle 1 1 Brot
+zelle 1 1 Brot
+code 0

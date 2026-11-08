@@ -123,14 +123,16 @@ Die Ereignisse je Art:
 | Kästchen, Umschalter, Optionsfeld | Klick, Geaendert |
 | Textfeld | Geaendert, Enter, FokusRein, FokusRaus |
 | Textbereich | Geaendert, FokusRein, FokusRaus |
-| Liste, Baum, Tabelle | Geaendert, Doppelklick (bei Liste und Tabelle auch Enter) |
+| Liste, Baum | Geaendert, Doppelklick (bei der Liste auch Enter) |
+| Tabelle | Geaendert, Doppelklick (auch Enter), Zelle(zeile, spalte) |
 | Regler, Zahlenfeld, Klappliste, Wähler, Reiterwerk | Geaendert |
 | Zeichenfläche | Zeichnen, Maus, Ziehen(x, y), Rad(schritte) |
 | Werkzeugleiste | Knopf(nr) |
 | Statusleiste | Feld(nr) |
 | jedes Control zusätzlich | MausRein, MausRaus |
 | Timer, Menüeintrag | Aktion |
-| Fenster | Geoeffnet, Schliessen, Groesse, Taste(taste) |
+| Fenster | Geoeffnet, Schliessen, Groesse, Taste(taste), Takt |
+| eigenes Control | Geoeffnet, Groesse, Takt |
 | App | Geoeffnet, Beenden |
 
 Ein Ereignis mit Klammern ruft seine Methode mit Werten: `Ziehen` mit der
@@ -139,7 +141,13 @@ hängt), `Rad` mit den Schritten des Mausrads, `Taste` mit dem Tastencode
 (`KEY_A`, `KEY_SPACE` ...), solange das Fenster vorn ist und kein
 Eingabefeld die Taste nimmt, `Knopf` mit der Nummer des gedrückten Knopfs
 der Werkzeugleiste und `Feld` mit der Nummer des angeklickten Felds der
-Statusleiste (ab 0, Trenner und Lücken zählen mit). Die Knöpfe stehen im
+Statusleiste (ab 0, Trenner und Lücken zählen mit), `Zelle` mit
+Datenzeile und Spalte jedes Klicks in eine Tabelle -- auch auf einen Knopf
+in der Zelle (`GUI_TABLE_CELL_KIND "knopf"`) und auch in der schon gewählten
+Zeile, wo `Geaendert` nicht mehr kommt. `Takt` läuft in jedem Bild nach den
+Ereignissen der Controls (die eines eigenen Controls vor denen des
+Fensters) -- dort fragt der Code ab, wofür es kein Ereignis gibt, etwa ein
+Kontextmenü aus `GUI_CONTEXT`. Die Knöpfe stehen im
 Inspektor in einer Zeile, `Text|Sinnbild|Tipp` je Knopf, durch Semikolon
 getrennt, `-` ist ein Trenner, `~` eine Lücke (`Neu|plus|Neues Produkt; -;
 |rueckgaengig|Rückgängig`); die Felder als `Text|Breite`, dahinter

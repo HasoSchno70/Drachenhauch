@@ -396,6 +396,7 @@ FUNCTION basisCode$(ei AS INTEGER) AS STRING
         ARRAY_PUSH(takt, "        IF NOT Self.studioOffen THEN RETURN")
         ARRAY_PUSH(takt, "        Self." + instName[qq] + ".studioLegen()")
         ARRAY_PUSH(takt, "        Self." + instName[qq] + ".studioTakt()")
+        ARRAY_PUSH(takt, "        Self." + instName[qq] + ".Takt()")
         ARRAY_PUSH(zeichnen, "        Self." + instName[qq] + ".studioZeichnen()")
     NEXT
     FOR i = 0 TO LEN(namen) - 1
@@ -423,6 +424,9 @@ FUNCTION basisCode$(ei AS INTEGER) AS STRING
                     bed = "studioFokusAlt = " + ctl + " AND studioFokusJetzt <> " + ctl
                 CASE "doppelklick"
                     bed = "GUI_DOUBLE_CLICKED(" + ctl + ")"
+                CASE "zelle"
+                    ARRAY_PUSH(takt, "        IF NOT Self.studioOffen THEN RETURN")
+                    ARRAY_PUSH(takt, "        IF GUI_TABLE_CLICKED(" + ctl + ") >= 0 THEN Self." + MAPGET(evMeth, schl) + "(GUI_TABLE_CLICKED(" + ctl + "), GUI_TABLE_CLICKED_COL(" + ctl + "))")
                 CASE "knopf"
                     ARRAY_PUSH(takt, "        IF NOT Self.studioOffen THEN RETURN")
                     ARRAY_PUSH(takt, "        IF GUI_TOOLBAR_CLICKED(" + ctl + ") >= 0 THEN Self." + MAPGET(evMeth, schl) + "(GUI_TOOLBAR_CLICKED(" + ctl + "))")

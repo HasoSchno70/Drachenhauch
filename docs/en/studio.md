@@ -122,14 +122,16 @@ The events per kind:
 | checkbox, toggle, radio button | Klick, Geaendert |
 | text field | Geaendert, Enter, FokusRein, FokusRaus |
 | text area | Geaendert, FokusRein, FokusRaus |
-| list, tree, table | Geaendert, Doppelklick (for list and table also Enter) |
+| list, tree | Geaendert, Doppelklick (for the list also Enter) |
+| table | Geaendert, Doppelklick (also Enter), Zelle(zeile, spalte) |
 | slider, number field, dropdown, pickers, tab control | Geaendert |
 | canvas | Zeichnen, Maus, Ziehen(x, y), Rad(schritte) |
 | toolbar | Knopf(nr) |
 | status bar | Feld(nr) |
 | every control in addition | MausRein, MausRaus |
 | timer, menu entry | Aktion |
-| window | Geoeffnet, Schliessen, Groesse, Taste(taste) |
+| window | Geoeffnet, Schliessen, Groesse, Taste(taste), Takt |
+| own control | Geoeffnet, Groesse, Takt |
 | App | Geoeffnet, Beenden |
 
 An event with parentheses calls its method with values: `Ziehen` (drag)
@@ -138,7 +140,13 @@ it), `Rad` (wheel) with the steps of the mouse wheel, `Taste` (key) with the
 key code (`KEY_A`, `KEY_SPACE` ...), as long as the window is in front and
 no input field takes the key, `Knopf` (button) with the number of the
 toolbar button pressed and `Feld` (field) with the number of the status bar
-field clicked (from 0, separators and gaps count too). The inspector holds
+field clicked (from 0, separators and gaps count too), `Zelle` (cell) with
+the data row and column of every click into a table -- also on a button in
+the cell (`GUI_TABLE_CELL_KIND "knopf"`) and also in the row already
+selected, where `Geaendert` no longer comes. `Takt` (tick) runs in every
+frame after the events of the controls (those of an own control before
+those of the window) -- that is where code polls what has no event, such as
+a context menu from `GUI_CONTEXT`. The inspector holds
 the buttons in one line, `text|symbol|tip` per button, separated by
 semicolons, `-` is a separator, `~` a gap (`New|plus|New product; -;
 |rueckgaengig|Undo`); the fields as `text|width`, optionally followed by
