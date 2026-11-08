@@ -3,12 +3,14 @@
 '
 ' Die Reise geht ueber den Adventskranz: zu jeder Kerze ein Kapitel. Die
 ' erste Kerze entzuendet sich, die Kamera faehrt in ihre Flamme -- und steht
-' im verschneiten Dorf bei Nacht. Die zweite fuehrt auf den Weihnachtsmarkt
-' (ein Karussell dreht sich im Takt), die dritte in den Winterwald an einen
-' zugefrorenen See, wo Eiskristalle mit der Melodie wachsen, die vierte auf
-' einen Schlittenflug vor dem Mond. Am Heiligabend sieht man durchs Fenster
-' in die Stube: der Baum schmueckt sich Kugel fuer Kugel zu "Stille Nacht",
-' um Mitternacht schlagen die Glocken, und der Stern auf der Spitze geht auf.
+' ueber einem Tal im Winterwald, wo Haus um Haus ein Dorf aus dem Schnee
+' waechst. Die zweite fuehrt auf den Weihnachtsmarkt (ein Karussell dreht
+' sich im Takt, Leute schlendern zwischen den Buden), die dritte in den
+' Winterwald an einen zugefrorenen See, wo Eiskristalle mit der Melodie
+' wachsen, die vierte auf einen Schlittenflug vor dem Mond. Am Heiligabend
+' oeffnet sich das Fenster zur Stube: der Baum entfaltet sich und schmueckt
+' sich Kugel fuer Kugel zu "Stille Nacht", um Mitternacht schlagen die
+' Glocken, und der Stern auf der Spitze geht auf.
 '
 ' Die Musik (musik.dh) ist ganz synthetisiert -- festlich-elektronisch, 116
 ' Schlaege je Minute, um das Glockenmotiv aus "Shchedryk" ("Carol of the
@@ -185,12 +187,14 @@ DIM ky1[MAX_STRICHE] AS INTEGER
 DIM kx2[MAX_STRICHE] AS INTEGER
 DIM ky2[MAX_STRICHE] AS INTEGER
 DIM kf[MAX_STRICHE] AS INTEGER
-' die Decke als Saeulen
-DIM dx1[SAEULEN] AS INTEGER
-DIM dy1[SAEULEN] AS INTEGER
-DIM dx2[SAEULEN] AS INTEGER
-DIM dy2[SAEULEN] AS INTEGER
-DIM df[SAEULEN] AS INTEGER
+' die Decke, gezeichnet in feinen Streifen von 2 Punkten, zwischen den
+' Saeulen weich verbunden (sonst sieht man die Treppe der Saeulen)
+CONST STREIFEN = 640
+DIM dx1[STREIFEN] AS INTEGER
+DIM dy1[STREIFEN] AS INTEGER
+DIM dx2[STREIFEN] AS INTEGER
+DIM dy2[STREIFEN] AS INTEGER
+DIM df[STREIFEN] AS INTEGER
 
 DIM si AS INTEGER
 RANDOMIZE(24)
@@ -311,19 +315,26 @@ SUB deckeZeichnen(zeit AS FLOAT)
     DIM j AS INTEGER
     DIM sicht AS FLOAT : sicht = schneeDraussen
     IF sicht <= 0.01 THEN RETURN
-    FOR j = 0 TO SAEULEN - 1
-        DIM h AS INTEGER : h = INT(liegt[j] * sicht)
-        dx1[j] = j * SAEULE_B : dx2[j] = j * SAEULE_B + SAEULE_B - 1
+    DIM schritt AS INTEGER : schritt = STREIFEN \ SAEULEN
+    FOR j = 0 TO STREIFEN - 1
+        ' Lage zwischen den Mitten zweier Saeulen, weich (Hermite) verbunden
+        DIM lage AS FLOAT : lage = (j + 0.5) / schritt - 0.5
+        DIM a AS INTEGER : a = CLAMP(INT(FLOOR(lage)), 0, SAEULEN - 1)
+        DIM b AS INTEGER : b = MIN(a + 1, SAEULEN - 1)
+        DIM t AS FLOAT : t = CLAMP(lage - a, 0.0, 1.0)
+        t = t * t * (3.0 - 2.0 * t)
+        DIM h AS INTEGER : h = INT((liegt[a] + (liegt[b] - liegt[a]) * t) * sicht)
+        dx1[j] = j * 2 : dx2[j] = j * 2 + 1
         dy1[j] = HOEHE - h : dy2[j] = HOEHE
         df[j] = RGBA(150, 165, 195, MAX(1, INT(190 * sicht)))
     NEXT
-    BOXES(dx1, dy1, dx2, dy2, df, SAEULEN)
+    BOXES(dx1, dy1, dx2, dy2, df, STREIFEN)
     ' die Kante: ein feiner heller Saum und hier und da ein Funkeln
-    FOR j = 0 TO SAEULEN - 1
+    FOR j = 0 TO STREIFEN - 1
         dy2[j] = dy1[j] + 2
         df[j] = RGBA(235, 242, 255, MAX(1, INT(200 * sicht)))
     NEXT
-    BOXES(dx1, dy1, dx2, dy2, df, SAEULEN)
+    BOXES(dx1, dy1, dx2, dy2, df, STREIFEN)
     DIM ton AS FLOAT : ton = musikTon()
     FOR j = 0 TO SAEULEN - 1
         DIM fun AS FLOAT : fun = SIN(zeit * 3.0 + j * 2.37) * SIN(zeit * 1.3 + j * 0.71)
@@ -436,8 +447,8 @@ SUB beschriftung(takt AS FLOAT)
     kapitel("Vierter Advent", "Der Flug zum Mond", "Sleigh ride past the moon", takt, AB_SCHLITTEN)
     kapitel("Heiligabend", "Durchs Fenster in die Stube", "Through the window, Christmas Eve", takt, AB_STUBE)
     ' kleine Hinweise, was gerade zu sehen ist
-    zweisprachig("Fachwerk, Schnee und Mondlicht: alles im Fragment-Shader berechnet", _
-        "Half-timbering, snow and moonlight: all computed in a fragment shader", 646, 18, zeigen(takt, AB_DORF + 6, AB_DORF + 11), FALSE)
+    zweisprachig("Haus um Haus wächst das Dorf aus dem Schnee -- alles im Fragment-Shader berechnet", _
+        "House by house the village grows out of the snow -- all computed in a fragment shader", 646, 18, zeigen(takt, AB_DORF + 6, AB_DORF + 11), FALSE)
     zweisprachig("Das Karussell dreht sich auf der Audio-Uhr, im Takt der Bassdrum", _
         "The carousel turns on the audio clock, in time with the kick drum", 646, 18, zeigen(takt, AB_MARKT + 6, AB_MARKT + 11), FALSE)
     zweisprachig("Schneekristalle: sechs Arme, jeder anders -- was unten ankommt, bleibt liegen", _
@@ -472,12 +483,17 @@ SUB uebergang(sh AS INTEGER, aus AS FLOAT, ein AS FLOAT, r AS FLOAT, g AS FLOAT,
     SHADER_SET3(sh, "uebLicht", r, g, b)
 END SUB
 
-' Ein Zwischenspiel am Kranz (zwei Takte): die naechste Kerze entzuendet sich,
-' die Kamera faehrt in ihre Flamme, das Licht fuehrt ins naechste Kapitel.
-SUB kranzZeigen(sh AS INTEGER, takt AS FLOAT, von AS FLOAT, brennen AS FLOAT, k AS INTEGER, bis AS FLOAT)
-    SHADER_SET(sh, "kerzen", brennen + CLAMP((takt - (von + 0.3)) * 2.5, 0.0, 1.0))
-    SHADER_SET(sh, "fokus", CLAMP((takt - (bis - 1.3)) / 1.3, 0.0, 1.0))
+' Ein Zwischenspiel am Kranz (zwei Takte): wenn das Licht des Uebergangs
+' gewichen ist, entzuendet sich die naechste Kerze (auf den Glockenschlag in
+' musik.dh), dann faehrt die Kamera in ihre Flamme und das Licht fuehrt ins
+' naechste Kapitel. Frueher entzuendete sie sich noch hinter dem Licht --
+' man sah sie schon brennen.
+SUB kranzZeigen(sh AS INTEGER, takt AS FLOAT, von AS FLOAT, k AS INTEGER, bis AS FLOAT)
+    SHADER_SET(sh, "kerzen", kerzenBrennen(takt))
+    SHADER_SET(sh, "fokus", CLAMP((takt - (bis - 0.8)) / 0.8, 0.0, 1.0))
     SHADER_SET(sh, "ziel", k)
+    SHADER_SET(sh, "phase", CLAMP((takt - von) / (bis - von), 0.0, 1.0))
+    SHADER_SET(sh, "bogen", 0.55)
 END SUB
 
 ' Die Farbe jedes Akkords: die Nacht (g-Moll) in kalten Toenen -- tiefblau,
@@ -582,21 +598,23 @@ WHILE NOT beenden
         sh = shKranz
         IF takt < AB_DORF THEN
             SHADER_SET(sh, "hell", CLAMP(takt / 1.5, 0.0, 1.0))
-            SHADER_SET(sh, "kerzen", CLAMP((takt - 4.9) * 2.5, 0.0, 1.0))
+            SHADER_SET(sh, "kerzen", kerzenBrennen(takt))
             SHADER_SET(sh, "fokus", CLAMP((takt - 6.4) / 1.6, 0.0, 1.0))
             SHADER_SET(sh, "ziel", 0)
+            SHADER_SET(sh, "phase", CLAMP(takt / AB_DORF, 0.0, 1.0))
+            SHADER_SET(sh, "bogen", 1.4)
             uebergang(sh, vorEnde(takt, AB_DORF), 1.0, 1.0, 0.75, 0.45)
         ELSEIF takt < AB_MARKT THEN
             SHADER_SET(sh, "hell", 1.0)
-            kranzZeigen(sh, takt, AB_KRANZ2, 1.0, 1, AB_MARKT)
+            kranzZeigen(sh, takt, AB_KRANZ2, 1, AB_MARKT)
             uebergang(sh, vorEnde(takt, AB_MARKT), nachBeginn(takt, AB_KRANZ2), 1.0, 0.75, 0.45)
         ELSEIF takt < AB_WALD THEN
             SHADER_SET(sh, "hell", 1.0)
-            kranzZeigen(sh, takt, AB_KRANZ3, 2.0, 2, AB_WALD)
+            kranzZeigen(sh, takt, AB_KRANZ3, 2, AB_WALD)
             uebergang(sh, vorEnde(takt, AB_WALD), nachBeginn(takt, AB_KRANZ3), 1.0, 0.75, 0.45)
         ELSE
             SHADER_SET(sh, "hell", 1.0)
-            kranzZeigen(sh, takt, AB_KRANZ4, 3.0, 3, AB_SCHLITTEN)
+            kranzZeigen(sh, takt, AB_KRANZ4, 3, AB_SCHLITTEN)
             uebergang(sh, vorEnde(takt, AB_SCHLITTEN), nachBeginn(takt, AB_KRANZ4), 1.0, 0.75, 0.45)
         END IF
     ELSEIF takt < AB_KRANZ2 THEN
@@ -637,12 +655,16 @@ WHILE NOT beenden
         ' juengste schon aufgegangen ist
         DIM schritt AS FLOAT : schritt = musikSchritt()
         SHADER_SET(sh, "kugeln", kugelnBei(schritt))
+        ' der Baum entfaltet sich, sobald das Fenster aufgeht, dann laeuft
+        ' das Licht die Kette hinauf
+        SHADER_SET(sh, "aufbau", CLAMP((takt - (AB_STUBE + 2.4)) / 4.0, 0.0, 1.0))
+        SHADER_SET(sh, "kette", CLAMP((takt - (AB_STUBE + 5.5)) / 3.0, 0.0, 1.0))
         SHADER_SET(sh, "glocke", glockenSchlag(takt))
         SHADER_SET(sh, "stern", CLAMP((takt - AB_STERN) * 2.0, 0.0, 1.0))
         SHADER_SET(sh, "nacht", CLAMP((takt - (AB_MITTERNACHT - 2)) / 2.0, 0.0, 1.0))
         uebergang(sh, vorEnde(takt, AB_AUS + 2), nachBeginn(takt, AB_STUBE), 1.0, 0.82, 0.55)
         ' Schnee nur, solange wir noch draussen vor dem Fenster stehen
-        zielDicht = IIF(takt < AB_STUBE + 5, 0.4, 0.0) : zielDraussen = 0.0
+        zielDicht = IIF(takt < AB_STUBE + 3.5, 0.4, 0.0) : zielDraussen = 0.0
         schneeWind = 0.05
     ELSE
         ' Abspann: das Dorf, ueber ihm der Stern, aus dem der Gruss aufsteigt

@@ -16,7 +16,9 @@
 ' dann mit Klavier, Chor und Streichern. Um Mitternacht schlagen die Glocken.
 '
 ' Instrumente: Celesta, Spieluhr, Glockenspiel, Roehrenglocken,
-' Schlittenschellen, Streicherflaechen, Chor, Klavier, Supersaw; Geraeusche:
+' Schlittenschellen, Streicherflaechen, Chor, Klavier, Supersaw, Blaeser und
+' Pauken (Fanfaren zu den Kapiteln, Wirbel davor, der Stern und der Gruss im
+' Abspann mit vollem Blech); Geraeusche:
 ' Schritte im Schnee, Stimmengewirr auf dem Markt, Wind und Eule im Wald,
 ' Kaminknistern, Uhrticken, ferne Kirchenglocken.
 IMPORT "audio"
@@ -44,6 +46,20 @@ CONST AB_MITTERNACHT = 96
 CONST AB_STERN = 99
 CONST AB_AUS = 100
 CONST RUECKUNG = 2
+' Wann sich am Kranz die naechste Kerze entzuendet (in Takten nach Beginn)
+CONST KERZE_AN = 0.75
+
+' Wie viele Kerzen am Kranz brennen (mit Bruchteil: die naechste entzuendet
+' sich gerade) -- fuer die Bilder, im selben Augenblick wie der Glockenschlag
+' (Abschnitt Kerzen in schrittPlanen). Die erste im Intro auf Takt 5, die
+' weiteren eine punktierte Halbe nach Beginn des Zwischenspiels, wenn das
+' Licht des Uebergangs gewichen ist.
+FUNCTION kerzenBrennen(takt AS FLOAT) AS FLOAT
+    IF takt < AB_KRANZ2 THEN RETURN CLAMP((takt - 4.9) * 2.5, 0.0, 1.0)
+    IF takt < AB_KRANZ3 THEN RETURN 1.0 + CLAMP((takt - (AB_KRANZ2 + KERZE_AN)) * 2.0, 0.0, 1.0)
+    IF takt < AB_KRANZ4 THEN RETURN 2.0 + CLAMP((takt - (AB_KRANZ3 + KERZE_AN)) * 2.0, 0.0, 1.0)
+    RETURN 3.0 + CLAMP((takt - (AB_KRANZ4 + KERZE_AN)) * 2.0, 0.0, 1.0)
+END FUNCTION
 
 FUNCTION msJeSchritt() AS FLOAT
     RETURN 60000.0 / TEMPO / 4.0
@@ -723,6 +739,69 @@ FUNCTION streicher(nr AS INTEGER, mitChor AS BOOLEAN) AS SOUND
     RETURN merken(k, s)
 END FUNCTION
 
+' --- Festliches Blech ------------------------------------------------------------
+
+' Eine Blaeserstimme: drei leicht verstimmte Saegen durch einen Tiefpass, der
+' sich ueber den Ton oeffnet -- der Ton schwillt hell an wie ein Horn oder
+' eine Trompete. Kurze Toene bleiben dunkler, lange strahlen.
+SUB blechStimme(ziel AS SOUND, f AS FLOAT, dauer AS INTEGER, pan AS FLOAT, vol AS FLOAT)
+    DIM c AS INTEGER
+    FOR c = -1 TO 1
+        DIM fc AS FLOAT : fc = f * 2.0 ^ (c * 7.0 / 1200.0)
+        dazuPan(ziel, AUDIO_SFX("saw", fc, 0, 45, dauer, 260, 0.0035, 5.3 + c * 0.4, vol, 0.0, 0.5, 0, 0, 500 + f * 1.4, 2600, 0.25), 0, 1.0, pan + c * 0.3)
+    NEXT
+END SUB
+
+' Ein Blaeserton (Melodie), `schritte` Sechzehntel lang
+FUNCTION blech(midi AS INTEGER, schritte AS INTEGER) AS SOUND
+    DIM k AS STRING : k = "blech" + STR$(midi) + "_" + STR$(schritte)
+    IF trocken THEN RETURN vormerken(k, FUNCTION() blech(midi, schritte))
+    DIM i AS INTEGER : i = gemerkt(k)
+    IF i >= 0 THEN RETURN klaenge[i]
+    DIM dauer AS INTEGER : dauer = INT(msJeSchritt() * schritte) - 20
+    DIM t AS SOUND : t = AUDIO_SOUND_NEW(dauer + 700)
+    blechStimme(t, hz(midi), dauer, 0.0, 0.16)
+    blechStimme(t, hz(midi - 12), dauer, 0.0, 0.08)
+    RETURN merken(k, mitEcho(t, dauer + 700, 0.3, 0.25, 2))
+END FUNCTION
+
+' Ein Blaeserakkord: die vier Akkordtoene, eine Oktave hoeher gelegt, und der
+' Grundton als Posaune darunter
+FUNCTION blechAkkord(nr AS INTEGER, schritte AS INTEGER) AS SOUND
+    DIM k AS STRING : k = "blechA" + STR$(nr) + "_" + STR$(schritte)
+    IF trocken THEN RETURN vormerken(k, FUNCTION() blechAkkord(nr, schritte))
+    DIM i AS INTEGER : i = gemerkt(k)
+    IF i >= 0 THEN RETURN klaenge[i]
+    DIM dauer AS INTEGER : dauer = INT(msJeSchritt() * schritte) - 20
+    DIM t AS SOUND : t = AUDIO_SOUND_NEW(dauer + 700)
+    DIM v AS INTEGER
+    FOR v = 0 TO 3
+        blechStimme(t, hz(akkTon(nr, v) + 12), dauer, (v - 1.5) * 0.35, 0.075)
+    NEXT
+    blechStimme(t, hz(grundTon(nr) + 24), dauer, 0.0, 0.1)
+    RETURN merken(k, mitEcho(t, dauer + 700, 0.35, 0.22, 2))
+END FUNCTION
+
+' Pauke: ein tiefer Sinus, der beim Anschlag ein wenig nachgibt, die Quinte
+' darueber leise, und ein dumpfer Schlag aus Rauschen
+FUNCTION pauke(midi AS INTEGER) AS SOUND
+    DIM k AS STRING : k = "pauke" + STR$(midi)
+    IF trocken THEN RETURN vormerken(k, FUNCTION() pauke(midi))
+    DIM i AS INTEGER : i = gemerkt(k)
+    IF i >= 0 THEN RETURN klaenge[i]
+    DIM f AS FLOAT : f = hz(midi)
+    DIM t AS SOUND : t = AUDIO_SOUND_NEW(1500)
+    dazu(t, AUDIO_SFX("sine", f * 1.04, -f * 0.25, 2, 40, 1300, 0, 0, 0.45), 0, 1.0)
+    dazu(t, AUDIO_SFX("sine", f * 1.51, -f * 0.3, 2, 20, 600, 0, 0, 0.15), 0, 1.0)
+    dazu(t, AUDIO_SFX("noise", 600, 0, 0, 8, 140, 0, 0, 0.6, 0.0, 0.5, 0, 0, 900, -2000, 0.2), 0, 0.35)
+    RETURN merken(k, t)
+END FUNCTION
+
+' Der Ton der Pauke zum Akkord: sein Grundton in der Lage der Pauken (F2..E3)
+FUNCTION paukenTon(nr AS INTEGER) AS INTEGER
+    RETURN 41 + ((grundTon(nr) - 41) MOD 12 + 12) MOD 12
+END FUNCTION
+
 ' --- Geraeusche ---------------------------------------------------------------
 
 ' Schritte im Schnee: zwei Schritte, jeder ein Knirschen aus kurzen, dumpfen
@@ -913,7 +992,7 @@ FUNCTION imKranz(takt AS INTEGER) AS BOOLEAN
 END FUNCTION
 
 ' Eine Melodie-Stimme in Schritt n: aus der Melodie m, `art` 0 = Lead,
-' 1 = Klavier, 2 = Celesta; die Stelle zaehlt ab dem Takt `von`.
+' 1 = Klavier, 2 = Celesta, 3 = Blech; die Stelle zaehlt ab dem Takt `von`.
 SUB melodieSpielen(n AS INTEGER, m AS ARRAY OF INTEGER, von AS INTEGER, art AS INTEGER, vol AS FLOAT, oktave AS INTEGER)
     DIM takt AS INTEGER : takt = n \ SCHRITTE_JE_TAKT
     DIM s AS INTEGER : s = n MOD SCHRITTE_JE_TAKT
@@ -927,7 +1006,22 @@ SUB melodieSpielen(n AS INTEGER, m AS ARRAY OF INTEGER, von AS INTEGER, art AS I
         CASE 0 : spielen(lead(ton, achtel), n, vol)
         CASE 1 : spielen(klavier(ton, achtel), n, vol)
         CASE 2 : spielen(celesta(ton, MIN(achtel, 4)), n, vol)
+        CASE 3 : spielen(blech(ton, achtel * 2), n, vol)
     END SELECT
+END SUB
+
+' Eine Fanfare auf den Akkord nr: kurz -- kurz-kurz -- lang
+SUB fanfare(n AS INTEGER, s AS INTEGER, nr AS INTEGER, vol AS FLOAT)
+    IF s = 0 THEN spielen(blechAkkord(nr, 2), n, vol)
+    IF s = 2 THEN spielen(blechAkkord(nr, 1), n, vol * 0.8)
+    IF s = 3 THEN spielen(blechAkkord(nr, 1), n, vol * 0.85)
+    IF s = 4 THEN spielen(blechAkkord(nr, 12), n, vol)
+END SUB
+
+' Ein Paukenwirbel in der zweiten Haelfte eines Takts, lauter werdend, auf
+' den Grundton des Akkords, der danach kommt
+SUB wirbel(n AS INTEGER, s AS INTEGER, nachher AS INTEGER, vol AS FLOAT)
+    IF s >= 8 THEN spielen(pauke(paukenTon(nachher)), n, vol * (0.3 + 0.09 * (s - 8)))
 END SUB
 
 ' Alles, was in Schritt n erklingt.
@@ -1006,12 +1100,40 @@ SUB schrittPlanen(n AS INTEGER)
         IF takt >= AB_RUECKUNG THEN melodieSpielen(n, nachtMelodie, AB_SCHLITTEN, 0, 0.4, 12)
     END IF
 
+    ' --- Blech und Pauken ---
+    ' Fanfaren zu den Kapiteln, im Dorf weiche Hoerner, auf dem Markt (zweite
+    ' Haelfte) Akkorde mit Auftakt, der Stern und der Gruss im Abspann
+    IF takt = AB_MARKT OR takt = AB_MARKT + 8 OR takt = AB_SCHLITTEN OR takt = AB_RUECKUNG THEN fanfare(n, s, nr, 0.5)
+    IF takt >= AB_DORF + 8 AND takt < AB_KRANZ2 AND takt MOD 2 = 0 AND s = 0 THEN spielen(blechAkkord(nr, 28), n, 0.3)
+    IF takt > AB_MARKT + 8 AND takt < AB_KRANZ3 THEN
+        IF takt MOD 2 = 0 AND s = 0 THEN spielen(blechAkkord(nr, 6), n, 0.32)
+        IF takt MOD 2 = 1 AND takt < AB_KRANZ3 - 1 AND (s = 12 OR s = 14) THEN spielen(blechAkkord(akkordNr(takt + 1), 2), n, 0.27)
+    END IF
+    ' die Pauke auf jedem Akkordwechsel, wo die Bassdrum laeuft
+    IF treibt(takt) AND takt >= AB_MARKT AND takt MOD 2 = 0 AND s = 0 THEN spielen(pauke(paukenTon(nr)), n, 0.55)
+    IF imMarkt(takt) AND takt >= AB_MARKT + 8 AND takt MOD 2 = 0 AND s = 8 THEN spielen(pauke(paukenTon(nr)), n, 0.45)
+    ' Wirbel vor dem Markt, dem Schlittenflug, dem Stern und dem Gruss
+    IF takt = AB_KRANZ2 + 1 THEN wirbel(n, s, akkordNr(AB_MARKT), 0.55)
+    IF takt = AB_KRANZ4 + 1 THEN wirbel(n, s, akkordNr(AB_SCHLITTEN), 0.55)
+    IF takt = AB_STERN - 1 THEN wirbel(n, s, 16, 0.7)
+    IF takt = AB_AUS + 3 THEN wirbel(n, s, akkordNr(AB_AUS + 4), 0.6)
+    ' der Gruss im Abspann: die zweite Phrase des Marktes als Blaesersatz,
+    ' ueber denselben Akkorden wie auf dem Markt
+    IF takt >= AB_AUS + 4 AND takt < AB_AUS + 8 THEN
+        melodieSpielen(n, marktMelodie, AB_AUS, 3, 0.55, 0)
+        IF takt MOD 2 = 0 AND s = 0 THEN spielen(blechAkkord(nr, 28), n, 0.32)
+        IF takt MOD 2 = 0 AND s = 0 THEN spielen(pauke(paukenTon(nr)), n, 0.6)
+    END IF
+    IF n = (AB_AUS + 4) * SCHRITTE_JE_TAKT THEN spielen(crash(), n, 0.4)
+
     ' --- Stille Nacht ---
     DIM st AS INTEGER : st = snStelle(n)
     IF st >= 0 THEN
         DIM zweite AS BOOLEAN : zweite = n - AB_STUBE * SCHRITTE_JE_TAKT >= SN_STROPHE
         ' der Akkord je 6/8-Takt, in der zweiten Strophe mit Chor
         IF st MOD 12 = 0 THEN spielen(streicher(24 + snTaktAkkord[st \ 12], zweite), n, IIF(zweite, 0.9, 0.55))
+        ' in der zweiten Strophe leise Hoerner unter dem Chor
+        IF zweite AND st MOD 12 = 0 THEN spielen(blechAkkord(24 + snTaktAkkord[st \ 12], 12), n, 0.2)
         ' Wiegen: die Akkordtoene als Achtel im Sechsachteltakt (Spieluhr bzw. Celesta)
         IF st MOD 2 = 0 THEN
             DIM wv AS INTEGER : wv = (st \ 2) MOD 6
@@ -1042,6 +1164,8 @@ SUB schrittPlanen(n AS INTEGER)
     ' der Stern geht auf: ein Akkord, Glocken in Kaskade, Chor
     IF n = AB_STERN * SCHRITTE_JE_TAKT THEN
         spielen(crash(), n, 0.45)
+        spielen(blechAkkord(16, 16), n, 0.5)
+        spielen(pauke(paukenTon(16)), n, 0.9)
         spielen(flaeche(16, TRUE), n, 0.9)
         spielen(chor(16), n, 0.8)
     END IF
@@ -1062,7 +1186,9 @@ SUB schrittPlanen(n AS INTEGER)
     END IF
 
     ' --- Kerzen --- jede Kerze, die sich entzuendet, mit einem Glockenschlag
-    IF s = 0 AND (takt = 5 OR takt = AB_KRANZ2 OR takt = AB_KRANZ3 OR takt = AB_KRANZ4) THEN
+    ' (am Kranz eine punktierte Halbe nach der Eins, wenn das Licht des
+    ' Uebergangs gewichen ist -- main.dh zuendet sie im selben Augenblick)
+    IF (s = 0 AND takt = 5) OR (s = KERZE_AN * SCHRITTE_JE_TAKT AND (takt = AB_KRANZ2 OR takt = AB_KRANZ3 OR takt = AB_KRANZ4)) THEN
         spielen(roehrenglocke(IIF(takt = 5, 55, IIF(takt = AB_KRANZ2, 58, IIF(takt = AB_KRANZ3, 62, 67)))), n, 0.6)
     END IF
 

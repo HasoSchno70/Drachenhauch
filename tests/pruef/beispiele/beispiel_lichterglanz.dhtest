@@ -3,7 +3,8 @@
 '
 ' Die Musik wird offline ausgeschrieben (--wav) und an der Datei geprueft:
 ' Stereo, Laenge, Spitze, still im Intro, laut auf dem Markt und im
-' Schlittenflug, die Glocken um Mitternacht, still am Ende. Die Bilder: jede
+' Schlittenflug, die Glocken um Mitternacht, das Blech beim Gruss im
+' Abspann (Takt 104..108), still am Ende. Die Bilder: jede
 ' Szene einmal ab ihrem Takt, das Bildschirmfoto darf weder schwarz noch
 ' weiss sein -- ein Shader, der nicht uebersetzt, liefert Schwarz (und
 ' main.dh bricht ab). Dazu: Stille Nacht und die Kugeln am Baum, der
@@ -28,6 +29,7 @@ pegel 0 1500 < 0.3
 pegel 62000 63000 > 0.05
 pegel 140000 141000 > 0.05
 pegel 199000 200000 > 0.02
+pegel 216000 218000 > 0.06
 pegel 232000 235000 < 0.03
 
 === adventskranz mit der ersten kerze
@@ -336,6 +338,138 @@ IMPORT "pruefen.dh"
 --- erwartet
 nicht schwarz TRUE, nicht weiss TRUE
 
+=== das dorf waechst erst noch aus dem schnee
+' Zu Beginn des Kapitels steht nur die Kirche, die Haeuser kommen erst noch
+' (frueher stand von Anfang an eine fertige, erleuchtete Gasse da). `fort`
+' ist festgelegt, damit das Bild nicht vom Tempo der Maschine abhaengt.
+--- programm ../../../examples/lichterglanz/main.dh
+--- ersetzen IMPORT "musik.dh"
+IMPORT "{sammlung}/../../../examples/lichterglanz/musik.dh"
+--- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../../examples/lichterglanz/assets/shader/" + name + ".fs")
+--- ersetzen SHADER_SET(sh, "fort", (takt - AB_DORF) / 16.0)
+SHADER_SET(sh, "fort", 0.12)
+--- argumente
+--fenster
+--ab
+12
+--- umgebung
+DHRT_FRAMES=30
+DHRT_SCREENSHOT={fall}/bild.png
+DH_OHNE_AUDIO=1
+--- datei zaehlen.dh
+' warme Bildpunkte (Fensterlicht: rot hell, deutlich roeter als blau) und
+' die mittlere Helligkeit, auf einem Raster von 4 Punkten
+DIM b AS INTEGER : b = LOADIMAGE("bild.png")
+DIM warm AS INTEGER
+DIM s AS FLOAT
+DIM n AS INTEGER
+DIM x AS INTEGER
+DIM y AS INTEGER
+FOR y = 0 TO 719 STEP 4
+    FOR x = 0 TO 1279 STEP 4
+        DIM f AS INTEGER : f = GETPIXEL(b, x, y)
+        DIM r AS INTEGER : r = (f SHR 16) BAND 255
+        DIM bl AS INTEGER : bl = f BAND 255
+        IF r > 120 AND r > bl + 40 THEN warm = warm + 1
+        s = s + r + ((f SHR 8) BAND 255) + bl
+        n = n + 1
+    NEXT
+NEXT
+DIM mittel AS FLOAT : mittel = s / n / 3
+PRINT "kaum fensterlicht "; warm < 15; ", nicht schwarz "; mittel > 4
+--- nachher
+IMPORT "zaehlen.dh"
+--- erwartet
+kaum fensterlicht TRUE, nicht schwarz TRUE
+
+=== das dorf steht und leuchtet
+' Spaeter im Kapitel stehen die Haeuser, ihre Fenster leuchten warm
+--- programm ../../../examples/lichterglanz/main.dh
+--- ersetzen IMPORT "musik.dh"
+IMPORT "{sammlung}/../../../examples/lichterglanz/musik.dh"
+--- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../../examples/lichterglanz/assets/shader/" + name + ".fs")
+--- ersetzen SHADER_SET(sh, "fort", (takt - AB_DORF) / 16.0)
+SHADER_SET(sh, "fort", 0.9)
+--- argumente
+--fenster
+--ab
+12
+--- umgebung
+DHRT_FRAMES=30
+DHRT_SCREENSHOT={fall}/bild.png
+DH_OHNE_AUDIO=1
+--- datei zaehlen.dh
+' warme Bildpunkte (Fensterlicht: rot hell, deutlich roeter als blau) und
+' die mittlere Helligkeit, auf einem Raster von 4 Punkten
+DIM b AS INTEGER : b = LOADIMAGE("bild.png")
+DIM warm AS INTEGER
+DIM s AS FLOAT
+DIM n AS INTEGER
+DIM x AS INTEGER
+DIM y AS INTEGER
+FOR y = 0 TO 719 STEP 4
+    FOR x = 0 TO 1279 STEP 4
+        DIM f AS INTEGER : f = GETPIXEL(b, x, y)
+        DIM r AS INTEGER : r = (f SHR 16) BAND 255
+        DIM bl AS INTEGER : bl = f BAND 255
+        IF r > 120 AND r > bl + 40 THEN warm = warm + 1
+        s = s + r + ((f SHR 8) BAND 255) + bl
+        n = n + 1
+    NEXT
+NEXT
+DIM mittel AS FLOAT : mittel = s / n / 3
+PRINT "fensterlicht "; warm > 60
+--- nachher
+IMPORT "zaehlen.dh"
+--- erwartet
+fensterlicht TRUE
+
+=== durchs offene fenster, nicht durch die sprosse
+' An dieser Stelle fuhr die Kamera frueher mitten durch das Fensterkreuz:
+' das Bild war schwarz. Jetzt sind die Fluegel offen und man sieht die Stube.
+--- programm ../../../examples/lichterglanz/main.dh
+--- ersetzen IMPORT "musik.dh"
+IMPORT "{sammlung}/../../../examples/lichterglanz/musik.dh"
+--- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../../examples/lichterglanz/assets/shader/" + name + ".fs")
+--- ersetzen SHADER_SET(sh, "fort", (takt - AB_STUBE) / (AB_AUS + 2 - AB_STUBE))
+SHADER_SET(sh, "fort", 0.207)
+--- argumente
+--fenster
+--ab
+86
+--- umgebung
+DHRT_FRAMES=30
+DHRT_SCREENSHOT={fall}/bild.png
+DH_OHNE_AUDIO=1
+--- datei zaehlen.dh
+' warme Bildpunkte (Fensterlicht: rot hell, deutlich roeter als blau) und
+' die mittlere Helligkeit, auf einem Raster von 4 Punkten
+DIM b AS INTEGER : b = LOADIMAGE("bild.png")
+DIM warm AS INTEGER
+DIM s AS FLOAT
+DIM n AS INTEGER
+DIM x AS INTEGER
+DIM y AS INTEGER
+FOR y = 0 TO 719 STEP 4
+    FOR x = 0 TO 1279 STEP 4
+        DIM f AS INTEGER : f = GETPIXEL(b, x, y)
+        DIM r AS INTEGER : r = (f SHR 16) BAND 255
+        DIM bl AS INTEGER : bl = f BAND 255
+        IF r > 120 AND r > bl + 40 THEN warm = warm + 1
+        s = s + r + ((f SHR 8) BAND 255) + bl
+        n = n + 1
+    NEXT
+NEXT
+DIM mittel AS FLOAT : mittel = s / n / 3
+PRINT "man sieht die stube "; mittel > 10; ", den baum "; warm > 20
+--- nachher
+IMPORT "zaehlen.dh"
+--- erwartet
+man sieht die stube TRUE, den baum TRUE
+
 === stille nacht schmueckt den baum
 ' 46 Toene je Strophe, die Strophe 144 Sechzehntel (zwoelf 6/8-Takte); je Ton
 ' eine Kugel, in zwei Strophen also 92. Die Huellkurve der Melodie beginnt
@@ -356,6 +490,26 @@ IMPORT "{sammlung}/../../../examples/lichterglanz/musik.dh"
 0 1 47 92
 1.00 0.50
 TRUE
+
+=== jede kerze entzuendet sich sichtbar, nach dem licht des uebergangs
+' Am Kranz brennt zu Beginn jedes Zwischenspiels nur, was schon brannte; die
+' naechste Kerze entzuendet sich erst, wenn das Licht des Uebergangs gewichen
+' ist, im Schritt des Glockenschlags (frueher schon nach 0.3 Takten, noch
+' hinter dem Licht -- man sah sie nur noch brennen).
+IMPORT "musik_hier.dh"
+PRINT kerzenBrennen(4.0); " "; kerzenBrennen(6.0)
+PRINT kerzenBrennen(AB_KRANZ2 + 0.6); " "; kerzenBrennen(AB_KRANZ2 + 1.3)
+PRINT kerzenBrennen(AB_KRANZ3 + 0.6); " "; kerzenBrennen(AB_KRANZ3 + 1.3)
+PRINT kerzenBrennen(AB_KRANZ4 + 0.6); " "; kerzenBrennen(AB_KRANZ4 + 1.3)
+PRINT "glocke im schritt "; KERZE_AN * SCHRITTE_JE_TAKT
+--- datei musik_hier.dh
+IMPORT "{sammlung}/../../../examples/lichterglanz/musik.dh"
+--- erwartet
+0.0 1.0
+1.0 2.0
+2.0 3.0
+3.0 4.0
+glocke im schritt 12.0
 
 === das glockenmotiv laeuft gegen den takt
 ' B-A-B-G in Sechzehnteln, 6 + 6 + 4 Schritte, jeden Takt wieder auf der Eins
