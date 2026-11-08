@@ -578,8 +578,30 @@ FUNCTION ausgeklappt(d AS JSON_HANDLE) AS JSON_HANDLE
         zumBehaelter(aus, p)
         instanzAusklappen(aus, i, cn, inst, i)
     NEXT
+    seitenDerTeile(aus)
     RETURN aus
 END FUNCTION
+
+' Steht eine Instanz auf einer Seite eines Reiterwerks oder Akkordeons
+' (tabctl.kinder), liegen ihre Teile auf derselben Seite -- sonst zeigten sie
+' sich auf jeder (gefunden mit der Kuehlschrank-App: ein Reiter je Control).
+SUB seitenDerTeile(aus AS JSON_HANDLE)
+    DIM i AS INTEGER
+    FOR i = 0 TO akFensterN - 1
+        DIM p AS STRING : p = "widgets." + STR$(i) + ".tabctl.kinder"
+        IF NOT JSON_HAS(aus, p) THEN CONTINUE
+        DIM n AS INTEGER : n = JSON_LEN(aus, p)
+        DIM m AS INTEGER
+        FOR m = 0 TO n - 1
+            DIM k AS INTEGER : k = JSON_GET_INT(aus, p + "." + STR$(m) + ".0")
+            DIM s AS INTEGER : s = JSON_GET_INT(aus, p + "." + STR$(m) + ".1")
+            DIM t AS INTEGER
+            FOR t = 0 TO LEN(akTeilInst) - 1
+                IF akWurzel[akTeilInst[t]] = k THEN JSON_APPEND_JSON(aus, p, JSON_PARSE("[" + STR$(akFensterN + t) + "," + STR$(s) + "]"))
+            NEXT
+        NEXT
+    NEXT
+END SUB
 
 ' Haengt die Teile einer Instanz an, deren Behaelter an Stelle wi steht, dann
 ' die Bloecke ihrer inneren Instanzen.
