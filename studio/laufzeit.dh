@@ -200,6 +200,17 @@ CLASS StudioControl
         RETURN ARRAY_INDEXOF(Self.studioMeldungen, ereignis) >= 0
     END FUNCTION
 
+    ' Gemeldet? Dann gleich abgeholt: oeffnet die Methode des Fensters ein
+    ' modales Fenster, dreht dessen Schleife weiter Bilder -- ein noch
+    ' stehendes Ereignis riefe sie dort wieder auf, ohne Ende (gefunden mit
+    ' der Kuehlschrank-App).
+    FUNCTION studioAbholen(ereignis AS STRING) AS BOOLEAN
+        DIM k AS INTEGER : k = ARRAY_INDEXOF(Self.studioMeldungen, ereignis)
+        IF k < 0 THEN RETURN FALSE
+        ARRAY_REMOVE_AT(Self.studioMeldungen, k)
+        RETURN TRUE
+    END FUNCTION
+
     SUB studioMeldungenLeeren()
         Self.studioMeldungen = []
     END SUB

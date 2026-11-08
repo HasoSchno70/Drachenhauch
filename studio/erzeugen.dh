@@ -457,7 +457,7 @@ FUNCTION basisCode$(ei AS INTEGER) AS STRING
                     ARRAY_PUSH(zeichnen, "        SCISSOR_END()")
             END SELECT
             ' Ein Ereignis, das ein eigenes Control mit Ausloesen meldet.
-            IF LEFT$(arten[i], 15) = "studio_control:" THEN bed = ctl + ".studioGemeldet(" + dhText$(ereig) + ")"
+            IF LEFT$(arten[i], 15) = "studio_control:" THEN bed = ctl + ".studioAbholen(" + dhText$(ereig) + ")"
             IF bed <> "" THEN
                 ARRAY_PUSH(takt, "        IF NOT Self.studioOffen THEN RETURN")
                 ARRAY_PUSH(takt, "        IF " + bed + " THEN " + mn)
@@ -766,6 +766,7 @@ FUNCTION projektPruefen() AS INTEGER
         IF b.el < 0 AND NOT b.fehler THEN CONTINUE
         IF b.fehler THEN fehler = fehler + 1
         ARRAY_PUSH(befunde, b)
+        protokoll("befund " + IIF(b.fehler, "fehler ", "warnung ") + IIF(b.el >= 0, elemente[MAX(0, b.el)].name, "-") + ":" + STR$(b.zeile) + " " + b.meldung)
     NEXT
     befundeAnzeigen()
     protokoll("geprueft " + STR$(fehler) + " " + STR$(LEN(befunde) - fehler))
