@@ -3,8 +3,9 @@
 '
 ' Die Reise geht ueber den Adventskranz: zu jeder Kerze ein Kapitel. Die
 ' erste Kerze entzuendet sich, die Kamera faehrt in ihre Flamme -- und steht
-' im verschneiten Dorf bei Nacht. Die zweite fuehrt auf den Weihnachtsmarkt
-' (ein Karussell dreht sich im Takt), die dritte in den Winterwald an einen
+' ueber einem Tal im Winterwald, wo Haus um Haus ein Dorf aus dem Schnee
+' waechst. Die zweite fuehrt auf den Weihnachtsmarkt (ein Karussell dreht
+' sich im Takt, Leute schlendern zwischen den Buden), die dritte in den Winterwald an einen
 ' zugefrorenen See, wo Eiskristalle mit der Melodie wachsen, die vierte auf
 ' einen Schlittenflug vor dem Mond. Am Heiligabend sieht man durchs Fenster
 ' in die Stube: der Baum schmueckt sich Kugel fuer Kugel zu "Stille Nacht",
@@ -436,8 +437,8 @@ SUB beschriftung(takt AS FLOAT)
     kapitel("Vierter Advent", "Der Flug zum Mond", "Sleigh ride past the moon", takt, AB_SCHLITTEN)
     kapitel("Heiligabend", "Durchs Fenster in die Stube", "Through the window, Christmas Eve", takt, AB_STUBE)
     ' kleine Hinweise, was gerade zu sehen ist
-    zweisprachig("Fachwerk, Schnee und Mondlicht: alles im Fragment-Shader berechnet", _
-        "Half-timbering, snow and moonlight: all computed in a fragment shader", 646, 18, zeigen(takt, AB_DORF + 6, AB_DORF + 11), FALSE)
+    zweisprachig("Haus um Haus wächst das Dorf aus dem Schnee -- alles im Fragment-Shader berechnet", _
+        "House by house the village grows out of the snow -- all computed in a fragment shader", 646, 18, zeigen(takt, AB_DORF + 6, AB_DORF + 11), FALSE)
     zweisprachig("Das Karussell dreht sich auf der Audio-Uhr, im Takt der Bassdrum", _
         "The carousel turns on the audio clock, in time with the kick drum", 646, 18, zeigen(takt, AB_MARKT + 6, AB_MARKT + 11), FALSE)
     zweisprachig("Schneekristalle: sechs Arme, jeder anders -- was unten ankommt, bleibt liegen", _
