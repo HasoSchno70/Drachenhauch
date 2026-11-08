@@ -3,7 +3,7 @@
   "x": 0,
   "y": 0,
   "w": 560,
-  "h": 640,
+  "h": 670,
   "movable": true,
   "closable": false,
   "visible": true,
@@ -591,5 +591,7 @@
   "tabs_closable": false,
   "default_button": -1,
   "cancel_button": -1,
-  "name": "ProduktFenster"
+  "name": "ProduktFenster",
+  "studio_standard": "knopfSichern",
+  "studio_abbrechen": "knopfAbbrechen"
 }

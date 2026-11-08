@@ -114,10 +114,6 @@ CLASS ProduktFenster EXTENDS ProduktFenster_Basis
     SUB knopfAbbrechen_Klick()
         Self.Zumachen()
     END SUB
-
-    SUB Taste(taste AS INTEGER)
-        IF taste = KEY_ESCAPE THEN Self.Zumachen()
-    END SUB
 END CLASS
 
 ' Heute plus n Tage als JJJJ-MM-TT (über SQLite, wie die Datumswerte der Datei).

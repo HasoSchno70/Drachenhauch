@@ -3,7 +3,7 @@
   "x": 0,
   "y": 0,
   "w": 440,
-  "h": 250,
+  "h": 280,
   "movable": true,
   "closable": false,
   "visible": true,
@@ -137,5 +137,7 @@
   "tabs_closable": false,
   "default_button": -1,
   "cancel_button": -1,
-  "name": "MindestmengeFenster"
+  "name": "MindestmengeFenster",
+  "studio_standard": "knopfSichern",
+  "studio_abbrechen": "knopfAbbrechen"
 }
