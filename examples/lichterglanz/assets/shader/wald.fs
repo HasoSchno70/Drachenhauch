@@ -438,14 +438,25 @@ void main() {
     vec3 c;
     float t = 0.0;
     float hit = -1.0;
-    int schritte = int(130.0 * G());
+    // Ueber dem flachen Eis schleicht ein flacher Strahl mit kleinen Schritten
+    // dahin: mit zu wenigen (Stufe 4: 58) blieb das hintere Eis dunkel, und die
+    // Laeufer schwebten ueber einem schwarzen Band. Darum mindestens 104
+    // Schritte, und gehen sie einem Strahl nach unten trotzdem aus, trifft er
+    // die Ebene des Eises.
+    int schritte = int(130.0 * max(G(), 0.8));
+    float dLetzt = 1e5;
     for (int i = 0; i < 130; i++) {
         if (i >= schritte) break;
         vec3 p = ro + rd * t;
         float d = szene(p);
+        dLetzt = d;
         if (d < 0.001 * t + 0.0008) { hit = t; break; }
         t += d * 0.7;
-        if (t > 80.0) break;
+        if (t > 80.0) { dLetzt = 1e5; break; }
+    }
+    if (hit < 0.0 && dLetzt < 1e4) {
+        if (dLetzt < 0.3) hit = t;
+        else if (rd.y < -0.002 && -ro.y / rd.y < 80.0) hit = -ro.y / rd.y;
     }
     if (hit > 0.0) {
         vec3 p = ro + rd * hit;
@@ -461,6 +472,18 @@ void main() {
             vec3 spiegel = himmel(rr);
             float saum = smoothstep(0.06 + 0.04 * rausch(vec2(atan(rr.x, rr.z) * 20.0, 1.0)), 0.02, rr.y);
             spiegel = mix(spiegel, vec3(0.01, 0.02, 0.03), saum);
+            // die Laeufer spiegeln sich im Eis -- erst damit stehen sie
+            // darauf (ohne wirkten sie bei tiefer Kamera, als schwebten sie)
+            float ts = 0.03;
+            float bild = 0.0;
+            for (int k = 0; k < 28; k++) {
+                vec3 q = p + rr * ts;
+                float dl = min(laeufer(q, 0), laeufer(q, 1));
+                if (dl < 0.01) { bild = 1.0; break; }
+                ts += dl;
+                if (ts > 7.0) break;
+            }
+            spiegel = mix(spiegel, vec3(0.012, 0.018, 0.035), bild * 0.85);
             float fres = 0.15 + 0.85 * pow(1.0 - max(dot(nn, -rd), 0.0), 4.0);
             c = mix(vec3(0.01, 0.025, 0.045), spiegel, fres);
             float riss = smoothstep(0.03, 0.0, abs(rausch(w * 0.9) - 0.5)) * 0.5;
