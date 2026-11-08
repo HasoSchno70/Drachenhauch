@@ -2,7 +2,9 @@
 ' Zeile und einem Kontextmenü. Wie tabs/inventory_tab.py der Python-App. Das
 ' Control meldet Geaendert, wenn sich der Vorrat geändert hat (das Fenster
 ' frischt dann Kopf und Rückgängig auf), und Neu/Bearbeiten, wenn der Dialog
-' aufgehen soll -- den öffnet das Fenster.
+' aufgehen soll -- den öffnet das Fenster. Rechts die Lagerorte wie
+' widgets/locations_sidebar.py: eine Zeile der Tabelle dorthin ziehen verlegt
+' den Eintrag (ein Schritt für Strg+Z).
 CLASS BestandSeite EXTENDS BestandSeite_Basis
     ' Alle Einträge und je Tabellenzeile die id des Eintrags.
     DIM eintraege AS ARRAY OF Eintrag
@@ -21,6 +23,8 @@ CLASS BestandSeite EXTENDS BestandSeite_Basis
     DIM miAbgelaufen AS INTEGER
     DIM miLoeschen AS INTEGER
     DIM mindestId AS INTEGER
+    ' Je Zeile der Liste rechts das Ziel (Ort oder "Ort · Bereich").
+    DIM ziele AS ARRAY OF STRING
 
     SUB Geoeffnet()
         Self.kontext = GUI_CONTEXT(Self.studioWin)
@@ -40,6 +44,7 @@ CLASS BestandSeite EXTENDS BestandSeite_Basis
         Self.schwelle = warnSchwelle()
         Self.eintraege = bestandLaden()
         Self.zeigen()
+        Self.zieleLaden()
         DIM z AS INTEGER : z = ARRAY_INDEXOF(Self.ids, war)
         IF z >= 0 THEN GUI_TABLE_SET_SELECTED(Self.tabelle, z)
     END SUB
@@ -173,6 +178,38 @@ CLASS BestandSeite EXTENDS BestandSeite_Basis
         ELSE
             mengeSetzen(e, neu)
         END IF
+        Self.laden()
+        Self.Ausloesen("Geaendert")
+    END SUB
+
+    ' Die Liste rechts: jeder Ort mit Sinnbild, darunter seine Bereiche.
+    SUB zieleLaden()
+        Self.ziele = ablageZiele()
+        GUI_LISTBOX_CLEAR(Self.ablageListe)
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(Self.ziele) - 1
+            DIM z AS STRING : z = Self.ziele[i]
+            DIM k AS INTEGER : k = INSTR(z, ZIEL_TRENNER)
+            IF k < 0 THEN
+                GUI_LISTBOX_ADD(Self.ablageListe, ortSinnbild$(z) + "  " + z)
+                GUI_LISTBOX_COLOR(Self.ablageListe, i, COLOR_LERP(ortFarbe(z), &HFFFFFF, 0.35))
+            ELSE
+                GUI_LISTBOX_ADD(Self.ablageListe, "        › " + MID$(z, k + LEN(ZIEL_TRENNER), LEN(z)))
+            END IF
+        NEXT
+    END SUB
+
+    ' Eine Zeile der Tabelle auf einen Ort gezogen.
+    SUB ablageListe_Abgelegt(zeile AS INTEGER, ziel AS INTEGER)
+        IF GUI_DROP_SOURCE() <> Self.tabelle THEN RETURN
+        IF zeile < 0 OR zeile >= LEN(Self.ids) OR ziel < 0 OR ziel >= LEN(Self.ziele) THEN RETURN
+        DIM e AS Eintrag : e = eintragLaden(Self.ids[zeile])
+        IF e IS NIL THEN RETURN
+        IF NOT verlegen(e, Self.ziele[ziel]) THEN
+            GUI_TOAST(Self.studioWin, e.name + " liegt schon dort.", "info")
+            RETURN
+        END IF
+        GUI_TOAST(Self.studioWin, e.name + " → " + Self.ziele[ziel] + " [Strg+Z]", "erfolg")
         Self.laden()
         Self.Ausloesen("Geaendert")
     END SUB

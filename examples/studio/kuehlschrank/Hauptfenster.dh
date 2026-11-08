@@ -8,6 +8,7 @@ CLASS Hauptfenster EXTENDS Hauptfenster_Basis
     SUB Geoeffnet()
         Self.nochNichtDa()
         Self.bestand.laden()
+        Self.orte.laden()
         Self.auffrischen()
         Self.uhr_Aktion()
     END SUB
@@ -44,11 +45,21 @@ CLASS Hauptfenster EXTENDS Hauptfenster_Basis
     ' Der Vorrat hat sich geändert (im Bestand oder über Rückgängig).
     SUB geaendert()
         Self.bestand.laden()
+        Self.orte.laden()
         Self.auffrischen()
     END SUB
 
     SUB bestand_Geaendert()
+        Self.orte.laden()
         Self.auffrischen()
+    END SUB
+
+    ' Eine Kachel im Reiter Lagerorte: was dort liegt.
+    SUB orte_Details()
+        DIM f AS LagerortFenster : f = NEW LagerortFenster()
+        f.ort = Self.orte.gewaehlterOrt
+        f.ZeigenModal()
+        IF f.geaendert THEN Self.geaendert()
     END SUB
 
     ' Der Dialog für einen neuen oder einen gewählten Eintrag.

@@ -1,0 +1,143 @@
+' Die Lagerorte: Farbe und Sinnbild je Ort (wie LocationSettingsManager der
+' Python-App), die Übersicht für
+' die Karten (get_storage_summary, hier mit abgelaufen und bald getrennt --
+' die Python-App zählte Abgelaufenes zu „laufen bald ab“) und Verlegen eines
+' Eintrags an einen anderen Ort.
+IMPORT "db"
+
+
+
+
+
+
+
+CONST ZIEL_TRENNER = " · "
+
+' Stichwort -> Farbe (RGB) und Sinnbild, wie DEFAULT_LOCATION_SETTINGS -- in
+' dieser Reihenfolge, denn „Kühlschrank“ enthält auch „schrank“.
+FUNCTION ortStichwoerter() AS ARRAY OF STRING
+    RETURN ["kühl|52,152,219|🧊", "gefrier|155,89,182|❄️", "tiefkühl|155,89,182|❄️", "schrank|125,60,152|🗄️", _
+            "vorrat|230,126,34|🏠", "brot|230,126,34|🍞", "obst|46,204,113|🍎", "gemüse|46,204,113|🥕", _
+            "arbeits|149,165,166|🔨"]
+END FUNCTION
+
+' "r,g,b|sinnbild" für einen Ort wie LocationSettingsManager._find_keyword:
+' erst location_settings (gleicher Name, dann ein Stichwort im Namen oder
+' der Name im Stichwort), dann die eingebauten Stichwörter, sonst Stahlblau
+' mit Paket.
+FUNCTION ortEinstellung$(name AS STRING) AS STRING
+    DIM klein AS STRING : klein = LOWER$(name)
+    DIM treffer AS STRING : treffer = ""
+    DIM teil AS STRING : teil = ""
+    DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT keyword, color_r, color_g, color_b, icon FROM location_settings ORDER BY id")
+    WHILE DB_NEXT(r)
+        DIM k AS STRING : k = LOWER$(DB_GET_STRING(r, 0))
+        DIM e AS STRING : e = STR$(DB_GET_INT(r, 1)) + "," + STR$(DB_GET_INT(r, 2)) + "," + STR$(DB_GET_INT(r, 3)) + "|" + DB_GET_STRING(r, 4)
+        IF k = klein AND treffer = "" THEN treffer = e
+        IF k <> "" AND teil = "" AND (INSTR(klein, k) >= 0 OR INSTR(k, klein) >= 0) THEN teil = e
+    WEND
+    IF treffer <> "" THEN RETURN treffer
+    IF teil <> "" THEN RETURN teil
+    DIM s AS STRING
+    FOR EACH s IN ortStichwoerter()
+        DIM f AS ARRAY OF STRING : f = SPLIT(s, "|")
+        IF INSTR(klein, f[0]) >= 0 THEN RETURN f[1] + "|" + f[2]
+    NEXT
+    RETURN "70,130,180|📦"
+END FUNCTION
+
+' Farbe als &HRRGGBB.
+FUNCTION ortFarbe(name AS STRING) AS INTEGER
+    DIM rgb AS ARRAY OF STRING : rgb = SPLIT(SPLIT(ortEinstellung$(name), "|")[0], ",")
+    RETURN RGB(INT(VAL(rgb[0])), INT(VAL(rgb[1])), INT(VAL(rgb[2])))
+END FUNCTION
+
+FUNCTION ortSinnbild$(name AS STRING) AS STRING
+    RETURN SPLIT(ortEinstellung$(name), "|")[1]
+END FUNCTION
+
+' Alle Orte: erst die aus storage_locations (in ihrer Reihenfolge), dann
+' Orte, die nur im Bestand vorkommen -- je mit Anzahl, abgelaufen und bald.
+FUNCTION ortUebersicht() AS ARRAY OF Ort
+    DIM aus AS ARRAY OF Ort : aus = []
+    DIM h AS STRING : h = heute$()
+    DIM tage AS STRING : tage = "+" + STR$(warnSchwelle()) + " days"
+    DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT o.name, IFNULL(o.temperature_zone, ''), " + _
+        "(SELECT COUNT(*) FROM inventory i WHERE i.storage_location = o.name), " + _
+        "(SELECT COUNT(*) FROM inventory i WHERE i.storage_location = o.name AND i.expiry_date < ?1), " + _
+        "(SELECT COUNT(*) FROM inventory i WHERE i.storage_location = o.name AND i.expiry_date >= ?1 AND i.expiry_date <= date(?1, ?2)) " + _
+        "FROM (SELECT name, temperature_zone, id AS ordnung FROM storage_locations " + _
+        "      UNION SELECT DISTINCT storage_location, NULL, 1000000 FROM inventory WHERE IFNULL(storage_location, '') <> '' AND storage_location NOT IN (SELECT name FROM storage_locations)) o " + _
+        "ORDER BY o.ordnung, o.name", h, tage)
+    WHILE DB_NEXT(r)
+        DIM o AS Ort : o = NEW Ort()
+        o.name = DB_GET_STRING(r, 0)
+        o.zone = DB_GET_STRING(r, 1)
+        o.anzahl = DB_GET_INT(r, 2)
+        o.abgelaufen = DB_GET_INT(r, 3)
+        o.bald = DB_GET_INT(r, 4)
+        ARRAY_PUSH(aus, o)
+    WEND
+    DIM x AS Ort
+    FOR EACH x IN aus
+        x.farbe = ortFarbe(x.name)
+        x.sinnbild = ortSinnbild$(x.name)
+    NEXT
+    RETURN aus
+END FUNCTION
+
+' Die Temperaturzone, wie sie auf der Kachel steht (gespeichert ist der
+' Schlüssel der Python-App).
+FUNCTION zoneText$(zone AS STRING) AS STRING
+    SELECT CASE zone
+        CASE "cold" : RETURN "kühl"
+        CASE "frozen" : RETURN "tiefgekühlt"
+        CASE "cool" : RETURN "kühl und dunkel"
+        CASE "room_temp" : RETURN "Raumtemperatur"
+    END SELECT
+    RETURN zone
+END FUNCTION
+
+' Die Einträge an einem Ort, wie bestandLaden.
+FUNCTION eintraegeAn(ort AS STRING) AS ARRAY OF Eintrag
+    DIM aus AS ARRAY OF Eintrag : aus = []
+    DIM e AS Eintrag
+    FOR EACH e IN bestandLaden()
+        IF e.lagerort = ort THEN ARRAY_PUSH(aus, e)
+    NEXT
+    RETURN aus
+END FUNCTION
+
+' Was die Liste neben dem Bestand anbietet: jeder Ort, dazu jedes Paar aus
+' Ort und Bereich, das im Bestand vorkommt ("Kühlschrank · oben").
+FUNCTION ablageZiele() AS ARRAY OF STRING
+    DIM aus AS ARRAY OF STRING : aus = []
+    DIM o AS Ort
+    FOR EACH o IN ortUebersicht()
+        ARRAY_PUSH(aus, o.name)
+        DIM b AS STRING
+        FOR EACH b IN textListe("SELECT DISTINCT storage_area FROM inventory WHERE storage_location = '" + REPLACE$(o.name, "'", "''") + "' AND IFNULL(storage_area, '') <> '' ORDER BY 1")
+            ARRAY_PUSH(aus, o.name + ZIEL_TRENNER + b)
+        NEXT
+    NEXT
+    RETURN aus
+END FUNCTION
+
+' Einen Eintrag an ein Ziel aus ablageZiele verlegen -- ein Schritt im Verlauf.
+' Wie die Seitenleiste der Python-App setzt das Ziel auch den Bereich (ohne
+' Bereich: keiner). Liefert FALSE, wenn er schon dort liegt.
+FUNCTION verlegen(e AS Eintrag, ziel AS STRING) AS BOOLEAN
+    DIM ort AS STRING : ort = ziel
+    DIM bereich AS STRING : bereich = ""
+    DIM k AS INTEGER : k = INSTR(ziel, ZIEL_TRENNER)
+    IF k >= 0 THEN
+        ort = LEFT$(ziel, k)
+        bereich = MID$(ziel, k + LEN(ZIEL_TRENNER), LEN(ziel))
+    END IF
+    IF ort = e.lagerort AND bereich = e.bereich THEN RETURN FALSE
+    verlauf.beginnen(e.name + " → " + ziel)
+    verlauf.merken("inventory", e.id)
+    DB_EXEC(db, "UPDATE inventory SET storage_location = ?, storage_area = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", ort, IIF(bereich = "", NIL, bereich), e.id)
+    verlauf.abschliessen()
+    RETURN TRUE
+END FUNCTION

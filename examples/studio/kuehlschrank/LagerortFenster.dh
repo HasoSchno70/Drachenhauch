@@ -1,0 +1,65 @@
+' Was an einem Lagerort liegt -- wie LocationDetailsDialog der Python-App:
+' Kopf mit Sinnbild und Name, die Einträge mit Status und einem Knopf
+' „Entnehmen“ je Zeile, der ein Stück herausnimmt (beim letzten: verbraucht).
+' Die Python-App zeigte jedes Stück als eigene Zeile; hier steht je Eintrag
+' eine Zeile mit seiner Menge, sonst wären 500 g fünfhundert Zeilen.
+CLASS LagerortFenster EXTENDS LagerortFenster_Basis
+    DIM ort AS STRING
+    DIM ids AS ARRAY OF INTEGER
+    ' Ob sich etwas geändert hat (das Hauptfenster frischt dann auf).
+    DIM geaendert AS BOOLEAN
+
+    SUB Geoeffnet()
+        GUI_SET_TEXT(Self.titel, ortSinnbild$(Self.ort) + "  " + Self.ort)
+        GUI_SET_COLOR(Self.titel, "fg", COLOR_LERP(ortFarbe(Self.ort), &HFFFFFF, 0.3))
+        Self.laden()
+    END SUB
+
+    SUB laden()
+        GUI_TABLE_CLEAR(Self.tabelle)
+        Self.ids = []
+        DIM schwelle AS INTEGER : schwelle = warnSchwelle()
+        DIM e AS Eintrag
+        DIM stueck AS FLOAT : stueck = 0
+        FOR EACH e IN eintraegeAn(Self.ort)
+            DIM z AS INTEGER : z = GUI_TABLE_ADD_ROW(Self.tabelle, [e.name, IIF(e.marke = "", "-", e.marke), e.mengeText$(), IIF(e.bereich = "", "-", e.bereich), IIF(e.ablauf = "", "-", e.ablauf), e.statusText$(schwelle), "Entnehmen"])
+            ARRAY_PUSH(Self.ids, e.id)
+            GUI_TABLE_CELL_KIND(Self.tabelle, z, SP_ENTNEHMEN, "knopf")
+            GUI_TABLE_CELL_COLOR(Self.tabelle, z, SP_ENTNEHMEN, &HF5C6C6, &H5C3434)
+            SELECT CASE e.status$(schwelle)
+                CASE "abgelaufen" : GUI_TABLE_CELL_COLOR(Self.tabelle, z, SP_ORT_STATUS, &HF5C6C6, &H6B3535)
+                CASE "bald" : GUI_TABLE_CELL_COLOR(Self.tabelle, z, SP_ORT_STATUS, &HFFE0B2, &H8A6D3B)
+                CASE "frisch" : GUI_TABLE_CELL_COLOR(Self.tabelle, z, SP_ORT_STATUS, &HC8E6C9, &H3D6B4F)
+            END SELECT
+        NEXT
+        DIM n AS INTEGER : n = LEN(Self.ids)
+        GUI_SET_TEXT(Self.info, "📦 " + IIF(n = 1, "1 Eintrag", STR$(n) + " Einträge") + " an diesem Lagerort")
+    END SUB
+
+    ' Ein Stück heraus: Menge minus eins, beim letzten (oder bei weniger als
+    ' einem) als verbraucht in den Verlauf.
+    SUB tabelle_Zelle(zeile AS INTEGER, spalte AS INTEGER)
+        IF spalte <> SP_ENTNEHMEN OR zeile < 0 OR zeile >= LEN(Self.ids) THEN RETURN
+        DIM e AS Eintrag : e = eintragLaden(Self.ids[zeile])
+        IF e IS NIL THEN RETURN
+        IF Frage("Ein Stück " + e.name + " entnehmen?", "Entnehmen|Abbrechen", "Entnehmen") <> 1 THEN RETURN
+        IF e.menge > 1.0 THEN
+            mengeSetzen(e, e.menge - 1.0)
+        ELSE
+            entnehmen(e, "consumed", e.name + " verbraucht")
+        END IF
+        Self.geaendert = TRUE
+        Self.laden()
+    END SUB
+
+    SUB knopfAktualisieren_Klick()
+        Self.laden()
+    END SUB
+
+    SUB knopfSchliessen_Klick()
+        Self.Zumachen()
+    END SUB
+END CLASS
+
+CONST SP_ORT_STATUS = 5
+CONST SP_ENTNEHMEN = 6

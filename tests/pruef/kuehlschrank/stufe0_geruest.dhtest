@@ -41,7 +41,7 @@ IMPORT "{sammlung}/../../../studio/berichte_laufzeit.dh"
 IMPORT "{sammlung}/../../../studio/berichte.dh"
 --- erwartet
 laden []
-elemente 14 start Hauptfenster
+elemente 18 start Hauptfenster
 app App TRUE
 fenster Hauptfenster TRUE
 datenbank Daten TRUE
@@ -53,11 +53,64 @@ klasse Aenderung TRUE
 klasse Schritt TRUE
 klasse Verlauf TRUE
 modul Bestand TRUE
+klasse Ort TRUE
+modul Lagerorte TRUE
 control BestandSeite TRUE
+control LagerorteSeite TRUE
+fenster LagerortFenster TRUE
 fenster ProduktFenster TRUE
 fenster MindestmengeFenster TRUE
 projektdatei TRUE
 daten fridge_database.db tabellen 17
+
+=== jedes fenster fasst seine widgets
+' Das h eines Fensters zaehlt seine Titelleiste mit (nur das Startfenster
+' laeuft ohne); was unten oder rechts hinausragt, schneidet es ab -- so
+' fehlten im Produktdialog Sichern und Abbrechen, bis Stufe 2 es sah.
+IMPORT "modell_imp.dh"
+IMPORT "gui"
+GUI_THEME_PRESET("modern_dark")
+DIM titel AS INTEGER : titel = GUI_METRIC_GET("title_h")
+projektLaden$(ARG$(0))
+DIM e AS Element
+FOR EACH e IN elemente
+    IF NOT hatLayout(e) THEN CONTINUE
+    DIM d AS JSON_HANDLE : d = JSON_PARSE(e.layout)
+    DIM innenB AS INTEGER : innenB = JSON_GET_INT(d, "w")
+    DIM innenH AS INTEGER : innenH = JSON_GET_INT(d, "h")
+    IF e.art = "fenster" AND e.name <> projStart THEN
+        IF JSON_GET_BOOL(d, "chrome") THEN innenH = innenH - titel
+    END IF
+    DIM zu AS ARRAY OF STRING : zu = []
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(d, "widgets") - 1
+        DIM k AS STRING : k = "widgets." + STR$(i) + "."
+        IF JSON_GET_INT(d, k + "y") + JSON_GET_INT(d, k + "h") > innenH OR JSON_GET_INT(d, k + "x") + JSON_GET_INT(d, k + "w") > innenB THEN ARRAY_PUSH(zu, JSON_GET_STRING(d, k + "name"))
+    NEXT
+    PRINT e.name; " "; IIF(LEN(zu) = 0, "passt", "ragt hinaus: " + JOIN$(zu, ", "))
+NEXT
+--- argumente
+{sammlung}/../../../examples/studio/kuehlschrank
+--- datei modell_imp.dh
+IMPORT "json"
+IMPORT "regex"
+IMPORT "imgfx"
+IMPORT "db"
+IMPORT "pdf"
+IMPORT "{sammlung}/../../../studio/sprache.dh"
+IMPORT "{sammlung}/../../../studio/bibliothek.dh"
+IMPORT "{sammlung}/../../../studio/modell.dh"
+IMPORT "{sammlung}/../../../studio/projekt.dh"
+IMPORT "{sammlung}/../../../studio/datenbank.dh"
+IMPORT "{sammlung}/../../../studio/berichte_laufzeit.dh"
+IMPORT "{sammlung}/../../../studio/berichte.dh"
+--- erwartet
+Hauptfenster passt
+BestandSeite passt
+LagerorteSeite passt
+LagerortFenster passt
+ProduktFenster passt
+MindestmengeFenster passt
 
 === f5 erzeugt das programm, eine neue datei bekommt die startdaten
 ' Ohne Datei im Projektordner legt das Programm sie an (Element Daten) und

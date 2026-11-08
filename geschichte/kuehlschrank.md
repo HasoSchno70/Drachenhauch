@@ -164,3 +164,93 @@ Fall in `werkzeug_studio_controls.dhtest` (Reiterseite, modales Fenster),
 Gegenproben: zehn im Beispiel, zwei für die Reiterseite, vier für
 Takt/Zelle, eine für das Abholen, eine für den Doppelklick in der Laufzeit
 -- jede fällt in ihrem Fall.
+
+## Stufe 2: die Lagerorte (2026-11-08)
+
+Der Reiter Lagerorte ist das eigene Control `LagerorteSeite`: je Ort eine
+Kachel auf einer Zeichenfläche (Glas in der Farbe des Orts, Sinnbild, Name,
+Temperaturzone, Anzahl, was abgelaufen ist und was bald abläuft), so viele
+Spalten, wie in die Breite passen, das Mausrad rollt. Farbe und Sinnbild
+sucht das Modul `Lagerorte` wie LocationSettingsManager: `location_settings`
+mit gleichem Namen, dann ein Stichwort im Namen (oder der Name im
+Stichwort), dann die eingebauten Stichwörter in ihrer Reihenfolge
+(„Kühlschrank“ ist `kühl`, nicht `schrank`), sonst Stahlblau mit Paket --
+`storage_locations.icon` nimmt die Python-App dafür nicht. Anders als dort
+zählt die Kachel Abgelaufenes getrennt (die Python-App zählte es zu „laufen
+bald ab“). Ein Klick auf eine Kachel öffnet `LagerortFenster` (wie
+LocationDetailsDialog): je Eintrag eine Zeile mit „Entnehmen“, das ein Stück
+herausnimmt, beim letzten als verbraucht -- die Python-App zeigte jedes Stück
+als eigene Zeile, bei 500 g wären das fünfhundert. Rechts neben dem Bestand
+steht die Liste der Orte und ihrer Bereiche (wie locations_sidebar.py); eine
+Zeile der Tabelle dorthin gezogen verlegt den Eintrag, ein Schritt für
+Strg+Z, und wie dort setzt das Ziel auch den Bereich.
+
+**Funde:**
+
+10. **Eine Tabellenzeile ließ sich ziehen, trug aber nichts.** Aus einer
+    Tabelle kamen `GUI_DRAG_INDEX` -1 und kein `GUI_DROP_TEXT`; jetzt die
+    Datenzeile und der Text ihrer ersten Zelle, wie bei Liste und Baum (gui).
+    Im Studio heißen Quelle und Ablage im Inspektor „Ziehbar“ und „Ablage“,
+    das Ereignis `Abgelegt(zeile, ziel)`.
+11. **Eine Zeichenfläche auf einer verdeckten Reiterseite malte über die
+    vordere.** `GUI_VISIBLE` bleibt dort wahr; neu `GUI_SHOWN(wdg)`, das
+    Fenster, Fensterreiter und jedes Reiterwerk darüber mitzählt (gui), und
+    das erzeugte `Zeichnen` fragt es.
+12. **Text auf einer Zeichenfläche stand in der Pixelschrift**, die gui
+    daneben in Sans. Das Studio setzt um `Zeichnen` die Schrift der
+    Oberfläche (`GUI_FONT` oder die eingebaute Sans) und danach die des
+    Programms zurück.
+13. **Ein Klick auf die Kachel öffnete das Detailfenster ohne Ende.**
+    `ZeigenModal` drehte sein erstes Bild noch im Bild des Klicks; dort ist
+    `MOUSE_HIT` noch wahr, das Maus-Ereignis der Zeichenfläche feuerte wieder
+    -- bis die Aufruftiefe überlief (Verwandter von Fund 8). Eine innere
+    Schleife (`ZeigenModal`, `Frage`) zeichnet jetzt erst das laufende Bild
+    fertig (`studioMalen`) und verteilt dann neue Eingaben.
+14. **`GUI_HIT_TEST` sieht durch den Schleier.** Ein Klick auf die
+    Zeichenfläche neben dem modalen Fenster hätte ein zweites geöffnet;
+    Maus, Rad und Ziehen einer Fläche fragen `studioFrei(fenster)`.
+15. **`Taste` erreichte ein modales Fenster nie** -- die Weitergabe galt nur
+    ohne `GUI_MODAL()`, ESC im Mindestmengen-Dialog tat seit Stufe 1 nichts.
+    Jetzt bekommt das oberste Fenster die Taste, wenn es nicht hinter einem
+    Dialog oder Schleier steht.
+16. **Standard- und Abbrechen-Knopf ließen sich nicht einstellen.** Die gui
+    kennt sie (`GUI_WINDOW_DEFAULT`/`CANCEL`, auch in der `.dhform`), der
+    Inspektor nicht. Neu „Standard-Knopf (Enter)“ und „Abbrechen-Knopf
+    (Esc)“ beim Fenster, gemerkt beim Namen (Umbenennen zieht mit; ein
+    Index wanderte beim Löschen eines Widgets davor).
+17. **Ein Dialog über einem modalen Fenster nahm ihm die Modalität.** Die
+    gui hatte einen einzigen Platz dafür; nach der Antwort auf „Ein Stück
+    entnehmen?“ war das Detailfenster nicht mehr modal und sein
+    Abbrechen-Knopf taub. Jetzt ein Stapel: geht der obere, ist der darunter
+    wieder modal (gui).
+
+**Eigene Fehler, gefunden in Stufe 2:** Im Produkt- und im
+Mindestmengen-Dialog fehlten seit Stufe 1 unten die Knöpfe -- das `h` einer
+`.dhform` zählt die Titelleiste mit, das Bauskript hatte nur den Inhalt
+gerechnet (die Proben riefen die Methoden direkt, keine sah das Fenster).
+Neu prüft `stufe0_geruest`, dass jedes Fenster seine Widgets fasst; die
+Regel in CLAUDE.md und im Handbuch sagt jetzt „mit Titelleiste“ statt „Höhe
+des Inhalts“. Der Klick-Test aus Stufe 1 hatte die Spaltenbreiten fest
+eingetragen und klickte daneben, sobald die Seitenleiste die Tabelle
+schmaler machte; `kSpalteMitte` liest sie aus der `.dhform`.
+
+**Fallen:** `KEY_ANY_HIT` sieht eingespielte Tasten nicht -- ESC aus einer
+Aufnahme erreicht `Taste` nie, wohl aber den Abbrechen-Knopf (die gui liest
+die Tasten selbst); `Taste` prüft nur eine echte Fensternachricht. Eine
+Probe mit `--bilder 30` endet, bevor ein drittes Bild-Paket dran ist --
+Bildschirmfotos danach zeigen alle dasselbe. Mess- und Abspiellauf teilen
+die Datei im Projektordner: Probedaten vorher löschen, sonst stehen sie
+doppelt da.
+
+Tests `tests/pruef/kuehlschrank/stufe2_lagerorte.dhtest` (4: Kacheln mit
+Farbe, Sinnbild, Zählern und Rollen; Verlegen mit Bereich und Rückgängig;
+Detailfenster mit Entnehmen; echte Eingaben -- Zeile ziehen, Strg+Z, Reiter,
+Kachel, Entnehmen, Enter, Esc, zurück zum Bestand), in `stufe0_geruest`
+„jedes Fenster fasst seine Widgets“, `werkzeug_studio_modal.dhtest` (4),
+je ein Fall in `werkzeug_studio_takt`, `gui_reiterwerk`,
+`gui_dialoge_ausbau` und `gui_tabelle_bedienung`. Gegenproben: elf im
+Beispiel, neun im Studio, fünf in der Laufzeit -- jede fällt in ihrem Fall.
+Die fürs Fertigzeichnen vor der inneren Schleife fiel zuerst nirgends:
+`studioFrei` verdeckte sie, solange der öffnende Klick hinter dem Schleier
+lag; erst ein Fenster, das genau unter dem Klick aufgeht und selbst eine
+Zeichenfläche hat, zeigt sie.

@@ -61,10 +61,32 @@
       "code": "Bestand.dh"
     },
     {
+      "art": "klasse",
+      "name": "Ort",
+      "code": "Ort.dh"
+    },
+    {
+      "art": "modul",
+      "name": "Lagerorte",
+      "code": "Lagerorte.dh"
+    },
+    {
       "art": "control",
       "name": "BestandSeite",
       "code": "BestandSeite.dh",
       "layout": "BestandSeite.dhform"
+    },
+    {
+      "art": "control",
+      "name": "LagerorteSeite",
+      "code": "LagerorteSeite.dh",
+      "layout": "LagerorteSeite.dhform"
+    },
+    {
+      "art": "fenster",
+      "name": "LagerortFenster",
+      "code": "LagerortFenster.dh",
+      "layout": "LagerortFenster.dhform"
     },
     {
       "art": "fenster",

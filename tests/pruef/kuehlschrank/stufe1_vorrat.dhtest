@@ -208,8 +208,8 @@ DIM w AS ARRAY OF STRING : w = SPLIT(TRIM$(READALL(p + "/_studio/lage.txt")), " 
 DIM tx AS INTEGER : tx = INT(VAL(w[0]))
 DIM ty AS INTEGER : ty = INT(VAL(w[1]))
 DIM zy AS INTEGER : zy = ty + INT(VAL(w[2])) + INT(VAL(w[3])) \ 2
-DIM mx AS INTEGER : mx = tx + 220 + 120 + 100 + 22
-DIM px AS INTEGER : px = mx + 44
+DIM mx AS INTEGER : mx = tx + kSpalteMitte(p, "BestandSeite", "tabelle", SP_MINUS_PROBE)
+DIM px AS INTEGER : px = tx + kSpalteMitte(p, "BestandSeite", "tabelle", SP_MINUS_PROBE + 1)
 slZeilen = [] : slBild = 0
 slHin(10, 10)
 slWarten(10)
@@ -231,6 +231,8 @@ PRINT "code "; kProbe(p, "klick.dh", "klick.txt", slBild + 20)
 --- datei laeufer.dh
 IMPORT "{sammlung}/../_hilfen/kuehlschrank.dh"
 slStudio = ARG$(0)
+' Die Spalte -1 der Bestandstabelle (SP_MINUS in BestandSeite.dh).
+CONST SP_MINUS_PROBE = 3
 --- datei mess.dh
 DIM f AS Hauptfenster : f = studioStartFenster
 DIM n AS INTEGER

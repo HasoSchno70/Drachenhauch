@@ -4,6 +4,7 @@
 ' nur dass statt der Bildschleife die Zeilen einer Probe-Datei laufen.
 ' Vorher slStudio setzen (der Weg zu studio.dh).
 IMPORT "db"
+IMPORT "json"
 IMPORT "studiolauf.dh"
 
 ' Das Projekt ohne Entwicklungsdaten und Erzeugtes (_studio/, bau/).
@@ -97,4 +98,23 @@ FUNCTION kAufbau$(pfad AS STRING) AS STRING
     WEND
     DB_CLOSE(db)
     RETURN JOIN$(z, CHR$(10))
+END FUNCTION
+
+' Wo die Mitte einer Spalte einer Tabelle liegt, vom linken Rand der Tabelle
+' aus -- aus den Spaltenbreiten in der .dhform (sonst klickt eine Pruefung
+' daneben, sobald jemand die Breiten aendert).
+FUNCTION kSpalteMitte(p AS STRING, form AS STRING, tabelle AS STRING, spalte AS INTEGER) AS INTEGER
+    DIM d AS JSON_HANDLE : d = JSON_LOAD(p + "/" + form + ".dhform")
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(d, "widgets") - 1
+        IF JSON_GET_STRING(d, "widgets." + STR$(i) + ".name") <> tabelle THEN CONTINUE
+        DIM k AS STRING : k = "widgets." + STR$(i) + ".table.col_widths."
+        DIM x AS INTEGER : x = 0
+        DIM s AS INTEGER
+        FOR s = 0 TO spalte - 1
+            x = x + JSON_GET_INT(d, k + STR$(s))
+        NEXT
+        RETURN x + JSON_GET_INT(d, k + STR$(spalte)) \ 2
+    NEXT
+    RETURN -1
 END FUNCTION
