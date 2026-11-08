@@ -38,18 +38,18 @@ ESC beendet, F11 schaltet das Vollbild.
 | Takt | Szene | Was geschieht |
 |---|---|---|
 | 0 | Adventskranz | Tannengrün, Beeren, Samtband, vier rote Kerzen; die erste entzündet sich, die Kamera fährt in ihre Flamme |
-| 8 | Erster Advent: das Dorf | eine Gasse zwischen Fachwerkhäusern, warme Fenster, in manchen ein Schwibbogen, Laternen, der Kirchturm am Ende |
+| 8 | Erster Advent: das Dorf | hoch über einem Tal im verschneiten Wald wächst das Dorf aus dem Schnee: erst die Kirche, dann Haus um Haus auf den Schlag (vorher leuchtet sein Grundriss golden), Fenster gehen an, Rauch steigt auf; zuletzt Dorfbaum und Laternen, die Kamera sinkt in die Gasse |
 | 24 | Kranz | die zweite Kerze |
-| 26 | Zweiter Advent: der Weihnachtsmarkt | Buden mit leuchtender Theke und Lichterketten, Dampf aus den Glühweinbuden, ein Karussell, das sich auf der Audio-Uhr dreht |
+| 26 | Zweiter Advent: der Weihnachtsmarkt | Buden mit Tassen, Kugeln, brennenden Kerzen und Lebkuchenherzen, Lichterketten vom Karussell zu den Buden, Leute in Mantel und Pudelmütze, Dampf aus den Glühweinbuden, ein Karussell, das sich auf der Audio-Uhr dreht |
 | 42 | Kranz | die dritte Kerze |
-| 44 | Dritter Advent: der Winterwald | ein zugefrorener See, verschneite Tannen, ein Reh im Mondlicht, Diamantstaub |
+| 44 | Dritter Advent: der Winterwald | ein zugefrorener See, verschneite Tannen, ein Reh im Mondlicht, Diamantstaub, Sternschnuppen |
 | 52 | Eisblumen | die Kamera senkt sich aufs Eis, sechsarmige Kristalle wachsen über den See und leuchten mit jedem Ton |
 | 60 | Kranz | die vierte Kerze |
 | 62 | Vierter Advent: der Flug zum Mond | tief über Hügel und Wälder, der Schlitten mit vier Rentieren zieht vor dem Mond vorbei, hinter sich Goldstaub; ab Takt 70 Polarlicht |
-| 78 | Heiligabend | vor dem Fenster (Eisblumen in den Ecken), dann hindurch in die Stube: Kamin, Geschenke, der Baum schmückt sich zu „Stille Nacht“ |
-| 96 | Mitternacht | es wird dunkler, zwölf Glockenschläge, jeder schickt einen Lichtring vom Baum aus |
+| 78 | Heiligabend | vor dem Fenster (Eisblumen in den Ecken), es öffnet sich, hindurch in die Stube: Kamin, Uhr, Schwibbogen, Geschenke; der Baum entfaltet sich, die Lichterkette geht an, er schmückt sich zu „Stille Nacht“ |
+| 96 | Mitternacht | es wird dunkler, die Uhr steht auf zwölf, zwölf Glockenschläge, jeder schickt einen Lichtring vom Baum aus |
 | 99 | Der Stern | der Stern auf der Spitze geht auf |
-| 102 | Abspann | das Dorf, über ihm der Stern; aus ihm steigen Funken auf und schreiben „Frohe Weihnachten“ |
+| 102 | Abspann | das Dorf, über ihm der Stern; aus ihm steigen Funken auf und schreiben „Frohe Weihnachten“, dazu spielt das Blech |
 
 ## Die Musik
 
@@ -73,6 +73,12 @@ eine Sechzehntel, jedes Bild plant die nächsten Schritte voraus
 - **Instrumente**: Celesta, Spieluhr, Glocken, Röhrenglocken,
   Schlittenschellen, Streicher, Chor, Klavier, Supersaw-Flächen, Bassdrum
   nur im Dorf, auf dem Markt und im Schlittenflug.
+- **Blech und Pauken**: ein Bläser aus drei verstimmten Sägen durch einen
+  Tiefpass, der sich über den Ton öffnet. Fanfaren zu Markt, Schlittenflug
+  und Rückung, weiche Hörner im Dorf und unter dem Chor von „Stille Nacht“,
+  Bläserakkorde mit Auftakt auf dem Markt; Paukenwirbel vor den Kapiteln,
+  der Stern geht mit vollem Blech auf, und zum Gruß im Abspann spielt das
+  Blech die zweite Phrase des Marktes.
 - **Geräusche**: Kaminknistern, Schritte im Schnee, ferne Kirchenglocken,
   Stimmengewirr auf dem Markt, Wind und eine Eule im Wald, das Ticken der
   Uhr vor Mitternacht.
@@ -100,22 +106,37 @@ die Flamme hinein, sonst ein Lichtkreis aus der Mitte.
 - **kranz.fs** -- Raymarching: ein Ring aus zerzaustem Tannengrün mit Nadeln
   und Rauhreif, Beeren, Samtschleifen, vier Kerzen aus Wachs, das von innen
   leuchtet, Flammen mit blauem Saum, im Hintergrund unscharfe Lichter.
-- **dorf.fs** -- eine Gasse aus wiederholten Häusern mit wechselnder Höhe;
-  Schnee liegt, wo eine Fläche nach oben zeigt. Fachwerk, Andreaskreuze,
-  Sprossenfenster und Schwibbögen werden auf die Fassade gerechnet. Im
-  Abspann hebt die Kamera den Blick zum Stern.
-- **markt.fs** -- Buden im Kreis, Glühbirnen als Abstandsfeld, deren Schein
-  sich entlang des Strahls sammelt; das Karussell mit acht Pferden im
-  Galopp, gestreiftem Dach und einem Lauflicht auf der Bassdrum.
+- **dorf.fs** -- ein Tal mit Hügeln, ringsum Tannen auf einem gedrehten
+  Raster; das Dorf ein Raster von Zellen zu acht Einheiten, je Zelle ein Haus
+  mit eigenem Maß, eigener Richtung und eigenem Beginn (von der Mitte nach
+  außen, auf einen Schlag gerundet). Ein Haus wächst aus dem Schnee und
+  federt nach, Fenster gehen an, aus dem Schornstein steigt Rauch, der beim
+  Marschieren des Strahls gesammelt wird. Fachwerk, Andreaskreuze,
+  Sprossenfenster und Schwibbögen werden auf die Fassade gerechnet, die
+  Kirche hat Fenster aus Buntglas, Uhr und Glockenstube. Strahlen, die ihre
+  Schritte aufbrauchen, zählen als Treffer. Im Abspann hebt die Kamera den
+  Blick zum Stern.
+- **markt.fs** -- Buden im Kreis mit Waren je Sorte auf der Theke,
+  Tannengirlande und Lebkuchenherzen; Glühbirnen und Kerzenflammen als
+  Abstandsfeld, deren Schein sich entlang des Strahls sammelt, auch in den
+  Ketten vom Karussell zu den Buden. Leute auf zwei Bahnen, im Kreis
+  wiederholt und gegeneinander gedreht, mit Schritt und schwingenden Armen.
+  Das Karussell mit acht bunten Pferden im Galopp, Spiegelsäule, Krone,
+  gestreiftem Dach und einem Lauflicht auf der Bassdrum.
 - **wald.fs** -- Tannen auf einem Raster, ein spiegelnder See mit Rissen,
-  ein Reh, Polarlicht als Schleier; die Eisblumen sind in einen Sektor
-  gefaltete Kristalle, jeder mit eigenem Keim und eigenem Beginn.
+  ein Reh, Polarlicht als Schleier, Sternschnuppen auf der Eins; die
+  Eisblumen sind in einen Sektor gefaltete Kristalle, jeder mit eigenem
+  Keim und eigenem Beginn.
 - **schlitten.fs** -- ein Höhenfeld aus Rauschen mit Bäumen und Dorflichtern,
   der Mond groß am Horizont; Schlitten und Rentiere sind ein 2D-Schattenriss
   im Bild des Mondes, die Beine im Galopp auf dem Takt.
-- **stube.fs** -- ein Raum mit Fensterwand, Kamin, Geschenken und dem Baum:
-  die Kugeln liegen auf zwölf Ebenen zu je acht, ihre Nummer zählt von oben
-  nach unten, sichtbar ist jede, deren Ton schon erklungen ist; die
-  Lichterkette ist eine Schraube um den Baum.
+- **stube.fs** -- ein Raum mit Fensterwand (zwei Flügel, die sich öffnen),
+  Kamin, Vertäfelung, Kommode mit Schwibbogen, Wanduhr, Geschenken und dem
+  Baum aus fünf Lagen, die sich wie ein Schirm von oben entfalten. Die 92
+  Kugeln hängen in elf Reihen auf der Kante der Lagen, auf der Seite zur
+  Kamera; ihre Nummer streut über den Baum, sichtbar ist jede, deren Ton
+  schon erklungen ist. Die Lichterkette ist eine Schraube auf der Kante der
+  Zweige, das Licht läuft sie von unten hinauf. Der Stern hat fünf Zacken
+  mit Facetten.
 
 Musik und Szenen prüft `tests/pruef/beispiele/beispiel_lichterglanz.dhtest`.
