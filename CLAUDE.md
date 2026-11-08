@@ -222,6 +222,10 @@ Einzelheiten stehen in der Geschichte des Bereichs.
   Rundweg); Handles (Texturen) stehen nicht darin.
 - Ereignisse (`GUI_CLICKED`, `GUI_CHANGED`, Antworten) gelten genau ein Bild;
   vom Programm gesetzte Werte sind keine Bedienung.
+- Breiten von Beschriftungen (Reiterköpfe, Werkzeugleiste) misst
+  `leisten_pass` je Bild; eine Schätzung an der Zeichenzahl gilt nur bis
+  dahin. Wer eine Lage von außen braucht, fragt die Laufzeit
+  (`GUI_TABCONTROL_ITEM_RECT` & Co.), statt sie nachzurechnen.
 
 **Meldungen, Doku, Website**
 - Meldungen deutsch schreiben. Wer eine Meldung ändert, die in
@@ -259,6 +263,10 @@ Einzelheiten stehen in der Geschichte des Bereichs.
   eigenen Teil der Meldung.
 
 **IDE, Studio, Werkzeuge**
+- Im Layout eines Studio-Fensters ist `h` die Höhe des Inhalts; eine
+  Menüleiste kommt im Entwurf wie im Programm obendrauf (`menueLeisteH`).
+  Ein Datenbank-Element aus einer fremden Datei hält deren Arten wörtlich
+  (`sql`, `sqlvorgabe`) -- der Abgleich darf ihre Tabellen nicht umbauen.
 - Anzeigetexte gehen durch `tr$` (Tafeln `ide/sprache/en.txt`,
   `studio/sprache/en.txt`, `examples/glutfaden/daten/sprache/en.txt`);
   **Schlüssel bleiben deutsch, übersetzt wird beim Anzeigen** (Ereignisnamen,
@@ -374,5 +382,6 @@ Was wann und warum gebaut wurde, steht unverändert in `geschichte/` (bis
 | `geschichte/ide.md` | die IDE: alle Stände, Debugger, Dock, Plugins, Hover |
 | `geschichte/werkzeuge.md` | die Editor-Piloten und ihre Faktoren, Auffrischen 2026-10, Klassendiagramm |
 | `geschichte/studio.md` | Drachenhauch Studio: Stufen, Datenbanken, Berichte, eigene Controls |
+| `geschichte/kuehlschrank.md` | Kühlschrank-App (PySide6-Port) im Studio: Stufen und Funde |
 | `geschichte/glutfaden.md` | Glutfaden (PySticky-Port), Stufen 1–26 |
 | `geschichte/dogfooding.md` | die Dogfooding-Runden, Bastelzentrale, Nachtflug, Lichterglanz |
