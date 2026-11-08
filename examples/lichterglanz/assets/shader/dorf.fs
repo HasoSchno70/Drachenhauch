@@ -466,7 +466,11 @@ void main() {
     float t = 0.0;
     float hit = -1.0;
     float qualm = 0.0;
-    int schritte = int(150.0 * G());
+    // Der Wald braucht seine Schritte: mit weniger als ~120 gehen sie ueber
+    // den Wipfeln aus, und die Tannen ziehen lange dunkle Striche (Stufe 4:
+    // 67 Schritte). In den tiefen Stufen spart darum nur die kleinere
+    // Rechenaufloesung.
+    int schritte = int(150.0 * max(G(), 0.8));
     for (int i = 0; i < 150; i++) {
         if (i >= schritte) break;
         vec3 p = ro + rd * t;
