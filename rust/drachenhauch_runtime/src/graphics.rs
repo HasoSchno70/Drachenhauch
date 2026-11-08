@@ -1557,6 +1557,16 @@ fn zeichen_aus_namen(spez: &str) -> Result<String, String> {
     Ok(menge.into_iter().filter_map(char::from_u32).collect())
 }
 
+/// Zeichen, die die Emoji-Schrift liefert: die Bloecke Dingbats/Symbole
+/// und Emoji, dazu die Emoji im Block "Verschiedene technische Zeichen"
+/// (Uhr und Sanduhr, Wecker, Stoppuhr, Vor/Zurueck: U+231A..U+23FF) und in
+/// "Pfeile und Symbole" (Stern, Quadrate: U+2B00..U+2BFF). Vorher landeten
+/// Wecker und Stoppuhr bei Segoe UI, das sie nicht hat -- in der
+/// Kuehlschrank-App stand "? Vorbereitung" und "? Ablaufende verwerten".
+fn ist_emoji(c: u32) -> bool {
+    matches!(c, 0x231A..=0x23FF | 0x2600..=0x27BF | 0x2B00..=0x2BFF | 0x1F000..=0x1FAFF)
+}
+
 /// Welche Datei ein Zeichen liefern koennte, das keine geladene Schrift hat
 /// -- je Block eine Kandidatenliste, der erste vorhandene Pfad gewinnt.
 /// Chinesisch bekommt hier die japanische Schrift: dieselben Codepunkte,
@@ -1564,7 +1574,7 @@ fn zeichen_aus_namen(spez: &str) -> Result<String, String> {
 fn ausweich_datei_fuer(c: u32) -> &'static [&'static str] {
     let cjk = matches!(c, 0x2E80..=0x9FFF | 0xF900..=0xFAFF | 0xFF00..=0xFFEF);
     let hangul = matches!(c, 0x1100..=0x11FF | 0x3130..=0x318F | 0xA960..=0xA97F | 0xAC00..=0xD7FF);
-    let emoji = matches!(c, 0x2600..=0x27BF | 0x1F000..=0x1FAFF);
+    let emoji = ist_emoji(c);
     let thai = matches!(c, 0xE00..=0xE7F);
     #[cfg(target_os = "windows")]
     {
