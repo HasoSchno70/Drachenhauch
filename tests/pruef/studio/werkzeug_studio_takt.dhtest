@@ -100,3 +100,106 @@ geaendert 1
 zelle 1 1 Brot
 zelle 1 1 Brot
 code 0
+
+=== zeichnen nur, wenn die flaeche zu sehen ist, und in der schrift der oberflaeche
+' Ein eigenes Control mit Zeichenflaeche auf Seite 1 eines Reiterwerks:
+' solange Seite 0 vorn ist, malt es nicht (vorher malte es ueber die vordere
+' Seite, GUI_SHOWN). Sein Text misst wie die eingebaute Sans, nicht wie die
+' Pixelschrift, die TEXT sonst nimmt; danach gilt wieder die des Programms.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+slHin(10, 10)
+slWarten(10)
+slTaste(294)
+slWarten(150)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+SETENV("DH_STUDIO_LAUF_BILDER", "20")
+DIM log AS STRING : log = CWD$() + "/s.log"
+slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+PRINT "erzeugt "; LEN(slAnfang(log, "erzeugt ")) = 1
+DIM neu AS ARRAY OF STRING : neu = []
+DIM s AS STRING
+FOR EACH s IN READLINES(p + "/_studio/main.dh")
+    IF LEFT$(s, 11) = "studioLauf(" THEN
+        DIM t AS STRING
+        FOR EACH t IN READLINES(CWD$() + "/probe.dh")
+            ARRAY_PUSH(neu, t)
+        NEXT
+    ELSE
+        ARRAY_PUSH(neu, s)
+    END IF
+NEXT
+WRITEALL(p + "/_studio/probe.dh", JOIN$(neu, CHR$(10)) + CHR$(10))
+DIM k AS INTEGER : k = PROCESS_START("dhrt", "run", "--bilder", "30", p + "/_studio/probe.dh")
+DIM leer AS INTEGER : leer = 0
+WHILE leer < 5
+    DIM t2 AS STRING : t2 = PROCESS_READ$(k) + PROCESS_ERR$(k)
+    IF t2 <> "" THEN
+        DIM zeile AS STRING
+        FOR EACH zeile IN SPLIT(REPLACE$(t2, CHR$(13), ""), CHR$(10))
+            IF zeile <> "" AND LEFT$(zeile, 8) <> "WARNING:" AND LEFT$(zeile, 5) <> "INFO:" THEN PRINT zeile
+        NEXT
+        leer = 0
+    ELSEIF NOT PROCESS_RUNNING(k) THEN
+        leer = leer + 1
+        SLEEP(30)
+    END IF
+WEND
+PRINT "code "; PROCESS_CODE(k)
+--- argumente
+{sammlung}/../../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei probe.dh
+SCREEN(640, 480, "Probe")
+studioSchirmB = SCREENWIDTH() : studioSchirmH = SCREENHEIGHT()
+studioDieStartseite = studioStartFenster
+studioDieApp.Geoeffnet()
+studioStartFenster.studioHaupt = TRUE
+studioStartFenster.Zeigen()
+DIM f AS Hauptfenster : f = studioStartFenster
+DIM n AS INTEGER
+WHILE n < 5 AND studioBild()
+    n = n + 1
+WEND
+PRINT "seite 0: "; f.bild1.gemalt
+GUI_TABCONTROL_SET_PAGE(f.reiter, 1)
+n = 0
+WHILE n < 5 AND studioBild()
+    n = n + 1
+WEND
+PRINT "seite 1: "; f.bild1.gemalt > 0
+TEXT_SIZE(20)
+DIM pixel AS FLOAT : pixel = TEXT_WIDTH("Wolke")
+SETFONT(LOADFONT("sans", 32))
+TEXT_SIZE(20)
+PRINT "wie sans "; f.bild1.breite = TEXT_WIDTH("Wolke"); " | wie pixel "; f.bild1.breite = pixel
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"control","name":"Malflaeche"},{"art":"fenster","name":"Hauptfenster"}]}
+--- datei proj/Malflaeche.dhform
+{"title":"Malflaeche","name":"Malflaeche","w":200,"h":120,"widgets":[{"kind":"canvas","name":"flaeche","x":0,"y":0,"w":200,"h":120}]}
+--- datei proj/Malflaeche.dh
+CLASS Malflaeche EXTENDS Malflaeche_Basis
+    DIM gemalt AS INTEGER
+    DIM breite AS FLOAT
+
+    SUB flaeche_Zeichnen()
+        Self.gemalt = Self.gemalt + 1
+        TEXT_SIZE(20)
+        Self.breite = TEXT_WIDTH("Wolke")
+    END SUB
+END CLASS
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":420,"h":300,"widgets":[
+{"kind":"tabcontrol","name":"reiter","x":10,"y":10,"w":400,"h":260,"items":["Eins","Zwei"],"tabctl":{"kinder":[[1,1]],"seite":0}},
+{"kind":"studio_control","studio_control":"Malflaeche","name":"bild1","x":20,"y":50,"w":200,"h":120}]}
+--- datei proj/Hauptfenster.dh
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+END CLASS
+--- erwartet
+erzeugt TRUE
+seite 0: 0
+seite 1: TRUE
+wie sans TRUE | wie pixel FALSE
+code 0

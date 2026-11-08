@@ -18,6 +18,26 @@ IMPORT "gui"
 IMPORT "pdf"
 IMPORT "imgfx"
 
+' Eine Zeichenfläche malt ihren Text in der Schrift der Oberfläche daneben:
+' der eigenen der gui (GUI_FONT), sonst der eingebauten Sans -- nicht in der
+' Pixelschrift, die TEXT ohne SETFONT nimmt. Wer eine andere will, setzt sie
+' in Zeichnen selbst; danach gilt wieder die des Programms.
+DIM studioSans AS INTEGER : studioSans = -1
+
+SUB studioSchriftAn()
+    IF GUI_FONT_GET()[0] >= 0 THEN
+        SETFONT(GUI_FONT_GET()[0])
+        RETURN
+    END IF
+    IF studioSans < 0 THEN studioSans = LOADFONT("sans", 32)
+    SETFONT(studioSans)
+END SUB
+
+SUB studioSchriftAus()
+    SETFONT(-1)
+    TEXT_STYLE("normal")
+END SUB
+
 CLASS StudioApp
     ' Nach dem Start, bevor das Startfenster aufgeht.
     SUB Geoeffnet()

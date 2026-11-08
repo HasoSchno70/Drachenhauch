@@ -135,6 +135,13 @@ Die Ereignisse je Art:
 | eigenes Control | Geoeffnet, Groesse, Takt |
 | App | Geoeffnet, Beenden |
 
+`Zeichnen` läuft in jedem Bild, in dem die Fläche zu sehen ist (nicht auf
+einer Reiterseite im Hintergrund), mit der Fläche als Schnittrechteck und in
+der Schrift der Oberfläche: der eigenen der gui (`GUI_FONT`), sonst der
+eingebauten Sans -- nicht in der Pixelschrift, die `TEXT` sonst nimmt.
+Gezeichnet wird in Bildschirmpunkten ab `GUI_CANVAS_X/Y`. Maus, Rad und
+Ziehen kommen nicht, solange ein modales Fenster vor der Fläche steht.
+
 Ein Ereignis mit Klammern ruft seine Methode mit Werten: `Ziehen` mit der
 Lage auf der Fläche (solange die Taste nach einem Druck auf die Fläche
 hängt), `Rad` mit den Schritten des Mausrads, `Taste` mit dem Tastencode

@@ -134,6 +134,13 @@ The events per kind:
 | own control | Geoeffnet, Groesse, Takt |
 | App | Geoeffnet, Beenden |
 
+`Zeichnen` (draw) runs in every frame in which the canvas is visible (not
+on a tab page in the background), clipped to the canvas and in the font of
+the interface: the gui's own (`GUI_FONT`), otherwise the built-in Sans --
+not the pixel font `TEXT` uses otherwise. Coordinates are screen points from
+`GUI_CANVAS_X/Y`. Maus, Rad and Ziehen do not come while a modal window
+stands in front of the canvas.
+
 An event with parentheses calls its method with values: `Ziehen` (drag)
 with the position on the canvas (while the button is held after a press on
 it), `Rad` (wheel) with the steps of the mouse wheel, `Taste` (key) with the

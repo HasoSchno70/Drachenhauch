@@ -455,9 +455,15 @@ FUNCTION basisCode$(ei AS INTEGER) AS STRING
                     ARRAY_PUSH(takt, "            END IF")
                     ARRAY_PUSH(takt, "        END IF")
                 CASE "zeichnen"
-                    ARRAY_PUSH(zeichnen, "        SCISSOR(GUI_CANVAS_X(" + ctl + "), GUI_CANVAS_Y(" + ctl + "), GUI_CANVAS_W(" + ctl + "), GUI_CANVAS_H(" + ctl + "))")
-                    ARRAY_PUSH(zeichnen, "        " + mn)
-                    ARRAY_PUSH(zeichnen, "        SCISSOR_END()")
+                    ' Nur, wenn die Fläche zu sehen ist: auf einer Reiterseite
+                    ' im Hintergrund malte sie sonst über die vordere.
+                    ARRAY_PUSH(zeichnen, "        IF GUI_SHOWN(" + ctl + ") THEN")
+                    ARRAY_PUSH(zeichnen, "            SCISSOR(GUI_CANVAS_X(" + ctl + "), GUI_CANVAS_Y(" + ctl + "), GUI_CANVAS_W(" + ctl + "), GUI_CANVAS_H(" + ctl + "))")
+                    ARRAY_PUSH(zeichnen, "            studioSchriftAn()")
+                    ARRAY_PUSH(zeichnen, "            " + mn)
+                    ARRAY_PUSH(zeichnen, "            studioSchriftAus()")
+                    ARRAY_PUSH(zeichnen, "            SCISSOR_END()")
+                    ARRAY_PUSH(zeichnen, "        END IF")
             END SELECT
             ' Ein Ereignis, das ein eigenes Control mit Ausloesen meldet.
             IF LEFT$(arten[i], 15) = "studio_control:" THEN bed = ctl + ".studioAbholen(" + dhText$(ereig) + ")"
