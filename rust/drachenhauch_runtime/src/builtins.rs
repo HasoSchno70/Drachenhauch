@@ -971,7 +971,7 @@ fn format_one(mask: &str, v: &Value) -> R {
     // Wert verschwand still -- etwa bei der VB-Maske "#,##0.00" (gefunden in
     // der Konsolen-Runde). Die Doku versprach schon eine Meldung.
     if !mask.replace("%%", "").contains('%') {
-        return err(format!("FORMAT$: die Maske {:?} hat keinen Platzhalter -- der Wert kaeme                             nicht vor. FORMAT$ arbeitet im printf-Stil (\"%.2f\", \"%05d\");                             Tausenderpunkte und Dezimalkomma schreibt ZAHL$(wert, stellen)", mask));
+        return err(format!("FORMAT$: die Maske {:?} hat keinen Platzhalter -- der Wert kaeme nicht vor. FORMAT$ arbeitet im printf-Stil (\"%.2f\", \"%05d\"); Tausenderpunkte und Dezimalkomma schreibt ZAHL$(wert, stellen)", mask));
     }
     let bytes: Vec<char> = mask.chars().collect();
     let mut out = String::new();
