@@ -2659,14 +2659,25 @@ impl Default for SidFx {
 /// Resonanter Tiefpass (Chamberlin SVF) mit ueber die Zeit gleitender
 /// Grenzfrequenz -- der SID/Acid-Sweep. Identisch zu `synth.svf_lowpass`
 /// (Editor-Vorschau), damit beide gleich klingen. Pure -> Rust-`#[test]`.
+///
+/// **Stabil nur unterhalb einer Grenze:** der Chamberlin-Filter schaukelt sich
+/// auf, sobald `f*f + 2*q*f >= 4` (Eigenwerte ausserhalb des Einheitskreises)
+/// -- bei Resonanz 0,25 schon ab etwa einem Viertel der Abtastrate (10,7 kHz
+/// bei 44,1 kHz), nicht erst an der Nyquistgrenze. Ein Sweep darueber hinaus
+/// (ein langer Blaeserton, dessen Filter sich weiter oeffnet) lief erst in die
+/// Begrenzung und dann auf NaN; im Mischer vergiftete das Hall und Kompressor,
+/// und der GANZE Ton blieb bis zum Ende stumm (Lichterglanz, Hoerner im Dorf).
+/// `f` wird darum knapp unter dieser Grenze gehalten; darunter klingt alles
+/// wie zuvor.
 fn svf_lowpass(wave: &mut [f64], cutoff: f64, sweep: f64, res: f64, sr: u32) {
     if cutoff <= 0.0 || wave.is_empty() { return; }
     let q = 1.0 - res.clamp(0.0, 0.95);
     let nyq = sr as f64 * 0.5;
+    let f_max = 0.95 * ((q * q + 4.0).sqrt() - q);
     let (mut low, mut band) = (0.0f64, 0.0f64);
     for i in 0..wave.len() {
         let fc = (cutoff + sweep * (i as f64 / sr as f64)).clamp(10.0, nyq * 0.99);
-        let f = 2.0 * (PI64 * fc / sr as f64).sin();
+        let f = (2.0 * (PI64 * fc / sr as f64).sin()).min(f_max);
         low += f * band;
         let high = wave[i] - low - q * band;
         band += f * high;
@@ -3105,6 +3116,25 @@ mod tests {
         svf_lowpass(&mut sig, 300.0, 0.0, 0.0, 44100);
         let after = sig.iter().skip(n / 2).map(|v| v.abs()).fold(0.0, f64::max);
         assert!(after < before * 0.5, "Tiefpass sollte 8kHz daempfen: {after} vs {before}");
+    }
+
+    #[test]
+    fn svf_sweep_bis_nyquist_bleibt_endlich_und_klingt_aus() {
+        // Eine Saege, deren Filter sich ueber vier Sekunden bis weit ueber
+        // 10 kHz oeffnet (wie die Hoerner in Lichterglanz), dann Stille: der
+        // Filter darf nicht aufschaukeln -- kein NaN, und in der Stille
+        // danach klingt er aus, statt an der Begrenzung zu kleben.
+        for res in [0.0, 0.25, 0.6, 0.95] {
+            let sr = 44100u32;
+            let n = sr as usize * 4;
+            let mut sig: Vec<f64> = (0..n)
+                .map(|i| if i < n - sr as usize { ((i as f64 * 600.0 / sr as f64) % 1.0) * 2.0 - 1.0 } else { 0.0 })
+                .collect();
+            svf_lowpass(&mut sig, 1300.0, 6000.0, res, sr);
+            assert!(sig.iter().all(|v| v.is_finite()), "NaN/inf bei Resonanz {res}");
+            let ende = sig[n - 2000..].iter().map(|v| v.abs()).fold(0.0, f64::max);
+            assert!(ende < 0.01, "Filter schwingt in der Stille weiter (Resonanz {res}): {ende}");
+        }
     }
 
     #[test]
