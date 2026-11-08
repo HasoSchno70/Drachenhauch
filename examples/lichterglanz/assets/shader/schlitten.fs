@@ -2,9 +2,13 @@
 // Der Schlittenflug: tief ueber verschneite Huegel und Waelder, in denen hier
 // und da ein Dorf leuchtet, auf einen riesigen Mond am Horizont zu. Vor dem
 // Mond zieht der Schlitten mit seinen Rentieren vorbei -- als Schattenriss,
-// die Beine im Galopp auf dem Takt -- und hinter sich eine Spur aus Gold-
-// staub. Mit der Rueckung (`rueck`) wird die Fahrt schneller und der Himmel
-// hell vom Polarlicht.
+// die Beine im Galopp auf dem Takt, das erste Rentier mit leuchtend roter
+// Nase -- und hinter sich eine Spur aus Goldstaub. Mit der Rueckung (`rueck`)
+// steigt die Kamera durch die Wolkendecke: darueber ein Wolkenmeer im
+// Mondlicht, durch dessen Luecken die Doerfer leuchten, der Himmel hell vom
+// Polarlicht. Dort schwingt das Gespann gross von unten heran, zieht ein
+// langes Band aus Goldstaub hinter sich her und steigt zum Mond auf, dessen
+// Scheibe es am Ende klein kreuzt.
 in vec2 fragTexCoord;
 uniform sampler2D texture0;
 uniform vec2 resolution;
@@ -63,8 +67,11 @@ vec3 dorfLichter(vec2 p) {
     vec2 q = p - m;
     vec2 zz = floor(q / 1.6);
     vec2 f = fract(q / 1.6) - 0.5;
-    float an = step(0.55, hash(zz + z * 7.0)) * step(length(q), 6.0);
-    return vec3(1.0, 0.65, 0.3) * an * smoothstep(0.18, 0.0, length(f)) * (0.8 + 0.2 * sin(time * 2.0 + hash(zz) * 9.0));
+    float an = step(0.5, hash(zz + z * 7.0)) * step(length(q), 6.5);
+    vec3 c = vec3(1.0, 0.65, 0.3) * an * smoothstep(0.22, 0.0, length(f)) * (0.8 + 0.2 * sin(time * 2.0 + hash(zz) * 9.0));
+    // ein warmer Schein ueber dem ganzen Dorf
+    c += vec3(1.0, 0.55, 0.25) * 0.12 * smoothstep(9.0, 2.0, length(q));
+    return c;
 }
 
 float uebHash(float x) { return fract(sin(x * 91.7) * 43758.5453); }
@@ -139,16 +146,26 @@ float schlittenForm(vec2 p) {
     return min(min(min(kufe, kasten), min(fahrer, sack)), stuetze);
 }
 
-// Das ganze Gespann im Bild; liefert die Deckung (0..1) und in `staub` den
-// Goldstaub hinter dem Schlitten.
+vec2 drehe(vec2 p, float a) {
+    float c = cos(a), s = sin(a);
+    return vec2(c * p.x - s * p.y, s * p.x + c * p.y);
+}
+vec2 bezier(vec2 a, vec2 b, vec2 c, vec2 d, float t) {
+    float u = 1.0 - t;
+    return u * u * u * a + 3.0 * u * u * t * b + 3.0 * u * t * t * c + t * t * t * d;
+}
+
+// Das ganze Gespann im Bild: der Kopf des ersten Rentiers bei `kopf`, Groesse
+// einer Koerperlaenge, Flugrichtung `winkel`. Liefert die Deckung (0..1), in
+// `staub` den Goldstaub dicht hinter dem Schlitten und in `nase` die Stelle
+// der roten Nase.
 float staub;
-float gespann(vec2 uv, vec2 mitte, float groesse) {
+vec2 nase;
+float gespann(vec2 uv, vec2 kopf, float groesse, float winkel) {
     staub = 0.0;
-    // die Fahrt: von links nach rechts vor dem Mond vorbei, zweimal im Kapitel
-    float lauf = fract(fort * 2.0 + 0.1);
-    vec2 kopf = mitte + vec2((-2.2 + 4.4 * lauf) * MOND_R * 1.7, MOND_R * (0.15 + 0.35 * sin(lauf * PI)));
-    kopf.y += 0.008 * sin(takt * PI * 2.0);
-    vec2 p = (uv - kopf) / groesse;
+    kopf.y += 0.15 * groesse * sin(takt * PI * 2.0);
+    vec2 p = drehe(uv - kopf, -winkel) / groesse;
+    nase = kopf + drehe(vec2(0.72, 0.26 + 0.03 * sin(takt * PI * 2.0)), winkel) * groesse;
     float d = 1e5;
     // vier Rentiere, paarweise hintereinander
     for (int i = 0; i < 4; i++) {
@@ -198,16 +215,25 @@ vec3 himmel(vec3 d) {
     return c;
 }
 
+// Die Wolkendecke (ab der Rueckung): eine Schicht in der Hoehe WOLKE, wie
+// dicht sie an der Stelle xz ist
+const float WOLKE = 15.0;
+float wolkenDichte(vec2 xz) {
+    return smoothstep(0.3, 0.55, fbm(xz * 0.015 + vec2(time * 0.015, 0.0)));
+}
+
 void main() {
     vec2 uv = (fragTexCoord * resolution - 0.5 * resolution) / resolution.y;
-    // Kamera: fliegt tief nach vorn, folgt den Huegeln, neigt sich in Kurven
-    float tempo = 16.0 + 10.0 * rueck;
-    float z = fort * 260.0 + time * 0.0;
+    // Kamera: fliegt tief nach vorn, folgt den Huegeln, neigt sich in Kurven;
+    // mit der Rueckung steigt sie durch die Wolken hinauf
+    float z = fort * 260.0;
     float x = 30.0 * sin(z * 0.006);
     vec3 ro = vec3(x, 0.0, z);
-    ro.y = max(gelaende(ro.xz), gelaende(ro.xz + vec2(0.0, 12.0))) + 4.5;
+    float steig = smoothstep(0.5, 0.64, fort);
+    float wolke = smoothstep(0.47, 0.55, fort);
+    ro.y = mix(max(gelaende(ro.xz), gelaende(ro.xz + vec2(0.0, 12.0))) + 4.5, 27.0 + 0.6 * sin(time * 0.7), steig);
     float neigen = -0.12 * cos(z * 0.006);
-    vec3 vorne = normalize(vec3(0.18 * cos(z * 0.006), -0.05, 1.0));
+    vec3 vorne = normalize(vec3(0.18 * cos(z * 0.006), mix(-0.05, -0.13, steig) + 0.12 * sin(steig * PI), 1.0));
     vec3 rechts = normalize(cross(vec3(sin(neigen), cos(neigen), 0.0), vorne));
     vec3 oben = cross(vorne, rechts);
     vec3 rd = normalize(vorne * 1.2 + uv.x * rechts + uv.y * oben);
@@ -240,12 +266,72 @@ void main() {
     } else {
         c = himmel(rd);
     }
-    // das Gespann vor dem Mond (im Bild: wo der Mond steht)
+    // die Wolkendecke: von oben im Mondlicht, durch die Luecken das Land
+    if (wolke > 0.0) {
+        float tc = (WOLKE - ro.y) / rd.y;
+        if (tc > 0.0 && (hit < 0.0 || tc < hit)) {
+            vec3 wp = ro + rd * tc;
+            float dicht = wolkenDichte(wp.xz) * wolke;
+            // Ballen: helle Kuppen, dunkle Taeler, zum Mond hin heller
+            float relief = fbm(wp.xz * 0.06 + 3.0) * 0.65 + fbm(wp.xz * 0.2 + 7.0) * 0.35;
+            float kuppe = smoothstep(0.35, 0.75, relief);
+            vec3 wf = ro.y > WOLKE
+                ? mix(vec3(0.16, 0.19, 0.3), vec3(0.85, 0.86, 0.92), kuppe) * (0.6 + 0.7 * pow(max(dot(normalize(vec3(rd.x, 0.0, rd.z)), normalize(vec3(MOND.x, 0.0, MOND.z))), 0.0), 6.0))
+                : vec3(0.12, 0.13, 0.2) * (0.6 + 0.4 * relief);
+            wf += vec3(1.0) * step(0.997, hash(floor(wp.xz * 4.0) + floor(time * 5.0))) * kuppe * 0.4;
+            // das Polarlicht faerbt die Wolken
+            wf += vec3(0.1, 0.5, 0.3) * rueck * 0.25 * relief;
+            dicht *= 1.0 - smoothstep(120.0, 260.0, tc);
+            c = mix(c, wf, dicht);
+        }
+        // mitten durch die Decke: alles im Nebel
+        float drin = exp(-abs(ro.y - WOLKE) * 0.45) * wolke;
+        c = mix(c, vec3(0.5, 0.54, 0.66), drin * 0.9);
+    }
+    // das Gespann: erst einmal klein vor dem Mond vorbei, nach der Rueckung
+    // ueber den Wolken gross von unten heran und hinauf zum Mond
     vec3 mr = vec3(dot(MOND, rechts), dot(MOND, oben), dot(MOND, vorne));
     vec2 mitte = mr.xy / mr.z * 1.2;
-    float sil = gespann(uv, mitte, 0.055);
-    c = mix(c, vec3(0.01, 0.01, 0.02), sil * step(hit, 0.0));
-    c += vec3(1.0, 0.78, 0.35) * staub * (0.7 + 0.8 * ton) * step(hit, 0.0);
+    float laufA = clamp(fort / 0.46, 0.0, 1.0);
+    float laufB = clamp((fort - 0.6) / 0.38, 0.0, 1.0);
+    float sil = 0.0;
+    float band = 0.0;
+    float vorn = 0.0;
+    if (fort < 0.47) {
+        vec2 kopf = mitte + vec2((-2.2 + 4.4 * laufA) * MOND_R * 1.7, MOND_R * (0.15 + 0.35 * sin(laufA * PI)));
+        sil = gespann(uv, kopf, 0.055, 0.0) * step(hit, 0.0);
+    } else if (fort > 0.6) {
+        vec2 a = vec2(-1.35, -0.3), b = vec2(-0.45, -0.46), cc = mitte + vec2(-0.75, -0.2), d = mitte + vec2(0.45, 0.08);
+        vec2 kopf = bezier(a, b, cc, d, laufB);
+        vec2 r = bezier(a, b, cc, d, min(laufB + 0.01, 1.0)) - bezier(a, b, cc, d, max(laufB - 0.01, 0.0));
+        float gr = mix(0.26, 0.02, pow(laufB, 0.7));
+        sil = gespann(uv, kopf, gr, atan(r.y, r.x));
+        vorn = 1.0;
+        // das Band aus Goldstaub: der Weg, den der Schlitten genommen hat
+        for (int k = 1; k < 56; k++) {
+            float fk = float(k);
+            float sk = laufB - fk * 0.009;
+            if (sk < 0.0) break;
+            vec2 rk = bezier(a, b, cc, d, sk + 0.005) - bezier(a, b, cc, d, sk - 0.005);
+            float gk = mix(0.26, 0.02, pow(sk, 0.7));
+            vec2 hinten = bezier(a, b, cc, d, sk) + drehe(vec2(-5.9, -0.32), atan(rk.y, rk.x)) * gk;
+            float alter = fk / 56.0;
+            hinten += vec2(hash(vec2(fk, 3.0)) - 0.5, hash(vec2(fk, 4.0)) - 0.5) * gk * 1.5 * alter;
+            hinten.y -= alter * alter * 0.05;
+            float rr = length(uv - hinten) / (gk * 0.35 + 0.002);
+            float funkeln = 0.55 + 0.45 * sin(time * 11.0 + fk * 2.7);
+            band += (exp(-rr * rr * 3.0) * 1.2 + exp(-rr * 1.6) * 0.15) * (1.0 - alter) * funkeln;
+        }
+    }
+    c = mix(c, vec3(0.01, 0.01, 0.02), sil);
+    c += vec3(1.0, 0.78, 0.35) * (staub * step(hit, 0.0) * (1.0 - vorn) + staub * vorn + band) * (0.7 + 0.8 * ton);
+    // die rote Nase des ersten Rentiers
+    if (fort < 0.47 || fort > 0.6) {
+        float gn = fort < 0.47 ? 0.055 : mix(0.26, 0.02, pow(laufB, 0.7));
+        float rn = length(uv - nase) / gn;
+        float sichtbar = fort < 0.47 ? step(hit, 0.0) : 1.0;
+        c += vec3(1.0, 0.12, 0.06) * (exp(-rn * rn * 120.0) * 3.0 + exp(-rn * 5.0) * 0.35) * (0.8 + 0.4 * kick) * sichtbar;
+    }
     c *= 1.0 + 0.1 * kick;
     c *= 1.0 - 0.3 * dot(uv * 0.9, uv * 0.9);
     c += (hash(fragTexCoord * resolution + time) - 0.5) * 0.012;
