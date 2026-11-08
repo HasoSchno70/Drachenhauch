@@ -2637,6 +2637,12 @@ FUNCTION vorfuehrenStufe22(daten AS INTEGER) AS BOOLEAN
             garnAbgelegt(-1, 0)
             PRINT "falsche nummern: farben "; lwMuster.farbanzahl()
             ' Ebenen ziehen: die Stelle in der echten Liste, dann zusammenfuehren
+            ' Unter Last kam dieser Schritt vor dem Neuzeichnen dran: die eben
+            ' neu gebaute Liste hatte noch keine Zeilen-Lagen (-1 an jeder
+            ' Stelle). Darum hier mit Absicht frisch gebaut und erst vermessen
+            ' -- so prueft jeder Lauf den schweren Fall, nicht nur ein voller.
+            seitenleisteMuster(lwMuster)
+            gtkVermessen(slEbenenListe)
             DIM z1 AS INTEGER : z1 = gtk_list_box_get_row_at_index(slEbenenListe, 1)
             DIM lage AS PangoRechteck
             gtk_widget_get_allocation(z1, lage)
