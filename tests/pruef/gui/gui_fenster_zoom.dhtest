@@ -75,3 +75,67 @@ GUI_WINDOW_DESIGN(w, TRUE)
 GUI_WINDOW_ZOOM(w, 5.0)
 --- fehler
 von 0.25 bis 4
+
+=== ein zugeschnittenes fenster zeichnet und trifft nur im zuschnitt
+' GUI_WINDOW_CLIP (2026-11-08, gefunden mit der Kuehlschrank-App): das
+' Studio haelt ein grosses Entwurfsfenster in seiner Mitte. Zwei rote Knoepfe,
+' der rechte liegt hinter dem Zuschnitt (x ab 120): er ist nicht zu sehen und
+' nimmt keinen Treffer, dort liegt auch das Fenster nicht mehr.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("F", 20, 20, 300, 100)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM a AS GUI_WIDGET : a = GUI_BUTTON(w, "A", 10, 10, 60, 30)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "B", 150, 10, 60, 30)
+GUI_SET_COLOR(a, "bg", &HFF0000)
+GUI_SET_COLOR(b, "bg", &HFF0000)
+GUI_WINDOW_DESIGN(w, TRUE)
+GUI_WINDOW_CLIP(w, 0, 0, 120, 300)
+PRINT "links "; GUI_HIT_TEST(20 + 40, 20 + 25) = a; " rechts "; GUI_HIT_TEST(20 + 180, 20 + 25) = -1; " fenster "; GUI_WINDOW_AT(20 + 180, 20 + 25) = -1
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(0) : GUI_DRAW() : FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=4
+--- erwartet
+links TRUE rechts TRUE fenster TRUE
+--- bild
+60 45 #FF0000 +-60
+200 45 nicht #FF0000 +-60
+
+=== zuschnitt mit zoom, und aufgehoben trifft wieder alles
+' Vergroessert schneidet der Zuschnitt erst auf dem Schirm; b = 0 hebt ihn auf.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("F", 20, 20, 150, 100)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM k AS GUI_WIDGET : k = GUI_BUTTON(w, "K", 10, 10, 60, 30)
+GUI_SET_COLOR(k, "bg", &HFF0000)
+GUI_WINDOW_DESIGN(w, TRUE)
+GUI_WINDOW_ZOOM(w, 2.0)
+GUI_WINDOW_CLIP(w, 0, 0, 100, 300)
+PRINT "im zuschnitt "; GUI_HIT_TEST(20 + 50, 20 + 50) = k; " dahinter "; GUI_HIT_TEST(20 + 120, 20 + 50) = -1
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(0) : GUI_DRAW() : FLIP()
+WEND
+GUI_WINDOW_CLIP(w, 0, 0, 0, 0)
+PRINT "aufgehoben "; GUI_HIT_TEST(20 + 120, 20 + 50) = k
+--- umgebung
+DHRT_FRAMES=4
+--- erwartet
+im zuschnitt TRUE dahinter TRUE
+aufgehoben TRUE
+--- bild
+70 70 #FF0000 +-60
+120 80 nicht #FF0000 +-60
+
+=== zuschnitt nur im entwurfsmodus
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("F", 20, 20, 150, 100)
+GUI_WINDOW_CLIP(w, 0, 0, 100, 100)
+--- fehler
+GUI_WINDOW_CLIP: nur fuer ein Fenster im Entwurfsmodus

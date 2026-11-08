@@ -679,6 +679,18 @@ FUNCTION controlLayout(cn AS STRING) AS JSON_HANDLE
     RETURN JSON_PARSE(elemente[ce].layout)
 END FUNCTION
 
+' Die Hoehe der Menueleiste eines Fensters mit Menues (MENUBAR_H der gui),
+' sonst 0. Die Hoehe im Layout ("h") ist die des Inhalts: die Leiste kommt
+' im Entwurf wie im Programm obendrauf, sonst schnitte sie unten ab, was am
+' Rand liegt (eine Statusleiste).
+CONST MENUELEISTE_H = 26
+
+FUNCTION menueLeisteH(d AS JSON_HANDLE) AS INTEGER
+    IF NOT JSON_HAS(d, "menus") THEN RETURN 0
+    IF JSON_LEN(d, "menus") = 0 THEN RETURN 0
+    RETURN MENUELEISTE_H
+END FUNCTION
+
 FUNCTION jsonText$(d AS JSON_HANDLE, pfad AS STRING) AS STRING
     IF NOT JSON_HAS(d, pfad) THEN RETURN ""
     IF JSON_TYPE(d, pfad) <> "string" THEN RETURN ""

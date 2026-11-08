@@ -1,0 +1,130 @@
+' Drachenhauch Studio: Menueleiste und grosse Fenster (gefunden beim Port der
+' Kuehlschrank-App). Die Hoehe im Layout ist die des Inhalts -- die
+' Menueleiste kommt im Entwurf wie im erzeugten Programm obendrauf. Vorher
+' schob sie den Inhalt 26 Punkte nach unten, ohne das Fenster zu vergroessern:
+' eine Statusleiste am unteren Rand fiel heraus, und die Rahmen des Entwurfs
+' lagen 26 Punkte ueber den Controls. Ein Fenster, groesser als die Mitte,
+' bleibt in ihr (GUI_WINDOW_CLIP) und geht beim Oeffnen kleiner auf.
+' Format: docs/werkzeuge.md, dhrt test.
+
+--- langsam
+=== im entwurf trifft ein klick auf die gemeldete lage das control
+' Erster Lauf misst die Lagen, der zweite klickt auf den Knopf direkt unter
+' der Menueleiste und auf die Statusleiste am unteren Rand (-1 = beim Oeffnen
+' nichts gewaehlt).
+IMPORT "laeufer.dh"
+DIM m AS STRING : m = CWD$() + "/m.log"
+slStarten(m, "", 6, CWD$() + "/f.dhform")
+DIM ox AS INTEGER
+DIM oy AS INTEGER
+(ox, oy) = slLage(m, "control oben")
+DIM sx AS INTEGER
+DIM sy AS INTEGER
+(sx, sy) = slLage(m, "control status")
+slHin(10, 10)
+slKlick(ox, oy)
+slWarten(4)
+slKlick(sx, sy)
+slWarten(4)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+DIM log AS STRING : log = CWD$() + "/s.log"
+slStarten(log, CWD$() + "/ev.txt", slBild + 10, CWD$() + "/f.dhform")
+DIM z AS STRING
+FOR EACH z IN slAnfang(log, "gewaehlt ")
+    PRINT z
+NEXT
+--- argumente
+{sammlung}/../../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei f.dhform
+{"title":"F","name":"F","w":420,"h":300,"menus":[{"label":"Datei","items":[{"label":"Beenden","name":"miBeenden"}]}],"widgets":[
+{"kind":"button","name":"oben","text":"Oben","x":20,"y":0,"w":120,"h":20},
+{"kind":"statusbar","name":"status","text":"Bereit","x":0,"y":280,"w":420,"h":20}]}
+--- erwartet
+gewaehlt -1 0
+gewaehlt 0 1
+gewaehlt 1 1
+
+=== im programm liegt die statusleiste am unteren rand des fensters
+' F5 erzeugt das Programm; die Probe fragt nach dem ersten Bild, was am
+' untersten Punkt des Schirms liegt.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+slHin(10, 10)
+slWarten(10)
+slTaste(294)
+slWarten(150)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+SETENV("DH_STUDIO_LAUF_BILDER", "20")
+DIM log AS STRING : log = CWD$() + "/s.log"
+slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+PRINT "erzeugt "; LEN(slAnfang(log, "erzeugt ")) = 1
+DIM k AS INTEGER : k = PROCESS_START("dhrt", "run", "--bilder", "30", p + "/_studio/main.dh")
+DIM leer AS INTEGER : leer = 0
+WHILE leer < 5
+    DIM t AS STRING : t = PROCESS_READ$(k)
+    IF t <> "" THEN
+        DIM zeile AS STRING
+        FOR EACH zeile IN SPLIT(REPLACE$(t, CHR$(13), ""), CHR$(10))
+            IF zeile <> "" AND LEFT$(zeile, 8) <> "WARNING:" AND LEFT$(zeile, 5) <> "INFO:" THEN PRINT zeile
+        NEXT
+        leer = 0
+    ELSEIF NOT PROCESS_RUNNING(k) THEN
+        leer = leer + 1
+        SLEEP(30)
+    END IF
+WEND
+--- argumente
+{sammlung}/../../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"}]}
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":420,"h":300,"menus":[{"label":"Datei","items":[{"label":"Beenden","name":"miBeenden"}]}],"widgets":[
+{"kind":"button","name":"oben","text":"Oben","x":20,"y":0,"w":120,"h":20},
+{"kind":"statusbar","name":"status","text":"Bereit","x":0,"y":280,"w":420,"h":20,"anchor":"lrb"}],
+"timer":[{"name":"messen","intervall":100,"aktiv":true,"wiederholen":false}]}
+--- datei proj/Hauptfenster.dh
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+
+    SUB messen_Aktion()
+        PRINT "schirm "; SCREENHEIGHT(); " unten status "; GUI_HIT_TEST(10, SCREENHEIGHT() - 4) = Self.status; " oben knopf "; GUI_HIT_TEST(30, 26 + 10) = Self.oben
+    END SUB
+END CLASS
+--- datei proj/App.dh
+CLASS App EXTENDS StudioApp
+END CLASS
+--- erwartet
+erzeugt TRUE
+schirm 326 unten status TRUE oben knopf TRUE
+
+=== ein grosses fenster geht eingepasst auf und bleibt in der mitte
+' 1400 x 900 passt bei 100 % nicht in die Mitte (Studio 1440 x 900): es geht
+' bei 50 % auf, und sein Knopf rechts unten ist zu sehen.
+IMPORT "laeufer.dh"
+DIM m AS STRING : m = CWD$() + "/m.log"
+slStarten(m, "", 6, CWD$() + "/f.dhform")
+PRINT "eingepasst "; slHat(m, "zoom eingepasst 50")
+DIM fx AS INTEGER
+DIM fy AS INTEGER
+(fx, fy) = slLage(m, "fenster")
+DIM kx AS INTEGER
+DIM ky AS INTEGER
+(kx, ky) = slLage(m, "control rechts")
+' Bei 100 % laege der Knopf bei x = fx + 1320 hinter dem Rand des Studios.
+PRINT "knopf zu sehen "; kx > fx AND kx < 1440 - 200 AND ky < 900 - 100
+--- argumente
+{sammlung}/../../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei f.dhform
+{"title":"F","name":"F","w":1400,"h":900,"widgets":[
+{"kind":"button","name":"rechts","text":"Rechts","x":1260,"y":840,"w":120,"h":40}]}
+--- erwartet
+eingepasst TRUE
+knopf zu sehen TRUE

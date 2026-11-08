@@ -263,6 +263,12 @@ line map that brings errors to their method.
 | Ctrl+mouse wheel, Ctrl+Plus/Minus, Ctrl+0 | zoom |
 | Esc | cancels placing, otherwise clears the selection |
 
+A window that does not fit into the middle at 100 % opens at 75 or 50 %;
+whatever reaches beyond the middle is clipped instead of lying over the
+inspector and the output. If the window has menus, the menu bar sits above
+the content: the height in the inspector is that of the content, and in the
+program the window grows by the bar.
+
 **Alignment guides:** while dragging and resizing, edges and centres snap to
 those of the other controls. They also snap to the edges and the centre of
 the window, 20 pixels from the edge and 12 pixels next to a neighbour. A pink

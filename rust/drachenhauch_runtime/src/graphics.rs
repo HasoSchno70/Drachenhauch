@@ -2563,12 +2563,17 @@ impl Graphics {
     }
     /// Zurueck zum vorigen Ziel und den Ausschnitt (x, y, b, h) mit Faktor
     /// `z` an (x, y) stempeln.
-    pub fn zoom_beenden(&mut self, x: i32, y: i32, b: i32, h: i32, z: f32) {
+    /// `clip`: nur dieser Teil des Schirms (GUI_WINDOW_CLIP) -- gesetzt erst
+    /// hier, nachdem wieder auf den Schirm gezeichnet wird; davor gingen die
+    /// Befehle in die Zwischenflaeche.
+    pub fn zoom_beenden(&mut self, x: i32, y: i32, b: i32, h: i32, z: f32, clip: Option<(i32, i32, i32, i32)>) {
         self.active_rt = self.zoom_vorher.take().unwrap_or(None);
         if let Some((i, _, _)) = self.zoom_rt {
             let q = [x as f32, y as f32, b as f32, h as f32];
             let d = [x as f32, y as f32, b as f32 * z, h as f32 * z];
+            if let Some((cx, cy, cb, ch)) = clip { self.push_clip(cx, cy, cb, ch); }
             self.emit(Cmd::RtDrawTeil(i, q, d));
+            if clip.is_some() { self.pop_clip(); }
         }
     }
     /// Zeichnet das Target (seine Textur) an Position x,y, skaliert + getoent.

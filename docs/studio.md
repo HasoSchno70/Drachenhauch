@@ -265,6 +265,12 @@ die auch Fehler an ihre Methode bringt.
 | Strg+Mausrad, Strg+Plus/Minus, Strg+0 | Zoom |
 | Esc | bricht ein Ablegen ab, sonst hebt es die Auswahl auf |
 
+Ein Fenster, das bei 100 % nicht in die Mitte passt, geht bei 75 oder
+50 % auf; was über die Mitte hinausreicht, wird abgeschnitten, statt über
+Inspektor und Ausgabe zu liegen. Hat das Fenster Menüs, steht die
+Menüleiste über dem Inhalt: die Höhe im Inspektor ist die des Inhalts, im
+Programm wird das Fenster um die Leiste höher.
+
 **Ausrichtungslinien:** Beim Ziehen und beim Ändern der Größe rasten die
 Kanten und Mitten an denen der anderen Controls ein. Einrasten gibt es auch
 an den Rändern und der Mitte des Fensters, 20 Punkte vom Rand und 12 Punkte

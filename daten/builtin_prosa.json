@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 2378,
+ "count": 2379,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -1091,6 +1091,7 @@
   "GUI_WINDOW_AT": "oberstes sichtbares Fenster am Bildschirmpunkt, oder -1 -- wer das Mausrad selbst auswertet, fragt hier, ob seine Fläche gerade oben liegt",
   "GUI_WINDOW_CANCEL": "Abbrechen-Knopf: ESC löst ihn aus (-1 = keiner)",
   "GUI_WINDOW_CHROME": "Titelleiste/Rahmen/Buttons zeichnen? Aus = randlos, Inhalt ab oben (damit eine Form das OS-Fenster ausfüllen kann). Default: an",
+  "GUI_WINDOW_CLIP": "ein Fenster im Entwurfsmodus nur in diesem Teil des Schirms zeigen (logische Punkte wie GUI_WINDOW_SET_BOUNDS): was draußen liegt, wird nicht gezeichnet und trifft keinen Klick (GUI_HIT_TEST, GUI_WINDOW_AT). b oder h ≤ 0 hebt den Zuschnitt auf. Außerhalb des Entwurfsmodus ein Fehler",
   "GUI_WINDOW_CLOSABLE": "Schließen-Button anzeigen (Default: aus)",
   "GUI_WINDOW_CLOSED": "BOOLEAN — wurde das Fenster geschlossen?",
   "GUI_WINDOW_CONTENT_H": "INTEGER — Breite und Hoehe des Inhaltsbereichs unter Titel-, Menue- und Reiterleiste -- dort zaehlen die Widget-Koordinaten; so sitzt eine Statusleiste unten, ohne die Hoehe der Menueleiste zu raten",

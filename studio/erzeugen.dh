@@ -321,6 +321,13 @@ FUNCTION basisCode$(ei AS INTEGER) AS STRING
         DIM rumpf AS JSON_HANDLE : rumpf = JSON_PARSE(JSON_STRINGIFY(aus))
         IF JSON_HAS(rumpf, "timer") THEN JSON_REMOVE(rumpf, "timer")
         IF JSON_HAS(rumpf, "menus") THEN JSON_REMOVE(rumpf, "menus")
+        ' Die Menueleiste kommt obendrauf: "h" ist die Hoehe des Inhalts.
+        DIM mlh AS INTEGER : mlh = menueLeisteH(aus)
+        IF mlh > 0 THEN
+            JSON_SET_INT(rumpf, "h", jsonZahl(rumpf, "h", 400) + mlh)
+            IF jsonZahl(rumpf, "min_h", 0) > 0 THEN JSON_SET_INT(rumpf, "min_h", jsonZahl(rumpf, "min_h", 0) + mlh)
+            IF jsonZahl(rumpf, "max_h", 0) > 0 THEN JSON_SET_INT(rumpf, "max_h", jsonZahl(rumpf, "max_h", 0) + mlh)
+        END IF
         ARRAY_PUSH(z, "        DIM j AS STRING : j = " + CHR$(34) + CHR$(34))
         DIM json AS STRING : json = JSON_STRINGIFY(rumpf)
         DIM pos AS INTEGER : pos = 0
@@ -565,7 +572,7 @@ FUNCTION startZeilen$() AS STRING
     IF s < 0 THEN RETURN "PRINT " + CHR$(34) + "Das Projekt hat kein Fenster." + CHR$(34) + CHR$(10)
     DIM d AS JSON_HANDLE : d = layoutFuerBasis(s)
     DIM b AS INTEGER : b = IIF(JSON_HAS(d, "w"), JSON_GET_INT(d, "w"), 600)
-    DIM h AS INTEGER : h = IIF(JSON_HAS(d, "h"), JSON_GET_INT(d, "h"), 400)
+    DIM h AS INTEGER : h = IIF(JSON_HAS(d, "h"), JSON_GET_INT(d, "h"), 400) + menueLeisteH(d)
     DIM titel AS STRING : titel = IIF(JSON_HAS(d, "title"), JSON_GET_STRING(d, "title"), elemente[s].name)
     DIM groesse AS BOOLEAN : groesse = FALSE
     IF JSON_HAS(d, "resizable") THEN groesse = JSON_GET_BOOL(d, "resizable")

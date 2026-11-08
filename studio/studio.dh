@@ -103,7 +103,7 @@ SUB punkteRechnen()
     punkteFuer = schluessel
     punkteX = [] : punkteY = [] : punkteX2 = [] : punkteY2 = []
     DIM x1 AS INTEGER : x1 = formX - 18
-    DIM y1 AS INTEGER : y1 = formY - TITEL_H - 18
+    DIM y1 AS INTEGER : y1 = formY - kopfH() - 18
     DIM x2 AS INTEGER : x2 = formX + zS(fensterB()) + 18
     DIM y2 AS INTEGER : y2 = formY + zS(fensterH()) + 28
     DIM y AS INTEGER

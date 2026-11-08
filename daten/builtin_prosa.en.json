@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/en und dem englischen Buch von `dhrt doku prosa` -- NICHT von Hand aendern. Der Hover nimmt sie mit DHRT_LANG=en.",
- "count": 2370,
+ "count": 2371,
  "docs": {
   "ABS": "Absolute value.",
   "ACOS": "Arc sine/cosine (x in [-1, 1])",
@@ -1090,6 +1090,7 @@
   "GUI_WINDOW_AT": "topmost visible window at the screen point, or -1 -- whoever evaluates the mouse wheel themselves asks here whether their area is currently on top",
   "GUI_WINDOW_CANCEL": "cancel button: ESC triggers it (-1 = none)",
   "GUI_WINDOW_CHROME": "draw title bar/border/buttons? Off = borderless, content starts at the top (so that a form can fill the OS window). Default: on",
+  "GUI_WINDOW_CLIP": "show a window in design mode only in this part of the screen (logical points like GUI_WINDOW_SET_BOUNDS): what lies outside is not drawn and takes no click (GUI_HIT_TEST, GUI_WINDOW_AT). b or h ≤ 0 removes the clip. Outside design mode it is an error",
   "GUI_WINDOW_CLOSABLE": "show a close button (default: off)",
   "GUI_WINDOW_CLOSED": "BOOLEAN — was the window closed?",
   "GUI_WINDOW_CONTENT_H": "INTEGER — width and height of the content area below the title, menu and tab bar -- widget coordinates count from there; a status bar sits at the bottom without guessing the height of the menu bar",

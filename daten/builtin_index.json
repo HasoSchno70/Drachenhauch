@@ -7155,6 +7155,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_WINDOW_CLIP",
+   "kind": "core",
+   "signature": "GUI_WINDOW_CLIP(win, x, y, b, h)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_WINDOW_ZOOM",
    "kind": "core",
    "signature": "GUI_WINDOW_ZOOM(win, faktor)",

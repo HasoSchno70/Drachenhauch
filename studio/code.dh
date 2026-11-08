@@ -312,6 +312,7 @@ SUB fensterAktivieren(ei AS INTEGER)
     aktFenster = ei
     DIM e AS Element : e = elemente[ei]
     doc = JSON_PARSE(e.layout)
+    zoomEinpassen()
     staende = [] : standPos = -1
     IF e.verlauf <> "" THEN
         DIM w AS JSON_HANDLE : w = JSON_PARSE(e.verlauf)

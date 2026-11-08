@@ -77,6 +77,7 @@ IMPORT "gui"
 | `GUI_WINDOW_DESIGN(win, an)` | — | design mode: the window is drawn, but its widgets receive no input (no hover, click, focus, callback; no dragging the border either). A form designer places real widgets on the surface this way and handles the mouse itself — `GUI_HIT_TEST` and all setters keep working. Default: off |
 | `GUI_WINDOW_ZOOM(win, faktor)` | — | draw a window in design mode magnified (0.25 to 4): the position stays, the area grows. Geometry seen from outside stays unmagnified, `GUI_HIT_TEST` and `GUI_WINDOW_AT` convert the mouse back. Drawing goes through an intermediate surface that is magnified smoothly — text is somewhat soft at 150–200 %. Outside design mode it is an error (the window would accept input, and the mouse would miss) |
 | `GUI_WINDOW_GET_ZOOM(win)` | FLOAT | the factor of `GUI_WINDOW_ZOOM` |
+| `GUI_WINDOW_CLIP(win, x, y, b, h)` | — | show a window in design mode only in this part of the screen (logical points like `GUI_WINDOW_SET_BOUNDS`): what lies outside is not drawn and takes no click (`GUI_HIT_TEST`, `GUI_WINDOW_AT`). `b` or `h` ≤ 0 removes the clip. Outside design mode it is an error |
 | `GUI_WINDOW_SET_MIN_SIZE(win, w, h)` | — | minimum size when resizing (0 = none) |
 | `GUI_WINDOW_SET_MAX_SIZE(win, w, h)` | — | maximum size when resizing (0 = none) |
 | `GUI_SEPARATOR(win, x, y, w)` | GUI_WIDGET | decorative divider line (horizontal) |

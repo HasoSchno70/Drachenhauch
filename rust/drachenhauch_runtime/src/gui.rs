@@ -3255,6 +3255,11 @@ pub struct Window {
     /// das Fenster bekommt dort keine Eingabe, also muss nur GUI_HIT_TEST
     /// (und wo ein Fenster liegt) die Mauslage zurueckrechnen.
     zoom: f32,
+    /// Zuschnitt auf dem Schirm (GUI_WINDOW_CLIP), nur im Entwurfsmodus: was
+    /// draussen liegt, wird nicht gezeichnet und trifft keinen Klick -- das
+    /// Studio haelt so ein grosses Entwurfsfenster in seiner Mitte, statt es
+    /// ueber Inspektor und Ausgabe zu legen.
+    zuschnitt: Option<(i32, i32, i32, i32)>,
     chrome: bool,                    // Titelleiste + Rahmen + Buttons? (aus = randlos,
                                      //   z.B. wenn die Form das OS-Fenster fuellt)
     min_w: i32, min_h: i32,          // Groessen-Grenzen (0 = keine)
@@ -3900,7 +3905,7 @@ impl Gui {
         let idx = self.windows.len();
         self.windows.push(Window {
             title, name: String::new(), x, y, w, h, widgets: Vec::new(),
-            movable: true, closable: false, visible: true, entwurf: false, zoom: 1.0,
+            movable: true, closable: false, visible: true, entwurf: false, zoom: 1.0, zuschnitt: None,
             resizable: false, pruefung_live: false, form_stand: Vec::new(), form_db: Vec::new(), chrome: true, min_w: 0, min_h: 0, max_w: 0, max_h: 0,
             base_w: w, base_h: h,
             close_clicked: false, alive: true, dlg: false, answer: 0,
@@ -5001,8 +5006,36 @@ impl Gui {
     fn sicht_rect(&self, wi: usize) -> (i32, i32, i32, i32) {
         let w = &self.windows[wi];
         let z = self.zoom_von(wi);
-        if z == 1.0 { return (w.x, w.y, w.w, w.h); }
-        (w.x, w.y, (w.w as f32 * z).round() as i32, (w.h as f32 * z).round() as i32)
+        let r = if z == 1.0 { (w.x, w.y, w.w, w.h) }
+                else { (w.x, w.y, (w.w as f32 * z).round() as i32, (w.h as f32 * z).round() as i32) };
+        match self.zuschnitt_von(wi) {
+            Some(c) => Self::schnitt(r, c),
+            None => r,
+        }
+    }
+    fn zuschnitt_von(&self, wi: usize) -> Option<(i32, i32, i32, i32)> {
+        let w = &self.windows[wi];
+        if w.entwurf { w.zuschnitt } else { None }
+    }
+    /// Die Schnittmenge zweier Rechtecke (x, y, b, h); leer = Breite/Hoehe 0.
+    fn schnitt(a: (i32, i32, i32, i32), b: (i32, i32, i32, i32)) -> (i32, i32, i32, i32) {
+        let x = a.0.max(b.0);
+        let y = a.1.max(b.1);
+        let x2 = (a.0 + a.2).min(b.0 + b.2);
+        let y2 = (a.1 + a.3).min(b.1 + b.3);
+        (x, y, (x2 - x).max(0), (y2 - y).max(0))
+    }
+    /// GUI_WINDOW_CLIP(win, x, y, b, h): nur dieser Teil des Schirms zeigt das
+    /// Fenster (logische Punkte wie GUI_WINDOW_SET_BOUNDS); b oder h <= 0 hebt
+    /// den Zuschnitt auf. Wie GUI_WINDOW_ZOOM nur im Entwurfsmodus -- ein
+    /// Fenster, das Eingaben nimmt, bekaeme sonst Tasten fuer Felder, die
+    /// niemand sieht.
+    pub fn window_clip(&mut self, h: i64, x: i32, y: i32, b: i32, ht: i32) -> Result<(), String> {
+        let r = (self.sk(x), self.sk(y), self.sk(b), self.sk(ht));
+        let w = self.win_mut(h, "GUI_WINDOW_CLIP")?;
+        if !w.entwurf { return Err("GUI_WINDOW_CLIP: nur fuer ein Fenster im Entwurfsmodus (GUI_WINDOW_DESIGN)".into()); }
+        w.zuschnitt = if b > 0 && ht > 0 { Some(r) } else { None };
+        Ok(())
     }
     /// Ein Schirmpunkt in die (unvergroesserten) Koordinaten des Fensters.
     fn ins_fenster(&self, wi: usize, mx: i32, my: i32) -> (i32, i32) {
@@ -5015,12 +5048,16 @@ impl Gui {
     /// einen Faktor hat.
     fn draw_window_sicht(&self, g: &mut Graphics, wi: usize) {
         let z = self.zoom_von(wi);
+        let clip = self.zuschnitt_von(wi);
         if z != 1.0 && g.zoom_beginnen() {
             self.draw_window(g, wi);
             let w = &self.windows[wi];
-            g.zoom_beenden(w.x, w.y, w.w, w.h, z);
+            // Zugeschnitten wird erst beim Uebertragen auf den Schirm.
+            g.zoom_beenden(w.x, w.y, w.w, w.h, z, clip);
         } else {
+            if let Some((x, y, b, h)) = clip { g.push_clip(x, y, b, h); }
             self.draw_window(g, wi);
+            if clip.is_some() { g.pop_clip(); }
         }
     }
 
