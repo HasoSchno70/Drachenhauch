@@ -39,13 +39,13 @@ ESC beendet, F11 schaltet das Vollbild.
 |---|---|---|
 | 0 | Adventskranz | Tannengrün, Beeren, Samtband, vier rote Kerzen; die erste entzündet sich, die Kamera fährt in ihre Flamme |
 | 8 | Erster Advent: das Dorf | hoch über einem Tal im verschneiten Wald wächst das Dorf aus dem Schnee: erst die Kirche, dann Haus um Haus auf den Schlag (vorher leuchtet sein Grundriss golden), Fenster gehen an, Rauch steigt auf; zuletzt Dorfbaum und Laternen, die Kamera sinkt in die Gasse |
-| 24 | Kranz | die zweite Kerze |
+| 24 | Kranz | die zweite Kerze entzündet sich auf einen Glockenschlag, die Kamera fährt in ihre Flamme |
 | 26 | Zweiter Advent: der Weihnachtsmarkt | Buden mit Tassen, Kugeln, brennenden Kerzen und Lebkuchenherzen, Lichterketten vom Karussell zu den Buden, Leute in Mantel und Pudelmütze, Dampf aus den Glühweinbuden, ein Karussell, das sich auf der Audio-Uhr dreht |
 | 42 | Kranz | die dritte Kerze |
-| 44 | Dritter Advent: der Winterwald | ein zugefrorener See, verschneite Tannen, ein Reh im Mondlicht, Diamantstaub, Sternschnuppen |
+| 44 | Dritter Advent: der Winterwald | ein zugefrorener See, verschneite Tannen, ein Reh im Mondlicht, eine Blockhütte mit warmen Fenstern, Eislichter am Ufer, die sich im Eis spiegeln, zwei Schlittschuhläufer, eine Eule vor dem Mond, Sternschnuppen |
 | 52 | Eisblumen | die Kamera senkt sich aufs Eis, sechsarmige Kristalle wachsen über den See und leuchten mit jedem Ton |
 | 60 | Kranz | die vierte Kerze |
-| 62 | Vierter Advent: der Flug zum Mond | tief über Hügel und Wälder, der Schlitten mit vier Rentieren zieht vor dem Mond vorbei, hinter sich Goldstaub; ab Takt 70 Polarlicht |
+| 62 | Vierter Advent: der Flug zum Mond | tief über Hügel und Dörfer, der Schlitten mit vier Rentieren (das erste mit roter Nase) zieht vor dem Mond vorbei; ab Takt 70 steigt die Kamera durch die Wolken, über dem Wolkenmeer im Polarlicht schwingt das Gespann groß heran und zieht ein Band aus Goldstaub zum Mond |
 | 78 | Heiligabend | vor dem Fenster (Eisblumen in den Ecken), es öffnet sich, hindurch in die Stube: Kamin, Uhr, Schwibbogen, Geschenke; der Baum entfaltet sich, die Lichterkette geht an, er schmückt sich zu „Stille Nacht“ |
 | 96 | Mitternacht | es wird dunkler, die Uhr steht auf zwölf, zwölf Glockenschläge, jeder schickt einen Lichtring vom Baum aus |
 | 99 | Der Stern | der Stern auf der Spitze geht auf |
@@ -105,7 +105,10 @@ die Flamme hinein, sonst ein Lichtkreis aus der Mitte.
 
 - **kranz.fs** -- Raymarching: ein Ring aus zerzaustem Tannengrün mit Nadeln
   und Rauhreif, Beeren, Samtschleifen, vier Kerzen aus Wachs, das von innen
-  leuchtet, Flammen mit blauem Saum, im Hintergrund unscharfe Lichter.
+  leuchtet, Flammen mit blauem Saum, im Hintergrund unscharfe Lichter. Die
+  Kamera steht in jedem Zwischenspiel vor der Kerze, die sich entzündet
+  (`kerzenBrennen` in `musik.dh`, im Schritt des Glockenschlags), und fährt
+  in ihre Flamme.
 - **dorf.fs** -- ein Tal mit Hügeln, ringsum Tannen auf einem gedrehten
   Raster; das Dorf ein Raster von Zellen zu acht Einheiten, je Zelle ein Haus
   mit eigenem Maß, eigener Richtung und eigenem Beginn (von der Mitte nach
@@ -126,10 +129,15 @@ die Flamme hinein, sonst ein Lichtkreis aus der Mitte.
 - **wald.fs** -- Tannen auf einem Raster, ein spiegelnder See mit Rissen,
   ein Reh, Polarlicht als Schleier, Sternschnuppen auf der Eins; die
   Eisblumen sind in einen Sektor gefaltete Kristalle, jeder mit eigenem
-  Keim und eigenem Beginn.
+  Keim und eigenem Beginn. Hütte, Eislichter und Läufer liegen im
+  Abstandsfeld; die warmen Lichter sammeln sich als Schein entlang des
+  Strahls und spiegeln sich, senkrecht gezogen, im rauhen Eis. Die Eule ist
+  ein Schattenriss in der Ebene des Mondes.
 - **schlitten.fs** -- ein Höhenfeld aus Rauschen mit Bäumen und Dorflichtern,
-  der Mond groß am Horizont; Schlitten und Rentiere sind ein 2D-Schattenriss
-  im Bild des Mondes, die Beine im Galopp auf dem Takt.
+  der Mond groß am Horizont; Schlitten und Rentiere sind ein 2D-Schattenriss,
+  die Beine im Galopp auf dem Takt. Die Wolkendecke ist eine Schicht, die
+  der Strahl schneidet. Über ihr fliegt das Gespann auf einer Bézier-Kurve
+  zum Mond, sein Goldband sind Funken an den Stellen, an denen es zuvor war.
 - **stube.fs** -- ein Raum mit Fensterwand (zwei Flügel, die sich öffnen),
   Kamin, Vertäfelung, Kommode mit Schwibbogen, Wanduhr, Geschenken und dem
   Baum aus fünf Lagen, die sich wie ein Schirm von oben entfalten. Die 92
