@@ -25,6 +25,7 @@ hierher und die Geschichte dorthin.
 ```
 rust/drachenhauch_runtime/   # die Runtime dhrt (Rust/raylib/Kira)
   src/lexer.rs parser.rs compiler.rs vm.rs builtins.rs + <modul>.rs
+  src/vm_*.rs gui_*.rs       # Methoden von Vm bzw. Gui nach Themen (Typen bleiben in vm.rs/gui.rs)
   src/jit.rs                 # Maschinencode (Cranelift)
   src/lsp.rs symbole.rs doku.rs pruef.rs pruefsammlung.rs   # Werkzeuge in dhrt
 rust/build_runtime.py        # Bau der Runtime (Python 3, nur Standardbibliothek)
@@ -62,7 +63,9 @@ Exe und kopiert `assets/`. Weitere Einstiege: `dhrt --check`, `dhrt lsp`,
 ## Built-ins erweitern
 
 Builtins leben in `rust/drachenhauch_runtime/src/builtins.rs` (pure) bzw. in den
-`try_*`-Familien von `vm.rs` (brauchen VM-/Fenster-Zustand). Neuer Builtin:
+`try_*`-Familien der VM (brauchen VM-/Fenster-Zustand; nach Themen in
+`vm_dienste.rs`, `vm_geraete.rs`, `vm_system.rs`, `vm_gui.rs`, `vm_grafik.rs`).
+Neuer Builtin:
 
 1. Einen Match-Arm ergänzen: Arity + Typen selbst prüfen (Validierung gehört in
    den Wrapper, nicht ins Backend), Fehlermeldung im gewohnten Wortlaut
@@ -96,7 +99,9 @@ Builtins leben in `rust/drachenhauch_runtime/src/builtins.rs` (pure) bzw. in den
 ## Neues Modul, IMPORT-Auflösung
 
 Module sind in `rust/drachenhauch_runtime/src/<modul>.rs` implementiert, Dispatch
-in `vm.rs` (`try_<modul>`), externe Typen + ihr Default in `vm.rs`/`value.rs`.
+in `vm.rs` (`familie_rufen`) und `try_<modul>` im passenden `vm_*.rs`, externe
+Typen + ihr Default in `vm.rs`/`value.rs`. Eine Methode in einer Teildatei ist
+`pub(super)`, damit `vm.rs` und die Geschwister sie sehen (ebenso bei `gui_*.rs`).
 Neues Modul: `.rs` schreiben, im Dispatch einhängen, den Namen in
 `preprocess.rs` MODULES ergänzen (sonst kennt der Preprocessor `IMPORT "modul"`
 nicht), Fall in einer Prüfsammlung, `builtin_index.json`, `docs/module-*.md`
