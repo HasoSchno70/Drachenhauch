@@ -159,6 +159,7 @@ studioDieApp.Geoeffnet()
 studioStartFenster.studioHaupt = TRUE
 studioStartFenster.Zeigen()
 DIM f AS Hauptfenster : f = studioStartFenster
+TEXT_SIZE(13)
 DIM n AS INTEGER
 WHILE n < 5 AND studioBild()
     n = n + 1
@@ -170,6 +171,9 @@ WHILE n < 5 AND studioBild()
     n = n + 1
 WEND
 PRINT "seite 1: "; f.bild1.gemalt > 0
+' Das TEXT_SIZE(20) aus Zeichnen bleibt dort: die gui zeichnet ohne eigene
+' Schrift in der Textgroesse des Programms, sie schrumpfte sonst mit.
+PRINT "groesse danach "; TEXT_HEIGHT()
 TEXT_SIZE(20)
 DIM pixel AS FLOAT : pixel = TEXT_WIDTH("Wolke")
 SETFONT(LOADFONT("sans", 32))
@@ -201,5 +205,6 @@ END CLASS
 erzeugt TRUE
 seite 0: 0
 seite 1: TRUE
+groesse danach 13
 wie sans TRUE | wie pixel FALSE
 code 0

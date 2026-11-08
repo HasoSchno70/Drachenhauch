@@ -136,8 +136,10 @@ The events per kind:
 
 `Zeichnen` (draw) runs in every frame in which the canvas is visible (not
 on a tab page in the background), clipped to the canvas and in the font of
-the interface: the gui's own (`GUI_FONT`), otherwise the built-in Sans --
-not the pixel font `TEXT` uses otherwise. Coordinates are screen points from
+the interface: the gui's own (`GUI_FONT`), otherwise the built-in Sans at
+the program's text size -- not the pixel font `TEXT` uses otherwise. Whatever
+`Zeichnen` changes in font, size and style stays there (like
+`GFX_PUSH`/`GFX_POP`). Coordinates are screen points from
 `GUI_CANVAS_X/Y`. Maus, Rad and Ziehen do not come while a modal window
 stands in front of the canvas.
 

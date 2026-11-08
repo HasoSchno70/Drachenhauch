@@ -19,23 +19,26 @@ IMPORT "pdf"
 IMPORT "imgfx"
 
 ' Eine Zeichenfläche malt ihren Text in der Schrift der Oberfläche daneben:
-' der eigenen der gui (GUI_FONT), sonst der eingebauten Sans -- nicht in der
-' Pixelschrift, die TEXT ohne SETFONT nimmt. Wer eine andere will, setzt sie
-' in Zeichnen selbst; danach gilt wieder die des Programms.
+' der eigenen der gui (GUI_FONT), sonst der eingebauten Sans in der
+' Textgröße des Programms -- nicht in der Pixelschrift, die TEXT ohne SETFONT
+' nimmt. Wer eine andere will, setzt sie in Zeichnen selbst. Danach gilt
+' wieder genau der Stand von vorher (GFX_PUSH/GFX_POP: Schrift, Größe, Stil):
+' ohne eine eigene Schrift zeichnet die gui in der Textgröße des Programms,
+' und ein TEXT_SIZE aus Zeichnen liess sonst die ganze Oberfläche schrumpfen.
 DIM studioSans AS INTEGER : studioSans = -1
 
 SUB studioSchriftAn()
+    GFX_PUSH()
     IF GUI_FONT_GET()[0] >= 0 THEN
-        SETFONT(GUI_FONT_GET()[0])
+        SETFONT(GUI_FONT_GET()[0], GUI_FONT_GET()[1])
         RETURN
     END IF
     IF studioSans < 0 THEN studioSans = LOADFONT("sans", 32)
-    SETFONT(studioSans)
+    SETFONT(studioSans, TEXT_HEIGHT())
 END SUB
 
 SUB studioSchriftAus()
-    SETFONT(-1)
-    TEXT_STYLE("normal")
+    GFX_POP()
 END SUB
 
 CLASS StudioApp
