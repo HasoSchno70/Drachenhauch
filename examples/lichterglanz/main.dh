@@ -31,6 +31,7 @@
 '
 ' ESC beendet, F11 schaltet das Vollbild.
 IMPORT "musik.dh"
+IMPORT "imgfx"
 
 CONST BREITE = 1280
 CONST HOEHE = 720
@@ -217,8 +218,26 @@ DIM dy1[STREIFEN] AS INTEGER
 DIM dx2[STREIFEN] AS INTEGER
 DIM dy2[STREIFEN] AS INTEGER
 DIM df[STREIFEN] AS INTEGER
+' die Kante darueber: ein heller Saum von 2 Punkten
+DIM kanteY[STREIFEN] AS INTEGER
+DIM kanteF[STREIFEN] AS INTEGER
+' was sich nie aendert, einmal: je Streifen die beiden Saeulen und das
+' Gewicht dazwischen (weich, Hermite)
+DIM dA[STREIFEN] AS INTEGER
+DIM dB[STREIFEN] AS INTEGER
+DIM dT[STREIFEN] AS FLOAT
+DIM deckeSicht AS FLOAT : deckeSicht = -1.0
 
 DIM si AS INTEGER
+FOR si = 0 TO STREIFEN - 1
+    DIM lage AS FLOAT : lage = (si + 0.5) / (STREIFEN \ SAEULEN) - 0.5
+    dA[si] = CLAMP(INT(FLOOR(lage)), 0, SAEULEN - 1)
+    dB[si] = MIN(dA[si] + 1, SAEULEN - 1)
+    DIM tw AS FLOAT : tw = CLAMP(lage - dA[si], 0.0, 1.0)
+    dT[si] = tw * tw * (3.0 - 2.0 * tw)
+    dx1[si] = si * 2 : dx2[si] = si * 2 + 1
+    dy2[si] = HOEHE
+NEXT
 RANDOMIZE(24)
 FOR si = 0 TO FLOCKEN - 1
     fX[si] = RND() * BREITE
@@ -258,6 +277,37 @@ SUB kristall(cx AS FLOAT, cy AS FLOAT, r AS FLOAT, w AS FLOAT, form AS INTEGER, 
             strich(bx, by, bx + COS(aw - 1.05) * l, by + SIN(aw - 1.05) * l, f)
         NEXT
     NEXT
+END SUB
+
+' Die zwoelf Formen (`form MOD 12` bestimmt Aeste und ihre Laenge) einmal
+' vorgezeichnet: doppelt so gross und zwei Punkte dick, verkleinert mit
+' Mipmaps -- so wird jeder nahe Kristall ein einziges gedrehtes Bild statt
+' rund dreissig Striche. Im Browser rechnet der Drachenhauch-Code ohne
+' Maschinencode, und die Striche kosteten dort mehrere Millisekunden je Bild.
+CONST KR = 34             ' Radius im Vorbild
+CONST KBILD = 80
+DIM kristallBild[12] AS INTEGER
+DIM kGross[NAH] AS FLOAT
+DIM kTon[NAH] AS INTEGER
+SUB kristalleVorzeichnen()
+    DIM k AS INTEGER
+    FOR k = 0 TO 11
+        DIM rt AS INTEGER : rt = RENDERTARGET_NEW(KBILD, KBILD)
+        RENDERTARGET_BEGIN(rt)
+        striche = 0
+        kristall(KBILD / 2, KBILD / 2, KR, 0.0, k, WHITE)
+        DIM s AS INTEGER
+        FOR s = 0 TO striche - 1
+            LINE(kx1[s], ky1[s], kx2[s], ky2[s], WHITE)
+            LINE(kx1[s] + 1, ky1[s], kx2[s] + 1, ky2[s], WHITE)
+            LINE(kx1[s], ky1[s] + 1, kx2[s], ky2[s] + 1, WHITE)
+            LINE(kx1[s] + 1, ky1[s] + 1, kx2[s] + 1, ky2[s] + 1, WHITE)
+        NEXT
+        RENDERTARGET_END()
+        kristallBild[k] = RENDERTARGET_IMAGE(rt)
+        IMAGE_MIPMAPS(kristallBild[k])
+    NEXT
+    striche = 0
 END SUB
 
 ' Wie dicht es schneit (0 = gar nicht), wie stark der Wind von links und ob
@@ -306,7 +356,8 @@ SUB schneeZeichnen(zeit AS FLOAT, takt AS FLOAT)
             IF i < NAH THEN
                 ' ein Kristall, 7..17 Punkte gross, mit leichtem Hof
                 DIM r AS FLOAT : r = 7.0 + 10.0 * (z - 0.7) / 0.3
-                kristall(fX[i], fY[i], r, fW[i], fForm[i], RGBA(220, 232, 255, MAX(1, g)))
+                kGross[i] = r / KR
+                kTon[i] = RGBA(220, 232, 255, MAX(1, g))
                 fPx[i] = INT(fX[i]) : fPy[i] = INT(fY[i]) : fPr[i] = INT(r * 0.35)
                 fPf[i] = RGBA(160, 190, 255, MAX(1, g \ 6))
             ELSE
@@ -327,6 +378,9 @@ SUB schneeZeichnen(zeit AS FLOAT, takt AS FLOAT)
         IF liegt[j] > mitte + 1.0 THEN liegt[j] = liegt[j] + (mitte - liegt[j]) * dt * 3.0
     NEXT
     CIRCLES(fPx, fPy, fPr, fPf, FLOCKEN)
+    FOR i = 0 TO MIN(NAH, anz) - 1
+        DRAWIMAGEROT(kristallBild[fForm[i] MOD 12], fPx[i], fPy[i], fW[i] * 57.29578, kGross[i], kTon[i])
+    NEXT
     IF striche > 0 THEN LINES(kx1, ky1, kx2, ky2, kf, striche)
     deckeZeichnen(zeit)
 END SUB
@@ -337,26 +391,22 @@ SUB deckeZeichnen(zeit AS FLOAT)
     DIM j AS INTEGER
     DIM sicht AS FLOAT : sicht = schneeDraussen
     IF sicht <= 0.01 THEN RETURN
-    DIM schritt AS INTEGER : schritt = STREIFEN \ SAEULEN
+    IF sicht <> deckeSicht THEN
+        deckeSicht = sicht
+        DIM fd AS INTEGER : fd = RGBA(150, 165, 195, MAX(1, INT(190 * sicht)))
+        DIM fk AS INTEGER : fk = RGBA(235, 242, 255, MAX(1, INT(200 * sicht)))
+        FOR j = 0 TO STREIFEN - 1
+            df[j] = fd : kanteF[j] = fk
+        NEXT
+    END IF
     FOR j = 0 TO STREIFEN - 1
-        ' Lage zwischen den Mitten zweier Saeulen, weich (Hermite) verbunden
-        DIM lage AS FLOAT : lage = (j + 0.5) / schritt - 0.5
-        DIM a AS INTEGER : a = CLAMP(INT(FLOOR(lage)), 0, SAEULEN - 1)
-        DIM b AS INTEGER : b = MIN(a + 1, SAEULEN - 1)
-        DIM t AS FLOAT : t = CLAMP(lage - a, 0.0, 1.0)
-        t = t * t * (3.0 - 2.0 * t)
-        DIM h AS INTEGER : h = INT((liegt[a] + (liegt[b] - liegt[a]) * t) * sicht)
-        dx1[j] = j * 2 : dx2[j] = j * 2 + 1
-        dy1[j] = HOEHE - h : dy2[j] = HOEHE
-        df[j] = RGBA(150, 165, 195, MAX(1, INT(190 * sicht)))
+        DIM la AS FLOAT : la = liegt[dA[j]]
+        dy1[j] = HOEHE - INT((la + (liegt[dB[j]] - la) * dT[j]) * sicht)
+        kanteY[j] = dy1[j] + 2
     NEXT
     BOXES(dx1, dy1, dx2, dy2, df, STREIFEN)
     ' die Kante: ein feiner heller Saum und hier und da ein Funkeln
-    FOR j = 0 TO STREIFEN - 1
-        dy2[j] = dy1[j] + 2
-        df[j] = RGBA(235, 242, 255, MAX(1, INT(200 * sicht)))
-    NEXT
-    BOXES(dx1, dy1, dx2, dy2, df, STREIFEN)
+    BOXES(dx1, dy1, dx2, kanteY, kanteF, STREIFEN)
     DIM ton AS FLOAT : ton = musikTon()
     FOR j = 0 TO SAEULEN - 1
         DIM fun AS FLOAT : fun = SIN(zeit * 3.0 + j * 2.37) * SIN(zeit * 1.3 + j * 0.71)
@@ -561,6 +611,7 @@ SUB startbild(anteil AS FLOAT, bild AS INTEGER)
 END SUB
 
 schwarmVorbereiten()
+kristalleVorzeichnen()
 IF tonDa() THEN
     musikVorbereiten(abTakt)
     DIM bild AS INTEGER

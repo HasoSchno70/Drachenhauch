@@ -553,7 +553,19 @@ DIM pruefMax AS FLOAT
 DIM pruefJ AS INTEGER
 FOR pruefJ = 0 TO SAEULEN - 1 : pruefMax = MAX(pruefMax, liegt[pruefJ]) : NEXT
 PRINT "schnee liegt "; pruefMax > 4.0
-PRINT "kristalle "; striche > 300
+' die nahen Flocken als Kristalle: vorgezeichnete Formen mit Armen (am Ende
+' des Arms nach rechts weiss, zwischen zwei Armen leer), alle gezeichnet
+DIM pruefNah AS INTEGER
+FOR pruefJ = 0 TO NAH - 1
+    IF kGross[pruefJ] > 0.15 THEN pruefNah = pruefNah + 1
+NEXT
+DIM pruefArme AS INTEGER
+FOR pruefJ = 0 TO 11
+    DIM pruefArm AS INTEGER : pruefArm = (GETPIXEL(kristallBild[pruefJ], KBILD \ 2 + KR - 3, KBILD \ 2) SHR 16) BAND 255
+    DIM pruefLuecke AS INTEGER : pruefLuecke = (GETPIXEL(kristallBild[pruefJ], KBILD \ 2 + 4, KBILD \ 2 - 26) SHR 16) BAND 255
+    IF pruefArm > 150 AND pruefLuecke < 50 THEN pruefArme = pruefArme + 1
+NEXT
+PRINT "kristalle "; pruefNah = NAH AND pruefArme = 12
 --- argumente
 --fenster
 --ab
