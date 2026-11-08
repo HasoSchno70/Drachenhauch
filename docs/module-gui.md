@@ -404,6 +404,7 @@ Native, blockierende Standarddialoge (kein IMPORT nötig — wie die Datei-Dialo
 | `GUI_DROPDOWN(win, x, y, w, h, items)` | GUI_WIDGET | aufklappende Auswahlliste; das Popup wird ueber allen anderen Widgets gezeichnet |
 | `GUI_DROPDOWN_SELECTED(dd)` | INTEGER | Index der Auswahl (`-1` = keine) |
 | `GUI_DROPDOWN_TEXT(dd)` | STRING | Text der Auswahl |
+| `GUI_DROPDOWN_COUNT(dd)` / `GUI_DROPDOWN_ITEM(dd, i)` | INTEGER / STRING | wie viele Einträge, und Eintrag i (ab 0) |
 | `GUI_DROPDOWN_SET_SELECTED(dd, i)` | — | Auswahl vom Programm aus setzen |
 | `GUI_SET_DROPDOWN(dd, items)` | — | Eintraege ersetzen |
 | `GUI_DROPDOWN_PLACEHOLDER(dd, text$)` | — | Hinweis in der Box, solange nichts gewählt ist („Bitte wählen“) |

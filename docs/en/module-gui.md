@@ -404,6 +404,7 @@ Native, blocking standard dialogs (no IMPORT needed — like the file dialogs):
 | `GUI_DROPDOWN(win, x, y, w, h, items)` | GUI_WIDGET | drop-down selection list; the popup is drawn above all other widgets |
 | `GUI_DROPDOWN_SELECTED(dd)` | INTEGER | index of the selection (`-1` = none) |
 | `GUI_DROPDOWN_TEXT(dd)` | STRING | text of the selection |
+| `GUI_DROPDOWN_COUNT(dd)` / `GUI_DROPDOWN_ITEM(dd, i)` | INTEGER / STRING | how many entries, and entry i (from 0) |
 | `GUI_DROPDOWN_SET_SELECTED(dd, i)` | — | set the selection from the program |
 | `GUI_SET_DROPDOWN(dd, items)` | — | replace the entries |
 | `GUI_DROPDOWN_PLACEHOLDER(dd, text$)` | — | hint in the box while nothing is selected ("Please choose") |

@@ -101,6 +101,34 @@ PRINT GUI_DROPDOWN_TEXT(d)
 --- erwartet
 c
 
+=== dropdown count and item
+' Die Eintraege einer Klappliste lesen -- auch nach GUI_SET_DROPDOWN; ein
+' Index daneben und eine Liste statt einer Klappliste sagen es.
+IMPORT "gui"
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("F", 0, 0, 300, 260)
+DIM dd AS GUI_WIDGET
+dd = GUI_DROPDOWN(win, 10, 10, 160, 26, ["rot", "gruen"])
+PRINT GUI_DROPDOWN_COUNT(dd); " "; GUI_DROPDOWN_ITEM(dd, 1)
+GUI_SET_DROPDOWN(dd, ["-- wählen --", "Bananen", "Banane bio", "Brot"])
+PRINT GUI_DROPDOWN_COUNT(dd); " "; GUI_DROPDOWN_ITEM(dd, 0); " | "; GUI_DROPDOWN_ITEM(dd, 3)
+TRY
+    PRINT GUI_DROPDOWN_ITEM(dd, 4)
+CATCH e
+    PRINT e
+END TRY
+DIM lb AS GUI_WIDGET : lb = GUI_LISTBOX(win, 10, 50, 160, 80, ["a"])
+TRY
+    PRINT GUI_DROPDOWN_COUNT(lb)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+2 gruen
+4 -- wählen -- | Brot
+GUI_DROPDOWN_ITEM: Eintrag 4 gibt es nicht (die Liste hat 4)
+GUI_DROPDOWN_COUNT: Widget ist keine Klappliste
+
 === form widgets roundtrip
 IMPORT "gui"
 DIM win AS GUI_WINDOW

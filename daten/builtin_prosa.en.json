@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/en und dem englischen Buch von `dhrt doku prosa` -- NICHT von Hand aendern. Der Hover nimmt sie mit DHRT_LANG=en.",
- "count": 2372,
+ "count": 2374,
  "docs": {
   "ABS": "Absolute value.",
   "ACOS": "Arc sine/cosine (x in [-1, 1])",
@@ -645,6 +645,8 @@
   "GUI_DRAW_TOP": "only what lies above all windows: open context menu and tooltip",
   "GUI_DRAW_WINDOW": "draw ONE window again, above everything added since GUI_DRAW",
   "GUI_DROPDOWN": "GUI_WIDGET — drop-down selection list; the popup is drawn above all other widgets",
+  "GUI_DROPDOWN_COUNT": "INTEGER / STRING how many entries, and entry i (from 0)",
+  "GUI_DROPDOWN_ITEM": "INTEGER / STRING how many entries, and entry i (from 0)",
   "GUI_DROPDOWN_PLACEHOLDER": "hint in the box while nothing is selected (\"Please choose\")",
   "GUI_DROPDOWN_SELECTED": "INTEGER — index of the selection (-1 = none)",
   "GUI_DROPDOWN_SET": "setting of the dropdown; bearbeitbar (editable) = you may type into the field, including what is not in the list (combo box)",

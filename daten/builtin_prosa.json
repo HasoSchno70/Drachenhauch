@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 2380,
+ "count": 2382,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -646,6 +646,8 @@
   "GUI_DRAW_TOP": "nur was über allen Fenstern liegt: offenes Kontextmenü und Tooltip",
   "GUI_DRAW_WINDOW": "EIN Fenster noch einmal zeichnen, über allem, was seit GUI_DRAW dazugekommen ist",
   "GUI_DROPDOWN": "GUI_WIDGET — aufklappende Auswahlliste; das Popup wird ueber allen anderen Widgets gezeichnet",
+  "GUI_DROPDOWN_COUNT": "INTEGER / STRING wie viele Einträge, und Eintrag i (ab 0)",
+  "GUI_DROPDOWN_ITEM": "INTEGER / STRING wie viele Einträge, und Eintrag i (ab 0)",
   "GUI_DROPDOWN_PLACEHOLDER": "Hinweis in der Box, solange nichts gewählt ist („Bitte wählen“)",
   "GUI_DROPDOWN_SELECTED": "INTEGER — Index der Auswahl (-1 = keine)",
   "GUI_DROPDOWN_SET": "Einstellung der Klappliste; bearbeitbar = in das Feld darf getippt werden, auch was nicht in der Liste steht (Combobox)",

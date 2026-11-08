@@ -5933,6 +5933,20 @@ impl Gui {
     pub fn list_clear(&mut self, h: i64) -> Result<(), String> {
         self.set_dropdown_items(h, Vec::new())
     }
+    /// GUI_DROPDOWN_COUNT / GUI_DROPDOWN_ITEM: die Eintraege einer
+    /// Klappliste lesen. Die Liste-Befehle konnten es schon, aber unter dem
+    /// Namen der Klappliste suchte man vergeblich (gefunden mit der
+    /// Kuehlschrank-App: welche Vorschlaege stehen gerade darin?).
+    pub fn dropdown_count(&self, h: i64) -> Result<i64, String> {
+        let w = self.wdg(h, "GUI_DROPDOWN_COUNT")?;
+        if w.kind != Kind::Dropdown { return Err("GUI_DROPDOWN_COUNT: Widget ist keine Klappliste".into()); }
+        Ok(w.items.len() as i64)
+    }
+    pub fn dropdown_item(&self, h: i64, i: i64) -> Result<String, String> {
+        let w = self.wdg(h, "GUI_DROPDOWN_ITEM")?;
+        if w.kind != Kind::Dropdown { return Err("GUI_DROPDOWN_ITEM: Widget ist keine Klappliste".into()); }
+        Ok(w.items[Self::list_idx(w, i, "GUI_DROPDOWN_ITEM")?].clone())
+    }
     /// GUI_LISTBOX_COUNT(lb)
     pub fn list_count(&self, h: i64) -> Result<i64, String> {
         Ok(self.item_widget(h, "GUI_LISTBOX_COUNT")?.items.len() as i64)

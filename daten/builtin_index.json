@@ -4695,6 +4695,18 @@
    "module": "gui"
   },
   {
+   "name": "GUI_DROPDOWN_COUNT",
+   "kind": "core",
+   "signature": "GUI_DROPDOWN_COUNT(dd)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_DROPDOWN_ITEM",
+   "kind": "core",
+   "signature": "GUI_DROPDOWN_ITEM(dd, i)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_DROPPED",
    "kind": "core",
    "signature": "GUI_DROPPED(widget)",

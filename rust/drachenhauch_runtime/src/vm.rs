@@ -9226,6 +9226,8 @@ impl<'p> Vm<'p> {
                 gstrs(a,5,"GUI_DROPDOWN")?)?),
             "gui_dropdown_selected" => Value::Int(self.gui.dropdown_selected(gi(a,0,"GUI_DROPDOWN_SELECTED")?)?),
             "gui_dropdown_text" => Value::str_rc(&self.gui.dropdown_text(gi(a,0,"GUI_DROPDOWN_TEXT")?)?),
+            "gui_dropdown_count" => Value::Int(self.gui.dropdown_count(gi(a,0,"GUI_DROPDOWN_COUNT")?)?),
+            "gui_dropdown_item" => Value::str_rc(&self.gui.dropdown_item(gi(a,0,"GUI_DROPDOWN_ITEM")?, gi(a,1,"GUI_DROPDOWN_ITEM")?)?),
             "gui_dropdown_set_selected" => { self.gui.dropdown_set_selected(gi(a,0,"GUI_DROPDOWN_SET_SELECTED")?, gi(a,1,"GUI_DROPDOWN_SET_SELECTED")?)?; Value::Nil }
             "gui_set_dropdown" => { self.gui.set_dropdown_items(gi(a,0,"GUI_SET_DROPDOWN")?, gstrs(a,1,"GUI_SET_DROPDOWN")?)?; Value::Nil }
             // --- ListBox (teilt die item-Logik mit Dropdown) ---
