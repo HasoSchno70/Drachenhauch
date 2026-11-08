@@ -3576,6 +3576,11 @@ pub struct Gui {
     // das ist der ganze Sinn von "modal": die Frage muss beantwortet werden,
     // bevor daneben weitergeklickt wird.
     modal: Option<usize>,
+    // Was vorher modal war: ein Dialog ueber einem modalen Fenster (Frage im
+    // Detailfenster) gibt bei seiner Antwort das Fenster darunter wieder
+    // frei -- vorher fiel die Modalitaet ganz weg, und das Fenster verlor mit
+    // ihr Enter und ESC (Standard- und Abbrechen-Knopf).
+    modal_vorher: Vec<usize>,
     // Gezogener Farbwaehler: (Fenster, Widget, Zone). Zone ist 0 = Farbfeld,
     // 1 = Ton-Streifen, 2 = Deckkraft-Streifen. Gemerkt wird sie, weil man
     // beim Suchen einer Farbe fast immer ueber den Rand hinauszieht -- ohne
@@ -3780,7 +3785,7 @@ impl Gui {
             schrift: None,
             windows: Vec::new(), z_order: Vec::new(),
             ta_zerlegung: std::cell::RefCell::new(HashMap::new()),
-            focus_window: None, focus_widget: None, modal: None, cp_drag: None,
+            focus_window: None, focus_widget: None, modal: None, modal_vorher: Vec::new(), cp_drag: None,
             drag_window: None, drag_dx: 0, drag_dy: 0,
             resize_window: None, resize_dx: 0, resize_dy: 0,
             skins: HashMap::new(),
@@ -4006,7 +4011,7 @@ impl Gui {
             win.default_btn = erster as i32;
             win.cancel_btn = letzter as i32;
         }
-        self.modal = Some(wi);
+        self.modal_setzen(wi);
         self.bring_to_front(wi);
         self.focus_window = Some(wi);
         // Fokus auf das Eingabefeld, sonst auf den ersten Knopf: der Dialog
@@ -4035,13 +4040,36 @@ impl Gui {
         }
         if an {
             if self.windows[wi].dlg { return Err("GUI_WINDOW_MODAL: ein Dialog ist schon modal".into()); }
-            self.modal = Some(wi);
+            self.modal_setzen(wi);
             self.bring_to_front(wi);
             self.focus_window = Some(wi);
         } else if self.modal == Some(wi) {
-            self.modal = None;
+            self.modal_loesen();
+        } else {
+            self.modal_vorher.retain(|&m| m != wi);
         }
         Ok(())
+    }
+
+    /// Ein Fenster wird modal; was es vorher war, kommt auf den Stapel.
+    fn modal_setzen(&mut self, wi: usize) {
+        if let Some(m) = self.modal {
+            if m != wi { self.modal_vorher.push(m); }
+        }
+        self.modal_vorher.retain(|&m| m != wi);
+        self.modal = Some(wi);
+    }
+
+    /// Das modale Fenster geht: das vorige, das noch steht, ist es wieder.
+    fn modal_loesen(&mut self) {
+        self.modal = None;
+        while let Some(m) = self.modal_vorher.pop() {
+            if self.windows.get(m).map(|w| w.alive && w.visible).unwrap_or(false) {
+                self.modal = Some(m);
+                self.focus_window = Some(m);
+                break;
+            }
+        }
     }
 
     /// Antwort eines Dialogs: 0 = noch offen, 1 = OK/Ja, 2 = Abbrechen/Nein.
@@ -14028,7 +14056,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         // Modalitaet frei, sobald es weg oder ausgeblendet ist -- sonst
         // saesse das Programm hinter einem Schleier ohne Fenster.
         if !self.windows.get(wi).map(|w| w.alive && w.visible).unwrap_or(false) {
-            self.modal = None;
+            self.modal_loesen();
             return;
         }
         if !self.windows[wi].dlg { return; }
@@ -14044,7 +14072,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             }
         }
         if antwort == 0 { return; }
-        self.modal = None;
+        self.modal_loesen();
         // Wie window_destroy: aus der z-Reihenfolge nehmen und JEDE haengende
         // Interaktions-Referenz loesen.
         self.z_order.retain(|&i| i != wi);

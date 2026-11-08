@@ -362,3 +362,50 @@ DHRT_FRAMES=8
 --- erwartet
 FALSE
 
+
+=== ein dialog ueber einem modalen fenster gibt es bei der antwort zurueck
+' Frage im modalen Detailfenster (gefunden mit der Kuehlschrank-App): Enter
+' beantwortet den Dialog, danach ist das Fenster darunter wieder modal --
+' der Knopf daneben nimmt keinen Klick, ESC drueckt seinen Abbrechen-Knopf.
+' Vorher fiel die Modalitaet mit der Antwort ganz weg.
+IMPORT "gui"
+SCREEN(520, 320, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Hinten", 4, 4, 200, 120)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "los", 8, 8, 90, 26)
+DIM m AS GUI_WINDOW : m = GUI_WINDOW("Modal", 250, 150, 200, 120)
+DIM zu AS GUI_WIDGET : zu = GUI_BUTTON(m, "zu", 8, 8, 90, 26)
+GUI_WINDOW_CANCEL(m, zu)
+GUI_WINDOW_MODAL(m, TRUE)
+DIM d AS GUI_WINDOW : d = GUI_DIALOG("F", "Wirklich?", "Ja|Nein")
+AUTOMATION_PLAY("ev.txt")
+DIM f AS INTEGER
+FOR f = 1 TO 30
+    GUI_UPDATE()
+    IF GUI_ANSWER(d) <> 0 THEN PRINT "antwort "; GUI_ANSWER(d); " modal "; GUI_MODAL()
+    IF GUI_CLICKED(b) THEN PRINT "los geklickt"
+    IF GUI_CLICKED(zu) THEN PRINT "zu bild "; f
+    GUI_DRAW()
+    FLIP()
+NEXT
+PRINT "modal "; GUI_MODAL()
+--- datei ev.txt
+c 10
+e 0 7 300 300 0 0
+e 3 2 257 0 0 0
+e 4 1 257 0 0 0
+e 8 7 40 20 0 0
+e 9 7 40 20 0 0
+e 10 6 0 0 0 0
+e 12 5 0 0 0 0
+e 16 2 256 0 0 0
+e 17 1 256 0 0 0
+e 20 7 300 300 0 0
+
+--- umgebung
+DHRT_FRAMES=34
+--- erwartet
+antwort 1 modal TRUE
+zu bild 18
+modal TRUE
