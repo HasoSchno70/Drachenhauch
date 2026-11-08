@@ -1,0 +1,296 @@
+' Kuehlschrank-App im Drachenhauch Studio, Stufe 1: der Vorrat
+' (examples/studio/kuehlschrank: BestandSeite, ProduktFenster,
+' MindestmengeFenster, Modul Bestand, Klassen Eintrag und Verlauf). Die
+' Proben laufen im erzeugten Programm (F5 im Studio, dann main.dh mit einer
+' Probe statt der Bildschleife), Heute ist fest (KUEHL_HEUTE).
+' Format: docs/werkzeuge.md, dhrt test.
+
+--- langsam
+=== tabelle, status, filter und suche
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+kKopieren(ARG$(1), p)
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = kF5(p, log)
+PRINT "geprueft "; slHat(log, "geprueft 0 0")
+SETENV("KUEHL_HEUTE", "2026-11-08")
+PRINT "code "; kProbe(p, "probe.dh", "", 5)
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../../studio/studio.dh
+{sammlung}/../../../examples/studio/kuehlschrank
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/kuehlschrank.dh"
+slStudio = ARG$(0)
+--- datei probe.dh
+' Vier Produkte, je ein Eintrag: abgelaufen, heute, in drei Tagen, frisch;
+' Butter hat eine Mindestmenge von 2 und liegt mit 1 darunter.
+DB_EXEC(db, "INSERT INTO products (name, brand, category, min_quantity, min_unit) VALUES ('Milch', 'Hof', 'Milchprodukte', NULL, NULL), ('Butter', 'Alm', 'Milchprodukte', 2, 'Stück'), ('Brot', NULL, 'Backwaren', NULL, NULL), ('Reis', NULL, 'Grundnahrungsmittel', NULL, NULL)")
+DB_EXEC(db, "INSERT INTO inventory (product_id, quantity, unit, expiry_date, storage_location, purchased_at_store) VALUES (1, 1, '📦 Stück', '2026-11-01', 'Kühlschrank', 'ALDI'), (2, 1, 'Stück', '2026-11-08', 'Kühlschrank', NULL), (3, 0.5, 'kg', '2026-11-11', 'Brotkasten', 'REWE'), (4, 2, 'kg', '2027-03-01', 'Vorratsraum', NULL)")
+DIM f AS Hauptfenster : f = studioStartFenster
+DIM s AS BestandSeite : s = f.bestand
+f.geaendert()
+SUB zeilen(s AS BestandSeite)
+    DIM z AS INTEGER
+    FOR z = 0 TO GUI_TABLE_ROW_COUNT(s.tabelle) - 1
+        PRINT "  "; GUI_TABLE_GET_CELL(s.tabelle, z, 0); " | "; GUI_TABLE_GET_CELL(s.tabelle, z, 2); " | "; GUI_TABLE_GET_CELL(s.tabelle, z, SP_MIN); " | "; GUI_TABLE_GET_CELL(s.tabelle, z, SP_MARKT); " | "; GUI_TABLE_GET_CELL(s.tabelle, z, SP_STATUS)
+    NEXT
+    PRINT "  "; GUI_TEXT(s.zusammenfassung)
+END SUB
+zeilen(s)
+PRINT "kacheln "; GUI_CARD_TEXT$(f.kachelGesamt); " "; GUI_CARD_TEXT$(f.kachelBald); " "; GUI_CARD_TEXT$(f.kachelAbgelaufen)
+s.knopfAbgelaufen_Klick()
+PRINT "abgelaufen"
+zeilen(s)
+s.knopfBald_Klick()
+PRINT "bald"
+zeilen(s)
+s.knopfMinimum_Klick()
+PRINT "minimum"
+zeilen(s)
+s.knopfAlle_Klick()
+GUI_SET_TEXT(s.sucheFeld, "REWE")
+s.sucheFeld_Geaendert()
+PRINT "suche rewe"
+zeilen(s)
+GUI_SET_TEXT(s.sucheFeld, "")
+s.sucheFeld_Geaendert()
+PRINT "einheit "; einheitText$("📦 Stück"); " | "; einheitText$("kg"); " | "; einheitText$("1 kg Packung")
+--- erwartet
+geprueft TRUE
+  Milch | 1 Stück | - | ALDI | Abgelaufen
+  Butter | 1 Stück | 2 Stück | - | Heute
+  Brot | 0,5 kg | - | REWE | 3 Tage
+  Reis | 2 kg | - | - | Frisch
+  4 Einträge, 1 abgelaufen, 2 bald ablaufend.
+kacheln 4 2 1
+abgelaufen
+  Milch | 1 Stück | - | ALDI | Abgelaufen
+  1 Eintrag von 4, 1 abgelaufen.
+bald
+  Butter | 1 Stück | 2 Stück | - | Heute
+  Brot | 0,5 kg | - | REWE | 3 Tage
+  2 Einträge von 4, 2 bald ablaufend.
+minimum
+  Butter | 1 Stück | 2 Stück | - | Heute
+  1 Eintrag von 4, 1 bald ablaufend.
+suche rewe
+  Brot | 0,5 kg | - | REWE | 3 Tage
+  1 Eintrag von 4, 1 bald ablaufend.
+einheit Stück | kg | 1 kg Packung
+code 0
+
+=== aendern, entnehmen, anlegen -- und rueckgaengig mit derselben id
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+kKopieren(ARG$(1), p)
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = kF5(p, log)
+SETENV("KUEHL_HEUTE", "2026-11-08")
+SETENV("KUEHL_EXPORT", CWD$() + "/bestand.csv")
+PRINT "code "; kProbe(p, "probe.dh", "", 5)
+DIM z AS STRING
+FOR EACH z IN READLINES(CWD$() + "/bestand.csv")
+    PRINT "csv "; z
+NEXT
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../../studio/studio.dh
+{sammlung}/../../../examples/studio/kuehlschrank
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/kuehlschrank.dh"
+slStudio = ARG$(0)
+--- datei probe.dh
+DB_EXEC(db, "INSERT INTO products (name, brand, category) VALUES ('Milch', 'Hof', 'Milchprodukte')")
+DB_EXEC(db, "INSERT INTO inventory (product_id, quantity, unit, purchase_date, expiry_date, storage_location) VALUES (1, 2, 'Liter', '2026-11-05', '2026-11-12', 'Kühlschrank')")
+DIM f AS Hauptfenster : f = studioStartFenster
+DIM s AS BestandSeite : s = f.bestand
+f.geaendert()
+FUNCTION stand$() AS STRING
+    DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT GROUP_CONCAT(i.id || ':' || p.name || ':' || i.quantity, ' ') FROM inventory i JOIN products p ON p.id = i.product_id")
+    DIM t AS STRING : t = ""
+    IF DB_NEXT(r) THEN t = IIF(DB_IS_NULL(r, 0), "-", DB_GET_STRING(r, 0))
+    RETURN t + " | verlauf " + STR$(dbZahl("SELECT COUNT(*) FROM consumption_history")) + " | produkte " + STR$(dbZahl("SELECT COUNT(*) FROM products"))
+END FUNCTION
+' -1 in Zeile 0 (2 -> 1), zurueck, wieder vor.
+s.tabelle_Zelle(0, SP_MINUS)
+PRINT "minus "; stand$(); " | "; verlauf.kannZurueck(); " "; verlauf.textZurueck$()
+f.miRueckgaengig_Aktion()
+PRINT "zurueck "; stand$(); " | "; GUI_STATUSBAR_TEXT$(f.status, 3); " | vor "; GUI_TOOLBAR_ENABLED(f.werkzeuge, KNOPF_WIEDERHOLEN)
+f.miWiederholen_Aktion()
+PRINT "wieder "; stand$()
+' Entnehmen schreibt den Verbrauch und nimmt den Eintrag weg; Rueckgaengig
+' bringt ihn mit derselben id 1 zurueck und nimmt die Verlaufszeile weg.
+DIM e AS Eintrag : e = eintragLaden(1)
+entnehmen(e, "consumed", "Milch verbraucht")
+f.geaendert()
+DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT product_name, quantity, unit, purchase_date, empty_date, duration_days, storage_location, reason FROM consumption_history")
+IF DB_NEXT(r) THEN PRINT "verbrauch "; DB_GET_STRING(r, 0); " "; DB_GET_STRING(r, 1); " "; DB_GET_STRING(r, 2); " "; DB_GET_STRING(r, 3); " "; DB_GET_STRING(r, 4); " "; DB_GET_INT(r, 5); " "; DB_GET_STRING(r, 6); " "; DB_GET_STRING(r, 7)
+PRINT "entnommen "; stand$(); " | tabelle "; GUI_TABLE_ROW_COUNT(s.tabelle)
+f.miRueckgaengig_Aktion()
+PRINT "zurueck "; stand$(); " | tabelle "; GUI_TABLE_ROW_COUNT(s.tabelle); " | "; GUI_TABLE_GET_CELL(s.tabelle, 0, 2)
+' Anlegen ueber den Dialog: erst fehlt die Kategorie, dann geht es.
+DIM pf AS ProduktFenster : pf = NEW ProduktFenster()
+pf.barcode = "4000400"
+pf.Zeigen()
+PRINT "neu "; GUI_TEXT(pf.titel); " | "; GUI_TEXT(pf.barcodeFeld); " | "; GUI_TEXT(pf.kaufFeld); " | "; GUI_TEXT(pf.ablaufFeld); " | "; GUI_TEXT(pf.einheitListe)
+GUI_SET_TEXT(pf.nameFeld, "Käse")
+GUI_SET_TEXT(pf.lagerortListe, "Kühlschrank")
+pf.knopfSichern_Klick()
+PRINT "fehlt "; GUI_TEXT(pf.fehlerText); " | "; pf.gesichert
+GUI_SET_TEXT(pf.kategorieListe, "Milchprodukte")
+GUI_SET_TEXT(pf.ablaufFeld, "2026-13-01")
+pf.knopfSichern_Klick()
+PRINT "datum "; GUI_TEXT(pf.fehlerText)
+pf.plus14_Klick()
+GUI_SET_CHECKED(pf.minKasten, TRUE)
+GUI_SET_VALUE(pf.minFeld, 3)
+pf.knopfSichern_Klick()
+PRINT "gesichert "; pf.gesichert; " | "; stand$()
+r = DB_QUERY(db, "SELECT p.barcode, p.min_quantity, p.min_unit, i.expiry_date FROM inventory i JOIN products p ON p.id = i.product_id WHERE p.name = 'Käse'")
+IF DB_NEXT(r) THEN PRINT "kaese "; DB_GET_STRING(r, 0); " "; DB_GET_STRING(r, 1); " "; DB_GET_STRING(r, 2); " "; DB_GET_STRING(r, 3)
+' Anlegen und Mindestmenge sind zwei Schritte; zweimal zurueck nimmt das
+' neue Produkt samt Eintrag weg.
+PRINT "tipp "; verlauf.textZurueck$()
+f.miRueckgaengig_Aktion()
+f.miRueckgaengig_Aktion()
+PRINT "ohne kaese "; stand$()
+f.miWiederholen_Aktion()
+PRINT "kaese wieder "; stand$()
+' Bearbeiten aendert Eintrag und Produkt in einem Schritt.
+DIM be AS ProduktFenster : be = NEW ProduktFenster()
+be.eintragId = 1
+be.Zeigen()
+PRINT "bearbeiten "; GUI_TEXT(be.titel); " | "; GUI_TEXT(be.nameFeld); " | "; GUI_ENABLED(be.barcodeFeld)
+GUI_SET_TEXT(be.nameFeld, "Vollmilch")
+GUI_SET_TEXT(be.marktListe, "EDEKA")
+be.knopfSichern_Klick()
+PRINT "geaendert "; stand$(); " | markt "; eintragLaden(1).markt
+f.miRueckgaengig_Aktion()
+PRINT "zurueck "; stand$(); " | markt ["; eintragLaden(1).markt; "]"
+f.miExport_Aktion()
+--- erwartet
+minus 1:Milch:1.0 | verlauf 0 | produkte 1 | TRUE Milch: 1 Liter
+zurueck 1:Milch:2.0 | verlauf 0 | produkte 1 | Rückgängig: Milch: 1 Liter | vor TRUE
+wieder 1:Milch:1.0 | verlauf 0 | produkte 1
+verbrauch Milch 1 Liter 2026-11-05 2026-11-08 3 Kühlschrank consumed
+entnommen - | verlauf 1 | produkte 1 | tabelle 0
+zurueck 1:Milch:1.0 | verlauf 0 | produkte 1 | tabelle 1 | 1 Liter
+neu Produkt hinzufügen | 4000400 | 2026-11-08 | 2026-11-15 | Stück
+fehlt Bitte eine Kategorie wählen. | FALSE
+datum Das Ablaufdatum braucht die Form JJJJ-MM-TT.
+gesichert TRUE | 1:Milch:1.0 2:Käse:1.0 | verlauf 0 | produkte 2
+kaese 4000400 3.0 Stück 2026-11-22
+tipp Mindestmenge für Käse
+ohne kaese 1:Milch:1.0 | verlauf 0 | produkte 1
+kaese wieder 1:Milch:1.0 2:Käse:1.0 | verlauf 0 | produkte 2
+bearbeiten Eintrag bearbeiten | Milch | FALSE
+geaendert 1:Vollmilch:1.0 2:Käse:1.0 | verlauf 0 | produkte 2 | markt EDEKA
+zurueck 1:Milch:1.0 2:Käse:1.0 | verlauf 0 | produkte 2 | markt []
+code 0
+csv Produkt;Marke;Menge;Einheit;Lagerort;Bereich;Ablaufdatum
+csv Milch;Hof;1;Liter;Kühlschrank;;2026-11-12
+csv Käse;;1;Stück;Kühlschrank;;2026-11-22
+
+=== echte klicks auf -1 und +1, strg+z und strg+y
+' Ein erster Lauf misst die Tabelle (Lage im Fenster unter der Menueleiste,
+' Kopf- und Zeilenhoehe), ein zweiter klickt -1, +1, +1 in Zeile 0 und
+' drueckt dann Strg+Z und Strg+Y -- die Bildschleife des Programms laeuft
+' dabei wie sonst (Zelle, Geaendert, Kuerzel im Menue).
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+kKopieren(ARG$(1), p)
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = kF5(p, log)
+SETENV("KUEHL_HEUTE", "2026-11-08")
+kProbe(p, "mess.dh", "", 8)
+DIM w AS ARRAY OF STRING : w = SPLIT(TRIM$(READALL(p + "/_studio/lage.txt")), " ")
+DIM tx AS INTEGER : tx = INT(VAL(w[0]))
+DIM ty AS INTEGER : ty = INT(VAL(w[1]))
+DIM zy AS INTEGER : zy = ty + INT(VAL(w[2])) + INT(VAL(w[3])) \ 2
+DIM mx AS INTEGER : mx = tx + 230 + 130 + 110 + 22
+DIM px AS INTEGER : px = mx + 44
+slZeilen = [] : slBild = 0
+slHin(10, 10)
+slWarten(10)
+slKlick(mx, zy)
+slWarten(6)
+slKlick(px, zy)
+slWarten(6)
+slKlick(px, zy)
+slWarten(6)
+slMit([341], 90)
+slWarten(6)
+slMit([341], 89)
+slWarten(10)
+slAufnahmeSchreiben(p + "/_studio/klick.txt")
+PRINT "code "; kProbe(p, "klick.dh", "klick.txt", slBild + 20)
+--- argumente
+{sammlung}/../../../studio/studio.dh
+{sammlung}/../../../examples/studio/kuehlschrank
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/kuehlschrank.dh"
+slStudio = ARG$(0)
+--- datei mess.dh
+DIM f AS Hauptfenster : f = studioStartFenster
+DIM n AS INTEGER
+WHILE n < 4 AND studioBild()
+    n = n + 1
+WEND
+WRITEALL("lage.txt", STR$(GUI_GET_X(f.bestand.tabelle)) + " " + STR$(GUI_GET_Y(f.bestand.tabelle) + 26) + " " + STR$(INT(GUI_TABLE_GET(f.bestand.tabelle, "kopfhoehe"))) + " " + STR$(INT(GUI_TABLE_GET(f.bestand.tabelle, "zeilenhoehe"))))
+--- datei klick.dh
+DB_EXEC(db, "INSERT INTO products (name) VALUES ('Milch')")
+DB_EXEC(db, "INSERT INTO inventory (product_id, quantity, unit, expiry_date) VALUES (1, 2, 'Liter', '2026-11-20')")
+DIM f AS Hauptfenster : f = studioStartFenster
+f.geaendert()
+DIM mengen AS ARRAY OF STRING : mengen = []
+DIM war AS STRING : war = ""
+WHILE studioBild()
+    DIM jetzt AS STRING : jetzt = GUI_TABLE_GET_CELL(f.bestand.tabelle, 0, 2)
+    IF jetzt <> war THEN ARRAY_PUSH(mengen, jetzt)
+    war = jetzt
+WEND
+PRINT "mengen "; JOIN$(mengen, " -> ")
+PRINT "kachel "; GUI_CARD_TEXT$(f.kachelGesamt); " status "; GUI_STATUSBAR_TEXT$(f.status, 3)
+--- erwartet
+mengen 2 Liter -> 1 Liter -> 2 Liter -> 3 Liter -> 2 Liter -> 3 Liter
+kachel 1 status Wiederholt: Milch: 3 Liter
+code 0
+
+=== rueckgaengig in der datei der python-app laesst den bestand stehen
+' Dort haengt inventory mit FOREIGN KEY ... ON DELETE CASCADE an products.
+' Rueckgaengig setzt eine Zeile per UPDATE zurueck -- ein INSERT OR REPLACE
+' loeschte das Produkt erst und naehme seinen Bestand mit.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+kKopieren(ARG$(1), p)
+DIM db AS DB_CONN : db = DB_OPEN(p + "/fridge_database.db")
+DB_EXEC(db, "CREATE TABLE products ( id INTEGER PRIMARY KEY AUTOINCREMENT, barcode TEXT UNIQUE, name TEXT NOT NULL, brand TEXT, category TEXT, image_url TEXT, min_quantity REAL, min_unit TEXT, default_storage_location TEXT, default_shelf_life_days INTEGER, nutritional_info TEXT, allergens TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP )")
+DB_EXEC(db, "CREATE TABLE inventory ( id INTEGER PRIMARY KEY AUTOINCREMENT, product_id INTEGER NOT NULL, quantity REAL NOT NULL DEFAULT 1, unit TEXT DEFAULT 'Stück', purchase_date DATE, expiry_date DATE, storage_location TEXT, storage_area TEXT, notes TEXT, status TEXT DEFAULT 'fresh', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, purchased_at_store TEXT, FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE CASCADE )")
+DB_EXEC(db, "INSERT INTO products (name) VALUES ('Milch')")
+DB_EXEC(db, "INSERT INTO inventory (product_id, quantity, unit, expiry_date) VALUES (1, 2, 'Liter', '2026-11-20')")
+DB_CLOSE(db)
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = kF5(p, log)
+SETENV("KUEHL_HEUTE", "2026-11-08")
+SETENV("DH_STUDIO_DATEN", p)
+PRINT "code "; kProbe(p, "probe.dh", "", 5)
+--- argumente
+{sammlung}/../../../studio/studio.dh
+{sammlung}/../../../examples/studio/kuehlschrank
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/kuehlschrank.dh"
+slStudio = ARG$(0)
+--- datei probe.dh
+DIM e AS Eintrag : e = eintragLaden(1)
+e.name = "Vollmilch"
+eintragAendern(e)
+mindestmengeSetzen(1, "Vollmilch", 2.0, "Liter")
+verlauf.rueckgaengig$()
+PRINT "nach einem schritt "; dbZahl("SELECT COUNT(*) FROM inventory")
+verlauf.rueckgaengig$()
+PRINT "eintraege "; dbZahl("SELECT COUNT(*) FROM inventory"); " name "; eintragLaden(1).name; " min "; eintragLaden(1).minMenge
+--- erwartet
+nach einem schritt 1
+eintraege 1 name Milch min 0.0
+code 0

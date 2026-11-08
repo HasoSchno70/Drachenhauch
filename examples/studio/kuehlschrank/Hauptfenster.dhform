@@ -45,6 +45,12 @@
           },
           {
             "art": "knopf",
+            "symbol": "wiederholen",
+            "tip": "Wiederholen (Strg+Y)",
+            "text": "Wiederholen"
+          },
+          {
+            "art": "knopf",
             "symbol": "aktualisieren",
             "tip": "Alles neu laden (F5)",
             "text": "Aktualisieren"
@@ -186,7 +192,12 @@
       "sel": 0,
       "anchor": "lrtb",
       "tabctl": {
-        "kinder": [],
+        "kinder": [
+          [
+            8,
+            0
+          ]
+        ],
         "seite": 0
       },
       "name": "reiter"
@@ -232,6 +243,16 @@
         ]
       },
       "name": "status"
+    },
+    {
+      "kind": "studio_control",
+      "studio_control": "BestandSeite",
+      "name": "bestand",
+      "x": 24,
+      "y": 176,
+      "w": 1232,
+      "h": 586,
+      "anchor": "lrtb"
     }
   ],
   "menus": [
@@ -263,9 +284,18 @@
           "shortcut": "Strg+N"
         },
         {
+          "label": "",
+          "separator": true
+        },
+        {
           "label": "Rückgängig",
           "name": "miRueckgaengig",
           "shortcut": "Strg+Z"
+        },
+        {
+          "label": "Wiederholen",
+          "name": "miWiederholen",
+          "shortcut": "Strg+Y"
         }
       ]
     },

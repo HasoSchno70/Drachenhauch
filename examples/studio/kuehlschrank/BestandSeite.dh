@@ -1,0 +1,228 @@
+' Der Reiter Bestand: Barcode-Feld, Suche, Filter, die Tabelle mit -1/+1 je
+' Zeile und einem Kontextmenü. Wie tabs/inventory_tab.py der Python-App. Das
+' Control meldet Geaendert, wenn sich der Vorrat geändert hat (das Fenster
+' frischt dann Kopf und Rückgängig auf), und Neu/Bearbeiten, wenn der Dialog
+' aufgehen soll -- den öffnet das Fenster.
+CLASS BestandSeite EXTENDS BestandSeite_Basis
+    ' Alle Einträge und je Tabellenzeile die id des Eintrags.
+    DIM eintraege AS ARRAY OF Eintrag
+    DIM ids AS ARRAY OF INTEGER
+    ' "", "abgelaufen", "bald", "frisch", "minimum"
+    DIM filter AS STRING
+    DIM schwelle AS INTEGER
+    ' Was der Dialog zeigen soll: 0 = neu (mit neuBarcode), sonst die id.
+    DIM bearbeitenId AS INTEGER
+    DIM neuBarcode AS STRING
+    ' Das Kontextmenü der Tabelle.
+    DIM kontext AS INTEGER
+    DIM miBearbeiten AS INTEGER
+    DIM miMindestmenge AS INTEGER
+    DIM miVerbraucht AS INTEGER
+    DIM miAbgelaufen AS INTEGER
+    DIM miLoeschen AS INTEGER
+    DIM mindestId AS INTEGER
+
+    SUB Geoeffnet()
+        Self.kontext = GUI_CONTEXT(Self.studioWin)
+        GUI_CONTEXT_WIDGET(Self.kontext, Self.tabelle)
+        Self.miBearbeiten = GUI_MENU_ITEM(Self.kontext, "Bearbeiten …")
+        Self.miMindestmenge = GUI_MENU_ITEM(Self.kontext, "Mindestmenge setzen …")
+        GUI_MENU_SEPARATOR(Self.kontext)
+        Self.miVerbraucht = GUI_MENU_ITEM(Self.kontext, "Verbraucht")
+        Self.miAbgelaufen = GUI_MENU_ITEM(Self.kontext, "Abgelaufen")
+        Self.miLoeschen = GUI_MENU_ITEM(Self.kontext, "Löschen")
+        Self.filterSetzen("")
+    END SUB
+
+    ' Neu aus der Datenbank, die Auswahl bleibt auf derselben id.
+    SUB laden()
+        DIM war AS INTEGER : war = Self.gewaehlt()
+        Self.schwelle = warnSchwelle()
+        Self.eintraege = bestandLaden()
+        Self.zeigen()
+        DIM z AS INTEGER : z = ARRAY_INDEXOF(Self.ids, war)
+        IF z >= 0 THEN GUI_TABLE_SET_SELECTED(Self.tabelle, z)
+    END SUB
+
+    FUNCTION passt(e AS Eintrag, such AS STRING) AS BOOLEAN
+        IF such <> "" AND INSTR(e.suchText$(), such) < 0 THEN RETURN FALSE
+        SELECT CASE Self.filter
+            CASE "" : RETURN TRUE
+            CASE "minimum" : RETURN e.unterMinimum()
+        END SELECT
+        RETURN e.status$(Self.schwelle) = Self.filter
+    END FUNCTION
+
+    SUB zeigen()
+        GUI_TABLE_CLEAR(Self.tabelle)
+        Self.ids = []
+        DIM such AS STRING : such = LOWER$(TRIM$(GUI_TEXT(Self.sucheFeld)))
+        DIM e AS Eintrag
+        DIM ab AS INTEGER : ab = 0
+        DIM bald AS INTEGER : bald = 0
+        FOR EACH e IN Self.eintraege
+            IF NOT Self.passt(e, such) THEN CONTINUE
+            DIM z AS INTEGER : z = GUI_TABLE_ADD_ROW(Self.tabelle, [e.name, IIF(e.marke = "", "-", e.marke), e.mengeText$(), "−1", "+1", e.minText$(), IIF(e.lagerort = "", "-", e.lagerort), IIF(e.bereich = "", "-", e.bereich), IIF(e.markt = "", "-", e.markt), IIF(e.ablauf = "", "-", e.ablauf), e.statusText$(Self.schwelle)])
+            ARRAY_PUSH(Self.ids, e.id)
+            GUI_TABLE_CELL_KIND(Self.tabelle, z, SP_MINUS, "knopf")
+            GUI_TABLE_CELL_KIND(Self.tabelle, z, SP_PLUS, "knopf")
+            Self.faerben(z, e)
+            IF e.status$(Self.schwelle) = "abgelaufen" THEN ab = ab + 1
+            IF e.status$(Self.schwelle) = "bald" THEN bald = bald + 1
+        NEXT
+        DIM text AS STRING : text = STR$(LEN(Self.ids)) + IIF(LEN(Self.ids) = 1, " Eintrag", " Einträge")
+        IF LEN(Self.ids) < LEN(Self.eintraege) THEN text = text + " von " + STR$(LEN(Self.eintraege))
+        IF ab > 0 THEN text = text + ", " + STR$(ab) + " abgelaufen"
+        IF bald > 0 THEN text = text + ", " + STR$(bald) + " bald ablaufend"
+        GUI_SET_TEXT(Self.zusammenfassung, text + ".")
+    END SUB
+
+    ' Status, Mindestmenge und Markt in den Farben der Python-App.
+    SUB faerben(z AS INTEGER, e AS Eintrag)
+        SELECT CASE e.status$(Self.schwelle)
+            CASE "abgelaufen" : GUI_TABLE_CELL_COLOR(Self.tabelle, z, SP_STATUS, &HF5C6C6, &H6B3535)
+            CASE "bald" : GUI_TABLE_CELL_COLOR(Self.tabelle, z, SP_STATUS, &HFFE0B2, &H8A6D3B)
+            CASE "frisch" : GUI_TABLE_CELL_COLOR(Self.tabelle, z, SP_STATUS, &HC8E6C9, &H3D6B4F)
+        END SELECT
+        IF e.minMenge > 0 THEN
+            IF e.unterMinimum() THEN
+                GUI_TABLE_CELL_COLOR(Self.tabelle, z, SP_MIN, &HF5C6C6, &H5C3434)
+            ELSE
+                GUI_TABLE_CELL_COLOR(Self.tabelle, z, SP_MIN, &HC8E6C9, &H2E4A3A)
+            END IF
+        END IF
+        IF e.markt <> "" THEN GUI_TABLE_CELL_COLOR(Self.tabelle, z, SP_MARKT, marktVorder(e.markt), marktFarbe(e.markt))
+        GUI_TABLE_CELL_COLOR(Self.tabelle, z, SP_MINUS, &HF5C6C6, &H5C3434)
+        GUI_TABLE_CELL_COLOR(Self.tabelle, z, SP_PLUS, &HC8E6C9, &H2E4A3A)
+    END SUB
+
+    ' Die id des gewählten Eintrags, -1 = keiner.
+    FUNCTION gewaehlt() AS INTEGER
+        DIM z AS INTEGER : z = GUI_TABLE_SELECTED(Self.tabelle)
+        IF z < 0 OR z >= LEN(Self.ids) THEN RETURN -1
+        RETURN Self.ids[z]
+    END FUNCTION
+
+    SUB filterSetzen(f AS STRING)
+        Self.filter = f
+        DIM namen AS ARRAY OF STRING : namen = ["", "abgelaufen", "bald", "frisch", "minimum"]
+        DIM knoepfe AS ARRAY OF INTEGER : knoepfe = [Self.knopfAlle, Self.knopfAbgelaufen, Self.knopfBald, Self.knopfFrisch, Self.knopfMinimum]
+        DIM k AS INTEGER
+        FOR k = 0 TO 4
+            GUI_BUTTON_VARIANT(knoepfe[k], IIF(namen[k] = f, "primaer", "umriss"))
+        NEXT
+        Self.zeigen()
+    END SUB
+
+    SUB knopfAlle_Klick()
+        Self.filterSetzen("")
+    END SUB
+
+    SUB knopfAbgelaufen_Klick()
+        Self.filterSetzen("abgelaufen")
+    END SUB
+
+    SUB knopfBald_Klick()
+        Self.filterSetzen("bald")
+    END SUB
+
+    SUB knopfFrisch_Klick()
+        Self.filterSetzen("frisch")
+    END SUB
+
+    SUB knopfMinimum_Klick()
+        Self.filterSetzen("minimum")
+    END SUB
+
+    SUB sucheFeld_Geaendert()
+        Self.zeigen()
+    END SUB
+
+    SUB barcodeFeld_Enter()
+        Self.knopfHinzufuegen_Klick()
+    END SUB
+
+    SUB knopfHinzufuegen_Klick()
+        Self.bearbeitenId = 0
+        Self.neuBarcode = TRIM$(GUI_TEXT(Self.barcodeFeld))
+        GUI_SET_TEXT(Self.barcodeFeld, "")
+        Self.Ausloesen("Bearbeiten")
+    END SUB
+
+    SUB knopfExport_Klick()
+        Self.Ausloesen("Export")
+    END SUB
+
+    SUB tabelle_Doppelklick()
+        IF Self.gewaehlt() < 0 THEN RETURN
+        Self.bearbeitenId = Self.gewaehlt()
+        Self.Ausloesen("Bearbeiten")
+    END SUB
+
+    ' -1/+1 in der Zeile; bei 0 die Frage, ob es verbraucht ist.
+    SUB tabelle_Zelle(zeile AS INTEGER, spalte AS INTEGER)
+        IF spalte <> SP_MINUS AND spalte <> SP_PLUS THEN RETURN
+        IF zeile < 0 OR zeile >= LEN(Self.ids) THEN RETURN
+        DIM e AS Eintrag : e = eintragLaden(Self.ids[zeile])
+        IF e IS NIL THEN RETURN
+        DIM neu AS FLOAT : neu = e.menge + IIF(spalte = SP_PLUS, 1.0, -1.0)
+        IF neu <= 0 THEN
+            IF Frage(e.name + " ist aufgebraucht?", "Verbraucht|Abbrechen", "Verbraucht?") <> 1 THEN RETURN
+            entnehmen(e, "consumed", e.name + " verbraucht")
+            GUI_TOAST(Self.studioWin, e.name + " verbraucht. Strg+Z nimmt es zurück.", "erfolg")
+        ELSE
+            mengeSetzen(e, neu)
+        END IF
+        Self.laden()
+        Self.Ausloesen("Geaendert")
+    END SUB
+
+    ' Das Kontextmenü: es gilt der Zeile, auf die rechts geklickt wurde
+    ' (die Tabelle wählt sie dabei).
+    SUB Takt()
+        IF GUI_CLICKED(Self.miBearbeiten) THEN Self.tabelle_Doppelklick()
+        IF GUI_CLICKED(Self.miMindestmenge) THEN
+            IF Self.gewaehlt() >= 0 THEN
+                Self.mindestId = Self.gewaehlt()
+                Self.Ausloesen("Mindestmenge")
+            END IF
+        END IF
+        IF GUI_CLICKED(Self.miVerbraucht) THEN Self.markieren("consumed", "verbraucht", "Verbraucht")
+        IF GUI_CLICKED(Self.miAbgelaufen) THEN Self.markieren("expired", "abgelaufen", "Abgelaufen")
+        IF GUI_CLICKED(Self.miLoeschen) THEN Self.markieren("deleted", "gelöscht", "Löschen")
+    END SUB
+
+    SUB markieren(grund AS STRING, wort AS STRING, knopf AS STRING)
+        IF Self.gewaehlt() < 0 THEN RETURN
+        DIM e AS Eintrag : e = eintragLaden(Self.gewaehlt())
+        IF e IS NIL THEN RETURN
+        DIM nachfrage AS STRING : nachfrage = IIF(grund = "deleted", e.name + " wirklich löschen?", e.name + " als " + wort + " markieren?")
+        IF Frage(nachfrage, knopf + "|Abbrechen", knopf) <> 1 THEN RETURN
+        entnehmen(e, grund, e.name + " " + wort)
+        GUI_TOAST(Self.studioWin, e.name + " " + wort + ". Strg+Z nimmt es zurück.", IIF(grund = "consumed", "erfolg", "warnung"))
+        Self.laden()
+        Self.Ausloesen("Geaendert")
+    END SUB
+END CLASS
+
+' Die Spalten der Tabelle.
+CONST SP_MINUS = 3
+CONST SP_PLUS = 4
+CONST SP_MIN = 5
+CONST SP_MARKT = 8
+CONST SP_STATUS = 10
+
+' Märkte in ihren Farben (STORE_COLORS der Python-App), unbekannte grau.
+FUNCTION marktFarbe(markt AS STRING) AS INTEGER
+    DIM m AS STRING : m = UPPER$(markt)
+    IF INSTR(m, "REWE") >= 0 OR INSTR(m, "KAUFLAND") >= 0 OR INSTR(m, "PENNY") >= 0 OR INSTR(m, "ROSSMANN") >= 0 THEN RETURN &H7A2626
+    IF INSTR(m, "EDEKA") >= 0 OR INSTR(m, "LIDL") >= 0 OR INSTR(m, "NETTO") >= 0 THEN RETURN &H8A7420
+    IF INSTR(m, "ALDI") >= 0 THEN RETURN &H1F4F80
+    IF INSTR(m, "DM") >= 0 THEN RETURN &H1F6B64
+    IF INSTR(m, "MÜLLER") >= 0 THEN RETURN &H8A5A1F
+    RETURN &H3C4048
+END FUNCTION
+
+FUNCTION marktVorder(markt AS STRING) AS INTEGER
+    RETURN &HF0F0F0
+END FUNCTION

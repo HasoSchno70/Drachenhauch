@@ -109,3 +109,58 @@ neuer Datei mit Startdaten und Kennzahlen, F5 auf einer Datei im Aufbau der
 Python-App -- sie bleibt Zeichen für Zeichen gleich); acht Verfälschungen des
 Beispiels fallen je in ihrem Fall. Hilfen in `tests/pruef/_hilfen/kuehlschrank.dh`
 (`kKopieren`, `kF5`, `kProbe`, `kCheck$`, `kAufbau$`).
+
+## Stufe 1: der Vorrat (2026-11-08)
+
+Der Reiter Bestand ist das eigene Control `BestandSeite` (Barcode-Feld,
+Hinzufügen, Export, Suche, fünf Filter, Tabelle mit −1/+1 je Zeile, Farben
+für Status, Mindestmenge und Markt wie in der Python-App, Kontextmenü
+Bearbeiten/Mindestmenge/Verbraucht/Abgelaufen/Löschen); es meldet
+`Geaendert`, `Bearbeiten`, `Export`, `Mindestmenge` ans Hauptfenster. Dazu
+die Fenster `ProduktFenster` (anlegen und bearbeiten in einem, Prüfung wie
+InputValidator, +3/+7/+14/+30 Tage) und `MindestmengeFenster`, das Modul
+`Bestand` (lesen mit den Tagen bis zum Ablauf aus SQLite, entnehmen mit
+einer Zeile in `consumption_history`, Einheiten ohne das Sinnbild, das die
+Python-App manchmal mitschrieb, CSV mit Semikolon) und die Klassen `Eintrag`,
+`Verlauf`, `Schritt`, `Aenderung`: Rückgängig und Wiederholen über den
+Stand jeder betroffenen Zeile vorher und nachher -- mit derselben id und
+per UPDATE (ein INSERT OR REPLACE auf `products` nähme über ON DELETE
+CASCADE den Bestand mit; SQLite kaskadiert auch beim REPLACE).
+
+**Funde:**
+
+6. **Ein eigenes Control auf einer Reiterseite zeigte sich auf jeder.** Die
+   Teile einer Instanz standen in keinem `tabctl.kinder`; `seitenDerTeile`
+   trägt sie auf der Seite der Instanz ein (Entwurf und Programm).
+7. **Kein Klick in eine Zelle, kein Haken je Bild.** Die Tabelle meldete nur
+   Geaendert und Doppelklick -- −1 in der schon gewählten Zeile kam nirgends
+   an --, und ein Kontextmenü ließ sich im Code bauen, aber nirgends
+   abfragen. Neu `Zelle(zeile, spalte)` und `Takt` für Fenster und Controls.
+   Einen Kontextmenü-Editor im Studio gibt es noch nicht (siehe offen).
+8. **Ein gemeldetes Ereignis mit modalem Fenster lief ohne Ende.** Die
+   Meldung eines Controls blieb bis zum Ende des Fenstertakts stehen; die
+   Schleife des modalen Produktfensters rief die Methode wieder auf, bis die
+   Aufruftiefe überlief. `studioAbholen` nimmt sie vor dem Aufruf weg.
+9. **Zweimal schnell „+1“ öffnete den Bearbeiten-Dialog.** Ein Doppelklick
+   auf eine Zelle der Art `knopf` oder `haken` zählte als Doppelklick der
+   Zeile; jetzt sind es zwei Klicks auf den Knopf (gui).
+
+Dabei: das Studio schreibt Befunde der Prüfung mit Text ins Protokoll -- ein
+Name `frage` neben der Laufzeit-Funktion `Frage` hielt F5 an, und das
+Protokoll sagte nur „geprueft 1 0“.
+
+**Offen:** ein kompaktes Datumsfeld zum Aufklappen (wie QDateEdit) hat die
+gui nicht -- Kauf- und Ablaufdatum sind Textfelder mit `GUI_RULE "datum"`
+und Schnellknöpfen; der Stapelscan (Stufe 6) braucht Datum je Tabellenzeile.
+Ein Kontextmenü entsteht im Code (`GUI_CONTEXT` in `Geoeffnet`, Abfrage in
+`Takt`), nicht im Menü-Editor des Studios.
+
+Tests `tests/pruef/kuehlschrank/stufe1_vorrat.dhtest` (4: Tabelle mit
+Status, Filtern und Suche; ändern, entnehmen, anlegen über den Dialog,
+bearbeiten, je mit Rückgängig und Wiederholen, CSV; echte Klicks auf −1/+1
+mit Strg+Z/Strg+Y; Rückgängig in einer Datei mit Fremdschlüssel), je ein
+Fall in `werkzeug_studio_controls.dhtest` (Reiterseite, modales Fenster),
+`werkzeug_studio_takt.dhtest` und `gui_tabelle_bedienung.dhtest`.
+Gegenproben: zehn im Beispiel, zwei für die Reiterseite, vier für
+Takt/Zelle, eine für das Abholen, eine für den Doppelklick in der Laufzeit
+-- jede fällt in ihrem Fall.

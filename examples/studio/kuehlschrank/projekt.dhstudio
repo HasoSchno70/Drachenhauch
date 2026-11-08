@@ -34,6 +34,49 @@
       "art": "klasse",
       "name": "Kennzahlen",
       "code": "Kennzahlen.dh"
+    },
+    {
+      "art": "klasse",
+      "name": "Eintrag",
+      "code": "Eintrag.dh"
+    },
+    {
+      "art": "klasse",
+      "name": "Aenderung",
+      "code": "Aenderung.dh"
+    },
+    {
+      "art": "klasse",
+      "name": "Schritt",
+      "code": "Schritt.dh"
+    },
+    {
+      "art": "klasse",
+      "name": "Verlauf",
+      "code": "Verlauf.dh"
+    },
+    {
+      "art": "modul",
+      "name": "Bestand",
+      "code": "Bestand.dh"
+    },
+    {
+      "art": "control",
+      "name": "BestandSeite",
+      "code": "BestandSeite.dh",
+      "layout": "BestandSeite.dhform"
+    },
+    {
+      "art": "fenster",
+      "name": "ProduktFenster",
+      "code": "ProduktFenster.dh",
+      "layout": "ProduktFenster.dhform"
+    },
+    {
+      "art": "fenster",
+      "name": "MindestmengeFenster",
+      "code": "MindestmengeFenster.dh",
+      "layout": "MindestmengeFenster.dhform"
     }
   ]
 }

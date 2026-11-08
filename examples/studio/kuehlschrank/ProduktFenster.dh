@@ -1,0 +1,141 @@
+' Ein Produkt in den Vorrat aufnehmen oder einen Eintrag bearbeiten -- wie
+' AddProductDialog und EditProductDialog der Python-App in einem Fenster.
+' eintragId = 0: neu (mit barcode); sonst der Eintrag. Nach dem Schließen
+' sagt gesichert, ob etwas geschrieben wurde.
+CLASS ProduktFenster EXTENDS ProduktFenster_Basis
+    DIM eintragId AS INTEGER
+    DIM barcode AS STRING
+    DIM gesichert AS BOOLEAN
+    DIM e AS Eintrag
+
+    SUB Geoeffnet()
+        GUI_SET_DROPDOWN(Self.kategorieListe, kategorien())
+        GUI_SET_DROPDOWN(Self.lagerortListe, lagerorte())
+        GUI_SET_DROPDOWN(Self.einheitListe, einheiten())
+        GUI_SET_DROPDOWN(Self.minEinheitListe, einheiten())
+        GUI_SET_DROPDOWN(Self.marktListe, maerkte())
+        IF Self.eintragId > 0 THEN Self.e = eintragLaden(Self.eintragId)
+        IF Self.e IS NIL THEN
+            Self.e = NEW Eintrag()
+            Self.e.barcode = Self.barcode
+            Self.e.menge = 1.0
+            Self.e.einheit = einstellung$("default_unit", "Stück")
+            Self.e.kaufdatum = heute$()
+            Self.e.ablauf = tagePlus$(einstellungZahl("default_expiry_days", 7))
+            Self.eintragId = 0
+        END IF
+        GUI_SET_TEXT(Self.titel, IIF(Self.eintragId = 0, "Produkt hinzufügen", "Eintrag bearbeiten"))
+        GUI_SET_TEXT(Self.barcodeFeld, Self.e.barcode)
+        ' Der Barcode gehört dem Produkt -- beim Bearbeiten bleibt er.
+        GUI_SET_ENABLED(Self.barcodeFeld, Self.eintragId = 0)
+        GUI_SET_TEXT(Self.nameFeld, Self.e.name)
+        GUI_SET_TEXT(Self.markeFeld, Self.e.marke)
+        GUI_SET_TEXT(Self.kategorieListe, Self.e.kategorie)
+        GUI_SET_TEXT(Self.lagerortListe, Self.e.lagerort)
+        GUI_SET_TEXT(Self.bereichFeld, Self.e.bereich)
+        GUI_SET_VALUE(Self.mengeFeld, Self.e.menge)
+        GUI_SET_TEXT(Self.einheitListe, einheitText$(Self.e.einheit))
+        GUI_SET_TEXT(Self.kaufFeld, Self.e.kaufdatum)
+        GUI_SET_TEXT(Self.ablaufFeld, Self.e.ablauf)
+        GUI_SET_TEXT(Self.marktListe, Self.e.markt)
+        GUI_SET_TEXT(Self.notizenFeld, Self.e.notizen)
+        GUI_SET_CHECKED(Self.minKasten, Self.e.minMenge > 0)
+        GUI_SET_VALUE(Self.minFeld, IIF(Self.e.minMenge > 0, Self.e.minMenge, 1.0))
+        GUI_SET_TEXT(Self.minEinheitListe, IIF(Self.e.minEinheit = "", einheitText$(Self.e.einheit), einheitText$(Self.e.minEinheit)))
+        Self.minKasten_Geaendert()
+        GUI_SET_TEXT(Self.fehlerText, "")
+        GUI_FOCUS(IIF(Self.eintragId = 0 AND Self.e.barcode = "", Self.barcodeFeld, Self.nameFeld))
+    END SUB
+
+    SUB minKasten_Geaendert()
+        GUI_SET_ENABLED(Self.minFeld, GUI_CHECKED(Self.minKasten))
+        GUI_SET_ENABLED(Self.minEinheitListe, GUI_CHECKED(Self.minKasten))
+    END SUB
+
+    ' Haltbarkeit in Tagen ab heute.
+    SUB plus3_Klick()
+        GUI_SET_TEXT(Self.ablaufFeld, tagePlus$(3))
+    END SUB
+
+    SUB plus7_Klick()
+        GUI_SET_TEXT(Self.ablaufFeld, tagePlus$(7))
+    END SUB
+
+    SUB plus14_Klick()
+        GUI_SET_TEXT(Self.ablaufFeld, tagePlus$(14))
+    END SUB
+
+    SUB plus30_Klick()
+        GUI_SET_TEXT(Self.ablaufFeld, tagePlus$(30))
+    END SUB
+
+    ' Was die Python-App prüft (InputValidator): Name, Kategorie, Lagerort,
+    ' Menge > 0, Datumsangaben JJJJ-MM-TT. "" = alles in Ordnung.
+    FUNCTION pruefen$() AS STRING
+        DIM name AS STRING : name = TRIM$(GUI_TEXT(Self.nameFeld))
+        IF name = "" THEN RETURN "Der Name fehlt."
+        IF LEN(name) > 200 THEN RETURN "Der Name ist länger als 200 Zeichen."
+        IF TRIM$(GUI_TEXT(Self.kategorieListe)) = "" THEN RETURN "Bitte eine Kategorie wählen."
+        IF TRIM$(GUI_TEXT(Self.lagerortListe)) = "" THEN RETURN "Bitte einen Lagerort wählen."
+        IF GUI_VALUE(Self.mengeFeld) <= 0 THEN RETURN "Die Menge muss größer als 0 sein."
+        IF NOT datumOk(TRIM$(GUI_TEXT(Self.kaufFeld)), TRUE) THEN RETURN "Das Kaufdatum braucht die Form JJJJ-MM-TT."
+        IF NOT datumOk(TRIM$(GUI_TEXT(Self.ablaufFeld)), FALSE) THEN RETURN "Das Ablaufdatum braucht die Form JJJJ-MM-TT."
+        RETURN ""
+    END FUNCTION
+
+    SUB knopfSichern_Klick()
+        DIM f AS STRING : f = Self.pruefen$()
+        GUI_SET_TEXT(Self.fehlerText, f)
+        IF f <> "" THEN RETURN
+        Self.e.barcode = TRIM$(GUI_TEXT(Self.barcodeFeld))
+        Self.e.name = TRIM$(GUI_TEXT(Self.nameFeld))
+        Self.e.marke = TRIM$(GUI_TEXT(Self.markeFeld))
+        Self.e.kategorie = TRIM$(GUI_TEXT(Self.kategorieListe))
+        Self.e.lagerort = TRIM$(GUI_TEXT(Self.lagerortListe))
+        Self.e.bereich = TRIM$(GUI_TEXT(Self.bereichFeld))
+        Self.e.menge = GUI_VALUE(Self.mengeFeld)
+        Self.e.einheit = TRIM$(GUI_TEXT(Self.einheitListe))
+        Self.e.kaufdatum = TRIM$(GUI_TEXT(Self.kaufFeld))
+        Self.e.ablauf = TRIM$(GUI_TEXT(Self.ablaufFeld))
+        Self.e.markt = TRIM$(GUI_TEXT(Self.marktListe))
+        Self.e.notizen = TRIM$(GUI_TEXT(Self.notizenFeld))
+        IF Self.eintragId = 0 THEN
+            Self.eintragId = eintragAnlegen(Self.e)
+        ELSE
+            eintragAendern(Self.e)
+        END IF
+        DIM mm AS FLOAT : mm = IIF(GUI_CHECKED(Self.minKasten), GUI_VALUE(Self.minFeld), 0.0)
+        DIM me AS STRING : me = TRIM$(GUI_TEXT(Self.minEinheitListe))
+        IF mm <> Self.e.minMenge OR (mm > 0 AND me <> einheitText$(Self.e.minEinheit)) THEN mindestmengeSetzen(Self.e.produktId, Self.e.name, mm, me)
+        Self.gesichert = TRUE
+        Self.Zumachen()
+    END SUB
+
+    SUB knopfAbbrechen_Klick()
+        Self.Zumachen()
+    END SUB
+
+    SUB Taste(taste AS INTEGER)
+        IF taste = KEY_ESCAPE THEN Self.Zumachen()
+    END SUB
+END CLASS
+
+' Heute plus n Tage als JJJJ-MM-TT (über SQLite, wie die Datumswerte der Datei).
+FUNCTION tagePlus$(n AS INTEGER) AS STRING
+    DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT date(?, ?)", heute$(), "+" + STR$(n) + " days")
+    IF NOT DB_NEXT(r) THEN RETURN heute$()
+    DIM t AS STRING : t = DB_GET_STRING(r, 0)
+    DB_CLOSE_RESULT(r)
+    RETURN t
+END FUNCTION
+
+' Ein Datum JJJJ-MM-TT, das es gibt; leer nur, wenn leer erlaubt ist.
+FUNCTION datumOk(t AS STRING, leerErlaubt AS BOOLEAN) AS BOOLEAN
+    IF t = "" THEN RETURN leerErlaubt
+    IF NOT REGEX_TEST(t, "^[0-9]{4}-[0-9]{2}-[0-9]{2}$") THEN RETURN FALSE
+    DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT date(?) = ?", t, t)
+    IF NOT DB_NEXT(r) THEN RETURN FALSE
+    DIM ok AS BOOLEAN : ok = NOT DB_IS_NULL(r, 0) AND DB_GET_INT(r, 0) = 1
+    DB_CLOSE_RESULT(r)
+    RETURN ok
+END FUNCTION

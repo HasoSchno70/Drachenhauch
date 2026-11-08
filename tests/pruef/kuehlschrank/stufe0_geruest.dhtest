@@ -41,13 +41,21 @@ IMPORT "{sammlung}/../../../studio/berichte_laufzeit.dh"
 IMPORT "{sammlung}/../../../studio/berichte.dh"
 --- erwartet
 laden []
-elemente 6 start Hauptfenster
+elemente 14 start Hauptfenster
 app App TRUE
 fenster Hauptfenster TRUE
 datenbank Daten TRUE
 modul Datenbank TRUE
 modul Startdaten TRUE
 klasse Kennzahlen TRUE
+klasse Eintrag TRUE
+klasse Aenderung TRUE
+klasse Schritt TRUE
+klasse Verlauf TRUE
+modul Bestand TRUE
+control BestandSeite TRUE
+fenster ProduktFenster TRUE
+fenster MindestmengeFenster TRUE
 projektdatei TRUE
 daten fridge_database.db tabellen 17
 
@@ -102,7 +110,7 @@ DB_EXEC(db, "UPDATE app_settings SET value = '4' WHERE key = 'expiring_days_thre
 f.auffrischen()
 PRINT "schwelle 4 "; GUI_CARD_TEXT$(f.kachelBald)
 ' Was erst spaeter kommt, ist gesperrt; Aktualisieren geht.
-PRINT "gesperrt "; GUI_TOOLBAR_ENABLED(f.werkzeuge, KNOPF_HINZUFUEGEN); " "; GUI_TOOLBAR_ENABLED(f.werkzeuge, KNOPF_EINSTELLUNGEN); " "; GUI_ENABLED(f.knopfEinkauf); " offen "; GUI_TOOLBAR_ENABLED(f.werkzeuge, KNOPF_AKTUALISIEREN)
+PRINT "gesperrt "; GUI_TOOLBAR_ENABLED(f.werkzeuge, KNOPF_EINSTELLUNGEN); " "; GUI_ENABLED(f.knopfEinkauf); " offen "; GUI_TOOLBAR_ENABLED(f.werkzeuge, KNOPF_HINZUFUEGEN); " "; GUI_TOOLBAR_ENABLED(f.werkzeuge, KNOPF_AKTUALISIEREN)
 f.werkzeuge_Knopf(KNOPF_AKTUALISIEREN)
 PRINT "status "; GUI_STATUSBAR_TEXT$(f.status, 3)
 --- erwartet
@@ -116,7 +124,7 @@ einheit Stück schwelle 3 fehlt vorgabe
 zweimal 9 18
 kacheln 5 2 1 | Produkte: 2
 schwelle 4 3
-gesperrt FALSE FALSE FALSE offen TRUE
+gesperrt FALSE FALSE offen TRUE TRUE
 status Aktualisiert.
 code 0
 
