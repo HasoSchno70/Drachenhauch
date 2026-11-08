@@ -117,7 +117,7 @@
       "kind": "button",
       "x": 628,
       "y": 44,
-      "w": 130,
+      "w": 136,
       "h": 30,
       "text": "Bald ablaufend",
       "color": -1,
@@ -132,7 +132,7 @@
     },
     {
       "kind": "button",
-      "x": 764,
+      "x": 770,
       "y": 44,
       "w": 80,
       "h": 30,
@@ -149,9 +149,9 @@
     },
     {
       "kind": "button",
-      "x": 850,
+      "x": 856,
       "y": 44,
-      "w": 130,
+      "w": 146,
       "h": 30,
       "text": "Unter Minimum",
       "color": -1,
@@ -195,19 +195,20 @@
         ],
         "rows": [],
         "col_widths": [
-          230,
-          130,
-          110,
+          220,
+          120,
+          100,
           44,
           44,
           100,
-          150,
-          120,
+          140,
           110,
           110,
-          120
+          110,
+          110
         ],
         "selected": -1,
+        "row_h": 28,
         "leer_text": "Noch nichts im Vorrat -- Barcode oben eintippen oder „Hinzufügen“ (Strg+N)."
       },
       "name": "tabelle"

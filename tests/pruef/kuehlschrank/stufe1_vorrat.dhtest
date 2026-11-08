@@ -208,7 +208,7 @@ DIM w AS ARRAY OF STRING : w = SPLIT(TRIM$(READALL(p + "/_studio/lage.txt")), " 
 DIM tx AS INTEGER : tx = INT(VAL(w[0]))
 DIM ty AS INTEGER : ty = INT(VAL(w[1]))
 DIM zy AS INTEGER : zy = ty + INT(VAL(w[2])) + INT(VAL(w[3])) \ 2
-DIM mx AS INTEGER : mx = tx + 230 + 130 + 110 + 22
+DIM mx AS INTEGER : mx = tx + 220 + 120 + 100 + 22
 DIM px AS INTEGER : px = mx + 44
 slZeilen = [] : slBild = 0
 slHin(10, 10)
