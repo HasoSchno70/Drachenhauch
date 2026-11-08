@@ -127,6 +127,9 @@ SUB inspektorAnlegen()
     inspZeile("Inhalt", "placeholder", "Platzhalter", "text", "textinput,textarea,dropdown", "")
     inspZeile("Inhalt", "items", "Einträge", "eintraege", LISTENARTEN, "")
     inspZeile("Inhalt", "table.headers", "Spalten", "eintraege", "table", "")
+    inspZeile("Inhalt", "leiste.eintraege", "Knöpfe", "leiste", "toolbar", "")
+    inspZeile("Inhalt", "leiste.beschriftung", "Mit Text", "schalter", "toolbar", "")
+    inspZeile("Inhalt", "status.felder", "Felder", "felder", "statusbar", "")
     inspZeile("Inhalt", "group", "Gruppe", "text", "radio", "")
     inspZeile("Inhalt", "studio_bild", "Bild", "wahl", "image", "(keins)")
     inspZeile("Inhalt", "checked", "Gesetzt", "schalter", "checkbox,radio,toggle", "")
@@ -161,9 +164,11 @@ SUB inspektorAnlegen()
         GUI_ADD_CLASS(z.lbl, "feldname")
         inspDazu(z.lbl)
         SELECT CASE z.art
-            CASE "text", "eintraege"
+            CASE "text", "eintraege", "leiste", "felder"
                 z.ed = GUI_TEXTINPUT(win, 0, 0, 10, 26)
                 IF z.art = "eintraege" THEN GUI_TOOLTIP(z.ed, tr$("Einträge durch Semikolon getrennt"))
+                IF z.art = "leiste" THEN GUI_TOOLTIP(z.ed, tr$("Text|Sinnbild|Tipp je Knopf, durch Semikolon getrennt; - = Trenner, ~ = Lücke"))
+                IF z.art = "felder" THEN GUI_TOOLTIP(z.ed, tr$("Text|Breite[|links,mitte,rechts[|klick]] je Feld, durch Semikolon getrennt; Breite 0 = der Rest"))
             CASE "komma"
                 z.ed = GUI_TEXTINPUT(win, 0, 0, 10, 26)
                 GUI_TEXTINPUT_SET(z.ed, "zahlen", 2)
@@ -278,6 +283,103 @@ SUB listeSetzen(pfad AS STRING, text AS STRING)
     JSON_SET_JSON(doc, pfad, a)
 END SUB
 
+' Die Knoepfe einer Werkzeugleiste als eine Zeile: "Text|Sinnbild|Tipp" je
+' Knopf, "-" = Trenner, "~" = Luecke (schiebt den Rest nach rechts). Was
+' leer ist, faellt hinten weg ("Neu|neu", "|stift|Bearbeiten").
+FUNCTION leisteText$(pfad AS STRING) AS STRING
+    IF NOT JSON_HAS(doc, pfad) THEN RETURN ""
+    DIM teile AS ARRAY OF STRING : teile = []
+    DIM k AS INTEGER
+    FOR k = 0 TO JSON_LEN(doc, pfad) - 1
+        DIM q AS STRING : q = pfad + "." + STR$(k)
+        DIM art AS STRING : art = jsonText$(doc, q + ".art")
+        IF art = "trenner" THEN
+            ARRAY_PUSH(teile, "-")
+        ELSEIF art = "luecke" THEN
+            ARRAY_PUSH(teile, "~")
+        ELSE
+            DIM f AS ARRAY OF STRING : f = [jsonText$(doc, q + ".text"), jsonText$(doc, q + ".symbol"), jsonText$(doc, q + ".tip")]
+            WHILE LEN(f) > 1 AND f[LEN(f) - 1] = ""
+                ARRAY_REMOVE_AT(f, LEN(f) - 1)
+            WEND
+            ARRAY_PUSH(teile, JOIN$(f, "|"))
+        END IF
+    NEXT
+    RETURN JOIN$(teile, "; ")
+END FUNCTION
+
+SUB leisteSetzen(pfad AS STRING, text AS STRING)
+    DIM a AS JSON_HANDLE : a = JSON_NEW_ARRAY()
+    DIM t AS STRING
+    FOR EACH t IN SPLIT(text, ";")
+        t = TRIM$(t)
+        IF t = "" THEN CONTINUE
+        DIM o AS JSON_HANDLE : o = JSON_PARSE("{}")
+        IF t = "-" THEN
+            JSON_SET_STRING(o, "art", "trenner")
+        ELSEIF t = "~" THEN
+            JSON_SET_STRING(o, "art", "luecke")
+        ELSE
+            JSON_SET_STRING(o, "art", "knopf")
+            DIM f AS ARRAY OF STRING : f = SPLIT(t, "|")
+            IF TRIM$(f[0]) <> "" THEN JSON_SET_STRING(o, "text", TRIM$(f[0]))
+            IF LEN(f) > 1 THEN
+                IF TRIM$(f[1]) <> "" THEN JSON_SET_STRING(o, "symbol", TRIM$(f[1]))
+            END IF
+            IF LEN(f) > 2 THEN
+                IF TRIM$(f[2]) <> "" THEN JSON_SET_STRING(o, "tip", TRIM$(f[2]))
+            END IF
+        END IF
+        JSON_APPEND_JSON(a, "", o)
+    NEXT
+    JSON_SET_JSON(doc, pfad, a)
+END SUB
+
+' Die Felder einer Statusleiste als eine Zeile: "Text|Breite" je Feld, dahinter
+' wahlweise die Ausrichtung (links, mitte, rechts) und "klick" (das Feld meldet
+' das Ereignis Feld).
+FUNCTION felderText$(pfad AS STRING) AS STRING
+    IF NOT JSON_HAS(doc, pfad) THEN RETURN ""
+    DIM teile AS ARRAY OF STRING : teile = []
+    DIM k AS INTEGER
+    FOR k = 0 TO JSON_LEN(doc, pfad) - 1
+        DIM q AS STRING : q = pfad + "." + STR$(k)
+        DIM b AS INTEGER : b = 0
+        IF JSON_HAS(doc, q + ".breite") THEN b = INT(JSON_GET_FLOAT(doc, q + ".breite"))
+        DIM z AS STRING : z = jsonText$(doc, q + ".text") + "|" + STR$(b)
+        DIM au AS STRING : au = jsonText$(doc, q + ".ausrichtung")
+        DIM kl AS BOOLEAN : kl = FALSE
+        IF JSON_HAS(doc, q + ".klickbar") THEN kl = JSON_GET_BOOL(doc, q + ".klickbar")
+        IF au <> "" OR kl THEN z = z + "|" + IIF(au = "", "links", au)
+        IF kl THEN z = z + "|klick"
+        ARRAY_PUSH(teile, z)
+    NEXT
+    RETURN JOIN$(teile, "; ")
+END FUNCTION
+
+SUB felderSetzen(pfad AS STRING, text AS STRING)
+    DIM a AS JSON_HANDLE : a = JSON_NEW_ARRAY()
+    DIM t AS STRING
+    FOR EACH t IN SPLIT(text, ";")
+        IF TRIM$(t) = "" THEN CONTINUE
+        DIM f AS ARRAY OF STRING : f = SPLIT(t, "|")
+        DIM o AS JSON_HANDLE : o = JSON_PARSE("{}")
+        JSON_SET_STRING(o, "text", TRIM$(f[0]))
+        DIM b AS INTEGER : b = 0
+        IF LEN(f) > 1 THEN b = MAX(0, INT(VAL(TRIM$(f[1]))))
+        JSON_SET_INT(o, "breite", b)
+        IF LEN(f) > 2 THEN
+            DIM au AS STRING : au = LOWER$(TRIM$(f[2]))
+            IF au = "mitte" OR au = "rechts" THEN JSON_SET_STRING(o, "ausrichtung", au)
+        END IF
+        IF LEN(f) > 3 THEN
+            IF LOWER$(TRIM$(f[3])) = "klick" THEN JSON_SET_BOOL(o, "klickbar", TRUE)
+        END IF
+        JSON_APPEND_JSON(a, "", o)
+    NEXT
+    JSON_SET_JSON(doc, pfad, a)
+END SUB
+
 SUB farbfeldZeigen(z AS InspZeile, pfad AS STRING)
     IF JSON_HAS(doc, pfad) THEN
         DIM c AS INTEGER : c = INT(JSON_GET_FLOAT(doc, pfad))
@@ -367,6 +469,10 @@ SUB inspektorFuellen()
                 END IF
             CASE "eintraege"
                 GUI_SET_TEXT(z.ed, listeText$(p))
+            CASE "leiste"
+                GUI_SET_TEXT(z.ed, leisteText$(p))
+            CASE "felder"
+                GUI_SET_TEXT(z.ed, felderText$(p))
             CASE "zahl"
                 ' Was die Laufzeit ohne Angabe nimmt (GUI_SAVE laesst es weg).
                 DIM v AS INTEGER : v = 0
@@ -551,6 +657,10 @@ SUB zeileUebernehmen(zi AS INTEGER)
                 END IF
             CASE "eintraege"
                 listeSetzen(p, GUI_TEXT(z.ed))
+            CASE "leiste"
+                leisteSetzen(p, GUI_TEXT(z.ed))
+            CASE "felder"
+                felderSetzen(p, GUI_TEXT(z.ed))
             CASE "komma"
                 IF TRIM$(GUI_TEXT(z.ed)) <> "" THEN JSON_SET_FLOAT(doc, p, VAL(REPLACE$(GUI_TEXT(z.ed), ",", ".")))
             CASE "zahl"
@@ -660,7 +770,7 @@ SUB inspektorPruefen()
         END IF
         IF NOT geaendertJetzt THEN CONTINUE
         zeileUebernehmen(zi)
-        IF z.art = "text" OR z.art = "komma" OR z.art = "eintraege" OR z.art = "zahl" OR z.art = "gewicht" THEN
+        IF z.art = "text" OR z.art = "komma" OR z.art = "eintraege" OR z.art = "leiste" OR z.art = "felder" OR z.art = "zahl" OR z.art = "gewicht" THEN
             IF inspAnhaengig >= 0 AND inspAnhaengig <> zi THEN merken()
             inspAnhaengig = zi
         ELSE

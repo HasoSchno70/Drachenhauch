@@ -602,6 +602,10 @@ FUNCTION ereignisseFuer(kind AS STRING) AS ARRAY OF STRING
             aus = ["Geaendert"]
         CASE "canvas"
             aus = ["Zeichnen", "Maus", "Ziehen", "Rad"]
+        CASE "toolbar"
+            aus = ["Knopf"]
+        CASE "statusbar"
+            aus = ["Feld"]
         CASE "timer", "menue"
             RETURN ["Aktion"]
         CASE "fenster"
@@ -621,6 +625,8 @@ END FUNCTION
 FUNCTION ereignisBeschreibung$(ereignis AS STRING) AS STRING
     SELECT CASE ereignis
         CASE "Klick" : RETURN tr$("wenn es angeklickt wird")
+        CASE "Knopf" : RETURN tr$("wenn ein Knopf der Leiste gedrückt wird (seine Nummer ab 0)")
+        CASE "Feld" : RETURN tr$("wenn ein klickbares Feld angeklickt wird (seine Nummer ab 0)")
         CASE "Ziehen" : RETURN tr$("solange die Maus nach einem Druck auf die Fläche gehalten wird (x, y auf der Fläche)")
         CASE "Rad" : RETURN tr$("wenn das Mausrad über der Fläche gedreht wird")
         CASE "Taste" : RETURN tr$("wenn eine Taste gedrückt wird und kein Eingabefeld sie nimmt (Tastencode)")
@@ -649,6 +655,7 @@ FUNCTION ereignisParameter$(ev AS STRING) AS STRING
         CASE "Ziehen" : RETURN "x AS INTEGER, y AS INTEGER"
         CASE "Rad" : RETURN "schritte AS FLOAT"
         CASE "Taste" : RETURN "taste AS INTEGER"
+        CASE "Knopf", "Feld" : RETURN "nr AS INTEGER"
     END SELECT
     RETURN ""
 END FUNCTION

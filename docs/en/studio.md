@@ -125,6 +125,8 @@ The events per kind:
 | list, tree, table | Geaendert, Doppelklick (for list and table also Enter) |
 | slider, number field, dropdown, pickers, tab control | Geaendert |
 | canvas | Zeichnen, Maus, Ziehen(x, y), Rad(schritte) |
+| toolbar | Knopf(nr) |
+| status bar | Feld(nr) |
 | every control in addition | MausRein, MausRaus |
 | timer, menu entry | Aktion |
 | window | Geoeffnet, Schliessen, Groesse, Taste(taste) |
@@ -134,7 +136,14 @@ An event with parentheses calls its method with values: `Ziehen` (drag)
 with the position on the canvas (while the button is held after a press on
 it), `Rad` (wheel) with the steps of the mouse wheel, `Taste` (key) with the
 key code (`KEY_A`, `KEY_SPACE` ...), as long as the window is in front and
-no input field takes the key. The suggestions know the whole text of the
+no input field takes the key, `Knopf` (button) with the number of the
+toolbar button pressed and `Feld` (field) with the number of the status bar
+field clicked (from 0, separators and gaps count too). The inspector holds
+the buttons in one line, `text|symbol|tip` per button, separated by
+semicolons, `-` is a separator, `~` a gap (`New|plus|New product; -;
+|rueckgaengig|Undo`); the fields as `text|width`, optionally followed by
+`links`/`mitte`/`rechts` and `klick` for a field that reports `Feld`
+(width 0 shares the rest). The suggestions know the whole text of the
 program including the generated base class -- so after `Self.` the
 controls, timers and menu entries of the window appear too.
 

@@ -683,3 +683,10 @@ Im Projektordner liegt schon eine Datei {0}.	The project folder already holds a 
 Tabelle {0} bleibt in der Datei, aber nicht im Aufbau: {1}	Table {0} stays in the file, but not in the structure: {1}
 Spalte {0}.{1} bleibt in der Datei, aber nicht im Aufbau: {2}	Column {0}.{1} stays in the file, but not in the structure: {2}
 {0} hat keine Spalte id INTEGER PRIMARY KEY -- das Studio zeigt sie, binden lässt sie sich nicht.	{0} has no column id INTEGER PRIMARY KEY -- the Studio shows it, but it cannot be bound.
+Knöpfe	Buttons
+Mit Text	With text
+Felder	Fields
+Text|Sinnbild|Tipp je Knopf, durch Semikolon getrennt; - = Trenner, ~ = Lücke	Text|symbol|tip per button, separated by semicolons; - = separator, ~ = gap
+Text|Breite[|links,mitte,rechts[|klick]] je Feld, durch Semikolon getrennt; Breite 0 = der Rest	Text|width[|links,mitte,rechts[|klick]] per field, separated by semicolons; width 0 = the rest
+wenn ein Knopf der Leiste gedrückt wird (seine Nummer ab 0)	when a button of the bar is pressed (its number from 0)
+wenn ein klickbares Feld angeklickt wird (seine Nummer ab 0)	when a clickable field is clicked (its number from 0)

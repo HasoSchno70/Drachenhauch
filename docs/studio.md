@@ -126,6 +126,8 @@ Die Ereignisse je Art:
 | Liste, Baum, Tabelle | Geaendert, Doppelklick (bei Liste und Tabelle auch Enter) |
 | Regler, Zahlenfeld, Klappliste, Wähler, Reiterwerk | Geaendert |
 | Zeichenfläche | Zeichnen, Maus, Ziehen(x, y), Rad(schritte) |
+| Werkzeugleiste | Knopf(nr) |
+| Statusleiste | Feld(nr) |
 | jedes Control zusätzlich | MausRein, MausRaus |
 | Timer, Menüeintrag | Aktion |
 | Fenster | Geoeffnet, Schliessen, Groesse, Taste(taste) |
@@ -135,7 +137,14 @@ Ein Ereignis mit Klammern ruft seine Methode mit Werten: `Ziehen` mit der
 Lage auf der Fläche (solange die Taste nach einem Druck auf die Fläche
 hängt), `Rad` mit den Schritten des Mausrads, `Taste` mit dem Tastencode
 (`KEY_A`, `KEY_SPACE` ...), solange das Fenster vorn ist und kein
-Eingabefeld die Taste nimmt. Die Vorschläge kennen den ganzen Text des
+Eingabefeld die Taste nimmt, `Knopf` mit der Nummer des gedrückten Knopfs
+der Werkzeugleiste und `Feld` mit der Nummer des angeklickten Felds der
+Statusleiste (ab 0, Trenner und Lücken zählen mit). Die Knöpfe stehen im
+Inspektor in einer Zeile, `Text|Sinnbild|Tipp` je Knopf, durch Semikolon
+getrennt, `-` ist ein Trenner, `~` eine Lücke (`Neu|plus|Neues Produkt; -;
+|rueckgaengig|Rückgängig`); die Felder als `Text|Breite`, dahinter
+wahlweise `links`/`mitte`/`rechts` und `klick` für ein Feld, das `Feld`
+meldet (Breite 0 teilt sich den Rest). Die Vorschläge kennen den ganzen Text des
 Programms samt der erzeugten Basisklasse -- hinter `Self.` stehen also auch
 die Controls, Timer und Menüeinträge des Fensters.
 

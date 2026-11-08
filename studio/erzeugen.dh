@@ -416,6 +416,12 @@ FUNCTION basisCode$(ei AS INTEGER) AS STRING
                     bed = "studioFokusAlt = " + ctl + " AND studioFokusJetzt <> " + ctl
                 CASE "doppelklick"
                     bed = "GUI_DOUBLE_CLICKED(" + ctl + ")"
+                CASE "knopf"
+                    ARRAY_PUSH(takt, "        IF NOT Self.studioOffen THEN RETURN")
+                    ARRAY_PUSH(takt, "        IF GUI_TOOLBAR_CLICKED(" + ctl + ") >= 0 THEN Self." + MAPGET(evMeth, schl) + "(GUI_TOOLBAR_CLICKED(" + ctl + "))")
+                CASE "feld"
+                    ARRAY_PUSH(takt, "        IF NOT Self.studioOffen THEN RETURN")
+                    ARRAY_PUSH(takt, "        IF GUI_STATUSBAR_CLICKED(" + ctl + ") >= 0 THEN Self." + MAPGET(evMeth, schl) + "(GUI_STATUSBAR_CLICKED(" + ctl + "))")
                 CASE "maus"
                     bed = "MOUSE_HIT(0) AND GUI_HIT_TEST(MOUSEX(), MOUSEY()) = " + ctl
                 CASE "rad"
