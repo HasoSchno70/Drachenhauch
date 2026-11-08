@@ -221,6 +221,23 @@ vec3 schattieren(vec3 p, vec3 rd, float m, vec3 n) {
     return alb * licht + vec3(0.7, 0.75, 0.9) * kante * 0.6;
 }
 
+// Sternschnuppen: alle drei Takte eine, auf der Eins, quer ueber den
+// oberen Himmel -- ein heller Kopf mit einem Schweif, der verglueht
+vec3 sternschnuppe(vec2 uv) {
+    float k = floor(takt / 3.0);
+    float f = (takt - k * 3.0) / 0.45;
+    if (f > 1.0 || hash(vec2(k, 2.0)) < 0.25) return vec3(0.0);
+    vec2 a = vec2(-0.75 + 0.9 * hash(vec2(k, 0.0)), 0.25 + 0.2 * hash(vec2(k, 1.0)));
+    vec2 v = normalize(vec2(1.0, -0.35 - 0.3 * hash(vec2(k, 3.0)))) * 0.75;
+    vec2 kopf = a + v * f;
+    vec2 schweif = a + v * max(f - 0.35, 0.0);
+    vec2 ks = kopf - schweif;
+    float h = clamp(dot(uv - schweif, ks) / max(dot(ks, ks), 1e-5), 0.0, 1.0);
+    float r = length(uv - schweif - ks * h);
+    float glut = sin(f * PI);
+    return vec3(0.85, 0.92, 1.0) * (exp(-r * 900.0) * h * h * 2.5 + exp(-length(uv - kopf) * 180.0) * 1.5) * glut;
+}
+
 void main() {
     vec2 uv = (fragTexCoord * resolution - 0.5 * resolution) / resolution.y;
     // Kamera: am Ufer entlang; zu den Kristallen senkt sie sich und schaut aufs Eis
@@ -280,6 +297,7 @@ void main() {
         c = mix(c, nebel, 1.0 - exp(-hit * 0.028));
     } else {
         c = himmel(rd);
+        c += sternschnuppe(uv);
     }
     // Diamantstaub: Glitzer in der Luft, im Mondlicht dichter
     vec2 g = floor(fragTexCoord * resolution / 3.0);

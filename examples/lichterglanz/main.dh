@@ -186,12 +186,14 @@ DIM ky1[MAX_STRICHE] AS INTEGER
 DIM kx2[MAX_STRICHE] AS INTEGER
 DIM ky2[MAX_STRICHE] AS INTEGER
 DIM kf[MAX_STRICHE] AS INTEGER
-' die Decke als Saeulen
-DIM dx1[SAEULEN] AS INTEGER
-DIM dy1[SAEULEN] AS INTEGER
-DIM dx2[SAEULEN] AS INTEGER
-DIM dy2[SAEULEN] AS INTEGER
-DIM df[SAEULEN] AS INTEGER
+' die Decke, gezeichnet in feinen Streifen von 2 Punkten, zwischen den
+' Saeulen weich verbunden (sonst sieht man die Treppe der Saeulen)
+CONST STREIFEN = 640
+DIM dx1[STREIFEN] AS INTEGER
+DIM dy1[STREIFEN] AS INTEGER
+DIM dx2[STREIFEN] AS INTEGER
+DIM dy2[STREIFEN] AS INTEGER
+DIM df[STREIFEN] AS INTEGER
 
 DIM si AS INTEGER
 RANDOMIZE(24)
@@ -312,19 +314,26 @@ SUB deckeZeichnen(zeit AS FLOAT)
     DIM j AS INTEGER
     DIM sicht AS FLOAT : sicht = schneeDraussen
     IF sicht <= 0.01 THEN RETURN
-    FOR j = 0 TO SAEULEN - 1
-        DIM h AS INTEGER : h = INT(liegt[j] * sicht)
-        dx1[j] = j * SAEULE_B : dx2[j] = j * SAEULE_B + SAEULE_B - 1
+    DIM schritt AS INTEGER : schritt = STREIFEN \ SAEULEN
+    FOR j = 0 TO STREIFEN - 1
+        ' Lage zwischen den Mitten zweier Saeulen, weich (Hermite) verbunden
+        DIM lage AS FLOAT : lage = (j + 0.5) / schritt - 0.5
+        DIM a AS INTEGER : a = CLAMP(INT(FLOOR(lage)), 0, SAEULEN - 1)
+        DIM b AS INTEGER : b = MIN(a + 1, SAEULEN - 1)
+        DIM t AS FLOAT : t = CLAMP(lage - a, 0.0, 1.0)
+        t = t * t * (3.0 - 2.0 * t)
+        DIM h AS INTEGER : h = INT((liegt[a] + (liegt[b] - liegt[a]) * t) * sicht)
+        dx1[j] = j * 2 : dx2[j] = j * 2 + 1
         dy1[j] = HOEHE - h : dy2[j] = HOEHE
         df[j] = RGBA(150, 165, 195, MAX(1, INT(190 * sicht)))
     NEXT
-    BOXES(dx1, dy1, dx2, dy2, df, SAEULEN)
+    BOXES(dx1, dy1, dx2, dy2, df, STREIFEN)
     ' die Kante: ein feiner heller Saum und hier und da ein Funkeln
-    FOR j = 0 TO SAEULEN - 1
+    FOR j = 0 TO STREIFEN - 1
         dy2[j] = dy1[j] + 2
         df[j] = RGBA(235, 242, 255, MAX(1, INT(200 * sicht)))
     NEXT
-    BOXES(dx1, dy1, dx2, dy2, df, SAEULEN)
+    BOXES(dx1, dy1, dx2, dy2, df, STREIFEN)
     DIM ton AS FLOAT : ton = musikTon()
     FOR j = 0 TO SAEULEN - 1
         DIM fun AS FLOAT : fun = SIN(zeit * 3.0 + j * 2.37) * SIN(zeit * 1.3 + j * 0.71)
