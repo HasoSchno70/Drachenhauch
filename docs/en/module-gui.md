@@ -536,7 +536,10 @@ are swallowed, menu shortcuts of other windows fall silent, the overlay lies
 over everything else. Unlike with `GUI_DIALOG`, **a button in the window
 ends nothing** — the program releases it when it is ready (`GUI_WINDOW_MODAL(win,
 FALSE)`), and hiding or destroying the window releases it by itself.
-`GUI_WINDOW_DEFAULT`/`GUI_WINDOW_CANCEL` supply Enter and ESC for it.
+`GUI_WINDOW_DEFAULT`/`GUI_WINDOW_CANCEL` supply Enter and ESC for it. The
+modal window takes the keyboard focus away from a widget behind it and gives
+it back when it goes -- otherwise a table behind it would get Enter as a
+double click.
 Example: [`examples/193_gui_dialoge.dh`](../../examples/193_gui_dialoge.dh).
 
 `\n` in the text (`CHR$(10)`) separates lines; the window adapts to the text

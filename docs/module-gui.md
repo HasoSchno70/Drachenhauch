@@ -536,7 +536,9 @@ werden verschluckt, Menü-Kürzel anderer Fenster schweigen, der Schleier liegt
 über allem anderen. Anders als bei `GUI_DIALOG` **beendet ein Knopf im Fenster
 nichts** — das Programm gibt frei, wenn es so weit ist (`GUI_WINDOW_MODAL(win,
 FALSE)`), und Ausblenden oder Zerstören des Fensters gibt von selbst frei.
-`GUI_WINDOW_DEFAULT`/`GUI_WINDOW_CANCEL` liefern Enter und ESC dazu.
+`GUI_WINDOW_DEFAULT`/`GUI_WINDOW_CANCEL` liefern Enter und ESC dazu. Den
+Tastaturfokus nimmt das modale Fenster einem Widget dahinter weg und gibt ihn
+beim Gehen zurück -- sonst bekäme eine Tabelle dahinter Enter als Doppelklick.
 Beispiel: [`examples/193_gui_dialoge.dh`](../examples/193_gui_dialoge.dh).
 
 `\n` im Text (`CHR$(10)`) trennt Zeilen; das Fenster passt sich Text und

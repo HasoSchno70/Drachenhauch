@@ -3581,6 +3581,12 @@ pub struct Gui {
     // frei -- vorher fiel die Modalitaet ganz weg, und das Fenster verlor mit
     // ihr Enter und ESC (Standard- und Abbrechen-Knopf).
     modal_vorher: Vec<usize>,
+    // Der Tastaturfokus, den ein modales Fenster beim Aufgehen vorfand: es
+    // nimmt ihn einem Widget in einem anderen Fenster weg und gibt ihn beim
+    // Gehen zurueck. Vorher blieb er auf der Tabelle dahinter, und Enter
+    // oeffnete dort per "Doppelklick" das naechste Fenster, statt den
+    // Standard-Knopf des modalen zu druecken (Kuehlschrank-App, Rezepte).
+    modal_fokus: Vec<(usize, Option<(usize, usize)>)>,
     // Gezogener Farbwaehler: (Fenster, Widget, Zone). Zone ist 0 = Farbfeld,
     // 1 = Ton-Streifen, 2 = Deckkraft-Streifen. Gemerkt wird sie, weil man
     // beim Suchen einer Farbe fast immer ueber den Rand hinauszieht -- ohne
@@ -3785,7 +3791,7 @@ impl Gui {
             schrift: None,
             windows: Vec::new(), z_order: Vec::new(),
             ta_zerlegung: std::cell::RefCell::new(HashMap::new()),
-            focus_window: None, focus_widget: None, modal: None, modal_vorher: Vec::new(), cp_drag: None,
+            focus_window: None, focus_widget: None, modal: None, modal_vorher: Vec::new(), modal_fokus: Vec::new(), cp_drag: None,
             drag_window: None, drag_dx: 0, drag_dy: 0,
             resize_window: None, resize_dx: 0, resize_dy: 0,
             skins: HashMap::new(),
@@ -4058,16 +4064,32 @@ impl Gui {
         }
         self.modal_vorher.retain(|&m| m != wi);
         self.modal = Some(wi);
+        if !self.modal_fokus.iter().any(|(m, _)| *m == wi) {
+            self.modal_fokus.push((wi, self.focus_widget));
+        }
+        if self.focus_widget.map_or(false, |(w, _)| w != wi) { self.focus_widget = None; }
     }
 
-    /// Das modale Fenster geht: das vorige, das noch steht, ist es wieder.
+    /// Das modale Fenster geht: das vorige, das noch steht, ist es wieder,
+    /// und der Fokus, den das gehende vorfand, kommt zurueck.
     fn modal_loesen(&mut self) {
-        self.modal = None;
+        let geht = self.modal.take();
         while let Some(m) = self.modal_vorher.pop() {
             if self.windows.get(m).map(|w| w.alive && w.visible).unwrap_or(false) {
                 self.modal = Some(m);
                 self.focus_window = Some(m);
                 break;
+            }
+        }
+        if let Some(g) = geht {
+            if let Some(k) = self.modal_fokus.iter().rposition(|(m, _)| *m == g) {
+                let (_, vorher) = self.modal_fokus.remove(k);
+                let lebt = vorher.map_or(false, |(w, i)| self.windows.get(w)
+                    .map_or(false, |win| win.alive && win.visible && win.widgets.get(i).map_or(false, |x| x.alive && x.visible)));
+                let erlaubt = vorher.map_or(false, |(w, _)| self.modal.map_or(true, |m| m == w));
+                if self.focus_widget.map_or(true, |(w, _)| w == g || !self.windows.get(w).map_or(false, |x| x.alive)) {
+                    self.focus_widget = if lebt && erlaubt { vorher } else { None };
+                }
             }
         }
     }

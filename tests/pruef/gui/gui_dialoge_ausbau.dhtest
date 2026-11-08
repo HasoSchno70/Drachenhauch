@@ -409,3 +409,56 @@ DHRT_FRAMES=34
 antwort 1 modal TRUE
 zu bild 18
 modal TRUE
+
+=== ein modales fenster nimmt den fokus und gibt ihn zurueck
+' Die Tabelle dahinter hat den Fokus (Enter = Doppelklick). Geht davor ein
+' modales Fenster mit Standard-Knopf auf, gehoert Enter ihm -- vorher blieb
+' der Fokus auf der Tabelle, und Enter oeffnete dort das naechste Fenster
+' (gefunden mit der Kuehlschrank-App). Danach hat die Tabelle ihn wieder.
+IMPORT "gui"
+SCREEN(520, 320, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Hinten", 4, 4, 300, 200)
+DIM kopf[1] AS STRING
+kopf[0] = "Name"
+DIM zeilen[2, 1] AS STRING
+zeilen[0, 0] = "Rührei" : zeilen[1, 0] = "Toast"
+DIM t AS GUI_WIDGET : t = GUI_TABLE(w, 8, 8, 260, 120, kopf, zeilen)
+GUI_TABLE_SET_SELECTED(t, 0)
+GUI_FOCUS(t)
+DIM m AS GUI_WINDOW
+DIM ok AS GUI_WIDGET
+AUTOMATION_PLAY("ev.txt")
+DIM f AS INTEGER
+FOR f = 1 TO 30
+    GUI_UPDATE()
+    IF f = 3 THEN
+        m = GUI_WINDOW("Modal", 250, 150, 220, 120)
+        ok = GUI_BUTTON(m, "Kochen", 8, 8, 90, 26)
+        GUI_WINDOW_DEFAULT(m, ok)
+        GUI_WINDOW_MODAL(m, TRUE)
+        PRINT "fokus hinten "; GUI_FOCUSED() = t
+    END IF
+    IF GUI_DOUBLE_CLICKED(t) THEN PRINT "tabelle doppelklick bild "; f
+    IF f > 3 THEN
+        IF GUI_CLICKED(ok) THEN
+            PRINT "kochen bild "; f
+            GUI_WINDOW_DESTROY(m)
+        END IF
+    END IF
+    IF f = 25 THEN PRINT "fokus danach "; GUI_FOCUSED() = t
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- datei ev.txt
+c 3
+e 0 7 300 300 0 0
+e 8 2 257 0 0 0
+e 9 1 257 0 0 0
+
+--- umgebung
+DHRT_FRAMES=34
+--- erwartet
+fokus hinten FALSE
+kochen bild 10
+fokus danach TRUE
