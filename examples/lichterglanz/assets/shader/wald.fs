@@ -36,6 +36,28 @@ const float PI = 3.14159265;
 const vec3 SEE = vec3(0.0, 0.0, 26.0);
 const float SEE_R = 17.0;
 const vec3 MOND = vec3(0.1696, 0.2694, 0.9479);
+// die Huette am anderen Ufer, ihr Licht spiegelt sich im Eis
+const vec3 HUETTE = vec3(7.5, 0.0, 47.0);
+const int EISLICHTER = 13;
+
+// Ein Eislicht (eine Kerze im Glas) am Ufer: auf der fernen Seite des Sees
+vec3 eislicht(int i) {
+    float a = -1.55 + float(i) * (3.1 / float(EISLICHTER - 1));
+    float r = SEE_R + 0.45;
+    return SEE + vec3(sin(a) * r, 0.22, cos(a) * r);
+}
+// die Lichter der Huette: zwei Fenster und die Tuer
+vec3 huettenLicht(int i) {
+    if (i == 0) return HUETTE + vec3(-1.1, 0.95, -1.75);
+    if (i == 1) return HUETTE + vec3(1.1, 0.95, -1.75);
+    return HUETTE + vec3(0.0, 0.6, -1.75);
+}
+
+// Zwei Schlittschuhlaeufer: der eine faehrt Achten, der andere weite Boegen
+vec3 laeuferOrt(int i, float t) {
+    if (i == 0) return SEE + vec3(5.5 * sin(0.33 * t), 0.0, -4.0 + 3.2 * sin(0.66 * t));
+    return SEE + vec3(-2.5 + 4.8 * cos(0.27 * t + 1.0), 0.0, 1.0 + 3.4 * sin(0.27 * t + 1.0));
+}
 
 float kapsel(vec3 p, vec3 a, vec3 b, float r) {
     vec3 pa = p - a, ba = b - a;
@@ -73,8 +95,67 @@ float reh(vec3 p) {
     return d;
 }
 
-// Material: 0 Schnee, 1 Eis, 2 Tanne, 3 Stamm, 4 Reh
+float sdBox(vec3 p, vec3 b) {
+    vec3 q = abs(p) - b;
+    return length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0);
+}
+
+// Die Huette: Blockhaus mit Satteldach und Schornstein
+float huette(vec3 p, out float m) {
+    vec3 q = p - HUETTE;
+    float d = sdBox(q - vec3(0.0, 0.7, 0.0), vec3(2.2, 1.2, 1.7));
+    m = 5.0;
+    float y = q.y - 1.9;
+    vec2 n = normalize(vec2(1.4, 2.05));
+    float dach = max(max(dot(n, vec2(abs(q.z), y)) - n.x * 2.05, -y - 0.12), abs(q.x) - 2.45) - 0.04;
+    if (dach < d) { d = dach; m = 6.0; }
+    float sch = sdBox(q - vec3(1.2, 2.9, 0.4), vec3(0.22, 0.75, 0.22));
+    if (sch < d) { d = sch; m = 6.0; }
+    return d;
+}
+
+// Ein Schlittschuhlaeufer in voller Fahrt: vorgebeugt, ein Bein stoesst ab,
+// die Arme schwingen; er neigt sich in die Kurve. teil: 0 Mantel, 1 Gesicht,
+// 2 Schal und Muetze
+float laeuferTeil;
+float laeufer(vec3 p, int i) {
+    float t = time;
+    vec3 o = laeuferOrt(i, t);
+    vec3 lp = p - o;
+    if (dot(lp, lp) > 6.0) return length(lp) - 1.9;
+    vec3 v = laeuferOrt(i, t + 0.05) - o;
+    vec3 v2 = laeuferOrt(i, t + 0.1) - 2.0 * laeuferOrt(i, t + 0.05) + o;
+    vec3 f = normalize(v);
+    vec3 sd = vec3(f.z, 0.0, -f.x);
+    // in die Kurve legen
+    float neig = clamp(dot(v2, sd) * 60.0, -0.35, 0.35);
+    vec3 q = vec3(dot(lp, sd), lp.y, dot(lp, f));
+    float c = cos(neig), s = sin(neig);
+    q.xy = vec2(c * q.x + s * q.y, -s * q.x + c * q.y);
+    float schritt = sin(t * 2.6 + float(i) * 1.7);
+    float d = kapsel(q, vec3(0.0, 0.95, -0.05), vec3(0.0, 1.38, 0.22), 0.17);
+    laeuferTeil = 0.0;
+    float kopf = length(q - vec3(0.0, 1.58, 0.33)) - 0.105;
+    if (kopf < d) { d = kopf; laeuferTeil = 1.0; }
+    float schal = min(length(q - vec3(0.0, 1.45, 0.27)) - 0.11, length(q - vec3(0.0, 1.66, 0.3)) - 0.1);
+    schal = min(schal, kapsel(q, vec3(0.05, 1.45, 0.2), vec3(0.1, 1.3, -0.25 - 0.1 * schritt), 0.035));
+    if (schal < d) { d = schal; laeuferTeil = 2.0; }
+    // Beine: das eine traegt, das andere stoesst schraeg nach hinten ab
+    float a = 0.12 + 0.3 * max(schritt, 0.0);
+    float b = 0.12 + 0.3 * max(-schritt, 0.0);
+    float beine = min(kapsel(q, vec3(0.09, 0.95, 0.0), vec3(0.09 + a, 0.05 + a * 0.4, -a * 1.2), 0.07),
+                      kapsel(q, vec3(-0.09, 0.95, 0.0), vec3(-0.09 - b, 0.05 + b * 0.4, -b * 1.2), 0.07));
+    if (beine < d) { d = beine; laeuferTeil = 0.0; }
+    float arme = min(kapsel(q, vec3(0.2, 1.33, 0.2), vec3(0.45, 1.0, 0.25 + 0.35 * schritt), 0.05),
+                     kapsel(q, vec3(-0.2, 1.33, 0.2), vec3(-0.45, 1.0, 0.25 - 0.35 * schritt), 0.05));
+    if (arme < d) { d = arme; laeuferTeil = 0.0; }
+    return d;
+}
+
+// Material: 0 Schnee, 1 Eis, 2 Tanne, 3 Stamm, 4 Reh, 5 Huette, 6 Dach und
+// Schornstein, 7 Laeufer, 8 Glas eines Eislichts
 float mat;
+float laeuferNr;
 float szene(vec3 p) {
     float rs = length(p.xz - SEE.xz);
     // Gelaende: Schnee, zum See hin abfallend, ausserhalb sanfte Huegel
@@ -87,7 +168,7 @@ float szene(vec3 p) {
     vec2 versatz = (vec2(hash(zelle), hash(zelle + 4.7)) - 0.5) * 1.2;
     vec2 mitte = (zelle + 0.5) * 3.2 + versatz;
     float rm = length(mitte - SEE.xz);
-    bool frei = rm > SEE_R + 1.2 && !(mitte.y < 15.0 && abs(mitte.x) < 7.0 && mitte.y > -20.0);
+    bool frei = rm > SEE_R + 1.2 && !(mitte.y < 15.0 && abs(mitte.x) < 7.0 && mitte.y > -20.0) && length(mitte - HUETTE.xz) > 4.5;
     if (frei) {
         float groesse = 0.8 + hash(zelle + 9.1) * 0.6;
         vec3 q = vec3(lz.x - versatz.x, p.y, lz.y - versatz.y) / groesse;
@@ -105,7 +186,59 @@ float szene(vec3 p) {
     }
     float r = reh(p);
     if (r < d) { d = r; mat = 4.0; }
+    float hm;
+    float h = huette(p, hm);
+    if (h < d) { d = h; mat = hm; }
+    for (int i = 0; i < 2; i++) {
+        float l = laeufer(p, i);
+        if (l < d) { d = l; mat = 7.0; laeuferNr = float(i); }
+    }
+    // die Glaeser der Eislichter (nur in ihrer Naehe gerechnet)
+    float ufer = abs(length(p.xz - SEE.xz) - (SEE_R + 0.45)) - 0.2;
+    if (ufer < 0.3 && p.y < 0.6) {
+        for (int i = 0; i < EISLICHTER; i++) {
+            vec3 q = p - eislicht(i) + vec3(0.0, 0.12, 0.0);
+            float glas = max(length(q.xz) - 0.08, abs(q.y) - 0.13);
+            if (glas < d) { d = glas; mat = 8.0; }
+        }
+    } else {
+        d = min(d, max(ufer, p.y - 0.6) + 0.05);
+    }
     return d;
+}
+
+// Die warmen Lichter (Huette, Eislichter): ihr Schein im Dunst, wo der
+// Strahl an ihnen vorbeigeht, und ihr Spiegelbild im Eis -- auf dem rauhen
+// Eis senkrecht zu einem Streifen gezogen
+float flackern(float i) { return 0.8 + 0.2 * sin(time * 9.0 + i * 3.1) * sin(time * 4.3 + i); }
+vec3 lichtSchein(vec3 ro, vec3 rd, float tmax) {
+    vec3 c = vec3(0.0);
+    for (int i = 0; i < EISLICHTER + 3; i++) {
+        vec3 l = i < EISLICHTER ? eislicht(i) : huettenLicht(i - EISLICHTER);
+        float tc = dot(l - ro, rd);
+        if (tc < 0.0 || tc > tmax + 0.4) continue;
+        vec3 q = ro + rd * tc - l;
+        float d2 = dot(q, q) / max(tc * 0.03, 1.0);
+        float k = i < EISLICHTER ? 1.0 : 1.6;
+        c += vec3(1.0, 0.62, 0.28) * (exp(-d2 * 90.0) * 2.2 + exp(-d2 * 4.0) * 0.08) * k * flackern(float(i));
+    }
+    return c;
+}
+vec3 lichtImEis(vec3 p, vec3 rr) {
+    vec3 c = vec3(0.0);
+    vec2 rh = normalize(rr.xz);
+    for (int i = 0; i < EISLICHTER + 3; i++) {
+        vec3 l = i < EISLICHTER ? eislicht(i) : huettenLicht(i - EISLICHTER);
+        vec3 v = normalize(l - p);
+        // seitlicher Winkel ohne atan: das Kreuzprodukt der waagrechten Richtungen
+        vec2 vh = normalize(v.xz);
+        float dx = rh.x * vh.y - rh.y * vh.x;
+        if (dot(rh, vh) < 0.0) continue;
+        float dy = rr.y - v.y;
+        float k = i < EISLICHTER ? 1.0 : 1.8;
+        c += vec3(1.0, 0.6, 0.25) * exp(-dx * dx * 9000.0 - dy * dy * 350.0) * 1.4 * k * flackern(float(i));
+    }
+    return c;
 }
 
 vec3 normale(vec3 p) {
@@ -127,6 +260,24 @@ vec3 himmel(vec3 d) {
     c += mix(vec3(0.1, 0.9, 0.5), vec3(0.4, 0.3, 1.0), smoothstep(0.2, 0.5, d.y)) * band * strahl * 0.12 * (1.0 + 0.6 * ton);
     float m = dot(d, MOND);
     float scheibe = smoothstep(0.99982, 0.9999, m);
+    // die Eule: auf ihren Ruf (Takt 3 und 10 des Waldes) fliegt sie mit
+    // schlagenden Fluegeln vor dem Mond vorbei, als Schattenriss
+    float flug = max(clamp((fort * 16.0 - 3.0) / 2.2, 0.0, 1.0) * step(fort * 16.0, 5.2), clamp((fort * 16.0 - 10.0) / 2.2, 0.0, 1.0) * step(fort * 16.0, 12.2));
+    if (flug > 0.0 && flug < 1.0) {
+        vec3 ex = normalize(cross(MOND, vec3(0.0, 1.0, 0.0)));
+        vec3 ey = cross(ex, MOND);
+        vec2 mq = vec2(dot(d, ex), dot(d, ey)) / 0.0145;
+        vec2 o = vec2(mix(-3.5, 3.5, flug), 0.25 + 0.4 * sin(flug * 3.14159) - 0.15);
+        vec2 e = mq - o;
+        float schlag = sin(time * 9.0);
+        float koerper = length(e / vec2(0.32, 0.2)) - 1.0;
+        vec2 fl = vec2(abs(e.x), e.y - schlag * 0.25 * abs(e.x));
+        float fluegel = length((fl - vec2(0.55, 0.05)) / vec2(0.6, 0.09)) - 1.0;
+        float eule = min(koerper, fluegel);
+        float sil = smoothstep(0.15, -0.05, eule);
+        scheibe *= 1.0 - sil;
+        c = mix(c, vec3(0.01, 0.015, 0.03), sil * 0.8);
+    }
     // Mare auf der Scheibe: dunklere Flecken aus Rauschen
     vec2 mq = vec2(d.x - MOND.x, d.y - MOND.y) * 300.0;
     c += vec3(0.98, 0.97, 0.9) * scheibe * (2.4 - 0.7 * rausch(mq * 0.8 + 3.0));
@@ -215,10 +366,43 @@ vec3 schattieren(vec3 p, vec3 rd, float m, vec3 n) {
         alb = mix(vec3(0.02, 0.07, 0.04), vec3(0.8, 0.86, 0.95), schnee);
     } else if (m < 3.5) {
         alb = vec3(0.08, 0.05, 0.03);
-    } else {
+    } else if (m < 4.5) {
         alb = vec3(0.18, 0.1, 0.06);
+    } else if (m < 5.5) {
+        // Blockhaus: liegende Stämme
+        alb = vec3(0.2, 0.1, 0.05) * (0.7 + 0.3 * smoothstep(0.0, 0.25, abs(fract(p.y * 3.2) - 0.5)));
+        if (n.y > 0.6) alb = vec3(0.85, 0.9, 1.0);
+    } else if (m < 6.5) {
+        alb = n.y > 0.3 ? vec3(0.85, 0.9, 1.0) : vec3(0.15, 0.07, 0.04);
+    } else if (m < 7.5) {
+        float w = laeuferNr;
+        alb = laeuferTeil < 0.5 ? (w < 0.5 ? vec3(0.08, 0.1, 0.25) : vec3(0.3, 0.05, 0.06))
+            : laeuferTeil < 1.5 ? vec3(0.85, 0.6, 0.48)
+            : (w < 0.5 ? vec3(0.85, 0.12, 0.1) : vec3(0.9, 0.85, 0.75));
+    } else {
+        alb = vec3(0.3, 0.25, 0.2);
     }
-    return alb * licht + vec3(0.7, 0.75, 0.9) * kante * 0.6;
+    // das warme Licht der Huette und der Eislichter auf allem in ihrer Naehe
+    vec3 warm = vec3(0.0);
+    for (int i = 0; i < EISLICHTER + 3; i++) {
+        vec3 l = (i < EISLICHTER ? eislicht(i) : huettenLicht(i - EISLICHTER)) - p;
+        float dd = dot(l, l);
+        if (dd > 40.0) continue;
+        warm += vec3(1.0, 0.6, 0.28) * (0.35 + 0.65 * max(dot(n, l * inversesqrt(dd)), 0.0)) / (1.0 + dd * 1.6) * (i < EISLICHTER ? 0.9 : 2.5);
+    }
+    vec3 c = alb * (licht + warm) + vec3(0.7, 0.75, 0.9) * kante * 0.6;
+    if (m > 4.5 && m < 5.5) {
+        // die Fenster und die Tuer leuchten
+        vec3 q = p - HUETTE;
+        if (q.z < -1.6) {
+            vec2 f1 = vec2(abs(abs(q.x) - 1.1), q.y - 0.95);
+            float fenster = step(f1.x, 0.38) * step(abs(f1.y), 0.3) * (1.0 - step(abs(f1.x), 0.025) * 1.0) * (1.0 - step(abs(f1.y), 0.025));
+            float tuer = step(abs(q.x), 0.35) * step(q.y, 1.25) * step(-0.5, q.y);
+            c = mix(c, vec3(1.0, 0.62, 0.28) * 2.2 * flackern(14.0), max(fenster, tuer * 0.6));
+        }
+    }
+    if (m > 7.5) c += vec3(1.0, 0.65, 0.3) * 1.2;
+    return c;
 }
 
 // Sternschnuppen: alle drei Takte eine, auf der Eins, quer ueber den
@@ -286,6 +470,13 @@ void main() {
             // die Mondbahn: viele kleine Glanzpunkte auf dem Eis
             float bahn = pow(max(dot(normalize(vec3(rr.x, abs(rr.y), rr.z)), MOND), 0.0), 300.0);
             c += vec3(0.9, 0.92, 1.0) * bahn * step(0.6, hash(floor(w * 90.0))) * smoothstep(0.4, 0.0, length(fract(w * 90.0) - 0.5)) * 4.0;
+            // die warmen Lichter am Ufer spiegeln sich
+            c += lichtImEis(p, rr) * (1.0 - saum * 0.5);
+            // die Laeufer: ein dunkler Schatten unter ihnen
+            for (int i = 0; i < 2; i++) {
+                vec3 lo = laeuferOrt(i, time);
+                c *= 1.0 - 0.5 * exp(-dot(p.xz - lo.xz, p.xz - lo.xz) * 3.0);
+            }
             // Eisblumen, die leuchten, wenn ein Ton erklingt
             float eb = eisblumen(w);
             c += vec3(0.55, 0.85, 1.0) * eb * (0.7 + 1.2 * ton);
@@ -298,6 +489,21 @@ void main() {
     } else {
         c = himmel(rd);
         c += sternschnuppe(uv);
+    }
+    c += lichtSchein(ro, rd, hit > 0.0 ? hit : 80.0);
+    // Rauch aus dem Schornstein der Huette, ein Schleier ueber dem Dach
+    {
+        vec3 sp = HUETTE + vec3(1.2, 3.7, 0.4);
+        float tc = max(dot(sp + vec3(0.5, 2.0, 0.0) - ro, rd), 0.0);
+        if (hit < 0.0 || tc < hit) {
+            vec3 q = ro + rd * tc - sp;
+            float hy = clamp(q.y, 0.0, 6.0);
+            vec2 achse = vec2(q.x - hy * 0.35, q.z);
+            float rr2 = 0.3 + hy * 0.25;
+            float dichte = exp(-dot(achse, achse) / (rr2 * rr2)) * smoothstep(-0.2, 0.4, q.y) * smoothstep(6.0, 1.0, q.y);
+            dichte *= 0.5 + 0.8 * rausch(vec2(q.y * 1.4 - time * 0.8, q.x * 2.0));
+            c = mix(c, vec3(0.3, 0.32, 0.4), clamp(dichte * 0.5, 0.0, 0.6));
+        }
     }
     // Diamantstaub: Glitzer in der Luft, im Mondlicht dichter
     vec2 g = floor(fragTexCoord * resolution / 3.0);
