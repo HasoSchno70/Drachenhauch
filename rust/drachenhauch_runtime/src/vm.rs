@@ -9305,6 +9305,10 @@ impl<'p> Vm<'p> {
             "gui_listbox_scroll_to" => { self.gui.list_scroll_to(gi(a,0,"GUI_LISTBOX_SCROLL_TO")?, gi(a,1,"GUI_LISTBOX_SCROLL_TO")?)?; Value::Nil }
             "gui_dropdown_set" => { self.gui.dropdown_set(gi(a,0,"GUI_DROPDOWN_SET")?, &gs(a,1,"GUI_DROPDOWN_SET")?, gnum(a,2,"GUI_DROPDOWN_SET")?)?; Value::Nil }
             "gui_dropdown_placeholder" => { self.gui.dropdown_placeholder(gi(a,0,"GUI_DROPDOWN_PLACEHOLDER")?, gs(a,1,"GUI_DROPDOWN_PLACEHOLDER")?.to_string())?; Value::Nil }
+            "gui_tabcontrol_item_rect" => {
+                let (x, y, w, h) = self.gui.tabcontrol_item_rect(gi(a,0,"GUI_TABCONTROL_ITEM_RECT")?, gi(a,1,"GUI_TABCONTROL_ITEM_RECT")?)?;
+                Value::Tuple(std::rc::Rc::new(vec![Value::Int(x as i64), Value::Int(y as i64), Value::Int(w as i64), Value::Int(h as i64)]))
+            }
             "gui_tree_item_rect" => {
                 let (x, y, w, h) = self.gui.tree_item_rect(gi(a,0,"GUI_TREE_ITEM_RECT")?, gi(a,1,"GUI_TREE_ITEM_RECT")?)?;
                 Value::Tuple(std::rc::Rc::new(vec![Value::Int(x as i64), Value::Int(y as i64), Value::Int(w as i64), Value::Int(h as i64)]))

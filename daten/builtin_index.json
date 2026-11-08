@@ -5325,6 +5325,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_TABCONTROL_ITEM_RECT",
+   "kind": "core",
+   "signature": "GUI_TABCONTROL_ITEM_RECT(tc, seite) AS TUPLE",
+   "module": "gui"
+  },
+  {
    "name": "GUI_LISTBOX_ITEM_RECT",
    "kind": "core",
    "signature": "GUI_LISTBOX_ITEM_RECT(lb, i) AS TUPLE",

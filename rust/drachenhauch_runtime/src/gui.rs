@@ -1801,6 +1801,9 @@ struct TabCtlState {
     /// (`zu`, ein Bild lang), welcher Reiter zu soll.
     schliessbar: bool,
     zu: Option<usize>,
+    /// Gemessene Breite jeder Beschriftung (Schirmpunkte, `leisten_pass`);
+    /// leer oder 0 = noch nicht gemessen, dann gilt die Schaetzung.
+    breiten: Vec<i32>,
 }
 
 /// Akkordeon (Kind::Accordion): Abschnitte untereinander, jeder mit einem
@@ -8142,17 +8145,23 @@ zellmodus, zeilen_anhaengen, spalten", key)),
 
     /// Die Koepfe eines Reiterwerks: (Seite, x links, x rechts), absolut.
     ///
-    /// EINE Quelle fuer Zeichnen und Treffertest. Die Breite wird an der
-    /// ZEICHENZAHL geschaetzt, nicht gemessen -- der Treffertest laeuft in
-    /// `handle_press`, und dort gibt es keine Grafik. Eine zweite, genauere
-    /// Rechnung beim Zeichnen waere der sicherste Weg, Klick und Beschriftung
-    /// auseinander laufen zu lassen.
+    /// EINE Quelle fuer Zeichnen, Treffertest und GUI_TABCONTROL_ITEM_RECT.
+    /// Die Breite der Beschriftung misst `leisten_pass` je Bild (wie bei der
+    /// Werkzeugleiste) -- der Treffertest in `handle_press` hat keine Grafik.
+    /// Vor der ersten Messung gilt eine Schaetzung an der Zeichenzahl; die war
+    /// frueher die einzige und zu knapp: bei "Lagerorte" lief der Text in den
+    /// naechsten Kopf (gefunden mit der Kuehlschrank-App).
     fn tc_koepfe(&self, ax: i32, wdg: &Widget) -> Vec<(usize, i32, i32)> {
         let mut x = ax;
         let mut out = Vec::new();
         let kreuz = if Self::tc_schliessbar(wdg) { self.sk(16) } else { 0 };
+        let breiten = wdg.tabctl.as_ref().map(|s| s.breiten.as_slice()).unwrap_or(&[]);
         for (i, t) in wdg.items.iter().enumerate() {
-            let b = self.sk(8) * t.chars().count() as i32 + self.sk(20) + kreuz;
+            let tw = match breiten.get(i) {
+                Some(&b) if b > 0 => b,
+                _ => self.sk(8) * t.chars().count() as i32,
+            };
+            let b = tw + self.sk(20) + kreuz;
             out.push((i, x, x + b));
             x += b + 2;
         }
@@ -8163,9 +8172,13 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     fn leisten_pass(&mut self, g: &Graphics) {
         let mut messung: Vec<(usize, usize, usize, i32)> = Vec::new();
         let mut pfade: Vec<(usize, usize, Vec<i32>)> = Vec::new();
+        let mut koepfe: Vec<(usize, usize, Vec<i32>)> = Vec::new();
         for (wi, win) in self.windows.iter().enumerate() {
             if !win.alive { continue; }
             for (i, w) in win.widgets.iter().enumerate() {
+                if w.kind == Kind::TabControl && !w.items.is_empty() {
+                    koepfe.push((wi, i, w.items.iter().map(|t| self.wtext_width(g, w, t)).collect()));
+                }
                 if let Some(p) = w.pfad.as_ref() {
                     pfade.push((wi, i, p.texte.iter().map(|t| self.wtext_width(g, w, t)).collect()));
                 }
@@ -8180,6 +8193,9 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         }
         for (wi, i, b) in pfade {
             if let Some(p) = self.windows[wi].widgets[i].pfad.as_mut() { p.breiten = b; }
+        }
+        for (wi, i, b) in koepfe {
+            self.windows[wi].widgets[i].tabctl.get_or_insert_with(Default::default).breiten = b;
         }
         for (wi, i, k, b) in messung {
             if let Some(e) = self.windows[wi].widgets[i].leiste.as_mut().and_then(|l| l.eintraege.get_mut(k)) {
@@ -8295,6 +8311,25 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         }
         let row = (my - (ay + 1) + t.scroll) / zeile_h;
         t.hover = if row >= 0 && (row as usize) < vis.len() { vis[row as usize] as i32 } else { -1 };
+    }
+
+    /// GUI_TABCONTROL_ITEM_RECT: wo der Kopf einer Seite auf dem Bildschirm
+    /// steht (x, y, b, h), in Bildschirmpunkten wie GUI_HIT_TEST -- aus
+    /// `tc_koepfe`, derselben Rechnung wie Zeichnen und Klick. Gebraucht fuer
+    /// Pruefungen mit echten Klicks (das Studio protokolliert damit seine
+    /// Reiter).
+    pub fn tabcontrol_item_rect(&self, h: i64, seite: i64) -> Result<(i32, i32, i32, i32), String> {
+        let w = self.wdg(h, "GUI_TABCONTROL_ITEM_RECT")?;
+        if w.kind != Kind::TabControl {
+            return Err("GUI_TABCONTROL_ITEM_RECT: Widget ist kein Reiterwerk".into());
+        }
+        if seite < 0 || seite as usize >= w.items.len() {
+            return Err(format!("GUI_TABCONTROL_ITEM_RECT: Seite {} ausserhalb [0..{}]", seite, w.items.len() as i64 - 1));
+        }
+        let (wi, _) = Self::dec_widget(h);
+        let (ax, ay, _, _) = self.abs_rect(wi, w);
+        let (_, x0, x1) = self.tc_koepfe(ax, w)[seite as usize];
+        Ok((x0, ay + 2, x1 - x0, self.sk(TC_KOPF_H) - 2))
     }
 
     /// GUI_TREE_ITEM_RECT: wo ein Knoten auf dem Bildschirm steht (x, y, b, h),

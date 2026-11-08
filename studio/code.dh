@@ -261,9 +261,11 @@ SUB reiterPruefen()
         navigatorAuswahl()
         IF k >= 0 THEN protokoll("vorn " + reiter[k].art + " " + reiterTitel$(reiter[k]))
         inspektorFuellen()
-        reiterProtokollieren()
         IF k >= 0 THEN feldBefunde(reiter[k])
     END IF
+    ' Je Bild, aber nur, wenn sich etwas bewegt hat: die Laufzeit misst die
+    ' Beschriftung eines neuen Kopfs erst einige Bilder spaeter.
+    reiterProtokollieren()
     IF k >= 0 AND k < LEN(reiter) THEN
         IF reiter[k].art = "datenbank" THEN
             dbAnsichtPruefen(reiter[k])
@@ -687,18 +689,29 @@ SUB knotenProtokollieren()
     NEXT
 END SUB
 
-' Fuer Pruefungen: Kopf und Kreuz jedes Reiters. Dieselbe Rechnung wie in
-' der Laufzeit (tc_koepfe, tc_kreuz): 8 je Zeichen + 20, mit Kreuz + 16.
+DIM reiterLagenWar AS STRING : reiterLagenWar = ""
+
+' Fuer Pruefungen: Kopf und Kreuz jedes Reiters, aus der Rechnung der
+' Laufzeit (GUI_TABCONTROL_ITEM_RECT; das Kreuz sitzt 12 vor dem Ende).
 SUB reiterProtokollieren()
     IF logDatei = "" THEN RETURN
-    DIM x AS INTEGER : x = GUI_GET_X(tcMitte)
-    DIM y AS INTEGER : y = GUI_GET_Y(tcMitte) + inhaltOben + 14
+    DIM zeilen AS ARRAY OF STRING : zeilen = []
     DIM k AS INTEGER
     FOR k = 0 TO GUI_TABCONTROL_COUNT(tcMitte) - 1
-        DIM b AS INTEGER : b = 8 * LEN(GUI_TABCONTROL_TITLE$(tcMitte, k)) + 36
-        protokoll("lage reiter " + STR$(k) + " " + STR$(x + b \ 2 - 8) + " " + STR$(y))
-        protokoll("lage kreuz " + STR$(k) + " " + STR$(x + b - 12) + " " + STR$(y + 1))
-        x = x + b + 2
+        DIM x AS INTEGER
+        DIM y AS INTEGER
+        DIM b AS INTEGER
+        DIM h AS INTEGER
+        (x, y, b, h) = GUI_TABCONTROL_ITEM_RECT(tcMitte, k)
+        ARRAY_PUSH(zeilen, "lage reiter " + STR$(k) + " " + STR$(x + b \ 2 - 8) + " " + STR$(y + h \ 2))
+        ARRAY_PUSH(zeilen, "lage kreuz " + STR$(k) + " " + STR$(x + b - 12) + " " + STR$(y + h \ 2 + 1))
+    NEXT
+    DIM alle AS STRING : alle = JOIN$(zeilen, CHR$(10))
+    IF alle = reiterLagenWar THEN RETURN
+    reiterLagenWar = alle
+    DIM z AS STRING
+    FOR EACH z IN zeilen
+        protokoll(z)
     NEXT
 END SUB
 

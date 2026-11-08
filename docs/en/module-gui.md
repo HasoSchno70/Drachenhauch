@@ -197,6 +197,7 @@ IMPORT "gui"
 | `GUI_TREE_CLEAR(tree)` | — | delete all nodes |
 | `GUI_TREE_SELECTED(tree)` / `GUI_TREE_SET_SELECTED(tree, node)` | INT / — | read/set the selected node (-1 = none) |
 | `GUI_TREE_LABEL(tree, node)` | STRING | text of a node |
+| `GUI_TABCONTROL_ITEM_RECT(tc, seite)` | TUPLE | (x, y, w, h) of a page's tab head on screen, from the same calculation as drawing and clicking -- for tests with real clicks |
 | `GUI_TREE_ITEM_RECT(tree, node)` | TUPLE | (x, y, w, h) of a node on screen, x at the start of its label; under a collapsed one (0, 0, 0, 0) -- for tests with real clicks |
 | `GUI_TREE_EXPAND(tree, node, flag)` | — | expand/collapse a node |
 | `GUI_TREE_SET(tree, key$, wert)` | — | setting on the tree: `mehrfachauswahl` (multi-select), `kaestchen` (checkboxes), `bearbeitbar` (editable: F2 renames) |

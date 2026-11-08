@@ -197,6 +197,7 @@ IMPORT "gui"
 | `GUI_TREE_CLEAR(tree)` | — | alle Knoten löschen |
 | `GUI_TREE_SELECTED(tree)` / `GUI_TREE_SET_SELECTED(tree, node)` | INT / — | gewählten Knoten lesen/setzen (-1 = keiner) |
 | `GUI_TREE_LABEL(tree, node)` | STRING | Text eines Knotens |
+| `GUI_TABCONTROL_ITEM_RECT(tc, seite)` | TUPLE | (x, y, b, h) des Kopfs einer Seite auf dem Bildschirm, aus derselben Rechnung wie Zeichnen und Klick -- für Prüfungen mit echten Klicks |
 | `GUI_TREE_ITEM_RECT(tree, node)` | TUPLE | (x, y, b, h) eines Knotens auf dem Bildschirm, x am Anfang der Beschriftung; unter einem zugeklappten (0, 0, 0, 0) -- für Prüfungen mit echten Klicks |
 | `GUI_TREE_EXPAND(tree, node, flag)` | — | Knoten auf-/zuklappen |
 | `GUI_TREE_SET(tree, key$, wert)` | — | Einstellung am Baum: `mehrfachauswahl`, `kaestchen`, `bearbeitbar` (F2 benennt um) |

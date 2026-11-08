@@ -375,3 +375,58 @@ GUI_TABCONTROL_SET(tc, "farbe", 1)
 DHRT_FRAMES=1
 --- fehler
 bekannt: schliessbar
+
+=== ein breiter titel bekommt einen kopf, der ihn fasst
+' Die Koepfe richten sich nach der gemessenen Beschriftung, nicht nach der
+' Zeichenzahl (8 je Zeichen): acht W sind breiter als 64 Punkte. Ein Klick
+' ans Ende ihres Textes bleibt auf der ersten Seite -- frueher lag dort
+' schon der zweite Kopf (gefunden mit der Kuehlschrank-App, "Lagerorte").
+' GUI_TABCONTROL_ITEM_RECT liefert die Lage aus derselben Rechnung.
+IMPORT "gui"
+SCREEN(500, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 460, 260)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
+DIM tc AS GUI_WIDGET : tc = GUI_TABCONTROL(w, 20, 20, 400, 200)
+GUI_TABCONTROL_ADD(tc, "WWWWWWWW")
+GUI_TABCONTROL_ADD(tc, "i")
+DIM f AS INTEGER
+FOR f = 1 TO 20
+    GUI_UPDATE()
+    IF f = 2 THEN
+        DIM x0 AS INTEGER
+        DIM y0 AS INTEGER
+        DIM b0 AS INTEGER
+        DIM h0 AS INTEGER
+        (x0, y0, b0, h0) = GUI_TABCONTROL_ITEM_RECT(tc, 0)
+        DIM x1 AS INTEGER
+        DIM y1 AS INTEGER
+        DIM b1 AS INTEGER
+        DIM h1 AS INTEGER
+        (x1, y1, b1, h1) = GUI_TABCONTROL_ITEM_RECT(tc, 1)
+        PRINT "breiter als geschaetzt "; b0 > 8 * 8 + 20; " anschluss "; x1 = x0 + b0 + 2; " hoehe "; h0
+    END IF
+    IF f = 12 THEN PRINT "seite "; GUI_TABCONTROL_PAGE(tc)
+    GUI_DRAW()
+    FLIP()
+NEXT
+TRY
+    GUI_TABCONTROL_ITEM_RECT(tc, 2)
+CATCH fehler
+    PRINT fehler
+END TRY
+--- datei ev.txt
+# Klick bei x = 31 + 8 * 8 + 20 + 6 = 121 -- hinter der alten Schaetzung, im Text
+c 4
+e 3 7 121 58 0 0
+e 4 7 121 58 0 0
+e 4 6 0 0 0 0
+e 5 5 0 0 0 0
+--- umgebung
+DHRT_FRAMES=22
+--- erwartet
+breiter als geschaetzt TRUE anschluss TRUE hoehe 24
+seite 0
+GUI_TABCONTROL_ITEM_RECT: Seite 2 ausserhalb [0..1]
