@@ -148,6 +148,8 @@ SUB inspektorAnlegen()
     inspZeile("Verhalten", "visible", "Sichtbar", "schalter", "*", "")
     inspZeile("Verhalten", "tooltip", "Hinweis", "text", "*", "")
     inspZeile("Verhalten", "tab_index", "Tab-Folge", "zahl", "*", "")
+    inspZeile("Verhalten", "draggable", "Ziehbar", "schalter", "listbox,tree,table,label,button,card,image", "")
+    inspZeile("Verhalten", "drop_target", "Ablage", "schalter", "*", "")
 
     DIM g AS INTEGER
     FOR g = 0 TO LEN(inspGruppen) - 1

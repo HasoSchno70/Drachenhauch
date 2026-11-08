@@ -424,6 +424,9 @@ FUNCTION basisCode$(ei AS INTEGER) AS STRING
                     bed = "studioFokusAlt = " + ctl + " AND studioFokusJetzt <> " + ctl
                 CASE "doppelklick"
                     bed = "GUI_DOUBLE_CLICKED(" + ctl + ")"
+                CASE "abgelegt"
+                    ARRAY_PUSH(takt, "        IF NOT Self.studioOffen THEN RETURN")
+                    ARRAY_PUSH(takt, "        IF GUI_DROPPED(" + ctl + ") THEN Self." + MAPGET(evMeth, schl) + "(GUI_DRAG_INDEX(), GUI_DROP_INDEX())")
                 CASE "zelle"
                     ARRAY_PUSH(takt, "        IF NOT Self.studioOffen THEN RETURN")
                     ARRAY_PUSH(takt, "        IF GUI_TABLE_CLICKED(" + ctl + ") >= 0 THEN Self." + MAPGET(evMeth, schl) + "(GUI_TABLE_CLICKED(" + ctl + "), GUI_TABLE_CLICKED_COL(" + ctl + "))")

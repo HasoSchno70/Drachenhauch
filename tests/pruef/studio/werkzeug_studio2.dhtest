@@ -228,7 +228,7 @@ slWarten(6)
 slAufnahmeSchreiben(CWD$() + "/ev.txt")
 DIM log AS STRING : log = CWD$() + "/s.log"
 DIM aus AS STRING : aus = slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
-PRINT "dialog "; slHat(log, "ereignisdialog knopf1 Klick,MausRein,MausRaus")
+PRINT "dialog "; slHat(log, "ereignisdialog knopf1 Klick,MausRein,MausRaus,Abgelegt")
 PRINT "neu "; slHat(log, "ereignis neu Hauptfenster.knopf1_Klick")
 PRINT "vorn "; slHat(log, "vorn code Hauptfenster.knopf1_Klick")
 DIM z AS STRING

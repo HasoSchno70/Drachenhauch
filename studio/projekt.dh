@@ -621,6 +621,7 @@ FUNCTION ereignisseFuer(kind AS STRING) AS ARRAY OF STRING
     END SELECT
     ARRAY_PUSH(aus, "MausRein")
     ARRAY_PUSH(aus, "MausRaus")
+    ARRAY_PUSH(aus, "Abgelegt")
     RETURN aus
 END FUNCTION
 
@@ -646,6 +647,7 @@ FUNCTION ereignisBeschreibung$(ereignis AS STRING) AS STRING
         CASE "Schliessen" : RETURN tr$("wenn es geschlossen werden soll")
         CASE "Groesse" : RETURN tr$("wenn sich seine Größe ändert")
         CASE "Takt" : RETURN tr$("in jedem Bild, nach den Ereignissen seiner Controls -- für alles, was es abfragen will")
+        CASE "Abgelegt" : RETURN tr$("wenn etwas darauf abgelegt wird (Zeile in der Quelle, Zeile hier; woher und was sagen GUI_DROP_SOURCE und GUI_DROP_TEXT)")
         CASE "Zelle" : RETURN tr$("wenn eine Zelle angeklickt wird (Datenzeile und Spalte, auch auf einen Knopf in der Zelle)")
         CASE "Beenden" : RETURN tr$("bevor das Programm endet")
     END SELECT
@@ -661,6 +663,7 @@ FUNCTION ereignisParameter$(ev AS STRING) AS STRING
         CASE "Taste" : RETURN "taste AS INTEGER"
         CASE "Knopf", "Feld" : RETURN "nr AS INTEGER"
         CASE "Zelle" : RETURN "zeile AS INTEGER, spalte AS INTEGER"
+        CASE "Abgelegt" : RETURN "zeile AS INTEGER, ziel AS INTEGER"
     END SELECT
     RETURN ""
 END FUNCTION

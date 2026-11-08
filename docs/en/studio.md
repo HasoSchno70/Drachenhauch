@@ -128,7 +128,7 @@ The events per kind:
 | canvas | Zeichnen, Maus, Ziehen(x, y), Rad(schritte) |
 | toolbar | Knopf(nr) |
 | status bar | Feld(nr) |
-| every control in addition | MausRein, MausRaus |
+| every control in addition | MausRein, MausRaus, Abgelegt(zeile, ziel) |
 | timer, menu entry | Aktion |
 | window | Geoeffnet, Schliessen, Groesse, Taste(taste), Takt |
 | own control | Geoeffnet, Groesse, Takt |
@@ -143,7 +143,12 @@ toolbar button pressed and `Feld` (field) with the number of the status bar
 field clicked (from 0, separators and gaps count too), `Zelle` (cell) with
 the data row and column of every click into a table -- also on a button in
 the cell (`GUI_TABLE_CELL_KIND "knopf"`) and also in the row already
-selected, where `Geaendert` no longer comes. `Takt` (tick) runs in every
+selected, where `Geaendert` no longer comes; `Abgelegt` (dropped) with the
+dragged row of the source and the row it landed on, when something was
+dragged onto a control that is "Ablage" (drop target) in the inspector (the
+source is "Ziehbar" (draggable): for list, tree and table the row, otherwise
+the control; `GUI_DROP_SOURCE()` says where it came from, `GUI_DROP_TEXT()`
+what). `Takt` (tick) runs in every
 frame after the events of the controls (those of an own control before
 those of the window) -- that is where code polls what has no event, such as
 a context menu from `GUI_CONTEXT`. The inspector holds

@@ -186,6 +186,6 @@ IMPORT "{sammlung}/../../../studio/bibliothek.dh"
 IMPORT "{sammlung}/../../../studio/modell.dh"
 IMPORT "{sammlung}/../../../studio/projekt.dh"
 --- erwartet
-Knopf MausRein MausRaus | Feld MausRein MausRaus
+Knopf MausRein MausRaus Abgelegt | Feld MausRein MausRaus Abgelegt
 leiste_Knopf(nr AS INTEGER)
 status_Feld(nr AS INTEGER)

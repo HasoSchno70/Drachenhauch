@@ -692,3 +692,6 @@ wenn ein Knopf der Leiste gedrückt wird (seine Nummer ab 0)	when a button of th
 wenn ein klickbares Feld angeklickt wird (seine Nummer ab 0)	when a clickable field is clicked (its number from 0)
 in jedem Bild, nach den Ereignissen seiner Controls -- für alles, was es abfragen will	in every frame, after the events of its controls -- for whatever it wants to poll
 wenn eine Zelle angeklickt wird (Datenzeile und Spalte, auch auf einen Knopf in der Zelle)	when a cell is clicked (data row and column, also on a button in the cell)
+Ziehbar	Draggable
+Ablage	Drop target
+wenn etwas darauf abgelegt wird (Zeile in der Quelle, Zeile hier; woher und was sagen GUI_DROP_SOURCE und GUI_DROP_TEXT)	when something is dropped on it (row in the source, row here; GUI_DROP_SOURCE and GUI_DROP_TEXT tell where from and what)

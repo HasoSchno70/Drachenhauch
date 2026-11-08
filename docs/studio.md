@@ -129,7 +129,7 @@ Die Ereignisse je Art:
 | Zeichenfläche | Zeichnen, Maus, Ziehen(x, y), Rad(schritte) |
 | Werkzeugleiste | Knopf(nr) |
 | Statusleiste | Feld(nr) |
-| jedes Control zusätzlich | MausRein, MausRaus |
+| jedes Control zusätzlich | MausRein, MausRaus, Abgelegt(zeile, ziel) |
 | Timer, Menüeintrag | Aktion |
 | Fenster | Geoeffnet, Schliessen, Groesse, Taste(taste), Takt |
 | eigenes Control | Geoeffnet, Groesse, Takt |
@@ -144,7 +144,11 @@ der Werkzeugleiste und `Feld` mit der Nummer des angeklickten Felds der
 Statusleiste (ab 0, Trenner und Lücken zählen mit), `Zelle` mit
 Datenzeile und Spalte jedes Klicks in eine Tabelle -- auch auf einen Knopf
 in der Zelle (`GUI_TABLE_CELL_KIND "knopf"`) und auch in der schon gewählten
-Zeile, wo `Geaendert` nicht mehr kommt. `Takt` läuft in jedem Bild nach den
+Zeile, wo `Geaendert` nicht mehr kommt; `Abgelegt` mit der gezogenen Zeile
+der Quelle und der Zeile, auf der sie landete, wenn etwas auf ein Control
+gezogen wurde, das im Inspektor „Ablage“ ist (die Quelle ist „Ziehbar“: bei
+Liste, Baum und Tabelle die Zeile, sonst das Control; woher es kam, sagt
+`GUI_DROP_SOURCE()`, was, `GUI_DROP_TEXT()`). `Takt` läuft in jedem Bild nach den
 Ereignissen der Controls (die eines eigenen Controls vor denen des
 Fensters) -- dort fragt der Code ab, wofür es kein Ereignis gibt, etwa ein
 Kontextmenü aus `GUI_CONTEXT`. Die Knöpfe stehen im
