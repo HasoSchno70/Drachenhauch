@@ -10,6 +10,7 @@ CLASS Hauptfenster EXTENDS Hauptfenster_Basis
         Self.bestand.laden()
         Self.orte.laden()
         Self.einkauf.laden()
+        Self.rezepte.laden()
         Self.auffrischen()
         Self.uhr_Aktion()
     END SUB
@@ -48,11 +49,20 @@ CLASS Hauptfenster EXTENDS Hauptfenster_Basis
         Self.bestand.laden()
         Self.orte.laden()
         Self.einkauf.laden()
+        Self.rezepte.laden()
         Self.auffrischen()
     END SUB
 
     SUB bestand_Geaendert()
         Self.orte.laden()
+        Self.auffrischen()
+    END SUB
+
+    ' Gekocht, angelegt, gelöscht, Fehlendes auf die Liste: alles neu.
+    SUB rezepte_Geaendert()
+        Self.bestand.laden()
+        Self.orte.laden()
+        Self.einkauf.laden()
         Self.auffrischen()
     END SUB
 

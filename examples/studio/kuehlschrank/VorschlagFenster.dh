@@ -1,0 +1,128 @@
+' „Was kann ich kochen?“ und „Ablaufende verwerten“ in einem Fenster -- die
+' Python-App zeigte dafür je eine HTML-Seite und für die Einkaufsliste einen
+' dritten Dialog. Hier eine Tabelle der Rezepte mit Anteil im Bestand und
+' dem, was fehlt (bzw. welche ablaufenden Produkte sie verwenden), Haken für
+' „Fehlende der markierten einkaufen“ (vorbelegt ab 75 %, wählbar ab 50 %)
+' und „Kochen“ für die gewählte Zeile.
+CLASS VorschlagFenster EXTENDS VorschlagFenster_Basis
+    ' "kochbar" oder "ablauf"
+    DIM art AS STRING
+    DIM rezepte AS ARRAY OF Rezept
+    ' Ergebnis: Posten auf der Einkaufsliste, Rezept zum Kochen (0 = keins).
+    DIM einkauf AS INTEGER
+    DIM kochenId AS INTEGER
+    DIM ab AS ARRAY OF Eintrag
+
+    SUB Geoeffnet()
+        DIM alle AS ARRAY OF Rezept : alle = rezepteLaden()
+        kochbarkeitRechnen(alle)
+        alle = nachProzent(alle)
+        IF Self.art = "ablauf" THEN
+            Self.ab = ablaufende()
+            Self.rezepte = ablaufVorschlaege(alle, Self.ab)
+            GUI_SET_TEXT(Self.titel, "⏰ Ablaufende Produkte verwerten")
+            DIM namen AS ARRAY OF STRING : namen = []
+            DIM e AS Eintrag
+            FOR EACH e IN Self.ab
+                IF LEN(namen) < 10 THEN ARRAY_PUSH(namen, e.name + " (" + e.ablauf + ")")
+            NEXT
+            GUI_SET_TEXT(Self.info, "Läuft bald ab: " + JOIN$(namen, ", ") + IIF(LEN(Self.ab) > 10, " und " + STR$(LEN(Self.ab) - 10) + " weitere", ""))
+            GUI_TABLE_HEADERS(Self.tabelle, ["✓", "Rezept", "Im Bestand", "Verwendet ablaufende", "Fehlt"])
+        ELSE
+            Self.rezepte = []
+            DIM y AS Rezept
+            FOR EACH y IN alle
+                IF LEN(y.zutaten) > 0 THEN ARRAY_PUSH(Self.rezepte, y)
+            NEXT
+            GUI_SET_TEXT(Self.titel, "🔍 Was kann ich kochen?")
+            GUI_SET_VISIBLE(Self.knopfInternet, FALSE)
+        END IF
+        Self.tabelleFuellen()
+    END SUB
+
+    SUB tabelleFuellen()
+        GUI_TABLE_CLEAR(Self.tabelle)
+        DIM sofort AS INTEGER, fast AS INTEGER, teils AS INTEGER, wenig AS INTEGER
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(Self.rezepte) - 1
+            DIM x AS Rezept : x = Self.rezepte[i]
+            DIM fehlt AS ARRAY OF STRING : fehlt = []
+            DIM z AS Zutat
+            FOR EACH z IN x.fehlende()
+                ARRAY_PUSH(fehlt, z.name)
+            NEXT
+            DIM mitte AS STRING
+            IF Self.art = "ablauf" THEN
+                mitte = verwendet[i]
+            ELSE
+                mitte = STR$(x.zutatenZahl - LEN(fehlt)) + " von " + STR$(x.zutatenZahl)
+            END IF
+            DIM status AS STRING
+            IF x.kochbar THEN
+                status = "✅ " : sofort = sofort + 1
+            ELSEIF x.prozent >= 75 THEN
+                status = "⚠ " : fast = fast + 1
+            ELSEIF x.prozent >= 50 THEN
+                status = "🔍 " : teils = teils + 1
+            ELSE
+                status = "❌ " : wenig = wenig + 1
+            END IF
+            DIM r AS INTEGER : r = GUI_TABLE_ADD_ROW(Self.tabelle, ["", status + x.name, STR$(INT(x.prozent + 0.5)) + " %", mitte, IIF(LEN(fehlt) = 0, "-", JOIN$(fehlt, ", "))])
+            IF x.prozent >= 50 AND LEN(fehlt) > 0 THEN
+                GUI_TABLE_CELL_KIND(Self.tabelle, r, 0, "haken")
+                GUI_TABLE_CELL_VALUE(Self.tabelle, r, 0, IIF(x.prozent >= 75, 1, 0))
+            END IF
+            GUI_TABLE_CELL_COLOR(Self.tabelle, r, 2, IIF(x.prozent >= 75, &H81C784, IIF(x.prozent >= 50, &HFFD54F, &HE57373)), -1)
+        NEXT
+        IF LEN(Self.rezepte) > 0 THEN GUI_TABLE_SET_SELECTED(Self.tabelle, 0)
+        IF Self.art = "kochbar" THEN
+            GUI_SET_TEXT(Self.info, "📊 ✅ " + STR$(sofort) + " sofort kochbar  •  ⚠ " + STR$(fast) + " fast kochbar  •  🔍 " + STR$(teils) + " teilweise  •  ❌ " + STR$(wenig) + " zu wenig Zutaten")
+        ELSEIF LEN(Self.rezepte) = 0 THEN
+            GUI_SET_TEXT(Self.leer, "Keines deiner Rezepte verwendet die ablaufenden Produkte -- im Katalog oder Internet suchen!")
+        END IF
+        GUI_SET_ENABLED(Self.knopfKochen, LEN(Self.rezepte) > 0)
+    END SUB
+
+    SUB knopfEinkaufen_Klick()
+        DIM n AS INTEGER : n = 0
+        DIM gewaehlt AS INTEGER : gewaehlt = 0
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(Self.rezepte) - 1
+            IF GUI_TABLE_GET_VALUE(Self.tabelle, i, 0) < 0.5 THEN CONTINUE
+            gewaehlt = gewaehlt + 1
+            n = n + fehlendeEinkaufen(Self.rezepte[i], 1.0)
+        NEXT
+        IF gewaehlt = 0 THEN
+            Meldung("Bitte hake mindestens ein Rezept ab (ab 50 % Zutaten im Bestand)!", "Keine Auswahl")
+            RETURN
+        END IF
+        Self.einkauf = Self.einkauf + n
+        Meldung(STR$(n) + " Zutat(en) auf die Einkaufsliste gesetzt.", "Einkaufsliste")
+    END SUB
+
+    SUB knopfKochen_Klick()
+        DIM z AS INTEGER : z = GUI_TABLE_SELECTED(Self.tabelle)
+        IF z < 0 OR z >= LEN(Self.rezepte) THEN RETURN
+        Self.kochenId = Self.rezepte[z].id
+        Self.Zumachen()
+    END SUB
+
+    SUB tabelle_Doppelklick()
+        Self.knopfKochen_Klick()
+    END SUB
+
+    ' Die Suche im Internet kommt mit Stufe 6; bis dahin wie die Python-App
+    ' ohne Schlüssel: die Suchwörter.
+    SUB knopfInternet_Klick()
+        DIM w AS ARRAY OF STRING : w = []
+        DIM e AS Eintrag
+        FOR EACH e IN Self.ab
+            IF LEN(w) < 3 THEN ARRAY_PUSH(w, e.name)
+        NEXT
+        Meldung("Suche im Internet nach Rezepten mit:" + CHR$(10) + CHR$(10) + JOIN$(w, " "), "Suchvorschlag")
+    END SUB
+
+    SUB knopfSchliessen_Klick()
+        Self.Zumachen()
+    END SUB
+END CLASS

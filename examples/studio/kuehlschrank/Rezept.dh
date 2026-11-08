@@ -1,0 +1,40 @@
+' Ein Rezept (recipes) mit seinen Zutaten, dazu wie gut der Bestand es
+' deckt (wie get_cookable_recipes der Python-App), wenn ausgerechnet.
+CLASS Rezept
+    DIM id AS INTEGER
+    DIM name AS STRING
+    DIM beschreibung AS STRING
+    DIM portionen AS INTEGER
+    DIM vorb AS INTEGER
+    DIM koch AS INTEGER
+    DIM anleitung AS STRING
+    ' Nur im Katalog (die Tabelle recipes hat keine Kategorie).
+    DIM kategorie AS STRING
+    DIM zutatenZahl AS INTEGER
+    DIM zutaten AS ARRAY OF Zutat
+    ' Kochbarkeit: Anteil der Zutaten im Bestand (eine zu knappe zählt halb),
+    ' kochbar = keine fehlt ganz.
+    DIM prozent AS FLOAT
+    DIM kochbar AS BOOLEAN
+    DIM gerechnet AS BOOLEAN
+
+    FUNCTION gesamt() AS INTEGER
+        RETURN Self.vorb + Self.koch
+    END FUNCTION
+
+    ' Was ganz oder zum Teil fehlt.
+    FUNCTION fehlende() AS ARRAY OF Zutat
+        DIM aus AS ARRAY OF Zutat : aus = []
+        DIM z AS Zutat
+        FOR EACH z IN Self.zutaten
+            IF z.status = "fehlt" OR z.status = "teil" THEN ARRAY_PUSH(aus, z)
+        NEXT
+        RETURN aus
+    END FUNCTION
+END CLASS
+
+' "20 min", ohne Zeit "-".
+FUNCTION minutenText$(m AS INTEGER) AS STRING
+    IF m <= 0 THEN RETURN "-"
+    RETURN STR$(m) + " min"
+END FUNCTION

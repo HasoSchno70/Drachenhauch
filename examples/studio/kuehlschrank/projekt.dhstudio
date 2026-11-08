@@ -81,6 +81,26 @@
       "code": "Einkauf.dh"
     },
     {
+      "art": "klasse",
+      "name": "Zutat",
+      "code": "Zutat.dh"
+    },
+    {
+      "art": "klasse",
+      "name": "Rezept",
+      "code": "Rezept.dh"
+    },
+    {
+      "art": "modul",
+      "name": "Rezepte",
+      "code": "Rezepte.dh"
+    },
+    {
+      "art": "modul",
+      "name": "Rezeptkatalog",
+      "code": "Rezeptkatalog.dh"
+    },
+    {
       "art": "control",
       "name": "BestandSeite",
       "code": "BestandSeite.dh",
@@ -97,6 +117,42 @@
       "name": "AbschlussFenster",
       "code": "AbschlussFenster.dh",
       "layout": "AbschlussFenster.dhform"
+    },
+    {
+      "art": "control",
+      "name": "RezepteSeite",
+      "code": "RezepteSeite.dh",
+      "layout": "RezepteSeite.dhform"
+    },
+    {
+      "art": "fenster",
+      "name": "RezeptFenster",
+      "code": "RezeptFenster.dh",
+      "layout": "RezeptFenster.dhform"
+    },
+    {
+      "art": "fenster",
+      "name": "KochenFenster",
+      "code": "KochenFenster.dh",
+      "layout": "KochenFenster.dhform"
+    },
+    {
+      "art": "fenster",
+      "name": "RezeptNeuFenster",
+      "code": "RezeptNeuFenster.dh",
+      "layout": "RezeptNeuFenster.dhform"
+    },
+    {
+      "art": "fenster",
+      "name": "KatalogFenster",
+      "code": "KatalogFenster.dh",
+      "layout": "KatalogFenster.dhform"
+    },
+    {
+      "art": "fenster",
+      "name": "VorschlagFenster",
+      "code": "VorschlagFenster.dh",
+      "layout": "VorschlagFenster.dhform"
     },
     {
       "art": "bericht",

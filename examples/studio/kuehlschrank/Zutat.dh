@@ -1,0 +1,17 @@
+' Eine Zutat eines Rezepts (recipe_ingredients), dazu was der Bestand dazu
+' sagt, wenn ausgerechnet: "ok", "teil" (zu wenig) oder "fehlt".
+CLASS Zutat
+    DIM id AS INTEGER
+    DIM name AS STRING
+    DIM menge AS FLOAT
+    DIM einheit AS STRING
+    ' 0 = nicht mit einem Produkt verknüpft (Suche über den Namen).
+    DIM produktId AS INTEGER
+    DIM status AS STRING
+    DIM vorhanden AS FLOAT
+    DIM bestandName AS STRING
+
+    FUNCTION mengeText$() AS STRING
+        RETURN zahlText$(Self.menge) + " " + Self.einheit
+    END FUNCTION
+END CLASS

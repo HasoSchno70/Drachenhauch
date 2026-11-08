@@ -1,0 +1,38 @@
+' Die Details eines Rezepts -- wie view_recipe_details der Python-App:
+' Portionen und Zeiten, die Zutaten (mit dem, was der Bestand dazu sagt), die
+' Zubereitung, „Jetzt kochen!“.
+CLASS RezeptFenster EXTENDS RezeptFenster_Basis
+    DIM rezeptId AS INTEGER
+    DIM kochenGewuenscht AS BOOLEAN
+
+    SUB Geoeffnet()
+        DIM x AS Rezept : x = rezeptLaden(Self.rezeptId)
+        IF x IS NIL THEN
+            Self.Zumachen()
+            RETURN
+        END IF
+        DIM l AS ARRAY OF Rezept : l = [x]
+        kochbarkeitRechnen(l)
+        GUI_SET_TEXT(Self.titel, "🍳 " + x.name)
+        GUI_SET_TEXT(Self.meta, "🍽 " + STR$(x.portionen) + " Portionen   ⏱ Vorbereitung: " + STR$(x.vorb) + " min   🍳 Kochzeit: " + STR$(x.koch) + " min   ⏳ Gesamt: " + STR$(x.gesamt()) + " min")
+        GUI_SET_TEXT(Self.beschreibung, x.beschreibung)
+        GUI_SET_TEXT(Self.zutatenTitel, "🥕 Zutaten (" + STR$(LEN(x.zutaten)) + ")")
+        GUI_TABLE_CLEAR(Self.tabelle)
+        DIM z AS Zutat
+        FOR EACH z IN x.zutaten
+            DIM t AS STRING : t = IIF(z.status = "ok", "✅ " + z.bestandName, IIF(z.status = "teil", "⚠ zu wenig " + z.bestandName, "❌ nicht im Bestand"))
+            DIM r AS INTEGER : r = GUI_TABLE_ADD_ROW(Self.tabelle, [z.mengeText$(), z.name, t])
+            GUI_TABLE_CELL_COLOR(Self.tabelle, r, 2, IIF(z.status = "ok", &H81C784, IIF(z.status = "teil", &HFFD54F, &HE57373)), -1)
+        NEXT
+        GUI_SET_TEXT(Self.anleitung, IIF(x.anleitung = "", "Keine Anleitung vorhanden.", x.anleitung))
+    END SUB
+
+    SUB knopfKochen_Klick()
+        Self.kochenGewuenscht = TRUE
+        Self.Zumachen()
+    END SUB
+
+    SUB knopfSchliessen_Klick()
+        Self.Zumachen()
+    END SUB
+END CLASS

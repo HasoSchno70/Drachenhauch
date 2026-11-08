@@ -204,6 +204,10 @@
           [
             10,
             2
+          ],
+          [
+            11,
+            4
           ]
         ],
         "seite": 0
@@ -276,6 +280,16 @@
       "kind": "studio_control",
       "studio_control": "EinkaufSeite",
       "name": "einkauf",
+      "x": 24,
+      "y": 176,
+      "w": 1232,
+      "h": 586,
+      "anchor": "lrtb"
+    },
+    {
+      "kind": "studio_control",
+      "studio_control": "RezepteSeite",
+      "name": "rezepte",
       "x": 24,
       "y": 176,
       "w": 1232,

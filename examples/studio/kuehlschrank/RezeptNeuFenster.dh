@@ -1,0 +1,101 @@
+' Ein Rezept von Hand anlegen -- wie AddRecipeDialog der Python-App: Name,
+' Portionen, Zeiten, Zutaten (eine Zutat, die genau wie ein Produkt im
+' Bestand heißt, wird damit verknüpft), Zubereitung. Neu: eine
+' Beschreibung (die Tabelle hat sie, der Python-Dialog fragte nicht danach).
+CLASS RezeptNeuFenster EXTENDS RezeptNeuFenster_Basis
+    DIM x AS Rezept
+    DIM gesichert AS BOOLEAN
+    ' Produkte im Bestand: Name und id.
+    DIM produktNamen AS ARRAY OF STRING
+    DIM produktIds AS ARRAY OF INTEGER
+
+    SUB Geoeffnet()
+        Self.x = NEW Rezept()
+        Self.x.zutaten = []
+        Self.produktNamen = []
+        Self.produktIds = []
+        DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT DISTINCT p.id, p.name FROM products p JOIN inventory i ON p.id = i.product_id ORDER BY p.name")
+        WHILE DB_NEXT(r)
+            ARRAY_PUSH(Self.produktIds, DB_GET_INT(r, 0))
+            ARRAY_PUSH(Self.produktNamen, DB_GET_STRING(r, 1))
+        WEND
+        GUI_SET_DROPDOWN(Self.zutatFeld, Self.produktNamen)
+        GUI_SET_TEXT(Self.zutatFeld, "")
+        GUI_SET_DROPDOWN(Self.einheitListe, einheiten())
+        GUI_SET_TEXT(Self.einheitListe, "Stück")
+        GUI_SET_VALUE(Self.portionenFeld, 4)
+        GUI_SET_VALUE(Self.mengeFeld, 1)
+        Self.tabelleFuellen()
+    END SUB
+
+    SUB tabelleFuellen()
+        GUI_TABLE_CLEAR(Self.tabelle)
+        DIM z AS Zutat
+        FOR EACH z IN Self.x.zutaten
+            DIM r AS INTEGER : r = GUI_TABLE_ADD_ROW(Self.tabelle, [z.name, zahlText$(z.menge), z.einheit, IIF(z.produktId > 0, "✅ Ja", "➖ Nein"), "🗑"])
+            GUI_TABLE_CELL_KIND(Self.tabelle, r, 4, "knopf")
+            GUI_TABLE_CELL_COLOR(Self.tabelle, r, 3, IIF(z.produktId > 0, &H81C784, &H8A9099), -1)
+        NEXT
+        DIM n AS INTEGER : n = LEN(Self.x.zutaten)
+        IF TRIM$(GUI_TEXT(Self.nameFeld)) = "" OR n = 0 THEN
+            GUI_SET_TEXT(Self.info, "💡 Fülle mindestens den Namen und eine Zutat aus")
+        ELSE
+            GUI_SET_TEXT(Self.info, "✅ " + STR$(n) + " Zutat(en) -- bereit zum Speichern")
+        END IF
+    END SUB
+
+    SUB nameFeld_Geaendert()
+        Self.tabelleFuellen()
+    END SUB
+
+    SUB knopfZutat_Klick()
+        DIM name AS STRING : name = TRIM$(GUI_TEXT(Self.zutatFeld))
+        IF name = "" THEN
+            Meldung("Bitte gib einen Zutatennamen ein!", "Fehler")
+            RETURN
+        END IF
+        DIM z AS Zutat : z = NEW Zutat()
+        z.name = name
+        z.menge = GUI_VALUE(Self.mengeFeld)
+        z.einheit = TRIM$(GUI_TEXT(Self.einheitListe))
+        DIM k AS INTEGER
+        FOR k = 0 TO LEN(Self.produktNamen) - 1
+            IF LOWER$(Self.produktNamen[k]) = LOWER$(name) THEN z.produktId = Self.produktIds[k]
+        NEXT
+        ARRAY_PUSH(Self.x.zutaten, z)
+        GUI_SET_TEXT(Self.zutatFeld, "")
+        GUI_SET_VALUE(Self.mengeFeld, 1)
+        Self.tabelleFuellen()
+    END SUB
+
+    SUB tabelle_Zelle(zeile AS INTEGER, spalte AS INTEGER)
+        IF spalte <> 4 OR zeile < 0 OR zeile >= LEN(Self.x.zutaten) THEN RETURN
+        ARRAY_REMOVE_AT(Self.x.zutaten, zeile)
+        Self.tabelleFuellen()
+    END SUB
+
+    SUB knopfSpeichern_Klick()
+        DIM name AS STRING : name = TRIM$(GUI_TEXT(Self.nameFeld))
+        IF name = "" THEN
+            Meldung("Bitte gib einen Rezeptnamen ein!", "Fehler")
+            RETURN
+        END IF
+        IF LEN(Self.x.zutaten) = 0 THEN
+            Meldung("Bitte füge mindestens eine Zutat hinzu!", "Fehler")
+            RETURN
+        END IF
+        Self.x.name = name
+        Self.x.beschreibung = TRIM$(GUI_TEXT(Self.beschreibungFeld))
+        Self.x.portionen = INT(GUI_VALUE(Self.portionenFeld))
+        Self.x.vorb = INT(GUI_VALUE(Self.vorbFeld))
+        Self.x.koch = INT(GUI_VALUE(Self.kochFeld))
+        Self.x.anleitung = GUI_TEXT(Self.anleitungFeld)
+        rezeptAnlegen(Self.x)
+        Self.gesichert = TRUE
+        Self.Zumachen()
+    END SUB
+
+    SUB knopfAbbrechen_Klick()
+        Self.Zumachen()
+    END SUB
+END CLASS

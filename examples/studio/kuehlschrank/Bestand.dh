@@ -106,7 +106,10 @@ END FUNCTION
 
 ' --- Anzeigen ------------------------------------------------------------------
 ' 1.0 -> "1", 0.5 -> "0,5".
-FUNCTION zahlText$(z AS FLOAT) AS STRING
+FUNCTION zahlText$(zahl AS FLOAT) AS STRING
+    ' Auf drei Stellen: gerechnete Mengen (Portionen mal Menge) sollen nicht
+    ' als 0,30000000000000004 erscheinen.
+    DIM z AS FLOAT : z = ROUND(zahl, 3)
     IF z = INT(z) THEN RETURN STR$(INT(z))
     RETURN REPLACE$(STR$(z), ".", ",")
 END FUNCTION
@@ -134,19 +137,25 @@ END SUB
 ' Wie remove_from_inventory der Python-App: erst eine Zeile im
 ' Verbrauchsverlauf (Grund consumed/expired/deleted/cooked), dann weg.
 SUB entnehmen(e AS Eintrag, grund AS STRING, text AS STRING)
-    DIM h AS STRING : h = heute$()
     verlauf.beginnen(text)
-    verlauf.merken("inventory", e.id)
     DB_BEGIN(db)
+    verbrauchen(e, grund)
+    DB_COMMIT(db)
+    verlauf.abschliessen()
+END SUB
+
+' Dasselbe als Teil eines Schritts, der schon begonnen hat (Kochen zieht
+' mehrere Einträge in einem Schritt ab) -- ohne eigene Transaktion.
+SUB verbrauchen(e AS Eintrag, grund AS STRING)
+    DIM h AS STRING : h = heute$()
+    verlauf.merken("inventory", e.id)
     DIM dauer AS INTEGER : dauer = 0
     IF e.kaufdatum <> "" THEN dauer = dbZahlMit("SELECT CAST(julianday(?1) - julianday(?2) AS INTEGER)", h, e.kaufdatum)
     DB_EXEC(db, "INSERT INTO consumption_history (product_id, product_name, barcode, quantity, unit, purchase_date, empty_date, removed_date, duration_days, storage_location, reason) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", _
             e.produktId, e.name, IIF(e.barcode = "", NIL, e.barcode), e.menge, e.einheit, IIF(e.kaufdatum = "", NIL, e.kaufdatum), h, h, dauer, e.lagerort, grund)
     DIM hid AS INTEGER : hid = DB_LAST_ROWID(db)
     DB_EXEC(db, "DELETE FROM inventory WHERE id = ?", e.id)
-    DB_COMMIT(db)
     verlauf.neu("consumption_history", hid)
-    verlauf.abschliessen()
 END SUB
 
 FUNCTION produktMitBarcode(barcode AS STRING) AS INTEGER

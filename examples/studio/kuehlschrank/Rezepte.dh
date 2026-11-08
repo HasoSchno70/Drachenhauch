@@ -1,0 +1,478 @@
+' Die Rezepte: lesen, wie gut der Bestand sie deckt, kochen (zieht vom
+' Bestand ab, älteste zuerst), fehlende Zutaten auf die Einkaufsliste,
+' anlegen und löschen -- jede Änderung ein Schritt für Strg+Z. Dazu die
+' Vorschläge für Ablaufendes und die Suche im Katalog. Wie
+' database_pkg/recipes.py, tabs/recipes_tab.py, dialogs/cook_recipe_dialog.py
+' und services/api/local_recipe_search.py der Python-App.
+IMPORT "db"
+IMPORT "regex"
+
+
+
+CONST REZEPT_SPALTEN = "id, name, description, servings, instructions, prep_time_minutes, cook_time_minutes"
+CONST ZUTAT_SPALTEN = "id, recipe_id, product_name, quantity, unit, product_id"
+
+
+
+
+
+
+
+
+
+' --- Kochen --------------------------------------------------------------------------
+' Wie viel von einer Zutat da ist (wie _get_available_quantity): über das
+' verknüpfte Produkt, sonst jedes Produkt, dessen Name passt (namePasst) --
+' alles zusammengezählt.
+
+
+
+
+
+
+
+
+' Wie show_expiring_recipes: Rezepte, die eine ablaufende Zutat verwenden
+' (namePasst), nach Rang = 10 je solcher Zutat + Anteil im Bestand. Die Namen der verwendeten stehen in
+' verwendet (je Rezept eine Zeile, durch Komma).
+DIM verwendet AS ARRAY OF STRING
+
+' --- Welche Zutat ist welches Produkt? -----------------------------------------------
+' Die Python-App verglich Teilzeichenketten: die Zutat "Ei" fand "Reis", und
+' im Kochen-Dialog standen 260 Stück Ei (10 Eier und 250 g Reis). Hier
+' Wörter: passt, wenn jedes Wort des kürzeren Namens im längeren vorkommt --
+' gleich oder mit einer Plural-Endung ("Zwiebel" und "Zwiebeln",
+' "Kartoffeln" und "Kartoffeln festkochend"), "Mehl" aber nicht in
+' "Kartoffeln mehlig".
+FUNCTION woerter(t AS STRING) AS ARRAY OF STRING
+    DIM aus AS ARRAY OF STRING : aus = []
+    DIM w AS STRING
+    FOR EACH w IN SPLIT(REGEX_REPLACE(LOWER$(t), "[^\p{L}\p{N}]+", " "), " ")
+        IF w <> "" THEN ARRAY_PUSH(aus, w)
+    NEXT
+    RETURN aus
+END FUNCTION
+
+FUNCTION wortGleich(a AS STRING, b AS STRING) AS BOOLEAN
+    IF a = b THEN RETURN TRUE
+    DIM k AS STRING : k = IIF(LEN(a) <= LEN(b), a, b)
+    DIM l AS STRING : l = IIF(LEN(a) <= LEN(b), b, a)
+    IF LEN(k) < 3 OR LEFT$(l, LEN(k)) <> k THEN RETURN FALSE
+    RETURN ARRAY_INDEXOF(["n", "e", "en", "s", "er", "es"], MID$(l, LEN(k), LEN(l))) >= 0
+END FUNCTION
+
+FUNCTION alleWoerterIn(kurz AS ARRAY OF STRING, lang AS ARRAY OF STRING) AS BOOLEAN
+    IF LEN(kurz) = 0 THEN RETURN FALSE
+    DIM w AS STRING
+    FOR EACH w IN kurz
+        DIM da AS BOOLEAN : da = FALSE
+        DIM v AS STRING
+        FOR EACH v IN lang
+            IF wortGleich(w, v) THEN da = TRUE
+        NEXT
+        IF NOT da THEN RETURN FALSE
+    NEXT
+    RETURN TRUE
+END FUNCTION
+
+FUNCTION namePasst(zutat AS STRING, produkt AS STRING) AS BOOLEAN
+    DIM a AS ARRAY OF STRING : a = woerter(zutat)
+    DIM b AS ARRAY OF STRING : b = woerter(produkt)
+    IF LEN(a) <= LEN(b) THEN RETURN alleWoerterIn(a, b)
+    RETURN alleWoerterIn(b, a)
+END FUNCTION
+
+' --- Lesen -------------------------------------------------------------------------
+FUNCTION rezeptAus(r AS DB_RESULT) AS Rezept
+    DIM x AS Rezept : x = NEW Rezept()
+    x.id = DB_GET_INT(r, 0)
+    x.name = DB_GET_STRING(r, 1)
+    x.beschreibung = IIF(DB_IS_NULL(r, 2), "", DB_GET_STRING(r, 2))
+    x.portionen = IIF(DB_IS_NULL(r, 3), 1, DB_GET_INT(r, 3))
+    x.anleitung = IIF(DB_IS_NULL(r, 4), "", DB_GET_STRING(r, 4))
+    x.vorb = IIF(DB_IS_NULL(r, 5), 0, DB_GET_INT(r, 5))
+    x.koch = IIF(DB_IS_NULL(r, 6), 0, DB_GET_INT(r, 6))
+    x.zutaten = []
+    RETURN x
+END FUNCTION
+
+FUNCTION zutatAus(r AS DB_RESULT) AS Zutat
+    DIM z AS Zutat : z = NEW Zutat()
+    z.id = DB_GET_INT(r, 0)
+    z.name = DB_GET_STRING(r, 2)
+    z.menge = DB_GET_FLOAT(r, 3)
+    z.einheit = DB_GET_STRING(r, 4)
+    z.produktId = IIF(DB_IS_NULL(r, 5), 0, DB_GET_INT(r, 5))
+    RETURN z
+END FUNCTION
+
+' Alle Rezepte mit ihren Zutaten, nach Name (wie get_all_recipes).
+FUNCTION rezepteLaden() AS ARRAY OF Rezept
+    DIM aus AS ARRAY OF Rezept : aus = []
+    DIM ids AS ARRAY OF INTEGER : ids = []
+    DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT " + REZEPT_SPALTEN + " FROM recipes ORDER BY name")
+    WHILE DB_NEXT(r)
+        DIM x AS Rezept : x = rezeptAus(r)
+        ARRAY_PUSH(aus, x)
+        ARRAY_PUSH(ids, x.id)
+    WEND
+    r = DB_QUERY(db, "SELECT " + ZUTAT_SPALTEN + " FROM recipe_ingredients ORDER BY recipe_id, id")
+    WHILE DB_NEXT(r)
+        DIM k AS INTEGER : k = ARRAY_INDEXOF(ids, DB_GET_INT(r, 1))
+        IF k >= 0 THEN ARRAY_PUSH(aus[k].zutaten, zutatAus(r))
+    WEND
+    DIM y AS Rezept
+    FOR EACH y IN aus
+        y.zutatenZahl = LEN(y.zutaten)
+    NEXT
+    RETURN aus
+END FUNCTION
+
+FUNCTION rezeptLaden(id AS INTEGER) AS Rezept
+    DIM x AS Rezept
+    FOR EACH x IN rezepteLaden()
+        IF x.id = id THEN RETURN x
+    NEXT
+    RETURN NIL
+END FUNCTION
+
+' --- Wie gut deckt der Bestand ein Rezept? -------------------------------------------
+' Wie get_cookable_recipes: je Zutat das Produkt im Bestand, dessen Name zu
+' ihr passt (namePasst) und das am meisten davon hat; reicht
+' die Menge, zählt die Zutat ganz, sonst halb. Einheiten vergleicht die
+' Python-App nicht -- hier auch nicht. Kochbar = keine fehlt ganz.
+SUB kochbarkeitRechnen(rezepte AS ARRAY OF Rezept)
+    DIM namen AS ARRAY OF STRING : namen = []
+    DIM mengen AS ARRAY OF FLOAT : mengen = []
+    DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT p.name, SUM(i.quantity) FROM inventory i JOIN products p ON i.product_id = p.id GROUP BY p.id, p.name, i.unit")
+    WHILE DB_NEXT(r)
+        ARRAY_PUSH(namen, DB_GET_STRING(r, 0))
+        ARRAY_PUSH(mengen, DB_GET_FLOAT(r, 1))
+    WEND
+    DIM x AS Rezept
+    FOR EACH x IN rezepte
+        x.gerechnet = TRUE
+        x.prozent = 0
+        x.kochbar = FALSE
+        IF LEN(x.zutaten) = 0 THEN CONTINUE
+        DIM punkte AS FLOAT : punkte = 0
+        DIM ganzFehlt AS INTEGER : ganzFehlt = 0
+        DIM z AS Zutat
+        FOR EACH z IN x.zutaten
+            DIM best AS INTEGER : best = -1
+            DIM i AS INTEGER
+            FOR i = 0 TO LEN(namen) - 1
+                IF namePasst(z.name, namen[i]) THEN
+                    IF best < 0 THEN
+                        best = i
+                    ELSEIF mengen[i] > mengen[best] THEN
+                        best = i
+                    END IF
+                END IF
+            NEXT
+            z.bestandName = ""
+            z.vorhanden = 0
+            IF best >= 0 THEN
+                IF mengen[best] > 0 THEN
+                    z.bestandName = namen[best]
+                    z.vorhanden = mengen[best]
+                END IF
+            END IF
+            IF z.vorhanden <= 0 THEN
+                z.status = "fehlt"
+                ganzFehlt = ganzFehlt + 1
+            ELSEIF z.vorhanden >= z.menge THEN
+                z.status = "ok"
+                punkte = punkte + 1
+            ELSE
+                z.status = "teil"
+                punkte = punkte + 0.5
+            END IF
+        NEXT
+        x.prozent = punkte / LEN(x.zutaten) * 100
+        x.kochbar = ganzFehlt = 0
+    NEXT
+END SUB
+
+' Nach Anteil absteigend, sonst in der Reihenfolge davor (stabil).
+FUNCTION nachProzent(rezepte AS ARRAY OF Rezept) AS ARRAY OF Rezept
+    DIM aus AS ARRAY OF Rezept : aus = []
+    DIM x AS Rezept
+    FOR EACH x IN rezepte
+        DIM i AS INTEGER : i = LEN(aus)
+        WHILE i > 0
+            IF aus[i - 1].prozent >= x.prozent THEN BREAK
+            i = i - 1
+        WEND
+        ARRAY_INSERT(aus, i, x)
+    NEXT
+    RETURN aus
+END FUNCTION
+
+FUNCTION verfuegbar(z AS Zutat) AS FLOAT
+    DIM r AS DB_RESULT
+    IF z.produktId > 0 THEN
+        r = DB_QUERY(db, "SELECT IFNULL(SUM(quantity), 0) FROM inventory WHERE product_id = ?", z.produktId)
+        IF DB_NEXT(r) THEN
+            DIM v AS FLOAT : v = DB_GET_FLOAT(r, 0)
+            DB_CLOSE_RESULT(r)
+            IF v > 0 THEN RETURN v
+        END IF
+    END IF
+    DIM w AS FLOAT : w = 0
+    r = DB_QUERY(db, "SELECT p.name, i.quantity FROM inventory i JOIN products p ON i.product_id = p.id")
+    WHILE DB_NEXT(r)
+        IF namePasst(z.name, DB_GET_STRING(r, 0)) THEN w = w + DB_GET_FLOAT(r, 1)
+    WEND
+    RETURN w
+END FUNCTION
+
+' Kocht ein Rezept für faktor-mal die Menge: je Zutat vom Bestand ab, was
+' am frühesten abläuft zuerst; ein ganzer Eintrag geht als "cooked" in den
+' Verbrauchsverlauf, ein Rest bleibt mit der kleineren Menge. Ein Schritt.
+' Liefert je abgezogene Zutat eine Zeile "1,5 Liter Milch".
+FUNCTION kochen(x AS Rezept, faktor AS FLOAT) AS ARRAY OF STRING
+    DIM aus AS ARRAY OF STRING : aus = []
+    verlauf.beginnen(x.name + " gekocht")
+    DB_BEGIN(db)
+    DIM z AS Zutat
+    FOR EACH z IN x.zutaten
+        DIM rest AS FLOAT : rest = z.menge * faktor
+        DIM weg AS FLOAT : weg = 0
+        DIM ids AS ARRAY OF INTEGER : ids = []
+        DIM r AS DB_RESULT
+        IF z.produktId > 0 THEN
+            r = DB_QUERY(db, "SELECT i.id FROM inventory i WHERE i.product_id = ? ORDER BY i.expiry_date IS NULL, i.expiry_date, i.id", z.produktId)
+        ELSE
+            r = DB_QUERY(db, "SELECT i.id, p.name FROM inventory i JOIN products p ON i.product_id = p.id ORDER BY i.expiry_date IS NULL, i.expiry_date, i.id")
+        END IF
+        WHILE DB_NEXT(r)
+            IF z.produktId > 0 THEN
+                ARRAY_PUSH(ids, DB_GET_INT(r, 0))
+            ELSEIF namePasst(z.name, DB_GET_STRING(r, 1)) THEN
+                ARRAY_PUSH(ids, DB_GET_INT(r, 0))
+            END IF
+        WEND
+        DIM id AS INTEGER
+        FOR EACH id IN ids
+            IF rest <= 0 THEN BREAK
+            DIM e AS Eintrag : e = eintragLaden(id)
+            IF e IS NIL THEN CONTINUE
+            IF e.menge <= rest THEN
+                verbrauchen(e, "cooked")
+                weg = weg + e.menge
+                rest = rest - e.menge
+            ELSE
+                verlauf.merken("inventory", e.id)
+                DB_EXEC(db, "UPDATE inventory SET quantity = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", e.menge - rest, e.id)
+                weg = weg + rest
+                rest = 0
+            END IF
+        NEXT
+        IF weg > 0 THEN ARRAY_PUSH(aus, zahlText$(weg) + " " + z.einheit + " " + z.name)
+    NEXT
+    DB_COMMIT(db)
+    verlauf.abschliessen()
+    RETURN aus
+END FUNCTION
+
+' Was fehlt (für faktor-mal die Menge) auf die Einkaufsliste, Notiz "Für:
+' Rezept" -- ein Schritt. Liefert, wie viele Posten es wurden.
+FUNCTION fehlendeEinkaufen(x AS Rezept, faktor AS FLOAT) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM z AS Zutat
+    FOR EACH z IN x.zutaten
+        DIM fehlt AS FLOAT : fehlt = z.menge * faktor - verfuegbar(z)
+        IF fehlt <= 0 THEN CONTINUE
+        IF n = 0 THEN verlauf.beginnen("Fehlendes für " + x.name)
+        DB_EXEC(db, "INSERT INTO shopping_list (product_name, quantity, unit, priority, notes) VALUES (?, ?, ?, 1, ?)", z.name, fehlt, z.einheit, "Für: " + x.name)
+        verlauf.neu("shopping_list", DB_LAST_ROWID(db))
+        n = n + 1
+    NEXT
+    IF n > 0 THEN verlauf.abschliessen()
+    RETURN n
+END FUNCTION
+
+' --- Anlegen und löschen -------------------------------------------------------------
+' Ein Rezept mit seinen Zutaten -- ein Schritt (erst das Rezept, dann die
+' Zutaten: Rückgängig nimmt sie in umgekehrter Reihenfolge).
+FUNCTION rezeptAnlegen(x AS Rezept) AS INTEGER
+    verlauf.beginnen(x.name + " angelegt")
+    DB_BEGIN(db)
+    DB_EXEC(db, "INSERT INTO recipes (name, description, servings, instructions, prep_time_minutes, cook_time_minutes) VALUES (?, ?, ?, ?, ?, ?)", _
+            x.name, IIF(x.beschreibung = "", NIL, x.beschreibung), MAX(1, x.portionen), IIF(x.anleitung = "", NIL, x.anleitung), IIF(x.vorb > 0, x.vorb, NIL), IIF(x.koch > 0, x.koch, NIL))
+    x.id = DB_LAST_ROWID(db)
+    verlauf.neu("recipes", x.id)
+    DIM z AS Zutat
+    FOR EACH z IN x.zutaten
+        DB_EXEC(db, "INSERT INTO recipe_ingredients (recipe_id, product_id, product_name, quantity, unit) VALUES (?, ?, ?, ?, ?)", _
+                x.id, IIF(z.produktId > 0, z.produktId, NIL), z.name, z.menge, IIF(z.einheit = "", "Stück", z.einheit))
+        z.id = DB_LAST_ROWID(db)
+        verlauf.neu("recipe_ingredients", z.id)
+    NEXT
+    DB_COMMIT(db)
+    verlauf.abschliessen()
+    RETURN x.id
+END FUNCTION
+
+' Löschen merkt erst die Zutaten, dann das Rezept -- Rückgängig setzt so das
+' Rezept vor seinen Zutaten wieder ein (der Fremdschlüssel will es so).
+SUB rezeptLoeschen(id AS INTEGER, name AS STRING)
+    verlauf.beginnen(name + " gelöscht")
+    DIM zid AS INTEGER
+    FOR EACH zid IN zahlListe("SELECT id FROM recipe_ingredients WHERE recipe_id = " + STR$(id) + " ORDER BY id")
+        verlauf.merken("recipe_ingredients", zid)
+    NEXT
+    verlauf.merken("recipes", id)
+    ' Die Zutaten ausdrücklich: eine Datei, die das Studio angelegt hat, kennt
+    ' den Verweis nur als Spalte (kein ON DELETE CASCADE wie die Python-Datei).
+    DB_BEGIN(db)
+    DB_EXEC(db, "DELETE FROM recipe_ingredients WHERE recipe_id = ?", id)
+    DB_EXEC(db, "DELETE FROM recipes WHERE id = ?", id)
+    DB_COMMIT(db)
+    verlauf.abschliessen()
+END SUB
+
+FUNCTION zahlListe(sql AS STRING) AS ARRAY OF INTEGER
+    DIM aus AS ARRAY OF INTEGER : aus = []
+    DIM r AS DB_RESULT : r = DB_QUERY(db, sql)
+    WHILE DB_NEXT(r)
+        ARRAY_PUSH(aus, DB_GET_INT(r, 0))
+    WEND
+    RETURN aus
+END FUNCTION
+
+' Was im Bestand bald abläuft (heute bis zur Warnschwelle), wie
+' get_expiring_soon.
+FUNCTION ablaufende() AS ARRAY OF Eintrag
+    DIM aus AS ARRAY OF Eintrag : aus = []
+    DIM e AS Eintrag
+    FOR EACH e IN bestandLaden()
+        IF e.ablauf <> "" AND e.tage >= 0 AND e.tage <= warnSchwelle() THEN ARRAY_PUSH(aus, e)
+    NEXT
+    RETURN aus
+END FUNCTION
+
+FUNCTION ablaufVorschlaege(rezepte AS ARRAY OF Rezept, ab AS ARRAY OF Eintrag) AS ARRAY OF Rezept
+    DIM aus AS ARRAY OF Rezept : aus = []
+    DIM raenge AS ARRAY OF FLOAT : raenge = []
+    verwendet = []
+    DIM x AS Rezept
+    FOR EACH x IN rezepte
+        DIM benutzt AS ARRAY OF STRING : benutzt = []
+        DIM z AS Zutat
+        FOR EACH z IN x.zutaten
+            DIM e AS Eintrag
+            FOR EACH e IN ab
+                IF namePasst(z.name, e.name) AND ARRAY_INDEXOF(benutzt, e.name) < 0 THEN
+                    ARRAY_PUSH(benutzt, e.name)
+                    BREAK
+                END IF
+            NEXT
+        NEXT
+        IF LEN(benutzt) = 0 THEN CONTINUE
+        DIM rang AS FLOAT : rang = LEN(benutzt) * 10 + x.prozent
+        DIM i AS INTEGER : i = LEN(aus)
+        WHILE i > 0
+            IF raenge[i - 1] >= rang THEN BREAK
+            i = i - 1
+        WEND
+        ARRAY_INSERT(aus, i, x)
+        ARRAY_INSERT(raenge, i, rang)
+        ARRAY_INSERT(verwendet, i, JOIN$(benutzt, ", "))
+    NEXT
+    RETURN aus
+END FUNCTION
+
+' --- Der Katalog -----------------------------------------------------------------------
+' Wie LocalRecipeSearch.search: Treffer im Namen (100, am Anfang +50),
+' Ähnlichkeit mit dem Namen über 0,5 (bis 40), in der Beschreibung (30), in
+' einer Zutat (20), in der Kategorie (15), je Wort ab drei Buchstaben im
+' Namen (25) oder in der Beschreibung (10). Die besten zehn, gleiche in der
+' Reihenfolge des Katalogs.
+FUNCTION katalogPunkte(frage AS STRING, x AS Rezept) AS FLOAT
+    DIM p AS FLOAT : p = 0
+    DIM n AS STRING : n = LOWER$(x.name)
+    DIM b AS STRING : b = LOWER$(x.beschreibung)
+    IF INSTR(n, frage) >= 0 THEN
+        p = p + 100
+        IF LEFT$(n, LEN(frage)) = frage THEN p = p + 50
+    END IF
+    DIM ae AS FLOAT : ae = aehnlichkeit(frage, n)
+    IF ae > 0.5 THEN p = p + ae * 40
+    IF INSTR(b, frage) >= 0 THEN p = p + 30
+    DIM z AS Zutat
+    FOR EACH z IN x.zutaten
+        IF INSTR(LOWER$(z.name), frage) >= 0 THEN
+            p = p + 20
+            BREAK
+        END IF
+    NEXT
+    IF INSTR(LOWER$(x.kategorie), frage) >= 0 THEN p = p + 15
+    DIM w AS STRING
+    FOR EACH w IN SPLIT(frage, " ")
+        IF LEN(w) >= 3 THEN
+            IF INSTR(n, w) >= 0 THEN
+                p = p + 25
+            ELSEIF INSTR(b, w) >= 0 THEN
+                p = p + 10
+            END IF
+        END IF
+    NEXT
+    RETURN p
+END FUNCTION
+
+FUNCTION katalogSuchen(text AS STRING) AS ARRAY OF Rezept
+    DIM aus AS ARRAY OF Rezept : aus = []
+    DIM frage AS STRING : frage = LOWER$(TRIM$(text))
+    IF frage = "" THEN RETURN aus
+    DIM punkte AS ARRAY OF FLOAT : punkte = []
+    DIM x AS Rezept
+    FOR EACH x IN katalog()
+        DIM p AS FLOAT : p = katalogPunkte(frage, x)
+        IF p <= 0 THEN CONTINUE
+        DIM i AS INTEGER : i = LEN(aus)
+        WHILE i > 0
+            IF punkte[i - 1] >= p THEN BREAK
+            i = i - 1
+        WEND
+        ARRAY_INSERT(aus, i, x)
+        ARRAY_INSERT(punkte, i, p)
+    NEXT
+    WHILE LEN(aus) > 10
+        ARRAY_REMOVE_AT(aus, LEN(aus) - 1)
+    WEND
+    RETURN aus
+END FUNCTION
+
+' Wie difflib.SequenceMatcher(None, a, b).ratio(): 2 * Treffer / (Länge a +
+' Länge b), die Treffer nach Ratcliff/Obershelp -- der längste gemeinsame
+' Block (bei gleicher Länge der früheste in a, dann in b), dann links und
+' rechts davon dasselbe.
+FUNCTION aehnlichkeit(a AS STRING, b AS STRING) AS FLOAT
+    IF LEN(a) + LEN(b) = 0 THEN RETURN 1.0
+    RETURN 2.0 * gemeinsam(a, 0, LEN(a), b, 0, LEN(b)) / (LEN(a) + LEN(b))
+END FUNCTION
+
+FUNCTION gemeinsam(a AS STRING, a0 AS INTEGER, a1 AS INTEGER, b AS STRING, b0 AS INTEGER, b1 AS INTEGER) AS INTEGER
+    IF a0 >= a1 OR b0 >= b1 THEN RETURN 0
+    DIM bi AS INTEGER : bi = a0
+    DIM bj AS INTEGER : bj = b0
+    DIM bk AS INTEGER : bk = 0
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    FOR i = a0 TO a1 - 1
+        FOR j = b0 TO b1 - 1
+            DIM k AS INTEGER : k = 0
+            WHILE i + k < a1 AND j + k < b1
+                IF MID$(a, i + k, 1) <> MID$(b, j + k, 1) THEN BREAK
+                k = k + 1
+            WEND
+            IF k > bk THEN
+                bi = i : bj = j : bk = k
+            END IF
+        NEXT
+    NEXT
+    IF bk = 0 THEN RETURN 0
+    RETURN bk + gemeinsam(a, a0, bi, b, b0, bj) + gemeinsam(a, bi + bk, a1, b, bj + bk, b1)
+END FUNCTION

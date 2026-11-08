@@ -42,7 +42,7 @@ IMPORT "{sammlung}/../../../studio/berichte_laufzeit.dh"
 IMPORT "{sammlung}/../../../studio/berichte.dh"
 --- erwartet
 laden []
-elemente 23 start Hauptfenster
+elemente 33 start Hauptfenster
 app App TRUE
 fenster Hauptfenster TRUE
 datenbank Daten TRUE
@@ -58,9 +58,19 @@ klasse Ort TRUE
 modul Lagerorte TRUE
 klasse Posten TRUE
 modul Einkauf TRUE
+klasse Zutat TRUE
+klasse Rezept TRUE
+modul Rezepte TRUE
+modul Rezeptkatalog TRUE
 control BestandSeite TRUE
 control EinkaufSeite TRUE
 fenster AbschlussFenster TRUE
+control RezepteSeite TRUE
+fenster RezeptFenster TRUE
+fenster KochenFenster TRUE
+fenster RezeptNeuFenster TRUE
+fenster KatalogFenster TRUE
+fenster VorschlagFenster TRUE
 bericht Einkaufszettel TRUE
 control LagerorteSeite TRUE
 fenster LagerortFenster TRUE
@@ -115,6 +125,12 @@ Hauptfenster passt
 BestandSeite passt
 EinkaufSeite passt
 AbschlussFenster passt
+RezepteSeite passt
+RezeptFenster passt
+KochenFenster passt
+RezeptNeuFenster passt
+KatalogFenster passt
+VorschlagFenster passt
 LagerorteSeite passt
 LagerortFenster passt
 ProduktFenster passt

@@ -318,3 +318,81 @@ sortiert und unsortiert; echte Klicks), je ein Fall in
 `werkzeug_studio_berichte`, `werkzeug_studio_takt` und `gui_form_widgets`.
 Gegenproben: achtzehn im Beispiel, zwei im Studio, zwei in der Laufzeit --
 jede fällt in ihrem Fall.
+
+## Stufe 4: die Rezepte (2026-11-08)
+
+Der Reiter Rezepte ist das eigene Control `RezepteSeite` (wie
+tabs/recipes_tab.py): Suche (in Name, Beschreibung und Zutaten), acht
+Sortierungen, die Schnellfilter „sofort kochbar“, „schnell“ (bis 30 min) und
+„wenig Zutaten“ (bis 5), eine Tabelle mit Marke (✅ kochbar, 🟡 ab 75 %),
+Zeitfarbe und den Knöpfen 🍳 und 🗑 je Zeile. Ein Doppelklick öffnet
+`RezeptFenster` (Details), 🍳 oder „Jetzt kochen“ dort `KochenFenster` (wie
+CookRecipeDialog): Portionen, Faktor, je Zutat benötigt/vorhanden/Status,
+„Fehlende einkaufen“ und „Jetzt kochen!“ -- das zieht vom Bestand ab, was am
+frühesten abläuft zuerst; ein ganzer Eintrag geht als `cooked` in den
+Verbrauchsverlauf, ein Rest bleibt mit der kleineren Menge, alles ein
+Schritt für Strg+Z. `RezeptNeuFenster` legt von Hand an (eine Zutat mit dem
+Namen eines Produkts wird verknüpft), `KatalogFenster` sucht in den 29
+deutschen Rezepten der Python-App (`Rezeptkatalog`, aus GERMAN_RECIPES
+übernommen) mit denselben Punkten wie LocalRecipeSearch -- die Ähnlichkeit
+rechnet `aehnlichkeit` wie difflib (Ratcliff/Obershelp), nachgerechnet auf
+allen Suchwörtern des Tests. `VorschlagFenster` zeigt „Was kann ich
+kochen?“ und „Ablaufende verwerten“; Löschen merkt erst die Zutaten, dann das
+Rezept, damit Rückgängig in einer Datei mit Fremdschlüssel das Rezept zuerst
+wieder einsetzt. `entnehmen` im Modul `Bestand` teilt sich dafür in
+`entnehmen` (Schritt und Transaktion) und `verbrauchen` (ein Eintrag in den
+Verlauf, ohne beides).
+
+**Abweichungen von der Python-App:** Sie verglich Zutat und Produkt als
+Teilzeichenketten -- „Ei“ fand „Reis“, im Kochen-Dialog standen 260 Stück Ei
+(10 Eier und 250 g Reis). Hier Wörter: jedes Wort des kürzeren Namens steht
+im längeren, gleich oder mit Plural-Endung (`namePasst`: „Zwiebel“ und
+„Zwiebeln“, aber nicht „Mehl“ und „Kartoffeln mehlig“). Der Import aus dem
+Katalog ließ die Beschreibung fallen; die Suche versprach im Platzhalter
+Zutaten und suchte sie nicht. Die drei Dialoge für Kochbares, Ablaufendes und
+Fehlendes sind hier ein Fenster mit zwei Arten. Die Suche im Internet
+(Spoonacular) kommt mit Stufe 6; bis dahin nennt der Knopf die Suchwörter.
+Eine Datei, die das Studio anlegt, kennt den Verweis der Zutat aufs Rezept
+nur als Spalte -- ohne `ON DELETE CASCADE` wie die Python-Datei; darum löscht
+`rezeptLoeschen` die Zutaten selbst (offen fürs Studio: Fremdschlüssel aus
+dem Datenbank-Element).
+
+**Funde:**
+
+21. **Eine Methode ersetzte still die geerbte** -- `SUB zeigen()` im
+    Kochen-Fenster war `Zeigen()` der Studio-Laufzeit (Namen ohne Groß/klein),
+    jeder Aufruf `kf.Zeigen()` landete dort, und eine Zeile tiefer brach
+    `GUI_VALUE` ab. Gewarnt wurde nur bei anderer Parameterzahl; jetzt auch
+    bei anderer Schreibweise (Compiler meldet einen Kandidaten mit der Zeile
+    der Elternklasse, `lsp::verdeckung_filtern` vergleicht die beiden Köpfe).
+22. **Die Meldung von `FORMAT$` ohne Platzhalter hatte Lücken** -- eine über
+    drei Zeilen fortgesetzte Zeichenkette in Rust trug die Einrückung mit
+    („kaeme                             nicht vor“). Aufgefallen mit der
+    VB-Maske `"0.0"`, die hier `"%.1f"` heißt.
+23. **⏱ ⏰ ⏳ ⭐ standen als Fragezeichen da** -- die Emoji im Block
+    „Verschiedene technische Zeichen“ (U+231A..U+23FF) und in „Pfeile und
+    Symbole“ (U+2B00..U+2BFF) gingen an Segoe UI statt an die Emoji-Schrift.
+24. **Enter in einem modalen Fenster traf die Tabelle dahinter.** Der Fokus
+    blieb auf ihr, Enter war dort ein Doppelklick und öffnete das nächste
+    Fenster, statt den Standard-Knopf zu drücken (der echte Klicklauf
+    öffnete Details über Details). Jetzt nimmt `GUI_WINDOW_MODAL` den Fokus
+    aus anderen Fenstern und gibt ihn beim Gehen zurück (gui).
+
+**Fallen:** Ein Messlauf und der Abspiellauf teilen die Datei -- Testdaten
+erst löschen. Eine Probe, die die Datei des Projektordners braucht, setzt
+`DH_STUDIO_DATEN`; ohne liest sie `_studio/fridge_database.db`.
+
+Tests `tests/pruef/kuehlschrank/stufe4_rezepte.dhtest` (7: Katalogsuche mit
+den Punkten der Python-App, Wörter statt Teilzeichenketten und Import mit
+Beschreibung; Liste, Suche, Sortierungen, Schnellfilter; Kochen mit
+Portionen, ältestes zuerst, Rückgängig und Wiederholen, Fehlendes einkaufen;
+anlegen von Hand, verknüpfen, löschen mit Rückgängig; Vorschläge für
+Kochbares und Ablaufendes; Löschen in einer Datei mit Fremdschlüssel; echte
+Klicks mit Doppelklick, Enter in zwei Dialogen, Papierkorb und Strg+Z), je ein
+Fall in `compiler_warnungen`, `konsole_werkzeug`, `schriften_vorrat` und
+`gui_dialoge_ausbau`. Gegenproben: einunddreißig im Beispiel, sechs in der
+Laufzeit -- jede fällt in ihrem Fall. Sieben im Beispiel fielen erst nach
+neuen Proben (kurzes Wort mit Endung „Ei“/„Eis“, das größere von zwei
+passenden Produkten, Kochen über das verknüpfte Produkt, der Rang der
+Ablaufenden, der früheste Block bei difflib, Suche nur in den Zutaten, der
+Filter „schnell“ allein): grün waren sie vorher auch ohne die Stelle.
