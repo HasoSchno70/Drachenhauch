@@ -80,11 +80,12 @@ DIM z AS INTEGER
 DIM t AS INTEGER
 ' Abwechselnd fuenfmal, der beste Lauf zaehlt -- einmal gemessen flackerte
 ' der Fall auf dem macOS-Laeufer der CI (2026-09-24), dreimal gemessen auch
-' noch (2026-10-02).
+' noch (2026-10-02), fuenfmal auch (2026-11-07) -- jetzt neunmal, und ein
+' Fehlschlag nennt die Zeiten (hier sind beide fast gleich, 43 und 45 ms).
 DIM vorn AS INTEGER : vorn = 1000000
 DIM hinten AS INTEGER : hinten = 1000000
 DIM runde AS INTEGER
-FOR runde = 1 TO 5
+FOR runde = 1 TO 9
     t = MILLIS()
     FOR i = 1 TO 1000000 : z = ABS(i) : NEXT
     vorn = MIN(vorn, MILLIS() - t)
@@ -92,7 +93,11 @@ FOR runde = 1 TO 5
     FOR i = 1 TO 1000000 : z = CHART_COUNT(c) : NEXT
     hinten = MIN(hinten, MILLIS() - t)
 NEXT
-PRINT hinten < vorn * 3 \ 2 + 20
+IF hinten < vorn * 3 \ 2 + 20 THEN
+    PRINT "TRUE"
+ELSE
+    PRINT "FALSE: ABS "; vorn; " ms, CHART_COUNT "; hinten; " ms"
+END IF
 --- umgebung
 DHRT_JIT=aus
 --- erwartet
