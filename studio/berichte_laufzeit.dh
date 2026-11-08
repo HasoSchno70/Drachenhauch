@@ -213,11 +213,19 @@ FUNCTION studioBWoZerlegen(wo AS STRING) AS BOOLEAN
     studioBWoSp = LOWER$(TRIM$(LEFT$(wo, i)))
     studioBWoOp = op
     studioBWoWert = TRIM$(MID$(wo, i + LEN(op)))
+    ' Ein Wert in Anfuehrungszeichen darf leer sein: markt <> "" heisst
+    ' "nur, wenn markt etwas hat" (vorher galt das als unlesbar, und das
+    ' Element erschien nie).
+    DIM gequotet AS BOOLEAN : gequotet = FALSE
     IF LEN(studioBWoWert) >= 2 THEN
         DIM a AS STRING : a = LEFT$(studioBWoWert, 1)
-        IF (a = "'" OR a = CHR$(34)) AND RIGHT$(studioBWoWert, 1) = a THEN studioBWoWert = MID$(studioBWoWert, 1, LEN(studioBWoWert) - 2)
+        IF (a = "'" OR a = CHR$(34)) AND RIGHT$(studioBWoWert, 1) = a THEN
+            studioBWoWert = MID$(studioBWoWert, 1, LEN(studioBWoWert) - 2)
+            gequotet = TRUE
+        END IF
     END IF
     IF NOT REGEX_TEST(studioBWoSp, "^[a-z0-9_.]+$") THEN RETURN FALSE
+    IF gequotet THEN RETURN TRUE
     RETURN studioBWoWert <> "" AND INSTR("<>=", LEFT$(studioBWoWert, 1)) < 0
 END FUNCTION
 
