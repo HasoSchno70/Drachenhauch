@@ -77,7 +77,18 @@ END IF
 
 ' Je Shader die gewaehlte Stufe (-1 = noch nicht gezeigt); eine neue Szene
 ' beginnt eine Stufe ueber der tiefsten bisher, damit sie nicht erst stockt.
+'
+' Eine Stufe tiefer muss sich LOHNEN: bremst nicht die Grafikkarte, sondern
+' das Programm selbst (im Browser rechnet der Drachenhauch-Code ohne
+' Maschinencode, dazu Schnee und Ton), wird ein Bild in jeder Stufe gleich
+' langsam -- gemessen im Dorf 24..25 ms in Stufe 0 wie in Stufe 4. Ohne diese
+' Pruefung stieg die Regelung dann bis Stufe 4 hinab, und mit zu wenigen
+' Schritten zog der Wald dunkle Striche, ganz ohne Gewinn. Darum: ist das
+' Bild nach einem Schritt nicht um ein Zehntel schneller, zurueck und dort
+' bleiben (`stufeFest`).
 DIM stufeJe[64] AS INTEGER
+DIM stufeVorher[64] AS FLOAT     ' Bildzeit vor dem letzten Schritt (0 = keiner offen)
+DIM stufeFest[64] AS BOOLEAN
 DIM sj AS INTEGER
 FOR sj = 0 TO 63 : stufeJe[sj] = -1 : NEXT
 DIM tiefsteStufe AS INTEGER
@@ -95,11 +106,22 @@ SUB gueteNachziehen(sh AS INTEGER)
     ELSE
         messBilder = messBilder + 1
         IF messBilder > 0 THEN messSumme = messSumme + (jetzt - messLetzt)
-        IF messBilder >= 30 THEN
-            IF messSumme / messBilder > 0.02 AND stufeJe[sh] < 4 THEN
+        IF messBilder >= 30 AND NOT stufeFest[sh] THEN
+            DIM bildzeit AS FLOAT : bildzeit = messSumme / messBilder
+            IF stufeVorher[sh] > 0.0 AND bildzeit > stufeVorher[sh] * 0.9 THEN
+                ' der letzte Schritt hat nichts gebracht
+                stufeJe[sh] = stufeJe[sh] - 1
+                stufeFest[sh] = TRUE
+                tiefsteStufe = 0
+                FOR sj = 0 TO 63 : tiefsteStufe = MAX(tiefsteStufe, stufeJe[sj]) : NEXT
+                IF messen THEN PRINT "Shader "; sh; " zurueck auf Stufe "; stufeJe[sh]; " (bringt nichts)"
+            ELSEIF bildzeit > 0.02 AND stufeJe[sh] < 4 THEN
+                stufeVorher[sh] = bildzeit
                 stufeJe[sh] = stufeJe[sh] + 1
                 tiefsteStufe = MAX(tiefsteStufe, stufeJe[sh])
                 IF messen THEN PRINT "Shader "; sh; " -> Stufe "; stufeJe[sh]
+            ELSE
+                stufeVorher[sh] = 0.0
             END IF
             messBilder = 0 : messSumme = 0.0
         END IF

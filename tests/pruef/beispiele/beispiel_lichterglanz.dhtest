@@ -613,3 +613,30 @@ PRINT "alles gebaut "; bauPos = LEN(bauKey); ", mehr als 250 klaenge "; AUDIO_SO
 IMPORT "{sammlung}/../../../examples/lichterglanz/musik.dh"
 --- erwartet
 alles gebaut TRUE, mehr als 250 klaenge TRUE
+
+=== die guete sinkt nicht, wenn das programm bremst
+' Im Browser bremst nicht die Grafikkarte, sondern das Programm selbst: ein
+' Bild dauert in jeder Stufe gleich lang. Hier nachgestellt mit 25 ms je Bild,
+' ganz gleich in welcher Stufe -- die Regelung probiert eine Stufe, sieht,
+' dass es nichts bringt, und kehrt um, statt bis Stufe 4 hinabzusteigen (wo
+' der Wald im Dorf dunkle Striche zog).
+--- programm ../../../examples/lichterglanz/main.dh
+--- ersetzen IMPORT "musik.dh"
+IMPORT "{sammlung}/../../../examples/lichterglanz/musik.dh"
+--- ersetzen     DIM h AS INTEGER : h = SHADER_LOAD("assets/shader/" + name + ".fs")
+    DIM h AS INTEGER : h = SHADER_LOAD("{sammlung}/../../../examples/lichterglanz/assets/shader/" + name + ".fs")
+--- ersetzen IF festeStufe < 0 AND GETENV$("DHRT_FRAMES") <> "" THEN festeStufe = 0
+' (die Stufe bleibt frei)
+--- ersetzen IF messBilder > 0 THEN messSumme = messSumme + (jetzt - messLetzt)
+IF messBilder > 0 THEN messSumme = messSumme + 0.025
+--- argumente
+--fenster
+--messen
+--ab
+12
+--- umgebung
+DHRT_FRAMES=200
+DH_OHNE_AUDIO=1
+--- enthaelt
+-> Stufe 1
+zurueck auf Stufe 0 (bringt nichts)
