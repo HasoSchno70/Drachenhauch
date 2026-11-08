@@ -54,6 +54,11 @@ DIM lwZiehX AS FLOAT
 DIM lwZiehY AS FLOAT
 DIM lwMausX AS INTEGER
 DIM lwMausY AS INTEGER
+' Die Vorfuehrung setzt den Zeiger selbst (lwMausX/Y); solange das gilt,
+' setzt ihn ein echtes Verlassen oder Bewegen nicht zurueck -- ein Fenster,
+' das ueber der Leinwand aufgeht (ein anderer Testlauf), schickt sonst ein
+' leave-notify, und die Marke im Lineal fehlt auf dem Foto.
+DIM lwMausFest AS BOOLEAN
 DIM lwSchrift AS INTEGER              ' PangoFontDescription
 DIM lwEingepasst AS BOOLEAN           ' beim ersten Zeichnen einpassen
 DIM lwZeile AS INTEGER                ' Bytes je Bildzeile in lwPuffer
@@ -896,7 +901,7 @@ FUNCTION lwBewegung(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOL
     DIM mx AS INTEGER : mx = leinwandZelleX(px)
     DIM my AS INTEGER : my = leinwandZelleY(py)
     IF mx < 0 OR my < 0 THEN mx = -1 : my = -1
-    IF lwZiehen OR mx <> lwMausX OR my <> lwMausY THEN
+    IF (NOT lwMausFest) AND (lwZiehen OR mx <> lwMausX OR my <> lwMausY) THEN
         lwMausX = mx
         lwMausY = my
         gtk_widget_queue_draw(lwFlaeche)
@@ -906,7 +911,7 @@ FUNCTION lwBewegung(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOL
 END FUNCTION
 
 FUNCTION lwVerlassen(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
-    IF lwMausX >= 0 THEN
+    IF lwMausX >= 0 AND NOT lwMausFest THEN
         lwMausX = -1
         lwMausY = -1
         gtk_widget_queue_draw(lwFlaeche)
