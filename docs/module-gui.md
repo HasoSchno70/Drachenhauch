@@ -1425,7 +1425,9 @@ Was eine Liste bequem macht, kann die Tabelle im **Zeilenmodus** genauso:
 
 * **Doppelklick oder Enter** auf eine Zeile meldet `GUI_DOUBLE_CLICKED(tbl)`
   ein Bild lang — „öffnen“ ohne eigene Doppelklick-Erkennung. Ein Doppelklick
-  auf eine bearbeitbare Textzelle bearbeitet sie weiterhin, statt zu melden.
+  auf eine bearbeitbare Textzelle bearbeitet sie weiterhin, statt zu melden;
+  einer auf eine Zelle der Art `knopf` oder `haken` sind zwei Klicks darauf
+  (`GUI_TABLE_CLICKED`), kein Doppelklick der Zeile.
 * **F2** bearbeitet die erste freigegebene Textspalte der gewählten Zeile
   (`GUI_TABLE_COL_EDIT`, in Anzeige-Reihenfolge). Im Zellmodus bearbeitet F2
   wie bisher die aktuelle Zelle.

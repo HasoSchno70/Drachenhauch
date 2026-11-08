@@ -1422,7 +1422,9 @@ What makes a list box comfortable, the table can do just as well in **row mode**
 
 * **Double click or Enter** on a row reports `GUI_DOUBLE_CLICKED(tbl)` for
   one frame — “open” without your own double-click detection. A double click
-  on an editable text cell still edits it instead of reporting.
+  on an editable text cell still edits it instead of reporting; one on a
+  cell of kind `knopf` or `haken` is two clicks on it (`GUI_TABLE_CLICKED`),
+  not a double click of the row.
 * **F2** edits the first enabled text column of the selected row
   (`GUI_TABLE_COL_EDIT`, in display order). In cell mode F2 edits the current
   cell as before.

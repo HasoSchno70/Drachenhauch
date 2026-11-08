@@ -414,3 +414,53 @@ e 2 8 0 -3 0 0
 DHRT_FRAMES=5
 --- bild
 200 81 #00FF00 +-60
+
+=== ein doppelklick auf einen knopf in der zelle oeffnet die zeile nicht
+' Zweimal schnell auf "+1" (Knopf in Spalte 1, x 150..289) sind zwei Klicks
+' auf den Knopf: GUI_TABLE_CLICKED/_COL melden beide, GUI_DOUBLE_CLICKED
+' keinen (gefunden mit der Kuehlschrank-App -- dort ging der Bearbeiten-
+' Dialog auf). Derselbe Doppelklick auf die Textspalte meldet weiter: der
+' zweite Druck ist der Doppelklick, sein Loslassen der zweite Klick.
+IMPORT "gui"
+SCREEN(300, 220, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 220)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM tb AS GUI_WIDGET : tb = GUI_TABLE(w, 10, 10, 280, 200)
+GUI_TABLE_HEADERS(tb, ["Name", "Aktion"])
+GUI_TABLE_ADD_ROW(tb, ["Apfel", "+1"]) : GUI_TABLE_ADD_ROW(tb, ["Birne", "+1"])
+GUI_TABLE_COL_WIDTHS(tb, [140, 140])
+GUI_TABLE_CELL_KIND(tb, 0, 1, "knopf")
+GUI_TABLE_CELL_KIND(tb, 1, 1, "knopf")
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_TABLE_CLICKED(tb) >= 0 THEN PRINT "klick "; GUI_TABLE_CLICKED(tb); " "; GUI_TABLE_CLICKED_COL(tb)
+    IF GUI_DOUBLE_CLICKED(tb) THEN PRINT "doppel "; GUI_TABLE_SELECTED(tb)
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 12
+e 0 7 5 215 0 0
+e 1 7 200 42 0 0
+e 2 6 0 0 0 0
+e 3 5 0 0 0 0
+e 4 6 0 0 0 0
+e 5 5 0 0 0 0
+e 12 7 60 62 0 0
+e 13 6 0 0 0 0
+e 14 5 0 0 0 0
+e 15 6 0 0 0 0
+e 16 5 0 0 0 0
+e 17 7 60 62 0 0
+
+--- umgebung
+DHRT_FRAMES=22
+--- erwartet
+klick 0 1
+klick 0 1
+klick 1 0
+doppel 1
+klick 1 0
