@@ -46,6 +46,20 @@ CONST AB_MITTERNACHT = 96
 CONST AB_STERN = 99
 CONST AB_AUS = 100
 CONST RUECKUNG = 2
+' Wann sich am Kranz die naechste Kerze entzuendet (in Takten nach Beginn)
+CONST KERZE_AN = 0.75
+
+' Wie viele Kerzen am Kranz brennen (mit Bruchteil: die naechste entzuendet
+' sich gerade) -- fuer die Bilder, im selben Augenblick wie der Glockenschlag
+' (Abschnitt Kerzen in schrittPlanen). Die erste im Intro auf Takt 5, die
+' weiteren eine punktierte Halbe nach Beginn des Zwischenspiels, wenn das
+' Licht des Uebergangs gewichen ist.
+FUNCTION kerzenBrennen(takt AS FLOAT) AS FLOAT
+    IF takt < AB_KRANZ2 THEN RETURN CLAMP((takt - 4.9) * 2.5, 0.0, 1.0)
+    IF takt < AB_KRANZ3 THEN RETURN 1.0 + CLAMP((takt - (AB_KRANZ2 + KERZE_AN)) * 2.0, 0.0, 1.0)
+    IF takt < AB_KRANZ4 THEN RETURN 2.0 + CLAMP((takt - (AB_KRANZ3 + KERZE_AN)) * 2.0, 0.0, 1.0)
+    RETURN 3.0 + CLAMP((takt - (AB_KRANZ4 + KERZE_AN)) * 2.0, 0.0, 1.0)
+END FUNCTION
 
 FUNCTION msJeSchritt() AS FLOAT
     RETURN 60000.0 / TEMPO / 4.0
@@ -1172,7 +1186,9 @@ SUB schrittPlanen(n AS INTEGER)
     END IF
 
     ' --- Kerzen --- jede Kerze, die sich entzuendet, mit einem Glockenschlag
-    IF s = 0 AND (takt = 5 OR takt = AB_KRANZ2 OR takt = AB_KRANZ3 OR takt = AB_KRANZ4) THEN
+    ' (am Kranz eine punktierte Halbe nach der Eins, wenn das Licht des
+    ' Uebergangs gewichen ist -- main.dh zuendet sie im selben Augenblick)
+    IF (s = 0 AND takt = 5) OR (s = KERZE_AN * SCHRITTE_JE_TAKT AND (takt = AB_KRANZ2 OR takt = AB_KRANZ3 OR takt = AB_KRANZ4)) THEN
         spielen(roehrenglocke(IIF(takt = 5, 55, IIF(takt = AB_KRANZ2, 58, IIF(takt = AB_KRANZ3, 62, 67)))), n, 0.6)
     END IF
 

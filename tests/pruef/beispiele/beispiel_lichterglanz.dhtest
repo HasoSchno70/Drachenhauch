@@ -491,6 +491,26 @@ IMPORT "{sammlung}/../../../examples/lichterglanz/musik.dh"
 1.00 0.50
 TRUE
 
+=== jede kerze entzuendet sich sichtbar, nach dem licht des uebergangs
+' Am Kranz brennt zu Beginn jedes Zwischenspiels nur, was schon brannte; die
+' naechste Kerze entzuendet sich erst, wenn das Licht des Uebergangs gewichen
+' ist, im Schritt des Glockenschlags (frueher schon nach 0.3 Takten, noch
+' hinter dem Licht -- man sah sie nur noch brennen).
+IMPORT "musik_hier.dh"
+PRINT kerzenBrennen(4.0); " "; kerzenBrennen(6.0)
+PRINT kerzenBrennen(AB_KRANZ2 + 0.6); " "; kerzenBrennen(AB_KRANZ2 + 1.3)
+PRINT kerzenBrennen(AB_KRANZ3 + 0.6); " "; kerzenBrennen(AB_KRANZ3 + 1.3)
+PRINT kerzenBrennen(AB_KRANZ4 + 0.6); " "; kerzenBrennen(AB_KRANZ4 + 1.3)
+PRINT "glocke im schritt "; KERZE_AN * SCHRITTE_JE_TAKT
+--- datei musik_hier.dh
+IMPORT "{sammlung}/../../../examples/lichterglanz/musik.dh"
+--- erwartet
+0.0 1.0
+1.0 2.0
+2.0 3.0
+3.0 4.0
+glocke im schritt 12.0
+
 === das glockenmotiv laeuft gegen den takt
 ' B-A-B-G in Sechzehnteln, 6 + 6 + 4 Schritte, jeden Takt wieder auf der Eins
 IMPORT "musik_hier.dh"

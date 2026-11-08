@@ -483,12 +483,17 @@ SUB uebergang(sh AS INTEGER, aus AS FLOAT, ein AS FLOAT, r AS FLOAT, g AS FLOAT,
     SHADER_SET3(sh, "uebLicht", r, g, b)
 END SUB
 
-' Ein Zwischenspiel am Kranz (zwei Takte): die naechste Kerze entzuendet sich,
-' die Kamera faehrt in ihre Flamme, das Licht fuehrt ins naechste Kapitel.
-SUB kranzZeigen(sh AS INTEGER, takt AS FLOAT, von AS FLOAT, brennen AS FLOAT, k AS INTEGER, bis AS FLOAT)
-    SHADER_SET(sh, "kerzen", brennen + CLAMP((takt - (von + 0.3)) * 2.5, 0.0, 1.0))
-    SHADER_SET(sh, "fokus", CLAMP((takt - (bis - 1.3)) / 1.3, 0.0, 1.0))
+' Ein Zwischenspiel am Kranz (zwei Takte): wenn das Licht des Uebergangs
+' gewichen ist, entzuendet sich die naechste Kerze (auf den Glockenschlag in
+' musik.dh), dann faehrt die Kamera in ihre Flamme und das Licht fuehrt ins
+' naechste Kapitel. Frueher entzuendete sie sich noch hinter dem Licht --
+' man sah sie schon brennen.
+SUB kranzZeigen(sh AS INTEGER, takt AS FLOAT, von AS FLOAT, k AS INTEGER, bis AS FLOAT)
+    SHADER_SET(sh, "kerzen", kerzenBrennen(takt))
+    SHADER_SET(sh, "fokus", CLAMP((takt - (bis - 0.8)) / 0.8, 0.0, 1.0))
     SHADER_SET(sh, "ziel", k)
+    SHADER_SET(sh, "phase", CLAMP((takt - von) / (bis - von), 0.0, 1.0))
+    SHADER_SET(sh, "bogen", 0.55)
 END SUB
 
 ' Die Farbe jedes Akkords: die Nacht (g-Moll) in kalten Toenen -- tiefblau,
@@ -593,21 +598,23 @@ WHILE NOT beenden
         sh = shKranz
         IF takt < AB_DORF THEN
             SHADER_SET(sh, "hell", CLAMP(takt / 1.5, 0.0, 1.0))
-            SHADER_SET(sh, "kerzen", CLAMP((takt - 4.9) * 2.5, 0.0, 1.0))
+            SHADER_SET(sh, "kerzen", kerzenBrennen(takt))
             SHADER_SET(sh, "fokus", CLAMP((takt - 6.4) / 1.6, 0.0, 1.0))
             SHADER_SET(sh, "ziel", 0)
+            SHADER_SET(sh, "phase", CLAMP(takt / AB_DORF, 0.0, 1.0))
+            SHADER_SET(sh, "bogen", 1.4)
             uebergang(sh, vorEnde(takt, AB_DORF), 1.0, 1.0, 0.75, 0.45)
         ELSEIF takt < AB_MARKT THEN
             SHADER_SET(sh, "hell", 1.0)
-            kranzZeigen(sh, takt, AB_KRANZ2, 1.0, 1, AB_MARKT)
+            kranzZeigen(sh, takt, AB_KRANZ2, 1, AB_MARKT)
             uebergang(sh, vorEnde(takt, AB_MARKT), nachBeginn(takt, AB_KRANZ2), 1.0, 0.75, 0.45)
         ELSEIF takt < AB_WALD THEN
             SHADER_SET(sh, "hell", 1.0)
-            kranzZeigen(sh, takt, AB_KRANZ3, 2.0, 2, AB_WALD)
+            kranzZeigen(sh, takt, AB_KRANZ3, 2, AB_WALD)
             uebergang(sh, vorEnde(takt, AB_WALD), nachBeginn(takt, AB_KRANZ3), 1.0, 0.75, 0.45)
         ELSE
             SHADER_SET(sh, "hell", 1.0)
-            kranzZeigen(sh, takt, AB_KRANZ4, 3.0, 3, AB_SCHLITTEN)
+            kranzZeigen(sh, takt, AB_KRANZ4, 3, AB_SCHLITTEN)
             uebergang(sh, vorEnde(takt, AB_SCHLITTEN), nachBeginn(takt, AB_KRANZ4), 1.0, 0.75, 0.45)
         END IF
     ELSEIF takt < AB_KRANZ2 THEN

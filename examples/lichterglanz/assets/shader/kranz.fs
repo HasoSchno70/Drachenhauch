@@ -2,7 +2,9 @@
 // Der Adventskranz: Tannengruen auf einem Holztisch, vier rote Kerzen, rotes
 // Samtband, Beeren. `kerzen` (0..4) sagt, wie viele brennen (mit Bruchteil: die
 // naechste entzuendet sich gerade), `fokus` (0..1) faehrt die Kamera in die
-// Flamme der Kerze `ziel` hinein -- dort beginnt das naechste Kapitel. Im
+// Flamme der Kerze `ziel` hinein -- dort beginnt das naechste Kapitel. Die
+// Kamera steht dabei immer vor dieser Kerze, damit die Fahrt frei in sie
+// hineingeht und keine andere davor steht. Im
 // Hintergrund unscharfe Lichter einer Lichterkette. Text und Zeichnungen der
 // Demo liegen in texture0 und werden obenauf gelegt.
 in vec2 fragTexCoord;
@@ -13,6 +15,8 @@ uniform float hell;      // Blende: 0 schwarz .. 1 voll
 uniform float kerzen;    // wie viele Kerzen brennen
 uniform float fokus;     // Fahrt in die Flamme
 uniform float ziel;      // ... welcher Kerze
+uniform float phase;     // wie weit das Zwischenspiel ist (0..1)
+uniform float bogen;     // wie weit die Kamera dabei um den Kranz zieht
 uniform float kick;
 uniform float ton;
 uniform float hoehe;
@@ -166,6 +170,9 @@ vec3 flammenLicht(vec3 ro, vec3 rd, float tmax) {
         vec3 fl = mix(vec3(1.0, 0.45, 0.08), vec3(1.0, 0.95, 0.75), smoothstep(0.2, 0.9, kern));
         fl = mix(vec3(0.25, 0.4, 1.0), fl, smoothstep(-0.05, -0.015, y));
         c += fl * kern * 3.5 * b;
+        // beim Entzuenden flammt sie kurz auf
+        float auf = sin(b * 3.14159) * step(b, 0.999);
+        c += vec3(1.0, 0.75, 0.4) * auf * (exp(-dot(q, q) * 160.0) * 2.5 + exp(-dot(q, q) * 18.0) * 0.5);
         // Schein
         float d2 = dot(q, q);
         c += vec3(1.0, 0.6, 0.25) * exp(-d2 * 45.0) * 0.55 * b * (1.0 + 0.4 * ton);
@@ -203,13 +210,18 @@ void main() {
     vec2 uv = (fragTexCoord * resolution - 0.5 * resolution) / resolution.y;
     // Kamera: kreist langsam schraeg ueber dem Kranz; mit `fokus` faehrt sie
     // auf die Flamme der Zielkerze zu, bis sie das Bild fuellt
-    float w = 0.9 + time * 0.06;
+    // vor der Zielkerze, ein wenig seitlich, und waehrend des Zwischenspiels
+    // zieht sie langsam auf sie zu
+    float w = kerzenWinkel(ziel) + 0.35 + bogen * (1.0 - phase);
     vec3 ro = vec3(cos(w) * 2.9, 1.75, sin(w) * 2.9);
     vec3 ta = vec3(0.0, 0.25, 0.0);
     vec3 fz = flamme(ziel);
     float f = fokus * fokus * (3.0 - 2.0 * fokus);
     ro = mix(ro, fz + normalize(ro - fz) * 0.12 + vec3(0.0, 0.02, 0.0), f);
-    ta = mix(ta, fz + vec3(0.0, 0.03, 0.0), smoothstep(0.0, 0.6, fokus));
+    // gleich nach dem Entzuenden richtet sie den Blick auf die neue Flamme --
+    // dort, in der Bildmitte, oeffnet sich dann das Licht des Uebergangs
+    float blick = max(smoothstep(0.4, 0.62, phase), smoothstep(0.0, 0.6, fokus));
+    ta = mix(ta, fz + vec3(0.0, 0.03, 0.0), blick);
     vec3 vorne = normalize(ta - ro);
     vec3 rechts = normalize(cross(vec3(0, 1, 0), vorne));
     vec3 oben = cross(vorne, rechts);
