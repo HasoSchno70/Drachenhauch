@@ -637,6 +637,10 @@ WHILE NOT beenden
         ' juengste schon aufgegangen ist
         DIM schritt AS FLOAT : schritt = musikSchritt()
         SHADER_SET(sh, "kugeln", kugelnBei(schritt))
+        ' der Baum entfaltet sich, sobald das Fenster aufgeht, dann laeuft
+        ' das Licht die Kette hinauf
+        SHADER_SET(sh, "aufbau", CLAMP((takt - (AB_STUBE + 2.4)) / 4.0, 0.0, 1.0))
+        SHADER_SET(sh, "kette", CLAMP((takt - (AB_STUBE + 5.5)) / 3.0, 0.0, 1.0))
         SHADER_SET(sh, "glocke", glockenSchlag(takt))
         SHADER_SET(sh, "stern", CLAMP((takt - AB_STERN) * 2.0, 0.0, 1.0))
         SHADER_SET(sh, "nacht", CLAMP((takt - (AB_MITTERNACHT - 2)) / 2.0, 0.0, 1.0))
