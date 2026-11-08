@@ -431,6 +431,19 @@ auf und kopiert ihre Zeilen um (SQLite kann eine Spalte nicht ändern);
 Spalten und Tabellen, die das Programm selbst angelegt hat, bleiben dabei
 stehen. Löschen und Umbenennen lassen sich nicht zurücknehmen.
 
+**Eine Datei, die es schon gibt** (aus einem anderen Programm), nimmt
+Projekt → Datenbank aus Datei übernehmen: die Datei kommt in den
+Projektordner (liegt sie schon dort, bleibt sie), ihr Aufbau wird das
+Schema -- Arten, Pflicht, Vorgaben, Eindeutig (UNIQUE über eine Spalte) und
+Verweise (FOREIGN KEY auf eine `id`). Was keine Art des Studios genau trifft
+(`DATE`, `TIMESTAMP`, `DEFAULT CURRENT_TIMESTAMP`, eine
+Pflichtspalte ohne Vorgabe), steht wörtlich daneben und gilt, bis man Art
+oder Vorgabe im Gitter ändert; so baut der Abgleich danach keine Tabelle
+neu auf, und die Datei bleibt Zeichen für Zeichen, wie sie war. Was das
+Schema nicht fassen kann (UNIQUE über zwei Spalten, eine Tabelle ohne `id`),
+bleibt in der Datei und steht in einer Meldung; eine Tabelle ohne `id` zeigt
+und bearbeitet der Reiter trotzdem, binden lässt sie sich nicht.
+
 Im Programm ist die Datenbank eine globale Verbindung unter ihrem Namen,
 offen, bevor die App startet:
 

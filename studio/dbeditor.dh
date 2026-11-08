@@ -428,12 +428,12 @@ SUB dbSpaltenFuellen(r AS Reiter)
     DIM k AS INTEGER
     FOR k = 0 TO dbSpZahl(s, t) - 1
         DIM tn AS STRING : tn = dbTypName$(dbSp$(s, t, k, "typ"))
-        DIM z AS INTEGER : z = GUI_TABLE_ADD_ROW(a.gitSp, [dbSp$(s, t, k, "name"), tn, "", "", dbSp$(s, t, k, "vorgabe"), dbSp$(s, t, k, "verweis")])
+        DIM z AS INTEGER : z = GUI_TABLE_ADD_ROW(a.gitSp, [dbSp$(s, t, k, "name"), tn, "", "", dbSpVorgabe$(s, t, k), dbSp$(s, t, k, "verweis")])
         GUI_TABLE_CELL_KIND(a.gitSp, z, 2, "haken")
         GUI_TABLE_CELL_KIND(a.gitSp, z, 3, "haken")
         GUI_TABLE_CELL_VALUE(a.gitSp, z, 2, IIF(dbSpAn(s, t, k, "pflicht"), 1.0, 0.0))
         GUI_TABLE_CELL_VALUE(a.gitSp, z, 3, IIF(dbSpAn(s, t, k, "eindeutig"), 1.0, 0.0))
-        ARRAY_PUSH(a.spStand, dbSpZeile$(dbSp$(s, t, k, "name"), tn, dbSpAn(s, t, k, "pflicht"), dbSpAn(s, t, k, "eindeutig"), dbSp$(s, t, k, "vorgabe"), dbSp$(s, t, k, "verweis")))
+        ARRAY_PUSH(a.spStand, dbSpZeile$(dbSp$(s, t, k, "name"), tn, dbSpAn(s, t, k, "pflicht"), dbSpAn(s, t, k, "eindeutig"), dbSpVorgabe$(s, t, k), dbSp$(s, t, k, "verweis")))
     NEXT
 END SUB
 

@@ -429,6 +429,7 @@ SUB befehle()
     IF GUI_CLICKED(miModulNeu) THEN elementFragen("modul")
     IF GUI_CLICKED(miKlasseNeu) THEN elementFragen("klasse")
     IF GUI_CLICKED(miDatenbankNeu) THEN elementFragen("datenbank")
+    IF GUI_CLICKED(miDatenbankDatei) THEN datenbankUebernehmenFragen()
     IF GUI_CLICKED(miBerichtNeu) THEN elementFragen("bericht")
     IF GUI_CLICKED(miMethodeNeu) OR t = tbMethode THEN methodeDialog(elementJetzt())
     IF GUI_CLICKED(miEreignisNeu) OR t = tbEreignis THEN
@@ -678,6 +679,8 @@ WHILE NOT beenden
     IF bildNr = 4 AND GETENV$("DH_STUDIO_LOESCHEN") <> "" THEN elementLoeschenFragen(elementIndex(GETENV$("DH_STUDIO_LOESCHEN")))
     ' Fuer Pruefungen: DH_STUDIO_OEFFNEN=<Element>[.<Tabelle>] wie ein Klick im Navigator.
     IF bildNr = 4 AND GETENV$("DH_STUDIO_OEFFNEN") <> "" THEN elementOeffnenNach(GETENV$("DH_STUDIO_OEFFNEN"))
+    ' Fuer Pruefungen: DH_STUDIO_UEBERNEHMEN=<datei> wie Projekt -> Datenbank aus Datei uebernehmen.
+    IF bildNr = 4 AND GETENV$("DH_STUDIO_UEBERNEHMEN") <> "" THEN datenbankUebernehmen(GETENV$("DH_STUDIO_UEBERNEHMEN"))
     IF controlsNachBild > 0 THEN
         controlsNachBild = controlsNachBild - 1
         IF controlsNachBild = 0 THEN controlsProtokollieren()

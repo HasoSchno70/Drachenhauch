@@ -423,6 +423,19 @@ were. Changing a column rebuilds the table and copies its rows (SQLite
 cannot change a column); columns and tables the program created by itself
 stay. Deleting and renaming cannot be undone.
 
+**A file that already exists** (from another program) is taken over with
+Project → Database from file: the file goes into the project folder (if it
+is already there, it stays), its structure becomes the schema -- types,
+required, defaults, unique (UNIQUE over one column) and references (FOREIGN
+KEY to an `id`). What no Studio type matches exactly (`DATE`, `TIMESTAMP`,
+`DEFAULT CURRENT_TIMESTAMP`, a required column without a
+default) is kept verbatim next to it and applies until you change the type
+or the default in the grid; so the sync afterwards rebuilds no table, and
+the file stays exactly as it was. What the schema cannot hold (UNIQUE over
+two columns, a table without `id`) stays in the file and is listed in a
+message; the tab still shows and edits a table without `id`, but it cannot
+be bound.
+
 In the program the database is a global connection under its name, open
 before the app starts:
 

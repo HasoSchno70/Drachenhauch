@@ -672,3 +672,86 @@ lauf TRUE
 gebaut TRUE
 daten mit TRUE
 exe kunden 2
+
+=== eine fremde datei uebernehmen legt das element an und laesst die datei, wie sie ist
+' Projekt -> Datenbank aus Datei uebernehmen (DH_STUDIO_UEBERNEHMEN statt des
+' Menues und des Dialogs): die Datei kommt in den Projektordner, ihr Aufbau
+' wird das Element Kuehl, die Hinweise (keine id, UNIQUE ueber zwei Spalten)
+' stehen in einer Meldung. Enter schliesst sie, Strg+S sichert -- danach ist
+' die Kopie Zeichen fuer Zeichen so gebaut wie das Original.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+SETENV("DH_STUDIO_UEBERNEHMEN", CWD$() + "/fremd/kuehl.db")
+DIM log AS STRING : log = CWD$() + "/s.log"
+slHin(10, 10)
+slWarten(14)
+slTaste(257)
+slWarten(6)
+slMit([341], 83)
+slWarten(10)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+slStarten(log, CWD$() + "/ev.txt", slBild + 10, p)
+DIM z AS STRING
+FOR EACH z IN slAnfang(log, "db ")
+    PRINT z
+NEXT
+PRINT "gesichert "; slHat(log, "gesichert " + p)
+PRINT "kopie "; FILEEXISTS(p + "/kuehl.db"); " gleich "; aufbau$(p + "/kuehl.db") = aufbau$(CWD$() + "/fremd/kuehl.db")
+DIM j AS JSON_HANDLE : j = JSON_PARSE(READALL(p + "/projekt.dhstudio"))
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(j, "elemente") - 1
+    IF JSON_GET_STRING(j, "elemente." + STR$(i) + ".art") = "datenbank" THEN PRINT "element "; JSON_GET_STRING(j, "elemente." + STR$(i) + ".name"); " "; JSON_GET_STRING(j, "elemente." + STR$(i) + ".schema")
+NEXT
+DIM s AS JSON_HANDLE : s = JSON_PARSE(READALL(p + "/Kuehl.dhdb"))
+PRINT "datei "; JSON_GET_STRING(s, "datei"); " tabellen "; JSON_LEN(s, "tabellen")
+PRINT "ablauf "; JSON_GET_STRING(s, "tabellen.1.spalten.1.name"); " "; JSON_GET_STRING(s, "tabellen.1.spalten.1.sql")
+FUNCTION aufbau$(pfad AS STRING) AS STRING
+    DIM db AS DB_CONN : db = DB_OPEN(pfad)
+    DIM t AS ARRAY OF STRING : t = []
+    DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT name, IFNULL(sql, '') FROM sqlite_master ORDER BY name")
+    WHILE DB_NEXT(r)
+        ARRAY_PUSH(t, DB_GET_STRING(r, 0) + " " + DB_GET_STRING(r, 1))
+    WEND
+    r = DB_QUERY(db, "SELECT name, created_at FROM products")
+    WHILE DB_NEXT(r)
+        ARRAY_PUSH(t, DB_GET_STRING(r, 0) + " " + DB_GET_STRING(r, 1))
+    WEND
+    DB_CLOSE(db)
+    RETURN JOIN$(t, CHR$(10))
+END FUNCTION
+--- argumente
+{sammlung}/../../../studio/studio.dh
+--- vorher
+IMPORT "db"
+MKDIR("fremd")
+DIM db AS DB_CONN : db = DB_OPEN("fremd/kuehl.db")
+DB_EXEC(db, "CREATE TABLE products (id INTEGER PRIMARY KEY AUTOINCREMENT, barcode TEXT UNIQUE, name TEXT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
+DB_EXEC(db, "CREATE TABLE inventory (id INTEGER PRIMARY KEY AUTOINCREMENT, product_id INTEGER NOT NULL, expiry_date DATE, FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE CASCADE)")
+DB_EXEC(db, "CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+DB_EXEC(db, "CREATE TABLE product_stores (id INTEGER PRIMARY KEY, product_id INTEGER, store_name TEXT, UNIQUE(product_id, store_name))")
+DB_EXEC(db, "INSERT INTO products (barcode, name) VALUES ('4000', 'Milch')")
+DB_CLOSE(db)
+--- datei laeufer.dh
+IMPORT "db"
+IMPORT "json"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"}]}
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":420,"h":300,"widgets":[]}
+--- datei proj/Hauptfenster.dh
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+END CLASS
+--- datei proj/App.dh
+CLASS App EXTENDS StudioApp
+END CLASS
+--- erwartet
+db uebernommen Kuehl kuehl.db 4
+db hinweis app_settings hat keine Spalte id INTEGER PRIMARY KEY -- das Studio zeigt sie, binden lässt sie sich nicht.
+db hinweis product_stores: eindeutig über (product_id, store_name) bleibt in der Datei -- das Studio kennt nur eindeutige Einzelspalten.
+gesichert TRUE
+kopie TRUE gleich TRUE
+element Kuehl Kuehl.dhdb
+datei kuehl.db tabellen 4
+ablauf expiry_date DATE
