@@ -370,6 +370,9 @@ Keine Vorschläge an dieser Stelle.	No suggestions here.
 Breite	Width
 Höhe	Height
 Größe änderbar	Resizable
+Standard-Knopf (Enter)	Default button (Enter)
+Abbrechen-Knopf (Esc)	Cancel button (Esc)
+(keiner)	(none)
 Intervall (ms)	Interval (ms)
 Läuft beim Start	Runs at start
 Wiederholt sich	Repeats

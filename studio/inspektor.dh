@@ -78,6 +78,9 @@ SUB inspektorAnlegen()
     inspZeile("Fenster", "w", "Breite", "zahl", "fenster", "")
     inspZeile("Fenster", "h", "Höhe", "zahl", "fenster", "")
     inspZeile("Fenster", "resizable", "Größe änderbar", "schalter", "fenster", "")
+    ' Welcher Knopf Enter bzw. Esc bekommt -- beim Namen, wie in Xojo.
+    inspZeile("Fenster", "studio_standard", "Standard-Knopf (Enter)", "knopfwahl", "fenster", "")
+    inspZeile("Fenster", "studio_abbrechen", "Abbrechen-Knopf (Esc)", "knopfwahl", "fenster", "")
     ' Ein eigenes Control legt fest, was es meldet und was eine Instanz
     ' einstellen kann; eine Instanz traegt ihre Werte (modell.dh).
     inspGruppe("Eigenes Control")
@@ -188,6 +191,9 @@ SUB inspektorAnlegen()
                 ' Die Werte einer "wahl" sind Woerter der Laufzeit und bleiben, wie sie
                 ' sind; bei "wahlindex" zaehlt nur die Stelle.
                 z.ed = GUI_DROPDOWN(win, 0, 0, 10, 26, SPLIT(IIF(z.art = "wahlindex", tr$(z.wahl), z.wahl), ";"))
+            CASE "knopfwahl"
+                ' Die Knoepfe des Fensters; inspektorFuellen setzt sie ein.
+                z.ed = GUI_DROPDOWN(win, 0, 0, 10, 26, [tr$("(keiner)")])
             CASE "farbe"
                 z.ed = GUI_BUTTON(win, tr$("Vorgabe"), 0, 0, 10, 26)
                 GUI_ADD_CLASS(z.ed, "farbfeld")
@@ -221,12 +227,23 @@ SUB inspDazu(w AS GUI_WIDGET)
     GUI_PANEL_ADD(inspPanel, w)
 END SUB
 
+' Die Namen der Knoepfe im Fenster (fuer Standard- und Abbrechen-Knopf).
+FUNCTION knoepfeDesFensters() AS ARRAY OF STRING
+    DIM aus AS ARRAY OF STRING : aus = []
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(doc, "widgets") - 1
+        DIM art AS STRING : art = feldText$(i, "kind")
+        IF (art = "button" OR art = "iconbutton") AND feldText$(i, "name") <> "" THEN ARRAY_PUSH(aus, feldText$(i, "name"))
+    NEXT
+    RETURN aus
+END FUNCTION
+
 FUNCTION giltFuer(z AS InspZeile, art AS STRING) AS BOOLEAN
     IF abstandL >= 0 THEN RETURN z.art = "gewicht"
     IF trayWahl >= 0 THEN RETURN z.fuer = "timer"
     IF auswahl < 0 THEN
         ' Ein eigenes Control hat keinen Titel und waechst mit seiner Instanz.
-        IF z.fuer = "fenster" AND entwurfIstControl() THEN RETURN z.schluessel <> "title" AND z.schluessel <> "resizable" AND z.schluessel <> "studio_tabelle"
+        IF z.fuer = "fenster" AND entwurfIstControl() THEN RETURN z.schluessel <> "title" AND z.schluessel <> "resizable" AND z.schluessel <> "studio_tabelle" AND z.art <> "knopfwahl"
         IF z.schluessel = "studio_ereignisse" OR z.schluessel = "studio_eigenschaften" THEN RETURN FALSE
         RETURN z.fuer = "fenster"
     END IF
@@ -515,6 +532,14 @@ SUB inspektorFuellen()
                 IF w = "" AND z.schluessel = "layout.art" THEN w = "spalte"
                 DIM idx AS INTEGER : idx = ARRAY_INDEXOF(eintraege, w)
                 GUI_DROPDOWN_SET_SELECTED(z.ed, MAX(0, idx))
+            CASE "knopfwahl"
+                DIM kl AS ARRAY OF STRING : kl = [tr$("(keiner)")]
+                DIM kn AS STRING
+                FOR EACH kn IN knoepfeDesFensters()
+                    ARRAY_PUSH(kl, kn)
+                NEXT
+                GUI_SET_DROPDOWN(z.ed, kl)
+                GUI_DROPDOWN_SET_SELECTED(z.ed, MAX(0, ARRAY_INDEXOF(kl, wertText$(p))))
             CASE "farbe"
                 farbfeldZeigen(z, p)
             CASE "info"
@@ -677,6 +702,12 @@ SUB zeileUebernehmen(zi AS INTEGER)
                 JSON_SET_BOOL(doc, p, GUI_CHECKED(z.ed))
             CASE "wahlindex"
                 JSON_SET_INT(doc, p, MAX(0, GUI_DROPDOWN_SELECTED(z.ed)))
+            CASE "knopfwahl"
+                IF GUI_DROPDOWN_SELECTED(z.ed) <= 0 THEN
+                    IF JSON_HAS(doc, p) THEN JSON_REMOVE(doc, p)
+                ELSE
+                    JSON_SET_STRING(doc, p, GUI_DROPDOWN_TEXT(z.ed))
+                END IF
             CASE "wahl"
                 DIM w AS STRING : w = GUI_DROPDOWN_TEXT(z.ed)
                 IF istDatenWahl(z.schluessel) AND GUI_DROPDOWN_SELECTED(z.ed) <= 0 THEN

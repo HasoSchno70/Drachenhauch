@@ -273,6 +273,8 @@ CLASS StudioFenster
     DIM studioControls AS ARRAY OF StudioControl
     DIM studioOffen AS BOOLEAN
     DIM studioHaupt AS BOOLEAN
+    ' Mit ZeigenModal gezeigt: alles andere liegt hinter dem Schleier.
+    DIM studioModal AS BOOLEAN
     DIM studioWarB AS INTEGER
     DIM studioWarH AS INTEGER
 
@@ -340,6 +342,7 @@ CLASS StudioFenster
         Self.Zeigen()
         IF NOT Self.studioOffen THEN RETURN
         GUI_WINDOW_MODAL(Self.studioWin, TRUE)
+        Self.studioModal = TRUE
         WHILE Self.studioOffen
             IF NOT studioBild() THEN RETURN
         WEND
@@ -375,6 +378,27 @@ DIM studioSchirmH AS INTEGER : studioSchirmH = 0
 DIM studioFokusAlt AS INTEGER : studioFokusAlt = -1
 DIM studioFokusJetzt AS INTEGER : studioFokusJetzt = -1
 DIM studioTaste AS INTEGER : studioTaste = -1
+' Das wievielte Bild gerade laeuft, und welches seine Eingabe an die
+' Ereignisse verteilt. Ruft ein Ereignis selbst studioBild (ZeigenModal,
+' Frage ...), wird erst dieses Bild fertig gezeichnet: sonst saehe die innere
+' Schleife denselben Mausklick noch einmal (MOUSE_HIT gilt bis FLIP) und
+' oeffnete den Dialog wieder und wieder.
+DIM studioBildNr AS INTEGER : studioBildNr = 0
+DIM studioVerteiltNr AS INTEGER : studioVerteiltNr = -1
+
+' Darf ein Fenster gerade rohe Maus-Eingaben nehmen (Zeichenflaechen)?
+' GUI_HIT_TEST sieht durch den Schleier eines modalen Fensters hindurch.
+FUNCTION studioFrei(w AS GUI_WINDOW) AS BOOLEAN
+    IF NOT GUI_MODAL() THEN RETURN TRUE
+    IF LEN(studioDialoge) > 0 THEN RETURN FALSE
+    DIM oben AS StudioFenster
+    DIM f AS StudioFenster
+    FOR EACH f IN studioFenster
+        IF f.studioOffen AND f.studioModal THEN oben = f
+    NEXT
+    IF oben IS NIL THEN RETURN FALSE
+    RETURN oben.studioWin = w
+END FUNCTION
 
 SUB studioAnmelden(f AS StudioFenster)
     ARRAY_PUSH(studioFenster, f)
@@ -389,6 +413,7 @@ END SUB
 ' Programm endet -- dann soll jede Schleife, die Bilder dreht, aufhoeren.
 FUNCTION studioBild() AS BOOLEAN
     IF studioEnde THEN RETURN FALSE
+    IF studioVerteiltNr = studioBildNr THEN studioMalen()
     IF WINDOW_CLOSE_REQUESTED() THEN
         studioDieStartseite.Zumachen()
         studioEnde = TRUE
@@ -403,6 +428,7 @@ FUNCTION studioBild() AS BOOLEAN
         IF studioDieStartseite.studioOffen THEN GUI_WINDOW_SET_BOUNDS(studioDieStartseite.studioWin, 0, 0, studioSchirmB, studioSchirmH)
     END IF
     GUI_UPDATE()
+    studioVerteiltNr = studioBildNr
     studioFokusAlt = studioFokusJetzt
     studioFokusJetzt = GUI_FOCUSED()
     studioTaste = KEY_ANY_HIT()
@@ -434,12 +460,16 @@ FUNCTION studioBild() AS BOOLEAN
             DIM art AS STRING : art = GUI_KIND(studioFokusJetzt)
             feld = art = "textinput" OR art = "textarea" OR art = "spinner" OR art = "dropdown"
         END IF
-        IF NOT feld AND GUI_MODAL() = FALSE THEN
+        IF NOT feld THEN
             DIM oben AS StudioFenster
             FOR EACH f IN studioFenster
                 IF f.studioOffen THEN oben = f
             NEXT
-            IF oben IS NOT NIL THEN oben.Taste(studioTaste)
+            ' Ein modales Fenster bekommt seine Tasten (ESC zum Schliessen);
+            ' hinter einem Dialog oder Schleier niemand.
+            IF oben IS NOT NIL THEN
+                IF studioFrei(oben.studioWin) THEN oben.Taste(studioTaste)
+            END IF
         END IF
     END IF
     ' Geschlossene Fenster aus der Liste nehmen.
@@ -449,6 +479,13 @@ FUNCTION studioBild() AS BOOLEAN
     NEXT
     studioFenster = noch
     IF studioEnde THEN RETURN FALSE
+    studioMalen()
+    RETURN TRUE
+END FUNCTION
+
+' Das Bild zeichnen und zeigen; danach gilt die naechste Eingabe.
+SUB studioMalen()
+    DIM f AS StudioFenster
     CLS(0)
     GUI_DRAW(FALSE)
     FOR EACH f IN studioFenster
@@ -463,8 +500,8 @@ FUNCTION studioBild() AS BOOLEAN
     NEXT
     GUI_DRAW_TOP()
     FLIP()
-    RETURN TRUE
-END FUNCTION
+    studioBildNr = studioBildNr + 1
+END SUB
 
 ' Der Einstieg: oeffnet das Programmfenster in der Groesse des Startfensters,
 ' laesst die App beginnen, zeigt das Startfenster und dreht die Bildschleife.

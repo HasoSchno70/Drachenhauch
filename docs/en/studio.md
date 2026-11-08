@@ -343,6 +343,13 @@ or Enter comes, not per keystroke. A name must be an identifier and unique in
 the window, because it later becomes a field of the window class; an invalid
 name is marked red and not applied.
 
+Without a selection the inspector shows the window, including **Default
+button (Enter)** and **Cancel button (Esc)**: a dropdown with the window's
+buttons. In the program Enter then presses the one and Esc the other -- its
+`_Klick` runs as for a mouse click (Enter also from a single-line text
+field; a text area keeps its Enter). The button is remembered by name; renaming it carries the choice
+along, deleting it drops it.
+
 ## Custom controls
 
 Several controls become a building block of their own, like a

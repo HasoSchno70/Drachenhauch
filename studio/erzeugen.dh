@@ -351,6 +351,19 @@ FUNCTION basisCode$(ei AS INTEGER) AS STRING
                 IF JSON_GET_STRING(aus, bp) <> "" THEN ARRAY_PUSH(z, "        GUI_SET_IMAGE(GUI_WINDOW_WIDGET(Self.studioWin, " + STR$(i) + "), Bild(" + dhText$(JSON_GET_STRING(aus, bp)) + "))")
             END IF
         NEXT
+        ' Standard- und Abbrechen-Knopf: Enter und Esc im Fenster druecken
+        ' ihn. Das Layout nennt ihn beim Namen (ein Index wanderte, sobald
+        ' ein Widget davor geloescht wird); einen, den es nicht mehr gibt,
+        ' laesst der Code weg.
+        DIM kw AS STRING
+        FOR EACH kw IN ["studio_standard", "studio_abbrechen"]
+            DIM kn AS STRING : kn = jsonText$(d, kw)
+            DIM ki AS INTEGER : ki = -1
+            FOR i = 0 TO nW - 1
+                IF kn <> "" AND LOWER$(namen[i]) = LOWER$(kn) THEN ki = i
+            NEXT
+            IF ki >= 0 THEN ARRAY_PUSH(z, "        GUI_WINDOW_" + IIF(kw = "studio_standard", "DEFAULT", "CANCEL") + "(Self.studioWin, GUI_WINDOW_WIDGET(Self.studioWin, " + STR$(ki) + "))")
+        NEXT
     END IF
     ' Timer.
     FOR i = 0 TO nT - 1
@@ -437,16 +450,16 @@ FUNCTION basisCode$(ei AS INTEGER) AS STRING
                     ARRAY_PUSH(takt, "        IF NOT Self.studioOffen THEN RETURN")
                     ARRAY_PUSH(takt, "        IF GUI_STATUSBAR_CLICKED(" + ctl + ") >= 0 THEN Self." + MAPGET(evMeth, schl) + "(GUI_STATUSBAR_CLICKED(" + ctl + "))")
                 CASE "maus"
-                    bed = "MOUSE_HIT(0) AND GUI_HIT_TEST(MOUSEX(), MOUSEY()) = " + ctl
+                    bed = "MOUSE_HIT(0) AND GUI_HIT_TEST(MOUSEX(), MOUSEY()) = " + ctl + " AND studioFrei(Self.studioWin)"
                 CASE "rad"
                     ARRAY_PUSH(takt, "        IF NOT Self.studioOffen THEN RETURN")
-                    ARRAY_PUSH(takt, "        IF MOUSEWHEEL_Y() <> 0.0 AND GUI_HIT_TEST(MOUSEX(), MOUSEY()) = " + ctl + " THEN Self." + MAPGET(evMeth, schl) + "(MOUSEWHEEL_Y())")
+                    ARRAY_PUSH(takt, "        IF MOUSEWHEEL_Y() <> 0.0 AND GUI_HIT_TEST(MOUSEX(), MOUSEY()) = " + ctl + " AND studioFrei(Self.studioWin) THEN Self." + MAPGET(evMeth, schl) + "(MOUSEWHEEL_Y())")
                 CASE "ziehen"
                     ' Ab dem Druck auf die Flaeche, solange die Taste haengt --
                     ' auch wenn die Maus die Flaeche dabei verlaesst.
                     DIM zf AS STRING : zf = "Self.studioZug_" + namen[i]
                     ARRAY_PUSH(takt, "        IF NOT Self.studioOffen THEN RETURN")
-                    ARRAY_PUSH(takt, "        IF MOUSE_HIT(0) AND GUI_HIT_TEST(MOUSEX(), MOUSEY()) = " + ctl + " THEN " + zf + " = TRUE")
+                    ARRAY_PUSH(takt, "        IF MOUSE_HIT(0) AND GUI_HIT_TEST(MOUSEX(), MOUSEY()) = " + ctl + " AND studioFrei(Self.studioWin) THEN " + zf + " = TRUE")
                     ARRAY_PUSH(takt, "        IF " + zf + " THEN")
                     ARRAY_PUSH(takt, "            IF MOUSEBUTTON(0) THEN")
                     ARRAY_PUSH(takt, "                Self." + MAPGET(evMeth, schl) + "(MOUSEX() - GUI_CANVAS_X(" + ctl + "), MOUSEY() - GUI_CANVAS_Y(" + ctl + "))")

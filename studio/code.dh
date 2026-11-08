@@ -834,6 +834,13 @@ SUB nameGeaendert(alt AS STRING, neu AS STRING, istFenster AS BOOLEAN)
         projGeaendert = TRUE
     ELSE
         controlUmbenannt(e, alt, neu)
+        ' Standard- und Abbrechen-Knopf nennen ihn beim Namen.
+        DIM kw AS STRING
+        FOR EACH kw IN ["studio_standard", "studio_abbrechen"]
+            IF JSON_HAS(doc, kw) THEN
+                IF LOWER$(JSON_GET_STRING(doc, kw)) = LOWER$(alt) THEN JSON_SET_STRING(doc, kw, neu)
+            END IF
+        NEXT
     END IF
     codeFelderNeu(e)
     navigatorFuellen()
