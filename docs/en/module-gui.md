@@ -3164,7 +3164,8 @@ The small things that tell an application from a demo (since 2026-09-05):
   panel, otherwise they lie under its area. A scrolling panel inside a
   scrolling panel does not exist.
 - **Dragging between widgets**: `GUI_DRAGGABLE(wdg, TRUE)` makes a widget a
-  source (for list and tree the row that was hit, otherwise the widget
+  source (for list, tree and table the row that was hit -- for the table the
+  data row with the text of its first cell --, otherwise the widget
   itself with its text), `GUI_DROP_TARGET(wdg, TRUE)` a drop target. A press
   becomes a drag after 5 px of movement — a click stays a click. During the
   drag the text hangs on the mouse and the drop target underneath gets a

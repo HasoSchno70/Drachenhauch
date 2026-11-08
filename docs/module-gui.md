@@ -3179,7 +3179,8 @@ Die kleinen Dinge, an denen man eine Anwendung von einer Demo unterscheidet
   unter seiner Fläche. Ein rollendes Panel in einem rollenden Panel gibt es
   nicht.
 - **Ziehen zwischen Widgets**: `GUI_DRAGGABLE(wdg, TRUE)` macht ein Widget
-  zur Quelle (bei Liste und Baum die getroffene Zeile, sonst das Widget
+  zur Quelle (bei Liste, Baum und Tabelle die getroffene Zeile -- bei der
+  Tabelle die Datenzeile mit dem Text ihrer ersten Zelle --, sonst das Widget
   selbst mit seinem Text), `GUI_DROP_TARGET(wdg, TRUE)` zur Ablage. Ein
   Druck wird ab 5 px Bewegung zum Zug — ein Klick bleibt ein Klick. Während
   des Zugs hängt der Text an der Maus und die Ablage darunter bekommt einen
