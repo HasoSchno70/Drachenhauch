@@ -642,7 +642,7 @@ WHILE NOT beenden
         SHADER_SET(sh, "nacht", CLAMP((takt - (AB_MITTERNACHT - 2)) / 2.0, 0.0, 1.0))
         uebergang(sh, vorEnde(takt, AB_AUS + 2), nachBeginn(takt, AB_STUBE), 1.0, 0.82, 0.55)
         ' Schnee nur, solange wir noch draussen vor dem Fenster stehen
-        zielDicht = IIF(takt < AB_STUBE + 5, 0.4, 0.0) : zielDraussen = 0.0
+        zielDicht = IIF(takt < AB_STUBE + 3.5, 0.4, 0.0) : zielDraussen = 0.0
         schneeWind = 0.05
     ELSE
         ' Abspann: das Dorf, ueber ihm der Stern, aus dem der Gruss aufsteigt
