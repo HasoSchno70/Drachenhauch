@@ -3,7 +3,8 @@
 '
 ' Die Musik wird offline ausgeschrieben (--wav) und an der Datei geprueft:
 ' Stereo, Laenge, Spitze, still im Intro, laut auf dem Markt und im
-' Schlittenflug, die Glocken um Mitternacht, still am Ende. Die Bilder: jede
+' Schlittenflug, die Glocken um Mitternacht, das Blech beim Gruss im
+' Abspann (Takt 104..108), still am Ende. Die Bilder: jede
 ' Szene einmal ab ihrem Takt, das Bildschirmfoto darf weder schwarz noch
 ' weiss sein -- ein Shader, der nicht uebersetzt, liefert Schwarz (und
 ' main.dh bricht ab). Dazu: Stille Nacht und die Kugeln am Baum, der
@@ -28,6 +29,7 @@ pegel 0 1500 < 0.3
 pegel 62000 63000 > 0.05
 pegel 140000 141000 > 0.05
 pegel 199000 200000 > 0.02
+pegel 216000 218000 > 0.06
 pegel 232000 235000 < 0.03
 
 === adventskranz mit der ersten kerze
