@@ -286,9 +286,11 @@ die auch Fehler an ihre Methode bringt.
 
 Ein Fenster, das bei 100 % nicht in die Mitte passt, geht bei 75 oder
 50 % auf; was über die Mitte hinausreicht, wird abgeschnitten, statt über
-Inspektor und Ausgabe zu liegen. Hat das Fenster Menüs, steht die
-Menüleiste über dem Inhalt: die Höhe im Inspektor ist die des Inhalts, im
-Programm wird das Fenster um die Leiste höher.
+Inspektor und Ausgabe zu liegen. Die Höhe im Inspektor ist die des
+Fensters samt Titelleiste (ein Control unten muss also über ihr enden; nur
+das Startfenster läuft im Programm ohne Titelleiste). Hat das Fenster Menüs,
+steht die Menüleiste über dem Inhalt: im Programm wird das Fenster um die
+Leiste höher.
 
 **Ausrichtungslinien:** Beim Ziehen und beim Ändern der Größe rasten die
 Kanten und Mitten an denen der anderen Controls ein. Einrasten gibt es auch

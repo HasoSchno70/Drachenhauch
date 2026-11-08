@@ -263,8 +263,9 @@ Einzelheiten stehen in der Geschichte des Bereichs.
   eigenen Teil der Meldung.
 
 **IDE, Studio, Werkzeuge**
-- Im Layout eines Studio-Fensters ist `h` die Höhe des Inhalts; eine
-  Menüleiste kommt im Entwurf wie im Programm obendrauf (`menueLeisteH`).
+- Im Layout eines Studio-Fensters zählt `h` die Titelleiste mit (nur das
+  Startfenster läuft ohne), eine Menüleiste kommt im Entwurf wie im
+  Programm obendrauf (`menueLeisteH`).
   Ein Datenbank-Element aus einer fremden Datei hält deren Arten wörtlich
   (`sql`, `sqlvorgabe`) -- der Abgleich darf ihre Tabellen nicht umbauen.
 - Anzeigetexte gehen durch `tr$` (Tafeln `ide/sprache/en.txt`,
