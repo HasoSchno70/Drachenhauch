@@ -9,6 +9,7 @@ CLASS Hauptfenster EXTENDS Hauptfenster_Basis
         Self.nochNichtDa()
         Self.bestand.laden()
         Self.orte.laden()
+        Self.einkauf.laden()
         Self.auffrischen()
         Self.uhr_Aktion()
     END SUB
@@ -46,12 +47,40 @@ CLASS Hauptfenster EXTENDS Hauptfenster_Basis
     SUB geaendert()
         Self.bestand.laden()
         Self.orte.laden()
+        Self.einkauf.laden()
         Self.auffrischen()
     END SUB
 
     SUB bestand_Geaendert()
         Self.orte.laden()
         Self.auffrischen()
+    END SUB
+
+    SUB einkauf_Geaendert()
+        Self.auffrischen()
+    END SUB
+
+    ' Der Einkaufszettel als Bericht: Vorschau mit Drucken und „Als PDF …“.
+    ' KUEHL_ZETTEL nennt eine PDF-Datei ohne Vorschau (für Prüfungen).
+    SUB einkauf_Drucken()
+        DIM w AS MAP OF ANY : w = Self.einkauf.zettelWerte()
+        DIM pfad AS STRING : pfad = GETENV$("KUEHL_ZETTEL")
+        IF pfad <> "" THEN
+            Einkaufszettel.Pdf(pfad, w)
+            GUI_STATUSBAR_SET(Self.status, 3, "Einkaufszettel: " + BASENAME(pfad))
+            RETURN
+        END IF
+        Einkaufszettel.Vorschau(w)
+    END SUB
+
+    ' Einkauf abschließen: die abgehakten Posten in den Bestand.
+    SUB einkauf_Abschliessen()
+        DIM f AS AbschlussFenster : f = NEW AbschlussFenster()
+        f.vorMarkt = Self.einkauf.markt$()
+        f.ZeigenModal()
+        IF f.uebertragen = 0 THEN RETURN
+        Self.geaendert()
+        GUI_TOAST(Self.Fenster(), "✅ " + STR$(f.uebertragen) + " Artikel zum Bestand hinzugefügt!", "erfolg")
     END SUB
 
     ' Eine Kachel im Reiter Lagerorte: was dort liegt.

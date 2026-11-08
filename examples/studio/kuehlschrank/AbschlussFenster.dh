@@ -1,0 +1,284 @@
+' Einkauf abschließen -- wie TransferToInventoryDialog der Python-App: je
+' abgehakter Posten eine Zeile mit Haken, Menge, Einheit, Ablaufdatum,
+' Lagerort und Preis (in der Tabelle zu bearbeiten), Sammelaktionen für
+' Ablaufdatum und Lagerort, der Markt für alle. Übernehmen legt fehlende
+' Produkte an, trägt den Bestand ein, merkt sich Markt und Preis je Produkt
+' (product_stores) und nimmt die Posten von der Liste -- alles ein Schritt
+' für Strg+Z.
+CLASS AbschlussFenster EXTENDS AbschlussFenster_Basis
+    DIM posten AS ARRAY OF Posten
+    ' Je Zeile das Produkt (0 = wird angelegt).
+    DIM produkte AS ARRAY OF INTEGER
+    ' Der Markt, den die Einkaufsseite gewählt hat.
+    DIM vorMarkt AS STRING
+    ' Ergebnis für das Hauptfenster.
+    DIM uebertragen AS INTEGER
+    DIM neuAngelegt AS INTEGER
+
+    SUB Geoeffnet()
+        DIM m AS ARRAY OF STRING : m = ["-- Markt wählen --"]
+        DIM s AS STRING
+        FOR EACH s IN marktListe()
+            ARRAY_PUSH(m, s)
+        NEXT
+        GUI_SET_DROPDOWN(Self.marktWahl, m)
+        GUI_DROPDOWN_SET_SELECTED(Self.marktWahl, MAX(0, ARRAY_INDEXOF(m, Self.vorMarkt)))
+        GUI_SET_DROPDOWN(Self.ortWahl, lagerorte())
+        GUI_DROPDOWN_SET_SELECTED(Self.ortWahl, 0)
+        GUI_SET_VALUE(Self.tageFeld, 7)
+        GUI_SET_CHECKED(Self.entfernenKasten, TRUE)
+        GUI_SET_CHECKED(Self.preiseKasten, TRUE)
+        GUI_TABLE_COL_TYPE(Self.tabelle, SP_A_MENGE, "zahl")
+        GUI_TABLE_COL_EDIT(Self.tabelle, SP_A_MENGE, TRUE)
+        GUI_TABLE_COL_CHOICES(Self.tabelle, SP_A_EINHEIT, einheiten())
+        GUI_TABLE_COL_EDIT(Self.tabelle, SP_A_EINHEIT, TRUE)
+        GUI_TABLE_COL_EDIT(Self.tabelle, SP_A_MHD, TRUE)
+        GUI_TABLE_COL_CHOICES(Self.tabelle, SP_A_ORT, lagerorte())
+        GUI_TABLE_COL_EDIT(Self.tabelle, SP_A_ORT, TRUE)
+        GUI_TABLE_COL_TYPE(Self.tabelle, SP_A_PREIS, "zahl")
+        GUI_TABLE_COL_EDIT(Self.tabelle, SP_A_PREIS, TRUE)
+        Self.fuellen()
+    END SUB
+
+    SUB fuellen()
+        Self.posten = []
+        Self.produkte = []
+        GUI_TABLE_CLEAR(Self.tabelle)
+        DIM p AS Posten
+        FOR EACH p IN postenLaden(TRUE)
+            IF NOT p.erledigt THEN CONTINUE
+            DIM pid AS INTEGER : pid = produktFuer(p.name)
+            DIM markt AS STRING : markt = IIF(pid > 0, letzterMarkt$(pid), "")
+            DIM preis AS STRING : preis = IIF(pid > 0, letzterPreis$(pid), "")
+            DIM z AS INTEGER : z = GUI_TABLE_ADD_ROW(Self.tabelle, ["", p.name, zahlText$(IIF(p.menge > 0, p.menge, 1.0)), einheitText$(IIF(p.einheit = "", "Stück", p.einheit)), _
+                tagePlus$(vorgabeTage(pid, p.kategorie)), vorgabeOrt$(pid, p.kategorie), preis, IIF(markt = "", "Neu", markt)])
+            GUI_TABLE_CELL_KIND(Self.tabelle, z, SP_A_HAKEN, "haken")
+            GUI_TABLE_CELL_VALUE(Self.tabelle, z, SP_A_HAKEN, 1)
+            IF markt <> "" THEN GUI_TABLE_CELL_COLOR(Self.tabelle, z, SP_A_MARKT, &H80CBC4, &H1F4F4A)
+            ARRAY_PUSH(Self.posten, p)
+            ARRAY_PUSH(Self.produkte, pid)
+        NEXT
+        GUI_SET_TEXT(Self.untertitel, STR$(LEN(Self.posten)) + " gekaufte Artikel zum Bestand hinzufügen")
+    END SUB
+
+    FUNCTION gewaehlt(z AS INTEGER) AS BOOLEAN
+        RETURN GUI_TABLE_GET_VALUE(Self.tabelle, z, SP_A_HAKEN) > 0.5
+    END FUNCTION
+
+    SUB knopfAlle_Klick()
+        DIM z AS INTEGER
+        FOR z = 0 TO LEN(Self.posten) - 1
+            GUI_TABLE_CELL_VALUE(Self.tabelle, z, SP_A_HAKEN, 1)
+        NEXT
+    END SUB
+
+    SUB knopfKeine_Klick()
+        DIM z AS INTEGER
+        FOR z = 0 TO LEN(Self.posten) - 1
+            GUI_TABLE_CELL_VALUE(Self.tabelle, z, SP_A_HAKEN, 0)
+        NEXT
+    END SUB
+
+    ' Sammelaktionen für die markierten Zeilen.
+    SUB knopfTage_Klick()
+        DIM z AS INTEGER
+        DIM n AS INTEGER : n = 0
+        FOR z = 0 TO LEN(Self.posten) - 1
+            IF NOT Self.gewaehlt(z) THEN CONTINUE
+            GUI_TABLE_SET_CELL(Self.tabelle, z, SP_A_MHD, tagePlus$(INT(GUI_VALUE(Self.tageFeld))))
+            n = n + 1
+        NEXT
+        IF n > 0 THEN GUI_TOAST(Self.studioWin, "Ablaufdatum für " + STR$(n) + " Artikel gesetzt", "erfolg")
+    END SUB
+
+    SUB knopfOrt_Klick()
+        DIM z AS INTEGER
+        DIM n AS INTEGER : n = 0
+        FOR z = 0 TO LEN(Self.posten) - 1
+            IF NOT Self.gewaehlt(z) THEN CONTINUE
+            GUI_TABLE_SET_CELL(Self.tabelle, z, SP_A_ORT, GUI_DROPDOWN_TEXT(Self.ortWahl))
+            n = n + 1
+        NEXT
+        IF n > 0 THEN GUI_TOAST(Self.studioWin, "Lagerort für " + STR$(n) + " Artikel gesetzt", "erfolg")
+    END SUB
+
+    FUNCTION menge(z AS INTEGER) AS FLOAT
+        RETURN VAL(REPLACE$(GUI_TABLE_GET_CELL(Self.tabelle, z, SP_A_MENGE), ",", "."))
+    END FUNCTION
+
+    ' Was nicht stimmt ("" = alles gut): Menge, Datum, Lagerort.
+    FUNCTION pruefen$() AS STRING
+        DIM z AS INTEGER
+        FOR z = 0 TO LEN(Self.posten) - 1
+            IF NOT Self.gewaehlt(z) THEN CONTINUE
+            DIM n AS STRING : n = Self.posten[z].name
+            IF Self.menge(z) <= 0 THEN RETURN n + ": die Menge muss größer als 0 sein."
+            IF NOT datumOk(TRIM$(GUI_TABLE_GET_CELL(Self.tabelle, z, SP_A_MHD)), FALSE) THEN RETURN n + ": das Ablaufdatum braucht die Form JJJJ-MM-TT."
+            IF TRIM$(GUI_TABLE_GET_CELL(Self.tabelle, z, SP_A_ORT)) = "" THEN RETURN n + ": bitte einen Lagerort wählen."
+        NEXT
+        RETURN ""
+    END FUNCTION
+
+    ' Wie _check_quantity_differences: was von der Liste abweicht, als Text.
+    FUNCTION abweichungen$() AS STRING
+        DIM t AS STRING : t = ""
+        DIM z AS INTEGER
+        FOR z = 0 TO LEN(Self.posten) - 1
+            IF NOT Self.gewaehlt(z) THEN CONTINUE
+            DIM p AS Posten : p = Self.posten[z]
+            DIM vorher AS FLOAT : vorher = IIF(p.menge > 0, p.menge, 1.0)
+            IF ABS(Self.menge(z) - vorher) > 0.0001 THEN
+                t = t + "  • " + p.name + ": " + zahlText$(vorher) + " → " + zahlText$(Self.menge(z)) + " " + einheitText$(p.einheit) + CHR$(10)
+            END IF
+        NEXT
+        RETURN t
+    END FUNCTION
+
+    SUB knopfUebernehmen_Klick()
+        DIM n AS INTEGER : n = 0
+        DIM z AS INTEGER
+        FOR z = 0 TO LEN(Self.posten) - 1
+            IF Self.gewaehlt(z) THEN n = n + 1
+        NEXT
+        IF n = 0 THEN
+            Meldung("Bitte wähle mindestens einen Artikel aus!", "Keine Auswahl")
+            RETURN
+        END IF
+        DIM fehler AS STRING : fehler = Self.pruefen$()
+        IF fehler <> "" THEN
+            Meldung(fehler, "Bitte prüfen")
+            RETURN
+        END IF
+        DIM ab AS STRING : ab = Self.abweichungen$()
+        IF ab <> "" THEN
+            IF Frage("Mengen weichen von der Einkaufsliste ab:" + CHR$(10) + CHR$(10) + ab + CHR$(10) + "Mit diesen Mengen übertragen?", "Übertragen|Abbrechen", "Mengen geändert") <> 1 THEN RETURN
+        END IF
+        DIM markt AS STRING : markt = ""
+        IF GUI_DROPDOWN_SELECTED(Self.marktWahl) > 0 THEN markt = GUI_DROPDOWN_TEXT(Self.marktWahl)
+        IF markt = "" THEN
+            IF Frage("Du hast keinen Markt ausgewählt. Ohne Markt kann die App nicht lernen, wo du einkaufst." + CHR$(10) + CHR$(10) + "Trotzdem fortfahren?", "Abbrechen|Fortfahren", "Kein Markt ausgewählt") <> 2 THEN RETURN
+        END IF
+        Self.uebernehmen(markt)
+        Meldung(STR$(Self.uebertragen) + " Artikel wurden zum Bestand hinzugefügt!" + IIF(markt = "", "", CHR$(10) + "🏪 Markt: " + markt) + _
+                IIF(Self.neuAngelegt > 0, CHR$(10) + "📦 " + STR$(Self.neuAngelegt) + " neue Produkte angelegt", ""), "Erfolg")
+        Self.Zumachen()
+    END SUB
+
+    ' Alles in einem Schritt des Verlaufs und einer Transaktion.
+    SUB uebernehmen(markt AS STRING)
+        DIM h AS STRING : h = heute$()
+        Self.uebertragen = 0
+        Self.neuAngelegt = 0
+        verlauf.beginnen("Einkauf abgeschlossen")
+        DB_BEGIN(db)
+        DIM z AS INTEGER
+        FOR z = 0 TO LEN(Self.posten) - 1
+            IF NOT Self.gewaehlt(z) THEN CONTINUE
+            DIM p AS Posten : p = Self.posten[z]
+            DIM ort AS STRING : ort = TRIM$(GUI_TABLE_GET_CELL(Self.tabelle, z, SP_A_ORT))
+            DIM pid AS INTEGER : pid = Self.produkte[z]
+            IF pid = 0 THEN pid = produktFuer(p.name)
+            IF pid = 0 THEN
+                DB_EXEC(db, "INSERT INTO products (name, category, default_storage_location) VALUES (?, ?, ?)", p.name, IIF(p.kategorie = "", NIL, p.kategorie), ort)
+                pid = DB_LAST_ROWID(db)
+                verlauf.neu("products", pid)
+                Self.neuAngelegt = Self.neuAngelegt + 1
+            END IF
+            DB_EXEC(db, "INSERT INTO inventory (product_id, quantity, unit, purchase_date, expiry_date, storage_location, notes, status, purchased_at_store) VALUES (?, ?, ?, ?, ?, ?, ?, 'fresh', ?)", _
+                    pid, Self.menge(z), GUI_TABLE_GET_CELL(Self.tabelle, z, SP_A_EINHEIT), h, TRIM$(GUI_TABLE_GET_CELL(Self.tabelle, z, SP_A_MHD)), ort, _
+                    IIF(markt = "", "Aus Einkaufsliste", "Eingekauft bei " + markt), IIF(markt = "", NIL, markt))
+            verlauf.neu("inventory", DB_LAST_ROWID(db))
+            IF markt <> "" THEN
+                DIM preis AS STRING : preis = TRIM$(GUI_TABLE_GET_CELL(Self.tabelle, z, SP_A_PREIS))
+                DIM mitPreis AS BOOLEAN : mitPreis = GUI_CHECKED(Self.preiseKasten) AND VAL(REPLACE$(preis, ",", ".")) > 0
+                DIM sid AS INTEGER : sid = dbZahlMit("SELECT id FROM product_stores WHERE product_id = ?1 AND store_name = ?2", STR$(pid), markt)
+                IF sid > 0 THEN
+                    verlauf.merken("product_stores", sid)
+                    IF mitPreis THEN
+                        DB_EXEC(db, "UPDATE product_stores SET last_purchased = ?, price = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", h, VAL(REPLACE$(preis, ",", ".")), sid)
+                    ELSE
+                        DB_EXEC(db, "UPDATE product_stores SET last_purchased = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", h, sid)
+                    END IF
+                ELSE
+                    DB_EXEC(db, "INSERT INTO product_stores (product_id, store_name, price, last_purchased) VALUES (?, ?, ?, ?)", pid, markt, IIF(mitPreis, VAL(REPLACE$(preis, ",", ".")), NIL), h)
+                    verlauf.neu("product_stores", DB_LAST_ROWID(db))
+                END IF
+            END IF
+            IF GUI_CHECKED(Self.entfernenKasten) THEN
+                verlauf.merken("shopping_list", p.id)
+                DB_EXEC(db, "DELETE FROM shopping_list WHERE id = ?", p.id)
+            END IF
+            Self.uebertragen = Self.uebertragen + 1
+        NEXT
+        DB_COMMIT(db)
+        verlauf.abschliessen()
+    END SUB
+
+    SUB knopfAbbrechen_Klick()
+        Self.Zumachen()
+    END SUB
+END CLASS
+
+CONST SP_A_HAKEN = 0
+CONST SP_A_MENGE = 2
+CONST SP_A_EINHEIT = 3
+CONST SP_A_MHD = 4
+CONST SP_A_ORT = 5
+CONST SP_A_PREIS = 6
+CONST SP_A_MARKT = 7
+
+' Wie search_products(name)[0]: das erste Produkt (nach Name), dessen Name
+' oder Marke den Text enthält; 0 = keins.
+FUNCTION produktFuer(name AS STRING) AS INTEGER
+    IF TRIM$(name) = "" THEN RETURN 0
+    RETURN dbZahlEin("SELECT id FROM products WHERE name LIKE '%' || ?1 || '%' OR brand LIKE '%' || ?1 || '%' ORDER BY name LIMIT 1", TRIM$(name))
+END FUNCTION
+
+' Wo es zuletzt gekauft wurde (bevorzugt zuerst) -- die Python-App zählte
+' dafür purchase_count, eine Spalte, die ihre Datei nicht hat.
+FUNCTION letzterMarkt$(pid AS INTEGER) AS STRING
+    RETURN textEin$("SELECT store_name FROM product_stores WHERE product_id = ? ORDER BY is_preferred DESC, last_purchased DESC, id DESC LIMIT 1", STR$(pid))
+END FUNCTION
+
+FUNCTION letzterPreis$(pid AS INTEGER) AS STRING
+    DIM t AS STRING : t = textEin$("SELECT price FROM product_stores WHERE product_id = ? AND price IS NOT NULL ORDER BY last_purchased DESC, id DESC LIMIT 1", STR$(pid))
+    IF t = "" THEN RETURN ""
+    RETURN zahlText$(VAL(t))
+END FUNCTION
+
+' Die Kategorie für die Vorgaben: die des Produkts, sonst die des Postens.
+FUNCTION vorgabeKategorie$(pid AS INTEGER, kategorie AS STRING) AS STRING
+    IF pid > 0 THEN
+        DIM pk AS STRING : pk = textEin$("SELECT IFNULL(category, '') FROM products WHERE id = ?", STR$(pid))
+        IF pk <> "" THEN RETURN pk
+    END IF
+    RETURN kategorie
+END FUNCTION
+
+' Tage bis zum Ablauf: die übliche Haltbarkeit der Kategorie (categories),
+' sonst eine Woche. (Die Python-App nahm Stichwörter aus SmartDefaults --
+' die kommen mit dem Scannen, Stufe 6.)
+FUNCTION vorgabeTage(pid AS INTEGER, kategorie AS STRING) AS INTEGER
+    DIM k AS STRING : k = vorgabeKategorie$(pid, kategorie)
+    IF k <> "" THEN
+        DIM t AS INTEGER : t = dbZahlEin("SELECT IFNULL(typical_shelf_life_days, 0) FROM categories WHERE name = ?", k)
+        IF t > 0 THEN RETURN t
+    END IF
+    RETURN 7
+END FUNCTION
+
+' Der Lagerort: der übliche des Produkts, sonst wo es zuletzt lag, sonst
+' was die Kategorie empfiehlt, sonst der erste Ort.
+FUNCTION vorgabeOrt$(pid AS INTEGER, kategorie AS STRING) AS STRING
+    DIM orte AS ARRAY OF STRING : orte = lagerorte()
+    DIM o AS STRING : o = ""
+    IF pid > 0 THEN
+        o = textEin$("SELECT IFNULL(default_storage_location, '') FROM products WHERE id = ?", STR$(pid))
+        IF o = "" THEN o = textEin$("SELECT IFNULL(storage_location, '') FROM inventory WHERE product_id = ? ORDER BY id DESC LIMIT 1", STR$(pid))
+    END IF
+    DIM k AS STRING : k = vorgabeKategorie$(pid, kategorie)
+    IF o = "" AND k <> "" THEN o = textEin$("SELECT IFNULL(recommended_storage, '') FROM categories WHERE name = ?", k)
+    IF o <> "" AND ARRAY_INDEXOF(orte, o) >= 0 THEN RETURN o
+    IF LEN(orte) > 0 THEN RETURN orte[0]
+    RETURN "Kühlschrank"
+END FUNCTION

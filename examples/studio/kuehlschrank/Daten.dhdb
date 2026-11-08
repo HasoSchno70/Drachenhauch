@@ -1003,5 +1003,11 @@
         }
       ]
     }
+  ],
+  "abfragen": [
+    {
+      "name": "Zettelzeilen",
+      "sql": "SELECT s.id AS id, s.product_name AS produkt, s.checked AS checked, CASE WHEN IFNULL(s.quantity, 0) = 0 THEN '-' ELSE REPLACE(CASE WHEN s.quantity = CAST(s.quantity AS INTEGER) THEN CAST(CAST(s.quantity AS INTEGER) AS TEXT) ELSE CAST(s.quantity AS TEXT) END, '.', ',') || ' ' || IFNULL(s.unit, '') END AS menge, IFNULL(s.category, '-') AS kategorie, IFNULL(s.notes, '-') AS notizen, COALESCE((SELECT json_extract(j.value, '$[0]') FROM json_each(:gaenge) j WHERE j.key = CAST(s.id AS TEXT)), 999) AS gang_nr, CASE COALESCE((SELECT json_extract(j.value, '$[0]') FROM json_each(:gaenge) j WHERE j.key = CAST(s.id AS TEXT)), 999) WHEN 999 THEN '-' ELSE CAST((SELECT json_extract(j.value, '$[0]') FROM json_each(:gaenge) j WHERE j.key = CAST(s.id AS TEXT)) AS TEXT) END AS gang, COALESCE((SELECT json_extract(j.value, '$[1]') FROM json_each(:gaenge) j WHERE j.key = CAST(s.id AS TEXT)), 100000 + s.id) AS reihe, :markt AS markt FROM shopping_list s"
+    }
   ]
 }

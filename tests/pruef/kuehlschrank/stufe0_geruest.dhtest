@@ -18,6 +18,7 @@ FOR EACH e IN elemente
     DIM gleich AS BOOLEAN : gleich = TRUE
     IF hatCode(e) THEN gleich = codeSetzen$(e) = JOIN$(READLINES(PATHJOIN(o, codeDatei$(e))), CHR$(10)) + CHR$(10)
     IF e.art = "datenbank" THEN gleich = JSON_PRETTY(dbSchema(e)) = JOIN$(READLINES(PATHJOIN(o, schemaDatei$(e))), CHR$(10))
+    IF e.art = "bericht" THEN gleich = JSON_PRETTY(berichtJ(e)) = JOIN$(READLINES(PATHJOIN(o, berichtDatei$(e))), CHR$(10))
     IF hatLayout(e) THEN gleich = gleich AND JSON_PRETTY(JSON_PARSE(e.layout)) = JOIN$(READLINES(PATHJOIN(o, layoutDatei$(e))), CHR$(10))
     PRINT e.art; " "; e.name; " "; gleich
 NEXT
@@ -41,7 +42,7 @@ IMPORT "{sammlung}/../../../studio/berichte_laufzeit.dh"
 IMPORT "{sammlung}/../../../studio/berichte.dh"
 --- erwartet
 laden []
-elemente 18 start Hauptfenster
+elemente 23 start Hauptfenster
 app App TRUE
 fenster Hauptfenster TRUE
 datenbank Daten TRUE
@@ -55,7 +56,12 @@ klasse Verlauf TRUE
 modul Bestand TRUE
 klasse Ort TRUE
 modul Lagerorte TRUE
+klasse Posten TRUE
+modul Einkauf TRUE
 control BestandSeite TRUE
+control EinkaufSeite TRUE
+fenster AbschlussFenster TRUE
+bericht Einkaufszettel TRUE
 control LagerorteSeite TRUE
 fenster LagerortFenster TRUE
 fenster ProduktFenster TRUE
@@ -107,6 +113,8 @@ IMPORT "{sammlung}/../../../studio/berichte.dh"
 --- erwartet
 Hauptfenster passt
 BestandSeite passt
+EinkaufSeite passt
+AbschlussFenster passt
 LagerorteSeite passt
 LagerortFenster passt
 ProduktFenster passt

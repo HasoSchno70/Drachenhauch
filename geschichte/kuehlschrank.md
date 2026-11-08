@@ -254,3 +254,67 @@ Die fürs Fertigzeichnen vor der inneren Schleife fiel zuerst nirgends:
 `studioFrei` verdeckte sie, solange der öffnende Klick hinter dem Schleier
 lag; erst ein Fenster, das genau unter dem Klick aufgeht und selbst eine
 Zeichenfläche hat, zeigt sie.
+
+## Stufe 3: der Einkauf (2026-11-08)
+
+Der Reiter Einkauf ist das eigene Control `EinkaufSeite` (wie
+tabs/shopping_tab.py): Liste mit Haken und Papierkorb je Zeile, Eingabe mit
+Vorschlägen aus den Produkten, fünf Schnellknöpfe, Auto-Ergänzen aus den
+Mindestmengen, „Alle umschalten“, „Erledigte löschen“, der Markt mit
+Gangplan (nach Gang sortieren, Gänge als Überschrift, „Nach Markt“), Drucken
+und „Einkauf abschließen“. Die sieben eingebauten Gangpläne der Python-App
+stehen im Modul `Einkauf`, eigene aus `store_layouts` gehen vor; der gewählte
+Markt steht wie dort in `store_settings`. `AbschlussFenster` (wie
+TransferToInventoryDialog) zeigt je abgehaktem Posten Menge, Einheit,
+Ablaufdatum, Lagerort und Preis zum Bearbeiten in der Tabelle, dazu
+Sammelaktionen; Übernehmen legt fehlende Produkte an, trägt den Bestand ein,
+merkt sich Markt und Preis (`product_stores`) und nimmt die Posten von der
+Liste -- ein Schritt für Strg+Z, wie jede Änderung der Liste außer dem
+Haken. Gedruckt wird der Studio-Bericht `Einkaufszettel`: seine Quelle ist
+die Abfrage `Zettelzeilen` im Datenbank-Element; Gang und Stelle je Posten
+rechnet das Programm und gibt sie als Parameter `:gaenge` (JSON) mit, die
+Abfrage liest sie mit `json_each`.
+
+**Abweichungen von der Python-App** (Fehler dort, die der Port nicht
+übernimmt): `product_stores.purchase_count` gibt es in ihrer Datei nicht --
+jedes „gelernte“ Speichern scheiterte still; hier gilt der zuletzt genutzte
+Markt. Der Gangplan suchte über den Namen unter einem Schlüssel `name`, den
+ein Posten nicht hat (er heißt `product_name`) -- die Suche fand nie etwas;
+neu findet er auch eine Abteilung, die in der Kategorie steckt („Fleisch &
+Wurst“). Die Schnellknöpfe zählten die offenen Posten der Liste selbst; hier
+das am häufigsten Verbrauchte, das nicht schon offen dasteht. Ein Posten von
+Hand bekommt die Kategorie des Produkts gleichen Namens. Die Vorgaben im
+Abschluss kommen aus der Kategorie und dem letzten Lagerort (SmartDefaults
+folgen mit Stufe 6).
+
+**Funde:**
+
+18. **Ein `TEXT_SIZE` in `Zeichnen` ließ die ganze Oberfläche schrumpfen**
+    (eigener Fehler aus Stufe 2): `studioSchriftAus` setzte die Schrift
+    zurück, die Größe nicht -- und ohne eigene Schrift zeichnet die gui in
+    der Textgröße des Programms. Jetzt `GFX_PUSH`/`GFX_POP` um `Zeichnen`.
+    Auf dem Bild von Stufe 2 war es schon zu sehen (kleinere Schrift als in
+    Stufe 1), aufgefallen ist es erst im Vergleich.
+19. **„Nur Zeilen mit `markt <> ""`“ ging nicht** -- die Zerlegung lehnte
+    jeden leeren Wert ab, auch einen in Anführungszeichen; „Markt:“ im Kopf
+    des Zettels erschien nie (Studio, Berichte).
+20. **Die Einträge einer Klappliste ließen sich nicht lesen** -- unter ihrem
+    Namen; `GUI_LISTBOX_COUNT/ITEM` konnten es, sagten es aber nicht. Neu
+    `GUI_DROPDOWN_COUNT(dd)` und `GUI_DROPDOWN_ITEM(dd, i)` (gui).
+
+**Fallen:** Ein Control meldet mit `Ausloesen`; das Fenster holt es im
+nächsten Bild ab -- eine Probe, die den Knopf direkt ruft, muss danach Bilder
+drehen. Eine Marktliste, die beim Öffnen gefüllt wird, kennt einen später
+angelegten Gangplan nicht (`maerkteFuellen`). Die Zeilen der Liste stehen
+nach Priorität (ein Schnellknopf legt mit 1 an, die Python-App mit 0 als
+Vorgabe der Tabelle) -- eine Probe sucht Zeilen beim Namen, nicht bei der
+Stelle.
+
+Tests `tests/pruef/kuehlschrank/stufe3_einkauf.dhtest` (5: Liste, Gangplan,
+Überschriften, eigener Plan, nach Markt; anlegen, Schnellknöpfe, Haken,
+Auto-Ergänzen, löschen mit Rückgängig; Abschluss mit Vorgaben, Prüfung,
+Abweichung, neuem Produkt, Rückgängig und Wiederholen; der Zettel als PDF,
+sortiert und unsortiert; echte Klicks), je ein Fall in
+`werkzeug_studio_berichte`, `werkzeug_studio_takt` und `gui_form_widgets`.
+Gegenproben: achtzehn im Beispiel, zwei im Studio, zwei in der Laufzeit --
+jede fällt in ihrem Fall.

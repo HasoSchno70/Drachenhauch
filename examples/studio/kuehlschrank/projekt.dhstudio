@@ -71,10 +71,37 @@
       "code": "Lagerorte.dh"
     },
     {
+      "art": "klasse",
+      "name": "Posten",
+      "code": "Posten.dh"
+    },
+    {
+      "art": "modul",
+      "name": "Einkauf",
+      "code": "Einkauf.dh"
+    },
+    {
       "art": "control",
       "name": "BestandSeite",
       "code": "BestandSeite.dh",
       "layout": "BestandSeite.dhform"
+    },
+    {
+      "art": "control",
+      "name": "EinkaufSeite",
+      "code": "EinkaufSeite.dh",
+      "layout": "EinkaufSeite.dhform"
+    },
+    {
+      "art": "fenster",
+      "name": "AbschlussFenster",
+      "code": "AbschlussFenster.dh",
+      "layout": "AbschlussFenster.dhform"
+    },
+    {
+      "art": "bericht",
+      "name": "Einkaufszettel",
+      "bericht": "Einkaufszettel.dhreport"
     },
     {
       "art": "control",
