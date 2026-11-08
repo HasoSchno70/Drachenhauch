@@ -1,0 +1,64 @@
+' Das Hauptfenster: Werkzeugleiste, Kopf mit drei Kennzahlen und dem Knopf
+' „Einkauf erfassen“, die fünf Reiter (Bestand, Lagerorte, Einkauf,
+' Statistik, Rezepte) und die Statusleiste mit Uhr. Der Timer auffrischen
+' holt alle 30 Sekunden die Zahlen neu wie in der Python-App.
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+
+    SUB Geoeffnet()
+        Self.nochNichtDa()
+        Self.auffrischen()
+        Self.uhr_Aktion()
+    END SUB
+
+    ' Kopf und Statusleiste neu aus der Datenbank.
+    SUB auffrischen()
+        DIM k AS Kennzahlen : k = NEW Kennzahlen()
+        k.rechnen()
+        GUI_CARD_SET_TEXT(Self.kachelGesamt, STR$(k.gesamt))
+        GUI_CARD_SET_TEXT(Self.kachelBald, STR$(k.bald))
+        GUI_CARD_SET_TEXT(Self.kachelAbgelaufen, STR$(k.abgelaufen))
+        GUI_STATUSBAR_SET(Self.status, 1, "Produkte: " + STR$(k.produkte))
+        GUI_STATUSBAR_SET(Self.status, 2, "Zuletzt: " + LEFT$(TIME$(), 5))
+    END SUB
+
+    ' Was erst mit einer späteren Stufe kommt, ist gesperrt statt stumm.
+    SUB nochNichtDa()
+        DIM nr AS INTEGER
+        FOR EACH nr IN [KNOPF_HINZUFUEGEN, KNOPF_RUECKGAENGIG, KNOPF_EXPORT, KNOPF_EINSTELLUNGEN]
+            GUI_TOOLBAR_ENABLE(Self.werkzeuge, nr, FALSE)
+        NEXT
+        GUI_SET_ENABLED(Self.knopfEinkauf, FALSE)
+        GUI_MENU_ENABLE(Self.miHinzufuegen, FALSE)
+        GUI_MENU_ENABLE(Self.miRueckgaengig, FALSE)
+        GUI_MENU_ENABLE(Self.miExport, FALSE)
+        GUI_MENU_ENABLE(Self.miEinstellungen, FALSE)
+    END SUB
+
+    SUB werkzeuge_Knopf(nr AS INTEGER)
+        IF nr = KNOPF_AKTUALISIEREN THEN Self.miAktualisieren_Aktion()
+    END SUB
+
+    SUB miAktualisieren_Aktion()
+        Self.auffrischen()
+        GUI_STATUSBAR_SET(Self.status, 3, "Aktualisiert.")
+    END SUB
+
+    SUB miBeenden_Aktion()
+        Self.Zumachen()
+    END SUB
+
+    SUB uhr_Aktion()
+        GUI_STATUSBAR_SET(Self.status, 4, TIME$())
+    END SUB
+
+    SUB auffrischen_Aktion()
+        Self.auffrischen()
+    END SUB
+END CLASS
+
+' Die Knöpfe der Werkzeugleiste (ihre Nummern; Trenner und Lücke zählen mit).
+CONST KNOPF_HINZUFUEGEN = 0
+CONST KNOPF_RUECKGAENGIG = 1
+CONST KNOPF_AKTUALISIEREN = 2
+CONST KNOPF_EXPORT = 4
+CONST KNOPF_EINSTELLUNGEN = 6

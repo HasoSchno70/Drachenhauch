@@ -1,0 +1,192 @@
+' Kuehlschrank-App im Drachenhauch Studio, Stufe 0: Geruest und Datenbank
+' (examples/studio/kuehlschrank). Das Projekt steht so im Ordner, wie das
+' Studio es schreibt; F5 erzeugt ein Programm, das sich ohne Befund
+' uebersetzt; eine neue Datei bekommt die Startdaten der Python-App; die
+' Datei der Python-App (fridge_database.db) bleibt beim Start, wie sie ist,
+' und der Kopf zeigt ihre Kennzahlen.
+' Format: docs/werkzeuge.md, dhrt test.
+
+--- langsam
+=== das projekt steht so im ordner, wie das studio es schreibt
+' Laden und wieder setzen gibt jede Datei Zeichen fuer Zeichen zurueck.
+IMPORT "modell_imp.dh"
+DIM o AS STRING : o = ARG$(0)
+PRINT "laden ["; projektLaden$(o); "]"
+PRINT "elemente "; LEN(elemente); " start "; projStart
+DIM e AS Element
+FOR EACH e IN elemente
+    DIM gleich AS BOOLEAN : gleich = TRUE
+    IF hatCode(e) THEN gleich = codeSetzen$(e) = JOIN$(READLINES(PATHJOIN(o, codeDatei$(e))), CHR$(10)) + CHR$(10)
+    IF e.art = "datenbank" THEN gleich = JSON_PRETTY(dbSchema(e)) = JOIN$(READLINES(PATHJOIN(o, schemaDatei$(e))), CHR$(10))
+    IF hatLayout(e) THEN gleich = gleich AND JSON_PRETTY(JSON_PARSE(e.layout)) = JOIN$(READLINES(PATHJOIN(o, layoutDatei$(e))), CHR$(10))
+    PRINT e.art; " "; e.name; " "; gleich
+NEXT
+PRINT "projektdatei "; projektJson$() = JOIN$(READLINES(PATHJOIN(o, PROJEKT_DATEI)), CHR$(10))
+DIM s AS JSON_HANDLE : s = dbSchema(elemente[elementIndex("Daten")])
+PRINT "daten "; dbDateiVon$(s); " tabellen "; dbTabZahl(s)
+--- argumente
+{sammlung}/../../../examples/studio/kuehlschrank
+--- datei modell_imp.dh
+IMPORT "json"
+IMPORT "regex"
+IMPORT "imgfx"
+IMPORT "db"
+IMPORT "pdf"
+IMPORT "{sammlung}/../../../studio/sprache.dh"
+IMPORT "{sammlung}/../../../studio/bibliothek.dh"
+IMPORT "{sammlung}/../../../studio/modell.dh"
+IMPORT "{sammlung}/../../../studio/projekt.dh"
+IMPORT "{sammlung}/../../../studio/datenbank.dh"
+IMPORT "{sammlung}/../../../studio/berichte_laufzeit.dh"
+IMPORT "{sammlung}/../../../studio/berichte.dh"
+--- erwartet
+laden []
+elemente 6 start Hauptfenster
+app App TRUE
+fenster Hauptfenster TRUE
+datenbank Daten TRUE
+modul Datenbank TRUE
+modul Startdaten TRUE
+klasse Kennzahlen TRUE
+projektdatei TRUE
+daten fridge_database.db tabellen 17
+
+=== f5 erzeugt das programm, eine neue datei bekommt die startdaten
+' Ohne Datei im Projektordner legt das Programm sie an (Element Daten) und
+' fuellt sie (Modul Startdaten). Die Probe rechnet den Kopf mit einem
+' festen Heute (KUEHL_HEUTE): abgelaufen vor heute, bald von heute bis heute
+' + 3 Tage, ein Eintrag ohne Datum zaehlt nur zum Gesamt.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+kKopieren(ARG$(1), p)
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = kF5(p, log)
+PRINT "geprueft "; slHat(log, "geprueft 0 0"); " erzeugt "; LEN(slAnfang(log, "erzeugt ")) = 1; " beendet "; slHat(log, "beendet 0")
+PRINT "datei "; FILEEXISTS(p + "/fridge_database.db")
+PRINT "check "; kCheck$(p)
+SETENV("KUEHL_HEUTE", "2026-11-08")
+PRINT "code "; kProbe(p, "probe.dh", "", 5)
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../../studio/studio.dh
+{sammlung}/../../../examples/studio/kuehlschrank
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/kuehlschrank.dh"
+slStudio = ARG$(0)
+--- datei probe.dh
+PRINT "lagerorte "; dbZahl("SELECT COUNT(*) FROM storage_locations"); " orte "; dbZahl("SELECT COUNT(*) FROM locations"); " kategorien "; dbZahl("SELECT COUNT(*) FROM categories"); " einheiten "; dbZahl("SELECT COUNT(*) FROM units"); " einstellungen "; dbZahl("SELECT COUNT(*) FROM app_settings")
+DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT name, temperature_zone FROM storage_locations ORDER BY id")
+DIM zonen AS ARRAY OF STRING : zonen = []
+WHILE DB_NEXT(r)
+    ARRAY_PUSH(zonen, DB_GET_STRING(r, 0) + "=" + DB_GET_STRING(r, 1))
+WEND
+PRINT JOIN$(zonen, " ")
+r = DB_QUERY(db, "SELECT recommended_storage, typical_shelf_life_days FROM categories WHERE name = 'Eier'")
+IF DB_NEXT(r) THEN PRINT "eier "; DB_GET_STRING(r, 0); " "; DB_GET_INT(r, 1)
+PRINT "einheit "; einstellung$("default_unit", "?"); " schwelle "; einstellungZahl("expiring_days_threshold", 0); " fehlt "; einstellung$("gibt_es_nicht", "vorgabe")
+' Ein zweiter Start legt nichts doppelt an.
+startdatenAnlegen()
+PRINT "zweimal "; dbZahl("SELECT COUNT(*) FROM storage_locations"); " "; dbZahl("SELECT COUNT(*) FROM categories")
+DB_EXEC(db, "INSERT INTO products (name) VALUES ('Milch')")
+DB_EXEC(db, "INSERT INTO products (name) VALUES ('Brot')")
+DB_EXEC(db, "INSERT INTO inventory (product_id, expiry_date) VALUES (1, '2026-11-01')")
+DB_EXEC(db, "INSERT INTO inventory (product_id, expiry_date) VALUES (1, '2026-11-08')")
+DB_EXEC(db, "INSERT INTO inventory (product_id, expiry_date) VALUES (2, '2026-11-11')")
+DB_EXEC(db, "INSERT INTO inventory (product_id, expiry_date) VALUES (2, '2026-11-12')")
+DB_EXEC(db, "INSERT INTO inventory (product_id) VALUES (2)")
+DIM f AS Hauptfenster : f = studioStartFenster
+f.auffrischen()
+PRINT "kacheln "; GUI_CARD_TEXT$(f.kachelGesamt); " "; GUI_CARD_TEXT$(f.kachelBald); " "; GUI_CARD_TEXT$(f.kachelAbgelaufen); " | "; GUI_STATUSBAR_TEXT$(f.status, 1)
+' Eine andere Warnschwelle zaehlt den 12. mit.
+DB_EXEC(db, "UPDATE app_settings SET value = '4' WHERE key = 'expiring_days_threshold'")
+f.auffrischen()
+PRINT "schwelle 4 "; GUI_CARD_TEXT$(f.kachelBald)
+' Was erst spaeter kommt, ist gesperrt; Aktualisieren geht.
+PRINT "gesperrt "; GUI_TOOLBAR_ENABLED(f.werkzeuge, KNOPF_HINZUFUEGEN); " "; GUI_TOOLBAR_ENABLED(f.werkzeuge, KNOPF_EINSTELLUNGEN); " "; GUI_ENABLED(f.knopfEinkauf); " offen "; GUI_TOOLBAR_ENABLED(f.werkzeuge, KNOPF_AKTUALISIEREN)
+f.werkzeuge_Knopf(KNOPF_AKTUALISIEREN)
+PRINT "status "; GUI_STATUSBAR_TEXT$(f.status, 3)
+--- erwartet
+geprueft TRUE erzeugt TRUE beendet TRUE
+datei TRUE
+check []
+lagerorte 9 orte 9 kategorien 18 einheiten 20 einstellungen 13
+Kühlschrank=cold Gefrierschrank=frozen Vorratsraum=room_temp Gemüsefach=cold Obstschale=room_temp Speisekammer=cool Kühlschranktür=cold Brotkasten=room_temp Gewürzregal=room_temp
+eier Kühlschrank 21
+einheit Stück schwelle 3 fehlt vorgabe
+zweimal 9 18
+kacheln 5 2 1 | Produkte: 2
+schwelle 4 3
+gesperrt FALSE FALSE FALSE offen TRUE
+status Aktualisiert.
+code 0
+
+=== die datei der python-app bleibt beim start, wie sie ist
+' Eine Datei mit dem Aufbau der Python-App (CREATE TABLE wie dort, mit
+' Zeilen) im Projektordner: F5 laesst das Programm auf ihr laufen. Danach ist
+' ihr Aufbau Zeichen fuer Zeichen derselbe (keine Spalte, kein Index dazu),
+' keine Startdaten kommen hinein, und der Kopf zeigt ihre Zahlen.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+kKopieren(ARG$(1), p)
+DIM db AS DB_CONN : db = DB_OPEN(p + "/fridge_database.db")
+DIM sql AS STRING
+FOR EACH sql IN READLINES(CWD$() + "/python.sql")
+    sql = TRIM$(sql)
+    IF RIGHT$(sql, 1) = ";" THEN sql = LEFT$(sql, LEN(sql) - 1)
+    IF sql <> "" THEN DB_EXEC(db, sql)
+NEXT
+DB_EXEC(db, "INSERT INTO storage_locations (name, icon, temperature_zone) VALUES ('Klappbox', '📦', 'room_temp')")
+DB_EXEC(db, "INSERT INTO products (barcode, name) VALUES ('4337185705540', 'Fettarme Milch')")
+DB_EXEC(db, "INSERT INTO inventory (product_id, unit, expiry_date, storage_location) VALUES (1, '📦 Stück', '2025-12-07', 'Klappbox')")
+DB_EXEC(db, "INSERT INTO inventory (product_id, unit, expiry_date, storage_location) VALUES (1, 'Stück', '2026-11-09', 'Klappbox')")
+DB_EXEC(db, "INSERT INTO app_settings (key, value) VALUES ('expiring_days_threshold', '3')")
+DB_CLOSE(db)
+DIM vorher AS STRING : vorher = kAufbau$(p + "/fridge_database.db")
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = kF5(p, log)
+PRINT "beendet "; slHat(log, "beendet 0")
+DIM nachher AS STRING : nachher = kAufbau$(p + "/fridge_database.db")
+PRINT "aufbau gleich "; nachher = vorher
+IF nachher <> vorher THEN PRINT nachher
+SETENV("KUEHL_HEUTE", "2026-11-08")
+SETENV("DH_STUDIO_DATEN", p)
+PRINT "code "; kProbe(p, "probe.dh", "", 5)
+PRINT "aufbau nach der probe "; kAufbau$(p + "/fridge_database.db") = vorher
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../../studio/studio.dh
+{sammlung}/../../../examples/studio/kuehlschrank
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/kuehlschrank.dh"
+slStudio = ARG$(0)
+--- datei probe.dh
+PRINT "lagerorte "; dbZahl("SELECT COUNT(*) FROM storage_locations"); " kategorien "; dbZahl("SELECT COUNT(*) FROM categories")
+DIM f AS Hauptfenster : f = studioStartFenster
+PRINT "kacheln "; GUI_CARD_TEXT$(f.kachelGesamt); " "; GUI_CARD_TEXT$(f.kachelBald); " "; GUI_CARD_TEXT$(f.kachelAbgelaufen); " | "; GUI_STATUSBAR_TEXT$(f.status, 1)
+--- datei python.sql
+CREATE TABLE products ( id INTEGER PRIMARY KEY AUTOINCREMENT, barcode TEXT UNIQUE, name TEXT NOT NULL, brand TEXT, category TEXT, image_url TEXT, min_quantity REAL, min_unit TEXT, default_storage_location TEXT, default_shelf_life_days INTEGER, nutritional_info TEXT, allergens TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP );
+CREATE TABLE locations ( id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE NOT NULL, type TEXT, temperature_zone TEXT, icon TEXT, sort_order INTEGER DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP );
+CREATE TABLE storage_locations ( id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE NOT NULL, icon TEXT, temperature_zone TEXT, description TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP );
+CREATE TABLE inventory ( id INTEGER PRIMARY KEY AUTOINCREMENT, product_id INTEGER NOT NULL, quantity REAL NOT NULL DEFAULT 1, unit TEXT DEFAULT 'Stück', purchase_date DATE, expiry_date DATE, storage_location TEXT, storage_area TEXT, notes TEXT, status TEXT DEFAULT 'fresh', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, purchased_at_store TEXT, FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE CASCADE );
+CREATE TABLE shopping_list ( id INTEGER PRIMARY KEY AUTOINCREMENT, product_name TEXT NOT NULL, quantity REAL DEFAULT 1, unit TEXT DEFAULT 'Stück', category TEXT, notes TEXT, checked INTEGER DEFAULT 0, priority INTEGER DEFAULT 0, added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP , store_name TEXT);
+CREATE TABLE recipes ( id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, description TEXT, servings INTEGER DEFAULT 1, instructions TEXT, prep_time_minutes INTEGER, cook_time_minutes INTEGER, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP );
+CREATE TABLE recipe_ingredients ( id INTEGER PRIMARY KEY AUTOINCREMENT, recipe_id INTEGER NOT NULL, product_id INTEGER, product_name TEXT NOT NULL, quantity REAL NOT NULL, unit TEXT NOT NULL, notes TEXT, FOREIGN KEY (recipe_id) REFERENCES recipes (id) ON DELETE CASCADE, FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE SET NULL );
+CREATE TABLE shopping_templates ( id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, description TEXT, items_json TEXT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, usage_count INTEGER DEFAULT 0 );
+CREATE TABLE user_learning ( id INTEGER PRIMARY KEY AUTOINCREMENT, barcode TEXT, product_name TEXT, field TEXT NOT NULL, value TEXT NOT NULL, choice_count INTEGER DEFAULT 1, last_used TIMESTAMP DEFAULT CURRENT_TIMESTAMP, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, confidence REAL DEFAULT 0.0 );
+CREATE TABLE consumption_history ( id INTEGER PRIMARY KEY AUTOINCREMENT, product_id INTEGER, product_name TEXT NOT NULL, barcode TEXT, quantity INTEGER DEFAULT 1, unit TEXT, purchase_date DATE, empty_date DATE, removed_date DATE, duration_days INTEGER, storage_location TEXT, reason TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE SET NULL );
+CREATE TABLE store_layouts ( id INTEGER PRIMARY KEY AUTOINCREMENT, store_name TEXT UNIQUE NOT NULL, layout_json TEXT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP );
+CREATE TABLE categories ( id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE NOT NULL, icon TEXT, recommended_storage TEXT, typical_shelf_life_days INTEGER, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP );
+CREATE TABLE units ( id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE NOT NULL, icon TEXT DEFAULT '📦' );
+CREATE TABLE store_settings ( id INTEGER PRIMARY KEY AUTOINCREMENT, key TEXT UNIQUE NOT NULL, value TEXT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP );
+CREATE TABLE app_settings ( key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP );
+CREATE TABLE location_settings ( id INTEGER PRIMARY KEY AUTOINCREMENT, keyword TEXT UNIQUE NOT NULL, color_r INTEGER NOT NULL DEFAULT 70, color_g INTEGER NOT NULL DEFAULT 130, color_b INTEGER NOT NULL DEFAULT 180, icon TEXT NOT NULL DEFAULT '📦', display_name TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP );
+CREATE TABLE product_stores ( id INTEGER PRIMARY KEY AUTOINCREMENT, product_id INTEGER NOT NULL, store_name TEXT NOT NULL, is_preferred INTEGER DEFAULT 0, price REAL, last_purchased DATE, notes TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE, UNIQUE(product_id, store_name) );
+CREATE INDEX idx_inventory_expiry ON inventory(expiry_date);
+CREATE INDEX idx_products_barcode ON products(barcode);
+--- erwartet
+beendet TRUE
+aufbau gleich TRUE
+lagerorte 1 kategorien 0
+kacheln 2 1 1 | Produkte: 1
+code 0
+aufbau nach der probe TRUE

@@ -1,0 +1,313 @@
+{
+  "title": "Kühlschrank-Verwaltung",
+  "x": 0,
+  "y": 0,
+  "w": 1280,
+  "h": 800,
+  "movable": true,
+  "closable": false,
+  "visible": true,
+  "resizable": true,
+  "chrome": true,
+  "min_w": 1000,
+  "min_h": 640,
+  "max_w": 0,
+  "max_h": 0,
+  "widgets": [
+    {
+      "kind": "toolbar",
+      "x": 0,
+      "y": 0,
+      "w": 1280,
+      "h": 40,
+      "text": "",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "anchor": "lrt",
+      "leiste": {
+        "eintraege": [
+          {
+            "art": "knopf",
+            "symbol": "plus",
+            "tip": "Produkt hinzufügen (Strg+N)",
+            "text": "Hinzufügen"
+          },
+          {
+            "art": "knopf",
+            "symbol": "rueckgaengig",
+            "tip": "Rückgängig (Strg+Z)",
+            "text": "Rückgängig"
+          },
+          {
+            "art": "knopf",
+            "symbol": "aktualisieren",
+            "tip": "Alles neu laden (F5)",
+            "text": "Aktualisieren"
+          },
+          {
+            "art": "trenner"
+          },
+          {
+            "art": "knopf",
+            "symbol": "export",
+            "tip": "Bestand als CSV (Strg+E)",
+            "text": "Export"
+          },
+          {
+            "art": "luecke"
+          },
+          {
+            "art": "knopf",
+            "symbol": "einstellungen",
+            "tip": "Einstellungen (Strg+,)",
+            "text": "Einstellungen"
+          }
+        ],
+        "beschriftung": true,
+        "symbolgroesse": 0
+      },
+      "name": "werkzeuge"
+    },
+    {
+      "kind": "label",
+      "x": 20,
+      "y": 56,
+      "w": 176,
+      "h": 16,
+      "text": "Kühlschrank-Verwaltung",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "font_size": 24,
+      "font_style": "fett",
+      "name": "titel"
+    },
+    {
+      "kind": "button",
+      "x": 20,
+      "y": 96,
+      "w": 190,
+      "h": 34,
+      "text": "Einkauf erfassen",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "variant": "erfolg",
+      "name": "knopfEinkauf"
+    },
+    {
+      "kind": "card",
+      "x": 700,
+      "y": 52,
+      "w": 180,
+      "h": 80,
+      "text": "Gesamt",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "0",
+      "visible": true,
+      "anchor": "rt",
+      "mode": "fuellen",
+      "name": "kachelGesamt"
+    },
+    {
+      "kind": "card",
+      "x": 890,
+      "y": 52,
+      "w": 180,
+      "h": 80,
+      "text": "Bald ablaufend",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "0",
+      "visible": true,
+      "anchor": "rt",
+      "mode": "fuellen",
+      "name": "kachelBald"
+    },
+    {
+      "kind": "card",
+      "x": 1080,
+      "y": 52,
+      "w": 180,
+      "h": 80,
+      "text": "Abgelaufen",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "0",
+      "visible": true,
+      "anchor": "rt",
+      "mode": "fuellen",
+      "name": "kachelAbgelaufen"
+    },
+    {
+      "kind": "tabcontrol",
+      "x": 20,
+      "y": 146,
+      "w": 1240,
+      "h": 620,
+      "text": "",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "items": [
+        "Bestand",
+        "Lagerorte",
+        "Einkauf",
+        "Statistik",
+        "Rezepte"
+      ],
+      "sel": 0,
+      "anchor": "lrtb",
+      "tabctl": {
+        "kinder": [],
+        "seite": 0
+      },
+      "name": "reiter"
+    },
+    {
+      "kind": "statusbar",
+      "x": 0,
+      "y": 776,
+      "w": 1280,
+      "h": 24,
+      "text": "Datenbank: OK",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "anchor": "lrb",
+      "status": {
+        "felder": [
+          {
+            "text": "Datenbank: OK",
+            "breite": 0
+          },
+          {
+            "text": "Produkte: 0",
+            "breite": 140
+          },
+          {
+            "text": "Zuletzt: --:--",
+            "breite": 140
+          },
+          {
+            "text": "",
+            "breite": 0
+          },
+          {
+            "text": "00:00:00",
+            "breite": 90,
+            "ausrichtung": "rechts"
+          }
+        ]
+      },
+      "name": "status"
+    }
+  ],
+  "menus": [
+    {
+      "label": "Datei",
+      "items": [
+        {
+          "label": "Bestand exportieren …",
+          "name": "miExport",
+          "shortcut": "Strg+E"
+        },
+        {
+          "label": "",
+          "separator": true
+        },
+        {
+          "label": "Beenden",
+          "name": "miBeenden",
+          "shortcut": "Strg+Q"
+        }
+      ]
+    },
+    {
+      "label": "Bearbeiten",
+      "items": [
+        {
+          "label": "Produkt hinzufügen …",
+          "name": "miHinzufuegen",
+          "shortcut": "Strg+N"
+        },
+        {
+          "label": "Rückgängig",
+          "name": "miRueckgaengig",
+          "shortcut": "Strg+Z"
+        }
+      ]
+    },
+    {
+      "label": "Ansicht",
+      "items": [
+        {
+          "label": "Aktualisieren",
+          "name": "miAktualisieren",
+          "shortcut": "F5"
+        }
+      ]
+    },
+    {
+      "label": "Extras",
+      "items": [
+        {
+          "label": "Einstellungen …",
+          "name": "miEinstellungen",
+          "shortcut": "Strg+,"
+        }
+      ]
+    }
+  ],
+  "tabs": [],
+  "active_tab": 0,
+  "tabs_closable": false,
+  "default_button": -1,
+  "cancel_button": -1,
+  "name": "Hauptfenster",
+  "timer": [
+    {
+      "name": "uhr",
+      "intervall": 1000,
+      "aktiv": true,
+      "wiederholen": true
+    },
+    {
+      "name": "auffrischen",
+      "intervall": 30000,
+      "aktiv": true,
+      "wiederholen": true
+    }
+  ]
+}

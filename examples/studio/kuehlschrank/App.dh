@@ -1,0 +1,17 @@
+' Die Kühlschrank-Verwaltung: Vorrat, Lagerorte, Einkauf, Statistik und
+' Rezepte. Ein Port der PySide6-App „Kühlschrank“ ins Drachenhauch Studio --
+' sie liest dieselbe Datei fridge_database.db. Beim Start öffnet die App die
+' Datenbank (eine neue bekommt die Startdaten), am Ende schließt sie sie.
+CLASS App EXTENDS StudioApp
+
+    SUB Geoeffnet()
+        GUI_THEME_PRESET("modern_dark")
+        ' Das Teal der Python-App für Auswahl und Fokus.
+        GUI_THEME_SET("accent", RGB(38, 166, 154))
+        dbOeffnen()
+    END SUB
+
+    SUB Beenden()
+        DB_CLOSE(db)
+    END SUB
+END CLASS

@@ -1,0 +1,70 @@
+' Die Datenbank: das Element Daten (Daten.dhdb) hat den Aufbau der Datei
+' fridge_database.db der Python-App -- übernommen mit Projekt -> Datenbank
+' aus Datei übernehmen, darum liest diese Fassung dieselbe Datei. Dieses
+' Modul gibt der Verbindung den kurzen Namen db, füllt eine neue Datei mit den
+' Startdaten (Modul Startdaten) und liest Einstellungen aus app_settings.
+' Datumswerte stehen wie dort als Text JJJJ-MM-TT.
+IMPORT "db"
+IMPORT "json"
+DIM db AS DB_CONN
+
+SUB dbOeffnen()
+    db = Daten
+    ' Wie die Python-App: Löschen eines Produkts nimmt seinen Bestand mit.
+    DB_EXEC(db, "PRAGMA foreign_keys = ON")
+    IF dbZahl("SELECT COUNT(*) FROM storage_locations") = 0 THEN startdatenAnlegen()
+END SUB
+
+' Die erste Spalte der ersten Zeile als Zahl (0, wenn nichts kommt).
+FUNCTION dbZahl(sql AS STRING) AS INTEGER
+    DIM r AS DB_RESULT : r = DB_QUERY(db, sql)
+    IF NOT DB_NEXT(r) THEN RETURN 0
+    DIM n AS INTEGER : n = DB_GET_INT(r, 0)
+    DB_CLOSE_RESULT(r)
+    RETURN n
+END FUNCTION
+
+' Dasselbe mit einem Wert für das ? in der Abfrage.
+FUNCTION dbZahlEin(sql AS STRING, a AS STRING) AS INTEGER
+    DIM r AS DB_RESULT : r = DB_QUERY(db, sql, a)
+    IF NOT DB_NEXT(r) THEN RETURN 0
+    DIM n AS INTEGER : n = DB_GET_INT(r, 0)
+    DB_CLOSE_RESULT(r)
+    RETURN n
+END FUNCTION
+
+' Dasselbe mit zwei Werten (?1 und ?2 in der Abfrage).
+FUNCTION dbZahlMit(sql AS STRING, a AS STRING, b AS STRING) AS INTEGER
+    DIM r AS DB_RESULT : r = DB_QUERY(db, sql, a, b)
+    IF NOT DB_NEXT(r) THEN RETURN 0
+    DIM n AS INTEGER : n = DB_GET_INT(r, 0)
+    DB_CLOSE_RESULT(r)
+    RETURN n
+END FUNCTION
+
+' Heute als JJJJ-MM-TT. KUEHL_HEUTE setzt ein anderes Datum (für Prüfungen,
+' damit „bald ablaufend“ nicht vom Kalender abhängt).
+FUNCTION heute$() AS STRING
+    DIM h AS STRING : h = GETENV$("KUEHL_HEUTE")
+    IF h <> "" THEN RETURN h
+    RETURN DATE$()
+END FUNCTION
+
+' Eine Einstellung aus app_settings. Dort steht JSON, wie die Python-App es
+' schreibt: "\"Stück\"" für einen Text, 3 und true wie sie sind.
+FUNCTION einstellung$(schluessel AS STRING, vorgabe AS STRING) AS STRING
+    DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT value FROM app_settings WHERE key = ?", schluessel)
+    IF NOT DB_NEXT(r) THEN RETURN vorgabe
+    DIM v AS STRING : v = DB_GET_STRING(r, 0)
+    DB_CLOSE_RESULT(r)
+    TRY
+        DIM j AS JSON_HANDLE : j = JSON_PARSE("{" + CHR$(34) + "v" + CHR$(34) + ":" + v + "}")
+        IF JSON_TYPE(j, "v") = "string" THEN RETURN JSON_GET_STRING(j, "v")
+    CATCH fehler
+    END TRY
+    RETURN v
+END FUNCTION
+
+FUNCTION einstellungZahl(schluessel AS STRING, vorgabe AS INTEGER) AS INTEGER
+    RETURN INT(VAL(einstellung$(schluessel, STR$(vorgabe))))
+END FUNCTION

@@ -1,0 +1,39 @@
+{
+  "format": "drachenhauch-studio",
+  "fassung": 1,
+  "name": "Kuehlschrank",
+  "start": "Hauptfenster",
+  "elemente": [
+    {
+      "art": "app",
+      "name": "App",
+      "code": "App.dh"
+    },
+    {
+      "art": "fenster",
+      "name": "Hauptfenster",
+      "code": "Hauptfenster.dh",
+      "layout": "Hauptfenster.dhform"
+    },
+    {
+      "art": "datenbank",
+      "name": "Daten",
+      "schema": "Daten.dhdb"
+    },
+    {
+      "art": "modul",
+      "name": "Datenbank",
+      "code": "Datenbank.dh"
+    },
+    {
+      "art": "modul",
+      "name": "Startdaten",
+      "code": "Startdaten.dh"
+    },
+    {
+      "art": "klasse",
+      "name": "Kennzahlen",
+      "code": "Kennzahlen.dh"
+    }
+  ]
+}
