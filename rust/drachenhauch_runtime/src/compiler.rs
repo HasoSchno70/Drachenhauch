@@ -5661,6 +5661,10 @@ fn fn_parts(decl: &Node) -> (&str, &[crate::ast::Param], &[Node], bool, &str) {
     }
 }
 
+/// Vorsatz eines Kandidaten "Methode ueberschreibt in anderer Schreibweise"
+/// -- `lsp::verdeckung_filtern` macht daraus eine Warnung oder laesst ihn weg.
+pub const SCHREIBWEISE_KANDIDAT: &str = "\u{1}schreibweise|";
+
 /// FnSig aus einem SUB/FUNCTION/Methoden-Knoten.
 fn make_sig(decl: &Node) -> Result<FnSig, String> {
     let (_, params, body, is_sub, return_type) = fn_parts(decl);
@@ -6537,7 +6541,6 @@ fn uebersetzen(ast: &Node, external_types: &std::collections::HashSet<String>,
                 if mname.starts_with("__") || mname == "init" { continue; }
                 let Some(eigen) = c.classes.get(cname).and_then(|ci| ci.method_sigs.get(mname)) else { continue };
                 let Some(geerbt) = c.find_method_sig(&parent, mname) else { continue };
-                if eigen.n_params == geerbt.n_params { continue; }
                 // Die Zeile der Kopfzeile: eine vor der ersten Anweisung.
                 let zeile = body.iter().find_map(|s| match s { Node::Stmt { line, .. } => Some(line.saturating_sub(1)), _ => None })
                     .unwrap_or(*cline);
@@ -6545,6 +6548,24 @@ fn uebersetzen(ast: &Node, external_types: &std::collections::HashSet<String>,
                 while let Some(ci) = c.classes.get(&wo) {
                     if ci.method_sigs.contains_key(mname) || ci.parent_name.is_empty() { break; }
                     wo = ci.parent_name.clone();
+                }
+                if eigen.n_params == geerbt.n_params {
+                    // Gleiche Parameterzahl: gewollt ueberschrieben -- ausser
+                    // die Schreibweise weicht ab (`SUB zeigen()` im Fenster
+                    // ersetzte still `Zeigen()` der Studio-Laufzeit, gefunden
+                    // mit der Kuehlschrank-App). Das sieht erst der Quelltext:
+                    // hier ein Kandidat mit der Zeile der geerbten Methode,
+                    // lsp::verdeckung_filtern vergleicht die beiden Koepfe.
+                    // Die Zeilen der beiden CLASS-Koepfe: ein leerer Rumpf
+                    // (`SUB Zeigen()` ... `END SUB`) verraet seine eigene nicht.
+                    let eltern = cls_decls.iter().find_map(|(d, z)| match d {
+                        Node::ClassDecl { name, .. } if *name == wo => Some(*z),
+                        _ => None,
+                    });
+                    if let Some(ez) = eltern {
+                        c.warnings.push((*cline, format!("{}{}|{}|{}|{}", SCHREIBWEISE_KANDIDAT, mname, Compiler::typ_klartext(cname), Compiler::typ_klartext(&wo), ez)));
+                    }
+                    continue;
                 }
                 c.warnings.push((zeile, format!(
                     "Methode '{}' in {} ueberschreibt '{}' aus {} -- dort mit {} Parameter(n), hier mit {} (Gross-/Kleinschreibung zaehlt nicht). Jeder Aufruf der geerbten Methode landet jetzt hier. Ist eine eigene Methode gemeint, einen anderen Namen vergeben.",

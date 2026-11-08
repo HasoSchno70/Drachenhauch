@@ -140,7 +140,9 @@ Einheitsmatrix, `VEC2` = Nullvektor; `model::neutrales_element`).
 - **Namen ohne Groß/klein.** Eine lokale `n` verdeckt `CONST N`, ebenso ein
   Parameter oder ein Feld `voll` die Konstante `VOLL`. `--check` warnt (bei
   Parametern und Feldern nur, wenn der Name im Block auch anders geschrieben
-  vorkommt, `lsp::verdeckung_filtern`); Strg+. benennt die Variable um. Vorbelegte Namen (`red`, `pi`,
+  vorkommt, `lsp::verdeckung_filtern`); Strg+. benennt die Variable um. Eine Methode
+  `zeigen` ersetzt `Zeigen` der Elternklasse (`--check` warnt bei anderer
+  Schreibweise). Vorbelegte Namen (`red`, `pi`,
   `KEY_*`) dürfen als Variable verschattet werden; eine Variable darf heißen wie
   ein Builtin, `LEN(s)` meint dann trotzdem den Builtin.
 - **`MID$`/`INSTR`/`INSTRREV` zählen ab 0**, nicht gefunden = -1.
