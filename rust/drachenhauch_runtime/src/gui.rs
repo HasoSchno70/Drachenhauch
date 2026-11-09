@@ -46,6 +46,7 @@ const KEY_ESC: i64 = 27;
 const KEY_PAGEUP: i64 = 1073741899;
 const KEY_PAGEDOWN: i64 = 1073741902;
 const KEY_F2: i64 = 1073741883;
+const KEY_F4: i64 = 1073741885;
 const K_A: i64 = 97;
 const K_B: i64 = 98;
 const K_I: i64 = 105;
@@ -1306,6 +1307,7 @@ impl TableState {
             1 => s.parse::<i64>().is_ok(),
             2 => s.replace(',', ".").parse::<f64>().is_ok(),
             3 => self.col_wahl.get(c).map(|w| w.iter().any(|x| x == s)).unwrap_or(false),
+            4 => crate::kalender::parse(s).is_some(),
             _ => true,
         }
     }
@@ -3177,6 +3179,10 @@ pub struct Widget {
     datum_min: Option<[i32; 3]>,
     datum_max: Option<[i32; 3]>,
     wochenbeginn: i32,
+    /// Datumsfeld (GUI_DATEFIELD): ein Feld mit dem Datum, das den Monat zum
+    /// Waehlen aufklappt -- statt des Monatsgitters im Fenster (wie QDateEdit
+    /// mit Kalender).
+    kompakt: bool,
     // Ausrichtung des Textes: -1 = Vorgabe der Art (Beschriftung und Textfeld
     // links, Knopf mittig), 0 links, 1 mitte, 2 rechts.
     align: i8,
@@ -3612,6 +3618,12 @@ pub struct Gui {
     active_split: Option<(usize, usize)>,    // laufendes Splitter-Drag
     split_off: i32,                          // Griff-Versatz (Maus -> Balkenkante)
     open_dropdown: Option<(usize, usize)>,   // gerade aufgeklapptes Dropdown
+    /// Aufgeklappter Monat: (Fenster, Widget, Zelle). Zelle = FALSE: ein
+    /// Datumsfeld; TRUE: die Zelle einer Datumsspalte, die gerade bearbeitet
+    /// wird (das Widget ist die Tabelle).
+    datum_auf: Option<(usize, usize, bool)>,
+    /// Der Tag, der im aufgeklappten Monat markiert ist (noch nicht gewaehlt).
+    datum_zeigt: [i32; 3],
     // Bearbeitbare Klappliste: steht die Markierung, weil jemand mit den
     // Pfeilen dorthin ging? Nur dann nimmt Enter den Eintrag -- ein beim
     // Tippen VORGESCHLAGENER Eintrag ersetzte sonst, was man getippt hat.
@@ -3800,7 +3812,7 @@ impl Gui {
             skins: HashMap::new(),
             active_slider: None,
             active_knob: None, active_split: None, split_off: 0,
-            open_dropdown: None, dd_auf_t: 0.0, dd_auf_von: None, dd_mark: -1, dd_pfeil: false, dd_scroll: 0, dd_tipp: String::new(), dd_tipp_zeit: 0.0, schirm_h: 0, schirm_b: 0, listbar_zug: None, tabar_zug: None, liste_taste: false, spin_edit: None, active_table: None, table_press: None, press_origin: None,
+            open_dropdown: None, datum_auf: None, datum_zeigt: [2000, 1, 1], dd_auf_t: 0.0, dd_auf_von: None, dd_mark: -1, dd_pfeil: false, dd_scroll: 0, dd_tipp: String::new(), dd_tipp_zeit: 0.0, schirm_h: 0, schirm_b: 0, listbar_zug: None, tabar_zug: None, liste_taste: false, spin_edit: None, active_table: None, table_press: None, press_origin: None,
             drag: None, drop: None, cursors: true,
             editing_table: None, last_click: None, dbl_click: false,
             open_menu: None, context_open: None, kontext_neu: None, rs_menue: None, sub_chain: Vec::new(), tasten_mod: (false, false),
@@ -4135,6 +4147,19 @@ impl Gui {
         let (j, m, t, _, _, _) = crate::builtins::local_datetime();
         wd.datum = [j as i32, m as i32, t as i32];
         self.add_widget(win, "GUI_DATEPICKER", wd)
+    }
+
+    /// Datumsfeld: zeigt das Datum und klappt beim Klick (Leertaste, F4,
+    /// Alt+Ab) den Monat auf -- ein Tag uebernimmt und klappt zu, ESC klappt
+    /// nur zu, die Pfeile verstellen es auch zugeklappt. Sonst ein
+    /// GUI_DATEPICKER: GUI_DATE, GUI_SET_DATE, GUI_DATE_RANGE gelten.
+    pub fn datefield(&mut self, win: i64, x: i32, y: i32, w: i32, h: i32)
+                     -> Result<i64, String> {
+        let mut wd = Self::blank(Kind::DatePicker, x, y, w.max(90), h.max(20));
+        let (j, m, t, _, _, _) = crate::builtins::local_datetime();
+        wd.datum = [j as i32, m as i32, t as i32];
+        wd.kompakt = true;
+        self.add_widget(win, "GUI_DATEFIELD", wd)
     }
 
     pub fn picked_color(&self, h: i64) -> Result<i64, String> {
@@ -4890,7 +4915,7 @@ impl Gui {
             tab_meldet: false, tab_treffer: false,
             spalten_start: (-1, -1),
             hsv: [0.0, 1.0, 1.0], alpha: 255, alpha_an: false,
-            datum: [2000, 1, 1], datum_min: None, datum_max: None, wochenbeginn: 0,
+            datum: [2000, 1, 1], datum_min: None, datum_max: None, wochenbeginn: 0, kompakt: false,
             zeit: [12, 0, 0], zeit_sek: false,
             step: 1.0,
             align: -1, wrap: false, passwort: false, nur_lesen: false, maxlaenge: 0, zahlen: 0, frei: false,
@@ -6993,7 +7018,8 @@ zellmodus, zeilen_anhaengen", key)),
             "ganz" | "ganzzahl" | "int" | "integer" => 1,
             "zahl" | "float" | "number" => 2,
             "auswahl" | "liste" | "choice" => 3,
-            _ => return Err(format!("GUI_TABLE_COL_TYPE: '{}' unbekannt -- text, ganz, zahl, auswahl", art)),
+            "datum" | "date" => 4,
+            _ => return Err(format!("GUI_TABLE_COL_TYPE: '{}' unbekannt -- text, ganz, zahl, auswahl, datum", art)),
         };
         let t = self.tbl_mut(h, "GUI_TABLE_COL_TYPE")?;
         if !(0..1000).contains(&c) { return Err(format!("GUI_TABLE_COL_TYPE: Spalte {} ausserhalb 0..999", c)); }
@@ -9727,10 +9753,27 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         // Die Tabelle braucht den Tastaturfokus, sonst landen die Zeichen im
         // Textfeld daneben.
         self.focus_widget = Some((wi, idx));
+        // Eine Datumsspalte klappt dazu den Monat auf (getippt werden darf
+        // trotzdem); er beginnt beim Datum der Zelle, sonst heute.
+        let datum = self.windows[wi].widgets[idx].tbl.as_ref()
+            .filter(|t| t.col_typ_of(c as usize) == 4)
+            .map(|t| crate::kalender::parse(&t.edit_text));
+        if let Some(d) = datum {
+            self.datum_zeigt = match d {
+                Some((j, m, t)) => [j, m, t],
+                None => {
+                    let (j, m, t, _, _, _) = crate::builtins::local_datetime();
+                    [j as i32, m as i32, t as i32]
+                }
+            };
+            self.open_dropdown = None;
+            self.datum_auf = Some((wi, idx, true));
+        }
     }
 
     /// Bearbeitung beenden. `uebernehmen` = Text in die Zelle schreiben.
     fn table_end_edit(&mut self, wi: usize, idx: usize, uebernehmen: bool) {
+        if self.datum_auf == Some((wi, idx, true)) { self.datum_auf = None; }
         let mut geaendert = false;
         {
             let t = match self.windows[wi].widgets[idx].tbl.as_mut() { Some(t) => t, None => return };
@@ -11804,6 +11847,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         }
         if w.kind == Kind::DatePicker {
             o["date"] = serde_json::json!(crate::kalender::format(w.datum[0], w.datum[1], w.datum[2]));
+            if w.kompakt { o["kompakt"] = serde_json::json!(true); }
         }
         if w.anchor != 5 { o["anchor"] = serde_json::json!(Self::anchor_str(w.anchor)); }
         if let Some(l) = w.list.as_ref() {
@@ -11952,7 +11996,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             if t.zeilen_anhaengen { tj["zeilen_anhaengen"] = serde_json::json!(true); }
             if t.col_typ.iter().any(|&x| x != 0) {
                 let namen: Vec<&str> = t.col_typ.iter()
-                    .map(|&x| match x { 1 => "ganz", 2 => "zahl", 3 => "auswahl", _ => "text" }).collect();
+                    .map(|&x| match x { 1 => "ganz", 2 => "zahl", 3 => "auswahl", 4 => "datum", _ => "text" }).collect();
                 tj["col_type"] = serde_json::json!(namen);
             }
             if t.col_wahl.iter().any(|w| !w.is_empty()) { tj["col_choices"] = serde_json::json!(t.col_wahl); }
@@ -12226,6 +12270,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         if let Some(t) = wj["date"].as_str() {
             if let Some((j, m, d)) = crate::kalender::parse(t) { w.datum = [j, m, d]; }
         }
+        if kind == Kind::DatePicker && wj["kompakt"].as_bool() == Some(true) { w.kompakt = true; }
         if kind == Kind::Table {
             let mut ts = TableState::default();
             if let Some(tj) = wj.get("table") {
@@ -12299,7 +12344,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 if let Some(v) = tj["zeilen_anhaengen"].as_bool() { ts.zeilen_anhaengen = v; }
                 if let Some(a) = tj["col_type"].as_array() {
                     ts.col_typ = a.iter().map(|x| match x.as_str().unwrap_or("") {
-                        "ganz" => 1, "zahl" => 2, "auswahl" => 3, _ => 0 }).collect();
+                        "ganz" => 1, "zahl" => 2, "auswahl" => 3, "datum" => 4, _ => 0 }).collect();
                 }
                 if let Some(a) = tj["col_choices"].as_array() {
                     ts.col_wahl = a.iter().map(|w| w.as_array().map(|w| w.iter()
@@ -14097,8 +14142,14 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 // das Kaestchen zurueck, das man eben angeklickt hatte, und der
                 // Dialog liess sich nicht mit Enter speichern (Kuehlschrank-App,
                 // Einstellungen).
+                // Ein zugeklapptes Datumsfeld ebenso (wie QDateEdit): Enter gilt
+                // dem Formular, aufgeklappt waehlt es den Tag.
+                let fok_datum = self.focus_widget.filter(|(w, _)| *w == top)
+                    .and_then(|(_, i)| self.windows[top].widgets.get(i))
+                    .map(|w| w.kind == Kind::DatePicker && w.kompakt).unwrap_or(false)
+                    && self.datum_auf.is_none();
                 let enter_frei = matches!(fok, None | Some(Kind::TextInput) | Some(Kind::Spinner)
-                    | Some(Kind::Checkbox) | Some(Kind::Toggle) | Some(Kind::Radio)) || fok_frei;
+                    | Some(Kind::Checkbox) | Some(Kind::Toggle) | Some(Kind::Radio)) || fok_frei || fok_datum;
                 // Beim Umbenennen in einer Liste gehoeren Enter und ESC dem Feld.
                 let liste_edit = self.focus_widget.filter(|(w, _)| *w == top)
                     .and_then(|(_, i)| self.windows[top].widgets.get(i))
@@ -16550,9 +16601,29 @@ zellmodus, zeilen_anhaengen, spalten", key)),
 
     /// Klick im Datumswaehler: Pfeile blaettern, eine Zelle waehlt den Tag.
     fn dp_press(&mut self, wi: usize, i: usize, mx: i32, my: i32) {
-        let (ax, ay, w, h) = self.abs_rect(wi, &self.windows[wi].widgets[i]);
+        if self.windows[wi].widgets[i].kompakt {
+            self.datum_umschalten(wi, i);
+            return;
+        }
+        let rect = self.abs_rect(wi, &self.windows[wi].widgets[i]);
+        let (wb, d) = (self.windows[wi].widgets[i].wochenbeginn, self.windows[wi].widgets[i].datum);
+        let (neu, _) = self.dp_rechne(wb, rect, d, mx, my);
+        // Ein gesperrtes Datum wird nicht uebernommen -- ein Klick, der die
+        // Marke auf einen Tag setzt, den der Waehler selbst ausschliesst,
+        // waere eine Luege.
+        if Self::dp_erlaubt(&self.windows[wi].widgets[i], neu) {
+            self.dp_setze(wi, i, neu);
+        }
+    }
+
+    /// Was ein Klick ins Monatsgitter `rect` bei Datum `d` bedeutet: das neue
+    /// Datum, und ob ein TAG getroffen wurde (sonst Blaettern im Kopf). Eine
+    /// Rechnung fuer den Waehler und den aufgeklappten Monat.
+    fn dp_rechne(&self, wochenbeginn: i32, rect: (i32, i32, i32, i32), d: [i32; 3],
+                 mx: i32, my: i32) -> ([i32; 3], bool) {
+        let (ax, ay, w, h) = rect;
         let (kopf, zw, zh) = self.dp_geom(w, h);
-        let d = self.windows[wi].widgets[i].datum;
+        let mut tag = false;
         let mut neu = d;
         if my < ay + kopf {
             // Vier Bereiche, von aussen nach innen: Jahr zurueck, Monat
@@ -16569,8 +16640,12 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 let sp = ((mx - ax) / zw).clamp(0, 6);
                 let ze = (my - gy) / zh;
                 if (0..6).contains(&ze) {
-                    let erster = crate::kalender::wochentag(d[0], d[1], 1);
+                    // Wie das Zeichnen: die erste Spalte ist der Wochenbeginn.
+                    // Vorher zaehlte der Klick immer ab Montag -- mit "Woche ab
+                    // Sonntag" traf er den Tag daneben.
+                    let erster = (crate::kalender::wochentag(d[0], d[1], 1) - wochenbeginn).rem_euclid(7);
                     let nr = ze * 7 + sp - erster + 1;
+                    tag = true;
                     let im_monat = crate::kalender::tage_im_monat(d[0], d[1]);
                     // Ein Klick auf einen Nachbarmonats-Tag blaettert dorthin --
                     // das ist die Erwartung, nicht "passiert nichts".
@@ -16588,12 +16663,66 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 }
             }
         }
-        // Ein gesperrtes Datum wird nicht uebernommen -- ein Klick, der die
-        // Marke auf einen Tag setzt, den der Waehler selbst ausschliesst,
-        // waere eine Luege.
-        if Self::dp_erlaubt(&self.windows[wi].widgets[i], neu) {
+        (neu, tag)
+    }
+
+    // --- Aufgeklappter Monat (Datumsfeld, Datumsspalte) ------------------------
+
+    /// Woran der Monat haengt: das Datumsfeld oder die bearbeitete Zelle.
+    fn datum_anker(&self) -> Option<(i32, i32, i32, i32)> {
+        let (wi, i, zelle) = self.datum_auf?;
+        let w = self.windows.get(wi)?.widgets.get(i)?;
+        if !self.windows[wi].alive || !self.windows[wi].visible || !w.alive || !w.visible { return None; }
+        if zelle { self.edit_cell_rect(wi, i) } else { Some(self.abs_rect(wi, w)) }
+    }
+
+    /// Lage des aufgeklappten Monats: unter dem Anker, oder darueber, wenn
+    /// unten kein Platz ist. EINE Quelle fuer Zeichnen und Klick.
+    fn datum_geom(&self) -> Option<(i32, i32, i32, i32)> {
+        let (ax, ay, aw, ah) = self.datum_anker()?;
+        let pw = aw.max(self.sk(252));
+        let ph = self.sk(236);
+        let (sb, sh) = self.schirm();
+        let x = ax.min(sb - pw).max(0);
+        let y = if ay + ah + ph > sh && ay - ph >= 0 { ay - ph } else { ay + ah };
+        Some((x, y, pw, ph))
+    }
+
+    fn datum_umschalten(&mut self, wi: usize, i: usize) {
+        if self.datum_auf == Some((wi, i, false)) {
+            self.datum_auf = None;
+        } else {
+            self.open_dropdown = None;
+            self.datum_auf = Some((wi, i, false));
+            self.datum_zeigt = self.windows[wi].widgets[i].datum;
+        }
+    }
+
+    /// Ein Tag ist gewaehlt: ins Feld (wenn erlaubt) bzw. in die Zelle.
+    fn datum_waehlen(&mut self, neu: [i32; 3]) {
+        let Some((wi, i, zelle)) = self.datum_auf else { return };
+        if zelle {
+            if let Some(t) = self.windows[wi].widgets[i].tbl.as_mut() {
+                t.edit_text = crate::kalender::format(neu[0], neu[1], neu[2]);
+            }
+            self.datum_auf = None;
+            self.table_end_edit(wi, i, true);
+        } else if Self::dp_erlaubt(&self.windows[wi].widgets[i], neu) {
+            self.datum_auf = None;
             self.dp_setze(wi, i, neu);
         }
+    }
+
+    /// Ein Klick in den aufgeklappten Monat: blaettern oder waehlen. FALSE,
+    /// wenn er daneben ging.
+    fn datum_klick(&mut self, mx: i32, my: i32) -> bool {
+        let Some(rect) = self.datum_geom() else { return false };
+        if !Self::in_rect(mx, my, rect) { return false; }
+        let Some((wi, i, zelle)) = self.datum_auf else { return false };
+        let wb = if zelle { 0 } else { self.windows[wi].widgets[i].wochenbeginn };
+        let (neu, tag) = self.dp_rechne(wb, rect, self.datum_zeigt, mx, my);
+        if tag { self.datum_waehlen(neu); } else { self.datum_zeigt = neu; }
+        true
     }
 
     fn dp_monat(&self, d: [i32; 3], schritte: i32) -> [i32; 3] {
@@ -16964,6 +17093,36 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 }
             }
             Kind::DatePicker => {
+                // Datumsfeld: Leertaste, F4, Alt+Ab klappen auf; offen waehlen die
+                // Pfeile den Tag, Enter/Leertaste uebernimmt, ESC klappt nur zu
+                // (verbraucht -- sonst druckte die Fensterregel auch Abbrechen).
+                if self.windows[wi].widgets[i].kompakt {
+                    if self.datum_auf == Some((wi, i, false)) {
+                        if g.key_pressed(KEY_ESC) { self.datum_auf = None; self.liste_taste = true; return; }
+                        if ausloesen {
+                            let z = self.datum_zeigt;
+                            self.datum_waehlen(z);
+                            self.liste_taste = true;
+                            return;
+                        }
+                        let d = self.datum_zeigt;
+                        let tage = (rechts as i32 - links as i32) + 7 * (ab as i32 - auf as i32);
+                        let mut neu = d;
+                        if tage != 0 {
+                            let (j, m, t) = crate::kalender::plus_tage(d[0], d[1], d[2], tage);
+                            neu = [j, m, t];
+                        }
+                        let weite = if g.key_shift() { 12 } else { 1 };
+                        if g.key_pressed(KEY_PAGEUP) { neu = self.dp_monat(neu, -weite); }
+                        if g.key_pressed(KEY_PAGEDOWN) { neu = self.dp_monat(neu, weite); }
+                        self.datum_zeigt = neu;
+                        return;
+                    }
+                    if leertaste || g.key_pressed(KEY_F4) || (g.key_alt() && ab) {
+                        self.datum_umschalten(wi, i);
+                        return;
+                    }
+                }
                 let d = self.windows[wi].widgets[i].datum;
                 let tage = (rechts as i32 - links as i32) + 7 * (ab as i32 - auf as i32);
                 let mut neu = d;
@@ -17264,6 +17423,21 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     }
 
     fn handle_press(&mut self, mx: i32, my: i32) {
+        // Ein aufgeklappter Monat liegt ueber allem (wie eine Klappliste) --
+        // vor der Zellbearbeitung, die jeden Klick daneben uebernimmt. Ein
+        // Klick daneben klappt ihn zu; einer auf das Datumsfeld selbst nur das.
+        if let Some((dw, di, zelle)) = self.datum_auf {
+            if self.datum_geom().is_none() {
+                self.datum_auf = None;
+            } else if self.datum_klick(mx, my) {
+                return;
+            } else {
+                let anker = self.datum_anker();
+                self.datum_auf = None;
+                let _ = (dw, di);
+                if !zelle && anker.map(|a| Self::in_rect(mx, my, a)).unwrap_or(false) { return; }
+            }
+        }
         // Ein Klick irgendwohin uebernimmt eine laufende Zellbearbeitung.
         // Ohne das bliebe der Editor offen stehen, waehrend die Tastatur
         // laengst woanders hinhoert -- ein Feld, das aussieht als koennte man
@@ -18612,6 +18786,8 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 self.draw_wahl_popup(g, ew, ei);
             }
         }
+        // Ein aufgeklappter Monat (Datumsfeld oder Datumsspalte).
+        self.draw_datum_popup(g);
         // Ueberlauf-Menue einer Werkzeugleiste -- ueber allen Fenstern.
         if let Some((lw, li)) = self.leiste_popup {
             if self.windows.get(lw).map(|w| w.alive && w.visible).unwrap_or(false) {
@@ -21709,7 +21885,11 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             Kind::Table => self.draw_table(g, wi, idx),
             Kind::Tree => self.draw_tree(g, wi, idx),
             Kind::ColorPicker => self.draw_colorpicker(g, wdg, ax, ay, w, h),
-            Kind::DatePicker => self.draw_datepicker(g, wdg, ax, ay, w, h),
+            Kind::DatePicker => if wdg.kompakt {
+                self.draw_datumsfeld(g, wdg, ax, ay, w, h)
+            } else {
+                self.draw_datepicker(g, wdg, ax, ay, w, h)
+            },
         }
         // Fokus-Ring: EINE Stelle fuer alle Arten, nach dem Zeichnen und damit
         // obenauf. Liegt AUSSERHALB der Widget-Flaeche (2 px Luft), sonst
@@ -21983,6 +22163,41 @@ zellmodus, zeilen_anhaengen, spalten", key)),
 
     fn rahmen(&self, g: &mut Graphics, wdg: &Widget, x1: i32, y1: i32, x2: i32, y2: i32) {
         g.rect(x1, y1, x2, y2, self.wcol(wdg, "border", "widget_border"));
+    }
+
+    /// Das zugeklappte Datumsfeld: das Datum und rechts ein Kalenderblatt.
+    fn draw_datumsfeld(&self, g: &mut Graphics, wdg: &Widget,
+                       ax: i32, ay: i32, w: i32, h: i32) {
+        self.fbox_tief_w(g, wdg.kind, ax, ay, ax + w - 1, ay + h - 1,
+                         self.wcol(wdg, "bg", "widget_bg"),
+                         self.wcol(wdg, "border", "widget_border"));
+        let schrift = self.wsize(g, wdg);
+        let text = crate::kalender::format(wdg.datum[0], wdg.datum[1], wdg.datum[2]);
+        self.wtext(g, wdg, ax + self.sk(8), ay + (h - schrift).max(0) / 2, text, self.txt_col(wdg));
+        let s = self.sk(12);
+        let (bx, by) = (ax + w - s - self.sk(9), ay + (h - s) / 2);
+        let c = self.th("muted_fg");
+        g.rect(bx, by + 2, bx + s, by + s, c);
+        g.line(bx, by + 5, bx + s, by + 5, c);
+        g.line(bx + 3, by, bx + 3, by + 3, c);
+        g.line(bx + s - 3, by, bx + s - 3, by + 3, c);
+    }
+
+    /// Der aufgeklappte Monat, obenauf: dasselbe Gitter wie der Waehler, mit
+    /// dem markierten Tag; Wochenbeginn und Grenzen vom Datumsfeld.
+    fn draw_datum_popup(&self, g: &mut Graphics) {
+        let Some((wi, i, zelle)) = self.datum_auf else { return };
+        let Some((px, py, pw, ph)) = self.datum_geom() else { return };
+        let quelle = &self.windows[wi].widgets[i];
+        let mut tw = Self::blank(Kind::DatePicker, 0, 0, pw, ph);
+        tw.datum = self.datum_zeigt;
+        if !zelle {
+            tw.wochenbeginn = quelle.wochenbeginn;
+            tw.datum_min = quelle.datum_min;
+            tw.datum_max = quelle.datum_max;
+        }
+        g.box_fill(px + 3, py + 3, px + pw + 2, py + ph + 2, 0x40i64 << 24);
+        self.draw_datepicker(g, &tw, px, py, pw, ph);
     }
 
     fn draw_datepicker(&self, g: &mut Graphics, wdg: &Widget,

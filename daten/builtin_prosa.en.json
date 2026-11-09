@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/en und dem englischen Buch von `dhrt doku prosa` -- NICHT von Hand aendern. Der Hover nimmt sie mit DHRT_LANG=en.",
- "count": 2374,
+ "count": 2375,
  "docs": {
   "ABS": "Absolute value.",
   "ACOS": "Arc sine/cosine (x in [-1, 1])",
@@ -600,6 +600,7 @@
   "GUI_CONTEXT_WIDGET": "bind a context menu to a widget: it only opens on a right-click on it (list box, tree, table select their row while doing so, a text area sets the cursor; not in its line-number column, which belongs to GUI_TEXTAREA_GUTTER_CLICKED); -1 binds it back to the window",
   "GUI_CURSORS": "mouse pointer shapes depending on the spot in the widget (default on): text beam over text, hand over anything clickable, double arrow at dividers, column edges and the window grip",
   "GUI_DATE": "chosen date as JJJJ-MM-TT",
+  "GUI_DATEFIELD": "date field: shows the date and drops down the month on a click (Space, F4, Alt+Down); a day takes it, ESC only closes, Enter belongs to the form while closed -- otherwise like GUI_DATEPICKER",
   "GUI_DATEPICKER": "month grid with paging arrows",
   "GUI_DATEPICKER_SET": "wochenbeginn (start of week: 0 = Monday … 6 = Sunday)",
   "GUI_DATE_CLEAR_MARKS": "remove all marks",
@@ -929,7 +930,7 @@
   "GUI_TABLE_COL_CHOICES": "entries of a choice column (makes it a choice column)",
   "GUI_TABLE_COL_EDIT": "enable a column for editing",
   "GUI_TABLE_COL_POS": "at which position is this data column?",
-  "GUI_TABLE_COL_TYPE": "text, ganz, zahl or auswahl",
+  "GUI_TABLE_COL_TYPE": "text, ganz, zahl, auswahl or datum (editing drops down the month under the cell; a day writes YYYY-MM-DD)",
   "GUI_TABLE_COL_WIDTHS": "column widths (1D ARRAY OF INTEGER; NIL = auto)",
   "GUI_TABLE_COPY$": "STRING — the range as tab-separated text",
   "GUI_TABLE_CURRENT_COL": "INTEGER — current cell (-1 = none)",

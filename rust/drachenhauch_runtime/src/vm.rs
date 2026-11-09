@@ -9869,6 +9869,10 @@ impl<'p> Vm<'p> {
                                           gi(a,1,"GUI_SET_PICKED_COLOR")?)?;
                 Value::Nil
             }
+            "gui_datefield" => Value::Int(self.gui.datefield(
+                gi(a,0,"GUI_DATEFIELD")?, gi(a,1,"GUI_DATEFIELD")? as i32,
+                gi(a,2,"GUI_DATEFIELD")? as i32, gi(a,3,"GUI_DATEFIELD")? as i32,
+                gi(a,4,"GUI_DATEFIELD")? as i32)?),
             "gui_datepicker" => Value::Int(self.gui.datepicker(
                 gi(a,0,"GUI_DATEPICKER")?, gi(a,1,"GUI_DATEPICKER")? as i32,
                 gi(a,2,"GUI_DATEPICKER")? as i32, gi(a,3,"GUI_DATEPICKER")? as i32,

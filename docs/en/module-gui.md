@@ -1613,7 +1613,7 @@ table.
 | `GUI_TABLE_SELECT_RANGE(tbl, anker_zeile, anker_spalte, zeile, spalte)` | — | set the range |
 | `GUI_TABLE_COPY$(tbl)` | STRING | the range as tab-separated text |
 | `GUI_TABLE_PASTE(tbl, text$)` | INTEGER | paste tab-separated text from the current cell on; number of cells written |
-| `GUI_TABLE_COL_TYPE(tbl, spalte, art$)` | — | `text`, `ganz`, `zahl` or `auswahl` |
+| `GUI_TABLE_COL_TYPE(tbl, spalte, art$)` | — | `text`, `ganz`, `zahl`, `auswahl` or `datum` (editing drops down the month under the cell; a day writes `YYYY-MM-DD`) |
 | `GUI_TABLE_COL_CHOICES(tbl, spalte, eintraege)` | — | entries of a choice column (makes it a choice column) |
 
 A **number column** accepts while typing only what can become a number (`-`
@@ -3655,6 +3655,7 @@ have to rebuild by hand.
 | `GUI_PICKED_COLOR(picker)` → INTEGER | chosen colour (`0xRRGGBB`) |
 | `GUI_SET_PICKED_COLOR(picker, farbe)` | set the colour |
 | `GUI_DATEPICKER(win, x, y, w, h)` → GUI_WIDGET | month grid with paging arrows |
+| `GUI_DATEFIELD(win, x, y, w, h)` → GUI_WIDGET | date field: shows the date and drops down the month on a click (Space, F4, Alt+Down); a day takes it, ESC only closes, Enter belongs to the form while closed -- otherwise like GUI_DATEPICKER |
 | `GUI_DATE(picker)` → STRING | chosen date as `JJJJ-MM-TT` |
 | `GUI_SET_DATE(picker, datum$)` | set the date |
 | `GUI_COLORPICKER_SET(picker, schluessel$, wert)` | `alpha` (0/1) — show an opacity strip |

@@ -1615,7 +1615,7 @@ Datenspalten, wie überall bei der Tabelle.
 | `GUI_TABLE_SELECT_RANGE(tbl, anker_zeile, anker_spalte, zeile, spalte)` | — | Bereich setzen |
 | `GUI_TABLE_COPY$(tbl)` | STRING | Bereich als Tabulator-Text |
 | `GUI_TABLE_PASTE(tbl, text$)` | INTEGER | Tabulator-Text ab der aktuellen Zelle einfügen; Zahl der geschriebenen Zellen |
-| `GUI_TABLE_COL_TYPE(tbl, spalte, art$)` | — | `text`, `ganz`, `zahl` oder `auswahl` |
+| `GUI_TABLE_COL_TYPE(tbl, spalte, art$)` | — | `text`, `ganz`, `zahl`, `auswahl` oder `datum` (beim Bearbeiten klappt der Monat unter der Zelle auf; ein Tag schreibt `JJJJ-MM-TT`) |
 | `GUI_TABLE_COL_CHOICES(tbl, spalte, eintraege)` | — | Einträge einer Auswahlspalte (macht sie zur Auswahl) |
 
 Eine **Zahlenspalte** nimmt beim Tippen nur, was eine Zahl werden kann
@@ -3665,6 +3665,7 @@ nachbauen müsste.
 | `GUI_PICKED_COLOR(picker)` → INTEGER | gewählte Farbe (`0xRRGGBB`) |
 | `GUI_SET_PICKED_COLOR(picker, farbe)` | Farbe setzen |
 | `GUI_DATEPICKER(win, x, y, w, h)` → GUI_WIDGET | Monatsgitter mit Blätterpfeilen |
+| `GUI_DATEFIELD(win, x, y, w, h)` → GUI_WIDGET | Datumsfeld: zeigt das Datum und klappt beim Klick (Leertaste, F4, Alt+Ab) den Monat auf; ein Tag übernimmt, ESC klappt nur zu, Enter gilt zugeklappt dem Formular -- sonst wie GUI_DATEPICKER |
 | `GUI_DATE(picker)` → STRING | gewähltes Datum als `JJJJ-MM-TT` |
 | `GUI_SET_DATE(picker, datum$)` | Datum setzen |
 | `GUI_COLORPICKER_SET(picker, schluessel$, wert)` | `alpha` (0/1) — Deckkraft-Streifen zeigen |

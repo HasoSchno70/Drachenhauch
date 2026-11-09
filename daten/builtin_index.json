@@ -4419,6 +4419,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_DATEFIELD",
+   "kind": "core",
+   "signature": "GUI_DATEFIELD(win, x, y, w, h)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_DATEPICKER",
    "kind": "core",
    "signature": "GUI_DATEPICKER(win, x, y, w, h)",
