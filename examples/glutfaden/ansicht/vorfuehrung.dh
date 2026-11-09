@@ -1553,10 +1553,17 @@ FUNCTION vorfuehrenStufe15(daten AS INTEGER) AS BOOLEAN
             PRINT "uebersicht: "; gtk_label_get_text(mkInfo)
             leinwandZoom(30, 0, 0)
             lwX = 40 : lwY = 30
+            ' der Zeiger steht fest, bis das Foto gemacht ist: im vollen
+            ' Testlauf geht sonst ein fremdes Fenster ueber der Leinwand auf,
+            ' das leave-notify setzt ihn zurueck. Das Verlassen hier mit
+            ' Absicht -- so prueft jeder Lauf diesen Fall.
             lwMausX = 4 : lwMausY = 2
+            lwMausFest = TRUE
+            DIM weg AS BOOLEAN : weg = lwVerlassen(lwFlaeche, 0, 0)
             gtk_widget_queue_draw(lwFlaeche)
         CASE 2
             ok = vfFoto(fenster, "flaeche")
+            lwMausFest = FALSE
             (vx, vy, vw, vh) = mkAusschnitt()
             PRINT "minikarte: bild "; mkB; "x"; mkH; " bei "; mkX; ","; mkY; " | ausschnitt "; vx; ","; vy; " "; vw; "x"; vh
             ' Lineal: Spalte 10 in die Mitte, Zeile 3 in die Mitte
@@ -2637,6 +2644,12 @@ FUNCTION vorfuehrenStufe22(daten AS INTEGER) AS BOOLEAN
             garnAbgelegt(-1, 0)
             PRINT "falsche nummern: farben "; lwMuster.farbanzahl()
             ' Ebenen ziehen: die Stelle in der echten Liste, dann zusammenfuehren
+            ' Unter Last kam dieser Schritt vor dem Neuzeichnen dran: die eben
+            ' neu gebaute Liste hatte noch keine Zeilen-Lagen (-1 an jeder
+            ' Stelle). Darum hier mit Absicht frisch gebaut und erst vermessen
+            ' -- so prueft jeder Lauf den schweren Fall, nicht nur ein voller.
+            seitenleisteMuster(lwMuster)
+            gtkVermessen(slEbenenListe)
             DIM z1 AS INTEGER : z1 = gtk_list_box_get_row_at_index(slEbenenListe, 1)
             DIM lage AS PangoRechteck
             gtk_widget_get_allocation(z1, lage)

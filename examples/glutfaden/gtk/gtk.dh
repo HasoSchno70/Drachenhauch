@@ -644,8 +644,12 @@ SUB gtkAbarbeiten()
     WEND
 END SUB
 
-' Ein Widget in eine PNG zeichnen (unabhaengig davon, ob es zu sehen ist).
-FUNCTION gtkFoto(w AS INTEGER, pfad AS STRING) AS BOOLEAN
+' Abarbeiten und vermessen lassen, was ansteht: danach haben eben gebaute
+' oder umgebaute Widgets ihre Lage. Wer eine Lage abfragt (Zeile unter y),
+' braucht das ebenso wie ein Foto -- im Takt eines g_timeout_add kommt der
+' Zeitgeber unter Last VOR dem Neuzeichnen dran (er hat den Vorrang), und
+' eine eben neu gebaute Liste hat dann noch keine Zeilen-Lagen.
+SUB gtkVermessen(w AS INTEGER)
     ' erst verteilen lassen, was noch ansteht -- ein eben gebautes Fenster hat
     ' sonst noch keine Groessen (Gtk-CRITICAL "alloc_needed")
     WHILE gtk_events_pending()
@@ -655,6 +659,11 @@ FUNCTION gtkFoto(w AS INTEGER, pfad AS STRING) AS BOOLEAN
     ' beim Abholen der Ereignisse. Hat im selben Takt etwas eine neue Groesse
     ' verlangt, verteilt erst das hier sie (sonst wieder "alloc_needed")
     gtk_container_check_resize(gtk_widget_get_toplevel(w))
+END SUB
+
+' Ein Widget in eine PNG zeichnen (unabhaengig davon, ob es zu sehen ist).
+FUNCTION gtkFoto(w AS INTEGER, pfad AS STRING) AS BOOLEAN
+    gtkVermessen(w)
     DIM flaeche AS INTEGER : flaeche = cairo_image_surface_create(CAIRO_ARGB32, gtk_widget_get_allocated_width(w), gtk_widget_get_allocated_height(w))
     DIM cr AS INTEGER : cr = cairo_create(flaeche)
     gtk_widget_draw(w, cr)
