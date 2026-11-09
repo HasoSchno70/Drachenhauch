@@ -64,7 +64,7 @@ CHART_LABEL(c, 0, "Mo")                ' label a category
 | Command | Effect |
 |---|---|
 | `CHART_SERIES(c, name$ [, farbe])` | create a series → index |
-| `CHART_ADD(c, name$, wert [, farbe])` | category + value in series 0 → index |
+| `CHART_ADD(c, name$, wert [, farbe])` | category + value in series 0 → index; the colour applies to the slice, for a bar chart with one series to the bar |
 | `CHART_DATA(c, reihe, werte)` | replace all values of a series (`ARRAY OF FLOAT`); the number of points follows the list, downwards too |
 | `CHART_SET_POINT(c, reihe, punkt, wert)` | change a single value |
 | `CHART_PUSH(c, reihe, wert)` | append a value at the end (live curves, see `fenster`) |

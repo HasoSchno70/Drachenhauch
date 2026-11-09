@@ -245,7 +245,7 @@
   "CAPSULE_WIRES": "dieselbe als Drahtgitter",
   "CEIL": "INT-Konvertierung",
   "CENT": "INTEGER — einen Betrag in ganze Cent umrechnen — rundet, statt abzuschneiden; nimmt auch geschriebene Beträge (\"19,99\", \"1.234,56\")",
-  "CHART_ADD": "Kategorie + Wert in Reihe 0 → Index",
+  "CHART_ADD": "Kategorie + Wert in Reihe 0 → Index; die Farbe gilt für das Segment, bei einem Balken mit einer Reihe für den Balken",
   "CHART_BOUNDS": "Feld verschieben/skalieren",
   "CHART_CLEAR": "Daten verwerfen",
   "CHART_CLICKED": "in diesem Bild angeklickter Punkt, sonst -1",

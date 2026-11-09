@@ -246,7 +246,7 @@
   "CAPSULE_WIRES": "the same as a wireframe",
   "CEIL": "INT conversion",
   "CENT": "INTEGER — convert an amount into whole cents — rounds instead of truncating; also accepts written amounts (\"19,99\", \"1.234,56\")",
-  "CHART_ADD": "category + value in series 0 → index",
+  "CHART_ADD": "category + value in series 0 → index; the colour applies to the slice, for a bar chart with one series to the bar",
   "CHART_BOUNDS": "move/resize the area",
   "CHART_CLEAR": "discard the data",
   "CHART_CLICKED": "point clicked in this frame, otherwise -1",
