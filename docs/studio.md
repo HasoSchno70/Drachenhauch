@@ -784,7 +784,7 @@ geerbte mit einer anderen Zahl von Parametern überschreibt.
 
 **Das große Beispiel:** `examples/studio/kuehlschrank/` ist eine
 Kühlschrank-Verwaltung (der Port einer PySide6-App, siehe sein `LIESMICH.md`)
-mit 18 Fenstern und eigenen Controls, einer vorhandenen SQLite-Datei als
+mit 13 Fenstern und 5 eigenen Controls, einer vorhandenen SQLite-Datei als
 Datenbank-Element, Werkzeug- und Statusleiste, Timern, Diagrammen, einem
 Bericht, Netzabfragen im Hintergrund und einer englischen Oberfläche
 (`sprache/en.txt`, siehe „Sprachen“ oben). Wie es Stufe für Stufe entstand
