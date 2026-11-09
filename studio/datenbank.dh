@@ -282,7 +282,39 @@ FUNCTION dbSpalteSql$(s AS JSON_HANDLE, t AS INTEGER, k AS INTEGER) AS STRING
     IF dbSpAn(s, t, k, "pflicht") THEN z = z + " NOT NULL"
     DIM d AS STRING : d = dbSpDefault$(s, t, k)
     IF d <> "" THEN z = z + " DEFAULT " + d
+    RETURN z + dbFkSql$(s, t, k)
+END FUNCTION
+
+' Ein Verweis als Fremdschluessel. "beimLoeschen" sagt, was mit einer Zeile
+' geschieht, wenn die Zeile geloescht wird, auf die sie zeigt: "verbieten"
+' (das Loeschen scheitert), "loeschen" (sie geht mit, ON DELETE CASCADE),
+' "leeren" (der Verweis wird NULL). "" = kein Fremdschluessel, nur die
+' Spalte. Fehlt das Feld (ein Aufbau von vor 2026-11-09), bleibt die Datei,
+' wie sie ist -- sonst baute der Abgleich jede uebernommene Tabelle um.
+FUNCTION dbFkSql$(s AS JSON_HANDLE, t AS INTEGER, k AS INTEGER) AS STRING
+    DIM ziel AS STRING : ziel = dbSp$(s, t, k, "verweis")
+    DIM a AS STRING : a = dbSp$(s, t, k, "beimLoeschen")
+    IF ziel = "" OR a = "" THEN RETURN ""
+    DIM z AS STRING : z = " REFERENCES " + dbQ$(ziel) + "(id)"
+    IF a = "loeschen" THEN z = z + " ON DELETE CASCADE"
+    IF a = "leeren" THEN z = z + " ON DELETE SET NULL"
     RETURN z
+END FUNCTION
+
+' Was der Abgleich an der Datei sehen will: "ziel|aktion", "" = keinen
+' Fremdschluessel.
+FUNCTION dbFkSoll$(s AS JSON_HANDLE, t AS INTEGER, k AS INTEGER) AS STRING
+    IF dbFkSql$(s, t, k) = "" THEN RETURN ""
+    RETURN LOWER$(dbSp$(s, t, k, "verweis")) + "|" + dbSp$(s, t, k, "beimLoeschen")
+END FUNCTION
+
+' ON DELETE, wie SQLite es meldet, als Wert von "beimLoeschen".
+FUNCTION dbFkAktion$(roh AS STRING) AS STRING
+    SELECT CASE UPPER$(TRIM$(roh))
+        CASE "CASCADE" : RETURN "loeschen"
+        CASE "SET NULL" : RETURN "leeren"
+    END SELECT
+    RETURN "verbieten"
 END FUNCTION
 
 ' Was beim Umkopieren in einer Pflichtspalte steht, wo die alte Tabelle NULL
@@ -314,6 +346,9 @@ FUNCTION dbSpalteSqlDazu$(s AS JSON_HANDLE, t AS INTEGER, k AS INTEGER) AS STRIN
         IF d = "" THEN d = dbDefault$(dbSp$(s, t, k, "typ"), TRUE, "")
     END IF
     IF d <> "" THEN z = z + " DEFAULT " + d
+    ' Ohne Fremdschluessel: ADD COLUMN ... REFERENCES verweigert SQLite bei
+    ' eingeschalteten Fremdschluesseln mit einer Vorgabe ungleich NULL. Im
+    ' Studio baut der Abgleich die Tabelle dafuer um.
     RETURN z
 END FUNCTION
 
@@ -377,6 +412,14 @@ SUB dbAbgleichenMit(db AS DB_CONN, s AS JSON_HANDLE)
                 ARRAY_PUSH(inn, DB_GET_INT(r, 3) <> 0)
                 ARRAY_PUSH(idf, IIF(DB_IS_NULL(r, 4), "", DB_GET_STRING(r, 4)))
             WEND
+            ' Die Fremdschluessel der Datei, je Spalte "ziel|aktion".
+            DIM fkSp AS ARRAY OF STRING : fkSp = []
+            DIM fkIst AS ARRAY OF STRING : fkIst = []
+            DIM rf AS DB_RESULT : rf = DB_QUERY(db, "PRAGMA foreign_key_list(" + dbQ$(name) + ")")
+            WHILE DB_NEXT(rf)
+                ARRAY_PUSH(fkSp, DB_GET_STRING(rf, 3))
+                ARRAY_PUSH(fkIst, LOWER$(DB_GET_STRING(rf, 2)) + "|" + dbFkAktion$(DB_GET_STRING(rf, 6)))
+            WEND
             DIM neu AS BOOLEAN : neu = FALSE
             DIM fehlt AS ARRAY OF INTEGER : fehlt = []
             DIM k AS INTEGER
@@ -384,9 +427,14 @@ SUB dbAbgleichenMit(db AS DB_CONN, s AS JSON_HANDLE)
                 DIM i AS INTEGER : i = dbListenIndex(inamen, dbSp$(s, t, k, "name"))
                 IF i < 0 THEN
                     ARRAY_PUSH(fehlt, k)
-                    IF dbSpalteSqlDazu$(s, t, k) <> dbSpalteSql$(s, t, k) THEN neu = TRUE
+                    ' Mit Fremdschluessel lieber neu: ADD COLUMN ... REFERENCES
+                    ' nimmt SQLite nur unter Bedingungen.
+                    IF dbSpalteSqlDazu$(s, t, k) <> dbSpalteSql$(s, t, k) OR dbFkSql$(s, t, k) <> "" THEN neu = TRUE
                 ELSEIF ityp[i] <> UPPER$(dbSpSqlTyp$(s, t, k)) OR inn[i] <> dbSpAn(s, t, k, "pflicht") OR idf[i] <> dbSpDefault$(s, t, k) THEN
                     neu = TRUE
+                ELSEIF dbSpHat(s, t, k, "beimLoeschen") THEN
+                    DIM fi AS INTEGER : fi = dbListenIndex(fkSp, dbSp$(s, t, k, "name"))
+                    IF IIF(fi >= 0, fkIst[MAX(0, fi)], "") <> dbFkSoll$(s, t, k) THEN neu = TRUE
                 END IF
             NEXT
             IF neu THEN
@@ -488,6 +536,13 @@ FUNCTION dbAusfuehren$(e AS Element, neu AS STRING, vorher AS ARRAY OF STRING) A
         RETURN dbMeldung$(ofehler)
     END TRY
     DIM fehler AS STRING : fehler = ""
+    ' Fremdschluessel aus, solange der Aufbau sich aendert (dhrt baut SQLite
+    ' mit SQLITE_DEFAULT_FOREIGN_KEYS, sie sind sonst an): der Umbau einer
+    ' Tabelle loescht sie mit DROP TABLE -- ein ON DELETE CASCADE nahm dabei
+    ' alle Zeilen der Tabellen mit, die auf sie zeigen, und ein neuer
+    ' Fremdschluessel scheiterte an einem Verweis ins Leere. In einer
+    ' Transaktion laesst SQLite das nicht mehr umschalten, darum davor.
+    DB_EXEC(db, "PRAGMA foreign_keys = OFF")
     TRY
         DB_BEGIN(db)
         DIM sql AS STRING
@@ -754,6 +809,7 @@ FUNCTION dbSchemaAusDatei$(pfad AS STRING, datei AS STRING) AS STRING
             DIM eindeutig AS ARRAY OF STRING : eindeutig = dbEindeutigeSpalten(db, tn, TRUE)
             DIM fkVon AS ARRAY OF STRING : fkVon = []
             DIM fkNach AS ARRAY OF STRING : fkNach = []
+            DIM fkAkt AS ARRAY OF STRING : fkAkt = []
             DIM rf AS DB_RESULT : rf = DB_QUERY(db, "PRAGMA foreign_key_list(" + dbQ$(tn) + ")")
             WHILE DB_NEXT(rf)
                 DIM ziel AS STRING : ziel = DB_GET_STRING(rf, 2)
@@ -761,6 +817,7 @@ FUNCTION dbSchemaAusDatei$(pfad AS STRING, datei AS STRING) AS STRING
                 IF LOWER$(zu) = "id" AND dbListenIndex(tabellen, ziel) >= 0 THEN
                     ARRAY_PUSH(fkVon, DB_GET_STRING(rf, 3))
                     ARRAY_PUSH(fkNach, tabellen[dbListenIndex(tabellen, ziel)])
+                    ARRAY_PUSH(fkAkt, dbFkAktion$(DB_GET_STRING(rf, 6)))
                 END IF
             WEND
             DIM hatId AS BOOLEAN : hatId = FALSE
@@ -792,7 +849,10 @@ FUNCTION dbSchemaAusDatei$(pfad AS STRING, datei AS STRING) AS STRING
                 ' Was dbDefault$ aus der Vorgabe machte, muss genau DEFAULT der Datei sein.
                 IF dbDefault$(typ, pflicht, vorgabe) <> dflt THEN JSON_SET_STRING(sp, "sqlvorgabe", dflt)
                 DIM fi AS INTEGER : fi = dbListenIndex(fkVon, sn)
-                IF fi >= 0 AND typ = "ganz" THEN JSON_SET_STRING(sp, "verweis", fkNach[fi])
+                IF fi >= 0 AND typ = "ganz" THEN
+                    JSON_SET_STRING(sp, "verweis", fkNach[fi])
+                    JSON_SET_STRING(sp, "beimLoeschen", fkAkt[fi])
+                END IF
                 JSON_APPEND_JSON(o, "spalten", sp)
             WEND
             IF NOT hatId THEN ARRAY_PUSH(dbUebHinweise, trf$("{0} hat keine Spalte id INTEGER PRIMARY KEY -- das Studio zeigt sie, binden lässt sie sich nicht.", [tn]))
@@ -1961,14 +2021,48 @@ FUNCTION dbSpalteVerweis$(e AS Element, tabelle AS STRING, name AS STRING, ziel 
     DIM p AS STRING : p = dbSpPfad$(t, k)
     IF ziel = "" THEN
         IF JSON_HAS(s, p + ".verweis") THEN JSON_REMOVE(s, p + ".verweis")
+        ' Ohne Ziel kein Fremdschluessel mehr -- ausdruecklich, damit der
+        ' Abgleich einen vorhandenen aus der Datei nimmt.
+        JSON_SET_STRING(s, p + ".beimLoeschen", "")
     ELSE
         DIM zt AS INTEGER : zt = dbTabIndex(s, ziel)
         IF zt < 0 THEN RETURN trf$("Die Tabelle {0} gibt es nicht.", [ziel])
         JSON_SET_STRING(s, p + ".verweis", dbTabName$(s, zt))
         ' Ein Verweis haelt eine id -- eine ganze Zahl.
         JSON_SET_STRING(s, p + ".typ", "ganz")
+        IF NOT JSON_HAS(s, p + ".beimLoeschen") THEN JSON_SET_STRING(s, p + ".beimLoeschen", "")
     END IF
     RETURN dbAusfuehren$(e, JSON_STRINGIFY(s), [])
+END FUNCTION
+
+' Was mit einer Zeile geschieht, wenn die Zeile geloescht wird, auf die ihr
+' Verweis zeigt ("", "verbieten", "loeschen", "leeren"; siehe dbFkSql$).
+FUNCTION dbSpalteBeimLoeschen$(e AS Element, tabelle AS STRING, name AS STRING, wert AS STRING) AS STRING
+    IF ARRAY_INDEXOF(["", "verbieten", "loeschen", "leeren"], wert) < 0 THEN RETURN trf$("„{0}“ ist keine Wahl -- möglich sind verbieten, loeschen und leeren.", [wert])
+    DIM s AS JSON_HANDLE : s = dbSchema(e)
+    DIM t AS INTEGER : t = dbTabIndex(s, tabelle)
+    IF t < 0 THEN RETURN trf$("Die Tabelle {0} gibt es nicht.", [tabelle])
+    DIM k AS INTEGER : k = dbSpIndex(s, t, name)
+    IF k < 0 THEN RETURN trf$("Die Spalte {0} gibt es nicht.", [name])
+    IF wert <> "" AND dbSp$(s, t, k, "verweis") = "" THEN RETURN trf$("Die Spalte {0} verweist auf nichts -- erst unter „Verweis auf“ eine Tabelle wählen.", [name])
+    IF wert = "leeren" AND dbSpAn(s, t, k, "pflicht") THEN RETURN trf$("Die Spalte {0} ist Pflicht -- leeren geht nur ohne.", [name])
+    JSON_SET_STRING(s, dbSpPfad$(t, k) + ".beimLoeschen", wert)
+    RETURN dbAusfuehren$(e, JSON_STRINGIFY(s), [])
+END FUNCTION
+
+' Die Wahl im Spalten-Gitter und ihr Wert.
+FUNCTION dbLoeschenNamen() AS ARRAY OF STRING
+    RETURN ["", tr$("verbieten"), tr$("mitlöschen"), tr$("leeren")]
+END FUNCTION
+
+FUNCTION dbLoeschenName$(wert AS STRING) AS STRING
+    DIM i AS INTEGER : i = ARRAY_INDEXOF(["", "verbieten", "loeschen", "leeren"], wert)
+    RETURN dbLoeschenNamen()[MAX(0, i)]
+END FUNCTION
+
+FUNCTION dbLoeschenWert$(name AS STRING) AS STRING
+    DIM i AS INTEGER : i = ARRAY_INDEXOF(dbLoeschenNamen(), name)
+    RETURN ["", "verbieten", "loeschen", "leeren"][MAX(0, i)]
 END FUNCTION
 
 ' Was eine Klappliste mit Verweis zeigt: die erste Textspalte der

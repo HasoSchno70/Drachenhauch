@@ -296,7 +296,8 @@ unveraendert TRUE
 
 === eine neue datei aus dem uebernommenen schema hat dieselben arten
 ' Das gebaute Programm legt auf einem leeren Rechner die Tabellen aus dem
-' Schema an: DATE bleibt DATE, CURRENT_TIMESTAMP bleibt die Vorgabe.
+' Schema an: DATE bleibt DATE, CURRENT_TIMESTAMP bleibt die Vorgabe, und der
+' Fremdschluessel kommt mit seinem ON DELETE mit.
 IMPORT "kern.dh"
 dateiAnlegen("kuehl.db")
 DIM s AS JSON_HANDLE : s = JSON_PARSE(dbSchemaAusDatei$("kuehl.db", "kuehl.db"))
@@ -407,7 +408,7 @@ CREATE INDEX idx_recipe_ingredients_recipe ON recipe_ingredients(recipe_id);
 CREATE INDEX idx_recipe_ingredients_product ON recipe_ingredients(product_id);
 CREATE INDEX idx_products_name ON products(name);
 --- erwartet
-CREATE TABLE IF NOT EXISTS "inventory" (id INTEGER PRIMARY KEY, "product_id" INTEGER NOT NULL, "quantity" REAL NOT NULL DEFAULT 1, "unit" TEXT DEFAULT 'Stück', "purchase_date" DATE, "expiry_date" DATE, "storage_location" TEXT, "storage_area" TEXT, "notes" TEXT, "status" TEXT DEFAULT 'fresh', "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "purchased_at_store" TEXT)
+CREATE TABLE IF NOT EXISTS "inventory" (id INTEGER PRIMARY KEY, "product_id" INTEGER NOT NULL REFERENCES "products"(id) ON DELETE CASCADE, "quantity" REAL NOT NULL DEFAULT 1, "unit" TEXT DEFAULT 'Stück', "purchase_date" DATE, "expiry_date" DATE, "storage_location" TEXT, "storage_area" TEXT, "notes" TEXT, "status" TEXT DEFAULT 'fresh', "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "purchased_at_store" TEXT)
 CREATE TABLE IF NOT EXISTS "app_settings" (id INTEGER PRIMARY KEY, "key" TEXT, "value" TEXT NOT NULL, "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
 "product_id" INTEGER NOT NULL DEFAULT 0
 "created_at" TIMESTAMP

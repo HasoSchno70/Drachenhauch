@@ -97,7 +97,7 @@ FUNCTION dbReiterNeu(e AS Element) AS INTEGER
     a.btDaten = dbKnopf(r, tr$("Daten"))
     a.hinweis = dbDazu(r, GUI_LABEL(win, "", 0, 0))
     GUI_ADD_CLASS(a.hinweis, "leise")
-    a.gitSp = dbDazu(r, GUI_GRID(win, 0, 0, 300, 200, [tr$("Name"), tr$("Art"), tr$("Pflicht"), tr$("Eindeutig"), tr$("Vorgabe"), tr$("Verweis auf")]))
+    a.gitSp = dbDazu(r, GUI_GRID(win, 0, 0, 300, 200, [tr$("Name"), tr$("Art"), tr$("Pflicht"), tr$("Eindeutig"), tr$("Vorgabe"), tr$("Verweis auf"), tr$("Beim Löschen")]))
     DIM namen AS ARRAY OF STRING : namen = []
     DIM t AS STRING
     FOR EACH t IN dbTypen()
@@ -106,6 +106,7 @@ FUNCTION dbReiterNeu(e AS Element) AS INTEGER
     GUI_TABLE_COL_CHOICES(a.gitSp, 1, namen)
     GUI_TABLE_COL_EDIT(a.gitSp, 2, FALSE)
     GUI_TABLE_COL_EDIT(a.gitSp, 3, FALSE)
+    GUI_TABLE_COL_CHOICES(a.gitSp, 6, dbLoeschenNamen())
     GUI_TABLE_PLACEHOLDER(a.gitSp, tr$("Noch keine Spalte. Die Spalte id hat jede Tabelle von selbst."))
     a.gitDa = -1
     a.btSpNeu = dbKnopf(r, tr$("Spalte hinzufügen …"))
@@ -167,12 +168,13 @@ END SUB
 ' Die Spalten des Spalten-Gitters: fest bis auf die Vorgabe, die den Rest nimmt.
 FUNCTION dbSpBreiten(rb AS INTEGER) AS ARRAY OF INTEGER
     DIM v AS INTEGER : v = MAX(460, rb - 2 - 12)
-    DIM n AS INTEGER : n = v * 22 \ 100
-    DIM t AS INTEGER : t = v * 17 \ 100
-    DIM p AS INTEGER : p = v * 11 \ 100
-    DIM e AS INTEGER : e = v * 13 \ 100
-    DIM g AS INTEGER : g = v * 17 \ 100
-    RETURN [n, t, p, e, g, v - n - t - p - e - g]
+    DIM n AS INTEGER : n = v * 19 \ 100
+    DIM t AS INTEGER : t = v * 14 \ 100
+    DIM p AS INTEGER : p = v * 10 \ 100
+    DIM e AS INTEGER : e = v * 11 \ 100
+    DIM g AS INTEGER : g = v * 14 \ 100
+    DIM r AS INTEGER : r = v * 16 \ 100
+    RETURN [n, t, p, e, g, r, v - n - t - p - e - g - r]
 END FUNCTION
 
 ' Die Spalten des Daten-Gitters: id schmal, der Rest zu gleichen Teilen.
@@ -406,8 +408,8 @@ SUB dbAbfrageUebernehmen(r AS Reiter)
 END SUB
 
 ' --- Spalten -----------------------------------------------------------------------
-FUNCTION dbSpZeile$(name AS STRING, typname AS STRING, pflicht AS BOOLEAN, eindeutig AS BOOLEAN, vorgabe AS STRING, verweis AS STRING) AS STRING
-    RETURN name + CHR$(9) + typname + CHR$(9) + IIF(pflicht, "1", "0") + CHR$(9) + IIF(eindeutig, "1", "0") + CHR$(9) + vorgabe + CHR$(9) + verweis
+FUNCTION dbSpZeile$(name AS STRING, typname AS STRING, pflicht AS BOOLEAN, eindeutig AS BOOLEAN, vorgabe AS STRING, verweis AS STRING, loeschen AS STRING) AS STRING
+    RETURN name + CHR$(9) + typname + CHR$(9) + IIF(pflicht, "1", "0") + CHR$(9) + IIF(eindeutig, "1", "0") + CHR$(9) + vorgabe + CHR$(9) + verweis + CHR$(9) + loeschen
 END FUNCTION
 
 SUB dbSpaltenFuellen(r AS Reiter)
@@ -428,17 +430,17 @@ SUB dbSpaltenFuellen(r AS Reiter)
     DIM k AS INTEGER
     FOR k = 0 TO dbSpZahl(s, t) - 1
         DIM tn AS STRING : tn = dbTypName$(dbSp$(s, t, k, "typ"))
-        DIM z AS INTEGER : z = GUI_TABLE_ADD_ROW(a.gitSp, [dbSp$(s, t, k, "name"), tn, "", "", dbSpVorgabe$(s, t, k), dbSp$(s, t, k, "verweis")])
+        DIM z AS INTEGER : z = GUI_TABLE_ADD_ROW(a.gitSp, [dbSp$(s, t, k, "name"), tn, "", "", dbSpVorgabe$(s, t, k), dbSp$(s, t, k, "verweis"), dbLoeschenName$(dbSp$(s, t, k, "beimLoeschen"))])
         GUI_TABLE_CELL_KIND(a.gitSp, z, 2, "haken")
         GUI_TABLE_CELL_KIND(a.gitSp, z, 3, "haken")
         GUI_TABLE_CELL_VALUE(a.gitSp, z, 2, IIF(dbSpAn(s, t, k, "pflicht"), 1.0, 0.0))
         GUI_TABLE_CELL_VALUE(a.gitSp, z, 3, IIF(dbSpAn(s, t, k, "eindeutig"), 1.0, 0.0))
-        ARRAY_PUSH(a.spStand, dbSpZeile$(dbSp$(s, t, k, "name"), tn, dbSpAn(s, t, k, "pflicht"), dbSpAn(s, t, k, "eindeutig"), dbSpVorgabe$(s, t, k), dbSp$(s, t, k, "verweis")))
+        ARRAY_PUSH(a.spStand, dbSpZeile$(dbSp$(s, t, k, "name"), tn, dbSpAn(s, t, k, "pflicht"), dbSpAn(s, t, k, "eindeutig"), dbSpVorgabe$(s, t, k), dbSp$(s, t, k, "verweis"), dbLoeschenName$(dbSp$(s, t, k, "beimLoeschen"))))
     NEXT
 END SUB
 
 FUNCTION dbSpAusGitter$(a AS DbAnsicht, z AS INTEGER) AS STRING
-    RETURN dbSpZeile$(TRIM$(GUI_TABLE_GET_CELL(a.gitSp, z, 0)), GUI_TABLE_GET_CELL(a.gitSp, z, 1), GUI_TABLE_GET_VALUE(a.gitSp, z, 2) >= 0.5, GUI_TABLE_GET_VALUE(a.gitSp, z, 3) >= 0.5, TRIM$(GUI_TABLE_GET_CELL(a.gitSp, z, 4)), TRIM$(GUI_TABLE_GET_CELL(a.gitSp, z, 5)))
+    RETURN dbSpZeile$(TRIM$(GUI_TABLE_GET_CELL(a.gitSp, z, 0)), GUI_TABLE_GET_CELL(a.gitSp, z, 1), GUI_TABLE_GET_VALUE(a.gitSp, z, 2) >= 0.5, GUI_TABLE_GET_VALUE(a.gitSp, z, 3) >= 0.5, TRIM$(GUI_TABLE_GET_CELL(a.gitSp, z, 4)), TRIM$(GUI_TABLE_GET_CELL(a.gitSp, z, 5)), GUI_TABLE_GET_CELL(a.gitSp, z, 6))
 END FUNCTION
 
 ' Eine Zeile im Spalten-Gitter hat sich geaendert: umbenennen oder aendern.
@@ -452,7 +454,13 @@ SUB dbSpaltenPruefen(r AS Reiter)
         DIM alt AS ARRAY OF STRING : alt = SPLIT(a.spStand[z], CHR$(9))
         DIM neu AS ARRAY OF STRING : neu = SPLIT(jetzt, CHR$(9))
         DIM fehler AS STRING
-        IF neu[5] <> alt[5] THEN
+        IF neu[6] <> alt[6] AND neu[5] = alt[5] THEN
+            fehler = dbSpalteBeimLoeschen$(r.el, a.tabelle, alt[0], dbLoeschenWert$(neu[6]))
+            IF fehler = "" THEN
+                status(trf$("Spalte {0}: beim Löschen {1}.", [alt[0], IIF(neu[6] = "", "-", neu[6])]))
+                protokoll("db spalte beimloeschen " + a.tabelle + "." + alt[0] + " [" + dbLoeschenWert$(neu[6]) + "]")
+            END IF
+        ELSEIF neu[5] <> alt[5] THEN
             fehler = dbSpalteVerweis$(r.el, a.tabelle, alt[0], neu[5])
             IF fehler = "" THEN
                 status(IIF(neu[5] = "", trf$("Spalte {0} verweist auf nichts mehr.", [alt[0]]), trf$("Spalte {0} verweist auf {1}.", [alt[0], neu[5]])))
