@@ -469,3 +469,75 @@ DHRT_FRAMES=22
 breiter als geschaetzt TRUE anschluss TRUE hoehe 24
 seite 0
 GUI_TABCONTROL_ITEM_RECT: Seite 2 ausserhalb [0..1]
+
+=== zu viele koepfe werden schmaler statt ueber den rand
+' Sechs Koepfe in 300 Punkten: frueher lagen die letzten jenseits des Rands
+' und ihre Seiten waren mit der Maus nicht zu erreichen (Kuehlschrank-App,
+' Einstellungen). Jetzt werden die breitesten zuerst schmaler (ihr Titel
+' endet mit "…"), ein kurzer behaelt seine Breite.
+IMPORT "gui"
+SCREEN(500, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 460, 260)
+DIM tc AS GUI_WIDGET : tc = GUI_TABCONTROL(w, 20, 20, 300, 200)
+DIM t AS STRING
+FOR EACH t IN ["Allgemein", "Benachrichtigungen", "Ablaufdaten", "Lagerorte", "Supermärkte", "i"]
+    GUI_TABCONTROL_ADD(tc, t)
+NEXT
+DIM f AS INTEGER
+FOR f = 1 TO 3
+    GUI_UPDATE()
+    GUI_DRAW()
+    FLIP()
+NEXT
+DIM x AS INTEGER, y AS INTEGER, b AS INTEGER, h AS INTEGER
+DIM links AS INTEGER, rechts AS INTEGER
+DIM breiten AS ARRAY OF INTEGER : breiten = []
+DIM k AS INTEGER
+FOR k = 0 TO 5
+    (x, y, b, h) = GUI_TABCONTROL_ITEM_RECT(tc, k)
+    IF k = 0 THEN links = x
+    rechts = x + b
+    ARRAY_PUSH(breiten, b)
+NEXT
+PRINT "alle drinnen "; rechts - links <= 300
+PRINT "kurzer behaelt "; breiten[5] < breiten[0]; " | lange gleich "; breiten[0] = breiten[1] AND breiten[1] = breiten[4]
+' Der Titel endet vor dem Rand seines Kopfs (gekuerzt mit "…"): in den
+' letzten Punkten des zweiten Kopfs steht keine Schrift (gewaehlt, damit sie
+' hell ist).
+GUI_TABCONTROL_SET_PAGE(tc, 1)
+FOR f = 1 TO 2
+    GUI_UPDATE()
+    GUI_DRAW()
+    FLIP()
+NEXT
+SAVESCREENSHOT("koepfe.png")
+DIM bild AS IMAGE : bild = LOADIMAGE("koepfe.png")
+(x, y, b, h) = GUI_TABCONTROL_ITEM_RECT(tc, 1)
+DIM hellPunkte AS INTEGER : hellPunkte = 0
+DIM px AS INTEGER, py AS INTEGER
+FOR py = y + 4 TO y + h - 5
+    FOR px = x + b - 8 TO x + b - 3
+        DIM c AS INTEGER : c = GETPIXEL(bild, px, py)
+        IF ((c SHR 16) BAND 255) > 150 AND ((c SHR 8) BAND 255) > 150 AND (c BAND 255) > 150 THEN hellPunkte = hellPunkte + 1
+    NEXT
+NEXT
+PRINT "schrift am rand "; hellPunkte' Zwei Koepfe passen wie bisher: nach ihrem Text.
+DIM tc2 AS GUI_WIDGET : tc2 = GUI_TABCONTROL(w, 20, 230, 300, 20)
+GUI_TABCONTROL_ADD(tc2, "eins")
+GUI_TABCONTROL_ADD(tc2, "Benachrichtigungen")
+GUI_UPDATE()
+GUI_DRAW()
+FLIP()
+DIM b0 AS INTEGER, b1 AS INTEGER
+(x, y, b0, h) = GUI_TABCONTROL_ITEM_RECT(tc2, 0)
+(x, y, b1, h) = GUI_TABCONTROL_ITEM_RECT(tc2, 1)
+PRINT "ungekuerzt "; b1 > b0 * 2
+--- umgebung
+DHRT_FRAMES=12
+--- erwartet
+alle drinnen TRUE
+kurzer behaelt TRUE | lange gleich TRUE
+schrift am rand 0
+ungekuerzt TRUE

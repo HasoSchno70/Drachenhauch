@@ -902,7 +902,7 @@
   "GUI_STYLESHEET_LOAD": "dasselbe aus einer Datei (üblich .dhstil)",
   "GUI_STYLE_SET": "benannten Stil festlegen (bg, fg, border, accent, font, font_size)",
   "GUI_SUBMENU": "Menü-Handle — Untermenü — öffnet beim Überfahren rechts daneben, beliebig tief",
-  "GUI_TABCONTROL": "GUI_WIDGET — Reiter innerhalb eines Fensters (Karteikasten)",
+  "GUI_TABCONTROL": "GUI_WIDGET — Reiter innerhalb eines Fensters (Karteikasten); passen die Köpfe nicht in die Breite, werden die breitesten zuerst schmaler und ihr Titel gekürzt",
   "GUI_TABCONTROL_ADD": "INTEGER — eine Seite anhängen, liefert ihre Nummer",
   "GUI_TABCONTROL_ADD_WIDGET": "ein Widget auf eine Seite legen; es behält seine Lage im Fenster",
   "GUI_TABCONTROL_CLOSED": "INTEGER — welche Seite in diesem Bild zu soll (Kreuz oder mittlere Maustaste), -1 = keine; das Programm entfernt sie selbst",

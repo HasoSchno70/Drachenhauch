@@ -8255,17 +8255,37 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     /// Vor der ersten Messung gilt eine Schaetzung an der Zeichenzahl; die war
     /// frueher die einzige und zu knapp: bei "Lagerorte" lief der Text in den
     /// naechsten Kopf (gefunden mit der Kuehlschrank-App).
-    fn tc_koepfe(&self, ax: i32, wdg: &Widget) -> Vec<(usize, i32, i32)> {
+    /// Die Koepfe eines Reiterwerks (Seite, x0, x1). Passen sie nicht in
+    /// `breite`, werden die breitesten zuerst schmaler (ihr Titel endet dann
+    /// mit "…", `tc_titel`) -- vorher lagen Koepfe jenseits des Rands, eine
+    /// Seite war mit der Maus nicht zu erreichen (Kuehlschrank-App,
+    /// Einstellungen mit sechs Reitern).
+    fn tc_koepfe(&self, ax: i32, breite: i32, wdg: &Widget) -> Vec<(usize, i32, i32)> {
         let mut x = ax;
         let mut out = Vec::new();
         let kreuz = if Self::tc_schliessbar(wdg) { self.sk(16) } else { 0 };
+        let pad = self.sk(20) + kreuz;
         let breiten = wdg.tabctl.as_ref().map(|s| s.breiten.as_slice()).unwrap_or(&[]);
-        for (i, t) in wdg.items.iter().enumerate() {
-            let tw = match breiten.get(i) {
-                Some(&b) if b > 0 => b,
-                _ => self.sk(8) * t.chars().count() as i32,
-            };
-            let b = tw + self.sk(20) + kreuz;
+        let mut tws: Vec<i32> = wdg.items.iter().enumerate().map(|(i, t)| match breiten.get(i) {
+            Some(&b) if b > 0 => b,
+            _ => self.sk(8) * t.chars().count() as i32,
+        }).collect();
+        let n = tws.len() as i32;
+        if breite > 0 && n > 0 {
+            let natur: i32 = tws.iter().sum::<i32>() + n * pad + 2 * (n - 1);
+            if natur > breite {
+                let platz = (breite - n * pad - 2 * (n - 1)).max(n * self.sk(16));
+                // Die groesste Kappe, unter der alles in den Platz passt.
+                let (mut lo, mut hi) = (self.sk(16), *tws.iter().max().unwrap_or(&0));
+                while lo < hi {
+                    let mitte = (lo + hi + 1) / 2;
+                    if tws.iter().map(|&t| t.min(mitte)).sum::<i32>() <= platz { lo = mitte; } else { hi = mitte - 1; }
+                }
+                for t in tws.iter_mut() { *t = (*t).min(lo); }
+            }
+        }
+        for (i, tw) in tws.into_iter().enumerate() {
+            let b = tw + pad;
             out.push((i, x, x + b));
             x += b + 2;
         }
@@ -8431,8 +8451,8 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             return Err(format!("GUI_TABCONTROL_ITEM_RECT: Seite {} ausserhalb [0..{}]", seite, w.items.len() as i64 - 1));
         }
         let (wi, _) = Self::dec_widget(h);
-        let (ax, ay, _, _) = self.abs_rect(wi, w);
-        let (_, x0, x1) = self.tc_koepfe(ax, w)[seite as usize];
+        let (ax, ay, bw, _) = self.abs_rect(wi, w);
+        let (_, x0, x1) = self.tc_koepfe(ax, bw, w)[seite as usize];
         Ok((x0, ay + 2, x1 - x0, self.sk(TC_KOPF_H) - 2))
     }
 
@@ -13545,9 +13565,9 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 let mut treffer = None;
                 for (i, w) in self.windows[top].widgets.iter().enumerate() {
                     if !Self::tc_schliessbar(w) || !self.widget_shown(top, w) { continue; }
-                    let (ax, ay, _, _) = self.abs_rect(top, w);
+                    let (ax, ay, bw, _) = self.abs_rect(top, w);
                     if my < ay || my >= ay + kopf { continue; }
-                    if let Some((k, _, _)) = self.tc_koepfe(ax, w).into_iter().find(|&(_, x0, x1)| mx >= x0 && mx < x1) {
+                    if let Some((k, _, _)) = self.tc_koepfe(ax, bw, w).into_iter().find(|&(_, x0, x1)| mx >= x0 && mx < x1) {
                         treffer = Some((i, k));
                     }
                 }
@@ -17575,9 +17595,9 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 else if Self::in_rect(mx, my, gm.abbrechen) { self.wz_knopf(win, i, 2); }
             }
             Kind::TabControl => {
-                let (ax, ay, _, _) = self.abs_rect(win, &self.windows[win].widgets[i]);
+                let (ax, ay, bw, _) = self.abs_rect(win, &self.windows[win].widgets[i]);
                 if my >= ay + self.sk(TC_KOPF_H) { return; }   // unter den Koepfen gehoert die Flaeche den Kindern
-                let treffer = self.tc_koepfe(ax, &self.windows[win].widgets[i])
+                let treffer = self.tc_koepfe(ax, bw, &self.windows[win].widgets[i])
                     .into_iter().find(|&(_, x0, x1)| mx >= x0 && mx < x1).map(|(k, _, x1)| (k as i32, x1));
                 if let Some((k, x1)) = treffer {
                     if Self::tc_schliessbar(&self.windows[win].widgets[i]) {
@@ -19495,7 +19515,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             Kind::TabControl => {
                 let n = Node::new(Role::TabList);
                 let kopf = self.sk(TC_KOPF_H);
-                for (k, x0, x1) in self.tc_koepfe(x, w) {
+                for (k, x0, x1) in self.tc_koepfe(x, bw, w) {
                     let mut t = Node::new(Role::Tab);
                     t.set_label(w.items[k].clone());
                     t.set_selected(w.sel == k as i32);
@@ -21633,7 +21653,8 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     self.wcol(wdg, "bg", "win_bg"), self.wcol(wdg, "border", "widget_border"));
                 let acc = self.acc_col(wdg);
                 g.push_clip(ax, ay, w, kopf);
-                for (i, x0, x1) in self.tc_koepfe(ax, wdg) {
+                let kreuz = if Self::tc_schliessbar(wdg) { self.sk(16) } else { 0 };
+                for (i, x0, x1) in self.tc_koepfe(ax, w, wdg) {
                     let aktiv = i as i32 == wdg.sel;
                     let bg = if aktiv { self.wcol(wdg, "bg", "widget_bg") } else { shade(self.th("win_bg"), -10) };
                     g.box_fill(x0, ay + 2, x1 - 1, ay + kopf - 1, bg);
@@ -21641,8 +21662,10 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     if aktiv { g.box_fill(x0, ay + kopf - 3, x1 - 1, ay + kopf - 1, acc); }
                     let fg = if aktiv { self.txt_col(wdg) } else { self.th("muted_fg") };
                     let th = self.wsize(g, wdg);
+                    // Ein geschmaelerter Kopf kuerzt seinen Titel (tc_koepfe).
+                    let titel = self.text_kuerzen(g, wdg, &wdg.items[i], x1 - x0 - self.sk(20) - kreuz);
                     self.wtext(g, wdg, x0 + self.sk(10), ay + 2 + (kopf - 2 - th).max(0) / 2,
-                               wdg.items[i].clone(), fg);
+                               titel, fg);
                     if Self::tc_schliessbar(wdg) {
                         // Zwei Striche wie am Reiter des Fensters.
                         let (kx, ky, k) = self.tc_kreuz(x1, ay);

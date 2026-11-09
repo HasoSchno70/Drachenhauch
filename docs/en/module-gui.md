@@ -231,7 +231,7 @@ IMPORT "gui"
 | `GUI_FILETREE_ICONS(ft, ordnerbild, dateibild)` | — | icons for folders and files (-1 = none) |
 | `GUI_FILETREE_COLOR(ft, muster$, farbe)` | — | text colour per file type: patterns as with the filter (`"*.json;*.ini"`), `"/"` for folders; the first match wins, -1 removes the colour |
 | `GUI_FILETREE_ICON(ft, muster$, sinnbild$)` | — | built-in icon per file type, same rule as the colour, drawn in the colour of the name; a folder with `"ordner"` shows `"ordner_offen"` when expanded, `""` removes it |
-| `GUI_TABCONTROL(win, x, y, w, h)` | GUI_WIDGET | tabs **inside** a window (card index) |
+| `GUI_TABCONTROL(win, x, y, w, h)` | GUI_WIDGET | tabs **inside** a window (card index); if the heads do not fit the width, the widest get narrower first and their title is shortened |
 | `GUI_TABCONTROL_ADD(tc, titel$)` | INTEGER | append a page, returns its number |
 | `GUI_TABCONTROL_ADD_WIDGET(tc, wdg, seite)` | — | put a widget on a page; it keeps its position in the window |
 | `GUI_TABCONTROL_PAGE(tc)` / `GUI_TABCONTROL_SET_PAGE(tc, seite)` | INTEGER / — | read and set the front page |

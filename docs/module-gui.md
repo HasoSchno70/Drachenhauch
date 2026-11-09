@@ -231,7 +231,7 @@ IMPORT "gui"
 | `GUI_FILETREE_ICONS(ft, ordnerbild, dateibild)` | — | Sinnbilder für Ordner und Dateien (-1 = keins) |
 | `GUI_FILETREE_COLOR(ft, muster$, farbe)` | — | Textfarbe je Dateiart: Muster wie beim Filter (`"*.json;*.ini"`), `"/"` für Ordner; das erste passende gilt, -1 nimmt die Farbe weg |
 | `GUI_FILETREE_ICON(ft, muster$, sinnbild$)` | — | eingebautes Sinnbild je Dateiart, nach derselben Regel wie die Farbe, gezeichnet in der Farbe des Namens; ein Ordner mit `"ordner"` zeigt aufgeklappt `"ordner_offen"`, `""` nimmt es weg |
-| `GUI_TABCONTROL(win, x, y, w, h)` | GUI_WIDGET | Reiter **innerhalb** eines Fensters (Karteikasten) |
+| `GUI_TABCONTROL(win, x, y, w, h)` | GUI_WIDGET | Reiter **innerhalb** eines Fensters (Karteikasten); passen die Köpfe nicht in die Breite, werden die breitesten zuerst schmaler und ihr Titel gekürzt |
 | `GUI_TABCONTROL_ADD(tc, titel$)` | INTEGER | eine Seite anhängen, liefert ihre Nummer |
 | `GUI_TABCONTROL_ADD_WIDGET(tc, wdg, seite)` | — | ein Widget auf eine Seite legen; es behält seine Lage im Fenster |
 | `GUI_TABCONTROL_PAGE(tc)` / `GUI_TABCONTROL_SET_PAGE(tc, seite)` | INTEGER / — | vordere Seite lesen und setzen |

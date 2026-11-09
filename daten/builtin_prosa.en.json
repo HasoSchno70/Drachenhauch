@@ -901,7 +901,7 @@
   "GUI_STYLESHEET_LOAD": "the same from a file (usually .dhstil)",
   "GUI_STYLE_SET": "define a named style (bg, fg, border, accent, font, font_size)",
   "GUI_SUBMENU": "menu handle — submenu — opens to the right on hover, any depth",
-  "GUI_TABCONTROL": "GUI_WIDGET — tabs inside a window (card index)",
+  "GUI_TABCONTROL": "GUI_WIDGET — tabs inside a window (card index); if the heads do not fit the width, the widest get narrower first and their title is shortened",
   "GUI_TABCONTROL_ADD": "INTEGER — append a page, returns its number",
   "GUI_TABCONTROL_ADD_WIDGET": "put a widget on a page; it keeps its position in the window",
   "GUI_TABCONTROL_CLOSED": "INTEGER — which page is to close in this frame (cross or middle mouse button), -1 = none; the program removes it itself",
