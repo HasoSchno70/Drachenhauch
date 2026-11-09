@@ -860,3 +860,27 @@ macOS: die App wird mit `installer/posix/dhrt.entitlements` signiert --
 Cranelift macht Speicher per mprotect ausfuehrbar (kein MAP_JIT), dafuer
 braucht Hardened Runtime `allow-unsigned-executable-memory`, `allow-jit`
 reicht NICHT.
+
+## vm.rs und gui.rs in Teilen (2026-11-08)
+
+`vm.rs` (15 300 Zeilen, davon ein `impl Vm` mit 12 900) und `gui.rs`
+(23 600, ein `impl Gui` mit 19 000) sind nach Themen zerlegt: die Typen und
+der Kern bleiben (`vm.rs` 4 500 Zeilen: Zustand, exec, dispatch, Koroutinen,
+OOP, Rueckrufe; `gui.rs` 6 000: Typen, Konstruktion, Fenster-Flags,
+Widget-Konstruktoren), die Methoden stehen in `vm_*.rs` (7 Dateien) und
+`gui_*.rs` (14 neue neben den alten sechs). Nur verschoben -- ein Skript hat
+ganze Abschnitte an ihren Kommentar-Kopfzeilen ausgeschnitten und in den
+Teilen ein nacktes `fn` zu `pub(super) fn` gemacht; dazu `pub(super)` an den
+Feldern von `ObjektVorlage` und an `LEERE_LAGE`. Die zwei Riesen bleiben
+ganze Funktionen: `try_graphics` (3 100 Zeilen, `vm_grafik.rs`) und
+`try_gui_innen` (1 600, `vm_gui.rs`).
+
+Belegt: dieselben Warnungen vor und nachher (mit und ohne Features), 670
+`#[test]` vorher wie nachher, alle 658 gelaufenen gruen, `--schnell` gruen
+bis auf zwei GTK-Proben von Glutfaden (`stufe15` Lineal-Marke, `stufe22`
+Ebenen-Stelle), die unter Last auch mit der Laufzeit von vorher fallen (5
+von 6 Laeufen bei sechs gleichzeitigen). Tempo (`bench_dhrt.dh`, je drei
+Laeufe): ohne Maschinencode alles gleich; mit ihm `familien.dh` 15,7 ->
+17,5 ms (ein `ZEIT_WOCHENTAG` je Runde, rund 9 ns mehr je Aufruf) und
+`felder.dh` 12,6 -> 11,3 ms, der Rest gleich -- die Lage des Codes nach dem
+Linken, nicht ein anderer Weg (`lto = true` fuegt ohnehin alles zusammen).
