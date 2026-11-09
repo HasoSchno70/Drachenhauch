@@ -1,0 +1,193 @@
+' Drachenhauch Studio: Kontextmenues im Menue-Editor (gefunden beim Port der
+' Kuehlschrank-App: das Kontextmenue des Bestands entstand im Code, mit
+' GUI_CONTEXT in Geoeffnet und einer Abfrage je Eintrag im Takt). Jetzt
+' stehen sie im Layout unter "kontextmenues" -- Name (das Handle als Feld),
+' Widget ("" = das ganze Fenster) und Eintraege wie ein Menue --, auch in
+' einem eigenen Control, und ihre benannten Eintraege haben das Ereignis
+' Aktion. Format: docs/werkzeuge.md, dhrt test.
+
+--- langsam
+=== der menue-editor legt ein kontextmenue an einer liste an
+' Strg+Umschalt+U, [+ Kontextmenue] (Name "kontext"), unter "An" die Liste
+' (Klappliste: Klick, Runter, Enter), [+ Eintrag], OK, Strg+S: das Layout
+' hat das Kontextmenue mit Widget und Eintrag.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+slHin(10, 10)
+slWarten(4)
+slMit([341, 340], 85)
+slWarten(10)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+DIM m AS STRING : m = CWD$() + "/m.log"
+slStarten(m, CWD$() + "/ev.txt", slBild + 10, p)
+PRINT "editor "; slHat(m, "menueeditor Hauptfenster")
+DIM kx AS INTEGER, ky AS INTEGER, ax AS INTEGER, ay AS INTEGER, bx AS INTEGER, by AS INTEGER, ox AS INTEGER, oy AS INTEGER
+(kx, ky) = slLage(m, "menue neukontext")
+(ax, ay) = slLage(m, "menue an")
+(bx, by) = slLage(m, "menue neueintrag")
+(ox, oy) = slLage(m, "menue ok")
+slKlick(kx, ky)
+slWarten(6)
+slKlick(ax, ay)
+slWarten(6)
+slTaste(264)
+slWarten(4)
+slTaste(257)
+slWarten(6)
+slKlick(bx, by)
+slWarten(6)
+slKlick(ox, oy)
+slWarten(10)
+slMit([341], 83)
+slWarten(10)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+DIM log AS STRING : log = CWD$() + "/s.log"
+slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+DIM z AS STRING
+FOR EACH z IN slAnfang(log, "kontextmenue ")
+    PRINT z
+NEXT
+DIM d AS JSON_HANDLE : d = JSON_PARSE(JOIN$(READLINES(p + "/Hauptfenster.dhform"), CHR$(10)))
+PRINT "datei "; JSON_GET_STRING(d, "kontextmenues.0.name"); " / "; JSON_GET_STRING(d, "kontextmenues.0.widget"); " / "; JSON_GET_STRING(d, "kontextmenues.0.items.0.name"); " | menus "; JSON_HAS(d, "menus")
+--- argumente
+{sammlung}/../../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "json"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"}]}
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":420,"h":300,"widgets":[
+{"kind":"listbox","name":"liste","items":["eins"],"x":40,"y":40,"w":160,"h":100}]}
+--- erwartet
+editor TRUE
+kontextmenue kontext an [liste] Eintrag:miEintrag
+datei kontext / liste / miEintrag | menus FALSE
+
+=== im programm oeffnet ein rechtsklick das kontextmenue, ein eintrag ruft sein ereignis
+' Rechtsklick auf die Liste (sie waehlt dabei ihre Zeile), Klick auf
+' "Loeschen"; Rechtsklick auf die Flaeche daneben oeffnet das Kontextmenue des
+' eigenen Controls (am Fenster), Klick auf seinen Eintrag.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+slHin(10, 10)
+slWarten(10)
+slTaste(294)
+slWarten(150)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+SETENV("DH_STUDIO_LAUF_BILDER", "20")
+DIM log AS STRING : log = CWD$() + "/s.log"
+slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+PRINT "erzeugt "; LEN(slAnfang(log, "erzeugt ")) = 1
+DIM basis AS STRING : basis = READALL(p + "/_studio/Hauptfenster_basis.dh")
+PRINT "an die liste "; INSTR(basis, "GUI_CONTEXT_WIDGET(Self.kontextListe, Self.liste)") >= 0
+PRINT "im control "; INSTR(READALL(p + "/_studio/Teil_basis.dh"), "Self.kontextTeil = GUI_CONTEXT(win)") >= 0
+PRINT "code "; probeLaufen(p, "probe.dh")
+--- argumente
+{sammlung}/../../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+' Statt studioLauf(...) die Probe-Zeilen (mit ihrer Aufnahme).
+FUNCTION probeLaufen(p AS STRING, teil AS STRING) AS INTEGER
+    DIM neu AS ARRAY OF STRING : neu = []
+    DIM s AS STRING
+    FOR EACH s IN READLINES(p + "/_studio/main.dh")
+        IF LEFT$(s, 11) = "studioLauf(" THEN
+            DIM t AS STRING
+            FOR EACH t IN READLINES(CWD$() + "/" + teil)
+                ARRAY_PUSH(neu, t)
+            NEXT
+        ELSE
+            ARRAY_PUSH(neu, s)
+        END IF
+    NEXT
+    WRITEALL(p + "/_studio/probe.dh", JOIN$(neu, CHR$(10)) + CHR$(10))
+    COPYFILE(CWD$() + "/klick.txt", p + "/_studio/klick.txt")
+    DIM k AS INTEGER : k = PROCESS_START("dhrt", "run", "--bilder", "90", p + "/_studio/probe.dh")
+    DIM leer AS INTEGER : leer = 0
+    WHILE leer < 5
+        DIM t2 AS STRING : t2 = PROCESS_READ$(k) + PROCESS_ERR$(k)
+        IF t2 <> "" THEN
+            DIM zeile AS STRING
+            FOR EACH zeile IN SPLIT(REPLACE$(t2, CHR$(13), ""), CHR$(10))
+                IF zeile <> "" AND LEFT$(zeile, 8) <> "WARNING:" AND LEFT$(zeile, 5) <> "INFO:" THEN PRINT zeile
+            NEXT
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(k) THEN
+            leer = leer + 1
+            SLEEP(30)
+        END IF
+    WEND
+    RETURN PROCESS_CODE(k)
+END FUNCTION
+--- datei probe.dh
+AUTOMATION_PLAY("klick.txt")
+SCREEN(640, 480, "Probe")
+' Wie studioLauf: 60 Bilder je Sekunde -- ein Kontextmenue zieht sich auf,
+' ungebremst kaeme der Klick vor dem fertigen Menue.
+SETFPS(60)
+studioSchirmB = SCREENWIDTH() : studioSchirmH = SCREENHEIGHT()
+studioDieStartseite = studioStartFenster
+studioDieApp.Geoeffnet()
+studioStartFenster.studioHaupt = TRUE
+studioStartFenster.Zeigen()
+WHILE studioBild()
+WEND
+--- datei klick.txt
+c 15
+e 0 7 60 80 0 0
+e 4 7 60 80 0 0
+e 5 7 60 80 0 0
+e 6 6 1 0 0 0
+e 8 5 1 0 0 0
+e 20 7 90 92 0 0
+e 21 7 90 92 0 0
+e 22 6 0 0 0 0
+e 24 5 0 0 0 0
+e 35 7 400 300 0 0
+e 36 6 1 0 0 0
+e 38 5 1 0 0 0
+e 50 7 430 312 0 0
+e 52 6 0 0 0 0
+e 54 5 0 0 0 0
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"control","name":"Teil"},{"art":"fenster","name":"Hauptfenster"}]}
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":640,"h":480,"widgets":[
+{"kind":"listbox","name":"liste","items":["eins","zwei","drei"],"x":20,"y":20,"w":200,"h":120},
+{"kind":"studio_control","studio_control":"Teil","name":"teil","x":300,"y":200,"w":300,"h":200}],
+"kontextmenues":[{"name":"kontextListe","widget":"liste","items":[{"label":"Löschen","name":"miLoeschen"},{"separator":true,"label":""},{"label":"Mehr","items":[{"label":"Tief","name":"miTief"}]}]}]}
+--- datei proj/Hauptfenster.dh
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+
+    SUB miLoeschen_Aktion()
+        PRINT "loeschen "; GUI_LISTBOX_SELECTED(Self.liste)
+    END SUB
+
+    SUB miTief_Aktion()
+        PRINT "tief"
+    END SUB
+END CLASS
+--- datei proj/Teil.dhform
+{"title":"Teil","name":"Teil","w":300,"h":200,"widgets":[
+{"kind":"label","name":"schild","text":"Teil","x":10,"y":10,"w":100,"h":20}],
+"kontextmenues":[{"name":"kontextTeil","widget":"","items":[{"label":"Teil-Eintrag","name":"miTeil"}]}]}
+--- datei proj/Teil.dh
+CLASS Teil EXTENDS Teil_Basis
+
+    SUB miTeil_Aktion()
+        PRINT "teil"
+    END SUB
+END CLASS
+--- datei proj/App.dh
+CLASS App EXTENDS StudioApp
+END CLASS
+--- erwartet
+erzeugt TRUE
+an die liste TRUE
+im control TRUE
+loeschen 2
+teil
+code 0

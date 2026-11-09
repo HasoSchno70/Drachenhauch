@@ -168,7 +168,10 @@ Ein Ereignis mit Klammern ruft seine Methode mit Werten: `Ziehen` mit der
 Lage auf der Fläche (solange die Taste nach einem Druck auf die Fläche
 hängt), `Rad` mit den Schritten des Mausrads, `Taste` mit dem Tastencode
 (`KEY_A`, `KEY_SPACE` ...), solange das Fenster vorn ist und kein
-Eingabefeld die Taste nimmt, `Knopf` mit der Nummer des gedrückten Knopfs
+Eingabefeld die Taste nimmt -- ein Kürzel (eine F-Taste, Strg oder Alt dazu)
+kommt auch aus einem Eingabefeld an, außer das Feld braucht es selbst
+(Strg+A/C/V/X/Z/Y, Pfeile, Pos1, Ende, Rück, Entf); ob Strg gedrückt ist,
+fragt die Methode mit `KEYPRESSED(KEY_LCTRL)` --, `Knopf` mit der Nummer des gedrückten Knopfs
 der Werkzeugleiste und `Feld` mit der Nummer des angeklickten Felds der
 Statusleiste (ab 0, Trenner und Lücken zählen mit), `Zelle` mit
 Datenzeile und Spalte jedes Klicks in eine Tabelle -- auch auf einen Knopf
@@ -249,6 +252,13 @@ Text (`miOeffnen`), der dem Text folgt, bis man ihn selbst ändert. Erst OK
 schreibt die Menüs ins Layout -- ein Rückgängig-Schritt; umbenannte Einträge
 nehmen ihre Ereignis-Methoden mit. Benannte Einträge stehen im Navigator
 unter dem Fenster, ihr Ereignis heißt `<Name>_Aktion`.
+
+**Kontextmenüs** legt derselbe Editor an: [+ Kontextmenü], darunter Einträge
+wie in einem Menü. Sein Name ist ein Feld des Fensters (das Handle aus
+`GUI_CONTEXT`), unter „An“ steht das Widget, auf dessen Rechtsklick es
+aufgeht -- eine Liste, ein Baum, eine Tabelle wählen dabei ihre Zeile --,
+oder das ganze Fenster. Auch ein eigenes Control hat Kontextmenüs (eine
+Menüleiste nicht). Im Layout stehen sie unter `kontextmenues`.
 
 **Dialoge, die warten.** Die Laufzeit des Projekts bietet:
 
@@ -600,6 +610,18 @@ die Tabelle (eine Zeile ohne Kunden bleibt, mit leerem Namen); die Spalte
 heißt im Ergebnis `kunde.name`, und unter diesem Namen kennen sie auch
 **Sortieren nach**, die **Bedingung** (`"kunde.ort" = 'Köln'`) und das
 Suchfeld.
+
+**Beim Löschen** macht aus dem Verweis einen Fremdschlüssel (`REFERENCES …
+(id)`) und sagt, was mit einer Zeile geschieht, wenn die Zeile gelöscht wird,
+auf die sie zeigt: *verbieten* (das Löschen scheitert, solange etwas auf sie
+zeigt), *mitlöschen* (`ON DELETE CASCADE`: die Posten gehen mit ihrer
+Rechnung) oder *leeren* (`ON DELETE SET NULL`, nicht bei einer
+Pflichtspalte). Leer bleibt es ein Verweis ohne Regel. Der Abgleich baut die
+Tabelle dafür um, die Zeilen bleiben -- auch ein Verweis ins Leere, er gilt
+erst für Änderungen danach. dhrt hat Fremdschlüssel immer an; ein
+gebautes Programm legt eine neue Datei so an, eine ältere ergänzt es nicht
+(das tut der Abgleich im Studio). Eine übernommene Datei bringt ihr
+`ON DELETE` mit.
 
 **Bilder.** Eine Spalte der Art **Bild** hält die Bytes einer Bilddatei
 (PNG, JPG, BMP oder GIF). Im Daten-Gitter steht ihre Größe; **Bild …** setzt

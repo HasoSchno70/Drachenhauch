@@ -53,6 +53,7 @@ SUB bausteineAnlegen()
     baustein("Auswahl", "listbox", "Liste", "Liste", 180, 120, "", "{'items':['Eintrag 1','Eintrag 2','Eintrag 3']}", "Einträge untereinander")
     baustein("Auswahl", "tree", "Baum", "Baum", 200, 160, "", "", "Einträge mit Unterpunkten")
     baustein("Auswahl", "datepicker", "Datumswähler", "Datum", 220, 200, "", "", "ein Tag aus dem Kalender")
+    baustein("Auswahl", "datepicker", "Datumsfeld", "Datum", 160, 28, "", "{'kompakt':true}", "ein Datum im Feld, der Kalender klappt auf")
     baustein("Auswahl", "timepicker", "Uhrzeit", "Uhrzeit", 150, 28, "", "", "Stunde und Minute")
     baustein("Auswahl", "colorpicker", "Farbwähler", "Farbe", 220, 170, "", "", "eine Farbe aus Fläche und Streifen")
     baustein("Anzeige", "label", "Beschriftung", "Beschriftung", 100, 20, "Beschriftung", "", "Text, den man nicht ändert")
@@ -251,6 +252,11 @@ FUNCTION symbolZeichnen(name AS STRING) AS IMAGE
             FOR k = 0 TO 11
                 IMAGE_FILL_RECT(img, 10 + (k MOD 4) * 6, 11 + (k \ 4) * 4, 12 + (k MOD 4) * 6, 12 + (k \ 4) * 4, IIF(k = 6, S_AKZENT, S_TEXT))
             NEXT
+        CASE "Datumsfeld"
+            IMAGE_FILL_ROUNDRECT(img, 2, 7, 37, 19, 2, S_FLAECHE)
+            IMAGE_FRAME(img, 2, 7, 37, 19, 1, S_RAND)
+            symText(img, 5, 12, 18)
+            IMAGE_FILL_RECT(img, 28, 10, 34, 16, S_AKZENT)
         CASE "Uhrzeit"
             IMAGE_RING(img, 20, 13, 10, 2, S_RAND)
             IMAGE_DRAW_LINE(img, 20, 13, 20, 6, S_HELL)

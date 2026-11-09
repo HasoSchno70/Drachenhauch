@@ -154,6 +154,7 @@ FUNCTION nameVergeben(kandidat AS STRING, ausser AS INTEGER) AS BOOLEAN
     DIM mn AS ARRAY OF STRING : mn = []
     DIM ma AS ARRAY OF STRING : ma = []
     menueNamenSammeln(doc, "menus", mn, ma)
+    kontextNamenSammeln(doc, mn, ma)
     DIM s AS STRING
     FOR EACH s IN mn
         IF LOWER$(s) = LOWER$(kandidat) AND ausser <> MENUE_NAME THEN RETURN TRUE

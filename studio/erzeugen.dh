@@ -94,6 +94,23 @@ SUB menueNamenSammeln(d AS JSON_HANDLE, pfad AS STRING, namen AS ARRAY OF STRING
     NEXT
 END SUB
 
+' Die Kontextmenues eines Fensters oder Controls ("kontextmenues" im Layout:
+' je eins mit name, widget -- "" = das ganze Fenster -- und items wie ein
+' Menue): ihr Name ist ein Feld (das Handle), ihre benannten Eintraege
+' haben wie Menueeintraege das Ereignis Aktion.
+SUB kontextNamenSammeln(d AS JSON_HANDLE, namen AS ARRAY OF STRING, arten AS ARRAY OF STRING)
+    IF NOT JSON_HAS(d, "kontextmenues") THEN RETURN
+    DIM k AS INTEGER
+    FOR k = 0 TO JSON_LEN(d, "kontextmenues") - 1
+        DIM p AS STRING : p = "kontextmenues." + STR$(k)
+        IF JSON_HAS(d, p + ".name") THEN
+            ARRAY_PUSH(namen, JSON_GET_STRING(d, p + ".name"))
+            ARRAY_PUSH(arten, "kontext")
+        END IF
+        menueNamenSammeln(d, p + ".items", namen, arten)
+    NEXT
+END SUB
+
 ' Die Zeilen, die die Menues eines Fensters bauen: oberste mit GUI_MENU,
 ' Untermenues mit GUI_SUBMENU, Eintraege mit GUI_MENU_ITEM -- ein benannter
 ' Eintrag landet in seinem Feld (Self.<name>), sonst in einer Hilfsvariable.
@@ -219,6 +236,7 @@ FUNCTION basisCode$(ei AS INTEGER) AS STRING
         ARRAY_PUSH(arten, "timer")
     NEXT
     IF NOT istControl THEN menueNamenSammeln(d, "menus", namen, arten)
+    kontextNamenSammeln(d, namen, arten)
     ' Je Control: welche Ereignisse der Nutzer geschrieben hat ("" = keins).
     DIM evMeth AS MAP OF STRING
     DIM m AS Methode
@@ -282,7 +300,7 @@ FUNCTION basisCode$(ei AS INTEGER) AS STRING
         IF NOT istBezeichner(namen[i]) THEN CONTINUE
         DIM typ AS STRING : typ = "GUI_WIDGET"
         IF arten[i] = "timer" THEN typ = "StudioTimer"
-        IF arten[i] = "menue" THEN typ = "INTEGER"
+        IF arten[i] = "menue" OR arten[i] = "kontext" THEN typ = "INTEGER"
         IF diagrammArt$(d, i) <> "" THEN typ = "StudioDiagramm"
         IF LEFT$(arten[i], 15) = "studio_control:" THEN
             DIM ik AS INTEGER : ik = ARRAY_INDEXOF(instIndex, i)
@@ -405,6 +423,26 @@ FUNCTION basisCode$(ei AS INTEGER) AS STRING
             DIM ml AS STRING : ml = IIF(JSON_HAS(d, mp + ".label"), JSON_GET_STRING(d, mp + ".label"), "")
             ARRAY_PUSH(z, "        DIM " + mv + " AS INTEGER : " + mv + " = GUI_MENU(Self.studioWin, studioTr$(" + dhText$(ml) + "))")
             IF JSON_HAS(d, mp + ".items") THEN menueCode(z, d, mp + ".items", mv, zaehler)
+        NEXT
+    END IF
+    ' Kontextmenues: auf ein Widget (Rechtsklick dort) oder aufs Fenster.
+    IF JSON_HAS(d, "kontextmenues") THEN
+        DIM kzaehler AS INTEGER : kzaehler = 500
+        DIM kk AS INTEGER
+        FOR kk = 0 TO JSON_LEN(d, "kontextmenues") - 1
+            DIM kp AS STRING : kp = "kontextmenues." + STR$(kk)
+            DIM kn AS STRING : kn = jsonText$(d, kp + ".name")
+            DIM kv AS STRING
+            IF istBezeichner(kn) THEN
+                kv = "Self." + kn
+            ELSE
+                kv = "studioK" + STR$(kk)
+                ARRAY_PUSH(z, "        DIM " + kv + " AS INTEGER")
+            END IF
+            ARRAY_PUSH(z, "        " + kv + " = GUI_CONTEXT(" + IIF(istControl, "win", "Self.studioWin") + ")")
+            DIM kw AS STRING : kw = jsonText$(d, kp + ".widget")
+            IF kw <> "" AND ARRAY_INDEXOF(namen, kw) >= 0 THEN ARRAY_PUSH(z, "        GUI_CONTEXT_WIDGET(" + kv + ", Self." + kw + ")")
+            IF JSON_HAS(d, kp + ".items") THEN menueCode(z, d, kp + ".items", kv, kzaehler)
         NEXT
     END IF
     ' Die eigenen Controls melden sich fertig, bevor das Fenster es tut (ein

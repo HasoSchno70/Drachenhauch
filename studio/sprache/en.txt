@@ -216,7 +216,6 @@ Anwendung	Application
 Control	Control
 Eigenes Control	Custom control
 Eigenes Control hinzufügen …	Add custom control …
-Menüs hat nur ein Fenster, kein eigenes Control.	Only a window has menus, not a custom control.
 ein eigenes Control dieses Projekts	a custom control of this project
 {0} gibt es nicht im Projekt	{0} does not exist in the project
 {0} enthält sich selbst	{0} contains itself
@@ -701,3 +700,22 @@ wenn eine Zelle angeklickt wird (Datenzeile und Spalte, auch auf einen Knopf in 
 Ziehbar	Draggable
 Ablage	Drop target
 wenn etwas darauf abgelegt wird (Zeile in der Quelle, Zeile hier; woher und was sagen GUI_DROP_SOURCE und GUI_DROP_TEXT)	when something is dropped on it (row in the source, row here; GUI_DROP_SOURCE and GUI_DROP_TEXT tell where from and what)
+Beim Löschen	On delete
+verbieten	forbid
+mitlöschen	delete too
+leeren	clear
+„{0}“ ist keine Wahl -- möglich sind verbieten, loeschen und leeren.	"{0}" is not a choice -- possible are verbieten, loeschen and leeren.
+Die Spalte {0} verweist auf nichts -- erst unter „Verweis auf“ eine Tabelle wählen.	The column {0} refers to nothing -- first choose a table under "Refers to".
+Die Spalte {0} ist Pflicht -- leeren geht nur ohne.	The column {0} is required -- clear works only without.
+Spalte {0}: beim Löschen {1}.	Column {0}: on delete {1}.
+Menüs hat ein Fenster oder ein eigenes Control.	Menus belong to a window or a custom control.
++ Kontextmenü	+ Context menu
+ein Menü für den Rechtsklick auf ein Widget oder das Fenster	a menu for the right click on a widget or the window
+An	On
+(das Fenster)	(the window)
+Rechtsklick auf dieses Widget öffnet das Kontextmenü	a right click on this widget opens the context menu
+Kontextmenü → {0}	Context menu → {0}
+Ein eigenes Control hat keine Menüleiste. [+ Kontextmenü] legt eins für den Rechtsklick an.	A custom control has no menu bar. [+ Context menu] creates one for the right click.
+Ein Kontextmenü mit {0} Einträgen. Sein Name ist das Handle (GUI_CONTEXT); die Einträge haben ihr Ereignis wie im Menü.	A context menu with {0} entries. Its name is the handle (GUI_CONTEXT); the entries have their event as in the menu.
+Datumsfeld	Date field
+ein Datum im Feld, der Kalender klappt auf	a date in a field, the calendar drops down

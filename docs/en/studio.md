@@ -166,7 +166,10 @@ An event with parentheses calls its method with values: `Ziehen` (drag)
 with the position on the canvas (while the button is held after a press on
 it), `Rad` (wheel) with the steps of the mouse wheel, `Taste` (key) with the
 key code (`KEY_A`, `KEY_SPACE` ...), as long as the window is in front and
-no input field takes the key, `Knopf` (button) with the number of the
+no input field takes the key -- a shortcut (a function key, Ctrl or Alt
+with it) also arrives from an input field unless the field needs it itself
+(Ctrl+A/C/V/X/Z/Y, arrows, Home, End, Backspace, Delete); the method asks
+`KEYPRESSED(KEY_LCTRL)` whether Ctrl is held --, `Knopf` (button) with the number of the
 toolbar button pressed and `Feld` (field) with the number of the status bar
 field clicked (from 0, separators and gaps count too), `Zelle` (cell) with
 the data row and column of every click into a table -- also on a button in
@@ -246,6 +249,13 @@ on the right, plus "with check mark". A new entry gets a name from its text
 writes the menus into the layout -- one undo step; renamed entries take
 their event methods with them. Named entries appear in the navigator under
 the window, their event is `<Name>_Aktion`.
+
+**Context menus** are created by the same editor: [+ Context menu], under it
+entries as in a menu. Its name is a field of the window (the handle from
+`GUI_CONTEXT`), under "On" stands the widget whose right click opens it -- a
+list, a tree, a table select their row on it --, or the whole window. A
+custom control has context menus too (a menu bar it has not). In the layout
+they are stored under `kontextmenues`.
 
 **Dialogs that wait.** The runtime of the project offers:
 
@@ -590,6 +600,17 @@ customer whose id is in `kunde`. The studio puts a LEFT JOIN around the table
 for this (a row without a customer stays, with an empty name); in the result
 the column is called `kunde.name`, and under that name **Sort by**, the
 **Condition** (`"kunde.ort" = 'Köln'`) and the search field know it as well.
+
+**On delete** turns the reference into a foreign key (`REFERENCES … (id)`)
+and says what happens to a row when the row it points to is deleted:
+*verbieten* (forbid: the delete fails as long as something points to it),
+*mitlöschen* (`ON DELETE CASCADE`: the items go with their invoice) or
+*leeren* (clear: `ON DELETE SET NULL`, not for a required column). Left
+empty it stays a reference without a rule. The comparison rebuilds the table
+for it, the rows stay -- also a reference into nothing, the rule applies to
+changes afterwards. dhrt always has foreign keys on; a built program creates
+a new file this way but does not add it to an older one (the comparison in
+the studio does). A taken-over file brings its `ON DELETE` along.
 
 **Images.** A column of the type **Image** holds the bytes of an image file
 (PNG, JPG, BMP or GIF). The data grid shows its size; **Image …** sets the

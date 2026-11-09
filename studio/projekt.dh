@@ -616,6 +616,8 @@ FUNCTION ereignisseFuer(kind AS STRING) AS ARRAY OF STRING
             aus = ["Feld"]
         CASE "timer", "menue"
             RETURN ["Aktion"]
+        CASE "kontext"
+            RETURN []
         CASE "fenster"
             RETURN ["Geoeffnet", "Schliessen", "Groesse", "Taste", "Takt"]
         CASE "control"
@@ -707,6 +709,7 @@ SUB controlsVon(ei AS INTEGER)
         NEXT
     END IF
     menueNamenSammeln(d, "menus", ctrlNamen, ctrlArten)
+    kontextNamenSammeln(d, ctrlNamen, ctrlArten)
 END SUB
 
 ' Benennt ein Control um: seine Ereignis-Methoden ziehen mit, und im Code
