@@ -483,6 +483,22 @@ DIM studioTaste AS INTEGER : studioTaste = -1
 DIM studioBildNr AS INTEGER : studioBildNr = 0
 DIM studioVerteiltNr AS INTEGER : studioVerteiltNr = -1
 
+' Ist die Taste ein Kuerzel fuers Fenster, auch wenn ein Eingabefeld den
+' Fokus hat? Eine F-Taste immer; mit Strg oder Alt alles, was das Feld nicht
+' selbst braucht (alles waehlen, kopieren, einfuegen, ausschneiden,
+' rueckgaengig, wiederholen, wortweise gehen und loeschen).
+FUNCTION studioKuerzelTaste(t AS INTEGER) AS BOOLEAN
+    IF ARRAY_INDEXOF([KEY_F1, KEY_F2, KEY_F3, KEY_F4, KEY_F5, KEY_F6, KEY_F7, KEY_F8, KEY_F9, KEY_F10, KEY_F11, KEY_F12], t) >= 0 THEN RETURN TRUE
+    DIM strg AS BOOLEAN : strg = KEYPRESSED(KEY_LCTRL) OR KEYPRESSED(KEY_RCTRL)
+    DIM alt AS BOOLEAN : alt = KEYPRESSED(KEY_LALT) OR KEYPRESSED(KEY_RALT)
+    IF NOT strg AND NOT alt THEN RETURN FALSE
+    ' Strg+Alt ist AltGr: damit tippt man im Feld (@, Euro, Klammern).
+    IF strg AND alt THEN RETURN FALSE
+    IF ARRAY_INDEXOF([KEY_LCTRL, KEY_RCTRL, KEY_LALT, KEY_RALT, KEY_LSHIFT, KEY_RSHIFT], t) >= 0 THEN RETURN FALSE
+    IF strg AND NOT alt AND ARRAY_INDEXOF([KEY_A, KEY_C, KEY_V, KEY_X, KEY_Z, KEY_Y, KEY_LEFT, KEY_RIGHT, KEY_UP, KEY_DOWN, KEY_HOME, KEY_END, KEY_BACKSPACE, KEY_DELETE], t) >= 0 THEN RETURN FALSE
+    RETURN TRUE
+END FUNCTION
+
 ' Darf ein Fenster gerade rohe Maus-Eingaben nehmen (Zeichenflaechen)?
 ' GUI_HIT_TEST sieht durch den Schleier eines modalen Fensters hindurch.
 FUNCTION studioFrei(w AS GUI_WINDOW) AS BOOLEAN
@@ -550,13 +566,16 @@ FUNCTION studioBild() AS BOOLEAN
         END IF
     NEXT
     ' Eine Taste gehoert dem obersten Fenster -- ausser ein Eingabefeld hat
-    ' den Fokus, dann tippt man dort.
+    ' den Fokus, dann tippt man dort. Ein Kuerzel (Strg oder Alt dazu, eine
+    ' F-Taste) kommt trotzdem an, solange das Feld es nicht selbst braucht:
+    ' Strg+S im Barcode-Feld speichert, Strg+C kopiert im Feld.
     IF studioTaste >= 0 AND NOT studioEnde THEN
         DIM feld AS BOOLEAN : feld = FALSE
         IF studioFokusJetzt >= 0 THEN
             DIM art AS STRING : art = GUI_KIND(studioFokusJetzt)
             feld = art = "textinput" OR art = "textarea" OR art = "spinner" OR art = "dropdown"
         END IF
+        IF feld AND studioKuerzelTaste(studioTaste) THEN feld = FALSE
         IF NOT feld THEN
             DIM oben AS StudioFenster
             FOR EACH f IN studioFenster
