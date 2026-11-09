@@ -493,23 +493,23 @@ SUB ueAbholen(abruf AS INTEGER, s AS STRING)
     TRY
         antwort = HTTP_RESULT(abruf)
     CATCH fehler
-        ueAufgeben(s, "Übersetzung nicht erreichbar -- die Texte bleiben englisch")
+        ueAufgeben(s, tr$("Übersetzung nicht erreichbar -- die Texte bleiben englisch"))
         RETURN
     END TRY
     DIM j AS JSON_HANDLE
     TRY
         j = JSON_PARSE(antwort)
     CATCH fehler2
-        ueAufgeben(s, "Ungültige Antwort vom Übersetzer -- die Texte bleiben englisch")
+        ueAufgeben(s, tr$("Ungültige Antwort vom Übersetzer -- die Texte bleiben englisch"))
         RETURN
     END TRY
     DIM st AS STRING : st = jText$(j, "responseStatus")
     IF st = "429" THEN
         ueGesperrt = TRUE
-        ueAufgeben(s, "Der Übersetzer hat sein Tageskontingent erreicht -- die übrigen Texte bleiben englisch")
+        ueAufgeben(s, tr$("Der Übersetzer hat sein Tageskontingent erreicht -- die übrigen Texte bleiben englisch"))
         RETURN
     ELSEIF st <> "200" THEN
-        ueAufgeben(s, "Übersetzer (" + st + "): " + jText$(j, "responseData.translatedText"))
+        ueAufgeben(s, trf$("Übersetzer ({0}): {1}", [st, jText$(j, "responseData.translatedText")]))
         RETURN
     END IF
     DIM t AS STRING : t = TRIM$(HTML_TEXT(jText$(j, "responseData.translatedText")))

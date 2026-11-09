@@ -12,7 +12,7 @@ CLASS LagerorteSeite EXTENDS LagerorteSeite_Basis
     SUB laden()
         Self.orte = ortUebersicht()
         Self.rollen = MIN(Self.rollen, Self.rollenMax())
-        GUI_SET_TEXT(Self.leerText, IIF(LEN(Self.orte) = 0, "📦 Noch keine Lagerorte vorhanden. Füge Produkte hinzu, um Lagerorte zu sehen.", ""))
+        GUI_SET_TEXT(Self.leerText, IIF(LEN(Self.orte) = 0, tr$("📦 Noch keine Lagerorte vorhanden. Füge Produkte hinzu, um Lagerorte zu sehen."), ""))
     END SUB
 
     FUNCTION spalten() AS INTEGER
@@ -76,16 +76,16 @@ CLASS LagerorteSeite EXTENDS LagerorteSeite_Basis
         DIM zb AS INTEGER : zb = TEXT_WIDTH(STR$(o.anzahl))
         TEXT_BOLD(FALSE)
         TEXT_SIZE(14)
-        TEXT(x + 24 + zb, y + 86, "Artikel", COLOR_LERP(&HFFFFFF, grund, 0.25))
+        TEXT(x + 24 + zb, y + 86, tr$("Artikel"), COLOR_LERP(&HFFFFFF, grund, 0.25))
         DIM wy AS INTEGER : wy = y + 124
         IF o.abgelaufen > 0 THEN
-            TEXT(x + 16, wy, "✖ " + STR$(o.abgelaufen) + " abgelaufen", &HFF8A80)
+            TEXT(x + 16, wy, trf$("✖ {0} abgelaufen", [STR$(o.abgelaufen)]), &HFF8A80)
             wy = wy + 22
         END IF
         IF o.bald > 0 THEN
-            TEXT(x + 16, wy, "⚠ " + IIF(o.bald = 1, "1 Lebensmittel läuft bald ab", STR$(o.bald) + " Lebensmittel laufen bald ab"), &HFFD180)
+            TEXT(x + 16, wy, IIF(o.bald = 1, tr$("⚠ 1 Lebensmittel läuft bald ab"), trf$("⚠ {0} Lebensmittel laufen bald ab", [STR$(o.bald)])), &HFFD180)
         ELSEIF o.abgelaufen = 0 THEN
-            TEXT(x + 16, wy, IIF(o.anzahl = 0, "leer", "✔ alles frisch"), COLOR_LERP(&HFFFFFF, grund, 0.35))
+            TEXT(x + 16, wy, IIF(o.anzahl = 0, tr$("leer"), tr$("✔ alles frisch")), COLOR_LERP(&HFFFFFF, grund, 0.35))
         END IF
     END SUB
 

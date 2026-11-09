@@ -35,8 +35,8 @@ CLASS KatalogFenster EXTENDS KatalogFenster_Basis
     DIM offenGezeigt AS INTEGER
 
     SUB Geoeffnet()
-        GUI_SET_TEXT(Self.anzahl, "🇩🇪 " + STR$(LEN(katalog())) + " Rezepte im Katalog")
-        GUI_SET_DROPDOWN(Self.suchArt, ["🔎 im Namen", "🥕 nach Zutaten"])
+        GUI_SET_TEXT(Self.anzahl, trf$("🇩🇪 {0} Rezepte im Katalog", [STR$(LEN(katalog()))]))
+        GUI_SET_DROPDOWN(Self.suchArt, [tr$("🔎 im Namen"), tr$("🥕 nach Zutaten")])
         GUI_DROPDOWN_SET_SELECTED(Self.suchArt, IIF(Self.vorgabeZutaten, 1, 0))
         Self.treffer = []
         Self.sucheAbruf = -1
@@ -58,7 +58,7 @@ CLASS KatalogFenster EXTENDS KatalogFenster_Basis
 
     SUB schluesselHinweis()
         IF spoonSchluessel$() = "" THEN
-            Self.status("🔑 Ohne Spoonacular-Schlüssel sucht nur der Katalog (kostenlos auf spoonacular.com/food-api).", "")
+            Self.status(tr$("🔑 Ohne Spoonacular-Schlüssel sucht nur der Katalog (kostenlos auf spoonacular.com/food-api)."), "")
         ELSE
             Self.status("", "")
         END IF
@@ -87,7 +87,7 @@ CLASS KatalogFenster EXTENDS KatalogFenster_Basis
     SUB knopfSuchen_Klick()
         DIM text AS STRING : text = TRIM$(GUI_TEXT(Self.sucheFeld))
         IF text = "" THEN
-            Self.status("❗ Bitte gib einen Suchbegriff ein!", "fehler")
+            Self.status(tr$("❗ Bitte gib einen Suchbegriff ein!"), "fehler")
             RETURN
         END IF
         ' Eine Suche, die noch läuft, gilt nicht mehr (die Python-App ließ sie
@@ -109,7 +109,7 @@ CLASS KatalogFenster EXTENDS KatalogFenster_Basis
             ELSE
                 Self.sucheAbruf = spoonSucheStarten(text, zutaten, MAX(1, hoechstens - Self.lokalZahl))
                 GUI_SET_ENABLED(Self.knopfSuchen, FALSE)
-                Self.status("⏳ " + STR$(Self.lokalZahl) + " im Katalog. Durchsuche das Internet …", "")
+                Self.status(trf$("⏳ {0} im Katalog. Durchsuche das Internet …", [STR$(Self.lokalZahl)]), "")
             END IF
         ELSE
             Self.status("", "")
@@ -134,11 +134,11 @@ CLASS KatalogFenster EXTENDS KatalogFenster_Basis
     SUB zaehlen()
         DIM n AS INTEGER : n = LEN(Self.treffer)
         IF n = 0 AND Self.sucheAbruf < 0 THEN
-            GUI_SET_TEXT(Self.ergebnis, "Nichts gefunden -- ein anderes Wort?")
+            GUI_SET_TEXT(Self.ergebnis, tr$("Nichts gefunden -- ein anderes Wort?"))
         ELSEIF Self.netzGefragt THEN
-            GUI_SET_TEXT(Self.ergebnis, "📋 " + STR$(n) + " Treffer: 🇩🇪 " + STR$(Self.lokalZahl) + " + 🌐 " + STR$(n - Self.lokalZahl))
+            GUI_SET_TEXT(Self.ergebnis, trf$("📋 {0} Treffer: 🇩🇪 {1} + 🌐 {2}", [STR$(n), STR$(Self.lokalZahl), STR$(n - Self.lokalZahl)]))
         ELSE
-            GUI_SET_TEXT(Self.ergebnis, "📋 " + STR$(n) + " Treffer")
+            GUI_SET_TEXT(Self.ergebnis, trf$("📋 {0} Treffer", [STR$(n)]))
         END IF
     END SUB
 
@@ -174,7 +174,7 @@ CLASS KatalogFenster EXTENDS KatalogFenster_Basis
         IF spoonFehler <> "" THEN
             Self.status("❗ " + spoonFehler, "fehler")
         ELSE
-            Self.status("🌐 " + STR$(LEN(neu)) + " aus dem Internet (Spoonacular)", "erfolg")
+            Self.status(trf$("🌐 {0} aus dem Internet (Spoonacular)", [STR$(LEN(neu))]), "erfolg")
         END IF
         DIM x AS Rezept
         FOR EACH x IN neu
@@ -236,13 +236,13 @@ CLASS KatalogFenster EXTENDS KatalogFenster_Basis
         DIM vorher AS INTEGER : vorher = Self.offenGezeigt
         Self.offenGezeigt = n
         IF n > 0 THEN
-            Self.status("🌐 Übersetze … (" + STR$(n) + " offen)", "")
+            Self.status(trf$("🌐 Übersetze … ({0} offen)", [STR$(n)]), "")
         ELSEIF vorher > 0 THEN
             IF ueFehler <> "" THEN
                 Self.status("❗ " + ueFehler, "fehler")
                 ueFehler = ""
             ELSE
-                Self.status("✓ Übersetzt", "erfolg")
+                Self.status(tr$("✓ Übersetzt"), "erfolg")
             END IF
         END IF
     END SUB
@@ -289,20 +289,20 @@ CLASS KatalogFenster EXTENDS KatalogFenster_Basis
         IF x IS NIL THEN
             t = ""
         ELSEIF x.herkunft = "netz" AND NOT x.vollstaendig THEN
-            t = Self.aus$(x, x.name) + CHR$(10) + CHR$(10) + "⏱ " + minutenText$(x.gesamt()) + "  •  🍽 " + STR$(x.portionen) + " Portionen" + CHR$(10) + CHR$(10)
+            t = Self.aus$(x, x.name) + CHR$(10) + CHR$(10) + trf$("⏱ {0}  •  🍽 {1} Portionen", [minutenText$(x.gesamt()), STR$(x.portionen)]) + CHR$(10) + CHR$(10)
             IF Self.fehlRezept = x THEN
-                t = t + "❗ Einzelheiten nicht geladen: " + Self.fehlText
+                t = t + trf$("❗ Einzelheiten nicht geladen: {0}", [Self.fehlText])
             ELSE
-                t = t + "⏳ Lade Einzelheiten …"
+                t = t + tr$("⏳ Lade Einzelheiten …")
             END IF
         ELSE
-            t = Self.aus$(x, x.name) + CHR$(10) + Self.aus$(x, x.beschreibung) + CHR$(10) + CHR$(10) + "🍽 " + STR$(x.portionen) + " Portionen, ⏱ " + STR$(x.vorb) + " + " + STR$(x.koch) + " min" + CHR$(10) + CHR$(10) + "Zutaten:" + CHR$(10)
+            t = Self.aus$(x, x.name) + CHR$(10) + Self.aus$(x, x.beschreibung) + CHR$(10) + CHR$(10) + trf$("🍽 {0} Portionen, ⏱ {1} + {2} min", [STR$(x.portionen), STR$(x.vorb), STR$(x.koch)]) + CHR$(10) + CHR$(10) + tr$("Zutaten:") + CHR$(10)
             DIM z AS Zutat
             FOR EACH z IN x.zutaten
                 t = t + "  • " + z.mengeText$() + " " + Self.zutatName$(x, z) + CHR$(10)
             NEXT
-            t = t + CHR$(10) + "Zubereitung:" + CHR$(10) + IIF(x.anleitung = "", "Keine Anleitung verfügbar.", Self.aus$(x, x.anleitung))
-            IF x.herkunft = "netz" THEN t = t + CHR$(10) + CHR$(10) + "🌐 " + Self.quellText$(x)
+            t = t + CHR$(10) + tr$("Zubereitung:") + CHR$(10) + IIF(x.anleitung = "", tr$("Keine Anleitung verfügbar."), Self.aus$(x, x.anleitung))
+            IF x.herkunft = "netz" THEN t = t + CHR$(10) + CHR$(10) + "🌐 " + Self.quellText$(x, TRUE)
         END IF
         IF t <> Self.gezeigt THEN
             GUI_SET_TEXT(Self.details, t)
@@ -315,9 +315,13 @@ CLASS KatalogFenster EXTENDS KatalogFenster_Basis
         END IF
     END SUB
 
-    FUNCTION quellText$(x AS Rezept) AS STRING
-        IF x.adresse = "" THEN RETURN "Quelle: " + x.quelle
-        RETURN "Quelle: " + x.quelle + " -- " + x.adresse
+    ' Angezeigt in der gewählten Sprache; was ins Rezept kommt, bleibt deutsch
+    ' (Daten).
+    FUNCTION quellText$(x AS Rezept, anzeigen AS BOOLEAN) AS STRING
+        DIM q AS STRING : q = x.quelle
+        IF x.adresse <> "" THEN q = q + " -- " + x.adresse
+        IF anzeigen THEN RETURN trf$("Quelle: {0}", [q])
+        RETURN "Quelle: " + q
     END FUNCTION
 
     ' --- Importieren -----------------------------------------------------------------
@@ -333,7 +337,7 @@ CLASS KatalogFenster EXTENDS KatalogFenster_Basis
             y = NEW Rezept()
             y.name = Self.aus$(x, x.name)
             y.beschreibung = Self.aus$(x, x.beschreibung)
-            y.beschreibung = TRIM$(y.beschreibung + CHR$(10) + CHR$(10) + Self.quellText$(x))
+            y.beschreibung = TRIM$(y.beschreibung + CHR$(10) + CHR$(10) + Self.quellText$(x, FALSE))
             y.portionen = x.portionen
             y.vorb = x.vorb
             y.koch = x.koch
@@ -350,22 +354,22 @@ CLASS KatalogFenster EXTENDS KatalogFenster_Basis
         END IF
         rezeptAnlegen(y)
         Self.importiert = Self.importiert + 1
-        GUI_TOAST(Self.studioWin, "„" + y.name + "“ wurde importiert!", "erfolg")
+        GUI_TOAST(Self.studioWin, trf$("„{0}“ wurde importiert!", [y.name]), "erfolg")
     END SUB
 
     ' --- Schlüssel und Schließen -----------------------------------------------------
     SUB knopfSchluessel_Klick()
         IF TRIM$(GETENV$("SPOONACULAR_API_KEY")) <> "" THEN
-            Meldung("Der Schlüssel kommt aus der Umgebungsvariable SPOONACULAR_API_KEY -- sie gilt vor dem gespeicherten.", "API-Schlüssel")
+            Meldung(tr$("Der Schlüssel kommt aus der Umgebungsvariable SPOONACULAR_API_KEY -- sie gilt vor dem gespeicherten."), tr$("API-Schlüssel"))
             RETURN
         END IF
-        DIM k AS STRING : k = Eingabe("Spoonacular-API-Schlüssel (kostenlos auf spoonacular.com/food-api):", spoonSchluessel$(), "API-Schlüssel")
+        DIM k AS STRING : k = Eingabe(tr$("Spoonacular-API-Schlüssel (kostenlos auf spoonacular.com/food-api):"), spoonSchluessel$(), tr$("API-Schlüssel"))
         IF k = "" THEN RETURN
         IF NOT spoonSchluesselSetzen(k) THEN
-            Meldung("Ein Schlüssel besteht nur aus Buchstaben, Ziffern und Bindestrichen.", "API-Schlüssel")
+            Meldung(tr$("Ein Schlüssel besteht nur aus Buchstaben, Ziffern und Bindestrichen."), tr$("API-Schlüssel"))
             RETURN
         END IF
-        Self.status("🔑 Schlüssel gespeichert.", "erfolg")
+        Self.status(tr$("🔑 Schlüssel gespeichert."), "erfolg")
     END SUB
 
     SUB knopfSchliessen_Klick()

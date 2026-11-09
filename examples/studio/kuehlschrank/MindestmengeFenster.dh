@@ -13,7 +13,7 @@ CLASS MindestmengeFenster EXTENDS MindestmengeFenster_Basis
             RETURN
         END IF
         GUI_SET_DROPDOWN(Self.einheitListe, einheiten())
-        GUI_SET_TEXT(Self.titel, "Mindestmenge: " + Self.e.name)
+        GUI_SET_TEXT(Self.titel, trf$("Mindestmenge: {0}", [Self.e.name]))
         GUI_SET_CHECKED(Self.aktivKasten, Self.e.minMenge > 0)
         GUI_SET_VALUE(Self.mengeFeld, IIF(Self.e.minMenge > 0, Self.e.minMenge, 1.0))
         GUI_SET_TEXT(Self.einheitListe, IIF(Self.e.minEinheit = "", einheitText$(Self.e.einheit), einheitText$(Self.e.minEinheit)))

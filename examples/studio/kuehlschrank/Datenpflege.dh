@@ -30,15 +30,16 @@ FUNCTION dbDateiGanz$() AS STRING
     RETURN PATHJOIN(CWD$(), p)
 END FUNCTION
 
-' Wie _format_size: "12,3 KB".
+' Wie _format_size: "12,3 KB" (englisch "12.3 KB").
 FUNCTION groesseText$(bytes AS INTEGER) AS STRING
     DIM x AS FLOAT : x = bytes
+    DIM komma AS STRING : komma = IIF(Sprache$() = "en", ".", ",")
     DIM e AS STRING
     FOR EACH e IN ["Bytes", "KB", "MB", "GB"]
-        IF ABS(x) < 1024 THEN RETURN REPLACE$(FORMAT$(x, "%.1f"), ".", ",") + " " + e
+        IF ABS(x) < 1024 THEN RETURN REPLACE$(FORMAT$(x, "%.1f"), ".", komma) + " " + IIF(e = "Bytes", tr$("Bytes"), e)
         x = x / 1024
     NEXT
-    RETURN REPLACE$(FORMAT$(x, "%.1f"), ".", ",") + " TB"
+    RETURN REPLACE$(FORMAT$(x, "%.1f"), ".", komma) + " TB"
 END FUNCTION
 
 FUNCTION sicherungsOrdner$() AS STRING
@@ -76,11 +77,11 @@ END FUNCTION
 ' ging.
 FUNCTION sicherungEinspielen$(pfad AS STRING) AS STRING
     vorEinspielen = ""
-    IF NOT FILEEXISTS(pfad) THEN RETURN "Die Datei gibt es nicht."
+    IF NOT FILEEXISTS(pfad) THEN RETURN tr$("Die Datei gibt es nicht.")
     TRY
         DB_EXEC(db, "ATTACH DATABASE ? AS q", pfad)
     CATCH fehler
-        RETURN "Das ist keine Datenbank-Datei."
+        RETURN tr$("Das ist keine Datenbank-Datei.")
     END TRY
     DIM gute AS BOOLEAN : gute = FALSE
     TRY
@@ -90,7 +91,7 @@ FUNCTION sicherungEinspielen$(pfad AS STRING) AS STRING
     END TRY
     IF NOT gute THEN
         DB_EXEC(db, "DETACH DATABASE q")
-        RETURN "Das ist keine Sicherung der Kühlschrank-App (es fehlen products und inventory)."
+        RETURN tr$("Das ist keine Sicherung der Kühlschrank-App (es fehlen products und inventory).")
     END IF
     DB_EXEC(db, "DETACH DATABASE q")
     vorEinspielen = sicherungAnlegen$()
@@ -148,7 +149,7 @@ FUNCTION csvExport(ordner AS STRING) AS ARRAY OF STRING
         WEND
         IF LEN(zeilen) = 1 THEN CONTINUE
         WRITEALL(PATHJOIN(ordner, t + ".csv"), JOIN$(zeilen, CHR$(10)) + CHR$(10))
-        ARRAY_PUSH(aus, t + ".csv (" + STR$(LEN(zeilen) - 1) + " Zeilen)")
+        ARRAY_PUSH(aus, trf$("{0}.csv ({1} Zeilen)", [t, STR$(LEN(zeilen) - 1)]))
     NEXT
     RETURN aus
 END FUNCTION

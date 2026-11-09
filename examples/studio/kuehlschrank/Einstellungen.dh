@@ -1,12 +1,14 @@
 ' Die Einstellungen in app_settings, wie AppConfig der Python-App (dieselben
 ' Schlüssel, JSON wie json.dumps): laden, speichern, auf die Vorgaben
-' zurück. Dazu drei, die dort im Fenster standen und nichts taten -- hier
-' wirken sie: dark_mode (das Thema der Oberfläche), barcode_cache_enabled
-' (der Cache von Open Food Facts) und daily_summary_minute (die Uhrzeit der
-' Zusammenfassung hatte Minuten, gespeichert wurde nur die Stunde).
+' zurück. Dazu vier, die dort im Fenster standen und nichts taten -- hier
+' wirken sie: dark_mode (das Thema der Oberfläche), language (Deutsch oder
+' Englisch, ab dem nächsten Start), barcode_cache_enabled (der Cache von
+' Open Food Facts) und daily_summary_minute (die Uhrzeit der Zusammenfassung
+' hatte Minuten, gespeichert wurde nur die Stunde).
 CLASS Einstellungen
     ' Allgemein
     DIM dunkel AS BOOLEAN
+    DIM sprache AS STRING
     DIM auffrischenS AS INTEGER
     DIM cacheAn AS BOOLEAN
     DIM einheit AS STRING
@@ -28,6 +30,7 @@ CLASS Einstellungen
     ' Die Vorgaben (wie die Klassenwerte von AppConfig und _reset_to_defaults).
     SUB vorgaben()
         Self.dunkel = TRUE
+        Self.sprache = "de"
         Self.auffrischenS = 30
         Self.cacheAn = TRUE
         Self.einheit = "Stück"
@@ -51,6 +54,8 @@ CLASS Einstellungen
     SUB laden()
         Self.vorgaben()
         Self.dunkel = einstellungJa("dark_mode", Self.dunkel)
+        ' Ohne Eintrag die Sprache, in der die App gerade läuft.
+        Self.sprache = IIF(einstellung$("language", IIF(Sprache$() = "en", "en", "de")) = "en", "en", "de")
         Self.auffrischenS = grenzen(einstellungZahl("auto_refresh_interval_ms", Self.auffrischenS * 1000) \ 1000, 5, 300)
         Self.cacheAn = einstellungJa("barcode_cache_enabled", Self.cacheAn)
         Self.einheit = einstellung$("default_unit", Self.einheit)
@@ -72,6 +77,7 @@ CLASS Einstellungen
     SUB speichern()
         DB_BEGIN(db)
         einstellungSetzen("dark_mode", jsonJa$(Self.dunkel))
+        einstellungSetzen("language", jsonText$(Self.sprache))
         einstellungSetzen("auto_refresh_interval_ms", STR$(Self.auffrischenS * 1000))
         einstellungSetzen("barcode_cache_enabled", jsonJa$(Self.cacheAn))
         einstellungSetzen("default_unit", jsonText$(Self.einheit))

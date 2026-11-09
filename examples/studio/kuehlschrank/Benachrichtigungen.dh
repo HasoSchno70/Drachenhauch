@@ -85,23 +85,23 @@ FUNCTION meldungenPruefen(e AS Einstellungen) AS ARRAY OF Nachricht
     DIM neu AS ARRAY OF STRING
     IF e.beiAbgelaufen THEN
         neu = neueNamen("abgelaufen", ab)
-        IF LEN(neu) > 0 THEN ARRAY_PUSH(aus, nachrichtNeu("⚠️ Produkte abgelaufen!", STR$(LEN(neu)) + " Produkt(e) sind abgelaufen: " + ersteDrei$(neu), TRUE))
+        IF LEN(neu) > 0 THEN ARRAY_PUSH(aus, nachrichtNeu(tr$("⚠️ Produkte abgelaufen!"), trf$("{0} Produkt(e) sind abgelaufen: {1}", [STR$(LEN(neu)), ersteDrei$(neu)]), TRUE))
     END IF
     IF e.beiHeute THEN
         neu = neueNamen("heute", hz)
-        IF LEN(neu) > 0 THEN ARRAY_PUSH(aus, nachrichtNeu("🔴 Läuft HEUTE ab!", ersteDrei$(neu), TRUE))
+        IF LEN(neu) > 0 THEN ARRAY_PUSH(aus, nachrichtNeu(tr$("🔴 Läuft HEUTE ab!"), ersteDrei$(neu), TRUE))
     END IF
     IF e.beiMorgen THEN
         neu = neueNamen("morgen", mo)
-        IF LEN(neu) > 0 THEN ARRAY_PUSH(aus, nachrichtNeu("🟡 Läuft MORGEN ab!", ersteDrei$(neu), TRUE))
+        IF LEN(neu) > 0 THEN ARRAY_PUSH(aus, nachrichtNeu(tr$("🟡 Läuft MORGEN ab!"), ersteDrei$(neu), TRUE))
     END IF
     IF e.beiBald AND LEN(bald) > 0 AND NOT MAPHAS(gemeldet, "bald|" + heute$()) THEN
         MAPPUT(gemeldet, "bald|" + heute$(), "1")
-        ARRAY_PUSH(aus, nachrichtNeu("🟡 Bald ablaufend", STR$(LEN(bald)) + " Produkt(e) laufen in den nächsten Tagen ab", FALSE))
+        ARRAY_PUSH(aus, nachrichtNeu(tr$("🟡 Bald ablaufend"), trf$("{0} Produkt(e) laufen in den nächsten Tagen ab", [STR$(LEN(bald))]), FALSE))
     END IF
     IF e.beiMinimum THEN
         neu = neueNamen("minimum", unterMindestmenge())
-        IF LEN(neu) > 0 THEN ARRAY_PUSH(aus, nachrichtNeu("📊 Mindestmenge unterschritten", STR$(LEN(neu)) + " Produkt(e): " + ersteDrei$(neu), FALSE))
+        IF LEN(neu) > 0 THEN ARRAY_PUSH(aus, nachrichtNeu(tr$("📊 Mindestmenge unterschritten"), trf$("{0} Produkt(e): {1}", [STR$(LEN(neu)), ersteDrei$(neu)]), FALSE))
     END IF
     RETURN aus
 END FUNCTION
@@ -118,10 +118,10 @@ FUNCTION zusammenfassung() AS Nachricht
     k.rechnen()
     IF k.abgelaufen = 0 AND k.bald = 0 THEN RETURN NIL
     DIM t AS ARRAY OF STRING : t = []
-    IF k.abgelaufen > 0 THEN ARRAY_PUSH(t, "❌ " + STR$(k.abgelaufen) + " abgelaufen")
-    IF k.bald > 0 THEN ARRAY_PUSH(t, "⏰ " + STR$(k.bald) + " bald ablaufend")
-    ARRAY_PUSH(t, "📦 " + STR$(k.gesamt) + " Artikel gesamt")
-    RETURN nachrichtNeu("🧊 Tägliche Kühlschrank-Übersicht", JOIN$(t, " | "), k.abgelaufen > 0)
+    IF k.abgelaufen > 0 THEN ARRAY_PUSH(t, trf$("❌ {0} abgelaufen", [STR$(k.abgelaufen)]))
+    IF k.bald > 0 THEN ARRAY_PUSH(t, trf$("⏰ {0} bald ablaufend", [STR$(k.bald)]))
+    ARRAY_PUSH(t, trf$("📦 {0} Artikel gesamt", [STR$(k.gesamt)]))
+    RETURN nachrichtNeu(tr$("🧊 Tägliche Kühlschrank-Übersicht"), JOIN$(t, " | "), k.abgelaufen > 0)
 END FUNCTION
 
 ' Ist die Zusammenfassung fällig? Ab der eingestellten Uhrzeit, einmal am Tag

@@ -34,7 +34,7 @@ CLASS ProduktFenster EXTENDS ProduktFenster_Basis
             Self.e.ablauf = tagePlus$(einstellungZahl("default_expiry_days", 7))
             Self.eintragId = 0
         END IF
-        GUI_SET_TEXT(Self.titel, IIF(Self.eintragId = 0, "Produkt hinzufügen", "Eintrag bearbeiten"))
+        GUI_SET_TEXT(Self.titel, IIF(Self.eintragId = 0, tr$("Produkt hinzufügen"), tr$("Eintrag bearbeiten")))
         GUI_SET_TEXT(Self.barcodeFeld, Self.e.barcode)
         ' Der Barcode gehört dem Produkt -- beim Bearbeiten bleibt er.
         GUI_SET_ENABLED(Self.barcodeFeld, Self.eintragId = 0)
@@ -59,7 +59,7 @@ CLASS ProduktFenster EXTENDS ProduktFenster_Basis
         Self.bildAbruf = -1
         GUI_SET_TEXT(Self.apiStatus, "")
         GUI_SET_TEXT(Self.cacheInfo, "")
-        GUI_SET_TEXT(Self.bildText, "📷 Kein Bild")
+        GUI_SET_TEXT(Self.bildText, tr$("📷 Kein Bild"))
         GUI_SET_ENABLED(Self.knopfSuchen, Self.eintragId = 0)
         GUI_SET_ENABLED(Self.knopfNeuSuchen, Self.eintragId = 0)
         IF Self.eintragId = 0 AND Self.e.barcode <> "" THEN Self.suchen(FALSE)
@@ -82,7 +82,7 @@ CLASS ProduktFenster EXTENDS ProduktFenster_Basis
     SUB suchen(ohneCache AS BOOLEAN)
         DIM b AS STRING : b = TRIM$(GUI_TEXT(Self.barcodeFeld))
         IF b = "" THEN
-            Meldung("Bitte Barcode eingeben!", "Fehler")
+            Meldung(tr$("Bitte Barcode eingeben!"), tr$("Fehler"))
             RETURN
         END IF
         IF Self.abruf >= 0 THEN HTTP_CANCEL(Self.abruf)
@@ -96,7 +96,7 @@ CLASS ProduktFenster EXTENDS ProduktFenster_Basis
         END IF
         Self.abruf = offStarten(b)
         Self.abrufBarcode = b
-        GUI_SET_TEXT(Self.apiStatus, "Suche...")
+        GUI_SET_TEXT(Self.apiStatus, tr$("Suche..."))
         GUI_SET_ENABLED(Self.barcodeFeld, FALSE)
     END SUB
 
@@ -123,24 +123,24 @@ CLASS ProduktFenster EXTENDS ProduktFenster_Basis
             DIM k AS STRING : k = kategorieAusApi$(fundKategorien$(f))
             IF k <> "" THEN GUI_SET_TEXT(Self.kategorieListe, k)
             IF f.bildUrl <> "" THEN
-                GUI_SET_TEXT(Self.bildText, "⏳ Lade...")
+                GUI_SET_TEXT(Self.bildText, tr$("⏳ Lade..."))
                 Self.bildUrl = f.bildUrl
                 Self.bildAbruf = HTTP_GET_START(f.bildUrl)
             END IF
             IF f.notizen$() <> "" THEN GUI_SET_TEXT(Self.notizenFeld, f.notizen$())
-            GUI_SET_TEXT(Self.cacheInfo, IIF(f.ausCache, "Aus Cache", "✓ Von API geladen"))
-            GUI_SET_TEXT(Self.apiStatus, "Gefunden!")
-            Meldung("Produktinformationen für '" + f.anzeigeName$() + "' wurden geladen!", "Gefunden")
+            GUI_SET_TEXT(Self.cacheInfo, IIF(f.ausCache, tr$("Aus Cache"), tr$("✓ Von API geladen")))
+            GUI_SET_TEXT(Self.apiStatus, tr$("Gefunden!"))
+            Meldung(trf$("Produktinformationen für '{0}' wurden geladen!", [f.anzeigeName$()]), tr$("Gefunden"))
             RETURN
         END IF
-        GUI_SET_TEXT(Self.apiStatus, "Nicht gefunden")
+        GUI_SET_TEXT(Self.apiStatus, tr$("Nicht gefunden"))
         GUI_SET_TEXT(Self.cacheInfo, "")
         IF f.ausCache THEN
-            Meldung("Produkt wurde zuvor nicht gefunden." + CHR$(10) + "Klicke 🗘 um erneut zu suchen.", "Nicht gefunden")
+            Meldung(tr$("Produkt wurde zuvor nicht gefunden.") + CHR$(10) + tr$("Klicke 🗘 um erneut zu suchen."), tr$("Nicht gefunden"))
         ELSEIF LEFT$(f.fehler, 15) = "Netzwerkfehler:" THEN
-            Meldung("Open Food Facts ist gerade nicht erreichbar." + CHR$(10) + "Bitte Daten manuell eingeben.", "Keine Verbindung")
+            Meldung(tr$("Open Food Facts ist gerade nicht erreichbar.") + CHR$(10) + tr$("Bitte Daten manuell eingeben."), tr$("Keine Verbindung"))
         ELSE
-            Meldung("Produkt wurde nicht in der Online-Datenbank gefunden." + CHR$(10) + "Bitte Daten manuell eingeben.", "Nicht gefunden")
+            Meldung(tr$("Produkt wurde nicht in der Online-Datenbank gefunden.") + CHR$(10) + tr$("Bitte Daten manuell eingeben."), tr$("Nicht gefunden"))
         END IF
     END SUB
 
@@ -158,7 +158,7 @@ CLASS ProduktFenster EXTENDS ProduktFenster_Basis
             GUI_SET_IMAGE(Self.bild, LOADIMAGE(pfad))
             GUI_SET_TEXT(Self.bildText, "")
         CATCH fehler
-            GUI_SET_TEXT(Self.bildText, "📷 Kein Bild")
+            GUI_SET_TEXT(Self.bildText, tr$("📷 Kein Bild"))
         END TRY
     END SUB
 
@@ -188,13 +188,13 @@ CLASS ProduktFenster EXTENDS ProduktFenster_Basis
     ' Menge > 0, Datumsangaben JJJJ-MM-TT. "" = alles in Ordnung.
     FUNCTION pruefen$() AS STRING
         DIM name AS STRING : name = TRIM$(GUI_TEXT(Self.nameFeld))
-        IF name = "" THEN RETURN "Der Name fehlt."
-        IF LEN(name) > 200 THEN RETURN "Der Name ist länger als 200 Zeichen."
-        IF TRIM$(GUI_TEXT(Self.kategorieListe)) = "" THEN RETURN "Bitte eine Kategorie wählen."
-        IF TRIM$(GUI_TEXT(Self.lagerortListe)) = "" THEN RETURN "Bitte einen Lagerort wählen."
-        IF GUI_VALUE(Self.mengeFeld) <= 0 THEN RETURN "Die Menge muss größer als 0 sein."
-        IF NOT datumOk(TRIM$(GUI_TEXT(Self.kaufFeld)), TRUE) THEN RETURN "Das Kaufdatum braucht die Form JJJJ-MM-TT."
-        IF NOT datumOk(TRIM$(GUI_TEXT(Self.ablaufFeld)), FALSE) THEN RETURN "Das Ablaufdatum braucht die Form JJJJ-MM-TT."
+        IF name = "" THEN RETURN tr$("Der Name fehlt.")
+        IF LEN(name) > 200 THEN RETURN tr$("Der Name ist länger als 200 Zeichen.")
+        IF TRIM$(GUI_TEXT(Self.kategorieListe)) = "" THEN RETURN tr$("Bitte eine Kategorie wählen.")
+        IF TRIM$(GUI_TEXT(Self.lagerortListe)) = "" THEN RETURN tr$("Bitte einen Lagerort wählen.")
+        IF GUI_VALUE(Self.mengeFeld) <= 0 THEN RETURN tr$("Die Menge muss größer als 0 sein.")
+        IF NOT datumOk(TRIM$(GUI_TEXT(Self.kaufFeld)), TRUE) THEN RETURN tr$("Das Kaufdatum braucht die Form JJJJ-MM-TT.")
+        IF NOT datumOk(TRIM$(GUI_TEXT(Self.ablaufFeld)), FALSE) THEN RETURN tr$("Das Ablaufdatum braucht die Form JJJJ-MM-TT.")
         RETURN ""
     END FUNCTION
 

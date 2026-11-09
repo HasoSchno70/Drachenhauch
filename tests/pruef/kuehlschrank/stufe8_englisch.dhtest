@@ -1,0 +1,318 @@
+' Kuehlschrank-App im Drachenhauch Studio, Stufe 8: die englische
+' Oberflaeche (examples/studio/kuehlschrank/sprache/en.txt). Die Python-App
+' bot im Fenster eine Sprache an, die nichts tat; hier waehlt sie Deutsch
+' oder Englisch ab dem naechsten Start, ohne Einstellung gilt DHRT_LANG.
+' Fenster, Menues und Bericht uebersetzt die Laufzeit des Studios
+' (studio/laufzeit.dh, studioTexte$), im Code geht jeder Anzeigetext durch
+' tr$/trf$. Daten (Lagerorte, Kategorien, Einheiten, Rezepte) bleiben, wie
+' sie in der Datenbank stehen.
+' Format: docs/werkzeuge.md, dhrt test.
+
+--- langsam
+=== jeder text hat eine uebersetzung und keine steht umsonst da
+' Aus dem Code: tr$("...") und trf$("...") ausserhalb von Kommentaren; aus
+' den Fenstern und dem Bericht, was die Laufzeit uebersetzt (dieselben Felder
+' wie studioTextFeld, Spaltenkoepfe und Eintraege, Menues). Der Titel eines
+' eigenen Controls erscheint nirgends.
+IMPORT "json"
+IMPORT "regex"
+DIM proj AS STRING : proj = ARG$(0)
+DIM tab AS MAP OF STRING : tab = {}
+DIM doppelt AS INTEGER : doppelt = 0
+DIM z AS STRING
+FOR EACH z IN READLINES(PATHJOIN(proj, "sprache/en.txt"))
+    DIM t AS INTEGER : t = INSTR(z, CHR$(9))
+    IF t <= 0 THEN
+        PRINT "ohne tabulator: "; z
+        CONTINUE
+    END IF
+    IF MAPHAS(tab, LEFT$(z, t)) THEN
+        doppelt = doppelt + 1
+        PRINT "doppelt: "; LEFT$(z, t)
+    END IF
+    IF TRIM$(MID$(z, t + 1)) = "" THEN PRINT "leer: "; LEFT$(z, t)
+    MAPPUT(tab, LEFT$(z, t), MID$(z, t + 1))
+NEXT
+DIM gesehen AS MAP OF INTEGER : gesehen = {}
+DIM fehlt AS INTEGER : fehlt = 0
+FUNCTION wortig(w AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(w) - 1
+        IF UPPER$(MID$(w, i, 1)) <> LOWER$(MID$(w, i, 1)) THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+SUB pruefe(w AS STRING, wo AS STRING)
+    IF NOT wortig(w) THEN RETURN
+    MAPPUT(gesehen, w, 1)
+    IF NOT MAPHAS(tab, w) THEN
+        fehlt = fehlt + 1
+        PRINT "fehlt: "; w; "  ("; wo; ")"
+    END IF
+END SUB
+FUNCTION textFeld(k AS STRING) AS BOOLEAN
+    SELECT CASE k
+        CASE "title", "titel", "text", "placeholder", "tooltip", "tip", "leer_text", "meldung", "label", "studio_diagramm_titel"
+            RETURN TRUE
+    END SELECT
+    RETURN FALSE
+END FUNCTION
+SUB texteIn(d AS JSON_HANDLE, pfad AS STRING, wo AS STRING, ohneTitel AS BOOLEAN)
+    DIM k AS STRING
+    FOR EACH k IN JSON_KEYS(d, pfad)
+        DIM p AS STRING : p = IIF(pfad = "", "", pfad + ".") + JSON_KEY$(k)
+        DIM art AS STRING : art = JSON_TYPE(d, p)
+        IF art = "string" THEN
+            IF textFeld(k) AND NOT (ohneTitel AND p = "title") THEN pruefe(JSON_GET_STRING(d, p), wo)
+        ELSEIF art = "object" THEN
+            texteIn(d, p, wo, ohneTitel)
+        ELSEIF art = "array" THEN
+            DIM i AS INTEGER
+            FOR i = 0 TO JSON_LEN(d, p) - 1
+                DIM pe AS STRING : pe = p + "." + STR$(i)
+                IF JSON_TYPE(d, pe) = "object" THEN
+                    texteIn(d, pe, wo, ohneTitel)
+                ELSEIF JSON_TYPE(d, pe) = "string" AND (k = "headers" OR k = "items") THEN
+                    pruefe(JSON_GET_STRING(d, pe), wo)
+                END IF
+            NEXT
+        END IF
+    NEXT
+END SUB
+' Die eigenen Controls des Projekts.
+DIM controls AS ARRAY OF STRING : controls = []
+DIM pj AS JSON_HANDLE : pj = JSON_LOAD(PATHJOIN(proj, "projekt.dhstudio"))
+DIM e AS INTEGER
+FOR e = 0 TO JSON_LEN(pj, "elemente") - 1
+    IF JSON_GET_STRING(pj, "elemente." + STR$(e) + ".art") = "control" THEN ARRAY_PUSH(controls, JSON_GET_STRING(pj, "elemente." + STR$(e) + ".name") + ".dhform")
+NEXT
+DIM q AS STRING : q = CHR$(34)
+DIM st AS STRING : st = q + "([^" + q + "]*)" + q
+DIM falsch AS INTEGER : falsch = 0
+DIM nForm AS INTEGER : nForm = 0
+DIM nCode AS INTEGER : nCode = 0
+DIM datei AS STRING
+FOR EACH datei IN DIRLIST(proj)
+    IF RIGHT$(datei, 7) = ".dhform" OR RIGHT$(datei, 9) = ".dhreport" THEN
+        texteIn(JSON_LOAD(PATHJOIN(proj, datei)), "", datei, ARRAY_INDEXOF(controls, datei) >= 0)
+        nForm = nForm + 1
+    END IF
+    IF RIGHT$(datei, 3) <> ".dh" THEN CONTINUE
+    nCode = nCode + 1
+    DIM nr AS INTEGER : nr = 0
+    FOR EACH z IN READLINES(PATHJOIN(proj, datei))
+        nr = nr + 1
+        IF LEFT$(TRIM$(z), 1) = "'" THEN CONTINUE
+        DIM w AS STRING
+        FOR EACH w IN REGEX_FIND_ALL(z, "\btr\$\(" + st)
+            pruefe(w, datei + ":" + STR$(nr))
+            IF INSTR(w, "{0}") >= 0 THEN falsch = falsch + 1 : PRINT "tr$ mit Platzhalter: "; w
+        NEXT
+        FOR EACH w IN REGEX_FIND_ALL(z, "\btrf\$\(" + st)
+            pruefe(w, datei + ":" + STR$(nr))
+            IF INSTR(w, "{0}") < 0 THEN falsch = falsch + 1 : PRINT "trf$ ohne Platzhalter: "; w
+        NEXT
+        ' tr$ nur mit einem Literal -- sonst sieht diese Pruefung den Text nicht.
+        IF REGEX_TEST(z, "\btrf?\$\([^" + q + ")]") THEN falsch = falsch + 1 : PRINT "ohne literal: "; datei; ":"; nr
+    NEXT
+NEXT
+' Gleiche Platzhalter auf beiden Seiten, und nichts in der Tafel, das niemand fragt.
+DIM k AS STRING
+DIM verwaist AS INTEGER : verwaist = 0
+FOR EACH k IN MAPKEYS(tab)
+    IF NOT MAPHAS(gesehen, k) THEN verwaist = verwaist + 1 : PRINT "verwaist: "; k
+    DIM n AS INTEGER
+    FOR n = 0 TO 4
+        DIM ph AS STRING : ph = "{" + STR$(n) + "}"
+        IF (INSTR(k, ph) >= 0) <> (INSTR(MAPGET(tab, k), ph) >= 0) THEN falsch = falsch + 1 : PRINT "platzhalter: "; k
+    NEXT
+    FOR EACH ph IN ["{n}", "{m}"]
+        IF (INSTR(k, ph) >= 0) <> (INSTR(MAPGET(tab, k), ph) >= 0) THEN falsch = falsch + 1 : PRINT "platzhalter: "; k
+    NEXT
+NEXT
+PRINT "dateien "; nForm > 15; " "; nCode > 40
+PRINT "genug texte "; MAPSIZE(gesehen) > 600
+PRINT "fehlt "; fehlt; " verwaist "; verwaist; " doppelt "; doppelt; " falsch "; falsch
+--- argumente
+{sammlung}/../../../examples/studio/kuehlschrank
+--- erwartet
+dateien TRUE TRUE
+genug texte TRUE
+fehlt 0 verwaist 0 doppelt 0 falsch 0
+
+=== auf englisch oeffnet jedes fenster ohne luecke und ohne deutschen rest
+' DHRT_LANG=en, keine Einstellung: die App laeuft englisch. Mit einem Vorrat
+' in jedem Status, einer Einkaufsliste und den Startdaten geht jedes Fenster
+' auf; danach steht in keinem ein Text der Tafel noch deutsch da, und die
+' Laufzeit hat keinen Text ohne Uebersetzung gesehen (DH_STUDIO_SPRACHLUECKEN).
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+kKopieren(ARG$(1), p)
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = kF5(p, log)
+PRINT "geprueft "; slHat(log, "geprueft 0 0")
+SETENV("KUEHL_HEUTE", "2026-11-08")
+SETENV("KUEHL_MELDUNGEN", CWD$() + "/meldungen.txt")
+SETENV("DH_STUDIO_SPRACHLUECKEN", CWD$() + "/luecken.txt")
+SETENV("DHRT_LANG", "en")
+PRINT "code "; kProbe(p, "probe.dh", "", 1500)
+PRINT "luecken '"; IIF(FILEEXISTS(CWD$() + "/luecken.txt"), REPLACE$(READALL(CWD$() + "/luecken.txt"), CHR$(10), " | "), ""); "'"
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../../studio/studio.dh
+{sammlung}/../../../examples/studio/kuehlschrank
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/kuehlschrank.dh"
+slStudio = ARG$(0)
+--- datei probe.dh
+DIM tafel AS MAP OF STRING : tafel = {}
+DIM tz AS STRING
+FOR EACH tz IN READLINES("assets/sprache/en.txt")
+    IF INSTR(tz, CHR$(9)) > 0 THEN MAPPUT(tafel, LEFT$(tz, INSTR(tz, CHR$(9))), MID$(tz, INSTR(tz, CHR$(9)) + 1))
+NEXT
+DIM gesehen AS INTEGER : gesehen = 0
+SUB bilder(n AS INTEGER)
+    DIM i AS INTEGER
+    FOR i = 1 TO n
+        studioBild()
+    NEXT
+END SUB
+' Ein Text der Tafel, der im Fenster noch deutsch dasteht -- ausser er ist
+' auch ein Datum der Datenbank (die Einheit "Dose" heisst wie ein Sinnbild).
+DIM datenWoerter AS ARRAY OF STRING
+SUB pruefen(name AS STRING, f AS StudioFenster)
+    bilder(3)
+    IF NOT f.studioOffen THEN
+        PRINT "zu: "; name
+        RETURN
+    END IF
+    IF LEN(datenWoerter) = 0 THEN
+        datenWoerter = einheiten()
+        DIM d AS STRING
+        FOR EACH d IN lagerorte()
+            ARRAY_PUSH(datenWoerter, d)
+        NEXT
+        FOR EACH d IN textListe("SELECT DISTINCT product_name FROM recipe_ingredients")
+            ARRAY_PUSH(datenWoerter, d)
+        NEXT
+        FOR EACH d IN kategorien()
+            ARRAY_PUSH(datenWoerter, d)
+        NEXT
+        FOR EACH d IN maerkte()
+            ARRAY_PUSH(datenWoerter, d)
+            DIM g AS STRING
+            FOR EACH g IN gangplan(d)
+                IF INSTR(g, "=") > 0 THEN ARRAY_PUSH(datenWoerter, LEFT$(g, INSTR(g, "=")))
+            NEXT
+        NEXT
+    END IF
+    gesehen = gesehen + 1
+    ' Ohne die Namen der Widgets ("name": "leer").
+    DIM j AS STRING : j = REGEX_REPLACE(GUI_TO_JSON(f.Fenster()), CHR$(34) + "name" + CHR$(34) + "\s*:\s*" + CHR$(34) + "[^" + CHR$(34) + "]*" + CHR$(34), "")
+    DIM k AS STRING
+    FOR EACH k IN MAPKEYS(tafel)
+        IF ARRAY_INDEXOF(datenWoerter, k) >= 0 THEN CONTINUE
+        IF MAPGET(tafel, k) <> k AND INSTR(j, CHR$(34) + k + CHR$(34)) >= 0 THEN PRINT "deutsch in "; name; ": "; k
+    NEXT
+END SUB
+PRINT "sprache "; Sprache$()
+DB_EXEC(db, "INSERT INTO products (name, category, min_quantity, min_unit) VALUES ('Hafermilch', 'Milchprodukte', 3, 'Liter'), ('Gouda', 'Milchprodukte', 0, NULL), ('Boskoop', 'Obst', 0, NULL), ('Vollkornbrot', 'Backwaren', 0, NULL), ('Rinderhack', 'Fleisch', 0, NULL)")
+DB_EXEC(db, "INSERT INTO inventory (product_id, quantity, unit, expiry_date, storage_location) VALUES (1, 1, 'Liter', '2026-11-08', 'Kühlschrank'), (2, 200, 'g', '2026-11-09', 'Kühlschrank'), (3, 6, 'Stück', '2026-11-05', 'Vorratsraum'), (4, 1, 'Stück', '2026-11-10', 'Vorratsraum'), (5, 500, 'g', '2026-12-20', 'Gefrierschrank')")
+DB_EXEC(db, "INSERT INTO shopping_list (product_name, quantity, unit, checked) VALUES ('Hafermilch', 2, 'Liter', 0), ('Vollkornbrot', 1, 'Stück', 1)")
+' Ein Rezept aus dem Katalog (Kaesespaetzle), fuer Rezept und Kochen.
+DIM rid AS INTEGER : rid = rezeptAnlegen(katalog()[12])
+DIM h AS Hauptfenster : h = studioStartFenster
+h.geaendert()
+DIM r AS INTEGER
+FOR r = 0 TO 4
+    GUI_TABCONTROL_SET_PAGE(h.reiter, r)
+    pruefen("Hauptfenster " + STR$(r), h)
+NEXT
+DIM f1 AS EinstellungenFenster : f1 = NEW EinstellungenFenster() : f1.Zeigen() : pruefen("Einstellungen", f1) : f1.Zumachen()
+DIM f2 AS ProduktFenster : f2 = NEW ProduktFenster() : f2.eintragId = 1 : f2.Zeigen() : pruefen("Produkt", f2) : f2.Zumachen()
+DIM f3 AS ScanFenster : f3 = NEW ScanFenster() : f3.Zeigen() : pruefen("Scan", f3) : f3.Zumachen()
+DIM f4 AS AbschlussFenster : f4 = NEW AbschlussFenster() : f4.Zeigen() : pruefen("Abschluss", f4) : f4.Zumachen()
+DIM f5 AS LagerortFenster : f5 = NEW LagerortFenster() : f5.ort = "Kühlschrank" : f5.Zeigen() : pruefen("Lagerort", f5) : f5.Zumachen()
+DIM f6 AS MindestmengeFenster : f6 = NEW MindestmengeFenster() : f6.eintragId = 1 : f6.Zeigen() : pruefen("Mindestmenge", f6) : f6.Zumachen()
+DIM f7 AS RezeptFenster : f7 = NEW RezeptFenster() : f7.rezeptId = rid : f7.Zeigen() : pruefen("Rezept", f7) : f7.Zumachen()
+DIM f8 AS KochenFenster : f8 = NEW KochenFenster() : f8.rezeptId = rid : f8.Zeigen() : pruefen("Kochen", f8) : f8.Zumachen()
+DIM f9 AS RezeptNeuFenster : f9 = NEW RezeptNeuFenster() : f9.Zeigen() : pruefen("RezeptNeu", f9) : f9.Zumachen()
+DIM f10 AS KatalogFenster : f10 = NEW KatalogFenster() : f10.Zeigen() : pruefen("Katalog", f10) : f10.Zumachen()
+DIM f11 AS VorschlagFenster : f11 = NEW VorschlagFenster() : f11.art = "kochbar" : f11.Zeigen() : pruefen("Vorschlag", f11) : f11.Zumachen()
+DIM f12 AS GangplanFenster : f12 = NEW GangplanFenster() : f12.markt = maerkte()[0] : f12.Zeigen() : pruefen("Gangplan", f12) : f12.Zumachen()
+' Benachrichtigungen und Zusammenfassung, wie der Timer sie schickt.
+DIM m AS Nachricht
+FOR EACH m IN meldungenPruefen(einstellungen())
+    meldungSenden(m)
+NEXT
+meldungSenden(zusammenfassung())
+PRINT "fenster "; gesehen
+PRINT "hinweis "; h.statistik.hinweise[0]
+PRINT "status "; GUI_STATUSBAR_TEXT$(h.status, 0)
+PRINT REPLACE$(READALL(GETENV$("KUEHL_MELDUNGEN")), CHR$(10), " / ")
+END
+--- erwartet
+geprueft TRUE
+sprache en
+fenster 17
+hinweis gefahr|⚠|Expired products|You have 1 expired items. Check them soon!
+status Database: OK
+! ⚠️ Products expired! | 1 product(s) have expired: Boskoop / ! 🔴 Expires TODAY! | Hafermilch / ! 🟡 Expires TOMORROW! | Gouda /   🟡 Expiring soon | 1 product(s) expire in the next few days /   📊 Below minimum quantity | 1 product(s): Hafermilch / ! 🧊 Daily fridge overview | ❌ 1 expired | ⏰ 3 expiring soon | 📦 5 items in total / 
+code 0
+luecken ''
+
+=== die sprache aus den einstellungen gilt ab dem naechsten start
+' Erster Lauf (deutsch): im Einstellungsfenster English waehlen und
+' speichern -- language = "en", eine Meldung in beiden Sprachen (Enter aus
+' der Aufnahme), die Fenster bleiben deutsch. Zweiter Lauf: englisch. Dann
+' language = "de" -- und mit DHRT_LANG=en bleibt der naechste Lauf deutsch.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+kKopieren(ARG$(1), p)
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = kF5(p, log)
+PRINT "geprueft "; slHat(log, "geprueft 0 0")
+SETENV("DHRT_LANG", "")
+slZeilen = [] : slBild = 0
+slHin(10, 10)
+slWarten(10)
+slTaste(257)
+slWarten(30)
+slTaste(257)
+slAufnahmeSchreiben(p + "/_studio/enter.txt")
+PRINT "code "; kProbe(p, "probe1.dh", "enter.txt", 1500)
+PRINT "code "; kProbe(p, "probe2.dh", "", 1500)
+SETENV("DHRT_LANG", "en")
+PRINT "code "; kProbe(p, "probe2.dh", "", 1500)
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../../studio/studio.dh
+{sammlung}/../../../examples/studio/kuehlschrank
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/kuehlschrank.dh"
+slStudio = ARG$(0)
+--- datei probe1.dh
+PRINT "sprache '"; Sprache$(); "' einstellung '"; einstellung$("language", ""); "' geladen "; einstellungen().sprache
+DIM f AS EinstellungenFenster : f = NEW EinstellungenFenster()
+f.Zeigen()
+studioBild()
+PRINT "wahl "; GUI_DROPDOWN_SELECTED(f.spracheWahl); " "; GUI_DROPDOWN_TEXT(f.spracheWahl); " | "; GUI_TEXT(f.spracheText)
+GUI_DROPDOWN_SET_SELECTED(f.spracheWahl, 1)
+f.knopfSpeichern_Klick()
+PRINT "gespeichert "; einstellung$("language", ""); " sprache jetzt '"; Sprache$(); "' offen "; f.studioOffen
+END
+--- datei probe2.dh
+PRINT "sprache '"; Sprache$(); "' "; GUI_TEXT(studioStartFenster.titel)
+' Fuer den naechsten Lauf: Deutsch.
+einstellungSetzen("language", jsonText$("de"))
+END
+--- erwartet
+geprueft TRUE
+sprache '' einstellung '' geladen de
+wahl 0 Deutsch | 🌐 Sprache:
+gespeichert en sprache jetzt '' offen FALSE
+code 0
+sprache 'en' Fridge Manager
+code 0
+sprache '' Kühlschrank-Verwaltung
+code 0

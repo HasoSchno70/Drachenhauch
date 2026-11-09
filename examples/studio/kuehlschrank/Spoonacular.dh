@@ -83,13 +83,13 @@ FUNCTION spoonAntwort$(abruf AS INTEGER) AS STRING
     CATCH fehler
         DIM st AS INTEGER : st = HTTP_STATUS()
         IF st = 401 THEN
-            spoonFehler = "Spoonacular kennt den API-Schlüssel nicht (401) -- bitte prüfen."
+            spoonFehler = tr$("Spoonacular kennt den API-Schlüssel nicht (401) -- bitte prüfen.")
         ELSEIF st = 402 THEN
-            spoonFehler = "Das Tageskontingent von Spoonacular ist aufgebraucht (402) -- morgen geht es wieder."
+            spoonFehler = tr$("Das Tageskontingent von Spoonacular ist aufgebraucht (402) -- morgen geht es wieder.")
         ELSEIF st = 0 THEN
-            spoonFehler = "Spoonacular ist nicht erreichbar."
+            spoonFehler = tr$("Spoonacular ist nicht erreichbar.")
         ELSE
-            spoonFehler = "Spoonacular antwortet mit Fehler " + STR$(st) + "."
+            spoonFehler = trf$("Spoonacular antwortet mit Fehler {0}.", [STR$(st)])
         END IF
         RETURN ""
     END TRY
@@ -103,7 +103,7 @@ FUNCTION spoonJson(antwort AS STRING) AS JSON_HANDLE
     TRY
         j = JSON_PARSE(antwort)
     CATCH fehler
-        spoonFehler = "Ungültige Antwort von Spoonacular."
+        spoonFehler = tr$("Ungültige Antwort von Spoonacular.")
         RETURN JSON_NEW_OBJECT()
     END TRY
     RETURN j

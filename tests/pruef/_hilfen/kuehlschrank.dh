@@ -10,7 +10,8 @@ IMPORT "studiolauf.dh"
 ' Spoonacular-Schluessel, den die Proben sehen ("" = keiner).
 DIM kSchluessel AS STRING
 
-' Das Projekt ohne Entwicklungsdaten und Erzeugtes (_studio/, bau/).
+' Das Projekt ohne Entwicklungsdaten und Erzeugtes (_studio/, bau/), aber
+' mit der Sprachtafel sprache/.
 SUB kKopieren(quelle AS STRING, ziel AS STRING)
     MKDIR(ziel)
     DIM n AS STRING
@@ -18,6 +19,12 @@ SUB kKopieren(quelle AS STRING, ziel AS STRING)
         IF n = "fridge_database.db" OR DIREXISTS(PATHJOIN(quelle, n)) THEN CONTINUE
         COPYFILE(PATHJOIN(quelle, n), PATHJOIN(ziel, n))
     NEXT
+    IF DIREXISTS(PATHJOIN(quelle, "sprache")) THEN
+        MKDIR(PATHJOIN(ziel, "sprache"))
+        FOR EACH n IN DIRLIST(PATHJOIN(quelle, "sprache"))
+            COPYFILE(PATHJOIN(PATHJOIN(quelle, "sprache"), n), PATHJOIN(PATHJOIN(ziel, "sprache"), n))
+        NEXT
+    END IF
 END SUB
 
 ' F5 im Studio: pruefen, erzeugen, das Programm 20 Bilder laufen lassen.
@@ -74,6 +81,7 @@ FUNCTION kProbe(p AS STRING, teil AS STRING, aufnahme AS STRING, bilder AS INTEG
             ARRAY_PUSH(neu, "SCREEN(1280, 830, " + CHR$(34) + "Probe" + CHR$(34) + ")")
             ARRAY_PUSH(neu, "studioSchirmB = SCREENWIDTH() : studioSchirmH = SCREENHEIGHT()")
             ARRAY_PUSH(neu, "studioDieStartseite = studioStartFenster")
+            ARRAY_PUSH(neu, "studioSpracheVorgabe()")
             ARRAY_PUSH(neu, "studioDieApp.Geoeffnet()")
             ARRAY_PUSH(neu, "studioStartFenster.studioHaupt = TRUE")
             ARRAY_PUSH(neu, "studioStartFenster.Zeigen()")

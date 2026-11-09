@@ -8,9 +8,9 @@
 ' das Intervall und die Zusammenfassung gesperrt (_toggle_options), ohne
 ' Zusammenfassung auch ihre Uhrzeit.
 '
-' Anders als dort: Dunkles Design und Barcode-Cache wirken (dort standen sie
-' im Fenster und wurden nie gelesen), die Sprache fehlt (dort gab es nur
-' Deutsch), die Uhrzeit behält ihre Minuten, und „Zurücksetzen“ sagt, dass
+' Anders als dort: Dunkles Design, Sprache und Barcode-Cache wirken (dort
+' standen sie im Fenster und wurden nie gelesen; die Sprache gilt ab dem
+' nächsten Start), die Uhrzeit behält ihre Minuten, und „Zurücksetzen“ sagt, dass
 ' noch nichts gespeichert ist (dort hieß es „Einstellungen zurückgesetzt!“,
 ' und „Abbrechen“ danach behielt die alten).
 CLASS EinstellungenFenster EXTENDS EinstellungenFenster_Basis
@@ -27,6 +27,8 @@ CLASS EinstellungenFenster EXTENDS EinstellungenFenster_Basis
         DIM u AS ARRAY OF STRING : u = einheiten()
         IF ARRAY_INDEXOF(u, e.einheit) < 0 THEN ARRAY_PUSH(u, e.einheit)
         GUI_SET_DROPDOWN(Self.einheitWahl, u)
+        ' Jede Sprache in ihrem eigenen Namen -- nicht übersetzt.
+        GUI_SET_DROPDOWN(Self.spracheWahl, ["Deutsch", "English"])
         Self.neuSinnbild = "📦"
         Self.orteFuellen()
         Self.maerkteFuellen(gewaehlterMarkt$())
@@ -36,6 +38,7 @@ CLASS EinstellungenFenster EXTENDS EinstellungenFenster_Basis
 
     SUB anzeigen(e AS Einstellungen)
         GUI_SET_CHECKED(Self.dunkelKasten, e.dunkel)
+        GUI_DROPDOWN_SET_SELECTED(Self.spracheWahl, IIF(e.sprache = "en", 1, 0))
         GUI_SET_VALUE(Self.auffrischenZahl, e.auffrischenS)
         GUI_SET_CHECKED(Self.cacheKasten, e.cacheAn)
         GUI_SET_TEXT(Self.einheitWahl, e.einheit)
@@ -59,6 +62,7 @@ CLASS EinstellungenFenster EXTENDS EinstellungenFenster_Basis
         DIM e AS Einstellungen : e = NEW Einstellungen()
         e.vorgaben()
         e.dunkel = GUI_CHECKED(Self.dunkelKasten)
+        e.sprache = IIF(GUI_DROPDOWN_SELECTED(Self.spracheWahl) = 1, "en", "de")
         e.auffrischenS = grenzen(INT(GUI_VALUE(Self.auffrischenZahl)), 5, 300)
         e.cacheAn = GUI_CHECKED(Self.cacheKasten)
         IF TRIM$(GUI_TEXT(Self.einheitWahl)) <> "" THEN e.einheit = TRIM$(GUI_TEXT(Self.einheitWahl))
@@ -102,7 +106,9 @@ CLASS EinstellungenFenster EXTENDS EinstellungenFenster_Basis
     SUB vorschau()
         DIM n AS INTEGER : n = grenzen(INT(GUI_VALUE(Self.warnZahl)), 1, 14)
         DIM bis AS STRING : bis = tagePlus$(n)
-        GUI_SET_TEXT(Self.warnBeispiel, "Bald ablaufend heißt: heute bis " + MID$(bis, 8, 2) + "." + MID$(bis, 5, 2) + "." + LEFT$(bis, 4) + " (" + STR$(n) + IIF(n = 1, " Tag", " Tage") + ").")
+        ' {0} Tag, {1} Monat, {2} Jahr -- die Reihenfolge sagt die Übersetzung.
+        DIM w AS ARRAY OF STRING : w = [MID$(bis, 8, 2), MID$(bis, 5, 2), LEFT$(bis, 4), STR$(n)]
+        GUI_SET_TEXT(Self.warnBeispiel, IIF(n = 1, trf$("Bald ablaufend heißt: heute bis {0}.{1}.{2} ({3} Tag).", w), trf$("Bald ablaufend heißt: heute bis {0}.{1}.{2} ({3} Tage).", w)))
     END SUB
 
     SUB warnZahl_Geaendert()
@@ -110,20 +116,20 @@ CLASS EinstellungenFenster EXTENDS EinstellungenFenster_Basis
     END SUB
 
     SUB knopfTest_Klick()
-        IF meldungSenden(nachrichtNeu("🧪 Test-Benachrichtigung", "Dies ist ein Test der Kühlschrank-App Benachrichtigungen.", FALSE)) THEN
-            GUI_TOAST(Self.studioWin, "Test-Benachrichtigung gesendet.", "erfolg")
+        IF meldungSenden(nachrichtNeu(tr$("🧪 Test-Benachrichtigung"), tr$("Dies ist ein Test der Kühlschrank-App Benachrichtigungen."), FALSE)) THEN
+            GUI_TOAST(Self.studioWin, tr$("Test-Benachrichtigung gesendet."), "erfolg")
         ELSE
-            GUI_TOAST(Self.studioWin, "Das System hat die Benachrichtigung nicht angenommen.", "warnung")
+            GUI_TOAST(Self.studioWin, tr$("Das System hat die Benachrichtigung nicht angenommen."), "warnung")
         END IF
     END SUB
 
     SUB knopfZuruecksetzen_Klick()
-        IF Frage("Alle Einstellungen auf Standard zurücksetzen?", "Ja|Nein", "Zurücksetzen") <> 1 THEN RETURN
+        IF Frage(tr$("Alle Einstellungen auf Standard zurücksetzen?"), "Ja|Nein", tr$("Zurücksetzen")) <> 1 THEN RETURN
         DIM e AS Einstellungen : e = NEW Einstellungen()
         e.vorgaben()
         Self.anzeigen(e)
         GUI_DROPDOWN_SET_SELECTED(Self.marktStandard, 0)
-        GUI_TOAST(Self.studioWin, "Vorgaben eingesetzt -- „Speichern“ übernimmt sie.", "info")
+        GUI_TOAST(Self.studioWin, tr$("Vorgaben eingesetzt -- „Speichern“ übernimmt sie."), "info")
     END SUB
 
     SUB knopfSpeichern_Klick()
@@ -134,6 +140,15 @@ CLASS EinstellungenFenster EXTENDS EinstellungenFenster_Basis
         ' ihn nicht zurück.
         standardMarktSetzen(IIF(GUI_DROPDOWN_SELECTED(Self.marktStandard) > 0, GUI_DROPDOWN_TEXT(Self.marktStandard), ""))
         themaSetzen(e.dunkel)
+        ' Die Fenster sind gebaut -- die Sprache wechselt beim nächsten Start
+        ' (wie im Studio), gesagt in beiden.
+        IF e.sprache <> IIF(Sprache$() = "en", "en", "de") THEN
+            IF e.sprache = "en" THEN
+                Meldung("Beim nächsten Start ist die Oberfläche englisch." + CHR$(10) + "The interface will be English at the next start.", "Sprache / Language")
+            ELSE
+                Meldung("The interface will be German at the next start." + CHR$(10) + "Beim nächsten Start ist die Oberfläche deutsch.", "Language / Sprache")
+            END IF
+        END IF
         Self.gespeichert = TRUE
         Self.Zumachen()
     END SUB
@@ -149,7 +164,7 @@ CLASS EinstellungenFenster EXTENDS EinstellungenFenster_Basis
         DIM n AS STRING
         FOR EACH n IN Self.ortNamen
             DIM f AS INTEGER : f = ortFarbe(n)
-            DIM z AS INTEGER : z = GUI_TABLE_ADD_ROW(Self.ortTabelle, [ortSinnbild$(n), n, "#" + RIGHT$("000000" + HEX$(f), 6), STR$(ortEintraege(n)), "🎨 Farbe", "🗑"])
+            DIM z AS INTEGER : z = GUI_TABLE_ADD_ROW(Self.ortTabelle, [ortSinnbild$(n), n, "#" + RIGHT$("000000" + HEX$(f), 6), STR$(ortEintraege(n)), tr$("🎨 Farbe"), "🗑"])
             DIM s AS INTEGER
             FOR EACH s IN [SP_O_SINNBILD, SP_O_FARBKNOPF, SP_O_WEG]
                 GUI_TABLE_CELL_KIND(Self.ortTabelle, z, s, "knopf")
@@ -168,10 +183,10 @@ CLASS EinstellungenFenster EXTENDS EinstellungenFenster_Basis
         DIM i AS INTEGER
         FOR i = 0 TO LEN(l) - 1
             DIM f AS ARRAY OF STRING : f = SPLIT(l[i], "|")
-            ARRAY_PUSH(namen, f[0] + "  " + f[1])
+            ARRAY_PUSH(namen, f[0] + "  " + sinnbildName$(f[1]))
             IF f[0] = jetzt THEN vorgabe = i
         NEXT
-        i = Auswahl("Sinnbild:", namen, vorgabe, "Sinnbild wählen")
+        i = Auswahl(tr$("Sinnbild:"), namen, vorgabe, tr$("Sinnbild wählen"))
         IF i < 0 THEN RETURN ""
         RETURN SPLIT(l[i], "|")[0]
     END FUNCTION
@@ -191,14 +206,14 @@ CLASS EinstellungenFenster EXTENDS EinstellungenFenster_Basis
         DIM name AS STRING : name = TRIM$(GUI_TEXT(Self.ortNameFeld))
         DIM m AS STRING : m = ortAnlegen$(name, Self.neuSinnbild)
         IF m <> "" THEN
-            Meldung(m, "Lagerort")
+            Meldung(m, tr$("Lagerort"))
             RETURN
         END IF
         GUI_SET_TEXT(Self.ortNameFeld, "")
         Self.neuSinnbild = "📦"
         Self.datenGeaendert = TRUE
         Self.orteFuellen()
-        GUI_TOAST(Self.studioWin, "Lagerort „" + name + "“ hinzugefügt!", "erfolg")
+        GUI_TOAST(Self.studioWin, trf$("Lagerort „{0}“ hinzugefügt!", [name]), "erfolg")
     END SUB
 
     SUB ortTabelle_Zelle(zeile AS INTEGER, spalte AS INTEGER)
@@ -209,17 +224,17 @@ CLASS EinstellungenFenster EXTENDS EinstellungenFenster_Basis
             IF s = "" THEN RETURN
             ortAussehenSetzen(n, ortFarbe(n), s)
         ELSEIF spalte = SP_O_FARBKNOPF THEN
-            DIM f AS INTEGER : f = FarbeWaehlen(ortFarbe(n), "Farbe für " + n)
+            DIM f AS INTEGER : f = FarbeWaehlen(ortFarbe(n), trf$("Farbe für {0}", [n]))
             IF f < 0 THEN RETURN
             ortAussehenSetzen(n, f, ortSinnbild$(n))
         ELSEIF spalte = SP_O_WEG THEN
-            IF Frage("Lagerort „" + n + "“ löschen?", "Löschen|Abbrechen", "Lagerort löschen") <> 1 THEN RETURN
+            IF Frage(trf$("Lagerort „{0}“ löschen?", [n]), tr$("Löschen|Abbrechen"), tr$("Lagerort löschen")) <> 1 THEN RETURN
             DIM m AS STRING : m = ortLoeschen$(n)
             IF m <> "" THEN
-                Meldung(m, "Lagerort")
+                Meldung(m, tr$("Lagerort"))
                 RETURN
             END IF
-            GUI_TOAST(Self.studioWin, "Lagerort „" + n + "“ gelöscht.", "erfolg")
+            GUI_TOAST(Self.studioWin, trf$("Lagerort „{0}“ gelöscht.", [n]), "erfolg")
         ELSE
             RETURN
         END IF
@@ -228,19 +243,20 @@ CLASS EinstellungenFenster EXTENDS EinstellungenFenster_Basis
     END SUB
 
     SUB knopfOrteZurueck_Klick()
-        IF Frage("Alle Lagerort-Farben und Sinnbilder auf Standard zurücksetzen?", "Ja|Nein", "Zurücksetzen") <> 1 THEN RETURN
+        IF Frage(tr$("Alle Lagerort-Farben und Sinnbilder auf Standard zurücksetzen?"), "Ja|Nein", tr$("Zurücksetzen")) <> 1 THEN RETURN
         ortAussehenZuruecksetzen()
         Self.datenGeaendert = TRUE
         Self.orteFuellen()
-        GUI_TOAST(Self.studioWin, "Lagerort-Farben und Sinnbilder zurückgesetzt.", "erfolg")
+        GUI_TOAST(Self.studioWin, tr$("Lagerort-Farben und Sinnbilder zurückgesetzt."), "erfolg")
     END SUB
 
     ' --- Supermärkte -------------------------------------------------------------
     ' standard: welcher Markt in der Klappliste stehen soll.
     SUB maerkteFuellen(standard AS STRING)
         Self.marktNamen = marktListe()
-        DIM s AS ARRAY OF STRING : s = ["-- Kein Standard --"]
-        DIM v AS ARRAY OF STRING : v = ["-- Standardplan --"]
+        ' Der erste Eintrag zählt über den Index, nicht über seinen Text.
+        DIM s AS ARRAY OF STRING : s = [tr$("-- Kein Standard --")]
+        DIM v AS ARRAY OF STRING : v = [tr$("-- Standardplan --")]
         DIM m AS STRING
         FOR EACH m IN Self.marktNamen
             ARRAY_PUSH(s, m)
@@ -254,7 +270,7 @@ CLASS EinstellungenFenster EXTENDS EinstellungenFenster_Basis
         FOR EACH m IN Self.marktNamen
             DIM ein AS BOOLEAN : ein = istEingebaut(m)
             DIM eigen AS BOOLEAN : eigen = hatEigenenPlan(m)
-            DIM art AS STRING : art = IIF(ein AND eigen, "eingebaut, angepasst", IIF(ein, "eingebaut", "eigener"))
+            DIM art AS STRING : art = IIF(ein AND eigen, tr$("eingebaut, angepasst"), IIF(ein, tr$("eingebaut"), tr$("eigener")))
             DIM z AS INTEGER : z = GUI_TABLE_ADD_ROW(Self.marktTabelle, [IIF(ein, "🏪", "⭐"), m, art, STR$(gangZahl(gangplan(m))), "✏️", IIF(eigen, IIF(ein, "↺", "🗑"), "")])
             GUI_TABLE_CELL_KIND(Self.marktTabelle, z, SP_M_BEARBEITEN, "knopf")
             IF eigen THEN GUI_TABLE_CELL_KIND(Self.marktTabelle, z, SP_M_WEG, "knopf")
@@ -276,14 +292,14 @@ CLASS EinstellungenFenster EXTENDS EinstellungenFenster_Basis
         IF GUI_DROPDOWN_SELECTED(Self.marktVorlage) > 0 THEN vorlage = GUI_DROPDOWN_TEXT(Self.marktVorlage)
         DIM m AS STRING : m = marktAnlegen$(name, vorlage)
         IF m <> "" THEN
-            Meldung(m, "Supermarkt")
+            Meldung(m, tr$("Supermarkt"))
             RETURN
         END IF
         GUI_SET_TEXT(Self.marktNameFeld, "")
         Self.datenGeaendert = TRUE
         Self.maerkteFuellen(Self.standardJetzt$())
-        GUI_TOAST(Self.studioWin, "Supermarkt „" + name + "“ erstellt!", "erfolg")
-        IF Frage("Möchtest du den Gangplan von „" + name + "“ jetzt bearbeiten?", "Ja|Nein", "Gangplan bearbeiten") = 1 THEN Self.planBearbeiten(name)
+        GUI_TOAST(Self.studioWin, trf$("Supermarkt „{0}“ erstellt!", [name]), "erfolg")
+        IF Frage(trf$("Möchtest du den Gangplan von „{0}“ jetzt bearbeiten?", [name]), "Ja|Nein", tr$("Gangplan bearbeiten")) = 1 THEN Self.planBearbeiten(name)
     END SUB
 
     SUB planBearbeiten(markt AS STRING)
@@ -293,7 +309,7 @@ CLASS EinstellungenFenster EXTENDS EinstellungenFenster_Basis
         IF NOT f.gesichert THEN RETURN
         Self.datenGeaendert = TRUE
         Self.maerkteFuellen(Self.standardJetzt$())
-        GUI_TOAST(Self.studioWin, "Gangplan für „" + markt + "“ gespeichert!", "erfolg")
+        GUI_TOAST(Self.studioWin, trf$("Gangplan für „{0}“ gespeichert!", [markt]), "erfolg")
     END SUB
 
     SUB marktTabelle_Zelle(zeile AS INTEGER, spalte AS INTEGER)
@@ -302,14 +318,14 @@ CLASS EinstellungenFenster EXTENDS EinstellungenFenster_Basis
         IF spalte = SP_M_BEARBEITEN THEN
             Self.planBearbeiten(m)
         ELSEIF spalte = SP_M_WEG AND hatEigenenPlan(m) THEN
-            DIM t AS STRING : t = IIF(istEingebaut(m), "Den eigenen Gangplan von „" + m + "“ verwerfen? Danach gilt wieder der eingebaute.", "Supermarkt „" + m + "“ wirklich löschen?")
-            IF Frage(t, "Ja|Nein", "Löschen") <> 1 THEN RETURN
+            DIM t AS STRING : t = IIF(istEingebaut(m), trf$("Den eigenen Gangplan von „{0}“ verwerfen? Danach gilt wieder der eingebaute.", [m]), trf$("Supermarkt „{0}“ wirklich löschen?", [m]))
+            IF Frage(t, "Ja|Nein", tr$("Löschen")) <> 1 THEN RETURN
             DIM standard AS STRING : standard = Self.standardJetzt$()
             planLoeschen(m)
             IF standard = m AND NOT istEingebaut(m) THEN standard = ""
             Self.datenGeaendert = TRUE
             Self.maerkteFuellen(standard)
-            GUI_TOAST(Self.studioWin, "„" + m + "“ gelöscht.", "erfolg")
+            GUI_TOAST(Self.studioWin, trf$("„{0}“ gelöscht.", [m]), "erfolg")
         END IF
     END SUB
 
@@ -319,9 +335,9 @@ CLASS EinstellungenFenster EXTENDS EinstellungenFenster_Basis
         DIM pfad AS STRING : pfad = dbDateiGanz$()
         GUI_SET_TEXT(Self.dbPfad, "📁 " + IIF(LEN(pfad) > 72, "…" + RIGHT$(pfad, 71), pfad))
         GUI_TOOLTIP(Self.dbPfad, pfad)
-        GUI_SET_TEXT(Self.dbGroesse, "Größe: " + groesseText$(FILESIZE(dbDatei$())))
-        GUI_SET_TEXT(Self.dbZahlen, STR$(dbZahl("SELECT COUNT(*) FROM products")) + " Produkte · " + STR$(dbZahl("SELECT COUNT(*) FROM inventory")) + " im Bestand · " + _
-            STR$(dbZahl("SELECT COUNT(*) FROM recipes")) + " Rezepte · " + STR$(dbZahl("SELECT COUNT(*) FROM shopping_list")) + " auf der Einkaufsliste")
+        GUI_SET_TEXT(Self.dbGroesse, trf$("Größe: {0}", [groesseText$(FILESIZE(dbDatei$()))]))
+        GUI_SET_TEXT(Self.dbZahlen, trf$("{0} Produkte · {1} im Bestand · {2} Rezepte · {3} auf der Einkaufsliste", [STR$(dbZahl("SELECT COUNT(*) FROM products")), STR$(dbZahl("SELECT COUNT(*) FROM inventory")), _
+            STR$(dbZahl("SELECT COUNT(*) FROM recipes")), STR$(dbZahl("SELECT COUNT(*) FROM shopping_list"))]))
     END SUB
 
     SUB dbMelden(text AS STRING, art AS STRING)
@@ -331,7 +347,7 @@ CLASS EinstellungenFenster EXTENDS EinstellungenFenster_Basis
     END SUB
 
     SUB knopfSichern_Klick()
-        Self.dbMelden("💾 Gesichert: " + BASENAME(sicherungAnlegen$()), "erfolg")
+        Self.dbMelden(trf$("💾 Gesichert: {0}", [BASENAME(sicherungAnlegen$())]), "erfolg")
     END SUB
 
     ' Alles neu im Fenster, nachdem der Inhalt ersetzt ist.
@@ -345,53 +361,53 @@ CLASS EinstellungenFenster EXTENDS EinstellungenFenster_Basis
     ' KUEHL_SICHERUNG nennt die Datei ohne Dialog (für Prüfungen).
     SUB knopfEinspielen_Klick()
         DIM pfad AS STRING : pfad = GETENV$("KUEHL_SICHERUNG")
-        IF pfad = "" THEN pfad = FILE_OPEN_DIALOG("Sicherung einspielen", "db")
+        IF pfad = "" THEN pfad = FILE_OPEN_DIALOG(tr$("Sicherung einspielen"), "db")
         IF pfad = "" THEN RETURN
-        IF Frage("Der ganze Inhalt wird durch die Sicherung ersetzt:" + CHR$(10) + BASENAME(pfad) + CHR$(10) + CHR$(10) + "Vorher entsteht eine Sicherung des jetzigen Stands.", "Einspielen|Abbrechen", "Sicherung einspielen") <> 1 THEN RETURN
+        IF Frage(tr$("Der ganze Inhalt wird durch die Sicherung ersetzt:") + CHR$(10) + BASENAME(pfad) + CHR$(10) + CHR$(10) + tr$("Vorher entsteht eine Sicherung des jetzigen Stands."), tr$("Einspielen|Abbrechen"), tr$("Sicherung einspielen")) <> 1 THEN RETURN
         DIM m AS STRING : m = sicherungEinspielen$(pfad)
         IF m <> "" THEN
             Self.dbMelden("❗ " + m, "fehler")
             RETURN
         END IF
         Self.allesNeu()
-        Self.dbMelden("📥 Eingespielt. Der Stand davor: " + BASENAME(vorEinspielen), "erfolg")
+        Self.dbMelden(trf$("📥 Eingespielt. Der Stand davor: {0}", [BASENAME(vorEinspielen)]), "erfolg")
     END SUB
 
     ' KUEHL_EXPORT_ORDNER nennt den Ordner ohne Dialog (für Prüfungen).
     SUB knopfCsv_Klick()
         DIM ordner AS STRING : ordner = GETENV$("KUEHL_EXPORT_ORDNER")
-        IF ordner = "" THEN ordner = FOLDER_DIALOG("Ordner für den Export")
+        IF ordner = "" THEN ordner = FOLDER_DIALOG(tr$("Ordner für den Export"))
         IF ordner = "" THEN RETURN
         DIM l AS ARRAY OF STRING : l = csvExport(ordner)
         IF LEN(l) = 0 THEN
-            Self.dbMelden("Keine Daten zum Exportieren.", "info")
+            Self.dbMelden(tr$("Keine Daten zum Exportieren."), "info")
         ELSE
-            Self.dbMelden("📤 " + STR$(LEN(l)) + " Tabellen: " + JOIN$(l, ", "), "erfolg")
+            Self.dbMelden(trf$("📤 {0} Tabellen: {1}", [STR$(LEN(l)), JOIN$(l, ", ")]), "erfolg")
         END IF
     END SUB
 
     SUB knopfOptimieren_Klick()
         optimieren()
-        Self.dbMelden("⚡ Optimiert: Indizes und Statistiken sind frisch.", "erfolg")
+        Self.dbMelden(tr$("⚡ Optimiert: Indizes und Statistiken sind frisch."), "erfolg")
     END SUB
 
     SUB knopfAufraeumen_Klick()
         DIM a AS INTEGER, b AS INTEGER
         (a, b) = aufraeumen()
-        Self.dbMelden("🧹 Aufgeräumt: " + groesseText$(a) + " → " + groesseText$(b) + " (gespart " + groesseText$(MAX(0, a - b)) + ")", "erfolg")
+        Self.dbMelden(trf$("🧹 Aufgeräumt: {0} → {1} (gespart {2})", [groesseText$(a), groesseText$(b), groesseText$(MAX(0, a - b))]), "erfolg")
     END SUB
 
     ' Wie _create_new_database: erst fragen, ob gesichert werden soll, dann
     ' noch einmal; danach steht der Inhalt neu da -- ohne Neustart.
     SUB knopfNeuDb_Klick()
-        DIM a AS INTEGER : a = Frage("Wirklich eine NEUE Datenbank? Alle Produkte, der Bestand, die Einkaufsliste und deine Rezepte werden gelöscht." + CHR$(10) + CHR$(10) + "Vorher eine Sicherung anlegen?", "Sichern und weiter|Ohne Sicherung|Abbrechen", "Neue Datenbank")
+        DIM a AS INTEGER : a = Frage(tr$("Wirklich eine NEUE Datenbank? Alle Produkte, der Bestand, die Einkaufsliste und deine Rezepte werden gelöscht.") + CHR$(10) + CHR$(10) + tr$("Vorher eine Sicherung anlegen?"), tr$("Sichern und weiter|Ohne Sicherung|Abbrechen"), tr$("Neue Datenbank"))
         IF a <> 1 AND a <> 2 THEN RETURN
         DIM gesichert AS STRING : gesichert = ""
         IF a = 1 THEN gesichert = sicherungAnlegen$()
-        IF Frage("Letzte Chance: Der Inhalt wird jetzt gelöscht und durch die Startdaten ersetzt. Fortfahren?", "Ja|Nein", "Neue Datenbank") <> 1 THEN RETURN
+        IF Frage(tr$("Letzte Chance: Der Inhalt wird jetzt gelöscht und durch die Startdaten ersetzt. Fortfahren?"), "Ja|Nein", tr$("Neue Datenbank")) <> 1 THEN RETURN
         datenbankNeu(GUI_CHECKED(Self.rezepteKasten))
         Self.allesNeu()
-        Self.dbMelden("🆕 Neu begonnen" + IIF(gesichert <> "", " -- gesichert: " + BASENAME(gesichert), "") + ".", "erfolg")
+        Self.dbMelden(IIF(gesichert <> "", trf$("🆕 Neu begonnen -- gesichert: {0}.", [BASENAME(gesichert)]), tr$("🆕 Neu begonnen.")), "erfolg")
     END SUB
 END CLASS
 

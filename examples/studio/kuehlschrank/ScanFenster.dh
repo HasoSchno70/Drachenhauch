@@ -28,7 +28,7 @@ CLASS ScanFenster EXTENDS ScanFenster_Basis
         Self.zeilenKat = [] : Self.zeilenMarke = []
         Self.abrufe = [] : Self.abrufBarcodes = []
         Self.blitzZeile = -1
-        DIM m AS ARRAY OF STRING : m = ["-- Markt wählen --"]
+        DIM m AS ARRAY OF STRING : m = [tr$("-- Markt wählen --")]
         DIM s AS STRING
         FOR EACH s IN marktListe()
             ARRAY_PUSH(m, s)
@@ -52,7 +52,7 @@ CLASS ScanFenster EXTENDS ScanFenster_Basis
 
     SUB zaehlen()
         DIM n AS INTEGER : n = Self.zeilen()
-        DIM t AS STRING : t = STR$(n) + " Produkt" + IIF(n <> 1, "e", "")
+        DIM t AS STRING : t = IIF(n = 1, trf$("{0} Produkt", [STR$(n)]), trf$("{0} Produkte", [STR$(n)]))
         GUI_SET_TEXT(Self.anzahlText, t)
         GUI_SET_TEXT(Self.anzahlKopf, "📦 " + t)
     END SUB
@@ -71,12 +71,12 @@ CLASS ScanFenster EXTENDS ScanFenster_Basis
     SUB knopfScannen_Klick()
         DIM b AS STRING : b = TRIM$(GUI_TEXT(Self.barcodeFeld))
         IF b = "" THEN
-            Self.status("❗ Bitte Barcode eingeben", "fehler")
+            Self.status(tr$("❗ Bitte Barcode eingeben"), "fehler")
             RETURN
         END IF
         GUI_SET_TEXT(Self.barcodeFeld, "")
         GUI_FOCUS(Self.barcodeFeld)
-        Self.status("🔎 Suche " + b + "...", "")
+        Self.status(trf$("🔎 Suche {0}...", [b]), "")
         DIM f AS Fund : f = offAusCache(b)
         IF f IS NOT NIL THEN
             Self.ergebnis(f)
@@ -110,9 +110,9 @@ CLASS ScanFenster EXTENDS ScanFenster_Basis
     SUB ergebnis(f AS Fund)
         IF NOT Self.hinzufuegen(f.barcode, f.anzeigeName$(), f, 1, "", -1) THEN RETURN
         IF f.gefunden THEN
-            Self.status("✅ " + f.anzeigeName$() + " hinzugefügt" + IIF(f.ausCache, " (Cache)", ""), "erfolg")
+            Self.status(IIF(f.ausCache, trf$("✅ {0} hinzugefügt (Cache)", [f.anzeigeName$()]), trf$("✅ {0} hinzugefügt", [f.anzeigeName$()])), "erfolg")
         ELSE
-            Self.status("❗ " + f.fehler + " - manuell hinzugefügt", "fehler")
+            Self.status(trf$("❗ {0} - manuell hinzugefügt", [f.fehlerAnzeige$()]), "fehler")
         END IF
     END SUB
 
@@ -135,10 +135,10 @@ CLASS ScanFenster EXTENDS ScanFenster_Basis
         IF barcode <> "" THEN
             FOR z = 0 TO Self.zeilen() - 1
                 IF GUI_TABLE_GET_CELL(Self.tabelle, z, SP_S_BARCODE) <> barcode THEN CONTINUE
-                IF Frage("'" + name + "' wurde bereits gescannt!" + CHR$(10) + CHR$(10) + "Möchtest du:" + CHR$(10) + "• JA: Menge erhöhen (+1)" + CHR$(10) + "• NEIN: Neuen Eintrag erstellen", "Ja|Nein", "Duplikat erkannt") = 1 THEN
+                IF Frage(trf$("'{0}' wurde bereits gescannt!", [name]) + CHR$(10) + CHR$(10) + tr$("Möchtest du:") + CHR$(10) + tr$("• JA: Menge erhöhen (+1)") + CHR$(10) + tr$("• NEIN: Neuen Eintrag erstellen"), "Ja|Nein", tr$("Duplikat erkannt")) = 1 THEN
                     DIM neu AS INTEGER : neu = INT(VAL(GUI_TABLE_GET_CELL(Self.tabelle, z, SP_S_MENGE))) + 1
                     GUI_TABLE_SET_CELL(Self.tabelle, z, SP_S_MENGE, STR$(neu))
-                    Self.status("✅ Menge erhöht: " + name + " (jetzt " + STR$(neu) + "x)", "erfolg")
+                    Self.status(trf$("✅ Menge erhöht: {0} (jetzt {1}x)", [name, STR$(neu)]), "erfolg")
                     RETURN FALSE
                 END IF
                 BREAK
@@ -153,7 +153,7 @@ CLASS ScanFenster EXTENDS ScanFenster_Basis
             DIM lt AS STRING : lt = gelernt$(barcode, name, "expiry_days")
             IF VAL(lt) > 0 THEN t = INT(VAL(lt)) ELSE t = vorschlagTage(name, kat)
         END IF
-        z = GUI_TABLE_ADD_ROW(Self.tabelle, ["", name, barcode, STR$(MAX(1, menge)), tagePlus$(t), "+3T", "+7T", "+14T", "+1M", "+3M", passenderOrt$(o, Self.orte), "❌"])
+        z = GUI_TABLE_ADD_ROW(Self.tabelle, ["", name, barcode, STR$(MAX(1, menge)), tagePlus$(t), tr$("+3T"), tr$("+7T"), tr$("+14T"), tr$("+1M"), tr$("+3M"), passenderOrt$(o, Self.orte), "❌"])
         GUI_TABLE_CELL_KIND(Self.tabelle, z, SP_S_HAKEN, "haken")
         GUI_TABLE_CELL_VALUE(Self.tabelle, z, SP_S_HAKEN, 1)
         DIM s AS INTEGER
@@ -183,7 +183,7 @@ CLASS ScanFenster EXTENDS ScanFenster_Basis
             GUI_TABLE_SET_CELL(Self.tabelle, zeile, SP_S_MHD, tagePlus$(tage[spalte - SP_S_SCHNELL]))
             GUI_SET_ENABLED(Self.knopfSpeichern, TRUE)
         ELSEIF spalte = SP_S_WEG THEN
-            IF Frage("Produkt aus Liste entfernen?", "Ja|Nein", "Zeile löschen") <> 1 THEN RETURN
+            IF Frage(tr$("Produkt aus Liste entfernen?"), "Ja|Nein", tr$("Zeile löschen")) <> 1 THEN RETURN
             Self.entfernen(zeile)
         END IF
     END SUB
@@ -239,43 +239,43 @@ CLASS ScanFenster EXTENDS ScanFenster_Basis
     SUB knopfTage_Klick()
         DIM n AS INTEGER : n = Self.markierte()
         IF n = 0 THEN
-            Meldung("Bitte wähle mindestens ein Produkt aus!", "Keine Auswahl")
+            Meldung(tr$("Bitte wähle mindestens ein Produkt aus!"), tr$("Keine Auswahl"))
             RETURN
         END IF
         DIM ok AS BOOLEAN
         DIM tage AS INTEGER
-        (ok, tage) = EingabeZahl("Tage ab heute für " + STR$(n) + " Produkt(e):", 7, 1, 365, "MHD setzen")
+        (ok, tage) = EingabeZahl(trf$("Tage ab heute für {0} Produkt(e):", [STR$(n)]), 7, 1, 365, tr$("MHD setzen"))
         IF NOT ok THEN RETURN
         DIM d AS STRING : d = tagePlus$(tage)
         DIM z AS INTEGER
         FOR z = 0 TO Self.zeilen() - 1
             IF Self.markiert(z) THEN GUI_TABLE_SET_CELL(Self.tabelle, z, SP_S_MHD, d)
         NEXT
-        Meldung("✅ MHD auf " + MID$(d, 8, 2) + "." + MID$(d, 5, 2) + "." + LEFT$(d, 4) + " gesetzt für " + STR$(n) + " Produkte!", "Erfolg")
+        Meldung(trf$("✅ MHD auf {0} gesetzt für {1} Produkte!", [MID$(d, 8, 2) + "." + MID$(d, 5, 2) + "." + LEFT$(d, 4), STR$(n)]), tr$("Erfolg"))
     END SUB
 
     SUB knopfOrt_Klick()
         DIM n AS INTEGER : n = Self.markierte()
         IF n = 0 THEN
-            Meldung("Bitte wähle mindestens ein Produkt aus!", "Keine Auswahl")
+            Meldung(tr$("Bitte wähle mindestens ein Produkt aus!"), tr$("Keine Auswahl"))
             RETURN
         END IF
-        DIM i AS INTEGER : i = Auswahl("Lagerort für " + STR$(n) + " Produkt(e):", Self.orte, 0, "Lagerort setzen")
+        DIM i AS INTEGER : i = Auswahl(trf$("Lagerort für {0} Produkt(e):", [STR$(n)]), Self.orte, 0, tr$("Lagerort setzen"))
         IF i < 0 THEN RETURN
         DIM z AS INTEGER
         FOR z = 0 TO Self.zeilen() - 1
             IF Self.markiert(z) THEN GUI_TABLE_SET_CELL(Self.tabelle, z, SP_S_ORT, Self.orte[i])
         NEXT
-        Meldung("✅ Lagerort '" + Self.orte[i] + "' gesetzt für " + STR$(n) + " Produkte!", "Erfolg")
+        Meldung(trf$("✅ Lagerort '{0}' gesetzt für {1} Produkte!", [Self.orte[i], STR$(n)]), tr$("Erfolg"))
     END SUB
 
     SUB knopfLoeschen_Klick()
         DIM n AS INTEGER : n = Self.markierte()
         IF n = 0 THEN
-            Meldung("Bitte wähle mindestens ein Produkt aus!", "Keine Auswahl")
+            Meldung(tr$("Bitte wähle mindestens ein Produkt aus!"), tr$("Keine Auswahl"))
             RETURN
         END IF
-        IF Frage("Möchtest du " + STR$(n) + " Produkt(e) aus der Liste entfernen?", "Ja|Nein", "Löschen bestätigen") <> 1 THEN RETURN
+        IF Frage(trf$("Möchtest du {0} Produkt(e) aus der Liste entfernen?", [STR$(n)]), "Ja|Nein", tr$("Löschen bestätigen")) <> 1 THEN RETURN
         DIM z AS INTEGER
         FOR z = Self.zeilen() - 1 TO 0 STEP -1
             IF Self.markiert(z) THEN Self.entfernen(z)
@@ -306,11 +306,11 @@ CLASS ScanFenster EXTENDS ScanFenster_Basis
         DIM markt AS STRING : markt = Self.markt$()
         DIM fehler AS ARRAY OF STRING : fehler = []
         DIM n AS INTEGER : n = Self.speichern(markt, fehler)
-        DIM bei AS STRING : bei = IIF(markt = "", "", " bei " + markt)
         IF LEN(fehler) > 0 THEN
-            Meldung(STR$(n) + " Produkte gespeichert" + bei + "." + CHR$(10) + CHR$(10) + "Fehler:" + CHR$(10) + JOIN$(fehler, CHR$(10)), "Teilweise Fehler")
+            DIM satz AS STRING : satz = IIF(markt = "", trf$("{0} Produkte gespeichert.", [STR$(n)]), trf$("{0} Produkte gespeichert bei {1}.", [STR$(n), markt]))
+            Meldung(satz + CHR$(10) + CHR$(10) + tr$("Fehler:") + CHR$(10) + JOIN$(fehler, CHR$(10)), tr$("Teilweise Fehler"))
         ELSE
-            Meldung("✅ " + STR$(n) + " Produkte erfolgreich gespeichert" + bei + "!", "Erfolg")
+            Meldung(IIF(markt = "", trf$("✅ {0} Produkte erfolgreich gespeichert!", [STR$(n)]), trf$("✅ {0} Produkte erfolgreich gespeichert bei {1}!", [STR$(n), markt])), tr$("Erfolg"))
         END IF
         Self.gespeichert = n
         IF n > 0 THEN Self.Zumachen()
@@ -321,7 +321,7 @@ CLASS ScanFenster EXTENDS ScanFenster_Basis
     FUNCTION speichern(markt AS STRING, fehler AS ARRAY OF STRING) AS INTEGER
         DIM n AS INTEGER : n = 0
         DIM h AS STRING : h = heute$()
-        verlauf.beginnen("Einkauf erfasst")
+        verlauf.beginnen(tr$("Einkauf erfasst"))
         DB_BEGIN(db)
         DIM z AS INTEGER
         FOR z = 0 TO Self.zeilen() - 1
@@ -332,11 +332,11 @@ CLASS ScanFenster EXTENDS ScanFenster_Basis
             DIM ort AS STRING : ort = TRIM$(GUI_TABLE_GET_CELL(Self.tabelle, z, SP_S_ORT))
             DIM menge AS INTEGER : menge = MAX(1, INT(VAL(GUI_TABLE_GET_CELL(Self.tabelle, z, SP_S_MENGE))))
             IF name = "" THEN
-                ARRAY_PUSH(fehler, "Zeile " + STR$(z + 1) + ": Produktname darf nicht leer sein")
+                ARRAY_PUSH(fehler, trf$("Zeile {0}: Produktname darf nicht leer sein", [STR$(z + 1)]))
                 CONTINUE
             END IF
             IF NOT datumOk(mhd, FALSE) THEN
-                ARRAY_PUSH(fehler, name + ": das MHD braucht die Form JJJJ-MM-TT")
+                ARRAY_PUSH(fehler, trf$("{0}: das MHD braucht die Form JJJJ-MM-TT", [name]))
                 CONTINUE
             END IF
             ' Das Produkt beim Barcode (ohne Barcode beim Namen), sonst neu --
@@ -375,10 +375,10 @@ CLASS ScanFenster EXTENDS ScanFenster_Basis
     ' --- Vorlagen (shopping_templates wie TemplateService) ------------------------
     SUB knopfVorlageSpeichern_Klick()
         IF Self.zeilen() = 0 THEN
-            Meldung("Keine Produkte zum Speichern!", "Fehler")
+            Meldung(tr$("Keine Produkte zum Speichern!"), tr$("Fehler"))
             RETURN
         END IF
-        DIM name AS STRING : name = TRIM$(Eingabe("Template-Name:", "Mein Einkauf", "Template speichern"))
+        DIM name AS STRING : name = TRIM$(Eingabe(tr$("Template-Name:"), tr$("Mein Einkauf"), tr$("Template speichern")))
         IF name = "" THEN RETURN
         DIM liste AS JSON_HANDLE : liste = JSON_NEW_ARRAY()
         DIM z AS INTEGER
@@ -396,12 +396,12 @@ CLASS ScanFenster EXTENDS ScanFenster_Basis
             JSON_SET_JSON(e, "notes", JSON_PARSE("null"))
             JSON_APPEND_JSON(liste, "", e)
         NEXT
-        verlauf.beginnen("Template " + name + " gespeichert")
+        verlauf.beginnen(trf$("Template {0} gespeichert", [name]))
         DB_EXEC(db, "INSERT INTO shopping_templates (name, items_json) VALUES (?, ?)", name, JSON_STRINGIFY(liste))
         DIM id AS INTEGER : id = DB_LAST_ROWID(db)
         verlauf.neu("shopping_templates", id)
         verlauf.abschliessen()
-        Meldung("✅ Template '" + name + "' gespeichert!" + CHR$(10) + CHR$(10) + "📦 " + STR$(Self.zeilen()) + " Produkte" + CHR$(10) + "🆔 Template-ID: " + STR$(id), "Erfolg")
+        Meldung(trf$("✅ Template '{0}' gespeichert!", [name]) + CHR$(10) + CHR$(10) + trf$("📦 {0} Produkte", [STR$(Self.zeilen())]) + CHR$(10) + trf$("🆔 Template-ID: {0}", [STR$(id)]), tr$("Erfolg"))
     END SUB
 
     ' Wie load_template -- aber mit Menge, Lagerort und Haltbarkeit aus der
@@ -418,13 +418,13 @@ CLASS ScanFenster EXTENDS ScanFenster_Basis
             CATCH kaputt
                 n = 0
             END TRY
-            ARRAY_PUSH(namen, DB_GET_STRING(r, 1) + " (" + STR$(n) + " Produkte)")
+            ARRAY_PUSH(namen, trf$("{0} ({1} Produkte)", [DB_GET_STRING(r, 1), STR$(n)]))
         WEND
         IF LEN(ids) = 0 THEN
-            Meldung("Noch keine Templates vorhanden!" + CHR$(10) + CHR$(10) + "💡 Erstelle ein Template mit '💾 Als Template speichern'", "Info")
+            Meldung(tr$("Noch keine Templates vorhanden!") + CHR$(10) + CHR$(10) + tr$("💡 Erstelle ein Template mit '💾 Als Template speichern'"), tr$("Info"))
             RETURN
         END IF
-        DIM i AS INTEGER : i = Auswahl("Wähle Template:", namen, 0, "Template laden")
+        DIM i AS INTEGER : i = Auswahl(tr$("Wähle Template:"), namen, 0, tr$("Template laden"))
         IF i < 0 THEN RETURN
         DB_EXEC(db, "UPDATE shopping_templates SET usage_count = IFNULL(usage_count, 0) + 1 WHERE id = ?", ids[i])
         DIM j AS JSON_HANDLE : j = JSON_PARSE(textEin$("SELECT items_json FROM shopping_templates WHERE id = ?", STR$(ids[i])))
@@ -441,7 +441,7 @@ CLASS ScanFenster EXTENDS ScanFenster_Basis
             END IF
             Self.hinzufuegen(jText$(j, p + "barcode"), jText$(j, p + "name"), NIL, menge, jText$(j, p + "storage_location"), tage)
         NEXT
-        Meldung("✅ Template geladen!" + CHR$(10) + CHR$(10) + "📦 " + STR$(JSON_LEN(j, "")) + " Produkte hinzugefügt", "Erfolg")
+        Meldung(tr$("✅ Template geladen!") + CHR$(10) + CHR$(10) + trf$("📦 {0} Produkte hinzugefügt", [STR$(JSON_LEN(j, ""))]), tr$("Erfolg"))
     END SUB
 END CLASS
 

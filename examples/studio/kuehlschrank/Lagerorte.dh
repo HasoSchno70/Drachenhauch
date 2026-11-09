@@ -84,10 +84,10 @@ END FUNCTION
 ' Schlüssel der Python-App).
 FUNCTION zoneText$(zone AS STRING) AS STRING
     SELECT CASE zone
-        CASE "cold" : RETURN "kühl"
-        CASE "frozen" : RETURN "tiefgekühlt"
-        CASE "cool" : RETURN "kühl und dunkel"
-        CASE "room_temp" : RETURN "Raumtemperatur"
+        CASE "cold" : RETURN tr$("kühl")
+        CASE "frozen" : RETURN tr$("tiefgekühlt")
+        CASE "cool" : RETURN tr$("kühl und dunkel")
+        CASE "room_temp" : RETURN tr$("Raumtemperatur")
     END SELECT
     RETURN zone
 END FUNCTION
@@ -144,6 +144,34 @@ FUNCTION ortSinnbilder() AS ARRAY OF STRING
             "🍫|Schokolade", "🍹|Getränk", "🥫|Dose", "🧂|Salz", "🌿|Kräuter", "🧈|Butter"]
 END FUNCTION
 
+' Der Name eines Sinnbilds aus ortSinnbilder, wie ihn die Auswahl zeigt
+' (gespeichert wird nur das Sinnbild selbst).
+FUNCTION sinnbildName$(name AS STRING) AS STRING
+    SELECT CASE name
+        CASE "Eiswürfel" : RETURN tr$("Eiswürfel")
+        CASE "Schneeflocke" : RETURN tr$("Schneeflocke")
+        CASE "Haus" : RETURN tr$("Haus")
+        CASE "Brot" : RETURN tr$("Brot")
+        CASE "Apfel" : RETURN tr$("Apfel")
+        CASE "Karotte" : RETURN tr$("Karotte")
+        CASE "Schrank" : RETURN tr$("Schrank")
+        CASE "Werkzeug" : RETURN tr$("Werkzeug")
+        CASE "Paket" : RETURN tr$("Paket")
+        CASE "Teller" : RETURN tr$("Teller")
+        CASE "Gurke" : RETURN tr$("Gurke")
+        CASE "Milch" : RETURN tr$("Milch")
+        CASE "Käse" : RETURN tr$("Käse")
+        CASE "Fleisch" : RETURN tr$("Fleisch")
+        CASE "Schokolade" : RETURN tr$("Schokolade")
+        CASE "Getränk" : RETURN tr$("Getränk")
+        CASE "Dose" : RETURN tr$("Dose")
+        CASE "Salz" : RETURN tr$("Salz")
+        CASE "Kräuter" : RETURN tr$("Kräuter")
+        CASE "Butter" : RETURN tr$("Butter")
+    END SELECT
+    RETURN name
+END FUNCTION
+
 ' Wie viele Einträge an einem Ort liegen (auch "Ort - Bereich").
 FUNCTION ortEintraege(name AS STRING) AS INTEGER
     RETURN dbZahlMit("SELECT COUNT(*) FROM inventory WHERE storage_location = ?1 OR storage_location LIKE ?2", name, name + " - %")
@@ -165,8 +193,8 @@ END SUB
 ' "" oder was nicht ging.
 FUNCTION ortAnlegen$(name AS STRING, sinnbild AS STRING) AS STRING
     name = TRIM$(name)
-    IF name = "" THEN RETURN "Bitte gib einen Namen ein!"
-    IF dbZahlEin("SELECT COUNT(*) FROM storage_locations WHERE lower(name) = lower(?)", name) > 0 THEN RETURN "Lagerort „" + name + "“ gibt es schon."
+    IF name = "" THEN RETURN tr$("Bitte gib einen Namen ein!")
+    IF dbZahlEin("SELECT COUNT(*) FROM storage_locations WHERE lower(name) = lower(?)", name) > 0 THEN RETURN trf$("Lagerort „{0}“ gibt es schon.", [name])
     DIM farbe AS INTEGER : farbe = ortFarbe(name)
     DB_BEGIN(db)
     DB_EXEC(db, "INSERT INTO storage_locations (name, icon, temperature_zone, description) VALUES (?, ?, 'room_temp', ?)", name, sinnbild, "Benutzerdefiniert: " + name)
@@ -181,7 +209,7 @@ END FUNCTION
 ' ihre Nummer. "" oder was nicht ging.
 FUNCTION ortLoeschen$(name AS STRING) AS STRING
     DIM n AS INTEGER : n = ortEintraege(name)
-    IF n > 0 THEN RETURN "An „" + name + "“ liegen noch " + STR$(n) + IIF(n = 1, " Eintrag", " Einträge") + " -- erst woandershin verlegen."
+    IF n > 0 THEN RETURN IIF(n = 1, trf$("An „{0}“ liegen noch {1} Eintrag -- erst woandershin verlegen.", [name, STR$(n)]), trf$("An „{0}“ liegen noch {1} Einträge -- erst woandershin verlegen.", [name, STR$(n)]))
     DB_BEGIN(db)
     DB_EXEC(db, "DELETE FROM storage_locations WHERE name = ?", name)
     DB_EXEC(db, "DELETE FROM locations WHERE name = ?", name)

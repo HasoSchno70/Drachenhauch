@@ -47,9 +47,9 @@ CLASS StatistikSeite EXTENDS StatistikSeite_Basis
             Self.orte.Hinzufuegen(Self.s.ortNamen[i], Self.s.ortZahlen[i], farben[i MOD LEN(farben)])
         NEXT
         Self.status.Leeren()
-        Self.status.Hinzufuegen("Frisch", Self.s.frisch, &H2D6A4F)
-        Self.status.Hinzufuegen("Bald ablaufend", Self.s.bald, &H6B5530)
-        Self.status.Hinzufuegen("Abgelaufen", Self.s.abgelaufen, &H6B3535)
+        Self.status.Hinzufuegen(tr$("Frisch"), Self.s.frisch, &H2D6A4F)
+        Self.status.Hinzufuegen(tr$("Bald ablaufend"), Self.s.bald, &H6B5530)
+        Self.status.Hinzufuegen(tr$("Abgelaufen"), Self.s.abgelaufen, &H6B3535)
     END SUB
 
     SUB knopfAuffrischen_Klick()
@@ -71,18 +71,18 @@ CLASS StatistikSeite EXTENDS StatistikSeite_Basis
     ' Wie test_notification: eine Mitteilung des Systems (Modul
     ' Benachrichtigungen). Nimmt das System sie nicht, sagt es das.
     SUB knopfMeldung_Klick()
-        IF meldungSenden(nachrichtNeu("Test-Benachrichtigung", "Benachrichtigungen funktionieren! 🎉", FALSE)) THEN
-            Meldung("Test-Benachrichtigung gesendet!", "✔ Erfolg")
+        IF meldungSenden(nachrichtNeu(tr$("Test-Benachrichtigung"), tr$("Benachrichtigungen funktionieren! 🎉"), FALSE)) THEN
+            Meldung(tr$("Test-Benachrichtigung gesendet!"), tr$("✔ Erfolg"))
         ELSE
-            Meldung("Das System hat die Benachrichtigung nicht angenommen.", "Benachrichtigung")
+            Meldung(tr$("Das System hat die Benachrichtigung nicht angenommen."), tr$("Benachrichtigung"))
         END IF
     END SUB
 
     SUB knopfCacheLeeren_Klick()
-        IF Frage("Möchtest du den Barcode-Cache wirklich leeren?" + CHR$(10) + CHR$(10) + "Dadurch müssen Barcodes erneut online abgefragt werden.", "Ja|Nein", "Cache leeren") <> 1 THEN RETURN
+        IF Frage(tr$("Möchtest du den Barcode-Cache wirklich leeren?") + CHR$(10) + CHR$(10) + tr$("Dadurch müssen Barcodes erneut online abgefragt werden."), "Ja|Nein", tr$("Cache leeren")) <> 1 THEN RETURN
         cacheLeeren()
         Self.laden()
-        Meldung("Cache wurde geleert!", "✔ Erfolg")
+        Meldung(tr$("Cache wurde geleert!"), tr$("✔ Erfolg"))
     END SUB
 
     ' --- Zeichnen ------------------------------------------------------------
@@ -123,11 +123,11 @@ CLASS StatistikSeite EXTENDS StatistikSeite_Basis
         DIM y0 AS INTEGER : y0 = GUI_CANVAS_Y(Self.kacheln)
         DIM b AS INTEGER : b = (GUI_CANVAS_W(Self.kacheln) - 4 * 12) \ 5
         DIM h AS INTEGER : h = GUI_CANVAS_H(Self.kacheln) - 2
-        Self.kachel(x0, y0, b, h, "info", "📦", "Gesamt", STR$(Self.s.gesamt), "Artikel im Bestand")
-        Self.kachel(x0 + (b + 12), y0, b, h, "erfolg", "🏷", "Produkte", STR$(Self.s.produkte), "Verschiedene Sorten")
-        Self.kachel(x0 + 2 * (b + 12), y0, b, h, "warnung", "⏰", "Ablaufend", STR$(Self.s.bald), "In den nächsten " + STR$(Self.s.schwelle) + " Tagen")
-        Self.kachel(x0 + 3 * (b + 12), y0, b, h, "gefahr", "❌", "Abgelaufen", STR$(Self.s.abgelaufen), "Sofort verbrauchen!")
-        Self.kachel(x0 + 4 * (b + 12), y0, b, h, "cache", "🗄", "Cache", STR$(Self.cacheZahl), "Gespeicherte Barcodes")
+        Self.kachel(x0, y0, b, h, "info", "📦", tr$("Gesamt"), STR$(Self.s.gesamt), tr$("Artikel im Bestand"))
+        Self.kachel(x0 + (b + 12), y0, b, h, "erfolg", "🏷", tr$("Produkte"), STR$(Self.s.produkte), tr$("Verschiedene Sorten"))
+        Self.kachel(x0 + 2 * (b + 12), y0, b, h, "warnung", "⏰", tr$("Ablaufend"), STR$(Self.s.bald), trf$("In den nächsten {0} Tagen", [STR$(Self.s.schwelle)]))
+        Self.kachel(x0 + 3 * (b + 12), y0, b, h, "gefahr", "❌", tr$("Abgelaufen"), STR$(Self.s.abgelaufen), tr$("Sofort verbrauchen!"))
+        Self.kachel(x0 + 4 * (b + 12), y0, b, h, "cache", "🗄", tr$("Cache"), STR$(Self.cacheZahl), tr$("Gespeicherte Barcodes"))
     END SUB
 
     ' Eine Karte der Übersicht: Kopf im Verlauf mit Titel, darunter Zeilen.
@@ -155,15 +155,15 @@ CLASS StatistikSeite EXTENDS StatistikSeite_Basis
         DIM leise AS INTEGER : leise = GUI_THEME_GET("muted_fg")
         TEXT_SIZE(14)
         ' Bestandübersicht
-        Self.karte(x0, y0, b, h, "info", "📦 Bestandübersicht")
-        TEXT(x0 + 16, y0 + 58, "✔ " + STR$(Self.s.frisch) + " Artikel frisch", Self.palette("erfolg")[2])
-        TEXT(x0 + 16, y0 + 86, "⏰ " + STR$(Self.s.bald) + " bald ablaufend", Self.palette("warnung")[2])
-        TEXT(x0 + 16, y0 + 114, "❌ " + STR$(Self.s.abgelaufen) + " abgelaufen", Self.palette("gefahr")[2])
+        Self.karte(x0, y0, b, h, "info", tr$("📦 Bestandübersicht"))
+        TEXT(x0 + 16, y0 + 58, trf$("✔ {0} Artikel frisch", [STR$(Self.s.frisch)]), Self.palette("erfolg")[2])
+        TEXT(x0 + 16, y0 + 86, trf$("⏰ {0} bald ablaufend", [STR$(Self.s.bald)]), Self.palette("warnung")[2])
+        TEXT(x0 + 16, y0 + 114, trf$("❌ {0} abgelaufen", [STR$(Self.s.abgelaufen)]), Self.palette("gefahr")[2])
         ' Top-Kategorien, je eine mit Balken aus zehn Feldern
         DIM x1 AS INTEGER : x1 = x0 + b + 16
-        Self.karte(x1, y0, b, h, "erfolg", "🏆 Top Kategorien")
+        Self.karte(x1, y0, b, h, "erfolg", tr$("🏆 Top Kategorien"))
         TEXT_SIZE(14)
-        IF LEN(Self.s.katNamen) = 0 THEN TEXT(x1 + 16, y0 + 58, "Keine Kategorien", leise)
+        IF LEN(Self.s.katNamen) = 0 THEN TEXT(x1 + 16, y0 + 58, tr$("Keine Kategorien"), leise)
         DIM i AS INTEGER
         FOR i = 0 TO LEN(Self.s.katNamen) - 1
             DIM zy AS INTEGER : zy = y0 + 58 + i * 28
@@ -178,9 +178,9 @@ CLASS StatistikSeite EXTENDS StatistikSeite_Basis
         NEXT
         ' Lagerorte (die ersten fünf), mit dem, was dort Aufmerksamkeit braucht
         DIM x2 AS INTEGER : x2 = x1 + b + 16
-        Self.karte(x2, y0, b, h, "lila", "📍 Lagerorte")
+        Self.karte(x2, y0, b, h, "lila", tr$("📍 Lagerorte"))
         TEXT_SIZE(14)
-        IF LEN(Self.s.ortNamen) = 0 THEN TEXT(x2 + 16, y0 + 58, "Keine Lagerorte", leise)
+        IF LEN(Self.s.ortNamen) = 0 THEN TEXT(x2 + 16, y0 + 58, tr$("Keine Lagerorte"), leise)
         FOR i = 0 TO MIN(5, LEN(Self.s.ortNamen)) - 1
             DIM oy AS INTEGER : oy = y0 + 58 + i * 28
             DIM vorn AS STRING : vorn = "📍 " + Self.s.ortNamen[i] + ": "
@@ -219,7 +219,7 @@ CLASS StatistikSeite EXTENDS StatistikSeite_Basis
     ' Ein Kuchen ohne Daten sagt es, wie die Python-App.
     SUB leer(d AS StudioDiagramm)
         IF d.Anzahl() > 0 THEN RETURN
-        DIM t AS STRING : t = "Keine Daten"
+        DIM t AS STRING : t = tr$("Keine Daten")
         TEXT_SIZE(16)
         TEXT(GUI_CANVAS_X(d.Flaeche) + (GUI_CANVAS_W(d.Flaeche) - TEXT_WIDTH(t)) \ 2, GUI_CANVAS_Y(d.Flaeche) + GUI_CANVAS_H(d.Flaeche) \ 2, t, GUI_THEME_GET("muted_fg"))
     END SUB

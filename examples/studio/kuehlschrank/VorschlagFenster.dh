@@ -22,21 +22,21 @@ CLASS VorschlagFenster EXTENDS VorschlagFenster_Basis
         IF Self.art = "ablauf" THEN
             Self.ab = ablaufende()
             Self.rezepte = ablaufVorschlaege(alle, Self.ab)
-            GUI_SET_TEXT(Self.titel, "⏰ Ablaufende Produkte verwerten")
+            GUI_SET_TEXT(Self.titel, tr$("⏰ Ablaufende Produkte verwerten"))
             DIM namen AS ARRAY OF STRING : namen = []
             DIM e AS Eintrag
             FOR EACH e IN Self.ab
                 IF LEN(namen) < 10 THEN ARRAY_PUSH(namen, e.name + " (" + e.ablauf + ")")
             NEXT
-            GUI_SET_TEXT(Self.info, "Läuft bald ab: " + JOIN$(namen, ", ") + IIF(LEN(Self.ab) > 10, " und " + STR$(LEN(Self.ab) - 10) + " weitere", ""))
-            GUI_TABLE_HEADERS(Self.tabelle, ["✓", "Rezept", "Im Bestand", "Verwendet ablaufende", "Fehlt"])
+            GUI_SET_TEXT(Self.info, IIF(LEN(Self.ab) > 10, trf$("Läuft bald ab: {0} und {1} weitere", [JOIN$(namen, ", "), STR$(LEN(Self.ab) - 10)]), trf$("Läuft bald ab: {0}", [JOIN$(namen, ", ")])))
+            GUI_TABLE_HEADERS(Self.tabelle, ["✓", tr$("Rezept"), tr$("Im Bestand"), tr$("Verwendet ablaufende"), tr$("Fehlt")])
         ELSE
             Self.rezepte = []
             DIM y AS Rezept
             FOR EACH y IN alle
                 IF LEN(y.zutaten) > 0 THEN ARRAY_PUSH(Self.rezepte, y)
             NEXT
-            GUI_SET_TEXT(Self.titel, "🔍 Was kann ich kochen?")
+            GUI_SET_TEXT(Self.titel, tr$("🔍 Was kann ich kochen?"))
             GUI_SET_VISIBLE(Self.knopfInternet, FALSE)
         END IF
         Self.tabelleFuellen()
@@ -57,7 +57,7 @@ CLASS VorschlagFenster EXTENDS VorschlagFenster_Basis
             IF Self.art = "ablauf" THEN
                 mitte = verwendet[i]
             ELSE
-                mitte = STR$(x.zutatenZahl - LEN(fehlt)) + " von " + STR$(x.zutatenZahl)
+                mitte = trf$("{0} von {1}", [STR$(x.zutatenZahl - LEN(fehlt)), STR$(x.zutatenZahl)])
             END IF
             DIM status AS STRING
             IF x.kochbar THEN
@@ -78,9 +78,9 @@ CLASS VorschlagFenster EXTENDS VorschlagFenster_Basis
         NEXT
         IF LEN(Self.rezepte) > 0 THEN GUI_TABLE_SET_SELECTED(Self.tabelle, 0)
         IF Self.art = "kochbar" THEN
-            GUI_SET_TEXT(Self.info, "📊 ✅ " + STR$(sofort) + " sofort kochbar  •  ⚠ " + STR$(fast) + " fast kochbar  •  🔍 " + STR$(teils) + " teilweise  •  ❌ " + STR$(wenig) + " zu wenig Zutaten")
+            GUI_SET_TEXT(Self.info, trf$("📊 ✅ {0} sofort kochbar  •  ⚠ {1} fast kochbar  •  🔍 {2} teilweise  •  ❌ {3} zu wenig Zutaten", [STR$(sofort), STR$(fast), STR$(teils), STR$(wenig)]))
         ELSEIF LEN(Self.rezepte) = 0 THEN
-            GUI_SET_TEXT(Self.leer, "Keines deiner Rezepte verwendet die ablaufenden Produkte -- im Katalog oder Internet suchen!")
+            GUI_SET_TEXT(Self.leer, tr$("Keines deiner Rezepte verwendet die ablaufenden Produkte -- im Katalog oder Internet suchen!"))
         END IF
         GUI_SET_ENABLED(Self.knopfKochen, LEN(Self.rezepte) > 0)
     END SUB
@@ -95,11 +95,11 @@ CLASS VorschlagFenster EXTENDS VorschlagFenster_Basis
             n = n + fehlendeEinkaufen(Self.rezepte[i], 1.0)
         NEXT
         IF gewaehlt = 0 THEN
-            Meldung("Bitte hake mindestens ein Rezept ab (ab 50 % Zutaten im Bestand)!", "Keine Auswahl")
+            Meldung(tr$("Bitte hake mindestens ein Rezept ab (ab 50 % Zutaten im Bestand)!"), tr$("Keine Auswahl"))
             RETURN
         END IF
         Self.einkauf = Self.einkauf + n
-        Meldung(STR$(n) + " Zutat(en) auf die Einkaufsliste gesetzt.", "Einkaufsliste")
+        Meldung(trf$("{0} Zutat(en) auf die Einkaufsliste gesetzt.", [STR$(n)]), tr$("Einkaufsliste"))
     END SUB
 
     SUB knopfKochen_Klick()

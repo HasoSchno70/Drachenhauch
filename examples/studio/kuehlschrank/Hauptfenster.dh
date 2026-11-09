@@ -24,8 +24,8 @@ CLASS Hauptfenster EXTENDS Hauptfenster_Basis
         GUI_CARD_SET_TEXT(Self.kachelGesamt, STR$(k.gesamt))
         GUI_CARD_SET_TEXT(Self.kachelBald, STR$(k.bald))
         GUI_CARD_SET_TEXT(Self.kachelAbgelaufen, STR$(k.abgelaufen))
-        GUI_STATUSBAR_SET(Self.status, 1, "Produkte: " + STR$(k.produkte))
-        GUI_STATUSBAR_SET(Self.status, 2, "Zuletzt: " + LEFT$(TIME$(), 5))
+        GUI_STATUSBAR_SET(Self.status, 1, trf$("Produkte: {0}", [STR$(k.produkte)]))
+        GUI_STATUSBAR_SET(Self.status, 2, trf$("Zuletzt: {0}", [LEFT$(TIME$(), 5)]))
         Self.statistik.laden()
         Self.verlaufZeigen()
     END SUB
@@ -34,8 +34,8 @@ CLASS Hauptfenster EXTENDS Hauptfenster_Basis
     SUB verlaufZeigen()
         GUI_TOOLBAR_ENABLE(Self.werkzeuge, KNOPF_RUECKGAENGIG, verlauf.kannZurueck())
         GUI_TOOLBAR_ENABLE(Self.werkzeuge, KNOPF_WIEDERHOLEN, verlauf.kannVor())
-        GUI_TOOLBAR_SET_TIP(Self.werkzeuge, KNOPF_RUECKGAENGIG, IIF(verlauf.kannZurueck(), "Rückgängig: " + verlauf.textZurueck$() + " (Strg+Z)", "Nichts rückgängig zu machen"))
-        GUI_TOOLBAR_SET_TIP(Self.werkzeuge, KNOPF_WIEDERHOLEN, IIF(verlauf.kannVor(), "Wiederholen: " + verlauf.textVor$() + " (Strg+Y)", "Nichts zu wiederholen"))
+        GUI_TOOLBAR_SET_TIP(Self.werkzeuge, KNOPF_RUECKGAENGIG, IIF(verlauf.kannZurueck(), trf$("Rückgängig: {0} (Strg+Z)", [verlauf.textZurueck$()]), tr$("Nichts rückgängig zu machen")))
+        GUI_TOOLBAR_SET_TIP(Self.werkzeuge, KNOPF_WIEDERHOLEN, IIF(verlauf.kannVor(), trf$("Wiederholen: {0} (Strg+Y)", [verlauf.textVor$()]), tr$("Nichts zu wiederholen")))
         GUI_MENU_ENABLE(Self.miRueckgaengig, verlauf.kannZurueck())
         GUI_MENU_ENABLE(Self.miWiederholen, verlauf.kannVor())
     END SUB
@@ -96,7 +96,7 @@ CLASS Hauptfenster EXTENDS Hauptfenster_Basis
         IF NOT f.gespeichert AND NOT f.datenGeaendert THEN RETURN
         Self.anwenden()
         Self.geaendert()
-        IF f.gespeichert THEN GUI_TOAST(Self.Fenster(), "✅ Einstellungen gespeichert!", "erfolg")
+        IF f.gespeichert THEN GUI_TOAST(Self.Fenster(), tr$("✅ Einstellungen gespeichert!"), "erfolg")
     END SUB
 
     ' Der Vorrat hat sich geändert (im Bestand oder über Rückgängig).
@@ -140,7 +140,7 @@ CLASS Hauptfenster EXTENDS Hauptfenster_Basis
         DIM pfad AS STRING : pfad = GETENV$("KUEHL_ZETTEL")
         IF pfad <> "" THEN
             Einkaufszettel.Pdf(pfad, w)
-            GUI_STATUSBAR_SET(Self.status, 3, "Einkaufszettel: " + BASENAME(pfad))
+            GUI_STATUSBAR_SET(Self.status, 3, trf$("Einkaufszettel: {0}", [BASENAME(pfad)]))
             RETURN
         END IF
         Einkaufszettel.Vorschau(w)
@@ -153,7 +153,7 @@ CLASS Hauptfenster EXTENDS Hauptfenster_Basis
         f.ZeigenModal()
         IF f.uebertragen = 0 THEN RETURN
         Self.geaendert()
-        GUI_TOAST(Self.Fenster(), "✅ " + STR$(f.uebertragen) + " Artikel zum Bestand hinzugefügt!", "erfolg")
+        GUI_TOAST(Self.Fenster(), trf$("✅ {0} Artikel zum Bestand hinzugefügt!", [STR$(f.uebertragen)]), "erfolg")
     END SUB
 
     ' Eine Kachel im Reiter Lagerorte: was dort liegt.
@@ -172,7 +172,7 @@ CLASS Hauptfenster EXTENDS Hauptfenster_Basis
         f.ZeigenModal()
         IF NOT f.gesichert THEN RETURN
         Self.geaendert()
-        GUI_TOAST(Self.Fenster(), IIF(Self.bestand.bearbeitenId = 0, f.e.name + " hinzugefügt.", f.e.name + " gesichert."), "erfolg")
+        GUI_TOAST(Self.Fenster(), IIF(Self.bestand.bearbeitenId = 0, trf$("{0} hinzugefügt.", [f.e.name]), trf$("{0} gesichert.", [f.e.name])), "erfolg")
     END SUB
 
     SUB bestand_Mindestmenge()
@@ -206,30 +206,30 @@ CLASS Hauptfenster EXTENDS Hauptfenster_Basis
         DIM t AS STRING : t = verlauf.rueckgaengig$()
         IF t = "" THEN RETURN
         Self.geaendert()
-        GUI_STATUSBAR_SET(Self.status, 3, "Rückgängig: " + t)
+        GUI_STATUSBAR_SET(Self.status, 3, trf$("Rückgängig: {0}", [t]))
     END SUB
 
     SUB miWiederholen_Aktion()
         DIM t AS STRING : t = verlauf.wiederholen$()
         IF t = "" THEN RETURN
         Self.geaendert()
-        GUI_STATUSBAR_SET(Self.status, 3, "Wiederholt: " + t)
+        GUI_STATUSBAR_SET(Self.status, 3, trf$("Wiederholt: {0}", [t]))
     END SUB
 
     ' Der Bestand als CSV wie export_inventory_to_csv der Python-App.
     ' KUEHL_EXPORT nennt die Datei ohne Dialog (für Prüfungen).
     SUB miExport_Aktion()
         DIM pfad AS STRING : pfad = GETENV$("KUEHL_EXPORT")
-        IF pfad = "" THEN pfad = FILE_SAVE_DIALOG("Bestand exportieren", "bestand.csv", "csv")
+        IF pfad = "" THEN pfad = FILE_SAVE_DIALOG(tr$("Bestand exportieren"), "bestand.csv", "csv")
         IF pfad = "" THEN RETURN
         DIM n AS INTEGER : n = csvSchreiben(pfad)
-        GUI_TOAST(Self.Fenster(), "Exportiert: " + STR$(n) + " Einträge.", "erfolg")
-        GUI_STATUSBAR_SET(Self.status, 3, "Exportiert: " + BASENAME(pfad))
+        GUI_TOAST(Self.Fenster(), trf$("Exportiert: {0} Einträge.", [STR$(n)]), "erfolg")
+        GUI_STATUSBAR_SET(Self.status, 3, trf$("Exportiert: {0}", [BASENAME(pfad)]))
     END SUB
 
     SUB miAktualisieren_Aktion()
         Self.geaendert()
-        GUI_STATUSBAR_SET(Self.status, 3, "Aktualisiert.")
+        GUI_STATUSBAR_SET(Self.status, 3, tr$("Aktualisiert."))
     END SUB
 
     SUB miBeenden_Aktion()

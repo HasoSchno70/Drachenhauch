@@ -9,7 +9,7 @@ CLASS GangplanFenster EXTENDS GangplanFenster_Basis
     DIM gesichert AS BOOLEAN
 
     SUB Geoeffnet()
-        GUI_SET_TEXT(Self.titel, "🏪 " + Self.markt + " -- Gang-Zuordnungen")
+        GUI_SET_TEXT(Self.titel, trf$("🏪 {0} -- Gang-Zuordnungen", [Self.markt]))
         GUI_TABLE_COL_TYPE(Self.tabelle, SP_G_GANG, "zahl")
         GUI_TABLE_COL_EDIT(Self.tabelle, SP_G_GANG, TRUE)
         ' Nach Gang (wie sorted(..., key=Gang)), gleiche in ihrer Reihenfolge.
@@ -54,7 +54,7 @@ CLASS GangplanFenster EXTENDS GangplanFenster_Basis
         DIM x AS STRING
         FOR EACH x IN Self.abteilungen()
             IF LOWER$(x) = LOWER$(a) THEN
-                Meldung("„" + a + "“ gibt es schon.", "Gangplan")
+                Meldung(trf$("„{0}“ gibt es schon.", [a]), tr$("Gangplan"))
                 RETURN
             END IF
         NEXT
@@ -77,7 +77,7 @@ CLASS GangplanFenster EXTENDS GangplanFenster_Basis
     SUB knopfSpeichern_Klick()
         DIM p AS ARRAY OF STRING : p = Self.plan()
         IF LEN(p) = 0 THEN
-            Meldung("Ein Gangplan braucht mindestens eine Abteilung.", "Gangplan")
+            Meldung(tr$("Ein Gangplan braucht mindestens eine Abteilung."), tr$("Gangplan"))
             RETURN
         END IF
         planSpeichern(Self.markt, p)

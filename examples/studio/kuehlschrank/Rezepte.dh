@@ -216,7 +216,7 @@ END FUNCTION
 ' Liefert je abgezogene Zutat eine Zeile "1,5 Liter Milch".
 FUNCTION kochen(x AS Rezept, faktor AS FLOAT) AS ARRAY OF STRING
     DIM aus AS ARRAY OF STRING : aus = []
-    verlauf.beginnen(x.name + " gekocht")
+    verlauf.beginnen(trf$("{0} gekocht", [x.name]))
     DB_BEGIN(db)
     DIM z AS Zutat
     FOR EACH z IN x.zutaten
@@ -267,7 +267,7 @@ FUNCTION fehlendeEinkaufen(x AS Rezept, faktor AS FLOAT) AS INTEGER
     FOR EACH z IN x.zutaten
         DIM fehlt AS FLOAT : fehlt = z.menge * faktor - verfuegbar(z)
         IF fehlt <= 0 THEN CONTINUE
-        IF n = 0 THEN verlauf.beginnen("Fehlendes für " + x.name)
+        IF n = 0 THEN verlauf.beginnen(trf$("Fehlendes für {0}", [x.name]))
         DB_EXEC(db, "INSERT INTO shopping_list (product_name, quantity, unit, priority, notes) VALUES (?, ?, ?, 1, ?)", z.name, fehlt, z.einheit, "Für: " + x.name)
         verlauf.neu("shopping_list", DB_LAST_ROWID(db))
         n = n + 1
@@ -280,7 +280,7 @@ END FUNCTION
 ' Ein Rezept mit seinen Zutaten -- ein Schritt (erst das Rezept, dann die
 ' Zutaten: Rückgängig nimmt sie in umgekehrter Reihenfolge).
 FUNCTION rezeptAnlegen(x AS Rezept) AS INTEGER
-    verlauf.beginnen(x.name + " angelegt")
+    verlauf.beginnen(trf$("{0} angelegt", [x.name]))
     DB_BEGIN(db)
     DB_EXEC(db, "INSERT INTO recipes (name, description, servings, instructions, prep_time_minutes, cook_time_minutes) VALUES (?, ?, ?, ?, ?, ?)", _
             x.name, IIF(x.beschreibung = "", NIL, x.beschreibung), MAX(1, x.portionen), IIF(x.anleitung = "", NIL, x.anleitung), IIF(x.vorb > 0, x.vorb, NIL), IIF(x.koch > 0, x.koch, NIL))
@@ -301,7 +301,7 @@ END FUNCTION
 ' Löschen merkt erst die Zutaten, dann das Rezept -- Rückgängig setzt so das
 ' Rezept vor seinen Zutaten wieder ein (der Fremdschlüssel will es so).
 SUB rezeptLoeschen(id AS INTEGER, name AS STRING)
-    verlauf.beginnen(name + " gelöscht")
+    verlauf.beginnen(trf$("{0} gelöscht", [name]))
     DIM zid AS INTEGER
     FOR EACH zid IN zahlListe("SELECT id FROM recipe_ingredients WHERE recipe_id = " + STR$(id) + " ORDER BY id")
         verlauf.merken("recipe_ingredients", zid)

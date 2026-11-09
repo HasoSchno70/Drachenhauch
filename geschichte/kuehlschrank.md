@@ -764,3 +764,88 @@ Gegenproben: sechsunddreißig im Beispiel, zwei im Studio, zwei in der gui --
 jede fällt in ihrem Fall. Die für den gekürzten Titel fiel erst, als die
 Bildprobe den Kopf wählte: ungewählt ist seine Schrift gedämpft und lag
 unter der Schwelle der Probe.
+
+## Stufe 8: Abschluss -- die englische Oberfläche (2026-11-09)
+
+Die Python-App bot unter Einstellungen → Allgemein eine Sprache an
+(„Deutsch“, „English“), die nichts tat. Hier gibt es die Oberfläche deutsch
+und englisch: die Klappliste „🌐 Sprache“ schreibt `language` in
+app_settings, die App wählt beim Start danach (`SpracheWaehlen` in
+`App.Geoeffnet`), ohne Einstellung gilt `DHRT_LANG`. Der Wechsel gilt ab dem
+nächsten Start -- gesagt in beiden Sprachen, wie im Studio.
+
+Die Tafel `sprache/en.txt` hat 713 Einträge: 283 Texte aus Fenstern, Menüs
+und dem Bericht, die die Laufzeit selbst übersetzt, und rund 430 aus dem
+Code, wo jeder Anzeigetext jetzt durch `tr$`/`trf$` geht -- auf Deutsch
+byte-gleich, alle Prüfsammlungen der Stufen 0 bis 7 blieben unverändert
+grün. Daten bleiben, wie sie in der Datenbank stehen: Lagerorte,
+Kategorien, Einheiten, Märkte, Gangpläne, die mitgelieferten Rezepte, auch
+Notizen, die die App selbst schreibt („Aus Einkaufsliste“). Wo ein Wort
+zugleich angezeigt und als Schlüssel gebraucht wird (Status „abgelaufen“,
+Grund „consumed“, der Netzwerkfehler eines Fundes), bleibt der Schlüssel und
+nur die Anzeige wird übersetzt (`statusText$`, `Fund.fehlerAnzeige$`).
+Englische Fassungen, die für ihr Feld zu lang waren, sind nach Bildern
+gekürzt („Below min.“, „Best before *“, „Last: {0}“).
+
+Dazu ein `LIESMICH.md` im Projekt, der Abschnitt „Sprachen“ und „Das große
+Beispiel“ im Handbuch des Studios (deutsch und englisch) und eine Regel in
+CLAUDE.md.
+
+**Abweichungen von der Python-App:** Die Sprache wirkt (dort tot). Zahlen
+mit Nachkommastellen und Datumsangaben behalten auf Englisch die deutsche
+Schreibweise („×1,0“, „09.11.2026“) bis auf die Größe der Datenbank und die
+Vorschau der Warnschwelle; wo das Deutsche keine Mehrzahl unterscheidet,
+steht im Englischen „(s)“.
+
+**Funde:**
+
+38. **Ein Studio-Projekt hatte keinen Weg zu einer zweiten Sprache.** Die
+    Texte der Fenster, Menüs und Berichte standen fest im erzeugten Code, und
+    die Laufzeit hatte kein `tr$`. Jetzt (`studio/laufzeit.dh`, Abschnitt
+    Sprache): eine Tafel `sprache/<code>.txt` im Projektordner, die das Studio
+    nach `assets/sprache/` kopiert; `SpracheWaehlen(code)`, `Sprache$()`,
+    `tr$`, `trf$`; `studioTexte$` übersetzt das Layout eines Fensters vor
+    `GUI_FROM_JSON` (Titel, Beschriftungen, Platzhalter, Tooltips,
+    Spaltenköpfe, Einträge, Reiter, Prüfregeln, Werkzeugleisten),
+    `studioBerichtTexte$` die Berichte, Menüs und Diagrammtitel gehen durch
+    `studioTr$`, Kürzel durch `studioKuerzel$` („Strg+S“ → „Ctrl+S“); die
+    Knöpfe von Frage/Eingabe/Auswahl/FarbeWaehlen und der Berichtsvorschau
+    kennt die Laufzeit selbst auf Englisch. `DH_STUDIO_SPRACHLUECKEN` schreibt
+    jeden Text ohne Übersetzung einmal in eine Datei. `trf$` setzt in einem
+    Durchgang ein -- ein Wert mit „{1}“ darin (ein Produktname) wird nicht
+    noch einmal ersetzt.
+39. **`READALL` riet zu einem Argument, das es nicht nahm.** Eine Datei, die
+    kein UTF-8 ist, meldet „dann als letztes Argument "cp1252" mitgeben“ --
+    `READALL(pfad, "cp1252")` war aber ein Fehler der Argumentzahl (gefunden,
+    als die Prüfung den Titel aus einem PDF lesen wollte). Jetzt nimmt
+    `READALL$(pfad, kodierung)` sie wie `READLINES`; auf einem offenen
+    FILE-Handle sagt ein zweites Argument, dass die Kodierung zu `OPENFILE`
+    gehört (Laufzeit).
+40. **Ein Spaltenkopf schrieb in den nächsten.** Zugeschnitten wurde nur die
+    ganze Kopfzeile, nicht die Spalte: „Best-before date“ lief über „Status“
+    (auch deutsch: „AblaufdatumStatus“). Jetzt endet ein zu breiter Titel mit
+    „...“ wie bei den Reiterköpfen (gui).
+
+**Fallen:** `studio/laufzeit.dh` braucht jetzt `IMPORT "json"` -- fehlte
+es, übersetzte jedes Projekt ohne eigenes JSON nicht mehr (17 Sammlungen
+des Studios fielen). Die Sprachprüfung des Studios sammelt `tr$("...")` aus
+`studio/*.dh` als Texte des Studios -- darum ruft der erzeugte Code und die
+Laufzeit selbst `studioTr$`. Ein Name wie `daten` ist im Projekt schon die
+Verbindung (`studio_datenbanken.dh`); eine Probe, die so heißt, übersetzt
+nicht. Die Code-Dateien haben vier Helfer parallel übersetzt, je eine Tafel;
+drei Schlüssel kamen doppelt mit verschiedener Übersetzung, die erste gilt.
+
+Tests `tests/pruef/kuehlschrank/stufe8_englisch.dhtest` (3: jeder Text hat
+eine Übersetzung, keine steht umsonst da, Platzhalter gleich, `tr$` nur mit
+Literal; auf Englisch gehen 17 Fenster und Seiten mit Vorrat in jedem Status
+auf, ohne Lücke und ohne Text der Tafel, der noch deutsch dasteht,
+Benachrichtigungen und Hinweise englisch; die Sprache aus den Einstellungen
+mit Meldung und Neustart, vor `DHRT_LANG`),
+`tests/pruef/studio/werkzeug_studio_sprache.dhtest` (ein Projekt englisch,
+deutsch und in der Sprache der App: Fenster, Menü, Kürzel, Diagramm,
+Bericht samt Titel und Seitenzahl, Lücken), je ein Fall in
+`module/kodierung` (2) und `gui/gui_tabelle_kante`.
+Gegenproben: zehn im Beispiel, neunzehn im Studio, zwei in der Laufzeit, eine
+in der gui (der Fall fiel gegen den Bau davor) -- jede fällt. Die für das
+Auslesen der Klappliste überlebte zuerst: die Probe wählte „Deutsch“, und
+das war auch die Vorgabe; jetzt wählt sie „English“.

@@ -16,7 +16,7 @@ CLASS AbschlussFenster EXTENDS AbschlussFenster_Basis
     DIM neuAngelegt AS INTEGER
 
     SUB Geoeffnet()
-        DIM m AS ARRAY OF STRING : m = ["-- Markt wählen --"]
+        DIM m AS ARRAY OF STRING : m = [tr$("-- Markt wählen --")]
         DIM s AS STRING
         FOR EACH s IN marktListe()
             ARRAY_PUSH(m, s)
@@ -51,14 +51,14 @@ CLASS AbschlussFenster EXTENDS AbschlussFenster_Basis
             DIM markt AS STRING : markt = IIF(pid > 0, letzterMarkt$(pid), "")
             DIM preis AS STRING : preis = IIF(pid > 0, letzterPreis$(pid), "")
             DIM z AS INTEGER : z = GUI_TABLE_ADD_ROW(Self.tabelle, ["", p.name, zahlText$(IIF(p.menge > 0, p.menge, 1.0)), einheitText$(IIF(p.einheit = "", "Stück", p.einheit)), _
-                tagePlus$(vorgabeTage(pid, p.name, p.kategorie)), vorgabeOrt$(pid, p.name, p.kategorie), preis, IIF(markt = "", "Neu", markt)])
+                tagePlus$(vorgabeTage(pid, p.name, p.kategorie)), vorgabeOrt$(pid, p.name, p.kategorie), preis, IIF(markt = "", tr$("Neu"), markt)])
             GUI_TABLE_CELL_KIND(Self.tabelle, z, SP_A_HAKEN, "haken")
             GUI_TABLE_CELL_VALUE(Self.tabelle, z, SP_A_HAKEN, 1)
             IF markt <> "" THEN GUI_TABLE_CELL_COLOR(Self.tabelle, z, SP_A_MARKT, &H80CBC4, &H1F4F4A)
             ARRAY_PUSH(Self.posten, p)
             ARRAY_PUSH(Self.produkte, pid)
         NEXT
-        GUI_SET_TEXT(Self.untertitel, STR$(LEN(Self.posten)) + " gekaufte Artikel zum Bestand hinzufügen")
+        GUI_SET_TEXT(Self.untertitel, trf$("{0} gekaufte Artikel zum Bestand hinzufügen", [STR$(LEN(Self.posten))]))
     END SUB
 
     FUNCTION gewaehlt(z AS INTEGER) AS BOOLEAN
@@ -88,7 +88,7 @@ CLASS AbschlussFenster EXTENDS AbschlussFenster_Basis
             GUI_TABLE_SET_CELL(Self.tabelle, z, SP_A_MHD, tagePlus$(INT(GUI_VALUE(Self.tageFeld))))
             n = n + 1
         NEXT
-        IF n > 0 THEN GUI_TOAST(Self.studioWin, "Ablaufdatum für " + STR$(n) + " Artikel gesetzt", "erfolg")
+        IF n > 0 THEN GUI_TOAST(Self.studioWin, trf$("Ablaufdatum für {0} Artikel gesetzt", [STR$(n)]), "erfolg")
     END SUB
 
     SUB knopfOrt_Klick()
@@ -99,7 +99,7 @@ CLASS AbschlussFenster EXTENDS AbschlussFenster_Basis
             GUI_TABLE_SET_CELL(Self.tabelle, z, SP_A_ORT, GUI_DROPDOWN_TEXT(Self.ortWahl))
             n = n + 1
         NEXT
-        IF n > 0 THEN GUI_TOAST(Self.studioWin, "Lagerort für " + STR$(n) + " Artikel gesetzt", "erfolg")
+        IF n > 0 THEN GUI_TOAST(Self.studioWin, trf$("Lagerort für {0} Artikel gesetzt", [STR$(n)]), "erfolg")
     END SUB
 
     FUNCTION menge(z AS INTEGER) AS FLOAT
@@ -112,9 +112,9 @@ CLASS AbschlussFenster EXTENDS AbschlussFenster_Basis
         FOR z = 0 TO LEN(Self.posten) - 1
             IF NOT Self.gewaehlt(z) THEN CONTINUE
             DIM n AS STRING : n = Self.posten[z].name
-            IF Self.menge(z) <= 0 THEN RETURN n + ": die Menge muss größer als 0 sein."
-            IF NOT datumOk(TRIM$(GUI_TABLE_GET_CELL(Self.tabelle, z, SP_A_MHD)), FALSE) THEN RETURN n + ": das Ablaufdatum braucht die Form JJJJ-MM-TT."
-            IF TRIM$(GUI_TABLE_GET_CELL(Self.tabelle, z, SP_A_ORT)) = "" THEN RETURN n + ": bitte einen Lagerort wählen."
+            IF Self.menge(z) <= 0 THEN RETURN trf$("{0}: die Menge muss größer als 0 sein.", [n])
+            IF NOT datumOk(TRIM$(GUI_TABLE_GET_CELL(Self.tabelle, z, SP_A_MHD)), FALSE) THEN RETURN trf$("{0}: das Ablaufdatum braucht die Form JJJJ-MM-TT.", [n])
+            IF TRIM$(GUI_TABLE_GET_CELL(Self.tabelle, z, SP_A_ORT)) = "" THEN RETURN trf$("{0}: bitte einen Lagerort wählen.", [n])
         NEXT
         RETURN ""
     END FUNCTION
@@ -141,26 +141,26 @@ CLASS AbschlussFenster EXTENDS AbschlussFenster_Basis
             IF Self.gewaehlt(z) THEN n = n + 1
         NEXT
         IF n = 0 THEN
-            Meldung("Bitte wähle mindestens einen Artikel aus!", "Keine Auswahl")
+            Meldung(tr$("Bitte wähle mindestens einen Artikel aus!"), tr$("Keine Auswahl"))
             RETURN
         END IF
         DIM fehler AS STRING : fehler = Self.pruefen$()
         IF fehler <> "" THEN
-            Meldung(fehler, "Bitte prüfen")
+            Meldung(fehler, tr$("Bitte prüfen"))
             RETURN
         END IF
         DIM ab AS STRING : ab = Self.abweichungen$()
         IF ab <> "" THEN
-            IF Frage("Mengen weichen von der Einkaufsliste ab:" + CHR$(10) + CHR$(10) + ab + CHR$(10) + "Mit diesen Mengen übertragen?", "Übertragen|Abbrechen", "Mengen geändert") <> 1 THEN RETURN
+            IF Frage(tr$("Mengen weichen von der Einkaufsliste ab:") + CHR$(10) + CHR$(10) + ab + CHR$(10) + tr$("Mit diesen Mengen übertragen?"), tr$("Übertragen|Abbrechen"), tr$("Mengen geändert")) <> 1 THEN RETURN
         END IF
         DIM markt AS STRING : markt = ""
         IF GUI_DROPDOWN_SELECTED(Self.marktWahl) > 0 THEN markt = GUI_DROPDOWN_TEXT(Self.marktWahl)
         IF markt = "" THEN
-            IF Frage("Du hast keinen Markt ausgewählt. Ohne Markt kann die App nicht lernen, wo du einkaufst." + CHR$(10) + CHR$(10) + "Trotzdem fortfahren?", "Abbrechen|Fortfahren", "Kein Markt ausgewählt") <> 2 THEN RETURN
+            IF Frage(tr$("Du hast keinen Markt ausgewählt. Ohne Markt kann die App nicht lernen, wo du einkaufst.") + CHR$(10) + CHR$(10) + tr$("Trotzdem fortfahren?"), tr$("Abbrechen|Fortfahren"), tr$("Kein Markt ausgewählt")) <> 2 THEN RETURN
         END IF
         Self.uebernehmen(markt)
-        Meldung(STR$(Self.uebertragen) + " Artikel wurden zum Bestand hinzugefügt!" + IIF(markt = "", "", CHR$(10) + "🏪 Markt: " + markt) + _
-                IIF(Self.neuAngelegt > 0, CHR$(10) + "📦 " + STR$(Self.neuAngelegt) + " neue Produkte angelegt", ""), "Erfolg")
+        Meldung(trf$("{0} Artikel wurden zum Bestand hinzugefügt!", [STR$(Self.uebertragen)]) + IIF(markt = "", "", CHR$(10) + trf$("🏪 Markt: {0}", [markt])) + _
+                IIF(Self.neuAngelegt > 0, CHR$(10) + trf$("📦 {0} neue Produkte angelegt", [STR$(Self.neuAngelegt)]), ""), tr$("Erfolg"))
         Self.Zumachen()
     END SUB
 
@@ -169,7 +169,7 @@ CLASS AbschlussFenster EXTENDS AbschlussFenster_Basis
         DIM h AS STRING : h = heute$()
         Self.uebertragen = 0
         Self.neuAngelegt = 0
-        verlauf.beginnen("Einkauf abgeschlossen")
+        verlauf.beginnen(tr$("Einkauf abgeschlossen"))
         DB_BEGIN(db)
         DIM z AS INTEGER
         FOR z = 0 TO LEN(Self.posten) - 1

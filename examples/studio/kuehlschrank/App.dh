@@ -6,6 +6,10 @@ CLASS App EXTENDS StudioApp
 
     SUB Geoeffnet()
         dbOeffnen()
+        ' Die Sprache aus den Einstellungen (Tafel sprache/en.txt); ohne
+        ' Einstellung die von DHRT_LANG -- das wählt die Laufzeit schon selbst.
+        DIM sp AS STRING : sp = einstellung$("language", "")
+        IF sp <> "" THEN SpracheWaehlen(IIF(sp = "en", "en", ""))
         ' Hell oder dunkel nach den Einstellungen, mit dem Teal der Python-App.
         themaSetzen(einstellungJa("dark_mode", TRUE))
     END SUB

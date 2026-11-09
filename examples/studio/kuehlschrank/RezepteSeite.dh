@@ -9,8 +9,8 @@ CLASS RezepteSeite EXTENDS RezepteSeite_Basis
     DIM ids AS ARRAY OF INTEGER
 
     SUB Geoeffnet()
-        GUI_SET_DROPDOWN(Self.sortierWahl, ["Name (A-Z)", "Name (Z-A)", "Kochzeit (kurz → lang)", "Kochzeit (lang → kurz)", _
-            "Portionen (wenig → viel)", "Portionen (viel → wenig)", "Zutaten (wenig → viel)", "Zutaten (viel → wenig)"])
+        GUI_SET_DROPDOWN(Self.sortierWahl, [tr$("Name (A-Z)"), tr$("Name (Z-A)"), tr$("Kochzeit (kurz → lang)"), tr$("Kochzeit (lang → kurz)"), _
+            tr$("Portionen (wenig → viel)"), tr$("Portionen (viel → wenig)"), tr$("Zutaten (wenig → viel)"), tr$("Zutaten (viel → wenig)")])
         GUI_DROPDOWN_SET_SELECTED(Self.sortierWahl, 0)
         Self.laden()
     END SUB
@@ -66,8 +66,8 @@ CLASS RezepteSeite EXTENDS RezepteSeite_Basis
         Self.ids = []
         FOR EACH x IN liste
             DIM marke AS STRING : marke = IIF(x.kochbar, "✅ ", IIF(x.prozent >= 75, "🟡 ", ""))
-            DIM z AS INTEGER : z = GUI_TABLE_ADD_ROW(Self.tabelle, [marke + x.name, STR$(x.portionen) + " Port.", STR$(x.zutatenZahl) + " Zutat(en)", _
-                minutenText$(x.vorb), minutenText$(x.koch), minutenText$(x.gesamt()), "🍳 Kochen", "🗑"])
+            DIM z AS INTEGER : z = GUI_TABLE_ADD_ROW(Self.tabelle, [marke + x.name, trf$("{0} Port.", [STR$(x.portionen)]), trf$("{0} Zutat(en)", [STR$(x.zutatenZahl)]), _
+                minutenText$(x.vorb), minutenText$(x.koch), minutenText$(x.gesamt()), tr$("🍳 Kochen"), "🗑"])
             ARRAY_PUSH(Self.ids, x.id)
             GUI_TABLE_CELL_KIND(Self.tabelle, z, SP_R_KOCHEN, "knopf")
             GUI_TABLE_CELL_KIND(Self.tabelle, z, SP_R_WEG, "knopf")
@@ -77,11 +77,11 @@ CLASS RezepteSeite EXTENDS RezepteSeite_Basis
             IF x.gesamt() > 0 THEN GUI_TABLE_CELL_COLOR(Self.tabelle, z, 5, farbe, -1)
         NEXT
         IF LEN(Self.alle) = 0 THEN
-            GUI_SET_TEXT(Self.info, "📖 Noch keine Rezepte vorhanden. Füge dein erstes Rezept hinzu oder suche im Katalog!")
+            GUI_SET_TEXT(Self.info, tr$("📖 Noch keine Rezepte vorhanden. Füge dein erstes Rezept hinzu oder suche im Katalog!"))
         ELSEIF LEN(liste) = LEN(Self.alle) THEN
-            GUI_SET_TEXT(Self.info, "📚 " + STR$(LEN(Self.alle)) + " Rezept(e) gespeichert")
+            GUI_SET_TEXT(Self.info, trf$("📚 {0} Rezept(e) gespeichert", [STR$(LEN(Self.alle))]))
         ELSE
-            GUI_SET_TEXT(Self.info, "🔍 " + STR$(LEN(liste)) + " von " + STR$(LEN(Self.alle)) + " Rezepten angezeigt (Filter aktiv)")
+            GUI_SET_TEXT(Self.info, trf$("🔍 {0} von {1} Rezepten angezeigt (Filter aktiv)", [STR$(LEN(liste)), STR$(LEN(Self.alle))]))
         END IF
     END SUB
 
@@ -153,9 +153,9 @@ CLASS RezepteSeite EXTENDS RezepteSeite_Basis
         ELSEIF spalte = SP_R_WEG THEN
             DIM x AS Rezept : x = rezeptLaden(id)
             IF x IS NIL THEN RETURN
-            IF Frage("„" + x.name + "“ löschen?", "Löschen|Abbrechen", "Löschen") <> 1 THEN RETURN
+            IF Frage(trf$("„{0}“ löschen?", [x.name]), tr$("Löschen|Abbrechen"), tr$("Löschen")) <> 1 THEN RETURN
             rezeptLoeschen(id, x.name)
-            GUI_TOAST(Self.studioWin, x.name + " gelöscht [Strg+Z]", "erfolg")
+            GUI_TOAST(Self.studioWin, trf$("{0} gelöscht [Strg+Z]", [x.name]), "erfolg")
             Self.geaendert()
         END IF
     END SUB
@@ -176,14 +176,14 @@ CLASS RezepteSeite EXTENDS RezepteSeite_Basis
         DIM f AS RezeptNeuFenster : f = NEW RezeptNeuFenster()
         f.ZeigenModal()
         IF f.gesichert THEN
-            GUI_TOAST(Self.studioWin, "„" + f.x.name + "“ gespeichert.", "erfolg")
+            GUI_TOAST(Self.studioWin, trf$("„{0}“ gespeichert.", [f.x.name]), "erfolg")
             Self.geaendert()
         END IF
     END SUB
 
     SUB knopfKochbar_Klick()
         IF LEN(Self.alle) = 0 THEN
-            Meldung("Du hast noch keine Rezepte gespeichert.", "Keine Rezepte")
+            Meldung(tr$("Du hast noch keine Rezepte gespeichert."), tr$("Keine Rezepte"))
             RETURN
         END IF
         Self.vorschlag("kochbar")
@@ -191,11 +191,11 @@ CLASS RezepteSeite EXTENDS RezepteSeite_Basis
 
     SUB knopfAblauf_Klick()
         IF LEN(ablaufende()) = 0 THEN
-            Meldung("✅ Super! Du hast keine Produkte, die bald ablaufen.", "Keine ablaufenden Produkte")
+            Meldung(tr$("✅ Super! Du hast keine Produkte, die bald ablaufen."), tr$("Keine ablaufenden Produkte"))
             RETURN
         END IF
         IF LEN(Self.alle) = 0 THEN
-            Meldung("Du hast noch keine Rezepte gespeichert. Füge Rezepte hinzu, um Vorschläge zu erhalten!", "Keine Rezepte")
+            Meldung(tr$("Du hast noch keine Rezepte gespeichert. Füge Rezepte hinzu, um Vorschläge zu erhalten!"), tr$("Keine Rezepte"))
             RETURN
         END IF
         Self.vorschlag("ablauf")

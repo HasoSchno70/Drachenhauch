@@ -32,15 +32,15 @@ CLASS RezeptNeuFenster EXTENDS RezeptNeuFenster_Basis
         GUI_TABLE_CLEAR(Self.tabelle)
         DIM z AS Zutat
         FOR EACH z IN Self.x.zutaten
-            DIM r AS INTEGER : r = GUI_TABLE_ADD_ROW(Self.tabelle, [z.name, zahlText$(z.menge), z.einheit, IIF(z.produktId > 0, "✅ Ja", "➖ Nein"), "🗑"])
+            DIM r AS INTEGER : r = GUI_TABLE_ADD_ROW(Self.tabelle, [z.name, zahlText$(z.menge), z.einheit, IIF(z.produktId > 0, tr$("✅ Ja"), tr$("➖ Nein")), "🗑"])
             GUI_TABLE_CELL_KIND(Self.tabelle, r, 4, "knopf")
             GUI_TABLE_CELL_COLOR(Self.tabelle, r, 3, IIF(z.produktId > 0, &H81C784, &H8A9099), -1)
         NEXT
         DIM n AS INTEGER : n = LEN(Self.x.zutaten)
         IF TRIM$(GUI_TEXT(Self.nameFeld)) = "" OR n = 0 THEN
-            GUI_SET_TEXT(Self.info, "💡 Fülle mindestens den Namen und eine Zutat aus")
+            GUI_SET_TEXT(Self.info, tr$("💡 Fülle mindestens den Namen und eine Zutat aus"))
         ELSE
-            GUI_SET_TEXT(Self.info, "✅ " + STR$(n) + " Zutat(en) -- bereit zum Speichern")
+            GUI_SET_TEXT(Self.info, trf$("✅ {0} Zutat(en) -- bereit zum Speichern", [STR$(n)]))
         END IF
     END SUB
 
@@ -51,7 +51,7 @@ CLASS RezeptNeuFenster EXTENDS RezeptNeuFenster_Basis
     SUB knopfZutat_Klick()
         DIM name AS STRING : name = TRIM$(GUI_TEXT(Self.zutatFeld))
         IF name = "" THEN
-            Meldung("Bitte gib einen Zutatennamen ein!", "Fehler")
+            Meldung(tr$("Bitte gib einen Zutatennamen ein!"), tr$("Fehler"))
             RETURN
         END IF
         DIM z AS Zutat : z = NEW Zutat()
@@ -77,11 +77,11 @@ CLASS RezeptNeuFenster EXTENDS RezeptNeuFenster_Basis
     SUB knopfSpeichern_Klick()
         DIM name AS STRING : name = TRIM$(GUI_TEXT(Self.nameFeld))
         IF name = "" THEN
-            Meldung("Bitte gib einen Rezeptnamen ein!", "Fehler")
+            Meldung(tr$("Bitte gib einen Rezeptnamen ein!"), tr$("Fehler"))
             RETURN
         END IF
         IF LEN(Self.x.zutaten) = 0 THEN
-            Meldung("Bitte füge mindestens eine Zutat hinzu!", "Fehler")
+            Meldung(tr$("Bitte füge mindestens eine Zutat hinzu!"), tr$("Fehler"))
             RETURN
         END IF
         Self.x.name = name

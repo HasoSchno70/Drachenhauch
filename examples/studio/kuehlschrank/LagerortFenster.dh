@@ -22,7 +22,7 @@ CLASS LagerortFenster EXTENDS LagerortFenster_Basis
         DIM e AS Eintrag
         DIM stueck AS FLOAT : stueck = 0
         FOR EACH e IN eintraegeAn(Self.ort)
-            DIM z AS INTEGER : z = GUI_TABLE_ADD_ROW(Self.tabelle, [e.name, IIF(e.marke = "", "-", e.marke), e.mengeText$(), IIF(e.bereich = "", "-", e.bereich), IIF(e.ablauf = "", "-", e.ablauf), e.statusText$(schwelle), "Entnehmen"])
+            DIM z AS INTEGER : z = GUI_TABLE_ADD_ROW(Self.tabelle, [e.name, IIF(e.marke = "", "-", e.marke), e.mengeText$(), IIF(e.bereich = "", "-", e.bereich), IIF(e.ablauf = "", "-", e.ablauf), e.statusText$(schwelle), tr$("Entnehmen")])
             ARRAY_PUSH(Self.ids, e.id)
             GUI_TABLE_CELL_KIND(Self.tabelle, z, SP_ENTNEHMEN, "knopf")
             GUI_TABLE_CELL_COLOR(Self.tabelle, z, SP_ENTNEHMEN, &HF5C6C6, &H5C3434)
@@ -33,7 +33,7 @@ CLASS LagerortFenster EXTENDS LagerortFenster_Basis
             END SELECT
         NEXT
         DIM n AS INTEGER : n = LEN(Self.ids)
-        GUI_SET_TEXT(Self.info, "📦 " + IIF(n = 1, "1 Eintrag", STR$(n) + " Einträge") + " an diesem Lagerort")
+        GUI_SET_TEXT(Self.info, IIF(n = 1, tr$("📦 1 Eintrag an diesem Lagerort"), trf$("📦 {0} Einträge an diesem Lagerort", [STR$(n)])))
     END SUB
 
     ' Ein Stück heraus: Menge minus eins, beim letzten (oder bei weniger als
@@ -42,11 +42,11 @@ CLASS LagerortFenster EXTENDS LagerortFenster_Basis
         IF spalte <> SP_ENTNEHMEN OR zeile < 0 OR zeile >= LEN(Self.ids) THEN RETURN
         DIM e AS Eintrag : e = eintragLaden(Self.ids[zeile])
         IF e IS NIL THEN RETURN
-        IF Frage("Ein Stück " + e.name + " entnehmen?", "Entnehmen|Abbrechen", "Entnehmen") <> 1 THEN RETURN
+        IF Frage(trf$("Ein Stück {0} entnehmen?", [e.name]), tr$("Entnehmen|Abbrechen"), tr$("Entnehmen")) <> 1 THEN RETURN
         IF e.menge > 1.0 THEN
             mengeSetzen(e, e.menge - 1.0)
         ELSE
-            entnehmen(e, "consumed", e.name + " verbraucht")
+            entnehmen(e, "consumed", trf$("{0} verbraucht", [e.name]))
         END IF
         Self.geaendert = TRUE
         Self.laden()

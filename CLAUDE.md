@@ -271,7 +271,8 @@ Einzelheiten stehen in der Geschichte des Bereichs.
   Ein Datenbank-Element aus einer fremden Datei hält deren Arten wörtlich
   (`sql`, `sqlvorgabe`) -- der Abgleich darf ihre Tabellen nicht umbauen.
 - Anzeigetexte gehen durch `tr$` (Tafeln `ide/sprache/en.txt`,
-  `studio/sprache/en.txt`, `examples/glutfaden/daten/sprache/en.txt`);
+  `studio/sprache/en.txt`, `examples/glutfaden/daten/sprache/en.txt`,
+  `examples/studio/kuehlschrank/sprache/en.txt`);
   **Schlüssel bleiben deutsch, übersetzt wird beim Anzeigen** (Ereignisnamen,
   Kategorien, Konfig-Schlüssel, Protokollzeilen).
 - Tests der IDE setzen `DH_IDE_KONFIG` (sonst schreibt jeder Lauf dem Nutzer
@@ -284,6 +285,12 @@ Einzelheiten stehen in der Geschichte des Bereichs.
   Controls mit (`instanzAusklappen`, `seitenDerTeile` in `studio/modell.dh`).
 - Kreuz und ESC: `WINDOW_CLOSE_REQUESTED()` fragt bei Ungesichertem nach;
   `QUITREQUESTED()` ohne Kreuz ist das Bildlimit eines Testlaufs.
+- Ein Studio-Projekt übersetzt sich über die Laufzeit des Studios: Tafel
+  `sprache/<code>.txt` im Projektordner, im Code `tr$`/`trf$` mit einem
+  LITERAL (Prüfungen sammeln die Literale), Fenster, Menüs und Berichte
+  übersetzt `studioTexte$` selbst. Daten aus der Datenbank bleiben, wie sie
+  sind; was ein Widget zurückliefert, ist die Übersetzung -- verglichen wird
+  über den Index oder mit `tr$`.
 - Die Kopien der Werkzeuge in Prüfungen laufen in `_programm/` -- Ordner mit
   `_` übergeht die IDE beim Durchsuchen. `--- programm` kopiert per
   `IMPORT "x.dh"` eingebundene Dateien mit, aber `--- einschub nach`,

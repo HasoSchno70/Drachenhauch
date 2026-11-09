@@ -43,17 +43,18 @@ CLASS Statistikdaten
         WEND
     END SUB
 
-    ' Die Hinweise wie _update_insights, je einer als "art|sinnbild|titel|text".
+    ' Die Hinweise wie _update_insights, je einer als "art|sinnbild|titel|text"
+    ' (art ist ein Schlüssel, Titel und Text sind schon übersetzt).
     FUNCTION einsichten() AS ARRAY OF STRING
         DIM aus AS ARRAY OF STRING : aus = []
-        IF Self.abgelaufen > 0 THEN ARRAY_PUSH(aus, "gefahr|⚠|Abgelaufene Produkte|Du hast " + STR$(Self.abgelaufen) + " abgelaufene Artikel. Überprüfe diese zeitnah!")
-        IF Self.bald > 0 THEN ARRAY_PUSH(aus, "warnung|⏰|Bald ablaufend|" + STR$(Self.bald) + " Artikel laufen in den nächsten " + STR$(Self.schwelle) + " Tagen ab.")
+        IF Self.abgelaufen > 0 THEN ARRAY_PUSH(aus, "gefahr|⚠|" + tr$("Abgelaufene Produkte") + "|" + trf$("Du hast {0} abgelaufene Artikel. Überprüfe diese zeitnah!", [STR$(Self.abgelaufen)]))
+        IF Self.bald > 0 THEN ARRAY_PUSH(aus, "warnung|⏰|" + tr$("Bald ablaufend") + "|" + trf$("{0} Artikel laufen in den nächsten {1} Tagen ab.", [STR$(Self.bald), STR$(Self.schwelle)]))
         IF Self.gesamt > 20 THEN
-            ARRAY_PUSH(aus, "erfolg|📦|Gut gefüllt!|Dein Kühlschrank ist mit " + STR$(Self.gesamt) + " Artikeln gut bestückt.")
+            ARRAY_PUSH(aus, "erfolg|📦|" + tr$("Gut gefüllt!") + "|" + trf$("Dein Kühlschrank ist mit {0} Artikeln gut bestückt.", [STR$(Self.gesamt)]))
         ELSEIF Self.gesamt < 5 THEN
-            ARRAY_PUSH(aus, "info|🛒|Einkaufen gehen?|Nur noch " + STR$(Self.gesamt) + " Artikel im Bestand. Zeit für einen Einkauf!")
+            ARRAY_PUSH(aus, "info|🛒|" + tr$("Einkaufen gehen?") + "|" + trf$("Nur noch {0} Artikel im Bestand. Zeit für einen Einkauf!", [STR$(Self.gesamt)]))
         END IF
-        IF LEN(Self.katNamen) > 0 THEN ARRAY_PUSH(aus, "lila|🏆|Top Kategorie|'" + Self.katNamen[0] + "' ist deine meistgenutzte Kategorie mit " + STR$(Self.katZahlen[0]) + " Artikeln.")
+        IF LEN(Self.katNamen) > 0 THEN ARRAY_PUSH(aus, "lila|🏆|" + tr$("Top Kategorie") + "|" + trf$("'{0}' ist deine meistgenutzte Kategorie mit {1} Artikeln.", [Self.katNamen[0], STR$(Self.katZahlen[0])]))
         RETURN aus
     END FUNCTION
 END CLASS

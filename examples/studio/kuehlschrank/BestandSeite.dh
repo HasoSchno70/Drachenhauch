@@ -29,12 +29,12 @@ CLASS BestandSeite EXTENDS BestandSeite_Basis
     SUB Geoeffnet()
         Self.kontext = GUI_CONTEXT(Self.studioWin)
         GUI_CONTEXT_WIDGET(Self.kontext, Self.tabelle)
-        Self.miBearbeiten = GUI_MENU_ITEM(Self.kontext, "Bearbeiten …")
-        Self.miMindestmenge = GUI_MENU_ITEM(Self.kontext, "Mindestmenge setzen …")
+        Self.miBearbeiten = GUI_MENU_ITEM(Self.kontext, tr$("Bearbeiten …"))
+        Self.miMindestmenge = GUI_MENU_ITEM(Self.kontext, tr$("Mindestmenge setzen …"))
         GUI_MENU_SEPARATOR(Self.kontext)
-        Self.miVerbraucht = GUI_MENU_ITEM(Self.kontext, "Verbraucht")
-        Self.miAbgelaufen = GUI_MENU_ITEM(Self.kontext, "Abgelaufen")
-        Self.miLoeschen = GUI_MENU_ITEM(Self.kontext, "Löschen")
+        Self.miVerbraucht = GUI_MENU_ITEM(Self.kontext, tr$("Verbraucht"))
+        Self.miAbgelaufen = GUI_MENU_ITEM(Self.kontext, tr$("Abgelaufen"))
+        Self.miLoeschen = GUI_MENU_ITEM(Self.kontext, tr$("Löschen"))
         Self.filterSetzen("")
     END SUB
 
@@ -75,10 +75,10 @@ CLASS BestandSeite EXTENDS BestandSeite_Basis
             IF e.status$(Self.schwelle) = "abgelaufen" THEN ab = ab + 1
             IF e.status$(Self.schwelle) = "bald" THEN bald = bald + 1
         NEXT
-        DIM text AS STRING : text = STR$(LEN(Self.ids)) + IIF(LEN(Self.ids) = 1, " Eintrag", " Einträge")
-        IF LEN(Self.ids) < LEN(Self.eintraege) THEN text = text + " von " + STR$(LEN(Self.eintraege))
-        IF ab > 0 THEN text = text + ", " + STR$(ab) + " abgelaufen"
-        IF bald > 0 THEN text = text + ", " + STR$(bald) + " bald ablaufend"
+        DIM text AS STRING : text = IIF(LEN(Self.ids) = 1, trf$("{0} Eintrag", [STR$(LEN(Self.ids))]), trf$("{0} Einträge", [STR$(LEN(Self.ids))]))
+        IF LEN(Self.ids) < LEN(Self.eintraege) THEN text = text + trf$(" von {0}", [STR$(LEN(Self.eintraege))])
+        IF ab > 0 THEN text = text + trf$(", {0} abgelaufen", [STR$(ab)])
+        IF bald > 0 THEN text = text + trf$(", {0} bald ablaufend", [STR$(bald)])
         GUI_SET_TEXT(Self.zusammenfassung, text + ".")
     END SUB
 
@@ -172,9 +172,9 @@ CLASS BestandSeite EXTENDS BestandSeite_Basis
         IF e IS NIL THEN RETURN
         DIM neu AS FLOAT : neu = e.menge + IIF(spalte = SP_PLUS, 1.0, -1.0)
         IF neu <= 0 THEN
-            IF Frage(e.name + " ist aufgebraucht?", "Verbraucht|Abbrechen", "Verbraucht?") <> 1 THEN RETURN
-            entnehmen(e, "consumed", e.name + " verbraucht")
-            GUI_TOAST(Self.studioWin, e.name + " verbraucht. Strg+Z nimmt es zurück.", "erfolg")
+            IF Frage(trf$("{0} ist aufgebraucht?", [e.name]), tr$("Verbraucht|Abbrechen"), tr$("Verbraucht?")) <> 1 THEN RETURN
+            entnehmen(e, "consumed", trf$("{0} verbraucht", [e.name]))
+            GUI_TOAST(Self.studioWin, trf$("{0} verbraucht. Strg+Z nimmt es zurück.", [e.name]), "erfolg")
         ELSE
             mengeSetzen(e, neu)
         END IF
@@ -206,10 +206,10 @@ CLASS BestandSeite EXTENDS BestandSeite_Basis
         DIM e AS Eintrag : e = eintragLaden(Self.ids[zeile])
         IF e IS NIL THEN RETURN
         IF NOT verlegen(e, Self.ziele[ziel]) THEN
-            GUI_TOAST(Self.studioWin, e.name + " liegt schon dort.", "info")
+            GUI_TOAST(Self.studioWin, trf$("{0} liegt schon dort.", [e.name]), "info")
             RETURN
         END IF
-        GUI_TOAST(Self.studioWin, e.name + " → " + Self.ziele[ziel] + " [Strg+Z]", "erfolg")
+        GUI_TOAST(Self.studioWin, trf$("{0} → {1} [Strg+Z]", [e.name, Self.ziele[ziel]]), "erfolg")
         Self.laden()
         Self.Ausloesen("Geaendert")
     END SUB
@@ -224,19 +224,44 @@ CLASS BestandSeite EXTENDS BestandSeite_Basis
                 Self.Ausloesen("Mindestmenge")
             END IF
         END IF
-        IF GUI_CLICKED(Self.miVerbraucht) THEN Self.markieren("consumed", "verbraucht", "Verbraucht")
-        IF GUI_CLICKED(Self.miAbgelaufen) THEN Self.markieren("expired", "abgelaufen", "Abgelaufen")
-        IF GUI_CLICKED(Self.miLoeschen) THEN Self.markieren("deleted", "gelöscht", "Löschen")
+        IF GUI_CLICKED(Self.miVerbraucht) THEN Self.markieren("consumed")
+        IF GUI_CLICKED(Self.miAbgelaufen) THEN Self.markieren("expired")
+        IF GUI_CLICKED(Self.miLoeschen) THEN Self.markieren("deleted")
     END SUB
 
-    SUB markieren(grund AS STRING, wort AS STRING, knopf AS STRING)
+    ' Frage, Schritt und Meldung je Grund als ganze Sätze (für die Übersetzung).
+    SUB markieren(grund AS STRING)
         IF Self.gewaehlt() < 0 THEN RETURN
         DIM e AS Eintrag : e = eintragLaden(Self.gewaehlt())
         IF e IS NIL THEN RETURN
-        DIM nachfrage AS STRING : nachfrage = IIF(grund = "deleted", e.name + " wirklich löschen?", e.name + " als " + wort + " markieren?")
-        IF Frage(nachfrage, knopf + "|Abbrechen", knopf) <> 1 THEN RETURN
-        entnehmen(e, grund, e.name + " " + wort)
-        GUI_TOAST(Self.studioWin, e.name + " " + wort + ". Strg+Z nimmt es zurück.", IIF(grund = "consumed", "erfolg", "warnung"))
+        DIM nachfrage AS STRING
+        DIM knoepfe AS STRING
+        DIM titel AS STRING
+        DIM schrittText AS STRING
+        DIM toast AS STRING
+        SELECT CASE grund
+            CASE "consumed"
+                nachfrage = trf$("{0} als verbraucht markieren?", [e.name])
+                knoepfe = tr$("Verbraucht|Abbrechen")
+                titel = tr$("Verbraucht")
+                schrittText = trf$("{0} verbraucht", [e.name])
+                toast = trf$("{0} verbraucht. Strg+Z nimmt es zurück.", [e.name])
+            CASE "expired"
+                nachfrage = trf$("{0} als abgelaufen markieren?", [e.name])
+                knoepfe = tr$("Abgelaufen|Abbrechen")
+                titel = tr$("Abgelaufen")
+                schrittText = trf$("{0} abgelaufen", [e.name])
+                toast = trf$("{0} abgelaufen. Strg+Z nimmt es zurück.", [e.name])
+            CASE ELSE
+                nachfrage = trf$("{0} wirklich löschen?", [e.name])
+                knoepfe = tr$("Löschen|Abbrechen")
+                titel = tr$("Löschen")
+                schrittText = trf$("{0} gelöscht", [e.name])
+                toast = trf$("{0} gelöscht. Strg+Z nimmt es zurück.", [e.name])
+        END SELECT
+        IF Frage(nachfrage, knoepfe, titel) <> 1 THEN RETURN
+        entnehmen(e, grund, schrittText)
+        GUI_TOAST(Self.studioWin, toast, IIF(grund = "consumed", "erfolg", "warnung"))
         Self.laden()
         Self.Ausloesen("Geaendert")
     END SUB

@@ -30,12 +30,12 @@ CLASS Eintrag
 
     FUNCTION statusText$(schwelle AS INTEGER) AS STRING
         SELECT CASE Self.status$(schwelle)
-            CASE "abgelaufen" : RETURN "Abgelaufen"
-            CASE "frisch" : RETURN "Frisch"
+            CASE "abgelaufen" : RETURN tr$("Abgelaufen")
+            CASE "frisch" : RETURN tr$("Frisch")
             CASE "bald"
-                IF Self.tage = 0 THEN RETURN "Heute"
-                IF Self.tage = 1 THEN RETURN "Morgen"
-                RETURN STR$(Self.tage) + " Tage"
+                IF Self.tage = 0 THEN RETURN tr$("Heute")
+                IF Self.tage = 1 THEN RETURN tr$("Morgen")
+                RETURN trf$("{0} Tage", [STR$(Self.tage)])
         END SELECT
         RETURN "-"
     END FUNCTION
