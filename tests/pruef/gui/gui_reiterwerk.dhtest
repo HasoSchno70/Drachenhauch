@@ -523,7 +523,8 @@ FOR py = y + 4 TO y + h - 5
         IF ((c SHR 16) BAND 255) > 150 AND ((c SHR 8) BAND 255) > 150 AND (c BAND 255) > 150 THEN hellPunkte = hellPunkte + 1
     NEXT
 NEXT
-PRINT "schrift am rand "; hellPunkte' Zwei Koepfe passen wie bisher: nach ihrem Text.
+PRINT "schrift am rand "; hellPunkte
+' Zwei Koepfe passen wie bisher: nach ihrem Text.
 DIM tc2 AS GUI_WIDGET : tc2 = GUI_TABCONTROL(w, 20, 230, 300, 20)
 GUI_TABCONTROL_ADD(tc2, "eins")
 GUI_TABCONTROL_ADD(tc2, "Benachrichtigungen")
