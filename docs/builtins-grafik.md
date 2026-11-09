@@ -455,7 +455,9 @@ Dinge:
   es beim Zeichnen oder Messen und backt es beim nächsten `FLIP` aus der
   passenden Systemschrift nach — Windows: MS Gothic, Malgun Gothic, Segoe UI
   Emoji, Segoe UI; macOS: Arial Unicode; Linux: Noto Sans CJK, sofern
-  installiert. Gebacken wird nur, was gebraucht wurde, nicht der ganze Block.
+  installiert. Hat die erste Datei der Liste das Zeichen nicht, fragt das
+  nächste Bild die nächste (🗘 steht in Segoe UI Symbol, nicht in Segoe UI
+  Emoji). Gebacken wird nur, was gebraucht wurde, nicht der ganze Block.
   Gemessen: das erste Bild mit Kanji, Hangul, Emoji und Hebräisch zugleich
   kostet einmalig etwa 100 ms, jedes weitere neue Zeichen etwa 15 ms, danach
   nichts mehr. Das gilt auch in einer selbst geladenen Schrift: fehlt ihr ein

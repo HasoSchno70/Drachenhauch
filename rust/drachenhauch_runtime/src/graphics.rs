@@ -1312,6 +1312,12 @@ pub struct Graphics {
     richtung_roh: std::cell::Cell<bool>,
     /// Codepunkte, die keine Datei liefern konnte -- nicht jedes Bild neu.
     glyphen_unmoeglich: std::collections::HashSet<u32>,
+    /// Welche Ausweich-Datei ein Zeichen schon nicht hatte: dann fragt das
+    /// naechste Bild die naechste der Liste. Vorher galt das Zeichen nach der
+    /// ersten vorhandenen Datei als unmoeglich -- 🗘 kam als "?", weil Segoe
+    /// UI Emoji es nicht hat, Segoe UI Symbol dahinter aber schon
+    /// (Kuehlschrank-App, Produktdialog).
+    glyphen_versucht: std::collections::HashSet<(u32, String)>,
     /// Je LOADFONT-Handle Zeichen, die der Font NICHT gebacken hat, die aber
     /// in seiner eigenen Datei stehen koennten. FLIP backt den Font damit
     /// neu (`eigene_nachbacken`) -- vorher kam z.B. das Dreieck von
@@ -2109,6 +2115,7 @@ impl Graphics {
             glyphen_fehlend: std::cell::RefCell::new(std::collections::HashSet::new()),
             richtung_roh: std::cell::Cell::new(false),
             glyphen_unmoeglich: std::collections::HashSet::new(),
+            glyphen_versucht: std::collections::HashSet::new(),
             eigen_fehlt: std::cell::RefCell::new(std::collections::HashMap::new()),
             eigen_nie: std::collections::HashSet::new(),
             font_bytes: std::cell::RefCell::new(HashMap::new()),
@@ -2285,7 +2292,9 @@ impl Graphics {
         let mut je_datei: std::collections::BTreeMap<String, Vec<u32>> = std::collections::BTreeMap::new();
         for c in fehlend {
             if self.glyphen_unmoeglich.contains(&c) { continue; }
-            let datei = ausweich_datei_fuer(c).iter().find(|p| std::path::Path::new(p).exists());
+            let versucht = &self.glyphen_versucht;
+            let datei = ausweich_datei_fuer(c).iter()
+                .find(|p| !versucht.contains(&(c, p.to_string())) && std::path::Path::new(p).exists());
             match datei {
                 Some(p) => je_datei.entry(p.to_string()).or_default().push(c),
                 None => { self.glyphen_unmoeglich.insert(c); }
@@ -2307,16 +2316,30 @@ impl Graphics {
             let thread = &self.thread;
             let f = match schrift_laden(rl, thread, &datei, groesse, &text) {
                 Ok(f) => f,
-                Err(_) => { for c in neue { self.glyphen_unmoeglich.insert(c); } continue; }
+                Err(_) => { for c in neue { self.naechste_datei(c, &datei); } continue; }
             };
             unsafe { raylib::ffi::SetTextureFilter(f.texture, 1 /*BILINEAR*/); }
             let hat = glyph_menge(&f);
-            for c in &neue { if !hat.contains(c) { self.glyphen_unmoeglich.insert(*c); } }
+            for c in &neue { if !hat.contains(c) { self.naechste_datei(*c, &datei); } }
             let eintrag = Ausweich { datei: datei.clone(), font: f, zeichen, hat };
             match pos {
                 Some(i) => self.ausweich[i] = eintrag,
                 None => self.ausweich.push(eintrag),
             }
+        }
+    }
+
+    /// Die Datei hatte das Zeichen nicht: im naechsten Bild die naechste der
+    /// Liste -- erst wenn keine mehr bleibt, ist es unmoeglich (ein `?`).
+    fn naechste_datei(&mut self, c: u32, datei: &str) {
+        self.glyphen_versucht.insert((c, datei.to_string()));
+        let versucht = &self.glyphen_versucht;
+        let noch = ausweich_datei_fuer(c).iter()
+            .any(|p| !versucht.contains(&(c, p.to_string())) && std::path::Path::new(p).exists());
+        if noch {
+            self.glyphen_fehlend.borrow_mut().insert(c);
+        } else {
+            self.glyphen_unmoeglich.insert(c);
         }
     }
 
