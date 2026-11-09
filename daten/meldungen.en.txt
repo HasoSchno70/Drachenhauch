@@ -499,6 +499,7 @@ Kann {} nicht lesen: {}	Cannot read {}: {}
 nicht lesbar: {}	not readable: {}
 run: keine Datei angegeben	run: no file given
 run --bilder: erwartet eine Zahl	run --bilder: expected a number
+run: {} erreicht das Programm nicht -- seine Argumente stehen hinter einem `--`: dhrt run {} -- {}	run: {} does not reach the program -- its arguments go after a `--`: dhrt run {} -- {}
 profile: keine Datei angegeben	profile: no file given
 dhrt fmt: {}: laesst sich nicht lesen (Syntaxfehler?) -- unveraendert gelassen	dhrt fmt: {}: cannot be read (syntax error?) -- left unchanged
 

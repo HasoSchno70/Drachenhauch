@@ -1205,7 +1205,9 @@ PRINT LEN(READLINES(pfad))
 When started via `dhrt`, everything after a standalone `--` belongs to the
 program, everything before it to the runtime. Without `--` the program gets no
 arguments. This is on purpose: otherwise `dhrt` could never add a switch of its own
-without breaking existing programs. The **exported `.exe`**
+without breaking existing programs. It does not happen silently, though:
+`dhrt run` names words after the file without `--` on standard error,
+together with the call as it was meant. The **exported `.exe`**
 is the program itself — there is nothing to separate there, all arguments
 belong to it, without `--`.
 

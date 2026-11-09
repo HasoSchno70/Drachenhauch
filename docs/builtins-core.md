@@ -1207,7 +1207,9 @@ PRINT LEN(READLINES(pfad))
 Beim Start über `dhrt` gehört alles hinter einem alleinstehenden `--` dem
 Programm, alles davor der Runtime. Ohne `--` bekommt das Programm keine
 Argumente. Das ist Absicht: sonst könnte `dhrt` sich keinen eigenen Schalter
-mehr zulegen, ohne bestehende Programme zu brechen. Die **exportierte `.exe`**
+mehr zulegen, ohne bestehende Programme zu brechen. Still geschieht es aber
+nicht: Wörter hinter der Datei ohne `--` nennt `dhrt run` auf der
+Fehlerausgabe, samt dem Aufruf, wie er gemeint war. Die **exportierte `.exe`**
 ist selbst das Programm — dort gibt es nichts zu trennen, alle Argumente
 gehören ihr, ohne `--`.
 
