@@ -1,0 +1,111 @@
+' Der Barcode-Cache wie services/api/barcode_cache.py: barcode_cache.json
+' neben der Datenbank, je Barcode ein Eintrag mit cached_at (ISO-Zeit) und
+' not_found. Einträge, die älter als 30 Tage sind, gelten nicht mehr (die
+' Python-App wirft sie beim Laden weg). Das Scannen (Stufe 6) schreibt ihn,
+' der Reiter Statistik zählt und leert ihn.
+IMPORT "json"
+
+CONST CACHE_TAGE = 30
+
+' Der Cache gilt nur, wenn er in den Einstellungen an ist (barcode_cache_enabled;
+' die Python-App hatte das Häkchen, las es aber nie).
+FUNCTION cacheAktiv() AS BOOLEAN
+    RETURN einstellungJa("barcode_cache_enabled", TRUE)
+END FUNCTION
+
+FUNCTION cachePfad$() AS STRING
+    RETURN studioDbPfad$("barcode_cache.json")
+END FUNCTION
+
+FUNCTION cacheLaden() AS JSON_HANDLE
+    DIM p AS STRING : p = cachePfad$()
+    IF NOT FILEEXISTS(p) THEN RETURN JSON_NEW_OBJECT()
+    DIM j AS JSON_HANDLE
+    TRY
+        j = JSON_PARSE(READALL(p))
+    CATCH fehler
+        RETURN JSON_NEW_OBJECT()
+    END TRY
+    IF JSON_TYPE(j, "") <> "object" THEN RETURN JSON_NEW_OBJECT()
+    RETURN j
+END FUNCTION
+
+' Gilt der Eintrag noch (nicht älter als CACHE_TAGE)?
+FUNCTION cacheFrisch(j AS JSON_HANDLE, schluessel AS STRING) AS BOOLEAN
+    DIM p AS STRING : p = JSON_KEY$(schluessel) + ".cached_at"
+    DIM wann AS STRING : wann = "2000-01-01"
+    IF JSON_HAS(j, p) THEN wann = LEFT$(JSON_GET_STRING(j, p), 10)
+    RETURN dbZahlMit("SELECT CAST(julianday(?1) - julianday(?2) AS INTEGER)", heute$(), wann) <= CACHE_TAGE
+END FUNCTION
+
+' (Einträge, gefunden, nicht gefunden) -- nur die gültigen.
+FUNCTION cacheZahlen() AS TUPLE
+    DIM j AS JSON_HANDLE : j = cacheLaden()
+    DIM n AS INTEGER
+    DIM nicht AS INTEGER
+    DIM k AS STRING
+    FOR EACH k IN JSON_KEYS(j, "")
+        IF NOT cacheFrisch(j, k) THEN CONTINUE
+        n = n + 1
+        DIM p AS STRING : p = JSON_KEY$(k) + ".not_found"
+        IF JSON_HAS(j, p) THEN
+            IF JSON_TYPE(j, p) = "boolean" THEN
+                IF JSON_GET_BOOL(j, p) THEN nicht = nicht + 1
+            END IF
+        END IF
+    NEXT
+    RETURN (n, n - nicht, nicht)
+END FUNCTION
+
+SUB cacheLeeren()
+    WRITEALL(cachePfad$(), "{}")
+END SUB
+
+SUB cacheSchreiben(j AS JSON_HANDLE)
+    WRITEALL(cachePfad$(), JSON_PRETTY(j))
+END SUB
+
+' Die Daten eines gefundenen Produkts (product_data als JSON-Text), solange
+' der Eintrag gilt; "" = nicht im Cache, abgelaufen oder "nicht gefunden".
+FUNCTION cacheProdukt$(barcode AS STRING) AS STRING
+    DIM j AS JSON_HANDLE : j = cacheLaden()
+    DIM k AS STRING : k = JSON_KEY$(barcode)
+    IF NOT JSON_HAS(j, k) THEN RETURN ""
+    IF NOT cacheFrisch(j, barcode) THEN RETURN ""
+    IF NOT JSON_HAS(j, k + ".product_data") THEN RETURN ""
+    IF JSON_TYPE(j, k + ".product_data") <> "object" THEN RETURN ""
+    RETURN JSON_STRINGIFY(JSON_GET_JSON(j, k + ".product_data"))
+END FUNCTION
+
+' Als "nicht gefunden" gemerkt (und noch gültig)?
+FUNCTION cacheNichtGefunden(barcode AS STRING) AS BOOLEAN
+    DIM j AS JSON_HANDLE : j = cacheLaden()
+    DIM p AS STRING : p = JSON_KEY$(barcode) + ".not_found"
+    IF NOT JSON_HAS(j, p) THEN RETURN FALSE
+    IF JSON_TYPE(j, p) <> "boolean" THEN RETURN FALSE
+    RETURN JSON_GET_BOOL(j, p) AND cacheFrisch(j, barcode)
+END FUNCTION
+
+FUNCTION cacheJetzt$() AS STRING
+    RETURN heute$() + "T" + TIME$()
+END FUNCTION
+
+' set: das Produkt mit Zeitstempel; set_not_found: nur der Vermerk.
+SUB cacheMerken(barcode AS STRING, daten AS JSON_HANDLE)
+    IF NOT cacheAktiv() THEN RETURN
+    DIM j AS JSON_HANDLE : j = cacheLaden()
+    DIM e AS JSON_HANDLE : e = JSON_NEW_OBJECT()
+    JSON_SET_JSON(e, "product_data", daten)
+    JSON_SET_STRING(e, "cached_at", cacheJetzt$())
+    JSON_SET_JSON(j, JSON_KEY$(barcode), e)
+    cacheSchreiben(j)
+END SUB
+
+SUB cacheMerkenNicht(barcode AS STRING)
+    IF NOT cacheAktiv() THEN RETURN
+    DIM j AS JSON_HANDLE : j = cacheLaden()
+    DIM e AS JSON_HANDLE : e = JSON_PARSE("{""product_data"": null, ""not_found"": true}")
+    JSON_SET_STRING(e, "cached_at", cacheJetzt$())
+    JSON_SET_JSON(j, JSON_KEY$(barcode), e)
+    cacheSchreiben(j)
+END SUB

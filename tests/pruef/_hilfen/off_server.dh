@@ -1,0 +1,51 @@
+' Ein falsches Open Food Facts fuer die Pruefungen der Kuehlschrank-App
+' (Stufe 6): antwortet auf /api/v0/product/<barcode>.json wie die echte
+' Schnittstelle und liefert /bild.png. Schreibt den Port nach port.txt (im
+' Ordner der Aufrufers, ARG$(0)) und jede Anfrage nach anfragen.txt; endet,
+' wenn dort "ende" liegt, sonst nach 90 Sekunden.
+'   4001  Vollmilch, mit Marke, Kategorien, Nutri-Score, Allergen und Bild
+'   4002  ohne product_name, aber product_name_de; nur categories_tags
+'   4003  status 0 (nicht gefunden)
+'   4005  weder product_name noch product_name_de, nur generic_name
+'   sonst 404
+IMPORT "httpd"
+DIM ordner AS STRING : ordner = ARG$(0)
+DIM s AS HTTPD : s = HTTPD_START(0, "127.0.0.1")
+DIM basis AS STRING : basis = "http://127.0.0.1:" + STR$(HTTPD_PORT(s))
+DIM q AS STRING : q = CHR$(34)
+FUNCTION t$(x AS STRING) AS STRING
+    RETURN CHR$(34) + x + CHR$(34)
+END FUNCTION
+WRITEALL(PATHJOIN(ordner, "port.txt"), STR$(HTTPD_PORT(s)))
+DIM anfragen AS ARRAY OF STRING : anfragen = []
+DIM start AS INTEGER : start = MILLIS()
+WHILE MILLIS() - start < 90000 AND NOT FILEEXISTS(PATHJOIN(ordner, "ende"))
+    IF HTTPD_ACCEPT(s) THEN
+        DIM pfad AS STRING : pfad = HTTPD_PATH$(s)
+        ARRAY_PUSH(anfragen, pfad + " " + HTTPD_HEADER$(s, "User-Agent"))
+        WRITEALL(PATHJOIN(ordner, "anfragen.txt"), JOIN$(anfragen, CHR$(10)) + CHR$(10))
+        IF pfad = "/api/v0/product/4001.json" THEN
+            HTTPD_SEND(s, 200, "application/json", "{" + t$("status") + ": 1, " + t$("product") + ": {" + _
+                t$("product_name") + ": " + t$("Vollmilch 3,5 %") + ", " + t$("brands") + ": " + t$("Weidemilch, Bio") + ", " + _
+                t$("categories") + ": " + t$("Milchprodukte, Milch") + ", " + t$("quantity") + ": " + t$("1 l") + ", " + _
+                t$("nutrition_grades") + ": " + t$("b") + ", " + t$("allergens_tags") + ": [" + t$("en:milk") + "], " + _
+                t$("image_front_small_url") + ": " + t$(basis + "/bild.png") + "}}")
+        ELSEIF pfad = "/api/v0/product/4002.json" THEN
+            HTTPD_SEND(s, 200, "application/json", "{" + t$("status") + ": 1, " + t$("product") + ": {" + _
+                t$("product_name") + ": " + t$("") + ", " + t$("product_name_de") + ": " + t$("Basmati Reis") + ", " + _
+                t$("categories_tags") + ": [" + t$("en:rices") + ", " + t$("en:cereals") + "]}}")
+        ELSEIF pfad = "/api/v0/product/4005.json" THEN
+            HTTPD_SEND(s, 200, "application/json", "{" + t$("status") + ": 1, " + t$("product") + ": {" + _
+                t$("generic_name") + ": " + t$("Haferflocken zart") + ", " + t$("brands") + ": " + t$("Hausmarke") + "}}")
+        ELSEIF pfad = "/api/v0/product/4003.json" THEN
+            HTTPD_SEND(s, 200, "application/json", "{" + t$("status") + ": 0, " + t$("status_verbose") + ": " + t$("product not found") + "}")
+        ELSEIF pfad = "/bild.png" THEN
+            HTTPD_SEND_FILE(s, 200, PATHJOIN(ordner, "bild.png"))
+        ELSE
+            HTTPD_SEND(s, 404, "text/plain", "nicht da")
+        END IF
+    ELSE
+        SLEEP(2)
+    END IF
+WEND
+HTTPD_STOP(s)

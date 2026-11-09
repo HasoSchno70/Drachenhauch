@@ -261,9 +261,11 @@ SUB reiterPruefen()
         navigatorAuswahl()
         IF k >= 0 THEN protokoll("vorn " + reiter[k].art + " " + reiterTitel$(reiter[k]))
         inspektorFuellen()
-        reiterProtokollieren()
         IF k >= 0 THEN feldBefunde(reiter[k])
     END IF
+    ' Je Bild, aber nur, wenn sich etwas bewegt hat: die Laufzeit misst die
+    ' Beschriftung eines neuen Kopfs erst einige Bilder spaeter.
+    reiterProtokollieren()
     IF k >= 0 AND k < LEN(reiter) THEN
         IF reiter[k].art = "datenbank" THEN
             dbAnsichtPruefen(reiter[k])
@@ -310,6 +312,7 @@ SUB fensterAktivieren(ei AS INTEGER)
     aktFenster = ei
     DIM e AS Element : e = elemente[ei]
     doc = JSON_PARSE(e.layout)
+    zoomEinpassen()
     staende = [] : standPos = -1
     IF e.verlauf <> "" THEN
         DIM w AS JSON_HANDLE : w = JSON_PARSE(e.verlauf)
@@ -687,18 +690,29 @@ SUB knotenProtokollieren()
     NEXT
 END SUB
 
-' Fuer Pruefungen: Kopf und Kreuz jedes Reiters. Dieselbe Rechnung wie in
-' der Laufzeit (tc_koepfe, tc_kreuz): 8 je Zeichen + 20, mit Kreuz + 16.
+DIM reiterLagenWar AS STRING : reiterLagenWar = ""
+
+' Fuer Pruefungen: Kopf und Kreuz jedes Reiters, aus der Rechnung der
+' Laufzeit (GUI_TABCONTROL_ITEM_RECT; das Kreuz sitzt 12 vor dem Ende).
 SUB reiterProtokollieren()
     IF logDatei = "" THEN RETURN
-    DIM x AS INTEGER : x = GUI_GET_X(tcMitte)
-    DIM y AS INTEGER : y = GUI_GET_Y(tcMitte) + inhaltOben + 14
+    DIM zeilen AS ARRAY OF STRING : zeilen = []
     DIM k AS INTEGER
     FOR k = 0 TO GUI_TABCONTROL_COUNT(tcMitte) - 1
-        DIM b AS INTEGER : b = 8 * LEN(GUI_TABCONTROL_TITLE$(tcMitte, k)) + 36
-        protokoll("lage reiter " + STR$(k) + " " + STR$(x + b \ 2 - 8) + " " + STR$(y))
-        protokoll("lage kreuz " + STR$(k) + " " + STR$(x + b - 12) + " " + STR$(y + 1))
-        x = x + b + 2
+        DIM x AS INTEGER
+        DIM y AS INTEGER
+        DIM b AS INTEGER
+        DIM h AS INTEGER
+        (x, y, b, h) = GUI_TABCONTROL_ITEM_RECT(tcMitte, k)
+        ARRAY_PUSH(zeilen, "lage reiter " + STR$(k) + " " + STR$(x + b \ 2 - 8) + " " + STR$(y + h \ 2))
+        ARRAY_PUSH(zeilen, "lage kreuz " + STR$(k) + " " + STR$(x + b - 12) + " " + STR$(y + h \ 2 + 1))
+    NEXT
+    DIM alle AS STRING : alle = JOIN$(zeilen, CHR$(10))
+    IF alle = reiterLagenWar THEN RETURN
+    reiterLagenWar = alle
+    DIM z AS STRING
+    FOR EACH z IN zeilen
+        protokoll(z)
     NEXT
 END SUB
 
@@ -820,6 +834,13 @@ SUB nameGeaendert(alt AS STRING, neu AS STRING, istFenster AS BOOLEAN)
         projGeaendert = TRUE
     ELSE
         controlUmbenannt(e, alt, neu)
+        ' Standard- und Abbrechen-Knopf nennen ihn beim Namen.
+        DIM kw AS STRING
+        FOR EACH kw IN ["studio_standard", "studio_abbrechen"]
+            IF JSON_HAS(doc, kw) THEN
+                IF LOWER$(JSON_GET_STRING(doc, kw)) = LOWER$(alt) THEN JSON_SET_STRING(doc, kw, neu)
+            END IF
+        NEXT
     END IF
     codeFelderNeu(e)
     navigatorFuellen()
@@ -1190,6 +1211,78 @@ FUNCTION elementAnlegen(art AS STRING, n AS STRING) AS BOOLEAN
     werkzeugeNachziehen()
     status(trf$("{0} {1} hinzugefügt.", [artText$(art), n]))
     protokoll("element neu " + art + " " + n)
+    RETURN TRUE
+END FUNCTION
+
+' Projekt -> Datenbank aus Datei uebernehmen: eine SQLite-Datei, die es schon
+' gibt (aus einem anderen Programm), wird ein Datenbank-Element. Die Datei
+' kommt in den Projektordner (liegt sie schon dort, bleibt sie, wo sie ist),
+' ihr Aufbau ins Schema -- ohne dass der Abgleich etwas an ihr aendert.
+' Fuer Pruefungen: DH_STUDIO_DATEI statt des Dialogs.
+DIM dlgUeb AS GUI_WINDOW : dlgUeb = -1
+
+SUB datenbankUebernehmenFragen()
+    IF GUI_MODAL() THEN RETURN
+    IF projOrdner = "" OR NOT DIREXISTS(projOrdner) THEN
+        status(tr$("Erst das Projekt sichern -- die Datei kommt in seinen Ordner."))
+        RETURN
+    END IF
+    DIM q AS STRING : q = GETENV$("DH_STUDIO_DATEI")
+    IF q = "" THEN q = FILE_OPEN_DIALOG(tr$("Datenbank wählen"), "db,sqlite,sqlite3,db3")
+    IF q = "" THEN RETURN
+    datenbankUebernehmen(q)
+END SUB
+
+' Aus dem Dateinamen ein freier Elementname: fridge_database.db -> Fridge_database.
+FUNCTION dbElementName$(pfad AS STRING) AS STRING
+    DIM b AS STRING : b = BASENAME(pfad)
+    DIM k AS INTEGER : k = INSTRREV(b, ".")
+    IF k > 0 THEN b = LEFT$(b, k)
+    b = REGEX_REPLACE(b, "[^A-Za-z0-9_]", "_")
+    IF NOT REGEX_TEST(b, "^[A-Za-z]") THEN b = "Daten" + b
+    b = UPPER$(LEFT$(b, 1)) + MID$(b, 1, LEN(b))
+    IF elementIndex(b) < 0 THEN RETURN b
+    DIM n AS INTEGER : n = 2
+    WHILE elementIndex(b + STR$(n)) >= 0
+        n = n + 1
+    WEND
+    RETURN b + STR$(n)
+END FUNCTION
+
+FUNCTION datenbankUebernehmen(q AS STRING) AS BOOLEAN
+    IF NOT FILEEXISTS(q) THEN
+        status(trf$("Die Datei gibt es nicht: {0}", [q]))
+        RETURN FALSE
+    END IF
+    DIM datei AS STRING : datei = BASENAME(q)
+    DIM ziel AS STRING : ziel = PATHJOIN(projOrdner, datei)
+    DIM schonDa AS BOOLEAN : schonDa = FALSE
+    IF FILEEXISTS(ziel) THEN schonDa = LOWER$(REALPATH$(q)) = LOWER$(REALPATH$(ziel))
+    IF NOT schonDa AND FILEEXISTS(ziel) THEN
+        status(trf$("Im Projektordner liegt schon eine Datei {0}.", [datei]))
+        RETURN FALSE
+    END IF
+    DIM schema AS STRING : schema = dbSchemaAusDatei$(q, datei)
+    IF schema = "" THEN
+        status(trf$("{0} lässt sich nicht lesen: {1}", [datei, dbUebHinweise[0]]))
+        RETURN FALSE
+    END IF
+    IF NOT schonDa THEN COPYFILE(q, ziel)
+    DIM e AS Element : e = elementNeu("datenbank", dbElementName$(q))
+    e.schema = schema
+    projLose = FALSE
+    navigatorFuellen()
+    dbFehler(dbAbgleichen$(e))
+    dbOeffnen(e, "")
+    werkzeugeNachziehen()
+    DIM n AS INTEGER : n = dbTabZahl(dbSchema(e))
+    status(trf$("{0} aus {1} übernommen: {2} Tabellen.", [e.name, datei, STR$(n)]))
+    protokoll("db uebernommen " + e.name + " " + datei + " " + STR$(n))
+    DIM h AS STRING
+    FOR EACH h IN dbUebHinweise
+        protokoll("db hinweis " + h)
+    NEXT
+    IF LEN(dbUebHinweise) > 0 THEN dlgUeb = GUI_DIALOG(trf$("{0} übernommen", [e.name]), JOIN$(dbUebHinweise, CHR$(10)), "ok")
     RETURN TRUE
 END FUNCTION
 

@@ -6123,7 +6123,12 @@ impl<'p> Vm<'p> {
                 Ok(Value::str_rc(&text))
             }
             Err(e) => {
-                if e.status != 0 { self.http_status = e.status; self.http_headers = e.headers; }
+                // Ohne Antwort (kein Netz, Zeitgrenze) ist der Status 0 und es
+                // gibt keine Kopfzeilen -- vorher blieben die der VORIGEN
+                // Antwort stehen, und ein Programm meldete "Fehler 200"
+                // (Kuehlschrank-App, Rezeptsuche).
+                self.http_status = e.status;
+                self.http_headers = e.headers;
                 // Sonst gehoerte der Rumpf der VORIGEN Antwort und HTTP_BYTES
                 // lieferte nach einem Fehlschlag alte Daten als neue aus.
                 self.http_body.clear();
@@ -6239,7 +6244,8 @@ impl<'p> Vm<'p> {
                 let path = bi_str(a, 1, "HTTP_DOWNLOAD")?.to_string();
                 match html::http_download(&url, &path) {
                     Ok(r) => { self.http_status = r.status; self.http_headers = r.headers; Value::Int(r.bytes) }
-                    Err(e) => { if e.status != 0 { self.http_status = e.status; self.http_headers = e.headers; } return Err(e.msg); }
+                    // Ohne Antwort Status 0 (siehe http_antwort).
+                    Err(e) => { self.http_status = e.status; self.http_headers = e.headers; return Err(e.msg); }
                 }
             }
             // --- Abrufe im Hintergrund: starten, nachsehen, abholen ---
@@ -9142,6 +9148,10 @@ impl<'p> Vm<'p> {
             "gui_set_active_tab" => { self.gui.set_active_tab(gi(a,0,"GUI_SET_ACTIVE_TAB")?, gi(a,1,"GUI_SET_ACTIVE_TAB")? as i32)?; Value::Nil }
             "gui_window_chrome" => { self.gui.window_chrome(gi(a,0,"GUI_WINDOW_CHROME")?, gbool(a,1,"GUI_WINDOW_CHROME")?)?; Value::Nil }
             "gui_window_zoom" => { self.gui.window_zoom(gi(a,0,"GUI_WINDOW_ZOOM")?, gnum(a,1,"GUI_WINDOW_ZOOM")?)?; Value::Nil }
+            "gui_window_clip" => {
+                self.gui.window_clip(gi(a,0,"GUI_WINDOW_CLIP")?, gi(a,1,"GUI_WINDOW_CLIP")? as i32, gi(a,2,"GUI_WINDOW_CLIP")? as i32, gi(a,3,"GUI_WINDOW_CLIP")? as i32, gi(a,4,"GUI_WINDOW_CLIP")? as i32)?;
+                Value::Nil
+            }
             "gui_window_get_zoom" => Value::Float(self.gui.window_get_zoom(gi(a,0,"GUI_WINDOW_GET_ZOOM")?)?),
             "gui_window_design" => { self.gui.window_design(gi(a,0,"GUI_WINDOW_DESIGN")?, gbool(a,1,"GUI_WINDOW_DESIGN")?)?; Value::Nil }
             "gui_window_set_min_size" => { self.gui.window_min_size(gi(a,0,"GUI_WINDOW_SET_MIN_SIZE")?, gi(a,1,"GUI_WINDOW_SET_MIN_SIZE")? as i32, gi(a,2,"GUI_WINDOW_SET_MIN_SIZE")? as i32)?; Value::Nil }
@@ -9222,6 +9232,8 @@ impl<'p> Vm<'p> {
                 gstrs(a,5,"GUI_DROPDOWN")?)?),
             "gui_dropdown_selected" => Value::Int(self.gui.dropdown_selected(gi(a,0,"GUI_DROPDOWN_SELECTED")?)?),
             "gui_dropdown_text" => Value::str_rc(&self.gui.dropdown_text(gi(a,0,"GUI_DROPDOWN_TEXT")?)?),
+            "gui_dropdown_count" => Value::Int(self.gui.dropdown_count(gi(a,0,"GUI_DROPDOWN_COUNT")?)?),
+            "gui_dropdown_item" => Value::str_rc(&self.gui.dropdown_item(gi(a,0,"GUI_DROPDOWN_ITEM")?, gi(a,1,"GUI_DROPDOWN_ITEM")?)?),
             "gui_dropdown_set_selected" => { self.gui.dropdown_set_selected(gi(a,0,"GUI_DROPDOWN_SET_SELECTED")?, gi(a,1,"GUI_DROPDOWN_SET_SELECTED")?)?; Value::Nil }
             "gui_set_dropdown" => { self.gui.set_dropdown_items(gi(a,0,"GUI_SET_DROPDOWN")?, gstrs(a,1,"GUI_SET_DROPDOWN")?)?; Value::Nil }
             // --- ListBox (teilt die item-Logik mit Dropdown) ---
@@ -9305,6 +9317,10 @@ impl<'p> Vm<'p> {
             "gui_listbox_scroll_to" => { self.gui.list_scroll_to(gi(a,0,"GUI_LISTBOX_SCROLL_TO")?, gi(a,1,"GUI_LISTBOX_SCROLL_TO")?)?; Value::Nil }
             "gui_dropdown_set" => { self.gui.dropdown_set(gi(a,0,"GUI_DROPDOWN_SET")?, &gs(a,1,"GUI_DROPDOWN_SET")?, gnum(a,2,"GUI_DROPDOWN_SET")?)?; Value::Nil }
             "gui_dropdown_placeholder" => { self.gui.dropdown_placeholder(gi(a,0,"GUI_DROPDOWN_PLACEHOLDER")?, gs(a,1,"GUI_DROPDOWN_PLACEHOLDER")?.to_string())?; Value::Nil }
+            "gui_tabcontrol_item_rect" => {
+                let (x, y, w, h) = self.gui.tabcontrol_item_rect(gi(a,0,"GUI_TABCONTROL_ITEM_RECT")?, gi(a,1,"GUI_TABCONTROL_ITEM_RECT")?)?;
+                Value::Tuple(std::rc::Rc::new(vec![Value::Int(x as i64), Value::Int(y as i64), Value::Int(w as i64), Value::Int(h as i64)]))
+            }
             "gui_tree_item_rect" => {
                 let (x, y, w, h) = self.gui.tree_item_rect(gi(a,0,"GUI_TREE_ITEM_RECT")?, gi(a,1,"GUI_TREE_ITEM_RECT")?)?;
                 Value::Tuple(std::rc::Rc::new(vec![Value::Int(x as i64), Value::Int(y as i64), Value::Int(w as i64), Value::Int(h as i64)]))
@@ -9839,6 +9855,7 @@ impl<'p> Vm<'p> {
             "gui_destroy" => { self.gui.destroy(gi(a,0,"GUI_DESTROY")?)?; Value::Nil }
             "gui_set_visible" => { self.gui.set_widget_visible(gi(a,0,"GUI_SET_VISIBLE")?, gbool(a,1,"GUI_SET_VISIBLE")?)?; Value::Nil }
             "gui_visible" => Value::Bool(self.gui.widget_visible(gi(a,0,"GUI_VISIBLE")?)?),
+            "gui_shown" => Value::Bool(self.gui.widget_gezeigt(gi(a,0,"GUI_SHOWN")?)?),
             "gui_kind" => Value::str_rc(self.gui.kind_name(gi(a,0,"GUI_KIND")?)?),
             "gui_focus" => { self.gui.focus(gi(a,0,"GUI_FOCUS")?)?; Value::Nil }
             "gui_focused" => Value::Int(self.gui.focused()),
@@ -9852,6 +9869,10 @@ impl<'p> Vm<'p> {
                                           gi(a,1,"GUI_SET_PICKED_COLOR")?)?;
                 Value::Nil
             }
+            "gui_datefield" => Value::Int(self.gui.datefield(
+                gi(a,0,"GUI_DATEFIELD")?, gi(a,1,"GUI_DATEFIELD")? as i32,
+                gi(a,2,"GUI_DATEFIELD")? as i32, gi(a,3,"GUI_DATEFIELD")? as i32,
+                gi(a,4,"GUI_DATEFIELD")? as i32)?),
             "gui_datepicker" => Value::Int(self.gui.datepicker(
                 gi(a,0,"GUI_DATEPICKER")?, gi(a,1,"GUI_DATEPICKER")? as i32,
                 gi(a,2,"GUI_DATEPICKER")? as i32, gi(a,3,"GUI_DATEPICKER")? as i32,

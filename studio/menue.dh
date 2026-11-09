@@ -7,6 +7,9 @@
 '  und sein Ereignis heisst <name>_Aktion. Der Editor arbeitet auf einer
 '  Kopie; erst OK schreibt sie ins Layout (ein Rueckgaengig-Schritt), und
 '  erst dann ziehen umbenannte Eintraege ihre Ereignis-Methoden mit.
+'  Kontextmenues stehen daneben unter "kontextmenues": je eins mit name
+'  (das Handle als Feld), widget ("" = das ganze Fenster) und items. Ein
+'  eigenes Control hat keine Menueleiste, aber Kontextmenues.
 ' ============================================================
 
 DIM dlgMn AS GUI_WINDOW : dlgMn = -1
@@ -17,6 +20,11 @@ DIM mnKuerzel AS GUI_WIDGET
 DIM mnHaken AS GUI_WIDGET
 DIM mnHinweis AS GUI_WIDGET
 DIM mnNeuMenue AS GUI_WIDGET
+DIM mnNeuKontext AS GUI_WIDGET
+DIM mnAn AS GUI_WIDGET
+DIM mnAnText AS GUI_WIDGET
+DIM mnControl AS BOOLEAN : mnControl = FALSE
+DIM mnAnNamen AS ARRAY OF STRING : mnAnNamen = []  ' "" = Fenster, dann die Widgets
 DIM mnNeuEintrag AS GUI_WIDGET
 DIM mnNeuUnter AS GUI_WIDGET
 DIM mnNeuTrenner AS GUI_WIDGET
@@ -25,7 +33,7 @@ DIM mnHoch AS GUI_WIDGET
 DIM mnRunter AS GUI_WIDGET
 DIM mnOk AS GUI_WIDGET
 DIM mnAbbr AS GUI_WIDGET
-DIM mnDoc AS JSON_HANDLE                       ' {"menus": [...]} -- die Arbeitskopie
+DIM mnDoc AS JSON_HANDLE                       ' {"menus": [...], "kontextmenues": [...]} -- die Arbeitskopie
 DIM mnPfade AS ARRAY OF STRING : mnPfade = []  ' je Baumknoten sein Pfad in mnDoc
 DIM mnWahl AS STRING : mnWahl = ""             ' Pfad des gewaehlten Eintrags
 DIM mnAlt AS ARRAY OF STRING : mnAlt = []      ' Umbenennungen: alter Name ...
@@ -37,27 +45,41 @@ SUB menueEditor()
         status(tr$("Menüs hat ein Fenster -- erst ein Layout öffnen."))
         RETURN
     END IF
-    IF elemente[aktFenster].art <> "fenster" THEN
-        status(tr$("Menüs hat nur ein Fenster, kein eigenes Control."))
+    IF elemente[aktFenster].art <> "fenster" AND elemente[aktFenster].art <> "control" THEN
+        status(tr$("Menüs hat ein Fenster oder ein eigenes Control."))
         RETURN
     END IF
+    mnControl = elemente[aktFenster].art = "control"
     mnDoc = JSON_NEW_OBJECT()
-    IF JSON_HAS(doc, "menus") THEN
+    IF JSON_HAS(doc, "menus") AND NOT mnControl THEN
         JSON_SET_JSON(mnDoc, "menus", JSON_GET_JSON(doc, "menus"))
     ELSE
         JSON_SET_JSON(mnDoc, "menus", JSON_NEW_ARRAY())
     END IF
+    IF JSON_HAS(doc, "kontextmenues") THEN
+        JSON_SET_JSON(mnDoc, "kontextmenues", JSON_GET_JSON(doc, "kontextmenues"))
+    ELSE
+        JSON_SET_JSON(mnDoc, "kontextmenues", JSON_NEW_ARRAY())
+    END IF
+    ' Woran ein Kontextmenue haengen kann: das Fenster oder ein benanntes Widget.
+    mnAnNamen = [""]
+    DIM wi AS INTEGER
+    FOR wi = 0 TO anzahl() - 1
+        IF istBezeichner(feldText$(wi, "name")) THEN ARRAY_PUSH(mnAnNamen, feldText$(wi, "name"))
+    NEXT
     mnAlt = [] : mnNeu = []
     mnWahl = ""
     IF dlgMn >= 0 THEN GUI_WINDOW_DESTROY(dlgMn)
     DIM b AS INTEGER : b = 640
-    DIM h AS INTEGER : h = 460
+    DIM h AS INTEGER : h = 500
     dlgMn = GUI_WINDOW(tr$("Menüs"), (SCREENWIDTH() - b) \ 2, (SCREENHEIGHT() - h) \ 2, b, h)
     GUI_WINDOW_MOVABLE(dlgMn, FALSE)
     GUI_WINDOW_CHROME(dlgMn, FALSE)
     DIM t AS GUI_WIDGET : t = GUI_LABEL(dlgMn, trf$("Menüs von {0}", [elemente[aktFenster].name]), 20, 16)
     GUI_ADD_CLASS(t, "dialogtitel")
-    mnBaum = GUI_TREE(dlgMn, 20, 52, 300, h - 160)
+    mnBaum = GUI_TREE(dlgMn, 20, 52, 300, h - 194)
+    mnNeuKontext = GUI_BUTTON(dlgMn, tr$("+ Kontextmenü"), 20, h - 132, 300, 28)
+    GUI_TOOLTIP(mnNeuKontext, tr$("ein Menü für den Rechtsklick auf ein Widget oder das Fenster"))
     mnNeuMenue = GUI_BUTTON(dlgMn, tr$("+ Menü"), 20, h - 98, 84, 28)
     mnNeuEintrag = GUI_BUTTON(dlgMn, tr$("+ Eintrag"), 108, h - 98, 92, 28)
     mnNeuUnter = GUI_BUTTON(dlgMn, tr$("+ Untermenü"), 204, h - 98, 116, 28)
@@ -76,7 +98,14 @@ SUB menueEditor()
     GUI_LABEL(dlgMn, tr$("Kürzel"), fx, 136)
     mnKuerzel = GUI_TEXTINPUT(dlgMn, fx + 80, 132, b - fx - 100, 28, tr$("z. B. Strg+S"))
     mnHaken = GUI_CHECKBOX(dlgMn, tr$("Mit Haken (an/aus)"), fx + 80, 174)
-    mnHinweis = GUI_LABEL(dlgMn, "", fx, 214)
+    mnAnText = GUI_LABEL(dlgMn, tr$("An"), fx, 216)
+    DIM anZeige AS ARRAY OF STRING : anZeige = [tr$("(das Fenster)")]
+    FOR wi = 1 TO LEN(mnAnNamen) - 1
+        ARRAY_PUSH(anZeige, mnAnNamen[wi])
+    NEXT
+    mnAn = GUI_DROPDOWN(dlgMn, fx + 80, 210, b - fx - 100, 30, anZeige)
+    GUI_TOOLTIP(mnAn, tr$("Rechtsklick auf dieses Widget öffnet das Kontextmenü"))
+    mnHinweis = GUI_LABEL(dlgMn, "", fx, 256)
     GUI_SET_WRAP(mnHinweis, b - fx - 20)
     GUI_ADD_CLASS(mnHinweis, "leise")
     mnOk = GUI_BUTTON(dlgMn, tr$("OK"), b - 216, h - 52, 90, 32)
@@ -97,8 +126,8 @@ SUB mnLagenProtokollieren()
     IF logDatei = "" OR dlgMn < 0 THEN RETURN
     DIM ox AS INTEGER : ox = GUI_WINDOW_GET_X(dlgMn)
     DIM oy AS INTEGER : oy = GUI_WINDOW_GET_Y(dlgMn)
-    DIM namen AS ARRAY OF STRING : namen = ["neumenue", "neueintrag", "neuunter", "neutrenner", "hoch", "runter", "weg", "ok", "abbrechen", "text", "name", "kuerzel", "haken"]
-    DIM w AS ARRAY OF INTEGER : w = [mnNeuMenue, mnNeuEintrag, mnNeuUnter, mnNeuTrenner, mnHoch, mnRunter, mnWeg, mnOk, mnAbbr, mnText, mnName, mnKuerzel, mnHaken]
+    DIM namen AS ARRAY OF STRING : namen = ["neumenue", "neueintrag", "neuunter", "neutrenner", "hoch", "runter", "weg", "ok", "abbrechen", "text", "name", "kuerzel", "haken", "neukontext", "an"]
+    DIM w AS ARRAY OF INTEGER : w = [mnNeuMenue, mnNeuEintrag, mnNeuUnter, mnNeuTrenner, mnHoch, mnRunter, mnWeg, mnOk, mnAbbr, mnText, mnName, mnKuerzel, mnHaken, mnNeuKontext, mnAn]
     DIM k AS INTEGER
     FOR k = 0 TO LEN(w) - 1
         protokoll("lage menue " + namen[k] + " " + STR$(ox + GUI_GET_X(w[k]) + 20) + " " + STR$(oy + GUI_GET_Y(w[k]) + 12))
@@ -108,6 +137,11 @@ END SUB
 SUB mnKnotenDazu(eltern AS INTEGER, pfad AS STRING)
     DIM text AS STRING : text = mnLabel$(pfad)
     IF mnIstTrenner(pfad) THEN text = "────────"
+    IF mnIstKontext(pfad) THEN
+        DIM an AS STRING : an = ""
+        IF JSON_HAS(mnDoc, pfad + ".widget") THEN an = JSON_GET_STRING(mnDoc, pfad + ".widget")
+        text = trf$("Kontextmenü → {0}", [IIF(an = "", tr$("(das Fenster)"), an)])
+    END IF
     IF JSON_HAS(mnDoc, pfad + ".name") THEN text = text + "   (" + JSON_GET_STRING(mnDoc, pfad + ".name") + ")"
     IF JSON_HAS(mnDoc, pfad + ".shortcut") THEN text = text + "   " + JSON_GET_STRING(mnDoc, pfad + ".shortcut")
     DIM n AS INTEGER : n = GUI_TREE_ADD(mnBaum, eltern, text)
@@ -129,6 +163,9 @@ SUB mnBaumFuellen()
     FOR k = 0 TO JSON_LEN(mnDoc, "menus") - 1
         mnKnotenDazu(-1, "menus." + STR$(k))
     NEXT
+    FOR k = 0 TO JSON_LEN(mnDoc, "kontextmenues") - 1
+        mnKnotenDazu(-1, "kontextmenues." + STR$(k))
+    NEXT
     DIM i AS INTEGER : i = ARRAY_INDEXOF(mnPfade, mnWahl)
     IF i >= 0 THEN GUI_TREE_SELECT(mnBaum, i, TRUE)
     mnStumm = FALSE
@@ -142,6 +179,11 @@ END FUNCTION
 FUNCTION mnIstTrenner(pfad AS STRING) AS BOOLEAN
     IF NOT JSON_HAS(mnDoc, pfad + ".separator") THEN RETURN FALSE
     RETURN JSON_GET_BOOL(mnDoc, pfad + ".separator")
+END FUNCTION
+
+' Ein Kontextmenue selbst (nicht einer seiner Eintraege).
+FUNCTION mnIstKontext(pfad AS STRING) AS BOOLEAN
+    RETURN LEFT$(pfad, 14) = "kontextmenues." AND INSTR(MID$(pfad, 14, LEN(pfad)), ".") < 0
 END FUNCTION
 
 ' Ein oberstes Menue oder ein Untermenue -- etwas mit Eintraegen.
@@ -173,17 +215,28 @@ SUB mnFelderFuellen()
     DIM da AS BOOLEAN : da = mnWahl <> ""
     DIM eintrag AS BOOLEAN : eintrag = FALSE
     IF da THEN eintrag = NOT mnIstMenue(mnWahl) AND NOT mnIstTrenner(mnWahl)
+    DIM kontext AS BOOLEAN : kontext = FALSE
+    IF da THEN kontext = mnIstKontext(mnWahl)
     GUI_SET_TEXT(mnText, IIF(da, mnLabel$(mnWahl), ""))
     GUI_SET_TEXT(mnName, "")
     GUI_SET_TEXT(mnKuerzel, "")
     GUI_SET_CHECKED(mnHaken, FALSE)
+    GUI_DROPDOWN_SET_SELECTED(mnAn, 0)
+    IF kontext THEN
+        IF JSON_HAS(mnDoc, mnWahl + ".name") THEN GUI_SET_TEXT(mnName, JSON_GET_STRING(mnDoc, mnWahl + ".name"))
+        DIM an AS STRING : an = ""
+        IF JSON_HAS(mnDoc, mnWahl + ".widget") THEN an = JSON_GET_STRING(mnDoc, mnWahl + ".widget")
+        GUI_DROPDOWN_SET_SELECTED(mnAn, MAX(0, ARRAY_INDEXOF(mnAnNamen, an)))
+    END IF
     IF eintrag THEN
         IF JSON_HAS(mnDoc, mnWahl + ".name") THEN GUI_SET_TEXT(mnName, JSON_GET_STRING(mnDoc, mnWahl + ".name"))
         IF JSON_HAS(mnDoc, mnWahl + ".shortcut") THEN GUI_SET_TEXT(mnKuerzel, JSON_GET_STRING(mnDoc, mnWahl + ".shortcut"))
         IF JSON_HAS(mnDoc, mnWahl + ".checkable") THEN GUI_SET_CHECKED(mnHaken, JSON_GET_BOOL(mnDoc, mnWahl + ".checkable"))
     END IF
-    GUI_SET_ENABLED(mnText, da AND NOT (da AND mnIstTrenner(mnWahl)))
-    GUI_SET_ENABLED(mnName, eintrag)
+    GUI_SET_ENABLED(mnText, da AND NOT (da AND mnIstTrenner(mnWahl)) AND NOT kontext)
+    GUI_SET_ENABLED(mnName, eintrag OR kontext)
+    GUI_SET_ENABLED(mnAn, kontext)
+    GUI_SET_ENABLED(mnNeuMenue, NOT mnControl)
     GUI_SET_ENABLED(mnKuerzel, eintrag)
     GUI_SET_ENABLED(mnHaken, eintrag)
     GUI_SET_ENABLED(mnWeg, da)
@@ -195,7 +248,9 @@ SUB mnFelderFuellen()
     GUI_SET_ERROR(mnName, "")
     GUI_SET_ERROR(mnKuerzel, "")
     IF NOT da THEN
-        GUI_SET_TEXT(mnHinweis, tr$("Noch kein Menü. [+ Menü] legt eins an."))
+        GUI_SET_TEXT(mnHinweis, IIF(mnControl, tr$("Ein eigenes Control hat keine Menüleiste. [+ Kontextmenü] legt eins für den Rechtsklick an."), tr$("Noch kein Menü. [+ Menü] legt eins an.")))
+    ELSEIF kontext THEN
+        GUI_SET_TEXT(mnHinweis, trf$("Ein Kontextmenü mit {0} Einträgen. Sein Name ist das Handle (GUI_CONTEXT); die Einträge haben ihr Ereignis wie im Menü.", [STR$(JSON_LEN(mnDoc, mnWahl + ".items"))]))
     ELSEIF eintrag THEN
         DIM n AS STRING : n = GUI_TEXT(mnName)
         GUI_SET_TEXT(mnHinweis, IIF(n = "", tr$("Ohne Namen hat der Eintrag kein Ereignis."), trf$("Ereignis: {0}_Aktion -- Doppelklick im Navigator legt es an.", [n])))
@@ -302,7 +357,7 @@ SUB mnLoeschen()
     DIM n AS INTEGER : n = JSON_LEN(mnDoc, liste)
     IF n > 0 THEN
         mnWahl = liste + "." + STR$(MIN(a, n - 1))
-    ELSEIF liste = "menus" THEN
+    ELSEIF liste = "menus" OR liste = "kontextmenues" THEN
         mnWahl = ""
     ELSE
         mnWahl = LEFT$(liste, LEN(liste) - 6)    ' ".items" weg: das Menue darueber
@@ -314,6 +369,26 @@ END SUB
 ' Die Felder in den gewaehlten Eintrag uebernehmen.
 SUB mnFelderUebernehmen()
     IF mnWahl = "" OR mnIstTrenner(mnWahl) THEN RETURN
+    IF mnIstKontext(mnWahl) THEN
+        DIM kn AS STRING : kn = TRIM$(GUI_TEXT(mnName))
+        DIM kalt AS STRING : kalt = ""
+        IF JSON_HAS(mnDoc, mnWahl + ".name") THEN kalt = JSON_GET_STRING(mnDoc, mnWahl + ".name")
+        IF NOT istBezeichner(kn) THEN
+            GUI_SET_ERROR(mnName, tr$("Ein Name beginnt mit einem Buchstaben und hat nur Buchstaben, Ziffern und _."))
+        ELSEIF mnNameBelegt(kn, mnWahl) THEN
+            GUI_SET_ERROR(mnName, trf$("Den Namen '{0}' gibt es in diesem Fenster schon.", [kn]))
+        ELSE
+            GUI_SET_ERROR(mnName, "")
+            JSON_SET_STRING(mnDoc, mnWahl + ".name", kn)
+            IF kalt <> "" AND LOWER$(kalt) <> LOWER$(kn) THEN
+                ARRAY_PUSH(mnAlt, kalt)
+                ARRAY_PUSH(mnNeu, kn)
+            END IF
+        END IF
+        JSON_SET_STRING(mnDoc, mnWahl + ".widget", mnAnNamen[MAX(0, MIN(LEN(mnAnNamen) - 1, GUI_DROPDOWN_SELECTED(mnAn)))])
+        mnBaumFuellen()
+        RETURN
+    END IF
     DIM labelAlt AS STRING : labelAlt = mnLabel$(mnWahl)
     JSON_SET_STRING(mnDoc, mnWahl + ".label", GUI_TEXT(mnText))
     IF NOT mnIstMenue(mnWahl) THEN
@@ -368,6 +443,11 @@ SUB mnSchreiben()
     ELSE
         JSON_SET_JSON(doc, "menus", JSON_GET_JSON(mnDoc, "menus"))
     END IF
+    IF JSON_LEN(mnDoc, "kontextmenues") = 0 THEN
+        IF JSON_HAS(doc, "kontextmenues") THEN JSON_REMOVE(doc, "kontextmenues")
+    ELSE
+        JSON_SET_JSON(doc, "kontextmenues", JSON_GET_JSON(mnDoc, "kontextmenues"))
+    END IF
     DIM e AS Element : e = elemente[aktFenster]
     DIM k AS INTEGER
     FOR k = 0 TO LEN(mnAlt) - 1
@@ -378,6 +458,11 @@ SUB mnSchreiben()
     nachAenderung(TRUE)
     status(tr$("Menüs übernommen."))
     protokoll("menues " + STR$(JSON_LEN(mnDoc, "menus")) + " " + mnUebersicht$())
+    DIM kk AS INTEGER
+    FOR kk = 0 TO JSON_LEN(mnDoc, "kontextmenues") - 1
+        DIM kp AS STRING : kp = "kontextmenues." + STR$(kk)
+        protokoll("kontextmenue " + JSON_GET_STRING(mnDoc, kp + ".name") + " an [" + JSON_GET_STRING(mnDoc, kp + ".widget") + "] " + mnListeText$(kp + ".items"))
+    NEXT
 END SUB
 
 ' Fuer das Protokoll: alle Eintraege als "Datei[Hallo:miHallo,-,Mehr[Tief:miTief]]".
@@ -429,9 +514,27 @@ SUB menueEditorPruefen()
         END IF
     END IF
     IF NOT mnStumm THEN
-        IF GUI_ENTERED(mnText) OR GUI_ENTERED(mnName) OR GUI_ENTERED(mnKuerzel) OR GUI_CLICKED(mnHaken) THEN mnFelderUebernehmen()
+        IF GUI_ENTERED(mnText) OR GUI_ENTERED(mnName) OR GUI_ENTERED(mnKuerzel) OR GUI_CLICKED(mnHaken) OR GUI_CHANGED(mnAn) THEN mnFelderUebernehmen()
     END IF
-    IF GUI_CLICKED(mnNeuMenue) THEN
+    IF GUI_CLICKED(mnNeuKontext) THEN
+        mnFelderUebernehmen()
+        DIM km AS JSON_HANDLE : km = JSON_NEW_OBJECT()
+        DIM kname AS STRING : kname = "kontext"
+        DIM kz AS INTEGER : kz = 2
+        WHILE mnNameBelegt(kname, "")
+            kname = "kontext" + STR$(kz)
+            kz = kz + 1
+        WEND
+        JSON_SET_STRING(km, "name", kname)
+        JSON_SET_STRING(km, "widget", "")
+        JSON_SET_JSON(km, "items", JSON_NEW_ARRAY())
+        JSON_APPEND_JSON(mnDoc, "kontextmenues", km)
+        mnWahl = "kontextmenues." + STR$(JSON_LEN(mnDoc, "kontextmenues") - 1)
+        mnBaumFuellen()
+        mnFelderFuellen()
+        GUI_FOCUS(mnName)
+    END IF
+    IF GUI_CLICKED(mnNeuMenue) AND NOT mnControl THEN
         mnFelderUebernehmen()
         DIM m AS JSON_HANDLE : m = JSON_NEW_OBJECT()
         JSON_SET_STRING(m, "label", trf$("Menü {0}", [STR$(JSON_LEN(mnDoc, "menus") + 1)]))

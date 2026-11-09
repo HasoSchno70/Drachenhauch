@@ -43,8 +43,8 @@ module.exports = (H) => [
       'WEND',
       'CLOSEFILE(f)',
     ], { out: ["Anna 95", "Bert 78"] }),
-  H.cmd("READALL$", 'READALL$(f)',
-    "Liest den gesamten verbleibenden Inhalt der Datei auf einmal als einen String.",
+  H.cmd("READALL$", 'READALL$(f[, kodierung$])',
+    "Liest den gesamten verbleibenden Inhalt der Datei auf einmal als einen String. Statt des Handles geht auch ein Pfad -- dann die ganze Datei, wahlweise mit Kodierung wie bei READLINES (\"cp1252\", \"latin1\", \"auto\").",
     [
       'DIM f AS FILE',
       'f = OPENFILE("notiz.txt", "w")',

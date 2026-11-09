@@ -1,0 +1,172 @@
+' gui: das Datumsfeld (GUI_DATEFIELD) und die Datumsspalte einer Tabelle
+' (GUI_TABLE_COL_TYPE "datum") -- gefunden beim Port der Kuehlschrank-App,
+' deren Dialoge QDateEdit mit aufklappendem Kalender nehmen (Produkt, je Zeile
+' im Stapelscan und beim Einkauf abschliessen). Vorher gab es nur das grosse
+' Monatsgitter im Fenster. Das Feld zeigt das Datum; ein Klick, Leertaste, F4
+' oder Alt+Ab klappt den Monat darunter auf (dasselbe Gitter); ein Tag
+' uebernimmt und klappt zu, ESC klappt nur zu, Enter gilt zugeklappt dem
+' Formular. Dazu: ein Klick ins Monatsgitter zaehlte die Spalten immer ab
+' Montag, gezeichnet wurde ab dem Wochenbeginn.
+' Eingaben kommen aus Aufnahmen (AUTOMATION_PLAY) -- Maus und Tasten der gui
+' sehen sie. Format: docs/werkzeuge.md, dhrt test.
+
+=== ein klick klappt auf, ein tag uebernimmt, json behaelt das feld
+IMPORT "helfer.dh"
+DIM w AS GUI_WINDOW : w = fenster()
+DIM f AS GUI_WIDGET : f = GUI_DATEFIELD(w, 20, 20, 160, 28)
+GUI_SET_DATE(f, "2026-11-09")
+PRINT "start "; GUI_DATE(f); " hoehe "; GUI_GET_H(f)
+' Bild 2 Klick aufs Feld, Bild 12 Klick auf den 20. (Monat ab Montag: der
+' 1. November 2026 ist ein Sonntag, Spalte 6).
+klick(1, 60, 34)
+klick(11, tagX(20, 6, 20, 160, 0), tagY(20, 6, 20, 28, 0))
+spielen()
+DIM aenderungen AS INTEGER : aenderungen = 0
+DIM offen AS STRING : offen = ""
+DIM n AS INTEGER
+FOR n = 1 TO 30
+    bild()
+    IF GUI_CHANGED(f) THEN aenderungen = aenderungen + 1
+    IF n = 6 THEN offen = GUI_DATE(f)
+NEXT
+PRINT "offen noch "; offen; " | gewaehlt "; GUI_DATE(f); " aenderungen "; aenderungen
+DIM j AS STRING : j = REPLACE$(GUI_TO_JSON(w), " ", "")
+PRINT "json kompakt "; INSTR(j, CHR$(34) + "kompakt" + CHR$(34) + ":true") >= 0
+DIM w2 AS GUI_WINDOW : w2 = GUI_FROM_JSON(j)
+PRINT "zurueck "; GUI_DATE(GUI_WINDOW_WIDGET(w2, 0)); " "; INSTR(REPLACE$(GUI_TO_JSON(w2), " ", ""), CHR$(34) + "kompakt" + CHR$(34) + ":true") >= 0
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/datumsfeld.dh"
+--- umgebung
+DHRT_FRAMES=200
+--- erwartet
+start 2026-11-09 hoehe 28
+offen noch 2026-11-09 | gewaehlt 2026-11-20 aenderungen 1
+json kompakt TRUE
+zurueck 2026-11-20 TRUE
+
+=== esc klappt nur zu, enter gilt zugeklappt dem formular
+' Klick klappt auf, ESC klappt zu -- der Abbrechen-Knopf bleibt unberuehrt;
+' Enter im zugeklappten Feld drueckt den Standard-Knopf.
+IMPORT "helfer.dh"
+DIM w AS GUI_WINDOW : w = fenster()
+DIM f AS GUI_WIDGET : f = GUI_DATEFIELD(w, 20, 20, 160, 28)
+GUI_SET_DATE(f, "2026-11-09")
+DIM ok AS GUI_WIDGET : ok = GUI_BUTTON(w, "OK", 300, 360, 90, 30)
+DIM ab AS GUI_WIDGET : ab = GUI_BUTTON(w, "Abbrechen", 400, 360, 110, 30)
+GUI_WINDOW_DEFAULT(w, ok)
+GUI_WINDOW_CANCEL(w, ab)
+klick(1, 60, 34)
+taste(10, 256)
+taste(20, 257)
+spielen()
+DIM nOk AS INTEGER : nOk = 0
+DIM nAb AS INTEGER : nAb = 0
+DIM n AS INTEGER
+FOR n = 1 TO 40
+    bild()
+    IF GUI_CLICKED(ok) THEN nOk = nOk + 1
+    IF GUI_CLICKED(ab) THEN nAb = nAb + 1
+NEXT
+PRINT "ok "; nOk; " abbrechen "; nAb; " datum "; GUI_DATE(f)
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/datumsfeld.dh"
+--- umgebung
+DHRT_FRAMES=200
+--- erwartet
+ok 1 abbrechen 0 datum 2026-11-09
+
+=== aufgeklappt waehlen die pfeile, enter uebernimmt, esc laesst es stehen
+' Klick klappt auf; rechts, rechts, ab = 9 Tage weiter, Enter nimmt den 18.
+' (und drueckt nicht den Standard-Knopf). Leertaste klappt wieder auf, links
+' markiert den 17., ESC -- es bleibt der 18.
+IMPORT "helfer.dh"
+DIM w AS GUI_WINDOW : w = fenster()
+DIM f AS GUI_WIDGET : f = GUI_DATEFIELD(w, 20, 20, 160, 28)
+GUI_SET_DATE(f, "2026-11-09")
+DIM ok AS GUI_WIDGET : ok = GUI_BUTTON(w, "OK", 300, 360, 90, 30)
+GUI_WINDOW_DEFAULT(w, ok)
+klick(1, 60, 34)
+taste(8, 262)
+taste(12, 262)
+taste(16, 264)
+taste(20, 257)
+taste(28, 32)
+taste(34, 263)
+taste(40, 256)
+spielen()
+DIM nOk AS INTEGER : nOk = 0
+DIM n AS INTEGER
+DIM nach AS STRING : nach = ""
+FOR n = 1 TO 60
+    bild()
+    IF GUI_CLICKED(ok) THEN nOk = nOk + 1
+    IF n = 26 THEN nach = GUI_DATE(f)
+NEXT
+PRINT "nach enter "; nach; " am ende "; GUI_DATE(f); " ok "; nOk
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/datumsfeld.dh"
+--- umgebung
+DHRT_FRAMES=200
+--- erwartet
+nach enter 2026-11-18 am ende 2026-11-18 ok 0
+
+=== eine datumsspalte klappt beim bearbeiten den monat unter der zelle auf
+' Doppelklick auf die Zelle MHD (Spalte "datum") klappt den Monat auf, ein
+' Klick auf den 25. schreibt 2026-11-25 in die Zelle und meldet die Tabelle
+' geaendert. Die Art steht im JSON.
+IMPORT "helfer.dh"
+DIM w AS GUI_WINDOW : w = fenster()
+DIM t AS GUI_WIDGET : t = GUI_TABLE(w, 20, 20, 400, 160)
+GUI_TABLE_HEADERS(t, ["Produkt", "MHD"])
+GUI_TABLE_COL_WIDTHS(t, [150, 150])
+GUI_TABLE_ADD_ROW(t, ["Milch", "2026-11-09"])
+GUI_TABLE_COL_TYPE(t, 1, "datum")
+GUI_TABLE_COL_EDIT(t, 1, TRUE)
+DIM kh AS INTEGER : kh = INT(GUI_TABLE_GET(t, "kopfhoehe"))
+DIM zh AS INTEGER : zh = INT(GUI_TABLE_GET(t, "zeilenhoehe"))
+DIM cx AS INTEGER : cx = 20 + 1 + 150
+DIM cy AS INTEGER : cy = 20 + 1 + kh
+klick(1, cx + 40, cy + zh \ 2)
+klick(5, cx + 40, cy + zh \ 2)
+' Der Monat liegt unter der Zelle (Hoehe der Zeile statt eines Felds).
+klick(16, tagX(25, 6, cx, 150, 0), tagY(25, 6, cy, zh, 0))
+spielen()
+DIM aend AS INTEGER : aend = 0
+DIM n AS INTEGER
+FOR n = 1 TO 40
+    bild()
+    IF GUI_CHANGED(t) THEN aend = aend + 1
+NEXT
+PRINT "zelle "; GUI_TABLE_GET_CELL(t, 0, 1); " geaendert "; aend
+PRINT "json "; INSTR(REPLACE$(GUI_TO_JSON(w), " ", ""), CHR$(34) + "datum" + CHR$(34)) >= 0
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/datumsfeld.dh"
+--- umgebung
+DHRT_FRAMES=200
+--- erwartet
+zelle 2026-11-25 geaendert 1
+json TRUE
+
+=== im monatsgitter trifft ein klick den tag auch mit woche ab sonntag
+' Gezeichnet wird ab dem Wochenbeginn, geklickt wurde ab Montag: mit
+' wochenbeginn 6 landete ein Klick auf den 20. beim 14.
+IMPORT "helfer.dh"
+DIM w AS GUI_WINDOW : w = fenster()
+DIM k AS GUI_WIDGET : k = GUI_DATEPICKER(w, 20, 20, 280, 240)
+GUI_SET_DATE(k, "2026-11-09")
+GUI_DATEPICKER_SET(k, "wochenbeginn", 6)
+' Zelle 40 x 32, Kopf 26, Wochentage 18; der 1. November ist ein Sonntag,
+' ab Sonntag also Spalte 0 -- der 20. steht in Woche 2, Spalte 5.
+klick(1, 20 + 5 * 40 + 20, 20 + 26 + 18 + 2 * 32 + 16)
+spielen()
+DIM n AS INTEGER
+FOR n = 1 TO 20
+    bild()
+NEXT
+PRINT "gewaehlt "; GUI_DATE(k)
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/datumsfeld.dh"
+--- umgebung
+DHRT_FRAMES=200
+--- erwartet
+gewaehlt 2026-11-20

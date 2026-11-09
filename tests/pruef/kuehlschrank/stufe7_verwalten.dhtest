@@ -1,0 +1,370 @@
+' Kuehlschrank-App im Drachenhauch Studio, Stufe 7 (zweiter Teil): die
+' Reiter Lagerorte, Supermaerkte und Datenbank der Einstellungen
+' (examples/studio/kuehlschrank: EinstellungenFenster, GangplanFenster,
+' Module Lagerorte, Einkauf, Datenpflege). Proben wie in den Stufen davor:
+' F5 im Studio, dann main.dh mit einer Probe statt der Bildschleife; Heute
+' ist fest.
+' Format: docs/werkzeuge.md, dhrt test.
+
+--- langsam
+=== lagerorte: anlegen, sinnbild auf der kachel, farbe, nur leer loeschen, zuruecksetzen
+' Ein neuer Ort steht in storage_locations (dort lesen ihn alle Teile der
+' App) und locations; sein Sinnbild auch in location_settings -- die
+' Python-App schrieb es nur nach locations, die Kachel zeigte es nie.
+' Loeschen nur ohne Eintraege (dort blieben sie mit einem Ort zurueck, den es
+' nicht mehr gab). Zuruecksetzen gilt sofort, ohne Neustart.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+kKopieren(ARG$(1), p)
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = kF5(p, log)
+PRINT "geprueft "; slHat(log, "geprueft 0 0")
+SETENV("KUEHL_HEUTE", "2026-11-08")
+PRINT "code "; kProbe(p, "probe.dh", "", 5)
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../../studio/studio.dh
+{sammlung}/../../../examples/studio/kuehlschrank
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/kuehlschrank.dh"
+slStudio = ARG$(0)
+--- datei probe.dh
+SUB ort(n AS STRING)
+    PRINT n; ": "; ortSinnbild$(n); " "; HEX$(ortFarbe(n)); " | storage "; dbZahlEin("SELECT COUNT(*) FROM storage_locations WHERE name = ?", n); " locations "; dbZahlEin("SELECT COUNT(*) FROM locations WHERE name = ?", n); " settings "; dbZahlEin("SELECT COUNT(*) FROM location_settings WHERE keyword = ?", n)
+END SUB
+PRINT "neu ["; ortAnlegen$("Keller", "🧀"); "]"
+ort("Keller")
+PRINT "doppelt ["; ortAnlegen$("keller", "📦"); "] leer ["; ortAnlegen$("  ", "📦"); "]"
+ortAussehenSetzen("Kühlschrank", &H112233, "🥛")
+ort("Kühlschrank")
+PRINT "symbol in storage "; JOIN$(textListe("SELECT icon FROM storage_locations WHERE name = 'Kühlschrank'"), "")
+DB_EXEC(db, "INSERT INTO products (name) VALUES ('Wein')")
+DB_EXEC(db, "INSERT INTO inventory (product_id, quantity, unit, storage_location) VALUES (1, 2, 'Flasche', 'Keller - Regal')")
+PRINT "voll ["; ortLoeschen$("Keller"); "]"
+DB_EXEC(db, "DELETE FROM inventory")
+PRINT "leer ["; ortLoeschen$("Keller"); "]"
+ort("Keller")
+ortAussehenZuruecksetzen()
+ort("Kühlschrank")
+' Im Fenster: die Tabelle, ein neuer Ort ueber Feld und Knopf.
+DIM ef AS EinstellungenFenster : ef = NEW EinstellungenFenster()
+ef.Zeigen()
+PRINT "zeilen "; GUI_TABLE_ROW_COUNT(ef.ortTabelle); " | "; GUI_TABLE_GET_CELL(ef.ortTabelle, 0, 0); " "; GUI_TABLE_GET_CELL(ef.ortTabelle, 0, 1); " "; GUI_TABLE_GET_CELL(ef.ortTabelle, 0, 2); " "; GUI_TABLE_GET_CELL(ef.ortTabelle, 0, 3)
+GUI_SET_TEXT(ef.ortNameFeld, "Dachboden")
+ef.neuSinnbild = "🍹"
+ef.knopfOrtNeu_Klick()
+DIM z AS INTEGER : z = GUI_TABLE_ROW_COUNT(ef.ortTabelle) - 1
+PRINT "danach "; z + 1; " | "; GUI_TABLE_GET_CELL(ef.ortTabelle, z, 0); " "; GUI_TABLE_GET_CELL(ef.ortTabelle, z, 1); " | feld ["; GUI_TEXT(ef.ortNameFeld); "] knopf "; GUI_TEXT(ef.ortSinnbildKnopf); " | geaendert "; ef.datenGeaendert
+PRINT "im bestand waehlbar "; ARRAY_INDEXOF(lagerorte(), "Dachboden") >= 0
+--- erwartet
+geprueft TRUE
+neu []
+Keller: 🧀 4682B4 | storage 1 locations 1 settings 1
+doppelt [Lagerort „keller“ gibt es schon.] leer [Bitte gib einen Namen ein!]
+Kühlschrank: 🥛 112233 | storage 1 locations 1 settings 1
+symbol in storage 🥛
+voll [An „Keller“ liegen noch 1 Eintrag -- erst woandershin verlegen.]
+leer []
+Keller: 📦 4682B4 | storage 0 locations 0 settings 0
+Kühlschrank: 🧊 3498DB | storage 1 locations 1 settings 0
+zeilen 9 | 🧊 Kühlschrank #3498DB 0
+danach 10 | 🍹 Dachboden | feld [] knopf 📦 | geaendert TRUE
+im bestand waehlbar TRUE
+code 0
+
+=== supermaerkte: vorlage, gangplan bearbeiten, eingebauten anpassen, loeschen, standard erst mit speichern
+' Ein neuer Markt kopiert eine Vorlage (oder den Standardplan); das
+' Gangplan-Fenster ordnet nach Gang, nimmt Abteilungen dazu und weg. Ein
+' eingebauter Markt bekommt einen eigenen Plan und kann zurueck. Wird ein
+' eigener Markt geloescht, der Standard war, ist es keiner mehr. Der
+' Standard-Markt gilt erst mit "Speichern" (die Python-App schrieb ihn bei
+' jeder Wahl, auch beim Zuruecksetzen).
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+kKopieren(ARG$(1), p)
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = kF5(p, log)
+SETENV("KUEHL_HEUTE", "2026-11-08")
+PRINT "code "; kProbe(p, "probe.dh", "", 5)
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../../studio/studio.dh
+{sammlung}/../../../examples/studio/kuehlschrank
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/kuehlschrank.dh"
+slStudio = ARG$(0)
+--- datei probe.dh
+PRINT "neu ["; marktAnlegen$("Mein Markt", "REWE"); "] "; gangZahl(gangplan("Mein Markt")); " "; gangplan("Mein Markt")[0]
+PRINT "doppelt ["; marktAnlegen$("mein markt", ""); "] eingebaut ["; marktAnlegen$("aldi", ""); "]"
+PRINT "standardplan ["; marktAnlegen$("Ecke", ""); "] "; JOIN$(gangplan("Ecke"), ";")
+DIM g AS GangplanFenster : g = NEW GangplanFenster()
+g.markt = "Ecke"
+g.Zeigen()
+PRINT "fenster "; GUI_TABLE_ROW_COUNT(g.tabelle); " | "; GUI_TABLE_GET_CELL(g.tabelle, 0, 0); "=" ; GUI_TABLE_GET_CELL(g.tabelle, 0, 1); " … "; GUI_TABLE_GET_CELL(g.tabelle, 8, 0); "=" ; GUI_TABLE_GET_CELL(g.tabelle, 8, 1)
+GUI_SET_TEXT(g.neuFeld, "Kaffee")
+GUI_SET_VALUE(g.neuGang, 4)
+g.knopfNeu_Klick()
+g.tabelle_Zelle(0, 2)
+GUI_TABLE_SET_CELL(g.tabelle, 0, 1, "99")
+g.knopfSpeichern_Klick()
+PRINT "gespeichert "; g.gesichert; " | "; JOIN$(gangplan("Ecke"), ";")
+' Ein eingebauter bekommt einen eigenen Plan -- und wieder den eingebauten.
+planSpeichern("ALDI", ["Obst=2", "Brot=1"])
+PRINT "aldi eigen "; hatEigenenPlan("ALDI"); " "; JOIN$(gangplan("ALDI"), ";")
+planLoeschen("ALDI")
+PRINT "aldi zurueck "; hatEigenenPlan("ALDI"); " "; gangZahl(gangplan("ALDI"))
+' Standard: ein eigener geloescht -> keiner; ein eingebauter bleibt.
+standardMarktSetzen("Ecke")
+planLoeschen("Ecke")
+PRINT "ecke weg ["; gewaehlterMarkt$(); "] "; ARRAY_INDEXOF(marktListe(), "Ecke")
+standardMarktSetzen("REWE")
+planSpeichern("REWE", ["Obst=1"])
+planLoeschen("REWE")
+PRINT "rewe bleibt ["; gewaehlterMarkt$(); "]"
+' Ein Plan, wie ihn die Python-App schreiben kann -- nicht nach Gang: das
+' Fenster ordnet ihn.
+DB_EXEC(db, "INSERT INTO store_layouts (store_name, layout_json) VALUES ('Wirr', ?)", "{" + CHR$(34) + "Getränke" + CHR$(34) + ": 7, " + CHR$(34) + "Obst" + CHR$(34) + ": 1}")
+DIM g2 AS GangplanFenster : g2 = NEW GangplanFenster()
+g2.markt = "Wirr"
+g2.Zeigen()
+PRINT "wirr "; GUI_TABLE_GET_CELL(g2.tabelle, 0, 0); " "; GUI_TABLE_GET_CELL(g2.tabelle, 1, 0)
+g2.knopfAbbrechen_Klick()
+DB_EXEC(db, "DELETE FROM store_layouts WHERE store_name = 'Wirr'")
+' Im Fenster: die Tabelle, der Standard erst mit Speichern.
+planSpeichern("EDEKA", ["Obst=1"])
+DIM ef AS EinstellungenFenster : ef = NEW EinstellungenFenster()
+ef.Zeigen()
+DIM i AS INTEGER
+FOR i = 0 TO GUI_TABLE_ROW_COUNT(ef.marktTabelle) - 1
+    PRINT "  "; GUI_TABLE_GET_CELL(ef.marktTabelle, i, 0); " "; GUI_TABLE_GET_CELL(ef.marktTabelle, i, 1); " | "; GUI_TABLE_GET_CELL(ef.marktTabelle, i, 2); " | "; GUI_TABLE_GET_CELL(ef.marktTabelle, i, 3); " | ["; GUI_TABLE_GET_CELL(ef.marktTabelle, i, 5); "]"
+NEXT
+PRINT "standard im fenster "; GUI_TEXT(ef.marktStandard)
+GUI_SET_TEXT(ef.marktStandard, "LIDL")
+PRINT "vor speichern ["; gewaehlterMarkt$(); "]"
+ef.knopfSpeichern_Klick()
+PRINT "nach speichern ["; gewaehlterMarkt$(); "]"
+--- erwartet
+neu [] 10 Obst=1
+doppelt [„mein markt“ gibt es schon.] eingebaut [„aldi“ gibt es schon.]
+standardplan [] Obst=1;Gemüse=1;Brot=2;Milchprodukte=3;Fleisch=4;Tiefkühl=5;Trockenwaren=6;Getränke=7;Sonstiges=8
+fenster 9 | Obst=1 … Sonstiges=8
+gespeichert TRUE | Brot=2;Milchprodukte=3;Fleisch=4;Kaffee=4;Tiefkühl=5;Trockenwaren=6;Getränke=7;Sonstiges=8;Gemüse=50
+aldi eigen TRUE Brot=1;Obst=2
+aldi zurueck FALSE 6
+ecke weg [] -1
+rewe bleibt [REWE]
+wirr Obst Getränke
+  🏪 ALDI | eingebaut | 6 | []
+  🏪 EDEKA | eingebaut, angepasst | 1 | [↺]
+  🏪 KAUFLAND | eingebaut | 11 | []
+  🏪 LIDL | eingebaut | 8 | []
+  ⭐ Mein Markt | eigener | 10 | [🗑]
+  🏪 NETTO | eingebaut | 7 | []
+  🏪 PENNY | eingebaut | 7 | []
+  🏪 REWE | eingebaut | 10 | []
+standard im fenster REWE
+vor speichern [REWE]
+nach speichern [LIDL]
+code 0
+
+=== datenbank: sichern, einspielen ohne neustart, fremde datei, csv, wartung, neu beginnen
+' Die Sicherung schreibt SQLite selbst (VACUUM INTO); Einspielen ersetzt den
+' Inhalt Tabelle fuer Tabelle, legt vorher eine Sicherung des jetzigen Stands
+' an und vergisst den Verlauf -- ohne Neustart (die Python-App ueberschrieb
+' die offene Datei). Eine Datei, die keine Sicherung ist, bleibt draussen.
+' "Neue Datenbank" fuellt die Startdaten, wahlweise mit den 29 Rezepten.
+IMPORT "laeufer.dh"
+IMPORT "regex"
+DIM p AS STRING : p = CWD$() + "/proj"
+kKopieren(ARG$(1), p)
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = kF5(p, log)
+SETENV("KUEHL_HEUTE", "2026-11-08")
+SETENV("KUEHL_EXPORT_ORDNER", CWD$() + "/export")
+MKDIR(CWD$() + "/export")
+WRITEALL(CWD$() + "/fremd.db", "das ist keine datenbank")
+PRINT "code "; kProbe(p, "probe.dh", "", 5)
+DIM ex AS ARRAY OF STRING : ex = DIRLIST(CWD$() + "/export")
+SORT(ex)
+PRINT "export: "; JOIN$(ex, " ")
+PRINT TRIM$(REGEX_REPLACE(READALL(CWD$() + "/export/products.csv"), "\d{4}-\d\d-\d\d \d\d:\d\d:\d\d", "ZEIT"))
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../../studio/studio.dh
+{sammlung}/../../../examples/studio/kuehlschrank
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/kuehlschrank.dh"
+slStudio = ARG$(0)
+--- datei probe.dh
+FUNCTION zahlen$() AS STRING
+    RETURN "produkte " + STR$(dbZahl("SELECT COUNT(*) FROM products")) + " bestand " + STR$(dbZahl("SELECT COUNT(*) FROM inventory")) + " liste " + STR$(dbZahl("SELECT COUNT(*) FROM shopping_list")) + " rezepte " + STR$(dbZahl("SELECT COUNT(*) FROM recipes")) + " orte " + STR$(dbZahl("SELECT COUNT(*) FROM storage_locations")) + " einstellungen " + STR$(dbZahl("SELECT COUNT(*) FROM app_settings"))
+END FUNCTION
+FUNCTION inDatei(pfad AS STRING, sql AS STRING) AS INTEGER
+    DIM d AS DB_CONN : d = DB_OPEN(pfad)
+    DIM r AS DB_RESULT : r = DB_QUERY(d, sql)
+    DIM n AS INTEGER : n = -1
+    IF DB_NEXT(r) THEN n = DB_GET_INT(r, 0)
+    DB_CLOSE_RESULT(r)
+    DB_CLOSE(d)
+    RETURN n
+END FUNCTION
+PRINT "groessen "; groesseText$(0); " | "; groesseText$(1536); " | "; groesseText$(5 * 1024 * 1024)
+DB_EXEC(db, "INSERT INTO products (name) VALUES ('Milch, frisch')")
+DB_EXEC(db, "INSERT INTO inventory (product_id, quantity, unit) VALUES (1, 2, 'Liter')")
+DIM s1 AS STRING : s1 = sicherungAnlegen$()
+PRINT "sicherung "; LEFT$(BASENAME(s1), 20); " im ordner "; BASENAME(DIRNAME(s1)); " | produkte darin "; inDatei(s1, "SELECT COUNT(*) FROM products")
+' Danach aendert sich viel -- und die Sicherung kommt zurueck.
+verlauf.beginnen("probe")
+verlauf.abschliessen()
+DB_EXEC(db, "DELETE FROM inventory")
+DB_EXEC(db, "DELETE FROM products")
+DB_EXEC(db, "INSERT INTO products (name) VALUES ('Käse')")
+DB_EXEC(db, "INSERT INTO shopping_list (product_name, quantity) VALUES ('Brot', 1)")
+PRINT "vorher: "; zahlen$()
+PRINT "einspielen ["; sicherungEinspielen$(s1); "]"
+PRINT "nachher: "; zahlen$(); " | "; JOIN$(textListe("SELECT name FROM products"), ",")
+PRINT "stand davor gesichert "; FILEEXISTS(vorEinspielen); " "; inDatei(vorEinspielen, "SELECT COUNT(*) FROM products WHERE name = 'Käse'"); " | verlauf "; verlauf.kannZurueck()
+PRINT "fremd ["; sicherungEinspielen$(CWD$() + "/../../fremd.db"); "]"
+PRINT "fehlt ["; sicherungEinspielen$(CWD$() + "/../gibtsnicht.db"); "]"
+' Eine Datenbank ohne products/inventory ist keine Sicherung der App.
+DIM a AS DB_CONN : a = DB_OPEN(CWD$() + "/../andere.db")
+DB_EXEC(a, "CREATE TABLE notizen (text TEXT)")
+DB_CLOSE(a)
+PRINT "andere ["; sicherungEinspielen$(CWD$() + "/../andere.db"); "]"
+' Eine aeltere Sicherung mit weniger Spalten und ohne shopping_list.
+DIM alt AS DB_CONN : alt = DB_OPEN(CWD$() + "/../alt.db")
+DB_EXEC(alt, "CREATE TABLE products (id INTEGER PRIMARY KEY, name TEXT)")
+DB_EXEC(alt, "CREATE TABLE inventory (id INTEGER PRIMARY KEY, product_id INTEGER, quantity REAL)")
+DB_EXEC(alt, "INSERT INTO products VALUES (7, 'Alt')")
+DB_EXEC(alt, "INSERT INTO inventory VALUES (1, 7, 3)")
+DB_CLOSE(alt)
+DB_EXEC(db, "INSERT INTO shopping_list (product_name, quantity) VALUES ('Brot', 1)")
+PRINT "alt ["; sicherungEinspielen$(CWD$() + "/../alt.db"); "] "; zahlen$(); " | "; JOIN$(textListe("SELECT id || ':' || name || ':' || IFNULL(barcode, '-') FROM products"), ",")
+PRINT "zurueck ["; sicherungEinspielen$(s1); "] "; zahlen$()
+PRINT "csv "; JOIN$(csvExport(GETENV$("KUEHL_EXPORT_ORDNER")), " / ")
+optimieren()
+PRINT "optimiert "; dbZahl("SELECT COUNT(*) FROM sqlite_master WHERE name = 'sqlite_stat1'")
+DIM vor AS INTEGER, nach AS INTEGER
+(vor, nach) = aufraeumen()
+PRINT "aufgeraeumt "; nach <= vor; " "; nach = FILESIZE(dbDatei$())
+' Das Fenster: Zahlen, Knoepfe ohne Frage.
+DIM ef AS EinstellungenFenster : ef = NEW EinstellungenFenster()
+ef.Zeigen()
+PRINT "fenster: "; GUI_TEXT(ef.dbZahlen); " | pfad endet "; RIGHT$(GUI_TEXT(ef.dbPfad), 18); " ganz "; INSTR(dbDateiGanz$(), ":\") >= 0 OR LEFT$(dbDateiGanz$(), 1) = "/"
+ef.knopfSichern_Klick()
+PRINT LEFT$(GUI_TEXT(ef.dbStatus), 34)
+ef.knopfOptimieren_Klick()
+PRINT GUI_TEXT(ef.dbStatus)
+ef.knopfCsv_Klick()
+PRINT GUI_TEXT(ef.dbStatus)
+datenbankNeu(TRUE)
+PRINT "neu mit rezepten: "; zahlen$(); " | verlauf "; verlauf.kannZurueck()
+datenbankNeu(FALSE)
+PRINT "neu ohne: "; zahlen$()
+--- erwartet
+groessen 0,0 Bytes | 1,5 KB | 5,0 MB
+sicherung kuehlschrank_backup_ im ordner backups | produkte darin 1
+vorher: produkte 1 bestand 0 liste 1 rezepte 0 orte 9 einstellungen 13
+einspielen []
+nachher: produkte 1 bestand 1 liste 0 rezepte 0 orte 9 einstellungen 13 | Milch, frisch
+stand davor gesichert TRUE 1 | verlauf FALSE
+fremd [Das ist keine Datenbank-Datei.]
+fehlt [Die Datei gibt es nicht.]
+andere [Das ist keine Sicherung der Kühlschrank-App (es fehlen products und inventory).]
+alt [] produkte 1 bestand 1 liste 0 rezepte 0 orte 9 einstellungen 13 | 7:Alt:-
+zurueck [] produkte 1 bestand 1 liste 0 rezepte 0 orte 9 einstellungen 13
+csv products.csv (1 Zeilen) / inventory.csv (1 Zeilen)
+optimiert 1
+aufgeraeumt TRUE TRUE
+fenster: 1 Produkte · 1 im Bestand · 0 Rezepte · 0 auf der Einkaufsliste | pfad endet fridge_database.db ganz TRUE
+💾 Gesichert: kuehlschrank_backup_2
+⚡ Optimiert: Indizes und Statistiken sind frisch.
+📤 2 Tabellen: products.csv (1 Zeilen), inventory.csv (1 Zeilen)
+neu mit rezepten: produkte 0 bestand 0 liste 0 rezepte 29 orte 9 einstellungen 13 | verlauf FALSE
+neu ohne: produkte 0 bestand 0 liste 0 rezepte 0 orte 9 einstellungen 13
+code 0
+export: inventory.csv products.csv
+id,barcode,name,brand,category,image_url,min_quantity,min_unit,default_storage_location,default_shelf_life_days,nutritional_info,allergens,created_at,updated_at
+1,,"Milch, frisch",,,,,,,,,,ZEIT,ZEIT
+
+=== echt: reiter datenbank, sicherung einspielen mit frage, esc
+' Strg+, , Reiter "Datenbank" (der sechste -- er passt jetzt in die
+' Leiste), "Sicherung einspielen" (KUEHL_SICHERUNG), die Frage mit Enter,
+' ESC. Danach zeigt das Hauptfenster den eingespielten Bestand.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+kKopieren(ARG$(1), p)
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = kF5(p, log)
+SETENV("KUEHL_HEUTE", "2026-11-08")
+kProbe(p, "mess.dh", "", 10)
+' Die Sicherung: dieselbe Datei mit zwei Eintraegen im Bestand.
+COPYFILE(p + "/_studio/fridge_database.db", CWD$() + "/sicherung.db")
+DIM d AS DB_CONN : d = DB_OPEN(CWD$() + "/sicherung.db")
+DB_EXEC(d, "INSERT INTO products (name) VALUES ('Milch'), ('Brot')")
+DB_EXEC(d, "INSERT INTO inventory (product_id, quantity, unit) VALUES (1, 1, 'Liter'), (2, 1, 'Stück')")
+DB_CLOSE(d)
+SETENV("KUEHL_SICHERUNG", CWD$() + "/sicherung.db")
+DIM w AS ARRAY OF STRING : w = SPLIT(TRIM$(READALL(p + "/_studio/lage.txt")), " ")
+FUNCTION z(i AS INTEGER) AS INTEGER
+    RETURN INT(VAL(w[i]))
+END FUNCTION
+slZeilen = [] : slBild = 0
+slHin(10, 10)
+slWarten(10)
+slMit([341], 44)
+slWarten(20)
+slKlick(z(0), z(1))
+slWarten(10)
+slKlick(z(2), z(3))
+slWarten(20)
+slTaste(257)
+slWarten(20)
+slTaste(256)
+slWarten(20)
+slAufnahmeSchreiben(p + "/_studio/klick.txt")
+PRINT "code "; kProbe(p, "klick.dh", "klick.txt", slBild + 20)
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../../studio/studio.dh
+{sammlung}/../../../examples/studio/kuehlschrank
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/kuehlschrank.dh"
+slStudio = ARG$(0)
+--- datei daten.dh
+DIM f AS Hauptfenster : f = studioStartFenster
+--- datei mess.dh
+IMPORT "../../daten.dh"
+DIM n AS INTEGER
+WHILE n < 4 AND studioBild()
+    n = n + 1
+WEND
+DIM t AS INTEGER : t = GUI_METRIC_GET("title_h")
+DIM ef AS EinstellungenFenster : ef = NEW EinstellungenFenster()
+ef.Zeigen()
+n = 0
+WHILE n < 3 AND studioBild()
+    n = n + 1
+WEND
+DIM ex AS INTEGER : ex = GUI_WINDOW_GET_X(ef.Fenster())
+DIM ey AS INTEGER : ey = GUI_WINDOW_GET_Y(ef.Fenster()) + t
+DIM rx AS INTEGER, ry AS INTEGER, rw AS INTEGER, rh AS INTEGER
+(rx, ry, rw, rh) = GUI_TABCONTROL_ITEM_RECT(ef.reiter, 5)
+WRITEALL("lage.txt", STR$(rx + rw \ 2) + " " + STR$(ry + rh \ 2) + " " + _
+    STR$(ex + GUI_GET_X(ef.knopfEinspielen) + GUI_GET_W(ef.knopfEinspielen) \ 2) + " " + STR$(ey + GUI_GET_Y(ef.knopfEinspielen) + GUI_GET_H(ef.knopfEinspielen) \ 2))
+--- datei klick.dh
+IMPORT "../../daten.dh"
+FUNCTION stand$() AS STRING
+    RETURN "bestand " + STR$(dbZahl("SELECT COUNT(*) FROM inventory")) + " kachel " + GUI_CARD_TEXT$(f.kachelGesamt)
+END FUNCTION
+DIM folge AS ARRAY OF STRING : folge = []
+DIM war AS STRING : war = ""
+WHILE studioBild()
+    DIM jetzt AS STRING : jetzt = stand$()
+    IF jetzt <> war THEN ARRAY_PUSH(folge, jetzt)
+    war = jetzt
+WEND
+PRINT JOIN$(folge, " -> ")
+--- erwartet
+bestand 0 kachel 0 -> bestand 2 kachel 2
+code 0

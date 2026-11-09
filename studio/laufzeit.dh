@@ -15,8 +15,33 @@
 ' kehren erst dann zurueck -- wie in Xojo oder Visual Basic.
 
 IMPORT "gui"
+IMPORT "json"
 IMPORT "pdf"
 IMPORT "imgfx"
+IMPORT "chart"
+
+' Eine Zeichenfläche malt ihren Text in der Schrift der Oberfläche daneben:
+' der eigenen der gui (GUI_FONT), sonst der eingebauten Sans in der
+' Textgröße des Programms -- nicht in der Pixelschrift, die TEXT ohne SETFONT
+' nimmt. Wer eine andere will, setzt sie in Zeichnen selbst. Danach gilt
+' wieder genau der Stand von vorher (GFX_PUSH/GFX_POP: Schrift, Größe, Stil):
+' ohne eine eigene Schrift zeichnet die gui in der Textgröße des Programms,
+' und ein TEXT_SIZE aus Zeichnen liess sonst die ganze Oberfläche schrumpfen.
+DIM studioSans AS INTEGER : studioSans = -1
+
+SUB studioSchriftAn()
+    GFX_PUSH()
+    IF GUI_FONT_GET()[0] >= 0 THEN
+        SETFONT(GUI_FONT_GET()[0], GUI_FONT_GET()[1])
+        RETURN
+    END IF
+    IF studioSans < 0 THEN studioSans = LOADFONT("sans", 32)
+    SETFONT(studioSans, TEXT_HEIGHT())
+END SUB
+
+SUB studioSchriftAus()
+    GFX_POP()
+END SUB
 
 CLASS StudioApp
     ' Nach dem Start, bevor das Startfenster aufgeht.
@@ -54,6 +79,98 @@ CLASS StudioTimer
         RETURN TRUE
     END FUNCTION
 END CLASS
+
+' Ein Diagramm: eine Zeichenfläche mit einem CHART aus dem Modul chart
+' (Kuchen, Balken, Linie, Fläche, Tacho, Leiste, Lampen). Es zeichnet sich
+' je Bild selbst, so groß wie die Fläche, in den Farben des Themas der
+' Oberfläche (hell oder dunkel, auch nach einem Wechsel). Daten kommen mit
+' Hinzufuegen (Kuchen, Balken: Name und Wert), Reihe (Linie, gruppierte
+' Balken) oder Wert (Tacho, Leiste, Lampen); alles Weitere über das Feld
+' Diagramm mit den CHART_*-Befehlen.
+CLASS StudioDiagramm
+    DIM Flaeche AS GUI_WIDGET
+    DIM Diagramm AS CHART
+    DIM Art AS STRING
+    DIM studioHell AS INTEGER     ' -1 = noch kein Thema gesetzt, 0 dunkel, 1 hell
+
+    SUB Leeren()
+        CHART_CLEAR(Self.Diagramm)
+    END SUB
+
+    ' Ein Wert mit Namen (Segment, Balken); Farbe -1 = aus der Palette.
+    SUB Hinzufuegen(name AS STRING, wert AS FLOAT, farbe AS INTEGER = -1)
+        CHART_ADD(Self.Diagramm, name, wert, farbe)
+    END SUB
+
+    ' Eine Reihe mit ihren Werten -> ihr Index.
+    FUNCTION Reihe(name AS STRING, werte AS ARRAY OF FLOAT) AS INTEGER
+        DIM r AS INTEGER : r = CHART_SERIES(Self.Diagramm, name)
+        CHART_DATA(Self.Diagramm, r, werte)
+        RETURN r
+    END FUNCTION
+
+    SUB Beschriften(punkt AS INTEGER, text AS STRING)
+        CHART_LABEL(Self.Diagramm, punkt, text)
+    END SUB
+
+    ' Der Wert von Tacho, Leiste und Lampen.
+    SUB Wert(w AS FLOAT)
+        CHART_VALUE(Self.Diagramm, w)
+    END SUB
+
+    SUB Titel(t AS STRING)
+        CHART_SET(Self.Diagramm, "titel", t)
+    END SUB
+
+    ' Eine Eigenschaft des Diagramms beim Namen (CHART_SET, _NUM, _FLAG):
+    ' Setzen("legende", "rechts"), SetzenZahl("innenradius", 0.5),
+    ' SetzenSchalter("prozent", TRUE).
+    SUB Setzen(name AS STRING, wert AS STRING)
+        CHART_SET(Self.Diagramm, name, wert)
+    END SUB
+
+    SUB SetzenZahl(name AS STRING, wert AS FLOAT)
+        CHART_SET_NUM(Self.Diagramm, name, wert)
+    END SUB
+
+    SUB SetzenSchalter(name AS STRING, an AS BOOLEAN)
+        CHART_SET_FLAG(Self.Diagramm, name, an)
+    END SUB
+
+    FUNCTION Anzahl() AS INTEGER
+        RETURN CHART_COUNT(Self.Diagramm)
+    END FUNCTION
+
+    SUB studioZeichnen()
+        IF NOT GUI_SHOWN(Self.Flaeche) THEN RETURN
+        ' Das Thema der Oberfläche: hell, wenn ihr Hintergrund hell ist.
+        ' Der Hintergrund ist der des Fensters, damit es sich einfügt.
+        DIM bg AS INTEGER : bg = GUI_THEME_GET("win_bg")
+        DIM hell AS INTEGER : hell = IIF(((bg SHR 16) BAND 255) + ((bg SHR 8) BAND 255) + (bg BAND 255) > 382, 1, 0)
+        IF hell <> Self.studioHell THEN
+            CHART_THEME(Self.Diagramm, IIF(hell = 1, "hell", "dunkel"))
+            CHART_SET_COLOR(Self.Diagramm, "hintergrund", bg)
+            Self.studioHell = hell
+        END IF
+        CHART_BOUNDS(Self.Diagramm, GUI_CANVAS_X(Self.Flaeche), GUI_CANVAS_Y(Self.Flaeche), GUI_CANVAS_W(Self.Flaeche), GUI_CANVAS_H(Self.Flaeche))
+        CHART_UPDATE(Self.Diagramm, DELTA())
+        studioSchriftAn()
+        CHART_DRAW(Self.Diagramm)
+        studioSchriftAus()
+    END SUB
+END CLASS
+
+' Ein Diagramm auf der Fläche (art wie bei CHART_NEW).
+FUNCTION studioDiagramm(flaeche AS GUI_WIDGET, art AS STRING, titel AS STRING) AS StudioDiagramm
+    DIM d AS StudioDiagramm : d = NEW StudioDiagramm()
+    d.Flaeche = flaeche
+    d.Art = art
+    d.studioHell = -1
+    d.Diagramm = CHART_NEW(art, 0, 0, 10, 10)
+    IF titel <> "" THEN CHART_SET(d.Diagramm, "titel", titel)
+    CHART_SET_FLAG(d.Diagramm, "komma", TRUE)
+    RETURN d
+END FUNCTION
 
 ' Wo ein Teil eines eigenen Controls auf einer Achse liegt, wenn das Control
 ' um `mehr` groesser ist als entworfen -- wie ein verankertes Widget: am
@@ -157,6 +274,10 @@ CLASS StudioControl
     SUB Groesse()
     END SUB
 
+    ' In jedem Bild, nach den Ereignissen seiner Teile.
+    SUB Takt()
+    END SUB
+
     ' Je Bild: die Teile zum Behaelter.
     SUB studioLegen()
         IF NOT Self.studioOffen THEN RETURN
@@ -194,6 +315,17 @@ CLASS StudioControl
 
     FUNCTION studioGemeldet(ereignis AS STRING) AS BOOLEAN
         RETURN ARRAY_INDEXOF(Self.studioMeldungen, ereignis) >= 0
+    END FUNCTION
+
+    ' Gemeldet? Dann gleich abgeholt: oeffnet die Methode des Fensters ein
+    ' modales Fenster, dreht dessen Schleife weiter Bilder -- ein noch
+    ' stehendes Ereignis riefe sie dort wieder auf, ohne Ende (gefunden mit
+    ' der Kuehlschrank-App).
+    FUNCTION studioAbholen(ereignis AS STRING) AS BOOLEAN
+        DIM k AS INTEGER : k = ARRAY_INDEXOF(Self.studioMeldungen, ereignis)
+        IF k < 0 THEN RETURN FALSE
+        ARRAY_REMOVE_AT(Self.studioMeldungen, k)
+        RETURN TRUE
     END FUNCTION
 
     SUB studioMeldungenLeeren()
@@ -238,6 +370,8 @@ CLASS StudioFenster
     DIM studioControls AS ARRAY OF StudioControl
     DIM studioOffen AS BOOLEAN
     DIM studioHaupt AS BOOLEAN
+    ' Mit ZeigenModal gezeigt: alles andere liegt hinter dem Schleier.
+    DIM studioModal AS BOOLEAN
     DIM studioWarB AS INTEGER
     DIM studioWarH AS INTEGER
 
@@ -263,6 +397,11 @@ CLASS StudioFenster
 
     ' Wenn sich die Groesse des Fensters geaendert hat.
     SUB Groesse()
+    END SUB
+
+    ' In jedem Bild, nach den Ereignissen seiner Controls -- fuer alles, was
+    ' das Fenster selbst abfragen will (Kontextmenue, eigene Tasten ...).
+    SUB Takt()
     END SUB
 
     ' Eine Taste, solange das Fenster vorn ist und kein Eingabefeld sie
@@ -300,6 +439,7 @@ CLASS StudioFenster
         Self.Zeigen()
         IF NOT Self.studioOffen THEN RETURN
         GUI_WINDOW_MODAL(Self.studioWin, TRUE)
+        Self.studioModal = TRUE
         WHILE Self.studioOffen
             IF NOT studioBild() THEN RETURN
         WEND
@@ -335,6 +475,43 @@ DIM studioSchirmH AS INTEGER : studioSchirmH = 0
 DIM studioFokusAlt AS INTEGER : studioFokusAlt = -1
 DIM studioFokusJetzt AS INTEGER : studioFokusJetzt = -1
 DIM studioTaste AS INTEGER : studioTaste = -1
+' Das wievielte Bild gerade laeuft, und welches seine Eingabe an die
+' Ereignisse verteilt. Ruft ein Ereignis selbst studioBild (ZeigenModal,
+' Frage ...), wird erst dieses Bild fertig gezeichnet: sonst saehe die innere
+' Schleife denselben Mausklick noch einmal (MOUSE_HIT gilt bis FLIP) und
+' oeffnete den Dialog wieder und wieder.
+DIM studioBildNr AS INTEGER : studioBildNr = 0
+DIM studioVerteiltNr AS INTEGER : studioVerteiltNr = -1
+
+' Ist die Taste ein Kuerzel fuers Fenster, auch wenn ein Eingabefeld den
+' Fokus hat? Eine F-Taste immer; mit Strg oder Alt alles, was das Feld nicht
+' selbst braucht (alles waehlen, kopieren, einfuegen, ausschneiden,
+' rueckgaengig, wiederholen, wortweise gehen und loeschen).
+FUNCTION studioKuerzelTaste(t AS INTEGER) AS BOOLEAN
+    IF ARRAY_INDEXOF([KEY_F1, KEY_F2, KEY_F3, KEY_F4, KEY_F5, KEY_F6, KEY_F7, KEY_F8, KEY_F9, KEY_F10, KEY_F11, KEY_F12], t) >= 0 THEN RETURN TRUE
+    DIM strg AS BOOLEAN : strg = KEYPRESSED(KEY_LCTRL) OR KEYPRESSED(KEY_RCTRL)
+    DIM alt AS BOOLEAN : alt = KEYPRESSED(KEY_LALT) OR KEYPRESSED(KEY_RALT)
+    IF NOT strg AND NOT alt THEN RETURN FALSE
+    ' Strg+Alt ist AltGr: damit tippt man im Feld (@, Euro, Klammern).
+    IF strg AND alt THEN RETURN FALSE
+    IF ARRAY_INDEXOF([KEY_LCTRL, KEY_RCTRL, KEY_LALT, KEY_RALT, KEY_LSHIFT, KEY_RSHIFT], t) >= 0 THEN RETURN FALSE
+    IF strg AND NOT alt AND ARRAY_INDEXOF([KEY_A, KEY_C, KEY_V, KEY_X, KEY_Z, KEY_Y, KEY_LEFT, KEY_RIGHT, KEY_UP, KEY_DOWN, KEY_HOME, KEY_END, KEY_BACKSPACE, KEY_DELETE], t) >= 0 THEN RETURN FALSE
+    RETURN TRUE
+END FUNCTION
+
+' Darf ein Fenster gerade rohe Maus-Eingaben nehmen (Zeichenflaechen)?
+' GUI_HIT_TEST sieht durch den Schleier eines modalen Fensters hindurch.
+FUNCTION studioFrei(w AS GUI_WINDOW) AS BOOLEAN
+    IF NOT GUI_MODAL() THEN RETURN TRUE
+    IF LEN(studioDialoge) > 0 THEN RETURN FALSE
+    DIM oben AS StudioFenster
+    DIM f AS StudioFenster
+    FOR EACH f IN studioFenster
+        IF f.studioOffen AND f.studioModal THEN oben = f
+    NEXT
+    IF oben IS NIL THEN RETURN FALSE
+    RETURN oben.studioWin = w
+END FUNCTION
 
 SUB studioAnmelden(f AS StudioFenster)
     ARRAY_PUSH(studioFenster, f)
@@ -349,6 +526,7 @@ END SUB
 ' Programm endet -- dann soll jede Schleife, die Bilder dreht, aufhoeren.
 FUNCTION studioBild() AS BOOLEAN
     IF studioEnde THEN RETURN FALSE
+    IF studioVerteiltNr = studioBildNr THEN studioMalen()
     IF WINDOW_CLOSE_REQUESTED() THEN
         studioDieStartseite.Zumachen()
         studioEnde = TRUE
@@ -363,6 +541,7 @@ FUNCTION studioBild() AS BOOLEAN
         IF studioDieStartseite.studioOffen THEN GUI_WINDOW_SET_BOUNDS(studioDieStartseite.studioWin, 0, 0, studioSchirmB, studioSchirmH)
     END IF
     GUI_UPDATE()
+    studioVerteiltNr = studioBildNr
     studioFokusAlt = studioFokusJetzt
     studioFokusJetzt = GUI_FOCUSED()
     studioTaste = KEY_ANY_HIT()
@@ -377,6 +556,7 @@ FUNCTION studioBild() AS BOOLEAN
             CONTINUE
         END IF
         f.studioTakt()
+        IF f.studioOffen AND NOT studioEnde THEN f.Takt()
         IF f.studioOffen THEN
             IF GUI_WINDOW_GET_W(f.studioWin) <> f.studioWarB OR GUI_WINDOW_GET_H(f.studioWin) <> f.studioWarH THEN
                 f.studioWarB = GUI_WINDOW_GET_W(f.studioWin)
@@ -386,19 +566,26 @@ FUNCTION studioBild() AS BOOLEAN
         END IF
     NEXT
     ' Eine Taste gehoert dem obersten Fenster -- ausser ein Eingabefeld hat
-    ' den Fokus, dann tippt man dort.
+    ' den Fokus, dann tippt man dort. Ein Kuerzel (Strg oder Alt dazu, eine
+    ' F-Taste) kommt trotzdem an, solange das Feld es nicht selbst braucht:
+    ' Strg+S im Barcode-Feld speichert, Strg+C kopiert im Feld.
     IF studioTaste >= 0 AND NOT studioEnde THEN
         DIM feld AS BOOLEAN : feld = FALSE
         IF studioFokusJetzt >= 0 THEN
             DIM art AS STRING : art = GUI_KIND(studioFokusJetzt)
             feld = art = "textinput" OR art = "textarea" OR art = "spinner" OR art = "dropdown"
         END IF
-        IF NOT feld AND GUI_MODAL() = FALSE THEN
+        IF feld AND studioKuerzelTaste(studioTaste) THEN feld = FALSE
+        IF NOT feld THEN
             DIM oben AS StudioFenster
             FOR EACH f IN studioFenster
                 IF f.studioOffen THEN oben = f
             NEXT
-            IF oben IS NOT NIL THEN oben.Taste(studioTaste)
+            ' Ein modales Fenster bekommt seine Tasten (ESC zum Schliessen);
+            ' hinter einem Dialog oder Schleier niemand.
+            IF oben IS NOT NIL THEN
+                IF studioFrei(oben.studioWin) THEN oben.Taste(studioTaste)
+            END IF
         END IF
     END IF
     ' Geschlossene Fenster aus der Liste nehmen.
@@ -408,6 +595,13 @@ FUNCTION studioBild() AS BOOLEAN
     NEXT
     studioFenster = noch
     IF studioEnde THEN RETURN FALSE
+    studioMalen()
+    RETURN TRUE
+END FUNCTION
+
+' Das Bild zeichnen und zeigen; danach gilt die naechste Eingabe.
+SUB studioMalen()
+    DIM f AS StudioFenster
     CLS(0)
     GUI_DRAW(FALSE)
     FOR EACH f IN studioFenster
@@ -422,8 +616,8 @@ FUNCTION studioBild() AS BOOLEAN
     NEXT
     GUI_DRAW_TOP()
     FLIP()
-    RETURN TRUE
-END FUNCTION
+    studioBildNr = studioBildNr + 1
+END SUB
 
 ' Der Einstieg: oeffnet das Programmfenster in der Groesse des Startfensters,
 ' laesst die App beginnen, zeigt das Startfenster und dreht die Bildschleife.
@@ -433,7 +627,9 @@ SUB studioLauf(app AS StudioApp, start AS StudioFenster, b AS INTEGER, h AS INTE
     SETFPS(60)
     studioSchirmB = SCREENWIDTH() : studioSchirmH = SCREENHEIGHT()
     studioDieStartseite = start
+    studioSpracheVorgabe()
     app.Geoeffnet()
+    IF studioSprache <> "" THEN SETWINDOWTITLE(studioTr$(titel))
     start.studioHaupt = TRUE
     start.Zeigen()
     WHILE studioBild()
@@ -468,14 +664,93 @@ END SUB
 ' Eine Frage; die Antwort ist die Nummer des Knopfs (1 = der erste).
 ' Knoepfe mit | getrennt, Enter = der erste, ESC = der letzte.
 FUNCTION Frage(text AS STRING, knoepfe AS STRING = "Ja|Nein", titel AS STRING = "") AS INTEGER
+    IF knoepfe = "Ja|Nein" THEN knoepfe = studioTr$("Ja|Nein")
     RETURN studioAntwort(GUI_DIALOG(titel, text, knoepfe))
 END FUNCTION
 
 ' Fragt nach einem Text; "" bei Abbrechen.
 FUNCTION Eingabe(text AS STRING, vorgabe AS STRING = "", titel AS STRING = "") AS STRING
-    DIM d AS GUI_WINDOW : d = GUI_PROMPT(titel, text, vorgabe)
+    DIM d AS GUI_WINDOW : d = GUI_PROMPT(titel, text, vorgabe, studioTr$("OK|Abbrechen"))
     IF studioAntwort(d) <> 1 THEN RETURN ""
     RETURN GUI_DIALOG_TEXT(d)
+END FUNCTION
+
+' Ein kleines Fenster mit Text, einem Feld und OK/Abbrechen (Enter/ESC),
+' modal und mittig -- fuer Auswahl und EingabeZahl. Liefert TRUE bei OK.
+' Wie Frage() dreht es selbst Bilder, bis eine Antwort da ist.
+' Den Fokus bekommt feld, wenn es einen soll (ein Zahlenfeld zum Tippen);
+' eine Klappliste nicht -- dort oeffnet Enter die Liste, statt OK zu druecken.
+FUNCTION studioFeldDialog(w AS GUI_WINDOW, feld AS GUI_WIDGET, ok AS GUI_WIDGET, ab AS GUI_WIDGET) AS BOOLEAN
+    GUI_WINDOW_DEFAULT(w, ok)
+    GUI_WINDOW_CANCEL(w, ab)
+    GUI_WINDOW_MODAL(w, TRUE)
+    IF feld >= 0 THEN GUI_FOCUS(feld)
+    ARRAY_PUSH(studioDialoge, w)
+    DIM ja AS BOOLEAN : ja = FALSE
+    WHILE studioBild()
+        IF GUI_CLICKED(ok) THEN
+            ja = TRUE
+            BREAK
+        END IF
+        IF GUI_CLICKED(ab) OR GUI_WINDOW_CLOSED(w) THEN BREAK
+    WEND
+    DIM rest AS ARRAY OF GUI_WINDOW : rest = []
+    DIM x AS GUI_WINDOW
+    FOR EACH x IN studioDialoge
+        IF NOT (x = w) THEN ARRAY_PUSH(rest, x)
+    NEXT
+    studioDialoge = rest
+    RETURN ja
+END FUNCTION
+
+FUNCTION studioKleinesFenster(titel AS STRING, text AS STRING) AS GUI_WINDOW
+    DIM b AS INTEGER : b = 380
+    DIM w AS GUI_WINDOW : w = GUI_WINDOW(titel, MAX(0, (SCREENWIDTH() - b) \ 2), MAX(0, (SCREENHEIGHT() - 150) \ 2), b, 150)
+    GUI_LABEL(w, text, 14, 12)
+    RETURN w
+END FUNCTION
+
+' Einer aus einer Liste (wie QInputDialog.getItem): der Index des gewaehlten
+' Eintrags, -1 bei Abbrechen.
+FUNCTION Auswahl(text AS STRING, eintraege AS ARRAY OF STRING, vorgabe AS INTEGER = 0, titel AS STRING = "") AS INTEGER
+    DIM w AS GUI_WINDOW : w = studioKleinesFenster(titel, text)
+    DIM feld AS GUI_WIDGET : feld = GUI_DROPDOWN(w, 14, 40, 352, 30, eintraege)
+    IF LEN(eintraege) > 0 THEN GUI_DROPDOWN_SET_SELECTED(feld, MAX(0, MIN(vorgabe, LEN(eintraege) - 1)))
+    DIM ok AS GUI_WIDGET : ok = GUI_BUTTON(w, "OK", 166, 84, 96, 30)
+    DIM ab AS GUI_WIDGET : ab = GUI_BUTTON(w, studioTr$("Abbrechen"), 270, 84, 96, 30)
+    DIM i AS INTEGER : i = -1
+    IF studioFeldDialog(w, -1, ok, ab) AND LEN(eintraege) > 0 THEN i = GUI_DROPDOWN_SELECTED(feld)
+    GUI_WINDOW_DESTROY(w)
+    RETURN i
+END FUNCTION
+
+' Eine ganze Zahl zwischen min und max (wie QInputDialog.getInt):
+' (TRUE, zahl) bei OK, (FALSE, vorgabe) bei Abbrechen.
+FUNCTION EingabeZahl(text AS STRING, vorgabe AS INTEGER, min AS INTEGER, max AS INTEGER, titel AS STRING = "") AS TUPLE
+    DIM w AS GUI_WINDOW : w = studioKleinesFenster(titel, text)
+    DIM feld AS GUI_WIDGET : feld = GUI_SPINNER(w, 14, 40, 160, min, max, vorgabe, 1)
+    DIM ok AS GUI_WIDGET : ok = GUI_BUTTON(w, "OK", 166, 84, 96, 30)
+    DIM ab AS GUI_WIDGET : ab = GUI_BUTTON(w, studioTr$("Abbrechen"), 270, 84, 96, 30)
+    DIM ja AS BOOLEAN : ja = studioFeldDialog(w, feld, ok, ab)
+    DIM z AS INTEGER : z = INT(GUI_VALUE(feld))
+    GUI_WINDOW_DESTROY(w)
+    IF NOT ja THEN RETURN (FALSE, vorgabe)
+    RETURN (TRUE, MAX(min, MIN(max, z)))
+END FUNCTION
+
+' Eine Farbe (wie QColorDialog.getColor): &HRRGGBB, -1 bei Abbrechen. Der
+' Waehler beginnt bei vorgabe (-1 = Weiss).
+FUNCTION FarbeWaehlen(vorgabe AS INTEGER, titel AS STRING = "") AS INTEGER
+    DIM b AS INTEGER : b = 380
+    DIM w AS GUI_WINDOW : w = GUI_WINDOW(titel, MAX(0, (SCREENWIDTH() - b) \ 2), MAX(0, (SCREENHEIGHT() - 320) \ 2), b, 320)
+    DIM feld AS GUI_WIDGET : feld = GUI_COLORPICKER(w, 14, 12, 352, 220)
+    GUI_SET_PICKED_COLOR(feld, IIF(vorgabe < 0, &HFFFFFF, vorgabe))
+    DIM ok AS GUI_WIDGET : ok = GUI_BUTTON(w, "OK", 166, 248, 96, 30)
+    DIM ab AS GUI_WIDGET : ab = GUI_BUTTON(w, studioTr$("Abbrechen"), 270, 248, 96, 30)
+    DIM f AS INTEGER : f = -1
+    IF studioFeldDialog(w, -1, ok, ab) THEN f = GUI_PICKED_COLOR(feld)
+    GUI_WINDOW_DESTROY(w)
+    RETURN f
 END FUNCTION
 
 ' Die Vorschau eines Berichts (studio_berichte.dh): ein Fenster mit der
@@ -486,9 +761,9 @@ SUB studioBerichtVorschau(p AS PDF, titel AS STRING)
     DIM zurueck AS GUI_WIDGET : zurueck = GUI_BUTTON(w, "<", 10, 8, 40, 26)
     DIM seite AS GUI_WIDGET : seite = GUI_LABEL(w, "", 58, 12)
     DIM weiter AS GUI_WIDGET : weiter = GUI_BUTTON(w, ">", 150, 8, 40, 26)
-    DIM drucken AS GUI_WIDGET : drucken = GUI_BUTTON(w, "Drucken", 300, 8, 100, 26)
-    DIM sichern AS GUI_WIDGET : sichern = GUI_BUTTON(w, "Als PDF …", 406, 8, 110, 26)
-    DIM zu AS GUI_WIDGET : zu = GUI_BUTTON(w, "Schließen", 522, 8, 106, 26)
+    DIM drucken AS GUI_WIDGET : drucken = GUI_BUTTON(w, studioTr$("Drucken"), 300, 8, 100, 26)
+    DIM sichern AS GUI_WIDGET : sichern = GUI_BUTTON(w, studioTr$("Als PDF …"), 406, 8, 110, 26)
+    DIM zu AS GUI_WIDGET : zu = GUI_BUTTON(w, studioTr$("Schließen"), 522, 8, 106, 26)
     DIM bild AS GUI_WIDGET : bild = GUI_IMAGE(w, 10, 42, 620, GUI_WINDOW_GET_H(w) - 82, -1)
     GUI_IMAGE_MODE(bild, "einpassen")
     GUI_WINDOW_MODAL(w, TRUE)
@@ -511,7 +786,7 @@ SUB studioBerichtVorschau(p AS PDF, titel AS STRING)
         IF GUI_CLICKED(zurueck) AND nr > 1 THEN nr = nr - 1 : neu = TRUE
         IF GUI_CLICKED(drucken) THEN PDF_PRINT(p)
         IF GUI_CLICKED(sichern) THEN
-            DIM ziel AS STRING : ziel = FILE_SAVE_DIALOG("PDF sichern", "pdf")
+            DIM ziel AS STRING : ziel = FILE_SAVE_DIALOG(studioTr$("PDF sichern"), "pdf")
             IF ziel <> "" THEN PDF_SAVE(p, ziel)
         END IF
     WEND
@@ -534,4 +809,231 @@ END FUNCTION
 
 FUNCTION studioDatei$(rel AS STRING) AS STRING
     RETURN "assets/" + rel
+END FUNCTION
+
+' --- Sprache ------------------------------------------------------------
+' Ein Projekt schreibt seine Texte in EINER Sprache, der seiner Quelle. Eine
+' Tafel sprache/<code>.txt im Projektordner macht eine zweite daraus: je
+' Zeile der Text, wie er im Projekt steht, ein Tabulator, die Uebersetzung
+' (wie studio/sprache/en.txt). Das Studio kopiert den Ordner nach
+' assets/sprache/, die gebaute Fassung nimmt ihn mit.
+'
+' Uebersetzt werden von selbst: die Texte der Fenster (Titel, Beschriftungen,
+' Platzhalter, Tooltips, Spaltenkoepfe, Eintraege, Reiter, Meldungen der
+' Pruefregeln, Diagrammtitel, Werkzeugleisten), die Menues samt Kuerzeln,
+' die Texte der Berichte und die Knoepfe der Dialoge hier. Im Code geht
+' jeder Anzeigetext durch studioTr$("...") bzw. trf$("Text mit {0}", [wert]).
+' Was das Programm aus einem Widget zurueckliest (GUI_TEXT einer
+' Klappliste), ist danach die Uebersetzung -- verglichen wird mit tr$(...).
+'
+' Welche Sprache: SpracheWaehlen(code) vor dem ersten Fenster (in
+' App.Geoeffnet); sonst Englisch, wenn DHRT_LANG englisch ist und die Tafel
+' en.txt da ist, sonst die Sprache der Quelle. Ein Wechsel gilt fuer
+' Fenster, die danach aufgebaut werden -- offene behalten ihre Texte.
+DIM studioSprache AS STRING : studioSprache = ""
+DIM studioSprachGewaehlt AS BOOLEAN : studioSprachGewaehlt = FALSE
+DIM studioTafel AS MAP OF STRING : studioTafel = {}
+' Texte, die in der Tafel fehlen -- jeder einmal; mit DH_STUDIO_SPRACHLUECKEN
+' (ein Dateipfad) schreibt die Laufzeit sie dorthin, fuer Pruefungen.
+DIM studioLuecken AS MAP OF INTEGER : studioLuecken = {}
+
+' Waehlt die Sprache ("" = die der Quelle). FALSE, wenn es keine Tafel
+' sprache/<code>.txt gibt -- dann bleibt es bei der Quelle.
+FUNCTION SpracheWaehlen(code AS STRING) AS BOOLEAN
+    studioSprachGewaehlt = TRUE
+    studioTafel = {}
+    studioLuecken = {}
+    studioSprache = ""
+    code = LOWER$(TRIM$(code))
+    IF code = "" THEN RETURN TRUE
+    DIM pfad AS STRING : pfad = studioDatei$("sprache/" + code + ".txt")
+    IF NOT FILEEXISTS(pfad) THEN RETURN FALSE
+    DIM z AS STRING
+    FOR EACH z IN READLINES(pfad)
+        z = REPLACE$(REPLACE$(z, CHR$(13), ""), CHR$(&HFEFF), "")
+        DIM t AS INTEGER : t = INSTR(z, CHR$(9))
+        IF t > 0 THEN MAPPUT(studioTafel, LEFT$(z, t), MID$(z, t + 1))
+    NEXT
+    studioSprache = code
+    RETURN TRUE
+END FUNCTION
+
+' Vor App.Geoeffnet: ohne Wahl Englisch, wenn DHRT_LANG englisch ist (und
+' die Tafel da ist), sonst die Sprache der Quelle.
+SUB studioSpracheVorgabe()
+    IF NOT studioSprachGewaehlt THEN SpracheWaehlen(IIF(LEFT$(LOWER$(GETENV$("DHRT_LANG")), 2) = "en", "en", ""))
+END SUB
+
+' Die gewaehlte Sprache, "" = die der Quelle.
+FUNCTION Sprache$() AS STRING
+    RETURN studioSprache
+END FUNCTION
+
+' Hat der Text einen Buchstaben? Zahlen, Zeichen und Sinnbilder allein
+' werden nicht nachgeschlagen.
+FUNCTION studioWortig(t AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(t) - 1
+        DIM c AS STRING : c = MID$(t, i, 1)
+        IF UPPER$(c) <> LOWER$(c) THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+' Ein Anzeigetext in der gewaehlten Sprache; was die Tafel nicht kennt,
+' bleibt, wie es ist.
+FUNCTION tr$(t AS STRING) AS STRING
+    IF studioSprache = "" THEN RETURN t
+    IF MAPHAS(studioTafel, t) THEN RETURN MAPGET(studioTafel, t)
+    IF NOT studioWortig(t) THEN RETURN t
+    DIM e AS STRING : e = studioEingebaut$(t)
+    IF e <> "" THEN RETURN e
+    IF NOT MAPHAS(studioLuecken, t) THEN
+        MAPPUT(studioLuecken, t, 1)
+        DIM f AS STRING : f = GETENV$("DH_STUDIO_SPRACHLUECKEN")
+        IF f <> "" THEN APPENDFILE(f, t + CHR$(10))
+    END IF
+    RETURN t
+END FUNCTION
+
+' Dasselbe fuer die Laufzeit und den erzeugten Code (die Sprachpruefung des
+' Studios sammelt tr$ mit Literal aus studio/*.dh als Texte des Studios).
+FUNCTION studioTr$(t AS STRING) AS STRING
+    RETURN tr$(t)
+END FUNCTION
+
+' Ein Text mit {0}, {1}, ...: erst uebersetzen, dann einsetzen -- in einem
+' Durchgang, damit ein eingesetzter Wert (ein Name mit "{1}") nicht noch
+' einmal gelesen wird.
+FUNCTION trf$(t AS STRING, werte AS ARRAY OF STRING) AS STRING
+    DIM v AS STRING : v = tr$(t)
+    DIM aus AS STRING : aus = ""
+    DIM i AS INTEGER : i = 0
+    WHILE i < LEN(v)
+        DIM c AS STRING : c = MID$(v, i, 1)
+        IF c = "{" THEN
+            DIM zu AS INTEGER : zu = INSTR(MID$(v, i + 1, 4), "}")
+            IF zu > 0 THEN
+                DIM nr AS STRING : nr = MID$(v, i + 1, zu)
+                IF VAL(nr) >= 0 AND VAL(nr) < LEN(werte) AND STR$(INT(VAL(nr))) = nr THEN
+                    aus = aus + werte[INT(VAL(nr))]
+                    i = i + zu + 2
+                    CONTINUE
+                END IF
+            END IF
+        END IF
+        aus = aus + c
+        i = i + 1
+    WEND
+    RETURN aus
+END FUNCTION
+
+' Die eigenen Texte der Laufzeit (Knoepfe der Dialoge, Vorschau der
+' Berichte) auf Englisch -- ein Projekt muss sie nicht in seiner Tafel haben,
+' darf sie dort aber anders sagen. "" = keiner.
+FUNCTION studioEingebaut$(t AS STRING) AS STRING
+    IF studioSprache <> "en" THEN RETURN ""
+    SELECT CASE t
+        CASE "Ja|Nein" : RETURN "Yes|No"
+        CASE "OK|Abbrechen" : RETURN "OK|Cancel"
+        CASE "Abbrechen" : RETURN "Cancel"
+        CASE "Drucken" : RETURN "Print"
+        CASE "Als PDF …" : RETURN "Save as PDF …"
+        CASE "Schließen" : RETURN "Close"
+        CASE "PDF sichern" : RETURN "Save PDF"
+        CASE "Seite {n} von {m}" : RETURN "Page {n} of {m}"
+    END SELECT
+    RETURN ""
+END FUNCTION
+
+' Ein Kuerzel, wie es im Menue steht: auf Englisch "Ctrl+Shift+Down" statt
+' "Strg+Umschalt+Runter" (die Laufzeit versteht beide Schreibweisen).
+FUNCTION studioKuerzel$(k AS STRING) AS STRING
+    IF studioSprache <> "en" OR k = "" THEN RETURN k
+    DIM teile AS ARRAY OF STRING : teile = SPLIT$(k, "+")
+    DIM aus AS STRING : aus = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(teile) - 1
+        DIM w AS STRING : w = teile[i]
+        SELECT CASE LOWER$(w)
+            CASE "strg" : w = "Ctrl"
+            CASE "umschalt" : w = "Shift"
+            CASE "entf" : w = "Del"
+            CASE "einfg" : w = "Ins"
+            CASE "pos1" : w = "Home"
+            CASE "ende" : w = "End"
+            CASE "bild auf" : w = "PageUp"
+            CASE "bild ab" : w = "PageDown"
+            CASE "leer" : w = "Space"
+            CASE "rueck" : w = "Backspace"
+            CASE "links" : w = "Left"
+            CASE "rechts" : w = "Right"
+            CASE "hoch" : w = "Up"
+            CASE "runter" : w = "Down"
+        END SELECT
+        aus = aus + IIF(i > 0, "+", "") + w
+    NEXT
+    RETURN aus
+END FUNCTION
+
+' Die Texte eines Fensters aus dem Layout (JSON) in der gewaehlten Sprache.
+FUNCTION studioTexte$(j AS STRING) AS STRING
+    IF studioSprache = "" THEN RETURN j
+    DIM d AS JSON_HANDLE : d = JSON_PARSE(j)
+    studioTexteIn(d, "")
+    RETURN JSON_STRINGIFY(d)
+END FUNCTION
+
+' Welche Felder eines Layouts Anzeigetext sind (Einzeltext bzw. Liste).
+FUNCTION studioTextFeld(k AS STRING) AS BOOLEAN
+    SELECT CASE k
+        CASE "title", "titel", "text", "placeholder", "tooltip", "tip", "leer_text", "meldung", "label", "studio_diagramm_titel"
+            RETURN TRUE
+    END SELECT
+    RETURN FALSE
+END FUNCTION
+
+SUB studioTexteIn(d AS JSON_HANDLE, pfad AS STRING)
+    DIM k AS STRING
+    FOR EACH k IN JSON_KEYS(d, pfad)
+        DIM p AS STRING : p = IIF(pfad = "", "", pfad + ".") + JSON_KEY$(k)
+        DIM art AS STRING : art = JSON_TYPE(d, p)
+        IF art = "string" THEN
+            IF studioTextFeld(k) THEN JSON_SET_STRING(d, p, tr$(JSON_GET_STRING(d, p)))
+        ELSEIF art = "object" THEN
+            studioTexteIn(d, p)
+        ELSEIF art = "array" THEN
+            DIM i AS INTEGER
+            FOR i = 0 TO JSON_LEN(d, p) - 1
+                DIM pe AS STRING : pe = p + "." + STR$(i)
+                DIM ae AS STRING : ae = JSON_TYPE(d, pe)
+                IF ae = "object" THEN
+                    studioTexteIn(d, pe)
+                ELSEIF ae = "string" AND (k = "headers" OR k = "items") THEN
+                    JSON_SET_STRING(d, pe, tr$(JSON_GET_STRING(d, pe)))
+                END IF
+            NEXT
+        END IF
+    NEXT
+END SUB
+
+' Die Texte eines Berichts (studio_berichte.dh): Titel und Textelemente; eine
+' Seitenzahl ohne eigenen Text bekommt die Vorlage in der gewaehlten Sprache.
+FUNCTION studioBerichtTexte$(j AS STRING) AS STRING
+    IF studioSprache = "" THEN RETURN j
+    DIM d AS JSON_HANDLE : d = JSON_PARSE(j)
+    studioTexteIn(d, "")
+    IF NOT JSON_HAS(d, "baender") THEN RETURN JSON_STRINGIFY(d)
+    DIM b AS INTEGER
+    FOR b = 0 TO JSON_LEN(d, "baender") - 1
+        DIM bp AS STRING : bp = "baender." + STR$(b) + ".elemente"
+        IF NOT JSON_HAS(d, bp) THEN CONTINUE
+        DIM i AS INTEGER
+        FOR i = 0 TO JSON_LEN(d, bp) - 1
+            DIM ep AS STRING : ep = bp + "." + STR$(i)
+            IF NOT JSON_HAS(d, ep + ".art") THEN CONTINUE
+            IF JSON_GET_STRING(d, ep + ".art") = "seitenzahl" AND NOT JSON_HAS(d, ep + ".text") THEN JSON_SET_STRING(d, ep + ".text", studioTr$("Seite {n} von {m}"))
+        NEXT
+    NEXT
+    RETURN JSON_STRINGIFY(d)
 END FUNCTION

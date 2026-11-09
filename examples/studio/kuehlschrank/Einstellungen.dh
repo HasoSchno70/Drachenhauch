@@ -1,0 +1,120 @@
+' Die Einstellungen in app_settings, wie AppConfig der Python-App (dieselben
+' Schlüssel, JSON wie json.dumps): laden, speichern, auf die Vorgaben
+' zurück. Dazu vier, die dort im Fenster standen und nichts taten -- hier
+' wirken sie: dark_mode (das Thema der Oberfläche), language (Deutsch oder
+' Englisch, ab dem nächsten Start), barcode_cache_enabled (der Cache von
+' Open Food Facts) und daily_summary_minute (die Uhrzeit der Zusammenfassung
+' hatte Minuten, gespeichert wurde nur die Stunde).
+CLASS Einstellungen
+    ' Allgemein
+    DIM dunkel AS BOOLEAN
+    DIM sprache AS STRING
+    DIM auffrischenS AS INTEGER
+    DIM cacheAn AS BOOLEAN
+    DIM einheit AS STRING
+    ' Benachrichtigungen
+    DIM meldungenAn AS BOOLEAN
+    DIM beiAbgelaufen AS BOOLEAN
+    DIM beiHeute AS BOOLEAN
+    DIM beiMorgen AS BOOLEAN
+    DIM beiBald AS BOOLEAN
+    DIM beiMinimum AS BOOLEAN
+    DIM pruefMin AS INTEGER
+    DIM tagesAn AS BOOLEAN
+    DIM tagesStunde AS INTEGER
+    DIM tagesMinute AS INTEGER
+    ' Ablaufdaten
+    DIM warnTage AS INTEGER
+    DIM haltbarTage AS INTEGER
+
+    ' Die Vorgaben (wie die Klassenwerte von AppConfig und _reset_to_defaults).
+    SUB vorgaben()
+        Self.dunkel = TRUE
+        Self.sprache = "de"
+        Self.auffrischenS = 30
+        Self.cacheAn = TRUE
+        Self.einheit = "Stück"
+        Self.meldungenAn = TRUE
+        Self.beiAbgelaufen = TRUE
+        Self.beiHeute = TRUE
+        Self.beiMorgen = TRUE
+        Self.beiBald = TRUE
+        Self.beiMinimum = TRUE
+        Self.pruefMin = 60
+        Self.tagesAn = TRUE
+        Self.tagesStunde = 9
+        Self.tagesMinute = 0
+        Self.warnTage = 3
+        Self.haltbarTage = 7
+    END SUB
+
+    ' Was fehlt, bleibt bei der Vorgabe. Werte außerhalb der Grenzen des
+    ' Fensters kommen auf die Grenze (die Python-App las sie ungeprüft: ein
+    ' Prüfintervall von 0 ms hätte den Timer im Kreis laufen lassen).
+    SUB laden()
+        Self.vorgaben()
+        Self.dunkel = einstellungJa("dark_mode", Self.dunkel)
+        ' Ohne Eintrag die Sprache, in der die App gerade läuft.
+        Self.sprache = IIF(einstellung$("language", IIF(Sprache$() = "en", "en", "de")) = "en", "en", "de")
+        Self.auffrischenS = grenzen(einstellungZahl("auto_refresh_interval_ms", Self.auffrischenS * 1000) \ 1000, 5, 300)
+        Self.cacheAn = einstellungJa("barcode_cache_enabled", Self.cacheAn)
+        Self.einheit = einstellung$("default_unit", Self.einheit)
+        Self.meldungenAn = einstellungJa("notifications_enabled", Self.meldungenAn)
+        Self.beiAbgelaufen = einstellungJa("notify_on_expired", Self.beiAbgelaufen)
+        Self.beiHeute = einstellungJa("notify_on_expiring_today", Self.beiHeute)
+        Self.beiMorgen = einstellungJa("notify_on_expiring_tomorrow", Self.beiMorgen)
+        Self.beiBald = einstellungJa("notify_on_expiring_soon", Self.beiBald)
+        Self.beiMinimum = einstellungJa("notify_on_below_minimum", Self.beiMinimum)
+        Self.pruefMin = grenzen(einstellungZahl("notification_check_interval_ms", Self.pruefMin * 60000) \ 60000, 15, 1440)
+        Self.tagesAn = einstellungJa("daily_summary_enabled", Self.tagesAn)
+        Self.tagesStunde = grenzen(einstellungZahl("daily_summary_hour", Self.tagesStunde), 0, 23)
+        Self.tagesMinute = grenzen(einstellungZahl("daily_summary_minute", Self.tagesMinute), 0, 59)
+        Self.warnTage = grenzen(einstellungZahl("expiring_days_threshold", Self.warnTage), 1, 14)
+        Self.haltbarTage = grenzen(einstellungZahl("default_expiry_days", Self.haltbarTage), 1, 365)
+    END SUB
+
+    ' Alles in einem Zug (wie save_all).
+    SUB speichern()
+        DB_BEGIN(db)
+        einstellungSetzen("dark_mode", jsonJa$(Self.dunkel))
+        einstellungSetzen("language", jsonText$(Self.sprache))
+        einstellungSetzen("auto_refresh_interval_ms", STR$(Self.auffrischenS * 1000))
+        einstellungSetzen("barcode_cache_enabled", jsonJa$(Self.cacheAn))
+        einstellungSetzen("default_unit", jsonText$(Self.einheit))
+        einstellungSetzen("notifications_enabled", jsonJa$(Self.meldungenAn))
+        einstellungSetzen("notify_on_expired", jsonJa$(Self.beiAbgelaufen))
+        einstellungSetzen("notify_on_expiring_today", jsonJa$(Self.beiHeute))
+        einstellungSetzen("notify_on_expiring_tomorrow", jsonJa$(Self.beiMorgen))
+        einstellungSetzen("notify_on_expiring_soon", jsonJa$(Self.beiBald))
+        einstellungSetzen("notify_on_below_minimum", jsonJa$(Self.beiMinimum))
+        einstellungSetzen("notification_check_interval_ms", STR$(Self.pruefMin * 60000))
+        einstellungSetzen("daily_summary_enabled", jsonJa$(Self.tagesAn))
+        einstellungSetzen("daily_summary_hour", STR$(Self.tagesStunde))
+        einstellungSetzen("daily_summary_minute", STR$(Self.tagesMinute))
+        einstellungSetzen("expiring_days_threshold", STR$(Self.warnTage))
+        einstellungSetzen("default_expiry_days", STR$(Self.haltbarTage))
+        DB_COMMIT(db)
+    END SUB
+
+    ' "09:00"
+    FUNCTION tagesZeit$() AS STRING
+        RETURN RIGHT$("0" + STR$(Self.tagesStunde), 2) + ":" + RIGHT$("0" + STR$(Self.tagesMinute), 2)
+    END FUNCTION
+END CLASS
+
+FUNCTION grenzen(x AS INTEGER, lo AS INTEGER, hi AS INTEGER) AS INTEGER
+    RETURN MAX(lo, MIN(hi, x))
+END FUNCTION
+
+' Die Einstellungen, wie sie gerade gelten (frisch aus der Datei).
+FUNCTION einstellungen() AS Einstellungen
+    DIM e AS Einstellungen : e = NEW Einstellungen()
+    e.laden()
+    RETURN e
+END FUNCTION
+
+' Das Thema der Oberfläche, hell oder dunkel, mit dem Teal der Python-App.
+SUB themaSetzen(dunkel AS BOOLEAN)
+    GUI_THEME_PRESET(IIF(dunkel, "modern_dark", "modern_light"))
+    GUI_THEME_SET("accent", RGB(38, 166, 154))
+END SUB

@@ -707,6 +707,22 @@ impl ChartObj {
         palette_at(&self.style.palette, serie)
     }
 
+    /// Farbe eines Balkens: bei EINER Reihe die Farbe, die CHART_ADD der
+    /// Kategorie mitgab (Ablauf-Status gruen/gelb/rot in der Kuehlschrank-App
+    /// -- vorher galt sie nur im Kuchen, der Balken nahm still die Reihe),
+    /// sonst die der Reihe.
+    #[cfg(feature = "graphics")]
+    fn bar_color(&self, serie: usize, idx: usize) -> i64 {
+        if self.series.len() == 1 {
+            if let Some(&c) = self.label_colors.get(idx) {
+                if c >= 0 {
+                    return with_alpha(c, self.style.deckkraft);
+                }
+            }
+        }
+        self.data_color(serie)
+    }
+
     fn slice_color(&self, idx: usize) -> i64 {
         match self.label_colors.get(idx) {
             Some(&c) if c >= 0 => c,
@@ -1553,14 +1569,14 @@ impl ChartObj {
                     } else {
                         stapel_neg = bis;
                     }
-                    let f = self.hell(self.data_color(si), self.glanz_von(i));
+                    let f = self.hell(self.bar_color(si, i), self.glanz_von(i));
                     self.bar_rect(g, &plot, basis, breite, von, bis, lo, hi, f, waagerecht);
                 }
             } else {
                 for (si, s) in self.series.iter().enumerate() {
                     let v = *self.anzeige(s).get(i).unwrap_or(&0.0);
                     let off = basis + breite * si as f64;
-                    let f = self.hell(self.data_color(si), self.glanz_von(i));
+                    let f = self.hell(self.bar_color(si, i), self.glanz_von(i));
                     self.bar_rect(g, &plot, off, breite, 0.0, v, lo, hi, f, waagerecht);
                     // Werte nur bei EINER Reihe anschreiben -- bei mehreren
                     // stehen die Balken so dicht, dass die Zahlen ineinander

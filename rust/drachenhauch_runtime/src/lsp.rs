@@ -345,6 +345,7 @@ fn einfaches_dim(zeile: &str) -> Option<String> {
 /// Warnung fuer lokale Variablen bleibt, wie sie war. `source` = die
 /// gemergte Quelle, auf die sich die Zeilen der Warnungen beziehen.
 pub fn verdeckung_filtern(warns: Vec<(u32, String)>, source: &str) -> Vec<(u32, String)> {
+    let warns = schreibweise_pruefen(warns, source);
     if !warns.iter().any(|(_, m)| (m.starts_with("Parameter '") || m.starts_with("Feld '"))
                                   && m.contains("' verdeckt die gleichnamige Konstante")) {
         return warns;
@@ -357,6 +358,43 @@ pub fn verdeckung_filtern(warns: Vec<(u32, String)>, source: &str) -> Vec<(u32, 
         let schreibweisen: std::collections::HashSet<String> = crate::symbole::fundstellen(source, &name)
             .into_iter().filter(|f| f.zeile >= von && f.zeile <= bis).map(|f| f.name).collect();
         schreibweisen.len() > 1
+    }).collect()
+}
+
+/// Kandidaten des Compilers "Methode ueberschreibt eine geerbte gleichen
+/// Namens" (`compiler::SCHREIBWEISE_KANDIDAT`): steht der Name in beiden
+/// Koepfen gleich geschrieben, ist das Ueberschreiben gewollt (`Geoeffnet`
+/// im Fenster) und der Kandidat faellt weg; sonst wird er zur Warnung --
+/// `SUB zeigen()` ersetzte still `Zeigen()` der Studio-Laufzeit.
+fn schreibweise_pruefen(warns: Vec<(u32, String)>, source: &str) -> Vec<(u32, String)> {
+    let vorsatz = crate::compiler::SCHREIBWEISE_KANDIDAT;
+    if !warns.iter().any(|(_, m)| m.starts_with(vorsatz)) { return warns; }
+    let zeilen: Vec<&str> = source.lines().collect();
+    let ende = regex::Regex::new(r"(?i)^\s*END\s+CLASS\b").unwrap();
+    // Der Kopf der Methode in der Klasse ab Zeile z (1-basiert, der CLASS-
+    // Kopf): ihre Zeile und der Name, wie er dort steht.
+    let kopf = |z: usize, name: &str| -> Option<(u32, String)> {
+        let re = regex::Regex::new(&format!(r"(?i)^\s*(?:(?:PUBLIC|PRIVATE|OVERRIDE|STATIC)\s+)*(?:SUB|FUNCTION)\s+({})\s*(?:\(|$)", regex::escape(name))).ok()?;
+        let mut k = z.max(1);
+        while k <= zeilen.len() {
+            let l = zeilen[k - 1];
+            if let Some(c) = re.captures(l) { return Some((k as u32, c[1].to_string())); }
+            if k > z && ende.is_match(l) { return None; }
+            k += 1;
+        }
+        None
+    };
+    warns.into_iter().filter_map(|(z, m)| {
+        let Some(rest) = m.strip_prefix(vorsatz) else { return Some((z, m)) };
+        let f: Vec<&str> = rest.split('|').collect();
+        if f.len() != 4 { return None; }
+        let ez: usize = f[3].parse().ok()?;
+        let (zeile, eigen) = kopf(z as usize, f[0])?;
+        let (_, geerbt) = kopf(ez, f[0])?;
+        if eigen == geerbt { return None; }
+        Some((zeile, format!(
+            "Methode '{}' in {} ueberschreibt '{}' aus {} -- Gross-/Kleinschreibung zaehlt nicht, es ist derselbe Name. Jeder Aufruf von '{}' landet jetzt hier. Ist eine eigene Methode gemeint, einen anderen Namen vergeben; soll sie ersetzen, genauso schreiben wie dort.",
+            eigen, f[1], geerbt, f[2], geerbt)))
     }).collect()
 }
 

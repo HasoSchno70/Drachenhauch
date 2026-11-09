@@ -971,6 +971,7 @@ Pfadbasiert, ohne FILE-Handle *(nur native Runtime)*:
 |---|---|
 | `WRITEALL(pfad$, text$[, kodierung$])` | Text komplett schreiben (überschreibt/erzeugt) |
 | `READLINES(pfad$[, kodierung$])` → ARRAY OF STRING | Datei als Zeilen-Array lesen |
+| `READALL$(pfad$[, kodierung$])` → STRING | Datei komplett als Text lesen |
 | `FILESIZE(pfad$)` → INTEGER | Größe in Bytes |
 | `FILE_ENCODING$(pfad$)` → STRING | was `"auto"` wählen würde: `utf8`, `utf8bom`, `cp1252` oder `binaer` (siehe Kodierungen) |
 | `DELETEFILE(pfad$)`, `RENAME(alt$, neu$)` | löschen / umbenennen·verschieben |
@@ -1207,7 +1208,9 @@ PRINT LEN(READLINES(pfad))
 Beim Start über `dhrt` gehört alles hinter einem alleinstehenden `--` dem
 Programm, alles davor der Runtime. Ohne `--` bekommt das Programm keine
 Argumente. Das ist Absicht: sonst könnte `dhrt` sich keinen eigenen Schalter
-mehr zulegen, ohne bestehende Programme zu brechen. Die **exportierte `.exe`**
+mehr zulegen, ohne bestehende Programme zu brechen. Still geschieht es aber
+nicht: Wörter hinter der Datei ohne `--` nennt `dhrt run` auf der
+Fehlerausgabe, samt dem Aufruf, wie er gemeint war. Die **exportierte `.exe`**
 ist selbst das Programm — dort gibt es nichts zu trennen, alle Argumente
 gehören ihr, ohne `--`.
 

@@ -36,6 +36,17 @@ PRINT FORMAT$(1234.5, "#,##0.00")
 --- fehler
 hat keinen Platzhalter
 
+=== die meldung ohne platzhalter hat keine luecken
+' Im Quelltext stand sie mit 29 Leerzeichen mitten im Satz -- so kam sie
+' auch an (gefunden mit der Kuehlschrank-App, FORMAT$(f, "0.0")).
+TRY
+    PRINT FORMAT$(1.5, "0.0")
+CATCH e
+    PRINT INSTR(e, "  ") < 0; " "; INSTR(e, "kaeme nicht vor") >= 0
+END TRY
+--- erwartet
+TRUE TRUE
+
 === format mit nur prozentzeichen ist auch ohne platzhalter
 PRINT FORMAT$(5, "100%%")
 --- fehler

@@ -4419,6 +4419,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_DATEFIELD",
+   "kind": "core",
+   "signature": "GUI_DATEFIELD(win, x, y, w, h)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_DATEPICKER",
    "kind": "core",
    "signature": "GUI_DATEPICKER(win, x, y, w, h)",
@@ -4692,6 +4698,18 @@
    "name": "GUI_DROPDOWN_TEXT",
    "kind": "core",
    "signature": "GUI_DROPDOWN_TEXT(dd)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_DROPDOWN_COUNT",
+   "kind": "core",
+   "signature": "GUI_DROPDOWN_COUNT(dd)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_DROPDOWN_ITEM",
+   "kind": "core",
+   "signature": "GUI_DROPDOWN_ITEM(dd, i)",
    "module": "gui"
   },
   {
@@ -5322,6 +5340,12 @@
    "name": "GUI_LISTBOX_TEXT",
    "kind": "core",
    "signature": "GUI_LISTBOX_TEXT(lb)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TABCONTROL_ITEM_RECT",
+   "kind": "core",
+   "signature": "GUI_TABCONTROL_ITEM_RECT(tc, seite) AS TUPLE",
    "module": "gui"
   },
   {
@@ -7101,6 +7125,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_SHOWN",
+   "kind": "core",
+   "signature": "GUI_SHOWN(wdg)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_VSLIDER",
    "kind": "core",
    "signature": "GUI_VSLIDER(win, x, y, h, min, max, default)",
@@ -7146,6 +7176,12 @@
    "name": "GUI_WINDOW_DEFAULT",
    "kind": "core",
    "signature": "GUI_WINDOW_DEFAULT(win, knopf)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_WINDOW_CLIP",
+   "kind": "core",
+   "signature": "GUI_WINDOW_CLIP(win, x, y, b, h)",
    "module": "gui"
   },
   {
@@ -10823,13 +10859,13 @@
   {
    "name": "READALL",
    "kind": "core",
-   "signature": "READALL$(f)",
+   "signature": "READALL$(f [, kodierung$])",
    "module": "core"
   },
   {
    "name": "READALL$",
    "kind": "core",
-   "signature": "READALL$(f)",
+   "signature": "READALL$(f [, kodierung$])",
    "module": "core"
   },
   {

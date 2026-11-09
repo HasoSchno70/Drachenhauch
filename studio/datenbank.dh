@@ -252,15 +252,103 @@ FUNCTION dbDefault$(typ AS STRING, pflicht AS BOOLEAN, vorgabe AS STRING) AS STR
     RETURN ""
 END FUNCTION
 
+' Steht das Feld in der Spalte (auch leer)?
+FUNCTION dbSpHat(s AS JSON_HANDLE, t AS INTEGER, k AS INTEGER, feld AS STRING) AS BOOLEAN
+    RETURN JSON_HAS(s, dbSpPfad$(t, k) + "." + feld)
+END FUNCTION
+
+' Aus einer uebernommenen Datei: "sql" = die Art, wie sie dort steht (DATE,
+' TIMESTAMP, VARCHAR(20)), "sqlvorgabe" = DEFAULT woertlich (CURRENT_TIMESTAMP,
+' auch leer: eine Pflichtspalte ganz ohne Vorgabe). Beides gilt, bis man Art
+' bzw. Vorgabe im Studio aendert -- so baut der Abgleich die Tabelle nicht um.
+FUNCTION dbSpSqlTyp$(s AS JSON_HANDLE, t AS INTEGER, k AS INTEGER) AS STRING
+    IF dbSpHat(s, t, k, "sql") THEN RETURN dbSp$(s, t, k, "sql")
+    RETURN dbTypSql$(dbSp$(s, t, k, "typ"))
+END FUNCTION
+
 FUNCTION dbSpDefault$(s AS JSON_HANDLE, t AS INTEGER, k AS INTEGER) AS STRING
+    IF dbSp$(s, t, k, "vorgabe") = "" AND dbSpHat(s, t, k, "sqlvorgabe") THEN RETURN dbSp$(s, t, k, "sqlvorgabe")
     RETURN dbDefault$(dbSp$(s, t, k, "typ"), dbSpAn(s, t, k, "pflicht"), dbSp$(s, t, k, "vorgabe"))
 END FUNCTION
 
+' Was das Spalten-Gitter als Vorgabe zeigt.
+FUNCTION dbSpVorgabe$(s AS JSON_HANDLE, t AS INTEGER, k AS INTEGER) AS STRING
+    IF dbSp$(s, t, k, "vorgabe") = "" AND dbSpHat(s, t, k, "sqlvorgabe") THEN RETURN dbSp$(s, t, k, "sqlvorgabe")
+    RETURN dbSp$(s, t, k, "vorgabe")
+END FUNCTION
+
 FUNCTION dbSpalteSql$(s AS JSON_HANDLE, t AS INTEGER, k AS INTEGER) AS STRING
-    DIM z AS STRING : z = dbQ$(dbSp$(s, t, k, "name")) + " " + dbTypSql$(dbSp$(s, t, k, "typ"))
+    DIM z AS STRING : z = dbQ$(dbSp$(s, t, k, "name")) + " " + dbSpSqlTyp$(s, t, k)
     IF dbSpAn(s, t, k, "pflicht") THEN z = z + " NOT NULL"
     DIM d AS STRING : d = dbSpDefault$(s, t, k)
     IF d <> "" THEN z = z + " DEFAULT " + d
+    RETURN z + dbFkSql$(s, t, k)
+END FUNCTION
+
+' Ein Verweis als Fremdschluessel. "beimLoeschen" sagt, was mit einer Zeile
+' geschieht, wenn die Zeile geloescht wird, auf die sie zeigt: "verbieten"
+' (das Loeschen scheitert), "loeschen" (sie geht mit, ON DELETE CASCADE),
+' "leeren" (der Verweis wird NULL). "" = kein Fremdschluessel, nur die
+' Spalte. Fehlt das Feld (ein Aufbau von vor 2026-11-09), bleibt die Datei,
+' wie sie ist -- sonst baute der Abgleich jede uebernommene Tabelle um.
+FUNCTION dbFkSql$(s AS JSON_HANDLE, t AS INTEGER, k AS INTEGER) AS STRING
+    DIM ziel AS STRING : ziel = dbSp$(s, t, k, "verweis")
+    DIM a AS STRING : a = dbSp$(s, t, k, "beimLoeschen")
+    IF ziel = "" OR a = "" THEN RETURN ""
+    DIM z AS STRING : z = " REFERENCES " + dbQ$(ziel) + "(id)"
+    IF a = "loeschen" THEN z = z + " ON DELETE CASCADE"
+    IF a = "leeren" THEN z = z + " ON DELETE SET NULL"
+    RETURN z
+END FUNCTION
+
+' Was der Abgleich an der Datei sehen will: "ziel|aktion", "" = keinen
+' Fremdschluessel.
+FUNCTION dbFkSoll$(s AS JSON_HANDLE, t AS INTEGER, k AS INTEGER) AS STRING
+    IF dbFkSql$(s, t, k) = "" THEN RETURN ""
+    RETURN LOWER$(dbSp$(s, t, k, "verweis")) + "|" + dbSp$(s, t, k, "beimLoeschen")
+END FUNCTION
+
+' ON DELETE, wie SQLite es meldet, als Wert von "beimLoeschen".
+FUNCTION dbFkAktion$(roh AS STRING) AS STRING
+    SELECT CASE UPPER$(TRIM$(roh))
+        CASE "CASCADE" : RETURN "loeschen"
+        CASE "SET NULL" : RETURN "leeren"
+    END SELECT
+    RETURN "verbieten"
+END FUNCTION
+
+' Was beim Umkopieren in einer Pflichtspalte steht, wo die alte Tabelle NULL
+' hat -- auch dann, wenn die Spalte selbst keine Vorgabe hat.
+FUNCTION dbSpLeerwert$(s AS JSON_HANDLE, t AS INTEGER, k AS INTEGER) AS STRING
+    DIM d AS STRING : d = dbSpDefault$(s, t, k)
+    IF d <> "" THEN RETURN d
+    RETURN dbDefault$(dbSp$(s, t, k, "typ"), TRUE, "")
+END FUNCTION
+
+' Eine Vorgabe, die ALTER TABLE ADD COLUMN nimmt: ein fester Wert, kein
+' CURRENT_TIMESTAMP und kein Ausdruck in Klammern.
+FUNCTION dbVorgabeFest(d AS STRING) AS BOOLEAN
+    DIM u AS STRING : u = UPPER$(TRIM$(d))
+    IF LEFT$(u, 8) = "CURRENT_" THEN RETURN FALSE
+    RETURN INSTR(u, "(") < 0
+END FUNCTION
+
+' Die Spalte fuer ALTER TABLE ADD COLUMN: dort will SQLite eine feste
+' Vorgabe und bei NOT NULL ueberhaupt eine. Weicht das von dbSpalteSql$ ab,
+' baut der Abgleich die Tabelle lieber neu auf; das gebaute Programm ergaenzt
+' damit eine aeltere Datei.
+FUNCTION dbSpalteSqlDazu$(s AS JSON_HANDLE, t AS INTEGER, k AS INTEGER) AS STRING
+    DIM z AS STRING : z = dbQ$(dbSp$(s, t, k, "name")) + " " + dbSpSqlTyp$(s, t, k)
+    DIM d AS STRING : d = dbSpDefault$(s, t, k)
+    IF NOT dbVorgabeFest(d) THEN d = ""
+    IF dbSpAn(s, t, k, "pflicht") THEN
+        z = z + " NOT NULL"
+        IF d = "" THEN d = dbDefault$(dbSp$(s, t, k, "typ"), TRUE, "")
+    END IF
+    IF d <> "" THEN z = z + " DEFAULT " + d
+    ' Ohne Fremdschluessel: ADD COLUMN ... REFERENCES verweigert SQLite bei
+    ' eingeschalteten Fremdschluesseln mit einer Vorgabe ungleich NULL. Im
+    ' Studio baut der Abgleich die Tabelle dafuer um.
     RETURN z
 END FUNCTION
 
@@ -324,6 +412,14 @@ SUB dbAbgleichenMit(db AS DB_CONN, s AS JSON_HANDLE)
                 ARRAY_PUSH(inn, DB_GET_INT(r, 3) <> 0)
                 ARRAY_PUSH(idf, IIF(DB_IS_NULL(r, 4), "", DB_GET_STRING(r, 4)))
             WEND
+            ' Die Fremdschluessel der Datei, je Spalte "ziel|aktion".
+            DIM fkSp AS ARRAY OF STRING : fkSp = []
+            DIM fkIst AS ARRAY OF STRING : fkIst = []
+            DIM rf AS DB_RESULT : rf = DB_QUERY(db, "PRAGMA foreign_key_list(" + dbQ$(name) + ")")
+            WHILE DB_NEXT(rf)
+                ARRAY_PUSH(fkSp, DB_GET_STRING(rf, 3))
+                ARRAY_PUSH(fkIst, LOWER$(DB_GET_STRING(rf, 2)) + "|" + dbFkAktion$(DB_GET_STRING(rf, 6)))
+            WEND
             DIM neu AS BOOLEAN : neu = FALSE
             DIM fehlt AS ARRAY OF INTEGER : fehlt = []
             DIM k AS INTEGER
@@ -331,8 +427,14 @@ SUB dbAbgleichenMit(db AS DB_CONN, s AS JSON_HANDLE)
                 DIM i AS INTEGER : i = dbListenIndex(inamen, dbSp$(s, t, k, "name"))
                 IF i < 0 THEN
                     ARRAY_PUSH(fehlt, k)
-                ELSEIF ityp[i] <> dbTypSql$(dbSp$(s, t, k, "typ")) OR inn[i] <> dbSpAn(s, t, k, "pflicht") OR idf[i] <> dbSpDefault$(s, t, k) THEN
+                    ' Mit Fremdschluessel lieber neu: ADD COLUMN ... REFERENCES
+                    ' nimmt SQLite nur unter Bedingungen.
+                    IF dbSpalteSqlDazu$(s, t, k) <> dbSpalteSql$(s, t, k) OR dbFkSql$(s, t, k) <> "" THEN neu = TRUE
+                ELSEIF ityp[i] <> UPPER$(dbSpSqlTyp$(s, t, k)) OR inn[i] <> dbSpAn(s, t, k, "pflicht") OR idf[i] <> dbSpDefault$(s, t, k) THEN
                     neu = TRUE
+                ELSEIF dbSpHat(s, t, k, "beimLoeschen") THEN
+                    DIM fi AS INTEGER : fi = dbListenIndex(fkSp, dbSp$(s, t, k, "name"))
+                    IF IIF(fi >= 0, fkIst[MAX(0, fi)], "") <> dbFkSoll$(s, t, k) THEN neu = TRUE
                 END IF
             NEXT
             IF neu THEN
@@ -369,7 +471,7 @@ SUB dbNeuAufbauen(db AS DB_CONN, s AS JSON_HANDLE, t AS INTEGER, name AS STRING,
         ARRAY_PUSH(ziel, dbQ$(sn))
         ' Eine Pflichtspalte nimmt keine NULL -- dort steht dann ihr Leerwert.
         IF dbSpAn(s, t, k, "pflicht") THEN
-            ARRAY_PUSH(quelle, "COALESCE(" + dbQ$(inamen[i]) + ", " + dbSpDefault$(s, t, k) + ")")
+            ARRAY_PUSH(quelle, "COALESCE(" + dbQ$(inamen[i]) + ", " + dbSpLeerwert$(s, t, k) + ")")
         ELSE
             ARRAY_PUSH(quelle, dbQ$(inamen[i]))
         END IF
@@ -391,11 +493,16 @@ SUB dbNeuAufbauen(db AS DB_CONN, s AS JSON_HANDLE, t AS INTEGER, name AS STRING,
     DB_EXEC(db, "ALTER TABLE " + dbQ$("studio_neu") + " RENAME TO " + dbQ$(name))
 END SUB
 
+' Eindeutig ist ein eigener Index -- ausser die Datei hat die Spalte schon
+' allein eindeutig (UNIQUE in CREATE TABLE, eine uebernommene Datei).
 SUB dbIndexeAbgleichen(db AS DB_CONN, s AS JSON_HANDLE, t AS INTEGER, name AS STRING)
+    DIM fremd AS ARRAY OF STRING : fremd = dbEindeutigeSpalten(db, name, FALSE)
     DIM soll AS ARRAY OF STRING : soll = []
+    DIM brauchen AS ARRAY OF BOOLEAN : brauchen = []
     DIM k AS INTEGER
     FOR k = 0 TO dbSpZahl(s, t) - 1
-        IF dbSpAn(s, t, k, "eindeutig") THEN ARRAY_PUSH(soll, dbIndexName$(name, dbSp$(s, t, k, "name")))
+        ARRAY_PUSH(brauchen, dbSpAn(s, t, k, "eindeutig") AND dbListenIndex(fremd, dbSp$(s, t, k, "name")) < 0)
+        IF brauchen[k] THEN ARRAY_PUSH(soll, dbIndexName$(name, dbSp$(s, t, k, "name")))
     NEXT
     DIM ist AS ARRAY OF STRING : ist = []
     DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT name FROM sqlite_master WHERE type = 'index' AND lower(tbl_name) = lower(?)", name)
@@ -408,7 +515,7 @@ SUB dbIndexeAbgleichen(db AS DB_CONN, s AS JSON_HANDLE, t AS INTEGER, name AS ST
         IF dbListenIndex(soll, n2) < 0 THEN DB_EXEC(db, "DROP INDEX " + dbQ$(n2))
     NEXT
     FOR k = 0 TO dbSpZahl(s, t) - 1
-        IF dbSpAn(s, t, k, "eindeutig") THEN DB_EXEC(db, dbIndexSql$(name, dbSp$(s, t, k, "name")))
+        IF brauchen[k] THEN DB_EXEC(db, dbIndexSql$(name, dbSp$(s, t, k, "name")))
     NEXT
 END SUB
 
@@ -429,6 +536,13 @@ FUNCTION dbAusfuehren$(e AS Element, neu AS STRING, vorher AS ARRAY OF STRING) A
         RETURN dbMeldung$(ofehler)
     END TRY
     DIM fehler AS STRING : fehler = ""
+    ' Fremdschluessel aus, solange der Aufbau sich aendert (dhrt baut SQLite
+    ' mit SQLITE_DEFAULT_FOREIGN_KEYS, sie sind sonst an): der Umbau einer
+    ' Tabelle loescht sie mit DROP TABLE -- ein ON DELETE CASCADE nahm dabei
+    ' alle Zeilen der Tabellen mit, die auf sie zeigen, und ein neuer
+    ' Fremdschluessel scheiterte an einem Verweis ins Leere. In einer
+    ' Transaktion laesst SQLite das nicht mehr umschalten, darum davor.
+    DB_EXEC(db, "PRAGMA foreign_keys = OFF")
     TRY
         DB_BEGIN(db)
         DIM sql AS STRING
@@ -564,8 +678,19 @@ FUNCTION dbSpalteAendern$(e AS Element, tabelle AS STRING, name AS STRING, typ A
     DIM k AS INTEGER : k = dbSpIndex(s, t, name)
     IF k < 0 THEN RETURN trf$("Die Spalte {0} gibt es nicht.", [name])
     IF dbListenIndex(dbTypen(), typ) < 0 THEN RETURN trf$("'{0}' ist keine Art.", [typ])
-    IF vorgabe <> "" AND dbLiteral$(typ, vorgabe) = "" THEN RETURN trf$("Die Vorgabe '{0}' passt nicht zu {1}.", [vorgabe, dbTypName$(typ)])
     DIM p AS STRING : p = dbSpPfad$(t, k)
+    ' Was aus einer uebernommenen Datei woertlich dasteht, bleibt, solange man
+    ' es nicht aendert: die Art bis zu einer anderen Art, die Vorgabe, solange
+    ' im Gitter derselbe Text steht.
+    IF typ <> dbSp$(s, t, k, "typ") AND dbSpHat(s, t, k, "sql") THEN JSON_REMOVE(s, p + ".sql")
+    IF dbSpHat(s, t, k, "sqlvorgabe") THEN
+        IF vorgabe = dbSp$(s, t, k, "sqlvorgabe") AND dbSp$(s, t, k, "vorgabe") = "" THEN
+            vorgabe = ""
+        ELSE
+            JSON_REMOVE(s, p + ".sqlvorgabe")
+        END IF
+    END IF
+    IF vorgabe <> "" AND dbLiteral$(typ, vorgabe) = "" THEN RETURN trf$("Die Vorgabe '{0}' passt nicht zu {1}.", [vorgabe, dbTypName$(typ)])
     JSON_SET_STRING(s, p + ".typ", typ)
     JSON_SET_BOOL(s, p + ".pflicht", pflicht)
     JSON_SET_BOOL(s, p + ".eindeutig", eindeutig)
@@ -589,6 +714,157 @@ FUNCTION dbDateiSetzen$(e AS Element, datei AS STRING) AS STRING
         IF FILEEXISTS(alt) AND NOT FILEEXISTS(neu) THEN RENAME(alt, neu)
     END IF
     RETURN dbAbgleichen$(e)
+END FUNCTION
+
+' --- Eine vorhandene Datei uebernehmen ---------------------------------------------
+'  Liest den Aufbau einer SQLite-Datei, die nicht aus dem Studio kommt, in ein
+'  Schema: je Tabelle die Spalten mit Art, Pflicht, Vorgabe, Eindeutig (ein
+'  UNIQUE oder PRIMARY KEY ueber genau diese Spalte) und Verweis (FOREIGN KEY
+'  auf die id einer anderen Tabelle). Was die Arten des Studios nicht genau
+'  treffen, steht woertlich daneben ("sql", "sqlvorgabe", siehe dbSpSqlTyp$)
+'  -- der Abgleich danach laesst die Datei, wie sie ist. Was das Schema nicht
+'  fassen kann (UNIQUE ueber zwei Spalten, eine Tabelle ohne id), bleibt in der
+'  Datei und steht in dbUebHinweise.
+DIM dbUebHinweise AS ARRAY OF STRING : dbUebHinweise = []
+
+FUNCTION dbArtAusSql$(typ AS STRING) AS STRING
+    DIM u AS STRING : u = UPPER$(TRIM$(typ))
+    IF INSTR(u, "INT") >= 0 THEN RETURN "ganz"
+    IF u = "DATE" THEN RETURN "datum"
+    IF INSTR(u, "BOOL") >= 0 THEN RETURN "wahr"
+    IF INSTR(u, "REAL") >= 0 OR INSTR(u, "FLOA") >= 0 OR INSTR(u, "DOUB") >= 0 OR INSTR(u, "NUMERIC") >= 0 OR INSTR(u, "DECIMAL") >= 0 THEN RETURN "zahl"
+    IF INSTR(u, "BLOB") >= 0 THEN RETURN "bild"
+    RETURN "text"
+END FUNCTION
+
+' DEFAULT, wie SQLite ihn meldet ('Stück', 1, CURRENT_TIMESTAMP), als Vorgabe
+' zum Tippen -- oder "", wenn er sich so nicht schreiben laesst.
+FUNCTION dbVorgabeAusSql$(typ AS STRING, roh AS STRING) AS STRING
+    DIM v AS STRING : v = roh
+    IF LEN(v) >= 2 AND LEFT$(v, 1) = "'" AND RIGHT$(v, 1) = "'" THEN v = REPLACE$(MID$(v, 1, LEN(v) - 2), "''", "'")
+    IF v = "" THEN RETURN ""
+    IF dbLiteral$(typ, v) = roh THEN RETURN v
+    RETURN ""
+END FUNCTION
+
+' Spalten, die allein eindeutig sind (UNIQUE, PRIMARY KEY ausser der id).
+' Beim Uebernehmen zaehlen auch die Indexe des Studios, und ein UNIQUE ueber
+' mehrere Spalten wird ein Hinweis; sonst nur, was nicht vom Studio ist.
+FUNCTION dbEindeutigeSpalten(db AS DB_CONN, tabelle AS STRING, uebernehmen AS BOOLEAN) AS ARRAY OF STRING
+    DIM aus AS ARRAY OF STRING : aus = []
+    DIM namen AS ARRAY OF STRING : namen = []
+    DIM r AS DB_RESULT : r = DB_QUERY(db, "PRAGMA index_list(" + dbQ$(tabelle) + ")")
+    WHILE DB_NEXT(r)
+        DIM iname AS STRING : iname = DB_GET_STRING(r, 1)
+        IF NOT uebernehmen AND LEFT$(iname, LEN(DB_INDEX_VOR)) = DB_INDEX_VOR THEN CONTINUE
+        IF DB_GET_INT(r, 2) <> 0 AND DB_GET_INT(r, 4) = 0 THEN ARRAY_PUSH(namen, iname)
+    WEND
+    DIM n AS STRING
+    FOR EACH n IN namen
+        DIM sp AS ARRAY OF STRING : sp = []
+        DIM ri AS DB_RESULT : ri = DB_QUERY(db, "PRAGMA index_info(" + dbQ$(n) + ")")
+        WHILE DB_NEXT(ri)
+            ARRAY_PUSH(sp, IIF(DB_IS_NULL(ri, 2), "", DB_GET_STRING(ri, 2)))
+        WEND
+        IF LEN(sp) = 1 THEN
+            ARRAY_PUSH(aus, sp[0])
+        ELSEIF uebernehmen THEN
+            ARRAY_PUSH(dbUebHinweise, trf$("{0}: eindeutig über ({1}) bleibt in der Datei -- das Studio kennt nur eindeutige Einzelspalten.", [tabelle, JOIN$(sp, ", ")]))
+        END IF
+    NEXT
+    RETURN aus
+END FUNCTION
+
+' Das Schema aus der Datei (JSON-Text; "" und die Meldung in dbUebHinweise[0],
+' wenn sie sich nicht lesen laesst). datei = wie das Schema sie nennt.
+FUNCTION dbSchemaAusDatei$(pfad AS STRING, datei AS STRING) AS STRING
+    dbUebHinweise = []
+    DIM db AS DB_CONN
+    TRY
+        db = DB_OPEN(pfad)
+    CATCH ofehler
+        dbUebHinweise = [dbMeldung$(ofehler)]
+        RETURN ""
+    END TRY
+    DIM s AS JSON_HANDLE : s = JSON_PARSE(dbSchemaNeu$("x"))
+    JSON_SET_STRING(s, "datei", datei)
+    DIM tabellen AS ARRAY OF STRING : tabellen = []
+    DIM tn AS STRING
+    TRY
+        DIM rt AS DB_RESULT : rt = DB_QUERY(db, "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY rowid")
+        WHILE DB_NEXT(rt)
+            tn = DB_GET_STRING(rt, 0)
+            IF LEFT$(LOWER$(tn), 7) = "sqlite_" THEN CONTINUE
+            DIM tf AS STRING : tf = dbNameFehler$(tn, "tabelle")
+            IF tf <> "" THEN
+                ARRAY_PUSH(dbUebHinweise, trf$("Tabelle {0} bleibt in der Datei, aber nicht im Aufbau: {1}", [tn, tf]))
+                CONTINUE
+            END IF
+            ARRAY_PUSH(tabellen, tn)
+        WEND
+        FOR EACH tn IN tabellen
+            DIM o AS JSON_HANDLE : o = JSON_PARSE("{}")
+            JSON_SET_STRING(o, "name", tn)
+            JSON_SET_JSON(o, "spalten", JSON_NEW_ARRAY())
+            DIM eindeutig AS ARRAY OF STRING : eindeutig = dbEindeutigeSpalten(db, tn, TRUE)
+            DIM fkVon AS ARRAY OF STRING : fkVon = []
+            DIM fkNach AS ARRAY OF STRING : fkNach = []
+            DIM fkAkt AS ARRAY OF STRING : fkAkt = []
+            DIM rf AS DB_RESULT : rf = DB_QUERY(db, "PRAGMA foreign_key_list(" + dbQ$(tn) + ")")
+            WHILE DB_NEXT(rf)
+                DIM ziel AS STRING : ziel = DB_GET_STRING(rf, 2)
+                DIM zu AS STRING : zu = IIF(DB_IS_NULL(rf, 4), "id", DB_GET_STRING(rf, 4))
+                IF LOWER$(zu) = "id" AND dbListenIndex(tabellen, ziel) >= 0 THEN
+                    ARRAY_PUSH(fkVon, DB_GET_STRING(rf, 3))
+                    ARRAY_PUSH(fkNach, tabellen[dbListenIndex(tabellen, ziel)])
+                    ARRAY_PUSH(fkAkt, dbFkAktion$(DB_GET_STRING(rf, 6)))
+                END IF
+            WEND
+            DIM hatId AS BOOLEAN : hatId = FALSE
+            DIM rs AS DB_RESULT : rs = DB_QUERY(db, "PRAGMA table_info(" + dbQ$(tn) + ")")
+            WHILE DB_NEXT(rs)
+                DIM sn AS STRING : sn = DB_GET_STRING(rs, 1)
+                DIM roh AS STRING : roh = IIF(DB_IS_NULL(rs, 2), "", DB_GET_STRING(rs, 2))
+                IF LOWER$(sn) = "id" THEN
+                    hatId = DB_GET_INT(rs, 5) = 1 AND UPPER$(roh) = "INTEGER"
+                    CONTINUE
+                END IF
+                DIM sf AS STRING : sf = dbNameFehler$(sn, "spalte")
+                IF sf <> "" THEN
+                    ARRAY_PUSH(dbUebHinweise, trf$("Spalte {0}.{1} bleibt in der Datei, aber nicht im Aufbau: {2}", [tn, sn, sf]))
+                    CONTINUE
+                END IF
+                DIM typ AS STRING : typ = dbArtAusSql$(roh)
+                DIM pflicht AS BOOLEAN : pflicht = DB_GET_INT(rs, 3) <> 0
+                DIM sp AS JSON_HANDLE : sp = JSON_PARSE("{}")
+                JSON_SET_STRING(sp, "name", sn)
+                JSON_SET_STRING(sp, "typ", typ)
+                JSON_SET_BOOL(sp, "pflicht", pflicht)
+                JSON_SET_BOOL(sp, "eindeutig", dbListenIndex(eindeutig, sn) >= 0)
+                DIM vorgabe AS STRING : vorgabe = ""
+                DIM dflt AS STRING : dflt = IIF(DB_IS_NULL(rs, 4), "", DB_GET_STRING(rs, 4))
+                IF dflt <> "" THEN vorgabe = dbVorgabeAusSql$(typ, dflt)
+                JSON_SET_STRING(sp, "vorgabe", vorgabe)
+                IF UPPER$(roh) <> dbTypSql$(typ) THEN JSON_SET_STRING(sp, "sql", roh)
+                ' Was dbDefault$ aus der Vorgabe machte, muss genau DEFAULT der Datei sein.
+                IF dbDefault$(typ, pflicht, vorgabe) <> dflt THEN JSON_SET_STRING(sp, "sqlvorgabe", dflt)
+                DIM fi AS INTEGER : fi = dbListenIndex(fkVon, sn)
+                IF fi >= 0 AND typ = "ganz" THEN
+                    JSON_SET_STRING(sp, "verweis", fkNach[fi])
+                    JSON_SET_STRING(sp, "beimLoeschen", fkAkt[fi])
+                END IF
+                JSON_APPEND_JSON(o, "spalten", sp)
+            WEND
+            IF NOT hatId THEN ARRAY_PUSH(dbUebHinweise, trf$("{0} hat keine Spalte id INTEGER PRIMARY KEY -- das Studio zeigt sie, binden lässt sie sich nicht.", [tn]))
+            JSON_APPEND_JSON(s, "tabellen", o)
+        NEXT
+    CATCH lfehler
+        dbUebHinweise = [dbMeldung$(lfehler)]
+        DB_CLOSE(db)
+        RETURN ""
+    END TRY
+    DB_CLOSE(db)
+    RETURN JSON_STRINGIFY(s)
 END FUNCTION
 
 ' --- Daten ------------------------------------------------------------------------
@@ -626,7 +902,7 @@ FUNCTION dbZeilenLesen$(e AS Element, tabelle AS STRING, grenze AS INTEGER) AS S
     DIM s AS JSON_HANDLE : s = dbSchema(e)
     DIM t AS INTEGER : t = dbTabIndex(s, tabelle)
     IF t < 0 THEN RETURN trf$("Die Tabelle {0} gibt es nicht.", [tabelle])
-    DIM spalten AS ARRAY OF STRING : spalten = ["id"]
+    DIM spalten AS ARRAY OF STRING : spalten = ["rowid"]
     DIM k AS INTEGER
     FOR k = 0 TO dbSpZahl(s, t) - 1
         ARRAY_PUSH(spalten, dbQ$(dbSp$(s, t, k, "name")))
@@ -637,7 +913,7 @@ FUNCTION dbZeilenLesen$(e AS Element, tabelle AS STRING, grenze AS INTEGER) AS S
         db = DB_OPEN(p)
         DIM rz AS DB_RESULT : rz = DB_QUERY(db, "SELECT COUNT(*) FROM " + dbQ$(tabelle))
         IF DB_NEXT(rz) THEN dbGesamt = DB_GET_INT(rz, 0)
-        DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT " + JOIN$(spalten, ", ") + " FROM " + dbQ$(tabelle) + " ORDER BY id LIMIT " + STR$(grenze))
+        DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT " + JOIN$(spalten, ", ") + " FROM " + dbQ$(tabelle) + " ORDER BY rowid LIMIT " + STR$(grenze))
         WHILE DB_NEXT(r)
             ARRAY_PUSH(dbIds, DB_GET_INT(r, 0))
             FOR k = 0 TO dbSpZahl(s, t) - 1
@@ -673,7 +949,7 @@ FUNCTION dbZelleSetzen$(e AS Element, tabelle AS STRING, id AS INTEGER, spalte A
         lit = dbLiteral$(typ, text)
         IF lit = "" THEN RETURN trf$("'{0}' passt nicht zu {1} ({2}).", [text, spalte, dbTypName$(typ)])
     END IF
-    DIM sql AS STRING : sql = "UPDATE " + dbQ$(tabelle) + " SET " + dbQ$(spalte) + " = ? WHERE id = ?"
+    DIM sql AS STRING : sql = "UPDATE " + dbQ$(tabelle) + " SET " + dbQ$(spalte) + " = ? WHERE rowid = ?"
     DIM fehler AS STRING : fehler = ""
     DIM db AS DB_CONN
     TRY
@@ -730,7 +1006,7 @@ FUNCTION dbBildSetzen$(e AS Element, tabelle AS STRING, id AS INTEGER, spalte AS
     ELSEIF dbSpAn(s, t, k, "pflicht") THEN
         RETURN trf$("{0} ist ein Pflichtfeld.", [spalte])
     END IF
-    DIM sql AS STRING : sql = "UPDATE " + dbQ$(tabelle) + " SET " + dbQ$(spalte) + " = ? WHERE id = ?"
+    DIM sql AS STRING : sql = "UPDATE " + dbQ$(tabelle) + " SET " + dbQ$(spalte) + " = ? WHERE rowid = ?"
     DIM fehler AS STRING : fehler = ""
     DIM db AS DB_CONN
     TRY
@@ -785,7 +1061,7 @@ FUNCTION dbZeileLoeschen$(e AS Element, tabelle AS STRING, id AS INTEGER) AS STR
     DIM db AS DB_CONN
     TRY
         db = DB_OPEN(p)
-        DB_EXEC(db, "DELETE FROM " + dbQ$(tabelle) + " WHERE id = ?", id)
+        DB_EXEC(db, "DELETE FROM " + dbQ$(tabelle) + " WHERE rowid = ?", id)
     CATCH dfehler
         fehler = dbMeldung$(dfehler)
     END TRY
@@ -830,6 +1106,26 @@ FUNCTION datenbankCode$() AS STRING
             ARRAY_PUSH(z, "        END IF")
             ARRAY_PUSH(z, "    WEND")
             ARRAY_PUSH(z, "    DB_EXEC(db, " + dbText$("ALTER TABLE " + CHR$(34)) + " + tabelle + " + dbText$(CHR$(34) + " ADD COLUMN ") + " + def)")
+            ARRAY_PUSH(z, "END SUB")
+            ARRAY_PUSH(z, "")
+            ARRAY_PUSH(z, "' Eindeutig: ein eigener Index -- ausser die Datei hat die Spalte schon allein")
+            ARRAY_PUSH(z, "' eindeutig (UNIQUE in CREATE TABLE).")
+            ARRAY_PUSH(z, "SUB studioDbEindeutig(db AS DB_CONN, tabelle AS STRING, spalte AS STRING)")
+            ARRAY_PUSH(z, "    DIM namen AS ARRAY OF STRING : namen = []")
+            ARRAY_PUSH(z, "    DIM r AS DB_RESULT : r = DB_QUERY(db, " + dbText$("PRAGMA index_list(" + CHR$(34)) + " + tabelle + " + dbText$(CHR$(34) + ")") + ")")
+            ARRAY_PUSH(z, "    WHILE DB_NEXT(r)")
+            ARRAY_PUSH(z, "        IF DB_GET_INT(r, 2) <> 0 AND DB_GET_INT(r, 4) = 0 AND LEFT$(DB_GET_STRING(r, 1), " + STR$(LEN(DB_INDEX_VOR)) + ") <> " + dbText$(DB_INDEX_VOR) + " THEN ARRAY_PUSH(namen, DB_GET_STRING(r, 1))")
+            ARRAY_PUSH(z, "    WEND")
+            ARRAY_PUSH(z, "    DIM n AS STRING")
+            ARRAY_PUSH(z, "    FOR EACH n IN namen")
+            ARRAY_PUSH(z, "        DIM sp AS ARRAY OF STRING : sp = []")
+            ARRAY_PUSH(z, "        r = DB_QUERY(db, " + dbText$("PRAGMA index_info(" + CHR$(34)) + " + n + " + dbText$(CHR$(34) + ")") + ")")
+            ARRAY_PUSH(z, "        WHILE DB_NEXT(r)")
+            ARRAY_PUSH(z, "            ARRAY_PUSH(sp, IIF(DB_IS_NULL(r, 2), " + dbText$("") + ", LOWER$(DB_GET_STRING(r, 2))))")
+            ARRAY_PUSH(z, "        WEND")
+            ARRAY_PUSH(z, "        IF LEN(sp) = 1 AND sp[0] = LOWER$(spalte) THEN RETURN")
+            ARRAY_PUSH(z, "    NEXT")
+            ARRAY_PUSH(z, "    DB_EXEC(db, " + dbText$("CREATE UNIQUE INDEX IF NOT EXISTS " + CHR$(34) + DB_INDEX_VOR) + " + LOWER$(tabelle) + " + dbText$("_") + " + LOWER$(spalte) + " + dbText$(CHR$(34) + " ON " + CHR$(34)) + " + tabelle + " + dbText$(CHR$(34) + " (" + CHR$(34)) + " + spalte + " + dbText$(CHR$(34) + ")") + ")")
             ARRAY_PUSH(z, "END SUB")
             ARRAY_PUSH(z, "")
             ARRAY_PUSH(z, "' Was im Studio umbenannt wurde, auch in einer aelteren Datei umbenennen --")
@@ -1007,10 +1303,10 @@ FUNCTION datenbankCode$() AS STRING
             ARRAY_PUSH(z, "DB_EXEC(" + e.name + ", " + dbText$(dbTabelleSql$(s, t, tn)) + ")")
             DIM k AS INTEGER
             FOR k = 0 TO dbSpZahl(s, t) - 1
-                ARRAY_PUSH(z, "studioDbSpalte(" + e.name + ", " + dbText$(tn) + ", " + dbText$(dbSp$(s, t, k, "name")) + ", " + dbText$(dbSpalteSql$(s, t, k)) + ")")
+                ARRAY_PUSH(z, "studioDbSpalte(" + e.name + ", " + dbText$(tn) + ", " + dbText$(dbSp$(s, t, k, "name")) + ", " + dbText$(dbSpalteSqlDazu$(s, t, k)) + ")")
             NEXT
             FOR k = 0 TO dbSpZahl(s, t) - 1
-                IF dbSpAn(s, t, k, "eindeutig") THEN ARRAY_PUSH(z, "DB_EXEC(" + e.name + ", " + dbText$(dbIndexSql$(tn, dbSp$(s, t, k, "name"))) + ")")
+                IF dbSpAn(s, t, k, "eindeutig") THEN ARRAY_PUSH(z, "studioDbEindeutig(" + e.name + ", " + dbText$(tn) + ", " + dbText$(dbSp$(s, t, k, "name")) + ")")
             NEXT
         NEXT
     NEXT
@@ -1725,14 +2021,48 @@ FUNCTION dbSpalteVerweis$(e AS Element, tabelle AS STRING, name AS STRING, ziel 
     DIM p AS STRING : p = dbSpPfad$(t, k)
     IF ziel = "" THEN
         IF JSON_HAS(s, p + ".verweis") THEN JSON_REMOVE(s, p + ".verweis")
+        ' Ohne Ziel kein Fremdschluessel mehr -- ausdruecklich, damit der
+        ' Abgleich einen vorhandenen aus der Datei nimmt.
+        JSON_SET_STRING(s, p + ".beimLoeschen", "")
     ELSE
         DIM zt AS INTEGER : zt = dbTabIndex(s, ziel)
         IF zt < 0 THEN RETURN trf$("Die Tabelle {0} gibt es nicht.", [ziel])
         JSON_SET_STRING(s, p + ".verweis", dbTabName$(s, zt))
         ' Ein Verweis haelt eine id -- eine ganze Zahl.
         JSON_SET_STRING(s, p + ".typ", "ganz")
+        IF NOT JSON_HAS(s, p + ".beimLoeschen") THEN JSON_SET_STRING(s, p + ".beimLoeschen", "")
     END IF
     RETURN dbAusfuehren$(e, JSON_STRINGIFY(s), [])
+END FUNCTION
+
+' Was mit einer Zeile geschieht, wenn die Zeile geloescht wird, auf die ihr
+' Verweis zeigt ("", "verbieten", "loeschen", "leeren"; siehe dbFkSql$).
+FUNCTION dbSpalteBeimLoeschen$(e AS Element, tabelle AS STRING, name AS STRING, wert AS STRING) AS STRING
+    IF ARRAY_INDEXOF(["", "verbieten", "loeschen", "leeren"], wert) < 0 THEN RETURN trf$("„{0}“ ist keine Wahl -- möglich sind verbieten, loeschen und leeren.", [wert])
+    DIM s AS JSON_HANDLE : s = dbSchema(e)
+    DIM t AS INTEGER : t = dbTabIndex(s, tabelle)
+    IF t < 0 THEN RETURN trf$("Die Tabelle {0} gibt es nicht.", [tabelle])
+    DIM k AS INTEGER : k = dbSpIndex(s, t, name)
+    IF k < 0 THEN RETURN trf$("Die Spalte {0} gibt es nicht.", [name])
+    IF wert <> "" AND dbSp$(s, t, k, "verweis") = "" THEN RETURN trf$("Die Spalte {0} verweist auf nichts -- erst unter „Verweis auf“ eine Tabelle wählen.", [name])
+    IF wert = "leeren" AND dbSpAn(s, t, k, "pflicht") THEN RETURN trf$("Die Spalte {0} ist Pflicht -- leeren geht nur ohne.", [name])
+    JSON_SET_STRING(s, dbSpPfad$(t, k) + ".beimLoeschen", wert)
+    RETURN dbAusfuehren$(e, JSON_STRINGIFY(s), [])
+END FUNCTION
+
+' Die Wahl im Spalten-Gitter und ihr Wert.
+FUNCTION dbLoeschenNamen() AS ARRAY OF STRING
+    RETURN ["", tr$("verbieten"), tr$("mitlöschen"), tr$("leeren")]
+END FUNCTION
+
+FUNCTION dbLoeschenName$(wert AS STRING) AS STRING
+    DIM i AS INTEGER : i = ARRAY_INDEXOF(["", "verbieten", "loeschen", "leeren"], wert)
+    RETURN dbLoeschenNamen()[MAX(0, i)]
+END FUNCTION
+
+FUNCTION dbLoeschenWert$(name AS STRING) AS STRING
+    DIM i AS INTEGER : i = ARRAY_INDEXOF(dbLoeschenNamen(), name)
+    RETURN ["", "verbieten", "loeschen", "leeren"][MAX(0, i)]
 END FUNCTION
 
 ' Was eine Klappliste mit Verweis zeigt: die erste Textspalte der

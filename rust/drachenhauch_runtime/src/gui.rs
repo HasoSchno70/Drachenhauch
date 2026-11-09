@@ -46,6 +46,7 @@ const KEY_ESC: i64 = 27;
 const KEY_PAGEUP: i64 = 1073741899;
 const KEY_PAGEDOWN: i64 = 1073741902;
 const KEY_F2: i64 = 1073741883;
+const KEY_F4: i64 = 1073741885;
 const K_A: i64 = 97;
 const K_B: i64 = 98;
 const K_I: i64 = 105;
@@ -392,8 +393,11 @@ fn widget_nimmt_taste(w: &Widget, code: i64) -> bool {
     const BEWEGEN: [i64; 8] = [1073741903, 1073741904, 1073741905, 1073741906,
                                1073741898, 1073741901, 1073741899, 1073741902];
     let k = w.kind;
+    // Kaestchen, Schalter und Radio nehmen nur die Leertaste -- Enter gehoert
+    // dort dem Standard-Knopf (wie unter Windows, macOS, Qt und im Web).
+    if code == 32 && matches!(k, Kind::Checkbox | Kind::Radio | Kind::Toggle) { return true; }
     if AUSLOESEN.contains(&code) {
-        return matches!(k, Kind::Button | Kind::Card | Kind::Checkbox | Kind::Radio | Kind::Toggle
+        return matches!(k, Kind::Button | Kind::Card
             | Kind::Dropdown | Kind::ListBox | Kind::Tree | Kind::Table | Kind::Accordion
             | Kind::TabControl | Kind::DatePicker | Kind::ColorPicker | Kind::TimePicker);
     }
@@ -1303,6 +1307,7 @@ impl TableState {
             1 => s.parse::<i64>().is_ok(),
             2 => s.replace(',', ".").parse::<f64>().is_ok(),
             3 => self.col_wahl.get(c).map(|w| w.iter().any(|x| x == s)).unwrap_or(false),
+            4 => crate::kalender::parse(s).is_some(),
             _ => true,
         }
     }
@@ -1801,6 +1806,9 @@ struct TabCtlState {
     /// (`zu`, ein Bild lang), welcher Reiter zu soll.
     schliessbar: bool,
     zu: Option<usize>,
+    /// Gemessene Breite jeder Beschriftung (Schirmpunkte, `leisten_pass`);
+    /// leer oder 0 = noch nicht gemessen, dann gilt die Schaetzung.
+    breiten: Vec<i32>,
 }
 
 /// Akkordeon (Kind::Accordion): Abschnitte untereinander, jeder mit einem
@@ -3171,6 +3179,10 @@ pub struct Widget {
     datum_min: Option<[i32; 3]>,
     datum_max: Option<[i32; 3]>,
     wochenbeginn: i32,
+    /// Datumsfeld (GUI_DATEFIELD): ein Feld mit dem Datum, das den Monat zum
+    /// Waehlen aufklappt -- statt des Monatsgitters im Fenster (wie QDateEdit
+    /// mit Kalender).
+    kompakt: bool,
     // Ausrichtung des Textes: -1 = Vorgabe der Art (Beschriftung und Textfeld
     // links, Knopf mittig), 0 links, 1 mitte, 2 rechts.
     align: i8,
@@ -3252,6 +3264,11 @@ pub struct Window {
     /// das Fenster bekommt dort keine Eingabe, also muss nur GUI_HIT_TEST
     /// (und wo ein Fenster liegt) die Mauslage zurueckrechnen.
     zoom: f32,
+    /// Zuschnitt auf dem Schirm (GUI_WINDOW_CLIP), nur im Entwurfsmodus: was
+    /// draussen liegt, wird nicht gezeichnet und trifft keinen Klick -- das
+    /// Studio haelt so ein grosses Entwurfsfenster in seiner Mitte, statt es
+    /// ueber Inspektor und Ausgabe zu legen.
+    zuschnitt: Option<(i32, i32, i32, i32)>,
     chrome: bool,                    // Titelleiste + Rahmen + Buttons? (aus = randlos,
                                      //   z.B. wenn die Form das OS-Fenster fuellt)
     min_w: i32, min_h: i32,          // Groessen-Grenzen (0 = keine)
@@ -3568,6 +3585,17 @@ pub struct Gui {
     // das ist der ganze Sinn von "modal": die Frage muss beantwortet werden,
     // bevor daneben weitergeklickt wird.
     modal: Option<usize>,
+    // Was vorher modal war: ein Dialog ueber einem modalen Fenster (Frage im
+    // Detailfenster) gibt bei seiner Antwort das Fenster darunter wieder
+    // frei -- vorher fiel die Modalitaet ganz weg, und das Fenster verlor mit
+    // ihr Enter und ESC (Standard- und Abbrechen-Knopf).
+    modal_vorher: Vec<usize>,
+    // Der Tastaturfokus, den ein modales Fenster beim Aufgehen vorfand: es
+    // nimmt ihn einem Widget in einem anderen Fenster weg und gibt ihn beim
+    // Gehen zurueck. Vorher blieb er auf der Tabelle dahinter, und Enter
+    // oeffnete dort per "Doppelklick" das naechste Fenster, statt den
+    // Standard-Knopf des modalen zu druecken (Kuehlschrank-App, Rezepte).
+    modal_fokus: Vec<(usize, Option<(usize, usize)>)>,
     // Gezogener Farbwaehler: (Fenster, Widget, Zone). Zone ist 0 = Farbfeld,
     // 1 = Ton-Streifen, 2 = Deckkraft-Streifen. Gemerkt wird sie, weil man
     // beim Suchen einer Farbe fast immer ueber den Rand hinauszieht -- ohne
@@ -3590,6 +3618,12 @@ pub struct Gui {
     active_split: Option<(usize, usize)>,    // laufendes Splitter-Drag
     split_off: i32,                          // Griff-Versatz (Maus -> Balkenkante)
     open_dropdown: Option<(usize, usize)>,   // gerade aufgeklapptes Dropdown
+    /// Aufgeklappter Monat: (Fenster, Widget, Zelle). Zelle = FALSE: ein
+    /// Datumsfeld; TRUE: die Zelle einer Datumsspalte, die gerade bearbeitet
+    /// wird (das Widget ist die Tabelle).
+    datum_auf: Option<(usize, usize, bool)>,
+    /// Der Tag, der im aufgeklappten Monat markiert ist (noch nicht gewaehlt).
+    datum_zeigt: [i32; 3],
     // Bearbeitbare Klappliste: steht die Markierung, weil jemand mit den
     // Pfeilen dorthin ging? Nur dann nimmt Enter den Eintrag -- ein beim
     // Tippen VORGESCHLAGENER Eintrag ersetzte sonst, was man getippt hat.
@@ -3772,13 +3806,13 @@ impl Gui {
             schrift: None,
             windows: Vec::new(), z_order: Vec::new(),
             ta_zerlegung: std::cell::RefCell::new(HashMap::new()),
-            focus_window: None, focus_widget: None, modal: None, cp_drag: None,
+            focus_window: None, focus_widget: None, modal: None, modal_vorher: Vec::new(), modal_fokus: Vec::new(), cp_drag: None,
             drag_window: None, drag_dx: 0, drag_dy: 0,
             resize_window: None, resize_dx: 0, resize_dy: 0,
             skins: HashMap::new(),
             active_slider: None,
             active_knob: None, active_split: None, split_off: 0,
-            open_dropdown: None, dd_auf_t: 0.0, dd_auf_von: None, dd_mark: -1, dd_pfeil: false, dd_scroll: 0, dd_tipp: String::new(), dd_tipp_zeit: 0.0, schirm_h: 0, schirm_b: 0, listbar_zug: None, tabar_zug: None, liste_taste: false, spin_edit: None, active_table: None, table_press: None, press_origin: None,
+            open_dropdown: None, datum_auf: None, datum_zeigt: [2000, 1, 1], dd_auf_t: 0.0, dd_auf_von: None, dd_mark: -1, dd_pfeil: false, dd_scroll: 0, dd_tipp: String::new(), dd_tipp_zeit: 0.0, schirm_h: 0, schirm_b: 0, listbar_zug: None, tabar_zug: None, liste_taste: false, spin_edit: None, active_table: None, table_press: None, press_origin: None,
             drag: None, drop: None, cursors: true,
             editing_table: None, last_click: None, dbl_click: false,
             open_menu: None, context_open: None, kontext_neu: None, rs_menue: None, sub_chain: Vec::new(), tasten_mod: (false, false),
@@ -3897,7 +3931,7 @@ impl Gui {
         let idx = self.windows.len();
         self.windows.push(Window {
             title, name: String::new(), x, y, w, h, widgets: Vec::new(),
-            movable: true, closable: false, visible: true, entwurf: false, zoom: 1.0,
+            movable: true, closable: false, visible: true, entwurf: false, zoom: 1.0, zuschnitt: None,
             resizable: false, pruefung_live: false, form_stand: Vec::new(), form_db: Vec::new(), chrome: true, min_w: 0, min_h: 0, max_w: 0, max_h: 0,
             base_w: w, base_h: h,
             close_clicked: false, alive: true, dlg: false, answer: 0,
@@ -3998,7 +4032,7 @@ impl Gui {
             win.default_btn = erster as i32;
             win.cancel_btn = letzter as i32;
         }
-        self.modal = Some(wi);
+        self.modal_setzen(wi);
         self.bring_to_front(wi);
         self.focus_window = Some(wi);
         // Fokus auf das Eingabefeld, sonst auf den ersten Knopf: der Dialog
@@ -4027,13 +4061,52 @@ impl Gui {
         }
         if an {
             if self.windows[wi].dlg { return Err("GUI_WINDOW_MODAL: ein Dialog ist schon modal".into()); }
-            self.modal = Some(wi);
+            self.modal_setzen(wi);
             self.bring_to_front(wi);
             self.focus_window = Some(wi);
         } else if self.modal == Some(wi) {
-            self.modal = None;
+            self.modal_loesen();
+        } else {
+            self.modal_vorher.retain(|&m| m != wi);
         }
         Ok(())
+    }
+
+    /// Ein Fenster wird modal; was es vorher war, kommt auf den Stapel.
+    fn modal_setzen(&mut self, wi: usize) {
+        if let Some(m) = self.modal {
+            if m != wi { self.modal_vorher.push(m); }
+        }
+        self.modal_vorher.retain(|&m| m != wi);
+        self.modal = Some(wi);
+        if !self.modal_fokus.iter().any(|(m, _)| *m == wi) {
+            self.modal_fokus.push((wi, self.focus_widget));
+        }
+        if self.focus_widget.map_or(false, |(w, _)| w != wi) { self.focus_widget = None; }
+    }
+
+    /// Das modale Fenster geht: das vorige, das noch steht, ist es wieder,
+    /// und der Fokus, den das gehende vorfand, kommt zurueck.
+    fn modal_loesen(&mut self) {
+        let geht = self.modal.take();
+        while let Some(m) = self.modal_vorher.pop() {
+            if self.windows.get(m).map(|w| w.alive && w.visible).unwrap_or(false) {
+                self.modal = Some(m);
+                self.focus_window = Some(m);
+                break;
+            }
+        }
+        if let Some(g) = geht {
+            if let Some(k) = self.modal_fokus.iter().rposition(|(m, _)| *m == g) {
+                let (_, vorher) = self.modal_fokus.remove(k);
+                let lebt = vorher.map_or(false, |(w, i)| self.windows.get(w)
+                    .map_or(false, |win| win.alive && win.visible && win.widgets.get(i).map_or(false, |x| x.alive && x.visible)));
+                let erlaubt = vorher.map_or(false, |(w, _)| self.modal.map_or(true, |m| m == w));
+                if self.focus_widget.map_or(true, |(w, _)| w == g || !self.windows.get(w).map_or(false, |x| x.alive)) {
+                    self.focus_widget = if lebt && erlaubt { vorher } else { None };
+                }
+            }
+        }
     }
 
     /// Antwort eines Dialogs: 0 = noch offen, 1 = OK/Ja, 2 = Abbrechen/Nein.
@@ -4074,6 +4147,19 @@ impl Gui {
         let (j, m, t, _, _, _) = crate::builtins::local_datetime();
         wd.datum = [j as i32, m as i32, t as i32];
         self.add_widget(win, "GUI_DATEPICKER", wd)
+    }
+
+    /// Datumsfeld: zeigt das Datum und klappt beim Klick (Leertaste, F4,
+    /// Alt+Ab) den Monat auf -- ein Tag uebernimmt und klappt zu, ESC klappt
+    /// nur zu, die Pfeile verstellen es auch zugeklappt. Sonst ein
+    /// GUI_DATEPICKER: GUI_DATE, GUI_SET_DATE, GUI_DATE_RANGE gelten.
+    pub fn datefield(&mut self, win: i64, x: i32, y: i32, w: i32, h: i32)
+                     -> Result<i64, String> {
+        let mut wd = Self::blank(Kind::DatePicker, x, y, w.max(90), h.max(20));
+        let (j, m, t, _, _, _) = crate::builtins::local_datetime();
+        wd.datum = [j as i32, m as i32, t as i32];
+        wd.kompakt = true;
+        self.add_widget(win, "GUI_DATEFIELD", wd)
     }
 
     pub fn picked_color(&self, h: i64) -> Result<i64, String> {
@@ -4829,7 +4915,7 @@ impl Gui {
             tab_meldet: false, tab_treffer: false,
             spalten_start: (-1, -1),
             hsv: [0.0, 1.0, 1.0], alpha: 255, alpha_an: false,
-            datum: [2000, 1, 1], datum_min: None, datum_max: None, wochenbeginn: 0,
+            datum: [2000, 1, 1], datum_min: None, datum_max: None, wochenbeginn: 0, kompakt: false,
             zeit: [12, 0, 0], zeit_sek: false,
             step: 1.0,
             align: -1, wrap: false, passwort: false, nur_lesen: false, maxlaenge: 0, zahlen: 0, frei: false,
@@ -4998,8 +5084,36 @@ impl Gui {
     fn sicht_rect(&self, wi: usize) -> (i32, i32, i32, i32) {
         let w = &self.windows[wi];
         let z = self.zoom_von(wi);
-        if z == 1.0 { return (w.x, w.y, w.w, w.h); }
-        (w.x, w.y, (w.w as f32 * z).round() as i32, (w.h as f32 * z).round() as i32)
+        let r = if z == 1.0 { (w.x, w.y, w.w, w.h) }
+                else { (w.x, w.y, (w.w as f32 * z).round() as i32, (w.h as f32 * z).round() as i32) };
+        match self.zuschnitt_von(wi) {
+            Some(c) => Self::schnitt(r, c),
+            None => r,
+        }
+    }
+    fn zuschnitt_von(&self, wi: usize) -> Option<(i32, i32, i32, i32)> {
+        let w = &self.windows[wi];
+        if w.entwurf { w.zuschnitt } else { None }
+    }
+    /// Die Schnittmenge zweier Rechtecke (x, y, b, h); leer = Breite/Hoehe 0.
+    fn schnitt(a: (i32, i32, i32, i32), b: (i32, i32, i32, i32)) -> (i32, i32, i32, i32) {
+        let x = a.0.max(b.0);
+        let y = a.1.max(b.1);
+        let x2 = (a.0 + a.2).min(b.0 + b.2);
+        let y2 = (a.1 + a.3).min(b.1 + b.3);
+        (x, y, (x2 - x).max(0), (y2 - y).max(0))
+    }
+    /// GUI_WINDOW_CLIP(win, x, y, b, h): nur dieser Teil des Schirms zeigt das
+    /// Fenster (logische Punkte wie GUI_WINDOW_SET_BOUNDS); b oder h <= 0 hebt
+    /// den Zuschnitt auf. Wie GUI_WINDOW_ZOOM nur im Entwurfsmodus -- ein
+    /// Fenster, das Eingaben nimmt, bekaeme sonst Tasten fuer Felder, die
+    /// niemand sieht.
+    pub fn window_clip(&mut self, h: i64, x: i32, y: i32, b: i32, ht: i32) -> Result<(), String> {
+        let r = (self.sk(x), self.sk(y), self.sk(b), self.sk(ht));
+        let w = self.win_mut(h, "GUI_WINDOW_CLIP")?;
+        if !w.entwurf { return Err("GUI_WINDOW_CLIP: nur fuer ein Fenster im Entwurfsmodus (GUI_WINDOW_DESIGN)".into()); }
+        w.zuschnitt = if b > 0 && ht > 0 { Some(r) } else { None };
+        Ok(())
     }
     /// Ein Schirmpunkt in die (unvergroesserten) Koordinaten des Fensters.
     fn ins_fenster(&self, wi: usize, mx: i32, my: i32) -> (i32, i32) {
@@ -5012,12 +5126,16 @@ impl Gui {
     /// einen Faktor hat.
     fn draw_window_sicht(&self, g: &mut Graphics, wi: usize) {
         let z = self.zoom_von(wi);
+        let clip = self.zuschnitt_von(wi);
         if z != 1.0 && g.zoom_beginnen() {
             self.draw_window(g, wi);
             let w = &self.windows[wi];
-            g.zoom_beenden(w.x, w.y, w.w, w.h, z);
+            // Zugeschnitten wird erst beim Uebertragen auf den Schirm.
+            g.zoom_beenden(w.x, w.y, w.w, w.h, z, clip);
         } else {
+            if let Some((x, y, b, h)) = clip { g.push_clip(x, y, b, h); }
             self.draw_window(g, wi);
+            if clip.is_some() { g.pop_clip(); }
         }
     }
 
@@ -5864,6 +5982,20 @@ impl Gui {
     /// GUI_LISTBOX_CLEAR(lb)
     pub fn list_clear(&mut self, h: i64) -> Result<(), String> {
         self.set_dropdown_items(h, Vec::new())
+    }
+    /// GUI_DROPDOWN_COUNT / GUI_DROPDOWN_ITEM: die Eintraege einer
+    /// Klappliste lesen. Die Liste-Befehle konnten es schon, aber unter dem
+    /// Namen der Klappliste suchte man vergeblich (gefunden mit der
+    /// Kuehlschrank-App: welche Vorschlaege stehen gerade darin?).
+    pub fn dropdown_count(&self, h: i64) -> Result<i64, String> {
+        let w = self.wdg(h, "GUI_DROPDOWN_COUNT")?;
+        if w.kind != Kind::Dropdown { return Err("GUI_DROPDOWN_COUNT: Widget ist keine Klappliste".into()); }
+        Ok(w.items.len() as i64)
+    }
+    pub fn dropdown_item(&self, h: i64, i: i64) -> Result<String, String> {
+        let w = self.wdg(h, "GUI_DROPDOWN_ITEM")?;
+        if w.kind != Kind::Dropdown { return Err("GUI_DROPDOWN_ITEM: Widget ist keine Klappliste".into()); }
+        Ok(w.items[Self::list_idx(w, i, "GUI_DROPDOWN_ITEM")?].clone())
     }
     /// GUI_LISTBOX_COUNT(lb)
     pub fn list_count(&self, h: i64) -> Result<i64, String> {
@@ -6886,7 +7018,8 @@ zellmodus, zeilen_anhaengen", key)),
             "ganz" | "ganzzahl" | "int" | "integer" => 1,
             "zahl" | "float" | "number" => 2,
             "auswahl" | "liste" | "choice" => 3,
-            _ => return Err(format!("GUI_TABLE_COL_TYPE: '{}' unbekannt -- text, ganz, zahl, auswahl", art)),
+            "datum" | "date" => 4,
+            _ => return Err(format!("GUI_TABLE_COL_TYPE: '{}' unbekannt -- text, ganz, zahl, auswahl, datum", art)),
         };
         let t = self.tbl_mut(h, "GUI_TABLE_COL_TYPE")?;
         if !(0..1000).contains(&c) { return Err(format!("GUI_TABLE_COL_TYPE: Spalte {} ausserhalb 0..999", c)); }
@@ -8142,17 +8275,43 @@ zellmodus, zeilen_anhaengen, spalten", key)),
 
     /// Die Koepfe eines Reiterwerks: (Seite, x links, x rechts), absolut.
     ///
-    /// EINE Quelle fuer Zeichnen und Treffertest. Die Breite wird an der
-    /// ZEICHENZAHL geschaetzt, nicht gemessen -- der Treffertest laeuft in
-    /// `handle_press`, und dort gibt es keine Grafik. Eine zweite, genauere
-    /// Rechnung beim Zeichnen waere der sicherste Weg, Klick und Beschriftung
-    /// auseinander laufen zu lassen.
-    fn tc_koepfe(&self, ax: i32, wdg: &Widget) -> Vec<(usize, i32, i32)> {
+    /// EINE Quelle fuer Zeichnen, Treffertest und GUI_TABCONTROL_ITEM_RECT.
+    /// Die Breite der Beschriftung misst `leisten_pass` je Bild (wie bei der
+    /// Werkzeugleiste) -- der Treffertest in `handle_press` hat keine Grafik.
+    /// Vor der ersten Messung gilt eine Schaetzung an der Zeichenzahl; die war
+    /// frueher die einzige und zu knapp: bei "Lagerorte" lief der Text in den
+    /// naechsten Kopf (gefunden mit der Kuehlschrank-App).
+    /// Die Koepfe eines Reiterwerks (Seite, x0, x1). Passen sie nicht in
+    /// `breite`, werden die breitesten zuerst schmaler (ihr Titel endet dann
+    /// mit "…", `tc_titel`) -- vorher lagen Koepfe jenseits des Rands, eine
+    /// Seite war mit der Maus nicht zu erreichen (Kuehlschrank-App,
+    /// Einstellungen mit sechs Reitern).
+    fn tc_koepfe(&self, ax: i32, breite: i32, wdg: &Widget) -> Vec<(usize, i32, i32)> {
         let mut x = ax;
         let mut out = Vec::new();
         let kreuz = if Self::tc_schliessbar(wdg) { self.sk(16) } else { 0 };
-        for (i, t) in wdg.items.iter().enumerate() {
-            let b = self.sk(8) * t.chars().count() as i32 + self.sk(20) + kreuz;
+        let pad = self.sk(20) + kreuz;
+        let breiten = wdg.tabctl.as_ref().map(|s| s.breiten.as_slice()).unwrap_or(&[]);
+        let mut tws: Vec<i32> = wdg.items.iter().enumerate().map(|(i, t)| match breiten.get(i) {
+            Some(&b) if b > 0 => b,
+            _ => self.sk(8) * t.chars().count() as i32,
+        }).collect();
+        let n = tws.len() as i32;
+        if breite > 0 && n > 0 {
+            let natur: i32 = tws.iter().sum::<i32>() + n * pad + 2 * (n - 1);
+            if natur > breite {
+                let platz = (breite - n * pad - 2 * (n - 1)).max(n * self.sk(16));
+                // Die groesste Kappe, unter der alles in den Platz passt.
+                let (mut lo, mut hi) = (self.sk(16), *tws.iter().max().unwrap_or(&0));
+                while lo < hi {
+                    let mitte = (lo + hi + 1) / 2;
+                    if tws.iter().map(|&t| t.min(mitte)).sum::<i32>() <= platz { lo = mitte; } else { hi = mitte - 1; }
+                }
+                for t in tws.iter_mut() { *t = (*t).min(lo); }
+            }
+        }
+        for (i, tw) in tws.into_iter().enumerate() {
+            let b = tw + pad;
             out.push((i, x, x + b));
             x += b + 2;
         }
@@ -8163,9 +8322,13 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     fn leisten_pass(&mut self, g: &Graphics) {
         let mut messung: Vec<(usize, usize, usize, i32)> = Vec::new();
         let mut pfade: Vec<(usize, usize, Vec<i32>)> = Vec::new();
+        let mut koepfe: Vec<(usize, usize, Vec<i32>)> = Vec::new();
         for (wi, win) in self.windows.iter().enumerate() {
             if !win.alive { continue; }
             for (i, w) in win.widgets.iter().enumerate() {
+                if w.kind == Kind::TabControl && !w.items.is_empty() {
+                    koepfe.push((wi, i, w.items.iter().map(|t| self.wtext_width(g, w, t)).collect()));
+                }
                 if let Some(p) = w.pfad.as_ref() {
                     pfade.push((wi, i, p.texte.iter().map(|t| self.wtext_width(g, w, t)).collect()));
                 }
@@ -8180,6 +8343,9 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         }
         for (wi, i, b) in pfade {
             if let Some(p) = self.windows[wi].widgets[i].pfad.as_mut() { p.breiten = b; }
+        }
+        for (wi, i, b) in koepfe {
+            self.windows[wi].widgets[i].tabctl.get_or_insert_with(Default::default).breiten = b;
         }
         for (wi, i, k, b) in messung {
             if let Some(e) = self.windows[wi].widgets[i].leiste.as_mut().and_then(|l| l.eintraege.get_mut(k)) {
@@ -8295,6 +8461,25 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         }
         let row = (my - (ay + 1) + t.scroll) / zeile_h;
         t.hover = if row >= 0 && (row as usize) < vis.len() { vis[row as usize] as i32 } else { -1 };
+    }
+
+    /// GUI_TABCONTROL_ITEM_RECT: wo der Kopf einer Seite auf dem Bildschirm
+    /// steht (x, y, b, h), in Bildschirmpunkten wie GUI_HIT_TEST -- aus
+    /// `tc_koepfe`, derselben Rechnung wie Zeichnen und Klick. Gebraucht fuer
+    /// Pruefungen mit echten Klicks (das Studio protokolliert damit seine
+    /// Reiter).
+    pub fn tabcontrol_item_rect(&self, h: i64, seite: i64) -> Result<(i32, i32, i32, i32), String> {
+        let w = self.wdg(h, "GUI_TABCONTROL_ITEM_RECT")?;
+        if w.kind != Kind::TabControl {
+            return Err("GUI_TABCONTROL_ITEM_RECT: Widget ist kein Reiterwerk".into());
+        }
+        if seite < 0 || seite as usize >= w.items.len() {
+            return Err(format!("GUI_TABCONTROL_ITEM_RECT: Seite {} ausserhalb [0..{}]", seite, w.items.len() as i64 - 1));
+        }
+        let (wi, _) = Self::dec_widget(h);
+        let (ax, ay, bw, _) = self.abs_rect(wi, w);
+        let (_, x0, x1) = self.tc_koepfe(ax, bw, w)[seite as usize];
+        Ok((x0, ay + 2, x1 - x0, self.sk(TC_KOPF_H) - 2))
     }
 
     /// GUI_TREE_ITEM_RECT: wo ein Knoten auf dem Bildschirm steht (x, y, b, h),
@@ -9521,7 +9706,13 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             // Doppelklick auf eine bearbeitbare Textzelle -> Bearbeiten.
             // Sonst ist er "oeffnen" wie bei der Liste: die Zeile wird
             // gewaehlt, und GUI_DOUBLE_CLICKED meldet es ein Bild lang.
-            if self.dbl_click && hc >= 0 {
+            // Nicht auf einem Knopf oder Haken in der Zelle: zweimal schnell
+            // "+1" sind zwei Klicks auf den Knopf, kein "oeffnen" der Zeile
+            // (gefunden mit der Kuehlschrank-App -- es ging der Dialog auf).
+            let bedienzelle = hc >= 0 && self.windows[wi].widgets[idx].tbl.as_ref().unwrap()
+                .cell(hr as usize, hc as usize)
+                .map(|z| matches!(z.kind, CellKind::Button | CellKind::Check)).unwrap_or(false);
+            if self.dbl_click && hc >= 0 && !bedienzelle {
                 self.table_begin_edit(wi, idx, hr, hc);
                 let bearbeitet = self.windows[wi].widgets[idx].tbl.as_ref().map(|t| t.edit_row >= 0).unwrap_or(false);
                 if bearbeitet { return; }
@@ -9562,10 +9753,27 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         // Die Tabelle braucht den Tastaturfokus, sonst landen die Zeichen im
         // Textfeld daneben.
         self.focus_widget = Some((wi, idx));
+        // Eine Datumsspalte klappt dazu den Monat auf (getippt werden darf
+        // trotzdem); er beginnt beim Datum der Zelle, sonst heute.
+        let datum = self.windows[wi].widgets[idx].tbl.as_ref()
+            .filter(|t| t.col_typ_of(c as usize) == 4)
+            .map(|t| crate::kalender::parse(&t.edit_text));
+        if let Some(d) = datum {
+            self.datum_zeigt = match d {
+                Some((j, m, t)) => [j, m, t],
+                None => {
+                    let (j, m, t, _, _, _) = crate::builtins::local_datetime();
+                    [j as i32, m as i32, t as i32]
+                }
+            };
+            self.open_dropdown = None;
+            self.datum_auf = Some((wi, idx, true));
+        }
     }
 
     /// Bearbeitung beenden. `uebernehmen` = Text in die Zelle schreiben.
     fn table_end_edit(&mut self, wi: usize, idx: usize, uebernehmen: bool) {
+        if self.datum_auf == Some((wi, idx, true)) { self.datum_auf = None; }
         let mut geaendert = false;
         {
             let t = match self.windows[wi].widgets[idx].tbl.as_mut() { Some(t) => t, None => return };
@@ -10477,7 +10685,17 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             _ => Err("GUI_VALUE: Widget ist kein slider/progress/spinner/splitter/knob".into()),
         }
     }
-    pub fn text(&self, h: i64) -> Result<String, String> { Ok(self.wdg(h, "GUI_TEXT")?.text.clone()) }
+    pub fn text(&self, h: i64) -> Result<String, String> {
+        let w = self.wdg(h, "GUI_TEXT")?;
+        // Eine Klappliste ohne Tippen zeigt ihre Auswahl -- GUI_TEXT liefert
+        // dasselbe. Vorher kam der zuletzt mit GUI_SET_TEXT gesetzte Text,
+        // auch nachdem der Nutzer etwas anderes gewaehlt hatte
+        // (Kuehlschrank-App, Standard-Einheit in den Einstellungen).
+        if w.kind == Kind::Dropdown && !w.frei {
+            return Ok(if w.sel >= 0 && (w.sel as usize) < w.items.len() { w.items[w.sel as usize].clone() } else { String::new() });
+        }
+        Ok(w.text.clone())
+    }
     pub fn set_text(&mut self, h: i64, t: String) -> Result<(), String> {
         let w = self.wdg_mut(h, "GUI_SET_TEXT")?;
         let n = t.chars().count() as i32;
@@ -10500,7 +10718,10 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         // Caret ans Ende, Selektion/Scroll zuruecksetzen (sonst zeigt das Caret
         // hinter das Ende des nun kuerzeren Textes).
         w.caret = n; w.sel_anchor = n; w.scroll = 0;
-        if w.kind == Kind::Dropdown && w.frei { dd_frei_abgleichen(w); }
+        // Eine Klappliste waehlt den Eintrag, der so heisst (Gross/klein egal),
+        // sonst keinen -- ohne Tippen gibt es nichts anderes zu zeigen. Vorher
+        // stand der Text nur im Widget: die Box zeigte weiter die alte Auswahl.
+        if w.kind == Kind::Dropdown { dd_frei_abgleichen(w); }
         // Beim gesetzten Text ist der Text die QUELLE -- sonst setzte
         // GUI_SET_TEXT dort etwas, das nie zu sehen ist.
         // Bei der Statusleiste ist der Text das ERSTE Feld -- ein Programm, das
@@ -10727,6 +10948,22 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     }
     pub fn widget_visible(&self, h: i64) -> Result<bool, String> {
         let w = self.wdg(h, "GUI_VISIBLE")?; Ok(w.alive && w.visible)
+    }
+    /// GUI_SHOWN: ist das Widget jetzt zu sehen? Anders als GUI_VISIBLE zaehlen
+    /// das Fenster, die Seite des Fensters und jeder Reiter-/Akkordeon-Behaelter
+    /// darueber mit -- eine Zeichenflaeche auf einer verdeckten Reiterseite
+    /// soll nicht zeichnen.
+    pub fn widget_gezeigt(&self, h: i64) -> Result<bool, String> {
+        let mut w = self.wdg(h, "GUI_SHOWN")?;
+        let (wi, _) = Self::dec_widget(h);
+        let win = &self.windows[wi];
+        if !win.alive || !win.visible { return Ok(false); }
+        for _ in 0..64 {
+            if !self.widget_shown(wi, w) { return Ok(false); }
+            if w.tc_von < 0 { return Ok(true); }
+            match win.widgets.get(w.tc_von as usize) { Some(tc) => w = tc, None => return Ok(true) }
+        }
+        Ok(true)
     }
     pub fn kind_name(&self, h: i64) -> Result<&'static str, String> {
         Ok(self.wdg(h, "GUI_KIND")?.kind.as_str())
@@ -11610,6 +11847,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         }
         if w.kind == Kind::DatePicker {
             o["date"] = serde_json::json!(crate::kalender::format(w.datum[0], w.datum[1], w.datum[2]));
+            if w.kompakt { o["kompakt"] = serde_json::json!(true); }
         }
         if w.anchor != 5 { o["anchor"] = serde_json::json!(Self::anchor_str(w.anchor)); }
         if let Some(l) = w.list.as_ref() {
@@ -11758,7 +11996,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             if t.zeilen_anhaengen { tj["zeilen_anhaengen"] = serde_json::json!(true); }
             if t.col_typ.iter().any(|&x| x != 0) {
                 let namen: Vec<&str> = t.col_typ.iter()
-                    .map(|&x| match x { 1 => "ganz", 2 => "zahl", 3 => "auswahl", _ => "text" }).collect();
+                    .map(|&x| match x { 1 => "ganz", 2 => "zahl", 3 => "auswahl", 4 => "datum", _ => "text" }).collect();
                 tj["col_type"] = serde_json::json!(namen);
             }
             if t.col_wahl.iter().any(|w| !w.is_empty()) { tj["col_choices"] = serde_json::json!(t.col_wahl); }
@@ -12032,6 +12270,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         if let Some(t) = wj["date"].as_str() {
             if let Some((j, m, d)) = crate::kalender::parse(t) { w.datum = [j, m, d]; }
         }
+        if kind == Kind::DatePicker && wj["kompakt"].as_bool() == Some(true) { w.kompakt = true; }
         if kind == Kind::Table {
             let mut ts = TableState::default();
             if let Some(tj) = wj.get("table") {
@@ -12105,7 +12344,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 if let Some(v) = tj["zeilen_anhaengen"].as_bool() { ts.zeilen_anhaengen = v; }
                 if let Some(a) = tj["col_type"].as_array() {
                     ts.col_typ = a.iter().map(|x| match x.as_str().unwrap_or("") {
-                        "ganz" => 1, "zahl" => 2, "auswahl" => 3, _ => 0 }).collect();
+                        "ganz" => 1, "zahl" => 2, "auswahl" => 3, "datum" => 4, _ => 0 }).collect();
                 }
                 if let Some(a) = tj["col_choices"].as_array() {
                     ts.col_wahl = a.iter().map(|w| w.as_array().map(|w| w.iter()
@@ -13371,9 +13610,9 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 let mut treffer = None;
                 for (i, w) in self.windows[top].widgets.iter().enumerate() {
                     if !Self::tc_schliessbar(w) || !self.widget_shown(top, w) { continue; }
-                    let (ax, ay, _, _) = self.abs_rect(top, w);
+                    let (ax, ay, bw, _) = self.abs_rect(top, w);
                     if my < ay || my >= ay + kopf { continue; }
-                    if let Some((k, _, _)) = self.tc_koepfe(ax, w).into_iter().find(|&(_, x0, x1)| mx >= x0 && mx < x1) {
+                    if let Some((k, _, _)) = self.tc_koepfe(ax, bw, w).into_iter().find(|&(_, x0, x1)| mx >= x0 && mx < x1) {
                         treffer = Some((i, k));
                     }
                 }
@@ -13895,7 +14134,22 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 let fok_frei = self.focus_widget.filter(|(w, _)| *w == top)
                     .and_then(|(_, i)| self.windows[top].widgets.get(i))
                     .map(|w| w.kind == Kind::Dropdown && w.frei).unwrap_or(false);
-                let enter_frei = matches!(fok, None | Some(Kind::TextInput)) || fok_frei;
+                // Ein Zahlenfeld uebernimmt Enter und gibt es weiter (spinner_keys)
+                // -- vorher blieb es dort haengen, ein Dialog mit Zahl liess sich
+                // nicht mit Enter bestaetigen (Kuehlschrank-App, MHD setzen).
+                // Ebenso ein Kaestchen, ein Schalter, ein Radio: sie schalten mit der
+                // Leertaste, Enter schickt das Formular ab. Vorher schaltete Enter
+                // das Kaestchen zurueck, das man eben angeklickt hatte, und der
+                // Dialog liess sich nicht mit Enter speichern (Kuehlschrank-App,
+                // Einstellungen).
+                // Ein zugeklapptes Datumsfeld ebenso (wie QDateEdit): Enter gilt
+                // dem Formular, aufgeklappt waehlt es den Tag.
+                let fok_datum = self.focus_widget.filter(|(w, _)| *w == top)
+                    .and_then(|(_, i)| self.windows[top].widgets.get(i))
+                    .map(|w| w.kind == Kind::DatePicker && w.kompakt).unwrap_or(false)
+                    && self.datum_auf.is_none();
+                let enter_frei = matches!(fok, None | Some(Kind::TextInput) | Some(Kind::Spinner)
+                    | Some(Kind::Checkbox) | Some(Kind::Toggle) | Some(Kind::Radio)) || fok_frei || fok_datum;
                 // Beim Umbenennen in einer Liste gehoeren Enter und ESC dem Feld.
                 let liste_edit = self.focus_widget.filter(|(w, _)| *w == top)
                     .and_then(|(_, i)| self.windows[top].widgets.get(i))
@@ -13934,7 +14188,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         // Modalitaet frei, sobald es weg oder ausgeblendet ist -- sonst
         // saesse das Programm hinter einem Schleier ohne Fenster.
         if !self.windows.get(wi).map(|w| w.alive && w.visible).unwrap_or(false) {
-            self.modal = None;
+            self.modal_loesen();
             return;
         }
         if !self.windows[wi].dlg { return; }
@@ -13950,7 +14204,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             }
         }
         if antwort == 0 { return; }
-        self.modal = None;
+        self.modal_loesen();
         // Wie window_destroy: aus der z-Reihenfolge nehmen und JEDE haengende
         // Interaktions-Referenz loesen.
         self.z_order.retain(|&i| i != wi);
@@ -16347,9 +16601,29 @@ zellmodus, zeilen_anhaengen, spalten", key)),
 
     /// Klick im Datumswaehler: Pfeile blaettern, eine Zelle waehlt den Tag.
     fn dp_press(&mut self, wi: usize, i: usize, mx: i32, my: i32) {
-        let (ax, ay, w, h) = self.abs_rect(wi, &self.windows[wi].widgets[i]);
+        if self.windows[wi].widgets[i].kompakt {
+            self.datum_umschalten(wi, i);
+            return;
+        }
+        let rect = self.abs_rect(wi, &self.windows[wi].widgets[i]);
+        let (wb, d) = (self.windows[wi].widgets[i].wochenbeginn, self.windows[wi].widgets[i].datum);
+        let (neu, _) = self.dp_rechne(wb, rect, d, mx, my);
+        // Ein gesperrtes Datum wird nicht uebernommen -- ein Klick, der die
+        // Marke auf einen Tag setzt, den der Waehler selbst ausschliesst,
+        // waere eine Luege.
+        if Self::dp_erlaubt(&self.windows[wi].widgets[i], neu) {
+            self.dp_setze(wi, i, neu);
+        }
+    }
+
+    /// Was ein Klick ins Monatsgitter `rect` bei Datum `d` bedeutet: das neue
+    /// Datum, und ob ein TAG getroffen wurde (sonst Blaettern im Kopf). Eine
+    /// Rechnung fuer den Waehler und den aufgeklappten Monat.
+    fn dp_rechne(&self, wochenbeginn: i32, rect: (i32, i32, i32, i32), d: [i32; 3],
+                 mx: i32, my: i32) -> ([i32; 3], bool) {
+        let (ax, ay, w, h) = rect;
         let (kopf, zw, zh) = self.dp_geom(w, h);
-        let d = self.windows[wi].widgets[i].datum;
+        let mut tag = false;
         let mut neu = d;
         if my < ay + kopf {
             // Vier Bereiche, von aussen nach innen: Jahr zurueck, Monat
@@ -16366,8 +16640,12 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 let sp = ((mx - ax) / zw).clamp(0, 6);
                 let ze = (my - gy) / zh;
                 if (0..6).contains(&ze) {
-                    let erster = crate::kalender::wochentag(d[0], d[1], 1);
+                    // Wie das Zeichnen: die erste Spalte ist der Wochenbeginn.
+                    // Vorher zaehlte der Klick immer ab Montag -- mit "Woche ab
+                    // Sonntag" traf er den Tag daneben.
+                    let erster = (crate::kalender::wochentag(d[0], d[1], 1) - wochenbeginn).rem_euclid(7);
                     let nr = ze * 7 + sp - erster + 1;
+                    tag = true;
                     let im_monat = crate::kalender::tage_im_monat(d[0], d[1]);
                     // Ein Klick auf einen Nachbarmonats-Tag blaettert dorthin --
                     // das ist die Erwartung, nicht "passiert nichts".
@@ -16385,12 +16663,66 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 }
             }
         }
-        // Ein gesperrtes Datum wird nicht uebernommen -- ein Klick, der die
-        // Marke auf einen Tag setzt, den der Waehler selbst ausschliesst,
-        // waere eine Luege.
-        if Self::dp_erlaubt(&self.windows[wi].widgets[i], neu) {
+        (neu, tag)
+    }
+
+    // --- Aufgeklappter Monat (Datumsfeld, Datumsspalte) ------------------------
+
+    /// Woran der Monat haengt: das Datumsfeld oder die bearbeitete Zelle.
+    fn datum_anker(&self) -> Option<(i32, i32, i32, i32)> {
+        let (wi, i, zelle) = self.datum_auf?;
+        let w = self.windows.get(wi)?.widgets.get(i)?;
+        if !self.windows[wi].alive || !self.windows[wi].visible || !w.alive || !w.visible { return None; }
+        if zelle { self.edit_cell_rect(wi, i) } else { Some(self.abs_rect(wi, w)) }
+    }
+
+    /// Lage des aufgeklappten Monats: unter dem Anker, oder darueber, wenn
+    /// unten kein Platz ist. EINE Quelle fuer Zeichnen und Klick.
+    fn datum_geom(&self) -> Option<(i32, i32, i32, i32)> {
+        let (ax, ay, aw, ah) = self.datum_anker()?;
+        let pw = aw.max(self.sk(252));
+        let ph = self.sk(236);
+        let (sb, sh) = self.schirm();
+        let x = ax.min(sb - pw).max(0);
+        let y = if ay + ah + ph > sh && ay - ph >= 0 { ay - ph } else { ay + ah };
+        Some((x, y, pw, ph))
+    }
+
+    fn datum_umschalten(&mut self, wi: usize, i: usize) {
+        if self.datum_auf == Some((wi, i, false)) {
+            self.datum_auf = None;
+        } else {
+            self.open_dropdown = None;
+            self.datum_auf = Some((wi, i, false));
+            self.datum_zeigt = self.windows[wi].widgets[i].datum;
+        }
+    }
+
+    /// Ein Tag ist gewaehlt: ins Feld (wenn erlaubt) bzw. in die Zelle.
+    fn datum_waehlen(&mut self, neu: [i32; 3]) {
+        let Some((wi, i, zelle)) = self.datum_auf else { return };
+        if zelle {
+            if let Some(t) = self.windows[wi].widgets[i].tbl.as_mut() {
+                t.edit_text = crate::kalender::format(neu[0], neu[1], neu[2]);
+            }
+            self.datum_auf = None;
+            self.table_end_edit(wi, i, true);
+        } else if Self::dp_erlaubt(&self.windows[wi].widgets[i], neu) {
+            self.datum_auf = None;
             self.dp_setze(wi, i, neu);
         }
+    }
+
+    /// Ein Klick in den aufgeklappten Monat: blaettern oder waehlen. FALSE,
+    /// wenn er daneben ging.
+    fn datum_klick(&mut self, mx: i32, my: i32) -> bool {
+        let Some(rect) = self.datum_geom() else { return false };
+        if !Self::in_rect(mx, my, rect) { return false; }
+        let Some((wi, i, zelle)) = self.datum_auf else { return false };
+        let wb = if zelle { 0 } else { self.windows[wi].widgets[i].wochenbeginn };
+        let (neu, tag) = self.dp_rechne(wb, rect, self.datum_zeigt, mx, my);
+        if tag { self.datum_waehlen(neu); } else { self.datum_zeigt = neu; }
+        true
     }
 
     fn dp_monat(&self, d: [i32; 3], schritte: i32) -> [i32; 3] {
@@ -16590,7 +16922,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 }
             }
             Kind::Checkbox | Kind::Toggle => {
-                if ausloesen {
+                if leertaste {
                     let w = &mut self.windows[wi].widgets[i];
                     w.checked = !w.checked;
                     // `clicked` auch hier setzen. Vorher blieb GUI_CLICKED auf
@@ -16607,7 +16939,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 }
             }
             Kind::Radio => {
-                if ausloesen && !self.windows[wi].widgets[i].checked {
+                if leertaste && !self.windows[wi].widgets[i].checked {
                     self.select_radio(wi, i);
                     self.windows[wi].widgets[i].clicked = true;   // wie beim Kaestchen
                     let w = &self.windows[wi].widgets[i];
@@ -16761,6 +17093,36 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 }
             }
             Kind::DatePicker => {
+                // Datumsfeld: Leertaste, F4, Alt+Ab klappen auf; offen waehlen die
+                // Pfeile den Tag, Enter/Leertaste uebernimmt, ESC klappt nur zu
+                // (verbraucht -- sonst druckte die Fensterregel auch Abbrechen).
+                if self.windows[wi].widgets[i].kompakt {
+                    if self.datum_auf == Some((wi, i, false)) {
+                        if g.key_pressed(KEY_ESC) { self.datum_auf = None; self.liste_taste = true; return; }
+                        if ausloesen {
+                            let z = self.datum_zeigt;
+                            self.datum_waehlen(z);
+                            self.liste_taste = true;
+                            return;
+                        }
+                        let d = self.datum_zeigt;
+                        let tage = (rechts as i32 - links as i32) + 7 * (ab as i32 - auf as i32);
+                        let mut neu = d;
+                        if tage != 0 {
+                            let (j, m, t) = crate::kalender::plus_tage(d[0], d[1], d[2], tage);
+                            neu = [j, m, t];
+                        }
+                        let weite = if g.key_shift() { 12 } else { 1 };
+                        if g.key_pressed(KEY_PAGEUP) { neu = self.dp_monat(neu, -weite); }
+                        if g.key_pressed(KEY_PAGEDOWN) { neu = self.dp_monat(neu, weite); }
+                        self.datum_zeigt = neu;
+                        return;
+                    }
+                    if leertaste || g.key_pressed(KEY_F4) || (g.key_alt() && ab) {
+                        self.datum_umschalten(wi, i);
+                        return;
+                    }
+                }
                 let d = self.windows[wi].widgets[i].datum;
                 let tage = (rechts as i32 - links as i32) + 7 * (ab as i32 - auf as i32);
                 let mut neu = d;
@@ -17061,6 +17423,21 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     }
 
     fn handle_press(&mut self, mx: i32, my: i32) {
+        // Ein aufgeklappter Monat liegt ueber allem (wie eine Klappliste) --
+        // vor der Zellbearbeitung, die jeden Klick daneben uebernimmt. Ein
+        // Klick daneben klappt ihn zu; einer auf das Datumsfeld selbst nur das.
+        if let Some((dw, di, zelle)) = self.datum_auf {
+            if self.datum_geom().is_none() {
+                self.datum_auf = None;
+            } else if self.datum_klick(mx, my) {
+                return;
+            } else {
+                let anker = self.datum_anker();
+                self.datum_auf = None;
+                let _ = (dw, di);
+                if !zelle && anker.map(|a| Self::in_rect(mx, my, a)).unwrap_or(false) { return; }
+            }
+        }
         // Ein Klick irgendwohin uebernimmt eine laufende Zellbearbeitung.
         // Ohne das bliebe der Editor offen stehen, waehrend die Tastatur
         // laengst woanders hinhoert -- ein Feld, das aussieht als koennte man
@@ -17392,9 +17769,9 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 else if Self::in_rect(mx, my, gm.abbrechen) { self.wz_knopf(win, i, 2); }
             }
             Kind::TabControl => {
-                let (ax, ay, _, _) = self.abs_rect(win, &self.windows[win].widgets[i]);
+                let (ax, ay, bw, _) = self.abs_rect(win, &self.windows[win].widgets[i]);
                 if my >= ay + self.sk(TC_KOPF_H) { return; }   // unter den Koepfen gehoert die Flaeche den Kindern
-                let treffer = self.tc_koepfe(ax, &self.windows[win].widgets[i])
+                let treffer = self.tc_koepfe(ax, bw, &self.windows[win].widgets[i])
                     .into_iter().find(|&(_, x0, x1)| mx >= x0 && mx < x1).map(|(k, _, x1)| (k as i32, x1));
                 if let Some((k, x1)) = treffer {
                     if Self::tc_schliessbar(&self.windows[win].widgets[i]) {
@@ -18284,8 +18661,9 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         if let Some(d) = self.drop.as_ref() { return d.index_quelle as i64; }
         self.drag.as_ref().filter(|d| d.aktiv).map(|d| d.index as i64).unwrap_or(-1)
     }
-    /// Was ein Druck auf ein ziehbares Widget mitnimmt: bei Liste und Baum
-    /// die getroffene Zeile, sonst das Widget selbst mit seinem Text.
+    /// Was ein Druck auf ein ziehbares Widget mitnimmt: bei Liste, Baum und
+    /// Tabelle die getroffene Zeile (bei der Tabelle die Datenzeile mit dem
+    /// Text ihrer ersten Zelle), sonst das Widget selbst mit seinem Text.
     fn zieh_nutzlast(&self, wi: usize, i: usize, mx: i32, my: i32) -> (i32, String) {
         let w = &self.windows[wi].widgets[i];
         match w.kind {
@@ -18298,11 +18676,19 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 let t = w.tree.as_ref().unwrap();
                 if k >= 0 { (k, t.nodes[k as usize].label.clone()) } else { (-1, String::new()) }
             }
+            Kind::Table => {
+                let k = self.zeile_unter(wi, i, mx, my);
+                let t = w.tbl.as_ref().unwrap();
+                if k >= 0 { (k, t.cell(k as usize, 0).map(|z| z.text.clone()).unwrap_or_default()) } else { (-1, String::new()) }
+            }
             _ => (-1, w.text.clone()),
         }
     }
-    /// Listenzeile bzw. Baumknoten (id) unter der Maus, sonst -1.
-    fn zeile_unter(&self, wi: usize, i: usize, _mx: i32, my: i32) -> i32 {
+    /// Listenzeile, Baumknoten (id) bzw. Datenzeile der Tabelle unter der
+    /// Maus, sonst -1. Die Tabelle rechnet wie ihr Hover (`table_geom`) --
+    /// vorher trug ein Zug aus ihr keine Zeile (gefunden mit der
+    /// Kuehlschrank-App: Bestandszeile auf einen Lagerort ziehen).
+    fn zeile_unter(&self, wi: usize, i: usize, mx: i32, my: i32) -> i32 {
         let w = &self.windows[wi].widgets[i];
         let (_, ay, _, _) = self.abs_rect(wi, w);
         match w.kind {
@@ -18316,6 +18702,13 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 let vis = Self::tree_visible(t);
                 let row = (my - (ay + 1) + t.scroll) / self.sk(TREE_ROW_H);
                 if row >= 0 && (row as usize) < vis.len() { vis[row as usize] as i32 } else { -1 }
+            }
+            Kind::Table => {
+                let gm = self.table_geom(wi, i);
+                if !Self::in_rect(mx, my, (gm.body_x, gm.body_y, gm.body_w, gm.body_h)) { return -1; }
+                let t = w.tbl.as_ref().unwrap();
+                let hv = (my - gm.body_y + t.scroll_y) / gm.row_h.max(1);
+                if hv >= 0 && hv < gm.n_rows as i32 { t.data_row(hv) } else { -1 }
             }
             _ => -1,
         }
@@ -18393,6 +18786,8 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 self.draw_wahl_popup(g, ew, ei);
             }
         }
+        // Ein aufgeklappter Monat (Datumsfeld oder Datumsspalte).
+        self.draw_datum_popup(g);
         // Ueberlauf-Menue einer Werkzeugleiste -- ueber allen Fenstern.
         if let Some((lw, li)) = self.leiste_popup {
             if self.windows.get(lw).map(|w| w.alive && w.visible).unwrap_or(false) {
@@ -19296,7 +19691,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             Kind::TabControl => {
                 let n = Node::new(Role::TabList);
                 let kopf = self.sk(TC_KOPF_H);
-                for (k, x0, x1) in self.tc_koepfe(x, w) {
+                for (k, x0, x1) in self.tc_koepfe(x, bw, w) {
                     let mut t = Node::new(Role::Tab);
                     t.set_label(w.items[k].clone());
                     t.set_selected(w.sel == k as i32);
@@ -21434,7 +21829,8 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     self.wcol(wdg, "bg", "win_bg"), self.wcol(wdg, "border", "widget_border"));
                 let acc = self.acc_col(wdg);
                 g.push_clip(ax, ay, w, kopf);
-                for (i, x0, x1) in self.tc_koepfe(ax, wdg) {
+                let kreuz = if Self::tc_schliessbar(wdg) { self.sk(16) } else { 0 };
+                for (i, x0, x1) in self.tc_koepfe(ax, w, wdg) {
                     let aktiv = i as i32 == wdg.sel;
                     let bg = if aktiv { self.wcol(wdg, "bg", "widget_bg") } else { shade(self.th("win_bg"), -10) };
                     g.box_fill(x0, ay + 2, x1 - 1, ay + kopf - 1, bg);
@@ -21442,8 +21838,10 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     if aktiv { g.box_fill(x0, ay + kopf - 3, x1 - 1, ay + kopf - 1, acc); }
                     let fg = if aktiv { self.txt_col(wdg) } else { self.th("muted_fg") };
                     let th = self.wsize(g, wdg);
+                    // Ein geschmaelerter Kopf kuerzt seinen Titel (tc_koepfe).
+                    let titel = self.text_kuerzen(g, wdg, &wdg.items[i], x1 - x0 - self.sk(20) - kreuz);
                     self.wtext(g, wdg, x0 + self.sk(10), ay + 2 + (kopf - 2 - th).max(0) / 2,
-                               wdg.items[i].clone(), fg);
+                               titel, fg);
                     if Self::tc_schliessbar(wdg) {
                         // Zwei Striche wie am Reiter des Fensters.
                         let (kx, ky, k) = self.tc_kreuz(x1, ay);
@@ -21487,7 +21885,11 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             Kind::Table => self.draw_table(g, wi, idx),
             Kind::Tree => self.draw_tree(g, wi, idx),
             Kind::ColorPicker => self.draw_colorpicker(g, wdg, ax, ay, w, h),
-            Kind::DatePicker => self.draw_datepicker(g, wdg, ax, ay, w, h),
+            Kind::DatePicker => if wdg.kompakt {
+                self.draw_datumsfeld(g, wdg, ax, ay, w, h)
+            } else {
+                self.draw_datepicker(g, wdg, ax, ay, w, h)
+            },
         }
         // Fokus-Ring: EINE Stelle fuer alle Arten, nach dem Zeichnen und damit
         // obenauf. Liegt AUSSERHALB der Widget-Flaeche (2 px Luft), sonst
@@ -21761,6 +22163,41 @@ zellmodus, zeilen_anhaengen, spalten", key)),
 
     fn rahmen(&self, g: &mut Graphics, wdg: &Widget, x1: i32, y1: i32, x2: i32, y2: i32) {
         g.rect(x1, y1, x2, y2, self.wcol(wdg, "border", "widget_border"));
+    }
+
+    /// Das zugeklappte Datumsfeld: das Datum und rechts ein Kalenderblatt.
+    fn draw_datumsfeld(&self, g: &mut Graphics, wdg: &Widget,
+                       ax: i32, ay: i32, w: i32, h: i32) {
+        self.fbox_tief_w(g, wdg.kind, ax, ay, ax + w - 1, ay + h - 1,
+                         self.wcol(wdg, "bg", "widget_bg"),
+                         self.wcol(wdg, "border", "widget_border"));
+        let schrift = self.wsize(g, wdg);
+        let text = crate::kalender::format(wdg.datum[0], wdg.datum[1], wdg.datum[2]);
+        self.wtext(g, wdg, ax + self.sk(8), ay + (h - schrift).max(0) / 2, text, self.txt_col(wdg));
+        let s = self.sk(12);
+        let (bx, by) = (ax + w - s - self.sk(9), ay + (h - s) / 2);
+        let c = self.th("muted_fg");
+        g.rect(bx, by + 2, bx + s, by + s, c);
+        g.line(bx, by + 5, bx + s, by + 5, c);
+        g.line(bx + 3, by, bx + 3, by + 3, c);
+        g.line(bx + s - 3, by, bx + s - 3, by + 3, c);
+    }
+
+    /// Der aufgeklappte Monat, obenauf: dasselbe Gitter wie der Waehler, mit
+    /// dem markierten Tag; Wochenbeginn und Grenzen vom Datumsfeld.
+    fn draw_datum_popup(&self, g: &mut Graphics) {
+        let Some((wi, i, zelle)) = self.datum_auf else { return };
+        let Some((px, py, pw, ph)) = self.datum_geom() else { return };
+        let quelle = &self.windows[wi].widgets[i];
+        let mut tw = Self::blank(Kind::DatePicker, 0, 0, pw, ph);
+        tw.datum = self.datum_zeigt;
+        if !zelle {
+            tw.wochenbeginn = quelle.wochenbeginn;
+            tw.datum_min = quelle.datum_min;
+            tw.datum_max = quelle.datum_max;
+        }
+        g.box_fill(px + 3, py + 3, px + pw + 2, py + ph + 2, 0x40i64 << 24);
+        self.draw_datepicker(g, &tw, px, py, pw, ph);
     }
 
     fn draw_datepicker(&self, g: &mut Graphics, wdg: &Widget,
@@ -22424,11 +22861,15 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                                        (90i64 << 24) | (accent & 0xFFFFFF));
                         }
                     }
-                    let s = t.header(c).to_string();
                     let al = *t.col_align.get(c).unwrap_or(&0);
                     // Platz fuer den Sortierpfeil freihalten, sonst schreibt
                     // ein langer Titel darueber.
                     let pfeil_platz = if t.sort_col == c as i32 { 14 } else { 0 };
+                    // Ein Titel, breiter als seine Spalte, endet mit "..." --
+                    // vorher schrieb er in den Kopf daneben (der Zuschnitt gilt
+                    // nur der ganzen Kopfzeile; Kuehlschrank-App englisch:
+                    // "Best-before dateStatus").
+                    let s = self.text_kuerzen(g, wdg, t.header(c), cw - pfeil_platz - 2 * self.sk(TBL_PADDING));
                     let tw = self.wtext_width(g, wdg, &s);
                     let tx = Self::align_x(cx, cw - pfeil_platz, tw, al, self.sk(TBL_PADDING));
                     let ty = ay + (titel_h - schrift).max(0) / 2;

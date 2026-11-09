@@ -71,6 +71,50 @@ property in den eigenschaften TRUE
 gleich TRUE
 modul 3 mal gleich TRUE
 
+=== dims zwischen methoden: eine leerzeile, kein stapel
+' Eine Datei von aussen mit DIMs zwischen den Methoden: jede herausgeloeste
+' Methode liess ihre Leerzeile bei den Eigenschaften zurueck (Kuehlschrank,
+' Modul Uebersetzung: vierzehn Leerzeilen in Folge nach dem Speichern).
+IMPORT "modell_imp.dh"
+DIM w AS Element : w = elementNeu("modul", "Gemischt")
+codeZerlegen(w, JOIN$(READLINES("Gemischt.dh"), CHR$(10)))
+PRINT "vorspann "; w.vorspann
+PRINT "["; REPLACE$(w.dekl, CHR$(10), "|"); "]"
+PRINT "methoden "; LEN(methoden)
+--- datei modell_imp.dh
+IMPORT "json"
+IMPORT "regex"
+IMPORT "imgfx"
+IMPORT "{sammlung}/../../../studio/sprache.dh"
+IMPORT "{sammlung}/../../../studio/bibliothek.dh"
+IMPORT "{sammlung}/../../../studio/modell.dh"
+IMPORT "{sammlung}/../../../studio/projekt.dh"
+--- datei Gemischt.dh
+' Modul mit Zustand.
+DIM a AS INTEGER
+
+FUNCTION eins() AS INTEGER
+    RETURN 1
+END FUNCTION
+
+FUNCTION zwei() AS INTEGER
+    RETURN 2
+END FUNCTION
+
+FUNCTION drei() AS INTEGER
+    RETURN 3
+END FUNCTION
+
+' Der zweite Teil.
+DIM b AS INTEGER
+
+SUB vier()
+END SUB
+--- erwartet
+vorspann ' Modul mit Zustand.
+[DIM a AS INTEGER||' Der zweite Teil.|DIM b AS INTEGER]
+methoden 4
+
 === ein control umbenennen zieht seine ereignisse und den code mit
 ' knopf10 ist ein anderes Wort und bleibt; der Kopf wird umbenannt.
 IMPORT "modell_imp.dh"
@@ -228,7 +272,7 @@ slWarten(6)
 slAufnahmeSchreiben(CWD$() + "/ev.txt")
 DIM log AS STRING : log = CWD$() + "/s.log"
 DIM aus AS STRING : aus = slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
-PRINT "dialog "; slHat(log, "ereignisdialog knopf1 Klick,MausRein,MausRaus")
+PRINT "dialog "; slHat(log, "ereignisdialog knopf1 Klick,MausRein,MausRaus,Abgelegt")
 PRINT "neu "; slHat(log, "ereignis neu Hauptfenster.knopf1_Klick")
 PRINT "vorn "; slHat(log, "vorn code Hauptfenster.knopf1_Klick")
 DIM z AS STRING

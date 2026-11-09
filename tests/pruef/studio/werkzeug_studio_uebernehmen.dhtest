@@ -1,0 +1,576 @@
+' Drachenhauch Studio: eine SQLite-Datei, die es schon gibt (aus einem anderen
+' Programm), als Datenbank-Element uebernehmen (Projekt -> Datenbank aus
+' Datei uebernehmen; studio/datenbank.dh dbSchemaAusDatei$, studio/code.dh
+' datenbankUebernehmen). Gefunden beim Port der Kuehlschrank-App: deren Datei
+' hat DATE, TIMESTAMP, DEFAULT CURRENT_TIMESTAMP, UNIQUE in CREATE TABLE,
+' FOREIGN KEY, Pflichtspalten ohne Vorgabe und eine Tabelle ohne id. Das
+' Schema haelt fest, was die Arten des Studios nicht treffen ("sql",
+' "sqlvorgabe"), damit der Abgleich danach die Datei so laesst, wie sie ist.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== der aufbau einer fremden datei wird ein schema
+IMPORT "kern.dh"
+dateiAnlegen("kuehl.db")
+DIM s AS JSON_HANDLE : s = JSON_PARSE(dbSchemaAusDatei$("kuehl.db", "kuehl.db"))
+PRINT "datei "; dbDateiVon$(s); " tabellen "; dbTabZahl(s)
+PRINT JOIN$(tabellenNamen(s), " ")
+DIM h AS STRING
+FOR EACH h IN dbUebHinweise
+    PRINT "hinweis "; h
+NEXT
+PRINT "inventory"
+spalten(s, "inventory")
+PRINT "products"
+spalten(s, "products")
+PRINT "app_settings"
+spalten(s, "app_settings")
+PRINT "user_learning"
+spalten(s, "user_learning")
+--- datei kern.dh
+IMPORT "json"
+IMPORT "regex"
+IMPORT "imgfx"
+IMPORT "db"
+IMPORT "{sammlung}/../../../studio/sprache.dh"
+IMPORT "{sammlung}/../../../studio/bibliothek.dh"
+IMPORT "{sammlung}/../../../studio/modell.dh"
+IMPORT "{sammlung}/../../../studio/projekt.dh"
+IMPORT "{sammlung}/../../../studio/datenbank.dh"
+' Die Datei aus dem Aufbau der Kuehlschrank-App (PySide6) mit ein paar Zeilen.
+SUB dateiAnlegen(pfad AS STRING)
+    DIM db AS DB_CONN : db = DB_OPEN(pfad)
+    DIM sql AS STRING
+    FOR EACH sql IN READLINES("schema.sql")
+        sql = TRIM$(sql)
+        IF RIGHT$(sql, 1) = ";" THEN sql = LEFT$(sql, LEN(sql) - 1)
+        IF sql <> "" THEN DB_EXEC(db, sql)
+    NEXT
+    DB_EXEC(db, "INSERT INTO products (barcode, name) VALUES ('4000', 'Milch')")
+    DB_EXEC(db, "INSERT INTO inventory (product_id, expiry_date) VALUES (1, '2026-11-20')")
+    DB_EXEC(db, "INSERT INTO app_settings (key, value, updated_at) VALUES ('theme', 'dark', '2026-11-08 10:00:00')")
+    DB_EXEC(db, "INSERT INTO app_settings (key, value, updated_at) VALUES ('language', 'de', '2026-11-08 10:00:00')")
+    DB_CLOSE(db)
+END SUB
+' Alles, was SQLite ueber den Aufbau weiss, und die Zeilen -- als ein Text.
+FUNCTION aufbau$(pfad AS STRING) AS STRING
+    DIM db AS DB_CONN : db = DB_OPEN(pfad)
+    DIM z AS ARRAY OF STRING : z = []
+    DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT type, name, IFNULL(sql, '') FROM sqlite_master ORDER BY name")
+    WHILE DB_NEXT(r)
+        ARRAY_PUSH(z, DB_GET_STRING(r, 0) + " " + DB_GET_STRING(r, 1) + " " + DB_GET_STRING(r, 2))
+    WEND
+    r = DB_QUERY(db, "SELECT id, name, barcode, created_at FROM products")
+    WHILE DB_NEXT(r)
+        ARRAY_PUSH(z, DB_GET_STRING(r, 0) + DB_GET_STRING(r, 1) + DB_GET_STRING(r, 2) + DB_GET_STRING(r, 3))
+    WEND
+    DB_CLOSE(db)
+    RETURN JOIN$(z, CHR$(10))
+END FUNCTION
+SUB spalten(s AS JSON_HANDLE, tab AS STRING)
+    DIM t AS INTEGER : t = dbTabIndex(s, tab)
+    DIM k AS INTEGER
+    FOR k = 0 TO dbSpZahl(s, t) - 1
+        DIM z AS STRING : z = "  " + dbSp$(s, t, k, "name") + " " + dbSp$(s, t, k, "typ")
+        IF dbSpAn(s, t, k, "pflicht") THEN z = z + " pflicht"
+        IF dbSpAn(s, t, k, "eindeutig") THEN z = z + " eindeutig"
+        IF dbSp$(s, t, k, "vorgabe") <> "" THEN z = z + " vorgabe=" + dbSp$(s, t, k, "vorgabe")
+        IF dbSpHat(s, t, k, "sql") THEN z = z + " sql=" + dbSp$(s, t, k, "sql")
+        IF dbSpHat(s, t, k, "sqlvorgabe") THEN z = z + " sqlvorgabe=[" + dbSp$(s, t, k, "sqlvorgabe") + "]"
+        IF dbSp$(s, t, k, "verweis") <> "" THEN z = z + " verweis=" + dbSp$(s, t, k, "verweis")
+        PRINT z
+    NEXT
+END SUB
+FUNCTION tabellenNamen(s AS JSON_HANDLE) AS ARRAY OF STRING
+    DIM aus AS ARRAY OF STRING : aus = []
+    DIM t AS INTEGER
+    FOR t = 0 TO dbTabZahl(s) - 1
+        ARRAY_PUSH(aus, dbTabName$(s, t))
+    NEXT
+    RETURN aus
+END FUNCTION
+--- datei schema.sql
+CREATE TABLE products ( id INTEGER PRIMARY KEY AUTOINCREMENT, barcode TEXT UNIQUE, name TEXT NOT NULL, brand TEXT, category TEXT, image_url TEXT, min_quantity REAL, min_unit TEXT, default_storage_location TEXT, default_shelf_life_days INTEGER, nutritional_info TEXT, allergens TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP );
+CREATE TABLE locations ( id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE NOT NULL, type TEXT, temperature_zone TEXT, icon TEXT, sort_order INTEGER DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP );
+CREATE TABLE storage_locations ( id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE NOT NULL, icon TEXT, temperature_zone TEXT, description TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP );
+CREATE TABLE inventory ( id INTEGER PRIMARY KEY AUTOINCREMENT, product_id INTEGER NOT NULL, quantity REAL NOT NULL DEFAULT 1, unit TEXT DEFAULT 'Stück', purchase_date DATE, expiry_date DATE, storage_location TEXT, storage_area TEXT, notes TEXT, status TEXT DEFAULT 'fresh', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, purchased_at_store TEXT, FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE CASCADE );
+CREATE TABLE shopping_list ( id INTEGER PRIMARY KEY AUTOINCREMENT, product_name TEXT NOT NULL, quantity REAL DEFAULT 1, unit TEXT DEFAULT 'Stück', category TEXT, notes TEXT, checked INTEGER DEFAULT 0, priority INTEGER DEFAULT 0, added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP , store_name TEXT);
+CREATE TABLE recipes ( id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, description TEXT, servings INTEGER DEFAULT 1, instructions TEXT, prep_time_minutes INTEGER, cook_time_minutes INTEGER, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP );
+CREATE TABLE recipe_ingredients ( id INTEGER PRIMARY KEY AUTOINCREMENT, recipe_id INTEGER NOT NULL, product_id INTEGER, product_name TEXT NOT NULL, quantity REAL NOT NULL, unit TEXT NOT NULL, notes TEXT, FOREIGN KEY (recipe_id) REFERENCES recipes (id) ON DELETE CASCADE, FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE SET NULL );
+CREATE TABLE shopping_templates ( id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, description TEXT, items_json TEXT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, usage_count INTEGER DEFAULT 0 );
+CREATE TABLE user_learning ( id INTEGER PRIMARY KEY AUTOINCREMENT, barcode TEXT, product_name TEXT, field TEXT NOT NULL, value TEXT NOT NULL, choice_count INTEGER DEFAULT 1, last_used TIMESTAMP DEFAULT CURRENT_TIMESTAMP, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, confidence REAL DEFAULT 0.0 );
+CREATE TABLE consumption_history ( id INTEGER PRIMARY KEY AUTOINCREMENT, product_id INTEGER, product_name TEXT NOT NULL, barcode TEXT, quantity INTEGER DEFAULT 1, unit TEXT, purchase_date DATE, empty_date DATE, removed_date DATE, duration_days INTEGER, storage_location TEXT, reason TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE SET NULL );
+CREATE TABLE store_layouts ( id INTEGER PRIMARY KEY AUTOINCREMENT, store_name TEXT UNIQUE NOT NULL, layout_json TEXT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP );
+CREATE TABLE categories ( id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE NOT NULL, icon TEXT, recommended_storage TEXT, typical_shelf_life_days INTEGER, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP );
+CREATE TABLE units ( id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE NOT NULL, icon TEXT DEFAULT '📦' );
+CREATE TABLE store_settings ( id INTEGER PRIMARY KEY AUTOINCREMENT, key TEXT UNIQUE NOT NULL, value TEXT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP );
+CREATE TABLE app_settings ( key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP );
+CREATE TABLE location_settings ( id INTEGER PRIMARY KEY AUTOINCREMENT, keyword TEXT UNIQUE NOT NULL, color_r INTEGER NOT NULL DEFAULT 70, color_g INTEGER NOT NULL DEFAULT 130, color_b INTEGER NOT NULL DEFAULT 180, icon TEXT NOT NULL DEFAULT '📦', display_name TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP );
+CREATE TABLE product_stores ( id INTEGER PRIMARY KEY AUTOINCREMENT, product_id INTEGER NOT NULL, store_name TEXT NOT NULL, is_preferred INTEGER DEFAULT 0, price REAL, last_purchased DATE, notes TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE, UNIQUE(product_id, store_name) );
+CREATE INDEX idx_products_barcode ON products(barcode);
+CREATE INDEX idx_products_category ON products(category);
+CREATE INDEX idx_inventory_product ON inventory(product_id);
+CREATE INDEX idx_inventory_location ON inventory(storage_location);
+CREATE INDEX idx_inventory_expiry ON inventory(expiry_date);
+CREATE INDEX idx_inventory_status ON inventory(status);
+CREATE INDEX idx_shopping_category ON shopping_list(category);
+CREATE INDEX idx_shopping_checked ON shopping_list(checked);
+CREATE INDEX idx_learning_barcode_field ON user_learning(barcode, field);
+CREATE INDEX idx_learning_name_field ON user_learning(product_name, field);
+CREATE INDEX idx_consumption_product ON consumption_history(product_name, barcode);
+CREATE INDEX idx_consumption_dates ON consumption_history(purchase_date, empty_date);
+CREATE INDEX idx_product_stores_product ON product_stores(product_id);
+CREATE INDEX idx_product_stores_store ON product_stores(store_name);
+CREATE INDEX idx_recipes_name ON recipes(name);
+CREATE INDEX idx_recipe_ingredients_recipe ON recipe_ingredients(recipe_id);
+CREATE INDEX idx_recipe_ingredients_product ON recipe_ingredients(product_id);
+CREATE INDEX idx_products_name ON products(name);
+--- erwartet
+datei kuehl.db tabellen 17
+products locations storage_locations inventory shopping_list recipes recipe_ingredients shopping_templates user_learning consumption_history store_layouts categories units store_settings app_settings location_settings product_stores
+hinweis app_settings hat keine Spalte id INTEGER PRIMARY KEY -- das Studio zeigt sie, binden lässt sie sich nicht.
+hinweis product_stores: eindeutig über (product_id, store_name) bleibt in der Datei -- das Studio kennt nur eindeutige Einzelspalten.
+inventory
+  product_id ganz pflicht sqlvorgabe=[] verweis=products
+  quantity zahl pflicht vorgabe=1
+  unit text vorgabe=Stück
+  purchase_date datum sql=DATE
+  expiry_date datum sql=DATE
+  storage_location text
+  storage_area text
+  notes text
+  status text vorgabe=fresh
+  created_at text sql=TIMESTAMP sqlvorgabe=[CURRENT_TIMESTAMP]
+  updated_at text sql=TIMESTAMP sqlvorgabe=[CURRENT_TIMESTAMP]
+  purchased_at_store text
+products
+  barcode text eindeutig
+  name text pflicht sqlvorgabe=[]
+  brand text
+  category text
+  image_url text
+  min_quantity zahl
+  min_unit text
+  default_storage_location text
+  default_shelf_life_days ganz
+  nutritional_info text
+  allergens text
+  created_at text sql=TIMESTAMP sqlvorgabe=[CURRENT_TIMESTAMP]
+  updated_at text sql=TIMESTAMP sqlvorgabe=[CURRENT_TIMESTAMP]
+app_settings
+  key text eindeutig
+  value text pflicht sqlvorgabe=[]
+  updated_at text sql=TIMESTAMP sqlvorgabe=[CURRENT_TIMESTAMP]
+user_learning
+  barcode text
+  product_name text
+  field text pflicht sqlvorgabe=[]
+  value text pflicht sqlvorgabe=[]
+  choice_count ganz vorgabe=1
+  last_used text sql=TIMESTAMP sqlvorgabe=[CURRENT_TIMESTAMP]
+  created_at text sql=TIMESTAMP sqlvorgabe=[CURRENT_TIMESTAMP]
+  confidence zahl vorgabe=0.0
+
+=== der abgleich laesst die uebernommene datei, wie sie ist
+' Aufbau, Indexe und Zeilen vorher und nachher: Zeichen fuer Zeichen gleich.
+' Ohne "sql"/"sqlvorgabe" baute der Abgleich jede Tabelle mit DATE, TIMESTAMP
+' oder einer Pflichtspalte ohne Vorgabe neu auf (ohne AUTOINCREMENT und
+' FOREIGN KEY), und fuer jedes UNIQUE kaeme ein zweiter Index dazu.
+IMPORT "kern.dh"
+projOrdner = CWD$()
+dateiAnlegen("kuehl.db")
+DIM vorher AS STRING : vorher = aufbau$("kuehl.db")
+DIM e AS Element : e = elementNeu("datenbank", "Vorrat")
+e.schema = dbSchemaAusDatei$("kuehl.db", "kuehl.db")
+PRINT "abgleich [" + dbAbgleichen$(e) + "]"
+DIM nachher AS STRING : nachher = aufbau$("kuehl.db")
+PRINT "unveraendert "; nachher = vorher
+IF nachher <> vorher THEN PRINT nachher
+' Der Daten-Editor liest auch die Tabelle ohne id (ueber rowid).
+PRINT "[" + dbZeilenLesen$(e, "app_settings", 10) + "] "; dbGesamt; " "; JOIN$(dbZellen, "|")
+PRINT "[" + dbZelleSetzen$(e, "app_settings", 2, "value", "en") + "]"
+PRINT "[" + dbZeilenLesen$(e, "app_settings", 10) + "] "; JOIN$(dbZellen, "|")
+--- datei kern.dh
+IMPORT "json"
+IMPORT "regex"
+IMPORT "imgfx"
+IMPORT "db"
+IMPORT "{sammlung}/../../../studio/sprache.dh"
+IMPORT "{sammlung}/../../../studio/bibliothek.dh"
+IMPORT "{sammlung}/../../../studio/modell.dh"
+IMPORT "{sammlung}/../../../studio/projekt.dh"
+IMPORT "{sammlung}/../../../studio/datenbank.dh"
+' Die Datei aus dem Aufbau der Kuehlschrank-App (PySide6) mit ein paar Zeilen.
+SUB dateiAnlegen(pfad AS STRING)
+    DIM db AS DB_CONN : db = DB_OPEN(pfad)
+    DIM sql AS STRING
+    FOR EACH sql IN READLINES("schema.sql")
+        sql = TRIM$(sql)
+        IF RIGHT$(sql, 1) = ";" THEN sql = LEFT$(sql, LEN(sql) - 1)
+        IF sql <> "" THEN DB_EXEC(db, sql)
+    NEXT
+    DB_EXEC(db, "INSERT INTO products (barcode, name) VALUES ('4000', 'Milch')")
+    DB_EXEC(db, "INSERT INTO inventory (product_id, expiry_date) VALUES (1, '2026-11-20')")
+    DB_EXEC(db, "INSERT INTO app_settings (key, value, updated_at) VALUES ('theme', 'dark', '2026-11-08 10:00:00')")
+    DB_EXEC(db, "INSERT INTO app_settings (key, value, updated_at) VALUES ('language', 'de', '2026-11-08 10:00:00')")
+    DB_CLOSE(db)
+END SUB
+' Alles, was SQLite ueber den Aufbau weiss, und die Zeilen -- als ein Text.
+FUNCTION aufbau$(pfad AS STRING) AS STRING
+    DIM db AS DB_CONN : db = DB_OPEN(pfad)
+    DIM z AS ARRAY OF STRING : z = []
+    DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT type, name, IFNULL(sql, '') FROM sqlite_master ORDER BY name")
+    WHILE DB_NEXT(r)
+        ARRAY_PUSH(z, DB_GET_STRING(r, 0) + " " + DB_GET_STRING(r, 1) + " " + DB_GET_STRING(r, 2))
+    WEND
+    r = DB_QUERY(db, "SELECT id, name, barcode, created_at FROM products")
+    WHILE DB_NEXT(r)
+        ARRAY_PUSH(z, DB_GET_STRING(r, 0) + DB_GET_STRING(r, 1) + DB_GET_STRING(r, 2) + DB_GET_STRING(r, 3))
+    WEND
+    DB_CLOSE(db)
+    RETURN JOIN$(z, CHR$(10))
+END FUNCTION
+SUB spalten(s AS JSON_HANDLE, tab AS STRING)
+    DIM t AS INTEGER : t = dbTabIndex(s, tab)
+    DIM k AS INTEGER
+    FOR k = 0 TO dbSpZahl(s, t) - 1
+        DIM z AS STRING : z = "  " + dbSp$(s, t, k, "name") + " " + dbSp$(s, t, k, "typ")
+        IF dbSpAn(s, t, k, "pflicht") THEN z = z + " pflicht"
+        IF dbSpAn(s, t, k, "eindeutig") THEN z = z + " eindeutig"
+        IF dbSp$(s, t, k, "vorgabe") <> "" THEN z = z + " vorgabe=" + dbSp$(s, t, k, "vorgabe")
+        IF dbSpHat(s, t, k, "sql") THEN z = z + " sql=" + dbSp$(s, t, k, "sql")
+        IF dbSpHat(s, t, k, "sqlvorgabe") THEN z = z + " sqlvorgabe=[" + dbSp$(s, t, k, "sqlvorgabe") + "]"
+        IF dbSp$(s, t, k, "verweis") <> "" THEN z = z + " verweis=" + dbSp$(s, t, k, "verweis")
+        PRINT z
+    NEXT
+END SUB
+FUNCTION tabellenNamen(s AS JSON_HANDLE) AS ARRAY OF STRING
+    DIM aus AS ARRAY OF STRING : aus = []
+    DIM t AS INTEGER
+    FOR t = 0 TO dbTabZahl(s) - 1
+        ARRAY_PUSH(aus, dbTabName$(s, t))
+    NEXT
+    RETURN aus
+END FUNCTION
+--- datei schema.sql
+CREATE TABLE products ( id INTEGER PRIMARY KEY AUTOINCREMENT, barcode TEXT UNIQUE, name TEXT NOT NULL, brand TEXT, category TEXT, image_url TEXT, min_quantity REAL, min_unit TEXT, default_storage_location TEXT, default_shelf_life_days INTEGER, nutritional_info TEXT, allergens TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP );
+CREATE TABLE locations ( id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE NOT NULL, type TEXT, temperature_zone TEXT, icon TEXT, sort_order INTEGER DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP );
+CREATE TABLE storage_locations ( id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE NOT NULL, icon TEXT, temperature_zone TEXT, description TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP );
+CREATE TABLE inventory ( id INTEGER PRIMARY KEY AUTOINCREMENT, product_id INTEGER NOT NULL, quantity REAL NOT NULL DEFAULT 1, unit TEXT DEFAULT 'Stück', purchase_date DATE, expiry_date DATE, storage_location TEXT, storage_area TEXT, notes TEXT, status TEXT DEFAULT 'fresh', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, purchased_at_store TEXT, FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE CASCADE );
+CREATE TABLE shopping_list ( id INTEGER PRIMARY KEY AUTOINCREMENT, product_name TEXT NOT NULL, quantity REAL DEFAULT 1, unit TEXT DEFAULT 'Stück', category TEXT, notes TEXT, checked INTEGER DEFAULT 0, priority INTEGER DEFAULT 0, added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP , store_name TEXT);
+CREATE TABLE recipes ( id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, description TEXT, servings INTEGER DEFAULT 1, instructions TEXT, prep_time_minutes INTEGER, cook_time_minutes INTEGER, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP );
+CREATE TABLE recipe_ingredients ( id INTEGER PRIMARY KEY AUTOINCREMENT, recipe_id INTEGER NOT NULL, product_id INTEGER, product_name TEXT NOT NULL, quantity REAL NOT NULL, unit TEXT NOT NULL, notes TEXT, FOREIGN KEY (recipe_id) REFERENCES recipes (id) ON DELETE CASCADE, FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE SET NULL );
+CREATE TABLE shopping_templates ( id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, description TEXT, items_json TEXT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, usage_count INTEGER DEFAULT 0 );
+CREATE TABLE user_learning ( id INTEGER PRIMARY KEY AUTOINCREMENT, barcode TEXT, product_name TEXT, field TEXT NOT NULL, value TEXT NOT NULL, choice_count INTEGER DEFAULT 1, last_used TIMESTAMP DEFAULT CURRENT_TIMESTAMP, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, confidence REAL DEFAULT 0.0 );
+CREATE TABLE consumption_history ( id INTEGER PRIMARY KEY AUTOINCREMENT, product_id INTEGER, product_name TEXT NOT NULL, barcode TEXT, quantity INTEGER DEFAULT 1, unit TEXT, purchase_date DATE, empty_date DATE, removed_date DATE, duration_days INTEGER, storage_location TEXT, reason TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE SET NULL );
+CREATE TABLE store_layouts ( id INTEGER PRIMARY KEY AUTOINCREMENT, store_name TEXT UNIQUE NOT NULL, layout_json TEXT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP );
+CREATE TABLE categories ( id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE NOT NULL, icon TEXT, recommended_storage TEXT, typical_shelf_life_days INTEGER, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP );
+CREATE TABLE units ( id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE NOT NULL, icon TEXT DEFAULT '📦' );
+CREATE TABLE store_settings ( id INTEGER PRIMARY KEY AUTOINCREMENT, key TEXT UNIQUE NOT NULL, value TEXT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP );
+CREATE TABLE app_settings ( key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP );
+CREATE TABLE location_settings ( id INTEGER PRIMARY KEY AUTOINCREMENT, keyword TEXT UNIQUE NOT NULL, color_r INTEGER NOT NULL DEFAULT 70, color_g INTEGER NOT NULL DEFAULT 130, color_b INTEGER NOT NULL DEFAULT 180, icon TEXT NOT NULL DEFAULT '📦', display_name TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP );
+CREATE TABLE product_stores ( id INTEGER PRIMARY KEY AUTOINCREMENT, product_id INTEGER NOT NULL, store_name TEXT NOT NULL, is_preferred INTEGER DEFAULT 0, price REAL, last_purchased DATE, notes TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE, UNIQUE(product_id, store_name) );
+CREATE INDEX idx_products_barcode ON products(barcode);
+CREATE INDEX idx_products_category ON products(category);
+CREATE INDEX idx_inventory_product ON inventory(product_id);
+CREATE INDEX idx_inventory_location ON inventory(storage_location);
+CREATE INDEX idx_inventory_expiry ON inventory(expiry_date);
+CREATE INDEX idx_inventory_status ON inventory(status);
+CREATE INDEX idx_shopping_category ON shopping_list(category);
+CREATE INDEX idx_shopping_checked ON shopping_list(checked);
+CREATE INDEX idx_learning_barcode_field ON user_learning(barcode, field);
+CREATE INDEX idx_learning_name_field ON user_learning(product_name, field);
+CREATE INDEX idx_consumption_product ON consumption_history(product_name, barcode);
+CREATE INDEX idx_consumption_dates ON consumption_history(purchase_date, empty_date);
+CREATE INDEX idx_product_stores_product ON product_stores(product_id);
+CREATE INDEX idx_product_stores_store ON product_stores(store_name);
+CREATE INDEX idx_recipes_name ON recipes(name);
+CREATE INDEX idx_recipe_ingredients_recipe ON recipe_ingredients(recipe_id);
+CREATE INDEX idx_recipe_ingredients_product ON recipe_ingredients(product_id);
+CREATE INDEX idx_products_name ON products(name);
+--- erwartet
+abgleich []
+unveraendert TRUE
+[] 2 theme|dark|2026-11-08 10:00:00|language|de|2026-11-08 10:00:00
+[]
+[] theme|dark|2026-11-08 10:00:00|language|en|2026-11-08 10:00:00
+
+=== eine neue datei aus dem uebernommenen schema hat dieselben arten
+' Das gebaute Programm legt auf einem leeren Rechner die Tabellen aus dem
+' Schema an: DATE bleibt DATE, CURRENT_TIMESTAMP bleibt die Vorgabe, und der
+' Fremdschluessel kommt mit seinem ON DELETE mit.
+IMPORT "kern.dh"
+dateiAnlegen("kuehl.db")
+DIM s AS JSON_HANDLE : s = JSON_PARSE(dbSchemaAusDatei$("kuehl.db", "kuehl.db"))
+PRINT dbTabelleSql$(s, dbTabIndex(s, "inventory"), "inventory")
+PRINT dbTabelleSql$(s, dbTabIndex(s, "app_settings"), "app_settings")
+' Ergaenzen in einer aelteren Datei (ALTER TABLE ADD COLUMN): dort nimmt
+' SQLite kein CURRENT_TIMESTAMP, und NOT NULL braucht eine Vorgabe.
+DIM t AS INTEGER : t = dbTabIndex(s, "inventory")
+PRINT dbSpalteSqlDazu$(s, t, dbSpIndex(s, t, "product_id"))
+PRINT dbSpalteSqlDazu$(s, t, dbSpIndex(s, t, "created_at"))
+PRINT dbSpalteSqlDazu$(s, t, dbSpIndex(s, t, "unit"))
+--- datei kern.dh
+IMPORT "json"
+IMPORT "regex"
+IMPORT "imgfx"
+IMPORT "db"
+IMPORT "{sammlung}/../../../studio/sprache.dh"
+IMPORT "{sammlung}/../../../studio/bibliothek.dh"
+IMPORT "{sammlung}/../../../studio/modell.dh"
+IMPORT "{sammlung}/../../../studio/projekt.dh"
+IMPORT "{sammlung}/../../../studio/datenbank.dh"
+' Die Datei aus dem Aufbau der Kuehlschrank-App (PySide6) mit ein paar Zeilen.
+SUB dateiAnlegen(pfad AS STRING)
+    DIM db AS DB_CONN : db = DB_OPEN(pfad)
+    DIM sql AS STRING
+    FOR EACH sql IN READLINES("schema.sql")
+        sql = TRIM$(sql)
+        IF RIGHT$(sql, 1) = ";" THEN sql = LEFT$(sql, LEN(sql) - 1)
+        IF sql <> "" THEN DB_EXEC(db, sql)
+    NEXT
+    DB_EXEC(db, "INSERT INTO products (barcode, name) VALUES ('4000', 'Milch')")
+    DB_EXEC(db, "INSERT INTO inventory (product_id, expiry_date) VALUES (1, '2026-11-20')")
+    DB_EXEC(db, "INSERT INTO app_settings (key, value, updated_at) VALUES ('theme', 'dark', '2026-11-08 10:00:00')")
+    DB_EXEC(db, "INSERT INTO app_settings (key, value, updated_at) VALUES ('language', 'de', '2026-11-08 10:00:00')")
+    DB_CLOSE(db)
+END SUB
+' Alles, was SQLite ueber den Aufbau weiss, und die Zeilen -- als ein Text.
+FUNCTION aufbau$(pfad AS STRING) AS STRING
+    DIM db AS DB_CONN : db = DB_OPEN(pfad)
+    DIM z AS ARRAY OF STRING : z = []
+    DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT type, name, IFNULL(sql, '') FROM sqlite_master ORDER BY name")
+    WHILE DB_NEXT(r)
+        ARRAY_PUSH(z, DB_GET_STRING(r, 0) + " " + DB_GET_STRING(r, 1) + " " + DB_GET_STRING(r, 2))
+    WEND
+    r = DB_QUERY(db, "SELECT id, name, barcode, created_at FROM products")
+    WHILE DB_NEXT(r)
+        ARRAY_PUSH(z, DB_GET_STRING(r, 0) + DB_GET_STRING(r, 1) + DB_GET_STRING(r, 2) + DB_GET_STRING(r, 3))
+    WEND
+    DB_CLOSE(db)
+    RETURN JOIN$(z, CHR$(10))
+END FUNCTION
+SUB spalten(s AS JSON_HANDLE, tab AS STRING)
+    DIM t AS INTEGER : t = dbTabIndex(s, tab)
+    DIM k AS INTEGER
+    FOR k = 0 TO dbSpZahl(s, t) - 1
+        DIM z AS STRING : z = "  " + dbSp$(s, t, k, "name") + " " + dbSp$(s, t, k, "typ")
+        IF dbSpAn(s, t, k, "pflicht") THEN z = z + " pflicht"
+        IF dbSpAn(s, t, k, "eindeutig") THEN z = z + " eindeutig"
+        IF dbSp$(s, t, k, "vorgabe") <> "" THEN z = z + " vorgabe=" + dbSp$(s, t, k, "vorgabe")
+        IF dbSpHat(s, t, k, "sql") THEN z = z + " sql=" + dbSp$(s, t, k, "sql")
+        IF dbSpHat(s, t, k, "sqlvorgabe") THEN z = z + " sqlvorgabe=[" + dbSp$(s, t, k, "sqlvorgabe") + "]"
+        IF dbSp$(s, t, k, "verweis") <> "" THEN z = z + " verweis=" + dbSp$(s, t, k, "verweis")
+        PRINT z
+    NEXT
+END SUB
+FUNCTION tabellenNamen(s AS JSON_HANDLE) AS ARRAY OF STRING
+    DIM aus AS ARRAY OF STRING : aus = []
+    DIM t AS INTEGER
+    FOR t = 0 TO dbTabZahl(s) - 1
+        ARRAY_PUSH(aus, dbTabName$(s, t))
+    NEXT
+    RETURN aus
+END FUNCTION
+--- datei schema.sql
+CREATE TABLE products ( id INTEGER PRIMARY KEY AUTOINCREMENT, barcode TEXT UNIQUE, name TEXT NOT NULL, brand TEXT, category TEXT, image_url TEXT, min_quantity REAL, min_unit TEXT, default_storage_location TEXT, default_shelf_life_days INTEGER, nutritional_info TEXT, allergens TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP );
+CREATE TABLE locations ( id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE NOT NULL, type TEXT, temperature_zone TEXT, icon TEXT, sort_order INTEGER DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP );
+CREATE TABLE storage_locations ( id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE NOT NULL, icon TEXT, temperature_zone TEXT, description TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP );
+CREATE TABLE inventory ( id INTEGER PRIMARY KEY AUTOINCREMENT, product_id INTEGER NOT NULL, quantity REAL NOT NULL DEFAULT 1, unit TEXT DEFAULT 'Stück', purchase_date DATE, expiry_date DATE, storage_location TEXT, storage_area TEXT, notes TEXT, status TEXT DEFAULT 'fresh', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, purchased_at_store TEXT, FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE CASCADE );
+CREATE TABLE shopping_list ( id INTEGER PRIMARY KEY AUTOINCREMENT, product_name TEXT NOT NULL, quantity REAL DEFAULT 1, unit TEXT DEFAULT 'Stück', category TEXT, notes TEXT, checked INTEGER DEFAULT 0, priority INTEGER DEFAULT 0, added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP , store_name TEXT);
+CREATE TABLE recipes ( id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, description TEXT, servings INTEGER DEFAULT 1, instructions TEXT, prep_time_minutes INTEGER, cook_time_minutes INTEGER, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP );
+CREATE TABLE recipe_ingredients ( id INTEGER PRIMARY KEY AUTOINCREMENT, recipe_id INTEGER NOT NULL, product_id INTEGER, product_name TEXT NOT NULL, quantity REAL NOT NULL, unit TEXT NOT NULL, notes TEXT, FOREIGN KEY (recipe_id) REFERENCES recipes (id) ON DELETE CASCADE, FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE SET NULL );
+CREATE TABLE shopping_templates ( id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, description TEXT, items_json TEXT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, usage_count INTEGER DEFAULT 0 );
+CREATE TABLE user_learning ( id INTEGER PRIMARY KEY AUTOINCREMENT, barcode TEXT, product_name TEXT, field TEXT NOT NULL, value TEXT NOT NULL, choice_count INTEGER DEFAULT 1, last_used TIMESTAMP DEFAULT CURRENT_TIMESTAMP, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, confidence REAL DEFAULT 0.0 );
+CREATE TABLE consumption_history ( id INTEGER PRIMARY KEY AUTOINCREMENT, product_id INTEGER, product_name TEXT NOT NULL, barcode TEXT, quantity INTEGER DEFAULT 1, unit TEXT, purchase_date DATE, empty_date DATE, removed_date DATE, duration_days INTEGER, storage_location TEXT, reason TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE SET NULL );
+CREATE TABLE store_layouts ( id INTEGER PRIMARY KEY AUTOINCREMENT, store_name TEXT UNIQUE NOT NULL, layout_json TEXT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP );
+CREATE TABLE categories ( id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE NOT NULL, icon TEXT, recommended_storage TEXT, typical_shelf_life_days INTEGER, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP );
+CREATE TABLE units ( id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE NOT NULL, icon TEXT DEFAULT '📦' );
+CREATE TABLE store_settings ( id INTEGER PRIMARY KEY AUTOINCREMENT, key TEXT UNIQUE NOT NULL, value TEXT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP );
+CREATE TABLE app_settings ( key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP );
+CREATE TABLE location_settings ( id INTEGER PRIMARY KEY AUTOINCREMENT, keyword TEXT UNIQUE NOT NULL, color_r INTEGER NOT NULL DEFAULT 70, color_g INTEGER NOT NULL DEFAULT 130, color_b INTEGER NOT NULL DEFAULT 180, icon TEXT NOT NULL DEFAULT '📦', display_name TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP );
+CREATE TABLE product_stores ( id INTEGER PRIMARY KEY AUTOINCREMENT, product_id INTEGER NOT NULL, store_name TEXT NOT NULL, is_preferred INTEGER DEFAULT 0, price REAL, last_purchased DATE, notes TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE, UNIQUE(product_id, store_name) );
+CREATE INDEX idx_products_barcode ON products(barcode);
+CREATE INDEX idx_products_category ON products(category);
+CREATE INDEX idx_inventory_product ON inventory(product_id);
+CREATE INDEX idx_inventory_location ON inventory(storage_location);
+CREATE INDEX idx_inventory_expiry ON inventory(expiry_date);
+CREATE INDEX idx_inventory_status ON inventory(status);
+CREATE INDEX idx_shopping_category ON shopping_list(category);
+CREATE INDEX idx_shopping_checked ON shopping_list(checked);
+CREATE INDEX idx_learning_barcode_field ON user_learning(barcode, field);
+CREATE INDEX idx_learning_name_field ON user_learning(product_name, field);
+CREATE INDEX idx_consumption_product ON consumption_history(product_name, barcode);
+CREATE INDEX idx_consumption_dates ON consumption_history(purchase_date, empty_date);
+CREATE INDEX idx_product_stores_product ON product_stores(product_id);
+CREATE INDEX idx_product_stores_store ON product_stores(store_name);
+CREATE INDEX idx_recipes_name ON recipes(name);
+CREATE INDEX idx_recipe_ingredients_recipe ON recipe_ingredients(recipe_id);
+CREATE INDEX idx_recipe_ingredients_product ON recipe_ingredients(product_id);
+CREATE INDEX idx_products_name ON products(name);
+--- erwartet
+CREATE TABLE IF NOT EXISTS "inventory" (id INTEGER PRIMARY KEY, "product_id" INTEGER NOT NULL REFERENCES "products"(id) ON DELETE CASCADE, "quantity" REAL NOT NULL DEFAULT 1, "unit" TEXT DEFAULT 'Stück', "purchase_date" DATE, "expiry_date" DATE, "storage_location" TEXT, "storage_area" TEXT, "notes" TEXT, "status" TEXT DEFAULT 'fresh', "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "purchased_at_store" TEXT)
+CREATE TABLE IF NOT EXISTS "app_settings" (id INTEGER PRIMARY KEY, "key" TEXT, "value" TEXT NOT NULL, "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
+"product_id" INTEGER NOT NULL DEFAULT 0
+"created_at" TIMESTAMP
+"unit" TEXT DEFAULT 'Stück'
+
+=== wer art oder vorgabe aendert, nimmt das woertliche zurueck
+' Dieselbe Vorgabe im Gitter (CURRENT_TIMESTAMP steht dort woertlich) laesst
+' sie stehen; eine andere Art nimmt "sql" weg und baut die Tabelle neu auf.
+IMPORT "kern.dh"
+projOrdner = CWD$()
+dateiAnlegen("kuehl.db")
+DIM e AS Element : e = elementNeu("datenbank", "Vorrat")
+e.schema = dbSchemaAusDatei$("kuehl.db", "kuehl.db")
+DIM s AS JSON_HANDLE : s = dbSchema(e)
+DIM t AS INTEGER : t = dbTabIndex(s, "inventory")
+DIM k AS INTEGER : k = dbSpIndex(s, t, "created_at")
+PRINT "gitter "; dbSpVorgabe$(s, t, k)
+PRINT "[" + dbSpalteAendern$(e, "inventory", "created_at", "text", FALSE, FALSE, "CURRENT_TIMESTAMP") + "]"
+PRINT "[" + dbSpalteAendern$(e, "inventory", "expiry_date", "text", FALSE, FALSE, "") + "]"
+PRINT "[" + dbSpalteAendern$(e, "inventory", "notes", "text", FALSE, FALSE, "keine") + "]"
+s = dbSchema(e)
+spalten(s, "inventory")
+DIM db AS DB_CONN : db = DB_OPEN("kuehl.db")
+DIM r AS DB_RESULT : r = DB_QUERY(db, "PRAGMA table_info(inventory)")
+WHILE DB_NEXT(r)
+    IF DB_GET_STRING(r, 1) = "expiry_date" OR DB_GET_STRING(r, 1) = "created_at" OR DB_GET_STRING(r, 1) = "notes" THEN PRINT "datei "; DB_GET_STRING(r, 1); " "; DB_GET_STRING(r, 2); " "; IIF(DB_IS_NULL(r, 4), "-", DB_GET_STRING(r, 4))
+WEND
+r = DB_QUERY(db, "SELECT expiry_date FROM inventory")
+IF DB_NEXT(r) THEN PRINT "zeile "; DB_GET_STRING(r, 0)
+' Fehlt der Datei eine Spalte mit CURRENT_TIMESTAMP, baut der Abgleich die
+' Tabelle neu auf (ADD COLUMN nimmt diese Vorgabe nicht).
+DB_EXEC(db, "ALTER TABLE products DROP COLUMN updated_at")
+DB_CLOSE(db)
+PRINT "abgleich [" + dbAbgleichen$(e) + "]"
+db = DB_OPEN("kuehl.db")
+r = DB_QUERY(db, "PRAGMA table_info(products)")
+WHILE DB_NEXT(r)
+    IF DB_GET_STRING(r, 1) = "updated_at" OR DB_GET_STRING(r, 1) = "name" THEN PRINT "datei "; DB_GET_STRING(r, 1); " "; DB_GET_STRING(r, 2); " "; DB_GET_INT(r, 3); " "; IIF(DB_IS_NULL(r, 4), "-", DB_GET_STRING(r, 4))
+WEND
+r = DB_QUERY(db, "SELECT name, updated_at IS NOT NULL FROM products")
+IF DB_NEXT(r) THEN PRINT "zeile "; DB_GET_STRING(r, 0); " "; DB_GET_INT(r, 1)
+DB_CLOSE(db)
+--- datei kern.dh
+IMPORT "json"
+IMPORT "regex"
+IMPORT "imgfx"
+IMPORT "db"
+IMPORT "{sammlung}/../../../studio/sprache.dh"
+IMPORT "{sammlung}/../../../studio/bibliothek.dh"
+IMPORT "{sammlung}/../../../studio/modell.dh"
+IMPORT "{sammlung}/../../../studio/projekt.dh"
+IMPORT "{sammlung}/../../../studio/datenbank.dh"
+' Die Datei aus dem Aufbau der Kuehlschrank-App (PySide6) mit ein paar Zeilen.
+SUB dateiAnlegen(pfad AS STRING)
+    DIM db AS DB_CONN : db = DB_OPEN(pfad)
+    DIM sql AS STRING
+    FOR EACH sql IN READLINES("schema.sql")
+        sql = TRIM$(sql)
+        IF RIGHT$(sql, 1) = ";" THEN sql = LEFT$(sql, LEN(sql) - 1)
+        IF sql <> "" THEN DB_EXEC(db, sql)
+    NEXT
+    DB_EXEC(db, "INSERT INTO products (barcode, name) VALUES ('4000', 'Milch')")
+    DB_EXEC(db, "INSERT INTO inventory (product_id, expiry_date) VALUES (1, '2026-11-20')")
+    DB_EXEC(db, "INSERT INTO app_settings (key, value, updated_at) VALUES ('theme', 'dark', '2026-11-08 10:00:00')")
+    DB_EXEC(db, "INSERT INTO app_settings (key, value, updated_at) VALUES ('language', 'de', '2026-11-08 10:00:00')")
+    DB_CLOSE(db)
+END SUB
+' Alles, was SQLite ueber den Aufbau weiss, und die Zeilen -- als ein Text.
+FUNCTION aufbau$(pfad AS STRING) AS STRING
+    DIM db AS DB_CONN : db = DB_OPEN(pfad)
+    DIM z AS ARRAY OF STRING : z = []
+    DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT type, name, IFNULL(sql, '') FROM sqlite_master ORDER BY name")
+    WHILE DB_NEXT(r)
+        ARRAY_PUSH(z, DB_GET_STRING(r, 0) + " " + DB_GET_STRING(r, 1) + " " + DB_GET_STRING(r, 2))
+    WEND
+    r = DB_QUERY(db, "SELECT id, name, barcode, created_at FROM products")
+    WHILE DB_NEXT(r)
+        ARRAY_PUSH(z, DB_GET_STRING(r, 0) + DB_GET_STRING(r, 1) + DB_GET_STRING(r, 2) + DB_GET_STRING(r, 3))
+    WEND
+    DB_CLOSE(db)
+    RETURN JOIN$(z, CHR$(10))
+END FUNCTION
+SUB spalten(s AS JSON_HANDLE, tab AS STRING)
+    DIM t AS INTEGER : t = dbTabIndex(s, tab)
+    DIM k AS INTEGER
+    FOR k = 0 TO dbSpZahl(s, t) - 1
+        DIM z AS STRING : z = "  " + dbSp$(s, t, k, "name") + " " + dbSp$(s, t, k, "typ")
+        IF dbSpAn(s, t, k, "pflicht") THEN z = z + " pflicht"
+        IF dbSpAn(s, t, k, "eindeutig") THEN z = z + " eindeutig"
+        IF dbSp$(s, t, k, "vorgabe") <> "" THEN z = z + " vorgabe=" + dbSp$(s, t, k, "vorgabe")
+        IF dbSpHat(s, t, k, "sql") THEN z = z + " sql=" + dbSp$(s, t, k, "sql")
+        IF dbSpHat(s, t, k, "sqlvorgabe") THEN z = z + " sqlvorgabe=[" + dbSp$(s, t, k, "sqlvorgabe") + "]"
+        IF dbSp$(s, t, k, "verweis") <> "" THEN z = z + " verweis=" + dbSp$(s, t, k, "verweis")
+        PRINT z
+    NEXT
+END SUB
+FUNCTION tabellenNamen(s AS JSON_HANDLE) AS ARRAY OF STRING
+    DIM aus AS ARRAY OF STRING : aus = []
+    DIM t AS INTEGER
+    FOR t = 0 TO dbTabZahl(s) - 1
+        ARRAY_PUSH(aus, dbTabName$(s, t))
+    NEXT
+    RETURN aus
+END FUNCTION
+--- datei schema.sql
+CREATE TABLE products ( id INTEGER PRIMARY KEY AUTOINCREMENT, barcode TEXT UNIQUE, name TEXT NOT NULL, brand TEXT, category TEXT, image_url TEXT, min_quantity REAL, min_unit TEXT, default_storage_location TEXT, default_shelf_life_days INTEGER, nutritional_info TEXT, allergens TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP );
+CREATE TABLE locations ( id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE NOT NULL, type TEXT, temperature_zone TEXT, icon TEXT, sort_order INTEGER DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP );
+CREATE TABLE storage_locations ( id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE NOT NULL, icon TEXT, temperature_zone TEXT, description TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP );
+CREATE TABLE inventory ( id INTEGER PRIMARY KEY AUTOINCREMENT, product_id INTEGER NOT NULL, quantity REAL NOT NULL DEFAULT 1, unit TEXT DEFAULT 'Stück', purchase_date DATE, expiry_date DATE, storage_location TEXT, storage_area TEXT, notes TEXT, status TEXT DEFAULT 'fresh', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, purchased_at_store TEXT, FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE CASCADE );
+CREATE TABLE shopping_list ( id INTEGER PRIMARY KEY AUTOINCREMENT, product_name TEXT NOT NULL, quantity REAL DEFAULT 1, unit TEXT DEFAULT 'Stück', category TEXT, notes TEXT, checked INTEGER DEFAULT 0, priority INTEGER DEFAULT 0, added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP , store_name TEXT);
+CREATE TABLE recipes ( id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, description TEXT, servings INTEGER DEFAULT 1, instructions TEXT, prep_time_minutes INTEGER, cook_time_minutes INTEGER, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP );
+CREATE TABLE recipe_ingredients ( id INTEGER PRIMARY KEY AUTOINCREMENT, recipe_id INTEGER NOT NULL, product_id INTEGER, product_name TEXT NOT NULL, quantity REAL NOT NULL, unit TEXT NOT NULL, notes TEXT, FOREIGN KEY (recipe_id) REFERENCES recipes (id) ON DELETE CASCADE, FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE SET NULL );
+CREATE TABLE shopping_templates ( id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, description TEXT, items_json TEXT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, usage_count INTEGER DEFAULT 0 );
+CREATE TABLE user_learning ( id INTEGER PRIMARY KEY AUTOINCREMENT, barcode TEXT, product_name TEXT, field TEXT NOT NULL, value TEXT NOT NULL, choice_count INTEGER DEFAULT 1, last_used TIMESTAMP DEFAULT CURRENT_TIMESTAMP, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, confidence REAL DEFAULT 0.0 );
+CREATE TABLE consumption_history ( id INTEGER PRIMARY KEY AUTOINCREMENT, product_id INTEGER, product_name TEXT NOT NULL, barcode TEXT, quantity INTEGER DEFAULT 1, unit TEXT, purchase_date DATE, empty_date DATE, removed_date DATE, duration_days INTEGER, storage_location TEXT, reason TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE SET NULL );
+CREATE TABLE store_layouts ( id INTEGER PRIMARY KEY AUTOINCREMENT, store_name TEXT UNIQUE NOT NULL, layout_json TEXT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP );
+CREATE TABLE categories ( id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE NOT NULL, icon TEXT, recommended_storage TEXT, typical_shelf_life_days INTEGER, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP );
+CREATE TABLE units ( id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE NOT NULL, icon TEXT DEFAULT '📦' );
+CREATE TABLE store_settings ( id INTEGER PRIMARY KEY AUTOINCREMENT, key TEXT UNIQUE NOT NULL, value TEXT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP );
+CREATE TABLE app_settings ( key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP );
+CREATE TABLE location_settings ( id INTEGER PRIMARY KEY AUTOINCREMENT, keyword TEXT UNIQUE NOT NULL, color_r INTEGER NOT NULL DEFAULT 70, color_g INTEGER NOT NULL DEFAULT 130, color_b INTEGER NOT NULL DEFAULT 180, icon TEXT NOT NULL DEFAULT '📦', display_name TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP );
+CREATE TABLE product_stores ( id INTEGER PRIMARY KEY AUTOINCREMENT, product_id INTEGER NOT NULL, store_name TEXT NOT NULL, is_preferred INTEGER DEFAULT 0, price REAL, last_purchased DATE, notes TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE, UNIQUE(product_id, store_name) );
+CREATE INDEX idx_products_barcode ON products(barcode);
+CREATE INDEX idx_products_category ON products(category);
+CREATE INDEX idx_inventory_product ON inventory(product_id);
+CREATE INDEX idx_inventory_location ON inventory(storage_location);
+CREATE INDEX idx_inventory_expiry ON inventory(expiry_date);
+CREATE INDEX idx_inventory_status ON inventory(status);
+CREATE INDEX idx_shopping_category ON shopping_list(category);
+CREATE INDEX idx_shopping_checked ON shopping_list(checked);
+CREATE INDEX idx_learning_barcode_field ON user_learning(barcode, field);
+CREATE INDEX idx_learning_name_field ON user_learning(product_name, field);
+CREATE INDEX idx_consumption_product ON consumption_history(product_name, barcode);
+CREATE INDEX idx_consumption_dates ON consumption_history(purchase_date, empty_date);
+CREATE INDEX idx_product_stores_product ON product_stores(product_id);
+CREATE INDEX idx_product_stores_store ON product_stores(store_name);
+CREATE INDEX idx_recipes_name ON recipes(name);
+CREATE INDEX idx_recipe_ingredients_recipe ON recipe_ingredients(recipe_id);
+CREATE INDEX idx_recipe_ingredients_product ON recipe_ingredients(product_id);
+CREATE INDEX idx_products_name ON products(name);
+--- erwartet
+gitter CURRENT_TIMESTAMP
+[]
+[]
+[]
+  product_id ganz pflicht sqlvorgabe=[] verweis=products
+  quantity zahl pflicht vorgabe=1
+  unit text vorgabe=Stück
+  purchase_date datum sql=DATE
+  expiry_date text
+  storage_location text
+  storage_area text
+  notes text vorgabe=keine
+  status text vorgabe=fresh
+  created_at text sql=TIMESTAMP sqlvorgabe=[CURRENT_TIMESTAMP]
+  updated_at text sql=TIMESTAMP sqlvorgabe=[CURRENT_TIMESTAMP]
+  purchased_at_store text
+datei expiry_date TEXT -
+datei notes TEXT 'keine'
+datei created_at TIMESTAMP CURRENT_TIMESTAMP
+zeile 2026-11-20
+abgleich []
+datei name TEXT 1 -
+datei updated_at TIMESTAMP 0 CURRENT_TIMESTAMP
+zeile Milch 1

@@ -77,6 +77,7 @@ IMPORT "gui"
 | `GUI_WINDOW_DESIGN(win, an)` | — | Entwurfsmodus: das Fenster wird gezeichnet, aber seine Widgets bekommen keine Eingabe (kein Hover, Klick, Fokus, Rückruf; auch kein Ziehen am Rahmen). Ein Form-Designer legt so echte Widgets auf die Fläche und verwaltet die Maus selbst — `GUI_HIT_TEST` und alle Setter gehen weiter. Default: aus |
 | `GUI_WINDOW_ZOOM(win, faktor)` | — | ein Fenster im Entwurfsmodus vergrößert zeichnen (0.25 bis 4): die Lage bleibt, die Fläche wächst. Geometrie nach außen bleibt unvergrößert, `GUI_HIT_TEST` und `GUI_WINDOW_AT` rechnen die Maus zurück. Gezeichnet wird über eine Zwischenfläche, die weich vergrößert wird — Schrift ist bei 150–200 % etwas weich. Außerhalb des Entwurfsmodus ein Fehler (das Fenster nähme Eingaben an, und die Maus träfe daneben) |
 | `GUI_WINDOW_GET_ZOOM(win)` | FLOAT | der Faktor von `GUI_WINDOW_ZOOM` |
+| `GUI_WINDOW_CLIP(win, x, y, b, h)` | — | ein Fenster im Entwurfsmodus nur in diesem Teil des Schirms zeigen (logische Punkte wie `GUI_WINDOW_SET_BOUNDS`): was draußen liegt, wird nicht gezeichnet und trifft keinen Klick (`GUI_HIT_TEST`, `GUI_WINDOW_AT`). `b` oder `h` ≤ 0 hebt den Zuschnitt auf. Außerhalb des Entwurfsmodus ein Fehler |
 | `GUI_WINDOW_SET_MIN_SIZE(win, w, h)` | — | Mindestgröße beim Resizen (0 = keine) |
 | `GUI_WINDOW_SET_MAX_SIZE(win, w, h)` | — | Maximalgröße beim Resizen (0 = keine) |
 | `GUI_SEPARATOR(win, x, y, w)` | GUI_WIDGET | dekorative Trennlinie (horizontal) |
@@ -197,6 +198,7 @@ IMPORT "gui"
 | `GUI_TREE_CLEAR(tree)` | — | alle Knoten löschen |
 | `GUI_TREE_SELECTED(tree)` / `GUI_TREE_SET_SELECTED(tree, node)` | INT / — | gewählten Knoten lesen/setzen (-1 = keiner) |
 | `GUI_TREE_LABEL(tree, node)` | STRING | Text eines Knotens |
+| `GUI_TABCONTROL_ITEM_RECT(tc, seite)` | TUPLE | (x, y, b, h) des Kopfs einer Seite auf dem Bildschirm, aus derselben Rechnung wie Zeichnen und Klick -- für Prüfungen mit echten Klicks |
 | `GUI_TREE_ITEM_RECT(tree, node)` | TUPLE | (x, y, b, h) eines Knotens auf dem Bildschirm, x am Anfang der Beschriftung; unter einem zugeklappten (0, 0, 0, 0) -- für Prüfungen mit echten Klicks |
 | `GUI_TREE_EXPAND(tree, node, flag)` | — | Knoten auf-/zuklappen |
 | `GUI_TREE_SET(tree, key$, wert)` | — | Einstellung am Baum: `mehrfachauswahl`, `kaestchen`, `bearbeitbar` (F2 benennt um) |
@@ -229,7 +231,7 @@ IMPORT "gui"
 | `GUI_FILETREE_ICONS(ft, ordnerbild, dateibild)` | — | Sinnbilder für Ordner und Dateien (-1 = keins) |
 | `GUI_FILETREE_COLOR(ft, muster$, farbe)` | — | Textfarbe je Dateiart: Muster wie beim Filter (`"*.json;*.ini"`), `"/"` für Ordner; das erste passende gilt, -1 nimmt die Farbe weg |
 | `GUI_FILETREE_ICON(ft, muster$, sinnbild$)` | — | eingebautes Sinnbild je Dateiart, nach derselben Regel wie die Farbe, gezeichnet in der Farbe des Namens; ein Ordner mit `"ordner"` zeigt aufgeklappt `"ordner_offen"`, `""` nimmt es weg |
-| `GUI_TABCONTROL(win, x, y, w, h)` | GUI_WIDGET | Reiter **innerhalb** eines Fensters (Karteikasten) |
+| `GUI_TABCONTROL(win, x, y, w, h)` | GUI_WIDGET | Reiter **innerhalb** eines Fensters (Karteikasten); passen die Köpfe nicht in die Breite, werden die breitesten zuerst schmaler und ihr Titel gekürzt |
 | `GUI_TABCONTROL_ADD(tc, titel$)` | INTEGER | eine Seite anhängen, liefert ihre Nummer |
 | `GUI_TABCONTROL_ADD_WIDGET(tc, wdg, seite)` | — | ein Widget auf eine Seite legen; es behält seine Lage im Fenster |
 | `GUI_TABCONTROL_PAGE(tc)` / `GUI_TABCONTROL_SET_PAGE(tc, seite)` | INTEGER / — | vordere Seite lesen und setzen |
@@ -402,6 +404,7 @@ Native, blockierende Standarddialoge (kein IMPORT nötig — wie die Datei-Dialo
 | `GUI_DROPDOWN(win, x, y, w, h, items)` | GUI_WIDGET | aufklappende Auswahlliste; das Popup wird ueber allen anderen Widgets gezeichnet |
 | `GUI_DROPDOWN_SELECTED(dd)` | INTEGER | Index der Auswahl (`-1` = keine) |
 | `GUI_DROPDOWN_TEXT(dd)` | STRING | Text der Auswahl |
+| `GUI_DROPDOWN_COUNT(dd)` / `GUI_DROPDOWN_ITEM(dd, i)` | INTEGER / STRING | wie viele Einträge, und Eintrag i (ab 0) |
 | `GUI_DROPDOWN_SET_SELECTED(dd, i)` | — | Auswahl vom Programm aus setzen |
 | `GUI_SET_DROPDOWN(dd, items)` | — | Eintraege ersetzen |
 | `GUI_DROPDOWN_PLACEHOLDER(dd, text$)` | — | Hinweis in der Box, solange nichts gewählt ist („Bitte wählen“) |
@@ -533,7 +536,9 @@ werden verschluckt, Menü-Kürzel anderer Fenster schweigen, der Schleier liegt
 über allem anderen. Anders als bei `GUI_DIALOG` **beendet ein Knopf im Fenster
 nichts** — das Programm gibt frei, wenn es so weit ist (`GUI_WINDOW_MODAL(win,
 FALSE)`), und Ausblenden oder Zerstören des Fensters gibt von selbst frei.
-`GUI_WINDOW_DEFAULT`/`GUI_WINDOW_CANCEL` liefern Enter und ESC dazu.
+`GUI_WINDOW_DEFAULT`/`GUI_WINDOW_CANCEL` liefern Enter und ESC dazu. Den
+Tastaturfokus nimmt das modale Fenster einem Widget dahinter weg und gibt ihn
+beim Gehen zurück -- sonst bekäme eine Tabelle dahinter Enter als Doppelklick.
 Beispiel: [`examples/193_gui_dialoge.dh`](../examples/193_gui_dialoge.dh).
 
 `\n` im Text (`CHR$(10)`) trennt Zeilen; das Fenster passt sich Text und
@@ -699,11 +704,13 @@ GUI_WINDOW_CANCEL(win, abbruchKnopf)  ' ESC drückt ihn
 Was jedes Formular braucht und was sonst jedes Programm mit `KEYHIT`
 nachbaute, ohne den Fokus zu beachten. Der Standard-Knopf trägt den Akzent
 als Rahmen, damit man sieht, was Enter tun wird. Die Taste gehört aber zuerst
-dem Widget mit Fokus: ein Knopf oder Kästchen mit Fokus nimmt Enter selbst,
+dem Widget mit Fokus: ein Knopf mit Fokus nimmt Enter selbst,
 ein Textbereich macht daraus einen Umbruch, eine Tabellenzelle in
 Bearbeitung ihr Ende. **Aus einem Textfeld heraus** ist Enter dagegen genau
 das: das Formular abschicken — das Feld meldet `GUI_ENTERED` **und** der
-Standard-Knopf klickt. ESC greift nicht, solange eine Klappliste offen ist.
+Standard-Knopf klickt. Ebenso aus einem Zahlenfeld (es übernimmt das
+Getippte vorher) und aus einem Kästchen, Schalter oder Optionsfeld -- die
+schalten mit der Leertaste, wie unter Windows, macOS und im Web. ESC greift nicht, solange eine Klappliste offen ist.
 Beide werden in die `.dhform` geschrieben (`default_button`/`cancel_button`,
 als Widget-Index).
 
@@ -860,6 +867,7 @@ dd = GUI_DROPDOWN(win, 20, 130, 160, 24, farben)   ' Klick klappt die Liste auf
 
 - `GUI_DROPDOWN_SELECTED(dd)` → Index (oder `-1`), `GUI_DROPDOWN_TEXT(dd)` → gewählter Text.
 - `GUI_DROPDOWN_SET_SELECTED(dd, i)` setzt die Auswahl, `GUI_SET_DROPDOWN(dd, items)` ersetzt die Liste.
+- `GUI_SET_TEXT(dd, "kg")` wählt den Eintrag, der so heißt (Groß/klein egal), sonst keinen; `GUI_TEXT(dd)` liefert den Text der Auswahl wie `GUI_DROPDOWN_TEXT` (bearbeitbar: siehe unten).
 - `GUI_ON_CHANGE(dd, handler)` feuert bei Auswahländerung. Das aufgeklappte Popup
   wird über allen anderen Widgets gezeichnet; Klick daneben schliesst es.
 - **Lange Listen**: das Popup zeigt höchstens zehn Einträge auf einmal, der Rest
@@ -1423,7 +1431,9 @@ Was eine Liste bequem macht, kann die Tabelle im **Zeilenmodus** genauso:
 
 * **Doppelklick oder Enter** auf eine Zeile meldet `GUI_DOUBLE_CLICKED(tbl)`
   ein Bild lang — „öffnen“ ohne eigene Doppelklick-Erkennung. Ein Doppelklick
-  auf eine bearbeitbare Textzelle bearbeitet sie weiterhin, statt zu melden.
+  auf eine bearbeitbare Textzelle bearbeitet sie weiterhin, statt zu melden;
+  einer auf eine Zelle der Art `knopf` oder `haken` sind zwei Klicks darauf
+  (`GUI_TABLE_CLICKED`), kein Doppelklick der Zeile.
 * **F2** bearbeitet die erste freigegebene Textspalte der gewählten Zeile
   (`GUI_TABLE_COL_EDIT`, in Anzeige-Reihenfolge). Im Zellmodus bearbeitet F2
   wie bisher die aktuelle Zelle.
@@ -1605,7 +1615,7 @@ Datenspalten, wie überall bei der Tabelle.
 | `GUI_TABLE_SELECT_RANGE(tbl, anker_zeile, anker_spalte, zeile, spalte)` | — | Bereich setzen |
 | `GUI_TABLE_COPY$(tbl)` | STRING | Bereich als Tabulator-Text |
 | `GUI_TABLE_PASTE(tbl, text$)` | INTEGER | Tabulator-Text ab der aktuellen Zelle einfügen; Zahl der geschriebenen Zellen |
-| `GUI_TABLE_COL_TYPE(tbl, spalte, art$)` | — | `text`, `ganz`, `zahl` oder `auswahl` |
+| `GUI_TABLE_COL_TYPE(tbl, spalte, art$)` | — | `text`, `ganz`, `zahl`, `auswahl` oder `datum` (beim Bearbeiten klappt der Monat unter der Zelle auf; ein Tag schreibt `JJJJ-MM-TT`) |
 | `GUI_TABLE_COL_CHOICES(tbl, spalte, eintraege)` | — | Einträge einer Auswahlspalte (macht sie zur Auswahl) |
 
 Eine **Zahlenspalte** nimmt beim Tippen nur, was eine Zahl werden kann
@@ -2394,6 +2404,7 @@ stabil (Löschen markiert nur als „tot", verschiebt keine Indizes).
 | `GUI_SET_BOUNDS(wdg, x, y, w, h)` | Widget verschieben/skalieren (fenster-relativ) |
 | `GUI_GET_X/Y/W/H(wdg)` → INTEGER | aktuelle Maße lesen |
 | `GUI_SET_VISIBLE(wdg, an)` / `GUI_VISIBLE(wdg)` → BOOLEAN | ein-/ausblenden (unsichtbar = nicht gezeichnet, nicht interaktiv) |
+| `GUI_SHOWN(wdg)` → BOOLEAN | ist es jetzt zu sehen? Zählt anders als `GUI_VISIBLE` auch das Fenster und verdeckte Reiterseiten (Fenster und Reiterwerk) mit -- eine Zeichenfläche auf einer Seite im Hintergrund zeichnet damit nicht |
 | `GUI_DESTROY(wdg)` | Widget entfernen (Handle wird ungültig, andere bleiben gültig) |
 | `GUI_KIND(wdg)` → STRING | `"button"`/`"label"`/`"checkbox"`/`"slider"`/`"textinput"`/`"panel"`/`"table"` |
 | `GUI_FOCUS(wdg)` | Tastatur-Fokus setzen (z.B. auf ein TextInput); `GUI_FOCUS(-1)` gibt ihn frei, die Tasten gehören dann dem Programm |
@@ -3175,7 +3186,8 @@ Die kleinen Dinge, an denen man eine Anwendung von einer Demo unterscheidet
   unter seiner Fläche. Ein rollendes Panel in einem rollenden Panel gibt es
   nicht.
 - **Ziehen zwischen Widgets**: `GUI_DRAGGABLE(wdg, TRUE)` macht ein Widget
-  zur Quelle (bei Liste und Baum die getroffene Zeile, sonst das Widget
+  zur Quelle (bei Liste, Baum und Tabelle die getroffene Zeile -- bei der
+  Tabelle die Datenzeile mit dem Text ihrer ersten Zelle --, sonst das Widget
   selbst mit seinem Text), `GUI_DROP_TARGET(wdg, TRUE)` zur Ablage. Ein
   Druck wird ab 5 px Bewegung zum Zug — ein Klick bleibt ein Klick. Während
   des Zugs hängt der Text an der Maus und die Ablage darunter bekommt einen
@@ -3272,7 +3284,7 @@ Akzentfarbe**; ohne sichtbaren Fokus wäre die Navigation wertlos.
 | Taste | Wirkung |
 |---|---|
 | `TAB` / `SHIFT+TAB` | nächstes / vorheriges Widget |
-| `LEERTASTE`, `ENTER` | Knopf auslösen, Kästchen/Schalter umschalten, Radio wählen, Klappliste auf/zu, Baumknoten auf/zuklappen |
+| `LEERTASTE`, `ENTER` | Knopf auslösen, Klappliste auf/zu, Baumknoten auf/zuklappen; Kästchen/Schalter umschalten und Radio wählen nur mit `LEERTASTE` (Enter drückt dort den Standard-Knopf) |
 | `←` `→` `↑` `↓` | Regler/Drehknopf verstellen (ein Zwanzigstel des Bereichs je Druck), Trenner verschieben (8 px), Auswahl in Liste/Klappliste/Baum bewegen |
 | `POS1` / `ENDE` | Regler/Drehknopf auf Minimum / Maximum |
 | `→` / `←` im Baum | aufklappen bzw. ins Kind / zuklappen bzw. zum Elternknoten |
@@ -3653,6 +3665,7 @@ nachbauen müsste.
 | `GUI_PICKED_COLOR(picker)` → INTEGER | gewählte Farbe (`0xRRGGBB`) |
 | `GUI_SET_PICKED_COLOR(picker, farbe)` | Farbe setzen |
 | `GUI_DATEPICKER(win, x, y, w, h)` → GUI_WIDGET | Monatsgitter mit Blätterpfeilen |
+| `GUI_DATEFIELD(win, x, y, w, h)` → GUI_WIDGET | Datumsfeld: zeigt das Datum und klappt beim Klick (Leertaste, F4, Alt+Ab) den Monat auf; ein Tag übernimmt, ESC klappt nur zu, Enter gilt zugeklappt dem Formular -- sonst wie GUI_DATEPICKER |
 | `GUI_DATE(picker)` → STRING | gewähltes Datum als `JJJJ-MM-TT` |
 | `GUI_SET_DATE(picker, datum$)` | Datum setzen |
 | `GUI_COLORPICKER_SET(picker, schluessel$, wert)` | `alpha` (0/1) — Deckkraft-Streifen zeigen |

@@ -1,0 +1,50 @@
+' Helfer fuer tests/pruef/gui/gui_datumsfeld.dhtest: ein Fenster ohne Rahmen,
+' Klicks und Tasten als Aufnahme (AUTOMATION_PLAY), ein Bild der gui, die
+' Mitte eines Tages im aufgeklappten Monat.
+IMPORT "gui"
+SCREEN(600, 420, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+SETFPS(60)
+DIM ereignisse AS ARRAY OF STRING : ereignisse = []
+FUNCTION fenster() AS GUI_WINDOW
+    DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 600, 420)
+    GUI_WINDOW_CHROME(w, FALSE)
+    RETURN w
+END FUNCTION
+SUB klick(bild AS INTEGER, x AS INTEGER, y AS INTEGER)
+    ARRAY_PUSH(ereignisse, "e " + STR$(bild) + " 7 " + STR$(x) + " " + STR$(y) + " 0 0")
+    ARRAY_PUSH(ereignisse, "e " + STR$(bild + 1) + " 6 0 0 0 0")
+    ARRAY_PUSH(ereignisse, "e " + STR$(bild + 3) + " 5 0 0 0 0")
+END SUB
+SUB taste(bild AS INTEGER, code AS INTEGER)
+    ARRAY_PUSH(ereignisse, "e " + STR$(bild) + " 2 " + STR$(code) + " 0 0 0")
+    ARRAY_PUSH(ereignisse, "e " + STR$(bild + 2) + " 1 " + STR$(code) + " 0 0 0")
+END SUB
+' Die Wiedergabe beginnt beim ersten Ereignis -- eins in Bild 0 voran.
+SUB spielen()
+    DIM z AS ARRAY OF STRING : z = ["e 0 7 590 410 0 0"]
+    DIM e AS STRING
+    FOR EACH e IN ereignisse
+        ARRAY_PUSH(z, e)
+    NEXT
+    WRITEALL("auf.txt", "c " + STR$(LEN(z)) + CHR$(10) + JOIN$(z, CHR$(10)) + CHR$(10))
+    AUTOMATION_PLAY("auf.txt")
+END SUB
+SUB bild()
+    GUI_UPDATE()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+END SUB
+' Mitte eines Tages im aufgeklappten Monat unter einem Feld bei (fx, fy, fb,
+' fh): Breite mindestens 252, Hoehe 236, Kopf 26, Wochentage 18, sechs
+' Wochen. erster = Spalte des Monatsersten (ab dem Wochenbeginn).
+FUNCTION tagX(tag AS INTEGER, erster AS INTEGER, fx AS INTEGER, fb AS INTEGER, dummy AS INTEGER) AS INTEGER
+    DIM pb AS INTEGER : pb = MAX(fb, 252)
+    DIM zb AS INTEGER : zb = pb \ 7
+    RETURN fx + ((tag - 1 + erster) MOD 7) * zb + zb \ 2
+END FUNCTION
+FUNCTION tagY(tag AS INTEGER, erster AS INTEGER, fy AS INTEGER, fh AS INTEGER, dummy AS INTEGER) AS INTEGER
+    DIM zh AS INTEGER : zh = (236 - 26 - 18) \ 6
+    RETURN fy + fh + 26 + 18 + ((tag - 1 + erster) \ 7) * zh + zh \ 2
+END FUNCTION

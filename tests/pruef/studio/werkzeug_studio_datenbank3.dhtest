@@ -88,6 +88,130 @@ filter abfrage []
 code TRUE TRUE
 loeschen [] 0 FALSE
 
+=== ein verweis als fremdschluessel: beim loeschen verbieten, mitloeschen, leeren
+' Vorher kannte das Studio einen Verweis nur als Spalte: eine Datei, die es
+' anlegte, hatte keinen Fremdschluessel, und die Kuehlschrank-App loeschte die
+' Zutaten eines Rezepts selbst. Jetzt sagt "beimLoeschen", was mit einer
+' Zeile geschieht, wenn die Zeile geloescht wird, auf die sie zeigt; der
+' Abgleich baut die Tabelle um (die Zeilen bleiben), das erzeugte Programm
+' legt sie so an und schaltet foreign_keys ein. Ein Aufbau ohne das Feld (vor
+' diesem Stand) laesst die Datei, wie sie ist.
+IMPORT "kern.dh"
+projOrdner = CWD$()
+DIM e AS Element : e = elementNeu("datenbank", "Daten")
+dbTabelleNeu$(e, "kunden") : dbSpalteNeu$(e, "kunden", "name", "text")
+dbTabelleNeu$(e, "rechnungen") : dbSpalteNeu$(e, "rechnungen", "kunde", "ganz")
+dbTabelleNeu$(e, "posten") : dbSpalteNeu$(e, "posten", "rechnung", "ganz") : dbSpalteNeu$(e, "posten", "text", "text")
+dbSpalteVerweis$(e, "rechnungen", "kunde", "kunden")
+dbSpalteVerweis$(e, "posten", "rechnung", "rechnungen")
+FUNCTION fk$(tabelle AS STRING) AS STRING
+    DIM db AS DB_CONN : db = DB_OPEN(dbPfad$(e))
+    DIM t AS ARRAY OF STRING : t = []
+    DIM r AS DB_RESULT : r = DB_QUERY(db, "PRAGMA foreign_key_list(" + tabelle + ")")
+    WHILE DB_NEXT(r)
+        ARRAY_PUSH(t, DB_GET_STRING(r, 3) + "->" + DB_GET_STRING(r, 2) + " " + DB_GET_STRING(r, 6))
+    WEND
+    DB_CLOSE(db)
+    RETURN "[" + JOIN$(t, ", ") + "]"
+END FUNCTION
+PRINT "nur verweis "; fk$("rechnungen"); " "; fk$("posten")
+DIM db AS DB_CONN : db = DB_OPEN(dbPfad$(e))
+DB_EXEC(db, "INSERT INTO kunden (id, name) VALUES (1, 'Anna'), (2, 'Bert')")
+DB_EXEC(db, "INSERT INTO rechnungen (id, kunde) VALUES (10, 1), (11, 2)")
+DB_EXEC(db, "INSERT INTO posten (rechnung, text) VALUES (10, 'a'), (10, 'b'), (11, 'c')")
+DB_CLOSE(db)
+PRINT "leeren [" + dbSpalteBeimLoeschen$(e, "rechnungen", "kunde", "leeren") + "] "; fk$("rechnungen")
+PRINT "mit [" + dbSpalteBeimLoeschen$(e, "posten", "rechnung", "loeschen") + "] "; fk$("posten")
+PRINT "falsch [" + dbSpalteBeimLoeschen$(e, "posten", "rechnung", "weg") + "]"
+PRINT "ohne verweis [" + dbSpalteBeimLoeschen$(e, "kunden", "name", "loeschen") + "]"
+dbSpalteAendern$(e, "posten", "text", "text", TRUE, FALSE, "")
+dbSpalteAendern$(e, "posten", "rechnung", "ganz", TRUE, FALSE, "")
+PRINT "pflicht [" + dbSpalteBeimLoeschen$(e, "posten", "rechnung", "leeren") + "] "; fk$("posten")
+PRINT "gitter "; dbLoeschenName$("loeschen"); " "; dbLoeschenWert$("mitlöschen"); " ["; dbLoeschenName$(""); "]"
+' Die Zeilen sind nach dem Umbau da; mit foreign_keys wirken die Regeln.
+db = DB_OPEN(dbPfad$(e))
+DB_EXEC(db, "PRAGMA foreign_keys = ON")
+FUNCTION zahl(sql AS STRING) AS STRING
+    DIM r AS DB_RESULT : r = DB_QUERY(db, sql)
+    DB_NEXT(r)
+    RETURN IIF(DB_IS_NULL(r, 0), "NULL", DB_GET_STRING(r, 0))
+END FUNCTION
+PRINT "zeilen "; zahl("SELECT COUNT(*) FROM kunden"); " "; zahl("SELECT COUNT(*) FROM rechnungen"); " "; zahl("SELECT COUNT(*) FROM posten")
+DB_EXEC(db, "DELETE FROM kunden WHERE id = 1")
+PRINT "kunde weg: rechnung 10 kunde "; zahl("SELECT kunde FROM rechnungen WHERE id = 10")
+DB_EXEC(db, "DELETE FROM rechnungen WHERE id = 10")
+PRINT "rechnung weg: posten "; zahl("SELECT COUNT(*) FROM posten")
+DB_CLOSE(db)
+PRINT "verbieten [" + dbSpalteBeimLoeschen$(e, "rechnungen", "kunde", "verbieten") + "] "; fk$("rechnungen")
+' Dabei wurde rechnungen umgebaut -- die Posten, die mit ON DELETE CASCADE auf
+' sie zeigen, sind noch da (vorher nahm DROP TABLE sie mit).
+db = DB_OPEN(dbPfad$(e))
+PRINT "posten nach dem umbau "; zahl("SELECT COUNT(*) FROM posten")
+DB_CLOSE(db)
+db = DB_OPEN(dbPfad$(e))
+DB_EXEC(db, "PRAGMA foreign_keys = ON")
+TRY
+    DB_EXEC(db, "DELETE FROM kunden WHERE id = 2")
+    PRINT "geloescht"
+CATCH f
+    PRINT "verboten "; INSTR(f, "FOREIGN KEY") >= 0
+END TRY
+DB_CLOSE(db)
+DIM code AS STRING : code = datenbankCode$()
+PRINT "code "; INSTR(code, "REFERENCES") >= 0; " "; INSTR(code, "ON DELETE CASCADE") >= 0
+' Verweis weg: der Fremdschluessel geht mit.
+PRINT "weg [" + dbSpalteVerweis$(e, "rechnungen", "kunde", "") + "] "; fk$("rechnungen")
+' Ein Aufbau ohne das Feld: eine Datei mit Fremdschluessel bleibt, wie sie ist.
+DIM s AS JSON_HANDLE : s = dbSchema(e)
+JSON_REMOVE(s, "tabellen.2.spalten.0.beimLoeschen")
+e.schema = JSON_STRINGIFY(s)
+dbSpalteNeu$(e, "posten", "menge", "ganz")
+PRINT "alt "; fk$("posten")
+' Faellt dort der Verweis weg, geht auch der Fremdschluessel.
+PRINT "alt weg [" + dbSpalteVerweis$(e, "posten", "rechnung", "") + "] "; fk$("posten")
+' Uebernehmen: die Aktion kommt aus der Datei.
+db = DB_OPEN("fremd.db")
+DB_EXEC(db, "CREATE TABLE eltern (id INTEGER PRIMARY KEY, name TEXT)")
+DB_EXEC(db, "CREATE TABLE kinder (id INTEGER PRIMARY KEY, a INTEGER REFERENCES eltern(id) ON DELETE CASCADE, b INTEGER REFERENCES eltern(id) ON DELETE SET NULL, c INTEGER REFERENCES eltern(id), d INTEGER REFERENCES eltern(id) ON DELETE RESTRICT)")
+DB_CLOSE(db)
+DIM us AS JSON_HANDLE : us = JSON_PARSE(dbSchemaAusDatei$(CWD$() + "/fremd.db", "fremd.db"))
+DIM k AS INTEGER
+FOR k = 0 TO 3
+    PRINT "uebernommen "; dbSp$(us, 1, k, "name"); " "; dbSp$(us, 1, k, "verweis"); " "; dbSp$(us, 1, k, "beimLoeschen")
+NEXT
+--- datei kern.dh
+IMPORT "json"
+IMPORT "regex"
+IMPORT "imgfx"
+IMPORT "db"
+IMPORT "{sammlung}/../../../studio/sprache.dh"
+IMPORT "{sammlung}/../../../studio/bibliothek.dh"
+IMPORT "{sammlung}/../../../studio/modell.dh"
+IMPORT "{sammlung}/../../../studio/projekt.dh"
+IMPORT "{sammlung}/../../../studio/datenbank.dh"
+--- erwartet
+nur verweis [] []
+leeren [] [kunde->kunden SET NULL]
+mit [] [rechnung->rechnungen CASCADE]
+falsch [„weg“ ist keine Wahl -- möglich sind verbieten, loeschen und leeren.]
+ohne verweis [Die Spalte name verweist auf nichts -- erst unter „Verweis auf“ eine Tabelle wählen.]
+pflicht [Die Spalte rechnung ist Pflicht -- leeren geht nur ohne.] [rechnung->rechnungen CASCADE]
+gitter mitlöschen loeschen []
+zeilen 2 2 3
+kunde weg: rechnung 10 kunde NULL
+rechnung weg: posten 1
+verbieten [] [kunde->kunden NO ACTION]
+posten nach dem umbau 1
+verboten TRUE
+code TRUE TRUE
+weg [] []
+alt [rechnung->rechnungen CASCADE]
+alt weg [] []
+uebernommen a eltern loeschen
+uebernommen b eltern leeren
+uebernommen c eltern verbieten
+uebernommen d eltern verbieten
+
 === das erzeugte fenster zeigt verweise, filtert, sortiert, sucht und fragt ab
 ' rechnungen.kunde verweist auf kunden: die Klappliste zeigt die Namen und
 ' bindet die id. Die Tabelle liste zeigt kunden ohne Bonn, nach Name
@@ -407,6 +531,7 @@ abfrage abgelegt Daten.koelner Tabelle1
 === den verweis einer spalte im spalten-gitter setzen
 ' In die Zelle "Verweis auf" der Spalte kunde "kunden" einfuegen: die Spalte
 ' wird eine Ganzzahl, Daten.dhdb nennt das Ziel, die Datei behaelt die Werte.
+' Dann in "Beim Loeschen" "mitloeschen": die Datei hat den Fremdschluessel.
 IMPORT "laeufer.dh"
 DIM p AS STRING : p = CWD$() + "/proj"
 SETENV("DH_STUDIO_OEFFNEN", "Daten.rechnungen")
@@ -435,6 +560,30 @@ PRINT "dhdb "; JSON_GET_STRING(j, "tabellen.1.spalten.0.name"); " "; JSON_GET_ST
 DIM db AS DB_CONN : db = DB_OPEN(p + "/daten.sqlite")
 DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT kunde, typeof(kunde) FROM rechnungen")
 IF DB_NEXT(r) THEN PRINT "wert "; DB_GET_STRING(r, 0); " "; DB_GET_STRING(r, 1)
+DB_CLOSE(db)
+slZeilen = [] : slBild = 0
+slHin(10, 10)
+slWarten(10)
+(x, y) = slLage(log, "dbzelle sp 0 6")
+slKlick(x, y)
+slWarten(4)
+slMit([341], 86)
+slWarten(10)
+slMit([341], 83)
+slWarten(10)
+slAufnahmeSchreiben(CWD$() + "/ev2.txt")
+SETENV("DH_STUDIO_ABLAGE", "mitlöschen")
+slStarten(log, CWD$() + "/ev2.txt", slBild + 10, p)
+FOR EACH z IN slAnfang(log, "db spalte beimloeschen")
+    PRINT z
+NEXT
+j = JSON_LOAD(p + "/Daten.dhdb")
+PRINT "dhdb "; JSON_GET_STRING(j, "tabellen.1.spalten.0.beimLoeschen")
+db = DB_OPEN(p + "/daten.sqlite")
+r = DB_QUERY(db, "PRAGMA foreign_key_list(rechnungen)")
+IF DB_NEXT(r) THEN PRINT "fk "; DB_GET_STRING(r, 3); " -> "; DB_GET_STRING(r, 2); " "; DB_GET_STRING(r, 6)
+r = DB_QUERY(db, "SELECT kunde FROM rechnungen")
+IF DB_NEXT(r) THEN PRINT "wert "; DB_GET_STRING(r, 0)
 DB_CLOSE(db)
 --- argumente
 {sammlung}/../../../studio/studio.dh
@@ -466,6 +615,10 @@ END CLASS
 db spalte verweis rechnungen.kunde [kunden]
 dhdb kunde ganz kunden
 wert 7 integer
+db spalte beimloeschen rechnungen.kunde [loeschen]
+dhdb loeschen
+fk kunde -> kunden CASCADE
+wert 7
 
 === sortieren und bedingung im inspektor
 ' Die Tabelle liste hat die Datenquelle kunden: "Sortieren nach" bietet deren

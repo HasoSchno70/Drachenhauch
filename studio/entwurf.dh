@@ -96,14 +96,27 @@ FUNCTION fensterH() AS INTEGER
     RETURN MAX(40, fensterZahl("h"))
 END FUNCTION
 
+' Ueber dem Inhalt (formY): die gezeichnete Titelleiste und, wenn das Fenster
+' Menues hat, die Menueleiste der gui (Schirmpunkte).
+FUNCTION kopfH() AS INTEGER
+    RETURN TITEL_H + zS(menueLeisteH(doc))
+END FUNCTION
+
 ' --- Lage und Neuaufbau --------------------------------------------------------
 ' Das Fenster mittig in den Mittelbereich, mit Platz fuer die Titelleiste.
 SUB entwurfLegen()
     DIM b AS INTEGER : b = zS(fensterB())
     DIM h AS INTEGER : h = zS(fensterH())
     formX = mitteX + MAX(32, (mitteB - b) \ 2)
-    formY = mitteY + MAX(32 + TITEL_H, (mitteH - h - TITEL_H) \ 2 + TITEL_H)
-    IF frm >= 0 THEN GUI_WINDOW_SET_BOUNDS(frm, formX, formY, fensterB(), fensterH())
+    formY = mitteY + MAX(32 + kopfH(), (mitteH - h - kopfH()) \ 2 + kopfH())
+    ' formY ist die Oberkante des Inhalts -- das Fenster der gui beginnt
+    ' mit seiner Menueleiste darueber.
+    IF frm >= 0 THEN
+        GUI_WINDOW_SET_BOUNDS(frm, formX, formY - zS(menueLeisteH(doc)), fensterB(), fensterH() + menueLeisteH(doc))
+        ' Ein Fenster, groesser als die Mitte, bleibt in ihr -- es laege
+        ' sonst ueber Inspektor und Ausgabe (gefunden mit der Kuehlschrank-App).
+        GUI_WINDOW_CLIP(frm, mitteX, mitteY, mitteB, mitteH)
+    END IF
 END SUB
 
 SUB entwurfBauen()
@@ -114,7 +127,9 @@ SUB entwurfBauen()
     IF frm >= 0 THEN GUI_WINDOW_DESTROY(frm)
     ' Eigene Controls ausgeklappt: ihre Teile stehen hinter den Controls des
     ' Fensters, die Nummern bis anzahl() bleiben die des Modells.
-    frm = GUI_FROM_JSON(JSON_STRINGIFY(ausgeklappt(doc)))
+    DIM bau AS JSON_HANDLE : bau = ausgeklappt(doc)
+    IF menueLeisteH(doc) > 0 THEN JSON_SET_INT(bau, "h", fensterH() + menueLeisteH(doc))
+    frm = GUI_FROM_JSON(JSON_STRINGIFY(bau))
     ' Eine eigene Kopie der Zuordnung -- das Pruefen klappt beim Erzeugen
     ' ebenfalls aus und ueberschriebe sonst die des Entwurfs.
     vkFensterN = akFensterN : vkInstanz = akInstanz : vkErster = akErster : vkAnzahl = akAnzahl
@@ -514,6 +529,21 @@ SUB lageSetzenVon(i AS INTEGER, x AS INTEGER, y AS INTEGER, w AS INTEGER, h AS I
 END SUB
 
 ' --- Zoom -------------------------------------------------------------------
+' Beim Oeffnen eines Fensters: passt es bei 100 % nicht in die Mitte, die
+' groesste Stufe bis 50 %, bei der es ganz zu sehen ist (der Rest laege
+' hinter dem Zuschnitt). Ein kleines Fenster bleibt bei 100 %.
+SUB zoomEinpassen()
+    zoomF = 1.0
+    IF mitteB <= 0 OR mitteH <= 0 THEN RETURN
+    DIM z AS FLOAT
+    FOR EACH z IN [1.0, 0.75, 0.5]
+        zoomF = z
+        IF fensterB() * z + 64 <= mitteB AND (fensterH() + menueLeisteH(doc)) * z + TITEL_H + 64 <= mitteH THEN EXIT FOR
+    NEXT
+    statusZoom()
+    IF zoomF < 1.0 THEN protokoll("zoom eingepasst " + STR$(INT(zoomF * 100 + 0.5)))
+END SUB
+
 SUB zoomStufe(richtung AS INTEGER)
     DIM stufen AS ARRAY OF FLOAT : stufen = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0]
     DIM k AS INTEGER
@@ -678,7 +708,7 @@ END FUNCTION
 ' Die Griffe des Fensters selbst: die rechte und die untere Kante und die
 ' Ecke unten rechts (Schirmlage). 0 = keiner, 1 rechts, 2 unten, 3 Ecke.
 FUNCTION fensterGriffBei(sx AS INTEGER, sy AS INTEGER) AS INTEGER
-    IF NOT layoutVorn() THEN RETURN 0
+    IF NOT inDerMitte(sx, sy) THEN RETURN 0
     DIM rx AS INTEGER : rx = formX + zS(fensterB())
     DIM uy AS INTEGER : uy = formY + zS(fensterH())
     IF ABS(sx - rx) <= 6 AND ABS(sy - uy) <= 6 THEN RETURN 3
@@ -749,7 +779,7 @@ END FUNCTION
 
 ' --- Maus ---------------------------------------------------------------------
 FUNCTION imFenster(sx AS INTEGER, sy AS INTEGER) AS BOOLEAN
-    IF NOT layoutVorn() THEN RETURN FALSE
+    IF NOT inDerMitte(sx, sy) THEN RETURN FALSE
     RETURN sx >= formX AND sy >= formY AND sx < formX + zS(fensterB()) AND sy < formY + zS(fensterH())
 END FUNCTION
 
@@ -1474,13 +1504,54 @@ SUB anordnen(was AS STRING)
     protokoll("angeordnet " + was + " " + STR$(LEN(gewaehlt)))
 END SUB
 
+' Ein Diagramm im Entwurf: ein Muster seiner Art, damit man sieht, was
+' kommt -- die Daten setzt erst das Programm. Je Art ein CHART, einmal
+' angelegt.
+DIM musterArten AS ARRAY OF STRING : musterArten = []
+DIM musterDiagramme AS ARRAY OF CHART : musterDiagramme = []
+
+SUB musterDiagramm(art AS STRING, titel AS STRING, x AS INTEGER, y AS INTEGER, b AS INTEGER, h AS INTEGER)
+    IF b < 20 OR h < 20 THEN RETURN
+    DIM k AS INTEGER : k = ARRAY_INDEXOF(musterArten, art)
+    IF k < 0 THEN
+        DIM c AS CHART
+        TRY
+            c = CHART_NEW(art, x, y, b, h)
+        CATCH fehler
+            RETURN
+        END TRY
+        CHART_THEME(c, "dunkel")
+        CHART_SET_FLAG(c, "komma", TRUE)
+        SELECT CASE art
+            CASE "linie", "flaeche", "line", "area"
+                DIM r AS INTEGER : r = CHART_SERIES(c, "A")
+                CHART_DATA(c, r, [3.0, 5.0, 4.0, 7.0, 6.0, 8.0])
+            CASE "tacho", "leiste", "led", "gauge", "bar_gauge", "lampen", "balkenanzeige", "zellen"
+                CHART_SET_NUM(c, "max", 100)
+                CHART_VALUE(c, 62)
+            CASE ELSE
+                CHART_ADD(c, "A", 45)
+                CHART_ADD(c, "B", 30)
+                CHART_ADD(c, "C", 25)
+        END SELECT
+        ARRAY_PUSH(musterArten, art)
+        ARRAY_PUSH(musterDiagramme, c)
+        protokoll("muster " + art)
+        k = LEN(musterArten) - 1
+    END IF
+    CHART_SET(musterDiagramme[k], "titel", titel)
+    CHART_BOUNDS(musterDiagramme[k], x, y, b, h)
+    CHART_DRAW(musterDiagramme[k])
+END SUB
+
 ' --- Zeichnen (nach GUI_DRAW, vor GUI_DRAW_TOP) -------------------------------
 SUB entwurfZeichnen()
     IF NOT layoutVorn() THEN RETURN
     DIM b AS INTEGER : b = zS(fensterB())
     DIM h AS INTEGER : h = zS(fensterH())
     DIM x0 AS INTEGER : x0 = formX
-    DIM y0 AS INTEGER : y0 = formY - TITEL_H
+    DIM y0 AS INTEGER : y0 = formY - kopfH()
+    DIM yt AS INTEGER : yt = formY - zS(menueLeisteH(doc))
     SCISSOR(mitteX, mitteY, mitteB, mitteH)
     ' Schatten: Ringe AUSSEN herum, nach aussen blasser. Gefuellte Flaechen
     ' gingen nicht -- die Entwurfsflaeche ist schon gezeichnet und laege
@@ -1490,8 +1561,8 @@ SUB entwurfZeichnen()
         RECTROUND(x0 - s, y0 - s + 3, x0 + b + s - 1, formY + h + s + 2, 8 + s, RGBA(0, 0, 0, MAX(3, 46 - s * 3)))
     NEXT
     ' Titelleiste wie bei einem echten Fenster: oben rund, unten gerade.
-    BOXROUND(x0, y0, x0 + b - 1, formY - 1, 8, farbe("titel"))
-    BOX(x0, y0 + 10, x0 + b - 1, formY - 1, farbe("titel"))
+    BOXROUND(x0, y0, x0 + b - 1, yt - 1, 8, farbe("titel"))
+    BOX(x0, y0 + 10, x0 + b - 1, yt - 1, farbe("titel"))
     DIM k AS INTEGER
     FOR k = 0 TO 2
         CIRCLE(x0 + 18 + k * 20, y0 + TITEL_H \ 2, 6, IIF(k = 0, &HEC6A5E, IIF(k = 1, &HF4BF4F, &H61C554)))
@@ -1581,6 +1652,22 @@ SUB entwurfZeichnen()
         ELSEIF NOT controlBrauchbar(cn) THEN
             TEXT(cx1 + 6, cy1 + 4, trf$("{0} enthält sich selbst", [cn]), farbe("leise"))
         END IF
+    NEXT
+    ' Die Diagramme: ein Muster in ihrer Art.
+    FOR li = 0 TO LEN(arten) - 1
+        IF arten[li] <> "canvas" THEN CONTINUE
+        DIM dgArt AS STRING : dgArt = feldText$(li, "studio_diagramm")
+        IF dgArt = "" THEN CONTINUE
+        DIM dgW AS GUI_WIDGET : dgW = IIF(frm >= 0, GUI_WINDOW_WIDGET(frm, li), -1)
+        IF dgW >= 0 THEN
+            IF NOT GUI_SHOWN(dgW) THEN CONTINUE
+        END IF
+        DIM dgx AS INTEGER
+        DIM dgy AS INTEGER
+        DIM dgb AS INTEGER
+        DIM dgh AS INTEGER
+        (dgx, dgy, dgb, dgh) = lageVon(li)
+        musterDiagramm(dgArt, feldText$(li, "studio_diagramm_titel"), formX + zS(dgx), formY + zS(dgy), zS(dgb), zS(dgh))
     NEXT
     ' Die Abstandhalter jedes Layouts.
     FOR li = 0 TO LEN(arten) - 1

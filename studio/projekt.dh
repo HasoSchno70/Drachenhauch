@@ -355,7 +355,13 @@ SUB codeZerlegen(e AS Element, quelle AS STRING)
                 ARRAY_PUSH(dekl, k)
             NEXT
             kommentare = []
-            ARRAY_PUSH(dekl, z)
+            ' Die Leerzeile zwischen zwei Methoden bleibt hier zurueck, wenn
+            ' sie herausgeloest sind -- bei DIMs zwischen Methoden (eine Datei
+            ' von aussen) standen sonst so viele Leerzeilen in Folge, wie
+            ' Methoden dazwischen waren. Eine genuegt.
+            DIM doppelt AS BOOLEAN : doppelt = FALSE
+            IF TRIM$(z) = "" AND LEN(dekl) > 0 THEN doppelt = TRIM$(dekl[LEN(dekl) - 1]) = ""
+            IF NOT doppelt THEN ARRAY_PUSH(dekl, z)
         END IF
         i = i + 1
     WEND
@@ -596,18 +602,26 @@ FUNCTION ereignisseFuer(kind AS STRING) AS ARRAY OF STRING
             aus = ["Geaendert", "Enter", "FokusRein", "FokusRaus"]
         CASE "textarea"
             aus = ["Geaendert", "FokusRein", "FokusRaus"]
-        CASE "listbox", "tree", "table"
+        CASE "listbox", "tree"
             aus = ["Geaendert", "Doppelklick"]
+        CASE "table"
+            aus = ["Geaendert", "Doppelklick", "Zelle"]
         CASE "slider", "spinner", "dropdown", "colorpicker", "datepicker", "timepicker", "tabcontrol"
             aus = ["Geaendert"]
         CASE "canvas"
             aus = ["Zeichnen", "Maus", "Ziehen", "Rad"]
+        CASE "toolbar"
+            aus = ["Knopf"]
+        CASE "statusbar"
+            aus = ["Feld"]
         CASE "timer", "menue"
             RETURN ["Aktion"]
+        CASE "kontext"
+            RETURN []
         CASE "fenster"
-            RETURN ["Geoeffnet", "Schliessen", "Groesse", "Taste"]
+            RETURN ["Geoeffnet", "Schliessen", "Groesse", "Taste", "Takt"]
         CASE "control"
-            RETURN ["Geoeffnet", "Groesse"]
+            RETURN ["Geoeffnet", "Groesse", "Takt"]
         CASE "studio_control"
             RETURN []
         CASE "app"
@@ -615,12 +629,15 @@ FUNCTION ereignisseFuer(kind AS STRING) AS ARRAY OF STRING
     END SELECT
     ARRAY_PUSH(aus, "MausRein")
     ARRAY_PUSH(aus, "MausRaus")
+    ARRAY_PUSH(aus, "Abgelegt")
     RETURN aus
 END FUNCTION
 
 FUNCTION ereignisBeschreibung$(ereignis AS STRING) AS STRING
     SELECT CASE ereignis
         CASE "Klick" : RETURN tr$("wenn es angeklickt wird")
+        CASE "Knopf" : RETURN tr$("wenn ein Knopf der Leiste gedrückt wird (seine Nummer ab 0)")
+        CASE "Feld" : RETURN tr$("wenn ein klickbares Feld angeklickt wird (seine Nummer ab 0)")
         CASE "Ziehen" : RETURN tr$("solange die Maus nach einem Druck auf die Fläche gehalten wird (x, y auf der Fläche)")
         CASE "Rad" : RETURN tr$("wenn das Mausrad über der Fläche gedreht wird")
         CASE "Taste" : RETURN tr$("wenn eine Taste gedrückt wird und kein Eingabefeld sie nimmt (Tastencode)")
@@ -637,6 +654,9 @@ FUNCTION ereignisBeschreibung$(ereignis AS STRING) AS STRING
         CASE "Geoeffnet" : RETURN tr$("nachdem es aufgebaut ist")
         CASE "Schliessen" : RETURN tr$("wenn es geschlossen werden soll")
         CASE "Groesse" : RETURN tr$("wenn sich seine Größe ändert")
+        CASE "Takt" : RETURN tr$("in jedem Bild, nach den Ereignissen seiner Controls -- für alles, was es abfragen will")
+        CASE "Abgelegt" : RETURN tr$("wenn etwas darauf abgelegt wird (Zeile in der Quelle, Zeile hier; woher und was sagen GUI_DROP_SOURCE und GUI_DROP_TEXT)")
+        CASE "Zelle" : RETURN tr$("wenn eine Zelle angeklickt wird (Datenzeile und Spalte, auch auf einen Knopf in der Zelle)")
         CASE "Beenden" : RETURN tr$("bevor das Programm endet")
     END SELECT
     ' Sonst ein Ereignis eines eigenen Controls.
@@ -649,6 +669,9 @@ FUNCTION ereignisParameter$(ev AS STRING) AS STRING
         CASE "Ziehen" : RETURN "x AS INTEGER, y AS INTEGER"
         CASE "Rad" : RETURN "schritte AS FLOAT"
         CASE "Taste" : RETURN "taste AS INTEGER"
+        CASE "Knopf", "Feld" : RETURN "nr AS INTEGER"
+        CASE "Zelle" : RETURN "zeile AS INTEGER, spalte AS INTEGER"
+        CASE "Abgelegt" : RETURN "zeile AS INTEGER, ziel AS INTEGER"
     END SELECT
     RETURN ""
 END FUNCTION
@@ -686,6 +709,7 @@ SUB controlsVon(ei AS INTEGER)
         NEXT
     END IF
     menueNamenSammeln(d, "menus", ctrlNamen, ctrlArten)
+    kontextNamenSammeln(d, ctrlNamen, ctrlArten)
 END SUB
 
 ' Benennt ein Control um: seine Ereignis-Methoden ziehen mit, und im Code

@@ -59,11 +59,11 @@ w = GUI_WINDOW("T", 10, 10, 380, 280)
 DIM kopf[1] AS STRING
 kopf[0] = "A"
 DIM gt AS GUI_WIDGET : gt = GUI_GRID(w, 10, 10, 340, 200, kopf)
-GUI_TABLE_COL_TYPE(gt, 0, "datum")
+GUI_TABLE_COL_TYPE(gt, 0, "uhrzeit")
 --- umgebung
 DHRT_FRAMES=2
 --- fehler
-GUI_TABLE_COL_TYPE: 'datum' unbekannt
+GUI_TABLE_COL_TYPE: 'uhrzeit' unbekannt
 
 === tippen bearbeitet und enter und tab ruecken weiter
 IMPORT "gui"

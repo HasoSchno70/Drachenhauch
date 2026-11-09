@@ -77,6 +77,7 @@ IMPORT "gui"
 | `GUI_WINDOW_DESIGN(win, an)` | — | design mode: the window is drawn, but its widgets receive no input (no hover, click, focus, callback; no dragging the border either). A form designer places real widgets on the surface this way and handles the mouse itself — `GUI_HIT_TEST` and all setters keep working. Default: off |
 | `GUI_WINDOW_ZOOM(win, faktor)` | — | draw a window in design mode magnified (0.25 to 4): the position stays, the area grows. Geometry seen from outside stays unmagnified, `GUI_HIT_TEST` and `GUI_WINDOW_AT` convert the mouse back. Drawing goes through an intermediate surface that is magnified smoothly — text is somewhat soft at 150–200 %. Outside design mode it is an error (the window would accept input, and the mouse would miss) |
 | `GUI_WINDOW_GET_ZOOM(win)` | FLOAT | the factor of `GUI_WINDOW_ZOOM` |
+| `GUI_WINDOW_CLIP(win, x, y, b, h)` | — | show a window in design mode only in this part of the screen (logical points like `GUI_WINDOW_SET_BOUNDS`): what lies outside is not drawn and takes no click (`GUI_HIT_TEST`, `GUI_WINDOW_AT`). `b` or `h` ≤ 0 removes the clip. Outside design mode it is an error |
 | `GUI_WINDOW_SET_MIN_SIZE(win, w, h)` | — | minimum size when resizing (0 = none) |
 | `GUI_WINDOW_SET_MAX_SIZE(win, w, h)` | — | maximum size when resizing (0 = none) |
 | `GUI_SEPARATOR(win, x, y, w)` | GUI_WIDGET | decorative divider line (horizontal) |
@@ -197,6 +198,7 @@ IMPORT "gui"
 | `GUI_TREE_CLEAR(tree)` | — | delete all nodes |
 | `GUI_TREE_SELECTED(tree)` / `GUI_TREE_SET_SELECTED(tree, node)` | INT / — | read/set the selected node (-1 = none) |
 | `GUI_TREE_LABEL(tree, node)` | STRING | text of a node |
+| `GUI_TABCONTROL_ITEM_RECT(tc, seite)` | TUPLE | (x, y, w, h) of a page's tab head on screen, from the same calculation as drawing and clicking -- for tests with real clicks |
 | `GUI_TREE_ITEM_RECT(tree, node)` | TUPLE | (x, y, w, h) of a node on screen, x at the start of its label; under a collapsed one (0, 0, 0, 0) -- for tests with real clicks |
 | `GUI_TREE_EXPAND(tree, node, flag)` | — | expand/collapse a node |
 | `GUI_TREE_SET(tree, key$, wert)` | — | setting on the tree: `mehrfachauswahl` (multi-select), `kaestchen` (checkboxes), `bearbeitbar` (editable: F2 renames) |
@@ -229,7 +231,7 @@ IMPORT "gui"
 | `GUI_FILETREE_ICONS(ft, ordnerbild, dateibild)` | — | icons for folders and files (-1 = none) |
 | `GUI_FILETREE_COLOR(ft, muster$, farbe)` | — | text colour per file type: patterns as with the filter (`"*.json;*.ini"`), `"/"` for folders; the first match wins, -1 removes the colour |
 | `GUI_FILETREE_ICON(ft, muster$, sinnbild$)` | — | built-in icon per file type, same rule as the colour, drawn in the colour of the name; a folder with `"ordner"` shows `"ordner_offen"` when expanded, `""` removes it |
-| `GUI_TABCONTROL(win, x, y, w, h)` | GUI_WIDGET | tabs **inside** a window (card index) |
+| `GUI_TABCONTROL(win, x, y, w, h)` | GUI_WIDGET | tabs **inside** a window (card index); if the heads do not fit the width, the widest get narrower first and their title is shortened |
 | `GUI_TABCONTROL_ADD(tc, titel$)` | INTEGER | append a page, returns its number |
 | `GUI_TABCONTROL_ADD_WIDGET(tc, wdg, seite)` | — | put a widget on a page; it keeps its position in the window |
 | `GUI_TABCONTROL_PAGE(tc)` / `GUI_TABCONTROL_SET_PAGE(tc, seite)` | INTEGER / — | read and set the front page |
@@ -402,6 +404,7 @@ Native, blocking standard dialogs (no IMPORT needed — like the file dialogs):
 | `GUI_DROPDOWN(win, x, y, w, h, items)` | GUI_WIDGET | drop-down selection list; the popup is drawn above all other widgets |
 | `GUI_DROPDOWN_SELECTED(dd)` | INTEGER | index of the selection (`-1` = none) |
 | `GUI_DROPDOWN_TEXT(dd)` | STRING | text of the selection |
+| `GUI_DROPDOWN_COUNT(dd)` / `GUI_DROPDOWN_ITEM(dd, i)` | INTEGER / STRING | how many entries, and entry i (from 0) |
 | `GUI_DROPDOWN_SET_SELECTED(dd, i)` | — | set the selection from the program |
 | `GUI_SET_DROPDOWN(dd, items)` | — | replace the entries |
 | `GUI_DROPDOWN_PLACEHOLDER(dd, text$)` | — | hint in the box while nothing is selected ("Please choose") |
@@ -533,7 +536,10 @@ are swallowed, menu shortcuts of other windows fall silent, the overlay lies
 over everything else. Unlike with `GUI_DIALOG`, **a button in the window
 ends nothing** — the program releases it when it is ready (`GUI_WINDOW_MODAL(win,
 FALSE)`), and hiding or destroying the window releases it by itself.
-`GUI_WINDOW_DEFAULT`/`GUI_WINDOW_CANCEL` supply Enter and ESC for it.
+`GUI_WINDOW_DEFAULT`/`GUI_WINDOW_CANCEL` supply Enter and ESC for it. The
+modal window takes the keyboard focus away from a widget behind it and gives
+it back when it goes -- otherwise a table behind it would get Enter as a
+double click.
 Example: [`examples/193_gui_dialoge.dh`](../../examples/193_gui_dialoge.dh).
 
 `\n` in the text (`CHR$(10)`) separates lines; the window adapts to the text
@@ -699,11 +705,13 @@ GUI_WINDOW_CANCEL(win, abbruchKnopf)  ' ESC presses it
 What every form needs and what every program otherwise rebuilt with `KEYHIT`,
 without paying attention to the focus. The default button carries the accent
 as a border, so that you can see what Enter will do. The key belongs first,
-however, to the widget with focus: a button or checkbox with focus takes
+however, to the widget with focus: a button with focus takes
 Enter itself, a text area turns it into a line break, a table cell being
 edited into its end. **From inside a text input**, by contrast, Enter is
 exactly that: submitting the form — the field reports `GUI_ENTERED` **and**
-the default button clicks. ESC has no effect while a dropdown is open.
+the default button clicks. The same from a number field (it takes over what
+was typed first) and from a checkbox, switch or radio button -- they toggle
+with the space bar, as on Windows, macOS and the web. ESC has no effect while a dropdown is open.
 Both are written into the `.dhform` (`default_button`/`cancel_button`,
 as a widget index).
 
@@ -859,6 +867,7 @@ dd = GUI_DROPDOWN(win, 20, 130, 160, 24, farben)   ' a click opens the list
 
 - `GUI_DROPDOWN_SELECTED(dd)` → index (or `-1`), `GUI_DROPDOWN_TEXT(dd)` → selected text.
 - `GUI_DROPDOWN_SET_SELECTED(dd, i)` sets the selection, `GUI_SET_DROPDOWN(dd, items)` replaces the list.
+- `GUI_SET_TEXT(dd, "kg")` selects the entry with that name (case does not matter), otherwise none; `GUI_TEXT(dd)` returns the text of the selection like `GUI_DROPDOWN_TEXT` (editable: see below).
 - `GUI_ON_CHANGE(dd, handler)` fires when the selection changes. The opened popup
   is drawn above all other widgets; a click elsewhere closes it.
 - **Long lists**: the popup shows at most ten entries at a time, the rest
@@ -1420,7 +1429,9 @@ What makes a list box comfortable, the table can do just as well in **row mode**
 
 * **Double click or Enter** on a row reports `GUI_DOUBLE_CLICKED(tbl)` for
   one frame — “open” without your own double-click detection. A double click
-  on an editable text cell still edits it instead of reporting.
+  on an editable text cell still edits it instead of reporting; one on a
+  cell of kind `knopf` or `haken` is two clicks on it (`GUI_TABLE_CLICKED`),
+  not a double click of the row.
 * **F2** edits the first enabled text column of the selected row
   (`GUI_TABLE_COL_EDIT`, in display order). In cell mode F2 edits the current
   cell as before.
@@ -1602,7 +1613,7 @@ table.
 | `GUI_TABLE_SELECT_RANGE(tbl, anker_zeile, anker_spalte, zeile, spalte)` | — | set the range |
 | `GUI_TABLE_COPY$(tbl)` | STRING | the range as tab-separated text |
 | `GUI_TABLE_PASTE(tbl, text$)` | INTEGER | paste tab-separated text from the current cell on; number of cells written |
-| `GUI_TABLE_COL_TYPE(tbl, spalte, art$)` | — | `text`, `ganz`, `zahl` or `auswahl` |
+| `GUI_TABLE_COL_TYPE(tbl, spalte, art$)` | — | `text`, `ganz`, `zahl`, `auswahl` or `datum` (editing drops down the month under the cell; a day writes `YYYY-MM-DD`) |
 | `GUI_TABLE_COL_CHOICES(tbl, spalte, eintraege)` | — | entries of a choice column (makes it a choice column) |
 
 A **number column** accepts while typing only what can become a number (`-`
@@ -2384,6 +2395,7 @@ stable while doing so (deleting only marks as "dead", it does not shift any indi
 | `GUI_SET_BOUNDS(wdg, x, y, w, h)` | move/resize a widget (relative to the window) |
 | `GUI_GET_X/Y/W/H(wdg)` → INTEGER | read the current dimensions |
 | `GUI_SET_VISIBLE(wdg, an)` / `GUI_VISIBLE(wdg)` → BOOLEAN | show/hide (invisible = not drawn, not interactive) |
+| `GUI_SHOWN(wdg)` → BOOLEAN | is it on screen right now? Unlike `GUI_VISIBLE` it also accounts for the window and hidden tab pages (window tabs and tab controls) -- a canvas on a page in the background can skip drawing |
 | `GUI_DESTROY(wdg)` | remove a widget (the handle becomes invalid, others stay valid) |
 | `GUI_KIND(wdg)` → STRING | `"button"`/`"label"`/`"checkbox"`/`"slider"`/`"textinput"`/`"panel"`/`"table"` |
 | `GUI_FOCUS(wdg)` | set the keyboard focus (e.g. on a TextInput); `GUI_FOCUS(-1)` releases it, the keys then belong to the program |
@@ -3160,7 +3172,8 @@ The small things that tell an application from a demo (since 2026-09-05):
   panel, otherwise they lie under its area. A scrolling panel inside a
   scrolling panel does not exist.
 - **Dragging between widgets**: `GUI_DRAGGABLE(wdg, TRUE)` makes a widget a
-  source (for list and tree the row that was hit, otherwise the widget
+  source (for list, tree and table the row that was hit -- for the table the
+  data row with the text of its first cell --, otherwise the widget
   itself with its text), `GUI_DROP_TARGET(wdg, TRUE)` a drop target. A press
   becomes a drag after 5 px of movement — a click stays a click. During the
   drag the text hangs on the mouse and the drop target underneath gets a
@@ -3257,7 +3270,7 @@ visible focus, navigation would be worthless.
 | Key | Effect |
 |---|---|
 | `TAB` / `SHIFT+TAB` | next / previous widget |
-| `LEERTASTE`, `ENTER` | trigger a button, toggle a checkbox/switch, select a radio, open/close a dropdown, expand/collapse a tree node |
+| `LEERTASTE`, `ENTER` | trigger a button, open/close a dropdown, expand/collapse a tree node; toggle a checkbox/switch and select a radio only with `LEERTASTE` (Enter presses the default button there) |
 | `←` `→` `↑` `↓` | adjust a slider/knob (one twentieth of the range per press), move a splitter (8 px), move the selection in list/dropdown/tree |
 | `POS1` / `ENDE` | slider/knob to minimum / maximum |
 | `→` / `←` in the tree | expand or go to the child / collapse or go to the parent node |
@@ -3642,6 +3655,7 @@ have to rebuild by hand.
 | `GUI_PICKED_COLOR(picker)` → INTEGER | chosen colour (`0xRRGGBB`) |
 | `GUI_SET_PICKED_COLOR(picker, farbe)` | set the colour |
 | `GUI_DATEPICKER(win, x, y, w, h)` → GUI_WIDGET | month grid with paging arrows |
+| `GUI_DATEFIELD(win, x, y, w, h)` → GUI_WIDGET | date field: shows the date and drops down the month on a click (Space, F4, Alt+Down); a day takes it, ESC only closes, Enter belongs to the form while closed -- otherwise like GUI_DATEPICKER |
 | `GUI_DATE(picker)` → STRING | chosen date as `JJJJ-MM-TT` |
 | `GUI_SET_DATE(picker, datum$)` | set the date |
 | `GUI_COLORPICKER_SET(picker, schluessel$, wert)` | `alpha` (0/1) — show an opacity strip |

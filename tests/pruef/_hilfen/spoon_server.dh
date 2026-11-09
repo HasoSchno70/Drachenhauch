@@ -1,0 +1,157 @@
+' Ein falsches Spoonacular und ein falscher Uebersetzer (MyMemory) fuer die
+' Pruefungen der Kuehlschrank-App (Stufe 6, Rezeptsuche). Schreibt den Port
+' nach port.txt (im Ordner des Aufrufers, ARG$(0)) und jede Anfrage nach
+' anfragen.txt; endet, wenn dort "ende" liegt, sonst nach 90 Sekunden.
+'
+' Spoonacular (Schluessel in der Kopfzeile x-api-key):
+'   testschluessel  gilt;  erschoepft  -> 402;  sonst  401
+'   /recipes/complexSearch  query mit "chicken": 101, 102; "pasta": 103;
+'       "kaputt": kein JSON; includeIngredients: 104; sonst keine Treffer.
+'       number begrenzt die Treffer.
+'   /recipes/101/information  analysierte Anleitung in zwei Abschnitten,
+'       Zeiten -1/null, Mengen metrisch und amerikanisch, HTML in summary
+'   /recipes/102/information  Anleitung als HTML-Liste, eigene Zeiten
+'   /recipes/103/information  404
+'   /recipes/104/information  kurz
+'   /recipes/105/information  "QUOTA Pie" (der Uebersetzer streikt an seinem Titel;
+'       query "quota" findet ihn)
+' Uebersetzer: /get?q=...&langpair=en|de -- bekannte Saetze deutsch, sonst
+'   "DE: " davor; ein Text mit "QUOTA" -> responseStatus 429.
+IMPORT "httpd"
+DIM ordner AS STRING : ordner = ARG$(0)
+DIM s AS HTTPD : s = HTTPD_START(0, "127.0.0.1")
+DIM q AS STRING : q = CHR$(34)
+FUNCTION t$(x AS STRING) AS STRING
+    RETURN CHR$(34) + x + CHR$(34)
+END FUNCTION
+FUNCTION feld$(name AS STRING, wert AS STRING) AS STRING
+    RETURN t$(name) + ": " + wert
+END FUNCTION
+WRITEALL(PATHJOIN(ordner, "port.txt"), STR$(HTTPD_PORT(s)))
+
+FUNCTION treffer$(id AS INTEGER, titel AS STRING, minuten AS INTEGER, portionen AS INTEGER) AS STRING
+    RETURN "{" + feld$("id", STR$(id)) + ", " + feld$("title", t$(titel)) + ", " + feld$("readyInMinutes", STR$(minuten)) + ", " + _
+        feld$("servings", STR$(portionen)) + ", " + feld$("sourceUrl", t$("https://example.org/" + STR$(id))) + ", " + _
+        feld$("summary", t$("A <b>simple</b> dish.")) + "}"
+END FUNCTION
+
+FUNCTION zutat$(name AS STRING, nameClean AS STRING, menge AS STRING, einheit AS STRING, metrisch AS STRING) AS STRING
+    DIM z AS STRING : z = "{" + feld$("name", t$(name)) + ", "
+    IF nameClean <> "" THEN z = z + feld$("nameClean", t$(nameClean)) + ", "
+    z = z + feld$("amount", menge) + ", " + feld$("unit", t$(einheit)) + ", " + feld$("original", t$(menge + " " + einheit + " " + name))
+    IF metrisch <> "" THEN
+        DIM m AS ARRAY OF STRING : m = SPLIT(metrisch, " ")
+        z = z + ", " + feld$("measures", "{" + feld$("metric", "{" + feld$("amount", m[0]) + ", " + feld$("unitShort", t$(m[1])) + "}") + "}")
+    END IF
+    RETURN z + "}"
+END FUNCTION
+
+FUNCTION schritt$(n AS INTEGER, text AS STRING) AS STRING
+    RETURN "{" + feld$("number", STR$(n)) + ", " + feld$("step", t$(text)) + "}"
+END FUNCTION
+
+FUNCTION rezept101$() AS STRING
+    DIM z AS ARRAY OF STRING
+    z = [zutat$("chicken breasts", "chicken breast", "1.5", "lb", "680.389 g"), _
+         zutat$("honey", "honey", "3", "Tbsps", ""), _
+         zutat$("garlic", "garlic", "4", "cloves", "4 cloves"), _
+         zutat$("sriracha", "sriracha", "0.25", "tsp", ""), _
+         zutat$("large eggs", "", "2", "large", ""), _
+         zutat$("flour", "flour", "0.5", "cups", "62.5 g"), _
+         zutat$("yolks from large eggs", "egg yolk", "2", "", ""), _
+         zutat$("parmesan cheese", "parmesan cheese", "2", "oz.", "")]
+    DIM a AS STRING
+    a = "[{" + feld$("name", t$("")) + ", " + feld$("steps", "[" + schritt$(1, "Mix the honey and garlic.") + ", " + schritt$(2, "Coat the chicken.") + "]") + "}, " + _
+        "{" + feld$("name", t$("For the sauce")) + ", " + feld$("steps", "[" + schritt$(1, "Simmer the sauce.") + "]") + "}]"
+    RETURN "{" + feld$("id", "101") + ", " + feld$("title", t$("Honey Garlic Chicken")) + ", " + _
+        feld$("summary", t$("<b>Honey Garlic Chicken</b> is <a href='x'>tasty</a> &amp; easy.")) + ", " + _
+        feld$("servings", "4") + ", " + feld$("preparationMinutes", "-1") + ", " + feld$("cookingMinutes", "null") + ", " + _
+        feld$("readyInMinutes", "45") + ", " + feld$("creditsText", t$("Foodista.com")) + ", " + feld$("sourceUrl", t$("https://example.org/honig")) + ", " + _
+        feld$("extendedIngredients", "[" + JOIN$(z, ", ") + "]") + ", " + feld$("analyzedInstructions", a) + "}"
+END FUNCTION
+
+FUNCTION rezept102$() AS STRING
+    RETURN "{" + feld$("id", "102") + ", " + feld$("title", t$("Chicken Soup")) + ", " + feld$("summary", t$("Warm soup.")) + ", " + _
+        feld$("servings", "6") + ", " + feld$("preparationMinutes", "10") + ", " + feld$("cookingMinutes", "20") + ", " + _
+        feld$("readyInMinutes", "30") + ", " + _
+        feld$("extendedIngredients", "[" + zutat$("water", "water", "2", "quarts", "") + ", " + zutat$("chicken", "chicken", "1", "pound", "") + "]") + ", " + _
+        feld$("analyzedInstructions", "[]") + ", " + feld$("instructions", t$("<ol><li>Boil the water.</li><li>Add the chicken.</li></ol>")) + "}"
+END FUNCTION
+
+FUNCTION rezept104$() AS STRING
+    RETURN "{" + feld$("id", "104") + ", " + feld$("title", t$("Milk Rice")) + ", " + feld$("servings", "2") + ", " + _
+        feld$("readyInMinutes", "35") + ", " + feld$("extendedIngredients", "[" + zutat$("milk", "milk", "1", "l", "") + "]") + "}"
+END FUNCTION
+
+FUNCTION deutsch$(e AS STRING) AS STRING
+    SELECT CASE e
+        CASE "Honey Garlic Chicken" : RETURN "Honig-Knoblauch-Hähnchen"
+        CASE "Chicken Soup" : RETURN "Hühnersuppe"
+        CASE "sriracha" : RETURN "Sriracha-Soße"
+        CASE "Honey Garlic Chicken is tasty & easy." : RETURN "Honig-Knoblauch-Hähnchen ist lecker &amp; einfach."
+    END SELECT
+    RETURN "DE: " + e
+END FUNCTION
+
+DIM anfragen AS ARRAY OF STRING : anfragen = []
+DIM start AS INTEGER : start = MILLIS()
+WHILE MILLIS() - start < 90000 AND NOT FILEEXISTS(PATHJOIN(ordner, "ende"))
+    IF HTTPD_ACCEPT(s) THEN
+        DIM pfad AS STRING : pfad = HTTPD_PATH$(s)
+        DIM schluessel AS STRING : schluessel = HTTPD_HEADER$(s, "x-api-key")
+        DIM zeile AS STRING : zeile = pfad
+        IF pfad = "/recipes/complexSearch" THEN
+            zeile = zeile + " query=" + HTTPD_QUERY$(s, "query") + " include=" + HTTPD_QUERY$(s, "includeIngredients") + " number=" + HTTPD_QUERY$(s, "number") + " key=" + schluessel + " apiKey=" + HTTPD_QUERY$(s, "apiKey")
+        ELSEIF pfad = "/get" THEN
+            zeile = zeile + " q=" + HTTPD_QUERY$(s, "q") + " langpair=" + HTTPD_QUERY$(s, "langpair")
+        END IF
+        ARRAY_PUSH(anfragen, zeile)
+        WRITEALL(PATHJOIN(ordner, "anfragen.txt"), JOIN$(anfragen, CHR$(10)) + CHR$(10))
+        IF pfad = "/get" THEN
+            DIM text AS STRING : text = HTTPD_QUERY$(s, "q")
+            IF INSTR(text, "QUOTA") >= 0 THEN
+                HTTPD_SEND(s, 200, "application/json", "{" + feld$("responseData", "{" + feld$("translatedText", t$("MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY")) + "}") + ", " + feld$("responseStatus", "429") + "}")
+            ELSE
+                HTTPD_SEND(s, 200, "application/json", "{" + feld$("responseData", "{" + feld$("translatedText", t$(deutsch$(text))) + "}") + ", " + feld$("responseStatus", "200") + "}")
+            END IF
+        ELSEIF LEFT$(pfad, 9) = "/recipes/" AND schluessel = "erschoepft" THEN
+            HTTPD_SEND(s, 402, "application/json", "{" + feld$("code", "402") + ", " + feld$("message", t$("Your daily points limit of 150 has been reached.")) + "}")
+        ELSEIF LEFT$(pfad, 9) = "/recipes/" AND schluessel <> "testschluessel" THEN
+            HTTPD_SEND(s, 401, "application/json", "{" + feld$("code", "401") + ", " + feld$("message", t$("You are not authorized.")) + "}")
+        ELSEIF pfad = "/recipes/complexSearch" THEN
+            DIM frage AS STRING : frage = HTTPD_QUERY$(s, "query")
+            DIM liste AS ARRAY OF STRING : liste = []
+            IF HTTPD_QUERY$(s, "includeIngredients") <> "" THEN
+                liste = [treffer$(104, "Milk Rice", 35, 2)]
+            ELSEIF INSTR(frage, "chicken") >= 0 THEN
+                liste = [treffer$(101, "Honey Garlic Chicken", 45, 4), treffer$(102, "Chicken Soup", 30, 6), "{" + feld$("title", t$("Ohne Nummer")) + "}"]
+            ELSEIF INSTR(frage, "pasta") >= 0 THEN
+                liste = [treffer$(103, "Pasta Gone", 20, 2)]
+            ELSEIF INSTR(frage, "quota") >= 0 THEN
+                liste = [treffer$(105, "QUOTA Pie", 10, 1)]
+            END IF
+            DIM n AS INTEGER : n = INT(VAL(HTTPD_QUERY$(s, "number")))
+            WHILE LEN(liste) > n AND n > 0
+                ARRAY_REMOVE_AT(liste, LEN(liste) - 1)
+            WEND
+            IF INSTR(frage, "kaputt") >= 0 THEN
+                HTTPD_SEND(s, 200, "application/json", "das ist kein json")
+            ELSE
+                HTTPD_SEND(s, 200, "application/json", "{" + feld$("results", "[" + JOIN$(liste, ", ") + "]") + ", " + feld$("totalResults", STR$(LEN(liste))) + "}")
+            END IF
+        ELSEIF pfad = "/recipes/101/information" THEN
+            HTTPD_SEND(s, 200, "application/json", rezept101$())
+        ELSEIF pfad = "/recipes/102/information" THEN
+            HTTPD_SEND(s, 200, "application/json", rezept102$())
+        ELSEIF pfad = "/recipes/104/information" THEN
+            HTTPD_SEND(s, 200, "application/json", rezept104$())
+        ELSEIF pfad = "/recipes/105/information" THEN
+            HTTPD_SEND(s, 200, "application/json", "{" + feld$("id", "105") + ", " + feld$("title", t$("QUOTA Pie")) + ", " + feld$("summary", t$("A QUOTA pie.")) + ", " + feld$("servings", "1") + ", " + feld$("instructions", t$("Bake it.")) + "}")
+        ELSE
+            HTTPD_SEND(s, 404, "application/json", "{" + feld$("code", "404") + "}")
+        END IF
+    ELSE
+        SLEEP(2)
+    END IF
+WEND
+HTTPD_STOP(s)

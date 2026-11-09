@@ -1,0 +1,60 @@
+' Die Zahlen des Reiters Statistik, wie get_statistics und
+' get_storage_summary der Python-App: Gesamt, Produkte, bald ablaufend und
+' abgelaufen (Kennzahlen), frisch = der Rest (auch ohne Datum), die fünf
+' häufigsten Kategorien und die Lagerorte nach Zahl der Einträge -- je Ort
+' der Teil vor " - " ("Kühlschrank - Tür" zählt zu "Kühlschrank"), dazu,
+' wie viele dort abgelaufen sind oder bald ablaufen.
+CLASS Statistikdaten
+    DIM gesamt AS INTEGER
+    DIM produkte AS INTEGER
+    DIM bald AS INTEGER
+    DIM abgelaufen AS INTEGER
+    DIM frisch AS INTEGER
+    DIM schwelle AS INTEGER
+    DIM katNamen AS ARRAY OF STRING
+    DIM katZahlen AS ARRAY OF INTEGER
+    DIM ortNamen AS ARRAY OF STRING
+    DIM ortZahlen AS ARRAY OF INTEGER
+    DIM ortBald AS ARRAY OF INTEGER
+
+    SUB rechnen()
+        DIM k AS Kennzahlen : k = NEW Kennzahlen()
+        k.rechnen()
+        Self.gesamt = k.gesamt
+        Self.produkte = k.produkte
+        Self.bald = k.bald
+        Self.abgelaufen = k.abgelaufen
+        Self.frisch = MAX(0, k.gesamt - k.bald - k.abgelaufen)
+        Self.schwelle = warnSchwelle()
+        Self.katNamen = [] : Self.katZahlen = []
+        DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT IFNULL(NULLIF(TRIM(p.category), ''), 'Sonstige') AS k, COUNT(*) AS n FROM inventory i JOIN products p ON i.product_id = p.id GROUP BY k ORDER BY n DESC, k LIMIT 5")
+        WHILE DB_NEXT(r)
+            ARRAY_PUSH(Self.katNamen, DB_GET_STRING(r, 0))
+            ARRAY_PUSH(Self.katZahlen, DB_GET_INT(r, 1))
+        WEND
+        Self.ortNamen = [] : Self.ortZahlen = [] : Self.ortBald = []
+        r = DB_QUERY(db, "SELECT CASE WHEN INSTR(storage_location, ' - ') > 0 THEN SUBSTR(storage_location, 1, INSTR(storage_location, ' - ') - 1) ELSE storage_location END AS o, COUNT(*) AS n, " + _
+            "SUM(CASE WHEN expiry_date IS NOT NULL AND expiry_date <> '' AND expiry_date <= date(?1, ?2) THEN 1 ELSE 0 END) " + _
+            "FROM inventory WHERE IFNULL(storage_location, '') <> '' GROUP BY o ORDER BY n DESC, o LIMIT 6", heute$(), "+" + STR$(Self.schwelle) + " days")
+        WHILE DB_NEXT(r)
+            ARRAY_PUSH(Self.ortNamen, DB_GET_STRING(r, 0))
+            ARRAY_PUSH(Self.ortZahlen, DB_GET_INT(r, 1))
+            ARRAY_PUSH(Self.ortBald, DB_GET_INT(r, 2))
+        WEND
+    END SUB
+
+    ' Die Hinweise wie _update_insights, je einer als "art|sinnbild|titel|text"
+    ' (art ist ein Schlüssel, Titel und Text sind schon übersetzt).
+    FUNCTION einsichten() AS ARRAY OF STRING
+        DIM aus AS ARRAY OF STRING : aus = []
+        IF Self.abgelaufen > 0 THEN ARRAY_PUSH(aus, "gefahr|⚠|" + tr$("Abgelaufene Produkte") + "|" + trf$("Du hast {0} abgelaufene Artikel. Überprüfe diese zeitnah!", [STR$(Self.abgelaufen)]))
+        IF Self.bald > 0 THEN ARRAY_PUSH(aus, "warnung|⏰|" + tr$("Bald ablaufend") + "|" + trf$("{0} Artikel laufen in den nächsten {1} Tagen ab.", [STR$(Self.bald), STR$(Self.schwelle)]))
+        IF Self.gesamt > 20 THEN
+            ARRAY_PUSH(aus, "erfolg|📦|" + tr$("Gut gefüllt!") + "|" + trf$("Dein Kühlschrank ist mit {0} Artikeln gut bestückt.", [STR$(Self.gesamt)]))
+        ELSEIF Self.gesamt < 5 THEN
+            ARRAY_PUSH(aus, "info|🛒|" + tr$("Einkaufen gehen?") + "|" + trf$("Nur noch {0} Artikel im Bestand. Zeit für einen Einkauf!", [STR$(Self.gesamt)]))
+        END IF
+        IF LEN(Self.katNamen) > 0 THEN ARRAY_PUSH(aus, "lila|🏆|" + tr$("Top Kategorie") + "|" + trf$("'{0}' ist deine meistgenutzte Kategorie mit {1} Artikeln.", [Self.katNamen[0], STR$(Self.katZahlen[0])]))
+        RETURN aus
+    END FUNCTION
+END CLASS

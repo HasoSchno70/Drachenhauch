@@ -359,6 +359,18 @@ Reflexionen/Mirror-Effekte.
 > ihrer Schreibweise; `N` meint danach wieder die Konstante. Tests
 > `tests/pruef/werkzeugkette/code_korrekturen.dhtest`.
 
+### H5. Eine Methode ersetzte still die geerbte gleichen Namens — ✅ BEHOBEN (2026-11-08)
+> **`SUB zeigen()` in einem Studio-Fenster ersetzte `Zeigen()` der
+> Studio-Laufzeit.** Namen kennen keine Groß-/Kleinschreibung, also ist
+> `zeigen` dieselbe Methode wie `Zeigen` -- jeder Aufruf `fenster.Zeigen()`
+> landete in der eigenen, das Fenster ging nie auf (Kühlschrank-App, Stufe 4:
+> „GUI_VALUE erwartet INTEGER“ eine Zeile tiefer). Bei anderer
+> Parameterzahl gab es dazu schon eine Warnung; bei gleicher galt es als
+> gewolltes Überschreiben. Jetzt warnt `--check` auch dann, wenn die
+> **Schreibweise** abweicht (`zeigen` gegen `Zeigen`, `BREITE` gegen
+> `Breite`); wer wirklich ersetzen will, schreibt den Namen wie in der
+> Elternklasse. Test `tests/pruef/laufzeit/compiler_warnungen.dhtest`.
+
 ## I — Umstieg aus anderen BASICs und aus Python (2026-09-21) — ✅ BEHOBEN
 
 > Gemessen, nicht geschätzt: rund 150 kleine Programme so geschrieben, wie man

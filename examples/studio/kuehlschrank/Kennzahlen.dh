@@ -1,0 +1,19 @@
+' Die Zahlen im Kopf des Hauptfensters, gerechnet wie get_statistics der
+' Python-App: alle Einträge im Bestand, verschiedene Produkte, bald
+' ablaufend (heute bis heute + Warnschwelle, Einstellung
+' expiring_days_threshold, Vorgabe 3 Tage) und abgelaufen (vor heute).
+CLASS Kennzahlen
+    DIM gesamt AS INTEGER
+    DIM produkte AS INTEGER
+    DIM bald AS INTEGER
+    DIM abgelaufen AS INTEGER
+
+    SUB rechnen()
+        DIM h AS STRING : h = heute$()
+        DIM tage AS STRING : tage = "+" + STR$(einstellungZahl("expiring_days_threshold", 3)) + " days"
+        Self.gesamt = dbZahl("SELECT COUNT(*) FROM inventory")
+        Self.produkte = dbZahl("SELECT COUNT(DISTINCT product_id) FROM inventory")
+        Self.bald = dbZahlMit("SELECT COUNT(*) FROM inventory WHERE expiry_date >= ?1 AND expiry_date <= date(?1, ?2)", h, tage)
+        Self.abgelaufen = dbZahlEin("SELECT COUNT(*) FROM inventory WHERE expiry_date < ?", h)
+    END SUB
+END CLASS

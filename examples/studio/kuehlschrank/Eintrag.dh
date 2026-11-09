@@ -1,0 +1,60 @@
+' Ein Eintrag im Vorrat: eine Zeile aus inventory mit ihrem Produkt, wie
+' bestandLaden sie liest. tage = Tage bis zum Ablauf (nur mit Datum).
+CLASS Eintrag
+    DIM id AS INTEGER
+    DIM produktId AS INTEGER
+    DIM name AS STRING
+    DIM marke AS STRING
+    DIM kategorie AS STRING
+    DIM barcode AS STRING
+    DIM menge AS FLOAT
+    DIM einheit AS STRING
+    DIM kaufdatum AS STRING
+    DIM ablauf AS STRING
+    DIM lagerort AS STRING
+    DIM bereich AS STRING
+    DIM notizen AS STRING
+    DIM markt AS STRING
+    DIM minMenge AS FLOAT
+    DIM minEinheit AS STRING
+    DIM tage AS INTEGER
+
+    ' "abgelaufen", "bald", "frisch" -- oder "" ohne Ablaufdatum. Wie
+    ' ExpiryStatus der Python-App: bald = heute bis heute + Warnschwelle.
+    FUNCTION status$(schwelle AS INTEGER) AS STRING
+        IF Self.ablauf = "" THEN RETURN ""
+        IF Self.tage < 0 THEN RETURN "abgelaufen"
+        IF Self.tage <= schwelle THEN RETURN "bald"
+        RETURN "frisch"
+    END FUNCTION
+
+    FUNCTION statusText$(schwelle AS INTEGER) AS STRING
+        SELECT CASE Self.status$(schwelle)
+            CASE "abgelaufen" : RETURN tr$("Abgelaufen")
+            CASE "frisch" : RETURN tr$("Frisch")
+            CASE "bald"
+                IF Self.tage = 0 THEN RETURN tr$("Heute")
+                IF Self.tage = 1 THEN RETURN tr$("Morgen")
+                RETURN trf$("{0} Tage", [STR$(Self.tage)])
+        END SELECT
+        RETURN "-"
+    END FUNCTION
+
+    FUNCTION unterMinimum() AS BOOLEAN
+        RETURN Self.minMenge > 0 AND Self.menge < Self.minMenge
+    END FUNCTION
+
+    FUNCTION mengeText$() AS STRING
+        RETURN TRIM$(zahlText$(Self.menge) + " " + einheitText$(Self.einheit))
+    END FUNCTION
+
+    FUNCTION minText$() AS STRING
+        IF Self.minMenge <= 0 THEN RETURN "-"
+        RETURN TRIM$(zahlText$(Self.minMenge) + " " + einheitText$(Self.minEinheit))
+    END FUNCTION
+
+    ' Wonach die Suche schaut, klein geschrieben.
+    FUNCTION suchText$() AS STRING
+        RETURN LOWER$(JOIN$([Self.name, Self.marke, Self.kategorie, Self.lagerort, Self.bereich, Self.markt, Self.barcode], " "))
+    END FUNCTION
+END CLASS

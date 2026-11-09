@@ -1,0 +1,316 @@
+' Drachenhauch Studio: das Ereignis Takt (Fenster und eigenes Control, je
+' Bild) und Zelle(zeile, spalte) der Tabelle -- gefunden beim Port der
+' Kuehlschrank-App: ein Klick auf -1/+1 in der schon gewaehlten Zeile kam
+' nirgends an (die Tabelle meldete nur Geaendert und Doppelklick), und ein
+' Kontextmenue liess sich nur im Code bauen, aber nirgends abfragen.
+' Format: docs/werkzeuge.md, dhrt test.
+
+--- langsam
+=== zelle meldet zeile und spalte, takt laeuft je bild in fenster und control
+' F5 erzeugt das Programm; die Probe klickt zweimal in Zeile 1, Spalte 1 (eine
+' Knopf-Zelle) -- beim zweiten Mal ist die Zeile schon gewaehlt, Geaendert
+' kommt dann nicht mehr, Zelle schon.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+slHin(10, 10)
+slWarten(10)
+slTaste(294)
+slWarten(150)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+SETENV("DH_STUDIO_LAUF_BILDER", "20")
+DIM log AS STRING : log = CWD$() + "/s.log"
+slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+PRINT "erzeugt "; LEN(slAnfang(log, "erzeugt ")) = 1
+DIM neu AS ARRAY OF STRING : neu = []
+DIM s AS STRING
+FOR EACH s IN READLINES(p + "/_studio/main.dh")
+    IF LEFT$(s, 11) = "studioLauf(" THEN ARRAY_PUSH(neu, "AUTOMATION_PLAY(" + CHR$(34) + "klick.txt" + CHR$(34) + ")")
+    ARRAY_PUSH(neu, s)
+NEXT
+WRITEALL(p + "/_studio/probe.dh", JOIN$(neu, CHR$(10)) + CHR$(10))
+WRITEALL(p + "/_studio/klick.txt", "c 8" + CHR$(10) + "e 0 7 245 72 0 0" + CHR$(10) + "e 5 7 245 72 0 0" + CHR$(10) + "e 10 6 0 0 0 0" + CHR$(10) + "e 12 5 0 0 0 0" + CHR$(10) + "e 20 7 245 72 0 0" + CHR$(10) + "e 25 7 245 72 0 0" + CHR$(10) + "e 30 6 0 0 0 0" + CHR$(10) + "e 32 5 0 0 0 0" + CHR$(10))
+DIM k AS INTEGER : k = PROCESS_START("dhrt", "run", "--bilder", "45", p + "/_studio/probe.dh")
+DIM leer AS INTEGER : leer = 0
+WHILE leer < 5
+    DIM t AS STRING : t = PROCESS_READ$(k)
+    IF t <> "" THEN
+        DIM zeile AS STRING
+        FOR EACH zeile IN SPLIT(REPLACE$(t, CHR$(13), ""), CHR$(10))
+            IF zeile <> "" AND LEFT$(zeile, 8) <> "WARNING:" AND LEFT$(zeile, 5) <> "INFO:" THEN PRINT zeile
+        NEXT
+        leer = 0
+    ELSEIF NOT PROCESS_RUNNING(k) THEN
+        leer = leer + 1
+        SLEEP(30)
+    END IF
+WEND
+PRINT "code "; PROCESS_CODE(k)
+--- argumente
+{sammlung}/../../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"control","name":"Zaehler"},{"art":"fenster","name":"Hauptfenster"}]}
+--- datei proj/Zaehler.dhform
+{"title":"Zaehler","name":"Zaehler","w":100,"h":30,"widgets":[{"kind":"label","name":"anzeige","text":"0","x":0,"y":0,"w":100,"h":30}]}
+--- datei proj/Zaehler.dh
+CLASS Zaehler EXTENDS Zaehler_Basis
+    DIM n AS INTEGER
+
+    SUB Takt()
+        Self.n = Self.n + 1
+        IF Self.n = 3 THEN PRINT "control takt 3"
+    END SUB
+END CLASS
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":420,"h":300,"widgets":[
+{"kind":"table","name":"tabelle","x":20,"y":20,"w":300,"h":200,"table":{"headers":["Name","Aktion"],"rows":[["Milch","-1"],["Brot","-1"]],"col_widths":[150,150],"selected":-1}},
+{"kind":"studio_control","studio_control":"Zaehler","name":"zaehler1","x":20,"y":240,"w":100,"h":30}]}
+--- datei proj/Hauptfenster.dh
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+    DIM bilder AS INTEGER
+
+    SUB Geoeffnet()
+        GUI_TABLE_CELL_KIND(Self.tabelle, 0, 1, "knopf")
+        GUI_TABLE_CELL_KIND(Self.tabelle, 1, 1, "knopf")
+    END SUB
+
+    SUB tabelle_Zelle(zeile AS INTEGER, spalte AS INTEGER)
+        PRINT "zelle "; zeile; " "; spalte; " "; GUI_TABLE_GET_CELL(Self.tabelle, zeile, 0)
+    END SUB
+
+    SUB tabelle_Geaendert()
+        PRINT "geaendert "; GUI_TABLE_SELECTED(Self.tabelle)
+    END SUB
+
+    SUB Takt()
+        Self.bilder = Self.bilder + 1
+        IF Self.bilder = 3 THEN PRINT "fenster takt 3"
+    END SUB
+END CLASS
+--- datei proj/App.dh
+CLASS App EXTENDS StudioApp
+END CLASS
+--- erwartet
+erzeugt TRUE
+control takt 3
+fenster takt 3
+geaendert 1
+zelle 1 1 Brot
+zelle 1 1 Brot
+code 0
+
+=== zeichnen nur, wenn die flaeche zu sehen ist, und in der schrift der oberflaeche
+' Ein eigenes Control mit Zeichenflaeche auf Seite 1 eines Reiterwerks:
+' solange Seite 0 vorn ist, malt es nicht (vorher malte es ueber die vordere
+' Seite, GUI_SHOWN). Sein Text misst wie die eingebaute Sans, nicht wie die
+' Pixelschrift, die TEXT sonst nimmt; danach gilt wieder die des Programms.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+slHin(10, 10)
+slWarten(10)
+slTaste(294)
+slWarten(150)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+SETENV("DH_STUDIO_LAUF_BILDER", "20")
+DIM log AS STRING : log = CWD$() + "/s.log"
+slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+PRINT "erzeugt "; LEN(slAnfang(log, "erzeugt ")) = 1
+DIM neu AS ARRAY OF STRING : neu = []
+DIM s AS STRING
+FOR EACH s IN READLINES(p + "/_studio/main.dh")
+    IF LEFT$(s, 11) = "studioLauf(" THEN
+        DIM t AS STRING
+        FOR EACH t IN READLINES(CWD$() + "/probe.dh")
+            ARRAY_PUSH(neu, t)
+        NEXT
+    ELSE
+        ARRAY_PUSH(neu, s)
+    END IF
+NEXT
+WRITEALL(p + "/_studio/probe.dh", JOIN$(neu, CHR$(10)) + CHR$(10))
+DIM k AS INTEGER : k = PROCESS_START("dhrt", "run", "--bilder", "30", p + "/_studio/probe.dh")
+DIM leer AS INTEGER : leer = 0
+WHILE leer < 5
+    DIM t2 AS STRING : t2 = PROCESS_READ$(k) + PROCESS_ERR$(k)
+    IF t2 <> "" THEN
+        DIM zeile AS STRING
+        FOR EACH zeile IN SPLIT(REPLACE$(t2, CHR$(13), ""), CHR$(10))
+            IF zeile <> "" AND LEFT$(zeile, 8) <> "WARNING:" AND LEFT$(zeile, 5) <> "INFO:" THEN PRINT zeile
+        NEXT
+        leer = 0
+    ELSEIF NOT PROCESS_RUNNING(k) THEN
+        leer = leer + 1
+        SLEEP(30)
+    END IF
+WEND
+PRINT "code "; PROCESS_CODE(k)
+--- argumente
+{sammlung}/../../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei probe.dh
+SCREEN(640, 480, "Probe")
+studioSchirmB = SCREENWIDTH() : studioSchirmH = SCREENHEIGHT()
+studioDieStartseite = studioStartFenster
+studioDieApp.Geoeffnet()
+studioStartFenster.studioHaupt = TRUE
+studioStartFenster.Zeigen()
+DIM f AS Hauptfenster : f = studioStartFenster
+TEXT_SIZE(13)
+DIM n AS INTEGER
+WHILE n < 5 AND studioBild()
+    n = n + 1
+WEND
+PRINT "seite 0: "; f.bild1.gemalt
+GUI_TABCONTROL_SET_PAGE(f.reiter, 1)
+n = 0
+WHILE n < 5 AND studioBild()
+    n = n + 1
+WEND
+PRINT "seite 1: "; f.bild1.gemalt > 0
+' Das TEXT_SIZE(20) aus Zeichnen bleibt dort: die gui zeichnet ohne eigene
+' Schrift in der Textgroesse des Programms, sie schrumpfte sonst mit.
+PRINT "groesse danach "; TEXT_HEIGHT()
+TEXT_SIZE(20)
+DIM pixel AS FLOAT : pixel = TEXT_WIDTH("Wolke")
+SETFONT(LOADFONT("sans", 32))
+TEXT_SIZE(20)
+PRINT "wie sans "; f.bild1.breite = TEXT_WIDTH("Wolke"); " | wie pixel "; f.bild1.breite = pixel
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"control","name":"Malflaeche"},{"art":"fenster","name":"Hauptfenster"}]}
+--- datei proj/Malflaeche.dhform
+{"title":"Malflaeche","name":"Malflaeche","w":200,"h":120,"widgets":[{"kind":"canvas","name":"flaeche","x":0,"y":0,"w":200,"h":120}]}
+--- datei proj/Malflaeche.dh
+CLASS Malflaeche EXTENDS Malflaeche_Basis
+    DIM gemalt AS INTEGER
+    DIM breite AS FLOAT
+
+    SUB flaeche_Zeichnen()
+        Self.gemalt = Self.gemalt + 1
+        TEXT_SIZE(20)
+        Self.breite = TEXT_WIDTH("Wolke")
+    END SUB
+END CLASS
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":420,"h":300,"widgets":[
+{"kind":"tabcontrol","name":"reiter","x":10,"y":10,"w":400,"h":260,"items":["Eins","Zwei"],"tabctl":{"kinder":[[1,1]],"seite":0}},
+{"kind":"studio_control","studio_control":"Malflaeche","name":"bild1","x":20,"y":50,"w":200,"h":120}]}
+--- datei proj/Hauptfenster.dh
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+END CLASS
+--- erwartet
+erzeugt TRUE
+seite 0: 0
+seite 1: TRUE
+groesse danach 13
+wie sans TRUE | wie pixel FALSE
+code 0
+
+=== ein reiterwerk im eigenen control zeigt nur seine seite, auch ein control darin
+' Das Reiterwerk im Control Aussen nennt seine Seiten mit den Nummern im
+' Control; ausgeklappt ins Fenster zeigten sie auf fremde Widgets, und alle
+' Seiten lagen uebereinander (gefunden mit der Kuehlschrank-App, Statistik).
+' Auf Seite 1 steht eine Instanz von Innen: ihre Teile gehoeren auf dieselbe
+' Seite. Aussen selbst liegt auf Seite 0 eines Reiterwerks im Fenster: auf
+' dessen Seite 1 ist nichts davon zu sehen, auch Innen nicht -- auch eine
+' Innen-Instanz, die in Aussen auf keiner Seite steht (frei): sie gehoert
+' ueber die Kette Innen -> Aussen auf die Seite des Fensters.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+slHin(10, 10)
+slWarten(10)
+slTaste(294)
+slWarten(150)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+SETENV("DH_STUDIO_LAUF_BILDER", "20")
+DIM log AS STRING : log = CWD$() + "/s.log"
+slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+PRINT "erzeugt "; LEN(slAnfang(log, "erzeugt ")) = 1
+DIM neu AS ARRAY OF STRING : neu = []
+DIM s AS STRING
+FOR EACH s IN READLINES(p + "/_studio/main.dh")
+    IF LEFT$(s, 11) = "studioLauf(" THEN
+        DIM t AS STRING
+        FOR EACH t IN READLINES(CWD$() + "/probe.dh")
+            ARRAY_PUSH(neu, t)
+        NEXT
+    ELSE
+        ARRAY_PUSH(neu, s)
+    END IF
+NEXT
+WRITEALL(p + "/_studio/probe.dh", JOIN$(neu, CHR$(10)) + CHR$(10))
+DIM k AS INTEGER : k = PROCESS_START("dhrt", "run", "--bilder", "30", p + "/_studio/probe.dh")
+DIM leer AS INTEGER : leer = 0
+WHILE leer < 5
+    DIM t2 AS STRING : t2 = PROCESS_READ$(k) + PROCESS_ERR$(k)
+    IF t2 <> "" THEN
+        DIM zeile AS STRING
+        FOR EACH zeile IN SPLIT(REPLACE$(t2, CHR$(13), ""), CHR$(10))
+            IF zeile <> "" AND LEFT$(zeile, 8) <> "WARNING:" AND LEFT$(zeile, 5) <> "INFO:" THEN PRINT zeile
+        NEXT
+        leer = 0
+    ELSEIF NOT PROCESS_RUNNING(k) THEN
+        leer = leer + 1
+        SLEEP(30)
+    END IF
+WEND
+PRINT "code "; PROCESS_CODE(k)
+--- argumente
+{sammlung}/../../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei probe.dh
+SCREEN(640, 480, "Probe")
+studioSchirmB = SCREENWIDTH() : studioSchirmH = SCREENHEIGHT()
+studioDieStartseite = studioStartFenster
+studioDieApp.Geoeffnet()
+studioStartFenster.studioHaupt = TRUE
+studioStartFenster.Zeigen()
+DIM f AS Hauptfenster : f = studioStartFenster
+SUB stand(wann AS STRING)
+    DIM n AS INTEGER
+    WHILE n < 2 AND studioBild()
+        n = n + 1
+    WEND
+    PRINT wann; ": eins "; GUI_SHOWN(f.teil.eins); " zwei "; GUI_SHOWN(f.teil.zwei); " innen "; GUI_SHOWN(f.teil.drin.wort); " frei "; GUI_SHOWN(f.teil.frei.wort); " knopf "; GUI_SHOWN(f.knopf)
+END SUB
+stand("seite 0")
+GUI_TABCONTROL_SET_PAGE(f.teil.seiten, 1)
+stand("seite 1")
+GUI_TABCONTROL_SET_PAGE(f.reiter, 1)
+stand("fenster 1")
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"control","name":"Innen"},{"art":"control","name":"Aussen"},{"art":"fenster","name":"Hauptfenster"}]}
+--- datei proj/Innen.dhform
+{"title":"Innen","name":"Innen","w":120,"h":40,"widgets":[{"kind":"label","name":"wort","text":"Innen","x":0,"y":0,"w":100,"h":20}]}
+--- datei proj/Innen.dh
+CLASS Innen EXTENDS Innen_Basis
+END CLASS
+--- datei proj/Aussen.dhform
+{"title":"Aussen","name":"Aussen","w":300,"h":200,"widgets":[
+{"kind":"tabcontrol","name":"seiten","x":0,"y":0,"w":300,"h":200,"items":["A","B"],"tabctl":{"kinder":[[1,0],[2,1],[3,1]],"seite":0}},
+{"kind":"label","name":"eins","text":"Eins","x":10,"y":40,"w":100,"h":20},
+{"kind":"label","name":"zwei","text":"Zwei","x":10,"y":40,"w":100,"h":20},
+{"kind":"studio_control","studio_control":"Innen","name":"drin","x":10,"y":80,"w":120,"h":40},
+{"kind":"studio_control","studio_control":"Innen","name":"frei","x":150,"y":80,"w":120,"h":40}]}
+--- datei proj/Aussen.dh
+CLASS Aussen EXTENDS Aussen_Basis
+END CLASS
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":440,"h":300,"widgets":[
+{"kind":"button","name":"knopf","text":"Fenster","x":340,"y":10,"w":90,"h":30},
+{"kind":"tabcontrol","name":"reiter","x":0,"y":0,"w":330,"h":260,"items":["Eins","Zwei"],"tabctl":{"kinder":[[2,0]],"seite":0}},
+{"kind":"studio_control","studio_control":"Aussen","name":"teil","x":10,"y":40,"w":300,"h":200}]}
+--- datei proj/Hauptfenster.dh
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+END CLASS
+--- erwartet
+erzeugt TRUE
+seite 0: eins TRUE zwei FALSE innen FALSE frei TRUE knopf TRUE
+seite 1: eins FALSE zwei TRUE innen TRUE frei TRUE knopf TRUE
+fenster 1: eins FALSE zwei FALSE innen FALSE frei FALSE knopf TRUE
+code 0

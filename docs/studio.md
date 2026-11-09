@@ -123,19 +123,72 @@ Die Ereignisse je Art:
 | Kästchen, Umschalter, Optionsfeld | Klick, Geaendert |
 | Textfeld | Geaendert, Enter, FokusRein, FokusRaus |
 | Textbereich | Geaendert, FokusRein, FokusRaus |
-| Liste, Baum, Tabelle | Geaendert, Doppelklick (bei Liste und Tabelle auch Enter) |
+| Liste, Baum | Geaendert, Doppelklick (bei der Liste auch Enter) |
+| Tabelle | Geaendert, Doppelklick (auch Enter), Zelle(zeile, spalte) |
 | Regler, Zahlenfeld, Klappliste, Wähler, Reiterwerk | Geaendert |
-| Zeichenfläche | Zeichnen, Maus, Ziehen(x, y), Rad(schritte) |
-| jedes Control zusätzlich | MausRein, MausRaus |
+| Zeichenfläche, Diagramm | Zeichnen, Maus, Ziehen(x, y), Rad(schritte) |
+| Werkzeugleiste | Knopf(nr) |
+| Statusleiste | Feld(nr) |
+| jedes Control zusätzlich | MausRein, MausRaus, Abgelegt(zeile, ziel) |
 | Timer, Menüeintrag | Aktion |
-| Fenster | Geoeffnet, Schliessen, Groesse, Taste(taste) |
+| Fenster | Geoeffnet, Schliessen, Groesse, Taste(taste), Takt |
+| eigenes Control | Geoeffnet, Groesse, Takt |
 | App | Geoeffnet, Beenden |
+
+`Zeichnen` läuft in jedem Bild, in dem die Fläche zu sehen ist (nicht auf
+einer Reiterseite im Hintergrund), mit der Fläche als Schnittrechteck und in
+der Schrift der Oberfläche: der eigenen der gui (`GUI_FONT`), sonst der
+eingebauten Sans in der Textgröße des Programms -- nicht in der
+Pixelschrift, die `TEXT` sonst nimmt. Was `Zeichnen` an Schrift, Größe und
+Stil ändert, gilt nur dort (wie `GFX_PUSH`/`GFX_POP`). Gezeichnet wird in Bildschirmpunkten ab `GUI_CANVAS_X/Y`. Maus, Rad und
+Ziehen kommen nicht, solange ein modales Fenster vor der Fläche steht.
+
+Ein **Diagramm** (Bibliothek, Gruppe Zeichnen) ist eine Zeichenfläche mit
+einem Diagramm aus dem Modul [`chart`](module-chart.md): die Art (Kuchen,
+Donut, Balken, Linie, Fläche, Tacho, Leiste, Lampen) und den Titel stellt der
+Inspektor ein, der Entwurf zeigt ein Muster. Im Code ist das Control ein
+`StudioDiagramm`, das sich in jedem Bild selbst zeichnet, so groß wie die
+Fläche und im Thema der Oberfläche (hell oder dunkel, auch nach einem
+Wechsel); ein eigenes `Zeichnen` kommt obendrauf.
+
+```basic
+Self.vorrat.Leeren()
+Self.vorrat.Hinzufuegen("Obst", 5)
+Self.vorrat.Hinzufuegen("Milch", 2, RGB(200, 60, 60))   ' eigene Farbe
+Self.vorrat.Setzen("legende", "rechts")                 ' CHART_SET
+Self.vorrat.SetzenSchalter("prozent", TRUE)             ' CHART_SET_FLAG
+```
+
+Dazu `Reihe(name, werte)` für Linien und gruppierte Balken, `Beschriften`,
+`Wert` für Tacho, Leiste und Lampen, `Titel`, `SetzenZahl`, `Anzahl()`;
+`Flaeche` ist die Zeichenfläche, `Diagramm` der CHART-Handle für alles
+Weitere.
 
 Ein Ereignis mit Klammern ruft seine Methode mit Werten: `Ziehen` mit der
 Lage auf der Fläche (solange die Taste nach einem Druck auf die Fläche
 hängt), `Rad` mit den Schritten des Mausrads, `Taste` mit dem Tastencode
 (`KEY_A`, `KEY_SPACE` ...), solange das Fenster vorn ist und kein
-Eingabefeld die Taste nimmt. Die Vorschläge kennen den ganzen Text des
+Eingabefeld die Taste nimmt -- ein Kürzel (eine F-Taste, Strg oder Alt dazu)
+kommt auch aus einem Eingabefeld an, außer das Feld braucht es selbst
+(Strg+A/C/V/X/Z/Y, Pfeile, Pos1, Ende, Rück, Entf); ob Strg gedrückt ist,
+fragt die Methode mit `KEYPRESSED(KEY_LCTRL)` --, `Knopf` mit der Nummer des gedrückten Knopfs
+der Werkzeugleiste und `Feld` mit der Nummer des angeklickten Felds der
+Statusleiste (ab 0, Trenner und Lücken zählen mit), `Zelle` mit
+Datenzeile und Spalte jedes Klicks in eine Tabelle -- auch auf einen Knopf
+in der Zelle (`GUI_TABLE_CELL_KIND "knopf"`) und auch in der schon gewählten
+Zeile, wo `Geaendert` nicht mehr kommt; `Abgelegt` mit der gezogenen Zeile
+der Quelle und der Zeile, auf der sie landete, wenn etwas auf ein Control
+gezogen wurde, das im Inspektor „Ablage“ ist (die Quelle ist „Ziehbar“: bei
+Liste, Baum und Tabelle die Zeile, sonst das Control; woher es kam, sagt
+`GUI_DROP_SOURCE()`, was, `GUI_DROP_TEXT()`). `Takt` läuft in jedem Bild nach den
+Ereignissen der Controls (die eines eigenen Controls vor denen des
+Fensters) -- dort fragt der Code ab, wofür es kein Ereignis gibt, etwa ein
+Kontextmenü aus `GUI_CONTEXT`. Die Knöpfe stehen im
+Inspektor in einer Zeile, `Text|Sinnbild|Tipp` je Knopf, durch Semikolon
+getrennt, `-` ist ein Trenner, `~` eine Lücke (`Neu|plus|Neues Produkt; -;
+|rueckgaengig|Rückgängig`); die Felder als `Text|Breite`, dahinter
+wahlweise `links`/`mitte`/`rechts` und `klick` für ein Feld, das `Feld`
+meldet (Breite 0 teilt sich den Rest). Die Vorschläge kennen den ganzen Text des
 Programms samt der erzeugten Basisklasse -- hinter `Self.` stehen also auch
 die Controls, Timer und Menüeinträge des Fensters.
 
@@ -200,6 +253,13 @@ schreibt die Menüs ins Layout -- ein Rückgängig-Schritt; umbenannte Einträge
 nehmen ihre Ereignis-Methoden mit. Benannte Einträge stehen im Navigator
 unter dem Fenster, ihr Ereignis heißt `<Name>_Aktion`.
 
+**Kontextmenüs** legt derselbe Editor an: [+ Kontextmenü], darunter Einträge
+wie in einem Menü. Sein Name ist ein Feld des Fensters (das Handle aus
+`GUI_CONTEXT`), unter „An“ steht das Widget, auf dessen Rechtsklick es
+aufgeht -- eine Liste, ein Baum, eine Tabelle wählen dabei ihre Zeile --,
+oder das ganze Fenster. Auch ein eigenes Control hat Kontextmenüs (eine
+Menüleiste nicht). Im Layout stehen sie unter `kontextmenues`.
+
 **Dialoge, die warten.** Die Laufzeit des Projekts bietet:
 
 | Aufruf | was er tut |
@@ -207,6 +267,9 @@ unter dem Fenster, ihr Ereignis heißt `<Name>_Aktion`.
 | `Meldung(text$ [, titel$])` | eine Meldung mit OK |
 | `Frage(text$ [, knoepfe$ [, titel$]])` | Knöpfe mit `\|` getrennt (Vorgabe `Ja\|Nein`), liefert die Nummer des Knopfs; Enter = der erste, ESC = der letzte |
 | `Eingabe(text$ [, vorgabe$ [, titel$]])` | fragt nach einem Text, `""` bei Abbrechen |
+| `Auswahl(text$, eintraege [, vorgabe [, titel$]])` | einer aus einer Liste (Klappliste); liefert den Index, `-1` bei Abbrechen |
+| `EingabeZahl(text$, vorgabe, min, max [, titel$])` | fragt nach einer ganzen Zahl; liefert `(TRUE, zahl)` oder bei Abbrechen `(FALSE, vorgabe)` |
+| `FarbeWaehlen(vorgabe [, titel$])` | eine Farbe im Farbwähler; liefert `&HRRGGBB`, `-1` bei Abbrechen |
 | `fenster.ZeigenModal()` | zeigt ein Fenster modal und kehrt erst zurück, wenn es geschlossen ist |
 | `Bild(name$)` | ein Bild aus `bilder/` des Projekts als IMAGE |
 
@@ -220,6 +283,30 @@ währenddessen, liefert `Frage` 0. Timer laufen auch während eines Dialogs.
 Projektordner; ein Bild-Control wählt seins im Inspektor unter „Bild“ und
 zeigt es schon im Entwurf. Beim Starten und Bauen kommen die Bilder nach
 `_studio/assets/bilder/`, und `dhrt --export` nimmt `assets/` neben die Exe.
+
+**Sprachen.** Ein Projekt schreibt seine Texte in einer Sprache, der seiner
+Quelle. Eine Tafel `sprache/<code>.txt` im Projektordner macht eine zweite
+daraus: je Zeile der Text, wie er im Projekt steht, ein Tabulator, die
+Übersetzung (`sprache/en.txt`). Von selbst übersetzt werden die Texte der
+Fenster (Titel, Beschriftungen, Platzhalter, Tooltips, Spaltenköpfe,
+Einträge, Reiter, Meldungen der Prüfregeln, Diagrammtitel, Werkzeugleisten),
+die Menüs samt Kürzeln (`Strg+S` wird `Ctrl+S`), die Texte der Berichte und
+die Knöpfe der Dialoge oben. Im Code geht jeder Anzeigetext durch `tr$`:
+
+| Aufruf | was er tut |
+|---|---|
+| `SpracheWaehlen(code$)` | wählt die Sprache (`""` = die der Quelle); `FALSE`, wenn es keine Tafel `sprache/<code>.txt` gibt |
+| `Sprache$()` | die gewählte Sprache, `""` = die der Quelle |
+| `tr$(text$)` | der Text in der gewählten Sprache; was die Tafel nicht kennt, bleibt |
+| `trf$(text$, werte)` | ein Text mit `{0}`, `{1}` ...: erst übersetzt, dann eingesetzt |
+
+Gewählt wird vor dem ersten Fenster, in `App.Geoeffnet`; ohne Wahl ist es
+Englisch, wenn `DHRT_LANG` englisch ist und die Tafel `en.txt` da ist. Ein
+Wechsel gilt für Fenster, die danach aufgebaut werden. Was das Programm aus
+einem Widget zurückliest (der Text einer Klappliste), ist die Übersetzung --
+verglichen wird mit `tr$("...")`. Mit `DH_STUDIO_SPRACHLUECKEN=datei`
+schreibt die Laufzeit jeden Text, der in der Tafel fehlt, einmal in die
+Datei.
 
 **Debugger.**
 
@@ -255,6 +342,14 @@ die auch Fehler an ihre Methode bringt.
 | Strg+Z / Strg+Y | Rückgängig / Wiederholen |
 | Strg+Mausrad, Strg+Plus/Minus, Strg+0 | Zoom |
 | Esc | bricht ein Ablegen ab, sonst hebt es die Auswahl auf |
+
+Ein Fenster, das bei 100 % nicht in die Mitte passt, geht bei 75 oder
+50 % auf; was über die Mitte hinausreicht, wird abgeschnitten, statt über
+Inspektor und Ausgabe zu liegen. Die Höhe im Inspektor ist die des
+Fensters samt Titelleiste (ein Control unten muss also über ihr enden; nur
+das Startfenster läuft im Programm ohne Titelleiste). Hat das Fenster Menüs,
+steht die Menüleiste über dem Inhalt: im Programm wird das Fenster um die
+Leiste höher.
 
 **Ausrichtungslinien:** Beim Ziehen und beim Ändern der Größe rasten die
 Kanten und Mitten an denen der anderen Controls ein. Einrasten gibt es auch
@@ -311,6 +406,13 @@ die die Eigenschaft haben. Ein Rückgängig-Schritt entsteht, wenn das Feld den
 Fokus abgibt oder Enter kommt, nicht je Anschlag. Ein Name muss ein
 Bezeichner sein und im Fenster eindeutig, denn er wird später zum Feld der
 Fensterklasse; ein ungültiger Name wird rot markiert und nicht übernommen.
+
+Ohne Auswahl zeigt der Inspektor das Fenster, dazu **Standard-Knopf (Enter)**
+und **Abbrechen-Knopf (Esc)**: eine Klappliste mit den Knöpfen des Fensters.
+Im Programm drückt Enter dann den einen und Esc den anderen -- sein
+`_Klick` läuft wie bei einem Mausklick (Enter auch aus einem einzeiligen
+Textfeld; ein Textbereich behält sein Enter). Gemerkt wird der Knopf beim Namen; wird er umbenannt, zieht die
+Wahl mit, wird er gelöscht, fällt sie weg.
 
 ## Eigene Controls
 
@@ -431,6 +533,19 @@ auf und kopiert ihre Zeilen um (SQLite kann eine Spalte nicht ändern);
 Spalten und Tabellen, die das Programm selbst angelegt hat, bleiben dabei
 stehen. Löschen und Umbenennen lassen sich nicht zurücknehmen.
 
+**Eine Datei, die es schon gibt** (aus einem anderen Programm), nimmt
+Projekt → Datenbank aus Datei übernehmen: die Datei kommt in den
+Projektordner (liegt sie schon dort, bleibt sie), ihr Aufbau wird das
+Schema -- Arten, Pflicht, Vorgaben, Eindeutig (UNIQUE über eine Spalte) und
+Verweise (FOREIGN KEY auf eine `id`). Was keine Art des Studios genau trifft
+(`DATE`, `TIMESTAMP`, `DEFAULT CURRENT_TIMESTAMP`, eine
+Pflichtspalte ohne Vorgabe), steht wörtlich daneben und gilt, bis man Art
+oder Vorgabe im Gitter ändert; so baut der Abgleich danach keine Tabelle
+neu auf, und die Datei bleibt Zeichen für Zeichen, wie sie war. Was das
+Schema nicht fassen kann (UNIQUE über zwei Spalten, eine Tabelle ohne `id`),
+bleibt in der Datei und steht in einer Meldung; eine Tabelle ohne `id` zeigt
+und bearbeitet der Reiter trotzdem, binden lässt sie sich nicht.
+
 Im Programm ist die Datenbank eine globale Verbindung unter ihrem Namen,
 offen, bevor die App startet:
 
@@ -495,6 +610,18 @@ die Tabelle (eine Zeile ohne Kunden bleibt, mit leerem Namen); die Spalte
 heißt im Ergebnis `kunde.name`, und unter diesem Namen kennen sie auch
 **Sortieren nach**, die **Bedingung** (`"kunde.ort" = 'Köln'`) und das
 Suchfeld.
+
+**Beim Löschen** macht aus dem Verweis einen Fremdschlüssel (`REFERENCES …
+(id)`) und sagt, was mit einer Zeile geschieht, wenn die Zeile gelöscht wird,
+auf die sie zeigt: *verbieten* (das Löschen scheitert, solange etwas auf sie
+zeigt), *mitlöschen* (`ON DELETE CASCADE`: die Posten gehen mit ihrer
+Rechnung) oder *leeren* (`ON DELETE SET NULL`, nicht bei einer
+Pflichtspalte). Leer bleibt es ein Verweis ohne Regel. Der Abgleich baut die
+Tabelle dafür um, die Zeilen bleiben -- auch ein Verweis ins Leere, er gilt
+erst für Änderungen danach. dhrt hat Fremdschlüssel immer an; ein
+gebautes Programm legt eine neue Datei so an, eine ältere ergänzt es nicht
+(das tut der Abgleich im Studio). Eine übernommene Datei bringt ihr
+`ON DELETE` mit.
 
 **Bilder.** Eine Spalte der Art **Bild** hält die Bytes einer Bilddatei
 (PNG, JPG, BMP oder GIF). Im Daten-Gitter steht ihre Größe; **Bild …** setzt
@@ -654,6 +781,15 @@ PDFs und die CSV landen beim Starten aus dem Studio in `_studio/`.
 Methode `zeigen(id)` in einem Fenster überschreibt das geerbte `Zeigen()` --
 `dhrt --check` (und damit die Problemliste) warnt, wenn eine Methode eine
 geerbte mit einer anderen Zahl von Parametern überschreibt.
+
+**Das große Beispiel:** `examples/studio/kuehlschrank/` ist eine
+Kühlschrank-Verwaltung (der Port einer PySide6-App, siehe sein `LIESMICH.md`)
+mit 18 Fenstern und eigenen Controls, einer vorhandenen SQLite-Datei als
+Datenbank-Element, Werkzeug- und Statusleiste, Timern, Diagrammen, einem
+Bericht, Netzabfragen im Hintergrund und einer englischen Oberfläche
+(`sprache/en.txt`, siehe „Sprachen“ oben). Wie es Stufe für Stufe entstand
+und welche Lücken des Studios es dabei gefunden hat, steht in
+`geschichte/kuehlschrank.md`.
 
 ## Für Prüfungen
 

@@ -271,6 +271,22 @@ fn setze_programm_args(raw: &[String]) {
     });
 }
 
+/// Woerter hinter der Datei, aber vor einem `--`, erreichen das Programm
+/// nicht (siehe oben) -- still verschluckt suchte man den Fehler im Programm
+/// (gefunden mit der Kuehlschrank-App: ein Testserver bekam seinen Ordner
+/// nie und schrieb neben sich). Schalter (`-x`, `--x`) bleiben still, sie
+/// gehoeren der Runtime.
+fn ohne_trenner_hinweis(rest: &[String], datei: &str) {
+    let woerter: Vec<&String> = rest.iter().take_while(|s| s.as_str() != "--").filter(|s| !s.starts_with('-')).collect();
+    if woerter.is_empty() {
+        return;
+    }
+    let liste = woerter.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(" ");
+    eprintln!("{}", meldung::t(&format!(
+        "run: {} erreicht das Programm nicht -- seine Argumente stehen hinter einem `--`: dhrt run {} -- {}",
+        liste, datei, liste)));
+}
+
 /// Die Fassung, wie ein Mensch sie nennt: "2026.8" statt "2026.8.0".
 ///
 /// Cargo verlangt drei Stellen; die dritte ist hier immer 0 und wuerde nur
@@ -532,6 +548,7 @@ fn main() -> ExitCode {
                 eprintln!("run: keine Datei angegeben");
                 return ExitCode::from(2);
             };
+            ohne_trenner_hinweis(&raw[i + 1..], datei);
             setze_programm_args(&raw);
             return run_main(datei);
         }

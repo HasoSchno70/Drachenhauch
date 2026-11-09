@@ -163,6 +163,60 @@ mwst = -> FALSE
 mw st = 1 -> FALSE
 mwst == 1 -> FALSE
 
+=== nur zeilen mit einem leeren wert in anfuehrungszeichen
+' "markt <> \"\"" heisst: nur, wenn markt etwas hat -- gefunden mit dem
+' Einkaufszettel der Kuehlschrank-App, dessen "Markt:" nie erschien (die
+' Zerlegung lehnte jeden leeren Wert ab, auch einen in Anfuehrungszeichen).
+' Ein leerer Wert ohne sie bleibt unlesbar.
+IMPORT "kern.dh"
+projOrdner = CWD$() + "/proj"
+DIM e AS Element : e = elementNeu("datenbank", "Daten")
+e.schema = READLINES("proj/Daten.dhdb")[0]
+DIM b AS Element : b = elementNeu("bericht", "Zettel")
+b.schema = READLINES("proj/Zettel.dhreport")[0]
+DIM db AS DB_CONN : db = DB_OPEN("proj/daten.sqlite")
+DIM r AS INTEGER
+FOR r = 1 TO 2
+    DIM p AS PDF : p = studioBerichtPdf(b.schema, db, berichtSql$(b), {"r": r})
+    PDF_SAVE(p, "z.pdf")
+    DIM t AS STRING : t = JOIN$(pdfSeiten("z.pdf"), CHR$(10))
+    PRINT "liste "; r; ": markt "; INSTR(t, "Markt:") >= 0; " | leer "; INSTR(t, "ohne Markt") >= 0
+NEXT
+DIM w AS STRING
+FOR EACH w IN ["markt <> " + CHR$(34) + CHR$(34), "markt = ''", "markt <>"]
+    PRINT w; " -> "; studioBWoZerlegen(w)
+NEXT
+--- vorher
+IMPORT "db"
+DIM db AS DB_CONN : db = DB_OPEN("proj/daten.sqlite")
+DB_EXEC(db, "CREATE TABLE zeilen (id INTEGER PRIMARY KEY, liste INTEGER, text TEXT, markt TEXT)")
+DB_EXEC(db, "INSERT INTO zeilen (liste, text, markt) VALUES (1, 'Milch', ''), (1, 'Brot', ''), (2, 'Käse', 'LIDL')")
+DB_CLOSE(db)
+--- datei proj/Daten.dhdb
+{"datei":"daten.sqlite","tabellen":[{"name":"zeilen","spalten":[{"name":"liste","typ":"ganz","pflicht":false,"eindeutig":false,"vorgabe":""},{"name":"text","typ":"text","pflicht":false,"eindeutig":false,"vorgabe":""},{"name":"markt","typ":"text","pflicht":false,"eindeutig":false,"vorgabe":""}]}]}
+--- datei proj/Zettel.dhreport
+{"titel":"Zettel","seite":{"format":"A4","hoch":true,"rand":[15,15,15,15]},"quelle":"Daten.zeilen","bedingung":"liste = :r","sortieren":["id"],"gruppen":[],"baender":[{"art":"detail","hoehe":6,"elemente":[{"art":"feld","spalte":"text","x":0,"y":0,"b":40,"h":5}]},{"art":"berichtsfuss","hoehe":20,"elemente":[{"art":"text","x":0,"y":0,"b":40,"h":6,"text":"Markt:","wo":"markt <> \"\""},{"art":"text","x":0,"y":7,"b":40,"h":6,"text":"ohne Markt","wo":"markt = ''"}]}]}
+--- datei kern.dh
+IMPORT "json"
+IMPORT "regex"
+IMPORT "imgfx"
+IMPORT "db"
+IMPORT "pdf"
+IMPORT "{sammlung}/../../../studio/sprache.dh"
+IMPORT "{sammlung}/../../../studio/bibliothek.dh"
+IMPORT "{sammlung}/../../../studio/modell.dh"
+IMPORT "{sammlung}/../../../studio/projekt.dh"
+IMPORT "{sammlung}/../../../studio/datenbank.dh"
+IMPORT "{sammlung}/../../../studio/berichte_laufzeit.dh"
+IMPORT "{sammlung}/../../../studio/berichte.dh"
+IMPORT "{sammlung}/../_hilfen/pdftext.dh"
+--- erwartet
+liste 1: markt FALSE | leer TRUE
+liste 2: markt TRUE | leer FALSE
+markt <> "" -> TRUE
+markt = '' -> TRUE
+markt <> -> FALSE
+
 === bildspalten: je zeile ihr bild, eingepasst
 ' Vier Artikel: ein rotes Quadrat, ein blaues Bild doppelt so breit wie hoch,
 ' einer ohne Bild (NULL) und einer mit Bytes, die kein Bild sind. Das

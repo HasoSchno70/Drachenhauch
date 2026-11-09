@@ -1,0 +1,297 @@
+' Der Reiter Einkauf: Liste mit Haken, Eingabe mit Vorschlägen aus den
+' Produkten, Schnellknöpfe, Auto-Ergänzen aus den Mindestmengen, Markt mit
+' Gangplan (sortieren, Gänge als Überschrift, nach Markt), Drucken und
+' „Einkauf abschließen“ -- wie tabs/shopping_tab.py. Das Control meldet
+' Geaendert (Kopf und Rückgängig auffrischen), Drucken und Abschliessen (das
+' Fenster öffnet Bericht bzw. Dialog).
+CLASS EinkaufSeite EXTENDS EinkaufSeite_Basis
+    ' Was die Tabelle zeigt, und je Zeile die id (0 = Überschrift eines Gangs).
+    DIM posten AS ARRAY OF Posten
+    DIM ids AS ARRAY OF INTEGER
+    DIM schnell AS ARRAY OF STRING
+    ' Wofür die Klappliste der Vorschläge gerade gefüllt wird -- ihr eigenes
+    ' Setzen ist keine Wahl.
+    DIM vorschlagAn AS BOOLEAN
+
+    SUB Geoeffnet()
+        Self.maerkteFuellen()
+        GUI_SET_VALUE(Self.mengeFeld, 1)
+        Self.vorschlaegeFuellen("")
+        Self.laden()
+    END SUB
+
+    ' Die Märkte mit Gangplan; gewählt ist der aus store_settings.
+    SUB maerkteFuellen()
+        DIM m AS ARRAY OF STRING : m = [tr$("-- Markt wählen --")]
+        DIM s AS STRING
+        FOR EACH s IN marktListe()
+            ARRAY_PUSH(m, s)
+        NEXT
+        GUI_SET_DROPDOWN(Self.marktWahl, m)
+        GUI_DROPDOWN_SET_SELECTED(Self.marktWahl, MAX(0, ARRAY_INDEXOF(m, gewaehlterMarkt$())))
+        Self.marktInfo()
+    END SUB
+
+    ' Der gewählte Markt ("" = keiner).
+    FUNCTION markt$() AS STRING
+        IF GUI_DROPDOWN_SELECTED(Self.marktWahl) <= 0 THEN RETURN ""
+        RETURN GUI_DROPDOWN_TEXT(Self.marktWahl)
+    END FUNCTION
+
+    FUNCTION sortiert() AS BOOLEAN
+        RETURN GUI_CHECKED(Self.sortierKasten) AND Self.markt$() <> ""
+    END FUNCTION
+
+    ' Die offenen Posten, wie sie gedruckt werden (sortiert, wenn gewählt).
+    FUNCTION offenePosten() AS ARRAY OF Posten
+        DIM l AS ARRAY OF Posten : l = postenLaden(FALSE)
+        IF Self.sortiert() THEN l = nachGang(l, Self.markt$())
+        RETURN l
+    END FUNCTION
+
+    SUB laden()
+        DIM alle AS ARRAY OF Posten : alle = postenLaden(TRUE)
+        IF Self.sortiert() THEN alle = nachGang(alle, Self.markt$())
+        Self.posten = alle
+        DIM war AS INTEGER : war = GUI_TABLE_SELECTED(Self.tabelle)
+        GUI_TABLE_CLEAR(Self.tabelle)
+        Self.ids = []
+        DIM offen AS INTEGER : offen = 0
+        DIM gang AS INTEGER : gang = -1
+        DIM p AS Posten
+        FOR EACH p IN alle
+            IF NOT p.erledigt THEN offen = offen + 1
+            IF Self.sortiert() AND GUI_CHECKED(Self.gruppierKasten) AND p.gang <> gang THEN
+                gang = p.gang
+                DIM u AS INTEGER : u = GUI_TABLE_ADD_ROW(Self.tabelle, ["", IIF(gang = GANG_ENDE, tr$("📍 Sonstiges"), trf$("📍 Gang {0}", [STR$(gang)])), "", "", "", "", ""])
+                GUI_TABLE_ROW_COLOR(Self.tabelle, u, &H80CBC4, &H253238)
+                ARRAY_PUSH(Self.ids, 0)
+            END IF
+            DIM z AS INTEGER : z = GUI_TABLE_ADD_ROW(Self.tabelle, ["", p.name, p.gangText$(), p.mengeText$(), IIF(p.kategorie = "", "-", p.kategorie), IIF(p.notizen = "", "-", p.notizen), "🗑"])
+            ARRAY_PUSH(Self.ids, p.id)
+            GUI_TABLE_CELL_KIND(Self.tabelle, z, SP_HAKEN, "haken")
+            GUI_TABLE_CELL_VALUE(Self.tabelle, z, SP_HAKEN, IIF(p.erledigt, 1, 0))
+            GUI_TABLE_CELL_KIND(Self.tabelle, z, SP_WEG, "knopf")
+            IF p.erledigt THEN GUI_TABLE_CELL_COLOR(Self.tabelle, z, 1, &H8A9099, -1)
+            IF p.gang > 0 AND p.gang <> GANG_ENDE THEN GUI_TABLE_CELL_COLOR(Self.tabelle, z, 2, &HFFCC80, &H5A4020)
+            ' Wie die Python-App: viel grün, etwas orange, wenig rot.
+            IF p.menge >= 5 THEN
+                GUI_TABLE_CELL_COLOR(Self.tabelle, z, 3, -1, &H2E4A3A)
+            ELSEIF p.menge >= 2 THEN
+                GUI_TABLE_CELL_COLOR(Self.tabelle, z, 3, -1, &H5A4020)
+            ELSE
+                GUI_TABLE_CELL_COLOR(Self.tabelle, z, 3, -1, &H5C3434)
+            END IF
+            GUI_TABLE_CELL_COLOR(Self.tabelle, z, 5, &HA0A6AE, -1)
+        NEXT
+        IF war >= 0 AND war < GUI_TABLE_ROW_COUNT(Self.tabelle) THEN GUI_TABLE_SET_SELECTED(Self.tabelle, war)
+        GUI_SET_TEXT(Self.statistik, trf$("🛒 {0} offen  •  ✅ {1} erledigt  •  📋 {2} gesamt", [STR$(offen), STR$(LEN(alle) - offen), STR$(LEN(alle))]))
+        Self.schnellZeigen()
+    END SUB
+
+    ' Die Schnellknöpfe: bis zu fünf, die übrigen unsichtbar.
+    SUB schnellZeigen()
+        Self.schnell = haeufige(5)
+        DIM k AS ARRAY OF INTEGER : k = [Self.schnell0, Self.schnell1, Self.schnell2, Self.schnell3, Self.schnell4]
+        DIM i AS INTEGER
+        FOR i = 0 TO 4
+            IF i < LEN(Self.schnell) THEN
+                GUI_SET_TEXT(k[i], LEFT$(Self.schnell[i], 15))
+                GUI_SET_VISIBLE(k[i], TRUE)
+            ELSE
+                GUI_SET_VISIBLE(k[i], FALSE)
+            END IF
+        NEXT
+        GUI_SET_VISIBLE(Self.schnellLeer, LEN(Self.schnell) = 0)
+    END SUB
+
+    SUB vorschlaegeFuellen(text AS STRING)
+        Self.vorschlagAn = TRUE
+        DIM v AS ARRAY OF STRING : v = [tr$("-- Aus Bestand wählen --")]
+        DIM s AS STRING
+        FOR EACH s IN produktVorschlaege(text)
+            ARRAY_PUSH(v, s)
+        NEXT
+        GUI_SET_DROPDOWN(Self.vorschlagListe, v)
+        GUI_DROPDOWN_SET_SELECTED(Self.vorschlagListe, 0)
+        Self.vorschlagAn = FALSE
+    END SUB
+
+    SUB marktInfo()
+        DIM m AS STRING : m = Self.markt$()
+        IF m = "" THEN
+            GUI_SET_TEXT(Self.marktHinweis, "")
+        ELSE
+            GUI_SET_TEXT(Self.marktHinweis, trf$("✅ {0} Gänge konfiguriert", [STR$(gangZahl(gangplan(m)))]))
+        END IF
+    END SUB
+
+    SUB marktWahl_Geaendert()
+        IF Self.markt$() <> "" THEN marktWaehlen(Self.markt$())
+        Self.marktInfo()
+        Self.laden()
+    END SUB
+
+    SUB sortierKasten_Geaendert()
+        IF GUI_CHECKED(Self.sortierKasten) AND Self.markt$() = "" THEN
+            GUI_SET_CHECKED(Self.sortierKasten, FALSE)
+            GUI_TOAST(Self.studioWin, tr$("Bitte wähle zuerst einen Supermarkt aus!"), "warnung")
+            RETURN
+        END IF
+        Self.laden()
+    END SUB
+
+    SUB gruppierKasten_Geaendert()
+        Self.laden()
+    END SUB
+
+    SUB knopfNachMarkt_Klick()
+        DIM t AS STRING : t = nachMarkt$()
+        IF t = "" THEN
+            GUI_TOAST(Self.studioWin, tr$("Keine Artikel in der Einkaufsliste!"), "info")
+            RETURN
+        END IF
+        Meldung(t + CHR$(10) + tr$("Nach dem Einkauf „Einkauf abschließen“ -- dann weiß die App, wo es was gibt."), tr$("Einkaufsliste nach Märkten"))
+    END SUB
+
+    SUB namenFeld_Geaendert()
+        Self.vorschlaegeFuellen(GUI_TEXT(Self.namenFeld))
+    END SUB
+
+    SUB vorschlagListe_Geaendert()
+        IF Self.vorschlagAn OR GUI_DROPDOWN_SELECTED(Self.vorschlagListe) <= 0 THEN RETURN
+        GUI_SET_TEXT(Self.namenFeld, GUI_DROPDOWN_TEXT(Self.vorschlagListe))
+    END SUB
+
+    SUB namenFeld_Enter()
+        Self.knopfHinzufuegen_Klick()
+    END SUB
+
+    SUB knopfHinzufuegen_Klick()
+        DIM name AS STRING : name = TRIM$(GUI_TEXT(Self.namenFeld))
+        IF name = "" THEN
+            GUI_TOAST(Self.studioWin, tr$("Bitte gib einen Produktnamen ein!"), "warnung")
+            RETURN
+        END IF
+        postenAnlegen(name, MAX(0.1, GUI_VALUE(Self.mengeFeld)), "", "", 1, "")
+        GUI_SET_TEXT(Self.namenFeld, "")
+        GUI_SET_VALUE(Self.mengeFeld, 1)
+        Self.vorschlaegeFuellen("")
+        GUI_TOAST(Self.studioWin, trf$("„{0}“ hinzugefügt!", [name]), "erfolg")
+        Self.laden()
+        Self.Ausloesen("Geaendert")
+    END SUB
+
+    SUB schnellNehmen(i AS INTEGER)
+        IF i >= LEN(Self.schnell) THEN RETURN
+        DIM name AS STRING : name = Self.schnell[i]
+        postenAnlegen(name, 1, "", "", 1, "")
+        GUI_TOAST(Self.studioWin, trf$("„{0}“ hinzugefügt!", [name]), "erfolg")
+        Self.laden()
+        Self.Ausloesen("Geaendert")
+    END SUB
+
+    SUB schnell0_Klick()
+        Self.schnellNehmen(0)
+    END SUB
+
+    SUB schnell1_Klick()
+        Self.schnellNehmen(1)
+    END SUB
+
+    SUB schnell2_Klick()
+        Self.schnellNehmen(2)
+    END SUB
+
+    SUB schnell3_Klick()
+        Self.schnellNehmen(3)
+    END SUB
+
+    SUB schnell4_Klick()
+        Self.schnellNehmen(4)
+    END SUB
+
+    ' Haken und Löschen je Zeile; die Überschrift eines Gangs tut nichts.
+    SUB tabelle_Zelle(zeile AS INTEGER, spalte AS INTEGER)
+        IF zeile < 0 OR zeile >= LEN(Self.ids) THEN RETURN
+        DIM id AS INTEGER : id = Self.ids[zeile]
+        IF id = 0 THEN RETURN
+        IF spalte = SP_HAKEN THEN
+            postenHaken(id, GUI_TABLE_GET_VALUE(Self.tabelle, zeile, SP_HAKEN) > 0.5)
+            Self.laden()
+        ELSEIF spalte = SP_WEG THEN
+            DIM p AS Posten : p = postenLesen(id)
+            IF p IS NIL THEN RETURN
+            IF Frage(trf$("{0} von der Einkaufsliste löschen?", [p.name]), tr$("Löschen|Abbrechen"), tr$("Löschen")) <> 1 THEN RETURN
+            postenLoeschen(id, p.name)
+            GUI_TOAST(Self.studioWin, trf$("{0} gelöscht [Strg+Z]", [p.name]), "erfolg")
+            Self.laden()
+            Self.Ausloesen("Geaendert")
+        END IF
+    END SUB
+
+    SUB knopfAlle_Klick()
+        IF LEN(Self.posten) = 0 THEN
+            GUI_TOAST(Self.studioWin, tr$("Keine Artikel in der Liste!"), "info")
+            RETURN
+        END IF
+        DIM offen AS BOOLEAN : offen = dbZahl("SELECT COUNT(*) FROM shopping_list WHERE checked = 0") > 0
+        DIM n AS INTEGER : n = alleHaken()
+        GUI_TOAST(Self.studioWin, IIF(offen, trf$("✅ {0} Artikel abgehakt!", [STR$(n)]), trf$("⬜ {0} Haken entfernt", [STR$(n)])), IIF(offen, "erfolg", "info"))
+        Self.laden()
+    END SUB
+
+    SUB knopfAuto_Klick()
+        DIM n AS INTEGER : n = autoErgaenzen()
+        IF n > 0 THEN
+            Meldung(trf$("{0} Produkt(e) wurden automatisch zur Einkaufsliste hinzugefügt.", [STR$(n)]), tr$("Auto-Ergänzt"))
+            Self.laden()
+            Self.Ausloesen("Geaendert")
+        ELSE
+            Meldung(tr$("Alle Produkte haben ausreichend Bestand."), tr$("Keine Ergänzungen"))
+        END IF
+    END SUB
+
+    SUB knopfErledigte_Klick()
+        DIM n AS INTEGER : n = dbZahl("SELECT COUNT(*) FROM shopping_list WHERE checked <> 0")
+        IF n = 0 THEN
+            GUI_TOAST(Self.studioWin, tr$("Keine erledigten Artikel zum Löschen vorhanden"), "info")
+            RETURN
+        END IF
+        IF Frage(trf$("Möchtest du {0} erledigte Artikel löschen?", [STR$(n)]), tr$("Löschen|Abbrechen"), tr$("Bestätigung")) <> 1 THEN RETURN
+        n = erledigteLoeschen()
+        GUI_TOAST(Self.studioWin, trf$("{0} Artikel gelöscht [Strg+Z]", [STR$(n)]), "erfolg")
+        Self.laden()
+        Self.Ausloesen("Geaendert")
+    END SUB
+
+    SUB knopfDrucken_Klick()
+        IF LEN(postenLaden(FALSE)) = 0 THEN
+            Meldung(tr$("Die Einkaufsliste ist leer!"), tr$("Info"))
+            RETURN
+        END IF
+        Self.Ausloesen("Drucken")
+    END SUB
+
+    SUB knopfAbschliessen_Klick()
+        IF dbZahl("SELECT COUNT(*) FROM shopping_list WHERE checked <> 0") = 0 THEN
+            GUI_TOAST(Self.studioWin, tr$("Keine erledigten Artikel vorhanden! Hake zuerst die gekauften Artikel ab."), "warnung")
+            RETURN
+        END IF
+        Self.Ausloesen("Abschliessen")
+    END SUB
+
+    ' Die Parameter des Einkaufszettels: je offener Posten sein Gang, dazu
+    ' der Markt (leer = nicht nach Gängen).
+    FUNCTION zettelWerte() AS MAP OF ANY
+        DIM w AS MAP OF ANY : w = {}
+        DIM l AS ARRAY OF Posten : l = Self.offenePosten()
+        MAPPUT(w, "gaenge", gaengeJson$(l))
+        MAPPUT(w, "markt", IIF(Self.sortiert(), trf$("{0} (sortiert nach Gängen)", [Self.markt$()]), ""))
+        RETURN w
+    END FUNCTION
+END CLASS
+
+' Die Spalten der Tabelle.
+CONST SP_HAKEN = 0
+CONST SP_WEG = 6

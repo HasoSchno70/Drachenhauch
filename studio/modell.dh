@@ -154,6 +154,7 @@ FUNCTION nameVergeben(kandidat AS STRING, ausser AS INTEGER) AS BOOLEAN
     DIM mn AS ARRAY OF STRING : mn = []
     DIM ma AS ARRAY OF STRING : ma = []
     menueNamenSammeln(doc, "menus", mn, ma)
+    kontextNamenSammeln(doc, mn, ma)
     DIM s AS STRING
     FOR EACH s IN mn
         IF LOWER$(s) = LOWER$(kandidat) AND ausser <> MENUE_NAME THEN RETURN TRUE
@@ -472,6 +473,7 @@ DIM akFensterN AS INTEGER : akFensterN = 0                    ' Controls vor dem
 DIM akInstanz AS ARRAY OF INTEGER : akInstanz = []            ' je Instanz: Index ihres Behaelters
 DIM akControl AS ARRAY OF STRING : akControl = []             ' ihr Control
 DIM akWurzel AS ARRAY OF INTEGER : akWurzel = []              ' die Instanz im Fenster, zu der sie gehoert
+DIM akVater AS ARRAY OF INTEGER : akVater = []                ' die Instanz, in deren Control sie steht (-1: im Fenster)
 DIM akName AS ARRAY OF STRING : akName = []                   ' ihr Name im Fenster (aussen_innen)
 DIM akErster AS ARRAY OF INTEGER : akErster = []              ' ihr erster Teil
 DIM akAnzahl AS ARRAY OF INTEGER : akAnzahl = []              ' wie viele eigene Teile
@@ -563,7 +565,7 @@ FUNCTION controlFuss(cn AS STRING) AS INTEGER
 END FUNCTION
 
 FUNCTION ausgeklappt(d AS JSON_HANDLE) AS JSON_HANDLE
-    akInstanz = [] : akControl = [] : akWurzel = [] : akName = [] : akErster = [] : akAnzahl = [] : akB = [] : akH = []
+    akInstanz = [] : akControl = [] : akWurzel = [] : akVater = [] : akName = [] : akErster = [] : akAnzahl = [] : akB = [] : akH = []
     akTeilInst = [] : akTeilFrei = [] : akTeilX = [] : akTeilY = [] : akTeilW = [] : akTeilH = [] : akTeilAnker = []
     DIM aus AS JSON_HANDLE : aus = JSON_PARSE(JSON_STRINGIFY(d))
     akFensterN = 0
@@ -576,18 +578,51 @@ FUNCTION ausgeklappt(d AS JSON_HANDLE) AS JSON_HANDLE
         DIM cn AS STRING : cn = jsonText$(aus, p + ".studio_control")
         DIM inst AS STRING : inst = jsonText$(aus, p + ".name")
         zumBehaelter(aus, p)
-        instanzAusklappen(aus, i, cn, inst, i)
+        instanzAusklappen(aus, i, cn, inst, i, -1)
     NEXT
+    seitenDerTeile(aus)
     RETURN aus
 END FUNCTION
 
+' Steht eine Instanz auf einer Seite eines Reiterwerks oder Akkordeons
+' (tabctl.kinder), liegen ihre Teile auf derselben Seite -- sonst zeigten sie
+' sich auf jeder (gefunden mit der Kuehlschrank-App: ein Reiter je Control).
+' Das gilt auch fuer ein Reiterwerk in einem Control (dessen Seiten nennen
+' schon die Nummern im Fenster, instanzAusklappen) und fuer eine Instanz in
+' einer Instanz: ein Teil gehoert zu jedem Behaelter auf seiner Kette.
+SUB seitenDerTeile(aus AS JSON_HANDLE)
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(aus, "widgets") - 1
+        DIM p AS STRING : p = "widgets." + STR$(i) + ".tabctl.kinder"
+        IF NOT JSON_HAS(aus, p) THEN CONTINUE
+        DIM n AS INTEGER : n = JSON_LEN(aus, p)
+        DIM m AS INTEGER
+        FOR m = 0 TO n - 1
+            DIM k AS INTEGER : k = JSON_GET_INT(aus, p + "." + STR$(m) + ".0")
+            DIM s AS INTEGER : s = JSON_GET_INT(aus, p + "." + STR$(m) + ".1")
+            DIM t AS INTEGER
+            FOR t = 0 TO LEN(akTeilInst) - 1
+                DIM slot AS INTEGER : slot = akTeilInst[t]
+                WHILE slot >= 0
+                    IF akInstanz[slot] = k THEN
+                        JSON_APPEND_JSON(aus, p, JSON_PARSE("[" + STR$(akFensterN + t) + "," + STR$(s) + "]"))
+                        BREAK
+                    END IF
+                    slot = akVater[slot]
+                WEND
+            NEXT
+        NEXT
+    NEXT
+END SUB
+
 ' Haengt die Teile einer Instanz an, deren Behaelter an Stelle wi steht, dann
 ' die Bloecke ihrer inneren Instanzen.
-SUB instanzAusklappen(aus AS JSON_HANDLE, wi AS INTEGER, cn AS STRING, inst AS STRING, wurzel AS INTEGER)
+SUB instanzAusklappen(aus AS JSON_HANDLE, wi AS INTEGER, cn AS STRING, inst AS STRING, wurzel AS INTEGER, vater AS INTEGER)
     DIM slot AS INTEGER : slot = LEN(akInstanz)
     ARRAY_PUSH(akInstanz, wi)
     ARRAY_PUSH(akControl, cn)
     ARRAY_PUSH(akWurzel, wurzel)
+    ARRAY_PUSH(akVater, vater)
     ARRAY_PUSH(akName, inst)
     DIM erster AS INTEGER : erster = JSON_LEN(aus, "widgets")
     ARRAY_PUSH(akErster, erster)
@@ -630,6 +665,14 @@ SUB instanzAusklappen(aus AS JSON_HANDLE, wi AS INTEGER, cn AS STRING, inst AS S
                 IF c >= 0 THEN JSON_SET_INT(t, "layout.kinder." + STR$(m) + ".0", c + erster)
             NEXT
         END IF
+        ' Ein Reiterwerk im Control: seine Seiten nennen Teile des Controls.
+        IF JSON_HAS(t, "tabctl.kinder") THEN
+            DIM tk AS INTEGER
+            FOR tk = 0 TO JSON_LEN(t, "tabctl.kinder") - 1
+                DIM tc AS INTEGER : tc = JSON_GET_INT(t, "tabctl.kinder." + STR$(tk) + ".0")
+                IF tc >= 0 THEN JSON_SET_INT(t, "tabctl.kinder." + STR$(tk) + ".0", tc + erster)
+            NEXT
+        END IF
         ' Ein Control im Control: ein Behaelter, ausgeklappt hinter den Teilen.
         IF jsonText$(t, "kind") = "studio_control" THEN
             ARRAY_PUSH(innenStelle, erster + k)
@@ -645,7 +688,7 @@ SUB instanzAusklappen(aus AS JSON_HANDLE, wi AS INTEGER, cn AS STRING, inst AS S
         ARRAY_PUSH(akTeilAnker, anker)
     NEXT
     FOR k = 0 TO LEN(innenStelle) - 1
-        instanzAusklappen(aus, innenStelle[k], innenControl[k], innenName[k], wurzel)
+        instanzAusklappen(aus, innenStelle[k], innenControl[k], innenName[k], wurzel, slot)
     NEXT
 END SUB
 
@@ -677,6 +720,18 @@ FUNCTION controlLayout(cn AS STRING) AS JSON_HANDLE
     IF elemente[ce].art <> "control" THEN RETURN JSON_PARSE("{}")
     IF ce = aktFenster THEN RETURN JSON_PARSE(JSON_STRINGIFY(doc))
     RETURN JSON_PARSE(elemente[ce].layout)
+END FUNCTION
+
+' Die Hoehe der Menueleiste eines Fensters mit Menues (MENUBAR_H der gui),
+' sonst 0. Die Hoehe im Layout ("h") ist die des Inhalts: die Leiste kommt
+' im Entwurf wie im Programm obendrauf, sonst schnitte sie unten ab, was am
+' Rand liegt (eine Statusleiste).
+CONST MENUELEISTE_H = 26
+
+FUNCTION menueLeisteH(d AS JSON_HANDLE) AS INTEGER
+    IF NOT JSON_HAS(d, "menus") THEN RETURN 0
+    IF JSON_LEN(d, "menus") = 0 THEN RETURN 0
+    RETURN MENUELEISTE_H
 END FUNCTION
 
 FUNCTION jsonText$(d AS JSON_HANDLE, pfad AS STRING) AS STRING
