@@ -704,12 +704,13 @@ GUI_WINDOW_CANCEL(win, abbruchKnopf)  ' ESC drückt ihn
 Was jedes Formular braucht und was sonst jedes Programm mit `KEYHIT`
 nachbaute, ohne den Fokus zu beachten. Der Standard-Knopf trägt den Akzent
 als Rahmen, damit man sieht, was Enter tun wird. Die Taste gehört aber zuerst
-dem Widget mit Fokus: ein Knopf oder Kästchen mit Fokus nimmt Enter selbst,
+dem Widget mit Fokus: ein Knopf mit Fokus nimmt Enter selbst,
 ein Textbereich macht daraus einen Umbruch, eine Tabellenzelle in
 Bearbeitung ihr Ende. **Aus einem Textfeld heraus** ist Enter dagegen genau
 das: das Formular abschicken — das Feld meldet `GUI_ENTERED` **und** der
 Standard-Knopf klickt. Ebenso aus einem Zahlenfeld (es übernimmt das
-Getippte vorher). ESC greift nicht, solange eine Klappliste offen ist.
+Getippte vorher) und aus einem Kästchen, Schalter oder Optionsfeld -- die
+schalten mit der Leertaste, wie unter Windows, macOS und im Web. ESC greift nicht, solange eine Klappliste offen ist.
 Beide werden in die `.dhform` geschrieben (`default_button`/`cancel_button`,
 als Widget-Index).
 
@@ -3283,7 +3284,7 @@ Akzentfarbe**; ohne sichtbaren Fokus wäre die Navigation wertlos.
 | Taste | Wirkung |
 |---|---|
 | `TAB` / `SHIFT+TAB` | nächstes / vorheriges Widget |
-| `LEERTASTE`, `ENTER` | Knopf auslösen, Kästchen/Schalter umschalten, Radio wählen, Klappliste auf/zu, Baumknoten auf/zuklappen |
+| `LEERTASTE`, `ENTER` | Knopf auslösen, Klappliste auf/zu, Baumknoten auf/zuklappen; Kästchen/Schalter umschalten und Radio wählen nur mit `LEERTASTE` (Enter drückt dort den Standard-Knopf) |
 | `←` `→` `↑` `↓` | Regler/Drehknopf verstellen (ein Zwanzigstel des Bereichs je Druck), Trenner verschieben (8 px), Auswahl in Liste/Klappliste/Baum bewegen |
 | `POS1` / `ENDE` | Regler/Drehknopf auf Minimum / Maximum |
 | `→` / `←` im Baum | aufklappen bzw. ins Kind / zuklappen bzw. zum Elternknoten |

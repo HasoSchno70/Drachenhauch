@@ -467,7 +467,9 @@ fokus danach TRUE
 ' Das Zahlenfeld uebernimmt Enter (GUI_ENTERED) und gibt es weiter an den
 ' Standard-Knopf -- vorher blieb es dort haengen, ein Dialog mit einer Zahl
 ' liess sich nicht mit Enter bestaetigen (Kuehlschrank-App, MHD setzen).
-' Ein Kaestchen mit Fokus behaelt Enter weiter fuer sich.
+' Ebenso aus einem Kaestchen: das schaltet nur mit der Leertaste (vorher
+' schaltete Enter es um, und der Dialog liess sich nicht mit Enter
+' speichern -- Kuehlschrank-App, Einstellungen).
 IMPORT "gui"
 SCREEN(420, 260, "T", 1)
 SET_WINDOW_POS(-3000, -3000)
@@ -489,16 +491,19 @@ FOR f = 1 TO 40
     FLIP()
 NEXT
 --- datei ev.txt
-c 5
+c 7
 e 0 7 300 300 0 0
 e 8 2 257 0 0 0
 e 9 1 257 0 0 0
 e 28 2 257 0 0 0
 e 29 1 257 0 0 0
+e 33 2 32 0 0 0
+e 34 1 32 0 0 0
 
 --- umgebung
 DHRT_FRAMES=44
 --- erwartet
 zahl enter bild 10
 ok bild 10 | wert 7
-kasten TRUE bild 30
+ok bild 30 | wert 7
+kasten TRUE bild 35

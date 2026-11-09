@@ -392,8 +392,11 @@ fn widget_nimmt_taste(w: &Widget, code: i64) -> bool {
     const BEWEGEN: [i64; 8] = [1073741903, 1073741904, 1073741905, 1073741906,
                                1073741898, 1073741901, 1073741899, 1073741902];
     let k = w.kind;
+    // Kaestchen, Schalter und Radio nehmen nur die Leertaste -- Enter gehoert
+    // dort dem Standard-Knopf (wie unter Windows, macOS, Qt und im Web).
+    if code == 32 && matches!(k, Kind::Checkbox | Kind::Radio | Kind::Toggle) { return true; }
     if AUSLOESEN.contains(&code) {
-        return matches!(k, Kind::Button | Kind::Card | Kind::Checkbox | Kind::Radio | Kind::Toggle
+        return matches!(k, Kind::Button | Kind::Card
             | Kind::Dropdown | Kind::ListBox | Kind::Tree | Kind::Table | Kind::Accordion
             | Kind::TabControl | Kind::DatePicker | Kind::ColorPicker | Kind::TimePicker);
     }
@@ -14069,7 +14072,13 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 // Ein Zahlenfeld uebernimmt Enter und gibt es weiter (spinner_keys)
                 // -- vorher blieb es dort haengen, ein Dialog mit Zahl liess sich
                 // nicht mit Enter bestaetigen (Kuehlschrank-App, MHD setzen).
-                let enter_frei = matches!(fok, None | Some(Kind::TextInput) | Some(Kind::Spinner)) || fok_frei;
+                // Ebenso ein Kaestchen, ein Schalter, ein Radio: sie schalten mit der
+                // Leertaste, Enter schickt das Formular ab. Vorher schaltete Enter
+                // das Kaestchen zurueck, das man eben angeklickt hatte, und der
+                // Dialog liess sich nicht mit Enter speichern (Kuehlschrank-App,
+                // Einstellungen).
+                let enter_frei = matches!(fok, None | Some(Kind::TextInput) | Some(Kind::Spinner)
+                    | Some(Kind::Checkbox) | Some(Kind::Toggle) | Some(Kind::Radio)) || fok_frei;
                 // Beim Umbenennen in einer Liste gehoeren Enter und ESC dem Feld.
                 let liste_edit = self.focus_widget.filter(|(w, _)| *w == top)
                     .and_then(|(_, i)| self.windows[top].widgets.get(i))
@@ -16764,7 +16773,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 }
             }
             Kind::Checkbox | Kind::Toggle => {
-                if ausloesen {
+                if leertaste {
                     let w = &mut self.windows[wi].widgets[i];
                     w.checked = !w.checked;
                     // `clicked` auch hier setzen. Vorher blieb GUI_CLICKED auf
@@ -16781,7 +16790,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 }
             }
             Kind::Radio => {
-                if ausloesen && !self.windows[wi].widgets[i].checked {
+                if leertaste && !self.windows[wi].widgets[i].checked {
                     self.select_radio(wi, i);
                     self.windows[wi].widgets[i].clicked = true;   // wie beim Kaestchen
                     let w = &self.windows[wi].widgets[i];

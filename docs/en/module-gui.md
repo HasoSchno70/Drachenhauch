@@ -705,12 +705,13 @@ GUI_WINDOW_CANCEL(win, abbruchKnopf)  ' ESC presses it
 What every form needs and what every program otherwise rebuilt with `KEYHIT`,
 without paying attention to the focus. The default button carries the accent
 as a border, so that you can see what Enter will do. The key belongs first,
-however, to the widget with focus: a button or checkbox with focus takes
+however, to the widget with focus: a button with focus takes
 Enter itself, a text area turns it into a line break, a table cell being
 edited into its end. **From inside a text input**, by contrast, Enter is
 exactly that: submitting the form — the field reports `GUI_ENTERED` **and**
 the default button clicks. The same from a number field (it takes over what
-was typed first). ESC has no effect while a dropdown is open.
+was typed first) and from a checkbox, switch or radio button -- they toggle
+with the space bar, as on Windows, macOS and the web. ESC has no effect while a dropdown is open.
 Both are written into the `.dhform` (`default_button`/`cancel_button`,
 as a widget index).
 
@@ -3269,7 +3270,7 @@ visible focus, navigation would be worthless.
 | Key | Effect |
 |---|---|
 | `TAB` / `SHIFT+TAB` | next / previous widget |
-| `LEERTASTE`, `ENTER` | trigger a button, toggle a checkbox/switch, select a radio, open/close a dropdown, expand/collapse a tree node |
+| `LEERTASTE`, `ENTER` | trigger a button, open/close a dropdown, expand/collapse a tree node; toggle a checkbox/switch and select a radio only with `LEERTASTE` (Enter presses the default button there) |
 | `←` `→` `↑` `↓` | adjust a slider/knob (one twentieth of the range per press), move a splitter (8 px), move the selection in list/dropdown/tree |
 | `POS1` / `ENDE` | slider/knob to minimum / maximum |
 | `→` / `←` in the tree | expand or go to the child / collapse or go to the parent node |
