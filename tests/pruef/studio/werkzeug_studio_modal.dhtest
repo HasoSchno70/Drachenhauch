@@ -394,3 +394,91 @@ slStudio = ARG$(0)
 felder gefunden TRUE TRUE
 uebernommen TRUE
 standard knopfOk | knopf knopfOk
+
+=== auswahl und eingabezahl warten wie frage
+' Zwei Dialoge der Laufzeit, die das Studio nicht hatte (wie
+' QInputDialog.getItem/getInt der Kuehlschrank-App): Auswahl liefert den
+' Index (ESC: -1), EingabeZahl (TRUE, zahl) oder (FALSE, vorgabe). Enter
+' drueckt OK -- auch mit dem Fokus im Zahlenfeld.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+slHin(10, 10)
+slWarten(10)
+slTaste(294)
+slWarten(150)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+SETENV("DH_STUDIO_LAUF_BILDER", "20")
+DIM log AS STRING : log = CWD$() + "/s.log"
+slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+PRINT "erzeugt "; LEN(slAnfang(log, "erzeugt ")) = 1
+slZeilen = [] : slBild = 0
+slHin(10, 10)
+DIM k AS INTEGER
+FOR EACH k IN [257, 256, 257, 256, 256]
+    slWarten(15)
+    slTaste(k)
+NEXT
+slAufnahmeSchreiben(p + "/_studio/tasten.txt")
+DIM neu AS ARRAY OF STRING : neu = []
+DIM s AS STRING
+FOR EACH s IN READLINES(p + "/_studio/main.dh")
+    IF LEFT$(s, 11) = "studioLauf(" THEN
+        ARRAY_PUSH(neu, "AUTOMATION_PLAY(" + CHR$(34) + "tasten.txt" + CHR$(34) + ")")
+        DIM t AS STRING
+        FOR EACH t IN READLINES(CWD$() + "/probe.dh")
+            ARRAY_PUSH(neu, t)
+        NEXT
+    ELSE
+        ARRAY_PUSH(neu, s)
+    END IF
+NEXT
+WRITEALL(p + "/_studio/probe.dh", JOIN$(neu, CHR$(10)) + CHR$(10))
+DIM kp AS INTEGER : kp = PROCESS_START("dhrt", "run", "--bilder", "200", p + "/_studio/probe.dh")
+DIM leer AS INTEGER : leer = 0
+WHILE leer < 5
+    DIM t2 AS STRING : t2 = PROCESS_READ$(kp) + PROCESS_ERR$(kp)
+    IF t2 <> "" THEN
+        DIM zeile AS STRING
+        FOR EACH zeile IN SPLIT(REPLACE$(t2, CHR$(13), ""), CHR$(10))
+            IF zeile <> "" AND LEFT$(zeile, 8) <> "WARNING:" AND LEFT$(zeile, 5) <> "INFO:" THEN PRINT zeile
+        NEXT
+        leer = 0
+    ELSEIF NOT PROCESS_RUNNING(kp) THEN
+        leer = leer + 1
+        SLEEP(30)
+    END IF
+WEND
+PRINT "code "; PROCESS_CODE(kp)
+--- argumente
+{sammlung}/../../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei probe.dh
+SCREEN(640, 480, "Probe")
+studioSchirmB = SCREENWIDTH() : studioSchirmH = SCREENHEIGHT()
+studioDieStartseite = studioStartFenster
+studioDieApp.Geoeffnet()
+studioStartFenster.studioHaupt = TRUE
+studioStartFenster.Zeigen()
+PRINT "auswahl enter "; Auswahl("Wohin?", ["Kühlschrank", "Keller", "Dach"], 1, "Ort")
+PRINT "auswahl esc "; Auswahl("Wohin?", ["Kühlschrank", "Keller"], 0, "Ort")
+DIM ok AS BOOLEAN
+DIM z AS INTEGER
+(ok, z) = EingabeZahl("Tage:", 500, 1, 365, "MHD")
+PRINT "zahl enter "; ok; " "; z
+(ok, z) = EingabeZahl("Tage:", 7, 1, 365, "MHD")
+PRINT "zahl esc "; ok; " "; z
+PRINT "leer "; Auswahl("Nichts", [], 0, "Leer")
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"}]}
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":420,"h":300,"widgets":[{"kind":"button","name":"knopf","text":"Eins","x":10,"y":10,"w":90,"h":30}]}
+--- erwartet
+erzeugt TRUE
+auswahl enter 1
+auswahl esc -1
+zahl enter TRUE 365
+zahl esc FALSE 7
+leer -1
+code 0

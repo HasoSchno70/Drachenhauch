@@ -257,6 +257,8 @@ unter dem Fenster, ihr Ereignis heißt `<Name>_Aktion`.
 | `Meldung(text$ [, titel$])` | eine Meldung mit OK |
 | `Frage(text$ [, knoepfe$ [, titel$]])` | Knöpfe mit `\|` getrennt (Vorgabe `Ja\|Nein`), liefert die Nummer des Knopfs; Enter = der erste, ESC = der letzte |
 | `Eingabe(text$ [, vorgabe$ [, titel$]])` | fragt nach einem Text, `""` bei Abbrechen |
+| `Auswahl(text$, eintraege [, vorgabe [, titel$]])` | einer aus einer Liste (Klappliste); liefert den Index, `-1` bei Abbrechen |
+| `EingabeZahl(text$, vorgabe, min, max [, titel$])` | fragt nach einer ganzen Zahl; liefert `(TRUE, zahl)` oder bei Abbrechen `(FALSE, vorgabe)` |
 | `fenster.ZeigenModal()` | zeigt ein Fenster modal und kehrt erst zurück, wenn es geschlossen ist |
 | `Bild(name$)` | ein Bild aus `bilder/` des Projekts als IMAGE |
 

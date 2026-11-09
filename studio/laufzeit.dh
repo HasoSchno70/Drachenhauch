@@ -652,6 +652,69 @@ FUNCTION Eingabe(text AS STRING, vorgabe AS STRING = "", titel AS STRING = "") A
     RETURN GUI_DIALOG_TEXT(d)
 END FUNCTION
 
+' Ein kleines Fenster mit Text, einem Feld und OK/Abbrechen (Enter/ESC),
+' modal und mittig -- fuer Auswahl und EingabeZahl. Liefert TRUE bei OK.
+' Wie Frage() dreht es selbst Bilder, bis eine Antwort da ist.
+' Den Fokus bekommt feld, wenn es einen soll (ein Zahlenfeld zum Tippen);
+' eine Klappliste nicht -- dort oeffnet Enter die Liste, statt OK zu druecken.
+FUNCTION studioFeldDialog(w AS GUI_WINDOW, feld AS GUI_WIDGET, ok AS GUI_WIDGET, ab AS GUI_WIDGET) AS BOOLEAN
+    GUI_WINDOW_DEFAULT(w, ok)
+    GUI_WINDOW_CANCEL(w, ab)
+    GUI_WINDOW_MODAL(w, TRUE)
+    IF feld >= 0 THEN GUI_FOCUS(feld)
+    ARRAY_PUSH(studioDialoge, w)
+    DIM ja AS BOOLEAN : ja = FALSE
+    WHILE studioBild()
+        IF GUI_CLICKED(ok) THEN
+            ja = TRUE
+            BREAK
+        END IF
+        IF GUI_CLICKED(ab) OR GUI_WINDOW_CLOSED(w) THEN BREAK
+    WEND
+    DIM rest AS ARRAY OF GUI_WINDOW : rest = []
+    DIM x AS GUI_WINDOW
+    FOR EACH x IN studioDialoge
+        IF NOT (x = w) THEN ARRAY_PUSH(rest, x)
+    NEXT
+    studioDialoge = rest
+    RETURN ja
+END FUNCTION
+
+FUNCTION studioKleinesFenster(titel AS STRING, text AS STRING) AS GUI_WINDOW
+    DIM b AS INTEGER : b = 380
+    DIM w AS GUI_WINDOW : w = GUI_WINDOW(titel, MAX(0, (SCREENWIDTH() - b) \ 2), MAX(0, (SCREENHEIGHT() - 150) \ 2), b, 150)
+    GUI_LABEL(w, text, 14, 12)
+    RETURN w
+END FUNCTION
+
+' Einer aus einer Liste (wie QInputDialog.getItem): der Index des gewaehlten
+' Eintrags, -1 bei Abbrechen.
+FUNCTION Auswahl(text AS STRING, eintraege AS ARRAY OF STRING, vorgabe AS INTEGER = 0, titel AS STRING = "") AS INTEGER
+    DIM w AS GUI_WINDOW : w = studioKleinesFenster(titel, text)
+    DIM feld AS GUI_WIDGET : feld = GUI_DROPDOWN(w, 14, 40, 352, 30, eintraege)
+    IF LEN(eintraege) > 0 THEN GUI_DROPDOWN_SET_SELECTED(feld, MAX(0, MIN(vorgabe, LEN(eintraege) - 1)))
+    DIM ok AS GUI_WIDGET : ok = GUI_BUTTON(w, "OK", 166, 84, 96, 30)
+    DIM ab AS GUI_WIDGET : ab = GUI_BUTTON(w, "Abbrechen", 270, 84, 96, 30)
+    DIM i AS INTEGER : i = -1
+    IF studioFeldDialog(w, -1, ok, ab) AND LEN(eintraege) > 0 THEN i = GUI_DROPDOWN_SELECTED(feld)
+    GUI_WINDOW_DESTROY(w)
+    RETURN i
+END FUNCTION
+
+' Eine ganze Zahl zwischen min und max (wie QInputDialog.getInt):
+' (TRUE, zahl) bei OK, (FALSE, vorgabe) bei Abbrechen.
+FUNCTION EingabeZahl(text AS STRING, vorgabe AS INTEGER, min AS INTEGER, max AS INTEGER, titel AS STRING = "") AS TUPLE
+    DIM w AS GUI_WINDOW : w = studioKleinesFenster(titel, text)
+    DIM feld AS GUI_WIDGET : feld = GUI_SPINNER(w, 14, 40, 160, min, max, vorgabe, 1)
+    DIM ok AS GUI_WIDGET : ok = GUI_BUTTON(w, "OK", 166, 84, 96, 30)
+    DIM ab AS GUI_WIDGET : ab = GUI_BUTTON(w, "Abbrechen", 270, 84, 96, 30)
+    DIM ja AS BOOLEAN : ja = studioFeldDialog(w, feld, ok, ab)
+    DIM z AS INTEGER : z = INT(GUI_VALUE(feld))
+    GUI_WINDOW_DESTROY(w)
+    IF NOT ja THEN RETURN (FALSE, vorgabe)
+    RETURN (TRUE, MAX(min, MIN(max, z)))
+END FUNCTION
+
 ' Die Vorschau eines Berichts (studio_berichte.dh): ein Fenster mit der
 ' Seite, Blaettern, Drucken, Sichern und Schliessen. Kehrt zurueck, wenn es
 ' zu ist -- wie Frage() dreht sie dafuer selbst Bilder.
