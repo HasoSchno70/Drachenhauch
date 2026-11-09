@@ -355,7 +355,13 @@ SUB codeZerlegen(e AS Element, quelle AS STRING)
                 ARRAY_PUSH(dekl, k)
             NEXT
             kommentare = []
-            ARRAY_PUSH(dekl, z)
+            ' Die Leerzeile zwischen zwei Methoden bleibt hier zurueck, wenn
+            ' sie herausgeloest sind -- bei DIMs zwischen Methoden (eine Datei
+            ' von aussen) standen sonst so viele Leerzeilen in Folge, wie
+            ' Methoden dazwischen waren. Eine genuegt.
+            DIM doppelt AS BOOLEAN : doppelt = FALSE
+            IF TRIM$(z) = "" AND LEN(dekl) > 0 THEN doppelt = TRIM$(dekl[LEN(dekl) - 1]) = ""
+            IF NOT doppelt THEN ARRAY_PUSH(dekl, z)
         END IF
         i = i + 1
     WEND
