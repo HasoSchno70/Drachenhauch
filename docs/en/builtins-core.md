@@ -970,6 +970,7 @@ Path-based, without a FILE handle *(native runtime only)*:
 |---|---|
 | `WRITEALL(pfad$, text$[, kodierung$])` | write text completely (overwrites/creates) |
 | `READLINES(pfad$[, kodierung$])` → ARRAY OF STRING | read a file as an array of lines |
+| `READALL$(pfad$[, kodierung$])` → STRING | read a whole file as text |
 | `FILESIZE(pfad$)` → INTEGER | size in bytes |
 | `FILE_ENCODING$(pfad$)` → STRING | what `"auto"` would choose: `utf8`, `utf8bom`, `cp1252` or `binaer` (see encodings) |
 | `DELETEFILE(pfad$)`, `RENAME(alt$, neu$)` | delete / rename·move |

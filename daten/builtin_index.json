@@ -10853,13 +10853,13 @@
   {
    "name": "READALL",
    "kind": "core",
-   "signature": "READALL$(f)",
+   "signature": "READALL$(f [, kodierung$])",
    "module": "core"
   },
   {
    "name": "READALL$",
    "kind": "core",
-   "signature": "READALL$(f)",
+   "signature": "READALL$(f [, kodierung$])",
    "module": "core"
   },
   {

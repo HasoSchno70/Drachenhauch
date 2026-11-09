@@ -971,6 +971,7 @@ Pfadbasiert, ohne FILE-Handle *(nur native Runtime)*:
 |---|---|
 | `WRITEALL(pfad$, text$[, kodierung$])` | Text komplett schreiben (überschreibt/erzeugt) |
 | `READLINES(pfad$[, kodierung$])` → ARRAY OF STRING | Datei als Zeilen-Array lesen |
+| `READALL$(pfad$[, kodierung$])` → STRING | Datei komplett als Text lesen |
 | `FILESIZE(pfad$)` → INTEGER | Größe in Bytes |
 | `FILE_ENCODING$(pfad$)` → STRING | was `"auto"` wählen würde: `utf8`, `utf8bom`, `cp1252` oder `binaer` (siehe Kodierungen) |
 | `DELETEFILE(pfad$)`, `RENAME(alt$, neu$)` | löschen / umbenennen·verschieben |

@@ -1023,8 +1023,8 @@
    "Bis zu `anzahl` Bytes lesen. Am Dateiende kommen WENIGER zurueck (0 = fertig) -- das ist kein Fehler."
   ],
   "readall$": [
-   "READALL$(f) AS STRING",
-   "Gesamten Datei-Inhalt einlesen."
+   "READALL$(f [, kodierung$]) AS STRING",
+   "Gesamten Datei-Inhalt einlesen: aus einem FILE-Handle den Rest, aus einem Pfad die ganze Datei -- dann wahlweise mit Kodierung wie READLINES (\"cp1252\", \"latin1\", \"auto\" ...)."
   ],
   "readall_bytes": [
    "READALL_BYTES(pfad) AS BUFFER",
