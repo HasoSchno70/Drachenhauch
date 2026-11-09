@@ -851,7 +851,7 @@
  "WRITELINE schreibt den Text und einen Zeilenumbruch. WRITE schreibt ohne Umbruch, sodass mehrere Stücke in einer Zeile landen.": "WRITELINE writes the text and a line break. WRITE writes with no break, so that several pieces end up on one line.",
  "Zeilenweise lesen": "Reading line by line",
  "READLINE liefert die nächste Zeile (ohne den Umbruch). ENDOFFILE wird TRUE, sobald das Dateiende erreicht ist – die typische Schleife liest, solange NOT ENDOFFILE.": "READLINE gives the next line (without the break). ENDOFFILE becomes TRUE once the end of the file is reached — the typical loop reads while NOT ENDOFFILE.",
- "Liest den gesamten verbleibenden Inhalt der Datei auf einmal als einen String.": "Reads all the remaining contents of the file at once, as one string.",
+ "Liest den gesamten verbleibenden Inhalt der Datei auf einmal als einen String. Statt des Handles geht auch ein Pfad -- dann die ganze Datei, wahlweise mit Kodierung wie bei READLINES (\"cp1252\", \"latin1\", \"auto\").": "Reads all the remaining contents of the file at once, as one string. Instead of the handle a path works too -- then the whole file, optionally with an encoding as for READLINES (\"cp1252\", \"latin1\", \"auto\").",
  "Bequem: ganze Datei auf einmal": "Convenient: the whole file at once",
  "Für viele Fälle brauchst du gar kein Handle. Diese pfadbasierten Befehle erledigen Öffnen, Lesen/Schreiben und Schließen in einem Schritt.": "For many cases you need no handle at all. These path-based commands do the opening, reading/writing and closing in one step.",
  "Schreibt den Text komplett in die Datei (erzeugt sie neu bzw. überschreibt sie).": "Writes the text into the file in full (creating it anew, or overwriting it).",

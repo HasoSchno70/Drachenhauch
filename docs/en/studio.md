@@ -769,7 +769,7 @@ studio, PDFs and the CSV end up in `_studio/`.
 a different number of parameters.
 
 **The big example:** `examples/studio/kuehlschrank/` is a fridge manager (the
-port of a PySide6 app, see its `LIESMICH.md`) with 18 windows and custom
+port of a PySide6 app, see its `LIESMICH.md`) with 13 windows and 5 custom
 controls, an existing SQLite file as database element, tool and status bar,
 timers, charts, a report, network requests in the background and an English
 interface (`sprache/en.txt`, see "Languages" above). How it grew stage by
