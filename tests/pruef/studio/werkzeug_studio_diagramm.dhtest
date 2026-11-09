@@ -1,0 +1,223 @@
+' Drachenhauch Studio: das Diagramm -- eine Zeichenflaeche mit einem CHART
+' aus dem Modul chart, das sich selbst zeichnet. Gefunden beim Port der
+' Kuehlschrank-App (Statistik): das Studio hatte keins, obwohl die Laufzeit
+' Kuchen, Balken und Linie kann.
+' Format: docs/werkzeuge.md, dhrt test.
+
+--- langsam
+=== ein diagramm zeichnet sich selbst, im thema der oberflaeche
+' Im Fenster ein Kuchen und im eigenen Control ein Balken auf Seite 1 eines
+' Reiterwerks. Das Feld ist ein StudioDiagramm, Zeichnen des Programms
+' kommt obendrauf; der Balken malt erst, wenn seine Seite vorn ist. Nach dem
+' Wechsel auf ein helles Thema zieht das Diagramm mit.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+slHin(10, 10)
+slWarten(10)
+slTaste(294)
+slWarten(150)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+SETENV("DH_STUDIO_LAUF_BILDER", "20")
+DIM log AS STRING : log = CWD$() + "/s.log"
+slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+PRINT "erzeugt "; LEN(slAnfang(log, "erzeugt ")) = 1
+PRINT "geprueft "; slHat(log, "geprueft 0 0")
+DIM neu AS ARRAY OF STRING : neu = []
+DIM s AS STRING
+FOR EACH s IN READLINES(p + "/_studio/main.dh")
+    IF LEFT$(s, 11) = "studioLauf(" THEN
+        DIM t AS STRING
+        FOR EACH t IN READLINES(CWD$() + "/probe.dh")
+            ARRAY_PUSH(neu, t)
+        NEXT
+    ELSE
+        ARRAY_PUSH(neu, s)
+    END IF
+NEXT
+WRITEALL(p + "/_studio/probe.dh", JOIN$(neu, CHR$(10)) + CHR$(10))
+DIM k AS INTEGER : k = PROCESS_START("dhrt", "run", "--bilder", "40", p + "/_studio/probe.dh")
+DIM leer AS INTEGER : leer = 0
+WHILE leer < 5
+    DIM t2 AS STRING : t2 = PROCESS_READ$(k) + PROCESS_ERR$(k)
+    IF t2 <> "" THEN
+        DIM zeile AS STRING
+        FOR EACH zeile IN SPLIT(REPLACE$(t2, CHR$(13), ""), CHR$(10))
+            IF zeile <> "" AND LEFT$(zeile, 8) <> "WARNING:" AND LEFT$(zeile, 5) <> "INFO:" THEN PRINT zeile
+        NEXT
+        leer = 0
+    ELSEIF NOT PROCESS_RUNNING(k) THEN
+        leer = leer + 1
+        SLEEP(30)
+    END IF
+WEND
+PRINT "code "; PROCESS_CODE(k)
+--- argumente
+{sammlung}/../../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei probe.dh
+SCREEN(640, 480, "Probe")
+studioSchirmB = SCREENWIDTH() : studioSchirmH = SCREENHEIGHT()
+studioDieStartseite = studioStartFenster
+studioDieApp.Geoeffnet()
+studioStartFenster.studioHaupt = TRUE
+studioStartFenster.Zeigen()
+DIM f AS Hauptfenster : f = studioStartFenster
+' Wie viele Farben in einem Rechteck des Bildschirms stehen. Je Foto eine
+' eigene Datei: LOADIMAGE liefert fuer denselben Pfad das erste Bild.
+DIM fotos AS INTEGER
+FUNCTION farben(x AS INTEGER, y AS INTEGER, b AS INTEGER, h AS INTEGER) AS INTEGER
+    DIM n AS INTEGER
+    WHILE n < 2 AND studioBild()
+        n = n + 1
+    WEND
+    fotos = fotos + 1
+    DIM datei AS STRING : datei = "schirm" + STR$(fotos) + ".png"
+    SAVESCREENSHOT(datei)
+    n = 0
+    WHILE n < 2 AND studioBild()
+        n = n + 1
+    WEND
+    DIM img AS IMAGE : img = LOADIMAGE(datei)
+    DIM gesehen AS ARRAY OF INTEGER : gesehen = []
+    DIM px AS INTEGER
+    DIM py AS INTEGER
+    FOR py = y TO y + h - 1 STEP 3
+        FOR px = x TO x + b - 1 STEP 3
+            DIM c AS INTEGER : c = GETPIXEL(img, px, py)
+            IF ARRAY_INDEXOF(gesehen, c) < 0 THEN ARRAY_PUSH(gesehen, c)
+        NEXT
+    NEXT
+    RETURN LEN(gesehen)
+END FUNCTION
+PRINT "kuchen "; f.kuchen IS StudioDiagramm; " "; f.kuchen.Art; " | balken "; f.teil.balken.Art
+f.kuchen.Hinzufuegen("Obst", 5)
+f.kuchen.Hinzufuegen("Gemüse", 3)
+f.kuchen.Hinzufuegen("Milch", 2, RGB(200, 60, 60))
+f.kuchen.Setzen("legende", "rechts")
+f.kuchen.SetzenSchalter("prozent", TRUE)
+PRINT "werte "; f.kuchen.Anzahl()
+DIM wx AS INTEGER : wx = GUI_CANVAS_X(f.kuchen.Flaeche)
+DIM wy AS INTEGER : wy = GUI_CANVAS_Y(f.kuchen.Flaeche)
+PRINT "kuchen farbig "; farben(wx, wy, GUI_CANVAS_W(f.kuchen.Flaeche), GUI_CANVAS_H(f.kuchen.Flaeche)) > 4; " | obendrauf "; f.obendrauf > 0
+f.teil.balken.Hinzufuegen("A", 4)
+f.teil.balken.Hinzufuegen("B", 7)
+DIM bx AS INTEGER : bx = GUI_CANVAS_X(f.teil.balken.Flaeche)
+DIM by AS INTEGER : by = GUI_CANVAS_Y(f.teil.balken.Flaeche)
+PRINT "seite 0: balken "; farben(bx, by, 150, 100) > 4
+GUI_TABCONTROL_SET_PAGE(f.reiter, 1)
+bx = GUI_CANVAS_X(f.teil.balken.Flaeche)
+by = GUI_CANVAS_Y(f.teil.balken.Flaeche)
+PRINT "seite 1: balken "; farben(bx, by, 150, 100) > 4
+PRINT "dunkel "; f.kuchen.studioHell
+GUI_THEME_PRESET("modern_light")
+DIM n AS INTEGER
+WHILE n < 3 AND studioBild()
+    n = n + 1
+WEND
+PRINT "hell "; f.kuchen.studioHell; " | balken hinten "; f.teil.balken.studioHell
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"control","name":"Teil"},{"art":"fenster","name":"Hauptfenster"}]}
+--- datei proj/App.dh
+CLASS App EXTENDS StudioApp
+    SUB Geoeffnet()
+        GUI_THEME_PRESET("modern_dark")
+    END SUB
+END CLASS
+--- datei proj/Teil.dhform
+{"title":"Teil","name":"Teil","w":200,"h":120,"widgets":[{"kind":"canvas","name":"balken","x":0,"y":0,"w":200,"h":120,"studio_diagramm":"balken","studio_diagramm_titel":"Zwei"}]}
+--- datei proj/Teil.dh
+CLASS Teil EXTENDS Teil_Basis
+END CLASS
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":620,"h":420,"widgets":[
+{"kind":"canvas","name":"kuchen","x":10,"y":10,"w":240,"h":180,"studio_diagramm":"kuchen","studio_diagramm_titel":"Vorrat"},
+{"kind":"tabcontrol","name":"reiter","x":260,"y":10,"w":340,"h":260,"items":["Eins","Zwei"],"tabctl":{"kinder":[[2,1]],"seite":0}},
+{"kind":"studio_control","studio_control":"Teil","name":"teil","x":270,"y":50,"w":200,"h":120}]}
+--- datei proj/Hauptfenster.dh
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+    DIM obendrauf AS INTEGER
+
+    SUB kuchen_Zeichnen()
+        Self.obendrauf = Self.obendrauf + 1
+    END SUB
+END CLASS
+--- erwartet
+erzeugt TRUE
+geprueft TRUE
+kuchen TRUE kuchen | balken balken
+werte 3
+kuchen farbig TRUE | obendrauf TRUE
+seite 0: balken FALSE
+seite 1: balken TRUE
+dunkel 0
+hell 1 | balken hinten 1
+code 0
+
+=== ein diagramm aus der bibliothek: zeichenflaeche mit art, muster im entwurf
+' Suchen nach "Diagramm", Doppelklick: eine Zeichenflaeche mit
+' studio_diagramm "kuchen"; der Entwurf zeigt ein Muster der Art, der
+' Inspektor die Zeile Diagramm. Im Fenster steht schon ein Balken.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+SETENV("DH_STUDIO_ABLAGE", "Diagramm")
+DIM m AS STRING : m = CWD$() + "/m.log"
+slStarten(m, "", 6, p)
+PRINT "muster balken "; slHat(m, "muster balken")
+DIM sx AS INTEGER
+DIM sy AS INTEGER
+(sx, sy) = slLage(m, "suche")
+slHin(10, 10)
+slKlick(sx, sy)
+slMit([341], 86)
+slWarten(30)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+slStarten(m, CWD$() + "/ev.txt", slBild + 10, p)
+DIM zx AS INTEGER
+DIM zy AS INTEGER
+(zx, zy) = slLage(m, "zeile canvas/Diagramm")
+PRINT "zeile "; zx > 0
+slZeilen = [] : slBild = 0
+slHin(10, 10)
+slKlick(sx, sy)
+slMit([341], 86)
+slWarten(30)
+slHin(zx, zy)
+slHin(zx, zy)
+slRunter()
+slHoch()
+slRunter()
+slHoch()
+slWarten(10)
+slMit([341], 83)
+slWarten(10)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+DIM log AS STRING : log = CWD$() + "/s.log"
+slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+PRINT "neu "; LEN(slAnfang(log, "neu canvas Diagramm1 ")) = 1
+PRINT "muster kuchen "; slHat(log, "muster kuchen")
+DIM fx AS INTEGER
+DIM fy AS INTEGER
+(fx, fy) = slLage(log, "feld studio_diagramm")
+PRINT "im inspektor "; fx > 0
+DIM d AS JSON_HANDLE : d = JSON_PARSE(JOIN$(READLINES(p + "/Hauptfenster.dhform"), CHR$(10)))
+PRINT "widgets "; JSON_LEN(d, "widgets"); " | "; JSON_GET_STRING(d, "widgets.1.kind"); " "; JSON_GET_STRING(d, "widgets.1.studio_diagramm")
+--- argumente
+{sammlung}/../../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "json"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"}]}
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":520,"h":340,"widgets":[
+{"kind":"canvas","name":"saeulen","x":10,"y":10,"w":200,"h":140,"studio_diagramm":"balken"}]}
+--- erwartet
+muster balken TRUE
+zeile TRUE
+neu TRUE
+muster kuchen TRUE
+im inspektor TRUE
+widgets 2 | canvas kuchen

@@ -181,6 +181,20 @@ END SUB
 ' Die Ereignisse werden NACH dem GUI_UPDATE abgefragt (studioTakt), nicht als
 ' Rueckruf der gui verdrahtet: so laeuft eine Ereignis-Methode ausserhalb
 ' von GUI_UPDATE und darf selbst Bilder drehen (Frage, ZeigenModal).
+' Ist das Widget i eine Zeichenfläche mit Diagramm, dessen Art (sonst "").
+FUNCTION diagrammArt$(d AS JSON_HANDLE, i AS INTEGER) AS STRING
+    DIM p AS STRING : p = "widgets." + STR$(i)
+    IF i >= JSON_LEN(d, "widgets") THEN RETURN ""
+    IF jsonText$(d, p + ".kind") <> "canvas" THEN RETURN ""
+    RETURN jsonText$(d, p + ".studio_diagramm")
+END FUNCTION
+
+' Das Diagramm auf dem Widget w (ein Ausdruck) -- fuer studioAufbauen und
+' studioEinbauen.
+FUNCTION diagrammBau$(d AS JSON_HANDLE, i AS INTEGER, w AS STRING) AS STRING
+    RETURN "studioDiagramm(" + w + ", " + dhText$(diagrammArt$(d, i)) + ", " + dhText$(jsonText$(d, "widgets." + STR$(i) + ".studio_diagramm_titel")) + ")"
+END FUNCTION
+
 FUNCTION basisCode$(ei AS INTEGER) AS STRING
     DIM e AS Element : e = elemente[ei]
     DIM istControl AS BOOLEAN : istControl = e.art = "control"
@@ -269,6 +283,7 @@ FUNCTION basisCode$(ei AS INTEGER) AS STRING
         DIM typ AS STRING : typ = "GUI_WIDGET"
         IF arten[i] = "timer" THEN typ = "StudioTimer"
         IF arten[i] = "menue" THEN typ = "INTEGER"
+        IF diagrammArt$(d, i) <> "" THEN typ = "StudioDiagramm"
         IF LEFT$(arten[i], 15) = "studio_control:" THEN
             DIM ik AS INTEGER : ik = ARRAY_INDEXOF(instIndex, i)
             IF ik >= 0 THEN typ = instKlasse[ik]
@@ -305,7 +320,7 @@ FUNCTION basisCode$(ei AS INTEGER) AS STRING
         FOR i = 0 TO nW - 1
             DIM tp AS STRING : tp = "widgets." + STR$(i)
             DIM tw AS STRING : tw = "GUI_WINDOW_WIDGET(win, erster + " + STR$(i) + ")"
-            IF istBezeichner(namen[i]) AND ARRAY_INDEXOF(instIndex, i) < 0 THEN ARRAY_PUSH(z, "        Self." + namen[i] + " = " + tw)
+            IF istBezeichner(namen[i]) AND ARRAY_INDEXOF(instIndex, i) < 0 THEN ARRAY_PUSH(z, "        Self." + namen[i] + " = " + IIF(diagrammArt$(d, i) <> "", diagrammBau$(d, i, tw), tw))
             DIM frei AS BOOLEAN : frei = i >= LEN(eltern)
             IF NOT frei THEN frei = eltern[i] < 0
             DIM an AS STRING : an = IIF(JSON_HAS(d, tp + ".anchor"), JSON_GET_STRING(d, tp + ".anchor"), "")
@@ -341,7 +356,8 @@ FUNCTION basisCode$(ei AS INTEGER) AS STRING
         FOR i = 0 TO nW - 1
             IF NOT istBezeichner(namen[i]) THEN CONTINUE
             IF LEFT$(arten[i], 15) = "studio_control:" THEN CONTINUE
-            ARRAY_PUSH(z, "        Self." + namen[i] + " = GUI_WINDOW_WIDGET(Self.studioWin, " + STR$(i) + ")")
+            DIM ww AS STRING : ww = "GUI_WINDOW_WIDGET(Self.studioWin, " + STR$(i) + ")"
+            ARRAY_PUSH(z, "        Self." + namen[i] + " = " + IIF(diagrammArt$(d, i) <> "", diagrammBau$(d, i, ww), ww))
         NEXT
         ' Die eigenen Controls: ein Objekt je Instanz, das seine Teile kennt.
         instanzenBauen(z, d, "Self.studioWin", "", "studioControls", instName, instKlasse, instIndex, instErster)
@@ -416,6 +432,12 @@ FUNCTION basisCode$(ei AS INTEGER) AS STRING
     FOR i = 0 TO LEN(namen) - 1
         IF NOT istBezeichner(namen[i]) THEN CONTINUE
         DIM ctl AS STRING : ctl = "Self." + namen[i]
+        ' Ein Diagramm zeichnet sich selbst, vor dem Zeichnen des Programms;
+        ' seine Ereignisse sind die der Fläche darunter.
+        IF diagrammArt$(d, i) <> "" THEN
+            ARRAY_PUSH(zeichnen, "        " + ctl + ".studioZeichnen()")
+            ctl = ctl + ".Flaeche"
+        END IF
         DIM evs AS ARRAY OF STRING : evs = ereignisseFuer(arten[i])
         DIM ereig AS STRING
         FOR EACH ereig IN evs

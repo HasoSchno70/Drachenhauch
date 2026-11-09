@@ -1504,6 +1504,46 @@ SUB anordnen(was AS STRING)
     protokoll("angeordnet " + was + " " + STR$(LEN(gewaehlt)))
 END SUB
 
+' Ein Diagramm im Entwurf: ein Muster seiner Art, damit man sieht, was
+' kommt -- die Daten setzt erst das Programm. Je Art ein CHART, einmal
+' angelegt.
+DIM musterArten AS ARRAY OF STRING : musterArten = []
+DIM musterDiagramme AS ARRAY OF CHART : musterDiagramme = []
+
+SUB musterDiagramm(art AS STRING, titel AS STRING, x AS INTEGER, y AS INTEGER, b AS INTEGER, h AS INTEGER)
+    IF b < 20 OR h < 20 THEN RETURN
+    DIM k AS INTEGER : k = ARRAY_INDEXOF(musterArten, art)
+    IF k < 0 THEN
+        DIM c AS CHART
+        TRY
+            c = CHART_NEW(art, x, y, b, h)
+        CATCH fehler
+            RETURN
+        END TRY
+        CHART_THEME(c, "dunkel")
+        CHART_SET_FLAG(c, "komma", TRUE)
+        SELECT CASE art
+            CASE "linie", "flaeche", "line", "area"
+                DIM r AS INTEGER : r = CHART_SERIES(c, "A")
+                CHART_DATA(c, r, [3.0, 5.0, 4.0, 7.0, 6.0, 8.0])
+            CASE "tacho", "leiste", "led", "gauge", "bar_gauge", "lampen", "balkenanzeige", "zellen"
+                CHART_SET_NUM(c, "max", 100)
+                CHART_VALUE(c, 62)
+            CASE ELSE
+                CHART_ADD(c, "A", 45)
+                CHART_ADD(c, "B", 30)
+                CHART_ADD(c, "C", 25)
+        END SELECT
+        ARRAY_PUSH(musterArten, art)
+        ARRAY_PUSH(musterDiagramme, c)
+        protokoll("muster " + art)
+        k = LEN(musterArten) - 1
+    END IF
+    CHART_SET(musterDiagramme[k], "titel", titel)
+    CHART_BOUNDS(musterDiagramme[k], x, y, b, h)
+    CHART_DRAW(musterDiagramme[k])
+END SUB
+
 ' --- Zeichnen (nach GUI_DRAW, vor GUI_DRAW_TOP) -------------------------------
 SUB entwurfZeichnen()
     IF NOT layoutVorn() THEN RETURN
@@ -1612,6 +1652,22 @@ SUB entwurfZeichnen()
         ELSEIF NOT controlBrauchbar(cn) THEN
             TEXT(cx1 + 6, cy1 + 4, trf$("{0} enthält sich selbst", [cn]), farbe("leise"))
         END IF
+    NEXT
+    ' Die Diagramme: ein Muster in ihrer Art.
+    FOR li = 0 TO LEN(arten) - 1
+        IF arten[li] <> "canvas" THEN CONTINUE
+        DIM dgArt AS STRING : dgArt = feldText$(li, "studio_diagramm")
+        IF dgArt = "" THEN CONTINUE
+        DIM dgW AS GUI_WIDGET : dgW = IIF(frm >= 0, GUI_WINDOW_WIDGET(frm, li), -1)
+        IF dgW >= 0 THEN
+            IF NOT GUI_SHOWN(dgW) THEN CONTINUE
+        END IF
+        DIM dgx AS INTEGER
+        DIM dgy AS INTEGER
+        DIM dgb AS INTEGER
+        DIM dgh AS INTEGER
+        (dgx, dgy, dgb, dgh) = lageVon(li)
+        musterDiagramm(dgArt, feldText$(li, "studio_diagramm_titel"), formX + zS(dgx), formY + zS(dgy), zS(dgb), zS(dgh))
     NEXT
     ' Die Abstandhalter jedes Layouts.
     FOR li = 0 TO LEN(arten) - 1

@@ -80,6 +80,9 @@ SUB bausteineAnlegen()
     baustein("Leisten", "statusbar", "Statusleiste", "Statusleiste", 400, 24, "Bereit.", "", "Meldungen unten im Fenster")
     baustein("Leisten", "breadcrumb", "Pfadleiste", "Pfad", 320, 26, "", "", "wo man gerade ist, zum Anklicken")
     baustein("Zeichnen", "canvas", "Zeichenfläche", "Zeichenflaeche", 240, 180, "", "", "eine Fläche, auf die das Programm selbst zeichnet")
+    ' Eine Zeichenfläche mit einem Diagramm aus dem Modul chart; die Art
+    ' (Kuchen, Balken ...) stellt der Inspektor ein.
+    baustein("Zeichnen", "canvas", "Diagramm", "Diagramm", 300, 200, "", "{'studio_diagramm':'kuchen'}", "Kuchen, Balken, Linie oder Tacho, das sich selbst zeichnet")
     baustein("Unsichtbar", "timer", "Timer", "Timer", 0, 0, "", "", "ruft sein Ereignis Aktion in festen Abständen")
     DIM i AS INTEGER
     FOR i = 0 TO LEN(bausteine) - 1
@@ -360,6 +363,11 @@ FUNCTION symbolZeichnen(name AS STRING) AS IMAGE
             IMAGE_FILL_RECT(img, 18, 2, 22, 3, S_RAND)
             IMAGE_DRAW_LINE(img, 20, 14, 20, 8, S_HELL)
             IMAGE_DRAW_LINE(img, 20, 14, 24, 17, S_AKZENT)
+        CASE "Diagramm"
+            IMAGE_FILL_RECT(img, 3, 3, 36, 22, S_FLAECHE)
+            IMAGE_FILL_RECT(img, 8, 14, 13, 20, S_AKZENT)
+            IMAGE_FILL_RECT(img, 16, 8, 21, 20, S_GRUEN)
+            IMAGE_FILL_RECT(img, 24, 11, 29, 20, S_HELL)
         CASE "Zeichenfläche"
             IMAGE_FILL_RECT(img, 3, 3, 36, 22, S_FLAECHE)
             IMAGE_POLYLINE(img, [6, 12, 18, 24, 30, 34], [19, 10, 15, 7, 13, 9], 2, S_AKZENT)

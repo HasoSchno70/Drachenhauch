@@ -18,6 +18,7 @@ IMPORT "regex"
 IMPORT "imgfx"
 IMPORT "db"
 IMPORT "pdf"
+IMPORT "chart"
 
 DIM logDatei AS STRING : logDatei = GETENV$("DH_STUDIO_LOG")
 ' Gesammelt und einmal je Bild geschrieben: die Lagen aller Controls sind bei

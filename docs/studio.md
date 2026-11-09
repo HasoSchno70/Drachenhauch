@@ -126,7 +126,7 @@ Die Ereignisse je Art:
 | Liste, Baum | Geaendert, Doppelklick (bei der Liste auch Enter) |
 | Tabelle | Geaendert, Doppelklick (auch Enter), Zelle(zeile, spalte) |
 | Regler, Zahlenfeld, Klappliste, Wähler, Reiterwerk | Geaendert |
-| Zeichenfläche | Zeichnen, Maus, Ziehen(x, y), Rad(schritte) |
+| Zeichenfläche, Diagramm | Zeichnen, Maus, Ziehen(x, y), Rad(schritte) |
 | Werkzeugleiste | Knopf(nr) |
 | Statusleiste | Feld(nr) |
 | jedes Control zusätzlich | MausRein, MausRaus, Abgelegt(zeile, ziel) |
@@ -142,6 +142,27 @@ eingebauten Sans in der Textgröße des Programms -- nicht in der
 Pixelschrift, die `TEXT` sonst nimmt. Was `Zeichnen` an Schrift, Größe und
 Stil ändert, gilt nur dort (wie `GFX_PUSH`/`GFX_POP`). Gezeichnet wird in Bildschirmpunkten ab `GUI_CANVAS_X/Y`. Maus, Rad und
 Ziehen kommen nicht, solange ein modales Fenster vor der Fläche steht.
+
+Ein **Diagramm** (Bibliothek, Gruppe Zeichnen) ist eine Zeichenfläche mit
+einem Diagramm aus dem Modul [`chart`](module-chart.md): die Art (Kuchen,
+Donut, Balken, Linie, Fläche, Tacho, Leiste, Lampen) und den Titel stellt der
+Inspektor ein, der Entwurf zeigt ein Muster. Im Code ist das Control ein
+`StudioDiagramm`, das sich in jedem Bild selbst zeichnet, so groß wie die
+Fläche und im Thema der Oberfläche (hell oder dunkel, auch nach einem
+Wechsel); ein eigenes `Zeichnen` kommt obendrauf.
+
+```basic
+Self.vorrat.Leeren()
+Self.vorrat.Hinzufuegen("Obst", 5)
+Self.vorrat.Hinzufuegen("Milch", 2, RGB(200, 60, 60))   ' eigene Farbe
+Self.vorrat.Setzen("legende", "rechts")                 ' CHART_SET
+Self.vorrat.SetzenSchalter("prozent", TRUE)             ' CHART_SET_FLAG
+```
+
+Dazu `Reihe(name, werte)` für Linien und gruppierte Balken, `Beschriften`,
+`Wert` für Tacho, Leiste und Lampen, `Titel`, `SetzenZahl`, `Anzahl()`;
+`Flaeche` ist die Zeichenfläche, `Diagramm` der CHART-Handle für alles
+Weitere.
 
 Ein Ereignis mit Klammern ruft seine Methode mit Werten: `Ziehen` mit der
 Lage auf der Fläche (solange die Taste nach einem Druck auf die Fläche

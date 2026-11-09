@@ -17,6 +17,7 @@
 IMPORT "gui"
 IMPORT "pdf"
 IMPORT "imgfx"
+IMPORT "chart"
 
 ' Eine Zeichenfläche malt ihren Text in der Schrift der Oberfläche daneben:
 ' der eigenen der gui (GUI_FONT), sonst der eingebauten Sans in der
@@ -77,6 +78,98 @@ CLASS StudioTimer
         RETURN TRUE
     END FUNCTION
 END CLASS
+
+' Ein Diagramm: eine Zeichenfläche mit einem CHART aus dem Modul chart
+' (Kuchen, Balken, Linie, Fläche, Tacho, Leiste, Lampen). Es zeichnet sich
+' je Bild selbst, so groß wie die Fläche, in den Farben des Themas der
+' Oberfläche (hell oder dunkel, auch nach einem Wechsel). Daten kommen mit
+' Hinzufuegen (Kuchen, Balken: Name und Wert), Reihe (Linie, gruppierte
+' Balken) oder Wert (Tacho, Leiste, Lampen); alles Weitere über das Feld
+' Diagramm mit den CHART_*-Befehlen.
+CLASS StudioDiagramm
+    DIM Flaeche AS GUI_WIDGET
+    DIM Diagramm AS CHART
+    DIM Art AS STRING
+    DIM studioHell AS INTEGER     ' -1 = noch kein Thema gesetzt, 0 dunkel, 1 hell
+
+    SUB Leeren()
+        CHART_CLEAR(Self.Diagramm)
+    END SUB
+
+    ' Ein Wert mit Namen (Segment, Balken); Farbe -1 = aus der Palette.
+    SUB Hinzufuegen(name AS STRING, wert AS FLOAT, farbe AS INTEGER = -1)
+        CHART_ADD(Self.Diagramm, name, wert, farbe)
+    END SUB
+
+    ' Eine Reihe mit ihren Werten -> ihr Index.
+    FUNCTION Reihe(name AS STRING, werte AS ARRAY OF FLOAT) AS INTEGER
+        DIM r AS INTEGER : r = CHART_SERIES(Self.Diagramm, name)
+        CHART_DATA(Self.Diagramm, r, werte)
+        RETURN r
+    END FUNCTION
+
+    SUB Beschriften(punkt AS INTEGER, text AS STRING)
+        CHART_LABEL(Self.Diagramm, punkt, text)
+    END SUB
+
+    ' Der Wert von Tacho, Leiste und Lampen.
+    SUB Wert(w AS FLOAT)
+        CHART_VALUE(Self.Diagramm, w)
+    END SUB
+
+    SUB Titel(t AS STRING)
+        CHART_SET(Self.Diagramm, "titel", t)
+    END SUB
+
+    ' Eine Eigenschaft des Diagramms beim Namen (CHART_SET, _NUM, _FLAG):
+    ' Setzen("legende", "rechts"), SetzenZahl("innenradius", 0.5),
+    ' SetzenSchalter("prozent", TRUE).
+    SUB Setzen(name AS STRING, wert AS STRING)
+        CHART_SET(Self.Diagramm, name, wert)
+    END SUB
+
+    SUB SetzenZahl(name AS STRING, wert AS FLOAT)
+        CHART_SET_NUM(Self.Diagramm, name, wert)
+    END SUB
+
+    SUB SetzenSchalter(name AS STRING, an AS BOOLEAN)
+        CHART_SET_FLAG(Self.Diagramm, name, an)
+    END SUB
+
+    FUNCTION Anzahl() AS INTEGER
+        RETURN CHART_COUNT(Self.Diagramm)
+    END FUNCTION
+
+    SUB studioZeichnen()
+        IF NOT GUI_SHOWN(Self.Flaeche) THEN RETURN
+        ' Das Thema der Oberfläche: hell, wenn ihr Hintergrund hell ist.
+        ' Der Hintergrund ist der des Fensters, damit es sich einfügt.
+        DIM bg AS INTEGER : bg = GUI_THEME_GET("win_bg")
+        DIM hell AS INTEGER : hell = IIF(((bg SHR 16) BAND 255) + ((bg SHR 8) BAND 255) + (bg BAND 255) > 382, 1, 0)
+        IF hell <> Self.studioHell THEN
+            CHART_THEME(Self.Diagramm, IIF(hell = 1, "hell", "dunkel"))
+            CHART_SET_COLOR(Self.Diagramm, "hintergrund", bg)
+            Self.studioHell = hell
+        END IF
+        CHART_BOUNDS(Self.Diagramm, GUI_CANVAS_X(Self.Flaeche), GUI_CANVAS_Y(Self.Flaeche), GUI_CANVAS_W(Self.Flaeche), GUI_CANVAS_H(Self.Flaeche))
+        CHART_UPDATE(Self.Diagramm, DELTA())
+        studioSchriftAn()
+        CHART_DRAW(Self.Diagramm)
+        studioSchriftAus()
+    END SUB
+END CLASS
+
+' Ein Diagramm auf der Fläche (art wie bei CHART_NEW).
+FUNCTION studioDiagramm(flaeche AS GUI_WIDGET, art AS STRING, titel AS STRING) AS StudioDiagramm
+    DIM d AS StudioDiagramm : d = NEW StudioDiagramm()
+    d.Flaeche = flaeche
+    d.Art = art
+    d.studioHell = -1
+    d.Diagramm = CHART_NEW(art, 0, 0, 10, 10)
+    IF titel <> "" THEN CHART_SET(d.Diagramm, "titel", titel)
+    CHART_SET_FLAG(d.Diagramm, "komma", TRUE)
+    RETURN d
+END FUNCTION
 
 ' Wo ein Teil eines eigenen Controls auf einer Achse liegt, wenn das Control
 ' um `mehr` groesser ist als entworfen -- wie ein verankertes Widget: am

@@ -112,6 +112,9 @@ Zeichnen	Drawing
 Zeichenfläche	Canvas
 Zeichenflaeche	Canvas
 eine Fläche, auf die das Programm selbst zeichnet	an area the program draws on itself
+Diagramm	Chart
+Kuchen, Balken, Linie oder Tacho, das sich selbst zeichnet	pie, bar, line or gauge that draws itself
+Diagrammtitel	Chart title
 Unsichtbar	Invisible
 Timer	Timer
 ruft sein Ereignis Aktion in festen Abständen	calls its Aktion event at fixed intervals

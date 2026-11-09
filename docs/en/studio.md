@@ -125,7 +125,7 @@ The events per kind:
 | list, tree | Geaendert, Doppelklick (for the list also Enter) |
 | table | Geaendert, Doppelklick (also Enter), Zelle(zeile, spalte) |
 | slider, number field, dropdown, pickers, tab control | Geaendert |
-| canvas | Zeichnen, Maus, Ziehen(x, y), Rad(schritte) |
+| canvas, chart | Zeichnen, Maus, Ziehen(x, y), Rad(schritte) |
 | toolbar | Knopf(nr) |
 | status bar | Feld(nr) |
 | every control in addition | MausRein, MausRaus, Abgelegt(zeile, ziel) |
@@ -142,6 +142,25 @@ the program's text size -- not the pixel font `TEXT` uses otherwise. Whatever
 `GFX_PUSH`/`GFX_POP`). Coordinates are screen points from
 `GUI_CANVAS_X/Y`. Maus, Rad and Ziehen do not come while a modal window
 stands in front of the canvas.
+
+A **chart** (library, group Drawing) is a canvas with a chart from the
+[`chart`](module-chart.md) module: the inspector sets its kind (pie, donut,
+bar, line, area, gauge, bar gauge, LEDs) and title, the design view shows a
+sample. In code the control is a `StudioDiagramm` that draws itself in every
+frame, as large as the canvas and in the theme of the interface (light or
+dark, also after a switch); your own `Zeichnen` comes on top.
+
+```basic
+Self.vorrat.Leeren()
+Self.vorrat.Hinzufuegen("Obst", 5)
+Self.vorrat.Hinzufuegen("Milch", 2, RGB(200, 60, 60))   ' own colour
+Self.vorrat.Setzen("legende", "rechts")                 ' CHART_SET
+Self.vorrat.SetzenSchalter("prozent", TRUE)             ' CHART_SET_FLAG
+```
+
+Also `Reihe(name, werte)` for lines and grouped bars, `Beschriften`, `Wert`
+for gauge, bar gauge and LEDs, `Titel`, `SetzenZahl`, `Anzahl()`; `Flaeche`
+is the canvas, `Diagramm` the CHART handle for everything else.
 
 An event with parentheses calls its method with values: `Ziehen` (drag)
 with the position on the canvas (while the button is held after a press on

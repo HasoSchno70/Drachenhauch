@@ -135,6 +135,10 @@ SUB inspektorAnlegen()
     inspZeile("Inhalt", "status.felder", "Felder", "felder", "statusbar", "")
     inspZeile("Inhalt", "group", "Gruppe", "text", "radio", "")
     inspZeile("Inhalt", "studio_bild", "Bild", "wahl", "image", "(keins)")
+    ' Eine Zeichenfläche mit Diagramm (laufzeit.dh, StudioDiagramm); die
+    ' Arten sind die von CHART_NEW.
+    inspZeile("Inhalt", "studio_diagramm", "Diagramm", "wahl", "canvas", "(keins);kuchen;donut;balken;linie;flaeche;tacho;leiste;led")
+    inspZeile("Inhalt", "studio_diagramm_titel", "Diagrammtitel", "text", "canvas", "")
     inspZeile("Inhalt", "checked", "Gesetzt", "schalter", "checkbox,radio,toggle", "")
     inspZeile("Inhalt", "min", "Minimum", "komma", WERTARTEN, "")
     inspZeile("Inhalt", "max", "Maximum", "komma", WERTARTEN, "")
