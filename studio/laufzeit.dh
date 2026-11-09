@@ -715,6 +715,21 @@ FUNCTION EingabeZahl(text AS STRING, vorgabe AS INTEGER, min AS INTEGER, max AS 
     RETURN (TRUE, MAX(min, MIN(max, z)))
 END FUNCTION
 
+' Eine Farbe (wie QColorDialog.getColor): &HRRGGBB, -1 bei Abbrechen. Der
+' Waehler beginnt bei vorgabe (-1 = Weiss).
+FUNCTION FarbeWaehlen(vorgabe AS INTEGER, titel AS STRING = "") AS INTEGER
+    DIM b AS INTEGER : b = 380
+    DIM w AS GUI_WINDOW : w = GUI_WINDOW(titel, MAX(0, (SCREENWIDTH() - b) \ 2), MAX(0, (SCREENHEIGHT() - 320) \ 2), b, 320)
+    DIM feld AS GUI_WIDGET : feld = GUI_COLORPICKER(w, 14, 12, 352, 220)
+    GUI_SET_PICKED_COLOR(feld, IIF(vorgabe < 0, &HFFFFFF, vorgabe))
+    DIM ok AS GUI_WIDGET : ok = GUI_BUTTON(w, "OK", 166, 248, 96, 30)
+    DIM ab AS GUI_WIDGET : ab = GUI_BUTTON(w, "Abbrechen", 270, 248, 96, 30)
+    DIM f AS INTEGER : f = -1
+    IF studioFeldDialog(w, -1, ok, ab) THEN f = GUI_PICKED_COLOR(feld)
+    GUI_WINDOW_DESTROY(w)
+    RETURN f
+END FUNCTION
+
 ' Die Vorschau eines Berichts (studio_berichte.dh): ein Fenster mit der
 ' Seite, Blaettern, Drucken, Sichern und Schliessen. Kehrt zurueck, wenn es
 ' zu ist -- wie Frage() dreht sie dafuer selbst Bilder.

@@ -259,6 +259,7 @@ unter dem Fenster, ihr Ereignis heißt `<Name>_Aktion`.
 | `Eingabe(text$ [, vorgabe$ [, titel$]])` | fragt nach einem Text, `""` bei Abbrechen |
 | `Auswahl(text$, eintraege [, vorgabe [, titel$]])` | einer aus einer Liste (Klappliste); liefert den Index, `-1` bei Abbrechen |
 | `EingabeZahl(text$, vorgabe, min, max [, titel$])` | fragt nach einer ganzen Zahl; liefert `(TRUE, zahl)` oder bei Abbrechen `(FALSE, vorgabe)` |
+| `FarbeWaehlen(vorgabe [, titel$])` | eine Farbe im Farbwähler; liefert `&HRRGGBB`, `-1` bei Abbrechen |
 | `fenster.ZeigenModal()` | zeigt ein Fenster modal und kehrt erst zurück, wenn es geschlossen ist |
 | `Bild(name$)` | ein Bild aus `bilder/` des Projekts als IMAGE |
 

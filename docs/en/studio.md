@@ -256,6 +256,7 @@ the window, their event is `<Name>_Aktion`.
 | `Eingabe(text$ [, vorgabe$ [, titel$]])` | asks for a text, `""` on cancel |
 | `Auswahl(text$, eintraege [, vorgabe [, titel$]])` | one of a list (dropdown); returns the index, `-1` on cancel |
 | `EingabeZahl(text$, vorgabe, min, max [, titel$])` | asks for a whole number; returns `(TRUE, zahl)` or on cancel `(FALSE, vorgabe)` |
+| `FarbeWaehlen(vorgabe [, titel$])` | a colour in the colour picker; returns `&HRRGGBB`, `-1` on cancel |
 | `fenster.ZeigenModal()` | shows a window modally and returns only when it is closed |
 | `Bild(name$)` | an image from the project's `bilder/` as IMAGE |
 

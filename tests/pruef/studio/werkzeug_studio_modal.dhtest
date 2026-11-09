@@ -395,11 +395,13 @@ felder gefunden TRUE TRUE
 uebernommen TRUE
 standard knopfOk | knopf knopfOk
 
-=== auswahl und eingabezahl warten wie frage
+=== auswahl, eingabezahl und farbewaehlen warten wie frage
 ' Zwei Dialoge der Laufzeit, die das Studio nicht hatte (wie
 ' QInputDialog.getItem/getInt der Kuehlschrank-App): Auswahl liefert den
 ' Index (ESC: -1), EingabeZahl (TRUE, zahl) oder (FALSE, vorgabe). Enter
-' drueckt OK -- auch mit dem Fokus im Zahlenfeld.
+' drueckt OK -- auch mit dem Fokus im Zahlenfeld. FarbeWaehlen (wie
+' QColorDialog.getColor, Lagerorte der Kuehlschrank-App) liefert die Farbe,
+' ESC -1.
 IMPORT "laeufer.dh"
 DIM p AS STRING : p = CWD$() + "/proj"
 slHin(10, 10)
@@ -414,7 +416,7 @@ PRINT "erzeugt "; LEN(slAnfang(log, "erzeugt ")) = 1
 slZeilen = [] : slBild = 0
 slHin(10, 10)
 DIM k AS INTEGER
-FOR EACH k IN [257, 256, 257, 256, 256]
+FOR EACH k IN [257, 256, 257, 256, 256, 257, 256]
     slWarten(15)
     slTaste(k)
 NEXT
@@ -470,6 +472,8 @@ PRINT "zahl enter "; ok; " "; z
 (ok, z) = EingabeZahl("Tage:", 7, 1, 365, "MHD")
 PRINT "zahl esc "; ok; " "; z
 PRINT "leer "; Auswahl("Nichts", [], 0, "Leer")
+PRINT "farbe enter "; HEX$(FarbeWaehlen(&H3FA9F5, "Farbe"))
+PRINT "farbe esc "; FarbeWaehlen(&H3FA9F5, "Farbe")
 --- datei proj/projekt.dhstudio
 {"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"}]}
 --- datei proj/Hauptfenster.dhform
@@ -481,4 +485,6 @@ auswahl esc -1
 zahl enter TRUE 365
 zahl esc FALSE 7
 leer -1
+farbe enter 3FA9F5
+farbe esc -1
 code 0
