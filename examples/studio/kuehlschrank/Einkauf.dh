@@ -47,7 +47,7 @@ FUNCTION postenAnlegen(name AS STRING, menge AS FLOAT, einheit AS STRING, katego
     IF kat = "" THEN kat = textEin$("SELECT IFNULL(category, '') FROM products WHERE lower(name) = lower(?) ORDER BY id LIMIT 1", name)
     verlauf.beginnen(name + " auf die Einkaufsliste")
     DB_EXEC(db, "INSERT INTO shopping_list (product_name, quantity, unit, category, priority, notes) VALUES (?, ?, ?, ?, ?, ?)", _
-            name, menge, IIF(einheit = "", "Stück", einheit), IIF(kat = "", NIL, kat), prioritaet, IIF(notizen = "", NIL, notizen))
+            name, menge, IIF(einheit = "", standardEinheit$(), einheit), IIF(kat = "", NIL, kat), prioritaet, IIF(notizen = "", NIL, notizen))
     DIM id AS INTEGER : id = DB_LAST_ROWID(db)
     verlauf.neu("shopping_list", id)
     verlauf.abschliessen()
@@ -120,7 +120,7 @@ FUNCTION autoErgaenzen() AS INTEGER
         IF dbZahlEin("SELECT COUNT(*) FROM shopping_list WHERE product_name = ? AND checked = 0", namen[i]) > 0 THEN CONTINUE
         IF neu = 0 THEN verlauf.beginnen("Auto-Ergänzen")
         DB_EXEC(db, "INSERT INTO shopping_list (product_name, quantity, unit, category, priority, notes) VALUES (?, ?, ?, ?, 3, 'Auto: Mindestmenge unterschritten')", _
-                namen[i], fehlt[i], IIF(einheiten[i] = "", "Stück", einheiten[i]), IIF(kats[i] = "", NIL, kats[i]))
+                namen[i], fehlt[i], IIF(einheiten[i] = "", standardEinheit$(), einheiten[i]), IIF(kats[i] = "", NIL, kats[i]))
         verlauf.neu("shopping_list", DB_LAST_ROWID(db))
         neu = neu + 1
     NEXT

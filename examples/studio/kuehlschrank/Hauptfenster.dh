@@ -1,12 +1,14 @@
 ' Das Hauptfenster: Werkzeugleiste, Kopf mit drei Kennzahlen und dem Knopf
 ' „Einkauf erfassen“, die fünf Reiter (Bestand, Lagerorte, Einkauf,
 ' Statistik, Rezepte) und die Statusleiste mit Uhr. Der Timer auffrischen
-' holt alle 30 Sekunden die Zahlen neu wie in der Python-App. Die Reiter sind
+' holt die Zahlen neu (alle 30 Sekunden, einstellbar), pruefen sucht nach
+' Abgelaufenem und Ablaufendem (Modul Benachrichtigungen), zusammenfassung
+' sieht jede Minute, ob die Übersicht des Tages fällig ist. Die Reiter sind
 ' eigene Controls; was sie melden (Geaendert, Bearbeiten ...), landet hier.
 CLASS Hauptfenster EXTENDS Hauptfenster_Basis
 
     SUB Geoeffnet()
-        Self.nochNichtDa()
+        Self.anwenden()
         Self.bestand.laden()
         Self.orte.laden()
         Self.einkauf.laden()
@@ -38,10 +40,60 @@ CLASS Hauptfenster EXTENDS Hauptfenster_Basis
         GUI_MENU_ENABLE(Self.miWiederholen, verlauf.kannVor())
     END SUB
 
-    ' Was erst mit einer späteren Stufe kommt, ist gesperrt statt stumm.
-    SUB nochNichtDa()
-        GUI_TOOLBAR_ENABLE(Self.werkzeuge, KNOPF_EINSTELLUNGEN, FALSE)
-        GUI_MENU_ENABLE(Self.miEinstellungen, FALSE)
+    ' Was die Einstellungen am Fenster ändern: wie oft es auffrischt und
+    ' prüft, ob es prüft. Die Python-App setzte nach dem Speichern nur die
+    ' Intervalle -- Benachrichtigungen ein- oder auszuschalten wirkte erst
+    ' nach einem Neustart.
+    SUB anwenden()
+        DIM e AS Einstellungen : e = einstellungen()
+        Self.auffrischen.Intervall = e.auffrischenS * 1000
+        Self.pruefen.Intervall = e.pruefMin * 60000
+        IF e.meldungenAn THEN
+            IF NOT Self.pruefen.Aktiv THEN Self.pruefen.Starten()
+        ELSE
+            Self.pruefen.Stoppen()
+        END IF
+    END SUB
+
+    ' --- Benachrichtigungen -------------------------------------------------------
+    SUB pruefen_Aktion()
+        Self.benachrichtigen()
+    END SUB
+
+    ' Fünf Sekunden nach dem Start das erste Mal (wie singleShot(5000)).
+    SUB erstpruefung_Aktion()
+        Self.benachrichtigen()
+    END SUB
+
+    SUB benachrichtigen()
+        DIM m AS Nachricht
+        FOR EACH m IN meldungenPruefen(einstellungen())
+            Self.melden(m)
+        NEXT
+    END SUB
+
+    SUB zusammenfassung_Aktion()
+        IF NOT zusammenfassungFaellig(einstellungen()) THEN RETURN
+        zusammenfassungErledigt()
+        DIM m AS Nachricht : m = zusammenfassung()
+        IF m IS NOT NIL THEN Self.melden(m)
+    END SUB
+
+    ' Ans System; nimmt es sie nicht (kein Tray, kein notify-send), zeigt
+    ' das Fenster sie selbst. Die letzte steht in der Statusleiste.
+    SUB melden(m AS Nachricht)
+        IF NOT meldungSenden(m) THEN GUI_TOAST(Self.Fenster(), m.titel + "  " + m.text, IIF(m.wichtig, "warnung", "info"), 6000)
+        GUI_STATUSBAR_SET(Self.status, 3, "🔔 " + m.titel)
+    END SUB
+
+    ' Die Einstellungen; gespeichert gilt alles sofort.
+    SUB miEinstellungen_Aktion()
+        DIM f AS EinstellungenFenster : f = NEW EinstellungenFenster()
+        f.ZeigenModal()
+        IF NOT f.gespeichert THEN RETURN
+        Self.anwenden()
+        Self.geaendert()
+        GUI_TOAST(Self.Fenster(), "✅ Einstellungen gespeichert!", "erfolg")
     END SUB
 
     ' Der Vorrat hat sich geändert (im Bestand oder über Rückgängig).
@@ -138,6 +190,7 @@ CLASS Hauptfenster EXTENDS Hauptfenster_Basis
             CASE KNOPF_WIEDERHOLEN : Self.miWiederholen_Aktion()
             CASE KNOPF_AKTUALISIEREN : Self.miAktualisieren_Aktion()
             CASE KNOPF_EXPORT : Self.miExport_Aktion()
+            CASE KNOPF_EINSTELLUNGEN : Self.miEinstellungen_Aktion()
         END SELECT
     END SUB
 

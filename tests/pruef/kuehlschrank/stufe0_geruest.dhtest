@@ -42,7 +42,7 @@ IMPORT "{sammlung}/../../../studio/berichte_laufzeit.dh"
 IMPORT "{sammlung}/../../../studio/berichte.dh"
 --- erwartet
 laden []
-elemente 42 start Hauptfenster
+elemente 46 start Hauptfenster
 app App TRUE
 fenster Hauptfenster TRUE
 datenbank Daten TRUE
@@ -69,6 +69,9 @@ modul Vorgaben TRUE
 modul OpenFoodFacts TRUE
 modul Uebersetzung TRUE
 modul Spoonacular TRUE
+klasse Einstellungen TRUE
+klasse Nachricht TRUE
+modul Benachrichtigungen TRUE
 control BestandSeite TRUE
 control EinkaufSeite TRUE
 fenster ScanFenster TRUE
@@ -79,6 +82,7 @@ fenster RezeptFenster TRUE
 fenster KochenFenster TRUE
 fenster RezeptNeuFenster TRUE
 fenster KatalogFenster TRUE
+fenster EinstellungenFenster TRUE
 fenster VorschlagFenster TRUE
 bericht Einkaufszettel TRUE
 control LagerorteSeite TRUE
@@ -141,6 +145,7 @@ RezeptFenster passt
 KochenFenster passt
 RezeptNeuFenster passt
 KatalogFenster passt
+EinstellungenFenster passt
 VorschlagFenster passt
 LagerorteSeite passt
 LagerortFenster passt
@@ -197,9 +202,9 @@ PRINT "kacheln "; GUI_CARD_TEXT$(f.kachelGesamt); " "; GUI_CARD_TEXT$(f.kachelBa
 DB_EXEC(db, "UPDATE app_settings SET value = '4' WHERE key = 'expiring_days_threshold'")
 f.auffrischen()
 PRINT "schwelle 4 "; GUI_CARD_TEXT$(f.kachelBald)
-' Was erst spaeter kommt (Einstellungen), ist gesperrt; Einkauf erfassen
-' (Stufe 6) und Aktualisieren gehen.
-PRINT "gesperrt "; GUI_TOOLBAR_ENABLED(f.werkzeuge, KNOPF_EINSTELLUNGEN); " "; GUI_ENABLED(f.knopfEinkauf); " offen "; GUI_TOOLBAR_ENABLED(f.werkzeuge, KNOPF_HINZUFUEGEN); " "; GUI_TOOLBAR_ENABLED(f.werkzeuge, KNOPF_AKTUALISIEREN)
+' Einstellungen (Stufe 7), Einkauf erfassen (Stufe 6) und Aktualisieren
+' gehen -- gesperrt ist nichts mehr.
+PRINT "frei "; GUI_TOOLBAR_ENABLED(f.werkzeuge, KNOPF_EINSTELLUNGEN); " "; GUI_ENABLED(f.knopfEinkauf); " offen "; GUI_TOOLBAR_ENABLED(f.werkzeuge, KNOPF_HINZUFUEGEN); " "; GUI_TOOLBAR_ENABLED(f.werkzeuge, KNOPF_AKTUALISIEREN)
 f.werkzeuge_Knopf(KNOPF_AKTUALISIEREN)
 PRINT "status "; GUI_STATUSBAR_TEXT$(f.status, 3)
 --- erwartet
@@ -213,7 +218,7 @@ einheit Stück schwelle 3 fehlt vorgabe
 zweimal 9 18
 kacheln 5 2 1 | Produkte: 2
 schwelle 4 3
-gesperrt FALSE TRUE offen TRUE TRUE
+frei TRUE TRUE offen TRUE TRUE
 status Aktualisiert.
 code 0
 

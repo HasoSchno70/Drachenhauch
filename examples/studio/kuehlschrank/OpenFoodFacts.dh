@@ -15,6 +15,7 @@ END FUNCTION
 
 ' Was der Cache schon weiß -- NIL, wenn das Netz gefragt werden muss.
 FUNCTION offAusCache(barcode AS STRING) AS Fund
+    IF NOT cacheAktiv() THEN RETURN NIL
     IF cacheNichtGefunden(barcode) THEN
         DIM n AS Fund : n = NEW Fund()
         n.barcode = barcode

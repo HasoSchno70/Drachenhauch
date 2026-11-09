@@ -7,6 +7,12 @@ IMPORT "json"
 
 CONST CACHE_TAGE = 30
 
+' Der Cache gilt nur, wenn er in den Einstellungen an ist (barcode_cache_enabled;
+' die Python-App hatte das Häkchen, las es aber nie).
+FUNCTION cacheAktiv() AS BOOLEAN
+    RETURN einstellungJa("barcode_cache_enabled", TRUE)
+END FUNCTION
+
 FUNCTION cachePfad$() AS STRING
     RETURN studioDbPfad$("barcode_cache.json")
 END FUNCTION
@@ -86,6 +92,7 @@ END FUNCTION
 
 ' set: das Produkt mit Zeitstempel; set_not_found: nur der Vermerk.
 SUB cacheMerken(barcode AS STRING, daten AS JSON_HANDLE)
+    IF NOT cacheAktiv() THEN RETURN
     DIM j AS JSON_HANDLE : j = cacheLaden()
     DIM e AS JSON_HANDLE : e = JSON_NEW_OBJECT()
     JSON_SET_JSON(e, "product_data", daten)
@@ -95,6 +102,7 @@ SUB cacheMerken(barcode AS STRING, daten AS JSON_HANDLE)
 END SUB
 
 SUB cacheMerkenNicht(barcode AS STRING)
+    IF NOT cacheAktiv() THEN RETURN
     DIM j AS JSON_HANDLE : j = cacheLaden()
     DIM e AS JSON_HANDLE : e = JSON_PARSE("{""product_data"": null, ""not_found"": true}")
     JSON_SET_STRING(e, "cached_at", cacheJetzt$())

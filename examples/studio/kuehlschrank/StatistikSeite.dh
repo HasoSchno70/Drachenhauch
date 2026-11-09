@@ -13,6 +13,8 @@ CLASS StatistikSeite EXTENDS StatistikSeite_Basis
     DIM hell AS BOOLEAN
 
     SUB Geoeffnet()
+        Self.hell = NOT einstellungJa("dark_mode", TRUE)
+        GUI_SET_TEXT(Self.knopfThema, IIF(Self.hell, "☀", "🌙"))
         ' Die Kuchen wie mit autopct: Anteil in Prozent im Segment, Namen daneben.
         Self.kategorien.Setzen("legende", "rechts")
         Self.kategorien.Setzen("werte", "innen")
@@ -54,20 +56,26 @@ CLASS StatistikSeite EXTENDS StatistikSeite_Basis
         Self.laden()
     END SUB
 
-    ' Wie toggle_theme: die ganze Oberfläche hell oder dunkel (nur für diesen
-    ' Lauf, die Python-App merkt es sich auch nicht).
+    ' Wie toggle_theme: die ganze Oberfläche hell oder dunkel. Die Python-App
+    ' vergaß es beim nächsten Start; hier ist es die Einstellung dark_mode,
+    ' dieselbe wie im Einstellungsfenster.
     SUB knopfThema_Klick()
-        Self.hell = NOT Self.hell
-        GUI_THEME_PRESET(IIF(Self.hell, "modern_light", "modern_dark"))
-        GUI_THEME_SET("accent", RGB(38, 166, 154))
+        DIM dunkel AS BOOLEAN : dunkel = NOT einstellungJa("dark_mode", TRUE)
+        einstellungSetzen("dark_mode", jsonJa$(dunkel))
+        themaSetzen(dunkel)
+        Self.hell = NOT dunkel
         GUI_SET_TEXT(Self.knopfThema, IIF(Self.hell, "☀", "🌙"))
         Self.laden()
     END SUB
 
-    ' Wie test_notification: eine Mitteilung des Systems.
+    ' Wie test_notification: eine Mitteilung des Systems (Modul
+    ' Benachrichtigungen). Nimmt das System sie nicht, sagt es das.
     SUB knopfMeldung_Klick()
-        NOTIFY("Test-Benachrichtigung", "Benachrichtigungen funktionieren! 🎉")
-        Meldung("Test-Benachrichtigung gesendet!", "✔ Erfolg")
+        IF meldungSenden(nachrichtNeu("Test-Benachrichtigung", "Benachrichtigungen funktionieren! 🎉", FALSE)) THEN
+            Meldung("Test-Benachrichtigung gesendet!", "✔ Erfolg")
+        ELSE
+            Meldung("Das System hat die Benachrichtigung nicht angenommen.", "Benachrichtigung")
+        END IF
     END SUB
 
     SUB knopfCacheLeeren_Klick()

@@ -65,6 +65,44 @@ FUNCTION einstellung$(schluessel AS STRING, vorgabe AS STRING) AS STRING
     RETURN v
 END FUNCTION
 
+' Eine Zahl -- was keine ist, gilt als die Vorgabe (nicht als 0: eine
+' Warnschwelle "kaputt" hätte sonst nichts mehr als bald gezählt).
 FUNCTION einstellungZahl(schluessel AS STRING, vorgabe AS INTEGER) AS INTEGER
-    RETURN INT(VAL(einstellung$(schluessel, STR$(vorgabe))))
+    DIM v AS STRING : v = TRIM$(einstellung$(schluessel, STR$(vorgabe)))
+    IF NOT REGEX_TEST(v, "^-?[0-9]+(\.[0-9]+)?$") THEN RETURN vorgabe
+    RETURN INT(VAL(v))
+END FUNCTION
+
+' true/false wie json.dumps; was sonst dasteht, gilt als die Vorgabe.
+FUNCTION einstellungJa(schluessel AS STRING, vorgabe AS BOOLEAN) AS BOOLEAN
+    DIM v AS STRING : v = LOWER$(TRIM$(einstellung$(schluessel, "")))
+    IF v = "true" THEN RETURN TRUE
+    IF v = "false" THEN RETURN FALSE
+    RETURN vorgabe
+END FUNCTION
+
+' Eine Einstellung schreiben -- wert ist schon JSON (wie save_all der
+' Python-App: json.dumps), für Text siehe jsonText$.
+SUB einstellungSetzen(schluessel AS STRING, wert AS STRING)
+    DB_EXEC(db, "INSERT OR REPLACE INTO app_settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)", schluessel, wert)
+END SUB
+
+' Ein Text als JSON-Wert ("Stück" -> "\"Stück\"").
+FUNCTION jsonText$(s AS STRING) AS STRING
+    DIM j AS JSON_HANDLE : j = JSON_NEW_OBJECT()
+    JSON_SET_STRING(j, "v", s)
+    DIM t AS STRING : t = JSON_STRINGIFY(j)
+    RETURN MID$(t, INSTR(t, ":") + 1, LEN(t) - INSTR(t, ":") - 2)
+END FUNCTION
+
+FUNCTION jsonJa$(b AS BOOLEAN) AS STRING
+    RETURN IIF(b, "true", "false")
+END FUNCTION
+
+' Die Uhrzeit als SS:MM. KUEHL_JETZT setzt eine andere (für Prüfungen der
+' Tageszusammenfassung).
+FUNCTION jetzt$() AS STRING
+    DIM j AS STRING : j = GETENV$("KUEHL_JETZT")
+    IF j <> "" THEN RETURN j
+    RETURN LEFT$(TIME$(), 5)
 END FUNCTION

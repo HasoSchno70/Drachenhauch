@@ -4,6 +4,8 @@
 ' in den Stufen davor: F5 im Studio, dann main.dh mit einer Probe statt der
 ' Bildschleife; Heute ist fest. Open Food Facts ist ein falscher Server auf
 ' diesem Rechner (_hilfen/off_server.dh) -- nie das echte.
+' Proben mit Netzverkehr bekommen 1500 Bilder und enden selbst (END): mit
+' fuenf endete studioBild() unter Last mitten im Warten auf die Antwort.
 ' Format: docs/werkzeuge.md, dhrt test.
 
 --- langsam
@@ -88,7 +90,7 @@ DIM log AS STRING : log = CWD$() + "/s.log"
 DIM aus AS STRING : aus = kF5(p, log)
 SETENV("KUEHL_HEUTE", "2026-11-08")
 DIM srv AS INTEGER : srv = kOffStarten(ARG$(3))
-PRINT "code "; kProbe(p, "probe.dh", "", 5)
+PRINT "code "; kProbe(p, "probe.dh", "", 1500)
 PRINT "anfragen "; kOffAnfragen$()
 PRINT "kennung "; INSTR(READALL(CWD$() + "/anfragen.txt"), "Kuehlschrank-App/1.0") >= 0
 kOffEnde(srv)
@@ -133,6 +135,7 @@ zeigen("4004 cache", offAusCache("4004"))
 DIM n AS INTEGER, g AS INTEGER, ng AS INTEGER
 (n, g, ng) = cacheZahlen()
 PRINT "cache "; n; " "; g; " "; ng; " | 4001 am "; LEFT$(JSON_GET_STRING(JSON_PARSE(READALL(cachePfad$())), "4001.cached_at"), 11)
+END
 --- erwartet
 4001 vorher NIL
 4001 netz gefunden TRUE cache FALSE | Vollmilch 3,5 % | Weidemilch | Milchprodukte, Milch | 1 l | b | en:milk | bild /bild.png | 

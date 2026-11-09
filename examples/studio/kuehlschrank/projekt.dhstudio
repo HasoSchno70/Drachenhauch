@@ -136,6 +136,21 @@
       "code": "Spoonacular.dh"
     },
     {
+      "art": "klasse",
+      "name": "Einstellungen",
+      "code": "Einstellungen.dh"
+    },
+    {
+      "art": "klasse",
+      "name": "Nachricht",
+      "code": "Nachricht.dh"
+    },
+    {
+      "art": "modul",
+      "name": "Benachrichtigungen",
+      "code": "Benachrichtigungen.dh"
+    },
+    {
       "art": "control",
       "name": "BestandSeite",
       "code": "BestandSeite.dh",
@@ -194,6 +209,12 @@
       "name": "KatalogFenster",
       "code": "KatalogFenster.dh",
       "layout": "KatalogFenster.dhform"
+    },
+    {
+      "art": "fenster",
+      "name": "EinstellungenFenster",
+      "code": "EinstellungenFenster.dh",
+      "layout": "EinstellungenFenster.dhform"
     },
     {
       "art": "fenster",

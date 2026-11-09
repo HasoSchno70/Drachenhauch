@@ -95,6 +95,12 @@ FUNCTION einheiten() AS ARRAY OF STRING
     RETURN aus
 END FUNCTION
 
+' Die Standard-Einheit aus den Einstellungen (wie AppConfig.DEFAULT_UNIT,
+' auch für Posten der Einkaufsliste ohne Einheit).
+FUNCTION standardEinheit$() AS STRING
+    RETURN einheitText$(einstellung$("default_unit", "Stück"))
+END FUNCTION
+
 FUNCTION maerkte() AS ARRAY OF STRING
     DIM aus AS ARRAY OF STRING : aus = bekannteMaerkte()
     DIM m AS STRING

@@ -29,7 +29,7 @@ CLASS ProduktFenster EXTENDS ProduktFenster_Basis
             Self.e = NEW Eintrag()
             Self.e.barcode = Self.barcode
             Self.e.menge = 1.0
-            Self.e.einheit = einstellung$("default_unit", "Stück")
+            Self.e.einheit = standardEinheit$()
             Self.e.kaufdatum = heute$()
             Self.e.ablauf = tagePlus$(einstellungZahl("default_expiry_days", 7))
             Self.eintragId = 0

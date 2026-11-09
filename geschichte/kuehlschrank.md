@@ -610,3 +610,85 @@ nach schärferen Proben: das Satzende lag im Testtext zufällig auf dem
 letzten Leerzeichen vor der Grenze, das zweite Fenster fand die Übersetzung
 im Speicher statt in der Datei, und eine englische Zutat sperrte das
 Importieren schon ohne die Prüfung der Texte.
+
+## Stufe 7, erster Teil: Einstellungen und Benachrichtigungen (2026-11-09)
+
+„Einstellungen“ (Werkzeugleiste, Extras, Strg+,) öffnet `EinstellungenFenster`
+(wie SettingsDialog) mit den Reitern Allgemein (dunkles Design,
+Auffrischen in Sekunden, Barcode-Cache, Standard-Einheit), Benachrichtigungen
+(an/aus, fünf Arten, Prüfintervall, tägliche Zusammenfassung mit Uhrzeit,
+Test-Benachrichtigung) und Ablaufdaten (Warnschwelle mit Beispieldatum,
+Standard-Haltbarkeit, Farbschema); Lagerorte, Supermärkte und Datenbank sind
+der zweite Teil. Die Klasse `Einstellungen` liest und schreibt `app_settings`
+mit denselben Schlüsseln und demselben JSON wie AppConfig (json.dumps), legt
+Unlesbares auf die Vorgabe und zu Großes auf die Grenze des Fensters.
+Gespeichert gilt alles sofort: Takt des Auffrischens und Prüfens, Prüfen an
+oder aus, Thema, Standard-Einheit (auch für Posten der Einkaufsliste ohne
+Einheit, wie dort), Warnschwelle. Das Modul `Benachrichtigungen` (wie
+ExpiryNotifier, Klasse `Nachricht`) meldet Abgelaufenes, was heute, morgen
+und bald abläuft, und was unter der Mindestmenge liegt -- jedes Produkt
+einmal je Art, „bald“ einmal am Tag --, dazu die tägliche Übersicht. Es
+sendet mit `NOTIFY`; nimmt das System sie nicht, zeigt das Hauptfenster sie
+als Toast, die letzte steht in der Statusleiste. Der Hauptfenster-Timer
+`erstpruefung` prüft fünf Sekunden nach dem Start, `pruefen` im Intervall,
+`zusammenfassung` sieht jede Minute nach der Uhrzeit. `KUEHL_MELDUNGEN`
+schreibt die Benachrichtigungen in eine Datei, `KUEHL_JETZT` setzt die
+Uhrzeit (für Prüfungen).
+
+**Abweichungen von der Python-App** (der Prüfer am Python-Code selbst
+nachgefahren, mit einer Attrappe der Datenbank): Der ExpiryNotifier las die
+Häkchen je Art nie -- „Bei abgelaufenen Produkten“ aus hieß trotzdem
+Meldungen über Abgelaufenes. Er prüfte nur einmal am Tag; das Prüfintervall
+tat danach nichts, und was am Nachmittag dazukam und heute abläuft, meldete
+niemand. Die Zusammenfassung nahm von der Uhrzeit nur die Stunde, ihr
+24-Stunden-Timer lief ab dem Start (also zur Startzeit), und nach 9 Uhr
+gestartet gab es heute keine; hier einmal am Tag ab der Uhrzeit, gemerkt in
+`daily_summary_last`. Benachrichtigungen ein- oder ausschalten wirkte erst
+nach einem Neustart. Dunkles Design, Sprache und Barcode-Cache standen im
+Fenster und wurden nie gelesen; hier wirken Design und Cache, die Sprache
+fehlt (es gab nur Deutsch). „Zurücksetzen“ meldete „Einstellungen
+zurückgesetzt!“, obwohl erst „Speichern“ sie schrieb -- „Abbrechen“ danach
+behielt die alten; hier sagt es das. Das Thema der Statistik vergaß sich beim
+nächsten Start; hier ist es dieselbe Einstellung. Namen stehen in der
+Reihenfolge des Ablaufs, jeder einmal (dort aus einer Menge, jedes Mal
+anders, und zwei Packungen Milch zählten bei „bald“ doppelt).
+
+**Funde:**
+
+34. **`GUI_SET_TEXT` wählte in einer Klappliste nichts** -- bei einer, in
+    die man nicht tippen kann, stand der Text nur im Widget: die Box zeigte
+    weiter die alte Auswahl (oder nichts), und `GUI_TEXT` lieferte den
+    gesetzten Text auch noch, nachdem der Nutzer etwas anderes gewählt hatte.
+    Die Standard-Einheit stand leer da. Jetzt wählt `GUI_SET_TEXT` den
+    Eintrag gleichen Namens (Groß/klein egal, sonst keinen) und `GUI_TEXT`
+    liefert die Auswahl (gui). Die Klapplisten im Produktdialog sind
+    bearbeitbar und waren nicht betroffen.
+35. **Enter schaltete ein Kästchen um, statt den Dialog abzuschicken.** Haken
+    anklicken, Enter -- der Haken war wieder da, gespeichert wurde nichts.
+    Die Regel stand so im Handbuch („ein Knopf oder Kästchen mit Fokus nimmt
+    Enter selbst“); unter Windows, macOS, in Qt (die Python-App) und im Web
+    schaltet die Leertaste, Enter drückt den Standard-Knopf. Jetzt auch hier,
+    für Kästchen, Schalter und Optionsfelder; ein Knopf mit Fokus nimmt Enter
+    weiter selbst (gui).
+
+**Eigene Fehler:** `einstellungZahl` machte aus einem unlesbaren Wert 0 --
+eine Warnschwelle „kaputt“ hätte nichts mehr als bald gezählt; jetzt gilt die
+Vorgabe. Eine Klasse `Meldung` hätte die Studio-Funktion `Meldung` (das
+Meldungsfenster) verdeckt -- Namen ohne Groß/klein --, darum heißt sie
+`Nachricht`.
+
+**Fallen:** `GUI_TIME$` liefert Sekunden mit („09:00:00“). Eine Werkzeugleiste
+verrät die Lage ihrer Knöpfe nicht -- die Klick-Probe öffnet die
+Einstellungen mit Strg+,. Der Open-Food-Facts-Fall aus Stufe 6 hatte dieselbe
+Falle wie die Rezeptsuche (fünf Bilder, die Antwort kam unter Last später)
+und fiel im Sammellauf; jetzt 1500 Bilder und `END`.
+
+Tests `tests/pruef/kuehlschrank/stufe7_einstellungen.dhtest` (6: Laden,
+Grenzen und Speichern wie json.dumps; die Arten mit Häkchen, einmal je
+Produkt, Neues später, Mindestmenge; Zusammenfassung mit Minuten, einmal am
+Tag; das Hauptfenster nach dem Speichern samt Pruef-Timer; echte Tasten und
+Klicks: Strg+, , Reiter, Haken, Enter, Zurücksetzen und ESC; Thema beim
+Start), je ein Fall in `gui_form_widgets` und `gui_dialoge_ausbau`.
+Gegenproben: vierundvierzig im Beispiel, vier in der gui -- jede fällt in
+ihrem Fall. Eine im Beispiel fiel erst mit einer zweiten Packung Käse:
+doppelte Namen fing sonst schon das Merken der Gemeldeten ab.

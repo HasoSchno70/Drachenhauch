@@ -1,0 +1,127 @@
+' Die Einstellungen -- wie SettingsDialog der Python-App, hier mit den
+' Reitern Allgemein, Benachrichtigungen und Ablaufdaten (Lagerorte,
+' Supermärkte und Datenbank folgen). Geladen und gespeichert wird über die
+' Klasse Einstellungen; „Zurücksetzen“ stellt die Vorgaben ins Fenster, erst
+' „Speichern“ übernimmt sie. Ohne Benachrichtigungen sind ihre Häkchen,
+' das Intervall und die Zusammenfassung gesperrt (_toggle_options), ohne
+' Zusammenfassung auch ihre Uhrzeit.
+'
+' Anders als dort: Dunkles Design und Barcode-Cache wirken (dort standen sie
+' im Fenster und wurden nie gelesen), die Sprache fehlt (dort gab es nur
+' Deutsch), die Uhrzeit behält ihre Minuten, und „Zurücksetzen“ sagt, dass
+' noch nichts gespeichert ist (dort hieß es „Einstellungen zurückgesetzt!“,
+' und „Abbrechen“ danach behielt die alten).
+CLASS EinstellungenFenster EXTENDS EinstellungenFenster_Basis
+    DIM gespeichert AS BOOLEAN
+
+    SUB Geoeffnet()
+        DIM e AS Einstellungen : e = einstellungen()
+        DIM u AS ARRAY OF STRING : u = einheiten()
+        IF ARRAY_INDEXOF(u, e.einheit) < 0 THEN ARRAY_PUSH(u, e.einheit)
+        GUI_SET_DROPDOWN(Self.einheitWahl, u)
+        Self.anzeigen(e)
+    END SUB
+
+    SUB anzeigen(e AS Einstellungen)
+        GUI_SET_CHECKED(Self.dunkelKasten, e.dunkel)
+        GUI_SET_VALUE(Self.auffrischenZahl, e.auffrischenS)
+        GUI_SET_CHECKED(Self.cacheKasten, e.cacheAn)
+        GUI_SET_TEXT(Self.einheitWahl, e.einheit)
+        GUI_SET_CHECKED(Self.meldungenKasten, e.meldungenAn)
+        GUI_SET_CHECKED(Self.abgelaufenKasten, e.beiAbgelaufen)
+        GUI_SET_CHECKED(Self.heuteKasten, e.beiHeute)
+        GUI_SET_CHECKED(Self.morgenKasten, e.beiMorgen)
+        GUI_SET_CHECKED(Self.baldKasten, e.beiBald)
+        GUI_SET_CHECKED(Self.minimumKasten, e.beiMinimum)
+        GUI_SET_VALUE(Self.pruefZahl, e.pruefMin)
+        GUI_SET_CHECKED(Self.tagesKasten, e.tagesAn)
+        GUI_SET_TIME(Self.tagesZeit, e.tagesZeit$())
+        GUI_SET_VALUE(Self.warnZahl, e.warnTage)
+        GUI_SET_VALUE(Self.haltbarZahl, e.haltbarTage)
+        Self.schalten()
+        Self.vorschau()
+    END SUB
+
+    ' Was im Fenster steht, als Einstellungen.
+    FUNCTION auslesen() AS Einstellungen
+        DIM e AS Einstellungen : e = NEW Einstellungen()
+        e.vorgaben()
+        e.dunkel = GUI_CHECKED(Self.dunkelKasten)
+        e.auffrischenS = grenzen(INT(GUI_VALUE(Self.auffrischenZahl)), 5, 300)
+        e.cacheAn = GUI_CHECKED(Self.cacheKasten)
+        IF TRIM$(GUI_TEXT(Self.einheitWahl)) <> "" THEN e.einheit = TRIM$(GUI_TEXT(Self.einheitWahl))
+        e.meldungenAn = GUI_CHECKED(Self.meldungenKasten)
+        e.beiAbgelaufen = GUI_CHECKED(Self.abgelaufenKasten)
+        e.beiHeute = GUI_CHECKED(Self.heuteKasten)
+        e.beiMorgen = GUI_CHECKED(Self.morgenKasten)
+        e.beiBald = GUI_CHECKED(Self.baldKasten)
+        e.beiMinimum = GUI_CHECKED(Self.minimumKasten)
+        e.pruefMin = grenzen(INT(GUI_VALUE(Self.pruefZahl)), 15, 1440)
+        e.tagesAn = GUI_CHECKED(Self.tagesKasten)
+        DIM z AS ARRAY OF STRING : z = SPLIT(GUI_TIME$(Self.tagesZeit), ":")
+        IF LEN(z) >= 2 THEN
+            e.tagesStunde = grenzen(INT(VAL(z[0])), 0, 23)
+            e.tagesMinute = grenzen(INT(VAL(z[1])), 0, 59)
+        END IF
+        e.warnTage = grenzen(INT(GUI_VALUE(Self.warnZahl)), 1, 14)
+        e.haltbarTage = grenzen(INT(GUI_VALUE(Self.haltbarZahl)), 1, 365)
+        RETURN e
+    END FUNCTION
+
+    ' Wie _toggle_options; die Uhrzeit hängt auch an der Zusammenfassung.
+    SUB schalten()
+        DIM an AS BOOLEAN : an = GUI_CHECKED(Self.meldungenKasten)
+        DIM w AS GUI_WIDGET
+        FOR EACH w IN [Self.abgelaufenKasten, Self.heuteKasten, Self.morgenKasten, Self.baldKasten, Self.minimumKasten, Self.pruefZahl, Self.tagesKasten]
+            GUI_SET_ENABLED(w, an)
+        NEXT
+        GUI_SET_ENABLED(Self.tagesZeit, an AND GUI_CHECKED(Self.tagesKasten))
+    END SUB
+
+    SUB meldungenKasten_Geaendert()
+        Self.schalten()
+    END SUB
+
+    SUB tagesKasten_Geaendert()
+        Self.schalten()
+    END SUB
+
+    ' Was mit der Schwelle als „bald“ gilt -- an einem Datum gezeigt.
+    SUB vorschau()
+        DIM n AS INTEGER : n = grenzen(INT(GUI_VALUE(Self.warnZahl)), 1, 14)
+        DIM bis AS STRING : bis = tagePlus$(n)
+        GUI_SET_TEXT(Self.warnBeispiel, "Bald ablaufend heißt: heute bis " + MID$(bis, 8, 2) + "." + MID$(bis, 5, 2) + "." + LEFT$(bis, 4) + " (" + STR$(n) + IIF(n = 1, " Tag", " Tage") + ").")
+    END SUB
+
+    SUB warnZahl_Geaendert()
+        Self.vorschau()
+    END SUB
+
+    SUB knopfTest_Klick()
+        IF meldungSenden(nachrichtNeu("🧪 Test-Benachrichtigung", "Dies ist ein Test der Kühlschrank-App Benachrichtigungen.", FALSE)) THEN
+            GUI_TOAST(Self.studioWin, "Test-Benachrichtigung gesendet.", "erfolg")
+        ELSE
+            GUI_TOAST(Self.studioWin, "Das System hat die Benachrichtigung nicht angenommen.", "warnung")
+        END IF
+    END SUB
+
+    SUB knopfZuruecksetzen_Klick()
+        IF Frage("Alle Einstellungen auf Standard zurücksetzen?", "Ja|Nein", "Zurücksetzen") <> 1 THEN RETURN
+        DIM e AS Einstellungen : e = NEW Einstellungen()
+        e.vorgaben()
+        Self.anzeigen(e)
+        GUI_TOAST(Self.studioWin, "Vorgaben eingesetzt -- „Speichern“ übernimmt sie.", "info")
+    END SUB
+
+    SUB knopfSpeichern_Klick()
+        DIM e AS Einstellungen : e = Self.auslesen()
+        e.speichern()
+        themaSetzen(e.dunkel)
+        Self.gespeichert = TRUE
+        Self.Zumachen()
+    END SUB
+
+    SUB knopfAbbrechen_Klick()
+        Self.Zumachen()
+    END SUB
+END CLASS

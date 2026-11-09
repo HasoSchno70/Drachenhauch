@@ -394,6 +394,24 @@
       "intervall": 30000,
       "aktiv": true,
       "wiederholen": true
+    },
+    {
+      "name": "pruefen",
+      "intervall": 3600000,
+      "aktiv": true,
+      "wiederholen": true
+    },
+    {
+      "name": "erstpruefung",
+      "intervall": 5000,
+      "aktiv": true,
+      "wiederholen": false
+    },
+    {
+      "name": "zusammenfassung",
+      "intervall": 60000,
+      "aktiv": true,
+      "wiederholen": true
     }
   ]
 }

@@ -5,10 +5,9 @@
 CLASS App EXTENDS StudioApp
 
     SUB Geoeffnet()
-        GUI_THEME_PRESET("modern_dark")
-        ' Das Teal der Python-App für Auswahl und Fokus.
-        GUI_THEME_SET("accent", RGB(38, 166, 154))
         dbOeffnen()
+        ' Hell oder dunkel nach den Einstellungen, mit dem Teal der Python-App.
+        themaSetzen(einstellungJa("dark_mode", TRUE))
     END SUB
 
     SUB Beenden()
