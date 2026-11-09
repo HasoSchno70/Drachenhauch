@@ -317,8 +317,11 @@ protokoll:
 === echt: einstellungen mit strg+komma, reiter, haken, enter speichert
 ' Strg+, (Menue Extras), Reiter Benachrichtigungen, Haken
 ' "Benachrichtigungen aktivieren" aus, Enter speichert (Standard-Knopf) --
-' danach steht der Pruef-Timer. Noch einmal auf, Zuruecksetzen (Frage: Enter),
-' ESC: die Vorgaben sind NICHT gespeichert.
+' danach steht der Pruef-Timer. Noch einmal auf, diesmal mit einem Klick auf
+' den Knopf der Werkzeugleiste (GUI_TOOLBAR_ITEM_X/_W), Zuruecksetzen
+' (Frage: Enter), ESC: die Vorgaben sind NICHT gespeichert. Ein drittes Mal
+' ueber die Werkzeugleiste, Haken wieder an, Enter -- erst das aendert den
+' Stand, und nur, wenn der Klick auf die Leiste das Fenster oeffnet.
 IMPORT "laeufer.dh"
 DIM p AS STRING : p = CWD$() + "/proj"
 kKopieren(ARG$(1), p)
@@ -341,13 +344,21 @@ slKlick(z(2), z(3))
 slWarten(10)
 slTaste(257)
 slWarten(20)
-slMit([341], 44)
+slKlick(z(6), z(7))
 slWarten(20)
 slKlick(z(4), z(5))
 slWarten(15)
 slTaste(257)
 slWarten(15)
 slTaste(256)
+slWarten(20)
+slKlick(z(6), z(7))
+slWarten(20)
+slKlick(z(0), z(1))
+slWarten(10)
+slKlick(z(2), z(3))
+slWarten(10)
+slTaste(257)
 slWarten(20)
 slAufnahmeSchreiben(p + "/_studio/klick.txt")
 PRINT "code "; kProbe(p, "klick.dh", "klick.txt", slBild + 20)
@@ -371,6 +382,14 @@ WHILE n < 4 AND studioBild()
     n = n + 1
 WEND
 DIM t AS INTEGER : t = GUI_METRIC_GET("title_h")
+' Der Knopf "Einstellungen" der Werkzeugleiste: seine Mitte; die Hoehe dort,
+' wo der Treffertest die Leiste meldet (ueber ihr liegt die Menueleiste).
+DIM wx AS INTEGER : wx = GUI_TOOLBAR_ITEM_X(f.werkzeuge, KNOPF_EINSTELLUNGEN) + GUI_TOOLBAR_ITEM_W(f.werkzeuge, KNOPF_EINSTELLUNGEN) \ 2
+DIM wy AS INTEGER : wy = -1
+DIM yy AS INTEGER
+FOR yy = 0 TO 120
+    IF wy < 0 AND GUI_HIT_TEST(wx, yy) = f.werkzeuge THEN wy = yy + 12
+NEXT
 DIM ef AS EinstellungenFenster : ef = NEW EinstellungenFenster()
 ef.Zeigen()
 DIM ex AS INTEGER : ex = GUI_WINDOW_GET_X(ef.Fenster())
@@ -379,7 +398,8 @@ DIM rx AS INTEGER, ry AS INTEGER, rw AS INTEGER, rh AS INTEGER
 (rx, ry, rw, rh) = GUI_TABCONTROL_ITEM_RECT(ef.reiter, 1)
 WRITEALL("lage.txt", STR$(rx + rw \ 2) + " " + STR$(ry + rh \ 2) + " " + _
     STR$(ex + GUI_GET_X(ef.meldungenKasten) + 8) + " " + STR$(ey + GUI_GET_Y(ef.meldungenKasten) + 8) + " " + _
-    STR$(ex + GUI_GET_X(ef.knopfZuruecksetzen) + GUI_GET_W(ef.knopfZuruecksetzen) \ 2) + " " + STR$(ey + GUI_GET_Y(ef.knopfZuruecksetzen) + GUI_GET_H(ef.knopfZuruecksetzen) \ 2))
+    STR$(ex + GUI_GET_X(ef.knopfZuruecksetzen) + GUI_GET_W(ef.knopfZuruecksetzen) \ 2) + " " + STR$(ey + GUI_GET_Y(ef.knopfZuruecksetzen) + GUI_GET_H(ef.knopfZuruecksetzen) \ 2) + " " + _
+    STR$(wx) + " " + STR$(wy))
 --- datei klick.dh
 IMPORT "../../daten.dh"
 FUNCTION stand$() AS STRING
@@ -394,7 +414,7 @@ WHILE studioBild()
 WEND
 PRINT JOIN$(folge, " -> ")
 --- erwartet
-an true schwelle 10 pruefen TRUE -> an false schwelle 10 pruefen FALSE
+an true schwelle 10 pruefen TRUE -> an false schwelle 10 pruefen FALSE -> an true schwelle 10 pruefen TRUE
 code 0
 
 === start: thema aus der einstellung

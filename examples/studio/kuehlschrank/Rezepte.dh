@@ -307,8 +307,9 @@ SUB rezeptLoeschen(id AS INTEGER, name AS STRING)
         verlauf.merken("recipe_ingredients", zid)
     NEXT
     verlauf.merken("recipes", id)
-    ' Die Zutaten ausdrücklich: eine Datei, die das Studio angelegt hat, kennt
-    ' den Verweis nur als Spalte (kein ON DELETE CASCADE wie die Python-Datei).
+    ' Die Zutaten ausdrücklich: eine Datei, die ein älteres Studio angelegt
+    ' hat, kennt den Verweis nur als Spalte; heute hat sie ON DELETE CASCADE
+    ' wie die Python-Datei (Daten.dhdb, beimLoeschen).
     DB_BEGIN(db)
     DB_EXEC(db, "DELETE FROM recipe_ingredients WHERE recipe_id = ?", id)
     DB_EXEC(db, "DELETE FROM recipes WHERE id = ?", id)

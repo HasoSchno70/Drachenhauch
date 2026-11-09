@@ -32,6 +32,7 @@ CLASS AbschlussFenster EXTENDS AbschlussFenster_Basis
         GUI_TABLE_COL_EDIT(Self.tabelle, SP_A_MENGE, TRUE)
         GUI_TABLE_COL_CHOICES(Self.tabelle, SP_A_EINHEIT, einheiten())
         GUI_TABLE_COL_EDIT(Self.tabelle, SP_A_EINHEIT, TRUE)
+        GUI_TABLE_COL_TYPE(Self.tabelle, SP_A_MHD, "datum")
         GUI_TABLE_COL_EDIT(Self.tabelle, SP_A_MHD, TRUE)
         GUI_TABLE_COL_CHOICES(Self.tabelle, SP_A_ORT, lagerorte())
         GUI_TABLE_COL_EDIT(Self.tabelle, SP_A_ORT, TRUE)

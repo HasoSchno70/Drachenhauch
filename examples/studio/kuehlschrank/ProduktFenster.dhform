@@ -438,7 +438,7 @@
       "name": "einheitListe"
     },
     {
-      "kind": "textinput",
+      "kind": "datepicker",
       "x": 140,
       "y": 312,
       "w": 120,
@@ -449,17 +449,14 @@
       "min": 0.0,
       "max": 1.0,
       "checked": false,
-      "placeholder": "JJJJ-MM-TT",
+      "placeholder": "",
       "visible": true,
-      "rules": [
-        {
-          "art": "datum"
-        }
-      ],
+      "date": "2026-11-09",
+      "kompakt": true,
       "name": "kaufFeld"
     },
     {
-      "kind": "textinput",
+      "kind": "datepicker",
       "x": 140,
       "y": 348,
       "w": 120,
@@ -470,13 +467,10 @@
       "min": 0.0,
       "max": 1.0,
       "checked": false,
-      "placeholder": "JJJJ-MM-TT",
+      "placeholder": "",
       "visible": true,
-      "rules": [
-        {
-          "art": "datum"
-        }
-      ],
+      "date": "2026-11-09",
+      "kompakt": true,
       "name": "ablaufFeld"
     },
     {

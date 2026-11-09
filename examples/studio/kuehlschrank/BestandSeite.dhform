@@ -292,5 +292,37 @@
   "default_button": -1,
   "cancel_button": -1,
   "name": "BestandSeite",
-  "studio_ereignisse": "Geaendert; Bearbeiten; Export; Mindestmenge"
+  "studio_ereignisse": "Geaendert; Bearbeiten; Export; Mindestmenge",
+  "kontextmenues": [
+    {
+      "name": "kontext",
+      "widget": "tabelle",
+      "items": [
+        {
+          "label": "Bearbeiten …",
+          "name": "miBearbeiten"
+        },
+        {
+          "label": "Mindestmenge setzen …",
+          "name": "miMindestmenge"
+        },
+        {
+          "label": "",
+          "separator": true
+        },
+        {
+          "label": "Verbraucht",
+          "name": "miVerbraucht"
+        },
+        {
+          "label": "Abgelaufen",
+          "name": "miAbgelaufen"
+        },
+        {
+          "label": "Löschen",
+          "name": "miLoeschen"
+        }
+      ]
+    }
+  ]
 }

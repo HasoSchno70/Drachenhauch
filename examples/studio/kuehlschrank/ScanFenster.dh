@@ -38,6 +38,8 @@ CLASS ScanFenster EXTENDS ScanFenster_Basis
         GUI_TABLE_COL_EDIT(Self.tabelle, SP_S_NAME, TRUE)
         GUI_TABLE_COL_TYPE(Self.tabelle, SP_S_MENGE, "zahl")
         GUI_TABLE_COL_EDIT(Self.tabelle, SP_S_MENGE, TRUE)
+        ' Das MHD je Zeile wie QDateEdit: bearbeiten klappt den Monat auf.
+        GUI_TABLE_COL_TYPE(Self.tabelle, SP_S_MHD, "datum")
         GUI_TABLE_COL_EDIT(Self.tabelle, SP_S_MHD, TRUE)
         GUI_TABLE_COL_CHOICES(Self.tabelle, SP_S_ORT, Self.orte)
         GUI_TABLE_COL_EDIT(Self.tabelle, SP_S_ORT, TRUE)

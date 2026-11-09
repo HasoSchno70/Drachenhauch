@@ -205,7 +205,8 @@
           "eindeutig": false,
           "vorgabe": "",
           "sqlvorgabe": "",
-          "verweis": "products"
+          "verweis": "products",
+          "beimLoeschen": "loeschen"
         },
         {
           "name": "quantity",
@@ -439,7 +440,8 @@
           "eindeutig": false,
           "vorgabe": "",
           "sqlvorgabe": "",
-          "verweis": "recipes"
+          "verweis": "recipes",
+          "beimLoeschen": "loeschen"
         },
         {
           "name": "product_id",
@@ -447,7 +449,8 @@
           "pflicht": false,
           "eindeutig": false,
           "vorgabe": "",
-          "verweis": "products"
+          "verweis": "products",
+          "beimLoeschen": "leeren"
         },
         {
           "name": "product_name",
@@ -611,7 +614,8 @@
           "pflicht": false,
           "eindeutig": false,
           "vorgabe": "",
-          "verweis": "products"
+          "verweis": "products",
+          "beimLoeschen": "leeren"
         },
         {
           "name": "product_name",
@@ -944,7 +948,8 @@
           "eindeutig": false,
           "vorgabe": "",
           "sqlvorgabe": "",
-          "verweis": "products"
+          "verweis": "products",
+          "beimLoeschen": "loeschen"
         },
         {
           "name": "store_name",

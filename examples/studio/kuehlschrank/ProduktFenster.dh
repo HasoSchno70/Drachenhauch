@@ -6,6 +6,8 @@
 ' Name, Marke, Kategorie, Notizen und das Bild -- mit Barcode geöffnet
 ' gleich zu Anfang, wie die Python-App.
 CLASS ProduktFenster EXTENDS ProduktFenster_Basis
+    ' Ein leeres Kaufdatum bleibt leer, bis man das Datumsfeld anfasst.
+    DIM kaufAngefasst AS BOOLEAN
     DIM eintragId AS INTEGER
     DIM barcode AS STRING
     DIM gesichert AS BOOLEAN
@@ -45,8 +47,12 @@ CLASS ProduktFenster EXTENDS ProduktFenster_Basis
         GUI_SET_TEXT(Self.bereichFeld, Self.e.bereich)
         GUI_SET_VALUE(Self.mengeFeld, Self.e.menge)
         GUI_SET_TEXT(Self.einheitListe, einheitText$(Self.e.einheit))
-        GUI_SET_TEXT(Self.kaufFeld, Self.e.kaufdatum)
-        GUI_SET_TEXT(Self.ablaufFeld, Self.e.ablauf)
+        ' Datumsfelder (wie QDateEdit): sie haben immer ein Datum. Ein leeres
+        ' Kaufdatum bleibt leer, solange man das Feld nicht anfasst; ein
+        ' fehlendes Ablaufdatum beginnt bei der Standard-Haltbarkeit.
+        IF datumOk(Self.e.kaufdatum, FALSE) THEN GUI_SET_DATE(Self.kaufFeld, Self.e.kaufdatum)
+        Self.kaufAngefasst = FALSE
+        GUI_SET_DATE(Self.ablaufFeld, IIF(datumOk(Self.e.ablauf, FALSE), Self.e.ablauf, tagePlus$(einstellungZahl("default_expiry_days", 7))))
         GUI_SET_TEXT(Self.marktListe, Self.e.markt)
         GUI_SET_TEXT(Self.notizenFeld, Self.e.notizen)
         GUI_SET_CHECKED(Self.minKasten, Self.e.minMenge > 0)
@@ -168,24 +174,28 @@ CLASS ProduktFenster EXTENDS ProduktFenster_Basis
     END SUB
 
     ' Haltbarkeit in Tagen ab heute.
+    SUB kaufFeld_Geaendert()
+        Self.kaufAngefasst = TRUE
+    END SUB
+
     SUB plus3_Klick()
-        GUI_SET_TEXT(Self.ablaufFeld, tagePlus$(3))
+        GUI_SET_DATE(Self.ablaufFeld, tagePlus$(3))
     END SUB
 
     SUB plus7_Klick()
-        GUI_SET_TEXT(Self.ablaufFeld, tagePlus$(7))
+        GUI_SET_DATE(Self.ablaufFeld, tagePlus$(7))
     END SUB
 
     SUB plus14_Klick()
-        GUI_SET_TEXT(Self.ablaufFeld, tagePlus$(14))
+        GUI_SET_DATE(Self.ablaufFeld, tagePlus$(14))
     END SUB
 
     SUB plus30_Klick()
-        GUI_SET_TEXT(Self.ablaufFeld, tagePlus$(30))
+        GUI_SET_DATE(Self.ablaufFeld, tagePlus$(30))
     END SUB
 
     ' Was die Python-App prüft (InputValidator): Name, Kategorie, Lagerort,
-    ' Menge > 0, Datumsangaben JJJJ-MM-TT. "" = alles in Ordnung.
+    ' Menge > 0 (die Datumsfelder haben immer ein Datum). "" = alles in Ordnung.
     FUNCTION pruefen$() AS STRING
         DIM name AS STRING : name = TRIM$(GUI_TEXT(Self.nameFeld))
         IF name = "" THEN RETURN tr$("Der Name fehlt.")
@@ -193,8 +203,6 @@ CLASS ProduktFenster EXTENDS ProduktFenster_Basis
         IF TRIM$(GUI_TEXT(Self.kategorieListe)) = "" THEN RETURN tr$("Bitte eine Kategorie wählen.")
         IF TRIM$(GUI_TEXT(Self.lagerortListe)) = "" THEN RETURN tr$("Bitte einen Lagerort wählen.")
         IF GUI_VALUE(Self.mengeFeld) <= 0 THEN RETURN tr$("Die Menge muss größer als 0 sein.")
-        IF NOT datumOk(TRIM$(GUI_TEXT(Self.kaufFeld)), TRUE) THEN RETURN tr$("Das Kaufdatum braucht die Form JJJJ-MM-TT.")
-        IF NOT datumOk(TRIM$(GUI_TEXT(Self.ablaufFeld)), FALSE) THEN RETURN tr$("Das Ablaufdatum braucht die Form JJJJ-MM-TT.")
         RETURN ""
     END FUNCTION
 
@@ -210,8 +218,8 @@ CLASS ProduktFenster EXTENDS ProduktFenster_Basis
         Self.e.bereich = TRIM$(GUI_TEXT(Self.bereichFeld))
         Self.e.menge = GUI_VALUE(Self.mengeFeld)
         Self.e.einheit = TRIM$(GUI_TEXT(Self.einheitListe))
-        Self.e.kaufdatum = TRIM$(GUI_TEXT(Self.kaufFeld))
-        Self.e.ablauf = TRIM$(GUI_TEXT(Self.ablaufFeld))
+        IF Self.e.kaufdatum <> "" OR Self.kaufAngefasst THEN Self.e.kaufdatum = GUI_DATE(Self.kaufFeld)
+        Self.e.ablauf = GUI_DATE(Self.ablaufFeld)
         Self.e.markt = TRIM$(GUI_TEXT(Self.marktListe))
         Self.e.notizen = TRIM$(GUI_TEXT(Self.notizenFeld))
         IF Self.eintragId = 0 THEN

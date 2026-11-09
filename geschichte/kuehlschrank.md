@@ -849,3 +849,82 @@ Gegenproben: zehn im Beispiel, neunzehn im Studio, zwei in der Laufzeit, eine
 in der gui (der Fall fiel gegen den Bau davor) -- jede fällt. Die für das
 Auslesen der Klappliste überlebte zuerst: die Probe wählte „Deutsch“, und
 das war auch die Vorgabe; jetzt wählt sie „English“.
+
+## Nachtrag: die offenen Punkte (2026-11-09)
+
+Fünf Stellen der Stufen 1 bis 7 standen als „offen“ oder als Falle da. Jetzt
+sind sie gebaut und im Beispiel benutzt.
+
+- **Datumsfeld** (Stufe 1, 6): Kauf- und Ablaufdatum im Produktfenster sind
+  `GUI_DATEFIELD`, das MHD je Zeile im Stapelscan und beim Einkauf
+  abschließen ist eine Datumsspalte -- wie QDateEdit mit Kalender in der
+  Python-App. Ein leeres Kaufdatum bleibt leer, bis man das Feld anfasst
+  (die Python-App setzte immer eins).
+- **Kontextmenü im Menü-Editor** (Stufe 1): das Kontextmenü des Bestands
+  steht im Layout von BestandSeite, seine Einträge haben `_Aktion` wie ein
+  Menü; geprüft mit einem echten Rechtsklick.
+- **Kürzel ohne Menü** (Stufe 6): Strg+S im Barcode-Feld des Stapelscans
+  speichert.
+- **Fremdschlüssel** (Stufe 4): das Datenbank-Element trägt `ON DELETE` aus
+  der Python-Datei; eine neue Datei hat ihre Fremdschlüssel. Die Zutaten
+  löscht `rezeptLoeschen` weiter selbst (eine ältere Datei kennt sie nicht).
+- **Werkzeugleiste** (Stufe 7): die Falle war keine -- `GUI_TOOLBAR_ITEM_X`
+  und `_W` gibt es seit dem Befehlsverzeichnis (#188). Die Klick-Probe der
+  Einstellungen klickt jetzt den Knopf der Leiste. Dabei fiel auf, dass sie
+  das zweite Öffnen nie prüfte (Zurücksetzen mit ESC ändert nichts); jetzt
+  öffnet ein dritter Klick und setzt den Haken wieder.
+
+**Funde:**
+
+41. **Ein Fenster ohne Menüleiste hatte keine Kürzel.** `Taste` kam nur an,
+    wenn kein Eingabefeld den Fokus hatte -- Strg+S im Barcode-Feld tat
+    nichts. Jetzt kommt ein Kürzel (F-Taste, Strg oder Alt dazu) auch aus
+    einem Eingabefeld an, außer das Feld braucht es selbst (Strg+A/C/V/X/Z/Y,
+    Pfeile, Pos1, Ende, Rück, Entf) oder es ist AltGr (Strg+Alt: @, €) --
+    Studio-Laufzeit, `studioKuerzelTaste`.
+42. **Das Datenbank-Element kannte keinen Fremdschlüssel.** Ein Verweis war
+    nur eine Spalte. Jetzt sagt „Beim Löschen“ (verbieten, mitlöschen,
+    leeren), was mit einer Zeile geschieht, deren Ziel gelöscht wird; der
+    Abgleich baut die Tabelle um, Übernehmen liest `ON DELETE` aus der Datei,
+    ein Aufbau ohne das Feld bleibt, wie er ist (Studio).
+43. **Der Umbau einer Tabelle löschte die Zeilen, die auf sie zeigten.** dhrt
+    baut SQLite mit `SQLITE_DEFAULT_FOREIGN_KEYS` -- die Fremdschlüssel sind
+    an, und `DROP TABLE` im Umbau nahm über `ON DELETE CASCADE` alle Kinder
+    mit. Bei der übernommenen Datei der Python-App hätte eine geänderte Spalte
+    in `products` den ganzen Bestand geleert. Jetzt schaltet der Abgleich sie
+    vor seiner Transaktion aus (Studio).
+44. **Kontextmenüs entstanden nur im Code.** Der Menü-Editor legt sie jetzt
+    an -- an ein Widget oder das Fenster, auch in einem eigenen Control --,
+    der erzeugte Code baut sie mit `GUI_CONTEXT`/`GUI_CONTEXT_WIDGET` (Studio).
+45. **Es gab kein Datumsfeld zum Aufklappen.** Neu `GUI_DATEFIELD` (das
+    Datum im Feld, ein Klick, Leertaste, F4 oder Alt+Ab klappt den Monat
+    auf, ESC nur zu, Enter gilt zugeklappt dem Formular) und die
+    Tabellenspalte `"datum"` (bearbeiten klappt den Monat unter der Zelle
+    auf); im Studio der Baustein „Datumsfeld“ (gui).
+46. **Ein Klick ins Monatsgitter zählte ab Montag.** Gezeichnet wurde ab dem
+    Wochenbeginn -- mit `wochenbeginn` 6 (Sonntag) traf ein Klick auf den 20.
+    den 14. Klick und Zeichnen rechnen jetzt gleich (`dp_rechne`, gui).
+
+**Fallen:** Der letzte Klick einer Aufnahme ohne Loslassen kam im Prüflauf
+nicht an (im Fall-Läufer schon) -- mit Loslassen geht es. `ADD COLUMN ...
+REFERENCES` verweigert SQLite bei eingeschalteten Fremdschlüsseln mit einer
+Vorgabe ungleich NULL; das gebaute Programm ergänzt eine Spalte darum ohne
+Fremdschlüssel. Eine Probe, die
+`studioLauf` ersetzt, braucht dessen `SETFPS(60)`. Ein Datumsfeld liefert
+sein Datum über `GUI_DATE`, nicht `GUI_TEXT`. Eine Spalte `"datum"` ist erst
+mit `GUI_TABLE_COL_EDIT` bearbeitbar, wie jede andere. Die laufende
+Zellbearbeitung übernimmt JEDEN Klick daneben -- der aufgeklappte Monat muss
+vor ihr an die Reihe. Die Gegenprobe für das sofortige Übernehmen der Wahl
+„An“ im Menü-Editor überlebt: die Wahl wird ohnehin beim nächsten Klick und
+mit OK übernommen; das sofortige frischt nur den Baum auf.
+
+Tests: `tests/pruef/gui/gui_datumsfeld.dhtest` (5),
+`tests/pruef/studio/werkzeug_studio_kuerzel.dhtest` (1, echte Tasten),
+`werkzeug_studio_kontext.dhtest` (2), ein Fall in
+`werkzeug_studio_datenbank3.dhtest` und dort der Gitter-Fall erweitert, in
+`stufe1_vorrat.dhtest` der echte Rechtsklick und die Datumsfelder, in
+`stufe7_einstellungen.dhtest` der Klick auf die Werkzeugleiste.
+Gegenproben: sieben in der gui (je ein Bau), fünf für die Kürzel, zehn für
+die Fremdschlüssel, sechs für die Kontextmenüs im Studio, zwei für den
+Rechtsklick im Bestand, zwei für die Werkzeugleiste -- alle fallen bis auf
+die eine oben.

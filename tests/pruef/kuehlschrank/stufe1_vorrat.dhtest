@@ -133,15 +133,20 @@ PRINT "zurueck "; stand$(); " | tabelle "; GUI_TABLE_ROW_COUNT(s.tabelle); " | "
 DIM pf AS ProduktFenster : pf = NEW ProduktFenster()
 pf.barcode = "4000400"
 pf.Zeigen()
-PRINT "neu "; GUI_TEXT(pf.titel); " | "; GUI_TEXT(pf.barcodeFeld); " | "; GUI_TEXT(pf.kaufFeld); " | "; GUI_TEXT(pf.ablaufFeld); " | "; GUI_TEXT(pf.einheitListe)
+PRINT "neu "; GUI_TEXT(pf.titel); " | "; GUI_TEXT(pf.barcodeFeld); " | "; GUI_DATE(pf.kaufFeld); " | "; GUI_DATE(pf.ablaufFeld); " | "; GUI_TEXT(pf.einheitListe)
 GUI_SET_TEXT(pf.nameFeld, "Käse")
 GUI_SET_TEXT(pf.lagerortListe, "Kühlschrank")
 pf.knopfSichern_Klick()
 PRINT "fehlt "; GUI_TEXT(pf.fehlerText); " | "; pf.gesichert
 GUI_SET_TEXT(pf.kategorieListe, "Milchprodukte")
-GUI_SET_TEXT(pf.ablaufFeld, "2026-13-01")
-pf.knopfSichern_Klick()
-PRINT "datum "; GUI_TEXT(pf.fehlerText)
+' Kauf- und Ablaufdatum sind Datumsfelder: ein Tag, den es nicht gibt,
+' kommt gar nicht erst hinein.
+TRY
+    GUI_SET_DATE(pf.ablaufFeld, "2026-13-01")
+    PRINT "datum angenommen"
+CATCH fd
+    PRINT "datum "; INSTR(fd, "kein Datum") >= 0
+END TRY
 pf.plus14_Klick()
 GUI_SET_CHECKED(pf.minKasten, TRUE)
 GUI_SET_VALUE(pf.minFeld, 3)
@@ -158,6 +163,9 @@ PRINT "ohne kaese "; stand$()
 f.miWiederholen_Aktion()
 PRINT "kaese wieder "; stand$()
 ' Bearbeiten aendert Eintrag und Produkt in einem Schritt.
+' Ohne Kaufdatum bleibt es leer -- das Datumsfeld zeigt eins, gespeichert
+' wird es nur, wenn man es anfasst.
+DB_EXEC(db, "UPDATE inventory SET purchase_date = NULL WHERE id = 1")
 DIM be AS ProduktFenster : be = NEW ProduktFenster()
 be.eintragId = 1
 be.Zeigen()
@@ -165,7 +173,7 @@ PRINT "bearbeiten "; GUI_TEXT(be.titel); " | "; GUI_TEXT(be.nameFeld); " | "; GU
 GUI_SET_TEXT(be.nameFeld, "Vollmilch")
 GUI_SET_TEXT(be.marktListe, "EDEKA")
 be.knopfSichern_Klick()
-PRINT "geaendert "; stand$(); " | markt "; eintragLaden(1).markt
+PRINT "geaendert "; stand$(); " | markt "; eintragLaden(1).markt; " | kauf ["; eintragLaden(1).kaufdatum; "]"
 f.miRueckgaengig_Aktion()
 PRINT "zurueck "; stand$(); " | markt ["; eintragLaden(1).markt; "]"
 f.miExport_Aktion()
@@ -178,14 +186,14 @@ entnommen - | verlauf 1 | produkte 1 | tabelle 0
 zurueck 1:Milch:1.0 | verlauf 0 | produkte 1 | tabelle 1 | 1 Liter
 neu Produkt hinzufügen | 4000400 | 2026-11-08 | 2026-11-15 | Stück
 fehlt Bitte eine Kategorie wählen. | FALSE
-datum Das Ablaufdatum braucht die Form JJJJ-MM-TT.
+datum TRUE
 gesichert TRUE | 1:Milch:1.0 2:Käse:1.0 | verlauf 0 | produkte 2
 kaese 4000400 3.0 Stück 2026-11-22
 tipp Mindestmenge für Käse
 ohne kaese 1:Milch:1.0 | verlauf 0 | produkte 1
 kaese wieder 1:Milch:1.0 2:Käse:1.0 | verlauf 0 | produkte 2
 bearbeiten Eintrag bearbeiten | Milch | FALSE
-geaendert 1:Vollmilch:1.0 2:Käse:1.0 | verlauf 0 | produkte 2 | markt EDEKA
+geaendert 1:Vollmilch:1.0 2:Käse:1.0 | verlauf 0 | produkte 2 | markt EDEKA | kauf []
 zurueck 1:Milch:1.0 2:Käse:1.0 | verlauf 0 | produkte 2 | markt []
 code 0
 csv Produkt;Marke;Menge;Einheit;Lagerort;Bereich;Ablaufdatum
@@ -257,6 +265,75 @@ PRINT "kachel "; GUI_CARD_TEXT$(f.kachelGesamt); " status "; GUI_STATUSBAR_TEXT$
 --- erwartet
 mengen 2 Liter -> 1 Liter -> 2 Liter -> 3 Liter -> 2 Liter -> 3 Liter
 kachel 1 status Wiederholt: Milch: 3 Liter
+code 0
+
+=== echt: rechtsklick auf eine zeile, verbraucht im kontextmenue
+' Das Kontextmenue der Tabelle steht im Layout von BestandSeite (Menue-Editor
+' des Studios, "kontextmenues"), seine Eintraege rufen miVerbraucht_Aktion
+' & Co. Rechtsklick auf Zeile 1 (die Tabelle waehlt sie), Runter dreimal
+' (Bearbeiten, Mindestmenge, der Trenner zaehlt nicht, Verbraucht), Enter;
+' die Frage beantwortet Enter. Weg ist Milch, nicht Butter.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+kKopieren(ARG$(1), p)
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = kF5(p, log)
+SETENV("KUEHL_HEUTE", "2026-11-08")
+kProbe(p, "mess.dh", "", 8)
+DIM w AS ARRAY OF STRING : w = SPLIT(TRIM$(READALL(p + "/_studio/lage.txt")), " ")
+DIM tx AS INTEGER : tx = INT(VAL(w[0]))
+DIM ty AS INTEGER : ty = INT(VAL(w[1]))
+' Zeile 1 (die zweite), Spalte Produkt.
+DIM zy AS INTEGER : zy = ty + INT(VAL(w[2])) + INT(VAL(w[3])) + INT(VAL(w[3])) \ 2
+DIM zx AS INTEGER : zx = tx + 40
+slZeilen = [] : slBild = 0
+slHin(10, 10)
+slWarten(10)
+slHin(zx, zy)
+slHin(zx, zy)
+ARRAY_PUSH(slZeilen, "e " + STR$(slBild) + " 6 1 0 0 0")
+ARRAY_PUSH(slZeilen, "e " + STR$(slBild + 2) + " 5 1 0 0 0")
+slBild = slBild + 4
+slWarten(20)
+slTaste(264)
+slWarten(4)
+slTaste(264)
+slWarten(4)
+slTaste(264)
+slWarten(4)
+slTaste(257)
+slWarten(20)
+slTaste(257)
+slWarten(20)
+slAufnahmeSchreiben(p + "/_studio/klick.txt")
+PRINT "code "; kProbe(p, "klick.dh", "klick.txt", slBild + 20)
+--- argumente
+{sammlung}/../../../studio/studio.dh
+{sammlung}/../../../examples/studio/kuehlschrank
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/kuehlschrank.dh"
+slStudio = ARG$(0)
+--- datei mess.dh
+DIM f AS Hauptfenster : f = studioStartFenster
+DIM n AS INTEGER
+WHILE n < 4 AND studioBild()
+    n = n + 1
+WEND
+WRITEALL("lage.txt", STR$(GUI_GET_X(f.bestand.tabelle)) + " " + STR$(GUI_GET_Y(f.bestand.tabelle) + 26) + " " + STR$(INT(GUI_TABLE_GET(f.bestand.tabelle, "kopfhoehe"))) + " " + STR$(INT(GUI_TABLE_GET(f.bestand.tabelle, "zeilenhoehe"))))
+--- datei klick.dh
+DB_EXEC(db, "INSERT INTO products (name) VALUES ('Butter'), ('Milch')")
+DB_EXEC(db, "INSERT INTO inventory (product_id, quantity, unit, expiry_date) VALUES (1, 1, 'Stück', '2026-11-20'), (2, 2, 'Liter', '2026-11-25')")
+DIM f AS Hauptfenster : f = studioStartFenster
+f.geaendert()
+PRINT "vorher "; GUI_TABLE_GET_CELL(f.bestand.tabelle, 0, 0); ", "; GUI_TABLE_GET_CELL(f.bestand.tabelle, 1, 0)
+WHILE studioBild()
+WEND
+PRINT "nachher "; GUI_TABLE_ROW_COUNT(f.bestand.tabelle); " "; GUI_TABLE_GET_CELL(f.bestand.tabelle, 0, 0)
+PRINT "verlauf "; JOIN$(textListe("SELECT product_name || ' ' || reason FROM consumption_history"), ", ")
+--- erwartet
+vorher Butter, Milch
+nachher 1 Butter
+verlauf Milch consumed
 code 0
 
 === rueckgaengig in der datei der python-app laesst den bestand stehen

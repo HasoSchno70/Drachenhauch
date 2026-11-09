@@ -15,26 +15,11 @@ CLASS BestandSeite EXTENDS BestandSeite_Basis
     ' Was der Dialog zeigen soll: 0 = neu (mit neuBarcode), sonst die id.
     DIM bearbeitenId AS INTEGER
     DIM neuBarcode AS STRING
-    ' Das Kontextmenü der Tabelle.
-    DIM kontext AS INTEGER
-    DIM miBearbeiten AS INTEGER
-    DIM miMindestmenge AS INTEGER
-    DIM miVerbraucht AS INTEGER
-    DIM miAbgelaufen AS INTEGER
-    DIM miLoeschen AS INTEGER
     DIM mindestId AS INTEGER
     ' Je Zeile der Liste rechts das Ziel (Ort oder "Ort · Bereich").
     DIM ziele AS ARRAY OF STRING
 
     SUB Geoeffnet()
-        Self.kontext = GUI_CONTEXT(Self.studioWin)
-        GUI_CONTEXT_WIDGET(Self.kontext, Self.tabelle)
-        Self.miBearbeiten = GUI_MENU_ITEM(Self.kontext, tr$("Bearbeiten …"))
-        Self.miMindestmenge = GUI_MENU_ITEM(Self.kontext, tr$("Mindestmenge setzen …"))
-        GUI_MENU_SEPARATOR(Self.kontext)
-        Self.miVerbraucht = GUI_MENU_ITEM(Self.kontext, tr$("Verbraucht"))
-        Self.miAbgelaufen = GUI_MENU_ITEM(Self.kontext, tr$("Abgelaufen"))
-        Self.miLoeschen = GUI_MENU_ITEM(Self.kontext, tr$("Löschen"))
         Self.filterSetzen("")
     END SUB
 
@@ -214,19 +199,28 @@ CLASS BestandSeite EXTENDS BestandSeite_Basis
         Self.Ausloesen("Geaendert")
     END SUB
 
-    ' Das Kontextmenü: es gilt der Zeile, auf die rechts geklickt wurde
-    ' (die Tabelle wählt sie dabei).
-    SUB Takt()
-        IF GUI_CLICKED(Self.miBearbeiten) THEN Self.tabelle_Doppelklick()
-        IF GUI_CLICKED(Self.miMindestmenge) THEN
-            IF Self.gewaehlt() >= 0 THEN
-                Self.mindestId = Self.gewaehlt()
-                Self.Ausloesen("Mindestmenge")
-            END IF
-        END IF
-        IF GUI_CLICKED(Self.miVerbraucht) THEN Self.markieren("consumed")
-        IF GUI_CLICKED(Self.miAbgelaufen) THEN Self.markieren("expired")
-        IF GUI_CLICKED(Self.miLoeschen) THEN Self.markieren("deleted")
+    ' Das Kontextmenü der Tabelle (im Layout, Menü-Editor): es gilt der Zeile,
+    ' auf die rechts geklickt wurde -- die Tabelle wählt sie dabei.
+    SUB miBearbeiten_Aktion()
+        Self.tabelle_Doppelklick()
+    END SUB
+
+    SUB miMindestmenge_Aktion()
+        IF Self.gewaehlt() < 0 THEN RETURN
+        Self.mindestId = Self.gewaehlt()
+        Self.Ausloesen("Mindestmenge")
+    END SUB
+
+    SUB miVerbraucht_Aktion()
+        Self.markieren("consumed")
+    END SUB
+
+    SUB miAbgelaufen_Aktion()
+        Self.markieren("expired")
+    END SUB
+
+    SUB miLoeschen_Aktion()
+        Self.markieren("deleted")
     END SUB
 
     ' Frage, Schritt und Meldung je Grund als ganze Sätze (für die Übersetzung).

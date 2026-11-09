@@ -96,10 +96,8 @@ Cache	Cache
 Cache leeren	Clear cache
 Cache wurde geleert!	Cache cleared!
 Dadurch müssen Barcodes erneut online abgefragt werden.	Barcodes will then have to be looked up online again.
-Das Ablaufdatum braucht die Form JJJJ-MM-TT.	The best-before date must have the form YYYY-MM-DD.
 Das ist keine Datenbank-Datei.	This is not a database file.
 Das ist keine Sicherung der Kühlschrank-App (es fehlen products und inventory).	This is not a backup of the Fridge app (products and inventory are missing).
-Das Kaufdatum braucht die Form JJJJ-MM-TT.	The purchase date must have the form YYYY-MM-DD.
 Das System hat die Benachrichtigung nicht angenommen.	The system did not accept the notification.
 Das Tageskontingent von Spoonacular ist aufgebraucht (402) -- morgen geht es wieder.	The Spoonacular daily quota is used up (402) -- it will work again tomorrow.
 Datei	File
@@ -196,7 +194,6 @@ Im Bestand	In stock
 In den nächsten {0} Tagen	In the next {0} days
 Info	Info
 Ins Deutsche übersetzen	Translate into German
-JJJJ-MM-TT	YYYY-MM-DD
 Karotte	Carrot
 Kategorie	Category
 Kategorie *	Category *
