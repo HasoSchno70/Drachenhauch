@@ -76,6 +76,7 @@ const KEY_ESC: i64 = 27;
 const KEY_PAGEUP: i64 = 1073741899;
 const KEY_PAGEDOWN: i64 = 1073741902;
 const KEY_F2: i64 = 1073741883;
+const KEY_F4: i64 = 1073741885;
 const K_A: i64 = 97;
 const K_B: i64 = 98;
 const K_I: i64 = 105;
@@ -422,8 +423,11 @@ fn widget_nimmt_taste(w: &Widget, code: i64) -> bool {
     const BEWEGEN: [i64; 8] = [1073741903, 1073741904, 1073741905, 1073741906,
                                1073741898, 1073741901, 1073741899, 1073741902];
     let k = w.kind;
+    // Kaestchen, Schalter und Radio nehmen nur die Leertaste -- Enter gehoert
+    // dort dem Standard-Knopf (wie unter Windows, macOS, Qt und im Web).
+    if code == 32 && matches!(k, Kind::Checkbox | Kind::Radio | Kind::Toggle) { return true; }
     if AUSLOESEN.contains(&code) {
-        return matches!(k, Kind::Button | Kind::Card | Kind::Checkbox | Kind::Radio | Kind::Toggle
+        return matches!(k, Kind::Button | Kind::Card
             | Kind::Dropdown | Kind::ListBox | Kind::Tree | Kind::Table | Kind::Accordion
             | Kind::TabControl | Kind::DatePicker | Kind::ColorPicker | Kind::TimePicker);
     }
@@ -1333,6 +1337,7 @@ impl TableState {
             1 => s.parse::<i64>().is_ok(),
             2 => s.replace(',', ".").parse::<f64>().is_ok(),
             3 => self.col_wahl.get(c).map(|w| w.iter().any(|x| x == s)).unwrap_or(false),
+            4 => crate::kalender::parse(s).is_some(),
             _ => true,
         }
     }
@@ -1831,6 +1836,9 @@ struct TabCtlState {
     /// (`zu`, ein Bild lang), welcher Reiter zu soll.
     schliessbar: bool,
     zu: Option<usize>,
+    /// Gemessene Breite jeder Beschriftung (Schirmpunkte, `leisten_pass`);
+    /// leer oder 0 = noch nicht gemessen, dann gilt die Schaetzung.
+    breiten: Vec<i32>,
 }
 
 /// Akkordeon (Kind::Accordion): Abschnitte untereinander, jeder mit einem
@@ -3201,6 +3209,10 @@ pub struct Widget {
     datum_min: Option<[i32; 3]>,
     datum_max: Option<[i32; 3]>,
     wochenbeginn: i32,
+    /// Datumsfeld (GUI_DATEFIELD): ein Feld mit dem Datum, das den Monat zum
+    /// Waehlen aufklappt -- statt des Monatsgitters im Fenster (wie QDateEdit
+    /// mit Kalender).
+    kompakt: bool,
     // Ausrichtung des Textes: -1 = Vorgabe der Art (Beschriftung und Textfeld
     // links, Knopf mittig), 0 links, 1 mitte, 2 rechts.
     align: i8,
@@ -3282,6 +3294,11 @@ pub struct Window {
     /// das Fenster bekommt dort keine Eingabe, also muss nur GUI_HIT_TEST
     /// (und wo ein Fenster liegt) die Mauslage zurueckrechnen.
     zoom: f32,
+    /// Zuschnitt auf dem Schirm (GUI_WINDOW_CLIP), nur im Entwurfsmodus: was
+    /// draussen liegt, wird nicht gezeichnet und trifft keinen Klick -- das
+    /// Studio haelt so ein grosses Entwurfsfenster in seiner Mitte, statt es
+    /// ueber Inspektor und Ausgabe zu legen.
+    zuschnitt: Option<(i32, i32, i32, i32)>,
     chrome: bool,                    // Titelleiste + Rahmen + Buttons? (aus = randlos,
                                      //   z.B. wenn die Form das OS-Fenster fuellt)
     min_w: i32, min_h: i32,          // Groessen-Grenzen (0 = keine)
@@ -3598,6 +3615,17 @@ pub struct Gui {
     // das ist der ganze Sinn von "modal": die Frage muss beantwortet werden,
     // bevor daneben weitergeklickt wird.
     modal: Option<usize>,
+    // Was vorher modal war: ein Dialog ueber einem modalen Fenster (Frage im
+    // Detailfenster) gibt bei seiner Antwort das Fenster darunter wieder
+    // frei -- vorher fiel die Modalitaet ganz weg, und das Fenster verlor mit
+    // ihr Enter und ESC (Standard- und Abbrechen-Knopf).
+    modal_vorher: Vec<usize>,
+    // Der Tastaturfokus, den ein modales Fenster beim Aufgehen vorfand: es
+    // nimmt ihn einem Widget in einem anderen Fenster weg und gibt ihn beim
+    // Gehen zurueck. Vorher blieb er auf der Tabelle dahinter, und Enter
+    // oeffnete dort per "Doppelklick" das naechste Fenster, statt den
+    // Standard-Knopf des modalen zu druecken (Kuehlschrank-App, Rezepte).
+    modal_fokus: Vec<(usize, Option<(usize, usize)>)>,
     // Gezogener Farbwaehler: (Fenster, Widget, Zone). Zone ist 0 = Farbfeld,
     // 1 = Ton-Streifen, 2 = Deckkraft-Streifen. Gemerkt wird sie, weil man
     // beim Suchen einer Farbe fast immer ueber den Rand hinauszieht -- ohne
@@ -3620,6 +3648,12 @@ pub struct Gui {
     active_split: Option<(usize, usize)>,    // laufendes Splitter-Drag
     split_off: i32,                          // Griff-Versatz (Maus -> Balkenkante)
     open_dropdown: Option<(usize, usize)>,   // gerade aufgeklapptes Dropdown
+    /// Aufgeklappter Monat: (Fenster, Widget, Zelle). Zelle = FALSE: ein
+    /// Datumsfeld; TRUE: die Zelle einer Datumsspalte, die gerade bearbeitet
+    /// wird (das Widget ist die Tabelle).
+    datum_auf: Option<(usize, usize, bool)>,
+    /// Der Tag, der im aufgeklappten Monat markiert ist (noch nicht gewaehlt).
+    datum_zeigt: [i32; 3],
     // Bearbeitbare Klappliste: steht die Markierung, weil jemand mit den
     // Pfeilen dorthin ging? Nur dann nimmt Enter den Eintrag -- ein beim
     // Tippen VORGESCHLAGENER Eintrag ersetzte sonst, was man getippt hat.
@@ -3802,13 +3836,13 @@ impl Gui {
             schrift: None,
             windows: Vec::new(), z_order: Vec::new(),
             ta_zerlegung: std::cell::RefCell::new(HashMap::new()),
-            focus_window: None, focus_widget: None, modal: None, cp_drag: None,
+            focus_window: None, focus_widget: None, modal: None, modal_vorher: Vec::new(), modal_fokus: Vec::new(), cp_drag: None,
             drag_window: None, drag_dx: 0, drag_dy: 0,
             resize_window: None, resize_dx: 0, resize_dy: 0,
             skins: HashMap::new(),
             active_slider: None,
             active_knob: None, active_split: None, split_off: 0,
-            open_dropdown: None, dd_auf_t: 0.0, dd_auf_von: None, dd_mark: -1, dd_pfeil: false, dd_scroll: 0, dd_tipp: String::new(), dd_tipp_zeit: 0.0, schirm_h: 0, schirm_b: 0, listbar_zug: None, tabar_zug: None, liste_taste: false, spin_edit: None, active_table: None, table_press: None, press_origin: None,
+            open_dropdown: None, datum_auf: None, datum_zeigt: [2000, 1, 1], dd_auf_t: 0.0, dd_auf_von: None, dd_mark: -1, dd_pfeil: false, dd_scroll: 0, dd_tipp: String::new(), dd_tipp_zeit: 0.0, schirm_h: 0, schirm_b: 0, listbar_zug: None, tabar_zug: None, liste_taste: false, spin_edit: None, active_table: None, table_press: None, press_origin: None,
             drag: None, drop: None, cursors: true,
             editing_table: None, last_click: None, dbl_click: false,
             open_menu: None, context_open: None, kontext_neu: None, rs_menue: None, sub_chain: Vec::new(), tasten_mod: (false, false),
@@ -3927,7 +3961,7 @@ impl Gui {
         let idx = self.windows.len();
         self.windows.push(Window {
             title, name: String::new(), x, y, w, h, widgets: Vec::new(),
-            movable: true, closable: false, visible: true, entwurf: false, zoom: 1.0,
+            movable: true, closable: false, visible: true, entwurf: false, zoom: 1.0, zuschnitt: None,
             resizable: false, pruefung_live: false, form_stand: Vec::new(), form_db: Vec::new(), chrome: true, min_w: 0, min_h: 0, max_w: 0, max_h: 0,
             base_w: w, base_h: h,
             close_clicked: false, alive: true, dlg: false, answer: 0,
@@ -4028,7 +4062,7 @@ impl Gui {
             win.default_btn = erster as i32;
             win.cancel_btn = letzter as i32;
         }
-        self.modal = Some(wi);
+        self.modal_setzen(wi);
         self.bring_to_front(wi);
         self.focus_window = Some(wi);
         // Fokus auf das Eingabefeld, sonst auf den ersten Knopf: der Dialog
@@ -4057,13 +4091,52 @@ impl Gui {
         }
         if an {
             if self.windows[wi].dlg { return Err("GUI_WINDOW_MODAL: ein Dialog ist schon modal".into()); }
-            self.modal = Some(wi);
+            self.modal_setzen(wi);
             self.bring_to_front(wi);
             self.focus_window = Some(wi);
         } else if self.modal == Some(wi) {
-            self.modal = None;
+            self.modal_loesen();
+        } else {
+            self.modal_vorher.retain(|&m| m != wi);
         }
         Ok(())
+    }
+
+    /// Ein Fenster wird modal; was es vorher war, kommt auf den Stapel.
+    fn modal_setzen(&mut self, wi: usize) {
+        if let Some(m) = self.modal {
+            if m != wi { self.modal_vorher.push(m); }
+        }
+        self.modal_vorher.retain(|&m| m != wi);
+        self.modal = Some(wi);
+        if !self.modal_fokus.iter().any(|(m, _)| *m == wi) {
+            self.modal_fokus.push((wi, self.focus_widget));
+        }
+        if self.focus_widget.map_or(false, |(w, _)| w != wi) { self.focus_widget = None; }
+    }
+
+    /// Das modale Fenster geht: das vorige, das noch steht, ist es wieder,
+    /// und der Fokus, den das gehende vorfand, kommt zurueck.
+    fn modal_loesen(&mut self) {
+        let geht = self.modal.take();
+        while let Some(m) = self.modal_vorher.pop() {
+            if self.windows.get(m).map(|w| w.alive && w.visible).unwrap_or(false) {
+                self.modal = Some(m);
+                self.focus_window = Some(m);
+                break;
+            }
+        }
+        if let Some(g) = geht {
+            if let Some(k) = self.modal_fokus.iter().rposition(|(m, _)| *m == g) {
+                let (_, vorher) = self.modal_fokus.remove(k);
+                let lebt = vorher.map_or(false, |(w, i)| self.windows.get(w)
+                    .map_or(false, |win| win.alive && win.visible && win.widgets.get(i).map_or(false, |x| x.alive && x.visible)));
+                let erlaubt = vorher.map_or(false, |(w, _)| self.modal.map_or(true, |m| m == w));
+                if self.focus_widget.map_or(true, |(w, _)| w == g || !self.windows.get(w).map_or(false, |x| x.alive)) {
+                    self.focus_widget = if lebt && erlaubt { vorher } else { None };
+                }
+            }
+        }
     }
 
     /// Antwort eines Dialogs: 0 = noch offen, 1 = OK/Ja, 2 = Abbrechen/Nein.
@@ -4104,6 +4177,19 @@ impl Gui {
         let (j, m, t, _, _, _) = crate::builtins::local_datetime();
         wd.datum = [j as i32, m as i32, t as i32];
         self.add_widget(win, "GUI_DATEPICKER", wd)
+    }
+
+    /// Datumsfeld: zeigt das Datum und klappt beim Klick (Leertaste, F4,
+    /// Alt+Ab) den Monat auf -- ein Tag uebernimmt und klappt zu, ESC klappt
+    /// nur zu, die Pfeile verstellen es auch zugeklappt. Sonst ein
+    /// GUI_DATEPICKER: GUI_DATE, GUI_SET_DATE, GUI_DATE_RANGE gelten.
+    pub fn datefield(&mut self, win: i64, x: i32, y: i32, w: i32, h: i32)
+                     -> Result<i64, String> {
+        let mut wd = Self::blank(Kind::DatePicker, x, y, w.max(90), h.max(20));
+        let (j, m, t, _, _, _) = crate::builtins::local_datetime();
+        wd.datum = [j as i32, m as i32, t as i32];
+        wd.kompakt = true;
+        self.add_widget(win, "GUI_DATEFIELD", wd)
     }
 
     pub fn picked_color(&self, h: i64) -> Result<i64, String> {
@@ -4859,7 +4945,7 @@ impl Gui {
             tab_meldet: false, tab_treffer: false,
             spalten_start: (-1, -1),
             hsv: [0.0, 1.0, 1.0], alpha: 255, alpha_an: false,
-            datum: [2000, 1, 1], datum_min: None, datum_max: None, wochenbeginn: 0,
+            datum: [2000, 1, 1], datum_min: None, datum_max: None, wochenbeginn: 0, kompakt: false,
             zeit: [12, 0, 0], zeit_sek: false,
             step: 1.0,
             align: -1, wrap: false, passwort: false, nur_lesen: false, maxlaenge: 0, zahlen: 0, frei: false,
@@ -5028,8 +5114,36 @@ impl Gui {
     fn sicht_rect(&self, wi: usize) -> (i32, i32, i32, i32) {
         let w = &self.windows[wi];
         let z = self.zoom_von(wi);
-        if z == 1.0 { return (w.x, w.y, w.w, w.h); }
-        (w.x, w.y, (w.w as f32 * z).round() as i32, (w.h as f32 * z).round() as i32)
+        let r = if z == 1.0 { (w.x, w.y, w.w, w.h) }
+                else { (w.x, w.y, (w.w as f32 * z).round() as i32, (w.h as f32 * z).round() as i32) };
+        match self.zuschnitt_von(wi) {
+            Some(c) => Self::schnitt(r, c),
+            None => r,
+        }
+    }
+    fn zuschnitt_von(&self, wi: usize) -> Option<(i32, i32, i32, i32)> {
+        let w = &self.windows[wi];
+        if w.entwurf { w.zuschnitt } else { None }
+    }
+    /// Die Schnittmenge zweier Rechtecke (x, y, b, h); leer = Breite/Hoehe 0.
+    fn schnitt(a: (i32, i32, i32, i32), b: (i32, i32, i32, i32)) -> (i32, i32, i32, i32) {
+        let x = a.0.max(b.0);
+        let y = a.1.max(b.1);
+        let x2 = (a.0 + a.2).min(b.0 + b.2);
+        let y2 = (a.1 + a.3).min(b.1 + b.3);
+        (x, y, (x2 - x).max(0), (y2 - y).max(0))
+    }
+    /// GUI_WINDOW_CLIP(win, x, y, b, h): nur dieser Teil des Schirms zeigt das
+    /// Fenster (logische Punkte wie GUI_WINDOW_SET_BOUNDS); b oder h <= 0 hebt
+    /// den Zuschnitt auf. Wie GUI_WINDOW_ZOOM nur im Entwurfsmodus -- ein
+    /// Fenster, das Eingaben nimmt, bekaeme sonst Tasten fuer Felder, die
+    /// niemand sieht.
+    pub fn window_clip(&mut self, h: i64, x: i32, y: i32, b: i32, ht: i32) -> Result<(), String> {
+        let r = (self.sk(x), self.sk(y), self.sk(b), self.sk(ht));
+        let w = self.win_mut(h, "GUI_WINDOW_CLIP")?;
+        if !w.entwurf { return Err("GUI_WINDOW_CLIP: nur fuer ein Fenster im Entwurfsmodus (GUI_WINDOW_DESIGN)".into()); }
+        w.zuschnitt = if b > 0 && ht > 0 { Some(r) } else { None };
+        Ok(())
     }
     /// Ein Schirmpunkt in die (unvergroesserten) Koordinaten des Fensters.
     fn ins_fenster(&self, wi: usize, mx: i32, my: i32) -> (i32, i32) {
@@ -5042,12 +5156,16 @@ impl Gui {
     /// einen Faktor hat.
     fn draw_window_sicht(&self, g: &mut Graphics, wi: usize) {
         let z = self.zoom_von(wi);
+        let clip = self.zuschnitt_von(wi);
         if z != 1.0 && g.zoom_beginnen() {
             self.draw_window(g, wi);
             let w = &self.windows[wi];
-            g.zoom_beenden(w.x, w.y, w.w, w.h, z);
+            // Zugeschnitten wird erst beim Uebertragen auf den Schirm.
+            g.zoom_beenden(w.x, w.y, w.w, w.h, z, clip);
         } else {
+            if let Some((x, y, b, h)) = clip { g.push_clip(x, y, b, h); }
             self.draw_window(g, wi);
+            if clip.is_some() { g.pop_clip(); }
         }
     }
 

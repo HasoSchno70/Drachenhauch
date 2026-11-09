@@ -194,9 +194,29 @@ impl Gui {
 
     /// Klick im Datumswaehler: Pfeile blaettern, eine Zelle waehlt den Tag.
     pub(super) fn dp_press(&mut self, wi: usize, i: usize, mx: i32, my: i32) {
-        let (ax, ay, w, h) = self.abs_rect(wi, &self.windows[wi].widgets[i]);
+        if self.windows[wi].widgets[i].kompakt {
+            self.datum_umschalten(wi, i);
+            return;
+        }
+        let rect = self.abs_rect(wi, &self.windows[wi].widgets[i]);
+        let (wb, d) = (self.windows[wi].widgets[i].wochenbeginn, self.windows[wi].widgets[i].datum);
+        let (neu, _) = self.dp_rechne(wb, rect, d, mx, my);
+        // Ein gesperrtes Datum wird nicht uebernommen -- ein Klick, der die
+        // Marke auf einen Tag setzt, den der Waehler selbst ausschliesst,
+        // waere eine Luege.
+        if Self::dp_erlaubt(&self.windows[wi].widgets[i], neu) {
+            self.dp_setze(wi, i, neu);
+        }
+    }
+
+    /// Was ein Klick ins Monatsgitter `rect` bei Datum `d` bedeutet: das neue
+    /// Datum, und ob ein TAG getroffen wurde (sonst Blaettern im Kopf). Eine
+    /// Rechnung fuer den Waehler und den aufgeklappten Monat.
+    pub(super) fn dp_rechne(&self, wochenbeginn: i32, rect: (i32, i32, i32, i32), d: [i32; 3],
+                 mx: i32, my: i32) -> ([i32; 3], bool) {
+        let (ax, ay, w, h) = rect;
         let (kopf, zw, zh) = self.dp_geom(w, h);
-        let d = self.windows[wi].widgets[i].datum;
+        let mut tag = false;
         let mut neu = d;
         if my < ay + kopf {
             // Vier Bereiche, von aussen nach innen: Jahr zurueck, Monat
@@ -213,8 +233,12 @@ impl Gui {
                 let sp = ((mx - ax) / zw).clamp(0, 6);
                 let ze = (my - gy) / zh;
                 if (0..6).contains(&ze) {
-                    let erster = crate::kalender::wochentag(d[0], d[1], 1);
+                    // Wie das Zeichnen: die erste Spalte ist der Wochenbeginn.
+                    // Vorher zaehlte der Klick immer ab Montag -- mit "Woche ab
+                    // Sonntag" traf er den Tag daneben.
+                    let erster = (crate::kalender::wochentag(d[0], d[1], 1) - wochenbeginn).rem_euclid(7);
                     let nr = ze * 7 + sp - erster + 1;
+                    tag = true;
                     let im_monat = crate::kalender::tage_im_monat(d[0], d[1]);
                     // Ein Klick auf einen Nachbarmonats-Tag blaettert dorthin --
                     // das ist die Erwartung, nicht "passiert nichts".
@@ -232,12 +256,66 @@ impl Gui {
                 }
             }
         }
-        // Ein gesperrtes Datum wird nicht uebernommen -- ein Klick, der die
-        // Marke auf einen Tag setzt, den der Waehler selbst ausschliesst,
-        // waere eine Luege.
-        if Self::dp_erlaubt(&self.windows[wi].widgets[i], neu) {
+        (neu, tag)
+    }
+
+    // --- Aufgeklappter Monat (Datumsfeld, Datumsspalte) ------------------------
+
+    /// Woran der Monat haengt: das Datumsfeld oder die bearbeitete Zelle.
+    pub(super) fn datum_anker(&self) -> Option<(i32, i32, i32, i32)> {
+        let (wi, i, zelle) = self.datum_auf?;
+        let w = self.windows.get(wi)?.widgets.get(i)?;
+        if !self.windows[wi].alive || !self.windows[wi].visible || !w.alive || !w.visible { return None; }
+        if zelle { self.edit_cell_rect(wi, i) } else { Some(self.abs_rect(wi, w)) }
+    }
+
+    /// Lage des aufgeklappten Monats: unter dem Anker, oder darueber, wenn
+    /// unten kein Platz ist. EINE Quelle fuer Zeichnen und Klick.
+    pub(super) fn datum_geom(&self) -> Option<(i32, i32, i32, i32)> {
+        let (ax, ay, aw, ah) = self.datum_anker()?;
+        let pw = aw.max(self.sk(252));
+        let ph = self.sk(236);
+        let (sb, sh) = self.schirm();
+        let x = ax.min(sb - pw).max(0);
+        let y = if ay + ah + ph > sh && ay - ph >= 0 { ay - ph } else { ay + ah };
+        Some((x, y, pw, ph))
+    }
+
+    pub(super) fn datum_umschalten(&mut self, wi: usize, i: usize) {
+        if self.datum_auf == Some((wi, i, false)) {
+            self.datum_auf = None;
+        } else {
+            self.open_dropdown = None;
+            self.datum_auf = Some((wi, i, false));
+            self.datum_zeigt = self.windows[wi].widgets[i].datum;
+        }
+    }
+
+    /// Ein Tag ist gewaehlt: ins Feld (wenn erlaubt) bzw. in die Zelle.
+    pub(super) fn datum_waehlen(&mut self, neu: [i32; 3]) {
+        let Some((wi, i, zelle)) = self.datum_auf else { return };
+        if zelle {
+            if let Some(t) = self.windows[wi].widgets[i].tbl.as_mut() {
+                t.edit_text = crate::kalender::format(neu[0], neu[1], neu[2]);
+            }
+            self.datum_auf = None;
+            self.table_end_edit(wi, i, true);
+        } else if Self::dp_erlaubt(&self.windows[wi].widgets[i], neu) {
+            self.datum_auf = None;
             self.dp_setze(wi, i, neu);
         }
+    }
+
+    /// Ein Klick in den aufgeklappten Monat: blaettern oder waehlen. FALSE,
+    /// wenn er daneben ging.
+    pub(super) fn datum_klick(&mut self, mx: i32, my: i32) -> bool {
+        let Some(rect) = self.datum_geom() else { return false };
+        if !Self::in_rect(mx, my, rect) { return false; }
+        let Some((wi, i, zelle)) = self.datum_auf else { return false };
+        let wb = if zelle { 0 } else { self.windows[wi].widgets[i].wochenbeginn };
+        let (neu, tag) = self.dp_rechne(wb, rect, self.datum_zeigt, mx, my);
+        if tag { self.datum_waehlen(neu); } else { self.datum_zeigt = neu; }
+        true
     }
 
     pub(super) fn dp_monat(&self, d: [i32; 3], schritte: i32) -> [i32; 3] {
@@ -437,7 +515,7 @@ impl Gui {
                 }
             }
             Kind::Checkbox | Kind::Toggle => {
-                if ausloesen {
+                if leertaste {
                     let w = &mut self.windows[wi].widgets[i];
                     w.checked = !w.checked;
                     // `clicked` auch hier setzen. Vorher blieb GUI_CLICKED auf
@@ -454,7 +532,7 @@ impl Gui {
                 }
             }
             Kind::Radio => {
-                if ausloesen && !self.windows[wi].widgets[i].checked {
+                if leertaste && !self.windows[wi].widgets[i].checked {
                     self.select_radio(wi, i);
                     self.windows[wi].widgets[i].clicked = true;   // wie beim Kaestchen
                     let w = &self.windows[wi].widgets[i];
@@ -608,6 +686,36 @@ impl Gui {
                 }
             }
             Kind::DatePicker => {
+                // Datumsfeld: Leertaste, F4, Alt+Ab klappen auf; offen waehlen die
+                // Pfeile den Tag, Enter/Leertaste uebernimmt, ESC klappt nur zu
+                // (verbraucht -- sonst druckte die Fensterregel auch Abbrechen).
+                if self.windows[wi].widgets[i].kompakt {
+                    if self.datum_auf == Some((wi, i, false)) {
+                        if g.key_pressed(KEY_ESC) { self.datum_auf = None; self.liste_taste = true; return; }
+                        if ausloesen {
+                            let z = self.datum_zeigt;
+                            self.datum_waehlen(z);
+                            self.liste_taste = true;
+                            return;
+                        }
+                        let d = self.datum_zeigt;
+                        let tage = (rechts as i32 - links as i32) + 7 * (ab as i32 - auf as i32);
+                        let mut neu = d;
+                        if tage != 0 {
+                            let (j, m, t) = crate::kalender::plus_tage(d[0], d[1], d[2], tage);
+                            neu = [j, m, t];
+                        }
+                        let weite = if g.key_shift() { 12 } else { 1 };
+                        if g.key_pressed(KEY_PAGEUP) { neu = self.dp_monat(neu, -weite); }
+                        if g.key_pressed(KEY_PAGEDOWN) { neu = self.dp_monat(neu, weite); }
+                        self.datum_zeigt = neu;
+                        return;
+                    }
+                    if leertaste || g.key_pressed(KEY_F4) || (g.key_alt() && ab) {
+                        self.datum_umschalten(wi, i);
+                        return;
+                    }
+                }
                 let d = self.windows[wi].widgets[i].datum;
                 let tage = (rechts as i32 - links as i32) + 7 * (ab as i32 - auf as i32);
                 let mut neu = d;
@@ -908,6 +1016,21 @@ impl Gui {
     }
 
     pub(super) fn handle_press(&mut self, mx: i32, my: i32) {
+        // Ein aufgeklappter Monat liegt ueber allem (wie eine Klappliste) --
+        // vor der Zellbearbeitung, die jeden Klick daneben uebernimmt. Ein
+        // Klick daneben klappt ihn zu; einer auf das Datumsfeld selbst nur das.
+        if let Some((dw, di, zelle)) = self.datum_auf {
+            if self.datum_geom().is_none() {
+                self.datum_auf = None;
+            } else if self.datum_klick(mx, my) {
+                return;
+            } else {
+                let anker = self.datum_anker();
+                self.datum_auf = None;
+                let _ = (dw, di);
+                if !zelle && anker.map(|a| Self::in_rect(mx, my, a)).unwrap_or(false) { return; }
+            }
+        }
         // Ein Klick irgendwohin uebernimmt eine laufende Zellbearbeitung.
         // Ohne das bliebe der Editor offen stehen, waehrend die Tastatur
         // laengst woanders hinhoert -- ein Feld, das aussieht als koennte man
@@ -1239,9 +1362,9 @@ impl Gui {
                 else if Self::in_rect(mx, my, gm.abbrechen) { self.wz_knopf(win, i, 2); }
             }
             Kind::TabControl => {
-                let (ax, ay, _, _) = self.abs_rect(win, &self.windows[win].widgets[i]);
+                let (ax, ay, bw, _) = self.abs_rect(win, &self.windows[win].widgets[i]);
                 if my >= ay + self.sk(TC_KOPF_H) { return; }   // unter den Koepfen gehoert die Flaeche den Kindern
-                let treffer = self.tc_koepfe(ax, &self.windows[win].widgets[i])
+                let treffer = self.tc_koepfe(ax, bw, &self.windows[win].widgets[i])
                     .into_iter().find(|&(_, x0, x1)| mx >= x0 && mx < x1).map(|(k, _, x1)| (k as i32, x1));
                 if let Some((k, x1)) = treffer {
                     if Self::tc_schliessbar(&self.windows[win].widgets[i]) {

@@ -597,11 +597,15 @@ impl Gui {
                                        (90i64 << 24) | (accent & 0xFFFFFF));
                         }
                     }
-                    let s = t.header(c).to_string();
                     let al = *t.col_align.get(c).unwrap_or(&0);
                     // Platz fuer den Sortierpfeil freihalten, sonst schreibt
                     // ein langer Titel darueber.
                     let pfeil_platz = if t.sort_col == c as i32 { 14 } else { 0 };
+                    // Ein Titel, breiter als seine Spalte, endet mit "..." --
+                    // vorher schrieb er in den Kopf daneben (der Zuschnitt gilt
+                    // nur der ganzen Kopfzeile; Kuehlschrank-App englisch:
+                    // "Best-before dateStatus").
+                    let s = self.text_kuerzen(g, wdg, t.header(c), cw - pfeil_platz - 2 * self.sk(TBL_PADDING));
                     let tw = self.wtext_width(g, wdg, &s);
                     let tx = Self::align_x(cx, cw - pfeil_platz, tw, al, self.sk(TBL_PADDING));
                     let ty = ay + (titel_h - schrift).max(0) / 2;

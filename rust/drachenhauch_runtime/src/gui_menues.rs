@@ -255,7 +255,17 @@ impl Gui {
             _ => Err("GUI_VALUE: Widget ist kein slider/progress/spinner/splitter/knob".into()),
         }
     }
-    pub fn text(&self, h: i64) -> Result<String, String> { Ok(self.wdg(h, "GUI_TEXT")?.text.clone()) }
+    pub fn text(&self, h: i64) -> Result<String, String> {
+        let w = self.wdg(h, "GUI_TEXT")?;
+        // Eine Klappliste ohne Tippen zeigt ihre Auswahl -- GUI_TEXT liefert
+        // dasselbe. Vorher kam der zuletzt mit GUI_SET_TEXT gesetzte Text,
+        // auch nachdem der Nutzer etwas anderes gewaehlt hatte
+        // (Kuehlschrank-App, Standard-Einheit in den Einstellungen).
+        if w.kind == Kind::Dropdown && !w.frei {
+            return Ok(if w.sel >= 0 && (w.sel as usize) < w.items.len() { w.items[w.sel as usize].clone() } else { String::new() });
+        }
+        Ok(w.text.clone())
+    }
     pub fn set_text(&mut self, h: i64, t: String) -> Result<(), String> {
         let w = self.wdg_mut(h, "GUI_SET_TEXT")?;
         let n = t.chars().count() as i32;
@@ -278,7 +288,10 @@ impl Gui {
         // Caret ans Ende, Selektion/Scroll zuruecksetzen (sonst zeigt das Caret
         // hinter das Ende des nun kuerzeren Textes).
         w.caret = n; w.sel_anchor = n; w.scroll = 0;
-        if w.kind == Kind::Dropdown && w.frei { dd_frei_abgleichen(w); }
+        // Eine Klappliste waehlt den Eintrag, der so heisst (Gross/klein egal),
+        // sonst keinen -- ohne Tippen gibt es nichts anderes zu zeigen. Vorher
+        // stand der Text nur im Widget: die Box zeigte weiter die alte Auswahl.
+        if w.kind == Kind::Dropdown { dd_frei_abgleichen(w); }
         // Beim gesetzten Text ist der Text die QUELLE -- sonst setzte
         // GUI_SET_TEXT dort etwas, das nie zu sehen ist.
         // Bei der Statusleiste ist der Text das ERSTE Feld -- ein Programm, das
@@ -505,6 +518,22 @@ impl Gui {
     }
     pub fn widget_visible(&self, h: i64) -> Result<bool, String> {
         let w = self.wdg(h, "GUI_VISIBLE")?; Ok(w.alive && w.visible)
+    }
+    /// GUI_SHOWN: ist das Widget jetzt zu sehen? Anders als GUI_VISIBLE zaehlen
+    /// das Fenster, die Seite des Fensters und jeder Reiter-/Akkordeon-Behaelter
+    /// darueber mit -- eine Zeichenflaeche auf einer verdeckten Reiterseite
+    /// soll nicht zeichnen.
+    pub fn widget_gezeigt(&self, h: i64) -> Result<bool, String> {
+        let mut w = self.wdg(h, "GUI_SHOWN")?;
+        let (wi, _) = Self::dec_widget(h);
+        let win = &self.windows[wi];
+        if !win.alive || !win.visible { return Ok(false); }
+        for _ in 0..64 {
+            if !self.widget_shown(wi, w) { return Ok(false); }
+            if w.tc_von < 0 { return Ok(true); }
+            match win.widgets.get(w.tc_von as usize) { Some(tc) => w = tc, None => return Ok(true) }
+        }
+        Ok(true)
     }
     pub fn kind_name(&self, h: i64) -> Result<&'static str, String> {
         Ok(self.wdg(h, "GUI_KIND")?.kind.as_str())

@@ -421,7 +421,7 @@ impl Gui {
             Kind::TabControl => {
                 let n = Node::new(Role::TabList);
                 let kopf = self.sk(TC_KOPF_H);
-                for (k, x0, x1) in self.tc_koepfe(x, w) {
+                for (k, x0, x1) in self.tc_koepfe(x, bw, w) {
                     let mut t = Node::new(Role::Tab);
                     t.set_label(w.items[k].clone());
                     t.set_selected(w.sel == k as i32);

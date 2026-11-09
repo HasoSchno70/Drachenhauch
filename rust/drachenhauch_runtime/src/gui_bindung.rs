@@ -756,8 +756,9 @@ impl Gui {
         if let Some(d) = self.drop.as_ref() { return d.index_quelle as i64; }
         self.drag.as_ref().filter(|d| d.aktiv).map(|d| d.index as i64).unwrap_or(-1)
     }
-    /// Was ein Druck auf ein ziehbares Widget mitnimmt: bei Liste und Baum
-    /// die getroffene Zeile, sonst das Widget selbst mit seinem Text.
+    /// Was ein Druck auf ein ziehbares Widget mitnimmt: bei Liste, Baum und
+    /// Tabelle die getroffene Zeile (bei der Tabelle die Datenzeile mit dem
+    /// Text ihrer ersten Zelle), sonst das Widget selbst mit seinem Text.
     pub(super) fn zieh_nutzlast(&self, wi: usize, i: usize, mx: i32, my: i32) -> (i32, String) {
         let w = &self.windows[wi].widgets[i];
         match w.kind {
@@ -770,11 +771,19 @@ impl Gui {
                 let t = w.tree.as_ref().unwrap();
                 if k >= 0 { (k, t.nodes[k as usize].label.clone()) } else { (-1, String::new()) }
             }
+            Kind::Table => {
+                let k = self.zeile_unter(wi, i, mx, my);
+                let t = w.tbl.as_ref().unwrap();
+                if k >= 0 { (k, t.cell(k as usize, 0).map(|z| z.text.clone()).unwrap_or_default()) } else { (-1, String::new()) }
+            }
             _ => (-1, w.text.clone()),
         }
     }
-    /// Listenzeile bzw. Baumknoten (id) unter der Maus, sonst -1.
-    pub(super) fn zeile_unter(&self, wi: usize, i: usize, _mx: i32, my: i32) -> i32 {
+    /// Listenzeile, Baumknoten (id) bzw. Datenzeile der Tabelle unter der
+    /// Maus, sonst -1. Die Tabelle rechnet wie ihr Hover (`table_geom`) --
+    /// vorher trug ein Zug aus ihr keine Zeile (gefunden mit der
+    /// Kuehlschrank-App: Bestandszeile auf einen Lagerort ziehen).
+    pub(super) fn zeile_unter(&self, wi: usize, i: usize, mx: i32, my: i32) -> i32 {
         let w = &self.windows[wi].widgets[i];
         let (_, ay, _, _) = self.abs_rect(wi, w);
         match w.kind {
@@ -788,6 +797,13 @@ impl Gui {
                 let vis = Self::tree_visible(t);
                 let row = (my - (ay + 1) + t.scroll) / self.sk(TREE_ROW_H);
                 if row >= 0 && (row as usize) < vis.len() { vis[row as usize] as i32 } else { -1 }
+            }
+            Kind::Table => {
+                let gm = self.table_geom(wi, i);
+                if !Self::in_rect(mx, my, (gm.body_x, gm.body_y, gm.body_w, gm.body_h)) { return -1; }
+                let t = w.tbl.as_ref().unwrap();
+                let hv = (my - gm.body_y + t.scroll_y) / gm.row_h.max(1);
+                if hv >= 0 && hv < gm.n_rows as i32 { t.data_row(hv) } else { -1 }
             }
             _ => -1,
         }
@@ -865,6 +881,8 @@ impl Gui {
                 self.draw_wahl_popup(g, ew, ei);
             }
         }
+        // Ein aufgeklappter Monat (Datumsfeld oder Datumsspalte).
+        self.draw_datum_popup(g);
         // Ueberlauf-Menue einer Werkzeugleiste -- ueber allen Fenstern.
         if let Some((lw, li)) = self.leiste_popup {
             if self.windows.get(lw).map(|w| w.alive && w.visible).unwrap_or(false) {

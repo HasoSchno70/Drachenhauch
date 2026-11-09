@@ -368,7 +368,8 @@ zellmodus, zeilen_anhaengen", key)),
             "ganz" | "ganzzahl" | "int" | "integer" => 1,
             "zahl" | "float" | "number" => 2,
             "auswahl" | "liste" | "choice" => 3,
-            _ => return Err(format!("GUI_TABLE_COL_TYPE: '{}' unbekannt -- text, ganz, zahl, auswahl", art)),
+            "datum" | "date" => 4,
+            _ => return Err(format!("GUI_TABLE_COL_TYPE: '{}' unbekannt -- text, ganz, zahl, auswahl, datum", art)),
         };
         let t = self.tbl_mut(h, "GUI_TABLE_COL_TYPE")?;
         if !(0..1000).contains(&c) { return Err(format!("GUI_TABLE_COL_TYPE: Spalte {} ausserhalb 0..999", c)); }

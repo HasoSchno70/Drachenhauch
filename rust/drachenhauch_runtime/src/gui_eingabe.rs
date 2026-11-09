@@ -215,9 +215,9 @@ impl Gui {
                 let mut treffer = None;
                 for (i, w) in self.windows[top].widgets.iter().enumerate() {
                     if !Self::tc_schliessbar(w) || !self.widget_shown(top, w) { continue; }
-                    let (ax, ay, _, _) = self.abs_rect(top, w);
+                    let (ax, ay, bw, _) = self.abs_rect(top, w);
                     if my < ay || my >= ay + kopf { continue; }
-                    if let Some((k, _, _)) = self.tc_koepfe(ax, w).into_iter().find(|&(_, x0, x1)| mx >= x0 && mx < x1) {
+                    if let Some((k, _, _)) = self.tc_koepfe(ax, bw, w).into_iter().find(|&(_, x0, x1)| mx >= x0 && mx < x1) {
                         treffer = Some((i, k));
                     }
                 }
@@ -739,7 +739,22 @@ impl Gui {
                 let fok_frei = self.focus_widget.filter(|(w, _)| *w == top)
                     .and_then(|(_, i)| self.windows[top].widgets.get(i))
                     .map(|w| w.kind == Kind::Dropdown && w.frei).unwrap_or(false);
-                let enter_frei = matches!(fok, None | Some(Kind::TextInput)) || fok_frei;
+                // Ein Zahlenfeld uebernimmt Enter und gibt es weiter (spinner_keys)
+                // -- vorher blieb es dort haengen, ein Dialog mit Zahl liess sich
+                // nicht mit Enter bestaetigen (Kuehlschrank-App, MHD setzen).
+                // Ebenso ein Kaestchen, ein Schalter, ein Radio: sie schalten mit der
+                // Leertaste, Enter schickt das Formular ab. Vorher schaltete Enter
+                // das Kaestchen zurueck, das man eben angeklickt hatte, und der
+                // Dialog liess sich nicht mit Enter speichern (Kuehlschrank-App,
+                // Einstellungen).
+                // Ein zugeklapptes Datumsfeld ebenso (wie QDateEdit): Enter gilt
+                // dem Formular, aufgeklappt waehlt es den Tag.
+                let fok_datum = self.focus_widget.filter(|(w, _)| *w == top)
+                    .and_then(|(_, i)| self.windows[top].widgets.get(i))
+                    .map(|w| w.kind == Kind::DatePicker && w.kompakt).unwrap_or(false)
+                    && self.datum_auf.is_none();
+                let enter_frei = matches!(fok, None | Some(Kind::TextInput) | Some(Kind::Spinner)
+                    | Some(Kind::Checkbox) | Some(Kind::Toggle) | Some(Kind::Radio)) || fok_frei || fok_datum;
                 // Beim Umbenennen in einer Liste gehoeren Enter und ESC dem Feld.
                 let liste_edit = self.focus_widget.filter(|(w, _)| *w == top)
                     .and_then(|(_, i)| self.windows[top].widgets.get(i))
@@ -778,7 +793,7 @@ impl Gui {
         // Modalitaet frei, sobald es weg oder ausgeblendet ist -- sonst
         // saesse das Programm hinter einem Schleier ohne Fenster.
         if !self.windows.get(wi).map(|w| w.alive && w.visible).unwrap_or(false) {
-            self.modal = None;
+            self.modal_loesen();
             return;
         }
         if !self.windows[wi].dlg { return; }
@@ -794,7 +809,7 @@ impl Gui {
             }
         }
         if antwort == 0 { return; }
-        self.modal = None;
+        self.modal_loesen();
         // Wie window_destroy: aus der z-Reihenfolge nehmen und JEDE haengende
         // Interaktions-Referenz loesen.
         self.z_order.retain(|&i| i != wi);

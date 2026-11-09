@@ -1022,7 +1022,13 @@ impl Gui {
             // Doppelklick auf eine bearbeitbare Textzelle -> Bearbeiten.
             // Sonst ist er "oeffnen" wie bei der Liste: die Zeile wird
             // gewaehlt, und GUI_DOUBLE_CLICKED meldet es ein Bild lang.
-            if self.dbl_click && hc >= 0 {
+            // Nicht auf einem Knopf oder Haken in der Zelle: zweimal schnell
+            // "+1" sind zwei Klicks auf den Knopf, kein "oeffnen" der Zeile
+            // (gefunden mit der Kuehlschrank-App -- es ging der Dialog auf).
+            let bedienzelle = hc >= 0 && self.windows[wi].widgets[idx].tbl.as_ref().unwrap()
+                .cell(hr as usize, hc as usize)
+                .map(|z| matches!(z.kind, CellKind::Button | CellKind::Check)).unwrap_or(false);
+            if self.dbl_click && hc >= 0 && !bedienzelle {
                 self.table_begin_edit(wi, idx, hr, hc);
                 let bearbeitet = self.windows[wi].widgets[idx].tbl.as_ref().map(|t| t.edit_row >= 0).unwrap_or(false);
                 if bearbeitet { return; }
@@ -1063,10 +1069,27 @@ impl Gui {
         // Die Tabelle braucht den Tastaturfokus, sonst landen die Zeichen im
         // Textfeld daneben.
         self.focus_widget = Some((wi, idx));
+        // Eine Datumsspalte klappt dazu den Monat auf (getippt werden darf
+        // trotzdem); er beginnt beim Datum der Zelle, sonst heute.
+        let datum = self.windows[wi].widgets[idx].tbl.as_ref()
+            .filter(|t| t.col_typ_of(c as usize) == 4)
+            .map(|t| crate::kalender::parse(&t.edit_text));
+        if let Some(d) = datum {
+            self.datum_zeigt = match d {
+                Some((j, m, t)) => [j, m, t],
+                None => {
+                    let (j, m, t, _, _, _) = crate::builtins::local_datetime();
+                    [j as i32, m as i32, t as i32]
+                }
+            };
+            self.open_dropdown = None;
+            self.datum_auf = Some((wi, idx, true));
+        }
     }
 
     /// Bearbeitung beenden. `uebernehmen` = Text in die Zelle schreiben.
     pub(super) fn table_end_edit(&mut self, wi: usize, idx: usize, uebernehmen: bool) {
+        if self.datum_auf == Some((wi, idx, true)) { self.datum_auf = None; }
         let mut geaendert = false;
         {
             let t = match self.windows[wi].widgets[idx].tbl.as_mut() { Some(t) => t, None => return };

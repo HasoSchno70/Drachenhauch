@@ -423,6 +423,7 @@ impl Gui {
         }
         if w.kind == Kind::DatePicker {
             o["date"] = serde_json::json!(crate::kalender::format(w.datum[0], w.datum[1], w.datum[2]));
+            if w.kompakt { o["kompakt"] = serde_json::json!(true); }
         }
         if w.anchor != 5 { o["anchor"] = serde_json::json!(Self::anchor_str(w.anchor)); }
         if let Some(l) = w.list.as_ref() {
@@ -571,7 +572,7 @@ impl Gui {
             if t.zeilen_anhaengen { tj["zeilen_anhaengen"] = serde_json::json!(true); }
             if t.col_typ.iter().any(|&x| x != 0) {
                 let namen: Vec<&str> = t.col_typ.iter()
-                    .map(|&x| match x { 1 => "ganz", 2 => "zahl", 3 => "auswahl", _ => "text" }).collect();
+                    .map(|&x| match x { 1 => "ganz", 2 => "zahl", 3 => "auswahl", 4 => "datum", _ => "text" }).collect();
                 tj["col_type"] = serde_json::json!(namen);
             }
             if t.col_wahl.iter().any(|w| !w.is_empty()) { tj["col_choices"] = serde_json::json!(t.col_wahl); }
@@ -845,6 +846,7 @@ impl Gui {
         if let Some(t) = wj["date"].as_str() {
             if let Some((j, m, d)) = crate::kalender::parse(t) { w.datum = [j, m, d]; }
         }
+        if kind == Kind::DatePicker && wj["kompakt"].as_bool() == Some(true) { w.kompakt = true; }
         if kind == Kind::Table {
             let mut ts = TableState::default();
             if let Some(tj) = wj.get("table") {
@@ -918,7 +920,7 @@ impl Gui {
                 if let Some(v) = tj["zeilen_anhaengen"].as_bool() { ts.zeilen_anhaengen = v; }
                 if let Some(a) = tj["col_type"].as_array() {
                     ts.col_typ = a.iter().map(|x| match x.as_str().unwrap_or("") {
-                        "ganz" => 1, "zahl" => 2, "auswahl" => 3, _ => 0 }).collect();
+                        "ganz" => 1, "zahl" => 2, "auswahl" => 3, "datum" => 4, _ => 0 }).collect();
                 }
                 if let Some(a) = tj["col_choices"].as_array() {
                     ts.col_wahl = a.iter().map(|w| w.as_array().map(|w| w.iter()

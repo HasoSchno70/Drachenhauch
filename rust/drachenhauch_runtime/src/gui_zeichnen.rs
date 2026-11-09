@@ -1861,7 +1861,8 @@ impl Gui {
                     self.wcol(wdg, "bg", "win_bg"), self.wcol(wdg, "border", "widget_border"));
                 let acc = self.acc_col(wdg);
                 g.push_clip(ax, ay, w, kopf);
-                for (i, x0, x1) in self.tc_koepfe(ax, wdg) {
+                let kreuz = if Self::tc_schliessbar(wdg) { self.sk(16) } else { 0 };
+                for (i, x0, x1) in self.tc_koepfe(ax, w, wdg) {
                     let aktiv = i as i32 == wdg.sel;
                     let bg = if aktiv { self.wcol(wdg, "bg", "widget_bg") } else { shade(self.th("win_bg"), -10) };
                     g.box_fill(x0, ay + 2, x1 - 1, ay + kopf - 1, bg);
@@ -1869,8 +1870,10 @@ impl Gui {
                     if aktiv { g.box_fill(x0, ay + kopf - 3, x1 - 1, ay + kopf - 1, acc); }
                     let fg = if aktiv { self.txt_col(wdg) } else { self.th("muted_fg") };
                     let th = self.wsize(g, wdg);
+                    // Ein geschmaelerter Kopf kuerzt seinen Titel (tc_koepfe).
+                    let titel = self.text_kuerzen(g, wdg, &wdg.items[i], x1 - x0 - self.sk(20) - kreuz);
                     self.wtext(g, wdg, x0 + self.sk(10), ay + 2 + (kopf - 2 - th).max(0) / 2,
-                               wdg.items[i].clone(), fg);
+                               titel, fg);
                     if Self::tc_schliessbar(wdg) {
                         // Zwei Striche wie am Reiter des Fensters.
                         let (kx, ky, k) = self.tc_kreuz(x1, ay);
@@ -1914,7 +1917,11 @@ impl Gui {
             Kind::Table => self.draw_table(g, wi, idx),
             Kind::Tree => self.draw_tree(g, wi, idx),
             Kind::ColorPicker => self.draw_colorpicker(g, wdg, ax, ay, w, h),
-            Kind::DatePicker => self.draw_datepicker(g, wdg, ax, ay, w, h),
+            Kind::DatePicker => if wdg.kompakt {
+                self.draw_datumsfeld(g, wdg, ax, ay, w, h)
+            } else {
+                self.draw_datepicker(g, wdg, ax, ay, w, h)
+            },
         }
         // Fokus-Ring: EINE Stelle fuer alle Arten, nach dem Zeichnen und damit
         // obenauf. Liegt AUSSERHALB der Widget-Flaeche (2 px Luft), sonst
@@ -2188,6 +2195,41 @@ impl Gui {
 
     pub(super) fn rahmen(&self, g: &mut Graphics, wdg: &Widget, x1: i32, y1: i32, x2: i32, y2: i32) {
         g.rect(x1, y1, x2, y2, self.wcol(wdg, "border", "widget_border"));
+    }
+
+    /// Das zugeklappte Datumsfeld: das Datum und rechts ein Kalenderblatt.
+    pub(super) fn draw_datumsfeld(&self, g: &mut Graphics, wdg: &Widget,
+                       ax: i32, ay: i32, w: i32, h: i32) {
+        self.fbox_tief_w(g, wdg.kind, ax, ay, ax + w - 1, ay + h - 1,
+                         self.wcol(wdg, "bg", "widget_bg"),
+                         self.wcol(wdg, "border", "widget_border"));
+        let schrift = self.wsize(g, wdg);
+        let text = crate::kalender::format(wdg.datum[0], wdg.datum[1], wdg.datum[2]);
+        self.wtext(g, wdg, ax + self.sk(8), ay + (h - schrift).max(0) / 2, text, self.txt_col(wdg));
+        let s = self.sk(12);
+        let (bx, by) = (ax + w - s - self.sk(9), ay + (h - s) / 2);
+        let c = self.th("muted_fg");
+        g.rect(bx, by + 2, bx + s, by + s, c);
+        g.line(bx, by + 5, bx + s, by + 5, c);
+        g.line(bx + 3, by, bx + 3, by + 3, c);
+        g.line(bx + s - 3, by, bx + s - 3, by + 3, c);
+    }
+
+    /// Der aufgeklappte Monat, obenauf: dasselbe Gitter wie der Waehler, mit
+    /// dem markierten Tag; Wochenbeginn und Grenzen vom Datumsfeld.
+    pub(super) fn draw_datum_popup(&self, g: &mut Graphics) {
+        let Some((wi, i, zelle)) = self.datum_auf else { return };
+        let Some((px, py, pw, ph)) = self.datum_geom() else { return };
+        let quelle = &self.windows[wi].widgets[i];
+        let mut tw = Self::blank(Kind::DatePicker, 0, 0, pw, ph);
+        tw.datum = self.datum_zeigt;
+        if !zelle {
+            tw.wochenbeginn = quelle.wochenbeginn;
+            tw.datum_min = quelle.datum_min;
+            tw.datum_max = quelle.datum_max;
+        }
+        g.box_fill(px + 3, py + 3, px + pw + 2, py + ph + 2, 0x40i64 << 24);
+        self.draw_datepicker(g, &tw, px, py, pw, ph);
     }
 
     pub(super) fn draw_datepicker(&self, g: &mut Graphics, wdg: &Widget,

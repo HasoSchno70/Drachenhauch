@@ -1030,17 +1030,43 @@ impl Gui {
 
     /// Die Koepfe eines Reiterwerks: (Seite, x links, x rechts), absolut.
     ///
-    /// EINE Quelle fuer Zeichnen und Treffertest. Die Breite wird an der
-    /// ZEICHENZAHL geschaetzt, nicht gemessen -- der Treffertest laeuft in
-    /// `handle_press`, und dort gibt es keine Grafik. Eine zweite, genauere
-    /// Rechnung beim Zeichnen waere der sicherste Weg, Klick und Beschriftung
-    /// auseinander laufen zu lassen.
-    pub(super) fn tc_koepfe(&self, ax: i32, wdg: &Widget) -> Vec<(usize, i32, i32)> {
+    /// EINE Quelle fuer Zeichnen, Treffertest und GUI_TABCONTROL_ITEM_RECT.
+    /// Die Breite der Beschriftung misst `leisten_pass` je Bild (wie bei der
+    /// Werkzeugleiste) -- der Treffertest in `handle_press` hat keine Grafik.
+    /// Vor der ersten Messung gilt eine Schaetzung an der Zeichenzahl; die war
+    /// frueher die einzige und zu knapp: bei "Lagerorte" lief der Text in den
+    /// naechsten Kopf (gefunden mit der Kuehlschrank-App).
+    /// Die Koepfe eines Reiterwerks (Seite, x0, x1). Passen sie nicht in
+    /// `breite`, werden die breitesten zuerst schmaler (ihr Titel endet dann
+    /// mit "…", `tc_titel`) -- vorher lagen Koepfe jenseits des Rands, eine
+    /// Seite war mit der Maus nicht zu erreichen (Kuehlschrank-App,
+    /// Einstellungen mit sechs Reitern).
+    pub(super) fn tc_koepfe(&self, ax: i32, breite: i32, wdg: &Widget) -> Vec<(usize, i32, i32)> {
         let mut x = ax;
         let mut out = Vec::new();
         let kreuz = if Self::tc_schliessbar(wdg) { self.sk(16) } else { 0 };
-        for (i, t) in wdg.items.iter().enumerate() {
-            let b = self.sk(8) * t.chars().count() as i32 + self.sk(20) + kreuz;
+        let pad = self.sk(20) + kreuz;
+        let breiten = wdg.tabctl.as_ref().map(|s| s.breiten.as_slice()).unwrap_or(&[]);
+        let mut tws: Vec<i32> = wdg.items.iter().enumerate().map(|(i, t)| match breiten.get(i) {
+            Some(&b) if b > 0 => b,
+            _ => self.sk(8) * t.chars().count() as i32,
+        }).collect();
+        let n = tws.len() as i32;
+        if breite > 0 && n > 0 {
+            let natur: i32 = tws.iter().sum::<i32>() + n * pad + 2 * (n - 1);
+            if natur > breite {
+                let platz = (breite - n * pad - 2 * (n - 1)).max(n * self.sk(16));
+                // Die groesste Kappe, unter der alles in den Platz passt.
+                let (mut lo, mut hi) = (self.sk(16), *tws.iter().max().unwrap_or(&0));
+                while lo < hi {
+                    let mitte = (lo + hi + 1) / 2;
+                    if tws.iter().map(|&t| t.min(mitte)).sum::<i32>() <= platz { lo = mitte; } else { hi = mitte - 1; }
+                }
+                for t in tws.iter_mut() { *t = (*t).min(lo); }
+            }
+        }
+        for (i, tw) in tws.into_iter().enumerate() {
+            let b = tw + pad;
             out.push((i, x, x + b));
             x += b + 2;
         }
@@ -1051,9 +1077,13 @@ impl Gui {
     pub(super) fn leisten_pass(&mut self, g: &Graphics) {
         let mut messung: Vec<(usize, usize, usize, i32)> = Vec::new();
         let mut pfade: Vec<(usize, usize, Vec<i32>)> = Vec::new();
+        let mut koepfe: Vec<(usize, usize, Vec<i32>)> = Vec::new();
         for (wi, win) in self.windows.iter().enumerate() {
             if !win.alive { continue; }
             for (i, w) in win.widgets.iter().enumerate() {
+                if w.kind == Kind::TabControl && !w.items.is_empty() {
+                    koepfe.push((wi, i, w.items.iter().map(|t| self.wtext_width(g, w, t)).collect()));
+                }
                 if let Some(p) = w.pfad.as_ref() {
                     pfade.push((wi, i, p.texte.iter().map(|t| self.wtext_width(g, w, t)).collect()));
                 }
@@ -1068,6 +1098,9 @@ impl Gui {
         }
         for (wi, i, b) in pfade {
             if let Some(p) = self.windows[wi].widgets[i].pfad.as_mut() { p.breiten = b; }
+        }
+        for (wi, i, b) in koepfe {
+            self.windows[wi].widgets[i].tabctl.get_or_insert_with(Default::default).breiten = b;
         }
         for (wi, i, k, b) in messung {
             if let Some(e) = self.windows[wi].widgets[i].leiste.as_mut().and_then(|l| l.eintraege.get_mut(k)) {
@@ -1183,6 +1216,25 @@ impl Gui {
         }
         let row = (my - (ay + 1) + t.scroll) / zeile_h;
         t.hover = if row >= 0 && (row as usize) < vis.len() { vis[row as usize] as i32 } else { -1 };
+    }
+
+    /// GUI_TABCONTROL_ITEM_RECT: wo der Kopf einer Seite auf dem Bildschirm
+    /// steht (x, y, b, h), in Bildschirmpunkten wie GUI_HIT_TEST -- aus
+    /// `tc_koepfe`, derselben Rechnung wie Zeichnen und Klick. Gebraucht fuer
+    /// Pruefungen mit echten Klicks (das Studio protokolliert damit seine
+    /// Reiter).
+    pub fn tabcontrol_item_rect(&self, h: i64, seite: i64) -> Result<(i32, i32, i32, i32), String> {
+        let w = self.wdg(h, "GUI_TABCONTROL_ITEM_RECT")?;
+        if w.kind != Kind::TabControl {
+            return Err("GUI_TABCONTROL_ITEM_RECT: Widget ist kein Reiterwerk".into());
+        }
+        if seite < 0 || seite as usize >= w.items.len() {
+            return Err(format!("GUI_TABCONTROL_ITEM_RECT: Seite {} ausserhalb [0..{}]", seite, w.items.len() as i64 - 1));
+        }
+        let (wi, _) = Self::dec_widget(h);
+        let (ax, ay, bw, _) = self.abs_rect(wi, w);
+        let (_, x0, x1) = self.tc_koepfe(ax, bw, w)[seite as usize];
+        Ok((x0, ay + 2, x1 - x0, self.sk(TC_KOPF_H) - 2))
     }
 
     /// GUI_TREE_ITEM_RECT: wo ein Knoten auf dem Bildschirm steht (x, y, b, h),
