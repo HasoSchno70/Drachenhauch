@@ -54,3 +54,50 @@ END FUNCTION
 SUB cacheLeeren()
     WRITEALL(cachePfad$(), "{}")
 END SUB
+
+SUB cacheSchreiben(j AS JSON_HANDLE)
+    WRITEALL(cachePfad$(), JSON_PRETTY(j))
+END SUB
+
+' Die Daten eines gefundenen Produkts (product_data als JSON-Text), solange
+' der Eintrag gilt; "" = nicht im Cache, abgelaufen oder "nicht gefunden".
+FUNCTION cacheProdukt$(barcode AS STRING) AS STRING
+    DIM j AS JSON_HANDLE : j = cacheLaden()
+    DIM k AS STRING : k = JSON_KEY$(barcode)
+    IF NOT JSON_HAS(j, k) THEN RETURN ""
+    IF NOT cacheFrisch(j, barcode) THEN RETURN ""
+    IF NOT JSON_HAS(j, k + ".product_data") THEN RETURN ""
+    IF JSON_TYPE(j, k + ".product_data") <> "object" THEN RETURN ""
+    RETURN JSON_STRINGIFY(JSON_GET_JSON(j, k + ".product_data"))
+END FUNCTION
+
+' Als "nicht gefunden" gemerkt (und noch gültig)?
+FUNCTION cacheNichtGefunden(barcode AS STRING) AS BOOLEAN
+    DIM j AS JSON_HANDLE : j = cacheLaden()
+    DIM p AS STRING : p = JSON_KEY$(barcode) + ".not_found"
+    IF NOT JSON_HAS(j, p) THEN RETURN FALSE
+    IF JSON_TYPE(j, p) <> "boolean" THEN RETURN FALSE
+    RETURN JSON_GET_BOOL(j, p) AND cacheFrisch(j, barcode)
+END FUNCTION
+
+FUNCTION cacheJetzt$() AS STRING
+    RETURN heute$() + "T" + TIME$()
+END FUNCTION
+
+' set: das Produkt mit Zeitstempel; set_not_found: nur der Vermerk.
+SUB cacheMerken(barcode AS STRING, daten AS JSON_HANDLE)
+    DIM j AS JSON_HANDLE : j = cacheLaden()
+    DIM e AS JSON_HANDLE : e = JSON_NEW_OBJECT()
+    JSON_SET_JSON(e, "product_data", daten)
+    JSON_SET_STRING(e, "cached_at", cacheJetzt$())
+    JSON_SET_JSON(j, JSON_KEY$(barcode), e)
+    cacheSchreiben(j)
+END SUB
+
+SUB cacheMerkenNicht(barcode AS STRING)
+    DIM j AS JSON_HANDLE : j = cacheLaden()
+    DIM e AS JSON_HANDLE : e = JSON_PARSE("{""product_data"": null, ""not_found"": true}")
+    JSON_SET_STRING(e, "cached_at", cacheJetzt$())
+    JSON_SET_JSON(j, JSON_KEY$(barcode), e)
+    cacheSchreiben(j)
+END SUB

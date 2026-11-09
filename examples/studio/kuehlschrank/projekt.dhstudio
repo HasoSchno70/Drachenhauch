@@ -111,6 +111,21 @@
       "code": "Barcodecache.dh"
     },
     {
+      "art": "klasse",
+      "name": "Fund",
+      "code": "Fund.dh"
+    },
+    {
+      "art": "modul",
+      "name": "Vorgaben",
+      "code": "Vorgaben.dh"
+    },
+    {
+      "art": "modul",
+      "name": "OpenFoodFacts",
+      "code": "OpenFoodFacts.dh"
+    },
+    {
       "art": "control",
       "name": "BestandSeite",
       "code": "BestandSeite.dh",
@@ -121,6 +136,12 @@
       "name": "EinkaufSeite",
       "code": "EinkaufSeite.dh",
       "layout": "EinkaufSeite.dhform"
+    },
+    {
+      "art": "fenster",
+      "name": "ScanFenster",
+      "code": "ScanFenster.dh",
+      "layout": "ScanFenster.dhform"
     },
     {
       "art": "fenster",

@@ -42,7 +42,7 @@ IMPORT "{sammlung}/../../../studio/berichte_laufzeit.dh"
 IMPORT "{sammlung}/../../../studio/berichte.dh"
 --- erwartet
 laden []
-elemente 36 start Hauptfenster
+elemente 40 start Hauptfenster
 app App TRUE
 fenster Hauptfenster TRUE
 datenbank Daten TRUE
@@ -64,8 +64,12 @@ modul Rezepte TRUE
 modul Rezeptkatalog TRUE
 klasse Statistikdaten TRUE
 modul Barcodecache TRUE
+klasse Fund TRUE
+modul Vorgaben TRUE
+modul OpenFoodFacts TRUE
 control BestandSeite TRUE
 control EinkaufSeite TRUE
+fenster ScanFenster TRUE
 fenster AbschlussFenster TRUE
 control RezepteSeite TRUE
 control StatistikSeite TRUE
@@ -127,6 +131,7 @@ IMPORT "{sammlung}/../../../studio/berichte.dh"
 Hauptfenster passt
 BestandSeite passt
 EinkaufSeite passt
+ScanFenster passt
 AbschlussFenster passt
 RezepteSeite passt
 StatistikSeite passt
@@ -190,7 +195,8 @@ PRINT "kacheln "; GUI_CARD_TEXT$(f.kachelGesamt); " "; GUI_CARD_TEXT$(f.kachelBa
 DB_EXEC(db, "UPDATE app_settings SET value = '4' WHERE key = 'expiring_days_threshold'")
 f.auffrischen()
 PRINT "schwelle 4 "; GUI_CARD_TEXT$(f.kachelBald)
-' Was erst spaeter kommt, ist gesperrt; Aktualisieren geht.
+' Was erst spaeter kommt (Einstellungen), ist gesperrt; Einkauf erfassen
+' (Stufe 6) und Aktualisieren gehen.
 PRINT "gesperrt "; GUI_TOOLBAR_ENABLED(f.werkzeuge, KNOPF_EINSTELLUNGEN); " "; GUI_ENABLED(f.knopfEinkauf); " offen "; GUI_TOOLBAR_ENABLED(f.werkzeuge, KNOPF_HINZUFUEGEN); " "; GUI_TOOLBAR_ENABLED(f.werkzeuge, KNOPF_AKTUALISIEREN)
 f.werkzeuge_Knopf(KNOPF_AKTUALISIEREN)
 PRINT "status "; GUI_STATUSBAR_TEXT$(f.status, 3)
@@ -205,7 +211,7 @@ einheit Stück schwelle 3 fehlt vorgabe
 zweimal 9 18
 kacheln 5 2 1 | Produkte: 2
 schwelle 4 3
-gesperrt FALSE FALSE offen TRUE TRUE
+gesperrt FALSE TRUE offen TRUE TRUE
 status Aktualisiert.
 code 0
 

@@ -51,7 +51,7 @@ CLASS AbschlussFenster EXTENDS AbschlussFenster_Basis
             DIM markt AS STRING : markt = IIF(pid > 0, letzterMarkt$(pid), "")
             DIM preis AS STRING : preis = IIF(pid > 0, letzterPreis$(pid), "")
             DIM z AS INTEGER : z = GUI_TABLE_ADD_ROW(Self.tabelle, ["", p.name, zahlText$(IIF(p.menge > 0, p.menge, 1.0)), einheitText$(IIF(p.einheit = "", "Stück", p.einheit)), _
-                tagePlus$(vorgabeTage(pid, p.kategorie)), vorgabeOrt$(pid, p.kategorie), preis, IIF(markt = "", "Neu", markt)])
+                tagePlus$(vorgabeTage(pid, p.name, p.kategorie)), vorgabeOrt$(pid, p.name, p.kategorie), preis, IIF(markt = "", "Neu", markt)])
             GUI_TABLE_CELL_KIND(Self.tabelle, z, SP_A_HAKEN, "haken")
             GUI_TABLE_CELL_VALUE(Self.tabelle, z, SP_A_HAKEN, 1)
             IF markt <> "" THEN GUI_TABLE_CELL_COLOR(Self.tabelle, z, SP_A_MARKT, &H80CBC4, &H1F4F4A)
@@ -189,20 +189,8 @@ CLASS AbschlussFenster EXTENDS AbschlussFenster_Basis
                     IIF(markt = "", "Aus Einkaufsliste", "Eingekauft bei " + markt), IIF(markt = "", NIL, markt))
             verlauf.neu("inventory", DB_LAST_ROWID(db))
             IF markt <> "" THEN
-                DIM preis AS STRING : preis = TRIM$(GUI_TABLE_GET_CELL(Self.tabelle, z, SP_A_PREIS))
-                DIM mitPreis AS BOOLEAN : mitPreis = GUI_CHECKED(Self.preiseKasten) AND VAL(REPLACE$(preis, ",", ".")) > 0
-                DIM sid AS INTEGER : sid = dbZahlMit("SELECT id FROM product_stores WHERE product_id = ?1 AND store_name = ?2", STR$(pid), markt)
-                IF sid > 0 THEN
-                    verlauf.merken("product_stores", sid)
-                    IF mitPreis THEN
-                        DB_EXEC(db, "UPDATE product_stores SET last_purchased = ?, price = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", h, VAL(REPLACE$(preis, ",", ".")), sid)
-                    ELSE
-                        DB_EXEC(db, "UPDATE product_stores SET last_purchased = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", h, sid)
-                    END IF
-                ELSE
-                    DB_EXEC(db, "INSERT INTO product_stores (product_id, store_name, price, last_purchased) VALUES (?, ?, ?, ?)", pid, markt, IIF(mitPreis, VAL(REPLACE$(preis, ",", ".")), NIL), h)
-                    verlauf.neu("product_stores", DB_LAST_ROWID(db))
-                END IF
+                DIM preis AS FLOAT : preis = VAL(REPLACE$(TRIM$(GUI_TABLE_GET_CELL(Self.tabelle, z, SP_A_PREIS)), ",", "."))
+                marktMerken(pid, markt, IIF(GUI_CHECKED(Self.preiseKasten), preis, 0.0))
             END IF
             IF GUI_CHECKED(Self.entfernenKasten) THEN
                 verlauf.merken("shopping_list", p.id)
@@ -256,20 +244,21 @@ FUNCTION vorgabeKategorie$(pid AS INTEGER, kategorie AS STRING) AS STRING
 END FUNCTION
 
 ' Tage bis zum Ablauf: die übliche Haltbarkeit der Kategorie (categories),
-' sonst eine Woche. (Die Python-App nahm Stichwörter aus SmartDefaults --
-' die kommen mit dem Scannen, Stufe 6.)
-FUNCTION vorgabeTage(pid AS INTEGER, kategorie AS STRING) AS INTEGER
+' sonst die Stichwörter im Namen (Modul Vorgaben, wie SmartDefaults der
+' Python-App), sonst eine Woche.
+FUNCTION vorgabeTage(pid AS INTEGER, name AS STRING, kategorie AS STRING) AS INTEGER
     DIM k AS STRING : k = vorgabeKategorie$(pid, kategorie)
     IF k <> "" THEN
         DIM t AS INTEGER : t = dbZahlEin("SELECT IFNULL(typical_shelf_life_days, 0) FROM categories WHERE name = ?", k)
         IF t > 0 THEN RETURN t
     END IF
-    RETURN 7
+    RETURN vorschlagTage(name, "")
 END FUNCTION
 
 ' Der Lagerort: der übliche des Produkts, sonst wo es zuletzt lag, sonst
-' was die Kategorie empfiehlt, sonst der erste Ort.
-FUNCTION vorgabeOrt$(pid AS INTEGER, kategorie AS STRING) AS STRING
+' was die Kategorie empfiehlt, sonst die Stichwörter im Namen, sonst der
+' erste Ort.
+FUNCTION vorgabeOrt$(pid AS INTEGER, name AS STRING, kategorie AS STRING) AS STRING
     DIM orte AS ARRAY OF STRING : orte = lagerorte()
     DIM o AS STRING : o = ""
     IF pid > 0 THEN
@@ -279,6 +268,5 @@ FUNCTION vorgabeOrt$(pid AS INTEGER, kategorie AS STRING) AS STRING
     DIM k AS STRING : k = vorgabeKategorie$(pid, kategorie)
     IF o = "" AND k <> "" THEN o = textEin$("SELECT IFNULL(recommended_storage, '') FROM categories WHERE name = ?", k)
     IF o <> "" AND ARRAY_INDEXOF(orte, o) >= 0 THEN RETURN o
-    IF LEN(orte) > 0 THEN RETURN orte[0]
-    RETURN "Kühlschrank"
+    RETURN passenderOrt$(vorschlagOrt$(name, ""), orte)
 END FUNCTION

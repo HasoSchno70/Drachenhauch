@@ -455,3 +455,81 @@ und `modules_chart`. Gegenproben: achtzehn im Beispiel, elf im Studio, eine
 in der Laufzeit -- jede fällt in ihrem Fall. Die Kette über zwei Controls
 fiel erst, als ein inneres Control dazukam, das in seinem äußeren auf keiner
 Seite steht: eins auf einer Seite ist schon durch sie verdeckt.
+
+## Stufe 6, erster Teil: Scannen (2026-11-09)
+
+„Einkauf erfassen“ im Kopf öffnet den Stapelscan `ScanFenster` (wie
+BatchScanDialog): Barcode tippen oder scannen, Enter; Open Food Facts liefert
+den Namen -- erst aus dem Cache (`barcode_cache.json` wie
+services/api/barcode_cache.py, auch „nicht gefunden“), sonst im Hintergrund
+(`HTTP_REQUEST_START`, das Fenster friert nicht ein; Modul `OpenFoodFacts`,
+Klasse `Fund`). Jede Zeile bekommt Lagerort und Ablaufdatum aus dem
+Gelernten (`user_learning` wie LearningService), sonst aus den Stichwörtern
+(Modul `Vorgaben`, die Listen von SmartDefaults). In der Tabelle lassen sich
+Name, Menge, MHD und Ort ändern, fünf Knöpfe je Zeile setzen das MHD, das
+Kreuz entfernt nach Frage; dazu Alle/Keine/Umkehren, MHD und Lagerort für die
+markierten, Markierte löschen, Vorlagen (`shopping_templates` wie
+TemplateService) und „Alle speichern“ mit dem Markt aus dem Kopf: Produkte
+samt Marke und Kategorie anlegen, Bestand eintragen, Markt merken
+(`marktMerken`, jetzt auch im Abschluss), das Gewählte lernen -- ein Schritt
+für Strg+Z. Der Produktdialog sucht seinen Barcode ebenso (Enter, „Suchen“,
+🗘 ohne Cache; mit Barcode geöffnet gleich zu Anfang) und füllt Name, Marke,
+Kategorie, Notizen und das Bild. Der Abschluss des Einkaufs (Stufe 3) nimmt
+die Stichwörter jetzt auch, wo Produkt und Kategorie nichts sagen.
+
+**Abweichungen von der Python-App:** SmartDefaults nahm das erste Stichwort
+der Liste, das irgendwo im Namen steckt: „Reis“ kam in den Gefrierschrank
+(„eis“), „Rindersteak“ hielt 180 Tage im Vorratsraum („tea“),
+„Pfefferminztee“ war ein Gewürz („pfeffer“), „Kölsch“ Öl. Hier zählt, wo es
+im Wort steht -- am Ende (das Grundwort) vor dem Anfang vor der Mitte, kurze
+Stichwörter nicht mitten im Wort, dann das frühere Wort, dann das längere
+Stichwort; „Zahnpasta“ bleibt Pasta, wie dort. Scannte man schneller, als
+das Netz antwortet, brach sie die vorige Suche ab und die Zeile fehlte; hier
+sind mehrere unterwegs. Nach „Menge erhöht“ schrieb sie gleich darauf
+„hinzugefügt“ über den Status. Eine Vorlage las sie mit Menge, Lagerort und
+Haltbarkeit und nahm doch die Vorgaben; Vorlagenzeilen ohne Barcode legten
+das zweite Produkt mit leerem Barcode gegen UNIQUE an. Neue Produkte bekamen
+weder Marke noch Kategorie. Die Märkte im Kopf waren eine feste Liste. Ein
+Netzfehler hieß im Produktdialog „nicht in der Online-Datenbank gefunden“.
+Der Offline-Manager wurde angelegt und nie benutzt -- er fehlt hier.
+
+**Funde:**
+
+28. **Das Studio hatte nur Meldung, Frage und Eingabe** -- keine Auswahl
+    aus einer Liste und keine Zahl (QInputDialog.getItem/getInt). Neu in der
+    Laufzeit `Auswahl` (Index, -1) und `EingabeZahl` ((TRUE, zahl) oder
+    (FALSE, vorgabe)), beide warten wie `Frage`.
+29. **`dhrt run datei.dh a b` gab dem Programm still nichts** -- Absicht
+    (die Runtime behält ihre Schalter), aber ohne ein Wort: der Testserver
+    bekam seinen Ordner nicht und schrieb neben sich, gesucht wurde im
+    Programm. Jetzt nennt `dhrt run` solche Wörter und den Aufruf mit `--`.
+30. **Enter im Zahlenfeld erreichte den Standard-Knopf nicht**, obwohl das
+    Zahlenfeld es dafür weitergibt -- die Regel des Standard-Knopfs ließ nur
+    Textfelder durch; „MHD setzen“ ließ sich nicht mit Enter bestätigen (gui).
+31. **🗘 stand als Fragezeichen da** -- die Ausweichschrift nahm die erste
+    Datei der Liste, die es gibt (Segoe UI Emoji), und gab auf, wenn ihr das
+    Zeichen fehlte; Segoe UI Symbol dahinter hat es. Jetzt fragt das nächste
+    Bild die nächste Datei.
+
+**Offen:** Kürzel ohne Menü -- Strg+S im Barcode-Feld speichert nicht, denn
+`Taste` erreicht ein Studio-Fenster nur, wenn kein Eingabefeld die Taste
+nimmt, und ein Fenster ohne Menüleiste hat keine Kürzel. Die Rezeptsuche im
+Netz (Spoonacular) ist der zweite Teil der Stufe.
+
+**Fallen:** `LOADIMAGE` erkennt das Format an der Endung -- ein Bild aus dem
+Netz braucht die aus der Adresse. Eine Klappliste mit Fokus nimmt Enter
+selbst (sie klappt auf); in `Auswahl` bekommt sie darum keinen Fokus. Proben
+fragen nie das echte Open Food Facts: `kOffStarten` startet einen falschen
+Server (`_hilfen/off_server.dh`), ohne ihn zeigt `KUEHL_OFF_URL` auf eine tote
+Adresse.
+
+Tests `tests/pruef/kuehlschrank/stufe6_scannen.dhtest` (7: Vorgaben und
+Lernen; Open Food Facts mit Cache, „nicht gefunden“, 404 und Kennung;
+Stapelscan mit drei Barcodes unterwegs, Duplikat, MHD-Knopf, Entfernen,
+Speichern mit Markt, Rückgängig und Gelerntem im zweiten Fenster; Vorlagen;
+Sammelaktionen; Produktdialog mit Bild; echte Klicks über eine Vorlage), je
+ein Fall in `werkzeug_studio_modal`, `os_builtins`, `gui_dialoge_ausbau` und
+`schriften_vorrat`. Gegenproben: sechsunddreißig im Beispiel, drei im Studio,
+drei in der Laufzeit -- jede fällt in ihrem Fall. Eine fiel erst nach einem
+neuen Produkt des falschen Servers (4005, ganz ohne Namen): der Name aus den
+Rohdaten war sonst nie gefragt.

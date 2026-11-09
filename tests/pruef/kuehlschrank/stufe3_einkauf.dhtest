@@ -309,7 +309,7 @@ PRINT stand$()
 --- erwartet
 markt LIDL | 3 gekaufte Artikel zum Bestand hinzufügen
   Mehl | 1 | kg | 2027-05-07 | Vorratsraum |  | Neu
-  Zahnpasta | 1 | Stück | 2026-11-15 | Kühlschrank |  | Neu
+  Zahnpasta | 1 | Stück | 2027-02-06 | Vorratsraum |  | Neu
   Milch | 2 | Liter | 2026-11-15 | Kühlschranktür | 1,19 | LIDL
 falsches datum 0 | offen TRUE
 abweichung
@@ -317,7 +317,7 @@ abweichung
 uebertragen 2 neu 1 | offen FALSE | Einkauf abgeschlossen
   bestand Milch 1.0 Liter 2026-11-20 Kühlschranktür - | -
   bestand Mehl 3.0 kg 2027-01-31 Vorratsraum LIDL | Eingekauft bei LIDL
-  bestand Zahnpasta 1.0 Stück 2026-11-15 Kühlschrank LIDL | Eingekauft bei LIDL
+  bestand Zahnpasta 1.0 Stück 2027-02-06 Vorratsraum LIDL | Eingekauft bei LIDL
   markt LIDL Milch 1.19 2026-11-01
   markt LIDL Mehl 1.29 2026-11-08
   markt LIDL Zahnpasta 0 2026-11-08
@@ -329,7 +329,7 @@ zurueck
 wieder
   bestand Milch 1.0 Liter 2026-11-20 Kühlschranktür - | -
   bestand Mehl 3.0 kg 2027-01-31 Vorratsraum LIDL | Eingekauft bei LIDL
-  bestand Zahnpasta 1.0 Stück 2026-11-15 Kühlschrank LIDL | Eingekauft bei LIDL
+  bestand Zahnpasta 1.0 Stück 2027-02-06 Vorratsraum LIDL | Eingekauft bei LIDL
   markt LIDL Milch 1.19 2026-11-01
   markt LIDL Mehl 1.29 2026-11-08
   markt LIDL Zahnpasta 0 2026-11-08

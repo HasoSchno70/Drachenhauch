@@ -1,0 +1,455 @@
+' Einkauf erfassen -- wie BatchScanDialog der Python-App: Barcodes
+' nacheinander scannen (oder tippen, Enter), je Barcode sucht Open Food Facts
+' den Namen (Cache zuerst, das Netz im Hintergrund), die Zeile bekommt
+' Lagerort und Ablaufdatum aus dem Gelernten, sonst aus den Stichwörtern
+' (Modul Vorgaben). Menge, Name, MHD und Ort lassen sich in der Tabelle
+' ändern, fünf Knöpfe je Zeile setzen das MHD (+3T ... +3M), dazu
+' Sammelaktionen für die markierten Zeilen, Vorlagen (shopping_templates)
+' und "Alle speichern" mit dem Markt aus dem Kopf: Produkte anlegen, Bestand
+' eintragen, Markt merken, Gewähltes lernen -- ein Schritt für Strg+Z.
+' Mehrere Barcodes dürfen gleichzeitig unterwegs sein (die Python-App brach
+' die vorige Suche ab, wenn man schneller scannte, als das Netz antwortet).
+CLASS ScanFenster EXTENDS ScanFenster_Basis
+    DIM orte AS ARRAY OF STRING
+    ' Je Zeile die Kategorien des Funds (für Vorgaben und Kategorie).
+    DIM zeilenKat AS ARRAY OF STRING
+    DIM zeilenMarke AS ARRAY OF STRING
+    ' Die Abrufe, die noch unterwegs sind, und ihre Barcodes.
+    DIM abrufe AS ARRAY OF INTEGER
+    DIM abrufBarcodes AS ARRAY OF STRING
+    ' Eine neue Zeile leuchtet kurz grün auf (animate_new_row).
+    DIM blitzZeile AS INTEGER
+    DIM blitzBis AS INTEGER
+    ' Ergebnis für das Hauptfenster.
+    DIM gespeichert AS INTEGER
+
+    SUB Geoeffnet()
+        Self.orte = lagerorte()
+        Self.zeilenKat = [] : Self.zeilenMarke = []
+        Self.abrufe = [] : Self.abrufBarcodes = []
+        Self.blitzZeile = -1
+        DIM m AS ARRAY OF STRING : m = ["-- Markt wählen --"]
+        DIM s AS STRING
+        FOR EACH s IN marktListe()
+            ARRAY_PUSH(m, s)
+        NEXT
+        GUI_SET_DROPDOWN(Self.marktWahl, m)
+        GUI_DROPDOWN_SET_SELECTED(Self.marktWahl, 0)
+        GUI_TABLE_COL_EDIT(Self.tabelle, SP_S_NAME, TRUE)
+        GUI_TABLE_COL_TYPE(Self.tabelle, SP_S_MENGE, "zahl")
+        GUI_TABLE_COL_EDIT(Self.tabelle, SP_S_MENGE, TRUE)
+        GUI_TABLE_COL_EDIT(Self.tabelle, SP_S_MHD, TRUE)
+        GUI_TABLE_COL_CHOICES(Self.tabelle, SP_S_ORT, Self.orte)
+        GUI_TABLE_COL_EDIT(Self.tabelle, SP_S_ORT, TRUE)
+        GUI_SET_ENABLED(Self.knopfSpeichern, FALSE)
+        Self.zaehlen()
+        GUI_FOCUS(Self.barcodeFeld)
+    END SUB
+
+    FUNCTION zeilen() AS INTEGER
+        RETURN GUI_TABLE_ROW_COUNT(Self.tabelle)
+    END FUNCTION
+
+    SUB zaehlen()
+        DIM n AS INTEGER : n = Self.zeilen()
+        DIM t AS STRING : t = STR$(n) + " Produkt" + IIF(n <> 1, "e", "")
+        GUI_SET_TEXT(Self.anzahlText, t)
+        GUI_SET_TEXT(Self.anzahlKopf, "📦 " + t)
+    END SUB
+
+    ' show_scan_status: grün für Erfolg, rot für Fehler, sonst neutral.
+    SUB status(text AS STRING, art AS STRING)
+        GUI_SET_TEXT(Self.scanStatus, text)
+        GUI_SET_COLOR(Self.scanStatus, "fg", IIF(art = "erfolg", &H81C784, IIF(art = "fehler", &HE57373, GUI_THEME_GET("text_fg"))))
+    END SUB
+
+    ' --- Scannen ---------------------------------------------------------------
+    SUB barcodeFeld_Enter()
+        Self.knopfScannen_Klick()
+    END SUB
+
+    SUB knopfScannen_Klick()
+        DIM b AS STRING : b = TRIM$(GUI_TEXT(Self.barcodeFeld))
+        IF b = "" THEN
+            Self.status("❗ Bitte Barcode eingeben", "fehler")
+            RETURN
+        END IF
+        GUI_SET_TEXT(Self.barcodeFeld, "")
+        GUI_FOCUS(Self.barcodeFeld)
+        Self.status("🔎 Suche " + b + "...", "")
+        DIM f AS Fund : f = offAusCache(b)
+        IF f IS NOT NIL THEN
+            Self.ergebnis(f)
+            RETURN
+        END IF
+        ARRAY_PUSH(Self.abrufe, offStarten(b))
+        ARRAY_PUSH(Self.abrufBarcodes, b)
+    END SUB
+
+    ' Je Bild: was aus dem Netz gekommen ist; das Aufleuchten endet.
+    SUB Takt()
+        DIM i AS INTEGER : i = 0
+        WHILE i < LEN(Self.abrufe)
+            IF HTTP_READY(Self.abrufe[i]) THEN
+                DIM f AS Fund : f = offAbholen(Self.abrufe[i], Self.abrufBarcodes[i])
+                ARRAY_REMOVE_AT(Self.abrufe, i)
+                ARRAY_REMOVE_AT(Self.abrufBarcodes, i)
+                Self.ergebnis(f)
+            ELSE
+                i = i + 1
+            END IF
+        WEND
+        IF Self.blitzZeile >= 0 AND MILLIS() > Self.blitzBis THEN
+            IF Self.blitzZeile < Self.zeilen() THEN Self.faerben(Self.blitzZeile, FALSE)
+            Self.blitzZeile = -1
+        END IF
+    END SUB
+
+    ' Nach einem Duplikat bleibt "Menge erhöht" stehen (die Python-App
+    ' schrieb gleich darauf "hinzugefügt" darüber).
+    SUB ergebnis(f AS Fund)
+        IF NOT Self.hinzufuegen(f.barcode, f.anzeigeName$(), f, 1, "", -1) THEN RETURN
+        IF f.gefunden THEN
+            Self.status("✅ " + f.anzeigeName$() + " hinzugefügt" + IIF(f.ausCache, " (Cache)", ""), "erfolg")
+        ELSE
+            Self.status("❗ " + f.fehler + " - manuell hinzugefügt", "fehler")
+        END IF
+    END SUB
+
+    SUB faerben(z AS INTEGER, an AS BOOLEAN)
+        DIM s AS INTEGER
+        FOR EACH s IN [SP_S_NAME, SP_S_BARCODE]
+            IF an THEN
+                GUI_TABLE_CELL_COLOR(Self.tabelle, z, s, &HFFFFFF, &H2ECC71)
+            ELSE
+                GUI_TABLE_CELL_COLOR(Self.tabelle, z, s, -1, -1)
+            END IF
+        NEXT
+    END SUB
+
+    ' Eine Zeile mit Vorgaben -- oder, wenn der Barcode schon in der Liste
+    ' steht, auf Wunsch eine mehr davon (Duplikat). Ort "" und Tage < 0:
+    ' aus dem Gelernten, sonst aus den Stichwörtern. TRUE = eine neue Zeile.
+    FUNCTION hinzufuegen(barcode AS STRING, name AS STRING, f AS Fund, menge AS INTEGER, ort AS STRING, tage AS INTEGER) AS BOOLEAN
+        DIM z AS INTEGER
+        IF barcode <> "" THEN
+            FOR z = 0 TO Self.zeilen() - 1
+                IF GUI_TABLE_GET_CELL(Self.tabelle, z, SP_S_BARCODE) <> barcode THEN CONTINUE
+                IF Frage("'" + name + "' wurde bereits gescannt!" + CHR$(10) + CHR$(10) + "Möchtest du:" + CHR$(10) + "• JA: Menge erhöhen (+1)" + CHR$(10) + "• NEIN: Neuen Eintrag erstellen", "Ja|Nein", "Duplikat erkannt") = 1 THEN
+                    DIM neu AS INTEGER : neu = INT(VAL(GUI_TABLE_GET_CELL(Self.tabelle, z, SP_S_MENGE))) + 1
+                    GUI_TABLE_SET_CELL(Self.tabelle, z, SP_S_MENGE, STR$(neu))
+                    Self.status("✅ Menge erhöht: " + name + " (jetzt " + STR$(neu) + "x)", "erfolg")
+                    RETURN FALSE
+                END IF
+                BREAK
+            NEXT
+        END IF
+        DIM kat AS STRING : kat = fundKategorien$(f)
+        DIM o AS STRING : o = ort
+        IF o = "" THEN o = gelernt$(barcode, name, "storage_location")
+        IF o = "" THEN o = vorschlagOrt$(name, kat)
+        DIM t AS INTEGER : t = tage
+        IF t < 0 THEN
+            DIM lt AS STRING : lt = gelernt$(barcode, name, "expiry_days")
+            IF VAL(lt) > 0 THEN t = INT(VAL(lt)) ELSE t = vorschlagTage(name, kat)
+        END IF
+        z = GUI_TABLE_ADD_ROW(Self.tabelle, ["", name, barcode, STR$(MAX(1, menge)), tagePlus$(t), "+3T", "+7T", "+14T", "+1M", "+3M", passenderOrt$(o, Self.orte), "❌"])
+        GUI_TABLE_CELL_KIND(Self.tabelle, z, SP_S_HAKEN, "haken")
+        GUI_TABLE_CELL_VALUE(Self.tabelle, z, SP_S_HAKEN, 1)
+        DIM s AS INTEGER
+        FOR s = SP_S_SCHNELL TO SP_S_SCHNELL + 4
+            GUI_TABLE_CELL_KIND(Self.tabelle, z, s, "knopf")
+        NEXT
+        GUI_TABLE_CELL_KIND(Self.tabelle, z, SP_S_WEG, "knopf")
+        ARRAY_PUSH(Self.zeilenKat, kat)
+        DIM marke AS STRING : marke = ""
+        IF f IS NOT NIL THEN marke = f.marke
+        ARRAY_PUSH(Self.zeilenMarke, marke)
+        IF Self.blitzZeile >= 0 AND Self.blitzZeile < Self.zeilen() THEN Self.faerben(Self.blitzZeile, FALSE)
+        Self.faerben(z, TRUE)
+        Self.blitzZeile = z
+        Self.blitzBis = MILLIS() + 500
+        GUI_TABLE_SET_SELECTED(Self.tabelle, z)
+        Self.zaehlen()
+        GUI_SET_ENABLED(Self.knopfSpeichern, TRUE)
+        RETURN TRUE
+    END FUNCTION
+
+    ' --- Je Zeile: MHD-Knöpfe und Entfernen ------------------------------------
+    SUB tabelle_Zelle(zeile AS INTEGER, spalte AS INTEGER)
+        IF zeile < 0 OR zeile >= Self.zeilen() THEN RETURN
+        IF spalte >= SP_S_SCHNELL AND spalte < SP_S_SCHNELL + 5 THEN
+            DIM tage AS ARRAY OF INTEGER : tage = [3, 7, 14, 30, 90]
+            GUI_TABLE_SET_CELL(Self.tabelle, zeile, SP_S_MHD, tagePlus$(tage[spalte - SP_S_SCHNELL]))
+            GUI_SET_ENABLED(Self.knopfSpeichern, TRUE)
+        ELSEIF spalte = SP_S_WEG THEN
+            IF Frage("Produkt aus Liste entfernen?", "Ja|Nein", "Zeile löschen") <> 1 THEN RETURN
+            Self.entfernen(zeile)
+        END IF
+    END SUB
+
+    SUB entfernen(z AS INTEGER)
+        GUI_TABLE_REMOVE_ROW(Self.tabelle, z)
+        ARRAY_REMOVE_AT(Self.zeilenKat, z)
+        ARRAY_REMOVE_AT(Self.zeilenMarke, z)
+        IF Self.blitzZeile = z THEN
+            Self.blitzZeile = -1
+        ELSEIF Self.blitzZeile > z THEN
+            Self.blitzZeile = Self.blitzZeile - 1
+        END IF
+        Self.zaehlen()
+        IF Self.zeilen() = 0 THEN GUI_SET_ENABLED(Self.knopfSpeichern, FALSE)
+    END SUB
+
+    ' --- Sammelaktionen ----------------------------------------------------------
+    FUNCTION markiert(z AS INTEGER) AS BOOLEAN
+        RETURN GUI_TABLE_GET_VALUE(Self.tabelle, z, SP_S_HAKEN) > 0.5
+    END FUNCTION
+
+    FUNCTION markierte() AS INTEGER
+        DIM n AS INTEGER : n = 0
+        DIM z AS INTEGER
+        FOR z = 0 TO Self.zeilen() - 1
+            IF Self.markiert(z) THEN n = n + 1
+        NEXT
+        RETURN n
+    END FUNCTION
+
+    SUB knopfAlle_Klick()
+        DIM z AS INTEGER
+        FOR z = 0 TO Self.zeilen() - 1
+            GUI_TABLE_CELL_VALUE(Self.tabelle, z, SP_S_HAKEN, 1)
+        NEXT
+    END SUB
+
+    SUB knopfKeine_Klick()
+        DIM z AS INTEGER
+        FOR z = 0 TO Self.zeilen() - 1
+            GUI_TABLE_CELL_VALUE(Self.tabelle, z, SP_S_HAKEN, 0)
+        NEXT
+    END SUB
+
+    SUB knopfUmkehren_Klick()
+        DIM z AS INTEGER
+        FOR z = 0 TO Self.zeilen() - 1
+            GUI_TABLE_CELL_VALUE(Self.tabelle, z, SP_S_HAKEN, IIF(Self.markiert(z), 0, 1))
+        NEXT
+    END SUB
+
+    SUB knopfTage_Klick()
+        DIM n AS INTEGER : n = Self.markierte()
+        IF n = 0 THEN
+            Meldung("Bitte wähle mindestens ein Produkt aus!", "Keine Auswahl")
+            RETURN
+        END IF
+        DIM ok AS BOOLEAN
+        DIM tage AS INTEGER
+        (ok, tage) = EingabeZahl("Tage ab heute für " + STR$(n) + " Produkt(e):", 7, 1, 365, "MHD setzen")
+        IF NOT ok THEN RETURN
+        DIM d AS STRING : d = tagePlus$(tage)
+        DIM z AS INTEGER
+        FOR z = 0 TO Self.zeilen() - 1
+            IF Self.markiert(z) THEN GUI_TABLE_SET_CELL(Self.tabelle, z, SP_S_MHD, d)
+        NEXT
+        Meldung("✅ MHD auf " + MID$(d, 8, 2) + "." + MID$(d, 5, 2) + "." + LEFT$(d, 4) + " gesetzt für " + STR$(n) + " Produkte!", "Erfolg")
+    END SUB
+
+    SUB knopfOrt_Klick()
+        DIM n AS INTEGER : n = Self.markierte()
+        IF n = 0 THEN
+            Meldung("Bitte wähle mindestens ein Produkt aus!", "Keine Auswahl")
+            RETURN
+        END IF
+        DIM i AS INTEGER : i = Auswahl("Lagerort für " + STR$(n) + " Produkt(e):", Self.orte, 0, "Lagerort setzen")
+        IF i < 0 THEN RETURN
+        DIM z AS INTEGER
+        FOR z = 0 TO Self.zeilen() - 1
+            IF Self.markiert(z) THEN GUI_TABLE_SET_CELL(Self.tabelle, z, SP_S_ORT, Self.orte[i])
+        NEXT
+        Meldung("✅ Lagerort '" + Self.orte[i] + "' gesetzt für " + STR$(n) + " Produkte!", "Erfolg")
+    END SUB
+
+    SUB knopfLoeschen_Klick()
+        DIM n AS INTEGER : n = Self.markierte()
+        IF n = 0 THEN
+            Meldung("Bitte wähle mindestens ein Produkt aus!", "Keine Auswahl")
+            RETURN
+        END IF
+        IF Frage("Möchtest du " + STR$(n) + " Produkt(e) aus der Liste entfernen?", "Ja|Nein", "Löschen bestätigen") <> 1 THEN RETURN
+        DIM z AS INTEGER
+        FOR z = Self.zeilen() - 1 TO 0 STEP -1
+            IF Self.markiert(z) THEN Self.entfernen(z)
+        NEXT
+    END SUB
+
+    ' Strg+S speichert, Strg+A markiert alle, Entf löscht die markierten --
+    ' solange kein Eingabefeld die Taste nimmt (im Barcode-Feld scannt Enter).
+    SUB Taste(taste AS INTEGER)
+        DIM strg AS BOOLEAN : strg = KEYPRESSED(KEY_LCTRL) OR KEYPRESSED(KEY_RCTRL)
+        IF strg AND taste = KEY_S THEN
+            Self.knopfSpeichern_Klick()
+        ELSEIF strg AND taste = KEY_A THEN
+            Self.knopfAlle_Klick()
+        ELSEIF taste = KEY_DELETE THEN
+            Self.knopfLoeschen_Klick()
+        END IF
+    END SUB
+
+    ' --- Speichern ----------------------------------------------------------------
+    FUNCTION markt$() AS STRING
+        IF GUI_DROPDOWN_SELECTED(Self.marktWahl) <= 0 THEN RETURN ""
+        RETURN GUI_DROPDOWN_TEXT(Self.marktWahl)
+    END FUNCTION
+
+    SUB knopfSpeichern_Klick()
+        IF NOT GUI_ENABLED(Self.knopfSpeichern) THEN RETURN
+        DIM markt AS STRING : markt = Self.markt$()
+        DIM fehler AS ARRAY OF STRING : fehler = []
+        DIM n AS INTEGER : n = Self.speichern(markt, fehler)
+        DIM bei AS STRING : bei = IIF(markt = "", "", " bei " + markt)
+        IF LEN(fehler) > 0 THEN
+            Meldung(STR$(n) + " Produkte gespeichert" + bei + "." + CHR$(10) + CHR$(10) + "Fehler:" + CHR$(10) + JOIN$(fehler, CHR$(10)), "Teilweise Fehler")
+        ELSE
+            Meldung("✅ " + STR$(n) + " Produkte erfolgreich gespeichert" + bei + "!", "Erfolg")
+        END IF
+        Self.gespeichert = n
+        IF n > 0 THEN Self.Zumachen()
+    END SUB
+
+    ' Die markierten Zeilen in den Bestand -- ein Schritt. Was nicht stimmt
+    ' (kein Name, kein Datum), kommt in fehler und bleibt in der Liste.
+    FUNCTION speichern(markt AS STRING, fehler AS ARRAY OF STRING) AS INTEGER
+        DIM n AS INTEGER : n = 0
+        DIM h AS STRING : h = heute$()
+        verlauf.beginnen("Einkauf erfasst")
+        DB_BEGIN(db)
+        DIM z AS INTEGER
+        FOR z = 0 TO Self.zeilen() - 1
+            IF NOT Self.markiert(z) THEN CONTINUE
+            DIM name AS STRING : name = TRIM$(GUI_TABLE_GET_CELL(Self.tabelle, z, SP_S_NAME))
+            DIM barcode AS STRING : barcode = TRIM$(GUI_TABLE_GET_CELL(Self.tabelle, z, SP_S_BARCODE))
+            DIM mhd AS STRING : mhd = TRIM$(GUI_TABLE_GET_CELL(Self.tabelle, z, SP_S_MHD))
+            DIM ort AS STRING : ort = TRIM$(GUI_TABLE_GET_CELL(Self.tabelle, z, SP_S_ORT))
+            DIM menge AS INTEGER : menge = MAX(1, INT(VAL(GUI_TABLE_GET_CELL(Self.tabelle, z, SP_S_MENGE))))
+            IF name = "" THEN
+                ARRAY_PUSH(fehler, "Zeile " + STR$(z + 1) + ": Produktname darf nicht leer sein")
+                CONTINUE
+            END IF
+            IF NOT datumOk(mhd, FALSE) THEN
+                ARRAY_PUSH(fehler, name + ": das MHD braucht die Form JJJJ-MM-TT")
+                CONTINUE
+            END IF
+            ' Das Produkt beim Barcode (ohne Barcode beim Namen), sonst neu --
+            ' mit Marke von Open Food Facts und Kategorie aus den Stichwörtern.
+            DIM pid AS INTEGER : pid = 0
+            IF barcode <> "" THEN
+                pid = produktMitBarcode(barcode)
+            ELSE
+                pid = dbZahlEin("SELECT id FROM products WHERE name = ? ORDER BY id LIMIT 1", name)
+            END IF
+            IF pid = 0 THEN
+                DIM kat AS STRING : kat = vorschlagKategorie$(name)
+                DB_EXEC(db, "INSERT INTO products (barcode, name, brand, category) VALUES (?, ?, ?, ?)", IIF(barcode = "", NIL, barcode), name, IIF(Self.zeilenMarke[z] = "", NIL, Self.zeilenMarke[z]), IIF(kat = "", NIL, kat))
+                pid = DB_LAST_ROWID(db)
+                verlauf.neu("products", pid)
+            END IF
+            DB_EXEC(db, "INSERT INTO inventory (product_id, quantity, unit, purchase_date, expiry_date, storage_location, status, purchased_at_store) VALUES (?, ?, 'Stück', ?, ?, ?, 'fresh', ?)", _
+                    pid, menge, h, mhd, ort, IIF(markt = "", NIL, markt))
+            verlauf.neu("inventory", DB_LAST_ROWID(db))
+            IF markt <> "" THEN marktMerken(pid, markt, 0.0)
+            ' Was gewählt wurde, merkt sich die App für das nächste Mal.
+            lernen(barcode, name, "storage_location", ort)
+            DIM tage AS INTEGER : tage = dbZahlMit("SELECT CAST(julianday(?1) - julianday(?2) AS INTEGER)", mhd, h)
+            IF tage > 0 THEN lernen(barcode, name, "expiry_days", STR$(tage))
+            n = n + 1
+        NEXT
+        DB_COMMIT(db)
+        verlauf.abschliessen()
+        RETURN n
+    END FUNCTION
+
+    SUB knopfAbbrechen_Klick()
+        Self.Zumachen()
+    END SUB
+
+    ' --- Vorlagen (shopping_templates wie TemplateService) ------------------------
+    SUB knopfVorlageSpeichern_Klick()
+        IF Self.zeilen() = 0 THEN
+            Meldung("Keine Produkte zum Speichern!", "Fehler")
+            RETURN
+        END IF
+        DIM name AS STRING : name = TRIM$(Eingabe("Template-Name:", "Mein Einkauf", "Template speichern"))
+        IF name = "" THEN RETURN
+        DIM liste AS JSON_HANDLE : liste = JSON_NEW_ARRAY()
+        DIM z AS INTEGER
+        FOR z = 0 TO Self.zeilen() - 1
+            DIM e AS JSON_HANDLE : e = JSON_NEW_OBJECT()
+            JSON_SET_STRING(e, "name", GUI_TABLE_GET_CELL(Self.tabelle, z, SP_S_NAME))
+            DIM b AS STRING : b = GUI_TABLE_GET_CELL(Self.tabelle, z, SP_S_BARCODE)
+            IF b = "" THEN JSON_SET_JSON(e, "barcode", JSON_PARSE("null")) ELSE JSON_SET_STRING(e, "barcode", b)
+            JSON_SET_INT(e, "quantity", MAX(1, INT(VAL(GUI_TABLE_GET_CELL(Self.tabelle, z, SP_S_MENGE)))))
+            JSON_SET_STRING(e, "storage_location", GUI_TABLE_GET_CELL(Self.tabelle, z, SP_S_ORT))
+            DIM t AS INTEGER : t = dbZahlMit("SELECT CAST(julianday(?1) - julianday(?2) AS INTEGER)", GUI_TABLE_GET_CELL(Self.tabelle, z, SP_S_MHD), heute$())
+            IF t > 0 THEN JSON_SET_INT(e, "expiry_days", t) ELSE JSON_SET_JSON(e, "expiry_days", JSON_PARSE("null"))
+            DIM k AS STRING : k = vorschlagKategorie$(GUI_TABLE_GET_CELL(Self.tabelle, z, SP_S_NAME))
+            IF k = "" THEN JSON_SET_JSON(e, "category", JSON_PARSE("null")) ELSE JSON_SET_STRING(e, "category", k)
+            JSON_SET_JSON(e, "notes", JSON_PARSE("null"))
+            JSON_APPEND_JSON(liste, "", e)
+        NEXT
+        verlauf.beginnen("Template " + name + " gespeichert")
+        DB_EXEC(db, "INSERT INTO shopping_templates (name, items_json) VALUES (?, ?)", name, JSON_STRINGIFY(liste))
+        DIM id AS INTEGER : id = DB_LAST_ROWID(db)
+        verlauf.neu("shopping_templates", id)
+        verlauf.abschliessen()
+        Meldung("✅ Template '" + name + "' gespeichert!" + CHR$(10) + CHR$(10) + "📦 " + STR$(Self.zeilen()) + " Produkte" + CHR$(10) + "🆔 Template-ID: " + STR$(id), "Erfolg")
+    END SUB
+
+    ' Wie load_template -- aber mit Menge, Lagerort und Haltbarkeit aus der
+    ' Vorlage (die Python-App las sie und nahm doch die Vorgaben).
+    SUB knopfVorlageLaden_Klick()
+        DIM ids AS ARRAY OF INTEGER : ids = []
+        DIM namen AS ARRAY OF STRING : namen = []
+        DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT id, name, items_json FROM shopping_templates ORDER BY name")
+        WHILE DB_NEXT(r)
+            ARRAY_PUSH(ids, DB_GET_INT(r, 0))
+            DIM n AS INTEGER : n = 0
+            TRY
+                n = JSON_LEN(JSON_PARSE(DB_GET_STRING(r, 2)), "")
+            CATCH kaputt
+                n = 0
+            END TRY
+            ARRAY_PUSH(namen, DB_GET_STRING(r, 1) + " (" + STR$(n) + " Produkte)")
+        WEND
+        IF LEN(ids) = 0 THEN
+            Meldung("Noch keine Templates vorhanden!" + CHR$(10) + CHR$(10) + "💡 Erstelle ein Template mit '💾 Als Template speichern'", "Info")
+            RETURN
+        END IF
+        DIM i AS INTEGER : i = Auswahl("Wähle Template:", namen, 0, "Template laden")
+        IF i < 0 THEN RETURN
+        DB_EXEC(db, "UPDATE shopping_templates SET usage_count = IFNULL(usage_count, 0) + 1 WHERE id = ?", ids[i])
+        DIM j AS JSON_HANDLE : j = JSON_PARSE(textEin$("SELECT items_json FROM shopping_templates WHERE id = ?", STR$(ids[i])))
+        DIM k AS INTEGER
+        FOR k = 0 TO JSON_LEN(j, "") - 1
+            DIM p AS STRING : p = STR$(k) + "."
+            DIM menge AS INTEGER : menge = 1
+            IF JSON_HAS(j, p + "quantity") THEN
+                IF JSON_TYPE(j, p + "quantity") = "number" THEN menge = JSON_GET_INT(j, p + "quantity")
+            END IF
+            DIM tage AS INTEGER : tage = -1
+            IF JSON_HAS(j, p + "expiry_days") THEN
+                IF JSON_TYPE(j, p + "expiry_days") = "number" THEN tage = JSON_GET_INT(j, p + "expiry_days")
+            END IF
+            Self.hinzufuegen(jText$(j, p + "barcode"), jText$(j, p + "name"), NIL, menge, jText$(j, p + "storage_location"), tage)
+        NEXT
+        Meldung("✅ Template geladen!" + CHR$(10) + CHR$(10) + "📦 " + STR$(JSON_LEN(j, "")) + " Produkte hinzugefügt", "Erfolg")
+    END SUB
+END CLASS
+
+CONST SP_S_HAKEN = 0
+CONST SP_S_NAME = 1
+CONST SP_S_BARCODE = 2
+CONST SP_S_MENGE = 3
+CONST SP_S_MHD = 4
+CONST SP_S_SCHNELL = 5
+CONST SP_S_ORT = 10
+CONST SP_S_WEG = 11

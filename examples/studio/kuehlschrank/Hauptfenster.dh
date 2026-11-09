@@ -41,7 +41,6 @@ CLASS Hauptfenster EXTENDS Hauptfenster_Basis
     ' Was erst mit einer späteren Stufe kommt, ist gesperrt statt stumm.
     SUB nochNichtDa()
         GUI_TOOLBAR_ENABLE(Self.werkzeuge, KNOPF_EINSTELLUNGEN, FALSE)
-        GUI_SET_ENABLED(Self.knopfEinkauf, FALSE)
         GUI_MENU_ENABLE(Self.miEinstellungen, FALSE)
     END SUB
 
@@ -52,6 +51,14 @@ CLASS Hauptfenster EXTENDS Hauptfenster_Basis
         Self.einkauf.laden()
         Self.rezepte.laden()
         Self.auffrischen()
+    END SUB
+
+    ' Einkauf erfassen: der Stapelscan (ScanFenster); was gespeichert wurde,
+    ' steht danach überall.
+    SUB knopfEinkauf_Klick()
+        DIM s AS ScanFenster : s = NEW ScanFenster()
+        s.ZeigenModal()
+        IF s.gespeichert > 0 THEN Self.geaendert()
     END SUB
 
     SUB bestand_Geaendert()

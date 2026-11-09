@@ -1,12 +1,22 @@
 ' Ein Produkt in den Vorrat aufnehmen oder einen Eintrag bearbeiten -- wie
 ' AddProductDialog und EditProductDialog der Python-App in einem Fenster.
 ' eintragId = 0: neu (mit barcode); sonst der Eintrag. Nach dem Schließen
-' sagt gesichert, ob etwas geschrieben wurde.
+' sagt gesichert, ob etwas geschrieben wurde. Ein neuer Eintrag sucht seinen
+' Barcode bei Open Food Facts (Enter, "Suchen"; 🗘 ohne Cache) und füllt
+' Name, Marke, Kategorie, Notizen und das Bild -- mit Barcode geöffnet
+' gleich zu Anfang, wie die Python-App.
 CLASS ProduktFenster EXTENDS ProduktFenster_Basis
     DIM eintragId AS INTEGER
     DIM barcode AS STRING
     DIM gesichert AS BOOLEAN
     DIM e AS Eintrag
+    ' Die Suche und das Bild, solange sie unterwegs sind (-1 = keine).
+    DIM abruf AS INTEGER
+    DIM abrufBarcode AS STRING
+    DIM bildAbruf AS INTEGER
+    DIM bildUrl AS STRING
+    ' Was zuletzt gefunden wurde (für Prüfungen).
+    DIM letzter AS Fund
 
     SUB Geoeffnet()
         GUI_SET_DROPDOWN(Self.kategorieListe, kategorien())
@@ -45,6 +55,111 @@ CLASS ProduktFenster EXTENDS ProduktFenster_Basis
         Self.minKasten_Geaendert()
         GUI_SET_TEXT(Self.fehlerText, "")
         GUI_FOCUS(IIF(Self.eintragId = 0 AND Self.e.barcode = "", Self.barcodeFeld, Self.nameFeld))
+        Self.abruf = -1
+        Self.bildAbruf = -1
+        GUI_SET_TEXT(Self.apiStatus, "")
+        GUI_SET_TEXT(Self.cacheInfo, "")
+        GUI_SET_TEXT(Self.bildText, "📷 Kein Bild")
+        GUI_SET_ENABLED(Self.knopfSuchen, Self.eintragId = 0)
+        GUI_SET_ENABLED(Self.knopfNeuSuchen, Self.eintragId = 0)
+        IF Self.eintragId = 0 AND Self.e.barcode <> "" THEN Self.suchen(FALSE)
+    END SUB
+
+    ' --- Open Food Facts ------------------------------------------------------
+    SUB barcodeFeld_Enter()
+        Self.suchen(FALSE)
+    END SUB
+
+    SUB knopfSuchen_Klick()
+        Self.suchen(FALSE)
+    END SUB
+
+    SUB knopfNeuSuchen_Klick()
+        Self.suchen(TRUE)
+    END SUB
+
+    ' search_product: Cache zuerst (außer ohneCache), sonst im Hintergrund.
+    SUB suchen(ohneCache AS BOOLEAN)
+        DIM b AS STRING : b = TRIM$(GUI_TEXT(Self.barcodeFeld))
+        IF b = "" THEN
+            Meldung("Bitte Barcode eingeben!", "Fehler")
+            RETURN
+        END IF
+        IF Self.abruf >= 0 THEN HTTP_CANCEL(Self.abruf)
+        Self.abruf = -1
+        IF NOT ohneCache THEN
+            DIM f AS Fund : f = offAusCache(b)
+            IF f IS NOT NIL THEN
+                Self.gefunden(f)
+                RETURN
+            END IF
+        END IF
+        Self.abruf = offStarten(b)
+        Self.abrufBarcode = b
+        GUI_SET_TEXT(Self.apiStatus, "Suche...")
+        GUI_SET_ENABLED(Self.barcodeFeld, FALSE)
+    END SUB
+
+    SUB Takt()
+        IF Self.abruf >= 0 THEN
+            IF HTTP_READY(Self.abruf) THEN
+                DIM f AS Fund : f = offAbholen(Self.abruf, Self.abrufBarcode)
+                Self.abruf = -1
+                GUI_SET_ENABLED(Self.barcodeFeld, TRUE)
+                Self.gefunden(f)
+            END IF
+        END IF
+        IF Self.bildAbruf >= 0 THEN
+            IF HTTP_READY(Self.bildAbruf) THEN Self.bildAbholen()
+        END IF
+    END SUB
+
+    ' on_api_result: die Felder füllen und sagen, was war.
+    SUB gefunden(f AS Fund)
+        Self.letzter = f
+        IF f.gefunden THEN
+            IF f.name <> "" THEN GUI_SET_TEXT(Self.nameFeld, f.name)
+            IF f.marke <> "" THEN GUI_SET_TEXT(Self.markeFeld, f.marke)
+            DIM k AS STRING : k = kategorieAusApi$(fundKategorien$(f))
+            IF k <> "" THEN GUI_SET_TEXT(Self.kategorieListe, k)
+            IF f.bildUrl <> "" THEN
+                GUI_SET_TEXT(Self.bildText, "⏳ Lade...")
+                Self.bildUrl = f.bildUrl
+                Self.bildAbruf = HTTP_GET_START(f.bildUrl)
+            END IF
+            IF f.notizen$() <> "" THEN GUI_SET_TEXT(Self.notizenFeld, f.notizen$())
+            GUI_SET_TEXT(Self.cacheInfo, IIF(f.ausCache, "Aus Cache", "✓ Von API geladen"))
+            GUI_SET_TEXT(Self.apiStatus, "Gefunden!")
+            Meldung("Produktinformationen für '" + f.anzeigeName$() + "' wurden geladen!", "Gefunden")
+            RETURN
+        END IF
+        GUI_SET_TEXT(Self.apiStatus, "Nicht gefunden")
+        GUI_SET_TEXT(Self.cacheInfo, "")
+        IF f.ausCache THEN
+            Meldung("Produkt wurde zuvor nicht gefunden." + CHR$(10) + "Klicke 🗘 um erneut zu suchen.", "Nicht gefunden")
+        ELSEIF LEFT$(f.fehler, 15) = "Netzwerkfehler:" THEN
+            Meldung("Open Food Facts ist gerade nicht erreichbar." + CHR$(10) + "Bitte Daten manuell eingeben.", "Keine Verbindung")
+        ELSE
+            Meldung("Produkt wurde nicht in der Online-Datenbank gefunden." + CHR$(10) + "Bitte Daten manuell eingeben.", "Nicht gefunden")
+        END IF
+    END SUB
+
+    ' Das Bild: die Bytes in eine Datei neben der Datenbank, dann LOADIMAGE
+    ' -- mit der Endung aus der Adresse, an ihr erkennt LOADIMAGE das Format.
+    SUB bildAbholen()
+        DIM a AS INTEGER : a = Self.bildAbruf
+        Self.bildAbruf = -1
+        DIM endung AS STRING : endung = LOWER$(MID$(Self.bildUrl, INSTRREV(Self.bildUrl, ".") + 1, 4))
+        IF ARRAY_INDEXOF(["png", "jpg", "jpeg", "webp", "gif", "bmp"], endung) < 0 THEN endung = "jpg"
+        TRY
+            HTTP_RESULT(a)
+            DIM pfad AS STRING : pfad = studioDbPfad$("produktbild." + endung)
+            WRITEALL_BYTES(pfad, HTTP_BYTES())
+            GUI_SET_IMAGE(Self.bild, LOADIMAGE(pfad))
+            GUI_SET_TEXT(Self.bildText, "")
+        CATCH fehler
+            GUI_SET_TEXT(Self.bildText, "📷 Kein Bild")
+        END TRY
     END SUB
 
     SUB minKasten_Geaendert()
@@ -112,6 +227,8 @@ CLASS ProduktFenster EXTENDS ProduktFenster_Basis
     END SUB
 
     SUB knopfAbbrechen_Klick()
+        IF Self.abruf >= 0 THEN HTTP_CANCEL(Self.abruf)
+        IF Self.bildAbruf >= 0 THEN HTTP_CANCEL(Self.bildAbruf)
         Self.Zumachen()
     END SUB
 END CLASS
@@ -134,4 +251,20 @@ FUNCTION datumOk(t AS STRING, leerErlaubt AS BOOLEAN) AS BOOLEAN
     DIM ok AS BOOLEAN : ok = NOT DB_IS_NULL(r, 0) AND DB_GET_INT(r, 0) = 1
     DB_CLOSE_RESULT(r)
     RETURN ok
+END FUNCTION
+
+' map_category: die Kategorien von Open Food Facts auf die der App -- die
+' Liste der Python-App, nach der Regel der Vorgaben (sie nahm die
+' Teilzeichenkette: "egg" fand "veggie").
+FUNCTION kategorieAusApi$(kategorien AS STRING) AS STRING
+    RETURN stichwortIn$("", kategorien, ["milch|Milchprodukte", "milk|Milchprodukte", "dairy|Milchprodukte", _
+        "joghurt|Joghurt", "yogurt|Joghurt", "yoghurt|Joghurt", "käse|Käse", "cheese|Käse", _
+        "fleisch|Fleisch", "meat|Fleisch", "wurst|Wurst", "sausage|Wurst", _
+        "fisch|Fisch", "fish|Fisch", "seafood|Fisch", "gemüse|Gemüse", "vegetables|Gemüse", "vegetable|Gemüse", _
+        "obst|Obst", "fruit|Obst", "fruits|Obst", "brot|Brot & Backwaren", "bread|Brot & Backwaren", "bakery|Brot & Backwaren", _
+        "eier|Eier", "eggs|Eier", "egg|Eier", "getränk|Getränke", "beverage|Getränke", "drink|Getränke", _
+        "süßigkeit|Süßigkeiten", "sweet|Süßigkeiten", "candy|Süßigkeiten", "chocolate|Süßigkeiten", _
+        "snack|Snacks", "chips|Snacks", "konserve|Konserven", "canned|Konserven", _
+        "tiefkühl|Tiefkühlware", "frozen|Tiefkühlware", "sauce|Soßen & Dips", "soße|Soßen & Dips", "dip|Soßen & Dips", _
+        "gewürz|Gewürze", "spice|Gewürze", "seasoning|Gewürze", "pasta|Pasta & Reis", "rice|Pasta & Reis", "noodle|Pasta & Reis"])
 END FUNCTION

@@ -330,3 +330,21 @@ FUNCTION nachMarkt$() AS STRING
     IF ohne <> "" THEN t = t + "Nicht zugeordnet" + CHR$(10) + ohne
     RETURN t
 END FUNCTION
+
+' Wo ein Produkt gekauft wurde (product_stores): Kaufdatum heute, der Preis
+' nur, wenn einer da ist (> 0). Teil des laufenden Schritts.
+SUB marktMerken(pid AS INTEGER, markt AS STRING, preis AS FLOAT)
+    DIM h AS STRING : h = heute$()
+    DIM sid AS INTEGER : sid = dbZahlMit("SELECT id FROM product_stores WHERE product_id = ?1 AND store_name = ?2", STR$(pid), markt)
+    IF sid > 0 THEN
+        verlauf.merken("product_stores", sid)
+        IF preis > 0 THEN
+            DB_EXEC(db, "UPDATE product_stores SET last_purchased = ?, price = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", h, preis, sid)
+        ELSE
+            DB_EXEC(db, "UPDATE product_stores SET last_purchased = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", h, sid)
+        END IF
+    ELSE
+        DB_EXEC(db, "INSERT INTO product_stores (product_id, store_name, price, last_purchased) VALUES (?, ?, ?, ?)", pid, markt, IIF(preis > 0, preis, NIL), h)
+        verlauf.neu("product_stores", DB_LAST_ROWID(db))
+    END IF
+END SUB

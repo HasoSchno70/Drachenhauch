@@ -1,0 +1,42 @@
+' Was die Suche nach einem Barcode ergab (wie APIResult und product_data der
+' Python-App): gefunden oder nicht, aus dem Cache oder dem Netz, dazu die
+' Felder, die die Dialoge brauchen. daten ist product_data als JSON-Text
+' (für die Vorgaben und den Cache).
+CLASS Fund
+    DIM barcode AS STRING
+    DIM gefunden AS BOOLEAN
+    DIM ausCache AS BOOLEAN
+    DIM fehler AS STRING
+    DIM name AS STRING
+    DIM marke AS STRING
+    DIM kategorien AS STRING
+    DIM menge AS STRING
+    DIM nutriScore AS STRING
+    DIM allergene AS ARRAY OF STRING
+    DIM bildUrl AS STRING
+    DIM daten AS STRING
+
+    ' Der Name für die Liste: der von Open Food Facts, sonst deutsch,
+    ' allgemein oder die Marke aus den Rohdaten, sonst "Unbekannt (Barcode)".
+    FUNCTION anzeigeName$() AS STRING
+        IF TRIM$(Self.name) <> "" THEN RETURN TRIM$(Self.name)
+        RETURN "Unbekannt (" + Self.barcode + ")"
+    END FUNCTION
+
+    ' Was der Produktdialog in die Notizen schreibt (Packungsgröße,
+    ' Nutri-Score, die ersten drei Allergene).
+    FUNCTION notizen$() AS STRING
+        DIM t AS ARRAY OF STRING : t = []
+        IF Self.menge <> "" THEN ARRAY_PUSH(t, "Packungsgröße: " + Self.menge)
+        IF Self.nutriScore <> "" THEN ARRAY_PUSH(t, "Nutri-Score: " + UPPER$(Self.nutriScore))
+        IF LEN(Self.allergene) > 0 THEN
+            DIM a AS ARRAY OF STRING : a = []
+            DIM i AS INTEGER
+            FOR i = 0 TO MIN(3, LEN(Self.allergene)) - 1
+                ARRAY_PUSH(a, REPLACE$(Self.allergene[i], "en:", ""))
+            NEXT
+            ARRAY_PUSH(t, "Allergene: " + JOIN$(a, ", "))
+        END IF
+        RETURN JOIN$(t, CHR$(10))
+    END FUNCTION
+END CLASS
