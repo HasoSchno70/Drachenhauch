@@ -101,6 +101,16 @@
       "code": "Rezeptkatalog.dh"
     },
     {
+      "art": "klasse",
+      "name": "Statistikdaten",
+      "code": "Statistikdaten.dh"
+    },
+    {
+      "art": "modul",
+      "name": "Barcodecache",
+      "code": "Barcodecache.dh"
+    },
+    {
       "art": "control",
       "name": "BestandSeite",
       "code": "BestandSeite.dh",
@@ -123,6 +133,12 @@
       "name": "RezepteSeite",
       "code": "RezepteSeite.dh",
       "layout": "RezepteSeite.dhform"
+    },
+    {
+      "art": "control",
+      "name": "StatistikSeite",
+      "code": "StatistikSeite.dh",
+      "layout": "StatistikSeite.dhform"
     },
     {
       "art": "fenster",

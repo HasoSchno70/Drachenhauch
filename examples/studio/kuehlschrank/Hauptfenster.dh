@@ -15,7 +15,7 @@ CLASS Hauptfenster EXTENDS Hauptfenster_Basis
         Self.uhr_Aktion()
     END SUB
 
-    ' Kopf, Statusleiste und Rückgängig neu aus der Datenbank.
+    ' Kopf, Statusleiste, Statistik und Rückgängig neu aus der Datenbank.
     SUB auffrischen()
         DIM k AS Kennzahlen : k = NEW Kennzahlen()
         k.rechnen()
@@ -24,6 +24,7 @@ CLASS Hauptfenster EXTENDS Hauptfenster_Basis
         GUI_CARD_SET_TEXT(Self.kachelAbgelaufen, STR$(k.abgelaufen))
         GUI_STATUSBAR_SET(Self.status, 1, "Produkte: " + STR$(k.produkte))
         GUI_STATUSBAR_SET(Self.status, 2, "Zuletzt: " + LEFT$(TIME$(), 5))
+        Self.statistik.laden()
         Self.verlaufZeigen()
     END SUB
 

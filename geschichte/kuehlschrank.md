@@ -396,3 +396,62 @@ neuen Proben (kurzes Wort mit Endung „Ei“/„Eis“, das größere von zwei
 passenden Produkten, Kochen über das verknüpfte Produkt, der Rang der
 Ablaufenden, der früheste Block bei difflib, Suche nur in den Zutaten, der
 Filter „schnell“ allein): grün waren sie vorher auch ohne die Stelle.
+
+## Stufe 5: die Statistik (2026-11-09)
+
+Der Reiter Statistik ist das eigene Control `StatistikSeite` (wie
+tabs/stats_tab.py): oben fünf Kacheln im Verlauf (Gesamt, Produkte,
+Ablaufend, Abgelaufen, Cache), darunter ein Reiterwerk mit vier Seiten --
+Übersicht (Bestand frisch/bald/abgelaufen, die fünf häufigsten Kategorien,
+die Lagerorte mit dem, was dort Aufmerksamkeit braucht), Charts (zwei Kuchen
+und der Ablauf-Status als Balken, Studio-Diagramme), Insights (Hinweise aus
+den Zahlen) und Cache (Einträge, gefunden, nicht gefunden; leeren mit
+Frage). Oben rechts Thema hell/dunkel für die ganze Oberfläche, eine
+Testbenachrichtigung (`NOTIFY`) und Aktualisieren; das Hauptfenster frischt
+die Seite mit allem anderen auf. Die Zahlen rechnet die Klasse
+`Statistikdaten` (wie get_statistics und get_storage_summary), den
+Barcode-Cache liest das Modul `Barcodecache` (barcode_cache.json neben der
+Datenbank; das Scannen in Stufe 6 schreibt ihn).
+
+**Abweichungen von der Python-App:** Je Lagerort zählte sie, was bald
+abläuft, als Summe der Mengen -- 500 g Hack waren 500; hier Einträge, die
+abgelaufen sind oder bald ablaufen. Orte gruppierte sie nach dem vollen
+Namen und kürzte erst beim Anzeigen auf den Teil vor " - " -- „Kühlschrank“
+stand so zweimal da; hier zählt „Kühlschrank - Tür“ zu „Kühlschrank“. Eine
+Kategorie NULL und eine leere hießen beide „Sonstige“ und standen getrennt;
+hier einmal. Gleich häufige Kategorien und Orte stehen nach dem Namen statt
+zufällig. Die Balken der Top-Kategorien rechnete sie aus und zeigte sie nie;
+hier stehen sie da. Ohne matplotlib gab es dort keine Charts. Die
+Übersicht steht nebeneinander statt untereinander.
+
+**Funde:**
+
+25. **Das Studio hatte kein Diagramm**, obwohl die Laufzeit Kuchen, Balken,
+    Linie und Tacho kann (Modul `chart`). Neu der Baustein „Diagramm“:
+    eine Zeichenfläche mit Art und Titel im Inspektor, einem Muster im
+    Entwurf und im Code ein `StudioDiagramm` (Leeren, Hinzufuegen, Reihe,
+    Wert, Setzen ...), das sich selbst zeichnet, im Thema der Oberfläche.
+26. **Ein Reiterwerk in einem eigenen Control schaltete nichts um** -- alle
+    vier Seiten lagen übereinander. Beim Ausklappen ins Fenster verschob das
+    Studio die Nummern der Kinder eines Layouts, die Seiten eines
+    Reiterwerks (`tabctl.kinder`) nicht; sie zeigten auf fremde Widgets.
+    Dazu gehören die Teile eines Controls im Control jetzt zu jeder Seite
+    auf ihrer Kette, nicht nur zu einer im Fenster.
+27. **Die Farbe aus `CHART_ADD` galt im Balken nicht** -- der Kuchen färbte
+    das Segment, der Balken nahm still die Farbe der Reihe; der Ablauf-Status
+    stand ganz in Hellblau (chart). Bei einer Reihe gilt sie jetzt.
+
+**Fallen:** `LOADIMAGE` liefert für denselben Pfad das zuerst geladene
+Bild -- eine Probe, die zweimal fotografiert, braucht zwei Dateinamen.
+`SAVESCREENSHOT` nimmt, was zuletzt gezeigt wurde: nach dem `FLIP` rufen.
+Das Thema der gui heißt in `GUI_THEME_GET` `win_bg`, nicht `bg`.
+
+Tests `tests/pruef/kuehlschrank/stufe5_statistik.dhtest` (4: Zahlen, Orte,
+Kategorien, Hinweise und die Werte der Diagramme; der Barcode-Cache mit der
+Grenze von 30 Tagen und Leeren mit Esc und Enter; Thema hell und dunkel samt
+Diagrammen; echte Klicks auf Statistik, Charts und Aktualisieren),
+`werkzeug_studio_diagramm` (2) und je ein Fall in `werkzeug_studio_takt`
+und `modules_chart`. Gegenproben: achtzehn im Beispiel, elf im Studio, eine
+in der Laufzeit -- jede fällt in ihrem Fall. Die Kette über zwei Controls
+fiel erst, als ein inneres Control dazukam, das in seinem äußeren auf keiner
+Seite steht: eins auf einer Seite ist schon durch sie verdeckt.
