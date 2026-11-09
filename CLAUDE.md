@@ -279,6 +279,9 @@ Einzelheiten stehen in der Geschichte des Bereichs.
   `DH_STUDIO_KONFIG`/`DH_STUDIO_LOG`.
 - Ein Kürzel steht nur im Menü; dieselbe Taste zusätzlich mit KEYHIT abzufragen
   ließe den Befehl zweimal laufen.
+- Studio: wer im Layout auf Widgets per Nummer zeigt (`layout.kinder`,
+  `tabctl.kinder`), verschiebt die Nummer beim Ausklappen eines eigenen
+  Controls mit (`instanzAusklappen`, `seitenDerTeile` in `studio/modell.dh`).
 - Kreuz und ESC: `WINDOW_CLOSE_REQUESTED()` fragt bei Ungesichertem nach;
   `QUITREQUESTED()` ohne Kreuz ist das Bildlimit eines Testlaufs.
 - Die Kopien der Werkzeuge in Prüfungen laufen in `_programm/` -- Ordner mit
