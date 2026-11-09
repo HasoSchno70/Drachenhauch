@@ -1,0 +1,1632 @@
+{
+  "title": "⚙️ Einstellungen",
+  "x": 0,
+  "y": 0,
+  "w": 960,
+  "h": 640,
+  "movable": true,
+  "closable": false,
+  "visible": true,
+  "resizable": false,
+  "chrome": true,
+  "min_w": 0,
+  "min_h": 0,
+  "max_w": 0,
+  "max_h": 0,
+  "widgets": [
+    {
+      "kind": "tabcontrol",
+      "x": 20,
+      "y": 14,
+      "w": 920,
+      "h": 520,
+      "text": "",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "items": [
+        "🎨 Allgemein",
+        "🔔 Benachrichtigungen",
+        "⏰ Ablaufdaten",
+        "📍 Lagerorte",
+        "🏪 Supermärkte",
+        "💾 Datenbank"
+      ],
+      "sel": 0,
+      "anchor": "lrtb",
+      "tabctl": {
+        "kinder": [
+          [
+            1,
+            0
+          ],
+          [
+            2,
+            0
+          ],
+          [
+            3,
+            0
+          ],
+          [
+            4,
+            0
+          ],
+          [
+            5,
+            0
+          ],
+          [
+            6,
+            0
+          ],
+          [
+            7,
+            0
+          ],
+          [
+            8,
+            0
+          ],
+          [
+            9,
+            0
+          ],
+          [
+            10,
+            0
+          ],
+          [
+            11,
+            0
+          ],
+          [
+            12,
+            0
+          ],
+          [
+            13,
+            1
+          ],
+          [
+            14,
+            1
+          ],
+          [
+            15,
+            1
+          ],
+          [
+            16,
+            1
+          ],
+          [
+            17,
+            1
+          ],
+          [
+            18,
+            1
+          ],
+          [
+            19,
+            1
+          ],
+          [
+            20,
+            1
+          ],
+          [
+            21,
+            1
+          ],
+          [
+            22,
+            1
+          ],
+          [
+            23,
+            1
+          ],
+          [
+            24,
+            1
+          ],
+          [
+            25,
+            1
+          ],
+          [
+            26,
+            1
+          ],
+          [
+            27,
+            1
+          ],
+          [
+            28,
+            2
+          ],
+          [
+            29,
+            2
+          ],
+          [
+            30,
+            2
+          ],
+          [
+            31,
+            2
+          ],
+          [
+            32,
+            2
+          ],
+          [
+            33,
+            2
+          ],
+          [
+            34,
+            2
+          ],
+          [
+            35,
+            2
+          ],
+          [
+            36,
+            2
+          ],
+          [
+            37,
+            2
+          ],
+          [
+            38,
+            2
+          ],
+          [
+            39,
+            2
+          ],
+          [
+            40,
+            2
+          ],
+          [
+            41,
+            2
+          ],
+          [
+            42,
+            2
+          ],
+          [
+            43,
+            2
+          ],
+          [
+            44,
+            3
+          ],
+          [
+            45,
+            3
+          ],
+          [
+            46,
+            3
+          ],
+          [
+            47,
+            3
+          ],
+          [
+            48,
+            3
+          ],
+          [
+            49,
+            3
+          ],
+          [
+            50,
+            4
+          ],
+          [
+            51,
+            4
+          ],
+          [
+            52,
+            4
+          ],
+          [
+            53,
+            4
+          ],
+          [
+            54,
+            4
+          ],
+          [
+            55,
+            4
+          ],
+          [
+            56,
+            4
+          ],
+          [
+            57,
+            4
+          ],
+          [
+            58,
+            5
+          ],
+          [
+            59,
+            5
+          ],
+          [
+            60,
+            5
+          ],
+          [
+            61,
+            5
+          ],
+          [
+            62,
+            5
+          ],
+          [
+            63,
+            5
+          ],
+          [
+            64,
+            5
+          ],
+          [
+            65,
+            5
+          ],
+          [
+            66,
+            5
+          ],
+          [
+            67,
+            5
+          ],
+          [
+            68,
+            5
+          ],
+          [
+            69,
+            5
+          ],
+          [
+            70,
+            5
+          ],
+          [
+            71,
+            5
+          ],
+          [
+            72,
+            5
+          ]
+        ],
+        "seite": 0
+      },
+      "name": "reiter"
+    },
+    {
+      "kind": "label",
+      "x": 44,
+      "y": 64,
+      "w": 128,
+      "h": 16,
+      "text": "Erscheinungsbild",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "font_style": "fett",
+      "name": "titelErscheinung"
+    },
+    {
+      "kind": "checkbox",
+      "x": 64,
+      "y": 96,
+      "w": 16,
+      "h": 16,
+      "text": "🌙 Dunkles Design",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": true,
+      "placeholder": "",
+      "visible": true,
+      "auto_w": true,
+      "name": "dunkelKasten"
+    },
+    {
+      "kind": "label",
+      "x": 64,
+      "y": 138,
+      "w": 80,
+      "h": 16,
+      "text": "🌐 Sprache:",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "name": "spracheText"
+    },
+    {
+      "kind": "dropdown",
+      "x": 250,
+      "y": 132,
+      "w": 200,
+      "h": 30,
+      "text": "",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "name": "spracheWahl"
+    },
+    {
+      "kind": "label",
+      "x": 44,
+      "y": 188,
+      "w": 64,
+      "h": 16,
+      "text": "Leistung",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "font_style": "fett",
+      "name": "titelLeistung"
+    },
+    {
+      "kind": "label",
+      "x": 64,
+      "y": 224,
+      "w": 128,
+      "h": 16,
+      "text": "Auffrischen alle",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "name": "auffrischenText"
+    },
+    {
+      "kind": "spinner",
+      "x": 250,
+      "y": 218,
+      "w": 110,
+      "h": 26,
+      "text": "",
+      "color": -1,
+      "value": 30.0,
+      "min": 5.0,
+      "max": 300.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "name": "auffrischenZahl"
+    },
+    {
+      "kind": "label",
+      "x": 372,
+      "y": 224,
+      "w": 64,
+      "h": 16,
+      "text": "Sekunden",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "name": "auffrischenEinheit"
+    },
+    {
+      "kind": "checkbox",
+      "x": 64,
+      "y": 264,
+      "w": 16,
+      "h": 16,
+      "text": "🗄 Barcode-Cache verwenden",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": true,
+      "placeholder": "",
+      "visible": true,
+      "auto_w": true,
+      "name": "cacheKasten"
+    },
+    {
+      "kind": "label",
+      "x": 44,
+      "y": 312,
+      "w": 72,
+      "h": 16,
+      "text": "Einheiten",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "font_style": "fett",
+      "name": "titelEinheiten"
+    },
+    {
+      "kind": "label",
+      "x": 64,
+      "y": 348,
+      "w": 136,
+      "h": 16,
+      "text": "Standard-Einheit:",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "name": "einheitText"
+    },
+    {
+      "kind": "dropdown",
+      "x": 250,
+      "y": 342,
+      "w": 200,
+      "h": 30,
+      "text": "",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "name": "einheitWahl"
+    },
+    {
+      "kind": "label",
+      "x": 44,
+      "y": 64,
+      "w": 424,
+      "h": 16,
+      "text": "🔔 Benachrichtigungen helfen dir, nichts zu vergessen!",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "name": "meldungenInfo"
+    },
+    {
+      "kind": "checkbox",
+      "x": 44,
+      "y": 98,
+      "w": 16,
+      "h": 16,
+      "text": "Benachrichtigungen aktivieren",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": true,
+      "placeholder": "",
+      "visible": true,
+      "auto_w": true,
+      "name": "meldungenKasten"
+    },
+    {
+      "kind": "label",
+      "x": 44,
+      "y": 140,
+      "w": 168,
+      "h": 16,
+      "text": "Benachrichtigen bei …",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "font_style": "fett",
+      "name": "titelBei"
+    },
+    {
+      "kind": "checkbox",
+      "x": 64,
+      "y": 172,
+      "w": 16,
+      "h": 16,
+      "text": "❌ Abgelaufenen Produkten",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": true,
+      "placeholder": "",
+      "visible": true,
+      "auto_w": true,
+      "name": "abgelaufenKasten"
+    },
+    {
+      "kind": "checkbox",
+      "x": 64,
+      "y": 202,
+      "w": 16,
+      "h": 16,
+      "text": "⏰ Heute ablaufenden Produkten",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": true,
+      "placeholder": "",
+      "visible": true,
+      "auto_w": true,
+      "name": "heuteKasten"
+    },
+    {
+      "kind": "checkbox",
+      "x": 64,
+      "y": 232,
+      "w": 16,
+      "h": 16,
+      "text": "📅 Morgen ablaufenden Produkten",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": true,
+      "placeholder": "",
+      "visible": true,
+      "auto_w": true,
+      "name": "morgenKasten"
+    },
+    {
+      "kind": "checkbox",
+      "x": 64,
+      "y": 262,
+      "w": 16,
+      "h": 16,
+      "text": "🔔 Bald ablaufenden Produkten",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": true,
+      "placeholder": "",
+      "visible": true,
+      "auto_w": true,
+      "name": "baldKasten"
+    },
+    {
+      "kind": "checkbox",
+      "x": 64,
+      "y": 292,
+      "w": 16,
+      "h": 16,
+      "text": "📉 Unterschreitung der Mindestmenge",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": true,
+      "placeholder": "",
+      "visible": true,
+      "auto_w": true,
+      "name": "minimumKasten"
+    },
+    {
+      "kind": "label",
+      "x": 44,
+      "y": 340,
+      "w": 64,
+      "h": 16,
+      "text": "Zeitplan",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "font_style": "fett",
+      "name": "titelZeitplan"
+    },
+    {
+      "kind": "label",
+      "x": 64,
+      "y": 376,
+      "w": 112,
+      "h": 16,
+      "text": "Prüfintervall:",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "name": "pruefText"
+    },
+    {
+      "kind": "spinner",
+      "x": 250,
+      "y": 370,
+      "w": 110,
+      "h": 26,
+      "text": "",
+      "color": -1,
+      "value": 60.0,
+      "min": 15.0,
+      "max": 1440.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "name": "pruefZahl"
+    },
+    {
+      "kind": "label",
+      "x": 372,
+      "y": 376,
+      "w": 56,
+      "h": 16,
+      "text": "Minuten",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "name": "pruefEinheit"
+    },
+    {
+      "kind": "checkbox",
+      "x": 64,
+      "y": 416,
+      "w": 16,
+      "h": 16,
+      "text": "Tägliche Zusammenfassung um",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": true,
+      "placeholder": "",
+      "visible": true,
+      "auto_w": true,
+      "name": "tagesKasten"
+    },
+    {
+      "kind": "timepicker",
+      "x": 330,
+      "y": 410,
+      "w": 110,
+      "h": 30,
+      "text": "",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "sel": 1,
+      "time": "12:00:00",
+      "name": "tagesZeit"
+    },
+    {
+      "kind": "button",
+      "x": 44,
+      "y": 466,
+      "w": 260,
+      "h": 36,
+      "text": "🧪 Test-Benachrichtigung",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "name": "knopfTest"
+    },
+    {
+      "kind": "label",
+      "x": 44,
+      "y": 64,
+      "w": 56,
+      "h": 16,
+      "text": "Warnung",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "font_style": "fett",
+      "name": "titelWarnung"
+    },
+    {
+      "kind": "label",
+      "x": 64,
+      "y": 100,
+      "w": 88,
+      "h": 16,
+      "text": "Warnung ab:",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "name": "warnText"
+    },
+    {
+      "kind": "spinner",
+      "x": 250,
+      "y": 94,
+      "w": 110,
+      "h": 26,
+      "text": "",
+      "color": -1,
+      "value": 3.0,
+      "min": 1.0,
+      "max": 14.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "name": "warnZahl"
+    },
+    {
+      "kind": "label",
+      "x": 372,
+      "y": 100,
+      "w": 88,
+      "h": 16,
+      "text": "Tage vorher",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "name": "warnEinheit"
+    },
+    {
+      "kind": "label",
+      "x": 64,
+      "y": 136,
+      "w": 1,
+      "h": 16,
+      "text": "",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "name": "warnBeispiel"
+    },
+    {
+      "kind": "label",
+      "x": 44,
+      "y": 184,
+      "w": 112,
+      "h": 16,
+      "text": "Standard-Werte",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "font_style": "fett",
+      "name": "titelStandard"
+    },
+    {
+      "kind": "label",
+      "x": 64,
+      "y": 220,
+      "w": 168,
+      "h": 16,
+      "text": "Standard-Haltbarkeit:",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "name": "haltbarText"
+    },
+    {
+      "kind": "spinner",
+      "x": 250,
+      "y": 214,
+      "w": 110,
+      "h": 26,
+      "text": "",
+      "color": -1,
+      "value": 7.0,
+      "min": 1.0,
+      "max": 365.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "name": "haltbarZahl"
+    },
+    {
+      "kind": "label",
+      "x": 372,
+      "y": 220,
+      "w": 32,
+      "h": 16,
+      "text": "Tage",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "name": "haltbarEinheit"
+    },
+    {
+      "kind": "label",
+      "x": 44,
+      "y": 268,
+      "w": 80,
+      "h": 16,
+      "text": "Farbschema",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "font_style": "fett",
+      "name": "titelFarben"
+    },
+    {
+      "kind": "label",
+      "x": 64,
+      "y": 304,
+      "w": 64,
+      "h": 16,
+      "text": "✅ Frisch",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "name": "frischText"
+    },
+    {
+      "kind": "panel",
+      "x": 250,
+      "y": 300,
+      "w": 110,
+      "h": 24,
+      "text": "",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "ov": {
+        "bg": 8505220
+      },
+      "name": "frischFarbe"
+    },
+    {
+      "kind": "label",
+      "x": 64,
+      "y": 340,
+      "w": 128,
+      "h": 16,
+      "text": "⏰ Bald ablaufend",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "name": "baldText"
+    },
+    {
+      "kind": "panel",
+      "x": 250,
+      "y": 336,
+      "w": 110,
+      "h": 24,
+      "text": "",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "ov": {
+        "bg": 16758605
+      },
+      "name": "baldFarbe"
+    },
+    {
+      "kind": "label",
+      "x": 64,
+      "y": 376,
+      "w": 96,
+      "h": 16,
+      "text": "❌ Abgelaufen",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "name": "abgelaufenText"
+    },
+    {
+      "kind": "panel",
+      "x": 250,
+      "y": 372,
+      "w": 110,
+      "h": 24,
+      "text": "",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "ov": {
+        "bg": 15037299
+      },
+      "name": "abgelaufenFarbe"
+    },
+    {
+      "kind": "label",
+      "x": 44,
+      "y": 64,
+      "w": 600,
+      "h": 16,
+      "text": "📍 Lagerorte anlegen, Sinnbild und Farbe ändern, löschen -- das gilt sofort.",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "name": "ortInfo"
+    },
+    {
+      "kind": "textinput",
+      "x": 44,
+      "y": 96,
+      "w": 300,
+      "h": 32,
+      "text": "",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "Name des Lagerorts …",
+      "visible": true,
+      "name": "ortNameFeld"
+    },
+    {
+      "kind": "button",
+      "x": 354,
+      "y": 96,
+      "w": 44,
+      "h": 32,
+      "text": "📦",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "tooltip": "Sinnbild wählen",
+      "name": "ortSinnbildKnopf"
+    },
+    {
+      "kind": "button",
+      "x": 408,
+      "y": 96,
+      "w": 160,
+      "h": 32,
+      "text": "➕ Hinzufügen",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "variant": "erfolg",
+      "name": "knopfOrtNeu"
+    },
+    {
+      "kind": "table",
+      "x": 44,
+      "y": 142,
+      "w": 672,
+      "h": 324,
+      "text": "",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "table": {
+        "headers": [
+          "",
+          "Lagerort",
+          "Farbe",
+          "Einträge",
+          "",
+          ""
+        ],
+        "rows": [],
+        "col_widths": [
+          44,
+          250,
+          110,
+          90,
+          100,
+          60
+        ],
+        "selected": -1
+      },
+      "name": "ortTabelle"
+    },
+    {
+      "kind": "button",
+      "x": 44,
+      "y": 476,
+      "w": 360,
+      "h": 36,
+      "text": "🗑 Farben und Sinnbilder zurücksetzen",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "variant": "gefahr",
+      "name": "knopfOrteZurueck"
+    },
+    {
+      "kind": "label",
+      "x": 44,
+      "y": 64,
+      "w": 448,
+      "h": 16,
+      "text": "🏪 Sortiere deine Einkaufsliste nach den Gängen im Laden!",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "name": "marktInfo"
+    },
+    {
+      "kind": "label",
+      "x": 44,
+      "y": 102,
+      "w": 176,
+      "h": 16,
+      "text": "⭐ Standard-Supermarkt:",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "name": "marktStandardText"
+    },
+    {
+      "kind": "dropdown",
+      "x": 270,
+      "y": 96,
+      "w": 260,
+      "h": 30,
+      "text": "",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "name": "marktStandard"
+    },
+    {
+      "kind": "label",
+      "x": 44,
+      "y": 146,
+      "w": 128,
+      "h": 16,
+      "text": "Neuer Supermarkt",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "font_style": "fett",
+      "name": "titelMarktNeu"
+    },
+    {
+      "kind": "textinput",
+      "x": 64,
+      "y": 176,
+      "w": 230,
+      "h": 32,
+      "text": "",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "z.B. Mein REWE …",
+      "visible": true,
+      "name": "marktNameFeld"
+    },
+    {
+      "kind": "dropdown",
+      "x": 304,
+      "y": 176,
+      "w": 230,
+      "h": 32,
+      "text": "",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "name": "marktVorlage"
+    },
+    {
+      "kind": "button",
+      "x": 544,
+      "y": 176,
+      "w": 150,
+      "h": 32,
+      "text": "➕ Erstellen",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "variant": "erfolg",
+      "name": "knopfMarktNeu"
+    },
+    {
+      "kind": "table",
+      "x": 44,
+      "y": 222,
+      "w": 672,
+      "h": 290,
+      "text": "",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "table": {
+        "headers": [
+          "",
+          "Supermarkt",
+          "Plan",
+          "Gänge",
+          "",
+          ""
+        ],
+        "rows": [],
+        "col_widths": [
+          40,
+          230,
+          180,
+          80,
+          70,
+          60
+        ],
+        "selected": -1
+      },
+      "name": "marktTabelle"
+    },
+    {
+      "kind": "label",
+      "x": 44,
+      "y": 64,
+      "w": 72,
+      "h": 16,
+      "text": "Datenbank",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "font_style": "fett",
+      "name": "titelDb"
+    },
+    {
+      "kind": "label",
+      "x": 64,
+      "y": 94,
+      "w": 1,
+      "h": 16,
+      "text": "",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "name": "dbPfad"
+    },
+    {
+      "kind": "label",
+      "x": 64,
+      "y": 120,
+      "w": 1,
+      "h": 16,
+      "text": "",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "name": "dbGroesse"
+    },
+    {
+      "kind": "label",
+      "x": 64,
+      "y": 146,
+      "w": 1,
+      "h": 16,
+      "text": "",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "name": "dbZahlen"
+    },
+    {
+      "kind": "label",
+      "x": 44,
+      "y": 186,
+      "w": 160,
+      "h": 16,
+      "text": "Sicherung und Export",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "font_style": "fett",
+      "name": "titelSicherung"
+    },
+    {
+      "kind": "button",
+      "x": 64,
+      "y": 216,
+      "w": 230,
+      "h": 36,
+      "text": "💾 Sicherung anlegen",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "variant": "primaer",
+      "name": "knopfSichern"
+    },
+    {
+      "kind": "button",
+      "x": 304,
+      "y": 216,
+      "w": 250,
+      "h": 36,
+      "text": "📥 Sicherung einspielen …",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "name": "knopfEinspielen"
+    },
+    {
+      "kind": "button",
+      "x": 64,
+      "y": 260,
+      "w": 230,
+      "h": 36,
+      "text": "📤 Als CSV exportieren …",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "name": "knopfCsv"
+    },
+    {
+      "kind": "label",
+      "x": 44,
+      "y": 314,
+      "w": 56,
+      "h": 16,
+      "text": "Wartung",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "font_style": "fett",
+      "name": "titelWartung"
+    },
+    {
+      "kind": "button",
+      "x": 64,
+      "y": 344,
+      "w": 230,
+      "h": 36,
+      "text": "⚡ Optimieren",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "name": "knopfOptimieren"
+    },
+    {
+      "kind": "button",
+      "x": 304,
+      "y": 344,
+      "w": 250,
+      "h": 36,
+      "text": "🧹 Aufräumen (VACUUM)",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "name": "knopfAufraeumen"
+    },
+    {
+      "kind": "label",
+      "x": 44,
+      "y": 398,
+      "w": 96,
+      "h": 16,
+      "text": "Neu beginnen",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "font_style": "fett",
+      "name": "titelNeu"
+    },
+    {
+      "kind": "checkbox",
+      "x": 64,
+      "y": 430,
+      "w": 16,
+      "h": 16,
+      "text": "Die 29 Rezepte des Katalogs mitnehmen",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": true,
+      "placeholder": "",
+      "visible": true,
+      "auto_w": true,
+      "name": "rezepteKasten"
+    },
+    {
+      "kind": "button",
+      "x": 64,
+      "y": 462,
+      "w": 230,
+      "h": 36,
+      "text": "🆕 Neue Datenbank …",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "variant": "gefahr",
+      "name": "knopfNeuDb"
+    },
+    {
+      "kind": "label",
+      "x": 304,
+      "y": 470,
+      "w": 400,
+      "h": 16,
+      "text": "",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "wrap": true,
+      "name": "dbStatus"
+    },
+    {
+      "kind": "button",
+      "x": 20,
+      "y": 550,
+      "w": 180,
+      "h": 40,
+      "text": "🔄 Zurücksetzen",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "anchor": "lb",
+      "variant": "warnung",
+      "name": "knopfZuruecksetzen"
+    },
+    {
+      "kind": "button",
+      "x": 640,
+      "y": 550,
+      "w": 140,
+      "h": 40,
+      "text": "❌ Abbrechen",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "anchor": "rb",
+      "name": "knopfAbbrechen"
+    },
+    {
+      "kind": "button",
+      "x": 790,
+      "y": 550,
+      "w": 150,
+      "h": 40,
+      "text": "✅ Speichern",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "anchor": "rb",
+      "variant": "erfolg",
+      "name": "knopfSpeichern"
+    }
+  ],
+  "menus": [],
+  "tabs": [],
+  "active_tab": 0,
+  "tabs_closable": false,
+  "default_button": -1,
+  "cancel_button": -1,
+  "name": "EinstellungenFenster",
+  "studio_abbrechen": "knopfAbbrechen",
+  "studio_standard": "knopfSpeichern"
+}

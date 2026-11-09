@@ -971,7 +971,7 @@ fn format_one(mask: &str, v: &Value) -> R {
     // Wert verschwand still -- etwa bei der VB-Maske "#,##0.00" (gefunden in
     // der Konsolen-Runde). Die Doku versprach schon eine Meldung.
     if !mask.replace("%%", "").contains('%') {
-        return err(format!("FORMAT$: die Maske {:?} hat keinen Platzhalter -- der Wert kaeme                             nicht vor. FORMAT$ arbeitet im printf-Stil (\"%.2f\", \"%05d\");                             Tausenderpunkte und Dezimalkomma schreibt ZAHL$(wert, stellen)", mask));
+        return err(format!("FORMAT$: die Maske {:?} hat keinen Platzhalter -- der Wert kaeme nicht vor. FORMAT$ arbeitet im printf-Stil (\"%.2f\", \"%05d\"); Tausenderpunkte und Dezimalkomma schreibt ZAHL$(wert, stellen)", mask));
     }
     let bytes: Vec<char> = mask.chars().collect();
     let mut out = String::new();
@@ -3437,12 +3437,18 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             }
         }
         "readall$" | "readall" => {
-            arity!(1);
+            arity!(1, 2);
             // Mit einem PFAD statt eines FILE-Handles: die ganze Datei auf
             // einmal -- so schreibt es jeder zuerst, und vorher war es ein
-            // Fehler ("READALL$ erwartet FILE").
+            // Fehler ("READALL$ erwartet FILE"). Die Kodierung wie bei
+            // READLINES: die Meldung fuer eine Datei, die kein UTF-8 ist,
+            // raet dazu, und vorher lehnte READALL das zweite Argument ab.
             if let Value::Str(pfad) = &a[0] {
-                return Ok(Value::str_rc(text_lesen(pfad, None, "READALL$")?));
+                let kod = if a.len() > 1 { Some(need_str(&a[1], "READALL$")?) } else { None };
+                return Ok(Value::str_rc(text_lesen(pfad, kod, "READALL$")?));
+            }
+            if a.len() > 1 {
+                return err("READALL$: die Kodierung einer offenen Datei steht schon bei OPENFILE(pfad, modus, kodierung)");
             }
             let f = file_h(&a[0], "READALL$")?;
             let mut f = f.borrow_mut();

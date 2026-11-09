@@ -112,6 +112,9 @@ Zeichnen	Drawing
 Zeichenfläche	Canvas
 Zeichenflaeche	Canvas
 eine Fläche, auf die das Programm selbst zeichnet	an area the program draws on itself
+Diagramm	Chart
+Kuchen, Balken, Linie oder Tacho, das sich selbst zeichnet	pie, bar, line or gauge that draws itself
+Diagrammtitel	Chart title
 Unsichtbar	Invisible
 Timer	Timer
 ruft sein Ereignis Aktion in festen Abständen	calls its Aktion event at fixed intervals
@@ -213,7 +216,6 @@ Anwendung	Application
 Control	Control
 Eigenes Control	Custom control
 Eigenes Control hinzufügen …	Add custom control …
-Menüs hat nur ein Fenster, kein eigenes Control.	Only a window has menus, not a custom control.
 ein eigenes Control dieses Projekts	a custom control of this project
 {0} gibt es nicht im Projekt	{0} does not exist in the project
 {0} enthält sich selbst	{0} contains itself
@@ -370,6 +372,9 @@ Keine Vorschläge an dieser Stelle.	No suggestions here.
 Breite	Width
 Höhe	Height
 Größe änderbar	Resizable
+Standard-Knopf (Enter)	Default button (Enter)
+Abbrechen-Knopf (Esc)	Cancel button (Esc)
+(keiner)	(none)
 Intervall (ms)	Interval (ms)
 Läuft beim Start	Runs at start
 Wiederholt sich	Repeats
@@ -672,3 +677,45 @@ Spalten gehören in ein Band der Seite.	Columns belong in a band of the page.
 Elemente gehören in ein Band.	Elements belong in a band.
 Nur Zeilen mit	Only rows with
 Summe über	Sum over
+Datenbank aus Datei übernehmen …	Database from file …
+Erst das Projekt sichern -- die Datei kommt in seinen Ordner.	Save the project first -- the file goes into its folder.
+Datenbank wählen	Choose database
+Im Projektordner liegt schon eine Datei {0}.	The project folder already holds a file {0}.
+{0} lässt sich nicht lesen: {1}	{0} cannot be read: {1}
+{0} aus {1} übernommen: {2} Tabellen.	{0} taken over from {1}: {2} tables.
+{0} übernommen	{0} taken over
+{0}: eindeutig über ({1}) bleibt in der Datei -- das Studio kennt nur eindeutige Einzelspalten.	{0}: unique over ({1}) stays in the file -- the Studio only knows unique single columns.
+Tabelle {0} bleibt in der Datei, aber nicht im Aufbau: {1}	Table {0} stays in the file, but not in the structure: {1}
+Spalte {0}.{1} bleibt in der Datei, aber nicht im Aufbau: {2}	Column {0}.{1} stays in the file, but not in the structure: {2}
+{0} hat keine Spalte id INTEGER PRIMARY KEY -- das Studio zeigt sie, binden lässt sie sich nicht.	{0} has no column id INTEGER PRIMARY KEY -- the Studio shows it, but it cannot be bound.
+Knöpfe	Buttons
+Mit Text	With text
+Felder	Fields
+Text|Sinnbild|Tipp je Knopf, durch Semikolon getrennt; - = Trenner, ~ = Lücke	Text|symbol|tip per button, separated by semicolons; - = separator, ~ = gap
+Text|Breite[|links,mitte,rechts[|klick]] je Feld, durch Semikolon getrennt; Breite 0 = der Rest	Text|width[|links,mitte,rechts[|klick]] per field, separated by semicolons; width 0 = the rest
+wenn ein Knopf der Leiste gedrückt wird (seine Nummer ab 0)	when a button of the bar is pressed (its number from 0)
+wenn ein klickbares Feld angeklickt wird (seine Nummer ab 0)	when a clickable field is clicked (its number from 0)
+in jedem Bild, nach den Ereignissen seiner Controls -- für alles, was es abfragen will	in every frame, after the events of its controls -- for whatever it wants to poll
+wenn eine Zelle angeklickt wird (Datenzeile und Spalte, auch auf einen Knopf in der Zelle)	when a cell is clicked (data row and column, also on a button in the cell)
+Ziehbar	Draggable
+Ablage	Drop target
+wenn etwas darauf abgelegt wird (Zeile in der Quelle, Zeile hier; woher und was sagen GUI_DROP_SOURCE und GUI_DROP_TEXT)	when something is dropped on it (row in the source, row here; GUI_DROP_SOURCE and GUI_DROP_TEXT tell where from and what)
+Beim Löschen	On delete
+verbieten	forbid
+mitlöschen	delete too
+leeren	clear
+„{0}“ ist keine Wahl -- möglich sind verbieten, loeschen und leeren.	"{0}" is not a choice -- possible are verbieten, loeschen and leeren.
+Die Spalte {0} verweist auf nichts -- erst unter „Verweis auf“ eine Tabelle wählen.	The column {0} refers to nothing -- first choose a table under "Refers to".
+Die Spalte {0} ist Pflicht -- leeren geht nur ohne.	The column {0} is required -- clear works only without.
+Spalte {0}: beim Löschen {1}.	Column {0}: on delete {1}.
+Menüs hat ein Fenster oder ein eigenes Control.	Menus belong to a window or a custom control.
++ Kontextmenü	+ Context menu
+ein Menü für den Rechtsklick auf ein Widget oder das Fenster	a menu for the right click on a widget or the window
+An	On
+(das Fenster)	(the window)
+Rechtsklick auf dieses Widget öffnet das Kontextmenü	a right click on this widget opens the context menu
+Kontextmenü → {0}	Context menu → {0}
+Ein eigenes Control hat keine Menüleiste. [+ Kontextmenü] legt eins für den Rechtsklick an.	A custom control has no menu bar. [+ Context menu] creates one for the right click.
+Ein Kontextmenü mit {0} Einträgen. Sein Name ist das Handle (GUI_CONTEXT); die Einträge haben ihr Ereignis wie im Menü.	A context menu with {0} entries. Its name is the handle (GUI_CONTEXT); the entries have their event as in the menu.
+Datumsfeld	Date field
+ein Datum im Feld, der Kalender klappt auf	a date in a field, the calendar drops down

@@ -131,7 +131,7 @@ PRINT "Status: ", HTTP_STATUS()
 PRINT body
 ```
 
-**Default-Timeout: 10 Sekunden.** Bei Timeout, Verbindungsfehler oder 4xx/5xx-Status wirft die Funktion `DHRuntimeError` mit Status-Code in der Meldung. Nach einem 4xx/5xx ist `HTTP_STATUS()` weiterhin lesbar — nützlich für `TRY/CATCH`-Pattern:
+**Default-Timeout: 10 Sekunden.** Bei Timeout, Verbindungsfehler oder 4xx/5xx-Status wirft die Funktion `DHRuntimeError` mit Status-Code in der Meldung. Nach einem 4xx/5xx ist `HTTP_STATUS()` weiterhin lesbar — nützlich für `TRY/CATCH`-Pattern. Kam gar keine Antwort (kein Netz, Zeitgrenze), ist es 0, nicht der Status der vorigen Antwort:
 
 ```basic
 TRY
@@ -211,6 +211,7 @@ Nach `HTTP_RESULT` stehen `HTTP_STATUS()` und `HTTP_HEADER()` genau wie nach `HT
 - **`HTTP_RESULT` vor `HTTP_READY`** bricht mit Klartext ab statt zu blockieren — sonst wäre der Vorteil wieder verspielt.
 - **Mehrere Abrufe laufen wirklich gleichzeitig.** Zwei Anfragen zu je 300 ms sind nach ~300 ms fertig, nicht nach 600.
 - **Nummern bleiben stabil** (Tombstones wie bei `timer`): eine abgeholte oder abgebrochene Nummer wird nicht neu vergeben. Ein Programm kann eine alte Nummer also nicht versehentlich auf einen fremden Abruf beziehen.
+- **Die erste Nummer ist 0** (wie bei `timer`). Wer sich "kein Abruf unterwegs" merken will, nimmt -1 -- ein frisches `DIM abruf AS INTEGER` ist 0 und damit schon die Nummer des ersten Abrufs.
 - **Abbrechen stoppt den Abruf nicht mitten im Netz** — er läuft zu Ende, sein Ergebnis wird verworfen. Das Programm wartet dabei auf nichts.
 - **Jede Methode.** `HTTP_GET_START` ist die Kurzform für GET; `HTTP_REQUEST_START` nimmt jede Methode samt Rumpf und Kopfzeilen (siehe Tabelle). Ein `HTTP_DOWNLOAD` im Hintergrund gibt es nicht -- dafür `HTTP_GET_START` und nach `HTTP_RESULT` den rohen Rumpf aus `HTTP_BYTES()` mit `WRITEALL_BYTES` sichern.
 

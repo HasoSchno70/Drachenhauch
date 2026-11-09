@@ -1,0 +1,190 @@
+' Die Datenbank pflegen, wie der Reiter Datenbank der Python-App
+' (database_tab.py): Sicherung anlegen und einspielen, Tabellen als CSV,
+' optimieren (ANALYZE), aufräumen (VACUUM), neu beginnen mit den Startdaten.
+'
+' Anders als dort:
+'  * Die Sicherung schreibt SQLite selbst (VACUUM INTO) -- die Python-App
+'    kopierte die Datei, während sie offen war.
+'  * Einspielen ersetzt den Inhalt Tabelle für Tabelle in einem Schritt, ohne
+'    Neustart; vorher entsteht eine Sicherung des jetzigen Stands. Dort wurde
+'    die offene Datei überschrieben, und die App musste neu starten.
+'  * „Neue Datenbank“ leert die offene Datei und legt die Startdaten an, mit
+'    den 29 Rezepten des Katalogs, wenn gewünscht (dort hieß es „50+“). „An
+'    anderem Ort erstellen“ fehlt: dort entstand eine Datei, die die App nie
+'    öffnete (ihr Pfad stand fest).
+IMPORT "db"
+
+CONST CSV_TABELLEN = "products,inventory,shopping_list,recipes,recipe_ingredients"
+
+' Die Sicherung, die das letzte Einspielen vorher angelegt hat.
+DIM vorEinspielen AS STRING
+
+FUNCTION dbDatei$() AS STRING
+    RETURN studioDbPfad$("fridge_database.db")
+END FUNCTION
+
+' Der Pfad zum Zeigen: ganz, auch wenn die Datei relativ geöffnet ist.
+FUNCTION dbDateiGanz$() AS STRING
+    DIM p AS STRING : p = dbDatei$()
+    IF LEFT$(p, 1) = "/" OR LEFT$(p, 1) = "\" OR MID$(p, 1, 1) = ":" THEN RETURN p
+    RETURN PATHJOIN(CWD$(), p)
+END FUNCTION
+
+' Wie _format_size: "12,3 KB" (englisch "12.3 KB").
+FUNCTION groesseText$(bytes AS INTEGER) AS STRING
+    DIM x AS FLOAT : x = bytes
+    DIM komma AS STRING : komma = IIF(Sprache$() = "en", ".", ",")
+    DIM e AS STRING
+    FOR EACH e IN ["Bytes", "KB", "MB", "GB"]
+        IF ABS(x) < 1024 THEN RETURN REPLACE$(FORMAT$(x, "%.1f"), ".", komma) + " " + IIF(e = "Bytes", tr$("Bytes"), e)
+        x = x / 1024
+    NEXT
+    RETURN REPLACE$(FORMAT$(x, "%.1f"), ".", komma) + " TB"
+END FUNCTION
+
+FUNCTION sicherungsOrdner$() AS STRING
+    RETURN PATHJOIN(DIRNAME(dbDatei$()), "backups")
+END FUNCTION
+
+' Eine Sicherung (kuehlschrank_backup_JJJJMMTT_SSMMSS.db im Ordner backups
+' neben der Datei); liefert ihren Pfad.
+FUNCTION sicherungAnlegen$() AS STRING
+    IF NOT FILEEXISTS(sicherungsOrdner$()) THEN MKDIR(sicherungsOrdner$())
+    DIM stempel AS STRING : stempel = REPLACE$(heute$(), "-", "") + "_" + REPLACE$(TIME$(), ":", "")
+    DIM ziel AS STRING : ziel = PATHJOIN(sicherungsOrdner$(), "kuehlschrank_backup_" + stempel + ".db")
+    DIM n AS INTEGER : n = 1
+    WHILE FILEEXISTS(ziel)
+        n = n + 1
+        ziel = PATHJOIN(sicherungsOrdner$(), "kuehlschrank_backup_" + stempel + "_" + STR$(n) + ".db")
+    WEND
+    DB_EXEC(db, "VACUUM INTO ?", ziel)
+    RETURN ziel
+END FUNCTION
+
+' Die eigenen Tabellen (ohne sqlite_*).
+FUNCTION tabellenIn(schema AS STRING) AS ARRAY OF STRING
+    RETURN textListe("SELECT name FROM " + schema + ".sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
+END FUNCTION
+
+FUNCTION spaltenIn(schema AS STRING, tabelle AS STRING) AS ARRAY OF STRING
+    RETURN textListe("SELECT name FROM pragma_table_info('" + REPLACE$(tabelle, "'", "''") + "', '" + schema + "')")
+END FUNCTION
+
+' Eine Sicherung einspielen: jede Tabelle bekommt den Inhalt der Sicherung
+' (die Spalten, die beide haben; eine Tabelle, die die Sicherung nicht kennt,
+' wird leer -- wie nach dem Ersetzen der Datei). Vorher eine Sicherung des
+' jetzigen Stands (ihr Pfad steht danach in vorEinspielen). "" oder was nicht
+' ging.
+FUNCTION sicherungEinspielen$(pfad AS STRING) AS STRING
+    vorEinspielen = ""
+    IF NOT FILEEXISTS(pfad) THEN RETURN tr$("Die Datei gibt es nicht.")
+    TRY
+        DB_EXEC(db, "ATTACH DATABASE ? AS q", pfad)
+    CATCH fehler
+        RETURN tr$("Das ist keine Datenbank-Datei.")
+    END TRY
+    DIM gute AS BOOLEAN : gute = FALSE
+    TRY
+        gute = dbZahl("SELECT COUNT(*) FROM q.sqlite_master WHERE type = 'table' AND name IN ('products', 'inventory')") = 2
+    CATCH fehler2
+        gute = FALSE
+    END TRY
+    IF NOT gute THEN
+        DB_EXEC(db, "DETACH DATABASE q")
+        RETURN tr$("Das ist keine Sicherung der Kühlschrank-App (es fehlen products und inventory).")
+    END IF
+    DB_EXEC(db, "DETACH DATABASE q")
+    vorEinspielen = sicherungAnlegen$()
+    DB_EXEC(db, "ATTACH DATABASE ? AS q", pfad)
+    DIM dort AS ARRAY OF STRING : dort = tabellenIn("q")
+    DB_EXEC(db, "PRAGMA foreign_keys = OFF")
+    DB_BEGIN(db)
+    DIM t AS STRING
+    FOR EACH t IN tabellenIn("main")
+        DIM qt AS STRING : qt = CHR$(34) + t + CHR$(34)
+        DB_EXEC(db, "DELETE FROM main." + qt)
+        IF ARRAY_INDEXOF(dort, t) < 0 THEN CONTINUE
+        DIM beide AS ARRAY OF STRING : beide = []
+        DIM qs AS ARRAY OF STRING : qs = spaltenIn("q", t)
+        DIM c AS STRING
+        FOR EACH c IN spaltenIn("main", t)
+            IF ARRAY_INDEXOF(qs, c) >= 0 THEN ARRAY_PUSH(beide, CHR$(34) + c + CHR$(34))
+        NEXT
+        IF LEN(beide) = 0 THEN CONTINUE
+        DB_EXEC(db, "INSERT INTO main." + qt + " (" + JOIN$(beide, ", ") + ") SELECT " + JOIN$(beide, ", ") + " FROM q." + qt)
+    NEXT
+    DB_COMMIT(db)
+    DB_EXEC(db, "DETACH DATABASE q")
+    DB_EXEC(db, "PRAGMA foreign_keys = ON")
+    ' Eine Sicherung ohne Lagerorte (eine alte) bekommt die Startdaten, wie
+    ' eine leere Datei beim Start.
+    IF dbZahl("SELECT COUNT(*) FROM storage_locations") = 0 THEN startdatenAnlegen()
+    ' Der Verlauf meinte Zeilen, die es so nicht mehr gibt.
+    verlauf.vergessen()
+    meldungenVergessen()
+    RETURN ""
+END FUNCTION
+
+' Wie _export_data: je Tabelle mit Zeilen eine CSV mit Kopfzeile (UTF-8);
+' liefert "tabelle.csv (n Zeilen)" je geschriebener Datei.
+FUNCTION csvExport(ordner AS STRING) AS ARRAY OF STRING
+    DIM aus AS ARRAY OF STRING : aus = []
+    DIM t AS STRING
+    FOR EACH t IN SPLIT(CSV_TABELLEN, ",")
+        DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT * FROM " + t)
+        DIM zeilen AS ARRAY OF STRING : zeilen = []
+        DIM n AS INTEGER : n = DB_COL_COUNT(r)
+        DIM kopf AS ARRAY OF STRING : kopf = []
+        DIM i AS INTEGER
+        FOR i = 0 TO n - 1
+            ARRAY_PUSH(kopf, DB_COL_NAME(r, i))
+        NEXT
+        ARRAY_PUSH(zeilen, CSV_ROW$(kopf))
+        WHILE DB_NEXT(r)
+            DIM f AS ARRAY OF STRING : f = []
+            FOR i = 0 TO n - 1
+                ARRAY_PUSH(f, IIF(DB_IS_NULL(r, i), "", DB_GET_STRING(r, i)))
+            NEXT
+            ARRAY_PUSH(zeilen, CSV_ROW$(f))
+        WEND
+        IF LEN(zeilen) = 1 THEN CONTINUE
+        WRITEALL(PATHJOIN(ordner, t + ".csv"), JOIN$(zeilen, CHR$(10)) + CHR$(10))
+        ARRAY_PUSH(aus, trf$("{0}.csv ({1} Zeilen)", [t, STR$(LEN(zeilen) - 1)]))
+    NEXT
+    RETURN aus
+END FUNCTION
+
+SUB optimieren()
+    DB_EXEC(db, "ANALYZE")
+    DB_EXEC(db, "PRAGMA optimize")
+END SUB
+
+' VACUUM; liefert (Größe vorher, Größe nachher).
+FUNCTION aufraeumen() AS TUPLE
+    DIM vorher AS INTEGER : vorher = FILESIZE(dbDatei$())
+    DB_EXEC(db, "VACUUM")
+    RETURN (vorher, FILESIZE(dbDatei$()))
+END FUNCTION
+
+' Neu beginnen: alles leer, dann die Startdaten (wie eine neue Datei), mit
+' den Rezepten des Katalogs, wenn gewünscht.
+SUB datenbankNeu(mitRezepten AS BOOLEAN)
+    DB_EXEC(db, "PRAGMA foreign_keys = OFF")
+    DB_BEGIN(db)
+    DIM t AS STRING
+    FOR EACH t IN tabellenIn("main")
+        DB_EXEC(db, "DELETE FROM " + CHR$(34) + t + CHR$(34))
+    NEXT
+    IF dbZahl("SELECT COUNT(*) FROM sqlite_master WHERE name = 'sqlite_sequence'") > 0 THEN DB_EXEC(db, "DELETE FROM sqlite_sequence")
+    DB_COMMIT(db)
+    DB_EXEC(db, "PRAGMA foreign_keys = ON")
+    startdatenAnlegen()
+    IF mitRezepten THEN
+        DIM x AS Rezept
+        FOR EACH x IN katalog()
+            rezeptAnlegen(x)
+        NEXT
+    END IF
+    verlauf.vergessen()
+    meldungenVergessen()
+END SUB

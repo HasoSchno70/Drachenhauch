@@ -101,6 +101,34 @@ PRINT GUI_DROPDOWN_TEXT(d)
 --- erwartet
 c
 
+=== dropdown count and item
+' Die Eintraege einer Klappliste lesen -- auch nach GUI_SET_DROPDOWN; ein
+' Index daneben und eine Liste statt einer Klappliste sagen es.
+IMPORT "gui"
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("F", 0, 0, 300, 260)
+DIM dd AS GUI_WIDGET
+dd = GUI_DROPDOWN(win, 10, 10, 160, 26, ["rot", "gruen"])
+PRINT GUI_DROPDOWN_COUNT(dd); " "; GUI_DROPDOWN_ITEM(dd, 1)
+GUI_SET_DROPDOWN(dd, ["-- wählen --", "Bananen", "Banane bio", "Brot"])
+PRINT GUI_DROPDOWN_COUNT(dd); " "; GUI_DROPDOWN_ITEM(dd, 0); " | "; GUI_DROPDOWN_ITEM(dd, 3)
+TRY
+    PRINT GUI_DROPDOWN_ITEM(dd, 4)
+CATCH e
+    PRINT e
+END TRY
+DIM lb AS GUI_WIDGET : lb = GUI_LISTBOX(win, 10, 50, 160, 80, ["a"])
+TRY
+    PRINT GUI_DROPDOWN_COUNT(lb)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+2 gruen
+4 -- wählen -- | Brot
+GUI_DROPDOWN_ITEM: Eintrag 4 gibt es nicht (die Liste hat 4)
+GUI_DROPDOWN_COUNT: Widget ist keine Klappliste
+
 === form widgets roundtrip
 IMPORT "gui"
 DIM win AS GUI_WINDOW
@@ -136,3 +164,33 @@ PRINT GUI_DROPDOWN_SELECTED(b)
 --- fehler
 GUI_DROPDOWN_SELECTED: Widget ist kein dropdown/listbox
 
+=== klappliste: gui_set_text waehlt, gui_text liefert die auswahl
+' Eine Klappliste ohne Tippen merkte sich den mit GUI_SET_TEXT gesetzten Text
+' nur, gewaehlt blieb der alte Eintrag (oder keiner) -- und GUI_TEXT lieferte
+' den gesetzten Text auch noch, nachdem eine andere Auswahl getroffen war
+' (Kuehlschrank-App, Standard-Einheit in den Einstellungen).
+IMPORT "gui"
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("F", 0, 0, 300, 260)
+DIM dd AS GUI_WIDGET
+dd = GUI_DROPDOWN(win, 10, 10, 150, 28, [])
+GUI_SET_DROPDOWN(dd, ["Stück", "kg", "g"])
+PRINT "anfang ["; GUI_TEXT(dd); "] "; GUI_DROPDOWN_SELECTED(dd)
+GUI_SET_TEXT(dd, "KG")
+PRINT "gesetzt ["; GUI_TEXT(dd); "] "; GUI_DROPDOWN_SELECTED(dd); " ["; GUI_DROPDOWN_TEXT(dd); "]"
+GUI_DROPDOWN_SET_SELECTED(dd, 2)
+PRINT "gewaehlt ["; GUI_TEXT(dd); "] "; GUI_DROPDOWN_SELECTED(dd)
+GUI_SET_TEXT(dd, "Liter")
+PRINT "unbekannt ["; GUI_TEXT(dd); "] "; GUI_DROPDOWN_SELECTED(dd)
+' Bearbeitbar bleibt es beim Text, wie es war.
+DIM fr AS GUI_WIDGET
+fr = GUI_DROPDOWN(win, 10, 50, 150, 28, ["Stück", "kg"])
+GUI_DROPDOWN_SET(fr, "bearbeitbar", 1)
+GUI_SET_TEXT(fr, "Liter")
+PRINT "bearbeitbar ["; GUI_TEXT(fr); "] "; GUI_DROPDOWN_SELECTED(fr)
+--- erwartet
+anfang [] -1
+gesetzt [kg] 1 [kg]
+gewaehlt [g] 2
+unbekannt [] -1
+bearbeitbar [Liter] -1

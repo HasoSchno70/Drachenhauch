@@ -1,0 +1,54 @@
+' Was die Suche nach einem Barcode ergab (wie APIResult und product_data der
+' Python-App): gefunden oder nicht, aus dem Cache oder dem Netz, dazu die
+' Felder, die die Dialoge brauchen. daten ist product_data als JSON-Text
+' (für die Vorgaben und den Cache).
+CLASS Fund
+    DIM barcode AS STRING
+    DIM gefunden AS BOOLEAN
+    DIM ausCache AS BOOLEAN
+    DIM fehler AS STRING
+    DIM name AS STRING
+    DIM marke AS STRING
+    DIM kategorien AS STRING
+    DIM menge AS STRING
+    DIM nutriScore AS STRING
+    DIM allergene AS ARRAY OF STRING
+    DIM bildUrl AS STRING
+    DIM daten AS STRING
+
+    ' Der Name für die Liste: der von Open Food Facts, sonst deutsch,
+    ' allgemein oder die Marke aus den Rohdaten, sonst "Unbekannt (Barcode)".
+    FUNCTION anzeigeName$() AS STRING
+        IF TRIM$(Self.name) <> "" THEN RETURN TRIM$(Self.name)
+        RETURN trf$("Unbekannt ({0})", [Self.barcode])
+    END FUNCTION
+
+    ' Der Fehler, wie er erscheint -- fehler selbst bleibt deutsch (das
+    ' Produktfenster erkennt daran den Netzwerkfehler).
+    FUNCTION fehlerAnzeige$() AS STRING
+        IF LEFT$(Self.fehler, 16) = "Netzwerkfehler: " THEN RETURN trf$("Netzwerkfehler: {0}", [MID$(Self.fehler, 16, LEN(Self.fehler))])
+        SELECT CASE Self.fehler
+            CASE "Produkt wurde zuvor nicht gefunden (aus Cache)" : RETURN tr$("Produkt wurde zuvor nicht gefunden (aus Cache)")
+            CASE "Ungültige Antwort von Open Food Facts" : RETURN tr$("Ungültige Antwort von Open Food Facts")
+            CASE "Produkt nicht in Open Food Facts gefunden" : RETURN tr$("Produkt nicht in Open Food Facts gefunden")
+        END SELECT
+        RETURN Self.fehler
+    END FUNCTION
+
+    ' Was der Produktdialog in die Notizen schreibt (Packungsgröße,
+    ' Nutri-Score, die ersten drei Allergene).
+    FUNCTION notizen$() AS STRING
+        DIM t AS ARRAY OF STRING : t = []
+        IF Self.menge <> "" THEN ARRAY_PUSH(t, trf$("Packungsgröße: {0}", [Self.menge]))
+        IF Self.nutriScore <> "" THEN ARRAY_PUSH(t, trf$("Nutri-Score: {0}", [UPPER$(Self.nutriScore)]))
+        IF LEN(Self.allergene) > 0 THEN
+            DIM a AS ARRAY OF STRING : a = []
+            DIM i AS INTEGER
+            FOR i = 0 TO MIN(3, LEN(Self.allergene)) - 1
+                ARRAY_PUSH(a, REPLACE$(Self.allergene[i], "en:", ""))
+            NEXT
+            ARRAY_PUSH(t, trf$("Allergene: {0}", [JOIN$(a, ", ")]))
+        END IF
+        RETURN JOIN$(t, CHR$(10))
+    END FUNCTION
+END CLASS

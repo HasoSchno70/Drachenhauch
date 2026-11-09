@@ -1,0 +1,234 @@
+' Der Reiter Statistik wie tabs/stats_tab.py: oben fünf Kacheln (Gesamt,
+' Produkte, Ablaufend, Abgelaufen, Cache), darunter vier Seiten -- Übersicht
+' (Bestand, Top-Kategorien mit Balken, Lagerorte), Charts (zwei Kuchen und
+' der Ablauf-Status als Balken, Studio-Diagramme), Insights (Hinweise aus den
+' Zahlen) und Cache (Barcode-Cache zählen und leeren). Oben rechts Thema
+' hell/dunkel, eine Testbenachrichtigung und Aktualisieren.
+CLASS StatistikSeite EXTENDS StatistikSeite_Basis
+    DIM s AS Statistikdaten
+    DIM hinweise AS ARRAY OF STRING
+    DIM cacheZahl AS INTEGER
+    DIM cacheTreffer AS INTEGER
+    DIM cacheOhne AS INTEGER
+    DIM hell AS BOOLEAN
+
+    SUB Geoeffnet()
+        Self.hell = NOT einstellungJa("dark_mode", TRUE)
+        GUI_SET_TEXT(Self.knopfThema, IIF(Self.hell, "☀", "🌙"))
+        ' Die Kuchen wie mit autopct: Anteil in Prozent im Segment, Namen daneben.
+        Self.kategorien.Setzen("legende", "rechts")
+        Self.kategorien.Setzen("werte", "innen")
+        Self.kategorien.SetzenSchalter("prozent", TRUE)
+        Self.orte.Setzen("legende", "rechts")
+        Self.orte.Setzen("werte", "innen")
+        Self.orte.SetzenSchalter("prozent", TRUE)
+        Self.status.Setzen("werte", "aussen")
+        Self.laden()
+    END SUB
+
+    SUB laden()
+        Self.s = NEW Statistikdaten()
+        Self.s.rechnen()
+        Self.hinweise = Self.s.einsichten()
+        (Self.cacheZahl, Self.cacheTreffer, Self.cacheOhne) = cacheZahlen()
+        GUI_CARD_SET_TEXT(Self.cacheEintraege, STR$(Self.cacheZahl))
+        GUI_CARD_SET_TEXT(Self.cacheGefunden, STR$(Self.cacheTreffer))
+        GUI_CARD_SET_TEXT(Self.cacheNicht, STR$(Self.cacheOhne))
+        ' Die Diagramme in den Farben der Python-App.
+        DIM farben AS ARRAY OF INTEGER : farben = [&H2D6A4F, &H2D5A8A, &H6B5530, &H5A4A7A, &H4A6A6A, &H6A4A5A]
+        Self.kategorien.Leeren()
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(Self.s.katNamen) - 1
+            Self.kategorien.Hinzufuegen(Self.s.katNamen[i], Self.s.katZahlen[i], farben[i MOD LEN(farben)])
+        NEXT
+        farben = [&H3A5A5A, &H5A4A6A, &H6B5530, &H2D5A8A, &H6B3535, &H4A6A4A]
+        Self.orte.Leeren()
+        FOR i = 0 TO LEN(Self.s.ortNamen) - 1
+            Self.orte.Hinzufuegen(Self.s.ortNamen[i], Self.s.ortZahlen[i], farben[i MOD LEN(farben)])
+        NEXT
+        Self.status.Leeren()
+        Self.status.Hinzufuegen(tr$("Frisch"), Self.s.frisch, &H2D6A4F)
+        Self.status.Hinzufuegen(tr$("Bald ablaufend"), Self.s.bald, &H6B5530)
+        Self.status.Hinzufuegen(tr$("Abgelaufen"), Self.s.abgelaufen, &H6B3535)
+    END SUB
+
+    SUB knopfAuffrischen_Klick()
+        Self.laden()
+    END SUB
+
+    ' Wie toggle_theme: die ganze Oberfläche hell oder dunkel. Die Python-App
+    ' vergaß es beim nächsten Start; hier ist es die Einstellung dark_mode,
+    ' dieselbe wie im Einstellungsfenster.
+    SUB knopfThema_Klick()
+        DIM dunkel AS BOOLEAN : dunkel = NOT einstellungJa("dark_mode", TRUE)
+        einstellungSetzen("dark_mode", jsonJa$(dunkel))
+        themaSetzen(dunkel)
+        Self.hell = NOT dunkel
+        GUI_SET_TEXT(Self.knopfThema, IIF(Self.hell, "☀", "🌙"))
+        Self.laden()
+    END SUB
+
+    ' Wie test_notification: eine Mitteilung des Systems (Modul
+    ' Benachrichtigungen). Nimmt das System sie nicht, sagt es das.
+    SUB knopfMeldung_Klick()
+        IF meldungSenden(nachrichtNeu(tr$("Test-Benachrichtigung"), tr$("Benachrichtigungen funktionieren! 🎉"), FALSE)) THEN
+            Meldung(tr$("Test-Benachrichtigung gesendet!"), tr$("✔ Erfolg"))
+        ELSE
+            Meldung(tr$("Das System hat die Benachrichtigung nicht angenommen."), tr$("Benachrichtigung"))
+        END IF
+    END SUB
+
+    SUB knopfCacheLeeren_Klick()
+        IF Frage(tr$("Möchtest du den Barcode-Cache wirklich leeren?") + CHR$(10) + CHR$(10) + tr$("Dadurch müssen Barcodes erneut online abgefragt werden."), "Ja|Nein", tr$("Cache leeren")) <> 1 THEN RETURN
+        cacheLeeren()
+        Self.laden()
+        Meldung(tr$("Cache wurde geleert!"), tr$("✔ Erfolg"))
+    END SUB
+
+    ' --- Zeichnen ------------------------------------------------------------
+    ' Die Farben je Art: dunkel, hell, Akzent (wie _PALETTE der Python-App).
+    FUNCTION palette(art AS STRING) AS ARRAY OF INTEGER
+        SELECT CASE art
+            CASE "erfolg" : RETURN [&H1A4A3A, &H2D6A4F, &H90D4B4]
+            CASE "warnung" : RETURN [&H4A3A1A, &H6B5530, &HF5D79E]
+            CASE "gefahr" : RETURN [&H4A1A1A, &H6B2525, &HF5A0A0]
+            CASE "lila" : RETURN [&H3D2D5A, &H5A4A7A, &HC0A0E0]
+            CASE "cache" : RETURN [&H2A2A3A, &H3A3A5A, &HA0A0C0]
+        END SELECT
+        RETURN [&H1E3A5F, &H2D5A8A, &H7EB8DA]
+    END FUNCTION
+
+    ' Eine Kachel: Verlauf von hell nach dunkel, Sinnbild und Titel oben, die
+    ' Zahl groß in der Mitte, darunter klein der Untertitel.
+    SUB kachel(x AS INTEGER, y AS INTEGER, b AS INTEGER, h AS INTEGER, art AS STRING, sinnbild AS STRING, titel AS STRING, wert AS STRING, unter AS STRING)
+        DIM p AS ARRAY OF INTEGER : p = Self.palette(art)
+        BOXROUND(x, y, x + b, y + h, 12, p[0])
+        BOXROUND(x, y, x + b, y + 24, 12, p[1])
+        GRADIENTV(x, y + 12, x + b, y + h - 12, p[1], p[0])
+        TEXT_SIZE(20)
+        TEXT(x + 14, y + 10, sinnbild, &HFFFFFF)
+        TEXT_BOLD(TRUE)
+        TEXT_SIZE(12)
+        TEXT(x + b - 14 - TEXT_WIDTH(titel), y + 14, titel, p[2])
+        TEXT_SIZE(30)
+        TEXT(x + (b - TEXT_WIDTH(wert)) \ 2, y + 34, wert, &HFFFFFF)
+        TEXT_BOLD(FALSE)
+        TEXT_SIZE(11)
+        TEXT(x + (b - TEXT_WIDTH(unter)) \ 2, y + h - 20, unter, RGBA(255, 255, 255, 160))
+    END SUB
+
+    SUB kacheln_Zeichnen()
+        IF Self.s IS NIL THEN RETURN
+        DIM x0 AS INTEGER : x0 = GUI_CANVAS_X(Self.kacheln)
+        DIM y0 AS INTEGER : y0 = GUI_CANVAS_Y(Self.kacheln)
+        DIM b AS INTEGER : b = (GUI_CANVAS_W(Self.kacheln) - 4 * 12) \ 5
+        DIM h AS INTEGER : h = GUI_CANVAS_H(Self.kacheln) - 2
+        Self.kachel(x0, y0, b, h, "info", "📦", tr$("Gesamt"), STR$(Self.s.gesamt), tr$("Artikel im Bestand"))
+        Self.kachel(x0 + (b + 12), y0, b, h, "erfolg", "🏷", tr$("Produkte"), STR$(Self.s.produkte), tr$("Verschiedene Sorten"))
+        Self.kachel(x0 + 2 * (b + 12), y0, b, h, "warnung", "⏰", tr$("Ablaufend"), STR$(Self.s.bald), trf$("In den nächsten {0} Tagen", [STR$(Self.s.schwelle)]))
+        Self.kachel(x0 + 3 * (b + 12), y0, b, h, "gefahr", "❌", tr$("Abgelaufen"), STR$(Self.s.abgelaufen), tr$("Sofort verbrauchen!"))
+        Self.kachel(x0 + 4 * (b + 12), y0, b, h, "cache", "🗄", tr$("Cache"), STR$(Self.cacheZahl), tr$("Gespeicherte Barcodes"))
+    END SUB
+
+    ' Eine Karte der Übersicht: Kopf im Verlauf mit Titel, darunter Zeilen.
+    SUB karte(x AS INTEGER, y AS INTEGER, b AS INTEGER, h AS INTEGER, art AS STRING, titel AS STRING)
+        DIM p AS ARRAY OF INTEGER : p = Self.palette(art)
+        BOXROUND(x, y, x + b, y + h, 12, GUI_THEME_GET("widget_bg"))
+        RECTROUND(x, y, x + b, y + h, 12, GUI_THEME_GET("widget_border"))
+        BOXROUND(x + 1, y + 1, x + b - 1, y + 40, 12, p[0])
+        GRADIENTH(x + 12, y + 1, x + b - 1, y + 40, p[0], p[1])
+        BOX(x + 1, y + 28, x + b - 1, y + 40, p[0])
+        GRADIENTH(x + 12, y + 28, x + b - 1, y + 40, p[0], p[1])
+        TEXT_BOLD(TRUE)
+        TEXT_SIZE(14)
+        TEXT(x + 16, y + 12, titel, &HFFFFFF)
+        TEXT_BOLD(FALSE)
+    END SUB
+
+    SUB uebersicht_Zeichnen()
+        IF Self.s IS NIL THEN RETURN
+        DIM x0 AS INTEGER : x0 = GUI_CANVAS_X(Self.uebersicht) + 16
+        DIM y0 AS INTEGER : y0 = GUI_CANVAS_Y(Self.uebersicht) + 16
+        DIM b AS INTEGER : b = (GUI_CANVAS_W(Self.uebersicht) - 32 - 2 * 16) \ 3
+        DIM h AS INTEGER : h = GUI_CANVAS_H(Self.uebersicht) - 32
+        DIM fg AS INTEGER : fg = GUI_THEME_GET("text_fg")
+        DIM leise AS INTEGER : leise = GUI_THEME_GET("muted_fg")
+        TEXT_SIZE(14)
+        ' Bestandübersicht
+        Self.karte(x0, y0, b, h, "info", tr$("📦 Bestandübersicht"))
+        TEXT(x0 + 16, y0 + 58, trf$("✔ {0} Artikel frisch", [STR$(Self.s.frisch)]), Self.palette("erfolg")[2])
+        TEXT(x0 + 16, y0 + 86, trf$("⏰ {0} bald ablaufend", [STR$(Self.s.bald)]), Self.palette("warnung")[2])
+        TEXT(x0 + 16, y0 + 114, trf$("❌ {0} abgelaufen", [STR$(Self.s.abgelaufen)]), Self.palette("gefahr")[2])
+        ' Top-Kategorien, je eine mit Balken aus zehn Feldern
+        DIM x1 AS INTEGER : x1 = x0 + b + 16
+        Self.karte(x1, y0, b, h, "erfolg", tr$("🏆 Top Kategorien"))
+        TEXT_SIZE(14)
+        IF LEN(Self.s.katNamen) = 0 THEN TEXT(x1 + 16, y0 + 58, tr$("Keine Kategorien"), leise)
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(Self.s.katNamen) - 1
+            DIM zy AS INTEGER : zy = y0 + 58 + i * 28
+            TEXT(x1 + 16, zy, STR$(i + 1) + ".", Self.palette("erfolg")[2])
+            TEXT(x1 + 40, zy, Self.s.katNamen[i] + ":", fg)
+            TEXT(x1 + 48 + TEXT_WIDTH(Self.s.katNamen[i] + ":"), zy, STR$(Self.s.katZahlen[i]), Self.palette("info")[2])
+            DIM f AS INTEGER
+            FOR f = 0 TO 9
+                DIM fx AS INTEGER : fx = x1 + b - 16 - (10 - f) * 9
+                BOX(fx, zy + 3, fx + 6, zy + 13, IIF(f < MIN(10, Self.s.katZahlen[i]), Self.palette("erfolg")[1], GUI_THEME_GET("widget_border")))
+            NEXT
+        NEXT
+        ' Lagerorte (die ersten fünf), mit dem, was dort Aufmerksamkeit braucht
+        DIM x2 AS INTEGER : x2 = x1 + b + 16
+        Self.karte(x2, y0, b, h, "lila", tr$("📍 Lagerorte"))
+        TEXT_SIZE(14)
+        IF LEN(Self.s.ortNamen) = 0 THEN TEXT(x2 + 16, y0 + 58, tr$("Keine Lagerorte"), leise)
+        FOR i = 0 TO MIN(5, LEN(Self.s.ortNamen)) - 1
+            DIM oy AS INTEGER : oy = y0 + 58 + i * 28
+            DIM vorn AS STRING : vorn = "📍 " + Self.s.ortNamen[i] + ": "
+            TEXT(x2 + 16, oy, vorn, fg)
+            DIM zx AS INTEGER : zx = x2 + 16 + TEXT_WIDTH(vorn)
+            TEXT(zx, oy, STR$(Self.s.ortZahlen[i]), Self.palette("lila")[2])
+            IF Self.s.ortBald[i] > 0 THEN TEXT(zx + TEXT_WIDTH(STR$(Self.s.ortZahlen[i]) + " "), oy, "(⚠ " + STR$(Self.s.ortBald[i]) + ")", Self.palette("warnung")[2])
+        NEXT
+    END SUB
+
+    ' Die Hinweise untereinander: Verlauf, links ein Streifen im Akzent.
+    SUB einsichten_Zeichnen()
+        DIM x0 AS INTEGER : x0 = GUI_CANVAS_X(Self.einsichten) + 16
+        DIM y0 AS INTEGER : y0 = GUI_CANVAS_Y(Self.einsichten) + 16
+        DIM b AS INTEGER : b = GUI_CANVAS_W(Self.einsichten) - 32
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(Self.hinweise) - 1
+            DIM t AS ARRAY OF STRING : t = SPLIT(Self.hinweise[i], "|")
+            DIM p AS ARRAY OF INTEGER : p = Self.palette(t[0])
+            DIM y AS INTEGER : y = y0 + i * 76
+            BOXROUND(x0, y, x0 + b, y + 64, 10, p[0])
+            GRADIENTH(x0 + 10, y, x0 + b - 10, y + 64, p[0], p[1])
+            BOXROUND(x0 + b - 20, y, x0 + b, y + 64, 10, p[1])
+            BOX(x0, y + 4, x0 + 4, y + 60, p[2])
+            TEXT_SIZE(26)
+            TEXT(x0 + 18, y + 18, t[1], &HFFFFFF)
+            TEXT_BOLD(TRUE)
+            TEXT_SIZE(14)
+            TEXT(x0 + 64, y + 12, t[2], p[2])
+            TEXT_BOLD(FALSE)
+            TEXT_SIZE(13)
+            TEXT(x0 + 64, y + 36, t[3], RGBA(255, 255, 255, 210))
+        NEXT
+    END SUB
+
+    ' Ein Kuchen ohne Daten sagt es, wie die Python-App.
+    SUB leer(d AS StudioDiagramm)
+        IF d.Anzahl() > 0 THEN RETURN
+        DIM t AS STRING : t = tr$("Keine Daten")
+        TEXT_SIZE(16)
+        TEXT(GUI_CANVAS_X(d.Flaeche) + (GUI_CANVAS_W(d.Flaeche) - TEXT_WIDTH(t)) \ 2, GUI_CANVAS_Y(d.Flaeche) + GUI_CANVAS_H(d.Flaeche) \ 2, t, GUI_THEME_GET("muted_fg"))
+    END SUB
+
+    SUB kategorien_Zeichnen()
+        Self.leer(Self.kategorien)
+    END SUB
+
+    SUB orte_Zeichnen()
+        Self.leer(Self.orte)
+    END SUB
+END CLASS

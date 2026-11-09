@@ -1,0 +1,99 @@
+' Drachenhauch Studio: Kuerzel ohne Menue (gefunden beim Port der
+' Kuehlschrank-App: Strg+S im Barcode-Feld des Stapelscans speicherte nicht).
+' Taste erreichte ein Fenster nur, wenn kein Eingabefeld den Fokus hatte.
+' Jetzt kommt ein Kuerzel -- F-Taste, Strg oder Alt dazu -- auch aus einem
+' Eingabefeld an, ausser das Feld braucht es selbst (Strg+C kopiert dort) oder
+' es ist AltGr (Strg+Alt: damit tippt man @). Eingespielte Aufnahmen sieht
+' KEY_ANY_HIT nicht, darum echte Fensternachrichten (fenstersender.ps1, roh:)
+' und darum seriell und nur unter Windows. Format: docs/werkzeuge.md.
+
+--- seriell
+--- langsam
+=== im eingabefeld erreicht ein kuerzel das fenster, tippen nicht
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+slHin(10, 10)
+slWarten(10)
+slTaste(294)
+slWarten(100)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+SETENV("DH_STUDIO_LAUF_BILDER", "20")
+DIM log AS STRING : log = CWD$() + "/s.log"
+slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+PRINT "erzeugt "; slHat(log, "erzeugt 2")
+DIM kennung AS STRING : kennung = "StudioKuerzel-" + STR$(MILLIS()) + "-" + STR$(INT(RND() * 100000))
+DIM q AS STRING : q = JOIN$(READLINES(p + "/_studio/main.dh"), CHR$(10))
+WRITEALL(p + "/_studio/probe.dh", REPLACE$(q, "!" + CHR$(34) + "Haupt" + CHR$(34), "ARG$(0)") + CHR$(10))
+DIM kind AS INTEGER : kind = PROCESS_START("dhrt", "run", "--bilder", "400", p + "/_studio/probe.dh", "--", kennung)
+' Tasten als WM_KEYDOWN/WM_KEYUP mit Scancode (GLFW liest ihn): Strg+S,
+' Strg+C, F5, a, AltGr+Q (Strg + rechtes Alt).
+FUNCTION ab$(vk AS STRING, sc AS INTEGER, erweitert AS BOOLEAN) AS STRING
+    DIM l AS INTEGER : l = (sc SHL 16) BOR 1 BOR IIF(erweitert, &H1000000, 0)
+    RETURN "roh:0x100:" + vk + ":" + STR$(l)
+END FUNCTION
+FUNCTION auf$(vk AS STRING, sc AS INTEGER, erweitert AS BOOLEAN) AS STRING
+    DIM l AS INTEGER : l = (sc SHL 16) BOR 1 BOR IIF(erweitert, &H1000000, 0) BOR &HC0000000
+    RETURN "roh:0x101:" + vk + ":" + STR$(l)
+END FUNCTION
+DIM folge AS ARRAY OF STRING : folge = []
+' Strg+S
+ARRAY_PUSH(folge, ab$("0x11", &H1D, FALSE)) : ARRAY_PUSH(folge, ab$("0x53", &H1F, FALSE)) : ARRAY_PUSH(folge, auf$("0x53", &H1F, FALSE)) : ARRAY_PUSH(folge, auf$("0x11", &H1D, FALSE))
+' Strg+C
+ARRAY_PUSH(folge, ab$("0x11", &H1D, FALSE)) : ARRAY_PUSH(folge, ab$("0x43", &H2E, FALSE)) : ARRAY_PUSH(folge, auf$("0x43", &H2E, FALSE)) : ARRAY_PUSH(folge, auf$("0x11", &H1D, FALSE))
+' F5
+ARRAY_PUSH(folge, ab$("0x74", &H3F, FALSE)) : ARRAY_PUSH(folge, auf$("0x74", &H3F, FALSE))
+' a
+ARRAY_PUSH(folge, ab$("0x41", &H1E, FALSE)) : ARRAY_PUSH(folge, auf$("0x41", &H1E, FALSE))
+' AltGr+Q
+ARRAY_PUSH(folge, ab$("0x11", &H1D, FALSE)) : ARRAY_PUSH(folge, ab$("0x12", &H38, TRUE)) : ARRAY_PUSH(folge, ab$("0x51", &H10, FALSE)) : ARRAY_PUSH(folge, auf$("0x51", &H10, FALSE)) : ARRAY_PUSH(folge, auf$("0x12", &H38, TRUE)) : ARRAY_PUSH(folge, auf$("0x11", &H1D, FALSE))
+DIM ps AS INTEGER : ps = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", skript$(), kennung, JOIN$(folge, ";"))
+auslesen$(ps, 60000)
+DIM aus AS STRING : aus = auslesen$(kind, 60000)
+IF INSTR(auslesenFehler, "Kein Fenster moeglich") >= 0 THEN
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END IF
+DIM z AS STRING
+FOR EACH z IN SPLIT(REPLACE$(aus, CHR$(13), ""), CHR$(10))
+    IF LEFT$(z, 6) = "taste " OR LEFT$(z, 5) = "fokus" THEN PRINT z
+NEXT
+--- argumente
+{sammlung}/../../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/uialeser.dh"
+slStudio = ARG$(0)
+FUNCTION skript$() AS STRING
+    RETURN "{sammlung}/../_hilfen/fenstersender.ps1"
+END FUNCTION
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"}]}
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":420,"h":300,"widgets":[
+{"kind":"textinput","name":"feld","x":40,"y":40,"w":200,"h":30}]}
+--- datei proj/Hauptfenster.dh
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+    SUB Geoeffnet()
+        GUI_FOCUS(Self.feld)
+    END SUB
+
+    SUB Taste(taste AS INTEGER)
+        DIM n AS STRING : n = STR$(taste)
+        SELECT CASE taste
+            CASE KEY_S : n = "S"
+            CASE KEY_C : n = "C"
+            CASE KEY_F5 : n = "F5"
+            CASE KEY_A : n = "a"
+            CASE KEY_Q : n = "Q"
+        END SELECT
+        PRINT "taste "; n; " strg "; KEYPRESSED(KEY_LCTRL) OR KEYPRESSED(KEY_RCTRL); " | fokus im feld "; GUI_FOCUSED() = Self.feld
+    END SUB
+END CLASS
+--- datei proj/App.dh
+CLASS App EXTENDS StudioApp
+END CLASS
+--- system windows
+--- erwartet
+erzeugt TRUE
+taste S strg TRUE | fokus im feld TRUE
+taste F5 strg FALSE | fokus im feld TRUE

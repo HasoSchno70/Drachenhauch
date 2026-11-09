@@ -3939,3 +3939,64 @@ END CLASS
 20 Methode 'zeigen' in KUNDEN ueberschreibt 'zeigen' aus FENSTER -- dort mit 0 Parameter(n), hier mit 1
 26 Methode 'zeigen' in ENKEL ueberschreibt 'zeigen' aus KUNDEN -- dort mit 1 Parameter(n), hier mit 0
 fertig
+
+=== eine methode, die eine geerbte in anderer schreibweise ueberschreibt
+' Gefunden mit der Kuehlschrank-App: `SUB zeigen()` (fuer die eigene
+' Tabelle) im Kochen-Fenster ersetzte still `Zeigen()` der Studio-Laufzeit --
+' gleiche Parameterzahl, also meldete die Pruefung oben nichts, und
+' `fenster.Zeigen()` lief in die Tabelle, bevor das Fenster gebaut war.
+' Gleich geschrieben (Geoeffnet) ist es gewolltes Ueberschreiben.
+IMPORT "json"
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = ""
+DIM stille AS INTEGER : stille = 0
+WHILE stille < 5
+    DIM zz AS STRING : zz = PROCESS_READ$(pc)
+    IF zz <> "" THEN
+        roh = roh + zz
+        stille = 0
+    ELSEIF NOT PROCESS_RUNNING(pc) THEN
+        stille = stille + 1
+        SLEEP(30)
+    END IF
+WEND
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + TRIM$(roh) + "}")
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    DIM m AS STRING : m = JSON_GET_STRING(h, "b." + STR$(i) + ".message")
+    IF INSTR(m, "ueberschreibt") >= 0 THEN PRINT JSON_GET_INT(h, "b." + STR$(i) + ".line"); " "; LEFT$(m, INSTR(m, ". Jeder"))
+NEXT
+PRINT "fertig"
+--- datei w.dh
+CLASS Fenster
+    SUB Zeigen()
+    END SUB
+
+    ' Wird gleich geschrieben ueberschrieben.
+    SUB Geoeffnet()
+    END SUB
+
+    FUNCTION Breite() AS INTEGER
+        RETURN 1
+    END FUNCTION
+END CLASS
+
+CLASS Kochen EXTENDS Fenster
+    SUB Geoeffnet()
+        Self.zeigen()
+    END SUB
+
+    SUB zeigen()
+        PRINT "tabelle"
+    END SUB
+END CLASS
+
+CLASS Enkel EXTENDS Kochen
+    FUNCTION BREITE() AS INTEGER
+        RETURN 2
+    END FUNCTION
+END CLASS
+--- erwartet
+19 Methode 'zeigen' in KOCHEN ueberschreibt 'Zeigen' aus FENSTER -- Gross-/Kleinschreibung zaehlt nicht, es ist derselbe Name
+25 Methode 'BREITE' in ENKEL ueberschreibt 'Breite' aus FENSTER -- Gross-/Kleinschreibung zaehlt nicht, es ist derselbe Name
+fertig

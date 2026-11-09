@@ -1,0 +1,107 @@
+' Ein Rezept kochen -- wie CookRecipeDialog der Python-App: Portionen
+' wählen (die Mengen rechnen mit), je Zutat benötigt, vorhanden, Status und
+' was fehlt; „Fehlende einkaufen“ und „Jetzt kochen!“ (zieht vom Bestand ab,
+' was am frühesten abläuft zuerst -- ein Schritt für Strg+Z).
+CLASS KochenFenster EXTENDS KochenFenster_Basis
+    DIM rezeptId AS INTEGER
+    DIM x AS Rezept
+    DIM geaendert AS BOOLEAN
+
+    SUB Geoeffnet()
+        Self.x = rezeptLaden(Self.rezeptId)
+        IF Self.x IS NIL THEN
+            Self.Zumachen()
+            RETURN
+        END IF
+        DIM l AS ARRAY OF Rezept : l = [Self.x]
+        kochbarkeitRechnen(l)
+        GUI_SET_TEXT(Self.titel, "🍳 " + Self.x.name)
+        GUI_SET_TEXT(Self.zeiten, trf$("⏱ Vorbereitung: {0} min | Kochzeit: {1} min", [STR$(Self.x.vorb), STR$(Self.x.koch)]))
+        DIM p AS FLOAT : p = Self.x.prozent
+        GUI_SET_TEXT(Self.anteil, IIF(p >= 100, "✅ ", IIF(p >= 75, "⚠ ", "❌ ")) + STR$(INT(p + 0.5)) + " %")
+        GUI_SET_COLOR(Self.anteil, "fg", IIF(p >= 100, &H81C784, IIF(p >= 75, &HFFB74D, &HE57373)))
+        GUI_SET_VALUE(Self.portionenFeld, MAX(1, Self.x.portionen))
+        GUI_SET_TEXT(Self.original, trf$("(Original: {0})", [STR$(Self.x.portionen)]))
+        Self.tabelleFuellen()
+    END SUB
+
+    FUNCTION faktor() AS FLOAT
+        RETURN GUI_VALUE(Self.portionenFeld) / MAX(1, Self.x.portionen)
+    END FUNCTION
+
+    SUB tabelleFuellen()
+        DIM f AS FLOAT : f = Self.faktor()
+        GUI_SET_TEXT(Self.faktorText, "×" + REPLACE$(FORMAT$(f, "%.1f"), ".", ","))
+        GUI_TABLE_CLEAR(Self.tabelle)
+        DIM fehlt AS INTEGER : fehlt = 0
+        DIM teil AS INTEGER : teil = 0
+        DIM verknuepft AS INTEGER : verknuepft = 0
+        DIM z AS Zutat
+        FOR EACH z IN Self.x.zutaten
+            DIM braucht AS FLOAT : braucht = z.menge * f
+            DIM da AS FLOAT : da = verfuegbar(z)
+            DIM status AS STRING
+            DIM diff AS STRING : diff = ""
+            DIM farbe AS INTEGER
+            IF da >= braucht THEN
+                status = tr$("✅ OK") : farbe = &H81C784
+            ELSEIF da > 0 THEN
+                status = tr$("⚠ Teilweise") : farbe = &HFFB74D
+                diff = "-" + zahlText$(braucht - da)
+                teil = teil + 1
+            ELSE
+                status = tr$("❌ Fehlt") : farbe = &HE57373
+                diff = "-" + zahlText$(braucht)
+                fehlt = fehlt + 1
+            END IF
+            IF z.produktId > 0 THEN verknuepft = verknuepft + 1
+            DIM r AS INTEGER : r = GUI_TABLE_ADD_ROW(Self.tabelle, [IIF(z.produktId > 0, "🔗 ", "") + z.name, zahlText$(braucht) + " " + z.einheit, IIF(da > 0, zahlText$(da) + " " + z.einheit, "-"), status, diff])
+            GUI_TABLE_CELL_COLOR(Self.tabelle, r, 3, farbe, -1)
+            IF diff <> "" THEN GUI_TABLE_CELL_COLOR(Self.tabelle, r, 4, &HE57373, -1)
+        NEXT
+        DIM n AS INTEGER : n = LEN(Self.x.zutaten)
+        IF fehlt = 0 AND teil = 0 THEN
+            GUI_SET_TEXT(Self.status, trf$("✅ Perfekt! Alle {0} Zutaten sind ausreichend vorhanden. Du kannst sofort mit dem Kochen beginnen!", [STR$(n)]))
+            GUI_SET_TEXT(Self.info, tr$("👨‍🍳 Bereit zum Kochen!"))
+        ELSEIF fehlt > 0 THEN
+            GUI_SET_TEXT(Self.status, trf$("⚠ Achtung: {0} Zutat(en) fehlen komplett, {1} teilweise vorhanden. Du kannst trotzdem kochen oder erst einkaufen gehen.", [STR$(fehlt), STR$(teil)]))
+            GUI_SET_TEXT(Self.info, trf$("🛒 {0} Zutat(en) fehlen", [STR$(fehlt + teil)]))
+        ELSE
+            GUI_SET_TEXT(Self.status, trf$("🟡 Fast komplett: {0} Zutat(en) sind nur teilweise vorhanden. Du kannst trotzdem kochen (evtl. kleinere Portionen).", [STR$(teil)]))
+            GUI_SET_TEXT(Self.info, trf$("🟡 {0} Zutat(en) teilweise", [STR$(teil)]))
+        END IF
+        IF verknuepft > 0 THEN GUI_SET_TEXT(Self.info, GUI_TEXT(Self.info) + trf$(" | 🔗 {0} verknüpft", [STR$(verknuepft)]))
+        GUI_SET_VISIBLE(Self.knopfEinkaufen, fehlt + teil > 0)
+    END SUB
+
+    SUB portionenFeld_Geaendert()
+        Self.tabelleFuellen()
+    END SUB
+
+    SUB knopfEinkaufen_Klick()
+        DIM n AS INTEGER : n = fehlendeEinkaufen(Self.x, Self.faktor())
+        IF n > 0 THEN
+            Self.geaendert = TRUE
+            Meldung(trf$("{0} fehlende Zutat(en) auf die Einkaufsliste gesetzt.", [STR$(n)]), tr$("Einkaufsliste"))
+        ELSE
+            Meldung(tr$("Alle Zutaten sind vorhanden."), tr$("Einkaufsliste"))
+        END IF
+    END SUB
+
+    SUB knopfKochen_Klick()
+        DIM p AS INTEGER : p = INT(GUI_VALUE(Self.portionenFeld))
+        IF Frage(trf$("Möchtest du „{0}“ für {1} Portionen kochen?", [Self.x.name, STR$(p)]) + CHR$(10) + CHR$(10) + tr$("Die vorhandenen Zutaten werden vom Bestand abgezogen."), tr$("Kochen|Abbrechen"), tr$("Kochen bestätigen")) <> 1 THEN RETURN
+        DIM weg AS ARRAY OF STRING : weg = kochen(Self.x, Self.faktor())
+        Self.geaendert = TRUE
+        IF LEN(weg) > 0 THEN
+            Meldung(trf$("„{0}“ wurde gekocht!", [Self.x.name]) + CHR$(10) + CHR$(10) + tr$("Vom Bestand abgezogen:") + CHR$(10) + "  • " + JOIN$(weg, CHR$(10) + "  • ") + CHR$(10) + CHR$(10) + trf$("🍽 {0} Portion(en) zubereitet", [STR$(p)]), tr$("Guten Appetit!"))
+        ELSE
+            Meldung(trf$("„{0}“ wurde gekocht!", [Self.x.name]) + CHR$(10) + CHR$(10) + tr$("Keine Zutaten im Bestand gefunden, die abgezogen werden konnten."), tr$("Guten Appetit!"))
+        END IF
+        Self.Zumachen()
+    END SUB
+
+    SUB knopfAbbrechen_Klick()
+        Self.Zumachen()
+    END SUB
+END CLASS

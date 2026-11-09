@@ -319,3 +319,42 @@ PRINT ARG$(0)
 --- erwartet
 1
 zwei woerter
+
+=== argumente ohne trenner bekommen einen hinweis
+' dhrt run datei.dh a b gibt dem Programm nichts (Absicht, die Runtime
+' behaelt ihre Schalter) -- aber nicht mehr still: ein Hinweis auf der
+' Fehlerausgabe nennt den Aufruf mit `--`. Ein Schalter hinter der Datei
+' bleibt still, und mit `--` kommen die Woerter an.
+WRITEALL("kind.dh", "PRINT ARGC(); " + CHR$(34) + "|" + CHR$(34) + "; ARG$(0)" + CHR$(10))
+SUB lauf(k AS INTEGER)
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    WHILE leer < 5
+        DIM t AS STRING : t = PROCESS_READ$(k) + PROCESS_ERR$(k)
+        IF t <> "" THEN
+            aus = aus + t
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(k) THEN
+            leer = leer + 1
+            SLEEP(20)
+        END IF
+    WEND
+    DIM z AS STRING
+    FOR EACH z IN SPLIT(REPLACE$(aus, CHR$(13), ""), CHR$(10))
+        IF z <> "" THEN PRINT "  "; REPLACE$(z, CWD$() + "/", "")
+    NEXT
+END SUB
+PRINT "ohne"
+lauf(PROCESS_START("dhrt", "run", CWD$() + "/kind.dh", "ordner", "zwei"))
+PRINT "schalter"
+lauf(PROCESS_START("dhrt", "run", CWD$() + "/kind.dh", "--stoppable"))
+PRINT "mit"
+lauf(PROCESS_START("dhrt", "run", CWD$() + "/kind.dh", "--", "ordner", "zwei"))
+--- erwartet
+ohne
+  run: ordner zwei erreicht das Programm nicht -- seine Argumente stehen hinter einem `--`: dhrt run kind.dh -- ordner zwei
+  0|
+schalter
+  0|
+mit
+  2|ordner

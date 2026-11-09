@@ -122,19 +122,72 @@ The events per kind:
 | checkbox, toggle, radio button | Klick, Geaendert |
 | text field | Geaendert, Enter, FokusRein, FokusRaus |
 | text area | Geaendert, FokusRein, FokusRaus |
-| list, tree, table | Geaendert, Doppelklick (for list and table also Enter) |
+| list, tree | Geaendert, Doppelklick (for the list also Enter) |
+| table | Geaendert, Doppelklick (also Enter), Zelle(zeile, spalte) |
 | slider, number field, dropdown, pickers, tab control | Geaendert |
-| canvas | Zeichnen, Maus, Ziehen(x, y), Rad(schritte) |
-| every control in addition | MausRein, MausRaus |
+| canvas, chart | Zeichnen, Maus, Ziehen(x, y), Rad(schritte) |
+| toolbar | Knopf(nr) |
+| status bar | Feld(nr) |
+| every control in addition | MausRein, MausRaus, Abgelegt(zeile, ziel) |
 | timer, menu entry | Aktion |
-| window | Geoeffnet, Schliessen, Groesse, Taste(taste) |
+| window | Geoeffnet, Schliessen, Groesse, Taste(taste), Takt |
+| own control | Geoeffnet, Groesse, Takt |
 | App | Geoeffnet, Beenden |
+
+`Zeichnen` (draw) runs in every frame in which the canvas is visible (not
+on a tab page in the background), clipped to the canvas and in the font of
+the interface: the gui's own (`GUI_FONT`), otherwise the built-in Sans at
+the program's text size -- not the pixel font `TEXT` uses otherwise. Whatever
+`Zeichnen` changes in font, size and style stays there (like
+`GFX_PUSH`/`GFX_POP`). Coordinates are screen points from
+`GUI_CANVAS_X/Y`. Maus, Rad and Ziehen do not come while a modal window
+stands in front of the canvas.
+
+A **chart** (library, group Drawing) is a canvas with a chart from the
+[`chart`](module-chart.md) module: the inspector sets its kind (pie, donut,
+bar, line, area, gauge, bar gauge, LEDs) and title, the design view shows a
+sample. In code the control is a `StudioDiagramm` that draws itself in every
+frame, as large as the canvas and in the theme of the interface (light or
+dark, also after a switch); your own `Zeichnen` comes on top.
+
+```basic
+Self.vorrat.Leeren()
+Self.vorrat.Hinzufuegen("Obst", 5)
+Self.vorrat.Hinzufuegen("Milch", 2, RGB(200, 60, 60))   ' own colour
+Self.vorrat.Setzen("legende", "rechts")                 ' CHART_SET
+Self.vorrat.SetzenSchalter("prozent", TRUE)             ' CHART_SET_FLAG
+```
+
+Also `Reihe(name, werte)` for lines and grouped bars, `Beschriften`, `Wert`
+for gauge, bar gauge and LEDs, `Titel`, `SetzenZahl`, `Anzahl()`; `Flaeche`
+is the canvas, `Diagramm` the CHART handle for everything else.
 
 An event with parentheses calls its method with values: `Ziehen` (drag)
 with the position on the canvas (while the button is held after a press on
 it), `Rad` (wheel) with the steps of the mouse wheel, `Taste` (key) with the
 key code (`KEY_A`, `KEY_SPACE` ...), as long as the window is in front and
-no input field takes the key. The suggestions know the whole text of the
+no input field takes the key -- a shortcut (a function key, Ctrl or Alt
+with it) also arrives from an input field unless the field needs it itself
+(Ctrl+A/C/V/X/Z/Y, arrows, Home, End, Backspace, Delete); the method asks
+`KEYPRESSED(KEY_LCTRL)` whether Ctrl is held --, `Knopf` (button) with the number of the
+toolbar button pressed and `Feld` (field) with the number of the status bar
+field clicked (from 0, separators and gaps count too), `Zelle` (cell) with
+the data row and column of every click into a table -- also on a button in
+the cell (`GUI_TABLE_CELL_KIND "knopf"`) and also in the row already
+selected, where `Geaendert` no longer comes; `Abgelegt` (dropped) with the
+dragged row of the source and the row it landed on, when something was
+dragged onto a control that is "Ablage" (drop target) in the inspector (the
+source is "Ziehbar" (draggable): for list, tree and table the row, otherwise
+the control; `GUI_DROP_SOURCE()` says where it came from, `GUI_DROP_TEXT()`
+what). `Takt` (tick) runs in every
+frame after the events of the controls (those of an own control before
+those of the window) -- that is where code polls what has no event, such as
+a context menu from `GUI_CONTEXT`. The inspector holds
+the buttons in one line, `text|symbol|tip` per button, separated by
+semicolons, `-` is a separator, `~` a gap (`New|plus|New product; -;
+|rueckgaengig|Undo`); the fields as `text|width`, optionally followed by
+`links`/`mitte`/`rechts` and `klick` for a field that reports `Feld`
+(width 0 shares the rest). The suggestions know the whole text of the
 program including the generated base class -- so after `Self.` the
 controls, timers and menu entries of the window appear too.
 
@@ -197,6 +250,13 @@ writes the menus into the layout -- one undo step; renamed entries take
 their event methods with them. Named entries appear in the navigator under
 the window, their event is `<Name>_Aktion`.
 
+**Context menus** are created by the same editor: [+ Context menu], under it
+entries as in a menu. Its name is a field of the window (the handle from
+`GUI_CONTEXT`), under "On" stands the widget whose right click opens it -- a
+list, a tree, a table select their row on it --, or the whole window. A
+custom control has context menus too (a menu bar it has not). In the layout
+they are stored under `kontextmenues`.
+
 **Dialogs that wait.** The runtime of the project offers:
 
 | Call | what it does |
@@ -204,6 +264,9 @@ the window, their event is `<Name>_Aktion`.
 | `Meldung(text$ [, titel$])` | a message with OK |
 | `Frage(text$ [, knoepfe$ [, titel$]])` | buttons separated by `\|` (default `Ja\|Nein`), returns the number of the button; Enter = the first, Esc = the last |
 | `Eingabe(text$ [, vorgabe$ [, titel$]])` | asks for a text, `""` on cancel |
+| `Auswahl(text$, eintraege [, vorgabe [, titel$]])` | one of a list (dropdown); returns the index, `-1` on cancel |
+| `EingabeZahl(text$, vorgabe, min, max [, titel$])` | asks for a whole number; returns `(TRUE, zahl)` or on cancel `(FALSE, vorgabe)` |
+| `FarbeWaehlen(vorgabe [, titel$])` | a colour in the colour picker; returns `&HRRGGBB`, `-1` on cancel |
 | `fenster.ZeigenModal()` | shows a window modally and returns only when it is closed |
 | `Bild(name$)` | an image from the project's `bilder/` as IMAGE |
 
@@ -218,6 +281,30 @@ project folder; an image control picks its image in the inspector under
 "Bild" and shows it in the designer already. When starting and building,
 the images go to `_studio/assets/bilder/`, and `dhrt --export` takes
 `assets/` next to the executable.
+
+**Languages.** A project writes its texts in one language, that of its
+source. A table `sprache/<code>.txt` in the project folder makes a second one
+from it: per line the text as it stands in the project, a tab, the
+translation (`sprache/en.txt`). Translated by themselves are the texts of
+the windows (titles, captions, placeholders, tooltips, column headers,
+entries, tabs, messages of the validation rules, chart titles, toolbars),
+the menus including their shortcuts (`Strg+S` becomes `Ctrl+S`), the texts
+of the reports and the buttons of the dialogs above. In the code every
+displayed text goes through `tr$`:
+
+| Call | what it does |
+|---|---|
+| `SpracheWaehlen(code$)` | chooses the language (`""` = that of the source); `FALSE` if there is no table `sprache/<code>.txt` |
+| `Sprache$()` | the chosen language, `""` = that of the source |
+| `tr$(text$)` | the text in the chosen language; what the table does not know stays |
+| `trf$(text$, werte)` | a text with `{0}`, `{1}` ...: translated first, then filled in |
+
+The choice is made before the first window, in `App.Geoeffnet`; without a
+choice it is English when `DHRT_LANG` is English and the table `en.txt`
+exists. A change applies to windows built afterwards. What the program reads
+back from a widget (the text of a drop-down list) is the translation --
+compare it with `tr$("...")`. With `DH_STUDIO_SPRACHLUECKEN=file` the runtime
+writes every text missing from the table into the file, once.
 
 **Debugger.**
 
@@ -253,6 +340,14 @@ line map that brings errors to their method.
 | Ctrl+Z / Ctrl+Y | undo / redo |
 | Ctrl+mouse wheel, Ctrl+Plus/Minus, Ctrl+0 | zoom |
 | Esc | cancels placing, otherwise clears the selection |
+
+A window that does not fit into the middle at 100 % opens at 75 or 50 %;
+whatever reaches beyond the middle is clipped instead of lying over the
+inspector and the output. The height in the inspector is that of the window
+including its title bar (a control at the bottom has to end above it; only
+the start window runs without a title bar in the program). If the window has
+menus, the menu bar sits above the content: in the program the window grows
+by the bar.
 
 **Alignment guides:** while dragging and resizing, edges and centres snap to
 those of the other controls. They also snap to the edges and the centre of
@@ -307,6 +402,13 @@ that have the property. An undo step is made when the field loses the focus
 or Enter comes, not per keystroke. A name must be an identifier and unique in
 the window, because it later becomes a field of the window class; an invalid
 name is marked red and not applied.
+
+Without a selection the inspector shows the window, including **Default
+button (Enter)** and **Cancel button (Esc)**: a dropdown with the window's
+buttons. In the program Enter then presses the one and Esc the other -- its
+`_Klick` runs as for a mouse click (Enter also from a single-line text
+field; a text area keeps its Enter). The button is remembered by name; renaming it carries the choice
+along, deleting it drops it.
 
 ## Custom controls
 
@@ -423,6 +525,19 @@ were. Changing a column rebuilds the table and copies its rows (SQLite
 cannot change a column); columns and tables the program created by itself
 stay. Deleting and renaming cannot be undone.
 
+**A file that already exists** (from another program) is taken over with
+Project → Database from file: the file goes into the project folder (if it
+is already there, it stays), its structure becomes the schema -- types,
+required, defaults, unique (UNIQUE over one column) and references (FOREIGN
+KEY to an `id`). What no Studio type matches exactly (`DATE`, `TIMESTAMP`,
+`DEFAULT CURRENT_TIMESTAMP`, a required column without a
+default) is kept verbatim next to it and applies until you change the type
+or the default in the grid; so the sync afterwards rebuilds no table, and
+the file stays exactly as it was. What the schema cannot hold (UNIQUE over
+two columns, a table without `id`) stays in the file and is listed in a
+message; the tab still shows and edits a table without `id`, but it cannot
+be bound.
+
 In the program the database is a global connection under its name, open
 before the app starts:
 
@@ -485,6 +600,17 @@ customer whose id is in `kunde`. The studio puts a LEFT JOIN around the table
 for this (a row without a customer stays, with an empty name); in the result
 the column is called `kunde.name`, and under that name **Sort by**, the
 **Condition** (`"kunde.ort" = 'Köln'`) and the search field know it as well.
+
+**On delete** turns the reference into a foreign key (`REFERENCES … (id)`)
+and says what happens to a row when the row it points to is deleted:
+*verbieten* (forbid: the delete fails as long as something points to it),
+*mitlöschen* (`ON DELETE CASCADE`: the items go with their invoice) or
+*leeren* (clear: `ON DELETE SET NULL`, not for a required column). Left
+empty it stays a reference without a rule. The comparison rebuilds the table
+for it, the rows stay -- also a reference into nothing, the rule applies to
+changes afterwards. dhrt always has foreign keys on; a built program creates
+a new file this way but does not add it to an older one (the comparison in
+the studio does). A taken-over file brings its `ON DELETE` along.
 
 **Images.** A column of the type **Image** holds the bytes of an image file
 (PNG, JPG, BMP or GIF). The data grid shows its size; **Image …** sets the
@@ -641,6 +767,14 @@ studio, PDFs and the CSV end up in `_studio/`.
 `zeigen(id)` in a window overrides the inherited `Zeigen()` -- `dhrt --check`
 (and so the problem list) warns when a method overrides an inherited one with
 a different number of parameters.
+
+**The big example:** `examples/studio/kuehlschrank/` is a fridge manager (the
+port of a PySide6 app, see its `LIESMICH.md`) with 18 windows and custom
+controls, an existing SQLite file as database element, tool and status bar,
+timers, charts, a report, network requests in the background and an English
+interface (`sprache/en.txt`, see "Languages" above). How it grew stage by
+stage and which gaps of the studio it found on the way is told in
+`geschichte/kuehlschrank.md`.
 
 ## For tests
 

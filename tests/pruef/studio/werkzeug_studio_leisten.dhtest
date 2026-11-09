@@ -1,0 +1,191 @@
+' Drachenhauch Studio: Werkzeugleiste und Statusleiste (gefunden beim Port der
+' Kuehlschrank-App). Der Inspektor hat fuer eine Werkzeugleiste die Zeilen
+' Knoepfe ("Text|Sinnbild|Tipp; -; ~") und Mit Text, fuer eine Statusleiste
+' Felder ("Text|Breite|Ausrichtung|klick"); die Leiste meldet das Ereignis
+' Knopf(nr), die Statusleiste Feld(nr) -- vorher stand eine Leiste ohne Knoepfe
+' im Fenster, und kein Druck darauf erreichte den Code.
+' Format: docs/werkzeuge.md, dhrt test.
+
+--- langsam
+=== die knoepfe einer werkzeugleiste im inspektor eintragen
+' Die Leiste waehlen, ins Feld Knoepfe klicken, Strg+A, Strg+V (die Ablage
+' hat die Knoepfe), Enter, Strg+S -- die Datei hat sie als leiste.eintraege.
+IMPORT "laeufer.dh"
+DIM m AS STRING : m = CWD$() + "/m.log"
+slStarten(m, "", 6, CWD$() + "/f.dhform")
+DIM fx AS INTEGER
+DIM fy AS INTEGER
+(fx, fy) = slLage(m, "fenster")
+slHin(10, 10)
+slKlick(fx + 200, fy + 18)
+slWarten(4)
+slAufnahmeSchreiben(CWD$() + "/ev1.txt")
+slStarten(m, CWD$() + "/ev1.txt", slBild + 10, CWD$() + "/f.dhform")
+DIM tx AS INTEGER
+DIM ty AS INTEGER
+(tx, ty) = slLage(m, "feld leiste.eintraege")
+slZeilen = [] : slBild = 0
+slHin(10, 10)
+slKlick(fx + 200, fy + 18)
+slWarten(4)
+slKlick(tx, ty)
+slMit([341], 65)
+slMit([341], 86)
+slTaste(257)
+slWarten(4)
+slMit([341], 83)
+slWarten(6)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+SETENV("DH_STUDIO_ABLAGE", "Eins|plus|Der erste; -; |minus|Weniger; ~; Drei")
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = slStarten(log, CWD$() + "/ev.txt", slBild + 20, CWD$() + "/f.dhform")
+PRINT "feld gefunden "; tx > 0
+PRINT "uebernommen "; slHat(log, "inspektor leiste.eintraege")
+DIM d AS JSON_HANDLE : d = JSON_LOAD(CWD$() + "/f.dhform")
+DIM k AS INTEGER
+FOR k = 0 TO JSON_LEN(d, "widgets.0.leiste.eintraege") - 1
+    DIM q AS STRING : q = "widgets.0.leiste.eintraege." + STR$(k)
+    DIM z AS STRING : z = JSON_GET_STRING(d, q + ".art")
+    IF JSON_HAS(d, q + ".text") THEN z = z + " text=" + JSON_GET_STRING(d, q + ".text")
+    IF JSON_HAS(d, q + ".symbol") THEN z = z + " symbol=" + JSON_GET_STRING(d, q + ".symbol")
+    IF JSON_HAS(d, q + ".tip") THEN z = z + " tip=" + JSON_GET_STRING(d, q + ".tip")
+    PRINT z
+NEXT
+' Die Datei geht durch die Laufzeit: GUI_FROM_JSON liest die Knoepfe.
+DIM w AS GUI_WINDOW : w = GUI_FROM_JSON(JSON_STRINGIFY(d))
+PRINT "knoepfe "; GUI_TOOLBAR_COUNT(GUI_WINDOW_WIDGET(w, 0))
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+IMPORT "json"
+IMPORT "gui"
+slStudio = ARG$(0)
+--- datei f.dhform
+{"title":"F","name":"F","w":520,"h":360,"widgets":[
+{"kind":"toolbar","name":"leiste","x":0,"y":0,"w":520,"h":36}]}
+--- erwartet
+feld gefunden TRUE
+uebernommen TRUE
+knopf text=Eins symbol=plus tip=Der erste
+trenner
+knopf symbol=minus tip=Weniger
+luecke
+knopf text=Drei
+knoepfe 5
+
+=== knopf und feld rufen ihr ereignis im erzeugten programm
+' F5 erzeugt das Programm; ein Timer schreibt nach dem ersten Bild die Lage
+' der Knoepfe und Felder (sie gelten erst nach GUI_UPDATE). Ein zweiter Lauf
+' klickt Knopf 2 ("Zwei", hinter dem Trenner) und das klickbare Feld 1.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+slHin(10, 10)
+slWarten(10)
+slTaste(294)
+slWarten(150)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+SETENV("DH_STUDIO_LAUF_BILDER", "20")
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+PRINT "erzeugt "; slHat(log, "erzeugt 2")
+DIM lagen AS ARRAY OF STRING : lagen = []
+DIM z AS STRING
+FOR EACH z IN slAnfang(log, "ausgabe lage ")
+    lagen = SPLIT(MID$(z, 13, LEN(z)), " ")
+NEXT
+PRINT "lagen "; LEN(lagen)
+DIM kx AS INTEGER : kx = INT(VAL(lagen[0]))
+DIM ky AS INTEGER : ky = INT(VAL(lagen[1]))
+DIM sx AS INTEGER : sx = INT(VAL(lagen[2]))
+DIM sy AS INTEGER : sy = INT(VAL(lagen[3]))
+DIM neu AS ARRAY OF STRING : neu = []
+DIM s AS STRING
+FOR EACH s IN READLINES(p + "/_studio/main.dh")
+    IF LEFT$(s, 11) = "studioLauf(" THEN ARRAY_PUSH(neu, "AUTOMATION_PLAY(" + CHR$(34) + "klick.txt" + CHR$(34) + ")")
+    ARRAY_PUSH(neu, s)
+NEXT
+WRITEALL(p + "/_studio/probe.dh", JOIN$(neu, CHR$(10)) + CHR$(10))
+DIM e AS ARRAY OF STRING : e = []
+ARRAY_PUSH(e, "e 0 7 " + STR$(kx) + " " + STR$(ky) + " 0 0")
+ARRAY_PUSH(e, "e 5 7 " + STR$(kx) + " " + STR$(ky) + " 0 0")
+ARRAY_PUSH(e, "e 10 6 0 0 0 0")
+ARRAY_PUSH(e, "e 12 5 0 0 0 0")
+ARRAY_PUSH(e, "e 20 7 " + STR$(sx) + " " + STR$(sy) + " 0 0")
+ARRAY_PUSH(e, "e 25 7 " + STR$(sx) + " " + STR$(sy) + " 0 0")
+ARRAY_PUSH(e, "e 30 6 0 0 0 0")
+ARRAY_PUSH(e, "e 32 5 0 0 0 0")
+WRITEALL(p + "/_studio/klick.txt", "c " + STR$(LEN(e)) + CHR$(10) + JOIN$(e, CHR$(10)) + CHR$(10))
+DIM k AS INTEGER : k = PROCESS_START("dhrt", "run", "--bilder", "50", p + "/_studio/probe.dh")
+DIM leer AS INTEGER : leer = 0
+WHILE leer < 5
+    DIM kt AS STRING : kt = PROCESS_READ$(k)
+    IF kt <> "" THEN
+        DIM zeile AS STRING
+        FOR EACH zeile IN SPLIT(REPLACE$(kt, CHR$(13), ""), CHR$(10))
+            IF zeile <> "" AND LEFT$(zeile, 8) <> "WARNING:" AND LEFT$(zeile, 5) <> "lage " THEN PRINT "lauf "; zeile
+        NEXT
+        leer = 0
+    ELSEIF NOT PROCESS_RUNNING(k) THEN
+        leer = leer + 1
+        SLEEP(30)
+    END IF
+WEND
+PRINT "code "; PROCESS_CODE(k)
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"}]}
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":420,"h":300,"widgets":[
+{"kind":"toolbar","name":"leiste","x":0,"y":0,"w":420,"h":36,"leiste":{"eintraege":[{"art":"knopf","text":"Eins","symbol":"plus"},{"art":"trenner"},{"art":"knopf","text":"Zwei","symbol":"minus"}],"beschriftung":true}},
+{"kind":"statusbar","name":"status","x":0,"y":276,"w":420,"h":24,"status":{"felder":[{"text":"Bereit","breite":0},{"text":"Zahl","breite":120,"klickbar":true}]}}],
+"timer":[{"name":"messen","intervall":200,"aktiv":true,"wiederholen":false}]}
+--- datei proj/Hauptfenster.dh
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+
+    SUB leiste_Knopf(nr AS INTEGER)
+        PRINT "knopf "; nr
+    END SUB
+
+    SUB status_Feld(nr AS INTEGER)
+        PRINT "feld "; nr
+    END SUB
+
+    SUB messen_Aktion()
+        DIM y AS INTEGER : y = GUI_GET_Y(Self.status) + 12
+        PRINT "lage "; GUI_TOOLBAR_ITEM_X(Self.leiste, 2) + GUI_TOOLBAR_ITEM_W(Self.leiste, 2) \ 2; " 18 "; GUI_STATUSBAR_FIELD_X(Self.status, 1) + GUI_STATUSBAR_FIELD_W(Self.status, 1) \ 2; " "; y
+    END SUB
+END CLASS
+--- datei proj/App.dh
+CLASS App EXTENDS StudioApp
+END CLASS
+--- erwartet
+erzeugt TRUE
+lagen 4
+lauf knopf 2
+lauf feld 1
+code 0
+
+=== der ereignis-dialog kennt knopf und feld mit ihrer nummer
+' Was der Dialog "Ereignis hinzufuegen" anbietet und in die Kopfzeile setzt.
+IMPORT "kern.dh"
+PRINT JOIN$(ereignisseFuer("toolbar"), " "); " | "; JOIN$(ereignisseFuer("statusbar"), " ")
+PRINT "leiste_Knopf("; ereignisParameter$("Knopf"); ")"
+PRINT "status_Feld("; ereignisParameter$("Feld"); ")"
+--- datei kern.dh
+IMPORT "json"
+IMPORT "regex"
+IMPORT "{sammlung}/../../../studio/sprache.dh"
+IMPORT "{sammlung}/../../../studio/bibliothek.dh"
+IMPORT "{sammlung}/../../../studio/modell.dh"
+IMPORT "{sammlung}/../../../studio/projekt.dh"
+--- erwartet
+Knopf MausRein MausRaus Abgelegt | Feld MausRein MausRaus Abgelegt
+leiste_Knopf(nr AS INTEGER)
+status_Feld(nr AS INTEGER)

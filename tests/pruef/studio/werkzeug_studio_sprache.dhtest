@@ -1,0 +1,176 @@
+' Drachenhauch Studio: ein Projekt in zwei Sprachen (gefunden beim Port der
+' Kuehlschrank-App, deren Einstellungen eine Sprache anboten). Vorher gab es
+' keinen Weg: die Texte der Fenster, Menues und Berichte standen fest im
+' erzeugten Code. Jetzt macht eine Tafel sprache/<code>.txt im Projektordner
+' eine zweite Sprache daraus (studio/laufzeit.dh: SpracheWaehlen, tr$, trf$,
+' studioTexte$, studioBerichtTexte$; studio/erzeugen.dh kopiert die Tafel
+' nach assets/sprache/ und schickt Layout, Menues und Diagrammtitel durch
+' die Laufzeit). Format: docs/werkzeuge.md, dhrt test.
+
+--- langsam
+=== ein projekt mit tafel laeuft englisch deutsch und in der sprache der app
+' F5 erzeugt das Programm, dann laeuft es dreimal: mit DHRT_LANG=en (die
+' Vorgabe), ohne (die Sprache der Quelle) und mit einer Sprache, die die App
+' selbst waehlt. Texte, die in der Tafel fehlen, schreibt die Laufzeit nach
+' DH_STUDIO_SPRACHLUECKEN.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+slHin(10, 10)
+slWarten(10)
+slTaste(294)
+slWarten(150)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+SETENV("DH_STUDIO_LAUF_BILDER", "20")
+DIM log AS STRING : log = CWD$() + "/s.log"
+slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+PRINT "erzeugt "; LEN(slAnfang(log, "erzeugt ")) = 1
+PRINT "tafel kopiert "; FILEEXISTS(p + "/_studio/assets/sprache/en.txt")
+DIM basis AS STRING : basis = READALL(p + "/_studio/Hauptfenster_basis.dh")
+PRINT "menue "; INSTR(basis, "studioTr$(!" + CHR$(34) + "Datei" + CHR$(34) + ")") >= 0; " kuerzel "; INSTR(basis, "studioKuerzel$(!" + CHR$(34) + "Strg+Q" + CHR$(34) + ")") >= 0; " diagramm "; INSTR(basis, "studioTr$(!" + CHR$(34) + "Anteile" + CHR$(34) + ")") >= 0
+
+SUB lauf(wie AS STRING)
+    PRINT "-- "; wie
+    IF FILEEXISTS(p + "/_studio/liste.pdf") THEN DELETEFILE(p + "/_studio/liste.pdf")
+    DIM k AS INTEGER : k = PROCESS_START("dhrt", "run", "--bilder", "40", p + "/_studio/main.dh")
+    DIM leer AS INTEGER : leer = 0
+    WHILE leer < 5
+        DIM t AS STRING : t = PROCESS_READ$(k)
+        IF t <> "" THEN
+            DIM zeile AS STRING
+            FOR EACH zeile IN SPLIT(REPLACE$(t, CHR$(13), ""), CHR$(10))
+                IF zeile <> "" AND LEFT$(zeile, 8) <> "WARNING:" AND LEFT$(zeile, 5) <> "INFO:" THEN PRINT zeile
+            NEXT
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(k) THEN
+            leer = leer + 1
+            SLEEP(30)
+        END IF
+    WEND
+    DIM s AS STRING : s = JOIN$(pdfSeiten(p + "/_studio/liste.pdf"), "|")
+    PRINT "bericht "; REPLACE$(s, CHR$(10), "|")
+    ' Der Titel steht nur in den Angaben der Datei (PDF_TITLE).
+    DIM roh AS STRING : roh = READALL(p + "/_studio/liste.pdf", "latin1")
+    PRINT "titel "; IIF(INSTR(roh, "Shopping list") >= 0, "Shopping list", IIF(INSTR(roh, "Einkaufsliste") >= 0, "Einkaufsliste", "?"))
+END SUB
+
+DIM luecken AS STRING : luecken = CWD$() + "/luecken.txt"
+SETENV("DH_STUDIO_SPRACHLUECKEN", luecken)
+SETENV("DHRT_LANG", "en")
+lauf("englisch")
+PRINT "luecken "; REPLACE$(READALL(luecken), CHR$(10), "|")
+SETENV("DHRT_LANG", "")
+lauf("deutsch")
+SETENV("PROBE_SPRACHE", "en")
+lauf("die app waehlt")
+--- argumente
+{sammlung}/../../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/pdftext.dh"
+slStudio = ARG$(0)
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"},{"art":"bericht","name":"Liste","bericht":"Liste.dhreport"}]}
+--- datei proj/sprache/en.txt
+Haupt	Main
+Bereit	Ready
+Speichern	Save
+Sichert alles	Saves everything
+Name eingeben	Enter a name
+Produkt	Product
+Menge	Quantity
+Rot	Red
+Grün	Green
+Datei	File
+Beenden	Quit
+{0} Stück	{0} pieces
+{0} und {1}	{0} and {1}
+Einkaufsliste	Shopping list
+Überschrift	Heading
+Anteile	Shares
+--- datei proj/Liste.dhreport
+{"titel":"Einkaufsliste","seite":{"format":"A4","hoch":true,"rand":[15,15,15,15]},"baender":[{"art":"berichtskopf","hoehe":20,"elemente":[{"art":"text","x":0,"y":0,"b":100,"h":8,"text":"Überschrift"},{"art":"seitenzahl","x":120,"y":0,"b":50,"h":8}]}]}
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":480,"h":320,"menus":[{"label":"Datei","items":[{"label":"Beenden","name":"miBeenden","shortcut":"Strg+Q"}]}],"widgets":[
+{"kind":"label","name":"lab","text":"Bereit","x":20,"y":10,"w":120,"h":20},
+{"kind":"button","name":"knopf","text":"Speichern","tooltip":"Sichert alles","x":20,"y":40,"w":120,"h":28},
+{"kind":"textinput","name":"feld","placeholder":"Name eingeben","x":20,"y":80,"w":200,"h":28},
+{"kind":"table","name":"tab","table":{"headers":["Produkt","Menge"],"rows":[]},"x":20,"y":120,"w":300,"h":100},
+{"kind":"dropdown","name":"wahl","items":["Rot","Grün"],"x":240,"y":80,"w":120,"h":28},
+{"kind":"label","name":"zahl","text":"42 ✓","x":200,"y":10,"w":60,"h":20},
+{"kind":"label","name":"luecke","text":"Fehlt hier","x":280,"y":10,"w":120,"h":20},
+{"kind":"canvas","name":"dia","studio_diagramm":"kuchen","studio_diagramm_titel":"Anteile","x":340,"y":120,"w":120,"h":100}],
+"timer":[{"name":"messen","intervall":100,"aktiv":true,"wiederholen":false}]}
+--- datei proj/Hauptfenster.dh
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+
+    SUB messen_Aktion()
+        PRINT "sprache '"; Sprache$(); "'"
+        PRINT "label "; GUI_TEXT(Self.lab); " knopf "; GUI_TEXT(Self.knopf)
+        DIM j AS STRING : j = GUI_TO_JSON(Self.Fenster())
+        DIM w AS STRING
+        FOR EACH w IN ["Haupt", "Main", "Sichert alles", "Saves everything", "Name eingeben", "Enter a name", "Produkt", "Product", "Grün", "Green", "42 ✓", "Fehlt hier"]
+            IF INSTR(j, CHR$(34) + w + CHR$(34)) >= 0 THEN PRINT "im fenster "; w
+        NEXT
+        PRINT "einmal "; trf$("{0} und {1}", ["a{1}", "b"])
+        PRINT "trf "; trf$("{0} Stück", ["3"]); " eingebaut "; tr$("Abbrechen"); " kuerzel "; studioKuerzel$("Strg+Umschalt+Q")
+        Liste.Pdf("liste.pdf", {})
+        PRINT "fr "; SpracheWaehlen("fr"); " '"; Sprache$(); "'"
+        Self.Zumachen()
+    END SUB
+END CLASS
+--- datei proj/App.dh
+CLASS App EXTENDS StudioApp
+    SUB Geoeffnet()
+        IF GETENV$("PROBE_SPRACHE") <> "" THEN SpracheWaehlen(GETENV$("PROBE_SPRACHE"))
+    END SUB
+END CLASS
+--- erwartet
+erzeugt TRUE
+tafel kopiert TRUE
+menue TRUE kuerzel TRUE diagramm TRUE
+-- englisch
+sprache 'en'
+label Ready knopf Save
+im fenster Main
+im fenster Saves everything
+im fenster Enter a name
+im fenster Product
+im fenster Green
+im fenster 42 ✓
+im fenster Fehlt hier
+einmal a{1} and b
+trf 3 pieces eingebaut Cancel kuerzel Ctrl+Shift+Q
+fr FALSE ''
+bericht Heading|Page 1 of 1|
+titel Shopping list
+luecken Fehlt hier|
+-- deutsch
+sprache ''
+label Bereit knopf Speichern
+im fenster Haupt
+im fenster Sichert alles
+im fenster Name eingeben
+im fenster Produkt
+im fenster Grün
+im fenster 42 ✓
+im fenster Fehlt hier
+einmal a{1} und b
+trf 3 Stück eingebaut Abbrechen kuerzel Strg+Umschalt+Q
+fr FALSE ''
+bericht Überschrift|Seite 1 von 1|
+titel Einkaufsliste
+-- die app waehlt
+sprache 'en'
+label Ready knopf Save
+im fenster Main
+im fenster Saves everything
+im fenster Enter a name
+im fenster Product
+im fenster Green
+im fenster 42 ✓
+im fenster Fehlt hier
+einmal a{1} and b
+trf 3 pieces eingebaut Cancel kuerzel Ctrl+Shift+Q
+fr FALSE ''
+bericht Heading|Page 1 of 1|
+titel Shopping list

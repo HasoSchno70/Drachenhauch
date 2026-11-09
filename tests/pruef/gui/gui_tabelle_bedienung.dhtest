@@ -414,3 +414,110 @@ e 2 8 0 -3 0 0
 DHRT_FRAMES=5
 --- bild
 200 81 #00FF00 +-60
+
+=== ein doppelklick auf einen knopf in der zelle oeffnet die zeile nicht
+' Zweimal schnell auf "+1" (Knopf in Spalte 1, x 150..289) sind zwei Klicks
+' auf den Knopf: GUI_TABLE_CLICKED/_COL melden beide, GUI_DOUBLE_CLICKED
+' keinen (gefunden mit der Kuehlschrank-App -- dort ging der Bearbeiten-
+' Dialog auf). Derselbe Doppelklick auf die Textspalte meldet weiter: der
+' zweite Druck ist der Doppelklick, sein Loslassen der zweite Klick.
+IMPORT "gui"
+SCREEN(300, 220, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 220)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM tb AS GUI_WIDGET : tb = GUI_TABLE(w, 10, 10, 280, 200)
+GUI_TABLE_HEADERS(tb, ["Name", "Aktion"])
+GUI_TABLE_ADD_ROW(tb, ["Apfel", "+1"]) : GUI_TABLE_ADD_ROW(tb, ["Birne", "+1"])
+GUI_TABLE_COL_WIDTHS(tb, [140, 140])
+GUI_TABLE_CELL_KIND(tb, 0, 1, "knopf")
+GUI_TABLE_CELL_KIND(tb, 1, 1, "knopf")
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_TABLE_CLICKED(tb) >= 0 THEN PRINT "klick "; GUI_TABLE_CLICKED(tb); " "; GUI_TABLE_CLICKED_COL(tb)
+    IF GUI_DOUBLE_CLICKED(tb) THEN PRINT "doppel "; GUI_TABLE_SELECTED(tb)
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 12
+e 0 7 5 215 0 0
+e 1 7 200 42 0 0
+e 2 6 0 0 0 0
+e 3 5 0 0 0 0
+e 4 6 0 0 0 0
+e 5 5 0 0 0 0
+e 12 7 60 62 0 0
+e 13 6 0 0 0 0
+e 14 5 0 0 0 0
+e 15 6 0 0 0 0
+e 16 5 0 0 0 0
+e 17 7 60 62 0 0
+
+--- umgebung
+DHRT_FRAMES=22
+--- erwartet
+klick 0 1
+klick 0 1
+klick 1 0
+doppel 1
+klick 1 0
+
+=== eine tabellenzeile auf eine liste ziehen traegt ihre zeile mit
+' Wie bei Liste und Baum: GUI_DRAG_INDEX ist die Datenzeile, GUI_DROP_TEXT
+' der Text ihrer ersten Zelle -- vorher kam aus einer Tabelle -1 und kein
+' Text (gefunden mit der Kuehlschrank-App: Bestandszeile auf einen Lagerort
+' ziehen). Der zweite Zug laeuft in der absteigend sortierten Tabelle: oben
+' steht dann Kirsche, die Datenzeile 2.
+IMPORT "gui"
+SCREEN(600, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 600, 300)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM tb AS GUI_WIDGET : tb = GUI_TABLE(w, 10, 10, 280, 200)
+GUI_TABLE_HEADERS(tb, ["Name", "Ort"])
+GUI_TABLE_ADD_ROW(tb, ["Apfel", "A"]) : GUI_TABLE_ADD_ROW(tb, ["Birne", "B"]) : GUI_TABLE_ADD_ROW(tb, ["Kirsche", "C"])
+DIM li AS GUI_WIDGET : li = GUI_LISTBOX(w, 320, 10, 200, 200, ["Kühlschrank", "Keller", "Box"])
+GUI_DRAGGABLE(tb, TRUE)
+GUI_DROP_TARGET(li, TRUE)
+DIM f AS INTEGER
+WHILE NOT QUITREQUESTED()
+    f = f + 1
+    IF f = 20 THEN GUI_TABLE_SORT(tb, 0, TRUE)
+    GUI_UPDATE()
+    IF GUI_DROPPED(li) THEN PRINT "abgelegt "; GUI_DRAG_INDEX(); " "; GUI_DROP_TEXT(); " auf "; GUI_DROP_INDEX()
+    CLS(0) : GUI_DRAW() : FLIP()
+WEND
+--- datei ev.txt
+c 22
+e 0 7 5 290 0 0
+e 1 7 60 62 0 0
+e 2 6 0 0 0 0
+e 4 7 70 62 0 0
+e 5 7 100 62 0 0
+e 6 7 200 62 0 0
+e 7 7 300 62 0 0
+e 8 7 380 40 0 0
+e 9 7 400 42 0 0
+e 10 7 400 42 0 0
+e 11 5 0 0 0 0
+e 14 7 5 290 0 0
+e 22 7 60 42 0 0
+e 23 6 0 0 0 0
+e 25 7 70 42 0 0
+e 26 7 150 42 0 0
+e 27 7 300 60 0 0
+e 28 7 400 62 0 0
+e 29 7 400 62 0 0
+e 30 5 0 0 0 0
+e 33 7 5 290 0 0
+e 34 7 5 290 0 0
+
+--- umgebung
+DHRT_FRAMES=40
+--- erwartet
+abgelegt 1 Birne auf 1
+abgelegt 2 Kirsche auf 2

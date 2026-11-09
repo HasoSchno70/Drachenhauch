@@ -362,3 +362,148 @@ DHRT_FRAMES=8
 --- erwartet
 FALSE
 
+
+=== ein dialog ueber einem modalen fenster gibt es bei der antwort zurueck
+' Frage im modalen Detailfenster (gefunden mit der Kuehlschrank-App): Enter
+' beantwortet den Dialog, danach ist das Fenster darunter wieder modal --
+' der Knopf daneben nimmt keinen Klick, ESC drueckt seinen Abbrechen-Knopf.
+' Vorher fiel die Modalitaet mit der Antwort ganz weg.
+IMPORT "gui"
+SCREEN(520, 320, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Hinten", 4, 4, 200, 120)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "los", 8, 8, 90, 26)
+DIM m AS GUI_WINDOW : m = GUI_WINDOW("Modal", 250, 150, 200, 120)
+DIM zu AS GUI_WIDGET : zu = GUI_BUTTON(m, "zu", 8, 8, 90, 26)
+GUI_WINDOW_CANCEL(m, zu)
+GUI_WINDOW_MODAL(m, TRUE)
+DIM d AS GUI_WINDOW : d = GUI_DIALOG("F", "Wirklich?", "Ja|Nein")
+AUTOMATION_PLAY("ev.txt")
+DIM f AS INTEGER
+FOR f = 1 TO 30
+    GUI_UPDATE()
+    IF GUI_ANSWER(d) <> 0 THEN PRINT "antwort "; GUI_ANSWER(d); " modal "; GUI_MODAL()
+    IF GUI_CLICKED(b) THEN PRINT "los geklickt"
+    IF GUI_CLICKED(zu) THEN PRINT "zu bild "; f
+    GUI_DRAW()
+    FLIP()
+NEXT
+PRINT "modal "; GUI_MODAL()
+--- datei ev.txt
+c 10
+e 0 7 300 300 0 0
+e 3 2 257 0 0 0
+e 4 1 257 0 0 0
+e 8 7 40 20 0 0
+e 9 7 40 20 0 0
+e 10 6 0 0 0 0
+e 12 5 0 0 0 0
+e 16 2 256 0 0 0
+e 17 1 256 0 0 0
+e 20 7 300 300 0 0
+
+--- umgebung
+DHRT_FRAMES=34
+--- erwartet
+antwort 1 modal TRUE
+zu bild 18
+modal TRUE
+
+=== ein modales fenster nimmt den fokus und gibt ihn zurueck
+' Die Tabelle dahinter hat den Fokus (Enter = Doppelklick). Geht davor ein
+' modales Fenster mit Standard-Knopf auf, gehoert Enter ihm -- vorher blieb
+' der Fokus auf der Tabelle, und Enter oeffnete dort das naechste Fenster
+' (gefunden mit der Kuehlschrank-App). Danach hat die Tabelle ihn wieder.
+IMPORT "gui"
+SCREEN(520, 320, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Hinten", 4, 4, 300, 200)
+DIM kopf[1] AS STRING
+kopf[0] = "Name"
+DIM zeilen[2, 1] AS STRING
+zeilen[0, 0] = "Rührei" : zeilen[1, 0] = "Toast"
+DIM t AS GUI_WIDGET : t = GUI_TABLE(w, 8, 8, 260, 120, kopf, zeilen)
+GUI_TABLE_SET_SELECTED(t, 0)
+GUI_FOCUS(t)
+DIM m AS GUI_WINDOW
+DIM ok AS GUI_WIDGET
+AUTOMATION_PLAY("ev.txt")
+DIM f AS INTEGER
+FOR f = 1 TO 30
+    GUI_UPDATE()
+    IF f = 3 THEN
+        m = GUI_WINDOW("Modal", 250, 150, 220, 120)
+        ok = GUI_BUTTON(m, "Kochen", 8, 8, 90, 26)
+        GUI_WINDOW_DEFAULT(m, ok)
+        GUI_WINDOW_MODAL(m, TRUE)
+        PRINT "fokus hinten "; GUI_FOCUSED() = t
+    END IF
+    IF GUI_DOUBLE_CLICKED(t) THEN PRINT "tabelle doppelklick bild "; f
+    IF f > 3 THEN
+        IF GUI_CLICKED(ok) THEN
+            PRINT "kochen bild "; f
+            GUI_WINDOW_DESTROY(m)
+        END IF
+    END IF
+    IF f = 25 THEN PRINT "fokus danach "; GUI_FOCUSED() = t
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- datei ev.txt
+c 3
+e 0 7 300 300 0 0
+e 8 2 257 0 0 0
+e 9 1 257 0 0 0
+
+--- umgebung
+DHRT_FRAMES=34
+--- erwartet
+fokus hinten FALSE
+kochen bild 10
+fokus danach TRUE
+
+=== enter in einem zahlenfeld drueckt den standard-knopf
+' Das Zahlenfeld uebernimmt Enter (GUI_ENTERED) und gibt es weiter an den
+' Standard-Knopf -- vorher blieb es dort haengen, ein Dialog mit einer Zahl
+' liess sich nicht mit Enter bestaetigen (Kuehlschrank-App, MHD setzen).
+' Ebenso aus einem Kaestchen: das schaltet nur mit der Leertaste (vorher
+' schaltete Enter es um, und der Dialog liess sich nicht mit Enter
+' speichern -- Kuehlschrank-App, Einstellungen).
+IMPORT "gui"
+SCREEN(420, 260, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Tage", 10, 10, 380, 200)
+DIM zahl AS GUI_WIDGET : zahl = GUI_SPINNER(w, 10, 10, 120, 1, 365, 7, 1)
+DIM kasten AS GUI_WIDGET : kasten = GUI_CHECKBOX(w, "Merken", 10, 50)
+DIM ok AS GUI_WIDGET : ok = GUI_BUTTON(w, "OK", 10, 100, 90, 28)
+GUI_WINDOW_DEFAULT(w, ok)
+GUI_FOCUS(zahl)
+AUTOMATION_PLAY("ev.txt")
+DIM f AS INTEGER
+FOR f = 1 TO 40
+    GUI_UPDATE()
+    IF GUI_ENTERED(zahl) THEN PRINT "zahl enter bild "; f
+    IF GUI_CLICKED(ok) THEN PRINT "ok bild "; f; " | wert "; INT(GUI_VALUE(zahl))
+    IF GUI_CHANGED(kasten) THEN PRINT "kasten "; GUI_CHECKED(kasten); " bild "; f
+    IF f = 20 THEN GUI_FOCUS(kasten)
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- datei ev.txt
+c 7
+e 0 7 300 300 0 0
+e 8 2 257 0 0 0
+e 9 1 257 0 0 0
+e 28 2 257 0 0 0
+e 29 1 257 0 0 0
+e 33 2 32 0 0 0
+e 34 1 32 0 0 0
+
+--- umgebung
+DHRT_FRAMES=44
+--- erwartet
+zahl enter bild 10
+ok bild 10 | wert 7
+ok bild 30 | wert 7
+kasten TRUE bild 35

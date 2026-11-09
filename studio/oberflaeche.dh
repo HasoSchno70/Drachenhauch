@@ -49,6 +49,7 @@ DIM miModulNeu AS INTEGER
 DIM miControlNeu AS INTEGER
 DIM miKlasseNeu AS INTEGER
 DIM miDatenbankNeu AS INTEGER
+DIM miDatenbankDatei AS INTEGER
 DIM miBerichtNeu AS INTEGER
 DIM miMethodeNeu AS INTEGER
 DIM miEreignisNeu AS INTEGER
@@ -155,6 +156,7 @@ SUB oberflaecheAnlegen()
     miModulNeu = GUI_MENU_ITEM(m, tr$("Modul hinzufügen …"))
     miKlasseNeu = GUI_MENU_ITEM(m, tr$("Klasse hinzufügen …"))
     miDatenbankNeu = GUI_MENU_ITEM(m, tr$("Datenbank hinzufügen …"))
+    miDatenbankDatei = GUI_MENU_ITEM(m, tr$("Datenbank aus Datei übernehmen …"))
     miBerichtNeu = GUI_MENU_ITEM(m, tr$("Bericht hinzufügen …"))
     miBildNeu = GUI_MENU_ITEM(m, tr$("Bild hinzufügen …"), kz$("Strg+Umschalt+B"))
     GUI_MENU_SEPARATOR(m)

@@ -453,7 +453,9 @@ things take care of this:
   emoji, Arabic, Hebrew, Thai), the runtime notes it while drawing or
   measuring and bakes it at the next `FLIP` from the matching system font —
   Windows: MS Gothic, Malgun Gothic, Segoe UI Emoji, Segoe UI; macOS: Arial
-  Unicode; Linux: Noto Sans CJK, if installed. Only what was needed is baked,
+  Unicode; Linux: Noto Sans CJK, if installed. If the first file of the list
+  lacks the character, the next frame asks the next one (🗘 is in Segoe UI
+  Symbol, not in Segoe UI Emoji). Only what was needed is baked,
   not the whole block. Measured: the first frame with kanji, hangul, emoji
   and Hebrew at once costs about 100 ms once, every further new character
   about 15 ms, after that nothing. This also applies within a font you loaded

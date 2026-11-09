@@ -64,7 +64,7 @@ CHART_LABEL(c, 0, "Mo")                ' Kategorie beschriften
 | Befehl | Wirkung |
 |---|---|
 | `CHART_SERIES(c, name$ [, farbe])` | Reihe anlegen → Index |
-| `CHART_ADD(c, name$, wert [, farbe])` | Kategorie + Wert in Reihe 0 → Index |
+| `CHART_ADD(c, name$, wert [, farbe])` | Kategorie + Wert in Reihe 0 → Index; die Farbe gilt für das Segment, bei einem Balken mit einer Reihe für den Balken |
 | `CHART_DATA(c, reihe, werte)` | Werte einer Reihe komplett ersetzen (`ARRAY OF FLOAT`); die Punktzahl folgt der Liste, auch nach unten |
 | `CHART_SET_POINT(c, reihe, punkt, wert)` | Einzelnen Wert ändern |
 | `CHART_PUSH(c, reihe, wert)` | Wert hinten anhängen (Live-Kurven, siehe `fenster`) |

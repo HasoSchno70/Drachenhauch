@@ -78,6 +78,9 @@ SUB inspektorAnlegen()
     inspZeile("Fenster", "w", "Breite", "zahl", "fenster", "")
     inspZeile("Fenster", "h", "Höhe", "zahl", "fenster", "")
     inspZeile("Fenster", "resizable", "Größe änderbar", "schalter", "fenster", "")
+    ' Welcher Knopf Enter bzw. Esc bekommt -- beim Namen, wie in Xojo.
+    inspZeile("Fenster", "studio_standard", "Standard-Knopf (Enter)", "knopfwahl", "fenster", "")
+    inspZeile("Fenster", "studio_abbrechen", "Abbrechen-Knopf (Esc)", "knopfwahl", "fenster", "")
     ' Ein eigenes Control legt fest, was es meldet und was eine Instanz
     ' einstellen kann; eine Instanz traegt ihre Werte (modell.dh).
     inspGruppe("Eigenes Control")
@@ -127,8 +130,15 @@ SUB inspektorAnlegen()
     inspZeile("Inhalt", "placeholder", "Platzhalter", "text", "textinput,textarea,dropdown", "")
     inspZeile("Inhalt", "items", "Einträge", "eintraege", LISTENARTEN, "")
     inspZeile("Inhalt", "table.headers", "Spalten", "eintraege", "table", "")
+    inspZeile("Inhalt", "leiste.eintraege", "Knöpfe", "leiste", "toolbar", "")
+    inspZeile("Inhalt", "leiste.beschriftung", "Mit Text", "schalter", "toolbar", "")
+    inspZeile("Inhalt", "status.felder", "Felder", "felder", "statusbar", "")
     inspZeile("Inhalt", "group", "Gruppe", "text", "radio", "")
     inspZeile("Inhalt", "studio_bild", "Bild", "wahl", "image", "(keins)")
+    ' Eine Zeichenfläche mit Diagramm (laufzeit.dh, StudioDiagramm); die
+    ' Arten sind die von CHART_NEW.
+    inspZeile("Inhalt", "studio_diagramm", "Diagramm", "wahl", "canvas", "(keins);kuchen;donut;balken;linie;flaeche;tacho;leiste;led")
+    inspZeile("Inhalt", "studio_diagramm_titel", "Diagrammtitel", "text", "canvas", "")
     inspZeile("Inhalt", "checked", "Gesetzt", "schalter", "checkbox,radio,toggle", "")
     inspZeile("Inhalt", "min", "Minimum", "komma", WERTARTEN, "")
     inspZeile("Inhalt", "max", "Maximum", "komma", WERTARTEN, "")
@@ -145,6 +155,8 @@ SUB inspektorAnlegen()
     inspZeile("Verhalten", "visible", "Sichtbar", "schalter", "*", "")
     inspZeile("Verhalten", "tooltip", "Hinweis", "text", "*", "")
     inspZeile("Verhalten", "tab_index", "Tab-Folge", "zahl", "*", "")
+    inspZeile("Verhalten", "draggable", "Ziehbar", "schalter", "listbox,tree,table,label,button,card,image", "")
+    inspZeile("Verhalten", "drop_target", "Ablage", "schalter", "*", "")
 
     DIM g AS INTEGER
     FOR g = 0 TO LEN(inspGruppen) - 1
@@ -161,9 +173,11 @@ SUB inspektorAnlegen()
         GUI_ADD_CLASS(z.lbl, "feldname")
         inspDazu(z.lbl)
         SELECT CASE z.art
-            CASE "text", "eintraege"
+            CASE "text", "eintraege", "leiste", "felder"
                 z.ed = GUI_TEXTINPUT(win, 0, 0, 10, 26)
                 IF z.art = "eintraege" THEN GUI_TOOLTIP(z.ed, tr$("Einträge durch Semikolon getrennt"))
+                IF z.art = "leiste" THEN GUI_TOOLTIP(z.ed, tr$("Text|Sinnbild|Tipp je Knopf, durch Semikolon getrennt; - = Trenner, ~ = Lücke"))
+                IF z.art = "felder" THEN GUI_TOOLTIP(z.ed, tr$("Text|Breite[|links,mitte,rechts[|klick]] je Feld, durch Semikolon getrennt; Breite 0 = der Rest"))
             CASE "komma"
                 z.ed = GUI_TEXTINPUT(win, 0, 0, 10, 26)
                 GUI_TEXTINPUT_SET(z.ed, "zahlen", 2)
@@ -181,6 +195,9 @@ SUB inspektorAnlegen()
                 ' Die Werte einer "wahl" sind Woerter der Laufzeit und bleiben, wie sie
                 ' sind; bei "wahlindex" zaehlt nur die Stelle.
                 z.ed = GUI_DROPDOWN(win, 0, 0, 10, 26, SPLIT(IIF(z.art = "wahlindex", tr$(z.wahl), z.wahl), ";"))
+            CASE "knopfwahl"
+                ' Die Knoepfe des Fensters; inspektorFuellen setzt sie ein.
+                z.ed = GUI_DROPDOWN(win, 0, 0, 10, 26, [tr$("(keiner)")])
             CASE "farbe"
                 z.ed = GUI_BUTTON(win, tr$("Vorgabe"), 0, 0, 10, 26)
                 GUI_ADD_CLASS(z.ed, "farbfeld")
@@ -214,12 +231,23 @@ SUB inspDazu(w AS GUI_WIDGET)
     GUI_PANEL_ADD(inspPanel, w)
 END SUB
 
+' Die Namen der Knoepfe im Fenster (fuer Standard- und Abbrechen-Knopf).
+FUNCTION knoepfeDesFensters() AS ARRAY OF STRING
+    DIM aus AS ARRAY OF STRING : aus = []
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(doc, "widgets") - 1
+        DIM art AS STRING : art = feldText$(i, "kind")
+        IF (art = "button" OR art = "iconbutton") AND feldText$(i, "name") <> "" THEN ARRAY_PUSH(aus, feldText$(i, "name"))
+    NEXT
+    RETURN aus
+END FUNCTION
+
 FUNCTION giltFuer(z AS InspZeile, art AS STRING) AS BOOLEAN
     IF abstandL >= 0 THEN RETURN z.art = "gewicht"
     IF trayWahl >= 0 THEN RETURN z.fuer = "timer"
     IF auswahl < 0 THEN
         ' Ein eigenes Control hat keinen Titel und waechst mit seiner Instanz.
-        IF z.fuer = "fenster" AND entwurfIstControl() THEN RETURN z.schluessel <> "title" AND z.schluessel <> "resizable" AND z.schluessel <> "studio_tabelle"
+        IF z.fuer = "fenster" AND entwurfIstControl() THEN RETURN z.schluessel <> "title" AND z.schluessel <> "resizable" AND z.schluessel <> "studio_tabelle" AND z.art <> "knopfwahl"
         IF z.schluessel = "studio_ereignisse" OR z.schluessel = "studio_eigenschaften" THEN RETURN FALSE
         RETURN z.fuer = "fenster"
     END IF
@@ -274,6 +302,103 @@ SUB listeSetzen(pfad AS STRING, text AS STRING)
     DIM t AS STRING
     FOR EACH t IN SPLIT(text, ";")
         IF TRIM$(t) <> "" THEN JSON_APPEND_STRING(a, "", TRIM$(t))
+    NEXT
+    JSON_SET_JSON(doc, pfad, a)
+END SUB
+
+' Die Knoepfe einer Werkzeugleiste als eine Zeile: "Text|Sinnbild|Tipp" je
+' Knopf, "-" = Trenner, "~" = Luecke (schiebt den Rest nach rechts). Was
+' leer ist, faellt hinten weg ("Neu|neu", "|stift|Bearbeiten").
+FUNCTION leisteText$(pfad AS STRING) AS STRING
+    IF NOT JSON_HAS(doc, pfad) THEN RETURN ""
+    DIM teile AS ARRAY OF STRING : teile = []
+    DIM k AS INTEGER
+    FOR k = 0 TO JSON_LEN(doc, pfad) - 1
+        DIM q AS STRING : q = pfad + "." + STR$(k)
+        DIM art AS STRING : art = jsonText$(doc, q + ".art")
+        IF art = "trenner" THEN
+            ARRAY_PUSH(teile, "-")
+        ELSEIF art = "luecke" THEN
+            ARRAY_PUSH(teile, "~")
+        ELSE
+            DIM f AS ARRAY OF STRING : f = [jsonText$(doc, q + ".text"), jsonText$(doc, q + ".symbol"), jsonText$(doc, q + ".tip")]
+            WHILE LEN(f) > 1 AND f[LEN(f) - 1] = ""
+                ARRAY_REMOVE_AT(f, LEN(f) - 1)
+            WEND
+            ARRAY_PUSH(teile, JOIN$(f, "|"))
+        END IF
+    NEXT
+    RETURN JOIN$(teile, "; ")
+END FUNCTION
+
+SUB leisteSetzen(pfad AS STRING, text AS STRING)
+    DIM a AS JSON_HANDLE : a = JSON_NEW_ARRAY()
+    DIM t AS STRING
+    FOR EACH t IN SPLIT(text, ";")
+        t = TRIM$(t)
+        IF t = "" THEN CONTINUE
+        DIM o AS JSON_HANDLE : o = JSON_PARSE("{}")
+        IF t = "-" THEN
+            JSON_SET_STRING(o, "art", "trenner")
+        ELSEIF t = "~" THEN
+            JSON_SET_STRING(o, "art", "luecke")
+        ELSE
+            JSON_SET_STRING(o, "art", "knopf")
+            DIM f AS ARRAY OF STRING : f = SPLIT(t, "|")
+            IF TRIM$(f[0]) <> "" THEN JSON_SET_STRING(o, "text", TRIM$(f[0]))
+            IF LEN(f) > 1 THEN
+                IF TRIM$(f[1]) <> "" THEN JSON_SET_STRING(o, "symbol", TRIM$(f[1]))
+            END IF
+            IF LEN(f) > 2 THEN
+                IF TRIM$(f[2]) <> "" THEN JSON_SET_STRING(o, "tip", TRIM$(f[2]))
+            END IF
+        END IF
+        JSON_APPEND_JSON(a, "", o)
+    NEXT
+    JSON_SET_JSON(doc, pfad, a)
+END SUB
+
+' Die Felder einer Statusleiste als eine Zeile: "Text|Breite" je Feld, dahinter
+' wahlweise die Ausrichtung (links, mitte, rechts) und "klick" (das Feld meldet
+' das Ereignis Feld).
+FUNCTION felderText$(pfad AS STRING) AS STRING
+    IF NOT JSON_HAS(doc, pfad) THEN RETURN ""
+    DIM teile AS ARRAY OF STRING : teile = []
+    DIM k AS INTEGER
+    FOR k = 0 TO JSON_LEN(doc, pfad) - 1
+        DIM q AS STRING : q = pfad + "." + STR$(k)
+        DIM b AS INTEGER : b = 0
+        IF JSON_HAS(doc, q + ".breite") THEN b = INT(JSON_GET_FLOAT(doc, q + ".breite"))
+        DIM z AS STRING : z = jsonText$(doc, q + ".text") + "|" + STR$(b)
+        DIM au AS STRING : au = jsonText$(doc, q + ".ausrichtung")
+        DIM kl AS BOOLEAN : kl = FALSE
+        IF JSON_HAS(doc, q + ".klickbar") THEN kl = JSON_GET_BOOL(doc, q + ".klickbar")
+        IF au <> "" OR kl THEN z = z + "|" + IIF(au = "", "links", au)
+        IF kl THEN z = z + "|klick"
+        ARRAY_PUSH(teile, z)
+    NEXT
+    RETURN JOIN$(teile, "; ")
+END FUNCTION
+
+SUB felderSetzen(pfad AS STRING, text AS STRING)
+    DIM a AS JSON_HANDLE : a = JSON_NEW_ARRAY()
+    DIM t AS STRING
+    FOR EACH t IN SPLIT(text, ";")
+        IF TRIM$(t) = "" THEN CONTINUE
+        DIM f AS ARRAY OF STRING : f = SPLIT(t, "|")
+        DIM o AS JSON_HANDLE : o = JSON_PARSE("{}")
+        JSON_SET_STRING(o, "text", TRIM$(f[0]))
+        DIM b AS INTEGER : b = 0
+        IF LEN(f) > 1 THEN b = MAX(0, INT(VAL(TRIM$(f[1]))))
+        JSON_SET_INT(o, "breite", b)
+        IF LEN(f) > 2 THEN
+            DIM au AS STRING : au = LOWER$(TRIM$(f[2]))
+            IF au = "mitte" OR au = "rechts" THEN JSON_SET_STRING(o, "ausrichtung", au)
+        END IF
+        IF LEN(f) > 3 THEN
+            IF LOWER$(TRIM$(f[3])) = "klick" THEN JSON_SET_BOOL(o, "klickbar", TRUE)
+        END IF
+        JSON_APPEND_JSON(a, "", o)
     NEXT
     JSON_SET_JSON(doc, pfad, a)
 END SUB
@@ -367,6 +492,10 @@ SUB inspektorFuellen()
                 END IF
             CASE "eintraege"
                 GUI_SET_TEXT(z.ed, listeText$(p))
+            CASE "leiste"
+                GUI_SET_TEXT(z.ed, leisteText$(p))
+            CASE "felder"
+                GUI_SET_TEXT(z.ed, felderText$(p))
             CASE "zahl"
                 ' Was die Laufzeit ohne Angabe nimmt (GUI_SAVE laesst es weg).
                 DIM v AS INTEGER : v = 0
@@ -407,6 +536,14 @@ SUB inspektorFuellen()
                 IF w = "" AND z.schluessel = "layout.art" THEN w = "spalte"
                 DIM idx AS INTEGER : idx = ARRAY_INDEXOF(eintraege, w)
                 GUI_DROPDOWN_SET_SELECTED(z.ed, MAX(0, idx))
+            CASE "knopfwahl"
+                DIM kl AS ARRAY OF STRING : kl = [tr$("(keiner)")]
+                DIM kn AS STRING
+                FOR EACH kn IN knoepfeDesFensters()
+                    ARRAY_PUSH(kl, kn)
+                NEXT
+                GUI_SET_DROPDOWN(z.ed, kl)
+                GUI_DROPDOWN_SET_SELECTED(z.ed, MAX(0, ARRAY_INDEXOF(kl, wertText$(p))))
             CASE "farbe"
                 farbfeldZeigen(z, p)
             CASE "info"
@@ -551,6 +688,10 @@ SUB zeileUebernehmen(zi AS INTEGER)
                 END IF
             CASE "eintraege"
                 listeSetzen(p, GUI_TEXT(z.ed))
+            CASE "leiste"
+                leisteSetzen(p, GUI_TEXT(z.ed))
+            CASE "felder"
+                felderSetzen(p, GUI_TEXT(z.ed))
             CASE "komma"
                 IF TRIM$(GUI_TEXT(z.ed)) <> "" THEN JSON_SET_FLOAT(doc, p, VAL(REPLACE$(GUI_TEXT(z.ed), ",", ".")))
             CASE "zahl"
@@ -565,6 +706,12 @@ SUB zeileUebernehmen(zi AS INTEGER)
                 JSON_SET_BOOL(doc, p, GUI_CHECKED(z.ed))
             CASE "wahlindex"
                 JSON_SET_INT(doc, p, MAX(0, GUI_DROPDOWN_SELECTED(z.ed)))
+            CASE "knopfwahl"
+                IF GUI_DROPDOWN_SELECTED(z.ed) <= 0 THEN
+                    IF JSON_HAS(doc, p) THEN JSON_REMOVE(doc, p)
+                ELSE
+                    JSON_SET_STRING(doc, p, GUI_DROPDOWN_TEXT(z.ed))
+                END IF
             CASE "wahl"
                 DIM w AS STRING : w = GUI_DROPDOWN_TEXT(z.ed)
                 IF istDatenWahl(z.schluessel) AND GUI_DROPDOWN_SELECTED(z.ed) <= 0 THEN
@@ -660,7 +807,7 @@ SUB inspektorPruefen()
         END IF
         IF NOT geaendertJetzt THEN CONTINUE
         zeileUebernehmen(zi)
-        IF z.art = "text" OR z.art = "komma" OR z.art = "eintraege" OR z.art = "zahl" OR z.art = "gewicht" THEN
+        IF z.art = "text" OR z.art = "komma" OR z.art = "eintraege" OR z.art = "leiste" OR z.art = "felder" OR z.art = "zahl" OR z.art = "gewicht" THEN
             IF inspAnhaengig >= 0 AND inspAnhaengig <> zi THEN merken()
             inspAnhaengig = zi
         ELSE

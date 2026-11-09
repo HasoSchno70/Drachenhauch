@@ -463,6 +463,37 @@ S/Zsbg==
 --- erwartet
 Köln
 
+=== readall mit pfad nimmt die kodierung wie readlines
+' Die Meldung fuer eine Datei, die kein UTF-8 ist, raet zum letzten Argument
+' -- READALL lehnte es vorher ab (gefunden beim Port der Kuehlschrank-App).
+PRINT READALL("g.txt", "cp1252")
+PRINT READALL$("g.txt", "latin1")
+TRY
+    PRINT READALL("g.txt")
+CATCH e
+    PRINT INSTR(e, "als letztes Argument") >= 0
+END TRY
+--- datei g.txt base64
+S/Zsbg==
+--- erwartet
+Köln
+Köln
+TRUE
+
+=== readall auf dem handle nimmt keine zweite kodierung
+DIM f AS FILE
+f = OPENFILE("g.txt", "r", "cp1252")
+TRY
+    PRINT READALL$(f, "utf8")
+CATCH e
+    PRINT e
+END TRY
+CLOSEFILE(f)
+--- datei g.txt base64
+S/Zsbg==
+--- erwartet
+READALL$: die Kodierung einer offenen Datei steht schon bei OPENFILE(pfad, modus, kodierung)
+
 === bom faellt weg
 ' Excel schreibt ihn -- sonst hiesse die erste Spalte fuer immer
 DIM t AS ARRAY OF STRING

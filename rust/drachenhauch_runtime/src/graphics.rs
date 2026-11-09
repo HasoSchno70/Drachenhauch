@@ -1312,6 +1312,12 @@ pub struct Graphics {
     richtung_roh: std::cell::Cell<bool>,
     /// Codepunkte, die keine Datei liefern konnte -- nicht jedes Bild neu.
     glyphen_unmoeglich: std::collections::HashSet<u32>,
+    /// Welche Ausweich-Datei ein Zeichen schon nicht hatte: dann fragt das
+    /// naechste Bild die naechste der Liste. Vorher galt das Zeichen nach der
+    /// ersten vorhandenen Datei als unmoeglich -- 🗘 kam als "?", weil Segoe
+    /// UI Emoji es nicht hat, Segoe UI Symbol dahinter aber schon
+    /// (Kuehlschrank-App, Produktdialog).
+    glyphen_versucht: std::collections::HashSet<(u32, String)>,
     /// Je LOADFONT-Handle Zeichen, die der Font NICHT gebacken hat, die aber
     /// in seiner eigenen Datei stehen koennten. FLIP backt den Font damit
     /// neu (`eigene_nachbacken`) -- vorher kam z.B. das Dreieck von
@@ -1557,6 +1563,16 @@ fn zeichen_aus_namen(spez: &str) -> Result<String, String> {
     Ok(menge.into_iter().filter_map(char::from_u32).collect())
 }
 
+/// Zeichen, die die Emoji-Schrift liefert: die Bloecke Dingbats/Symbole
+/// und Emoji, dazu die Emoji im Block "Verschiedene technische Zeichen"
+/// (Uhr und Sanduhr, Wecker, Stoppuhr, Vor/Zurueck: U+231A..U+23FF) und in
+/// "Pfeile und Symbole" (Stern, Quadrate: U+2B00..U+2BFF). Vorher landeten
+/// Wecker und Stoppuhr bei Segoe UI, das sie nicht hat -- in der
+/// Kuehlschrank-App stand "? Vorbereitung" und "? Ablaufende verwerten".
+fn ist_emoji(c: u32) -> bool {
+    matches!(c, 0x231A..=0x23FF | 0x2600..=0x27BF | 0x2B00..=0x2BFF | 0x1F000..=0x1FAFF)
+}
+
 /// Welche Datei ein Zeichen liefern koennte, das keine geladene Schrift hat
 /// -- je Block eine Kandidatenliste, der erste vorhandene Pfad gewinnt.
 /// Chinesisch bekommt hier die japanische Schrift: dieselben Codepunkte,
@@ -1564,7 +1580,7 @@ fn zeichen_aus_namen(spez: &str) -> Result<String, String> {
 fn ausweich_datei_fuer(c: u32) -> &'static [&'static str] {
     let cjk = matches!(c, 0x2E80..=0x9FFF | 0xF900..=0xFAFF | 0xFF00..=0xFFEF);
     let hangul = matches!(c, 0x1100..=0x11FF | 0x3130..=0x318F | 0xA960..=0xA97F | 0xAC00..=0xD7FF);
-    let emoji = matches!(c, 0x2600..=0x27BF | 0x1F000..=0x1FAFF);
+    let emoji = ist_emoji(c);
     let thai = matches!(c, 0xE00..=0xE7F);
     #[cfg(target_os = "windows")]
     {
@@ -2099,6 +2115,7 @@ impl Graphics {
             glyphen_fehlend: std::cell::RefCell::new(std::collections::HashSet::new()),
             richtung_roh: std::cell::Cell::new(false),
             glyphen_unmoeglich: std::collections::HashSet::new(),
+            glyphen_versucht: std::collections::HashSet::new(),
             eigen_fehlt: std::cell::RefCell::new(std::collections::HashMap::new()),
             eigen_nie: std::collections::HashSet::new(),
             font_bytes: std::cell::RefCell::new(HashMap::new()),
@@ -2275,7 +2292,9 @@ impl Graphics {
         let mut je_datei: std::collections::BTreeMap<String, Vec<u32>> = std::collections::BTreeMap::new();
         for c in fehlend {
             if self.glyphen_unmoeglich.contains(&c) { continue; }
-            let datei = ausweich_datei_fuer(c).iter().find(|p| std::path::Path::new(p).exists());
+            let versucht = &self.glyphen_versucht;
+            let datei = ausweich_datei_fuer(c).iter()
+                .find(|p| !versucht.contains(&(c, p.to_string())) && std::path::Path::new(p).exists());
             match datei {
                 Some(p) => je_datei.entry(p.to_string()).or_default().push(c),
                 None => { self.glyphen_unmoeglich.insert(c); }
@@ -2297,16 +2316,30 @@ impl Graphics {
             let thread = &self.thread;
             let f = match schrift_laden(rl, thread, &datei, groesse, &text) {
                 Ok(f) => f,
-                Err(_) => { for c in neue { self.glyphen_unmoeglich.insert(c); } continue; }
+                Err(_) => { for c in neue { self.naechste_datei(c, &datei); } continue; }
             };
             unsafe { raylib::ffi::SetTextureFilter(f.texture, 1 /*BILINEAR*/); }
             let hat = glyph_menge(&f);
-            for c in &neue { if !hat.contains(c) { self.glyphen_unmoeglich.insert(*c); } }
+            for c in &neue { if !hat.contains(c) { self.naechste_datei(*c, &datei); } }
             let eintrag = Ausweich { datei: datei.clone(), font: f, zeichen, hat };
             match pos {
                 Some(i) => self.ausweich[i] = eintrag,
                 None => self.ausweich.push(eintrag),
             }
+        }
+    }
+
+    /// Die Datei hatte das Zeichen nicht: im naechsten Bild die naechste der
+    /// Liste -- erst wenn keine mehr bleibt, ist es unmoeglich (ein `?`).
+    fn naechste_datei(&mut self, c: u32, datei: &str) {
+        self.glyphen_versucht.insert((c, datei.to_string()));
+        let versucht = &self.glyphen_versucht;
+        let noch = ausweich_datei_fuer(c).iter()
+            .any(|p| !versucht.contains(&(c, p.to_string())) && std::path::Path::new(p).exists());
+        if noch {
+            self.glyphen_fehlend.borrow_mut().insert(c);
+        } else {
+            self.glyphen_unmoeglich.insert(c);
         }
     }
 
@@ -2563,12 +2596,17 @@ impl Graphics {
     }
     /// Zurueck zum vorigen Ziel und den Ausschnitt (x, y, b, h) mit Faktor
     /// `z` an (x, y) stempeln.
-    pub fn zoom_beenden(&mut self, x: i32, y: i32, b: i32, h: i32, z: f32) {
+    /// `clip`: nur dieser Teil des Schirms (GUI_WINDOW_CLIP) -- gesetzt erst
+    /// hier, nachdem wieder auf den Schirm gezeichnet wird; davor gingen die
+    /// Befehle in die Zwischenflaeche.
+    pub fn zoom_beenden(&mut self, x: i32, y: i32, b: i32, h: i32, z: f32, clip: Option<(i32, i32, i32, i32)>) {
         self.active_rt = self.zoom_vorher.take().unwrap_or(None);
         if let Some((i, _, _)) = self.zoom_rt {
             let q = [x as f32, y as f32, b as f32, h as f32];
             let d = [x as f32, y as f32, b as f32 * z, h as f32 * z];
+            if let Some((cx, cy, cb, ch)) = clip { self.push_clip(cx, cy, cb, ch); }
             self.emit(Cmd::RtDrawTeil(i, q, d));
+            if clip.is_some() { self.pop_clip(); }
         }
     }
     /// Zeichnet das Target (seine Textur) an Position x,y, skaliert + getoent.

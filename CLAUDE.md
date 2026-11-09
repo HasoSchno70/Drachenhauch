@@ -145,7 +145,9 @@ Einheitsmatrix, `VEC2` = Nullvektor; `model::neutrales_element`).
 - **Namen ohne Groß/klein.** Eine lokale `n` verdeckt `CONST N`, ebenso ein
   Parameter oder ein Feld `voll` die Konstante `VOLL`. `--check` warnt (bei
   Parametern und Feldern nur, wenn der Name im Block auch anders geschrieben
-  vorkommt, `lsp::verdeckung_filtern`); Strg+. benennt die Variable um. Vorbelegte Namen (`red`, `pi`,
+  vorkommt, `lsp::verdeckung_filtern`); Strg+. benennt die Variable um. Eine Methode
+  `zeigen` ersetzt `Zeigen` der Elternklasse (`--check` warnt bei anderer
+  Schreibweise). Vorbelegte Namen (`red`, `pi`,
   `KEY_*`) dürfen als Variable verschattet werden; eine Variable darf heißen wie
   ein Builtin, `LEN(s)` meint dann trotzdem den Builtin.
 - **`MID$`/`INSTR`/`INSTRREV` zählen ab 0**, nicht gefunden = -1.
@@ -227,6 +229,10 @@ Einzelheiten stehen in der Geschichte des Bereichs.
   Rundweg); Handles (Texturen) stehen nicht darin.
 - Ereignisse (`GUI_CLICKED`, `GUI_CHANGED`, Antworten) gelten genau ein Bild;
   vom Programm gesetzte Werte sind keine Bedienung.
+- Breiten von Beschriftungen (Reiterköpfe, Werkzeugleiste) misst
+  `leisten_pass` je Bild; eine Schätzung an der Zeichenzahl gilt nur bis
+  dahin. Wer eine Lage von außen braucht, fragt die Laufzeit
+  (`GUI_TABCONTROL_ITEM_RECT` & Co.), statt sie nachzurechnen.
 
 **Meldungen, Doku, Website**
 - Meldungen deutsch schreiben. Wer eine Meldung ändert, die in
@@ -264,8 +270,14 @@ Einzelheiten stehen in der Geschichte des Bereichs.
   eigenen Teil der Meldung.
 
 **IDE, Studio, Werkzeuge**
+- Im Layout eines Studio-Fensters zählt `h` die Titelleiste mit (nur das
+  Startfenster läuft ohne), eine Menüleiste kommt im Entwurf wie im
+  Programm obendrauf (`menueLeisteH`).
+  Ein Datenbank-Element aus einer fremden Datei hält deren Arten wörtlich
+  (`sql`, `sqlvorgabe`) -- der Abgleich darf ihre Tabellen nicht umbauen.
 - Anzeigetexte gehen durch `tr$` (Tafeln `ide/sprache/en.txt`,
-  `studio/sprache/en.txt`, `examples/glutfaden/daten/sprache/en.txt`);
+  `studio/sprache/en.txt`, `examples/glutfaden/daten/sprache/en.txt`,
+  `examples/studio/kuehlschrank/sprache/en.txt`);
   **Schlüssel bleiben deutsch, übersetzt wird beim Anzeigen** (Ereignisnamen,
   Kategorien, Konfig-Schlüssel, Protokollzeilen).
 - Tests der IDE setzen `DH_IDE_KONFIG` (sonst schreibt jeder Lauf dem Nutzer
@@ -273,8 +285,17 @@ Einzelheiten stehen in der Geschichte des Bereichs.
   `DH_STUDIO_KONFIG`/`DH_STUDIO_LOG`.
 - Ein Kürzel steht nur im Menü; dieselbe Taste zusätzlich mit KEYHIT abzufragen
   ließe den Befehl zweimal laufen.
+- Studio: wer im Layout auf Widgets per Nummer zeigt (`layout.kinder`,
+  `tabctl.kinder`), verschiebt die Nummer beim Ausklappen eines eigenen
+  Controls mit (`instanzAusklappen`, `seitenDerTeile` in `studio/modell.dh`).
 - Kreuz und ESC: `WINDOW_CLOSE_REQUESTED()` fragt bei Ungesichertem nach;
   `QUITREQUESTED()` ohne Kreuz ist das Bildlimit eines Testlaufs.
+- Ein Studio-Projekt übersetzt sich über die Laufzeit des Studios: Tafel
+  `sprache/<code>.txt` im Projektordner, im Code `tr$`/`trf$` mit einem
+  LITERAL (Prüfungen sammeln die Literale), Fenster, Menüs und Berichte
+  übersetzt `studioTexte$` selbst. Daten aus der Datenbank bleiben, wie sie
+  sind; was ein Widget zurückliefert, ist die Übersetzung -- verglichen wird
+  über den Index oder mit `tr$`.
 - Die Kopien der Werkzeuge in Prüfungen laufen in `_programm/` -- Ordner mit
   `_` übergeht die IDE beim Durchsuchen. `--- programm` kopiert per
   `IMPORT "x.dh"` eingebundene Dateien mit, aber `--- einschub nach`,
@@ -379,5 +400,6 @@ Was wann und warum gebaut wurde, steht unverändert in `geschichte/` (bis
 | `geschichte/ide.md` | die IDE: alle Stände, Debugger, Dock, Plugins, Hover |
 | `geschichte/werkzeuge.md` | die Editor-Piloten und ihre Faktoren, Auffrischen 2026-10, Klassendiagramm |
 | `geschichte/studio.md` | Drachenhauch Studio: Stufen, Datenbanken, Berichte, eigene Controls |
+| `geschichte/kuehlschrank.md` | Kühlschrank-App (PySide6-Port) im Studio: Stufen und Funde |
 | `geschichte/glutfaden.md` | Glutfaden (PySticky-Port), Stufen 1–26 |
 | `geschichte/dogfooding.md` | die Dogfooding-Runden, Bastelzentrale, Nachtflug, Lichterglanz |

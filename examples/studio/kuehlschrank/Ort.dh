@@ -1,0 +1,11 @@
+' Ein Lagerort mit dem, was dort liegt -- für die Karten im Reiter Lagerorte
+' und die Liste neben dem Bestand.
+CLASS Ort
+    DIM name AS STRING
+    DIM sinnbild AS STRING
+    DIM farbe AS INTEGER
+    DIM zone AS STRING
+    DIM anzahl AS INTEGER
+    DIM bald AS INTEGER
+    DIM abgelaufen AS INTEGER
+END CLASS

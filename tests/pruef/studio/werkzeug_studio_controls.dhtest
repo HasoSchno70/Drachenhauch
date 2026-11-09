@@ -767,3 +767,124 @@ verweigert TRUE
 weg FALSE
 leer weg TRUE
 dateien FALSE TRUE
+
+=== ein control auf einer reiterseite zeigt sich nur dort
+' Die Instanz steht auf Seite 1 des Reiterwerks (tabctl.kinder); ihre Teile
+' kommen beim Ausklappen hinter alle Controls und liegen jetzt auf derselben
+' Seite -- vorher traf ihr Knopf auch auf Seite 0 (gefunden mit der
+' Kuehlschrank-App, ein Reiter je Control). Ein Timer im erzeugten Programm
+' fragt den Treffer auf beiden Seiten ab.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+slHin(10, 10)
+slWarten(10)
+slTaste(294)
+slWarten(150)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+SETENV("DH_STUDIO_LAUF_BILDER", "20")
+DIM log AS STRING : log = CWD$() + "/s.log"
+slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+DIM z AS STRING
+FOR EACH z IN slAnfang(log, "ausgabe seite")
+    PRINT z
+NEXT
+--- argumente
+{sammlung}/../../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"control","name":"Seite"},{"art":"fenster","name":"Hauptfenster"}]}
+--- datei proj/Seite.dhform
+{"title":"Seite","name":"Seite","w":300,"h":120,"widgets":[{"kind":"button","name":"knopf","text":"Drin","x":10,"y":10,"w":100,"h":30}]}
+--- datei proj/Seite.dh
+CLASS Seite EXTENDS Seite_Basis
+END CLASS
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":420,"h":300,"widgets":[
+{"kind":"tabcontrol","name":"reiter","x":10,"y":10,"w":400,"h":280,"items":["Eins","Zwei"],"tabctl":{"kinder":[[1,1]],"seite":0}},
+{"kind":"studio_control","studio_control":"Seite","name":"seite1","x":20,"y":50,"w":300,"h":120}],
+"timer":[{"name":"messen","intervall":100,"aktiv":true,"wiederholen":false}]}
+--- datei proj/Hauptfenster.dh
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+    SUB messen_Aktion()
+        PRINT "seite "; GUI_TABCONTROL_PAGE(Self.reiter); " treffer knopf "; GUI_HIT_TEST(40, 75) = Self.seite1.knopf
+        GUI_TABCONTROL_SET_PAGE(Self.reiter, 1)
+        GUI_UPDATE()
+        PRINT "seite "; GUI_TABCONTROL_PAGE(Self.reiter); " treffer knopf "; GUI_HIT_TEST(40, 75) = Self.seite1.knopf
+    END SUB
+END CLASS
+--- datei proj/App.dh
+CLASS App EXTENDS StudioApp
+END CLASS
+--- erwartet
+ausgabe seite 0 treffer knopf FALSE
+ausgabe seite 1 treffer knopf TRUE
+
+=== ein gemeldetes ereignis mit modalem fenster laeuft genau einmal
+' Das Control meldet "Los"; die Methode des Fensters oeffnet darauf ein
+' modales Fenster, das sich nach einem Timer selbst schliesst. Dessen
+' Schleife dreht weitere Bilder -- ein Ereignis, das bis zum Ende des
+' Fenstertakts stehen blieb, rief die Methode dort wieder auf, bis die
+' Aufruftiefe ueberlief (gefunden mit der Kuehlschrank-App).
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+slHin(10, 10)
+slWarten(10)
+slTaste(294)
+slWarten(150)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+SETENV("DH_STUDIO_LAUF_BILDER", "40")
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+DIM z AS STRING
+FOR EACH z IN slAnfang(log, "ausgabe ")
+    IF INSTR(z, "los") >= 0 OR INSTR(z, "fehler") >= 0 OR INSTR(z, "Aufruftiefe") >= 0 THEN PRINT z
+NEXT
+--- argumente
+{sammlung}/../../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"control","name":"Melder"},{"art":"fenster","name":"Hauptfenster"},{"art":"fenster","name":"Dialog"}]}
+--- datei proj/Melder.dhform
+{"title":"Melder","name":"Melder","w":120,"h":30,"studio_ereignisse":"Los","widgets":[{"kind":"label","name":"anzeige","text":"M","x":0,"y":0,"w":120,"h":30}]}
+--- datei proj/Melder.dh
+CLASS Melder EXTENDS Melder_Basis
+END CLASS
+--- datei proj/Dialog.dhform
+{"title":"Dialog","name":"Dialog","w":200,"h":100,"widgets":[],"timer":[{"name":"zu","intervall":150,"aktiv":true,"wiederholen":false}]}
+--- datei proj/Dialog.dh
+CLASS Dialog EXTENDS Dialog_Basis
+    SUB zu_Aktion()
+        Self.Zumachen()
+    END SUB
+END CLASS
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":420,"h":300,"widgets":[
+{"kind":"studio_control","studio_control":"Melder","name":"melder1","x":20,"y":20,"w":120,"h":30}]}
+--- datei proj/Hauptfenster.dh
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+    DIM bilder AS INTEGER
+    DIM n AS INTEGER
+
+    SUB Takt()
+        Self.bilder = Self.bilder + 1
+        IF Self.bilder = 3 THEN Self.melder1.Ausloesen("Los")
+    END SUB
+
+    SUB melder1_Los()
+        Self.n = Self.n + 1
+        PRINT "los "; Self.n
+        DIM d AS Dialog : d = NEW Dialog()
+        d.ZeigenModal()
+        PRINT "los zu"
+    END SUB
+END CLASS
+--- datei proj/App.dh
+CLASS App EXTENDS StudioApp
+END CLASS
+--- erwartet
+ausgabe los 1
+ausgabe los zu

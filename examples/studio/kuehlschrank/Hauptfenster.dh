@@ -1,0 +1,254 @@
+' Das Hauptfenster: Werkzeugleiste, Kopf mit drei Kennzahlen und dem Knopf
+' „Einkauf erfassen“, die fünf Reiter (Bestand, Lagerorte, Einkauf,
+' Statistik, Rezepte) und die Statusleiste mit Uhr. Der Timer auffrischen
+' holt die Zahlen neu (alle 30 Sekunden, einstellbar), pruefen sucht nach
+' Abgelaufenem und Ablaufendem (Modul Benachrichtigungen), zusammenfassung
+' sieht jede Minute, ob die Übersicht des Tages fällig ist. Die Reiter sind
+' eigene Controls; was sie melden (Geaendert, Bearbeiten ...), landet hier.
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+
+    SUB Geoeffnet()
+        Self.anwenden()
+        Self.bestand.laden()
+        Self.orte.laden()
+        Self.einkauf.laden()
+        Self.rezepte.laden()
+        Self.auffrischen()
+        Self.uhr_Aktion()
+    END SUB
+
+    ' Kopf, Statusleiste, Statistik und Rückgängig neu aus der Datenbank.
+    SUB auffrischen()
+        DIM k AS Kennzahlen : k = NEW Kennzahlen()
+        k.rechnen()
+        GUI_CARD_SET_TEXT(Self.kachelGesamt, STR$(k.gesamt))
+        GUI_CARD_SET_TEXT(Self.kachelBald, STR$(k.bald))
+        GUI_CARD_SET_TEXT(Self.kachelAbgelaufen, STR$(k.abgelaufen))
+        GUI_STATUSBAR_SET(Self.status, 1, trf$("Produkte: {0}", [STR$(k.produkte)]))
+        GUI_STATUSBAR_SET(Self.status, 2, trf$("Zuletzt: {0}", [LEFT$(TIME$(), 5)]))
+        Self.statistik.laden()
+        Self.verlaufZeigen()
+    END SUB
+
+    ' Rückgängig und Wiederholen: an, solange es etwas gibt, mit Tipp.
+    SUB verlaufZeigen()
+        GUI_TOOLBAR_ENABLE(Self.werkzeuge, KNOPF_RUECKGAENGIG, verlauf.kannZurueck())
+        GUI_TOOLBAR_ENABLE(Self.werkzeuge, KNOPF_WIEDERHOLEN, verlauf.kannVor())
+        GUI_TOOLBAR_SET_TIP(Self.werkzeuge, KNOPF_RUECKGAENGIG, IIF(verlauf.kannZurueck(), trf$("Rückgängig: {0} (Strg+Z)", [verlauf.textZurueck$()]), tr$("Nichts rückgängig zu machen")))
+        GUI_TOOLBAR_SET_TIP(Self.werkzeuge, KNOPF_WIEDERHOLEN, IIF(verlauf.kannVor(), trf$("Wiederholen: {0} (Strg+Y)", [verlauf.textVor$()]), tr$("Nichts zu wiederholen")))
+        GUI_MENU_ENABLE(Self.miRueckgaengig, verlauf.kannZurueck())
+        GUI_MENU_ENABLE(Self.miWiederholen, verlauf.kannVor())
+    END SUB
+
+    ' Was die Einstellungen am Fenster ändern: wie oft es auffrischt und
+    ' prüft, ob es prüft. Die Python-App setzte nach dem Speichern nur die
+    ' Intervalle -- Benachrichtigungen ein- oder auszuschalten wirkte erst
+    ' nach einem Neustart.
+    SUB anwenden()
+        DIM e AS Einstellungen : e = einstellungen()
+        Self.auffrischen.Intervall = e.auffrischenS * 1000
+        Self.pruefen.Intervall = e.pruefMin * 60000
+        ' Auch das Thema: eine eingespielte Sicherung bringt ihr eigenes mit.
+        themaSetzen(e.dunkel)
+        IF e.meldungenAn THEN
+            IF NOT Self.pruefen.Aktiv THEN Self.pruefen.Starten()
+        ELSE
+            Self.pruefen.Stoppen()
+        END IF
+    END SUB
+
+    ' --- Benachrichtigungen -------------------------------------------------------
+    SUB pruefen_Aktion()
+        Self.benachrichtigen()
+    END SUB
+
+    ' Fünf Sekunden nach dem Start das erste Mal (wie singleShot(5000)).
+    SUB erstpruefung_Aktion()
+        Self.benachrichtigen()
+    END SUB
+
+    SUB benachrichtigen()
+        DIM m AS Nachricht
+        FOR EACH m IN meldungenPruefen(einstellungen())
+            Self.melden(m)
+        NEXT
+    END SUB
+
+    SUB zusammenfassung_Aktion()
+        IF NOT zusammenfassungFaellig(einstellungen()) THEN RETURN
+        zusammenfassungErledigt()
+        DIM m AS Nachricht : m = zusammenfassung()
+        IF m IS NOT NIL THEN Self.melden(m)
+    END SUB
+
+    ' Ans System; nimmt es sie nicht (kein Tray, kein notify-send), zeigt
+    ' das Fenster sie selbst. Die letzte steht in der Statusleiste.
+    SUB melden(m AS Nachricht)
+        IF NOT meldungSenden(m) THEN GUI_TOAST(Self.Fenster(), m.titel + "  " + m.text, IIF(m.wichtig, "warnung", "info"), 6000)
+        GUI_STATUSBAR_SET(Self.status, 3, "🔔 " + m.titel)
+    END SUB
+
+    ' Die Einstellungen; gespeichert gilt alles sofort.
+    SUB miEinstellungen_Aktion()
+        DIM f AS EinstellungenFenster : f = NEW EinstellungenFenster()
+        f.ZeigenModal()
+        ' Lagerorte, Märkte und Datenbank ändern sich auch ohne „Speichern“.
+        IF NOT f.gespeichert AND NOT f.datenGeaendert THEN RETURN
+        Self.anwenden()
+        Self.geaendert()
+        IF f.gespeichert THEN GUI_TOAST(Self.Fenster(), tr$("✅ Einstellungen gespeichert!"), "erfolg")
+    END SUB
+
+    ' Der Vorrat hat sich geändert (im Bestand oder über Rückgängig).
+    SUB geaendert()
+        Self.bestand.laden()
+        Self.orte.laden()
+        Self.einkauf.laden()
+        Self.rezepte.laden()
+        Self.auffrischen()
+    END SUB
+
+    ' Einkauf erfassen: der Stapelscan (ScanFenster); was gespeichert wurde,
+    ' steht danach überall.
+    SUB knopfEinkauf_Klick()
+        DIM s AS ScanFenster : s = NEW ScanFenster()
+        s.ZeigenModal()
+        IF s.gespeichert > 0 THEN Self.geaendert()
+    END SUB
+
+    SUB bestand_Geaendert()
+        Self.orte.laden()
+        Self.auffrischen()
+    END SUB
+
+    ' Gekocht, angelegt, gelöscht, Fehlendes auf die Liste: alles neu.
+    SUB rezepte_Geaendert()
+        Self.bestand.laden()
+        Self.orte.laden()
+        Self.einkauf.laden()
+        Self.auffrischen()
+    END SUB
+
+    SUB einkauf_Geaendert()
+        Self.auffrischen()
+    END SUB
+
+    ' Der Einkaufszettel als Bericht: Vorschau mit Drucken und „Als PDF …“.
+    ' KUEHL_ZETTEL nennt eine PDF-Datei ohne Vorschau (für Prüfungen).
+    SUB einkauf_Drucken()
+        DIM w AS MAP OF ANY : w = Self.einkauf.zettelWerte()
+        DIM pfad AS STRING : pfad = GETENV$("KUEHL_ZETTEL")
+        IF pfad <> "" THEN
+            Einkaufszettel.Pdf(pfad, w)
+            GUI_STATUSBAR_SET(Self.status, 3, trf$("Einkaufszettel: {0}", [BASENAME(pfad)]))
+            RETURN
+        END IF
+        Einkaufszettel.Vorschau(w)
+    END SUB
+
+    ' Einkauf abschließen: die abgehakten Posten in den Bestand.
+    SUB einkauf_Abschliessen()
+        DIM f AS AbschlussFenster : f = NEW AbschlussFenster()
+        f.vorMarkt = Self.einkauf.markt$()
+        f.ZeigenModal()
+        IF f.uebertragen = 0 THEN RETURN
+        Self.geaendert()
+        GUI_TOAST(Self.Fenster(), trf$("✅ {0} Artikel zum Bestand hinzugefügt!", [STR$(f.uebertragen)]), "erfolg")
+    END SUB
+
+    ' Eine Kachel im Reiter Lagerorte: was dort liegt.
+    SUB orte_Details()
+        DIM f AS LagerortFenster : f = NEW LagerortFenster()
+        f.ort = Self.orte.gewaehlterOrt
+        f.ZeigenModal()
+        IF f.geaendert THEN Self.geaendert()
+    END SUB
+
+    ' Der Dialog für einen neuen oder einen gewählten Eintrag.
+    SUB bestand_Bearbeiten()
+        DIM f AS ProduktFenster : f = NEW ProduktFenster()
+        f.eintragId = Self.bestand.bearbeitenId
+        f.barcode = Self.bestand.neuBarcode
+        f.ZeigenModal()
+        IF NOT f.gesichert THEN RETURN
+        Self.geaendert()
+        GUI_TOAST(Self.Fenster(), IIF(Self.bestand.bearbeitenId = 0, trf$("{0} hinzugefügt.", [f.e.name]), trf$("{0} gesichert.", [f.e.name])), "erfolg")
+    END SUB
+
+    SUB bestand_Mindestmenge()
+        DIM f AS MindestmengeFenster : f = NEW MindestmengeFenster()
+        f.eintragId = Self.bestand.mindestId
+        f.ZeigenModal()
+        IF f.gesichert THEN Self.geaendert()
+    END SUB
+
+    SUB bestand_Export()
+        Self.miExport_Aktion()
+    END SUB
+
+    SUB werkzeuge_Knopf(nr AS INTEGER)
+        SELECT CASE nr
+            CASE KNOPF_HINZUFUEGEN : Self.miHinzufuegen_Aktion()
+            CASE KNOPF_RUECKGAENGIG : Self.miRueckgaengig_Aktion()
+            CASE KNOPF_WIEDERHOLEN : Self.miWiederholen_Aktion()
+            CASE KNOPF_AKTUALISIEREN : Self.miAktualisieren_Aktion()
+            CASE KNOPF_EXPORT : Self.miExport_Aktion()
+            CASE KNOPF_EINSTELLUNGEN : Self.miEinstellungen_Aktion()
+        END SELECT
+    END SUB
+
+    SUB miHinzufuegen_Aktion()
+        GUI_TABCONTROL_SET_PAGE(Self.reiter, 0)
+        Self.bestand.knopfHinzufuegen_Klick()
+    END SUB
+
+    SUB miRueckgaengig_Aktion()
+        DIM t AS STRING : t = verlauf.rueckgaengig$()
+        IF t = "" THEN RETURN
+        Self.geaendert()
+        GUI_STATUSBAR_SET(Self.status, 3, trf$("Rückgängig: {0}", [t]))
+    END SUB
+
+    SUB miWiederholen_Aktion()
+        DIM t AS STRING : t = verlauf.wiederholen$()
+        IF t = "" THEN RETURN
+        Self.geaendert()
+        GUI_STATUSBAR_SET(Self.status, 3, trf$("Wiederholt: {0}", [t]))
+    END SUB
+
+    ' Der Bestand als CSV wie export_inventory_to_csv der Python-App.
+    ' KUEHL_EXPORT nennt die Datei ohne Dialog (für Prüfungen).
+    SUB miExport_Aktion()
+        DIM pfad AS STRING : pfad = GETENV$("KUEHL_EXPORT")
+        IF pfad = "" THEN pfad = FILE_SAVE_DIALOG(tr$("Bestand exportieren"), "bestand.csv", "csv")
+        IF pfad = "" THEN RETURN
+        DIM n AS INTEGER : n = csvSchreiben(pfad)
+        GUI_TOAST(Self.Fenster(), trf$("Exportiert: {0} Einträge.", [STR$(n)]), "erfolg")
+        GUI_STATUSBAR_SET(Self.status, 3, trf$("Exportiert: {0}", [BASENAME(pfad)]))
+    END SUB
+
+    SUB miAktualisieren_Aktion()
+        Self.geaendert()
+        GUI_STATUSBAR_SET(Self.status, 3, tr$("Aktualisiert."))
+    END SUB
+
+    SUB miBeenden_Aktion()
+        Self.Zumachen()
+    END SUB
+
+    SUB uhr_Aktion()
+        GUI_STATUSBAR_SET(Self.status, 4, TIME$())
+    END SUB
+
+    SUB auffrischen_Aktion()
+        Self.auffrischen()
+    END SUB
+END CLASS
+
+' Die Knöpfe der Werkzeugleiste (ihre Nummern; Trenner und Lücke zählen mit).
+CONST KNOPF_HINZUFUEGEN = 0
+CONST KNOPF_RUECKGAENGIG = 1
+CONST KNOPF_WIEDERHOLEN = 2
+CONST KNOPF_AKTUALISIEREN = 3
+CONST KNOPF_EXPORT = 5
+CONST KNOPF_EINSTELLUNGEN = 7

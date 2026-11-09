@@ -1,0 +1,545 @@
+' Kuehlschrank-App im Drachenhauch Studio, Stufe 3: der Einkauf
+' (examples/studio/kuehlschrank: EinkaufSeite, AbschlussFenster, Bericht
+' Einkaufszettel mit der Abfrage Zettelzeilen, Modul Einkauf, Klasse Posten).
+' Proben wie in Stufe 1 und 2: F5 im Studio, dann main.dh mit einer Probe
+' statt der Bildschleife; Heute ist fest.
+' Format: docs/werkzeuge.md, dhrt test.
+
+--- langsam
+=== liste, gangplan, gaenge als ueberschrift, nach markt
+' Gang wie StoreLayoutManager: die Kategorie steht im Plan (Obst), eine
+' Abteilung steckt in der Kategorie (Fleisch & Wurst -> Wurst, neu), eine
+' Abteilung im Namen (Tiefkuehlpizza -> Tiefkuehl), sonst ans Ende. Ein
+' eigener Plan aus store_layouts geht dem eingebauten vor.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+kKopieren(ARG$(1), p)
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = kF5(p, log)
+PRINT "geprueft "; slHat(log, "geprueft 0 0")
+SETENV("KUEHL_HEUTE", "2026-11-08")
+PRINT "code "; kProbe(p, "probe.dh", "", 5)
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../../studio/studio.dh
+{sammlung}/../../../examples/studio/kuehlschrank
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/kuehlschrank.dh"
+slStudio = ARG$(0)
+--- datei probe.dh
+DB_EXEC(db, "INSERT INTO products (name, brand) VALUES ('Bananen', 'Chiquita'), ('Salami', NULL)")
+DB_EXEC(db, "INSERT INTO product_stores (product_id, store_name, last_purchased) VALUES (1, 'ALDI', '2026-10-01'), (1, 'REWE', '2026-11-01'), (2, 'LIDL', '2026-11-02')")
+DB_EXEC(db, "INSERT INTO store_layouts (store_name, layout_json) VALUES ('Mein Laden', '{" + CHR$(34) + "Obst" + CHR$(34) + ": 4, " + CHR$(34) + "Fleisch" + CHR$(34) + ": 1}')")
+DB_EXEC(db, "INSERT INTO shopping_list (product_name, quantity, unit, category, notes, checked, priority) VALUES " + _
+    "('Bananen', 6, 'Stück', 'Obst', NULL, 0, 1), ('Tiefkühlpizza', 2, 'Stück', NULL, 'die mit Salami', 0, 1), " + _
+    "('Salami', 1, 'Stück', 'Fleisch & Wurst', NULL, 0, 1), ('Brot', 1, 'Stück', 'Backwaren', NULL, 1, 1), " + _
+    "('Seife', 0, 'Stück', NULL, NULL, 0, 1), ('Milch', 2, 'Liter', 'Milchprodukte', 'Auto', 0, 3)")
+DIM f AS Hauptfenster : f = studioStartFenster
+DIM s AS EinkaufSeite : s = f.einkauf
+s.maerkteFuellen()
+f.geaendert()
+SUB zeilen(s AS EinkaufSeite)
+    DIM z AS INTEGER
+    FOR z = 0 TO GUI_TABLE_ROW_COUNT(s.tabelle) - 1
+        IF s.ids[z] = 0 THEN
+            PRINT "  # "; GUI_TABLE_GET_CELL(s.tabelle, z, 1)
+            CONTINUE
+        END IF
+        PRINT "  "; IIF(GUI_TABLE_GET_VALUE(s.tabelle, z, SP_HAKEN) > 0.5, "x", "."); " "; GUI_TABLE_GET_CELL(s.tabelle, z, 1); " | "; GUI_TABLE_GET_CELL(s.tabelle, z, 2); " | "; GUI_TABLE_GET_CELL(s.tabelle, z, 3); " | "; GUI_TABLE_GET_CELL(s.tabelle, z, 4); " | "; GUI_TABLE_GET_CELL(s.tabelle, z, 5)
+    NEXT
+    PRINT "  "; GUI_TEXT(s.statistik)
+END SUB
+zeilen(s)
+PRINT "maerkte "; JOIN$(marktListe(), ", ")
+GUI_DROPDOWN_SET_SELECTED(s.marktWahl, ARRAY_INDEXOF(marktListe(), "LIDL") + 1)
+s.marktWahl_Geaendert()
+PRINT "gewaehlt "; gewaehlterMarkt$(); " | "; GUI_TEXT(s.marktHinweis)
+GUI_SET_CHECKED(s.sortierKasten, TRUE)
+s.sortierKasten_Geaendert()
+PRINT "nach gang"
+zeilen(s)
+GUI_SET_CHECKED(s.gruppierKasten, TRUE)
+s.gruppierKasten_Geaendert()
+PRINT "mit ueberschrift"
+zeilen(s)
+GUI_DROPDOWN_SET_SELECTED(s.marktWahl, ARRAY_INDEXOF(marktListe(), "Mein Laden") + 1)
+s.marktWahl_Geaendert()
+GUI_SET_CHECKED(s.gruppierKasten, FALSE)
+s.gruppierKasten_Geaendert()
+PRINT "eigener plan | "; GUI_TEXT(s.marktHinweis)
+zeilen(s)
+PRINT "nach markt"
+PRINT nachMarkt$()
+--- erwartet
+geprueft TRUE
+  . Milch | - | 2 Liter | Milchprodukte | Auto
+  . Seife | - | - | - | -
+  . Tiefkühlpizza | - | 2 Stück | - | die mit Salami
+  x Brot | - | 1 Stück | Backwaren | -
+  . Salami | - | 1 Stück | Fleisch & Wurst | -
+  . Bananen | - | 6 Stück | Obst | -
+  🛒 5 offen  •  ✅ 1 erledigt  •  📋 6 gesamt
+maerkte ALDI, EDEKA, KAUFLAND, LIDL, Mein Laden, NETTO, PENNY, REWE
+gewaehlt LIDL | ✅ 8 Gänge konfiguriert
+nach gang
+  . Bananen | 1 | 6 Stück | Obst | -
+  x Brot | 2 | 1 Stück | Backwaren | -
+  . Milch | 3 | 2 Liter | Milchprodukte | Auto
+  . Salami | 4 | 1 Stück | Fleisch & Wurst | -
+  . Tiefkühlpizza | 5 | 2 Stück | - | die mit Salami
+  . Seife | - | - | - | -
+  🛒 5 offen  •  ✅ 1 erledigt  •  📋 6 gesamt
+mit ueberschrift
+  # 📍 Gang 1
+  . Bananen | 1 | 6 Stück | Obst | -
+  # 📍 Gang 2
+  x Brot | 2 | 1 Stück | Backwaren | -
+  # 📍 Gang 3
+  . Milch | 3 | 2 Liter | Milchprodukte | Auto
+  # 📍 Gang 4
+  . Salami | 4 | 1 Stück | Fleisch & Wurst | -
+  # 📍 Gang 5
+  . Tiefkühlpizza | 5 | 2 Stück | - | die mit Salami
+  # 📍 Sonstiges
+  . Seife | - | - | - | -
+  🛒 5 offen  •  ✅ 1 erledigt  •  📋 6 gesamt
+eigener plan | ✅ 4 Gänge konfiguriert
+  . Salami | 1 | 1 Stück | Fleisch & Wurst | -
+  . Bananen | 4 | 6 Stück | Obst | -
+  x Brot | - | 1 Stück | Backwaren | -
+  . Milch | - | 2 Liter | Milchprodukte | Auto
+  . Seife | - | - | - | -
+  . Tiefkühlpizza | - | 2 Stück | - | die mit Salami
+  🛒 5 offen  •  ✅ 1 erledigt  •  📋 6 gesamt
+nach markt
+🏪 LIDL
+  ☐ Salami (1 Stück)
+🏪 REWE
+  ☐ Bananen (6 Stück)
+Nicht zugeordnet
+  ☐ Milch (2 Liter)
+  ☐ Seife
+  ☐ Tiefkühlpizza (2 Stück)
+code 0
+
+=== anlegen, schnellknoepfe, haken, auto-ergaenzen, loeschen -- mit rueckgaengig
+' Ein Posten nimmt die Kategorie des Produkts gleichen Namens; die
+' Schnellknoepfe zeigen, was am haeufigsten verbraucht wurde und nicht schon
+' offen auf der Liste steht. Auto-Ergaenzen nimmt jedes Produkt unter der
+' Mindestmenge (Bestand zusammengezaehlt), das nicht schon offen dasteht.
+' Der Haken ist kein Schritt, alles andere einer.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+kKopieren(ARG$(1), p)
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = kF5(p, log)
+SETENV("KUEHL_HEUTE", "2026-11-08")
+PRINT "code "; kProbe(p, "probe.dh", "", 5)
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../../studio/studio.dh
+{sammlung}/../../../examples/studio/kuehlschrank
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/kuehlschrank.dh"
+slStudio = ARG$(0)
+--- datei probe.dh
+DB_EXEC(db, "INSERT INTO products (name, brand, category, min_quantity, min_unit) VALUES ('Käse', NULL, 'Milchprodukte', NULL, NULL), ('Milch', NULL, 'Milchprodukte', 3, 'Liter'), ('Nudeln', 'Barilla', NULL, 2, 'Packung'), ('Bananen', NULL, 'Obst', 4, 'Stück')")
+DB_EXEC(db, "INSERT INTO inventory (product_id, quantity, unit, expiry_date, storage_location) VALUES (2, 1, 'Liter', '2026-11-20', 'Kühlschrank'), (2, 0.5, 'Liter', '2026-11-21', 'Kühlschrank'), (4, 5, 'Stück', '2026-11-15', 'Obstschale')")
+DB_EXEC(db, "INSERT INTO consumption_history (product_name, quantity, unit, reason, removed_date) VALUES ('Joghurt', 1, 'Stück', 'consumed', '2026-11-01'), ('Joghurt', 1, 'Stück', 'consumed', '2026-11-02'), ('Milch', 1, 'Liter', 'consumed', '2026-11-03'), ('Brot', 1, 'Stück', 'consumed', '2026-11-04')")
+DB_EXEC(db, "INSERT INTO shopping_list (product_name, quantity, unit, checked) VALUES ('Brot', 1, 'Stück', 0)")
+DIM f AS Hauptfenster : f = studioStartFenster
+DIM s AS EinkaufSeite : s = f.einkauf
+f.geaendert()
+FUNCTION stand$() AS STRING
+    DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT GROUP_CONCAT(product_name || ':' || quantity || ':' || IFNULL(category, '-') || ':' || checked, ' ') FROM (SELECT * FROM shopping_list ORDER BY id)")
+    DIM t AS STRING : t = "-"
+    IF DB_NEXT(r) THEN
+        IF NOT DB_IS_NULL(r, 0) THEN t = DB_GET_STRING(r, 0)
+    END IF
+    RETURN t
+END FUNCTION
+FUNCTION knoepfe$(s AS EinkaufSeite) AS STRING
+    DIM t AS STRING : t = ""
+    DIM k AS INTEGER
+    FOR EACH k IN [s.schnell0, s.schnell1, s.schnell2, s.schnell3, s.schnell4]
+        IF GUI_VISIBLE(k) THEN t = t + "[" + GUI_TEXT(k) + "]"
+    NEXT
+    RETURN t + IIF(GUI_VISIBLE(s.schnellLeer), " leer", "")
+END FUNCTION
+PRINT "start "; stand$(); " | schnell "; knoepfe$(s)
+GUI_SET_TEXT(s.namenFeld, "ban")
+s.namenFeld_Geaendert()
+PRINT "vorschlag "; GUI_DROPDOWN_COUNT(s.vorschlagListe); " "; GUI_DROPDOWN_ITEM(s.vorschlagListe, 1)
+GUI_DROPDOWN_SET_SELECTED(s.vorschlagListe, 1)
+s.vorschlagListe_Geaendert()
+PRINT "gewaehlt "; GUI_TEXT(s.namenFeld)
+GUI_SET_TEXT(s.namenFeld, "Käse")
+GUI_SET_VALUE(s.mengeFeld, 2)
+s.knopfHinzufuegen_Klick()
+PRINT "kaese "; stand$(); " | "; verlauf.textZurueck$(); " | feld ["; GUI_TEXT(s.namenFeld); "]"
+s.schnell0_Klick()
+PRINT "schnell "; stand$(); " | "; knoepfe$(s)
+GUI_TABLE_CELL_VALUE(s.tabelle, ARRAY_INDEXOF(s.ids, 1), SP_HAKEN, 1)
+s.tabelle_Zelle(ARRAY_INDEXOF(s.ids, 1), SP_HAKEN)
+PRINT "haken "; stand$(); " | "; GUI_TEXT(s.statistik); " | "; verlauf.textZurueck$()
+s.knopfAlle_Klick()
+PRINT "alle "; stand$()
+s.knopfAlle_Klick()
+PRINT "keiner "; stand$()
+PRINT "auto "; autoErgaenzen(); " | "; stand$()
+PRINT "nochmal "; autoErgaenzen()
+f.miRueckgaengig_Aktion()
+PRINT "zurueck "; stand$()
+f.miWiederholen_Aktion()
+postenHaken(1, TRUE)
+postenHaken(2, TRUE)
+PRINT "erledigte "; erledigteLoeschen(); " | "; stand$()
+postenLoeschen(3, "Joghurt")
+PRINT "geloescht "; stand$()
+f.miRueckgaengig_Aktion()
+f.miRueckgaengig_Aktion()
+PRINT "zweimal zurueck "; stand$()
+--- erwartet
+start Brot:1.0:-:0 | schnell [Joghurt][Milch]
+vorschlag 2 Bananen
+gewaehlt Bananen
+kaese Brot:1.0:-:0 Käse:2.0:Milchprodukte:0 | Käse auf die Einkaufsliste | feld []
+schnell Brot:1.0:-:0 Käse:2.0:Milchprodukte:0 Joghurt:1.0:-:0 | [Milch]
+haken Brot:1.0:-:1 Käse:2.0:Milchprodukte:0 Joghurt:1.0:-:0 | 🛒 2 offen  •  ✅ 1 erledigt  •  📋 3 gesamt | Joghurt auf die Einkaufsliste
+alle Brot:1.0:-:1 Käse:2.0:Milchprodukte:1 Joghurt:1.0:-:1
+keiner Brot:1.0:-:0 Käse:2.0:Milchprodukte:0 Joghurt:1.0:-:0
+auto 2 | Brot:1.0:-:0 Käse:2.0:Milchprodukte:0 Joghurt:1.0:-:0 Milch:1.5:Milchprodukte:0 Nudeln:2.0:-:0
+nochmal 0
+zurueck Brot:1.0:-:0 Käse:2.0:Milchprodukte:0 Joghurt:1.0:-:0
+erledigte 2 | Joghurt:1.0:-:0 Milch:1.5:Milchprodukte:0 Nudeln:2.0:-:0
+geloescht Milch:1.5:Milchprodukte:0 Nudeln:2.0:-:0
+zweimal zurueck Brot:1.0:-:1 Käse:2.0:Milchprodukte:1 Joghurt:1.0:-:0 Milch:1.5:Milchprodukte:0 Nudeln:2.0:-:0
+code 0
+
+=== einkauf abschliessen: vorgaben, pruefung, abweichung, ein schritt
+' Die Zeilen bekommen Vorgaben: Tage aus der Kategorie (Milchprodukte 7,
+' Grundnahrungsmittel 180, ohne eine Woche), den Lagerort, wo das Produkt
+' zuletzt lag (sonst wie die Kategorie empfiehlt, sonst den ersten), den
+' letzten Preis und Markt. Ein falsches Datum haelt an (Enter fuer die
+' Meldung); eine geaenderte Menge fragt (Enter = uebertragen), dann die
+' Erfolgsmeldung (Enter). Ein Produkt ohne Treffer wird angelegt; was im
+' Dialog nicht markiert ist, bleibt auf der Liste. Alles ist ein Schritt.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+kKopieren(ARG$(1), p)
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = kF5(p, log)
+SETENV("KUEHL_HEUTE", "2026-11-08")
+slZeilen = [] : slBild = 0
+slHin(10, 10)
+slWarten(10)
+slTaste(257)
+slWarten(20)
+slTaste(257)
+slWarten(20)
+slTaste(257)
+slAufnahmeSchreiben(p + "/_studio/enter.txt")
+PRINT "code "; kProbe(p, "probe.dh", "enter.txt", 120)
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../../studio/studio.dh
+{sammlung}/../../../examples/studio/kuehlschrank
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/kuehlschrank.dh"
+slStudio = ARG$(0)
+--- datei probe.dh
+DB_EXEC(db, "INSERT INTO products (name, category) VALUES ('Milch', 'Milchprodukte'), ('Mehl', 'Grundnahrungsmittel')")
+DB_EXEC(db, "INSERT INTO inventory (product_id, quantity, unit, expiry_date, storage_location) VALUES (1, 1, 'Liter', '2026-11-20', 'Kühlschranktür')")
+DB_EXEC(db, "INSERT INTO product_stores (product_id, store_name, price, last_purchased) VALUES (1, 'LIDL', 1.19, '2026-11-01')")
+DB_EXEC(db, "INSERT INTO shopping_list (product_name, quantity, unit, category, checked) VALUES ('Milch', 2, 'Liter', 'Milchprodukte', 1), ('Mehl', 1, 'kg', NULL, 1), ('Zahnpasta', 1, 'Stück', NULL, 1), ('Salz', 1, 'Packung', NULL, 0)")
+DIM f AS Hauptfenster : f = studioStartFenster
+f.geaendert()
+FUNCTION stand$() AS STRING
+    DIM t AS STRING : t = ""
+    DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT p.name, i.quantity, i.unit, i.expiry_date, i.storage_location, IFNULL(i.purchased_at_store, '-'), IFNULL(i.notes, '-') FROM inventory i JOIN products p ON p.id = i.product_id ORDER BY i.id")
+    WHILE DB_NEXT(r)
+        t = t + "  bestand " + DB_GET_STRING(r, 0) + " " + DB_GET_STRING(r, 1) + " " + DB_GET_STRING(r, 2) + " " + DB_GET_STRING(r, 3) + " " + DB_GET_STRING(r, 4) + " " + DB_GET_STRING(r, 5) + " | " + DB_GET_STRING(r, 6) + CHR$(10)
+    WEND
+    r = DB_QUERY(db, "SELECT s.store_name, p.name, IFNULL(s.price, 0), s.last_purchased FROM product_stores s JOIN products p ON p.id = s.product_id ORDER BY s.id")
+    WHILE DB_NEXT(r)
+        t = t + "  markt " + DB_GET_STRING(r, 0) + " " + DB_GET_STRING(r, 1) + " " + DB_GET_STRING(r, 2) + " " + DB_GET_STRING(r, 3) + CHR$(10)
+    WEND
+    t = t + "  liste " + JOIN$(textListe("SELECT product_name FROM shopping_list ORDER BY id"), ", ") + " | produkte " + STR$(dbZahl("SELECT COUNT(*) FROM products"))
+    RETURN t
+END FUNCTION
+DIM af AS AbschlussFenster : af = NEW AbschlussFenster()
+af.vorMarkt = "LIDL"
+af.Zeigen()
+PRINT "markt "; GUI_DROPDOWN_TEXT(af.marktWahl); " | "; GUI_TEXT(af.untertitel)
+DIM z AS INTEGER
+DIM s AS INTEGER
+FOR z = 0 TO GUI_TABLE_ROW_COUNT(af.tabelle) - 1
+    DIM t AS STRING : t = "  "
+    FOR s = 1 TO 7
+        t = t + GUI_TABLE_GET_CELL(af.tabelle, z, s) + IIF(s < 7, " | ", "")
+    NEXT
+    PRINT t
+NEXT
+FUNCTION zeile(af AS AbschlussFenster, name AS STRING) AS INTEGER
+    DIM z AS INTEGER
+    FOR z = 0 TO GUI_TABLE_ROW_COUNT(af.tabelle) - 1
+        IF GUI_TABLE_GET_CELL(af.tabelle, z, 1) = name THEN RETURN z
+    NEXT
+    RETURN -1
+END FUNCTION
+' Milch nicht mitnehmen, Mehl mit falschem Datum.
+GUI_TABLE_CELL_VALUE(af.tabelle, zeile(af, "Milch"), SP_A_HAKEN, 0)
+GUI_TABLE_SET_CELL(af.tabelle, zeile(af, "Mehl"), SP_A_MHD, "2026-13-01")
+af.knopfUebernehmen_Klick()
+PRINT "falsches datum "; af.uebertragen; " | offen "; af.studioOffen
+GUI_TABLE_SET_CELL(af.tabelle, zeile(af, "Mehl"), SP_A_MHD, "2027-01-31")
+GUI_TABLE_SET_CELL(af.tabelle, zeile(af, "Mehl"), SP_A_MENGE, "3")
+GUI_TABLE_SET_CELL(af.tabelle, zeile(af, "Mehl"), SP_A_PREIS, "1,29")
+PRINT "abweichung"
+PRINT af.abweichungen$()
+af.knopfUebernehmen_Klick()
+PRINT "uebertragen "; af.uebertragen; " neu "; af.neuAngelegt; " | offen "; af.studioOffen; " | "; verlauf.textZurueck$()
+PRINT stand$()
+f.miRueckgaengig_Aktion()
+PRINT "zurueck"
+PRINT stand$()
+f.miWiederholen_Aktion()
+PRINT "wieder"
+PRINT stand$()
+--- erwartet
+markt LIDL | 3 gekaufte Artikel zum Bestand hinzufügen
+  Mehl | 1 | kg | 2027-05-07 | Vorratsraum |  | Neu
+  Zahnpasta | 1 | Stück | 2027-02-06 | Vorratsraum |  | Neu
+  Milch | 2 | Liter | 2026-11-15 | Kühlschranktür | 1,19 | LIDL
+falsches datum 0 | offen TRUE
+abweichung
+  • Mehl: 1 → 3 kg
+uebertragen 2 neu 1 | offen FALSE | Einkauf abgeschlossen
+  bestand Milch 1.0 Liter 2026-11-20 Kühlschranktür - | -
+  bestand Mehl 3.0 kg 2027-01-31 Vorratsraum LIDL | Eingekauft bei LIDL
+  bestand Zahnpasta 1.0 Stück 2027-02-06 Vorratsraum LIDL | Eingekauft bei LIDL
+  markt LIDL Milch 1.19 2026-11-01
+  markt LIDL Mehl 1.29 2026-11-08
+  markt LIDL Zahnpasta 0 2026-11-08
+  liste Milch, Salz | produkte 3
+zurueck
+  bestand Milch 1.0 Liter 2026-11-20 Kühlschranktür - | -
+  markt LIDL Milch 1.19 2026-11-01
+  liste Milch, Mehl, Zahnpasta, Salz | produkte 2
+wieder
+  bestand Milch 1.0 Liter 2026-11-20 Kühlschranktür - | -
+  bestand Mehl 3.0 kg 2027-01-31 Vorratsraum LIDL | Eingekauft bei LIDL
+  bestand Zahnpasta 1.0 Stück 2027-02-06 Vorratsraum LIDL | Eingekauft bei LIDL
+  markt LIDL Milch 1.19 2026-11-01
+  markt LIDL Mehl 1.29 2026-11-08
+  markt LIDL Zahnpasta 0 2026-11-08
+  liste Milch, Salz | produkte 3
+code 0
+
+=== der einkaufszettel: bericht aus der abfrage, gaenge aus dem programm
+' Drucken mit KUEHL_ZETTEL schreibt den Bericht Einkaufszettel als PDF:
+' nur offene Posten, nach Gang sortiert, mit Markt im Kopf -- ohne
+' Sortierung in der Reihenfolge der Liste und ohne Markt.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+kKopieren(ARG$(1), p)
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = kF5(p, log)
+SETENV("KUEHL_HEUTE", "2026-11-08")
+SETENV("KUEHL_PDF", CWD$())
+PRINT "code "; kProbe(p, "probe.dh", "", 10)
+DIM d AS STRING
+FOR EACH d IN ["sortiert.pdf", "liste.pdf"]
+    PRINT "== "; d
+    DIM z AS STRING
+    FOR EACH z IN SPLIT(JOIN$(pdfSeiten(CWD$() + "/" + d), CHR$(10)), CHR$(10))
+        IF z <> "" AND INSTR(z, ".2026") < 0 THEN PRINT z
+    NEXT
+NEXT
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../../studio/studio.dh
+{sammlung}/../../../examples/studio/kuehlschrank
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/kuehlschrank.dh"
+IMPORT "{sammlung}/../_hilfen/pdftext.dh"
+slStudio = ARG$(0)
+--- datei probe.dh
+DB_EXEC(db, "INSERT INTO shopping_list (product_name, quantity, unit, category, notes, checked) VALUES ('Tiefkühlpizza', 2, 'Stück', NULL, 'mit Salami', 0), ('Bananen', 6, 'Stück', 'Obst', NULL, 0), ('Brot', 1, 'Stück', 'Backwaren', NULL, 1), ('Käse', 0.5, 'kg', 'Milchprodukte', NULL, 0), ('Seife', 0, 'Stück', NULL, NULL, 0)")
+DIM f AS Hauptfenster : f = studioStartFenster
+DIM s AS EinkaufSeite : s = f.einkauf
+f.geaendert()
+' Drucken meldet das Control; das Fenster holt es im naechsten Bild ab.
+SUB bilder()
+    DIM n AS INTEGER
+    WHILE n < 2 AND studioBild()
+        n = n + 1
+    WEND
+END SUB
+SETENV("KUEHL_ZETTEL", GETENV$("KUEHL_PDF") + "/liste.pdf")
+s.knopfDrucken_Klick()
+bilder()
+GUI_DROPDOWN_SET_SELECTED(s.marktWahl, ARRAY_INDEXOF(marktListe(), "REWE") + 1)
+s.marktWahl_Geaendert()
+GUI_SET_CHECKED(s.sortierKasten, TRUE)
+s.sortierKasten_Geaendert()
+SETENV("KUEHL_ZETTEL", GETENV$("KUEHL_PDF") + "/sortiert.pdf")
+s.knopfDrucken_Klick()
+bilder()
+PRINT "status "; GUI_STATUSBAR_TEXT$(f.status, 3)
+--- erwartet
+status Einkaufszettel: sortiert.pdf
+code 0
+== sortiert.pdf
+Einkaufsliste
+Erstellt am
+Markt:
+REWE (sortiert nach Gängen)
+Produkt
+Gang
+Menge
+Kategorie
+Notizen
+Bananen
+1
+6 Stück
+Obst
+-
+Käse
+3
+0,5 kg
+Milchprodukte
+-
+Tiefkühlpizza
+5
+2 Stück
+-
+mit Salami
+Seife
+-
+-
+-
+-
+Anzahl Artikel:
+4
+Erstellt mit der Kühlschrank-Verwaltung
+Seite 1 von 1
+== liste.pdf
+Einkaufsliste
+Erstellt am
+Produkt
+Gang
+Menge
+Kategorie
+Notizen
+Seife
+-
+-
+-
+-
+Tiefkühlpizza
+-
+2 Stück
+-
+mit Salami
+Käse
+-
+0,5 kg
+Milchprodukte
+-
+Bananen
+-
+6 Stück
+Obst
+-
+Anzahl Artikel:
+4
+Erstellt mit der Kühlschrank-Verwaltung
+Seite 1 von 1
+
+=== echt: reiter, schnellknopf, haken, papierkorb, strg+z
+' Ein Messlauf liest die Lagen (Reiterkopf, Schnellknopf, Tabelle, Spalten
+' aus der .dhform), dann klickt der zweite Lauf: Reiter Einkauf, Schnellknopf
+' Joghurt (Prioritaet 1, steht damit oben), Haken in Zeile 0 (Joghurt),
+' Papierkorb in Zeile 1 (Brot, Enter fuer die Frage), Strg+Z holt Brot
+' zurueck.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+kKopieren(ARG$(1), p)
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = kF5(p, log)
+SETENV("KUEHL_HEUTE", "2026-11-08")
+kProbe(p, "mess.dh", "", 10)
+DIM w AS ARRAY OF STRING : w = SPLIT(TRIM$(READALL(p + "/_studio/lage.txt")), " ")
+FUNCTION z(i AS INTEGER) AS INTEGER
+    RETURN INT(VAL(w[i]))
+END FUNCTION
+DIM zy0 AS INTEGER : zy0 = z(5) + z(6) + z(7) \ 2
+slZeilen = [] : slBild = 0
+slHin(10, 10)
+slWarten(10)
+slKlick(z(0), z(1))
+slWarten(10)
+slKlick(z(2), z(3))
+slWarten(10)
+slKlick(z(4) + kSpalteMitte(p, "EinkaufSeite", "tabelle", 0), zy0)
+slWarten(10)
+slKlick(z(4) + kSpalteMitte(p, "EinkaufSeite", "tabelle", 6), zy0 + z(7))
+slWarten(15)
+slTaste(257)
+slWarten(15)
+slMit([341], 90)
+slWarten(10)
+slAufnahmeSchreiben(p + "/_studio/klick.txt")
+PRINT "code "; kProbe(p, "klick.dh", "klick.txt", slBild + 20)
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../../studio/studio.dh
+{sammlung}/../../../examples/studio/kuehlschrank
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/kuehlschrank.dh"
+slStudio = ARG$(0)
+--- datei daten.dh
+' Messlauf und Abspiellauf teilen die Datei: jedes Mal frisch.
+DB_EXEC(db, "DELETE FROM shopping_list")
+DB_EXEC(db, "DELETE FROM consumption_history")
+DB_EXEC(db, "INSERT INTO shopping_list (product_name, quantity, unit) VALUES ('Brot', 1, 'Stück')")
+DB_EXEC(db, "INSERT INTO consumption_history (product_name, quantity, unit, reason) VALUES ('Joghurt', 1, 'Stück', 'consumed'), ('Joghurt', 1, 'Stück', 'consumed')")
+DIM f AS Hauptfenster : f = studioStartFenster
+DIM s AS EinkaufSeite : s = f.einkauf
+f.geaendert()
+--- datei mess.dh
+IMPORT "../../daten.dh"
+GUI_TABCONTROL_SET_PAGE(f.reiter, 2)
+DIM n AS INTEGER
+WHILE n < 4 AND studioBild()
+    n = n + 1
+WEND
+DIM rx AS INTEGER, ry AS INTEGER, rw AS INTEGER, rh AS INTEGER
+(rx, ry, rw, rh) = GUI_TABCONTROL_ITEM_RECT(f.reiter, 2)
+WRITEALL("lage.txt", STR$(rx + rw \ 2) + " " + STR$(ry + rh \ 2) + " " + _
+    STR$(GUI_GET_X(s.schnell0) + GUI_GET_W(s.schnell0) \ 2) + " " + STR$(GUI_GET_Y(s.schnell0) + 26 + GUI_GET_H(s.schnell0) \ 2) + " " + _
+    STR$(GUI_GET_X(s.tabelle)) + " " + STR$(GUI_GET_Y(s.tabelle) + 26) + " " + STR$(INT(GUI_TABLE_GET(s.tabelle, "kopfhoehe"))) + " " + STR$(INT(GUI_TABLE_GET(s.tabelle, "zeilenhoehe"))))
+--- datei klick.dh
+IMPORT "../../daten.dh"
+FUNCTION stand$() AS STRING
+    DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT GROUP_CONCAT(product_name || ':' || checked, ' ') FROM (SELECT * FROM shopping_list ORDER BY id)")
+    DIM t AS STRING : t = "-"
+    IF DB_NEXT(r) THEN
+        IF NOT DB_IS_NULL(r, 0) THEN t = DB_GET_STRING(r, 0)
+    END IF
+    RETURN t + " / Seite " + STR$(GUI_TABCONTROL_PAGE(f.reiter))
+END FUNCTION
+DIM folge AS ARRAY OF STRING : folge = []
+DIM war AS STRING : war = ""
+WHILE studioBild()
+    DIM jetzt AS STRING : jetzt = stand$()
+    IF jetzt <> war THEN ARRAY_PUSH(folge, jetzt)
+    war = jetzt
+WEND
+PRINT JOIN$(folge, " -> ")
+PRINT "statistik "; GUI_TEXT(s.statistik); " | status "; GUI_STATUSBAR_TEXT$(f.status, 3)
+--- erwartet
+Brot:0 / Seite 0 -> Brot:0 / Seite 2 -> Brot:0 Joghurt:0 / Seite 2 -> Brot:0 Joghurt:1 / Seite 2 -> Joghurt:1 / Seite 2 -> Brot:0 Joghurt:1 / Seite 2
+statistik 🛒 1 offen  •  ✅ 1 erledigt  •  📋 2 gesamt | status Rückgängig: Brot von der Liste
+code 0

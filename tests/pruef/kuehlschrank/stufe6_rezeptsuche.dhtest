@@ -1,0 +1,604 @@
+' Kuehlschrank-App im Drachenhauch Studio, Stufe 6 (zweiter Teil): die
+' Rezeptsuche im Internet (examples/studio/kuehlschrank: KatalogFenster,
+' Module Spoonacular und Uebersetzung). Proben wie in den Stufen davor: F5
+' im Studio, dann main.dh mit einer Probe statt der Bildschleife; Heute ist
+' fest. Spoonacular und der Uebersetzer sind ein falscher Server auf diesem
+' Rechner (_hilfen/spoon_server.dh) -- nie die echten, nie ein echter
+' Schluessel.
+' Format: docs/werkzeuge.md, dhrt test.
+
+--- langsam
+=== woerterbuch, einheiten, stuecke, katalog nach zutaten
+' Suchwoerter gehen englisch hinaus, auch ohne Umlaut (die Python-App
+' uebersetzte "Nudeln mit Tomaten" nicht) und zusammengesetzt; Zutaten
+' kommen deutsch herein, das laengste bekannte Ende gilt. Einheiten wie
+' UnitConverter, aber "oz." und "Tbsps" werden auch umgerechnet. Lange
+' Zeilen teilt der Uebersetzer an Satzenden.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+kKopieren(ARG$(1), p)
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = kF5(p, log)
+PRINT "geprueft "; slHat(log, "geprueft 0 0")
+SETENV("KUEHL_HEUTE", "2026-11-08")
+PRINT "code "; kProbe(p, "probe.dh", "", 5)
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../../studio/studio.dh
+{sammlung}/../../../examples/studio/kuehlschrank
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/kuehlschrank.dh"
+slStudio = ARG$(0)
+--- datei probe.dh
+DIM f AS STRING
+FOR EACH f IN ["Hähnchen mit Nudeln", "Nudeln mit Tomaten", "Kartoffelsuppe", "Schweinebraten", "Käsespätzle", "Jägerschnitzel", "Vollmilch 3,5 %", "pasta carbonara", "Saure Sahne", "Erdbeerkuchen"]
+    PRINT f; " -> "; frageEnglisch$(f)
+NEXT
+PRINT "zutaten -> "; zutatenEnglisch$("Milch, Hähnchenbrust ,Tomaten,")
+FOR EACH f IN ["chicken breast", "red bell pepper", "fresh basil", "strawberries", "large eggs", "sriracha", "salt and pepper", "Cherries", "cranberries", "peaches", "lemons"]
+    PRINT f; " -> ["; zutatDeutsch$(f); "]"
+NEXT
+DIM z AS Zutat : z = NEW Zutat()
+DIM e AS STRING
+FOR EACH e IN ["2|cups", "8|oz", "8|oz.", "1.5|tablespoons", "3|Tbsps", "0.25|tsp", "5|cups", "3|pounds", "2|large", "1|", "2|handfuls", "1|stick", "0.333|cup", "236.588|ml"]
+    DIM t AS ARRAY OF STRING : t = SPLIT(e, "|")
+    einheitUmrechnen(z, VAL(t[0]), t[1])
+    PRINT e; " -> "; z.mengeText$()
+NEXT
+DIM lang AS STRING : lang = ""
+DIM i AS INTEGER
+FOR i = 1 TO 30
+    lang = lang + "Stir the pot now and wait. "
+NEXT
+DIM st AS ARRAY OF STRING : st = ueStuecke(lang)
+DIM l AS ARRAY OF STRING : l = []
+FOR EACH f IN st
+    ARRAY_PUSH(l, STR$(LEN(f)) + ":" + RIGHT$(f, 14))
+NEXT
+PRINT "stuecke "; LEN(lang); " -> "; JOIN$(l, " / ")
+PRINT "ohne satzende "; LEN(ueStuecke(REPEAT$("abcdefghi ", 50))); " | kurz "; JOIN$(ueStuecke("  Boil.  "), "|")
+DIM x AS Rezept
+DIM n AS ARRAY OF STRING : n = []
+FOR EACH x IN katalogNachZutaten("Milch, Ei", 6)
+    ARRAY_PUSH(n, x.name)
+NEXT
+PRINT "nach zutaten "; JOIN$(n, ", ")
+PRINT "katalog max 3 "; LEN(katalogSuchen("kartoffel", 3))
+--- erwartet
+geprueft TRUE
+Hähnchen mit Nudeln -> chicken with pasta
+Nudeln mit Tomaten -> pasta with tomato
+Kartoffelsuppe -> potato soup
+Schweinebraten -> pork roast
+Käsespätzle -> cheese spaetzle
+Jägerschnitzel -> schnitzel
+Vollmilch 3,5 % -> milk
+pasta carbonara -> pasta carbonara
+Saure Sahne -> sour cream
+Erdbeerkuchen -> strawberries cake
+zutaten -> milk,chicken breast,tomato
+chicken breast -> [Hähnchenbrust]
+red bell pepper -> [Paprika]
+fresh basil -> [Basilikum]
+strawberries -> [Erdbeeren]
+large eggs -> [Ei]
+sriracha -> []
+salt and pepper -> [Salz und Pfeffer]
+Cherries -> [Kirschen]
+cranberries -> [Preiselbeere]
+peaches -> [Pfirsich]
+lemons -> [Zitrone]
+2|cups -> 480 ml
+8|oz -> 227 g
+8|oz. -> 227 g
+1.5|tablespoons -> 1,5 EL
+3|Tbsps -> 3 EL
+0.25|tsp -> 0,25 TL
+5|cups -> 1,2 l
+3|pounds -> 1,36 kg
+2|large -> 2 Stück
+1| -> 1 Stück
+2|handfuls -> 2 Handvoll
+1|stick -> 1 stick
+0.333|cup -> 80 ml
+236.588|ml -> 237 ml
+stuecke 810 -> 377: now and wait. / 377: now and wait. / 53: now and wait.
+ohne satzende 2 | kurz Boil.
+nach zutaten Kaiserschmarrn, Jägerschnitzel, Wiener Schnitzel, Königsberger Klopse, Frikadellen, Käsespätzle
+katalog max 3 3
+code 0
+
+=== suche im netz: katalog zuerst, dann internet, uebersetzt, importiert
+' Die Treffer des Katalogs stehen sofort da, die aus dem Internet kommen im
+' Hintergrund dazu (englisch gefragt, der Schluessel in der Kopfzeile, nicht
+' in der Adresse). Titel und Texte kommen erst englisch, dann deutsch;
+' Einzelheiten laedt erst die Auswahl, importieren geht, wenn alles da ist.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+kKopieren(ARG$(1), p)
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = kF5(p, log)
+SETENV("KUEHL_HEUTE", "2026-11-08")
+DIM srv AS INTEGER : srv = kNetzStarten(ARG$(2))
+kSchluessel = "testschluessel"
+PRINT "code "; kProbe(p, "probe.dh", "", 1500)
+kOffEnde(srv)
+DIM a AS STRING
+' Die Uebersetzungen laufen zu viert gleichzeitig: sortiert.
+DIM gets AS ARRAY OF STRING : gets = []
+FOR EACH a IN READLINES(CWD$() + "/anfragen.txt")
+    IF LEFT$(a, 5) = "/get " THEN
+        ARRAY_PUSH(gets, a)
+    ELSEIF a <> "" THEN
+        PRINT "anfrage "; a
+    END IF
+NEXT
+SORT(gets)
+FOR EACH a IN gets
+    PRINT "uebersetzt "; a
+NEXT
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../../studio/studio.dh
+{sammlung}/../../../examples/studio/kuehlschrank
+{sammlung}/../_hilfen/spoon_server.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/kuehlschrank.dh"
+slStudio = ARG$(0)
+--- datei probe.dh
+SUB warten(kf AS KatalogFenster)
+    DIM n AS INTEGER
+    WHILE (kf.sucheAbruf >= 0 OR LEN(kf.detailAbrufe) > 0 OR ueOffen() > 0) AND n < 900 AND studioBild()
+        n = n + 1
+    WEND
+END SUB
+SUB zeilen(kf AS KatalogFenster)
+    DIM i AS INTEGER
+    FOR i = 0 TO GUI_TABLE_ROW_COUNT(kf.tabelle) - 1
+        PRINT "  "; GUI_TABLE_GET_CELL(kf.tabelle, i, 0); " "; GUI_TABLE_GET_CELL(kf.tabelle, i, 1); " | "; GUI_TABLE_GET_CELL(kf.tabelle, i, 2); " | "; GUI_TABLE_GET_CELL(kf.tabelle, i, 3)
+    NEXT
+END SUB
+DIM kf AS KatalogFenster : kf = NEW KatalogFenster()
+kf.Zeigen()
+PRINT "hinweis ["; GUI_TEXT(kf.hinweis); "]"
+GUI_SET_TEXT(kf.sucheFeld, "Hähnchen")
+kf.sucheFeld_Enter()
+PRINT "sofort: "; GUI_TEXT(kf.ergebnis); " | "; GUI_TEXT(kf.hinweis); " | suchen an "; GUI_ENABLED(kf.knopfSuchen)
+zeilen(kf)
+warten(kf)
+PRINT "danach: "; GUI_TEXT(kf.ergebnis); " | "; GUI_TEXT(kf.hinweis); " | suchen an "; GUI_ENABLED(kf.knopfSuchen); " | gewaehlt "; GUI_TABLE_SELECTED(kf.tabelle); " | details ["; GUI_TEXT(kf.details); "]"
+zeilen(kf)
+DIM z AS INTEGER
+FOR z = 0 TO LEN(kf.treffer) - 1
+    IF kf.treffer[z].netzId = 101 THEN GUI_TABLE_SET_SELECTED(kf.tabelle, z)
+NEXT
+kf.tabelle_Geaendert()
+PRINT "gewaehlt: import an "; GUI_ENABLED(kf.knopfImport); " | "; REPLACE$(GUI_TEXT(kf.details), CHR$(10), " / ")
+DIM n AS INTEGER
+WHILE LEN(kf.detailAbrufe) > 0 AND n < 900 AND studioBild()
+    n = n + 1
+WEND
+PRINT "einzelheiten da, uebersetzung offen "; ueOffen() > 0; " | import an "; GUI_ENABLED(kf.knopfImport); " | "; SPLIT(GUI_TEXT(kf.details), CHR$(10))[0]
+kf.knopfImport_Klick()
+PRINT "zu frueh importiert "; kf.importiert
+warten(kf)
+PRINT "uebersetzt: import an "; GUI_ENABLED(kf.knopfImport)
+PRINT GUI_TEXT(kf.details)
+GUI_SET_CHECKED(kf.uebersetzenSchalter, FALSE)
+kf.uebersetzenSchalter_Geaendert()
+PRINT "englisch: "; GUI_TABLE_GET_CELL(kf.tabelle, 0, 1); " | "; REPLACE$(GUI_TEXT(kf.details), CHR$(10), " / ")
+GUI_SET_CHECKED(kf.uebersetzenSchalter, TRUE)
+kf.uebersetzenSchalter_Geaendert()
+PRINT "wieder deutsch: "; GUI_TABLE_GET_CELL(kf.tabelle, 0, 1); " | offen "; ueOffen()
+kf.knopfImport_Klick()
+PRINT "importiert "; kf.importiert
+PRINT JOIN$(textListe("SELECT name || ' | ' || servings || ' | ' || IFNULL(prep_time_minutes, '-') || '+' || IFNULL(cook_time_minutes, '-') || ' | ' || REPLACE(IFNULL(description, '-'), CHAR(10), ' / ') || ' | ' || REPLACE(IFNULL(instructions, '-'), CHAR(10), ' / ') FROM recipes WHERE name LIKE 'Honig%'"), CHR$(10))
+PRINT JOIN$(textListe("SELECT product_name || ' ' || quantity || ' ' || unit FROM recipe_ingredients WHERE recipe_id = (SELECT MAX(id) FROM recipes) ORDER BY id"), " / ")
+PRINT "zurueck "; verlauf.rueckgaengig$(); " | "; dbZahl("SELECT COUNT(*) FROM recipes WHERE name LIKE 'Honig%'")
+' Die Suppe hat nur bekannte Zutaten: nur ihre Texte sind noch unterwegs.
+FOR z = 0 TO LEN(kf.treffer) - 1
+    IF kf.treffer[z].netzId = 102 THEN GUI_TABLE_SET_SELECTED(kf.tabelle, z)
+NEXT
+kf.tabelle_Geaendert()
+n = 0
+WHILE LEN(kf.detailAbrufe) > 0 AND n < 900 AND studioBild()
+    n = n + 1
+WEND
+PRINT "suppe da: offen "; ueOffen() > 0; " | import an "; GUI_ENABLED(kf.knopfImport)
+warten(kf)
+PRINT "suppe uebersetzt: import an "; GUI_ENABLED(kf.knopfImport)
+DIM j AS JSON_HANDLE : j = JSON_PARSE(READALL(studioDbPfad$("uebersetzungen.json")))
+PRINT "cache "; JSON_LEN(j, ""); " | "; JSON_GET_STRING(j, JSON_KEY$("Chicken Soup"))
+END
+--- erwartet
+hinweis []
+sofort: 📋 0 Treffer | ⏳ 0 im Katalog. Durchsuche das Internet … | suchen an FALSE
+danach: 📋 2 Treffer: 🇩🇪 0 + 🌐 2 | ✓ Übersetzt | suchen an TRUE | gewaehlt -1 | details []
+  🌐 Honig-Knoblauch-Hähnchen | 45 min | 4
+  🌐 Hühnersuppe | 30 min | 6
+gewaehlt: import an FALSE | Honig-Knoblauch-Hähnchen /  / ⏱ 45 min  •  🍽 4 Portionen /  / ⏳ Lade Einzelheiten …
+einzelheiten da, uebersetzung offen TRUE | import an FALSE | Honig-Knoblauch-Hähnchen
+zu frueh importiert 0
+uebersetzt: import an TRUE
+Honig-Knoblauch-Hähnchen
+Honig-Knoblauch-Hähnchen ist lecker & einfach.
+🍽 4 Portionen, ⏱ 13 + 32 min
+Zutaten:
+  • 680 g Hähnchenbrust
+  • 3 EL Honig
+  • 4 Zehen Knoblauch
+  • 0,25 TL Sriracha-Soße
+  • 2 Stück Ei
+  • 62 g Mehl
+  • 2 Stück Eigelb
+  • 57 g Parmesan
+Zubereitung:
+DE: 1. Mix the honey and garlic.
+DE: 2. Coat the chicken.
+DE: For the sauce:
+DE: 3. Simmer the sauce.
+🌐 Quelle: Foodista.com -- https://example.org/honig
+englisch: Honey Garlic Chicken | Honey Garlic Chicken / Honey Garlic Chicken is tasty & easy. /  / 🍽 4 Portionen, ⏱ 13 + 32 min /  / Zutaten: /   • 680 g Hähnchenbrust /   • 3 EL Honig /   • 4 Zehen Knoblauch /   • 0,25 TL sriracha /   • 2 Stück Ei /   • 62 g Mehl /   • 2 Stück Eigelb /   • 57 g Parmesan /  / Zubereitung: / 1. Mix the honey and garlic. / 2. Coat the chicken. / For the sauce: / 3. Simmer the sauce. /  / 🌐 Quelle: Foodista.com -- https://example.org/honig
+wieder deutsch: Honig-Knoblauch-Hähnchen | offen 0
+importiert 1
+Honig-Knoblauch-Hähnchen | 4 | 13+32 | Honig-Knoblauch-Hähnchen ist lecker & einfach. /  / Quelle: Foodista.com -- https://example.org/honig | DE: 1. Mix the honey and garlic. / DE: 2. Coat the chicken. / DE: For the sauce: / DE: 3. Simmer the sauce.
+Hähnchenbrust 680.0 g / Honig 3.0 EL / Knoblauch 4.0 Zehen / Sriracha-Soße 0.25 TL / Ei 2.0 Stück / Mehl 62.0 g / Eigelb 2.0 Stück / Parmesan 57.0 g
+zurueck Honig-Knoblauch-Hähnchen angelegt | 0
+suppe da: offen TRUE | import an FALSE
+suppe uebersetzt: import an TRUE
+cache 11 | Hühnersuppe
+code 0
+anfrage /recipes/complexSearch query=chicken include= number=10 key=testschluessel apiKey=
+anfrage /recipes/101/information
+anfrage /recipes/102/information
+uebersetzt /get q=1. Mix the honey and garlic. langpair=en|de
+uebersetzt /get q=2. Coat the chicken. langpair=en|de
+uebersetzt /get q=3. Simmer the sauce. langpair=en|de
+uebersetzt /get q=Add the chicken. langpair=en|de
+uebersetzt /get q=Boil the water. langpair=en|de
+uebersetzt /get q=Chicken Soup langpair=en|de
+uebersetzt /get q=For the sauce: langpair=en|de
+uebersetzt /get q=Honey Garlic Chicken is tasty & easy. langpair=en|de
+uebersetzt /get q=Honey Garlic Chicken langpair=en|de
+uebersetzt /get q=Warm soup. langpair=en|de
+uebersetzt /get q=sriracha langpair=en|de
+
+=== fehler: kein schluessel, falscher, kontingent, kaputt, kein netz, einzelheiten fehlen
+' Die Python-App zeigte in jedem Fall nur "Keine Rezepte gefunden" (der Grund
+' stand im Log). Hier steht er in der Statuszeile; der Katalog sucht weiter.
+' Kein Netz nach einer gelungenen Suche ist kein "Fehler 200".
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+kKopieren(ARG$(1), p)
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = kF5(p, log)
+SETENV("KUEHL_HEUTE", "2026-11-08")
+DIM srv AS INTEGER : srv = kNetzStarten(ARG$(2))
+PRINT "code "; kProbe(p, "probe.dh", "", 1500)
+kOffEnde(srv)
+PRINT "anfragen "; kOffAnfragen$()
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../../studio/studio.dh
+{sammlung}/../../../examples/studio/kuehlschrank
+{sammlung}/../_hilfen/spoon_server.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/kuehlschrank.dh"
+slStudio = ARG$(0)
+--- datei probe.dh
+SUB warten(kf AS KatalogFenster)
+    DIM n AS INTEGER
+    WHILE (kf.sucheAbruf >= 0 OR LEN(kf.detailAbrufe) > 0 OR ueOffen() > 0) AND n < 900 AND studioBild()
+        n = n + 1
+    WEND
+END SUB
+SUB suchen(kf AS KatalogFenster, wann AS STRING, text AS STRING)
+    GUI_SET_TEXT(kf.sucheFeld, text)
+    kf.knopfSuchen_Klick()
+    warten(kf)
+    PRINT wann; ": "; GUI_TEXT(kf.ergebnis); " | "; GUI_TEXT(kf.hinweis); " | suchen an "; GUI_ENABLED(kf.knopfSuchen)
+END SUB
+DIM kf AS KatalogFenster : kf = NEW KatalogFenster()
+kf.Zeigen()
+PRINT "ohne schluessel ["; GUI_TEXT(kf.hinweis); "]"
+suchen(kf, "ohne schluessel", "Schnitzel")
+PRINT "leer"
+GUI_SET_TEXT(kf.sucheFeld, "  ")
+kf.knopfSuchen_Klick()
+PRINT "leer: "; GUI_TEXT(kf.hinweis); " | "; GUI_TEXT(kf.ergebnis)
+SETENV("SPOONACULAR_API_KEY", "falsch")
+suchen(kf, "falsch", "Hähnchen")
+SETENV("SPOONACULAR_API_KEY", "erschoepft")
+suchen(kf, "erschoepft", "Hähnchen")
+SETENV("SPOONACULAR_API_KEY", "testschluessel")
+suchen(kf, "kaputt", "kaputt")
+suchen(kf, "gut", "Nudeln")
+DIM basis AS STRING : basis = GETENV$("KUEHL_SPOON_URL")
+SETENV("KUEHL_SPOON_URL", "http://127.0.0.1:9")
+suchen(kf, "kein netz", "Nudeln")
+SETENV("KUEHL_SPOON_URL", basis)
+suchen(kf, "wieder", "Nudeln")
+GUI_TABLE_SET_SELECTED(kf.tabelle, 0)
+kf.tabelle_Geaendert()
+warten(kf)
+PRINT "einzelheiten 404: "; REPLACE$(GUI_TEXT(kf.details), CHR$(10), " / "); " | import an "; GUI_ENABLED(kf.knopfImport)
+' Der Uebersetzer streikt: der Rest bleibt englisch, importieren geht.
+suchen(kf, "kontingent", "quota")
+GUI_TABLE_SET_SELECTED(kf.tabelle, 0)
+kf.tabelle_Geaendert()
+warten(kf)
+PRINT "kontingent: "; GUI_TABLE_GET_CELL(kf.tabelle, 0, 1); " | "; GUI_TEXT(kf.hinweis); " | import an "; GUI_ENABLED(kf.knopfImport); " | "; SPLIT(GUI_TEXT(kf.details), CHR$(10))[1]
+END
+--- erwartet
+ohne schluessel [🔑 Ohne Spoonacular-Schlüssel sucht nur der Katalog (kostenlos auf spoonacular.com/food-api).]
+ohne schluessel: 📋 5 Treffer | 🔑 Ohne Spoonacular-Schlüssel sucht nur der Katalog (kostenlos auf spoonacular.com/food-api). | suchen an TRUE
+leer
+leer: ❗ Bitte gib einen Suchbegriff ein! | 📋 5 Treffer
+falsch: Nichts gefunden -- ein anderes Wort? | ❗ Spoonacular kennt den API-Schlüssel nicht (401) -- bitte prüfen. | suchen an TRUE
+erschoepft: Nichts gefunden -- ein anderes Wort? | ❗ Das Tageskontingent von Spoonacular ist aufgebraucht (402) -- morgen geht es wieder. | suchen an TRUE
+kaputt: Nichts gefunden -- ein anderes Wort? | ❗ Ungültige Antwort von Spoonacular. | suchen an TRUE
+gut: 📋 1 Treffer: 🇩🇪 0 + 🌐 1 | ✓ Übersetzt | suchen an TRUE
+kein netz: Nichts gefunden -- ein anderes Wort? | ❗ Spoonacular ist nicht erreichbar. | suchen an TRUE
+wieder: 📋 1 Treffer: 🇩🇪 0 + 🌐 1 | 🌐 1 aus dem Internet (Spoonacular) | suchen an TRUE
+einzelheiten 404: DE: Pasta Gone /  / ⏱ 20 min  •  🍽 2 Portionen /  / ❗ Einzelheiten nicht geladen: Spoonacular antwortet mit Fehler 404. | import an FALSE
+kontingent: 📋 1 Treffer: 🇩🇪 0 + 🌐 1 | ❗ Der Übersetzer hat sein Tageskontingent erreicht -- die übrigen Texte bleiben englisch | suchen an TRUE
+kontingent: QUOTA Pie | ❗ Der Übersetzer hat sein Tageskontingent erreicht -- die übrigen Texte bleiben englisch | import an TRUE | A QUOTA pie.
+code 0
+anfragen /recipes/complexSearch /recipes/complexSearch /recipes/complexSearch /recipes/complexSearch /get /recipes/complexSearch /recipes/103/information /recipes/complexSearch /get /recipes/105/information
+
+=== spaete antwort gehoert zu ihrem rezept, nicht zum gewaehlten
+' Zwei Rezepte nacheinander gewaehlt, die Antwort des ersten kommt zuletzt:
+' die Python-App zeigte sie unter dem zweiten und importierte sie auch so.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+kKopieren(ARG$(1), p)
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = kF5(p, log)
+SETENV("KUEHL_HEUTE", "2026-11-08")
+DIM srv AS INTEGER : srv = kNetzStarten(ARG$(2))
+kSchluessel = "testschluessel"
+PRINT "code "; kProbe(p, "probe.dh", "", 1500)
+kOffEnde(srv)
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../../studio/studio.dh
+{sammlung}/../../../examples/studio/kuehlschrank
+{sammlung}/../_hilfen/spoon_server.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/kuehlschrank.dh"
+slStudio = ARG$(0)
+--- datei probe.dh
+DIM kf AS KatalogFenster : kf = NEW KatalogFenster()
+kf.Zeigen()
+GUI_SET_CHECKED(kf.uebersetzenSchalter, FALSE)
+GUI_SET_TEXT(kf.sucheFeld, "chicken")
+kf.knopfSuchen_Klick()
+DIM n AS INTEGER
+WHILE kf.sucheAbruf >= 0 AND n < 900 AND studioBild()
+    n = n + 1
+WEND
+PRINT "treffer "; LEN(kf.treffer); " | gewaehlt "; GUI_TABLE_SELECTED(kf.tabelle)
+' Erst das erste waehlen, dann das zweite -- beide Antworten abwarten, ohne
+' den Takt des Fensters, und die erste zuletzt einsortieren.
+GUI_TABLE_SET_SELECTED(kf.tabelle, 0)
+kf.tabelle_Geaendert()
+GUI_TABLE_SET_SELECTED(kf.tabelle, 1)
+kf.tabelle_Geaendert()
+' Noch einmal dasselbe: es bleibt bei einem Abruf je Rezept.
+kf.tabelle_Geaendert()
+PRINT "unterwegs "; LEN(kf.detailAbrufe)
+n = 0
+WHILE NOT (HTTP_READY(kf.detailAbrufe[0]) AND HTTP_READY(kf.detailAbrufe[1])) AND n < 3000
+    SLEEP(5)
+    n = n + 1
+WEND
+DIM a AS INTEGER : a = kf.detailAbrufe[0]
+DIM x AS Rezept : x = kf.detailRezepte[0]
+kf.detailAbrufe[0] = kf.detailAbrufe[1] : kf.detailRezepte[0] = kf.detailRezepte[1]
+kf.detailAbrufe[1] = a : kf.detailRezepte[1] = x
+kf.Takt()
+PRINT "gewaehlt "; GUI_TABLE_SELECTED(kf.tabelle); " | "; REPLACE$(GUI_TEXT(kf.details), CHR$(10), " / ")
+PRINT "erstes "; kf.treffer[0].name; " "; LEN(kf.treffer[0].zutaten); " | zweites "; kf.treffer[1].name; " "; LEN(kf.treffer[1].zutaten)
+kf.knopfImport_Klick()
+PRINT "importiert "; JOIN$(textListe("SELECT name || ' ' || servings FROM recipes WHERE id = (SELECT MAX(id) FROM recipes)"), "")
+END
+--- erwartet
+treffer 2 | gewaehlt -1
+unterwegs 2
+gewaehlt 1 | Chicken Soup / Warm soup. /  / 🍽 6 Portionen, ⏱ 10 + 20 min /  / Zutaten: /   • 1,89 l Wasser /   • 454 g Hähnchen /  / Zubereitung: / Boil the water. / Add the chicken. /  / 🌐 Quelle: Spoonacular -- https://example.org/102
+erstes Honey Garlic Chicken 8 | zweites Chicken Soup 2
+importiert Chicken Soup 6
+code 0
+
+=== ablaufende im internet nach zutaten, schluessel, cache der uebersetzung
+' "Im Internet suchen" bei den Ablaufenden gibt die Namen als Zutaten weiter
+' (includeIngredients, englisch); der Katalog sucht dieselben Zutaten. Ein
+' Schluessel aus der Umgebung gilt vor dem gespeicherten. Was einmal
+' uebersetzt ist, fragt niemand mehr.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+kKopieren(ARG$(1), p)
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = kF5(p, log)
+SETENV("KUEHL_HEUTE", "2026-11-08")
+DIM srv AS INTEGER : srv = kNetzStarten(ARG$(2))
+PRINT "code "; kProbe(p, "probe.dh", "", 1500)
+kOffEnde(srv)
+DIM a AS STRING
+IF FILEEXISTS(CWD$() + "/anfragen.txt") THEN
+    FOR EACH a IN READLINES(CWD$() + "/anfragen.txt")
+        IF a <> "" THEN PRINT "anfrage "; a
+    NEXT
+END IF
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../../studio/studio.dh
+{sammlung}/../../../examples/studio/kuehlschrank
+{sammlung}/../_hilfen/spoon_server.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/kuehlschrank.dh"
+slStudio = ARG$(0)
+--- datei probe.dh
+SUB warten(kf AS KatalogFenster)
+    DIM n AS INTEGER
+    WHILE (kf.sucheAbruf >= 0 OR LEN(kf.detailAbrufe) > 0 OR ueOffen() > 0) AND n < 900 AND studioBild()
+        n = n + 1
+    WEND
+END SUB
+PRINT "schluessel ["; spoonSchluessel$(); "]"
+PRINT "mit leerzeichen "; spoonSchluesselSetzen("abc def"); " | gut "; spoonSchluesselSetzen(" testschluessel "); " | "; spoonSchluessel$(); " | gespeichert "; JOIN$(textListe("SELECT value FROM app_settings WHERE key = 'spoonacular_api_key'"), "")
+SETENV("SPOONACULAR_API_KEY", "aus-der-umgebung")
+PRINT "umgebung gilt "; spoonSchluessel$()
+SETENV("SPOONACULAR_API_KEY", "")
+' Zwei ablaufende Produkte, dann "Im Internet suchen".
+DB_EXEC(db, "INSERT INTO products (name) VALUES ('Fettarme Milch'), ('Tellerlinsen')")
+DB_EXEC(db, "INSERT INTO inventory (product_id, quantity, unit, expiry_date) VALUES (1, 1, 'Liter', '2026-11-09'), (1, 1, 'Liter', '2026-11-10'), (2, 500, 'g', '2026-11-10')")
+DIM vf AS VorschlagFenster : vf = NEW VorschlagFenster()
+vf.art = "ablauf"
+vf.Zeigen()
+vf.knopfInternet_Klick()
+PRINT "suche ["; vf.suche; "]"
+DIM kf AS KatalogFenster : kf = NEW KatalogFenster()
+kf.vorgabeText = vf.suche
+kf.vorgabeZutaten = TRUE
+kf.Zeigen()
+warten(kf)
+PRINT GUI_DROPDOWN_SELECTED(kf.suchArt); " | "; GUI_TEXT(kf.sucheFeld); " | "; GUI_TEXT(kf.ergebnis)
+DIM i AS INTEGER
+FOR i = 0 TO GUI_TABLE_ROW_COUNT(kf.tabelle) - 1
+    PRINT "  "; GUI_TABLE_GET_CELL(kf.tabelle, i, 0); " "; GUI_TABLE_GET_CELL(kf.tabelle, i, 1)
+NEXT
+GUI_TABLE_SET_SELECTED(kf.tabelle, GUI_TABLE_ROW_COUNT(kf.tabelle) - 1)
+kf.tabelle_Geaendert()
+warten(kf)
+PRINT "ohne anleitung: "; REPLACE$(MID$(GUI_TEXT(kf.details), INSTR(GUI_TEXT(kf.details), "Zutaten:"), 999), CHR$(10), " / ")
+kf.knopfSchliessen_Klick()
+' Wie nach einem neuen Start (der Speicher ist leer), dieselbe Suche: die
+' Titel kommen aus der Datei.
+MAPCLEAR(ueDe)
+ueGeladen = FALSE
+DIM kf2 AS KatalogFenster : kf2 = NEW KatalogFenster()
+kf2.vorgabeText = vf.suche
+kf2.vorgabeZutaten = TRUE
+kf2.Zeigen()
+warten(kf2)
+PRINT "zweites mal: "; GUI_TABLE_GET_CELL(kf2.tabelle, GUI_TABLE_ROW_COUNT(kf2.tabelle) - 1, 1)
+END
+--- erwartet
+schluessel []
+mit leerzeichen FALSE | gut TRUE | testschluessel | gespeichert "testschluessel"
+umgebung gilt aus-der-umgebung
+suche [Fettarme Milch, Tellerlinsen]
+1 | Fettarme Milch, Tellerlinsen | 📋 4 Treffer: 🇩🇪 3 + 🌐 1
+  🇩🇪 Kaiserschmarrn
+  🇩🇪 Milchreis
+  🇩🇪 Himmel und Erde
+  🌐 DE: Milk Rice
+ohne anleitung: Zutaten: /   • 1 l Milch /  / Zubereitung: / Keine Anleitung verfügbar. /  / 🌐 Quelle: Spoonacular -- https://example.org/104
+zweites mal: DE: Milk Rice
+code 0
+anfrage /recipes/complexSearch query= include=milk,lentils number=7 key=testschluessel apiKey=
+anfrage /get q=Milk Rice langpair=en|de
+anfrage /recipes/104/information
+anfrage /recipes/complexSearch query= include=milk,lentils number=7 key=testschluessel apiKey=
+
+=== echt: ablaufende verwerten, im internet suchen, waehlen, importieren
+' Reiter Rezepte, "Ablaufende verwerten", dort "Im Internet suchen": die
+' Rezeptsuche geht modal auf und sucht gleich nach den Zutaten; ein Klick
+' auf den Treffer laedt die Einzelheiten, "Rezept importieren" legt es an,
+' ESC schliesst. Zwei modale Fenster nacheinander, das Netz im Takt.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+kKopieren(ARG$(1), p)
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = kF5(p, log)
+SETENV("KUEHL_HEUTE", "2026-11-08")
+kProbe(p, "mess.dh", "", 10)
+DIM w AS ARRAY OF STRING : w = SPLIT(TRIM$(READALL(p + "/_studio/lage.txt")), " ")
+FUNCTION z(i AS INTEGER) AS INTEGER
+    RETURN INT(VAL(w[i]))
+END FUNCTION
+slZeilen = [] : slBild = 0
+slHin(10, 10)
+slWarten(10)
+slKlick(z(0), z(1))
+slWarten(10)
+slKlick(z(2), z(3))
+slWarten(20)
+slKlick(z(4), z(5))
+slWarten(60)
+slKlick(z(6), z(7))
+slWarten(60)
+slKlick(z(8), z(9))
+slWarten(20)
+slTaste(256)
+slWarten(20)
+slAufnahmeSchreiben(p + "/_studio/klick.txt")
+DIM srv AS INTEGER : srv = kNetzStarten(ARG$(2))
+kSchluessel = "testschluessel"
+PRINT "code "; kProbe(p, "klick.dh", "klick.txt", slBild + 20)
+kOffEnde(srv)
+PRINT "anfragen "; kOffAnfragen$()
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../../studio/studio.dh
+{sammlung}/../../../examples/studio/kuehlschrank
+{sammlung}/../_hilfen/spoon_server.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/kuehlschrank.dh"
+slStudio = ARG$(0)
+--- datei daten.dh
+' Messlauf und Abspiellauf teilen die Datei: jedes Mal frisch.
+DB_EXEC(db, "DELETE FROM recipe_ingredients")
+DB_EXEC(db, "DELETE FROM recipes")
+DB_EXEC(db, "DELETE FROM inventory")
+DB_EXEC(db, "DELETE FROM products")
+DB_EXEC(db, "INSERT INTO recipes (name, servings) VALUES ('Toast', 1)")
+DB_EXEC(db, "INSERT INTO recipe_ingredients (recipe_id, product_name, quantity, unit) VALUES (1, 'Brot', 2, 'Scheiben')")
+DB_EXEC(db, "INSERT INTO products (name) VALUES ('Sriracha')")
+DB_EXEC(db, "INSERT INTO inventory (product_id, quantity, unit, expiry_date) VALUES (1, 1, 'Flasche', '2026-11-09')")
+DIM f AS Hauptfenster : f = studioStartFenster
+DIM s AS RezepteSeite : s = f.rezepte
+f.geaendert()
+--- datei mess.dh
+IMPORT "../../daten.dh"
+GUI_TABCONTROL_SET_PAGE(f.reiter, 4)
+DIM n AS INTEGER
+WHILE n < 4 AND studioBild()
+    n = n + 1
+WEND
+DIM t AS INTEGER : t = GUI_METRIC_GET("title_h")
+DIM rx AS INTEGER, ry AS INTEGER, rw AS INTEGER, rh AS INTEGER
+(rx, ry, rw, rh) = GUI_TABCONTROL_ITEM_RECT(f.reiter, 4)
+DIM vf AS VorschlagFenster : vf = NEW VorschlagFenster()
+vf.art = "ablauf"
+vf.Zeigen()
+DIM vx AS INTEGER : vx = GUI_WINDOW_GET_X(vf.Fenster())
+DIM vy AS INTEGER : vy = GUI_WINDOW_GET_Y(vf.Fenster()) + t
+vf.Zumachen()
+DIM kf AS KatalogFenster : kf = NEW KatalogFenster()
+kf.Zeigen()
+DIM kx AS INTEGER : kx = GUI_WINDOW_GET_X(kf.Fenster())
+DIM ky AS INTEGER : ky = GUI_WINDOW_GET_Y(kf.Fenster()) + t
+WRITEALL("lage.txt", STR$(rx + rw \ 2) + " " + STR$(ry + rh \ 2) + " " + _
+    STR$(GUI_GET_X(s.knopfAblauf) + GUI_GET_W(s.knopfAblauf) \ 2) + " " + STR$(GUI_GET_Y(s.knopfAblauf) + 26 + GUI_GET_H(s.knopfAblauf) \ 2) + " " + _
+    STR$(vx + GUI_GET_X(vf.knopfInternet) + GUI_GET_W(vf.knopfInternet) \ 2) + " " + STR$(vy + GUI_GET_Y(vf.knopfInternet) + GUI_GET_H(vf.knopfInternet) \ 2) + " " + _
+    STR$(kx + GUI_GET_X(kf.tabelle) + 120) + " " + STR$(ky + GUI_GET_Y(kf.tabelle) + INT(GUI_TABLE_GET(kf.tabelle, "kopfhoehe")) + INT(GUI_TABLE_GET(kf.tabelle, "zeilenhoehe")) \ 2) + " " + _
+    STR$(kx + GUI_GET_X(kf.knopfImport) + GUI_GET_W(kf.knopfImport) \ 2) + " " + STR$(ky + GUI_GET_Y(kf.knopfImport) + GUI_GET_H(kf.knopfImport) \ 2))
+--- datei klick.dh
+IMPORT "../../daten.dh"
+FUNCTION stand$() AS STRING
+    RETURN JOIN$(textListe("SELECT r.name || ':' || (SELECT GROUP_CONCAT(product_name || ' ' || quantity || ' ' || unit) FROM recipe_ingredients WHERE recipe_id = r.id) FROM recipes r ORDER BY r.id"), " ") + " / Seite " + STR$(GUI_TABCONTROL_PAGE(f.reiter)) + " / Liste " + STR$(GUI_TABLE_ROW_COUNT(s.tabelle))
+END FUNCTION
+DIM folge AS ARRAY OF STRING : folge = []
+DIM war AS STRING : war = ""
+WHILE studioBild()
+    DIM jetzt AS STRING : jetzt = stand$()
+    IF jetzt <> war THEN ARRAY_PUSH(folge, jetzt)
+    war = jetzt
+WEND
+PRINT JOIN$(folge, " -> ")
+--- erwartet
+Toast:Brot 2.0 Scheiben / Seite 0 / Liste 1 -> Toast:Brot 2.0 Scheiben / Seite 4 / Liste 1 -> Toast:Brot 2.0 Scheiben DE: Milk Rice:Milch 1.0 l / Seite 4 / Liste 2
+code 0
+anfragen /recipes/complexSearch /get /recipes/104/information

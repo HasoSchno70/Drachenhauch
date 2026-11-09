@@ -1,0 +1,236 @@
+' Der Vorrat: Einträge lesen, Mengen ändern, entnehmen (mit einer Zeile im
+' Verbrauchsverlauf consumption_history), Produkte und Mindestmengen -- die
+' Arbeit von database_pkg/inventory.py und products.py der Python-App. Jede
+' Änderung geht über verlauf (Klasse Verlauf), damit Strg+Z sie zurücknimmt.
+IMPORT "db"
+IMPORT "regex"
+DIM verlauf AS Verlauf : verlauf = NEW Verlauf()
+
+' Die Märkte, die die Python-App kennt (AppConfig.DEFAULT_STORES).
+FUNCTION bekannteMaerkte() AS ARRAY OF STRING
+    RETURN ["REWE", "EDEKA", "ALDI", "LIDL", "KAUFLAND", "NETTO", "PENNY", "DM", "ROSSMANN", "MÜLLER"]
+END FUNCTION
+
+FUNCTION warnSchwelle() AS INTEGER
+    RETURN einstellungZahl("expiring_days_threshold", 3)
+END FUNCTION
+
+' --- Lesen ---------------------------------------------------------------------
+FUNCTION bestandSql$() AS STRING
+    RETURN "SELECT i.id, i.product_id, p.name, IFNULL(p.brand, ''), IFNULL(p.category, ''), IFNULL(p.barcode, ''), " + _
+           "i.quantity, IFNULL(i.unit, ''), IFNULL(i.purchase_date, ''), IFNULL(i.expiry_date, ''), " + _
+           "IFNULL(i.storage_location, ''), IFNULL(i.storage_area, ''), IFNULL(i.notes, ''), IFNULL(i.purchased_at_store, ''), " + _
+           "IFNULL(p.min_quantity, 0), IFNULL(p.min_unit, ''), " + _
+           "IFNULL(CAST(julianday(i.expiry_date) - julianday(?) AS INTEGER), 0) " + _
+           "FROM inventory i JOIN products p ON p.id = i.product_id"
+END FUNCTION
+
+FUNCTION eintragAus(r AS DB_RESULT) AS Eintrag
+    DIM e AS Eintrag : e = NEW Eintrag()
+    e.id = DB_GET_INT(r, 0)
+    e.produktId = DB_GET_INT(r, 1)
+    e.name = DB_GET_STRING(r, 2)
+    e.marke = DB_GET_STRING(r, 3)
+    e.kategorie = DB_GET_STRING(r, 4)
+    e.barcode = DB_GET_STRING(r, 5)
+    e.menge = DB_GET_FLOAT(r, 6)
+    e.einheit = DB_GET_STRING(r, 7)
+    e.kaufdatum = DB_GET_STRING(r, 8)
+    e.ablauf = DB_GET_STRING(r, 9)
+    e.lagerort = DB_GET_STRING(r, 10)
+    e.bereich = DB_GET_STRING(r, 11)
+    e.notizen = DB_GET_STRING(r, 12)
+    e.markt = DB_GET_STRING(r, 13)
+    e.minMenge = DB_GET_FLOAT(r, 14)
+    e.minEinheit = DB_GET_STRING(r, 15)
+    e.tage = DB_GET_INT(r, 16)
+    RETURN e
+END FUNCTION
+
+' Alle Einträge, die ohne Datum zuletzt, sonst nach Ablaufdatum.
+FUNCTION bestandLaden() AS ARRAY OF Eintrag
+    DIM aus AS ARRAY OF Eintrag : aus = []
+    DIM r AS DB_RESULT : r = DB_QUERY(db, bestandSql$() + " ORDER BY IFNULL(i.expiry_date, '') = '', i.expiry_date, p.name", heute$())
+    WHILE DB_NEXT(r)
+        ARRAY_PUSH(aus, eintragAus(r))
+    WEND
+    RETURN aus
+END FUNCTION
+
+' Ein Eintrag nach seiner id (NIL, wenn es ihn nicht gibt).
+FUNCTION eintragLaden(id AS INTEGER) AS Eintrag
+    DIM r AS DB_RESULT : r = DB_QUERY(db, bestandSql$() + " WHERE i.id = ?", heute$(), id)
+    IF NOT DB_NEXT(r) THEN RETURN NIL
+    DIM e AS Eintrag : e = eintragAus(r)
+    DB_CLOSE_RESULT(r)
+    RETURN e
+END FUNCTION
+
+' Eine Spalte aller Zeilen als Liste (für Klapplisten).
+FUNCTION textListe(sql AS STRING) AS ARRAY OF STRING
+    DIM aus AS ARRAY OF STRING : aus = []
+    DIM r AS DB_RESULT : r = DB_QUERY(db, sql)
+    WHILE DB_NEXT(r)
+        IF NOT DB_IS_NULL(r, 0) THEN ARRAY_PUSH(aus, DB_GET_STRING(r, 0))
+    WEND
+    RETURN aus
+END FUNCTION
+
+FUNCTION kategorien() AS ARRAY OF STRING
+    RETURN textListe("SELECT name FROM categories ORDER BY name")
+END FUNCTION
+
+FUNCTION lagerorte() AS ARRAY OF STRING
+    RETURN textListe("SELECT name FROM storage_locations ORDER BY id")
+END FUNCTION
+
+' Die Einheiten ohne das Sinnbild, das die Python-App manchmal davorschrieb.
+FUNCTION einheiten() AS ARRAY OF STRING
+    DIM aus AS ARRAY OF STRING : aus = []
+    DIM u AS STRING
+    FOR EACH u IN textListe("SELECT name FROM units ORDER BY id")
+        u = einheitText$(u)
+        IF ARRAY_INDEXOF(aus, u) < 0 THEN ARRAY_PUSH(aus, u)
+    NEXT
+    RETURN aus
+END FUNCTION
+
+' Die Standard-Einheit aus den Einstellungen (wie AppConfig.DEFAULT_UNIT,
+' auch für Posten der Einkaufsliste ohne Einheit).
+FUNCTION standardEinheit$() AS STRING
+    RETURN einheitText$(einstellung$("default_unit", "Stück"))
+END FUNCTION
+
+FUNCTION maerkte() AS ARRAY OF STRING
+    DIM aus AS ARRAY OF STRING : aus = bekannteMaerkte()
+    DIM m AS STRING
+    FOR EACH m IN textListe("SELECT DISTINCT purchased_at_store FROM inventory WHERE IFNULL(purchased_at_store, '') <> '' ORDER BY 1")
+        IF ARRAY_INDEXOF(aus, m) < 0 THEN ARRAY_PUSH(aus, m)
+    NEXT
+    RETURN aus
+END FUNCTION
+
+' --- Anzeigen ------------------------------------------------------------------
+' 1.0 -> "1", 0.5 -> "0,5".
+FUNCTION zahlText$(zahl AS FLOAT) AS STRING
+    ' Auf drei Stellen: gerechnete Mengen (Portionen mal Menge) sollen nicht
+    ' als 0,30000000000000004 erscheinen.
+    DIM z AS FLOAT : z = ROUND(zahl, 3)
+    IF z = INT(z) THEN RETURN STR$(INT(z))
+    RETURN REPLACE$(STR$(z), ".", ",")
+END FUNCTION
+
+' "📦 Stück" -> "Stück": die Python-App speicherte manchmal den Text der
+' Klappliste samt Sinnbild. Was vor dem ersten Leerzeichen keinen Buchstaben
+' und keine Ziffer hat, fällt weg.
+FUNCTION einheitText$(u AS STRING) AS STRING
+    DIM t AS STRING : t = TRIM$(u)
+    DIM k AS INTEGER : k = INSTR(t, " ")
+    IF k > 0 THEN
+        IF NOT REGEX_TEST(LEFT$(t, k), "[A-Za-zÄÖÜäöüß0-9]") THEN t = TRIM$(MID$(t, k + 1, LEN(t)))
+    END IF
+    RETURN t
+END FUNCTION
+
+' --- Ändern (jede Änderung ein Schritt im Verlauf) -------------------------------
+SUB mengeSetzen(e AS Eintrag, menge AS FLOAT)
+    verlauf.beginnen(e.name + ": " + zahlText$(menge) + " " + einheitText$(e.einheit))
+    verlauf.merken("inventory", e.id)
+    DB_EXEC(db, "UPDATE inventory SET quantity = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", menge, e.id)
+    verlauf.abschliessen()
+END SUB
+
+' Wie remove_from_inventory der Python-App: erst eine Zeile im
+' Verbrauchsverlauf (Grund consumed/expired/deleted/cooked), dann weg.
+SUB entnehmen(e AS Eintrag, grund AS STRING, text AS STRING)
+    verlauf.beginnen(text)
+    DB_BEGIN(db)
+    verbrauchen(e, grund)
+    DB_COMMIT(db)
+    verlauf.abschliessen()
+END SUB
+
+' Dasselbe als Teil eines Schritts, der schon begonnen hat (Kochen zieht
+' mehrere Einträge in einem Schritt ab) -- ohne eigene Transaktion.
+SUB verbrauchen(e AS Eintrag, grund AS STRING)
+    DIM h AS STRING : h = heute$()
+    verlauf.merken("inventory", e.id)
+    DIM dauer AS INTEGER : dauer = 0
+    IF e.kaufdatum <> "" THEN dauer = dbZahlMit("SELECT CAST(julianday(?1) - julianday(?2) AS INTEGER)", h, e.kaufdatum)
+    DB_EXEC(db, "INSERT INTO consumption_history (product_id, product_name, barcode, quantity, unit, purchase_date, empty_date, removed_date, duration_days, storage_location, reason) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", _
+            e.produktId, e.name, IIF(e.barcode = "", NIL, e.barcode), e.menge, e.einheit, IIF(e.kaufdatum = "", NIL, e.kaufdatum), h, h, dauer, e.lagerort, grund)
+    DIM hid AS INTEGER : hid = DB_LAST_ROWID(db)
+    DB_EXEC(db, "DELETE FROM inventory WHERE id = ?", e.id)
+    verlauf.neu("consumption_history", hid)
+END SUB
+
+FUNCTION produktMitBarcode(barcode AS STRING) AS INTEGER
+    IF TRIM$(barcode) = "" THEN RETURN 0
+    RETURN dbZahlEin("SELECT id FROM products WHERE barcode = ?", TRIM$(barcode))
+END FUNCTION
+
+' Ein neues Produkt und sein Eintrag im Vorrat -- ein Schritt. Gibt es den
+' Barcode schon, bekommt das vorhandene Produkt den Eintrag.
+FUNCTION eintragAnlegen(e AS Eintrag) AS INTEGER
+    verlauf.beginnen(trf$("{0} hinzugefügt", [e.name]))
+    DB_BEGIN(db)
+    DIM pid AS INTEGER : pid = produktMitBarcode(e.barcode)
+    IF pid = 0 THEN
+        DB_EXEC(db, "INSERT INTO products (barcode, name, brand, category) VALUES (?, ?, ?, ?)", IIF(e.barcode = "", NIL, TRIM$(e.barcode)), e.name, IIF(e.marke = "", NIL, e.marke), IIF(e.kategorie = "", NIL, e.kategorie))
+        pid = DB_LAST_ROWID(db)
+        verlauf.neu("products", pid)
+    END IF
+    e.produktId = pid
+    DB_EXEC(db, "INSERT INTO inventory (product_id, quantity, unit, purchase_date, expiry_date, storage_location, storage_area, notes, status, purchased_at_store) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'fresh', ?)", _
+            pid, e.menge, e.einheit, IIF(e.kaufdatum = "", NIL, e.kaufdatum), IIF(e.ablauf = "", NIL, e.ablauf), e.lagerort, IIF(e.bereich = "", NIL, e.bereich), IIF(e.notizen = "", NIL, e.notizen), IIF(e.markt = "", NIL, e.markt))
+    e.id = DB_LAST_ROWID(db)
+    DB_COMMIT(db)
+    verlauf.neu("inventory", e.id)
+    verlauf.abschliessen()
+    RETURN e.id
+END FUNCTION
+
+' Was der Bearbeiten-Dialog ändert: der Eintrag und Name, Marke, Kategorie
+' seines Produkts.
+SUB eintragAendern(e AS Eintrag)
+    verlauf.beginnen(trf$("{0} geändert", [e.name]))
+    verlauf.merken("inventory", e.id)
+    verlauf.merken("products", e.produktId)
+    DB_BEGIN(db)
+    DB_EXEC(db, "UPDATE inventory SET quantity = ?, unit = ?, purchase_date = ?, expiry_date = ?, storage_location = ?, storage_area = ?, notes = ?, purchased_at_store = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", _
+            e.menge, e.einheit, IIF(e.kaufdatum = "", NIL, e.kaufdatum), IIF(e.ablauf = "", NIL, e.ablauf), e.lagerort, IIF(e.bereich = "", NIL, e.bereich), IIF(e.notizen = "", NIL, e.notizen), IIF(e.markt = "", NIL, e.markt), e.id)
+    DB_EXEC(db, "UPDATE products SET name = ?, brand = ?, category = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", e.name, IIF(e.marke = "", NIL, e.marke), IIF(e.kategorie = "", NIL, e.kategorie), e.produktId)
+    DB_COMMIT(db)
+    verlauf.abschliessen()
+END SUB
+
+' Mindestmenge eines Produkts; menge 0 nimmt sie weg.
+SUB mindestmengeSetzen(produktId AS INTEGER, name AS STRING, menge AS FLOAT, einheit AS STRING)
+    verlauf.beginnen(IIF(menge > 0, trf$("Mindestmenge für {0}", [name]), trf$("Keine Mindestmenge für {0}", [name])))
+    verlauf.merken("products", produktId)
+    IF menge > 0 THEN
+        DB_EXEC(db, "UPDATE products SET min_quantity = ?, min_unit = ? WHERE id = ?", menge, einheit, produktId)
+    ELSE
+        DB_EXEC(db, "UPDATE products SET min_quantity = NULL, min_unit = NULL WHERE id = ?", produktId)
+    END IF
+    verlauf.abschliessen()
+END SUB
+
+' --- CSV ---------------------------------------------------------------------------
+' Wie export_inventory_to_csv: Semikolon, UTF-8, eine Kopfzeile.
+FUNCTION csvFeld$(t AS STRING) AS STRING
+    IF INSTR(t, ";") < 0 AND INSTR(t, CHR$(34)) < 0 AND INSTR(t, CHR$(10)) < 0 THEN RETURN t
+    RETURN CHR$(34) + REPLACE$(t, CHR$(34), CHR$(34) + CHR$(34)) + CHR$(34)
+END FUNCTION
+
+FUNCTION csvSchreiben(pfad AS STRING) AS INTEGER
+    DIM z AS ARRAY OF STRING : z = [tr$("Produkt;Marke;Menge;Einheit;Lagerort;Bereich;Ablaufdatum")]
+    DIM e AS Eintrag
+    DIM n AS INTEGER : n = 0
+    FOR EACH e IN bestandLaden()
+        ARRAY_PUSH(z, JOIN$([csvFeld$(e.name), csvFeld$(e.marke), zahlText$(e.menge), csvFeld$(einheitText$(e.einheit)), csvFeld$(e.lagerort), csvFeld$(e.bereich), e.ablauf], ";"))
+        n = n + 1
+    NEXT
+    WRITEALL(pfad, JOIN$(z, CHR$(10)) + CHR$(10))
+    RETURN n
+END FUNCTION

@@ -767,3 +767,41 @@ PRINT "ok"
 --- erwartet
 ok
 
+
+=== ein balken mit einer reihe nimmt die farbe aus chart add
+' CHART_ADD(c, name, wert, farbe): der Kuchen faerbte das Segment, der
+' Balken nahm still die Farbe der Reihe (gefunden mit der Kuehlschrank-App,
+' Ablauf-Status gruen/gelb/rot). Gemessen in der Mitte jedes Balkens.
+IMPORT "chart"
+TRY
+    SCREEN(300, 200, "Balken")
+CATCH fehler
+    PRINT "UEBERSPRINGEN: kein Fenster"
+    END
+END TRY
+SET_WINDOW_POS(-3000, -3000)
+DIM c AS CHART : c = CHART_NEW("balken", 0, 0, 300, 200)
+CHART_SET_NUM(c, "glanz", 0)
+CHART_ADD(c, "A", 10, RGB(200, 0, 0))
+CHART_ADD(c, "B", 10, RGB(0, 0, 200))
+DIM k AS INTEGER
+' Das Foto nimmt, was zuletzt gezeigt wurde: nach dem FLIP.
+FOR k = 1 TO 4
+    CLS(0)
+    CHART_DRAW(c)
+    FLIP()
+    IF k = 2 THEN SAVESCREENSHOT("b.png")
+NEXT
+DIM img AS IMAGE : img = LOADIMAGE("b.png")
+' Die rote und die blaue Spalte: wo im Bild ueberwiegt welcher Kanal?
+DIM rot AS INTEGER
+DIM blau AS INTEGER
+DIM x AS INTEGER
+FOR x = 0 TO 299 STEP 2
+    DIM f AS INTEGER : f = GETPIXEL(img, x, 150)
+    IF ((f SHR 16) BAND 255) > 150 AND (f BAND 255) < 60 THEN rot = rot + 1
+    IF (f BAND 255) > 150 AND ((f SHR 16) BAND 255) < 60 THEN blau = blau + 1
+NEXT
+PRINT "rot "; rot > 10; " blau "; blau > 10
+--- erwartet
+rot TRUE blau TRUE

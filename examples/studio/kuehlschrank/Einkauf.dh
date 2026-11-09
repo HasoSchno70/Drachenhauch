@@ -1,0 +1,420 @@
+' Die Einkaufsliste: lesen, anlegen, abhaken, löschen (jede Änderung außer
+' dem Haken ein Schritt im Verlauf), Auto-Ergänzen aus den Mindestmengen,
+' Schnellknöpfe, Vorschläge -- wie tabs/shopping_tab.py und
+' database_pkg/shopping.py der Python-App. Dazu die Gangpläne der Märkte wie
+' StoreLayoutManager: sieben eingebaute, eigene aus store_layouts (die gehen
+' vor), der gewählte Markt in store_settings.
+IMPORT "db"
+IMPORT "json"
+
+' --- Lesen -----------------------------------------------------------------------
+' Wie get_shopping_list: Priorität absteigend, dann Kategorie und Name.
+FUNCTION postenLaden(mitErledigten AS BOOLEAN) AS ARRAY OF Posten
+    DIM aus AS ARRAY OF Posten : aus = []
+    DIM sql AS STRING : sql = "SELECT id, product_name, IFNULL(quantity, 0), IFNULL(unit, ''), IFNULL(category, ''), IFNULL(notes, ''), IFNULL(checked, 0), IFNULL(priority, 0) FROM shopping_list"
+    IF NOT mitErledigten THEN sql = sql + " WHERE checked = 0"
+    DIM r AS DB_RESULT : r = DB_QUERY(db, sql + " ORDER BY priority DESC, category, product_name")
+    WHILE DB_NEXT(r)
+        DIM p AS Posten : p = NEW Posten()
+        p.id = DB_GET_INT(r, 0)
+        p.name = DB_GET_STRING(r, 1)
+        p.menge = DB_GET_FLOAT(r, 2)
+        p.einheit = DB_GET_STRING(r, 3)
+        p.kategorie = DB_GET_STRING(r, 4)
+        p.notizen = DB_GET_STRING(r, 5)
+        p.erledigt = DB_GET_INT(r, 6) <> 0
+        p.prioritaet = DB_GET_INT(r, 7)
+        p.gang = 0
+        ARRAY_PUSH(aus, p)
+    WEND
+    RETURN aus
+END FUNCTION
+
+FUNCTION postenLesen(id AS INTEGER) AS Posten
+    DIM p AS Posten
+    FOR EACH p IN postenLaden(TRUE)
+        IF p.id = id THEN RETURN p
+    NEXT
+    RETURN NIL
+END FUNCTION
+
+' --- Ändern ----------------------------------------------------------------------
+' Wie add_to_shopping_list; die Kategorie kommt, wenn leer, vom Produkt
+' gleichen Namens (die Python-App liess sie leer -- ohne sie findet der
+' Gangplan nur über den Namen).
+FUNCTION postenAnlegen(name AS STRING, menge AS FLOAT, einheit AS STRING, kategorie AS STRING, prioritaet AS INTEGER, notizen AS STRING) AS INTEGER
+    DIM kat AS STRING : kat = kategorie
+    IF kat = "" THEN kat = textEin$("SELECT IFNULL(category, '') FROM products WHERE lower(name) = lower(?) ORDER BY id LIMIT 1", name)
+    verlauf.beginnen(trf$("{0} auf die Einkaufsliste", [name]))
+    DB_EXEC(db, "INSERT INTO shopping_list (product_name, quantity, unit, category, priority, notes) VALUES (?, ?, ?, ?, ?, ?)", _
+            name, menge, IIF(einheit = "", standardEinheit$(), einheit), IIF(kat = "", NIL, kat), prioritaet, IIF(notizen = "", NIL, notizen))
+    DIM id AS INTEGER : id = DB_LAST_ROWID(db)
+    verlauf.neu("shopping_list", id)
+    verlauf.abschliessen()
+    RETURN id
+END FUNCTION
+
+' Der Haken ist kein Schritt im Verlauf (wie in der Python-App).
+SUB postenHaken(id AS INTEGER, an AS BOOLEAN)
+    DB_EXEC(db, "UPDATE shopping_list SET checked = ? WHERE id = ?", IIF(an, 1, 0), id)
+END SUB
+
+' Wie _toggle_all_items: ist noch einer offen, alle abhaken, sonst alle frei.
+' Liefert, wie viele sich geändert haben.
+FUNCTION alleHaken() AS INTEGER
+    DIM offen AS INTEGER : offen = dbZahl("SELECT COUNT(*) FROM shopping_list WHERE checked = 0")
+    DIM gesamt AS INTEGER : gesamt = dbZahl("SELECT COUNT(*) FROM shopping_list")
+    IF offen > 0 THEN
+        DB_EXEC(db, "UPDATE shopping_list SET checked = 1 WHERE checked = 0")
+        RETURN offen
+    END IF
+    DB_EXEC(db, "UPDATE shopping_list SET checked = 0")
+    RETURN gesamt
+END FUNCTION
+
+SUB postenLoeschen(id AS INTEGER, name AS STRING)
+    verlauf.beginnen(trf$("{0} von der Liste", [name]))
+    verlauf.merken("shopping_list", id)
+    DB_EXEC(db, "DELETE FROM shopping_list WHERE id = ?", id)
+    verlauf.abschliessen()
+END SUB
+
+' Wie clear_checked_items -- ein Schritt für alle.
+FUNCTION erledigteLoeschen() AS INTEGER
+    DIM ids AS ARRAY OF INTEGER : ids = []
+    DIM p AS Posten
+    FOR EACH p IN postenLaden(TRUE)
+        IF p.erledigt THEN ARRAY_PUSH(ids, p.id)
+    NEXT
+    IF LEN(ids) = 0 THEN RETURN 0
+    verlauf.beginnen(trf$("{0} erledigte Posten gelöscht", [STR$(LEN(ids))]))
+    DIM id AS INTEGER
+    FOR EACH id IN ids
+        verlauf.merken("shopping_list", id)
+    NEXT
+    DB_EXEC(db, "DELETE FROM shopping_list WHERE checked <> 0")
+    verlauf.abschliessen()
+    RETURN LEN(ids)
+END FUNCTION
+
+' Wie auto_add_to_shopping_list_from_minimums: jedes Produkt, dessen Bestand
+' (alle Einträge zusammen) unter der Mindestmenge liegt und das nicht schon
+' offen auf der Liste steht, mit der fehlenden Menge -- ein Schritt.
+FUNCTION autoErgaenzen() AS INTEGER
+    DIM namen AS ARRAY OF STRING : namen = []
+    DIM fehlt AS ARRAY OF FLOAT : fehlt = []
+    DIM einheiten AS ARRAY OF STRING : einheiten = []
+    DIM kats AS ARRAY OF STRING : kats = []
+    DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT p.name, p.min_quantity - COALESCE(SUM(i.quantity), 0), IFNULL(p.min_unit, ''), IFNULL(p.category, '') " + _
+        "FROM products p LEFT JOIN inventory i ON p.id = i.product_id WHERE p.min_quantity IS NOT NULL " + _
+        "GROUP BY p.id HAVING COALESCE(SUM(i.quantity), 0) < p.min_quantity ORDER BY p.name")
+    WHILE DB_NEXT(r)
+        ARRAY_PUSH(namen, DB_GET_STRING(r, 0))
+        ARRAY_PUSH(fehlt, DB_GET_FLOAT(r, 1))
+        ARRAY_PUSH(einheiten, DB_GET_STRING(r, 2))
+        ARRAY_PUSH(kats, DB_GET_STRING(r, 3))
+    WEND
+    DIM neu AS INTEGER : neu = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(namen) - 1
+        IF dbZahlEin("SELECT COUNT(*) FROM shopping_list WHERE product_name = ? AND checked = 0", namen[i]) > 0 THEN CONTINUE
+        IF neu = 0 THEN verlauf.beginnen(tr$("Auto-Ergänzen"))
+        DB_EXEC(db, "INSERT INTO shopping_list (product_name, quantity, unit, category, priority, notes) VALUES (?, ?, ?, ?, 3, 'Auto: Mindestmenge unterschritten')", _
+                namen[i], fehlt[i], IIF(einheiten[i] = "", standardEinheit$(), einheiten[i]), IIF(kats[i] = "", NIL, kats[i]))
+        verlauf.neu("shopping_list", DB_LAST_ROWID(db))
+        neu = neu + 1
+    NEXT
+    IF neu > 0 THEN verlauf.abschliessen()
+    RETURN neu
+END FUNCTION
+
+' --- Vorschläge --------------------------------------------------------------------
+' Die Schnellknöpfe: was am häufigsten verbraucht wurde und nicht schon offen
+' auf der Liste steht. (Die Python-App zählte die offenen Posten der Liste
+' selbst -- da steht jeder einmal, und ein Knopf setzte ihn ein zweites Mal
+' darauf.)
+FUNCTION haeufige(anzahl AS INTEGER) AS ARRAY OF STRING
+    RETURN textListe("SELECT product_name FROM consumption_history WHERE IFNULL(product_name, '') <> '' " + _
+        "AND product_name NOT IN (SELECT product_name FROM shopping_list WHERE checked = 0) " + _
+        "GROUP BY product_name ORDER BY COUNT(*) DESC, MAX(removed_date) DESC, product_name LIMIT " + STR$(anzahl))
+END FUNCTION
+
+' Wie search_products: Name oder Marke enthält den Text.
+FUNCTION produktVorschlaege(text AS STRING) AS ARRAY OF STRING
+    DIM aus AS ARRAY OF STRING : aus = []
+    DIM r AS DB_RESULT
+    IF LEN(TRIM$(text)) < 2 THEN
+        r = DB_QUERY(db, "SELECT DISTINCT name FROM products ORDER BY name")
+    ELSE
+        r = DB_QUERY(db, "SELECT DISTINCT name FROM products WHERE name LIKE ?1 OR brand LIKE ?1 ORDER BY name LIMIT 10", "%" + TRIM$(text) + "%")
+    END IF
+    WHILE DB_NEXT(r)
+        ARRAY_PUSH(aus, DB_GET_STRING(r, 0))
+    WEND
+    RETURN aus
+END FUNCTION
+
+FUNCTION textEin$(sql AS STRING, a AS STRING) AS STRING
+    DIM r AS DB_RESULT : r = DB_QUERY(db, sql, a)
+    IF NOT DB_NEXT(r) THEN RETURN ""
+    DIM t AS STRING : t = IIF(DB_IS_NULL(r, 0), "", DB_GET_STRING(r, 0))
+    DB_CLOSE_RESULT(r)
+    RETURN t
+END FUNCTION
+
+' --- Märkte und Gänge --------------------------------------------------------------
+' Die eingebauten Gangpläne (STORE_LAYOUTS): Abteilung=Gang in ihrer
+' Reihenfolge -- die Suche über den Namen nimmt die erste, die passt.
+FUNCTION eingebautePlaene() AS ARRAY OF STRING
+    DIM obst AS STRING : obst = "Obst=1;Gemüse=1;Obstschale=1;Gemüsefach=1;Brot=2;Backwaren=2;"
+    RETURN ["REWE|" + obst + "Kühlregal=3;Kühlschrank=3;Milchprodukte=3;Käse=3;Wurst=3;Fleisch=4;Fisch=4;Tiefkühl=5;Gefrierschrank=5;TK-Waren=5;Trockenwaren=6;Vorratsraum=6;Nudeln=6;Reis=6;Konserven=7;Süßwaren=8;Snacks=8;Getränke=9;Sonstiges=10", _
+            "EDEKA|" + obst + "Fleisch=3;Fisch=3;Wurst=3;Kühlregal=4;Kühlschrank=4;Milchprodukte=4;Käse=4;Tiefkühl=5;Gefrierschrank=5;TK-Waren=5;Trockenwaren=6;Vorratsraum=6;Nudeln=6;Reis=6;Konserven=6;Getränke=7;Süßwaren=8;Snacks=8;Sonstiges=9", _
+            "ALDI|" + obst + "Kühlregal=3;Kühlschrank=3;Milchprodukte=3;Käse=3;Wurst=3;Fleisch=3;Tiefkühl=4;Gefrierschrank=4;TK-Waren=4;Trockenwaren=5;Vorratsraum=5;Konserven=5;Getränke=6;Süßwaren=6;Snacks=6;Sonstiges=6", _
+            "LIDL|" + obst + "Kühlregal=3;Kühlschrank=3;Milchprodukte=3;Käse=3;Wurst=4;Fleisch=4;Tiefkühl=5;Gefrierschrank=5;TK-Waren=5;Trockenwaren=6;Vorratsraum=6;Konserven=6;Getränke=7;Süßwaren=8;Snacks=8;Sonstiges=8", _
+            "KAUFLAND|" + obst + "Fleisch=3;Fisch=3;Wurst=4;Kühlregal=5;Kühlschrank=5;Milchprodukte=5;Käse=5;Tiefkühl=6;Gefrierschrank=6;TK-Waren=6;Trockenwaren=7;Vorratsraum=7;Nudeln=7;Reis=7;Konserven=8;Getränke=9;Süßwaren=10;Snacks=10;Sonstiges=11", _
+            "NETTO|Obst=1;Gemüse=1;Brot=2;Backwaren=2;Kühlregal=3;Milchprodukte=3;Wurst=3;Fleisch=3;Tiefkühl=4;Gefrierschrank=4;Trockenwaren=5;Konserven=5;Getränke=6;Süßwaren=7;Snacks=7;Sonstiges=7", _
+            "PENNY|Obst=1;Gemüse=1;Brot=2;Backwaren=2;Kühlregal=3;Milchprodukte=3;Wurst=3;Fleisch=3;Tiefkühl=4;Gefrierschrank=4;Trockenwaren=5;Konserven=5;Getränke=6;Süßwaren=7;Snacks=7;Sonstiges=7"]
+END FUNCTION
+
+' Alle Märkte mit Gangplan, sortiert (eingebaute und eigene).
+FUNCTION marktListe() AS ARRAY OF STRING
+    DIM aus AS ARRAY OF STRING : aus = []
+    DIM s AS STRING
+    FOR EACH s IN eingebautePlaene()
+        ARRAY_PUSH(aus, SPLIT(s, "|")[0])
+    NEXT
+    FOR EACH s IN textListe("SELECT store_name FROM store_layouts ORDER BY store_name")
+        IF ARRAY_INDEXOF(aus, s) < 0 THEN ARRAY_PUSH(aus, s)
+    NEXT
+    SORT(aus)
+    RETURN aus
+END FUNCTION
+
+' Der Gangplan eines Markts als "Abteilung=Gang" in seiner Reihenfolge; ein
+' eigener (store_layouts) geht vor. Leer, wenn es keinen gibt.
+FUNCTION gangplan(markt AS STRING) AS ARRAY OF STRING
+    DIM aus AS ARRAY OF STRING : aus = []
+    DIM j AS STRING : j = textEin$("SELECT layout_json FROM store_layouts WHERE store_name = ?", markt)
+    IF j <> "" THEN
+        DIM h AS JSON_HANDLE : h = JSON_PARSE(j)
+        DIM k AS STRING
+        FOR EACH k IN JSON_KEYS(h, "")
+            ARRAY_PUSH(aus, k + "=" + STR$(JSON_GET_INT(h, JSON_KEY$(k))))
+        NEXT
+        RETURN aus
+    END IF
+    DIM s AS STRING
+    FOR EACH s IN eingebautePlaene()
+        DIM f AS ARRAY OF STRING : f = SPLIT(s, "|")
+        IF f[0] = markt THEN RETURN SPLIT(f[1], ";")
+    NEXT
+    RETURN aus
+END FUNCTION
+
+' --- Gangpläne verwalten (Einstellungen, Reiter Supermärkte) ------------------------
+FUNCTION istEingebaut(markt AS STRING) AS BOOLEAN
+    DIM s AS STRING
+    FOR EACH s IN eingebautePlaene()
+        IF SPLIT(s, "|")[0] = markt THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+FUNCTION hatEigenenPlan(markt AS STRING) AS BOOLEAN
+    RETURN dbZahlEin("SELECT COUNT(*) FROM store_layouts WHERE store_name = ?", markt) > 0
+END FUNCTION
+
+' Wie die Python-App „leer starten“ ließ -- mit neun Abteilungen.
+FUNCTION standardPlan() AS ARRAY OF STRING
+    RETURN ["Obst=1", "Gemüse=1", "Brot=2", "Milchprodukte=3", "Fleisch=4", "Tiefkühl=5", "Trockenwaren=6", "Getränke=7", "Sonstiges=8"]
+END FUNCTION
+
+' Einen Plan als eigenen speichern (create_custom_layout): JSON in der
+' Reihenfolge der Gänge.
+SUB planSpeichern(markt AS STRING, plan AS ARRAY OF STRING)
+    DIM j AS JSON_HANDLE : j = JSON_NEW_OBJECT()
+    DIM g AS INTEGER
+    FOR g = 0 TO gangZahl(plan)
+        DIM e AS STRING
+        FOR EACH e IN plan
+            DIM f AS ARRAY OF STRING : f = SPLIT(e, "=")
+            IF INT(VAL(f[1])) = g THEN JSON_SET_INT(j, JSON_KEY$(f[0]), g)
+        NEXT
+    NEXT
+    DB_BEGIN(db)
+    DB_EXEC(db, "DELETE FROM store_layouts WHERE store_name = ?", markt)
+    DB_EXEC(db, "INSERT INTO store_layouts (store_name, layout_json) VALUES (?, ?)", markt, JSON_STRINGIFY(j))
+    DB_COMMIT(db)
+END SUB
+
+' Einen neuen Markt (aus einer Vorlage oder dem Standardplan). "" oder was
+' nicht ging -- den Namen gibt es schon (Groß/klein egal).
+FUNCTION marktAnlegen$(name AS STRING, vorlage AS STRING) AS STRING
+    name = TRIM$(name)
+    IF name = "" THEN RETURN tr$("Bitte gib einen Namen ein!")
+    DIM m AS STRING
+    FOR EACH m IN marktListe()
+        IF UPPER$(m) = UPPER$(name) THEN RETURN trf$("„{0}“ gibt es schon.", [name])
+    NEXT
+    DIM plan AS ARRAY OF STRING : plan = standardPlan()
+    IF vorlage <> "" THEN plan = gangplan(vorlage)
+    IF LEN(plan) = 0 THEN plan = ["Sonstiges=1"]
+    planSpeichern(name, plan)
+    RETURN ""
+END FUNCTION
+
+' Den eigenen Plan weg: ein eingebauter Markt hat danach wieder seinen
+' eingebauten, ein eigener ist ganz weg -- und war er der Standard-Markt,
+' ist es keiner mehr (die Python-App ließ ihn stehen, der Einkauf sortierte
+' dann nach nichts).
+SUB planLoeschen(markt AS STRING)
+    DB_EXEC(db, "DELETE FROM store_layouts WHERE store_name = ?", markt)
+    IF NOT istEingebaut(markt) AND gewaehlterMarkt$() = markt THEN DB_EXEC(db, "DELETE FROM store_settings WHERE key = 'selected_store'")
+END SUB
+
+FUNCTION gangZahl(plan AS ARRAY OF STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM e AS STRING
+    FOR EACH e IN plan
+        n = MAX(n, INT(VAL(SPLIT(e, "=")[1])))
+    NEXT
+    RETURN n
+END FUNCTION
+
+' Wie get_aisle_number: die Kategorie steht im Plan; sonst (neu) eine
+' Abteilung, die in der Kategorie steckt ("Fleisch & Wurst" -> Fleisch);
+' sonst eine Abteilung im Namen des Postens; sonst ans Ende. (Die
+' Python-App suchte im Namen unter dem Schlüssel "name", den ein Posten nicht
+' hat -- die Suche über den Namen fand dort nie etwas.)
+SUB gangSetzen(p AS Posten, plan AS ARRAY OF STRING)
+    DIM e AS STRING
+    FOR EACH e IN plan
+        DIM f AS ARRAY OF STRING : f = SPLIT(e, "=")
+        IF p.kategorie <> "" AND f[0] = p.kategorie THEN
+            p.gang = INT(VAL(f[1])) : p.gangName = f[0]
+            RETURN
+        END IF
+    NEXT
+    DIM k AS STRING : k = LOWER$(p.kategorie)
+    IF k <> "" THEN
+        FOR EACH e IN plan
+            f = SPLIT(e, "=")
+            IF INSTR(k, LOWER$(f[0])) >= 0 THEN
+                p.gang = INT(VAL(f[1])) : p.gangName = f[0]
+                RETURN
+            END IF
+        NEXT
+    END IF
+    DIM n AS STRING : n = LOWER$(p.name)
+    FOR EACH e IN plan
+        f = SPLIT(e, "=")
+        IF INSTR(n, LOWER$(f[0])) >= 0 THEN
+            p.gang = INT(VAL(f[1])) : p.gangName = f[0]
+            RETURN
+        END IF
+    NEXT
+    p.gang = GANG_ENDE
+    p.gangName = "Sonstiges"
+END SUB
+
+' Nach dem Gangplan: jeder Posten bekommt seinen Gang, dann nach Gang und
+' Name (stabil).
+FUNCTION nachGang(posten AS ARRAY OF Posten, markt AS STRING) AS ARRAY OF Posten
+    DIM plan AS ARRAY OF STRING : plan = gangplan(markt)
+    DIM aus AS ARRAY OF Posten : aus = []
+    DIM p AS Posten
+    FOR EACH p IN posten
+        gangSetzen(p, plan)
+        DIM i AS INTEGER : i = LEN(aus)
+        WHILE i > 0
+            DIM v AS Posten : v = aus[i - 1]
+            IF v.gang < p.gang OR (v.gang = p.gang AND LOWER$(v.name) <= LOWER$(p.name)) THEN BREAK
+            i = i - 1
+        WEND
+        ARRAY_INSERT(aus, i, p)
+    NEXT
+    RETURN aus
+END FUNCTION
+
+FUNCTION gewaehlterMarkt$() AS STRING
+    RETURN textEin$("SELECT value FROM store_settings WHERE key = ?", "selected_store")
+END FUNCTION
+
+' Der Standard-Markt aus den Einstellungen; "" = keiner.
+SUB standardMarktSetzen(markt AS STRING)
+    IF markt = "" THEN
+        DB_EXEC(db, "DELETE FROM store_settings WHERE key = 'selected_store'")
+    ELSE
+        marktWaehlen(markt)
+    END IF
+END SUB
+
+SUB marktWaehlen(markt AS STRING)
+    DB_EXEC(db, "INSERT OR REPLACE INTO store_settings (key, value, updated_at) VALUES ('selected_store', ?, CURRENT_TIMESTAMP)", markt)
+END SUB
+
+' Für den Einkaufszettel: je offener Posten Gang und Stelle in der Liste
+' als JSON {"id": [gang, stelle]} -- die Abfrage Zettelzeilen liest es mit
+' json_each, der Bericht sortiert nach der Stelle.
+FUNCTION gaengeJson$(posten AS ARRAY OF Posten) AS STRING
+    DIM teile AS ARRAY OF STRING : teile = []
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(posten) - 1
+        DIM p AS Posten : p = posten[i]
+        ARRAY_PUSH(teile, CHR$(34) + STR$(p.id) + CHR$(34) + ": [" + STR$(IIF(p.gang = 0, GANG_ENDE, p.gang)) + ", " + STR$(i) + "]")
+    NEXT
+    RETURN "{" + JOIN$(teile, ", ") + "}"
+END FUNCTION
+
+' --- Nach Markt ----------------------------------------------------------------------
+' Wie get_shopping_list_by_store: der Markt, bei dem das passende Produkt
+' (Name oder Marke enthält den Posten) zuletzt gekauft wurde -- bevorzugte
+' zuerst; ohne Kauf "Nicht zugeordnet". Ein Text je Markt mit den Posten.
+FUNCTION nachMarkt$() AS STRING
+    DIM maerkte AS ARRAY OF STRING : maerkte = []
+    DIM listen AS ARRAY OF STRING : listen = []
+    DIM ohne AS STRING : ohne = ""
+    DIM p AS Posten
+    FOR EACH p IN postenLaden(FALSE)
+        DIM m AS STRING : m = textEin$("SELECT s.store_name FROM products pr JOIN product_stores s ON s.product_id = pr.id " + _
+            "WHERE pr.id = (SELECT id FROM products WHERE lower(name) LIKE '%' || lower(?1) || '%' OR lower(IFNULL(brand, '')) LIKE '%' || lower(?1) || '%' ORDER BY name LIMIT 1) " + _
+            "ORDER BY s.is_preferred DESC, s.last_purchased DESC LIMIT 1", p.name)
+        DIM zeile AS STRING : zeile = "  ☐ " + p.name + IIF(p.menge > 0, " (" + p.mengeText$() + ")", "")
+        IF m = "" THEN
+            ohne = ohne + zeile + CHR$(10)
+        ELSE
+            DIM k AS INTEGER : k = ARRAY_INDEXOF(maerkte, m)
+            IF k < 0 THEN
+                ARRAY_PUSH(maerkte, m)
+                ARRAY_PUSH(listen, "")
+                k = LEN(maerkte) - 1
+            END IF
+            listen[k] = listen[k] + zeile + CHR$(10)
+        END IF
+    NEXT
+    DIM t AS STRING : t = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(maerkte) - 1
+        t = t + "🏪 " + maerkte[i] + CHR$(10) + listen[i]
+    NEXT
+    IF ohne <> "" THEN t = t + tr$("Nicht zugeordnet") + CHR$(10) + ohne
+    RETURN t
+END FUNCTION
+
+' Wo ein Produkt gekauft wurde (product_stores): Kaufdatum heute, der Preis
+' nur, wenn einer da ist (> 0). Teil des laufenden Schritts.
+SUB marktMerken(pid AS INTEGER, markt AS STRING, preis AS FLOAT)
+    DIM h AS STRING : h = heute$()
+    DIM sid AS INTEGER : sid = dbZahlMit("SELECT id FROM product_stores WHERE product_id = ?1 AND store_name = ?2", STR$(pid), markt)
+    IF sid > 0 THEN
+        verlauf.merken("product_stores", sid)
+        IF preis > 0 THEN
+            DB_EXEC(db, "UPDATE product_stores SET last_purchased = ?, price = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", h, preis, sid)
+        ELSE
+            DB_EXEC(db, "UPDATE product_stores SET last_purchased = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", h, sid)
+        END IF
+    ELSE
+        DB_EXEC(db, "INSERT INTO product_stores (product_id, store_name, price, last_purchased) VALUES (?, ?, ?, ?)", pid, markt, IIF(preis > 0, preis, NIL), h)
+        verlauf.neu("product_stores", DB_LAST_ROWID(db))
+    END IF
+END SUB

@@ -1,0 +1,490 @@
+' Drachenhauch Studio: modale Fenster im erzeugten Programm -- gefunden beim
+' Port der Kuehlschrank-App (Kachel anklicken oeffnet das Detailfenster):
+' - ZeigenModal (und Frage) drehen ihr erstes Bild noch im Bild des Klicks;
+'   vorher sah die innere Schleife denselben MOUSE_HIT noch einmal, und das
+'   Maus-Ereignis der Zeichenflaeche oeffnete das Fenster wieder und wieder,
+'   bis die Aufruftiefe ueberlief.
+' - GUI_HIT_TEST sieht durch den Schleier: ein Klick auf die Zeichenflaeche
+'   neben dem modalen Fenster oeffnete ein zweites (studioFrei).
+' - Standard- und Abbrechen-Knopf eines Fensters (Inspektor, beim Namen):
+'   Enter und Esc druecken ihn.
+' - Taste erreicht ein modales Fenster (vorher nie, GUI_MODAL() war ja wahr).
+' Format: docs/werkzeuge.md, dhrt test.
+
+--- langsam
+=== eine zeichenflaeche oeffnet das modale fenster einmal, enter und esc schliessen es
+' Klick auf die Flaeche oeffnet den Dialog; ein Klick daneben auf die Flaeche
+' (hinter dem Schleier) tut nichts; Enter drueckt OK. Zweiter Klick, Esc
+' drueckt Zu.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+slHin(10, 10)
+slWarten(10)
+slTaste(294)
+slWarten(150)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+SETENV("DH_STUDIO_LAUF_BILDER", "20")
+DIM log AS STRING : log = CWD$() + "/s.log"
+slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+PRINT "erzeugt "; LEN(slAnfang(log, "erzeugt ")) = 1
+PRINT "code "; probeLaufen(p, "probe.dh")
+--- argumente
+{sammlung}/../../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+' Statt studioLauf(...) die Probe-Zeilen (mit ihrer Aufnahme).
+FUNCTION probeLaufen(p AS STRING, teil AS STRING) AS INTEGER
+    DIM neu AS ARRAY OF STRING : neu = []
+    DIM s AS STRING
+    FOR EACH s IN READLINES(p + "/_studio/main.dh")
+        IF LEFT$(s, 11) = "studioLauf(" THEN
+            DIM t AS STRING
+            FOR EACH t IN READLINES(CWD$() + "/" + teil)
+                ARRAY_PUSH(neu, t)
+            NEXT
+        ELSE
+            ARRAY_PUSH(neu, s)
+        END IF
+    NEXT
+    WRITEALL(p + "/_studio/probe.dh", JOIN$(neu, CHR$(10)) + CHR$(10))
+    COPYFILE(CWD$() + "/klick.txt", p + "/_studio/klick.txt")
+    DIM k AS INTEGER : k = PROCESS_START("dhrt", "run", "--bilder", "90", p + "/_studio/probe.dh")
+    DIM leer AS INTEGER : leer = 0
+    WHILE leer < 5
+        DIM t2 AS STRING : t2 = PROCESS_READ$(k) + PROCESS_ERR$(k)
+        IF t2 <> "" THEN
+            DIM zeile AS STRING
+            FOR EACH zeile IN SPLIT(REPLACE$(t2, CHR$(13), ""), CHR$(10))
+                IF zeile <> "" AND LEFT$(zeile, 8) <> "WARNING:" AND LEFT$(zeile, 5) <> "INFO:" THEN PRINT zeile
+            NEXT
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(k) THEN
+            leer = leer + 1
+            SLEEP(30)
+        END IF
+    WEND
+    RETURN PROCESS_CODE(k)
+END FUNCTION
+--- datei probe.dh
+AUTOMATION_PLAY("klick.txt")
+SCREEN(640, 480, "Probe")
+studioSchirmB = SCREENWIDTH() : studioSchirmH = SCREENHEIGHT()
+studioDieStartseite = studioStartFenster
+studioDieApp.Geoeffnet()
+studioStartFenster.studioHaupt = TRUE
+studioStartFenster.Zeigen()
+WHILE studioBild()
+WEND
+--- datei klick.txt
+c 17
+e 0 7 60 60 0 0
+e 4 7 60 60 0 0
+e 5 7 60 60 0 0
+e 6 6 0 0 0 0
+e 8 5 0 0 0 0
+e 20 7 60 120 0 0
+e 21 7 60 120 0 0
+e 22 6 0 0 0 0
+e 24 5 0 0 0 0
+e 30 2 257 0 0 0
+e 32 1 257 0 0 0
+e 40 7 60 60 0 0
+e 41 7 60 60 0 0
+e 42 6 0 0 0 0
+e 44 5 0 0 0 0
+e 55 2 256 0 0 0
+e 57 1 256 0 0 0
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"},{"art":"fenster","name":"Dialog"}]}
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":640,"h":480,"widgets":[
+{"kind":"canvas","name":"flaeche","x":20,"y":20,"w":200,"h":200}]}
+--- datei proj/Hauptfenster.dh
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+    DIM auf AS INTEGER
+
+    SUB flaeche_Maus()
+        Self.auf = Self.auf + 1
+        PRINT "maus "; Self.auf
+        DIM d AS Dialog : d = NEW Dialog()
+        d.ZeigenModal()
+        PRINT "dialog zurueck "; d.wie
+    END SUB
+END CLASS
+--- datei proj/Dialog.dhform
+{"title":"Dialog","name":"Dialog","w":300,"h":160,"studio_standard":"knopfOk","studio_abbrechen":"knopfZu","widgets":[
+{"kind":"textinput","name":"feld","x":20,"y":20,"w":200,"h":26},
+{"kind":"button","name":"knopfOk","text":"OK","x":20,"y":70,"w":100,"h":30},
+{"kind":"button","name":"knopfZu","text":"Zu","x":130,"y":70,"w":100,"h":30}]}
+--- datei proj/Dialog.dh
+CLASS Dialog EXTENDS Dialog_Basis
+    DIM wie AS STRING
+
+    SUB knopfOk_Klick()
+        Self.wie = "ok"
+        Self.Zumachen()
+    END SUB
+
+    SUB knopfZu_Klick()
+        Self.wie = "zu"
+        Self.Zumachen()
+    END SUB
+END CLASS
+--- erwartet
+erzeugt TRUE
+maus 1
+dialog zurueck ok
+maus 2
+dialog zurueck zu
+code 0
+
+=== der klick, der ein modales fenster oeffnet, trifft es nicht gleich mit
+' Das Fenster geht genau dort auf, wo geklickt wurde, und hat selbst eine
+' Zeichenflaeche: im ersten Bild seiner Schleife darf es den oeffnenden Klick
+' nicht noch einmal sehen (MOUSE_HIT gilt bis FLIP). Erst der zweite Klick
+' trifft seine Flaeche.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+slHin(10, 10)
+slWarten(10)
+slTaste(294)
+slWarten(150)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+SETENV("DH_STUDIO_LAUF_BILDER", "20")
+DIM log AS STRING : log = CWD$() + "/s.log"
+slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+PRINT "erzeugt "; LEN(slAnfang(log, "erzeugt ")) = 1
+PRINT "code "; probeLaufen(p, "probe.dh")
+--- argumente
+{sammlung}/../../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+FUNCTION probeLaufen(p AS STRING, teil AS STRING) AS INTEGER
+    DIM neu AS ARRAY OF STRING : neu = []
+    DIM s AS STRING
+    FOR EACH s IN READLINES(p + "/_studio/main.dh")
+        IF LEFT$(s, 11) = "studioLauf(" THEN
+            DIM t AS STRING
+            FOR EACH t IN READLINES(CWD$() + "/" + teil)
+                ARRAY_PUSH(neu, t)
+            NEXT
+        ELSE
+            ARRAY_PUSH(neu, s)
+        END IF
+    NEXT
+    WRITEALL(p + "/_studio/probe.dh", JOIN$(neu, CHR$(10)) + CHR$(10))
+    COPYFILE(CWD$() + "/klick.txt", p + "/_studio/klick.txt")
+    DIM k AS INTEGER : k = PROCESS_START("dhrt", "run", "--bilder", "60", p + "/_studio/probe.dh")
+    DIM leer AS INTEGER : leer = 0
+    WHILE leer < 5
+        DIM t2 AS STRING : t2 = PROCESS_READ$(k) + PROCESS_ERR$(k)
+        IF t2 <> "" THEN
+            DIM zeile AS STRING
+            FOR EACH zeile IN SPLIT(REPLACE$(t2, CHR$(13), ""), CHR$(10))
+                IF zeile <> "" AND LEFT$(zeile, 8) <> "WARNING:" AND LEFT$(zeile, 5) <> "INFO:" THEN PRINT zeile
+            NEXT
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(k) THEN
+            leer = leer + 1
+            SLEEP(30)
+        END IF
+    WEND
+    RETURN PROCESS_CODE(k)
+END FUNCTION
+--- datei probe.dh
+AUTOMATION_PLAY("klick.txt")
+SCREEN(640, 480, "Probe")
+studioSchirmB = SCREENWIDTH() : studioSchirmH = SCREENHEIGHT()
+studioDieStartseite = studioStartFenster
+studioDieApp.Geoeffnet()
+studioStartFenster.studioHaupt = TRUE
+studioStartFenster.Zeigen()
+WHILE studioBild()
+WEND
+--- datei klick.txt
+c 8
+e 0 7 320 240 0 0
+e 4 7 320 240 0 0
+e 5 7 320 240 0 0
+e 6 6 0 0 0 0
+e 8 5 0 0 0 0
+e 25 7 320 240 0 0
+e 26 6 0 0 0 0
+e 28 5 0 0 0 0
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"},{"art":"fenster","name":"Dialog"}]}
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":640,"h":480,"widgets":[
+{"kind":"canvas","name":"flaeche","x":0,"y":0,"w":640,"h":480}]}
+--- datei proj/Hauptfenster.dh
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+    SUB flaeche_Maus()
+        PRINT "maus"
+        DIM d AS Dialog : d = NEW Dialog()
+        d.ZeigenModal()
+        PRINT "dialog zurueck "; d.wie
+    END SUB
+END CLASS
+--- datei proj/Dialog.dhform
+{"title":"Dialog","name":"Dialog","w":300,"h":160,"widgets":[
+{"kind":"canvas","name":"flaeche","x":0,"y":0,"w":300,"h":130}]}
+--- datei proj/Dialog.dh
+CLASS Dialog EXTENDS Dialog_Basis
+    DIM wie AS STRING
+
+    SUB flaeche_Maus()
+        PRINT "dialog maus"
+        Self.wie = "maus"
+        Self.Zumachen()
+    END SUB
+END CLASS
+--- erwartet
+erzeugt TRUE
+maus
+dialog maus
+dialog zurueck maus
+code 0
+
+=== taste erreicht ein modales fenster
+' Echte Fensternachricht (Aufnahmen sieht KEY_ANY_HIT nicht): Esc an das
+' Programm, waehrend ein modales Fenster ohne Abbrechen-Knopf steht -- seine
+' Methode Taste bekommt sie und schliesst es.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+slHin(10, 10)
+slWarten(10)
+slTaste(294)
+slWarten(150)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+SETENV("DH_STUDIO_LAUF_BILDER", "20")
+DIM log AS STRING : log = CWD$() + "/s.log"
+slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+PRINT "erzeugt "; LEN(slAnfang(log, "erzeugt ")) = 1
+DIM neu AS ARRAY OF STRING : neu = []
+DIM s AS STRING
+FOR EACH s IN READLINES(p + "/_studio/main.dh")
+    IF LEFT$(s, 11) = "studioLauf(" THEN
+        DIM t AS STRING
+        FOR EACH t IN READLINES(CWD$() + "/probe.dh")
+            ARRAY_PUSH(neu, t)
+        NEXT
+    ELSE
+        ARRAY_PUSH(neu, s)
+    END IF
+NEXT
+WRITEALL(p + "/_studio/probe.dh", JOIN$(neu, CHR$(10)) + CHR$(10))
+PRINT sende$(skript$(), "proj/_studio/probe.dh", "esc", "")
+--- argumente
+{sammlung}/../../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/fenstersender.dh"
+slStudio = ARG$(0)
+FUNCTION skript$() AS STRING
+    RETURN "{sammlung}/../_hilfen/fenstersender.ps1"
+END FUNCTION
+--- datei probe.dh
+SCREEN(640, 480, ARG$(0))
+SET_WINDOW_POS(-3000, -3000)
+studioSchirmB = SCREENWIDTH() : studioSchirmH = SCREENHEIGHT()
+studioDieStartseite = studioStartFenster
+studioDieApp.Geoeffnet()
+studioStartFenster.studioHaupt = TRUE
+studioStartFenster.Zeigen()
+DIM d AS Dialog : d = NEW Dialog()
+d.start = MILLIS()
+d.ZeigenModal()
+PRINT "zurueck"
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"},{"art":"fenster","name":"Dialog"}]}
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":640,"h":480,"widgets":[]}
+--- datei proj/Hauptfenster.dh
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+END CLASS
+--- datei proj/Dialog.dhform
+{"title":"Dialog","name":"Dialog","w":300,"h":160,"widgets":[
+{"kind":"button","name":"knopfOk","text":"OK","x":20,"y":70,"w":100,"h":30}]}
+--- datei proj/Dialog.dh
+CLASS Dialog EXTENDS Dialog_Basis
+    DIM start AS INTEGER
+
+    SUB Taste(taste AS INTEGER)
+        PRINT "taste "; taste
+        IF taste = KEY_ESCAPE THEN Self.Zumachen()
+    END SUB
+
+    ' Kommt keine Taste an, endet der Lauf trotzdem.
+    SUB Takt()
+        IF MILLIS() - Self.start > 6000 THEN
+            PRINT "zeit um"
+            Self.Zumachen()
+        END IF
+    END SUB
+END CLASS
+--- system windows
+--- erwartet
+erzeugt TRUE
+gesendet
+taste 27
+zurueck
+
+=== standard-knopf im inspektor waehlen, umbenennen zieht mit
+' Ohne Auswahl zeigt der Inspektor das Fenster: in "Standard-Knopf (Enter)"
+' zweimal runter (knopfA, knopfB), Enter; dann knopfB waehlen und in
+' knopfOk umbenennen (Strg+A, Strg+V), Strg+S -- die Datei nennt den Knopf
+' beim neuen Namen.
+IMPORT "laeufer.dh"
+DIM m AS STRING : m = CWD$() + "/m.log"
+slStarten(m, "", 6, CWD$() + "/f.dhform")
+DIM fx AS INTEGER
+DIM fy AS INTEGER
+(fx, fy) = slLage(m, "fenster")
+DIM sx AS INTEGER
+DIM sy AS INTEGER
+(sx, sy) = slLage(m, "feld studio_standard")
+slHin(10, 10)
+slKlick(fx + 190, fy + 115)
+slWarten(4)
+slAufnahmeSchreiben(CWD$() + "/ev1.txt")
+slStarten(m, CWD$() + "/ev1.txt", slBild + 10, CWD$() + "/f.dhform")
+DIM nx AS INTEGER
+DIM ny AS INTEGER
+(nx, ny) = slLage(m, "feld name")
+slZeilen = [] : slBild = 0
+slHin(10, 10)
+slKlick(sx, sy)
+slWarten(4)
+slTaste(264)
+slTaste(264)
+slTaste(257)
+slWarten(4)
+slKlick(fx + 190, fy + 115)
+slWarten(4)
+slKlick(nx, ny)
+slMit([341], 65)
+slMit([341], 86)
+slTaste(257)
+slWarten(4)
+slMit([341], 83)
+slWarten(6)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+SETENV("DH_STUDIO_ABLAGE", "knopfOk")
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = slStarten(log, CWD$() + "/ev.txt", slBild + 20, CWD$() + "/f.dhform")
+PRINT "felder gefunden "; sx > 0; " "; nx > 0
+PRINT "uebernommen "; slHat(log, "inspektor studio_standard")
+DIM d AS JSON_HANDLE : d = JSON_LOAD(CWD$() + "/f.dhform")
+PRINT "standard "; JSON_GET_STRING(d, "studio_standard"); " | knopf "; JSON_GET_STRING(d, "widgets.1.name")
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+IMPORT "json"
+slStudio = ARG$(0)
+--- datei f.dhform
+{"title":"F","name":"F","w":400,"h":240,"widgets":[
+{"kind":"button","name":"knopfA","text":"A","x":20,"y":100,"w":100,"h":30},
+{"kind":"button","name":"knopfB","text":"B","x":140,"y":100,"w":100,"h":30},
+{"kind":"textinput","name":"feld","x":20,"y":30,"w":200,"h":26}]}
+--- erwartet
+felder gefunden TRUE TRUE
+uebernommen TRUE
+standard knopfOk | knopf knopfOk
+
+=== auswahl, eingabezahl und farbewaehlen warten wie frage
+' Zwei Dialoge der Laufzeit, die das Studio nicht hatte (wie
+' QInputDialog.getItem/getInt der Kuehlschrank-App): Auswahl liefert den
+' Index (ESC: -1), EingabeZahl (TRUE, zahl) oder (FALSE, vorgabe). Enter
+' drueckt OK -- auch mit dem Fokus im Zahlenfeld. FarbeWaehlen (wie
+' QColorDialog.getColor, Lagerorte der Kuehlschrank-App) liefert die Farbe,
+' ESC -1.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+slHin(10, 10)
+slWarten(10)
+slTaste(294)
+slWarten(150)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+SETENV("DH_STUDIO_LAUF_BILDER", "20")
+DIM log AS STRING : log = CWD$() + "/s.log"
+slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+PRINT "erzeugt "; LEN(slAnfang(log, "erzeugt ")) = 1
+slZeilen = [] : slBild = 0
+slHin(10, 10)
+DIM k AS INTEGER
+FOR EACH k IN [257, 256, 257, 256, 256, 257, 256]
+    slWarten(15)
+    slTaste(k)
+NEXT
+slAufnahmeSchreiben(p + "/_studio/tasten.txt")
+DIM neu AS ARRAY OF STRING : neu = []
+DIM s AS STRING
+FOR EACH s IN READLINES(p + "/_studio/main.dh")
+    IF LEFT$(s, 11) = "studioLauf(" THEN
+        ARRAY_PUSH(neu, "AUTOMATION_PLAY(" + CHR$(34) + "tasten.txt" + CHR$(34) + ")")
+        DIM t AS STRING
+        FOR EACH t IN READLINES(CWD$() + "/probe.dh")
+            ARRAY_PUSH(neu, t)
+        NEXT
+    ELSE
+        ARRAY_PUSH(neu, s)
+    END IF
+NEXT
+WRITEALL(p + "/_studio/probe.dh", JOIN$(neu, CHR$(10)) + CHR$(10))
+DIM kp AS INTEGER : kp = PROCESS_START("dhrt", "run", "--bilder", "200", p + "/_studio/probe.dh")
+DIM leer AS INTEGER : leer = 0
+WHILE leer < 5
+    DIM t2 AS STRING : t2 = PROCESS_READ$(kp) + PROCESS_ERR$(kp)
+    IF t2 <> "" THEN
+        DIM zeile AS STRING
+        FOR EACH zeile IN SPLIT(REPLACE$(t2, CHR$(13), ""), CHR$(10))
+            IF zeile <> "" AND LEFT$(zeile, 8) <> "WARNING:" AND LEFT$(zeile, 5) <> "INFO:" THEN PRINT zeile
+        NEXT
+        leer = 0
+    ELSEIF NOT PROCESS_RUNNING(kp) THEN
+        leer = leer + 1
+        SLEEP(30)
+    END IF
+WEND
+PRINT "code "; PROCESS_CODE(kp)
+--- argumente
+{sammlung}/../../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei probe.dh
+SCREEN(640, 480, "Probe")
+studioSchirmB = SCREENWIDTH() : studioSchirmH = SCREENHEIGHT()
+studioDieStartseite = studioStartFenster
+studioDieApp.Geoeffnet()
+studioStartFenster.studioHaupt = TRUE
+studioStartFenster.Zeigen()
+PRINT "auswahl enter "; Auswahl("Wohin?", ["Kühlschrank", "Keller", "Dach"], 1, "Ort")
+PRINT "auswahl esc "; Auswahl("Wohin?", ["Kühlschrank", "Keller"], 0, "Ort")
+DIM ok AS BOOLEAN
+DIM z AS INTEGER
+(ok, z) = EingabeZahl("Tage:", 500, 1, 365, "MHD")
+PRINT "zahl enter "; ok; " "; z
+(ok, z) = EingabeZahl("Tage:", 7, 1, 365, "MHD")
+PRINT "zahl esc "; ok; " "; z
+PRINT "leer "; Auswahl("Nichts", [], 0, "Leer")
+PRINT "farbe enter "; HEX$(FarbeWaehlen(&H3FA9F5, "Farbe"))
+PRINT "farbe esc "; FarbeWaehlen(&H3FA9F5, "Farbe")
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"}]}
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":420,"h":300,"widgets":[{"kind":"button","name":"knopf","text":"Eins","x":10,"y":10,"w":90,"h":30}]}
+--- erwartet
+erzeugt TRUE
+auswahl enter 1
+auswahl esc -1
+zahl enter TRUE 365
+zahl esc FALSE 7
+leer -1
+farbe enter 3FA9F5
+farbe esc -1
+code 0

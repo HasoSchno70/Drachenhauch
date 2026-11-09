@@ -359,6 +359,18 @@ reflections/mirror effects become possible.
 > means the constant again. Tests
 > `tests/pruef/werkzeugkette/code_korrekturen.dhtest`.
 
+### H5. A method silently replaced the inherited one of the same name — ✅ FIXED (2026-11-08)
+> **`SUB zeigen()` in a Studio window replaced `Zeigen()` of the Studio
+> runtime.** Names ignore upper/lower case, so `zeigen` is the same method as
+> `Zeigen` -- every call `fenster.Zeigen()` landed in your own one, and the
+> window never opened (fridge app, stage 4: "GUI_VALUE erwartet INTEGER" one
+> line further down). With a different number of parameters there already
+> was a warning; with the same number it counted as an intended override.
+> Now `--check` also warns when the **spelling** differs (`zeigen` versus
+> `Zeigen`, `BREITE` versus `Breite`); if you really want to replace it,
+> spell the name as in the parent class. Test
+> `tests/pruef/laufzeit/compiler_warnungen.dhtest`.
+
 ## I — Switching from other BASICs and from Python (2026-09-21) — ✅ FIXED
 
 > Measured, not estimated: around 150 small programs written the way you

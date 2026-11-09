@@ -499,6 +499,7 @@ Kann {} nicht lesen: {}	Cannot read {}: {}
 nicht lesbar: {}	not readable: {}
 run: keine Datei angegeben	run: no file given
 run --bilder: erwartet eine Zahl	run --bilder: expected a number
+run: {} erreicht das Programm nicht -- seine Argumente stehen hinter einem `--`: dhrt run {} -- {}	run: {} does not reach the program -- its arguments go after a `--`: dhrt run {} -- {}
 profile: keine Datei angegeben	profile: no file given
 dhrt fmt: {}: laesst sich nicht lesen (Syntaxfehler?) -- unveraendert gelassen	dhrt fmt: {}: cannot be read (syntax error?) -- left unchanged
 
@@ -1053,6 +1054,7 @@ CHART_SET: {} erwartet {}, nicht '{}'	CHART_SET: {} expects {}, not '{}'
 # ---------------------------------------------------------------- Dateien, Kodierung, ZIP, XML, Excel, CSV
 {}: Kodierung '{}' kenne ich nicht -- moeglich sind: {}	{}: unknown encoding '{}' -- possible are: {}
 {}: {}Zeile {} ist kein UTF-8 (Byte 0x{} an Stelle {}). Kommt die Datei aus Excel oder einem alten Windows-Programm, ist sie meist cp1252 -- dann als letztes Argument "cp1252" mitgeben. Moeglich sind: {}	{}: {}line {} is not UTF-8 (byte 0x{} at position {}). If the file comes from Excel or an old Windows program, it is usually cp1252 -- then pass "cp1252" as the last argument. Possible are: {}
+READALL$: die Kodierung einer offenen Datei steht schon bei OPENFILE(pfad, modus, kodierung)	READALL$: the encoding of an open file is already given at OPENFILE(pfad, modus, kodierung)
 {}: das Zeichen '{}' (U+{}) gibt es in {} nicht -- die Datei in utf8 schreiben oder das Zeichen ersetzen	{}: the character '{}' (U+{}) does not exist in {} -- write the file in utf8 or replace the character
 {}: das Trennzeichen muss genau ein Zeichen sein (bekommen: {})	{}: the separator must be exactly one character (got: {})
 {}: kein lesbares ZIP: {}	{}: not a readable ZIP: {}

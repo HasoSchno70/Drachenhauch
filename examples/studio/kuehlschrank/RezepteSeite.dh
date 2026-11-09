@@ -1,0 +1,215 @@
+' Der Reiter Rezepte: Suche (Name, Beschreibung, Zutaten), Sortierung,
+' Schnellfilter (sofort kochbar, schnell, wenig Zutaten), die Tabelle mit
+' Kochen und Löschen je Zeile, Doppelklick für die Details. Oben „Rezept
+' suchen“ (Katalog), „Manuell hinzufügen“, „Was kann ich kochen?“ und
+' „Ablaufende verwerten“ -- wie tabs/recipes_tab.py. Die Dialoge öffnet die
+' Seite selbst; geändert hat sich etwas, meldet sie Geaendert.
+CLASS RezepteSeite EXTENDS RezepteSeite_Basis
+    DIM alle AS ARRAY OF Rezept
+    DIM ids AS ARRAY OF INTEGER
+
+    SUB Geoeffnet()
+        GUI_SET_DROPDOWN(Self.sortierWahl, [tr$("Name (A-Z)"), tr$("Name (Z-A)"), tr$("Kochzeit (kurz → lang)"), tr$("Kochzeit (lang → kurz)"), _
+            tr$("Portionen (wenig → viel)"), tr$("Portionen (viel → wenig)"), tr$("Zutaten (wenig → viel)"), tr$("Zutaten (viel → wenig)")])
+        GUI_DROPDOWN_SET_SELECTED(Self.sortierWahl, 0)
+        Self.laden()
+    END SUB
+
+    SUB laden()
+        Self.alle = rezepteLaden()
+        kochbarkeitRechnen(Self.alle)
+        Self.zeigen()
+    END SUB
+
+    FUNCTION passt(x AS Rezept, such AS STRING) AS BOOLEAN
+        IF such <> "" THEN
+            DIM t AS STRING : t = LOWER$(x.name + " " + x.beschreibung)
+            DIM z AS Zutat
+            FOR EACH z IN x.zutaten
+                t = t + " " + LOWER$(z.name)
+            NEXT
+            IF INSTR(t, such) < 0 THEN RETURN FALSE
+        END IF
+        IF GUI_CHECKED(Self.kochbarKasten) AND NOT x.kochbar THEN RETURN FALSE
+        IF GUI_CHECKED(Self.schnellKasten) AND x.gesamt() > 30 THEN RETURN FALSE
+        IF GUI_CHECKED(Self.wenigKasten) AND x.zutatenZahl > 5 THEN RETURN FALSE
+        RETURN TRUE
+    END FUNCTION
+
+    ' Der Schlüssel der gewählten Sortierung; gerade = aufsteigend.
+    FUNCTION schluessel(x AS Rezept) AS STRING
+        SELECT CASE GUI_DROPDOWN_SELECTED(Self.sortierWahl) \ 2
+            CASE 1 : RETURN RIGHT$("00000" + STR$(x.gesamt()), 6)
+            CASE 2 : RETURN RIGHT$("00000" + STR$(x.portionen), 6)
+            CASE 3 : RETURN RIGHT$("00000" + STR$(x.zutatenZahl), 6)
+        END SELECT
+        RETURN LOWER$(x.name)
+    END FUNCTION
+
+    SUB zeigen()
+        DIM such AS STRING : such = LOWER$(TRIM$(GUI_TEXT(Self.sucheFeld)))
+        DIM ab AS BOOLEAN : ab = GUI_DROPDOWN_SELECTED(Self.sortierWahl) MOD 2 = 1
+        DIM liste AS ARRAY OF Rezept : liste = []
+        DIM x AS Rezept
+        FOR EACH x IN Self.alle
+            IF NOT Self.passt(x, such) THEN CONTINUE
+            DIM k AS STRING : k = Self.schluessel(x)
+            DIM i AS INTEGER : i = LEN(liste)
+            WHILE i > 0
+                DIM v AS STRING : v = Self.schluessel(liste[i - 1])
+                IF IIF(ab, v >= k, v <= k) THEN BREAK
+                i = i - 1
+            WEND
+            ARRAY_INSERT(liste, i, x)
+        NEXT
+        GUI_TABLE_CLEAR(Self.tabelle)
+        Self.ids = []
+        FOR EACH x IN liste
+            DIM marke AS STRING : marke = IIF(x.kochbar, "✅ ", IIF(x.prozent >= 75, "🟡 ", ""))
+            DIM z AS INTEGER : z = GUI_TABLE_ADD_ROW(Self.tabelle, [marke + x.name, trf$("{0} Port.", [STR$(x.portionen)]), trf$("{0} Zutat(en)", [STR$(x.zutatenZahl)]), _
+                minutenText$(x.vorb), minutenText$(x.koch), minutenText$(x.gesamt()), tr$("🍳 Kochen"), "🗑"])
+            ARRAY_PUSH(Self.ids, x.id)
+            GUI_TABLE_CELL_KIND(Self.tabelle, z, SP_R_KOCHEN, "knopf")
+            GUI_TABLE_CELL_KIND(Self.tabelle, z, SP_R_WEG, "knopf")
+            GUI_TABLE_CELL_COLOR(Self.tabelle, z, SP_R_KOCHEN, &HC8E6C9, &H2E4A3A)
+            GUI_TABLE_CELL_COLOR(Self.tabelle, z, SP_R_WEG, &HF5C6C6, &H5C3434)
+            DIM farbe AS INTEGER : farbe = IIF(x.gesamt() <= 30, &H81C784, IIF(x.gesamt() <= 60, &HFFD54F, &HE57373))
+            IF x.gesamt() > 0 THEN GUI_TABLE_CELL_COLOR(Self.tabelle, z, 5, farbe, -1)
+        NEXT
+        IF LEN(Self.alle) = 0 THEN
+            GUI_SET_TEXT(Self.info, tr$("📖 Noch keine Rezepte vorhanden. Füge dein erstes Rezept hinzu oder suche im Katalog!"))
+        ELSEIF LEN(liste) = LEN(Self.alle) THEN
+            GUI_SET_TEXT(Self.info, trf$("📚 {0} Rezept(e) gespeichert", [STR$(LEN(Self.alle))]))
+        ELSE
+            GUI_SET_TEXT(Self.info, trf$("🔍 {0} von {1} Rezepten angezeigt (Filter aktiv)", [STR$(LEN(liste)), STR$(LEN(Self.alle))]))
+        END IF
+    END SUB
+
+    SUB sucheFeld_Geaendert()
+        Self.zeigen()
+    END SUB
+
+    SUB sortierWahl_Geaendert()
+        Self.zeigen()
+    END SUB
+
+    SUB kochbarKasten_Geaendert()
+        Self.zeigen()
+    END SUB
+
+    SUB schnellKasten_Geaendert()
+        Self.zeigen()
+    END SUB
+
+    SUB wenigKasten_Geaendert()
+        Self.zeigen()
+    END SUB
+
+    SUB knopfZuruecksetzen_Klick()
+        GUI_SET_TEXT(Self.sucheFeld, "")
+        GUI_DROPDOWN_SET_SELECTED(Self.sortierWahl, 0)
+        GUI_SET_CHECKED(Self.kochbarKasten, FALSE)
+        GUI_SET_CHECKED(Self.schnellKasten, FALSE)
+        GUI_SET_CHECKED(Self.wenigKasten, FALSE)
+        Self.zeigen()
+    END SUB
+
+    FUNCTION gewaehlt() AS INTEGER
+        DIM z AS INTEGER : z = GUI_TABLE_SELECTED(Self.tabelle)
+        IF z < 0 OR z >= LEN(Self.ids) THEN RETURN -1
+        RETURN Self.ids[z]
+    END FUNCTION
+
+    ' Etwas hat sich geändert: neu lesen und es melden.
+    SUB geaendert()
+        Self.laden()
+        Self.Ausloesen("Geaendert")
+    END SUB
+
+    SUB tabelle_Doppelklick()
+        IF Self.gewaehlt() < 0 THEN RETURN
+        Self.details(Self.gewaehlt())
+    END SUB
+
+    SUB details(id AS INTEGER)
+        DIM f AS RezeptFenster : f = NEW RezeptFenster()
+        f.rezeptId = id
+        f.ZeigenModal()
+        IF f.kochenGewuenscht THEN Self.kochen(id)
+    END SUB
+
+    SUB kochen(id AS INTEGER)
+        DIM f AS KochenFenster : f = NEW KochenFenster()
+        f.rezeptId = id
+        f.ZeigenModal()
+        IF f.geaendert THEN Self.geaendert()
+    END SUB
+
+    SUB tabelle_Zelle(zeile AS INTEGER, spalte AS INTEGER)
+        IF zeile < 0 OR zeile >= LEN(Self.ids) THEN RETURN
+        DIM id AS INTEGER : id = Self.ids[zeile]
+        IF spalte = SP_R_KOCHEN THEN
+            Self.kochen(id)
+        ELSEIF spalte = SP_R_WEG THEN
+            DIM x AS Rezept : x = rezeptLaden(id)
+            IF x IS NIL THEN RETURN
+            IF Frage(trf$("„{0}“ löschen?", [x.name]), tr$("Löschen|Abbrechen"), tr$("Löschen")) <> 1 THEN RETURN
+            rezeptLoeschen(id, x.name)
+            GUI_TOAST(Self.studioWin, trf$("{0} gelöscht [Strg+Z]", [x.name]), "erfolg")
+            Self.geaendert()
+        END IF
+    END SUB
+
+    SUB knopfKatalog_Klick()
+        Self.katalog("", FALSE)
+    END SUB
+
+    SUB katalog(text AS STRING, nachZutaten AS BOOLEAN)
+        DIM f AS KatalogFenster : f = NEW KatalogFenster()
+        f.vorgabeText = text
+        f.vorgabeZutaten = nachZutaten
+        f.ZeigenModal()
+        IF f.importiert > 0 THEN Self.geaendert()
+    END SUB
+
+    SUB knopfNeu_Klick()
+        DIM f AS RezeptNeuFenster : f = NEW RezeptNeuFenster()
+        f.ZeigenModal()
+        IF f.gesichert THEN
+            GUI_TOAST(Self.studioWin, trf$("„{0}“ gespeichert.", [f.x.name]), "erfolg")
+            Self.geaendert()
+        END IF
+    END SUB
+
+    SUB knopfKochbar_Klick()
+        IF LEN(Self.alle) = 0 THEN
+            Meldung(tr$("Du hast noch keine Rezepte gespeichert."), tr$("Keine Rezepte"))
+            RETURN
+        END IF
+        Self.vorschlag("kochbar")
+    END SUB
+
+    SUB knopfAblauf_Klick()
+        IF LEN(ablaufende()) = 0 THEN
+            Meldung(tr$("✅ Super! Du hast keine Produkte, die bald ablaufen."), tr$("Keine ablaufenden Produkte"))
+            RETURN
+        END IF
+        IF LEN(Self.alle) = 0 THEN
+            Meldung(tr$("Du hast noch keine Rezepte gespeichert. Füge Rezepte hinzu, um Vorschläge zu erhalten!"), tr$("Keine Rezepte"))
+            RETURN
+        END IF
+        Self.vorschlag("ablauf")
+    END SUB
+
+    SUB vorschlag(art AS STRING)
+        DIM f AS VorschlagFenster : f = NEW VorschlagFenster()
+        f.art = art
+        f.ZeigenModal()
+        IF f.einkauf > 0 THEN Self.Ausloesen("Geaendert")
+        IF f.kochenId > 0 THEN Self.kochen(f.kochenId)
+        IF f.suche <> "" THEN Self.katalog(f.suche, TRUE)
+    END SUB
+END CLASS
+
+CONST SP_R_KOCHEN = 6
+CONST SP_R_WEG = 7
