@@ -14053,7 +14053,10 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 let fok_frei = self.focus_widget.filter(|(w, _)| *w == top)
                     .and_then(|(_, i)| self.windows[top].widgets.get(i))
                     .map(|w| w.kind == Kind::Dropdown && w.frei).unwrap_or(false);
-                let enter_frei = matches!(fok, None | Some(Kind::TextInput)) || fok_frei;
+                // Ein Zahlenfeld uebernimmt Enter und gibt es weiter (spinner_keys)
+                // -- vorher blieb es dort haengen, ein Dialog mit Zahl liess sich
+                // nicht mit Enter bestaetigen (Kuehlschrank-App, MHD setzen).
+                let enter_frei = matches!(fok, None | Some(Kind::TextInput) | Some(Kind::Spinner)) || fok_frei;
                 // Beim Umbenennen in einer Liste gehoeren Enter und ESC dem Feld.
                 let liste_edit = self.focus_widget.filter(|(w, _)| *w == top)
                     .and_then(|(_, i)| self.windows[top].widgets.get(i))

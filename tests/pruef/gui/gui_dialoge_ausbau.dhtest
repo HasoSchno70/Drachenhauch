@@ -462,3 +462,43 @@ DHRT_FRAMES=34
 fokus hinten FALSE
 kochen bild 10
 fokus danach TRUE
+
+=== enter in einem zahlenfeld drueckt den standard-knopf
+' Das Zahlenfeld uebernimmt Enter (GUI_ENTERED) und gibt es weiter an den
+' Standard-Knopf -- vorher blieb es dort haengen, ein Dialog mit einer Zahl
+' liess sich nicht mit Enter bestaetigen (Kuehlschrank-App, MHD setzen).
+' Ein Kaestchen mit Fokus behaelt Enter weiter fuer sich.
+IMPORT "gui"
+SCREEN(420, 260, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Tage", 10, 10, 380, 200)
+DIM zahl AS GUI_WIDGET : zahl = GUI_SPINNER(w, 10, 10, 120, 1, 365, 7, 1)
+DIM kasten AS GUI_WIDGET : kasten = GUI_CHECKBOX(w, "Merken", 10, 50)
+DIM ok AS GUI_WIDGET : ok = GUI_BUTTON(w, "OK", 10, 100, 90, 28)
+GUI_WINDOW_DEFAULT(w, ok)
+GUI_FOCUS(zahl)
+AUTOMATION_PLAY("ev.txt")
+DIM f AS INTEGER
+FOR f = 1 TO 40
+    GUI_UPDATE()
+    IF GUI_ENTERED(zahl) THEN PRINT "zahl enter bild "; f
+    IF GUI_CLICKED(ok) THEN PRINT "ok bild "; f; " | wert "; INT(GUI_VALUE(zahl))
+    IF GUI_CHANGED(kasten) THEN PRINT "kasten "; GUI_CHECKED(kasten); " bild "; f
+    IF f = 20 THEN GUI_FOCUS(kasten)
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- datei ev.txt
+c 5
+e 0 7 300 300 0 0
+e 8 2 257 0 0 0
+e 9 1 257 0 0 0
+e 28 2 257 0 0 0
+e 29 1 257 0 0 0
+
+--- umgebung
+DHRT_FRAMES=44
+--- erwartet
+zahl enter bild 10
+ok bild 10 | wert 7
+kasten TRUE bild 30

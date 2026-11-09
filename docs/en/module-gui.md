@@ -709,7 +709,8 @@ however, to the widget with focus: a button or checkbox with focus takes
 Enter itself, a text area turns it into a line break, a table cell being
 edited into its end. **From inside a text input**, by contrast, Enter is
 exactly that: submitting the form — the field reports `GUI_ENTERED` **and**
-the default button clicks. ESC has no effect while a dropdown is open.
+the default button clicks. The same from a number field (it takes over what
+was typed first). ESC has no effect while a dropdown is open.
 Both are written into the `.dhform` (`default_button`/`cancel_button`,
 as a widget index).
 

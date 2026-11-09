@@ -708,7 +708,8 @@ dem Widget mit Fokus: ein Knopf oder Kästchen mit Fokus nimmt Enter selbst,
 ein Textbereich macht daraus einen Umbruch, eine Tabellenzelle in
 Bearbeitung ihr Ende. **Aus einem Textfeld heraus** ist Enter dagegen genau
 das: das Formular abschicken — das Feld meldet `GUI_ENTERED` **und** der
-Standard-Knopf klickt. ESC greift nicht, solange eine Klappliste offen ist.
+Standard-Knopf klickt. Ebenso aus einem Zahlenfeld (es übernimmt das
+Getippte vorher). ESC greift nicht, solange eine Klappliste offen ist.
 Beide werden in die `.dhform` geschrieben (`default_button`/`cancel_button`,
 als Widget-Index).
 
