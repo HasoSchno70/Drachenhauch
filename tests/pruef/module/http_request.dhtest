@@ -793,6 +793,68 @@ PROCESS_KILL(VAL(srv[1]))
 fehler
 0
 
+=== http status ist nach einem fehler ohne antwort 0
+' Ohne Antwort (kein Netz) blieb der Status der VORIGEN Antwort stehen --
+' die Kuehlschrank-App meldete "Spoonacular antwortet mit Fehler 200".
+' Ebenso die Kopfzeilen. Blockierend, im Hintergrund und beim Herunterladen.
+' Gegenserver: tests/pruef/_hilfen/gegenserver.dh
+IMPORT "html"
+FUNCTION starten$(modus AS STRING, verz AS STRING, schl AS STRING) AS STRING
+    DIM portdatei AS STRING : portdatei = CWD$() + "/port.txt"
+    IF FILEEXISTS(portdatei) THEN DELETEFILE(portdatei)
+    DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", modus, verz, schl, portdatei)
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 15000
+        IF FILEEXISTS(portdatei) THEN
+            DIM z AS ARRAY OF STRING : z = READLINES(portdatei)
+            IF LEN(z) > 0 THEN
+                IF TRIM$(z[0]) <> "" THEN RETURN "http://127.0.0.1:" + TRIM$(z[0]) + "|" + STR$(p)
+            END IF
+        END IF
+        SLEEP(10)
+    WEND
+    RETURN "|" + STR$(p)
+END FUNCTION
+DIM srv AS ARRAY OF STRING : srv = SPLIT$(starten$("echo", "0", "-"), "|")
+DIM basis AS STRING : basis = srv[0]
+DIM t AS STRING
+SUB vorher()
+    t = HTTP_GET(basis + "/rohe-bytes")
+    PRINT "vorher "; HTTP_STATUS(); " "; HTTP_HEADER("content-length") <> ""
+END SUB
+vorher()
+TRY
+    t = HTTP_GET("http://127.0.0.1:1/weg")
+CATCH e
+    PRINT "blockierend "; HTTP_STATUS(); " ["; HTTP_HEADER("content-length"); "]"
+END TRY
+vorher()
+DIM a AS INTEGER : a = HTTP_GET_START("http://127.0.0.1:1/weg")
+WHILE NOT HTTP_READY(a)
+    SLEEP(5)
+WEND
+TRY
+    t = HTTP_RESULT(a)
+CATCH e2
+    PRINT "hintergrund "; HTTP_STATUS(); " ["; HTTP_HEADER("content-length"); "]"
+END TRY
+vorher()
+TRY
+    HTTP_DOWNLOAD("http://127.0.0.1:1/weg", CWD$() + "/weg.bin")
+CATCH e3
+    PRINT "herunterladen "; HTTP_STATUS(); " ["; HTTP_HEADER("content-length"); "]"
+END TRY
+PROCESS_KILL(VAL(srv[1]))
+--- argumente
+{sammlung}/../_hilfen/gegenserver.dh
+--- erwartet
+vorher 200 TRUE
+blockierend 0 []
+vorher 200 TRUE
+hintergrund 0 []
+vorher 200 TRUE
+herunterladen 0 []
+
 === timeout greift
 ' Gegenserver: tests/pruef/_hilfen/gegenserver.dh (Bis Stufe 48 in test_http_request.py.)
 IMPORT "html"

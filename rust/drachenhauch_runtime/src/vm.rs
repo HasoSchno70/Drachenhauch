@@ -6123,7 +6123,12 @@ impl<'p> Vm<'p> {
                 Ok(Value::str_rc(&text))
             }
             Err(e) => {
-                if e.status != 0 { self.http_status = e.status; self.http_headers = e.headers; }
+                // Ohne Antwort (kein Netz, Zeitgrenze) ist der Status 0 und es
+                // gibt keine Kopfzeilen -- vorher blieben die der VORIGEN
+                // Antwort stehen, und ein Programm meldete "Fehler 200"
+                // (Kuehlschrank-App, Rezeptsuche).
+                self.http_status = e.status;
+                self.http_headers = e.headers;
                 // Sonst gehoerte der Rumpf der VORIGEN Antwort und HTTP_BYTES
                 // lieferte nach einem Fehlschlag alte Daten als neue aus.
                 self.http_body.clear();
@@ -6239,7 +6244,8 @@ impl<'p> Vm<'p> {
                 let path = bi_str(a, 1, "HTTP_DOWNLOAD")?.to_string();
                 match html::http_download(&url, &path) {
                     Ok(r) => { self.http_status = r.status; self.http_headers = r.headers; Value::Int(r.bytes) }
-                    Err(e) => { if e.status != 0 { self.http_status = e.status; self.http_headers = e.headers; } return Err(e.msg); }
+                    // Ohne Antwort Status 0 (siehe http_antwort).
+                    Err(e) => { self.http_status = e.status; self.http_headers = e.headers; return Err(e.msg); }
                 }
             }
             // --- Abrufe im Hintergrund: starten, nachsehen, abholen ---

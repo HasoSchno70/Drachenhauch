@@ -130,7 +130,7 @@ PRINT "Status: ", HTTP_STATUS()
 PRINT body
 ```
 
-**Default timeout: 10 seconds.** On a timeout, a connection error or a 4xx/5xx status the function throws `DHRuntimeError` with the status code in the message. After a 4xx/5xx, `HTTP_STATUS()` remains readable — useful for the `TRY/CATCH` pattern:
+**Default timeout: 10 seconds.** On a timeout, a connection error or a 4xx/5xx status the function throws `DHRuntimeError` with the status code in the message. After a 4xx/5xx, `HTTP_STATUS()` remains readable — useful for the `TRY/CATCH` pattern. If no response came at all (no network, timeout), it is 0, not the status of the previous response:
 
 ```basic
 TRY
@@ -210,6 +210,7 @@ After `HTTP_RESULT`, `HTTP_STATUS()` and `HTTP_HEADER()` are ready exactly as af
 - **`HTTP_RESULT` before `HTTP_READY`** aborts with a plain-language message instead of blocking — otherwise the advantage would be thrown away again.
 - **Several requests really run at the same time.** Two requests of 300 ms each are done after ~300 ms, not after 600.
 - **Numbers stay stable** (tombstones as with `timer`): a collected or cancelled number is not handed out again. So a program cannot accidentally refer an old number to someone else's request.
+- **The first number is 0** (as with `timer`). To remember "no request in flight", use -1 -- a fresh `DIM abruf AS INTEGER` is 0 and thus already the number of the first request.
 - **Cancelling does not stop the request in mid-network** — it runs to the end, and its result is discarded. The program does not wait for anything.
 - **Any method.** `HTTP_GET_START` is the short form for GET; `HTTP_REQUEST_START` takes any method together with body and headers (see the table). There is no `HTTP_DOWNLOAD` in the background -- for that use `HTTP_GET_START` and, after `HTTP_RESULT`, save the raw body from `HTTP_BYTES()` with `WRITEALL_BYTES`.
 
