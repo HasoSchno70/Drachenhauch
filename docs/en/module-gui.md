@@ -866,6 +866,7 @@ dd = GUI_DROPDOWN(win, 20, 130, 160, 24, farben)   ' a click opens the list
 
 - `GUI_DROPDOWN_SELECTED(dd)` → index (or `-1`), `GUI_DROPDOWN_TEXT(dd)` → selected text.
 - `GUI_DROPDOWN_SET_SELECTED(dd, i)` sets the selection, `GUI_SET_DROPDOWN(dd, items)` replaces the list.
+- `GUI_SET_TEXT(dd, "kg")` selects the entry with that name (case does not matter), otherwise none; `GUI_TEXT(dd)` returns the text of the selection like `GUI_DROPDOWN_TEXT` (editable: see below).
 - `GUI_ON_CHANGE(dd, handler)` fires when the selection changes. The opened popup
   is drawn above all other widgets; a click elsewhere closes it.
 - **Long lists**: the popup shows at most ten entries at a time, the rest

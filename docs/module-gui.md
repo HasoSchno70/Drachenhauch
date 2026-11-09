@@ -866,6 +866,7 @@ dd = GUI_DROPDOWN(win, 20, 130, 160, 24, farben)   ' Klick klappt die Liste auf
 
 - `GUI_DROPDOWN_SELECTED(dd)` → Index (oder `-1`), `GUI_DROPDOWN_TEXT(dd)` → gewählter Text.
 - `GUI_DROPDOWN_SET_SELECTED(dd, i)` setzt die Auswahl, `GUI_SET_DROPDOWN(dd, items)` ersetzt die Liste.
+- `GUI_SET_TEXT(dd, "kg")` wählt den Eintrag, der so heißt (Groß/klein egal), sonst keinen; `GUI_TEXT(dd)` liefert den Text der Auswahl wie `GUI_DROPDOWN_TEXT` (bearbeitbar: siehe unten).
 - `GUI_ON_CHANGE(dd, handler)` feuert bei Auswahländerung. Das aufgeklappte Popup
   wird über allen anderen Widgets gezeichnet; Klick daneben schliesst es.
 - **Lange Listen**: das Popup zeigt höchstens zehn Einträge auf einmal, der Rest
