@@ -211,6 +211,67 @@ FUNCTION gangplan(markt AS STRING) AS ARRAY OF STRING
     RETURN aus
 END FUNCTION
 
+' --- Gangpläne verwalten (Einstellungen, Reiter Supermärkte) ------------------------
+FUNCTION istEingebaut(markt AS STRING) AS BOOLEAN
+    DIM s AS STRING
+    FOR EACH s IN eingebautePlaene()
+        IF SPLIT(s, "|")[0] = markt THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+FUNCTION hatEigenenPlan(markt AS STRING) AS BOOLEAN
+    RETURN dbZahlEin("SELECT COUNT(*) FROM store_layouts WHERE store_name = ?", markt) > 0
+END FUNCTION
+
+' Wie die Python-App „leer starten“ ließ -- mit neun Abteilungen.
+FUNCTION standardPlan() AS ARRAY OF STRING
+    RETURN ["Obst=1", "Gemüse=1", "Brot=2", "Milchprodukte=3", "Fleisch=4", "Tiefkühl=5", "Trockenwaren=6", "Getränke=7", "Sonstiges=8"]
+END FUNCTION
+
+' Einen Plan als eigenen speichern (create_custom_layout): JSON in der
+' Reihenfolge der Gänge.
+SUB planSpeichern(markt AS STRING, plan AS ARRAY OF STRING)
+    DIM j AS JSON_HANDLE : j = JSON_NEW_OBJECT()
+    DIM g AS INTEGER
+    FOR g = 0 TO gangZahl(plan)
+        DIM e AS STRING
+        FOR EACH e IN plan
+            DIM f AS ARRAY OF STRING : f = SPLIT(e, "=")
+            IF INT(VAL(f[1])) = g THEN JSON_SET_INT(j, JSON_KEY$(f[0]), g)
+        NEXT
+    NEXT
+    DB_BEGIN(db)
+    DB_EXEC(db, "DELETE FROM store_layouts WHERE store_name = ?", markt)
+    DB_EXEC(db, "INSERT INTO store_layouts (store_name, layout_json) VALUES (?, ?)", markt, JSON_STRINGIFY(j))
+    DB_COMMIT(db)
+END SUB
+
+' Einen neuen Markt (aus einer Vorlage oder dem Standardplan). "" oder was
+' nicht ging -- den Namen gibt es schon (Groß/klein egal).
+FUNCTION marktAnlegen$(name AS STRING, vorlage AS STRING) AS STRING
+    name = TRIM$(name)
+    IF name = "" THEN RETURN "Bitte gib einen Namen ein!"
+    DIM m AS STRING
+    FOR EACH m IN marktListe()
+        IF UPPER$(m) = UPPER$(name) THEN RETURN "„" + name + "“ gibt es schon."
+    NEXT
+    DIM plan AS ARRAY OF STRING : plan = standardPlan()
+    IF vorlage <> "" THEN plan = gangplan(vorlage)
+    IF LEN(plan) = 0 THEN plan = ["Sonstiges=1"]
+    planSpeichern(name, plan)
+    RETURN ""
+END FUNCTION
+
+' Den eigenen Plan weg: ein eingebauter Markt hat danach wieder seinen
+' eingebauten, ein eigener ist ganz weg -- und war er der Standard-Markt,
+' ist es keiner mehr (die Python-App ließ ihn stehen, der Einkauf sortierte
+' dann nach nichts).
+SUB planLoeschen(markt AS STRING)
+    DB_EXEC(db, "DELETE FROM store_layouts WHERE store_name = ?", markt)
+    IF NOT istEingebaut(markt) AND gewaehlterMarkt$() = markt THEN DB_EXEC(db, "DELETE FROM store_settings WHERE key = 'selected_store'")
+END SUB
+
 FUNCTION gangZahl(plan AS ARRAY OF STRING) AS INTEGER
     DIM n AS INTEGER : n = 0
     DIM e AS STRING
@@ -278,6 +339,15 @@ END FUNCTION
 FUNCTION gewaehlterMarkt$() AS STRING
     RETURN textEin$("SELECT value FROM store_settings WHERE key = ?", "selected_store")
 END FUNCTION
+
+' Der Standard-Markt aus den Einstellungen; "" = keiner.
+SUB standardMarktSetzen(markt AS STRING)
+    IF markt = "" THEN
+        DB_EXEC(db, "DELETE FROM store_settings WHERE key = 'selected_store'")
+    ELSE
+        marktWaehlen(markt)
+    END IF
+END SUB
 
 SUB marktWaehlen(markt AS STRING)
     DB_EXEC(db, "INSERT OR REPLACE INTO store_settings (key, value, updated_at) VALUES ('selected_store', ?, CURRENT_TIMESTAMP)", markt)

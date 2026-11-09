@@ -151,6 +151,11 @@
       "code": "Benachrichtigungen.dh"
     },
     {
+      "art": "modul",
+      "name": "Datenpflege",
+      "code": "Datenpflege.dh"
+    },
+    {
       "art": "control",
       "name": "BestandSeite",
       "code": "BestandSeite.dh",
@@ -215,6 +220,12 @@
       "name": "EinstellungenFenster",
       "code": "EinstellungenFenster.dh",
       "layout": "EinstellungenFenster.dhform"
+    },
+    {
+      "art": "fenster",
+      "name": "GangplanFenster",
+      "code": "GangplanFenster.dh",
+      "layout": "GangplanFenster.dhform"
     },
     {
       "art": "fenster",

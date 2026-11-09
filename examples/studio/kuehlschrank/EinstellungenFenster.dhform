@@ -2,7 +2,7 @@
   "title": "⚙️ Einstellungen",
   "x": 0,
   "y": 0,
-  "w": 760,
+  "w": 960,
   "h": 640,
   "movable": true,
   "closable": false,
@@ -18,7 +18,7 @@
       "kind": "tabcontrol",
       "x": 20,
       "y": 14,
-      "w": 720,
+      "w": 920,
       "h": 520,
       "text": "",
       "color": -1,
@@ -31,7 +31,10 @@
       "items": [
         "🎨 Allgemein",
         "🔔 Benachrichtigungen",
-        "⏰ Ablaufdaten"
+        "⏰ Ablaufdaten",
+        "📍 Lagerorte",
+        "🏪 Supermärkte",
+        "💾 Datenbank"
       ],
       "sel": 0,
       "anchor": "lrtb",
@@ -200,6 +203,122 @@
           [
             41,
             2
+          ],
+          [
+            42,
+            3
+          ],
+          [
+            43,
+            3
+          ],
+          [
+            44,
+            3
+          ],
+          [
+            45,
+            3
+          ],
+          [
+            46,
+            3
+          ],
+          [
+            47,
+            3
+          ],
+          [
+            48,
+            4
+          ],
+          [
+            49,
+            4
+          ],
+          [
+            50,
+            4
+          ],
+          [
+            51,
+            4
+          ],
+          [
+            52,
+            4
+          ],
+          [
+            53,
+            4
+          ],
+          [
+            54,
+            4
+          ],
+          [
+            55,
+            4
+          ],
+          [
+            56,
+            5
+          ],
+          [
+            57,
+            5
+          ],
+          [
+            58,
+            5
+          ],
+          [
+            59,
+            5
+          ],
+          [
+            60,
+            5
+          ],
+          [
+            61,
+            5
+          ],
+          [
+            62,
+            5
+          ],
+          [
+            63,
+            5
+          ],
+          [
+            64,
+            5
+          ],
+          [
+            65,
+            5
+          ],
+          [
+            66,
+            5
+          ],
+          [
+            67,
+            5
+          ],
+          [
+            68,
+            5
+          ],
+          [
+            69,
+            5
+          ],
+          [
+            70,
+            5
           ]
         ],
         "seite": 0
@@ -891,6 +1010,523 @@
       "name": "abgelaufenFarbe"
     },
     {
+      "kind": "label",
+      "x": 44,
+      "y": 64,
+      "w": 600,
+      "h": 16,
+      "text": "📍 Lagerorte anlegen, Sinnbild und Farbe ändern, löschen -- das gilt sofort.",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "name": "ortInfo"
+    },
+    {
+      "kind": "textinput",
+      "x": 44,
+      "y": 96,
+      "w": 300,
+      "h": 32,
+      "text": "",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "Name des Lagerorts …",
+      "visible": true,
+      "name": "ortNameFeld"
+    },
+    {
+      "kind": "button",
+      "x": 354,
+      "y": 96,
+      "w": 44,
+      "h": 32,
+      "text": "📦",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "tooltip": "Sinnbild wählen",
+      "name": "ortSinnbildKnopf"
+    },
+    {
+      "kind": "button",
+      "x": 408,
+      "y": 96,
+      "w": 160,
+      "h": 32,
+      "text": "➕ Hinzufügen",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "variant": "erfolg",
+      "name": "knopfOrtNeu"
+    },
+    {
+      "kind": "table",
+      "x": 44,
+      "y": 142,
+      "w": 672,
+      "h": 324,
+      "text": "",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "table": {
+        "headers": [
+          "",
+          "Lagerort",
+          "Farbe",
+          "Einträge",
+          "",
+          ""
+        ],
+        "rows": [],
+        "col_widths": [
+          44,
+          250,
+          110,
+          90,
+          100,
+          60
+        ],
+        "selected": -1
+      },
+      "name": "ortTabelle"
+    },
+    {
+      "kind": "button",
+      "x": 44,
+      "y": 476,
+      "w": 360,
+      "h": 36,
+      "text": "🗑 Farben und Sinnbilder zurücksetzen",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "variant": "gefahr",
+      "name": "knopfOrteZurueck"
+    },
+    {
+      "kind": "label",
+      "x": 44,
+      "y": 64,
+      "w": 448,
+      "h": 16,
+      "text": "🏪 Sortiere deine Einkaufsliste nach den Gängen im Laden!",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "name": "marktInfo"
+    },
+    {
+      "kind": "label",
+      "x": 44,
+      "y": 102,
+      "w": 176,
+      "h": 16,
+      "text": "⭐ Standard-Supermarkt:",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "name": "marktStandardText"
+    },
+    {
+      "kind": "dropdown",
+      "x": 270,
+      "y": 96,
+      "w": 260,
+      "h": 30,
+      "text": "",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "name": "marktStandard"
+    },
+    {
+      "kind": "label",
+      "x": 44,
+      "y": 146,
+      "w": 128,
+      "h": 16,
+      "text": "Neuer Supermarkt",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "font_style": "fett",
+      "name": "titelMarktNeu"
+    },
+    {
+      "kind": "textinput",
+      "x": 64,
+      "y": 176,
+      "w": 230,
+      "h": 32,
+      "text": "",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "z.B. Mein REWE …",
+      "visible": true,
+      "name": "marktNameFeld"
+    },
+    {
+      "kind": "dropdown",
+      "x": 304,
+      "y": 176,
+      "w": 230,
+      "h": 32,
+      "text": "",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "name": "marktVorlage"
+    },
+    {
+      "kind": "button",
+      "x": 544,
+      "y": 176,
+      "w": 150,
+      "h": 32,
+      "text": "➕ Erstellen",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "variant": "erfolg",
+      "name": "knopfMarktNeu"
+    },
+    {
+      "kind": "table",
+      "x": 44,
+      "y": 222,
+      "w": 672,
+      "h": 290,
+      "text": "",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "table": {
+        "headers": [
+          "",
+          "Supermarkt",
+          "Plan",
+          "Gänge",
+          "",
+          ""
+        ],
+        "rows": [],
+        "col_widths": [
+          40,
+          230,
+          180,
+          80,
+          70,
+          60
+        ],
+        "selected": -1
+      },
+      "name": "marktTabelle"
+    },
+    {
+      "kind": "label",
+      "x": 44,
+      "y": 64,
+      "w": 72,
+      "h": 16,
+      "text": "Datenbank",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "font_style": "fett",
+      "name": "titelDb"
+    },
+    {
+      "kind": "label",
+      "x": 64,
+      "y": 94,
+      "w": 1,
+      "h": 16,
+      "text": "",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "name": "dbPfad"
+    },
+    {
+      "kind": "label",
+      "x": 64,
+      "y": 120,
+      "w": 1,
+      "h": 16,
+      "text": "",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "name": "dbGroesse"
+    },
+    {
+      "kind": "label",
+      "x": 64,
+      "y": 146,
+      "w": 1,
+      "h": 16,
+      "text": "",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "name": "dbZahlen"
+    },
+    {
+      "kind": "label",
+      "x": 44,
+      "y": 186,
+      "w": 160,
+      "h": 16,
+      "text": "Sicherung und Export",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "font_style": "fett",
+      "name": "titelSicherung"
+    },
+    {
+      "kind": "button",
+      "x": 64,
+      "y": 216,
+      "w": 230,
+      "h": 36,
+      "text": "💾 Sicherung anlegen",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "variant": "primaer",
+      "name": "knopfSichern"
+    },
+    {
+      "kind": "button",
+      "x": 304,
+      "y": 216,
+      "w": 250,
+      "h": 36,
+      "text": "📥 Sicherung einspielen …",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "name": "knopfEinspielen"
+    },
+    {
+      "kind": "button",
+      "x": 64,
+      "y": 260,
+      "w": 230,
+      "h": 36,
+      "text": "📤 Als CSV exportieren …",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "name": "knopfCsv"
+    },
+    {
+      "kind": "label",
+      "x": 44,
+      "y": 314,
+      "w": 56,
+      "h": 16,
+      "text": "Wartung",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "font_style": "fett",
+      "name": "titelWartung"
+    },
+    {
+      "kind": "button",
+      "x": 64,
+      "y": 344,
+      "w": 230,
+      "h": 36,
+      "text": "⚡ Optimieren",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "name": "knopfOptimieren"
+    },
+    {
+      "kind": "button",
+      "x": 304,
+      "y": 344,
+      "w": 250,
+      "h": 36,
+      "text": "🧹 Aufräumen (VACUUM)",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "name": "knopfAufraeumen"
+    },
+    {
+      "kind": "label",
+      "x": 44,
+      "y": 398,
+      "w": 96,
+      "h": 16,
+      "text": "Neu beginnen",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "font_style": "fett",
+      "name": "titelNeu"
+    },
+    {
+      "kind": "checkbox",
+      "x": 64,
+      "y": 430,
+      "w": 16,
+      "h": 16,
+      "text": "Die 29 Rezepte des Katalogs mitnehmen",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": true,
+      "placeholder": "",
+      "visible": true,
+      "auto_w": true,
+      "name": "rezepteKasten"
+    },
+    {
+      "kind": "button",
+      "x": 64,
+      "y": 462,
+      "w": 230,
+      "h": 36,
+      "text": "🆕 Neue Datenbank …",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "variant": "gefahr",
+      "name": "knopfNeuDb"
+    },
+    {
+      "kind": "label",
+      "x": 304,
+      "y": 470,
+      "w": 400,
+      "h": 16,
+      "text": "",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "wrap": true,
+      "name": "dbStatus"
+    },
+    {
       "kind": "button",
       "x": 20,
       "y": 550,
@@ -910,7 +1546,7 @@
     },
     {
       "kind": "button",
-      "x": 440,
+      "x": 640,
       "y": 550,
       "w": 140,
       "h": 40,
@@ -927,7 +1563,7 @@
     },
     {
       "kind": "button",
-      "x": 590,
+      "x": 790,
       "y": 550,
       "w": 150,
       "h": 40,

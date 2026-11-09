@@ -135,3 +135,63 @@ FUNCTION verlegen(e AS Eintrag, ziel AS STRING) AS BOOLEAN
     verlauf.abschliessen()
     RETURN TRUE
 END FUNCTION
+
+' --- Verwalten (Einstellungen, Reiter Lagerorte) ----------------------------------
+' Die Sinnbilder zur Auswahl wie AVAILABLE_ICONS: "Sinnbild|Name".
+FUNCTION ortSinnbilder() AS ARRAY OF STRING
+    RETURN ["🧊|Eiswürfel", "❄️|Schneeflocke", "🏠|Haus", "🍞|Brot", "🍎|Apfel", "🥕|Karotte", "🗄️|Schrank", _
+            "🔨|Werkzeug", "📦|Paket", "🍽️|Teller", "🥒|Gurke", "🥛|Milch", "🧀|Käse", "🍖|Fleisch", _
+            "🍫|Schokolade", "🍹|Getränk", "🥫|Dose", "🧂|Salz", "🌿|Kräuter", "🧈|Butter"]
+END FUNCTION
+
+' Wie viele Einträge an einem Ort liegen (auch "Ort - Bereich").
+FUNCTION ortEintraege(name AS STRING) AS INTEGER
+    RETURN dbZahlMit("SELECT COUNT(*) FROM inventory WHERE storage_location = ?1 OR storage_location LIKE ?2", name, name + " - %")
+END FUNCTION
+
+' Farbe und Sinnbild eines Orts merken (location_settings wie save_setting;
+' dazu das Sinnbild in storage_locations und locations wie _set_icon).
+SUB ortAussehenSetzen(name AS STRING, farbe AS INTEGER, sinnbild AS STRING)
+    DB_EXEC(db, "INSERT INTO location_settings (keyword, color_r, color_g, color_b, icon, updated_at) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP) " + _
+        "ON CONFLICT(keyword) DO UPDATE SET color_r = excluded.color_r, color_g = excluded.color_g, color_b = excluded.color_b, icon = excluded.icon, updated_at = CURRENT_TIMESTAMP", _
+        name, (farbe SHR 16) BAND 255, (farbe SHR 8) BAND 255, farbe BAND 255, sinnbild)
+    DB_EXEC(db, "UPDATE storage_locations SET icon = ? WHERE name = ?", sinnbild, name)
+    DB_EXEC(db, "UPDATE locations SET icon = ? WHERE name = ?", sinnbild, name)
+END SUB
+
+' Ein neuer Ort in storage_locations (dort lesen ihn alle Teile der App) und
+' locations (wie die Python-App), mit seinem Sinnbild in location_settings --
+' die Python-App schrieb es nur nach locations, die Kachel zeigte es nie.
+' "" oder was nicht ging.
+FUNCTION ortAnlegen$(name AS STRING, sinnbild AS STRING) AS STRING
+    name = TRIM$(name)
+    IF name = "" THEN RETURN "Bitte gib einen Namen ein!"
+    IF dbZahlEin("SELECT COUNT(*) FROM storage_locations WHERE lower(name) = lower(?)", name) > 0 THEN RETURN "Lagerort „" + name + "“ gibt es schon."
+    DIM farbe AS INTEGER : farbe = ortFarbe(name)
+    DB_BEGIN(db)
+    DB_EXEC(db, "INSERT INTO storage_locations (name, icon, temperature_zone, description) VALUES (?, ?, 'room_temp', ?)", name, sinnbild, "Benutzerdefiniert: " + name)
+    DB_EXEC(db, "INSERT OR IGNORE INTO locations (name, type, temperature_zone, icon, sort_order) VALUES (?, 'custom', 'room_temp', ?, (SELECT IFNULL(MAX(sort_order), 0) + 1 FROM locations))", name, sinnbild)
+    ortAussehenSetzen(name, farbe, sinnbild)
+    DB_COMMIT(db)
+    RETURN ""
+END FUNCTION
+
+' Einen Ort löschen -- nur leer: die Python-App ließ die Einträge mit einem
+' Ort zurück, den es nicht mehr gab, und schützte die ersten sechs Orte über
+' ihre Nummer. "" oder was nicht ging.
+FUNCTION ortLoeschen$(name AS STRING) AS STRING
+    DIM n AS INTEGER : n = ortEintraege(name)
+    IF n > 0 THEN RETURN "An „" + name + "“ liegen noch " + STR$(n) + IIF(n = 1, " Eintrag", " Einträge") + " -- erst woandershin verlegen."
+    DB_BEGIN(db)
+    DB_EXEC(db, "DELETE FROM storage_locations WHERE name = ?", name)
+    DB_EXEC(db, "DELETE FROM locations WHERE name = ?", name)
+    DB_EXEC(db, "DELETE FROM location_settings WHERE keyword = ?", name)
+    DB_COMMIT(db)
+    RETURN ""
+END FUNCTION
+
+' Alle eigenen Farben und Sinnbilder weg (reset_all_to_default) -- die
+' Kacheln zeigen gleich wieder die eingebauten, ohne Neustart.
+SUB ortAussehenZuruecksetzen()
+    DB_EXEC(db, "DELETE FROM location_settings")
+END SUB

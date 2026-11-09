@@ -48,6 +48,8 @@ CLASS Hauptfenster EXTENDS Hauptfenster_Basis
         DIM e AS Einstellungen : e = einstellungen()
         Self.auffrischen.Intervall = e.auffrischenS * 1000
         Self.pruefen.Intervall = e.pruefMin * 60000
+        ' Auch das Thema: eine eingespielte Sicherung bringt ihr eigenes mit.
+        themaSetzen(e.dunkel)
         IF e.meldungenAn THEN
             IF NOT Self.pruefen.Aktiv THEN Self.pruefen.Starten()
         ELSE
@@ -90,10 +92,11 @@ CLASS Hauptfenster EXTENDS Hauptfenster_Basis
     SUB miEinstellungen_Aktion()
         DIM f AS EinstellungenFenster : f = NEW EinstellungenFenster()
         f.ZeigenModal()
-        IF NOT f.gespeichert THEN RETURN
+        ' Lagerorte, Märkte und Datenbank ändern sich auch ohne „Speichern“.
+        IF NOT f.gespeichert AND NOT f.datenGeaendert THEN RETURN
         Self.anwenden()
         Self.geaendert()
-        GUI_TOAST(Self.Fenster(), "✅ Einstellungen gespeichert!", "erfolg")
+        IF f.gespeichert THEN GUI_TOAST(Self.Fenster(), "✅ Einstellungen gespeichert!", "erfolg")
     END SUB
 
     ' Der Vorrat hat sich geändert (im Bestand oder über Rückgängig).

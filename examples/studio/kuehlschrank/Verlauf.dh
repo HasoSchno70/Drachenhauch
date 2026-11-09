@@ -43,6 +43,13 @@ CLASS Verlauf
         Self.offen = NIL
     END SUB
 
+    ' Alles vergessen -- nach dem Einspielen einer Sicherung oder einer neuen
+    ' Datenbank meinen die Schritte Zeilen, die es so nicht mehr gibt.
+    SUB vergessen()
+        Self.zurueck = []
+        Self.vor = []
+    END SUB
+
     FUNCTION kannZurueck() AS BOOLEAN
         RETURN LEN(Self.zurueck) > 0
     END FUNCTION

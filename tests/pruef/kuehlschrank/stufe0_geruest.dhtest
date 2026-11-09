@@ -42,7 +42,7 @@ IMPORT "{sammlung}/../../../studio/berichte_laufzeit.dh"
 IMPORT "{sammlung}/../../../studio/berichte.dh"
 --- erwartet
 laden []
-elemente 46 start Hauptfenster
+elemente 48 start Hauptfenster
 app App TRUE
 fenster Hauptfenster TRUE
 datenbank Daten TRUE
@@ -72,6 +72,7 @@ modul Spoonacular TRUE
 klasse Einstellungen TRUE
 klasse Nachricht TRUE
 modul Benachrichtigungen TRUE
+modul Datenpflege TRUE
 control BestandSeite TRUE
 control EinkaufSeite TRUE
 fenster ScanFenster TRUE
@@ -83,6 +84,7 @@ fenster KochenFenster TRUE
 fenster RezeptNeuFenster TRUE
 fenster KatalogFenster TRUE
 fenster EinstellungenFenster TRUE
+fenster GangplanFenster TRUE
 fenster VorschlagFenster TRUE
 bericht Einkaufszettel TRUE
 control LagerorteSeite TRUE
@@ -146,6 +148,7 @@ KochenFenster passt
 RezeptNeuFenster passt
 KatalogFenster passt
 EinstellungenFenster passt
+GangplanFenster passt
 VorschlagFenster passt
 LagerorteSeite passt
 LagerortFenster passt

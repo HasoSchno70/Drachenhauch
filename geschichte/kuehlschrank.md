@@ -692,3 +692,75 @@ Start), je ein Fall in `gui_form_widgets` und `gui_dialoge_ausbau`.
 Gegenproben: vierundvierzig im Beispiel, vier in der gui -- jede fällt in
 ihrem Fall. Eine im Beispiel fiel erst mit einer zweiten Packung Käse:
 doppelte Namen fing sonst schon das Merken der Gemeldeten ab.
+
+## Stufe 7, zweiter Teil: Lagerorte, Supermärkte, Datenbank (2026-11-09)
+
+Das Einstellungsfenster hat jetzt alle sechs Reiter der Python-App. Was auf
+den Reitern Lagerorte, Supermärkte und Datenbank geschieht, gilt sofort (wie
+dort); das Hauptfenster frischt danach auf, auch ohne „Speichern“.
+
+- **Lagerorte:** neu mit Name und Sinnbild (`Auswahl` aus den Sinnbildern
+  von AVAILABLE_ICONS), je Zeile Sinnbild und Farbe ändern (`FarbeWaehlen`)
+  und löschen, „Farben und Sinnbilder zurücksetzen“ (Modul `Lagerorte`).
+- **Supermärkte:** der Standard-Markt (derselbe wie im Einkauf), neue Märkte
+  aus einer Vorlage oder dem Standardplan, je Markt den Gangplan bearbeiten
+  (`GangplanFenster` wie StoreLayoutEditDialog: Gang je Abteilung, ✖,
+  Neue), einen eigenen löschen oder einen angepassten eingebauten zurück
+  auf seinen eingebauten (Modul `Einkauf`).
+- **Datenbank:** Pfad, Größe und Zahlen; Sicherung anlegen und einspielen,
+  CSV-Export, Optimieren, Aufräumen, neu beginnen (Modul `Datenpflege`).
+  `KUEHL_SICHERUNG` und `KUEHL_EXPORT_ORDNER` ersetzen die Dateidialoge (für
+  Prüfungen).
+
+**Abweichungen von der Python-App:** Der Reiter Lagerorte las `locations`,
+der Rest der App `storage_locations`; eine neue Datei füllt dort nur
+`storage_locations` -- der Reiter hätte keinen einzigen Ort gezeigt, und
+Orte aus dem Produktdialog nie. Hier ist es eine Liste, beide Tabellen
+werden gepflegt. Das Sinnbild eines neuen Orts stand nur in
+den beiden Tabellen, die Kachel liest es aus `location_settings` und zeigte
+es nie; hier steht es auch dort.
+Löschen ließ die Einträge mit einem Ort zurück, den es nicht mehr gab, und
+schützte die ersten sechs Orte über ihre Nummer; hier geht nur ein leerer.
+Zurücksetzen der Farben verlangte einen Neustart. Der Standard-Markt wurde
+bei jeder Wahl in der Klappliste geschrieben, auch durch „Zurücksetzen“, und
+„Abbrechen“ nahm ihn nicht zurück; hier gilt er mit „Speichern“. Ein
+gelöschter eigener Markt blieb Standard-Markt, der Einkauf sortierte nach
+nichts. Ein Gangplan ohne Abteilung ließ sich speichern. Die Sicherung
+kopierte die offene Datei; hier schreibt SQLite sie (`VACUUM INTO`).
+Einspielen überschrieb die offene Datei und verlangte einen Neustart; hier
+ersetzt es den Inhalt Tabelle für Tabelle (die Spalten, die beide haben),
+legt vorher eine Sicherung des jetzigen Stands an, vergisst den Verlauf, und
+eine Datei, die keine Sicherung der App ist, bleibt draußen. „Neue
+Datenbank“ versprach „50+ Rezepte“ (es sind 29) und verlangte einen
+Neustart; „An anderem Ort erstellen“ legte eine Datei an, die die App nie
+öffnete (ihr Pfad stand fest) -- das fehlt hier.
+
+**Funde:**
+
+36. **Das Studio hatte keinen Farbdialog** -- nur den Farbwähler als Widget
+    (QColorDialog.getColor). Neu in der Laufzeit `FarbeWaehlen(vorgabe,
+    titel)`: die Farbe als `&HRRGGBB`, `-1` bei Abbrechen, wartet wie
+    `Frage`.
+37. **Reiterköpfe, die nicht passten, lagen jenseits des Rands.** Mit sechs
+    Reitern in 720 Punkten war „Supermärkte“ halb und „Datenbank“ gar nicht
+    zu sehen, die Seite mit der Maus nicht zu erreichen. Jetzt werden die
+    breitesten Köpfe zuerst schmaler, ihr Titel endet mit „...“ (gui).
+    Danach ist das Fenster 960 breit geworden wie das der Python-App --
+    als Gestaltung, nicht mehr als Ausweg.
+
+**Fallen:** `SORT` sortiert an Ort und Stelle und liefert nichts. `csv` ist
+kein Modul zum Importieren -- `CSV_ROW$` gehört zum Kern. Eine frisch
+angelegte Datei hat kein `sqlite_sequence`, solange niemand eine Zeile in
+eine AUTOINCREMENT-Tabelle geschrieben hat.
+
+Tests `tests/pruef/kuehlschrank/stufe7_verwalten.dhtest` (4: Lagerorte mit
+Sinnbild auf der Kachel, Farbe, nur leer löschen, Zurücksetzen, Fenster;
+Supermärkte mit Vorlage, Gangplan-Fenster, eingebautem und eigenem Plan,
+Standard erst mit Speichern; Datenbank mit Sicherung, Einspielen samt
+fremder und alter Datei, CSV, Wartung, neu beginnen; echte Tasten und
+Klicks: Strg+, , sechster Reiter, Einspielen mit Frage, ESC), je ein Fall in
+`gui_reiterwerk` und `werkzeug_studio_modal`.
+Gegenproben: sechsunddreißig im Beispiel, zwei im Studio, zwei in der gui --
+jede fällt in ihrem Fall. Die für den gekürzten Titel fiel erst, als die
+Bildprobe den Kopf wählte: ungewählt ist seine Schrift gedämpft und lag
+unter der Schwelle der Probe.
