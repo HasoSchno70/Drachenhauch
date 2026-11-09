@@ -17,6 +17,14 @@ CLASS Rezept
     DIM prozent AS FLOAT
     DIM kochbar AS BOOLEAN
     DIM gerechnet AS BOOLEAN
+    ' Nur aus dem Internet (Spoonacular): herkunft "netz", die Nummer dort,
+    ' Quelle (creditsText) und Adresse; vollstaendig, sobald Zutaten und
+    ' Anleitung da sind.
+    DIM herkunft AS STRING
+    DIM netzId AS INTEGER
+    DIM quelle AS STRING
+    DIM adresse AS STRING
+    DIM vollstaendig AS BOOLEAN
 
     FUNCTION gesamt() AS INTEGER
         RETURN Self.vorb + Self.koch

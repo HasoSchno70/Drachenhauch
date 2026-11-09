@@ -513,8 +513,7 @@ Der Offline-Manager wurde angelegt und nie benutzt -- er fehlt hier.
 
 **Offen:** Kürzel ohne Menü -- Strg+S im Barcode-Feld speichert nicht, denn
 `Taste` erreicht ein Studio-Fenster nur, wenn kein Eingabefeld die Taste
-nimmt, und ein Fenster ohne Menüleiste hat keine Kürzel. Die Rezeptsuche im
-Netz (Spoonacular) ist der zweite Teil der Stufe.
+nimmt, und ein Fenster ohne Menüleiste hat keine Kürzel.
 
 **Fallen:** `LOADIMAGE` erkennt das Format an der Endung -- ein Bild aus dem
 Netz braucht die aus der Adresse. Eine Klappliste mit Fokus nimmt Enter
@@ -533,3 +532,81 @@ ein Fall in `werkzeug_studio_modal`, `os_builtins`, `gui_dialoge_ausbau` und
 drei in der Laufzeit -- jede fällt in ihrem Fall. Eine fiel erst nach einem
 neuen Produkt des falschen Servers (4005, ganz ohne Namen): der Name aus den
 Rohdaten war sonst nie gefragt.
+
+## Stufe 6, zweiter Teil: Rezepte aus dem Internet (2026-11-09)
+
+Die Rezeptsuche `KatalogFenster` (wie RecipeSearchDialog) sucht erst im
+Katalog, dann im Internet (Spoonacular, Modul `Spoonacular`): im Namen oder
+nach Zutaten (mit Komma), höchstens 5 bis 20 Treffer, mit oder ohne
+Internet, mit oder ohne Übersetzung. Alles aus dem Netz läuft im Takt des
+Fensters: die Treffer des Katalogs stehen sofort da, die aus dem Internet
+kommen dazu; erst die Auswahl lädt die Einzelheiten eines Rezepts (ein Punkt
+vom Tageskontingent), importieren geht, sobald sie und ihre Übersetzung da
+sind -- mit Beschreibung und Quelle. Suchwörter und Zutaten übersetzt ein
+Wörterbuch (Modul `Uebersetzung`, ohne Netz, damit eine Zutat „Zwiebel“
+heißt und zum Vorrat passt; zusammengesetzte Wörter über ihr Grundwort),
+Titel, Beschreibung und Anleitung ein Dienst im Netz (MyMemory, frei und ohne
+Schlüssel; die Python-App nahm Google über deep_translator). Er bekommt Stücke
+bis 400 Zeichen, vier zugleich; die englischen Texte stehen sofort da und
+werden deutsch, sobald er antwortet; was einmal übersetzt ist, steht in
+`uebersetzungen.json`. Einheiten wie UnitConverter, metrisch, wo Spoonacular
+es mitliefert. Der Schlüssel kommt aus `SPOONACULAR_API_KEY` (wie die `.env`
+dort) oder aus `app_settings` („🔑 API-Schlüssel …“), er geht als Kopfzeile
+hinaus. „Ablaufende verwerten“ → „Im Internet suchen“ öffnet die Suche nach
+den Zutaten. `KUEHL_SPOON_URL` und `KUEHL_UE_URL` ersetzen die Adressen.
+
+**Abweichungen von der Python-App** (am Python-Code selbst nachgeprüft, mit
+den Daten des falschen Servers): Die Suchwörter übersetzte sie nur, wenn ein
+Umlaut oder eins von vier Wörtern darin stand -- „Nudeln mit Tomaten“ ging
+deutsch hinaus und fand nichts. Jeden Titel, jede Beschreibung, jede
+Anleitung und jede Zutat übersetzte sie einzeln, bevor sie etwas zeigte. Ein
+Fehler (kein oder falscher Schlüssel, Kontingent, kein Netz) hieß „Keine
+Rezepte gefunden“, der Grund stand im Log; der Schlüssel stand in jeder
+Adresse. Kam die Antwort zu einem früher gewählten Rezept zuletzt, zeigte sie
+sie unter dem jetzt gewählten -- und importierte sie so; hier gehören
+Einzelheiten zu ihrem Rezept. `clean_unit_name` rief sie nie: „oz.“ und
+„Tbsps“ blieben englisch, „large“ und keine Einheit wurden nicht „Stück“,
+0,25 TL wurden 0,2. Unbekannte Zeiten (-1) standen als „-1 Min“ da, aus 45
+Minuten wurden 13 + 31. „&amp;“ blieb stehen, mehrere Abschnitte der
+Anleitung fingen je bei 1 an (ohne Namen), eine Anleitung als HTML-Liste
+klebte zu „Boil the water.Add the chicken.“ zusammen, und ohne Anleitung
+speicherte sie „Keine Anleitung verfügbar.“ als Anleitung. Für Ablaufendes
+gab sie die ersten drei Namen als Suchwort für Titel hinaus, zweimal
+„Milch“, wenn zwei Packungen ablaufen; hier jedes einmal, als Zutaten.
+
+**Funde:**
+
+32. **Das Studio stapelte Leerzeilen** -- wer eine Datei von außen öffnet, in
+    der DIMs zwischen Methoden stehen, bekam beim Speichern so viele
+    Leerzeilen in Folge, wie Methoden dazwischen waren (jede herausgelöste
+    ließ ihre Trennzeile bei den Eigenschaften). Im Modul `Uebersetzung`
+    vierzehn, in `Lagerorte` und `Rezepte` standen sie seit Stufe 2 und 4
+    unbemerkt. Jetzt genügt eine (`codeZerlegen`).
+33. **`HTTP_STATUS()` behielt nach einem Netzfehler den vorigen Status** --
+    kam gar keine Antwort, blieben Status und Kopfzeilen der letzten stehen,
+    und die Suche meldete „Spoonacular antwortet mit Fehler 200“. Jetzt 0 und
+    keine Kopfzeilen, blockierend, im Hintergrund und bei `HTTP_DOWNLOAD`
+    (wie `HTTP_BYTES()` schon leer war).
+
+**Fallen:** Abrufnummern zählen ab 0 wie bei `timer` -- „0 = keiner
+unterwegs“ hielt die erste Suche für keine, und ihre Antwort wurde nie
+abgeholt. Das Handbuch sagt es jetzt; „keiner“ ist -1. Eine Probe mit
+Netzverkehr braucht mehr als fünf Bilder (`kProbe(..., 1500)` und `END` am
+Ende), sonst endet `studioBild()` mitten im Warten. Vier Übersetzungen
+gleichzeitig kommen in wechselnder Reihenfolge an -- die Probe sortiert sie.
+Keine Probe fragt das echte Spoonacular oder den echten Übersetzer
+(`_hilfen/spoon_server.dh`, `kNetzStarten`), und keine sieht einen
+Schlüssel aus der Umgebung (`kSchluessel`).
+
+Tests `tests/pruef/kuehlschrank/stufe6_rezeptsuche.dhtest` (6: Wörterbuch,
+Einheiten, Stücke und Katalog nach Zutaten; Suche mit Übersetzung im
+Hintergrund, Auswahl, zu frühes und richtiges Importieren, Schalter,
+Rückgängig; sieben Fehlerfälle samt Kontingent des Übersetzers; späte
+Antwort; Ablaufende nach Zutaten, Schlüssel und Cache der Übersetzung; echte
+Klicks durch zwei modale Fenster), je ein Fall in `werkzeug_studio2` und
+`http_request`. Gegenproben: zweiundsechzig im Beispiel, eine im Studio,
+zwei in der Laufzeit -- jede fällt in ihrem Fall. Drei im Beispiel fielen erst
+nach schärferen Proben: das Satzende lag im Testtext zufällig auf dem
+letzten Leerzeichen vor der Grenze, das zweite Fenster fand die Übersetzung
+im Speicher statt in der Datei, und eine englische Zutat sperrte das
+Importieren schon ohne die Prüfung der Texte.

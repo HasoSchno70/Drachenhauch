@@ -1,0 +1,531 @@
+' Deutsch und Englisch für die Rezeptsuche im Netz. Spoonacular kennt nur
+' Englisch; die Python-App übersetzte darum mit deep_translator (Google ohne
+' Schlüssel) die Suchwörter -- aber nur, wenn ein Umlaut oder eins von vier
+' Wörtern darin stand ("Nudeln mit Tomaten" ging deutsch hinaus und fand
+' nichts) -- und jeden Titel, jede Beschreibung, jede Anleitung und jede
+' Zutat einzeln, bevor sie etwas zeigte.
+'
+' Hier zwei Wege:
+'  * ein Wörterbuch für Suchwörter und Zutaten (ohne Netz, immer gleich --
+'    eine Zutat soll "Zwiebel" heißen, damit sie zum Vorrat passt),
+'  * für Titel, Beschreibung und Anleitung ein Dienst im Netz (MyMemory, frei
+'    und ohne Schlüssel; KUEHL_UE_URL ersetzt die Adresse). Er läuft im
+'    Hintergrund: die englischen Texte stehen sofort da, die deutschen kommen
+'    nach. Höchstens UE_STUECK Zeichen je Anfrage (der Dienst nimmt 500 Byte),
+'    lange Zeilen werden an Satzenden geteilt. Was schon übersetzt ist, merkt
+'    sich uebersetzungen.json neben der Datenbank.
+IMPORT "html"
+IMPORT "json"
+
+CONST UE_STUECK = 400
+CONST UE_GLEICHZEITIG = 4
+
+' Das Wörterbuch in beide Richtungen (wbLaden füllt es beim ersten Gebrauch).
+DIM wbDeEn AS MAP OF STRING
+DIM wbEnDe AS MAP OF STRING
+
+' Der Dienst im Netz: was übersetzt ist, Stücke, die nicht gingen (bleiben in
+' dieser Sitzung englisch), die Schlange, die Abrufe unterwegs mit ihrem
+' Text, und was zuletzt schiefging ("" = nichts; das Fenster zeigt es).
+DIM ueDe AS MAP OF STRING
+DIM ueAus AS MAP OF STRING
+DIM ueSchlange AS ARRAY OF STRING
+DIM ueAbrufe AS ARRAY OF INTEGER
+DIM ueAbrufText AS ARRAY OF STRING
+DIM ueGeladen AS BOOLEAN
+DIM ueFehler AS STRING
+' Das Tageskontingent ist erschöpft: in dieser Sitzung keine Anfrage mehr.
+DIM ueGesperrt AS BOOLEAN
+
+' --- Das Wörterbuch --------------------------------------------------------------------
+' "Deutsch|englisch|weitere englische Formen". Deutsch -> Englisch nimmt die
+' erste englische Form, Englisch -> Deutsch den ersten Eintrag, der die Form
+' kennt (darum steht "Hähnchen" vor "Huhn").
+FUNCTION woerterbuch() AS ARRAY OF STRING
+    RETURN [ _
+        "Hähnchenbrust|chicken breast|chicken breasts|boneless skinless chicken breast", "Hähnchenschenkel|chicken thighs|chicken thigh", _
+        "Hähnchen|chicken", "Hühnchen|chicken", "Huhn|chicken", "Hühnerbrühe|chicken broth|chicken stock", _
+        "Rinderhackfleisch|ground beef", "Hackfleisch|ground meat|minced meat", "Rindfleisch|beef", "Rind|beef", _
+        "Schweinefleisch|pork", "Schwein|pork", "Lamm|lamb", "Pute|turkey", "Truthahn|turkey", "Speck|bacon", _
+        "Schinken|ham", "Wurst|sausage", "Lachs|salmon", "Thunfisch|tuna", "Garnelen|shrimp|prawns", "Fisch|fish", _
+        "Steak|steak", "Schnitzel|schnitzel", "Braten|roast", "Gulasch|goulash", "Hackbraten|meatloaf", _
+        "Frikadellen|meatballs", "Klopse|meatballs", "Fleisch|meat", _
+        "Milch|milk|whole milk", "Butter|butter|unsalted butter", "Sahne|heavy cream|cream|whipping cream|heavy whipping cream", _
+        "Schlagsahne|whipped cream", "Saure Sahne|sour cream", "Schmand|sour cream", "Frischkäse|cream cheese", _
+        "Käse|cheese", "Parmesan|parmesan|parmesan cheese", "Mozzarella|mozzarella|mozzarella cheese", _
+        "Cheddar|cheddar|cheddar cheese", "Feta|feta|feta cheese", "Quark|quark", "Joghurt|yogurt|greek yogurt|plain yogurt", _
+        "Ei|egg|eggs", "Eigelb|egg yolk|egg yolks", "Eiweiß|egg white|egg whites", _
+        "Kartoffel|potato|potatoes", "Süßkartoffel|sweet potato|sweet potatoes", _
+        "Zwiebel|onion|onions|yellow onion|white onion", "Rote Zwiebel|red onion", _
+        "Frühlingszwiebel|green onions|scallions|spring onions|green onion|scallion", _
+        "Knoblauch|garlic|garlic cloves|clove garlic", "Schalotte|shallot|shallots", "Lauch|leek|leeks", _
+        "Tomate|tomato|tomatoes|canned tomatoes|diced tomatoes", "Tomatenmark|tomato paste", _
+        "Passierte Tomaten|tomato sauce|crushed tomatoes", "Karotte|carrot|carrots", "Möhre|carrot", _
+        "Sellerie|celery", "Paprika|bell pepper|bell peppers|red bell pepper|green bell pepper", _
+        "Gurke|cucumber", "Zucchini|zucchini", "Aubergine|eggplant", "Brokkoli|broccoli", "Blumenkohl|cauliflower", _
+        "Kohl|cabbage", "Rotkohl|red cabbage", "Sauerkraut|sauerkraut", "Spinat|spinach|baby spinach", _
+        "Salat|salad|lettuce", "Champignons|mushrooms|mushroom|button mushrooms", "Pilze|mushrooms", _
+        "Erbsen|peas|green peas", "Bohnen|beans|green beans", "Kidneybohnen|kidney beans", "Linsen|lentils", _
+        "Kichererbsen|chickpeas|garbanzo beans", "Mais|corn|sweet corn", "Kürbis|pumpkin|butternut squash", _
+        "Avocado|avocado", "Ingwer|ginger|fresh ginger", "Chili|chili|chili pepper|jalapeno", "Spargel|asparagus", _
+        "Rosenkohl|brussels sprouts", "Radieschen|radishes|radish", "Rote Bete|beets|beetroot", "Gemüse|vegetables", _
+        "Apfel|apple|apples", "Banane|banana|bananas", "Zitrone|lemon", "Zitronensaft|lemon juice", _
+        "Limette|lime", "Limettensaft|lime juice", "Orange|orange", "Erdbeeren|strawberries|strawberry", _
+        "Himbeeren|raspberries", "Heidelbeeren|blueberries", "Kirschen|cherries", "Birne|pear", "Pfirsich|peach", _
+        "Ananas|pineapple", "Rosinen|raisins", "Beeren|berries", _
+        "Mehl|flour|all purpose flour|all-purpose flour|wheat flour", "Zucker|sugar|granulated sugar|white sugar", _
+        "Brauner Zucker|brown sugar", "Puderzucker|powdered sugar|confectioners sugar|icing sugar", _
+        "Backpulver|baking powder", "Natron|baking soda", "Hefe|yeast|dry yeast", "Vanilleextrakt|vanilla extract|vanilla", _
+        "Vanillezucker|vanilla sugar", "Speisestärke|cornstarch|corn starch", "Haferflocken|oats|rolled oats", _
+        "Reis|rice|white rice|long grain rice", "Nudeln|pasta|noodles", "Spaghetti|spaghetti", "Penne|penne", _
+        "Lasagneplatten|lasagna noodles", "Brot|bread", "Semmelbrösel|breadcrumbs|bread crumbs|panko", _
+        "Tortilla|tortillas|tortilla", "Honig|honey", "Schokolade|chocolate|dark chocolate|chocolate chips", _
+        "Kakaopulver|cocoa powder|cocoa", "Preiselbeere|cranberry", "Nüsse|nuts", "Walnüsse|walnuts", "Mandeln|almonds", _
+        "Erdnussbutter|peanut butter", "Erdnüsse|peanuts", _
+        "Olivenöl|olive oil|extra virgin olive oil", "Öl|oil|vegetable oil|canola oil|cooking oil", "Sesamöl|sesame oil", _
+        "Essig|vinegar|white vinegar|apple cider vinegar", "Balsamico|balsamic vinegar", "Senf|mustard|dijon mustard", _
+        "Ketchup|ketchup", "Mayonnaise|mayonnaise|mayo", "Sojasauce|soy sauce", "Brühe|broth|stock", _
+        "Gemüsebrühe|vegetable broth|vegetable stock", "Rinderbrühe|beef broth|beef stock", "Wasser|water", _
+        "Weißwein|white wine|dry white wine", "Rotwein|red wine", "Wein|wine", "Bier|beer", "Kokosmilch|coconut milk", _
+        "Salz und Pfeffer|salt and pepper", "Salz|salt|sea salt|kosher salt", "Pfeffer|pepper|black pepper|ground pepper", _
+        "Paprikapulver|paprika|smoked paprika|sweet paprika", "Zimt|cinnamon|ground cinnamon", "Muskatnuss|nutmeg", _
+        "Kreuzkümmel|cumin|ground cumin", "Kümmel|caraway|caraway seeds", "Oregano|oregano|dried oregano", _
+        "Basilikum|basil|fresh basil", "Thymian|thyme|fresh thyme", "Rosmarin|rosemary", "Petersilie|parsley|fresh parsley", _
+        "Schnittlauch|chives", "Dill|dill", "Minze|mint|fresh mint", "Koriander|cilantro|coriander", _
+        "Lorbeerblatt|bay leaf|bay leaves", "Currypulver|curry powder", "Chilipulver|chili powder", _
+        "Cayennepfeffer|cayenne pepper|cayenne", _
+        "Suppe|soup", "Eintopf|stew", "Kuchen|cake", "Torte|cake", "Auflauf|casserole", "Pfannkuchen|pancakes", _
+        "Kekse|cookies", "Plätzchen|cookies", "Brötchen|rolls", "Soße|sauce", "Sauce|sauce", "Frühstück|breakfast", _
+        "Nachtisch|dessert", "Dessert|dessert", "Vegetarisch|vegetarian", "Vegan|vegan", "Pizza|pizza", _
+        "Burger|burger", "Curry|curry", "Spätzle|spaetzle", "Knödel|dumplings", "Klöße|dumplings", _
+        "Rouladen|beef roulades", "Strudel|strudel", "Gebraten|fried", "Gebacken|baked", "Mit|with", "Und|and"]
+END FUNCTION
+
+SUB wbLaden()
+    IF MAPSIZE(wbDeEn) > 0 THEN RETURN
+    DIM e AS STRING
+    FOR EACH e IN woerterbuch()
+        DIM t AS ARRAY OF STRING : t = SPLIT(e, "|")
+        DIM de AS STRING : de = LOWER$(t[0])
+        IF NOT MAPHAS(wbDeEn, de) THEN MAPPUT(wbDeEn, de, t[1])
+        DIM i AS INTEGER
+        FOR i = 1 TO LEN(t) - 1
+            IF NOT MAPHAS(wbEnDe, LOWER$(t[i])) THEN MAPPUT(wbEnDe, LOWER$(t[i]), t[0])
+        NEXT
+    NEXT
+END SUB
+
+' Die Wörter eines Textes, klein, ohne Satzzeichen und ohne Zahlen
+' ("Vollmilch 3,5 %" -> "vollmilch").
+FUNCTION wbWoerter(text AS STRING) AS ARRAY OF STRING
+    DIM aus AS ARRAY OF STRING : aus = []
+    DIM w AS STRING
+    FOR EACH w IN SPLIT(REGEX_REPLACE(LOWER$(text), "[,;:!?()%]", " "), " ")
+        IF REGEX_TEST(w, "[a-zäöüß]") THEN ARRAY_PUSH(aus, TRIM$(w))
+    NEXT
+    RETURN aus
+END FUNCTION
+
+' Ein deutsches Wort, so wie es dasteht oder ohne Endung ("Tomaten" ->
+' "tomate", "Schweine" -> "schwein"); "" = unbekannt.
+FUNCTION wbDeutsch$(w AS STRING) AS STRING
+    IF MAPHAS(wbDeEn, w) THEN RETURN MAPGET(wbDeEn, w)
+    DIM e AS STRING
+    FOR EACH e IN ["n", "en", "e", "s", "er", "nen"]
+        IF LEN(w) > LEN(e) + 2 AND RIGHT$(w, LEN(e)) = e THEN
+            DIM st AS STRING : st = LEFT$(w, LEN(w) - LEN(e))
+            IF MAPHAS(wbDeEn, st) THEN RETURN MAPGET(wbDeEn, st)
+        END IF
+    NEXT
+    RETURN ""
+END FUNCTION
+
+' Ein Wort auf Englisch -- auch zusammengesetzt: das längste bekannte
+' Grundwort am Ende, davor ein bekanntes Bestimmungswort ("Kartoffelsuppe" ->
+' "potato soup", "Schweinebraten" -> "pork roast"); ist das Bestimmungswort
+' unbekannt, das Grundwort allein ("Vollmilch" -> "milk", "Jägerschnitzel"
+' -> "schnitzel"). Sonst bleibt es, wie es ist (ein englisches Wort wie
+' "pasta" stimmt schon).
+FUNCTION wortEnglisch$(w AS STRING) AS STRING
+    DIM d AS STRING : d = wbDeutsch$(w)
+    IF d <> "" THEN RETURN d
+    DIM allein AS STRING : allein = ""
+    DIM k AS INTEGER
+    FOR k = 3 TO LEN(w) - 3
+        DIM grund AS STRING : grund = wbDeutsch$(MID$(w, k, LEN(w)))
+        IF grund = "" THEN CONTINUE
+        DIM vorne AS STRING : vorne = wbVorne$(LEFT$(w, k))
+        IF vorne <> "" THEN RETURN vorne + " " + grund
+        IF allein = "" THEN allein = grund
+    NEXT
+    IF allein <> "" THEN RETURN allein
+    RETURN w
+END FUNCTION
+
+' Ein Bestimmungswort, auch ohne seine Endung ("Erdbeer"kuchen -> "Erdbeeren").
+FUNCTION wbVorne$(w AS STRING) AS STRING
+    DIM e AS STRING
+    FOR EACH e IN ["", "e", "en", "n"]
+        DIM d AS STRING : d = wbDeutsch$(w + e)
+        IF d <> "" THEN RETURN d
+    NEXT
+    RETURN ""
+END FUNCTION
+
+' Die Suchwörter auf Englisch: erst Wortpaare ("saure sahne"), dann je Wort.
+' nurBekannte lässt unbekannte Wörter weg, solange ein bekanntes bleibt
+' ("Fettarme Milch" -> "milk") -- für Zutaten aus Produktnamen.
+FUNCTION frageEnglisch$(frage AS STRING, nurBekannte AS BOOLEAN = FALSE) AS STRING
+    wbLaden()
+    DIM w AS ARRAY OF STRING : w = wbWoerter(frage)
+    DIM aus AS ARRAY OF STRING : aus = []
+    DIM i AS INTEGER : i = 0
+    WHILE i < LEN(w)
+        IF i + 1 < LEN(w) THEN
+            DIM paar AS STRING : paar = w[i] + " " + w[i + 1]
+            IF MAPHAS(wbDeEn, paar) THEN
+                ARRAY_PUSH(aus, MAPGET(wbDeEn, paar))
+                i = i + 2
+                CONTINUE
+            END IF
+        END IF
+        DIM e AS STRING : e = wortEnglisch$(w[i])
+        IF e <> w[i] OR NOT nurBekannte THEN ARRAY_PUSH(aus, e)
+        i = i + 1
+    WEND
+    IF LEN(aus) = 0 THEN RETURN JOIN$(w, " ")
+    RETURN JOIN$(aus, " ")
+END FUNCTION
+
+' Zutaten mit Komma ("Milch, Hähnchen") -> "milk,chicken".
+FUNCTION zutatenEnglisch$(text AS STRING) AS STRING
+    DIM aus AS ARRAY OF STRING : aus = []
+    DIM t AS STRING
+    FOR EACH t IN SPLIT(text, ",")
+        IF TRIM$(t) <> "" THEN ARRAY_PUSH(aus, frageEnglisch$(t, TRUE))
+    NEXT
+    RETURN JOIN$(aus, ",")
+END FUNCTION
+
+' Eine englische Form, auch im Plural ("strawberries" -> "strawberry").
+FUNCTION wbEnglisch$(e AS STRING) AS STRING
+    IF MAPHAS(wbEnDe, e) THEN RETURN MAPGET(wbEnDe, e)
+    IF RIGHT$(e, 3) = "ies" AND MAPHAS(wbEnDe, LEFT$(e, LEN(e) - 3) + "y") THEN RETURN MAPGET(wbEnDe, LEFT$(e, LEN(e) - 3) + "y")
+    IF RIGHT$(e, 2) = "es" AND MAPHAS(wbEnDe, LEFT$(e, LEN(e) - 2)) THEN RETURN MAPGET(wbEnDe, LEFT$(e, LEN(e) - 2))
+    IF RIGHT$(e, 1) = "s" AND MAPHAS(wbEnDe, LEFT$(e, LEN(e) - 1)) THEN RETURN MAPGET(wbEnDe, LEFT$(e, LEN(e) - 1))
+    RETURN ""
+END FUNCTION
+
+' Eine Zutat auf Deutsch: der ganze Name oder sein längstes bekanntes Ende
+' ("red bell pepper" -> "Paprika", "fresh basil" -> "Basilikum"); "" =
+' unbekannt (dann fragt die Suche den Dienst).
+FUNCTION zutatDeutsch$(englisch AS STRING) AS STRING
+    wbLaden()
+    DIM w AS ARRAY OF STRING : w = wbWoerter(englisch)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(w) - 1
+        DIM rest AS STRING : rest = w[i]
+        DIM k AS INTEGER
+        FOR k = i + 1 TO LEN(w) - 1
+            rest = rest + " " + w[k]
+        NEXT
+        DIM d AS STRING : d = wbEnglisch$(rest)
+        IF d <> "" THEN RETURN d
+    NEXT
+    RETURN ""
+END FUNCTION
+
+' --- Einheiten -------------------------------------------------------------------------
+' Wie UnitConverter.convert_unit: Kochmaße werden EL/TL (nicht ml), Tassen
+' und flüssige Unzen ml (ab 1000 l), Unzen und Pfund g (ab 1000 kg). Vorher
+' fallen Punkt und Plural-s weg -- die Python-App hatte clean_unit_name dafür,
+' rief es aber nie: "oz." und "Tbsps" blieben englisch. Größenangaben (large,
+' medium) und keine Einheit sind "Stück", wie beim Import dort.
+FUNCTION einheitWort$(e AS STRING) AS STRING
+    SELECT CASE e
+        CASE "gram", "grams", "g" : RETURN "g"
+        CASE "kilogram", "kilograms", "kg" : RETURN "kg"
+        CASE "milliliter", "milliliters", "ml" : RETURN "ml"
+        CASE "liter", "liters", "l" : RETURN "l"
+        CASE "piece", "pieces", "large", "medium", "small", "whole", "" : RETURN "Stück"
+        CASE "slice" : RETURN "Scheibe"
+        CASE "slices" : RETURN "Scheiben"
+        CASE "clove" : RETURN "Zehe"
+        CASE "cloves" : RETURN "Zehen"
+        CASE "bunch", "bunches" : RETURN "Bund"
+        CASE "can" : RETURN "Dose"
+        CASE "cans" : RETURN "Dosen"
+        CASE "package", "pkg" : RETURN "Packung"
+        CASE "packages" : RETURN "Packungen"
+        CASE "tablespoon", "tablespoons", "tbsp", "tbs", "tb" : RETURN "EL"
+        CASE "teaspoon", "teaspoons", "tsp", "ts" : RETURN "TL"
+        CASE "pinch" : RETURN "Prise"
+        CASE "pinches" : RETURN "Prisen"
+        CASE "dash", "dashes" : RETURN "Spritzer"
+        CASE "serving" : RETURN "Portion"
+        CASE "servings" : RETURN "Portionen"
+        CASE "handful", "handfuls" : RETURN "Handvoll"
+        CASE "head" : RETURN "Kopf"
+        CASE "stalk", "stalks" : RETURN "Stange"
+        CASE "sprig", "sprigs" : RETURN "Zweig"
+        CASE "leaf", "leaves" : RETURN "Blatt"
+        CASE "to taste" : RETURN "nach Geschmack"
+    END SELECT
+    RETURN ""
+END FUNCTION
+
+FUNCTION einheitMl(e AS STRING) AS FLOAT
+    SELECT CASE e
+        CASE "cup", "cups" : RETURN 240
+        CASE "fluid ounce", "fluid ounces", "fl oz", "floz" : RETURN 30
+        CASE "pint", "pints" : RETURN 473
+        CASE "quart", "quarts" : RETURN 946
+        CASE "gallon", "gallons" : RETURN 3785
+    END SELECT
+    RETURN 0
+END FUNCTION
+
+FUNCTION einheitG(e AS STRING) AS FLOAT
+    SELECT CASE e
+        CASE "ounce", "ounces", "oz" : RETURN 28.35
+        CASE "pound", "pounds", "lb", "lbs" : RETURN 453.6
+    END SELECT
+    RETURN 0
+END FUNCTION
+
+' Menge und Einheit einer Zutat auf deutsche Maße. Eine unbekannte Einheit
+' bleibt, wie sie ist.
+SUB einheitUmrechnen(z AS Zutat, menge AS FLOAT, einheit AS STRING)
+    DIM e AS STRING : e = LOWER$(TRIM$(REPLACE$(einheit, ".", "")))
+    DIM w AS STRING : w = einheitWort$(e)
+    IF w = "" AND einheitMl(e) = 0 AND einheitG(e) = 0 AND RIGHT$(e, 1) = "s" THEN e = LEFT$(e, LEN(e) - 1)
+    w = einheitWort$(e)
+    IF w <> "" THEN
+        ' Metrisch von Spoonacular (236,588 ml): ganze Gramm und Milliliter.
+        IF (w = "g" OR w = "ml") AND menge >= 10 THEN
+            z.menge = ROUND(menge, 0)
+        ELSE
+            z.menge = mengeRunden(menge)
+        END IF
+        z.einheit = w
+    ELSEIF einheitMl(e) > 0 THEN
+        DIM ml AS FLOAT : ml = menge * einheitMl(e)
+        IF ml >= 1000 THEN
+            z.menge = ROUND(ml / 1000, 2) : z.einheit = "l"
+        ELSE
+            z.menge = ROUND(ml, 0) : z.einheit = "ml"
+        END IF
+    ELSEIF einheitG(e) > 0 THEN
+        DIM g AS FLOAT : g = menge * einheitG(e)
+        IF g >= 1000 THEN
+            z.menge = ROUND(g / 1000, 2) : z.einheit = "kg"
+        ELSE
+            z.menge = ROUND(g, 0) : z.einheit = "g"
+        END IF
+    ELSE
+        z.menge = mengeRunden(menge)
+        z.einheit = TRIM$(einheit)
+    END IF
+END SUB
+
+' Ganz bleibt ganz; unter 1 zwei Stellen (0,25 TL -- die Python-App rundete
+' auf eine Stelle: 0,2), sonst eine.
+FUNCTION mengeRunden(m AS FLOAT) AS FLOAT
+    IF m = INT(m) THEN RETURN m
+    IF m < 1 THEN RETURN ROUND(m, 2)
+    RETURN ROUND(m, 1)
+END FUNCTION
+
+' --- Der Dienst im Netz ----------------------------------------------------------------
+FUNCTION ueBasis$() AS STRING
+    DIM u AS STRING : u = GETENV$("KUEHL_UE_URL")
+    IF u = "" THEN RETURN "https://api.mymemory.translated.net"
+    RETURN u
+END FUNCTION
+
+FUNCTION uePfad$() AS STRING
+    RETURN studioDbPfad$("uebersetzungen.json")
+END FUNCTION
+
+SUB ueLaden()
+    IF ueGeladen THEN RETURN
+    ueGeladen = TRUE
+    IF NOT FILEEXISTS(uePfad$()) THEN RETURN
+    TRY
+        DIM j AS JSON_HANDLE : j = JSON_PARSE(READALL(uePfad$()))
+        DIM k AS STRING
+        FOR EACH k IN JSON_KEYS(j, "")
+            IF JSON_TYPE(j, JSON_KEY$(k)) = "string" THEN MAPPUT(ueDe, k, JSON_GET_STRING(j, JSON_KEY$(k)))
+        NEXT
+    CATCH fehler
+    END TRY
+END SUB
+
+SUB ueSichern()
+    DIM j AS JSON_HANDLE : j = JSON_NEW_OBJECT()
+    DIM k AS STRING
+    FOR EACH k IN MAPKEYS(ueDe)
+        JSON_SET_STRING(j, JSON_KEY$(k), MAPGET(ueDe, k))
+    NEXT
+    WRITEALL(uePfad$(), JSON_PRETTY(j))
+END SUB
+
+' Eine Zeile in Stücke für den Dienst: an Satzenden, sonst an Leerzeichen.
+FUNCTION ueStuecke(zeile AS STRING) AS ARRAY OF STRING
+    DIM aus AS ARRAY OF STRING : aus = []
+    DIM rest AS STRING : rest = TRIM$(zeile)
+    WHILE LEN(rest) > UE_STUECK
+        DIM schnitt AS INTEGER : schnitt = -1
+        DIM i AS INTEGER
+        FOR i = UE_STUECK - 1 TO 1 STEP -1
+            DIM zwei AS STRING : zwei = MID$(rest, i, 2)
+            IF zwei = ". " OR zwei = "! " OR zwei = "? " THEN
+                schnitt = i + 1
+                BREAK
+            END IF
+        NEXT
+        IF schnitt < 0 THEN schnitt = INSTRREV(LEFT$(rest, UE_STUECK), " ")
+        IF schnitt <= 0 THEN schnitt = UE_STUECK
+        ARRAY_PUSH(aus, TRIM$(LEFT$(rest, schnitt)))
+        rest = TRIM$(MID$(rest, schnitt, LEN(rest)))
+    WEND
+    IF rest <> "" THEN ARRAY_PUSH(aus, rest)
+    RETURN aus
+END FUNCTION
+
+' Lohnt ein Stück die Anfrage? (Nicht schon da, unterwegs oder aufgegeben,
+' und es steht ein Buchstabe darin.)
+FUNCTION ueBraucht(s AS STRING) AS BOOLEAN
+    IF MAPHAS(ueDe, s) OR MAPHAS(ueAus, s) THEN RETURN FALSE
+    IF ARRAY_INDEXOF(ueSchlange, s) >= 0 OR ARRAY_INDEXOF(ueAbrufText, s) >= 0 THEN RETURN FALSE
+    RETURN REGEX_TEST(s, "[A-Za-z]")
+END FUNCTION
+
+' Alles von text, was noch fehlt, in die Schlange.
+SUB ueAnfordern(text AS STRING)
+    ueLaden()
+    DIM z AS STRING
+    FOR EACH z IN SPLIT(text, CHR$(10))
+        DIM s AS STRING
+        FOR EACH s IN ueStuecke(z)
+            IF NOT ueBraucht(s) THEN CONTINUE
+            IF ueGesperrt THEN
+                MAPPUT(ueAus, s, "1")
+            ELSE
+                ARRAY_PUSH(ueSchlange, s)
+            END IF
+        NEXT
+    NEXT
+END SUB
+
+' Der Text, soweit übersetzt: je Stück die deutsche Fassung, sonst englisch.
+FUNCTION ueText$(text AS STRING) AS STRING
+    ueLaden()
+    DIM zeilen AS ARRAY OF STRING : zeilen = []
+    DIM z AS STRING
+    FOR EACH z IN SPLIT(text, CHR$(10))
+        DIM t AS ARRAY OF STRING : t = []
+        DIM s AS STRING
+        FOR EACH s IN ueStuecke(z)
+            ARRAY_PUSH(t, MAPGETOR(ueDe, s, s))
+        NEXT
+        ARRAY_PUSH(zeilen, JOIN$(t, " "))
+    NEXT
+    RETURN JOIN$(zeilen, CHR$(10))
+END FUNCTION
+
+' Ist von text nichts mehr unterwegs?
+FUNCTION ueBereit(text AS STRING) AS BOOLEAN
+    DIM z AS STRING
+    FOR EACH z IN SPLIT(text, CHR$(10))
+        DIM s AS STRING
+        FOR EACH s IN ueStuecke(z)
+            IF ARRAY_INDEXOF(ueSchlange, s) >= 0 OR ARRAY_INDEXOF(ueAbrufText, s) >= 0 THEN RETURN FALSE
+        NEXT
+    NEXT
+    RETURN TRUE
+END FUNCTION
+
+FUNCTION ueOffen() AS INTEGER
+    RETURN LEN(ueSchlange) + LEN(ueAbrufe)
+END FUNCTION
+
+' Je Bild: Angekommenes abholen, Wartende starten. TRUE, wenn etwas kam.
+FUNCTION ueTakt() AS BOOLEAN
+    DIM neu AS BOOLEAN : neu = FALSE
+    DIM i AS INTEGER : i = 0
+    WHILE i < LEN(ueAbrufe)
+        IF HTTP_READY(ueAbrufe[i]) THEN
+            DIM a AS INTEGER : a = ueAbrufe[i]
+            DIM s AS STRING : s = ueAbrufText[i]
+            ARRAY_REMOVE_AT(ueAbrufe, i)
+            ARRAY_REMOVE_AT(ueAbrufText, i)
+            ueAbholen(a, s)
+            neu = TRUE
+        ELSE
+            i = i + 1
+        END IF
+    WEND
+    WHILE LEN(ueAbrufe) < UE_GLEICHZEITIG AND LEN(ueSchlange) > 0
+        DIM t AS STRING : t = ueSchlange[0]
+        ARRAY_REMOVE_AT(ueSchlange, 0)
+        ARRAY_PUSH(ueAbrufe, ueStarten(t))
+        ARRAY_PUSH(ueAbrufText, t)
+    WEND
+    IF neu THEN ueSichern()
+    RETURN neu
+END FUNCTION
+
+FUNCTION ueStarten(s AS STRING) AS INTEGER
+    DIM kopf AS MAP OF STRING
+    MAPPUT(kopf, "User-Agent", "Kuehlschrank-App/1.0 (Drachenhauch)")
+    MAPPUT(kopf, "Accept", "application/json")
+    HTTP_TIMEOUT(10)
+    RETURN HTTP_REQUEST_START("GET", ueBasis$() + "/get?q=" + URL_ENCODE(s) + "&langpair=en%7Cde", "", kopf)
+END FUNCTION
+
+' Eine Antwort einsortieren. Geht etwas schief (kein Netz, Kontingent
+' aufgebraucht), bleibt der Rest der Schlange englisch -- jede weitere
+' Anfrage liefe in denselben Fehler (die Python-App fragte trotzdem jede
+' Zutat einzeln weiter).
+SUB ueAbholen(abruf AS INTEGER, s AS STRING)
+    DIM antwort AS STRING
+    TRY
+        antwort = HTTP_RESULT(abruf)
+    CATCH fehler
+        ueAufgeben(s, "Übersetzung nicht erreichbar -- die Texte bleiben englisch")
+        RETURN
+    END TRY
+    DIM j AS JSON_HANDLE
+    TRY
+        j = JSON_PARSE(antwort)
+    CATCH fehler2
+        ueAufgeben(s, "Ungültige Antwort vom Übersetzer -- die Texte bleiben englisch")
+        RETURN
+    END TRY
+    DIM st AS STRING : st = jText$(j, "responseStatus")
+    IF st = "429" THEN
+        ueGesperrt = TRUE
+        ueAufgeben(s, "Der Übersetzer hat sein Tageskontingent erreicht -- die übrigen Texte bleiben englisch")
+        RETURN
+    ELSEIF st <> "200" THEN
+        ueAufgeben(s, "Übersetzer (" + st + "): " + jText$(j, "responseData.translatedText"))
+        RETURN
+    END IF
+    DIM t AS STRING : t = TRIM$(HTML_TEXT(jText$(j, "responseData.translatedText")))
+    IF t = "" THEN
+        MAPPUT(ueAus, s, "1")
+    ELSE
+        MAPPUT(ueDe, s, t)
+    END IF
+END SUB
+
+SUB ueAufgeben(s AS STRING, warum AS STRING)
+    ueFehler = warum
+    MAPPUT(ueAus, s, "1")
+    DIM w AS STRING
+    FOR EACH w IN ueSchlange
+        MAPPUT(ueAus, w, "1")
+    NEXT
+    ueSchlange = []
+END SUB

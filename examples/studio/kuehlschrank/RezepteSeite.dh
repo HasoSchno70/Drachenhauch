@@ -161,7 +161,13 @@ CLASS RezepteSeite EXTENDS RezepteSeite_Basis
     END SUB
 
     SUB knopfKatalog_Klick()
+        Self.katalog("", FALSE)
+    END SUB
+
+    SUB katalog(text AS STRING, nachZutaten AS BOOLEAN)
         DIM f AS KatalogFenster : f = NEW KatalogFenster()
+        f.vorgabeText = text
+        f.vorgabeZutaten = nachZutaten
         f.ZeigenModal()
         IF f.importiert > 0 THEN Self.geaendert()
     END SUB
@@ -201,6 +207,7 @@ CLASS RezepteSeite EXTENDS RezepteSeite_Basis
         f.ZeigenModal()
         IF f.einkauf > 0 THEN Self.Ausloesen("Geaendert")
         IF f.kochenId > 0 THEN Self.kochen(f.kochenId)
+        IF f.suche <> "" THEN Self.katalog(f.suche, TRUE)
     END SUB
 END CLASS
 

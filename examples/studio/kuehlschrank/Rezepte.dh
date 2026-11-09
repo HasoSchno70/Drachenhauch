@@ -7,30 +7,13 @@
 IMPORT "db"
 IMPORT "regex"
 
-
-
 CONST REZEPT_SPALTEN = "id, name, description, servings, instructions, prep_time_minutes, cook_time_minutes"
 CONST ZUTAT_SPALTEN = "id, recipe_id, product_name, quantity, unit, product_id"
-
-
-
-
-
-
-
-
 
 ' --- Kochen --------------------------------------------------------------------------
 ' Wie viel von einer Zutat da ist (wie _get_available_quantity): über das
 ' verknüpfte Produkt, sonst jedes Produkt, dessen Name passt (namePasst) --
 ' alles zusammengezählt.
-
-
-
-
-
-
-
 
 ' Wie show_expiring_recipes: Rezepte, die eine ablaufende Zutat verwenden
 ' (namePasst), nach Rang = 10 je solcher Zutat + Anteil im Bestand. Die Namen der verwendeten stehen in
@@ -422,7 +405,7 @@ FUNCTION katalogPunkte(frage AS STRING, x AS Rezept) AS FLOAT
     RETURN p
 END FUNCTION
 
-FUNCTION katalogSuchen(text AS STRING) AS ARRAY OF Rezept
+FUNCTION katalogSuchen(text AS STRING, anzahl AS INTEGER = 10) AS ARRAY OF Rezept
     DIM aus AS ARRAY OF Rezept : aus = []
     DIM frage AS STRING : frage = LOWER$(TRIM$(text))
     IF frage = "" THEN RETURN aus
@@ -439,7 +422,45 @@ FUNCTION katalogSuchen(text AS STRING) AS ARRAY OF Rezept
         ARRAY_INSERT(aus, i, x)
         ARRAY_INSERT(punkte, i, p)
     NEXT
-    WHILE LEN(aus) > 10
+    WHILE LEN(aus) > anzahl
+        ARRAY_REMOVE_AT(aus, LEN(aus) - 1)
+    WEND
+    RETURN aus
+END FUNCTION
+
+' Nach Zutaten (mit Komma): Rezepte des Katalogs, die mindestens eine davon
+' verwenden, die mit den meisten zuerst -- Wörter wie namePasst (die
+' Python-App suchte eine Zutat als Teilzeichenkette: "Ei" fand "Reis").
+FUNCTION katalogNachZutaten(text AS STRING, anzahl AS INTEGER) AS ARRAY OF Rezept
+    DIM aus AS ARRAY OF Rezept : aus = []
+    DIM gesucht AS ARRAY OF STRING : gesucht = []
+    DIM t AS STRING
+    FOR EACH t IN SPLIT(text, ",")
+        IF TRIM$(t) <> "" THEN ARRAY_PUSH(gesucht, TRIM$(t))
+    NEXT
+    DIM zahlen AS ARRAY OF INTEGER : zahlen = []
+    DIM x AS Rezept
+    FOR EACH x IN katalog()
+        DIM n AS INTEGER : n = 0
+        FOR EACH t IN gesucht
+            DIM z AS Zutat
+            FOR EACH z IN x.zutaten
+                IF namePasst(t, z.name) THEN
+                    n = n + 1
+                    BREAK
+                END IF
+            NEXT
+        NEXT
+        IF n = 0 THEN CONTINUE
+        DIM i AS INTEGER : i = LEN(aus)
+        WHILE i > 0
+            IF zahlen[i - 1] >= n THEN BREAK
+            i = i - 1
+        WEND
+        ARRAY_INSERT(aus, i, x)
+        ARRAY_INSERT(zahlen, i, n)
+    NEXT
+    WHILE LEN(aus) > anzahl
         ARRAY_REMOVE_AT(aus, LEN(aus) - 1)
     WEND
     RETURN aus

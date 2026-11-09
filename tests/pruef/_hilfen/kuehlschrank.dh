@@ -7,6 +7,9 @@ IMPORT "db"
 IMPORT "json"
 IMPORT "studiolauf.dh"
 
+' Spoonacular-Schluessel, den die Proben sehen ("" = keiner).
+DIM kSchluessel AS STRING
+
 ' Das Projekt ohne Entwicklungsdaten und Erzeugtes (_studio/, bau/).
 SUB kKopieren(quelle AS STRING, ziel AS STRING)
     MKDIR(ziel)
@@ -86,6 +89,11 @@ FUNCTION kProbe(p AS STRING, teil AS STRING, aufnahme AS STRING, bilder AS INTEG
     ' Nie das echte Open Food Facts: ohne kOffStarten eine Adresse, an der
     ' niemand antwortet.
     IF GETENV$("KUEHL_OFF_URL") = "" THEN SETENV("KUEHL_OFF_URL", "http://127.0.0.1:9")
+    ' Ebenso nie das echte Spoonacular und nie der echte Uebersetzer; der
+    ' Schluessel ist der der Pruefung (kSchluessel), nie einer aus der Umgebung.
+    IF GETENV$("KUEHL_SPOON_URL") = "" THEN SETENV("KUEHL_SPOON_URL", "http://127.0.0.1:9")
+    IF GETENV$("KUEHL_UE_URL") = "" THEN SETENV("KUEHL_UE_URL", "http://127.0.0.1:9")
+    SETENV("SPOONACULAR_API_KEY", kSchluessel)
     DIM k AS INTEGER : k = PROCESS_START("dhrt", "run", "--bilder", STR$(bilder), p + "/_studio/probe.dh")
     kLauf$(k, TRUE)
     RETURN PROCESS_CODE(k)
@@ -155,4 +163,15 @@ FUNCTION kOffAnfragen$() AS STRING
         IF z <> "" THEN ARRAY_PUSH(aus, SPLIT(z, " ")[0])
     NEXT
     RETURN JOIN$(aus, " ")
+END FUNCTION
+
+
+' Das falsche Spoonacular samt Uebersetzer (spoon_server.dh) im Fallordner
+' starten; die Proben fragen es ueber KUEHL_SPOON_URL und KUEHL_UE_URL.
+' Anhalten mit kOffEnde, die Anfragen liest kOffAnfragen$ bzw. die Datei.
+FUNCTION kNetzStarten(server AS STRING) AS INTEGER
+    DIM k AS INTEGER : k = kOffStarten(server)
+    SETENV("KUEHL_SPOON_URL", GETENV$("KUEHL_OFF_URL"))
+    SETENV("KUEHL_UE_URL", GETENV$("KUEHL_OFF_URL"))
+    RETURN k
 END FUNCTION

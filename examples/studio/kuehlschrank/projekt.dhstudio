@@ -126,6 +126,16 @@
       "code": "OpenFoodFacts.dh"
     },
     {
+      "art": "modul",
+      "name": "Uebersetzung",
+      "code": "Uebersetzung.dh"
+    },
+    {
+      "art": "modul",
+      "name": "Spoonacular",
+      "code": "Spoonacular.dh"
+    },
+    {
       "art": "control",
       "name": "BestandSeite",
       "code": "BestandSeite.dh",

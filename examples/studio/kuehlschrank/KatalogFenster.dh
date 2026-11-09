@@ -1,66 +1,381 @@
-' Die Rezeptsuche -- wie RecipeSearchDialog der Python-App, hier zuerst im
-' Katalog (29 deutsche Rezepte, ohne Internet): Suchen, Ergebnis wählen,
-' Details sehen, importieren. Die Suche im Internet (Spoonacular, mit
-' Schlüssel) kommt mit dem Scannen in Stufe 6.
+' Die Rezeptsuche -- wie RecipeSearchDialog der Python-App: erst im Katalog
+' (29 deutsche Rezepte, ohne Netz), dann im Internet (Spoonacular, Modul
+' Spoonacular): Suchen, Ergebnis wählen, Einzelheiten sehen, importieren.
+' Gesucht wird im Namen oder nach Zutaten (mit Komma, die Vorschläge für
+' Ablaufendes kommen so herein). Alles aus dem Netz läuft im Hintergrund
+' (Takt): die Treffer des Katalogs stehen sofort da, die aus dem Internet
+' kommen dazu; die Einzelheiten eines Rezepts lädt erst die Auswahl. Mit
+' "Ins Deutsche übersetzen" erscheinen Titel und Texte erst englisch und
+' werden deutsch, sobald der Übersetzer antwortet (Modul Uebersetzung);
+' importieren lässt sich ein Rezept, wenn seine Texte fertig sind.
+'
+' Anders als dort: Kam die Antwort zu einem früher gewählten Rezept zuletzt,
+' zeigte die Python-App sie -- und importierte sie -- unter dem jetzt
+' gewählten. Hier gehören Einzelheiten zu ihrem Rezept. Ein Fehler (kein
+' Schlüssel, Kontingent, kein Netz) steht in der Statuszeile.
 CLASS KatalogFenster EXTENDS KatalogFenster_Basis
     DIM treffer AS ARRAY OF Rezept
     DIM importiert AS INTEGER
+    ' Vom Aufrufer: Suchtext und ob nach Zutaten (sucht dann gleich).
+    DIM vorgabeText AS STRING
+    DIM vorgabeZutaten AS BOOLEAN
+    ' Die Suche im Netz (-1 = keine unterwegs; Abrufe zählen ab 0), wie viele Treffer aus dem
+    ' Katalog stammen und ob das Netz gefragt wurde.
+    DIM sucheAbruf AS INTEGER
+    DIM lokalZahl AS INTEGER
+    DIM netzGefragt AS BOOLEAN
+    ' Je Rezept, dessen Einzelheiten unterwegs sind, der Abruf.
+    DIM detailAbrufe AS ARRAY OF INTEGER
+    DIM detailRezepte AS ARRAY OF Rezept
+    ' Das Rezept, dessen Einzelheiten nicht kamen, und warum.
+    DIM fehlRezept AS Rezept
+    DIM fehlText AS STRING
+    ' Was zuletzt in den Einzelheiten stand (nicht jedes Bild neu setzen).
+    DIM gezeigt AS STRING
+    DIM offenGezeigt AS INTEGER
 
     SUB Geoeffnet()
         GUI_SET_TEXT(Self.anzahl, "🇩🇪 " + STR$(LEN(katalog())) + " Rezepte im Katalog")
+        GUI_SET_DROPDOWN(Self.suchArt, ["🔎 im Namen", "🥕 nach Zutaten"])
+        GUI_DROPDOWN_SET_SELECTED(Self.suchArt, IIF(Self.vorgabeZutaten, 1, 0))
         Self.treffer = []
+        Self.sucheAbruf = -1
+        Self.detailAbrufe = [] : Self.detailRezepte = []
+        Self.offenGezeigt = -1
         GUI_SET_ENABLED(Self.knopfImport, FALSE)
-    END SUB
-
-    SUB knopfSuchen_Klick()
-        Self.treffer = katalogSuchen(GUI_TEXT(Self.sucheFeld))
-        GUI_TABLE_CLEAR(Self.tabelle)
-        DIM x AS Rezept
-        FOR EACH x IN Self.treffer
-            GUI_TABLE_ADD_ROW(Self.tabelle, [x.name, minutenText$(x.gesamt()), STR$(x.portionen), x.kategorie])
-        NEXT
-        GUI_SET_TEXT(Self.ergebnis, IIF(LEN(Self.treffer) = 0, "Nichts gefunden -- ein anderes Wort?", "📋 " + STR$(LEN(Self.treffer)) + " Treffer"))
-        GUI_SET_TEXT(Self.details, "")
-        GUI_SET_ENABLED(Self.knopfImport, FALSE)
-        IF LEN(Self.treffer) > 0 THEN
-            GUI_TABLE_SET_SELECTED(Self.tabelle, 0)
-            Self.tabelle_Geaendert()
+        Self.schluesselHinweis()
+        GUI_FOCUS(Self.sucheFeld)
+        IF Self.vorgabeText <> "" THEN
+            GUI_SET_TEXT(Self.sucheFeld, Self.vorgabeText)
+            Self.knopfSuchen_Klick()
         END IF
     END SUB
 
+    SUB status(text AS STRING, art AS STRING)
+        GUI_SET_TEXT(Self.hinweis, text)
+        GUI_SET_COLOR(Self.hinweis, "fg", IIF(art = "fehler", &HE57373, IIF(art = "erfolg", &H81C784, GUI_THEME_GET("muted_fg"))))
+    END SUB
+
+    SUB schluesselHinweis()
+        IF spoonSchluessel$() = "" THEN
+            Self.status("🔑 Ohne Spoonacular-Schlüssel sucht nur der Katalog (kostenlos auf spoonacular.com/food-api).", "")
+        ELSE
+            Self.status("", "")
+        END IF
+    END SUB
+
+    FUNCTION uebersetzen() AS BOOLEAN
+        RETURN GUI_CHECKED(Self.uebersetzenSchalter)
+    END FUNCTION
+
+    ' Ein Text eines Rezepts, wie er erscheint: aus dem Netz übersetzt, soweit da.
+    FUNCTION aus$(x AS Rezept, text AS STRING) AS STRING
+        IF x.herkunft = "netz" AND Self.uebersetzen() THEN RETURN ueText$(text)
+        RETURN text
+    END FUNCTION
+
+    FUNCTION zutatName$(x AS Rezept, z AS Zutat) AS STRING
+        IF z.englisch THEN RETURN Self.aus$(x, z.name)
+        RETURN z.name
+    END FUNCTION
+
+    ' --- Suchen ------------------------------------------------------------------
     SUB sucheFeld_Enter()
         Self.knopfSuchen_Klick()
     END SUB
 
+    SUB knopfSuchen_Klick()
+        DIM text AS STRING : text = TRIM$(GUI_TEXT(Self.sucheFeld))
+        IF text = "" THEN
+            Self.status("❗ Bitte gib einen Suchbegriff ein!", "fehler")
+            RETURN
+        END IF
+        ' Eine Suche, die noch läuft, gilt nicht mehr (die Python-App ließ sie
+        ' zu Ende laufen und mischte ihre Treffer unter die neuen).
+        IF Self.sucheAbruf >= 0 THEN HTTP_CANCEL(Self.sucheAbruf)
+        Self.sucheAbruf = -1
+        Self.netzGefragt = FALSE
+        DIM hoechstens AS INTEGER : hoechstens = INT(GUI_VALUE(Self.maxZahl))
+        DIM zutaten AS BOOLEAN : zutaten = GUI_DROPDOWN_SELECTED(Self.suchArt) = 1
+        IF zutaten THEN
+            Self.treffer = katalogNachZutaten(text, hoechstens)
+        ELSE
+            Self.treffer = katalogSuchen(text, hoechstens)
+        END IF
+        Self.lokalZahl = LEN(Self.treffer)
+        IF GUI_CHECKED(Self.internetSchalter) THEN
+            IF spoonSchluessel$() = "" THEN
+                Self.schluesselHinweis()
+            ELSE
+                Self.sucheAbruf = spoonSucheStarten(text, zutaten, MAX(1, hoechstens - Self.lokalZahl))
+                GUI_SET_ENABLED(Self.knopfSuchen, FALSE)
+                Self.status("⏳ " + STR$(Self.lokalZahl) + " im Katalog. Durchsuche das Internet …", "")
+            END IF
+        ELSE
+            Self.status("", "")
+        END IF
+        Self.tabelleFuellen(0)
+    END SUB
+
+    ' Die Tabelle neu, danach die Zeile waehle gewählt (-1 = keine).
+    SUB tabelleFuellen(waehle AS INTEGER)
+        GUI_TABLE_CLEAR(Self.tabelle)
+        DIM x AS Rezept
+        FOR EACH x IN Self.treffer
+            GUI_TABLE_ADD_ROW(Self.tabelle, [IIF(x.herkunft = "netz", "🌐", "🇩🇪"), Self.aus$(x, x.name), minutenText$(x.gesamt()), STR$(x.portionen), x.kategorie])
+        NEXT
+        Self.zaehlen()
+        IF waehle >= 0 AND waehle < LEN(Self.treffer) THEN
+            GUI_TABLE_SET_SELECTED(Self.tabelle, waehle)
+        END IF
+        Self.tabelle_Geaendert()
+    END SUB
+
+    SUB zaehlen()
+        DIM n AS INTEGER : n = LEN(Self.treffer)
+        IF n = 0 AND Self.sucheAbruf < 0 THEN
+            GUI_SET_TEXT(Self.ergebnis, "Nichts gefunden -- ein anderes Wort?")
+        ELSEIF Self.netzGefragt THEN
+            GUI_SET_TEXT(Self.ergebnis, "📋 " + STR$(n) + " Treffer: 🇩🇪 " + STR$(Self.lokalZahl) + " + 🌐 " + STR$(n - Self.lokalZahl))
+        ELSE
+            GUI_SET_TEXT(Self.ergebnis, "📋 " + STR$(n) + " Treffer")
+        END IF
+    END SUB
+
+    ' --- Was aus dem Netz kommt ------------------------------------------------------
+    SUB Takt()
+        IF Self.sucheAbruf >= 0 THEN
+            IF HTTP_READY(Self.sucheAbruf) THEN
+                DIM a AS INTEGER : a = Self.sucheAbruf
+                Self.sucheAbruf = -1
+                Self.netzTreffer(spoonAntwort$(a))
+            END IF
+        END IF
+        DIM i AS INTEGER : i = 0
+        WHILE i < LEN(Self.detailAbrufe)
+            IF HTTP_READY(Self.detailAbrufe[i]) THEN
+                DIM d AS INTEGER : d = Self.detailAbrufe[i]
+                DIM x AS Rezept : x = Self.detailRezepte[i]
+                ARRAY_REMOVE_AT(Self.detailAbrufe, i)
+                ARRAY_REMOVE_AT(Self.detailRezepte, i)
+                Self.detailsDa(x, spoonAntwort$(d))
+            ELSE
+                i = i + 1
+            END IF
+        WEND
+        IF ueTakt() THEN Self.uebersetzt()
+        Self.uebersetzerStatus()
+    END SUB
+
+    SUB netzTreffer(antwort AS STRING)
+        GUI_SET_ENABLED(Self.knopfSuchen, TRUE)
+        Self.netzGefragt = TRUE
+        DIM neu AS ARRAY OF Rezept : neu = spoonTreffer(antwort)
+        IF spoonFehler <> "" THEN
+            Self.status("❗ " + spoonFehler, "fehler")
+        ELSE
+            Self.status("🌐 " + STR$(LEN(neu)) + " aus dem Internet (Spoonacular)", "erfolg")
+        END IF
+        DIM x AS Rezept
+        FOR EACH x IN neu
+            ARRAY_PUSH(Self.treffer, x)
+            IF Self.uebersetzen() THEN ueAnfordern(x.name)
+        NEXT
+        ' Die Auswahl bleibt; war keine, bleibt es dabei -- ein Rezept aus dem
+        ' Netz zu wählen lädt seine Einzelheiten, und das kostet bei
+        ' Spoonacular einen Punkt vom Tageskontingent.
+        Self.tabelleFuellen(GUI_TABLE_SELECTED(Self.tabelle))
+    END SUB
+
+    SUB detailsDa(x AS Rezept, antwort AS STRING)
+        IF spoonDetailsAus(x, antwort) THEN
+            IF Self.uebersetzen() THEN Self.anfordern(x)
+        ELSE
+            Self.fehlRezept = x
+            Self.fehlText = spoonFehler
+        END IF
+        IF x = Self.gewaehlt() THEN Self.detailsZeigen()
+    END SUB
+
+    ' Alle Texte eines Rezepts aus dem Netz zum Übersetzen.
+    SUB anfordern(x AS Rezept)
+        IF x.herkunft <> "netz" THEN RETURN
+        ueAnfordern(x.name)
+        ueAnfordern(x.beschreibung)
+        ueAnfordern(x.anleitung)
+        DIM z AS Zutat
+        FOR EACH z IN x.zutaten
+            IF z.englisch THEN ueAnfordern(z.name)
+        NEXT
+    END SUB
+
+    FUNCTION bereit(x AS Rezept) AS BOOLEAN
+        IF x.herkunft <> "netz" THEN RETURN TRUE
+        IF NOT x.vollstaendig THEN RETURN FALSE
+        IF NOT Self.uebersetzen() THEN RETURN TRUE
+        IF NOT ueBereit(x.name) OR NOT ueBereit(x.beschreibung) OR NOT ueBereit(x.anleitung) THEN RETURN FALSE
+        DIM z AS Zutat
+        FOR EACH z IN x.zutaten
+            IF z.englisch AND NOT ueBereit(z.name) THEN RETURN FALSE
+        NEXT
+        RETURN TRUE
+    END FUNCTION
+
+    ' Neue Übersetzungen: Titel in der Tabelle und die Einzelheiten.
+    SUB uebersetzt()
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(Self.treffer) - 1
+            IF Self.treffer[i].herkunft = "netz" THEN GUI_TABLE_SET_CELL(Self.tabelle, i, 1, Self.aus$(Self.treffer[i], Self.treffer[i].name))
+        NEXT
+        Self.detailsZeigen()
+    END SUB
+
+    SUB uebersetzerStatus()
+        DIM n AS INTEGER : n = ueOffen()
+        IF n = Self.offenGezeigt THEN RETURN
+        DIM vorher AS INTEGER : vorher = Self.offenGezeigt
+        Self.offenGezeigt = n
+        IF n > 0 THEN
+            Self.status("🌐 Übersetze … (" + STR$(n) + " offen)", "")
+        ELSEIF vorher > 0 THEN
+            IF ueFehler <> "" THEN
+                Self.status("❗ " + ueFehler, "fehler")
+                ueFehler = ""
+            ELSE
+                Self.status("✓ Übersetzt", "erfolg")
+            END IF
+        END IF
+    END SUB
+
+    SUB uebersetzenSchalter_Geaendert()
+        IF Self.uebersetzen() THEN
+            DIM x AS Rezept
+            FOR EACH x IN Self.treffer
+                IF x.herkunft = "netz" THEN
+                    ueAnfordern(x.name)
+                    IF x.vollstaendig THEN Self.anfordern(x)
+                END IF
+            NEXT
+        END IF
+        Self.uebersetzt()
+    END SUB
+
+    ' --- Auswahl und Einzelheiten ----------------------------------------------------
     FUNCTION gewaehlt() AS Rezept
         DIM z AS INTEGER : z = GUI_TABLE_SELECTED(Self.tabelle)
         IF z < 0 OR z >= LEN(Self.treffer) THEN RETURN NIL
         RETURN Self.treffer[z]
     END FUNCTION
 
+    ' Ein Rezept aus dem Netz ohne Einzelheiten lädt sie jetzt (einmal; nach
+    ' einem Fehler beim nächsten Wählen wieder).
     SUB tabelle_Geaendert()
         DIM x AS Rezept : x = Self.gewaehlt()
-        IF x IS NIL THEN RETURN
-        DIM t AS STRING : t = x.name + CHR$(10) + x.beschreibung + CHR$(10) + CHR$(10) + "🍽 " + STR$(x.portionen) + " Portionen, ⏱ " + STR$(x.vorb) + " + " + STR$(x.koch) + " min" + CHR$(10) + CHR$(10) + "Zutaten:" + CHR$(10)
-        DIM z AS Zutat
-        FOR EACH z IN x.zutaten
-            t = t + "  • " + z.mengeText$() + " " + z.name + CHR$(10)
-        NEXT
-        GUI_SET_TEXT(Self.details, t + CHR$(10) + "Zubereitung:" + CHR$(10) + x.anleitung)
-        GUI_SET_ENABLED(Self.knopfImport, TRUE)
+        IF x IS NOT NIL THEN
+            IF x.herkunft = "netz" AND NOT x.vollstaendig THEN
+                IF ARRAY_INDEXOF(Self.detailRezepte, x) < 0 THEN
+                    IF Self.fehlRezept = x THEN Self.fehlRezept = NIL
+                    ARRAY_PUSH(Self.detailAbrufe, spoonDetailsStarten(x.netzId))
+                    ARRAY_PUSH(Self.detailRezepte, x)
+                END IF
+            END IF
+        END IF
+        Self.detailsZeigen()
     END SUB
 
+    SUB detailsZeigen()
+        DIM x AS Rezept : x = Self.gewaehlt()
+        DIM t AS STRING
+        IF x IS NIL THEN
+            t = ""
+        ELSEIF x.herkunft = "netz" AND NOT x.vollstaendig THEN
+            t = Self.aus$(x, x.name) + CHR$(10) + CHR$(10) + "⏱ " + minutenText$(x.gesamt()) + "  •  🍽 " + STR$(x.portionen) + " Portionen" + CHR$(10) + CHR$(10)
+            IF Self.fehlRezept = x THEN
+                t = t + "❗ Einzelheiten nicht geladen: " + Self.fehlText
+            ELSE
+                t = t + "⏳ Lade Einzelheiten …"
+            END IF
+        ELSE
+            t = Self.aus$(x, x.name) + CHR$(10) + Self.aus$(x, x.beschreibung) + CHR$(10) + CHR$(10) + "🍽 " + STR$(x.portionen) + " Portionen, ⏱ " + STR$(x.vorb) + " + " + STR$(x.koch) + " min" + CHR$(10) + CHR$(10) + "Zutaten:" + CHR$(10)
+            DIM z AS Zutat
+            FOR EACH z IN x.zutaten
+                t = t + "  • " + z.mengeText$() + " " + Self.zutatName$(x, z) + CHR$(10)
+            NEXT
+            t = t + CHR$(10) + "Zubereitung:" + CHR$(10) + IIF(x.anleitung = "", "Keine Anleitung verfügbar.", Self.aus$(x, x.anleitung))
+            IF x.herkunft = "netz" THEN t = t + CHR$(10) + CHR$(10) + "🌐 " + Self.quellText$(x)
+        END IF
+        IF t <> Self.gezeigt THEN
+            GUI_SET_TEXT(Self.details, t)
+            Self.gezeigt = t
+        END IF
+        IF x IS NIL THEN
+            GUI_SET_ENABLED(Self.knopfImport, FALSE)
+        ELSE
+            GUI_SET_ENABLED(Self.knopfImport, Self.bereit(x))
+        END IF
+    END SUB
+
+    FUNCTION quellText$(x AS Rezept) AS STRING
+        IF x.adresse = "" THEN RETURN "Quelle: " + x.quelle
+        RETURN "Quelle: " + x.quelle + " -- " + x.adresse
+    END FUNCTION
+
+    ' --- Importieren -----------------------------------------------------------------
     ' Wie import_web_recipe -- mit der Beschreibung (die Python-App liess sie
-    ' beim Import fallen).
+    ' beim Import fallen); ein Rezept aus dem Netz mit den deutschen Texten und
+    ' seiner Quelle.
     SUB knopfImport_Klick()
         DIM x AS Rezept : x = Self.gewaehlt()
         IF x IS NIL THEN RETURN
-        rezeptAnlegen(x)
+        IF NOT Self.bereit(x) THEN RETURN
+        DIM y AS Rezept : y = x
+        IF x.herkunft = "netz" THEN
+            y = NEW Rezept()
+            y.name = Self.aus$(x, x.name)
+            y.beschreibung = Self.aus$(x, x.beschreibung)
+            y.beschreibung = TRIM$(y.beschreibung + CHR$(10) + CHR$(10) + Self.quellText$(x))
+            y.portionen = x.portionen
+            y.vorb = x.vorb
+            y.koch = x.koch
+            y.anleitung = Self.aus$(x, x.anleitung)
+            y.zutaten = []
+            DIM z AS Zutat
+            FOR EACH z IN x.zutaten
+                DIM n AS Zutat : n = NEW Zutat()
+                n.name = Self.zutatName$(x, z)
+                n.menge = z.menge
+                n.einheit = z.einheit
+                ARRAY_PUSH(y.zutaten, n)
+            NEXT
+        END IF
+        rezeptAnlegen(y)
         Self.importiert = Self.importiert + 1
-        GUI_TOAST(Self.studioWin, "„" + x.name + "“ wurde importiert!", "erfolg")
+        GUI_TOAST(Self.studioWin, "„" + y.name + "“ wurde importiert!", "erfolg")
+    END SUB
+
+    ' --- Schlüssel und Schließen -----------------------------------------------------
+    SUB knopfSchluessel_Klick()
+        IF TRIM$(GETENV$("SPOONACULAR_API_KEY")) <> "" THEN
+            Meldung("Der Schlüssel kommt aus der Umgebungsvariable SPOONACULAR_API_KEY -- sie gilt vor dem gespeicherten.", "API-Schlüssel")
+            RETURN
+        END IF
+        DIM k AS STRING : k = Eingabe("Spoonacular-API-Schlüssel (kostenlos auf spoonacular.com/food-api):", spoonSchluessel$(), "API-Schlüssel")
+        IF k = "" THEN RETURN
+        IF NOT spoonSchluesselSetzen(k) THEN
+            Meldung("Ein Schlüssel besteht nur aus Buchstaben, Ziffern und Bindestrichen.", "API-Schlüssel")
+            RETURN
+        END IF
+        Self.status("🔑 Schlüssel gespeichert.", "erfolg")
     END SUB
 
     SUB knopfSchliessen_Klick()
+        IF Self.sucheAbruf >= 0 THEN HTTP_CANCEL(Self.sucheAbruf)
+        Self.sucheAbruf = -1
+        DIM a AS INTEGER
+        FOR EACH a IN Self.detailAbrufe
+            HTTP_CANCEL(a)
+        NEXT
+        Self.detailAbrufe = [] : Self.detailRezepte = []
         Self.Zumachen()
     END SUB
 END CLASS

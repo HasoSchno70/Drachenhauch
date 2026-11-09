@@ -5,12 +5,6 @@
 ' Eintrags an einen anderen Ort.
 IMPORT "db"
 
-
-
-
-
-
-
 CONST ZIEL_TRENNER = " · "
 
 ' Stichwort -> Farbe (RGB) und Sinnbild, wie DEFAULT_LOCATION_SETTINGS -- in

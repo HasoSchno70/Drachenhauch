@@ -10,6 +10,10 @@ CLASS Zutat
     DIM status AS STRING
     DIM vorhanden AS FLOAT
     DIM bestandName AS STRING
+    ' Nur aus dem Internet: die Zeile dort ("2 cups flour") und ob der Name
+    ' noch englisch ist (das Wörterbuch kannte ihn nicht).
+    DIM original AS STRING
+    DIM englisch AS BOOLEAN
 
     FUNCTION mengeText$() AS STRING
         RETURN zahlText$(Self.menge) + " " + Self.einheit

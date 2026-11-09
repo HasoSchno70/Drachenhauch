@@ -42,7 +42,7 @@ IMPORT "{sammlung}/../../../studio/berichte_laufzeit.dh"
 IMPORT "{sammlung}/../../../studio/berichte.dh"
 --- erwartet
 laden []
-elemente 40 start Hauptfenster
+elemente 42 start Hauptfenster
 app App TRUE
 fenster Hauptfenster TRUE
 datenbank Daten TRUE
@@ -67,6 +67,8 @@ modul Barcodecache TRUE
 klasse Fund TRUE
 modul Vorgaben TRUE
 modul OpenFoodFacts TRUE
+modul Uebersetzung TRUE
+modul Spoonacular TRUE
 control BestandSeite TRUE
 control EinkaufSeite TRUE
 fenster ScanFenster TRUE

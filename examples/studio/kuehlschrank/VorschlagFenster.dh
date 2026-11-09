@@ -11,6 +11,8 @@ CLASS VorschlagFenster EXTENDS VorschlagFenster_Basis
     ' Ergebnis: Posten auf der Einkaufsliste, Rezept zum Kochen (0 = keins).
     DIM einkauf AS INTEGER
     DIM kochenId AS INTEGER
+    ' Zutaten für die Rezeptsuche im Internet ("" = keine).
+    DIM suche AS STRING
     DIM ab AS ARRAY OF Eintrag
 
     SUB Geoeffnet()
@@ -111,15 +113,18 @@ CLASS VorschlagFenster EXTENDS VorschlagFenster_Basis
         Self.knopfKochen_Klick()
     END SUB
 
-    ' Die Suche im Internet kommt mit Stufe 6; bis dahin wie die Python-App
-    ' ohne Schlüssel: die Suchwörter.
+    ' Wie _search_for_expiring: die ersten drei ablaufenden Produkte (jedes
+    ' einmal; dort stand "Milch Milch Linsen", wenn zwei Packungen ablaufen) -- hier
+    ' als Zutaten (Spoonacular sucht dann Rezepte, die sie verwenden; die
+    ' Python-App gab die drei Namen als Suchwort für Titel hinaus).
     SUB knopfInternet_Klick()
         DIM w AS ARRAY OF STRING : w = []
         DIM e AS Eintrag
         FOR EACH e IN Self.ab
-            IF LEN(w) < 3 THEN ARRAY_PUSH(w, e.name)
+            IF LEN(w) < 3 AND ARRAY_INDEXOF(w, e.name) < 0 THEN ARRAY_PUSH(w, e.name)
         NEXT
-        Meldung("Suche im Internet nach Rezepten mit:" + CHR$(10) + CHR$(10) + JOIN$(w, " "), "Suchvorschlag")
+        Self.suche = JOIN$(w, ", ")
+        Self.Zumachen()
     END SUB
 
     SUB knopfSchliessen_Klick()
