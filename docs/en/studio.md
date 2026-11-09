@@ -272,6 +272,30 @@ project folder; an image control picks its image in the inspector under
 the images go to `_studio/assets/bilder/`, and `dhrt --export` takes
 `assets/` next to the executable.
 
+**Languages.** A project writes its texts in one language, that of its
+source. A table `sprache/<code>.txt` in the project folder makes a second one
+from it: per line the text as it stands in the project, a tab, the
+translation (`sprache/en.txt`). Translated by themselves are the texts of
+the windows (titles, captions, placeholders, tooltips, column headers,
+entries, tabs, messages of the validation rules, chart titles, toolbars),
+the menus including their shortcuts (`Strg+S` becomes `Ctrl+S`), the texts
+of the reports and the buttons of the dialogs above. In the code every
+displayed text goes through `tr$`:
+
+| Call | what it does |
+|---|---|
+| `SpracheWaehlen(code$)` | chooses the language (`""` = that of the source); `FALSE` if there is no table `sprache/<code>.txt` |
+| `Sprache$()` | the chosen language, `""` = that of the source |
+| `tr$(text$)` | the text in the chosen language; what the table does not know stays |
+| `trf$(text$, werte)` | a text with `{0}`, `{1}` ...: translated first, then filled in |
+
+The choice is made before the first window, in `App.Geoeffnet`; without a
+choice it is English when `DHRT_LANG` is English and the table `en.txt`
+exists. A change applies to windows built afterwards. What the program reads
+back from a widget (the text of a drop-down list) is the translation --
+compare it with `tr$("...")`. With `DH_STUDIO_SPRACHLUECKEN=file` the runtime
+writes every text missing from the table into the file, once.
+
 **Debugger.**
 
 | Action | effect |
@@ -722,6 +746,14 @@ studio, PDFs and the CSV end up in `_studio/`.
 `zeigen(id)` in a window overrides the inherited `Zeigen()` -- `dhrt --check`
 (and so the problem list) warns when a method overrides an inherited one with
 a different number of parameters.
+
+**The big example:** `examples/studio/kuehlschrank/` is a fridge manager (the
+port of a PySide6 app, see its `LIESMICH.md`) with 18 windows and custom
+controls, an existing SQLite file as database element, tool and status bar,
+timers, charts, a report, network requests in the background and an English
+interface (`sprache/en.txt`, see "Languages" above). How it grew stage by
+stage and which gaps of the studio it found on the way is told in
+`geschichte/kuehlschrank.md`.
 
 ## For tests
 

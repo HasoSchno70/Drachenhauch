@@ -15,6 +15,7 @@
 ' kehren erst dann zurueck -- wie in Xojo oder Visual Basic.
 
 IMPORT "gui"
+IMPORT "json"
 IMPORT "pdf"
 IMPORT "imgfx"
 IMPORT "chart"
@@ -607,7 +608,9 @@ SUB studioLauf(app AS StudioApp, start AS StudioFenster, b AS INTEGER, h AS INTE
     SETFPS(60)
     studioSchirmB = SCREENWIDTH() : studioSchirmH = SCREENHEIGHT()
     studioDieStartseite = start
+    studioSpracheVorgabe()
     app.Geoeffnet()
+    IF studioSprache <> "" THEN SETWINDOWTITLE(studioTr$(titel))
     start.studioHaupt = TRUE
     start.Zeigen()
     WHILE studioBild()
@@ -642,12 +645,13 @@ END SUB
 ' Eine Frage; die Antwort ist die Nummer des Knopfs (1 = der erste).
 ' Knoepfe mit | getrennt, Enter = der erste, ESC = der letzte.
 FUNCTION Frage(text AS STRING, knoepfe AS STRING = "Ja|Nein", titel AS STRING = "") AS INTEGER
+    IF knoepfe = "Ja|Nein" THEN knoepfe = studioTr$("Ja|Nein")
     RETURN studioAntwort(GUI_DIALOG(titel, text, knoepfe))
 END FUNCTION
 
 ' Fragt nach einem Text; "" bei Abbrechen.
 FUNCTION Eingabe(text AS STRING, vorgabe AS STRING = "", titel AS STRING = "") AS STRING
-    DIM d AS GUI_WINDOW : d = GUI_PROMPT(titel, text, vorgabe)
+    DIM d AS GUI_WINDOW : d = GUI_PROMPT(titel, text, vorgabe, studioTr$("OK|Abbrechen"))
     IF studioAntwort(d) <> 1 THEN RETURN ""
     RETURN GUI_DIALOG_TEXT(d)
 END FUNCTION
@@ -694,7 +698,7 @@ FUNCTION Auswahl(text AS STRING, eintraege AS ARRAY OF STRING, vorgabe AS INTEGE
     DIM feld AS GUI_WIDGET : feld = GUI_DROPDOWN(w, 14, 40, 352, 30, eintraege)
     IF LEN(eintraege) > 0 THEN GUI_DROPDOWN_SET_SELECTED(feld, MAX(0, MIN(vorgabe, LEN(eintraege) - 1)))
     DIM ok AS GUI_WIDGET : ok = GUI_BUTTON(w, "OK", 166, 84, 96, 30)
-    DIM ab AS GUI_WIDGET : ab = GUI_BUTTON(w, "Abbrechen", 270, 84, 96, 30)
+    DIM ab AS GUI_WIDGET : ab = GUI_BUTTON(w, studioTr$("Abbrechen"), 270, 84, 96, 30)
     DIM i AS INTEGER : i = -1
     IF studioFeldDialog(w, -1, ok, ab) AND LEN(eintraege) > 0 THEN i = GUI_DROPDOWN_SELECTED(feld)
     GUI_WINDOW_DESTROY(w)
@@ -707,7 +711,7 @@ FUNCTION EingabeZahl(text AS STRING, vorgabe AS INTEGER, min AS INTEGER, max AS 
     DIM w AS GUI_WINDOW : w = studioKleinesFenster(titel, text)
     DIM feld AS GUI_WIDGET : feld = GUI_SPINNER(w, 14, 40, 160, min, max, vorgabe, 1)
     DIM ok AS GUI_WIDGET : ok = GUI_BUTTON(w, "OK", 166, 84, 96, 30)
-    DIM ab AS GUI_WIDGET : ab = GUI_BUTTON(w, "Abbrechen", 270, 84, 96, 30)
+    DIM ab AS GUI_WIDGET : ab = GUI_BUTTON(w, studioTr$("Abbrechen"), 270, 84, 96, 30)
     DIM ja AS BOOLEAN : ja = studioFeldDialog(w, feld, ok, ab)
     DIM z AS INTEGER : z = INT(GUI_VALUE(feld))
     GUI_WINDOW_DESTROY(w)
@@ -723,7 +727,7 @@ FUNCTION FarbeWaehlen(vorgabe AS INTEGER, titel AS STRING = "") AS INTEGER
     DIM feld AS GUI_WIDGET : feld = GUI_COLORPICKER(w, 14, 12, 352, 220)
     GUI_SET_PICKED_COLOR(feld, IIF(vorgabe < 0, &HFFFFFF, vorgabe))
     DIM ok AS GUI_WIDGET : ok = GUI_BUTTON(w, "OK", 166, 248, 96, 30)
-    DIM ab AS GUI_WIDGET : ab = GUI_BUTTON(w, "Abbrechen", 270, 248, 96, 30)
+    DIM ab AS GUI_WIDGET : ab = GUI_BUTTON(w, studioTr$("Abbrechen"), 270, 248, 96, 30)
     DIM f AS INTEGER : f = -1
     IF studioFeldDialog(w, -1, ok, ab) THEN f = GUI_PICKED_COLOR(feld)
     GUI_WINDOW_DESTROY(w)
@@ -738,9 +742,9 @@ SUB studioBerichtVorschau(p AS PDF, titel AS STRING)
     DIM zurueck AS GUI_WIDGET : zurueck = GUI_BUTTON(w, "<", 10, 8, 40, 26)
     DIM seite AS GUI_WIDGET : seite = GUI_LABEL(w, "", 58, 12)
     DIM weiter AS GUI_WIDGET : weiter = GUI_BUTTON(w, ">", 150, 8, 40, 26)
-    DIM drucken AS GUI_WIDGET : drucken = GUI_BUTTON(w, "Drucken", 300, 8, 100, 26)
-    DIM sichern AS GUI_WIDGET : sichern = GUI_BUTTON(w, "Als PDF …", 406, 8, 110, 26)
-    DIM zu AS GUI_WIDGET : zu = GUI_BUTTON(w, "Schließen", 522, 8, 106, 26)
+    DIM drucken AS GUI_WIDGET : drucken = GUI_BUTTON(w, studioTr$("Drucken"), 300, 8, 100, 26)
+    DIM sichern AS GUI_WIDGET : sichern = GUI_BUTTON(w, studioTr$("Als PDF …"), 406, 8, 110, 26)
+    DIM zu AS GUI_WIDGET : zu = GUI_BUTTON(w, studioTr$("Schließen"), 522, 8, 106, 26)
     DIM bild AS GUI_WIDGET : bild = GUI_IMAGE(w, 10, 42, 620, GUI_WINDOW_GET_H(w) - 82, -1)
     GUI_IMAGE_MODE(bild, "einpassen")
     GUI_WINDOW_MODAL(w, TRUE)
@@ -763,7 +767,7 @@ SUB studioBerichtVorschau(p AS PDF, titel AS STRING)
         IF GUI_CLICKED(zurueck) AND nr > 1 THEN nr = nr - 1 : neu = TRUE
         IF GUI_CLICKED(drucken) THEN PDF_PRINT(p)
         IF GUI_CLICKED(sichern) THEN
-            DIM ziel AS STRING : ziel = FILE_SAVE_DIALOG("PDF sichern", "pdf")
+            DIM ziel AS STRING : ziel = FILE_SAVE_DIALOG(studioTr$("PDF sichern"), "pdf")
             IF ziel <> "" THEN PDF_SAVE(p, ziel)
         END IF
     WEND
@@ -786,4 +790,231 @@ END FUNCTION
 
 FUNCTION studioDatei$(rel AS STRING) AS STRING
     RETURN "assets/" + rel
+END FUNCTION
+
+' --- Sprache ------------------------------------------------------------
+' Ein Projekt schreibt seine Texte in EINER Sprache, der seiner Quelle. Eine
+' Tafel sprache/<code>.txt im Projektordner macht eine zweite daraus: je
+' Zeile der Text, wie er im Projekt steht, ein Tabulator, die Uebersetzung
+' (wie studio/sprache/en.txt). Das Studio kopiert den Ordner nach
+' assets/sprache/, die gebaute Fassung nimmt ihn mit.
+'
+' Uebersetzt werden von selbst: die Texte der Fenster (Titel, Beschriftungen,
+' Platzhalter, Tooltips, Spaltenkoepfe, Eintraege, Reiter, Meldungen der
+' Pruefregeln, Diagrammtitel, Werkzeugleisten), die Menues samt Kuerzeln,
+' die Texte der Berichte und die Knoepfe der Dialoge hier. Im Code geht
+' jeder Anzeigetext durch studioTr$("...") bzw. trf$("Text mit {0}", [wert]).
+' Was das Programm aus einem Widget zurueckliest (GUI_TEXT einer
+' Klappliste), ist danach die Uebersetzung -- verglichen wird mit tr$(...).
+'
+' Welche Sprache: SpracheWaehlen(code) vor dem ersten Fenster (in
+' App.Geoeffnet); sonst Englisch, wenn DHRT_LANG englisch ist und die Tafel
+' en.txt da ist, sonst die Sprache der Quelle. Ein Wechsel gilt fuer
+' Fenster, die danach aufgebaut werden -- offene behalten ihre Texte.
+DIM studioSprache AS STRING : studioSprache = ""
+DIM studioSprachGewaehlt AS BOOLEAN : studioSprachGewaehlt = FALSE
+DIM studioTafel AS MAP OF STRING : studioTafel = {}
+' Texte, die in der Tafel fehlen -- jeder einmal; mit DH_STUDIO_SPRACHLUECKEN
+' (ein Dateipfad) schreibt die Laufzeit sie dorthin, fuer Pruefungen.
+DIM studioLuecken AS MAP OF INTEGER : studioLuecken = {}
+
+' Waehlt die Sprache ("" = die der Quelle). FALSE, wenn es keine Tafel
+' sprache/<code>.txt gibt -- dann bleibt es bei der Quelle.
+FUNCTION SpracheWaehlen(code AS STRING) AS BOOLEAN
+    studioSprachGewaehlt = TRUE
+    studioTafel = {}
+    studioLuecken = {}
+    studioSprache = ""
+    code = LOWER$(TRIM$(code))
+    IF code = "" THEN RETURN TRUE
+    DIM pfad AS STRING : pfad = studioDatei$("sprache/" + code + ".txt")
+    IF NOT FILEEXISTS(pfad) THEN RETURN FALSE
+    DIM z AS STRING
+    FOR EACH z IN READLINES(pfad)
+        z = REPLACE$(REPLACE$(z, CHR$(13), ""), CHR$(&HFEFF), "")
+        DIM t AS INTEGER : t = INSTR(z, CHR$(9))
+        IF t > 0 THEN MAPPUT(studioTafel, LEFT$(z, t), MID$(z, t + 1))
+    NEXT
+    studioSprache = code
+    RETURN TRUE
+END FUNCTION
+
+' Vor App.Geoeffnet: ohne Wahl Englisch, wenn DHRT_LANG englisch ist (und
+' die Tafel da ist), sonst die Sprache der Quelle.
+SUB studioSpracheVorgabe()
+    IF NOT studioSprachGewaehlt THEN SpracheWaehlen(IIF(LEFT$(LOWER$(GETENV$("DHRT_LANG")), 2) = "en", "en", ""))
+END SUB
+
+' Die gewaehlte Sprache, "" = die der Quelle.
+FUNCTION Sprache$() AS STRING
+    RETURN studioSprache
+END FUNCTION
+
+' Hat der Text einen Buchstaben? Zahlen, Zeichen und Sinnbilder allein
+' werden nicht nachgeschlagen.
+FUNCTION studioWortig(t AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(t) - 1
+        DIM c AS STRING : c = MID$(t, i, 1)
+        IF UPPER$(c) <> LOWER$(c) THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+' Ein Anzeigetext in der gewaehlten Sprache; was die Tafel nicht kennt,
+' bleibt, wie es ist.
+FUNCTION tr$(t AS STRING) AS STRING
+    IF studioSprache = "" THEN RETURN t
+    IF MAPHAS(studioTafel, t) THEN RETURN MAPGET(studioTafel, t)
+    IF NOT studioWortig(t) THEN RETURN t
+    DIM e AS STRING : e = studioEingebaut$(t)
+    IF e <> "" THEN RETURN e
+    IF NOT MAPHAS(studioLuecken, t) THEN
+        MAPPUT(studioLuecken, t, 1)
+        DIM f AS STRING : f = GETENV$("DH_STUDIO_SPRACHLUECKEN")
+        IF f <> "" THEN APPENDFILE(f, t + CHR$(10))
+    END IF
+    RETURN t
+END FUNCTION
+
+' Dasselbe fuer die Laufzeit und den erzeugten Code (die Sprachpruefung des
+' Studios sammelt tr$ mit Literal aus studio/*.dh als Texte des Studios).
+FUNCTION studioTr$(t AS STRING) AS STRING
+    RETURN tr$(t)
+END FUNCTION
+
+' Ein Text mit {0}, {1}, ...: erst uebersetzen, dann einsetzen -- in einem
+' Durchgang, damit ein eingesetzter Wert (ein Name mit "{1}") nicht noch
+' einmal gelesen wird.
+FUNCTION trf$(t AS STRING, werte AS ARRAY OF STRING) AS STRING
+    DIM v AS STRING : v = tr$(t)
+    DIM aus AS STRING : aus = ""
+    DIM i AS INTEGER : i = 0
+    WHILE i < LEN(v)
+        DIM c AS STRING : c = MID$(v, i, 1)
+        IF c = "{" THEN
+            DIM zu AS INTEGER : zu = INSTR(MID$(v, i + 1, 4), "}")
+            IF zu > 0 THEN
+                DIM nr AS STRING : nr = MID$(v, i + 1, zu)
+                IF VAL(nr) >= 0 AND VAL(nr) < LEN(werte) AND STR$(INT(VAL(nr))) = nr THEN
+                    aus = aus + werte[INT(VAL(nr))]
+                    i = i + zu + 2
+                    CONTINUE
+                END IF
+            END IF
+        END IF
+        aus = aus + c
+        i = i + 1
+    WEND
+    RETURN aus
+END FUNCTION
+
+' Die eigenen Texte der Laufzeit (Knoepfe der Dialoge, Vorschau der
+' Berichte) auf Englisch -- ein Projekt muss sie nicht in seiner Tafel haben,
+' darf sie dort aber anders sagen. "" = keiner.
+FUNCTION studioEingebaut$(t AS STRING) AS STRING
+    IF studioSprache <> "en" THEN RETURN ""
+    SELECT CASE t
+        CASE "Ja|Nein" : RETURN "Yes|No"
+        CASE "OK|Abbrechen" : RETURN "OK|Cancel"
+        CASE "Abbrechen" : RETURN "Cancel"
+        CASE "Drucken" : RETURN "Print"
+        CASE "Als PDF …" : RETURN "Save as PDF …"
+        CASE "Schließen" : RETURN "Close"
+        CASE "PDF sichern" : RETURN "Save PDF"
+        CASE "Seite {n} von {m}" : RETURN "Page {n} of {m}"
+    END SELECT
+    RETURN ""
+END FUNCTION
+
+' Ein Kuerzel, wie es im Menue steht: auf Englisch "Ctrl+Shift+Down" statt
+' "Strg+Umschalt+Runter" (die Laufzeit versteht beide Schreibweisen).
+FUNCTION studioKuerzel$(k AS STRING) AS STRING
+    IF studioSprache <> "en" OR k = "" THEN RETURN k
+    DIM teile AS ARRAY OF STRING : teile = SPLIT$(k, "+")
+    DIM aus AS STRING : aus = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(teile) - 1
+        DIM w AS STRING : w = teile[i]
+        SELECT CASE LOWER$(w)
+            CASE "strg" : w = "Ctrl"
+            CASE "umschalt" : w = "Shift"
+            CASE "entf" : w = "Del"
+            CASE "einfg" : w = "Ins"
+            CASE "pos1" : w = "Home"
+            CASE "ende" : w = "End"
+            CASE "bild auf" : w = "PageUp"
+            CASE "bild ab" : w = "PageDown"
+            CASE "leer" : w = "Space"
+            CASE "rueck" : w = "Backspace"
+            CASE "links" : w = "Left"
+            CASE "rechts" : w = "Right"
+            CASE "hoch" : w = "Up"
+            CASE "runter" : w = "Down"
+        END SELECT
+        aus = aus + IIF(i > 0, "+", "") + w
+    NEXT
+    RETURN aus
+END FUNCTION
+
+' Die Texte eines Fensters aus dem Layout (JSON) in der gewaehlten Sprache.
+FUNCTION studioTexte$(j AS STRING) AS STRING
+    IF studioSprache = "" THEN RETURN j
+    DIM d AS JSON_HANDLE : d = JSON_PARSE(j)
+    studioTexteIn(d, "")
+    RETURN JSON_STRINGIFY(d)
+END FUNCTION
+
+' Welche Felder eines Layouts Anzeigetext sind (Einzeltext bzw. Liste).
+FUNCTION studioTextFeld(k AS STRING) AS BOOLEAN
+    SELECT CASE k
+        CASE "title", "titel", "text", "placeholder", "tooltip", "tip", "leer_text", "meldung", "label", "studio_diagramm_titel"
+            RETURN TRUE
+    END SELECT
+    RETURN FALSE
+END FUNCTION
+
+SUB studioTexteIn(d AS JSON_HANDLE, pfad AS STRING)
+    DIM k AS STRING
+    FOR EACH k IN JSON_KEYS(d, pfad)
+        DIM p AS STRING : p = IIF(pfad = "", "", pfad + ".") + JSON_KEY$(k)
+        DIM art AS STRING : art = JSON_TYPE(d, p)
+        IF art = "string" THEN
+            IF studioTextFeld(k) THEN JSON_SET_STRING(d, p, tr$(JSON_GET_STRING(d, p)))
+        ELSEIF art = "object" THEN
+            studioTexteIn(d, p)
+        ELSEIF art = "array" THEN
+            DIM i AS INTEGER
+            FOR i = 0 TO JSON_LEN(d, p) - 1
+                DIM pe AS STRING : pe = p + "." + STR$(i)
+                DIM ae AS STRING : ae = JSON_TYPE(d, pe)
+                IF ae = "object" THEN
+                    studioTexteIn(d, pe)
+                ELSEIF ae = "string" AND (k = "headers" OR k = "items") THEN
+                    JSON_SET_STRING(d, pe, tr$(JSON_GET_STRING(d, pe)))
+                END IF
+            NEXT
+        END IF
+    NEXT
+END SUB
+
+' Die Texte eines Berichts (studio_berichte.dh): Titel und Textelemente; eine
+' Seitenzahl ohne eigenen Text bekommt die Vorlage in der gewaehlten Sprache.
+FUNCTION studioBerichtTexte$(j AS STRING) AS STRING
+    IF studioSprache = "" THEN RETURN j
+    DIM d AS JSON_HANDLE : d = JSON_PARSE(j)
+    studioTexteIn(d, "")
+    IF NOT JSON_HAS(d, "baender") THEN RETURN JSON_STRINGIFY(d)
+    DIM b AS INTEGER
+    FOR b = 0 TO JSON_LEN(d, "baender") - 1
+        DIM bp AS STRING : bp = "baender." + STR$(b) + ".elemente"
+        IF NOT JSON_HAS(d, bp) THEN CONTINUE
+        DIM i AS INTEGER
+        FOR i = 0 TO JSON_LEN(d, bp) - 1
+            DIM ep AS STRING : ep = bp + "." + STR$(i)
+            IF NOT JSON_HAS(d, ep + ".art") THEN CONTINUE
+            IF JSON_GET_STRING(d, ep + ".art") = "seitenzahl" AND NOT JSON_HAS(d, ep + ".text") THEN JSON_SET_STRING(d, ep + ".text", studioTr$("Seite {n} von {m}"))
+        NEXT
+    NEXT
+    RETURN JSON_STRINGIFY(d)
 END FUNCTION

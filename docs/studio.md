@@ -274,6 +274,30 @@ Projektordner; ein Bild-Control wählt seins im Inspektor unter „Bild“ und
 zeigt es schon im Entwurf. Beim Starten und Bauen kommen die Bilder nach
 `_studio/assets/bilder/`, und `dhrt --export` nimmt `assets/` neben die Exe.
 
+**Sprachen.** Ein Projekt schreibt seine Texte in einer Sprache, der seiner
+Quelle. Eine Tafel `sprache/<code>.txt` im Projektordner macht eine zweite
+daraus: je Zeile der Text, wie er im Projekt steht, ein Tabulator, die
+Übersetzung (`sprache/en.txt`). Von selbst übersetzt werden die Texte der
+Fenster (Titel, Beschriftungen, Platzhalter, Tooltips, Spaltenköpfe,
+Einträge, Reiter, Meldungen der Prüfregeln, Diagrammtitel, Werkzeugleisten),
+die Menüs samt Kürzeln (`Strg+S` wird `Ctrl+S`), die Texte der Berichte und
+die Knöpfe der Dialoge oben. Im Code geht jeder Anzeigetext durch `tr$`:
+
+| Aufruf | was er tut |
+|---|---|
+| `SpracheWaehlen(code$)` | wählt die Sprache (`""` = die der Quelle); `FALSE`, wenn es keine Tafel `sprache/<code>.txt` gibt |
+| `Sprache$()` | die gewählte Sprache, `""` = die der Quelle |
+| `tr$(text$)` | der Text in der gewählten Sprache; was die Tafel nicht kennt, bleibt |
+| `trf$(text$, werte)` | ein Text mit `{0}`, `{1}` ...: erst übersetzt, dann eingesetzt |
+
+Gewählt wird vor dem ersten Fenster, in `App.Geoeffnet`; ohne Wahl ist es
+Englisch, wenn `DHRT_LANG` englisch ist und die Tafel `en.txt` da ist. Ein
+Wechsel gilt für Fenster, die danach aufgebaut werden. Was das Programm aus
+einem Widget zurückliest (der Text einer Klappliste), ist die Übersetzung --
+verglichen wird mit `tr$("...")`. Mit `DH_STUDIO_SPRACHLUECKEN=datei`
+schreibt die Laufzeit jeden Text, der in der Tafel fehlt, einmal in die
+Datei.
+
 **Debugger.**
 
 | Handgriff | wirkt so |
@@ -735,6 +759,15 @@ PDFs und die CSV landen beim Starten aus dem Studio in `_studio/`.
 Methode `zeigen(id)` in einem Fenster überschreibt das geerbte `Zeigen()` --
 `dhrt --check` (und damit die Problemliste) warnt, wenn eine Methode eine
 geerbte mit einer anderen Zahl von Parametern überschreibt.
+
+**Das große Beispiel:** `examples/studio/kuehlschrank/` ist eine
+Kühlschrank-Verwaltung (der Port einer PySide6-App, siehe sein `LIESMICH.md`)
+mit 18 Fenstern und eigenen Controls, einer vorhandenen SQLite-Datei als
+Datenbank-Element, Werkzeug- und Statusleiste, Timern, Diagrammen, einem
+Bericht, Netzabfragen im Hintergrund und einer englischen Oberfläche
+(`sprache/en.txt`, siehe „Sprachen“ oben). Wie es Stufe für Stufe entstand
+und welche Lücken des Studios es dabei gefunden hat, steht in
+`geschichte/kuehlschrank.md`.
 
 ## Für Prüfungen
 

@@ -111,12 +111,12 @@ SUB menueCode(z AS ARRAY OF STRING, d AS JSON_HANDLE, pfad AS STRING, menue AS S
         IF JSON_HAS(d, p + ".items") THEN
             DIM unter AS STRING : unter = "studioM" + STR$(zaehler)
             zaehler = zaehler + 1
-            ARRAY_PUSH(z, "        DIM " + unter + " AS INTEGER : " + unter + " = GUI_SUBMENU(" + menue + ", " + dhText$(label) + ")")
+            ARRAY_PUSH(z, "        DIM " + unter + " AS INTEGER : " + unter + " = GUI_SUBMENU(" + menue + ", studioTr$(" + dhText$(label) + "))")
             menueCode(z, d, p + ".items", unter, zaehler)
             CONTINUE
         END IF
-        DIM ruf AS STRING : ruf = "GUI_MENU_ITEM(" + menue + ", " + dhText$(label)
-        IF JSON_HAS(d, p + ".shortcut") THEN ruf = ruf + ", " + dhText$(JSON_GET_STRING(d, p + ".shortcut"))
+        DIM ruf AS STRING : ruf = "GUI_MENU_ITEM(" + menue + ", studioTr$(" + dhText$(label) + ")"
+        IF JSON_HAS(d, p + ".shortcut") THEN ruf = ruf + ", studioKuerzel$(" + dhText$(JSON_GET_STRING(d, p + ".shortcut")) + ")"
         ruf = ruf + ")"
         DIM ziel AS STRING
         IF JSON_HAS(d, p + ".name") THEN
@@ -192,7 +192,7 @@ END FUNCTION
 ' Das Diagramm auf dem Widget w (ein Ausdruck) -- fuer studioAufbauen und
 ' studioEinbauen.
 FUNCTION diagrammBau$(d AS JSON_HANDLE, i AS INTEGER, w AS STRING) AS STRING
-    RETURN "studioDiagramm(" + w + ", " + dhText$(diagrammArt$(d, i)) + ", " + dhText$(jsonText$(d, "widgets." + STR$(i) + ".studio_diagramm_titel")) + ")"
+    RETURN "studioDiagramm(" + w + ", " + dhText$(diagrammArt$(d, i)) + ", studioTr$(" + dhText$(jsonText$(d, "widgets." + STR$(i) + ".studio_diagramm_titel")) + "))"
 END FUNCTION
 
 FUNCTION basisCode$(ei AS INTEGER) AS STRING
@@ -351,7 +351,8 @@ FUNCTION basisCode$(ei AS INTEGER) AS STRING
             ARRAY_PUSH(z, "        j = j + " + dhText$(MID$(json, pos, 96)))
             pos = pos + 96
         WEND
-        ARRAY_PUSH(z, "        Self.studioWin = GUI_FROM_JSON(j)")
+        ' Die Texte in der gewaehlten Sprache (laufzeit.dh, studioTexte$).
+        ARRAY_PUSH(z, "        Self.studioWin = GUI_FROM_JSON(studioTexte$(j))")
         ARRAY_PUSH(z, "        Self.studioControls = []")
         FOR i = 0 TO nW - 1
             IF NOT istBezeichner(namen[i]) THEN CONTINUE
@@ -402,7 +403,7 @@ FUNCTION basisCode$(ei AS INTEGER) AS STRING
             DIM mv AS STRING : mv = "studioM" + STR$(zaehler)
             zaehler = zaehler + 1
             DIM ml AS STRING : ml = IIF(JSON_HAS(d, mp + ".label"), JSON_GET_STRING(d, mp + ".label"), "")
-            ARRAY_PUSH(z, "        DIM " + mv + " AS INTEGER : " + mv + " = GUI_MENU(Self.studioWin, " + dhText$(ml) + ")")
+            ARRAY_PUSH(z, "        DIM " + mv + " AS INTEGER : " + mv + " = GUI_MENU(Self.studioWin, studioTr$(" + dhText$(ml) + "))")
             IF JSON_HAS(d, mp + ".items") THEN menueCode(z, d, mp + ".items", mv, zaehler)
         NEXT
     END IF
@@ -706,6 +707,21 @@ SUB erzeugen()
         IF NOT DIREXISTS(ab) THEN MKDIR(ab)
         FOR EACH alt IN DIRLIST(pb)
             COPYFILE(PATHJOIN(pb, alt), PATHJOIN(ab, alt))
+        NEXT
+    END IF
+    ' Die Sprachtafeln unter assets/sprache/ (laufzeit.dh, SpracheWaehlen).
+    DIM asp AS STRING : asp = PATHJOIN(PATHJOIN(o, "assets"), "sprache")
+    IF DIREXISTS(asp) THEN
+        FOR EACH alt IN DIRLIST(asp)
+            DELETEFILE(PATHJOIN(asp, alt))
+        NEXT
+    END IF
+    DIM psp AS STRING : psp = PATHJOIN(projOrdner, "sprache")
+    IF DIREXISTS(psp) THEN
+        IF NOT DIREXISTS(PATHJOIN(o, "assets")) THEN MKDIR(PATHJOIN(o, "assets"))
+        IF NOT DIREXISTS(asp) THEN MKDIR(asp)
+        FOR EACH alt IN DIRLIST(psp, "*.txt")
+            COPYFILE(PATHJOIN(psp, alt), PATHJOIN(asp, alt))
         NEXT
     END IF
     WRITEALL(PATHJOIN(o, "main.dh"), mainCode$())
