@@ -933,7 +933,7 @@ PRINT "KiCad-Hinweise: "; JOIN$(kim.hinweise, " | ")
 DIM kimSchlecht2 AS kern.KicadErgebnis : kimSchlecht2 = kern.kicadAusText("(kicad_pcb (version 20221018))", "x", ".")
 PRINT "KiCad-Fremd: ok "; kimSchlecht2.ok; "  "; kimSchlecht2.fehler; "  (erwartet FALSE  ... kein KiCad-Schaltplan)"
 ' ein importierter Schaltplan laesst sich speichern und wieder laden
-DIM kimPfad AS STRING : kimPfad = "C:/Programmieren/Python/GameBasic/funkenflug/pruef_kicad.fkn"
+DIM kimPfad AS STRING : kimPfad = "pruef_kicad.fkn"
 DIM kimSp AS BOOLEAN : kimSp = kern.dokumentSpeichern(kim.dok, kimPfad)
 DIM kimDok2 AS kern.Dokument : kimDok2 = kern.dokumentLaden(kimPfad)
 DIM kimN2 AS kern.Netze : kimN2 = kern.netzeDokument(kimDok2)
@@ -1175,7 +1175,7 @@ FOR bmi = 0 TO LEN(bErc) - 1
     IF bErc[bmi].text = "Bus ohne Namen" THEN bLeer = TRUE
 NEXT
 PRINT "Bus-ERC Gruppen: zwei Namen "; bZwei; "  ohne Namen "; bLeer; "  Gruppen "; JOIN$(ARRAY_MAP(kern.busGruppen(bbl), FUNCTION(g) STR$(g)), ","); "  (erwartet TRUE TRUE  Gruppen 0,0,2)"
-DIM bPfad AS STRING : bPfad = "C:/Programmieren/Python/GameBasic/funkenflug/pruef_bus.fkn"
+DIM bPfad AS STRING : bPfad = "pruef_bus.fkn"
 DIM bGesp AS BOOLEAN : bGesp = kern.dokumentSpeichern(bdok, bPfad)
 DIM bdok2 AS kern.Dokument : bdok2 = kern.dokumentLaden(bPfad)
 DELETEFILE(bPfad)
@@ -1314,7 +1314,7 @@ PRINT "Instanz-Stueckliste: "; miBom[0].menge; " "; JOIN$(miBom[0].referenzen, "
 DIM miAn AS INTEGER : miAn = kern.annotieren(mi, FALSE)
 miF = kern.flach(mi)
 PRINT "Instanz annotieren: geaendert "; miAn; "  Kopie "; miF.blaetter[2].bauteile[0].referenz; "  im Original "; MAPGETOR(miR.instanzRefs, "/" + miB.id, "-"); "  erste bleibt "; miR.referenz; "  (erwartet 1  R2  R2  R1)"
-DIM miPfad AS STRING : miPfad = "C:/Programmieren/Python/GameBasic/funkenflug/pruef_inst.fkn"
+DIM miPfad AS STRING : miPfad = "pruef_inst.fkn"
 DIM miSp AS BOOLEAN : miSp = kern.dokumentSpeichern(mi, miPfad)
 DIM mi2 AS kern.Dokument : mi2 = kern.dokumentLaden(miPfad)
 DELETEFILE(miPfad)
@@ -1402,7 +1402,7 @@ PRINT "KiCad-Bib Vorschau: "; klVs.id; " "; LEN(klVs.pins); " Pins  nicht regist
 DIM klF AS kern.KicadBib : klF = kern.kicadBibLaden("daten/kicad/beispiel.kicad_sch")
 DIM klF2 AS kern.KicadBib : klF2 = kern.kicadBibLaden("daten/kicad/gibtsnicht.kicad_sym")
 ' geaenderte Datei: der Index wird beim Einsetzen erneuert
-DIM klAend AS STRING : klAend = "C:/Programmieren/Python/GameBasic/funkenflug/pruef_bib.kicad_sym"
+DIM klAend AS STRING : klAend = "pruef_bib.kicad_sym"
 DIM klTx AS STRING : klTx = READALL$("daten/kicad/testbib.kicad_sym")
 WRITEALL(klAend, klTx)
 DIM klA AS kern.KicadBib : klA = kern.kicadBibLaden(klAend)
@@ -1413,7 +1413,7 @@ DIM klAj AS INTEGER : klAj = kern.kicadBibPruefen(klA, klAi)
 PRINT "KiCad-Bib geaendert: GND "; klAi; " -> "; klAj; " "; klA.eintraege[klAj].name; "  R_Small weg "; kern.kicadBibPruefen(klA, klA.eintrag("R_Small")); "  unveraendert "; kern.kicadBibPruefen(klA, klAj) = klAj; "  (erwartet GND 3 -> 3 GND  R_Small weg -1  unveraendert TRUE)"
 DELETEFILE(klAend)
 ' Index-Zwischenspeicher: zweites Laden aus der .idx, nach Aenderung neu
-DIM klC AS STRING : klC = "C:/Programmieren/Python/GameBasic/funkenflug/pruef_bibcache"
+DIM klC AS STRING : klC = "pruef_bibcache"
 WRITEALL(klAend, klTx)
 DIM klC1 AS kern.KicadBib : klC1 = kern.kicadBibLadenGemerkt(klAend, klC)
 DIM klIdx AS ARRAY OF STRING : klIdx = DIRLIST(klC)
@@ -1435,7 +1435,7 @@ RMDIR(klC)
 DELETEFILE(klAend)
 PRINT "KiCad-Bib fremd: "; klF.fehler; " "; LEN(klF.eintraege); "  fehlt "; LEFT$(klF2.fehler, 20); "  (erwartet keine KiCad-Symbolbibliothek ... 0  fehlt Datei nicht gefunden)"
 ' Save / Load
-DIM pfad AS STRING : pfad = "C:/Programmieren/Python/GameBasic/funkenflug/pruef.fkn"
+DIM pfad AS STRING : pfad = "pruef.fkn"
 PRINT "Speichern: "; kern.dokumentSpeichern(dok, pfad)
 DIM dok2 AS kern.Dokument : dok2 = kern.dokumentLaden(pfad)
 PRINT "Geladen Bauteile: "; LEN(dok2.blaetter[0].bauteile)

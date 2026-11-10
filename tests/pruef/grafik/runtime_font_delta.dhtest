@@ -4,14 +4,16 @@
 SCREEN(320, 120, "t")
 DIM a AS INTEGER
 DIM b AS INTEGER
-a = LOADFONT("C:/Programmieren/Python/GameBasic/circuitrunner/assets/font.ttf", 30)
-b = LOADFONT("C:/Programmieren/Python/GameBasic/circuitrunner/assets/font.ttf", 60)
+a = LOADFONT(ARG$(0), 30)
+b = LOADFONT(ARG$(0), 60)
 SETFONT(a)
 PRINT TEXT_WIDTH("WIDTH")
 SETFONT(b)
 PRINT TEXT_WIDTH("WIDTH")
 TEXT_SIZE(30)
 PRINT TEXT_WIDTH("WIDTH")
+--- argumente
+{sammlung}/../../../circuitrunner/assets/font.ttf
 --- erwartet
 78
 159
@@ -20,9 +22,11 @@ PRINT TEXT_WIDTH("WIDTH")
 === drawimagepartex runs
 SCREEN(200, 200, "t")
 DIM t AS IMAGE
-t = LOADIMAGE("C:/Programmieren/Python/GameBasic/circuitrunner/assets/tiles.png")
+t = LOADIMAGE(ARG$(0))
 DRAWIMAGEPARTEX(t, 64, 0, 32, 32, 10, 10, 128, 128)
 PRINT "OK"
+--- argumente
+{sammlung}/../../../circuitrunner/assets/tiles.png
 --- erwartet
 OK
 
@@ -37,10 +41,12 @@ DHRT_FRAMES=2
 === umlaute mit geladenem font
 SCREEN(320, 120, "t")
 DIM f AS INTEGER
-f = LOADFONT("C:/Programmieren/Python/GameBasic/circuitrunner/assets/font.ttf", 30)
+f = LOADFONT(ARG$(0), 30)
 SETFONT(f)
 PRINT TEXT_WIDTH("äöü")
 PRINT TEXT_WIDTH("???")
+--- argumente
+{sammlung}/../../../circuitrunner/assets/font.ttf
 --- erwartet
 41
 36
@@ -71,8 +77,10 @@ PRINT TEXT_WIDTH("HALLO WELT")
 ' raylib zaehlt beim Laden die gefundenen Glyphen und meldet fehlende
 SCREEN(320, 120, "t")
 DIM f AS INTEGER
-f = LOADFONT("C:/Programmieren/Python/GameBasic/circuitrunner/assets/font.ttf", 30)
+f = LOADFONT(ARG$(0), 30)
 PRINT "OK"
+--- argumente
+{sammlung}/../../../circuitrunner/assets/font.ttf
 --- erwartet
 OK
 
