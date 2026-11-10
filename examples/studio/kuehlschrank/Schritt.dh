@@ -1,6 +1,0 @@
-' Ein Schritt im Verlauf: was der Nutzer getan hat (für Menü und Tipp) und
-' die Zeilen, die es geändert hat.
-CLASS Schritt
-    DIM text AS STRING
-    DIM teile AS ARRAY OF Aenderung
-END CLASS

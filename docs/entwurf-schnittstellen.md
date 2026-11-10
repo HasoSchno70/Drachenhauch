@@ -109,8 +109,8 @@ Das betrifft Vererbung schon heute, mit oder ohne Schnittstellen.
 
 | | Klassen | davon mit `EXTENDS` |
 |---|---|---|
-| Funkenflug (`funkenflug/`) | 47 | 0 |
-| Glutfaden (`examples/glutfaden/`) | 59 | 0 |
+| Funkenflug (damals `funkenflug/`, heute eigenes Repo) | 47 | 0 |
+| Glutfaden (damals `examples/glutfaden`, heute eigenes Repo) | 59 | 0 |
 | übrige Beispiele | 39 | 6, alle in drei Lehrbeispielen (`08`, `48`, `167`) |
 | IDE und Werkzeuge 183–199 | 0 | – |
 
@@ -120,23 +120,23 @@ Programm. Stattdessen wird über ein Art-Feld verzweigt; in Funkenflug und
 Glutfaden zusammen in rund 50 `SELECT CASE`. Die deutlichsten Stellen:
 
 * **Glutfaden, Werkzeuge:** 15 Werkzeuge als Zahlen (`WZ_STIFT` …
-  `WZ_FARBVERLAUF`, `ansicht/werkzeuge.dh`). Drücken, Ziehen, Loslassen und
+  `WZ_FARBVERLAUF`, ansicht/werkzeuge.dh in Glutfaden). Drücken, Ziehen, Loslassen und
   Vorschau sind je ein `SELECT CASE wzAktiv`, rund 80 Vergleiche in sechs
   Dateien. In PySticky waren es Klassen (`PencilTool`, `GradientTool` …),
   die Kommentare nennen sie noch.
-* **Glutfaden, Rückgängig:** `Aenderung` (`kern/verlauf.dh`) hat 9 Arten
+* **Glutfaden, Rückgängig:** `Aenderung` (kern/verlauf.dh in Glutfaden) hat 9 Arten
   und rund 25 Felder, ein `SELECT CASE` über alle Arten wendet sie an.
-* **Funkenflug, Grundformen:** `Primitiv` (`kern/modell.dh`) trägt die
+* **Funkenflug, Grundformen:** `Primitiv` (kern/modell.dh in Funkenflug) trägt die
   Vereinigung aller Felder von Linie bis Text. Zeichnen, Treffertest und
   Radius stehen als `SELECT` in drei Dateien.
 * **Funkenflug, Auswahl:** vier Felder `gSelB/L/D/Bus` (Bauteil, Label,
   Draht, Bus) und jede Funktion viermal (`istGewaehltB/L/D`,
   `umschaltenB/L/D` …), weil es keinen gemeinsamen Typ gibt
-  (`ansicht/auswahl.dh`).
+  (ansicht/auswahl.dh in Funkenflug).
 * **Glutfaden, Einlesen:** `OxsImport`, `PatImport` und `XsdImport` haben
   dieselben Felder (`muster`, `warnungen`) ohne gemeinsamen Typ.
   `fremdLaden` kopiert sie dreimal von Hand in eine vierte Klasse
-  `FremdImport` (`kern/verwalten.dh`).
+  `FremdImport` (kern/verwalten.dh in Glutfaden).
 
 Keiner dieser Fälle **brauchte** eine Schnittstelle: Jeder ließe sich mit
 einer abstrakten Basisklasse lösen, die es seit 2026.8 gibt. Das Fehlen von
@@ -149,7 +149,7 @@ Die Typprobe `DHRT_TYPEN_PRUEFEN=1` bricht ab, wenn ein Wert nicht zu dem
 Typ passt, den der Übersetzer annimmt, und erfasst dabei auch Klassen. Damit
 liefen ohne einen Befund:
 
-* der Kerntest von Funkenflug (`funkenflug/pruef_kern.dh`);
+* der Kerntest von Funkenflug (pruef_kern.dh, heute im Repo Funkenflug);
 * die Sammlungen `glutfaden_kern`, `glutfaden_bearbeiten`, `vererbung`,
   `typtest`, `gebundene_methoden`.
 
@@ -391,7 +391,7 @@ Begründung „zweites Typsystem“ trifft auf diese Laufzeit nicht zu, siehe 2 
 
 Die Auswahl in Funkenflug ist auf eine abstrakte Basisklasse umgebaut:
 
-* `kern.Element` (`kern/modell.dh`) trägt `id` und kündigt
+* `kern.Element` (kern/modell.dh in Funkenflug) trägt `id` und kündigt
   `verschieben(dx, dy)` an. `Bauteil`, `Label`, `Draht` und `Bus` erben
   davon und füllen es aus.
 * Die Auswahl ist **eine** Menge `gSel AS ARRAY OF kern.Element` statt vier
@@ -413,7 +413,7 @@ jetzt die eine Menge.
    Vorfahrin, und die Auswahl braucht nur einen Vertrag. Den Fall aus
    Abschnitt 5, Punkt 2 (zwei Verträge, verschieden geerbt) gibt es hier
    nicht. Das Speichern ist ein zweiter Vertrag nur dem Namen nach: Es sind
-   freie Funktionen in `kern/datei.dh`, und an ihnen hängt nichts, das ein
+   freie Funktionen in kern/datei.dh von Funkenflug, und an ihnen hängt nichts, das ein
    gemeinsamer Typ verbessern würde.
 2. **Weg B war die Voraussetzung.** Erst seit Klassentypen geprüft werden,
    sagt `ARRAY OF kern.Element` etwas. Vorher hätte die Menge alles
@@ -446,7 +446,7 @@ Zwei Doppelungen, beide ohne gemeinsamen Typ:
   Leseposition (`daten`, `p`, `brauche`, `u16`, `u32`, `ueber`). Nur die
   Meldung am Dateiende, die Texte und die Farben unterscheiden sich.
 
-Umgebaut (`kern/einleser.dh`):
+Umgebaut (kern/einleser.dh in Glutfaden):
 
 * Ein Ergebnis `MusterImport` für alle drei Formate und für `fremdLaden`.
   Es braucht keine Unterklassen, weil kein Format ein eigenes Feld hat;

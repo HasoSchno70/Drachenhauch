@@ -18,8 +18,6 @@ in `docs/werkzeuge.md`.
 | `ide/` | die IDE (`ide/ide.dh`) |
 | `studio/` | das Drachenhauch Studio |
 | `werkzeuge/` | die Werkzeuge 183–199 und weitere Hilfsprogramme |
-| `glutfaden/` | das Beispiel Glutfaden |
-| `kuehlschrank/` | die Kühlschrank-App im Studio (`examples/studio/kuehlschrank`), je Stufe eine Sammlung |
 | `beispiele/` | die übrigen Beispielprogramme |
 | `buecher/` | die Bücher |
 

@@ -225,7 +225,7 @@ IMPORT "json"
 DIM ordner AS STRING : ordner = ARG$(0)
 DIM roh AS ARRAY OF STRING : roh = DIRLIST_REC(ordner, "*.dh")
 DIM dateien AS ARRAY OF STRING : dateien = []
-' Ein Programm aus Unterordnern (examples/glutfaden: kern/, gtk/, ansicht/)
+' Ein Programm aus Unterordnern (wie examples/bastelzentrale: bereiche/)
 ' prueft man ueber seine main.dh -- die Teile eines Namensraums sprechen
 ' einander ohne Praefix an und uebersetzen allein nicht.
 DIM programme AS MAP OF BOOLEAN
@@ -315,16 +315,14 @@ DIM dateien AS ARRAY OF STRING : dateien = []
 DIM i AS INTEGER
 FOR i = 0 TO LEN(roh) - 1
     IF INSTR(roh[i], "target/") >= 0 OR INSTR(roh[i], "target" + CHR$(92)) >= 0 THEN CONTINUE
+    ' Die Stufe des Installers (installer/output/stufe, von bauen.dh, nicht
+    ' versioniert) ist eine Kopie samt Programmen, die laengst ausgezogen sein
+    ' koennen -- Bauausgabe wie target/.
+    IF INSTR(REPLACE$(roh[i], CHR$(92), "/"), "installer/output/") >= 0 THEN CONTINUE
     IF LEFT$(BASENAME(roh[i]), 7) = "_dhtmp_" THEN CONTINUE
-    ' Glutfadens Ansicht-Dateien sind TEILE von main.dh: ihre globalen Namen
-    ' (einst, lwHat ...) legt ein anderer Teil an. Allein uebersetzt ist die
-    ' Warnung dort richtig, keine Falschmeldung -- bis Stufe 18 fiel das nur
-    ' nicht auf, weil jede Datei vorher an einem unbekannten kern.-Typ scheiterte.
-    IF INSTR(REPLACE$(roh[i], CHR$(92), "/"), "examples/glutfaden/ansicht/") >= 0 THEN CONTINUE
-    ' Funkenflug (Schaltplan-Editor) ist genauso gebaut: ansicht/*.dh sind
-    ' Teile von funkenflug/main.dh (gDok, gBlatt ... legt main.dh an).
-    IF INSTR(REPLACE$(roh[i], CHR$(92), "/"), "funkenflug/ansicht/") >= 0 THEN CONTINUE
-    ' Die Bastelzentrale ebenso: bereiche/*.dh sind Teile ihrer main.dh.
+    ' Die Bastelzentrale: bereiche/*.dh sind Teile ihrer main.dh, ihre
+    ' globalen Namen legt ein anderer Teil an (so waren auch Glutfaden und
+    ' Funkenflug gebaut, bis sie 2026-11 eigene Repos bekamen).
     IF INSTR(REPLACE$(roh[i], CHR$(92), "/"), "examples/bastelzentrale/bereiche/") >= 0 THEN CONTINUE
     ' Die IDE ebenso: ide/teile/*.dh sind Teile von ide/ide.dh (der Fall
     ' "ide uebersetzt ohne befund" in werkzeug_ide.dhtest prueft das Ganze).

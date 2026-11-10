@@ -1,8 +1,0 @@
-' Eine Zeile, die ein Schritt ändert: ihr Stand vorher und nachher als JSON
-' (Spalte -> Wert, NULL als null); "" = die Zeile gab es (noch) nicht.
-CLASS Aenderung
-    DIM tabelle AS STRING
-    DIM id AS INTEGER
-    DIM vorher AS STRING
-    DIM nachher AS STRING
-END CLASS

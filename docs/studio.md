@@ -783,8 +783,8 @@ Methode `zeigen(id)` in einem Fenster überschreibt das geerbte `Zeigen()` --
 `dhrt --check` (und damit die Problemliste) warnt, wenn eine Methode eine
 geerbte mit einer anderen Zahl von Parametern überschreibt.
 
-**Das große Beispiel:** `examples/studio/kuehlschrank/` ist eine
-Kühlschrank-Verwaltung (der Port einer PySide6-App, siehe sein `LIESMICH.md`)
+**Das große Beispiel:** [Kuehlschrank-Drachenhauch](https://github.com/HasoSchno70/Kuehlschrank-Drachenhauch) (ein eigenes
+Repo) ist eine Kühlschrank-Verwaltung (der Port einer PySide6-App, siehe sein README)
 mit 13 Fenstern und 5 eigenen Controls, einer vorhandenen SQLite-Datei als
 Datenbank-Element, Werkzeug- und Statusleiste, Timern, Diagrammen, einem
 Bericht, Netzabfragen im Hintergrund und einer englischen Oberfläche

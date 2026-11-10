@@ -222,7 +222,7 @@ the plugin's name in front.
 
 ## Plugins in Glutfaden
 
-Glutfaden (`examples/glutfaden`, from stage 26 on) loads plugins the same
+[Glutfaden](https://github.com/HasoSchno70/Glutfaden) (its own repository, from stage 26 on) loads plugins the same
 way: a folder `plugins/<name>/plugin.dh` in Glutfaden's settings folder
 (logo menu → Plugins → Open the plugin folder), started with
 `WINDOW_OPEN`, the same line and the same library `dh_plugin.dh`. The
