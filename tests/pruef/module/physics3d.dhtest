@@ -57,6 +57,10 @@ PRINT PHYS3D_COUNT(w)
 === schlafend angelegt bleibt der stapel ruhig bis zum anstoss
 ' PHYS3D_SLEEP (2026-10-10): ein frisch aufgebauter Stapel ruht ohnehin --
 ' schlafend angelegt kostet er den Loeser nichts. Ein Stoss weckt ihn.
+' Seit rapier 0.36 (2026-11-10) weckt jeder NEU beginnende Kontakt; die
+' Kontakte des Stapels entstehen erst im ersten Schritt. dhrt legt ihn danach
+' wieder schlafen (schlaf_offen in physics3d.rs) -- er setzt sich in diesem
+' einen Schritt um gut 1 mm (vorher genau 0) und liegt dann still.
 IMPORT "physics3d"
 DIM w AS PHYS_WORLD
 w = PHYS3D_NEW()
@@ -69,8 +73,10 @@ PHYS3D_SLEEP(w, a)
 PHYS3D_SLEEP(w, b)
 PRINT "schlafen "; PHYS3D_SLEEPING(w, a); " "; PHYS3D_SLEEPING(w, b)
 DIM i AS INTEGER
-FOR i = 1 TO 30 : PHYS3D_STEP(w, 1.0 / 60) : NEXT
-PRINT "noch "; PHYS3D_SLEEPING(w, b); " lage "; PHYS3D_BODY_Y(w, b)
+PHYS3D_STEP(w, 1.0 / 60)
+DIM y1 AS FLOAT : y1 = PHYS3D_BODY_Y(w, b)
+FOR i = 2 TO 30 : PHYS3D_STEP(w, 1.0 / 60) : NEXT
+PRINT "noch "; PHYS3D_SLEEPING(w, b); " still "; PHYS3D_BODY_Y(w, b) = y1; " nah am start "; ABS(y1 - 1.5) < 0.01
 PHYS3D_APPLY_IMPULSE(w, b, 2.0, 0.0, 0.0)
 PRINT "wach "; NOT PHYS3D_SLEEPING(w, b)
 FOR i = 1 TO 30 : PHYS3D_STEP(w, 1.0 / 60) : NEXT
@@ -78,7 +84,7 @@ PRINT "geschoben "; PHYS3D_BODY_X(w, b) > 0.3
 PRINT "boden schlaeft nie "; PHYS3D_SLEEPING(w, 0)
 --- erwartet
 schlafen TRUE TRUE
-noch TRUE lage 1.5
+noch TRUE still TRUE nah am start TRUE
 wach TRUE
 geschoben TRUE
 boden schlaeft nie FALSE

@@ -18,7 +18,7 @@ use rapier2d::prelude::*;
 pub struct Phys2dWorld {
     bodies: RigidBodySet,
     colliders: ColliderSet,
-    gravity: Vector<Real>,
+    gravity: Vector,
     params: IntegrationParameters,
     pipeline: PhysicsPipeline,
     islands: IslandManager,
@@ -27,7 +27,16 @@ pub struct Phys2dWorld {
     impulse_joints: ImpulseJointSet,
     multibody_joints: MultibodyJointSet,
     ccd: CCDSolver,
-    query: QueryPipeline,
+    // Seit rapier 0.36 gibt es weiche Koerper; der Loeser und `remove`
+    // wollen ihre Menge sehen, auch wenn Drachenhauch keine anlegt.
+    soft_bodies: SoftBodySet,
+    /// Koerper, die schlafen gelegt wurden, bevor ihre Kontakte bestanden.
+    /// Seit rapier 0.36 weckt JEDER neu beginnende Kontakt ("starts wake
+    /// unconditionally") -- ein schlafend angelegter Stapel wachte im ersten
+    /// Schritt auf, weil seine Kontakte erst dort entstehen. Nach dem naechsten
+    /// Schritt legt `step` sie wieder schlafen; ein echter Anstoss (Impuls,
+    /// Tempo, Position, Wecken) nimmt den Koerper vorher aus der Liste.
+    schlaf_offen: Vec<RigidBodyHandle>,
     handles: Vec<Option<RigidBodyHandle>>,
 }
 
@@ -48,7 +57,8 @@ impl Phys2dWorld {
             impulse_joints: ImpulseJointSet::new(),
             multibody_joints: MultibodyJointSet::new(),
             ccd: CCDSolver::new(),
-            query: QueryPipeline::new(),
+            soft_bodies: SoftBodySet::new(),
+            schlaf_offen: Vec::new(),
             handles: Vec::new(),
         }
     }
@@ -90,12 +100,22 @@ impl Phys2dWorld {
     pub fn step(&mut self, dt: f32) {
         self.params.dt = dt.clamp(0.0001, 0.05);
         self.pipeline.step(
-            &self.gravity, &self.params, &mut self.islands,
+            self.gravity, &self.params, &mut self.islands,
             &mut self.broad, &mut self.narrow,
             &mut self.bodies, &mut self.colliders,
             &mut self.impulse_joints, &mut self.multibody_joints,
-            &mut self.ccd, Some(&mut self.query), &(), &(),
+            &mut self.soft_bodies, &mut self.ccd, &(), &(),
         );
+        for h in std::mem::take(&mut self.schlaf_offen) {
+            if let Some(rb) = self.bodies.get_mut(h) {
+                if !rb.is_sleeping() { rb.sleep(); }
+            }
+        }
+    }
+
+    /// Ein Anstoss von aussen: der Koerper soll wach bleiben.
+    fn angestossen(&mut self, h: RigidBodyHandle) {
+        self.schlaf_offen.retain(|x| *x != h);
     }
 
     fn handle(&self, idx: i64) -> Option<RigidBodyHandle> {
@@ -141,6 +161,7 @@ impl Phys2dWorld {
             if let Some(rb) = self.bodies.get_mut(h) {
                 rb.set_linvel(Vector::new(vx, vy), true);
             }
+            self.angestossen(h);
         }
     }
 
@@ -149,6 +170,7 @@ impl Phys2dWorld {
             if let Some(rb) = self.bodies.get_mut(h) {
                 rb.apply_impulse(Vector::new(ix, iy), true);
             }
+            self.angestossen(h);
         }
     }
 
@@ -157,6 +179,7 @@ impl Phys2dWorld {
             if let Some(rb) = self.bodies.get_mut(h) {
                 rb.set_translation(Vector::new(x, y), true);
             }
+            self.angestossen(h);
         }
     }
 
@@ -207,6 +230,11 @@ impl Phys2dWorld {
             if let Some(rb) = self.bodies.get_mut(h) {
                 if schlafen { rb.sleep(); } else { rb.wake_up(true); }
             }
+            if schlafen {
+                if !self.schlaf_offen.contains(&h) { self.schlaf_offen.push(h); }
+            } else {
+                self.angestossen(h);
+            }
         }
     }
 
@@ -223,7 +251,8 @@ impl Phys2dWorld {
         if idx < 0 || i >= self.handles.len() { return; }
         if let Some(h) = self.handles[i].take() {
             self.bodies.remove(h, &mut self.islands, &mut self.colliders,
-                               &mut self.impulse_joints, &mut self.multibody_joints, true);
+                               &mut self.impulse_joints, &mut self.multibody_joints,
+                               &mut self.soft_bodies, true);
         }
     }
 

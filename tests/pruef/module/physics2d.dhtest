@@ -182,3 +182,26 @@ haengt 50.0
 wach TRUE
 faellt TRUE
 wieder wach TRUE
+
+=== schlafend angelegter stapel bleibt ruhig bis zum anstoss
+' Wie in physics3d: seit rapier 0.36 (2026-11-10) weckt jeder neu beginnende
+' Kontakt, und die Kontakte eines frisch gebauten Stapels entstehen erst im
+' ersten Schritt. dhrt legt ihn danach wieder schlafen (schlaf_offen).
+IMPORT "physics2d"
+DIM w AS PHYS2D_WORLD
+w = PHYS2D_NEW()
+PHYS2D_ADD_BOX(w, 200.0, 310.0, 200.0, 10.0, FALSE, 0.0)
+DIM a AS INTEGER : a = PHYS2D_ADD_BOX(w, 200.0, 290.0, 10.0, 10.0, TRUE, 0.0)
+DIM b AS INTEGER : b = PHYS2D_ADD_BOX(w, 200.0, 270.0, 10.0, 10.0, TRUE, 0.0)
+PHYS2D_SLEEP(w, a)
+PHYS2D_SLEEP(w, b)
+DIM i AS INTEGER
+PHYS2D_STEP(w, 1.0 / 60)
+DIM y1 AS FLOAT : y1 = PHYS2D_BODY_Y(w, b)
+FOR i = 2 TO 30 : PHYS2D_STEP(w, 1.0 / 60) : NEXT
+PRINT "noch "; PHYS2D_SLEEPING(w, b); " still "; PHYS2D_BODY_Y(w, b) = y1; " nah am start "; ABS(y1 - 270.0) < 1.0
+PHYS2D_APPLY_IMPULSE(w, b, 50.0, 0.0)
+PRINT "wach "; NOT PHYS2D_SLEEPING(w, b)
+--- erwartet
+noch TRUE still TRUE nah am start TRUE
+wach TRUE

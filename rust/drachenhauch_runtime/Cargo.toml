@@ -72,9 +72,9 @@ ttf-parser = { version = "0.25", optional = true }
 gif = "0.13"
 # physics3d-Modul (PHYS3D_*): echte 3D-Starrkoerper-Physik. Pure-Rust (nalgebra),
 # keine C-Toolchain -> ungated immer dabei.
-rapier3d = { version = "0.22", optional = true }
+rapier3d = { version = "0.36", optional = true }
 # physics2d-Modul (PHYS2D_*): echte 2D-Starrkoerper-Physik. Ebenfalls pure-Rust.
-rapier2d = { version = "0.22", optional = true }
+rapier2d = { version = "0.36", optional = true }
 # Pruefsummen und Identitaet (WP D: SHA256$/SHA1$/MD5$/HMAC_SHA256$/UUID4$/
 # RANDOM_BYTES). Alles RustCrypto bzw. pure-Rust, keine C-Toolchain -> ungated:
 # ein Konsolenprogramm, das eine Pruefsumme bildet, soll nicht ausgerechnet das
