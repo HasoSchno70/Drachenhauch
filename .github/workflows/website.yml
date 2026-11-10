@@ -38,13 +38,20 @@ on:
       - "web/**"
       - "rust/build_wasm.py"
       - "rust/drachenhauch_runtime/Cargo.toml"
+      - "rust/drachenhauch_runtime/Cargo.lock"
+      - "rust/drachenhauch_runtime/src/**"
       - ".github/workflows/website.yml"
+  # Auch der Quelltext der Laufzeit: die Spielwiese IST diese Laufzeit, und ein
+  # Rust-PR, der nur fuer den Desktop uebersetzt, faellt sonst erst auf, wenn
+  # jemand die Website von Hand neu baut.
   pull_request:
     paths:
       - "tools/website.dh"
       - "web/**"
       - "rust/build_wasm.py"
       - "rust/drachenhauch_runtime/Cargo.toml"
+      - "rust/drachenhauch_runtime/Cargo.lock"
+      - "rust/drachenhauch_runtime/src/**"
       - ".github/workflows/website.yml"
   workflow_dispatch:
 

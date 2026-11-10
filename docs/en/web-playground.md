@@ -5,7 +5,7 @@
 > in German and English (`?lang=de|en`, otherwise the browser's language). It
 > is built by the website workflow (`.github/workflows/website.yml`,
 > emscripten 6.0.0, demo `examples/webspiel/main.dh`), also for every pull
-> request that touches `web/`, the website or `Cargo.toml` -- the web build had
+> request that touches `web/`, the website or the runtime (`Cargo.toml`, `Cargo.lock`, `src/`) -- the web build had
 > stopped compiling with 2026.43, and nobody noticed.
 
 > **As of 2026-10-13 (web round, example `examples/webspiel`):**

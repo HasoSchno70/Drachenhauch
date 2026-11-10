@@ -245,7 +245,7 @@ Einzelheiten stehen in der Geschichte des Bereichs.
   dieser Datei -- ein Pfad, den es nicht mehr gibt, ist ein Befund.
 - Die Website baut `tools/website.dh` (`.github/workflows/website.yml`), samt
   Spielwiese aus `rust/build_wasm.py`; der Web-Bau läuft dort auch für jeden
-  PR, der `web/`, die Website oder `Cargo.toml` anfasst.
+  PR, der `web/`, die Website oder die Laufzeit (`Cargo.toml`, `src/`) anfasst.
 
 **Prüfsammlungen (`dhrt test`)**
 - Format in `docs/werkzeuge.md`: `=== Fall`, Quelltext, `--- erwartet` /
