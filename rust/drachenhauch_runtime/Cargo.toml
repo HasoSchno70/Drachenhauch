@@ -209,7 +209,7 @@ cranelift-jit = { version = "0.136", optional = true }
 cranelift-module = { version = "0.136", optional = true }
 cranelift-native = { version = "0.136", optional = true }
 # Fremde Bibliotheken laden (DECLARE ... LIB, src/ffi.rs).
-libloading = { version = "0.8", optional = true }
+libloading = { version = "0.9", optional = true }
 
 # --- Web-Build (emscripten): wasm-bindgen-Familie festnageln ---------------
 # Kira zieht cpal fuer JEDES wasm32-Ziel mit dem Feature `wasm-bindgen` herein
