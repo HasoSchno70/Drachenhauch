@@ -22,8 +22,6 @@ jobs:
   # bleibt allein fuer den Bauschritt (`rust/build_runtime.py`, nur
   # Standardbibliothek -- `tests/pruef/werkzeugkette/bauskripte.dhtest` haelt das fest) und
   # fuer die Probe von `rust/build_wasm.py` in `tests/pruef/werkzeugkette/build_wasm.dhtest`.
-  # Die Qt-Editoren und ihre pytest-Dateien sind damit NICHT mehr geprueft;
-  # sie fallen im Loeschschritt (Punkt 7).
   #
   # Job-Name und Matrix bleiben, obwohl es nur noch eine Version gibt: `main`
   # verlangt die Pruefung "test (3.12)" beim NAMEN. Ein neuer Name meldete
@@ -142,7 +140,7 @@ jobs:
   # uebersprungen -- die Sprache selbst, Dateien, Netz, Datenbank, CSV, ZIP,
   # Mengen, Namensraeume und Hintergrund-Auftraege sind vollstaendig dabei.
   # Uebersprungen wird, was Pixel, Fenster, Audio-Pegel oder Eingabe prueft
-  # (`_BRAUCHT_GRAFIK` in conftest.py, empirisch ermittelt).
+  # (die Bewertung in `pruefsammlung.rs` erkennt den fehlenden Grafik-Builtin).
   #
   # `DHRT_OHNE_GRAFIK=1` schaltet das Ueberspringen frei. Ohne die Variable
   # aendert sich nichts -- der Windows-Lauf oben sieht einen fehlenden
