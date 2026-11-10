@@ -67,7 +67,7 @@ happen *next to* a game — tools, reports, small services:
 | **Network** | `HTTP_GET`/`POST` with headers and JSON, TLS, plus `SHA256$`, `HMAC_SHA256$` and `UUID4$` for authenticated services |
 | **Data** | SQLite, PostgreSQL and MySQL with the same commands, CSV per RFC 4180, ZIP, JSON, regex, `BUFFER` for binary files |
 | **Larger programs** | namespaces (`IMPORT "math.dh" AS math`), `PRIVATE`, `TRY`/`CATCH`/`FINALLY` with error codes, inheritance with `SUPER` and `ABSTRACT`, `ASSERT_EQ` |
-| **Foreign libraries** | `DECLARE FUNCTION MulDiv LIB "kernel32" (a AS LONG, b AS LONG, c AS LONG) AS LONG` — call the Windows API, the C library or device drivers directly, with pointers, structs and callbacks; even embed Python with numpy ([more, in German](docs/en/ffi.md)) |
+| **Foreign libraries** | `DECLARE FUNCTION MulDiv LIB "kernel32" (a AS LONG, b AS LONG, c AS LONG) AS LONG` — call the Windows API, the C library or device drivers directly, with pointers, structs and callbacks; even embed Python with numpy ([more](docs/en/ffi.md)) |
 | **In the background** | HTTP, database, external programs and **your own functions** (`TASK_START`) — the main loop keeps running |
 | **Applications like Xojo** | Drachenhauch Studio: draw windows from a library of controls, set properties in the inspector, double-click a control and write the code for its event; a window is a class, the project a folder; F5 starts, Ctrl+B builds an `.exe`, F7 debugs ([more](docs/en/studio.md)) |
 | **Panels and plugins** | `GUI_DOCK` arranges panels on the left, right and bottom, as tabs or floating; the IDE and Glutfaden load your own Drachenhauch programs as plugins; the IDE also fetches them from GitHub or a ZIP, ships three and tests them without a window ([more](docs/en/ide-plugins.md)) |
@@ -87,7 +87,7 @@ Details in the [manual](docs/en/README.md); how it got there is in the
 
 **[Download Drachenhauch](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — for Windows a single installer (about 58 MB), for macOS a `.dmg`, for Linux a `.tar.gz` (x86_64, and aarch64 for the [Raspberry Pi](docs/en/raspberry-pi.md)); currently version 2026.45.
 
-You do **not** need Python installed. It ships the complete development environment, the `dhrt` runtime, all 226 examples with their assets, the textbook in both languages as `.docx` and `.epub`, and the ESP32 skeleton. The Windows installer is unsigned, so SmartScreen will speak up on first launch; the macOS app is not notarised yet.
+You do **not** need Python installed. It ships the complete development environment, the `dhrt` runtime, all examples with their assets, the textbook in both languages as `.docx` and `.epub`, and the ESP32 skeleton. The Windows installer is unsigned, so SmartScreen will speak up on first launch; the macOS app is not notarised yet.
 
 ## Working from source
 
@@ -119,7 +119,7 @@ node build_epub.js [--lang en]        # -> .epub (reflows to the reader's font s
 dhrt run tools/buch_bauen.dh -- buch-referenz [--lang en]   # two-pass build with page numbers in the TOC
 ```
 
-One thing stays German on purpose: the run-time error messages quoted in Appendix D. `dhrt` prints them in German, and an English message in the book would be one the reader never sees.
+One thing stays German on purpose: the run-time error messages quoted in Appendix D, because that is how `dhrt` prints them by default. With `DHRT_LANG=en` the runtime prints its messages in English.
 
 ## Manual
 
@@ -276,7 +276,7 @@ Built with `rust/build_wasm.py`; the harness lives in `web/`.
 
 ## Examples
 
-`examples/` contains 214 examples plus ten benchmarks, from "Hello World" to a complete mini game:
+`examples/` contains over 200 examples and a set of benchmarks, from "Hello World" to a complete mini game:
 
 | File | Shows |
 |---|---|
@@ -314,11 +314,7 @@ Built with `rust/build_wasm.py`; the harness lives in `web/`.
 
 Pipeline: **source → preprocessor → lexer → parser → compiler → VM**; the VM compiles hot functions and loops to machine code while running (Cranelift, `DHRT_JIT=aus` turns it off) — **all inside `dhrt`** (Rust). `dhrt run file.dh` is a self-contained end-to-end run with no Python involved. Correctness is guarded by the **test collections** (`tests/pruef/*.dhtest`, one `dhrt run` per case) plus Rust `#[test]`s.
 
-> **History:** Programs used to also run through a Python **tree-walking interpreter** and two Python **bytecode VMs** (a plain Python VM and a Cython VM), guaranteeing "bit-identical output" across all three. As of **Stage B** the tree-walker and the entire Python toolchain (interpreter/compiler/vm/serialize) have been **removed** — `dhrt` is the only runtime and compiles the source itself.
-
-**Native Rust runtime (raylib + Kira) — the only runtime.** `dhrt` (`rust/drachenhauch_runtime/`)
-lexes, parses, compiles and executes the source itself — a self-contained Rust
-front-end, no Python anywhere in the execution path. What runs natively:
+**One runtime: `dhrt`** (`rust/drachenhauch_runtime/`, Rust with raylib and Kira). What it covers:
 
 | Area | Scope |
 |---|---|
@@ -342,9 +338,9 @@ stops working. One showcase that exercises nearly all of it at once:
 of chrome spheres with IBL, shadows, bloom and stereo techno. Plan and status in
 [docs/rust-runtime.md](docs/en/rust-runtime.md).
 
-**Front-end port to Rust — complete.** The entire toolchain (lexer → parser → compiler → preprocessor) has been ported to Rust, each stage verified for output parity against the Python tree-walker. **`dhrt run file.dh` is a self-contained end-to-end run with no Python:** it preprocesses (`IMPORT` resolution for both source files and built-in modules), lexes, parses, compiles and executes — scalars/arithmetic/control flow, arrays/maps, functions, classes/OOP, `SELECT`/`FOR EACH`/tuples/`WITH`/`TRY`/slicing/comprehensions/coroutines. It changes into the file's directory so relative `IMPORT` and asset paths resolve correctly (`dhrt file.dh` without `run` works the same way; `.dhc` files still use the direct VM path). Debug entry points: `dhrt --tokens`/`--ast`/`--preprocess`/`--runsrc`. **Self-export without Python:** `dhrt --export file.dh` compiles the source itself and bundles it into a self-contained `.exe` (appends the bytecode to a copy of the runtime, copies `assets/`). Aliased module imports (`IMPORT "json" AS j` → `J_PARSE`, `DIM h AS J_HANDLE`) work natively too. This also makes the **web playground pure Rust WASM**, compiling the source in the browser (no Pyodide): `rust/build_wasm.py file.dh` produces `web/dhrt.{js,wasm}` with the source embedded (the emscripten toolchain on Windows is wired up automatically). **Console and animated graphics both run in the browser** — the Drachenhauch render loop yields every frame via ASYNCIFY (`emscripten_sleep(0)` inside `flip()`), so `WHILE … FLIP() … WEND` doesn't freeze the tab; **shareable links** pack the source into the URL hash. Plan & stages in [docs/rust-frontend-port.md](docs/rust-frontend-port.md) (German).
+`dhrt run file.dh` changes into the file's directory, so relative `IMPORT` and asset paths resolve. Debug entry points: `dhrt --tokens`/`--ast`/`--preprocess`/`--runsrc`. The **web playground** is the same runtime compiled to WebAssembly: `rust/build_wasm.py file.dh` produces `web/dhrt.{js,wasm}`, the render loop yields every frame (ASYNCIFY), and shareable links pack the source into the URL hash.
 
-Architecture details and extension notes in [CLAUDE.md](CLAUDE.md) (German).
+Architecture details and extension notes in [CLAUDE.md](CLAUDE.md) (German); how it got there in [geschichte/](geschichte/) (German).
 
 ## Tests
 

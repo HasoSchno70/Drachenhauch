@@ -88,7 +88,7 @@ Nachzulesen im [Handbuch](docs/README.md); wie es dazu kam, steht in der
 
 **[Drachenhauch herunterladen](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — für Windows ein Installer (rund 58 MB), für macOS eine `.dmg`, für Linux ein `.tar.gz` (x86_64, und aarch64 für den [Raspberry Pi](docs/raspberry-pi.md)); aktuell Fassung 2026.45.
 
-Python muss dafür **nicht** installiert sein. Mit dabei sind die komplette Entwicklungsumgebung, die Runtime `dhrt`, alle 226 Beispiele samt Assets, beide Bücher (*Der Einstieg* und *Das Lehrbuch*, letzteres in beiden Sprachen) als `.docx` und `.epub` sowie das ESP32-Grundgerüst. Der Windows-Installer ist nicht signiert, SmartScreen meldet sich also beim ersten Start; die macOS-App ist noch nicht beglaubigt.
+Python muss dafür **nicht** installiert sein. Mit dabei sind die komplette Entwicklungsumgebung, die Runtime `dhrt`, alle Beispiele samt Assets, beide Bücher (*Der Einstieg* und *Das Lehrbuch*, letzteres in beiden Sprachen) als `.docx` und `.epub` sowie das ESP32-Grundgerüst. Der Windows-Installer ist nicht signiert, SmartScreen meldet sich also beim ersten Start; die macOS-App ist noch nicht beglaubigt.
 
 ## Aus dem Quelltext arbeiten
 
@@ -275,7 +275,7 @@ Gebaut wird mit `rust/build_wasm.py`, das Gerüst liegt in `web/`.
 
 ## Beispiele
 
-`examples/` enthält 214 Beispiele plus zehn Benchmarks, von "Hallo Welt" bis zum kompletten Mini-Spiel:
+`examples/` enthält über 200 Beispiele und eine Reihe Benchmarks, von "Hallo Welt" bis zum kompletten Mini-Spiel:
 
 | Datei | Zeigt |
 |---|---|
@@ -339,11 +339,7 @@ Gebaut wird mit `rust/build_wasm.py`, das Gerüst liegt in `web/`.
 
 Pipeline: **Source → Preprocessor → Lexer → Parser → Compiler → VM**, heiße Funktionen und Schleifen übersetzt die VM beim Laufen in Maschinencode (Cranelift, `DHRT_JIT=aus` schaltet ab) — **alles in `dhrt`** (Rust). `dhrt run datei.dh` ist ein eigenständiger End-to-End-Lauf ohne Python. Korrektheit sichern die **Prüfsammlungen** (`tests/pruef/*.dhtest`, je Fall ein eigener `dhrt run`) + Rust-`#[test]`s.
 
-> **Geschichte:** Früher liefen Programme zusätzlich über einen Python-**Tree-Walker** und zwei Python-**Bytecode-VMs** (Python-VM, Cython-VM), mit „bit-identischem Output" als Garantie. Seit **Stufe B** sind Tree-Walker + Python-Toolchain (interpreter/compiler/vm/serialize) **alle entfernt** — `dhrt` ist die einzige Runtime und kompiliert den Quelltext selbst.
-
-**Native Rust-Runtime (raylib + Kira) — die einzige Runtime.** `dhrt` (`rust/drachenhauch_runtime/`)
-lext, parst, kompiliert und führt den Quelltext selbst aus — ein eigenständiges
-Rust-Frontend, kein Python im Ausführungspfad. Was davon nativ läuft:
+**Eine Runtime: `dhrt`** (`rust/drachenhauch_runtime/`, Rust mit raylib und Kira). Was sie abdeckt:
 
 | Bereich | Umfang |
 |---|---|
@@ -367,9 +363,9 @@ plötzlich nicht mehr läuft. Ein Schaustück, das fast alles davon gleichzeitig
 Chrom-Kugeln mit IBL, Schatten, Bloom und Stereo-Techno. Plan und Stand in
 [docs/rust-runtime.md](docs/rust-runtime.md).
 
-**Front-End-Portierung nach Rust — abgeschlossen.** Die komplette Toolchain (Lexer → Parser → Compiler → Preprocessor) wurde nach Rust portiert, jede Stufe per Output-Parität gegen den Python-Tree-Walker verifiziert. **`dhrt run datei.dh` ist ein eigenständiger End-to-End-Lauf ohne Python:** preprocesst (`IMPORT`-Auflösung von Quelldateien und Built-in-Modulen), lext, parst, kompiliert und führt aus — Skalare/Arithmetik/Kontrollfluss, Arrays/Maps, Funktionen, Klassen/OOP, `SELECT`/`FOR EACH`/Tupel/`WITH`/`TRY`/Slicing/Comprehensions/Coroutinen. Es wird ins Datei-Verzeichnis gewechselt, sodass relative `IMPORT`- und Asset-Pfade stimmen (`dhrt datei.dh` ohne `run` funktioniert genauso; `.dhc`-Dateien laufen weiter den direkten VM-Pfad). Debug-Einstiege `dhrt --tokens`/`--ast`/`--preprocess`/`--runsrc`. **Selbst-Export ohne Python:** `dhrt --export datei.dh` kompiliert die Quelle selbst und bündelt sie zu einer eigenständigen `.exe` (hängt den Bytecode an eine Kopie der Runtime, kopiert `assets/`). Aliasierte Modul-Imports (`IMPORT "json" AS j` → `J_PARSE`, `DIM h AS J_HANDLE`) funktionieren ebenfalls nativ. Damit ist auch der **Web-Playground ein reines Rust-WASM**, das die Quelle im Browser kompiliert (kein Pyodide): `rust/build_wasm.py datei.dh` erzeugt `web/dhrt.{js,wasm}` mit eingebetteter Quelle (emscripten-Toolchain auf Windows wird automatisch verdrahtet). **Konsole und animierte Grafik laufen im Browser** — der DH-Render-Loop yieldet pro Frame via ASYNCIFY (`emscripten_sleep(0)` in `flip()`), sodass `WHILE … FLIP() … WEND` den Tab nicht einfriert; **teilbare Links** packen die Quelle in den URL-Hash. Plan & Stufen in [docs/rust-frontend-port.md](docs/rust-frontend-port.md).
+`dhrt run datei.dh` wechselt ins Verzeichnis der Datei, damit relative `IMPORT`- und Asset-Pfade stimmen. Debug-Einstiege: `dhrt --tokens`/`--ast`/`--preprocess`/`--runsrc`. Die **Spielwiese im Browser** ist dieselbe Runtime als WebAssembly: `rust/build_wasm.py datei.dh` erzeugt `web/dhrt.{js,wasm}`, die Zeichenschleife gibt jedes Bild ab (ASYNCIFY), und teilbare Links packen die Quelle in den URL-Hash.
 
-Architektur-Details und Erweiterungs-Hinweise in [CLAUDE.md](CLAUDE.md).
+Architektur-Details und Erweiterungs-Hinweise in [CLAUDE.md](CLAUDE.md), wie es dazu kam in [geschichte/](geschichte/).
 
 ## Tests
 
