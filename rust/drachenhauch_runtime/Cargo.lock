@@ -1369,7 +1369,7 @@ dependencies = [
  "ureq",
  "uuid",
  "wasm-bindgen",
- "webpki-roots 0.26.11",
+ "webpki-roots 1.0.11",
  "windows 0.62.2",
  "xmrs",
  "xmrsplayer",
