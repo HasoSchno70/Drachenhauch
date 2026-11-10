@@ -3872,7 +3872,8 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             // `new_from_slice` scheitert bei HMAC nie (jede Schluessellaenge
             // ist zulaessig, zu lange werden gehasht) -- der Fehlerzweig ist
             // trotzdem ausgeschrieben statt unwrap().
-            let mut m = <hmac::Hmac<sha2::Sha256> as hmac::Mac>::new_from_slice(&schluessel)
+            // Seit hmac 0.13 liegt new_from_slice im Trait KeyInit, nicht in Mac.
+            let mut m = <hmac::Hmac<sha2::Sha256> as hmac::KeyInit>::new_from_slice(&schluessel)
                 .map_err(|e| format!("HMAC_SHA256$: Schluessel nicht verwendbar: {}", e))?;
             m.update(&daten);
             Ok(Value::str_rc(hex_string(&m.finalize().into_bytes())))

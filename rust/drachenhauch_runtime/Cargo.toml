@@ -86,10 +86,10 @@ rapier2d = { version = "0.22", optional = true }
 # die Art Code, die auf den ersten Blick stimmt und in einem Randfall still
 # etwas anderes liefert -- und hier haengt eine Signaturpruefung daran. Die
 # Testvektoren aus den Normen laufen trotzdem als Golden-Tests mit.
-sha2 = "0.10"
-sha1 = "0.10"
-md-5 = "0.10"
-hmac = "0.12"
+sha2 = "0.11"
+sha1 = "0.11"
+md-5 = "0.11"
+hmac = "0.13"
 uuid = { version = "1", features = ["v4"] }
 getrandom = "0.2"
 # mDNS-Antworter (src/mdns.rs): SO_REUSEADDR/-PORT auf 5353 neben dem
