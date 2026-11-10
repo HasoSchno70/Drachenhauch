@@ -1353,6 +1353,7 @@ has to show what a program prints *while* it runs, and send it input
 | Function | Effect |
 |---|---|
 | `PROCESS_START(programm$, ...)` → INTEGER | starts with open input and output; `"dhrt"` as the program means this runtime itself. An array of texts among the arguments is spread out (`PROCESS_START("dhrt", "run", datei$, "--", argumente)`), a MAP of texts gives the child additional environment variables (only it, not your own program) |
+| `PROCESS_START_DETACHED(programm$, ...)` → INTEGER | starts **detached**: without pipes and without a number for the other `PROCESS_*`, the child keeps running when this program ends (this is how the IDE's start screen launches the studio and closes). Arguments as with `PROCESS_START`; returns the system's process id |
 | `PROCESS_READ$(prozess)` → STRING | what has arrived on stdout since the last call (empty = nothing new) |
 | `PROCESS_ERR$(prozess)` → STRING | the same for stderr |
 | `PROCESS_WRITE(prozess, text$)` | send to the input — an `INPUT` in the child needs the line ending `CHR$(10)` |

@@ -22,6 +22,8 @@ Linux startet `drachenhauch --studio [projekt]` es aus dem Terminal. In der
 IDE: Werkzeuge → Drachenhauch Studio (mit dem Projektordner, wenn er ein
 Studio-Projekt ist), und eine `.dhstudio` oder `.dhform` im Projektbaum geht
 im Studio auf. Das Studio ersetzt den früheren Form-Designer (bis 2026.45).
+Der Startbildschirm der IDE bietet es gleich nach dem Vorspann an
+(„Modern – das Studio“).
 
 **Stand: Stufe 4.** Projekte mit mehreren Fenstern, Modulen und Klassen,
 Ereignisse und ein Code-Feld je Methode; Starten, Bauen und Fehler an der

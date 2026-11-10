@@ -332,6 +332,7 @@ SUB einstellungenZeigen()
     GUI_SET_CHECKED(cbKlammern, klammernAn)
     GUI_SET_CHECKED(cbFormatSichern, formatSichernAn)
     GUI_SET_CHECKED(cbVorspann, vorspannAn)
+    GUI_SET_CHECKED(cbStartwahl, startwahl = "frage")
     GUI_SET_CHECKED(cbGlanz, glanzAn)
     GUI_SET_CHECKED(cbBaumHaken, baumHakenAn)
     GUI_SET_CHECKED(cbWasser, wasserzeichenAn)
@@ -374,6 +375,12 @@ SUB einstellungenNachziehen()
         vorspannAn = GUI_CHECKED(cbVorspann)
         konfigSichern()
         protokoll("vorspann " + IIF(vorspannAn, "an", "aus"))
+    END IF
+    ' Aus heisst: gleich die IDE -- wer hier steht, arbeitet ja in ihr.
+    IF GUI_CHECKED(cbStartwahl) <> (startwahl = "frage") THEN
+        startwahl = IIF(GUI_CHECKED(cbStartwahl), "frage", "ide")
+        konfigSichern()
+        protokoll("startwahl einstellung " + startwahl)
     END IF
     IF GUI_DROPDOWN_SELECTED(ddVorspann) <> vorspannWahlStand AND GUI_DROPDOWN_SELECTED(ddVorspann) >= 0 THEN
         vorspannWahlStand = GUI_DROPDOWN_SELECTED(ddVorspann)

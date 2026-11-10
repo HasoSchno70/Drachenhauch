@@ -21,7 +21,8 @@ if the association was chosen during installation). On macOS and Linux
 `drachenhauch --studio [project]` starts it from the terminal. In the IDE:
 Werkzeuge → Drachenhauch Studio (with the project folder if it is a studio
 project), and a `.dhstudio` or `.dhform` in the project tree opens in the
-studio. The studio replaces the former form designer (until 2026.45).
+studio. The studio replaces the former form designer (until 2026.45). The
+IDE's start screen offers it right after the intro ("Modern – the Studio").
 
 **Status: stage 4.** Projects with several windows, modules and classes,
 events and a code field per method; starting, building and errors shown at

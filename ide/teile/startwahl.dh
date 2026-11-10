@@ -1,0 +1,359 @@
+' ============================================================
+'  IDE -- der Startbildschirm: klassisch in der IDE oder modern im Studio
+' ============================================================
+'  Nach dem Vorspann, vor dem Aufbau der IDE: zwei Karten, "Klassisch --
+'  die IDE" und "Modern -- das Studio". Maus, Pfeile/Tab, Enter/Leertaste,
+'  1/2, ESC (= die IDE). "Nicht mehr fragen" merkt die Wahl in der ide.json
+'  (`startwahl`: "frage", "ide" oder "studio"); zurueck ueber die
+'  Einstellungen oder Umschalt beim Start.
+'
+'  Gerufen wird das, BEVOR die Teile-Dateien ihre eigenen DIMs ausfuehren
+'  (sie stehen weiter unten in ide.dh) -- darum nur lokale Variablen hier.
+'  Die Vorschauen sind gezeichnet, keine Bildschirmfotos: die veralten nicht
+'  und passen sich jeder Groesse an.
+' ============================================================
+
+' Weiches Ein- und Ausschwingen (0..1).
+FUNCTION swWeich(t AS FLOAT) AS FLOAT
+    DIM u AS FLOAT : u = MAX(0.0, MIN(1.0, t))
+    RETURN u * u * (3.0 - 2.0 * u)
+END FUNCTION
+
+' Eine Farbe mit Deckkraft 0..1 (RGBA: 255 = deckend).
+FUNCTION swFarbe(f AS INTEGER, a AS FLOAT) AS INTEGER
+    DIM r AS INTEGER : r = (f \ 65536) MOD 256
+    DIM g AS INTEGER : g = (f \ 256) MOD 256
+    DIM b AS INTEGER : b = f MOD 256
+    RETURN RGBA(r, g, b, MAX(1, MIN(255, INT(a * 255.0))))
+END FUNCTION
+
+' Text in einer Groesse, waagerecht um cx zentriert.
+SUB swMitte(cx AS INTEGER, y AS INTEGER, t AS STRING, gr AS INTEGER, f AS INTEGER)
+    TEXT_SIZE(gr)
+    TEXT(cx - TEXT_WIDTH(t) \ 2, y, t, f)
+END SUB
+
+' Die Vorschau der IDE: Projektbaum links, Code mit Farben rechts, eine
+' blinkende Marke.
+SUB swVorschauIde(x AS INTEGER, y AS INTEGER, b AS INTEGER, h AS INTEGER, s AS FLOAT, a AS FLOAT, zeit AS FLOAT)
+    BOXROUND(x, y, x + b - 1, y + h - 1, INT(8 * s), swFarbe(&H0E1220, a))
+    DIM bb AS INTEGER : bb = INT(b * 0.28)
+    BOXROUND(x, y, x + bb, y + h - 1, INT(8 * s), swFarbe(&H151A2C, a))
+    DIM zh AS INTEGER : zh = INT(15 * s)
+    DIM i AS INTEGER
+    ' Baum: Ordner und eingerueckte Dateien.
+    FOR i = 0 TO 7
+        DIM ein AS INTEGER : ein = IIF(i = 0 OR i = 4, 0, INT(12 * s))
+        DIM ty AS INTEGER : ty = y + INT(12 * s) + i * zh
+        IF ty + INT(6 * s) > y + h - INT(8 * s) THEN EXIT FOR
+        BOXROUND(x + INT(10 * s) + ein, ty, x + INT(18 * s) + ein, ty + INT(6 * s), 2, swFarbe(IIF(i = 0 OR i = 4, &HE8C468, &H6FC3F0), a * 0.9))
+        BOX(x + INT(22 * s) + ein, ty + 1, x + bb - INT(10 * s) - (i MOD 3) * INT(8 * s), ty + INT(5 * s), swFarbe(&H8A93A8, a * 0.55))
+    NEXT
+    ' Code: Zeilennummern und farbige Woerter.
+    DIM laengen AS ARRAY OF INTEGER : laengen = [5, 9, 14, 7, 0, 6, 11, 16, 8, 4]
+    DIM farben AS ARRAY OF INTEGER : farben = [&HF0A050, &H9CDCFE, &HCE9178, &H6FC3F0, &H8FD98C]
+    DIM cx AS INTEGER : cx = x + bb + INT(14 * s)
+    FOR i = 0 TO LEN(laengen) - 1
+        DIM zy AS INTEGER : zy = y + INT(12 * s) + i * zh
+        IF zy + INT(6 * s) > y + h - INT(8 * s) THEN EXIT FOR
+        BOX(cx, zy + 1, cx + INT(8 * s), zy + INT(5 * s), swFarbe(&H4B5563, a))
+        DIM einzug AS INTEGER : einzug = IIF(i >= 2 AND i <= 7 AND i <> 4, INT(16 * s), 0)
+        DIM wx AS INTEGER : wx = cx + INT(18 * s) + einzug
+        DIM rest AS INTEGER : rest = laengen[i]
+        DIM k AS INTEGER : k = 0
+        WHILE rest > 0
+            DIM w AS INTEGER : w = MIN(rest, 3 + (i + k) MOD 4)
+            DIM ww AS INTEGER : ww = INT(w * 6 * s)
+            IF wx + ww > x + b - INT(10 * s) THEN EXIT WHILE
+            BOXROUND(wx, zy, wx + ww, zy + INT(6 * s), 2, swFarbe(farben[(i + k) MOD LEN(farben)], a * 0.95))
+            wx = wx + ww + INT(5 * s)
+            rest = rest - w
+            k = k + 1
+        WEND
+    NEXT
+    ' Die Marke blinkt in Zeile 7.
+    IF INT(zeit * 1.6) MOD 2 = 0 THEN
+        DIM my AS INTEGER : my = y + INT(12 * s) + 7 * zh - INT(2 * s)
+        BOX(cx + INT(150 * s), my, cx + INT(150 * s) + MAX(1, INT(2 * s)), my + INT(10 * s), swFarbe(&HFFFFFF, a))
+    END IF
+END SUB
+
+' Die Vorschau des Studios: Bibliothek links, ein Fenster im Entwurf mit
+' Feldern und einem gewaehlten Knopf samt Griffen und Ausrichtungslinie.
+SUB swVorschauStudio(x AS INTEGER, y AS INTEGER, b AS INTEGER, h AS INTEGER, s AS FLOAT, a AS FLOAT, zeit AS FLOAT)
+    BOXROUND(x, y, x + b - 1, y + h - 1, INT(8 * s), swFarbe(&H0E1220, a))
+    ' Punktraster der Entwurfsflaeche.
+    DIM px AS INTEGER
+    DIM py AS INTEGER
+    FOR py = y + INT(10 * s) TO y + h - INT(10 * s) STEP INT(MAX(8, 14 * s))
+        FOR px = x + INT(10 * s) TO x + b - INT(10 * s) STEP INT(MAX(8, 14 * s))
+            BOX(px, py, px, py, swFarbe(&H2A3248, a))
+        NEXT
+    NEXT
+    ' Bibliothek.
+    DIM bb AS INTEGER : bb = INT(b * 0.22)
+    BOXROUND(x, y, x + bb, y + h - 1, INT(8 * s), swFarbe(&H151A2C, a))
+    DIM i AS INTEGER
+    FOR i = 0 TO 6
+        DIM ly AS INTEGER : ly = y + INT(12 * s) + i * INT(18 * s)
+        IF ly + INT(10 * s) > y + h - INT(8 * s) THEN EXIT FOR
+        RECTROUND(x + INT(8 * s), ly, x + INT(22 * s), ly + INT(10 * s), 2, swFarbe(&H5CC8F0, a * 0.8))
+        BOX(x + INT(27 * s), ly + INT(3 * s), x + bb - INT(8 * s) - (i MOD 2) * INT(10 * s), ly + INT(7 * s), swFarbe(&H8A93A8, a * 0.55))
+    NEXT
+    ' Das Fenster im Entwurf.
+    DIM fx AS INTEGER : fx = x + bb + INT(18 * s)
+    DIM fy AS INTEGER : fy = y + INT(14 * s)
+    DIM fb AS INTEGER : fb = x + b - INT(14 * s) - fx
+    DIM fh AS INTEGER : fh = y + h - INT(14 * s) - fy
+    BOXROUND(fx, fy, fx + fb, fy + fh, INT(6 * s), swFarbe(&H1E2436, a))
+    BOXROUND(fx, fy, fx + fb, fy + INT(18 * s), INT(6 * s), swFarbe(&H2A3148, a))
+    DIM k AS INTEGER
+    FOR k = 0 TO 2
+        CIRCLE(fx + INT(10 * s) + k * INT(10 * s), fy + INT(9 * s), MAX(2, INT(3 * s)), swFarbe(IIF(k = 0, &HEC6A5E, IIF(k = 1, &HF4BF4F, &H61C554)), a))
+    NEXT
+    ' Beschriftungen und Felder.
+    DIM zx AS INTEGER : zx = fx + INT(12 * s)
+    DIM fz AS INTEGER
+    FOR fz = 0 TO 1
+        DIM zy AS INTEGER : zy = fy + INT(30 * s) + fz * INT(26 * s)
+        BOX(zx, zy + INT(5 * s), zx + INT(34 * s), zy + INT(9 * s), swFarbe(&H8A93A8, a * 0.7))
+        RECTROUND(zx + INT(42 * s), zy, fx + fb - INT(12 * s), zy + INT(14 * s), 3, swFarbe(&H4B5A78, a))
+    NEXT
+    ' Ein Kaestchen.
+    DIM ky AS INTEGER : ky = fy + INT(84 * s)
+    IF ky + INT(10 * s) < fy + fh - INT(30 * s) THEN
+        RECTROUND(zx, ky, zx + INT(10 * s), ky + INT(10 * s), 2, swFarbe(&H5CC8F0, a))
+        BOX(zx + INT(16 * s), ky + INT(3 * s), zx + INT(60 * s), ky + INT(7 * s), swFarbe(&H8A93A8, a * 0.6))
+    END IF
+    ' Der gewaehlte Knopf: er gleitet sacht hin und her, die
+    ' Ausrichtungslinie rastet an der Kante der Felder ein.
+    DIM kb AS INTEGER : kb = INT(56 * s)
+    DIM kh AS INTEGER : kh = INT(18 * s)
+    DIM schwung AS FLOAT : schwung = swWeich(0.5 + 0.5 * SIN(zeit * 1.3))
+    DIM kx AS INTEGER : kx = fx + fb - INT(12 * s) - kb - INT(schwung * 18 * s)
+    DIM kyy AS INTEGER : kyy = fy + fh - INT(12 * s) - kh
+    BOXROUND(kx, kyy, kx + kb, kyy + kh, INT(4 * s), swFarbe(&H3A8FD0, a))
+    BOX(kx + INT(14 * s), kyy + INT(7 * s), kx + kb - INT(14 * s), kyy + INT(11 * s), swFarbe(&HFFFFFF, a * 0.85))
+    IF schwung < 0.08 THEN BOX(kx + kb, fy + INT(22 * s), kx + kb, fy + fh - 2, swFarbe(&HF06090, a))
+    DIM gx AS ARRAY OF INTEGER : gx = [kx, kx + kb, kx, kx + kb]
+    DIM gy AS ARRAY OF INTEGER : gy = [kyy, kyy, kyy + kh, kyy + kh]
+    DIM g AS INTEGER
+    FOR g = 0 TO 3
+        BOX(gx[g] - INT(2 * s), gy[g] - INT(2 * s), gx[g] + INT(2 * s), gy[g] + INT(2 * s), swFarbe(&HFFFFFF, a))
+    NEXT
+END SUB
+
+' Eine Karte. nr 0 = IDE, 1 = Studio; hv 0..1 = wie sehr sie gewaehlt ist.
+SUB swKarte(nr AS INTEGER, x AS INTEGER, y AS INTEGER, b AS INTEGER, h AS INTEGER, s AS FLOAT, a AS FLOAT, hv AS FLOAT, zeit AS FLOAT, grossFont AS INTEGER, kleinFont AS INTEGER)
+    DIM akz AS INTEGER : akz = IIF(nr = 0, &HF0A050, &H5CC8F0)
+    DIM r AS INTEGER : r = INT(16 * s)
+    ' Schatten nach aussen, nach aussen blasser.
+    DIM k AS INTEGER
+    FOR k = 1 TO 12
+        RECTROUND(x - k, y - k + INT(4 * s), x + b + k, y + h + k + INT(4 * s), r + k, swFarbe(&H000000, a * MAX(0.01, 0.16 - k * 0.012)))
+    NEXT
+    ' Leuchten der gewaehlten Karte in ihrer Farbe.
+    IF hv > 0.01 THEN
+        FOR k = 1 TO 10
+            RECTROUND(x - k, y - k, x + b + k, y + h + k, r + k, swFarbe(akz, a * hv * MAX(0.01, 0.22 - k * 0.02)))
+        NEXT
+    END IF
+    BOXROUND(x, y, x + b, y + h, r, swFarbe(&H1A2032, a * 0.96))
+    GRADIENTV(x + r, y + 1, x + b - r, y + INT(3 * s), swFarbe(akz, a * (0.35 + 0.65 * hv)), swFarbe(akz, a * 0.05))
+    RECTROUND(x, y, x + b, y + h, r, swFarbe(IIF(hv > 0.5, akz, &H38405A), a * (0.6 + 0.4 * hv)))
+    ' Vorschau.
+    DIM vx AS INTEGER : vx = x + INT(22 * s)
+    DIM vy AS INTEGER : vy = y + INT(22 * s)
+    DIM vb AS INTEGER : vb = b - INT(44 * s)
+    DIM vh AS INTEGER : vh = INT(172 * s)
+    IF nr = 0 THEN swVorschauIde(vx, vy, vb, vh, s, a, zeit) ELSE swVorschauStudio(vx, vy, vb, vh, s, a, zeit)
+    ' Marke, Titel, drei Zeilen.
+    IF kleinFont >= 0 THEN SETFONT(kleinFont)
+    DIM marke AS STRING : marke = IIF(nr = 0, tr$("KLASSISCH"), tr$("MODERN"))
+    TEXT_SIZE(INT(12 * s))
+    DIM mw AS INTEGER : mw = TEXT_WIDTH(marke)
+    DIM my AS INTEGER : my = vy + vh + INT(20 * s)
+    BOXROUND(vx, my, vx + mw + INT(16 * s), my + INT(20 * s), INT(10 * s), swFarbe(akz, a * 0.18))
+    TEXT(vx + INT(8 * s), my + INT(3 * s), marke, swFarbe(akz, a))
+    IF grossFont >= 0 THEN SETFONT(grossFont)
+    TEXT_SIZE(INT(28 * s))
+    TEXT(vx, my + INT(30 * s), IIF(nr = 0, tr$("Die IDE"), tr$("Das Studio")), swFarbe(&HF2F4F8, a))
+    IF kleinFont >= 0 THEN SETFONT(kleinFont)
+    TEXT_SIZE(INT(15 * s))
+    DIM zeilen AS ARRAY OF STRING
+    IF nr = 0 THEN
+        zeilen = [tr$("Code zuerst: Spiele, Werkzeuge, Konsole"), tr$("Eigene Hauptschleife, 2D und 3D"), tr$("Projektbaum, Debugger, Handbuch auf F1")]
+    ELSE
+        zeilen = [tr$("Oberfläche zuerst: Fenster aus Controls"), tr$("Doppelklick aufs Control, Code je Ereignis"), tr$("Datenbanken, Berichte, eigene Controls")]
+    END IF
+    DIM zi AS INTEGER
+    FOR zi = 0 TO LEN(zeilen) - 1
+        DIM zy AS INTEGER : zy = my + INT(72 * s) + zi * INT(24 * s)
+        CIRCLE(vx + INT(4 * s), zy + INT(9 * s), MAX(2, INT(3 * s)), swFarbe(akz, a * 0.9))
+        TEXT(vx + INT(16 * s), zy, zeilen[zi], swFarbe(&HB8C0D0, a))
+    NEXT
+    ' Taste unten rechts.
+    TEXT_SIZE(INT(13 * s))
+    DIM taste AS STRING : taste = IIF(nr = 0, "1", "2")
+    DIM tx AS INTEGER : tx = x + b - INT(22 * s) - INT(22 * s)
+    DIM tyy AS INTEGER : tyy = y + h - INT(36 * s)
+    RECTROUND(tx, tyy, tx + INT(22 * s), tyy + INT(22 * s), INT(5 * s), swFarbe(&H5A647C, a * (0.5 + 0.5 * hv)))
+    TEXT(tx + (INT(22 * s) - TEXT_WIDTH(taste)) \ 2, tyy + INT(4 * s), taste, swFarbe(&HC8D0DC, a))
+END SUB
+
+' Der Bildschirm selbst. Liefert "ide", "studio" oder "kreuz" (Fenster zu
+' bzw. Bildlimit eines Testlaufs); `merken` sagt, ob "Nicht mehr fragen"
+' angekreuzt war.
+FUNCTION startwahlZeigen(BYREF merken AS BOOLEAN) AS STRING
+    protokoll("startwahl gezeigt")
+    ' Eine eigene, grosse Schrift fuer die Ueberschriften -- die der
+    ' Oberflaeche ist in 32 px geladen und wuerde bei 44 px weich.
+    DIM grossFont AS INTEGER : grossFont = -1
+    DIM kleinFont AS INTEGER : kleinFont = -1
+    DIM fp AS STRING
+    FOR EACH fp IN ("C:/Windows/Fonts/segoeuib.ttf", "C:/Windows/Fonts/segoeui.ttf", "/System/Library/Fonts/Supplemental/Arial Bold.ttf", "/System/Library/Fonts/Supplemental/Arial.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
+        IF grossFont < 0 AND FILEEXISTS(fp) THEN grossFont = LOADFONT(fp, 96)
+    NEXT
+    FOR EACH fp IN ("C:/Windows/Fonts/segoeui.ttf", "/System/Library/Fonts/Supplemental/Arial.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
+        IF kleinFont < 0 AND FILEEXISTS(fp) THEN kleinFont = LOADFONT(fp, 48)
+    NEXT
+    DIM logo AS INTEGER : logo = -1
+    IF FILEEXISTS(PATHJOIN(bilderOrdner, "schriftzug.png")) THEN logo = LOADIMAGE(PATHJOIN(bilderOrdner, "schriftzug.png"))
+    DIM wahl AS INTEGER : wahl = 0            ' 0 = IDE, 1 = Studio
+    DIM hv AS ARRAY OF FLOAT : hv = [1.0, 0.0]
+    merken = FALSE
+    DIM ergebnis AS STRING : ergebnis = ""
+    DIM t0 AS FLOAT : t0 = GET_TIME()
+    DIM zuletzt AS FLOAT : zuletzt = t0
+    WHILE ergebnis = ""
+        IF WINDOW_CLOSE_REQUESTED() THEN ergebnis = "kreuz" : EXIT WHILE
+        IF QUITREQUESTED() THEN ergebnis = "kreuz" : EXIT WHILE
+        DIM jetzt AS FLOAT : jetzt = GET_TIME()
+        DIM dt AS FLOAT : dt = MIN(0.1, jetzt - zuletzt)
+        zuletzt = jetzt
+        DIM ein AS FLOAT : ein = swWeich((jetzt - t0) / 0.45)
+        DIM bw AS INTEGER : bw = SCREENWIDTH()
+        DIM bh AS INTEGER : bh = SCREENHEIGHT()
+        DIM s AS FLOAT : s = MAX(0.7, MIN(2.2, MIN(bw / 1280.0, bh / 820.0)))
+        DIM kb AS INTEGER : kb = INT(430 * s)
+        DIM kh AS INTEGER : kh = INT(392 * s)
+        DIM luecke AS INTEGER : luecke = INT(44 * s)
+        DIM kx0 AS INTEGER : kx0 = (bw - 2 * kb - luecke) \ 2
+        DIM ky AS INTEGER : ky = INT(bh * 0.5 - kh * 0.42) + INT((1.0 - ein) * 24 * s)
+        DIM kxs AS ARRAY OF INTEGER : kxs = [kx0, kx0 + kb + luecke]
+        ' Maus: ueber einer Karte waehlt sie, ein Klick nimmt sie.
+        DIM mx AS INTEGER : mx = MOUSEX()
+        DIM mym AS INTEGER : mym = MOUSEY()
+        DIM ueber AS INTEGER : ueber = -1
+        DIM n AS INTEGER
+        FOR n = 0 TO 1
+            IF mx >= kxs[n] AND mx <= kxs[n] + kb AND mym >= ky AND mym <= ky + kh THEN ueber = n
+        NEXT
+        IF ueber >= 0 THEN wahl = ueber
+        ' Kaestchen "Nicht mehr fragen".
+        IF kleinFont >= 0 THEN SETFONT(kleinFont)
+        TEXT_SIZE(INT(15 * s))
+        DIM ktext AS STRING : ktext = tr$("Nicht mehr fragen")
+        DIM kq AS INTEGER : kq = INT(18 * s)
+        DIM kgesamt AS INTEGER : kgesamt = kq + INT(10 * s) + TEXT_WIDTH(ktext)
+        DIM kkx AS INTEGER : kkx = (bw - kgesamt) \ 2
+        DIM kky AS INTEGER : kky = ky + kh + INT(40 * s)
+        DIM ueberKaestchen AS BOOLEAN : ueberKaestchen = mx >= kkx - 4 AND mx <= kkx + kgesamt + 4 AND mym >= kky - 4 AND mym <= kky + kq + 4
+        IF ueber >= 0 OR ueberKaestchen THEN MOUSE_CURSOR("hand") ELSE MOUSE_CURSOR("auto")
+        IF MOUSE_HIT(0) THEN
+            IF ueber >= 0 THEN ergebnis = IIF(ueber = 0, "ide", "studio")
+            IF ueberKaestchen THEN merken = NOT merken
+        END IF
+        ' Tastatur.
+        IF KEYHIT(KEY_LEFT) THEN wahl = 0
+        IF KEYHIT(KEY_RIGHT) THEN wahl = 1
+        IF KEYHIT(KEY_TAB) THEN wahl = 1 - wahl
+        IF KEYHIT("1") THEN ergebnis = "ide"
+        IF KEYHIT("2") THEN ergebnis = "studio"
+        IF KEYHIT("n") THEN merken = NOT merken
+        IF KEYHIT(KEY_RETURN) OR KEYHIT(KEY_SPACE) THEN ergebnis = IIF(wahl = 0, "ide", "studio")
+        IF KEYHIT(KEY_ESCAPE) THEN ergebnis = "ide"
+        ' Die gewaehlte Karte leuchtet weich auf, die andere klingt ab.
+        FOR n = 0 TO 1
+            DIM ziel AS FLOAT : ziel = IIF(n = wahl, 1.0, 0.0)
+            hv[n] = hv[n] + (ziel - hv[n]) * MIN(1.0, dt * 10.0)
+        NEXT
+
+        ' --- Zeichnen ---
+        GRADIENTV(0, 0, bw, bh, &H0C1018, &H161124)
+        ' Zwei Lichter hinter den Karten, in ihren Farben.
+        CIRCLE_GRADIENT(kxs[0] + kb \ 2, ky + kh \ 2, INT(kb * 0.95), swFarbe(&HF0A050, ein * (0.06 + 0.10 * hv[0])), swFarbe(&HF0A050, 0.0))
+        CIRCLE_GRADIENT(kxs[1] + kb \ 2, ky + kh \ 2, INT(kb * 0.95), swFarbe(&H5CC8F0, ein * (0.06 + 0.10 * hv[1])), swFarbe(&H5CC8F0, 0.0))
+        ' Schriftzug, Ueberschrift, Unterzeile.
+        DIM oben AS INTEGER : oben = ky - INT(190 * s)
+        IF logo >= 0 THEN
+            DIM lh AS INTEGER : lh = INT(92 * s)
+            DIM lb AS INTEGER : lb = INT(IMAGEWIDTH(logo) * lh / IMAGEHEIGHT(logo))
+            DRAWIMAGEPARTEX(logo, 0, 0, IMAGEWIDTH(logo), IMAGEHEIGHT(logo), (bw - lb) \ 2, MAX(INT(8 * s), oben - INT(40 * s)), lb, lh, swFarbe(&HFFFFFF, ein))
+        END IF
+        IF grossFont >= 0 THEN SETFONT(grossFont)
+        swMitte(bw \ 2, oben + INT(70 * s), tr$("Wie möchtest du arbeiten?"), INT(38 * s), swFarbe(&HF4F6FA, ein))
+        IF kleinFont >= 0 THEN SETFONT(kleinFont)
+        swMitte(bw \ 2, oben + INT(122 * s), tr$("Beides ist Drachenhauch – dieselbe Sprache, dieselbe Laufzeit."), INT(17 * s), swFarbe(&H98A2B6, ein))
+        ' Karten.
+        FOR n = 0 TO 1
+            swKarte(n, kxs[n], ky - INT(hv[n] * 6 * s), kb, kh, s, ein, hv[n], jetzt - t0, grossFont, kleinFont)
+        NEXT
+        ' Kaestchen und Hinweis.
+        IF kleinFont >= 0 THEN SETFONT(kleinFont)
+        RECTROUND(kkx, kky, kkx + kq, kky + kq, INT(4 * s), swFarbe(IIF(ueberKaestchen, &HC8D0DC, &H7A849A), ein))
+        IF merken THEN
+            BOXROUND(kkx + 3, kky + 3, kkx + kq - 3, kky + kq - 3, INT(3 * s), swFarbe(&HF0A050, ein))
+        END IF
+        TEXT_SIZE(INT(15 * s))
+        TEXT(kkx + kq + INT(10 * s), kky + (kq - INT(15 * s)) \ 2 - 1, ktext, swFarbe(&HC8D0DC, ein))
+        swMitte(bw \ 2, kky + INT(34 * s), tr$("Wieder fragen lassen: Einstellungen der IDE, oder beim Start Umschalt halten."), INT(13 * s), swFarbe(&H6A748A, ein))
+        swMitte(bw \ 2, bh - INT(34 * s), tr$("Pfeile wählen, Enter startet – oder 1 und 2"), INT(13 * s), swFarbe(&H5A647A, ein))
+        FLIP()
+    WEND
+    MOUSE_CURSOR("auto")
+    IF uiFont >= 0 THEN SETFONT(uiFont)
+    IF logo >= 0 THEN IMAGE_FREE(logo)
+    IF ergebnis <> "kreuz" AND merken THEN
+        startwahl = ergebnis
+        JSON_SET_STRING(konfig, "startwahl", ergebnis)
+        TRY
+            MKDIR(DIRNAME(konfigPfad))
+            WRITEALL(konfigPfad, JSON_STRINGIFY(konfig))
+        CATCH e
+        END TRY
+    END IF
+    protokoll("startwahl " + ergebnis + IIF(merken, " gemerkt", ""))
+    RETURN ergebnis
+END FUNCTION
+
+' Das Studio losgeloest starten (es laeuft weiter, wenn die IDE gleich
+' endet) -- mit dem Studio-Projekt im Startordner, wenn es dort eins gibt.
+' FALSE, wenn es das Studio nicht gibt: dann bleibt es bei der IDE.
+FUNCTION startwahlStudio() AS BOOLEAN
+    DIM pfad AS STRING : pfad = PATHJOIN(wurzel, "studio/studio.dh")
+    IF NOT FILEEXISTS(pfad) THEN
+        protokoll("startwahl studio fehlt")
+        RETURN FALSE
+    END IF
+    DIM args AS ARRAY OF STRING : args = ["run", pfad]
+    DIM projekt AS STRING : projekt = PATHJOIN(startOrdner, "projekt.dhstudio")
+    IF FILEEXISTS(projekt) THEN
+        ARRAY_PUSH(args, "--")
+        ARRAY_PUSH(args, projekt)
+    END IF
+    ' Pruefungen starten das Studio nicht wirklich -- ein losgeloestes
+    ' Fenster liefe nach dem Fall weiter.
+    IF GETENV$("DH_IDE_STUDIO_TROCKEN") = "1" THEN
+        protokoll("startwahl studio trocken " + JOIN$(args, " "))
+        RETURN TRUE
+    END IF
+    TRY
+        DIM pid AS INTEGER : pid = PROCESS_START_DETACHED("dhrt", args)
+        protokoll("startwahl studio gestartet")
+        RETURN TRUE
+    CATCH e
+        protokoll("startwahl studio fehler " + e)
+    END TRY
+    RETURN FALSE
+END FUNCTION

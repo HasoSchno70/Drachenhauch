@@ -1,0 +1,56 @@
+' PROCESS_START_DETACHED (2026-11-10, fuer den Startbildschirm der IDE): ein
+' losgeloestes Kind laeuft weiter, wenn der Aufrufer endet. Ein Kind aus
+' PROCESS_START beendet dhrt dagegen mit (Drop von `Prozess`) -- so startete
+' der Startbildschirm das Studio und nahm es beim eigenen Ende gleich wieder
+' mit. Der Fall startet die Eltern, die Eltern starten das Kind und enden
+' sofort; das Kind schreibt erst danach eine Datei.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== ein losgeloestes kind ueberlebt das ende der eltern
+DIM e AS INTEGER : e = PROCESS_START("dhrt", "run", "eltern.dh")
+DIM aus AS STRING : aus = ""
+DIM leer AS INTEGER : leer = 0
+WHILE leer < 5
+    DIM t AS STRING : t = PROCESS_READ$(e) + PROCESS_ERR$(e)
+    aus = aus + t
+    IF t = "" AND NOT PROCESS_RUNNING(e) THEN leer = leer + 1
+    SLEEP(20)
+WEND
+PRINT TRIM$(aus)
+PRINT "eltern zu ende, datei noch nicht da "; NOT FILEEXISTS("kind.txt")
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE NOT FILEEXISTS("kind.txt") AND MILLIS() - t0 < 20000
+    SLEEP(50)
+WEND
+PRINT "das kind schrieb "; FILEEXISTS("kind.txt")
+--- datei eltern.dh
+DIM pid AS INTEGER : pid = PROCESS_START_DETACHED("dhrt", "run", "kind.dh")
+PRINT "pid groesser 0 "; pid > 0
+--- datei kind.dh
+SLEEP(1500)
+WRITEALL("kind.txt", "da")
+--- erwartet
+pid groesser 0 TRUE
+eltern zu ende, datei noch nicht da TRUE
+das kind schrieb TRUE
+
+=== ein kind aus process_start endet mit den eltern
+' Der Unterschied, um den es geht: dieselben Eltern mit PROCESS_START.
+DIM e AS INTEGER : e = PROCESS_START("dhrt", "run", "eltern.dh")
+WHILE PROCESS_RUNNING(e)
+    SLEEP(20)
+WEND
+SLEEP(3500)
+PRINT "das kind schrieb "; FILEEXISTS("kind.txt")
+--- datei eltern.dh
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", "kind.dh")
+--- datei kind.dh
+SLEEP(1500)
+WRITEALL("kind.txt", "da")
+--- erwartet
+das kind schrieb FALSE
+
+=== ein programm, das es nicht gibt, ist ein fehler
+DIM pid AS INTEGER : pid = PROCESS_START_DETACHED("gibt_es_nicht_dh_42")
+--- fehler
+PROCESS_START_DETACHED: 'gibt_es_nicht_dh_42' laesst sich nicht starten
