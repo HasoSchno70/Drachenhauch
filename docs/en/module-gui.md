@@ -378,7 +378,7 @@ A **text area** has scrolled three lines per step since 2026-09-18 (before
 that not at all); the cursor does not pull the view back as long as neither
 it nor the text changes -- a key that moves it pulls the view back to it.
 
-**Submenus** are created with `GUI_SUBMENU` and receive their entries like any menu; they open on hover and stay open while you move diagonally across (only another entry on the same level closes them). In the `.dhform` they are stored **nested** on the entry (`items`), shortcuts as `shortcut`, check marks as `checkable`/`checked`. Icons are texture handles and, as with `GUI_IMAGE`, are not saved. The form designer does not edit menus, but passes them through unchanged and writes them into the DH code.
+**Submenus** are created with `GUI_SUBMENU` and receive their entries like any menu; they open on hover and stay open while you move diagonally across (only another entry on the same level closes them). In the `.dhform` they are stored **nested** on the entry (`items`), shortcuts as `shortcut`, check marks as `checkable`/`checked`. Icons are texture handles and, as with `GUI_IMAGE`, are not saved. In Drachenhauch Studio they are made in the menu editor.
 
 ### Tabs + keyboard navigation
 
@@ -1076,7 +1076,7 @@ full anyway. The widths are measured in `GUI_UPDATE`, the click reads the
 same number.
 
 Both are stored in the `.dhform` (`status` with fields, `pfad` with parts and
-values); in the form designer they are in the palette.
+values).
 
 ## ListBox, Image, Canvas
 
@@ -2036,8 +2036,7 @@ GUI_TREETABLE_EXPAND(tt, ex, TRUE)
 All three are stored completely in the `.dhform`: open sections, heights and
 child positions under `akkordeon`, the check switch and button texts under
 `assistent`, parent entries and expanded rows under `table` (`baum`,
-`eltern`, `offen`). The form designer offers them in the palette; their
-sections and steps go into the field “Einträge” (entries).
+`eltern`, `offen`). Drachenhauch Studio offers them in its library.
 
 The wizard divides up its width: the three buttons are 112 points wide, and
 narrower in a narrow wizard, so that they do not lie on top of each other.
@@ -2330,7 +2329,7 @@ GUI_ON_CLICK(ok, on_start)        ' on_start is a FUNCREF
   **Limit:** a handler bound this way is **not** written by `GUI_SAVE`/`GUI_TO_JSON`.
   When loading, the instance would not exist, and saving only the
   method name would be misleading — it would be interpreted as a free function.
-  Forms that are meant to survive as a `.dhform` (form designer)
+  Forms that are meant to survive as a `.dhform`
   therefore still need free handler functions.
 - Works for **buttons** (click = press+release on the button) and
   **checkboxes** (on every toggle).
@@ -2841,8 +2840,7 @@ also across several levels. `GUI_LAYOUT_MIN_W/H(layout)` return it — the
 right value for `WINDOW_MIN_SIZE`.
 
 No constraint system — for a form this is enough, and you still understand it. In the `.dhform` the container is stored with `layout`
-(kind, dimensions, `kinder` as `[Index, Gewicht]`); the form designer knows it as a
-palette entry with a "Layout" field per control. Example:
+(kind, dimensions, `kinder` as `[Index, Gewicht]`). Example:
 [`examples/194_gui_layout.dh`](../../examples/194_gui_layout.dh).
 
 ## Indentation on line break
@@ -3090,8 +3088,7 @@ END IF
   `GUI_FORM_CLEAN` the state counts as clean; `GUI_FORM_CHANGED` compares
   against it. That makes the prompt "Save | Discard | Cancel" a single
   line.
-- In the `.dhform`: `bind` and `form`; the form designer has the fields
-  "Binding" and "Form" for them.
+- In the `.dhform`: `bind` and `form`.
 
 The club manager (`examples/verein/`) shows all of it together against a
 server that several people use at the same time.
@@ -3142,8 +3139,8 @@ END IF
   `GUI_CLEAR_ERRORS(win)` clears them all.
 - `GUI_VALIDATE_LIVE(win, TRUE)` checks a field as soon as the focus leaves
   it — not on every keystroke: a half-typed address is not a wrong one.
-- Rules are stored in the `.dhform` (`rules`, `error_label`); the form
-  designer has a field "Rules" for them (`pflicht; laenge 2 60; email`).
+- Rules are stored in the `.dhform` (`rules`, `error_label`), for example
+  `pflicht; laenge 2 60; email`.
 
 Deliberately not included: a custom rule as a FUNCREF. Whatever a rule
 cannot do, the program checks itself after `GUI_VALIDATE` and reports with
@@ -3261,7 +3258,7 @@ progress, image, canvas) still receives no focus and never fires the two
 edges.
 
 All seven survive `GUI_SAVE`/`GUI_LOAD` and `GUI_TO_JSON`/`GUI_FROM_JSON`
-— that is the way a form built in the form designer gets its handlers.
+— that is the way a designed form gets its handlers.
 
 ## Operation without a mouse
 
@@ -3336,7 +3333,7 @@ What the program can contribute:
 
 **Labels.** An input field has no text of its own; the screen reader takes
 the **label to its left** (same row) or **directly above it** (same left
-edge) — the way the form designer places them. If there is none, the
+edge). If there is none, the
 tooltip serves as the name. An error message from form validation is read
 out as a description. So anyone building a field without a neighbouring
 label should at least give it a `GUI_TOOLTIP`.

@@ -259,6 +259,7 @@ pub fn konstanten(ordner: &Path) -> Vec<Befund> {
 /// als Inline-Code in historischen Notizen. Fuer LINKS gilt die Liste NICHT:
 /// ein Link verspricht "hier kannst du hinspringen".
 pub const GEDULDETE_PFADE: &[(&str, &str)] = &[
+    ("examples/197_form_designer.dh", "Form-Designer, 2026-11-10 entfernt (das Studio ersetzt ihn) -- nur noch in Entwuerfen genannt"),
     ("drachenhauch/interpreter.py", "Tree-Walker, mit Stufe B entfernt -- nur in historischen Notizen"),
     ("drachenhauch/parser.py", "Python-Parser, 2026-08-19 entfernt (Stufe C) -- nur noch im Entwurf genannt"),
     ("drachenhauch/ast_nodes.py", "AST-Knoten des Python-Parsers, mit ihm entfernt"),

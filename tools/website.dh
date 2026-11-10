@@ -687,13 +687,13 @@ SUB startseite(sprache AS STRING)
     IF en THEN
         h = h + "<p class=" + q + "spruch" + q + ">Let your ideas breathe fire.</p>" + CHR$(10)
         h = h + "<h1>A modern BASIC for games and desktop applications</h1>" + CHR$(10)
-        h = h + "<p><strong>Drachenhauch</strong> (German for <em>dragon's breath</em>) is a programming language for writing <strong>2D and 3D games and desktop applications with a GUI</strong> — and the command-line tools and small services that go with them. It comes with its own IDE, form designer and sprite, tilemap and sound editors, and turns a program into a standalone <code>.exe</code> with one command. Windows, macOS and Linux, and the browser via WebAssembly.</p>" + CHR$(10)
+        h = h + "<p><strong>Drachenhauch</strong> (German for <em>dragon's breath</em>) is a programming language for writing <strong>2D and 3D games and desktop applications with a GUI</strong> — and the command-line tools and small services that go with them. It comes with its own IDE, Drachenhauch Studio for GUI applications, and sprite, tilemap and sound editors, and turns a program into a standalone <code>.exe</code> with one command. Windows, macOS and Linux, and the browser via WebAssembly.</p>" + CHR$(10)
         h = h + "<p>A BASIC in the spirit of QB64, FreeBASIC or Blitz Basic, with the batteries of PICO-8 or LÖVE for games and the forms and tables of Visual Basic for applications — easy to start with, strict enough to grow up with.</p>" + CHR$(10)
         h = h + "<p class=" + q + "knoepfe" + q + ">" + IIF(mitSpielwiese, "<a class=" + q + "knopf" + q + " href=" + q + spielwieseUrl$("", "en") + q + ">Try it in your browser</a>", "") + "<a class=" + q + IIF(mitSpielwiese, "knopf zweit", "knopf") + q + " href=" + q + REPO + "/releases/latest" + q + ">Download</a><a class=" + q + "knopf zweit" + q + " href=" + q + "en/index.html" + q + ">Read the manual</a><a class=" + q + "knopf zweit" + q + " href=" + q + "en/umstieg.html" + q + ">Coming from another BASIC?</a></p>" + CHR$(10)
     ELSE
         h = h + "<p class=" + q + "spruch" + q + ">Feuer frei für deine Ideen.</p>" + CHR$(10)
         h = h + "<h1>Ein modernes BASIC für Spiele und Anwendungen</h1>" + CHR$(10)
-        h = h + "<p><strong>Drachenhauch</strong> ist eine Programmiersprache für <strong>2D- und 3D-Spiele und Anwendungen mit grafischer Oberfläche</strong> — und für die Kommandozeilen-Werkzeuge und kleinen Dienste, die dazugehören. Mit eigener Entwicklungsumgebung, Form-Designer, Sprite-, Karten- und Klang-Editoren; ein Befehl macht aus einem Programm eine eigenständige <code>.exe</code>. Windows, macOS und Linux und als WebAssembly im Browser.</p>" + CHR$(10)
+        h = h + "<p><strong>Drachenhauch</strong> ist eine Programmiersprache für <strong>2D- und 3D-Spiele und Anwendungen mit grafischer Oberfläche</strong> — und für die Kommandozeilen-Werkzeuge und kleinen Dienste, die dazugehören. Mit eigener Entwicklungsumgebung, dem Drachenhauch Studio für Anwendungen und Sprite-, Karten- und Klang-Editoren; ein Befehl macht aus einem Programm eine eigenständige <code>.exe</code>. Windows, macOS und Linux und als WebAssembly im Browser.</p>" + CHR$(10)
         h = h + "<p>Ein BASIC im Geist von QB64, FreeBASIC oder Blitz Basic, mit dem Werkzeugkasten von PICO-8 oder LÖVE für Spiele und den Formularen und Tabellen von Visual Basic für Anwendungen — leicht anzufangen, streng genug, um damit zu wachsen.</p>" + CHR$(10)
         h = h + "<p class=" + q + "knoepfe" + q + ">" + IIF(mitSpielwiese, "<a class=" + q + "knopf" + q + " href=" + q + spielwieseUrl$("", "de") + q + ">Im Browser ausprobieren</a>", "") + "<a class=" + q + IIF(mitSpielwiese, "knopf zweit", "knopf") + q + " href=" + q + REPO + "/releases/latest" + q + ">Herunterladen</a><a class=" + q + "knopf zweit" + q + " href=" + q + "de/index.html" + q + ">Zum Handbuch</a><a class=" + q + "knopf zweit" + q + " href=" + q + "de/umstieg.html" + q + ">Umstieg aus einem anderen BASIC</a></p>" + CHR$(10)
     END IF
@@ -710,7 +710,7 @@ SUB startseite(sprache AS STRING)
         h = h + "<section><h2>What is in the box</h2><ul>" + CHR$(10)
         h = h + "<li><strong>The language:</strong> BASIC with strict typing, classes, lambdas, coroutines, modules and packages; a compiler with machine code (Cranelift) for hot loops.</li>" + CHR$(10)
         h = h + "<li><strong>Games:</strong> 2D and 3D graphics (raylib), shaders, sprites, Tiled maps, particles, 2D/3D physics (Rapier), sound and music with effects (Kira), gamepads.</li>" + CHR$(10)
-        h = h + "<li><strong>Applications:</strong> windows, forms, tables, trees, a form designer, SQLite, PostgreSQL and MySQL, PDF and printing, screen readers.</li>" + CHR$(10)
+        h = h + "<li><strong>Applications:</strong> windows, forms, tables, trees, a GUI designer (Drachenhauch Studio), SQLite, PostgreSQL and MySQL, PDF and printing, screen readers.</li>" + CHR$(10)
         h = h + "<li><strong>Tools:</strong> an IDE with debugger and profiler, editors for sprites, tilemaps, particles, sound effects, music (tracker and score) — all written in Drachenhauch itself.</li>" + CHR$(10)
         h = h + "<li><strong>Reach:</strong> network, HTTP, MQTT, serial ports, MIDI, Arduino (Firmata), foreign C libraries; export as a standalone program, or WebAssembly for the browser.</li>" + CHR$(10)
         h = h + "</ul></section>" + CHR$(10)
@@ -719,7 +719,7 @@ SUB startseite(sprache AS STRING)
         h = h + "<section><h2>Was dabei ist</h2><ul>" + CHR$(10)
         h = h + "<li><strong>Die Sprache:</strong> BASIC mit strenger Typisierung, Klassen, Lambdas, Koroutinen, Modulen und Paketen; ein Übersetzer mit Maschinencode (Cranelift) für heiße Schleifen.</li>" + CHR$(10)
         h = h + "<li><strong>Spiele:</strong> 2D- und 3D-Grafik (raylib), Shader, Sprites, Tiled-Karten, Partikel, 2D/3D-Physik (Rapier), Ton und Musik mit Effekten (Kira), Gamepads.</li>" + CHR$(10)
-        h = h + "<li><strong>Anwendungen:</strong> Fenster, Formulare, Tabellen, Bäume, ein Form-Designer, SQLite, PostgreSQL und MySQL, PDF und Drucken, Bildschirmleser.</li>" + CHR$(10)
+        h = h + "<li><strong>Anwendungen:</strong> Fenster, Formulare, Tabellen, Bäume, ein Oberflächen-Designer (Drachenhauch Studio), SQLite, PostgreSQL und MySQL, PDF und Drucken, Bildschirmleser.</li>" + CHR$(10)
         h = h + "<li><strong>Werkzeuge:</strong> eine IDE mit Debugger und Profiler, Editoren für Sprites, Karten, Partikel, Klangeffekte, Musik (Tracker und Notenblatt) — alle selbst in Drachenhauch geschrieben.</li>" + CHR$(10)
         h = h + "<li><strong>Anschluss:</strong> Netzwerk, HTTP, MQTT, serielle Schnittstellen, MIDI, Arduino (Firmata), fremde C-Bibliotheken; Ausgabe als eigenständiges Programm oder als WebAssembly für den Browser.</li>" + CHR$(10)
         h = h + "</ul></section>" + CHR$(10)
@@ -757,7 +757,7 @@ FUNCTION llms$() AS STRING
     t = t + "Key facts:" + nl
     t = t + "- Source files end in `.dh`; programs run with `dhrt run file.dh` and are exported to a standalone executable with `dhrt --export file.dh`." + nl
     t = t + "- Comparable to QB64, FreeBASIC and Blitz Basic (language), PICO-8 and LÖVE (games) and Visual Basic (forms and tables)." + nl
-    t = t + "- Built-in modules for 2D/3D graphics, sound and music, physics, GUI (windows, forms, tables, form designer), SQLite/PostgreSQL/MySQL, PDF and printing, networking, HTTP, MQTT, serial ports and MIDI." + nl
+    t = t + "- Built-in modules for 2D/3D graphics, sound and music, physics, GUI (windows, forms, tables, Drachenhauch Studio), SQLite/PostgreSQL/MySQL, PDF and printing, networking, HTTP, MQTT, serial ports and MIDI." + nl
     t = t + "- Keywords and built-in names are case-insensitive; string escapes only in `!" + CHR$(34) + "...\n" + CHR$(34) + "` strings; `MID$` and `INSTR` count from 0." + nl
     t = t + "- Open source under the MIT or Apache 2.0 license; programs written with it may be distributed and sold, including the runtime." + nl
     t = t + "- Source code and releases: " + REPO + nl

@@ -191,8 +191,8 @@ exists only once -- two cases at the same time pasted each other's text.
 Whoever tests the real clipboard sets `DHRT_ZWISCHENABLAGE=system` in
 `--- umgebung` (as `zwischenablage.dhtest` does).
 
-**Testing tools without Python** (since stage 32): this is how the form
-designer's tests run in `tests/pruef/werkzeuge/werkzeug_formdesigner.dhtest`. Two ways
+**Testing tools without Python** (since stage 32): this is how the animation
+FSM editor's tests run in `tests/pruef/werkzeuge/werkzeug_animfsm.dhtest`. Two ways
 side by side — real clicks through a recording (insertion
 `AUTOMATION_PLAY("ev.txt")` after `SETFPS(60)`, fixture file
 `--- datei _programm/ev.txt`), or directly through the tool's subroutines

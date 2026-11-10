@@ -20,9 +20,8 @@ Anwendungsmenü, und eine `.dhstudio` öffnet per Doppelklick im Studio (unter
 Windows, wenn die Verknüpfung beim Installieren gewählt war). Unter macOS und
 Linux startet `drachenhauch --studio [projekt]` es aus dem Terminal. In der
 IDE: Werkzeuge → Drachenhauch Studio (mit dem Projektordner, wenn er ein
-Studio-Projekt ist), und eine `.dhstudio` im Projektbaum geht im Studio auf.
-Der Form-Designer öffnet sein Formular mit Datei → Im Drachenhauch Studio
-öffnen (Strg+Umschalt+O).
+Studio-Projekt ist), und eine `.dhstudio` oder `.dhform` im Projektbaum geht
+im Studio auf. Das Studio ersetzt den früheren Form-Designer (bis 2026.45).
 
 **Stand: Stufe 4.** Projekte mit mehreren Fenstern, Modulen und Klassen,
 Ereignisse und ein Code-Feld je Methode; Starten, Bauen und Fehler an der
@@ -740,7 +739,7 @@ Fehler mit seinem Namen.
 ## Ein einzelnes Fenster
 
 Eine `.dhform` (dasselbe Format, das `GUI_SAVE` schreibt und `GUI_LOAD`
-liest) geht auch ohne Projekt auf, aus dem Form-Designer oder aus einem
+liest) geht auch ohne Projekt auf, aus der IDE oder aus einem
 Programm; Controls ohne Namen bekommen beim Öffnen einen. Solange nur das
 Fenster bearbeitet wird, schreibt Sichern genau diese Datei. Kommt Code oder
 ein weiteres Element dazu, wird daraus ein Projekt, und Sichern fragt nach

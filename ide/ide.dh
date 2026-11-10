@@ -1452,7 +1452,6 @@ DIM miWzPartikel AS INTEGER : miWzPartikel = GUI_MENU_ITEM(mWerkzeuge, tr$("Part
 DIM miWzTilemap AS INTEGER : miWzTilemap = GUI_MENU_ITEM(mWerkzeuge, tr$("Tilemap-Editor"))
 DIM miWzSprite AS INTEGER : miWzSprite = GUI_MENU_ITEM(mWerkzeuge, tr$("Sprite-Editor"))
 DIM miWzTracker AS INTEGER : miWzTracker = GUI_MENU_ITEM(mWerkzeuge, tr$("Tracker"))
-DIM miWzForm AS INTEGER : miWzForm = GUI_MENU_ITEM(mWerkzeuge, tr$("Form-Designer"))
 DIM miWzAnim AS INTEGER : miWzAnim = GUI_MENU_ITEM(mWerkzeuge, tr$("Anim-FSM-Editor"))
 DIM miWzNoten AS INTEGER : miWzNoten = GUI_MENU_ITEM(mWerkzeuge, tr$("Notenblatt"))
 DIM miWzKlassen AS INTEGER : miWzKlassen = GUI_MENU_ITEM(mWerkzeuge, tr$("Klassendiagramm"))

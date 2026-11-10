@@ -985,9 +985,9 @@ SUB tabOeffnen(pfad AS STRING, inhalt AS STRING)
     IF pfad <> "" THEN pluginEreignis("geoeffnet", pfad)
 END SUB
 
-' Eine .dhform oeffnet seit Stand 31 den Form-Designer in Drachenhauch
-' (examples/197_form_designer.dh) -- als Text nur auf ausdruecklichen Wunsch
-' (Befehlspalette), weil man ein Formular sonst im JSON statt am Bild baut.
+' Eine .dhform oeffnet das Drachenhauch Studio (bis 2026-11-10 den
+' Form-Designer) -- als Text nur auf ausdruecklichen Wunsch (Befehlspalette),
+' weil man ein Formular sonst im JSON statt am Bild baut.
 DIM letzteForm AS STRING : letzteForm = ""
 DIM formAlsText AS BOOLEAN : formAlsText = FALSE
 
@@ -1003,8 +1003,8 @@ SUB dateiOeffnen(pfad AS STRING)
     END IF
     IF LOWER$(RIGHT$(pfad, 7)) = ".dhform" AND NOT formAlsText THEN
         letzteForm = pfad
-        werkzeugMit("197_form_designer.dh", pfad)
-        GUI_SET_TEXT(lblStatus, tr$("Im Form-Designer geöffnet: ") + BASENAME(pfad) + tr$(" -- als Text: Befehlspalette, 'Formular als Text öffnen'"))
+        studioStarten(pfad)
+        GUI_SET_TEXT(lblStatus, GUI_TEXT(lblStatus) + tr$(" -- als Text: Befehlspalette, 'Formular als Text öffnen'"))
         RETURN
     END IF
     ' Bilder und Klaenge zeigt die IDE selbst -- man will sehen bzw. hoeren,

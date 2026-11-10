@@ -378,7 +378,7 @@ Ein **Textbereich** rollt seit 2026-09-18 drei Zeilen je Schritt (vorher gar
 nicht); die Marke holt den Ausschnitt nicht zurück, solange sie und der Text
 sich nicht ändern -- eine Taste, die sie bewegt, zieht ihn wieder zu ihr.
 
-**Untermenüs** entstehen mit `GUI_SUBMENU` und bekommen ihre Einträge wie jedes Menü; sie öffnen beim Überfahren und bleiben offen, solange man schräg hinüberfährt (erst ein anderer Eintrag derselben Ebene schließt sie). In der `.dhform` liegen sie **verschachtelt** am Eintrag (`items`), Kürzel als `shortcut`, Häkchen als `checkable`/`checked`. Sinnbilder sind Textur-Handles und werden wie bei `GUI_IMAGE` nicht gespeichert. Der Form-Designer bearbeitet Menüs nicht, reicht sie aber unverändert durch und schreibt sie in den DH-Code.
+**Untermenüs** entstehen mit `GUI_SUBMENU` und bekommen ihre Einträge wie jedes Menü; sie öffnen beim Überfahren und bleiben offen, solange man schräg hinüberfährt (erst ein anderer Eintrag derselben Ebene schließt sie). In der `.dhform` liegen sie **verschachtelt** am Eintrag (`items`), Kürzel als `shortcut`, Häkchen als `checkable`/`checked`. Sinnbilder sind Textur-Handles und werden wie bei `GUI_IMAGE` nicht gespeichert. Im Drachenhauch Studio entstehen sie im Menü-Editor.
 
 ### Reiter (Tabs) + Tastatur-Navigation
 
@@ -1078,7 +1078,7 @@ Bildschirmleser bekommt ihn ohnehin vollständig. Die Breiten werden in
 `GUI_UPDATE` gemessen, der Klick liest dieselbe Zahl.
 
 Beide stehen in der `.dhform` (`status` mit Feldern, `pfad` mit Teilen und
-Werten); im Form-Designer liegen sie in der Palette.
+Werten).
 
 ## ListBox, Image, Canvas
 
@@ -2044,8 +2044,8 @@ GUI_TREETABLE_EXPAND(tt, ex, TRUE)
 Alle drei stehen vollständig in der `.dhform`: offene Abschnitte, Höhen und
 Kinderlagen unter `akkordeon`, Prüfschalter und Knopftexte unter
 `assistent`, Elternangaben und Aufgeklapptes unter `table` (`baum`,
-`eltern`, `offen`). Der Form-Designer bietet sie in der Palette an; ihre
-Abschnitte und Schritte stehen im Feld „Einträge".
+`eltern`, `offen`). Das Drachenhauch Studio bietet sie in seiner Bibliothek
+an.
 
 Der Assistent teilt seine Breite: die drei Knöpfe sind 112 Punkte breit,
 in einem schmalen Assistenten schmaler, damit sie nicht übereinander
@@ -2340,7 +2340,7 @@ GUI_ON_CLICK(ok, on_start)        ' on_start ist eine FUNCREF
   **Grenze:** ein so gebundener Handler wird von `GUI_SAVE`/`GUI_TO_JSON`
   **nicht** mitgeschrieben. Beim Laden gäbe es die Instanz nicht, und nur den
   Methodennamen zu speichern wäre irreführend — er würde als freie Funktion
-  gedeutet. Formulare, die als `.dhform` überleben sollen (Form-Designer),
+  gedeutet. Formulare, die als `.dhform` überleben sollen,
   brauchen also weiterhin freie Handler-Funktionen.
 - Funktioniert für **Buttons** (Klick = Press+Release auf dem Knopf) und
   **Checkboxen** (bei jedem Toggle).
@@ -2852,8 +2852,7 @@ auch durch mehrere Ebenen. `GUI_LAYOUT_MIN_W/H(layout)` liefern es — der
 richtige Wert für `WINDOW_MIN_SIZE`.
 
 Kein Constraint-System — für ein Formular reicht das, und man versteht es noch. In der `.dhform` steht der Behälter mit `layout`
-(Art, Maße, `kinder` als `[Index, Gewicht]`); der Form-Designer kennt ihn als
-Palette-Eintrag mit einem Feld „Layout" je Control. Beispiel:
+(Art, Maße, `kinder` als `[Index, Gewicht]`). Beispiel:
 [`examples/194_gui_layout.dh`](../examples/194_gui_layout.dh).
 
 ## Einrückung beim Zeilenumbruch
@@ -3104,8 +3103,7 @@ END IF
   `GUI_FORM_CLEAN` gilt der Stand als sauber; `GUI_FORM_CHANGED` vergleicht
   dagegen. Damit ist die Rückfrage „Speichern | Verwerfen | Abbrechen" eine
   Zeile.
-- In der `.dhform`: `bind` und `form`; der Form-Designer hat dafür die Felder
-  „Bindung" und „Formular".
+- In der `.dhform`: `bind` und `form`.
 
 Die Vereinsverwaltung (`examples/verein/`) zeigt alles zusammen an einem
 Server, an dem mehrere Leute gleichzeitig arbeiten.
@@ -3156,8 +3154,8 @@ END IF
 - `GUI_VALIDATE_LIVE(win, TRUE)` prüft ein Feld, sobald der Fokus es
   verlässt — nicht bei jedem Anschlag: eine halb getippte Adresse ist keine
   falsche.
-- Regeln stehen in der `.dhform` (`rules`, `error_label`); der Form-Designer
-  hat dafür ein Feld „Regeln" (`pflicht; laenge 2 60; email`).
+- Regeln stehen in der `.dhform` (`rules`, `error_label`), etwa
+  `pflicht; laenge 2 60; email`.
 
 Bewusst nicht: eine eigene Regel als FUNCREF. Was eine Regel nicht kann,
 prüft das Programm nach `GUI_VALIDATE` selbst und meldet es mit
@@ -3275,8 +3273,8 @@ Fortschritt, Bild, Zeichenfläche) bekommt weiterhin keinen Fokus und feuert
 die beiden Flanken nie.
 
 Alle sieben überleben `GUI_SAVE`/`GUI_LOAD` bzw. `GUI_TO_JSON`/`GUI_FROM_JSON`
-— das ist der Weg, über den ein im Form-Designer gebautes Formular seine
-Handler bekommt.
+— das ist der Weg, über den ein entworfenes Formular seine Handler
+bekommt.
 
 ## Bedienung ohne Maus
 
@@ -3351,8 +3349,7 @@ Was das Programm beisteuern kann:
 
 **Beschriftungen.** Ein Eingabefeld hat keinen eigenen Text; der
 Bildschirmleser nimmt die **Beschriftung links daneben** (gleiche Zeile)
-oder **direkt darüber** (gleiche linke Kante) — so, wie der Form-Designer
-sie setzt. Gibt es keine, gilt der Tooltip als Name. Eine Fehlermeldung aus
+oder **direkt darüber** (gleiche linke Kante). Gibt es keine, gilt der Tooltip als Name. Eine Fehlermeldung aus
 der Formularprüfung wird als Beschreibung mitgelesen. Wer ein Feld ohne
 Nachbar-Beschriftung baut, gibt ihm also wenigstens einen `GUI_TOOLTIP`.
 

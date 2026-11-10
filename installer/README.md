@@ -2,7 +2,7 @@
 
 Die Distribution enthält die Laufzeit `dhrt`, die IDE in Drachenhauch
 (`ide/ide.dh`), das Handbuch (`docs/*.md`), die Beispiele samt der Werkzeuge
-(Sprite, Tilemap, Tracker, SFX, Partikel, Form-Designer, Anim-FSM,
+(Sprite, Tilemap, Tracker, SFX, Partikel, Anim-FSM,
 Notenblatt), die Bücher und die ESP32-Sketche — **ohne Python und ohne Qt**.
 Windows bekommt einen Installer (`Drachenhauch-IDE-Setup-<fassung>.exe`),
 macOS ein `.dmg` mit `Drachenhauch.app`, Linux ein `.tar.gz` mit `install.sh`.

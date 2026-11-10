@@ -75,6 +75,9 @@ Type: files; Name: "{autodesktop}\GameBasic.lnk"
 ; etwas ab -- ohne das blieben umbenannte Bilder fuer immer liegen. Nur
 ; dieser Unterordner; der Beispielordner selbst ist `uninsneveruninstall`.
 Type: filesandordirs; Name: "{commondocs}\Drachenhauch\examples\screenshots"
+; Den Form-Designer gibt es seit 2026.46 nicht mehr (das Studio ersetzt ihn);
+; seine Verknuepfung aus einer frueheren Installation zeigte sonst ins Leere.
+Type: files; Name: "{group}\Form-Designer.lnk"
 
 [Files]
 Source: "{#DhrtQuelle}"; DestDir: "{app}"; DestName: "dhrt.exe"; Flags: ignoreversion
@@ -141,7 +144,6 @@ Name: "{group}\Partikel-Editor"; Filename: "{app}\dhrt.exe"; Parameters: "run ""
 Name: "{group}\Tilemap-Editor"; Filename: "{app}\dhrt.exe"; Parameters: "run ""{commondocs}\Drachenhauch\examples\187_tilemap_editor.dh"""; AppUserModelID: "Drachenhauch.Tilemap"; IconFilename: "{app}\drachenhauch.ico"; WorkingDir: "{commondocs}\Drachenhauch\examples"
 Name: "{group}\Sprite-Editor"; Filename: "{app}\dhrt.exe"; Parameters: "run ""{commondocs}\Drachenhauch\examples\189_sprite_editor.dh"""; AppUserModelID: "Drachenhauch.Sprite"; IconFilename: "{app}\drachenhauch.ico"; WorkingDir: "{commondocs}\Drachenhauch\examples"
 Name: "{group}\Tracker"; Filename: "{app}\dhrt.exe"; Parameters: "run ""{commondocs}\Drachenhauch\examples\190_tracker.dh"""; AppUserModelID: "Drachenhauch.Tracker"; IconFilename: "{app}\drachenhauch.ico"; WorkingDir: "{commondocs}\Drachenhauch\examples"
-Name: "{group}\Form-Designer"; Filename: "{app}\dhrt.exe"; Parameters: "run ""{commondocs}\Drachenhauch\examples\197_form_designer.dh"""; AppUserModelID: "Drachenhauch.FormDesigner"; IconFilename: "{app}\drachenhauch.ico"; WorkingDir: "{commondocs}\Drachenhauch\examples"
 Name: "{group}\Anim-FSM-Editor"; Filename: "{app}\dhrt.exe"; Parameters: "run ""{commondocs}\Drachenhauch\examples\198_anim_fsm_editor.dh"""; AppUserModelID: "Drachenhauch.AnimFSM"; IconFilename: "{app}\drachenhauch.ico"; WorkingDir: "{commondocs}\Drachenhauch\examples"
 Name: "{group}\Notenblatt"; Filename: "{app}\dhrt.exe"; Parameters: "run ""{commondocs}\Drachenhauch\examples\199_notenblatt.dh"""; AppUserModelID: "Drachenhauch.Notenblatt"; IconFilename: "{app}\drachenhauch.ico"; WorkingDir: "{commondocs}\Drachenhauch\examples"
 Name: "{group}\Drachenhauch Studio"; Filename: "{app}\dhrt.exe"; Parameters: "run ""{app}\studio\studio.dh"""; AppUserModelID: "Drachenhauch.Studio"; IconFilename: "{app}\drachenhauch.ico"; WorkingDir: "{commondocs}\Drachenhauch"; Comment: "Programme mit Oberflaeche entwerfen, schreiben, starten und bauen"

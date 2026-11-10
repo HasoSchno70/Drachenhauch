@@ -2163,7 +2163,7 @@ FUNCTION neuProjektAnlegen(art AS INTEGER, name AS STRING, ort AS STRING) AS BOO
                     "    GUI_DRAW()", _
                     "    FLIP()", _
                     "WEND"]))
-                liesmich = "Eine Anwendung mit Fenster: F5 startet sie. Das Formular lässt sich auch im Form-Designer bauen (Werkzeuge)."
+                liesmich = "Eine Anwendung mit Fenster: F5 startet sie. Das Formular lässt sich auch im Drachenhauch Studio bauen (Werkzeuge)."
             CASE 2
                 WRITEALL(PATHJOIN(ziel, "rechnen.dh"), npZeilen$([ _
                     "' Rechnen -- eine Funktion, die tests.dhtest prueft.", _

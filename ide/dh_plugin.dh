@@ -170,7 +170,7 @@ SUB PLUGIN_BEFEHL(id AS STRING, titel AS STRING, kuerzel AS STRING = "")
     plgSenden(j)
 END SUB
 
-' Eine eigene Leiste: eine .dhform (etwa aus dem Form-Designer), die die IDE
+' Eine eigene Leiste: eine .dhform (etwa aus dem Drachenhauch Studio), die die IDE
 ' als Fenster in ihr Dock legt -- links, rechts, unten oder schwebend. Die
 ' Widgets heissen wie in der Form (Feld "name"); Klicks und Aenderungen
 ' kommen als "klick" bzw. "geaendert".

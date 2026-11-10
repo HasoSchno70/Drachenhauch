@@ -135,7 +135,6 @@ Partikel-Editor	Particle editor
 Tilemap-Editor	Tilemap editor
 Sprite-Editor	Sprite editor
 Tracker	Tracker
-Form-Designer	Form designer
 Anim-FSM-Editor	Anim FSM editor
 Notenblatt	Score editor
 Beispiele als Projekt öffnen	Open examples as project
@@ -406,7 +405,6 @@ Alles aufgeklappt.	Everything unfolded.
 Höchstens 	At most 
  Reiter -- erst einen schließen.	 tabs -- close one first.
 Gibt es nicht: 	Does not exist: 
-Im Form-Designer geöffnet: 	Opened in the form designer: 
  -- als Text: Befehlspalette, 'Formular als Text öffnen'	 -- as text: command palette, 'Open form as text'
 Mit dem Programm des Systems geöffnet: 	Opened with the system's program: 
 Lässt sich nicht öffnen: 	Cannot be opened: 
@@ -867,7 +865,6 @@ Werkzeug: Partikel-Editor	Tool: particle editor
 Werkzeug: Tilemap-Editor	Tool: tilemap editor
 Werkzeug: Sprite-Editor	Tool: sprite editor
 Werkzeug: Tracker	Tool: tracker
-Werkzeug: Form-Designer	Tool: form designer
 Werkzeug: Anim-FSM-Editor	Tool: anim FSM editor
 Werkzeug: Notenblatt	Tool: score editor
 Sprache der Oberfläche: Deutsch/English	Interface language: Deutsch/English

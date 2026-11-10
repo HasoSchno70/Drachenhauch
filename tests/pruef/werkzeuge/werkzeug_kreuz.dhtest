@@ -412,57 +412,6 @@ PRINT "kasten "; f[1]
 bis zum bildlimit FALSE
 kasten keine
 
-=== formdesigner: ungesichert fragt das kreuz nach
-DIM prN AS INTEGER
-DIM prS AS INTEGER
---- programm ../../../examples/197_form_designer.dh nach SETFPS(60)
---- streichen WINDOW_MAXIMIZE()
---- einschub nach FLIP()
-prN = prN + 1
-IF prN = 3 THEN
-    geaendert = TRUE
-    SETWINDOWTITLE("DH-Kreuz-formdesigner-u")
-    prS = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", GETENV$("PRSENDER"), "DH-Kreuz-formdesigner-u", "kreuz")
-END IF
-WRITEALL("probe.txt", STR$(prN) + " " + IIF(GUI_MODAL(), "frage", "keine"))
-
---- umgebung
-DHRT_FRAMES=360
-PRSENDER={sammlung}/../_hilfen/fenstersender.ps1
---- nachher
-DIM f AS ARRAY OF STRING : f = SPLIT$(READLINES("_programm/probe.txt")[0], " ")
-PRINT "bis zum bildlimit "; VAL(f[0]) >= 350
-PRINT "kasten "; f[1]
---- system windows
---- erwartet
-bis zum bildlimit TRUE
-kasten frage
-
-=== formdesigner: gesichert beendet das kreuz sofort
-DIM prN AS INTEGER
-DIM prS AS INTEGER
---- programm ../../../examples/197_form_designer.dh nach SETFPS(60)
---- streichen WINDOW_MAXIMIZE()
---- einschub nach FLIP()
-prN = prN + 1
-IF prN = 3 THEN
-    SETWINDOWTITLE("DH-Kreuz-formdesigner-g")
-    prS = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", GETENV$("PRSENDER"), "DH-Kreuz-formdesigner-g", "kreuz")
-END IF
-WRITEALL("probe.txt", STR$(prN) + " " + IIF(GUI_MODAL(), "frage", "keine"))
-
---- umgebung
-DHRT_FRAMES=360
-PRSENDER={sammlung}/../_hilfen/fenstersender.ps1
---- nachher
-DIM f AS ARRAY OF STRING : f = SPLIT$(READLINES("_programm/probe.txt")[0], " ")
-PRINT "bis zum bildlimit "; VAL(f[0]) >= 350
-PRINT "kasten "; f[1]
---- system windows
---- erwartet
-bis zum bildlimit FALSE
-kasten keine
-
 === animfsm: ungesichert fragt das kreuz nach
 DIM prN AS INTEGER
 DIM prS AS INTEGER

@@ -108,7 +108,7 @@ its own) `PLUGIN_LAEUFT()` is FALSE and the program ends right away.
 | Command | What it does |
 |---|---|
 | `PLUGIN_BEFEHL(id$, titel$ [, kuerzel$])` | register a command: it appears in the **Plugins** menu, in the command palette and on the shortcut. When triggered, the event `befehl` arrives with `PLUGIN_ID$()` |
-| `PLUGIN_LEISTE(id$, titel$, formdatei$ [, bereich$])` | a panel of its own in the dock: a `.dhform` (from the form designer, say) as a window on the left, right (default), bottom or floating. The user can move it like any panel of the IDE |
+| `PLUGIN_LEISTE(id$, titel$, formdatei$ [, bereich$])` | a panel of its own in the dock: a `.dhform` (from Drachenhauch Studio, say) as a window on the left, right (default), bottom or floating. The user can move it like any panel of the IDE |
 | `PLUGIN_HOERE(ereignis$)` | listen to an event: `gesichert` (saved), `geoeffnet` (opened), `reiter` (another tab in front), `gestartet` (started), `beendet` (a program has run), `geprueft` (checked) -- each with `PLUGIN_DATEI$()`. Plus `hover`: when the mouse rests on a word, as an event of its own (see `PLUGIN_HOVER_ANTWORT`), and `vervollstaendigen` (complete): when the completion list opens (see `PLUGIN_VORSCHLAEGE`) |
 | `PLUGIN_SETZE(leiste$, widget$, was$, wert$)` | change a widget of the own panel: `text`, `checked`, `value`, `enabled`, `visible` or `selected` (row of a list, entry of a dropdown, node of a tree) |
 | `PLUGIN_LISTE(leiste$, widget$, eintraege)` | the entries of a list or dropdown of the panel |
