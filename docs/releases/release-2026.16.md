@@ -99,7 +99,7 @@ bleiben 48 Module und 216 Beispiele. **4401 Fälle in 297 Prüfsammlungen**
 braucht Rust 1.98. Der Windows-Installer wächst von 54 auf **55 MB** (Cranelift).
 
 Wie der Maschinencode gebaut ist und welche Wege verworfen wurden, steht in
-`docs/entwurf-maschinencode.md`.
+`docs/intern/entwurf-maschinencode.md`.
 
 ## Was offen bleibt
 

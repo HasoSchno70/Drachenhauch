@@ -1466,7 +1466,7 @@ pub struct Graphics {
 /// Interpunktion (Gedankenstriche, Anfuehrungszeichen, Auslassungspunkte)
 /// und das Euro-Zeichen. Bis 2026-09-06 fehlte alles ab Latin Extended --
 /// auch das `€`, das damit in jedem Preis ein Fragezeichen war (gemessen,
-/// docs/entwurf-eingabemethoden.md). Was hier nicht steht (CJK, Hangul,
+/// docs/intern/entwurf-eingabemethoden.md). Was hier nicht steht (CJK, Hangul,
 /// Emoji, Arabisch, ...), holt `ausweich_nachladen` auf Zuruf.
 fn zeichensatz() -> String {
     let mut chars = String::new();
@@ -4558,7 +4558,7 @@ impl Graphics {
     pub fn ime_abholen(&mut self) -> (Vec<String>, Option<(String, i32)>) { crate::ime::abholen() }
 
     /// Lage des IME-Umwandlungsfensters: an die Schreibmarke des Textfelds
-    /// mit Fokus (docs/entwurf-eingabemethoden.md, Weg B). Ohne diesen Ruf
+    /// mit Fokus (docs/intern/entwurf-eingabemethoden.md, Weg B). Ohne diesen Ruf
     /// stellt Windows sein Fenster, wohin es will -- meist links oben.
     /// `x`, `y`, `h` in Bildschirm-Pixeln des Programms (vor dem Massstab).
     pub fn ime_position(&mut self, x: i32, y: i32, h: i32) {

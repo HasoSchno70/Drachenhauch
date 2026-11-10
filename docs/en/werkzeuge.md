@@ -111,7 +111,7 @@ IF ASSERT_FAILED() > 0 THEN EXIT(1)
 A test program checks itself with `ASSERT`. Most of the language's tests,
 however, are output comparisons: a short program, an expected output. For
 those you do not need one program per file, but a **collection** (since
-2026-09-07, path D of the [Python removal](../entwurf-python-abbau.md)
+2026-09-07, path D of the [Python removal](../intern/entwurf-python-abbau.md)
 (German)):
 
 ```dhtest

@@ -1,4 +1,4 @@
-' Felder mit eigener Untergrenze (docs/entwurf-feld-untergrenze.md):
+' Felder mit eigener Untergrenze (docs/intern/entwurf-feld-untergrenze.md):
 ' `DIM a[1 TO 31]`, LBOUND/UBOUND, Meldungen mit den Grenzen aus dem DIM und
 ' der Dimension ab 1, die Befehle mit einer Stelle (INSERT/REMOVE_AT/
 ' INDEXOF/FIND/COPY, Slicing). Jeder Fall laeuft in der VM (DHRT_JIT=aus)

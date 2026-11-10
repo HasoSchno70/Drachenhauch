@@ -2,7 +2,7 @@
 
 > **Status: gebaut (2026-08-17 bis 2026-08-19), alle vier Stufen I.1 bis
 > I.4** -- `IMPORT "x.dh" AS x`, `PRIVATE`, Klassen, Structs und ENUMs aus
-> dem Namensraum; Handbuch in [sprache.md](sprache.md) (Namensraum). Der Text
+> dem Namensraum; Handbuch in [sprache.md](../sprache.md) (Namensraum). Der Text
 > unten ist die Fassung des Entwurfs und steht als Protokoll. Er war zum Lesen und
 > Entscheiden da. WP I ist der einzige Punkt der [Allzweck-Roadmap](allzweck-roadmap.md),
 > der auf **bestehenden** Code zurückwirkt — deshalb erst der Entwurf, dann
@@ -139,7 +139,7 @@ PRINT mathe.quadrat(3.0)                   ' Fehler: 'quadrat' ist PRIVATE in ma
 Wort**, sondern über eine Vorausschau erkannt (`private` gefolgt von
 `SUB`/`FUNCTION`/`DIM`/`CONST`/`CLASS`). Ein neues Schlüsselwort würde
 `DIM private AS …` in bestehendem Code zum Fehler machen, und die Liste der
-reservierten Wörter ist in [sprache.md](sprache.md) schon als Stolperstein
+reservierten Wörter ist in [sprache.md](../sprache.md) schon als Stolperstein
 dokumentiert.
 
 ### 3.2 Semantik

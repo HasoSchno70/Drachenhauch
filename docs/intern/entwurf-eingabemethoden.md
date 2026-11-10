@@ -17,7 +17,7 @@
 > ~100 ms, ein weiteres neues Kanji ~15 ms, der Start 50 ms mehr für den
 > größeren Grundvorrat (357 → 407 ms). Tests `tests/pruef/grafik/schriften_vorrat.dhtest`
 > (Bildvergleich echt gegen `?`, Gegenprobe U+E000 bleibt `?`). Siehe
-> [builtins-grafik.md](builtins-grafik.md#umlaute-euro-und-fremde-schriften).
+> [builtins-grafik.md](../builtins-grafik.md#umlaute-euro-und-fremde-schriften).
 > **Nachtrag, selber Tag: C ist gebaut.** `ime.rs` hängt einen zweiten
 > Subclass an raylibs Fenster (derselbe Griff wie AccessKit), nimmt
 > `WM_IME_STARTCOMPOSITION` / `WM_IME_COMPOSITION` (`GCS_COMPSTR`,

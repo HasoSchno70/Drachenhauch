@@ -95,7 +95,7 @@ remainder; that is one of the reasons why a type of its own pays off.
 * **No literal.** `preis = 19.99` does not assign 19,99 € to a GELD variable,
   but is an error; you need `GELD_NEU`. A literal (`19.99g`)
   would have required an intervention in the language core — the trade-off is described in
-  [Design: money (German)](../entwurf-geldtyp.md).
+  [Design: money (German)](../intern/entwurf-geldtyp.md).
 * **There is no `GELD * GELD`.** Euros times euros would be square euros.
 * **To the outside it becomes a number again.** `xlsx`, `json` and `chart` do not know
   GELD; it goes there as `GELD_CENT` (whole number, lossless) or

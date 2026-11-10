@@ -1,6 +1,6 @@
 ' Die zwei Bauskripte bleiben Python -- aber nur mit der Standardbibliothek.
 '
-' Entscheidung (c) aus docs/entwurf-python-abbau.md (7.7, 2026-09-18):
+' Entscheidung (c) aus docs/intern/entwurf-python-abbau.md (7.7, 2026-09-18):
 ' rust/build_runtime.py und rust/build_wasm.py sind die bewusst letzten zwei
 ' Python-Dateien. Ersetzen liessen sie sich nur schlecht -- auf einem frischen
 ' Klon gibt es noch kein dhrt, das ein Bauskript in Drachenhauch laufen lassen

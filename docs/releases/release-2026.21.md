@@ -39,7 +39,7 @@ IMPORT "spielkiste/vektor.dh"
   Projektsuche und "Projekt prüfen" lassen `pakete/` aus -- dort liegt
   fremder Code, den das nächste Holen überschreibt.
 
-Mehr in [Pakete](pakete.md).
+Mehr in [Pakete](../pakete.md).
 
 ### Lambdas
 

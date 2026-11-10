@@ -10,7 +10,7 @@ aber mit der Laufzeit `dhrt`. Sie ersetzt den Form-Designer
 * *Der Name ist „Drachenhauch Studio“.*
 
 **Stand:** Stufe 1 bis 4 sind gebaut (2026-11-01, Ordner `studio/`, Handbuch
-[studio.md](studio.md), Prüfungen `tests/pruef/studio/werkzeug_studio.dhtest`,
+[studio.md](../studio.md), Prüfungen `tests/pruef/studio/werkzeug_studio.dhtest`,
 `tests/pruef/studio/werkzeug_studio2.dhtest`, `tests/pruef/studio/werkzeug_studio3.dhtest` und
 `tests/pruef/studio/werkzeug_studio4.dhtest`).
 Für Stufe 2 kamen in die Laufzeit schließbare Reiter im Reiterwerk

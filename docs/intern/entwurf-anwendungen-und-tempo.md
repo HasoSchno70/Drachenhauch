@@ -257,9 +257,9 @@ schreiben will, trotzdem vermisst:
 | **Installer nicht signiert, macOS nicht beglaubigt** | SmartScreen/Gatekeeper warnen — für Anwendungen an Kunden ein Ausschlussgrund. Die Wege sind gebaut (`DH_SIGN_*`, `DH_MAC_SIGNATUR`), es fehlt das Zertifikat | Geld, kein Code |
 | ~~**Kein Tray-Symbol, keine System-Benachrichtigung**~~ | erledigt 2026-10-04: `TRAY_*`, `NOTIFY`, `WINDOW_HIDE`/`SHOW`; das Symbol seit 2026-10-08 auf allen drei Systemen (macOS Menüleiste, Linux StatusNotifierItem über D-Bus), Mitteilungen ebenso | — |
 | **Oberfläche ist selbst gezeichnet** | sieht auf jedem System gleich aus, aber nicht „nativ“; dafür gibt es Themen und Maßstab. Kein Handlungsbedarf, aber ehrlich sagen | — |
-| ~~**Kein Paketverzeichnis**~~ | erledigt 2026-10-04: `dhrt paket hole github:nutzer/repo@stand` (auch https, lokal), Pakete in `pakete/` des Projekts, `paket.lock.json` mit SHA-256 -- [pakete.md](pakete.md) | — |
+| ~~**Kein Paketverzeichnis**~~ | erledigt 2026-10-04: `dhrt paket hole github:nutzer/repo@stand` (auch https, lokal), Pakete in `pakete/` des Projekts, `paket.lock.json` mit SHA-256 -- [pakete.md](../pakete.md) | — |
 | ~~**Keine anonymen Funktionen**~~ | erledigt 2026-10-04: Lambdas `FUNCTION(x) x * 2` / `SUB() ...` mit kopierten Locals, dazu `ARRAY_MAP/FILTER/REDUCE/FIND` | — |
-| ~~**Kein Aufruf fremder DLLs/.so**~~ | erledigt 2026-10-05/06 (Fassung 2026.22): `DECLARE … LIB` mit eigenen Typwörtern, `BYREF`, Zeigern, Structs über `BUFFER` und Rückrufen; Export nimmt die Bibliothek mit -- [ffi.md](ffi.md) | — |
+| ~~**Kein Aufruf fremder DLLs/.so**~~ | erledigt 2026-10-05/06 (Fassung 2026.22): `DECLARE … LIB` mit eigenen Typwörtern, `BYREF`, Zeigern, Structs über `BUFFER` und Rückrufen; Export nimmt die Bibliothek mit -- [ffi.md](../ffi.md) | — |
 
 ## 3. Empfohlene Reihenfolge
 

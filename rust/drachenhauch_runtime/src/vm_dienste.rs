@@ -764,7 +764,7 @@ impl<'p> Vm<'p> {
                     .map_err(|e| format!("PDF_SAVE: {}: {}", pfad, e))?;
                 Value::Nil
             }
-            // Drucken (docs/entwurf-drucken.md, Weg C): dieselbe Seite auf den
+            // Drucken (docs/intern/entwurf-drucken.md, Weg C): dieselbe Seite auf den
             // Drucker -- GDI unter Windows, lp unter Unix. `zieldatei` fuer
             // Drucker, die in eine Datei schreiben (Microsoft Print to PDF).
             "pdf_print" => {

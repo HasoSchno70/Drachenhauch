@@ -88,7 +88,7 @@ None of it needs a window. A Drachenhauch program can be a console
 application, a cron job or a game — same language.
 
 Details in the [manual](docs/en/README.md); how it got there is in the
-[general-purpose roadmap](docs/allzweck-roadmap.md) (German).
+[general-purpose roadmap](docs/intern/allzweck-roadmap.md) (German).
 
 ## Download
 
@@ -159,7 +159,7 @@ Full documentation lives in [docs/en/](docs/en/README.md) — the English transl
 - **[Language reference](docs/en/sprache.md)** — variables, types, `ENUM`, `SELECT CASE`, functions with defaults and named arguments, classes, try/catch, f-strings, coroutines (`YIELD` + `CORO_*`)
 - **[Standard built-ins](docs/en/builtins-core.md)** — math, strings, maps, file I/O, …
 - **[Graphics built-ins](docs/en/builtins-grafik.md)** — native runtime (dhrt/raylib), Z-layers, sprite atlas, asset preloader
-- **[Performance](docs/PERFORMANCE.md)** (German) — benchmark numbers + optimizations shipped (spec ops, inline caches, typed arrays, ECS bulk ops, …)
+- **[Performance](docs/intern/PERFORMANCE.md)** (German) — benchmark numbers + optimizations shipped (spec ops, inline caches, typed arrays, ECS bulk ops, …)
 - **Modules** — 57 of them, [table below](#modules)
 - **[IDE](docs/en/ide.md)** — the development environment, written in Drachenhauch itself: tabs, project tree, completion, help on the word, snippets, multi-cursor, folding, split view, project-wide refactorings, **debugger** (incl. conditional breakpoints), **profiler**, git blame/diff, manual in a window, welcome page with an example gallery
 - **[Drachenhauch Studio](docs/en/studio.md)** (`studio/studio.dh`) — GUI applications in the style of Xojo: window designer with alignment guides, inspector, navigator, code per event, layout containers, custom controls, databases with queries, reports (PDF, print, preview), menus, timers, images, dialogs, project templates, German and English interface, projects in two languages, start/build/debug; example projects `examples/studio/rechnungen/` and [Kuehlschrank-Drachenhauch](https://github.com/HasoSchno70/Kuehlschrank-Drachenhauch) (a fridge manager with 13 windows and 5 custom controls, its own repository)

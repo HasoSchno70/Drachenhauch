@@ -1484,7 +1484,7 @@ impl Compiler {
     }
 
     /// Der Typ, den ein Ausdruck ZUR LAUFZEIT hat -- fuer den Code, nicht
-    /// fuer Meldungen (M1, `docs/entwurf-maschinencode.md`). Anders als
+    /// fuer Meldungen (M1, `docs/intern/entwurf-maschinencode.md`). Anders als
     /// `statischer_typ` muss hier jede Aussage stimmen; `Typ::Unbekannt` ist
     /// immer erlaubt. Belegt wird das mit `DHRT_TYPEN_PRUEFEN=1`: dann steht
     /// hinter jedem getypten Ausdruck eine Probe (`TYP_PRUEFEN`).

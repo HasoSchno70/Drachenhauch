@@ -19,7 +19,7 @@ Drachenhauch ist ein BASIC-Dialekt mit Pascal-strikter Typisierung und OOP, für
 
 - **[Standard-Built-ins](builtins-core.md)** — Math, Strings, Bitwise, Maps, File-I/O, Konvertierung, Zeit/Random
 - **[Grafik-Built-ins](builtins-grafik.md)** — SCREEN, CLS, BOX, CIRCLE, LOADIMAGE, Sound, Tilemap, Eingabe, **`LOAD_ASSETS`** (Bulk-Preloader), **Sprite-Atlas + Batch-Draw**, **Z-Layer-Rendering**
-- **[Performance](PERFORMANCE.md)** — historische Bench-Zahlen + Liste umgesetzter Optimierungen (die verglichenen Python-Pfade sind seit Stufe B entfernt; Produktion = `dhrt`)
+- **[Performance](intern/PERFORMANCE.md)** — historische Bench-Zahlen + Liste umgesetzter Optimierungen (die verglichenen Python-Pfade sind seit Stufe B entfernt; Produktion = `dhrt`)
 
 ### Module
 
@@ -92,11 +92,11 @@ Jedes Modul wird mit `IMPORT "<name>"` aktiviert und stellt eigene Befehle berei
 Papiere, die etwas **abwägen**, statt etwas zu beschreiben — gemessen,
 entworfen, empfohlen; entschieden ist nichts davon.
 
-- **[Allzweck-Audit 2](allzweck-audit-2.md)** — was einer Sprache fehlt, mit
+- **[Allzweck-Audit 2](intern/allzweck-audit-2.md)** — was einer Sprache fehlt, mit
   der man Software bauen soll; acht Punkte, abgearbeitet
-- **[Entwurf: Geld](entwurf-geldtyp.md)** — Fließkomma, Cent, ein eigener
+- **[Entwurf: Geld](intern/entwurf-geldtyp.md)** — Fließkomma, Cent, ein eigener
   Typ? Mit dem Befund, dass `INT(19.99 * 100)` **1998** ergibt
-- **[Untersuchung: Datenbank-Treiber](entwurf-datenbanktreiber.md)** — was
+- **[Untersuchung: Datenbank-Treiber](intern/entwurf-datenbanktreiber.md)** — was
   PostgreSQL und MySQL wirklich kosten würden (Kisten, Bauzeit, Größe, TLS)
 
 ### Werkzeug
@@ -124,69 +124,69 @@ Arbeitsnotizen, keine Anwender-Doku — sie erklären, warum etwas so ist, wie e
 
 - **[Stolpersteine](stolpersteine.md)** — Reibungspunkte der Sprache, beim Schreiben des Lehrbuchs gesammelt
 - **Doku-Prüfer** — `dhrt pruef` schickt jeden `basic`-Block durch die Front-End-Kette (`bloecke`), prüft Befehlsnamen in Tabellen/Fließtext (`namen`), die Zählungen im README (`zaehlungen`), Tasten-Konstanten (`konstanten`) und Pfade/Links (`pfade`). Hängt an der Testsuite; bis September 2026 zwei Python-Skripte in `tools/`
-- **[Rust-Front-End-Portierung](rust-frontend-port.md)** und **[Runtime-Migration](rust-runtime.md)** — wie `dhrt` entstand
-- **[Entwurf: Namensräume](entwurf-namensraeume.md)** — WP I der Allzweck-Roadmap. Alle vier Stufen sind inzwischen gebaut; das Dokument bleibt als Protokoll der Entscheidungen
-- **[Entwurf: Schnittstellen](entwurf-schnittstellen.md)** — `INTERFACE`/`IMPLEMENTS` neu abgewogen: Klassentypen werden heute gar nicht geprüft, die großen Programme nutzen keine Vererbung; Empfehlung: erst Klassentypen prüfen, dann Schnittstellen nach einer Probe in Funkenflug (noch nicht gebaut)
-- **[Entwurf: Python-Parser entfernen](entwurf-python-parser-entfernen.md)** — gemessen, was noch am zweiten Parser hängt, und was ein Schnitt kostet
-- **[Entwurf: Auffindbar machen](entwurf-sichtbarkeit.md)** — wie Suchmaschinen und KI-Assistenten Drachenhauch finden: englisches README, Website mit Handbuch und `llms.txt`, und was außerhalb des Repositorys zu tun ist
-- **[Entwurf: Mengen](entwurf-set-builtins.md)** — der letzte offene WP-J-Punkt, nach dem Nachmessen neu zugeschnitten
-- **[Entwurf: Felder mit eigener Untergrenze](entwurf-feld-untergrenze.md)** — `DIM tage[1 TO 31]`, `DIM feld[-10 TO 10, -10 TO 10]`: die Grenzen gehören zum Feld, nicht zur Variable; was das an Befehlen, Meldungen und Maschinencode berührt (noch nicht gebaut)
-- **[Entwurf: TASK_START](entwurf-task-start.md)** — DH-Code im Hintergrund; drei Wege, und der dritte umgeht das Send-Problem ganz
-- **[Entwurf: Mehrere OS-Fenster](entwurf-native-fenster.md)** — warum es ein Fenster je Prozess gibt, vier Wege; gebaut ist Weg B: ein zweites Fenster als zweiter `dhrt` mit Textkanal (`WINDOW_OPEN`)
-- **[Entwurf: Python abbauen](entwurf-python-abbau.md)** — 110 000 Zeilen Python gemessen (58 % Tests, 32 000 IDE und Editoren, zwei Drittel des Installers); Wege Werkzeugkette/LSP nach dhrt, IDE und Editoren in Drachenhauch, Tests als `dhrt test`; Empfehlung: Werkzeugkette zuerst, dann die IDE
-- **[Entwurf: Anwendungen und Tempo](entwurf-anwendungen-und-tempo.md)** — gemessen gegen Python: Zeichenketten-Anhängen ist quadratisch, Builtins werden am Namen gesucht; was einer GUI-Anwendung noch fehlt, und in welcher Reihenfolge
-- **[Entwurf: Maschinencode](entwurf-maschinencode.md)** — wie Drachenhauch als übersetzte Sprache richtig schnell wird: getypte Zwischenstufe, getypte VM, dann Cranelift-JIT mit der VM als Referenz
-- **[Entwurf: Pakete](entwurf-pakete.md)** — Bibliotheken holen und teilen ohne eigenen Server: Quellen, Ablage im Projekt, Sperrdatei mit Prüfsumme; gebaut als `dhrt paket`
-- **[Entwurf: Fremde Bibliotheken](entwurf-ffi.md)** — `DECLARE FUNCTION … LIB` wie in VB6/FreeBASIC: Typen, Laden, Aufruf über Cranelift, Structs über BUFFER, was heikel bleibt; gebaut samt Rückrufen, Struct-Lage und variabler Argumentzahl
-- **[Entwurf: SPEAK](entwurf-speak.md)** — Sprachausgabe fuer Spiele ohne gui: WinRT liefert die besseren Stimmen und einen Klang statt eines Lautsprecherausgangs (12–35 ms je Satz, gemessen); Empfehlung: Synthese zu PCM durch Kira, Bildschirmleser zuerst
-- **[Entwurf: Eingabemethoden (IME)](entwurf-eingabemethoden.md)** — gemessen: der Speicher ist Unicode, die Anzeige Latin-1 (das Euro-Zeichen ist ein Fragezeichen); Wege Zeichenvorrat, Umwandlungsfenster, Preedit, SDL; Empfehlung: erst sehen, dann tippen
-- **[Entwurf: Barrierefreiheit](entwurf-barrierefreiheit.md)** — der UIA-Baum eines dhrt-Fensters ist leer, gemessen; AccessKit, Sprachausgabe und Handwerk als Wege; Empfehlung: Handwerk sofort, dann AccessKit mit Windows zuerst
-- **[Entwurf: Was der gui gegen GTK 3 fehlt](entwurf-gui-wie-gtk.md)** — gemessen: 100 000 Tabellenzeilen sind keine Lücke; vier Pakete (Popover/Toast/Suchfeld, Bausteine wie Fluss-Layout und Mnemonics, Textformung/RTL/Rechtschreibung, Stildatei mit Selektoren und Klassen wie GTK-CSS) und ihre Reihenfolge; alles gebaut bis auf die volle Textformung (Ligaturen, indische Schriften)
-- **[Entwurf: Drachenhauch Studio](entwurf-studio.md)** — eine eigenständige IDE für Programme mit Oberfläche im Stil von Xojo: Projekt als Ordner, Fenster als Klasse mit Ereignis-Methoden, Layout-Editor, Bibliothek, Inspektor, Starten und Bauen; fünf Stufen
-- **[Entwurf: Berichte im Studio](entwurf-berichte.md)** — gedruckte Seiten aus den Daten des Projekts (Rechnung, Liste): Bänder mit Gruppen und Summen, Quelle mit Parametern, Entwurf auf einer Seite in mm, PDF/Drucken/Vorschau im Programm; drei Stufen
-- **[Entwurf: Drucken](entwurf-drucken.md)** — kein raylib fuers Papier: geprüfte Bausteine, vier Wege; Empfehlung: die Seite selbst zeichnen (GDI/CUPS als Ziele des pdf-Moduls), dazu ein Befehl, der eine Datei öffnet
-- **[Release 2026.45](release-2026.45.md)** — was in dieser Fassung neu ist
-- **[Release 2026.44](release-2026.44.md)** — was in dieser Fassung neu ist
-- **[Release 2026.43](release-2026.43.md)** — was in dieser Fassung neu ist
-- **[Release 2026.42](release-2026.42.md)** — was in dieser Fassung neu ist
-- **[Release 2026.41](release-2026.41.md)** — was in dieser Fassung neu ist
-- **[Release 2026.40](release-2026.40.md)** — was in dieser Fassung neu ist
-- **[Release 2026.39](release-2026.39.md)** — was in dieser Fassung neu ist
-- **[Release 2026.38](release-2026.38.md)** — was in dieser Fassung neu ist
-- **[Release 2026.37](release-2026.37.md)** — was in dieser Fassung neu ist
-- **[Release 2026.36](release-2026.36.md)** — was in dieser Fassung neu ist
-- **[Release 2026.35](release-2026.35.md)** — was in dieser Fassung neu ist
-- **[Release 2026.34](release-2026.34.md)** — was in dieser Fassung neu ist
-- **[Release 2026.33](release-2026.33.md)** — die Fassung davor
-- **[Release 2026.32](release-2026.32.md)** — und die davor
-- **[Release 2026.31](release-2026.31.md)** — und die davor
-- **[Release 2026.30](release-2026.30.md)** — und die davor
-- **[Release 2026.29](release-2026.29.md)** — und die davor
-- **[Release 2026.28](release-2026.28.md)** — und die davor
-- **[Release 2026.27](release-2026.27.md)** — und die davor
-- **[Release 2026.26](release-2026.26.md)** — und die davor
-- **[Release 2026.25](release-2026.25.md)** — und die davor
-- **[Release 2026.24](release-2026.24.md)** — und die davor
-- **[Release 2026.23](release-2026.23.md)** — und die davor
-- **[Release 2026.22](release-2026.22.md)** — und die davor
-- **[Release 2026.21](release-2026.21.md)** — und die davor
-- **[Release 2026.20](release-2026.20.md)** — und die davor
-- **[Release 2026.19](release-2026.19.md)** — und die davor
-- **[Release 2026.18](release-2026.18.md)** — und die davor
-- **[Release 2026.17](release-2026.17.md)** — und die davor
-- **[Release 2026.16](release-2026.16.md)** — und die davor
-- **[Release 2026.15](release-2026.15.md)** — und die davor
-- **[Release 2026.14](release-2026.14.md)** — und die davor
-- **[Release 2026.13](release-2026.13.md)** — und die davor
-- **[Release 2026.12](release-2026.12.md)** — und die davor
-- **[Release 2026.11](release-2026.11.md)** — und die davor
-- **[Release 2026.10](release-2026.10.md)** — und die davor
-- **[Release 2026.9](release-2026.9.md)** — und die davor
-- **[Release 2026.8](release-2026.8.md)** — und die davor
-- **[Allzweck-Roadmap](allzweck-roadmap.md)** — was fehlt, damit man damit *alles* schreiben kann und nicht nur Spiele (aktuell, Audit 2026-08)
-- **[Allzweck-Audit, zweite Runde](allzweck-audit-2.md)** — was nach der abgearbeiteten Roadmap noch fehlt, damit man Drachenhauch zum Software-Bauen *wählt* (2026-08-23)
-- **[Befehlssatz-Roadmap](befehlssatz-roadmap.md)** und **[GUI-Design-Notiz](gui-module-design.md)** — historisch, mit Lesehinweis
-- **[Umbenennung GameBasic → Drachenhauch](umbenennung-drachenhauch.md)** — die Checkliste von 2026-08
+- **[Rust-Front-End-Portierung](intern/rust-frontend-port.md)** und **[Runtime-Migration](rust-runtime.md)** — wie `dhrt` entstand
+- **[Entwurf: Namensräume](intern/entwurf-namensraeume.md)** — WP I der Allzweck-Roadmap. Alle vier Stufen sind inzwischen gebaut; das Dokument bleibt als Protokoll der Entscheidungen
+- **[Entwurf: Schnittstellen](intern/entwurf-schnittstellen.md)** — `INTERFACE`/`IMPLEMENTS` neu abgewogen: Klassentypen werden heute gar nicht geprüft, die großen Programme nutzen keine Vererbung; Empfehlung: erst Klassentypen prüfen, dann Schnittstellen nach einer Probe in Funkenflug (noch nicht gebaut)
+- **[Entwurf: Python-Parser entfernen](intern/entwurf-python-parser-entfernen.md)** — gemessen, was noch am zweiten Parser hängt, und was ein Schnitt kostet
+- **[Entwurf: Auffindbar machen](intern/entwurf-sichtbarkeit.md)** — wie Suchmaschinen und KI-Assistenten Drachenhauch finden: englisches README, Website mit Handbuch und `llms.txt`, und was außerhalb des Repositorys zu tun ist
+- **[Entwurf: Mengen](intern/entwurf-set-builtins.md)** — der letzte offene WP-J-Punkt, nach dem Nachmessen neu zugeschnitten
+- **[Entwurf: Felder mit eigener Untergrenze](intern/entwurf-feld-untergrenze.md)** — `DIM tage[1 TO 31]`, `DIM feld[-10 TO 10, -10 TO 10]`: die Grenzen gehören zum Feld, nicht zur Variable; was das an Befehlen, Meldungen und Maschinencode berührt (noch nicht gebaut)
+- **[Entwurf: TASK_START](intern/entwurf-task-start.md)** — DH-Code im Hintergrund; drei Wege, und der dritte umgeht das Send-Problem ganz
+- **[Entwurf: Mehrere OS-Fenster](intern/entwurf-native-fenster.md)** — warum es ein Fenster je Prozess gibt, vier Wege; gebaut ist Weg B: ein zweites Fenster als zweiter `dhrt` mit Textkanal (`WINDOW_OPEN`)
+- **[Entwurf: Python abbauen](intern/entwurf-python-abbau.md)** — 110 000 Zeilen Python gemessen (58 % Tests, 32 000 IDE und Editoren, zwei Drittel des Installers); Wege Werkzeugkette/LSP nach dhrt, IDE und Editoren in Drachenhauch, Tests als `dhrt test`; Empfehlung: Werkzeugkette zuerst, dann die IDE
+- **[Entwurf: Anwendungen und Tempo](intern/entwurf-anwendungen-und-tempo.md)** — gemessen gegen Python: Zeichenketten-Anhängen ist quadratisch, Builtins werden am Namen gesucht; was einer GUI-Anwendung noch fehlt, und in welcher Reihenfolge
+- **[Entwurf: Maschinencode](intern/entwurf-maschinencode.md)** — wie Drachenhauch als übersetzte Sprache richtig schnell wird: getypte Zwischenstufe, getypte VM, dann Cranelift-JIT mit der VM als Referenz
+- **[Entwurf: Pakete](intern/entwurf-pakete.md)** — Bibliotheken holen und teilen ohne eigenen Server: Quellen, Ablage im Projekt, Sperrdatei mit Prüfsumme; gebaut als `dhrt paket`
+- **[Entwurf: Fremde Bibliotheken](intern/entwurf-ffi.md)** — `DECLARE FUNCTION … LIB` wie in VB6/FreeBASIC: Typen, Laden, Aufruf über Cranelift, Structs über BUFFER, was heikel bleibt; gebaut samt Rückrufen, Struct-Lage und variabler Argumentzahl
+- **[Entwurf: SPEAK](intern/entwurf-speak.md)** — Sprachausgabe fuer Spiele ohne gui: WinRT liefert die besseren Stimmen und einen Klang statt eines Lautsprecherausgangs (12–35 ms je Satz, gemessen); Empfehlung: Synthese zu PCM durch Kira, Bildschirmleser zuerst
+- **[Entwurf: Eingabemethoden (IME)](intern/entwurf-eingabemethoden.md)** — gemessen: der Speicher ist Unicode, die Anzeige Latin-1 (das Euro-Zeichen ist ein Fragezeichen); Wege Zeichenvorrat, Umwandlungsfenster, Preedit, SDL; Empfehlung: erst sehen, dann tippen
+- **[Entwurf: Barrierefreiheit](intern/entwurf-barrierefreiheit.md)** — der UIA-Baum eines dhrt-Fensters ist leer, gemessen; AccessKit, Sprachausgabe und Handwerk als Wege; Empfehlung: Handwerk sofort, dann AccessKit mit Windows zuerst
+- **[Entwurf: Was der gui gegen GTK 3 fehlt](intern/entwurf-gui-wie-gtk.md)** — gemessen: 100 000 Tabellenzeilen sind keine Lücke; vier Pakete (Popover/Toast/Suchfeld, Bausteine wie Fluss-Layout und Mnemonics, Textformung/RTL/Rechtschreibung, Stildatei mit Selektoren und Klassen wie GTK-CSS) und ihre Reihenfolge; alles gebaut bis auf die volle Textformung (Ligaturen, indische Schriften)
+- **[Entwurf: Drachenhauch Studio](intern/entwurf-studio.md)** — eine eigenständige IDE für Programme mit Oberfläche im Stil von Xojo: Projekt als Ordner, Fenster als Klasse mit Ereignis-Methoden, Layout-Editor, Bibliothek, Inspektor, Starten und Bauen; fünf Stufen
+- **[Entwurf: Berichte im Studio](intern/entwurf-berichte.md)** — gedruckte Seiten aus den Daten des Projekts (Rechnung, Liste): Bänder mit Gruppen und Summen, Quelle mit Parametern, Entwurf auf einer Seite in mm, PDF/Drucken/Vorschau im Programm; drei Stufen
+- **[Entwurf: Drucken](intern/entwurf-drucken.md)** — kein raylib fuers Papier: geprüfte Bausteine, vier Wege; Empfehlung: die Seite selbst zeichnen (GDI/CUPS als Ziele des pdf-Moduls), dazu ein Befehl, der eine Datei öffnet
+- **[Release 2026.45](releases/release-2026.45.md)** — was in dieser Fassung neu ist
+- **[Release 2026.44](releases/release-2026.44.md)** — was in dieser Fassung neu ist
+- **[Release 2026.43](releases/release-2026.43.md)** — was in dieser Fassung neu ist
+- **[Release 2026.42](releases/release-2026.42.md)** — was in dieser Fassung neu ist
+- **[Release 2026.41](releases/release-2026.41.md)** — was in dieser Fassung neu ist
+- **[Release 2026.40](releases/release-2026.40.md)** — was in dieser Fassung neu ist
+- **[Release 2026.39](releases/release-2026.39.md)** — was in dieser Fassung neu ist
+- **[Release 2026.38](releases/release-2026.38.md)** — was in dieser Fassung neu ist
+- **[Release 2026.37](releases/release-2026.37.md)** — was in dieser Fassung neu ist
+- **[Release 2026.36](releases/release-2026.36.md)** — was in dieser Fassung neu ist
+- **[Release 2026.35](releases/release-2026.35.md)** — was in dieser Fassung neu ist
+- **[Release 2026.34](releases/release-2026.34.md)** — was in dieser Fassung neu ist
+- **[Release 2026.33](releases/release-2026.33.md)** — die Fassung davor
+- **[Release 2026.32](releases/release-2026.32.md)** — und die davor
+- **[Release 2026.31](releases/release-2026.31.md)** — und die davor
+- **[Release 2026.30](releases/release-2026.30.md)** — und die davor
+- **[Release 2026.29](releases/release-2026.29.md)** — und die davor
+- **[Release 2026.28](releases/release-2026.28.md)** — und die davor
+- **[Release 2026.27](releases/release-2026.27.md)** — und die davor
+- **[Release 2026.26](releases/release-2026.26.md)** — und die davor
+- **[Release 2026.25](releases/release-2026.25.md)** — und die davor
+- **[Release 2026.24](releases/release-2026.24.md)** — und die davor
+- **[Release 2026.23](releases/release-2026.23.md)** — und die davor
+- **[Release 2026.22](releases/release-2026.22.md)** — und die davor
+- **[Release 2026.21](releases/release-2026.21.md)** — und die davor
+- **[Release 2026.20](releases/release-2026.20.md)** — und die davor
+- **[Release 2026.19](releases/release-2026.19.md)** — und die davor
+- **[Release 2026.18](releases/release-2026.18.md)** — und die davor
+- **[Release 2026.17](releases/release-2026.17.md)** — und die davor
+- **[Release 2026.16](releases/release-2026.16.md)** — und die davor
+- **[Release 2026.15](releases/release-2026.15.md)** — und die davor
+- **[Release 2026.14](releases/release-2026.14.md)** — und die davor
+- **[Release 2026.13](releases/release-2026.13.md)** — und die davor
+- **[Release 2026.12](releases/release-2026.12.md)** — und die davor
+- **[Release 2026.11](releases/release-2026.11.md)** — und die davor
+- **[Release 2026.10](releases/release-2026.10.md)** — und die davor
+- **[Release 2026.9](releases/release-2026.9.md)** — und die davor
+- **[Release 2026.8](releases/release-2026.8.md)** — und die davor
+- **[Allzweck-Roadmap](intern/allzweck-roadmap.md)** — was fehlt, damit man damit *alles* schreiben kann und nicht nur Spiele (aktuell, Audit 2026-08)
+- **[Allzweck-Audit, zweite Runde](intern/allzweck-audit-2.md)** — was nach der abgearbeiteten Roadmap noch fehlt, damit man Drachenhauch zum Software-Bauen *wählt* (2026-08-23)
+- **[Befehlssatz-Roadmap](intern/befehlssatz-roadmap.md)** und **[GUI-Design-Notiz](intern/gui-module-design.md)** — historisch, mit Lesehinweis
+- **[Umbenennung GameBasic → Drachenhauch](intern/umbenennung-drachenhauch.md)** — die Checkliste von 2026-08
 
 ## Erstes Programm
 

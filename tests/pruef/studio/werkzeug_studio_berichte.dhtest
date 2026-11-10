@@ -1,6 +1,6 @@
 ' Drachenhauch Studio: Berichte, Stufe 1 -- auslegen und drucken
 ' (studio/berichte_laufzeit.dh, studio/berichte.dh, studio/laufzeit.dh,
-' docs/entwurf-berichte.md). Ein Bericht (Element "bericht", Datei
+' docs/intern/entwurf-berichte.md). Ein Bericht (Element "bericht", Datei
 ' .dhreport) hat Baender mit Gruppen und Summen, eine Quelle mit :parametern
 ' und wird im Programm zu Pdf/Drucken/Vorschau; im Studio zeigt ihn ein
 ' Reiter, [Vorschau …] setzt ihn mit den Entwicklungsdaten.

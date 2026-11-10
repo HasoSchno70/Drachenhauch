@@ -2,7 +2,7 @@
 
 Stand 2026-09-24. Frage des Nutzers: wie wird Drachenhauch als
 Compilersprache *richtig* schnell? Vorher erledigt ist die Kleinarbeit aus
-`docs/entwurf-anwendungen-und-tempo.md` (Anhängen, Builtin-Familien, globale
+`docs/intern/entwurf-anwendungen-und-tempo.md` (Anhängen, Builtin-Familien, globale
 Felder, Objektfelder, Aufrufe, Falten, JSON-Umweg, geteilter Dispatch).
 Damit ist ausgereizt, was eine Stapel-VM mit `Value`-Enum ohne Umbau hergibt.
 
@@ -91,7 +91,7 @@ gemergt.
 Jedes misst seinen Kern selbst und gibt ihn als `ZEIT <ms>` aus -- die
 Wandzeit traegt rund 40 ms Start mit. `--gegen pfad\zu\dhrt.exe` misst eine
 zweite Laufzeit abwechselnd mit und gibt A/B aus. Erste Tabelle in
-`docs/PERFORMANCE.md` (Messbank). Ein echtes Spiel ist nicht dabei: es
+`docs/intern/PERFORMANCE.md` (Messbank). Ein echtes Spiel ist nicht dabei: es
 braucht ein Fenster, und die Bank soll auf jeder Maschine laufen.
 
 **Der erste Fund der Bank:** `LEFT$`/`RIGHT$`/`MID$`/`INSTR` legten je Aufruf

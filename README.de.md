@@ -89,7 +89,7 @@ Nichts davon braucht ein Fenster. Ein Drachenhauch-Programm kann eine
 Konsolenanwendung sein, ein Cron-Job oder ein Spiel — dieselbe Sprache.
 
 Nachzulesen im [Handbuch](docs/README.md); wie es dazu kam, steht in der
-[Allzweck-Roadmap](docs/allzweck-roadmap.md).
+[Allzweck-Roadmap](docs/intern/allzweck-roadmap.md).
 
 ## Herunterladen
 
@@ -158,7 +158,7 @@ Vollständige Doku im [docs/](docs/README.md)-Ordner:
 - **[Sprachreferenz](docs/sprache.md)** — Variablen, Typen, `ENUM`, `SELECT CASE`, Funktionen mit Defaults und Named Arguments, Klassen, Try/Catch, f-Strings, Escape-Folgen mit `!"…\n…"`, Coroutines (`YIELD` + `CORO_*`)
 - **[Standard-Built-ins](docs/builtins-core.md)** — Math, Strings, Maps, File-I/O, …
 - **[Grafik-Built-ins](docs/builtins-grafik.md)** — native Runtime (dhrt/raylib), Z-Layer, Sprite-Atlas, Asset-Preloader
-- **[Performance](docs/PERFORMANCE.md)** — Bench-Zahlen + umgesetzte Optimierungen (Spec-Ops, IC, Typed Arrays, ECS Bulk-Ops, …)
+- **[Performance](docs/intern/PERFORMANCE.md)** — Bench-Zahlen + umgesetzte Optimierungen (Spec-Ops, IC, Typed Arrays, ECS Bulk-Ops, …)
 - **Module** — 57 Stück, [Tabelle unten](#module)
 - **[IDE](docs/ide.md)** — die Entwicklungsumgebung, selbst in Drachenhauch geschrieben: Reiter, Projektbaum, Vervollständigung, Hilfe zum Wort, Schnipsel, Mehrfach-Marken, Faltung, geteilte Ansicht, Umbauten über das ganze Projekt, **Debugger** (auch bedingte Haltepunkte), **Profiler**, git blame/diff, Handbuch im Fenster, Willkommensseite mit Beispiel-Galerie
 - **[Drachenhauch Studio](docs/studio.md)** (`studio/studio.dh`) — Anwendungen mit Oberfläche im Stil von Xojo: Fenster-Entwurf mit Ausrichtungslinien, Inspektor, Navigator, Code je Ereignis, Layout-Behälter, eigene Controls, Datenbanken mit Abfragen, Berichte (PDF, Druck, Vorschau), Menüs, Timer, Bilder, Dialoge, Projektvorlagen, deutsche und englische Oberfläche, Projekte in zwei Sprachen, Starten/Bauen/Debuggen; Beispielprojekte `examples/studio/rechnungen/` und [Kuehlschrank-Drachenhauch](https://github.com/HasoSchno70/Kuehlschrank-Drachenhauch) (eine Kühlschrank-Verwaltung mit 13 Fenstern und 5 eigenen Controls, eigenes Repo)

@@ -889,6 +889,6 @@ ruft. Die Laufzeit lädt die Bibliothek beim ersten Aufruf
 (`libloading`) und baut je Signatur einmal einen kleinen Übergang mit
 Cranelift -- derselben Bibliothek, die auch den Maschinencode erzeugt; er
 legt die Argumente nach der C-Aufrufkonvention des Systems ab. Entwurf und
-Entscheidungen: [entwurf-ffi.md](entwurf-ffi.md), Quelltext
+Entscheidungen: [entwurf-ffi.md](intern/entwurf-ffi.md), Quelltext
 `rust/drachenhauch_runtime/src/ffi.rs`, Prüfungen
 `tests/pruef/sprache/ffi.dhtest`.

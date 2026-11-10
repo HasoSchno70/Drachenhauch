@@ -1,7 +1,7 @@
 # Drachenhauch 2026.10
 
 *Die Notizen zu dieser Fassung. Warum die einzelnen Stücke so und nicht anders
-gebaut wurden, steht in [Punkt 8 des zweiten Allzweck-Audits](allzweck-audit-2.md)
+gebaut wurden, steht in [Punkt 8 des zweiten Allzweck-Audits](../intern/allzweck-audit-2.md)
 und in den jeweiligen Modul-Seiten.*
 
 ## Neu in dieser Fassung
@@ -89,7 +89,7 @@ damit) — nur herausgeführt war sie nie. Es ist ein **Stapel**: ein inneres
 **Ein Instrument anschließen.** Drachenhauch bringt Tracker, Sampler,
 sfxr-Synth, Notenblatt-Editor und Kira-Busse mit — bis hierher konnte kein
 angeschlossenes Keyboard etwas davon ansteuern. Das neue Modul
-[`midi`](module-midi.md) schließt diese Brücke, mit 27 Befehlen zum Auflisten,
+[`midi`](../module-midi.md) schließt diese Brücke, mit 27 Befehlen zum Auflisten,
 Empfangen (Cursor-Muster wie `db`/`mqtt`) und Senden:
 
 ```basic

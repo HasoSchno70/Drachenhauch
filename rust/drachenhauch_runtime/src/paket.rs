@@ -1,4 +1,4 @@
-//! `dhrt paket` -- Bibliotheken holen und teilen (docs/entwurf-pakete.md).
+//! `dhrt paket` -- Bibliotheken holen und teilen (docs/intern/entwurf-pakete.md).
 //!
 //!   dhrt paket hole                       alles aus paket.json holen
 //!   dhrt paket hole <quelle> [--als name] eines dazunehmen

@@ -158,7 +158,7 @@ ureq = { version = "2", optional = true }
 # C-Toolchain mitbraeuchte -- dieselbe Wahl, die ureq schon getroffen hat.
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12", "logging"], optional = true }
 webpki-roots = { version = "0.26", optional = true }
-# db-Modul gegen einen Server (docs/entwurf-datenbanktreiber.md): PostgreSQL
+# db-Modul gegen einen Server (docs/intern/entwurf-datenbanktreiber.md): PostgreSQL
 # und MySQL, beide reines Rust; TLS ueber dasselbe rustls+ring wie smtp/ureq
 # (fuer mysql ausdruecklich `rustls-tls-ring`, die Vorgabe zoege aws-lc-sys
 # und damit cmake nach).
@@ -198,7 +198,7 @@ rfd = { version = "0.14", optional = true }
 # muss nichts installiert sein. Auf dem Desktop immer dabei (build_runtime.py).
 openh264 = { version = "0.9", optional = true }
 mp4 = { version = "0.14", optional = true }
-# Barrierefreiheit (docs/entwurf-barrierefreiheit.md, Weg C): das gui-Modul
+# Barrierefreiheit (docs/intern/entwurf-barrierefreiheit.md, Weg C): das gui-Modul
 # schiebt seinen Widget-Baum an die Schnittstelle des Systems (Windows: UI
 # Automation), damit Bildschirmleser, Lupe und Sprachsteuerung ihn sehen.
 # Reines Rust; der Baum wird nur gebaut, wenn ein Hilfsprogramm danach fragt.
@@ -305,10 +305,10 @@ video = ["dep:openh264", "dep:mp4"]
 # macOS- und Linux-Weg mit `cargo check --features webcam` auch in den
 # Bauten der CI ohne raylib. graphics schaltet es ein (das IMAGE braucht es).
 webcam = ["dep:zune-jpeg"]
-# Maschinencode fuer reine Zahlenfunktionen (M3, docs/entwurf-maschinencode.md,
+# Maschinencode fuer reine Zahlenfunktionen (M3, docs/intern/entwurf-maschinencode.md,
 # src/jit.rs). Seit M5 an per Vorgabe, DHRT_JIT=aus laesst alles in der VM.
 jit = ["dep:cranelift-codegen", "dep:cranelift-frontend", "dep:cranelift-jit", "dep:cranelift-module", "dep:cranelift-native"]
-# Fremde Bibliotheken aufrufen (DECLARE ... LIB, docs/entwurf-ffi.md): die
+# Fremde Bibliotheken aufrufen (DECLARE ... LIB, docs/intern/entwurf-ffi.md): die
 # Uebergaenge baut Cranelift, darum haengt es an jit.
 ffi = ["jit", "dep:libloading"]
 db = ["dep:rusqlite"]
@@ -317,7 +317,7 @@ pg = ["db", "dep:postgres", "dep:tokio-postgres-rustls", "dep:bytes", "dep:rustl
 mysql = ["db", "dep:mysql"]
 # PDF-Modul (krilla, eingebettete DejaVu-Schriften, Textformung) -- gut 6 MB
 # der Laufzeit; ein Programm, das kein PDF schreibt, braucht es nicht
-# (schlanker Export, docs/entwurf-anwendungen-und-tempo.md).
+# (schlanker Export, docs/intern/entwurf-anwendungen-und-tempo.md).
 pdf = ["dep:krilla", "schriften", "dep:rustybuzz"]
 # Die eingebauten Schriften (DejaVu, ~5,3 MB) fuer LOADFONT("sans") -- das
 # pdf-Modul bringt sie mit, der Web-Bau schaltet sie eigens ein.

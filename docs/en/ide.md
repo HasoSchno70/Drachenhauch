@@ -1,7 +1,7 @@
 # The IDE in Drachenhauch (`ide/ide.dh`)
 
 A development environment written in the language it serves.
-It is path C from [Design: phasing out Python](../entwurf-python-abbau.md) (German): the
+It is path C from [Design: phasing out Python](../intern/entwurf-python-abbau.md) (German): the
 Qt IDE (32,000 lines of Python) is to be replaced by a Drachenhauch program.
 Until it catches up, the Qt IDE stays in the installer.
 
@@ -822,7 +822,7 @@ in steps, a refactoring is also checked **without preview** (and opens it
 if it introduces errors), and the **checkmarks** in the tree are the
 means to restrict a refactoring to a self-chosen set of files.
 
-Compared with the Qt IDE nothing has been open at menu level since stage 9; the smaller gaps in keyboard, mouse and panels are listed in `docs/entwurf-python-abbau.md`, section 7.3. Since
+Compared with the Qt IDE nothing has been open at menu level since stage 9; the smaller gaps in keyboard, mouse and panels are listed in `docs/intern/entwurf-python-abbau.md`, section 7.3. Since
 stage 29 you can **select and copy** in the rendered manual, and
 the search goes **forward and back** (Enter / Shift+Enter, two buttons),
 selects the match and highlights all others. What would be up
@@ -840,4 +840,4 @@ overwritten. **Since 2026-09-19 the same `bauen.dh` also packages for macOS
 examples at startup into `Dokumente/Drachenhauch/examples` and tells the IDE
 via `DH_IDE_BEISPIELE` where they are (details in
 [installer/README.md](../../installer/README.md)). The list is in
-[entwurf-python-abbau.md](../entwurf-python-abbau.md) (German), section C.
+[entwurf-python-abbau.md](../intern/entwurf-python-abbau.md) (German), section C.

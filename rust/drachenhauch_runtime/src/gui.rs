@@ -3784,7 +3784,7 @@ pub struct Gui {
     // schon steht, wird nicht nachtraeglich umgerechnet (darum lehnt
     // `set_scale` einen Wechsel ab, solange Fenster existieren).
     scale: f64,
-    // --- Bedienung ohne Maus, zweiter Teil (docs/entwurf-barrierefreiheit.md, Weg A)
+    // --- Bedienung ohne Maus, zweiter Teil (docs/intern/entwurf-barrierefreiheit.md, Weg A)
     /// Per Tastatur gefuehrter Eintrag im tiefsten offenen Leistenmenue
     /// (Index in `items`); None = die Maus fuehrt.
     menu_cursor: Option<usize>,

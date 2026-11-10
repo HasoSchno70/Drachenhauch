@@ -1,5 +1,5 @@
 ' Rechtschreibung (rechtschreibung.rs, gui_rechtschreibung.rs;
-' docs/entwurf-gui-wie-gtk.md Paket 3). Format: docs/werkzeuge.md.
+' docs/intern/entwurf-gui-wie-gtk.md Paket 3). Format: docs/werkzeuge.md.
 '
 ' Die Woerterbuecher sind winzige Hunspell-Dateien als Beilage -- so ist das
 ' Ergebnis auf jedem System dasselbe. Nur ein Fall fragt die Pruefung von

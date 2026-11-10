@@ -205,7 +205,7 @@ ohne Stildatei darf sich kein Punkt ändern.
 
 - **Mehrere echte Betriebssystem-Fenster** in einem Prozess: raylib hat
   eines je Prozess; `WINDOW_OPEN` (zweiter Prozess) und das Dock decken es
-  ab. Siehe `docs/entwurf-native-fenster.md`.
+  ab. Siehe `docs/intern/entwurf-native-fenster.md`.
 - **Touch-Gesten an Widgets** (Wischen in Listen, Kneifen in der
   Zeichenfläche): die Rohdaten gibt es (`GESTURE$`), die gui wertet sie
   nicht aus. Erst, wenn jemand die gui auf einem Tablet benutzt.

@@ -16,7 +16,7 @@ Kein Python, kein zweites Programm: Lexer, Parser, Compiler, der
 Befehlsindex und die Hover-Texte liegen in `dhrt`, und der Server benutzt
 sie in einem Prozess. Bis September 2026 rechnete ein Python-Server
 (`drachenhauch/lsp/`) nach, was `dhrt` beim Übersetzen längst wusste — er
-ist mit Weg A aus [entwurf-python-abbau.md](entwurf-python-abbau.md)
+ist mit Weg A aus [entwurf-python-abbau.md](intern/entwurf-python-abbau.md)
 entfallen.
 
 | LSP-Methode | Funktion |

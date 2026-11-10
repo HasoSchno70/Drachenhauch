@@ -2,11 +2,11 @@
 
 > **Stand 24.08.2026: Weg A und Weg C sind gebaut.** `CENT`, `EURO$` und
 > `ROUND_HALF_UP` gibt es, und der Abschnitt „Mit Geld rechnen" steht in
-> [builtins-core.md](builtins-core.md#mit-geld-rechnen). Der dritte Befehl
+> [builtins-core.md](../builtins-core.md#mit-geld-rechnen). Der dritte Befehl
 > heißt **nicht** `RUNDE_AUF` wie unten vorgeschlagen: das hätte jeder als
 > „aufrunden" gelesen, also als `CEIL` — und das ist genau die falsche
 > Bedeutung. `ROUND_HALF_UP` steht dafür neben `ROUND`/`FLOOR`/`CEIL`, wo
-> es hingehört. **Weg C ist als Modul [`geld`](module-geld.md) dazugekommen**
+> es hingehört. **Weg C ist als Modul [`geld`](../module-geld.md) dazugekommen**
 > — ein eigener Wert mit `+ - * /` und exakten Vergleichen, der sich nicht
 > mit gewöhnlichen Zahlen mischen lässt. Weg B (ein Typ im Sprachkern, mit
 > dem Literal `19.99`) bleibt ungebaut; die Abwägung unten steht unverändert.
@@ -65,7 +65,7 @@ gerechnet reicht das für ±92 Billiarden Cent — jede Buchhaltung dieser Welt.
 
 Kein neuer Typ. Stattdessen:
 
-* Ein Abschnitt „Mit Geld rechnen" in [builtins-core.md](builtins-core.md):
+* Ein Abschnitt „Mit Geld rechnen" in [builtins-core.md](../builtins-core.md):
   in ganzen Cent rechnen, **`ROUND` statt `INT`** beim Umrechnen, und warum.
 * `ROUND`s Rundungsregel dokumentieren.
 * Drei neue Builtins (**gebaut am 24.08.2026**, Namen wie hier — bis auf
@@ -210,7 +210,7 @@ Meldung nennt gleich die Lösung (*„aus 19.99 macht CENT(19.99) die Zahl
 1999"*) — eine Anzeige, die aus einer Kommazahl stillschweigend „19,99 €"
 macht, würde genau die Rechenweise verschleiern, um die es geht.
 
-Vorführung: [examples/179_kasse.dh](../examples/179_kasse.dh). Der Bon
+Vorführung: [examples/179_kasse.dh](../../examples/179_kasse.dh). Der Bon
 endet mit dem Fall, der zeigt, dass das kein Haarspalten ist: eine
 FLOAT-Summe, die richtig aussieht, sich richtig druckt und sogar gleich
 `72.71` ist — und aus der `INT(summe * 100)` trotzdem `7270` macht.

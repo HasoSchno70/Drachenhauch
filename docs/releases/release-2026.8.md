@@ -1,7 +1,7 @@
 # Drachenhauch 2026.8
 
 *Die Notizen zu dieser Fassung. Was dahintersteckt und warum es so und nicht
-anders gebaut wurde, steht in der [Allzweck-Roadmap](allzweck-roadmap.md) und
+anders gebaut wurde, steht in der [Allzweck-Roadmap](../intern/allzweck-roadmap.md) und
 den vier Entwürfen daneben.*
 
 ## Neu in dieser Fassung

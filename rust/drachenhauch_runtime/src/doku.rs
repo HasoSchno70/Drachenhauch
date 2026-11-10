@@ -1,5 +1,5 @@
 //! `dhrt doku` -- die Doku-Werkzeuge, die bis 2026-09-06 in Python lagen
-//! (Weg A aus `docs/entwurf-python-abbau.md`):
+//! (Weg A aus `docs/intern/entwurf-python-abbau.md`):
 //!
 //!   dhrt doku prosa [--pruefen]          builtin_prosa.json aus docs/ (+ Referenzbuch)
 //!   dhrt doku grammatik [--pruefen]      VS-Code-Grammatik aus Keywords + Index

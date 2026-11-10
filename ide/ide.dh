@@ -3,7 +3,7 @@
 ' ============================================================
 '  Eine Entwicklungsumgebung, geschrieben in der Sprache, die sie
 '  bedient. Sie soll die Qt-IDE abloesen; bis sie gleichzieht, bleibt
-'  die Qt-IDE im Installer (docs/entwurf-python-abbau.md, Weg C).
+'  die Qt-IDE im Installer (docs/intern/entwurf-python-abbau.md, Weg C).
 '
 '  Stand 1 kann: Dateien in Reitern oeffnen, bearbeiten, sichern;
 '  Projektbaum; Syntax-Einfaerbung des sichtbaren Ausschnitts; Fehler-

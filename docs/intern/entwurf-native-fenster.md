@@ -1,7 +1,7 @@
 # Entwurf: Mehrere OS-Fenster in Drachenhauch
 
 > **Stand 05.09.2026: Weg B ist gebaut** — `WINDOW_OPEN/SEND/RECV$/ALIVE/CLOSE`
-> und `PARENT_SEND/RECV$/ALIVE`, siehe [builtins-core.md](builtins-core.md#ein-zweites-fenster-window_open).
+> und `PARENT_SEND/RECV$/ALIVE`, siehe [builtins-core.md](../builtins-core.md#ein-zweites-fenster-window_open).
 > Der Kanal ist eine TCP-Verbindung auf 127.0.0.1 statt stdin/stdout (das Kind
 > darf weiter `PRINT`). Die drei Prüfsteine unten, gemessen: 1000 Nachrichten
 > im Schub hin und zurück ~60 ms; eine **einzelne** Runde kostet ein bis drei

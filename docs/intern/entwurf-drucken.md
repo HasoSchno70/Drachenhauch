@@ -5,7 +5,7 @@
 > seine Befehle auf und spielt sie auf drei Ziele: `PDF_SAVE`, `PDF_PRINT`
 > (GDI unter Windows, `lp` unter macOS/Linux; dazu `PRINTERS()` und
 > `PRINTER_DEFAULT$()`) und `PDF_PREVIEW` (die Seite als `IMAGE`). Siehe
-> [module-pdf.md](module-pdf.md#drucken-und-vorschau). Prüfstein 1, gemessen:
+> [module-pdf.md](../module-pdf.md#drucken-und-vorschau). Prüfstein 1, gemessen:
 > zwei Seiten durch „Microsoft Print to PDF“ in eine Datei in ~0,9 s, und im
 > Ergebnis stehen Nummer, Name und der rechtsbündige Betrag an seiner Stelle
 > (`tests/pruef/module/drucken.dhtest`; gelesen wird die Datei des Treibers seit

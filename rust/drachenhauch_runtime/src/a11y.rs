@@ -1,5 +1,5 @@
 //! Barrierefreiheit: die Bruecke zwischen dem gui-Modul und der
-//! Barrierefreiheits-Schnittstelle des Systems (docs/entwurf-barrierefreiheit.md,
+//! Barrierefreiheits-Schnittstelle des Systems (docs/intern/entwurf-barrierefreiheit.md,
 //! Weg C).
 //!
 //! Gemessen vor dem Bau: ein laufendes dhrt-Fenster hatte im UIA-Baum von

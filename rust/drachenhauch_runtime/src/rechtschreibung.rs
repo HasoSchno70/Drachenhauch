@@ -1,4 +1,4 @@
-//! Rechtschreibung (SPELL_*, docs/entwurf-gui-wie-gtk.md Paket 3).
+//! Rechtschreibung (SPELL_*, docs/intern/entwurf-gui-wie-gtk.md Paket 3).
 //!
 //! Zwei Quellen, ein Vertrag:
 //! * unter Windows die Rechtschreibpruefung des Systems (`ISpellChecker`) --

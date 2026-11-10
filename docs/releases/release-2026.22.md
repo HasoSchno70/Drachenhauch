@@ -56,7 +56,7 @@ Für eine Bibliothek, der man nicht traut, gibt es den Weg über einen Auftrag
 (`TASK_START`) -- stürzt der ab, läuft das Hauptprogramm weiter und bekommt
 einen Fehler.
 
-Mehr in [Fremde Bibliotheken](ffi.md), dazu ein neues Kapitel im Lehrbuch
+Mehr in [Fremde Bibliotheken](../ffi.md), dazu ein neues Kapitel im Lehrbuch
 und das Beispiel `206_fremde_bibliotheken.dh`.
 
 ## Behoben

@@ -1,5 +1,5 @@
 //! Rechtschreibung in Textfeld und Textbereich (GUI_SPELL, Paket 3 aus
-//! docs/entwurf-gui-wie-gtk.md).
+//! docs/intern/entwurf-gui-wie-gtk.md).
 //!
 //! Das Feld haelt nur das Handle eines Woerterbuchs (rechtschreibung.rs);
 //! geprueft wird eine kurze Pause nach der letzten Aenderung, nicht je

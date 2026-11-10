@@ -83,7 +83,7 @@ Ausweg.
 * Glutfaden: die drei Einleser (OXS, PAT, XSD) teilen sich ein Ergebnis und
   eine Basisklasse für das Lesen der Bytes. Funkenflug: die Auswahl ist eine
   Menge aus `kern.Element` statt vier Feldern.
-* `docs/entwurf-schnittstellen.md` wägt `INTERFACE`/`IMPLEMENTS` ab. Zwei
+* `docs/intern/entwurf-schnittstellen.md` wägt `INTERFACE`/`IMPLEMENTS` ab. Zwei
   Proben an Funkenflug und Glutfaden kamen mit einer abstrakten Basisklasse
   aus; `INTERFACE` wird vorerst nicht gebaut.
 

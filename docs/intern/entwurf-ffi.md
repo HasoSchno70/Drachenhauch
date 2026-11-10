@@ -2,7 +2,7 @@
 
 Stand 2026-10-05. Punkt „Kein Aufruf fremder DLLs/.so“ aus
 [entwurf-anwendungen-und-tempo.md](entwurf-anwendungen-und-tempo.md).
-**Stufe 1 ist gebaut (2026-10-05), Stufen 2 und 3 am 2026-10-06, die Struct-Lage am selben Tag** -- Handbuch [ffi.md](ffi.md). Die
+**Stufe 1 ist gebaut (2026-10-05), Stufen 2 und 3 am 2026-10-06, die Struct-Lage am selben Tag** -- Handbuch [ffi.md](../ffi.md). Die
 Syntax unten steht weiter in Textblöcken, weil es die Fassung des Entwurfs
 ist.
 

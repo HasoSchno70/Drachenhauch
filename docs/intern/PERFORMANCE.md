@@ -5,7 +5,7 @@
 > seit Stufe B **alle entfernt** sind. Die EINZIGE Runtime ist heute `dhrt`
 > (Rust/raylib). Auch das fruehere `--bench` des Python-Starters existiert nicht mehr. Die Zahlen unten
 > sind nur noch als Optimierungs-Logbuch interessant; gemessen wird heute gegen
-> `dhrt`. Siehe [docs/rust-runtime.md](rust-runtime.md).
+> `dhrt`. Siehe [docs/rust-runtime.md](../rust-runtime.md).
 
 ## Messbank (seit 2026-09-24)
 

@@ -2,7 +2,7 @@
 //
 // Startet `dhrt lsp` (stdio) und verbindet ihn als LanguageClient -- die
 // Runtime IST der Sprachserver, Python braucht es dafuer seit 2026-09-06
-// nicht mehr (Weg A aus docs/entwurf-python-abbau.md). Syntax-Highlighting kommt aus der TextMate-Grammatik und
+// nicht mehr (Weg A aus docs/intern/entwurf-python-abbau.md). Syntax-Highlighting kommt aus der TextMate-Grammatik und
 // laeuft auch ohne Server; der Server liefert Diagnostics/Completion/Hover/
 // Goto-Definition/References/Outline.
 

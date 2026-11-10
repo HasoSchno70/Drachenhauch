@@ -1,4 +1,4 @@
-' SPEAK -- Sprachausgabe als Klang unter Klaengen (docs/entwurf-speak.md, Weg C).
+' SPEAK -- Sprachausgabe als Klang unter Klaengen (docs/intern/entwurf-speak.md, Weg C).
 '
 ' SPEAK_SOUND liefert einen Klang mit Huellkurve; SPEAKING geht an und wieder
 ' aus; Anhaengen dauert doppelt so lang wie Unterbrechen; eine unbekannte

@@ -9,7 +9,7 @@
 > gui-Beispiel 45 jetzt acht — Gruppe, Beschriftungen, Regler mit Namen aus
 > der Nachbar-Beschriftung, Kästchen, Eingabefeld, Knopf
 > (`tests/pruef/gui/gui_barrierefreiheit.dhtest`). Siehe
-> [module-gui.md](module-gui.md#barrierefreiheit). **Nachtrag, selber Tag:
+> [module-gui.md](../module-gui.md#barrierefreiheit). **Nachtrag, selber Tag:
 > die Adapter für macOS (NSAccessibility, Objective-C-Subclassing von GLFWs
 > Fenster-View samt Fokus-Weiterleitung an `GLFWWindow`) und Linux (AT-SPI,
 > `accesskit_unix` mit `async-io`; Fensterlage und -fokus meldet FLIP) sind

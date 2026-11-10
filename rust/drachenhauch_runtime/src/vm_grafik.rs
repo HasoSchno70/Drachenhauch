@@ -705,7 +705,7 @@ impl<'p> Vm<'p> {
             // Runtime zeichnet jeden Frame neu aus dem Command-Buffer (Layer
             // werden pro FLIP geleert), es gibt also keine persistenten Pixel
             // zum Verschieben. Graceful No-Op (Programm laeuft); SCROLL ist
-            // Tree-Walker-only (siehe docs/befehlssatz-roadmap.md).
+            // Tree-Walker-only (siehe docs/intern/befehlssatz-roadmap.md).
             "scroll" => { let _ = (gi(a,0,"SCROLL")?, gi(a,1,"SCROLL")?); Value::Nil }
             "joystick_count" => Value::Int(g!().joystick_count()),
             "joystick_name" => Value::Str(g!().joystick_name(gi(a,0,"JOYSTICK_NAME")?)?.into()),
@@ -1932,7 +1932,7 @@ impl<'p> Vm<'p> {
                 self.audio_mut()?.save_wav(idx, &pfad, bits)?;
                 Value::Nil
             }
-            // --- Sprachausgabe (sprache.rs, Weg C aus docs/entwurf-speak.md) ---
+            // --- Sprachausgabe (sprache.rs, Weg C aus docs/intern/entwurf-speak.md) ---
             // SPEAK fragt ZUERST, ob ein Bildschirmleser zuhoert: dann geht der
             // Satz als Ansage in den Baum (seine Stimme, sein Tempo, seine
             // Braillezeile -- und nicht zwei Stimmen zugleich). Sonst die

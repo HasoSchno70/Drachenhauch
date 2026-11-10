@@ -508,7 +508,7 @@ als Ausgangspunkt:
       kaputte Dateien (fehlende Schluss-Anführung liest bis zum Ende, statt
       den Import abzubrechen). Zeilen ungleicher Länge werden auf die breiteste
       aufgefüllt. Neun Rust-`#[test]`s für die Zerlegung, zehn Golden-Tests für
-      den Weg durch die Sprache, [examples/169_csv.dh](../examples/169_csv.dh)
+      den Weg durch die Sprache, [examples/169_csv.dh](../../examples/169_csv.dh)
 - [x] **ZIP lesen/schreiben** (2026-08-19): `ZIP_LIST`/`ZIP_READ`/`ZIP_READ$`/
       `ZIP_EXTRACT`/`ZIP_CREATE`/`ZIP_WRITE`. Beim Entpacken geht jeder
       Eintragsname durch eine Zip-Slip-Prüfung — ein Archiv darf

@@ -1,4 +1,4 @@
-//! Ueberlagerungen und Rueckmeldung (docs/entwurf-gui-wie-gtk.md, Paket 1):
+//! Ueberlagerungen und Rueckmeldung (docs/intern/entwurf-gui-wie-gtk.md, Paket 1):
 //! Popover an einem Widget, Toasts, Infoleiste, Suchfeld und Sinnbilder im
 //! Textfeld, Vorschlaege unter einem Textfeld.
 //!

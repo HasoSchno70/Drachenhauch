@@ -1,7 +1,7 @@
 //! Kindprozesse mit LAUFENDER Ausgabe (`PROCESS_*`).
 //!
 //! `SHELL_START` liefert die Ausgabe erst am Ende (`SHELL_RESULT$`). Eine IDE
-//! in Drachenhauch (Weg C aus `docs/entwurf-python-abbau.md`) muss zeigen, was
+//! in Drachenhauch (Weg C aus `docs/intern/entwurf-python-abbau.md`) muss zeigen, was
 //! ein Programm druckt, WAEHREND es laeuft, und ihm Eingaben schicken
 //! (`INPUT`, der Debugger). Darum hier das Muster von `WINDOW_RECV$`:
 //! Faeden lesen stdout und stderr zeilenweise in Puffer, das Programm holt

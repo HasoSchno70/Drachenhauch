@@ -4,7 +4,7 @@ Stand 2026-10-04. Punkt „Kein Paketverzeichnis“ aus
 [entwurf-anwendungen-und-tempo.md](entwurf-anwendungen-und-tempo.md).
 
 **Gebaut** am selben Tag (`rust/drachenhauch_runtime/src/paket.rs`, Handbuch
-[pakete.md](pakete.md), Tests `tests/pruef/werkzeugkette/paket.dhtest`). Beim Bauen kam
+[pakete.md](../pakete.md), Tests `tests/pruef/werkzeugkette/paket.dhtest`). Beim Bauen kam
 dazu bzw. wich ab:
 
 - **Die Pruefsumme geht ueber den entpackten Inhalt**, nicht ueber die
@@ -22,7 +22,7 @@ dazu bzw. wich ab:
 
 `IMPORT "datei.dh"` sucht neben der importierenden Datei, dann in jedem
 Ordner aus `DH_PATH`, dann in `<Benutzerordner>/.drachenhauch/bibliothek`
-(siehe [sprache.md](sprache.md#wo-gesucht-wird)). Wer eine Bibliothek teilen
+(siehe [sprache.md](../sprache.md#wo-gesucht-wird)). Wer eine Bibliothek teilen
 will, schickt Dateien herum; wer sie benutzt, kopiert sie von Hand. Es gibt
 keine Versionen, keinen Weg, eine Bibliothek zu holen, und nichts, was
 festhaelt, welches Projekt welche Fassung braucht -- auf einem zweiten

@@ -136,4 +136,4 @@ damit in der fertigen Datei, und auf dem Zielrechner braucht es weder
 ## Warum es so gebaut ist
 
 Die Entscheidungen (kein Server, Pakete im Projekt, Prüfsumme über den
-Inhalt) und was bewusst fehlt, stehen im [Entwurf](entwurf-pakete.md).
+Inhalt) und was bewusst fehlt, stehen im [Entwurf](intern/entwurf-pakete.md).

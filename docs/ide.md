@@ -1,7 +1,7 @@
 # Die IDE in Drachenhauch (`ide/ide.dh`)
 
 Eine Entwicklungsumgebung, geschrieben in der Sprache, die sie bedient.
-Sie ist Weg C aus [Entwurf: Python abbauen](entwurf-python-abbau.md): die
+Sie ist Weg C aus [Entwurf: Python abbauen](intern/entwurf-python-abbau.md): die
 Qt-IDE (32 000 Zeilen Python) soll durch ein Drachenhauch-Programm abgelöst
 werden. Bis das gleichzieht, bleibt die Qt-IDE im Installer.
 
@@ -824,7 +824,7 @@ auf, wenn er Fehler dazubringt), und die **Häkchen** im Baum sind das
 Mittel, einen Umbau auf eine selbst gewählte Menge von Dateien zu
 beschränken.
 
-Gegen die Qt-IDE ist seit Stand 9 auf Menü-Ebene nichts mehr offen; die kleineren Lücken in Tastatur, Maus und Panels stehen in `docs/entwurf-python-abbau.md`, Abschnitt 7.3. Seit
+Gegen die Qt-IDE ist seit Stand 9 auf Menü-Ebene nichts mehr offen; die kleineren Lücken in Tastatur, Maus und Panels stehen in `docs/intern/entwurf-python-abbau.md`, Abschnitt 7.3. Seit
 Stand 29 lässt sich im gesetzten Handbuch **markieren und kopieren**, und
 die Suche geht **weiter und zurück** (Enter / Umschalt+Enter, zwei Knöpfe),
 markiert die Fundstelle und hebt alle anderen hervor. Was als Nächstes
@@ -842,4 +842,4 @@ diese hier gleichzieht. **Gebaut wird er seit 2026-09-16 in Drachenhauch**
 Beispiele beim Start in `Dokumente/Drachenhauch/examples` und sagt der IDE
 über `DH_IDE_BEISPIELE`, wo sie liegen (Einzelheiten in
 [installer/README.md](../installer/README.md)). Die Liste steht in
-[entwurf-python-abbau.md](entwurf-python-abbau.md), Abschnitt C.
+[entwurf-python-abbau.md](intern/entwurf-python-abbau.md), Abschnitt C.

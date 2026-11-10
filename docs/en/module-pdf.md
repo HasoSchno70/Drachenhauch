@@ -139,7 +139,7 @@ underneath each other.
 The module **records** its pages. The same page can therefore go to three
 destinations: the file (`PDF_SAVE`), the printer (`PDF_PRINT`) and an image
 (`PDF_PREVIEW`). There is no PDF renderer behind it; the renderer is the
-operating system ([design, German](../entwurf-drucken.md)).
+operating system ([design, German](../intern/entwurf-drucken.md)).
 
 ```basic
 PDF_PRINT(p)                                   ' default printer, one copy

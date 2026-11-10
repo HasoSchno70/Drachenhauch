@@ -4,7 +4,7 @@
 führt ihn aus — `dhrt run datei.dh` ist ein eigenständiger End-to-End-Lauf
 **ohne Python**. Python bleibt nur noch in den Editoren/Tools; der
 Referenz-Tree-Walker, gegen den hier verglichen wurde, ist inzwischen
-entfernt (siehe [Prinzip](#prinzip-waehrend-der-portierung) am Ende). Damit kann auch der [Web-Playground](web-playground.md)
+entfernt (siehe [Prinzip](#prinzip-waehrend-der-portierung) am Ende). Damit kann auch der [Web-Playground](../web-playground.md)
 ein reines Rust-WASM werden (kein Pyodide nötig).
 
 Die Front-End-Toolchain (`lexer`/`tokens`/`parser`/`ast_nodes`/`compiler`/
@@ -25,7 +25,7 @@ Stufen fertig.** dhrt führt `.dhc` weiterhin direkt aus (VM-Pfad); `dhrt run`
 
 ## Stufe 1 — Lexer (fertig)
 
-- [`rust/drachenhauch_runtime/src/lexer.rs`](../rust/drachenhauch_runtime/src/lexer.rs): `Tt`
+- [`rust/drachenhauch_runtime/src/lexer.rs`](../../rust/drachenhauch_runtime/src/lexer.rs): `Tt`
   (Token-Typen mit exakt den Python-`TokenType.name`-Strings), `Lexer`,
   f-String-Expansion (inkl. Format-Spec `{x:.2f}` → `FORMAT$`), `&H`/`&B`,
   Zeilenfortsetzung (`_`+Newline, implizit in Klammern), lowercase-Idents,
@@ -42,10 +42,10 @@ Stufen fertig.** dhrt führt `.dhc` weiterhin direkt aus (VM-Pfad); `dhrt run`
 
 ## Stufe 2 — Parser (fertig)
 
-- [`rust/drachenhauch_runtime/src/ast.rs`](../rust/drachenhauch_runtime/src/ast.rs): `Node`-Enum
+- [`rust/drachenhauch_runtime/src/ast.rs`](../../rust/drachenhauch_runtime/src/ast.rs): `Node`-Enum
   (alle ~50 Knoten aus `ast_nodes.py`) + `Param`/`CaseMatch`, `to_json()`
   emittiert exakt die Dataclass-Feld-Struktur (`{"_": NodeName, ...}`).
-- [`rust/drachenhauch_runtime/src/parser.rs`](../rust/drachenhauch_runtime/src/parser.rs):
+- [`rust/drachenhauch_runtime/src/parser.rs`](../../rust/drachenhauch_runtime/src/parser.rs):
   Recursive-Descent-Port (gleiche Präzedenz + Disambiguierungen: Tupel-Assign-
   Lookahead, `FOR EACH`, `IIF`, Slice-vs-Index, WITH-`.member`, List/Dict/Set-
   Comprehensions, Operator-Overloading, Properties). Debug-Einstieg
@@ -61,7 +61,7 @@ Stufen fertig.** dhrt führt `.dhc` weiterhin direkt aus (VM-Pfad); `dhrt run`
 
 ## Stufe 3 — Compiler (in Arbeit)
 
-[`rust/drachenhauch_runtime/src/compiler.rs`](../rust/drachenhauch_runtime/src/compiler.rs): AST →
+[`rust/drachenhauch_runtime/src/compiler.rs`](../../rust/drachenhauch_runtime/src/compiler.rs): AST →
 `.dhc`-JSON. Debug-/Run-Einstieg `dhrt --runsrc <datei.dh>` macht **alles in
 Rust** (lex+parse+compile+run).
 
@@ -123,7 +123,7 @@ DATA-Arrays ab).
 
 ## Stufe 4 — Preprocess / `IMPORT` (fertig)
 
-[`rust/drachenhauch_runtime/src/preprocess.rs`](../rust/drachenhauch_runtime/src/preprocess.rs):
+[`rust/drachenhauch_runtime/src/preprocess.rs`](../../rust/drachenhauch_runtime/src/preprocess.rs):
 Port von drachenhauch/preprocess.py. `process(source, base)` expandiert
 `IMPORT`-Zeilen rekursiv **vor dem Lexen** und liefert `(merged_source,
 imported_modules)`:
@@ -156,7 +156,7 @@ nicht.
 
 ## Stufe 5 — Verdrahtung / `dhrt run` (fertig)
 
-[`src/main.rs`](../rust/drachenhauch_runtime/src/main.rs): `dhrt run datei.dh` ist der
+[`src/main.rs`](../../rust/drachenhauch_runtime/src/main.rs): `dhrt run datei.dh` ist der
 eigenständige End-to-End-Lauf — preprocess → lex → parse → compile → VM, alles
 in Rust. `run_main` kanonisiert den Pfad, wechselt **ins Datei-Verzeichnis**
 (`set_current_dir`, wie damals der Python-Starter `dhrun.py`), damit relative
@@ -168,7 +168,7 @@ laufen weiter den direkten VM-Pfad. Die Front-End-Kette ist in
 das **ohne** chdir läuft — Dev-/Parity-Einstieg).
 
 Gate: stdout von `dhrt run` == Python-Tree-Walker mit demselben chdir
-([`tests/pruef/laufzeit/rust_run_parity.dhtest`](../tests/pruef/laufzeit/rust_run_parity.dhtest), 2 Tests:
+([`tests/pruef/laufzeit/rust_run_parity.dhtest`](../../tests/pruef/laufzeit/rust_run_parity.dhtest), 2 Tests:
 relativer Laufzeit-Datei-Zugriff + Quellcode- + Modul-IMPORT, sowie der
 `dhrt <datei.dh>`-Auto-Detect). Graphics-Smoke-Test (raylib) headless verifiziert.
 
@@ -181,7 +181,7 @@ Portierung erreicht.
   selbst → `.dhc` und hängt den Payload (`<gbc><u64 len><DHRTPAY1>`) an eine
   Kopie der eigenen Runtime-Exe — eine eigenständige `.exe`, ohne Python (der
   frühere Weg über `dhrun.py`/`export.py` ist entfernt). `assets/` neben der Quelle wird mitkopiert. Test
-  [`tests/pruef/werkzeugkette/dhrt_export.dhtest`](../tests/pruef/werkzeugkette/dhrt_export.dhtest)
+  [`tests/pruef/werkzeugkette/dhrt_export.dhtest`](../../tests/pruef/werkzeugkette/dhrt_export.dhtest)
   (exportiert, startet die Exe, vergleicht ihre Ausgabe).
 - **Aliasierte Modul-IMPORTs** `IMPORT "json" AS j`: `preprocess::compile_env`
   liefert neben den externen Typen (inkl. aliasierter wie `j_handle`/`v`) eine
@@ -198,7 +198,7 @@ Portierung erreicht.
   (`setup_emscripten_env`: CC/CXX/AR/Linker → `.exe`, bindgen-Includes,
   Ninja-Generator, cmake/ninja auf PATH). Verifiziert: `node web/dhrt.js` ==
   Python-Tree-Walker (aus eingebetteter Quelle). Details:
-  [docs/web-playground.md](web-playground.md).
+  [docs/web-playground.md](../web-playground.md).
 
 ## Prinzip (waehrend der Portierung)
 

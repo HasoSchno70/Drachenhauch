@@ -1,6 +1,6 @@
 //! `dhrt pruef` -- die Doku-Pruefer, die bis 2026-09-06 in Python lagen
 //! (`tools/pruef_docs.py`, `tools/pruef_doku_aussagen.py`; Weg A aus
-//! `docs/entwurf-python-abbau.md`):
+//! `docs/intern/entwurf-python-abbau.md`):
 //!
 //!   dhrt pruef                       alles (docs/ und CLAUDE.md)
 //!   dhrt pruef bloecke [ordner]      jeden ```basic-Block durch die Front-End-Kette
@@ -42,11 +42,20 @@ fn md_dateien(ordner: &Path, nur: Option<&[String]>) -> Vec<PathBuf> {
         v.sort();
         return v.iter().map(|n| ordner.join(n)).filter(|p| p.exists()).collect();
     }
-    let mut v: Vec<PathBuf> = std::fs::read_dir(ordner).map(|rd| rd.filter_map(|e| e.ok()).map(|e| e.path())
-        .filter(|p| p.extension().map_or(false, |x| x == "md")).collect()).unwrap_or_default();
+    let md_in = |o: &Path| -> Vec<PathBuf> {
+        std::fs::read_dir(o).map(|rd| rd.filter_map(|e| e.ok()).map(|e| e.path())
+            .filter(|p| p.extension().map_or(false, |x| x == "md")).collect()).unwrap_or_default()
+    };
+    let mut v = md_in(ordner);
+    // Entwuerfe und Release-Notes liegen seit 2026-11 in docs/intern/ und
+    // docs/releases/ -- geprueft werden sie weiter wie das Handbuch.
+    for unter in UNTERORDNER { v.extend(md_in(&ordner.join(unter))); }
     v.sort();
     v
 }
+
+/// Unterordner von docs/, die die Pruefungen mitlesen (nicht in docs/en/).
+const UNTERORDNER: &[&str] = &["intern", "releases"];
 
 /// Datei als Text, Zeilenenden auf LF -- Python las mit Universal-Newlines,
 /// und ein ```basic-Block in einer CRLF-Datei zaehlte sonst nicht.

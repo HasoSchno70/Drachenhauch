@@ -1,4 +1,4 @@
-//! Drucken und Oeffnen -- Wege A und C aus `docs/entwurf-drucken.md`.
+//! Drucken und Oeffnen -- Wege A und C aus `docs/intern/entwurf-drucken.md`.
 //!
 //! **Weg A:** `OPENDOC(pfad$)` oeffnet eine lokale Datei mit ihrem
 //! Standardprogramm -- das Gegenstueck zu `OPENURL`, das absichtlich nur

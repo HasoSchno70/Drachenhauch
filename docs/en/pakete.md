@@ -136,4 +136,4 @@ thus inside the finished file, and the target computer needs neither
 
 The decisions (no server, packages in the project, checksum over the
 contents) and what is deliberately missing are in the
-[design document](../entwurf-pakete.md) (German).
+[design document](../intern/entwurf-pakete.md) (German).

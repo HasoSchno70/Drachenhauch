@@ -289,7 +289,7 @@ pub fn hardware_missing_msg(module: &str) -> String {
 /// einen Ort weniger kennt.
 /// Die `pakete/`-Ordner von der importierenden Datei aus nach oben -- der
 /// Schritt zwischen "neben der Datei" und `DH_PATH` (`dhrt paket`, siehe
-/// docs/entwurf-pakete.md). Von innen nach aussen wie bei `node_modules`:
+/// docs/intern/entwurf-pakete.md). Von innen nach aussen wie bei `node_modules`:
 /// braucht ein Paket selbst ein Paket, liegt es in seinem eigenen `pakete/`
 /// und wird dort zuerst gefunden, auch wenn das Projekt eine andere Fassung
 /// desselben Pakets hat.

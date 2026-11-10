@@ -1,4 +1,4 @@
-' Drucken (docs/entwurf-drucken.md, Wege A und C): PRINTERS, PRINTER_DEFAULT$,
+' Drucken (docs/intern/entwurf-drucken.md, Wege A und C): PRINTERS, PRINTER_DEFAULT$,
 ' PDF_PREVIEW, die Fehlermeldungen von PDF_PRINT und OPENDOC.
 '
 ' Bis 2026-09-16 in tests/test_drucken.py; der Druck durch einen ECHTEN
@@ -169,7 +169,7 @@ fehlende datei TRUE
 programm abgewiesen TRUE
 
 === der druck geht durch einen echten treiber
-' Pruefstein 1 aus docs/entwurf-drucken.md: PDF_PRINT schickt die Seiten
+' Pruefstein 1 aus docs/intern/entwurf-drucken.md: PDF_PRINT schickt die Seiten
 ' wirklich an einen Druckertreiber. "Microsoft Print to PDF" nimmt in DOCINFO
 ' einen Ausgabepfad und fragt dann nicht nach -- was dabei herauskommt, ist
 ' also das, was der Treiber aus unserem GDI-Weg gemacht hat: mm in

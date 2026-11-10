@@ -9,7 +9,7 @@
 > macOS (`say`) und Linux (`espeak-ng`) wie unten beschrieben, ungeprüft.
 > Prüfstein: `tests/pruef/ton/speak.dhtest` (WAV Byte für Byte gelesen, Dauern
 > gemessen) und der fremde UIA-Leser in `tests/pruef/gui/gui_barrierefreiheit.dhtest`.
-> Doku: [module-audio.md](module-audio.md), Abschnitt „Sprechen".
+> Doku: [module-audio.md](../module-audio.md), Abschnitt „Sprechen".
 
 *Untersuchung, seither umgesetzt.* Der Rest aus der
 [Barrierefreiheit](entwurf-barrierefreiheit.md): dort war Weg B („selbst

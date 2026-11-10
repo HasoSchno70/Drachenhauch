@@ -30,7 +30,7 @@ bestehende Programme**; sie stehen gleich zuerst.*
 Gestartet aus dem Startmenü („Drachenhauch Studio“), aus der IDE (Werkzeuge
 → Drachenhauch Studio), per Doppelklick auf eine `.dhstudio`, unter macOS
 und Linux mit `drachenhauch --studio [projekt]` oder direkt mit
-`dhrt run studio/studio.dh`. Handbuch: [studio.md](studio.md).
+`dhrt run studio/studio.dh`. Handbuch: [studio.md](../studio.md).
 
 * **Fenster entwerfen:** eine Bibliothek mit 34 Bausteinen in acht Gruppen
   (mit Vorschaubild und Suche), Ablegen per Klick oder Zug,

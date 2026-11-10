@@ -1,5 +1,5 @@
 //! AST-Knoten fuer Drachenhauch -- Rust-Port von `drachenhauch/ast_nodes.py`.
-//! Stufe 2 der Front-End-Portierung (siehe docs/rust-frontend-port.md).
+//! Stufe 2 der Front-End-Portierung (siehe docs/intern/rust-frontend-port.md).
 //!
 //! `to_json()` emittiert exakt die Struktur, die der Python-Test aus den
 //! Dataclass-Feldern baut (`{"_": NodeName, feld: ...}`), damit der Parser
@@ -148,7 +148,7 @@ pub enum Node {
     Read { targets: Vec<Node> },
     EnumDecl { name: String, members: Vec<(String, Option<Node>)> },
     /// `DECLARE FUNCTION name LIB "bib" [ALIAS "c_name"] (p AS LONG, ...) AS typ`
-    /// -- eine Funktion aus einer fremden Bibliothek (docs/entwurf-ffi.md).
+    /// -- eine Funktion aus einer fremden Bibliothek (docs/intern/entwurf-ffi.md).
     /// `params` = (Name, Typwort klein, BYREF); `ret` = None bei SUB.
     /// `anzeige` = der Name in der Schreibweise des Quelltexts (fuer Meldungen).
     DeclareLib { name: String, anzeige: String, lib: String, alias: Option<String>,

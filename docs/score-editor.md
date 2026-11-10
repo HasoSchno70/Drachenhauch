@@ -8,7 +8,7 @@ direkt in den Tracker übernehmen (ein Tracker-Kanal je Spur).
 
 Das Notenblatt ist ein Drachenhauch-Programm:
 `examples/199_notenblatt.dh`. Es ersetzt den früheren Qt-Editor `dhscore`
-(Weg B aus [entwurf-python-abbau.md](entwurf-python-abbau.md)) und braucht
+(Weg B aus [entwurf-python-abbau.md](intern/entwurf-python-abbau.md)) und braucht
 kein Python.
 
 ## Starten

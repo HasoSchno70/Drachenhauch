@@ -1341,7 +1341,7 @@ impl<'p> Vm<'p> {
     /// Grundlage fuer `TASK_START`: ein Auftrag laeuft als eigener Prozess,
     /// damit DH-Code nicht ueber eine Thread-Grenze muss (`Value` haelt
     /// ueberall `Rc`, `Program` ist weder Send noch Sync -- siehe
-    /// docs/entwurf-task-start.md).
+    /// docs/intern/entwurf-task-start.md).
     ///
     /// DAS HAUPTPROGRAMM LAEUFT BEWUSST NICHT MIT. Damit sind auch die
     /// Globals nicht gesetzt -- und eine `CONST` auf oberster Ebene IST ein

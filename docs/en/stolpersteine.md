@@ -88,7 +88,7 @@ and the documentation. Consistent right now, so not a must.
 
 ### D1. `/` returns INTEGER sometimes, FLOAT other times  —  ✅ CHANGED 2026-09-24: always FLOAT
 > **New decision (2026-09-24):** `/` always returns a floating-point number, `8 / 2` is
-> `4.0`. The occasion was compilation to machine code (`docs/entwurf-maschinencode.md`):
+> `4.0`. The occasion was compilation to machine code (`docs/intern/entwurf-maschinencode.md`):
 > a type that depends on the value cannot be fixed in advance. `\` divides as integers.
 > Assigning to an INTEGER variable still works as long as the result is whole
 > (`i = 8 / 2` is 4); an array index from `/` aborts, and `dhrt --check` warns

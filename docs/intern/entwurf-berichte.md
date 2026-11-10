@@ -20,7 +20,7 @@ Entschieden am 2026-11-03:*
 (Auslegung), `studio/berichte.dh` (Modell, erzeugter Code),
 `studio/berichte_reiter.dh` (Reiter, Vorschau), `PDF_PREVIEW` mit den echten
 Schriften; Prüfung `tests/pruef/studio/werkzeug_studio_berichte.dhtest`, Handbuch
-[studio.md](studio.md#berichte). Stufe 2 ist gebaut (selber Tag): der Reiter
+[studio.md](../studio.md#berichte). Stufe 2 ist gebaut (selber Tag): der Reiter
 ist ein Entwurf (Leiste der Elemente, Spalten der Quelle, Eigenschaften,
 Ziehen mit Raster und Ausrichtungslinien, Griffe, Bandhöhe, Rahmen,
 Rückgängig je Reiter); jedes Band trägt eine Leiste mit seinem Namen statt

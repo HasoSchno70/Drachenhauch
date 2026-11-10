@@ -1,4 +1,4 @@
-' Ueberlagerungen und Rueckmeldung (gui_ueber.rs, docs/entwurf-gui-wie-gtk.md
+' Ueberlagerungen und Rueckmeldung (gui_ueber.rs, docs/intern/entwurf-gui-wie-gtk.md
 ' Paket 1): Popover, Toast, Infoleiste, Suchfeld, Sinnbilder im Textfeld,
 ' Vorschlaege unter dem Textfeld. Format: docs/werkzeuge.md.
 '

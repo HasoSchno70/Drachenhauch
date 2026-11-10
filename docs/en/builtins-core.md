@@ -216,7 +216,7 @@ a percentage or a factor is involved.
 writes `DIM preis AS FLOAT` and sums with it directly still gets
 `0.30000000000000004` — the language does not stop them. What a real
 money type would cost and why it is nevertheless not coming is described in
-[Draft: money](../entwurf-geldtyp.md) (German).
+[Draft: money](../intern/entwurf-geldtyp.md) (German).
 
 **Perlin noise** — deterministic: the same input always returns the same
 value, roughly between `-1` and `1`. For procedural generation (terrain, caves,
@@ -653,7 +653,7 @@ For programs there is `SHELL`, deliberately kept separate.
 ## A second window: `WINDOW_OPEN`
 
 Drachenhauch knows **one OS window per process** (raylib keeps its state
-globally; the trade-off is described in [entwurf-native-fenster.md](../entwurf-native-fenster.md) (German)).
+globally; the trade-off is described in [entwurf-native-fenster.md](../intern/entwurf-native-fenster.md) (German)).
 A second window is therefore a **second `dhrt`** that runs its own
 program with its own `SCREEN` — with its own entry in the taskbar,
 on any monitor, and a crash there does not take the first one down with it. The two

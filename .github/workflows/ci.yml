@@ -17,7 +17,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Seit 2026-09-21 OHNE pytest, mypy und pip (docs/entwurf-python-abbau.md,
+  # Seit 2026-09-21 OHNE pytest, mypy und pip (docs/intern/entwurf-python-abbau.md,
   # 7.7 Punkt 6): geprueft wird nur noch ueber `dhrt test tests/pruef`. Python
   # bleibt allein fuer den Bauschritt (`rust/build_runtime.py`, nur
   # Standardbibliothek -- `tests/pruef/werkzeugkette/bauskripte.dhtest` haelt das fest) und
@@ -109,7 +109,7 @@ jobs:
           DH_OHNE_AUDIO: 1
         run: rust/drachenhauch_runtime/target/release/dhrt.exe test tests/pruef
 
-      # Regel 3 aus docs/entwurf-maschinencode.md: jede Sammlung auf beiden
+      # Regel 3 aus docs/intern/entwurf-maschinencode.md: jede Sammlung auf beiden
       # Wegen, dieselbe Erwartung. Seit M5 ist der Maschinencode Vorgabe (der
       # Lauf oben), hier dieselben Sammlungen in der VM allein. `--schnell`
       # -- die langsamen Sammlungen (IDE, Werkzeuge) laufen oben mit
@@ -218,7 +218,7 @@ jobs:
         run: rust/drachenhauch_runtime/target/release/dhrt test tests/pruef
 
       # Dieselben Sammlungen ohne Maschinencode (Regel 3 aus
-      # docs/entwurf-maschinencode.md; seit M5 ist der Lauf oben der mit
+      # docs/intern/entwurf-maschinencode.md; seit M5 ist der Lauf oben der mit
       # Maschinencode -- auf macOS zugleich der Beleg fuer arm64).
       - name: Pruefsammlungen ohne Maschinencode (DHRT_JIT=aus)
         env:

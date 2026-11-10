@@ -659,7 +659,7 @@ pub struct Instance {
     pub fields: Vec<Value>,
 }
 
-/// Feste Lage der Felder einer Klasse (M4, docs/entwurf-maschinencode.md):
+/// Feste Lage der Felder einer Klasse (M4, docs/intern/entwurf-maschinencode.md):
 /// Name -> Platz und je Platz der Typ. Einmal beim Laden gerechnet
 /// (`model::programm_bauen`), Vorfahren zuerst; ein Feld, das eine
 /// Unterklasse noch einmal deklariert, bleibt auf dem Platz der Vorfahrin
@@ -718,7 +718,7 @@ pub(crate) fn klasse_erbt(kind: &str, basis: &str) -> bool {
 /// Bis 2026-10-22 reichte `coerce` Klassen ungeprueft durch: eine Variable
 /// `AS Tier` nahm ein `Auto` und eine Parameter `AS Datei` die Zahl 5, und
 /// der Fehler kam erst beim ersten Methodenaufruf, weit weg von der Stelle
-/// (docs/entwurf-schnittstellen.md, Weg B).
+/// (docs/intern/entwurf-schnittstellen.md, Weg B).
 pub(crate) fn klasse_pruefen(value: &Value, target: &str, ctx: &str) -> Result<(), String> {
     let ist = match value {
         Value::Nil => return Ok(()),

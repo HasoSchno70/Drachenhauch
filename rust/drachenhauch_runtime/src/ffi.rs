@@ -1,6 +1,6 @@
 //! Fremde Bibliotheken aufrufen: `DECLARE FUNCTION name LIB "bib" (...)`.
 //!
-//! Entwurf: docs/entwurf-ffi.md (Stufe 1). Der Compiler macht aus jedem
+//! Entwurf: docs/intern/entwurf-ffi.md (Stufe 1). Der Compiler macht aus jedem
 //! Aufruf einer deklarierten Funktion den internen Befehl `__ffi` und gibt
 //! ihm die Deklaration als ersten Wert mit (`signatur_text`). Hier wird sie
 //! einmal zerlegt, die Bibliothek beim ERSTEN Aufruf geladen (ein Programm,

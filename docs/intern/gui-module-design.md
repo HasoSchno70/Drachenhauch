@@ -4,10 +4,10 @@
 > umgesetzt und läuft **nativ in `dhrt`** (`rust/drachenhauch_runtime/src/gui.rs`) — nicht
 > mehr in `drachenhauch/modules/gui.py`. Erwähnungen von „3 Pfaden"/Tree-Walker/
 > Python-VM unten beschreiben die damalige (entfernte) Architektur. Aktuelle
-> Doku: [module-gui.md](module-gui.md).
+> Doku: [module-gui.md](../module-gui.md).
 
 > Status: **Phase 1+2 implementiert** (Modul `gui`, Retained-Mode) -- siehe
-> [module-gui.md](module-gui.md), `drachenhauch/modules/gui.py`,
+> [module-gui.md](../module-gui.md), `drachenhauch/modules/gui.py`,
 > Tests `tests/test_modules_gui.py`, Demo `examples/45_gui.dh`.
 > Verifiziert: TW == Python-VM == Native-VM (bit-identisch).
 > Phase 3 (FUNCREF-Callbacks `GUI_ON_CLICK`) implementiert -- Builtin->Engine-

@@ -353,13 +353,13 @@ Sechs der acht Zeilen sind gebaut, jede mit Doku, Beispiel und Tests:
 
 | | Modul / Ausbau | Doku |
 |---|---|---|
-| Dateisystem | `RMDIR`, Zeitstempel, rekursiv suchen, Namensmuster, Temp-Ordner | [builtins-core.md](builtins-core.md) |
-| Webserver | `httpd` | [module-httpd.md](module-httpd.md) |
-| Einstellungen | `ini` | [module-ini.md](module-ini.md) |
-| Austauschformat | `xml` | [module-xml.md](module-xml.md) |
-| Druck | `pdf` | [module-pdf.md](module-pdf.md) |
-| Auswertung | `xlsx` | [module-xlsx.md](module-xlsx.md) |
-| Versand | `smtp` | [module-smtp.md](module-smtp.md) |
+| Dateisystem | `RMDIR`, Zeitstempel, rekursiv suchen, Namensmuster, Temp-Ordner | [builtins-core.md](../builtins-core.md) |
+| Webserver | `httpd` | [module-httpd.md](../module-httpd.md) |
+| Einstellungen | `ini` | [module-ini.md](../module-ini.md) |
+| Austauschformat | `xml` | [module-xml.md](../module-xml.md) |
+| Druck | `pdf` | [module-pdf.md](../module-pdf.md) |
+| Auswertung | `xlsx` | [module-xlsx.md](../module-xlsx.md) |
+| Versand | `smtp` | [module-smtp.md](../module-smtp.md) |
 
 YAML und TOML sind bewusst **nicht** dazugekommen: INI deckt den Fall
 „Einstellungen, die ein Mensch bearbeitet" ab, JSON den Fall „Daten", und

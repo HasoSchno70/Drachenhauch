@@ -2,7 +2,7 @@
 
 > **Stand 2026-10-06: gebaut, beide** -- nicht als eigene Module, sondern im
 > Modul `db`: `DB_OPEN("postgres://...")` bzw. `DB_OPEN("mysql://...")`,
-> alles andere wie bei SQLite ([module-db.md](module-db.md#server-postgresql-und-mysql)).
+> alles andere wie bei SQLite ([module-db.md](../module-db.md#server-postgresql-und-mysql)).
 > Der Grund gegen MySQL ist weggefallen: `mysql` 28 hat den Schalter
 > `rustls-tls-ring`, TLS laeuft damit ueber dasselbe rustls+ring wie bei
 > PostgreSQL, smtp und ureq -- kein `aws-lc-sys`, kein cmake. Gemessen:
@@ -15,7 +15,7 @@
 > derselben Erwartung; die CI startet sie auf dem Linux-Laeufer).
 
 *Untersuchung, keine Umsetzung.* Drachenhauch spricht heute genau eine
-Datenbank: SQLite, über das Modul [`db`](module-db.md). Für ein Programm auf
+Datenbank: SQLite, über das Modul [`db`](../module-db.md). Für ein Programm auf
 einem Rechner reicht das vollständig. Sobald aber **zwei Leute gleichzeitig**
 mit denselben Daten arbeiten sollen — die Kassiererin vorn, die Buchhaltung
 hinten —, endet SQLite: es ist eine Datei, kein Server.
@@ -44,7 +44,7 @@ vorbeikommt, weil es seinen SQLite-Quelltext mitliefert.
 
 Eine Datenbank im Netz ohne TLS ist keine Option — dort gingen Kennwort und
 Daten im Klartext über die Leitung, dieselbe Überlegung wie beim Modul
-[`smtp`](module-smtp.md).
+[`smtp`](../module-smtp.md).
 
 * **PostgreSQL:** `tokio-postgres-rustls` 0.13 löst sich auf **rustls 0.23 +
   ring** auf — Fassung für Fassung dieselben Kisten, die über `ureq` (Modul
@@ -101,13 +101,13 @@ also deutlich mehr als `ini`, deutlich weniger als `gui`.
 ## Was dagegen spricht
 
 * **Zielgruppe.** Drachenhauch ist für Bastler und für Software auf dem
-  eigenen Rechner gedacht ([Leitbild](../README.md)). Wer einen
+  eigenen Rechner gedacht ([Leitbild](../../README.md)). Wer einen
   PostgreSQL-Server betreibt, hat meist auch schon Werkzeuge dafür.
 * **Ein Treiber ist ein Versprechen.** Fassungen, Typen, TLS, Zeitzonen — das
   wird gepflegt oder es verrottet. `db` gegen SQLite ist stabil, weil SQLite
   mitgeliefert wird; ein Netz-Treiber hängt an einem fremden Server.
 * **Es gibt einen Umweg**, der heute schon funktioniert: das Modul
-  [`html`](module-html.md) spricht mit einer HTTP-Schnittstelle vor der
+  [`html`](../module-html.md) spricht mit einer HTTP-Schnittstelle vor der
   Datenbank (PostgREST, ein eigener kleiner Dienst, `cloudserver/`). Für
   „mehrere Arbeitsplätze auf denselben Datenbestand" ist das oft ohnehin die
   bessere Bauform, weil die Regeln dann an einer Stelle liegen.

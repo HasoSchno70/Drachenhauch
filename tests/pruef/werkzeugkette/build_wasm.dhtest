@@ -1,7 +1,7 @@
 ' Das WASM-Geruest: rust/build_wasm.py, der Web-Harness in web/ und der
 ' emscripten-Einstieg in main.rs. Bis 2026-09-21 tests/test_build_wasm.py
 ' (pytest) -- die Datei faellt mit dem Python-Teil weg, das Bauskript aber
-' NICHT (Entscheidung (c) in docs/entwurf-python-abbau.md: es bleibt Python,
+' NICHT (Entscheidung (c) in docs/intern/entwurf-python-abbau.md: es bleibt Python,
 ' nur mit der Standardbibliothek). Darum prueft ein Python-Kind seine Logik:
 ' dasselbe nackte Python 3, das der Bau ohnehin braucht, ohne pytest.
 '

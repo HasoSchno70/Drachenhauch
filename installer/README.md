@@ -42,7 +42,7 @@ Beispielordner als Arbeitsverzeichnis; `.dh`-Dateien oeffnen sich in der
 IDE (`-- "%1"`).
 
 **Seit 2026-09-21 liefert er alles, was vorher nur der Qt-Installer hatte**
-(`docs/entwurf-python-abbau.md`, 7.7 Punkt 4):
+(`docs/intern/entwurf-python-abbau.md`, 7.7 Punkt 4):
 
 * **die Buecher** -- Lehrbuch, Handbook und Einstieg als `.docx` und
   `.epub` nach `{app}\buecher`, samt Startmenue-Eintraegen; wie im

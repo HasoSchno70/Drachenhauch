@@ -1,4 +1,4 @@
-//! Bausteine, die eine Anwendung erwartet (docs/entwurf-gui-wie-gtk.md,
+//! Bausteine, die eine Anwendung erwartet (docs/intern/entwurf-gui-wie-gtk.md,
 //! Paket 2): Fliesslayout mit Auswahl, Alt-Buchstaben auf Knoepfen und
 //! Beschriftungen, Beschriftung kuerzen und markieren, Marken am Regler,
 //! Kreisel, markierte Tage im Datumswaehler, Groessengruppen, Schriftwahl.

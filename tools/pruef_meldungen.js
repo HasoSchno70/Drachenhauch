@@ -247,7 +247,7 @@ function quellen(buchDir) {
 // ist ehrlicher als eine Heuristik, die eine ganze Sorte stillschweigend
 // verschluckt.
 const KEINE_MELDUNG = [
-  // docs/allzweck-roadmap.md: Schema mit Platzhalter, kein echter Wortlaut.
+  // docs/intern/allzweck-roadmap.md: Schema mit Platzhalter, kein echter Wortlaut.
   '"NAME: erwartet …"',
   // docs/stolpersteine.md: ein VORSCHLAG mit Gedankenstrich statt "--".
   // Der geltende Wortlaut steht dreizehn Zeilen darueber und wird geprueft.

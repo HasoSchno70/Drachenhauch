@@ -95,7 +95,7 @@ Rest fast immer; das ist einer der Gründe, warum sich ein eigener Typ lohnt.
 * **Kein Literal.** `preis = 19.99` weist einer GELD-Variablen keine 19,99 €
   zu, sondern ist ein Fehler; es braucht `GELD_NEU`. Ein Literal (`19.99g`)
   hätte einen Eingriff in den Sprachkern gebraucht — die Abwägung steht in
-  [Entwurf: Geld](entwurf-geldtyp.md).
+  [Entwurf: Geld](intern/entwurf-geldtyp.md).
 * **`GELD * GELD` gibt es nicht.** Euro mal Euro wären Quadrat-Euro.
 * **Nach außen wird es wieder eine Zahl.** `xlsx`, `json` und `chart` kennen
   kein GELD; dorthin geht es als `GELD_CENT` (ganze Zahl, verlustfrei) oder

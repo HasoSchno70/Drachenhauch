@@ -7,7 +7,7 @@
 //!
 //! **Was hier NICHT laeuft: DH-Code.** Ein Auftrag ist eine Rust-Funktion, die
 //! ohne VM auskommt (eine SQL-Abfrage, ein Kindprozess). Der Grund steht in
-//! `docs/allzweck-roadmap.md` unter WP H: `Value` haelt seine Zeichenketten,
+//! `docs/intern/allzweck-roadmap.md` unter WP H: `Value` haelt seine Zeichenketten,
 //! Felder und Objekte in `Rc`, und ein `Rc` darf den Thread nicht wechseln.
 //! Eine DH-Funktion im Hintergrund auszufuehren hiesse also, `Value` (und
 //! damit auch `Func`/`Program`) auf `Arc` umzustellen -- was JEDEM
