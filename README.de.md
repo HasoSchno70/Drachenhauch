@@ -6,7 +6,7 @@
 
 <p align="center"><em><a href="README.md">English</a> · Deutsch</em></p>
 
-**Drachenhauch** ist eine moderne BASIC-Programmiersprache für **2D- und 3D-Spiele und Anwendungen mit grafischer Oberfläche** — und für die Kommandozeilen-Werkzeuge und kleinen Dienste, die dazugehören. Mit eigener Entwicklungsumgebung, dem **Drachenhauch Studio** für Anwendungen mit Oberfläche im Stil von Xojo, Form-Designer, Sprite-, Karten- und Klang-Editoren; ein Befehl macht aus einem Programm eine eigenständige `.exe`. Läuft unter Windows, macOS und Linux und als WebAssembly im Browser.
+**Drachenhauch** ist eine moderne BASIC-Programmiersprache für **2D- und 3D-Spiele und Anwendungen mit grafischer Oberfläche** — und für die Kommandozeilen-Werkzeuge und kleinen Dienste, die dazugehören. Mit eigener Entwicklungsumgebung, dem **Drachenhauch Studio** für Anwendungen mit Oberfläche im Stil von Xojo, Sprite-, Karten- und Klang-Editoren; ein Befehl macht aus einem Programm eine eigenständige `.exe`. Läuft unter Windows, macOS und Linux und als WebAssembly im Browser.
 
 Ein BASIC im Geist von QB64, FreeBASIC oder Blitz Basic, mit dem Werkzeugkasten von PICO-8 oder LÖVE für Spiele und den Formularen und Tabellen von Visual Basic für Anwendungen — leicht anzufangen, streng genug, um damit zu wachsen.
 
@@ -58,7 +58,7 @@ Startseite, jede per Doppelklick startbar.
 
 Drachenhauch fing als Spiele-BASIC an (damals „GameBasic“). Inzwischen
 schreibt man damit auch Anwendungen mit Fenstern, Formularen und Tabellen
-(Modul `gui`, Form-Designer, Datenbank-Bindung, Drucken) und die Dinge, die
+(Modul `gui`, Drachenhauch Studio, Datenbank-Bindung, Drucken) und die Dinge, die
 *neben* einem Spiel anfallen — Werkzeuge, Auswertungen, kleine Dienste:
 
 | | |
@@ -138,7 +138,6 @@ Vollständige Doku im [docs/](docs/README.md)-Ordner:
   - **[Tracker](docs/tracker.md)** (`190_tracker.dh`) — mehrspuriger Musik-Editor, [Tabelle unten](#tracker)
   - **[Notenblatt](docs/score-editor.md)** (`199_notenblatt.dh`) — echte Notensatz-Darstellung, Wiedergabe, Übergabe an den Tracker
   - **[Tilemap-/Level-Editor](docs/tilemap-editor.md)** (`187_tilemap_editor.dh`) — Ebenen, Objekt-Ebenen, mehrere Tilesets, Kachel-Eigenschaften, Tiled-JSON (`TILED_LOAD`), DH-Code-Renderer
-  - **[Form-Designer](docs/form-designer.md)** (`197_form_designer.dh`) — GUI-Formulare im Xojo-Stil, `.dhform` für `GUI_LOAD`, F5 startet, DH-Code
   - **[Animations-FSM-Editor](docs/anim-editor.md)** (`198_anim_fsm_editor.dh`) — Zustände, Übergänge und Bedingungen als Graph, `.dhanim` für `ANIM_FSM_LOAD` ([Modul `animfsm`](docs/module-animfsm.md)), Vorschau mit F5
   - **[Klassendiagramm](docs/klassendiagramm.md)** (`210_klassendiagramm.dh`) — alle Klassen des Projekts mit Feldern und Methoden, Vererbung und Verwendung als Pfeile; Doppelklick springt in der IDE an die Stelle, P sichert ein Bild
 - **[Sprachserver + VS Code](docs/lsp.md)** — Drachenhauch in jedem LSP-Editor: Syntax-Highlighting, Diagnostics, Completion, Hover, Goto-Definition, References, Outline. Der Server ist die Runtime selbst (`dhrt lsp`), ohne Python (`vscode-drachenhauch/`)

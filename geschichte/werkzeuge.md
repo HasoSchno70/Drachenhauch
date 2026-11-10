@@ -734,3 +734,23 @@ in Tests: Eintrag k liegt bei y + 24 + k * 22 + 11 unter dem Feld. Tests
 Python -- das Tracker-Gitter ist dort ein fester, von `to_tracker_song`
 aufgezeichneter Stand). Schluesselwechsel rueckt die
 Noten ohne Dialog um Oktaven heran und sagt es (Strg+Z nimmt es zurueck).
+
+## Form-Designer entfernt (2026-11-10)
+
+Wunsch des Nutzers: der Form-Designer (`examples/197_form_designer.dh`, seit
+2026-09-06 der erste Editor-Pilot von Weg B) wird nicht mehr gebraucht -- das
+Drachenhauch Studio ersetzt ihn (es hat sein Fenstermodell uebernommen,
+`studio/modell.dh`). Weg sind das Beispiel, `docs/form-designer.md` (de/en),
+`werkzeug_formdesigner.dhtest` und seine zwei Faelle in
+`werkzeug_kreuz.dhtest`, der Menueeintrag Werkzeuge -> Form-Designer samt
+Befehl `wz_form` und Paletteneintrag, die Verknuepfung im Startmenue (der
+Installer loescht die einer frueheren Installation, `[InstallDelete]`) und
+der Eintrag in `examples/kategorien.json`. Eine `.dhform` im Projektbaum der
+IDE geht jetzt im Studio auf (`studioStarten`, Status nennt die Datei statt
+des Ordners); als Text weiter ueber die Befehlspalette. Die Handbuecher nennen
+an seiner Stelle das Studio oder nur noch das Format. Tests: der Fall in
+`werkzeug_ide_13_25.dhtest` erwartet `studio b_maske.dhform`, der Fall
+"der form-designer findet das studio" in `werkzeug_studio5.dhtest` wurde zu
+"eine dhform aus der ide geht im studio auf"; beide Faelle lenken
+`DH_STUDIO_KONFIG` in den Fallordner. Der alte Pfad steht in
+`GEDULDETE_PFADE` (nur noch in Entwuerfen genannt).

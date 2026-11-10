@@ -116,7 +116,7 @@ END SUB
 ' Die angebotenen Staende als Reiter zurueckholen -- UNGESICHERT: die Datei
 ' auf der Platte bleibt, wie sie war, bis man selbst sichert. Eine Datei
 ' geht ueber tabOeffnen und nicht ueber dateiOeffnen, sonst oeffnete eine
-' als Text bearbeitete .dhform den Form-Designer statt ihres Textes.
+' als Text bearbeitete .dhform das Studio statt ihres Textes.
 SUB whHolen()
     DIM n AS INTEGER : n = 0
     DIM d AS STRING
@@ -497,7 +497,6 @@ SUB befehl(k AS STRING)
         CASE "wz_tilemap" : werkzeugStarten("187_tilemap_editor.dh")
         CASE "wz_sprite" : werkzeugStarten("189_sprite_editor.dh")
         CASE "wz_tracker" : werkzeugStarten("190_tracker.dh")
-        CASE "wz_form" : werkzeugStarten("197_form_designer.dh")
         CASE "form_text" : formularAlsText()
         CASE "wz_anim" : werkzeugStarten("198_anim_fsm_editor.dh")
         CASE "wz_noten" : werkzeugStarten("199_notenblatt.dh")
@@ -542,7 +541,7 @@ symbol(miStart, "start") : symbol(miStopp, "stopp") : symbol(miPruefen, "pruefen
 symbol(miDebug, "debug") : symbol(miHaltepunkt, "haltepunkt") : symbol(miBedingung, "haltepunkt")
 symbol(miExport, "export")
 symbol(miWzSfx, "werkzeug") : symbol(miWzPartikel, "werkzeug") : symbol(miWzTilemap, "werkzeug")
-symbol(miWzSprite, "werkzeug") : symbol(miWzTracker, "werkzeug") : symbol(miWzForm, "werkzeug") : symbol(miWzStudio, "werkzeug")
+symbol(miWzSprite, "werkzeug") : symbol(miWzTracker, "werkzeug") : symbol(miWzStudio, "werkzeug")
 symbol(miWzAnim, "werkzeug") : symbol(miWzNoten, "werkzeug") : symbol(miWzKlassen, "werkzeug") : symbol(miWzBastel, "werkzeug")
 symbol(miHandbuch, "handbuch") : symbol(miKuerzel, "handbuch")
 symbol(miUmbruch, "umbruch") : symbol(miLeiste, "menue")
@@ -629,7 +628,7 @@ menueBefehl(miMinimap, "minimap", "") : menueBefehl(miFalten, "falten", "F4") : 
 menueBefehl(miFaltenAuf, "falten_auf", "Umschalt+F4") : menueBefehl(miUeber, "ueber", "") : menueBefehl(miHandbuch, "handbuch", "F1")
 menueBefehl(miDrucken, "drucken", "Strg+P") : menueBefehl(miPdf, "pdf", "") : menueBefehl(miWzSfx, "wz_sfx", "")
 menueBefehl(miWzPartikel, "wz_partikel", "") : menueBefehl(miWzTilemap, "wz_tilemap", "") : menueBefehl(miWzSprite, "wz_sprite", "")
-menueBefehl(miWzTracker, "wz_tracker", "") : menueBefehl(miWzForm, "wz_form", "") : menueBefehl(miWzAnim, "wz_anim", "")
+menueBefehl(miWzTracker, "wz_tracker", "") : menueBefehl(miWzAnim, "wz_anim", "")
 menueBefehl(miWzNoten, "wz_noten", "") : menueBefehl(miWzKlassen, "wz_klassen", "") : menueBefehl(miWzStudio, "wz_studio", "") : menueBefehl(miWzBastel, "wz_bastel", "") : menueBefehl(miBeispiele, "beispiele", "") : menueBefehl(miThemen, "beispiele_themen", "")
 menueBefehl(miAusdruck, "ausdruck", "Strg+E") : menueBefehl(miSchnell, "schnell", "Strg+Umschalt+O") : menueBefehl(miTodo, "todo", "Strg+Umschalt+M")
 menueBefehl(miBlame, "blame", "Strg+Umschalt+B") : menueBefehl(miDiff, "diff", "Strg+Umschalt+D") : menueBefehl(miVerlauf, "verlauf", "")

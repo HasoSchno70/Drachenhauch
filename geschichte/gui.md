@@ -628,3 +628,20 @@ in `farben.json` als `baum_ordner` ... `baum_klang`. Tests zwei Faelle in
 Dateien; Rundweg ueber GUI_TO_JSON -- das ist EINGERUECKT, verglichen wird
 ohne Leerraum), zwei in `werkzeug_ide_schriftzug.dhtest` (beide Themen,
 eigene Farben).
+
+## Menue und Klappliste ueber allen Fenstern (2026-11-10)
+
+Fund des Nutzers im Studio: das aufgeklappte Menue "Ansicht" lag unter dem
+Entwurfsfenster -- "Helles E..." und "English" waren zur Haelfte verdeckt.
+Die gui zeichnete ein aufgeklapptes Leistenmenue und eine offene Klappliste
+mit IHREM Fenster (`draw_window`), also unter jedem Fenster davor (das Studio
+holt sein Entwurfsfenster jedes Bild nach vorn) und unter allem, was ein
+Programm nach `GUI_DRAW(FALSE)` malt (die Titelleiste des Entwurfs). Der
+Treffertest (`menu_input`) nahm den Klick aber vor allen Fenstern an -- ein
+Klick auf das Verdeckte waehlte den Eintrag, den man nicht sah. Jetzt kommen
+beide in die obere Schicht (`draw_top`, nach Popovern, vor dem
+Kontextmenue), wie das Kontextmenue schon immer; `popups_zeichnen` an EINER
+Stelle. Ausnahme `popups_oben`: ein Fenster im Entwurfsmodus mit Zoom oder
+Zuschnitt behaelt sie, denn dort stehen sie in seiner vergroesserten Lage.
+Tests drei Faelle in `gui_menue_obenauf.dhtest` (selbst gemalt, Fenster
+davor, Klappliste), die alte Laufzeit faellt alle drei.

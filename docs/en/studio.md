@@ -20,9 +20,9 @@ menu, and a `.dhstudio` opens in the studio with a double-click (on Windows,
 if the association was chosen during installation). On macOS and Linux
 `drachenhauch --studio [project]` starts it from the terminal. In the IDE:
 Werkzeuge → Drachenhauch Studio (with the project folder if it is a studio
-project), and a `.dhstudio` in the project tree opens in the studio. The form
-designer opens its form with Datei → Im Drachenhauch Studio öffnen
-(Ctrl+Shift+O).
+project), and a `.dhstudio` or `.dhform` in the project tree opens in the
+studio. The studio replaces the former form designer (until 2026.45). The
+IDE's start screen offers it right after the intro ("Modern – the Studio").
 
 **Status: stage 4.** Projects with several windows, modules and classes,
 events and a code field per method; starting, building and errors shown at
@@ -727,7 +727,7 @@ returns when it is closed. A missing parameter is an error naming it.
 ## A single window
 
 A `.dhform` (the same format that `GUI_SAVE` writes and `GUI_LOAD` reads)
-also opens without a project, from the form designer or from a program;
+also opens without a project, from the IDE or from a program;
 controls without a name get one when opened. As long as only the window is
 edited, Save writes exactly this file. When code or another element is
 added, it becomes a project and Save asks for a folder. New, Open and Quit

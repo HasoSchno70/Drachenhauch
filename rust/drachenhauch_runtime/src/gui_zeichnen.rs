@@ -261,14 +261,23 @@ impl Gui {
         // Der Lichtstreif liegt ueber den Widgets, aber unter aufgeklappten
         // Menues und Klapplisten -- die gehoeren nicht zum Fenster.
         self.draw_glanz(g, wi);
-        // Aufgeklapptes Menueleisten-Dropdown ueber den Widgets.
-        if let Some((mw, mi)) = self.open_menu {
-            if mw == wi {
-                let _ = (mi, y, toff, mboff);
+        // Aufgeklapptes Leistenmenue und offene Klappliste liegen ueber ALLEN
+        // Fenstern (`draw_top`) -- der Klick geht ja auch an sie, egal was
+        // darueber liegt. Hier nur bei einem vergroesserten oder
+        // zugeschnittenen Fenster, dessen Lage sie teilen.
+        let _ = (y, toff, mboff);
+        if !self.popups_oben(wi) { self.popups_zeichnen(g, wi); }
+    }
+
+    /// Das aufgeklappte Leistenmenue und die offene Klappliste von `wi`.
+    pub(super) fn popups_zeichnen(&self, g: &mut Graphics, wi: usize) {
+        let win = &self.windows[wi];
+        if !(win.alive && win.visible) { return; }
+        if let Some((mw, _)) = self.open_menu {
+            if mw == wi && self.context_open.is_none() {
                 for (pw, pm, px, py) in self.popup_chain(g) { self.draw_items_popup(g, pw, pm, px, py); }
             }
         }
-        // Aufgeklapptes Dropdown-Popup ueber allen Widgets dieses Fensters.
         if let Some((dw, di)) = self.open_dropdown {
             if dw == wi && win.widgets.get(di).map(|x| x.alive && x.visible).unwrap_or(false) {
                 self.draw_dropdown_popup(g, wi, di);

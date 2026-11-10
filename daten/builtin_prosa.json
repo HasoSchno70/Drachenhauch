@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 2383,
+ "count": 2384,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -644,7 +644,7 @@
   "GUI_DRAGGING": "GUI_WIDGET / BOOL / STRING / GUI_WIDGET / INTEGER / INTEGER laufender Zug, Ablage in diesem Bild, was gezogen wurde, woher, welche Zeile, auf welche Zeile",
   "GUI_DRAG_INDEX": "GUI_WIDGET / BOOL / STRING / GUI_WIDGET / INTEGER / INTEGER laufender Zug, Ablage in diesem Bild, was gezogen wurde, woher, welche Zeile, auf welche Zeile",
   "GUI_DRAW": "alle Fenster zeichnen (hinten→vorne); obenauf=FALSE lässt Kontextmenü und Tooltip weg",
-  "GUI_DRAW_TOP": "nur was über allen Fenstern liegt: offenes Kontextmenü und Tooltip",
+  "GUI_DRAW_TOP": "nur was über allen Fenstern liegt: offenes Menü (Leiste oder Kontext), offene Klappliste, Tooltip",
   "GUI_DRAW_WINDOW": "EIN Fenster noch einmal zeichnen, über allem, was seit GUI_DRAW dazugekommen ist",
   "GUI_DROPDOWN": "GUI_WIDGET — aufklappende Auswahlliste; das Popup wird ueber allen anderen Widgets gezeichnet",
   "GUI_DROPDOWN_COUNT": "INTEGER / STRING wie viele Einträge, und Eintrag i (ab 0)",
@@ -1766,6 +1766,7 @@
   "PROCESS_READ$": "was seit dem letzten Abruf auf stdout kam (leer = nichts Neues)",
   "PROCESS_RUNNING": "läuft es noch?",
   "PROCESS_START": "startet mit offener Eingabe und Ausgabe; \"dhrt\" als Programm meint diese Runtime selbst. Ein Feld von Texten unter den Argumenten wird ausgebreitet (PROCESS_START(\"dhrt\", \"run\", datei$, \"--\", argumente)), eine MAP von Texten gibt dem Kind zusätzliche Umgebungsvariablen (nur ihm, nicht dem eigenen Programm)",
+  "PROCESS_START_DETACHED": "startet losgelöst: ohne Leitungen und ohne Nummer für die anderen PROCESS_*, das Kind läuft weiter, wenn dieses Programm endet (so startet der Startbildschirm der IDE das Studio und schließt sich). Argumente wie bei PROCESS_START; liefert die Prozessnummer des Systems",
   "PROCESS_WRITE": "an die Eingabe schicken — ein INPUT im Kind braucht das Zeilenende CHR$(10)",
   "QUAT_CONJUGATE": "QUAT — die umgekehrte Drehung (bei Einheitslänge = die Inverse)",
   "QUAT_FROM_AXIS_ANGLE": "QUAT — Drehung um eine Achse (Winkel im Bogenmaß)",

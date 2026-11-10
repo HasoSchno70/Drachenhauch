@@ -108,7 +108,6 @@ entworfen, empfohlen; entschieden ist nichts davon.
 - **[Sprite-Editor](sprite-editor.md)** (`examples/189_sprite_editor.dh`) — Pixel-Art mit Einzelbildern, Ebenen, Auswahlmaske, GIF, Atlas-Export
 - **[Tilemap-Editor](tilemap-editor.md)** (`examples/187_tilemap_editor.dh`) — Level bauen, Tiled-JSON lesen und schreiben
 - **[Drachenhauch Studio](studio.md)** (`studio/studio.dh`) — die IDE für Programme mit Oberfläche im Stil von Xojo; Stufe 1: Fenster entwerfen mit Bibliothek, Ausrichtungslinien und Inspektor
-- **[Form-Designer](form-designer.md)** (`examples/197_form_designer.dh`) — Oberflächen zusammenklicken, Xojo-Stil, F5 startet sie
 - **[Partikel-Editor](particle-editor.md)** (`examples/185_partikel_editor.dh`) — Effekte live einstellen
 - **[Animations-Editor](anim-editor.md)** (`examples/198_anim_fsm_editor.dh`) — Zustandsautomat für Sprite-Animationen
 - **[Notenblatt](score-editor.md)** (`examples/199_notenblatt.dh`) — Noten setzen statt Tracker-Zeilen füllen

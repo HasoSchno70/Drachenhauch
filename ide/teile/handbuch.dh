@@ -820,12 +820,15 @@ SUB studioStarten(arg AS STRING)
         protokoll("studio")
     ELSE
         ARRAY_PUSH(werkzeuge, PROCESS_START("dhrt", "run", pfad, "--", ziel))
-        GUI_SET_TEXT(lblStatus, tr$("Im Drachenhauch Studio geöffnet: ") + BASENAME(DIRNAME(ziel)))
+        ' Ein Projekt heisst wie sein Ordner, ein einzelnes Fenster wie seine Datei.
+        DIM gezeigt AS STRING : gezeigt = BASENAME(DIRNAME(ziel))
+        IF LOWER$(RIGHT$(ziel, 7)) = ".dhform" THEN gezeigt = BASENAME(ziel)
+        GUI_SET_TEXT(lblStatus, tr$("Im Drachenhauch Studio geöffnet: ") + gezeigt)
         protokoll("studio " + BASENAME(ziel))
     END IF
 END SUB
 
-' Befehlspalette: das zuletzt im Designer geoeffnete Formular als Text.
+' Befehlspalette: das zuletzt im Studio geoeffnete Formular als Text.
 SUB formularAlsText()
     IF letzteForm = "" THEN
         GUI_SET_TEXT(lblStatus, tr$("Noch kein Formular geöffnet -- erst eine .dhform im Projektbaum wählen."))

@@ -24,6 +24,11 @@
 //! geerbten Leitungen offen, der Aufrufer wartete auf ihn. Windows ueber
 //! `taskkill /T` (VOR dem eigenen kill, der Baum haengt am Elternprozess),
 //! Unix ueber eine eigene Prozessgruppe je Kind.
+//!
+//! `PROCESS_START_DETACHED(programm$, ...)` (2026-11-10, fuer den
+//! Startbildschirm der IDE, der das Studio startet und sich dann beendet):
+//! LOSGELOEST, ohne Leitungen und ohne Griff -- das Kind ueberlebt das Ende
+//! des Aufrufers. Geliefert wird die Prozessnummer des Systems.
 
 use std::io::{BufRead, BufReader, Read, Write};
 use std::process::{Child, ChildStdin, Command, Stdio};
@@ -55,6 +60,22 @@ fn sammler<R: Read + Send + 'static>(quelle: R, ziel: Arc<Mutex<String>>) {
     });
 }
 
+/// Der Befehl fuer ein Kind: "dhrt" meint diese Runtime -- so startet die
+/// IDE ein Programm, ohne dass die Exe im PATH liegen muss --, und die
+/// Schalter eines Testlaufs gehen nicht an das Kind weiter.
+fn befehl(programm: &str, args: &[String], fn_: &str) -> Result<Command, String> {
+    let exe = if programm.eq_ignore_ascii_case("dhrt") {
+        std::env::current_exe().map_err(|e| format!("{}: eigener Pfad unbekannt: {}", fn_, e))?
+            .to_string_lossy().into_owned()
+    } else { programm.to_string() };
+    let mut cmd = Command::new(&exe);
+    cmd.args(args);
+    for v in ["DHRT_FRAMES", "DHRT_SCREENSHOT", "DHRT_CONTACT", "DHRT_CONTACT_MAX", "DHRT_CONTACT_COLS", "DHRT_CONTACT_EVERY"] {
+        cmd.env_remove(v);
+    }
+    Ok(cmd)
+}
+
 impl Prozess {
     pub fn starten(programm: &str, args: &[String]) -> Result<Prozess, String> {
         Self::starten_mit(programm, args, &[])
@@ -62,17 +83,8 @@ impl Prozess {
 
     /// Wie `starten`, mit zusaetzlicher Umgebung nur fuer dieses Kind.
     pub fn starten_mit(programm: &str, args: &[String], umgebung: &[(String, String)]) -> Result<Prozess, String> {
-        // "dhrt" meint diese Runtime -- so startet die IDE ein Programm, ohne
-        // dass die Exe im PATH liegen muss.
-        let exe = if programm.eq_ignore_ascii_case("dhrt") {
-            std::env::current_exe().map_err(|e| format!("PROCESS_START: eigener Pfad unbekannt: {}", e))?
-                .to_string_lossy().into_owned()
-        } else { programm.to_string() };
-        let mut cmd = Command::new(&exe);
-        cmd.args(args).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped());
-        for v in ["DHRT_FRAMES", "DHRT_SCREENSHOT", "DHRT_CONTACT", "DHRT_CONTACT_MAX", "DHRT_CONTACT_COLS", "DHRT_CONTACT_EVERY"] {
-            cmd.env_remove(v);
-        }
+        let mut cmd = befehl(programm, args, "PROCESS_START")?;
+        cmd.stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped());
         // Ein dhrt-Kind soll zeilenweise hinausschreiben, nicht blockweise:
         // an einer Leitung kaeme seine Ausgabe sonst erst am Ende (vm.rs,
         // `live_ausgabe`).
@@ -95,6 +107,35 @@ impl Prozess {
         if let Some(e) = kind.stderr.take() { sammler(e, Arc::clone(&stderr)); }
         let stdin = kind.stdin.take();
         Ok(Prozess { kind, stdin, stdout, stderr, code: None, was: programm.to_string() })
+    }
+
+    /// PROCESS_START_DETACHED: losgeloest starten. Keine Leitungen (niemand
+    /// liest sie mehr, wenn der Aufrufer endet -- ein Kind, das schreibt,
+    /// liefe sonst gegen eine geschlossene Leitung), eigene Gruppe, unter
+    /// Windows ohne die Konsole des Aufrufers. Kein `Prozess`: dessen Drop
+    /// beendet das Kind. Liefert die Prozessnummer des Systems.
+    pub fn losgeloest(programm: &str, args: &[String], umgebung: &[(String, String)]) -> Result<u32, String> {
+        let mut cmd = befehl(programm, args, "PROCESS_START_DETACHED")?;
+        cmd.stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null());
+        for (k, v) in umgebung { cmd.env(k, v); }
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            // DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
+            cmd.creation_flags(0x0000_0008 | 0x0000_0200);
+        }
+        #[cfg(all(unix, not(target_os = "emscripten")))]
+        {
+            use std::os::unix::process::CommandExt;
+            cmd.process_group(0);
+        }
+        let mut kind = cmd.spawn().map_err(|e| format!("PROCESS_START_DETACHED: '{}' laesst sich nicht starten: {}", programm, e))?;
+        let id = kind.id();
+        // Ein Faden wartet auf das Kind, solange der Aufrufer lebt -- unter
+        // Unix bliebe ein beendetes Kind sonst als Zombie stehen. Endet der
+        // Aufrufer zuerst, uebernimmt das System.
+        std::thread::spawn(move || { let _ = kind.wait(); });
+        Ok(id)
     }
 
     /// Neue Standardausgabe seit dem letzten Abruf.

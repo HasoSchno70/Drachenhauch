@@ -1,0 +1,172 @@
+' Der Startbildschirm der IDE (2026-11-10, ide/teile/startwahl.dh): nach dem
+' Vorspann waehlt man zwischen der klassischen IDE und dem modernen Studio.
+' "Nicht mehr fragen" merkt die Wahl in der ide.json (`startwahl`), die
+' Einstellungen holen die Frage zurueck. Ein Testlauf sieht den Bildschirm
+' nur mit DH_IDE_STARTWAHL=1; DH_IDE_STUDIO_TROCKEN=1 startet das Studio
+' nicht wirklich (ein losgeloestes Fenster liefe nach dem Fall weiter) --
+' dass PROCESS_START_DETACHED losloest, prueft laufzeit/process_detached.
+' Tasten in der Aufnahme: 2 drueckt, 1 laesst los; "2" = 50, N = 78,
+' Enter = 257. Format: docs/werkzeuge.md, dhrt test.
+
+--- langsam
+=== taste 2 waehlt das studio, und die ide endet
+AUTOMATION_PLAY("ev.txt")
+--- programm ../../../ide/ide.dh nach SETFPS(60)
+--- umgebung
+DHRT_FRAMES=300
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+DH_IDE_STARTWAHL=1
+DH_IDE_STUDIO_TROCKEN=1
+--- datei _programm/ev.txt
+c 3
+e 0 7 5 5 0 0
+e 10 2 50 0 0 0
+e 12 1 50 0 0 0
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM z AS STRING
+FOR EACH z IN L
+    IF LEFT$(z, 24) = "startwahl studio trocken" THEN
+        PRINT "trocken "; RIGHT$(REPLACE$(z, CHR$(92), "/"), 16)
+    ELSEIF LEFT$(z, 9) = "startwahl" OR z = "bereit" THEN
+        PRINT z
+    END IF
+NEXT
+--- erwartet
+startwahl gezeigt
+startwahl studio
+trocken studio/studio.dh
+
+=== n kreuzt nicht mehr fragen an, enter nimmt die ide
+AUTOMATION_PLAY("ev.txt")
+--- programm ../../../ide/ide.dh nach SETFPS(60)
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+DH_IDE_STARTWAHL=1
+DH_IDE_STUDIO_TROCKEN=1
+--- datei _programm/ev.txt
+c 5
+e 0 7 5 5 0 0
+e 10 2 78 0 0 0
+e 12 1 78 0 0 0
+e 16 2 257 0 0 0
+e 18 1 257 0 0 0
+
+--- nachher
+IMPORT "json"
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM z AS STRING
+FOR EACH z IN L
+    IF LEFT$(z, 9) = "startwahl" OR z = "bereit" THEN PRINT z
+NEXT
+DIM j AS JSON_HANDLE : j = JSON_LOAD("_programm/ide.json")
+PRINT "gemerkt "; JSON_GET_STRING(j, "startwahl")
+--- erwartet
+startwahl gezeigt
+startwahl ide gemerkt
+bereit
+gemerkt ide
+
+=== ein gemerktes studio fragt nicht
+AUTOMATION_PLAY("ev.txt")
+--- programm ../../../ide/ide.dh nach SETFPS(60)
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+DH_IDE_STARTWAHL=1
+DH_IDE_STUDIO_TROCKEN=1
+--- datei _programm/ide.json
+{"startwahl": "studio"}
+--- datei _programm/ev.txt
+c 1
+e 0 7 5 5 0 0
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM z AS STRING
+FOR EACH z IN L
+    IF LEFT$(z, 24) = "startwahl studio trocken" THEN
+        PRINT "trocken"
+    ELSEIF LEFT$(z, 9) = "startwahl" OR z = "bereit" THEN
+        PRINT z
+    END IF
+NEXT
+--- erwartet
+startwahl studio (gemerkt)
+trocken
+
+=== mit einer datei als argument kommt keine wahl
+AUTOMATION_PLAY("ev.txt")
+--- programm ../../../ide/ide.dh nach SETFPS(60)
+--- argumente
+a.dh
+--- umgebung
+DHRT_FRAMES=120
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+DH_IDE_STARTWAHL=1
+DH_IDE_STUDIO_TROCKEN=1
+--- datei a.dh
+PRINT 1
+--- datei _programm/ev.txt
+c 1
+e 0 7 5 5 0 0
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM z AS STRING
+FOR EACH z IN L
+    IF LEFT$(z, 9) = "startwahl" OR z = "bereit" THEN PRINT z
+NEXT
+--- erwartet
+bereit
+
+=== die einstellung holt die frage zurueck bzw. schaltet sie ab
+' Aus heisst "gleich die IDE"; wieder an heisst "fragen".
+DIM prB AS INTEGER
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
+--- einschub nach glanzStartNachziehen()
+prB = prB + 1
+IF prB = 5 THEN
+    einstellungenZeigen()
+    protokoll("pr angezeigt " + STR$(GUI_CHECKED(cbStartwahl)))
+    GUI_SET_CHECKED(cbStartwahl, FALSE)
+END IF
+IF prB = 8 THEN
+    protokoll("pr json " + JSON_GET_STRING(JSON_LOAD(konfigPfad), "startwahl"))
+    GUI_SET_CHECKED(cbStartwahl, TRUE)
+END IF
+IF prB = 11 THEN
+    protokoll("pr json " + JSON_GET_STRING(JSON_LOAD(konfigPfad), "startwahl"))
+    EXIT(0)
+END IF
+--- argumente
+a.dh
+--- umgebung
+DHRT_FRAMES=300
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+--- datei a.dh
+PRINT 1
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM z AS STRING
+FOR EACH z IN L
+    IF LEFT$(z, 3) = "pr " OR LEFT$(z, 9) = "startwahl" THEN PRINT z
+NEXT
+--- erwartet
+pr angezeigt TRUE
+startwahl einstellung ide
+pr json ide
+startwahl einstellung frage
+pr json frage

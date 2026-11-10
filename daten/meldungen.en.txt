@@ -1133,7 +1133,7 @@ IMAGE_SAVE_GIF: Bild {} ist {}x{}, das erste {}x{} -- ein GIF hat EINE Leinwand	
 unbekannter Schriftstil '{}' (erlaubt: normal, fett, kursiv, unterstrichen, durchgestrichen -- verbunden mit + oder Komma)	unknown font style '{}' (allowed: normal, fett, kursiv, unterstrichen, durchgestrichen -- joined with + or comma)
 
 # ---------------------------------------------------------------- Prozesse, Fenster, Tray, Sprache, Video
-PROCESS_START: eigener Pfad unbekannt: {}	PROCESS_START: own path unknown: {}
+{}: eigener Pfad unbekannt: {}	{}: own path unknown: {}
 PROCESS_WRITE: die Eingabe von '{}' ist geschlossen	PROCESS_WRITE: the input of '{}' is closed
 PROCESS_WRITE: '{}' nimmt nichts mehr an: {}	PROCESS_WRITE: '{}' accepts nothing more: {}
 {}: eine Nachricht ist EINE Zeile -- kein Zeilenumbruch darin (schick zwei Nachrichten oder JSON)	{}: a message is ONE line -- no line break in it (send two messages or JSON)

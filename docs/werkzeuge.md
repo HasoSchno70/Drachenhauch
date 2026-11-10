@@ -188,7 +188,7 @@ den Text des anderen ein. Wer die echte Ablage prüft, setzt
 `DHRT_ZWISCHENABLAGE=system` in `--- umgebung` (so `zwischenablage.dhtest`).
 
 **Werkzeuge ohne Python prüfen** (seit Stufe 32): so laufen die Tests des
-Form-Designers in `tests/pruef/werkzeuge/werkzeug_formdesigner.dhtest`. Zwei Wege
+Anim-FSM-Editors in `tests/pruef/werkzeuge/werkzeug_animfsm.dhtest`. Zwei Wege
 nebeneinander — echte Klicks über eine Aufnahme (Einschub
 `AUTOMATION_PLAY("ev.txt")` hinter `SETFPS(60)`, Beilage
 `--- datei _programm/ev.txt`), oder direkt über die Unterprogramme des

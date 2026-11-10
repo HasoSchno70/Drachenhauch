@@ -1355,6 +1355,7 @@ schicken — dafür gibt es Prozesse mit Leitung in beide Richtungen:
 | Funktion | Wirkung |
 |---|---|
 | `PROCESS_START(programm$, ...)` → INTEGER | startet mit offener Eingabe und Ausgabe; `"dhrt"` als Programm meint diese Runtime selbst. Ein Feld von Texten unter den Argumenten wird ausgebreitet (`PROCESS_START("dhrt", "run", datei$, "--", argumente)`), eine MAP von Texten gibt dem Kind zusätzliche Umgebungsvariablen (nur ihm, nicht dem eigenen Programm) |
+| `PROCESS_START_DETACHED(programm$, ...)` → INTEGER | startet **losgelöst**: ohne Leitungen und ohne Nummer für die anderen `PROCESS_*`, das Kind läuft weiter, wenn dieses Programm endet (so startet der Startbildschirm der IDE das Studio und schließt sich). Argumente wie bei `PROCESS_START`; liefert die Prozessnummer des Systems |
 | `PROCESS_READ$(prozess)` → STRING | was seit dem letzten Abruf auf stdout kam (leer = nichts Neues) |
 | `PROCESS_ERR$(prozess)` → STRING | dasselbe für stderr |
 | `PROCESS_WRITE(prozess, text$)` | an die Eingabe schicken — ein `INPUT` im Kind braucht das Zeilenende `CHR$(10)` |

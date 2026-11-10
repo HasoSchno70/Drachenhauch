@@ -5,7 +5,7 @@
 '  Rueckgaengig benutzen dasselbe Format, das GUI_SAVE/GUI_LOAD lesen. Die
 '  Entwurfsflaeche (entwurf.dh) ist nur eine Ansicht davon -- jede Aenderung
 '  schreibt hierher und baut sie neu (gemessen: 1000 Controls in 2,7 ms).
-'  Uebernommen aus dem Form-Designer (examples/197_form_designer.dh).
+'  Uebernommen aus dem frueheren Form-Designer (examples/197, bis 2026.45).
 ' ============================================================
 
 CONST RASTER = 8

@@ -135,7 +135,6 @@ Partikel-Editor	Particle editor
 Tilemap-Editor	Tilemap editor
 Sprite-Editor	Sprite editor
 Tracker	Tracker
-Form-Designer	Form designer
 Anim-FSM-Editor	Anim FSM editor
 Notenblatt	Score editor
 Beispiele als Projekt öffnen	Open examples as project
@@ -406,7 +405,6 @@ Alles aufgeklappt.	Everything unfolded.
 Höchstens 	At most 
  Reiter -- erst einen schließen.	 tabs -- close one first.
 Gibt es nicht: 	Does not exist: 
-Im Form-Designer geöffnet: 	Opened in the form designer: 
  -- als Text: Befehlspalette, 'Formular als Text öffnen'	 -- as text: command palette, 'Open form as text'
 Mit dem Programm des Systems geöffnet: 	Opened with the system's program: 
 Lässt sich nicht öffnen: 	Cannot be opened: 
@@ -867,7 +865,6 @@ Werkzeug: Partikel-Editor	Tool: particle editor
 Werkzeug: Tilemap-Editor	Tool: tilemap editor
 Werkzeug: Sprite-Editor	Tool: sprite editor
 Werkzeug: Tracker	Tool: tracker
-Werkzeug: Form-Designer	Tool: form designer
 Werkzeug: Anim-FSM-Editor	Tool: anim FSM editor
 Werkzeug: Notenblatt	Tool: score editor
 Sprache der Oberfläche: Deutsch/English	Interface language: Deutsch/English
@@ -1008,3 +1005,19 @@ Nicht verbunden -- erst [Verbinden].	Not connected -- [Connect] first.
 getrennt	disconnected
 für das Programm freigegeben, danach wieder verbunden	released for the program, reconnected afterwards
 Noch keine Zahlenzeilen -- etwa: 12 34 oder temp:21.5	No lines of numbers yet -- for example: 12 34 or temp:21.5
+KLASSISCH	CLASSIC
+MODERN	MODERN
+Die IDE	The IDE
+Das Studio	The Studio
+Projektbaum, Debugger, Handbuch auf F1	Project tree, debugger, manual on F1
+Oberfläche zuerst: Fenster aus Controls	Interface first: windows from controls
+Datenbanken, Berichte, eigene Controls	Databases, reports, custom controls
+Nicht mehr fragen	Don't ask again
+Wie möchtest du arbeiten?	How would you like to work?
+Beides ist Drachenhauch – dieselbe Sprache, dieselbe Laufzeit.	Both are Drachenhauch – the same language, the same runtime.
+Wieder fragen lassen: Einstellungen der IDE, oder beim Start Umschalt halten.	To be asked again: the IDE's settings, or hold Shift at start.
+Pfeile wählen, Enter startet – oder 1 und 2	Arrows choose, Enter starts – or 1 and 2
+Beim Start fragen: IDE oder Studio	Ask at start: IDE or Studio
+Code zuerst: Spiele, Werkzeuge, Konsole	Code first: games, tools, console
+Eigene Hauptschleife, 2D und 3D	Your own main loop, 2D and 3D
+Doppelklick aufs Control, Code je Ereignis	Double-click a control, code per event

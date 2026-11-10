@@ -245,9 +245,13 @@ impl<'p> Vm<'p> {
              || name == "opendoc" || name.starts_with("printer")) { return Ok(None); }
         let v = match name {
             // ===== Kindprozesse mit laufender Ausgabe (prozess.rs, fuer die IDE) =====
-            "process_start" => {
-                if a.is_empty() { return Err("PROCESS_START: erwartet mind. 1 Argument (Programm)".into()); }
-                let prog = bi_str(a, 0, "PROCESS_START")?.to_string();
+            "process_start" | "process_start_detached" => {
+                // Losgeloest (PROCESS_START_DETACHED): ohne Leitungen und ohne
+                // Griff, das Kind ueberlebt das Ende dieses Programms; die
+                // Argumente nehmen beide gleich.
+                let fn_ = if name == "process_start" { "PROCESS_START" } else { "PROCESS_START_DETACHED" };
+                if a.is_empty() { return Err(format!("{}: erwartet mind. 1 Argument (Programm)", fn_)); }
+                let prog = bi_str(a, 0, fn_)?.to_string();
                 // Ein FELD von Texten wird ausgebreitet (eine variable Zahl von
                 // Argumenten liess sich vorher gar nicht uebergeben), eine MAP
                 // von Texten ist zusaetzliche Umgebung NUR fuer das Kind --
@@ -261,7 +265,7 @@ impl<'p> Vm<'p> {
                             for x in arr.borrow().cells.iter() {
                                 match x {
                                     Value::Str(s) => rest.push(s.to_string()),
-                                    _ => return Err("PROCESS_START: ein Feld von Argumenten muss aus Texten bestehen".into()),
+                                    _ => return Err(format!("{}: ein Feld von Argumenten muss aus Texten bestehen", fn_)),
                                 }
                             }
                         }
@@ -269,12 +273,15 @@ impl<'p> Vm<'p> {
                             for (k, v) in m.borrow().entries().iter() {
                                 match v {
                                     Value::Str(s) => umgebung.push((k.clone(), s.to_string())),
-                                    _ => return Err(format!("PROCESS_START: die Umgebung muss aus Texten bestehen ('{}')", k)),
+                                    _ => return Err(format!("{}: die Umgebung muss aus Texten bestehen ('{}')", fn_, k)),
                                 }
                             }
                         }
-                        _ => rest.push(bi_str(a, i, "PROCESS_START")?.to_string()),
+                        _ => rest.push(bi_str(a, i, fn_)?.to_string()),
                     }
+                }
+                if name == "process_start_detached" {
+                    return Ok(Some(Value::Int(crate::prozess::Prozess::losgeloest(&prog, &rest, &umgebung)? as i64)));
                 }
                 let p = crate::prozess::Prozess::starten_mit(&prog, &rest, &umgebung)?;
                 self.prozesse.push(Some(p));

@@ -332,6 +332,7 @@ SUB einstellungenZeigen()
     GUI_SET_CHECKED(cbKlammern, klammernAn)
     GUI_SET_CHECKED(cbFormatSichern, formatSichernAn)
     GUI_SET_CHECKED(cbVorspann, vorspannAn)
+    GUI_SET_CHECKED(cbStartwahl, startwahl = "frage")
     GUI_SET_CHECKED(cbGlanz, glanzAn)
     GUI_SET_CHECKED(cbBaumHaken, baumHakenAn)
     GUI_SET_CHECKED(cbWasser, wasserzeichenAn)
@@ -374,6 +375,12 @@ SUB einstellungenNachziehen()
         vorspannAn = GUI_CHECKED(cbVorspann)
         konfigSichern()
         protokoll("vorspann " + IIF(vorspannAn, "an", "aus"))
+    END IF
+    ' Aus heisst: gleich die IDE -- wer hier steht, arbeitet ja in ihr.
+    IF GUI_CHECKED(cbStartwahl) <> (startwahl = "frage") THEN
+        startwahl = IIF(GUI_CHECKED(cbStartwahl), "frage", "ide")
+        konfigSichern()
+        protokoll("startwahl einstellung " + startwahl)
     END IF
     IF GUI_DROPDOWN_SELECTED(ddVorspann) <> vorspannWahlStand AND GUI_DROPDOWN_SELECTED(ddVorspann) >= 0 THEN
         vorspannWahlStand = GUI_DROPDOWN_SELECTED(ddVorspann)
@@ -985,9 +992,9 @@ SUB tabOeffnen(pfad AS STRING, inhalt AS STRING)
     IF pfad <> "" THEN pluginEreignis("geoeffnet", pfad)
 END SUB
 
-' Eine .dhform oeffnet seit Stand 31 den Form-Designer in Drachenhauch
-' (examples/197_form_designer.dh) -- als Text nur auf ausdruecklichen Wunsch
-' (Befehlspalette), weil man ein Formular sonst im JSON statt am Bild baut.
+' Eine .dhform oeffnet das Drachenhauch Studio (bis 2026-11-10 den
+' Form-Designer) -- als Text nur auf ausdruecklichen Wunsch (Befehlspalette),
+' weil man ein Formular sonst im JSON statt am Bild baut.
 DIM letzteForm AS STRING : letzteForm = ""
 DIM formAlsText AS BOOLEAN : formAlsText = FALSE
 
@@ -1003,8 +1010,8 @@ SUB dateiOeffnen(pfad AS STRING)
     END IF
     IF LOWER$(RIGHT$(pfad, 7)) = ".dhform" AND NOT formAlsText THEN
         letzteForm = pfad
-        werkzeugMit("197_form_designer.dh", pfad)
-        GUI_SET_TEXT(lblStatus, tr$("Im Form-Designer geöffnet: ") + BASENAME(pfad) + tr$(" -- als Text: Befehlspalette, 'Formular als Text öffnen'"))
+        studioStarten(pfad)
+        GUI_SET_TEXT(lblStatus, GUI_TEXT(lblStatus) + tr$(" -- als Text: Befehlspalette, 'Formular als Text öffnen'"))
         RETURN
     END IF
     ' Bilder und Klaenge zeigt die IDE selbst -- man will sehen bzw. hoeren,

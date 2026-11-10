@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/en und dem englischen Buch von `dhrt doku prosa` -- NICHT von Hand aendern. Der Hover nimmt sie mit DHRT_LANG=en.",
- "count": 2375,
+ "count": 2376,
  "docs": {
   "ABS": "Absolute value.",
   "ACOS": "Arc sine/cosine (x in [-1, 1])",
@@ -643,7 +643,7 @@
   "GUI_DRAGGING": "GUI_WIDGET / BOOL / STRING / GUI_WIDGET / INTEGER / INTEGER current drag, drop in this frame, what was dragged, from where, which row, onto which row",
   "GUI_DRAG_INDEX": "GUI_WIDGET / BOOL / STRING / GUI_WIDGET / INTEGER / INTEGER current drag, drop in this frame, what was dragged, from where, which row, onto which row",
   "GUI_DRAW": "draw all windows (back→front); obenauf=FALSE leaves out the context menu and tooltip",
-  "GUI_DRAW_TOP": "only what lies above all windows: open context menu and tooltip",
+  "GUI_DRAW_TOP": "only what lies above all windows: open menu (bar or context), open dropdown list, tooltip",
   "GUI_DRAW_WINDOW": "draw ONE window again, above everything added since GUI_DRAW",
   "GUI_DROPDOWN": "GUI_WIDGET — drop-down selection list; the popup is drawn above all other widgets",
   "GUI_DROPDOWN_COUNT": "INTEGER / STRING how many entries, and entry i (from 0)",
@@ -1761,6 +1761,7 @@
   "PROCESS_READ$": "what has arrived on stdout since the last call (empty = nothing new)",
   "PROCESS_RUNNING": "is it still running?",
   "PROCESS_START": "starts with open input and output; \"dhrt\" as the program means this runtime itself. An array of texts among the arguments is spread out (PROCESS_START(\"dhrt\", \"run\", datei$, \"--\", argumente)), a MAP of texts gives the child additional environment variables (only it, not your own program)",
+  "PROCESS_START_DETACHED": "starts detached: without pipes and without a number for the other PROCESS_*, the child keeps running when this program ends (this is how the IDE's start screen launches the studio and closes). Arguments as with PROCESS_START; returns the system's process id",
   "PROCESS_WRITE": "send to the input — an INPUT in the child needs the line ending CHR$(10)",
   "QUAT_CONJUGATE": "QUAT — the reverse rotation (at unit length = the inverse)",
   "QUAT_FROM_AXIS_ANGLE": "QUAT — rotation around an axis (angle in radians)",

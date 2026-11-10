@@ -112,7 +112,7 @@ gestartet) ist `PLUGIN_LAEUFT()` FALSE und das Programm endet gleich.
 | Befehl | Was es tut |
 |---|---|
 | `PLUGIN_BEFEHL(id$, titel$ [, kuerzel$])` | einen Befehl anmelden: er steht im Menü **Plugins**, in der Befehlspalette und auf dem Kürzel. Ausgelöst kommt das Ereignis `befehl` mit `PLUGIN_ID$()` |
-| `PLUGIN_LEISTE(id$, titel$, formdatei$ [, bereich$])` | eine eigene Leiste im Dock: eine `.dhform` (etwa aus dem Form-Designer) als Fenster links, rechts (Vorgabe), unten oder schwebend. Der Nutzer kann sie verschieben wie jede Leiste der IDE |
+| `PLUGIN_LEISTE(id$, titel$, formdatei$ [, bereich$])` | eine eigene Leiste im Dock: eine `.dhform` (etwa aus dem Drachenhauch Studio) als Fenster links, rechts (Vorgabe), unten oder schwebend. Der Nutzer kann sie verschieben wie jede Leiste der IDE |
 | `PLUGIN_HOERE(ereignis$)` | ein Ereignis hören: `gesichert`, `geoeffnet`, `reiter` (ein anderer Reiter vorn), `gestartet`, `beendet` (ein Programm lief), `geprueft` -- jeweils mit `PLUGIN_DATEI$()`. Dazu `hover`: beim Verweilen der Maus auf einem Wort, als eigenes Ereignis (siehe `PLUGIN_HOVER_ANTWORT`), und `vervollstaendigen`: wenn die Liste der Vervollständigung aufgeht (siehe `PLUGIN_VORSCHLAEGE`) |
 | `PLUGIN_SETZE(leiste$, widget$, was$, wert$)` | ein Widget der eigenen Leiste ändern: `text`, `checked`, `value`, `enabled`, `visible` oder `selected` (Zeile einer Liste, Eintrag einer Klappliste, Knoten eines Baums) |
 | `PLUGIN_LISTE(leiste$, widget$, eintraege)` | die Einträge einer Liste oder Klappliste der Leiste |

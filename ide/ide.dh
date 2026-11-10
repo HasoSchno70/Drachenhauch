@@ -1062,6 +1062,28 @@ IF (GETENV$("DHRT_FRAMES") = "" OR GETENV$("DH_IDE_VORSPANN") = "1") AND vorspan
 END IF
 IF vorspannSchluss THEN END
 
+' Der Startbildschirm (teile/startwahl.dh): klassisch in der IDE oder modern
+' im Drachenhauch Studio. `startwahl` in der ide.json: "frage" (Vorgabe),
+' "ide" oder "studio" ("Nicht mehr fragen"); Umschalt beim Start fragt
+' trotzdem. Nicht bei einem Argument (eine Datei oder ein Ordner zum
+' Oeffnen) und nicht in einem Testlauf, ausser DH_IDE_STARTWAHL=1. Mit dem
+' Studio startet es losgeloest, und die IDE endet hier.
+DIM startwahl AS STRING : startwahl = LOWER$(kText("startwahl", "frage"))
+IF startwahl <> "ide" AND startwahl <> "studio" THEN startwahl = "frage"
+IF ARGC() = 0 AND (GETENV$("DHRT_FRAMES") = "" OR GETENV$("DH_IDE_STARTWAHL") = "1") THEN
+    DIM swWahl AS STRING : swWahl = startwahl
+    DIM swGemerkt AS BOOLEAN : swGemerkt = FALSE
+    IF swWahl = "frage" OR KEYPRESSED(KEY_LSHIFT) OR KEYPRESSED(KEY_RSHIFT) THEN
+        swWahl = startwahlZeigen(swGemerkt)
+    ELSE
+        protokoll("startwahl " + swWahl + " (gemerkt)")
+    END IF
+    IF swWahl = "kreuz" THEN END
+    IF swWahl = "studio" THEN
+        IF startwahlStudio() THEN END
+    END IF
+END IF
+
 ' Absturz-Wiederherstellung: jede laufende IDE schreibt alle `whTakt`
 ' Sekunden die Texte ihrer ungesicherten Reiter nach
 ' wiederherstellung/<kennung>/stand.json neben die ide.json. Ein EIGENER
@@ -1452,7 +1474,6 @@ DIM miWzPartikel AS INTEGER : miWzPartikel = GUI_MENU_ITEM(mWerkzeuge, tr$("Part
 DIM miWzTilemap AS INTEGER : miWzTilemap = GUI_MENU_ITEM(mWerkzeuge, tr$("Tilemap-Editor"))
 DIM miWzSprite AS INTEGER : miWzSprite = GUI_MENU_ITEM(mWerkzeuge, tr$("Sprite-Editor"))
 DIM miWzTracker AS INTEGER : miWzTracker = GUI_MENU_ITEM(mWerkzeuge, tr$("Tracker"))
-DIM miWzForm AS INTEGER : miWzForm = GUI_MENU_ITEM(mWerkzeuge, tr$("Form-Designer"))
 DIM miWzAnim AS INTEGER : miWzAnim = GUI_MENU_ITEM(mWerkzeuge, tr$("Anim-FSM-Editor"))
 DIM miWzNoten AS INTEGER : miWzNoten = GUI_MENU_ITEM(mWerkzeuge, tr$("Notenblatt"))
 DIM miWzKlassen AS INTEGER : miWzKlassen = GUI_MENU_ITEM(mWerkzeuge, tr$("Klassendiagramm"))
@@ -2210,6 +2231,9 @@ DIM MASS_STUFEN AS ARRAY OF FLOAT : MASS_STUFEN = [0.0, 1.0, 1.25, 1.5, 1.75, 2.
 DIM lblMass AS GUI_WIDGET : lblMass = GUI_LABEL(winEinst, tr$("Größe der Oberfläche"), 400, 326)
 DIM ddMass AS GUI_WIDGET : ddMass = GUI_DROPDOWN(winEinst, 600, 322, 160, 28, [tr$("Wie das System"), "100 %", "125 %", "150 %", "175 %", "200 %", "250 %", "300 %"])
 DIM lblMassHinweis AS GUI_WIDGET : lblMassHinweis = GUI_LABEL(winEinst, "", 400, 358)
+' Der Startbildschirm (IDE oder Studio): an = jedes Mal fragen, aus = gleich
+' die IDE.
+DIM cbStartwahl AS GUI_WIDGET : cbStartwahl = GUI_CHECKBOX(winEinst, tr$("Beim Start fragen: IDE oder Studio"), 400, 394, TRUE)
 DIM massWahlStand AS INTEGER : massWahlStand = 0
 DIM lblSchrift AS GUI_WIDGET : lblSchrift = GUI_LABEL(winEinst, tr$("Schriftgröße"), 16, 290)
 DIM spSchrift AS GUI_WIDGET : spSchrift = GUI_SPINNER(winEinst, 200, 286, 90, 10, 32, 16)
@@ -2807,6 +2831,8 @@ IMPORT "teile/befehle.dh"
 IMPORT "teile/plugins.dh"
 
 IMPORT "teile/sichern.dh"
+' Der Startbildschirm: klassisch oder modern (vor dem Aufbau gerufen).
+IMPORT "teile/startwahl.dh"
 
 ' --- Start -------------------------------------------------------------
 layout()

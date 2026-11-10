@@ -2989,3 +2989,30 @@ Laeufe), `tests/pruef/werkzeugkette/code_format.dhtest`, Auswahlbereich in
 `tests/pruef/ide/ide_bausteine.dhtest`. Offen gegen die Qt-IDE: Markdown gerendert,
 Faltung, Minimap, geteilter Editor, Mehrfach-Marken, Schnipsel,
 Signaturhilfe, Umbenennen, Git-Blame, Sitzung je Projekt.
+
+## Startbildschirm: IDE oder Studio (2026-11-10)
+
+Idee des Nutzers, gleich nach dem Ende des Form-Designers: nach dem Vorspann
+"schick zwischen den beiden Editoren entscheiden" -- klassisch in der IDE oder
+modern im Studio. Abgestimmt: jedes Mal fragen, "Nicht mehr fragen" merkt
+die Wahl (`startwahl` in der ide.json), zurueck ueber die Einstellungen oder
+Umschalt beim Start; mit dem Studio schliesst sich die IDE. Gebaut in
+`ide/teile/startwahl.dh`, gerufen in `ide/ide.dh` gleich nach dem Vorspann --
+VOR den DIMs der Teile-Dateien, darum dort nur lokale Variablen. Gezeichnet
+ohne gui (das gibt es dort noch nicht): Verlauf, zwei Lichter, Schriftzug,
+zwei Karten mit gezeichneter Vorschau (Code mit Farben bzw. ein Fenster im
+Entwurf, dessen Knopf an der Ausrichtungslinie einrastet), eigene grosse
+Schrift (96 px) fuer die Ueberschriften. Kein Bildschirmfoto als Vorschau:
+das veraltet und passt nicht zu jeder Groesse.
+
+Fund dabei: ein Kind aus PROCESS_START endet mit dem Aufrufer (Drop von
+`Prozess` beendet den Baum) -- das Studio waere mit der IDE gleich wieder
+zu gewesen. Neu `PROCESS_START_DETACHED` (prozess.rs `losgeloest`: ohne
+Leitungen, eigene Gruppe, unter Windows DETACHED_PROCESS, ein Faden wartet
+gegen Zombies; Argumente wie PROCESS_START, gemeinsamer `befehl`). Tests:
+`laufzeit/process_detached.dhtest` (losgeloest ueberlebt, PROCESS_START
+nicht, Fehler; Gegenprobe: losgeloest ueber `Prozess` -> Fall 1 faellt) und
+`ide/werkzeug_ide_startwahl.dhtest` (fuenf Faelle, vier Gegenproben je an
+Abfrage, Argument, Einstellung und Merken). Pruefungen sehen den Bildschirm
+nur mit `DH_IDE_STARTWAHL=1`, `DH_IDE_STUDIO_TROCKEN=1` startet das Studio
+dort nicht wirklich.
