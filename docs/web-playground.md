@@ -5,7 +5,7 @@
 > deutsch und englisch (`?lang=de|en`, sonst die Sprache des Browsers). Gebaut
 > wird er im Website-Lauf (`.github/workflows/website.yml`, emscripten 6.0.0,
 > Demo `examples/webspiel/main.dh`), auch für jeden Pull Request, der `web/`,
-> die Website oder `Cargo.toml` anfasst -- der Web-Bau übersetzte seit 2026.43
+> die Website oder die Laufzeit (`Cargo.toml`, `Cargo.lock`, `src/`) anfasst -- der Web-Bau übersetzte seit 2026.43
 > nicht mehr, und niemand sah es.
 
 > **Stand 2026-10-13 (Web-Runde, Beispiel `examples/webspiel`):**

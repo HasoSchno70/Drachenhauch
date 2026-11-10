@@ -1,0 +1,49 @@
+# Sicherheitspruefung der Rust-Abhaengigkeiten (cargo audit gegen die
+# RustSec-Datenbank).
+#
+# Laeuft, wenn sich Cargo.toml oder Cargo.lock aendern, und jeden Montag
+# ohne Anlass: neue Luecken werden gemeldet, ohne dass sich hier etwas
+# aendert. Rot wird der Lauf nur bei einer echten Luecke ("vulnerability");
+# Hinweise wie "unmaintained" oder "yanked" stehen im Protokoll, halten aber
+# nichts auf.
+#
+# Gehoert NICHT zu den Pflicht-Pruefungen von main: eine neu gemeldete Luecke
+# in einer fremden Crate soll keinen fremden PR blockieren. Beim ersten
+# Einrichten (2026-11-10) fand der Lauf drei Luecken (ctutils, webpki-roots,
+# libsqlite3-sys); behoben im selben PR.
+
+name: Audit
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "rust/drachenhauch_runtime/Cargo.toml"
+      - "rust/drachenhauch_runtime/Cargo.lock"
+      - ".github/workflows/audit.yml"
+  pull_request:
+    paths:
+      - "rust/drachenhauch_runtime/Cargo.toml"
+      - "rust/drachenhauch_runtime/Cargo.lock"
+      - ".github/workflows/audit.yml"
+  schedule:
+    - cron: "17 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cargo-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Fertig gebaut statt `cargo install` (spart einige Minuten Uebersetzen).
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit
+
+      - name: cargo audit
+        working-directory: rust/drachenhauch_runtime
+        run: cargo audit

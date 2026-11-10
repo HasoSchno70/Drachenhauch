@@ -1,0 +1,37 @@
+# Dependabot haelt die Rust-Crates und die GitHub-Actions aktuell.
+#
+# Monatlich und gebuendelt: ein CI-Lauf dauert rund 40 Minuten auf drei
+# Systemen, und ein Einzelentwickler soll nicht jede Woche zehn PRs
+# durchsehen. Kleine Spruenge (minor/patch) kommen gesammelt in EINEM PR;
+# grosse Spruenge (major) einzeln, weil sie eher Anpassungen brauchen.
+#
+# raylib haengt an einer Probe von Hand (eine neue raylib-Fassung braucht
+# erst die passende Bindung), darum dort keine major-Spruenge.
+# wasm-bindgen ist fuer den Web-Bau mit "=0.2.100" festgenagelt; das
+# fasst Dependabot nicht an.
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: /rust/drachenhauch_runtime
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "Abhaengigkeiten"
+    groups:
+      crates-klein:
+        update-types: [minor, patch]
+    ignore:
+      - dependency-name: raylib
+        update-types: [version-update:semver-major]
+      - dependency-name: wasm-bindgen
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "Actions"
+    groups:
+      actions:
+        patterns: ["*"]

@@ -245,7 +245,7 @@ Einzelheiten stehen in der Geschichte des Bereichs.
   dieser Datei -- ein Pfad, den es nicht mehr gibt, ist ein Befund.
 - Die Website baut `tools/website.dh` (`.github/workflows/website.yml`), samt
   Spielwiese aus `rust/build_wasm.py`; der Web-Bau läuft dort auch für jeden
-  PR, der `web/`, die Website oder `Cargo.toml` anfasst.
+  PR, der `web/`, die Website oder die Laufzeit (`Cargo.toml`, `src/`) anfasst.
 
 **Prüfsammlungen (`dhrt test`)**
 - Format in `docs/werkzeuge.md`: `=== Fall`, Quelltext, `--- erwartet` /
@@ -330,6 +330,13 @@ Hardware-Features und auf drei Systemen; ein grüner Lauf auf dieser Maschine
 sagt darum wenig (der MSVC-Linker schluckt, was ld64 ablehnt). Vor dem Push
 auch `cargo check` ohne das Feature `jit` (ein verrutschtes `cfg` fällt sonst
 erst in der CI auf).
+
+Nicht Pflicht, aber zu beachten: `audit.yml` (`cargo audit`, bei Änderungen an
+`Cargo.toml`/`Cargo.lock` und jeden Montag) wird rot bei einer bekannten
+Sicherheitslücke in einer Crate; Dependabot (`.github/dependabot.yml`) bündelt
+monatlich die Updates von Crates und Actions in je einen PR. `cargo fmt` und
+`clippy` sind bewusst nicht eingerichtet (fmt würde fast jede Datei umsetzen,
+clippy meldete beim Messen 2026-11-10 rund 270 Warnungen).
 
 ## Build und Test
 
