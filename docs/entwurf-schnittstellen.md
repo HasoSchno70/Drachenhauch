@@ -120,11 +120,11 @@ Programm. Stattdessen wird über ein Art-Feld verzweigt; in Funkenflug und
 Glutfaden zusammen in rund 50 `SELECT CASE`. Die deutlichsten Stellen:
 
 * **Glutfaden, Werkzeuge:** 15 Werkzeuge als Zahlen (`WZ_STIFT` …
-  `WZ_FARBVERLAUF`, `ansicht/werkzeuge.dh`). Drücken, Ziehen, Loslassen und
+  `WZ_FARBVERLAUF`, ansicht/werkzeuge.dh in Glutfaden). Drücken, Ziehen, Loslassen und
   Vorschau sind je ein `SELECT CASE wzAktiv`, rund 80 Vergleiche in sechs
   Dateien. In PySticky waren es Klassen (`PencilTool`, `GradientTool` …),
   die Kommentare nennen sie noch.
-* **Glutfaden, Rückgängig:** `Aenderung` (`kern/verlauf.dh`) hat 9 Arten
+* **Glutfaden, Rückgängig:** `Aenderung` (kern/verlauf.dh in Glutfaden) hat 9 Arten
   und rund 25 Felder, ein `SELECT CASE` über alle Arten wendet sie an.
 * **Funkenflug, Grundformen:** `Primitiv` (kern/modell.dh in Funkenflug) trägt die
   Vereinigung aller Felder von Linie bis Text. Zeichnen, Treffertest und
@@ -136,7 +136,7 @@ Glutfaden zusammen in rund 50 `SELECT CASE`. Die deutlichsten Stellen:
 * **Glutfaden, Einlesen:** `OxsImport`, `PatImport` und `XsdImport` haben
   dieselben Felder (`muster`, `warnungen`) ohne gemeinsamen Typ.
   `fremdLaden` kopiert sie dreimal von Hand in eine vierte Klasse
-  `FremdImport` (`kern/verwalten.dh`).
+  `FremdImport` (kern/verwalten.dh in Glutfaden).
 
 Keiner dieser Fälle **brauchte** eine Schnittstelle: Jeder ließe sich mit
 einer abstrakten Basisklasse lösen, die es seit 2026.8 gibt. Das Fehlen von
@@ -446,7 +446,7 @@ Zwei Doppelungen, beide ohne gemeinsamen Typ:
   Leseposition (`daten`, `p`, `brauche`, `u16`, `u32`, `ueber`). Nur die
   Meldung am Dateiende, die Texte und die Farben unterscheiden sich.
 
-Umgebaut (`kern/einleser.dh`):
+Umgebaut (kern/einleser.dh in Glutfaden):
 
 * Ein Ergebnis `MusterImport` für alle drei Formate und für `fremdLaden`.
   Es braucht keine Unterklassen, weil kein Format ein eigenes Feld hat;
