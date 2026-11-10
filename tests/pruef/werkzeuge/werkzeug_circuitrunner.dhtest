@@ -39,7 +39,7 @@ EXIT(0)
 --- programm ../../../spiele/circuitrunner/circuitrunner.dh nach '  HAUPTSCHLEIFE
 --- ersetzen CONST SAVEPATH = "circuitrunner.save"
 CONST SAVEPATH = "{fall}/circuitrunner.save"
-CHDIR("{sammlung}/../../../circuitrunner")
+CHDIR("{sammlung}/../../../spiele/circuitrunner")
 
 --- datei _programm/circuit.dh
 IMPORT "{sammlung}/../_hilfen/circuitlevel.dh"
@@ -92,7 +92,7 @@ EXIT(0)
 --- programm ../../../spiele/circuitrunner/circuitrunner.dh nach '  HAUPTSCHLEIFE
 --- ersetzen CONST SAVEPATH = "circuitrunner.save"
 CONST SAVEPATH = "{fall}/circuitrunner.save"
-CHDIR("{sammlung}/../../../circuitrunner")
+CHDIR("{sammlung}/../../../spiele/circuitrunner")
 
 --- datei _programm/circuit.dh
 IMPORT "{sammlung}/../_hilfen/circuitlevel.dh"
@@ -140,7 +140,7 @@ EXIT(0)
 --- programm ../../../spiele/circuitrunner/circuitrunner.dh nach '  HAUPTSCHLEIFE
 --- ersetzen CONST SAVEPATH = "circuitrunner.save"
 CONST SAVEPATH = "{fall}/circuitrunner.save"
-CHDIR("{sammlung}/../../../circuitrunner")
+CHDIR("{sammlung}/../../../spiele/circuitrunner")
 
 --- datei _programm/circuit.dh
 IMPORT "{sammlung}/../_hilfen/circuitlevel.dh"
@@ -172,7 +172,7 @@ EXIT(0)
 --- programm ../../../spiele/circuitrunner/circuitrunner.dh nach '  HAUPTSCHLEIFE
 --- ersetzen CONST SAVEPATH = "circuitrunner.save"
 CONST SAVEPATH = "{fall}/circuitrunner.save"
-CHDIR("{sammlung}/../../../circuitrunner")
+CHDIR("{sammlung}/../../../spiele/circuitrunner")
 
 --- datei _programm/circuit.dh
 IMPORT "{sammlung}/../_hilfen/circuitlevel.dh"
@@ -207,7 +207,7 @@ EXIT(0)
 --- programm ../../../spiele/circuitrunner/circuitrunner.dh nach '  HAUPTSCHLEIFE
 --- ersetzen CONST SAVEPATH = "circuitrunner.save"
 CONST SAVEPATH = "{fall}/circuitrunner.save"
-CHDIR("{sammlung}/../../../circuitrunner")
+CHDIR("{sammlung}/../../../spiele/circuitrunner")
 
 --- datei _programm/circuit.dh
 IMPORT "{sammlung}/../_hilfen/circuitlevel.dh"
