@@ -175,8 +175,14 @@ kopieren, Datei vom Finder).
 die Pakete für macOS und Linux MIT Grafik und probiert sie aus: unter Linux
 entpacken, `install.sh`, die IDE unter xvfb starten, die Sammlung
 `tests/pruef/werkzeuge/werkzeug_paket.dhtest` mit dieser Laufzeit; unter macOS das `.dmg`
-einhängen, Signatur und Aufbau prüfen. Den Windows-Installer baut er nicht —
-Inno Setup haben die Läufer nicht.
+einhängen, Signatur und Aufbau prüfen. Den Windows-Installer baut er nicht.
+
+`.github/workflows/release.yml` baut ein ganzes Release aus einem Tag
+(`git push origin v<fassung>`): den Windows-Installer (Inno Setup holt sich der
+Lauf über choco, gebaut wird mit `--hardware --laufzeiten`, die Fassung muss
+zum Tag passen), die Pakete über `package.yml`, dazu `SHA256SUMS.txt` und die
+drei Bücher. Alles kommt als **Entwurf** an das GitHub-Release; veröffentlicht
+wird von Hand. Von Hand gestartet mit „probe“ baut er nur die Pakete.
 
 ## Aufbau
 
