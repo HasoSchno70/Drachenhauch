@@ -643,7 +643,7 @@
   "GUI_DRAGGING": "GUI_WIDGET / BOOL / STRING / GUI_WIDGET / INTEGER / INTEGER current drag, drop in this frame, what was dragged, from where, which row, onto which row",
   "GUI_DRAG_INDEX": "GUI_WIDGET / BOOL / STRING / GUI_WIDGET / INTEGER / INTEGER current drag, drop in this frame, what was dragged, from where, which row, onto which row",
   "GUI_DRAW": "draw all windows (back→front); obenauf=FALSE leaves out the context menu and tooltip",
-  "GUI_DRAW_TOP": "only what lies above all windows: open context menu and tooltip",
+  "GUI_DRAW_TOP": "only what lies above all windows: open menu (bar or context), open dropdown list, tooltip",
   "GUI_DRAW_WINDOW": "draw ONE window again, above everything added since GUI_DRAW",
   "GUI_DROPDOWN": "GUI_WIDGET — drop-down selection list; the popup is drawn above all other widgets",
   "GUI_DROPDOWN_COUNT": "INTEGER / STRING how many entries, and entry i (from 0)",

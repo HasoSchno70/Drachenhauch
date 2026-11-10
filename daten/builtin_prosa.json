@@ -644,7 +644,7 @@
   "GUI_DRAGGING": "GUI_WIDGET / BOOL / STRING / GUI_WIDGET / INTEGER / INTEGER laufender Zug, Ablage in diesem Bild, was gezogen wurde, woher, welche Zeile, auf welche Zeile",
   "GUI_DRAG_INDEX": "GUI_WIDGET / BOOL / STRING / GUI_WIDGET / INTEGER / INTEGER laufender Zug, Ablage in diesem Bild, was gezogen wurde, woher, welche Zeile, auf welche Zeile",
   "GUI_DRAW": "alle Fenster zeichnen (hinten→vorne); obenauf=FALSE lässt Kontextmenü und Tooltip weg",
-  "GUI_DRAW_TOP": "nur was über allen Fenstern liegt: offenes Kontextmenü und Tooltip",
+  "GUI_DRAW_TOP": "nur was über allen Fenstern liegt: offenes Menü (Leiste oder Kontext), offene Klappliste, Tooltip",
   "GUI_DRAW_WINDOW": "EIN Fenster noch einmal zeichnen, über allem, was seit GUI_DRAW dazugekommen ist",
   "GUI_DROPDOWN": "GUI_WIDGET — aufklappende Auswahlliste; das Popup wird ueber allen anderen Widgets gezeichnet",
   "GUI_DROPDOWN_COUNT": "INTEGER / STRING wie viele Einträge, und Eintrag i (ab 0)",

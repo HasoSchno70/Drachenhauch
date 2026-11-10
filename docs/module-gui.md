@@ -304,7 +304,7 @@ IMPORT "gui"
 | `GUI_TABLE_ROW_COUNT(tbl)` | INTEGER | Anzahl Datenzeilen |
 | `GUI_UPDATE()` | — | **Pflicht** pro Frame: Maus/Tasten verarbeiten |
 | `GUI_DRAW([obenauf])` | — | alle Fenster zeichnen (hinten→vorne); `obenauf`=FALSE lässt Kontextmenü und Tooltip weg |
-| `GUI_DRAW_TOP()` | — | nur was über allen Fenstern liegt: offenes Kontextmenü und Tooltip |
+| `GUI_DRAW_TOP()` | — | nur was über allen Fenstern liegt: offenes Menü (Leiste oder Kontext), offene Klappliste, Tooltip |
 | `GUI_DRAW_WINDOW(win)` | — | EIN Fenster noch einmal zeichnen, über allem, was seit `GUI_DRAW` dazugekommen ist |
 | `GUI_CLICKED(widget)` | BOOLEAN | in diesem Frame angeklickt? Gilt für Button, Menü-Eintrag, **Checkbox, Toggle und Radio** und für einen Klick auf einen Listeneintrag -- auch auf den schon gewählten |
 | `GUI_CHANGED(widget)` | BOOLEAN | hat die **Bedienung** das Widget im letzten `GUI_UPDATE` geändert (Auswahl -- auch der Knoten eines Baums --, Wert, Text, Haken)? Was das Programm selbst setzt, zählt nicht. Der erste Aufruf beginnt zu beobachten und liefert FALSE |
@@ -1261,17 +1261,22 @@ zu nehmen: was obenauf zu sehen ist, bekommt im nächsten Bild auch die Klicks.
 Vorher lag es nach einem Klick ins Fenster darunter wieder dahinter -- man sah
 einen Knopf, und der Klick ging an das Fenster, das man nicht sah.
 
-**Kontextmenü und Tooltip** liegen über *allen* Fenstern und sind deshalb vom
-selben Problem betroffen — ein Tooltip folgt der Maus und landet also
-regelmäßig über einer Zeichenfläche. Für sie gibt es `GUI_DRAW_TOP()`, und
-`GUI_DRAW` lässt sie mit `GUI_DRAW(FALSE)` weg:
+**Menüs, Klapplisten und Tooltip** liegen über *allen* Fenstern und sind
+deshalb vom selben Problem betroffen — ein Tooltip folgt der Maus und landet
+also regelmäßig über einer Zeichenfläche. Für sie gibt es `GUI_DRAW_TOP()`,
+und `GUI_DRAW` lässt sie mit `GUI_DRAW(FALSE)` weg. Das gilt für das
+Kontextmenü wie für ein aufgeklapptes Menü der Menüleiste und eine offene
+Klappliste: Sie liegen auch über einem Fenster, das vor ihrem eigenen steht
+— der Klick geht ja auch an sie. Nur bei einem vergrößerten oder
+zugeschnittenen Fenster im Entwurfsmodus (`GUI_WINDOW_ZOOM`,
+`GUI_WINDOW_CLIP`) bleiben sie bei ihrem Fenster.
 
 ```basic
 GUI_UPDATE()
 GUI_DRAW(FALSE)                             ' Fenster, ohne die obenauf-Schicht
 ' ... hier malt das Programm in seine Zeichenflächen ...
 IF dialogOffen THEN GUI_DRAW_WINDOW(dlg)
-GUI_DRAW_TOP()                              ' Kontextmenü + Tooltip, zuletzt
+GUI_DRAW_TOP()                              ' Menüs, Klapplisten, Tooltip, zuletzt
 FLIP()
 ```
 

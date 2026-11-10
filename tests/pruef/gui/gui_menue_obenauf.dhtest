@@ -1,0 +1,114 @@
+' Ein aufgeklapptes Leistenmenue und eine offene Klappliste liegen ueber
+' ALLEM (2026-11-10): ueber anderen Fenstern und ueber dem, was ein Programm
+' nach GUI_DRAW(FALSE) selbst malt -- sie kommen mit GUI_DRAW_TOP. Vorher
+' zeichnete die gui sie mit ihrem eigenen Fenster; im Studio deckten das
+' Entwurfsfenster und seine Titelleiste die unteren Eintraege des Menues
+' "Ansicht" zu, und ein Klick dorthin waehlte trotzdem den verdeckten
+' Eintrag.
+' Geprueft wird am Bild. Knopf 0 = links: Ereignis 6 drueckt, 5 laesst los,
+' 7 bewegt die Maus. Format: docs/werkzeuge.md, dhrt test.
+
+--- langsam
+=== das menue liegt ueber dem selbst gemalten
+IMPORT "gui"
+SCREEN(300, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 300)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM m AS INTEGER : m = GUI_MENU(w, "Datei")
+DIM n AS INTEGER : n = GUI_MENU_ITEM(m, "Neu")
+DIM s AS INTEGER : s = GUI_MENU_ITEM(m, "Sichern")
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(0)
+    GUI_DRAW(FALSE)
+    ' Wie das Studio: unterhalb der Menueleiste malt das Programm selbst.
+    BOX(0, 30, 299, 299, &HFF00FF)
+    GUI_DRAW_TOP()
+    FLIP()
+WEND
+--- datei ev.txt
+c 5
+e 0 7 5 295 0 0
+e 1 7 20 13 0 0
+e 2 6 0 0 0 0
+e 3 5 0 0 0 0
+e 4 7 200 250 0 0
+
+--- umgebung
+DHRT_FRAMES=12
+--- bild
+30 45 nicht #FF00FF +-40
+280 45 #FF00FF
+
+=== das menue liegt ueber einem fenster davor
+IMPORT "gui"
+SCREEN(300, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 300)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM m AS INTEGER : m = GUI_MENU(w, "Datei")
+DIM n AS INTEGER : n = GUI_MENU_ITEM(m, "Neu")
+DIM s AS INTEGER : s = GUI_MENU_ITEM(m, "Sichern")
+DIM v AS GUI_WINDOW : v = GUI_WINDOW("B", 0, 30, 300, 270)
+GUI_WINDOW_CHROME(v, FALSE)
+DIM k AS GUI_WIDGET : k = GUI_BUTTON(v, "", 0, 0, 300, 270)
+GUI_SET_COLOR(k, "bg", &HFF00FF)
+GUI_SET_COLOR(k, "border", &HFF00FF)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    ' Wie das Studio sein Entwurfsfenster: immer obenauf.
+    GUI_WINDOW_FRONT(v)
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 5
+e 0 7 5 295 0 0
+e 1 7 20 13 0 0
+e 2 6 0 0 0 0
+e 3 5 0 0 0 0
+e 4 7 200 250 0 0
+
+--- umgebung
+DHRT_FRAMES=12
+--- bild
+30 45 nicht #FF00FF +-40
+280 45 #FF00FF +-40
+
+=== die offene klappliste liegt ueber einem fenster davor
+IMPORT "gui"
+SCREEN(300, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 300)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM dd AS GUI_WIDGET : dd = GUI_DROPDOWN(w, 10, 4, 150, 26, ["Apfel", "Birne", "Kirsche"])
+DIM v AS GUI_WINDOW : v = GUI_WINDOW("B", 0, 34, 300, 266)
+GUI_WINDOW_CHROME(v, FALSE)
+DIM k AS GUI_WIDGET : k = GUI_BUTTON(v, "", 0, 0, 300, 266)
+GUI_SET_COLOR(k, "bg", &HFF00FF)
+GUI_SET_COLOR(k, "border", &HFF00FF)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    GUI_WINDOW_FRONT(v)
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 5
+e 0 7 5 295 0 0
+e 1 7 60 16 0 0
+e 2 6 0 0 0 0
+e 3 5 0 0 0 0
+e 4 7 200 250 0 0
+
+--- umgebung
+DHRT_FRAMES=12
+--- bild
+40 60 nicht #FF00FF +-40
+280 60 #FF00FF +-40

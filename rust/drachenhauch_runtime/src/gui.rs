@@ -5125,6 +5125,13 @@ impl Gui {
         let w = &self.windows[wi];
         if w.entwurf { w.zuschnitt } else { None }
     }
+    /// Kommen das aufgeklappte Leistenmenue und die offene Klappliste dieses
+    /// Fensters in die obere Schicht (`draw_top`)? Ja, ausser das Fenster
+    /// wird vergroessert oder zugeschnitten gezeichnet -- dann stehen sie in
+    /// dessen Lage und bleiben beim Fenster.
+    fn popups_oben(&self, wi: usize) -> bool {
+        self.zoom_von(wi) == 1.0 && self.zuschnitt_von(wi).is_none()
+    }
     /// Die Schnittmenge zweier Rechtecke (x, y, b, h); leer = Breite/Hoehe 0.
     fn schnitt(a: (i32, i32, i32, i32), b: (i32, i32, i32, i32)) -> (i32, i32, i32, i32) {
         let x = a.0.max(b.0);

@@ -845,6 +845,16 @@ impl Gui {
         // dem, was ein Programm in eine Zeichenflaeche gemalt hat.
         self.ueber_zeichnen(g);
         self.rs_zeichnen(g);
+        // Aufgeklapptes Leistenmenue und offene Klappliste: ueber allen
+        // Fenstern und dem, was das Programm danach gemalt hat -- vorher
+        // deckte sie jedes Fenster zu, das ueber ihrem eigenen lag (im
+        // Studio das Entwurfsfenster), und der Klick traf sie trotzdem.
+        let mut eigner: Vec<usize> = Vec::new();
+        if let Some((mw, _)) = self.open_menu { eigner.push(mw); }
+        if let Some((dw, _)) = self.open_dropdown { if !eigner.contains(&dw) { eigner.push(dw); } }
+        for wi in eigner {
+            if wi < self.windows.len() && self.popups_oben(wi) { self.popups_zeichnen(g, wi); }
+        }
         // Kontextmenue ueber ALLEM (nach allen Fenstern).
         // Die Lagen kommen aus `popup_chain` -- derselben Quelle wie der
         // Treffertest, dort weicht ein Popup am Bildschirmrand aus.

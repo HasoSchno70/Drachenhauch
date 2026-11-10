@@ -304,7 +304,7 @@ IMPORT "gui"
 | `GUI_TABLE_ROW_COUNT(tbl)` | INTEGER | number of data rows |
 | `GUI_UPDATE()` | — | **required** every frame: process mouse/keys |
 | `GUI_DRAW([obenauf])` | — | draw all windows (back→front); `obenauf`=FALSE leaves out the context menu and tooltip |
-| `GUI_DRAW_TOP()` | — | only what lies above all windows: open context menu and tooltip |
+| `GUI_DRAW_TOP()` | — | only what lies above all windows: open menu (bar or context), open dropdown list, tooltip |
 | `GUI_DRAW_WINDOW(win)` | — | draw ONE window again, above everything added since `GUI_DRAW` |
 | `GUI_CLICKED(widget)` | BOOLEAN | clicked in this frame? Applies to button, menu entry, **checkbox, toggle and radio** and to a click on a list entry -- also the one already selected |
 | `GUI_CHANGED(widget)` | BOOLEAN | did the **user** change the widget in the last `GUI_UPDATE` (selection -- the node of a tree too --, value, text, tick)? What the program sets itself does not count. The first call starts watching and returns FALSE |
@@ -1260,17 +1260,21 @@ focus: what is visible on top also gets the clicks in the next frame.
 Before, after a click into the window underneath it lay behind again -- you
 saw a button, and the click went to the window you could not see.
 
-**Context menu and tooltip** lie above *all* windows and are therefore
-affected by the same problem — a tooltip follows the mouse and so regularly
-ends up above a canvas. For them there is `GUI_DRAW_TOP()`, and `GUI_DRAW`
-leaves them out with `GUI_DRAW(FALSE)`:
+**Menus, dropdown lists and tooltip** lie above *all* windows and are
+therefore affected by the same problem — a tooltip follows the mouse and so
+regularly ends up above a canvas. For them there is `GUI_DRAW_TOP()`, and
+`GUI_DRAW` leaves them out with `GUI_DRAW(FALSE)`. That holds for the context
+menu as well as for an opened menu of the menu bar and an open dropdown list:
+they also lie above a window in front of their own — the click goes to them,
+after all. Only for a zoomed or clipped window in design mode
+(`GUI_WINDOW_ZOOM`, `GUI_WINDOW_CLIP`) do they stay with their window.
 
 ```basic
 GUI_UPDATE()
 GUI_DRAW(FALSE)                             ' windows, without the on-top layer
 ' ... here the program paints into its canvases ...
 IF dialogOffen THEN GUI_DRAW_WINDOW(dlg)
-GUI_DRAW_TOP()                              ' context menu + tooltip, last
+GUI_DRAW_TOP()                              ' menus, dropdown lists, tooltip, last
 FLIP()
 ```
 
