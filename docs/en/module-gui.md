@@ -2520,7 +2520,7 @@ themes can be switched via the menu.
   (`GUI_LAYOUT`); no constraint system.
 - **One program, one OS window**; gui windows live inside it — not beyond the
   edge, not on the second monitor, without their own entry in the taskbar.
-  Why, and which paths there would be: [entwurf-native-fenster.md](../entwurf-native-fenster.md) (German).
+  Why, and which paths there would be: [entwurf-native-fenster.md](../intern/entwurf-native-fenster.md) (German).
 - **Runtime manipulation** (moving/resizing/deleting/showing/hiding/
   hit test/enumeration) is supported — see the section above.
 - **Headless/graphical**: `GUI_UPDATE`/`GUI_DRAW` need an active
@@ -3310,7 +3310,7 @@ speech control query a window through the system's interface — on Windows
 system; until September 2026 every Drachenhauch window was, for these
 programs, a title and nothing else (measured: zero descendants in the UIA
 tree, see
-[entwurf-barrierefreiheit.md](../entwurf-barrierefreiheit.md) (German)).
+[entwurf-barrierefreiheit.md](../intern/entwurf-barrierefreiheit.md) (German)).
 
 Since then **the `gui` module reports its tree by itself**, through the
 Rust library [AccessKit](https://accesskit.dev/): every window, every

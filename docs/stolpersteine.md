@@ -1,7 +1,7 @@
 # Drachenhauch — Stolpersteine & Inkonsistenzen (beim Schreiben des Lehrbuchs aufgefallen)
 
 Sammlung von Sprach-/Engine-Reibungspunkten, die beim Verfassen von
-`buch-referenz/` (alle Kapitel + Module gegen `dhrt` verifiziert) auftauchten.
+`buecher/referenz/` (alle Kapitel + Module gegen `dhrt` verifiziert) auftauchten.
 **Nicht das Buch, sondern Drachenhauch selbst** betreffend — als Backlog zum
 späteren Beheben. Jeder Punkt ist gegen den aktuellen `dhrt`-release-Build
 reproduziert.
@@ -88,7 +88,7 @@ verlangen. Aktuell konsistent, also kein Muss.
 
 ### D1. `/` liefert mal INTEGER, mal FLOAT  —  ✅ GEÄNDERT 2026-09-24: immer FLOAT
 > **Neue Entscheidung (2026-09-24):** `/` liefert immer eine Kommazahl, `8 / 2` ist
-> `4.0`. Anlass war die Übersetzung in Maschinencode (`docs/entwurf-maschinencode.md`):
+> `4.0`. Anlass war die Übersetzung in Maschinencode (`docs/intern/entwurf-maschinencode.md`):
 > ein Typ, der am Wert hängt, lässt sich nicht vorab festlegen. `\` teilt ganzzahlig.
 > Eine Zuweisung an eine INTEGER-Variable geht weiter, solange das Ergebnis glatt ist
 > (`i = 8 / 2` ist 4); ein Feld-Index aus `/` bricht ab, und `dhrt --check` warnt

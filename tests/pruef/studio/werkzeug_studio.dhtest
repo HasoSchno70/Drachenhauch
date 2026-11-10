@@ -1,4 +1,4 @@
-' Drachenhauch Studio, Stufe 1 (studio/, docs/entwurf-studio.md): Fenster
+' Drachenhauch Studio, Stufe 1 (studio/, docs/intern/entwurf-studio.md): Fenster
 ' entwerfen mit Bibliothek, Entwurfsflaeche, Ausrichtungslinien, Inspektor.
 '
 ' Jeder Fall startet das Studio als Kind (_hilfen/studiolauf.dh): ein erster

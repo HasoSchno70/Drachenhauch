@@ -2531,7 +2531,7 @@ Themen umschalten.
   (`GUI_LAYOUT`); kein Constraint-System.
 - **Ein Programm, ein OS-Fenster**; gui-Fenster leben darin — nicht über den
   Rand, nicht auf dem zweiten Monitor, ohne eigenen Eintrag in der Taskleiste.
-  Warum, und welche Wege es gäbe: [entwurf-native-fenster.md](entwurf-native-fenster.md).
+  Warum, und welche Wege es gäbe: [entwurf-native-fenster.md](intern/entwurf-native-fenster.md).
 - **Laufzeit-Manipulation** (Verschieben/Skalieren/Löschen/Ein-/Ausblenden/
   Hit-Test/Enumeration) wird unterstützt — siehe Abschnitt oben.
 - **Headless/grafisch**: `GUI_UPDATE`/`GUI_DRAW` brauchen einen aktiven
@@ -3326,7 +3326,7 @@ ab — unter Windows *UI Automation*. raylib malt Pixel und meldet dem
 System keine Bedienelemente; bis September 2026 war jedes
 Drachenhauch-Fenster für diese Programme ein Titel und sonst nichts
 (gemessen: null Nachkommen im UIA-Baum, siehe
-[entwurf-barrierefreiheit.md](entwurf-barrierefreiheit.md)).
+[entwurf-barrierefreiheit.md](intern/entwurf-barrierefreiheit.md)).
 
 Seither **meldet das `gui`-Modul seinen Baum von selbst**, über die
 Rust-Bibliothek [AccessKit](https://accesskit.dev/): jedes Fenster, jedes

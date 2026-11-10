@@ -76,7 +76,7 @@ dhrt test code/eins_pruefung.dh
 ```
 
 **What gets found is `*_pruefung.dh`** — the rule was read off the existing
-code, not invented: `buch-tippspiel/code/` has always named its four test
+code, not invented: `buecher/tippspiel/code/` has always named its four test
 programs that way. A file named explicitly runs even without this ending;
 whoever writes it down means it.
 
@@ -111,7 +111,7 @@ IF ASSERT_FAILED() > 0 THEN EXIT(1)
 A test program checks itself with `ASSERT`. Most of the language's tests,
 however, are output comparisons: a short program, an expected output. For
 those you do not need one program per file, but a **collection** (since
-2026-09-07, path D of the [Python removal](../entwurf-python-abbau.md)
+2026-09-07, path D of the [Python removal](../intern/entwurf-python-abbau.md)
 (German)):
 
 ```dhtest

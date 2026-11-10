@@ -2,7 +2,7 @@
 ' pakete/<name>/ neben der paket.json ab, merkt sie dort und in
 ' paket.lock.json (mit SHA-256), und IMPORT findet sie -- von der
 ' importierenden Datei aus nach oben in jedem pakete/. Entwurf:
-' docs/entwurf-pakete.md.
+' docs/intern/entwurf-pakete.md.
 '
 ' Jeder Fall baut sich seine Bibliotheken selbst (Ordner, ZIP) und ruft
 ' dhrt als Kind; das Projekt ist der Unterordner "projekt".

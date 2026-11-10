@@ -884,6 +884,6 @@ The runtime loads the library at the first call
 (`libloading`) and builds, once per signature, a small transition with
 Cranelift -- the same library that also generates the machine code; it
 places the arguments according to the system's C calling convention. Design and
-decisions: [entwurf-ffi.md](../entwurf-ffi.md) (German), source code
+decisions: [entwurf-ffi.md](../intern/entwurf-ffi.md) (German), source code
 `rust/drachenhauch_runtime/src/ffi.rs`, tests
 `tests/pruef/sprache/ffi.dhtest`.

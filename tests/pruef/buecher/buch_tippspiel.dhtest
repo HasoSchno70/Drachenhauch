@@ -233,7 +233,7 @@ rueckgabe 0
 === die kapitel wachsen
 ' Jedes Kapitel baut auf dem vorigen auf. Schrumpft eines, ist beim
 ' Bearbeiten etwas verlorengegangen.
-DIM code AS STRING : code = ARG$(0) + "/buch-tippspiel/code/"
+DIM code AS STRING : code = ARG$(0) + "/buecher/tippspiel/code/"
 DIM folge AS ARRAY OF STRING
 folge = ["kap04/spielplan.dh", "kap05/tipps.dh", "kap06/punkte.dh", "kap07/rangliste.dh", _
          "kap08/zeit.dh", "kap09/netz.dh", "kap10/robust.dh", "kap11/sicherung.dh", "kap12/politur.dh"]
@@ -251,7 +251,7 @@ PRINT "geprueft "; LEN(folge)
 geprueft 9
 
 === das readme verweist auf alle kapitel
-DIM text AS STRING : text = BUFFER_TO_STRING$(READALL_BYTES(ARG$(0) + "/buch-tippspiel/README.md"))
+DIM text AS STRING : text = BUFFER_TO_STRING$(READALL_BYTES(ARG$(0) + "/buecher/tippspiel/README.md"))
 DIM fehlt AS INTEGER : fehlt = 0
 DIM nr AS INTEGER
 FOR nr = 1 TO 13
@@ -271,7 +271,7 @@ fehlend 0
 ' Fehlt ein Bild, laesst der Build die Stelle stillschweigend aus -- im
 ' fertigen Buch klafft eine Luecke, die niemandem auffaellt.
 IMPORT "regex"
-DIM buch AS STRING : buch = ARG$(0) + "/buch-tippspiel/buch"
+DIM buch AS STRING : buch = ARG$(0) + "/buecher/tippspiel/buch"
 PRINT "skript da "; FILEEXISTS(buch + "/build_book.js")
 DIM text AS STRING : text = BUFFER_TO_STRING$(READALL_BYTES(buch + "/build_book.js"))
 ' Mit einer Gruppe im Muster liefert REGEX_FIND_ALL die Gruppe.
@@ -301,7 +301,7 @@ bilder gefunden TRUE
 === alle dreizehn kapitel stehen im buch und im verzeichnis
 ' toc_titles.json entsteht beim Build und speist den Zwei-Pass.
 IMPORT "json"
-DIM buch AS STRING : buch = ARG$(0) + "/buch-tippspiel/buch"
+DIM buch AS STRING : buch = ARG$(0) + "/buecher/tippspiel/buch"
 DIM text AS STRING : text = BUFFER_TO_STRING$(READALL_BYTES(buch + "/build_book.js"))
 DIM toc AS JSON_HANDLE
 DIM mitToc AS BOOLEAN : mitToc = FILEEXISTS(buch + "/toc_titles.json")
@@ -332,14 +332,14 @@ geprueft
 ' Warnung; hier ist es ein Fehler. Ohne Node oder ohne das docx-Paket
 ' ueberspringt sich der Fall -- npm install gehoert nicht in einen Testlauf.
 IMPORT "helfer.dh"
-DIM buch AS STRING : buch = ARG$(0) + "/buch-tippspiel/buch"
+DIM buch AS STRING : buch = ARG$(0) + "/buecher/tippspiel/buch"
 DIM fall AS STRING : fall = CWD$()
 IF NOT nodeDa() THEN
     PRINT "UEBERSPRINGEN: node fehlt"
     EXIT(0)
 END IF
 IF NOT DIREXISTS(buch + "/node_modules/docx") THEN
-    PRINT "UEBERSPRINGEN: docx nicht installiert (npm install in buch-tippspiel/buch)"
+    PRINT "UEBERSPRINGEN: docx nicht installiert (npm install in buecher/tippspiel/buch)"
     EXIT(0)
 END IF
 SETENV("BUCH_ZIEL_DIR", fall)
@@ -366,7 +366,7 @@ docx da TRUE
 ' macOS-Rechner der CI brach es ab und liess den ganzen Lauf fallen. Jetzt
 ' sagt es "uebersprungen" und endet mit 0. Der Server wird dafuer auf einen
 ' Namen umgebogen, den es nicht gibt (.invalid, RFC 6761).
---- programm ../../../buch-tippspiel/code/abruf_pruefung.dh
+--- programm ../../../buecher/tippspiel/code/abruf_pruefung.dh
 --- ersetzen CONST URL AS STRING = "https://api.openligadb.de/getmatchdata/bl1/2026"
 CONST URL AS STRING = "https://api.openligadb.invalid/getmatchdata/bl1/2026"
 --- enthaelt
@@ -376,7 +376,7 @@ UEBERSPRUNGEN -- OpenLigaDB nicht erreichbar:
 ' Gegenprobe: nur ein Fehler VOM NETZ heisst uebersprungen. Ein falsch
 ' benutztes HTTP_RESULT (kein Abruf mit dieser Nummer) bricht weiter ab --
 ' sonst wuerde das TRY jeden echten Fehler unsichtbar machen.
---- programm ../../../buch-tippspiel/code/abruf_pruefung.dh
+--- programm ../../../buecher/tippspiel/code/abruf_pruefung.dh
 --- ersetzen DIM antwort AS STRING : antwort = HTTP_GET(URL)
 DIM antwort AS STRING : antwort = HTTP_RESULT(99)
 --- fehler

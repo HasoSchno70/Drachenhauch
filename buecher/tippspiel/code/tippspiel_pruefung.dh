@@ -1,0 +1,804 @@
+' ============================================================
+'  TIPPSPIEL -- Pruefung ohne Fenster
+' ============================================================
+'  Dieselbe Punkteregel und derselbe Datenbank-Ablauf wie in
+'  tippspiel.dh, nur ohne Oberflaeche: laeuft in der Konsole,
+'  prueft sich selbst und meldet am Ende, was schiefging.
+'
+'  Warum getrennt? Die Regel ist das Herz der Anwendung. Sie
+'  darf nicht nur dann nachweisbar richtig sein, wenn jemand
+'  von Hand klickt.
+'
+'  Start:  dhrt run buecher/tippspiel/code/tippspiel_pruefung.dh
+'
+'  Rueckgabewert: 0 = alles gruen, 1 = mindestens eine Pruefung
+'  fehlgeschlagen. Damit laesst sich der Aufruf in ein Skript
+'  haengen. Die Fehlschlaege selbst gehen nach stderr (mit
+'  Zeilennummer), die Bilanz nach stdout -- ein
+'  `... > bericht.txt` bleibt also lesbar.
+' ============================================================
+IMPORT "db"
+IMPORT "json"
+
+' Sammeln statt abbrechen: ein Pruefprogramm soll ALLE Fehler zeigen, nicht
+' nur den ersten. Ohne diese Zeile bricht die erste fehlgeschlagene Pruefung
+' ab -- das ist die Vorgabe und fuer eine Vorbedingung mitten im Programm
+' auch die richtige.
+ASSERT_COLLECT(TRUE)
+
+' Frueher standen hier drei fast wortgleiche SUBs (pruefe/pruefeJa/pruefeText),
+' die sich nur im Typ unterschieden, plus zwei Zaehler von Hand. ASSERT_EQ
+' vergleicht mit derselben Gleichheit wie der "="-Operator und zaehlt selbst;
+' Fehlschlaege meldet es mit Zeile auf stderr, die Bilanz kommt von
+' ASSERT_REPORT.
+
+' ---- Die Regel (wortgleich mit tippspiel.dh) -----------------------------
+CONST ART_DANEBEN = 0
+CONST ART_TENDENZ = 1
+CONST ART_DIFFERENZ = 2
+CONST ART_EXAKT = 3
+
+FUNCTION tendenz(heim AS INTEGER, gast AS INTEGER) AS INTEGER
+    IF heim > gast THEN RETURN 1
+    IF heim < gast THEN RETURN -1
+    RETURN 0
+END FUNCTION
+
+FUNCTION art(tippH AS INTEGER, tippA AS INTEGER, ergH AS INTEGER, ergA AS INTEGER) AS INTEGER
+    IF tippH = ergH AND tippA = ergA THEN RETURN ART_EXAKT
+    IF tendenz(tippH, tippA) <> tendenz(ergH, ergA) THEN RETURN ART_DANEBEN
+    IF (tippH - tippA) = (ergH - ergA) THEN RETURN ART_DIFFERENZ
+    RETURN ART_TENDENZ
+END FUNCTION
+
+CONST REGEL_EXAKT = 3
+CONST REGEL_DIFFERENZ = 2
+CONST REGEL_TENDENZ = 1
+CONST REGEL_DANEBEN = 0
+
+FUNCTION punkteFuer(a AS INTEGER, exakt AS INTEGER, differenz AS INTEGER, tendenz AS INTEGER, daneben AS INTEGER) AS INTEGER
+    SELECT CASE a
+        CASE ART_EXAKT     : RETURN exakt
+        CASE ART_DIFFERENZ : RETURN differenz
+        CASE ART_TENDENZ   : RETURN tendenz
+    END SELECT
+    RETURN daneben
+END FUNCTION
+
+' Kurzform fuer die Pruefungen, die mit der Vorgabe rechnen.
+FUNCTION punkte(tippH AS INTEGER, tippA AS INTEGER, ergH AS INTEGER, ergA AS INTEGER) AS INTEGER
+    RETURN punkteFuer(art(tippH, tippA, ergH, ergA), REGEL_EXAKT, REGEL_DIFFERENZ, REGEL_TENDENZ, REGEL_DANEBEN)
+END FUNCTION
+
+PRINT "=== Punkteregel ==="
+ASSERT_EQ(punkte(2, 1, 2, 1), 3, "exakt getroffen 2:1 auf 2:1")
+ASSERT_EQ(punkte(0, 0, 0, 0), 3, "exaktes Unentschieden 0:0")
+ASSERT_EQ(punkte(3, 2, 2, 1), 2, "Tendenz + Differenz 3:2 auf 2:1")
+ASSERT_EQ(punkte(3, 0, 2, 1), 1, "nur Tendenz 3:0 auf 2:1")
+ASSERT_EQ(punkte(1, 2, 2, 1), 0, "falsche Tendenz 1:2 auf 2:1")
+ASSERT_EQ(punkte(2, 1, 1, 1), 0, "Heimsieg getippt, Remis gespielt")
+ASSERT_EQ(punkte(1, 1, 2, 2), 2, "Remis getippt, anderes Remis")
+
+' ---- Der Ablauf gegen eine echte Datenbank -------------------------------
+PRINT ""
+PRINT "=== Ablauf in der Datenbank ==="
+
+DIM db AS DB_CONN
+db = DB_OPEN(":memory:")
+
+DB_EXEC(db, "CREATE TABLE spieler (id INTEGER PRIMARY KEY, name TEXT)")
+DB_EXEC(db, "CREATE TABLE spiele (id INTEGER PRIMARY KEY, " + "saison INTEGER NOT NULL DEFAULT 2026, " + "liga TEXT NOT NULL DEFAULT 'bl1', spieltag INTEGER, " + "heim TEXT, gast TEXT, anstoss TEXT, tore_heim INTEGER, tore_gast INTEGER)")
+' Ein Spiel ist eindeutig durch Liga, Spieltag und die beiden Vereine --
+' wie in tippspiel.dh als Index, damit die Regel auch fuer eine Datenbank
+' gilt, die es schon vorher gab.
+DB_EXEC(db, "CREATE UNIQUE INDEX idx_spiel ON spiele (saison, liga, spieltag, heim, gast)")
+
+' Auf welche Saison schauen die Abfragen gerade? Im Programm kommt das aus
+' dem Spinner, hier aus dieser Zahl -- damit die Pruefungen weiter unten
+' umschalten koennen, ohne dass jeder Aufruf sie mitschleppen muss.
+DB_EXEC(db, "CREATE TABLE punkteregeln (saison INTEGER PRIMARY KEY, " + "exakt INTEGER NOT NULL, differenz INTEGER NOT NULL, " + "tendenz INTEGER NOT NULL, daneben INTEGER NOT NULL)")
+
+DIM pruefSaison AS INTEGER : pruefSaison = 2026
+DB_EXEC(db, "CREATE TABLE tipps (id INTEGER PRIMARY KEY, spieler_id INTEGER, " + "spiel_id INTEGER, tipp_heim INTEGER, tipp_gast INTEGER, punkte INTEGER, " + "UNIQUE(spieler_id, spiel_id))")
+
+DB_EXEC(db, "INSERT INTO spieler (id, name) VALUES (1, 'Anna'), (2, 'Ben')")
+DB_EXEC(db, "INSERT INTO spiele (id, spieltag, heim, gast) VALUES " + "(1, 1, 'Bayern', 'Stuttgart'), (2, 1, 'Dortmund', 'HSV')")
+
+' Anna tippt exakt, Ben daneben
+DB_EXEC(db, "INSERT INTO tipps (spieler_id, spiel_id, tipp_heim, tipp_gast) VALUES (1,1,2,1)")
+DB_EXEC(db, "INSERT INTO tipps (spieler_id, spiel_id, tipp_heim, tipp_gast) VALUES (2,1,0,3)")
+
+DIM r AS DB_RESULT
+r = DB_QUERY(db, "SELECT COUNT(*) FROM tipps")
+DB_NEXT(r)
+ASSERT_EQ(DB_GET_INT(r, 0), 2, "Tipps gespeichert")
+DB_CLOSE_RESULT(r)
+
+' Derselbe Tipp noch einmal -- darf keine zweite Zeile geben (UNIQUE + UPSERT)
+DB_EXEC(db, "INSERT INTO tipps (spieler_id, spiel_id, tipp_heim, tipp_gast) " + "VALUES (1,1,4,0) ON CONFLICT(spieler_id, spiel_id) DO UPDATE SET " + "tipp_heim = excluded.tipp_heim, tipp_gast = excluded.tipp_gast, punkte = NULL")
+r = DB_QUERY(db, "SELECT COUNT(*) FROM tipps")
+DB_NEXT(r)
+ASSERT_EQ(DB_GET_INT(r, 0), 2, "Zweiter Tipp ueberschreibt, legt nicht an")
+DB_CLOSE_RESULT(r)
+
+' Zurueck auf den exakten Tipp
+DB_EXEC(db, "UPDATE tipps SET tipp_heim = 2, tipp_gast = 1 WHERE spieler_id = 1 AND spiel_id = 1")
+
+' Ergebnis eintragen und werten
+DB_EXEC(db, "UPDATE spiele SET tore_heim = 2, tore_gast = 1 WHERE id = 1")
+
+CONST MAXT = 100
+DIM ids[MAXT] AS INTEGER
+DIM werte[MAXT] AS INTEGER
+DIM n AS INTEGER : n = 0
+r = DB_QUERY(db, "SELECT id, tipp_heim, tipp_gast FROM tipps WHERE spiel_id = 1")
+WHILE DB_NEXT(r)
+    ids[n] = DB_GET_INT(r, 0)
+    werte[n] = punkte(DB_GET_INT(r, 1), DB_GET_INT(r, 2), 2, 1)
+    n = n + 1
+WEND
+DB_CLOSE_RESULT(r)
+
+DB_BEGIN(db)
+DIM i AS INTEGER
+FOR i = 0 TO n - 1
+    DB_EXEC(db, "UPDATE tipps SET punkte = ? WHERE id = ?", werte[i], ids[i])
+NEXT
+DB_COMMIT(db)
+
+r = DB_QUERY(db, "SELECT punkte FROM tipps WHERE spieler_id = 1 AND spiel_id = 1")
+DB_NEXT(r)
+ASSERT_EQ(DB_GET_INT(r, 0), 3, "Anna bekommt 3 Punkte")
+DB_CLOSE_RESULT(r)
+
+r = DB_QUERY(db, "SELECT punkte FROM tipps WHERE spieler_id = 2 AND spiel_id = 1")
+DB_NEXT(r)
+ASSERT_EQ(DB_GET_INT(r, 0), 0, "Ben bekommt 0 Punkte")
+DB_CLOSE_RESULT(r)
+
+' ---- Rangliste: nur gewertete Spiele zaehlen -----------------------------
+' Anna tippt auch das zweite Spiel -- das hat noch kein Ergebnis und darf
+' die Rangliste nicht beeinflussen.
+DB_EXEC(db, "INSERT INTO tipps (spieler_id, spiel_id, tipp_heim, tipp_gast) VALUES (1,2,1,1)")
+
+r = DB_QUERY(db, "SELECT p.name, " + "  COALESCE(SUM(CASE WHEN s.tore_heim IS NOT NULL THEN t.punkte END), 0) AS punkte, " + "  COUNT(t.id) AS tipps " + "FROM spieler p " + "LEFT JOIN tipps t ON t.spieler_id = p.id " + "LEFT JOIN spiele s ON s.id = t.spiel_id " + "GROUP BY p.id, p.name ORDER BY punkte DESC, p.name")
+PRINT ""
+PRINT "  Rangliste:"
+DIM platz AS INTEGER : platz = 0
+WHILE DB_NEXT(r)
+    platz = platz + 1
+    PRINT "    "; platz; ". "; DB_GET_STRING(r, 0); "  "; DB_GET_INT(r, 1); " Punkte aus "; DB_GET_INT(r, 2); " Tipps"
+    IF platz = 1 THEN
+        ASSERT_EQ(DB_GET_INT(r, 1), 3, "Erster ist Anna mit 3 Punkten")
+        ASSERT_EQ(DB_GET_INT(r, 2), 2, "Annas offener Tipp zaehlt mit als abgegeben")
+    END IF
+WEND
+DB_CLOSE_RESULT(r)
+
+' ---- Mehrere Spieltage ---------------------------------------------------
+' Bis hierher lag alles auf dem 1. Spieltag. Eine Saison hat 34 -- und damit
+' zwei Fragen, die vorher keine waren: welche Spiele gehoeren zusammen, und
+' auf welchen Spieltag schaut man beim Start?
+PRINT ""
+PRINT "=== Mehrere Spieltage ==="
+
+FUNCTION anzahl(sql AS STRING) AS INTEGER
+    DIM q AS DB_RESULT
+    q = DB_QUERY(db, sql)
+    DIM n AS INTEGER : n = 0
+    IF DB_NEXT(q) THEN n = DB_GET_INT(q, 0)
+    DB_CLOSE_RESULT(q)
+    RETURN n
+END FUNCTION
+
+' Auf welchen Spieltag schaut man? Auf den mit dem naechsten Anpfiff -- in
+' der gewaehlten Liga, denn jede hat ihren eigenen Spielplan.
+' Die Uhrzeit kommt als Parameter herein, nicht aus ZEIT_JETZT() -- eine
+' Pruefung, deren Ergebnis vom Kalender abhaengt, prueft nichts.
+FUNCTION spieltagBei(liga AS STRING, jetzt AS STRING) AS INTEGER
+    DIM q AS DB_RESULT
+    q = DB_QUERY(db, "SELECT spieltag FROM spiele " + "WHERE saison = ? AND liga = ? " + "  AND anstoss IS NOT NULL AND anstoss >= ? " + "ORDER BY anstoss LIMIT 1", pruefSaison, liga, jetzt)
+    DIM tag AS INTEGER : tag = 0
+    IF DB_NEXT(q) THEN tag = DB_GET_INT(q, 0)
+    DB_CLOSE_RESULT(q)
+    IF tag = 0 THEN
+        q = DB_QUERY(db, "SELECT COALESCE(MAX(spieltag), 1) FROM spiele " + "WHERE saison = ? AND liga = ?", pruefSaison, liga)
+        IF DB_NEXT(q) THEN tag = DB_GET_INT(q, 0)
+        DB_CLOSE_RESULT(q)
+    END IF
+    RETURN tag
+END FUNCTION
+
+DB_EXEC(db, "INSERT INTO spiele (id, spieltag, heim, gast, anstoss) VALUES " + "(11, 2, 'Leipzig', 'Freiburg', '2026-09-04 20:30:00'), " + "(12, 2, 'Koeln', 'Bremen', '2026-09-05 15:30:00'), " + "(13, 3, 'Stuttgart', 'Bayern', '2026-09-11 20:30:00')")
+
+ASSERT_EQ(anzahl("SELECT COUNT(*) FROM spiele WHERE spieltag = 2"), 2, _
+          "Spieltag 2 hat 2 Spiele")
+ASSERT_EQ(anzahl("SELECT COUNT(*) FROM spiele WHERE spieltag = 3"), 1, _
+          "Spieltag 3 hat 1 Spiel")
+
+' Ein zweiter Abruf desselben Spielplans darf nichts verdoppeln -- dafuer
+' sorgt der Index, nicht das Programm.
+DB_EXEC(db, "INSERT INTO spiele (saison, liga, spieltag, heim, gast, anstoss) " + "VALUES (2026, 'bl1', 2, ?, ?, ?) " + "ON CONFLICT(saison, liga, spieltag, heim, gast) DO UPDATE SET " + "  anstoss = excluded.anstoss", "Leipzig", "Freiburg", "2026-09-04 18:30:00")
+ASSERT_EQ(anzahl("SELECT COUNT(*) FROM spiele WHERE spieltag = 2"), 2, _
+          "zweiter Abruf legt keine Dublette an")
+ASSERT_EQ(anzahl("SELECT COUNT(*) FROM spiele WHERE id = 11 AND anstoss = '2026-09-04 18:30:00'"), 1, _
+          "dabei wird der Anstoss aufgefrischt")
+
+' Dieselbe Paarung an einem ANDEREN Spieltag ist ein anderes Spiel. Ohne den
+' Spieltag im Index waere das Rueckspiel keins.
+DB_EXEC(db, "INSERT INTO spiele (spieltag, heim, gast, anstoss) VALUES " + "(20, 'Leipzig', 'Freiburg', '2027-02-06 15:30:00')")
+ASSERT_EQ(anzahl("SELECT COUNT(*) FROM spiele WHERE heim = 'Leipzig' AND gast = 'Freiburg'"), 2, _
+          "dieselbe Paarung am anderen Spieltag ist ein zweites Spiel")
+
+ASSERT_EQ(spieltagBei("bl1", "2026-09-01 12:00:00"), 2, _
+          "vor dem 2. Spieltag zeigt er auf den 2.")
+ASSERT_EQ(spieltagBei("bl1", "2026-09-04 21:00:00"), 2, _
+          "zwischen den Spielen bleibt er beim 2.")
+ASSERT_EQ(spieltagBei("bl1", "2026-09-06 00:00:00"), 3, _
+          "nach dem 2. Spieltag zeigt er auf den 3.")
+ASSERT_EQ(spieltagBei("bl1", "2027-12-31 00:00:00"), 20, _
+          "ist die Saison durch, bleibt der letzte stehen")
+
+' Die Rangliste kennt keine Spieltage -- sie zaehlt die ganze Saison.
+DB_EXEC(db, "UPDATE spiele SET tore_heim = 1, tore_gast = 0 WHERE id = 11")
+DB_EXEC(db, "INSERT INTO tipps (spieler_id, spiel_id, tipp_heim, tipp_gast, punkte) " + "VALUES (1, 11, 1, 0, 3)")
+r = DB_QUERY(db, "SELECT COALESCE(SUM(CASE WHEN s.tore_heim IS NOT NULL " + "                         THEN t.punkte END), 0) " + "FROM tipps t LEFT JOIN spiele s ON s.id = t.spiel_id " + "WHERE t.spieler_id = 1")
+DB_NEXT(r)
+ASSERT_EQ(DB_GET_INT(r, 0), 6, "Annas Punkte zaehlen ueber beide Spieltage")
+DB_CLOSE_RESULT(r)
+
+' ---- Ergebnisse aus der Antwort ------------------------------------------
+' Die Stelle, an der es lautlos falsch wird. matchResults hat ZWEI Eintraege,
+' und der erste ist das Halbzeitergebnis -- Gladbach gegen Leverkusen stand
+' zur Pause 0:2 und endete 2:3. Wer den ersten nimmt, wertet die Saison
+' falsch aus, und zwar plausibel falsch: es stehen ja Zahlen da.
+'
+' Geprueft wird gegen eine Antwort von Hand, nicht gegen das Netz. Eine
+' Pruefung, die eine Verbindung braucht, prueft an schlechten Tagen nichts.
+PRINT ""
+PRINT "=== Ergebnisse aus der Antwort ==="
+
+' Wortgleich mit tippspiel.dh.
+FUNCTION endergebnis(wurzel AS JSON_HANDLE, pfad AS STRING, BYREF toreHeim AS INTEGER, BYREF toreGast AS INTEGER) AS BOOLEAN
+    IF NOT JSON_HAS(wurzel, pfad + ".matchIsFinished") THEN RETURN FALSE
+    IF NOT JSON_GET_BOOL(wurzel, pfad + ".matchIsFinished") THEN RETURN FALSE
+
+    DIM m AS INTEGER : m = JSON_LEN(wurzel, pfad + ".matchResults")
+    DIM k AS INTEGER
+    FOR k = 0 TO m - 1
+        DIM rp AS STRING : rp = pfad + ".matchResults." + STR$(k)
+        IF JSON_GET_INT(wurzel, rp + ".resultTypeID") = 2 THEN
+            toreHeim = JSON_GET_INT(wurzel, rp + ".pointsTeam1")
+            toreGast = JSON_GET_INT(wurzel, rp + ".pointsTeam2")
+            RETURN TRUE
+        END IF
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+' Einfache Anfuehrungszeichen schreiben sich leichter -- JSON braucht
+' doppelte, also einmal tauschen.
+FUNCTION alsJson(s AS STRING) AS STRING
+    RETURN REPLACE$(s, "'", CHR$(34))
+END FUNCTION
+
+DIM roh AS STRING
+roh = "[" + "{'matchIsFinished': true, 'matchResults': [" + "  {'resultTypeID': 1, 'pointsTeam1': 0, 'pointsTeam2': 2}," + "  {'resultTypeID': 2, 'pointsTeam1': 2, 'pointsTeam2': 3}]}," + "{'matchIsFinished': false, 'matchResults': [" + "  {'resultTypeID': 1, 'pointsTeam1': 1, 'pointsTeam2': 0}]}," + "{'matchIsFinished': true, 'matchResults': []}," + "{'matchIsFinished': true, 'matchResults': [" + "  {'resultTypeID': 2, 'pointsTeam1': 0, 'pointsTeam2': 0}," + "  {'resultTypeID': 1, 'pointsTeam1': 0, 'pointsTeam2': 0}]}" + "]"
+DIM antwort AS JSON_HANDLE
+antwort = JSON_PARSE(alsJson(roh))
+
+DIM h AS INTEGER : h = -1
+DIM g AS INTEGER : g = -1
+ASSERT_EQ(endergebnis(antwort, "0", h, g), TRUE, "abgepfiffenes Spiel hat ein Ergebnis")
+ASSERT_EQ(h, 2, "  und zwar das Endergebnis, nicht die Halbzeit (Heim)")
+ASSERT_EQ(g, 3, "  Gast")
+
+h = -1 : g = -1
+ASSERT_EQ(endergebnis(antwort, "1", h, g), FALSE, "laufendes Spiel gibt keins her")
+ASSERT_EQ(h, -1, "  und ruehrt die Werte nicht an")
+
+ASSERT_EQ(endergebnis(antwort, "2", h, g), FALSE, "abgepfiffen, aber ohne Eintrag")
+
+' Die Reihenfolge in der Antwort ist nichts, worauf man sich stuetzen darf.
+h = -1 : g = -1
+ASSERT_EQ(endergebnis(antwort, "3", h, g), TRUE, "Endergebnis zuerst wird auch gefunden")
+ASSERT_EQ(h + g, 0, "  0:0 ist ein Ergebnis, kein fehlendes")
+
+' Und die Probe aufs Ganze: der Halbzeitstand haette 1 Punkt gegeben, das
+' Endergebnis gibt 3. Genau daran faellt der Fehler NICHT auf.
+ASSERT_EQ(punkte(2, 3, 2, 3), 3, "exakter Tipp auf 2:3 gibt 3")
+ASSERT_EQ(punkte(0, 2, 2, 3), 1, "Tipp auf den Halbzeitstand 0:2 gaebe nur 1")
+
+' ---- Tippgemeinschaften --------------------------------------------------
+' Das Buero tippt gegen das Buero. Die Rangliste bleibt dieselbe Rechnung --
+' nur der Kreis, ueber den sie geht, ist ein anderer. Genau deshalb steht sie
+' auch im Programm nur einmal da: "? = 0" heisst alle.
+PRINT ""
+PRINT "=== Tippgemeinschaften ==="
+
+DB_EXEC(db, "CREATE TABLE gruppen (id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE)")
+DB_EXEC(db, "CREATE TABLE gruppen_mitglieder (gruppe_id INTEGER NOT NULL, " + "spieler_id INTEGER NOT NULL, PRIMARY KEY (gruppe_id, spieler_id))")
+
+' Clara dazu: Spiel 11 endete 1:0, sie tippt 2:1 -- Tendenz und Differenz
+' stimmen, macht 2 Punkte. Anna hat 6, Ben 0.
+DB_EXEC(db, "INSERT INTO spieler (id, name) VALUES (3, 'Clara')")
+DB_EXEC(db, "INSERT INTO tipps (spieler_id, spiel_id, tipp_heim, tipp_gast, punkte) " + "VALUES (3, 11, 2, 1, 2)")
+
+' Die Rangliste des Programms, wortgleich. gid = 0 heisst: alle Spieler.
+FUNCTION wertung(gid AS INTEGER, BYREF erster AS STRING, BYREF punkteErster AS INTEGER) AS INTEGER
+    DIM q AS DB_RESULT
+    q = DB_QUERY(db, "SELECT p.name, " + "  COALESCE(SUM(CASE WHEN s.tore_heim IS NOT NULL " + "                    THEN t.punkte END), 0) AS punkte " + "FROM spieler p " + "LEFT JOIN tipps t ON t.spieler_id = p.id " + "LEFT JOIN spiele s ON s.id = t.spiel_id AND s.saison = ? " + "WHERE ? = 0 OR EXISTS (SELECT 1 FROM gruppen_mitglieder m " + "                       WHERE m.gruppe_id = ? AND m.spieler_id = p.id) " + "GROUP BY p.id, p.name " + "ORDER BY punkte DESC, p.name", pruefSaison, gid, gid)
+    erster = ""
+    punkteErster = 0
+    DIM n AS INTEGER : n = 0
+    WHILE DB_NEXT(q)
+        IF n = 0 THEN
+            erster = DB_GET_STRING(q, 0)
+            punkteErster = DB_GET_INT(q, 1)
+        END IF
+        n = n + 1
+    WEND
+    DB_CLOSE_RESULT(q)
+    RETURN n
+END FUNCTION
+
+DIM wer AS STRING
+DIM wieviel AS INTEGER
+ASSERT_EQ(wertung(0, wer, wieviel), 3, "ohne Gemeinschaft stehen alle drin")
+ASSERT_EQ(wer, "Anna", "  und vorn steht Anna")
+ASSERT_EQ(wieviel, 6, "  mit 6 Punkten")
+
+DB_EXEC(db, "INSERT INTO gruppen (id, name) VALUES (1, 'Büro'), (2, 'Familie')")
+DB_EXEC(db, "INSERT INTO gruppen_mitglieder (gruppe_id, spieler_id) VALUES (1,1), (1,3)")
+
+ASSERT_EQ(wertung(1, wer, wieviel), 2, "das Buero sind zwei")
+ASSERT_EQ(wer, "Anna", "  vorn steht Anna")
+ASSERT_EQ(wieviel, 6, "  Punkte bleiben dieselben wie in der Gesamtwertung")
+
+' Eine leere Gemeinschaft ist leer -- nicht "alle". Der haeufigste Fehler
+' bei so einem Filter: der leere Fall faellt auf den ungefilterten zurueck.
+ASSERT_EQ(wertung(2, wer, wieviel), 0, "eine Gemeinschaft ohne Mitglieder ist leer")
+
+' Ein Spieler darf in mehreren sein -- deshalb eine eigene Tabelle und keine
+' Spalte am Spieler.
+DB_EXEC(db, "INSERT INTO gruppen_mitglieder (gruppe_id, spieler_id) VALUES (2, 1)")
+ASSERT_EQ(anzahl("SELECT COUNT(*) FROM gruppen_mitglieder WHERE spieler_id = 1"), 2, _
+          "Anna ist jetzt in zweien")
+ASSERT_EQ(wertung(2, wer, wieviel), 1, "die Familie ist trotzdem nur eine Person")
+
+' Zweimal dasselbe Mitglied laesst die Datenbank gar nicht erst zu.
+DIM ging AS BOOLEAN : ging = TRUE
+TRY
+    DB_EXEC(db, "INSERT INTO gruppen_mitglieder (gruppe_id, spieler_id) VALUES (1, 1)")
+CATCH e
+    ging = FALSE
+END TRY
+ASSERT_EQ(ging, FALSE, "dasselbe Mitglied zweimal geht nicht")
+ASSERT_EQ(anzahl("SELECT COUNT(*) FROM gruppen_mitglieder WHERE gruppe_id = 1"), 2, _
+          "  und hat nichts hinterlassen")
+
+ging = TRUE
+TRY
+    DB_EXEC(db, "INSERT INTO gruppen (name) VALUES ('Büro')")
+CATCH e
+    ging = FALSE
+END TRY
+ASSERT_EQ(ging, FALSE, "denselben Namen zweimal auch nicht")
+
+' Loeschen loest die Gemeinschaft auf, nicht die Tipps.
+DIM tippsVorher AS INTEGER : tippsVorher = anzahl("SELECT COUNT(*) FROM tipps")
+DB_EXEC(db, "DELETE FROM gruppen_mitglieder WHERE gruppe_id = 1")
+DB_EXEC(db, "DELETE FROM gruppen WHERE id = 1")
+ASSERT_EQ(anzahl("SELECT COUNT(*) FROM gruppen WHERE id = 1"), 0, "geloescht ist geloescht")
+ASSERT_EQ(anzahl("SELECT COUNT(*) FROM gruppen_mitglieder WHERE gruppe_id = 1"), 0, _
+          "  die Mitgliederliste geht mit")
+ASSERT_EQ(anzahl("SELECT COUNT(*) FROM tipps"), tippsVorher, "  die Tipps bleiben")
+ASSERT_EQ(wertung(0, wer, wieviel), 3, "  und die Gesamtwertung steht unveraendert da")
+
+' ---- Zwei Ligen ----------------------------------------------------------
+' Die 2. Bundesliga ist nicht "mehr vom selben": sie hat ihren eigenen
+' Spielplan und faengt frueher an. Was vorher der Schluessel eines Spiels
+' war (Spieltag + Paarung), ist es jetzt nicht mehr allein.
+PRINT ""
+PRINT "=== Zwei Ligen ==="
+
+DB_EXEC(db, "INSERT INTO spiele (id, liga, spieltag, heim, gast, anstoss) VALUES " + "(31, 'bl2', 1, 'VfL Bochum', 'Hertha BSC', '2026-08-07 20:30:00'), " + "(32, 'bl2', 1, 'FC St. Pauli', 'SpVgg Greuther Fürth', '2026-08-09 13:30:00'), " + "(33, 'bl2', 2, 'Hertha BSC', 'VfL Bochum', '2026-08-15 13:00:00')")
+
+ASSERT_EQ(anzahl("SELECT COUNT(*) FROM spiele WHERE liga = 'bl1' AND spieltag = 1"), 2, _
+          "die 1. Liga sieht die Spiele der 2. nicht")
+ASSERT_EQ(anzahl("SELECT COUNT(*) FROM spiele WHERE liga = 'bl2' AND spieltag = 1"), 2, _
+          "und umgekehrt")
+
+' Jede Liga hat ihren eigenen Kalender -- und das ist keine Kleinigkeit: die
+' 2. Bundesliga faengt drei Wochen frueher an. Dem 1. Spieltag der 1. Liga
+' dafuer die echten Termine geben (bisher stand dort keiner).
+DB_EXEC(db, "UPDATE spiele SET anstoss = '2026-08-28 20:30:00' WHERE id = 1")
+DB_EXEC(db, "UPDATE spiele SET anstoss = '2026-08-29 15:30:00' WHERE id = 2")
+
+' Am 10. August ist die 2. Liga schon beim 2. Spieltag, waehrend die 1. noch
+' gar nicht angefangen hat. Ein gemeinsamer Spieltag waere also falsch.
+ASSERT_EQ(spieltagBei("bl2", "2026-08-10 00:00:00"), 2, _
+          "am 10.08. ist die 2. Liga beim 2. Spieltag")
+ASSERT_EQ(spieltagBei("bl1", "2026-08-10 00:00:00"), 1, "die 1. Liga steht da noch beim 1.")
+
+' Der Grund, warum die Liga in den Index gehoert: dieselbe Paarung KANN es
+' in beiden geben. Bei echten Bundesliga-Daten kommt das nicht vor -- ein
+' Verein spielt in genau einer Liga -- aber der Schluessel eines Spiels sind
+' nun einmal alle vier Spalten, und das UPSERT beim Abruf nennt sie auch so.
+DB_EXEC(db, "INSERT INTO spiele (liga, spieltag, heim, gast) " + "VALUES ('bl1', 1, 'VfL Bochum', 'Hertha BSC')")
+ASSERT_EQ(anzahl("SELECT COUNT(*) FROM spiele WHERE heim = 'VfL Bochum' AND gast = 'Hertha BSC'"), 2, _
+          "dieselbe Paarung in der anderen Liga ist ein anderes Spiel")
+
+DIM nochmal AS BOOLEAN : nochmal = TRUE
+TRY
+    DB_EXEC(db, "INSERT INTO spiele (liga, spieltag, heim, gast) " + "VALUES ('bl2', 1, 'VfL Bochum', 'Hertha BSC')")
+CATCH e
+    nochmal = FALSE
+END TRY
+ASSERT_EQ(nochmal, FALSE, "in DERSELBEN Liga aber nicht")
+
+' Ein Tipp auf ein Zweitliga-Spiel zaehlt in derselben Rangliste. Die
+' Wertung geht ueber den Spieler, nicht ueber die Liga.
+DB_EXEC(db, "UPDATE spiele SET tore_heim = 2, tore_gast = 0 WHERE id = 31")
+DB_EXEC(db, "INSERT INTO tipps (spieler_id, spiel_id, tipp_heim, tipp_gast, punkte) " + "VALUES (2, 31, 2, 0, 3)")
+ASSERT_EQ(wertung(0, wer, wieviel), 3, "Bens Zweitliga-Tipp zaehlt in der Gesamtwertung")
+ASSERT_EQ(wer, "Anna", "  und bringt ihn nicht an Anna vorbei")
+
+' ---- Ligatabelle ---------------------------------------------------------
+' Die Tabelle wird gerechnet, nicht gespeichert -- sie steht schon in den
+' Ergebnissen. Der Kniff: jedes Spiel liefert ZWEI Zeilen, eine je Sicht.
+' Wortgleich mit tippspiel.dh.
+PRINT ""
+PRINT "=== Ligatabelle ==="
+
+FUNCTION tabellenAbfrage() AS STRING
+    RETURN "WITH ligaspiele AS (" + "    SELECT heim, gast, tore_heim, tore_gast FROM spiele" + "     WHERE saison = ? AND liga = ?" + "), vereine AS (" + "    SELECT heim AS verein FROM ligaspiele" + "    UNION SELECT gast FROM ligaspiele" + "), auftritte AS (" + "    SELECT heim AS verein, tore_heim AS eigene, tore_gast AS fremde" + "      FROM ligaspiele WHERE tore_heim IS NOT NULL" + "    UNION ALL" + "    SELECT gast, tore_gast, tore_heim" + "      FROM ligaspiele WHERE tore_heim IS NOT NULL" + ") " + "SELECT v.verein, COUNT(a.verein) AS sp, " + "  COALESCE(SUM(a.eigene > a.fremde), 0) AS s, " + "  COALESCE(SUM(a.eigene = a.fremde), 0) AS u, " + "  COALESCE(SUM(a.eigene < a.fremde), 0) AS n, " + "  COALESCE(SUM(a.eigene), 0) AS tore, " + "  COALESCE(SUM(a.fremde), 0) AS gegentore, " + "  COALESCE(SUM(a.eigene) - SUM(a.fremde), 0) AS diff, " + "  COALESCE(SUM(CASE WHEN a.eigene > a.fremde THEN 3 " + "                    WHEN a.eigene = a.fremde THEN 1 ELSE 0 END), 0) AS punkte " + "FROM vereine v LEFT JOIN auftritte a ON a.verein = v.verein " + "GROUP BY v.verein " + "ORDER BY punkte DESC, diff DESC, tore DESC, v.verein"
+END FUNCTION
+
+' Eine eigene kleine Liga, damit die vorherigen Pruefungen nicht hineinreden.
+DB_EXEC(db, "INSERT INTO spiele (liga, spieltag, heim, gast, tore_heim, tore_gast) VALUES " + "('tl', 1, 'Adler', 'Bieber', 3, 1), " + "('tl', 1, 'Chamaeleon', 'Dachs', 2, 2), " + "('tl', 2, 'Bieber', 'Chamaeleon', 0, 1), " + "('tl', 2, 'Dachs', 'Adler', 1, 1)")
+' Ein Spiel ohne Ergebnis darf nirgends mitzaehlen -- weder als Niederlage
+' noch als 0:0.
+DB_EXEC(db, "INSERT INTO spiele (liga, spieltag, heim, gast) VALUES " + "('tl', 3, 'Adler', 'Chamaeleon')")
+' Und ein Verein, der noch kein Spiel hatte, gehoert trotzdem in die Tabelle.
+DB_EXEC(db, "INSERT INTO spiele (liga, spieltag, heim, gast) VALUES " + "('tl', 3, 'Eichhorn', 'Bieber')")
+
+' Die Tabelle einmal einlesen.
+CONST MAXV = 20
+DIM tVerein[MAXV] AS STRING
+DIM tSp[MAXV] AS INTEGER
+DIM tTore[MAXV] AS INTEGER
+DIM tGegen[MAXV] AS INTEGER
+DIM tDiff[MAXV] AS INTEGER
+DIM tPunkte[MAXV] AS INTEGER
+DIM tAnzahl AS INTEGER : tAnzahl = 0
+
+r = DB_QUERY(db, tabellenAbfrage(), pruefSaison, "tl")
+WHILE DB_NEXT(r)
+    tVerein[tAnzahl] = DB_GET_STRING(r, 0)
+    tSp[tAnzahl] = DB_GET_INT(r, 1)
+    tTore[tAnzahl] = DB_GET_INT(r, 5)
+    tGegen[tAnzahl] = DB_GET_INT(r, 6)
+    tDiff[tAnzahl] = DB_GET_INT(r, 7)
+    tPunkte[tAnzahl] = DB_GET_INT(r, 8)
+    tAnzahl = tAnzahl + 1
+WEND
+DB_CLOSE_RESULT(r)
+
+PRINT "  Tabelle:"
+DIM ti AS INTEGER
+FOR ti = 0 TO tAnzahl - 1
+    PRINT "    "; ti + 1; ". "; tVerein[ti]; "  "; tSp[ti]; " Sp  "; tTore[ti]; ":"; tGegen[ti]; "  "; tDiff[ti]; "  "; tPunkte[ti]; " Pkt"
+NEXT
+
+' Adler: 3:1 gewonnen, 1:1 -> 4 Punkte, 4:2, Diff +2
+' Chamaeleon: 2:2, 1:0 gewonnen -> 4 Punkte, 3:2, Diff +1
+' Beide 4 Punkte -- die Tordifferenz entscheidet.
+ASSERT_EQ(tAnzahl, 5, "alle Vereine stehen drin, auch der ohne Spiel")
+ASSERT_EQ(tVerein[0], "Adler", "Erster ist Adler (4 Punkte, Diff +2)")
+ASSERT_EQ(tVerein[1], "Chamaeleon", "Zweiter ist Chamaeleon (4 Punkte, Diff +1)")
+ASSERT_EQ(tPunkte[0], 4, "  Adler hat 4 Punkte")
+ASSERT_EQ(tPunkte[1], 4, "  Chamaeleon auch")
+ASSERT_EQ(tDiff[0] - tDiff[1], 1, "  entschieden hat die Tordifferenz")
+
+ASSERT_EQ(tSp[0], 2, "Adler hat zwei Spiele -- das dritte hat kein Ergebnis")
+
+' Eichhorn hat noch nicht gespielt und steht damit auf 0 Punkten, aber auf
+' Tordifferenz 0. Bieber hat zwei Spiele verloren: auch 0 Punkte, aber -3.
+' Der Verein OHNE Spiel steht also ueber dem, der zweimal verloren hat --
+' das ist richtig so und faellt nur auf, wenn man es einmal hinschreibt.
+ASSERT_EQ(tVerein[3], "Eichhorn", "wer nicht gespielt hat, steht auf Platz 4")
+ASSERT_EQ(tSp[3], 0, "  mit null Spielen")
+ASSERT_EQ(tPunkte[3], 0, "  und null Punkten (nicht NULL)")
+ASSERT_EQ(tVerein[tAnzahl - 1], "Bieber", "Letzter ist Bieber -- 0 Punkte UND -3 Tore")
+ASSERT_EQ(tDiff[tAnzahl - 1], -3, "  seine Differenz ist schlechter als die von Eichhorn")
+
+' Die Probe, die eine Ligatabelle immer bestehen muss: was die einen
+' schiessen, kassieren die anderen.
+DIM summeTore AS INTEGER : summeTore = 0
+DIM summeGegen AS INTEGER : summeGegen = 0
+DIM summeSp AS INTEGER : summeSp = 0
+FOR ti = 0 TO tAnzahl - 1
+    summeTore = summeTore + tTore[ti]
+    summeGegen = summeGegen + tGegen[ti]
+    summeSp = summeSp + tSp[ti]
+NEXT
+ASSERT_EQ(summeTore - summeGegen, 0, "Tore und Gegentore gehen auf")
+ASSERT_EQ(summeSp, 8, "vier gewertete Spiele, also acht Einsaetze")
+
+' Ein Unentschieden gibt beiden einen Punkt -- zusammen 2 statt 3.
+' Vier Spiele, davon zwei unentschieden: 2*3 + 2*2 = 10.
+DIM summePunkte AS INTEGER : summePunkte = 0
+FOR ti = 0 TO tAnzahl - 1
+    summePunkte = summePunkte + tPunkte[ti]
+NEXT
+ASSERT_EQ(summePunkte, 10, "Punktsumme stimmt (2 Siege a 3, 2 Remis a 2)")
+
+' ---- Statistik -----------------------------------------------------------
+' Die Statistik fragt nach der ART eines Treffers, nicht nach seinen Punkten.
+' Heute sind das dieselben Zahlen -- genau deshalb muss man einmal
+' hinschreiben, dass es zwei verschiedene Fragen sind.
+PRINT ""
+PRINT "=== Trefferarten ==="
+
+ASSERT_EQ(art(2, 1, 2, 1), ART_EXAKT, "2:1 auf 2:1 ist exakt")
+ASSERT_EQ(art(3, 2, 2, 1), ART_DIFFERENZ, "3:2 auf 2:1 ist die Tordifferenz")
+ASSERT_EQ(art(3, 0, 2, 1), ART_TENDENZ, "3:0 auf 2:1 ist nur die Tendenz")
+ASSERT_EQ(art(1, 2, 2, 1), ART_DANEBEN, "1:2 auf 2:1 ist daneben")
+
+' Der Sonderfall, der beim Tippen von Unentschieden auffaellt: zwei
+' Unentschieden haben IMMER dieselbe Tordifferenz. 1:1 auf 2:2 kann also
+' nie "nur Tendenz" sein.
+ASSERT_EQ(art(1, 1, 2, 2), ART_DIFFERENZ, _
+          "1:1 auf 2:2 ist die Tordifferenz, nie nur Tendenz")
+ASSERT_EQ(art(0, 0, 0, 0), ART_EXAKT, "0:0 auf 0:0 ist exakt")
+
+' Art und Punkte muessen zusammenpassen -- ueber alle Tipps und Ergebnisse
+' von 0:0 bis 5:5. Wer eine der beiden Funktionen aendert und die andere
+' vergisst, faellt hier auf.
+DIM th AS INTEGER
+DIM tg AS INTEGER
+DIM eh AS INTEGER
+DIM eg AS INTEGER
+DIM schief AS INTEGER : schief = 0
+DIM gezaehlt AS INTEGER : gezaehlt = 0
+FOR th = 0 TO 5
+    FOR tg = 0 TO 5
+        FOR eh = 0 TO 5
+            FOR eg = 0 TO 5
+                gezaehlt = gezaehlt + 1
+                DIM a AS INTEGER : a = art(th, tg, eh, eg)
+                DIM p AS INTEGER : p = punkte(th, tg, eh, eg)
+                DIM soll AS INTEGER : soll = 0
+                IF a = ART_EXAKT THEN soll = 3
+                IF a = ART_DIFFERENZ THEN soll = 2
+                IF a = ART_TENDENZ THEN soll = 1
+                IF p <> soll THEN schief = schief + 1
+            NEXT
+        NEXT
+    NEXT
+NEXT
+ASSERT_EQ(gezaehlt, 1296, "alle 1296 Paarungen von 0:0 bis 5:5 geprueft")
+ASSERT_EQ(schief, 0, "  Art und Punkte passen ueberall zusammen")
+
+PRINT ""
+PRINT "=== Statistik eines Spielers ==="
+
+' Die Abfrage des Programms, wortgleich. Der leere Ligafilter heisst beide.
+FUNCTION statAbfrage() AS STRING
+    RETURN "SELECT s.spieltag, t.tipp_heim, t.tipp_gast, s.tore_heim, s.tore_gast " + "FROM tipps t JOIN spiele s ON s.id = t.spiel_id " + "WHERE t.spieler_id = ? AND s.saison = ? AND s.tore_heim IS NOT NULL " + "  AND (? = '' OR s.liga = ?) " + "ORDER BY s.spieltag"
+END FUNCTION
+
+FUNCTION statZeilen(spieler AS INTEGER, liga AS STRING, BYREF summe AS INTEGER, BYREF exakt AS INTEGER) AS INTEGER
+    DIM q AS DB_RESULT
+    q = DB_QUERY(db, statAbfrage(), spieler, pruefSaison, liga, liga)
+    DIM n AS INTEGER : n = 0
+    summe = 0
+    exakt = 0
+    WHILE DB_NEXT(q)
+        n = n + 1
+        summe = summe + punkte(DB_GET_INT(q, 1), DB_GET_INT(q, 2), DB_GET_INT(q, 3), DB_GET_INT(q, 4))
+        IF art(DB_GET_INT(q, 1), DB_GET_INT(q, 2), DB_GET_INT(q, 3), DB_GET_INT(q, 4)) = ART_EXAKT THEN exakt = exakt + 1
+    WEND
+    DB_CLOSE_RESULT(q)
+    RETURN n
+END FUNCTION
+
+' Clara bekommt einen zweiten Tipp -- einen in der 2. Liga, auf ein Spiel
+' mit Ergebnis (id 31, 2:0), exakt getroffen.
+DB_EXEC(db, "INSERT INTO tipps (spieler_id, spiel_id, tipp_heim, tipp_gast) " + "VALUES (3, 31, 2, 0)")
+' Und einen auf ein Spiel OHNE Ergebnis -- der darf nirgends auftauchen.
+DB_EXEC(db, "INSERT INTO tipps (spieler_id, spiel_id, tipp_heim, tipp_gast) " + "SELECT 3, id, 1, 1 FROM spiele WHERE liga = 'tl' AND spieltag = 3 LIMIT 1")
+
+DIM sSumme AS INTEGER
+DIM sExakt AS INTEGER
+ASSERT_EQ(statZeilen(3, "", sSumme, sExakt), 2, "Clara hat zwei gewertete Tipps")
+ASSERT_EQ(sSumme, 5, "  der Tipp auf das Spiel ohne Ergebnis ist nicht dabei")
+ASSERT_EQ(sExakt, 1, "  einer davon exakt (2:0 auf 2:0)")
+
+ASSERT_EQ(statZeilen(3, "bl1", sSumme, sExakt), 1, "nur 1. Liga: einer")
+ASSERT_EQ(sSumme, 2, "  und der bringt 2 Punkte")
+ASSERT_EQ(statZeilen(3, "bl2", sSumme, sExakt), 1, "nur 2. Liga: auch einer")
+ASSERT_EQ(sSumme, 3, "  und der bringt 3")
+
+' Die gespeicherte Punktespalte wird dabei nicht gebraucht: die Statistik
+' rechnet aus Tipp und Ergebnis. Zum Beweis eine falsche Zahl hineinschreiben
+' -- die Statistik darf sich davon nicht beirren lassen.
+DB_EXEC(db, "UPDATE tipps SET punkte = 99 WHERE spieler_id = 3")
+ASSERT_EQ(statZeilen(3, "", sSumme, sExakt), 2, _
+          "eine falsche Punktespalte aendert die Statistik nicht")
+ASSERT_EQ(sSumme, 5, "  die Punkte kommen aus Tipp und Ergebnis")
+
+' Die Spalte wieder richtigstellen. Die RANGLISTE liest sie naemlich sehr
+' wohl -- sie summiert tipps.punkte, statt jeden Tipp neu zu rechnen. Liesse
+' man die 99 stehen, faende der naechste Abschnitt Clara mit 198 Punkten
+' vorn, und man suchte den Fehler dort, wo keiner ist.
+DB_EXEC(db, "UPDATE tipps SET punkte = 2 WHERE spieler_id = 3 AND spiel_id = 11")
+DB_EXEC(db, "UPDATE tipps SET punkte = 3 WHERE spieler_id = 3 AND spiel_id = 31")
+DB_EXEC(db, "UPDATE tipps SET punkte = NULL " + "WHERE spieler_id = 3 AND spiel_id NOT IN (11, 31)")
+
+' ---- Saisons -------------------------------------------------------------
+' Die Saison steht ueber Liga und Spieltag. Ohne sie im Schluessel waere das
+' Spiel Falke gegen Gams am 1. Spieltag jedes Jahr DASSELBE Spiel -- der
+' Abruf der neuen Saison wuerde die Ergebnisse der alten ueberschreiben, und
+' die Tipps von damals hingen ploetzlich an einem anderen Ergebnis.
+PRINT ""
+PRINT "=== Saisons ==="
+
+' Dieselbe Paarung, dieselbe Liga, derselbe Spieltag -- zwei Jahre.
+DB_EXEC(db, "INSERT INTO spiele (saison, liga, spieltag, heim, gast, tore_heim, tore_gast) " + "VALUES (2025, 'bl1', 1, 'Falke', 'Gams', 4, 0)")
+DB_EXEC(db, "INSERT INTO spiele (saison, liga, spieltag, heim, gast, tore_heim, tore_gast) " + "VALUES (2026, 'bl1', 1, 'Falke', 'Gams', 1, 1)")
+ASSERT_EQ(anzahl("SELECT COUNT(*) FROM spiele WHERE heim = 'Falke' AND gast = 'Gams'"), 2, _
+          "dieselbe Paarung in zwei Saisons sind zwei Spiele")
+
+DIM nochmal2 AS BOOLEAN : nochmal2 = TRUE
+TRY
+    DB_EXEC(db, "INSERT INTO spiele (saison, liga, spieltag, heim, gast) " + "VALUES (2026, 'bl1', 1, 'Falke', 'Gams')")
+CATCH e
+    nochmal2 = FALSE
+END TRY
+ASSERT_EQ(nochmal2, FALSE, "in DERSELBEN Saison aber nicht")
+
+' Der Abruf einer Saison darf die andere nicht anfassen -- genau hier haette
+' es vorher stillschweigend Daten gekostet.
+DB_EXEC(db, "INSERT INTO spiele (saison, liga, spieltag, heim, gast, tore_heim, tore_gast) " + "VALUES (2026, 'bl1', 1, 'Falke', 'Gams', 3, 2) " + "ON CONFLICT(saison, liga, spieltag, heim, gast) DO UPDATE SET " + "  tore_heim = excluded.tore_heim, tore_gast = excluded.tore_gast")
+ASSERT_EQ(anzahl("SELECT tore_heim FROM spiele WHERE saison = 2025 AND heim = 'Falke'"), 4, _
+          "das Ergebnis von 2025 bleibt stehen")
+ASSERT_EQ(anzahl("SELECT tore_heim FROM spiele WHERE saison = 2026 AND heim = 'Falke'"), 3, _
+          "  das von 2026 wird aufgefrischt")
+
+' Zwei Tipps desselben Spielers auf "dasselbe" Spiel in zwei Saisons: das
+' geht, weil es zwei Spiele sind. Ohne die Saison waere der zweite Tipp als
+' Aenderung des ersten durchgegangen (UNIQUE(spieler_id, spiel_id)).
+DB_EXEC(db, "INSERT INTO tipps (spieler_id, spiel_id, tipp_heim, tipp_gast, punkte) " + "SELECT 2, id, 4, 0, 3 FROM spiele WHERE saison = 2025 AND heim = 'Falke'")
+DB_EXEC(db, "INSERT INTO tipps (spieler_id, spiel_id, tipp_heim, tipp_gast, punkte) " + "SELECT 2, id, 0, 4, 0 FROM spiele WHERE saison = 2026 AND heim = 'Falke'")
+ASSERT_EQ(anzahl("SELECT COUNT(*) FROM tipps t JOIN spiele s ON s.id = t.spiel_id " + "WHERE t.spieler_id = 2 AND s.heim = 'Falke'"), 2, _
+          "Ben hat in beiden Saisons einen Tipp darauf")
+
+' Und die Wertung zaehlt sie NICHT zusammen -- darum geht es.
+DIM werWer AS STRING
+DIM werPkt AS INTEGER
+
+pruefSaison = 2025
+ASSERT_EQ(wertung(0, werWer, werPkt), 3, "2025 stehen alle Spieler da")
+ASSERT_EQ(werWer, "Ben", "  aber vorn steht Ben")
+ASSERT_EQ(werPkt, 3, "  mit 3 Punkten aus seinem einen exakten Tipp")
+
+pruefSaison = 2026
+ASSERT_EQ(wertung(0, werWer, werPkt), 3, "2026 stehen weiter alle drei da")
+ASSERT_EQ(werWer, "Anna", "  und vorn steht unveraendert Anna")
+ASSERT_EQ(werPkt, 6, "  mit ihren 6 Punkten -- Bens 3 aus 2025 zaehlen hier nicht")
+
+' Auch die Ligatabelle sieht nur ihre Saison.
+pruefSaison = 2025
+DIM qs AS DB_RESULT
+qs = DB_QUERY(db, tabellenAbfrage(), pruefSaison, "bl1")
+DIM v25 AS INTEGER : v25 = 0
+WHILE DB_NEXT(qs)
+    v25 = v25 + 1
+WEND
+DB_CLOSE_RESULT(qs)
+ASSERT_EQ(v25, 2, "die Tabelle von 2025 kennt nur deren zwei Vereine")
+pruefSaison = 2026
+
+' ---- Punkteregeln --------------------------------------------------------
+' Die Punktzahl je Trefferart steht nicht mehr im Quelltext, sondern je
+' Saison in der Datenbank. Fehlt dort eine Zeile, gilt die Vorgabe.
+'
+' Die Gefahr dabei ist nicht die Rechnung, sondern die Reichweite: eine
+' Neuberechnung laeuft ueber ALLE Saisons. Holte sie sich die Regel aus
+' einer Variablen -- der Saison, die gerade im Fenster steht --, bekaeme das
+' Jahr 2023 nachtraeglich die Regel von 2026. Deshalb sind die vier Werte
+' Parameter, und die Abfrage bringt sie je Zeile mit.
+PRINT ""
+PRINT "=== Punkteregeln ==="
+
+ASSERT_EQ(punkteFuer(ART_EXAKT, REGEL_EXAKT, REGEL_DIFFERENZ, REGEL_TENDENZ, REGEL_DANEBEN), 3, _
+          "mit der Vorgabe gibt exakt 3")
+ASSERT_EQ(punkteFuer(ART_EXAKT, 5, 3, 2, 1), 5, "mit einer eigenen Regel gibt exakt 5")
+ASSERT_EQ(punkteFuer(ART_DIFFERENZ, 5, 3, 2, 1), 3, "  Tordifferenz 3")
+ASSERT_EQ(punkteFuer(ART_TENDENZ, 5, 3, 2, 1), 2, "  nur Tendenz 2")
+ASSERT_EQ(punkteFuer(ART_DANEBEN, 5, 3, 2, 1), 1, "  und daneben muss nicht 0 sein")
+
+' Die Neuberechnung des Programms, wortgleich: jede Zeile bringt die Regel
+' ihrer eigenen Saison mit.
+SUB alleNeuRechnen()
+    DIM ids AS ARRAY OF INTEGER
+    DIM werte AS ARRAY OF INTEGER
+    ids = []
+    werte = []
+    DIM q AS DB_RESULT
+    q = DB_QUERY(db, "SELECT t.id, t.tipp_heim, t.tipp_gast, " + "       s.tore_heim, s.tore_gast, " + "       COALESCE(r.exakt, " + STR$(REGEL_EXAKT) + "), " + "       COALESCE(r.differenz, " + STR$(REGEL_DIFFERENZ) + "), " + "       COALESCE(r.tendenz, " + STR$(REGEL_TENDENZ) + "), " + "       COALESCE(r.daneben, " + STR$(REGEL_DANEBEN) + ") " + "FROM tipps t JOIN spiele s ON s.id = t.spiel_id " + "LEFT JOIN punkteregeln r ON r.saison = s.saison " + "WHERE s.tore_heim IS NOT NULL")
+    WHILE DB_NEXT(q)
+        ARRAY_PUSH(ids, DB_GET_INT(q, 0))
+        ARRAY_PUSH(werte, punkteFuer( art(DB_GET_INT(q, 1), DB_GET_INT(q, 2), DB_GET_INT(q, 3), DB_GET_INT(q, 4)), DB_GET_INT(q, 5), DB_GET_INT(q, 6), DB_GET_INT(q, 7), DB_GET_INT(q, 8)))
+    WEND
+    DB_CLOSE_RESULT(q)
+    DB_BEGIN(db)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(ids) - 1
+        DB_EXEC(db, "UPDATE tipps SET punkte = ? WHERE id = ?", werte[i], ids[i])
+    NEXT
+    DB_COMMIT(db)
+END SUB
+
+' Ausgangslage: Ben hat 2025 einen exakten Tipp (Falke 4:0) und 2026 einen
+' danebenliegenden auf dasselbe Spiel.
+FUNCTION bensPunkte(saison AS INTEGER) AS INTEGER
+    DIM q AS DB_RESULT
+    q = DB_QUERY(db, "SELECT COALESCE(t.punkte, -1) FROM tipps t " + "JOIN spiele s ON s.id = t.spiel_id " + "WHERE t.spieler_id = 2 AND s.saison = ? AND s.heim = 'Falke'", saison)
+    DIM v AS INTEGER : v = -1
+    IF DB_NEXT(q) THEN v = DB_GET_INT(q, 0)
+    DB_CLOSE_RESULT(q)
+    RETURN v
+END FUNCTION
+
+alleNeuRechnen()
+ASSERT_EQ(bensPunkte(2025), 3, "nach der Vorgabe: Bens exakter Tipp von 2025 gibt 3")
+ASSERT_EQ(bensPunkte(2026), 0, "  sein danebenliegender von 2026 gibt 0")
+
+' Jetzt bekommt NUR 2026 eine eigene Regel: exakt 5, daneben 1.
+DB_EXEC(db, "INSERT INTO punkteregeln (saison, exakt, differenz, tendenz, daneben) " + "VALUES (2026, 5, 3, 2, 1)")
+alleNeuRechnen()
+ASSERT_EQ(bensPunkte(2026), 1, "2026 rechnet jetzt nach der eigenen Regel: daneben gibt 1")
+ASSERT_EQ(bensPunkte(2025), 3, _
+          "2025 bleibt bei der Vorgabe -- der exakte Tipp gibt weiter 3")
+
+' Und andersherum, damit es nicht am Zufall der Reihenfolge liegt.
+DB_EXEC(db, "INSERT INTO punkteregeln (saison, exakt, differenz, tendenz, daneben) " + "VALUES (2025, 10, 3, 2, 0)")
+alleNeuRechnen()
+ASSERT_EQ(bensPunkte(2025), 10, "nun rechnet 2025 mit 10 fuer exakt")
+ASSERT_EQ(bensPunkte(2026), 1, "  und 2026 unveraendert mit 1 fuer daneben")
+
+' Regel weg -> wieder Vorgabe. Das ist der Weg zurueck, ohne die Zahlen von
+' Hand wieder eintippen zu muessen.
+DB_EXEC(db, "DELETE FROM punkteregeln WHERE saison = 2025")
+alleNeuRechnen()
+ASSERT_EQ(bensPunkte(2025), 3, "ohne eigene Zeile gilt wieder die Vorgabe")
+ASSERT_EQ(bensPunkte(2026), 1, "  und 2026 stoert das nicht")
+
+' Und der Weg zurueck auch fuer 2026: Regel weg, danebenliegender Tipp
+' wieder 0. Damit ist der Kreis in beiden Jahren geschlossen.
+DB_EXEC(db, "DELETE FROM punkteregeln WHERE saison = 2026")
+alleNeuRechnen()
+ASSERT_EQ(bensPunkte(2026), 0, _
+          "auch 2026 rechnet ohne eigene Zeile wieder nach der Vorgabe")
+ASSERT_EQ(bensPunkte(2025), 3, "  und 2025 steht weiter bei 3")
+
+' Alle Zahlen, die bensPunkte liest, kommen aus der GESPEICHERTEN Spalte
+' tipps.punkte -- nicht aus einer Neuberechnung im Lesen. Die Rangliste
+' liest dieselbe Spalte, sieht die neue Regel also nach dem Nachrechnen.
+
+DB_CLOSE(db)
+
+PRINT ""
+PRINT "============================================"
+' ASSERT_REPORT schreibt die Bilanz nach stdout und liefert die Zahl der
+' Fehlschlaege. Erst der Rueckgabewert macht die Pruefung fuer ein Skript
+' oder eine CI auswertbar -- vorher endete sie immer mit 0, egal was
+' herauskam.
+IF ASSERT_REPORT() > 0 THEN
+    PRINT "============================================"
+    EXIT(1)
+END IF
+PRINT "============================================"

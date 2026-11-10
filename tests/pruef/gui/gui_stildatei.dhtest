@@ -1,4 +1,4 @@
-' Stildatei (GUI_STYLESHEET, gui_stil.rs; docs/entwurf-gui-wie-gtk.md
+' Stildatei (GUI_STYLESHEET, gui_stil.rs; docs/intern/entwurf-gui-wie-gtk.md
 ' Paket 4): Selektoren nach Art, Klasse, Name und Zustand, Vorrang wie in
 ' CSS, GUI_SET_COLOR vor allem. Format: docs/werkzeuge.md.
 '

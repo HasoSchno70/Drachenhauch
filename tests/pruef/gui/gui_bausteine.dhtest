@@ -1,4 +1,4 @@
-' Bausteine (gui_bausteine.rs, docs/entwurf-gui-wie-gtk.md Paket 2):
+' Bausteine (gui_bausteine.rs, docs/intern/entwurf-gui-wie-gtk.md Paket 2):
 ' Fliesslayout mit Auswahl, Alt-Buchstaben, Beschriftung kuerzen und
 ' markieren, Reglermarken, Kreisel, Kalendermarken, Groessengruppen,
 ' Schriftwahl. Format: docs/werkzeuge.md.

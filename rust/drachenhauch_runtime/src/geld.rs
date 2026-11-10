@@ -1,6 +1,6 @@
 //! Modul `geld` -- ein Betrag als eigener Wert.
 //!
-//! Weg C aus `docs/entwurf-geldtyp.md`. Weg A (die Befehle `CENT`, `EURO$`,
+//! Weg C aus `docs/intern/entwurf-geldtyp.md`. Weg A (die Befehle `CENT`, `EURO$`,
 //! `ROUND_HALF_UP`) ist eine Rechenweise: man rechnet in `INTEGER`-Cent und
 //! muss daran denken. Hier ist es ein **Typ** -- und der denkt mit:
 //!

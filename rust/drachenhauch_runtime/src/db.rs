@@ -1,6 +1,6 @@
 //! Datenbanken (DB_*): SQLite ueber `rusqlite` (bundled SQLite, Feature
 //! `db`) und -- mit den Features `pg` bzw. `mysql` -- PostgreSQL und MySQL
-//! ueber einen Server (docs/entwurf-datenbanktreiber.md).
+//! ueber einen Server (docs/intern/entwurf-datenbanktreiber.md).
 //!
 //! Dieselben Befehle fuer alle drei: `DB_OPEN` entscheidet am Ziel --
 //! `postgres://...`/`postgresql://...` und `mysql://...` sind Server, alles

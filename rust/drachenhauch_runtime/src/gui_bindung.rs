@@ -1322,7 +1322,7 @@ impl Gui {
     /// Lage der Schreibmarke des Textfelds/Textbereichs mit Fokus in
     /// Bildschirm-Pixeln: (x, y_oben, hoehe). None ohne Text-Fokus. Dieselbe
     /// Rechnung wie das Zeichnen der Marke in `draw_widget` -- fuer das
-    /// IME-Umwandlungsfenster (docs/entwurf-eingabemethoden.md, Weg B).
+    /// IME-Umwandlungsfenster (docs/intern/entwurf-eingabemethoden.md, Weg B).
     pub fn schreibmarke(&self, g: &Graphics) -> Option<(i32, i32, i32)> {
         let (wi, i) = self.focus_widget?;
         if self.focus_window != Some(wi) { return None; }

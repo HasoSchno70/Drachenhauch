@@ -1,4 +1,4 @@
-' Fremde Bibliotheken aufrufen: DECLARE ... LIB (docs/entwurf-ffi.md, Stufen 1 bis 3).
+' Fremde Bibliotheken aufrufen: DECLARE ... LIB (docs/intern/entwurf-ffi.md, Stufen 1 bis 3).
 ' Geprueft wird gegen Bibliotheken, die ueberall da sind: unter Windows
 ' kernel32/user32, sonst und auch unter Windows die C-Bibliothek ("c", "m" --
 ' ucrtbase, glibc, libSystem). Jeder Typ der DECLARE-Zeile kommt mindestens

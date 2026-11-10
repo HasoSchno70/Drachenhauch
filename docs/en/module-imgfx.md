@@ -90,7 +90,7 @@ point wide -- and each one re-uploads the texture. Anyone who **produces** a
 graphic from many shapes (tiles, icons, buttons) needs more: a filled
 polygon, a thick line, rounded corners, a ring, a gradient. That is what
 these eight are for (built for the tile generator of Circuit Runner,
-`circuitrunner/make_tiles.dh`):
+`spiele/circuitrunner/make_tiles.dh`):
 
 | Function | Effect |
 |---|---|

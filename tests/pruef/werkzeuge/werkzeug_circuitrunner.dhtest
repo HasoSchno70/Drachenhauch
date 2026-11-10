@@ -1,4 +1,4 @@
-' Die CIRCUIT-RUNNER-Engine (circuitrunner/circuitrunner.dh), angesteuert wie
+' Die CIRCUIT-RUNNER-Engine (spiele/circuitrunner/circuitrunner.dh), angesteuert wie
 ' ein Werkzeug: der Fall steht als Einschub hinter dem Kommentar der
 ' Hauptschleife, laeuft also nach allem Laden und vor der ersten Runde, und
 ' endet mit EXIT(0). Bis Stufe 53 (2026-09-14) in tests/test_circuitrunner.py,
@@ -36,10 +36,10 @@ FOR prK = 0 TO nmob - 1
     PRINT "M " + STR$(mob_x[prK]) + " " + STR$(mob_y[prK])
 NEXT
 EXIT(0)
---- programm ../../../circuitrunner/circuitrunner.dh nach '  HAUPTSCHLEIFE
+--- programm ../../../spiele/circuitrunner/circuitrunner.dh nach '  HAUPTSCHLEIFE
 --- ersetzen CONST SAVEPATH = "circuitrunner.save"
 CONST SAVEPATH = "{fall}/circuitrunner.save"
-CHDIR("{sammlung}/../../../circuitrunner")
+CHDIR("{sammlung}/../../../spiele/circuitrunner")
 
 --- datei _programm/circuit.dh
 IMPORT "{sammlung}/../_hilfen/circuitlevel.dh"
@@ -89,10 +89,10 @@ PRINT "passwort abcd: " + STR$(find_password("abcd")) + " unbekannt: " + STR$(fi
 PRINT "fortschritt: " + STR$(SAVE_GET_INT_OR(sav, cur_setkey + "/max", 0))
 PRINT "sicherung da: " + STR$(FILEEXISTS(GETENV$("DHRT_START_DIR") + "/circuitrunner.save"))
 EXIT(0)
---- programm ../../../circuitrunner/circuitrunner.dh nach '  HAUPTSCHLEIFE
+--- programm ../../../spiele/circuitrunner/circuitrunner.dh nach '  HAUPTSCHLEIFE
 --- ersetzen CONST SAVEPATH = "circuitrunner.save"
 CONST SAVEPATH = "{fall}/circuitrunner.save"
-CHDIR("{sammlung}/../../../circuitrunner")
+CHDIR("{sammlung}/../../../spiele/circuitrunner")
 
 --- datei _programm/circuit.dh
 IMPORT "{sammlung}/../_hilfen/circuitlevel.dh"
@@ -137,10 +137,10 @@ PRINT "170 uebrig: " + STR$(prB1 >= 169 AND prB1 <= 171) + " rekord " + STR$(prR
 PRINT "150 ist schlechter: " + STR$(prB2 = prB1) + " rekord " + STR$(prR2)
 PRINT "190 ist besser: " + STR$(prB3 >= 189 AND prB3 <= 191) + " rekord " + STR$(prR3)
 EXIT(0)
---- programm ../../../circuitrunner/circuitrunner.dh nach '  HAUPTSCHLEIFE
+--- programm ../../../spiele/circuitrunner/circuitrunner.dh nach '  HAUPTSCHLEIFE
 --- ersetzen CONST SAVEPATH = "circuitrunner.save"
 CONST SAVEPATH = "{fall}/circuitrunner.save"
-CHDIR("{sammlung}/../../../circuitrunner")
+CHDIR("{sammlung}/../../../spiele/circuitrunner")
 
 --- datei _programm/circuit.dh
 IMPORT "{sammlung}/../_hilfen/circuitlevel.dh"
@@ -169,10 +169,10 @@ load_level(0)
 PRINT "tat: " + STR$(tat(px, py))
 PRINT "hinweis da: " + STR$(LEN(lvl_hint) > 0)
 EXIT(0)
---- programm ../../../circuitrunner/circuitrunner.dh nach '  HAUPTSCHLEIFE
+--- programm ../../../spiele/circuitrunner/circuitrunner.dh nach '  HAUPTSCHLEIFE
 --- ersetzen CONST SAVEPATH = "circuitrunner.save"
 CONST SAVEPATH = "{fall}/circuitrunner.save"
-CHDIR("{sammlung}/../../../circuitrunner")
+CHDIR("{sammlung}/../../../spiele/circuitrunner")
 
 --- datei _programm/circuit.dh
 IMPORT "{sammlung}/../_hilfen/circuitlevel.dh"
@@ -204,10 +204,10 @@ FOR prT = 0 TO 2
 NEXT
 PRINT "POS " + STR$(mob_x[0]) + " " + STR$(mob_y[0])
 EXIT(0)
---- programm ../../../circuitrunner/circuitrunner.dh nach '  HAUPTSCHLEIFE
+--- programm ../../../spiele/circuitrunner/circuitrunner.dh nach '  HAUPTSCHLEIFE
 --- ersetzen CONST SAVEPATH = "circuitrunner.save"
 CONST SAVEPATH = "{fall}/circuitrunner.save"
-CHDIR("{sammlung}/../../../circuitrunner")
+CHDIR("{sammlung}/../../../spiele/circuitrunner")
 
 --- datei _programm/circuit.dh
 IMPORT "{sammlung}/../_hilfen/circuitlevel.dh"
@@ -312,7 +312,7 @@ FOR i = 0 TO 1023
 NEXT
 PRINT "chips im gitter "; chips
 --- argumente
-{sammlung}/../../../circuitrunner/convert_dat.dh
+{sammlung}/../../../spiele/circuitrunner/convert_dat.dh
 --- erwartet
 test: 1 Level (ms) -> FALL/test.json
 ms 1
@@ -353,7 +353,7 @@ IMPORT "json"
 DIM h AS JSON_HANDLE : h = JSON_LOAD("lynx.json")
 PRINT JSON_GET_STRING(h, "ruleset"); " "; JSON_GET_STRING(h, "levels.0.title")
 --- argumente
-{sammlung}/../../../circuitrunner/convert_dat.dh
+{sammlung}/../../../spiele/circuitrunner/convert_dat.dh
 --- erwartet
 lynx Level 1
 
@@ -383,7 +383,7 @@ PRINT REPLACE$(TRIM$(lauf$(q)), CWD$(), "FALL"); " / "; PROCESS_CODE(q)
 DIM r AS INTEGER : r = PROCESS_START("dhrt", "run", ARG$(0))
 PRINT INSTR(lauf$(r), "convert_dat.dh -- pfad") >= 0; " / "; PROCESS_CODE(r)
 --- argumente
-{sammlung}/../../../circuitrunner/convert_dat.dh
+{sammlung}/../../../spiele/circuitrunner/convert_dat.dh
 --- erwartet
 Keine gueltige CC-Datei (Magic 0x20736164).
 rueckgabe 1, datei FALSE
@@ -436,7 +436,7 @@ FOR k = 0 TO n - 1
     PRINT JSON_GET_STRING(h, "levels." + STR$(k) + ".title"); ": "; LEN(hex) = 2048 AND LEN(JSON_GET_STRING(h, "levels." + STR$(k) + ".lower")) = 2048; " "; spieler = 1; " "; ausgang; " "; JSON_GET_INT(h, "levels." + STR$(k) + ".chips") = chips
 NEXT
 --- argumente
-{sammlung}/../../../circuitrunner/make_demo_levels.dh
+{sammlung}/../../../spiele/circuitrunner/make_demo_levels.dh
 --- erwartet
 5 Demo-Level (alle validiert) -> FALL/demo.json
 level TRUE
@@ -472,8 +472,8 @@ DIM neu AS BUFFER : neu = READALL_BYTES("demo.json")
 DIM alt AS BUFFER : alt = READALL_BYTES(ARG$(1))
 PRINT BUFFER_LEN(neu) = BUFFER_LEN(alt) AND BUFFER_TO_HEX$(neu) = BUFFER_TO_HEX$(alt)
 --- argumente
-{sammlung}/../../../circuitrunner/make_demo_levels.dh
-{sammlung}/../../../circuitrunner/levels/circuit_runner.json
+{sammlung}/../../../spiele/circuitrunner/make_demo_levels.dh
+{sammlung}/../../../spiele/circuitrunner/levels/circuit_runner.json
 --- erwartet
 TRUE
 
@@ -515,8 +515,8 @@ PRINT IMAGEWIDTH(b); " "; IMAGEHEIGHT(b)
 ' 0x00 Boden deckt ganz, 0x20 gibt es nicht, 0x40 Kaefer hat einen Rand
 PRINT GETALPHA(b, 32, 32); " "; GETALPHA(b, 32, 2 * 64 + 32); " "; GETALPHA(b, 1, 4 * 64 + 1); " "; GETALPHA(b, 32, 4 * 64 + 35)
 --- argumente
-{sammlung}/../../../circuitrunner/make_tiles.dh
-{sammlung}/../../../circuitrunner/assets/tiles.json
+{sammlung}/../../../spiele/circuitrunner/make_tiles.dh
+{sammlung}/../../../spiele/circuitrunner/assets/tiles.json
 --- erwartet
 TRUE
 TRUE
@@ -560,7 +560,7 @@ PRINT READLINES("sfx/CREDITS.txt")[4]
 PROCESS_KILL(srv)
 --- argumente
 {sammlung}/../_hilfen/gegenserver.dh
-{sammlung}/../../../circuitrunner/download_sfx.dh
+{sammlung}/../../../spiele/circuitrunner/download_sfx.dh
 --- erwartet
 rueckgabe 0, zeilen 8
 /sfx/tick_001.wav
@@ -602,7 +602,7 @@ PRINT READLINES("musik/CREDITS.txt")[2]
 PROCESS_KILL(srv)
 --- argumente
 {sammlung}/../_hilfen/gegenserver.dh
-{sammlung}/../../../circuitrunner/download_music.dh
+{sammlung}/../../../spiele/circuitrunner/download_music.dh
 --- erwartet
 rueckgabe 0
 /musik/Juhani%20Junkala%20%5BRetro%20Game%20Music%20Pack%5D%20Title%20Screen.ogg

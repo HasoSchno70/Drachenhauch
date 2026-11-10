@@ -457,7 +457,7 @@ pub struct Compiler {
     /// erreichen kann (Objekte, Lambdas, Aufrufe ueber Werte). Siehe `leih_spur`.
     leih_spuren: HashMap<String, Option<(std::collections::HashSet<String>, Vec<String>)>>,
     /// `DECLARE ... LIB` (klein geschriebener Name): Funktionen aus fremden
-    /// Bibliotheken, docs/entwurf-ffi.md.
+    /// Bibliotheken, docs/intern/entwurf-ffi.md.
     ffi_decls: HashMap<String, FfiDecl>,
     /// Die Lagen aller `STRUCT ... LAYOUT C` (cstruct.rs), klein geschrieben.
     lagen: HashMap<String, crate::cstruct::Lage>,
@@ -1484,7 +1484,7 @@ impl Compiler {
     }
 
     /// Der Typ, den ein Ausdruck ZUR LAUFZEIT hat -- fuer den Code, nicht
-    /// fuer Meldungen (M1, `docs/entwurf-maschinencode.md`). Anders als
+    /// fuer Meldungen (M1, `docs/intern/entwurf-maschinencode.md`). Anders als
     /// `statischer_typ` muss hier jede Aussage stimmen; `Typ::Unbekannt` ist
     /// immer erlaubt. Belegt wird das mit `DHRT_TYPEN_PRUEFEN=1`: dann steht
     /// hinter jedem getypten Ausdruck eine Probe (`TYP_PRUEFEN`).

@@ -19,7 +19,7 @@ Drachenhauch is a BASIC dialect with Pascal-strict typing and OOP, for games and
 
 - **[Standard built-ins](builtins-core.md)** — math, strings, bitwise, maps, file I/O, conversion, time/random
 - **[Graphics built-ins](builtins-grafik.md)** — SCREEN, CLS, BOX, CIRCLE, LOADIMAGE, sound, tilemap, input, **`LOAD_ASSETS`** (bulk preloader), **sprite atlas + batch draw**, **Z-layer rendering**
-- **[Performance](../PERFORMANCE.md)** (German) — historical benchmark numbers + a list of optimizations shipped (the Python paths they were compared against have been removed since stage B; production = `dhrt`)
+- **[Performance](../intern/PERFORMANCE.md)** (German) — historical benchmark numbers + a list of optimizations shipped (the Python paths they were compared against have been removed since stage B; production = `dhrt`)
 
 ### Modules
 
@@ -92,12 +92,12 @@ Each module is activated with `IMPORT "<name>"` and provides its own commands.
 Papers that **weigh** something rather than describe it — measured,
 designed, recommended; none of it is decided.
 
-- **[General-purpose audit 2](../allzweck-audit-2.md)** (German) — what a
+- **[General-purpose audit 2](../intern/allzweck-audit-2.md)** (German) — what a
   language you are supposed to build software with is missing; eight points,
   worked through
-- **[Design: money](../entwurf-geldtyp.md)** (German) — floating point, cents,
+- **[Design: money](../intern/entwurf-geldtyp.md)** (German) — floating point, cents,
   a type of its own? With the finding that `INT(19.99 * 100)` yields **1998**
-- **[Investigation: database drivers](../entwurf-datenbanktreiber.md)** (German)
+- **[Investigation: database drivers](../intern/entwurf-datenbanktreiber.md)** (German)
   — what PostgreSQL and MySQL would really cost (crates, build time, size, TLS)
 
 ### Tools
@@ -125,65 +125,65 @@ Working notes, not user documentation — they explain why something is the way 
 
 - **[Stumbling blocks](stolpersteine.md)** — friction points of the language, collected while writing the textbook
 - **Doc checker** — `dhrt pruef` sends every `basic` block through the front-end chain (`bloecke`), checks command names in tables and prose (`namen`), the counts in the README (`zaehlungen`), key constants (`konstanten`) and paths/links (`pfade`). Hooked into the test suite; until September 2026 it was two Python scripts in `tools/`
-- **[Rust front-end port](../rust-frontend-port.md)** (German) and **[runtime migration](rust-runtime.md)** — how `dhrt` came about
-- **[Design: namespaces](../entwurf-namensraeume.md)** (German) — WP I of the general-purpose roadmap. All four stages have been built by now; the document remains as a record of the decisions
-- **[Design: interfaces](../entwurf-schnittstellen.md)** (German) — `INTERFACE`/`IMPLEMENTS` weighed again: class types are not checked at all today, and the large programs use no inheritance; recommendation: check class types first, then interfaces after a trial in Funkenflug (not built yet)
-- **[Design: removing the Python parser](../entwurf-python-parser-entfernen.md)** (German) — measured what still depends on the second parser, and what a cut would cost
-- **[Design: making it findable](../entwurf-sichtbarkeit.md)** (German) — how search engines and AI assistants find Drachenhauch: English README, a website with the manual and `llms.txt`, and what to do outside the repository
-- **[Design: sets](../entwurf-set-builtins.md)** (German) — the last open WP-J point, re-scoped after measuring again
-- **[Design: TASK_START](../entwurf-task-start.md)** (German) — DH code in the background; three ways, and the third avoids the Send problem entirely
-- **[Design: multiple OS windows](../entwurf-native-fenster.md)** (German) — why there is one window per process, four ways; built is way B: a second window as a second `dhrt` with a text channel (`WINDOW_OPEN`)
-- **[Design: phasing out Python](../entwurf-python-abbau.md)** (German) — 110,000 lines of Python measured (58 % tests, 32,000 IDE and editors, two thirds of the installer); ways: toolchain/LSP into dhrt, IDE and editors in Drachenhauch, tests as `dhrt test`; recommendation: toolchain first, then the IDE
-- **[Design: applications and speed](../entwurf-anwendungen-und-tempo.md)** (German) — measured against Python: string appending is quadratic, built-ins are looked up by name; what a GUI application still lacks, and in which order
-- **[Design: machine code](../entwurf-maschinencode.md)** (German) — how Drachenhauch becomes really fast as a compiled language: a typed intermediate stage, a typed VM, then a Cranelift JIT with the VM as the reference
-- **[Design: packages](../entwurf-pakete.md)** (German) — fetch and share libraries without a server of our own: sources, storage in the project, lock file with checksum; built as `dhrt paket`
-- **[Design: foreign libraries](../entwurf-ffi.md)** (German) — `DECLARE FUNCTION … LIB` as in VB6/FreeBASIC: types, loading, calling via Cranelift, structs via BUFFER, what remains tricky; built including callbacks, struct layout and variable argument counts
-- **[Design: SPEAK](../entwurf-speak.md)** (German) — speech output for games without the gui: WinRT delivers the better voices and a sound instead of a speaker output (12–35 ms per sentence, measured); recommendation: synthesis to PCM through Kira, screen readers first
-- **[Design: input methods (IME)](../entwurf-eingabemethoden.md)** (German) — measured: storage is Unicode, display is Latin-1 (the euro sign is a question mark); ways: character set, composition window, preedit, SDL; recommendation: first see, then type
-- **[Design: accessibility](../entwurf-barrierefreiheit.md)** (German) — the UIA tree of a dhrt window is empty, measured; AccessKit, speech output and craftsmanship as the ways; recommendation: craftsmanship right away, then AccessKit with Windows first
-- **[Design: printing](../entwurf-drucken.md)** (German) — no raylib for paper: building blocks checked, four ways; recommendation: draw the page ourselves (GDI/CUPS as targets of the pdf module), plus a command that opens a file
-- **[Release 2026.45](../release-2026.45.md)** (German) — what is new in this version
-- **[Release 2026.44](../release-2026.44.md)** (German) — what is new in this version
-- **[Release 2026.43](../release-2026.43.md)** (German) — what is new in this version
-- **[Release 2026.42](../release-2026.42.md)** (German) — what is new in this version
-- **[Release 2026.41](../release-2026.41.md)** (German) — what is new in this version
-- **[Release 2026.40](../release-2026.40.md)** (German) — what is new in this version
-- **[Release 2026.39](../release-2026.39.md)** (German) — what is new in this version
-- **[Release 2026.38](../release-2026.38.md)** (German) — what is new in this version
-- **[Release 2026.37](../release-2026.37.md)** (German) — what is new in this version
-- **[Release 2026.36](../release-2026.36.md)** (German) — what is new in this version
-- **[Release 2026.35](../release-2026.35.md)** (German) — what is new in this version
-- **[Release 2026.34](../release-2026.34.md)** (German) — what is new in this version
-- **[Release 2026.33](../release-2026.33.md)** (German) — the version before
-- **[Release 2026.32](../release-2026.32.md)** (German) — and the one before that
-- **[Release 2026.31](../release-2026.31.md)** (German) — and the one before that
-- **[Release 2026.30](../release-2026.30.md)** (German) — and the one before that
-- **[Release 2026.29](../release-2026.29.md)** (German) — and the one before that
-- **[Release 2026.28](../release-2026.28.md)** (German) — and the one before that
-- **[Release 2026.27](../release-2026.27.md)** (German) — and the one before that
-- **[Release 2026.26](../release-2026.26.md)** (German) — and the one before that
-- **[Release 2026.25](../release-2026.25.md)** (German) — and the one before that
-- **[Release 2026.24](../release-2026.24.md)** (German) — and the one before that
-- **[Release 2026.23](../release-2026.23.md)** (German) — and the one before that
-- **[Release 2026.22](../release-2026.22.md)** (German) — and the one before that
-- **[Release 2026.21](../release-2026.21.md)** (German) — and the one before that
-- **[Release 2026.20](../release-2026.20.md)** (German) — and the one before that
-- **[Release 2026.19](../release-2026.19.md)** (German) — and the one before that
-- **[Release 2026.18](../release-2026.18.md)** (German) — and the one before that
-- **[Release 2026.17](../release-2026.17.md)** (German) — and the one before that
-- **[Release 2026.16](../release-2026.16.md)** (German) — and the one before that
-- **[Release 2026.15](../release-2026.15.md)** (German) — and the one before that
-- **[Release 2026.14](../release-2026.14.md)** (German) — and the one before that
-- **[Release 2026.13](../release-2026.13.md)** (German) — and the one before that
-- **[Release 2026.12](../release-2026.12.md)** (German) — and the one before that
-- **[Release 2026.11](../release-2026.11.md)** (German) — and the one before that
-- **[Release 2026.10](../release-2026.10.md)** (German) — and the one before that
-- **[Release 2026.9](../release-2026.9.md)** (German) — and the one before that
-- **[Release 2026.8](../release-2026.8.md)** (German) — and the one before that
-- **[General-purpose roadmap](../allzweck-roadmap.md)** (German) — what is missing so that you can write *anything* with it and not just games (current, audit 2026-08)
-- **[General-purpose audit, second round](../allzweck-audit-2.md)** (German) — what is still missing after the completed roadmap for people to *choose* Drachenhauch for building software (2026-08-23)
-- **[Command set roadmap](../befehlssatz-roadmap.md)** (German) and **[GUI design note](../gui-module-design.md)** (German) — historical, with a reading note
-- **[Renaming GameBasic → Drachenhauch](../umbenennung-drachenhauch.md)** (German) — the checklist from 2026-08
+- **[Rust front-end port](../intern/rust-frontend-port.md)** (German) and **[runtime migration](rust-runtime.md)** — how `dhrt` came about
+- **[Design: namespaces](../intern/entwurf-namensraeume.md)** (German) — WP I of the general-purpose roadmap. All four stages have been built by now; the document remains as a record of the decisions
+- **[Design: interfaces](../intern/entwurf-schnittstellen.md)** (German) — `INTERFACE`/`IMPLEMENTS` weighed again: class types are not checked at all today, and the large programs use no inheritance; recommendation: check class types first, then interfaces after a trial in Funkenflug (not built yet)
+- **[Design: removing the Python parser](../intern/entwurf-python-parser-entfernen.md)** (German) — measured what still depends on the second parser, and what a cut would cost
+- **[Design: making it findable](../intern/entwurf-sichtbarkeit.md)** (German) — how search engines and AI assistants find Drachenhauch: English README, a website with the manual and `llms.txt`, and what to do outside the repository
+- **[Design: sets](../intern/entwurf-set-builtins.md)** (German) — the last open WP-J point, re-scoped after measuring again
+- **[Design: TASK_START](../intern/entwurf-task-start.md)** (German) — DH code in the background; three ways, and the third avoids the Send problem entirely
+- **[Design: multiple OS windows](../intern/entwurf-native-fenster.md)** (German) — why there is one window per process, four ways; built is way B: a second window as a second `dhrt` with a text channel (`WINDOW_OPEN`)
+- **[Design: phasing out Python](../intern/entwurf-python-abbau.md)** (German) — 110,000 lines of Python measured (58 % tests, 32,000 IDE and editors, two thirds of the installer); ways: toolchain/LSP into dhrt, IDE and editors in Drachenhauch, tests as `dhrt test`; recommendation: toolchain first, then the IDE
+- **[Design: applications and speed](../intern/entwurf-anwendungen-und-tempo.md)** (German) — measured against Python: string appending is quadratic, built-ins are looked up by name; what a GUI application still lacks, and in which order
+- **[Design: machine code](../intern/entwurf-maschinencode.md)** (German) — how Drachenhauch becomes really fast as a compiled language: a typed intermediate stage, a typed VM, then a Cranelift JIT with the VM as the reference
+- **[Design: packages](../intern/entwurf-pakete.md)** (German) — fetch and share libraries without a server of our own: sources, storage in the project, lock file with checksum; built as `dhrt paket`
+- **[Design: foreign libraries](../intern/entwurf-ffi.md)** (German) — `DECLARE FUNCTION … LIB` as in VB6/FreeBASIC: types, loading, calling via Cranelift, structs via BUFFER, what remains tricky; built including callbacks, struct layout and variable argument counts
+- **[Design: SPEAK](../intern/entwurf-speak.md)** (German) — speech output for games without the gui: WinRT delivers the better voices and a sound instead of a speaker output (12–35 ms per sentence, measured); recommendation: synthesis to PCM through Kira, screen readers first
+- **[Design: input methods (IME)](../intern/entwurf-eingabemethoden.md)** (German) — measured: storage is Unicode, display is Latin-1 (the euro sign is a question mark); ways: character set, composition window, preedit, SDL; recommendation: first see, then type
+- **[Design: accessibility](../intern/entwurf-barrierefreiheit.md)** (German) — the UIA tree of a dhrt window is empty, measured; AccessKit, speech output and craftsmanship as the ways; recommendation: craftsmanship right away, then AccessKit with Windows first
+- **[Design: printing](../intern/entwurf-drucken.md)** (German) — no raylib for paper: building blocks checked, four ways; recommendation: draw the page ourselves (GDI/CUPS as targets of the pdf module), plus a command that opens a file
+- **[Release 2026.45](../releases/release-2026.45.md)** (German) — what is new in this version
+- **[Release 2026.44](../releases/release-2026.44.md)** (German) — what is new in this version
+- **[Release 2026.43](../releases/release-2026.43.md)** (German) — what is new in this version
+- **[Release 2026.42](../releases/release-2026.42.md)** (German) — what is new in this version
+- **[Release 2026.41](../releases/release-2026.41.md)** (German) — what is new in this version
+- **[Release 2026.40](../releases/release-2026.40.md)** (German) — what is new in this version
+- **[Release 2026.39](../releases/release-2026.39.md)** (German) — what is new in this version
+- **[Release 2026.38](../releases/release-2026.38.md)** (German) — what is new in this version
+- **[Release 2026.37](../releases/release-2026.37.md)** (German) — what is new in this version
+- **[Release 2026.36](../releases/release-2026.36.md)** (German) — what is new in this version
+- **[Release 2026.35](../releases/release-2026.35.md)** (German) — what is new in this version
+- **[Release 2026.34](../releases/release-2026.34.md)** (German) — what is new in this version
+- **[Release 2026.33](../releases/release-2026.33.md)** (German) — the version before
+- **[Release 2026.32](../releases/release-2026.32.md)** (German) — and the one before that
+- **[Release 2026.31](../releases/release-2026.31.md)** (German) — and the one before that
+- **[Release 2026.30](../releases/release-2026.30.md)** (German) — and the one before that
+- **[Release 2026.29](../releases/release-2026.29.md)** (German) — and the one before that
+- **[Release 2026.28](../releases/release-2026.28.md)** (German) — and the one before that
+- **[Release 2026.27](../releases/release-2026.27.md)** (German) — and the one before that
+- **[Release 2026.26](../releases/release-2026.26.md)** (German) — and the one before that
+- **[Release 2026.25](../releases/release-2026.25.md)** (German) — and the one before that
+- **[Release 2026.24](../releases/release-2026.24.md)** (German) — and the one before that
+- **[Release 2026.23](../releases/release-2026.23.md)** (German) — and the one before that
+- **[Release 2026.22](../releases/release-2026.22.md)** (German) — and the one before that
+- **[Release 2026.21](../releases/release-2026.21.md)** (German) — and the one before that
+- **[Release 2026.20](../releases/release-2026.20.md)** (German) — and the one before that
+- **[Release 2026.19](../releases/release-2026.19.md)** (German) — and the one before that
+- **[Release 2026.18](../releases/release-2026.18.md)** (German) — and the one before that
+- **[Release 2026.17](../releases/release-2026.17.md)** (German) — and the one before that
+- **[Release 2026.16](../releases/release-2026.16.md)** (German) — and the one before that
+- **[Release 2026.15](../releases/release-2026.15.md)** (German) — and the one before that
+- **[Release 2026.14](../releases/release-2026.14.md)** (German) — and the one before that
+- **[Release 2026.13](../releases/release-2026.13.md)** (German) — and the one before that
+- **[Release 2026.12](../releases/release-2026.12.md)** (German) — and the one before that
+- **[Release 2026.11](../releases/release-2026.11.md)** (German) — and the one before that
+- **[Release 2026.10](../releases/release-2026.10.md)** (German) — and the one before that
+- **[Release 2026.9](../releases/release-2026.9.md)** (German) — and the one before that
+- **[Release 2026.8](../releases/release-2026.8.md)** (German) — and the one before that
+- **[General-purpose roadmap](../intern/allzweck-roadmap.md)** (German) — what is missing so that you can write *anything* with it and not just games (current, audit 2026-08)
+- **[General-purpose audit, second round](../intern/allzweck-audit-2.md)** (German) — what is still missing after the completed roadmap for people to *choose* Drachenhauch for building software (2026-08-23)
+- **[Command set roadmap](../intern/befehlssatz-roadmap.md)** (German) and **[GUI design note](../intern/gui-module-design.md)** (German) — historical, with a reading note
+- **[Renaming GameBasic → Drachenhauch](../intern/umbenennung-drachenhauch.md)** (German) — the checklist from 2026-08
 
 ## First program
 

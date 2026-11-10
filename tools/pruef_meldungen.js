@@ -36,7 +36,7 @@
 // die RGB-Sache gefunden. Wer die Zahl der Zitate ploetzlich sinken sieht,
 // sollte trotzdem hinsehen; sie steht deshalb in jeder Zeile der Ausgabe.
 //
-// Aufruf:  node tools/pruef_meldungen.js [buch-einstieg|docs ...]
+// Aufruf:  node tools/pruef_meldungen.js [buecher/einstieg|docs ...]
 // Rueckgabe: 0 = alle Zitate gedeckt, 1 = mindestens eines weicht ab,
 //            2 = nicht vollstaendig pruefbar (kein Netz)
 const fs = require("fs");
@@ -247,7 +247,7 @@ function quellen(buchDir) {
 // ist ehrlicher als eine Heuristik, die eine ganze Sorte stillschweigend
 // verschluckt.
 const KEINE_MELDUNG = [
-  // docs/allzweck-roadmap.md: Schema mit Platzhalter, kein echter Wortlaut.
+  // docs/intern/allzweck-roadmap.md: Schema mit Platzhalter, kein echter Wortlaut.
   '"NAME: erwartet …"',
   // docs/stolpersteine.md: ein VORSCHLAG mit Gedankenstrich statt "--".
   // Der geltende Wortlaut steht dreizehn Zeilen darueber und wird geprueft.
@@ -357,8 +357,10 @@ function gemeinsameWorte(a, b) {
 // Meldungen und veraltet genauso -- tools/pruef_doku_aussagen.py sagt in
 // seinem eigenen Kopf, dass ihm genau diese Sorte Aussage entgeht.
 const gewuenscht = process.argv.slice(2);
-const buecher = fs.readdirSync(WURZEL)
-  .filter((d) => /^buch-/.test(d) && fs.statSync(path.join(WURZEL, d)).isDirectory())
+const BUECHER = path.join(WURZEL, "buecher");
+const buecher = (fs.existsSync(BUECHER) ? fs.readdirSync(BUECHER) : [])
+  .filter((d) => fs.statSync(path.join(BUECHER, d)).isDirectory())
+  .map((d) => "buecher/" + d)
   .concat(fs.existsSync(path.join(WURZEL, "docs")) ? ["docs"] : [])
   .filter((d) => !gewuenscht.length || gewuenscht.includes(d))
   .sort();

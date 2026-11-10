@@ -1,4 +1,4 @@
-//! Fenster als Prozess -- Weg B aus `docs/entwurf-native-fenster.md`.
+//! Fenster als Prozess -- Weg B aus `docs/intern/entwurf-native-fenster.md`.
 //!
 //! Drachenhauch kennt ein OS-Fenster je Prozess (raylib haelt seinen Zustand
 //! global). Ein zweites Fenster ist deshalb ein zweiter `dhrt`, der sein

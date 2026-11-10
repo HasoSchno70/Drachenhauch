@@ -124,7 +124,7 @@ def main() -> int:
         # raylibs Tipp-Warteschlange fasst 16 Zeichen je Bild; eine bestaetigte
         # Eingabe aus einer IME (ein japanischer Satz) ist laenger, und der Rest
         # fiele still weg. Der Wert ist ein #define in raylibs config.h; cmake
-        # uebernimmt CFLAGS aus der Umgebung (docs/entwurf-eingabemethoden.md).
+        # uebernimmt CFLAGS aus der Umgebung (docs/intern/entwurf-eingabemethoden.md).
         env["CFLAGS"] = (env.get("CFLAGS", "") + " -DMAX_CHAR_PRESSED_QUEUE=256").strip()
 
     # `--test` fuehrt die Rust-Unit-Tests aus (mit derselben Toolchain-Env),

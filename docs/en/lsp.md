@@ -16,7 +16,7 @@ No Python, no second program: lexer, parser, compiler, the command index and
 the hover texts live in `dhrt`, and the server uses them in one process. Until
 September 2026 a Python server (`drachenhauch/lsp/`) recomputed what `dhrt`
 already knew when compiling — it was dropped with path A from
-[entwurf-python-abbau.md](../entwurf-python-abbau.md) (German).
+[entwurf-python-abbau.md](../intern/entwurf-python-abbau.md) (German).
 
 | LSP method | Function |
 |---|---|

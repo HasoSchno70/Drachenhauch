@@ -89,7 +89,7 @@ Nichts davon braucht ein Fenster. Ein Drachenhauch-Programm kann eine
 Konsolenanwendung sein, ein Cron-Job oder ein Spiel — dieselbe Sprache.
 
 Nachzulesen im [Handbuch](docs/README.md); wie es dazu kam, steht in der
-[Allzweck-Roadmap](docs/allzweck-roadmap.md).
+[Allzweck-Roadmap](docs/intern/allzweck-roadmap.md).
 
 ## Herunterladen
 
@@ -126,19 +126,19 @@ rust/drachenhauch_runtime/target/release/dhrt run ide/ide.dh
 
 ## Das Lehrbuch
 
-**[Drachenhauch — Das Lehrbuch](buch-referenz/buch/)** ist beides zugleich: ein Kurs, der vom ersten schwarzen Fenster bis zu Klassen, Modulen und fertigen Spielen führt, und ein Nachschlagewerk, in dem **jeder einzelne Befehl** mit einem lauffähigen Beispielprogramm erklärt wird. Sieben Teile, 85 Kapitel, alle Codebeispiele gegen `dhrt --check` verifiziert.
+**[Drachenhauch — Das Lehrbuch](buecher/referenz/buch/)** ist beides zugleich: ein Kurs, der vom ersten schwarzen Fenster bis zu Klassen, Modulen und fertigen Spielen führt, und ein Nachschlagewerk, in dem **jeder einzelne Befehl** mit einem lauffähigen Beispielprogramm erklärt wird. Sieben Teile, 85 Kapitel, alle Codebeispiele gegen `dhrt --check` verifiziert.
 
 | Ausgabe | Zum Drucken (A4) | Fürs Lesegerät |
 |---|---|---|
-| **Deutsch** — 570 Seiten | [Drachenhauch-Lehrbuch.docx](buch-referenz/buch/Drachenhauch-Lehrbuch.docx?raw=1) | [.epub](buch-referenz/buch/Drachenhauch-Lehrbuch.epub?raw=1) |
-| **English** — 561 pages | [Drachenhauch-Handbook.docx](buch-referenz/buch/Drachenhauch-Handbook.docx?raw=1) | [.epub](buch-referenz/buch/Drachenhauch-Handbook.epub?raw=1) |
+| **Deutsch** — 570 Seiten | [Drachenhauch-Lehrbuch.docx](buecher/referenz/buch/Drachenhauch-Lehrbuch.docx?raw=1) | [.epub](buecher/referenz/buch/Drachenhauch-Lehrbuch.epub?raw=1) |
+| **English** — 561 pages | [Drachenhauch-Handbook.docx](buecher/referenz/buch/Drachenhauch-Handbook.docx?raw=1) | [.epub](buecher/referenz/buch/Drachenhauch-Handbook.epub?raw=1) |
 
 Beide Sprachen entstehen aus **denselben** Kapitelquellen (`content/NN_*.js`): die Renderer bekommen ein `H`, das jede Zeichenkette vorher durch den Katalog `i18n/en.json` schickt. Ein zweiter Satz englischer Kapiteldateien wäre binnen eines Monats vom deutschen abgedriftet — so kann er es nicht. Fehlt ein Eintrag, bleibt der deutsche Satz stehen und das Buch baut trotzdem; `node fehlend.js en` zählt, wo noch welche fehlen.
 
 ```
 node build_book.js [--lang en]        # -> .docx (A4, zum Drucken)
 node build_epub.js [--lang en]        # -> .epub (fließt in die Schriftgröße des Lesers, Nachtmodus)
-dhrt run tools/buch_bauen.dh -- buch-referenz [--lang en]   # Zwei-Pass-Build mit Seitenzahlen im Inhalt
+dhrt run tools/buch_bauen.dh -- buecher/referenz [--lang en]   # Zwei-Pass-Build mit Seitenzahlen im Inhalt
 ```
 
 ### Weitere Bücher
@@ -147,9 +147,9 @@ Drei kürzere Bücher bauen je ein fertiges Programm, Kapitel für Kapitel:
 
 | Buch | Was entsteht | Herunterladen |
 |---|---|---|
-| **[Der Einstieg](buch-einstieg/README.md)** | Programmieren von null an, für Menschen, die noch nie eine Zeile geschrieben haben — der sanfteste Einstieg | [.docx](buch-einstieg/buch/Drachenhauch-Einstieg.docx?raw=1) · [.epub](buch-einstieg/buch/Drachenhauch-Einstieg.epub?raw=1) |
-| **[Arcade-Shooter](buch-galaga/README.md)** | Ein Weltraum-Shooter mit Angriffswellen, die Sprites zeichnest du selbst im Pixel-Editor | [.docx](buch-galaga/buch/Drachenhauch-Buch.docx?raw=1) |
-| **[Tippspiel](buch-tippspiel/README.md)** | Eine Bundesliga-Tippanwendung mit Datenbank, Rangliste und Spielplan aus dem Netz — die erste ernsthafte Anwendung | [.docx](buch-tippspiel/buch/Drachenhauch-Tippspiel.docx?raw=1) |
+| **[Der Einstieg](buecher/einstieg/README.md)** | Programmieren von null an, für Menschen, die noch nie eine Zeile geschrieben haben — der sanfteste Einstieg | [.docx](buecher/einstieg/buch/Drachenhauch-Einstieg.docx?raw=1) · [.epub](buecher/einstieg/buch/Drachenhauch-Einstieg.epub?raw=1) |
+| **[Arcade-Shooter](buecher/galaga/README.md)** | Ein Weltraum-Shooter mit Angriffswellen, die Sprites zeichnest du selbst im Pixel-Editor | [.docx](buecher/galaga/buch/Drachenhauch-Buch.docx?raw=1) |
+| **[Tippspiel](buecher/tippspiel/README.md)** | Eine Bundesliga-Tippanwendung mit Datenbank, Rangliste und Spielplan aus dem Netz — die erste ernsthafte Anwendung | [.docx](buecher/tippspiel/buch/Drachenhauch-Tippspiel.docx?raw=1) |
 
 ## Handbuch
 
@@ -158,7 +158,7 @@ Vollständige Doku im [docs/](docs/README.md)-Ordner:
 - **[Sprachreferenz](docs/sprache.md)** — Variablen, Typen, `ENUM`, `SELECT CASE`, Funktionen mit Defaults und Named Arguments, Klassen, Try/Catch, f-Strings, Escape-Folgen mit `!"…\n…"`, Coroutines (`YIELD` + `CORO_*`)
 - **[Standard-Built-ins](docs/builtins-core.md)** — Math, Strings, Maps, File-I/O, …
 - **[Grafik-Built-ins](docs/builtins-grafik.md)** — native Runtime (dhrt/raylib), Z-Layer, Sprite-Atlas, Asset-Preloader
-- **[Performance](docs/PERFORMANCE.md)** — Bench-Zahlen + umgesetzte Optimierungen (Spec-Ops, IC, Typed Arrays, ECS Bulk-Ops, …)
+- **[Performance](docs/intern/PERFORMANCE.md)** — Bench-Zahlen + umgesetzte Optimierungen (Spec-Ops, IC, Typed Arrays, ECS Bulk-Ops, …)
 - **Module** — 57 Stück, [Tabelle unten](#module)
 - **[IDE](docs/ide.md)** — die Entwicklungsumgebung, selbst in Drachenhauch geschrieben: Reiter, Projektbaum, Vervollständigung, Hilfe zum Wort, Schnipsel, Mehrfach-Marken, Faltung, geteilte Ansicht, Umbauten über das ganze Projekt, **Debugger** (auch bedingte Haltepunkte), **Profiler**, git blame/diff, Handbuch im Fenster, Willkommensseite mit Beispiel-Galerie
 - **[Drachenhauch Studio](docs/studio.md)** (`studio/studio.dh`) — Anwendungen mit Oberfläche im Stil von Xojo: Fenster-Entwurf mit Ausrichtungslinien, Inspektor, Navigator, Code je Ereignis, Layout-Behälter, eigene Controls, Datenbanken mit Abfragen, Berichte (PDF, Druck, Vorschau), Menüs, Timer, Bilder, Dialoge, Projektvorlagen, deutsche und englische Oberfläche, Projekte in zwei Sprachen, Starten/Bauen/Debuggen; Beispielprojekte `examples/studio/rechnungen/` und [Kuehlschrank-Drachenhauch](https://github.com/HasoSchno70/Kuehlschrank-Drachenhauch) (eine Kühlschrank-Verwaltung mit 13 Fenstern und 5 eigenen Controls, eigenes Repo)

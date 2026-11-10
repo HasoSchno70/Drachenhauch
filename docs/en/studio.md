@@ -4,7 +4,7 @@ Drachenhauch Studio is an IDE for programs with a user interface, in the
 style of Xojo: put windows together with the mouse, set properties in the
 inspector, later write the code of the events and start the program. It runs
 on the `dhrt` runtime and is itself a Drachenhauch program. The design with
-all stages is in [entwurf-studio.md](../entwurf-studio.md) (German).
+all stages is in [entwurf-studio.md](../intern/entwurf-studio.md) (German).
 
 ```text
 dhrt run studio/studio.dh
@@ -651,7 +651,7 @@ WEND
 A **report** is a printed page from the project's data, for example an
 invoice or a list (Project → Add report …). Its description is in
 `<Name>.dhreport` (JSON); how it is built and what is still to come is in the
-[design](../entwurf-berichte.md) (German). A report has **bands** one below the
+[design](../intern/entwurf-berichte.md) (German). A report has **bands** one below the
 other: report header, page header, group header, detail (per row of the
 source), group footer, page footer, report footer. They hold elements in mm:
 fixed text, fields (a column of the source, also `kunde.name` through a

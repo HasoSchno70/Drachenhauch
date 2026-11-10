@@ -139,7 +139,7 @@ untereinander.
 Das Modul zeichnet seine Seiten **auf**. Dieselbe Seite geht damit auf drei
 Ziele: die Datei (`PDF_SAVE`), den Drucker (`PDF_PRINT`) und ein Bild
 (`PDF_PREVIEW`). Es gibt keinen PDF-Renderer dahinter; der Renderer ist das
-Betriebssystem ([Entwurf](entwurf-drucken.md)).
+Betriebssystem ([Entwurf](intern/entwurf-drucken.md)).
 
 ```basic
 PDF_PRINT(p)                                   ' Standarddrucker, eine Kopie

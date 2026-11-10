@@ -1,4 +1,4 @@
-' Feste Lage der Objektfelder (M4, docs/entwurf-maschinencode.md): jede
+' Feste Lage der Objektfelder (M4, docs/intern/entwurf-maschinencode.md): jede
 ' Klasse hat eine Lage (Name -> Platz, Vorfahren zuerst), jede Instanz ein
 ' Feld von Werten, und die Befehle `obj.x` merken sich (Lage, Platz) ihres
 ' letzten Treffers. Die Faelle pruefen, was dabei schiefgehen koennte: eine

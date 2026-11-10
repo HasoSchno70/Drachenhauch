@@ -430,7 +430,7 @@ Demo: [examples/87_ttf_fonts.dh](../examples/87_ttf_fonts.dh).
 `TEXT(x, y, "Köln")` zeichnet **Köln**, nicht `K?ln`, und `TEXT(x, y, "12,50 €")`
 zeigt das Euro-Zeichen — bis September 2026 war es ein Fragezeichen, ebenso
 `ő`, `ł`, `Ω`, `Я`, jedes Kanji und jedes Emoji (gemessen in
-[entwurf-eingabemethoden.md](entwurf-eingabemethoden.md)). Dafür sorgen drei
+[entwurf-eingabemethoden.md](intern/entwurf-eingabemethoden.md)). Dafür sorgen drei
 Dinge:
 
 - **Der Grund-Zeichenvorrat** jeder Schrift — der Ausweich-Schrift und jeder

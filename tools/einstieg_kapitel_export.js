@@ -13,7 +13,7 @@
 const fs = require("fs");
 const path = require("path");
 
-const BUCH = path.join(__dirname, "..", "buch-einstieg", "buch");
+const BUCH = path.join(__dirname, "..", "buecher/einstieg", "buch");
 const CONTENT = path.join(BUCH, "content");
 const nix = () => "";
 const kapitel = [];

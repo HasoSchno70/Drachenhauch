@@ -1,7 +1,7 @@
 ' raylib ausgereizt, Etappe 4 (2026-10-03): Text. SDF-Schriften, die bei
 ' jeder Groesse scharf bleiben, Fragen an eine Schrift, eine Schrift als
 ' Bild fuer LOADFONT_IMAGE, die Bildrate, und drei Textbefehle.
-' Die Schriftdatei kommt aus circuitrunner/assets (versioniert).
+' Die Schriftdatei kommt aus spiele/circuitrunner/assets (versioniert).
 ' Format: docs/werkzeuge.md, dhrt test.
 
 === schreibweisen fuer bezeichner
@@ -69,7 +69,7 @@ PRINT "beide gezeichnet "; sw + sg > 2000 AND nw + ng > 2000
 PRINT "sdf scharf "; sg * 3 < ng
 PRINT "gewoehnliche verschwimmt "; ng > 1500
 --- argumente
-{sammlung}/../../../circuitrunner/assets/font.ttf
+{sammlung}/../../../spiele/circuitrunner/assets/font.ttf
 --- umgebung
 DHRT_FRAMES=60
 --- erwartet
@@ -96,7 +96,7 @@ PRINT "breite "; INT(FONT_GLYPH_WIDTH(n, "W", 24) + 0.5) = TEXT_WIDTH("W"); " ";
 SETFONT(-1) : TEXT_SIZE(20)
 PRINT "eingebaut "; INT(FONT_GLYPH_WIDTH(-1, "W", 20) + 0.5) = TEXT_WIDTH("W")
 --- argumente
-{sammlung}/../../../circuitrunner/assets/font.ttf
+{sammlung}/../../../spiele/circuitrunner/assets/font.ttf
 --- umgebung
 DHRT_FRAMES=2
 --- erwartet
@@ -145,7 +145,7 @@ FOR y = 1 TO IMAGEHEIGHT(sb) - 2
 NEXT
 PRINT "sdf als bild "; voll > 100; " "; halb < voll
 --- argumente
-{sammlung}/../../../circuitrunner/assets/font.ttf
+{sammlung}/../../../spiele/circuitrunner/assets/font.ttf
 --- umgebung
 DHRT_FRAMES=2
 --- erwartet

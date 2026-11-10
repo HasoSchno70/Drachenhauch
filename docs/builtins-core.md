@@ -215,7 +215,7 @@ ein Prozentsatz oder ein Faktor im Spiel ist.
 `DIM preis AS FLOAT` schreibt und direkt damit summiert, bekommt weiterhin
 `0.30000000000000004` — die Sprache hindert ihn nicht daran. Was ein echter
 Geldtyp kosten würde und warum er trotzdem nicht kommt, steht in
-[Entwurf: Geld](entwurf-geldtyp.md).
+[Entwurf: Geld](intern/entwurf-geldtyp.md).
 
 **Perlin-Noise** — deterministisch: dieselbe Eingabe liefert immer denselben
 Wert, ungefähr zwischen `-1` und `1`. Für prozedurale Erzeugung (Gelände, Höhlen,
@@ -654,7 +654,7 @@ Für Programme gibt es `SHELL`, mit Absicht getrennt.
 ## Ein zweites Fenster: `WINDOW_OPEN`
 
 Drachenhauch kennt **ein OS-Fenster je Prozess** (raylib hält seinen Zustand
-global; die Abwägung steht in [entwurf-native-fenster.md](entwurf-native-fenster.md)).
+global; die Abwägung steht in [entwurf-native-fenster.md](intern/entwurf-native-fenster.md)).
 Ein zweites Fenster ist deshalb ein **zweiter `dhrt`**, der sein eigenes
 Programm mit eigenem `SCREEN` fährt — mit eigenem Eintrag in der Taskleiste,
 auf jedem Monitor, und ein Absturz dort reißt das erste nicht mit. Verbunden

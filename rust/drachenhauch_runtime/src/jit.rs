@@ -1,4 +1,4 @@
-//! Maschinencode fuer reine Zahlenfunktionen (M3, docs/entwurf-maschinencode.md).
+//! Maschinencode fuer reine Zahlenfunktionen (M3, docs/intern/entwurf-maschinencode.md).
 //!
 //! Uebersetzt wird eine FUNCTION/SUB nur, wenn sie REIN ist: Parameter,
 //! Locals und Rueckgabe sind INTEGER, FLOAT oder BOOLEAN, und sie tut nichts
@@ -82,7 +82,7 @@ enum Elem { I, F, Wert(Art) }
 /// die Helfer `feld_lesen_*`/`feld_setzen_*`, weil die Lage eines `Value`
 /// im Speicher nicht festgelegt ist.
 ///
-/// Eine **Familie** (Weg F aus docs/entwurf-schnittstellen.md): Objekte
+/// Eine **Familie** (Weg F aus docs/intern/entwurf-schnittstellen.md): Objekte
 /// mehrerer Unterklassen einer gemeinsamen Vorfahrin, etwa Kreise und
 /// Quadrate in einem `ARRAY OF Form`. Dann ist `lage`/`name` die der
 /// Vorfahrin (ihre Felder liegen bei allen auf demselben Platz, Vorfahren

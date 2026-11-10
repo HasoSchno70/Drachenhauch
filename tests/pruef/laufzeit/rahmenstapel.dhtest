@@ -1,4 +1,4 @@
-' Rahmenstapel (M2, docs/entwurf-maschinencode.md): ein Aufruf einer
+' Rahmenstapel (M2, docs/intern/entwurf-maschinencode.md): ein Aufruf einer
 ' schlichten Funktion (CALL_USER, keine Coroutine, kein BYREF) wechselt in
 ' `dispatch` den Rahmen, statt ueber exec -> run_frame -> dispatch neu
 ' einzusteigen. Fehler laufen Rahmen fuer Rahmen nach aussen, bis ein TRY sie

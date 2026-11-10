@@ -1,4 +1,4 @@
-' Drachenhauch Studio, Stufe 3 (studio/, docs/entwurf-studio.md): Starten
+' Drachenhauch Studio, Stufe 3 (studio/, docs/intern/entwurf-studio.md): Starten
 ' und Bauen. Das Studio erzeugt _studio/ (main.dh, je Fenster eine
 ' Basisklasse, die Laufzeit studio_laufzeit.dh und den Code des Projekts so,
 ' wie er im Editor steht), startet es mit dhrt run, zeigt die Ausgabe und

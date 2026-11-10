@@ -1,4 +1,4 @@
-//! Sprachausgabe: `SPEAK` und Verwandte (Weg C aus `docs/entwurf-speak.md`).
+//! Sprachausgabe: `SPEAK` und Verwandte (Weg C aus `docs/intern/entwurf-speak.md`).
 //!
 //! Der Grundgedanke: eine gesprochene Zeile ist **ein Klang unter Klaengen**.
 //! Die Systemstimme liefert PCM (Windows: WinRT `Windows.Media.SpeechSynthesis`,

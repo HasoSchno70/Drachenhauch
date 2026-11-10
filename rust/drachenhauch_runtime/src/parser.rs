@@ -1611,7 +1611,7 @@ impl Parser {
     }
 
     /// `DECLARE SUB|FUNCTION name LIB "bib" [ALIAS "c_name"] (...) [AS typ]`
-    /// -- eine Funktion aus einer fremden Bibliothek (docs/entwurf-ffi.md).
+    /// -- eine Funktion aus einer fremden Bibliothek (docs/intern/entwurf-ffi.md).
     /// `DECLARE`, `LIB` und `ALIAS` sind keine Schluesselwoerter: sie zaehlen
     /// nur hier. Die Typwoerter (`LONG`, `ZEIGER`, `TEXT` ...) gibt es nur in
     /// dieser Zeile, `ffi::typ_zeichen` prueft sie.

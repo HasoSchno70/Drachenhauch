@@ -1,4 +1,4 @@
-' Superinstruktionen (M2, docs/entwurf-maschinencode.md): beim Laden markiert
+' Superinstruktionen (M2, docs/intern/entwurf-maschinencode.md): beim Laden markiert
 ' `model::verschmelzen` Folgen wie `LOAD a, LOAD b, ADD, STORE c`, und
 ' `dispatch` fuehrt sie in einem Schritt aus -- aber nur den sicheren Fall.
 ' Alles andere (Ueberlauf, Division durch 0, eine Umwandlung beim Speichern,

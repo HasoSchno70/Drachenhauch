@@ -430,7 +430,7 @@ Demo: [examples/87_ttf_fonts.dh](../../examples/87_ttf_fonts.dh).
 `TEXT(x, y, "Köln")` draws **Köln**, not `K?ln`, and `TEXT(x, y, "12,50 €")`
 shows the euro sign — until September 2026 it was a question mark, as were
 `ő`, `ł`, `Ω`, `Я`, every kanji and every emoji (measured in
-[entwurf-eingabemethoden.md](../entwurf-eingabemethoden.md) (German)). Three
+[entwurf-eingabemethoden.md](../intern/entwurf-eingabemethoden.md) (German)). Three
 things take care of this:
 
 - **The basic character set** of every font — the fallback font and every

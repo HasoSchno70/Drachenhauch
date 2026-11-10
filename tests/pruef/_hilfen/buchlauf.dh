@@ -8,7 +8,7 @@ DIM blCode AS INTEGER : blCode = 0
 
 SUB kopieLaufen(wurzel AS STRING, rel AS STRING, bilder AS INTEGER)
     DIM ziel AS STRING : ziel = CWD$() + "/" + REPLACE$(rel, "/", "_")
-    COPYFILE(wurzel + "/buch-tippspiel/code/" + rel, ziel)
+    COPYFILE(wurzel + "/buecher/tippspiel/code/" + rel, ziel)
     DIM p AS INTEGER
     IF bilder > 0 THEN
         p = PROCESS_START("dhrt", "run", "--bilder", STR$(bilder), ziel)

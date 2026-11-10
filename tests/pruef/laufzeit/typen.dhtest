@@ -1,4 +1,4 @@
-' M1 aus docs/entwurf-maschinencode.md: der Compiler schreibt jedem Ausdruck
+' M1 aus docs/intern/entwurf-maschinencode.md: der Compiler schreibt jedem Ausdruck
 ' einen Typ zu (`Compiler::typ_von`, `typen.rs`). `dhrt --typen` zeigt ihn;
 ' mit `DHRT_TYPEN_PRUEFEN=1` steht hinter jedem getypten Ausdruck eine Probe,
 ' die zur Laufzeit abbricht, wenn der Typ nicht stimmt -- damit laeuft die

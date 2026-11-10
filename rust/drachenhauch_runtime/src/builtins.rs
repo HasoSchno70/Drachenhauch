@@ -3655,7 +3655,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         // STR$()-Umweg, den man sonst von Hand geht, 0,35 us je Aufnahme --
         // es ging hier nie um Tempo, sondern darum, dass
         // `MAPPUT(m, STR$(x), 1)` die Absicht verdeckt.
-        // Siehe docs/entwurf-set-builtins.md.
+        // Siehe docs/intern/entwurf-set-builtins.md.
         "set_add" | "set_has" | "set_remove" => {
             arity!(2);
             let anz = name.to_uppercase();

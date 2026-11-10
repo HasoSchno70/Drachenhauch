@@ -73,7 +73,7 @@ dhrt test code/eins_pruefung.dh
 ```
 
 **Gefunden wird `*_pruefung.dh`** — die Regel ist am Bestand abgelesen, nicht
-erfunden: `buch-tippspiel/code/` nennt seine vier Prüfprogramme seit jeher so.
+erfunden: `buecher/tippspiel/code/` nennt seine vier Prüfprogramme seit jeher so.
 Eine ausdrücklich genannte Datei läuft auch ohne diese Endung; wer sie
 hinschreibt, meint sie.
 
@@ -109,7 +109,7 @@ IF ASSERT_FAILED() > 0 THEN EXIT(1)
 Ein Prüfprogramm prüft sich selbst mit `ASSERT`. Die meisten Tests der
 Sprache sind aber Ausgabevergleiche: ein kurzes Programm, eine erwartete
 Ausgabe. Dafür braucht es kein Programm je Datei, sondern eine **Sammlung**
-(seit 2026-09-07, Weg D des [Python-Abbaus](entwurf-python-abbau.md)):
+(seit 2026-09-07, Weg D des [Python-Abbaus](intern/entwurf-python-abbau.md)):
 
 ```dhtest
 ' Kopfkommentar bis zum ersten Fall

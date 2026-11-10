@@ -1,6 +1,6 @@
 //! Symbole im Quelltext: Definitionen, Fundstellen, Bloecke, Kommentar-Doku.
 //!
-//! Der Port von `editor_qt/symbols.py` (Weg A aus `docs/entwurf-python-abbau.md`):
+//! Der Port von `editor_qt/symbols.py` (Weg A aus `docs/intern/entwurf-python-abbau.md`):
 //! ein zeilenweiser, stack-basierter Scanner, der Kommentare und
 //! Zeichenketten ausblendet, aber bewusst KEIN Lexer ist -- ein Sprachserver
 //! sieht halb getippten Text und muss trotzdem antworten (dieselbe

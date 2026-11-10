@@ -1,4 +1,4 @@
-//! Stildatei (GUI_STYLESHEET, docs/entwurf-gui-wie-gtk.md Paket 4, erste
+//! Stildatei (GUI_STYLESHEET, docs/intern/entwurf-gui-wie-gtk.md Paket 4, erste
 //! Stufe): das Aussehen der Widgets per Regel statt per Befehl je Widget --
 //! wie GTK-CSS, aber nur die Teilmenge, die zur gui passt.
 //!

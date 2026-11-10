@@ -1,7 +1,7 @@
 Schrift fuer examples/204_scharfe_schrift.dh
 ============================================
 
-Datei:   roboto_medium.ttf (dieselbe Datei wie circuitrunner/assets/font.ttf)
+Datei:   roboto_medium.ttf (dieselbe Datei wie spiele/circuitrunner/assets/font.ttf)
 Schrift: Roboto Medium, Version 2.137
 Autor:   Christian Robertson / Google
 Quelle:  https://fonts.google.com/specimen/Roboto

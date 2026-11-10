@@ -1,5 +1,5 @@
 //! `dhrt doku` -- die Doku-Werkzeuge, die bis 2026-09-06 in Python lagen
-//! (Weg A aus `docs/entwurf-python-abbau.md`):
+//! (Weg A aus `docs/intern/entwurf-python-abbau.md`):
 //!
 //!   dhrt doku prosa [--pruefen]          builtin_prosa.json aus docs/ (+ Referenzbuch)
 //!   dhrt doku grammatik [--pruefen]      VS-Code-Grammatik aus Keywords + Index
@@ -285,13 +285,13 @@ fn prosa_main(pruefen: bool) -> ExitCode {
     if pruefen && !node_da() {
         // Ohne Node fehlt eine der Quellen -- ein Vergleich meldete dann
         // Abweichungen, die nur an der Umgebung liegen.
-        println!("Node fehlt -- Pruefung uebersprungen (buch-referenz nicht lesbar).");
+        println!("Node fehlt -- Pruefung uebersprungen (buecher/referenz nicht lesbar).");
         return ExitCode::SUCCESS;
     }
     let code = abliefern(&ziel, &text, pruefen, &format!("{} Beschreibungen", daten.len()), "dhrt doku prosa");
     let code_en = abliefern(&ziel_en, &text_en, pruefen, &format!("{} englische Beschreibungen", daten_en.len()), "dhrt doku prosa");
     let code = if code_en != ExitCode::SUCCESS { code_en } else { code };
-    if !pruefen && !node_da() { println!("  Hinweis: ohne Node -- die Eintraege aus buch-referenz fehlen."); }
+    if !pruefen && !node_da() { println!("  Hinweis: ohne Node -- die Eintraege aus buecher/referenz fehlen."); }
     code
 }
 

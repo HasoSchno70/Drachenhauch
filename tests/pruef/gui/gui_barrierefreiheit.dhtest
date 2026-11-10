@@ -1,4 +1,4 @@
-' Barrierefreiheit (docs/entwurf-barrierefreiheit.md, Wege A und C).
+' Barrierefreiheit (docs/intern/entwurf-barrierefreiheit.md, Wege A und C).
 '
 ' Der Kern ist der Pruefstein aus dem Entwurf: ein FREMDER Leser -- UI
 ' Automation aus PowerShell heraus (System.Windows.Automation, keine neue
@@ -296,7 +296,7 @@ haken
 geklickt Anna
 
 === speak ohne gui spricht ueber den leser
-' SPEAK fragt zuerst den Bildschirmleser (docs/entwurf-speak.md, Weg C): laeuft
+' SPEAK fragt zuerst den Bildschirmleser (docs/intern/entwurf-speak.md, Weg C): laeuft
 ' einer, geht der Satz als Ansage in den Baum -- auch in einem Programm OHNE
 ' gui, dessen Baum sonst nur das Fenster waere. Der fremde Leser findet den
 ' Satz als Text-Knoten; die Systemstimme bleibt still, SPEAKING ist FALSE.

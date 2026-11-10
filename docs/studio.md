@@ -4,7 +4,7 @@ Drachenhauch Studio ist eine IDE für Programme mit Oberfläche, im Stil von
 Xojo: Fenster zusammenklicken, Eigenschaften im Inspektor einstellen, später
 den Code der Ereignisse schreiben und das Programm starten. Es läuft mit der
 Laufzeit `dhrt` und ist selbst ein Drachenhauch-Programm. Der Entwurf mit
-allen Stufen steht in [entwurf-studio.md](entwurf-studio.md).
+allen Stufen steht in [entwurf-studio.md](intern/entwurf-studio.md).
 
 ```text
 dhrt run studio/studio.dh
@@ -663,7 +663,7 @@ WEND
 Ein **Bericht** ist eine gedruckte Seite aus den Daten des Projekts, etwa
 eine Rechnung oder eine Liste (Projekt → Bericht hinzufügen …). Seine
 Beschreibung steht in `<Name>.dhreport` (JSON); wie sie aufgebaut ist und
-was noch kommt, steht im [Entwurf](entwurf-berichte.md). Ein Bericht hat
+was noch kommt, steht im [Entwurf](intern/entwurf-berichte.md). Ein Bericht hat
 **Bänder** untereinander: Berichtskopf, Seitenkopf, Gruppenkopf, Detail (je
 Zeile der Quelle), Gruppenfuß, Seitenfuß, Berichtsfuß. Darin stehen
 Elemente in mm: fester Text, Felder (eine Spalte der Quelle, auch

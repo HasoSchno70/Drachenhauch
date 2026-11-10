@@ -1,4 +1,4 @@
-' Maschinencode (M3..M5, docs/entwurf-maschinencode.md, src/jit.rs). Jeder
+' Maschinencode (M3..M5, docs/intern/entwurf-maschinencode.md, src/jit.rs). Jeder
 ' Fall steht zweimal: in der VM (DHRT_JIT=aus) und mit Maschinencode --
 ' die Erwartung ist dieselbe, und sie ist die Ausgabe der VM. Gibt der
 ' Maschinencode bei einem Fehler auf, rechnet die VM den Aufruf nach; darum
@@ -7484,7 +7484,7 @@ gefangen: BAND erwartet INTEGER, erhalten INTEGER / STRING
 jit: 3 Funktionen, 2 Schleifen, 2 Schleifenlaeufe
 
 === objekte verschiedener unterklassen in einem feld
-' Weg F (docs/entwurf-schnittstellen.md): Kreis, Rechteck und Quadrat (zwei
+' Weg F (docs/intern/entwurf-schnittstellen.md): Kreis, Rechteck und Quadrat (zwei
 ' Stufen) in einem ARRAY OF Form. Der Maschinencode fasst sie als Familie
 ' und verteilt den Aufruf ueber die Lage; das Basisfeld n liegt bei allen
 ' auf demselben Platz. Bis 2026-10-22 stieg er bei jedem Element einer

@@ -1,6 +1,6 @@
 //! C-Structs ueber BUFFER: `STRUCT name LAYOUT C [PACK n] ... END STRUCT`.
 //!
-//! Entwurf: docs/entwurf-ffi.md (Struct-Lage). Eine Variable dieses Typs ist
+//! Entwurf: docs/intern/entwurf-ffi.md (Struct-Lage). Eine Variable dieses Typs ist
 //! zur Laufzeit ein gewoehnlicher BUFFER in der Groesse des Structs; der
 //! Compiler kennt die Lage jedes Feldes und macht aus `st.monat` einen
 //! Zugriff an fester Stelle (`__struct_get`/`__struct_set`). Darum geht ein
@@ -35,7 +35,7 @@
 //! Structs zaehlen, unterscheidet Linux auf ARM64 (AAPCS64: ja) von Linux
 //! und macOS auf x86-64 und macOS auf ARM (nein) -- darum drei Regeln.
 //! Alles nachgemessen mit clang fuer fuenf Ziele und gegengeprueft mit dem
-//! echten gcc und cl.exe (docs/entwurf-ffi.md).
+//! echten gcc und cl.exe (docs/intern/entwurf-ffi.md).
 //!
 //! Hier steht nichts, was fremden Speicher anfasst -- alle Zugriffe bleiben
 //! im BUFFER und pruefen seine Laenge. Das Modul braucht das Feature `ffi`

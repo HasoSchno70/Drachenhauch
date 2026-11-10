@@ -1,5 +1,5 @@
 ' ============================================================
-'  Drachenhauch Studio -- Berichte (docs/entwurf-berichte.md)
+'  Drachenhauch Studio -- Berichte (docs/intern/entwurf-berichte.md)
 ' ============================================================
 '  Ein Bericht ist ein Element der Art "bericht"; seine Beschreibung (JSON,
 '  Datei <Name>.dhreport) steht in e.schema wie der Aufbau einer Datenbank.

@@ -1,4 +1,4 @@
-//! Eingabemethoden (IME): die Umwandlung im Feld (docs/entwurf-eingabemethoden.md,
+//! Eingabemethoden (IME): die Umwandlung im Feld (docs/intern/entwurf-eingabemethoden.md,
 //! Weg C).
 //!
 //! Wer Japanisch, Chinesisch oder Koreanisch schreibt, tippt Silben, und eine

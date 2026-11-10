@@ -90,7 +90,7 @@ einem Punkt Breite -- und jeder laedt die Textur neu hoch. Wer eine Grafik aus
 vielen Formen **herstellt** (Kacheln, Symbole, Knoepfe), braucht mehr: ein
 gefuelltes Vieleck, eine dicke Linie, abgerundete Ecken, einen Ring, einen
 Verlauf. Dafuer diese acht (gebaut fuer den Kachel-Generator des Circuit
-Runners, `circuitrunner/make_tiles.dh`):
+Runners, `spiele/circuitrunner/make_tiles.dh`):
 
 | Funktion | Wirkung |
 |---|---|

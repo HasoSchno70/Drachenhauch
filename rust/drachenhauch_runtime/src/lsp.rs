@@ -1,6 +1,6 @@
 //! `dhrt lsp` -- der Sprachserver (LSP ueber stdio, JSON-RPC 2.0).
 //!
-//! Weg A aus `docs/entwurf-python-abbau.md`: bis hierher rechnete
+//! Weg A aus `docs/intern/entwurf-python-abbau.md`: bis hierher rechnete
 //! `drachenhauch/lsp/` in Python nach, was dhrt beim Uebersetzen laengst
 //! weiss. Jetzt liegen Diagnose (dieselbe Kette wie `--check`), Symbole
 //! (`symbole.rs`), Index und Hover-Texte (eingebettet, wie der Index im

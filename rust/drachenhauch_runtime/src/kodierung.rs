@@ -1,4 +1,4 @@
-//! Textkodierungen jenseits von UTF-8 (Punkt 3 aus docs/allzweck-audit-2.md).
+//! Textkodierungen jenseits von UTF-8 (Punkt 3 aus docs/intern/allzweck-audit-2.md).
 //!
 //! Bis hierher war jede Textdatei UTF-8, sonst gar nicht lesbar:
 //!

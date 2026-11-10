@@ -1,4 +1,4 @@
-' Klassentypen werden geprueft (docs/entwurf-schnittstellen.md, Weg B).
+' Klassentypen werden geprueft (docs/intern/entwurf-schnittstellen.md, Weg B).
 ' Ein Platz vom Typ einer Klasse -- Variable, Parameter, Feld, Feldelement,
 ' MAP-Wert, Rueckgabe -- nimmt NIL und Instanzen der Klasse oder einer
 ' Unterklasse (`value::klasse_pruefen`). Bis 2026-10-22 reichte die Laufzeit

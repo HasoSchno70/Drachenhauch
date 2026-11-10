@@ -8,7 +8,7 @@ tracker (one tracker channel per track).
 
 The score editor is a Drachenhauch program:
 `examples/199_notenblatt.dh`. It replaces the former Qt editor `dhscore`
-(path B in [entwurf-python-abbau.md](../entwurf-python-abbau.md), German)
+(path B in [entwurf-python-abbau.md](../intern/entwurf-python-abbau.md), German)
 and needs no Python.
 
 ## Starting

@@ -1,0 +1,1199 @@
+# Entwurf: Drachenhauch als übersetzte Sprache — richtig schnell
+
+Stand 2026-09-24. Frage des Nutzers: wie wird Drachenhauch als
+Compilersprache *richtig* schnell? Vorher erledigt ist die Kleinarbeit aus
+`docs/intern/entwurf-anwendungen-und-tempo.md` (Anhängen, Builtin-Familien, globale
+Felder, Objektfelder, Aufrufe, Falten, JSON-Umweg, geteilter Dispatch).
+Damit ist ausgereizt, was eine Stapel-VM mit `Value`-Enum ohne Umbau hergibt.
+
+## 1. Wo wir stehen — gemessen
+
+Dieselbe Maschine, dasselbe Programm (fib in Drachenhauch, Python und JavaScript), heute:
+
+| Aufgabe | dhrt (Stand #241) | CPython | Node (V8, JIT) |
+|---|---|---|---|
+| `fib(30)`, 1,35 Mio. Aufrufe | 210 ms | 57 ms | 7 ms |
+| 10 Mio. FLOAT-Additionen | 219 ms | 405 ms | 6 ms |
+
+Die Schleife ist schneller als Python, aber **30- bis 35-mal langsamer als
+Maschinencode**. Das ist kein Feinschliff mehr, das ist die Bauart:
+
+- **Jeder Wert ist ein `Value`** (Enum, 24 Byte, mit Tag). `s = s + i * 0.5`
+  liest zwei Tags, prüft sie, baut ein neues `Value`, schreibt es auf den
+  Stapel, holt es wieder herunter und prüft beim Speichern den Typ — für eine
+  einzige Maschinen-Addition.
+- **Jede Instruktion geht durch `match instr.op`** und oft noch durch ein
+  `match` auf `Arg`. Ein Sprung pro Instruktion, den die CPU schlecht
+  vorhersagt.
+- **Jeder Aufruf baut einen Rahmen** (Locals-Vec aus dem Vorrat, Stapel,
+  `try_handlers`, Rückkehr über `Step`). Bei `fib` ist das fast die ganze Zeit.
+
+Dabei ist Drachenhauch **streng typisiert** (Pascal-Art): in `fib` steht
+`n AS INTEGER`, und der Compiler weiß das. Die VM prüft trotzdem zur Laufzeit,
+was zur Übersetzungszeit feststeht. **Das ist der eigentliche Hebel** — eine
+dynamische Sprache wie JavaScript muss sich Typen erst erraten, Drachenhauch
+hat sie geschrieben.
+
+## 2. Wege, die es gibt
+
+| Weg | Wirkung | Kosten | Urteil |
+|---|---|---|---|
+| **A** VM umbauen: getypte Opcodes auf Slots, verschmolzene Vergleich+Sprung, Rahmen ohne Zuteilung | 2–3× | Wochen, geringes Risiko, gilt überall (auch Web) | **ja, zuerst** |
+| **B** Maschinencode mit **Cranelift** zur Laufzeit (JIT) | 10–30× bei Zahlen/Aufrufen, 2–3× bei Text/Maps | Monate; +2–4 MB in `dhrt` | **ja, das Ziel** |
+| C Maschinencode mit Cranelift *vorab* (Objektdatei, AOT) | wie B, ohne Startzeit | braucht einen Linker beim Export — den hat ein Nutzer nicht | später, wenn B steht |
+| D nach C oder Rust übersetzen und fremden Compiler rufen | wie B/C | Nutzer bräuchte gcc/rustc; Exporte wären an deren Fassung gebunden | nein |
+| E LLVM | etwas besserer Code als Cranelift | 50+ MB, langsames Übersetzen, schwierig zu bauen (drei Systeme) | nein |
+
+**Warum Cranelift:** reines Rust (passt zu `cargo`, kein cmake/libclang wie
+bei raylib), gebaut für schnelles Übersetzen (wasmtime übersetzt damit ganze
+Programme beim Laden), Ziele x86-64 und arm64 — also Windows, Linux und Mac.
+Der Code ist etwa auf dem Niveau von LLVM `-O1`; für eine Spielsprache reicht
+das bei Weitem.
+
+**Warum zur Laufzeit statt vorab:** dann braucht `dhrt --export` keinen
+Linker, eine exportierte Exe ist weiter „Laufzeit + angehängtes Programm“, und
+übersetzt wird beim Start (für ein Spiel mit ein paar tausend Zeilen im
+Bereich von Millisekunden).
+
+## 3. Die Lehre aus zwei Laufzeiten — ausdrücklich
+
+Ein JIT ist **wieder ein zweiter Ausführungsweg**. Genau den hat das Projekt
+mit Stufe B abgeschafft, und der Grund war gut: zwei Wege laufen
+auseinander. Deshalb drei Regeln, die nicht verhandelbar sind:
+
+1. **Die VM bleibt die Wahrheit.** Was der JIT nicht sicher kann, läuft in der
+   VM — eine Funktion wird ganz übersetzt oder gar nicht, nie halb.
+2. **Der JIT rechnet nur das Einfache selbst** (Ganzzahl/Kommazahl/BOOLEAN,
+   Sprünge, Aufrufe übersetzter Funktionen). Alles andere — Zeichenketten,
+   Felder, MAPs, Objekte, Builtins — ruft er als **dieselbe Rust-Funktion**,
+   die auch die VM ruft. Es gibt keine zweite Fassung von `addieren` oder
+   `MAPGET`.
+3. **Jede Prüfsammlung läuft zweimal**: `DHRT_JIT=aus` und mit Maschinencode (seit M5 die Vorgabe)
+   (jede übersetzbare Funktion sofort übersetzt), dieselbe Erwartung. Das ist
+   der Ersatz für die alte Parität gegen den Tree-Walker — nur dass die
+   Referenz diesmal nicht gelöscht wird.
+
+Dazu gehört die **genaue Semantik**, die der Maschinencode einhalten muss und
+die leicht vergessen wird: Ganzzahl-Überlauf ist ein Fehler („Ganzzahl-Ueberlauf
+bei '+'“), nicht Umlauf; Division durch null; `MOD` mit negativem Vorzeichen
+(`-17 MOD 5` ist 3); Fehlermeldungen mit Zeile. Jede davon bekommt einen Fall,
+der unter beiden Schaltern läuft.
+
+## 4. Die Schritte
+
+Jeder Schritt endet mit einer Messung gegen den Stand davor und wird einzeln
+gemergt.
+
+### M0 — Messbank (Tage) — erledigt 2026-09-24
+
+`bench_dhrt.dh` nimmt per Vorgabe die acht Programme unter `tools/tempo/`
+(Aufrufe, Kommazahlen, Ganzzahlen, Felder, Objekte, Text, Maps, Builtins).
+Jedes misst seinen Kern selbst und gibt ihn als `ZEIT <ms>` aus -- die
+Wandzeit traegt rund 40 ms Start mit. `--gegen pfad\zu\dhrt.exe` misst eine
+zweite Laufzeit abwechselnd mit und gibt A/B aus. Erste Tabelle in
+`docs/intern/PERFORMANCE.md` (Messbank). Ein echtes Spiel ist nicht dabei: es
+braucht ein Fenster, und die Bank soll auf jeder Maschine laufen.
+
+**Der erste Fund der Bank:** `LEFT$`/`RIGHT$`/`MID$`/`INSTR` legten je Aufruf
+den ganzen Text als Zeichenliste an -- behoben (`text.dh` 4144 -> 1135 ms).
+Uebrig bleibt, dass `MID$(s, i, 1)` in einer Schleife ueber den Text mit dem
+Quadrat der Laenge waechst; das ist ein Punkt fuer M4 (Zeichenketten, die
+wissen, dass sie nur ASCII enthalten, oder einen Zeichenindex tragen).
+
+### M1 — getypte Zwischenstufe im Compiler (2–3 Wochen) — erster Schritt 2026-09-24
+
+Heute geht der Compiler vom Syntaxbaum direkt zu Bytecode, und die Typen
+kennt er nur stellenweise. Neu ist `Compiler::typ_von` mit dem Typ aus
+`typen.rs`: jedem Ausdruck ein Typ, oder `?` (unbekannt), wo er nicht
+feststeht. `statischer_typ` bleibt, was es war -- ein vorsichtiger Helfer
+fuer Warnungen, der vereinfachen darf; `typ_von` ist fuer den Code und darf
+es nicht.
+
+**Geprueft wird nicht an Beispielen, sondern am ganzen Bestand:** mit
+`DHRT_TYPEN_PRUEFEN=1` setzt der Compiler hinter jeden getypten Ausdruck
+eine Probe (`TYP_PRUEFEN`), die abbricht, wenn der Wert einen anderen Typ
+hat. Die Pruefsammlung laeuft damit (Kinder erben die Variable). Der erste
+Lauf fand genau eine falsche Regel -- "ein Befehl auf `$` liefert Text" --,
+denn `SPLIT$` liefert ein Feld; 284 Proben in 49 Sammlungen schlugen an.
+Seither kennt `typ_von` nur Befehle aus einer Tabelle, deren Typen
+nachgemessen sind (`typen::builtin_typ`). `dhrt --typen datei.dh` zeigt, was
+der Compiler je Ausdruck weiss.
+
+**Wo der Typ am WERT haengt** (gemessen, nicht angenommen):
+
+| Ausdruck | Ergebnis |
+|---|---|
+| `a / b` mit zwei INTEGER | bis 2026-09-24 INTEGER, wenn es aufgeht (`480 / 2`), sonst FLOAT -- seither immer FLOAT |
+| `a ^ b` mit zwei INTEGER | INTEGER (`2 ^ 3`) oder FLOAT (`2 ^ -1`) |
+| `a AND b`, `a OR b` | einer der beiden WERTE (`6 AND 3` ist 3) |
+| `VAL(t)` | INTEGER oder FLOAT, je nach Text |
+| `MIN(1, 2.0)` | der kleinere Wert samt seinem Typ (INTEGER) |
+
+`typen.rs` fuehrt dafuer `ZAHL` (INTEGER oder FLOAT). **`/` ist seit
+2026-09-24 immer FLOAT** (Entscheidung des Nutzers): `PRINT 480 / 2` zeigt
+`240.0`, `feld[n / 2]` bricht ab, und `dhrt --check` warnt vor einem Index,
+der sicher eine Kommazahl ist. Der volle Testlauf fand im ganzen Bestand
+keine Stelle, die am alten Verhalten hing -- nur Erwartungen, die `4` statt
+`4.0` zeigten, und im Referenzbuch den Satz, der das alte Verhalten
+beschrieb. `^`, `VAL` und `MIN` bleiben wertabhaengig.
+
+Offen in M1: Methoden ohne statisch bekannte Klasse, FUNCREF-Aufrufe, die
+Laufvariable von FOR EACH, Modultypen (VEC2 & Co.) und die meisten Builtins
+bleiben `?`. Das ist erlaubt (dort bleibt M2 beim heutigen Code), aber es
+begrenzt, wie viel M2 bringt. Gemessen ueber alle `examples/*.dh` mit
+`dhrt --typen`: **76 % von 86 700 Ausdruecken sind getypt.** Die groessten
+Posten im Rest sind Builtins (`RGB`, `GUI_*`, `KEYPRESSED`, `MIN`/`MAX`) und
+Modulhandles (`GUI_WINDOW`, `JSON_HANDLE`) -- fuer die Rechenschleifen, um
+die es M2/M3 geht, zaehlen die wenig; fuer die naechsten Schritte heisst das:
+Builtins mit Zahlen zuerst in die Tabelle.
+
+### M2 — VM auf die Typen setzen (2–3 Wochen, Weg A)
+
+- Opcodes auf Slots statt Stapel, wo die Typen feststehen:
+  `ADD_II dst, a, b`, `LT_II_JUMP a, b, ziel`, `FOR_II`.
+- Aufrufe ohne eigene Locals-Vec: ein gemeinsamer Wertestapel, der Rahmen ist
+  ein Fenster darauf.
+- Speichern ohne Typprüfung, wo der Compiler den Typ bewiesen hat.
+
+Ziel: `fib(30)` unter 100 ms, Zahlenschleife unter 100 ms. Das kommt auch dem
+Web-Bau zugute, der keinen JIT bekommen kann.
+
+**Erster Schritt 2026-09-24 -- was gemessen wurde, bevor gebaut wurde:**
+
+| Messung | Ergebnis |
+|---|---|
+| leere Schleife (nur FOR_NEXT) | 3,2 ns je Durchlauf |
+| `s = i` (LOAD_LOCAL + STORE_LOCAL) | +9,5 ns |
+| `s = i + i` (noch ein LOAD + ADD) | +8 ns |
+| ein Aufruf `f(n)` ohne Rumpf | ~45 ns |
+| dieselbe Schleife mit lokalen statt globalen Variablen | nur 5 % schneller |
+
+Ein trivialer Befehl kostet also 4-5 ns. **Zwei Versuche brachten nichts und
+sind wieder draussen:** (1) die Typangabe je Variable als Byte statt als
+Zeichenkette vergleichen (A/B 0,99-1,09 -- der Textvergleich war nicht der
+Engpass); (2) eine kleine eigene Schleife fuer die 15 haeufigsten Befehle, in
+der Hoffnung, dass der Compiler dort Register frei hat (`dispatch` ist riesig).
+Die Befehle wurden darin kaum billiger (3,7 ns), und jedes Verlassen der
+Schleife fuer einen fremden Befehl kostete mehr, als sie sparte --
+`zahlen.dh` wurde 20 % LANGSAMER. Die Lehre: ein Befehl tut hier echte Arbeit
+(Wert klonen, Stapel, Typ pruefen, alten Wert freigeben); der Hebel ist die
+ANZAHL der Befehle, nicht die Schleife um sie.
+
+**Gebaut: Superinstruktionen.** `model::verschmelzen` markiert beim Laden
+Folgen aus zwei Operanden (LOAD_LOCAL/LOAD_CONST/LOAD_GLOBAL_SLOT), einem
+Rechen- oder Vergleichsbefehl und optional STORE_LOCAL, STORE_GLOBAL_SLOT
+oder JUMP_IF_FALSE/TRUE -- nur, wo kein Sprung in die Folge fuehrt. Der
+Bytecode bleibt dabei unveraendert stehen, Sprungziele und Zeilen stimmen
+also weiter. `Vm::verschmolzen` fuehrt eine markierte Folge in einem Schritt
+aus, aber nur den sicheren Fall; bei allem anderen (Ueberlauf, Division
+durch 0, Umwandlung beim Speichern, konstanter oder leerer Platz,
+Kommazahl-Gleichheit) laeuft sie Befehl fuer Befehl wie immer, mit derselben
+Meldung. `DHRT_OHNE_VERSCHMELZEN=1` schaltet es ab, `dhrt --verschmolzen
+datei.dh` listet die Stellen. Gemessen gegen den Stand davor: `aufrufe.dh`
+(fib) 0,86, `ganzzahl.dh` 0,88, die uebrigen gleich. Offen fuer die naechsten
+Schritte: der Aufruf selbst (~45 ns) und Folgen, deren zweiter Operand
+schon auf dem Stapel liegt (`i MOD 3 = 0` verschmilzt heute nur zur Haelfte).
+
+**Zweiter Schritt 2026-09-25: Rahmenstapel.** Ein Aufruf einer schlichten
+Funktion (CALL_USER, keine Coroutine, kein BYREF) stieg bisher ueber
+`exec -> exec_inner -> run_frame -> dispatch` neu in den Interpreter ein. Jetzt
+legt `dispatch` den Zustand des Aufrufers auf `Vm::rahmen` und laeuft im
+selben Aufruf mit dem Gerufenen weiter; RETURN (auch RETURN_VOID, HALT, Ende
+des Codes) holt ihn zurueck. Fehler wickelt `run_frame` Rahmen fuer Rahmen
+ab: erst die TRY-Handler des innersten, dann die des Aufrufers -- wie vorher,
+als jeder Aufruf sein eigenes `run_frame` hatte; die Fehlerzeile nimmt die
+Funktion, in der der Fehler FIEL. EXIT und die Stop-Signale raeumen alle
+Rahmen ab. Nicht unter Profiler/Debugger/Stop (die fuehren einen Stapel je
+`exec`). Dazu bindet `bind_params` im haeufigsten Fall die Parameter direkt,
+statt jeden Platz erst mit seiner Vorgabe zu belegen. Gemessen: ein leerer
+Aufruf 41 -> 29 ns, `aufrufe.dh` (fib) 0,85 gegen Schritt 1. Tests
+`tests/pruef/laufzeit/rahmenstapel.dhtest` (Erwartungen = Ausgabe des Baus davor; die
+erste Fassung nannte bei einem Fehler drei Ebenen tief die Zeile des
+Aufrufers -- gefunden von genau diesem Vergleich).
+
+**Dritter Schritt 2026-09-25: Methoden auf den Rahmenstapel -- gemessen und
+verworfen.** Dafuer muss `dispatch` das `Self` je Rahmen fuehren (eine
+Variable, die ueber die ganze Schleife lebt) und jeder Rahmen das `Self` von
+Aufrufer und Gerufenem tragen. Ergebnis: ein Methodenaufruf 37 -> 35 ns, aber
+JEDER Befehl in `dispatch` wurde teurer -- ein freier Aufruf 30 -> 35 ns, fib
+1,07; mit schmalerer Buchfuehrung (freie Funktionen erben das `Self`) sogar
+40 ns und fib 1,09. Die zusaetzliche lebende Variable und der Block kosten die
+heisse Schleife mehr, als der Methodenaufruf spart. **Lehre fuer M3:** der
+Rest liegt nicht mehr im Aufruf, sondern daran, dass `dispatch` als Ganzes
+schlecht in Register passt -- das loest erst Maschinencode.
+
+**Dabei gefunden: `MID$`/`INSTR`/`REGEX_FIND_POS` zaehlten Zeichen einzeln.**
+`text.dh` war im Methoden-Bau 1,6-mal langsamer, obwohl es keine Funktion
+aufruft: die Schleife je Zeichen in `builtins::zeichen_stelle` haengt an der
+Lage des Codes. Jetzt nimmt sie bei reinem ASCII vor der Stelle die
+Byte-Stelle direkt (`is_ascii` prueft wortweise), `zeichen_zahl` und
+`zeichen_stelle_genau` dasselbe fuer die Zaehlungen in INSTR und
+REGEX_FIND_POS. 28000 x `MID$` in 200000 Zeichen: 700 -> 23 ms, `text.dh`
+0,07.
+
+### M3 — Cranelift für Zahlenfunktionen (4–6 Wochen, Weg B)
+
+Feature `jit` (standardmäßig aus). Übersetzt wird eine FUNCTION/SUB, wenn alle
+ihre Locals, Parameter und Rückgaben INTEGER, FLOAT oder BOOLEAN sind und sie
+nur Rechnen, IF/SELECT, FOR/WHILE/REPEAT und Aufrufe solcher Funktionen
+enthält. Ein Fehler (Überlauf, Division durch null) springt in eine
+Ausstiegsroutine, die dieselbe Meldung mit derselben Zeile baut wie die VM.
+
+- `DHRT_JIT=aus|auto|immer`; `auto` übersetzt nach N Aufrufen oder beim ersten
+  heißen Schleifenrücksprung.
+- Debugger, Profiler, `dhrt call`/TASK_START: zunächst VM (sie brauchen die
+  Zeile je Instruktion).
+- CI: jede Sammlung zweimal (Abschnitt 3), auf allen drei Systemen.
+
+Ziel: `fib(30)` unter 20 ms, Zahlenschleife unter 20 ms.
+
+**Erster Schritt 2026-09-25 -- reine Zahlenfunktionen, gebaut** (`src/jit.rs`,
+Feature `jit` mit Cranelift 0.134 -- 0.135 und neuer verlangen Rust 1.96; seit M5 0.136 mit Rust 1.98).
+Uebersetzt wird eine Funktion, wenn sie REIN ist: Parameter/Locals/Rueckgabe
+INTEGER, FLOAT oder BOOLEAN (`any`-Locals, deren Art aus den Zuweisungen
+folgt, gehen mit), und sie nur rechnet (+ - * / \ MOD, Vorzeichen,
+Vergleiche, NOT), springt (IF, SELECT, WHILE, REPEAT, FOR ueber INTEGER) und
+andere reine Funktionen ruft. Eine abstrakte Ausfuehrung ueber den Bytecode
+bestimmt je Stelle die Art jedes Stapelplatzes und Locals; widersprechen sich
+zwei Wege, bleibt die Funktion in der VM. Ruft sie eine, die in der VM
+bleibt, bleibt sie auch dort (ganz oder gar nicht, Regel 1).
+
+**Fehler: die VM rechnet nach.** Weil eine reine Funktion keine
+Nebenwirkung hat, gibt der Maschinencode bei JEDEM Fehlerfall auf --
+Ueberlauf, Division durch 0, `MIN \ -1`, FLOAT -> INTEGER mit
+Nachkommastellen oder ausserhalb des Bereichs, `<` mit NaN, fehlendes
+RETURN, zu tiefe Rekursion (Zaehler im `Kontext`, gleiche Grenze wie `exec`)
+-- und die VM rechnet denselben Aufruf noch einmal. Meldung und Zeile kommen
+damit von der VM selbst; es gibt keine zweite Fassung einer Fehlermeldung.
+Nach 8 Rueckfaellen nimmt eine Funktion nur noch die VM. Die VM ruft den
+Maschinencode nur, wenn jedes Argument genau passt (Umwandlungen und ihre
+Fehler bleiben bei ihr), und nicht unter Profiler/Debugger/Stop.
+
+Schalter: `DHRT_JIT=immer` uebersetzt beim Start jede reine Funktion (sonst
+laeuft alles in der VM wie bisher -- `auto` kommt spaeter), `dhrt --jit
+datei.dh` nennt je Funktion "uebersetzt" oder den Grund.
+
+| gemessen | VM | Maschinencode |
+|---|---|---|
+| `fib(30)` (`tools/tempo/aufrufe.dh`) | 144 ms | 3,3 ms |
+| 10 Mio. `s = s + i * 0.5` in einer Funktion | 189 ms | 5,1 ms |
+| 10 Mio. `IF i MOD 3 = 0 THEN s = s + i` in einer Funktion | 382 ms | 8,1 ms |
+
+Die Tempo-Programme, die im Hauptprogramm rechnen, aendern sich nicht --
+dort sind die Variablen global (M4 Punkt 1). Ueber alle `.dh` des Repos:
+85 Funktionen werden uebersetzt, keine laesst Cranelift scheitern; die
+haeufigsten Gruende, in der VM zu bleiben, sind STRING (701, nur der erste
+Grund zaehlt), globale Variablen (488) und eingebaute Befehle (95).
+
+Pruefung: `tests/pruef/laufzeit/jit.dhtest` (jeder Randfall zweimal, Erwartung =
+Ausgabe der VM; Gegenprobe: ohne die MOD-Korrektur bzw. ohne die
+Ueberlaufpruefung beim Multiplizieren fallen genau die Maschinencode-Faelle),
+die ganze Suite unter `DHRT_JIT=immer` (lokal `--schnell`: 3580 ok, 0 fehl),
+und die CI laeuft die Sammlungen zweimal (Windows zweiter Lauf `--schnell`,
+Linux/macOS ganz -- macOS ist zugleich arm64).
+
+### M4 — Breite (laufend)
+
+Nach Wirkung, jeweils mit eigener Messung:
+
+**Schritt 1 (2026-09-25): globale Zahl-Variablen in Funktionen -- gebaut.**
+Eine Funktion, die globale INTEGER/FLOAT/BOOLEAN liest und schreibt, ist fuer
+die VM nicht mehr rein -- der Rueckfall "die VM rechnet nach" schriebe doppelt.
+Darum arbeitet der Maschinencode auf einem **Schatten**: je globalem Platz ein
+Wert und ein Merkbyte (0 frei, 1 geholt, 2 geaendert). Beim ersten Lesen holt
+`global_holen` (eine Rust-Funktion, die der Maschinencode ruft) den Wert aus
+dem Slot der VM; ein leerer Platz -- die Funktion laeuft vor dem DIM -- laesst
+ihn aufgeben. Geschrieben wird nur in den Schatten. Kommt der Aufruf ohne
+Fehler zurueck, schreibt die VM die geaenderten Plaetze in ihre Slots; sonst
+wird der Schatten verworfen, und die VM rechnet von vorn -- mit genau ihren
+Zwischenstaenden (ein `zaehler = zaehler + 1` vor einem Fehler zaehlt einmal).
+Welche Plaetze eine Funktion samt allen, die sie ruft, beruehren kann, steht
+beim Uebersetzen fest; nur deren Marken werden nach dem Aufruf geloescht. Die
+Art eines Platzes kommt aus den DECLARE-Befehlen des Hauptprogramms
+(widersprechen sich zwei, bleibt er der VM); Konstanten sind lesbar, wenn sie
+eine Typangabe haben. FOR ueber eine globale Laufvariable geht mit.
+
+Ergebnis ueber alle `.dh` des Repos: 100 statt 85 uebersetzte Funktionen --
+Globals waren zwar bei 488 Funktionen der ERSTE Grund, aber dieselben rufen
+fast immer auch Builtins oder benutzen Texte. Der grosse Hebel fuer Globals
+sind **Schleifen im Hauptprogramm** (`zahlen.dh`, `ganzzahl.dh`, Spielschleifen):
+dort ist alles global, aber das Hauptprogramm als Ganzes nie rein. Das braucht
+die Uebersetzung einzelner Schleifen -- der naechste Schritt.
+
+Pruefung: sieben Faelle mehr in `jit.dhtest` (uebernommen erst nach dem
+Aufruf, vor dem DIM, FOR ueber ein Global, Umwandeln beim Schreiben, zwei
+Funktionen auf einem Schatten, Konstante zur Laufzeit, Hochzaehlen vor einem
+Fehler). Gegenprobe: wird der Schatten auch nach einem Fehlschlag
+uebernommen, faellt "hochzaehlen vor einem fehler" (3 statt 2) -- die ersten
+sechs Faelle hatten das NICHT gesehen, weil die VM beim Nachrechnen denselben
+Wert noch einmal schreibt. Suite unter `DHRT_JIT=immer` (`--schnell`): 3593
+ok, 0 fehl.
+
+**Schritt 2 (2026-09-25): Schleifen einzeln uebersetzen -- gebaut.** Eine
+Schleife wird beim ersten Ruecksprung (FOR_NEXT genommen, JUMP rueckwaerts)
+als **Bereich** uebersetzt -- mit den Arten, die ihre Locals in DIESEM
+Augenblick haben (die abstrakte Ausfuehrung startet dort statt beim
+Funktionsanfang). Bereich = vom Kopf (Ziel des Ruecksprungs) bis zum
+LETZTEN Ruecksprung dorthin; springt etwas von aussen in die Mitte, bleibt
+die Schleife der VM. Signatur `(ctx, locals*) -> i64`: der Maschinencode
+liest und schreibt die Locals ueber Zeiger, zurueck kommt die Stelle, an der
+die VM weitermacht (jeder Sprung aus dem Bereich ist ein Ausgang, der Stapel
+muss dort leer sein), oder -1 fuer "aufgegeben". Je Ausgang steht fest,
+welche Art jeder Local dort hat -- ein Local, den der Bereich nicht anfasst,
+bleibt, wie er ist. RETURN im Bereich bleibt der VM. `Instr::schleife`
+merkt je Ruecksprung: 0 unversucht, 1 nie, n >= 2 Bereich n - 2. Die VM
+fragt den Merker erst, wenn der JIT ueberhaupt an ist.
+
+**Globale in Variablen:** ein globaler Platz, den KEINE aus dem Bereich
+gerufene Funktion beruehrt, wird einmal am Eingang geholt, lebt als
+Cranelift-Variable (also im Register) und wird an jedem Ausgang in den
+Schatten zurueckgeschrieben; uebernommen wird wie bei Funktionen nur nach
+Erfolg. Ohne das kostete jedes `summe = summe + i` einen Gang durch den
+Schatten und die Schleife lag bei der Haelfte der Wirkung.
+
+**Aufgeben mitten in der Schleife** (Ueberlauf nach 40 Runden) ist heikel,
+weil die VM dann ab dem KOPF der Schleife weiterrechnet -- mit den Locals,
+die der Maschinencode bis dahin geschrieben hat, waere das falsch. Darum
+schreibt der Bereich Locals und Globale erst an einem Ausgang; beim Aufgeben
+bleiben die Werte vom Eingang stehen, und die VM rechnet die ganze Schleife
+selbst. Die Gegenprobe (Schatten auch beim Aufgeben uebernehmen) faellt im
+Fall "schleife ruft eine funktion mit global und laeuft ueber" (324 statt
+40) -- die uebrigen Schleifenfaelle haetten es nicht gesehen.
+
+**Ein Nebenfund:** die aeussere von zwei verschachtelten Schleifen blieb
+anfangs der VM, weil ihr Rumpf das DIM der inneren Laufvariable enthaelt
+(`DECLARE_GLOBAL_SLOT`). Steht der Platz beim Uebersetzen schon, tut der
+Befehl nichts -- der Maschinencode ueberspringt ihn dann.
+
+Gemessen: `tools/tempo/zahlen.dh` 236 -> 6,1 ms, `ganzzahl.dh` 488 -> 9,6 ms
+(beide Schleifen im Hauptprogramm, alles global). Die VM selbst bleibt
+unveraendert (A/B gegen den Bau davor 0,96..1,04). `DHRT_JIT_BILANZ=1`
+schreibt am Ende nach stderr, wie viele Funktionen und Schleifen uebersetzt
+wurden und warum eine Schleife der VM blieb. Pruefung: neun Schleifenfaelle
+in `jit.dhtest` (Hauptprogramm, Funktion mit Ausgabe, Ueberlauf mittendrin,
+BREAK/CONTINUE, verschachtelt, Text bleibt VM, reine und unreine Aufrufe,
+Global danach in einer Funktion, Global im Aufruf mit Ueberlauf), jeder mit
+der Bilanz als `--- stderr`. Gegenproben: Locals an den Ausgaengen nicht
+zurueckschreiben -> 2 Faelle fallen; Schatten beim Aufgeben uebernehmen -> 1.
+
+**Schritt 3 (2026-09-25): Felder von INTEGER/FLOAT in Schleifen -- gebaut.**
+Eine Schleife, die beim Eintritt ein Feld von Zahlen vorfindet (in einem
+Local oder einem globalen Platz), liest und schreibt es direkt im Speicher:
+die VM beschreibt es beim Eintritt im Kontext (Zeiger auf die Daten,
+Groessen, Schritte), der Maschinencode prueft jeden Index gegen die Groesse
+(`feld_adresse`, vorzeichenlos -- ein negativer Index ist damit auch
+ausserhalb) und rechnet die Adresse. Die Groesse aendert sich im Bereich
+nicht: jeder Befehl, der ein Feld wachsen laesst, ist ein eingebauter
+Befehl und laesst die Schleife in der VM. Zwischen zwei Eintritten darf es
+wachsen (und umziehen) -- beschrieben wird bei JEDEM Eintritt neu, Art und
+Dimensionen muessen zu denen beim Bauen passen. Nur in Bereichen: eine
+Funktion mit einem Feld bleibt der VM, ihre Schleifen werden trotzdem
+uebersetzt.
+
+**Der eigentliche Umbau ist das Aussteigen mitten in der Schleife.** Bis
+dahin gab ein Bereich bei einem Fehler auf, und die VM rechnete die ganze
+Schleife ab dem Kopf noch einmal -- richtig, solange nichts geschrieben war,
+was die VM nicht zuruecknimmt. Ein Feld ist genau das: `a[i] = a[i] * 7`
+doppelt gerechnet ist falsch, und in einem CATCH sieht man es. Jetzt steigt
+der Bereich am FEHLERHAFTEN Befehl aus: vor jedem Befehl merkt sich die
+Erzeugung Stelle, Stapel und Arten der Locals (`Bauer::punkt`); jede
+Pruefung, die fehlschlagen kann, springt in einen eigenen Block, der die
+Locals und die beforderten Globalen zurueckschreibt, den Stapel in einen
+Puffer legt und `-2 - nr` zurueckgibt. Die VM uebernimmt den Schatten wie
+nach einem Ausgang, legt die Locals ab, schiebt den Stapel (ein Feld auf
+dem Stapel ist sein Wert von beim Eintritt) und macht an genau diesem
+Befehl weiter -- sie fuehrt ihn selbst aus und meldet ihren Fehler mit
+ihrer Zeile. Nichts wird doppelt gerechnet. Das gilt jetzt fuer JEDEN
+Bereich, nicht nur fuer die mit Feldern; aufgegeben (-1) wird nur noch vor
+dem ersten Befehl (Globale holen beim Eintritt).
+
+**Eine Ausnahme bleibt:** ruft der Bereich eine Funktion, die globale
+Variablen schreibt (auch mittelbar, `Uebersetzt::schreibt_globale`), laege
+deren halbe Arbeit beim Aussteigen schon im Schatten, und die VM riefe sie
+noch einmal. Solche Bereiche bleiben beim alten Aufgeben -- und duerfen
+dann keine Felder schreiben (sie bleiben der VM, der Grund steht in der
+Bilanz).
+
+Gemessen: `tools/tempo/felder.dh` (1 Mio. Plaetze fuellen, summieren,
+SORT) 92 -> 13 ms. `DHRT_JIT_BILANZ=1` zaehlt das Aussteigen eigens
+("N mal mitten in einer Schleife ausgestiegen"). Pruefung: 18 Faelle mehr
+in `jit.dhtest` -- fuellen/summieren, FLOAT, zwei Dimensionen, Feld in
+einer Funktion und als Parameter, zwei Namen fuer ein Feld, ein Feld, das
+zwischen 50 Eintritten waechst, und sieben Faelle, die mitten in der
+Schleife aussteigen (Index ausserhalb beim Schreiben und Lesen, Ueberlauf
+mit dem Vorgaenger im Feld, krumme Zahl ins Ganzzahlfeld, Division durch 0
+mitten im Ausdruck, globaler Zaehler, ohne TRY); im CATCH wird der Stand
+gedruckt, doppelt Gerechnetes faellt also auf -- dazu ein Fall, der in
+einer FUNKTION aussteigt (im Hauptprogramm ist alles global, die Locals
+wuerden dort gar nicht geprueft). Gegenproben: Aufgeben statt Aussteigen
+(das alte Modell, Felder schreiben erlaubt) -> "index ausserhalb" druckt eine
+andere Summe (die ersten Plaetze werden doppelt hochgezaehlt); Locals beim Aussteigen nicht
+zurueckschreiben -> der Funktionsfall faellt; ohne Schritt bei zwei
+Dimensionen -> "zwei dimensionen" faellt; den Stapel nicht vollstaendig
+zurueckgeben -> vier Faelle melden "Stack underflow" statt ihres Fehlers.
+**Falle beim Gegenproben:** ein Fall meldet nur seine ERSTE Abweichung, und
+die Bilanzzeile auf stderr kommt vor der Ausgabe -- zwei Mutationen fielen
+zuerst nur an der Bilanz, und ob die gedruckten Werte sie auch zeigen,
+sagte erst der Vergleich VM gegen Maschinencode ohne die Bilanz.
+
+**Schritt 4a (2026-09-25): feste Lage der Objektfelder in der VM -- gebaut.**
+Bis dahin trug jede Instanz eine `FxHashMap<String, FieldVal>`, und jedes
+`obj.x` hashte den Namen; jedes Feld jeder Instanz trug ausserdem seinen
+Typ als eigenen `String`. Jetzt hat jede KLASSE eine Lage
+(`value::Layout`: Name -> Platz, Typ je Platz; beim Laden in
+`model::programm_bauen` gerechnet, Vorfahren zuerst), und eine Instanz
+haelt `Rc<Layout>` plus `Vec<Value>`. Ein Feld, das eine Unterklasse noch
+einmal deklariert, bleibt auf dem Platz der Vorfahrin und nimmt den Typ der
+Unterklasse -- wie die Hash-Ablage davor. Die Feldbefehle (LOAD/STORE_MEMBER,
+LOAD/STORE_FIELD) merken sich (Lage, Platz) ihres letzten Treffers; hat das
+naechste Objekt dieselbe Lage, gibt es keine Suche. Den Merkplatz teilen
+sie sich mit CALL_METHOD (`Instr::merk`), das seither ebenfalls die LAGE
+vergleicht statt den Klassennamen als Text. Eine PROPERTY kommt nie in den
+Merkplatz (gesetzt wird er erst, nachdem feststeht, dass es keine ist).
+Eine Klasse, die es nicht gibt, bekommt EINE geteilte leere Lage -- eine je
+Instanz wuerde freigegeben, und eine spaetere Lage koennte ihre Adresse
+erben; der Merkplatz traefe dann falsch.
+
+Gemessen (`bench_dhrt.dh --gegen`, je zweimal): `objekte.dh` 125 -> 95 ms
+(0,76). **Ein Preis, der sich nicht ganz vermeiden liess:** `ganzzahl.dh`
+(kein einziges Objekt) wurde 4 % langsamer. Drei Aufteilungen gemessen:
+alles in `dispatch` und ein eigenes Merkfeld in `Instr` (+16 Byte) 1,07;
+ein gemeinsames Merkfeld 1,05; alles in eigene Funktionen 1,03, aber dann
+`zahlen.dh` 1,08 und `objekte.dh` nur 0,87. Genommen ist: nur der schnelle
+Weg (dieselbe Klasse wie zuletzt) in `dispatch`, der Rest in
+`member_laden`/`member_setzen` -- `objekte.dh` 0,76, `ganzzahl.dh` 1,04,
+alles andere 0,98..1,03. Es ist Codelage, keine Arbeit: die Schleife
+fasst nichts davon an. Pruefung `tests/pruef/sprache/objektlage.dhtest` (8, auf
+dem Bau davor ebenso gruen): eine Stelle mit zwei Klassen, deren Felder
+verschieden liegen, Vererbung, ein neu deklariertes Feld, PROPERTY und Feld
+an derselben Stelle, Methoden an einer Stelle mit wechselnden Klassen,
+Umwandeln beim Speichern. Gegenproben: Merkplatz ohne Vergleich der Lage
+-> zwei Faelle fallen (die Felder der zweiten Klasse kommen vertauscht, und
+die PROPERTY wird uebergangen); Typ der Vorfahrin statt der Unterklasse ->
+"noch einmal deklariert" faellt; CALL_METHOD ohne Vergleich -> "wechselnde
+Klassen" bricht ab.
+
+**Schritt 4b (2026-09-25): Objektfelder im Maschinencode -- gebaut.** Ein
+Bereich kennt jetzt Objekte (`Art::Obj(k)`, k = Klasse im Bereich, erkannt
+an ihrer Lage). Im Maschinencode ist ein Objekt ein Zeiger auf
+`RefCell<Instance>`; seine Felder liest und schreibt er ueber kleine
+Rust-Helfer (`feld_lesen_i/_f`, `feld_setzen_i/_f`), weil die Lage eines
+`Value` im Speicher nicht festgelegt ist -- ein Aufruf statt der Suche,
+der Bereich bleibt Maschinencode. Woher Objekte kommen: Locals, `Self`
+(LOAD_SELF, LOAD_FIELD/STORE_FIELD in einer Methode), Felder eines
+Objekts, die selbst ein Objekt halten, und Elemente von Feldern von
+Werten und Tupeln (`Elem::Wert`, auch fuer Zahlen). **Jedes Element und
+jedes Objekt-Feld wird beim Lesen auf seine Klasse geprueft** (die Lage
+aus dem ersten Element beim Bauen); passt sie nicht, steigt der Bereich
+aus, und die VM rechnet diesen Durchgang -- gemischte Klassen und
+Unterklassen gehen also, nur langsamer. Eine PROPERTY laesst den Bereich
+in der VM; Felder vom Typ Text/`any` ebenso.
+
+**Globale Plaetze ohne festen Zahlentyp** (Objekte, die Laufvariable von
+FOR EACH) fuehrt der Bereich wie Locals (`dyn_glob`, Platz `n_lokal + j`):
+ihre Art folgt dem, was hineinkommt, und an Ausgaengen schreibt die VM
+sie in die globalen Plaetze zurueck. **Dafuer bekommt die Laufvariable von
+FOR EACH im Hauptprogramm einen Platz** (`collect_globals`) -- vorher lief
+sie ueber ihren Namen (LOAD_NAME), und das war schon in der VM teuer.
+Zurueck in die VM kommt ein Objekt als neuer Verweis auf das alte
+(`Rc::increment_strong_count`): waehrend des Bereichs halten es die
+Locals, Globalen und Felder der VM, die er nicht veraendert.
+
+Gemessen `tools/tempo/teilchen.dh` (10 000 Objekte, 100 Schritte, drei
+Felder lesen und schreiben): vor 4a 661 ms, VM mit fester Lage und
+FOR-EACH-Platz 177 ms, Maschinencode 27 ms. Pruefung: 12 Faelle mehr in
+`jit.dhtest` (Objekte in einem Feld, Self in einer Methode, zwei Klassen
+mit vertauschten Feldern in einem Tupel, PROPERTY bleibt VM, Objekt im
+Feld eines Objekts, Fehler mit Objekten auf dem Stapel, Objekt als Local
+einer Funktion, Tupel von Zahlen, gemischte Zahlen, Objekt in eine globale
+Variable, Aufruf, der Globale schreibt, Unterklasse an der Stelle der
+Oberklasse). Gegenproben: ohne Klassenpruefung beim Lesen -> "verschiedene
+Klassen in einem Tupel" rechnet mit vertauschten Feldern (erst beim
+Vergleich VM gegen Maschinencode sichtbar, im Fall selbst faellt zuerst die
+Bilanzzeile); globale Plaetze an Ausgaengen nicht zurueckschreiben -> vier
+Faelle fallen (Laufvariable nach der Schleife, Objekt in einer globalen
+Variable). **Ein Fund aus der Suite:** mit ihrem neuen Platz stand die
+FOR-EACH-Variable auch in `global_vars` -- und verdeckte damit einen Befehl
+gleichen Namens (`FOR EACH len IN ...` mit `LEN(x)` darin brach ab). Sie
+bekommt nur den Platz.
+
+**Schritt 5 (2026-09-25): Zeichenketten, MAPs und reine Befehle -- gebaut
+als Wertemodus.** Scheitert ein Bereich im getypten Modus (ein Text, eine
+MAP, ein Befehl), wird er ein zweites Mal im **Wertemodus** gebaut
+(`Jit::wertebereich`, `Art::W`): alles, was keine Zahl ist, liegt als
+`Value` in einer Ablage (`Kontext::werte`) -- Local s auf Platz s,
+Stapeltiefe d auf Platz `n_gesamt + d` --, und der Maschinencode fuehrt
+nur noch die Reihenfolge und ruft je Befehl einen Rust-Helfer (`w_op`,
+`w_builtin_*`, `w_index`, `w_setzen`, `w_speichern` ...). Beim Eintritt
+werden die Werte aus den Plaetzen der VM in die Ablage **verschoben**
+(nicht kopiert), an jedem Ausgang, beim Aussteigen und beim Aufgeben
+wieder zurueck. Regeln: Befehle nur aus der reinen Familie (Merkplatz
+`familie` = `BUILTIN_FAMILIEN`, nur wenn die VM an dieser Stelle schon
+gefragt hat -- ein nie genommener Zweig bleibt VM), Rechnen und
+Vergleichen nur fuer schlichte Werte (sonst aussteigen, die VM rechnet mit
+ihren Meldungen), eine getypte Zuweisung ueber `coerce` wie die VM.
+**Anhaengen an Ort und Stelle:** bei `s = s + e` gibt der Platz von `s`
+seinen Verweis ganz ab, bevor gerechnet wird -- sonst hielten zwei den
+Text, `Rc::get_mut` schluege fehl, und jede Runde kopierte. Beim ersten
+Bau wurde das uebersehen: `text.dh` stieg 195 904 Mal aus, weil die Kopie
+ab 4 KB ueber `konstant_rechnen` lief, das (fuer das Falten gedacht)
+laengere Texte ablehnt. Die Argumente eines Befehls gehen als Scheibe der
+Ablage hinein, ohne `Vec` je Aufruf.
+
+Gemessen: `text.dh` VM 53 ms, Maschinencode 41 ms; `maps.dh` gleich
+schnell (104 gegen 107 ms) -- dort ist die Hash-Suche der Befehl selbst,
+der Weg dorthin kostet kaum etwas. Ein Befehl, der an seiner Stelle vor
+dem ersten Ruecksprung noch nie lief (Merkplatz 0), laesst den Bereich in
+der VM -- welche Familie er ist, weiss dann niemand. Pruefung: 14 Faelle
+mehr in `jit.dhtest` (Text anhaengen, ein zweiter Name auf denselben Text,
+MAP schreiben/lesen, `m[k]`, Fehler mit Text auf dem Stapel, Fehler eines
+Befehls, Text in getypte Variablen, eine Zahl in eine Textvariable,
+Zahlen aus Text, Textvergleiche, Text in einem Feld, drei Faelle, die in
+der VM bleiben). Gegenproben: Werte an Ausgaengen nicht zurueck -> 10 Faelle fallen; der
+Stapel beim Aussteigen NIL -> "Fehler eines Befehls" faellt; ohne `coerce`
+-> "eine Zahl in eine Textvariable" laeuft durch; `<` als `<=` -> der
+Textvergleich faellt; ein gescheiterter Befehl liefert still NIL -> "Fehler
+eines Befehls" faellt. Zwei davon blieben im ersten Anlauf gruen: kein Text
+war je GLEICH seinem Vergleich, und die `coerce`-Probe stand in einem TRY,
+dessen Schleife in der VM blieb.
+
+**Schritt 6 (2026-09-25): Befehle der uebrigen Familien -- gebaut.** Im
+Wertemodus ruft `w_builtin_roh` jetzt auch Befehle, die die VM braucht
+(Grafik, gui, zeit, scene, Datei, db ...): ueber einen Zeiger auf die VM
+(`Kontext::vm`) und DENSELBEN Weg wie CALL_BUILTIN (`Vm::builtin_rufen`
+samt Merkplatz). **Ausgenommen ist, was Drachenhauch-Code ruft** -- dessen
+Locals und Globale liegen waehrend des Bereichs in den Werteplaetzen bzw.
+Registern: Coroutinen (Familie 4), `TIMER_UPDATE` und `GUI_UPDATE`
+(Rueckrufe), Auftraege (8, lesen die Globalen), `SORT` mit Vergleich (2 --
+merkt sich ohnehin nie eine Familie), dazu `ASSERT` (braucht die Zeile);
+`befehl_im_bereich` ist die eine Stelle. **Scheitert so ein Befehl, wird
+er nicht nachgerechnet**: er hat womoeglich schon etwas getan; der Bereich
+steigt vor ihm aus, und die VM gibt die Meldung an seiner Stelle aus
+(`Kontext::meldung` -> `Jit::meldung_nehmen`, `*ip = weiter + 1`, damit
+`run_frame` die Zeile des Befehls nimmt). Einen Befehl, der erst etwas tut
+und dann scheitert, gibt es im Bestand nicht -- dass die VM ihn nicht
+doppelt ruft, laesst sich darum nicht beobachten (die Gegenprobe
+"nachrechnen" bleibt gruen). Die VM gibt dafuer ihren Zeiger vor dem Leihen
+von `self.jit` als rohen Zeiger mit (`vmp`); die Befehle beruehren weder
+`self.jit` noch die Locals.
+
+Gemessen `tools/tempo/familien.dh` (200 000 Runden Rechnen plus ein
+`ZEIT_WOCHENTAG` je Runde): VM 200 ms, vorher 66 ms (nur die innere
+Schleife im Maschinencode), jetzt 16,5 ms. Ein Befehl allein wird nicht
+schneller (der Befehl selbst kostet das meiste), aber er haelt die Schleife
+nicht mehr in der VM. Pruefung: 5 Faelle mehr in `jit.dhtest` (zeit-Befehle,
+ein scene-Befehl scheitert mit und ohne TRY samt `ERROR_LINE`, TIMER_UPDATE
+mit Rueckruf auf eine Globale, eine Coroutine, die eine Globale liest).
+Gegenproben: Coroutinen zugelassen -> 20 statt 110; TIMER_UPDATE
+zugelassen -> 200 statt 2100 (beide jeweils mit falschem Ergebnis, nicht
+nur an der Bilanzzeile); `*ip = weiter` statt `+ 1` -> falsche Zeile.
+
+**Schritt 7a (2026-09-25): Methodenaufrufe in Bereichen -- gebaut.** Im
+Wertemodus ruft ein Bereich `obj.methode(...)` ueber den Helfer
+`w_methode` und `Vm::methode_rufen` -- derselbe Weg wie CALL_METHOD
+(Merkplatz, Coroutine als Handle, Methoden von Text/Feld/MAP, NIL-Meldung).
+Der Rumpf der Methode laeuft noch in der VM (das ist 7b); gewonnen ist,
+dass eine Schleife mit einem Methodenaufruf nicht mehr ganz in der VM
+bleibt. **Die Methode laeuft, waehrend der Bereich Locals und Globale bei
+sich haelt** (Register, Werteplaetze, Schatten) -- darum prueft
+`methoden_harmlos` beim Bauen: JEDE Methode dieses Namens in JEDER Klasse
+(der Empfaenger steht erst beim Laufen fest), dazu alle Operatoren und die
+PROPERTYs, die sie ueber `obj.x` erreichen, und alles, was die rufen, darf
+keine Globale beruehren, die der Bereich oder eine von ihm gerufene
+Funktion beruehrt; kein FUNCREF-Aufruf, kein SUPER, keine Coroutine, kein
+`SORT`/`TIMER_UPDATE`/`GUI_UPDATE`/`TASK_*`/`EXIT`. Eine Globale, die der
+Bereich nicht anfasst, darf die Methode lesen und schreiben. Ein Fehler in
+der Methode wird nicht nachgerechnet (sie hat womoeglich schon Felder
+geschrieben); die VM meldet ihn an der Aufrufstelle, die Zeile bleibt die
+in der Methode.
+
+**Zwei Fehler aus Schritt 5, dabei gefunden:** `w_op` reichte `"MOD"`
+weiter, `konstant_rechnen` kennt nur `"mod"` -- jedes `MOD` mit einem Wert
+stieg aus (richtiges Ergebnis, 99 Ausstiege bei 100 Runden). Und
+`konstant_rechnen` verwirft Texte ueber 4 KB (die Grenze des Faltens), ein
+neu zusammengesetzter langer Text stieg also jede Runde aus. Jetzt rechnet
+`w_op` mit `vm::wert_rechnen` (dieselben Regeln ohne die Grenzen des
+Faltens; `konstant_rechnen` ist ein Aufruf davon plus die Grenzen).
+
+Gemessen `tools/tempo/objekte.dh`: 100 -> 92 ms (der Rumpf ist noch VM).
+Pruefung: 9 Faelle mehr in `jit.dhtest` (Methode mit Feldern, Methode liest
+eine Globale des Bereichs, eine andere Globale, zwei Klassen mit derselben
+Methode, Methoden von Text und MAP, Fehler in einer Methode, Methode auf
+NIL, Methode ruft FUNCREF, ein langer Text). Gegenproben, alle mit falschem
+Ergebnis und nicht nur an der Bilanzzeile: ohne Globalen-Pruefung (andere
+Summen als die 1901 bzw. 40 der VM), nur die erste Klasse eines Namens geprueft,
+ein Fehler wird nachgerechnet (Konto -5 statt -2), FUNCREF zugelassen;
+dazu `"MOD"` und die Faltgrenze (Ausstiege an der Bilanzzeile).
+
+**Schritt 7b (2026-09-25): Methodenrumpfe als Maschinencode -- gebaut.**
+Methoden werden wie freie Funktionen uebersetzt; `Self` kommt ueber
+`Kontext::selbst`, Feldzugriffe laufen ueber dieselben Helfer wie in
+Bereichen. **Die Methodentafel** (`Globale::tafel`, Index
+`functions.len() + j`) fuehrt je Klasse JEDE Methode, die sie sieht --
+auch geerbte, mit der Lage DIESER Klasse. Eine geerbte Methode bekommt also
+je Unterklasse eine eigene Fassung: sonst loeste `Self.hilfe()` darin
+statisch die Fassung der Vorfahrin auf, die VM aber die Ueberschreibung.
+Gerufen wird (1) aus der VM (CALL_METHOD -> `Jit::methode`, nur wenn es
+eine Fassung fuer genau die Lage des Objekts gibt; ausserhalb von
+`dispatch` in `methode_maschinencode`, die Abfrage einmal je Eintritt als
+`methoden_jit` -- mitten in `dispatch` kostete sie jeden Methodenaufruf der
+VM 3 %), (2) aus uebersetztem Code und Bereichen im getypten Modus, wenn
+der Empfaenger ein `Obj(k)` ist (statisch ueber die Tafel; `Self` des
+Gerufenen wird vor dem Aufruf in den Kontext geschrieben).
+
+**Feldschreibungen und das Aufgeben:** eine Funktion, die aufgibt, rechnet
+die VM von vorn -- bisher harmlos, weil reine Funktionen nichts schrieben.
+Eine Methode schreibt Felder. Darum fuehrt `feld_setzen` ein **Journal**
+(`Kontext::journal`: Objekt, Platz, alter Wert); gibt der Aufruf auf,
+stellt `journal_zurueck` die Felder rueckwaerts wieder her. Aus der VM ist
+das Journal fuer den ganzen Aufruf an; **in einem Bereich nur fuer die
+Dauer eines Methodenaufrufs** (`journal_bereich` -> `journal`, danach
+`journal_schluss`): der Bereich steigt bei einem Fehler VOR dem Aufruf aus,
+und die VM ruft die Methode noch einmal -- ihre Schreibungen muessen dann
+zurueck sein; die eigenen Schreibungen des Bereichs gelten und gehoeren
+nicht hinein. **Gefunden hat das die Gegenprobe VM gegen Maschinencode**:
+der erste Bau hatte das Journal nur im Einstieg aus der VM, und ein
+Bereich, dessen Methode nach einer Feldschreibung ueberlief, zaehlte die
+Schreibung doppelt (8 statt 7).
+
+Gemessen `tools/tempo/objekte.dh` (1 Mio. Methodenaufrufe): VM 97 ms,
+Maschinencode 12 ms (7 ms ohne das Journal im Bereich -- es ist der Preis
+dafuer, dass ein Fehler die Felder nicht doppelt schreibt). Pruefung: 8
+Faelle mehr in `jit.dhtest` (Methodenrumpf aus der VM gerufen,
+ueberschriebene Hilfsmethode gewinnt -- aus einem Bereich und aus der VM --,
+geerbte Methode auf der Unterklasse, Methode gibt nach einer Feldschreibung
+auf -- aus einem Bereich und aus der VM --, Methode ruft Methode eines
+anderen Objekts, Methode mit globaler Zahl). Gegenproben, alle mit falschem
+Ergebnis: Journal im Bereich aus (8 statt 7), Journal nicht zuruecknehmen,
+Lage beim Einstieg aus der VM nicht pruefen (29 statt 20, 1 statt 10),
+`Self` des Gerufenen nicht setzen (Absturz), nur eigene Methoden in der
+Tafel (die geerbten bleiben in der VM).
+
+**Schritt 8 (2026-09-26): reine Zahlenbefehle direkt im Maschinencode --
+gebaut.** Nach M5 ist der naechste Schritt gemessen, nicht geplant: ueber
+`tools/tempo` liefen alle Schleifen schon als Maschinencode, aber
+`builtins.dh` (3 Mio. `ABS`/`SQR`/`INT`) brauchte 107 ms -- ~35 ns je
+Aufruf im Wertemodus, fuer eine Rechnung, die eine Anweisung ist.
+`zahl_befehl` (jit.rs) nennt die Befehle, die der Maschinencode selbst
+rechnet, und die Art ihres Ergebnisses: `ABS INT FLOOR CEIL ROUND SGN/SIGN
+FLT SQR/SQRT SIN COS TAN ATAN EXP LOG ASIN ACOS DEG RAD FRAC ATAN2 HYPOT LERP
+MIN MAX CLAMP`, nur mit INTEGER/FLOAT als Argument; `MIN`/`MAX`/`CLAMP` nur,
+wenn alle Argumente dieselbe Art haben (sie liefern einen der WERTE).
+`zahl_rechnen` baut sie nach builtins.rs: eine Ganzzahl geht wie bei
+`need_num` als Kommazahl hinein, auch bei `INT` (INT(2^53 + 1) rundet wie in
+der VM); `ROUND` ist IEEE-Runden zur geraden Zahl (`nearest`), `FLOOR`/`CEIL`
+saettigen wie Rusts `as i64`; Sinus und Co. rufen dieselben Rust-Funktionen
+(`mathe1`/`mathe2`), darum bitgleich. **Jeder Fehlerfall der VM steigt aus**
+(ABS von i64::MIN, SQR negativ, INT ausserhalb oder NaN, LOG <= 0,
+ASIN/ACOS ausserhalb [-1, 1]); die VM fuehrt den Befehl selbst aus und
+meldet ihn. Das gilt im getypten Modus und im Wertemodus (dort, wenn die
+Argumente Zahlen sind), in Funktionen gibt der Aufruf auf. Keiner der Namen
+wird von einer frueheren Familie beantwortet -- der Merkplatz braucht nicht
+gefragt zu werden, und Funktionen mit diesen Befehlen werden beim Start
+uebersetzt.
+
+Gemessen: `builtins.dh` VM 155 ms, vorher 107 ms, jetzt 3,3 ms.
+Pruefung: 10 Faelle mehr in `jit.dhtest` (alle Befehle in einer Schleife,
+Runden und Abschneiden, INT einer grossen Ganzzahl, SQR negativ, ABS von
+MIN, INT ausserhalb/LOG/ASIN, MIN/MAX gemischt, DEG/RAD/LERP bis aufs letzte
+Bit, Befehle in Funktionen). Neun Gegenproben, alle mit falschem Ergebnis:
+ROUND als FLOOR, INT ohne Grenze, INT einer Ganzzahl ohne den Umweg ueber
+Komma, ABS ohne MIN-Pruefung, SQR und LOG ohne Pruefung, DEG in anderer
+Reihenfolge (ein Bit), SGN vertauscht, CLAMP vertauscht. **Zwei davon
+fielen erst im zweiten Anlauf**: bei der grossen Ganzzahl hoben sich mit
+Schritt 2 die Rundungen in der Summe auf (995 + 997 = 996 + 996), und bei
+ganzen Zahlen -6..6 rechnen `x * 180 / PI` und `x * (180 / PI)` gleich.
+
+**Schritt 9 (2026-09-26): Spielschleifen -- `NOT` auf Werte und vorbelegte
+Konstanten.** Ein Durchlauf ueber alle Beispiele (je 30 Bilder, Bilanz der
+Gruende) zeigte, woran echte Programme scheitern: 377 Schleifen blieben in
+der VM, 99 davon an "NOT auf NIL oder ein Feld" -- `WHILE NOT
+QUITREQUESTED()`: der Befehl liefert im Wertemodus einen Wert, und `NOT`
+darauf kannte der Wertemodus nicht. Jetzt ruft er `W_WAHR` (`truthy()`,
+nimmt den Wert vom Platz wie ein Sprung) und kippt das Bit -- die VM rechnet
+`!v.truthy()`. Dahinter kam der naechste Grund, "globale Variable" (21): die
+vorbelegten Konstanten (`BLACK`, `RED`, `KEY_ESCAPE`, `PI` ...) haben keinen
+Platz und laufen ueber `LOAD_NAME`. Sie sind unveraenderlich, `vorbelegt`
+setzt sie als Zahl ein -- ausser ein Platz heisst genauso (dann hat das
+Programm den Namen selbst angelegt; mit Plaetzen fuer jede Globale erzeugt
+der Compiler dann aber gar kein `LOAD_NAME`, die Pruefung ist eine
+Absicherung). Danach 343 Schleifen in der VM; die Spielschleife von
+`09_shapes.dh` laeuft ganz als Maschinencode. Die naechsten Gruende:
+Ausgabe (PRINT, 42), zwei Wege mit verschiedenen Arten (31), GUI_UPDATE
+(23, ruft Rueckrufe), Mitglied von etwas, das kein Objekt ist (21).
+
+Pruefung: 4 Faelle mehr in `jit.dhtest` (NOT auf Wahrheitswerte, NOT auf
+Text/Zahl/NIL als Wert, Spielschleife mit NOT und Konstanten, Konstanten in
+Funktionen); drei Gegenproben, alle mit falschem Ergebnis (NOT ungekippt,
+PI als TAU, Farbwert + 1).
+
+**Schritt 10 (2026-09-26): PRINT im Wertemodus.** Naechster Grund im
+Durchlauf ueber die Beispiele: "Ausgabe (PRINT)", 42 Schleifen. Der Rumpf
+von `op::PRINT` steht jetzt in `Vm::drucken` (Trenner, Umbruch, Leeren bei
+`DHRT_LIVE`), und der Wertemodus ruft ihn ueber `w_drucken` mit den Werten
+von den Plaetzen -- dieselbe Ausgabe, derselbe Puffer. PRINT kann nicht
+scheitern; weil es eine Nebenwirkung ist, setzt es `schreibt_felder`: ein
+Bereich, der aufgeben und die VM von vorn rechnen lassen muesste (er ruft
+eine Funktion, die Globale schreibt), wuerde doppelt drucken -- so einer wird
+im Wertemodus ohnehin nicht gebaut, und genau das haelt ein Fall fest
+(Gegenprobe: ohne die Pruefung stehen die Zeilen doppelt da). Danach 304
+statt 343 Schleifen in der VM. Die naechsten Gruende: zwei Wege mit
+verschiedenen Arten (32), GUI_UPDATE (23), Mitglied von etwas, das kein
+Objekt ist (21).
+
+Pruefung: 4 Faelle mehr in `jit.dhtest` (Trenner und leere PRINTs, PRINT vor
+einem Fehler in derselben Runde, PRINT mit einer Funktion, die Globale
+schreibt, Werte aller Art); drei Gegenproben am Ergebnis (Werte vertauscht,
+letzter Wert fehlt, Schutz vor dem Aufgeben entfernt).
+
+**Schritt 11 (2026-09-26): die Bilanz zaehlt Runden; Handles lesen.** Der
+Durchlauf nach Schritt 10 zaehlte SCHLEIFEN -- und bei 12 der 32 Treffer des
+naechsten Grundes war es dieselbe Startschleife der gui-Beispiele (`FOR EACH
+fp IN (drei Schriftdateien)`), die dreimal laeuft. Eine Startschleife wog so
+viel wie die Hauptschleife. Jetzt zaehlt die VM jede Runde einer Schleife,
+die in der VM bleibt (`Jit::vm_runde` in beiden Haken, nur mit
+`DHRT_JIT_BILANZ`; ohne Bilanz ein nicht genommener Zweig), und die Bilanz
+nennt am Ende die zehn meistgedrehten: `jit: N Runden in der VM -- Stelle ...:
+Grund`. Gewichtet ueber alle Beispiele (60 Bilder) fuehrten Warteschleifen
+(`WHILE AUDIO_IS_PLAYING(ch)`, 35 Mio. Runden -- sie warten auf echte Zeit,
+Maschinencode braechte nichts), dann **Handles**: Bild-, Atlas-, Klang- und
+Schrift-Handles sind in der VM GANZZAHLEN, der deklarierte Typ
+(`sprite_atlas`) machte den Platz "fremd", und schon das Lesen liess die
+Schleife in der VM (`76_layers_atlas.dh`, 348 579 Runden). Lesen ist nur die
+Zahl und jetzt erlaubt; Schreiben bleibt gesperrt, dort prueft die VM den
+Typ. Danach laufen alle fuenf Schleifen von `76_layers_atlas.dh` als
+Maschinencode (die Wandzeit bleibt gleich -- das Programm ist auf eine
+Bildrate gebremst).
+
+Die gewichtete Liste danach, Warteschleifen ausgenommen: "eingebauter Befehl
+(an dieser Stelle noch nie gerufen)" (57 Schleifen, 73 000 Runden -- Befehle
+in Zweigen, die vor dem ersten Ruecksprung nicht liefen), "legt eine globale
+Variable an" (13, 95 000), "ruft eine Funktion, die in der VM bleibt" (29,
+49 000), "Mitglied von etwas, das kein Objekt ist" (21, 24 000).
+
+Pruefung: 2 Faelle mehr in `jit.dhtest` (Handle als Zahl lesen; Handle
+schreiben bleibt in der VM und zaehlt 4 Runden); 21 alte Faelle tragen jetzt
+ihre Rundenzeile. Gegenproben: Handles wieder sperren und Runden nicht
+zaehlen fallen (dort ist die Bilanzzeile das Gepruefte); eine falsche Art im
+Analysezustand beim Lesen fiel NICHT -- der Code nimmt die Art des Platzes
+aus seinem eigenen Zustand, die Verfaelschung traf eine Stelle ohne Wirkung.
+
+**Schritt 12 (2026-09-26): Befehle in seltenen Zweigen spaet binden.** Eine
+Schleife wird beim ersten Ruecksprung uebersetzt, und jeder Befehl in einem
+Zweig, der bis dahin nicht lief (Tastendruck, Themawechsel, `IF i = 25`),
+hatte noch keine Familie -- die GANZE Schleife blieb dann in der VM
+("an dieser Stelle noch nie gerufen", 57 Schleifen). Jetzt zaehlt beim
+Bauen nur der Name (`befehl_im_bereich` mit einer beliebigen erlaubten
+Familie); `w_builtin_roh` fragt beim Laufen: fehlt die Familie oder ruft sie
+Drachenhauch-Code (2/4/8), steigt der Bereich VOR dem Befehl aus -- ohne
+Meldung, die Argumente bleiben auf ihren Plaetzen --, die VM fuehrt ihn aus
+und merkt sich dabei die Familie; beim naechsten Eintritt laeuft er im
+Maschinencode. Ein Befehl einer verbotenen Familie steigt jedes Mal aus
+(SORT mit Vergleich), ist aber richtig.
+
+Runden in der VM ueber alle Beispiele, Warteschleifen ausgenommen: 708 451
+vor Schritt 11, 248 320 danach. Die naechsten Gruende nach Runden: "legt eine
+globale Variable an" (17 Schleifen, 95 000 -- ein `DIM` in der Schleife von
+etwas, das keine Zahl ist), "ruft eine Funktion, die in der VM bleibt" (34,
+51 000), "Mitglied von etwas, das kein Objekt ist" (22, 25 000), Funktionen,
+die ein TUPLE liefern (`sinscroll_rgb`, 40 000).
+
+Pruefung: 3 Faelle mehr in `jit.dhtest` (JSON und LEN in seltenen Zweigen:
+zwei Ausstiege, danach Maschinencode; SORT mit Vergleich, der eine Globale
+zaehlt, die die Schleife liest: steigt jedes Mal aus; Fehler eines spaet
+gebundenen Befehls mit Zeile). Gegenproben: ohne die Laufzeitpruefung
+liefert der SORT-Fall ein anderes Ergebnis; mit der alten Regel faellt die
+Bilanz.
+
+**Schritt 13 (2026-09-26): Globale ohne Platz werden feste Ausgaenge.** Ein
+`DIM` in einem Zweig der Schleife, der vor dem Bauen nicht lief, legt eine
+Globale an, die es beim Bauen noch nicht gibt -- die ganze Schleife blieb
+in der VM ("legt eine globale Variable an", 95 000 Runden). **Der erste
+Versuch war Warten**: die Schleife merkte sich den fehlenden Platz und wurde
+neu gebaut, sobald es ihn gab. Richtig, aber im Messlauf wirkungslos (95 104
+-> 94 941 Runden) -- die Zweige (Dialoge im Tilemap-Editor ...) liefen in
+60 Bildern nie, die Schleife wartete also die ganze Zeit. Jetzt wird sie
+trotzdem gebaut: `globale_fehlt` macht jeden Befehl, der so eine Globale
+anfasst (DIM, Lesen, Schreiben, FOR ueber sie), zu einem **festen Ausgang**
+ohne Nachfolger -- dort steigt der Bereich immer aus, die VM fuehrt den
+Befehl und den Rest der Runde aus. Die gebaute Schleife merkt sich die
+fehlenden Plaetze (`Schleife::fehlende`); gibt es einen davon beim Eintritt,
+wird sie beim naechsten Ruecksprung neu gebaut, dann ohne den Ausgang.
+
+Runden in der VM ueber alle Beispiele (Warteschleifen ausgenommen): 248 320
+-> 156 616. Die naechsten Gruende: "ruft eine Funktion, die in der VM
+bleibt" (38 Schleifen, 55 000), "Mitglied von etwas, das kein Objekt ist"
+(21, 24 000), Funktionen, die ein TUPLE liefern (40 000), "Befehl" (19 000).
+
+Pruefung: 3 Faelle in `jit.dhtest` (DIM im seltenen Zweig: ein Ausstieg,
+einmal neu gebaut; DIM im nie genommenen Zweig: gebaut, nie ausgestiegen;
+seltenes DIM neben TRY bleibt in der VM). Gegenproben, beide an der Bilanz
+(das Ergebnis bleibt per Bauart richtig): ohne Neubau, ohne festen Ausgang.
+
+**Schritt 14 (2026-09-26): Funktionen lesen globale Zahlenfelder; RGB.**
+Der naechste Grund aus der Messung, "ruft eine Funktion, die in der VM
+bleibt", hing an den gerufenen FUNKTIONEN: `ShapeCell` in Tetris liest
+`SHAPES[k, r, i]`, `fband` in Cybermatic `fft[k]`, `IsWhite` im Sampler
+`whitePat[m]` -- alle drei "globale Variable, die keine Zahl ist". Ein
+Bereich liest Felder ueber eine Beschreibung, die die VM bei jedem Eintritt
+ausfuellt; eine Funktion hat keine (sie wird auch aus anderem Maschinencode
+gerufen, und ihre Beschreibung stuende dann im Kontext des Rufers). Sie
+liest darum ueber den Helfer `gfeld_lesen` (Platz, bis drei Indizes, Art):
+Grenzen und Zellenart prueft er, bei jedem Fehler gibt die Funktion auf und
+die VM rechnet sie nach. Die Art der Elemente kommt STATISCH aus dem
+Hauptprogramm (`Globale::felder`: DECLARE_ARRAY_NAME bzw. DECLARE_NAME
+`array:T`, gefolgt von BIND_GLOBAL_SLOT; zwei verschiedene Anlagen = nicht
+genommen). Nur lesen -- eine schreibende Funktion waere nicht mehr rein --,
+und ein Feld darf in einer Funktion nicht in ein Local wandern. Dazu
+`RGB`/`RGBA` mit Ganzzahlen in `zahl_befehl` (Bereich 0..255 prueft der
+Code, Deckkraft 0 wird 1 wie in builtins.rs) -- `hue` in Cybermatic und
+PBR-Reaktor scheiterte nur daran.
+
+Runden in der VM ueber alle Beispiele: 156 616 -> 132 738; Sampler und
+PBR-Reaktor sind ganz im Maschinencode. Tetris bleibt: seine Schleife ruft
+`drawblock`, ein SUB mit `BOX` -- eine Funktion mit Befehlen, die nicht
+nur rechnen, laeuft weiter in der VM (naechster Schritt: solche Aufrufe aus
+dem Bereich heraus ueber die VM, wie `w_methode`).
+
+Pruefung: 10 Faelle in `jit.dhtest` (Feld mit einem und drei Indizes,
+Kommazahlfeld, Index ausserhalb, Feld aendert sich zwischen den Aufrufen,
+Feld ohne Groesse, RGB in einer Funktion, RGBA mit Deckkraft 0, RGB
+ausserhalb im Bereich und in der Funktion). Gegenproben: Indizes
+vertauscht, Kommazahl falsch gelesen, Anteile verschoben, Deckkraft 0
+bleibt 0, ohne Bereichspruefung -- jede faellt in ihren Faellen.
+
+**Schritt 15 (2026-09-26): Funktionen, die in der VM bleiben, aus dem
+Bereich rufen.** Ein Bereich im Wertemodus ruft eine Funktion, die nicht
+uebersetzt ist, jetzt ueber die VM (`w_funktion` -> `Vm::funktion_rufen`,
+derselbe Weg wie CALL_USER ohne BYREF) -- wie Methoden seit Schritt 7a.
+`Bereich::vm_fns` sagt je Funktion, ob sie in der VM bleibt; der
+getypte Weg, der so einen Aufruf enthaelt, faellt in den Wertemodus
+zurueck (vorher gab er auf, obwohl die Analyse gelang). Die Pruefung
+teilt sich `gerufenes_harmlos` mit den Methoden: nichts, was die Funktion
+ruft, darf eine Globale beruehren, die der Bereich oder seine uebersetzten
+Funktionen beruehren -- die haelt der Bereich bei sich (Schatten,
+Werteplaetze), die VM saehe einen alten Stand oder ueberschriebe ihn.
+Was er ueber die VM ruft, zaehlt dabei NICHT zu seinen Globalen: das
+laeuft wie jede VM-Funktion nacheinander. BYREF und Coroutinen bleiben in
+der VM. Ein Fehler in der gerufenen Funktion geht als Meldung an ihre
+Stelle (`meldung`), die VM ruft sie nicht noch einmal.
+
+**Der Fund dabei, und er lag schon seit Schritt 7a:** `Jit::schleife`
+hielt `schleifen.borrow_mut()`, solange der Bereich lief. Hat die ueber die
+VM gerufene Funktion selbst eine Schleife, tritt die VM in `schleife`
+wieder ein -- "RefCell already borrowed", Absturz. Gefunden hat es
+`httpd.dhtest` (der Klient ruft `holen$` in einer Schleife, `holen$` liest
+in einer Schleife); bei Methoden haette es genauso passieren koennen, nur
+traf es kein Fall. Die Schleifen liegen jetzt als `Rc<Schleife>` in der
+Liste, die Ausleihe gilt nur fuer das Nachschlagen, `fehlschlaege` ist eine
+`Cell`. Den Schatten teilen sich innen und aussen weiter: die Pruefung
+verlangt verschiedene Globale, und jeder Bereich raeumt nur die Merkbytes
+seiner eigenen ab.
+
+Runden in der VM ueber alle Beispiele: 132 738 -> 73 456. Tetris'
+`drawfield` laeuft jetzt als Maschinencode (`DrawBlock` mit `BOX` ueber
+die VM). Die naechsten Gruende: TUPLE auspacken im Wertemodus (Befehl 69:
+Orbital 28 000, Hires 6 600), "Mitglied von etwas, das kein Objekt ist"
+(Schneefall 22 000, Coinquest 9 000).
+
+Pruefung: 10 Faelle in `jit.dhtest` (Funktion mit eigener Schleife, Textfunktion, SUB schreibt fremde
+Globale, Funktion beruehrt eine Globale des Bereichs -> VM, Argumente in
+Reihenfolge, THROW mitten drin ohne doppelten Aufruf, Laufzeitfehler,
+Rekursion, BYREF -> VM, SUB ohne Ergebnis). Gegenproben: ohne Pruefung auf
+Globale, Argumente umgedreht, ohne Meldung (die VM riefe doppelt), ohne
+Rueckfall in den Wertemodus, ohne `Rc` (stuerzt ab).
+
+**Schritt 16 (2026-09-26): Tupel im Wertemodus.** Seit Schritt 15
+laufen Funktionen, die ein TUPLE liefern, ueber die VM -- die Schleife
+scheiterte danach am Auspacken (`(r, g, b) = sinscrollrgb(...)`, Befehl
+69). `UNPACK_TUPLE` und `BUILD_TUPLE` im Wertemodus gehen ueber zwei
+Helfer: `w_auspacken` legt die Elemente so auf die Werteplaetze, wie die
+VM sie auf ihren Stapel legt (das erste oben); passt die Laenge nicht oder
+ist es kein Tupel, bleibt der Wert liegen und der Bereich steigt VOR dem
+Befehl aus -- die VM meldet den Fehler mit ihrem Wortlaut. `w_tupel`
+baut ein Tupel aus den Plaetzen. Was danach in ein INTEGER-Ziel geht,
+prueft wie immer `w_speichern`.
+
+Runden in der VM ueber alle Beispiele: 73 456 -> 40 114. Orbital und
+Hires-Showcase laufen fast ganz im Maschinencode.
+
+Pruefung: 5 Faelle in `jit.dhtest` (Tupel aus einer Funktion, Reihenfolge
+der Ziele, bauen und weitergeben, falsche Laenge, falscher Typ fuer ein
+Ziel). Gegenproben: Reihenfolge verdreht, Laenge nicht geprueft, Tupel
+verkehrt gebaut.
+
+**Schritt 17 (2026-09-26): Mitglieder von Werten.** Im Wertemodus ist ein
+Objekt ein Wert (`Art::W`), und `obj.x` darauf liess die Schleife in der VM
+("Mitglied von etwas, das kein Objekt ist" -- Schneefall 21 600 Runden,
+Coinquest 8 900). `LOAD_MEMBER`/`STORE_MEMBER` auf einem Wert gehen jetzt
+ueber `w_mitglied_lesen`/`w_mitglied_setzen` -> `Vm::member_laden`/
+`member_setzen`, also denselben Weg wie die VM: Feld ueber den Merkplatz,
+PROPERTY, Namensraum, gebundene Methode, Typpruefung beim Setzen. Eine
+PROPERTY fuehrt Drachenhauch-Code aus; `mitglied_harmlos` prueft darum alle
+Getter bzw. Setter dieses Namens (in allen Klassen -- der Empfaenger steht
+erst beim Laufen fest) mit `gerufenes_harmlos` wie eine Methode. Ein Fehler
+geht als Meldung an die Stelle, die VM fuehrt den Befehl nicht noch einmal
+aus -- ein Setter mit Nebenwirkung liefe sonst zweimal.
+
+Runden in der VM ueber alle Beispiele: 40 114 -> 18 233. Schneefall laeuft
+fast ganz im Maschinencode; Coinquest scheitert jetzt an "FOR nicht ueber
+INTEGER".
+
+Pruefung: 6 Faelle in `jit.dhtest` (Felder von Objekten als Werte,
+PROPERTY als Wert, PROPERTY beruehrt eine Globale des Bereichs -> VM, NIL
+mitten drin, Setter wirft, falscher Typ fuer ein Feld); sechs alte Faelle,
+die hier absichtlich in der VM blieben, werden jetzt uebersetzt (gleiche
+Ausgabe, neue Bilanz). Gegenproben: ohne Pruefung der PROPERTYs, ohne
+Meldung (der Setter liefe doppelt), Setzen ohne Wirkung.
+
+**Schritt 18 (2026-09-26): FOR mit Kommazahl oder Wert als Grenze.** Seit
+`/` immer FLOAT liefert, ist `FOR r = 0 TO WORLD_H / TILE - 1` eine
+Schleife mit Kommazahl-Grenze -- der Maschinencode kannte nur INTEGER
+("FOR nicht ueber INTEGER", Coinquest 8 900 Runden). Die Laufvariable und
+die Schrittweite bleiben INTEGER; die Grenze darf jetzt F sein (verglichen
+ueber `vergleichen`, wie die VM mit `cmp`) oder im Wertemodus W (auf einen
+freien Platz kopiert und als Zahl gelesen -- das Local bleibt stehen; keine
+Zahl: aussteigen, die VM meldet). Verglichen wird VOR dem Zurueckschreiben
+der Laufvariable, damit ein Ausstieg (NaN) nichts halb geschrieben
+hinterlaesst. Eine W-Grenze, die eine Ganzzahl ist, wird als Kommazahl
+verglichen -- das weicht von der VM erst jenseits von 2^53 ab.
+
+**Dazu ein zweiter Punkt:** die verborgene Grenze einer FOR-Schleife ist ein
+Local ohne Typ (`any`). Im Wertemodus hielt es nach einer Zuweisung eines
+Werts `W`, beim Eintritt aber eine Zahl (F) -- am Ruecksprung trafen sich
+zwei Arten, und die aeussere Schleife blieb in der VM. Locals ohne Typ sind
+im Wertemodus jetzt immer ein Wert: beim Eintritt (`wertebereich`, die
+Eintrittspruefung laesst dort Zahlen zu) und beim Schreiben einer Zahl
+(`w_boxen` + `w_nach_lokal`).
+
+Runden in der VM ueber alle Beispiele: 18 233 -> 9 033.
+
+Pruefung: 4 Faelle in `jit.dhtest` (Kommazahl-Grenze, rueckwaerts mit
+Kommazahl-Grenze, Wert als Grenze, Grenze wird mitten drin ein Text).
+Gegenproben: Grenze verbraucht statt kopiert, ohne `any` als Wert (nur an
+der Bilanz -- die Schleifen bleiben dann richtig in der VM), vorwaerts mit
+`>=` statt `>`. **Eine Gegenprobe blieb gruen:** rueckwaerts `<=` statt `<`
+-- eine FOR-Schleife mit negativer Schrittweite wird gar nicht zu
+`FOR_NEXT` verschmolzen, sondern laeuft ueber gewoehnliche Vergleiche; der
+Zweig `neg` im Maschinencode kommt in keinem Fall vor.
+
+**Schritt 19 (2026-09-26): Laufzeit statt Runden -- zwei Rueckschritte.**
+Die Messung einzelner Programme (`bench_dhrt.dh`, `tools/tempo`) zeigte,
+was die Zaehlung der VM-Runden nicht zeigt:
+
+| Programm | VM | vor Schritt 19 | nach Schritt 19 |
+|---|---|---|---|
+| teilchen.dh | 200 ms | **221 ms** | 28 ms |
+| familien.dh | 216 ms | 37 ms | 16 ms |
+
+(1) `teilchen.dh`: seit Schritt 17 wurde die AEUSSERE Schleife im
+Wertemodus gebaut und schluckte die innere `FOR EACH`, die vorher getypt
+lief -- jeder Feldzugriff ging jetzt ueber einen Helfer statt ueber einen
+Objektzeiger, langsamer als die VM. Die aeussere scheiterte getypt schon
+immer (`__comp_iter` fuer FOR EACH), im Wertemodus bis Schritt 17 an den
+Mitgliedern. Jetzt: liegen Mitglieder von Werten in einer INNEREN Schleife
+(`innere_schleife_mit`), bleibt die aeussere in der VM, und die innere
+bekommt ihren eigenen, getypten Bereich. (2) `familien.dh`: seit Schritt 18
+waren Locals ohne Typ im Wertemodus immer Werte -- auch die verborgene
+Grenze `TO 10` der inneren Schleife, und jede Runde kostete zwei
+Helferaufrufe. Jetzt ist das nur noch der dritte Versuch
+(`Bereich::any_w`): erst getypt, dann Wertemodus ohne, dann mit.
+
+**Die Lehre:** die Zahl der VM-Runden war ein Stellvertreter fuer die
+Laufzeit, und er hat zweimal in die falsche Richtung gezeigt -- eine
+Runde im Maschinencode ist nicht immer schneller als eine in der VM. Die
+Messbank gehoert zu jedem Schritt, nicht nur die Runden.
+
+Stand der Messbank (Bestwert aus 5, ms, VM / Maschinencode): aufrufe
+138 / 3,2; builtins 149 / 2,9; familien 216 / 16; felder 92 / 11;
+ganzzahl 487 / 8,9; maps 106 / 107 (die Zeit steckt in MAPPUT/MAPGET/STR$
+selbst, nicht in der Schleife); objekte 103 / 11,5; teilchen 200 / 28;
+text 51 / 40; zahlen 221 / 5,4.
+
+**Schritt 20 (2026-09-26): maps.dh angesehen.** Zerlegt (200 000 Runden,
+mit/ohne Maschinencode praktisch gleich): Schluessel bauen `"k" + STR$(i)`
+37 ms, dazu MAPPUT 24 ms, MAPGET 9 ms -- die Map war nicht das Teuerste.
+Drei Funde:
+
+- **Text zusammensetzen war im Maschinencode langsamer als in der VM**
+  (`"k" + a`: 24 gegen 17 ms). `w_op` rechnete ueber `wert_rechnen`:
+  Kopie des linken Texts, dann angehaengt -- zwei Speicheranlagen. Jetzt
+  wie `Vm::addieren` ein Text in passender Groesse: 12,5 ms.
+- **`w_speichern` rief bei JEDEM Speichern `coerce(v.clone(), ...)`**,
+  also Verweis kopieren und Typnamen vergleichen, auch wenn der Wert schon
+  passt. Jetzt vorher der schnelle Weg wie `passend!` in der VM.
+- **MAPPUT**: der Index der MAP nahm Rusts SipHash; jetzt foldhash mit
+  zufaelligem Startwert je Prozess (die Schluessel koennen von aussen
+  kommen -- FxHash waere mit ausgesuchten Schluesseln zu Kollisionen zu
+  treiben). Und ein vorhandener Schluessel wird ohne Speicheranlage
+  ueberschrieben (`DhMap::put_str`). Die zwei Kopien je neuem Schluessel
+  (Liste und Index) bleiben -- sie zu teilen hiesse, die Schnittstelle von
+  `DhMap` umzubauen.
+
+maps.dh: 107 -> 81 ms mit Maschinencode, 106 -> 100 ms in der VM; die
+uebrigen Werte der Messbank unveraendert. Zwei Faelle neu in `jit.dhtest`
+(Wert in ein INTEGER- bzw. STRING-Local einer SUB). Gegenproben: der
+schnelle Weg nimmt eine Zahl fuer ein STRING-Local an, der Text wird
+verkehrt herum zusammengesetzt -- beide fallen. **Die erste Fassung der
+ersten Gegenprobe blieb gruen:** sie liess eine Kommazahl in ein
+INTEGER-Local, aber ein Local mit Zahlentyp nimmt gar nicht `w_speichern`,
+sondern `w_zahl_i` -- die Mutation traf eine Kombination, die dort nie
+ankommt.
+
+**Schritt 21 (2026-09-27): die MAP ueber `indexmap`, `Gb*` heisst `Dh*`.**
+Wie die schnellen Sprachen Maps bauen (Python `dict`, Rust `indexmap`):
+eine dichte Liste der Eintraege in Einfuege-Reihenfolge und daneben eine
+Hashtabelle, die nur POSITIONEN haelt -- jeder Schluessel liegt einmal im
+Speicher. `DhMap` hatte denselben Aufbau von Hand, aber mit einem
+`HashMap<String, usize>` daneben: jeder Schluessel zweimal, beim Einfuegen
+zweimal gehasht, und Loeschen baute den ganzen Index neu auf. Jetzt
+`indexmap::IndexMap<String, Value>` mit foldhash (stand schon in der
+Lockfile); die Schnittstelle von `DhMap` ist gleich geblieben, `entries()`
+liefert eine `indexmap`-Scheibe, die dieselben `(k, v)`-Paare hergibt.
+Loeschen behaelt die Reihenfolge (`shift_remove`).
+
+Gemessen gegen den Bau davor: maps.dh 81 -> 79 ms (VM 100 -> 96), 20 000
+Schluessel vorn beginnend loeschen 493 -> 288 ms, eine Million Schluessel
+214 -> 160 MB Spitze. Die uebrigen Werte der Messbank unveraendert. Beim
+Einfuegen und Suchen bleibt der Unterschied klein -- der Schluessel
+`"k" + STR$(i)` wird weiter je Runde gebaut, und das ist der groessere
+Teil. Im selben Zug heissen die Laufzeit-Typen `GbMap`/`GbArray`/`GbFile`
+jetzt `DhMap`/`DhArray`/`DhFile` -- das `Gb` kam noch von GameBasic.
+
+Pruefung: ein Fall mehr in `map_reihenfolge.dhtest` (Ueberschreiben behaelt
+den Platz). Gegenproben: Loeschen mit `swap_remove` (die Reihenfolge geht
+verloren) laesst zwei Faelle dort fallen, Ueberschreiben ans Ende schieben
+den neuen Fall und einen in `mengen.dhtest`.
+
+**Schritt 22 (2026-10-07): Funktionen fremder Bibliotheken.** `__ffi` war
+in `befehl_im_bereich` gesperrt, weil ein Rueckruf Drachenhauch-Code ruft,
+waehrend der Bereich Locals und Globale haelt. Jetzt erlaubt, solange das
+Programm keinen Rueckruf vergeben hat und die Signatur keinen nimmt
+(Begruendung und Gegenprobe: `entwurf-ffi.md`, Stand Maschinencode). Eine
+Signatur nur aus Zahlen wird im getypten Bereich zu `Art::S` (der Zeiger
+auf die Konstante; beim Aussteigen geht er als die Konstante selbst an die
+VM zurueck), der Aufruf zu `ffi_zahlen` mit den Werten in einem
+Stapelplatz. Allein erlaubt, aber im Wertemodus, brachte es nichts; getypt
+und mit schlankerem Aufrufweg: `ffi.dh` 201 -> 54 ms (VM 202 -> 116 ms).
+
+**Schritt 23 (2026-10-10, Dogfooding mit einem Spiel): `^`, Zusammenfluss
+im Wertemodus, Werte an uebersetzte Funktionen.** Die Bilanz des Beispiels
+`examples/kometen` nannte drei Gruende, die in Spielen staendig vorkommen:
+(1) `^` gab es im Maschinencode gar nicht -- jede Schleife mit der
+ueblichen Abstandsrechnung `(dx) ^ 2 + (dy) ^ 2` blieb in der VM. Jetzt mit
+einer Kommazahl dabei `powf` (dieselbe Funktion wie `vm::pow`, also gleiche
+Ergebnisse), INTEGER ^ feste Ganzzahl 0..16 als Ganzzahl mit
+Ueberlaufpruefung (`fester_exponent`; ein Ueberlauf steigt aus, die VM
+meldet ihn); ein variabler INTEGER-Exponent bleibt beim Wertemodus, weil
+dort der Ergebnistyp am Wert haengt. 2 Mio. `(x) ^ 2` in einer Schleife:
+131 -> 19 ms, mit `(i MOD 100) ^ 2` 109 -> 3 ms. (2) `IF k.lebt AND x > 0`
+im Wertemodus: das kurzgeschlossene AND laesst auf dem einen Weg den Wert
+des Felds, auf dem anderen einen Wahrheitswert auf dem Stapel -- "zwei Wege
+treffen sich mit verschiedenen Arten". Jetzt erweitert `melden` die Stelle
+zum Wert und rechnet den Block neu, und `ablegen` legt auf dem Weg mit der
+Zahl sie vor dem Sprung in ihren Platz (`w_boxen`). (3) Ein Wert (Feld eines
+Objekts) als Argument einer UEBERSETZTEN Funktion lief nicht durch die
+getypte Pruefung ("Argument 1 an umlauf passt nicht") -- im Wertemodus geht
+so ein Aufruf jetzt ueber die VM (`w_funktion`), wie bei Funktionen ohne
+Maschinencode. Faelle in `jit.dhtest` ("potenz im maschinencode", "und und
+oder ueber objektfelder im wertemodus"), je mit und ohne.
+
+**Schritt 24 (2026-10-15, Glutfaden): Bit-Operatoren.** `BAND`, `BOR`,
+`BXOR`, `SHL`, `SHR` und `BNOT` gab es im Maschinencode gar nicht -- jede
+Schleife damit blieb in der VM, also fast jeder Code, der Farben in Bytes
+zerlegt oder zusammensetzt (`(f SHR 16) BAND 255`). Jetzt getypt fuer zwei
+INTEGER (`band`/`bor`/`bxor`, `ishl`/`sshr` wie Rusts `<<`/`>>`, `bnot`)
+und im Wertemodus ueber `w_op`; eine Schiebeweite ausserhalb 0..63 steigt
+aus und die VM meldet sie in ihrer Zeile, ein Nicht-INTEGER ebenso. Ein
+Bildpuffer mit einer Million Punkten (`BUFFER_SET_U32` mit `BOR` in der
+Schleife): 217 -> 151 ms, der Rest ist der Befehlsaufruf je Punkt. Faelle
+in `jit.dhtest` ("bit-operatoren in funktion und schleife"), je mit und ohne;
+gegen den Bau davor faellt der Maschinencode-Fall an der Bilanz (0 statt 3
+Funktionen, 0 statt 2 Schleifen).
+
+**Schritt 25 (2026-10-22): mehrere Klassen an einer Stelle.** Eine
+Objektart kannte genau EINE Lage, und die Art der Elemente eines Feldes
+legte das erste Element fest. In einem gemischten `ARRAY OF Form` stieg der
+Code darum bei jedem Element einer zweiten Klasse aus (Weg F aus
+[entwurf-schnittstellen.md](entwurf-schnittstellen.md)). Jetzt kann eine Art
+eine **Familie** sein: bis zu vier Lagen mit einer gemeinsamen Vorfahrin
+(`Klasse::familie`, `familie_nr`). `elemente_art` sieht beim Bauen bis zu
+4096 Elemente an. Felder der Vorfahrin liegen bei allen Mitgliedern auf
+demselben Platz und werden direkt gelesen; ist ein Platz oder Typ
+verschieden oder hat ein Mitglied eine PROPERTY gleichen Namens, bleibt der
+Zugriff in der VM. Ein Methodenaufruf holt die Lage des Objekts (`obj_lage`)
+und verzweigt zur uebersetzten Methode des Mitglieds; alle muessen dieselbe
+Form haben. Passt keine Lage, steigt er aus, bevor `Self` gesetzt ist.
+Gemessen, eine Million Aufrufe: `b_poly` (Kreis/Quadrat) 72 -> 12 ms, so
+schnell wie eine einzige Klasse (10 ms); `tools/tempo` unveraendert (A/B
+0,97..1,02). Der Arm fuer Art 5 sitzt in `familie_bits`, nicht in
+`wert_bits`: dort kostete er gemessen 5 % bei jedem Objekt-Lesen, auch ohne
+Familie. Faelle in `jit.dhtest` (vier Paare, dazu ein alter Fall, dessen
+Bilanz jetzt 3 Laeufe statt 6 Ausstiegen zeigt); gegen den Bau davor fallen
+die drei Faelle mit Familie an der Bilanz.
+
+## 5. Was bewusst nicht kommt
+
+- Kein eigener Registerzuteiler, keine eigenen Optimierungen jenseits dessen,
+  was Cranelift mitbringt — der Gewinn liegt im Wegfall der Typprüfungen und
+  des Dispatch, nicht in cleveren Schleifen.
+- Keine Übersetzung von Coroutinen (YIELD), TRY/CATCH und `any`-Code in M3/M4;
+  das ist die VM, bis gemessen wird, dass es sich lohnt.
+- Kein AOT (Weg C), solange B den Export nicht bremst.
+
+## 6. Grobe Rechnung
+
+| Schritt | Aufwand | `fib(30)` | Zahlenschleife |
+|---|---|---|---|
+| heute | — | 210 ms | 219 ms |
+| M2 (VM getypt) | ~5 Wochen inkl. M0/M1 | ~100 ms | ~100 ms |
+| M3 (JIT Zahlen) | +4–6 Wochen | ~15 ms | ~15 ms |
+| M4 (Breite) | laufend | — | Objekte/Felder 5–10×, Text/Maps 2–3× |
+
+Die Zahlen für M2/M3 sind Schätzungen aus dem, was Stapel-VMs und
+Cranelift-Code anderswo erreichen, nicht gemessen — M0 ist genau dafür da,
+sie nach jedem Schritt zu ersetzen.
+
+1. **Globale Variablen** (feste Slots, seit #235/#236 gibt es die) und
+   **Felder von INTEGER/FLOAT** mit Grenzprüfung inline.
+2. **Objektfelder mit fester Lage**: eine Klasse kennt ihre Felder zur
+   Übersetzungszeit — `Self.x` wird ein Speicherzugriff mit festem Versatz
+   statt einer Suche.
+3. **Zeichenketten und MAPs** über die Laufzeit-Funktionen (Regel 2);
+   `STRING` als Zeiger, Referenzzählen bleibt beim Rust-Code.
+4. **Builtins**: je Familie ein Aufruf mit fester Nummer (die Nummern gibt es
+   seit #234) — für Grafikbefehle ist der Befehl selbst teuer, nicht der Weg
+   dorthin.
+5. Methoden (Merkplatz je Aufrufstelle wie in der VM, #238).
+
+### M5 — Standard an (gebaut 2026-09-25)
+
+- **Maschinencode ist Vorgabe**; `DHRT_JIT=aus` laesst alles in der VM
+  (`immer` bleibt als Wort gueltig). Kein eigenes `auto`: uebersetzt werden
+  Funktionen beim Start und Schleifen beim ersten Ruecksprung, und gemessen
+  kostet das nichts -- `PRINT "hallo"` 32 ms mit wie ohne, die IDE 720 ms mit
+  wie ohne.
+- **Die CI laeuft weiter beide Wege**, nur umgekehrt beschriftet: der
+  Hauptlauf mit Maschinencode (Windows die ganze Suite, vorher nur
+  `--schnell`), der zweite mit `DHRT_JIT=aus`. `jit.dhtest` setzt fuer seine
+  VM-Haelfte `DHRT_JIT=aus` ausdruecklich -- sonst pruefte sie ebenfalls den
+  Maschinencode. Die ganze Suite lief vor der Umstellung lokal mit
+  Maschinencode: 4263 ok, 0 fehl in 296 Sammlungen, darunter zum ersten Mal IDE und Werkzeuge; ohne Maschinencode (--schnell) 3753 ok.
+- Export: nichts zu tun (uebersetzt wird beim Start).
+- **macOS**: Hardened Runtime verbietet, Speicher ausfuehrbar zu machen.
+  **Hier stand, `allow-jit` reiche -- das stimmt fuer Cranelift nicht**:
+  cranelift-jit 0.136 legt Code in gewoehnlichem Speicher an und schaltet ihn
+  per `mprotect` auf ausfuehrbar (in cranelift-jit, Datei memory/mod.rs), ohne `MAP_JIT`; `allow-jit`
+  deckt nur `MAP_JIT`-Speicher. Die App bekommt darum
+  `installer/posix/dhrt.entitlements` mit `allow-unsigned-executable-memory`
+  (und `allow-jit` fuer eine spaetere Fassung mit `MAP_JIT`), eingetragen in
+  `macosSignieren` (`installer/paket.dh`). Der Paketlauf (`package.yml`)
+  prueft die Berechtigung in der Signatur und laesst eine Schleife aus dem
+  Bundle laufen, bis die Bilanz "1 Schleifenlaeufe" sagt -- vorher baute er
+  dhrt nicht einmal mit dem Feature `jit`. **Ungeprueft, bis der Paketlauf
+  gelaufen ist** (er wird nur von Hand gestartet).
+- **Web**: kein JIT (emscripten), dort bleibt M2.
+- **Rust 1.98 und Cranelift 0.136** (vorher 0.134, weil 0.135/0.136 Rust
+  1.95/1.96 verlangen und lokal 1.95 lag; die CI nahm ohnehin das neueste
+  Stable). Der Sprung brauchte keine Quellaenderung; Tempo gleich,
+  `aufrufe.dh` mit dem neuen Compiler etwas schneller (4,2 -> 3,3 ms).

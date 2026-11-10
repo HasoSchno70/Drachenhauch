@@ -467,7 +467,7 @@ impl<'p> Vm<'p> {
                 let liste: Vec<serde_json::Value> = g.as_array().map(|v| v.iter().map(um).collect()).unwrap_or_default();
                 Value::str_rc(&serde_json::Value::Array(liste).to_string())
             }
-            // ===== Drucken + Oeffnen (docs/entwurf-drucken.md) =====
+            // ===== Drucken + Oeffnen (docs/intern/entwurf-drucken.md) =====
             "opendoc" => { crate::drucken::oeffnen(bi_str(a, 0, "OPENDOC")?)?; Value::Nil }
             "printers" => {
                 let namen = crate::drucken::drucker_liste()?;
@@ -477,7 +477,7 @@ impl<'p> Vm<'p> {
                 Value::Array(Rc::new(RefCell::new(arr)))
             }
             "printer_default$" | "printer_default" => Value::str_rc(crate::drucken::standard_drucker()?),
-            // ===== Fenster als Prozess (docs/entwurf-native-fenster.md, Weg B) =====
+            // ===== Fenster als Prozess (docs/intern/entwurf-native-fenster.md, Weg B) =====
             // Ein zweites OS-Fenster ist ein zweiter dhrt mit eigenem SCREEN;
             // die Seiten reden ueber Textzeilen. Kein geteilter Zustand --
             // dieselbe Grenze wie bei TASK_START, aus demselben Grund.
@@ -533,7 +533,7 @@ impl<'p> Vm<'p> {
             // `Value` haelt ueberall `Rc`, `Program` ist weder Send noch Sync.
             // Die Grenze ist zugleich die Zusage -- ein Auftrag sieht KEINE
             // Globals des Hauptprogramms, auch keine CONST. Er bekommt mit,
-            // was er braucht. Siehe docs/entwurf-task-start.md.
+            // was er braucht. Siehe docs/intern/entwurf-task-start.md.
             "task_start" => {
                 if a.is_empty() {
                     return Err("TASK_START: erwartet eine Funktion, z.B. TASK_START(Rechne, 42)".into());

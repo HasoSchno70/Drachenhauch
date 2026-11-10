@@ -1,5 +1,5 @@
 //! Die Typen, die der Compiler einem Ausdruck zuschreibt (M1 aus
-//! `docs/entwurf-maschinencode.md`).
+//! `docs/intern/entwurf-maschinencode.md`).
 //!
 //! Anders als `Compiler::statischer_typ` (ein vorsichtiger Helfer fuer
 //! WARNUNGEN, der auch mal "weiss nicht" sagen darf, wo er es wuesste) ist

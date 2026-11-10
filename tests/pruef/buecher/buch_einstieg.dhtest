@@ -47,7 +47,7 @@ abweichend 0
 IMPORT "helfer.dh"
 DIM d AS JSON_HANDLE : d = kapitelExport(ARG$(0))
 DIM hoechste AS INTEGER : hoechste = JSON_GET_INT(d, "hoechste")
-DIM ordner AS STRING : ordner = ARG$(0) + "/buch-einstieg/buch/content"
+DIM ordner AS STRING : ordner = ARG$(0) + "/buecher/einstieg/buch/content"
 DIM dateien AS ARRAY OF STRING : dateien = DIRLIST(ordner, "*.js")
 SORT(dateien)
 DIM zahl AS INTEGER : zahl = 0
@@ -143,12 +143,12 @@ genug ausgefuehrt TRUE
 ' Anhaenge mit: die Angabe meint alle Kapiteldateien.
 IMPORT "regex"
 DIM w AS STRING : w = ARG$(0)
-DIM anhang AS STRING : anhang = BUFFER_TO_STRING$(READALL_BYTES(w + "/buch-einstieg/buch/content/36_anhang_c_weiter.js"))
+DIM anhang AS STRING : anhang = BUFFER_TO_STRING$(READALL_BYTES(w + "/buecher/einstieg/buch/content/36_anhang_c_weiter.js"))
 DIM q AS STRING : q = CHR$(34)
 DIM ist AS ARRAY OF INTEGER
-ist = [LEN(DIRLIST(w + "/buch-referenz/buch/content", "*.js")), _
-       LEN(REGEX_FIND_ALL(BUFFER_TO_STRING$(READALL_BYTES(w + "/buch-galaga/buch/build_book.js")), "chapter\(" + q + "Kapitel \d+:")), _
-       LEN(REGEX_FIND_ALL(BUFFER_TO_STRING$(READALL_BYTES(w + "/buch-tippspiel/buch/build_book.js")), "chapter\(" + q + "Kapitel \d+:"))]
+ist = [LEN(DIRLIST(w + "/buecher/referenz/buch/content", "*.js")), _
+       LEN(REGEX_FIND_ALL(BUFFER_TO_STRING$(READALL_BYTES(w + "/buecher/galaga/buch/build_book.js")), "chapter\(" + q + "Kapitel \d+:")), _
+       LEN(REGEX_FIND_ALL(BUFFER_TO_STRING$(READALL_BYTES(w + "/buecher/tippspiel/buch/build_book.js")), "chapter\(" + q + "Kapitel \d+:"))]
 DIM namen AS ARRAY OF STRING : namen = ["Lehrbuch", "Galaga", "Tippspiel"]
 DIM muster AS ARRAY OF STRING : muster = ["die ganze Sprache, (\d+) Kapitel", "Arcade-Shooter in (\d+) Kapiteln", "Rangliste in (\d+) Kapiteln"]
 DIM i AS INTEGER
