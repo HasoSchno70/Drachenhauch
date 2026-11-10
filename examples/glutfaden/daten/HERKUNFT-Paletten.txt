@@ -1,0 +1,15 @@
+Herkunft der Garnpaletten in paletten/
+=====================================
+
+Die 19 Tabellen (DMC, Anchor, Madeira, Cosmo, Diamond Dotz ...) hat der
+Projektautor selbst zusammengestellt. Sie enthalten je Farbe die Nummer und
+den Namen des Herstellers und einen RGB-Wert als Naeherung fuer den
+Bildschirm. Die Farbnummern und -namen gehoeren den jeweiligen Herstellern;
+die Marken sind Marken ihrer Inhaber und werden nur genannt, um die Garne zu
+bezeichnen. Die RGB-Werte sind keine Herstellerangaben, echte Garne weichen
+je nach Charge und Licht ab.
+
+Origin of the thread palettes in paletten/: compiled by the project author.
+Each entry holds the manufacturer's number and name plus an RGB approximation
+for the screen. Numbers, names and brands belong to their owners; the RGB
+values are approximations, not manufacturer data.
