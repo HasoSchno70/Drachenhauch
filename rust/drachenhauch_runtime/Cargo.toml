@@ -3,7 +3,7 @@ name = "drachenhauch_runtime"
 # Die EINZIGE Stelle, die die Fassung nennt (bis 2026-09-21 standen
 # pyproject.toml und drachenhauch/__init__.py daneben). `dhrt --version`
 # und VERSION$() geben sie aus, tests/pruef/werkzeugkette/dhrt_werkzeuge.dhtest prueft
-# das. (Cargo verlangt drei Stellen, das Projekt nennt sich "2026.43".)
+# das. (Cargo verlangt drei Stellen; die Fassung sind die ersten beiden.)
 version = "2026.45.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
@@ -31,7 +31,7 @@ unicode-bidi = "0.3"
 # Schneller Nicht-DoS-Hasher fuer interne Lookup-Maps (Funktionen/Klassen/
 # Instanz-Felder) -- Keys kommen aus dem Compiler, nicht von Angreifern.
 rustc-hash = "2"
-# Index der MAP (GbMap): deren Schluessel koennen von aussen kommen (httpd,
+# Index der MAP (DhMap): deren Schluessel koennen von aussen kommen (httpd,
 # JSON, Dateien) -- darum nicht FxHash, sondern foldhash mit zufaelligem
 # Startwert je Prozess; so schnell wie Fx, aber nicht mit ausgesuchten
 # Schluesseln zu Kollisionen zu treiben. Steht ueber hashbrown ohnehin in der
