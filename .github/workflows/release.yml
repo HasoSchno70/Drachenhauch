@@ -1,0 +1,166 @@
+# Baut ein Release aus einem Tag: Windows-Installer, macOS- und Linux-Pakete,
+# Prueffsummen, die drei grossen Buecher -- und legt alles als ENTWURF an ein
+# GitHub-Release. Veroeffentlicht wird von Hand (Release ansehen, "Publish").
+#
+# Ablauf einer Fassung (bisher von Hand, siehe geschichte/ und die Notiz zu
+# den Fassungen):
+#   1. PR mit Fassungsnummer (rust/drachenhauch_runtime/Cargo.toml), Notizen
+#      (docs/releases/release-<fassung>.md) und Buechern -> mergen
+#   2. git tag v<fassung> <merge-commit> && git push origin v<fassung>
+#   3. dieser Workflow: Pakete, Pruefsummen, Release-Entwurf
+#   4. Entwurf auf GitHub ansehen und veroeffentlichen
+#
+# Von Hand (Actions -> Release -> Run workflow) mit einem Tag; "probe" baut
+# nur die Pakete als Artefakte, ohne ein Release anzufassen.
+#
+# Der Windows-Installer entstand bis 2026-11 nur auf dem Rechner des Autors
+# (Inno Setup fehlt den Laeufern); hier holt choco es. Signiert wird nicht --
+# installer/bauen.dh signiert nur mit DH_SIGN_CERT, und dafuer gibt es (noch)
+# kein Zertifikat.
+
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag, aus dem gebaut wird (z. B. v2026.46)"
+        type: string
+        required: true
+      probe:
+        description: "Nur bauen (Artefakte), kein Release anlegen"
+        type: boolean
+        default: true
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  TAG: ${{ inputs.tag || github.ref_name }}
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    env:
+      CFLAGS: -DMAX_CHAR_PRESSED_QUEUE=256
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.TAG }}
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust-Abhaengigkeiten cachen
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust/drachenhauch_runtime
+
+      - name: Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      # Wie fuer eine Fassung von Hand: mit Hardware-Modulen und den kleinen
+      # Laufzeiten (sonst fehlten seriell/usb/bt/wlan/midi, und dhrt-konsole
+      # und dhrt-spiel stuenden auf einer alten Fassung).
+      - name: dhrt bauen
+        run: python rust/build_runtime.py --hardware --laufzeiten
+
+      - name: Fassung passt zum Tag
+        shell: bash
+        run: |
+          fassung="$(rust/drachenhauch_runtime/target/release/dhrt.exe --version | head -n 1 | awk '{print $2}')"
+          echo "dhrt $fassung, Tag $TAG"
+          if [ "v$fassung" != "$TAG" ]; then
+            echo "::error::Tag $TAG passt nicht zur Fassung $fassung in Cargo.toml"
+            exit 1
+          fi
+
+      - name: Installer bauen
+        run: rust/drachenhauch_runtime/target/release/dhrt.exe run installer/bauen.dh
+
+      - name: Sammlung werkzeug_installer
+        env:
+          DH_OHNE_AUDIO: "1"
+        run: rust/drachenhauch_runtime/target/release/dhrt.exe test tests/pruef/werkzeuge/werkzeug_installer.dhtest
+
+      - name: Installer hochladen
+        uses: actions/upload-artifact@v7
+        with:
+          name: drachenhauch-ide-windows
+          path: installer/output/*.exe
+          if-no-files-found: error
+          retention-days: 14
+
+  pakete:
+    uses: ./.github/workflows/package.yml
+    with:
+      ref: ${{ inputs.tag || github.ref_name }}
+    secrets: inherit
+
+  veroeffentlichen:
+    needs: [windows, pakete]
+    if: ${{ github.event_name == 'push' || !inputs.probe }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.TAG }}
+
+      - name: Pakete einsammeln
+        uses: actions/download-artifact@v7
+        with:
+          pattern: drachenhauch-ide-*
+          path: dist
+          merge-multiple: true
+
+      - name: Pruefen, Buecher, Pruefsummen
+        run: |
+          fassung="${TAG#v}"
+          ls -l dist
+          # Je System genau ein Paket, alle mit der Fassung im Namen.
+          for muster in "Setup-$fassung.exe" "-$fassung-macos-arm64.dmg" "-$fassung-linux-x86_64.tar.gz" "-$fassung-linux-aarch64.tar.gz"; do
+            n=$(ls dist | grep -c -F -- "$muster" || true)
+            if [ "$n" != "1" ]; then echo "::error::$muster: $n Dateien statt einer"; exit 1; fi
+          done
+          # Die drei Buecher, die auch der Installer mitbringt (Ort vor und
+          # nach dem Umzug nach buecher/).
+          for b in Drachenhauch-Lehrbuch Drachenhauch-Handbook Drachenhauch-Einstieg; do
+            for e in docx epub; do
+              f=$(git ls-files "buecher/*/buch/$b.$e" "buch-*/buch/$b.$e" | head -n 1)
+              if [ -z "$f" ]; then echo "::error::$b.$e fehlt im Repo"; exit 1; fi
+              cp "$f" dist/
+            done
+          done
+          (cd dist && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt)
+
+      - name: Notizen finden
+        run: |
+          fassung="${TAG#v}"
+          for n in "docs/releases/release-$fassung.md" "docs/release-$fassung.md"; do
+            if [ -f "$n" ]; then echo "NOTIZEN=$n" >> "$GITHUB_ENV"; echo "Notizen: $n"; exit 0; fi
+          done
+          echo "::error::Keine Notizen docs/releases/release-$fassung.md"
+          exit 1
+
+      # Gibt es das Release schon (von Hand angelegt), kommen nur die Dateien
+      # dazu (--clobber ersetzt gleichnamige). Sonst ein Entwurf.
+      - name: Release-Entwurf
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          fassung="${TAG#v}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --clobber
+            echo "Dateien an das bestehende Release $TAG gehaengt."
+          else
+            gh release create "$TAG" dist/* --draft --verify-tag \
+              --title "Drachenhauch $fassung" --notes-file "$NOTIZEN"
+            echo "Entwurf angelegt: $TAG -- auf GitHub ansehen und veroeffentlichen."
+          fi

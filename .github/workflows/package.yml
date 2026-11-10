@@ -2,6 +2,15 @@ name: Package (manuell)
 
 on:
   workflow_dispatch:
+  # Auch als Baustein von release.yml: dort mit dem Tag als `ref`, damit die
+  # Pakete genau die Fassung enthalten, die das Release nennt.
+  workflow_call:
+    inputs:
+      ref:
+        description: "Tag oder Commit, der gepackt wird (leer = der ausloesende)"
+        type: string
+        required: false
+        default: ""
 
 # Die Pakete OHNE Python fuer macOS und Linux, manuell ueber den Actions-Tab
 # ("Run workflow") -- NICHT Teil der push/PR-CI, weil ein Lauf mit Grafik
@@ -48,6 +57,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
 
       - uses: dtolnay/rust-toolchain@stable
 
