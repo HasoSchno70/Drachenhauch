@@ -13,18 +13,25 @@ Think of it as a BASIC in the spirit of QB64, FreeBASIC or Blitz Basic, with the
 Under the hood: a BASIC dialect with Pascal-strict typing and OOP. Programs run through **`dhrt`** — the native Rust runtime, which lexes, parses, compiles and executes the source itself. Graphics and 3D via **raylib**, sound via **[Kira](https://github.com/tesselode/kira)** on its own audio thread. The IDE and all tools are written in Drachenhauch too; Python is only needed for the runtime's build script.
 
 ```basic
-IMPORT "sprite"
 IMPORT "particles"
 
 SCREEN(320, 240, "Hello World", 2)
 
-DIM hero AS SPRITE
-hero = SPRITE_NEW(LOADIMAGE("assets/hero.png"), 16, 16)
-SPRITE_SET_POS(hero, 100.0, 100.0)
+DIM sparks AS PARTICLE_SYSTEM
+sparks = PARTICLE_SYSTEM_NEW(160, 120)
+PARTICLE_SET_VELOCITY(sparks, -60, 60, -140, -40)
+PARTICLE_SET_LIFETIME(sparks, 400, 900)
+PARTICLE_SET_GRAVITY(sparks, 0, 200)
+PARTICLE_SET_COLOR(sparks, RGB(255, 160, 40))
+PARTICLE_SET_FADE(sparks, TRUE)
 
 WHILE NOT QUITREQUESTED()
     CLS()
-    SPRITE_DRAW(hero)
+    TEXT(8, 8, "Hello, Drachenhauch!")
+    PARTICLE_SET_POS(sparks, MOUSEX(), MOUSEY())
+    PARTICLE_EMIT(sparks, 6)
+    PARTICLE_UPDATE(sparks, 16)
+    PARTICLE_DRAW(sparks)
     FLIP()
     SLEEP(16)
 WEND
@@ -91,15 +98,29 @@ You do **not** need Python installed. It ships the complete development environm
 
 ## Working from source
 
-You need Rust (`cargo`) and any Python 3 — only for the build script, with no
-venv and no packages (it uses the standard library only). Build the runtime
-once; after that everything runs through `dhrt`:
+You need Rust (`cargo`, via [rustup](https://rustup.rs)) and any Python 3 — only for the build script, with no
+venv and no packages (it uses the standard library only). raylib compiles its C sources with cmake and needs libclang, so install first:
+
+| System | Install first |
+|---|---|
+| Windows | Visual Studio Build Tools with "Desktop development with C++" (brings cmake) and [LLVM](https://github.com/llvm/llvm-project/releases) for libclang; the build script finds both on its own |
+| macOS | Xcode command line tools (`xcode-select --install`) and `brew install cmake` |
+| Debian/Ubuntu | `sudo apt install cmake clang pkg-config libasound2-dev libgtk-3-dev libudev-dev libx11-dev libxrandr-dev libxi-dev libxinerama-dev libxcursor-dev libgl1-mesa-dev libgles-dev libegl-dev libwayland-dev libxkbcommon-dev wayland-protocols` |
+
+Build the runtime once; after that everything runs through `dhrt`. On Windows:
 
 ```
 python rust\build_runtime.py                              # builds dhrt (with --hardware: serial/usb/bt/wifi/midi)
 rust\drachenhauch_runtime\target\release\dhrt run ide\ide.dh           # the IDE
 rust\drachenhauch_runtime\target\release\dhrt run file.dh              # a program
 rust\drachenhauch_runtime\target\release\dhrt test tests\pruef         # all checks
+```
+
+On macOS and Linux the same with forward slashes and `python3`:
+
+```
+python3 rust/build_runtime.py
+rust/drachenhauch_runtime/target/release/dhrt run ide/ide.dh
 ```
 
 ## The textbook
