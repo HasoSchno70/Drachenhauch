@@ -227,7 +227,7 @@ der Ausgabe mit dem Namen des Plugins davor.
 
 ## Plugins in Glutfaden
 
-Glutfaden (`examples/glutfaden`, ab Stufe 26) lädt Plugins auf dieselbe
+[Glutfaden](https://github.com/HasoSchno70/Glutfaden) (ein eigenes Repo, ab Stufe 26) lädt Plugins auf dieselbe
 Weise: ein Ordner `plugins/<name>/plugin.dh` im Einstellungsordner von
 Glutfaden (Logo-Menü → Plugins → Plugin-Ordner öffnen), gestartet mit
 `WINDOW_OPEN`, dieselbe Leitung und dieselbe Bibliothek `dh_plugin.dh`.

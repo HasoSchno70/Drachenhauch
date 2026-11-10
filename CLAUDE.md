@@ -276,8 +276,7 @@ Einzelheiten stehen in der Geschichte des Bereichs.
   Ein Datenbank-Element aus einer fremden Datei hält deren Arten wörtlich
   (`sql`, `sqlvorgabe`) -- der Abgleich darf ihre Tabellen nicht umbauen.
 - Anzeigetexte gehen durch `tr$` (Tafeln `ide/sprache/en.txt`,
-  `studio/sprache/en.txt`, `examples/glutfaden/daten/sprache/en.txt`,
-  `examples/studio/kuehlschrank/sprache/en.txt`);
+  `studio/sprache/en.txt`);
   **Schlüssel bleiben deutsch, übersetzt wird beim Anzeigen** (Ereignisnamen,
   Kategorien, Konfig-Schlüssel, Protokollzeilen).
 - Tests der IDE setzen `DH_IDE_KONFIG` (sonst schreibt jeder Lauf dem Nutzer
@@ -369,8 +368,8 @@ rust\drachenhauch_runtime\target\release\dhrt pruef      # Doku, Namen, Pfade, M
 - `--check` meldet Tippfehler in Variablennamen mit Gültigkeitsbereich; der
   Lauf über alle `.dh` des Repos ist ein Test
   (`tests/pruef/werkzeugkette/dhrt_check.dhtest`) -- neue Fehlalarme fallen
-  dort auf. Unter-Projekte (`examples/glutfaden/ansicht/`,
-  `examples/bastelzentrale/bereiche/`, Studio-Projekte) sind ausgenommen.
+  dort auf. Unter-Projekte (`examples/bastelzentrale/bereiche/`,
+  `ide/teile/`, Studio-Projekte) sind ausgenommen.
 - `JSON_LEN` wirft bei einem Pfad, den es nicht gibt -- vorher `JSON_HAS`; ein
   Punkt im Schlüssel ist ein Pfad, maskiert mit `JSON_KEY$`.
 - `PROCESS_START` nimmt Kindern `DHRT_FRAMES`/`DHRT_SCREENSHOT` ab und setzt
@@ -400,6 +399,6 @@ Was wann und warum gebaut wurde, steht unverändert in `geschichte/` (bis
 | `geschichte/ide.md` | die IDE: alle Stände, Debugger, Dock, Plugins, Hover |
 | `geschichte/werkzeuge.md` | die Editor-Piloten und ihre Faktoren, Auffrischen 2026-10, Klassendiagramm |
 | `geschichte/studio.md` | Drachenhauch Studio: Stufen, Datenbanken, Berichte, eigene Controls |
-| `geschichte/kuehlschrank.md` | Kühlschrank-App (PySide6-Port) im Studio: Stufen und Funde |
-| `geschichte/glutfaden.md` | Glutfaden (PySticky-Port), Stufen 1–26 |
+| `geschichte/kuehlschrank.md` | Kühlschrank-App (PySide6-Port) im Studio: Stufen und Funde (seit 2026-11 eigenes Repo `Kuehlschrank-Drachenhauch`) |
+| `geschichte/glutfaden.md` | Glutfaden (PySticky-Port), Stufen 1–26 (seit 2026-11 eigenes Repo `Glutfaden`, ebenso `Funkenflug`) |
 | `geschichte/dogfooding.md` | die Dogfooding-Runden, Bastelzentrale, Nachtflug, Lichterglanz |
