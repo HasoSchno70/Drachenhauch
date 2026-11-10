@@ -142,6 +142,16 @@ dhrt run tools/buch_bauen.dh -- buch-referenz [--lang en]   # two-pass build wit
 
 One thing stays German on purpose: the run-time error messages quoted in Appendix D, because that is how `dhrt` prints them by default. With `DHRT_LANG=en` the runtime prints its messages in English.
 
+### More books (German)
+
+Three shorter books build one finished program each, chapter by chapter:
+
+| Book | What you build | Download |
+|---|---|---|
+| **[Der Einstieg](buch-einstieg/README.md)** | Programming from zero, for people who have never written a line of code — the gentlest way in | [.docx](buch-einstieg/buch/Drachenhauch-Einstieg.docx?raw=1) · [.epub](buch-einstieg/buch/Drachenhauch-Einstieg.epub?raw=1) |
+| **[Arcade-Shooter](buch-galaga/README.md)** | A space shooter with attack waves, with sprites you draw yourself in the pixel editor | [.docx](buch-galaga/buch/Drachenhauch-Buch.docx?raw=1) |
+| **[Tippspiel](buch-tippspiel/README.md)** | A football prediction app with a database, ranking table and schedule download — the first serious application | [.docx](buch-tippspiel/buch/Drachenhauch-Tippspiel.docx?raw=1) |
+
 ## Manual
 
 Full documentation lives in [docs/en/](docs/en/README.md) — the English translation of the German manual in [docs/](docs/README.md). Design notes, audits and release notes stay German only:

@@ -141,6 +141,16 @@ node build_epub.js [--lang en]        # -> .epub (fließt in die Schriftgröße 
 dhrt run tools/buch_bauen.dh -- buch-referenz [--lang en]   # Zwei-Pass-Build mit Seitenzahlen im Inhalt
 ```
 
+### Weitere Bücher
+
+Drei kürzere Bücher bauen je ein fertiges Programm, Kapitel für Kapitel:
+
+| Buch | Was entsteht | Herunterladen |
+|---|---|---|
+| **[Der Einstieg](buch-einstieg/README.md)** | Programmieren von null an, für Menschen, die noch nie eine Zeile geschrieben haben — der sanfteste Einstieg | [.docx](buch-einstieg/buch/Drachenhauch-Einstieg.docx?raw=1) · [.epub](buch-einstieg/buch/Drachenhauch-Einstieg.epub?raw=1) |
+| **[Arcade-Shooter](buch-galaga/README.md)** | Ein Weltraum-Shooter mit Angriffswellen, die Sprites zeichnest du selbst im Pixel-Editor | [.docx](buch-galaga/buch/Drachenhauch-Buch.docx?raw=1) |
+| **[Tippspiel](buch-tippspiel/README.md)** | Eine Bundesliga-Tippanwendung mit Datenbank, Rangliste und Spielplan aus dem Netz — die erste ernsthafte Anwendung | [.docx](buch-tippspiel/buch/Drachenhauch-Tippspiel.docx?raw=1) |
+
 ## Handbuch
 
 Vollständige Doku im [docs/](docs/README.md)-Ordner:
