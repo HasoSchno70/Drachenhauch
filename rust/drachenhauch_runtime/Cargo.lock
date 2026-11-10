@@ -1327,7 +1327,7 @@ dependencies = [
  "foldhash",
  "futures",
  "getrandom 0.2.17",
- "gif 0.13.3",
+ "gif",
  "hidapi",
  "hmac",
  "indexmap",
@@ -1711,16 +1711,6 @@ dependencies = [
  "r-efi 6.0.0",
  "rand_core 0.10.1",
  "wasm-bindgen",
-]
-
-[[package]]
-name = "gif"
-version = "0.13.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4ae047235e33e2829703574b54fdec96bfbad892062d97fed2f76022287de61b"
-dependencies = [
- "color_quant",
- "weezl",
 ]
 
 [[package]]
@@ -2211,7 +2201,7 @@ dependencies = [
  "bumpalo",
  "flate2",
  "float-cmp",
- "gif 0.14.2",
+ "gif",
  "image-webp",
  "imagesize",
  "indexmap",
