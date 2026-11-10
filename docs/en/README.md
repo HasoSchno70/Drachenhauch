@@ -2,7 +2,7 @@
 
 Complete reference for the Drachenhauch language, all built-in commands and all built-in modules.
 
-Drachenhauch is a BASIC dialect with Pascal-strict typing and OOP, designed for games. Programs run through **`dhrt`** — the native Rust/raylib runtime, which lexes, parses, compiles and executes the source itself. The IDE and the tools are Drachenhauch programs themselves; Python is left only in the two build scripts.
+Drachenhauch is a BASIC dialect with Pascal-strict typing and OOP, for games and for applications with a GUI. Programs run through **`dhrt`** — the native Rust/raylib runtime, which lexes, parses, compiles and executes the source itself. The IDE and the tools are Drachenhauch programs themselves; Python is left only in the two build scripts.
 
 **Deutsch:** this is the translation of the German manual in [../README.md](../README.md); the IDE shows it when its interface is English. Only the design notes, audits and release notes stay German. Code is not translated, its comments are -- `dhrt pruef uebersetzung` checks that every English file follows its German one (headings, table rows, code, links). Whoever changes a German document updates the translation too.
 

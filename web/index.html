@@ -100,7 +100,7 @@
     (function () {
       var s = document.createElement("script");
       // Denselben Stempel wie fuer .wasm/.data (playground.js, locateFile).
-      s.src = "dhrt.js" + (window.GB_CACHE_BUSTER || "");
+      s.src = "dhrt.js" + (window.DH_CACHE_BUSTER || "");
       document.body.appendChild(s);
     })();
   </script>

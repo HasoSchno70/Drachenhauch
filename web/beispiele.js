@@ -8,7 +8,7 @@
 // Neues Beispiel: Eintrag mit `name` (Knopfbeschriftung), `name_en` (dieselbe
 // auf Englisch) und `src` (Quelle) anhaengen. Kurz halten -- die Galerie soll zum Lesen einladen, nicht zum
 // Scrollen.
-window.GB_BEISPIELE = [
+window.DH_BEISPIELE = [
   {
     // Einziger Eintrag mit `datei` statt `src`: das Programm, mit dem der Build
     // gemacht wurde (`build_wasm.py <datei.dh>` legt es als program.dh ab).

@@ -5,30 +5,21 @@
 .idea/
 *.iml
 
-# Python
+# Python (nur noch die zwei Bauskripte in rust/)
 __pycache__/
 *.py[cod]
-*.egg-info/
 .venv/
-venv/
-env/
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
 
 # Build / Distribution
 build/
 dist/
-*.spec
-*.pyd
 *.so
-drachenhauch/vm_native.c
 
 # OS
 .DS_Store
 Thumbs.db
 
-# Grosse Demo-Musik-Assets (via examples/assets/download_*.py geladen)
+# Grosse Demo-Musik-Assets (via examples/assets/download_*.dh geladen)
 examples/assets/cybermatic_pulse.ogg
 examples/assets/techno_messup.ogg
 # HDR-Environment fuer HDR-IBL-Demo (via download_hdri.dh geladen)
@@ -42,16 +33,18 @@ voidreaver/voidreaver.db*
 fireplace/assets/fireplace.jpg
 fireplace/assets/fire.ogg
 fireplace/assets/wind.mp3
-examples/highscores.txt
+# Bestenliste aus 16_files.dh -- entsteht dort, wo das Programm laeuft
+highscores.txt
+# Spielstaende und Belege der Beispiele (32_coinquest, 196_rechnungen)
+examples/coinquest.db
+examples/rechnungen.db
 # Eingabe-Aufnahme der AUTOMATION-Demo (153_automation.dh, F9 schreibt sie)
 examples/aufnahme.txt
 
 # Drachenhauch-Installer: Quelle committen, Build-Artefakte ignorieren
 installer/output/
-installer/Drachenhauch.ico
 installer/Drachenhauch.icns
 installer/Drachenhauch.png
-!installer/Drachenhauch.spec
 installer/THIRD-PARTY-NOTICES.txt
 installer/THIRD-PARTY-NOTICES-IDE.txt
 
@@ -81,8 +74,7 @@ buch-tippspiel/code/*_dist/
 
 # Arbeitsdateien der IDE (Fehlerpruefung/Debugger/Profiler). Sie liegen
 # ABSICHTLICH neben der Quelle -- sonst loest `IMPORT "helfer.dh"` nicht auf --
-# und bleiben liegen, wenn ein Lauf abbricht. Der Qt-Testlauf beendet seine
-# Prozesse per os._exit(), das `finally`-Aufraeumen laeuft dort also nie.
+# und bleiben liegen, wenn ein Lauf abbricht.
 _dhtmp_*.dh
 
 # Website (tools/website.dh)
