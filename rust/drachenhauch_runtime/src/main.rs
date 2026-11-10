@@ -1027,7 +1027,7 @@ fn fmt_main(dateien: &[String], nur_pruefen: bool, einruecken: bool) -> ExitCode
 
 /// Endung, an der ein Pruefprogramm erkannt wird.
 ///
-/// Die Regel ist am Bestand abgelesen, nicht erfunden: `buch-tippspiel/code/`
+/// Die Regel ist am Bestand abgelesen, nicht erfunden: `buecher/tippspiel/code/`
 /// nennt seine vier Pruefprogramme seit jeher `*_pruefung.dh`. Eine zweite,
 /// englische Schreibweise daneben waere nur eine Quelle fuer "warum laeuft
 /// meine Datei nicht mit".
@@ -1573,7 +1573,7 @@ fn sammlung_laufen(exe: &std::path::Path, pfad: &std::path::Path, filter: Option
 ///
 /// Die Bausteine dafuer gibt es seit WP E (`ASSERT`, `ASSERT_COLLECT`,
 /// `ASSERT_REPORT`, Rueckgabewert). Was fehlte, war das Dach: ohne es schreibt
-/// sich jedes Projekt seinen eigenen Laeufer -- so wie `buch-tippspiel` sich
+/// sich jedes Projekt seinen eigenen Laeufer -- so wie `buecher/tippspiel` sich
 /// vor WP E sein eigenes `ASSERT` geschrieben hatte.
 ///
 /// **Jede Datei laeuft als eigener Prozess.** Derselbe Grund wie bei

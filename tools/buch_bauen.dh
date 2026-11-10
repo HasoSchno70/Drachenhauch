@@ -1,11 +1,11 @@
 ' Zwei-Pass-Bau der Buecher mit Seitenzahlen im Inhaltsverzeichnis.
 '
-'     dhrt run tools/buch_bauen.dh -- buch-referenz [--lang de|en]
-'     dhrt run tools/buch_bauen.dh -- buch-einstieg
-'     dhrt run tools/buch_bauen.dh -- buch-galaga
-'     dhrt run tools/buch_bauen.dh -- buch-tippspiel
-'     dhrt run tools/buch_bauen.dh -- buch-referenz --nur-messen   ' vorhandenes PDF messen
-'     dhrt run tools/buch_bauen.dh -- buch-einstieg --nur-bilder   ' nur images/ druckfertig
+'     dhrt run tools/buch_bauen.dh -- buecher/referenz [--lang de|en]
+'     dhrt run tools/buch_bauen.dh -- buecher/einstieg
+'     dhrt run tools/buch_bauen.dh -- buecher/galaga
+'     dhrt run tools/buch_bauen.dh -- buecher/tippspiel
+'     dhrt run tools/buch_bauen.dh -- buecher/referenz --nur-messen   ' vorhandenes PDF messen
+'     dhrt run tools/buch_bauen.dh -- buecher/einstieg --nur-bilder   ' nur images/ druckfertig
 '
 ' Pass 1:  node build_book.js  -> .docx (Verzeichnis noch ohne Zahlen) + toc_titles
 '          -> LibreOffice rendert ein PDF -> Seite je Ueberschrift messen
@@ -560,17 +560,17 @@ DIM basis AS STRING : basis = ""
 DIM mitSprache AS BOOLEAN : mitSprache = TRUE
 DIM genau AS BOOLEAN : genau = TRUE
 SELECT CASE name
-    CASE "buch-referenz"
+    CASE "referenz"
         IF sprache = "de" THEN basis = "Drachenhauch-Lehrbuch"
         IF sprache = "en" THEN basis = "Drachenhauch-Handbook"
-    CASE "buch-einstieg"
+    CASE "einstieg"
         IF sprache = "de" THEN basis = "Drachenhauch-Einstieg"
-    CASE "buch-galaga"
+    CASE "galaga"
         basis = "Drachenhauch-Buch" : mitSprache = FALSE : genau = FALSE
-    CASE "buch-tippspiel"
+    CASE "tippspiel"
         basis = "Drachenhauch-Tippspiel" : mitSprache = FALSE : genau = FALSE
     CASE ELSE
-        PRINT "Unbekanntes Buch: "; name; " (buch-referenz, buch-einstieg, buch-galaga, buch-tippspiel)"
+        PRINT "Unbekanntes Buch: "; name; " (buecher/referenz, buecher/einstieg, buecher/galaga, buecher/tippspiel)"
         EXIT(2)
 END SELECT
 IF basis = "" THEN

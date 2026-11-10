@@ -1,7 +1,7 @@
 # Drachenhauch — pitfalls & inconsistencies (found while writing the textbook)
 
 A collection of friction points in the language and the engine that came up
-while writing `buch-referenz/` (all chapters and modules verified against
+while writing `buecher/referenz/` (all chapters and modules verified against
 `dhrt`). **It concerns Drachenhauch itself, not the book** — a backlog for
 fixing later. Every item has been reproduced against the current `dhrt`
 release build.

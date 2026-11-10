@@ -122,12 +122,12 @@ Source: "{#Esp32}\*"; DestDir: "{commondocs}\Drachenhauch\esp32"; \
     Flags: recursesubdirs createallsubdirs uninsneveruninstall skipifsourcedoesntexist
 ; Die Buecher, falls gebaut (tools/buch_bauen.dh) -- .docx zum Drucken,
 ; .epub zum Lesen am Geraet; der Einstieg ist der Band fuer Anfaenger.
-Source: "..\buch-referenz\buch\Drachenhauch-Lehrbuch.docx"; DestDir: "{app}\buecher"; Flags: ignoreversion skipifsourcedoesntexist
-Source: "..\buch-referenz\buch\Drachenhauch-Lehrbuch.epub"; DestDir: "{app}\buecher"; Flags: ignoreversion skipifsourcedoesntexist
-Source: "..\buch-referenz\buch\Drachenhauch-Handbook.docx"; DestDir: "{app}\buecher"; Flags: ignoreversion skipifsourcedoesntexist
-Source: "..\buch-referenz\buch\Drachenhauch-Handbook.epub"; DestDir: "{app}\buecher"; Flags: ignoreversion skipifsourcedoesntexist
-Source: "..\buch-einstieg\buch\Drachenhauch-Einstieg.docx"; DestDir: "{app}\buecher"; Flags: ignoreversion skipifsourcedoesntexist
-Source: "..\buch-einstieg\buch\Drachenhauch-Einstieg.epub"; DestDir: "{app}\buecher"; Flags: ignoreversion skipifsourcedoesntexist
+Source: "..\buecher\referenz\buch\Drachenhauch-Lehrbuch.docx"; DestDir: "{app}\buecher"; Flags: ignoreversion skipifsourcedoesntexist
+Source: "..\buecher\referenz\buch\Drachenhauch-Lehrbuch.epub"; DestDir: "{app}\buecher"; Flags: ignoreversion skipifsourcedoesntexist
+Source: "..\buecher\referenz\buch\Drachenhauch-Handbook.docx"; DestDir: "{app}\buecher"; Flags: ignoreversion skipifsourcedoesntexist
+Source: "..\buecher\referenz\buch\Drachenhauch-Handbook.epub"; DestDir: "{app}\buecher"; Flags: ignoreversion skipifsourcedoesntexist
+Source: "..\buecher\einstieg\buch\Drachenhauch-Einstieg.docx"; DestDir: "{app}\buecher"; Flags: ignoreversion skipifsourcedoesntexist
+Source: "..\buecher\einstieg\buch\Drachenhauch-Einstieg.epub"; DestDir: "{app}\buecher"; Flags: ignoreversion skipifsourcedoesntexist
 Source: "LIZENZ.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "THIRD-PARTY-NOTICES-IDE.txt"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 

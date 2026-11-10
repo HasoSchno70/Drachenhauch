@@ -6,7 +6,7 @@
 ' Daten schon weg sind.
 '
 ' Bis 2026-09-16 tests/test_beispiel_sqlite_tabelle.py. Die Datenbank
-' (pyramid_pusher/pyramid_pusher.db) ist nicht versioniert; fehlt sie, meldet
+' (spiele/pyramid_pusher/pyramid_pusher.db) ist nicht versioniert; fehlt sie, meldet
 ' sich der Fall als uebersprungen. Die Demo laeuft als Kind mit
 ' `dhrt run --bilder 20` (PROCESS_START nimmt dem Kind DHRT_FRAMES ab).
 

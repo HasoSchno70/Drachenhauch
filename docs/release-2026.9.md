@@ -123,11 +123,11 @@ einen Verlauf liefert immer FLOAT.
 
 ## Der Einstieg — ein zweites Buch
 
-Im Regal stand [Das Lehrbuch](../buch-referenz/README.md): vollständig,
+Im Regal stand [Das Lehrbuch](../buecher/referenz/README.md): vollständig,
 systematisch, jeder Befehl mit Beispiel, Konsole zuerst und Grafik ab Teil IV.
 Es setzt voraus, dass jemand schon weiß, warum er das lernen will.
 
-**[Der Einstieg](../buch-einstieg/README.md) geht den umgekehrten Weg.** Das
+**[Der Einstieg](../buecher/einstieg/README.md) geht den umgekehrten Weg.** Das
 allererste Programm ist fünf Zeilen lang und öffnet ein Fenster mit einer
 leuchtenden Sonne; verstanden wird hinterher. Nach jedem Kapitel steht etwas
 auf dem Bildschirm, das man jemandem zeigen möchte — ein Sternenhimmel, ein

@@ -125,19 +125,19 @@ rust/drachenhauch_runtime/target/release/dhrt run ide/ide.dh
 
 ## The textbook
 
-**[Drachenhauch — The Handbook](buch-referenz/buch/)** is two things at once: a course that takes you from the first black window to classes, modules and finished games, and a reference in which **every single command** is explained with a runnable example program. Seven parts, 85 chapters, every code sample verified against `dhrt --check`.
+**[Drachenhauch — The Handbook](buecher/referenz/buch/)** is two things at once: a course that takes you from the first black window to classes, modules and finished games, and a reference in which **every single command** is explained with a runnable example program. Seven parts, 85 chapters, every code sample verified against `dhrt --check`.
 
 | Edition | For printing (A4) | For e-readers |
 |---|---|---|
-| **English** — 561 pages | [Drachenhauch-Handbook.docx](buch-referenz/buch/Drachenhauch-Handbook.docx?raw=1) | [.epub](buch-referenz/buch/Drachenhauch-Handbook.epub?raw=1) |
-| **Deutsch** — 570 Seiten | [Drachenhauch-Lehrbuch.docx](buch-referenz/buch/Drachenhauch-Lehrbuch.docx?raw=1) | [.epub](buch-referenz/buch/Drachenhauch-Lehrbuch.epub?raw=1) |
+| **English** — 561 pages | [Drachenhauch-Handbook.docx](buecher/referenz/buch/Drachenhauch-Handbook.docx?raw=1) | [.epub](buecher/referenz/buch/Drachenhauch-Handbook.epub?raw=1) |
+| **Deutsch** — 570 Seiten | [Drachenhauch-Lehrbuch.docx](buecher/referenz/buch/Drachenhauch-Lehrbuch.docx?raw=1) | [.epub](buecher/referenz/buch/Drachenhauch-Lehrbuch.epub?raw=1) |
 
 Both languages come out of the **same** chapter sources (`content/NN_*.js`): the renderers are handed an `H` that puts every string through the catalogue `i18n/en.json` first. A second set of English chapter files would have drifted from the German inside a month — this way it cannot. If an entry is missing, the German sentence stays and the book still builds; `node fehlend.js en` counts what is still outstanding.
 
 ```
 node build_book.js [--lang en]        # -> .docx (A4, for printing)
 node build_epub.js [--lang en]        # -> .epub (reflows to the reader's font size, dark mode)
-dhrt run tools/buch_bauen.dh -- buch-referenz [--lang en]   # two-pass build with page numbers in the TOC
+dhrt run tools/buch_bauen.dh -- buecher/referenz [--lang en]   # two-pass build with page numbers in the TOC
 ```
 
 One thing stays German on purpose: the run-time error messages quoted in Appendix D, because that is how `dhrt` prints them by default. With `DHRT_LANG=en` the runtime prints its messages in English.
@@ -148,9 +148,9 @@ Three shorter books build one finished program each, chapter by chapter:
 
 | Book | What you build | Download |
 |---|---|---|
-| **[Der Einstieg](buch-einstieg/README.md)** | Programming from zero, for people who have never written a line of code — the gentlest way in | [.docx](buch-einstieg/buch/Drachenhauch-Einstieg.docx?raw=1) · [.epub](buch-einstieg/buch/Drachenhauch-Einstieg.epub?raw=1) |
-| **[Arcade-Shooter](buch-galaga/README.md)** | A space shooter with attack waves, with sprites you draw yourself in the pixel editor | [.docx](buch-galaga/buch/Drachenhauch-Buch.docx?raw=1) |
-| **[Tippspiel](buch-tippspiel/README.md)** | A football prediction app with a database, ranking table and schedule download — the first serious application | [.docx](buch-tippspiel/buch/Drachenhauch-Tippspiel.docx?raw=1) |
+| **[Der Einstieg](buecher/einstieg/README.md)** | Programming from zero, for people who have never written a line of code — the gentlest way in | [.docx](buecher/einstieg/buch/Drachenhauch-Einstieg.docx?raw=1) · [.epub](buecher/einstieg/buch/Drachenhauch-Einstieg.epub?raw=1) |
+| **[Arcade-Shooter](buecher/galaga/README.md)** | A space shooter with attack waves, with sprites you draw yourself in the pixel editor | [.docx](buecher/galaga/buch/Drachenhauch-Buch.docx?raw=1) |
+| **[Tippspiel](buecher/tippspiel/README.md)** | A football prediction app with a database, ranking table and schedule download — the first serious application | [.docx](buecher/tippspiel/buch/Drachenhauch-Tippspiel.docx?raw=1) |
 
 ## Manual
 

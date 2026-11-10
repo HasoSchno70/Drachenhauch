@@ -27,12 +27,12 @@ examples/assets/ibl_env.hdr
 # Geriggtes Modell fuer Skelett-Animations-Demo (via download_robot.dh geladen)
 examples/assets/robot.glb
 # VOIDREAVER-Spielstand/Run-DB (zur Laufzeit erzeugt)
-voidreaver/voidreaver.save
-voidreaver/voidreaver.db*
-# Kaminfeuer-Demo: freie Assets (via fireplace/assets/download.dh geladen)
-fireplace/assets/fireplace.jpg
-fireplace/assets/fire.ogg
-fireplace/assets/wind.mp3
+spiele/voidreaver/voidreaver.save
+spiele/voidreaver/voidreaver.db*
+# Kaminfeuer-Demo: freie Assets (via spiele/fireplace/assets/download.dh geladen)
+spiele/fireplace/assets/fireplace.jpg
+spiele/fireplace/assets/fire.ogg
+spiele/fireplace/assets/wind.mp3
 # Bestenliste aus 16_files.dh -- entsteht dort, wo das Programm laeuft
 highscores.txt
 # Spielstaende und Belege der Beispiele (32_coinquest, 196_rechnungen)
@@ -67,10 +67,10 @@ examples/feedleser/*.db*
 # Tippspiel-Buch: jeder Kapitelstand legt seine SQLite-Datei beim ersten Start
 # selbst an (tippspiel.db, kapNN.db, kapNN_sicherung.db, dazu -wal/-shm).
 # Das sind die Daten des Lesers, nicht der Quelltext des Buchs.
-buch-tippspiel/code/*.db*
-buch-tippspiel/code/kap*/*.db*
+buecher/tippspiel/code/*.db*
+buecher/tippspiel/code/kap*/*.db*
 # Der Export legt den Ordner mit der .exe an -- Bauergebnis, kein Quelltext.
-buch-tippspiel/code/*_dist/
+buecher/tippspiel/code/*_dist/
 
 # Arbeitsdateien der IDE (Fehlerpruefung/Debugger/Profiler). Sie liegen
 # ABSICHTLICH neben der Quelle -- sonst loest `IMPORT "helfer.dh"` nicht auf --

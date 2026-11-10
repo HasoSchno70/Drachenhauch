@@ -81,7 +81,7 @@ muss. Wer mittendrin abbricht, hinterlässt kein kaputtes Projekt.
 - [x] **3c** Editor-Formate `.gbsprite`/`.gbanim`/`.gbform`/`.gbproj` → `.dh*`
       (19 Dateien, 346 Verweise). Öffnen-Dialoge zeigen die alte Endung weiter.
 - [x] **3d** Buch: alle 784 Codeblöcke durch `dhrt --check`, 0 Befunde.
-      Der Prüfer liegt jetzt als `buch-referenz/buch/pruef_codebloecke.js` im
+      Der Prüfer liegt jetzt als `buecher/referenz/buch/pruef_codebloecke.js` im
       Repo statt als Einzeiler pro Sitzung.
 - [x] `.docx` und `.epub` neu gebaut (der Buchtext hatte sich geändert)
 - [x] 3106 Tests grün, mypy sauber, 65 Rust-Tests, Runtime gebaut

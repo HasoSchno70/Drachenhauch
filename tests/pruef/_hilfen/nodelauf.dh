@@ -1,7 +1,7 @@
 ' Ein Node-Werkzeug des Buches starten und seine Ausgabe einsammeln.
 '
 ' Die Kapitel des Referenzbuchs sind JavaScript-Module; gelesen werden sie von
-' den Werkzeugen unter tools/ bzw. buch-referenz/buch/. `nlStarten(ordner,
+' den Werkzeugen unter tools/ bzw. buecher/referenz/buch/. `nlStarten(ordner,
 ' skript)` laeuft IM Ordner (die Werkzeuge suchen ihre Dateien relativ) und
 ' fuellt danach nlAus, nlErr und nlCode.
 DIM nlAus AS STRING : nlAus = ""

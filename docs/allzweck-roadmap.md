@@ -26,7 +26,7 @@ Dazu SQLite, JSON, Regex, HTTP-Client, Diagramme, eine 22-Widget-GUI mit
 Tabellen und Formular-Designer, Sprachserver, Debugger, Profiler, Export als
 eigenständige `.exe`.
 
-Das Tippspiel (`buch-tippspiel/`) ist der Beleg: echte Datenbank-Anwendung mit
+Das Tippspiel (`buecher/tippspiel/`) ist der Beleg: echte Datenbank-Anwendung mit
 Netz, Fenstern, Reitern und Saison-Verwaltung — vollständig in Drachenhauch.
 
 ## Umsetzungs-Checkliste pro Befehl (Stand Stufe B — dhrt ist die einzige Runtime)
@@ -259,7 +259,7 @@ Doku: `docs/builtins-core.md`, Abschnitt „Prüfsummen und Identität".
 
 ## WP E — Prüfen und Melden (✅ ERLEDIGT 2026-08-17)
 
-`buch-tippspiel/code/tippspiel_pruefung.dh` war ein von Hand geschriebener
+`buecher/tippspiel/code/tippspiel_pruefung.dh` war ein von Hand geschriebener
 Ersatz für einen Testrahmen. Dass es ihn gab, war der beste Beleg, dass er
 fehlte — und er zahlt sich bei jedem weiteren WP hier selbst zurück.
 

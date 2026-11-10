@@ -186,7 +186,7 @@ PRINT "ohne fehler "; (INSTR(dlAus, "0 mit Fehlern") >= 0)
 ' macOS nur "rueckgabe 1" da.
 IF dlCode <> 0 THEN PRINT dlAus; dlErr
 --- argumente
-{sammlung}/../../../buch-tippspiel/code
+{sammlung}/../../../buecher/tippspiel/code
 --- datei helfer.dh
 IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet

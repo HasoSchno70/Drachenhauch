@@ -1,7 +1,7 @@
 # Drachenhauch — Stolpersteine & Inkonsistenzen (beim Schreiben des Lehrbuchs aufgefallen)
 
 Sammlung von Sprach-/Engine-Reibungspunkten, die beim Verfassen von
-`buch-referenz/` (alle Kapitel + Module gegen `dhrt` verifiziert) auftauchten.
+`buecher/referenz/` (alle Kapitel + Module gegen `dhrt` verifiziert) auftauchten.
 **Nicht das Buch, sondern Drachenhauch selbst** betreffend — als Backlog zum
 späteren Beheben. Jeder Punkt ist gegen den aktuellen `dhrt`-release-Build
 reproduziert.

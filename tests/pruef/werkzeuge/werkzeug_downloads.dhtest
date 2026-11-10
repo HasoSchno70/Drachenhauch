@@ -100,7 +100,7 @@ PRINT "rueckgabe "; PROCESS_CODE(q)
 PROCESS_KILL(srv)
 --- argumente
 {sammlung}/../_hilfen/gegenserver.dh
-{sammlung}/../../../fireplace/assets/download.dh
+{sammlung}/../../../spiele/fireplace/assets/download.dh
 --- erwartet
 Lade fireplace.jpg ...
   OK (0 KB)

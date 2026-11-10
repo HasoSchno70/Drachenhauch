@@ -7,7 +7,7 @@ IMPORT "xml"
 IMPORT "regex"
 
 FUNCTION epubBauen$(wurzel AS STRING) AS STRING
-    DIM buch AS STRING : buch = wurzel + "/buch-referenz/buch"
+    DIM buch AS STRING : buch = wurzel + "/buecher/referenz/buch"
     IF NOT nodeDa() THEN
         PRINT "UEBERSPRINGEN: node fehlt"
         EXIT(0)

@@ -479,7 +479,7 @@ sich nicht starten lassen).
    pytest-Dateien sind seither ungeprüft, bis Punkt 7 sie löscht.
 7. **Löschen:** `drachenhauch/`, `tests/*.py`, `conftest.py`, `dhrun.py`,
    die Starter, `pyproject.toml`, `requirements.txt`, dazu die 14
-   Qt-`.dhsprite`-Dateien in `buch-galaga/assets/sprites/` und
+   Qt-`.dhsprite`-Dateien in `buecher/galaga/assets/sprites/` und
    `examples/platformer/` (das PNG daneben bleibt, es ist das, was die
    Spiele laden); danach Anleitungen und Buchkapitel umschreiben.
 

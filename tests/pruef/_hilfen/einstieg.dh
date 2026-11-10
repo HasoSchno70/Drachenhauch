@@ -29,5 +29,5 @@ SUB buchWerkzeug(wurzel AS STRING, skript AS STRING)
         PRINT "UEBERSPRINGEN: dhrt nicht gebaut"
         EXIT(0)
     END IF
-    nlStarten(wurzel + "/buch-einstieg/buch", skript)
+    nlStarten(wurzel + "/buecher/einstieg/buch", skript)
 END SUB

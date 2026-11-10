@@ -90,7 +90,7 @@ verweise ins leere 0
 ' Nummern zeigen ins Nichts -- der Leser sieht sie nirgends. Beim Gegenlesen
 ' standen 20 solche Stellen im Buch; es waren die DATEInummern der Quelle.
 IMPORT "regex"
-DIM inhalt AS STRING : inhalt = ARG$(0) + "/buch-referenz/buch/content"
+DIM inhalt AS STRING : inhalt = ARG$(0) + "/buecher/referenz/buch/content"
 DIM dateien AS ARRAY OF STRING : dateien = DIRLIST(inhalt, "*.js")
 DIM treffer AS INTEGER : treffer = 0
 DIM i AS INTEGER
@@ -115,7 +115,7 @@ kapitelnummern 0
 ' `pruef_codebloecke.js` schickt jeden Block durch `dhrt --check`. Ein
 ' Tippfehler im Buch faellt sonst erst dem Leser auf, der ihn abtippt.
 IMPORT "helfer.dh"
-DIM buch AS STRING : buch = ARG$(0) + "/buch-referenz/buch"
+DIM buch AS STRING : buch = ARG$(0) + "/buecher/referenz/buch"
 IF NOT nodeDa() THEN
     PRINT "UEBERSPRINGEN: node fehlt"
     EXIT(0)
@@ -140,7 +140,7 @@ genug bloecke TRUE
 ' `{ out: [...] }`-Angabe. Die stand fuer 332 Bloecke im Buch und war nie
 ' nachgemessen -- sieben davon waren falsch (LEN("Drachenhauch") als 9).
 IMPORT "helfer.dh"
-DIM buch AS STRING : buch = ARG$(0) + "/buch-referenz/buch"
+DIM buch AS STRING : buch = ARG$(0) + "/buecher/referenz/buch"
 IF NOT nodeDa() THEN
     PRINT "UEBERSPRINGEN: node fehlt"
     EXIT(0)

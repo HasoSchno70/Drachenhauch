@@ -33,8 +33,8 @@ DIM neu AS BUFFER : neu = READALL_BYTES("01.xsb")
 DIM alt AS BUFFER : alt = READALL_BYTES(ARG$(1))
 PRINT BUFFER_LEN(neu) = BUFFER_LEN(alt) AND BUFFER_TO_HEX$(neu) = BUFFER_TO_HEX$(alt)
 --- argumente
-{sammlung}/../../../pyramid_pusher/levels/_authoring/make_levels.dh
-{sammlung}/../../../pyramid_pusher/levels/01_pyramid_pusher.xsb
+{sammlung}/../../../spiele/pyramid_pusher/levels/_authoring/make_levels.dh
+{sammlung}/../../../spiele/pyramid_pusher/levels/01_pyramid_pusher.xsb
 --- erwartet
   [OK ]  1. Die erste Kammer   ok
   [OK ]  2. Nach oben          ok
@@ -56,7 +56,7 @@ TRUE
 === ein unloesbarer level wird nicht geschrieben
 ' Die Kiste der ersten Kammer steht an der linken Wand -- sie kann nur noch
 ' auf und ab, das Ziel liegt rechts. Die Suche muss das merken.
---- programm ../../../pyramid_pusher/levels/_authoring/make_levels.dh
+--- programm ../../../spiele/pyramid_pusher/levels/_authoring/make_levels.dh
 --- ersetzen # @$. #
 #$@ . #
 --- erwartet
@@ -107,9 +107,9 @@ DIM neu AS BUFFER : neu = READALL_BYTES("02.xsb")
 DIM alt AS BUFFER : alt = READALL_BYTES(ARG$(2))
 PRINT BUFFER_LEN(neu) = BUFFER_LEN(alt) AND BUFFER_TO_HEX$(neu) = BUFFER_TO_HEX$(alt)
 --- argumente
-{sammlung}/../../../pyramid_pusher/levels/_authoring/convert_skinner.dh
-{sammlung}/../../../pyramid_pusher/levels/_authoring/source/skinner_arranged.txt
-{sammlung}/../../../pyramid_pusher/levels/02_skinner_classics.xsb
+{sammlung}/../../../spiele/pyramid_pusher/levels/_authoring/convert_skinner.dh
+{sammlung}/../../../spiele/pyramid_pusher/levels/_authoring/source/skinner_arranged.txt
+{sammlung}/../../../spiele/pyramid_pusher/levels/02_skinner_classics.xsb
 --- erwartet
 366 gueltige Level ->
      65  Sasquatch VII

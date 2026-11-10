@@ -73,7 +73,7 @@ dhrt test code/eins_pruefung.dh
 ```
 
 **Gefunden wird `*_pruefung.dh`** — die Regel ist am Bestand abgelesen, nicht
-erfunden: `buch-tippspiel/code/` nennt seine vier Prüfprogramme seit jeher so.
+erfunden: `buecher/tippspiel/code/` nennt seine vier Prüfprogramme seit jeher so.
 Eine ausdrücklich genannte Datei läuft auch ohne diese Endung; wer sie
 hinschreibt, meint sie.
 

@@ -11,7 +11,7 @@
 const fs = require("fs");
 const path = require("path");
 
-const CONTENT = path.join(__dirname, "..", "buch-referenz", "buch", "content");
+const CONTENT = path.join(__dirname, "..", "buecher/referenz", "buch", "content");
 const nix = () => "";
 const tips_ohne_rumpf = [];
 const cmds_ohne_text = [];

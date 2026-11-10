@@ -303,7 +303,7 @@ Was fehlte:
   `ASSERT_COLLECT`, `ASSERT_REPORT`, Rückgabewert). Was fehlt, ist das Dach:
   `dhrt test verzeichnis/` — Dateien einsammeln, jede laufen lassen, eine
   Bilanz und einen Rückgabewert liefern. Ohne das schreibt jedes Projekt sich
-  seinen eigenen Läufer, so wie `buch-tippspiel` sich vor WP E seinen eigenen
+  seinen eigenen Läufer, so wie `buecher/tippspiel` sich vor WP E seinen eigenen
   `ASSERT` geschrieben hat.
 - **Ein Formatierer** (`dhrt fmt`). Bei einer Sprache mit Einrückungs-Freiheit
   und Groß-/Kleinschreibungs-Unempfindlichkeit ist das mehr wert als anderswo:
@@ -429,7 +429,7 @@ Roadmap („wie viele neue Programme macht das möglich, pro Aufwand"):
   künftige Programm besser macht, ohne dass jemand etwas dazulernen muss. Und
   weil es das Versprechen einlöst, mit dem die Sprache antritt. **Erledigt am
   23.08.2026** — der Bestand blieb dabei still, was den Verdacht wert war und
-  gegengeprüft wurde: in das größte echte Programm (`buch-tippspiel`, 1922
+  gegengeprüft wurde: in das größte echte Programm (`buecher/tippspiel`, 1922
   Zeilen) eingebaute Fehler werden alle gefunden.
 - **2, 3, 4** sind zusammen „Daten rein und raus". Sie öffnen die Klasse
   Programme, die Daten von woanders holt, umformt und weitergibt — das ist der

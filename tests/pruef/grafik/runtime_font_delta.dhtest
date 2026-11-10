@@ -13,7 +13,7 @@ PRINT TEXT_WIDTH("WIDTH")
 TEXT_SIZE(30)
 PRINT TEXT_WIDTH("WIDTH")
 --- argumente
-{sammlung}/../../../circuitrunner/assets/font.ttf
+{sammlung}/../../../spiele/circuitrunner/assets/font.ttf
 --- erwartet
 78
 159
@@ -26,7 +26,7 @@ t = LOADIMAGE(ARG$(0))
 DRAWIMAGEPARTEX(t, 64, 0, 32, 32, 10, 10, 128, 128)
 PRINT "OK"
 --- argumente
-{sammlung}/../../../circuitrunner/assets/tiles.png
+{sammlung}/../../../spiele/circuitrunner/assets/tiles.png
 --- erwartet
 OK
 
@@ -46,7 +46,7 @@ SETFONT(f)
 PRINT TEXT_WIDTH("äöü")
 PRINT TEXT_WIDTH("???")
 --- argumente
-{sammlung}/../../../circuitrunner/assets/font.ttf
+{sammlung}/../../../spiele/circuitrunner/assets/font.ttf
 --- erwartet
 41
 36
@@ -80,7 +80,7 @@ DIM f AS INTEGER
 f = LOADFONT(ARG$(0), 30)
 PRINT "OK"
 --- argumente
-{sammlung}/../../../circuitrunner/assets/font.ttf
+{sammlung}/../../../spiele/circuitrunner/assets/font.ttf
 --- erwartet
 OK
 

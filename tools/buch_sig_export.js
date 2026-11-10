@@ -6,7 +6,7 @@
 "use strict";
 const fs = require("fs");
 const path = require("path");
-const CONTENT = path.join(__dirname, "..", "buch-referenz", "buch", "content");
+const CONTENT = path.join(__dirname, "..", "buecher/referenz", "buch", "content");
 const nix = () => "";
 const treffer = [];
 let datei = "";

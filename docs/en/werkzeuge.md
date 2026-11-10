@@ -76,7 +76,7 @@ dhrt test code/eins_pruefung.dh
 ```
 
 **What gets found is `*_pruefung.dh`** — the rule was read off the existing
-code, not invented: `buch-tippspiel/code/` has always named its four test
+code, not invented: `buecher/tippspiel/code/` has always named its four test
 programs that way. A file named explicitly runs even without this ending;
 whoever writes it down means it.
 

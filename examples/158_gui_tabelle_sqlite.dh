@@ -2,7 +2,7 @@
 '  DRACHENHAUCH -- gui-Tabelle an einer echten SQLite-Datenbank
 ' ============================================================
 '  Zeigt die geloesten Level aus dem Spiel "Pyramid Pusher"
-'  (pyramid_pusher/pyramid_pusher.db) in der gui-Tabelle -- lesen,
+'  (spiele/pyramid_pusher/pyramid_pusher.db) in der gui-Tabelle -- lesen,
 '  sortieren, filtern, bearbeiten und loeschen, alles gegen die
 '  Datenbank.
 '
@@ -46,7 +46,7 @@ GUI_THEME_PRESET("glas_dunkel")
 DIM SW AS INTEGER : SW = SCREENWIDTH()
 DIM SH AS INTEGER : SH = SCREENHEIGHT()
 
-CONST ORIGINAL = "../pyramid_pusher/pyramid_pusher.db"
+CONST ORIGINAL = "../spiele/pyramid_pusher/pyramid_pusher.db"
 CONST ARBEIT = "tabelle_sqlite_arbeitskopie.db"
 
 ' --- Arbeitskopie anlegen --------------------------------------------------
