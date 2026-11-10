@@ -3,7 +3,7 @@
 ' ============================================================
 '  Das Studio benutzt diese Datei fuer seine Vorschau und kopiert sie fuer
 '  ein Programm mit Berichten nach _studio/studio_berichte.dh. Sie kennt
-'  kein Fenster: aus der Beschreibung eines Berichts (JSON, docs/entwurf-
+'  kein Fenster: aus der Beschreibung eines Berichts (JSON, docs/intern/entwurf-
 '  berichte.md), einer Verbindung und dem SELECT seiner Quelle entsteht ein
 '  PDF-Handle. Sichern, Drucken und die Vorschau machen die Aufrufer.
 '

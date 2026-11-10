@@ -134,7 +134,7 @@ pub struct TaskErgebnis {
 /// ist damit weder `Send` noch `Sync` und laesst sich nicht ueber eine
 /// Thread-Grenze reichen. Ein Prozess teilt keinen Speicher -- damit
 /// verschwindet das Problem, ohne eine Zeile an `Value` zu aendern. Der Preis
-/// sind gemessene ~12 ms Prozessstart. Siehe docs/entwurf-task-start.md.
+/// sind gemessene ~12 ms Prozessstart. Siehe docs/intern/entwurf-task-start.md.
 ///
 /// Laeuft ohne VM, also auf einem Auftrags-Thread wie `shell_arbeit`.
 pub fn task_arbeit(exe: std::path::PathBuf, datei: String, funktion: String,

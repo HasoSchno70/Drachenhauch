@@ -533,7 +533,7 @@ impl<'p> Vm<'p> {
             // `Value` haelt ueberall `Rc`, `Program` ist weder Send noch Sync.
             // Die Grenze ist zugleich die Zusage -- ein Auftrag sieht KEINE
             // Globals des Hauptprogramms, auch keine CONST. Er bekommt mit,
-            // was er braucht. Siehe docs/entwurf-task-start.md.
+            // was er braucht. Siehe docs/intern/entwurf-task-start.md.
             "task_start" => {
                 if a.is_empty() {
                     return Err("TASK_START: erwartet eine Funktion, z.B. TASK_START(Rechne, 42)".into());

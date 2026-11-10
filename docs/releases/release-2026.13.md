@@ -135,7 +135,7 @@ System übersetzt.
 **Vier Untersuchungen, vier Entscheidungen.** Die Lückenliste nach dem
 sechsten Piloten nannte vier Architekturpunkte: mehrere Fenster, Drucken,
 Barrierefreiheit, Eingabemethoden. Jeder bekam erst ein Papier mit
-Messungen und Wegen (`docs/entwurf-*.md`), dann eine Entscheidung, dann den
+Messungen und Wegen (`docs/intern/entwurf-*.md`), dann eine Entscheidung, dann den
 Bau. Mit dieser Fassung ist die Liste abgearbeitet.
 
 **Zahlen.** Die Befehlsreferenz von 1712 auf **1715** Einträge

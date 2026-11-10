@@ -457,7 +457,7 @@ pub struct Compiler {
     /// erreichen kann (Objekte, Lambdas, Aufrufe ueber Werte). Siehe `leih_spur`.
     leih_spuren: HashMap<String, Option<(std::collections::HashSet<String>, Vec<String>)>>,
     /// `DECLARE ... LIB` (klein geschriebener Name): Funktionen aus fremden
-    /// Bibliotheken, docs/entwurf-ffi.md.
+    /// Bibliotheken, docs/intern/entwurf-ffi.md.
     ffi_decls: HashMap<String, FfiDecl>,
     /// Die Lagen aller `STRUCT ... LAYOUT C` (cstruct.rs), klein geschrieben.
     lagen: HashMap<String, crate::cstruct::Lage>,

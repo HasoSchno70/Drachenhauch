@@ -2,7 +2,7 @@
 '  DRACHENHAUCH STUDIO
 ' ============================================================
 '  Eine IDE fuer Programme mit Oberflaeche, im Stil von Xojo, mit der
-'  Laufzeit dhrt. Entwurf: docs/entwurf-studio.md. Stufe 1: das Fenster
+'  Laufzeit dhrt. Entwurf: docs/intern/entwurf-studio.md. Stufe 1: das Fenster
 '  entwerfen -- Bibliothek mit Sinnbildern, Entwurfsflaeche mit Griffen,
 '  Ausrichtungslinien und Rueckgaengig, Inspektor mit Gruppen und echten
 '  Editoren, Navigator. Stufe 2: Projekte als Ordner, mehrere Fenster,
