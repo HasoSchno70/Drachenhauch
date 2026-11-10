@@ -157,7 +157,7 @@ ureq = { version = "2", optional = true }
 # `ring` als Krypto-Anbieter (NICHT die Vorgabe aws-lc-rs), weil der eine
 # C-Toolchain mitbraeuchte -- dieselbe Wahl, die ureq schon getroffen hat.
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12", "logging"], optional = true }
-webpki-roots = { version = "0.26", optional = true }
+webpki-roots = { version = "1.0", optional = true }
 # db-Modul gegen einen Server (docs/entwurf-datenbanktreiber.md): PostgreSQL
 # und MySQL, beide reines Rust; TLS ueber dasselbe rustls+ring wie smtp/ureq
 # (fuer mysql ausdruecklich `rustls-tls-ring`, die Vorgabe zoege aws-lc-sys
@@ -209,7 +209,7 @@ cranelift-jit = { version = "0.136", optional = true }
 cranelift-module = { version = "0.136", optional = true }
 cranelift-native = { version = "0.136", optional = true }
 # Fremde Bibliotheken laden (DECLARE ... LIB, src/ffi.rs).
-libloading = { version = "0.8", optional = true }
+libloading = { version = "0.9", optional = true }
 
 # --- Web-Build (emscripten): wasm-bindgen-Familie festnageln ---------------
 # Kira zieht cpal fuer JEDES wasm32-Ziel mit dem Feature `wasm-bindgen` herein
