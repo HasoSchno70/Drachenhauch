@@ -88,7 +88,7 @@ jobs:
         run: cargo build --release --locked
 
       - name: emscripten einrichten
-        uses: mymindstorm/setup-emsdk@v14
+        uses: mymindstorm/setup-emsdk@v16
         with:
           version: 6.0.0
           actions-cache-folder: emsdk-cache
@@ -117,7 +117,7 @@ jobs:
       - name: Website bauen
         run: rust/drachenhauch_runtime/target/release/dhrt run tools/website.dh -- --ziel _site --spielwiese web
 
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         if: github.event_name != 'pull_request'
         with:
           path: _site
@@ -131,4 +131,4 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
