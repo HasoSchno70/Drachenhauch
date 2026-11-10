@@ -1,0 +1,22 @@
+name: "Wunsch / Feature request"
+description: "Eine Idee für Sprache, Module, IDE oder Studio / An idea for the language, modules, IDE or Studio"
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: wofuer
+    attributes:
+      label: "Wofür brauchst du es? / What do you need it for?"
+      description: "Was willst du bauen, und woran hakt es heute? / What are you building, and what stops you today?"
+    validations:
+      required: true
+  - type: textarea
+    id: wie
+    attributes:
+      label: "Wie könnte es aussehen? / What could it look like?"
+      description: "Gern als Drachenhauch-Code / Drachenhauch code welcome"
+      render: basic
+  - type: textarea
+    id: anders
+    attributes:
+      label: "Anderswo gesehen? / Seen elsewhere?"
+      description: "Ein anderes BASIC, eine Bibliothek, ein Werkzeug / Another BASIC, a library, a tool"
