@@ -13,18 +13,25 @@ Ein BASIC im Geist von QB64, FreeBASIC oder Blitz Basic, mit dem Werkzeugkasten 
 Unter der Haube: ein BASIC-Dialekt mit Pascal-strikter Typisierung und OOP — für Spiele ebenso wie für Anwendungen mit grafischer Oberfläche, Kommandozeilen-Werkzeuge und kleine Dienste. Programme laufen über **`dhrt`** — die native Rust-Runtime, die Quelltext selbst lext, parst, kompiliert und ausführt. Grafik und 3D über **raylib**, Ton über **[Kira](https://github.com/tesselode/kira)** auf einem eigenen Audio-Thread. Auch die IDE und alle Werkzeuge sind in Drachenhauch geschrieben; Python braucht nur noch das Bauskript der Laufzeit.
 
 ```basic
-IMPORT "sprite"
 IMPORT "particles"
 
 SCREEN(320, 240, "Hallo Welt", 2)
 
-DIM held AS SPRITE
-held = SPRITE_NEW(LOADIMAGE("assets/hero.png"), 16, 16)
-SPRITE_SET_POS(held, 100.0, 100.0)
+DIM funken AS PARTICLE_SYSTEM
+funken = PARTICLE_SYSTEM_NEW(160, 120)
+PARTICLE_SET_VELOCITY(funken, -60, 60, -140, -40)
+PARTICLE_SET_LIFETIME(funken, 400, 900)
+PARTICLE_SET_GRAVITY(funken, 0, 200)
+PARTICLE_SET_COLOR(funken, RGB(255, 160, 40))
+PARTICLE_SET_FADE(funken, TRUE)
 
 WHILE NOT QUITREQUESTED()
     CLS()
-    SPRITE_DRAW(held)
+    TEXT(8, 8, "Hallo, Drachenhauch!")
+    PARTICLE_SET_POS(funken, MOUSEX(), MOUSEY())
+    PARTICLE_EMIT(funken, 6)
+    PARTICLE_UPDATE(funken, 16)
+    PARTICLE_DRAW(funken)
     FLIP()
     SLEEP(16)
 WEND
@@ -92,15 +99,29 @@ Python muss dafür **nicht** installiert sein. Mit dabei sind die komplette Entw
 
 ## Aus dem Quelltext arbeiten
 
-Gebraucht werden Rust (`cargo`) und ein beliebiges Python 3 — nur für das
-Bauskript, ohne venv und ohne Pakete (es benutzt nur die Standardbibliothek).
-Einmal die Laufzeit bauen, danach läuft alles über `dhrt`:
+Gebraucht werden Rust (`cargo`, über [rustup](https://rustup.rs)) und ein beliebiges Python 3 — nur für das
+Bauskript, ohne venv und ohne Pakete (es benutzt nur die Standardbibliothek). raylib übersetzt seine C-Quellen mit cmake und braucht libclang, also vorher:
+
+| System | Vorher installieren |
+|---|---|
+| Windows | Visual Studio Build Tools mit „Desktopentwicklung mit C++“ (bringt cmake mit) und [LLVM](https://github.com/llvm/llvm-project/releases) für libclang; das Bauskript findet beides selbst |
+| macOS | Xcode-Kommandozeilenwerkzeuge (`xcode-select --install`) und `brew install cmake` |
+| Debian/Ubuntu | `sudo apt install cmake clang pkg-config libasound2-dev libgtk-3-dev libudev-dev libx11-dev libxrandr-dev libxi-dev libxinerama-dev libxcursor-dev libgl1-mesa-dev libgles-dev libegl-dev libwayland-dev libxkbcommon-dev wayland-protocols` |
+
+Einmal die Laufzeit bauen, danach läuft alles über `dhrt`. Unter Windows:
 
 ```
 python rust\build_runtime.py                              # baut dhrt (mit --hardware: serial/usb/bt/wifi/midi)
 rust\drachenhauch_runtime\target\release\dhrt run ide\ide.dh           # die IDE
 rust\drachenhauch_runtime\target\release\dhrt run datei.dh             # ein Programm
 rust\drachenhauch_runtime\target\release\dhrt test tests\pruef         # alle Prüfungen
+```
+
+Unter macOS und Linux dasselbe mit Schrägstrichen und `python3`:
+
+```
+python3 rust/build_runtime.py
+rust/drachenhauch_runtime/target/release/dhrt run ide/ide.dh
 ```
 
 ## Das Lehrbuch
@@ -119,6 +140,16 @@ node build_book.js [--lang en]        # -> .docx (A4, zum Drucken)
 node build_epub.js [--lang en]        # -> .epub (fließt in die Schriftgröße des Lesers, Nachtmodus)
 dhrt run tools/buch_bauen.dh -- buch-referenz [--lang en]   # Zwei-Pass-Build mit Seitenzahlen im Inhalt
 ```
+
+### Weitere Bücher
+
+Drei kürzere Bücher bauen je ein fertiges Programm, Kapitel für Kapitel:
+
+| Buch | Was entsteht | Herunterladen |
+|---|---|---|
+| **[Der Einstieg](buch-einstieg/README.md)** | Programmieren von null an, für Menschen, die noch nie eine Zeile geschrieben haben — der sanfteste Einstieg | [.docx](buch-einstieg/buch/Drachenhauch-Einstieg.docx?raw=1) · [.epub](buch-einstieg/buch/Drachenhauch-Einstieg.epub?raw=1) |
+| **[Arcade-Shooter](buch-galaga/README.md)** | Ein Weltraum-Shooter mit Angriffswellen, die Sprites zeichnest du selbst im Pixel-Editor | [.docx](buch-galaga/buch/Drachenhauch-Buch.docx?raw=1) |
+| **[Tippspiel](buch-tippspiel/README.md)** | Eine Bundesliga-Tippanwendung mit Datenbank, Rangliste und Spielplan aus dem Netz — die erste ernsthafte Anwendung | [.docx](buch-tippspiel/buch/Drachenhauch-Tippspiel.docx?raw=1) |
 
 ## Handbuch
 
@@ -385,4 +416,4 @@ Drachenhauch steht wahlweise unter der
 - [MIT-Lizenz](LICENSE-MIT) oder der
 - [Apache-Lizenz, Version 2.0](LICENSE-APACHE)
 
-— du suchst dir eine aus. Programme und Spiele, die du mit Drachenhauch schreibst, gehören dir: du darfst sie weitergeben und verkaufen, samt der eingebauten Laufzeit `dhrt`. Bestandteile anderer Hersteller behalten ihre eigenen Lizenzen (Rust-Crates: `installer/lizenzen.dh` sammelt sie; Assets der Beispiele: [examples/ASSET-CREDITS.md](examples/ASSET-CREDITS.md)).
+— du suchst dir eine aus. Programme und Spiele, die du mit Drachenhauch schreibst, gehören dir: du darfst sie weitergeben und verkaufen, samt der eingebauten Laufzeit `dhrt`. Bestandteile anderer Hersteller behalten ihre eigenen Lizenzen (Rust-Crates: `installer/lizenzen.dh` sammelt sie; Assets der Beispiele: [examples/ASSET-CREDITS.md](examples/ASSET-CREDITS.md); Schriften, Vorspann und Logo von Laufzeit und IDE: [daten/HERKUNFT.md](daten/HERKUNFT.md)).

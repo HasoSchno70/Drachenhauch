@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: "Handbuch / Manual"
+    url: https://hasoschno70.github.io/Drachenhauch/
+    about: "Erst nachschlagen: Handbuch, Module, Stolpersteine / Look it up first: manual, modules, pitfalls"
+  - name: "Sicherheitslücke privat melden / Report a vulnerability privately"
+    url: https://github.com/HasoSchno70/Drachenhauch/security/advisories/new
+    about: "Nicht als öffentliches Issue / Not as a public issue"

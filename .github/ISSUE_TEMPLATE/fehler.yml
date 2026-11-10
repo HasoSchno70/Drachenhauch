@@ -1,0 +1,57 @@
+name: "Fehler melden / Bug report"
+description: "Etwas tut nicht, was es soll / Something does not work as it should"
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Danke fürs Melden! Sicherheitslücken bitte nicht hier, sondern privat (siehe SECURITY.md).
+        Thanks for reporting! Security problems go to a private report instead (see SECURITY.md).
+  - type: textarea
+    id: was
+    attributes:
+      label: "Was passiert? / What happens?"
+      description: "Und was hättest du erwartet? / And what did you expect?"
+    validations:
+      required: true
+  - type: textarea
+    id: programm
+    attributes:
+      label: "Kleines Programm, das es zeigt / Small program that shows it"
+      description: "So kurz wie möglich / As short as possible"
+      render: basic
+  - type: textarea
+    id: ausgabe
+    attributes:
+      label: "Fehlermeldung oder Ausgabe / Error message or output"
+      render: text
+  - type: input
+    id: fassung
+    attributes:
+      label: "Fassung / Version"
+      description: "Ausgabe von / output of `dhrt --version`"
+    validations:
+      required: true
+  - type: dropdown
+    id: system
+    attributes:
+      label: "System"
+      options:
+        - Windows
+        - macOS
+        - Linux
+        - Raspberry Pi
+        - "Browser (Spielwiese / playground)"
+    validations:
+      required: true
+  - type: dropdown
+    id: wo
+    attributes:
+      label: "Wo? / Where?"
+      options:
+        - "Sprache oder Laufzeit / language or runtime (dhrt)"
+        - "IDE"
+        - "Studio"
+        - "Handbuch oder Buch / manual or book"
+        - "Installer oder Paket / installer or package"
+        - "Anderes / other"
