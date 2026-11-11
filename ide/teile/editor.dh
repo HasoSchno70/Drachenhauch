@@ -1051,15 +1051,15 @@ SUB dateiOeffnen(pfad AS STRING)
     baumFuellen()
     zuletztMerken(pfad)
     IF reiterPlatz <> "" THEN
-        GUI_SET_TEXT(lblStatus, pfad + "  --  " + tr$("Höchstens ") + STR$(MAX_TABS) + tr$(" Reiter, geschlossen: ") + reiterPlatz)
+        GUI_SET_TEXT(lblStatus, kurzPfad$(pfad) + "  --  " + tr$("Höchstens ") + STR$(MAX_TABS) + tr$(" Reiter, geschlossen: ") + reiterPlatz)
         reiterPlatz = ""
     ELSEIF paketVon$(pfad) <> "" THEN
-        GUI_SET_TEXT(lblStatus, tr$("Datei aus dem Paket ") + paketVon$(pfad) + tr$(" -- Änderungen gehen beim nächsten Holen verloren: ") + pfad)
+        GUI_SET_TEXT(lblStatus, tr$("Datei aus dem Paket ") + paketVon$(pfad) + tr$(" -- Änderungen gehen beim nächsten Holen verloren: ") + kurzPfad$(pfad))
         protokoll("paketdatei " + paketVon$(pfad))
     ELSEIF kodierung = "utf8" THEN
-        GUI_SET_TEXT(lblStatus, pfad)
+        GUI_SET_TEXT(lblStatus, kurzPfad$(pfad))
     ELSE
-        GUI_SET_TEXT(lblStatus, tr$("Kein UTF-8, als ") + kodierung + tr$(" gelesen -- Sichern schreibt UTF-8: ") + pfad)
+        GUI_SET_TEXT(lblStatus, tr$("Kein UTF-8, als ") + kodierung + tr$(" gelesen -- Sichern schreibt UTF-8: ") + kurzPfad$(pfad))
         protokoll("gelesen als " + kodierung)
     END IF
 END SUB
@@ -1068,6 +1068,27 @@ END SUB
 ' derselbe Ordner kommt als kurzer und als langer Name an (der Debugger
 ' meldet den langen), und am Text allein zog das Projekt beim ersten Halt
 ' in einer importierten Datei in deren Ordner um.
+' Der Weg fuer die Statuszeile: im Projekt ab dem Projektordner
+' ("ide/teile/editor.dh"), sonst ganz. Den ganzen Weg der aktiven Datei
+' zeigt der Hilfetext des Feldes (statusTippNachziehen).
+FUNCTION kurzPfad$(pfad AS STRING) AS STRING
+    IF pfad = "" OR projektOrdner = "" THEN RETURN pfad
+    DIM wurzel AS STRING : wurzel = wegGleich$(projektOrdner)
+    IF RIGHT$(wurzel, 1) <> "/" THEN wurzel = wurzel + "/"
+    DIM p AS STRING : p = wegGleich$(pfad)
+    IF LOWER$(LEFT$(p, LEN(wurzel))) <> LOWER$(wurzel) THEN RETURN pfad
+    RETURN MID$(p, LEN(wurzel))
+END FUNCTION
+
+' Je Bild: der Hilfetext von Feld 0 ist der ganze Weg der aktiven Datei.
+SUB statusTippNachziehen()
+    DIM t AS STRING : t = ""
+    IF aktiverTab >= 0 AND aktiverTab < tabAnzahl THEN t = reiter[aktiverTab].pfad
+    IF t = statusTipp THEN RETURN
+    statusTipp = t
+    GUI_STATUSBAR_TIP(lblStatus, 0, t)
+END SUB
+
 FUNCTION imProjekt(pfad AS STRING) AS BOOLEAN
     IF projektOrdner = "" THEN RETURN FALSE
     IF LEFT$(wegGleich$(pfad), LEN(wegGleich$(projektOrdner))) = wegGleich$(projektOrdner) THEN RETURN TRUE
@@ -1142,7 +1163,7 @@ FUNCTION sichern(i AS INTEGER, alsNeu AS BOOLEAN) AS BOOLEAN
     blameMarkeZeile = -1
     reiterNeuSetzen()
     zuletztMerken(pfad)
-    GUI_SET_TEXT(lblStatus, tr$("Gesichert: ") + pfad)
+    GUI_SET_TEXT(lblStatus, tr$("Gesichert: ") + kurzPfad$(pfad))
     protokoll("gesichert " + pfad)
     ' Beim Sichern neu starten: nur ein laufendes F5-Programm (Debugger und
     ' Profil haben einen Zustand, den man nicht nebenbei wegwirft), nur fuer

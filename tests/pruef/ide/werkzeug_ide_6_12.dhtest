@@ -978,6 +978,44 @@ pr leiste gefunden TRUE
 im baum tief
 pr baum tief reiter b_zwei.dh
 
+=== die statuszeile nennt den weg ab dem projekt, den ganzen im hilfetext
+' Seit 2026.47: vorher stand dort der ganze Weg ab Laufwerk -- lang und
+' doppelt zur Pfadleiste. Der ganze Weg der aktiven Datei ist jetzt der
+' Hilfetext des Feldes.
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 10 THEN dateiOeffnen(PATHJOIN(projektOrdner, "tief/unten/b_zwei.dh"))
+IF prBild = 20 THEN
+    protokoll("pr status " + GUI_STATUSBAR_TEXT$(lblStatus, 0))
+    protokoll("pr tipp " + STR$(wegGleich$(statusTipp) = wegGleich$(PATHJOIN(projektOrdner, "tief/unten/b_zwei.dh"))))
+    dateiOeffnen("C:/gibt/es/nicht/x.dh")
+    protokoll("pr fremd " + GUI_STATUSBAR_TEXT$(lblStatus, 0))
+    EXIT(0)
+END IF
+--- argumente
+a_eins.dh
+--- umgebung
+DHRT_FRAMES=150
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+--- datei a_eins.dh
+PRINT 1
+--- datei tief/unten/b_zwei.dh
+PRINT 2
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " THEN PRINT L[i]
+NEXT
+--- erwartet
+pr status tief/unten/b_zwei.dh
+pr tipp TRUE
+pr fremd Gibt es nicht: C:/gibt/es/nicht/x.dh
+
 === definition hier zeigen
 AUTOMATION_PLAY("ev.txt")
 --- programm ../../../ide/ide.dh nach SETFPS(60)
