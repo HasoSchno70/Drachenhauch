@@ -192,7 +192,7 @@ xmrsplayer = { version = "0.13", optional = true }
 # Native OS-Datei-/Ordner-Dialoge (FILE_OPEN_DIALOG/FILE_SAVE_DIALOG/FOLDER_DIALOG).
 # Desktop-GUI -> ans graphics-Feature gekoppelt. Auf Windows pure-Rust (windows-sys),
 # keine C-Toolchain.
-rfd = { version = "0.14", optional = true }
+rfd = { version = "0.18", optional = true }
 # Video (Modul `video`, src/video.rs): MP4-Container in reinem Rust, H.264
 # ueber Ciscos openh264, beim Bau aus dem Quelltext uebersetzt -- beim Nutzer
 # muss nichts installiert sein. Auf dem Desktop immer dabei (build_runtime.py).
