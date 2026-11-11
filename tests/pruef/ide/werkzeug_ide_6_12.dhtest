@@ -922,6 +922,62 @@ PRINT "pfad sprung 1 " ; hat("pfad sprung 1")
 spur bis treffer TRUE
 pfad sprung 1 TRUE
 
+=== die pfadleiste beginnt mit den ordnern im projekt
+' Seit 2026.47: unter dem Reiter stand vorher nur noch einmal sein Name.
+' Jetzt kommen vorn die Ordner zwischen Projekt und Datei; ein Klick auf
+' einen Ordner zeigt ihn im Projektbaum. Der Fall sucht die Pfadleiste auf
+' dem Schirm und klickt ihren ersten Teil ("tief").
+DIM prBild AS INTEGER : prBild = 0
+DIM prX AS INTEGER : prX = -1
+DIM prY AS INTEGER : prY = -1
+--- programm ../../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 10 THEN dateiOeffnen(PATHJOIN(projektOrdner, "tief/unten/b_zwei.dh"))
+IF prBild = 25 THEN
+    protokoll("pr teile " + STR$(GUI_BREADCRUMB_COUNT(lblSpur)) + " " + GUI_BREADCRUMB_TEXT$(lblSpur, 0) + " " + GUI_BREADCRUMB_TEXT$(lblSpur, 1) + " " + GUI_BREADCRUMB_TEXT$(lblSpur, 2))
+    GUI_FILETREE_SELECT(baum, PATHJOIN(projektOrdner, "a_eins.dh"))
+    baumLetzteWahl = GUI_FILETREE_SELECTED$(baum)
+    DIM prSx AS INTEGER
+    DIM prSy AS INTEGER
+    FOR prSy = 0 TO SCREENHEIGHT() - 1 STEP 2
+        FOR prSx = 0 TO SCREENWIDTH() - 1 STEP 2
+            IF prY < 0 AND GUI_HIT_TEST(prSx, prSy) = lblSpur THEN prX = prSx + 10 : prY = prSy + 8
+        NEXT
+    NEXT
+    protokoll("pr leiste gefunden " + STR$(prY >= 0))
+    IF prY >= 0 THEN
+        WRITEALL("klick.txt", "c 3" + CHR$(10) + "e 0 7 " + STR$(prX) + " " + STR$(prY) + " 0 0" + CHR$(10) + "e 2 6 0 0 0 0" + CHR$(10) + "e 5 5 0 0 0 0" + CHR$(10) + CHR$(10))
+        AUTOMATION_PLAY("klick.txt")
+    END IF
+END IF
+IF prBild = 50 THEN
+    protokoll("pr baum " + BASENAME(GUI_FILETREE_SELECTED$(baum)) + " reiter " + BASENAME(reiter[aktiverTab].pfad))
+    EXIT(0)
+END IF
+--- argumente
+a_eins.dh
+--- umgebung
+DHRT_FRAMES=150
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+--- datei a_eins.dh
+PRINT 1
+--- datei tief/unten/b_zwei.dh
+PRINT 2
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 8) = "im baum " OR LEFT$(L[i], 11) = "pfad sprung" THEN PRINT L[i]
+NEXT
+--- erwartet
+pr teile 3 tief unten b_zwei.dh
+pr leiste gefunden TRUE
+im baum tief
+pr baum tief reiter b_zwei.dh
+
 === definition hier zeigen
 AUTOMATION_PLAY("ev.txt")
 --- programm ../../../ide/ide.dh nach SETFPS(60)

@@ -2990,7 +2990,14 @@ WHILE NOT beenden
     IF sfk = sfPos THEN befehl("zeile")
     IF sfk = sfUmbruch THEN befehl("umbruch")
     DIM spk AS INTEGER : spk = GUI_BREADCRUMB_CLICKED(lblSpur)
-    IF spk >= 0 THEN pfadAnspringen(INT(VAL(GUI_BREADCRUMB_DATA$(lblSpur, spk))))
+    IF spk >= 0 THEN
+        DIM spd AS STRING : spd = GUI_BREADCRUMB_DATA$(lblSpur, spk)
+        IF LEFT$(spd, 2) = "o:" THEN
+            imBaumZeigen(MID$(spd, 2))
+        ELSE
+            pfadAnspringen(INT(VAL(spd)))
+        END IF
+    END IF
     ' Kacheln: ein Klick oeffnet das Beispiel.
     DIM kc AS INTEGER
     FOR kc = 0 TO kachelAnzahl - 1

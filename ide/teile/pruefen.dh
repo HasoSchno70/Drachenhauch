@@ -802,6 +802,19 @@ SUB spurNachziehen()
     ' Die Pfadleiste bekommt je Teil die ZEILE seines Blocks als Wert --
     ' ein Klick springt dorthin (pfadAnspringen).
     GUI_BREADCRUMB_CLEAR(lblSpur)
+    ' Vorn die Ordner im Projekt, wie in anderen IDEs -- sonst stuende
+    ' unter dem Reiter nur noch einmal sein Name. Ein Ordner zeigt sich
+    ' beim Klick im Projektbaum ("o:" vor dem Weg).
+    DIM ordner AS ARRAY OF STRING : ordner = spurOrdner(reiter[aktiverTab].pfad)
+    DIM oi AS INTEGER
+    DIM oweg AS STRING : oweg = wegGleich$(projektOrdner)
+    IF RIGHT$(oweg, 1) = "/" THEN oweg = LEFT$(oweg, LEN(oweg) - 1)
+    FOR oi = 0 TO LEN(ordner) - 1
+        oweg = oweg + "/" + ordner[oi]
+        GUI_BREADCRUMB_ADD(lblSpur, ordner[oi], "o:" + oweg)
+        spur = IIF(oi = 0, "", spur + "  >  ") + ordner[oi]
+    NEXT
+    IF LEN(ordner) > 0 THEN spur = spur + "  >  " + datei
     GUI_BREADCRUMB_ADD(lblSpur, datei, "1")
     DIM j AS JSON_HANDLE : j = JSON_PARSE(CODE_SYMBOLS$(GUI_TEXT(ta)))
     DIM i AS INTEGER
@@ -821,6 +834,23 @@ SUB spurNachziehen()
     NEXT
     protokoll("spur " + spur)
 END SUB
+
+' Die Ordner zwischen Projektordner und Datei, von oben nach unten; leer
+' fuer eine Datei direkt im Projekt oder ausserhalb.
+FUNCTION spurOrdner(pfad AS STRING) AS ARRAY OF STRING
+    DIM r AS ARRAY OF STRING
+    IF pfad = "" OR projektOrdner = "" THEN RETURN r
+    DIM wurzel AS STRING : wurzel = wegGleich$(projektOrdner)
+    IF RIGHT$(wurzel, 1) <> "/" THEN wurzel = wurzel + "/"
+    DIM p AS STRING : p = wegGleich$(pfad)
+    IF LOWER$(LEFT$(p, LEN(wurzel))) <> LOWER$(wurzel) THEN RETURN r
+    DIM teile AS ARRAY OF STRING : teile = SPLIT$(MID$(p, LEN(wurzel)), "/")
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(teile) - 2
+        IF teile[i] <> "" THEN ARRAY_PUSH(r, teile[i])
+    NEXT
+    RETURN r
+END FUNCTION
 
 ' Ein Klick in die Pfadleiste: an den Anfang des Blocks springen.
 SUB pfadAnspringen(zeile AS INTEGER)
