@@ -61,6 +61,27 @@ All nine ship as examples — click an image to jump to its source.
 The IDE shows the same gallery with **21 demos** on its start page, each one
 launchable with a double click.
 
+### Applications with a user interface
+
+<table>
+<tr>
+<td width="50%" align="center"><a href="docs/en/studio.md"><img src=".github/bilder/studio_en.png" width="420" alt="Drachenhauch Studio"></a><br><b>Drachenhauch Studio</b><br><sub>design windows, wire up events, a database in the project, F5 to run</sub></td>
+<td width="50%" align="center"><a href="docs/en/ide.md"><img src=".github/bilder/ide_en.png" width="420" alt="The IDE"></a><br><b>The IDE</b><br><sub>project tree, outline, live checks, debugger, help on every command</sub></td>
+</tr>
+</table>
+
+<table>
+<tr>
+<td width="25%" align="center"><a href="examples/196_rechnungen.dh"><img src=".github/bilder/196_rechnungen.png" width="200" alt="Invoices"></a><br><b>Invoices</b><br><sub>customers, items, PDF, SQLite</sub></td>
+<td width="25%" align="center"><a href="examples/200_gui_akkordeon_assistent.dh"><img src=".github/bilder/200_gui_akkordeon_assistent.png" width="200" alt="Accordion and wizard"></a><br><b>Accordion and wizard</b><br><sub>tree table, step-by-step dialog</sub></td>
+<td width="25%" align="center"><a href="examples/195_gui_feinschliff.dh"><img src=".github/bilder/195_gui_feinschliff.png" width="200" alt="Drag and drop"></a><br><b>Drag and drop</b><br><sub>sliders, progress, tiles, scrolling</sub></td>
+<td width="25%" align="center"><a href="examples/191_gui_formular.dh"><img src=".github/bilder/191_gui_formular.png" width="200" alt="Forms"></a><br><b>Forms</b><br><sub>password, length and number limits, Enter and Esc</sub></td>
+</tr>
+</table>
+
+The interface examples are German like most of the examples; the IDE, the
+Studio and their help switch to English in the settings.
+
 ### And everything else
 
 Drachenhauch started as a games BASIC (back then called “GameBasic”). These
