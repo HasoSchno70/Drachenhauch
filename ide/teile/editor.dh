@@ -402,6 +402,7 @@ SUB einstellungenNachziehen()
     IF GUI_CHECKED(cbBaumHaken) <> baumHakenAn THEN baumHakenSetzen(GUI_CHECKED(cbBaumHaken))
     IF GUI_CHECKED(cbWasser) <> wasserzeichenAn THEN
         wasserzeichenAn = GUI_CHECKED(cbWasser)
+        wasserzeichenSelbst = TRUE
         wasserzeichenAlle()
         konfigSichern()
     END IF

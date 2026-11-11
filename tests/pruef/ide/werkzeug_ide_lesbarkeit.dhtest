@@ -311,3 +311,32 @@ NEXT
 probe knopf gefunden TRUE
 ueber zu
 probe offen FALSE
+
+=== der schriftzug hinter dem code ist aus, ausser man hat ihn selbst eingeschaltet
+' Seit 2026.47 aus per Vorgabe. Eine alte ide.json haelt "wasserzeichen":
+' true auch dann fest, wenn es nur die Vorgabe war -- es gilt nur mit
+' "wasserzeichen_selbst" (in den Einstellungen umgeschaltet).
+PRINT "alt "; wasserzeichenAn
+EXIT(0)
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
+--- umgebung
+DHRT_FRAMES=100
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+--- datei _programm/ide.json
+{"wasserzeichen": true}
+--- erwartet
+alt FALSE
+
+=== selbst eingeschaltet bleibt der schriftzug
+PRINT "selbst "; wasserzeichenAn
+EXIT(0)
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
+--- umgebung
+DHRT_FRAMES=100
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+--- datei _programm/ide.json
+{"wasserzeichen": true, "wasserzeichen_selbst": true}
+--- erwartet
+selbst TRUE

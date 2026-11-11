@@ -1011,9 +1011,14 @@ vorspannAn = kBool("vorspann", vorspannAn)
 DIM glanzAn AS BOOLEAN : glanzAn = TRUE
 glanzAn = kBool("glanz", glanzAn)
 ' Der Schriftzug schwach hinter dem Code -- er fuellt das Feld, rollt aber
-' nicht mit: Grund, kein Inhalt.
-DIM wasserzeichenAn AS BOOLEAN : wasserzeichenAn = TRUE
-wasserzeichenAn = kBool("wasserzeichen", wasserzeichenAn)
+' nicht mit: Grund, kein Inhalt. Seit 2026.47 standardmaessig AUS: hinter
+' dem Code soll eine ruhige Flaeche sein (wie in anderen Editoren), das Logo
+' steht auf der Willkommensseite. Die ide.json haelt jeden Wert fest, auch
+' eine Vorgabe -- darum gilt "wasserzeichen" nur, wenn man es selbst in den
+' Einstellungen umgeschaltet hat (`wasserzeichen_selbst`).
+DIM wasserzeichenAn AS BOOLEAN : wasserzeichenAn = FALSE
+DIM wasserzeichenSelbst AS BOOLEAN : wasserzeichenSelbst = kBool("wasserzeichen_selbst", FALSE)
+IF wasserzeichenSelbst THEN wasserzeichenAn = kBool("wasserzeichen", wasserzeichenAn)
 DIM hgBild AS INTEGER : hgBild = -1
 IF FILEEXISTS(PATHJOIN(bilderOrdner, "schriftzug.png")) THEN hgBild = LOADIMAGE(PATHJOIN(bilderOrdner, "schriftzug.png"))
 uiGroesse = MAX(12, MIN(22, kInt("ui_schrift", uiGroesse)))
