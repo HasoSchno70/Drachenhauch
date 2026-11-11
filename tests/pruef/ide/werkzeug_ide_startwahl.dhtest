@@ -73,6 +73,46 @@ startwahl ide gemerkt
 bereit
 gemerkt ide
 
+=== nach dem startbildschirm schreibt die ide in ihrer eigenen schriftgroesse
+' Der Bildschirm setzt fuer seine Karten eigene Groessen (TEXT_SIZE, mit dem
+' Massstab des Schirms) und stellte danach nur die Schriftart der IDE zurueck,
+' nicht ihre Groesse: Menues, Projektbaum, Reiter und Statuszeile kamen viel
+' zu gross (2026-11-11, gefunden nach dem Aktualisieren auf 2026.46). Gemessen
+' wird die Breite eines Textes davor und danach.
+AUTOMATION_PLAY("ev.txt")
+--- programm ../../../ide/ide.dh nach SETFPS(60)
+--- einschub nach DIM swGemerkt AS BOOLEAN : swGemerkt = FALSE
+protokoll("breite vorher " + STR$(TEXT_WIDTH("Projekt Datei Ansicht")))
+--- einschub nach IF swWahl = "kreuz" THEN END
+protokoll("breite nachher " + STR$(TEXT_WIDTH("Projekt Datei Ansicht")))
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+DH_IDE_STARTWAHL=1
+DH_IDE_STUDIO_TROCKEN=1
+--- datei _programm/ev.txt
+c 3
+e 0 7 5 5 0 0
+e 10 2 257 0 0 0
+e 12 1 257 0 0 0
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM vorher AS STRING
+DIM nachher AS STRING
+DIM z AS STRING
+FOR EACH z IN L
+    IF LEFT$(z, 14) = "breite vorher " THEN vorher = MID$(z, 14)
+    IF LEFT$(z, 15) = "breite nachher " THEN nachher = MID$(z, 15)
+NEXT
+PRINT "gemessen "; vorher <> "" AND nachher <> ""
+PRINT "gleich "; vorher = nachher; IIF(vorher = nachher, "", " (" + vorher + " / " + nachher + ")")
+--- erwartet
+gemessen TRUE
+gleich TRUE
+
 === ein gemerktes studio fragt nicht
 AUTOMATION_PLAY("ev.txt")
 --- programm ../../../ide/ide.dh nach SETFPS(60)

@@ -312,7 +312,16 @@ FUNCTION startwahlZeigen(BYREF merken AS BOOLEAN) AS STRING
         FLIP()
     WEND
     MOUSE_CURSOR("auto")
-    IF uiFont >= 0 THEN SETFONT(uiFont)
+    ' Schriftart UND -groesse der IDE zurueck: die Karten oben setzen eigene
+    ' Groessen (mit dem Massstab des Schirms), und nur die Schriftart
+    ' zurueckzustellen liess Menues, Baum, Reiter und Statuszeile zu gross.
+    ' Ohne eigene Schrift zeichnet die IDE in der Vorgabe der Laufzeit (20).
+    IF uiFont >= 0 THEN
+        SETFONT(uiFont)
+        TEXT_SIZE(uiGroesse)
+    ELSE
+        TEXT_SIZE(20)
+    END IF
     IF logo >= 0 THEN IMAGE_FREE(logo)
     IF ergebnis <> "kreuz" AND merken THEN
         startwahl = ergebnis
