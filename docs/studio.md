@@ -408,8 +408,8 @@ Fokus abgibt oder Enter kommt, nicht je Anschlag. Ein Name muss ein
 Bezeichner sein und im Fenster eindeutig, denn er wird später zum Feld der
 Fensterklasse; ein ungültiger Name wird rot markiert und nicht übernommen.
 
-Ohne Auswahl zeigt der Inspektor das Fenster, dazu **Standard-Knopf (Enter)**
-und **Abbrechen-Knopf (Esc)**: eine Klappliste mit den Knöpfen des Fensters.
+Ohne Auswahl zeigt der Inspektor das Fenster, dazu **Enter-Knopf**
+und **Esc-Knopf**: eine Klappliste mit den Knöpfen des Fensters.
 Im Programm drückt Enter dann den einen und Esc den anderen -- sein
 `_Klick` läuft wie bei einem Mausklick (Enter auch aus einem einzeiligen
 Textfeld; ein Textbereich behält sein Enter). Gemerkt wird der Knopf beim Namen; wird er umbenannt, zieht die

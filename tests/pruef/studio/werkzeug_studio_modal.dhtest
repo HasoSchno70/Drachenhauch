@@ -332,7 +332,7 @@ taste 27
 zurueck
 
 === standard-knopf im inspektor waehlen, umbenennen zieht mit
-' Ohne Auswahl zeigt der Inspektor das Fenster: in "Standard-Knopf (Enter)"
+' Ohne Auswahl zeigt der Inspektor das Fenster: in "Enter-Knopf"
 ' zweimal runter (knopfA, knopfB), Enter; dann knopfB waehlen und in
 ' knopfOk umbenennen (Strg+A, Strg+V), Strg+S -- die Datei nennt den Knopf
 ' beim neuen Namen.
