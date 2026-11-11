@@ -273,6 +273,9 @@ SUB bereichsFarben()
     ' Die Ueberschrift der Hilfe gedaempft: sie sagt, was darunter steht, und
     ' soll nicht lauter sein als der Text selbst.
     GUI_SET_COLOR(lblHilfeKopf, "fg", GUI_THEME_GET("muted_fg"))
+    ' Ebenso der Kopf der Problemliste: er steht rechts und leise, damit er
+    ' nicht wie ein weiterer Reiter aussieht.
+    GUI_SET_COLOR(lblProbleme, "fg", GUI_THEME_GET("muted_fg"))
     GUI_SET_COLOR(tblVars, "bg", farbMisch(grund, TON_DEBUG, anteil))
     protokoll("bereichsfarben " + COLOR_HEX$(farbMisch(grund, TON_AUSGABE, anteil)))
     baumFarben()
@@ -1875,8 +1878,11 @@ DIM ctxSeriell AS INTEGER : ctxSeriell = GUI_CONTEXT(win)
 DIM miSerKopieren AS INTEGER : miSerKopieren = GUI_MENU_ITEM(ctxSeriell, tr$("Alle Zeilen kopieren"))
 GUI_CONTEXT_WIDGET(ctxSeriell, lstSeriell)
 ' Der Reiter der Leiste heisst schon "Probleme" -- ohne Ergebnis bleibt der
-' Kopf daneben leer, sonst stuende das Wort zweimal nebeneinander.
+' Kopf daneben leer, sonst stuende das Wort zweimal nebeneinander. Die Zahl
+' steht im Reiter ("Probleme (3)"), die Aufschluesselung rechts im Kopf.
 DIM lblProbleme AS GUI_WIDGET : lblProbleme = GUI_LABEL(win, "", 0, 0)
+GUI_SET_ALIGN(lblProbleme, "rechts")
+DIM problemeTitel AS STRING : problemeTitel = tr$("Probleme")
 DIM lstProbleme AS GUI_WIDGET : lstProbleme = GUI_LISTBOX(win, 0, 0, 10, 10, [])
 ' Rechtsklick auf die Liste der Suchtreffer (Strg+Umschalt+F): einzeln
 ' ersetzen, die angehakten ersetzen, alle/keinen anhaken.

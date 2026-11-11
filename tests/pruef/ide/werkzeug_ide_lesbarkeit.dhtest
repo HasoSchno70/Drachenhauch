@@ -340,3 +340,41 @@ DH_IDE_KONFIG=ide.json
 {"wasserzeichen": true, "wasserzeichen_selbst": true}
 --- erwartet
 selbst TRUE
+
+=== die zahl der probleme steht im reiter, ohne probleme ist der kopf leer
+' Seit 2026.47: neben dem Reiter "Probleme" stand "keine" -- es sah aus wie
+' ein zweiter Reiter. Jetzt traegt der Reiter die Zahl, der Kopf daneben
+' bleibt ohne Probleme leer.
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 80 THEN
+    protokoll("pr kopf |" + GUI_TEXT(lblProbleme) + "|")
+    GUI_SET_TEXT(reiter[aktiverTab].feld, "PRINT 1" + NL)
+END IF
+IF prBild = 170 THEN
+    protokoll("pr kopf |" + GUI_TEXT(lblProbleme) + "|")
+    EXIT(0)
+END IF
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=250
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT gibtsnicht
+PRINT auchnicht
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 15) = "probleme titel " THEN PRINT L[i]
+NEXT
+--- erwartet
+probleme titel Probleme (2)
+pr kopf |0 Fehler, 2 Warnungen|
+probleme titel Probleme
+pr kopf ||

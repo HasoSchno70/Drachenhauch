@@ -304,9 +304,17 @@ SUB pruefen()
     IF altF >= 0 AND altF <> ta THEN hinweiseZeigen(altF)
     hinweiseZeigen(ta)
     IF fehlerEndeAn AND LEN(fh) > 0 THEN protokoll("fehlertexte " + STR$(LEN(fh)))
+    ' Die Zahl im Reiter, ohne Probleme nichts im Kopf: "keine" neben dem
+    ' Reiter sah aus wie ein zweiter Reiter (die Liste sagt es selbst).
+    DIM pt AS STRING : pt = tr$("Probleme") + IIF(n - hinweise > 0, " (" + STR$(n - hinweise) + ")", "")
+    IF pt <> problemeTitel THEN
+        problemeTitel = pt
+        GUI_DOCK_TITLE(win, "probleme", pt)
+        protokoll("probleme titel " + pt)
+    END IF
     IF problemModus = 0 THEN
         IF n = 0 THEN
-            GUI_SET_TEXT(lblProbleme, tr$("keine"))
+            GUI_SET_TEXT(lblProbleme, "")
         ELSE
             DIM zusatz AS STRING : zusatz = ""
             IF hinweise > 0 THEN zusatz = ", " + STR$(hinweise) + IIF(hinweise = 1, " Hinweis", " Hinweise")
