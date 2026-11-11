@@ -191,7 +191,7 @@ SUB codeFarben(licht AS BOOLEAN)
     ELSE
         F_KLAMMER1 = &HF0C040 : F_KLAMMER2 = &HD878E0 : F_KLAMMER3 = &H40A8F8
     END IF
-    TON_PROJEKT = &H3B7BD8 : TON_AUSGABE = &H2E9E62 : TON_PROBLEME = &HD98B2B : TON_DEBUG = &H8C5BD6
+    TON_PROJEKT = &H3B7BD8 : TON_AUSGABE = &H3B7BD8 : TON_PROBLEME = &H3B7BD8 : TON_DEBUG = &H3B7BD8
     IF licht THEN
         B_ORDNER = &H8A5E00 : B_DH = &H0B5FA0 : B_WERKZEUG = &HA8500C : B_TEST = &H2A7A30
         B_DATEN = &H83379A : B_TEXT = &H4B5563 : B_BILD = &HA82A62 : B_KLANG = &H107468
@@ -249,10 +249,13 @@ END FUNCTION
 
 ' Die Toene der Bereiche -- Variablen, weil eigene Farben (farben.json) sie
 ' ueberschreiben duerfen; codeFarben setzt sie auf die Vorgabe zurueck.
+' Seit 2026.47 haben alle Bereiche DENSELBEN Ton: vier Farben um den Code
+' (blau, tuerkis, braun, violett) wirkten wie ein Flickenteppich. Wer sie
+' trennen will, setzt sie in der farben.json.
 DIM TON_PROJEKT AS INTEGER : TON_PROJEKT = &H3B7BD8
-DIM TON_AUSGABE AS INTEGER : TON_AUSGABE = &H2E9E62
-DIM TON_PROBLEME AS INTEGER : TON_PROBLEME = &HD98B2B
-DIM TON_DEBUG AS INTEGER : TON_DEBUG = &H8C5BD6
+DIM TON_AUSGABE AS INTEGER : TON_AUSGABE = &H3B7BD8
+DIM TON_PROBLEME AS INTEGER : TON_PROBLEME = &H3B7BD8
+DIM TON_DEBUG AS INTEGER : TON_DEBUG = &H3B7BD8
 
 SUB bereichsFarben()
     DIM grund AS INTEGER : grund = GUI_THEME_GET("widget_bg")
@@ -270,6 +273,8 @@ SUB bereichsFarben()
     GUI_SET_COLOR(tfSeriell, "bg", farbMisch(grund, TON_AUSGABE, anteil))
     GUI_SET_COLOR(tfEingabe, "bg", farbMisch(grund, TON_AUSGABE, anteil))
     GUI_SET_COLOR(lstProbleme, "bg", farbMisch(grund, TON_PROBLEME, anteil))
+    ' Die Hilfe als eigene Flaeche unter der Liste, im selben Ton.
+    GUI_SET_COLOR(pnlHilfe, "bg", farbMisch(grund, TON_PROBLEME, anteil))
     ' Die Ueberschrift der Hilfe gedaempft: sie sagt, was darunter steht, und
     ' soll nicht lauter sein als der Text selbst.
     GUI_SET_COLOR(lblHilfeKopf, "fg", GUI_THEME_GET("muted_fg"))
@@ -1898,6 +1903,10 @@ GUI_LISTBOX_PLACEHOLDER(lstProbleme, tr$("Keine Probleme gefunden"))
 ' Unter den Problemen steht die Hilfe zum Wort unter der Schreibmarke. Leer
 ' sah der Streifen wie ein Lagefehler aus -- darum ein eigener Kopf und ein
 ' Hinweis, solange es nichts zu sagen gibt.
+' Seit 2026.47 steht sie in einer eigenen, umrandeten Flaeche (pnlHilfe,
+' VOR den Beschriftungen angelegt: gezeichnet wird von vorn, die
+' Beschriftungen liegen darauf) -- vorher schwebte der Text frei.
+DIM pnlHilfe AS GUI_WIDGET : pnlHilfe = GUI_PANEL(win, 0, 0, 10, 10)
 DIM lblHilfeKopf AS GUI_WIDGET : lblHilfeKopf = GUI_LABEL(win, tr$("Hilfe zum Wort unter der Schreibmarke"), 0, 0)
 DIM lblHilfe AS GUI_WIDGET : lblHilfe = GUI_LABEL(win, "", 0, 0)
 CONST HILFE_LEER = "Schreibmarke auf einen Befehl oder Namen stellen -- hier steht dann, was er tut und wie er aufgerufen wird."
@@ -2052,6 +2061,7 @@ GUI_DOCK_ADD(win, "seriell", chkSerZeit) : GUI_DOCK_ADD(win, "seriell", btnSerLe
 GUI_DOCK_ADD(win, "seriell", lstSeriell) : GUI_DOCK_ADD(win, "seriell", imgSeriell)
 GUI_DOCK_ADD(win, "seriell", tfSeriell) : GUI_DOCK_ADD(win, "seriell", ddSerEnde)
 GUI_DOCK_ADD(win, "probleme", lstProbleme) : GUI_DOCK_ADD(win, "probleme", lblProbleme)
+GUI_DOCK_ADD(win, "probleme", pnlHilfe)
 GUI_DOCK_ADD(win, "probleme", lblHilfeKopf) : GUI_DOCK_ADD(win, "probleme", lblHilfe)
 GUI_DOCK_ADD(win, "debugger", lblDebug) : GUI_DOCK_ADD(win, "debugger", tblVars)
 GUI_DOCK_ADD(win, "debugger", btnWeiter) : GUI_DOCK_ADD(win, "debugger", btnDrueber)

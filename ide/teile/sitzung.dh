@@ -287,9 +287,11 @@ SUB layoutLeisten()
     (x, y, b, h) = GUI_DOCK_RECT(win, "probleme")
     IF b > 0 THEN
         GUI_SET_BOUNDS(lstProbleme, x, y, b, h \ 2 - 4)
-        GUI_SET_BOUNDS(lblHilfeKopf, x, y + h \ 2, b, 18)
-        GUI_SET_BOUNDS(lblHilfe, x, y + h \ 2 + 22, b, h \ 2 - 22)
-        GUI_SET_WRAP(lblHilfe, MAX(40, b - 8))
+        DIM hy AS INTEGER : hy = y + h \ 2
+        GUI_SET_BOUNDS(pnlHilfe, x, hy, b, MAX(30, y + h - hy))
+        GUI_SET_BOUNDS(lblHilfeKopf, x + 8, hy + 6, b - 16, 18)
+        GUI_SET_BOUNDS(lblHilfe, x + 8, hy + 28, b - 16, MAX(10, y + h - hy - 34))
+        GUI_SET_WRAP(lblHilfe, MAX(40, b - 24))
         (kx, ky, kb, kh) = GUI_DOCK_HEAD_RECT(win, "probleme")
         GUI_SET_BOUNDS(lblProbleme, kx + 8, ky + 2, MAX(40, kb - 8), 18)
     END IF

@@ -463,7 +463,8 @@ as well. These building blocks came with it:
   themes as a template. Per theme (`"dunkel"`, `"hell"`) there are the
   code colours (`grund`, `kommentar`, `text`, `zahl`, `schluessel`,
   `operator`, `fundstelle`, `klammer`, `suchtreffer`, `typ`), the tones of the
-  areas (`projekt`, `ausgabe`, `probleme`, `debugger`), the colours of the
+  areas (`projekt`, `ausgabe`, `probleme`, `debugger`; since 2026.47 all the
+  same blue by default), the colours of the
   project tree per file type (`baum_ordner`, `baum_dh`, `baum_werkzeug` for
   `.dhform`/`.dhsprite`/`.dhstudio` ..., `baum_test`, `baum_daten` for
   `.json`/`.csv`/`.ini`, `baum_text`, `baum_bild`, `baum_klang`) and under

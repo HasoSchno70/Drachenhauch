@@ -464,7 +464,8 @@ bekäme. Diese Bausteine kamen mit ihr:
   Themen als Vorlage. Je Thema (`"dunkel"`, `"hell"`) stehen die
   Code-Farben (`grund`, `kommentar`, `text`, `zahl`, `schluessel`,
   `operator`, `fundstelle`, `klammer`, `suchtreffer`, `typ`), die Töne der
-  Bereiche (`projekt`, `ausgabe`, `probleme`, `debugger`), die Farben des
+  Bereiche (`projekt`, `ausgabe`, `probleme`, `debugger`; seit 2026.47 per
+  Vorgabe alle derselbe Blauton), die Farben des
   Projektbaums je Dateiart (`baum_ordner`, `baum_dh`, `baum_werkzeug` für
   `.dhform`/`.dhsprite`/`.dhstudio` ..., `baum_test`, `baum_daten` für
   `.json`/`.csv`/`.ini`, `baum_text`, `baum_bild`, `baum_klang`) und unter

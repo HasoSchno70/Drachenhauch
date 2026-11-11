@@ -428,3 +428,33 @@ pr im lauf TRUE TRUE
 eingabezeile aus
 pr danach FALSE
 pr terminal TRUE
+
+=== die hilfe steht in einer eigenen flaeche unter den problemen
+' Seit 2026.47: Kopf und Text der Hilfe liegen in einem Kasten (pnlHilfe)
+' unter der Liste, mit Rand nach innen -- vorher schwebte der Text frei.
+' Und alle Bereiche haben einen Ton: die Hilfe traegt den der Liste.
+FUNCTION prDrin(w AS GUI_WIDGET) AS BOOLEAN
+    RETURN GUI_GET_X(w) > GUI_GET_X(pnlHilfe) AND GUI_GET_Y(w) > GUI_GET_Y(pnlHilfe) AND GUI_GET_X(w) + GUI_GET_W(w) < GUI_GET_X(pnlHilfe) + GUI_GET_W(pnlHilfe) AND GUI_GET_Y(w) + GUI_GET_H(w) <= GUI_GET_Y(pnlHilfe) + GUI_GET_H(pnlHilfe)
+END FUNCTION
+PRINT "sichtbar "; GUI_VISIBLE(pnlHilfe)
+PRINT "unter der liste "; GUI_GET_Y(pnlHilfe) >= GUI_GET_Y(lstProbleme) + GUI_GET_H(lstProbleme)
+PRINT "kopf drin "; prDrin(lblHilfeKopf)
+PRINT "text drin "; prDrin(lblHilfe)
+PRINT "ein ton "; TON_AUSGABE = TON_PROJEKT AND TON_PROBLEME = TON_PROJEKT AND TON_DEBUG = TON_PROJEKT
+EXIT(0)
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=100
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT 1
+--- erwartet
+sichtbar TRUE
+unter der liste TRUE
+kopf drin TRUE
+text drin TRUE
+ein ton TRUE

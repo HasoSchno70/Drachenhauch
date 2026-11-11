@@ -61,8 +61,9 @@ titel als text sichtbar TRUE
 satz unter dem titel TRUE
 
 === die bereiche tragen ihre farbe in beiden themen
-' Die Ausgabe ist gruenlich: 9 % Gruen in die Widget-Farbe des dunklen
-' Themas, 7 % in die des hellen. Der Wechsel des Themas mischt neu --
+' Die Ausgabe ist blaeulich wie alle Bereiche (seit 2026.47 ein Ton fuer
+' alle): 9 % Blau in die Widget-Farbe des dunklen Themas, 7 % in die des
+' hellen. Der Wechsel des Themas mischt neu --
 ' sonst trueg das helle Thema die dunklen Toene.
 befehl("thema")
 EXIT(0)
@@ -79,8 +80,8 @@ FOR i = 0 TO LEN(L) - 1
     IF LEFT$(L[i], 14) = "bereichsfarben" THEN PRINT L[i]
 NEXT
 --- erwartet
-bereichsfarben #384A51
-bereichsfarben #EDF5F3
+bereichsfarben #39475B
+bereichsfarben #EEF3FB
 
 === der projektbaum faerbt nach dateiart, in beiden themen
 ' Ordner gold, Quelltext blau -- im hellen Thema dunklere Toene derselben
