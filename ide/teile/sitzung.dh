@@ -345,10 +345,7 @@ END FUNCTION
 
 ' Je Bild: aendert sich das, legt layout() neu an.
 SUB eingabeNachziehen()
-    IF eingabeNoetig() <> eingabeGezeigt THEN
-        layout()
-        protokoll("eingabezeile " + IIF(eingabeGezeigt, "an", "aus"))
-    END IF
+    IF eingabeNoetig() <> eingabeGezeigt THEN layout()
 END SUB
 
 SUB layout()
@@ -370,7 +367,11 @@ SUB layout()
     DIM statusH AS INTEGER : statusH = 24
     ' Die Eingabezeile nur, solange jemand zuhoert (Programm, Debugger,
     ' Terminal) -- sonst nimmt das Dock ihren Platz (eingabeNachziehen).
+    ' Gemeldet wird der Wechsel HIER: auch terminalZeigen legt neu an, und
+    ' dort sah eingabeNachziehen den Wechsel nie.
+    DIM eingabeVorher AS BOOLEAN : eingabeVorher = eingabeGezeigt
     eingabeGezeigt = eingabeNoetig()
+    IF eingabeGezeigt <> eingabeVorher THEN protokoll("eingabezeile " + IIF(eingabeGezeigt, "an", "aus"))
     DIM eingabeH AS INTEGER : eingabeH = IIF(eingabeGezeigt, 30, 0)
     GUI_SET_VISIBLE(tfEingabe, eingabeGezeigt)
     GUI_SET_VISIBLE(btnEingabe, eingabeGezeigt)

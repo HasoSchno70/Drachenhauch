@@ -1939,7 +1939,7 @@ GUI_STATUSBAR_TIP(lblStatus, sfUmbruch, tr$("Zeilenumbruch an/aus (Alt+Z)"))
 DIM statusTipp AS STRING : statusTipp = ""
 DIM tfEingabe AS GUI_WIDGET : tfEingabe = GUI_TEXTINPUT(win, 0, 0, 10, 26, tr$("Eingabe für das laufende Programm -- Enter schickt"))
 DIM btnEingabe AS GUI_WIDGET : btnEingabe = GUI_BUTTON(win, tr$("Senden"), 0, 0, 80, 26)
-DIM eingabeGezeigt AS BOOLEAN : eingabeGezeigt = TRUE
+DIM eingabeGezeigt AS BOOLEAN : eingabeGezeigt = FALSE
 
 ' Vervollstaendigung: ein kleines Fenster mit Liste, sonst unsichtbar.
 DIM winVervoll AS GUI_WINDOW : winVervoll = GUI_WINDOW(tr$("Vervollständigen"), 400, 200, 320, 240)
