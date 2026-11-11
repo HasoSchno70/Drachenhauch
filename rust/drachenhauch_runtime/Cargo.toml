@@ -69,7 +69,7 @@ ttf-parser = { version = "0.25", optional = true }
 # LZW-Schreiber ist die Art Code, die auf den ersten Blick stimmt und in
 # einem Randfall still etwas Falsches liefert -- dieselbe Begruendung wie
 # unten bei den Pruefsummen.
-gif = "0.13"
+gif = "0.14"
 # physics3d-Modul (PHYS3D_*): echte 3D-Starrkoerper-Physik. Pure-Rust (nalgebra),
 # keine C-Toolchain -> ungated immer dabei.
 rapier3d = { version = "0.36", optional = true }
