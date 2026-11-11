@@ -330,8 +330,9 @@ sagt darum wenig (der MSVC-Linker schluckt, was ld64 ablehnt). Vor dem Push
 auch `cargo check` ohne das Feature `jit` (ein verrutschtes `cfg` fällt sonst
 erst in der CI auf).
 
-Eine Fassung: PR mit Nummer (`Cargo.toml`), Notizen
-(`docs/releases/release-<fassung>.md`) und Büchern; nach dem Merge
+Eine Fassung: PR mit Nummer (`Cargo.toml`), Notizen deutsch und englisch
+(`docs/releases/release-<fassung>.md` und `.en.md`, im Release englisch zuerst)
+und Büchern; nach dem Merge
 `git tag v<fassung>` auf den Merge-Commit und pushen. `release.yml` baut daraus
 Installer, Pakete und Prüfsummen und legt einen Release-**Entwurf** an, den der
 Nutzer veröffentlicht.

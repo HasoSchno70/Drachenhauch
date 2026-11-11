@@ -140,14 +140,28 @@ jobs:
           done
           (cd dist && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt)
 
+      # Die Notizen gibt es deutsch (release-<fassung>.md) und seit 2026.46
+      # auch englisch (release-<fassung>.en.md). Das Release zeigt beide:
+      # englisch zuerst (die Seite auf GitHub lesen die meisten auf Englisch),
+      # darunter das Deutsche.
       - name: Notizen finden
         run: |
           fassung="${TAG#v}"
+          de=""
           for n in "docs/releases/release-$fassung.md" "docs/release-$fassung.md"; do
-            if [ -f "$n" ]; then echo "NOTIZEN=$n" >> "$GITHUB_ENV"; echo "Notizen: $n"; exit 0; fi
+            if [ -f "$n" ]; then de="$n"; break; fi
           done
-          echo "::error::Keine Notizen docs/releases/release-$fassung.md"
-          exit 1
+          if [ -z "$de" ]; then echo "::error::Keine Notizen docs/releases/release-$fassung.md"; exit 1; fi
+          en="${de%.md}.en.md"
+          ziel="$RUNNER_TEMP/notizen.md"
+          if [ -f "$en" ]; then
+            { cat "$en"; printf '\n\n---\n\n*Deutsch:*\n\n'; cat "$de"; } > "$ziel"
+            echo "Notizen: $en + $de"
+          else
+            cp "$de" "$ziel"
+            echo "Notizen: $de (keine englische Fassung)"
+          fi
+          echo "NOTIZEN=$ziel" >> "$GITHUB_ENV"
 
       # Gibt es das Release schon (von Hand angelegt), kommen nur die Dateien
       # dazu (--clobber ersetzt gleichnamige). Sonst ein Entwurf.
