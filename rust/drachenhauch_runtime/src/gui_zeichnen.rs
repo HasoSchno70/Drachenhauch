@@ -708,6 +708,22 @@ impl Gui {
                 // Zeilen einzeln: so gilt die Ausrichtung je Zeile, und ein
                 // umbrechendes Label zeichnet genau das, was umbruch_layout
                 // gemessen hat (samt Kuerzen, Auswahl und Alt-Buchstabe).
+                // Ein eigener Grund (`GUI_SET_COLOR(lbl, "bg", ..)` oder die
+                // Stildatei) wird gezeichnet, ebenso ein eigener Rand -- bis
+                // 2026.47 ueberging eine Beschriftung beides still, und wer
+                // Text auf einer Flaeche wollte, legte ein Panel darunter.
+                let grund = wdg.ov.get("bg").copied().or_else(|| self.stil_farbe(wdg, "bg", stil::BASIS));
+                let rand = wdg.ov.get("border").copied().or_else(|| self.stil_farbe(wdg, "border", stil::BASIS));
+                if grund.is_some() || rand.is_some() {
+                    let rad = self.m("corner_radius").min(h / 2).max(0);
+                    if let Some(c) = grund { g.round_rect(ax, ay, ax + w - 1, ay + h - 1, rad, c, true); }
+                    // Ohne Rundung `rect` wie der Fehlerrahmen: die runde
+                    // Kontur liegt bei Radius 0 einen Punkt links/oben daneben.
+                    if let Some(c) = rand {
+                        if rad > 0 { g.round_rect(ax, ay, ax + w - 1, ay + h - 1, rad, c, false); }
+                        else { g.rect(ax, ay, ax + w - 1, ay + h - 1, c); }
+                    }
+                }
                 let (pv, ph) = self.w_abstand(wdg).unwrap_or((0, 0));
                 self.label_zeichnen(g, wdg, ax + ph, ay + pv, (w - 2 * ph).max(1), fg);
             }

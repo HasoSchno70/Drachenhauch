@@ -2120,6 +2120,10 @@ warn = GUI_BUTTON(win, "Löschen", 20, 100, 100, 30)
 GUI_SET_COLOR(warn, "bg", RGB(160, 40, 40))   ' only this button is red
 ```
 
+A **label** (`GUI_LABEL`) also draws `"bg"` and `"border"` (since
+2026.47; from the style sheet too) -- text on a surface of its own needs no
+panel underneath.
+
 Buttons have two more roles: `"hover"` (under the mouse) and
 `"pressed"` (held down); without them the background becomes lighter or darker. And the
 **text colour follows the background** as long as `"fg"` is not set: dark on a

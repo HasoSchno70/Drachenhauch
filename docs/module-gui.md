@@ -2130,6 +2130,10 @@ warn = GUI_BUTTON(win, "Löschen", 20, 100, 100, 30)
 GUI_SET_COLOR(warn, "bg", RGB(160, 40, 40))   ' nur dieser Button ist rot
 ```
 
+Auch eine **Beschriftung** (`GUI_LABEL`) zeichnet `"bg"` und `"border"`
+(seit 2026.47; ebenso aus der Stildatei) -- für Text auf einer eigenen
+Fläche braucht es kein Panel darunter.
+
 Für Knöpfe gibt es zwei Rollen mehr: `"hover"` (unter der Maus) und
 `"pressed"` (gedrückt); ohne sie wird der Grund heller bzw. dunkler. Und die
 **Schriftfarbe folgt dem Grund**, solange `"fg"` nicht gesetzt ist: auf einem
