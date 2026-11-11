@@ -2570,7 +2570,10 @@ wird: darüber nimmt die Stärke im Verhältnis ab, ein Fünftel bleibt stehen,
 damit eine hohe Fläche nicht ganz nach Papier aussieht. Mit ihr werden auch
 die **Fase** (mit dem Quadrat des Anteils) und der **Fokusring** um eine hohe
 Fläche leiser -- eine helle Kante in voller Stärke über einer ganzen Leiste
-und ein zweiter Rahmen um ein großes Code-Feld wirken unruhig.
+und ein zweiter Rahmen um ein großes Code-Feld wirken unruhig. Ebenso der
+**Rand eines Textbereichs im Fokus**: um eine hohe Fläche mischt sich der
+Akzent mit der Randfarbe (mindestens 35 % Akzent); ein eigener Akzent am
+Widget (`GUI_SET_COLOR(ta, "accent", …)`) gilt unverändert.
 `GUI_METRIC_SET("verlauf_hoehe", 120)` ist ein guter Anfang für eine
 Oberfläche mit großen Listen und Textfeldern.
 

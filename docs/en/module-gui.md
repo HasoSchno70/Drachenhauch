@@ -2559,7 +2559,10 @@ less: above it the strength decreases proportionally, one fifth remains,
 so that a tall surface does not look completely like paper. With it the
 **bevel** (by the square of the share) and the **focus ring** around a tall
 surface become quieter too -- a light edge at full strength across a whole
-panel and a second frame around a large code field look restless.
+panel and a second frame around a large code field look restless. The
+same goes for the **border of a focused text area**: around a tall surface
+the accent mixes with the border colour (at least 35 % accent); an accent
+of the widget's own (`GUI_SET_COLOR(ta, "accent", …)`) applies unchanged.
 `GUI_METRIC_SET("verlauf_hoehe", 120)` is a good start for an
 interface with large lists and text inputs.
 

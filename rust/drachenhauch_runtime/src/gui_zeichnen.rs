@@ -975,7 +975,16 @@ impl Gui {
             Kind::TextArea => {
                 let focused = self.focus_widget == Some((wi, idx));
                 let fg = self.txt_col(wdg);
-                let bcol = if focused { self.wcol(wdg, "accent", "accent") } else { self.wcol(wdg, "border", "widget_border") };
+                // Fokus: der Rand im Akzent -- um eine GROSSE Flaeche (das
+                // Code-Feld einer IDE) aber gemischt mit dem Rand, wie der
+                // Fokusring darunter (`verlauf_hoehe`): ein voller Akzent um
+                // 900 Punkte Code war der lauteste Strich im Fenster, und die
+                // Schreibmarke zeigt den Fokus ohnehin. Eine eigene Farbe
+                // (`accent` am Widget) gilt unveraendert.
+                let rand = self.wcol(wdg, "border", "widget_border");
+                let bcol = if !focused { rand }
+                    else if wdg.ov.contains_key("accent") { self.wcol(wdg, "accent", "accent") }
+                    else { mischen(rand, self.th("accent"), self.verlauf_anteil(h).max(0.35)) };
                 self.fbox_tief_w(g, wdg.kind, ax, ay, ax + w - 1, ay + h - 1, self.wcol(wdg, "bg", "win_bg"), bcol);
                 let pad = 5;
                 let lh = self.ta_line_h(g, wdg);

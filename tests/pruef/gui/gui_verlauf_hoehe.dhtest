@@ -163,3 +163,78 @@ PRINT "gross leiser "; ringGross < ringKlein \ 3
 klein deutlich TRUE
 gross sichtbar TRUE
 gross leiser TRUE
+
+=== ein kleiner textbereich zeigt den fokus im vollen akzent
+' Bis zur Hoehe `verlauf_hoehe` ist der Rand im Fokus der Akzent.
+IMPORT "gui"
+SCREEN(400, 400, "T", 1)
+GUI_METRIC_SET("corner_radius", 0)
+GUI_METRIC_SET("verlauf_hoehe", 120)
+GUI_THEME_SET("accent", &HFF00FF)
+GUI_THEME_SET("widget_border", &H404040)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 400, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(w, 40, 40, 300, 80)
+GUI_FOCUS(ta)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=30
+--- bild
+40 80 #FF00FF +-30
+
+=== ein grosser textbereich zeigt den fokus leiser
+' Seit 2026.47: um eine grosse Flaeche (ein Code-Feld) mischt sich der
+' Akzent mit dem Rand -- hier 35 %: #404040 -> #FF00FF gibt etwa #7F2A7F.
+IMPORT "gui"
+SCREEN(400, 400, "T", 1)
+GUI_METRIC_SET("corner_radius", 0)
+GUI_METRIC_SET("verlauf_hoehe", 120)
+GUI_THEME_SET("accent", &HFF00FF)
+GUI_THEME_SET("widget_border", &H404040)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 400, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(w, 40, 40, 300, 300)
+GUI_FOCUS(ta)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=30
+--- bild
+40 190 #7F2A7F +-30
+40 190 nicht #FF00FF +-60
+
+=== eine eigene akzentfarbe gilt auch um einen grossen textbereich
+' Wer dem Widget selbst einen Akzent gibt, bekommt ihn ungemischt.
+IMPORT "gui"
+SCREEN(400, 400, "T", 1)
+GUI_METRIC_SET("corner_radius", 0)
+GUI_METRIC_SET("verlauf_hoehe", 120)
+GUI_THEME_SET("accent", &HFF00FF)
+GUI_THEME_SET("widget_border", &H404040)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 400, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(w, 40, 40, 300, 300)
+GUI_SET_COLOR(ta, "accent", &H00FF00)
+GUI_FOCUS(ta)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=30
+--- bild
+40 190 #00FF00 +-30
