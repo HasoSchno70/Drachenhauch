@@ -1584,6 +1584,9 @@ GUI_MENU_SEPARATOR(mPlugins)
 ' wurden, und ein Text-"|" als Trenner. Der Befehl je Eintrag steht in
 ' wzBefehle unter derselben Nummer.
 DIM leiste AS GUI_WIDGET : leiste = GUI_TOOLBAR(win, 0, 0, 10, 34)
+' Seit 2026.47 groessere Sinnbilder (vorher aus der Hoehe gerechnet, rund
+' 20): die Leiste ist das, was man am haeufigsten anklickt.
+GUI_TOOLBAR_SET(leiste, "symbolgroesse", 22)
 DIM wzBefehle AS ARRAY OF STRING : wzBefehle = []
 SUB wzKnopf(sinnbild AS STRING, tip AS STRING, bef AS STRING)
     GUI_TOOLBAR_ADD(leiste, sinnbild, tr$(tip))
@@ -1776,7 +1779,10 @@ DIM lblProjekt AS GUI_WIDGET : lblProjekt = GUI_LABEL(win, tr$("Projekt"), 0, 0)
 ' Filter ueber dem Baum, in der Zeile des Projektnamens -- der Baum bleibt,
 ' wo er war. Ein Teil des Dateinamens, Gross/klein egal; Ordner bleiben
 ' stehen (ihr Inhalt wird beim Aufklappen gefiltert).
-DIM tfBaumFilter AS GUI_WIDGET : tfBaumFilter = GUI_TEXTINPUT(win, 0, 0, 10, 10, tr$("Filter ..."))
+' Seit 2026.47 ein Suchfeld (Lupe, Kreuz zum Leeren) wie im Studio -- vorher
+' sah "Filter ..." im Kopf aus wie ein weiterer Reiter.
+DIM tfBaumFilter AS GUI_WIDGET : tfBaumFilter = GUI_TEXTINPUT(win, 0, 0, 10, 10, tr$("Filter"))
+GUI_TEXTINPUT_SET(tfBaumFilter, "suche", 1)
 GUI_TOOLTIP(tfBaumFilter, tr$("Nur Dateien, deren Name das enthält"))
 DIM baumFilterZuletzt AS STRING : baumFilterZuletzt = ""
 DIM lblGliederung AS GUI_WIDGET : lblGliederung = GUI_LABEL(win, tr$("Gliederung"), 0, 0)
@@ -1837,7 +1843,8 @@ DIM lblAusgabe AS GUI_WIDGET : lblAusgabe = GUI_LABEL(win, "", 0, 0)   ' der Rei
 DIM lstAusgabe AS GUI_WIDGET : lstAusgabe = GUI_LISTBOX(win, 0, 0, 10, 10, [])
 ' Nur passende Zeilen zeigen (Teiltext, Gross/klein egal); die Zeilen selbst
 ' bleiben, leer zeigt wieder alle.
-DIM tfAusgabeFilter AS GUI_WIDGET : tfAusgabeFilter = GUI_TEXTINPUT(win, 0, 0, 10, 10, tr$("Filter ..."))
+DIM tfAusgabeFilter AS GUI_WIDGET : tfAusgabeFilter = GUI_TEXTINPUT(win, 0, 0, 10, 10, tr$("Filter"))
+GUI_TEXTINPUT_SET(tfAusgabeFilter, "suche", 1)
 GUI_TOOLTIP(tfAusgabeFilter, tr$("Nur Zeilen der Ausgabe zeigen, die diesen Text enthalten"))
 DIM ausgabeFilterAlt AS STRING : ausgabeFilterAlt = ""
 DIM ctxAusgabe AS INTEGER : ctxAusgabe = GUI_CONTEXT(win)

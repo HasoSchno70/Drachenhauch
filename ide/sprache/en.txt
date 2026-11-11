@@ -190,6 +190,7 @@ Andere schließen	Close others
 Rechts davon schließen	Close to the right
 Projekt	Project
 Filter ...	Filter ...
+Filter	Filter
 Nur Dateien, deren Name das enthält	Only files whose name contains this
 Gliederung	Outline
 Keine Unterprogramme	No subroutines
