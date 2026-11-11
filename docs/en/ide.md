@@ -389,7 +389,9 @@ as well. These building blocks came with it:
   commands (`MID$("abc", 1, 1)` → `s, start, n`). As many names
   appear as there are arguments, without type; a single argument
   (`SETFPS(60)`) gets no hint. One hint per line (the first
-  such call). The IDE remembers the signatures until the next
+  such call), since 2026.47 only on the line with the cursor --
+  `"parameter_nur_zeile": false` in the `ide.json` shows them at every
+  call again. The IDE remembers the signatures until the next
   save. A **method call** (`ob.setz(3, 4)`) gets the names of the
   method of ITS class, inherited ones included -- all from one compile
   per check (`CODE_METHOD_CALLS$`); if the text does not compile right

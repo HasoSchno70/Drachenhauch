@@ -458,3 +458,75 @@ unter der liste TRUE
 kopf drin TRUE
 text drin TRUE
 ein ton TRUE
+
+=== parameternamen stehen nur in der zeile der schreibmarke
+' Seit 2026.47: an jedem Aufruf der Datei zugleich machten sie den Code
+' unruhig. Die Marke steht erst in Zeile 1 (nichts), dann auf dem Aufruf
+' in Zeile 4 (einer), dann in Zeile 5 (nichts).
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 60 THEN GUI_TEXTAREA_GOTO(reiter[aktiverTab].feld, 4, 1)
+IF prBild = 70 THEN GUI_TEXTAREA_GOTO(reiter[aktiverTab].feld, 5, 1)
+IF prBild = 80 THEN EXIT(0)
+--- argumente
+haupt.dh
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+--- datei haupt.dh
+SUB kreis(x AS INTEGER, y AS INTEGER, r AS INTEGER)
+    PRINT x
+END SUB
+kreis(100, 50, 20)
+DIM a AS INTEGER : a = 1
+kreis(1, 2, 3)
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+DIM vorher AS STRING : vorher = ""
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 16) = "parameter zeile " AND L[i] <> vorher THEN PRINT L[i] : vorher = L[i]
+NEXT
+--- erwartet
+parameter zeile 1 0
+parameter zeile 4 1
+parameter zeile 5 0
+
+=== mit parameter_nur_zeile false stehen sie an allen aufrufen
+' Beide Aufrufe zugleich, und ein Wechsel der Zeile zeigt nicht neu.
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 60 THEN GUI_TEXTAREA_GOTO(reiter[aktiverTab].feld, 4, 1)
+IF prBild = 70 THEN GUI_TEXTAREA_GOTO(reiter[aktiverTab].feld, 5, 1)
+IF prBild = 80 THEN EXIT(0)
+--- argumente
+haupt.dh
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+--- datei haupt.dh
+SUB kreis(x AS INTEGER, y AS INTEGER, r AS INTEGER)
+    PRINT x
+END SUB
+kreis(100, 50, 20)
+DIM a AS INTEGER : a = 1
+kreis(1, 2, 3)
+--- datei _programm/ide.json
+{"parameter_nur_zeile": false}
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+DIM vorher AS STRING : vorher = ""
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 16) = "parameter zeile " AND L[i] <> vorher THEN PRINT L[i] : vorher = L[i]
+NEXT
+--- erwartet
+parameter zeile 1 2

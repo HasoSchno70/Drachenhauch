@@ -390,7 +390,9 @@ bekäme. Diese Bausteine kamen mit ihr:
   Befehle (`MID$("abc", 1, 1)` → `s, start, n`). Es stehen so viele Namen
   da, wie Argumente dastehen, ohne Typ; ein einzelnes Argument
   (`SETFPS(60)`) bekommt keinen Hinweis. Ein Hinweis je Zeile (der erste
-  solche Aufruf). Die Signaturen merkt sich die IDE bis zum nächsten
+  solche Aufruf), seit 2026.47 nur in der Zeile der Schreibmarke --
+  `"parameter_nur_zeile": false` in der `ide.json` zeigt sie wieder an
+  allen Aufrufen. Die Signaturen merkt sich die IDE bis zum nächsten
   Sichern. Ein **Methodenaufruf** (`ob.setz(3, 4)`) bekommt die Namen der
   Methode SEINER Klasse, auch geerbt -- alle aus einem Übersetzungslauf je
   Prüfung (`CODE_METHOD_CALLS$`); übersetzt der Text gerade nicht, gilt der

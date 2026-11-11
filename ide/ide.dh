@@ -599,6 +599,11 @@ DIM typHinweiseAn AS BOOLEAN : typHinweiseAn = TRUE
 ' festes Argument (Zahl, Text, TRUE/FALSE) mitgegeben wird, steht die
 ' Signatur -- `kreis(100, 50, 20)` sagt sonst nicht, was 50 ist.
 DIM paramNamenAn AS BOOLEAN : paramNamenAn = TRUE
+' Seit 2026.47 nur in der Zeile der Schreibmarke: an jedem Aufruf der
+' Datei zugleich machten sie den Code unruhig. "parameter_nur_zeile":
+' false in der ide.json zeigt sie wieder ueberall.
+DIM paramNurZeile AS BOOLEAN : paramNurZeile = TRUE
+DIM paramZeileGezeigt AS INTEGER : paramZeileGezeigt = -1
 DIM paramFeld AS GUI_WIDGET : paramFeld = -1
 ' Ein Hinweis hinter einer Zeile (GUI_TEXTAREA_HINTS).
 CLASS Zeilenhinweis
@@ -1177,6 +1182,7 @@ zaehlerAn = kBool("aufrufzaehler", zaehlerAn)
 fehlerEndeAn = kBool("fehler_am_ende", fehlerEndeAn)
 typHinweiseAn = kBool("typ_hinweise", typHinweiseAn)
 paramNamenAn = kBool("parameter_namen", paramNamenAn)
+paramNurZeile = kBool("parameter_nur_zeile", paramNurZeile)
 einfuegenEinrueckenAn = kBool("einfuegen_einruecken", einfuegenEinrueckenAn)
 neustartSichernAn = kBool("neustart_beim_sichern", neustartSichernAn)
 IF JSON_HAS(konfig, "start") THEN

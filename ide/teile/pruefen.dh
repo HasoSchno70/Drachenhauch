@@ -805,6 +805,8 @@ SUB spurNachziehen()
     DIM schl AS STRING : schl = STR$(aktiverTab) + ":" + STR$(z) + ":" + gliederungSchluessel
     IF schl = spurSchluessel THEN RETURN
     spurSchluessel = schl
+    ' Die Parameternamen gehen mit der Zeile der Schreibmarke mit.
+    IF paramNamenAn AND paramNurZeile AND ta = paramFeld AND z <> paramZeileGezeigt THEN hinweiseZeigen(ta)
     DIM datei AS STRING : datei = reiter[aktiverTab].name$()
     DIM spur AS STRING : spur = datei
     ' Die Pfadleiste bekommt je Teil die ZEILE seines Blocks als Wert --
