@@ -378,3 +378,53 @@ probleme titel Probleme (2)
 pr kopf |0 Fehler, 2 Warnungen|
 probleme titel Probleme
 pr kopf ||
+
+=== die eingabezeile steht nur, solange ein programm zuhoert
+' Seit 2026.47: vorher stand "Eingabe fuer das laufende Programm" immer
+' unten, auch ohne Programm. Jetzt nur waehrend eines Laufs (F5, Debugger)
+' oder im Terminal; sonst bekommt das Dock den Platz.
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../../ide/ide.dh nach SETFPS(60)
+--- einschub nach     IF GUI_DOUBLE_CLICKED(lstProbleme) THEN problemAnspringen()
+prBild = prBild + 1
+IF prBild = 20 THEN
+    protokoll("pr vorher " + STR$(GUI_VISIBLE(tfEingabe)))
+    befehl("start")
+END IF
+IF prBild = 120 THEN
+    protokoll("pr im lauf " + STR$(GUI_VISIBLE(tfEingabe)) + " " + STR$(GUI_VISIBLE(btnEingabe)))
+    GUI_SET_TEXT(tfEingabe, "21")
+    eingabeSenden()
+END IF
+IF prBild = 240 THEN
+    protokoll("pr danach " + STR$(GUI_VISIBLE(tfEingabe)))
+    terminalZeigen(TRUE)
+END IF
+IF prBild = 250 THEN
+    protokoll("pr terminal " + STR$(GUI_VISIBLE(tfEingabe)))
+    EXIT(0)
+END IF
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=300
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+DIM n AS INTEGER
+INPUT "Zahl"; n
+PRINT "doppelt "; n * 2
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 13) = "eingabezeile " THEN PRINT L[i]
+NEXT
+--- erwartet
+pr vorher FALSE
+eingabezeile an
+pr im lauf TRUE TRUE
+eingabezeile aus
+pr danach FALSE
+pr terminal TRUE

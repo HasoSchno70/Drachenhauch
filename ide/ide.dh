@@ -1917,6 +1917,7 @@ GUI_STATUSBAR_TIP(lblStatus, sfUmbruch, tr$("Zeilenumbruch an/aus (Alt+Z)"))
 DIM statusTipp AS STRING : statusTipp = ""
 DIM tfEingabe AS GUI_WIDGET : tfEingabe = GUI_TEXTINPUT(win, 0, 0, 10, 26, tr$("Eingabe für das laufende Programm -- Enter schickt"))
 DIM btnEingabe AS GUI_WIDGET : btnEingabe = GUI_BUTTON(win, tr$("Senden"), 0, 0, 80, 26)
+DIM eingabeGezeigt AS BOOLEAN : eingabeGezeigt = TRUE
 
 ' Vervollstaendigung: ein kleines Fenster mit Liste, sonst unsichtbar.
 DIM winVervoll AS GUI_WINDOW : winVervoll = GUI_WINDOW(tr$("Vervollständigen"), 400, 200, 320, 240)
@@ -2998,6 +2999,7 @@ WHILE NOT beenden
     IF sfk = sfPos THEN befehl("zeile")
     IF sfk = sfUmbruch THEN befehl("umbruch")
     statusTippNachziehen()
+    eingabeNachziehen()
     DIM spk AS INTEGER : spk = GUI_BREADCRUMB_CLICKED(lblSpur)
     IF spk >= 0 THEN
         DIM spd AS STRING : spd = GUI_BREADCRUMB_DATA$(lblSpur, spk)

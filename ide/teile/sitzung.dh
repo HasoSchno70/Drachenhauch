@@ -334,6 +334,20 @@ FUNCTION aktivesFeldOderWk() AS GUI_WIDGET
     RETURN lblWkTitel
 END FUNCTION
 
+' Braucht es die Eingabezeile? Ein laufendes Programm (auch im Debugger)
+' oder das Terminal liest dort mit.
+FUNCTION eingabeNoetig() AS BOOLEAN
+    RETURN prozess >= 0 OR terminalAn
+END FUNCTION
+
+' Je Bild: aendert sich das, legt layout() neu an.
+SUB eingabeNachziehen()
+    IF eingabeNoetig() <> eingabeGezeigt THEN
+        layout()
+        protokoll("eingabezeile " + IIF(eingabeGezeigt, "an", "aus"))
+    END IF
+END SUB
+
 SUB layout()
     DIM w AS INTEGER : w = schirmB()
     DIM h AS INTEGER : h = schirmH()
@@ -351,7 +365,12 @@ SUB layout()
     GUI_SET_VISIBLE(leiste, leisteAn)
     IF leisteAn THEN GUI_SET_BOUNDS(leiste, 0, oben - 4, w, 36)
     DIM statusH AS INTEGER : statusH = 24
-    DIM eingabeH AS INTEGER : eingabeH = 30
+    ' Die Eingabezeile nur, solange jemand zuhoert (Programm, Debugger,
+    ' Terminal) -- sonst nimmt das Dock ihren Platz (eingabeNachziehen).
+    eingabeGezeigt = eingabeNoetig()
+    DIM eingabeH AS INTEGER : eingabeH = IIF(eingabeGezeigt, 30, 0)
+    GUI_SET_VISIBLE(tfEingabe, eingabeGezeigt)
+    GUI_SET_VISIBLE(btnEingabe, eingabeGezeigt)
     oben = oben + leisteH
     ' Das Dock nimmt alles zwischen Werkzeugleiste und Eingabezeile: links
     ' und rechts die Seitenleisten, unten Ausgabe und Probleme, die Mitte
