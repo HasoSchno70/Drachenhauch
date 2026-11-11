@@ -310,7 +310,6 @@ SUB pruefen()
     IF pt <> problemeTitel THEN
         problemeTitel = pt
         GUI_DOCK_TITLE(win, "probleme", pt)
-        protokoll("probleme titel " + pt)
     END IF
     IF problemModus = 0 THEN
         IF n = 0 THEN

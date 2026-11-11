@@ -857,6 +857,11 @@ impl Gui {
     }
     /// GUI_DOCK_ACTIVATE(win, name$): den Reiter nach vorn holen.
     pub fn dock_activate(&mut self, win: i64, name: &str) -> Result<(), String> { self.dock_show(win, name, true) }
+    /// GUI_DOCK_TITLE$(win, name$): der Titel im Reiter einer Leiste.
+    pub fn dock_title_text(&self, win: i64, name: &str) -> Result<String, String> {
+        let li = self.dock_leiste(win, name, "GUI_DOCK_TITLE$")?;
+        Ok(self.dock_ref(win, "GUI_DOCK_TITLE$")?.leisten[li].titel.clone())
+    }
     pub fn dock_title(&mut self, win: i64, name: &str, titel: &str) -> Result<(), String> {
         let li = self.dock_leiste(win, name, "GUI_DOCK_TITLE")?;
         let d = self.dock_mut(win, "GUI_DOCK_TITLE")?;

@@ -989,7 +989,7 @@ prBild = prBild + 1
 IF prBild = 10 THEN dateiOeffnen(PATHJOIN(projektOrdner, "tief/unten/b_zwei.dh"))
 IF prBild = 20 THEN
     protokoll("pr status " + GUI_STATUSBAR_TEXT$(lblStatus, 0))
-    protokoll("pr tipp " + STR$(wegGleich$(statusTipp) = wegGleich$(PATHJOIN(projektOrdner, "tief/unten/b_zwei.dh"))))
+    protokoll("pr tipp " + STR$(wegGleich$(GUI_STATUSBAR_TIP$(lblStatus, 0)) = wegGleich$(PATHJOIN(projektOrdner, "tief/unten/b_zwei.dh"))))
     dateiOeffnen("C:/gibt/es/nicht/x.dh")
     protokoll("pr fremd " + GUI_STATUSBAR_TEXT$(lblStatus, 0))
     EXIT(0)

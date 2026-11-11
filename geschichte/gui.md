@@ -645,3 +645,18 @@ Stelle. Ausnahme `popups_oben`: ein Fenster im Entwurfsmodus mit Zoom oder
 Zuschnitt behaelt sie, denn dort stehen sie in seiner vergroesserten Lage.
 Tests drei Faelle in `gui_menue_obenauf.dhtest` (selbst gemalt, Fenster
 davor, Klappliste), die alte Laufzeit faellt alle drei.
+
+## Abfragen zu den Settern (2026-11-11)
+
+`GUI_TOOLTIP$`, `GUI_TEXTINPUT_GET` (dieselben Schluessel wie
+`GUI_TEXTINPUT_SET`), `GUI_TEXTINPUT_PLACEHOLDER$` (auch Textbereich),
+`GUI_STATUSBAR_TIP$`, `GUI_TOOLBAR_GET`, `GUI_DOCK_TITLE$`,
+`GUI_TEXTAREA_HINT$` und `GUI_TEXTAREA_HINT_COUNT`. Anlass: die Tests der
+IDE-Durchsicht (geschichte/ide.md) konnten den Zustand nicht zuruecklesen.
+`GUI_TEXTAREA_HINT$` zieht die Zeilen vorher nach (`marken_abgleichen`),
+sonst gaebe es zwischen Tippen und naechstem Bild den alten Stand. Die
+Gegenprobe verfaelschte alle acht in einem Bau (`gui_abfragen.dhtest`,
+jeder Wertefall prueft einen anderen Getter). Dazu der Fokusrand: ein
+Textbereich ueber `verlauf_hoehe` mischt den Akzent mit der Randfarbe
+(mindestens 35 %), ein eigener Akzent am Widget bleibt
+(`gui_verlauf_hoehe.dhtest`).

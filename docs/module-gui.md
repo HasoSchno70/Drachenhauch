@@ -55,6 +55,7 @@ IMPORT "gui"
 | `GUI_DOCK_SHOW(win, name$, an)` | — | eine Leiste ausblenden bzw. wieder zeigen (dann vorn) |
 | `GUI_DOCK_ACTIVATE(win, name$)` | — | den Reiter der Leiste nach vorn holen |
 | `GUI_DOCK_TITLE(win, name$, titel$)` | — | den Reiter neu beschriften |
+| `GUI_DOCK_TITLE$(win, name$)` | STRING | die Beschriftung des Reiters |
 | `GUI_DOCK_CLOSABLE(win, name$, an)` | — | ein Kreuz am Reiter: ein Klick blendet die Leiste aus und meldet sie |
 | `GUI_DOCK_CLOSED$(win)` | STRING | die Leiste, deren Kreuz in diesem Bild geklickt wurde ("" = keine) |
 | `GUI_DOCK_CHANGED(win)` | BOOLEAN | hat sich in diesem Bild ein Rechteck geändert (gezogen, umgeschaltet, abgetrennt)? Dann die Inhalte neu verteilen |
@@ -149,6 +150,7 @@ IMPORT "gui"
 | `GUI_TOOLBAR_SET_TIP(tb, eintrag, tip$)` | — | Tooltip eines Eintrags |
 | `GUI_TOOLBAR_SET_TEXT(tb, eintrag, text$)` | — | Beschriftung eines Eintrags |
 | `GUI_TOOLBAR_SET(tb, schluessel$, wert)` | — | `beschriftung` (0/1: Text neben dem Sinnbild), `symbolgroesse` (Punkte, 0 = aus der Höhe) |
+| `GUI_TOOLBAR_GET(tb, schluessel$)` | INTEGER | liest `beschriftung` und `symbolgroesse` zurück |
 | `GUI_TOOLBAR_ITEM_X(tb, eintrag)` | INTEGER | linke Kante eines Eintrags im Fenster (wie `GUI_GET_X`) |
 | `GUI_TOOLBAR_ITEM_W(tb, eintrag)` | INTEGER | Breite eines Eintrags |
 | `GUI_TOOLBAR_OVERFLOW(tb)` | INTEGER | wie viele Knöpfe gerade im »-Menü stehen (0 = alles passt) |
@@ -157,6 +159,7 @@ IMPORT "gui"
 | `GUI_STATUSBAR_SET(sb, feld, text$)` | — | Text eines Feldes (`GUI_SET_TEXT` meint Feld 0) |
 | `GUI_STATUSBAR_TEXT$(sb, feld)` | STRING | Text eines Feldes |
 | `GUI_STATUSBAR_TIP(sb, feld, tip$)` | — | Tooltip eines Feldes |
+| `GUI_STATUSBAR_TIP$(sb, feld)` | STRING | Tooltip eines Feldes lesen |
 | `GUI_STATUSBAR_CLICKABLE(sb, feld, an)` | — | Feld anklickbar machen |
 | `GUI_STATUSBAR_CLICKED(sb)` | INTEGER | Nummer des Feldes, das in diesem Bild geklickt wurde, sonst -1 |
 | `GUI_STATUSBAR_COUNT(sb)` | INTEGER | Zahl der Felder |
@@ -183,6 +186,8 @@ IMPORT "gui"
 | `GUI_PANEL(win, x, y, w, h[, titel$])` | GUI_WIDGET | Container (Deko) |
 | `GUI_TEXTINPUT(win, x, y, w, h[, platzhalter$])` | GUI_WIDGET | einzeiliges Eingabefeld (Caret + Selektion, Strg+Z/Y); der Platzhalter steht gedaempft da, bis getippt wird -- auch mit Fokus |
 | `GUI_TEXTINPUT_SET(tf, key$, wert)` | — | `passwort`, `nur_lesen`, `maxlaenge`, `zahlen` (0 frei, 1 ganze Zahl, 2 Kommazahl, 3 Geldbetrag in Cent), `suche` (Suchfeld mit Lupe und Kreuz) |
+| `GUI_TEXTINPUT_GET(tf, key$)` | INTEGER | liest dieselben Schlüssel zurück (Schalter als 0/1) |
+| `GUI_TEXTINPUT_PLACEHOLDER$(tf)` | STRING | der graue Text im leeren Feld (auch eines `GUI_TEXTAREA`) |
 | `GUI_TEXTINPUT_ICON(tf, links$, rechts$)` | — | ein eingebautes Sinnbild links und rechts im Feld ("" = keins) -- siehe [Suchfeld, Sinnbilder, Vorschläge](#suchfeld-sinnbilder-vorschläge) |
 | `GUI_ICON_CLICKED(tf)` | INTEGER | in diesem Bild angeklicktes Sinnbild: 1 links, 2 rechts, 0 keins |
 | `GUI_SEARCH_CHANGED(tf)` | BOOLEAN | ein Suchfeld meldet seinen Text: 150 ms nach dem letzten Anschlag, sofort bei Enter, Kreuz und ESC |
@@ -314,6 +319,7 @@ IMPORT "gui"
 | `GUI_HOVERED(widget)` | BOOLEAN | Maus über dem Widget? |
 | `GUI_SET_TEXT(widget, text$)` | — | Text setzen |
 | `GUI_TOOLTIP(widget, text$)` | — | Hover-Hilfetext (mehrzeilig via `\n`; "" entfernt ihn) |
+| `GUI_TOOLTIP$(widget)` | STRING | der gesetzte Hilfetext ("" ohne) |
 | `GUI_SET_CHECKED(widget, an)` | — | Checkbox setzen |
 | `GUI_SET_VALUE(widget, wert)` | — | Slider-Wert setzen (wird geclamped) |
 | `GUI_ON_CLICK(widget, funcref)` | — | FUNCREF-Callback bei Klick (Button/Checkbox) |
@@ -3489,6 +3495,8 @@ einem brauchbaren Code-Feld.
 | `GUI_TEXTAREA_POS_AT(ta, x, y)` → (zeile, spalte) | welches Zeichen unter dem Bildschirmpunkt liegt (ab 1; dieselbe Rechnung wie der Klick). (0, 0) neben dem Text: ausserhalb, in der Nummernspalte, unter der letzten Zeile, hinter dem Zeilenende -- fuer Tooltips beim Ueberfahren und Strg+Klick |
 | `GUI_TEXTAREA_GOTO(ta, zeile[, spalte])` | Marke setzen, Auswahl aufheben, den Ausschnitt so rollen, dass die Zeile in der Mitte steht |
 | `GUI_TEXTAREA_HINTS(ta, zeilen, texte [, farbe])` | Text gedaempft hinter das Ende von Zeilen (ab 1) setzen, etwa die Werte der Variablen im Debugger-Halt; folgt seiner Zeile wie eine Marke, leere Listen loeschen, `GUI_SET_TEXT` auch. `farbe` darf ein Feld sein, eine je Hinweis (`-1` = gedaempft) |
+| `GUI_TEXTAREA_HINT$(ta, zeile)` | der Hinweis hinter einer Zeile (ab 1), "" ohne -- nach dem Mitwandern beim Tippen, so wie er gezeichnet wird |
+| `GUI_TEXTAREA_HINT_COUNT(ta)` | wie viele Zeilen einen Hinweis tragen |
 | `GUI_TEXTAREA_SCROLL(ta, zeile)` | den Ausschnitt rollen, sodass die Zeile oben steht -- ohne die Marke zu bewegen, wie das Mausrad (fuer eine Uebersichtskarte) |
 | `GUI_TEXTAREA_SELECT(ta, z1, s1, z2, s2)` | einen Bereich markieren, Marke am Ende |
 | `GUI_TEXTAREA_SELECTION$(ta)` → STRING | der markierte Text |

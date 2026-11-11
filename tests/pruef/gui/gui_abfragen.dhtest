@@ -1,0 +1,171 @@
+' Abfragen zu Settern der gui (seit 2026.47): was ein Programm setzt, kann es
+' auch zuruecklesen -- vorher mussten Tests der IDE sich den Zustand selbst
+' merken oder die Form aus GUI_SAVE nach Text durchsuchen.
+' GUI_TOOLTIP$, GUI_TEXTINPUT_GET, GUI_TEXTINPUT_PLACEHOLDER$,
+' GUI_STATUSBAR_TIP$, GUI_TOOLBAR_GET, GUI_DOCK_TITLE$, GUI_TEXTAREA_HINT$,
+' GUI_TEXTAREA_HINT_COUNT.
+
+=== hilfetext eines widgets
+IMPORT "gui"
+SCREEN(300, 200, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 300, 200)
+DIM k AS GUI_WIDGET : k = GUI_BUTTON(w, "OK", 10, 10, 80, 26)
+PRINT "leer |"; GUI_TOOLTIP$(k); "|"
+GUI_TOOLTIP(k, "Speichert die Datei")
+PRINT "gesetzt "; GUI_TOOLTIP$(k)
+GUI_TOOLTIP(k, "")
+PRINT "entfernt |"; GUI_TOOLTIP$(k); "|"
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+leer ||
+gesetzt Speichert die Datei
+entfernt ||
+
+=== einstellungen und platzhalter eines textfelds
+IMPORT "gui"
+SCREEN(300, 200, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 300, 200)
+DIM tf AS GUI_WIDGET : tf = GUI_TEXTINPUT(w, 10, 10, 200, 26, "Name ...")
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(w, 10, 50, 200, 80, "Notizen")
+PRINT "platzhalter "; GUI_TEXTINPUT_PLACEHOLDER$(tf); " / "; GUI_TEXTINPUT_PLACEHOLDER$(ta)
+PRINT "vorher "; GUI_TEXTINPUT_GET(tf, "suche"); GUI_TEXTINPUT_GET(tf, "passwort"); GUI_TEXTINPUT_GET(tf, "nur_lesen"); GUI_TEXTINPUT_GET(tf, "maxlaenge"); GUI_TEXTINPUT_GET(tf, "zahlen")
+GUI_TEXTINPUT_SET(tf, "suche", 1)
+GUI_TEXTINPUT_SET(tf, "passwort", 1)
+GUI_TEXTINPUT_SET(tf, "nur_lesen", 1)
+GUI_TEXTINPUT_SET(tf, "maxlaenge", 12)
+GUI_TEXTINPUT_SET(tf, "zahlen", 3)
+PRINT "nachher "; GUI_TEXTINPUT_GET(tf, "suche"); GUI_TEXTINPUT_GET(tf, "passwort"); GUI_TEXTINPUT_GET(tf, "nur_lesen"); GUI_TEXTINPUT_GET(tf, "maxlaenge"); GUI_TEXTINPUT_GET(tf, "zahlen")
+GUI_TEXTINPUT_SET(tf, "suche", 0)
+PRINT "suche aus "; GUI_TEXTINPUT_GET(tf, "search")
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+platzhalter Name ... / Notizen
+vorher 00000
+nachher 111123
+suche aus 0
+
+=== ein unbekannter schluessel ist ein fehler
+IMPORT "gui"
+SCREEN(300, 200, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 300, 200)
+DIM tf AS GUI_WIDGET : tf = GUI_TEXTINPUT(w, 10, 10, 200, 26)
+PRINT GUI_TEXTINPUT_GET(tf, "farbe")
+--- umgebung
+DHRT_FRAMES=2
+--- fehler
+GUI_TEXTINPUT_GET: unbekannter Schluessel 'farbe'
+
+=== nur ein textfeld hat textfeld-einstellungen
+IMPORT "gui"
+SCREEN(300, 200, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 300, 200)
+DIM k AS GUI_WIDGET : k = GUI_BUTTON(w, "OK", 10, 10, 80, 26)
+PRINT GUI_TEXTINPUT_GET(k, "suche")
+--- umgebung
+DHRT_FRAMES=2
+--- fehler
+GUI_TEXTINPUT_GET: das Widget ist kein GUI_TEXTINPUT
+
+=== hilfetext eines feldes der statusleiste
+IMPORT "gui"
+SCREEN(400, 200, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 200)
+DIM sb AS GUI_WIDGET : sb = GUI_STATUSBAR(w, 0, 170, 400, 24, "Bereit.")
+DIM pos AS INTEGER : pos = GUI_STATUSBAR_ADD(sb, "Zeile 1", 100, "mitte")
+GUI_STATUSBAR_TIP(sb, 0, "C:/projekt/haupt.dh")
+GUI_STATUSBAR_TIP(sb, pos, "Gehe zu Zeile")
+PRINT "feld 0 "; GUI_STATUSBAR_TIP$(sb, 0)
+PRINT "feld 1 "; GUI_STATUSBAR_TIP$(sb, pos)
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+feld 0 C:/projekt/haupt.dh
+feld 1 Gehe zu Zeile
+
+=== einstellungen der werkzeugleiste
+IMPORT "gui"
+SCREEN(400, 200, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 200)
+DIM tb AS GUI_WIDGET : tb = GUI_TOOLBAR(w, 0, 0, 400, 34)
+GUI_TOOLBAR_ADD(tb, "neu", "Neu")
+PRINT "vorgabe "; GUI_TOOLBAR_GET(tb, "symbolgroesse"); " "; GUI_TOOLBAR_GET(tb, "beschriftung")
+GUI_TOOLBAR_SET(tb, "symbolgroesse", 22)
+GUI_TOOLBAR_SET(tb, "beschriftung", 1)
+PRINT "gesetzt "; GUI_TOOLBAR_GET(tb, "symbol"); " "; GUI_TOOLBAR_GET(tb, "text")
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+vorgabe 0 0
+gesetzt 22 1
+
+=== titel einer dock-leiste
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 600, 400)
+GUI_DOCK(w, 0, 0, 600, 400)
+GUI_DOCK_PANEL(w, "probleme", "Probleme", "unten")
+PRINT "anfang "; GUI_DOCK_TITLE$(w, "probleme")
+GUI_DOCK_TITLE(w, "probleme", "Probleme (3)")
+PRINT "neu "; GUI_DOCK_TITLE$(w, "probleme")
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+anfang Probleme
+neu Probleme (3)
+
+=== eine leiste, die es nicht gibt
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 600, 400)
+GUI_DOCK(w, 0, 0, 600, 400)
+PRINT GUI_DOCK_TITLE$(w, "gibtsnicht")
+--- umgebung
+DHRT_FRAMES=2
+--- fehler
+GUI_DOCK_TITLE$
+
+=== hinweise im textbereich, auch nachdem sie mitgewandert sind
+IMPORT "gui"
+SCREEN(400, 200, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 200)
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(w, 0, 0, 380, 180)
+GUI_SET_TEXT(ta, "a = 1" + CHR$(10) + "b = 2" + CHR$(10) + "c = 3")
+PRINT "ohne "; GUI_TEXTAREA_HINT_COUNT(ta); " |"; GUI_TEXTAREA_HINT$(ta, 2); "|"
+GUI_TEXTAREA_HINTS(ta, [2, 3], ["zwei", "drei"])
+PRINT "anzahl "; GUI_TEXTAREA_HINT_COUNT(ta)
+PRINT "zeile 1 |"; GUI_TEXTAREA_HINT$(ta, 1); "|"
+PRINT "zeile 2 "; GUI_TEXTAREA_HINT$(ta, 2)
+PRINT "zeile 3 "; GUI_TEXTAREA_HINT$(ta, 3)
+' Eine Zeile darueber: die Hinweise wandern mit, die Abfrage sieht es sofort.
+GUI_TEXTAREA_SELECT(ta, 1, 1, 1, 1)
+GUI_TEXTAREA_INSERT(ta, "neu = 0" + CHR$(10))
+PRINT "danach 2 |"; GUI_TEXTAREA_HINT$(ta, 2); "|"
+PRINT "danach 3 "; GUI_TEXTAREA_HINT$(ta, 3)
+PRINT "danach 4 "; GUI_TEXTAREA_HINT$(ta, 4)
+PRINT "zeile 0 |"; GUI_TEXTAREA_HINT$(ta, 0); "|"
+GUI_TEXTAREA_HINTS(ta, [], [])
+PRINT "geloescht "; GUI_TEXTAREA_HINT_COUNT(ta)
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+ohne 0 ||
+anzahl 2
+zeile 1 ||
+zeile 2 zwei
+zeile 3 drei
+danach 2 ||
+danach 3 zwei
+danach 4 drei
+zeile 0 ||
+geloescht 0

@@ -256,6 +256,15 @@ Einzelheiten stehen in der Geschichte des Bereichs.
 - **Jede neue Prüfung bekommt eine Gegenprobe**: die Stelle verfälschen, bauen,
   zusehen, dass genau dieser Fall fällt, zurücksetzen. Ein grüner Fall, der
   auch ohne die Änderung grün wäre, ist wertlos -- das ist hier oft passiert.
+  Die Gegenprobe verfälscht die EINE Stelle, nicht die ganze Änderung: fällt
+  der Fall dann nur an „Variable nicht deklariert“, ist nichts bewiesen.
+  Und was der Fall misst, muss sich mit der Änderung bewegen
+  (`GUI_TOOLBAR_ITEM_W` blieb bei größeren Sinnbildern gleich -- grün vorher
+  wie nachher).
+- Zustand der gui fragt ein Test über die Abfragen (`GUI_TOOLBAR_GET`,
+  `GUI_DOCK_TITLE$`, `GUI_TEXTAREA_HINT$` …), nicht
+  über eigene Protokollzeilen oder die Form aus `GUI_SAVE`. Fehlt zu einem
+  Setter die Abfrage, wird sie gebaut.
 - `--- seriell` nur für echte Einzelstücke (fester Port, Soundkarte, Drucker,
   echte Zwischenablage, Fensternachrichten, MIDI-Port). Jedes Kind bekommt
   `DHRT_ZWISCHENABLAGE=privat` und `DHRT_OHNE_EINGABE=1`.
