@@ -61,6 +61,24 @@ Alle neun sind mitgelieferte Beispiele — ein Klick aufs Bild führt zum Quellt
 Die Entwicklungsumgebung zeigt dieselbe Galerie mit **21 Demos** auf ihrer
 Startseite, jede per Doppelklick startbar.
 
+### Anwendungen mit Oberfläche
+
+<table>
+<tr>
+<td width="50%" align="center"><a href="docs/studio.md"><img src=".github/bilder/studio.png" width="420" alt="Drachenhauch Studio"></a><br><b>Drachenhauch Studio</b><br><sub>Fenster entwerfen, Ereignisse verdrahten, Datenbank im Projekt, F5 startet</sub></td>
+<td width="50%" align="center"><a href="docs/ide.md"><img src=".github/bilder/ide.png" width="420" alt="Die IDE"></a><br><b>Die IDE</b><br><sub>Projektbaum, Gliederung, Prüfung beim Tippen, Debugger, Hilfe zu jedem Befehl</sub></td>
+</tr>
+</table>
+
+<table>
+<tr>
+<td width="25%" align="center"><a href="examples/196_rechnungen.dh"><img src=".github/bilder/196_rechnungen.png" width="200" alt="Rechnungen"></a><br><b>Rechnungen</b><br><sub>Kunden, Artikel, PDF, SQLite</sub></td>
+<td width="25%" align="center"><a href="examples/200_gui_akkordeon_assistent.dh"><img src=".github/bilder/200_gui_akkordeon_assistent.png" width="200" alt="Akkordeon und Assistent"></a><br><b>Akkordeon und Assistent</b><br><sub>Baumtabelle, Dialog in Schritten</sub></td>
+<td width="25%" align="center"><a href="examples/195_gui_feinschliff.dh"><img src=".github/bilder/195_gui_feinschliff.png" width="200" alt="Ziehen und Ablegen"></a><br><b>Ziehen und Ablegen</b><br><sub>Regler, Fortschritt, Kacheln, Rollen</sub></td>
+<td width="25%" align="center"><a href="examples/191_gui_formular.dh"><img src=".github/bilder/191_gui_formular.png" width="200" alt="Formulare"></a><br><b>Formulare</b><br><sub>Passwort, Höchstlänge, nur Zahlen, Enter und Esc</sub></td>
+</tr>
+</table>
+
 ### Und außerdem: alles andere
 
 Drachenhauch fing als Spiele-BASIC an (damals „GameBasic“). Inzwischen
@@ -93,7 +111,7 @@ Nachzulesen im [Handbuch](docs/README.md); wie es dazu kam, steht in der
 
 ## Herunterladen
 
-**[Drachenhauch herunterladen](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — für Windows ein Installer (rund 58 MB), für macOS eine `.dmg`, für Linux ein `.tar.gz` (x86_64, und aarch64 für den [Raspberry Pi](docs/raspberry-pi.md)); aktuell Fassung 2026.45.
+**[Drachenhauch herunterladen](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — für Windows ein Installer (rund 58 MB), für macOS eine `.dmg`, für Linux ein `.tar.gz` (x86_64, und aarch64 für den [Raspberry Pi](docs/raspberry-pi.md)); aktuell Fassung 2026.46.
 
 Python muss dafür **nicht** installiert sein. Mit dabei sind die komplette Entwicklungsumgebung, die Runtime `dhrt`, alle Beispiele samt Assets, beide Bücher (*Der Einstieg* und *Das Lehrbuch*, letzteres in beiden Sprachen) als `.docx` und `.epub` sowie das ESP32-Grundgerüst. Der Windows-Installer ist nicht signiert, SmartScreen meldet sich also beim ersten Start; die macOS-App ist noch nicht beglaubigt.
 
