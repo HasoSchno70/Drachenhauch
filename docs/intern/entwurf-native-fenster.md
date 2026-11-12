@@ -320,9 +320,37 @@ Funde am Rand:
   -- vorher `rlDrawRenderBatchActive()`. (Die erste Probe am Hauptfenster
   meldete deshalb faelschlich FALSCH.)
 
-**Offen fuer Stufe 0:** Linux (X11, Wayland) und macOS. Lokal gibt es nur
-Windows; der naechste Schritt waere ein Lauf auf den CI-Rechnern (Linux mit
-`xvfb-run` und Mesa, macOS mit seinem Fensterserver) oder unter WSLg.
+### Stufe 0 unter Linux (WSLg, 12.11.2026): bestanden, bis auf das Kreuz
+
+Ubuntu 24.04 in WSL2, WSLg (XWayland), Mesa 25.2 llvmpipe (OpenGL 4.5 core,
+also in Software). dhrt baut GLFW nur fuer X11 (`GLFW_BUILD_X11`) und laeuft
+auf Wayland-Desktops ueber XWayland -- genau dieser Weg ist hier gemessen.
+Gebaut in WSL mit eigenem Zielordner (`CARGO_TARGET_DIR=/root/dht_spike`,
+`LIBCLANG_PATH=/usr/lib/llvm-18/lib`); Klicks von aussen ueber `xdotool`
+(`SPIKE_AUSSEN=1`).
+
+| Frage | gemessen |
+|---|---|
+| Render-Ziel, FBO im zweiten Kontext | vollstaendig (beide Kontexte 4.5 core) |
+| zeigt das aktuelle Bild | 24 von 24 Rueckleseproben richtig |
+| echte X11-Klicks im zweiten Fenster | 2 von 2 |
+| Hauptfenster nach den Wechseln | richtig |
+| Bildrate, Zeigen je Bild | 60; Median 1,07 ms (Software-Rendern) |
+| Kreuz ueber den Fenstermanager | **nicht pruefbar**: WSLgs X-Server fuehrt keine Fensterliste (`wmctrl -c` scheitert); GLFW meldet WM_DELETE_WINDOW unter X11 wie WM_CLOSE unter Windows |
+
+**Der erste Lauf war schwarz -- auch im Hauptfenster, auch OHNE zweites
+Fenster.** Ursache ist die bekannte Linux-Falle (`graphics.rs`,
+`render_ziel`): raylibs `LoadRenderTexture` laesst unter gcc/Mesa die Farbe
+ohne Speicher (`glCompressedTexImage2D` statt `glTexImage2D`). Das
+Spike-Programm legt das Ziel jetzt wie dhrt selbst an, mit leerem Puffer;
+in Stufe 1 gilt dasselbe: **ein Render-Ziel fuer Weg E nur ueber
+`render_ziel`**, nie ueber `LoadRenderTexture`. Abgegrenzt mit
+`SPIKE_OHNE_ZWEIT=1` (nur das Hauptfenster): erst so war klar, dass der
+Fehler nicht am zweiten Fenster lag.
+
+**Offen fuer Stufe 0:** macOS -- nur auf einem Mac oder einem macOS-Rechner
+der CI zu pruefen. Unter macOS braucht der zweite Kontext
+`GLFW_OPENGL_FORWARD_COMPAT` (im Spike gesetzt).
 
 **Stufe 1 -- der Befehl (etwa eine Woche).** Ein Befehl macht ein gui-Fenster
 zum OS-Fenster (Arbeitsname: GUI_WINDOW_NATIVE mit Fenster und an/aus, noch nicht gebaut): Titel,

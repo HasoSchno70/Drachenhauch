@@ -97,7 +97,26 @@ fn main() {
         ffi::InitWindow(640, 360, titel.as_ptr());
         ffi::SetTargetFPS(60);
         let haupt = glfwGetCurrentContext();
-        let ziel = ffi::LoadRenderTexture(bw, bh);
+        // Wie dhrt (graphics.rs `render_ziel`): unter Linux bleibt eine Textur
+        // aus raylibs LoadRenderTexture ohne Speicher (gcc-Bau ruft
+        // glCompressedTexImage2D, Mesa lehnt ab) -- darum selbst anlegen.
+        let ziel = {
+            let id = ffi::rlLoadFramebuffer();
+            ffi::rlEnableFramebuffer(id);
+            let leer = vec![0u8; (bw * bh * 4) as usize];
+            let farbe = ffi::rlLoadTexture(leer.as_ptr() as *const c_void, bw, bh, 7, 1);
+            let tiefe = ffi::rlLoadTextureDepth(bw, bh, true);
+            ffi::rlFramebufferAttach(id, farbe, 0, 100, 0);
+            ffi::rlFramebufferAttach(id, tiefe, 100, 200, 0);
+            let fertig = ffi::rlFramebufferComplete(id);
+            ffi::rlDisableFramebuffer();
+            println!("ERGEBNIS render_ziel_vollstaendig {}", fertig);
+            ffi::RenderTexture2D {
+                id,
+                texture: ffi::Texture { id: farbe, width: bw, height: bh, mipmaps: 1, format: 7 },
+                depth: ffi::Texture { id: tiefe, width: bw, height: bh, mipmaps: 1, format: 19 },
+            }
+        };
 
         // Zweites Fenster: dieselbe GL-Fassung wie raylib (3.3 core), Kontext
         // mit dem Hauptfenster GETEILT.
@@ -107,9 +126,16 @@ fn main() {
         glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
         if cfg!(target_os = "macos") { glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, 1); }
         let t2 = CString::new("Spike: zweites Fenster").unwrap();
-        let zweit = glfwCreateWindow(bw, bh, t2.as_ptr(), std::ptr::null_mut(), haupt);
+        // SPIKE_OHNE_ZWEIT=1: nur das Hauptfenster -- zum Abgrenzen, ob ein
+        // Fehler am zweiten Fenster liegt oder schon am Render-Ziel.
+        let ohne_zweit = std::env::var("SPIKE_OHNE_ZWEIT").map(|s| s == "1").unwrap_or(false);
+        let zweit = if ohne_zweit { std::ptr::null_mut() } else { glfwCreateWindow(bw, bh, t2.as_ptr(), std::ptr::null_mut(), haupt) };
+        if ohne_zweit { println!("ERGEBNIS ohne_zweites_fenster"); }
         println!("ERGEBNIS fenster_angelegt {}", !zweit.is_null());
-        if zweit.is_null() { std::process::exit(2); }
+        if zweit.is_null() && !ohne_zweit { std::process::exit(2); }
+        let gl_haupt: extern "system" fn(u32) -> *const u8 = laden("glGetString");
+        println!("ERGEBNIS gl_haupt {}", std::ffi::CStr::from_ptr(gl_haupt(0x1F02) as *const c_char).to_string_lossy());
+        let (gl, fbo, status) = if ohne_zweit { (None, 0u32, GL_FRAMEBUFFER_COMPLETE) } else {
         glfwSetWindowPos(zweit, 760, 120);
         glfwSetMouseButtonCallback(zweit, Some(klick));
 
@@ -125,6 +151,8 @@ fn main() {
             read_pixels: laden("glReadPixels"),
             get_error: laden("glGetError"),
         };
+        let gl_zweit: extern "system" fn(u32) -> *const u8 = laden("glGetString");
+        println!("ERGEBNIS gl_zweit {}", std::ffi::CStr::from_ptr(gl_zweit(0x1F02) as *const c_char).to_string_lossy());
         let mut fbo = 0u32;
         (gl.gen_framebuffers)(1, &mut fbo);
         (gl.bind_framebuffer)(GL_READ_FRAMEBUFFER, fbo);
@@ -132,16 +160,22 @@ fn main() {
         let status = (gl.check_framebuffer_status)(GL_READ_FRAMEBUFFER);
         println!("ERGEBNIS fbo_vollstaendig {}", status == GL_FRAMEBUFFER_COMPLETE);
         glfwMakeContextCurrent(haupt);
+        (Some(gl), fbo, status)
+        };
 
         let fehler_art = std::env::var("SPIKE_FEHLER").unwrap_or_default();
+        // SPIKE_BILDER: wie lange (Vorgabe 240); unter Linux klickt und
+        // schliesst ein Skript von aussen (xdotool/wmctrl, SPIKE_AUSSEN=1).
+        let max_bilder: i32 = std::env::var("SPIKE_BILDER").ok().and_then(|s| s.parse().ok()).unwrap_or(240);
+        let aussen = std::env::var("SPIKE_AUSSEN").map(|s| s == "1").unwrap_or(false);
         let mut bild = 0;
         let mut zeigen_us: Vec<u128> = Vec::new();
         let mut pixel_ok = 0;
         let mut pixel_falsch = 0;
-        let mut zweit_offen = true;
+        let mut zweit_offen = !ohne_zweit;
         let mut fps_summe = 0;
         let start = Instant::now();
-        while !ffi::WindowShouldClose() && bild < 240 {
+        while !ffi::WindowShouldClose() && bild < max_bilder {
             bild += 1;
             // 1) In das Render-Ziel zeichnen (Hauptkontext, raylib wie immer).
             //    Die Grundfarbe wechselt je Sekunde -- daran erkennt die
@@ -165,9 +199,9 @@ fn main() {
             // Probe am HAUPTFENSTER: zeichnet raylib nach den Wechseln der
             // Kontexte noch richtig? Rechts im Bild des Render-Ziels (frei von
             // Kreis und Text, egal ob gespiegelt) muss die Grundfarbe stehen,
-            // daneben der Hintergrund. Bild 230 liegt NACH dem Schliessen des
-            // zweiten Fensters.
-            if bild == 100 || bild == 230 {
+            // daneben der Hintergrund. Das vorletzte Mal liegt NACH dem
+            // Schliessen des zweiten Fensters.
+            if bild == 100 || bild == max_bilder - 10 {
                 ffi::rlDrawRenderBatchActive();   // erst zeichnen, was gesammelt ist
                 let img = ffi::LoadImageFromScreen();
                 let s = img.width as f32 / 640.0;
@@ -193,6 +227,7 @@ fn main() {
                     zweit_offen = false;
                     println!("ERGEBNIS zweites_fenster_geschlossen_bei_bild {}", bild);
                 } else {
+                    let gl = gl.as_ref().unwrap();
                     let t0 = Instant::now();
                     glfwMakeContextCurrent(zweit);
                     let (mut fb, mut fh) = (0, 0);
@@ -262,9 +297,9 @@ fn main() {
         if zweit_offen { glfwDestroyWindow(zweit); }
         ffi::UnloadRenderTexture(ziel);
         // Kein ffi::CloseWindow(): der Name steht auch in user32 (LNK2005); der Prozess endet gleich.
-        let gut = status == GL_FRAMEBUFFER_COMPLETE && pixel_ok > 0 && pixel_falsch == 0
-            && (cfg!(not(windows)) || KLICKS.load(Ordering::SeqCst) == 2) && fps_mittel >= 55
-            && HAUPT_FALSCH.load(Ordering::SeqCst) == 0 && (cfg!(not(windows)) || !zweit_offen);
+        let gut = status == GL_FRAMEBUFFER_COMPLETE && (ohne_zweit || pixel_ok > 0) && pixel_falsch == 0
+            && (ohne_zweit || (cfg!(not(windows)) && !aussen) || KLICKS.load(Ordering::SeqCst) == 2) && fps_mittel >= 55
+            && HAUPT_FALSCH.load(Ordering::SeqCst) == 0 && (ohne_zweit || (cfg!(not(windows)) && !aussen) || !zweit_offen);
         println!("ERGEBNIS gesamt {}", if gut { "gut" } else { "SCHLECHT" });
         std::process::exit(if gut { 0 } else { 1 });
     }
