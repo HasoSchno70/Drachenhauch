@@ -5233,6 +5233,14 @@ impl Gui {
         self.windows.get(h as usize).map(|w| w.alive && w.nativ != 0)
             .ok_or_else(|| "GUI_WINDOW_IS_NATIVE: ungueltiges GUI_WINDOW-Handle".to_string())
     }
+    /// GUI_WINDOW_NATIVE_SCALE(win): um wie viel das native Fenster auf
+    /// seinem Schirm groesser gezeichnet wird als im Hauptfenster (Dichte
+    /// seines Schirms durch die des Hauptfensters). 1.0 im Hauptfenster.
+    pub fn window_native_scale(&self, g: Option<&Graphics>, h: i64) -> Result<f64, String> {
+        let w = self.windows.get(h as usize).filter(|w| w.alive)
+            .ok_or_else(|| "GUI_WINDOW_NATIVE_SCALE: ungueltiges GUI_WINDOW-Handle".to_string())?;
+        Ok(match (g, w.nativ) { (Some(g), id) if id != 0 => g.nativ_massstab(id) as f64, _ => 1.0 })
+    }
     /// Einmal je Bild, vor der Bedienung: was das System an den nativen
     /// Fenstern getan hat (Kreuz, Groesse, Fokus), und was das Programm
     /// geaendert hat (Titel, sichtbar, Lage, Groesse), abgleichen.

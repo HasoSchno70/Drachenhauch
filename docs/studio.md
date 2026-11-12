@@ -717,7 +717,9 @@ Zeile nicht. Was sich nicht so lesen lässt, nimmt das Feld nicht an.
 
 Strg+Rad zoomt, das Rad rollt (mit Umschalt seitwärts). **Vorschau …** setzt
 den Bericht mit den Daten der Entwicklungsdatei, fragt nach den Parametern und
-blättert durch die Seiten.
+blättert durch die Seiten. **Als eigenes Fenster** macht die Vorschau zu einem
+echten Fenster des Systems (`GUI_WINDOW_NATIVE`) -- auf den zweiten Schirm
+gezogen, bleibt das Studio daneben frei; **Zurück ins Studio** holt sie wieder.
 
 Ein **Bild-Element** zeigt eine Datei aus `bilder/` (Eigenschaft Bild) oder,
 wenn es eine **Spalte** nennt, je Zeile das Bild aus dieser Bildspalte -- etwa

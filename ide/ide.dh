@@ -1023,6 +1023,11 @@ vorspannAn = kBool("vorspann", vorspannAn)
 ' Drachenhauch. Abschalten in den Einstellungen (`glanz`).
 DIM glanzAn AS BOOLEAN : glanzAn = TRUE
 glanzAn = kBool("glanz", glanzAn)
+' Die Einstellungen als eigenes OS-Fenster (GUI_WINDOW_NATIVE, Weg E):
+' neben die IDE oder auf den zweiten Schirm ziehen. Aus per Vorgabe -- wo es
+' keine echten Fenster gibt (Browser, macOS), bleibt es ohnehin eines im
+' Hauptfenster.
+DIM einstEigenAn AS BOOLEAN : einstEigenAn = kBool("einstellungen_eigen", FALSE)
 ' Der Schriftzug schwach hinter dem Code -- er fuellt das Feld, rollt aber
 ' nicht mit: Grund, kein Inhalt. Seit 2026.47 standardmaessig AUS: hinter
 ' dem Code soll eine ruhige Flaeche sein (wie in anderen Editoren), das Logo
@@ -2281,6 +2286,11 @@ DIM spHbGr AS GUI_WIDGET : spHbGr = GUI_SPINNER(winEinst, 200, 358, 90, 10, 32, 
 DIM lblAuto AS GUI_WIDGET : lblAuto = GUI_LABEL(winEinst, tr$("Sichern nach ... s Ruhe (0 = nie)"), 16, 398)
 DIM spAuto AS GUI_WIDGET : spAuto = GUI_SPINNER(winEinst, 260, 394, 90, 0, 120, 0)
 DIM btnEinstZu AS GUI_WIDGET : btnEinstZu = GUI_BUTTON(winEinst, tr$("Schließen"), 16, 452, 120, 30)
+DIM cbEinstEigen AS GUI_WIDGET : cbEinstEigen = GUI_CHECKBOX(winEinst, tr$("Als eigenes Fenster (neben die IDE ziehen)"), 160, 457, FALSE)
+GUI_TOOLTIP(cbEinstEigen, tr$("Die Einstellungen in einem echten Fenster des Systems -- es lässt sich aus der IDE heraus auf einen anderen Schirm ziehen"))
+' Als echtes Fenster hat es das Kreuz des Systems; das schliesst es wie
+' [Schliessen].
+GUI_WINDOW_CLOSABLE(winEinst, TRUE)
 DIM einstOffen AS BOOLEAN : einstOffen = FALSE
 
 ' --- Beispiele nach Themen ---------------------------------------------
@@ -3140,6 +3150,8 @@ WHILE NOT beenden
     befehleNachziehen()
     themenNachziehen()
     IF GUI_CLICKED(btnEinstZu) THEN GUI_WINDOW_VISIBLE(winEinst, FALSE) : einstOffen = FALSE : GUI_FOCUS(aktivesFeld())
+    ' Ueber das Kreuz (der gui oder des Systems) geschlossen.
+    IF einstOffen AND NOT GUI_WINDOW_SHOWN(winEinst) THEN einstOffen = FALSE : GUI_FOCUS(aktivesFeld())
     IF GUI_CLICKED(btnBefehlEin) OR GUI_DOUBLE_CLICKED(lstBefehle) THEN befehlEinfuegen()
     IF GUI_CLICKED(btnPeekZu) THEN GUI_WINDOW_VISIBLE(winPeek, FALSE) : GUI_FOCUS(aktivesFeld())
     IF GUI_CLICKED(btnPeekHin) THEN

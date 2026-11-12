@@ -141,6 +141,7 @@ mod glfw {
         pub fn glfwWindowShouldClose(f: *mut c_void) -> c_int;
         pub fn glfwSetWindowShouldClose(f: *mut c_void, wert: c_int);
         pub fn glfwGetFramebufferSize(f: *mut c_void, b: *mut c_int, h: *mut c_int);
+        pub fn glfwGetWindowContentScale(f: *mut c_void, x: *mut f32, y: *mut f32);
         pub fn glfwGetWindowPos(f: *mut c_void, x: *mut c_int, y: *mut c_int);
         pub fn glfwSetWindowPos(f: *mut c_void, x: c_int, y: c_int);
         pub fn glfwSetWindowSize(f: *mut c_void, b: c_int, h: c_int);
@@ -258,7 +259,11 @@ impl Fenster {
     /// echten Fenster gibt oder GLFW es ablehnt -- der Aufrufer bleibt dann
     /// beim gui-Fenster im Hauptfenster.
     #[allow(unused_variables)]
-    pub fn anlegen(haupt: *mut c_void, titel: &str, b: i32, h: i32, x: i32, y: i32, groesse_aenderbar: bool) -> Option<Fenster> {
+    /// `b`, `h` in Punkten der gui; das Fenster bekommt sie mal dem
+    /// Massstab seines Schirms (`verhaeltnis` zu `haupt_dichte`), der hier
+    /// noch vor dem Zeigen feststeht -- zurueck kommt er mit dem Fenster.
+    #[allow(unused_variables)]
+    pub fn anlegen(haupt: *mut c_void, haupt_dichte: f32, titel: &str, b: i32, h: i32, x: i32, y: i32, groesse_aenderbar: bool) -> Option<(Fenster, f32)> {
         if !moeglich() || haupt.is_null() { return None; }
         #[cfg(all(feature = "graphics", any(windows, target_os = "linux")))]
         unsafe {
@@ -304,8 +309,12 @@ impl Fenster {
             let mut fbo = 0u32;
             (gl.gen_framebuffers)(1, &mut fbo);
             glfwMakeContextCurrent(haupt);
+            let fenster = Fenster { handle: f, gl, fbo, titel: titel.to_string() };
+            // Jetzt steht es auf seinem Schirm -- dessen Dichte gilt.
+            let k = verhaeltnis(fenster.dichte(), haupt_dichte, massstab_vorgabe());
+            if k != 1.0 { glfwSetWindowSize(f, pixel(b.max(1), k), pixel(h.max(1), k)); }
             glfwShowWindow(f);
-            Some(Fenster { handle: f, gl, fbo, titel: titel.to_string() })
+            Some((fenster, k))
         }
         #[cfg(not(all(feature = "graphics", any(windows, target_os = "linux"))))]
         None
@@ -372,6 +381,16 @@ impl Fenster {
     pub fn lage_setzen(&self, x: i32, y: i32) {
         #[cfg(all(feature = "graphics", any(windows, target_os = "linux")))]
         unsafe { glfw::glfwSetWindowPos(self.handle, x, y); }
+    }
+    /// Pixeldichte des Schirms, auf dem das Fenster steht (1.0 = 96 dpi,
+    /// 1.5 bei 150 %). Wechselt, wenn man es auf einen anderen Schirm zieht.
+    pub fn dichte(&self) -> f32 {
+        #[allow(unused_mut)]
+        let (mut x, mut y) = (1.0f32, 1.0f32);
+        #[cfg(all(feature = "graphics", any(windows, target_os = "linux")))]
+        unsafe { glfw::glfwGetWindowContentScale(self.handle, &mut x, &mut y); }
+        let _ = y;
+        if x.is_finite() && x > 0.0 { x } else { 1.0 }
     }
     #[allow(unused_variables)]
     pub fn groesse_setzen(&self, b: i32, h: i32) {
@@ -456,9 +475,52 @@ pub fn zeiger_flaeche(gefangen: Option<u32>, drinnen: &[(u32, bool)]) -> u32 {
     drinnen.iter().find(|(_, d)| *d).map(|(k, _)| *k).unwrap_or(0)
 }
 
+/// Massstab eines nativen Fensters: Dichte seines Schirms durch die des
+/// Hauptfensters -- die gui ist fuer den Schirm des Hauptfensters gebaut
+/// (`GUI_SCALE(WINDOW_DPI_X())`), ein Fenster auf einem dichteren Schirm
+/// soll dort genauso gross aussehen. `vorgabe` (DHRT_NATIV_MASSSTAB) gilt
+/// vor allem anderen; auf eine Hundertstel gerundet, damit ein Schirm mit
+/// 125 % neben einem mit 150 % nicht bei jedem Bild ein anderes Ergebnis gibt.
+pub fn verhaeltnis(nativ: f32, haupt: f32, vorgabe: Option<f32>) -> f32 {
+    if let Some(v) = vorgabe.filter(|v| v.is_finite() && (0.25..=8.0).contains(v)) { return v; }
+    if !(nativ.is_finite() && haupt.is_finite() && nativ > 0.0 && haupt > 0.0) { return 1.0; }
+    ((nativ / haupt).clamp(0.25, 8.0) * 100.0).round() / 100.0
+}
+/// Punkte der gui -> Pixel des Fensters.
+pub fn pixel(n: i32, k: f32) -> i32 { if k == 1.0 { n } else { ((n as f32 * k).round() as i32).max(1) } }
+/// Pixel des Fensters -> Punkte der gui (Maus, Groesse vom System).
+pub fn punkte(n: f64, k: f32) -> f64 { if k == 1.0 { n } else { n / k as f64 } }
+/// DHRT_NATIV_MASSSTAB: fester Massstab fuer alle nativen Fenster -- fuer
+/// Pruefungen ohne zweiten Schirm, und wer es auf einem Schirm groesser will.
+pub fn massstab_vorgabe() -> Option<f32> {
+    static V: std::sync::OnceLock<Option<f32>> = std::sync::OnceLock::new();
+    *V.get_or_init(|| std::env::var("DHRT_NATIV_MASSSTAB").ok().and_then(|s| s.trim().parse::<f32>().ok()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn massstab_je_schirm() {
+        // Gleiche Dichte -> 1; Hauptfenster 100 %, natives auf 150 % -> 1.5.
+        assert_eq!(verhaeltnis(1.0, 1.0, None), 1.0);
+        assert_eq!(verhaeltnis(1.5, 1.0, None), 1.5);
+        assert_eq!(verhaeltnis(1.0, 1.5, None), 0.67);
+        assert_eq!(verhaeltnis(1.25, 1.5, None), 0.83);
+        // Die Vorgabe gewinnt, Unsinn faellt auf das Verhaeltnis zurueck.
+        assert_eq!(verhaeltnis(1.0, 1.0, Some(2.0)), 2.0);
+        assert_eq!(verhaeltnis(1.5, 1.0, Some(0.0)), 1.5);
+        assert_eq!(verhaeltnis(f32::NAN, 1.0, None), 1.0);
+        assert_eq!(verhaeltnis(1.0, 0.0, None), 1.0);
+        // Hin und zurueck bleibt die Groesse (bei k >= 1 exakt).
+        assert_eq!(pixel(300, 1.5), 450);
+        assert_eq!(punkte(450.0, 1.5), 300.0);
+        assert_eq!(pixel(301, 1.25), 376);
+        assert_eq!(punkte(376.0, 1.25).round() as i32, 301);
+        assert_eq!(pixel(0, 1.5), 1);
+        assert_eq!(pixel(7, 1.0), 7);
+    }
 
     #[test]
     fn tasten_und_knoepfe_buchen() {

@@ -749,3 +749,30 @@ Modal-Sperre; Menue-Sperre, Leisten-Flaeche, Sperre dahinter, Bildrichtung).
 Linux (WSLg, X11-Klicks per xdotool): Klick im nativen Fenster und im
 Hauptfenster getrennt gezaehlt, Tippen kommt an, Kontextmenue im modalen
 nativen Dialog geht. Ein Besitzer ist dort noch nicht gesetzt (nur Windows).
+
+## Echte OS-Fenster, Weg E Stufe 2 (Rest, 2026-11-12)
+
+- Massstab je Schirm: ein natives Fenster auf einem Schirm anderer Dichte
+  als das Hauptfenster bekommt k = Dichte seines Schirms / Dichte des
+  Hauptfensters (`nativfenster::verhaeltnis`, glfwGetWindowContentScale).
+  Fenster und Render-Ziel sind k-mal so gross; beim Abspielen skaliert eine
+  rlgl-Matrix die Geometrie (glatt, ohne Rundung je Ecke). Der
+  Abspiel-Faktor `s` der Ziele ist eine ganze Zahl -- 1.5 ging damit nicht,
+  ein `f32` haette `render_scene` ganz umgestellt. Text zeichnet ohne die
+  Matrix in k-facher Groesse (`ohne_rt_matrix`, sonst vergroesserte
+  Glyphen = unscharf), der Scissor rechnet k selbst (sieht keine Matrix).
+  Maus und Groesse vom System kommen in Pixeln und gehen durch k zurueck
+  in Punkte; eine Groesse, die wir selbst gesetzt haben, ist keine
+  Bedienung, und eine vom Nutzer gezogene behaelt ihre Pixel
+  (`system_groesse`, sonst zuckte das Fenster um ein Pixel).
+  Schirmwechsel prueft `nativ_bild` je Bild (nicht waehrend gedrueckt).
+  Abfrage `GUI_WINDOW_NATIVE_SCALE`, Pruefhebel `DHRT_NATIV_MASSSTAB`.
+- Vorzeigen: IDE-Einstellungen mit Schalter "Als eigenes Fenster"
+  (`einstellungen_eigen`, aus per Vorgabe -- Aufnahmen in IDE-Tests
+  erreichen ein natives Fenster nicht), Studio-Berichtsvorschau mit Knopf
+  "Als eigenes Fenster" / "Zurueck ins Studio" (rechts angehaengt, die
+  Knoepfe davor bleiben fuer die Klicklagen der Tests, wo sie waren).
+Pruefung: zwei neue Faelle (Groesse und Farben bei 1.5 per
+`fensterpixel.ps1 groesse`, Klick in Pixeln trifft den Knopf in Punkten);
+Gegenprobe: Mausumrechnung und Matrix verfaelscht -- je genau ihr Fall
+faellt.

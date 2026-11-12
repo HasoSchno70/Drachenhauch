@@ -704,7 +704,10 @@ accept.
 
 Ctrl+wheel zooms, the wheel scrolls (with Shift sideways). **Preview …**
 typesets the report with the data of the development file, asks for the
-parameters and pages through the result.
+parameters and pages through the result. **As a separate window** turns the
+preview into a real system window (`GUI_WINDOW_NATIVE`) -- dragged onto a
+second screen, the Studio stays free beside it; **Back into the Studio**
+brings it back.
 
 An **image element** shows a file from `bilder/` (property Bild) or, when it
 names a **column**, the image from that image column for each row -- a photo

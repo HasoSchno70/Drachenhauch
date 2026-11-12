@@ -246,8 +246,14 @@ struct NativPlatz {
     f: crate::nativfenster::Fenster,
     /// Index in `render_targets`.
     rt: usize,
+    /// Groesse in Punkten der gui.
     b: i32,
     h: i32,
+    /// Massstab gegen das Hauptfenster (`nativfenster::verhaeltnis`) und
+    /// die Groesse in Pixeln, die das Fenster und sein Ziel danach haben.
+    k: f32,
+    pb: i32,
+    ph: i32,
     sichtbar: bool,
     /// Eingang des letzten Bildes (Zustand und Ereignisse).
     e: crate::nativfenster::Eingang,
@@ -259,17 +265,19 @@ struct NativPlatz {
     zeichen: Vec<char>,
     schliessen: bool,
     groesse_neu: Option<(i32, i32)>,
+    /// Die letzte Groesse vom System: (Punkte, Pixel).
+    system_groesse: Option<((i32, i32), (i32, i32))>,
     /// Ist das Hauptfenster sein Besitzer (modaler Dialog)?
     besessen: bool,
 }
 impl NativPlatz {
-    fn neu(id: u32, f: crate::nativfenster::Fenster, rt: usize, b: i32, h: i32) -> Self {
-        use crate::nativfenster::{MAUSTASTEN, TASTATUR};
+    fn neu(id: u32, f: crate::nativfenster::Fenster, rt: usize, b: i32, h: i32, k: f32) -> Self {
+        use crate::nativfenster::{MAUSTASTEN, TASTATUR, pixel};
         NativPlatz {
-            id, f, rt, b, h, sichtbar: true, e: Default::default(),
+            id, f, rt, b, h, k, pb: pixel(b, k), ph: pixel(h, k), sichtbar: true, e: Default::default(),
             knopf_vorher: [false; MAUSTASTEN], knopf_halt: [crate::flanken::Halt::default(); MAUSTASTEN],
             taste_vorher: vec![false; TASTATUR], taste_halt: vec![crate::flanken::Halt::default(); TASTATUR],
-            zeichen: Vec::new(), schliessen: false, groesse_neu: None, besessen: false,
+            zeichen: Vec::new(), schliessen: false, groesse_neu: None, system_groesse: None, besessen: false,
         }
     }
 }
@@ -285,6 +293,32 @@ struct RenderTarget {
     /// eben leicht verschoben wieder hineinzeichnen, was Schweife, Nachzieher
     /// und den klassischen Demo-Feedback-Effekt ergibt.
     behalten: bool,
+    /// Abspiel-Massstab: 1 fuer alle Ziele des Programms. Ein natives
+    /// Fenster (Weg E) auf einem Schirm anderer Pixeldichte bekommt hier sein
+    /// Verhaeltnis zum Hauptfenster -- seine Befehle sind in Punkten der gui,
+    /// sein Ziel ist in Pixeln seines Schirms (`RT_MASS`).
+    mass: f32,
+}
+impl RenderTarget {
+    fn neu(rt: RenderTexture2D, behalten: bool) -> Self { RenderTarget { rt, cmds: Vec::new(), behalten, mass: 1.0 } }
+}
+
+thread_local! {
+    /// Massstab des Ziels, das gerade abgespielt wird (siehe
+    /// `RenderTarget::mass`). Die Geometrie skaliert eine Matrix; Text und
+    /// Scissor fragen hier nach -- Text wird in voller Groesse gesetzt statt
+    /// vergroessert (sonst unscharf), und der Scissor spricht Pixel.
+    static RT_MASS: std::cell::Cell<f32> = const { std::cell::Cell::new(1.0) };
+}
+/// Zeichnet `f` ohne die Matrix des Abspiel-Massstabs und gibt ihm den
+/// Faktor mit, um den es Lage und Groesse selbst vergroessern soll.
+fn ohne_rt_matrix<R>(f: impl FnOnce(f32) -> R) -> R {
+    let m = RT_MASS.with(|c| c.get());
+    if m == 1.0 { return f(1.0); }
+    unsafe { raylib::ffi::rlPushMatrix(); raylib::ffi::rlScalef(1.0 / m, 1.0 / m, 1.0); }
+    let r = f(m);
+    unsafe { raylib::ffi::rlPopMatrix(); }
+    r
 }
 
 struct Atlas {
@@ -2571,7 +2605,7 @@ impl Graphics {
     pub fn rendertarget_new(&mut self, w: i32, h: i32, behalten: bool) -> Result<i64, String> {
         let rt = render_ziel(&mut self.rl, &self.thread, w.max(1) as u32, h.max(1) as u32)
             .map_err(|e| format!("RENDERTARGET_NEW: {}", e))?;
-        self.render_targets.push(RenderTarget { rt, cmds: Vec::new(), behalten });
+        self.render_targets.push(RenderTarget::neu(rt, behalten));
         Ok((self.render_targets.len() - 1) as i64)
     }
 
@@ -2644,17 +2678,55 @@ impl Graphics {
     /// x, y) samt Render-Ziel. `None`, wo es keine gibt -- dann bleibt die
     /// gui beim gui-Fenster im Hauptfenster.
     pub fn nativ_anlegen(&mut self, titel: &str, b: i32, h: i32, x: i32, y: i32, aenderbar: bool) -> Option<u32> {
+        use crate::nativfenster::pixel;
         let (b, h) = (b.max(1), h.max(1));
-        let rt = render_ziel(&mut self.rl, &self.thread, b as u32, h as u32).ok()?;
-        let f = crate::nativfenster::Fenster::anlegen(self.haupt_glfw as *mut std::ffi::c_void, titel, b, h, x, y, aenderbar)?;
+        let dichte = self.haupt_dichte();
+        let (f, k) = crate::nativfenster::Fenster::anlegen(self.haupt_glfw as *mut std::ffi::c_void, dichte, titel, b, h, x, y, aenderbar)?;
+        let rt = match render_ziel(&mut self.rl, &self.thread, pixel(b, k) as u32, pixel(h, k) as u32) {
+            Ok(rt) => rt,
+            Err(_) => { f.schliessen(self.haupt_glfw as *mut std::ffi::c_void); return None; }
+        };
+        let mut ziel = RenderTarget::neu(rt, false);
+        ziel.mass = k;
         let platz = match self.nativ_frei.pop() {
-            Some(i) => { self.render_targets[i] = RenderTarget { rt, cmds: Vec::new(), behalten: false }; i }
-            None => { self.render_targets.push(RenderTarget { rt, cmds: Vec::new(), behalten: false }); self.render_targets.len() - 1 }
+            Some(i) => { self.render_targets[i] = ziel; i }
+            None => { self.render_targets.push(ziel); self.render_targets.len() - 1 }
         };
         let id = self.nativ_naechste;
         self.nativ_naechste += 1;
-        self.nativ.push(NativPlatz::neu(id, f, platz, b, h));
+        self.nativ.push(NativPlatz::neu(id, f, platz, b, h, k));
         Some(id)
+    }
+    /// Dichte des Schirms, auf dem das Hauptfenster steht (Bezug fuer den
+    /// Massstab der nativen Fenster).
+    fn haupt_dichte(&self) -> f32 { self.rl.get_window_scale_dpi().x }
+    /// Der Massstab eines nativen Fensters gegen das Hauptfenster
+    /// (GUI_WINDOW_NATIVE_SCALE); 1, wenn es keines ist.
+    pub fn nativ_massstab(&self, id: u32) -> f32 { self.nativ_platz(id).map(|p| p.k).unwrap_or(1.0) }
+    /// Ziel und Fenster auf Groesse (Punkte) und Massstab bringen.
+    fn nativ_ziel_neu(&mut self, id: u32, b: i32, h: i32, k: f32, auch_fenster: bool) {
+        use crate::nativfenster::pixel;
+        let Some(p) = self.nativ_platz(id) else { return };
+        let platz = p.rt;
+        // Kam die Groesse eben vom System (der Nutzer zieht am Rand), gelten
+        // dessen Pixel -- zurueckgerechnet waeren sie um eins daneben, und
+        // das Fenster zuckte unter der Hand.
+        let (pb, ph) = match p.system_groesse {
+            Some((punkte, px)) if punkte == (b, h) && p.k == k => px,
+            _ => (pixel(b, k), pixel(h, k)),
+        };
+        let Ok(rt) = render_ziel(&mut self.rl, &self.thread, pb as u32, ph as u32) else { return };
+        let mut ziel = RenderTarget::neu(rt, false);
+        ziel.mass = k;
+        self.render_targets[platz] = ziel;
+        if let Some(p) = self.nativ_platz_mut(id) {
+            p.b = b; p.h = h; p.k = k;
+            // Erst merken, dann setzen: die Meldung des Systems ueber genau
+            // diese Groesse ist dann keine Bedienung (nativ_bild).
+            let alt = (p.pb, p.ph);
+            p.pb = pb; p.ph = ph;
+            if auch_fenster && alt != (pb, ph) { p.f.groesse_setzen(pb, ph); }
+        }
     }
     /// Das native Fenster schliessen; sein Render-Ziel wird frei.
     pub fn nativ_schliessen(&mut self, id: u32) {
@@ -2681,13 +2753,8 @@ impl Graphics {
         let (b, h) = (b.max(1), h.max(1));
         let Some(p) = self.nativ_platz(id) else { return };
         if (p.b, p.h) == (b, h) { return; }
-        let platz = p.rt;
-        let Ok(rt) = render_ziel(&mut self.rl, &self.thread, b as u32, h as u32) else { return };
-        self.render_targets[platz] = RenderTarget { rt, cmds: Vec::new(), behalten: false };
-        if let Some(p) = self.nativ_platz_mut(id) {
-            p.b = b; p.h = h;
-            if auch_fenster { p.f.groesse_setzen(b, h); }
-        }
+        let k = p.k;
+        self.nativ_ziel_neu(id, b, h, k, auch_fenster);
     }
     pub fn nativ_titel(&mut self, id: u32, titel: &str) { if let Some(p) = self.nativ_platz_mut(id) { p.f.titel_setzen(titel); } }
     pub fn nativ_sichtbar(&mut self, id: u32, an: bool) {
@@ -2734,7 +2801,9 @@ impl Graphics {
         let z = self.zeiger_flaeche();
         if s != z { return Some((-100_000, -100_000)); }
         if s == 0 { return None; }
-        self.nativ_platz(s).map(|p| (p.e.maus.0 as i64, p.e.maus.1 as i64))
+        // Pixel des Fensters -> Punkte der gui (Massstab des Schirms).
+        use crate::nativfenster::punkte;
+        self.nativ_platz(s).map(|p| (punkte(p.e.maus.0, p.k).floor() as i64, punkte(p.e.maus.1, p.k).floor() as i64))
     }
     /// (unten, neu, los) einer Maustaste in der Sicht der gui, wenn sie
     /// durch ein natives Fenster schaut oder der Zeiger nicht in ihrer ist.
@@ -2774,7 +2843,7 @@ impl Graphics {
         for p in nativ.iter_mut() {
             if p.sichtbar {
                 let tex = render_targets[p.rt].rt.texture.id;
-                p.f.zeigen(haupt, tex, p.b, p.h);
+                p.f.zeigen(haupt, tex, p.pb, p.ph);
             }
             let e = p.f.abholen();
             p.knopf_vorher = p.e.knopf_unten;
@@ -2789,7 +2858,17 @@ impl Graphics {
                 p.taste_halt[t] = crate::flanken::weiter(p.taste_halt[t], e.taste_druck[t], e.taste_los[t], e.taste_unten[t], flanke);
             }
             p.zeichen.extend(e.zeichen.iter().copied());
-            if let Some(g) = e.groesse { p.groesse_neu = Some(g); }
+            // Pixel des Systems -> Punkte der gui. Die Groesse, die wir eben
+            // selbst gesetzt haben, ist keine Bedienung.
+            if let Some(g) = e.groesse {
+                if g != (p.pb, p.ph) {
+                    use crate::nativfenster::punkte;
+                    let pt = ((punkte(g.0 as f64, p.k).round() as i32).max(1), (punkte(g.1 as f64, p.k).round() as i32).max(1));
+                    p.pb = g.0; p.ph = g.1;
+                    p.system_groesse = Some((pt, g));
+                    p.groesse_neu = Some(pt);
+                }
+            }
             if p.f.schliessen_gewuenscht() { p.schliessen = true; }
             p.e = e;
         }
@@ -2811,6 +2890,17 @@ impl Graphics {
         if self.nativ_gefangen.is_none() {
             self.nativ_gefangen = self.nativ.iter().find(|p| aktiv(p)).map(|p| p.id);
         }
+        // Auf einen Schirm anderer Dichte gezogen (oder das Hauptfenster):
+        // neuer Massstab, gleiche Groesse in Punkten. Nicht waehrend eine
+        // Taste gedrueckt ist -- das Fenster wuchse unter dem Ziehen.
+        let haupt_d = self.haupt_dichte();
+        let wechsel: Vec<(u32, i32, i32, f32)> = self.nativ.iter()
+            .filter(|p| self.nativ_gefangen != Some(p.id))
+            .filter_map(|p| {
+                let k = crate::nativfenster::verhaeltnis(p.f.dichte(), haupt_d, crate::nativfenster::massstab_vorgabe());
+                ((k - p.k).abs() > 0.005).then_some((p.id, p.b, p.h, k))
+            }).collect();
+        for (id, b, h, k) in wechsel { self.nativ_ziel_neu(id, b, h, k, true); }
     }
 
     /// GUI_WINDOW_ZOOM: ab jetzt in die Zoom-Flaeche zeichnen. FALSE, wenn
@@ -2824,8 +2914,8 @@ impl Graphics {
             // waeren Schrift und Linien bei 150 % treppig.
             unsafe { raylib::ffi::SetTextureFilter(rt.texture, 1 /*BILINEAR*/); }
             match self.zoom_rt {
-                Some((i, _, _)) => self.render_targets[i] = RenderTarget { rt, cmds: Vec::new(), behalten: false },
-                None => self.render_targets.push(RenderTarget { rt, cmds: Vec::new(), behalten: false }),
+                Some((i, _, _)) => self.render_targets[i] = RenderTarget::neu(rt, false),
+                None => self.render_targets.push(RenderTarget::neu(rt, false)),
             }
             let i = match self.zoom_rt { Some((i, _, _)) => i, None => self.render_targets.len() - 1 };
             self.zoom_rt = Some((i, sw, sh));
@@ -4816,20 +4906,22 @@ impl Graphics {
                 CANDIDATEFORM, CFS_CANDIDATEPOS, CFS_POINT, COMPOSITIONFORM,
             };
             // Hat ein natives Fenster (Weg E) den Fokus, gehoert ihm die
-            // Umwandlung -- seine Koordinaten sind die der gui (Massstab 1).
-            let nativ = self.nativ.iter().find(|p| p.e.fokus).map(|p| p.f.os_handle());
+            // Umwandlung -- seine Koordinaten sind die der gui, mal dem
+            // Massstab seines Schirms.
+            let nativ = self.nativ.iter().find(|p| p.e.fokus).map(|p| (p.f.os_handle(), p.k));
             let handle = match nativ {
-                Some(h) => h as *mut std::ffi::c_void,
+                Some((h, _)) => h as *mut std::ffi::c_void,
                 None => unsafe { self.rl.get_window_handle() },
             };
             if handle.is_null() { return; }
             let hwnd = HWND(handle);
-            let s = if nativ.is_some() { 1 } else { self.scale.max(1) };
-            let punkt = POINT { x: x * s, y: (y + h) * s };
+            let k = match nativ { Some((_, k)) => k, None => self.scale.max(1) as f32 };
+            let px = |v: i32| crate::nativfenster::pixel(v, k);
+            let punkt = POINT { x: px(x), y: px(y + h) };
             unsafe {
                 let ctx = ImmGetContext(hwnd);
                 if ctx.is_invalid() { return; }
-                let comp = COMPOSITIONFORM { dwStyle: CFS_POINT, ptCurrentPos: POINT { x: x * s, y: y * s },
+                let comp = COMPOSITIONFORM { dwStyle: CFS_POINT, ptCurrentPos: POINT { x: px(x), y: px(y) },
                                              rcArea: RECT::default() };
                 let _ = ImmSetCompositionWindow(ctx, &comp);
                 let kand = CANDIDATEFORM { dwIndex: 0, dwStyle: CFS_CANDIDATEPOS, ptCurrentPos: punkt,
@@ -7878,6 +7970,7 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
                 // legt sich ueber den alten. Das ist der ganze Trick hinter
                 // Rueckkopplung/Nachzieheffekten.
                 let behalten = render_targets[i].behalten;
+                let m = render_targets[i].mass;
                 let mut tx = rl.begin_texture_mode(thread, &mut render_targets[i].rt);
                 let clear = if behalten { None } else { Some(clear_rt) };
                 // Maßstab 1, NICHT der Fenster-Maßstab `s`: ein Render-Target
@@ -7887,9 +7980,14 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
                 // behaltenen Target blieben die abgeschnittenen Raender stehen
                 // ("die Kurven kleben am rechten Rand"). Hochskaliert wird beim
                 // Stempeln (Cmd::RtDraw rechnet dort mit `s`), nicht hier.
+                // Ein natives Fenster auf einem Schirm anderer Dichte: die
+                // Matrix vergroessert die Geometrie (glatt, ohne Rundung je
+                // Ecke), Text und Scissor lesen `RT_MASS`.
+                if m != 1.0 { RT_MASS.with(|c| c.set(m)); unsafe { raylib::ffi::rlPushMatrix(); raylib::ffi::rlScalef(m, m, 1.0); } }
                 render_scene(&mut tx, 1, clear, &synth, &[0], textures, fonts, ausweich, font_glyphs,
                     &[], cam, &[], None, (-1, -1, -1, -1), &empty_set, &empty_map, &empty_emis,
                     (false, 0, 0, 0), &[], None, None, None, None);
+                if m != 1.0 { unsafe { raylib::ffi::rlPopMatrix(); } RT_MASS.with(|c| c.set(1.0)); }
             }
         }
         let rts: &[RenderTarget] = render_targets;
@@ -8806,20 +8904,21 @@ fn render_scene<D: RaylibDraw>(
                             d.draw_triangle_fan(&v, *col);
                         }
                     }
-                    Cmd::Text(x, y, txt, sz, col, font, spacing) => {
-                        zeichne_text(d, *font, txt, (x * s) as f32, (y * s) as f32,
-                                     (sz * s) as f32, spacing * s as f32, *col, fonts, font_glyphs, ausweich);
-                    }
-                    Cmd::TextStil(x, y, txt, sz, col, font, spacing, emu) => {
-                        zeichne_text_stil(d, *font, txt, (x * s) as f32, (y * s) as f32,
-                                          (sz * s) as f32, spacing * s as f32, *col, *emu,
+                    Cmd::Text(x, y, txt, sz, col, font, spacing) => ohne_rt_matrix(|m| {
+                        zeichne_text(d, *font, txt, (x * s) as f32 * m, (y * s) as f32 * m,
+                                     (sz * s) as f32 * m, spacing * s as f32 * m, *col, fonts, font_glyphs, ausweich);
+                    }),
+                    Cmd::TextStil(x, y, txt, sz, col, font, spacing, emu) => ohne_rt_matrix(|m| {
+                        zeichne_text_stil(d, *font, txt, (x * s) as f32 * m, (y * s) as f32 * m,
+                                          (sz * s) as f32 * m, spacing * s as f32 * m, *col, *emu,
                                           fonts, font_glyphs, ausweich);
-                    }
-                    Cmd::TextRot(cx, cy, txt, sz, col, font, spacing, ang, scl) => {
+                    }),
+                    Cmd::TextRot(cx, cy, txt, sz, col, font, spacing, ang, scl) => ohne_rt_matrix(|m| {
                         // Zentriert auf (cx,cy), Rotation um das Text-Zentrum
                         // (DrawTextPro: origin = halbe Textbox).
+                        let scl = &(scl * m);
                         let fsize = (sz * s) as f32 * scl;
-                        let pos = Vector2::new((cx * s) as f32, (cy * s) as f32);
+                        let pos = Vector2::new((cx * s) as f32 * m, (cy * s) as f32 * m);
                         match font_zu_handle(*font, fonts, ausweich) {
                             Some(f) => {
                                 let fspacing = spacing * s as f32 * scl;
@@ -8844,7 +8943,7 @@ fn render_scene<D: RaylibDraw>(
                                 }
                             }
                         }
-                    }
+                    }),
                     Cmd::Texture(i, x, y, dw, dh) => {
                         // Review-Fund: `dw`/`dh` sind bereits beim Emit ueber
                         // ssize() mit cam_zoom skaliert -- hier nur noch der
@@ -9101,8 +9200,12 @@ fn render_scene<D: RaylibDraw>(
                     }
                     Cmd::ScissorPush(x, y, w, h) => {
                         // Logische -> Screen-Pixel, dann mit aktuellem Clip schneiden.
-                        let mut rx = x * s; let mut ry = y * s;
-                        let mut rw = w * s; let mut rh = h * s;
+                        // Der Scissor sieht die Matrix nicht -- ein Ziel mit
+                        // eigenem Massstab (natives Fenster) rechnet ihn hier.
+                        let m = RT_MASS.with(|c| c.get());
+                        let px = |v: i32| if m == 1.0 { v } else { (v as f32 * m).round() as i32 };
+                        let mut rx = px(x * s); let mut ry = px(y * s);
+                        let mut rw = px((x + w) * s) - rx; let mut rh = px((y + h) * s) - ry;
                         if let Some(&(cx, cy, cw, ch)) = clip_stack.last() {
                             let nx = rx.max(cx); let ny = ry.max(cy);
                             let nx2 = (rx + rw).min(cx + cw); let ny2 = (ry + rh).min(cy + ch);

@@ -617,6 +617,9 @@ Berichtsfuß	Report footer
 Seite {n} von {m}	Page {n} of {m}
 TT.MM.JJJJ	DD.MM.YYYY
 Vorschau: {0}	Preview: {0}
+Als eigenes Fenster	As a separate window
+Zurück ins Studio	Back into the Studio
+Die Vorschau in einem echten Fenster des Systems -- auf einen anderen Schirm ziehen	The preview in a real system window -- drag it onto another screen
 Setzen	Typeset
 Schließen	Close
 {0} / {1}	{0} / {1}

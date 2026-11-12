@@ -1741,6 +1741,7 @@ DIM bvZurueck AS GUI_WIDGET
 DIM bvWeiter AS GUI_WIDGET
 DIM bvSetzen AS GUI_WIDGET
 DIM bvZu AS GUI_WIDGET
+DIM bvEigen AS GUI_WIDGET
 DIM bvFelder AS ARRAY OF GUI_WIDGET : bvFelder = []
 DIM bvNamen AS ARRAY OF STRING : bvNamen = []
 DIM bvPdf AS PDF
@@ -1752,7 +1753,7 @@ DIM bvBildHandle AS IMAGE : bvBildHandle = -1
 SUB berichtVorschauOeffnen(e AS Element)
     IF bvWin >= 0 THEN GUI_WINDOW_DESTROY(bvWin)
     bvEl = e
-    bvWin = GUI_WINDOW(trf$("Vorschau: {0}", [e.name]), 120, 60, 760, 780)
+    bvWin = GUI_WINDOW(trf$("Vorschau: {0}", [e.name]), 120, 60, 930, 780)
     bvNamen = berichtParameter(e)
     bvFelder = []
     DIM x AS INTEGER : x = 12
@@ -1769,6 +1770,12 @@ SUB berichtVorschauOeffnen(e AS Element)
     bvSeite = GUI_LABEL(bvWin, "", 516, 12)
     bvWeiter = GUI_BUTTON(bvWin, ">", 610, 8, 40, 26)
     bvZu = GUI_BUTTON(bvWin, tr$("Schließen"), 660, 8, 86, 26)
+    ' Die Vorschau als echtes Fenster des Systems (GUI_WINDOW_NATIVE): auf
+    ' den zweiten Schirm ziehen, waehrend das Studio daneben bleibt. Rechts
+    ' angehaengt -- die Knoepfe davor bleiben, wo sie waren.
+    bvEigen = GUI_BUTTON(bvWin, tr$("Als eigenes Fenster"), 756, 8, 162, 26)
+    GUI_TOOLTIP(bvEigen, tr$("Die Vorschau in einem echten Fenster des Systems -- auf einen anderen Schirm ziehen"))
+    GUI_WINDOW_CLOSABLE(bvWin, TRUE)
     bvBild = GUI_IMAGE(bvWin, 12, 44, 734, 700, -1)
     GUI_IMAGE_MODE(bvBild, "einpassen")
     GUI_WINDOW_MODAL(bvWin, TRUE)
@@ -1842,6 +1849,13 @@ SUB berichtVorschauPruefen()
         RETURN
     END IF
     IF GUI_CLICKED(bvSetzen) THEN berichtVorschauSetzen()
+    IF GUI_CLICKED(bvEigen) THEN
+        ' Hin und zurueck; wo es keine echten Fenster gibt, bleibt es eins
+        ' im Studio.
+        DIM ist AS BOOLEAN : ist = GUI_WINDOW_NATIVE(bvWin, NOT GUI_WINDOW_IS_NATIVE(bvWin))
+        GUI_SET_TEXT(bvEigen, IIF(ist, tr$("Zurück ins Studio"), tr$("Als eigenes Fenster")))
+        protokoll("vorschau eigen " + IIF(ist, "an", "aus"))
+    END IF
     IF NOT bvHat THEN RETURN
     IF GUI_CLICKED(bvWeiter) AND bvNr < PDF_PAGE_COUNT(bvPdf) THEN
         bvNr = bvNr + 1
