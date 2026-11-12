@@ -742,10 +742,21 @@ WEND
   `FALSE` and the window stays as it was -- in the browser, without a
   screen (before `SCREEN`), on macOS (not tested there yet) and with
   `DHRT_OHNE_NATIVE_FENSTER=1`. So a program runs the same everywhere.
-- **Not yet** (later stages): modal dialogs as real windows, context menus
-  and tooltips beyond the edge of the native window, screen reader and
-  input methods (IME) in the native window, tear-off dock panels,
-  recordings (`AUTOMATION_PLAY`) in the native window.
+- **Modal** (`GUI_WINDOW_MODAL(win, TRUE)`): on Windows the main window
+  becomes its **owner** -- the dialog stays above it and has no taskbar
+  entry of its own, the main window is dimmed, a click into it does
+  nothing and brings the dialog to the front. Enter and ESC press the
+  default and cancel button as usual.
+- Context menu, tooltip, suggestions, an opened month, cell choice and the
+  toolbar's overflow menu are shown in the native window (within its
+  bounds). The composition of an input method (IME) appears at the cursor
+  of the window that has the focus.
+- **Not yet** (later stages): popups beyond the edge of the native window,
+  screen reader in the native window, the owner on Linux, tear-off dock
+  panels, recordings (`AUTOMATION_PLAY`) in the native window.
+- While a modal dialog is open, only **its** menus work (context menu,
+  menu bar) -- those of the windows behind it stay locked. Up to 2026.47
+  all of them were locked, the dialog's own too.
 
 ## Button
 

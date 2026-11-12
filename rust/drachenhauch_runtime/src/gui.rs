@@ -3621,6 +3621,10 @@ pub struct Gui {
     flaeche: u32,
     /// Welche Oberflaeche hatte im letzten Bild den Tastaturfokus des Systems?
     fokus_flaeche: u32,
+    /// Ein natives Fenster, das den Fokus des Systems bekommen soll (ein
+    /// Klick ins Hauptfenster, waehrend es modal ist) -- im naechsten
+    /// Abgleich, der die Grafik hat.
+    nativ_fokus_wunsch: Option<u32>,
     focus_window: Option<usize>,
     focus_widget: Option<(usize, usize)>,
     // Offener modaler Dialog. Solange einer steht, bekommt NUR er Eingaben --
@@ -3846,7 +3850,7 @@ impl Gui {
     pub fn new() -> Gui {
         Gui {
             schrift: None,
-            windows: Vec::new(), z_order: Vec::new(), flaeche: 0, fokus_flaeche: 0,
+            windows: Vec::new(), z_order: Vec::new(), flaeche: 0, fokus_flaeche: 0, nativ_fokus_wunsch: None,
             ta_zerlegung: std::cell::RefCell::new(HashMap::new()),
             focus_window: None, focus_widget: None, modal: None, modal_vorher: Vec::new(), modal_fokus: Vec::new(), cp_drag: None,
             drag_window: None, drag_dx: 0, drag_dy: 0,
@@ -5171,9 +5175,22 @@ impl Gui {
         if id == 0 || !g.nativ_beginnen(id) { return; }
         g.sicht_setzen(Some(id));
         self.draw_window_sicht(g, wi);
-        if self.tip_fenster() == Some(wi) { self.draw_tooltip(g); }
+        self.draw_top_flaeche(g, id);
         g.sicht_setzen(Some(0));
         g.nativ_beenden();
+    }
+    /// Ein Druck auf einer anderen Oberflaeche schliesst die Popups eines
+    /// Fensters, das nicht auf ihr steht -- wie ein Klick daneben. Sonst
+    /// verglichen die Treffertests der Popups Koordinaten zweier Flaechen.
+    pub(super) fn fremde_popups_zu(&mut self) {
+        let f = self.flaeche;
+        let fremd = |w: &Vec<Window>, wi: usize| w.get(wi).map(|x| x.nativ != f).unwrap_or(true);
+        if self.context_open.map(|c| fremd(&self.windows, c.0)).unwrap_or(false) { self.context_open = None; self.sub_chain.clear(); }
+        if self.open_menu.map(|m| fremd(&self.windows, m.0)).unwrap_or(false) { self.open_menu = None; }
+        if self.open_dropdown.map(|d| fremd(&self.windows, d.0)).unwrap_or(false) { self.open_dropdown = None; }
+        if self.datum_auf.map(|d| fremd(&self.windows, d.0)).unwrap_or(false) { self.datum_auf = None; }
+        if self.leiste_popup.map(|l| fremd(&self.windows, l.0)).unwrap_or(false) { self.leiste_popup = None; }
+        if self.rs_fenster().map(|wi| fremd(&self.windows, wi)).unwrap_or(false) { self.rs_menue = None; }
     }
     /// Zu welchem Fenster gehoert der Hilfetext, der gerade dran ist?
     pub(super) fn tip_fenster(&self) -> Option<usize> {
@@ -5247,13 +5264,18 @@ impl Gui {
                 w.x = 0; w.y = 0;
             }
             w.chrome = false;
+            // Modal (Stufe 2): das Hauptfenster wird Besitzer -- der Dialog
+            // bleibt darueber; beim Modalwerden bekommt er den Fokus.
+            let modal = self.modal == Some(wi);
             g.nativ_groesse(id, w.w, w.h, true);
+            g.nativ_besitzer(id, modal);
             g.nativ_titel(id, &w.title);
             g.nativ_sichtbar(id, w.visible);
         }
         // Bekommt ein natives Fenster den Fokus des Systems, bekommt sein
         // gui-Fenster den der gui -- sonst landete Getipptes im Fenster,
         // das die gui zuletzt fokussiert hatte.
+        if let Some(id) = self.nativ_fokus_wunsch.take() { g.nativ_fokussieren(id); }
         let fokus = g.fokus_flaeche();
         if fokus != self.fokus_flaeche {
             self.fokus_flaeche = fokus;

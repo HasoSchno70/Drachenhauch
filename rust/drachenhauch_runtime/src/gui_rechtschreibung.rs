@@ -322,6 +322,8 @@ impl Gui {
     }
 
     /// Das Menue (aus `draw_top`).
+    /// Zu welchem Fenster gehoert das offene Vorschlagsmenue?
+    pub(super) fn rs_fenster(&self) -> Option<usize> { self.rs_menue.as_ref().map(|m| m.wi) }
     pub(super) fn rs_zeichnen(&self, g: &mut Graphics) {
         let Some((x, y, b, h, ih)) = self.rs_rect(g) else { return };
         let m = self.rs_menue.as_ref().unwrap();

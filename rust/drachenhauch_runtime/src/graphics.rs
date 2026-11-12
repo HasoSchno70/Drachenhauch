@@ -259,6 +259,8 @@ struct NativPlatz {
     zeichen: Vec<char>,
     schliessen: bool,
     groesse_neu: Option<(i32, i32)>,
+    /// Ist das Hauptfenster sein Besitzer (modaler Dialog)?
+    besessen: bool,
 }
 impl NativPlatz {
     fn neu(id: u32, f: crate::nativfenster::Fenster, rt: usize, b: i32, h: i32) -> Self {
@@ -267,7 +269,7 @@ impl NativPlatz {
             id, f, rt, b, h, sichtbar: true, e: Default::default(),
             knopf_vorher: [false; MAUSTASTEN], knopf_halt: [crate::flanken::Halt::default(); MAUSTASTEN],
             taste_vorher: vec![false; TASTATUR], taste_halt: vec![crate::flanken::Halt::default(); TASTATUR],
-            zeichen: Vec::new(), schliessen: false, groesse_neu: None,
+            zeichen: Vec::new(), schliessen: false, groesse_neu: None, besessen: false,
         }
     }
 }
@@ -1447,6 +1449,8 @@ pub struct Graphics {
     /// In welchem nativen Fenster eine Maustaste gedrueckt ist (der Zeiger
     /// gehoert dann dorthin, auch wenn er den Rand verlaesst).
     nativ_gefangen: Option<u32>,
+    /// Die Flaeche, fuer die `ime_zuletzt` gilt.
+    ime_flaeche: i32,
     /// Auf welcher Taste jeder Buchstabe NACH DER BELEGUNG liegt (Index 0 =
     /// a): der dhrt-Code der Taste nach Lage (97..122). raylib/GLFW benennen
     /// Tasten nach ihrer Lage auf einer US-Tastatur -- auf einer deutschen
@@ -2205,6 +2209,7 @@ impl Graphics {
             haupt_glfw,
             sicht: None,
             nativ_gefangen: None,
+            ime_flaeche: 0,
             belegung: std::array::from_fn(|i| 97 + i as i64),
             auto_maus: None,
             key_names: HashMap::new(),
@@ -2689,6 +2694,13 @@ impl Graphics {
         if let Some(p) = self.nativ_platz_mut(id) { if p.sichtbar != an { p.sichtbar = an; p.f.sichtbar(an); } }
     }
     pub fn nativ_fokussieren(&mut self, id: u32) { if let Some(p) = self.nativ_platz(id) { p.f.fokussieren(); } }
+    /// Das Hauptfenster als Besitzer setzen oder loesen (modaler Dialog).
+    pub fn nativ_besitzer(&mut self, id: u32, an: bool) {
+        let haupt = self.haupt_glfw as *mut std::ffi::c_void;
+        if let Some(p) = self.nativ_platz_mut(id) {
+            if p.besessen != an { p.besessen = an; p.f.besitzer_setzen(haupt, an); }
+        }
+    }
     /// Lage auf dem Bildschirm (Systempunkte).
     pub fn nativ_lage(&self, id: u32) -> Option<(i32, i32)> { self.nativ_platz(id).map(|p| p.f.lage()) }
     pub fn nativ_lage_setzen(&mut self, id: u32, x: i32, y: i32) { if let Some(p) = self.nativ_platz(id) { p.f.lage_setzen(x, y); } }
@@ -4790,8 +4802,12 @@ impl Graphics {
     /// stellt Windows sein Fenster, wohin es will -- meist links oben.
     /// `x`, `y`, `h` in Bildschirm-Pixeln des Programms (vor dem Massstab).
     pub fn ime_position(&mut self, x: i32, y: i32, h: i32) {
-        if self.ime_zuletzt == Some((x, y, h)) { return; }
+        // Gemerkt samt der Flaeche mit Fokus: dieselbe Stelle in einem
+        // anderen Fenster ist eine andere Stelle.
+        let f = self.fokus_flaeche() as i32;
+        if self.ime_zuletzt == Some((x, y, h)) && self.ime_flaeche == f { return; }
         self.ime_zuletzt = Some((x, y, h));
+        self.ime_flaeche = f;
         #[cfg(windows)]
         {
             use windows::Win32::Foundation::{HWND, POINT, RECT};
@@ -4799,10 +4815,16 @@ impl Graphics {
                 ImmGetContext, ImmReleaseContext, ImmSetCandidateWindow, ImmSetCompositionWindow,
                 CANDIDATEFORM, CFS_CANDIDATEPOS, CFS_POINT, COMPOSITIONFORM,
             };
-            let handle = unsafe { self.rl.get_window_handle() };
+            // Hat ein natives Fenster (Weg E) den Fokus, gehoert ihm die
+            // Umwandlung -- seine Koordinaten sind die der gui (Massstab 1).
+            let nativ = self.nativ.iter().find(|p| p.e.fokus).map(|p| p.f.os_handle());
+            let handle = match nativ {
+                Some(h) => h as *mut std::ffi::c_void,
+                None => unsafe { self.rl.get_window_handle() },
+            };
             if handle.is_null() { return; }
             let hwnd = HWND(handle);
-            let s = self.scale.max(1);
+            let s = if nativ.is_some() { 1 } else { self.scale.max(1) };
             let punkt = POINT { x: x * s, y: (y + h) * s };
             unsafe {
                 let ctx = ImmGetContext(hwnd);

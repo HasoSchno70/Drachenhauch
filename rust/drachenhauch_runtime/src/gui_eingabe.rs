@@ -79,6 +79,9 @@ impl Gui {
         // Mittlere Taste: nur die Reiter benutzen sie (Reiter zu).
         let mitte_just = g.mouse_button(2) && !self.was_mitte_down;
         self.was_mitte_down = g.mouse_button(2);
+        // Weg E: ein Druck auf einer anderen Oberflaeche schliesst die
+        // offenen Popups der Fenster, die nicht auf ihr stehen.
+        if just_pressed || right_just { self.fremde_popups_zu(); }
 
         // Transiente Flags ruecksetzen -- die Dialog-Antwort gehoert dazu:
         // sie ist ein Ereignis, kein Zustand (siehe Window::answer).
@@ -152,10 +155,11 @@ impl Gui {
         self.leisten_pass(g);
         // Menue-Eingabe (Menueleiste/Dropdown/Kontext) VOR den Widgets -- konsumiert
         // den Klick ggf., damit er nicht zusaetzlich ein Widget ausloest.
-        // Menues sind waehrend eines Dialogs gesperrt (siehe handle_press).
+        // Waehrend eines modalen Dialogs gelten nur SEINE Menues (bis 2026.47
+        // waren alle gesperrt, auch das Kontextmenue im Dialog selbst --
+        // gefunden beim Bau der echten Fenster, Weg E Stufe 2).
         self.kontext_neu = None;
-        let menu_consumed = if self.modal.is_some() { false }
-                            else { self.menu_input(mx, my, just_pressed, right_just, g) };
+        let menu_consumed = self.menu_input(mx, my, just_pressed, right_just, g);
         self.untermenues_folgen(g, mx, my);
         self.kuerzel_gefeuert = false;
         if !menu_consumed { self.kuerzel_pruefen(g); self.mn_pruefen(g); }
@@ -920,6 +924,12 @@ impl Gui {
         if left_just {
             for &wi in self.z_order.clone().iter().rev() {
                 if !self.windows[wi].alive || !self.windows[wi].visible { continue; }
+                // Nur Fenster der Flaeche unter dem Zeiger (Weg E: ein
+                // natives steht bei 0,0 -- sonst traefe ein Klick oben im
+                // Hauptfenster seine Menueleiste) und, waehrend eines
+                // modalen Dialogs, nur dieser.
+                if self.windows[wi].nativ != self.flaeche { continue; }
+                if self.modal.is_some_and(|m| m != wi) { continue; }
                 if let Some(nm) = self.bar_menu_at(g, wi, mx, my) {
                     self.open_menu = Some((wi, nm));
                     return true;
@@ -927,7 +937,7 @@ impl Gui {
             }
         }
         if right_just {
-            if let Some(wi) = self.topmost_at(mx, my) {
+            if let Some(wi) = self.topmost_at(mx, my).filter(|&wi| self.modal.is_none_or(|m| m == wi)) {
                 // Ein an ein Widget gebundenes Kontextmenue gewinnt, wenn die
                 // Maus auf seinem Widget steht; sonst das des Fensters. Das
                 // Widget waehlt dabei trotzdem seine Zeile (Liste, Baum,

@@ -156,6 +156,8 @@ mod glfw {
         pub fn glfwSetCharCallback(f: *mut c_void, r: Option<FnUint>) -> Option<FnUint>;
         pub fn glfwSetWindowFocusCallback(f: *mut c_void, r: Option<FnInt>) -> Option<FnInt>;
         pub fn glfwSetWindowSizeCallback(f: *mut c_void, r: Option<FnGroesse>) -> Option<FnGroesse>;
+        #[cfg(windows)]
+        pub fn glfwGetWin32Window(f: *mut c_void) -> *mut c_void;
     }
 
     pub const CONTEXT_VERSION_MAJOR: c_int = 0x0002_2002;
@@ -232,6 +234,15 @@ const GL_NEAREST: u32 = 0x2600;
 pub fn aktueller_kontext() -> usize {
     #[cfg(all(feature = "graphics", any(windows, target_os = "linux")))]
     unsafe { return glfw::glfwGetCurrentContext() as usize; }
+    #[allow(unreachable_code)]
+    0
+}
+
+/// Das Fenster des Betriebssystems zu einem GLFW-Fenster (Windows: HWND).
+#[allow(unused_variables)]
+pub fn os_handle(f: *mut c_void) -> usize {
+    #[cfg(all(feature = "graphics", windows))]
+    unsafe { return glfw::glfwGetWin32Window(f) as usize; }
     #[allow(unreachable_code)]
     0
 }
@@ -384,6 +395,27 @@ impl Fenster {
         #[cfg(all(feature = "graphics", any(windows, target_os = "linux")))]
         unsafe { glfw::glfwFocusWindow(self.handle); }
     }
+    /// Das Fenster des Betriebssystems (unter Windows das HWND), 0 sonst --
+    /// fuer die Eingabemethode (ImmSetCompositionWindow).
+    pub fn os_handle(&self) -> usize { os_handle(self.handle) }
+
+    /// Das Hauptfenster als Besitzer (Weg E, Stufe 2): unter Windows bleibt
+    /// ein besessenes Fenster ueber seinem Besitzer und hat keinen eigenen
+    /// Eintrag in der Taskleiste -- so steht ein modaler Dialog. Unter Linux
+    /// (noch) nichts: GLFW kennt dort kein "transient for".
+    #[allow(unused_variables)]
+    pub fn besitzer_setzen(&self, haupt: *mut c_void, an: bool) {
+        #[cfg(all(feature = "graphics", windows))]
+        unsafe {
+            use windows::Win32::Foundation::HWND;
+            use windows::Win32::UI::WindowsAndMessaging::{SetWindowLongPtrW, GWLP_HWNDPARENT};
+            let ich = glfw::glfwGetWin32Window(self.handle);
+            if ich.is_null() { return; }
+            let wert = if an { glfw::glfwGetWin32Window(haupt) as isize } else { 0 };
+            SetWindowLongPtrW(HWND(ich), GWLP_HWNDPARENT, wert);
+        }
+    }
+
     /// Das Fenster als Zahl -- fuer Tests (Fensternachrichten) und Handles.
     pub fn handle(&self) -> usize { self.handle as usize }
 
