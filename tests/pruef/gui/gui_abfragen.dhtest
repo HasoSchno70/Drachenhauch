@@ -169,3 +169,140 @@ danach 3 zwei
 danach 4 drei
 zeile 0 ||
 geloescht 0
+
+=== die uebrigen setter lassen sich zuruecklesen
+' Ausrichtung, Anker, Schriftgroesse, Sinnbild, rund, Mindestmass, Umbruch,
+' Tab-Reihenfolge und benannter Stil -- je vorher und nachher.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 300)
+DIM k AS GUI_WIDGET : k = GUI_BUTTON(w, "OK", 10, 10, 80, 26)
+DIM l AS GUI_WIDGET : l = GUI_LABEL(w, "Ein langer Text zum Umbrechen", 10, 50)
+PRINT "vorher |"; GUI_GET_ALIGN$(k); "| "; GUI_GET_ANCHOR$(k); " "; GUI_GET_FONT_SIZE(k); " |"; GUI_GET_ICON$(k); "| "; GUI_GET_ICON(k); " "; GUI_GET_ROUND(k)
+PRINT "vorher "; GUI_GET_MIN_W(k); " "; GUI_GET_MIN_H(k); " "; GUI_GET_WRAP(l); " "; GUI_GET_TAB_INDEX(k)
+GUI_SET_ALIGN(k, "rechts")
+GUI_SET_ANCHOR(k, "brl")
+GUI_SET_FONT_SIZE(k, 22)
+GUI_SET_ICON(k, "start")
+GUI_SET_ROUND(k, TRUE)
+GUI_SET_MIN_SIZE(k, 60, 30)
+GUI_SET_WRAP(l, 120)
+GUI_SET_TAB_INDEX(k, 3)
+PRINT "nachher "; GUI_GET_ALIGN$(k); " "; GUI_GET_ANCHOR$(k); " "; GUI_GET_FONT_SIZE(k); " "; GUI_GET_ICON$(k); " "; GUI_GET_ICON(k); " "; GUI_GET_ROUND(k)
+PRINT "nachher "; GUI_GET_MIN_W(k); " "; GUI_GET_MIN_H(k); " "; GUI_GET_WRAP(l); " "; GUI_GET_TAB_INDEX(k)
+GUI_SET_WRAP(l, 0)
+PRINT "umbruch aus "; GUI_GET_WRAP(l)
+GUI_STYLE_SET("warn", "bg", &HC03030)
+PRINT "stil "; HEX$(GUI_STYLE_GET("warn", "bg")); " "; GUI_STYLE_GET("warn", "fg")
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+vorher || lt 0 || -1 FALSE
+vorher 0 0 0 0
+nachher rechts lrb 22 start -1 TRUE
+nachher 60 30 120 3
+umbruch aus 0
+stil C03030 -1
+
+=== ein unbekannter stil ist ein fehler
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 300)
+PRINT GUI_STYLE_GET("gibtsnicht", "bg")
+--- umgebung
+DHRT_FRAMES=2
+--- fehler
+GUI_STYLE_GET: unbekannter Style 'gibtsnicht'
+
+=== rueckgaengig und wieder vor ueber die api
+' GUI_UNDO/GUI_REDO nehmen denselben Weg wie Strg+Z/Strg+Y; GUI_CAN_UNDO
+' und GUI_CAN_REDO sagen, ob es einen Schritt gibt (fuer Menueeintraege).
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 300)
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(w, 10, 10, 300, 200)
+GUI_SET_TEXT(ta, "abc")
+PRINT "frisch "; GUI_CAN_UNDO(ta); " "; GUI_CAN_REDO(ta); " "; GUI_UNDO(ta)
+GUI_TEXTAREA_SELECT(ta, 1, 4, 1, 4)
+GUI_TEXTAREA_INSERT(ta, "def")
+PRINT "eingefuegt "; GUI_TEXT(ta); " "; GUI_CAN_UNDO(ta); " "; GUI_CAN_REDO(ta)
+PRINT "zurueck "; GUI_UNDO(ta); " "; GUI_TEXT(ta); " "; GUI_CAN_UNDO(ta); " "; GUI_CAN_REDO(ta)
+PRINT "vor "; GUI_REDO(ta); " "; GUI_TEXT(ta); " "; GUI_CAN_REDO(ta)
+GUI_UNDO_CLEAR(ta)
+PRINT "vergessen "; GUI_CAN_UNDO(ta); " "; GUI_UNDO(ta); " "; GUI_TEXT(ta)
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+frisch FALSE FALSE FALSE
+eingefuegt abcdef TRUE FALSE
+zurueck TRUE abc FALSE TRUE
+vor TRUE abcdef FALSE
+vergessen FALSE FALSE abcdef
+
+=== nur textfeld und textbereich haben einen verlauf
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 300)
+DIM k AS GUI_WIDGET : k = GUI_BUTTON(w, "OK", 10, 10, 80, 26)
+PRINT GUI_CAN_UNDO(k)
+--- umgebung
+DHRT_FRAMES=2
+--- fehler
+GUI_CAN_UNDO: nur ein Textfeld oder Textbereich hat einen Verlauf
+
+=== das thema system folgt einem hellen system mit eigenem akzent
+' DHRT_SYSTEM_DUNKEL/DHRT_SYSTEM_AKZENT legen die Antwort des Systems fest.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 300)
+PRINT "dunkel "; GUI_SYSTEM_DARK(); " akzent "; HEX$(GUI_SYSTEM_ACCENT())
+GUI_THEME_PRESET("system")
+PRINT "grund "; HEX$(GUI_THEME_GET("widget_bg")); " akzent "; HEX$(GUI_THEME_GET("accent")); " rund "; GUI_METRIC_GET("corner_radius") > 0
+--- umgebung
+DHRT_FRAMES=2
+DHRT_SYSTEM_DUNKEL=0
+DHRT_SYSTEM_AKZENT=#FF8800
+--- erwartet
+dunkel FALSE akzent FF8800
+grund FFFFFF akzent FF8800 rund TRUE
+
+=== das thema system folgt einem dunklen system ohne bekannten akzent
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 300)
+PRINT "dunkel "; GUI_SYSTEM_DARK(); " akzent "; GUI_SYSTEM_ACCENT()
+GUI_THEME_PRESET("system")
+PRINT "grund "; HEX$(GUI_THEME_GET("widget_bg")); " akzent "; HEX$(GUI_THEME_GET("accent"))
+--- umgebung
+DHRT_FRAMES=2
+DHRT_SYSTEM_DUNKEL=1
+DHRT_SYSTEM_AKZENT=-
+--- erwartet
+dunkel TRUE akzent -1
+grund 2A3542 akzent 2BC4E8
+
+=== die echte abfrage des systems laeuft ohne fehler
+' Was das System antwortet, haengt von der Maschine ab -- geprueft wird,
+' dass die Abfrage gelingt und eine Farbe in Ordnung ist.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 300)
+DIM d AS BOOLEAN : d = GUI_SYSTEM_DARK()
+DIM a AS INTEGER : a = GUI_SYSTEM_ACCENT()
+PRINT "akzent gueltig "; a >= -1 AND a <= &HFFFFFF
+GUI_THEME_PRESET("system")
+' Unbekannt heisst fuer das Preset dunkel, fuer GUI_SYSTEM_DARK aber FALSE.
+DIM g AS INTEGER : g = GUI_THEME_GET("widget_bg")
+PRINT "passt "; IIF(d, g = &H2A3542, g = &H2A3542 OR g = &HFFFFFF)
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+akzent gueltig TRUE
+passt TRUE

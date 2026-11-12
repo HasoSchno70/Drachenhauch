@@ -1050,6 +1050,10 @@ impl Gui {
         });
         idxs
     }
+    /// GUI_GET_TAB_INDEX(w): 0 = Anlege-Reihenfolge.
+    pub fn get_tab_index(&self, h: i64) -> Result<i64, String> {
+        Ok(self.wdg(h, "GUI_GET_TAB_INDEX")?.tab_index as i64)
+    }
     pub fn set_tab_index(&mut self, h: i64, n: i64) -> Result<(), String> {
         if n < 0 { return Err("GUI_SET_TAB_INDEX: der Index ist 0 (Anlege-Reihenfolge) oder groesser".into()); }
         let w = self.wdg_mut(h, "GUI_SET_TAB_INDEX")?;

@@ -101,6 +101,7 @@ mod modbus;
 mod midifile;
 mod hotplug;
 mod farbraum;
+mod systemaussehen;
 mod kalender;
 mod syntax;
 mod symbole;

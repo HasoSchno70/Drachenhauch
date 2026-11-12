@@ -92,6 +92,7 @@ IMPORT "gui"
 | `GUI_FORM_CONFLICT$(win[, formular$])` | STRING | warum das letzte SAVE nichts gespeichert hat: `geaendert`, `geloescht` oder leer |
 | `GUI_TEXTAREA_SET(ta, "umbruch", 1)` | — | Textbereich bricht an Wortgrenzen um (Notizen, Briefe) |
 | `GUI_SET_MIN_SIZE(wdg, min_w, min_h)` | — | Mindestmaß: ein gewichtetes Kind im Behälter und ein verankertes Widget schrumpfen nicht darunter |
+| `GUI_GET_MIN_W(wdg)` / `GUI_GET_MIN_H(wdg)` | INTEGER | das gesetzte Mindestmaß, 0 = keins |
 | `GUI_LAYOUT_MIN_W(layout)` / `GUI_LAYOUT_MIN_H(layout)` | INTEGER | was ein Behälter mindestens braucht — der Wert für `WINDOW_MIN_SIZE` |
 | `GUI_RULE(feld, art$[, a, b][, muster$][, meldung$])` | — | **Prüfregel** anhängen: `pflicht`, `zahl`, `ganz`, `bereich a b`, `laenge min max`, `email`, `datum`, `muster regex$` — siehe [Formularprüfung](#formularprüfung) |
 | `GUI_VALIDATE(win)` / `GUI_VALIDATE_WIDGET(feld)` | INTEGER / STRING | alle Regeln des Fensters prüfen (Zahl der Fehler, erstes Feld bekommt den Fokus) / ein Feld (Meldung oder "") |
@@ -128,12 +129,15 @@ IMPORT "gui"
 | `GUI_FONT_DIALOG_SIZE(dlg)` | INTEGER | die gewählte Größe |
 | `GUI_AUTOSIZE(wdg)` | — | Breite und Höhe aus dem Inhalt; Breite oder Höhe `0` beim Anlegen heißt dasselbe |
 | `GUI_SET_ANCHOR(wdg, edges$)` | — | Anchoring: an welchen Kanten das Widget klebt (Teilmenge von `"lrtb"`, Default `"lt"` = oben-links). Beim Fenster-Resize fließen die Widgets mit: links+rechts → dehnen, nur rechts → mitwandern, keiner → zentrieren (analog oben/unten). |
+| `GUI_GET_ANCHOR$(wdg)` | STRING | die Kanten, an denen es klebt, in der Reihenfolge `"lrtb"` (Vorgabe `"lt"`) |
 | `GUI_WINDOW_CLOSED(win)` | BOOLEAN | wurde das Fenster geschlossen? |
 | `GUI_BUTTON(win, text$, x, y, w, h)` | GUI_WIDGET | Knopf |
 | `GUI_BUTTON_VARIANT(knopf, art$)` | — | Knopfart: `standard`, `primaer`, `erfolg`, `warnung`, `gefahr`, `umriss`, `flach`, `link` |
 | `GUI_BUTTON_GET_VARIANT$(knopf)` | STRING | die Knopfart als Name |
 | `GUI_ICON_BUTTON(win, x, y, w, h, tex[, text$])` | GUI_WIDGET | Knopf mit Icon (Textur-Handle oder Name eines eingebauten Sinnbilds); ohne Text = flacher Toolbar-Button |
 | `GUI_SET_ICON(button, tex)` | — | Icon eines Buttons setzen/ersetzen (-1 entfernt) |
+| `GUI_GET_ICON$(button)` / `GUI_GET_ICON(button)` | STRING / INTEGER | das eingebaute Sinnbild (`""` ohne) bzw. die Textur (-1 ohne) |
+| `GUI_SET_ROUND(widget, an)` / `GUI_GET_ROUND(widget)` | — / BOOLEAN | Knopf rund statt eckig zeichnen (für Knöpfe mit nur einem Sinnbild) |
 | `GUI_TOOLBAR(win, x, y, w, h)` | GUI_WIDGET | Werkzeugleiste: mit Einträgen (`GUI_TOOLBAR_ADD`) verteilt, zeichnet und meldet sie ihre Knöpfe selbst; ohne Einträge ein flacher Streifen |
 | `GUI_TOOLBAR_ADD(tb, sinnbild[, tip$[, text$]])` | INTEGER | Knopf anhängen — `sinnbild` ist der Name eines eingebauten Sinnbilds oder ein Bild; liefert die Nummer des Eintrags |
 | `GUI_TOOLBAR_SEPARATOR(tb)` | INTEGER | senkrechter Trenner als Eintrag |
@@ -176,7 +180,9 @@ IMPORT "gui"
 | `GUI_BREADCRUMB_FIRST_VISIBLE(bc)` | INTEGER | erster sichtbarer Teil; die davor stehen unter „…“ |
 | `GUI_LABEL(win, text$, x, y[, farbe])` | GUI_WIDGET | Text |
 | `GUI_SET_ALIGN(wdg, wie$)` | — | Text links, `mitte` oder `rechts` ausrichten (Beschriftung, Knopf, Textfeld) |
+| `GUI_GET_ALIGN$(wdg)` | STRING | die gesetzte Ausrichtung; `""` = die Vorgabe der Art |
 | `GUI_SET_WRAP(label, breite)` | — | Beschriftung bei `breite` Pixeln an Wortgrenzen umbrechen (0 = aus); die Höhe folgt dem Text |
+| `GUI_GET_WRAP(label)` | INTEGER | die Umbruchbreite, 0 = aus |
 | `GUI_WINDOW_DEFAULT(win, knopf)` | — | Standard-Knopf: Enter im Fenster löst ihn aus (-1 = keiner) |
 | `GUI_WINDOW_CANCEL(win, knopf)` | — | Abbrechen-Knopf: ESC löst ihn aus (-1 = keiner) |
 | `GUI_CHECKBOX(win, label$, x, y[, default])` | GUI_WIDGET | Toggle |
@@ -188,6 +194,9 @@ IMPORT "gui"
 | `GUI_TEXTINPUT_SET(tf, key$, wert)` | — | `passwort`, `nur_lesen`, `maxlaenge`, `zahlen` (0 frei, 1 ganze Zahl, 2 Kommazahl, 3 Geldbetrag in Cent), `suche` (Suchfeld mit Lupe und Kreuz) |
 | `GUI_TEXTINPUT_GET(tf, key$)` | INTEGER | liest dieselben Schlüssel zurück (Schalter als 0/1) |
 | `GUI_TEXTINPUT_PLACEHOLDER$(tf)` | STRING | der graue Text im leeren Feld (auch eines `GUI_TEXTAREA`) |
+| `GUI_UNDO(tf)` / `GUI_REDO(tf)` | BOOLEAN | einen Schritt zurück bzw. wieder vor, wie Strg+Z / Strg+Y (Textfeld und Textbereich); `TRUE`, wenn es einen gab |
+| `GUI_CAN_UNDO(tf)` / `GUI_CAN_REDO(tf)` | BOOLEAN | gibt es einen Schritt? -- etwa für einen Menüeintrag, der sonst ausgegraut ist |
+| `GUI_UNDO_CLEAR(tf)` | — | den Verlauf vergessen (nach dem Laden einer Datei) |
 | `GUI_TEXTINPUT_ICON(tf, links$, rechts$)` | — | ein eingebautes Sinnbild links und rechts im Feld ("" = keins) -- siehe [Suchfeld, Sinnbilder, Vorschläge](#suchfeld-sinnbilder-vorschläge) |
 | `GUI_ICON_CLICKED(tf)` | INTEGER | in diesem Bild angeklicktes Sinnbild: 1 links, 2 rechts, 0 keins |
 | `GUI_SEARCH_CHANGED(tf)` | BOOLEAN | ein Suchfeld meldet seinen Text: 150 ms nach dem letzten Anschlag, sofort bei Enter, Kreuz und ESC |
@@ -327,6 +336,8 @@ IMPORT "gui"
 | `GUI_THEME(accent)` | — | Akzentfarbe (RGB) umstellen (Kurzform) |
 | `GUI_THEME_SET(key$, farbe)` / `GUI_THEME_GET(key$)` | — / INT | einzelne Theme-Farbe setzen/lesen |
 | `GUI_THEME_PRESET(name$)` | — | Look: dark/light/retro/contrast + **modern_dark/modern_light** (rund + Schatten) |
+| `GUI_SYSTEM_DARK()` | BOOLEAN | steht das Betriebssystem auf dunkel? (Windows, macOS, GNOME; unbekannt = `FALSE`) |
+| `GUI_SYSTEM_ACCENT()` | INTEGER | die Akzentfarbe des Betriebssystems, -1 wenn unbekannt |
 | `GUI_METRIC_SET(key$, wert)` / `GUI_METRIC_GET(key$)` | — / INT | Layout-Größe setzen/lesen |
 | `GUI_SET_COLOR(widget, rolle$, farbe)` | — | eine Farbe pro Widget (bg/fg/border/accent, bei Knöpfen auch hover/pressed; -1 entfernt) |
 | `GUI_RESET()` | — | Fenster/Widgets löschen + Theme/Metriken zurücksetzen |
@@ -462,9 +473,11 @@ Native, blockierende Standarddialoge (kein IMPORT nötig — wie die Datei-Dialo
 | `GUI_FONT(font [, groesse])` | — | die eigene Schrift der ganzen gui: gemessen und gezeichnet wird mit ihr, egal welche Schrift das Programm gerade mit `SETFONT` aktiv hat (ohne `groesse` die aktuelle Textgröße); `-1` = die aktive des Programms, auch die Pixelschrift (ohne `GUI_FONT` und ohne `SETFONT` nimmt die gui die eingebaute Sans) |
 | `GUI_FONT_GET()` | TUPLE | `(font, groesse)` der eigenen Schrift, `(-1, 0)` ohne |
 | `GUI_SET_FONT_SIZE(wdg, px)` | — | eigene Schriftgroesse fuer dieses Widget |
+| `GUI_GET_FONT_SIZE(wdg)` | INTEGER | die eigene Schriftgröße, 0 = die des Themas |
 | `GUI_SET_FONT_STYLE(wdg, stil$)` | — | Schriftstil fuer dieses Widget: `fett`, `kursiv`, `unterstrichen`, `durchgestrichen`, verbunden mit `+`; `"normal"` nimmt ihn weg. Echte Schnitte, wo es sie als Datei gibt, sonst nachgebildet |
 | `GUI_GET_FONT_STYLE$(wdg)` | STRING | der Stil des Widgets, z. B. `"fett+unterstrichen"` |
 | `GUI_STYLE_SET(name$, prop$, wert)` | — | benannten Stil festlegen (`bg`, `fg`, `border`, `accent`, `font`, `font_size`) |
+| `GUI_STYLE_GET(name$, prop$)` | INTEGER | ein Wert des Stils, -1 wenn er ihn nicht setzt (unbekannter Stil = Fehler) |
 | `GUI_APPLY_STYLE(widget, name$)` | — | einen benannten Stil auf ein Widget uebertragen -- spart, ihn Widget fuer Widget zu wiederholen |
 | `GUI_STYLESHEET(text$)` | — | eine Stildatei setzen: Regeln nach Art, Klasse, Name und Zustand wie in CSS ("" = keine) -- siehe [Stildatei](#7-stildatei-regeln-nach-art-klasse-name-und-zustand) |
 | `GUI_STYLESHEET_LOAD(pfad$)` | — | dasselbe aus einer Datei (üblich `.dhstil`) |
@@ -2074,7 +2087,16 @@ GUI_THEME_PRESET("retro")         ' grün auf schwarz (Terminal)
 GUI_THEME_PRESET("contrast")      ' schwarz/gelb, maximaler Kontrast
 GUI_THEME_PRESET("modern_dark")   ' PROFESSIONELL: Anthrazit + Cyan, runde Ecken + Schatten
 GUI_THEME_PRESET("modern_light")  ' PROFESSIONELL: hell, Windows-11-nah, runde Ecken + Schatten
+GUI_THEME_PRESET("system")        ' wie das Betriebssystem: modern hell oder dunkel, mit seinem Akzent
 ```
+
+**`"system"`** fragt das Betriebssystem (Windows: Registry, macOS:
+`defaults`, Linux: GNOME-`gsettings`): steht es auf dunkel, gilt
+`modern_dark`, sonst `modern_light`, und die Akzentfarbe ist die des Systems,
+wo es eine nennt. Wer während des Laufs nachzieht, fragt `GUI_SYSTEM_DARK()`
+(die Antwort gilt zwei Sekunden) und ruft das Preset erneut. Für Prüfungen
+legen `DHRT_SYSTEM_DUNKEL=1|0` und `DHRT_SYSTEM_AKZENT=#RRGGBB` die Antwort
+fest.
 
 Die beiden **`modern_*`**-Presets sind ein *kompletter* Look: sie setzen nicht nur
 die Farben, sondern auch die Metriken (`corner_radius`, `title_h`, `pad`, `shadow`)
@@ -3359,6 +3381,7 @@ Was das Programm beisteuern kann:
 | `GUI_ANNOUNCE(text$[, dringend])` | einen Satz an den Bildschirmleser des Nutzers geben — er spricht ihn mit seiner Stimme (höflich: nach dem laufenden Satz; dringend: sofort). Ohne Hilfsprogramm passiert nichts. Für alles, was sonst nur in einer Statuszeile steht: „Rechnung gespeichert“, „3 Zeilen gelöscht“ |
 | `GUI_SCREENREADER()` | `TRUE`, sobald ein Hilfsprogramm den Baum angefordert hat — etwa um mehr anzusagen oder Bewegung abzuschalten |
 | `GUI_SET_TAB_INDEX(wdg, index)` | Tab-Reihenfolge festlegen: Widgets mit Index über 0 zuerst, aufsteigend; 0 (Vorgabe) = Reihenfolge des Anlegens |
+| `GUI_GET_TAB_INDEX(wdg)` | den gesetzten Index lesen (0 = Anlege-Reihenfolge) |
 
 **Beschriftungen.** Ein Eingabefeld hat keinen eigenen Text; der
 Bildschirmleser nimmt die **Beschriftung links daneben** (gleiche Zeile)

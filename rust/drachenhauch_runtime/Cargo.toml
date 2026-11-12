@@ -245,7 +245,7 @@ mimalloc = { version = "0.1", default-features = false }
 cpal = { version = "0.18.1", optional = true }
 
 [target.'cfg(windows)'.dependencies]
-windows = { version = "0.62", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_Graphics_Printing", "Win32_Storage_Xps", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging", "Win32_Media_MediaFoundation", "Win32_UI_Input_Ime", "Win32_UI_Input_KeyboardAndMouse", "Win32_System_WinRT", "Win32_System_Console", "Win32_System_Com", "Win32_Globalization", "Foundation", "Foundation_Collections", "Media_Core", "Media_SpeechSynthesis", "Storage_Streams"] }
+windows = { version = "0.62", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_Graphics_Printing", "Win32_Storage_Xps", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging", "Win32_Media_MediaFoundation", "Win32_UI_Input_Ime", "Win32_UI_Input_KeyboardAndMouse", "Win32_System_WinRT", "Win32_System_Console", "Win32_System_Com", "Win32_System_Registry", "Win32_Globalization", "Foundation", "Foundation_Collections", "Media_Core", "Media_SpeechSynthesis", "Storage_Streams"] }
 # UIA-Adapter von AccessKit: haengt sich per Subclassing an raylibs GLFW-Fenster.
 accesskit_windows = { version = "0.35", optional = true }
 
