@@ -1,5 +1,10 @@
 # Entwurf: Mehrere OS-Fenster in Drachenhauch
 
+> **Stand 12.11.2026: Weg E ist geplant, nicht gebaut** (Abschnitt 8): ein
+> gui-Fenster als echtes OS-Fenster im SELBEN Prozess -- gezeichnet wird
+> weiter in raylibs Kontext, ein zweites GLFW-Fenster zeigt das Bild nur und
+> liefert die Eingabe. Zuerst ein Spike mit Ausstiegskriterium.
+>
 > **Stand 05.09.2026: Weg B ist gebaut** — `WINDOW_OPEN/SEND/RECV$/ALIVE/CLOSE`
 > und `PARENT_SEND/RECV$/ALIVE`, siehe [builtins-core.md](../builtins-core.md#ein-zweites-fenster-window_open).
 > Der Kanal ist eine TCP-Verbindung auf 127.0.0.1 statt stdin/stdout (das Kind
@@ -234,3 +239,89 @@ vier Wege vorwegnehmen:
   `SHELL_START("dhrt", "run", "vorschau.dh", pfad)` — ohne Rückkanal, aber
   mit eigenem Fenster. Das ist B ohne Kanal und zeigt, ob der Bedarf echt
   ist, bevor jemand den Kanal baut.
+
+## 8. Weg E: zeigen statt zeichnen (Plan, 12.11.2026)
+
+Weg B hat Fall b geloest. Offen blieb alles, was Zustand TEILT: ein Dialog
+oder eine Werkzeugpalette ausserhalb des Hauptfensters, eine abgerissene
+Dock-Leiste (Fall a und c). Die Durchsicht der gui nach 2026.46 nannte das
+die groesste Luecke gegenueber Qt, WinForms und GTK.
+
+### Die Idee
+
+Weg C scheiterte daran, dass raylib mit ZWEI Fenstern zeichnen muesste. Weg E
+laesst raylib bei einem Fenster:
+
+1. Die gui zeichnet ein gui-Fenster wie bisher, mit raylib im Kontext des
+   Hauptfensters -- aber in ein Render-Ziel statt auf den Schirm
+   (`render_ziel`, dasselbe wie fuer `GUI_DRAW_WINDOW`).
+2. Ein zweites OS-Fenster, direkt mit GLFW angelegt
+   (`glfwCreateWindow(..., share = Hauptfenster)`), teilt den GL-Kontext und
+   zeigt die Textur unveraendert: ein Rechteck, eigene VAO (VAOs teilen sich
+   zwischen Kontexten nicht), `glfwSwapBuffers`, zurueck in den Hauptkontext.
+3. Maus, Tasten und Text des zweiten Fensters kommen ueber GLFW-Rueckrufe
+   an genau DIESEM Fenster (raylib setzt seine nur am Hauptfenster) und gehen
+   in die gui -- verschoben auf die Koordinaten des gui-Fensters.
+
+Die Laufzeit ruft GLFW schon heute direkt (`flanken.rs`:
+`glfwSetMouseButtonCallback`, `glfwSetKeyCallback`; `graphics.rs`:
+`glfwCreateCursor`, `glfwGetKeyScancode`) -- der Weg dorthin ist erprobt,
+ohne raylib zu forken. Alles bleibt in einem Prozess: Bilder, Objekte, das
+Dokument sind geteilt.
+
+### Stufen
+
+**Stufe 0 -- Spike (ein bis zwei Tage, Wegwerf-Code).** Ein Probeprogramm
+oeffnet ein zweites GLFW-Fenster mit geteiltem Kontext, das Hauptfenster
+rendert ein gui-Fenster in ein Render-Ziel, das zweite zeigt es; Klicks
+kommen an. Gemessen: beide Fenster bei 60 Bildern; der Zustand von rlgl
+(Batch, Shader, Matrizen) uebersteht den Wechsel der Kontexte; Windows, dann
+Linux (X11) und macOS. **Ausstieg:** laesst sich rlgl nach dem Wechsel nicht
+sauber weiterbenutzen, ist Weg E tot -- Kosten zwei Tage.
+
+**Stufe 1 -- der Befehl (etwa eine Woche).** Ein Befehl macht ein gui-Fenster
+zum OS-Fenster (Arbeitsname: GUI_WINDOW_NATIVE mit Fenster und an/aus, noch nicht gebaut): Titel,
+Taskleiste, zweiter Monitor, Kreuz des Systems (`GUI_WINDOW_CLOSE_REQUESTED`).
+Alles andere bleibt: Widgets, Ereignisse, Stildatei, Massstab -- das
+Programm muss nicht wissen, wo sein Fenster steht. **Wo es keine echten
+Fenster gibt** (Web, CI ohne Schirm, ein Fehler beim Anlegen), bleibt es
+still ein gui-Fenster wie heute; ein Programm laeuft ueberall gleich.
+Pruefung: Umrechnung von Lage und Eingabe als Rust-Test ohne Fenster, echte
+Fenster in eigenen Faellen mit `--- seriell`.
+
+**Stufe 2 -- Verhalten (etwa eine Woche).** Modale Dialoge als echte Fenster
+ueber dem Hauptfenster (Windows: Besitzer-Fenster, damit kein eigener
+Taskleisten-Eintrag), Fokus und Tastatur zwischen den Fenstern, IME und
+Tooltips im zweiten Fenster, eigener Massstab bei anderem DPI des Monitors.
+Vorzeigen: Einstellungen in IDE und Studio als herausziehbare Dialoge.
+
+**Stufe 3 -- abreissbare Dock-Leisten (ein bis zwei Wochen).** Fall c: eine
+Leiste aus dem Hauptfenster ziehen und wieder andocken. Baut auf 1 und 2 auf
+-- eine abgerissene Leiste ist ein gui-Fenster, das zum OS-Fenster wird.
+
+**Stufe 4 -- Schliff.** Bildschirmleser (AccessKit je Fenster), Eigenheiten
+von macOS und Linux, Handbuch, ein Beispielprogramm.
+
+### Risiken
+
+| Risiko | was es kostet | Gegenmittel |
+|---|---|---|
+| rlgl-Zustand beim Kontextwechsel | Weg E insgesamt | Stufe 0 klaert es zuerst |
+| Wayland erlaubt keine eigene Fensterlage | Fenster stehen, wo der Compositor will | Lage als Wunsch; Rueckfall bleibt |
+| zwei `SwapBuffers` mit Vsync halbieren die Bildrate | ruckelnde Fenster | zweites Fenster mit Intervall 0 |
+| Popup-Menues ueber den Rand des zweiten Fensters | abgeschnittene Menues | zuerst innerhalb; spaeter Popups als eigene Fenster |
+| AccessKit haengt am Hauptfenster (Subclassing) | Bildschirmleser sieht nur eines | Stufe 4, ein Adapter je Fenster |
+
+### Nebeneinander mit den anderen Wegen
+
+| | B Prozess (gebaut) | E zeigen statt zeichnen |
+|---|---|---|
+| geteilter Zustand | nein, Nachrichten | ja |
+| Fall a, Dialog ausserhalb | ueber Nachrichten | ja |
+| Fall c, Andocken | nein | Stufe 3 |
+| Eingriff in raylib | nein | nein (GLFW direkt) |
+| Web-Bau | Befehl = Fehler | Rueckfall ins eine Fenster |
+| Aufwand | erledigt | Spike 2 Tage, danach Wochen |
+
+**Reihenfolge:** Stufe 0 erst nach Fassung 2026.47 und den kleinen
+gui-Punkten (Abfragen, Rueckgaengig als API, Aussehen des Systems).
