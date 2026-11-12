@@ -71,6 +71,7 @@ IMPORT "gui"
 | `GUI_WINDOW_CLOSABLE(win, an)` | — | Schließen-Button anzeigen (Default: aus) |
 | `GUI_WINDOW_NATIVE(win, an)` | BOOLEAN | das Fenster als **echtes OS-Fenster** (eigene Titelleiste, Taskleiste, zweiter Monitor) bzw. zurück ins Hauptfenster; `FALSE` heißt bei `an`: Rückfall, es bleibt ein gui-Fenster |
 | `GUI_WINDOW_IS_NATIVE(win)` | BOOLEAN | ist es gerade ein echtes OS-Fenster? |
+| `GUI_WINDOW_NATIVE_SCALE(win)` | FLOAT | um wie viel das native Fenster auf seinem Schirm größer gezeichnet wird als im Hauptfenster (Pixeldichte seines Schirms durch die des Hauptfensters); 1.0 im Hauptfenster |
 | `GUI_WINDOW_VISIBLE(win, an)` | — | Sichtbarkeit setzen |
 | `GUI_WINDOW_FRONT(win)` | — | Fenster nach vorn holen, ohne ihm den Fokus zu geben -- fuer eine Vorschlagsliste oder einen Tooltip, der beim Tippen ueber dem Text liegen soll. Per `GUI_WINDOW_VISIBLE` eingeblendet liegt ein Fenster sonst hinter dem zuletzt angeklickten |
 | `GUI_WINDOW_SHOWN(win)` | BOOLEAN | ist das Fenster gerade sichtbar? Das Gegenstueck zum Setzer -- ohne den Getter muesste ein Programm sich merken, was es selbst gesetzt hat, und laege daneben, sobald der Nutzer das Fenster ueber sein Kreuz schliesst |
@@ -752,6 +753,13 @@ WEND
   das Überlauf-Menü der Werkzeugleiste stehen im nativen Fenster (in
   seinen Grenzen). Die Umwandlung einer Eingabemethode (IME) erscheint an
   der Schreibmarke des Fensters, das den Fokus hat.
+- **Pixeldichte:** steht das native Fenster auf einem Schirm mit anderer
+  Skalierung als das Hauptfenster (100 % neben 150 %), wird es dort
+  entsprechend größer gezeichnet -- Linien glatt, Schrift in voller Größe
+  gesetzt statt vergrößert. Zieht man es hinüber, passt es sich an.
+  `GUI_WINDOW_NATIVE_SCALE(win)` nennt den Faktor (1.0 bei gleicher
+  Dichte); alle Maße nach außen bleiben in Punkten der gui.
+  `DHRT_NATIV_MASSSTAB=1.5` setzt ihn fest (Prüfungen ohne zweiten Schirm).
 - **Noch nicht** (spätere Stufen): Popups über den Rand des nativen
   Fensters hinaus, Bildschirmleser im nativen Fenster, der Besitzer unter
   Linux, abreißbare Dock-Leisten, Aufnahmen (`AUTOMATION_PLAY`) im

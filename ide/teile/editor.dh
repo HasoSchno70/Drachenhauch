@@ -319,6 +319,16 @@ SUB massHinweisSetzen()
     GUI_SET_TEXT(lblMassHinweis, t)
 END SUB
 
+' Die Einstellungen als eigenes OS-Fenster oder zurueck ins Hauptfenster.
+' Geht es nicht (kein echtes Fenster moeglich), bleibt es, wie es ist, und
+' das Protokoll sagt es.
+SUB einstEigenSetzen()
+    IF GUI_WINDOW_IS_NATIVE(winEinst) = einstEigenAn THEN RETURN
+    DIM ist AS BOOLEAN : ist = GUI_WINDOW_NATIVE(winEinst, einstEigenAn)
+    protokoll("einstellungen eigen " + IIF(ist, "an", IIF(einstEigenAn, "nicht moeglich", "aus")))
+    GUI_FOCUS(cbEinstEigen)
+END SUB
+
 SUB einstellungenZeigen()
     GUI_SET_CHECKED(cbHell, hell)
     GUI_SET_CHECKED(cbUmbruch, umbruchAn)
@@ -334,6 +344,7 @@ SUB einstellungenZeigen()
     GUI_SET_CHECKED(cbVorspann, vorspannAn)
     GUI_SET_CHECKED(cbStartwahl, startwahl = "frage")
     GUI_SET_CHECKED(cbGlanz, glanzAn)
+    GUI_SET_CHECKED(cbEinstEigen, einstEigenAn)
     GUI_SET_CHECKED(cbBaumHaken, baumHakenAn)
     GUI_SET_CHECKED(cbWasser, wasserzeichenAn)
     GUI_SET_VALUE(spUi, uiGroesse)
@@ -348,6 +359,7 @@ SUB einstellungenZeigen()
     ' Die linke Kante bleibt, wo sie war: die zweite Spalte waechst nach rechts.
     GUI_WINDOW_SET_BOUNDS(winEinst, (schirmB() - 420) \ 2, 150, 820, 530)
     GUI_WINDOW_VISIBLE(winEinst, TRUE)
+    einstEigenSetzen()
     einstOffen = TRUE
     GUI_FOCUS(cbHell)
     protokoll("einstellungen auf")
@@ -416,6 +428,11 @@ SUB einstellungenNachziehen()
         konfigSichern()
         massHinweisSetzen()
         protokoll("massstab " + FORMAT$(massEinst, "%.2f"))
+    END IF
+    IF GUI_CHECKED(cbEinstEigen) <> einstEigenAn THEN
+        einstEigenAn = GUI_CHECKED(cbEinstEigen)
+        einstEigenSetzen()
+        konfigSichern()
     END IF
     IF GUI_CHECKED(cbGlanz) <> glanzAn THEN
         glanzAn = GUI_CHECKED(cbGlanz)

@@ -71,6 +71,7 @@ IMPORT "gui"
 | `GUI_WINDOW_CLOSABLE(win, an)` | — | show a close button (default: off) |
 | `GUI_WINDOW_NATIVE(win, an)` | BOOLEAN | the window as a **real OS window** (own title bar, taskbar, second monitor) or back into the main window; `FALSE` with `an` means: fallback, it stays a gui window |
 | `GUI_WINDOW_IS_NATIVE(win)` | BOOLEAN | is it a real OS window right now? |
+| `GUI_WINDOW_NATIVE_SCALE(win)` | FLOAT | how much larger the native window is drawn on its screen than in the main window (its screen's pixel density divided by the main window's); 1.0 in the main window |
 | `GUI_WINDOW_VISIBLE(win, an)` | — | set visibility |
 | `GUI_WINDOW_FRONT(win)` | — | bring the window to the front without giving it focus -- for a suggestion list or a tooltip that should lie over the text while typing. Shown via `GUI_WINDOW_VISIBLE`, a window otherwise lies behind the one clicked last |
 | `GUI_WINDOW_SHOWN(win)` | BOOLEAN | is the window currently visible? The counterpart to the setter -- without the getter a program would have to remember what it set itself, and would be wrong as soon as the user closes the window with its cross |
@@ -751,6 +752,12 @@ WEND
   toolbar's overflow menu are shown in the native window (within its
   bounds). The composition of an input method (IME) appears at the cursor
   of the window that has the focus.
+- **Pixel density:** if the native window is on a screen with a different
+  scaling than the main window (100 % next to 150 %), it is drawn larger
+  there -- lines smooth, text set at full size instead of magnified. Drag
+  it across and it adapts. `GUI_WINDOW_NATIVE_SCALE(win)` tells the factor
+  (1.0 at equal density); every size going out stays in gui points.
+  `DHRT_NATIV_MASSSTAB=1.5` fixes it (tests without a second screen).
 - **Not yet** (later stages): popups beyond the edge of the native window,
   screen reader in the native window, the owner on Linux, tear-off dock
   panels, recordings (`AUTOMATION_PLAY`) in the native window.

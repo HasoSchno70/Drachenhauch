@@ -257,6 +257,92 @@ WEND
 120,145 #00FF00
 nativ TRUE
 
+=== auf einem dichteren schirm ist das native fenster groesser
+' DHRT_NATIV_MASSSTAB=1.5 tut so, als stuende das native Fenster auf einem
+' Schirm mit 150 % neben einem Hauptfenster mit 100 % (ohne zweiten Schirm
+' nicht anders pruefbar). Das Fenster hat dann 240 x 160 Punkte, aber
+' 360 x 240 Pixel; der gruene Streifen (120..160 Punkte) liegt bei Pixel
+' 200 -- bei Massstab 1 waere dort schon kein Fenster mehr.
+IMPORT "helfer.dh"
+DIM kennung AS STRING : kennung = "Dicht-" + STR$(MILLIS()) + "-" + STR$(INT(RND() * 1000000))
+DIM kind AS INTEGER : kind = PROCESS_START("dhrt", "run", CWD$() + "/bild.dh", "--", kennung)
+DIM ps AS INTEGER : ps = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", pixel_skript$(), kennung, "groesse;120,15;300,200")
+DIM s AS STRING : s = auslesen$(ps, 30000)
+DIM k AS STRING : k = auslesen$(kind, 30000)
+IF INSTR(auslesenFehler, "Kein Fenster moeglich") >= 0 THEN
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    END
+END IF
+PRINT s; k;
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/fenstersender.dh"
+FUNCTION pixel_skript$() AS STRING
+    RETURN "{sammlung}/../_hilfen/fensterpixel.ps1"
+END FUNCTION
+--- datei bild.dh
+IMPORT "gui"
+SCREEN(400, 300, "Haupt-" + ARG$(0), 1)
+DIM p AS GUI_WINDOW : p = GUI_WINDOW(ARG$(0), 40, 40, 240, 160)
+DIM oben AS GUI_WIDGET : oben = GUI_LABEL(p, "", 0, 0)
+GUI_SET_BOUNDS(oben, 0, 0, 240, 40)
+GUI_SET_COLOR(oben, "bg", &HFF00FF)
+DIM unten AS GUI_WIDGET : unten = GUI_LABEL(p, "", 0, 0)
+GUI_SET_BOUNDS(unten, 0, 120, 240, 40)
+GUI_SET_COLOR(unten, "bg", &H00FF00)
+PRINT "massstab vorher "; GUI_WINDOW_NATIVE_SCALE(p)
+PRINT "nativ "; GUI_WINDOW_NATIVE(p, TRUE)
+PRINT "massstab "; GUI_WINDOW_NATIVE_SCALE(p)
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE NOT QUITREQUESTED() AND MILLIS() - t0 < 5000
+    GUI_UPDATE()
+    CLS(&H202830) : GUI_DRAW() : FLIP()
+WEND
+--- umgebung
+DHRT_NATIV_MASSSTAB=1.5
+--- system windows
+--- erwartet
+groesse 360x240
+120,15 #FF00FF
+300,200 #00FF00
+massstab vorher 1.0
+nativ TRUE
+massstab 1.5
+
+=== ein klick auf einem dichteren schirm trifft den knopf
+' Die Maus kommt in Pixeln des Fensters und wird in Punkte der gui
+' umgerechnet: Pixel (200, 95) sind bei Massstab 1.5 die Punkte (133, 63) --
+' im Knopf (20..160, 40..70); ohne Umrechnung laege der Klick daneben.
+IMPORT "helfer.dh"
+PRINT sende$(skript$(), "probe.dh", "roh:512:0:6226120;roh:513:1:6226120;roh:514:0:6226120", "palette")
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/fenstersender.dh"
+FUNCTION skript$() AS STRING
+    RETURN "{sammlung}/../_hilfen/fenstersender.ps1"
+END FUNCTION
+--- datei probe.dh
+IMPORT "gui"
+DIM kennung AS STRING : kennung = ARG$(0)
+SCREEN(500, 300, "Haupt-" + kennung, 1)
+DIM p AS GUI_WINDOW : p = GUI_WINDOW(kennung, 40, 40, 240, 160)
+DIM pk AS GUI_WIDGET : pk = GUI_BUTTON(p, "Paletten-Knopf", 20, 40, 140, 30)
+DIM nativ AS BOOLEAN : nativ = GUI_WINDOW_NATIVE(p, TRUE)
+DIM t0 AS INTEGER : t0 = MILLIS()
+DIM pkl AS INTEGER
+WHILE NOT QUITREQUESTED() AND MILLIS() - t0 < 6000
+    GUI_UPDATE()
+    IF GUI_CLICKED(pk) THEN pkl = pkl + 1
+    CLS(&H202830) : GUI_DRAW() : FLIP()
+WEND
+PRINT "nativ "; nativ
+PRINT "klicks "; pkl
+--- umgebung
+DHRT_NATIV_MASSSTAB=1.5
+--- system windows
+--- erwartet
+gesendet
+nativ TRUE
+klicks 1
+
 === ein modaler nativer dialog gehoert dem hauptfenster und dunkelt es ab
 ' Weg E, Stufe 2: ist der Dialog modal, wird das Hauptfenster sein Besitzer
 ' (Windows: GWLP_HWNDPARENT) -- er bleibt darueber und hat keinen eigenen

@@ -7335,6 +7335,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_WINDOW_NATIVE_SCALE",
+   "kind": "core",
+   "signature": "GUI_WINDOW_NATIVE_SCALE(win) AS FLOAT",
+   "module": "gui"
+  },
+  {
    "name": "GUI_WINDOW_CLOSED",
    "kind": "core",
    "signature": "GUI_WINDOW_CLOSED(win)",

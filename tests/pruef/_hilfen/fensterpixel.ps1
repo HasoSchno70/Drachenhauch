@@ -1,6 +1,7 @@
 # Sucht ein Fenster ueber seinen Titel und liest Farben aus seinem INHALT
 # (Client-Bereich, ohne Rahmen und Titelleiste). Punkte als "x,y;x,y" in
-# Client-Koordinaten; Ausgabe je Punkt eine Zeile "x,y #RRGGBB". Fuer
+# Client-Koordinaten; Ausgabe je Punkt eine Zeile "x,y #RRGGBB" ("groesse"
+# als Punkt: die Groesse des Inhalts, "groesse BxH"). Fuer
 # Fenster, die kein Programm selbst fotografieren kann -- etwa das zweite,
 # native Fenster eines Programms (GUI_WINDOW_NATIVE, Weg E).
 #
@@ -46,6 +47,13 @@ $gr.ReleaseHdc($dc)
 # Client-Ursprung innerhalb des ganzen Fensters
 $dx = $o.X - $w.L; $dy = $o.Y - $w.T
 foreach ($p in $Punkte.Split(";")) {
+    # "groesse" statt eines Punktes: die Groesse des Inhalts in Pixeln.
+    if ($p -eq "groesse") {
+        $c = New-Object FP+RECT
+        [FP]::GetClientRect($h, [ref]$c) | Out-Null
+        "groesse {0}x{1}" -f $c.R, $c.B
+        continue
+    }
     $xy = $p.Split(",")
     $c = $bmp.GetPixel([int]$xy[0] + $dx, [int]$xy[1] + $dy)
     "{0},{1} #{2:X2}{3:X2}{4:X2}" -f $xy[0], $xy[1], $c.R, $c.G, $c.B
