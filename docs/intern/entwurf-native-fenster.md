@@ -348,9 +348,26 @@ in Stufe 1 gilt dasselbe: **ein Render-Ziel fuer Weg E nur ueber
 `SPIKE_OHNE_ZWEIT=1` (nur das Hauptfenster): erst so war klar, dass der
 Fehler nicht am zweiten Fenster lag.
 
-**Offen fuer Stufe 0:** macOS -- nur auf einem Mac oder einem macOS-Rechner
-der CI zu pruefen. Unter macOS braucht der zweite Kontext
-`GLFW_OPENGL_FORWARD_COMPAT` (im Spike gesetzt).
+### Stufe 0 unter macOS: auf der CI nicht pruefbar
+
+Ein Einmal-Lauf auf den CI-Rechnern (12.11.2026, `macos-latest` = Apple M1
+virtuell mit macOS 26.7, `macos-15-intel` = i7-8700B mit macOS 15.7) kam
+nicht bis Weg E: schon raylibs HAUPTfenster scheitert mit "NSGL: Failed to
+find a suitable pixel format" -- dieselbe Grenze, die `package.yml` am
+19.09.2026 festhielt. Die macOS-Rechner der CI haben kein OpenGL fuer
+Fenster; Weg E unter macOS laesst sich nur auf einem echten Mac pruefen.
+
+Was fuer macOS spricht: geteilte Kontexte sind unter NSGL der gewoehnliche
+Fall (GLFW nutzt dort `shareContext`), `glBlitFramebuffer` gehoert zu
+OpenGL 3.2+, und Apple liefert 4.1 core. Der zweite Kontext braucht
+`GLFW_OPENGL_FORWARD_COMPAT` (im Spike gesetzt). Was dagegen sprechen
+koennte: GLFW verlangt unter macOS alle Fensterbefehle im Hauptfaden --
+dhrt zeichnet dort ohnehin.
+
+**Stand Stufe 0: bestanden unter Windows und Linux; macOS offen bis zu
+einem Lauf auf einem Mac** (`cargo build --release --example
+spike_zweitfenster --features graphics`, dann das Programm starten; ohne
+automatische Klicks prueft es Bild, Hauptfenster und Bildrate).
 
 **Stufe 1 -- der Befehl (etwa eine Woche).** Ein Befehl macht ein gui-Fenster
 zum OS-Fenster (Arbeitsname: GUI_WINDOW_NATIVE mit Fenster und an/aus, noch nicht gebaut): Titel,
