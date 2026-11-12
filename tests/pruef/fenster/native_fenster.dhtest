@@ -256,3 +256,565 @@ WEND
 120,15 #FF00FF
 120,145 #00FF00
 nativ TRUE
+
+=== ein modaler nativer dialog gehoert dem hauptfenster und dunkelt es ab
+' Weg E, Stufe 2: ist der Dialog modal, wird das Hauptfenster sein Besitzer
+' (Windows: GWLP_HWNDPARENT) -- er bleibt darueber und hat keinen eigenen
+' Eintrag in der Taskleiste. Der Schleier liegt ueber dem Hauptfenster: dort,
+' wo kein gui-Fenster steht (450, 250), ist es dunkler als sein CLS-Grund.
+IMPORT "helfer.dh"
+DIM kennung AS STRING : kennung = "Modal-" + STR$(MILLIS()) + "-" + STR$(INT(RND() * 1000000))
+DIM kind AS INTEGER : kind = PROCESS_START("dhrt", "run", CWD$() + "/dialog.dh", "--", kennung, "modal")
+DIM bes AS STRING : bes = ps$("fensterbesitzer.ps1", kennung, "")
+DIM px AS STRING : px = ps$("fensterpixel.ps1", "Haupt-" + kennung, "450,250")
+DIM k AS STRING : k = auslesen$(kind, 30000)
+IF INSTR(auslesenFehler, "Kein Fenster moeglich") >= 0 THEN
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    END
+END IF
+PRINT REPLACE$(TRIM$(bes), kennung, "K")
+PRINT "abgedunkelt "; INSTR(px, "#202830") < 0 AND INSTR(px, "450,250 #") >= 0
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/fenstersender.dh"
+FUNCTION skript$() AS STRING
+    RETURN "{sammlung}/../_hilfen/fenstersender.ps1"
+END FUNCTION
+FUNCTION hilfe$(name AS STRING) AS STRING
+    RETURN "{sammlung}/../_hilfen/" + name
+END FUNCTION
+FUNCTION ps$(skriptname AS STRING, a AS STRING, b AS STRING) AS STRING
+    DIM p AS INTEGER : p = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", hilfe$(skriptname), a, b)
+    RETURN auslesen$(p, 30000)
+END FUNCTION
+--- datei dialog.dh
+IMPORT "gui"
+' ARG$(0) = Kennung; ARG$(1) = "haupt": das Hauptfenster traegt sie (dorthin
+' schickt der Sender), sonst der Dialog. "frei": der Dialog ist nicht modal.
+DIM kennung AS STRING : kennung = ARG$(0)
+DIM art AS STRING : art = ARG$(1)
+SCREEN(500, 300, IIF(art = "haupt", kennung, "Haupt-" + kennung), 1)
+DIM haupt AS GUI_WINDOW : haupt = GUI_WINDOW("Haupt", 10, 10, 300, 200)
+DIM hk AS GUI_WIDGET : hk = GUI_BUTTON(haupt, "Haupt-Knopf", 20, 40, 120, 30)
+DIM d AS GUI_WINDOW : d = GUI_WINDOW(IIF(art = "haupt", "Dialog-" + kennung, kennung), 60, 60, 260, 140)
+DIM ok AS GUI_WIDGET : ok = GUI_BUTTON(d, "OK", 30, 80, 80, 30)
+DIM ab AS GUI_WIDGET : ab = GUI_BUTTON(d, "Abbrechen", 130, 80, 100, 30)
+DIM feld AS GUI_WIDGET : feld = GUI_TEXTINPUT(d, 30, 30, 200, 26)
+GUI_WINDOW_DEFAULT(d, ok)
+GUI_WINDOW_CANCEL(d, ab)
+DIM kontext AS INTEGER : kontext = GUI_CONTEXT(d)
+DIM eintrag AS INTEGER : eintrag = GUI_MENU_ITEM(kontext, "Einfuegen")
+GUI_CONTEXT_WIDGET(kontext, feld)
+IF art <> "frei" THEN GUI_WINDOW_MODAL(d, TRUE)
+DIM nativ AS BOOLEAN : nativ = GUI_WINDOW_NATIVE(d, TRUE)
+DIM t0 AS INTEGER : t0 = MILLIS()
+DIM hkl AS INTEGER
+DIM okl AS INTEGER
+DIM abl AS INTEGER
+WHILE NOT QUITREQUESTED() AND MILLIS() - t0 < 9000
+    GUI_UPDATE()
+    IF GUI_CLICKED(hk) THEN hkl = hkl + 1
+    IF GUI_CLICKED(ok) THEN okl = okl + 1
+    IF GUI_CLICKED(ab) THEN abl = abl + 1
+    CLS(&H202830) : GUI_DRAW() : FLIP()
+WEND
+PRINT "nativ "; nativ
+PRINT "klicks haupt "; hkl; " ok "; okl; " abbrechen "; abl
+--- system windows
+--- erwartet
+besitzer Haupt-K
+abgedunkelt TRUE
+
+=== ein klick ins hauptfenster erreicht es nicht, solange der dialog modal ist
+IMPORT "helfer.dh"
+PRINT sende$(skript$(), "dialog.dh", "roh:512:0:5898300;roh:513:1:5898300;roh:514:0:5898300", "haupt")
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/fenstersender.dh"
+FUNCTION skript$() AS STRING
+    RETURN "{sammlung}/../_hilfen/fenstersender.ps1"
+END FUNCTION
+FUNCTION hilfe$(name AS STRING) AS STRING
+    RETURN "{sammlung}/../_hilfen/" + name
+END FUNCTION
+FUNCTION ps$(skriptname AS STRING, a AS STRING, b AS STRING) AS STRING
+    DIM p AS INTEGER : p = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", hilfe$(skriptname), a, b)
+    RETURN auslesen$(p, 30000)
+END FUNCTION
+--- datei dialog.dh
+IMPORT "gui"
+' ARG$(0) = Kennung; ARG$(1) = "haupt": das Hauptfenster traegt sie (dorthin
+' schickt der Sender), sonst der Dialog. "frei": der Dialog ist nicht modal.
+DIM kennung AS STRING : kennung = ARG$(0)
+DIM art AS STRING : art = ARG$(1)
+SCREEN(500, 300, IIF(art = "haupt", kennung, "Haupt-" + kennung), 1)
+DIM haupt AS GUI_WINDOW : haupt = GUI_WINDOW("Haupt", 10, 10, 300, 200)
+DIM hk AS GUI_WIDGET : hk = GUI_BUTTON(haupt, "Haupt-Knopf", 20, 40, 120, 30)
+DIM d AS GUI_WINDOW : d = GUI_WINDOW(IIF(art = "haupt", "Dialog-" + kennung, kennung), 60, 60, 260, 140)
+DIM ok AS GUI_WIDGET : ok = GUI_BUTTON(d, "OK", 30, 80, 80, 30)
+DIM ab AS GUI_WIDGET : ab = GUI_BUTTON(d, "Abbrechen", 130, 80, 100, 30)
+DIM feld AS GUI_WIDGET : feld = GUI_TEXTINPUT(d, 30, 30, 200, 26)
+GUI_WINDOW_DEFAULT(d, ok)
+GUI_WINDOW_CANCEL(d, ab)
+DIM kontext AS INTEGER : kontext = GUI_CONTEXT(d)
+DIM eintrag AS INTEGER : eintrag = GUI_MENU_ITEM(kontext, "Einfuegen")
+GUI_CONTEXT_WIDGET(kontext, feld)
+IF art <> "frei" THEN GUI_WINDOW_MODAL(d, TRUE)
+DIM nativ AS BOOLEAN : nativ = GUI_WINDOW_NATIVE(d, TRUE)
+DIM t0 AS INTEGER : t0 = MILLIS()
+DIM hkl AS INTEGER
+DIM okl AS INTEGER
+DIM abl AS INTEGER
+WHILE NOT QUITREQUESTED() AND MILLIS() - t0 < 9000
+    GUI_UPDATE()
+    IF GUI_CLICKED(hk) THEN hkl = hkl + 1
+    IF GUI_CLICKED(ok) THEN okl = okl + 1
+    IF GUI_CLICKED(ab) THEN abl = abl + 1
+    CLS(&H202830) : GUI_DRAW() : FLIP()
+WEND
+PRINT "nativ "; nativ
+PRINT "klicks haupt "; hkl; " ok "; okl; " abbrechen "; abl
+--- system windows
+--- erwartet
+gesendet
+nativ TRUE
+klicks haupt 0 ok 0 abbrechen 0
+
+=== enter im nativen dialog drueckt den standard-knopf
+' WM_SETFOCUS (7), dann WM_KEYDOWN/WM_KEYUP VK_RETURN (13, Scancode 0x1C).
+IMPORT "helfer.dh"
+PRINT sende$(skript$(), "dialog.dh", "roh:7:0:0;roh:256:13:1835009;roh:257:13:3223060481", "modal")
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/fenstersender.dh"
+FUNCTION skript$() AS STRING
+    RETURN "{sammlung}/../_hilfen/fenstersender.ps1"
+END FUNCTION
+FUNCTION hilfe$(name AS STRING) AS STRING
+    RETURN "{sammlung}/../_hilfen/" + name
+END FUNCTION
+FUNCTION ps$(skriptname AS STRING, a AS STRING, b AS STRING) AS STRING
+    DIM p AS INTEGER : p = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", hilfe$(skriptname), a, b)
+    RETURN auslesen$(p, 30000)
+END FUNCTION
+--- datei dialog.dh
+IMPORT "gui"
+' ARG$(0) = Kennung; ARG$(1) = "haupt": das Hauptfenster traegt sie (dorthin
+' schickt der Sender), sonst der Dialog. "frei": der Dialog ist nicht modal.
+DIM kennung AS STRING : kennung = ARG$(0)
+DIM art AS STRING : art = ARG$(1)
+SCREEN(500, 300, IIF(art = "haupt", kennung, "Haupt-" + kennung), 1)
+DIM haupt AS GUI_WINDOW : haupt = GUI_WINDOW("Haupt", 10, 10, 300, 200)
+DIM hk AS GUI_WIDGET : hk = GUI_BUTTON(haupt, "Haupt-Knopf", 20, 40, 120, 30)
+DIM d AS GUI_WINDOW : d = GUI_WINDOW(IIF(art = "haupt", "Dialog-" + kennung, kennung), 60, 60, 260, 140)
+DIM ok AS GUI_WIDGET : ok = GUI_BUTTON(d, "OK", 30, 80, 80, 30)
+DIM ab AS GUI_WIDGET : ab = GUI_BUTTON(d, "Abbrechen", 130, 80, 100, 30)
+DIM feld AS GUI_WIDGET : feld = GUI_TEXTINPUT(d, 30, 30, 200, 26)
+GUI_WINDOW_DEFAULT(d, ok)
+GUI_WINDOW_CANCEL(d, ab)
+DIM kontext AS INTEGER : kontext = GUI_CONTEXT(d)
+DIM eintrag AS INTEGER : eintrag = GUI_MENU_ITEM(kontext, "Einfuegen")
+GUI_CONTEXT_WIDGET(kontext, feld)
+IF art <> "frei" THEN GUI_WINDOW_MODAL(d, TRUE)
+DIM nativ AS BOOLEAN : nativ = GUI_WINDOW_NATIVE(d, TRUE)
+DIM t0 AS INTEGER : t0 = MILLIS()
+DIM hkl AS INTEGER
+DIM okl AS INTEGER
+DIM abl AS INTEGER
+WHILE NOT QUITREQUESTED() AND MILLIS() - t0 < 9000
+    GUI_UPDATE()
+    IF GUI_CLICKED(hk) THEN hkl = hkl + 1
+    IF GUI_CLICKED(ok) THEN okl = okl + 1
+    IF GUI_CLICKED(ab) THEN abl = abl + 1
+    CLS(&H202830) : GUI_DRAW() : FLIP()
+WEND
+PRINT "nativ "; nativ
+PRINT "klicks haupt "; hkl; " ok "; okl; " abbrechen "; abl
+--- system windows
+--- erwartet
+gesendet
+nativ TRUE
+klicks haupt 0 ok 1 abbrechen 0
+
+=== esc im nativen dialog drueckt den abbrechen-knopf
+IMPORT "helfer.dh"
+PRINT sende$(skript$(), "dialog.dh", "roh:7:0:0;roh:256:27:65537;roh:257:27:3221291009", "modal")
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/fenstersender.dh"
+FUNCTION skript$() AS STRING
+    RETURN "{sammlung}/../_hilfen/fenstersender.ps1"
+END FUNCTION
+FUNCTION hilfe$(name AS STRING) AS STRING
+    RETURN "{sammlung}/../_hilfen/" + name
+END FUNCTION
+FUNCTION ps$(skriptname AS STRING, a AS STRING, b AS STRING) AS STRING
+    DIM p AS INTEGER : p = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", hilfe$(skriptname), a, b)
+    RETURN auslesen$(p, 30000)
+END FUNCTION
+--- datei dialog.dh
+IMPORT "gui"
+' ARG$(0) = Kennung; ARG$(1) = "haupt": das Hauptfenster traegt sie (dorthin
+' schickt der Sender), sonst der Dialog. "frei": der Dialog ist nicht modal.
+DIM kennung AS STRING : kennung = ARG$(0)
+DIM art AS STRING : art = ARG$(1)
+SCREEN(500, 300, IIF(art = "haupt", kennung, "Haupt-" + kennung), 1)
+DIM haupt AS GUI_WINDOW : haupt = GUI_WINDOW("Haupt", 10, 10, 300, 200)
+DIM hk AS GUI_WIDGET : hk = GUI_BUTTON(haupt, "Haupt-Knopf", 20, 40, 120, 30)
+DIM d AS GUI_WINDOW : d = GUI_WINDOW(IIF(art = "haupt", "Dialog-" + kennung, kennung), 60, 60, 260, 140)
+DIM ok AS GUI_WIDGET : ok = GUI_BUTTON(d, "OK", 30, 80, 80, 30)
+DIM ab AS GUI_WIDGET : ab = GUI_BUTTON(d, "Abbrechen", 130, 80, 100, 30)
+DIM feld AS GUI_WIDGET : feld = GUI_TEXTINPUT(d, 30, 30, 200, 26)
+GUI_WINDOW_DEFAULT(d, ok)
+GUI_WINDOW_CANCEL(d, ab)
+DIM kontext AS INTEGER : kontext = GUI_CONTEXT(d)
+DIM eintrag AS INTEGER : eintrag = GUI_MENU_ITEM(kontext, "Einfuegen")
+GUI_CONTEXT_WIDGET(kontext, feld)
+IF art <> "frei" THEN GUI_WINDOW_MODAL(d, TRUE)
+DIM nativ AS BOOLEAN : nativ = GUI_WINDOW_NATIVE(d, TRUE)
+DIM t0 AS INTEGER : t0 = MILLIS()
+DIM hkl AS INTEGER
+DIM okl AS INTEGER
+DIM abl AS INTEGER
+WHILE NOT QUITREQUESTED() AND MILLIS() - t0 < 9000
+    GUI_UPDATE()
+    IF GUI_CLICKED(hk) THEN hkl = hkl + 1
+    IF GUI_CLICKED(ok) THEN okl = okl + 1
+    IF GUI_CLICKED(ab) THEN abl = abl + 1
+    CLS(&H202830) : GUI_DRAW() : FLIP()
+WEND
+PRINT "nativ "; nativ
+PRINT "klicks haupt "; hkl; " ok "; okl; " abbrechen "; abl
+--- system windows
+--- erwartet
+gesendet
+nativ TRUE
+klicks haupt 0 ok 0 abbrechen 1
+
+=== das kontextmenue eines nativen fensters steht in ihm
+' Rechtsklick (WM_RBUTTONDOWN 516 / UP 517) ins Feld bei (60, 40): das Menue
+' "Einfuegen" erscheint darunter IM nativen Fenster -- vorher landete es im
+' Hauptfenster an der Stelle, die es im nativen gehabt haette. Gelesen wird
+' (150, 60) im nativen Fenster vor und nach dem Klick.
+IMPORT "helfer.dh"
+DIM kennung AS STRING : kennung = "Kontext-" + STR$(MILLIS()) + "-" + STR$(INT(RND() * 1000000))
+DIM kind AS INTEGER : kind = PROCESS_START("dhrt", "run", CWD$() + "/dialog.dh", "--", kennung, "frei")
+DIM vorher AS STRING : vorher = ps$("fensterpixel.ps1", kennung, "150,60")
+DIM s AS STRING : s = ps$("fenstersender.ps1", kennung, "roh:512:0:2621500;roh:516:2:2621500;roh:517:0:2621500")
+DIM nachher AS STRING : nachher = ps$("fensterpixel.ps1", kennung, "150,60")
+DIM k AS STRING : k = auslesen$(kind, 30000)
+IF INSTR(auslesenFehler, "Kein Fenster moeglich") >= 0 THEN
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    END
+END IF
+PRINT "gelesen "; INSTR(vorher, "150,60 #") >= 0 AND INSTR(nachher, "150,60 #") >= 0
+PRINT "menue da "; TRIM$(vorher) <> TRIM$(nachher)
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/fenstersender.dh"
+FUNCTION skript$() AS STRING
+    RETURN "{sammlung}/../_hilfen/fenstersender.ps1"
+END FUNCTION
+FUNCTION hilfe$(name AS STRING) AS STRING
+    RETURN "{sammlung}/../_hilfen/" + name
+END FUNCTION
+FUNCTION ps$(skriptname AS STRING, a AS STRING, b AS STRING) AS STRING
+    DIM p AS INTEGER : p = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", hilfe$(skriptname), a, b)
+    RETURN auslesen$(p, 30000)
+END FUNCTION
+--- datei dialog.dh
+IMPORT "gui"
+' ARG$(0) = Kennung; ARG$(1) = "haupt": das Hauptfenster traegt sie (dorthin
+' schickt der Sender), sonst der Dialog. "frei": der Dialog ist nicht modal.
+DIM kennung AS STRING : kennung = ARG$(0)
+DIM art AS STRING : art = ARG$(1)
+SCREEN(500, 300, IIF(art = "haupt", kennung, "Haupt-" + kennung), 1)
+DIM haupt AS GUI_WINDOW : haupt = GUI_WINDOW("Haupt", 10, 10, 300, 200)
+DIM hk AS GUI_WIDGET : hk = GUI_BUTTON(haupt, "Haupt-Knopf", 20, 40, 120, 30)
+DIM d AS GUI_WINDOW : d = GUI_WINDOW(IIF(art = "haupt", "Dialog-" + kennung, kennung), 60, 60, 260, 140)
+DIM ok AS GUI_WIDGET : ok = GUI_BUTTON(d, "OK", 30, 80, 80, 30)
+DIM ab AS GUI_WIDGET : ab = GUI_BUTTON(d, "Abbrechen", 130, 80, 100, 30)
+DIM feld AS GUI_WIDGET : feld = GUI_TEXTINPUT(d, 30, 30, 200, 26)
+GUI_WINDOW_DEFAULT(d, ok)
+GUI_WINDOW_CANCEL(d, ab)
+DIM kontext AS INTEGER : kontext = GUI_CONTEXT(d)
+DIM eintrag AS INTEGER : eintrag = GUI_MENU_ITEM(kontext, "Einfuegen")
+GUI_CONTEXT_WIDGET(kontext, feld)
+IF art <> "frei" THEN GUI_WINDOW_MODAL(d, TRUE)
+DIM nativ AS BOOLEAN : nativ = GUI_WINDOW_NATIVE(d, TRUE)
+DIM t0 AS INTEGER : t0 = MILLIS()
+DIM hkl AS INTEGER
+DIM okl AS INTEGER
+DIM abl AS INTEGER
+WHILE NOT QUITREQUESTED() AND MILLIS() - t0 < 9000
+    GUI_UPDATE()
+    IF GUI_CLICKED(hk) THEN hkl = hkl + 1
+    IF GUI_CLICKED(ok) THEN okl = okl + 1
+    IF GUI_CLICKED(ab) THEN abl = abl + 1
+    CLS(&H202830) : GUI_DRAW() : FLIP()
+WEND
+PRINT "nativ "; nativ
+PRINT "klicks haupt "; hkl; " ok "; okl; " abbrechen "; abl
+--- system windows
+--- erwartet
+gelesen TRUE
+menue da TRUE
+
+=== das kontextmenue im modalen nativen dialog geht
+' Gefunden beim Bau von Stufe 2: waehrend eines modalen Dialogs waren ALLE
+' Menues gesperrt, auch das Kontextmenue im Dialog selbst. Jetzt gelten die
+' Menues des Dialogs. Rechtsklick ins Feld (60, 40), Klick auf "Einfuegen"
+' (110, 55).
+IMPORT "helfer.dh"
+PRINT sende$(skript$(), "menue.dh", "roh:512:0:2621500;roh:516:2:2621500;roh:517:0:2621500;roh:512:0:3604590;roh:513:1:3604590;roh:514:0:3604590", "nativ")
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/fenstersender.dh"
+FUNCTION skript$() AS STRING
+    RETURN "{sammlung}/../_hilfen/fenstersender.ps1"
+END FUNCTION
+--- datei menue.dh
+' Probe: Menues waehrend eines modalen Dialogs, und die Menueleiste eines
+' nativen Fensters gegen Klicks im Hauptfenster.
+' ARG$(0) = Kennung, ARG$(1) = Art:
+'   "nativ"  -- der modale Dialog ist ein natives Fenster (Titel = Kennung)
+'   "innen"  -- der modale Dialog bleibt im Hauptfenster (Haupt-Titel = Kennung)
+'   "leiste" -- kein Dialog; ein natives Fenster mit Menueleiste, Haupt-Titel = Kennung
+IMPORT "gui"
+DIM kennung AS STRING : kennung = ARG$(0)
+DIM art AS STRING : art = ARG$(1)
+SCREEN(500, 320, IIF(art = "nativ", "Haupt-" + kennung, kennung), 1)
+DIM haupt AS GUI_WINDOW : haupt = GUI_WINDOW("Haupt", 10, 10, 300, 220)
+DIM hk AS GUI_WIDGET : hk = GUI_BUTTON(haupt, "Haupt-Knopf", 20, 40, 120, 30)
+DIM hm AS INTEGER : hm = GUI_CONTEXT(haupt)
+DIM heintrag AS INTEGER : heintrag = GUI_MENU_ITEM(hm, "Haupt-Eintrag")
+DIM d AS GUI_WINDOW : d = GUI_WINDOW(IIF(art = "nativ", kennung, IIF(art = "leiste", "Leiste-" + kennung, "Dialog")), 60, 60, 260, 140)
+DIM feld AS GUI_WIDGET : feld = GUI_TEXTINPUT(d, 30, 30, 200, 26)
+DIM dm AS INTEGER : dm = GUI_CONTEXT(d)
+DIM deintrag AS INTEGER : deintrag = GUI_MENU_ITEM(dm, "Einfuegen")
+GUI_CONTEXT_WIDGET(dm, feld)
+DIM leiste AS INTEGER
+DIM lneu AS INTEGER
+IF art = "leiste" THEN
+    leiste = GUI_MENU(d, "Datei")
+    lneu = GUI_MENU_ITEM(leiste, "Neu")
+    PRINT "nativ "; GUI_WINDOW_NATIVE(d, TRUE)
+ELSE
+    GUI_WINDOW_MODAL(d, TRUE)
+    IF art = "nativ" THEN PRINT "nativ "; GUI_WINDOW_NATIVE(d, TRUE) ELSE PRINT "nativ FALSE"
+END IF
+DIM dauer AS INTEGER : dauer = 8000
+DIM t0 AS INTEGER : t0 = MILLIS()
+DIM nd AS INTEGER
+DIM nh AS INTEGER
+DIM nl AS INTEGER
+WHILE NOT QUITREQUESTED() AND MILLIS() - t0 < dauer
+    GUI_UPDATE()
+    IF GUI_CLICKED(deintrag) THEN nd = nd + 1
+    IF GUI_CLICKED(heintrag) THEN nh = nh + 1
+    IF art = "leiste" THEN
+        IF GUI_CLICKED(lneu) THEN nl = nl + 1
+    END IF
+    CLS(&H202830) : GUI_DRAW() : FLIP()
+WEND
+PRINT "dialog-eintrag "; nd; " haupt-eintrag "; nh; " leisten-eintrag "; nl
+--- system windows
+--- erwartet
+gesendet
+nativ TRUE
+dialog-eintrag 1 haupt-eintrag 0 leisten-eintrag 0
+
+=== das kontextmenue im modalen dialog im hauptfenster geht
+' Derselbe Fund ohne Weg E: der Dialog steht im Hauptfenster (bei 60, 60,
+' Titelleiste ~21), sein Feld bei (90, 111).
+IMPORT "helfer.dh"
+PRINT sende$(skript$(), "menue.dh", "roh:512:0:7864420;roh:516:2:7864420;roh:517:0:7864420;roh:512:0:8913046;roh:513:1:8913046;roh:514:0:8913046", "innen")
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/fenstersender.dh"
+FUNCTION skript$() AS STRING
+    RETURN "{sammlung}/../_hilfen/fenstersender.ps1"
+END FUNCTION
+--- datei menue.dh
+' Probe: Menues waehrend eines modalen Dialogs, und die Menueleiste eines
+' nativen Fensters gegen Klicks im Hauptfenster.
+' ARG$(0) = Kennung, ARG$(1) = Art:
+'   "nativ"  -- der modale Dialog ist ein natives Fenster (Titel = Kennung)
+'   "innen"  -- der modale Dialog bleibt im Hauptfenster (Haupt-Titel = Kennung)
+'   "leiste" -- kein Dialog; ein natives Fenster mit Menueleiste, Haupt-Titel = Kennung
+IMPORT "gui"
+DIM kennung AS STRING : kennung = ARG$(0)
+DIM art AS STRING : art = ARG$(1)
+SCREEN(500, 320, IIF(art = "nativ", "Haupt-" + kennung, kennung), 1)
+DIM haupt AS GUI_WINDOW : haupt = GUI_WINDOW("Haupt", 10, 10, 300, 220)
+DIM hk AS GUI_WIDGET : hk = GUI_BUTTON(haupt, "Haupt-Knopf", 20, 40, 120, 30)
+DIM hm AS INTEGER : hm = GUI_CONTEXT(haupt)
+DIM heintrag AS INTEGER : heintrag = GUI_MENU_ITEM(hm, "Haupt-Eintrag")
+DIM d AS GUI_WINDOW : d = GUI_WINDOW(IIF(art = "nativ", kennung, IIF(art = "leiste", "Leiste-" + kennung, "Dialog")), 60, 60, 260, 140)
+DIM feld AS GUI_WIDGET : feld = GUI_TEXTINPUT(d, 30, 30, 200, 26)
+DIM dm AS INTEGER : dm = GUI_CONTEXT(d)
+DIM deintrag AS INTEGER : deintrag = GUI_MENU_ITEM(dm, "Einfuegen")
+GUI_CONTEXT_WIDGET(dm, feld)
+DIM leiste AS INTEGER
+DIM lneu AS INTEGER
+IF art = "leiste" THEN
+    leiste = GUI_MENU(d, "Datei")
+    lneu = GUI_MENU_ITEM(leiste, "Neu")
+    PRINT "nativ "; GUI_WINDOW_NATIVE(d, TRUE)
+ELSE
+    GUI_WINDOW_MODAL(d, TRUE)
+    IF art = "nativ" THEN PRINT "nativ "; GUI_WINDOW_NATIVE(d, TRUE) ELSE PRINT "nativ FALSE"
+END IF
+DIM dauer AS INTEGER : dauer = 8000
+DIM t0 AS INTEGER : t0 = MILLIS()
+DIM nd AS INTEGER
+DIM nh AS INTEGER
+DIM nl AS INTEGER
+WHILE NOT QUITREQUESTED() AND MILLIS() - t0 < dauer
+    GUI_UPDATE()
+    IF GUI_CLICKED(deintrag) THEN nd = nd + 1
+    IF GUI_CLICKED(heintrag) THEN nh = nh + 1
+    IF art = "leiste" THEN
+        IF GUI_CLICKED(lneu) THEN nl = nl + 1
+    END IF
+    CLS(&H202830) : GUI_DRAW() : FLIP()
+WEND
+PRINT "dialog-eintrag "; nd; " haupt-eintrag "; nh; " leisten-eintrag "; nl
+--- system windows
+--- erwartet
+gesendet
+nativ FALSE
+dialog-eintrag 1 haupt-eintrag 0 leisten-eintrag 0
+
+=== die menues hinter dem modalen dialog bleiben gesperrt
+' Das Kontextmenue des Hauptfensters (Rechtsklick bei 30, 150 -- im
+' Hauptfenster, neben dem Dialog) geht nicht auf, solange der Dialog modal ist.
+IMPORT "helfer.dh"
+PRINT sende$(skript$(), "menue.dh", "roh:512:0:9830430;roh:516:2:9830430;roh:517:0:9830430;roh:512:0:10813520;roh:513:1:10813520;roh:514:0:10813520", "innen")
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/fenstersender.dh"
+FUNCTION skript$() AS STRING
+    RETURN "{sammlung}/../_hilfen/fenstersender.ps1"
+END FUNCTION
+--- datei menue.dh
+' Probe: Menues waehrend eines modalen Dialogs, und die Menueleiste eines
+' nativen Fensters gegen Klicks im Hauptfenster.
+' ARG$(0) = Kennung, ARG$(1) = Art:
+'   "nativ"  -- der modale Dialog ist ein natives Fenster (Titel = Kennung)
+'   "innen"  -- der modale Dialog bleibt im Hauptfenster (Haupt-Titel = Kennung)
+'   "leiste" -- kein Dialog; ein natives Fenster mit Menueleiste, Haupt-Titel = Kennung
+IMPORT "gui"
+DIM kennung AS STRING : kennung = ARG$(0)
+DIM art AS STRING : art = ARG$(1)
+SCREEN(500, 320, IIF(art = "nativ", "Haupt-" + kennung, kennung), 1)
+DIM haupt AS GUI_WINDOW : haupt = GUI_WINDOW("Haupt", 10, 10, 300, 220)
+DIM hk AS GUI_WIDGET : hk = GUI_BUTTON(haupt, "Haupt-Knopf", 20, 40, 120, 30)
+DIM hm AS INTEGER : hm = GUI_CONTEXT(haupt)
+DIM heintrag AS INTEGER : heintrag = GUI_MENU_ITEM(hm, "Haupt-Eintrag")
+DIM d AS GUI_WINDOW : d = GUI_WINDOW(IIF(art = "nativ", kennung, IIF(art = "leiste", "Leiste-" + kennung, "Dialog")), 60, 60, 260, 140)
+DIM feld AS GUI_WIDGET : feld = GUI_TEXTINPUT(d, 30, 30, 200, 26)
+DIM dm AS INTEGER : dm = GUI_CONTEXT(d)
+DIM deintrag AS INTEGER : deintrag = GUI_MENU_ITEM(dm, "Einfuegen")
+GUI_CONTEXT_WIDGET(dm, feld)
+DIM leiste AS INTEGER
+DIM lneu AS INTEGER
+IF art = "leiste" THEN
+    leiste = GUI_MENU(d, "Datei")
+    lneu = GUI_MENU_ITEM(leiste, "Neu")
+    PRINT "nativ "; GUI_WINDOW_NATIVE(d, TRUE)
+ELSE
+    GUI_WINDOW_MODAL(d, TRUE)
+    IF art = "nativ" THEN PRINT "nativ "; GUI_WINDOW_NATIVE(d, TRUE) ELSE PRINT "nativ FALSE"
+END IF
+DIM dauer AS INTEGER : dauer = 8000
+DIM t0 AS INTEGER : t0 = MILLIS()
+DIM nd AS INTEGER
+DIM nh AS INTEGER
+DIM nl AS INTEGER
+WHILE NOT QUITREQUESTED() AND MILLIS() - t0 < dauer
+    GUI_UPDATE()
+    IF GUI_CLICKED(deintrag) THEN nd = nd + 1
+    IF GUI_CLICKED(heintrag) THEN nh = nh + 1
+    IF art = "leiste" THEN
+        IF GUI_CLICKED(lneu) THEN nl = nl + 1
+    END IF
+    CLS(&H202830) : GUI_DRAW() : FLIP()
+WEND
+PRINT "dialog-eintrag "; nd; " haupt-eintrag "; nh; " leisten-eintrag "; nl
+--- system windows
+--- erwartet
+gesendet
+nativ FALSE
+dialog-eintrag 0 haupt-eintrag 0 leisten-eintrag 0
+
+=== ein klick oben im hauptfenster oeffnet nicht die menueleiste eines nativen fensters
+' Das native Fenster steht auf seiner Flaeche bei (0, 0) -- seine Menueleiste
+' "Datei" liegt dort, wo im Hauptfenster oben links frei ist. Ohne den Filter
+' nach Oberflaechen oeffnete ein Klick bei (25, 8) im Hauptfenster sie: das
+' Menue ging IM nativen Fenster auf (Pixel bei 30, 32 dort vorher und
+' nachher). Den Eintrag traf erst der naechste Klick nicht mehr, weil er
+' fremde Popups schliesst -- darum misst der Fall das Bild, nicht den Klick.
+IMPORT "helfer.dh"
+DIM kennung AS STRING : kennung = "Leiste-" + STR$(MILLIS()) + "-" + STR$(INT(RND() * 1000000))
+DIM kind AS INTEGER : kind = PROCESS_START("dhrt", "run", CWD$() + "/menue.dh", "--", kennung, "leiste")
+DIM vorher AS STRING : vorher = ps$("fensterpixel.ps1", "Leiste-" + kennung, "30,32")
+DIM s AS STRING : s = ps$("fenstersender.ps1", kennung, "roh:512:0:524313;roh:513:1:524313;roh:514:0:524313")
+DIM nachher AS STRING : nachher = ps$("fensterpixel.ps1", "Leiste-" + kennung, "30,32")
+DIM k AS STRING : k = auslesen$(kind, 30000)
+IF INSTR(auslesenFehler, "Kein Fenster moeglich") >= 0 THEN
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    END
+END IF
+PRINT "gelesen "; INSTR(vorher, "30,32 #") >= 0 AND INSTR(nachher, "30,32 #") >= 0
+PRINT "leiste zu "; TRIM$(vorher) = TRIM$(nachher)
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/fenstersender.dh"
+FUNCTION skript$() AS STRING
+    RETURN "{sammlung}/../_hilfen/fenstersender.ps1"
+END FUNCTION
+FUNCTION ps$(skriptname AS STRING, a AS STRING, b AS STRING) AS STRING
+    DIM p AS INTEGER : p = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "{sammlung}/../_hilfen/" + skriptname, a, b)
+    RETURN auslesen$(p, 30000)
+END FUNCTION
+--- datei menue.dh
+' Probe: Menues waehrend eines modalen Dialogs, und die Menueleiste eines
+' nativen Fensters gegen Klicks im Hauptfenster.
+' ARG$(0) = Kennung, ARG$(1) = Art:
+'   "nativ"  -- der modale Dialog ist ein natives Fenster (Titel = Kennung)
+'   "innen"  -- der modale Dialog bleibt im Hauptfenster (Haupt-Titel = Kennung)
+'   "leiste" -- kein Dialog; ein natives Fenster mit Menueleiste, Haupt-Titel = Kennung
+IMPORT "gui"
+DIM kennung AS STRING : kennung = ARG$(0)
+DIM art AS STRING : art = ARG$(1)
+SCREEN(500, 320, IIF(art = "nativ", "Haupt-" + kennung, kennung), 1)
+DIM haupt AS GUI_WINDOW : haupt = GUI_WINDOW("Haupt", 10, 10, 300, 220)
+DIM hk AS GUI_WIDGET : hk = GUI_BUTTON(haupt, "Haupt-Knopf", 20, 40, 120, 30)
+DIM hm AS INTEGER : hm = GUI_CONTEXT(haupt)
+DIM heintrag AS INTEGER : heintrag = GUI_MENU_ITEM(hm, "Haupt-Eintrag")
+DIM d AS GUI_WINDOW : d = GUI_WINDOW(IIF(art = "nativ", kennung, IIF(art = "leiste", "Leiste-" + kennung, "Dialog")), 60, 60, 260, 140)
+DIM feld AS GUI_WIDGET : feld = GUI_TEXTINPUT(d, 30, 30, 200, 26)
+DIM dm AS INTEGER : dm = GUI_CONTEXT(d)
+DIM deintrag AS INTEGER : deintrag = GUI_MENU_ITEM(dm, "Einfuegen")
+GUI_CONTEXT_WIDGET(dm, feld)
+DIM leiste AS INTEGER
+DIM lneu AS INTEGER
+IF art = "leiste" THEN
+    leiste = GUI_MENU(d, "Datei")
+    lneu = GUI_MENU_ITEM(leiste, "Neu")
+    PRINT "nativ "; GUI_WINDOW_NATIVE(d, TRUE)
+ELSE
+    GUI_WINDOW_MODAL(d, TRUE)
+    IF art = "nativ" THEN PRINT "nativ "; GUI_WINDOW_NATIVE(d, TRUE) ELSE PRINT "nativ FALSE"
+END IF
+DIM dauer AS INTEGER : dauer = 8000
+DIM t0 AS INTEGER : t0 = MILLIS()
+DIM nd AS INTEGER
+DIM nh AS INTEGER
+DIM nl AS INTEGER
+WHILE NOT QUITREQUESTED() AND MILLIS() - t0 < dauer
+    GUI_UPDATE()
+    IF GUI_CLICKED(deintrag) THEN nd = nd + 1
+    IF GUI_CLICKED(heintrag) THEN nh = nh + 1
+    IF art = "leiste" THEN
+        IF GUI_CLICKED(lneu) THEN nl = nl + 1
+    END IF
+    CLS(&H202830) : GUI_DRAW() : FLIP()
+WEND
+PRINT "dialog-eintrag "; nd; " haupt-eintrag "; nh; " leisten-eintrag "; nl
+--- system windows
+--- erwartet
+gelesen TRUE
+leiste zu TRUE

@@ -840,11 +840,20 @@ impl Gui {
 
     /// Was ueber allen Fenstern liegt: ein offenes Kontextmenue und der
     /// Tooltip (GUI_DRAW_TOP).
-    pub fn draw_top(&self, g: &mut Graphics) {
+    pub fn draw_top(&self, g: &mut Graphics) { self.draw_top_flaeche(g, 0); }
+
+    /// Die obere Schicht EINER Oberflaeche (Weg E, Stufe 2): im
+    /// Hauptfenster (0) alles, was zu Fenstern des Hauptfensters gehoert;
+    /// in einem nativen Fenster (nativ_zeichnen) dessen Kontextmenue,
+    /// Toasts, Vorschlaege, Monat, Zellwahl, Leistenmenue und Hilfetext --
+    /// in dessen Koordinaten. Vorher landeten sie im Hauptfenster, an der
+    /// Stelle, die sie im nativen gehabt haetten.
+    pub(super) fn draw_top_flaeche(&self, g: &mut Graphics, f: u32) {
+        let hier = |wi: usize| self.windows.get(wi).map(|w| w.nativ == f).unwrap_or(false);
         // Popover, Infoleisten, Toasts, Vorschlaege -- ueber den Fenstern und
         // dem, was ein Programm in eine Zeichenflaeche gemalt hat.
-        self.ueber_zeichnen(g);
-        self.rs_zeichnen(g);
+        self.ueber_zeichnen(g, f);
+        if self.rs_fenster().map(hier).unwrap_or(false) { self.rs_zeichnen(g); }
         // Aufgeklapptes Leistenmenue und offene Klappliste: ueber allen
         // Fenstern und dem, was das Programm danach gemalt hat -- vorher
         // deckte sie jedes Fenster zu, das ueber ihrem eigenen lag (im
@@ -858,14 +867,14 @@ impl Gui {
         // Kontextmenue ueber ALLEM (nach allen Fenstern).
         // Die Lagen kommen aus `popup_chain` -- derselben Quelle wie der
         // Treffertest, dort weicht ein Popup am Bildschirmrand aus.
-        if let Some((wi, _, _, _)) = self.context_open {
+        if let Some((wi, _, _, _)) = self.context_open.filter(|c| hier(c.0)) {
             if self.windows.get(wi).map(|w| w.alive).unwrap_or(false) {
                 for (pw, pm, px, py) in self.popup_chain(g) { self.draw_items_popup(g, pw, pm, px, py); }
             }
         }
         // Laufender Zug: die Ablage darunter bekommt einen Rahmen, der Text
         // haengt an der Maus -- sonst sieht man nicht, dass man etwas traegt.
-        if let Some(d) = self.drag.as_ref().filter(|d| d.aktiv) {
+        if let Some(d) = self.drag.as_ref().filter(|d| d.aktiv && g.zeiger_flaeche() == f) {
             let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
             if let Some((zw, zi)) = self.ablage_unter(mx, my) {
                 let (x, y, w, h) = self.abs_rect(zw, &self.windows[zw].widgets[zi]);
@@ -886,23 +895,21 @@ impl Gui {
         }
         // Offene Auswahlliste einer Gitterzelle -- sie reicht gern ueber den
         // Tabellenrand hinaus.
-        if let Some((ew, ei)) = self.editing_table {
+        if let Some((ew, ei)) = self.editing_table.filter(|e| hier(e.0)) {
             if self.windows.get(ew).map(|w| w.alive && w.visible).unwrap_or(false) {
                 self.draw_wahl_popup(g, ew, ei);
             }
         }
         // Ein aufgeklappter Monat (Datumsfeld oder Datumsspalte).
-        self.draw_datum_popup(g);
+        if self.datum_auf.map(|d| hier(d.0)).unwrap_or(false) { self.draw_datum_popup(g); }
         // Ueberlauf-Menue einer Werkzeugleiste -- ueber allen Fenstern.
-        if let Some((lw, li)) = self.leiste_popup {
+        if let Some((lw, li)) = self.leiste_popup.filter(|l| hier(l.0)) {
             if self.windows.get(lw).map(|w| w.alive && w.visible).unwrap_or(false) {
                 self.draw_leisten_popup(g, lw, li);
             }
         }
-        // Tooltip ganz zuletzt, wenn die Maus lange genug ruht -- der eines
-        // nativen Fensters steht in dessen Ziel (nativ_zeichnen).
-        let tip_nativ = self.tip_fenster().map(|wi| self.windows.get(wi).map(|w| w.nativ != 0).unwrap_or(false)).unwrap_or(false);
-        if !tip_nativ { self.draw_tooltip(g); }
+        // Tooltip ganz zuletzt, wenn die Maus lange genug ruht.
+        if self.tip_fenster().map(hier).unwrap_or(f == 0) { self.draw_tooltip(g); }
     }
 
     /// Alles hinter dem modalen Dialog abdunkeln. Das ist nicht Deko: ohne

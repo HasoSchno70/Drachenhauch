@@ -1115,7 +1115,15 @@ impl Gui {
         // woanders hingeht. Ohne das waere er nur ein Fenster, das obenauf
         // liegt -- man koennte daneben weiterarbeiten, und genau das soll eine
         // Rueckfrage verhindern.
-        if let Some(m) = self.modal { if win != m { return; } }
+        if let Some(m) = self.modal {
+            if win != m {
+                // Ein modaler Dialog als natives Fenster: der Klick daneben
+                // holt ihn nach vorn, wie bei jedem Systemdialog.
+                let id = self.windows[m].nativ;
+                if id != 0 { self.nativ_fokus_wunsch = Some(id); }
+                return;
+            }
+        }
         // Entwurfsmodus: der Klick gehoert dem Designer, nicht den Widgets --
         // und auch nicht dem Fensterrahmen (kein Ziehen, kein Schliessen).
         // Das Fenster kommt nach vorn, nimmt aber keinen Fokus, damit die

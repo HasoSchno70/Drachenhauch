@@ -743,11 +743,22 @@ WEND
   `FALSE` und das Fenster bleibt, wie es war -- im Browser, ohne
   Bildschirm (vor `SCREEN`), unter macOS (dort noch nicht geprüft) und mit
   `DHRT_OHNE_NATIVE_FENSTER=1`. Ein Programm läuft also überall gleich.
-- **Noch nicht** (spätere Stufen): modale Dialoge als echte Fenster,
-  Kontextmenüs und Hilfetexte über den Rand des nativen Fensters hinaus,
-  Bildschirmleser und Eingabemethoden (IME) im nativen Fenster,
-  abreißbare Dock-Leisten, Aufnahmen (`AUTOMATION_PLAY`) im nativen
-  Fenster.
+- **Modal** (`GUI_WINDOW_MODAL(win, TRUE)`) wird das Hauptfenster unter
+  Windows sein **Besitzer**: der Dialog bleibt darüber und hat keinen
+  eigenen Eintrag in der Taskleiste, das Hauptfenster ist abgedunkelt, ein
+  Klick hinein erreicht nichts und holt den Dialog nach vorn. Enter und
+  ESC drücken Standard- und Abbrechen-Knopf wie sonst.
+- Kontextmenü, Hilfetext, Vorschläge, aufgeklappter Monat, Zellauswahl und
+  das Überlauf-Menü der Werkzeugleiste stehen im nativen Fenster (in
+  seinen Grenzen). Die Umwandlung einer Eingabemethode (IME) erscheint an
+  der Schreibmarke des Fensters, das den Fokus hat.
+- **Noch nicht** (spätere Stufen): Popups über den Rand des nativen
+  Fensters hinaus, Bildschirmleser im nativen Fenster, der Besitzer unter
+  Linux, abreißbare Dock-Leisten, Aufnahmen (`AUTOMATION_PLAY`) im
+  nativen Fenster.
+- Während eines modalen Dialogs gelten nur **seine** Menüs (Kontextmenü,
+  Menüleiste) -- die der Fenster dahinter bleiben gesperrt. Bis 2026.47
+  waren alle gesperrt, auch die im Dialog selbst.
 
 ## Button
 

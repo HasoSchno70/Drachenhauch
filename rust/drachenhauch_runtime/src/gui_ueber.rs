@@ -731,17 +731,22 @@ impl Gui {
 
     /// Popover, Infoleisten, Toasts und Vorschlagslisten -- in der oberen
     /// Schicht, vor Kontextmenue und Tooltip.
-    pub(super) fn ueber_zeichnen(&self, g: &mut Graphics) {
-        for &wi in self.z_order.iter() {
-            if self.ist_offener_pop(wi) { self.pop_zeichnen(g, wi); }
+    /// `f`: die Oberflaeche (Weg E) -- nur, was zu ihren Fenstern gehoert.
+    pub(super) fn ueber_zeichnen(&self, g: &mut Graphics, f: u32) {
+        // Ein Popover ist nie nativ (window_native lehnt ab).
+        if f == 0 {
+            for &wi in self.z_order.iter() {
+                if self.ist_offener_pop(wi) { self.pop_zeichnen(g, wi); }
+            }
         }
         for &wi in self.z_order.iter() {
             let win = &self.windows[wi];
-            if !win.alive || !win.visible { continue; }
+            if !win.alive || !win.visible || win.nativ != f { continue; }
             if let Some(i) = win.info.as_ref() { self.info_zeichnen(g, i); }
             for t in win.toasts.iter() { self.toast_zeichnen(g, t); }
         }
         for wi in 0..self.windows.len() {
+            if self.windows[wi].nativ != f { continue; }
             for i in 0..self.windows[wi].widgets.len() {
                 if self.windows[wi].widgets[i].feld.as_ref().map(|z| z.offen).unwrap_or(false) {
                     self.vorschlag_zeichnen(g, wi, i);

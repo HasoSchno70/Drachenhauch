@@ -718,3 +718,34 @@ Fensternachrichten), Gegenprobe in zwei verfaelschten Baeuen: jede der
 sechs Stellen (Rueckfall, Fangregel, Flaechenfilter, Bildrichtung, Zeichen,
 Kreuz) laesst ihren Fall fallen. macOS: Rueckfall, bis der Spike auf einem
 Mac lief.
+
+## Echte OS-Fenster, Weg E Stufe 2 (2026-11-12)
+
+- Popups nach Oberflaeche: `draw_top_flaeche(g, f)` zeichnet die obere
+  Schicht (Kontextmenue, Toasts, Vorschlaege, Monat, Zellwahl, Leistenmenue,
+  Rechtschreibung, Hilfetext) nur fuer Fenster der Flaeche `f`; ein natives
+  Fenster bekommt seine in `nativ_zeichnen`. Ein Druck auf einer anderen
+  Flaeche schliesst fremde Popups (`fremde_popups_zu`) -- sonst verglichen
+  ihre Treffertests Koordinaten zweier Flaechen.
+- Modal und nativ: unter Windows wird das Hauptfenster Besitzer
+  (`GWLP_HWNDPARENT`, `besitzer_setzen`) -- der Dialog bleibt darueber, ohne
+  Eintrag in der Taskleiste. Der Schleier liegt ueber dem Hauptfenster, ein
+  Klick hinein holt den Dialog nach vorn (`nativ_fokus_wunsch`).
+- IME: die Umwandlung folgt dem Fenster mit dem Fokus des Systems
+  (`ime_position` auf dessen HWND, Massstab 1).
+- **Fund und behoben:** waehrend eines modalen Dialogs waren ALLE Menues
+  gesperrt, auch das Kontextmenue im Dialog selbst (`menu_input` lief gar
+  nicht). Jetzt gelten die des Dialogs, die dahinter bleiben gesperrt. Dabei
+  zweiter Fund: die Schleife ueber die Menueleisten sah die Oberflaeche nicht
+  -- ein Klick oben im Hauptfenster haette die Leiste eines nativen
+  Fensters (bei 0, 0) geoeffnet.
+- Pruefhelfer: `fensterpixel.ps1` liest jetzt per PrintWindow
+  (PW_RENDERFULLCONTENT) statt vom Bildschirm -- ein nebenher laufendes
+  Vollbildprogramm (eine Weihnachtsszene) liess den Bildfall mit fremden
+  Farben fallen. `fensterbesitzer.ps1` nennt den Besitzer eines Fensters.
+Pruefung: `native_fenster.dhtest` jetzt 18 Faelle; Gegenproben in vier
+verfaelschten Baeuen (Besitzer, Kontextmenue-Flaeche, Schleier, Tasten,
+Modal-Sperre; Menue-Sperre, Leisten-Flaeche, Sperre dahinter, Bildrichtung).
+Linux (WSLg, X11-Klicks per xdotool): Klick im nativen Fenster und im
+Hauptfenster getrennt gezaehlt, Tippen kommt an, Kontextmenue im modalen
+nativen Dialog geht. Ein Besitzer ist dort noch nicht gesetzt (nur Windows).

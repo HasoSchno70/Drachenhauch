@@ -35,6 +35,11 @@ impl Gui {
                 if naechster != Some(h) { self.dock_oben_nachholen(g, h); }
             }
         }
+        // Ein modaler Dialog als natives Fenster: das Hauptfenster bekommt
+        // seinen Schleier hier, ueber allen seinen Fenstern.
+        if let Some(m) = self.modal {
+            if self.windows.get(m).map(|w| w.alive && w.visible && w.nativ != 0).unwrap_or(false) { self.schleier(g); }
+        }
         if obenauf { self.draw_top(g); }
         g.sicht_setzen(None);
     }
