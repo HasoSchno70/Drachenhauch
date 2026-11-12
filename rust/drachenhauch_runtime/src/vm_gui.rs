@@ -668,6 +668,10 @@ impl<'p> Vm<'p> {
             }
             // --- Mindestmasse + Formularpruefung ---
             "gui_set_min_size" => { self.gui.set_min_size(gi(a,0,"GUI_SET_MIN_SIZE")?, gi(a,1,"GUI_SET_MIN_SIZE")? as i32, gi(a,2,"GUI_SET_MIN_SIZE")? as i32)?; Value::Nil }
+            "gui_get_min_w" | "gui_get_min_h" => { let n = if name == "gui_get_min_w" { "GUI_GET_MIN_W" } else { "GUI_GET_MIN_H" };
+                if a.len() != 1 { return Err(format!("{}: erwartet (widget)", n)); }
+                let (mw, mh) = self.gui.get_min_size(gi(a,0,n)?, n)?;
+                Value::Int(if name == "gui_get_min_w" { mw } else { mh }) }
             "gui_layout_min_w" => Value::Int(self.gui.layout_min(gi(a,0,"GUI_LAYOUT_MIN_W")?)?.0),
             "gui_layout_min_h" => Value::Int(self.gui.layout_min(gi(a,0,"GUI_LAYOUT_MIN_H")?)?.1),
             "gui_rule" => {
@@ -758,6 +762,12 @@ impl<'p> Vm<'p> {
                 if let Some(s) = sym { self.gui.set_icon_symbol(h, &s)?; }
                 Value::Int(h)
             }
+            "gui_get_icon$" => { let n = "GUI_GET_ICON$";
+                if a.len() != 1 { return Err(format!("{}: erwartet (knopf)", n)); }
+                Value::str_rc(&self.gui.get_icon_symbol(gi(a,0,n)?)?) }
+            "gui_get_icon" => { let n = "GUI_GET_ICON";
+                if a.len() != 1 { return Err(format!("{}: erwartet (knopf)", n)); }
+                Value::Int(self.gui.get_icon(gi(a,0,n)?)?) }
             "gui_set_icon" => {
                 match gsym(a,1,"GUI_SET_ICON")? {
                     (Some(s), _) => self.gui.set_icon_symbol(gi(a,0,"GUI_SET_ICON")?, &s)?,
@@ -848,6 +858,23 @@ impl<'p> Vm<'p> {
             "gui_entered" => Value::Bool(self.gui.entered(gi(a,0,"GUI_ENTERED")?)?),
             "gui_set_align" => { self.gui.set_align(gi(a,0,"GUI_SET_ALIGN")?, &gs(a,1,"GUI_SET_ALIGN")?)?; Value::Nil }
             "gui_set_wrap" => { self.gui.set_wrap(gi(a,0,"GUI_SET_WRAP")?, gi(a,1,"GUI_SET_WRAP")? as i32)?; Value::Nil }
+            "gui_get_align$" => { let n = "GUI_GET_ALIGN$";
+                if a.len() != 1 { return Err(format!("{}: erwartet (widget)", n)); }
+                Value::str_rc(&self.gui.get_align(gi(a,0,n)?)?) }
+            "gui_get_wrap" => { let n = "GUI_GET_WRAP";
+                if a.len() != 1 { return Err(format!("{}: erwartet (label)", n)); }
+                Value::Int(self.gui.get_wrap(gi(a,0,n)?)?) }
+            "gui_undo" | "gui_redo" => { let wieder = name == "gui_redo";
+                let n = if wieder { "GUI_REDO" } else { "GUI_UNDO" };
+                if a.len() != 1 { return Err(format!("{}: erwartet (tf)", n)); }
+                Value::Bool(self.gui.undo(gi(a,0,n)?, wieder)?) }
+            "gui_can_undo" | "gui_can_redo" => { let wieder = name == "gui_can_redo";
+                let n = if wieder { "GUI_CAN_REDO" } else { "GUI_CAN_UNDO" };
+                if a.len() != 1 { return Err(format!("{}: erwartet (tf)", n)); }
+                Value::Bool(self.gui.can_undo(gi(a,0,n)?, wieder)?) }
+            "gui_undo_clear" => { let n = "GUI_UNDO_CLEAR";
+                if a.len() != 1 { return Err(format!("{}: erwartet (tf)", n)); }
+                self.gui.undo_clear(gi(a,0,n)?)?; Value::Nil }
             "gui_textinput_get" => { let n = "GUI_TEXTINPUT_GET";
                 if a.len() != 2 { return Err(format!("{}: erwartet (tf, key$)", n)); }
                 Value::Int(self.gui.textinput_get(gi(a,0,n)?, &gs(a,1,n)?)? as i64) }
@@ -954,6 +981,9 @@ impl<'p> Vm<'p> {
                 Value::Nil
             }
             "gui_set_round" => { self.gui.set_round(gi(a,0,"GUI_SET_ROUND")?, gbool(a,1,"GUI_SET_ROUND")?)?; Value::Nil }
+            "gui_get_round" => { let n = "GUI_GET_ROUND";
+                if a.len() != 1 { return Err(format!("{}: erwartet (widget)", n)); }
+                Value::Bool(self.gui.get_round(gi(a,0,n)?)?) }
             "gui_set_color" => { self.gui.set_color(gi(a,0,"GUI_SET_COLOR")?, gs(a,1,"GUI_SET_COLOR")?, gi(a,2,"GUI_SET_COLOR")?)?; Value::Nil }
             "gui_theme_preset" => { self.gui.theme_preset(&gs(a,0,"GUI_THEME_PRESET")?)?; Value::Nil }
             "gui_scale" => { self.gui.set_scale(gnum(a,0,"GUI_SCALE")?)?; Value::Nil }
@@ -968,6 +998,9 @@ impl<'p> Vm<'p> {
                 self.gui.announce(text, dringend); Value::Nil
             }
             "gui_set_tab_index" => { self.gui.set_tab_index(gi(a,0,"GUI_SET_TAB_INDEX")?, gi(a,1,"GUI_SET_TAB_INDEX")?)?; Value::Nil }
+            "gui_get_tab_index" => { let n = "GUI_GET_TAB_INDEX";
+                if a.len() != 1 { return Err(format!("{}: erwartet (widget)", n)); }
+                Value::Int(self.gui.get_tab_index(gi(a,0,n)?)?) }
             "gui_answer" => Value::Int(self.gui.answer(gi(a,0,"GUI_ANSWER")?)?),
             "gui_modal" => Value::Bool(self.gui.modal_offen()),
             "gui_reset" => { self.gui.reset(); Value::Nil }
@@ -1091,6 +1124,21 @@ impl<'p> Vm<'p> {
             "gui_set_font_size" => { self.gui.set_font_size(gi(a,0,"GUI_SET_FONT_SIZE")?, gi(a,1,"GUI_SET_FONT_SIZE")?)?; Value::Nil }
             "gui_set_anchor" => { self.gui.set_anchor(gi(a,0,"GUI_SET_ANCHOR")?, &gs(a,1,"GUI_SET_ANCHOR")?)?; Value::Nil }
             "gui_style_set" => { self.gui.style_set(gs(a,0,"GUI_STYLE_SET")?, gs(a,1,"GUI_STYLE_SET")?, gi(a,2,"GUI_STYLE_SET")?)?; Value::Nil }
+            "gui_get_font_size" => { let n = "GUI_GET_FONT_SIZE";
+                if a.len() != 1 { return Err(format!("{}: erwartet (widget)", n)); }
+                Value::Int(self.gui.get_font_size(gi(a,0,n)?)?) }
+            "gui_get_anchor$" => { let n = "GUI_GET_ANCHOR$";
+                if a.len() != 1 { return Err(format!("{}: erwartet (widget)", n)); }
+                Value::str_rc(&self.gui.get_anchor(gi(a,0,n)?)?) }
+            "gui_style_get" => { let n = "GUI_STYLE_GET";
+                if a.len() != 2 { return Err(format!("{}: erwartet (name$, prop$)", n)); }
+                Value::Int(self.gui.style_get(&gs(a,0,n)?, &gs(a,1,n)?)?) }
+            "gui_system_dark" => { let n = "GUI_SYSTEM_DARK";
+                if !a.is_empty() { return Err(format!("{}: erwartet keine Argumente", n)); }
+                Value::Bool(crate::systemaussehen::jetzt().dunkel == Some(true)) }
+            "gui_system_accent" => { let n = "GUI_SYSTEM_ACCENT";
+                if !a.is_empty() { return Err(format!("{}: erwartet keine Argumente", n)); }
+                Value::Int(crate::systemaussehen::jetzt().akzent.unwrap_or(-1)) }
             "gui_apply_style" => { self.gui.apply_style(gi(a,0,"GUI_APPLY_STYLE")?, &gs(a,1,"GUI_APPLY_STYLE")?)?; Value::Nil }
             "gui_hit_test" => Value::Int(self.gui.hit_test(gi(a,0,"GUI_HIT_TEST")? as i32, gi(a,1,"GUI_HIT_TEST")? as i32)),
             "gui_window_set_bounds" => { self.gui.window_set_bounds(gi(a,0,"GUI_WINDOW_SET_BOUNDS")?, gi(a,1,"GUI_WINDOW_SET_BOUNDS")? as i32, gi(a,2,"GUI_WINDOW_SET_BOUNDS")? as i32, gi(a,3,"GUI_WINDOW_SET_BOUNDS")? as i32, gi(a,4,"GUI_WINDOW_SET_BOUNDS")? as i32)?; Value::Nil }

@@ -660,3 +660,25 @@ jeder Wertefall prueft einen anderen Getter). Dazu der Fokusrand: ein
 Textbereich ueber `verlauf_hoehe` mischt den Akzent mit der Randfarbe
 (mindestens 35 %), ein eigener Akzent am Widget bleibt
 (`gui_verlauf_hoehe.dhtest`).
+
+## Kleine Luecken gegenueber anderen GUIs (2026-11-12)
+
+Aus einer Durchsicht "was fehlt gegenueber Qt, WinForms, GTK" die drei
+kleinen Punkte (der grosse -- echte OS-Fenster -- steht als Weg E in
+docs/intern/entwurf-native-fenster.md):
+- Elf Abfragen zu Settern ohne Gegenstueck (`GUI_GET_ALIGN$`,
+  `GUI_GET_ANCHOR$`, `GUI_GET_FONT_SIZE`, `GUI_GET_ICON$`/`GUI_GET_ICON`,
+  `GUI_GET_ROUND`, `GUI_GET_MIN_W`/`_H`, `GUI_GET_WRAP`, `GUI_GET_TAB_INDEX`,
+  `GUI_STYLE_GET`), gefunden durch einen Abgleich des Index (Setter ohne
+  Getter).
+- Rueckgaengig als API: `GUI_UNDO`/`GUI_REDO`/`GUI_CAN_UNDO`/`GUI_CAN_REDO`/
+  `GUI_UNDO_CLEAR` -- derselbe Weg wie Strg+Z (`text_undo`), bei einer
+  zweiten Ansicht der Besitzer.
+- Aussehen des Systems: `systemaussehen.rs` (Registry, `defaults`,
+  `gsettings`; zwei Sekunden gemerkt), `GUI_SYSTEM_DARK`,
+  `GUI_SYSTEM_ACCENT`, `GUI_THEME_PRESET("system")`; fuer Pruefungen
+  `DHRT_SYSTEM_DUNKEL`/`DHRT_SYSTEM_AKZENT`. Unbekannt heisst fuer das Preset
+  dunkel, fuer `GUI_SYSTEM_DARK` FALSE.
+Gegenprobe: alle Stellen in einem Bau verfaelscht, und ein Vergleich zeigte
+JEDE Ausgabezeile neben der Erwartung (dhrt test nennt nur die erste) -- so
+war keine Verfaelschung hinter einer frueher fallenden Zeile verdeckt.

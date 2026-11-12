@@ -378,6 +378,10 @@ impl Gui {
         self.wdg_mut(h, "GUI_SET_ROUND")?.rund = f;
         Ok(())
     }
+    /// GUI_GET_ROUND(w): rund gezeichnet (GUI_SET_ROUND)?
+    pub fn get_round(&self, h: i64) -> Result<bool, String> {
+        Ok(self.wdg(h, "GUI_GET_ROUND")?.rund)
+    }
     /// Grafik fuer eine Widget-Art hinterlegen (9-Slice). `bild` = -1 nimmt
     /// sie wieder weg.
     pub fn set_skin(&mut self, art: String, bild: i64, rand: i32) -> Result<(), String> {
@@ -441,17 +445,37 @@ impl Gui {
     pub fn font_style(&self, h: i64) -> Result<String, String> {
         Ok(crate::schnitt::stil_text(self.wdg(h, "GUI_GET_FONT_STYLE$")?.stil))
     }
+    /// GUI_GET_FONT_SIZE(w): die mit GUI_SET_FONT_SIZE gesetzte Groesse,
+    /// 0 = die des Themas.
+    pub fn get_font_size(&self, h: i64) -> Result<i64, String> {
+        Ok(self.wdg(h, "GUI_GET_FONT_SIZE")?.font_size as i64)
+    }
     pub fn set_font_size(&mut self, h: i64, sz: i64) -> Result<(), String> {
         if sz < 0 { return Err("GUI_SET_FONT_SIZE: Groesse muss >= 0 sein".into()); }
         self.wdg_mut(h, "GUI_SET_FONT_SIZE")?.font_size = sz as i32; Ok(())
     }
     /// Anchoring eines Widgets setzen (Edge-String aus "lrtb", z.B. "lrtb",
     /// "rb"). Die Anchor-Basis ist das aktuelle Rechteck des Widgets.
+    /// GUI_GET_ANCHOR$(w): die Kanten, an denen das Widget haengt, in der
+    /// Reihenfolge "lrtb" (Vorgabe "lt").
+    pub fn get_anchor(&self, h: i64) -> Result<String, String> {
+        let a = self.wdg(h, "GUI_GET_ANCHOR$")?.anchor;
+        let mut s = String::new();
+        for (bit, c) in [(1u8, 'l'), (2, 'r'), (4, 't'), (8, 'b')] { if a & bit != 0 { s.push(c); } }
+        Ok(s)
+    }
     pub fn set_anchor(&mut self, h: i64, s: &str) -> Result<(), String> {
         self.wdg_mut(h, "GUI_SET_ANCHOR")?.anchor = Self::anchor_mask(s); Ok(())
     }
     /// Benannten Style anlegen/erweitern: `prop` in bg/fg/border/accent (Farbe),
     /// font (Handle), font_size (px). Inkrementell aufrufbar.
+    /// GUI_STYLE_GET(name$, prop$): ein Wert eines benannten Styles, -1 wenn
+    /// er ihn nicht setzt. Ein unbekannter Style ist ein Fehler.
+    pub fn style_get(&self, name: &str, prop: &str) -> Result<i64, String> {
+        let s = self.styles.get(name)
+            .ok_or_else(|| format!("GUI_STYLE_GET: unbekannter Style '{}'", name))?;
+        Ok(s.get(prop).copied().unwrap_or(-1))
+    }
     pub fn style_set(&mut self, name: String, prop: String, value: i64) -> Result<(), String> {
         if !matches!(prop.as_str(), "bg" | "fg" | "border" | "accent" | "hover" | "pressed" | "font" | "font_size") {
             return Err("GUI_STYLE_SET: prop muss bg/fg/border/accent/hover/pressed/font/font_size sein".into());
@@ -740,6 +764,17 @@ impl Gui {
         Ok(())
     }
 
+    /// GUI_GET_ALIGN$(w): "links", "mitte" oder "rechts"; "" = die
+    /// Vorgabe der Art (ein Knopf steht mittig, ein Textfeld links).
+    pub fn get_align(&self, h: i64) -> Result<String, String> {
+        Ok(match self.wdg(h, "GUI_GET_ALIGN$")?.align { 0 => "links", 1 => "mitte", 2 => "rechts", _ => "" }.into())
+    }
+    /// GUI_GET_WRAP(label): die Umbruchbreite (GUI_SET_WRAP), 0 = aus.
+    pub fn get_wrap(&self, h: i64) -> Result<i64, String> {
+        let w = self.wdg(h, "GUI_GET_WRAP")?;
+        Ok(if w.wrap { self.unsk(w.w) as i64 } else { 0 })
+    }
+
     /// GUI_SET_WRAP(label, breite) -- bei `breite` Pixeln an Wortgrenzen
     /// umbrechen (0 = aus). Die Hoehe folgt dem Text (siehe umbruch_layout);
     /// GUI_GET_H liefert sie ab dem naechsten GUI_UPDATE.
@@ -963,6 +998,41 @@ impl Gui {
         }
         w.undo_zeit = jetzt;
         w.redo.clear();
+    }
+
+    /// Fuer GUI_UNDO & Co.: das Textfeld oder der Textbereich, dessen
+    /// Verlauf gilt -- bei einer zweiten Ansicht (`teil_von`) der Besitzer,
+    /// wie bei Strg+Z.
+    fn verlauf_ziel(&self, h: i64, f: &str) -> Result<(usize, usize), String> {
+        let w = self.wdg(h, f)?;
+        if !matches!(w.kind, Kind::TextInput | Kind::TextArea) {
+            return Err(format!("{}: nur ein Textfeld oder Textbereich hat einen Verlauf", f));
+        }
+        let (wi, i) = Self::dec_widget(h);
+        Ok((wi, w.teil_von.unwrap_or(i)))
+    }
+    /// GUI_UNDO(tf) / GUI_REDO(tf): ein Schritt zurueck bzw. wieder vor,
+    /// derselbe Weg wie Strg+Z / Strg+Y. TRUE, wenn es einen gab.
+    pub fn undo(&mut self, h: i64, wieder: bool) -> Result<bool, String> {
+        let (wi, i) = self.verlauf_ziel(h, if wieder { "GUI_REDO" } else { "GUI_UNDO" })?;
+        let w = &self.windows[wi].widgets[i];
+        if (if wieder { &w.redo } else { &w.undo }).is_empty() { return Ok(false); }
+        self.text_undo(wi, i, wieder);
+        Ok(true)
+    }
+    /// GUI_CAN_UNDO(tf) / GUI_CAN_REDO(tf) -- fuer Menueeintraege, die
+    /// ausgegraut sein sollen, wenn es nichts gibt.
+    pub fn can_undo(&self, h: i64, wieder: bool) -> Result<bool, String> {
+        let (wi, i) = self.verlauf_ziel(h, if wieder { "GUI_CAN_REDO" } else { "GUI_CAN_UNDO" })?;
+        let w = &self.windows[wi].widgets[i];
+        Ok(!(if wieder { &w.redo } else { &w.undo }).is_empty())
+    }
+    /// GUI_UNDO_CLEAR(tf): den Verlauf vergessen (etwa nach dem Laden).
+    pub fn undo_clear(&mut self, h: i64) -> Result<(), String> {
+        let (wi, i) = self.verlauf_ziel(h, "GUI_UNDO_CLEAR")?;
+        let w = &mut self.windows[wi].widgets[i];
+        w.undo.clear(); w.redo.clear();
+        Ok(())
     }
 
     /// Strg+Z / Strg+Y im Textfeld oder Textbereich.

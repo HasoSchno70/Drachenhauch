@@ -92,6 +92,7 @@ IMPORT "gui"
 | `GUI_FORM_CONFLICT$(win[, formular$])` | STRING | why the last SAVE saved nothing: `geaendert` (changed), `geloescht` (deleted) or empty |
 | `GUI_TEXTAREA_SET(ta, "umbruch", 1)` | — | text area wraps at word boundaries (notes, letters) |
 | `GUI_SET_MIN_SIZE(wdg, min_w, min_h)` | — | minimum size: a weighted child in a container and an anchored widget do not shrink below it |
+| `GUI_GET_MIN_W(wdg)` / `GUI_GET_MIN_H(wdg)` | INTEGER | the minimum size that was set, 0 = none |
 | `GUI_LAYOUT_MIN_W(layout)` / `GUI_LAYOUT_MIN_H(layout)` | INTEGER | what a container needs at least — the value for `WINDOW_MIN_SIZE` |
 | `GUI_RULE(feld, art$[, a, b][, muster$][, meldung$])` | — | attach a **validation rule**: `pflicht` (required), `zahl` (number), `ganz` (integer), `bereich a b` (range), `laenge min max` (length), `email`, `datum` (date), `muster regex$` (pattern) — see [Form validation](#form-validation) |
 | `GUI_VALIDATE(win)` / `GUI_VALIDATE_WIDGET(feld)` | INTEGER / STRING | check all rules of the window (number of errors, the first field gets focus) / one field (message or "") |
@@ -128,12 +129,15 @@ IMPORT "gui"
 | `GUI_FONT_DIALOG_SIZE(dlg)` | INTEGER | the chosen size |
 | `GUI_AUTOSIZE(wdg)` | — | width and height from the content; a width or height of `0` when creating means the same |
 | `GUI_SET_ANCHOR(wdg, edges$)` | — | anchoring: which edges the widget sticks to (subset of `"lrtb"`, default `"lt"` = top-left). When the window is resized, the widgets flow along: left+right → stretch, only right → move along, none → centre (likewise top/bottom). |
+| `GUI_GET_ANCHOR$(wdg)` | STRING | the edges it sticks to, in the order `"lrtb"` (default `"lt"`) |
 | `GUI_WINDOW_CLOSED(win)` | BOOLEAN | was the window closed? |
 | `GUI_BUTTON(win, text$, x, y, w, h)` | GUI_WIDGET | button |
 | `GUI_BUTTON_VARIANT(knopf, art$)` | — | button kind: `standard`, `primaer` (primary), `erfolg` (success), `warnung` (warning), `gefahr` (danger), `umriss` (outline), `flach` (flat), `link` |
 | `GUI_BUTTON_GET_VARIANT$(knopf)` | STRING | the button kind as a name |
 | `GUI_ICON_BUTTON(win, x, y, w, h, tex[, text$])` | GUI_WIDGET | button with an icon (texture handle or name of a built-in icon); without text = flat toolbar button |
 | `GUI_SET_ICON(button, tex)` | — | set/replace a button's icon (-1 removes it) |
+| `GUI_GET_ICON$(button)` / `GUI_GET_ICON(button)` | STRING / INTEGER | the built-in icon (`""` if none) or the texture (-1 if none) |
+| `GUI_SET_ROUND(widget, an)` / `GUI_GET_ROUND(widget)` | — / BOOLEAN | draw a button round instead of square (for buttons with only an icon) |
 | `GUI_TOOLBAR(win, x, y, w, h)` | GUI_WIDGET | toolbar: with entries (`GUI_TOOLBAR_ADD`) it lays out, draws and reports its buttons itself; without entries a flat strip |
 | `GUI_TOOLBAR_ADD(tb, sinnbild[, tip$[, text$]])` | INTEGER | append a button — `sinnbild` is the name of a built-in icon or an image; returns the number of the entry |
 | `GUI_TOOLBAR_SEPARATOR(tb)` | INTEGER | vertical separator as an entry |
@@ -176,7 +180,9 @@ IMPORT "gui"
 | `GUI_BREADCRUMB_FIRST_VISIBLE(bc)` | INTEGER | first visible part; the ones before it sit under "…" |
 | `GUI_LABEL(win, text$, x, y[, farbe])` | GUI_WIDGET | text |
 | `GUI_SET_ALIGN(wdg, wie$)` | — | align text left, `mitte` (centre) or `rechts` (right) (label, button, text input) |
+| `GUI_GET_ALIGN$(wdg)` | STRING | the alignment that was set; `""` = the default of the kind |
 | `GUI_SET_WRAP(label, breite)` | — | wrap a label at word boundaries at `breite` pixels (0 = off); the height follows the text |
+| `GUI_GET_WRAP(label)` | INTEGER | the wrap width, 0 = off |
 | `GUI_WINDOW_DEFAULT(win, knopf)` | — | default button: Enter in the window triggers it (-1 = none) |
 | `GUI_WINDOW_CANCEL(win, knopf)` | — | cancel button: ESC triggers it (-1 = none) |
 | `GUI_CHECKBOX(win, label$, x, y[, default])` | GUI_WIDGET | toggle |
@@ -188,6 +194,9 @@ IMPORT "gui"
 | `GUI_TEXTINPUT_SET(tf, key$, wert)` | — | `passwort` (password), `nur_lesen` (read-only), `maxlaenge` (max length), `zahlen` (numbers: 0 free, 1 integer, 2 decimal, 3 amount of money in cents), `suche` (search field with magnifier and cross) |
 | `GUI_TEXTINPUT_GET(tf, key$)` | INTEGER | reads the same keys back (switches as 0/1) |
 | `GUI_TEXTINPUT_PLACEHOLDER$(tf)` | STRING | the grey text in the empty field (also of a `GUI_TEXTAREA`) |
+| `GUI_UNDO(tf)` / `GUI_REDO(tf)` | BOOLEAN | one step back or forward again, like Ctrl+Z / Ctrl+Y (text field and text area); `TRUE` if there was one |
+| `GUI_CAN_UNDO(tf)` / `GUI_CAN_REDO(tf)` | BOOLEAN | is there a step? -- for a menu item that is greyed out otherwise |
+| `GUI_UNDO_CLEAR(tf)` | — | forget the history (after loading a file) |
 | `GUI_TEXTINPUT_ICON(tf, links$, rechts$)` | — | a built-in symbol on the left and right inside the field ("" = none) -- see [Search field, symbols, suggestions](#search-field-symbols-suggestions) |
 | `GUI_ICON_CLICKED(tf)` | INTEGER | symbol clicked in this frame: 1 left, 2 right, 0 none |
 | `GUI_SEARCH_CHANGED(tf)` | BOOLEAN | a search field reports its text: 150 ms after the last keystroke, at once on Enter, the cross and ESC |
@@ -327,6 +336,8 @@ IMPORT "gui"
 | `GUI_THEME(accent)` | — | change the accent colour (RGB) (short form) |
 | `GUI_THEME_SET(key$, farbe)` / `GUI_THEME_GET(key$)` | — / INT | set/read a single theme colour |
 | `GUI_THEME_PRESET(name$)` | — | look: dark/light/retro/contrast + **modern_dark/modern_light** (rounded + shadows) |
+| `GUI_SYSTEM_DARK()` | BOOLEAN | is the operating system set to dark? (Windows, macOS, GNOME; unknown = `FALSE`) |
+| `GUI_SYSTEM_ACCENT()` | INTEGER | the accent colour of the operating system, -1 if unknown |
 | `GUI_METRIC_SET(key$, wert)` / `GUI_METRIC_GET(key$)` | — / INT | set/read a layout size |
 | `GUI_SET_COLOR(widget, rolle$, farbe)` | — | one colour per widget (bg/fg/border/accent, for buttons also hover/pressed; -1 removes it) |
 | `GUI_RESET()` | — | delete windows/widgets + reset theme/metrics |
@@ -462,9 +473,11 @@ Native, blocking standard dialogs (no IMPORT needed — like the file dialogs):
 | `GUI_FONT(font [, groesse])` | — | the gui's own font: it measures and draws with it, whatever font the program currently has active via `SETFONT` (without `groesse` the current text size); `-1` = the program's active font, the pixel font included (without `GUI_FONT` and without `SETFONT` the gui uses the built-in Sans) |
 | `GUI_FONT_GET()` | TUPLE | `(font, groesse)` of the own font, `(-1, 0)` without |
 | `GUI_SET_FONT_SIZE(wdg, px)` | — | own font size for this widget |
+| `GUI_GET_FONT_SIZE(wdg)` | INTEGER | its own font size, 0 = the theme's |
 | `GUI_SET_FONT_STYLE(wdg, stil$)` | — | font style for this widget: `fett` (bold), `kursiv` (italic), `unterstrichen` (underlined), `durchgestrichen` (strikethrough), joined with `+`; `"normal"` removes it. Real font faces where they exist as files, otherwise emulated |
 | `GUI_GET_FONT_STYLE$(wdg)` | STRING | the widget's style, e.g. `"fett+unterstrichen"` |
 | `GUI_STYLE_SET(name$, prop$, wert)` | — | define a named style (`bg`, `fg`, `border`, `accent`, `font`, `font_size`) |
+| `GUI_STYLE_GET(name$, prop$)` | INTEGER | a value of the style, -1 if it does not set it (unknown style = error) |
 | `GUI_APPLY_STYLE(widget, name$)` | — | apply a named style to a widget -- saves repeating it widget by widget |
 | `GUI_STYLESHEET(text$)` | — | set a stylesheet: rules by kind, class, name and state as in CSS ("" = none) -- see [Stylesheet](#7-stylesheet-rules-by-kind-class-name-and-state) |
 | `GUI_STYLESHEET_LOAD(pfad$)` | — | the same from a file (usually `.dhstil`) |
@@ -2064,7 +2077,16 @@ GUI_THEME_PRESET("retro")         ' green on black (terminal)
 GUI_THEME_PRESET("contrast")      ' black/yellow, maximum contrast
 GUI_THEME_PRESET("modern_dark")   ' PROFESSIONAL: anthracite + cyan, rounded corners + shadow
 GUI_THEME_PRESET("modern_light")  ' PROFESSIONAL: light, close to Windows 11, rounded corners + shadow
+GUI_THEME_PRESET("system")        ' like the operating system: modern light or dark, with its accent
 ```
+
+**`"system"`** asks the operating system (Windows: registry, macOS:
+`defaults`, Linux: GNOME `gsettings`): if it is set to dark, `modern_dark`
+applies, otherwise `modern_light`, and the accent colour is the system's,
+where it names one. Whoever follows changes while running asks
+`GUI_SYSTEM_DARK()` (the answer holds for two seconds) and calls the preset
+again. For tests, `DHRT_SYSTEM_DUNKEL=1|0` and `DHRT_SYSTEM_AKZENT=#RRGGBB`
+fix the answer.
 
 The two **`modern_*`** presets are a *complete* look: they set not only the
 colours but also the metrics (`corner_radius`, `title_h`, `pad`, `shadow`)
@@ -3343,6 +3365,7 @@ What the program can contribute:
 | `GUI_ANNOUNCE(text$[, dringend])` | hand a sentence to the user's screen reader — it speaks it with its voice (polite: after the current sentence; urgent: immediately). Without an assistive program nothing happens. For everything that would otherwise only appear in a status line: "Invoice saved", "3 rows deleted" |
 | `GUI_SCREENREADER()` | `TRUE` as soon as an assistive program has requested the tree — for example to announce more or to switch off motion |
 | `GUI_SET_TAB_INDEX(wdg, index)` | set the tab order: widgets with an index above 0 first, ascending; 0 (default) = order of creation |
+| `GUI_GET_TAB_INDEX(wdg)` | read the index that was set (0 = creation order) |
 
 **Labels.** An input field has no text of its own; the screen reader takes
 the **label to its left** (same row) or **directly above it** (same left

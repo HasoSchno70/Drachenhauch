@@ -106,6 +106,18 @@ impl Gui {
         if w.kind != Kind::Button { return Err("GUI_SET_ICON: Widget ist kein button".into()); }
         w.sel = tex as i32; w.sinnbild.clear(); Ok(())
     }
+    /// GUI_GET_ICON$(knopf): das eingebaute Sinnbild ("" ohne);
+    /// GUI_GET_ICON(knopf): die Textur (-1 ohne).
+    pub fn get_icon_symbol(&self, h: i64) -> Result<String, String> {
+        let w = self.wdg(h, "GUI_GET_ICON$")?;
+        if w.kind != Kind::Button { return Err("GUI_GET_ICON$: Widget ist kein button".into()); }
+        Ok(w.sinnbild.clone())
+    }
+    pub fn get_icon(&self, h: i64) -> Result<i64, String> {
+        let w = self.wdg(h, "GUI_GET_ICON")?;
+        if w.kind != Kind::Button { return Err("GUI_GET_ICON: Widget ist kein button".into()); }
+        Ok(if w.sinnbild.is_empty() { w.sel as i64 } else { -1 })
+    }
     /// Eingebautes Sinnbild auf einen Knopf -- `""` nimmt es wieder weg.
     pub fn set_icon_symbol(&mut self, h: i64, name: &str) -> Result<(), String> {
         let n = if name.is_empty() { String::new() } else { sinnbild_pruefen(name, "GUI_SET_ICON")? };

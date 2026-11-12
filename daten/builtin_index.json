@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 2441,
+ "count": 2459,
  "builtins": [
   {
    "name": "ABS",
@@ -5757,9 +5757,21 @@
    "module": "gui"
   },
   {
+   "name": "GUI_GET_ALIGN$",
+   "kind": "core",
+   "signature": "GUI_GET_ALIGN$(wdg) AS STRING",
+   "module": "gui"
+  },
+  {
    "name": "GUI_SET_ANCHOR",
    "kind": "core",
    "signature": "GUI_SET_ANCHOR(wdg, edges$)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_GET_ANCHOR$",
+   "kind": "core",
+   "signature": "GUI_GET_ANCHOR$(wdg) AS STRING",
    "module": "gui"
   },
   {
@@ -5829,6 +5841,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_GET_FONT_SIZE",
+   "kind": "core",
+   "signature": "GUI_GET_FONT_SIZE(wdg) AS INTEGER",
+   "module": "gui"
+  },
+  {
    "name": "GUI_SET_FONT_STYLE",
    "kind": "core",
    "signature": "GUI_SET_FONT_STYLE(wdg, stil$)",
@@ -5838,6 +5856,18 @@
    "name": "GUI_SET_ICON",
    "kind": "core",
    "signature": "GUI_SET_ICON(button, tex)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_GET_ICON",
+   "kind": "core",
+   "signature": "GUI_GET_ICON(button) AS INTEGER",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_GET_ICON$",
+   "kind": "core",
+   "signature": "GUI_GET_ICON$(button) AS STRING",
    "module": "gui"
   },
   {
@@ -5859,6 +5889,18 @@
    "module": "gui"
   },
   {
+   "name": "GUI_GET_MIN_H",
+   "kind": "core",
+   "signature": "GUI_GET_MIN_H(widget) AS INTEGER",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_GET_MIN_W",
+   "kind": "core",
+   "signature": "GUI_GET_MIN_W(widget) AS INTEGER",
+   "module": "gui"
+  },
+  {
    "name": "GUI_SET_PICKED_COLOR",
    "kind": "core",
    "signature": "GUI_SET_PICKED_COLOR(picker, farbe)",
@@ -5871,6 +5913,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_GET_ROUND",
+   "kind": "core",
+   "signature": "GUI_GET_ROUND(widget) AS BOOLEAN",
+   "module": "gui"
+  },
+  {
    "name": "GUI_SET_TAB",
    "kind": "core",
    "signature": "GUI_SET_TAB(widget, page)",
@@ -5880,6 +5928,12 @@
    "name": "GUI_SET_TAB_INDEX",
    "kind": "core",
    "signature": "GUI_SET_TAB_INDEX(wdg, index)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_GET_TAB_INDEX",
+   "kind": "core",
+   "signature": "GUI_GET_TAB_INDEX(wdg) AS INTEGER",
    "module": "gui"
   },
   {
@@ -5910,6 +5964,12 @@
    "name": "GUI_SET_WRAP",
    "kind": "core",
    "signature": "GUI_SET_WRAP(label, breite)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_GET_WRAP",
+   "kind": "core",
+   "signature": "GUI_GET_WRAP(label) AS INTEGER",
    "module": "gui"
   },
   {
@@ -6018,6 +6078,12 @@
    "name": "GUI_STYLE_SET",
    "kind": "core",
    "signature": "GUI_STYLE_SET(name$, prop$, wert)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_STYLE_GET",
+   "kind": "core",
+   "signature": "GUI_STYLE_GET(name$, prop$) AS INTEGER",
    "module": "gui"
   },
   {
@@ -6741,6 +6807,36 @@
    "module": "gui"
   },
   {
+   "name": "GUI_UNDO",
+   "kind": "core",
+   "signature": "GUI_UNDO(tf) AS BOOLEAN",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_REDO",
+   "kind": "core",
+   "signature": "GUI_REDO(tf) AS BOOLEAN",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_CAN_UNDO",
+   "kind": "core",
+   "signature": "GUI_CAN_UNDO(tf) AS BOOLEAN",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_CAN_REDO",
+   "kind": "core",
+   "signature": "GUI_CAN_REDO(tf) AS BOOLEAN",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_UNDO_CLEAR",
+   "kind": "core",
+   "signature": "GUI_UNDO_CLEAR(tf)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_TEXTINPUT_PLACEHOLDER$",
    "kind": "core",
    "signature": "GUI_TEXTINPUT_PLACEHOLDER$(tf) AS STRING",
@@ -6768,6 +6864,18 @@
    "name": "GUI_THEME_PRESET",
    "kind": "core",
    "signature": "GUI_THEME_PRESET(name)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_SYSTEM_DARK",
+   "kind": "core",
+   "signature": "GUI_SYSTEM_DARK() AS BOOLEAN",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_SYSTEM_ACCENT",
+   "kind": "core",
+   "signature": "GUI_SYSTEM_ACCENT() AS INTEGER",
    "module": "gui"
   },
   {

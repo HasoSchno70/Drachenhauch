@@ -253,6 +253,12 @@ impl Gui {
         let (mw, mh) = self.min_mass(wi, i, 0);
         Ok((self.unsk(mw) as i64, self.unsk(mh) as i64))
     }
+    /// GUI_GET_MIN_W / GUI_GET_MIN_H: die mit GUI_SET_MIN_SIZE gesetzte
+    /// Mindestgroesse (logisch), 0 = keine.
+    pub fn get_min_size(&self, h: i64, f: &str) -> Result<(i64, i64), String> {
+        let w = self.wdg(h, f)?;
+        Ok((self.unsk(w.min_w) as i64, self.unsk(w.min_h) as i64))
+    }
     pub fn set_min_size(&mut self, h: i64, mw: i32, mh: i32) -> Result<(), String> {
         let (mw, mh) = (self.sk(mw.max(0)), self.sk(mh.max(0)));
         let w = self.wdg_mut(h, "GUI_SET_MIN_SIZE")?;
@@ -1231,7 +1237,20 @@ impl Gui {
         self.metrics.get(key).copied().ok_or_else(|| unbekannt("GUI_METRIC_GET", key, self.metrics.keys()))
     }
     pub fn theme_preset(&mut self, name: &str) -> Result<(), String> {
-        let key = name.to_lowercase();
+        let mut key = name.to_lowercase();
+        // "system": hell oder dunkel wie das Betriebssystem, mit dessen
+        // Akzentfarbe (systemaussehen.rs); unbekannt = dunkel.
+        let system = key == "system";
+        let aussehen = if system { Some(crate::systemaussehen::jetzt()) } else { None };
+        if let Some(a) = aussehen {
+            key = if a.dunkel == Some(false) { "modern_light".into() } else { "modern_dark".into() };
+        }
+        let ergebnis = self.theme_preset_name(&key, name);
+        if let Some(farbe) = aussehen.and_then(|a| a.akzent) { self.theme.insert("accent".into(), farbe); }
+        ergebnis
+    }
+    fn theme_preset_name(&mut self, key: &str, name: &str) -> Result<(), String> {
+        let key = key.to_string();
         match preset(&key) {
             Some(p) => {
                 for (k, v) in p { self.theme.insert(k, v); }
