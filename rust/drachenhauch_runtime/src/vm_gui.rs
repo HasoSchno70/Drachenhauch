@@ -244,6 +244,13 @@ impl<'p> Vm<'p> {
             "gui_window_glow_stop" => { self.gui.window_glow_stop(gi(a, 0, "GUI_WINDOW_GLOW_STOP")?)?; Value::Nil }
             "gui_window_glowing" => Value::Bool(self.gui.window_glowing(gi(a, 0, "GUI_WINDOW_GLOWING")?)?),
             "gui_window_closable" => { self.gui.window_closable(gi(a,0,"GUI_WINDOW_CLOSABLE")?, gbool(a,1,"GUI_WINDOW_CLOSABLE")?)?; Value::Nil }
+            "gui_window_native" => { let n = "GUI_WINDOW_NATIVE";
+                if a.len() != 2 { return Err(format!("{}: erwartet (win, an)", n)); }
+                let (h, an) = (gi(a,0,n)?, gbool(a,1,n)?);
+                Value::Bool(self.gui.window_native(self.gfx.as_mut(), h, an)?) }
+            "gui_window_is_native" => { let n = "GUI_WINDOW_IS_NATIVE";
+                if a.len() != 1 { return Err(format!("{}: erwartet (win)", n)); }
+                Value::Bool(self.gui.window_is_native(gi(a,0,n)?)?) }
             "gui_window_front" => { self.gui.window_front(gi(a,0,"GUI_WINDOW_FRONT")?)?; Value::Nil }
             "gui_window_visible" => { self.gui.window_visible(gi(a,0,"GUI_WINDOW_VISIBLE")?, gbool(a,1,"GUI_WINDOW_VISIBLE")?)?; Value::Nil }
             "gui_window_shown" => Value::Bool(self.gui.window_shown(gi(a,0,"GUI_WINDOW_SHOWN")?)?),

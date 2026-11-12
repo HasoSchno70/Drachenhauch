@@ -227,6 +227,9 @@ impl Gui {
             let w = &self.windows[wi];
             // Ein angedocktes Fenster unter einer schwebenden Leiste seines
             // Gastfensters: der Punkt gehoert der Leiste.
+            // Nur Fenster der Oberflaeche, durch die die gui gerade schaut
+            // (Weg E): ein Punkt im Hauptfenster trifft kein natives.
+            if w.nativ != self.flaeche { continue; }
             if w.alive && w.visible && Self::in_rect(mx, my, self.sicht_rect(wi))
                 && !self.dock_gast_verdeckt(wi, mx, my) { return Some(wi); }
         }

@@ -102,6 +102,8 @@ mod midifile;
 mod hotplug;
 mod farbraum;
 mod systemaussehen;
+#[cfg(feature = "graphics")]
+mod nativfenster;
 mod kalender;
 mod syntax;
 mod symbole;

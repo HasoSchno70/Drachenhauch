@@ -10,10 +10,17 @@ using System;
 using System.Runtime.InteropServices;
 public static class FensterSender {
   [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr h, uint m, IntPtr w, IntPtr l);
+  [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern IntPtr FindWindow(string k, string t);
 }
 "@
 $h = [IntPtr]::Zero
 for ($i = 0; $i -lt 150 -and $h -eq [IntPtr]::Zero; $i++) {
+    # Zuerst ueber den Titel selbst ($null kaeme als "" an, darum NullString):
+    # so findet sich auch ein ZWEITES
+    # Fenster eines Programms (Weg E, GUI_WINDOW_NATIVE), das nie das
+    # Hauptfenster seines Prozesses ist.
+    $f = [FensterSender]::FindWindow([NullString]::Value, $Titel)
+    if ($f -ne [IntPtr]::Zero) { $h = $f; break }
     $p = Get-Process | Where-Object { $_.MainWindowTitle -eq $Titel } | Select-Object -First 1
     if ($p -and $p.MainWindowHandle -ne 0) { $h = $p.MainWindowHandle }
     else { Start-Sleep -Milliseconds 100 }

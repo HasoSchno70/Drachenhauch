@@ -239,6 +239,39 @@ struct Layer {
 /// Render-Target (RENDERTARGET_*): eine RenderTexture2D mit eigenem Command-
 /// Buffer. RENDERTARGET_BEGIN lenkt `emit` hierher um; beim FLIP wird der Buffer
 /// (falls nicht leer) auf die Textur gerendert, bevor die Hauptszene laeuft.
+/// Ein natives Fenster (Weg E) mit seinem Render-Ziel und dem Stand der
+/// Eingabe ueber die Bilder hinweg.
+struct NativPlatz {
+    id: u32,
+    f: crate::nativfenster::Fenster,
+    /// Index in `render_targets`.
+    rt: usize,
+    b: i32,
+    h: i32,
+    sichtbar: bool,
+    /// Eingang des letzten Bildes (Zustand und Ereignisse).
+    e: crate::nativfenster::Eingang,
+    knopf_vorher: [bool; crate::nativfenster::MAUSTASTEN],
+    knopf_halt: [crate::flanken::Halt; crate::nativfenster::MAUSTASTEN],
+    taste_vorher: Vec<bool>,
+    taste_halt: Vec<crate::flanken::Halt>,
+    /// Getippte Zeichen, bis die gui sie abholt.
+    zeichen: Vec<char>,
+    schliessen: bool,
+    groesse_neu: Option<(i32, i32)>,
+}
+impl NativPlatz {
+    fn neu(id: u32, f: crate::nativfenster::Fenster, rt: usize, b: i32, h: i32) -> Self {
+        use crate::nativfenster::{MAUSTASTEN, TASTATUR};
+        NativPlatz {
+            id, f, rt, b, h, sichtbar: true, e: Default::default(),
+            knopf_vorher: [false; MAUSTASTEN], knopf_halt: [crate::flanken::Halt::default(); MAUSTASTEN],
+            taste_vorher: vec![false; TASTATUR], taste_halt: vec![crate::flanken::Halt::default(); TASTATUR],
+            zeichen: Vec::new(), schliessen: false, groesse_neu: None,
+        }
+    }
+}
+
 struct RenderTarget {
     rt: RenderTexture2D,
     cmds: Vec<Cmd>,
@@ -1395,6 +1428,25 @@ pub struct Graphics {
     maus_halt: [crate::flanken::Halt; crate::flanken::TASTEN],
     /// Dasselbe fuer die Tastatur, je GLFW-Tastencode.
     tasten_halt: Vec<crate::flanken::Halt>,
+    /// Weg E: native Fenster der gui (nativfenster.rs), je mit ihrem
+    /// Render-Ziel und dem Eingang des letzten Bildes.
+    nativ: Vec<NativPlatz>,
+    nativ_naechste: u32,
+    /// Plaetze in `render_targets`, die ein geschlossenes natives Fenster
+    /// freigab (Indizes bleiben fest, darum wiederverwenden statt loeschen).
+    nativ_frei: Vec<usize>,
+    nativ_vorher: Option<Option<usize>>,
+    /// raylibs Fenster als GLFW-Fenster -- einmal nach dem Anlegen gemerkt,
+    /// statt sich auf "der aktuelle Kontext" zu verlassen.
+    haupt_glfw: usize,
+    /// Liest gerade die gui (GUI_UPDATE/GUI_DRAW), und fuer welche
+    /// Oberflaeche (0 = Hauptfenster)? Nur dann liefern die Eingabe-
+    /// abfragen den Stand eines nativen Fensters -- MOUSEX & Co. des
+    /// Programms bleiben beim Hauptfenster.
+    sicht: Option<u32>,
+    /// In welchem nativen Fenster eine Maustaste gedrueckt ist (der Zeiger
+    /// gehoert dann dorthin, auch wenn er den Rand verlaesst).
+    nativ_gefangen: Option<u32>,
     /// Auf welcher Taste jeder Buchstabe NACH DER BELEGUNG liegt (Index 0 =
     /// a): der dhrt-Code der Taste nach Lage (97..122). raylib/GLFW benennen
     /// Tasten nach ihrer Lage auf einer US-Tastatur -- auf einer deutschen
@@ -1963,6 +2015,7 @@ impl Graphics {
         let (mut rl, thread) = Graphics::fenster_bauen(builder)?;
         // Klicks zwischen zwei Bildern mitzaehlen (flanken.rs).
         crate::flanken::einhaengen();
+        let haupt_glfw = crate::nativfenster::aktueller_kontext();
         let _ = crate::flanken::abholen();
         let _ = crate::flanken::tasten_abholen();
         let hwnd = fenster_handle(&mut rl);
@@ -2145,6 +2198,13 @@ impl Graphics {
             auto_injected_keys: Vec::new(),
             maus_halt: [crate::flanken::Halt::default(); crate::flanken::TASTEN],
             tasten_halt: vec![crate::flanken::Halt::default(); crate::flanken::TASTATUR],
+            nativ: Vec::new(),
+            nativ_naechste: 1,
+            nativ_frei: Vec::new(),
+            nativ_vorher: None,
+            haupt_glfw,
+            sicht: None,
+            nativ_gefangen: None,
             belegung: std::array::from_fn(|i| 97 + i as i64),
             auto_maus: None,
             key_names: HashMap::new(),
@@ -2571,6 +2631,174 @@ impl Graphics {
         // Eine RenderTexture steht in OpenGL auf dem Kopf.
         img.flip_vertical();
         self.push_tex_from_image(img)
+    }
+
+    // ------------------------------------------------ native Fenster (Weg E)
+
+    /// Ein natives Fenster anlegen (b x h Punkte, an der Bildschirmstelle
+    /// x, y) samt Render-Ziel. `None`, wo es keine gibt -- dann bleibt die
+    /// gui beim gui-Fenster im Hauptfenster.
+    pub fn nativ_anlegen(&mut self, titel: &str, b: i32, h: i32, x: i32, y: i32, aenderbar: bool) -> Option<u32> {
+        let (b, h) = (b.max(1), h.max(1));
+        let rt = render_ziel(&mut self.rl, &self.thread, b as u32, h as u32).ok()?;
+        let f = crate::nativfenster::Fenster::anlegen(self.haupt_glfw as *mut std::ffi::c_void, titel, b, h, x, y, aenderbar)?;
+        let platz = match self.nativ_frei.pop() {
+            Some(i) => { self.render_targets[i] = RenderTarget { rt, cmds: Vec::new(), behalten: false }; i }
+            None => { self.render_targets.push(RenderTarget { rt, cmds: Vec::new(), behalten: false }); self.render_targets.len() - 1 }
+        };
+        let id = self.nativ_naechste;
+        self.nativ_naechste += 1;
+        self.nativ.push(NativPlatz::neu(id, f, platz, b, h));
+        Some(id)
+    }
+    /// Das native Fenster schliessen; sein Render-Ziel wird frei.
+    pub fn nativ_schliessen(&mut self, id: u32) {
+        let Some(i) = self.nativ.iter().position(|p| p.id == id) else { return };
+        let p = self.nativ.remove(i);
+        self.render_targets[p.rt].cmds.clear();
+        self.nativ_frei.push(p.rt);
+        if self.nativ_gefangen == Some(id) { self.nativ_gefangen = None; }
+        p.f.schliessen(self.haupt_glfw as *mut std::ffi::c_void);
+    }
+    fn nativ_platz(&self, id: u32) -> Option<&NativPlatz> { self.nativ.iter().find(|p| p.id == id) }
+    pub fn nativ_ids(&self) -> Vec<u32> { self.nativ.iter().map(|p| p.id).collect() }
+    fn nativ_platz_mut(&mut self, id: u32) -> Option<&mut NativPlatz> { self.nativ.iter_mut().find(|p| p.id == id) }
+    /// Ab jetzt in das Render-Ziel des nativen Fensters zeichnen.
+    pub fn nativ_beginnen(&mut self, id: u32) -> bool {
+        let Some(rt) = self.nativ_platz(id).map(|p| p.rt) else { return false };
+        self.nativ_vorher = Some(self.active_rt);
+        self.active_rt = Some(rt);
+        true
+    }
+    pub fn nativ_beenden(&mut self) { self.active_rt = self.nativ_vorher.take().unwrap_or(None); }
+    /// Groesse (Punkte) -- vom Programm gesetzt; das Render-Ziel waechst mit.
+    pub fn nativ_groesse(&mut self, id: u32, b: i32, h: i32, auch_fenster: bool) {
+        let (b, h) = (b.max(1), h.max(1));
+        let Some(p) = self.nativ_platz(id) else { return };
+        if (p.b, p.h) == (b, h) { return; }
+        let platz = p.rt;
+        let Ok(rt) = render_ziel(&mut self.rl, &self.thread, b as u32, h as u32) else { return };
+        self.render_targets[platz] = RenderTarget { rt, cmds: Vec::new(), behalten: false };
+        if let Some(p) = self.nativ_platz_mut(id) {
+            p.b = b; p.h = h;
+            if auch_fenster { p.f.groesse_setzen(b, h); }
+        }
+    }
+    pub fn nativ_titel(&mut self, id: u32, titel: &str) { if let Some(p) = self.nativ_platz_mut(id) { p.f.titel_setzen(titel); } }
+    pub fn nativ_sichtbar(&mut self, id: u32, an: bool) {
+        if let Some(p) = self.nativ_platz_mut(id) { if p.sichtbar != an { p.sichtbar = an; p.f.sichtbar(an); } }
+    }
+    pub fn nativ_fokussieren(&mut self, id: u32) { if let Some(p) = self.nativ_platz(id) { p.f.fokussieren(); } }
+    /// Lage auf dem Bildschirm (Systempunkte).
+    pub fn nativ_lage(&self, id: u32) -> Option<(i32, i32)> { self.nativ_platz(id).map(|p| p.f.lage()) }
+    pub fn nativ_lage_setzen(&mut self, id: u32, x: i32, y: i32) { if let Some(p) = self.nativ_platz(id) { p.f.lage_setzen(x, y); } }
+    /// Das native Fenster als Zahl (fuer Tests mit Fensternachrichten).
+    pub fn nativ_handle(&self, id: u32) -> Option<usize> { self.nativ_platz(id).map(|p| p.f.handle()) }
+    /// Wollte das System das Fenster schliessen (Kreuz)? Einmal je Wunsch.
+    pub fn nativ_schliessen_gewuenscht(&mut self, id: u32) -> bool {
+        match self.nativ_platz_mut(id) { Some(p) => std::mem::take(&mut p.schliessen), None => false }
+    }
+    /// Hat der Nutzer das Fenster in der Groesse geaendert? Einmal je Aenderung.
+    pub fn nativ_groesse_neu(&mut self, id: u32) -> Option<(i32, i32)> {
+        self.nativ_platz_mut(id).and_then(|p| p.groesse_neu.take())
+    }
+    /// Die Lage des Hauptfensters auf dem Bildschirm (Systempunkte).
+    pub fn fenster_lage(&self) -> (i32, i32) { let v = self.rl.get_window_position(); (v.x as i32, v.y as i32) }
+    /// Die gui liest (Some) oder das Programm (None); Some(k) = durch die
+    /// Brille der Oberflaeche k.
+    pub fn sicht_setzen(&mut self, s: Option<u32>) { self.sicht = s; }
+    /// Ueber welcher Oberflaeche steht der Zeiger? (0 = Hauptfenster)
+    pub fn zeiger_flaeche(&self) -> u32 {
+        let drinnen: Vec<(u32, bool)> = self.nativ.iter().map(|p| (p.id, p.e.drinnen && p.sichtbar)).collect();
+        crate::nativfenster::zeiger_flaeche(self.nativ_gefangen, &drinnen)
+    }
+    /// Welche Oberflaeche hat den Tastaturfokus des Systems? (0 = das
+    /// Hauptfenster oder keine der nativen)
+    pub fn fokus_flaeche(&self) -> u32 { self.nativ.iter().find(|p| p.e.fokus).map(|p| p.id).unwrap_or(0) }
+    /// Mauslage in der Sicht der gui: Some, wenn sie gerade durch eine
+    /// Oberflaeche schaut -- weit draussen, wenn der Zeiger nicht dort ist.
+    fn nativ_maus(&self) -> Option<(i64, i64)> {
+        let s = self.sicht?;
+        let z = self.zeiger_flaeche();
+        if s != z { return Some((-100_000, -100_000)); }
+        if s == 0 { return None; }
+        self.nativ_platz(s).map(|p| (p.e.maus.0 as i64, p.e.maus.1 as i64))
+    }
+    /// (unten, neu, los) einer Maustaste in der Sicht der gui, wenn sie
+    /// durch ein natives Fenster schaut oder der Zeiger nicht in ihrer ist.
+    fn nativ_knopf(&self, b: i64) -> Option<(bool, bool, bool)> {
+        let s = self.sicht?;
+        if b < 0 || b as usize >= crate::nativfenster::MAUSTASTEN { return None; }
+        let z = self.zeiger_flaeche();
+        if s != z { return Some((false, false, false)); }
+        if s == 0 { return None; }
+        let p = self.nativ_platz(s)?;
+        let k = b as usize;
+        let (jetzt, vorher, h) = (p.e.knopf_unten[k], p.knopf_vorher[k], p.knopf_halt[k]);
+        Some((jetzt || h.unten, (jetzt && !vorher) || h.neu, (!jetzt && vorher) || h.los))
+    }
+    /// (unten, neu, los) einer Taste im nativen Fenster mit Fokus -- nur
+    /// fuer die gui; das Hauptfenster bekommt dann ohnehin nichts.
+    fn nativ_taste(&self, t: usize) -> (bool, bool, bool) {
+        if self.sicht.is_none() || t >= crate::nativfenster::TASTATUR { return (false, false, false); }
+        let Some(p) = self.nativ.iter().find(|p| p.e.fokus) else { return (false, false, false) };
+        let (jetzt, vorher, h) = (p.e.taste_unten[t], p.taste_vorher[t], p.taste_halt[t]);
+        (jetzt || h.unten, (jetzt && !vorher) || h.neu, (!jetzt && vorher) || h.los)
+    }
+    fn nativ_wiederholt(&self, t: usize) -> bool {
+        self.sicht.is_some() && self.nativ.iter().any(|p| p.e.fokus && p.e.wiederholt.contains(&t))
+    }
+    fn nativ_rad(&self) -> Option<(f64, f64)> {
+        let s = self.sicht?;
+        let z = self.zeiger_flaeche();
+        if s != z { return Some((0.0, 0.0)); }
+        if s == 0 { return None; }
+        self.nativ_platz(s).map(|p| p.e.rad)
+    }
+    /// Einmal je Bild, nach EndDrawing: zeigen, Eingang abholen.
+    fn nativ_bild(&mut self) {
+        let haupt = self.haupt_glfw as *mut std::ffi::c_void;
+        let Graphics { nativ, render_targets, .. } = self;
+        for p in nativ.iter_mut() {
+            if p.sichtbar {
+                let tex = render_targets[p.rt].rt.texture.id;
+                p.f.zeigen(haupt, tex, p.b, p.h);
+            }
+            let e = p.f.abholen();
+            p.knopf_vorher = p.e.knopf_unten;
+            for k in 0..crate::nativfenster::MAUSTASTEN {
+                let flanke = e.knopf_unten[k] && !p.knopf_vorher[k];
+                p.knopf_halt[k] = crate::flanken::weiter(p.knopf_halt[k], e.knopf_druck[k], e.knopf_los[k], e.knopf_unten[k], flanke);
+            }
+            p.taste_vorher.copy_from_slice(&p.e.taste_unten);
+            for t in 0..crate::nativfenster::TASTATUR {
+                if e.taste_druck[t] == 0 && e.taste_los[t] == 0 && !p.taste_halt[t].unten && !p.taste_halt[t].los { continue; }
+                let flanke = e.taste_unten[t] && !p.taste_vorher[t];
+                p.taste_halt[t] = crate::flanken::weiter(p.taste_halt[t], e.taste_druck[t], e.taste_los[t], e.taste_unten[t], flanke);
+            }
+            p.zeichen.extend(e.zeichen.iter().copied());
+            if let Some(g) = e.groesse { p.groesse_neu = Some(g); }
+            if p.f.schliessen_gewuenscht() { p.schliessen = true; }
+            p.e = e;
+        }
+        // Gedrueckt in einem nativen Fenster: der Zeiger gehoert ihm, bis
+        // alle Tasten los sind -- auch ohne "drinnen". Ein Druck IST der
+        // Beweis, dass der Zeiger dort ist; Windows meldet das Verlassen
+        // (WM_MOUSELEAVE) mitunter, bevor der Druck ankommt (gemessen mit
+        // geschickten Fensternachrichten: drinnen 1, drinnen 0, dann Druck).
+        // Ein Klick ganz zwischen zwei Bildern (knopf_halt) haelt ihn ebenso.
+        let aktiv = |p: &NativPlatz| p.e.knopf_unten.iter().any(|&u| u)
+            || p.e.knopf_druck.iter().any(|&d| d > 0)
+            // Das Bild des Loslassens gehoert noch dem Fenster -- erst darin
+            // wird aus Druecken ein Klick.
+            || p.e.knopf_los.iter().any(|&l| l > 0)
+            || p.knopf_halt.iter().any(|h| h.unten || h.los);
+        if let Some(k) = self.nativ_gefangen {
+            if !self.nativ_platz(k).map(aktiv).unwrap_or(false) { self.nativ_gefangen = None; }
+        }
+        if self.nativ_gefangen.is_none() {
+            self.nativ_gefangen = self.nativ.iter().find(|p| aktiv(p)).map(|p| p.id);
+        }
     }
 
     /// GUI_WINDOW_ZOOM: ab jetzt in die Zoom-Flaeche zeichnen. FALSE, wenn
@@ -6219,11 +6447,21 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         while let Some(c) = self.rl.get_char_pressed() {
             s.push(c);
         }
+        // Getippt in einem nativen Fenster (es hat dann den Fokus, das
+        // Hauptfenster bekommt nichts) -- nur fuer die gui.
+        if self.sicht.is_some() {
+            for p in self.nativ.iter_mut() { if p.e.fokus { s.extend(p.zeichen.drain(..)); } }
+        }
         s
     }
-    pub fn mouse_x(&self) -> i64 { (self.rl.get_mouse_x() / self.scale) as i64 }
-    pub fn mouse_y(&self) -> i64 { (self.rl.get_mouse_y() / self.scale) as i64 }
+    pub fn mouse_x(&self) -> i64 {
+        match self.nativ_maus() { Some((x, _)) => x, None => (self.rl.get_mouse_x() / self.scale) as i64 }
+    }
+    pub fn mouse_y(&self) -> i64 {
+        match self.nativ_maus() { Some((_, y)) => y, None => (self.rl.get_mouse_y() / self.scale) as i64 }
+    }
     pub fn mouse_button(&self, b: i64) -> bool {
+        if let Some(n) = self.nativ_knopf(b) { return n.0; }
         match Self::mouse_btn(b) { Some(x) => self.rl.is_mouse_button_down(x) || self.halt(b).unten, None => false }
     }
     fn halt(&self, b: i64) -> crate::flanken::Halt {
@@ -6235,9 +6473,9 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     fn t_halt(&self, k: raylib::consts::KeyboardKey) -> crate::flanken::Halt {
         self.tasten_halt.get(k as usize).copied().unwrap_or_default()
     }
-    fn t_unten(&self, k: raylib::consts::KeyboardKey) -> bool { self.rl.is_key_down(k) || self.t_halt(k).unten }
-    fn t_neu(&self, k: raylib::consts::KeyboardKey) -> bool { self.rl.is_key_pressed(k) || self.t_halt(k).neu }
-    fn t_los(&self, k: raylib::consts::KeyboardKey) -> bool { self.rl.is_key_released(k) || self.t_halt(k).los }
+    fn t_unten(&self, k: raylib::consts::KeyboardKey) -> bool { self.rl.is_key_down(k) || self.t_halt(k).unten || self.nativ_taste(k as usize).0 }
+    fn t_neu(&self, k: raylib::consts::KeyboardKey) -> bool { self.rl.is_key_pressed(k) || self.t_halt(k).neu || self.nativ_taste(k as usize).1 }
+    fn t_los(&self, k: raylib::consts::KeyboardKey) -> bool { self.rl.is_key_released(k) || self.t_halt(k).los || self.nativ_taste(k as usize).2 }
 
     // --- Eingabe-FLANKEN -----------------------------------------------------
     // `MOUSEBUTTON` und `KEYPRESSED` liefern beide "wird gehalten". Damit fehlte
@@ -6256,10 +6494,12 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     }
     /// MOUSE_HIT(b): in DIESEM Frame gedrueckt worden?
     pub fn mouse_hit(&self, b: i64) -> bool {
+        if let Some(n) = self.nativ_knopf(b) { return n.1; }
         match Self::mouse_btn(b) { Some(x) => self.rl.is_mouse_button_pressed(x) || self.halt(b).neu, None => false }
     }
     /// MOUSE_RELEASED(b): in DIESEM Frame losgelassen worden?
     pub fn mouse_released(&self, b: i64) -> bool {
+        if let Some(n) = self.nativ_knopf(b) { return n.2; }
         match Self::mouse_btn(b) { Some(x) => self.rl.is_mouse_button_released(x) || self.halt(b).los, None => false }
     }
 
@@ -6303,7 +6543,7 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     /// KEYREPEAT(code): erster Druck ODER System-Auto-Repeat (Textcursor,
     /// Mengen-Eingabe) -- haelt man die Taste, feuert es wiederholt.
     pub fn key_repeat(&self, code: i64) -> bool {
-        self.key_test(code, |k| self.t_neu(k) || self.rl.is_key_pressed_repeat(k))
+        self.key_test(code, |k| self.t_neu(k) || self.rl.is_key_pressed_repeat(k) || self.nativ_wiederholt(k as usize))
     }
 
     /// Relative Mausbewegung seit dem letzten Frame -- Grundlage fuer
@@ -6323,8 +6563,14 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     /// `MOUSEWHEEL` liefert nur die vertikale Achse als ganze Zahl -- ein
     /// horizontales Rad (viele Maeuse, jedes Touchpad) war damit unerreichbar,
     /// und feine Touchpad-Schritte (0.25) fielen auf 0 herunter.
-    pub fn mouse_wheel_x(&self) -> f64 { self.rl.get_mouse_wheel_move_v().x as f64 }
-    pub fn mouse_wheel_y(&self) -> f64 { self.rl.get_mouse_wheel_move_v().y as f64 }
+    pub fn mouse_wheel_x(&self) -> f64 {
+        if let Some(r) = self.nativ_rad() { return r.0; }
+        self.rl.get_mouse_wheel_move_v().x as f64
+    }
+    pub fn mouse_wheel_y(&self) -> f64 {
+        if let Some(r) = self.nativ_rad() { return r.1; }
+        self.rl.get_mouse_wheel_move_v().y as f64
+    }
 
     /// KEY_NAME$(code): Anzeigename einer Taste fuer Belegungsdialoge.
     /// raylib/GLFW kennt nur die Namen der DRUCKBAREN Tasten (und die
@@ -6705,7 +6951,10 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
 
     /// Mausrad-Delta dieses Frames (raylib liefert es pro Frame; "pop" =
     /// einmal lesen). Positiv = nach oben/vorn.
-    pub fn pop_mouse_wheel(&self) -> i64 { self.rl.get_mouse_wheel_move() as i64 }
+    pub fn pop_mouse_wheel(&self) -> i64 {
+        if let Some(r) = self.nativ_rad() { return r.1 as i64; }
+        self.rl.get_mouse_wheel_move() as i64
+    }
 
     /// Logische Fenster-Breite/Hoehe (wie an SCREEN uebergeben).
     // Live-Fenstergroesse (logisch, d.h. ohne Scale) -- spiegelt eine evtl. vom
@@ -7696,6 +7945,11 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         // Eingabe fuer den naechsten Frame schon eingelesen -- die eingespeisten
         // Werte ueberschreiben sie also und gelten fuer genau diesen Frame.
         self.automation_tick();
+
+        // Weg E: die nativen Fenster zeigen (ihre Render-Ziele sind oben
+        // schon abgespielt, EndDrawing hat geflusht) und ihre Eingabe
+        // dieses Bildes abholen (die Rueckrufe liefen in glfwPollEvents).
+        self.nativ_bild();
 
         // Was am Tray-Symbol geschah, gilt jetzt ein Bild lang (tray.rs).
         crate::tray::abholen();

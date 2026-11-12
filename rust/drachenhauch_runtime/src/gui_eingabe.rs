@@ -43,7 +43,14 @@ impl Gui {
                 }
             }
         }
+        // Weg E: erst abgleichen, was an den nativen Fenstern geschah, dann
+        // durch die Oberflaeche unter dem Zeiger schauen.
+        self.nativ_abgleich(g);
+        self.flaeche = g.zeiger_flaeche();
+        g.sicht_setzen(Some(self.flaeche));
         self.update_innen(g);
+        g.sicht_setzen(None);
+        self.flaeche = 0;
         // Das Dock rechnet NACH der Bedienung: ein Klick auf einen Reiter
         // oder ein Zug an der Trennlinie steht so schon in GUI_DOCK_RECT und
         // GUI_DOCK_CHANGED, wenn das Programm nach GUI_UPDATE fragt.

@@ -1,6 +1,7 @@
 # Entwurf: Mehrere OS-Fenster in Drachenhauch
 
-> **Stand 12.11.2026: Weg E ist geplant, nicht gebaut** (Abschnitt 8): ein
+> **Stand 12.11.2026: Weg E, Stufe 1 ist gebaut** (`GUI_WINDOW_NATIVE`,
+> Windows und Linux; macOS Rueckfall) -- Abschnitt 8. Davor geplant: ein
 > gui-Fenster als echtes OS-Fenster im SELBEN Prozess -- gezeichnet wird
 > weiter in raylibs Kontext, ein zweites GLFW-Fenster zeigt das Bild nur und
 > liefert die Eingabe. Zuerst ein Spike mit Ausstiegskriterium.
