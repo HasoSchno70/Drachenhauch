@@ -269,3 +269,295 @@ NEXT
 --- erwartet
 ueber bilder 0
 probe offen TRUE
+
+=== der ok-knopf im info-fenster laesst sich anklicken
+' Gemeldet 2026-11-11: OK im Fenster "Ueber Drachenhauch" liess sich nur mit
+' Enter druecken, nicht mit der Maus. Der Fall sucht den Knopf auf dem
+' Schirm (GUI_HIT_TEST) und klickt ihn ueber eine Aufnahme.
+DIM prBild AS INTEGER
+DIM prX AS INTEGER : prX = -1
+DIM prY AS INTEGER : prY = -1
+--- programm ../../../ide/ide.dh nach SETFPS(60)
+--- einschub nach trefferNachziehen()
+    prBild = prBild + 1
+    IF prBild = 3 THEN befehl("ueber")
+    IF prBild = 8 THEN
+        DIM prSx AS INTEGER
+        DIM prSy AS INTEGER
+        FOR prSy = 0 TO SCREENHEIGHT() - 1 STEP 2
+            FOR prSx = 0 TO SCREENWIDTH() - 1 STEP 2
+                IF prY < 0 AND GUI_HIT_TEST(prSx, prSy) = btnUeberOk THEN prX = prSx + 10 : prY = prSy + 8
+            NEXT
+        NEXT
+        protokoll("probe knopf gefunden " + STR$(prY >= 0))
+        IF prY >= 0 THEN
+            WRITEALL("klick.txt", "c 3" + CHR$(10) + "e 0 7 " + STR$(prX) + " " + STR$(prY) + " 0 0" + CHR$(10) + "e 2 6 0 0 0 0" + CHR$(10) + "e 5 5 0 0 0 0" + CHR$(10) + CHR$(10))
+            AUTOMATION_PLAY("klick.txt")
+        END IF
+    END IF
+    IF prBild = 30 THEN protokoll("probe offen " + STR$(GUI_WINDOW_SHOWN(winUeber))) : EXIT(0)
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF L[i] = "ueber zu" OR LEFT$(L[i], 6) = "probe " THEN PRINT L[i]
+NEXT
+--- erwartet
+probe knopf gefunden TRUE
+ueber zu
+probe offen FALSE
+
+=== der schriftzug hinter dem code ist aus, ausser man hat ihn selbst eingeschaltet
+' Seit 2026.47 aus per Vorgabe. Eine alte ide.json haelt "wasserzeichen":
+' true auch dann fest, wenn es nur die Vorgabe war -- es gilt nur mit
+' "wasserzeichen_selbst" (in den Einstellungen umgeschaltet).
+PRINT "alt "; wasserzeichenAn
+EXIT(0)
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
+--- umgebung
+DHRT_FRAMES=100
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+--- datei _programm/ide.json
+{"wasserzeichen": true}
+--- erwartet
+alt FALSE
+
+=== selbst eingeschaltet bleibt der schriftzug
+PRINT "selbst "; wasserzeichenAn
+EXIT(0)
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
+--- umgebung
+DHRT_FRAMES=100
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+--- datei _programm/ide.json
+{"wasserzeichen": true, "wasserzeichen_selbst": true}
+--- erwartet
+selbst TRUE
+
+=== die zahl der probleme steht im reiter, ohne probleme ist der kopf leer
+' Seit 2026.47: neben dem Reiter "Probleme" stand "keine" -- es sah aus wie
+' ein zweiter Reiter. Jetzt traegt der Reiter die Zahl, der Kopf daneben
+' bleibt ohne Probleme leer.
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 80 THEN
+    protokoll("pr kopf |" + GUI_TEXT(lblProbleme) + "| titel " + GUI_DOCK_TITLE$(win, "probleme"))
+    GUI_SET_TEXT(reiter[aktiverTab].feld, "PRINT 1" + NL)
+END IF
+IF prBild = 170 THEN
+    protokoll("pr kopf |" + GUI_TEXT(lblProbleme) + "| titel " + GUI_DOCK_TITLE$(win, "probleme"))
+    EXIT(0)
+END IF
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=250
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT gibtsnicht
+PRINT auchnicht
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " THEN PRINT L[i]
+NEXT
+--- erwartet
+pr kopf |0 Fehler, 2 Warnungen| titel Probleme (2)
+pr kopf || titel Probleme
+
+=== die eingabezeile steht nur, solange ein programm zuhoert
+' Seit 2026.47: vorher stand "Eingabe fuer das laufende Programm" immer
+' unten, auch ohne Programm. Jetzt nur waehrend eines Laufs (F5, Debugger)
+' oder im Terminal; sonst bekommt das Dock den Platz. Gemeldet wird jeder
+' Wechsel, auch der aus terminalZeigen (es legt selbst neu an).
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../../ide/ide.dh nach SETFPS(60)
+--- einschub nach     IF GUI_DOUBLE_CLICKED(lstProbleme) THEN problemAnspringen()
+prBild = prBild + 1
+IF prBild = 20 THEN
+    protokoll("pr vorher " + STR$(GUI_VISIBLE(tfEingabe)))
+    befehl("start")
+END IF
+IF prBild = 120 THEN
+    protokoll("pr im lauf " + STR$(GUI_VISIBLE(tfEingabe)) + " " + STR$(GUI_VISIBLE(btnEingabe)))
+    GUI_SET_TEXT(tfEingabe, "21")
+    eingabeSenden()
+END IF
+IF prBild = 240 THEN
+    protokoll("pr danach " + STR$(GUI_VISIBLE(tfEingabe)))
+    terminalZeigen(TRUE)
+END IF
+IF prBild = 250 THEN
+    protokoll("pr terminal " + STR$(GUI_VISIBLE(tfEingabe)))
+    EXIT(0)
+END IF
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=300
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+DIM n AS INTEGER
+INPUT "Zahl"; n
+PRINT "doppelt "; n * 2
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 13) = "eingabezeile " THEN PRINT L[i]
+NEXT
+--- erwartet
+pr vorher FALSE
+eingabezeile an
+pr im lauf TRUE TRUE
+eingabezeile aus
+pr danach FALSE
+eingabezeile an
+pr terminal TRUE
+
+=== die hilfe steht in einer eigenen flaeche unter den problemen
+' Seit 2026.47: Kopf und Text der Hilfe liegen in einem Kasten (pnlHilfe)
+' unter der Liste, mit Rand nach innen -- vorher schwebte der Text frei.
+' Und alle Bereiche haben einen Ton: die Hilfe traegt den der Liste.
+FUNCTION prDrin(w AS GUI_WIDGET) AS BOOLEAN
+    RETURN GUI_GET_X(w) > GUI_GET_X(pnlHilfe) AND GUI_GET_Y(w) > GUI_GET_Y(pnlHilfe) AND GUI_GET_X(w) + GUI_GET_W(w) < GUI_GET_X(pnlHilfe) + GUI_GET_W(pnlHilfe) AND GUI_GET_Y(w) + GUI_GET_H(w) <= GUI_GET_Y(pnlHilfe) + GUI_GET_H(pnlHilfe)
+END FUNCTION
+PRINT "sichtbar "; GUI_VISIBLE(pnlHilfe)
+PRINT "unter der liste "; GUI_GET_Y(pnlHilfe) >= GUI_GET_Y(lstProbleme) + GUI_GET_H(lstProbleme)
+PRINT "kopf drin "; prDrin(lblHilfeKopf)
+PRINT "text drin "; prDrin(lblHilfe)
+PRINT "ein ton "; TON_AUSGABE = TON_PROJEKT AND TON_PROBLEME = TON_PROJEKT AND TON_DEBUG = TON_PROJEKT
+EXIT(0)
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=100
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT 1
+--- erwartet
+sichtbar TRUE
+unter der liste TRUE
+kopf drin TRUE
+text drin TRUE
+ein ton TRUE
+
+=== parameternamen stehen nur in der zeile der schreibmarke
+' Seit 2026.47: an jedem Aufruf der Datei zugleich machten sie den Code
+' unruhig. Die Marke steht erst in Zeile 1 (nichts), dann auf dem Aufruf
+' in Zeile 4 (einer), dann in Zeile 5 (nichts).
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 58 OR prBild = 68 OR prBild = 78 THEN
+    DIM prF AS GUI_WIDGET : prF = reiter[aktiverTab].feld
+    protokoll("pr hinweise |" + GUI_TEXTAREA_HINT$(prF, 4) + "|" + GUI_TEXTAREA_HINT$(prF, 6) + "|")
+END IF
+IF prBild = 60 THEN GUI_TEXTAREA_GOTO(reiter[aktiverTab].feld, 4, 1)
+IF prBild = 70 THEN GUI_TEXTAREA_GOTO(reiter[aktiverTab].feld, 5, 1)
+IF prBild = 80 THEN EXIT(0)
+--- argumente
+haupt.dh
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+--- datei haupt.dh
+SUB kreis(x AS INTEGER, y AS INTEGER, r AS INTEGER)
+    PRINT x
+END SUB
+kreis(100, 50, 20)
+DIM a AS INTEGER : a = 1
+kreis(1, 2, 3)
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 12) = "pr hinweise " THEN PRINT L[i]
+NEXT
+--- erwartet
+pr hinweise |||
+pr hinweise |x, y, r||
+pr hinweise |||
+
+=== mit parameter_nur_zeile false stehen sie an allen aufrufen
+' Beide Aufrufe zugleich, und ein Wechsel der Zeile zeigt nicht neu.
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 58 OR prBild = 68 OR prBild = 78 THEN
+    DIM prF AS GUI_WIDGET : prF = reiter[aktiverTab].feld
+    protokoll("pr hinweise |" + GUI_TEXTAREA_HINT$(prF, 4) + "|" + GUI_TEXTAREA_HINT$(prF, 6) + "|")
+END IF
+IF prBild = 60 THEN GUI_TEXTAREA_GOTO(reiter[aktiverTab].feld, 4, 1)
+IF prBild = 70 THEN GUI_TEXTAREA_GOTO(reiter[aktiverTab].feld, 5, 1)
+IF prBild = 80 THEN EXIT(0)
+--- argumente
+haupt.dh
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+--- datei haupt.dh
+SUB kreis(x AS INTEGER, y AS INTEGER, r AS INTEGER)
+    PRINT x
+END SUB
+kreis(100, 50, 20)
+DIM a AS INTEGER : a = 1
+kreis(1, 2, 3)
+--- datei _programm/ide.json
+{"parameter_nur_zeile": false}
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 12) = "pr hinweise " THEN PRINT L[i]
+NEXT
+--- erwartet
+pr hinweise |x, y, r|x, y, r|
+pr hinweise |x, y, r|x, y, r|
+pr hinweise |x, y, r|x, y, r|
+
+=== werkzeugleiste mit groesseren sinnbildern, filter als suchfelder
+' Seit 2026.47: die Sinnbilder der Leiste sind 22 Punkte gross (vorher aus
+' der Hoehe gerechnet, rund 20), und die beiden Filter (Projekt, Ausgabe)
+' sind Suchfelder mit Lupe -- "Filter ..." im Kopf sah aus wie ein Reiter.
+PRINT "suchfelder "; GUI_TEXTINPUT_GET(tfBaumFilter, "suche"); " "; GUI_TEXTINPUT_GET(tfAusgabeFilter, "suche")
+PRINT "platzhalter "; GUI_TEXTINPUT_PLACEHOLDER$(tfBaumFilter); " / "; GUI_TEXTINPUT_PLACEHOLDER$(tfAusgabeFilter)
+PRINT "symbol "; GUI_TOOLBAR_GET(leiste, "symbolgroesse")
+EXIT(0)
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=100
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT 1
+--- erwartet
+suchfelder 1 1
+platzhalter Filter / Filter
+symbol 22

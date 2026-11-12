@@ -28,6 +28,7 @@ SUB konfigSichern()
     JSON_SET_BOOL(konfig, "fehler_am_ende", fehlerEndeAn)
     JSON_SET_BOOL(konfig, "typ_hinweise", typHinweiseAn)
     JSON_SET_BOOL(konfig, "parameter_namen", paramNamenAn)
+    JSON_SET_BOOL(konfig, "parameter_nur_zeile", paramNurZeile)
     JSON_SET_BOOL(konfig, "einfuegen_einruecken", einfuegenEinrueckenAn)
     JSON_SET_BOOL(konfig, "neustart_beim_sichern", neustartSichernAn)
     JSON_SET_JSON(konfig, "start", JSON_PARSE("[]"))
@@ -46,6 +47,7 @@ SUB konfigSichern()
     JSON_SET_STRING(konfig, "startwahl", startwahl)
     JSON_SET_BOOL(konfig, "glanz", glanzAn)
     JSON_SET_BOOL(konfig, "wasserzeichen", wasserzeichenAn)
+    JSON_SET_BOOL(konfig, "wasserzeichen_selbst", wasserzeichenSelbst)
     JSON_SET_INT(konfig, "ui_schrift", uiGroesse)
     JSON_SET_FLOAT(konfig, "massstab", massEinst)
     JSON_SET_BOOL(konfig, "baum_haken", baumHakenAn)
@@ -286,9 +288,11 @@ SUB layoutLeisten()
     (x, y, b, h) = GUI_DOCK_RECT(win, "probleme")
     IF b > 0 THEN
         GUI_SET_BOUNDS(lstProbleme, x, y, b, h \ 2 - 4)
-        GUI_SET_BOUNDS(lblHilfeKopf, x, y + h \ 2, b, 18)
-        GUI_SET_BOUNDS(lblHilfe, x, y + h \ 2 + 22, b, h \ 2 - 22)
-        GUI_SET_WRAP(lblHilfe, MAX(40, b - 8))
+        DIM hy AS INTEGER : hy = y + h \ 2
+        GUI_SET_BOUNDS(pnlHilfe, x, hy, b, MAX(30, y + h - hy))
+        GUI_SET_BOUNDS(lblHilfeKopf, x + 8, hy + 6, b - 16, 18)
+        GUI_SET_BOUNDS(lblHilfe, x + 8, hy + 28, b - 16, MAX(10, y + h - hy - 34))
+        GUI_SET_WRAP(lblHilfe, MAX(40, b - 24))
         (kx, ky, kb, kh) = GUI_DOCK_HEAD_RECT(win, "probleme")
         GUI_SET_BOUNDS(lblProbleme, kx + 8, ky + 2, MAX(40, kb - 8), 18)
     END IF
@@ -333,6 +337,17 @@ FUNCTION aktivesFeldOderWk() AS GUI_WIDGET
     RETURN lblWkTitel
 END FUNCTION
 
+' Braucht es die Eingabezeile? Ein laufendes Programm (auch im Debugger)
+' oder das Terminal liest dort mit.
+FUNCTION eingabeNoetig() AS BOOLEAN
+    RETURN prozess >= 0 OR terminalAn
+END FUNCTION
+
+' Je Bild: aendert sich das, legt layout() neu an.
+SUB eingabeNachziehen()
+    IF eingabeNoetig() <> eingabeGezeigt THEN layout()
+END SUB
+
 SUB layout()
     DIM w AS INTEGER : w = schirmB()
     DIM h AS INTEGER : h = schirmH()
@@ -350,7 +365,16 @@ SUB layout()
     GUI_SET_VISIBLE(leiste, leisteAn)
     IF leisteAn THEN GUI_SET_BOUNDS(leiste, 0, oben - 4, w, 36)
     DIM statusH AS INTEGER : statusH = 24
-    DIM eingabeH AS INTEGER : eingabeH = 30
+    ' Die Eingabezeile nur, solange jemand zuhoert (Programm, Debugger,
+    ' Terminal) -- sonst nimmt das Dock ihren Platz (eingabeNachziehen).
+    ' Gemeldet wird der Wechsel HIER: auch terminalZeigen legt neu an, und
+    ' dort sah eingabeNachziehen den Wechsel nie.
+    DIM eingabeVorher AS BOOLEAN : eingabeVorher = eingabeGezeigt
+    eingabeGezeigt = eingabeNoetig()
+    IF eingabeGezeigt <> eingabeVorher THEN protokoll("eingabezeile " + IIF(eingabeGezeigt, "an", "aus"))
+    DIM eingabeH AS INTEGER : eingabeH = IIF(eingabeGezeigt, 30, 0)
+    GUI_SET_VISIBLE(tfEingabe, eingabeGezeigt)
+    GUI_SET_VISIBLE(btnEingabe, eingabeGezeigt)
     oben = oben + leisteH
     ' Das Dock nimmt alles zwischen Werkzeugleiste und Eingabezeile: links
     ' und rechts die Seitenleisten, unten Ausgabe und Probleme, die Mitte

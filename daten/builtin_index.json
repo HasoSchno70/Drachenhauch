@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 2433,
+ "count": 2441,
  "builtins": [
   {
    "name": "ABS",
@@ -4533,6 +4533,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_DOCK_TITLE$",
+   "kind": "core",
+   "signature": "GUI_DOCK_TITLE$(win, name$) AS STRING",
+   "module": "gui"
+  },
+  {
    "name": "GUI_DOCK_CLOSABLE",
    "kind": "core",
    "signature": "GUI_DOCK_CLOSABLE(win, name$, an)",
@@ -6003,6 +6009,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_STATUSBAR_TIP$",
+   "kind": "core",
+   "signature": "GUI_STATUSBAR_TIP$(sb, feld) AS STRING",
+   "module": "gui"
+  },
+  {
    "name": "GUI_STYLE_SET",
    "kind": "core",
    "signature": "GUI_STYLE_SET(name$, prop$, wert)",
@@ -6531,6 +6543,18 @@
    "module": "gui"
   },
   {
+   "name": "GUI_TEXTAREA_HINT_COUNT",
+   "kind": "core",
+   "signature": "GUI_TEXTAREA_HINT_COUNT(ta) AS INTEGER",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TEXTAREA_HINT$",
+   "kind": "core",
+   "signature": "GUI_TEXTAREA_HINT$(ta, zeile) AS STRING",
+   "module": "gui"
+  },
+  {
    "name": "GUI_TEXTAREA_SCROLL",
    "kind": "core",
    "signature": "GUI_TEXTAREA_SCROLL(ta, zeile)",
@@ -6717,6 +6741,18 @@
    "module": "gui"
   },
   {
+   "name": "GUI_TEXTINPUT_PLACEHOLDER$",
+   "kind": "core",
+   "signature": "GUI_TEXTINPUT_PLACEHOLDER$(tf) AS STRING",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TEXTINPUT_GET",
+   "kind": "core",
+   "signature": "GUI_TEXTINPUT_GET(tf, schluessel$) AS INTEGER",
+   "module": "gui"
+  },
+  {
    "name": "GUI_THEME",
    "kind": "core",
    "signature": "GUI_THEME(accent)",
@@ -6867,6 +6903,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_TOOLBAR_GET",
+   "kind": "core",
+   "signature": "GUI_TOOLBAR_GET(tb, schluessel$) AS INTEGER",
+   "module": "gui"
+  },
+  {
    "name": "GUI_TOOLBAR_SET_CHECKED",
    "kind": "core",
    "signature": "GUI_TOOLBAR_SET_CHECKED(tb, eintrag, an)",
@@ -6900,6 +6942,12 @@
    "name": "GUI_TOOLTIP",
    "kind": "core",
    "signature": "GUI_TOOLTIP(wdg, text)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TOOLTIP$",
+   "kind": "core",
+   "signature": "GUI_TOOLTIP$(wdg) AS STRING",
    "module": "gui"
   },
   {

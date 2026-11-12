@@ -55,6 +55,7 @@ IMPORT "gui"
 | `GUI_DOCK_SHOW(win, name$, an)` | — | hide a panel or show it again (then in front) |
 | `GUI_DOCK_ACTIVATE(win, name$)` | — | bring the panel's tab to the front |
 | `GUI_DOCK_TITLE(win, name$, titel$)` | — | relabel the tab |
+| `GUI_DOCK_TITLE$(win, name$)` | STRING | the label of the tab |
 | `GUI_DOCK_CLOSABLE(win, name$, an)` | — | a cross on the tab: a click hides the panel and reports it |
 | `GUI_DOCK_CLOSED$(win)` | STRING | the panel whose cross was clicked in this frame ("" = none) |
 | `GUI_DOCK_CHANGED(win)` | BOOLEAN | did a rectangle change in this frame (dragged, switched, detached)? Then lay out the contents again |
@@ -149,6 +150,7 @@ IMPORT "gui"
 | `GUI_TOOLBAR_SET_TIP(tb, eintrag, tip$)` | — | tooltip of an entry |
 | `GUI_TOOLBAR_SET_TEXT(tb, eintrag, text$)` | — | label of an entry |
 | `GUI_TOOLBAR_SET(tb, schluessel$, wert)` | — | `beschriftung` (0/1: text next to the icon), `symbolgroesse` (icon size in points, 0 = from the height) |
+| `GUI_TOOLBAR_GET(tb, schluessel$)` | INTEGER | reads `beschriftung` and `symbolgroesse` back |
 | `GUI_TOOLBAR_ITEM_X(tb, eintrag)` | INTEGER | left edge of an entry in the window (like `GUI_GET_X`) |
 | `GUI_TOOLBAR_ITEM_W(tb, eintrag)` | INTEGER | width of an entry |
 | `GUI_TOOLBAR_OVERFLOW(tb)` | INTEGER | how many buttons are currently in the » menu (0 = everything fits) |
@@ -157,6 +159,7 @@ IMPORT "gui"
 | `GUI_STATUSBAR_SET(sb, feld, text$)` | — | text of a field (`GUI_SET_TEXT` means field 0) |
 | `GUI_STATUSBAR_TEXT$(sb, feld)` | STRING | text of a field |
 | `GUI_STATUSBAR_TIP(sb, feld, tip$)` | — | tooltip of a field |
+| `GUI_STATUSBAR_TIP$(sb, feld)` | STRING | read the tooltip of a field |
 | `GUI_STATUSBAR_CLICKABLE(sb, feld, an)` | — | make a field clickable |
 | `GUI_STATUSBAR_CLICKED(sb)` | INTEGER | number of the field clicked in this frame, otherwise -1 |
 | `GUI_STATUSBAR_COUNT(sb)` | INTEGER | number of fields |
@@ -183,6 +186,8 @@ IMPORT "gui"
 | `GUI_PANEL(win, x, y, w, h[, titel$])` | GUI_WIDGET | container (decoration) |
 | `GUI_TEXTINPUT(win, x, y, w, h[, platzhalter$])` | GUI_WIDGET | single-line input field (cursor + selection, Ctrl+Z/Y); the placeholder stays, dimmed, until something is typed -- also with focus |
 | `GUI_TEXTINPUT_SET(tf, key$, wert)` | — | `passwort` (password), `nur_lesen` (read-only), `maxlaenge` (max length), `zahlen` (numbers: 0 free, 1 integer, 2 decimal, 3 amount of money in cents), `suche` (search field with magnifier and cross) |
+| `GUI_TEXTINPUT_GET(tf, key$)` | INTEGER | reads the same keys back (switches as 0/1) |
+| `GUI_TEXTINPUT_PLACEHOLDER$(tf)` | STRING | the grey text in the empty field (also of a `GUI_TEXTAREA`) |
 | `GUI_TEXTINPUT_ICON(tf, links$, rechts$)` | — | a built-in symbol on the left and right inside the field ("" = none) -- see [Search field, symbols, suggestions](#search-field-symbols-suggestions) |
 | `GUI_ICON_CLICKED(tf)` | INTEGER | symbol clicked in this frame: 1 left, 2 right, 0 none |
 | `GUI_SEARCH_CHANGED(tf)` | BOOLEAN | a search field reports its text: 150 ms after the last keystroke, at once on Enter, the cross and ESC |
@@ -314,6 +319,7 @@ IMPORT "gui"
 | `GUI_HOVERED(widget)` | BOOLEAN | mouse over the widget? |
 | `GUI_SET_TEXT(widget, text$)` | — | set the text |
 | `GUI_TOOLTIP(widget, text$)` | — | hover help text (multi-line via `\n`; "" removes it) |
+| `GUI_TOOLTIP$(widget)` | STRING | the help text that was set ("" if none) |
 | `GUI_SET_CHECKED(widget, an)` | — | set a checkbox |
 | `GUI_SET_VALUE(widget, wert)` | — | set the slider value (gets clamped) |
 | `GUI_ON_CLICK(widget, funcref)` | — | FUNCREF callback on click (button/checkbox) |
@@ -2114,6 +2120,10 @@ warn = GUI_BUTTON(win, "Löschen", 20, 100, 100, 30)
 GUI_SET_COLOR(warn, "bg", RGB(160, 40, 40))   ' only this button is red
 ```
 
+A **label** (`GUI_LABEL`) also draws `"bg"` and `"border"` (since
+2026.47; from the style sheet too) -- text on a surface of its own needs no
+panel underneath.
+
 Buttons have two more roles: `"hover"` (under the mouse) and
 `"pressed"` (held down); without them the background becomes lighter or darker. And the
 **text colour follows the background** as long as `"fg"` is not set: dark on a
@@ -2559,7 +2569,10 @@ less: above it the strength decreases proportionally, one fifth remains,
 so that a tall surface does not look completely like paper. With it the
 **bevel** (by the square of the share) and the **focus ring** around a tall
 surface become quieter too -- a light edge at full strength across a whole
-panel and a second frame around a large code field look restless.
+panel and a second frame around a large code field look restless. The
+same goes for the **border of a focused text area**: around a tall surface
+the accent mixes with the border colour (at least 35 % accent); an accent
+of the widget's own (`GUI_SET_COLOR(ta, "accent", …)`) applies unchanged.
 `GUI_METRIC_SET("verlauf_hoehe", 120)` is a good start for an
 interface with large lists and text inputs.
 
@@ -3475,6 +3488,8 @@ usable code field.
 | `GUI_TEXTAREA_POS_AT(ta, x, y)` → (zeile, spalte) | which character lies under the screen point (from 1; the same calculation as the click). (0, 0) next to the text: outside, in the line-number column, below the last line, behind the end of the line -- for tooltips on hover and Ctrl+click |
 | `GUI_TEXTAREA_GOTO(ta, zeile[, spalte])` | set the cursor, clear the selection, scroll the view so that the line is in the middle |
 | `GUI_TEXTAREA_HINTS(ta, zeilen, texte [, farbe])` | put dimmed text behind the end of lines (from 1), for example the values of the variables when the debugger stops; follows its line like a marker, empty lists clear, `GUI_SET_TEXT` too. `farbe` may be an array, one per hint (`-1` = dimmed) |
+| `GUI_TEXTAREA_HINT$(ta, zeile)` | the hint behind a line (from 1), "" if none -- after moving along while typing, as it is drawn |
+| `GUI_TEXTAREA_HINT_COUNT(ta)` | how many lines carry a hint |
 | `GUI_TEXTAREA_SCROLL(ta, zeile)` | scroll the view so that the line is at the top -- without moving the cursor, like the mouse wheel (for an overview map) |
 | `GUI_TEXTAREA_SELECT(ta, z1, s1, z2, s2)` | select a range, cursor at the end |
 | `GUI_TEXTAREA_SELECTION$(ta)` → STRING | the selected text |

@@ -939,8 +939,15 @@ SUB hinweiseZeigen(ta AS GUI_WIDGET)
         ARRAY_PUSH(farben, -1)
     NEXT
     IF paramNamenAn AND ta = paramFeld THEN
+        ' Nur die Zeile der Schreibmarke (paramNurZeile); wechselt sie,
+        ' zeigt spurNachziehen neu.
+        DIM pmz AS INTEGER
+        DIM pms AS INTEGER
+        (pmz, pms) = GUI_TEXTAREA_CURSOR(ta)
+        paramZeileGezeigt = pmz
         FOR i = 0 TO LEN(paramHinweise) - 1
             DIM ph AS Zeilenhinweis : ph = paramHinweise[i]
+            IF paramNurZeile AND ph.zeile <> pmz THEN CONTINUE
             DIM pk AS INTEGER : pk = IIF(MAPHAS(zlNr, STR$(ph.zeile)), MAPGET(zlNr, STR$(ph.zeile)), -1)
             IF pk >= 0 THEN
                 tx[pk] = tx[pk] + "   ·   " + ph.text

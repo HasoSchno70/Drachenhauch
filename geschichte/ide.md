@@ -3016,3 +3016,43 @@ nicht, Fehler; Gegenprobe: losgeloest ueber `Prozess` -> Fall 1 faellt) und
 Abfrage, Argument, Einstellung und Merken). Pruefungen sehen den Bildschirm
 nur mit `DH_IDE_STARTWAHL=1`, `DH_IDE_STUDIO_TROCKEN=1` startet das Studio
 dort nicht wirklich.
+
+## Professioneller: Durchsicht in 13 Punkten (2026-11-11)
+
+Nach 2026.46 eine Durchsicht der Oberflaeche (Aufnahmen IDE und Studio).
+Vorher zwei Fehler: nach dem Startbildschirm schrieb die IDE in der Groesse
+des Startbildschirms (`startwahl.dh` setzt `SETFONT` UND `TEXT_SIZE` zurueck),
+und OK in "Ueber Drachenhauch" nahm keinen Klick -- `handle_press` ging die
+Widgets von vorn durch, Zeichnen und `GUI_HIT_TEST` von hinten; jetzt alle
+von hinten (das oberste Widget bekommt den Klick).
+
+Umgesetzt, je ein Commit mit Fall und Gegenprobe:
+3 Schriftzug hinter dem Code aus per Vorgabe (`wasserzeichen_selbst`: eine
+alte `ide.json` hielt `true` auch als blosse Vorgabe fest); 4 Studio-Inspektor
+"Enter-Knopf"/"Esc-Knopf" statt abgeschnittener Texte; 5 Pfadleiste beginnt
+mit den Ordnern im Projekt (Klick zeigt den Ordner im Baum); 6 Zahl der
+Probleme im Reiter, Kopf ohne Probleme leer (das "keine" sah aus wie ein
+Reiter); 7 Eingabezeile nur, solange Programm, Debugger oder Terminal
+zuhoert (`eingabeNachziehen`); 8 ein Ton fuer alle Bereiche, die Hilfe in
+einem eigenen Kasten (`pnlHilfe`, vor den Beschriftungen angelegt -- ein
+Label zeichnet keinen Hintergrund); 9 Parameternamen nur in der Zeile der
+Schreibmarke (`parameter_nur_zeile`, `spurNachziehen` zeigt beim
+Zeilenwechsel neu); 10 Fokusrand grosser Textbereiche leiser (gui); 11
+Sinnbilder der Leiste 22 Punkte; 12 Filter als Suchfelder; 13 Statuszeile
+nennt den Weg ab dem Projekt, den ganzen als Hilfetext.
+
+Funde beim Testen:
+- Eine Gegenprobe, die die ganze Aenderung zuruecknimmt (`git stash`), liess
+  drei Faelle nur an "Variable nicht deklariert" fallen -- bewiesen war
+  nichts. Verfaelscht wird die EINE Zeile.
+- `GUI_TOOLBAR_ITEM_W` blieb bei groesseren Sinnbildern 30: der erste Fall
+  zur Leiste war vorher wie nachher gruen.
+- Zu vielen Settern fehlte die Abfrage; die Tests behalfen sich mit eigenen
+  Protokollzeilen der IDE oder durchsuchten die Form aus `GUI_SAVE`. Darum
+  die acht Abfragen (geschichte/gui.md) und die Regel in CLAUDE.md.
+- Ein unbekannter Name ist in der Pruefung der IDE eine WARNUNG.
+- `terminalZeigen` ruft `layout()` selbst -- ein Lauscher auf den Wechsel
+  sieht ihn dann nicht.
+- Zwei Sammlungen mit Aufnahmen (`6_12` und `lesbarkeit`) nebeneinander
+  liessen sechs Faelle in die Zeitgrenze laufen; einzeln und im vollen Lauf
+  gruen.

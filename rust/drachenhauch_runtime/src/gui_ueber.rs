@@ -300,6 +300,10 @@ impl Gui {
     }
 
     // ================================================================ Textfeld
+    /// Ist das Textfeld ein Suchfeld (GUI_TEXTINPUT_SET "suche")?
+    pub(super) fn feld_ist_suche(w: &Widget) -> bool {
+        w.feld.as_ref().map(|z| z.suche).unwrap_or(false)
+    }
     fn feld_mut(&mut self, h: i64, f: &str) -> Result<&mut FeldZusatz, String> {
         let w = self.wdg_mut(h, f)?;
         if w.kind != Kind::TextInput { return Err(format!("{}: Widget ist kein Textfeld (GUI_TEXTINPUT)", f)); }

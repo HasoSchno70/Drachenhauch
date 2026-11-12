@@ -313,6 +313,10 @@ impl Gui {
     pub fn set_tooltip(&mut self, h: i64, t: String) -> Result<(), String> {
         self.wdg_mut(h, "GUI_TOOLTIP")?.tooltip = t; Ok(())
     }
+    /// GUI_TOOLTIP$(w): der mit GUI_TOOLTIP gesetzte Hilfetext.
+    pub fn tooltip_text(&self, h: i64) -> Result<String, String> {
+        Ok(self.wdg(h, "GUI_TOOLTIP$")?.tooltip.clone())
+    }
     pub fn set_checked(&mut self, h: i64, f: bool) -> Result<(), String> {
         let kind = self.wdg(h, "GUI_SET_CHECKED")?.kind;
         if !matches!(kind, Kind::Checkbox | Kind::Radio | Kind::Toggle) { return Err("GUI_SET_CHECKED: Widget ist keine checkbox/radio/toggle".into()); }
@@ -777,6 +781,34 @@ impl Gui {
                 "GUI_TEXTINPUT_SET: unbekannter Schluessel '{}' -- passwort, nur_lesen, maxlaenge, zahlen, suche", key)),
         }
         Ok(())
+    }
+
+    /// GUI_TEXTINPUT_GET(tf, key$): liest, was GUI_TEXTINPUT_SET setzt
+    /// (Schalter als 0/1). Ein Test fragt so den Zustand, statt ihn sich
+    /// selbst zu merken.
+    pub fn textinput_get(&self, h: i64, key: &str) -> Result<f64, String> {
+        let w = self.wdg(h, "GUI_TEXTINPUT_GET")?;
+        if w.kind != Kind::TextInput {
+            return Err("GUI_TEXTINPUT_GET: das Widget ist kein GUI_TEXTINPUT".into());
+        }
+        let b = |x: bool| if x { 1.0 } else { 0.0 };
+        Ok(match key.to_lowercase().as_str() {
+            "passwort" | "password" => b(w.passwort),
+            "nur_lesen" | "readonly" => b(w.nur_lesen),
+            "maxlaenge" | "maxlen" => w.maxlaenge as f64,
+            "zahlen" | "numeric" => w.zahlen as f64,
+            "suche" | "search" => b(Self::feld_ist_suche(w)),
+            _ => return Err(format!(
+                "GUI_TEXTINPUT_GET: unbekannter Schluessel '{}' -- passwort, nur_lesen, maxlaenge, zahlen, suche", key)),
+        })
+    }
+    /// GUI_TEXTINPUT_PLACEHOLDER$(tf): der graue Text im leeren Feld.
+    pub fn textinput_placeholder(&self, h: i64) -> Result<String, String> {
+        let w = self.wdg(h, "GUI_TEXTINPUT_PLACEHOLDER$")?;
+        if !matches!(w.kind, Kind::TextInput | Kind::TextArea) {
+            return Err("GUI_TEXTINPUT_PLACEHOLDER$: das Widget ist kein GUI_TEXTINPUT oder GUI_TEXTAREA".into());
+        }
+        Ok(w.placeholder.clone())
     }
 
     /// GUI_ENTERED(tf) -- wurde in DIESEM Bild Enter im Textfeld gedrueckt?

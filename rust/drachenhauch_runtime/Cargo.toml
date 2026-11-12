@@ -4,7 +4,7 @@ name = "drachenhauch_runtime"
 # pyproject.toml und drachenhauch/__init__.py daneben). `dhrt --version`
 # und VERSION$() geben sie aus, tests/pruef/werkzeugkette/dhrt_werkzeuge.dhtest prueft
 # das. (Cargo verlangt drei Stellen; die Fassung sind die ersten beiden.)
-version = "2026.46.0"
+version = "2026.47.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "Drachenhauch runtime (Rust): compiles and runs Drachenhauch programs -- games, GUI applications and command-line tools."

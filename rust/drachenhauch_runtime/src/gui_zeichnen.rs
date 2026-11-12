@@ -708,6 +708,22 @@ impl Gui {
                 // Zeilen einzeln: so gilt die Ausrichtung je Zeile, und ein
                 // umbrechendes Label zeichnet genau das, was umbruch_layout
                 // gemessen hat (samt Kuerzen, Auswahl und Alt-Buchstabe).
+                // Ein eigener Grund (`GUI_SET_COLOR(lbl, "bg", ..)` oder die
+                // Stildatei) wird gezeichnet, ebenso ein eigener Rand -- bis
+                // 2026.47 ueberging eine Beschriftung beides still, und wer
+                // Text auf einer Flaeche wollte, legte ein Panel darunter.
+                let grund = wdg.ov.get("bg").copied().or_else(|| self.stil_farbe(wdg, "bg", stil::BASIS));
+                let rand = wdg.ov.get("border").copied().or_else(|| self.stil_farbe(wdg, "border", stil::BASIS));
+                if grund.is_some() || rand.is_some() {
+                    let rad = self.m("corner_radius").min(h / 2).max(0);
+                    if let Some(c) = grund { g.round_rect(ax, ay, ax + w - 1, ay + h - 1, rad, c, true); }
+                    // Ohne Rundung `rect` wie der Fehlerrahmen: die runde
+                    // Kontur liegt bei Radius 0 einen Punkt links/oben daneben.
+                    if let Some(c) = rand {
+                        if rad > 0 { g.round_rect(ax, ay, ax + w - 1, ay + h - 1, rad, c, false); }
+                        else { g.rect(ax, ay, ax + w - 1, ay + h - 1, c); }
+                    }
+                }
                 let (pv, ph) = self.w_abstand(wdg).unwrap_or((0, 0));
                 self.label_zeichnen(g, wdg, ax + ph, ay + pv, (w - 2 * ph).max(1), fg);
             }
@@ -975,7 +991,16 @@ impl Gui {
             Kind::TextArea => {
                 let focused = self.focus_widget == Some((wi, idx));
                 let fg = self.txt_col(wdg);
-                let bcol = if focused { self.wcol(wdg, "accent", "accent") } else { self.wcol(wdg, "border", "widget_border") };
+                // Fokus: der Rand im Akzent -- um eine GROSSE Flaeche (das
+                // Code-Feld einer IDE) aber gemischt mit dem Rand, wie der
+                // Fokusring darunter (`verlauf_hoehe`): ein voller Akzent um
+                // 900 Punkte Code war der lauteste Strich im Fenster, und die
+                // Schreibmarke zeigt den Fokus ohnehin. Eine eigene Farbe
+                // (`accent` am Widget) gilt unveraendert.
+                let rand = self.wcol(wdg, "border", "widget_border");
+                let bcol = if !focused { rand }
+                    else if wdg.ov.contains_key("accent") { self.wcol(wdg, "accent", "accent") }
+                    else { mischen(rand, self.th("accent"), self.verlauf_anteil(h).max(0.35)) };
                 self.fbox_tief_w(g, wdg.kind, ax, ay, ax + w - 1, ay + h - 1, self.wcol(wdg, "bg", "win_bg"), bcol);
                 let pad = 5;
                 let lh = self.ta_line_h(g, wdg);

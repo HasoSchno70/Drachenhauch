@@ -462,6 +462,9 @@ impl<'p> Vm<'p> {
             "gui_statusbar_set" => { self.gui.statusbar_set(gi(a,0,"GUI_STATUSBAR_SET")?, gi(a,1,"GUI_STATUSBAR_SET")?, gs(a,2,"GUI_STATUSBAR_SET")?)?; Value::Nil }
             "gui_statusbar_text$" | "gui_statusbar_text" => Value::str_rc(&self.gui.statusbar_text(gi(a,0,"GUI_STATUSBAR_TEXT")?, gi(a,1,"GUI_STATUSBAR_TEXT")?)?),
             "gui_statusbar_tip" => { self.gui.statusbar_tip(gi(a,0,"GUI_STATUSBAR_TIP")?, gi(a,1,"GUI_STATUSBAR_TIP")?, gs(a,2,"GUI_STATUSBAR_TIP")?)?; Value::Nil }
+            "gui_statusbar_tip$" => { let n = "GUI_STATUSBAR_TIP$";
+                if a.len() != 2 { return Err(format!("{}: erwartet (sb, feld)", n)); }
+                Value::str_rc(&self.gui.statusbar_tip_text(gi(a,0,n)?, gi(a,1,n)?)?) }
             "gui_statusbar_clickable" => { self.gui.statusbar_clickable(gi(a,0,"GUI_STATUSBAR_CLICKABLE")?, gi(a,1,"GUI_STATUSBAR_CLICKABLE")?, gbool(a,2,"GUI_STATUSBAR_CLICKABLE")?)?; Value::Nil }
             "gui_statusbar_clicked" => Value::Int(self.gui.statusbar_clicked(gi(a,0,"GUI_STATUSBAR_CLICKED")?)?),
             "gui_statusbar_count" => Value::Int(self.gui.statusbar_count(gi(a,0,"GUI_STATUSBAR_COUNT")?)?),
@@ -786,6 +789,9 @@ impl<'p> Vm<'p> {
             "gui_toolbar_set_tip" => { self.gui.toolbar_set_tip(gi(a,0,"GUI_TOOLBAR_SET_TIP")?, gi(a,1,"GUI_TOOLBAR_SET_TIP")?, gs(a,2,"GUI_TOOLBAR_SET_TIP")?)?; Value::Nil }
             "gui_toolbar_set_text" => { self.gui.toolbar_set_text(gi(a,0,"GUI_TOOLBAR_SET_TEXT")?, gi(a,1,"GUI_TOOLBAR_SET_TEXT")?, gs(a,2,"GUI_TOOLBAR_SET_TEXT")?)?; Value::Nil }
             "gui_toolbar_set" => { self.gui.toolbar_set(gi(a,0,"GUI_TOOLBAR_SET")?, &gs(a,1,"GUI_TOOLBAR_SET")?, gnum(a,2,"GUI_TOOLBAR_SET")?)?; Value::Nil }
+            "gui_toolbar_get" => { let n = "GUI_TOOLBAR_GET";
+                if a.len() != 2 { return Err(format!("{}: erwartet (tb, key$)", n)); }
+                Value::Int(self.gui.toolbar_get(gi(a,0,n)?, &gs(a,1,n)?)? as i64) }
             "gui_toolbar_item_x" => Value::Int(self.gui.toolbar_item_rect(gi(a,0,"GUI_TOOLBAR_ITEM_X")?, gi(a,1,"GUI_TOOLBAR_ITEM_X")?)?.0),
             "gui_toolbar_item_w" => Value::Int(self.gui.toolbar_item_rect(gi(a,0,"GUI_TOOLBAR_ITEM_W")?, gi(a,1,"GUI_TOOLBAR_ITEM_W")?)?.1),
             "gui_toolbar" => Value::Int(self.gui.toolbar(gi(a,0,"GUI_TOOLBAR")?, gi(a,1,"GUI_TOOLBAR")? as i32,
@@ -831,6 +837,9 @@ impl<'p> Vm<'p> {
             "gui_text" => Value::str_rc(&self.gui.text(gi(a,0,"GUI_TEXT")?)?),
             "gui_set_text" => { self.gui.set_text(gi(a,0,"GUI_SET_TEXT")?, gs(a,1,"GUI_SET_TEXT")?)?; Value::Nil }
             "gui_tooltip" => { self.gui.set_tooltip(gi(a,0,"GUI_TOOLTIP")?, gs(a,1,"GUI_TOOLTIP")?)?; Value::Nil }
+            "gui_tooltip$" => { let n = "GUI_TOOLTIP$";
+                if a.len() != 1 { return Err(format!("{}: erwartet (widget)", n)); }
+                Value::str_rc(&self.gui.tooltip_text(gi(a,0,n)?)?) }
             "gui_set_checked" => { self.gui.set_checked(gi(a,0,"GUI_SET_CHECKED")?, gbool(a,1,"GUI_SET_CHECKED")?)?; Value::Nil }
             "gui_set_value" => { self.gui.set_value(gi(a,0,"GUI_SET_VALUE")?, gnum(a,1,"GUI_SET_VALUE")?)?; Value::Nil }
             "gui_on_click" => { self.gui.on_click(gi(a,0,"GUI_ON_CLICK")?, gfunc(a,1,"GUI_ON_CLICK")?)?; Value::Nil }
@@ -839,6 +848,12 @@ impl<'p> Vm<'p> {
             "gui_entered" => Value::Bool(self.gui.entered(gi(a,0,"GUI_ENTERED")?)?),
             "gui_set_align" => { self.gui.set_align(gi(a,0,"GUI_SET_ALIGN")?, &gs(a,1,"GUI_SET_ALIGN")?)?; Value::Nil }
             "gui_set_wrap" => { self.gui.set_wrap(gi(a,0,"GUI_SET_WRAP")?, gi(a,1,"GUI_SET_WRAP")? as i32)?; Value::Nil }
+            "gui_textinput_get" => { let n = "GUI_TEXTINPUT_GET";
+                if a.len() != 2 { return Err(format!("{}: erwartet (tf, key$)", n)); }
+                Value::Int(self.gui.textinput_get(gi(a,0,n)?, &gs(a,1,n)?)? as i64) }
+            "gui_textinput_placeholder$" => { let n = "GUI_TEXTINPUT_PLACEHOLDER$";
+                if a.len() != 1 { return Err(format!("{}: erwartet (tf)", n)); }
+                Value::str_rc(&self.gui.textinput_placeholder(gi(a,0,n)?)?) }
             "gui_textinput_set" => {
                 self.gui.textinput_set(gi(a,0,"GUI_TEXTINPUT_SET")?, &gs(a,1,"GUI_TEXTINPUT_SET")?,
                                        gnum(a,2,"GUI_TEXTINPUT_SET")?)?; Value::Nil
@@ -1321,6 +1336,9 @@ impl<'p> Vm<'p> {
             "gui_dock_show" => { self.gui.dock_show(gi(a,0,"GUI_DOCK_SHOW")?, &gs(a,1,"GUI_DOCK_SHOW")?, gbool(a,2,"GUI_DOCK_SHOW")?)?; Value::Nil }
             "gui_dock_activate" => { self.gui.dock_activate(gi(a,0,"GUI_DOCK_ACTIVATE")?, &gs(a,1,"GUI_DOCK_ACTIVATE")?)?; Value::Nil }
             "gui_dock_title" => { self.gui.dock_title(gi(a,0,"GUI_DOCK_TITLE")?, &gs(a,1,"GUI_DOCK_TITLE")?, &gs(a,2,"GUI_DOCK_TITLE")?)?; Value::Nil }
+            "gui_dock_title$" => { let n = "GUI_DOCK_TITLE$";
+                if a.len() != 2 { return Err(format!("{}: erwartet (win, name$)", n)); }
+                Value::str_rc(&self.gui.dock_title_text(gi(a,0,n)?, &gs(a,1,n)?)?) }
             "gui_dock_closable" => { self.gui.dock_closable(gi(a,0,"GUI_DOCK_CLOSABLE")?, &gs(a,1,"GUI_DOCK_CLOSABLE")?, gbool(a,2,"GUI_DOCK_CLOSABLE")?)?; Value::Nil }
             "gui_dock_closed$" | "gui_dock_closed" => Value::str_rc(self.gui.dock_closed(gi(a,0,"GUI_DOCK_CLOSED$")?)?),
             "gui_dock_changed" => Value::Bool(self.gui.dock_changed(gi(a,0,"GUI_DOCK_CHANGED")?)?),
@@ -1535,6 +1553,12 @@ impl<'p> Vm<'p> {
                 self.gui.textarea_marks(gi(a, 0, n)?, ganze(&a[1], n)?, ganze(&a[2], n)?)?;
                 Value::Nil
             }
+            "gui_textarea_hint$" => { let n = "GUI_TEXTAREA_HINT$";
+                if a.len() != 2 { return Err(format!("{}: erwartet (ta, zeile)", n)); }
+                Value::str_rc(&self.gui.textarea_hint(gi(a,0,n)?, gi(a,1,n)?)?) }
+            "gui_textarea_hint_count" => { let n = "GUI_TEXTAREA_HINT_COUNT";
+                if a.len() != 1 { return Err(format!("{}: erwartet (ta)", n)); }
+                Value::Int(self.gui.textarea_hint_count(gi(a,0,n)?)?) }
             "gui_textarea_hints" => {
                 let n = "GUI_TEXTAREA_HINTS";
                 if a.len() < 3 || a.len() > 4 { return Err(format!("{}: erwartet (ta, zeilen, texte [, farbe])", n)); }

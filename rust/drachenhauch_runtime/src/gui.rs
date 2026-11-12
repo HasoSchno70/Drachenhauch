@@ -4357,6 +4357,22 @@ impl Gui {
 
     /// GUI_TEXTAREA_HINTS(ta, zeilen, texte [, farbe]): Text hinter dem Ende
     /// der Zeilen (ab 1), ersetzt alle bisherigen; leere Listen loeschen.
+    /// GUI_TEXTAREA_HINT$(ta, zeile): der Hinweis hinter einer Zeile (ab 1),
+    /// "" ohne. Die Zeilen wandern beim Tippen mit -- gefragt wird der
+    /// Stand nach dem Nachziehen, so wie er gezeichnet wird.
+    pub fn textarea_hint(&mut self, h: i64, zeile: i64) -> Result<String, String> {
+        let wd = self.wdg_mut(h, "GUI_TEXTAREA_HINT$")?;
+        if wd.kind != Kind::TextArea { return Err("GUI_TEXTAREA_HINT$: das Widget ist kein GUI_TEXTAREA".into()); }
+        marken_abgleichen(wd);
+        if zeile < 1 { return Ok(String::new()); }
+        Ok(wd.hinweise.iter().find(|m| m.0 as i64 == zeile - 1).map(|m| m.1.clone()).unwrap_or_default())
+    }
+    /// GUI_TEXTAREA_HINT_COUNT(ta): wie viele Zeilen einen Hinweis tragen.
+    pub fn textarea_hint_count(&self, h: i64) -> Result<i64, String> {
+        let wd = self.wdg(h, "GUI_TEXTAREA_HINT_COUNT")?;
+        if wd.kind != Kind::TextArea { return Err("GUI_TEXTAREA_HINT_COUNT: das Widget ist kein GUI_TEXTAREA".into()); }
+        Ok(wd.hinweise.len() as i64)
+    }
     pub fn textarea_hints(&mut self, h: i64, zeilen: Vec<i64>, texte: Vec<String>, farbe: i64, farben: Vec<i64>) -> Result<(), String> {
         if zeilen.len() != texte.len() {
             return Err(format!(

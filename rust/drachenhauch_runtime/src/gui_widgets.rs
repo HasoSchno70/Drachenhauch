@@ -221,6 +221,16 @@ impl Gui {
         }
         Ok(())
     }
+    /// GUI_TOOLBAR_GET(tb, key$): liest, was GUI_TOOLBAR_SET setzt.
+    pub fn toolbar_get(&self, h: i64, key: &str) -> Result<f64, String> {
+        let l = self.tb_ref(h, "GUI_TOOLBAR_GET")?;
+        let (mit_text, symbol) = l.map(|l| (l.mit_text, l.symbol)).unwrap_or((false, 0));
+        Ok(match key.to_lowercase().as_str() {
+            "beschriftung" | "text" => if mit_text { 1.0 } else { 0.0 },
+            "symbolgroesse" | "symbol" => symbol as f64,
+            _ => return Err(format!("GUI_TOOLBAR_GET: unbekannte Einstellung '{}' -- bekannt sind: beschriftung, symbolgroesse", key)),
+        })
+    }
     /// Lage eines Eintrags (x, Breite) in logischen Koordinaten, wie GUI_GET_X.
     pub fn toolbar_item_rect(&self, h: i64, i: i64) -> Result<(i64, i64), String> {
         let w = self.wdg(h, "GUI_TOOLBAR_ITEM_X")?;
@@ -409,6 +419,10 @@ impl Gui {
     }
     pub fn statusbar_tip(&mut self, h: i64, i: i64, tip: String) -> Result<(), String> {
         self.sb_feld(h, i, "GUI_STATUSBAR_TIP")?.tip = tip; Ok(())
+    }
+    /// GUI_STATUSBAR_TIP$(sb, feld): der Hilfetext eines Feldes.
+    pub fn statusbar_tip_text(&mut self, h: i64, i: i64) -> Result<String, String> {
+        Ok(self.sb_feld(h, i, "GUI_STATUSBAR_TIP$")?.tip.clone())
     }
     pub fn statusbar_clickable(&mut self, h: i64, i: i64, an: bool) -> Result<(), String> {
         self.sb_feld(h, i, "GUI_STATUSBAR_CLICKABLE")?.klickbar = an; Ok(())

@@ -1196,13 +1196,18 @@ impl Gui {
                 }
             }
         }
-        // Widget unter der Maus.
+        // Widget unter der Maus: das OBERSTE, also von hinten gesucht -- wie
+        // GUI_HIT_TEST und das Zeichnen (spaeter angelegt liegt oben). Bis
+        // 2026-11-11 gewann hier der erste Treffer von vorn: im Info-Fenster
+        // der IDE wuchs die Beschriftung mit einem langen Pfad ueber den
+        // OK-Knopf, der Knopf lag sichtbar oben, der Klick ging aber an die
+        // Beschriftung (nur Enter schloss das Fenster).
         let mut hit = None;
-        for i in 0..n {
+        for i in (0..n).rev() {
             // Ein Layout-Behaelter ist Luft: er darf den Klick nicht schlucken,
-            // der seinen Kindern gilt (sie kommen in der Reihenfolge NACH ihm).
-            // Ein rollendes Panel ebenso -- der erste Treffer gewinnt hier,
-            // und das Panel liegt vor seinen Kindern.
+            // der seinen Kindern gilt (sie kommen in der Reihenfolge NACH ihm
+            // und werden von hinten zuerst gefunden). Ein rollendes Panel
+            // ebenso.
             let (r, active) = { let w = &self.windows[win].widgets[i]; (self.abs_rect(win, w), self.widget_shown(win, w) && w.enabled && w.kind != Kind::Layout && w.panel.is_none() && self.im_panel_sichtbar(win, w, mx, my)) };
             if active && Self::in_rect(mx, my, r) && !self.luft_fuer_kinder(win, i, mx, my) { hit = Some(i); break; }
         }

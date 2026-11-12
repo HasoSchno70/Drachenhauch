@@ -191,7 +191,7 @@ SUB codeFarben(licht AS BOOLEAN)
     ELSE
         F_KLAMMER1 = &HF0C040 : F_KLAMMER2 = &HD878E0 : F_KLAMMER3 = &H40A8F8
     END IF
-    TON_PROJEKT = &H3B7BD8 : TON_AUSGABE = &H2E9E62 : TON_PROBLEME = &HD98B2B : TON_DEBUG = &H8C5BD6
+    TON_PROJEKT = &H3B7BD8 : TON_AUSGABE = &H3B7BD8 : TON_PROBLEME = &H3B7BD8 : TON_DEBUG = &H3B7BD8
     IF licht THEN
         B_ORDNER = &H8A5E00 : B_DH = &H0B5FA0 : B_WERKZEUG = &HA8500C : B_TEST = &H2A7A30
         B_DATEN = &H83379A : B_TEXT = &H4B5563 : B_BILD = &HA82A62 : B_KLANG = &H107468
@@ -249,10 +249,13 @@ END FUNCTION
 
 ' Die Toene der Bereiche -- Variablen, weil eigene Farben (farben.json) sie
 ' ueberschreiben duerfen; codeFarben setzt sie auf die Vorgabe zurueck.
+' Seit 2026.47 haben alle Bereiche DENSELBEN Ton: vier Farben um den Code
+' (blau, tuerkis, braun, violett) wirkten wie ein Flickenteppich. Wer sie
+' trennen will, setzt sie in der farben.json.
 DIM TON_PROJEKT AS INTEGER : TON_PROJEKT = &H3B7BD8
-DIM TON_AUSGABE AS INTEGER : TON_AUSGABE = &H2E9E62
-DIM TON_PROBLEME AS INTEGER : TON_PROBLEME = &HD98B2B
-DIM TON_DEBUG AS INTEGER : TON_DEBUG = &H8C5BD6
+DIM TON_AUSGABE AS INTEGER : TON_AUSGABE = &H3B7BD8
+DIM TON_PROBLEME AS INTEGER : TON_PROBLEME = &H3B7BD8
+DIM TON_DEBUG AS INTEGER : TON_DEBUG = &H3B7BD8
 
 SUB bereichsFarben()
     DIM grund AS INTEGER : grund = GUI_THEME_GET("widget_bg")
@@ -270,9 +273,14 @@ SUB bereichsFarben()
     GUI_SET_COLOR(tfSeriell, "bg", farbMisch(grund, TON_AUSGABE, anteil))
     GUI_SET_COLOR(tfEingabe, "bg", farbMisch(grund, TON_AUSGABE, anteil))
     GUI_SET_COLOR(lstProbleme, "bg", farbMisch(grund, TON_PROBLEME, anteil))
+    ' Die Hilfe als eigene Flaeche unter der Liste, im selben Ton.
+    GUI_SET_COLOR(pnlHilfe, "bg", farbMisch(grund, TON_PROBLEME, anteil))
     ' Die Ueberschrift der Hilfe gedaempft: sie sagt, was darunter steht, und
     ' soll nicht lauter sein als der Text selbst.
     GUI_SET_COLOR(lblHilfeKopf, "fg", GUI_THEME_GET("muted_fg"))
+    ' Ebenso der Kopf der Problemliste: er steht rechts und leise, damit er
+    ' nicht wie ein weiterer Reiter aussieht.
+    GUI_SET_COLOR(lblProbleme, "fg", GUI_THEME_GET("muted_fg"))
     GUI_SET_COLOR(tblVars, "bg", farbMisch(grund, TON_DEBUG, anteil))
     protokoll("bereichsfarben " + COLOR_HEX$(farbMisch(grund, TON_AUSGABE, anteil)))
     baumFarben()
@@ -591,6 +599,11 @@ DIM typHinweiseAn AS BOOLEAN : typHinweiseAn = TRUE
 ' festes Argument (Zahl, Text, TRUE/FALSE) mitgegeben wird, steht die
 ' Signatur -- `kreis(100, 50, 20)` sagt sonst nicht, was 50 ist.
 DIM paramNamenAn AS BOOLEAN : paramNamenAn = TRUE
+' Seit 2026.47 nur in der Zeile der Schreibmarke: an jedem Aufruf der
+' Datei zugleich machten sie den Code unruhig. "parameter_nur_zeile":
+' false in der ide.json zeigt sie wieder ueberall.
+DIM paramNurZeile AS BOOLEAN : paramNurZeile = TRUE
+DIM paramZeileGezeigt AS INTEGER : paramZeileGezeigt = -1
 DIM paramFeld AS GUI_WIDGET : paramFeld = -1
 ' Ein Hinweis hinter einer Zeile (GUI_TEXTAREA_HINTS).
 CLASS Zeilenhinweis
@@ -1011,9 +1024,14 @@ vorspannAn = kBool("vorspann", vorspannAn)
 DIM glanzAn AS BOOLEAN : glanzAn = TRUE
 glanzAn = kBool("glanz", glanzAn)
 ' Der Schriftzug schwach hinter dem Code -- er fuellt das Feld, rollt aber
-' nicht mit: Grund, kein Inhalt.
-DIM wasserzeichenAn AS BOOLEAN : wasserzeichenAn = TRUE
-wasserzeichenAn = kBool("wasserzeichen", wasserzeichenAn)
+' nicht mit: Grund, kein Inhalt. Seit 2026.47 standardmaessig AUS: hinter
+' dem Code soll eine ruhige Flaeche sein (wie in anderen Editoren), das Logo
+' steht auf der Willkommensseite. Die ide.json haelt jeden Wert fest, auch
+' eine Vorgabe -- darum gilt "wasserzeichen" nur, wenn man es selbst in den
+' Einstellungen umgeschaltet hat (`wasserzeichen_selbst`).
+DIM wasserzeichenAn AS BOOLEAN : wasserzeichenAn = FALSE
+DIM wasserzeichenSelbst AS BOOLEAN : wasserzeichenSelbst = kBool("wasserzeichen_selbst", FALSE)
+IF wasserzeichenSelbst THEN wasserzeichenAn = kBool("wasserzeichen", wasserzeichenAn)
 DIM hgBild AS INTEGER : hgBild = -1
 IF FILEEXISTS(PATHJOIN(bilderOrdner, "schriftzug.png")) THEN hgBild = LOADIMAGE(PATHJOIN(bilderOrdner, "schriftzug.png"))
 uiGroesse = MAX(12, MIN(22, kInt("ui_schrift", uiGroesse)))
@@ -1164,6 +1182,7 @@ zaehlerAn = kBool("aufrufzaehler", zaehlerAn)
 fehlerEndeAn = kBool("fehler_am_ende", fehlerEndeAn)
 typHinweiseAn = kBool("typ_hinweise", typHinweiseAn)
 paramNamenAn = kBool("parameter_namen", paramNamenAn)
+paramNurZeile = kBool("parameter_nur_zeile", paramNurZeile)
 einfuegenEinrueckenAn = kBool("einfuegen_einruecken", einfuegenEinrueckenAn)
 neustartSichernAn = kBool("neustart_beim_sichern", neustartSichernAn)
 IF JSON_HAS(konfig, "start") THEN
@@ -1565,6 +1584,9 @@ GUI_MENU_SEPARATOR(mPlugins)
 ' wurden, und ein Text-"|" als Trenner. Der Befehl je Eintrag steht in
 ' wzBefehle unter derselben Nummer.
 DIM leiste AS GUI_WIDGET : leiste = GUI_TOOLBAR(win, 0, 0, 10, 34)
+' Seit 2026.47 groessere Sinnbilder (vorher aus der Hoehe gerechnet, rund
+' 20): die Leiste ist das, was man am haeufigsten anklickt.
+GUI_TOOLBAR_SET(leiste, "symbolgroesse", 22)
 DIM wzBefehle AS ARRAY OF STRING : wzBefehle = []
 SUB wzKnopf(sinnbild AS STRING, tip AS STRING, bef AS STRING)
     GUI_TOOLBAR_ADD(leiste, sinnbild, tr$(tip))
@@ -1757,7 +1779,10 @@ DIM lblProjekt AS GUI_WIDGET : lblProjekt = GUI_LABEL(win, tr$("Projekt"), 0, 0)
 ' Filter ueber dem Baum, in der Zeile des Projektnamens -- der Baum bleibt,
 ' wo er war. Ein Teil des Dateinamens, Gross/klein egal; Ordner bleiben
 ' stehen (ihr Inhalt wird beim Aufklappen gefiltert).
-DIM tfBaumFilter AS GUI_WIDGET : tfBaumFilter = GUI_TEXTINPUT(win, 0, 0, 10, 10, tr$("Filter ..."))
+' Seit 2026.47 ein Suchfeld (Lupe, Kreuz zum Leeren) wie im Studio -- vorher
+' sah "Filter ..." im Kopf aus wie ein weiterer Reiter.
+DIM tfBaumFilter AS GUI_WIDGET : tfBaumFilter = GUI_TEXTINPUT(win, 0, 0, 10, 10, tr$("Filter"))
+GUI_TEXTINPUT_SET(tfBaumFilter, "suche", 1)
 GUI_TOOLTIP(tfBaumFilter, tr$("Nur Dateien, deren Name das enthält"))
 DIM baumFilterZuletzt AS STRING : baumFilterZuletzt = ""
 DIM lblGliederung AS GUI_WIDGET : lblGliederung = GUI_LABEL(win, tr$("Gliederung"), 0, 0)
@@ -1818,7 +1843,8 @@ DIM lblAusgabe AS GUI_WIDGET : lblAusgabe = GUI_LABEL(win, "", 0, 0)   ' der Rei
 DIM lstAusgabe AS GUI_WIDGET : lstAusgabe = GUI_LISTBOX(win, 0, 0, 10, 10, [])
 ' Nur passende Zeilen zeigen (Teiltext, Gross/klein egal); die Zeilen selbst
 ' bleiben, leer zeigt wieder alle.
-DIM tfAusgabeFilter AS GUI_WIDGET : tfAusgabeFilter = GUI_TEXTINPUT(win, 0, 0, 10, 10, tr$("Filter ..."))
+DIM tfAusgabeFilter AS GUI_WIDGET : tfAusgabeFilter = GUI_TEXTINPUT(win, 0, 0, 10, 10, tr$("Filter"))
+GUI_TEXTINPUT_SET(tfAusgabeFilter, "suche", 1)
 GUI_TOOLTIP(tfAusgabeFilter, tr$("Nur Zeilen der Ausgabe zeigen, die diesen Text enthalten"))
 DIM ausgabeFilterAlt AS STRING : ausgabeFilterAlt = ""
 DIM ctxAusgabe AS INTEGER : ctxAusgabe = GUI_CONTEXT(win)
@@ -1870,8 +1896,11 @@ DIM ctxSeriell AS INTEGER : ctxSeriell = GUI_CONTEXT(win)
 DIM miSerKopieren AS INTEGER : miSerKopieren = GUI_MENU_ITEM(ctxSeriell, tr$("Alle Zeilen kopieren"))
 GUI_CONTEXT_WIDGET(ctxSeriell, lstSeriell)
 ' Der Reiter der Leiste heisst schon "Probleme" -- ohne Ergebnis bleibt der
-' Kopf daneben leer, sonst stuende das Wort zweimal nebeneinander.
+' Kopf daneben leer, sonst stuende das Wort zweimal nebeneinander. Die Zahl
+' steht im Reiter ("Probleme (3)"), die Aufschluesselung rechts im Kopf.
 DIM lblProbleme AS GUI_WIDGET : lblProbleme = GUI_LABEL(win, "", 0, 0)
+GUI_SET_ALIGN(lblProbleme, "rechts")
+DIM problemeTitel AS STRING : problemeTitel = tr$("Probleme")
 DIM lstProbleme AS GUI_WIDGET : lstProbleme = GUI_LISTBOX(win, 0, 0, 10, 10, [])
 ' Rechtsklick auf die Liste der Suchtreffer (Strg+Umschalt+F): einzeln
 ' ersetzen, die angehakten ersetzen, alle/keinen anhaken.
@@ -1887,6 +1916,10 @@ GUI_LISTBOX_PLACEHOLDER(lstProbleme, tr$("Keine Probleme gefunden"))
 ' Unter den Problemen steht die Hilfe zum Wort unter der Schreibmarke. Leer
 ' sah der Streifen wie ein Lagefehler aus -- darum ein eigener Kopf und ein
 ' Hinweis, solange es nichts zu sagen gibt.
+' Seit 2026.47 steht sie in einer eigenen, umrandeten Flaeche (pnlHilfe,
+' VOR den Beschriftungen angelegt: gezeichnet wird von vorn, die
+' Beschriftungen liegen darauf) -- vorher schwebte der Text frei.
+DIM pnlHilfe AS GUI_WIDGET : pnlHilfe = GUI_PANEL(win, 0, 0, 10, 10)
 DIM lblHilfeKopf AS GUI_WIDGET : lblHilfeKopf = GUI_LABEL(win, tr$("Hilfe zum Wort unter der Schreibmarke"), 0, 0)
 DIM lblHilfe AS GUI_WIDGET : lblHilfe = GUI_LABEL(win, "", 0, 0)
 CONST HILFE_LEER = "Schreibmarke auf einen Befehl oder Namen stellen -- hier steht dann, was er tut und wie er aufgerufen wird."
@@ -1902,8 +1935,11 @@ GUI_STATUSBAR_TIP(lblStatus, sfPos, tr$("Gehe zu Zeile (Strg+G)"))
 DIM sfUmbruch AS INTEGER : sfUmbruch = GUI_STATUSBAR_ADD(lblStatus, tr$("Umbruch aus"), 110, "mitte")
 GUI_STATUSBAR_CLICKABLE(lblStatus, sfUmbruch, TRUE)
 GUI_STATUSBAR_TIP(lblStatus, sfUmbruch, tr$("Zeilenumbruch an/aus (Alt+Z)"))
+' Der ganze Weg der aktiven Datei als Hilfetext von Feld 0 (statusTippNachziehen).
+DIM statusTipp AS STRING : statusTipp = ""
 DIM tfEingabe AS GUI_WIDGET : tfEingabe = GUI_TEXTINPUT(win, 0, 0, 10, 26, tr$("Eingabe für das laufende Programm -- Enter schickt"))
 DIM btnEingabe AS GUI_WIDGET : btnEingabe = GUI_BUTTON(win, tr$("Senden"), 0, 0, 80, 26)
+DIM eingabeGezeigt AS BOOLEAN : eingabeGezeigt = FALSE
 
 ' Vervollstaendigung: ein kleines Fenster mit Liste, sonst unsichtbar.
 DIM winVervoll AS GUI_WINDOW : winVervoll = GUI_WINDOW(tr$("Vervollständigen"), 400, 200, 320, 240)
@@ -2038,6 +2074,7 @@ GUI_DOCK_ADD(win, "seriell", chkSerZeit) : GUI_DOCK_ADD(win, "seriell", btnSerLe
 GUI_DOCK_ADD(win, "seriell", lstSeriell) : GUI_DOCK_ADD(win, "seriell", imgSeriell)
 GUI_DOCK_ADD(win, "seriell", tfSeriell) : GUI_DOCK_ADD(win, "seriell", ddSerEnde)
 GUI_DOCK_ADD(win, "probleme", lstProbleme) : GUI_DOCK_ADD(win, "probleme", lblProbleme)
+GUI_DOCK_ADD(win, "probleme", pnlHilfe)
 GUI_DOCK_ADD(win, "probleme", lblHilfeKopf) : GUI_DOCK_ADD(win, "probleme", lblHilfe)
 GUI_DOCK_ADD(win, "debugger", lblDebug) : GUI_DOCK_ADD(win, "debugger", tblVars)
 GUI_DOCK_ADD(win, "debugger", btnWeiter) : GUI_DOCK_ADD(win, "debugger", btnDrueber)
@@ -2984,8 +3021,17 @@ WHILE NOT beenden
     IF sfk >= 0 THEN protokoll("statusfeld " + STR$(sfk))
     IF sfk = sfPos THEN befehl("zeile")
     IF sfk = sfUmbruch THEN befehl("umbruch")
+    statusTippNachziehen()
+    eingabeNachziehen()
     DIM spk AS INTEGER : spk = GUI_BREADCRUMB_CLICKED(lblSpur)
-    IF spk >= 0 THEN pfadAnspringen(INT(VAL(GUI_BREADCRUMB_DATA$(lblSpur, spk))))
+    IF spk >= 0 THEN
+        DIM spd AS STRING : spd = GUI_BREADCRUMB_DATA$(lblSpur, spk)
+        IF LEFT$(spd, 2) = "o:" THEN
+            imBaumZeigen(MID$(spd, 2))
+        ELSE
+            pfadAnspringen(INT(VAL(spd)))
+        END IF
+    END IF
     ' Kacheln: ein Klick oeffnet das Beispiel.
     DIM kc AS INTEGER
     FOR kc = 0 TO kachelAnzahl - 1

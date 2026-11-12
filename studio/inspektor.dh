@@ -79,8 +79,8 @@ SUB inspektorAnlegen()
     inspZeile("Fenster", "h", "Höhe", "zahl", "fenster", "")
     inspZeile("Fenster", "resizable", "Größe änderbar", "schalter", "fenster", "")
     ' Welcher Knopf Enter bzw. Esc bekommt -- beim Namen, wie in Xojo.
-    inspZeile("Fenster", "studio_standard", "Standard-Knopf (Enter)", "knopfwahl", "fenster", "")
-    inspZeile("Fenster", "studio_abbrechen", "Abbrechen-Knopf (Esc)", "knopfwahl", "fenster", "")
+    inspZeile("Fenster", "studio_standard", "Enter-Knopf", "knopfwahl", "fenster", "")
+    inspZeile("Fenster", "studio_abbrechen", "Esc-Knopf", "knopfwahl", "fenster", "")
     ' Ein eigenes Control legt fest, was es meldet und was eine Instanz
     ' einstellen kann; eine Instanz traegt ihre Werte (modell.dh).
     inspGruppe("Eigenes Control")

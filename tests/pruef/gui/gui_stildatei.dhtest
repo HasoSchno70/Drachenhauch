@@ -769,3 +769,41 @@ GUI_STYLESHEET: Zeile 1: 'window' gibt es nur als Vorfahre (window#name button) 
 GUI_STYLESHEET: Zeile 1: uebergang fuer 'schatten' -- eine eigene Dauer haben bg, fg, border und accent
 GUI_STYLESHEET: Zeile 1: uebergang erwartet eine ganze Zahl 0..2000, erhalten 'bg'
 kein fehler
+
+=== eine beschriftung zeichnet ihren eigenen grund und rand
+' Seit 2026.47: GUI_SET_COLOR(lbl, "bg", ..) und bg/border aus der Stildatei
+' gelten auch fuer eine Beschriftung -- vorher ueberging sie beides still.
+' Gemessen wird rechts im Feld, wo kein Text steht.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+GUI_METRIC_SET("corner_radius", 0)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 400, 300)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM eigen AS GUI_WIDGET : eigen = GUI_LABEL(w, "eigen", 20, 20)
+GUI_SET_BOUNDS(eigen, 20, 20, 300, 30)
+GUI_SET_COLOR(eigen, "bg", &HFF00FF)
+DIM stil AS GUI_WIDGET : stil = GUI_LABEL(w, "stil", 20, 80)
+GUI_SET_BOUNDS(stil, 20, 80, 300, 30)
+GUI_ADD_CLASS(stil, "kasten")
+DIM rand AS GUI_WIDGET : rand = GUI_LABEL(w, "rand", 20, 140)
+GUI_SET_BOUNDS(rand, 20, 140, 300, 30)
+GUI_SET_COLOR(rand, "border", &HFFFF00)
+DIM schlicht AS GUI_WIDGET : schlicht = GUI_LABEL(w, "schlicht", 20, 200)
+GUI_SET_BOUNDS(schlicht, 20, 200, 300, 30)
+GUI_STYLESHEET(".kasten { bg: #00FF00 }")
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=4
+--- bild
+280 35 #FF00FF +-30
+280 95 #00FF00 +-30
+20 155 #FFFF00 +-30
+280 155 nicht #FFFF00 +-60
+280 215 nicht #FF00FF +-60
+280 215 nicht #00FF00 +-60
