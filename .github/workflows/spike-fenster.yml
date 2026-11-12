@@ -1,0 +1,44 @@
+# Einmal-Lauf fuer Weg E, Stufe 0 (docs/intern/entwurf-native-fenster.md):
+# das Spike-Programm auf macOS. Laeuft nur fuer Zweige spike/**, wird nach
+# dem Lauf wieder entfernt. package.yml hielt 2026-09-19 fest, dass die
+# macOS-Laeufer kein passendes OpenGL haben ("NSGL: Failed to find a
+# suitable pixel format") -- ob das noch gilt, zeigt dieser Lauf auch.
+name: Spike Fenster
+
+on:
+  push:
+    branches: ['spike/**']
+  workflow_dispatch:
+
+jobs:
+  macos:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, macos-15-intel]
+    runs-on: ${{ matrix.os }}
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust-Abhaengigkeiten cachen
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust/drachenhauch_runtime
+
+      - name: Spike bauen
+        working-directory: rust/drachenhauch_runtime
+        env:
+          CFLAGS: -DMAX_CHAR_PRESSED_QUEUE=256
+        run: cargo build --release --locked --example spike_zweitfenster --features graphics
+
+      - name: Spike laufen lassen
+        working-directory: rust/drachenhauch_runtime
+        run: |
+          sw_vers
+          sysctl -n machdep.cpu.brand_string || true
+          # macOS hat kein timeout -- perl mit alarm statt dessen
+          perl -e 'alarm 90; exec @ARGV' ./target/release/examples/spike_zweitfenster 2>&1 | grep -v '^INFO: \(TEXTURE\|SHADER\|FBO\|VAO\|FILEIO\)' | tail -60
+          echo "exit ${PIPESTATUS[0]}"
