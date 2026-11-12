@@ -369,6 +369,12 @@ einem Lauf auf einem Mac** (`cargo build --release --example
 spike_zweitfenster --features graphics`, dann das Programm starten; ohne
 automatische Klicks prueft es Bild, Hauptfenster und Bildrate).
 
+**Folge fuer Stufe 1 (12.11.2026, kein Mac zur Hand):** echte Fenster
+werden nur unter Windows und Linux eingeschaltet; unter macOS nimmt der
+Befehl den Rueckfall (ein gui-Fenster im Hauptfenster wie bisher), bis ein
+Lauf des Spikes auf einem Mac bestanden ist. So bekommt kein Mac-Nutzer
+einen ungeprueften Weg, und ein Programm laeuft dort unveraendert.
+
 **Stufe 1 -- der Befehl (etwa eine Woche).** Ein Befehl macht ein gui-Fenster
 zum OS-Fenster (Arbeitsname: GUI_WINDOW_NATIVE mit Fenster und an/aus, noch nicht gebaut): Titel,
 Taskleiste, zweiter Monitor, Kreuz des Systems (`GUI_WINDOW_CLOSE_REQUESTED`).
