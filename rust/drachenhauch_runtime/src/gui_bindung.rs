@@ -899,8 +899,10 @@ impl Gui {
                 self.draw_leisten_popup(g, lw, li);
             }
         }
-        // Tooltip ganz zuletzt, wenn die Maus lange genug ruht.
-        self.draw_tooltip(g);
+        // Tooltip ganz zuletzt, wenn die Maus lange genug ruht -- der eines
+        // nativen Fensters steht in dessen Ziel (nativ_zeichnen).
+        let tip_nativ = self.tip_fenster().map(|wi| self.windows.get(wi).map(|w| w.nativ != 0).unwrap_or(false)).unwrap_or(false);
+        if !tip_nativ { self.draw_tooltip(g); }
     }
 
     /// Alles hinter dem modalen Dialog abdunkeln. Das ist nicht Deko: ohne
@@ -948,6 +950,13 @@ impl Gui {
             None => return Err("GUI_DRAW_WINDOW: ungueltiges GUI_WINDOW-Handle".into()),
         };
         if !w.visible { return Ok(()); }
+        if w.nativ != 0 {
+            g.sicht_setzen(Some(0));
+            self.nativ_zeichnen(g, wi);
+            g.sicht_setzen(None);
+            self.bring_to_front(wi);
+            return Ok(());
+        }
         if self.modal == Some(wi) { self.schleier(g); }
         if w.pop.is_some() { self.pop_zeichnen(g, wi); } else { self.draw_window_sicht(g, wi); }
         if self.dock_hat_angedockte(wi) { self.dock_oben_nachholen(g, wi); }

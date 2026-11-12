@@ -1,6 +1,7 @@
 # Entwurf: Mehrere OS-Fenster in Drachenhauch
 
-> **Stand 12.11.2026: Weg E ist geplant, nicht gebaut** (Abschnitt 8): ein
+> **Stand 12.11.2026: Weg E, Stufe 1 ist gebaut** (`GUI_WINDOW_NATIVE`,
+> Windows und Linux; macOS Rueckfall) -- Abschnitt 8. Davor geplant: ein
 > gui-Fenster als echtes OS-Fenster im SELBEN Prozess -- gezeichnet wird
 > weiter in raylibs Kontext, ein zweites GLFW-Fenster zeigt das Bild nur und
 > liefert die Eingabe. Zuerst ein Spike mit Ausstiegskriterium.
@@ -278,6 +279,102 @@ kommen an. Gemessen: beide Fenster bei 60 Bildern; der Zustand von rlgl
 (Batch, Shader, Matrizen) uebersteht den Wechsel der Kontexte; Windows, dann
 Linux (X11) und macOS. **Ausstieg:** laesst sich rlgl nach dem Wechsel nicht
 sauber weiterbenutzen, ist Weg E tot -- Kosten zwei Tage.
+
+### Stufe 0, Ergebnis unter Windows (12.11.2026): bestanden
+
+Probeprogramm `rust/drachenhauch_runtime/examples/spike_zweitfenster.rs`
+(Wegwerf-Code, baut gegen dasselbe raylib/GLFW wie dhrt; Bau:
+`cargo build --release --example spike_zweitfenster --features graphics`
+mit der Umgebung aus `rust/build_runtime.py`). Es prueft sich selbst und
+endet mit `ERGEBNIS gesamt gut`, Exit 0.
+
+| Frage | gemessen (Windows 11, drei Laeufe) |
+|---|---|
+| zweites GLFW-Fenster mit geteiltem Kontext | angelegt; FBO mit der geteilten Textur vollstaendig |
+| zeigt das AKTUELLE Bild aus raylibs Render-Ziel | 10 bzw. 12 von 10/12 Rueckleseproben richtig, 0 falsch (die Grundfarbe wechselt je Sekunde) |
+| Klicks im zweiten Fenster (WM_LBUTTONDOWN) | 2 von 2 im eigenen GLFW-Rueckruf |
+| Hauptfenster zeichnet nach den Wechseln richtig | ja, vor und nach dem Schliessen des zweiten Fensters |
+| Kreuz des zweiten Fensters (WM_CLOSE) | `glfwWindowShouldClose`, Fenster weg, Hauptfenster laeuft weiter |
+| Bildrate | 59 im Mittel (Ziel 60), 240 Bilder in 4,0 s |
+| Kosten des Zeigens je Bild | Median 0,43-0,49 ms, 95 % unter 0,83 ms |
+
+Wie es geht: Texturen teilen sich zwischen Kontexten, Framebuffer und VAOs
+nicht. Der zweite Kontext bekommt darum eine eigene FBO mit der geteilten
+Textur als Lesepuffer und kopiert sie mit `glBlitFramebuffer` (gespiegelt,
+weil raylibs Render-Ziele auf dem Kopf stehen) in seinen Bildschirm -- ohne
+Shader, ohne VAO, ohne rlgl. `glfwSwapInterval(0)` im zweiten Kontext, sonst
+wartet jedes Fenster auf seinen eigenen Bildwechsel. Reihenfolge je Bild:
+raylib zeichnet ins Render-Ziel und ins Hauptfenster, `EndDrawing` tauscht
+(und flusht damit), dann Kontext wechseln, blitten, tauschen, ZURUECK in den
+Hauptkontext.
+
+Gegenproben (`SPIKE_FEHLER=`): ohne Blit fallen alle Rueckleseproben des
+zweiten Fensters (0 richtig, 10 falsch); ohne den Wechsel zurueck zeichnet
+das Hauptfenster falsch -- der Kontextwechsel ist also genau die Stelle, an
+der Weg E haengt, und er laesst sich vollstaendig zuruecknehmen.
+
+Funde am Rand:
+- `CloseWindow` gibt es in raylib UND in user32: wer im selben Programm
+  `CloseWindow` ruft und user32 frueh zieht (etwa ueber das windows-Crate),
+  bekommt LNK2005. dhrt ruft es nicht direkt; in Stufe 1 bleibt das so.
+- `LoadImageFromScreen` mitten im Bild sieht den noch gesammelten Batch nicht
+  -- vorher `rlDrawRenderBatchActive()`. (Die erste Probe am Hauptfenster
+  meldete deshalb faelschlich FALSCH.)
+
+### Stufe 0 unter Linux (WSLg, 12.11.2026): bestanden, bis auf das Kreuz
+
+Ubuntu 24.04 in WSL2, WSLg (XWayland), Mesa 25.2 llvmpipe (OpenGL 4.5 core,
+also in Software). dhrt baut GLFW nur fuer X11 (`GLFW_BUILD_X11`) und laeuft
+auf Wayland-Desktops ueber XWayland -- genau dieser Weg ist hier gemessen.
+Gebaut in WSL mit eigenem Zielordner (`CARGO_TARGET_DIR=/root/dht_spike`,
+`LIBCLANG_PATH=/usr/lib/llvm-18/lib`); Klicks von aussen ueber `xdotool`
+(`SPIKE_AUSSEN=1`).
+
+| Frage | gemessen |
+|---|---|
+| Render-Ziel, FBO im zweiten Kontext | vollstaendig (beide Kontexte 4.5 core) |
+| zeigt das aktuelle Bild | 24 von 24 Rueckleseproben richtig |
+| echte X11-Klicks im zweiten Fenster | 2 von 2 |
+| Hauptfenster nach den Wechseln | richtig |
+| Bildrate, Zeigen je Bild | 60; Median 1,07 ms (Software-Rendern) |
+| Kreuz ueber den Fenstermanager | **nicht pruefbar**: WSLgs X-Server fuehrt keine Fensterliste (`wmctrl -c` scheitert); GLFW meldet WM_DELETE_WINDOW unter X11 wie WM_CLOSE unter Windows |
+
+**Der erste Lauf war schwarz -- auch im Hauptfenster, auch OHNE zweites
+Fenster.** Ursache ist die bekannte Linux-Falle (`graphics.rs`,
+`render_ziel`): raylibs `LoadRenderTexture` laesst unter gcc/Mesa die Farbe
+ohne Speicher (`glCompressedTexImage2D` statt `glTexImage2D`). Das
+Spike-Programm legt das Ziel jetzt wie dhrt selbst an, mit leerem Puffer;
+in Stufe 1 gilt dasselbe: **ein Render-Ziel fuer Weg E nur ueber
+`render_ziel`**, nie ueber `LoadRenderTexture`. Abgegrenzt mit
+`SPIKE_OHNE_ZWEIT=1` (nur das Hauptfenster): erst so war klar, dass der
+Fehler nicht am zweiten Fenster lag.
+
+### Stufe 0 unter macOS: auf der CI nicht pruefbar
+
+Ein Einmal-Lauf auf den CI-Rechnern (12.11.2026, `macos-latest` = Apple M1
+virtuell mit macOS 26.7, `macos-15-intel` = i7-8700B mit macOS 15.7) kam
+nicht bis Weg E: schon raylibs HAUPTfenster scheitert mit "NSGL: Failed to
+find a suitable pixel format" -- dieselbe Grenze, die `package.yml` am
+19.09.2026 festhielt. Die macOS-Rechner der CI haben kein OpenGL fuer
+Fenster; Weg E unter macOS laesst sich nur auf einem echten Mac pruefen.
+
+Was fuer macOS spricht: geteilte Kontexte sind unter NSGL der gewoehnliche
+Fall (GLFW nutzt dort `shareContext`), `glBlitFramebuffer` gehoert zu
+OpenGL 3.2+, und Apple liefert 4.1 core. Der zweite Kontext braucht
+`GLFW_OPENGL_FORWARD_COMPAT` (im Spike gesetzt). Was dagegen sprechen
+koennte: GLFW verlangt unter macOS alle Fensterbefehle im Hauptfaden --
+dhrt zeichnet dort ohnehin.
+
+**Stand Stufe 0: bestanden unter Windows und Linux; macOS offen bis zu
+einem Lauf auf einem Mac** (`cargo build --release --example
+spike_zweitfenster --features graphics`, dann das Programm starten; ohne
+automatische Klicks prueft es Bild, Hauptfenster und Bildrate).
+
+**Folge fuer Stufe 1 (12.11.2026, kein Mac zur Hand):** echte Fenster
+werden nur unter Windows und Linux eingeschaltet; unter macOS nimmt der
+Befehl den Rueckfall (ein gui-Fenster im Hauptfenster wie bisher), bis ein
+Lauf des Spikes auf einem Mac bestanden ist. So bekommt kein Mac-Nutzer
+einen ungeprueften Weg, und ein Programm laeuft dort unveraendert.
 
 **Stufe 1 -- der Befehl (etwa eine Woche).** Ein Befehl macht ein gui-Fenster
 zum OS-Fenster (Arbeitsname: GUI_WINDOW_NATIVE mit Fenster und an/aus, noch nicht gebaut): Titel,

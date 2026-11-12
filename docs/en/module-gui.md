@@ -69,6 +69,8 @@ IMPORT "gui"
 | `GUI_DOCK_STATE$(win)` | STRING | the arrangement as JSON (areas, groups, front tabs, sizes, floating, hidden) |
 | `GUI_DOCK_SET_STATE(win, stand$)` | — | take over an arrangement; panels that do not exist yet get their place as soon as they are registered |
 | `GUI_WINDOW_CLOSABLE(win, an)` | — | show a close button (default: off) |
+| `GUI_WINDOW_NATIVE(win, an)` | BOOLEAN | the window as a **real OS window** (own title bar, taskbar, second monitor) or back into the main window; `FALSE` with `an` means: fallback, it stays a gui window |
+| `GUI_WINDOW_IS_NATIVE(win)` | BOOLEAN | is it a real OS window right now? |
 | `GUI_WINDOW_VISIBLE(win, an)` | — | set visibility |
 | `GUI_WINDOW_FRONT(win)` | — | bring the window to the front without giving it focus -- for a suggestion list or a tooltip that should lie over the text while typing. Shown via `GUI_WINDOW_VISIBLE`, a window otherwise lies behind the one clicked last |
 | `GUI_WINDOW_SHOWN(win)` | BOOLEAN | is the window currently visible? The counterpart to the setter -- without the getter a program would have to remember what it set itself, and would be wrong as soon as the user closes the window with its cross |
@@ -700,6 +702,50 @@ Creates a window and returns it. New windows appear **on top**
   closed flag)
 - `GUI_WINDOW_CLOSED(win)` — TRUE as soon as the × button was pressed (stays
   TRUE until the window is set visible again)
+
+### As a real OS window
+
+A gui window lives inside the program's window. `GUI_WINDOW_NATIVE(win, TRUE)`
+turns it into a **window of its own on the system** -- with the system's
+title bar and close button, its own taskbar entry, free to drag beyond the
+edge and onto the second monitor. Everything else stays: the same widgets,
+events, style sheet and data, because it is the same program.
+
+```basic
+IMPORT "gui"
+SCREEN(800, 600, "Editor")
+DIM haupt AS GUI_WINDOW : haupt = GUI_WINDOW("Dokument", 10, 10, 500, 400)
+DIM palette AS GUI_WINDOW : palette = GUI_WINDOW("Werkzeuge", 520, 10, 220, 300)
+GUI_WINDOW_CLOSABLE(palette, TRUE)
+DIM pinsel AS GUI_WIDGET : pinsel = GUI_BUTTON(palette, "Pinsel", 10, 10, 120, 30)
+IF NOT GUI_WINDOW_NATIVE(palette, TRUE) THEN PRINT "bleibt im Hauptfenster"
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_CLICKED(pinsel) THEN PRINT "Pinsel gewählt"
+    CLS(0) : GUI_DRAW() : FLIP()
+WEND
+```
+
+- It appears where it stood in the main window, as large as the gui
+  window. The system provides the title bar, the gui's own goes away.
+  `GUI_WINDOW_SET_BOUNDS` moves and resizes the OS window.
+- The **system's close button** (and Alt+F4) acts like the gui's:
+  `GUI_WINDOW_CLOSED` reports it, only when `GUI_WINDOW_CLOSABLE` is on.
+  If the user makes it larger, the gui window grows with it (with
+  `GUI_WINDOW_RESIZABLE`).
+- Clicks in the native window only hit its widgets, clicks in the main
+  window never the native one. Typing lands in the window that has the
+  system focus. The program's `MOUSEX`/`MOUSEY` stay with the main window.
+- `GUI_WINDOW_NATIVE(win, FALSE)` brings it back, to its old place and
+  with its old frame; `GUI_WINDOW_DESTROY` closes the OS window too.
+- **Fallback:** where there are no real windows, the command returns
+  `FALSE` and the window stays as it was -- in the browser, without a
+  screen (before `SCREEN`), on macOS (not tested there yet) and with
+  `DHRT_OHNE_NATIVE_FENSTER=1`. So a program runs the same everywhere.
+- **Not yet** (later stages): modal dialogs as real windows, context menus
+  and tooltips beyond the edge of the native window, screen reader and
+  input methods (IME) in the native window, tear-off dock panels,
+  recordings (`AUTOMATION_PLAY`) in the native window.
 
 ## Button
 
@@ -2550,9 +2596,10 @@ themes can be switched via the menu.
   planned alternative (phase 4).
 - **Coordinates plus anchors**, plus auto-size and row/column/grid containers
   (`GUI_LAYOUT`); no constraint system.
-- **One program, one OS window**; gui windows live inside it — not beyond the
-  edge, not on the second monitor, without their own entry in the taskbar.
-  Why, and which paths there would be: [entwurf-native-fenster.md](../intern/entwurf-native-fenster.md) (German).
+- **One program, one OS window** -- unless a gui window becomes a real one
+  with `GUI_WINDOW_NATIVE` (Windows and Linux; section "As a real OS
+  window"). How it is built: [entwurf-native-fenster.md](../intern/entwurf-native-fenster.md)
+  (German), way E.
 - **Runtime manipulation** (moving/resizing/deleting/showing/hiding/
   hit test/enumeration) is supported — see the section above.
 - **Headless/graphical**: `GUI_UPDATE`/`GUI_DRAW` need an active

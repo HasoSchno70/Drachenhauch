@@ -3352,6 +3352,13 @@ pub struct Window {
     toasts: Vec<ueber::Toast>,
     /// Die Leiste oben im Inhalt (GUI_INFOBAR).
     info: Option<Box<ueber::InfoLeiste>>,
+    /// Weg E: die Oberflaeche des Fensters -- 0 = im Hauptfenster, sonst
+    /// ein echtes OS-Fenster (graphics.rs `nativ_*`). Ein natives steht
+    /// auf seiner Oberflaeche bei (0, 0) und ohne eigene Titelleiste (die
+    /// gibt das System); `nativ_vorher` merkt Lage und Rahmen fuer den
+    /// Rueckweg (GUI_WINDOW_NATIVE ..., FALSE).
+    nativ: u32,
+    nativ_vorher: Option<(i32, i32, bool)>,
 }
 
 /// Groesster Zeitschritt des Lichtstreifs je Bild (Sekunden), siehe
@@ -3609,6 +3616,11 @@ pub struct Gui {
     // Vergleich kostet einen Bruchteil davon (Stresstest 2026-10-02).
     ta_zerlegung: std::cell::RefCell<HashMap<i64, (String, std::rc::Rc<(Vec<char>, Vec<usize>)>)>>,
     z_order: Vec<usize>,         // Zeichen-/Hit-Reihenfolge (umordbar)
+    /// Die Oberflaeche, durch die gui gerade schaut (Weg E): waehrend
+    /// GUI_UPDATE die unter dem Zeiger. Nur ihre Fenster sind treffbar.
+    flaeche: u32,
+    /// Welche Oberflaeche hatte im letzten Bild den Tastaturfokus des Systems?
+    fokus_flaeche: u32,
     focus_window: Option<usize>,
     focus_widget: Option<(usize, usize)>,
     // Offener modaler Dialog. Solange einer steht, bekommt NUR er Eingaben --
@@ -3834,7 +3846,7 @@ impl Gui {
     pub fn new() -> Gui {
         Gui {
             schrift: None,
-            windows: Vec::new(), z_order: Vec::new(),
+            windows: Vec::new(), z_order: Vec::new(), flaeche: 0, fokus_flaeche: 0,
             ta_zerlegung: std::cell::RefCell::new(HashMap::new()),
             focus_window: None, focus_widget: None, modal: None, modal_vorher: Vec::new(), modal_fokus: Vec::new(), cp_drag: None,
             drag_window: None, drag_dx: 0, drag_dy: 0,
@@ -3972,6 +3984,7 @@ impl Gui {
             glanz: Glanz::neu(),
             dock: None, dock_host: -1,
             pop: None, toasts: Vec::new(), info: None,
+            nativ: 0, nativ_vorher: None,
         });
         self.z_order.push(idx);
         self.focus_window = Some(idx);
@@ -5146,7 +5159,111 @@ impl Gui {
     /// wird vergroessert oder zugeschnitten gezeichnet -- dann stehen sie in
     /// dessen Lage und bleiben beim Fenster.
     fn popups_oben(&self, wi: usize) -> bool {
-        self.zoom_von(wi) == 1.0 && self.zuschnitt_von(wi).is_none()
+        // Ein natives Fenster hat seine eigene Flaeche: Menues und
+        // Klapplisten gehoeren hinein, nicht ueber das Hauptfenster.
+        self.zoom_von(wi) == 1.0 && self.zuschnitt_von(wi).is_none() && self.windows[wi].nativ == 0
+    }
+    /// Ein natives Fenster (Weg E) in sein Render-Ziel zeichnen, mit dem
+    /// Zeiger in seiner Sicht; der Hilfetext gehoert hinein, wenn er zu
+    /// einem seiner Widgets gehoert.
+    pub(super) fn nativ_zeichnen(&self, g: &mut Graphics, wi: usize) {
+        let id = self.windows[wi].nativ;
+        if id == 0 || !g.nativ_beginnen(id) { return; }
+        g.sicht_setzen(Some(id));
+        self.draw_window_sicht(g, wi);
+        if self.tip_fenster() == Some(wi) { self.draw_tooltip(g); }
+        g.sicht_setzen(Some(0));
+        g.nativ_beenden();
+    }
+    /// Zu welchem Fenster gehoert der Hilfetext, der gerade dran ist?
+    pub(super) fn tip_fenster(&self) -> Option<usize> {
+        self.hover_w.map(|(wi, _)| wi).or(self.tip_fokus.map(|(wi, _)| wi))
+    }
+
+    /// GUI_WINDOW_NATIVE(win, an): das Fenster als echtes OS-Fenster
+    /// (Weg E) oder zurueck ins Hauptfenster. TRUE, wenn es danach ein
+    /// natives ist -- FALSE heisst bei `an` der Rueckfall: im Browser, ohne
+    /// Bildschirm, unter macOS (noch ungeprueft) oder wenn das System das
+    /// Fenster ablehnt, bleibt es ein gui-Fenster wie bisher.
+    pub fn window_native(&mut self, g: Option<&mut Graphics>, h: i64, an: bool) -> Result<bool, String> {
+        let wi = h as usize;
+        let w = self.windows.get(wi).filter(|w| w.alive)
+            .ok_or_else(|| "GUI_WINDOW_NATIVE: ungueltiges GUI_WINDOW-Handle".to_string())?;
+        if an == (w.nativ != 0) { return Ok(an); }
+        let Some(g) = g else { return Ok(false) };
+        if an {
+            if w.dock_host >= 0 || w.pop.is_some() { return Ok(false); }
+            let (fx, fy) = g.fenster_lage();
+            let Some(id) = g.nativ_anlegen(&w.title, w.w, w.h, fx + w.x, fy + w.y, w.resizable) else { return Ok(false) };
+            let w = &mut self.windows[wi];
+            w.nativ_vorher = Some((w.x, w.y, w.chrome));
+            w.nativ = id;
+            w.x = 0; w.y = 0; w.chrome = false;
+            self.clear_window_interactions(wi);
+            Ok(true)
+        } else {
+            let id = w.nativ;
+            g.nativ_schliessen(id);
+            let w = &mut self.windows[wi];
+            w.nativ = 0;
+            if let Some((x, y, c)) = w.nativ_vorher.take() { w.x = x; w.y = y; w.chrome = c; }
+            self.clear_window_interactions(wi);
+            Ok(false)
+        }
+    }
+    /// GUI_WINDOW_IS_NATIVE(win): ist es gerade ein echtes OS-Fenster?
+    pub fn window_is_native(&self, h: i64) -> Result<bool, String> {
+        self.windows.get(h as usize).map(|w| w.alive && w.nativ != 0)
+            .ok_or_else(|| "GUI_WINDOW_IS_NATIVE: ungueltiges GUI_WINDOW-Handle".to_string())
+    }
+    /// Einmal je Bild, vor der Bedienung: was das System an den nativen
+    /// Fenstern getan hat (Kreuz, Groesse, Fokus), und was das Programm
+    /// geaendert hat (Titel, sichtbar, Lage, Groesse), abgleichen.
+    pub(super) fn nativ_abgleich(&mut self, g: &mut Graphics) {
+        // Native Fenster, zu denen kein lebendes gui-Fenster mehr gehoert
+        // (GUI_WINDOW_DESTROY, GUI_RESET), schliessen.
+        let lebend: Vec<u32> = self.windows.iter().filter(|w| w.alive && w.nativ != 0).map(|w| w.nativ).collect();
+        for id in g.nativ_ids() { if !lebend.contains(&id) { g.nativ_schliessen(id); } }
+        for wi in 0..self.windows.len() {
+            let id = self.windows[wi].nativ;
+            if id == 0 { continue; }
+            if !self.windows[wi].alive { self.windows[wi].nativ = 0; continue; }
+            if g.nativ_schliessen_gewuenscht(id) && self.windows[wi].closable {
+                // Wie ein Klick auf das Kreuz der gui (gui_bedienung.rs).
+                self.windows[wi].close_clicked = true;
+                self.windows[wi].visible = false;
+                self.clear_window_interactions(wi);
+            }
+            if let Some((b, h)) = g.nativ_groesse_neu(id) {
+                let w = &mut self.windows[wi];
+                if (w.w, w.h) != (b, h) { w.w = b; w.h = h; self.relayout(wi); }
+            }
+            let w = &mut self.windows[wi];
+            // Vom Programm verschoben (GUI_WINDOW_SET_BOUNDS): das OS-Fenster
+            // folgt, das gui-Fenster bleibt auf seiner Flaeche bei (0, 0).
+            if w.x != 0 || w.y != 0 {
+                let (fx, fy) = g.fenster_lage();
+                g.nativ_lage_setzen(id, fx + w.x, fy + w.y);
+                w.x = 0; w.y = 0;
+            }
+            w.chrome = false;
+            g.nativ_groesse(id, w.w, w.h, true);
+            g.nativ_titel(id, &w.title);
+            g.nativ_sichtbar(id, w.visible);
+        }
+        // Bekommt ein natives Fenster den Fokus des Systems, bekommt sein
+        // gui-Fenster den der gui -- sonst landete Getipptes im Fenster,
+        // das die gui zuletzt fokussiert hatte.
+        let fokus = g.fokus_flaeche();
+        if fokus != self.fokus_flaeche {
+            self.fokus_flaeche = fokus;
+            let ziel = if fokus != 0 {
+                self.windows.iter().position(|w| w.alive && w.nativ == fokus)
+            } else {
+                self.z_order.iter().rev().copied().find(|&i| self.windows[i].alive && self.windows[i].visible && self.windows[i].nativ == 0)
+            };
+            if let Some(wi) = ziel { self.focus_window = Some(wi); }
+        }
     }
     /// Die Schnittmenge zweier Rechtecke (x, y, b, h); leer = Breite/Hoehe 0.
     fn schnitt(a: (i32, i32, i32, i32), b: (i32, i32, i32, i32)) -> (i32, i32, i32, i32) {

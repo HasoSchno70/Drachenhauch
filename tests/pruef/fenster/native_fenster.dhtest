@@ -1,0 +1,258 @@
+' Echte OS-Fenster fuer gui-Fenster (Weg E, Stufe 1; Entwurf
+' docs/intern/entwurf-native-fenster.md, Abschnitt 8).
+'
+' GUI_WINDOW_NATIVE(win, TRUE) macht ein gui-Fenster zu einem eigenen
+' OS-Fenster: die gui zeichnet es in ein Render-Ziel, ein zweites GLFW-Fenster
+' mit geteiltem Kontext zeigt es, seine Eingabe kommt ueber eigene
+' Rueckrufe. Die Faelle mit Fenster schicken ECHTE Windows-Nachrichten
+' (fenstersender.ps1 findet auch das zweite Fenster ueber seinen Titel) --
+' eine Aufnahme liefe am zweiten Fenster vorbei. Das Kind endet nach sechs
+' Sekunden selbst und meldet, was angekommen ist.
+' Ohne Fenster (CI) ueberspringt fenstersender.dh die Faelle.
+' Format: docs/werkzeuge.md, dhrt test.
+--- seriell
+
+--- langsam
+=== ohne bildschirm bleibt es ein gui-fenster
+' Der Rueckfall: vor SCREEN (und im Browser, unter macOS, oder mit
+' DHRT_OHNE_NATIVE_FENSTER=1) liefert der Befehl FALSE, und das Fenster
+' bleibt eins im Hauptfenster.
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 10, 10, 200, 100)
+PRINT GUI_WINDOW_NATIVE(w, TRUE); " "; GUI_WINDOW_IS_NATIVE(w)
+PRINT GUI_WINDOW_NATIVE(w, FALSE); " "; GUI_WINDOW_IS_NATIVE(w)
+--- erwartet
+FALSE FALSE
+FALSE FALSE
+
+=== abgeschaltet bleibt es ein gui-fenster
+IMPORT "gui"
+SCREEN(300, 200, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 10, 10, 200, 100)
+PRINT GUI_WINDOW_NATIVE(w, TRUE); " "; GUI_WINDOW_IS_NATIVE(w)
+--- umgebung
+DHRT_FRAMES=2
+DHRT_OHNE_NATIVE_FENSTER=1
+--- erwartet
+FALSE FALSE
+
+=== ein ungueltiges fenster ist ein fehler
+IMPORT "gui"
+PRINT GUI_WINDOW_NATIVE(77, TRUE)
+--- fehler
+GUI_WINDOW_NATIVE: ungueltiges GUI_WINDOW-Handle
+
+=== hin und zurueck
+' Zurueck ins Hauptfenster bekommt das Fenster seine Lage und seinen
+' Rahmen wieder.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Palette-Hin", 30, 40, 200, 120)
+PRINT "nativ "; GUI_WINDOW_NATIVE(w, TRUE); " "; GUI_WINDOW_IS_NATIVE(w)
+DIM i AS INTEGER
+FOR i = 1 TO 5
+    GUI_UPDATE() : CLS(0) : GUI_DRAW() : FLIP()
+NEXT
+PRINT "zurueck "; GUI_WINDOW_NATIVE(w, FALSE); " "; GUI_WINDOW_IS_NATIVE(w)
+--- umgebung
+DHRT_FRAMES=20
+--- system windows
+--- erwartet
+nativ TRUE TRUE
+zurueck FALSE FALSE
+
+=== ein klick im nativen fenster trifft dessen knopf
+' Gefunden beim Bau: Windows meldet das Verlassen (WM_MOUSELEAVE) mitunter,
+' bevor der Druck ankommt -- ein Druck haelt den Zeiger darum selbst fest.
+' 0x200 = WM_MOUSEMOVE, 0x201/0x202 = linke Taste; (90, 55) liegt im Knopf.
+IMPORT "helfer.dh"
+PRINT sende$(skript$(), "probe.dh", "roh:512:0:3604570;roh:513:1:3604570;roh:514:0:3604570", "palette")
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/fenstersender.dh"
+FUNCTION skript$() AS STRING
+    RETURN "{sammlung}/../_hilfen/fenstersender.ps1"
+END FUNCTION
+--- datei probe.dh
+IMPORT "gui"
+' ARG$(1) = "palette": das native Fenster traegt den Titel ARG$(0) (dorthin
+' schickt der Sender); "haupt": das Hauptfenster.
+DIM kennung AS STRING : kennung = ARG$(0)
+DIM ziel AS STRING : ziel = ARG$(1)
+SCREEN(500, 300, IIF(ziel = "haupt", kennung, "Haupt-" + kennung), 1)
+DIM haupt AS GUI_WINDOW : haupt = GUI_WINDOW("Haupt", 10, 10, 300, 200)
+DIM hk AS GUI_WIDGET : hk = GUI_BUTTON(haupt, "Haupt-Knopf", 20, 40, 120, 30)
+DIM p AS GUI_WINDOW : p = GUI_WINDOW(IIF(ziel = "haupt", "Palette-" + kennung, kennung), 40, 40, 240, 160)
+GUI_WINDOW_CLOSABLE(p, TRUE)
+DIM pk AS GUI_WIDGET : pk = GUI_BUTTON(p, "Paletten-Knopf", 20, 40, 140, 30)
+DIM tf AS GUI_WIDGET : tf = GUI_TEXTINPUT(p, 20, 90, 180, 26)
+DIM nativ AS BOOLEAN : nativ = GUI_WINDOW_NATIVE(p, TRUE)
+DIM t0 AS INTEGER : t0 = MILLIS()
+DIM hkl AS INTEGER
+DIM pkl AS INTEGER
+WHILE NOT QUITREQUESTED() AND MILLIS() - t0 < 6000
+    GUI_UPDATE()
+    IF GUI_CLICKED(hk) THEN hkl = hkl + 1
+    IF GUI_CLICKED(pk) THEN pkl = pkl + 1
+    CLS(&H202830) : GUI_DRAW() : FLIP()
+WEND
+PRINT "nativ "; nativ
+PRINT "klicks haupt "; hkl; " palette "; pkl
+PRINT "geschlossen "; GUI_WINDOW_CLOSED(p)
+PRINT "text |"; GUI_TEXT(tf); "|"
+--- system windows
+--- erwartet
+gesendet
+nativ TRUE
+klicks haupt 0 palette 1
+geschlossen FALSE
+text ||
+
+=== ein klick im hauptfenster trifft das native nicht
+' Gegenrichtung: das native Fenster steht auf seiner Flaeche bei (0, 0) --
+' ohne die Trennung der Oberflaechen traefe ein Klick bei (60, 90) im
+' Hauptfenster es.
+IMPORT "helfer.dh"
+PRINT sende$(skript$(), "probe.dh", "roh:512:0:5898300;roh:513:1:5898300;roh:514:0:5898300", "haupt")
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/fenstersender.dh"
+FUNCTION skript$() AS STRING
+    RETURN "{sammlung}/../_hilfen/fenstersender.ps1"
+END FUNCTION
+--- datei probe.dh
+IMPORT "gui"
+DIM kennung AS STRING : kennung = ARG$(0)
+DIM ziel AS STRING : ziel = ARG$(1)
+SCREEN(500, 300, IIF(ziel = "haupt", kennung, "Haupt-" + kennung), 1)
+DIM haupt AS GUI_WINDOW : haupt = GUI_WINDOW("Haupt", 10, 10, 300, 200)
+DIM hk AS GUI_WIDGET : hk = GUI_BUTTON(haupt, "Haupt-Knopf", 20, 40, 120, 30)
+DIM p AS GUI_WINDOW : p = GUI_WINDOW(IIF(ziel = "haupt", "Palette-" + kennung, kennung), 40, 40, 240, 160)
+DIM pk AS GUI_WIDGET : pk = GUI_BUTTON(p, "Paletten-Knopf", 20, 40, 140, 30)
+DIM nativ AS BOOLEAN : nativ = GUI_WINDOW_NATIVE(p, TRUE)
+DIM t0 AS INTEGER : t0 = MILLIS()
+DIM hkl AS INTEGER
+DIM pkl AS INTEGER
+WHILE NOT QUITREQUESTED() AND MILLIS() - t0 < 6000
+    GUI_UPDATE()
+    IF GUI_CLICKED(hk) THEN hkl = hkl + 1
+    IF GUI_CLICKED(pk) THEN pkl = pkl + 1
+    CLS(&H202830) : GUI_DRAW() : FLIP()
+WEND
+PRINT "nativ "; nativ
+PRINT "klicks haupt "; hkl; " palette "; pkl
+--- system windows
+--- erwartet
+gesendet
+nativ TRUE
+klicks haupt 1 palette 0
+
+=== tippen im nativen fenster
+' Klick ins Textfeld (60, 100), Fokus (WM_SETFOCUS = 7), "h" und "i"
+' (WM_CHAR = 258). Die Zeichen kommen nur zur gui, solange das native
+' Fenster den Fokus des Systems hat.
+IMPORT "helfer.dh"
+PRINT sende$(skript$(), "probe.dh", "roh:512:0:6553660;roh:513:1:6553660;roh:514:0:6553660;roh:7:0:0;roh:258:104:0;roh:258:105:0", "palette")
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/fenstersender.dh"
+FUNCTION skript$() AS STRING
+    RETURN "{sammlung}/../_hilfen/fenstersender.ps1"
+END FUNCTION
+--- datei probe.dh
+IMPORT "gui"
+DIM kennung AS STRING : kennung = ARG$(0)
+SCREEN(500, 300, "Haupt-" + kennung, 1)
+DIM p AS GUI_WINDOW : p = GUI_WINDOW(kennung, 40, 40, 240, 160)
+GUI_WINDOW_CLOSABLE(p, TRUE)
+DIM pk AS GUI_WIDGET : pk = GUI_BUTTON(p, "Paletten-Knopf", 20, 40, 140, 30)
+DIM tf AS GUI_WIDGET : tf = GUI_TEXTINPUT(p, 20, 90, 180, 26)
+DIM nativ AS BOOLEAN : nativ = GUI_WINDOW_NATIVE(p, TRUE)
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE NOT QUITREQUESTED() AND MILLIS() - t0 < 6000
+    GUI_UPDATE()
+    CLS(&H202830) : GUI_DRAW() : FLIP()
+WEND
+PRINT "nativ "; nativ
+PRINT "text |"; GUI_TEXT(tf); "|"
+--- system windows
+--- erwartet
+gesendet
+nativ TRUE
+text |hi|
+
+=== das kreuz des systems schliesst das gui-fenster
+' WM_CLOSE (16) -- was das Kreuz der Titelleiste und Alt+F4 ausloesen. Das
+' gui-Fenster gilt danach als geschlossen wie nach seinem eigenen Kreuz.
+IMPORT "helfer.dh"
+PRINT sende$(skript$(), "probe.dh", "roh:16:0:0", "palette")
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/fenstersender.dh"
+FUNCTION skript$() AS STRING
+    RETURN "{sammlung}/../_hilfen/fenstersender.ps1"
+END FUNCTION
+--- datei probe.dh
+IMPORT "gui"
+DIM kennung AS STRING : kennung = ARG$(0)
+SCREEN(500, 300, "Haupt-" + kennung, 1)
+DIM p AS GUI_WINDOW : p = GUI_WINDOW(kennung, 40, 40, 240, 160)
+GUI_WINDOW_CLOSABLE(p, TRUE)
+DIM pk AS GUI_WIDGET : pk = GUI_BUTTON(p, "Paletten-Knopf", 20, 40, 140, 30)
+DIM tf AS GUI_WIDGET : tf = GUI_TEXTINPUT(p, 20, 90, 180, 26)
+DIM nativ AS BOOLEAN : nativ = GUI_WINDOW_NATIVE(p, TRUE)
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE NOT QUITREQUESTED() AND MILLIS() - t0 < 6000
+    GUI_UPDATE()
+    CLS(&H202830) : GUI_DRAW() : FLIP()
+WEND
+PRINT "nativ "; nativ
+PRINT "geschlossen "; GUI_WINDOW_CLOSED(p)
+PRINT "text |"; GUI_TEXT(tf); "|"
+--- system windows
+--- erwartet
+gesendet
+nativ TRUE
+geschlossen TRUE
+text ||
+
+=== das native fenster zeigt das bild richtig herum
+' Gefunden beim Bau: das Bild stand auf dem Kopf (der Spike spiegelte, seine
+' Proben lagen symmetrisch und sahen es nicht). Oben ein magenta Streifen,
+' unten ein gruener; fensterpixel.ps1 liest beide aus dem Inhalt des
+' nativen Fensters vom Bildschirm.
+IMPORT "helfer.dh"
+DIM kennung AS STRING : kennung = "Bild-" + STR$(MILLIS()) + "-" + STR$(INT(RND() * 1000000))
+DIM kind AS INTEGER : kind = PROCESS_START("dhrt", "run", CWD$() + "/bild.dh", "--", kennung)
+DIM ps AS INTEGER : ps = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", pixel_skript$(), kennung, "120,15;120,145")
+DIM s AS STRING : s = auslesen$(ps, 30000)
+DIM k AS STRING : k = auslesen$(kind, 30000)
+IF INSTR(auslesenFehler, "Kein Fenster moeglich") >= 0 THEN
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    END
+END IF
+PRINT s; k;
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/fenstersender.dh"
+FUNCTION pixel_skript$() AS STRING
+    RETURN "{sammlung}/../_hilfen/fensterpixel.ps1"
+END FUNCTION
+--- datei bild.dh
+IMPORT "gui"
+SCREEN(400, 300, "Haupt-" + ARG$(0), 1)
+DIM p AS GUI_WINDOW : p = GUI_WINDOW(ARG$(0), 40, 40, 240, 160)
+DIM oben AS GUI_WIDGET : oben = GUI_LABEL(p, "", 0, 0)
+GUI_SET_BOUNDS(oben, 0, 0, 240, 40)
+GUI_SET_COLOR(oben, "bg", &HFF00FF)
+DIM unten AS GUI_WIDGET : unten = GUI_LABEL(p, "", 0, 0)
+GUI_SET_BOUNDS(unten, 0, 120, 240, 40)
+GUI_SET_COLOR(unten, "bg", &H00FF00)
+PRINT "nativ "; GUI_WINDOW_NATIVE(p, TRUE)
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE NOT QUITREQUESTED() AND MILLIS() - t0 < 5000
+    GUI_UPDATE()
+    CLS(&H202830) : GUI_DRAW() : FLIP()
+WEND
+--- system windows
+--- erwartet
+120,15 #FF00FF
+120,145 #00FF00
+nativ TRUE

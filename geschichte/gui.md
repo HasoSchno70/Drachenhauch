@@ -682,3 +682,39 @@ docs/intern/entwurf-native-fenster.md):
 Gegenprobe: alle Stellen in einem Bau verfaelscht, und ein Vergleich zeigte
 JEDE Ausgabezeile neben der Erwartung (dhrt test nennt nur die erste) -- so
 war keine Verfaelschung hinter einer frueher fallenden Zeile verdeckt.
+
+## Echte OS-Fenster, Weg E Stufe 1 (2026-11-12)
+
+`GUI_WINDOW_NATIVE(win, an)` / `GUI_WINDOW_IS_NATIVE(win)`. Bau nach
+docs/intern/entwurf-native-fenster.md, Abschnitt 8:
+- `nativfenster.rs`: zweites GLFW-Fenster mit geteiltem Kontext, eigene
+  Rueckrufe (Knopf, Taste, Lage, drinnen, Rad, Zeichen, Fokus, Groesse),
+  Eingang je Fenster, Zeigen per FBO + `glBlitFramebuffer`.
+- `graphics.rs`: das Hauptfenster als GLFW-Handle gemerkt (statt "der
+  aktuelle Kontext"), je natives Fenster ein Render-Ziel ueber
+  `render_ziel`, Zeigen und Abholen in `flip` nach EndDrawing. Die
+  Eingabeabfragen liefern den Stand eines nativen Fensters NUR in der Sicht
+  der gui (`sicht`, gesetzt in GUI_UPDATE/GUI_DRAW) -- MOUSEX & Co. des
+  Programms bleiben beim Hauptfenster.
+- gui: Oberflaeche je Fenster (`nativ`), ein natives steht auf seiner bei
+  (0, 0) ohne eigene Titelleiste; `topmost_at` sieht nur die Fenster der
+  Flaeche, durch die die gui schaut; Popups im Fenster
+  (`popups_oben` = falsch); `nativ_abgleich` je Bild: Kreuz, Groesse, Lage,
+  Titel, sichtbar, Fokus, verwaiste Fenster.
+Funde beim Bau:
+- Das Bild stand auf dem Kopf: dhrts Ziele stehen schon richtig herum, der
+  Spike spiegelte -- seine Proben lagen symmetrisch und sahen es nicht.
+- Windows meldet WM_MOUSELEAVE mitunter, bevor der Druck ankommt: ein Druck
+  haelt den Zeiger darum selbst fest, bis einschliesslich des Bildes, in dem
+  losgelassen wird -- sonst traf der Klick die falsche Flaeche oder wurde nie
+  einer.
+- PowerShell gibt `$null` an einen string-Parameter als "" weiter:
+  `FindWindow($null, ...)` suchte eine Fensterklasse "". Richtig:
+  `[NullString]::Value`. fenstersender.ps1 findet ein Fenster jetzt zuerst
+  ueber seinen Titel (auch das zweite eines Programms); neu fensterpixel.ps1
+  (Farben aus dem Inhalt eines Fensters vom Bildschirm).
+Pruefung `tests/pruef/fenster/native_fenster.dhtest` (9 Faelle, echte
+Fensternachrichten), Gegenprobe in zwei verfaelschten Baeuen: jede der
+sechs Stellen (Rueckfall, Fangregel, Flaechenfilter, Bildrichtung, Zeichen,
+Kreuz) laesst ihren Fall fallen. macOS: Rueckfall, bis der Spike auf einem
+Mac lief.

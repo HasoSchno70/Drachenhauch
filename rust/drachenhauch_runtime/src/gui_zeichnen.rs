@@ -18,7 +18,13 @@ impl Gui {
     /// nicht zugedeckt hat. Genau an einer Kante also, an der ein Tooltip oft
     /// liegt, weil er der Maus folgt.
     pub fn draw(&self, g: &mut Graphics, obenauf: bool) {
+        g.sicht_setzen(Some(0));
         for (k, &wi) in self.z_order.iter().enumerate() {
+            // Ein natives Fenster (Weg E) zeichnet in sein eigenes Ziel.
+            if self.windows[wi].nativ != 0 {
+                if self.windows[wi].alive && self.windows[wi].visible { self.nativ_zeichnen(g, wi); }
+                continue;
+            }
             if self.modal == Some(wi) { self.schleier(g); }
             // Ein Popover kommt in der oberen Schicht (draw_top).
             if self.windows[wi].alive && self.windows[wi].visible && self.windows[wi].pop.is_none() { self.draw_window_sicht(g, wi); }
@@ -30,6 +36,7 @@ impl Gui {
             }
         }
         if obenauf { self.draw_top(g); }
+        g.sicht_setzen(None);
     }
 
     /// Layout der Menueleiste: (menu_idx, x_links_abs, x_rechts_abs) je Bar-Menue.

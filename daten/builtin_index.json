@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 2459,
+ "count": 2461,
  "builtins": [
   {
    "name": "ABS",
@@ -7320,6 +7320,18 @@
    "name": "GUI_WINDOW_CLOSABLE",
    "kind": "core",
    "signature": "GUI_WINDOW_CLOSABLE(win, flag)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_WINDOW_NATIVE",
+   "kind": "core",
+   "signature": "GUI_WINDOW_NATIVE(win, an) AS BOOLEAN",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_WINDOW_IS_NATIVE",
+   "kind": "core",
+   "signature": "GUI_WINDOW_IS_NATIVE(win) AS BOOLEAN",
    "module": "gui"
   },
   {

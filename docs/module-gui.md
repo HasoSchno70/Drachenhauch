@@ -69,6 +69,8 @@ IMPORT "gui"
 | `GUI_DOCK_STATE$(win)` | STRING | die Anordnung als JSON (Bereiche, Gruppen, Reiter vorn, Größen, schwebende, ausgeblendete) |
 | `GUI_DOCK_SET_STATE(win, stand$)` | — | eine Anordnung übernehmen; Leisten, die es noch nicht gibt, bekommen ihren Platz, sobald sie angemeldet werden |
 | `GUI_WINDOW_CLOSABLE(win, an)` | — | Schließen-Button anzeigen (Default: aus) |
+| `GUI_WINDOW_NATIVE(win, an)` | BOOLEAN | das Fenster als **echtes OS-Fenster** (eigene Titelleiste, Taskleiste, zweiter Monitor) bzw. zurück ins Hauptfenster; `FALSE` heißt bei `an`: Rückfall, es bleibt ein gui-Fenster |
+| `GUI_WINDOW_IS_NATIVE(win)` | BOOLEAN | ist es gerade ein echtes OS-Fenster? |
 | `GUI_WINDOW_VISIBLE(win, an)` | — | Sichtbarkeit setzen |
 | `GUI_WINDOW_FRONT(win)` | — | Fenster nach vorn holen, ohne ihm den Fokus zu geben -- fuer eine Vorschlagsliste oder einen Tooltip, der beim Tippen ueber dem Text liegen soll. Per `GUI_WINDOW_VISIBLE` eingeblendet liegt ein Fenster sonst hinter dem zuletzt angeklickten |
 | `GUI_WINDOW_SHOWN(win)` | BOOLEAN | ist das Fenster gerade sichtbar? Das Gegenstueck zum Setzer -- ohne den Getter muesste ein Programm sich merken, was es selbst gesetzt hat, und laege daneben, sobald der Nutzer das Fenster ueber sein Kreuz schliesst |
@@ -699,6 +701,53 @@ Legt ein Fenster an und gibt es zurück. Neue Fenster erscheinen **oben**
   Geschlossen-Flag zurück)
 - `GUI_WINDOW_CLOSED(win)` — TRUE sobald der ×-Button gedrückt wurde (bleibt
   TRUE bis das Fenster wieder sichtbar gesetzt wird)
+
+### Als echtes OS-Fenster
+
+Ein gui-Fenster lebt im Fenster des Programms. `GUI_WINDOW_NATIVE(win, TRUE)`
+macht es zu einem **eigenen Fenster des Systems** -- mit Titelleiste und
+Kreuz des Systems, eigenem Eintrag in der Taskleiste, frei über den Rand
+und auf den zweiten Monitor zu ziehen. Alles andere bleibt: dieselben
+Widgets, Ereignisse, Stildatei und Daten, denn es ist dasselbe Programm.
+
+```basic
+IMPORT "gui"
+SCREEN(800, 600, "Editor")
+DIM haupt AS GUI_WINDOW : haupt = GUI_WINDOW("Dokument", 10, 10, 500, 400)
+DIM palette AS GUI_WINDOW : palette = GUI_WINDOW("Werkzeuge", 520, 10, 220, 300)
+GUI_WINDOW_CLOSABLE(palette, TRUE)
+DIM pinsel AS GUI_WIDGET : pinsel = GUI_BUTTON(palette, "Pinsel", 10, 10, 120, 30)
+IF NOT GUI_WINDOW_NATIVE(palette, TRUE) THEN PRINT "bleibt im Hauptfenster"
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_CLICKED(pinsel) THEN PRINT "Pinsel gewählt"
+    CLS(0) : GUI_DRAW() : FLIP()
+WEND
+```
+
+- Es erscheint dort, wo es im Hauptfenster stand, so groß wie das
+  gui-Fenster. Die Titelleiste gibt das System, die eigene der gui fällt
+  weg. `GUI_WINDOW_SET_BOUNDS` verschiebt und vergrößert das OS-Fenster.
+- Das **Kreuz des Systems** (und Alt+F4) wirkt wie das Kreuz der gui:
+  `GUI_WINDOW_CLOSED` meldet es, nur wenn `GUI_WINDOW_CLOSABLE` an ist.
+  Zieht der Nutzer es größer, wächst das gui-Fenster mit (bei
+  `GUI_WINDOW_RESIZABLE`).
+- Klicks im nativen Fenster treffen nur seine Widgets, Klicks im
+  Hauptfenster nie das native. Getipptes landet in dem Fenster, das den
+  Fokus des Systems hat. `MOUSEX`/`MOUSEY` des Programms bleiben beim
+  Hauptfenster.
+- `GUI_WINDOW_NATIVE(win, FALSE)` holt es zurück, an seine alte Stelle
+  und mit seinem alten Rahmen; `GUI_WINDOW_DESTROY` schließt auch das
+  OS-Fenster.
+- **Rückfall:** wo es keine echten Fenster gibt, liefert der Befehl
+  `FALSE` und das Fenster bleibt, wie es war -- im Browser, ohne
+  Bildschirm (vor `SCREEN`), unter macOS (dort noch nicht geprüft) und mit
+  `DHRT_OHNE_NATIVE_FENSTER=1`. Ein Programm läuft also überall gleich.
+- **Noch nicht** (spätere Stufen): modale Dialoge als echte Fenster,
+  Kontextmenüs und Hilfetexte über den Rand des nativen Fensters hinaus,
+  Bildschirmleser und Eingabemethoden (IME) im nativen Fenster,
+  abreißbare Dock-Leisten, Aufnahmen (`AUTOMATION_PLAY`) im nativen
+  Fenster.
 
 ## Button
 
@@ -2561,9 +2610,10 @@ Themen umschalten.
   geplante Alternative (Phase 4).
 - **Koordinaten plus Anker**, dazu Automaß und Zeilen-/Spalten-/Rasterbehälter
   (`GUI_LAYOUT`); kein Constraint-System.
-- **Ein Programm, ein OS-Fenster**; gui-Fenster leben darin — nicht über den
-  Rand, nicht auf dem zweiten Monitor, ohne eigenen Eintrag in der Taskleiste.
-  Warum, und welche Wege es gäbe: [entwurf-native-fenster.md](intern/entwurf-native-fenster.md).
+- **Ein Programm, ein OS-Fenster** -- es sei denn, ein gui-Fenster wird mit
+  `GUI_WINDOW_NATIVE` zu einem echten (Windows und Linux; Abschnitt
+  "Als echtes OS-Fenster"). Wie das gebaut ist:
+  [entwurf-native-fenster.md](intern/entwurf-native-fenster.md), Weg E.
 - **Laufzeit-Manipulation** (Verschieben/Skalieren/Löschen/Ein-/Ausblenden/
   Hit-Test/Enumeration) wird unterstützt — siehe Abschnitt oben.
 - **Headless/grafisch**: `GUI_UPDATE`/`GUI_DRAW` brauchen einen aktiven

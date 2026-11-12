@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 2410,
+ "count": 2412,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -1140,8 +1140,10 @@
   "GUI_WINDOW_GLOWING": "BOOLEAN — läuft ein Lichtstreif (auch in der Pause zwischen zwei)?",
   "GUI_WINDOW_GLOW_SET": "Lichtstreif einstellen: farbe, dauer, pause (ms bis zur Wiederkehr, 0 = einmal), richtung (rechts/links/unten/oben), breite, staerke (0..1), rand, art (streif, lampe oder rahmen)",
   "GUI_WINDOW_GLOW_STOP": "den Lichtstreif anhalten",
+  "GUI_WINDOW_IS_NATIVE": "BOOLEAN — ist es gerade ein echtes OS-Fenster?",
   "GUI_WINDOW_MODAL": "ein eigenes Fenster modal schalten: alles andere liegt hinter dem Schleier und nimmt keine Eingabe an",
   "GUI_WINDOW_MOVABLE": "per Titelleiste verschiebbar (Default: an)",
+  "GUI_WINDOW_NATIVE": "BOOLEAN — das Fenster als echtes OS-Fenster (eigene Titelleiste, Taskleiste, zweiter Monitor) bzw. zurück ins Hauptfenster; FALSE heißt bei an: Rückfall, es bleibt ein gui-Fenster",
   "GUI_WINDOW_RESIZABLE": "am unteren-rechten Griff größenveränderbar (Default: aus)",
   "GUI_WINDOW_SCROLLABLE": "Inhalt scrollt, wenn er höher als das Fenster ist (Mausrad + Scrollbalken). Inhaltshöhe automatisch aus den Widgets. Default: aus",
   "GUI_WINDOW_SET_BOUNDS": "Fenster bewegen/skalieren/lesen",
