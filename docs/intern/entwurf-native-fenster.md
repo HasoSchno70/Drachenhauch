@@ -279,6 +279,51 @@ kommen an. Gemessen: beide Fenster bei 60 Bildern; der Zustand von rlgl
 Linux (X11) und macOS. **Ausstieg:** laesst sich rlgl nach dem Wechsel nicht
 sauber weiterbenutzen, ist Weg E tot -- Kosten zwei Tage.
 
+### Stufe 0, Ergebnis unter Windows (12.11.2026): bestanden
+
+Probeprogramm `rust/drachenhauch_runtime/examples/spike_zweitfenster.rs`
+(Wegwerf-Code, baut gegen dasselbe raylib/GLFW wie dhrt; Bau:
+`cargo build --release --example spike_zweitfenster --features graphics`
+mit der Umgebung aus `rust/build_runtime.py`). Es prueft sich selbst und
+endet mit `ERGEBNIS gesamt gut`, Exit 0.
+
+| Frage | gemessen (Windows 11, drei Laeufe) |
+|---|---|
+| zweites GLFW-Fenster mit geteiltem Kontext | angelegt; FBO mit der geteilten Textur vollstaendig |
+| zeigt das AKTUELLE Bild aus raylibs Render-Ziel | 10 bzw. 12 von 10/12 Rueckleseproben richtig, 0 falsch (die Grundfarbe wechselt je Sekunde) |
+| Klicks im zweiten Fenster (WM_LBUTTONDOWN) | 2 von 2 im eigenen GLFW-Rueckruf |
+| Hauptfenster zeichnet nach den Wechseln richtig | ja, vor und nach dem Schliessen des zweiten Fensters |
+| Kreuz des zweiten Fensters (WM_CLOSE) | `glfwWindowShouldClose`, Fenster weg, Hauptfenster laeuft weiter |
+| Bildrate | 59 im Mittel (Ziel 60), 240 Bilder in 4,0 s |
+| Kosten des Zeigens je Bild | Median 0,43-0,49 ms, 95 % unter 0,83 ms |
+
+Wie es geht: Texturen teilen sich zwischen Kontexten, Framebuffer und VAOs
+nicht. Der zweite Kontext bekommt darum eine eigene FBO mit der geteilten
+Textur als Lesepuffer und kopiert sie mit `glBlitFramebuffer` (gespiegelt,
+weil raylibs Render-Ziele auf dem Kopf stehen) in seinen Bildschirm -- ohne
+Shader, ohne VAO, ohne rlgl. `glfwSwapInterval(0)` im zweiten Kontext, sonst
+wartet jedes Fenster auf seinen eigenen Bildwechsel. Reihenfolge je Bild:
+raylib zeichnet ins Render-Ziel und ins Hauptfenster, `EndDrawing` tauscht
+(und flusht damit), dann Kontext wechseln, blitten, tauschen, ZURUECK in den
+Hauptkontext.
+
+Gegenproben (`SPIKE_FEHLER=`): ohne Blit fallen alle Rueckleseproben des
+zweiten Fensters (0 richtig, 10 falsch); ohne den Wechsel zurueck zeichnet
+das Hauptfenster falsch -- der Kontextwechsel ist also genau die Stelle, an
+der Weg E haengt, und er laesst sich vollstaendig zuruecknehmen.
+
+Funde am Rand:
+- `CloseWindow` gibt es in raylib UND in user32: wer im selben Programm
+  `CloseWindow` ruft und user32 frueh zieht (etwa ueber das windows-Crate),
+  bekommt LNK2005. dhrt ruft es nicht direkt; in Stufe 1 bleibt das so.
+- `LoadImageFromScreen` mitten im Bild sieht den noch gesammelten Batch nicht
+  -- vorher `rlDrawRenderBatchActive()`. (Die erste Probe am Hauptfenster
+  meldete deshalb faelschlich FALSCH.)
+
+**Offen fuer Stufe 0:** Linux (X11, Wayland) und macOS. Lokal gibt es nur
+Windows; der naechste Schritt waere ein Lauf auf den CI-Rechnern (Linux mit
+`xvfb-run` und Mesa, macOS mit seinem Fensterserver) oder unter WSLg.
+
 **Stufe 1 -- der Befehl (etwa eine Woche).** Ein Befehl macht ein gui-Fenster
 zum OS-Fenster (Arbeitsname: GUI_WINDOW_NATIVE mit Fenster und an/aus, noch nicht gebaut): Titel,
 Taskleiste, zweiter Monitor, Kreuz des Systems (`GUI_WINDOW_CLOSE_REQUESTED`).

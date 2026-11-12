@@ -340,3 +340,9 @@ full = ["graphics", "dialogs", "video", "db", "net", "http", "smtp", "pdf", "phy
 [profile.release]
 opt-level = 3
 lto = true
+
+# Stufe 0 von Weg E (docs/intern/entwurf-native-fenster.md): Wegwerf-Probe,
+# braucht raylib -- ohne graphics (CI, cargo test) wird sie nicht gebaut.
+[[example]]
+name = "spike_zweitfenster"
+required-features = ["graphics"]
