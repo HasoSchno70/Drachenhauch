@@ -743,9 +743,9 @@ WEND
   `FALSE` and the window stays as it was -- in the browser, without a
   screen (before `SCREEN`), on macOS (not tested there yet) and with
   `DHRT_OHNE_NATIVE_FENSTER=1`. So a program runs the same everywhere.
-- **Modal** (`GUI_WINDOW_MODAL(win, TRUE)`): on Windows the main window
-  becomes its **owner** -- the dialog stays above it and has no taskbar
-  entry of its own, the main window is dimmed, a click into it does
+- **Modal** (`GUI_WINDOW_MODAL(win, TRUE)`): the main window becomes its
+  **owner** (Windows; on Linux with X11 `WM_TRANSIENT_FOR`) -- the dialog
+  stays above it and has no taskbar entry of its own, the main window is dimmed, a click into it does
   nothing and brings the dialog to the front. Enter and ESC press the
   default and cancel button as usual.
 - Context menu, tooltip, suggestions, an opened month, cell choice and the
@@ -758,8 +758,20 @@ WEND
   it across and it adapts. `GUI_WINDOW_NATIVE_SCALE(win)` tells the factor
   (1.0 at equal density); every size going out stays in gui points.
   `DHRT_NATIV_MASSSTAB=1.5` fixes it (tests without a second screen).
-- **Not yet** (later stages): popups beyond the edge of the native window,
-  screen reader in the native window, the owner on Linux, recordings (`AUTOMATION_PLAY`) in the native window.
+- **Screen reader:** every real window has its own tree for assistive
+  programs (Windows UI Automation; macOS and Linux via AccessKit like the
+  main window). A reader finds the widgets in the window they are in and
+  can operate them there -- also those of a torn-off dock panel.
+- **Recordings** (`AUTOMATION_RECORD`/`AUTOMATION_PLAY`) include the real
+  windows: lines `n frame surface kind a b` go to the native window of that
+  number (1 = the first one created). Kinds: 0 mouse (x, y), 1/2 mouse
+  button a down/up, 3/4/5 key a (GLFW code) down/up/repeated, 6 character
+  a, 7 focus a (0/1), 8 wheel (a, b), 9 pointer inside a (0/1). Written by
+  hand, a click without a move in the window first needs a `9` before it,
+  or only the press -- the press holds the pointer.
+- **Not yet:** popups beyond the edge of the native window.
+- Example: [`examples/219_echte_fenster.dh`](../../examples/219_echte_fenster.dh)
+  (palette, modal dialog, tear-off panels).
 - While a modal dialog is open, only **its** menus work (context menu,
   menu bar) -- those of the windows behind it stay locked. Up to 2026.47
   all of them were locked, the dialog's own too.

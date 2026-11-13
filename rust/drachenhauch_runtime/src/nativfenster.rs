@@ -115,6 +115,59 @@ pub fn knopf_buchen(e: &mut Eingang, knopf: i32, aktion: i32) {
     }
 }
 
+/// Ein Ereignis einer Aufnahme (AUTOMATION_PLAY, Zeile `n`) in den Eingang
+/// buchen -- so, wie es der Rueckruf von GLFW taete. Arten: 0 Maus (a, b),
+/// 1/2 Maustaste a runter/hoch, 3/4/5 Taste a (GLFW-Tastencode)
+/// runter/hoch/wiederholt, 6 Zeichen a, 7 Fokus a (0/1), 8 Rad (a, b),
+/// 9 drinnen a (0/1).
+pub fn ereignis_buchen(e: &mut Eingang, art: i32, a: f64, b: f64) {
+    match art {
+        0 => e.maus = (a, b),
+        1 => knopf_buchen(e, a as i32, 1),
+        2 => knopf_buchen(e, a as i32, 0),
+        3 => taste_buchen(e, a as i32, 1),
+        4 => taste_buchen(e, a as i32, 0),
+        5 => taste_buchen(e, a as i32, 2),
+        6 => if let Some(z) = char::from_u32(a as u32) { e.zeichen.push(z) },
+        7 => {
+            e.fokus = a != 0.0;
+            if a == 0.0 {
+                for k in 0..MAUSTASTEN { if e.knopf_unten[k] { e.knopf_unten[k] = false; e.knopf_los[k] += 1; } }
+                for t in 0..TASTATUR { if e.taste_unten[t] { e.taste_unten[t] = false; e.taste_los[t] += 1; } }
+            }
+        }
+        8 => { e.rad.0 += a; e.rad.1 += b; }
+        9 => e.drinnen = a != 0.0,
+        _ => {}
+    }
+}
+
+/// Was ein Bild an einem nativen Fenster geschah, als Ereignisse wie in
+/// `ereignis_buchen` (fuer AUTOMATION_RECORD). `vorher` ist der Eingang des
+/// Bildes davor (Lage, drinnen, Fokus), `jetzt` der eben abgeholte.
+pub fn ereignisse_von(vorher: &Eingang, jetzt: &Eingang) -> Vec<(i32, f64, f64)> {
+    let mut v = Vec::new();
+    if jetzt.drinnen != vorher.drinnen { v.push((9, jetzt.drinnen as i32 as f64, 0.0)); }
+    if jetzt.fokus != vorher.fokus { v.push((7, jetzt.fokus as i32 as f64, 0.0)); }
+    if jetzt.maus != vorher.maus { v.push((0, jetzt.maus.0, jetzt.maus.1)); }
+    // Druck und Loslassen im selben Bild: haengt die Taste am Ende, kam das
+    // Loslassen zuerst (einer frueheren), sonst der Druck.
+    for k in 0..MAUSTASTEN {
+        let (d, l) = (jetzt.knopf_druck[k], jetzt.knopf_los[k]);
+        let reihe: [(i32, u32); 2] = if jetzt.knopf_unten[k] { [(2, l), (1, d)] } else { [(1, d), (2, l)] };
+        for (art, n) in reihe { for _ in 0..n { v.push((art, k as f64, 0.0)); } }
+    }
+    for t in 0..TASTATUR {
+        let (d, l) = (jetzt.taste_druck[t], jetzt.taste_los[t]);
+        let reihe: [(i32, u32); 2] = if jetzt.taste_unten[t] { [(4, l), (3, d)] } else { [(3, d), (4, l)] };
+        for (art, n) in reihe { for _ in 0..n { v.push((art, t as f64, 0.0)); } }
+    }
+    for &t in &jetzt.wiederholt { v.push((5, t as f64, 0.0)); }
+    for &z in &jetzt.zeichen { v.push((6, z as u32 as f64, 0.0)); }
+    if jetzt.rad != (0.0, 0.0) { v.push((8, jetzt.rad.0, jetzt.rad.1)); }
+    v
+}
+
 // ----------------------------------------------------------------- GLFW
 
 #[cfg(all(feature = "graphics", any(windows, target_os = "linux")))]
@@ -159,6 +212,24 @@ mod glfw {
         pub fn glfwSetWindowSizeCallback(f: *mut c_void, r: Option<FnGroesse>) -> Option<FnGroesse>;
         #[cfg(windows)]
         pub fn glfwGetWin32Window(f: *mut c_void) -> *mut c_void;
+        // X11 (Stufe 4: Besitzer unter Linux). Unter Wayland melden beide
+        // einen Fehler und liefern NULL/0 -- dann bleibt es beim Rueckfall.
+        #[cfg(target_os = "linux")]
+        pub fn glfwGetX11Display() -> *mut c_void;
+        #[cfg(target_os = "linux")]
+        pub fn glfwGetX11Window(f: *mut c_void) -> std::os::raw::c_ulong;
+        #[cfg(target_os = "linux")]
+        pub fn glfwGetPlatform() -> c_int;
+    }
+    /// GLFW_PLATFORM_X11
+    #[cfg(target_os = "linux")]
+    pub const PLATFORM_X11: c_int = 0x0006_0004;
+    // libX11 bindet raylib unter Linux ohnehin.
+    #[cfg(target_os = "linux")]
+    unsafe extern "C" {
+        pub fn XSetTransientForHint(d: *mut c_void, w: std::os::raw::c_ulong, besitzer: std::os::raw::c_ulong) -> c_int;
+        pub fn XDeleteProperty(d: *mut c_void, w: std::os::raw::c_ulong, eigenschaft: std::os::raw::c_ulong) -> c_int;
+        pub fn XFlush(d: *mut c_void) -> c_int;
     }
 
     pub const CONTEXT_VERSION_MAJOR: c_int = 0x0002_2002;
@@ -266,7 +337,12 @@ impl Fenster {
     #[allow(unused_variables)]
     /// `rahmen` = FALSE: ohne Titelleiste und Rand des Systems (eine
     /// abgerissene Dock-Leiste, deren Kopf die gui selbst zeichnet).
-    pub fn anlegen(haupt: *mut c_void, haupt_dichte: f32, titel: &str, b: i32, h: i32, x: i32, y: i32, groesse_aenderbar: bool, rahmen: bool) -> Option<(Fenster, f32)> {
+    /// `vor_zeigen` bekommt das Fenster des Systems (HWND), bevor es zum
+    /// ersten Mal sichtbar wird -- der Adapter fuer Bildschirmleser verlangt
+    /// ein Fenster, das noch nie zu sehen war (Stufe 4).
+    #[allow(clippy::too_many_arguments)]
+    pub fn anlegen(haupt: *mut c_void, haupt_dichte: f32, titel: &str, b: i32, h: i32, x: i32, y: i32, groesse_aenderbar: bool, rahmen: bool,
+                   vor_zeigen: &mut dyn FnMut(usize)) -> Option<(Fenster, f32)> {
         if !moeglich() || haupt.is_null() { return None; }
         #[cfg(all(feature = "graphics", any(windows, target_os = "linux")))]
         unsafe {
@@ -317,6 +393,7 @@ impl Fenster {
             // Jetzt steht es auf seinem Schirm -- dessen Dichte gilt.
             let k = verhaeltnis(fenster.dichte(), haupt_dichte, massstab_vorgabe());
             if k != 1.0 { glfwSetWindowSize(f, pixel(b.max(1), k), pixel(h.max(1), k)); }
+            vor_zeigen(os_handle(f));
             glfwShowWindow(f);
             Some((fenster, k))
         }
@@ -351,6 +428,12 @@ impl Fenster {
             }
             glfwMakeContextCurrent(haupt);
         }
+    }
+
+    /// Ein Ereignis einer Aufnahme einspeisen (`ereignis_buchen`).
+    pub fn einspeisen(&self, art: i32, a: f64, b: f64) {
+        let mut m = EINGAENGE.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some(e) = m.get_or_insert_with(HashMap::new).get_mut(&(self.handle as usize)) { ereignis_buchen(e, art, a, b); }
     }
 
     /// Was seit dem letzten Mal geschah (je Bild einmal).
@@ -425,7 +508,7 @@ impl Fenster {
     /// Das Hauptfenster als Besitzer (Weg E, Stufe 2): unter Windows bleibt
     /// ein besessenes Fenster ueber seinem Besitzer und hat keinen eigenen
     /// Eintrag in der Taskleiste -- so steht ein modaler Dialog. Unter Linux
-    /// (noch) nichts: GLFW kennt dort kein "transient for".
+    /// (X11) dasselbe ueber WM_TRANSIENT_FOR; unter Wayland nichts.
     #[allow(unused_variables)]
     pub fn besitzer_setzen(&self, haupt: *mut c_void, an: bool) {
         #[cfg(all(feature = "graphics", windows))]
@@ -436,6 +519,24 @@ impl Fenster {
             if ich.is_null() { return; }
             let wert = if an { glfw::glfwGetWin32Window(haupt) as isize } else { 0 };
             SetWindowLongPtrW(HWND(ich), GWLP_HWNDPARENT, wert);
+        }
+        // Linux (X11): WM_TRANSIENT_FOR -- der Fenstermanager haelt den
+        // Dialog ueber dem Hauptfenster und meist aus der Fensterliste.
+        #[cfg(all(feature = "graphics", target_os = "linux"))]
+        unsafe {
+            use glfw::*;
+            if glfwGetPlatform() != PLATFORM_X11 { return; }
+            let d = glfwGetX11Display();
+            let ich = glfwGetX11Window(self.handle);
+            if d.is_null() || ich == 0 { return; }
+            if an {
+                let besitzer = glfwGetX11Window(haupt);
+                if besitzer != 0 { XSetTransientForHint(d, ich, besitzer); }
+            } else {
+                // XA_WM_TRANSIENT_FOR (Xatom.h)
+                XDeleteProperty(d, ich, 68);
+            }
+            XFlush(d);
         }
     }
 
@@ -504,6 +605,33 @@ pub fn massstab_vorgabe() -> Option<f32> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn aufnahme_hin_und_zurueck() {
+        // Was ein Bild an Ereignissen hatte, geht als Liste hinaus und kommt
+        // ueber ereignis_buchen wieder an -- auch Druck UND Loslassen im
+        // selben Bild (der Klick ganz zwischen zwei Bildern).
+        let vorher = Eingang::default();
+        let mut jetzt = Eingang::default();
+        for (art, a, b) in [(9, 1.0, 0.0), (0, 40.0, 30.0), (1, 0.0, 0.0), (2, 0.0, 0.0), (7, 1.0, 0.0), (3, 65.0, 0.0), (6, 'a' as u32 as f64, 0.0), (8, 0.0, -1.0)] {
+            ereignis_buchen(&mut jetzt, art, a, b);
+        }
+        assert!(jetzt.drinnen && jetzt.fokus && jetzt.maus == (40.0, 30.0));
+        assert_eq!((jetzt.knopf_druck[0], jetzt.knopf_los[0], jetzt.knopf_unten[0]), (1, 1, false));
+        assert!(jetzt.taste_unten[65] && jetzt.zeichen == vec!['a'] && jetzt.rad == (0.0, -1.0));
+        let liste = ereignisse_von(&vorher, &jetzt);
+        let mut wieder = Eingang::default();
+        for &(art, a, b) in &liste { ereignis_buchen(&mut wieder, art, a, b); }
+        assert_eq!(wieder.maus, jetzt.maus);
+        assert_eq!((wieder.drinnen, wieder.fokus), (true, true));
+        assert_eq!((wieder.knopf_druck[0], wieder.knopf_los[0], wieder.knopf_unten[0]), (1, 1, false));
+        assert_eq!((wieder.taste_druck[65], wieder.taste_unten[65]), (1, true));
+        assert_eq!(wieder.zeichen, vec!['a']);
+        assert_eq!(wieder.rad, (0.0, -1.0));
+        // Fokus weg laesst nichts haengen.
+        ereignis_buchen(&mut wieder, 7, 0.0, 0.0);
+        assert!(!wieder.taste_unten[65]);
+    }
 
     #[test]
     fn massstab_je_schirm() {

@@ -744,9 +744,9 @@ WEND
   `FALSE` und das Fenster bleibt, wie es war -- im Browser, ohne
   Bildschirm (vor `SCREEN`), unter macOS (dort noch nicht geprüft) und mit
   `DHRT_OHNE_NATIVE_FENSTER=1`. Ein Programm läuft also überall gleich.
-- **Modal** (`GUI_WINDOW_MODAL(win, TRUE)`) wird das Hauptfenster unter
-  Windows sein **Besitzer**: der Dialog bleibt darüber und hat keinen
-  eigenen Eintrag in der Taskleiste, das Hauptfenster ist abgedunkelt, ein
+- **Modal** (`GUI_WINDOW_MODAL(win, TRUE)`) wird das Hauptfenster sein
+  **Besitzer** (Windows; unter Linux mit X11 `WM_TRANSIENT_FOR`): der
+  Dialog bleibt darüber und hat keinen eigenen Eintrag in der Taskleiste, das Hauptfenster ist abgedunkelt, ein
   Klick hinein erreicht nichts und holt den Dialog nach vorn. Enter und
   ESC drücken Standard- und Abbrechen-Knopf wie sonst.
 - Kontextmenü, Hilfetext, Vorschläge, aufgeklappter Monat, Zellauswahl und
@@ -760,10 +760,21 @@ WEND
   `GUI_WINDOW_NATIVE_SCALE(win)` nennt den Faktor (1.0 bei gleicher
   Dichte); alle Maße nach außen bleiben in Punkten der gui.
   `DHRT_NATIV_MASSSTAB=1.5` setzt ihn fest (Prüfungen ohne zweiten Schirm).
-- **Noch nicht** (spätere Stufen): Popups über den Rand des nativen
-  Fensters hinaus, Bildschirmleser im nativen Fenster, der Besitzer unter
-  Linux, Aufnahmen (`AUTOMATION_PLAY`) im
-  nativen Fenster.
+- **Bildschirmleser:** jedes echte Fenster hat seinen eigenen Baum für
+  Hilfsprogramme (Windows UI Automation; macOS und Linux über AccessKit wie
+  das Hauptfenster). Ein Leser findet die Widgets im Fenster, in dem sie
+  stehen, und kann sie dort bedienen -- auch die einer abgerissenen
+  Dock-Leiste.
+- **Aufnahmen** (`AUTOMATION_RECORD`/`AUTOMATION_PLAY`) nehmen die echten
+  Fenster mit: Zeilen `n Bild Fläche Art a b` gehen an das native Fenster
+  dieser Nummer (1 = das erste angelegte). Arten: 0 Maus (x, y), 1/2
+  Maustaste a runter/hoch, 3/4/5 Taste a (GLFW-Code) runter/hoch/wiederholt,
+  6 Zeichen a, 7 Fokus a (0/1), 8 Rad (a, b), 9 Zeiger drinnen a (0/1).
+  Von Hand geschrieben braucht ein Klick ohne vorherige Bewegung im Fenster
+  ein `9` davor oder nur den Druck -- der Druck hält den Zeiger.
+- **Noch nicht:** Popups über den Rand des nativen Fensters hinaus.
+- Beispiel: [`examples/219_echte_fenster.dh`](../examples/219_echte_fenster.dh)
+  (Palette, modaler Dialog, abreißbare Leisten).
 - Während eines modalen Dialogs gelten nur **seine** Menüs (Kontextmenü,
   Menüleiste) -- die der Fenster dahinter bleiben gesperrt. Bis 2026.47
   waren alle gesperrt, auch die im Dialog selbst.

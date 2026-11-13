@@ -269,6 +269,9 @@ struct NativPlatz {
     system_groesse: Option<((i32, i32), (i32, i32))>,
     /// Ist das Hauptfenster sein Besitzer (modaler Dialog)?
     besessen: bool,
+    /// Der Adapter fuer Bildschirmleser dieses Fensters (Stufe 4) -- jedes
+    /// Fenster des Systems hat seinen eigenen Baum.
+    a11y: Option<crate::a11y::A11y>,
 }
 impl NativPlatz {
     fn neu(id: u32, f: crate::nativfenster::Fenster, rt: usize, b: i32, h: i32, k: f32) -> Self {
@@ -277,7 +280,7 @@ impl NativPlatz {
             id, f, rt, b, h, k, pb: pixel(b, k), ph: pixel(h, k), sichtbar: true, e: Default::default(),
             knopf_vorher: [false; MAUSTASTEN], knopf_halt: [crate::flanken::Halt::default(); MAUSTASTEN],
             taste_vorher: vec![false; TASTATUR], taste_halt: vec![crate::flanken::Halt::default(); TASTATUR],
-            zeichen: Vec::new(), schliessen: false, groesse_neu: None, system_groesse: None, besessen: false,
+            zeichen: Vec::new(), schliessen: false, groesse_neu: None, system_groesse: None, besessen: false, a11y: None,
         }
     }
 }
@@ -1504,6 +1507,16 @@ pub struct Graphics {
     /// ein Knopf zaehlt ihn erst beim LOSLASSEN auf demselben Knopf -- die
     /// Bildzaehlung stimmt dann noch, der Klick landet nur woanders.
     auto_maus: Option<usize>,
+    /// Weg E, Stufe 4: Ereignisse an native Fenster in einer Aufnahme
+    /// (Zeilen `n Bild Flaeche Art a b`), sortiert, und wie weit gespielt.
+    auto_nativ: Vec<(u32, u32, i32, f64, f64)>,
+    auto_nativ_idx: usize,
+    /// Beim Aufnehmen: die Zeilen fuer native Fenster, das Bild der
+    /// Aufnahme, und der Versatz zu raylibs Bildzaehler (an der ersten
+    /// Zeile `e` abgelesen), damit beide Arten zusammen abspielen.
+    auto_rec_nativ: Vec<(u32, String)>,
+    auto_rec_bild: u32,
+    auto_rec_versatz: Option<i64>,
     /// Gemerkte Anzeigenamen je Tastencode (siehe `key_name`).
     key_names: HashMap<i64, String>,
     // Post-Processing (Shader): die Szene wird in `scene_rt` gerendert und beim
@@ -2246,6 +2259,8 @@ impl Graphics {
             ime_flaeche: 0,
             belegung: std::array::from_fn(|i| 97 + i as i64),
             auto_maus: None,
+            auto_nativ: Vec::new(), auto_nativ_idx: 0,
+            auto_rec_nativ: Vec::new(), auto_rec_bild: 0, auto_rec_versatz: None,
             key_names: HashMap::new(),
         };
         // DHRT_FONT setzt einen TTF als Default-Font (scharfe Schrift in
@@ -2681,7 +2696,9 @@ impl Graphics {
         use crate::nativfenster::pixel;
         let (b, h) = (b.max(1), h.max(1));
         let dichte = self.haupt_dichte();
-        let (f, k) = crate::nativfenster::Fenster::anlegen(self.haupt_glfw as *mut std::ffi::c_void, dichte, titel, b, h, x, y, aenderbar, rahmen)?;
+        let mut a11y = None;
+        let (f, k) = crate::nativfenster::Fenster::anlegen(self.haupt_glfw as *mut std::ffi::c_void, dichte, titel, b, h, x, y, aenderbar, rahmen,
+            &mut |os| { a11y = crate::a11y::A11y::neu(os as *mut std::ffi::c_void); })?;
         let rt = match render_ziel(&mut self.rl, &self.thread, pixel(b, k) as u32, pixel(h, k) as u32) {
             Ok(rt) => rt,
             Err(_) => { f.schliessen(self.haupt_glfw as *mut std::ffi::c_void); return None; }
@@ -2694,7 +2711,9 @@ impl Graphics {
         };
         let id = self.nativ_naechste;
         self.nativ_naechste += 1;
-        self.nativ.push(NativPlatz::neu(id, f, platz, b, h, k));
+        let mut p = NativPlatz::neu(id, f, platz, b, h, k);
+        p.a11y = a11y;
+        self.nativ.push(p);
         Some(id)
     }
     /// Dichte des Schirms, auf dem das Hauptfenster steht (Bezug fuer den
@@ -2857,7 +2876,7 @@ impl Graphics {
     /// Einmal je Bild, nach EndDrawing: zeigen, Eingang abholen.
     fn nativ_bild(&mut self) {
         let haupt = self.haupt_glfw as *mut std::ffi::c_void;
-        let Graphics { nativ, render_targets, .. } = self;
+        let Graphics { nativ, render_targets, auto_recording, auto_rec_nativ, auto_rec_bild, .. } = self;
         for p in nativ.iter_mut() {
             if p.sichtbar {
                 let tex = render_targets[p.rt].rt.texture.id;
@@ -2876,6 +2895,12 @@ impl Graphics {
                 p.taste_halt[t] = crate::flanken::weiter(p.taste_halt[t], e.taste_druck[t], e.taste_los[t], e.taste_unten[t], flanke);
             }
             p.zeichen.extend(e.zeichen.iter().copied());
+            // AUTOMATION_RECORD: was an diesem Fenster geschah, mitschreiben.
+            if *auto_recording {
+                for (art, a, b) in crate::nativfenster::ereignisse_von(&p.e, &e) {
+                    auto_rec_nativ.push((*auto_rec_bild, format!("{} {} {} {}", p.id, art, a, b)));
+                }
+            }
             // Pixel des Systems -> Punkte der gui. Die Groesse, die wir eben
             // selbst gesetzt haben, ist keine Bedienung.
             if let Some(g) = e.groesse {
@@ -2907,6 +2932,16 @@ impl Graphics {
         }
         if self.nativ_gefangen.is_none() {
             self.nativ_gefangen = self.nativ.iter().find(|p| aktiv(p)).map(|p| p.id);
+        }
+        // AUTOMATION_RECORD: Bilder zaehlen; den Versatz zu raylibs Zaehler
+        // an dessen erster Zeile ablesen -- sie kam in DIESEM Bild an.
+        if self.auto_recording {
+            if self.auto_rec_versatz.is_none() {
+                if let Some(e0) = self.auto_list.as_ref().filter(|l| l.count() > 0).and_then(|l| l.events().first().map(|e| e.frame())) {
+                    self.auto_rec_versatz = Some(e0 as i64 - self.auto_rec_bild as i64);
+                }
+            }
+            self.auto_rec_bild += 1;
         }
         // Auf einen Schirm anderer Dichte gezogen (oder das Hauptfenster):
         // neuer Massstab, gleiche Groesse in Punkten. Nicht waehrend eine
@@ -6797,6 +6832,9 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         self.auto_list = Some(list);
         self.auto_path = Some(path.to_string());
         self.auto_recording = true;
+        self.auto_rec_nativ.clear();
+        self.auto_rec_bild = 0;
+        self.auto_rec_versatz = None;
         Ok(())
     }
     /// AUTOMATION_STOP(): beendet, was gerade laeuft. Eine Aufnahme wird dabei
@@ -6812,6 +6850,17 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         let count = list.count() as i64;
         if !list.export(&path) {
             return Err(format!("AUTOMATION_STOP: '{}' nicht schreibbar", path));
+        }
+        // Weg E, Stufe 4: die Ereignisse der nativen Fenster anhaengen --
+        // raylibs Leser uebergeht Zeilen, die nicht mit `c` oder `e` beginnen.
+        if !self.auto_rec_nativ.is_empty() {
+            use std::io::Write;
+            let versatz = self.auto_rec_versatz.unwrap_or(0);
+            let mut f = std::fs::OpenOptions::new().append(true).open(&path)
+                .map_err(|e| format!("AUTOMATION_STOP: '{}' nicht schreibbar: {}", path, e))?;
+            for (bild, rest) in std::mem::take(&mut self.auto_rec_nativ) {
+                let _ = writeln!(f, "n {} {}", (bild as i64 + versatz).max(0), rest);
+            }
         }
         Ok(count)
     }
@@ -6832,13 +6881,25 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         self.auto_events = list.events();
         // Aufsteigend nach Frame -- die Wiedergabe laeuft strikt vorwaerts.
         self.auto_events.sort_by_key(|e| e.frame());
-        self.auto_play_base = self.auto_events.first().map(|e| e.frame()).unwrap_or(0);
+        // Weg E, Stufe 4: Zeilen `n Bild Flaeche Art a b` fuer native Fenster.
+        self.auto_nativ = std::fs::read_to_string(path).unwrap_or_default().lines()
+            .filter_map(|z| {
+                let t: Vec<&str> = z.split_whitespace().collect();
+                if t.len() < 5 || t[0] != "n" { return None; }
+                Some((t[1].parse().ok()?, t[2].parse().ok()?, t[3].parse().ok()?, t[4].parse().ok()?,
+                      t.get(5).and_then(|b| b.parse().ok()).unwrap_or(0.0)))
+            }).collect();
+        self.auto_nativ.sort_by_key(|n| n.0);
+        self.auto_nativ_idx = 0;
+        let erstes_e = self.auto_events.first().map(|e| e.frame());
+        let erstes_n = self.auto_nativ.first().map(|n| n.0);
+        self.auto_play_base = match (erstes_e, erstes_n) { (Some(a), Some(b)) => a.min(b), (a, b) => a.or(b).unwrap_or(0) };
         self.auto_play_idx = 0;
         self.auto_play_frame = 0;
         self.auto_maus = None;
-        self.auto_playing = !self.auto_events.is_empty();
+        self.auto_playing = !self.auto_events.is_empty() || !self.auto_nativ.is_empty();
         self.auto_list = Some(list);
-        Ok(self.auto_events.len() as i64)
+        Ok((self.auto_events.len() + self.auto_nativ.len()) as i64)
     }
     pub fn automation_recording(&self) -> bool { self.auto_recording }
     pub fn automation_playing(&self) -> bool { self.auto_playing }
@@ -6895,8 +6956,16 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         if !maus_neu {
             if let Some(i) = self.auto_maus { self.auto_events[i].play(); }
         }
+        // Weg E, Stufe 4: Ereignisse an native Fenster -- in ihren Eingang,
+        // wie von GLFW; ein Fenster, das es (noch) nicht gibt, verpasst sie.
+        while self.auto_nativ_idx < self.auto_nativ.len() {
+            let (bild, flaeche, art, a, b) = self.auto_nativ[self.auto_nativ_idx];
+            if bild.saturating_sub(self.auto_play_base) > self.auto_play_frame { break; }
+            if let Some(p) = self.nativ.iter().find(|p| p.id == flaeche) { p.f.einspeisen(art, a, b); }
+            self.auto_nativ_idx += 1;
+        }
         self.auto_play_frame += 1;
-        if self.auto_play_idx >= self.auto_events.len() { self.auto_playing = false; }
+        if self.auto_play_idx >= self.auto_events.len() && self.auto_nativ_idx >= self.auto_nativ.len() { self.auto_playing = false; }
     }
 
     /// KEY_ANY_HIT(): DH-Code der zuletzt gedrueckten Taste, -1 wenn keine.
@@ -7845,6 +7914,23 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     pub fn a11y_aktionen(&mut self) -> Vec<accesskit::ActionRequest> {
         self.a11y.as_mut().map(|a| a.aktionen()).unwrap_or_default()
     }
+    /// Stufe 4: hat ein Hilfsprogramm nach dem Baum eines nativen Fensters
+    /// gefragt? Die Flaechen, fuer die es gilt.
+    pub fn a11y_nativ_aktiv(&self) -> Vec<u32> {
+        self.nativ.iter().filter(|p| p.a11y.as_ref().map_or(false, |a| a.aktiv())).map(|p| p.id).collect()
+    }
+    /// Aktionen an native Fenster, je mit ihrer Flaeche.
+    pub fn a11y_nativ_aktionen(&mut self) -> Vec<(u32, accesskit::ActionRequest)> {
+        let mut v = Vec::new();
+        for p in self.nativ.iter_mut() {
+            if let Some(a) = p.a11y.as_mut() { for r in a.aktionen() { v.push((p.id, r)); } }
+        }
+        v
+    }
+    /// Den Baum eines nativen Fensters uebergeben.
+    pub fn a11y_nativ_senden(&mut self, id: u32, baum: accesskit::TreeUpdate) {
+        if let Some(a) = self.nativ_platz_mut(id).and_then(|p| p.a11y.as_mut()) { a.senden(|| baum); }
+    }
     /// Einen vollstaendigen Baum uebergeben (aus GUI_UPDATE).
     pub fn a11y_senden(&mut self, baum: accesskit::TreeUpdate) {
         if let Some(a) = self.a11y.as_mut() { a.senden(|| baum); self.a11y_versorgt = true; }
@@ -7870,6 +7956,12 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
             let pos = self.rl.get_window_position();
             a.fenster_lage(pos.x as i32, pos.y as i32, self.width * self.scale, self.height * self.scale);
             a.fenster_fokus(self.rl.is_window_focused());
+        }
+        // Dasselbe je nativem Fenster (Stufe 4).
+        for p in self.nativ.iter_mut() {
+            let (x, y) = p.f.lage();
+            let (pb, ph, fokus) = (p.pb, p.ph, p.e.fokus);
+            if let Some(a) = p.a11y.as_mut() { a.fenster_lage(x, y, pb, ph); a.fenster_fokus(fokus); }
         }
         if self.a11y_aktiv() && !self.a11y_versorgt {
             use accesskit::{Node, NodeId, Role, TreeId, TreeInfo, TreeUpdate};
