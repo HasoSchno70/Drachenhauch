@@ -55,6 +55,8 @@ impl Gui {
         // oder ein Zug an der Trennlinie steht so schon in GUI_DOCK_RECT und
         // GUI_DOCK_CHANGED, wenn das Programm nach GUI_UPDATE fragt.
         self.dock_pass(g);
+        // Weg E, Stufe 3: abgerissene Leisten als eigene Fenster fuehren.
+        self.dock_raus_abgleich(g);
         self.stil_pass();
         self.rs_pass(g.delta());
         for wi in 0..self.windows.len() {
@@ -523,7 +525,7 @@ impl Gui {
             }
         }
         self.uebergaenge(g);
-        self.dock_zug_pass(is_down, mx, my);
+        self.dock_zug_pass(g, is_down, mx, my);
         // Rollbalken einer Liste ziehen -- auch wenn die Maus die Rinne
         // verlaesst, wie bei jedem Rollbalken.
         if let Some((wi, i, griff)) = self.listbar_zug {

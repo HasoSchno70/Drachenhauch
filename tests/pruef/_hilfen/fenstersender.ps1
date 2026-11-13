@@ -32,9 +32,15 @@ if ($Nachricht.StartsWith("roh:")) {
     # roh:msg:wparam:lparam (Zahlen dezimal oder 0x...) -- eine beliebige
     # Nachricht, etwa die eines Tray-Symbols (tray.rs: WM_TRAY = 0x802D).
     # Mehrere mit ";" getrennt, je 300 ms Abstand (jede soll ihr eigenes Bild haben).
-    foreach ($teil in $Nachricht.Split(";")) {
-        $t = $teil.Split(":")
-        [FensterSender]::PostMessage($h, [uint32]$t[1], [IntPtr][int64]$t[2], [IntPtr][int64]$t[3]) | Out-Null
+    # Mit "+" verbundene gehen OHNE Abstand hinaus, also ins selbe Bild --
+    # etwa Bewegen und Loslassen, wenn das Programm dazwischen das Fenster
+    # verschiebt: Windows meldet danach die Lage des ECHTEN Zeigers, und die
+    # geschickte waere verloren.
+    foreach ($gruppe in $Nachricht.Split(";")) {
+        foreach ($teil in $gruppe.Split("+")) {
+            $t = $teil.Split(":")
+            [FensterSender]::PostMessage($h, [uint32]$t[1], [IntPtr][int64]$t[2], [IntPtr][int64]$t[3]) | Out-Null
+        }
         Start-Sleep -Milliseconds 300
     }
 } elseif ($Nachricht -eq "esc") {

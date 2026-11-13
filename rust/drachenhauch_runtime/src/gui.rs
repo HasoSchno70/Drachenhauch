@@ -3359,6 +3359,10 @@ pub struct Window {
     /// Rueckweg (GUI_WINDOW_NATIVE ..., FALSE).
     nativ: u32,
     nativ_vorher: Option<(i32, i32, bool)>,
+    /// Als abgerissene Dock-Leiste (Stufe 3) traegt das Fenster Titel,
+    /// Kreuz und Griff der Leiste; vorher: (schliessbar, groesse aenderbar,
+    /// Titel), zurueck beim Andocken.
+    dock_raus_vorher: Option<(bool, bool, String)>,
 }
 
 /// Groesster Zeitschritt des Lichtstreifs je Bild (Sekunden), siehe
@@ -3988,7 +3992,7 @@ impl Gui {
             glanz: Glanz::neu(),
             dock: None, dock_host: -1,
             pop: None, toasts: Vec::new(), info: None,
-            nativ: 0, nativ_vorher: None,
+            nativ: 0, nativ_vorher: None, dock_raus_vorher: None,
         });
         self.z_order.push(idx);
         self.focus_window = Some(idx);
@@ -5211,7 +5215,7 @@ impl Gui {
         if an {
             if w.dock_host >= 0 || w.pop.is_some() { return Ok(false); }
             let (fx, fy) = g.fenster_lage();
-            let Some(id) = g.nativ_anlegen(&w.title, w.w, w.h, fx + w.x, fy + w.y, w.resizable) else { return Ok(false) };
+            let Some(id) = g.nativ_anlegen(&w.title, w.w, w.h, fx + w.x, fy + w.y, w.resizable, true) else { return Ok(false) };
             let w = &mut self.windows[wi];
             w.nativ_vorher = Some((w.x, w.y, w.chrome));
             w.nativ = id;
@@ -5271,7 +5275,9 @@ impl Gui {
                 g.nativ_lage_setzen(id, fx + w.x, fy + w.y);
                 w.x = 0; w.y = 0;
             }
-            w.chrome = false;
+            // Eine abgerissene Dock-Leiste zeichnet ihren Kopf selbst (das
+            // System gibt ihr keinen Rahmen).
+            if w.dock_raus_vorher.is_none() { w.chrome = false; }
             // Modal (Stufe 2): das Hauptfenster wird Besitzer -- der Dialog
             // bleibt darueber; beim Modalwerden bekommt er den Fokus.
             let modal = self.modal == Some(wi);

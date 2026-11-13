@@ -1,0 +1,200 @@
+' Abreissbare Dock-Leisten (Weg E, Stufe 3a; Entwurf
+' docs/intern/entwurf-native-fenster.md, Abschnitt 8).
+'
+' Eine schwebende Leiste mit eigenem Fenster (GUI_DOCK_WINDOW), ueber den
+' Rand des Hauptfensters gezogen, wird ein echtes Fenster des Systems; ihren
+' Kopf (Titelleiste der gui) ueber einen Bereich des Docks gezogen, dockt sie
+' wieder an. Die Faelle schicken ECHTE Windows-Nachrichten
+' (fenstersender.ps1), das Kind endet nach sechs Sekunden selbst.
+' Ohne Fenster (CI) ueberspringt fenstersender.dh die Faelle.
+' Format: docs/werkzeuge.md, dhrt test.
+--- seriell
+
+--- langsam
+=== eine schwebende leiste ueber den rand gezogen wird ein eigenes fenster
+' Kopf der schwebenden Gruppe bei (580, 110) greifen, ueber den rechten Rand
+' (700) hinaus ziehen und dort loslassen. 0x200/0x201/0x202 = Maus; lParam
+' = x + y * 65536.
+IMPORT "helfer.dh"
+PRINT sende$(skript$(), "dock.dh", "roh:512:0:7209540;roh:513:1:7209540;roh:512:1:7209520;roh:512:1:7209760;roh:512:1:9831300;roh:514:0:9831300", "haupt")
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/fenstersender.dh"
+FUNCTION skript$() AS STRING
+    RETURN "{sammlung}/../_hilfen/fenstersender.ps1"
+END FUNCTION
+--- datei dock.dh
+IMPORT "gui"
+' ARG$(1): "haupt" = das Hauptfenster traegt die Kennung (dorthin schickt der
+' Sender), sonst traegt sie die Leiste (ihr eigenes Fenster).
+DIM kennung AS STRING : kennung = ARG$(0)
+DIM art AS STRING : art = ARG$(1)
+SCREEN(700, 500, IIF(art = "haupt", kennung, "Haupt-" + kennung), 1)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Dock", 0, 0, 700, 500)
+GUI_WINDOW_CHROME(w, FALSE)
+GUI_DOCK(w, 0, 0, 700, 500)
+GUI_DOCK_PANEL(w, "dateien", "Dateien", "links")
+GUI_DOCK_PANEL(w, "plug", IIF(art = "haupt", "Plug-" + kennung, kennung), "schwebend")
+GUI_DOCK_CLOSABLE(w, "plug", TRUE)
+DIM p AS GUI_WINDOW : p = GUI_WINDOW("P", 0, 0, 200, 150)
+DIM pk AS GUI_WIDGET : pk = GUI_BUTTON(p, "Plug-Knopf", 10, 10, 120, 28)
+GUI_DOCK_WINDOW(w, "plug", p)
+GUI_DOCK_FLOAT(w, "plug", 200, 100, 400, 180)
+IF art = "raus" OR art = "kreuz" THEN GUI_DOCK_MOVE(w, "plug", "fenster")
+DIM zu AS STRING : zu = ""
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE NOT QUITREQUESTED() AND MILLIS() - t0 < 6000
+    GUI_UPDATE()
+    IF GUI_DOCK_CLOSED$(w) <> "" THEN zu = GUI_DOCK_CLOSED$(w)
+    CLS(&H202830) : GUI_DRAW() : FLIP()
+WEND
+PRINT "wo "; GUI_DOCK_WHERE$(w, "plug"); " nativ "; GUI_WINDOW_IS_NATIVE(p)
+IF art = "kreuz" THEN PRINT "geschlossen |"; zu; "|"
+--- system windows
+--- erwartet
+gesendet
+wo fenster nativ TRUE
+
+=== ihr kopf ueber einen bereich gezogen dockt sie wieder an
+' Die Leiste steht als Fenster dort, wo sie schwebte (200, 100 im
+' Hauptfenster). Ihren Kopf bei (300, 10) greifen und um (-450, 90) ziehen:
+' der Zeiger steht dann ueber der linken Leiste des Hauptfensters (50, 200).
+' Bewegen und Loslassen im SELBEN Bild ("+"): sobald das Programm das
+' Fenster mitzieht, meldet Windows den echten Zeiger -- die geschickte Lage
+' gaelte dann nicht mehr. (-150, 100) als lParam: 6618986.
+IMPORT "helfer.dh"
+PRINT sende$(skript$(), "dock.dh", "roh:512:0:655660;roh:513:1:655660;roh:512:1:6618986+roh:514:0:6618986", "raus")
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/fenstersender.dh"
+FUNCTION skript$() AS STRING
+    RETURN "{sammlung}/../_hilfen/fenstersender.ps1"
+END FUNCTION
+--- datei dock.dh
+IMPORT "gui"
+DIM kennung AS STRING : kennung = ARG$(0)
+DIM art AS STRING : art = ARG$(1)
+SCREEN(700, 500, IIF(art = "haupt", kennung, "Haupt-" + kennung), 1)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Dock", 0, 0, 700, 500)
+GUI_WINDOW_CHROME(w, FALSE)
+GUI_DOCK(w, 0, 0, 700, 500)
+GUI_DOCK_PANEL(w, "dateien", "Dateien", "links")
+GUI_DOCK_PANEL(w, "plug", IIF(art = "haupt", "Plug-" + kennung, kennung), "schwebend")
+GUI_DOCK_CLOSABLE(w, "plug", TRUE)
+DIM p AS GUI_WINDOW : p = GUI_WINDOW("P", 0, 0, 200, 150)
+DIM pk AS GUI_WIDGET : pk = GUI_BUTTON(p, "Plug-Knopf", 10, 10, 120, 28)
+GUI_DOCK_WINDOW(w, "plug", p)
+GUI_DOCK_FLOAT(w, "plug", 200, 100, 400, 180)
+IF art = "raus" OR art = "kreuz" THEN GUI_DOCK_MOVE(w, "plug", "fenster")
+DIM zu AS STRING : zu = ""
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE NOT QUITREQUESTED() AND MILLIS() - t0 < 6000
+    GUI_UPDATE()
+    IF GUI_DOCK_CLOSED$(w) <> "" THEN zu = GUI_DOCK_CLOSED$(w)
+    CLS(&H202830) : GUI_DRAW() : FLIP()
+WEND
+PRINT "wo "; GUI_DOCK_WHERE$(w, "plug"); " nativ "; GUI_WINDOW_IS_NATIVE(p)
+IF art = "kreuz" THEN PRINT "geschlossen |"; zu; "|"
+--- system windows
+--- erwartet
+gesendet
+wo links nativ FALSE
+
+=== das kreuz der abgerissenen leiste schliesst sie
+' WM_CLOSE (16) -- Alt+F4 oder das Kreuz in ihrem Kopf: wie das Kreuz am
+' Reiter. GUI_DOCK_CLOSED$ meldet sie, das Fenster geht ins Gastfenster
+' zurueck (unsichtbar, bis die Leiste wieder gezeigt wird).
+IMPORT "helfer.dh"
+PRINT sende$(skript$(), "dock.dh", "roh:16:0:0", "kreuz")
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/fenstersender.dh"
+FUNCTION skript$() AS STRING
+    RETURN "{sammlung}/../_hilfen/fenstersender.ps1"
+END FUNCTION
+--- datei dock.dh
+IMPORT "gui"
+DIM kennung AS STRING : kennung = ARG$(0)
+DIM art AS STRING : art = ARG$(1)
+SCREEN(700, 500, IIF(art = "haupt", kennung, "Haupt-" + kennung), 1)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Dock", 0, 0, 700, 500)
+GUI_WINDOW_CHROME(w, FALSE)
+GUI_DOCK(w, 0, 0, 700, 500)
+GUI_DOCK_PANEL(w, "dateien", "Dateien", "links")
+GUI_DOCK_PANEL(w, "plug", IIF(art = "haupt", "Plug-" + kennung, kennung), "schwebend")
+GUI_DOCK_CLOSABLE(w, "plug", TRUE)
+DIM p AS GUI_WINDOW : p = GUI_WINDOW("P", 0, 0, 200, 150)
+DIM pk AS GUI_WIDGET : pk = GUI_BUTTON(p, "Plug-Knopf", 10, 10, 120, 28)
+GUI_DOCK_WINDOW(w, "plug", p)
+GUI_DOCK_FLOAT(w, "plug", 200, 100, 400, 180)
+IF art = "raus" OR art = "kreuz" THEN GUI_DOCK_MOVE(w, "plug", "fenster")
+DIM zu AS STRING : zu = ""
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE NOT QUITREQUESTED() AND MILLIS() - t0 < 6000
+    GUI_UPDATE()
+    IF GUI_DOCK_CLOSED$(w) <> "" THEN zu = GUI_DOCK_CLOSED$(w)
+    CLS(&H202830) : GUI_DRAW() : FLIP()
+WEND
+PRINT "wo "; GUI_DOCK_WHERE$(w, "plug"); " nativ "; GUI_WINDOW_IS_NATIVE(p)
+IF art = "kreuz" THEN PRINT "geschlossen |"; zu; "|"
+--- system windows
+--- erwartet
+gesendet
+wo zu nativ FALSE
+geschlossen |plug|
+
+=== der stand merkt sich das eigene fenster
+' GUI_DOCK_STATE$ haelt "fenster" und die Lage auf dem Bildschirm; zurueck
+' angedockt und den Stand wieder gesetzt, geht die Leiste wieder hinaus.
+IMPORT "gui"
+IMPORT "json"
+SCREEN(700, 500, "Stand", 1)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Dock", 0, 0, 700, 500)
+GUI_WINDOW_CHROME(w, FALSE)
+GUI_DOCK(w, 0, 0, 700, 500)
+GUI_DOCK_PANEL(w, "plug", "Plug-Stand", "links")
+DIM p AS GUI_WINDOW : p = GUI_WINDOW("P", 0, 0, 200, 150)
+GUI_DOCK_WINDOW(w, "plug", p)
+SUB bilder(n AS INTEGER)
+    DIM i AS INTEGER
+    FOR i = 1 TO n
+        GUI_UPDATE() : CLS(0) : GUI_DRAW() : FLIP()
+    NEXT
+END SUB
+GUI_DOCK_MOVE(w, "plug", "fenster")
+bilder(3)
+PRINT "raus "; GUI_DOCK_WHERE$(w, "plug"); " "; GUI_WINDOW_IS_NATIVE(p)
+DIM stand AS STRING : stand = GUI_DOCK_STATE$(w)
+DIM j AS JSON_HANDLE : j = JSON_PARSE(stand)
+PRINT "im stand "; JSON_GET_BOOL(j, "schweben.0.fenster"); " lage "; JSON_LEN(j, "schweben.0.lage")
+GUI_DOCK_MOVE(w, "plug", "rechts")
+bilder(3)
+PRINT "zurueck "; GUI_DOCK_WHERE$(w, "plug"); " "; GUI_WINDOW_IS_NATIVE(p)
+GUI_DOCK_SET_STATE(w, stand)
+bilder(3)
+PRINT "wieder "; GUI_DOCK_WHERE$(w, "plug"); " "; GUI_WINDOW_IS_NATIVE(p)
+--- umgebung
+DHRT_FRAMES=40
+--- system windows
+--- erwartet
+raus fenster TRUE
+im stand TRUE lage 2
+zurueck rechts FALSE
+wieder fenster TRUE
+
+=== eine leiste aus widgets des gastfensters bleibt schwebend
+' Stufe 3a: nur Leisten mit eigenem Fenster gehen hinaus; GUI_DOCK_MOVE mit
+' "fenster" laesst die anderen schwebend im Gastfenster (der Rueckfall).
+IMPORT "gui"
+SCREEN(700, 500, "Widgets", 1)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Dock", 0, 0, 700, 500)
+GUI_WINDOW_CHROME(w, FALSE)
+GUI_DOCK(w, 0, 0, 700, 500)
+GUI_DOCK_PANEL(w, "liste", "Liste", "links")
+DIM l AS GUI_WIDGET : l = GUI_LISTBOX(w, 0, 0, 10, 10, ["a"])
+GUI_DOCK_ADD(w, "liste", l)
+GUI_DOCK_MOVE(w, "liste", "fenster")
+GUI_UPDATE()
+PRINT GUI_DOCK_WHERE$(w, "liste")
+--- umgebung
+DHRT_FRAMES=5
+--- system windows
+--- erwartet
+schwebend

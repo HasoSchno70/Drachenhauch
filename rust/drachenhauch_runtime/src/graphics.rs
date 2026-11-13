@@ -2677,11 +2677,11 @@ impl Graphics {
     /// Ein natives Fenster anlegen (b x h Punkte, an der Bildschirmstelle
     /// x, y) samt Render-Ziel. `None`, wo es keine gibt -- dann bleibt die
     /// gui beim gui-Fenster im Hauptfenster.
-    pub fn nativ_anlegen(&mut self, titel: &str, b: i32, h: i32, x: i32, y: i32, aenderbar: bool) -> Option<u32> {
+    pub fn nativ_anlegen(&mut self, titel: &str, b: i32, h: i32, x: i32, y: i32, aenderbar: bool, rahmen: bool) -> Option<u32> {
         use crate::nativfenster::pixel;
         let (b, h) = (b.max(1), h.max(1));
         let dichte = self.haupt_dichte();
-        let (f, k) = crate::nativfenster::Fenster::anlegen(self.haupt_glfw as *mut std::ffi::c_void, dichte, titel, b, h, x, y, aenderbar)?;
+        let (f, k) = crate::nativfenster::Fenster::anlegen(self.haupt_glfw as *mut std::ffi::c_void, dichte, titel, b, h, x, y, aenderbar, rahmen)?;
         let rt = match render_ziel(&mut self.rl, &self.thread, pixel(b, k) as u32, pixel(h, k) as u32) {
             Ok(rt) => rt,
             Err(_) => { f.schliessen(self.haupt_glfw as *mut std::ffi::c_void); return None; }
@@ -2783,6 +2783,24 @@ impl Graphics {
     }
     /// Die Lage des Hauptfensters auf dem Bildschirm (Systempunkte).
     pub fn fenster_lage(&self) -> (i32, i32) { let v = self.rl.get_window_position(); (v.x as i32, v.y as i32) }
+    /// Wo steht der Zeiger auf dem Bildschirm (Systempunkte)? Aus der Sicht
+    /// der Oberflaeche, die ihn gerade hat: Lage ihres Fensters plus Zeiger
+    /// darin. Nicht der Zeiger des Systems -- so folgt ein Zug auch
+    /// geschickten Fensternachrichten (Pruefungen), und waehrend eine Taste
+    /// haengt, meldet das Fenster mit dem Druck den Zeiger auch ausserhalb.
+    pub fn zeiger_bildschirm(&self) -> (i32, i32) {
+        let z = self.zeiger_flaeche();
+        if z != 0 {
+            if let Some(p) = self.nativ_platz(z) {
+                let (x, y) = p.f.lage();
+                return (x + p.e.maus.0.floor() as i32, y + p.e.maus.1.floor() as i32);
+            }
+        }
+        let (x, y) = self.fenster_lage();
+        (x + self.rl.get_mouse_x(), y + self.rl.get_mouse_y())
+    }
+    /// Der Massstab von SCREEN (Systempunkte je Punkt des Programms).
+    pub fn haupt_massstab(&self) -> i32 { self.scale.max(1) }
     /// Die gui liest (Some) oder das Programm (None); Some(k) = durch die
     /// Brille der Oberflaeche k.
     pub fn sicht_setzen(&mut self, s: Option<u32>) { self.sicht = s; }

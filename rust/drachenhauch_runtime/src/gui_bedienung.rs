@@ -1154,6 +1154,13 @@ impl Gui {
             self.clear_window_interactions(win);
             return;
         }
+        // Titelleiste einer abgerissenen Dock-Leiste: sie zieht das Fenster
+        // ueber den Bildschirm und dockt es ueber dem Gastfenster wieder an;
+        // ein Doppelklick holt sie heim (wie auf ihrem Kopf im Dock).
+        if has_chrome && self.windows[win].dock_raus_vorher.is_some() && Self::in_rect(mx, my, (wx, wy, ww, th)) {
+            self.dock_raus_greifen(win);
+            return;
+        }
         // Titelleiste -> Drag? (nur mit Chrome)
         if has_chrome && Self::in_rect(mx, my, (wx, wy, ww, th)) {
             if self.windows[win].movable {

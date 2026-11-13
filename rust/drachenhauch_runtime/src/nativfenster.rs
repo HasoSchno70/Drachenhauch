@@ -167,6 +167,7 @@ mod glfw {
     pub const OPENGL_CORE_PROFILE: c_int = 0x0003_2001;
     pub const RESIZABLE: c_int = 0x0002_0003;
     pub const VISIBLE: c_int = 0x0002_0004;
+    pub const DECORATED: c_int = 0x0002_0005;
     pub const FOCUS_ON_SHOW: c_int = 0x0002_000C;
 
     pub unsafe extern "C" fn r_knopf(f: *mut c_void, knopf: c_int, aktion: c_int, _m: c_int) {
@@ -263,7 +264,9 @@ impl Fenster {
     /// Massstab seines Schirms (`verhaeltnis` zu `haupt_dichte`), der hier
     /// noch vor dem Zeigen feststeht -- zurueck kommt er mit dem Fenster.
     #[allow(unused_variables)]
-    pub fn anlegen(haupt: *mut c_void, haupt_dichte: f32, titel: &str, b: i32, h: i32, x: i32, y: i32, groesse_aenderbar: bool) -> Option<(Fenster, f32)> {
+    /// `rahmen` = FALSE: ohne Titelleiste und Rand des Systems (eine
+    /// abgerissene Dock-Leiste, deren Kopf die gui selbst zeichnet).
+    pub fn anlegen(haupt: *mut c_void, haupt_dichte: f32, titel: &str, b: i32, h: i32, x: i32, y: i32, groesse_aenderbar: bool, rahmen: bool) -> Option<(Fenster, f32)> {
         if !moeglich() || haupt.is_null() { return None; }
         #[cfg(all(feature = "graphics", any(windows, target_os = "linux")))]
         unsafe {
@@ -276,6 +279,7 @@ impl Fenster {
             // Erst unsichtbar anlegen, an die Stelle setzen, dann zeigen --
             // sonst springt es sichtbar von (0,0) an seinen Platz.
             glfwWindowHint(VISIBLE, 0);
+            glfwWindowHint(DECORATED, rahmen as c_int);
             let t = CString::new(titel.replace('\0', " ")).ok()?;
             let f = glfwCreateWindow(b.max(1), h.max(1), t.as_ptr(), std::ptr::null_mut(), haupt);
             glfwDefaultWindowHints();

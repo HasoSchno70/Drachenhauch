@@ -51,7 +51,7 @@ IMPORT "gui"
 | `GUI_DOCK_HEAD_RECT(win, name$)` | TUPLE | der freie Teil des Kopfs rechts neben den Reitern -- Platz für Filter, Zähler, Knöpfe der Leiste |
 | `GUI_DOCK_CENTER(win)` | TUPLE | das Rechteck der Mitte (x, y, b, h) |
 | `GUI_DOCK_SHOWN(win, name$)` | BOOLEAN | ist der Inhalt der Leiste zu sehen (vorderer Reiter, Bereich an, nicht ausgeblendet)? |
-| `GUI_DOCK_WHERE$(win, name$)` | STRING | `links`, `rechts`, `unten`, `schwebend` oder `zu` |
+| `GUI_DOCK_WHERE$(win, name$)` | STRING | `links`, `rechts`, `unten`, `schwebend`, `fenster` (abgerissen, ein eigenes Fenster des Systems) oder `zu` |
 | `GUI_DOCK_SHOW(win, name$, an)` | — | eine Leiste ausblenden bzw. wieder zeigen (dann vorn) |
 | `GUI_DOCK_ACTIVATE(win, name$)` | — | den Reiter der Leiste nach vorn holen |
 | `GUI_DOCK_TITLE(win, name$, titel$)` | — | den Reiter neu beschriften |
@@ -65,7 +65,7 @@ IMPORT "gui"
 | `GUI_DOCK_SHARE(win, name$, anteil)` | — | der Anteil der Gruppe der Leiste an ihrem Bereich, verglichen mit den anderen Gruppen dort |
 | `GUI_DOCK_GET_SIZE(win, bereich$)` | INTEGER | Breite bzw. Höhe eines Bereichs |
 | `GUI_DOCK_FLOAT(win, name$, x, y, w, h)` | — | eine Leiste abtrennen (schwebend an dieser Stelle) |
-| `GUI_DOCK_MOVE(win, name$, bereich$ [, neben$])` | — | eine Leiste andocken: als neue Gruppe im Bereich oder als Reiter neben `neben$` |
+| `GUI_DOCK_MOVE(win, name$, bereich$ [, neben$])` | — | eine Leiste andocken: als neue Gruppe im Bereich oder als Reiter neben `neben$`; `fenster` reißt sie als eigenes Fenster ab (nur Leisten aus `GUI_DOCK_WINDOW`, sonst bleibt sie schwebend) |
 | `GUI_DOCK_STATE$(win)` | STRING | die Anordnung als JSON (Bereiche, Gruppen, Reiter vorn, Größen, schwebende, ausgeblendete) |
 | `GUI_DOCK_SET_STATE(win, stand$)` | — | eine Anordnung übernehmen; Leisten, die es noch nicht gibt, bekommen ihren Platz, sobald sie angemeldet werden |
 | `GUI_WINDOW_CLOSABLE(win, an)` | — | Schließen-Button anzeigen (Default: aus) |
@@ -762,7 +762,8 @@ WEND
   `DHRT_NATIV_MASSSTAB=1.5` setzt ihn fest (Prüfungen ohne zweiten Schirm).
 - **Noch nicht** (spätere Stufen): Popups über den Rand des nativen
   Fensters hinaus, Bildschirmleser im nativen Fenster, der Besitzer unter
-  Linux, abreißbare Dock-Leisten, Aufnahmen (`AUTOMATION_PLAY`) im
+  Linux, abreißbare Dock-Leisten aus Widgets des Gastfensters (`GUI_DOCK_ADD`; die
+  aus `GUI_DOCK_WINDOW` reißen ab, siehe Dock), Aufnahmen (`AUTOMATION_PLAY`) im
   nativen Fenster.
 - Während eines modalen Dialogs gelten nur **seine** Menüs (Kontextmenü,
   Menüleiste) -- die der Fenster dahinter bleiben gesperrt. Bis 2026.47
@@ -4333,6 +4334,20 @@ Reihenfolge der Fenster direkt über dem Gastfenster -- auch nachdem jemand
 ins Gastfenster geklickt hat. So kommt eine `.dhform` als Leiste herein,
 etwa die eines Plugins der IDE: ihre Widgets verweisen über Nummern
 aufeinander, und in ein fremdes Fenster eingesetzt verrutschten die.
+
+**Abreißen** (echte Fenster, siehe [Als echtes OS-Fenster](#als-echtes-os-fenster)):
+eine schwebende Leiste aus `GUI_DOCK_WINDOW`, an ihrem Kopf über den Rand des
+Hauptfensters gezogen, wird ein **eigenes Fenster des Systems** -- neben das
+Programm oder auf den zweiten Schirm. Es hat keinen Rahmen des Systems; die
+Titelleiste der gui ist ihr Kopf (Titel, Kreuz, Griff unten rechts). Den Kopf
+über einen Bereich des Docks gezogen, zeigt der Hinweis das Ziel, und beim
+Loslassen dockt sie dort an; ein Doppelklick auf den Kopf holt sie in ihren
+Bereich. Ihr Kreuz (und Alt+F4) schließt sie wie das Kreuz am Reiter.
+`GUI_DOCK_MOVE(w, name$, "fenster")` reißt vom Programm aus ab,
+`GUI_DOCK_WHERE$` sagt dann `fenster`, und `GUI_DOCK_STATE$` merkt sich die
+Lage auf dem Bildschirm. Leisten aus Widgets des Gastfensters (`GUI_DOCK_ADD`)
+bleiben vorerst schwebend im Gastfenster, ebenso jede Leiste, wo es keine
+echten Fenster gibt.
 
 **Die Anordnung merken:** `GUI_DOCK_STATE$` liefert sie als JSON (Größen in
 logischen Punkten, also unabhängig von `GUI_SCALE`), `GUI_DOCK_SET_STATE`
