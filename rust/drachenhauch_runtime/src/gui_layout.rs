@@ -528,20 +528,20 @@ impl Gui {
             // neuen Angaben beim Speichern verloren gehen.
             let rows: Vec<serde_json::Value> = t.rows.iter().map(|row| {
                 serde_json::Value::Array(row.iter().map(|c| {
-                    if c.fg < 0 && c.bg < 0 && c.align < 0
-                        && c.kind == CellKind::Text && c.image < 0 && c.value == 0.0 {
-                        serde_json::json!(c.text)
+                    if c.fg() < 0 && c.bg() < 0 && c.align() < 0
+                        && c.kind() == CellKind::Text && c.image() < 0 && c.value() == 0.0 {
+                        serde_json::json!(c.text.as_str())
                     } else {
                         let mut o = serde_json::Map::new();
-                        o.insert("text".into(), serde_json::json!(c.text));
-                        if c.fg >= 0 { o.insert("fg".into(), serde_json::json!(c.fg)); }
-                        if c.bg >= 0 { o.insert("bg".into(), serde_json::json!(c.bg)); }
-                        if c.align >= 0 { o.insert("align".into(), serde_json::json!(c.align)); }
-                        if c.kind != CellKind::Text {
-                            o.insert("kind".into(), serde_json::json!(c.kind.name()));
+                        o.insert("text".into(), serde_json::json!(c.text.as_str()));
+                        if c.fg() >= 0 { o.insert("fg".into(), serde_json::json!(c.fg())); }
+                        if c.bg() >= 0 { o.insert("bg".into(), serde_json::json!(c.bg())); }
+                        if c.align() >= 0 { o.insert("align".into(), serde_json::json!(c.align())); }
+                        if c.kind() != CellKind::Text {
+                            o.insert("kind".into(), serde_json::json!(c.kind().name()));
                         }
-                        if c.image >= 0 { o.insert("image".into(), serde_json::json!(c.image)); }
-                        if c.value != 0.0 { o.insert("value".into(), serde_json::json!(c.value)); }
+                        if c.image() >= 0 { o.insert("image".into(), serde_json::json!(c.image())); }
+                        if c.value() != 0.0 { o.insert("value".into(), serde_json::json!(c.value())); }
                         serde_json::Value::Object(o)
                     }
                 }).collect())
@@ -880,14 +880,14 @@ impl Gui {
                     fn to_cell(x: &serde_json::Value) -> Cell {
                         if let Some(o) = x.as_object() {
                             let mut c = Cell::text(o.get("text").map(cell_to_string).unwrap_or_default());
-                            if let Some(v) = o.get("fg").and_then(|v| v.as_i64()) { c.fg = v; }
-                            if let Some(v) = o.get("bg").and_then(|v| v.as_i64()) { c.bg = v; }
-                            if let Some(v) = o.get("align").and_then(|v| v.as_i64()) { c.align = v as i8; }
+                            if let Some(v) = o.get("fg").and_then(|v| v.as_i64()) { c.set_fg(v); }
+                            if let Some(v) = o.get("bg").and_then(|v| v.as_i64()) { c.set_bg(v); }
+                            if let Some(v) = o.get("align").and_then(|v| v.as_i64()) { c.set_align(v as i8); }
                             if let Some(v) = o.get("kind").and_then(|v| v.as_str()) {
-                                if let Some(k) = CellKind::parse(v) { c.kind = k; }
+                                if let Some(k) = CellKind::parse(v) { c.set_kind(k); }
                             }
-                            if let Some(v) = o.get("image").and_then(|v| v.as_i64()) { c.image = v; }
-                            if let Some(v) = o.get("value").and_then(|v| v.as_f64()) { c.value = v; }
+                            if let Some(v) = o.get("image").and_then(|v| v.as_i64()) { c.set_image(v); }
+                            if let Some(v) = o.get("value").and_then(|v| v.as_f64()) { c.set_value(v); }
                             c
                         } else {
                             Cell::text(cell_to_string(x))

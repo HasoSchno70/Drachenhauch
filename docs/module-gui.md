@@ -1840,6 +1840,15 @@ END IF
 **Beispiel:** [examples/81_table_select.dh](../examples/81_table_select.dh) zeigt
 beide Tabellen (Retained `gui` + Immediate `ui`) nebeneinander.
 
+**Wie groß darf sie werden?** Gezeichnet werden nur die sichtbaren Zeilen --
+Rollen und Bedienen bleiben auch bei einer Million Zeilen flüssig (2 bis 4 ms
+je Bild). Gemessen mit einer Million Zeilen zu fünf Spalten: Füllen per
+`GUI_TABLE_ADD_ROW` rund 0,7 s, Sortieren 0,13 s, Filtern 0,04 s, eine Zelle
+setzen (auch in einer sortierten oder gefilterten Tabelle) 3 ms, Speicher
+rund 350 MB. Kurze Zelltexte (bis 22 Byte) kosten keine eigene Zuteilung.
+Für Datenmengen, die nicht in den Speicher passen, liest man aus der
+Datenbank seitenweise (`LIMIT`/`OFFSET`).
+
 ## Baum (Tree-View)
 
 ```basic

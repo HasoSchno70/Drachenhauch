@@ -669,12 +669,12 @@ impl Gui {
                         let (r, c) = (row as usize, t.hover_col);
                         if c >= 0 {
                             if let Some(cell) = t.cell(r, c as usize) {
-                                if cell.kind == CellKind::Check { haken = true; }
+                                if cell.kind() == CellKind::Check { haken = true; }
                             }
                         }
                         if haken {
                             let cell = t.cell_mut(r, t.hover_col as usize).unwrap();
-                            cell.value = if cell.value >= 0.5 { 0.0 } else { 1.0 };
+                            cell.set_value(if cell.value() >= 0.5 { 0.0 } else { 1.0 });
                         }
                     }
                     let f = w.on_change.clone();

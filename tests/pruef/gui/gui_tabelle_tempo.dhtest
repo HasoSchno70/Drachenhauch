@@ -43,3 +43,47 @@ baum zeilen 120300 sichtbar 300 flott TRUE
 aufgeklappt sichtbar 700
 sortiert flott TRUE
 erste 0 letzte 19999
+
+=== zellen setzen in einer grossen sortierten und gefilterten tabelle
+' Messung 2026-11-13: GUI_TABLE_SET_CELL baute die ganze Ansicht neu --
+' 77 ms je Zelle bei 100000 Zeilen, 1,3 s bei einer Million; ein Programm,
+' das Zellen in einer Schleife setzt, wurde quadratisch. Jetzt ordnet es nur
+' die eine Zeile neu ein (Rust-Test `zelle_aendern_wie_neu_gebaut`). 10000
+' Zellen in 100000 Zeilen: vorher ueber zwoelf Minuten, mit dem vollen
+' Neubau bei schnellem Sortieren noch rund 20 s, jetzt Bruchteile einer
+' Sekunde. (Mit 2000 Zellen blieb die Gegenprobe knapp unter der Grenze.)
+IMPORT "gui"
+DIM win AS GUI_WINDOW : win = GUI_WINDOW("w", 0, 0, 400, 300)
+DIM s AS GUI_WIDGET : s = GUI_TABLE(win, 0, 0, 380, 280)
+GUI_TABLE_HEADERS(s, ["Wert", "Art"])
+DIM i AS INTEGER
+DIM r AS INTEGER
+FOR i = 0 TO 99999
+    r = GUI_TABLE_ADD_ROW(s, [STR$(i), IIF(i MOD 2 = 0, "x", "y")])
+NEXT
+GUI_TABLE_SORT(s, 0, FALSE)
+GUI_TABLE_FILTER(s, 1, "x")
+PRINT "sichtbar "; GUI_TABLE_VIEW_COUNT(s)
+DIM t0 AS FLOAT : t0 = GET_TIME()
+' Die Sortierspalte: 10000 gerade Zeilen bekommen negative Werte und
+' wandern nach vorn.
+FOR i = 0 TO 9999
+    GUI_TABLE_SET_CELL(s, i * 2, 0, STR$(-i))
+NEXT
+PRINT "flott "; GET_TIME() - t0 < 5.0
+PRINT "erste "; GUI_TABLE_GET_CELL(s, GUI_TABLE_VIEW_ROW(s, 0), 0); " zweite "; GUI_TABLE_GET_CELL(s, GUI_TABLE_VIEW_ROW(s, 1), 0)
+' Die Filterspalte: eine ungerade Zeile passt jetzt und steht an ihrem Platz.
+GUI_TABLE_SET_CELL(s, 30001, 1, "x")
+PRINT "sichtbar "; GUI_TABLE_VIEW_COUNT(s)
+DIM k AS INTEGER
+DIM wo AS INTEGER : wo = -1
+FOR k = 0 TO GUI_TABLE_VIEW_COUNT(s) - 1
+    IF GUI_TABLE_VIEW_ROW(s, k) = 30001 THEN wo = k : EXIT FOR
+NEXT
+PRINT "davor "; GUI_TABLE_GET_CELL(s, GUI_TABLE_VIEW_ROW(s, wo - 1), 0); " danach "; GUI_TABLE_GET_CELL(s, GUI_TABLE_VIEW_ROW(s, wo + 1), 0)
+--- erwartet
+sichtbar 50000
+flott TRUE
+erste -9999 zweite -9998
+sichtbar 50001
+davor 30000 danach 30002

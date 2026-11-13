@@ -1833,6 +1833,15 @@ END IF
 **Example:** [examples/81_table_select.dh](../../examples/81_table_select.dh) shows
 both tables (retained `gui` + immediate `ui`) side by side.
 
+**How large can it get?** Only the visible rows are drawn -- scrolling and
+operating stay smooth even with a million rows (2 to 4 ms per frame).
+Measured with a million rows of five columns: filling with
+`GUI_TABLE_ADD_ROW` about 0.7 s, sorting 0.13 s, filtering 0.04 s, setting
+one cell (also in a sorted or filtered table) 3 ms, memory about 350 MB.
+Short cell texts (up to 22 bytes) need no allocation of their own. For data
+that does not fit into memory, read from the database page by page
+(`LIMIT`/`OFFSET`).
+
 ## Tree (tree view)
 
 ```basic

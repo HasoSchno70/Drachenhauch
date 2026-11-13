@@ -1692,7 +1692,7 @@ impl Gui {
 
 /// Ein fuer eine Teilflaeche ausgeliehenes Gastfenster (Stufe 3b): was es
 /// vorher war, damit `zurueckgeben` es wiederherstellt.
-pub(super) struct Leihe {
+pub(crate) struct Leihe {
     pub(super) wi: usize,
     pub(super) k: usize,
     pub(super) id: u32,
