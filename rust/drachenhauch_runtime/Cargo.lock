@@ -1262,7 +1262,7 @@ checksum = "117240f60069e65410b3ae1bb213295bd828f707b5bec6596a1afc8793ce0cbc"
 
 [[package]]
 name = "drachenhauch_runtime"
-version = "2026.47.0"
+version = "2026.48.0"
 dependencies = [
  "accesskit",
  "accesskit_macos",
