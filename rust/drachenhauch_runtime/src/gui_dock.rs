@@ -87,6 +87,10 @@ pub(super) struct Bereich {
 pub(super) struct Schwebe {
     pub(super) gruppe: Gruppe,
     pub(super) x: i32, pub(super) y: i32, pub(super) w: i32, pub(super) h: i32,
+    /// Abgerissen (Weg E, Stufe 3): die Gruppe steht als eigenes Fenster
+    /// des Systems ausserhalb des Gastfensters. `Some(None)` = soll hinaus,
+    /// die Stelle rechnet der Abgleich aus der Lage im Gastfenster.
+    pub(super) raus: Option<Option<(i32, i32)>>,
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -132,6 +136,11 @@ pub(super) enum Zug {
     Leiste { leiste: usize, x0: i32, y0: i32, aktiv: bool, ziel: Option<Ziel> },
     Schwebe { nr: usize, dx: i32, dy: i32 },
     Groesse { nr: usize, dx: i32, dy: i32 },
+    /// Eine abgerissene Gruppe wird gezogen -- in Bildschirmpunkten, denn
+    /// sie steht in keinem Fenster der gui. `greif` = Zeiger minus Lage des
+    /// Fensters (gesetzt beim ersten Bild), `ziel` = wohin sie beim
+    /// Loslassen ueber dem Gastfenster andocken wuerde.
+    Draussen { nr: usize, greif: Option<(i32, i32)>, ziel: Option<Ziel> },
 }
 
 pub(super) struct DockState {
@@ -277,9 +286,15 @@ impl DockState {
             }
             Ziel::Schweben(x, y) => {
                 let (w, h) = (self.sk_breite(), self.kopf * 10);
-                self.schweben.push(Schwebe { gruppe: Gruppe { leisten: vec![li], aktiv: li, anteil: 1.0 }, x, y, w, h });
+                self.schweben.push(Schwebe { gruppe: Gruppe { leisten: vec![li], aktiv: li, anteil: 1.0 }, x, y, w, h, raus: None });
             }
         }
+    }
+
+    /// Kann die Gruppe ein eigenes Fenster werden? In Stufe 3a: genau eine
+    /// Leiste, und die traegt ein eigenes gui-Fenster (GUI_DOCK_WINDOW).
+    pub(super) fn reissbar(&self, k: usize) -> bool {
+        self.schweben.get(k).map(|s| s.gruppe.leisten.len() == 1 && self.leisten[s.gruppe.leisten[0]].fenster >= 0).unwrap_or(false)
     }
 
     /// Vorgabebreite einer frisch abgetrennten Leiste.
@@ -348,6 +363,20 @@ impl DockState {
         }
         for k in 0..self.schweben.len() {
             if !self.schweben[k].gruppe.leisten.iter().any(|&i| !self.leisten[i].zu) { continue; }
+            // Abgerissen: kein Platz im Gastfenster (kein Kopf, kein
+            // Treffertest), die Leiste ist aber zu sehen -- in ihrem Fenster.
+            if self.schweben[k].raus.is_some() {
+                let (w, h, kopf) = (self.schweben[k].w, self.schweben[k].h, self.kopf);
+                let aktiv = self.schweben[k].gruppe.aktiv;
+                for &li in &self.schweben[k].gruppe.leisten.clone() {
+                    self.leisten[li].schwebt = k as i32;
+                    if li == aktiv && !self.leisten[li].zu {
+                        self.leisten[li].sichtbar = true;
+                        self.leisten[li].rect = (0, 0, w, (h - kopf).max(0));
+                    }
+                }
+                continue;
+            }
             // Im Dock halten: ein gesicherter Stand aus einem groesseren
             // Fenster legte sie sonst ausser Reichweite.
             {
@@ -543,10 +572,18 @@ impl DockState {
         }
         serde_json::json!({
             "bereiche": ber,
-            "schweben": self.schweben.iter().map(|s| serde_json::json!({
-                "x": unsk(s.x), "y": unsk(s.y), "w": unsk(s.w), "h": unsk(s.h),
-                "gruppe": gruppe(&s.gruppe),
-            })).collect::<Vec<_>>(),
+            "schweben": self.schweben.iter().map(|s| {
+                let mut o = serde_json::json!({
+                    "x": unsk(s.x), "y": unsk(s.y), "w": unsk(s.w), "h": unsk(s.h),
+                    "gruppe": gruppe(&s.gruppe),
+                });
+                // Abgerissen: dazu die Lage auf dem Bildschirm (Systempunkte).
+                if let Some(r) = s.raus {
+                    o["fenster"] = serde_json::json!(true);
+                    if let Some((x, y)) = r { o["lage"] = serde_json::json!([x, y]); }
+                }
+                o
+            }).collect::<Vec<_>>(),
             "zu": self.leisten.iter().filter(|l| l.zu).map(|l| l.name.clone()).collect::<Vec<_>>(),
         })
     }
@@ -596,7 +633,7 @@ impl DockState {
             for s in ss {
                 if let Some(g) = gruppe_aus(self, &s["gruppe"]) {
                     let gi = |k: &str, d: i32| s[k].as_i64().map(|x| sk(x as i32)).unwrap_or(d);
-                    self.schweben.push(Schwebe { gruppe: g, x: gi("x", 40), y: gi("y", 40), w: gi("w", 300).max(MIN_GROESSE), h: gi("h", 240).max(MIN_GROESSE) });
+                    self.schweben.push(Schwebe { gruppe: g, x: gi("x", 40), y: gi("y", 40), w: gi("w", 300).max(MIN_GROESSE), h: gi("h", 240).max(MIN_GROESSE), raus: raus_aus(s) });
                 }
             }
         }
@@ -645,6 +682,7 @@ impl DockState {
                         if let Some(last) = self.schweben.last_mut() {
                             last.w = s["w"].as_i64().unwrap_or(last.w as i64) as i32;
                             last.h = s["h"].as_i64().unwrap_or(last.h as i64) as i32;
+                            last.raus = raus_aus(s);
                         }
                     }
                 }
@@ -837,6 +875,7 @@ impl Gui {
         if d.leisten[li].zu { return Ok("zu".into()); }
         Ok(match d.ort_von(li) {
             Some(Ort::Bereich(b, _)) => BEREICH_NAMEN[b].into(),
+            Some(Ort::Schwebe(k)) if d.schweben[k].raus.is_some() => "fenster".into(),
             Some(Ort::Schwebe(_)) => "schwebend".into(),
             None => "zu".into(),
         })
@@ -923,7 +962,7 @@ impl Gui {
         }
         d.herausnehmen(li);
         d.leisten[li].zu = false;
-        d.schweben.push(Schwebe { gruppe: Gruppe { leisten: vec![li], aktiv: li, anteil: 1.0 }, x, y, w, h });
+        d.schweben.push(Schwebe { gruppe: Gruppe { leisten: vec![li], aktiv: li, anteil: 1.0 }, x, y, w, h, raus: None });
         d.rechnen();
         Ok(())
     }
@@ -932,6 +971,25 @@ impl Gui {
     pub fn dock_move(&mut self, win: i64, name: &str, bereich: &str, neben: &str) -> Result<(), String> {
         let f = "GUI_DOCK_MOVE";
         let li = self.dock_leiste(win, name, f)?;
+        // "fenster": als eigenes Fenster des Systems hinaus (Weg E). Wo das
+        // nicht geht (Leiste aus Widgets des Gastfensters, kein Bildschirm),
+        // bleibt sie schwebend -- GUI_DOCK_WHERE$ sagt, was daraus wurde.
+        if matches!(bereich.to_lowercase().as_str(), "fenster" | "window") && neben.is_empty() {
+            let d = self.dock_mut(win, f)?;
+            if !matches!(d.ort_von(li), Some(Ort::Schwebe(k)) if d.schweben[k].gruppe.leisten.len() == 1) {
+                let r = d.leisten[li].rect;
+                let (x, y) = if r.2 > 0 { (r.0, r.1 - d.kopf) } else { (d.x + 40, d.y + 40) };
+                let (w, h) = if r.2 > 0 { (r.2, r.3 + d.kopf) } else { (d.sk_breite(), d.kopf * 10) };
+                d.herausnehmen(li);
+                d.leisten[li].zu = false;
+                d.schweben.push(Schwebe { gruppe: Gruppe { leisten: vec![li], aktiv: li, anteil: 1.0 }, x, y, w: w.max(MIN_GROESSE), h: h.max(MIN_GROESSE), raus: None });
+            }
+            if let Some(Ort::Schwebe(k)) = d.ort_von(li) {
+                if d.reissbar(k) && d.schweben[k].raus.is_none() { d.schweben[k].raus = Some(None); }
+            }
+            d.rechnen();
+            return Ok(());
+        }
         let ziel = if neben.is_empty() { Ziel::Rand(Self::bereich_arg(bereich, f)?) } else { Ziel::Reiter(self.dock_leiste(win, neben, f)?) };
         let d = self.dock_mut(win, f)?;
         d.einsetzen(li, ziel);
@@ -973,12 +1031,126 @@ impl Gui {
         self.dock_ordnen();
     }
 
+    /// Weg E, Stufe 3: eine abgerissene Gruppe (`Schwebe::raus`) ist das
+    /// Fenster ihrer Leiste als eigenes Fenster des Systems -- ohne dessen
+    /// Rahmen, mit Titelleiste, Kreuz und Griff der gui als Kopf. Hier, je
+    /// Bild nach der Bedienung, wird aus dem Stand des Docks der der
+    /// Fenster: hinaus, zurueck, Groesse und Lage nachziehen, das Kreuz.
+    pub(super) fn dock_raus_abgleich(&mut self, g: &mut Graphics) {
+        let haupt = g.fenster_lage();
+        let s_px = g.haupt_massstab();
+        for wi in 0..self.windows.len() {
+            if self.windows[wi].dock.is_none() || !self.windows[wi].alive { continue; }
+            let gast_sichtbar = self.windows[wi].visible;
+            let (ox, oy) = (self.windows[wi].x, self.windows[wi].y + self.content_top(wi));
+            let zieht = matches!(self.windows[wi].dock.as_ref().unwrap().zug, Some(Zug::Draussen { .. }));
+            let mut soll: Vec<usize> = Vec::new();
+            let n = self.windows[wi].dock.as_ref().unwrap().schweben.len();
+            for k in 0..n {
+                let (raus, reissbar, li) = {
+                    let d = self.windows[wi].dock.as_ref().unwrap();
+                    (d.schweben[k].raus, d.reissbar(k), d.schweben[k].gruppe.aktiv)
+                };
+                let Some(lage) = raus else { continue };
+                let kind = self.windows[wi].dock.as_ref().unwrap().leisten[li].fenster;
+                let lebt = kind >= 0 && self.windows.get(kind as usize).map(|w| w.alive).unwrap_or(false);
+                if !reissbar || !lebt {
+                    // Geht nicht (mehr): sie bleibt schwebend im Gastfenster.
+                    self.windows[wi].dock.as_deref_mut().unwrap().schweben[k].raus = None;
+                    continue;
+                }
+                let ki = kind as usize;
+                let (zu, titel, schliessbar, name) = {
+                    let l = &self.windows[wi].dock.as_ref().unwrap().leisten[li];
+                    (l.zu, l.titel.clone(), l.schliessbar, l.name.clone())
+                };
+                // Das Kreuz der Leiste (in ihrem Kopf oder Alt+F4): wie das
+                // Kreuz am Reiter -- zu, und GUI_DOCK_CLOSED$ meldet sie.
+                if self.windows[ki].nativ != 0 && self.windows[ki].close_clicked {
+                    self.windows[ki].close_clicked = false;
+                    let d = self.windows[wi].dock.as_deref_mut().unwrap();
+                    d.leisten[li].zu = true;
+                    d.geschlossen = name.clone();
+                    d.rechnen();
+                    continue;
+                }
+                if zu || !gast_sichtbar { continue; }
+                soll.push(ki);
+                let (sw, sh) = { let s = &self.windows[wi].dock.as_ref().unwrap().schweben[k]; (s.w, s.h) };
+                if self.windows[ki].nativ == 0 {
+                    // Hinaus: dort, wo die Gruppe im Gastfenster stand.
+                    let (sx, sy) = { let s = &self.windows[wi].dock.as_ref().unwrap().schweben[k]; (s.x, s.y) };
+                    let (x, y) = lage.unwrap_or((haupt.0 + (ox + sx) * s_px, haupt.1 + (oy + sy) * s_px));
+                    let Some(id) = g.nativ_anlegen(&titel, sw, sh, x, y, true, false) else {
+                        self.windows[wi].dock.as_deref_mut().unwrap().schweben[k].raus = None;
+                        continue;
+                    };
+                    let w = &mut self.windows[ki];
+                    w.nativ_vorher = Some((w.x, w.y, w.chrome));
+                    w.dock_raus_vorher = Some((w.closable, w.resizable, w.title.clone()));
+                    w.nativ = id;
+                    w.x = 0; w.y = 0; w.w = sw; w.h = sh;
+                    w.chrome = true; w.closable = schliessbar; w.resizable = true;
+                    w.title = titel;
+                    w.visible = true;
+                    self.clear_window_interactions(ki);
+                    self.relayout(ki);
+                    self.windows[wi].dock.as_deref_mut().unwrap().schweben[k].raus = Some(Some((x, y)));
+                } else {
+                    // Draussen: Groesse (Griff der gui) und Lage nachziehen.
+                    let id = self.windows[ki].nativ;
+                    let (kw, kh) = (self.windows[ki].w, self.windows[ki].h);
+                    self.windows[ki].title = titel;
+                    self.windows[ki].closable = schliessbar;
+                    self.windows[ki].visible = true;
+                    let d = self.windows[wi].dock.as_deref_mut().unwrap();
+                    d.schweben[k].w = kw; d.schweben[k].h = kh;
+                    if !zieht { if let Some(l) = g.nativ_lage(id) { d.schweben[k].raus = Some(Some(l)); } }
+                }
+            }
+            // Fenster, deren Gruppe nicht (mehr) draussen ist: zurueck ins
+            // Gastfenster -- dock_fenster_setzen legt sie auf ihre Leiste.
+            let zurueck: Vec<usize> = (0..self.windows.len()).filter(|&ki| {
+                let w = &self.windows[ki];
+                w.dock_host == wi as i32 && w.nativ != 0 && w.dock_raus_vorher.is_some() && !soll.contains(&ki)
+            }).collect();
+            for ki in zurueck {
+                g.nativ_schliessen(self.windows[ki].nativ);
+                let w = &mut self.windows[ki];
+                w.nativ = 0;
+                if let Some((x, y, c)) = w.nativ_vorher.take() { w.x = x; w.y = y; w.chrome = c; }
+                if let Some((c, r, t)) = w.dock_raus_vorher.take() { w.closable = c; w.resizable = r; w.title = t; }
+                self.clear_window_interactions(ki);
+            }
+            if let Some(d) = self.windows[wi].dock.as_deref_mut() { d.rechnen(); }
+            self.dock_fenster_setzen(wi);
+        }
+    }
+
+    /// Ein Druck auf die Titelleiste einer abgerissenen Leiste (das Fenster
+    /// `ki` als eigenes Fenster): Zug ueber den Bildschirm, Doppelklick =
+    /// heim in ihren Bereich.
+    pub(super) fn dock_raus_greifen(&mut self, ki: usize) {
+        let h = self.windows[ki].dock_host;
+        if h < 0 { return; }
+        let dbl = self.dbl_click;
+        let Some(d) = self.windows.get_mut(h as usize).and_then(|w| w.dock.as_deref_mut()) else { return };
+        let Some(li) = d.leisten.iter().position(|l| l.fenster == ki as i64) else { return };
+        let Some(Ort::Schwebe(k)) = d.ort_von(li) else { return };
+        if d.schweben[k].raus.is_none() { return; }
+        if dbl { d.heimholen(k); d.rechnen(); return; }
+        d.zug = Some(Zug::Draussen { nr: k, greif: None, ziel: None });
+    }
+
     /// Die angedockten Fenster auf ihre Leisten setzen.
     pub(super) fn dock_fenster_setzen(&mut self, wi: usize) {
         let (hx, hy) = (self.windows[wi].x, self.windows[wi].y + self.content_top(wi));
         let gast_sichtbar = self.windows[wi].visible;
         let auftraege: Vec<(i64, bool, (i32, i32, i32, i32))> = match self.windows[wi].dock.as_ref() {
-            Some(d) => d.leisten.iter().filter(|l| l.fenster >= 0).map(|l| (l.fenster, l.sichtbar, l.rect)).collect(),
+            // Abgerissene Leisten fuehrt `dock_raus_abgleich`.
+            Some(d) => d.leisten.iter().filter(|l| l.fenster >= 0)
+                .filter(|l| l.schwebt < 0 || d.schweben.get(l.schwebt as usize).map(|s| s.raus.is_none()).unwrap_or(true))
+                .map(|l| (l.fenster, l.sichtbar, l.rect)).collect(),
             None => return,
         };
         for (k, sichtbar, (x, y, w, h)) in auftraege {
@@ -1096,9 +1268,22 @@ impl Gui {
 
     /// Einen laufenden Zug am Dock weiterfuehren (jedes Bild, solange die
     /// Taste haengt) und beim Loslassen abschliessen.
-    pub(super) fn dock_zug_pass(&mut self, is_down: bool, mx: i32, my: i32) {
+    pub(super) fn dock_zug_pass(&mut self, g: &mut Graphics, is_down: bool, mx: i32, my: i32) {
+        // Ausserhalb des Hauptfensters? (Punkte der gui; nur auf seiner Flaeche)
+        let (sw, sh) = (g.screen_width() as i32, g.screen_height() as i32);
+        let draussen = self.flaeche == 0 && (mx < 0 || my < 0 || mx >= sw || my >= sh);
+        let zeiger = g.zeiger_bildschirm();
+        let haupt = g.fenster_lage();
+        let s_px = g.haupt_massstab();
+        let moeglich = crate::nativfenster::moeglich();
         for wi in 0..self.windows.len() {
             let (ox, oy) = (self.windows[wi].x, self.windows[wi].y + self.content_top(wi));
+            // Fuer einen Zug draussen: das native Fenster der Leiste und wo
+            // der Zeiger im Gastfenster stuende.
+            let kind_nativ: Vec<(i64, u32)> = self.windows.iter().enumerate().filter(|(_, w)| w.dock_host == wi as i32 && w.nativ != 0)
+                .map(|(i, w)| (i as i64, w.nativ)).collect();
+            let (zx, zy) = ((zeiger.0 - haupt.0) / s_px, (zeiger.1 - haupt.1) / s_px);
+            let im_haupt = zx >= 0 && zy >= 0 && zx < sw && zy < sh;
             let d = match self.windows[wi].dock.as_deref_mut() { Some(d) if d.zug.is_some() => d, _ => continue };
             let (cx, cy) = (mx - ox, my - oy);
             let zug = d.zug.take().unwrap();
@@ -1110,13 +1295,46 @@ impl Gui {
                     if is_down { Some(Zug::Trenner { art, m0, a0, b0 }) } else { None }
                 }
                 Zug::Schwebe { nr, dx, dy } => {
-                    if nr < d.schweben.len() {
-                        let s = &mut d.schweben[nr];
-                        s.x = (cx - dx).clamp(d.x - s.w + 40, d.x + d.w - 40);
-                        s.y = (cy - dy).clamp(d.y - 2, d.y + d.h - 20);
+                    // Ueber den Rand des Hauptfensters gezogen: die Leiste
+                    // reisst ab und wird ein eigenes Fenster (Weg E, Stufe 3)
+                    // -- unter dem Zeiger, wo man sie gegriffen hat.
+                    if is_down && draussen && moeglich && d.reissbar(nr) {
+                        let greif = (dx * s_px, dy * s_px);
+                        d.schweben[nr].raus = Some(Some((zeiger.0 - greif.0, zeiger.1 - greif.1)));
                         d.rechnen();
+                        Some(Zug::Draussen { nr, greif: Some(greif), ziel: None })
+                    } else {
+                        if nr < d.schweben.len() {
+                            let s = &mut d.schweben[nr];
+                            s.x = (cx - dx).clamp(d.x - s.w + 40, d.x + d.w - 40);
+                            s.y = (cy - dy).clamp(d.y - 2, d.y + d.h - 20);
+                            d.rechnen();
+                        }
+                        if is_down { Some(Zug::Schwebe { nr, dx, dy }) } else { None }
                     }
-                    if is_down { Some(Zug::Schwebe { nr, dx, dy }) } else { None }
+                }
+                Zug::Draussen { nr, greif, ziel } => {
+                    if nr >= d.schweben.len() || d.schweben[nr].raus.is_none() { None } else {
+                        let li = d.schweben[nr].gruppe.aktiv;
+                        let lage = d.schweben[nr].raus.flatten();
+                        let greif = greif.or(lage.map(|(x, y)| (zeiger.0 - x, zeiger.1 - y)));
+                        if let Some((gx, gy)) = greif {
+                            let neu = (zeiger.0 - gx, zeiger.1 - gy);
+                            d.schweben[nr].raus = Some(Some(neu));
+                            let id = kind_nativ.iter().find(|(k, _)| *k == d.leisten[li].fenster).map(|p| p.1);
+                            if let Some(id) = id { g.nativ_lage_setzen(id, neu.0, neu.1); }
+                        }
+                        // Ueber dem Gastfenster: andocken, wo ein Reiter
+                        // hinfiele -- frei schweben hiesse hier: draussen bleiben.
+                        let ziel = if im_haupt {
+                            match d.ziel_unter(li, zx - ox, zy - oy) { Ziel::Schweben(..) => None, z => Some(z) }
+                        } else { None };
+                        if is_down { Some(Zug::Draussen { nr, greif, ziel }) } else {
+                            if let Some(z) = ziel { d.einsetzen(li, z); }
+                            d.rechnen();
+                            None
+                        }
+                    }
                 }
                 Zug::Groesse { nr, dx, dy } => {
                     if nr < d.schweben.len() {
@@ -1292,14 +1510,24 @@ impl Gui {
                 g.pop_clip();
             }
         }
-        if let Some(Zug::Leiste { leiste, aktiv: true, ziel: Some(z), .. }) = &d.zug {
-            let (zx, zy, zw, zh) = d.ziel_rect(*z);
+        let ziel = match &d.zug {
+            Some(Zug::Leiste { aktiv: true, ziel: Some(z), .. }) | Some(Zug::Draussen { ziel: Some(z), .. }) => Some(*z),
+            _ => None,
+        };
+        if let Some(z) = ziel {
+            let (zx, zy, zw, zh) = d.ziel_rect(z);
             let c = self.th("accent");
             g.box_fill(ox + zx, oy + zy, ox + zx + zw - 1, oy + zy + zh - 1, with_alpha(c, 0x50));
             g.rect(ox + zx, oy + zy, ox + zx + zw - 1, oy + zy + zh - 1, c);
-            let _ = leiste;
         }
     }
+}
+
+/// "fenster"/"lage" eines Eintrags in "schweben" (GUI_DOCK_STATE$).
+fn raus_aus(s: &serde_json::Value) -> Option<Option<(i32, i32)>> {
+    if !s["fenster"].as_bool().unwrap_or(false) { return None; }
+    let l = s["lage"].as_array();
+    Some(l.and_then(|a| Some((a.first()?.as_i64()? as i32, a.get(1)?.as_i64()? as i32))))
 }
 
 /// Eine Farbe mit Deckkraft (1..255; 0 hiesse deckend).
@@ -1389,6 +1617,34 @@ mod tests {
         f.einsetzen(0, Ziel::Rand(2));
         f.nachtragen(0);
         assert_eq!(f.ort_von(0), Some(Ort::Bereich(1, 0)));
+    }
+
+    #[test]
+    fn abgerissen_ohne_platz_im_gast_und_im_stand() {
+        let mut d = dock();
+        // ausgabe traegt ein eigenes Fenster (GUI_DOCK_WINDOW) und schwebt
+        d.leisten[2].fenster = 7;
+        d.einsetzen(2, Ziel::Schweben(300, 100));
+        assert!(d.reissbar(0));
+        d.schweben[0].raus = Some(Some((1500, 200)));
+        d.rechnen();
+        // kein Kopf, kein Treffertest im Gastfenster -- aber zu sehen
+        assert!(d.geom.iter().all(|g| !matches!(g.ort, Ort::Schwebe(_))));
+        assert!(d.schwebe_unter(310, 110).is_none());
+        assert!(d.leisten[2].sichtbar && d.leisten[2].schwebt == 0);
+        let id = |n: i32| n;
+        let st = d.stand(&id);
+        assert_eq!(st["schweben"][0]["fenster"], serde_json::json!(true));
+        assert_eq!(st["schweben"][0]["lage"], serde_json::json!([1500, 200]));
+        let mut e = dock();
+        e.leisten[2].fenster = 7;
+        e.stand_setzen(&st, &id).unwrap();
+        e.rechnen();
+        assert_eq!(e.schweben[0].raus, Some(Some((1500, 200))));
+        // Leisten aus Widgets des Gastfensters reissen (noch) nicht ab
+        let mut f = dock();
+        f.einsetzen(3, Ziel::Schweben(10, 10));
+        assert!(!f.reissbar(0));
     }
 
     #[test]

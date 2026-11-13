@@ -51,7 +51,7 @@ IMPORT "gui"
 | `GUI_DOCK_HEAD_RECT(win, name$)` | TUPLE | the free part of the header right of the tabs -- room for the panel's filter, counters, buttons |
 | `GUI_DOCK_CENTER(win)` | TUPLE | the rectangle of the centre (x, y, w, h) |
 | `GUI_DOCK_SHOWN(win, name$)` | BOOLEAN | is the content of the panel shown (front tab, area on, not hidden)? |
-| `GUI_DOCK_WHERE$(win, name$)` | STRING | `links`, `rechts`, `unten`, `schwebend` or `zu` (hidden) |
+| `GUI_DOCK_WHERE$(win, name$)` | STRING | `links`, `rechts`, `unten`, `schwebend`, `fenster` (torn off, a system window of its own) or `zu` (hidden) |
 | `GUI_DOCK_SHOW(win, name$, an)` | — | hide a panel or show it again (then in front) |
 | `GUI_DOCK_ACTIVATE(win, name$)` | — | bring the panel's tab to the front |
 | `GUI_DOCK_TITLE(win, name$, titel$)` | — | relabel the tab |
@@ -65,7 +65,7 @@ IMPORT "gui"
 | `GUI_DOCK_SHARE(win, name$, anteil)` | — | the share of the panel's group in its area, compared with the other groups there |
 | `GUI_DOCK_GET_SIZE(win, bereich$)` | INTEGER | width or height of an area |
 | `GUI_DOCK_FLOAT(win, name$, x, y, w, h)` | — | detach a panel (floating at this place) |
-| `GUI_DOCK_MOVE(win, name$, bereich$ [, neben$])` | — | dock a panel: as a new group in the area or as a tab next to `neben$` |
+| `GUI_DOCK_MOVE(win, name$, bereich$ [, neben$])` | — | dock a panel: as a new group in the area or as a tab next to `neben$`; `fenster` tears it off as a window of its own (only panels from `GUI_DOCK_WINDOW`, others stay floating) |
 | `GUI_DOCK_STATE$(win)` | STRING | the arrangement as JSON (areas, groups, front tabs, sizes, floating, hidden) |
 | `GUI_DOCK_SET_STATE(win, stand$)` | — | take over an arrangement; panels that do not exist yet get their place as soon as they are registered |
 | `GUI_WINDOW_CLOSABLE(win, an)` | — | show a close button (default: off) |
@@ -760,7 +760,8 @@ WEND
   `DHRT_NATIV_MASSSTAB=1.5` fixes it (tests without a second screen).
 - **Not yet** (later stages): popups beyond the edge of the native window,
   screen reader in the native window, the owner on Linux, tear-off dock
-  panels, recordings (`AUTOMATION_PLAY`) in the native window.
+  panels made of widgets of the host window (`GUI_DOCK_ADD`; those from
+  `GUI_DOCK_WINDOW` do tear off, see Dock), recordings (`AUTOMATION_PLAY`) in the native window.
 - While a modal dialog is open, only **its** menus work (context menu,
   menu bar) -- those of the windows behind it stay locked. Up to 2026.47
   all of them were locked, the dialog's own too.
@@ -4310,6 +4311,20 @@ in the window order directly above the host window -- also after someone
 clicked into the host window. That is how a `.dhform` comes in as a panel,
 for instance one of an IDE plugin: its widgets refer to each other by number,
 and inserted into a foreign window those would shift.
+
+**Tearing off** (real windows, see [As a real OS window](#as-a-real-os-window)):
+a floating panel from `GUI_DOCK_WINDOW`, dragged by its head beyond the edge
+of the main window, becomes a **system window of its own** -- beside the
+program or on the second screen. It has no system frame; the gui's title bar
+is its head (title, close box, grip at the bottom right). Drag the head over
+an area of the dock and the hint shows the target; on release it docks
+there. A double click on the head brings it back to its area. Its close box
+(and Alt+F4) closes it like the close box on the tab.
+`GUI_DOCK_MOVE(w, name$, "fenster")` tears it off from the program,
+`GUI_DOCK_WHERE$` then says `fenster`, and `GUI_DOCK_STATE$` remembers its
+position on the screen. Panels made of widgets of the host window
+(`GUI_DOCK_ADD`) stay floating in the host window for now, as does every
+panel where there are no real windows.
 
 **Remembering the arrangement:** `GUI_DOCK_STATE$` returns it as JSON (sizes
 in logical points, so independent of `GUI_SCALE`), `GUI_DOCK_SET_STATE` takes

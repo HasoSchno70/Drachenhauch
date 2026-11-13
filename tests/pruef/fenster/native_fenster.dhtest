@@ -312,8 +312,11 @@ massstab 1.5
 ' Die Maus kommt in Pixeln des Fensters und wird in Punkte der gui
 ' umgerechnet: Pixel (200, 95) sind bei Massstab 1.5 die Punkte (133, 63) --
 ' im Knopf (20..160, 40..70); ohne Umrechnung laege der Klick daneben.
+' Alles in EINEM Bild ("+"): das Fenster waechst nach dem Anlegen auf 1.5,
+' und steht der echte Zeiger darueber, meldet Windows dessen Lage -- ein
+' Druck danach traefe die (einmal gesehen, 2026-11-13).
 IMPORT "helfer.dh"
-PRINT sende$(skript$(), "probe.dh", "roh:512:0:6226120;roh:513:1:6226120;roh:514:0:6226120", "palette")
+PRINT sende$(skript$(), "probe.dh", "roh:512:0:6226120+roh:513:1:6226120+roh:514:0:6226120", "palette")
 --- datei helfer.dh
 IMPORT "{sammlung}/../_hilfen/fenstersender.dh"
 FUNCTION skript$() AS STRING

@@ -776,3 +776,37 @@ Pruefung: zwei neue Faelle (Groesse und Farben bei 1.5 per
 `fensterpixel.ps1 groesse`, Klick in Pixeln trifft den Knopf in Punkten);
 Gegenprobe: Mausumrechnung und Matrix verfaelscht -- je genau ihr Fall
 faellt.
+
+## Echte OS-Fenster, Weg E Stufe 3a: Leisten abreissen (2026-11-13)
+
+- Zwei Arten Leisten: `GUI_DOCK_WINDOW` traegt ein eigenes gui-Fenster
+  (Plugins), `GUI_DOCK_ADD` Widgets des Gastfensters (IDE, Studio: 49
+  Aufrufe gegen 1). Die zweite Art laesst sich nicht in ein anderes Fenster
+  umhaengen -- die Handles der Widgets tragen ihr Fenster. 3a nimmt die
+  erste Art und baut Geste, Rueckweg und Stand; 3b (Teilflaechen fuer
+  `GUI_DOCK_ADD`) folgt.
+- `Schwebe::raus`: die Gruppe steht draussen (`Some(None)` = soll hinaus,
+  Lage rechnet der Abgleich). Draussen hat sie keinen Platz im Gastfenster
+  (`rechnen` legt keine Geometrie an), ihre Leiste gilt als sichtbar.
+  `dock_raus_abgleich` macht je Bild aus dem Stand des Docks den der
+  Fenster: das Fenster der Leiste wird nativ OHNE Rahmen des Systems
+  (`GLFW_DECORATED` aus), mit Titelleiste, Kreuz und Griff der gui als
+  Kopf (`dock_raus_vorher` merkt, was das Fenster vorher war).
+- Abreissen: `Zug::Schwebe` ueber den Rand des Hauptfensters (die
+  Mauslage geht dort ueber den Rand, waehrend die Taste haengt) wird
+  `Zug::Draussen` -- gerechnet in Bildschirmpunkten (`zeiger_bildschirm`:
+  Lage des Fensters mit dem Zeiger plus Zeiger darin). Ueber einem Bereich
+  zeigt der Hinweis das Ziel, beim Loslassen `einsetzen`; ein Zug ins Freie
+  des Gastfensters heisst draussen bleiben.
+- **Fund beim Pruefen:** verschiebt das Programm ein Fenster unter dem
+  Zeiger, meldet Windows danach die Lage des ECHTEN Zeigers -- eine
+  geschickte Bewegung galt nur bis zum naechsten Bild, das Loslassen danach
+  landete am echten Zeiger. Im Gebrauch richtig; der Fenstersender kennt
+  jetzt "+" (Nachrichten ohne Abstand, also im selben Bild).
+- `GUI_DOCK_MOVE(..., "fenster")`, `GUI_DOCK_WHERE$` = `fenster`,
+  `GUI_DOCK_STATE$` mit `fenster` und `lage`; das Kreuz (Alt+F4) schliesst
+  wie das am Reiter.
+Pruefung: `tests/pruef/fenster/dock_abreissen.dhtest` (abreissen, andocken,
+Kreuz, Stand, Rueckfall), Rust-Test `abgerissen_ohne_platz_im_gast_und_im_stand`;
+Gegenprobe in einem verfaelschten Bau (Abreissen, Andocken, Stand, Kreuz)
+-- je genau ihr Fall faellt.
