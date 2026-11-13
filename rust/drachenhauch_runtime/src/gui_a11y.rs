@@ -332,9 +332,9 @@ impl Gui {
                         if let Some(row) = t.rows.get(dz) {
                             for (c, cell) in row.iter().enumerate().take(63) {
                                 let mut z = Node::new(Role::Cell);
-                                let text = match cell.kind {
-                                    CellKind::Check => (if cell.value > 0.5 { "ja" } else { "nein" }).to_string(),
-                                    CellKind::Bar => zahl_kurz(cell.value),
+                                let text = match cell.kind() {
+                                    CellKind::Check => (if cell.value() > 0.5 { "ja" } else { "nein" }).to_string(),
+                                    CellKind::Bar => zahl_kurz(cell.value()),
                                     _ => cell.text.clone(),
                                 };
                                 z.set_label(text.clone());

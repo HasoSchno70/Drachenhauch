@@ -824,9 +824,28 @@ fn parse_align(s: &str) -> Option<i8> {
     })
 }
 
+/// Die Sortierregel der Tabelle an EINER Stelle: beide als Zahl lesbar =
+/// zahlenweise (sonst stuende "10" vor "9"), sonst der Text klein.
+fn sortier_vergleich(za: Option<f64>, ta: &str, zb: Option<f64>, tb: &str) -> std::cmp::Ordering {
+    match (za, zb) {
+        (Some(x), Some(y)) => x.partial_cmp(&y).unwrap_or(std::cmp::Ordering::Equal),
+        _ => ta.cmp(tb),
+    }
+}
+
+/// Eine Zelle: ihr Text, und nur wenn gesetzt ihr Stil. Bis 2026-11 trug
+/// jede Zelle Farben, Art, Bild, Wert und Ausrichtung selbst (64 Byte), fast
+/// immer auf der Vorgabe -- eine Tabelle mit 1 Mio. Zeilen zu 5 Spalten hielt
+/// so rund 320 MB nur fuer Vorgaben. Jetzt 32 Byte plus Text.
 #[derive(Clone, Default)]
 pub struct Cell {
     text: String,
+    stil: Option<Box<ZellStil>>,
+}
+
+/// Was eine Zelle ausser ihrem Text haben kann (siehe `Cell`).
+#[derive(Clone)]
+struct ZellStil {
     /// -1 = Farbe des Themas (nicht eingefroren -- ein Themenwechsel wirkt).
     fg: i64,
     /// -1 = keine eigene Flaeche (Zeilenfarbe bzw. Zebra schlaegt durch).
@@ -839,11 +858,26 @@ pub struct Cell {
     /// -1 = Ausrichtung der Spalte uebernehmen.
     align: i8,
 }
+impl Default for ZellStil {
+    fn default() -> Self { ZellStil { fg: -1, bg: -1, kind: CellKind::Text, image: -1, value: 0.0, align: -1 } }
+}
 
 impl Cell {
-    fn text(s: String) -> Cell {
-        Cell { text: s, fg: -1, bg: -1, kind: CellKind::Text, image: -1, value: 0.0, align: -1 }
-    }
+    fn text(s: String) -> Cell { Cell { text: s, stil: None } }
+    fn fg(&self) -> i64 { self.stil.as_ref().map_or(-1, |s| s.fg) }
+    fn bg(&self) -> i64 { self.stil.as_ref().map_or(-1, |s| s.bg) }
+    fn kind(&self) -> CellKind { self.stil.as_ref().map_or(CellKind::Text, |s| s.kind) }
+    fn image(&self) -> i64 { self.stil.as_ref().map_or(-1, |s| s.image) }
+    fn value(&self) -> f64 { self.stil.as_ref().map_or(0.0, |s| s.value) }
+    fn align(&self) -> i8 { self.stil.as_ref().map_or(-1, |s| s.align) }
+    /// Den Stil zum Schreiben -- legt ihn erst an, wenn jemand schreibt.
+    fn stil_mut(&mut self) -> &mut ZellStil { self.stil.get_or_insert_with(Default::default) }
+    fn set_fg(&mut self, v: i64) { if v != self.fg() { self.stil_mut().fg = v; } }
+    fn set_bg(&mut self, v: i64) { if v != self.bg() { self.stil_mut().bg = v; } }
+    fn set_kind(&mut self, v: CellKind) { if v != self.kind() { self.stil_mut().kind = v; } }
+    fn set_image(&mut self, v: i64) { if v != self.image() { self.stil_mut().image = v; } }
+    fn set_value(&mut self, v: f64) { if v != self.value() { self.stil_mut().value = v; } }
+    fn set_align(&mut self, v: i8) { if v != self.align() { self.stil_mut().align = v; } }
 }
 
 pub struct TableState {
@@ -1087,24 +1121,60 @@ impl TableState {
     /// Punktespalte die haeufigste Enttaeuschung an einer Tabelle.
     fn rebuild_view(&mut self) {
         if self.baum { return self.rebuild_baum(); }
-        let mut v: Vec<usize> = (0..self.rows.len()).filter(|&r| self.passt(r)).collect();
+        // Die Filter EINMAL klein schreiben, nicht je Zeile (1 Mio. Zeilen:
+        // 137 ms, davon der groesste Teil fuer immer dieselbe Umwandlung).
+        let filter: Vec<(usize, String)> = self.filters.iter().enumerate()
+            .filter(|(_, f)| !f.is_empty()).map(|(c, f)| (c, f.to_lowercase())).collect();
+        let mut v: Vec<usize> = if filter.is_empty() { (0..self.rows.len()).collect() } else {
+            (0..self.rows.len()).filter(|&r| filter.iter().all(|(c, f)| {
+                self.cell(r, *c).map(|x| x.text.as_str()).unwrap_or("").to_lowercase().contains(f.as_str())
+            })).collect()
+        };
         if self.sort_col >= 0 {
+            // Den Schluessel je Zeile EINMAL rechnen (Zahl, wenn lesbar, und
+            // der Text klein) -- vorher las jeder der ~20 Mio. Vergleiche bei
+            // 1 Mio. Zeilen beide Texte neu als Zahl und schrieb beide klein
+            // (1,3 s). Dieselbe Regel wie `sortier_vergleich`.
             let c = self.sort_col as usize;
             let desc = self.sort_desc;
-            let rows = &self.rows;                 // nur lesend -- `v` ist lokal
-            let txt = |r: usize| -> &str {
-                rows.get(r).and_then(|row| row.get(c)).map(|x| x.text.as_str()).unwrap_or("")
-            };
-            v.sort_by(|&a, &b| {
-                let (sa, sb) = (txt(a), txt(b));
-                let ord = match (sa.trim().parse::<f64>(), sb.trim().parse::<f64>()) {
-                    (Ok(x), Ok(y)) => x.partial_cmp(&y).unwrap_or(std::cmp::Ordering::Equal),
-                    _ => sa.to_lowercase().cmp(&sb.to_lowercase()),
-                };
+            let mut k: Vec<(usize, Option<f64>, String)> = v.iter().map(|&r| {
+                let s = self.cell(r, c).map(|x| x.text.as_str()).unwrap_or("");
+                (r, s.trim().parse::<f64>().ok(), s.to_lowercase())
+            }).collect();
+            k.sort_by(|a, b| {
+                let ord = sortier_vergleich(a.1, &a.2, b.1, &b.2);
                 if desc { ord.reverse() } else { ord }
             });
+            v = k.into_iter().map(|x| x.0).collect();
         }
         self.view = v;
+    }
+
+    /// Eine Zelle hat sich geaendert (GUI_TABLE_SET_CELL, Bearbeiten im
+    /// Feld): nur DIESE Zeile neu einordnen statt die ganze Ansicht neu zu
+    /// bauen -- das kostete bei 1 Mio. Zeilen 1,3 s je Zelle, und ein
+    /// Programm, das Zellen in einer Schleife setzt, wurde quadratisch.
+    /// Haengt weder Filter noch Sortierung an der Spalte, bleibt alles, wie
+    /// es ist; im Baum der volle Neubau.
+    fn zelle_geaendert(&mut self, r: usize, c: usize) {
+        if self.baum { return self.rebuild_view(); }
+        let gefiltert = self.filters.get(c).map(|f| !f.is_empty()).unwrap_or(false);
+        let sortiert = self.sort_col == c as i32;
+        if !gefiltert && !sortiert { return; }
+        if let Some(p) = self.view.iter().position(|&x| x == r) { self.view.remove(p); }
+        if !self.passt(r) { return; }
+        let pos = if self.sort_col >= 0 {
+            // Hinter alle gleichen -- wie die stabile Sortierung beim Neubau
+            // stellte, solange r die juengere Zeile ist; sonst davor.
+            self.view.partition_point(|&x| match self.vergleiche(x, r) {
+                std::cmp::Ordering::Less => true,
+                std::cmp::Ordering::Equal => x < r,
+                std::cmp::Ordering::Greater => false,
+            })
+        } else {
+            self.view.partition_point(|&x| x < r)
+        };
+        self.view.insert(pos, r);
     }
 
     /// Vergleich zweier Datenzeilen nach der Sortierspalte -- dieselbe Regel
@@ -1115,10 +1185,7 @@ impl TableState {
             self.rows.get(r).and_then(|row| row.get(c)).map(|x| x.text.as_str()).unwrap_or("")
         };
         let (sa, sb) = (txt(a), txt(b));
-        let ord = match (sa.trim().parse::<f64>(), sb.trim().parse::<f64>()) {
-            (Ok(x), Ok(y)) => x.partial_cmp(&y).unwrap_or(std::cmp::Ordering::Equal),
-            _ => sa.to_lowercase().cmp(&sb.to_lowercase()),
-        };
+        let ord = sortier_vergleich(sa.trim().parse::<f64>().ok(), &sa.to_lowercase(), sb.trim().parse::<f64>().ok(), &sb.to_lowercase());
         if self.sort_desc { ord.reverse() } else { ord }
     }
 
@@ -1313,7 +1380,7 @@ impl TableState {
     fn align_of(&self, r: usize, c: usize) -> i8 {
         let ca = *self.col_align.get(c).unwrap_or(&0);
         match self.cell(r, c) {
-            Some(cell) if cell.align >= 0 => cell.align,
+            Some(cell) if cell.align() >= 0 => cell.align(),
             _ => ca,
         }
     }
@@ -1355,8 +1422,8 @@ impl TableState {
     /// Inhalt werden zu Leerzeichen -- sie sind dort die Trenner.
     fn zell_text(&self, r: usize, c: usize) -> String {
         let s = match self.cell(r, c) {
-            Some(x) if x.kind == CellKind::Check => (if x.value >= 0.5 { "1" } else { "0" }).to_string(),
-            Some(x) if x.kind == CellKind::Bar => zahl_kurz(x.value),
+            Some(x) if x.kind() == CellKind::Check => (if x.value() >= 0.5 { "1" } else { "0" }).to_string(),
+            Some(x) if x.kind() == CellKind::Bar => zahl_kurz(x.value()),
             Some(x) => x.text.clone(),
             None => String::new(),
         };
@@ -1380,7 +1447,7 @@ impl TableState {
     /// eine Hakenzelle nimmt 1/0/ja/nein. Liefert, ob geschrieben wurde.
     fn zelle_schreiben(&mut self, r: usize, c: usize, s: &str) -> bool {
         if !self.col_editable(c) || r >= self.rows.len() { return false; }
-        let kind = self.cell(r, c).map(|x| x.kind).unwrap_or(CellKind::Text);
+        let kind = self.cell(r, c).map(|x| x.kind()).unwrap_or(CellKind::Text);
         match kind {
             CellKind::Check => {
                 let v = match s.trim().to_lowercase().as_str() {
@@ -1388,7 +1455,7 @@ impl TableState {
                     "0" | "nein" | "false" | "falsch" | "" => 0.0,
                     _ => return false,
                 };
-                if let Some(x) = self.cell_mut(r, c) { x.value = v; }
+                if let Some(x) = self.cell_mut(r, c) { x.set_value(v); }
                 true
             }
             CellKind::Text => {
@@ -6193,6 +6260,39 @@ mod formate_tests {
 #[cfg(test)]
 mod tabelle_anhaengen_tests {
     use super::{Cell, TableState};
+
+    // Nach jeder geaenderten Zelle (gezielt einsortiert) dieselbe Ansicht
+    // wie nach dem vollen Neubau -- mit Filter, Sortierung auf- und
+    // absteigend, gleichen Schluesseln, Zahlen und Text gemischt.
+    #[test]
+    fn zelle_aendern_wie_neu_gebaut() {
+        let mut zufall: u64 = 7;
+        let mut naechste = |n: usize| { zufall = zufall.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407); ((zufall >> 33) as usize) % n.max(1) };
+        let texte = ["a1", "b2", "ab", "c", "10", "9", "A1", "", " 3 "];
+        for runde in 0..40 {
+            let mut t = TableState::default();
+            for _ in 0..60 {
+                t.rows.push(vec![Cell::text(texte[naechste(texte.len())].to_string()), Cell::text(texte[naechste(texte.len())].to_string())]);
+                t.row_fg.push(-1);
+                t.row_bg.push(-1);
+            }
+            if runde % 3 != 0 { t.filters = vec![String::new(), "a".to_string()]; }
+            if runde % 4 != 1 { t.sort_col = (runde % 2) as i32; t.sort_desc = runde % 5 == 0; }
+            t.rebuild_view();
+            for _ in 0..80 {
+                let (r, c) = (naechste(t.rows.len()), naechste(2));
+                t.rows[r][c].text = texte[naechste(texte.len())].to_string();
+                t.zelle_geaendert(r, c);
+                let mut neu = TableState::default();
+                neu.rows = t.rows.clone();
+                neu.filters = t.filters.clone();
+                neu.sort_col = t.sort_col;
+                neu.sort_desc = t.sort_desc;
+                neu.rebuild_view();
+                assert_eq!(t.view, neu.view, "runde {}", runde);
+            }
+        }
+    }
 
     // Nach jedem Anhaengen muss die Ansicht dieselbe sein wie nach dem
     // vollen Neubau -- flach und als Baum, mit und ohne Filter/Sortierung,

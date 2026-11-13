@@ -98,7 +98,7 @@ impl Gui {
         let t = self.tbl_mut(h, "GUI_TABLE_SET_CELL")?;
         let (r, c) = Self::tbl_rc(t, r, c, "GUI_TABLE_SET_CELL")?;
         t.cell_mut(r, c).unwrap().text = text;
-        t.rebuild_view();   // Filter/Sortierung haengen am Text
+        t.zelle_geaendert(r, c);   // Filter/Sortierung haengen am Text
         Ok(())
     }
     pub fn table_get_cell(&self, h: i64, r: i64, c: i64) -> Result<String, String> {
@@ -113,8 +113,8 @@ impl Gui {
         let t = self.tbl_mut(h, "GUI_TABLE_CELL_COLOR")?;
         let (r, c) = Self::tbl_rc(t, r, c, "GUI_TABLE_CELL_COLOR")?;
         let cell = t.cell_mut(r, c).unwrap();
-        cell.fg = fg;
-        cell.bg = bg;
+        cell.set_fg(fg);
+        cell.set_bg(bg);
         Ok(())
     }
     pub fn table_cell_align(&mut self, h: i64, r: i64, c: i64, wie: &str) -> Result<(), String> {
@@ -122,7 +122,7 @@ impl Gui {
             "GUI_TABLE_CELL_ALIGN: '{}' unbekannt -- links, mitte oder rechts", wie))?;
         let t = self.tbl_mut(h, "GUI_TABLE_CELL_ALIGN")?;
         let (r, c) = Self::tbl_rc(t, r, c, "GUI_TABLE_CELL_ALIGN")?;
-        t.cell_mut(r, c).unwrap().align = a;
+        t.cell_mut(r, c).unwrap().set_align(a);
         Ok(())
     }
     /// Ganze Zeile faerben -- ein Aufruf statt einer je Spalte.
@@ -144,7 +144,7 @@ impl Gui {
             "GUI_TABLE_CELL_KIND: '{}' unbekannt -- text, bild, haken, balken, knopf", art))?;
         let t = self.tbl_mut(h, "GUI_TABLE_CELL_KIND")?;
         let (r, c) = Self::tbl_rc(t, r, c, "GUI_TABLE_CELL_KIND")?;
-        t.cell_mut(r, c).unwrap().kind = k;
+        t.cell_mut(r, c).unwrap().set_kind(k);
         Ok(())
     }
     /// Bild in die Zelle. Setzt die Art gleich mit -- sonst muesste man zwei
@@ -153,21 +153,21 @@ impl Gui {
         let t = self.tbl_mut(h, "GUI_TABLE_CELL_IMAGE")?;
         let (r, c) = Self::tbl_rc(t, r, c, "GUI_TABLE_CELL_IMAGE")?;
         let cell = t.cell_mut(r, c).unwrap();
-        cell.image = bild;
-        cell.kind = CellKind::Image;
+        cell.set_image(bild);
+        cell.set_kind(CellKind::Image);
         Ok(())
     }
     /// Wert einer Haken- oder Balkenzelle (Haken: 0/1, Balken: 0..1).
     pub fn table_cell_value(&mut self, h: i64, r: i64, c: i64, v: f64) -> Result<(), String> {
         let t = self.tbl_mut(h, "GUI_TABLE_CELL_VALUE")?;
         let (r, c) = Self::tbl_rc(t, r, c, "GUI_TABLE_CELL_VALUE")?;
-        t.cell_mut(r, c).unwrap().value = v;
+        t.cell_mut(r, c).unwrap().set_value(v);
         Ok(())
     }
     pub fn table_get_value(&self, h: i64, r: i64, c: i64) -> Result<f64, String> {
         let t = self.tbl_ref(h, "GUI_TABLE_GET_VALUE")?;
         let (r, c) = Self::tbl_rc(t, r, c, "GUI_TABLE_GET_VALUE")?;
-        Ok(t.cell(r, c).map(|x| x.value).unwrap_or(0.0))
+        Ok(t.cell(r, c).map(|x| x.value()).unwrap_or(0.0))
     }
     pub fn table_col_align(&mut self, h: i64, c: i64, wie: &str) -> Result<(), String> {
         let a = parse_align(wie).ok_or_else(|| format!(

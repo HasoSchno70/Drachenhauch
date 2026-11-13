@@ -514,7 +514,7 @@ impl Gui {
     /// kann aber ausscheren.
     pub(super) fn cell_bg(t: &TableState, r: usize, c: usize, zebra_bg: i64) -> i64 {
         if let Some(cell) = t.cell(r, c) {
-            if cell.bg >= 0 { return cell.bg; }
+            if cell.bg() >= 0 { return cell.bg(); }
         }
         if let Some(&rb) = t.row_bg.get(r) {
             if rb >= 0 { return rb; }
@@ -523,7 +523,7 @@ impl Gui {
     }
     pub(super) fn cell_fg(t: &TableState, r: usize, c: usize, thema: i64) -> i64 {
         if let Some(cell) = t.cell(r, c) {
-            if cell.fg >= 0 { return cell.fg; }
+            if cell.fg() >= 0 { return cell.fg(); }
         }
         if let Some(&rf) = t.row_fg.get(r) {
             if rf >= 0 { return rf; }
@@ -858,18 +858,18 @@ impl Gui {
             return;
         }
 
-        match cell.kind {
+        match cell.kind() {
             CellKind::Text => {
                 let tw = self.wtext_width(g, wdg, &cell.text);
                 let tx = Self::align_x(cx, cw, tw, al, self.sk(TBL_PADDING));
                 self.wtext(g, wdg, tx, cy + (ch - schrift).max(0) / 2, cell.text.clone(), fgc);
             }
             CellKind::Image => {
-                if cell.image >= 0 {
+                if cell.image() >= 0 {
                     // In die Zelle einpassen, Seitenverhaeltnis behalten --
                     // gestreckte Bilder in einer Tabelle sehen kaputt aus.
-                    let iw = g.image_width(cell.image).unwrap_or(0);
-                    let ih = g.image_height(cell.image).unwrap_or(0);
+                    let iw = g.image_width(cell.image()).unwrap_or(0);
+                    let ih = g.image_height(cell.image()).unwrap_or(0);
                     if iw > 0 && ih > 0 {
                         let rand = 2;
                         let max_w = (cw - 2 * rand).max(1);
@@ -878,7 +878,7 @@ impl Gui {
                         let dw = ((iw as f64 * s) as i32).max(1);
                         let dh = ((ih as f64 * s) as i32).max(1);
                         let dx = match al { 1 => cx + (cw - dw) / 2, 2 => cx + cw - dw - rand, _ => cx + rand };
-                        g.draw_image_rect(cell.image, dx, cy + (ch - dh) / 2, dw, dh);
+                        g.draw_image_rect(cell.image(), dx, cy + (ch - dh) / 2, dw, dh);
                     }
                 }
             }
@@ -888,7 +888,7 @@ impl Gui {
                 let by = cy + (ch - b) / 2;
                 g.box_fill(bx, by, bx + b - 1, by + b - 1, self.th("win_bg"));
                 g.rect(bx, by, bx + b - 1, by + b - 1, border);
-                if cell.value >= 0.5 {
+                if cell.value() >= 0.5 {
                     // Haken als zwei Striche -- ein gefuelltes Kaestchen
                     // liesse sich von einer eingefaerbten Zelle nicht trennen.
                     let m = b / 2;
@@ -902,12 +902,12 @@ impl Gui {
                 let bh = (ch - 2 * rand).clamp(6, 22);
                 let bx = cx + rand;
                 let by = cy + (ch - bh) / 2;
-                let v = cell.value.clamp(0.0, 1.0);
+                let v = cell.value().clamp(0.0, 1.0);
                 g.box_fill(bx, by, bx + bw - 1, by + bh - 1, self.th("win_bg"));
                 if v > 0.0 {
                     let fw = ((bw - 2) as f64 * v) as i32;
                     if fw > 0 {
-                        let farbe = if cell.fg >= 0 { cell.fg } else { accent };
+                        let farbe = if cell.fg() >= 0 { cell.fg() } else { accent };
                         g.box_fill(bx + 1, by + 1, bx + fw, by + bh - 2, farbe);
                     }
                 }

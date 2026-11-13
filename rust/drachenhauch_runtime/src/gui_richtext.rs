@@ -1027,7 +1027,7 @@ impl Gui {
             // (gefunden mit der Kuehlschrank-App -- es ging der Dialog auf).
             let bedienzelle = hc >= 0 && self.windows[wi].widgets[idx].tbl.as_ref().unwrap()
                 .cell(hr as usize, hc as usize)
-                .map(|z| matches!(z.kind, CellKind::Button | CellKind::Check)).unwrap_or(false);
+                .map(|z| matches!(z.kind(), CellKind::Button | CellKind::Check)).unwrap_or(false);
             if self.dbl_click && hc >= 0 && !bedienzelle {
                 self.table_begin_edit(wi, idx, hr, hc);
                 let bearbeitet = self.windows[wi].widgets[idx].tbl.as_ref().map(|t| t.edit_row >= 0).unwrap_or(false);
@@ -1045,7 +1045,7 @@ impl Gui {
         let t = match self.windows[wi].widgets[idx].tbl.as_mut() { Some(t) => t, None => return };
         if r < 0 || c < 0 || r as usize >= t.rows.len() { return; }
         if !t.col_editable(c as usize) { return; }
-        let art = t.cell(r as usize, c as usize).map(|x| x.kind).unwrap_or(CellKind::Text);
+        let art = t.cell(r as usize, c as usize).map(|x| x.kind()).unwrap_or(CellKind::Text);
         if art != CellKind::Text { return; }
         t.edit_text = t.cell(r as usize, c as usize).map(|x| x.text.clone()).unwrap_or_default();
         // Eine Auswahlspalte bekommt statt des Eingabefelds ihre Liste; ohne
@@ -1115,7 +1115,7 @@ impl Gui {
             t.edit_scroll = 0;
             // Erst JETZT neu sortieren/filtern. Waehrend des Tippens waere die
             // Zeile bei jedem Zeichen weggesprungen.
-            if geaendert { t.rebuild_view(); }
+            if geaendert { t.zelle_geaendert(r, c); }
         }
         self.editing_table = None;
         if geaendert {
@@ -1299,7 +1299,7 @@ impl Gui {
                     let r = t.selected;
                     let c = gm.order.iter().copied().find(|&c| t.col_editable(c)
                         && t.col_typ_of(c) != 3
-                        && t.cell(r as usize, c).map(|x| x.kind).unwrap_or(CellKind::Text) == CellKind::Text);
+                        && t.cell(r as usize, c).map(|x| x.kind()).unwrap_or(CellKind::Text) == CellKind::Text);
                     (r, c)
                 };
                 if let Some(c) = spalte { self.table_begin_edit(wi, i, r, c as i32); self.tabelle_zeigen(wi, i); }
@@ -1413,7 +1413,7 @@ impl Gui {
             let t = self.windows[wi].widgets[i].tbl.as_ref().unwrap();
             if t.view_of(t.cur_r) < 0 || t.cur_c < 0 { return; }
             let (r, c) = (t.cur_r as usize, t.cur_c as usize);
-            (r, c, t.cell(r, c).map(|x| x.kind).unwrap_or(CellKind::Text), t.col_editable(c), t.col_typ_of(c))
+            (r, c, t.cell(r, c).map(|x| x.kind()).unwrap_or(CellKind::Text), t.col_editable(c), t.col_typ_of(c))
         };
         if g.key_pressed(KEY_ENTER) || g.key_pressed(KEY_F2) {
             if darf && art == CellKind::Text { self.table_begin_edit(wi, i, r as i32, c as i32); }
@@ -1429,7 +1429,7 @@ impl Gui {
             let _ = g.pop_text_input();
             {
                 let t = self.windows[wi].widgets[i].tbl.as_mut().unwrap();
-                if let Some(x) = t.cell_mut(r, c) { x.value = if x.value >= 0.5 { 0.0 } else { 1.0 }; }
+                if let Some(x) = t.cell_mut(r, c) { x.set_value(if x.value() >= 0.5 { 0.0 } else { 1.0 }); }
             }
             let f = self.windows[wi].widgets[i].on_change.clone();
             if let Some(f) = f { self.pending.push(f); }
