@@ -810,3 +810,45 @@ Pruefung: `tests/pruef/fenster/dock_abreissen.dhtest` (abreissen, andocken,
 Kreuz, Stand, Rueckfall), Rust-Test `abgerissen_ohne_platz_im_gast_und_im_stand`;
 Gegenprobe in einem verfaelschten Bau (Abreissen, Andocken, Stand, Kreuz)
 -- je genau ihr Fall faellt.
+
+## Echte OS-Fenster, Weg E Stufe 3b: Teilflaechen (2026-11-13)
+
+- Eine Leiste aus `GUI_DOCK_ADD` ist ein Ausschnitt des Gastfensters. Sie
+  reisst als **Teilflaeche** ab: ein natives Fenster ohne eigenes
+  gui-Fenster (`Schwebe::flaeche`). Fuer Zeichnen (`teile_zeichnen`, nach
+  `GUI_DRAW`) und Bedienung (GUI_UPDATE, wenn der Zeiger dort ist) wird das
+  Gastfenster **ausgeliehen** (`leihen`/`zurueckgeben`): so verschoben, dass
+  die Gruppe bei (0, 0) steht, und als Fenster dieser Flaeche. Der ganze
+  Zeichen- und Bedienweg laeuft unveraendert; `widget_shown` laesst nur die
+  Widgets der Gruppe durch (und im Hauptfenster gerade die nicht),
+  `DockState::sicht` dasselbe fuer Kopf, Reiter, Griff und Trennlinien.
+- Die Gruppe behaelt ihre gedachte Lage im Gastfenster -- dort liegen ihre
+  Widgets, dort rechnet `GUI_DOCK_RECT`, das Programm verteilt unveraendert.
+- Popups eines Gastfensters gehoeren der Flaeche des letzten Drucks
+  (`teil_druck`, `popup_flaeche`) -- ein Kontextmenue aus der Teilflaeche
+  steht dort, eins aus dem Hauptfenster dort.
+- **Fund:** `nativ_abgleich` (Stufe 1) schloss jedes native Fenster, das
+  keinem gui-Fenster gehoert -- die Teilflaeche wurde jedes Bild
+  geschlossen und neu angelegt (die Proben fanden mal kein Fenster, mal
+  eines mit 0 x 0). Die Teilflaechen stehen jetzt in `teil_ids`.
+- Ein Zug aus der Teilflaeche rechnet sein Ziel mit der echten Lage des
+  Gastfensters (waehrend der Leihe steht es verschoben).
+- **Zweiter Fund (beim Schaerfen der Faelle):** Tastatur und Maus liefen
+  durch die Flaeche unter dem Zeiger. Windows meldet den Zeiger nach einem
+  Klick gern als gegangen -- Tab in der Teilflaeche lief dann durch die
+  Widgets des Hauptfensters (dort ist die Leiste unsichtbar) und landete
+  auf einem Knopf des Hauptfensters. Jetzt: ohne Maus im Hauptfenster
+  schaut die gui durch die Teilflaeche mit dem Tastaturfokus.
+- Die Gegenprobe deckte drei Faelle auf, die auch verfaelscht gruen
+  blieben: `dock_frei` schuetzt die Treffer in der Teilflaeche schon (der
+  Filter in `widget_shown` wirkt erst bei Tab), ein Klick lag auf einem
+  Punkt beider Knoepfe, ein Ziel fiel auch falsch gerechnet links aus.
+  Geschaerft: Tab-Fall, Klick nur auf den Leistenknopf, Andocken rechts.
+  Ungeprueft bleibt der Fokuswechsel OHNE Klick (Alt+Tab in die
+  Teilflaeche): dann bekommt das Gastfenster den Fokus der gui.
+- In der IDE nachgesehen: die Gliederung (`GUI_DOCK_MOVE(win, "gliederung",
+  "fenster")`) steht als eigenes Fenster mit Kopf und Eintraegen da.
+Pruefung: `dock_abreissen.dhtest` jetzt 12 Faelle (3b: abreissen per Zug,
+Klick in der Teilflaeche, Stelle im Hauptfenster frei, Tippen, Tab, Bild,
+Andocken rechts; Rueckfall ohne echte Fenster); Rust-Test erweitert (Sicht der
+Gruppe). Gegenproben in drei verfaelschten Bauten.

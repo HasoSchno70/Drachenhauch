@@ -54,6 +54,16 @@ impl Gui {
                 if !d.leisten.get(w.dock_von as usize).map(|l| l.sichtbar).unwrap_or(true) { return false; }
             }
         }
+        // Stufe 3b: Widgets einer abgerissenen Leiste stehen in ihrer
+        // Teilflaeche, nicht im Gastfenster -- und durch die Teilflaeche
+        // gesehen gibt es nur sie.
+        if let Some(d) = self.windows[win].dock.as_ref() {
+            let gruppe = if w.dock_von >= 0 { d.leisten.get(w.dock_von as usize).map(|l| l.schwebt).unwrap_or(-1) } else { -1 };
+            match self.leihe.as_ref().filter(|l| l.wi == win) {
+                Some(l) => if gruppe != l.k as i32 { return false; },
+                None => if gruppe >= 0 && d.teilflaeche(gruppe as usize) { return false; },
+            }
+        }
         // Reiter IM Fenster: nur die vordere Seite ist da -- fuer das
         // Zeichnen wie fuer jeden Treffertest, die beide hier fragen.
         if w.tc_von >= 0 {

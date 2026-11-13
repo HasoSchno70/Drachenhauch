@@ -1,6 +1,6 @@
 # Entwurf: Mehrere OS-Fenster in Drachenhauch
 
-> **Stand 12.11.2026: Weg E, Stufen 1 und 2 sind gebaut, samt Massstab je Schirm; Stufe 3a (Leisten aus `GUI_DOCK_WINDOW` abreissen) ebenso** (`GUI_WINDOW_NATIVE`,
+> **Stand 12.11.2026: Weg E, Stufen 1 und 2 sind gebaut, samt Massstab je Schirm; Stufe 3 (Leisten abreissen, 3a und 3b) ebenso** (`GUI_WINDOW_NATIVE`,
 > Windows und Linux; macOS Rueckfall) -- Abschnitt 8. Davor geplant: ein
 > gui-Fenster als echtes OS-Fenster im SELBEN Prozess -- gezeichnet wird
 > weiter in raylibs Kontext, ein zweites GLFW-Fenster zeigt das Bild nur und
@@ -395,7 +395,7 @@ Vorzeigen: Einstellungen in IDE und Studio als herausziehbare Dialoge.
 **Stufe 3 -- abreissbare Dock-Leisten (ein bis zwei Wochen).** Fall c: eine
 Leiste aus dem Hauptfenster ziehen und wieder andocken. Baut auf 1 und 2 auf
 -- eine abgerissene Leiste ist ein gui-Fenster, das zum OS-Fenster wird.
-Geteilt am 13.11.2026: **3a** (gebaut) reisst Leisten aus `GUI_DOCK_WINDOW`
+Geteilt am 13.11.2026, beide gebaut: **3a** reisst Leisten aus `GUI_DOCK_WINDOW`
 ab -- sie tragen ein eigenes gui-Fenster. **3b** braucht Teilflaechen: eine
 Leiste aus `GUI_DOCK_ADD` ist ein Ausschnitt des Gastfensters, ihre Widgets
 lassen sich nicht umhaengen (die Handles tragen das Fenster); gezeichnet und
