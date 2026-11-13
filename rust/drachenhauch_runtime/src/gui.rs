@@ -839,9 +839,46 @@ fn sortier_vergleich(za: Option<f64>, ta: &str, zb: Option<f64>, tb: &str) -> st
 /// so rund 320 MB nur fuer Vorgaben. Jetzt 32 Byte plus Text.
 #[derive(Clone, Default)]
 pub struct Cell {
-    text: String,
+    text: ZellText,
     stil: Option<Box<ZellStil>>,
 }
+
+/// Der Text einer Zelle: bis 22 Byte direkt in der Zelle, laenger auf dem
+/// Heap. Fast jede Zelle ist kurz (Zahl, Datum, Name) -- als `String` kostete
+/// jede eine eigene Zuteilung, bei 1 Mio. Zeilen zu 5 Spalten 5 Mio.
+/// Zuteilungen und der groesste Teil des Speichers der Tabelle.
+#[derive(Clone)]
+pub enum ZellText {
+    Kurz(u8, [u8; 22]),
+    Lang(Box<str>),
+}
+impl Default for ZellText { fn default() -> Self { ZellText::Kurz(0, [0; 22]) } }
+impl ZellText {
+    pub fn as_str(&self) -> &str {
+        match self {
+            // Nur aus einem &str gebaut (From) -- die Bytes sind gueltiges UTF-8.
+            ZellText::Kurz(n, b) => std::str::from_utf8(&b[..*n as usize]).unwrap_or(""),
+            ZellText::Lang(s) => s,
+        }
+    }
+}
+impl From<&str> for ZellText {
+    fn from(s: &str) -> Self {
+        if s.len() <= 22 {
+            let mut b = [0u8; 22];
+            b[..s.len()].copy_from_slice(s.as_bytes());
+            ZellText::Kurz(s.len() as u8, b)
+        } else { ZellText::Lang(s.into()) }
+    }
+}
+impl From<String> for ZellText { fn from(s: String) -> Self { ZellText::from(s.as_str()) } }
+impl std::ops::Deref for ZellText { type Target = str; fn deref(&self) -> &str { self.as_str() } }
+impl PartialEq for ZellText { fn eq(&self, o: &Self) -> bool { self.as_str() == o.as_str() } }
+impl PartialEq<str> for ZellText { fn eq(&self, o: &str) -> bool { self.as_str() == o } }
+impl PartialEq<String> for ZellText { fn eq(&self, o: &String) -> bool { self.as_str() == o.as_str() } }
+impl PartialEq<&str> for ZellText { fn eq(&self, o: &&str) -> bool { self.as_str() == *o } }
+impl std::fmt::Display for ZellText { fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { f.write_str(self.as_str()) } }
+impl std::fmt::Debug for ZellText { fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { write!(f, "{:?}", self.as_str()) } }
 
 /// Was eine Zelle ausser ihrem Text haben kann (siehe `Cell`).
 #[derive(Clone)]
@@ -863,7 +900,7 @@ impl Default for ZellStil {
 }
 
 impl Cell {
-    fn text(s: String) -> Cell { Cell { text: s, stil: None } }
+    fn text(s: String) -> Cell { Cell { text: s.into(), stil: None } }
     fn fg(&self) -> i64 { self.stil.as_ref().map_or(-1, |s| s.fg) }
     fn bg(&self) -> i64 { self.stil.as_ref().map_or(-1, |s| s.bg) }
     fn kind(&self) -> CellKind { self.stil.as_ref().map_or(CellKind::Text, |s| s.kind) }
@@ -1424,7 +1461,7 @@ impl TableState {
         let s = match self.cell(r, c) {
             Some(x) if x.kind() == CellKind::Check => (if x.value() >= 0.5 { "1" } else { "0" }).to_string(),
             Some(x) if x.kind() == CellKind::Bar => zahl_kurz(x.value()),
-            Some(x) => x.text.clone(),
+            Some(x) => x.text.to_string(),
             None => String::new(),
         };
         s.replace(['\t', '\n', '\r'], " ")
@@ -1462,7 +1499,7 @@ impl TableState {
                 let s = s.trim_end_matches('\r');
                 if !self.wert_ok(c, s) { return false; }
                 let neu = if self.col_typ_of(c) == 0 { s.to_string() } else { s.trim().to_string() };
-                if let Some(x) = self.cell_mut(r, c) { x.text = neu; }
+                if let Some(x) = self.cell_mut(r, c) { x.text = neu.into(); }
                 true
             }
             _ => false,
@@ -6259,7 +6296,19 @@ mod formate_tests {
 
 #[cfg(test)]
 mod tabelle_anhaengen_tests {
-    use super::{Cell, TableState};
+    use super::{Cell, TableState, ZellText};
+
+    #[test]
+    fn zelltext_kurz_und_lang() {
+        for s in ["", "a", "2026-11-13", &"x".repeat(22), &"x".repeat(23), &"ä".repeat(11), &"ä".repeat(12), "Grüße, Welt -- ein längerer Text"] {
+            let z = ZellText::from(s);
+            assert_eq!(z.as_str(), s);
+            assert_eq!(matches!(z, ZellText::Kurz(..)), s.len() <= 22, "{:?}", s);
+            assert!(z == s.to_string());
+        }
+        assert_eq!(std::mem::size_of::<ZellText>(), std::mem::size_of::<String>());
+        assert!(std::mem::size_of::<Cell>() <= 32);
+    }
 
     // Nach jeder geaenderten Zelle (gezielt einsortiert) dieselbe Ansicht
     // wie nach dem vollen Neubau -- mit Filter, Sortierung auf- und
@@ -6281,7 +6330,7 @@ mod tabelle_anhaengen_tests {
             t.rebuild_view();
             for _ in 0..80 {
                 let (r, c) = (naechste(t.rows.len()), naechste(2));
-                t.rows[r][c].text = texte[naechste(texte.len())].to_string();
+                t.rows[r][c].text = texte[naechste(texte.len())].into();
                 t.zelle_geaendert(r, c);
                 let mut neu = TableState::default();
                 neu.rows = t.rows.clone();

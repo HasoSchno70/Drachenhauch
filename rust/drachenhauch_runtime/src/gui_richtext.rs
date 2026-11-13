@@ -1047,7 +1047,7 @@ impl Gui {
         if !t.col_editable(c as usize) { return; }
         let art = t.cell(r as usize, c as usize).map(|x| x.kind()).unwrap_or(CellKind::Text);
         if art != CellKind::Text { return; }
-        t.edit_text = t.cell(r as usize, c as usize).map(|x| x.text.clone()).unwrap_or_default();
+        t.edit_text = t.cell(r as usize, c as usize).map(|x| x.text.to_string()).unwrap_or_default();
         // Eine Auswahlspalte bekommt statt des Eingabefelds ihre Liste; ohne
         // Eintraege gibt es nichts zu waehlen.
         if t.col_typ_of(c as usize) == 3 {
@@ -1102,7 +1102,7 @@ impl Gui {
                 if t.wert_ok(c, &neu) {
                     let neu = if t.col_typ_of(c) == 0 { neu } else { neu.trim().to_string() };
                     if let Some(cell) = t.cell_mut(r, c) {
-                        if cell.text != neu { cell.text = neu; geaendert = true; }
+                        if cell.text != neu { cell.text = neu.into(); geaendert = true; }
                     }
                 }
             }

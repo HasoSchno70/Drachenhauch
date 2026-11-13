@@ -862,7 +862,7 @@ impl Gui {
             CellKind::Text => {
                 let tw = self.wtext_width(g, wdg, &cell.text);
                 let tx = Self::align_x(cx, cw, tw, al, self.sk(TBL_PADDING));
-                self.wtext(g, wdg, tx, cy + (ch - schrift).max(0) / 2, cell.text.clone(), fgc);
+                self.wtext(g, wdg, tx, cy + (ch - schrift).max(0) / 2, cell.text.to_string(), fgc);
             }
             CellKind::Image => {
                 if cell.image() >= 0 {
@@ -915,7 +915,7 @@ impl Gui {
                 if !cell.text.is_empty() {
                     let tw = self.wtext_width(g, wdg, &cell.text);
                     self.wtext(g, wdg, bx + (bw - tw) / 2, by + (bh - schrift).max(0) / 2,
-                               cell.text.clone(), fg_thema);
+                               cell.text.to_string(), fg_thema);
                 }
             }
             CellKind::Button => {
@@ -928,7 +928,7 @@ impl Gui {
                           self.th("widget_bg"), border);
                 let tw = self.wtext_width(g, wdg, &cell.text);
                 self.wtext(g, wdg, bx + (bw - tw) / 2, by + (bh - schrift).max(0) / 2,
-                           cell.text.clone(), fgc);
+                           cell.text.to_string(), fgc);
             }
         }
     }

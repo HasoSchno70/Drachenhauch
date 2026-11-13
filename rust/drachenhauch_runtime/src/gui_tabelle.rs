@@ -97,14 +97,14 @@ impl Gui {
     pub fn table_set_cell(&mut self, h: i64, r: i64, c: i64, text: String) -> Result<(), String> {
         let t = self.tbl_mut(h, "GUI_TABLE_SET_CELL")?;
         let (r, c) = Self::tbl_rc(t, r, c, "GUI_TABLE_SET_CELL")?;
-        t.cell_mut(r, c).unwrap().text = text;
+        t.cell_mut(r, c).unwrap().text = text.into();
         t.zelle_geaendert(r, c);   // Filter/Sortierung haengen am Text
         Ok(())
     }
     pub fn table_get_cell(&self, h: i64, r: i64, c: i64) -> Result<String, String> {
         let t = self.tbl_ref(h, "GUI_TABLE_GET_CELL")?;
         let (r, c) = Self::tbl_rc(t, r, c, "GUI_TABLE_GET_CELL")?;
-        Ok(t.cell(r, c).map(|x| x.text.clone()).unwrap_or_default())
+        Ok(t.cell(r, c).map(|x| x.text.to_string()).unwrap_or_default())
     }
     /// Farben je Zelle. -1 laesst die jeweilige Farbe beim Thema bzw. bei der
     /// Zeilenfarbe -- so faerbt man nur den Vordergrund, ohne die Flaeche zu

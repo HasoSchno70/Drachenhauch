@@ -530,10 +530,10 @@ impl Gui {
                 serde_json::Value::Array(row.iter().map(|c| {
                     if c.fg() < 0 && c.bg() < 0 && c.align() < 0
                         && c.kind() == CellKind::Text && c.image() < 0 && c.value() == 0.0 {
-                        serde_json::json!(c.text)
+                        serde_json::json!(c.text.as_str())
                     } else {
                         let mut o = serde_json::Map::new();
-                        o.insert("text".into(), serde_json::json!(c.text));
+                        o.insert("text".into(), serde_json::json!(c.text.as_str()));
                         if c.fg() >= 0 { o.insert("fg".into(), serde_json::json!(c.fg())); }
                         if c.bg() >= 0 { o.insert("bg".into(), serde_json::json!(c.bg())); }
                         if c.align() >= 0 { o.insert("align".into(), serde_json::json!(c.align())); }

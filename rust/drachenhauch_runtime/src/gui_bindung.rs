@@ -774,7 +774,7 @@ impl Gui {
             Kind::Table => {
                 let k = self.zeile_unter(wi, i, mx, my);
                 let t = w.tbl.as_ref().unwrap();
-                if k >= 0 { (k, t.cell(k as usize, 0).map(|z| z.text.clone()).unwrap_or_default()) } else { (-1, String::new()) }
+                if k >= 0 { (k, t.cell(k as usize, 0).map(|z| z.text.to_string()).unwrap_or_default()) } else { (-1, String::new()) }
             }
             _ => (-1, w.text.clone()),
         }

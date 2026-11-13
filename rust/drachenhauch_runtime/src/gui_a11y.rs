@@ -335,7 +335,7 @@ impl Gui {
                                 let text = match cell.kind() {
                                     CellKind::Check => (if cell.value() > 0.5 { "ja" } else { "nein" }).to_string(),
                                     CellKind::Bar => zahl_kurz(cell.value()),
-                                    _ => cell.text.clone(),
+                                    _ => cell.text.to_string(),
                                 };
                                 z.set_label(text.clone());
                                 z.set_value(text);
