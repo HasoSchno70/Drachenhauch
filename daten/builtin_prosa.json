@@ -626,7 +626,7 @@
   "GUI_DOCK_FLOAT": "eine Leiste abtrennen (schwebend an dieser Stelle)",
   "GUI_DOCK_GET_SIZE": "INTEGER — Breite bzw. Höhe eines Bereichs",
   "GUI_DOCK_HEAD_RECT": "TUPLE — der freie Teil des Kopfs rechts neben den Reitern -- Platz für Filter, Zähler, Knöpfe der Leiste",
-  "GUI_DOCK_MOVE": "eine Leiste andocken: als neue Gruppe im Bereich oder als Reiter neben neben$; fenster reißt sie als eigenes Fenster ab (nur Leisten aus GUI_DOCK_WINDOW, sonst bleibt sie schwebend)",
+  "GUI_DOCK_MOVE": "eine Leiste andocken: als neue Gruppe im Bereich oder als Reiter neben neben$; fenster reißt sie als eigenes Fenster ab (wo es keine echten Fenster gibt, bleibt sie schwebend)",
   "GUI_DOCK_PANEL": "eine Leiste als neue Gruppe am Ende von links, rechts, unten oder schwebend",
   "GUI_DOCK_RECT": "TUPLE — das Inhaltsrechteck der Leiste (x, y, b, h); (0, 0, 0, 0), wenn sie nicht zu sehen ist",
   "GUI_DOCK_SET": "Maße des Docks: kopf (Höhe der Reiterzeile, 22), rand (8), abstand (zwischen Gruppen, 8), fuge (über dem unteren Bereich, 2)",

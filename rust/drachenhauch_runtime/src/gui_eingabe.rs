@@ -47,9 +47,24 @@ impl Gui {
         // durch die Oberflaeche unter dem Zeiger schauen.
         self.nativ_abgleich(g);
         self.flaeche = g.zeiger_flaeche();
+        // Stufe 3b: Tastatur in einer Teilflaeche, der Zeiger aber ueber
+        // dem Hauptfenster (Windows meldet ihn nach dem Klick gern als
+        // gegangen): ohne Maus im Hauptfenster schaut die gui durch die
+        // Flaeche mit dem Fokus -- sonst liefe Tab durch die Widgets des
+        // Hauptfensters, in dem die Leiste gar nicht steht.
+        if self.flaeche == 0 {
+            let fokus = g.fokus_flaeche();
+            let maus_haupt = (0..3).any(|b| g.mouse_button(b) || g.mouse_hit(b) || g.mouse_released(b));
+            if fokus != 0 && !maus_haupt && self.teil_von_flaeche(fokus).is_some() { self.flaeche = fokus; }
+        }
+        // Stufe 3b: ist es eine Teilflaeche, schaut die gui durch das dafuer
+        // verschoben ausgeliehene Gastfenster.
+        let leihe = self.teil_von_flaeche(self.flaeche);
+        if let Some((wi, k)) = leihe { self.leihen(wi, k, self.flaeche); }
         g.sicht_setzen(Some(self.flaeche));
         self.update_innen(g);
         g.sicht_setzen(None);
+        if leihe.is_some() { self.zurueckgeben(); }
         self.flaeche = 0;
         // Das Dock rechnet NACH der Bedienung: ein Klick auf einen Reiter
         // oder ein Zug an der Trennlinie steht so schon in GUI_DOCK_RECT und
@@ -83,7 +98,11 @@ impl Gui {
         self.was_mitte_down = g.mouse_button(2);
         // Weg E: ein Druck auf einer anderen Oberflaeche schliesst die
         // offenen Popups der Fenster, die nicht auf ihr stehen.
-        if just_pressed || right_just { self.fremde_popups_zu(); }
+        if just_pressed || right_just {
+            self.fremde_popups_zu();
+            // Popups, die dieser Druck oeffnet, gehoeren seiner Flaeche.
+            self.teil_druck = self.leihe.as_ref().map(|l| (l.wi, l.id));
+        }
 
         // Transiente Flags ruecksetzen -- die Dialog-Antwort gehoert dazu:
         // sie ist ein Ereignis, kein Zustand (siehe Window::answer).

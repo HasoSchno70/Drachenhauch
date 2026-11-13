@@ -849,7 +849,7 @@ impl Gui {
     /// in dessen Koordinaten. Vorher landeten sie im Hauptfenster, an der
     /// Stelle, die sie im nativen gehabt haetten.
     pub(super) fn draw_top_flaeche(&self, g: &mut Graphics, f: u32) {
-        let hier = |wi: usize| self.windows.get(wi).map(|w| w.nativ == f).unwrap_or(false);
+        let hier = |wi: usize| self.windows.get(wi).is_some() && self.popup_flaeche(wi) == f;
         // Popover, Infoleisten, Toasts, Vorschlaege -- ueber den Fenstern und
         // dem, was ein Programm in eine Zeichenflaeche gemalt hat.
         self.ueber_zeichnen(g, f);

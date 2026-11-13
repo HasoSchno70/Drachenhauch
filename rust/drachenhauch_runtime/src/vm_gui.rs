@@ -1502,6 +1502,9 @@ impl<'p> Vm<'p> {
                 let obenauf = if a.is_empty() { true } else { gbool(a, 0, "GUI_DRAW")? };
                 let g = self.gfx.as_mut().ok_or("GUI_DRAW: vor SCREEN aufgerufen")?;
                 self.gui.draw(g, obenauf);
+                // Abgerissene Leisten aus Widgets des Gastfensters (Weg E,
+                // Stufe 3b) in ihre eigenen Fenster.
+                self.gui.teile_zeichnen(g);
                 Value::Nil
             }
             "gui_draw_top" => {

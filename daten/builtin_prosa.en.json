@@ -625,7 +625,7 @@
   "GUI_DOCK_FLOAT": "detach a panel (floating at this place)",
   "GUI_DOCK_GET_SIZE": "INTEGER — width or height of an area",
   "GUI_DOCK_HEAD_RECT": "TUPLE — the free part of the header right of the tabs -- room for the panel's filter, counters, buttons",
-  "GUI_DOCK_MOVE": "dock a panel: as a new group in the area or as a tab next to neben$; fenster tears it off as a window of its own (only panels from GUI_DOCK_WINDOW, others stay floating)",
+  "GUI_DOCK_MOVE": "dock a panel: as a new group in the area or as a tab next to neben$; fenster tears it off as a window of its own (where there are no real windows, it stays floating)",
   "GUI_DOCK_PANEL": "a panel as a new group at the end of links (left), rechts (right), unten (bottom) or schwebend (floating)",
   "GUI_DOCK_RECT": "TUPLE — the content rectangle of the panel (x, y, w, h); (0, 0, 0, 0) when it is not shown",
   "GUI_DOCK_SET": "dimensions of the dock: kopf (height of the tab row, 22), rand (margin, 8), abstand (between groups, 8), fuge (above the bottom area, 2)",

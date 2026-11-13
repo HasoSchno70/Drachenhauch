@@ -3629,6 +3629,14 @@ pub struct Gui {
     /// Klick ins Hauptfenster, waehrend es modal ist) -- im naechsten
     /// Abgleich, der die Grafik hat.
     nativ_fokus_wunsch: Option<u32>,
+    /// Stufe 3b: die gui schaut gerade durch eine Teilflaeche -- das
+    /// Gastfenster ist dafuer verschoben ausgeliehen (`leihen`).
+    pub(super) leihe: Option<dock::Leihe>,
+    /// Die Flaeche des letzten Drucks, wenn er in einer Teilflaeche war:
+    /// (Gastfenster, Flaeche). Dorthin gehoeren dessen Popups.
+    pub(super) teil_druck: Option<(usize, u32)>,
+    /// Die nativen Fenster aller Teilflaechen (zum Aufraeumen).
+    pub(super) teil_ids: Vec<u32>,
     focus_window: Option<usize>,
     focus_widget: Option<(usize, usize)>,
     // Offener modaler Dialog. Solange einer steht, bekommt NUR er Eingaben --
@@ -3854,7 +3862,7 @@ impl Gui {
     pub fn new() -> Gui {
         Gui {
             schrift: None,
-            windows: Vec::new(), z_order: Vec::new(), flaeche: 0, fokus_flaeche: 0, nativ_fokus_wunsch: None,
+            windows: Vec::new(), z_order: Vec::new(), flaeche: 0, fokus_flaeche: 0, nativ_fokus_wunsch: None, leihe: None, teil_druck: None, teil_ids: Vec::new(),
             ta_zerlegung: std::cell::RefCell::new(HashMap::new()),
             focus_window: None, focus_widget: None, modal: None, modal_vorher: Vec::new(), modal_fokus: Vec::new(), cp_drag: None,
             drag_window: None, drag_dx: 0, drag_dy: 0,
@@ -5169,7 +5177,17 @@ impl Gui {
     fn popups_oben(&self, wi: usize) -> bool {
         // Ein natives Fenster hat seine eigene Flaeche: Menues und
         // Klapplisten gehoeren hinein, nicht ueber das Hauptfenster.
-        self.zoom_von(wi) == 1.0 && self.zuschnitt_von(wi).is_none() && self.windows[wi].nativ == 0
+        self.zoom_von(wi) == 1.0 && self.zuschnitt_von(wi).is_none() && self.popup_flaeche(wi) == 0
+    }
+    /// Auf welcher Flaeche stehen die Popups des Fensters? Die eines
+    /// nativen Fensters in ihm; die eines Gastfensters dort, wo zuletzt
+    /// gedrueckt wurde -- in einer seiner Teilflaechen oder im Hauptfenster.
+    pub(super) fn popup_flaeche(&self, wi: usize) -> u32 {
+        if let Some((pw, f)) = self.teil_druck { if pw == wi { return f; } }
+        match self.leihe.as_ref().filter(|l| l.wi == wi) {
+            Some(l) => l.nativ,
+            None => self.windows.get(wi).map(|w| w.nativ).unwrap_or(0),
+        }
     }
     /// Ein natives Fenster (Weg E) in sein Render-Ziel zeichnen, mit dem
     /// Zeiger in seiner Sicht; der Hilfetext gehoert hinein, wenn er zu
@@ -5188,13 +5206,13 @@ impl Gui {
     /// verglichen die Treffertests der Popups Koordinaten zweier Flaechen.
     pub(super) fn fremde_popups_zu(&mut self) {
         let f = self.flaeche;
-        let fremd = |w: &Vec<Window>, wi: usize| w.get(wi).map(|x| x.nativ != f).unwrap_or(true);
-        if self.context_open.map(|c| fremd(&self.windows, c.0)).unwrap_or(false) { self.context_open = None; self.sub_chain.clear(); }
-        if self.open_menu.map(|m| fremd(&self.windows, m.0)).unwrap_or(false) { self.open_menu = None; }
-        if self.open_dropdown.map(|d| fremd(&self.windows, d.0)).unwrap_or(false) { self.open_dropdown = None; }
-        if self.datum_auf.map(|d| fremd(&self.windows, d.0)).unwrap_or(false) { self.datum_auf = None; }
-        if self.leiste_popup.map(|l| fremd(&self.windows, l.0)).unwrap_or(false) { self.leiste_popup = None; }
-        if self.rs_fenster().map(|wi| fremd(&self.windows, wi)).unwrap_or(false) { self.rs_menue = None; }
+        let fremd = |s: &Gui, wi: usize| s.windows.get(wi).is_none() || s.popup_flaeche(wi) != f;
+        if self.context_open.map(|c| fremd(self, c.0)).unwrap_or(false) { self.context_open = None; self.sub_chain.clear(); }
+        if self.open_menu.map(|m| fremd(self, m.0)).unwrap_or(false) { self.open_menu = None; }
+        if self.open_dropdown.map(|d| fremd(self, d.0)).unwrap_or(false) { self.open_dropdown = None; }
+        if self.datum_auf.map(|d| fremd(self, d.0)).unwrap_or(false) { self.datum_auf = None; }
+        if self.leiste_popup.map(|l| fremd(self, l.0)).unwrap_or(false) { self.leiste_popup = None; }
+        if self.rs_fenster().map(|wi| fremd(self, wi)).unwrap_or(false) { self.rs_menue = None; }
     }
     /// Zu welchem Fenster gehoert der Hilfetext, der gerade dran ist?
     pub(super) fn tip_fenster(&self) -> Option<usize> {
@@ -5251,7 +5269,10 @@ impl Gui {
     pub(super) fn nativ_abgleich(&mut self, g: &mut Graphics) {
         // Native Fenster, zu denen kein lebendes gui-Fenster mehr gehoert
         // (GUI_WINDOW_DESTROY, GUI_RESET), schliessen.
-        let lebend: Vec<u32> = self.windows.iter().filter(|w| w.alive && w.nativ != 0).map(|w| w.nativ).collect();
+        // Die Teilflaechen abgerissener Leisten (Stufe 3b) gehoeren keinem
+        // gui-Fenster -- die fuehrt dock_raus_abgleich.
+        let lebend: Vec<u32> = self.windows.iter().filter(|w| w.alive && w.nativ != 0).map(|w| w.nativ)
+            .chain(self.teil_ids.iter().copied()).collect();
         for id in g.nativ_ids() { if !lebend.contains(&id) { g.nativ_schliessen(id); } }
         for wi in 0..self.windows.len() {
             let id = self.windows[wi].nativ;
@@ -5294,7 +5315,9 @@ impl Gui {
         if fokus != self.fokus_flaeche {
             self.fokus_flaeche = fokus;
             let ziel = if fokus != 0 {
+                // Eine Teilflaeche (Stufe 3b) gehoert ihrem Gastfenster.
                 self.windows.iter().position(|w| w.alive && w.nativ == fokus)
+                    .or_else(|| self.teil_von_flaeche(fokus).map(|(wi, _)| wi))
             } else {
                 self.z_order.iter().rev().copied().find(|&i| self.windows[i].alive && self.windows[i].visible && self.windows[i].nativ == 0)
             };
