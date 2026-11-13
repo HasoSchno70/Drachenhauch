@@ -879,3 +879,27 @@ Pruefung: zwei Leser-Faelle (natives Fenster, Teilflaeche) mit einem
 fremden UIA-Leser (`_hilfen/uialeser_fenster.ps1`, findet Fenster ueber den
 Titel), zwei Aufnahme-Faelle (von Hand geschrieben; aufgenommen mit echten
 Nachrichten und wieder abgespielt), Rust-Test `aufnahme_hin_und_zurueck`.
+
+## Grosse Tabellen (2026-11-13)
+
+Aus der Durchsicht "womit sich die gui messen kann", Punkt 4. Zuerst
+gemessen (1 Mio. Zeilen zu 5 Spalten): gezeichnet wurde schon nur der
+sichtbare Teil (2-4 ms je Bild), aber
+- `GUI_TABLE_SET_CELL` baute die ganze Ansicht neu (Filtern und Sortieren
+  aller Zeilen): 1,4 s je Zelle -- eine Schleife ueber Zellen wurde
+  quadratisch. Jetzt `zelle_geaendert`: nur die eine Zeile neu einordnen,
+  und gar nicht, wenn weder Filter noch Sortierung an der Spalte haengen
+  (3 ms). Ebenso nach dem Bearbeiten im Feld.
+- Sortieren las in jedem der ~20 Mio. Vergleiche beide Texte neu als Zahl
+  und schrieb beide klein: 1,3 s. Schluessel einmal je Zeile: 0,13 s.
+  Filtern: der Filter einmal klein, 0,14 -> 0,04 s. Die Sortierregel steht
+  an einer Stelle (`sortier_vergleich`).
+- Speicher: jede Zelle trug Farben, Art, Bild, Wert, Ausrichtung (64 Byte)
+  und eine eigene Zuteilung fuer den Text. Jetzt Text plus Stil, der erst
+  beim Setzen entsteht, und Texte bis 22 Byte in der Zelle (`ZellText`).
+  Spitze der Tabelle allein 612 -> 438 MB (davon rund 90 MB Grundlast).
+Pruefung: Rust-Tests `zelle_aendern_wie_neu_gebaut` (gegen den vollen
+Neubau) und `zelltext_kurz_und_lang`; Fall in `gui_tabelle_tempo.dhtest`
+(10000 Zellen in 100000 Zeilen; mit 2000 blieb die Gegenprobe mit dem
+vollen Neubau knapp unter der Zeitgrenze -- erst geschaerft greift sie). Offen: ein
+virtueller Modus fuer Daten, die nicht in den Speicher passen (Punkt C).
