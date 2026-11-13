@@ -43,7 +43,15 @@ impl Gui {
     /// darunter ein Ansage-Knoten und jedes sichtbare gui-Fenster mit
     /// Menueleiste, Reitern und Widgets. Vollstaendig, jedes Bild -- nur
     /// gebaut, wenn jemand zuhoert (siehe vm.rs).
-    pub fn a11y_baum(&self, g: &Graphics, titel: &str) -> accesskit::TreeUpdate {
+    pub fn a11y_baum(&self, g: &Graphics, titel: &str) -> accesskit::TreeUpdate { self.a11y_baum_auf(g, titel, 0) }
+
+    /// Der Baum EINER Flaeche (Weg E, Stufe 4): 0 = das Hauptfenster mit
+    /// seinen gui-Fenstern, sonst ein natives Fenster oder eine Teilflaeche
+    /// (dann mit ausgeliehenem Gastfenster). Jedes Fenster des Systems hat
+    /// seinen eigenen Adapter und seinen eigenen Baum -- vorher stand alles
+    /// im Baum des Hauptfensters, und ein Bildschirmleser fand im nativen
+    /// Fenster nichts. Die Ansage gehoert dem Hauptfenster.
+    pub(super) fn a11y_baum_auf(&self, g: &Graphics, titel: &str, f: u32) -> accesskit::TreeUpdate {
         use accesskit::{Live, Node, NodeId, Role, TreeId, TreeInfo, TreeUpdate};
         use crate::a11y::ids;
         let mut nodes: Vec<(NodeId, Node)> = Vec::new();
@@ -56,11 +64,13 @@ impl Gui {
         if self.ansage_nr % 2 == 1 { t.push(' '); }
         an.set_value(t.clone());
         an.set_label(t);
-        nodes.push((NodeId(ids::ANSAGE), an));
-        kinder.push(NodeId(ids::ANSAGE));
+        if f == 0 {
+            nodes.push((NodeId(ids::ANSAGE), an));
+            kinder.push(NodeId(ids::ANSAGE));
+        }
         for &wi in &self.z_order {
             if let Some(win) = self.windows.get(wi) {
-                if win.alive && win.visible { kinder.push(self.a11y_fenster(g, wi, &mut nodes)); }
+                if win.alive && win.visible && win.nativ == f { kinder.push(self.a11y_fenster(g, wi, &mut nodes)); }
             }
         }
         let mut root = Node::new(Role::Window);
@@ -70,7 +80,7 @@ impl Gui {
         // Fokus: das Widget mit Fokus, sonst das Fenster mit Fokus, sonst die Wurzel.
         let mut focus = NodeId(ids::ROOT);
         if let Some(fw) = self.focus_window {
-            if self.windows.get(fw).map_or(false, |w| w.alive && w.visible) {
+            if self.windows.get(fw).map_or(false, |w| w.alive && w.visible && w.nativ == f) {
                 focus = NodeId(ids::fenster(fw));
                 if let Some((wi, i)) = self.focus_widget {
                     if wi == fw {
@@ -532,6 +542,37 @@ impl Gui {
     /// Eine Aktion des Hilfsprogramms ausfuehren -- auf DERSELBEN Mechanik
     /// wie Maus und Tastatur, damit `GUI_CLICKED`, `GUI_ON_CLICK` und
     /// `on_change` genauso feuern.
+    /// Stufe 4: die Baeume der nativen Fenster und Teilflaechen, nach denen
+    /// ein Hilfsprogramm gefragt hat, bauen und schicken.
+    pub fn a11y_nativ(&mut self, g: &mut Graphics) {
+        for f in g.a11y_nativ_aktiv() {
+            let baum = match self.teil_von_flaeche(f) {
+                Some((wi, k)) => {
+                    let titel = self.windows[wi].dock.as_ref().and_then(|d| d.schweben.get(k))
+                        .map(|s| s.gruppe.aktiv).and_then(|li| self.windows[wi].dock.as_ref().map(|d| d.leisten[li].titel.clone()))
+                        .unwrap_or_default();
+                    self.leihen(wi, k, f);
+                    let b = self.a11y_baum_auf(g, &titel, f);
+                    self.zurueckgeben();
+                    b
+                }
+                None => {
+                    let titel = self.windows.iter().find(|w| w.alive && w.nativ == f).map(|w| w.title.clone()).unwrap_or_default();
+                    self.a11y_baum_auf(g, &titel, f)
+                }
+            };
+            g.a11y_nativ_senden(f, baum);
+        }
+    }
+    /// Eine Aktion aus dem Baum der Flaeche `f` -- bei einer Teilflaeche mit
+    /// ausgeliehenem Gastfenster, sonst gaelten ihre Widgets als unsichtbar.
+    pub fn a11y_aktion_auf(&mut self, req: accesskit::ActionRequest, g: &Graphics, f: u32) {
+        match self.teil_von_flaeche(f) {
+            Some((wi, k)) => { self.leihen(wi, k, f); self.a11y_aktion(req, g); self.zurueckgeben(); }
+            None => self.a11y_aktion(req, g),
+        }
+    }
+
     pub fn a11y_aktion(&mut self, req: accesskit::ActionRequest, g: &Graphics) {
         use accesskit::{Action, ActionData};
         use crate::a11y::ids::{self, Ziel};

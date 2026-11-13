@@ -1,6 +1,6 @@
 # Entwurf: Mehrere OS-Fenster in Drachenhauch
 
-> **Stand 12.11.2026: Weg E, Stufen 1 und 2 sind gebaut, samt Massstab je Schirm; Stufe 3 (Leisten abreissen, 3a und 3b) ebenso** (`GUI_WINDOW_NATIVE`,
+> **Stand 12.11.2026: Weg E, Stufen 1 und 2 sind gebaut, samt Massstab je Schirm; Stufen 3 (Leisten abreissen) und 4 (Bildschirmleser, Aufnahmen, Besitzer unter Linux, Beispiel) ebenso; offen bleiben Popups ueber den Fensterrand** (`GUI_WINDOW_NATIVE`,
 > Windows und Linux; macOS Rueckfall) -- Abschnitt 8. Davor geplant: ein
 > gui-Fenster als echtes OS-Fenster im SELBEN Prozess -- gezeichnet wird
 > weiter in raylibs Kontext, ein zweites GLFW-Fenster zeigt das Bild nur und

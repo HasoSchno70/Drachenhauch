@@ -1475,7 +1475,7 @@ impl Gui {
                         if is_down { Some(Zug::Schwebe { nr, dx, dy }) } else { None }
                     }
                 }
-                Zug::Draussen { nr, greif, ziel } => {
+                Zug::Draussen { nr, greif, ziel: _ } => {
                     if nr >= d.schweben.len() || d.schweben[nr].raus.is_none() { None } else {
                         let li = d.schweben[nr].gruppe.aktiv;
                         let lage = d.schweben[nr].raus.flatten();

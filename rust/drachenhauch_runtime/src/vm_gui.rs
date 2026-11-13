@@ -1478,6 +1478,9 @@ impl<'p> Vm<'p> {
                     // (Kandidatenliste der IME, Weg B).
                     g.ime_feld_aktiv(self.gui.ime_feld_aktiv());
                     if let Some((x, y, h)) = self.gui.schreibmarke(g) { g.ime_position(x, y, h); }
+                    // Weg E, Stufe 4: native Fenster haben je ihren Baum.
+                    for (f, req) in g.a11y_nativ_aktionen() { self.gui.a11y_aktion_auf(req, g, f); }
+                    self.gui.a11y_nativ(g);
                     if self.gui.screenreader {
                         for req in g.a11y_aktionen() { self.gui.a11y_aktion(req, g); }
                         let titel = g.fenster_titel().to_string();

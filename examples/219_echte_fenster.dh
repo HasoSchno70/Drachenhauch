@@ -1,0 +1,116 @@
+' ============================================================
+'  gui: echte Fenster des Systems -- Palette, Dialog, abreissbare Leisten
+' ============================================================
+'    GUI_WINDOW_NATIVE  die Werkzeug-Palette als eigenes Fenster: frei ueber
+'                       den Rand, auf den zweiten Schirm, mit Kreuz und
+'                       Eintrag in der Taskleiste
+'    modaler Dialog     "Einstellungen ..." oeffnet einen echten Dialog,
+'                       der ueber dem Hauptfenster bleibt
+'    Dock               die Leisten "Ebenen" und "Protokoll" an ihrem Kopf
+'                       ueber den Rand des Fensters ziehen -- sie reissen ab
+'                       und werden eigene Fenster; zurueck ueber einen Bereich
+'                       gezogen, docken sie wieder an
+'
+'  Wo es keine echten Fenster gibt (Browser, macOS), bleibt alles im
+'  Hauptfenster -- das Programm laeuft trotzdem gleich.
+' ============================================================
+IMPORT "gui"
+
+SCREEN(1000, 680, "Echte Fenster", 1)
+GUI_SCALE(1.0)
+
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Zeichenbrett", 0, 0, 1000, 680)
+GUI_WINDOW_CHROME(w, FALSE)
+GUI_DOCK(w, 0, 0, 1000, 680)
+GUI_DOCK_PANEL(w, "ebenen", "Ebenen", "links")
+GUI_DOCK_PANEL(w, "protokoll", "Protokoll", "unten")
+
+DIM ebenen AS GUI_WIDGET : ebenen = GUI_LISTBOX(w, 0, 0, 10, 10, ["Hintergrund", "Skizze", "Farbe", "Text"])
+DIM protokoll AS GUI_WIDGET : protokoll = GUI_LISTBOX(w, 0, 0, 10, 10, [])
+GUI_DOCK_ADD(w, "ebenen", ebenen)
+GUI_DOCK_ADD(w, "protokoll", protokoll)
+DIM hinweis AS GUI_WIDGET : hinweis = GUI_LABEL(w, "", 0, 0)
+DIM hinweis2 AS GUI_WIDGET : hinweis2 = GUI_LABEL(w, "", 0, 0)
+DIM knopfEinst AS GUI_WIDGET : knopfEinst = GUI_BUTTON(w, "Einstellungen ...", 0, 0, 160, 30)
+DIM knopfPalette AS GUI_WIDGET : knopfPalette = GUI_BUTTON(w, "Palette hinein/hinaus", 0, 0, 200, 30)
+
+' --- Die Palette: ein gui-Fenster, das ein echtes Fenster wird ---------
+DIM palette AS GUI_WINDOW : palette = GUI_WINDOW("Werkzeuge", 720, 60, 220, 250)
+GUI_WINDOW_CLOSABLE(palette, TRUE)
+DIM werkzeuge AS ARRAY OF STRING : werkzeuge = ["Pinsel", "Radierer", "Linie", "Kreis", "Text"]
+DIM knoepfe AS ARRAY OF GUI_WIDGET : knoepfe = []
+DIM i AS INTEGER
+FOR i = 0 TO LEN(werkzeuge) - 1
+    ARRAY_PUSH(knoepfe, GUI_BUTTON(palette, werkzeuge[i], 16, 14 + i * 40, 188, 32))
+NEXT
+
+' --- Der Dialog: modal, als echtes Fenster ueber dem Hauptfenster -------
+DIM dlg AS GUI_WINDOW : dlg = GUI_WINDOW("Einstellungen", 300, 200, 360, 200)
+DIM cbRaster AS GUI_WIDGET : cbRaster = GUI_CHECKBOX(dlg, "Raster zeigen", 20, 20, TRUE)
+DIM cbKanten AS GUI_WIDGET : cbKanten = GUI_CHECKBOX(dlg, "Kanten glätten", 20, 54, FALSE)
+DIM dlgOk AS GUI_WIDGET : dlgOk = GUI_BUTTON(dlg, "OK", 140, 120, 90, 32)
+DIM dlgAb AS GUI_WIDGET : dlgAb = GUI_BUTTON(dlg, "Abbrechen", 240, 120, 100, 32)
+' Enter drueckt OK, ESC Abbrechen -- auch im echten Fenster.
+GUI_WINDOW_DEFAULT(dlg, dlgOk)
+GUI_WINDOW_CANCEL(dlg, dlgAb)
+GUI_WINDOW_VISIBLE(dlg, FALSE)
+
+SUB melden(text AS STRING)
+    GUI_LISTBOX_ADD(protokoll, text)
+    GUI_LISTBOX_SET_SELECTED(protokoll, GUI_LISTBOX_COUNT(protokoll) - 1)
+END SUB
+
+SUB verteilen()
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    DIM b AS INTEGER
+    DIM h AS INTEGER
+    (x, y, b, h) = GUI_DOCK_RECT(w, "ebenen") : IF b > 0 THEN GUI_SET_BOUNDS(ebenen, x, y, b, h)
+    (x, y, b, h) = GUI_DOCK_RECT(w, "protokoll") : IF b > 0 THEN GUI_SET_BOUNDS(protokoll, x, y, b, h)
+    (x, y, b, h) = GUI_DOCK_CENTER(w)
+    GUI_SET_BOUNDS(knopfEinst, x + 20, y + 20, 160, 30)
+    GUI_SET_BOUNDS(knopfPalette, x + 190, y + 20, 200, 30)
+    GUI_SET_BOUNDS(hinweis, x + 20, y + 64, b - 40, 26)
+    GUI_SET_BOUNDS(hinweis2, x + 20, y + 92, b - 40, 26)
+END SUB
+
+' Die Palette gleich hinaus -- FALSE heisst: hier gibt es keine echten Fenster.
+DIM echt AS BOOLEAN : echt = GUI_WINDOW_NATIVE(palette, TRUE)
+GUI_SET_TEXT(hinweis, IIF(echt, "Die Palette ist ein eigenes Fenster.", "Hier gibt es keine echten Fenster -- alles bleibt im Hauptfenster."))
+GUI_SET_TEXT(hinweis2, IIF(echt, "Zieh 'Ebenen' oder 'Protokoll' am Kopf über den Rand: sie reißen ab.", ""))
+melden(IIF(echt, "Palette als eigenes Fenster (Massstab " + STR$(GUI_WINDOW_NATIVE_SCALE(palette)) + ")", "Palette im Hauptfenster"))
+verteilen()
+
+DIM woVorher AS STRING : woVorher = ""
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_DOCK_CHANGED(w) THEN verteilen()
+    ' Wohin sind die Leisten gezogen worden?
+    DIM wo AS STRING : wo = GUI_DOCK_WHERE$(w, "ebenen") + "/" + GUI_DOCK_WHERE$(w, "protokoll")
+    IF wo <> woVorher THEN
+        IF woVorher <> "" THEN melden("Leisten: Ebenen " + GUI_DOCK_WHERE$(w, "ebenen") + ", Protokoll " + GUI_DOCK_WHERE$(w, "protokoll"))
+        woVorher = wo
+    END IF
+    FOR i = 0 TO LEN(knoepfe) - 1
+        IF GUI_CLICKED(knoepfe[i]) THEN melden("Werkzeug: " + werkzeuge[i])
+    NEXT
+    IF GUI_WINDOW_CLOSED(palette) THEN melden("Palette geschlossen")
+    IF GUI_CLICKED(knopfPalette) THEN
+        GUI_WINDOW_VISIBLE(palette, TRUE)
+        DIM jetzt AS BOOLEAN : jetzt = GUI_WINDOW_NATIVE(palette, NOT GUI_WINDOW_IS_NATIVE(palette))
+        melden(IIF(jetzt, "Palette hinaus", "Palette ins Hauptfenster"))
+    END IF
+    IF GUI_CLICKED(knopfEinst) THEN
+        GUI_WINDOW_VISIBLE(dlg, TRUE)
+        GUI_WINDOW_MODAL(dlg, TRUE)
+        GUI_WINDOW_NATIVE(dlg, TRUE)
+    END IF
+    IF GUI_CLICKED(dlgOk) OR GUI_CLICKED(dlgAb) THEN
+        IF GUI_CLICKED(dlgOk) THEN melden("Einstellungen: Raster " + STR$(GUI_CHECKED(cbRaster)) + ", Kanten " + STR$(GUI_CHECKED(cbKanten)))
+        GUI_WINDOW_MODAL(dlg, FALSE)
+        GUI_WINDOW_VISIBLE(dlg, FALSE)
+    END IF
+    CLS(&H1B2330)
+    GUI_DRAW()
+    FLIP()
+WEND

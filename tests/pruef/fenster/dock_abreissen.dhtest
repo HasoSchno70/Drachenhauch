@@ -713,3 +713,83 @@ PRINT "text |"; GUI_TEXT(tf); "|"
 gesendet
 wo rechts klicks liste 0 haupt 0
 text ||
+
+=== ein fremder leser bedient die teilflaeche
+' Weg E, Stufe 4: auch eine Teilflaeche hat ihren eigenen Baum -- gebaut mit
+' ausgeliehenem Gastfenster, also nur mit den Widgets der Leiste. Der Leser
+' drueckt ihren Knopf.
+IMPORT "helfer.dh"
+DIM kennung AS STRING : kennung = "TeilLeser-" + STR$(MILLIS()) + "-" + STR$(INT(RND() * 1000000))
+DIM kind AS INTEGER : kind = PROCESS_START("dhrt", "run", CWD$() + "/teil.dh", "--", kennung, "raus")
+DIM s AS STRING : s = leser$(kennung, "Listen-Knopf", "")
+DIM k AS STRING : k = auslesen$(kind, 30000)
+IF INSTR(auslesenFehler, "Kein Fenster moeglich") >= 0 THEN
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    END
+END IF
+PRINT "knopf der leiste "; INSTR(s, "N: ControlType.Button [Listen-Knopf]") >= 0
+PRINT "ohne das hauptfenster "; INSTR(s, "[Haupt-Knopf]") < 0
+PRINT k;
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/fenstersender.dh"
+FUNCTION leser$(titel AS STRING, klick AS STRING, wert AS STRING) AS STRING
+    DIM p AS INTEGER : p = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "{sammlung}/../_hilfen/uialeser_fenster.ps1", titel, klick, wert)
+    RETURN auslesen$(p, 60000)
+END FUNCTION
+--- datei teil.dh
+IMPORT "gui"
+' Eine Leiste aus Widgets des Gastfensters (GUI_DOCK_ADD): Knopf, Textfeld,
+' Farbfeld. ARG$(1): enthaelt "raus" = gleich als eigenes Fenster;
+' beginnt mit "haupt" = das Hauptfenster traegt die Kennung (dorthin
+' schickt der Sender), sonst die Leiste.
+DIM kennung AS STRING : kennung = ARG$(0)
+DIM art AS STRING : art = ARG$(1)
+DIM haupt_ziel AS BOOLEAN : haupt_ziel = LEFT$(art, 5) = "haupt"
+SCREEN(700, 500, IIF(haupt_ziel, kennung, "Haupt-" + kennung), 1)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Dock", 0, 0, 700, 500)
+GUI_WINDOW_CHROME(w, FALSE)
+GUI_DOCK(w, 0, 0, 700, 500)
+GUI_DOCK_PANEL(w, "dateien", "Dateien", "links")
+GUI_DOCK_PANEL(w, "liste", IIF(haupt_ziel, "Liste-" + kennung, kennung), "schwebend")
+DIM lk AS GUI_WIDGET : lk = GUI_BUTTON(w, "Listen-Knopf", 0, 0, 10, 10)
+DIM tf AS GUI_WIDGET : tf = GUI_TEXTINPUT(w, 0, 0, 10, 10)
+DIM farbe AS GUI_WIDGET : farbe = GUI_LABEL(w, "", 0, 0)
+GUI_SET_COLOR(farbe, "bg", &HFF00FF)
+GUI_DOCK_ADD(w, "liste", lk)
+GUI_DOCK_ADD(w, "liste", tf)
+GUI_DOCK_ADD(w, "liste", farbe)
+' Im Hauptfenster, dort, wo die Leiste gedacht noch steht.
+DIM hk AS GUI_WIDGET : hk = GUI_BUTTON(w, "Haupt-Knopf", 250, 140, 140, 40)
+GUI_DOCK_FLOAT(w, "liste", 200, 100, 400, 180)
+SUB verteilen()
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    DIM b AS INTEGER
+    DIM h AS INTEGER
+    (x, y, b, h) = GUI_DOCK_RECT(w, "liste")
+    IF b > 0 THEN
+        GUI_SET_BOUNDS(lk, x + 10, y + 10, 140, 30)
+        GUI_SET_BOUNDS(tf, x + 10, y + 50, 200, 26)
+        GUI_SET_BOUNDS(farbe, x + 250, y + 50, 100, 60)
+    END IF
+END SUB
+verteilen()
+IF INSTR(art, "raus") >= 0 THEN GUI_DOCK_MOVE(w, "liste", "fenster")
+DIM nl AS INTEGER
+DIM nh AS INTEGER
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE NOT QUITREQUESTED() AND MILLIS() - t0 < 6000
+    GUI_UPDATE()
+    IF GUI_DOCK_CHANGED(w) THEN verteilen()
+    IF GUI_CLICKED(lk) THEN nl = nl + 1
+    IF GUI_CLICKED(hk) THEN nh = nh + 1
+    CLS(&H202830) : GUI_DRAW() : FLIP()
+WEND
+PRINT "wo "; GUI_DOCK_WHERE$(w, "liste"); " klicks liste "; nl; " haupt "; nh
+PRINT "text |"; GUI_TEXT(tf); "|"
+--- system windows
+--- erwartet
+knopf der leiste TRUE
+ohne das hauptfenster TRUE
+wo fenster klicks liste 1 haupt 0
+text ||

@@ -852,3 +852,30 @@ Pruefung: `dock_abreissen.dhtest` jetzt 12 Faelle (3b: abreissen per Zug,
 Klick in der Teilflaeche, Stelle im Hauptfenster frei, Tippen, Tab, Bild,
 Andocken rechts; Rueckfall ohne echte Fenster); Rust-Test erweitert (Sicht der
 Gruppe). Gegenproben in drei verfaelschten Bauten.
+
+## Echte OS-Fenster, Weg E Stufe 4: Schliff (2026-11-13)
+
+- Bildschirmleser: jedes native Fenster bekommt seinen eigenen
+  AccessKit-Adapter -- eingehaengt, bevor es zum ersten Mal sichtbar wird
+  (`Fenster::anlegen` ruft `vor_zeigen`; der Windows-Adapter verlangt ein
+  Fenster, das noch nie zu sehen war). Der Baum je Flaeche
+  (`a11y_baum_auf`): das Hauptfenster ohne die nativen Fenster, ein natives
+  mit seinen Widgets, eine Teilflaeche mit ausgeliehenem Gastfenster.
+  Aktionen kommen mit ihrer Flaeche zurueck (`a11y_aktion_auf`).
+- Besitzer unter Linux: `XSetTransientForHint` auf `glfwGetX11Window`
+  (libX11 bindet raylib ohnehin); unter Wayland nichts. In WSLg mit
+  `xprop` nachgesehen: modal = `WM_TRANSIENT_FOR` des Hauptfensters,
+  danach weg.
+- Aufnahmen: Zeilen `n Bild Flaeche Art a b` (raylibs Leser uebergeht sie).
+  Wiedergabe speist sie in den Eingang des nativen Fensters wie GLFW
+  (`ereignis_buchen`); die Aufnahme schreibt mit, was ankam
+  (`ereignisse_von`), und haengt es beim Stopp an -- mit raylibs
+  Bildzaehler, dessen Versatz an der ersten Zeile `e` abgelesen wird.
+- Beispiel `examples/219_echte_fenster.dh`: Palette als echtes Fenster,
+  modaler Dialog, abreissbare Leisten.
+- Offen: Popups ueber den Rand eines nativen Fensters (brauchen eigene
+  Popup-Fenster).
+Pruefung: zwei Leser-Faelle (natives Fenster, Teilflaeche) mit einem
+fremden UIA-Leser (`_hilfen/uialeser_fenster.ps1`, findet Fenster ueber den
+Titel), zwei Aufnahme-Faelle (von Hand geschrieben; aufgenommen mit echten
+Nachrichten und wieder abgespielt), Rust-Test `aufnahme_hin_und_zurueck`.
