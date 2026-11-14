@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 2414,
+ "count": 2418,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -965,6 +965,8 @@
   "GUI_TABLE_HEADERS": "Spaltentitel setzen (1D ARRAY OF STRING)",
   "GUI_TABLE_IS_SELECTED": "ist diese Datenzeile gewählt?",
   "GUI_TABLE_MOVE_COL": "Spalte verschieben (Anzeige-Positionen)",
+  "GUI_TABLE_NEED_COUNT": "wie viele ab dort am Stück fehlen (höchstens 1000)",
+  "GUI_TABLE_NEED_FROM": "erste Zeile, die die Tabelle gerade braucht (sichtbar oder eine Seite davor/danach); -1 = nichts",
   "GUI_TABLE_PASTE": "INTEGER — Tabulator-Text ab der aktuellen Zelle einfügen; Zahl der geschriebenen Zellen",
   "GUI_TABLE_PLACEHOLDER": "Hinweis, wenn keine Zeile zu sehen ist („Keine Treffer“); steht in der .dhform",
   "GUI_TABLE_RANGE": "TUPLE — (anker_zeile, anker_spalte, zeile, spalte) des Bereichs",
@@ -985,8 +987,10 @@
   "GUI_TABLE_SORT": "programmgesteuert; Spalte < 0 hebt die Sortierung auf",
   "GUI_TABLE_SORT_COL": "aktuelle Sortierung lesen",
   "GUI_TABLE_SORT_DESC": "aktuelle Sortierung lesen",
+  "GUI_TABLE_SUPPLY": "Zeilen ab ab liefern: ARRAY OF STRING für eine Zeile, 2D-Feld für mehrere",
   "GUI_TABLE_VIEW_COUNT": "INTEGER — wie viele Zeilen sind gerade SICHTBAR? (nach Filtern)",
   "GUI_TABLE_VIEW_ROW": "INTEGER — welche Datenzeile steht an sichtbarer Stelle i? -- Sortieren und Filtern stellen die Daten nicht um",
+  "GUI_TABLE_VIRTUAL": "virtueller Modus mit dieser Zeilenzahl; nochmals gerufen (etwa nach einem anderen Filter): neue Zahl, alles Gelieferte veraltet",
   "GUI_TABS": "Reiter-Leiste anlegen (labels = ARRAY/TUPLE von Strings); aktiver Reiter → 0",
   "GUI_TABS_CLOSABLE": "jeder Reiter bekommt ein Kreuz. Geschlossen wird nichts — die Laufzeit meldet nur, welches getroffen wurde",
   "GUI_TAB_CLOSED": "welcher Reiter in diesem Bild geschlossen werden soll (-1 = keiner). Trifft das Kreuz oder die mittlere Maustaste",

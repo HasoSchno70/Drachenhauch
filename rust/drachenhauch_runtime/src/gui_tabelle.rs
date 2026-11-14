@@ -43,7 +43,9 @@ impl Gui {
     }
     pub fn table_set_rows(&mut self, h: i64, rows: Vec<Vec<String>>) -> Result<(), String> {
         let t = self.tbl_mut(h, "GUI_TABLE_ROWS")?;
-        let old_n = t.rows.len();
+        // Eigene Zeilen beenden den virtuellen Modus.
+        let old_n = t.zeilen_zahl();
+        t.virt = None;
         t.rows = rows.into_iter()
             .map(|r| r.into_iter().map(Cell::text).collect())
             .collect();
@@ -82,9 +84,9 @@ impl Gui {
     /// Zeile/Spalte pruefen und melden, WELCHE Angabe daneben lag -- ein blosses
     /// "Index ungueltig" laesst einen beide durchsuchen.
     pub(super) fn tbl_rc(t: &TableState, r: i64, c: i64, fn_: &str) -> Result<(usize, usize), String> {
-        if r < 0 || r >= t.rows.len() as i64 {
+        if r < 0 || r >= t.zeilen_zahl() as i64 {
             return Err(format!("{}: Zeile {} gibt es nicht (0..{})",
-                               fn_, r, t.rows.len().saturating_sub(1)));
+                               fn_, r, t.zeilen_zahl().saturating_sub(1)));
         }
         let n = t.n_cols();
         if c < 0 || c >= n as i64 {
@@ -128,6 +130,9 @@ impl Gui {
     /// Ganze Zeile faerben -- ein Aufruf statt einer je Spalte.
     pub fn table_row_color(&mut self, h: i64, r: i64, fg: i64, bg: i64) -> Result<(), String> {
         let t = self.tbl_mut(h, "GUI_TABLE_ROW_COLOR")?;
+        if t.virt.is_some() {
+            return Err("GUI_TABLE_ROW_COLOR: nicht in einer virtuellen Tabelle -- GUI_TABLE_CELL_COLOR je gelieferter Zelle".into());
+        }
         if r < 0 || r >= t.rows.len() as i64 {
             return Err(format!("GUI_TABLE_ROW_COLOR: Zeile {} gibt es nicht (0..{})",
                                r, t.rows.len().saturating_sub(1)));
@@ -184,6 +189,7 @@ impl Gui {
 
     pub fn table_add_row(&mut self, h: i64, zellen: Vec<String>) -> Result<i64, String> {
         let t = self.tbl_mut(h, "GUI_TABLE_ADD_ROW")?;
+        if t.virt.is_some() { return Err("GUI_TABLE_ADD_ROW: die Tabelle ist virtuell -- Zeilenzahl mit GUI_TABLE_VIRTUAL, Inhalt mit GUI_TABLE_SUPPLY".into()); }
         t.rows.push(zellen.into_iter().map(Cell::text).collect());
         t.row_fg.push(-1);
         t.row_bg.push(-1);
@@ -192,6 +198,7 @@ impl Gui {
     }
     pub fn table_remove_row(&mut self, h: i64, r: i64) -> Result<(), String> {
         let t = self.tbl_mut(h, "GUI_TABLE_REMOVE_ROW")?;
+        if t.virt.is_some() { return Err("GUI_TABLE_REMOVE_ROW: die Tabelle ist virtuell -- Zeilenzahl mit GUI_TABLE_VIRTUAL".into()); }
         if r < 0 || r >= t.rows.len() as i64 {
             return Err(format!("GUI_TABLE_REMOVE_ROW: Zeile {} gibt es nicht (0..{})",
                                r, t.rows.len().saturating_sub(1)));
@@ -225,6 +232,7 @@ impl Gui {
     }
     pub fn table_clear(&mut self, h: i64) -> Result<(), String> {
         let t = self.tbl_mut(h, "GUI_TABLE_CLEAR")?;
+        t.virt = None;
         t.rows.clear();
         t.eltern.clear(); t.offen.clear();
         t.row_fg.clear();
@@ -314,9 +322,9 @@ zellmodus, zeilen_anhaengen", key)),
         Ok(if spalte { t.cur_c } else { t.cur_r } as i64)
     }
     pub(super) fn zelle_pruefen(t: &TableState, r: i64, c: i64, fn_: &str) -> Result<(), String> {
-        if r < 0 || r >= t.rows.len() as i64 || c < 0 || c >= t.n_cols() as i64 {
+        if r < 0 || r >= t.zeilen_zahl() as i64 || c < 0 || c >= t.n_cols() as i64 {
             return Err(format!("{}: Zelle ({}, {}) gibt es nicht -- {} Zeilen, {} Spalten",
-                               fn_, r, c, t.rows.len(), t.n_cols()));
+                               fn_, r, c, t.zeilen_zahl(), t.n_cols()));
         }
         Ok(())
     }
@@ -495,9 +503,9 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     /// Zeile zur Auswahl hinzunehmen bzw. herausnehmen (programmgesteuert).
     pub fn table_select(&mut self, h: i64, r: i64, an: bool) -> Result<(), String> {
         let t = self.tbl_mut(h, "GUI_TABLE_SELECT")?;
-        if r < 0 || r >= t.rows.len() as i64 {
+        if r < 0 || r >= t.zeilen_zahl() as i64 {
             return Err(format!("GUI_TABLE_SELECT: Zeile {} gibt es nicht (0..{})",
-                               r, t.rows.len().saturating_sub(1)));
+                               r, t.zeilen_zahl().saturating_sub(1)));
         }
         let r = r as i32;
         let drin = t.sel_rows.contains(&r);
@@ -570,7 +578,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     }
     /// Wieviele Zeilen sind nach Filter/Sortierung sichtbar?
     pub fn table_view_count(&self, h: i64) -> Result<i64, String> {
-        Ok(self.tbl_ref(h, "GUI_TABLE_VIEW_COUNT")?.view.len() as i64)
+        Ok(self.tbl_ref(h, "GUI_TABLE_VIEW_COUNT")?.ansicht_len() as i64)
     }
     /// Ansichtszeile -> Datenzeile. Damit laesst sich die Tabelle in der
     /// SICHTBAREN Reihenfolge durchgehen, ohne dass die Daten umgestellt
@@ -584,7 +592,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     }
     pub fn table_set_selected(&mut self, h: i64, row: i64) -> Result<(), String> {
         let t = self.tbl_mut(h, "GUI_TABLE_SET_SELECTED")?;
-        let n = t.rows.len() as i64;
+        let n = t.zeilen_zahl() as i64;
         let r = if row >= 0 && row < n { row as i32 } else { -1 };
         // Ueber auswahl_setzen, damit die Mehrfachauswahl nicht daneben
         // stehenbleibt und beide Angaben auseinander laufen.
@@ -598,6 +606,98 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         Ok(self.tbl_ref(h, "GUI_TABLE_CLICKED_COL")?.clicked_col as i64)
     }
     pub fn table_row_count(&self, h: i64) -> Result<i64, String> {
-        Ok(self.tbl_ref(h, "GUI_TABLE_ROW_COUNT")?.rows.len() as i64)
+        Ok(self.tbl_ref(h, "GUI_TABLE_ROW_COUNT")?.zeilen_zahl() as i64)
+    }
+
+    // --- Virtueller Modus ----------------------------------------------------
+
+    /// GUI_TABLE_VIRTUAL(tbl, zeilen): die Tabelle zeigt `zeilen` Zeilen,
+    /// deren Inhalt das Programm auf Nachfrage liefert (GUI_TABLE_NEED_FROM,
+    /// GUI_TABLE_SUPPLY). Nochmals gerufen: neue Zeilenzahl (etwa nach einem
+    /// anderen Filter), alles Gelieferte gilt als veraltet. Eigene Zeilen
+    /// (GUI_TABLE_ROWS, GUI_TABLE_CLEAR) beenden den Modus.
+    pub fn table_virtual(&mut self, h: i64, zeilen: i64) -> Result<(), String> {
+        let t = self.tbl_mut(h, "GUI_TABLE_VIRTUAL")?;
+        // Die Bildlauf-Rechnung der Tabelle spricht Pixel in i32.
+        let grenze = (i32::MAX / 2) as i64 / t.row_h.max(1) as i64;
+        if zeilen < 0 || zeilen > grenze {
+            return Err(format!("GUI_TABLE_VIRTUAL: Zeilenzahl {} ausserhalb 0..{}", zeilen, grenze));
+        }
+        let n = zeilen as usize;
+        t.rows.clear();
+        t.view.clear();
+        t.row_fg.clear();
+        t.row_bg.clear();
+        t.baum = false;
+        t.virt = Some(Box::new(Virtuell { n, cache: Default::default() }));
+        if t.selected >= n as i32 { t.selected = -1; }
+        t.sel_rows.retain(|&r| (r as usize) < n);
+        if t.cur_r >= n as i32 { t.cur_r = -1; t.ber_r = -1; }
+        if t.edit_row >= 0 { t.edit_row = -1; t.edit_col = -1; }
+        let max = (n as i64 * t.row_h as i64).min(i32::MAX as i64) as i32;
+        if t.scroll_y > max { t.scroll_y = 0; }
+        Ok(())
+    }
+
+    /// Welche Zeilen braucht die virtuelle Tabelle gerade? (erste, Anzahl):
+    /// die erste fehlende im sichtbaren Bereich samt einer Seite davor und
+    /// danach, und wie viele ab dort am Stueck fehlen (hoechstens 1000).
+    /// (-1, 0), wenn nichts fehlt oder die Tabelle nicht virtuell ist.
+    /// Eine Zeile, die ein Aufruf ohne Geometrie ins Bild geholt hat
+    /// (GUI_TABLE_SET_CURRENT), zaehlt schon -- so auch vor dem ersten Bild.
+    pub fn table_need(&mut self, h: i64) -> Result<(i64, i64), String> {
+        let (wi, i) = Self::dec_widget(h);
+        if self.tbl_ref(h, "GUI_TABLE_NEED_FROM")?.virt.is_none() { return Ok((-1, 0)); }
+        if self.windows[wi].widgets[i].tbl.as_ref().map(|t| t.sicht_holen).unwrap_or(false) { self.tabelle_zeigen(wi, i); }
+        let (von, bis) = self.virtuell_bereich(wi, i);
+        let t = self.tbl_ref(h, "GUI_TABLE_NEED_FROM")?;
+        let Some(v) = t.virt.as_ref() else { return Ok((-1, 0)) };
+        let Some(erste) = (von..bis).find(|r| !v.cache.contains_key(r)) else { return Ok((-1, 0)) };
+        let n = (erste..bis).take_while(|r| !v.cache.contains_key(r)).take(1000).count();
+        Ok((erste as i64, n as i64))
+    }
+
+    /// Sichtbarer Bereich einer virtuellen Tabelle samt einer Seite davor
+    /// und danach: [von, bis) in Zeilen.
+    fn virtuell_bereich(&self, wi: usize, i: usize) -> (usize, usize) {
+        let gm = self.table_geom(wi, i);
+        let Some(t) = self.windows[wi].widgets[i].tbl.as_ref() else { return (0, 0) };
+        let n = t.ansicht_len();
+        let rh = gm.row_h.max(1);
+        let erste = (t.scroll_y / rh).max(0) as usize;
+        let seite = ((gm.body_h / rh) + 1).max(1) as usize;
+        (erste.saturating_sub(seite).min(n), (erste + 2 * seite).min(n))
+    }
+
+    /// GUI_TABLE_SUPPLY(tbl, ab, zellen): Zeilen ab `ab` liefern -- ein 2D
+    /// ARRAY OF STRING (mehrere Zeilen) oder ein ARRAY OF STRING (eine).
+    /// Weit vom sichtbaren Bereich gelieferte Zeilen vergisst die Tabelle
+    /// wieder, sobald sie mehr als einige Seiten haelt.
+    pub fn table_supply(&mut self, h: i64, ab: i64, zeilen: Vec<Vec<String>>) -> Result<(), String> {
+        let (wi, i) = Self::dec_widget(h);
+        let n = match self.tbl_ref(h, "GUI_TABLE_SUPPLY")?.virt.as_ref() {
+            Some(v) => v.n,
+            None => return Err("GUI_TABLE_SUPPLY: die Tabelle ist nicht virtuell (GUI_TABLE_VIRTUAL)".into()),
+        };
+        if ab < 0 || ab as usize > n {
+            return Err(format!("GUI_TABLE_SUPPLY: Zeile {} gibt es nicht (0..{})", ab, n.saturating_sub(1)));
+        }
+        let (von, bis) = self.virtuell_bereich(wi, i);
+        let seite = (bis - von).max(1);
+        let t = self.tbl_mut(h, "GUI_TABLE_SUPPLY")?;
+        let Some(v) = t.virt.as_deref_mut() else { return Ok(()) };
+        for (k, z) in zeilen.into_iter().enumerate() {
+            let r = ab as usize + k;
+            if r >= n { break; }
+            v.cache.insert(r, z.into_iter().map(Cell::text).collect());
+        }
+        // Vergessen, was weit weg liegt -- erst ab einem Vorrat, damit Hin-
+        // und Herrollen nicht staendig neu fragt.
+        let halten = (8 * seite).max(2000);
+        if v.cache.len() > halten {
+            let (a, b) = (von.saturating_sub(2 * seite), bis + 2 * seite);
+            v.cache.retain(|&r, _| r >= a && r < b);
+        }
+        Ok(())
     }
 }

@@ -1849,8 +1849,51 @@ Measured with a million rows of five columns: filling with
 `GUI_TABLE_ADD_ROW` about 0.7 s, sorting 0.13 s, filtering 0.04 s, setting
 one cell (also in a sorted or filtered table) 3 ms, memory about 350 MB.
 Short cell texts (up to 22 bytes) need no allocation of their own. For data
-that does not fit into memory, read from the database page by page
-(`LIMIT`/`OFFSET`).
+that does not fit into memory: the virtual table.
+
+### Virtual table
+
+With millions of rows from a database the table does not have to hold
+them all. `GUI_TABLE_VIRTUAL(tbl, zeilen)` only tells it how many there
+are; the program supplies the content on request -- always just around
+what is visible. The table forgets rows far away again, so memory stays
+small however long it is.
+
+| Built-in | Effect |
+|---|---|
+| `GUI_TABLE_VIRTUAL(tbl, zeilen)` | virtual mode with this row count; called again (say after another filter): new count, everything supplied is outdated |
+| `GUI_TABLE_NEED_FROM(tbl)` | first row the table needs right now (visible or a page before/after); -1 = nothing |
+| `GUI_TABLE_NEED_COUNT(tbl)` | how many are missing in a row from there (at most 1000) |
+| `GUI_TABLE_SUPPLY(tbl, ab, zellen)` | supply rows from `ab`: `ARRAY OF STRING` for one row, a 2D array for several |
+
+```basic
+IMPORT "gui"
+DIM win AS GUI_WINDOW : win = GUI_WINDOW("Kunden", 0, 0, 600, 400)
+DIM tbl AS GUI_WIDGET : tbl = GUI_TABLE(win, 10, 10, 580, 380)
+GUI_TABLE_HEADERS(tbl, ["Nr", "Name"])
+GUI_TABLE_VIRTUAL(tbl, 5000000)
+' each frame after GUI_UPDATE:
+SUB nachliefern()
+    DIM von AS INTEGER : von = GUI_TABLE_NEED_FROM(tbl)
+    IF von < 0 THEN EXIT SUB
+    DIM r AS INTEGER
+    FOR r = von TO von + GUI_TABLE_NEED_COUNT(tbl) - 1
+        GUI_TABLE_SUPPLY(tbl, r, [STR$(r), "Kunde " + STR$(r)])
+    NEXT
+END SUB
+```
+
+With a database, a query with `LIMIT anzahl OFFSET von` supplies the rows,
+`SELECT COUNT(*)` the count. **Sorting and filtering are the program's
+job** (`ORDER BY`, `WHERE`): a click on the header only sets
+`GUI_TABLE_SORT_COL`/`GUI_TABLE_SORT_DESC` and has everything requested
+anew, as does a filter in the filter row (`GUI_TABLE_GET_FILTER`) -- then
+set the new count with `GUI_TABLE_VIRTUAL`. Selection, keyboard, editing
+and `GUI_TABLE_GET_CELL` work with row numbers as usual; a cell not
+supplied is empty. Not virtual: `GUI_TABLE_ADD_ROW`, `GUI_TABLE_REMOVE_ROW`
+and `GUI_TABLE_ROW_COLOR` (an error -- colours per cell work), tree
+tables. `GUI_TABLE_ROWS` and `GUI_TABLE_CLEAR` end the mode. At most about
+44 million rows at a row height of 24 points (scrolling counts in points).
 
 ## Tree (tree view)
 

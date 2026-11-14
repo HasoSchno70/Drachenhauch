@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 2463,
+ "count": 2467,
  "builtins": [
   {
    "name": "ABS",
@@ -6384,6 +6384,30 @@
    "name": "GUI_TABLE_ROW_COLOR",
    "kind": "module",
    "signature": "GUI_TABLE_ROW_COLOR(tbl, zeile, vordergrund, hintergrund)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TABLE_VIRTUAL",
+   "kind": "core",
+   "signature": "GUI_TABLE_VIRTUAL(tbl, zeilen)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TABLE_NEED_FROM",
+   "kind": "core",
+   "signature": "GUI_TABLE_NEED_FROM(tbl) AS INTEGER",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TABLE_NEED_COUNT",
+   "kind": "core",
+   "signature": "GUI_TABLE_NEED_COUNT(tbl) AS INTEGER",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TABLE_SUPPLY",
+   "kind": "core",
+   "signature": "GUI_TABLE_SUPPLY(tbl, ab, zellen)",
    "module": "gui"
   },
   {

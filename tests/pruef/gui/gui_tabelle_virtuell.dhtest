@@ -1,0 +1,102 @@
+' Virtuelle Tabelle (GUI_TABLE_VIRTUAL, Punkt C der grossen Tabellen):
+' die Tabelle hat n Zeilen, haelt aber nur, was das Programm geliefert
+' hat -- rund um den sichtbaren Bereich. GUI_TABLE_NEED_FROM/_COUNT sagen,
+' welche Zeilen fehlen, GUI_TABLE_SUPPLY liefert sie; weit entfernte
+' vergisst die Tabelle wieder. Ohne Fenster: die Zeile, die
+' GUI_TABLE_SET_CURRENT ins Bild holt, zaehlt schon vor dem ersten Bild.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== zehn millionen zeilen, geliefert wird nur, was zu sehen ist
+IMPORT "gui"
+DIM win AS GUI_WINDOW : win = GUI_WINDOW("w", 0, 0, 400, 300)
+DIM t AS GUI_WIDGET : t = GUI_TABLE(win, 0, 0, 380, 280)
+GUI_TABLE_HEADERS(t, ["Nr", "Quadrat"])
+DIM t0 AS FLOAT : t0 = GET_TIME()
+GUI_TABLE_VIRTUAL(t, 10000000)
+PRINT "zeilen "; GUI_TABLE_ROW_COUNT(t); " sichtbar "; GUI_TABLE_VIEW_COUNT(t)
+PRINT "braucht ab "; GUI_TABLE_NEED_FROM(t); " anzahl "; GUI_TABLE_NEED_COUNT(t)
+SUB liefern()
+    DIM von AS INTEGER : von = GUI_TABLE_NEED_FROM(t)
+    DIM n AS INTEGER : n = GUI_TABLE_NEED_COUNT(t)
+    DIM r AS INTEGER
+    FOR r = von TO von + n - 1
+        GUI_TABLE_SUPPLY(t, r, [STR$(r), STR$(r * r)])
+    NEXT
+END SUB
+liefern()
+PRINT "danach braucht "; GUI_TABLE_NEED_FROM(t); " "; GUI_TABLE_NEED_COUNT(t)
+PRINT "zelle 5 "; GUI_TABLE_GET_CELL(t, 5, 1); " ungeliefert ["; GUI_TABLE_GET_CELL(t, 9000000, 1); "]"
+GUI_TABLE_SET_CURRENT(t, 9000000, 0)
+DIM ab AS INTEGER : ab = GUI_TABLE_NEED_FROM(t)
+PRINT "nach dem sprung ab "; ab; " nahe "; ab > 8999900 AND ab <= 9000000
+liefern()
+PRINT "zelle 9000000 "; GUI_TABLE_GET_CELL(t, 9000000, 1); " oben noch "; GUI_TABLE_GET_CELL(t, 5, 1)
+PRINT "flott "; GET_TIME() - t0 < 2.0
+--- erwartet
+zeilen 10000000 sichtbar 10000000
+braucht ab 0 anzahl 26
+danach braucht -1 0
+zelle 5 25 ungeliefert []
+nach dem sprung ab 8999975 nahe TRUE
+zelle 9000000 81000000000000 oben noch 25
+flott TRUE
+
+=== weit entfernte zeilen vergisst die tabelle
+' Mehr als ein Vorrat von 2000 Zeilen: was weit weg vom sichtbaren Bereich
+' liegt, faellt heraus (danach leer); was zu sehen ist, bleibt.
+IMPORT "gui"
+DIM win AS GUI_WINDOW : win = GUI_WINDOW("w", 0, 0, 400, 300)
+DIM t AS GUI_WIDGET : t = GUI_TABLE(win, 0, 0, 380, 280)
+GUI_TABLE_HEADERS(t, ["Nr"])
+GUI_TABLE_VIRTUAL(t, 1000000)
+GUI_TABLE_SUPPLY(t, 0, ["null"])
+GUI_TABLE_SUPPLY(t, 500000, ["weit"])
+PRINT "vorher ["; GUI_TABLE_GET_CELL(t, 500000, 0); "]"
+DIM r AS INTEGER
+FOR r = 600000 TO 602500
+    GUI_TABLE_SUPPLY(t, r, [STR$(r)])
+NEXT
+PRINT "danach ["; GUI_TABLE_GET_CELL(t, 500000, 0); "] ["; GUI_TABLE_GET_CELL(t, 601000, 0); "] sichtbar ["; GUI_TABLE_GET_CELL(t, 0, 0); "]"
+--- erwartet
+vorher [weit]
+danach [] [] sichtbar [null]
+
+=== sortieren und neue zeilenzahl fragen alles neu an
+' Virtuell sortiert und filtert das Programm (etwa ORDER BY): nach einem
+' Klick auf den Kopf oder GUI_TABLE_SORT ist alles Gelieferte veraltet,
+' ebenso nach einer neuen Zeilenzahl.
+IMPORT "gui"
+DIM win AS GUI_WINDOW : win = GUI_WINDOW("w", 0, 0, 400, 300)
+DIM t AS GUI_WIDGET : t = GUI_TABLE(win, 0, 0, 380, 280)
+GUI_TABLE_HEADERS(t, ["Nr"])
+GUI_TABLE_VIRTUAL(t, 100)
+DIM r AS INTEGER
+FOR r = 0 TO 99
+    GUI_TABLE_SUPPLY(t, r, [STR$(r)])
+NEXT
+PRINT "geliefert "; GUI_TABLE_NEED_FROM(t)
+GUI_TABLE_SORT(t, 0, TRUE)
+PRINT "sortiert "; GUI_TABLE_SORT_COL(t); " "; GUI_TABLE_SORT_DESC(t); " braucht "; GUI_TABLE_NEED_FROM(t)
+DIM zz[2, 1] AS STRING
+zz[0, 0] = "neunundneunzig" : zz[1, 0] = "achtundneunzig"
+GUI_TABLE_SUPPLY(t, 0, zz)
+PRINT "oben "; GUI_TABLE_GET_CELL(t, 0, 0); " "; GUI_TABLE_GET_CELL(t, 1, 0)
+GUI_TABLE_VIRTUAL(t, 3)
+PRINT "drei zeilen "; GUI_TABLE_ROW_COUNT(t); " braucht "; GUI_TABLE_NEED_FROM(t); " "; GUI_TABLE_NEED_COUNT(t)
+GUI_TABLE_CLEAR(t)
+PRINT "geleert "; GUI_TABLE_ROW_COUNT(t); " braucht "; GUI_TABLE_NEED_FROM(t)
+--- erwartet
+geliefert -1
+sortiert 0 TRUE braucht 0
+oben neunundneunzig achtundneunzig
+drei zeilen 3 braucht 0 3
+geleert 0 braucht -1
+
+=== eigene zeilen anhaengen geht virtuell nicht
+IMPORT "gui"
+DIM win AS GUI_WINDOW : win = GUI_WINDOW("w", 0, 0, 400, 300)
+DIM t AS GUI_WIDGET : t = GUI_TABLE(win, 0, 0, 380, 280)
+GUI_TABLE_VIRTUAL(t, 10)
+DIM r AS INTEGER : r = GUI_TABLE_ADD_ROW(t, ["x"])
+--- fehler
+GUI_TABLE_ADD_ROW: die Tabelle ist virtuell

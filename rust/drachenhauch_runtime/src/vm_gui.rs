@@ -1255,6 +1255,20 @@ impl<'p> Vm<'p> {
             "gui_table_get_filter" => Value::str_rc(&self.gui.table_get_filter(gi(a,0,"GUI_TABLE_GET_FILTER")?, gi(a,1,"GUI_TABLE_GET_FILTER")?)?),
             "gui_table_view_count" => Value::Int(self.gui.table_view_count(gi(a,0,"GUI_TABLE_VIEW_COUNT")?)?),
             "gui_table_view_row" => Value::Int(self.gui.table_view_row(gi(a,0,"GUI_TABLE_VIEW_ROW")?, gi(a,1,"GUI_TABLE_VIEW_ROW")?)?),
+            "gui_table_virtual" => { let n = "GUI_TABLE_VIRTUAL";
+                if a.len() != 2 { return Err(format!("{}: erwartet (tbl, zeilen)", n)); }
+                self.gui.table_virtual(gi(a,0,n)?, gi(a,1,n)?)?; Value::Nil }
+            "gui_table_need_from" => { let n = "GUI_TABLE_NEED_FROM";
+                if a.len() != 1 { return Err(format!("{}: erwartet (tbl)", n)); }
+                Value::Int(self.gui.table_need(gi(a,0,n)?)?.0) }
+            "gui_table_need_count" => { let n = "GUI_TABLE_NEED_COUNT";
+                if a.len() != 1 { return Err(format!("{}: erwartet (tbl)", n)); }
+                Value::Int(self.gui.table_need(gi(a,0,n)?)?.1) }
+            "gui_table_supply" => { let n = "GUI_TABLE_SUPPLY";
+                if a.len() != 3 { return Err(format!("{}: erwartet (tbl, ab, zellen)", n)); }
+                // Ein 2D-Feld liefert mehrere Zeilen, ein einfaches eine.
+                let zeilen = match gstrs2(a,2,n) { Ok(z) => z, Err(_) => vec![gstrs(a,2,n)?] };
+                self.gui.table_supply(gi(a,0,n)?, gi(a,1,n)?, zeilen)?; Value::Nil }
             "gui_table_row_count" => Value::Int(self.gui.table_row_count(gi(a,0,"GUI_TABLE_ROW_COUNT")?)?),
             "gui_tree" => Value::Int(self.gui.tree(gi(a,0,"GUI_TREE")?, gi(a,1,"GUI_TREE")? as i32,
                 gi(a,2,"GUI_TREE")? as i32, gi(a,3,"GUI_TREE")? as i32, gi(a,4,"GUI_TREE")? as i32)?),

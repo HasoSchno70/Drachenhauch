@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/en und dem englischen Buch von `dhrt doku prosa` -- NICHT von Hand aendern. Der Hover nimmt sie mit DHRT_LANG=en.",
- "count": 2406,
+ "count": 2410,
  "docs": {
   "ABS": "Absolute value.",
   "ACOS": "Arc sine/cosine (x in [-1, 1])",
@@ -964,6 +964,8 @@
   "GUI_TABLE_HEADERS": "set the column titles (1D ARRAY OF STRING)",
   "GUI_TABLE_IS_SELECTED": "is this data row selected?",
   "GUI_TABLE_MOVE_COL": "move a column (display positions)",
+  "GUI_TABLE_NEED_COUNT": "how many are missing in a row from there (at most 1000)",
+  "GUI_TABLE_NEED_FROM": "first row the table needs right now (visible or a page before/after); -1 = nothing",
   "GUI_TABLE_PASTE": "INTEGER — paste tab-separated text from the current cell on; number of cells written",
   "GUI_TABLE_PLACEHOLDER": "hint when no row is visible (“No matches”); stored in the .dhform",
   "GUI_TABLE_RANGE": "TUPLE — (anker_zeile, anker_spalte, zeile, spalte) of the range",
@@ -984,8 +986,10 @@
   "GUI_TABLE_SORT": "from the program; column < 0 removes the sorting",
   "GUI_TABLE_SORT_COL": "read the current sorting",
   "GUI_TABLE_SORT_DESC": "read the current sorting",
+  "GUI_TABLE_SUPPLY": "supply rows from ab: ARRAY OF STRING for one row, a 2D array for several",
   "GUI_TABLE_VIEW_COUNT": "INTEGER — how many rows are currently VISIBLE? (after filtering)",
   "GUI_TABLE_VIEW_ROW": "INTEGER — which data row is at visible position i? -- sorting and filtering do not rearrange the data",
+  "GUI_TABLE_VIRTUAL": "virtual mode with this row count; called again (say after another filter): new count, everything supplied is outdated",
   "GUI_TABS": "create a tab bar (labels = ARRAY/TUPLE of strings); active tab → 0",
   "GUI_TABS_CLOSABLE": "every tab gets a cross. Nothing is closed — the runtime only reports which one was hit",
   "GUI_TAB_CLOSED": "which tab should be closed in this frame (-1 = none). Hit by the cross or the middle mouse button",

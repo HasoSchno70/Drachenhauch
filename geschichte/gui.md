@@ -938,3 +938,27 @@ Eintrag 1). Fund nebenbei: steht der echte Zeiger ueber der Stelle, an der
 die Probefenster aufgehen, fallen die Klick-Faelle mit Massstab und
 Teilflaeche -- mit und ohne diese Aenderung (Windows meldet den echten
 Zeiger).
+
+## Virtuelle Tabelle (2026-11-14)
+
+Punkt C der grossen Tabellen: Daten, die nicht in den Speicher passen.
+`GUI_TABLE_VIRTUAL(tbl, n)` gibt der Tabelle nur die Zeilenzahl; sie haelt
+die gelieferten Zeilen in einer Tabelle nach Zeilennummer (`Virtuell`) und
+sagt mit `GUI_TABLE_NEED_FROM`/`_COUNT`, was ihr im sichtbaren Bereich
+samt einer Seite davor und danach fehlt; `GUI_TABLE_SUPPLY` liefert.
+Mehr als acht Seiten (mindestens 2000 Zeilen) Vorrat: was weiter als zwei
+Seiten weg liegt, fliegt raus.
+- Kein Rueckruf aus dem Zeichnen heraus: die gui ist dort ausgeliehen, und
+  ein Rueckruf haette in den Maschinencode-Bereich gemusst. Nachfrage und
+  Lieferung gehen ueber die Bildschleife des Programms, wie bei
+  `LVS_OWNERDATA` mit Cache-Hinweis.
+- Die Tabelle fragt ueber `ansicht`, `ansicht_len`, `zeilen_zahl` und
+  `zeile` statt `view`/`rows` direkt -- virtuell ist Ansicht = Daten
+  (das Programm sortiert und filtert). Eine andere Sortierung, ein Filter
+  oder eine neue Zahl verwerfen alles Gelieferte.
+- Grenze: der Bildlauf rechnet in i32-Punkten, also hoechstens
+  (i32::MAX/2)/Zeilenhoehe Zeilen (rund 44 Mio. bei 24).
+Pruefung: `gui_tabelle_virtuell.dhtest` (zehn Millionen Zeilen ohne
+Fenster, Sprung per `GUI_TABLE_SET_CURRENT`, Vergessen, Sortieren, Fehler
+beim Anhaengen), drei Gegenproben (Bedarf ohne Blick auf das Gelieferte,
+kein Vergessen, Sortieren ohne Verwerfen).

@@ -1856,8 +1856,52 @@ je Bild). Gemessen mit einer Million Zeilen zu fünf Spalten: Füllen per
 `GUI_TABLE_ADD_ROW` rund 0,7 s, Sortieren 0,13 s, Filtern 0,04 s, eine Zelle
 setzen (auch in einer sortierten oder gefilterten Tabelle) 3 ms, Speicher
 rund 350 MB. Kurze Zelltexte (bis 22 Byte) kosten keine eigene Zuteilung.
-Für Datenmengen, die nicht in den Speicher passen, liest man aus der
-Datenbank seitenweise (`LIMIT`/`OFFSET`).
+Für Datenmengen, die nicht in den Speicher passen: die virtuelle Tabelle.
+
+### Virtuelle Tabelle
+
+Bei Millionen Zeilen aus einer Datenbank muss die Tabelle sie nicht alle
+halten. `GUI_TABLE_VIRTUAL(tbl, zeilen)` sagt ihr nur, wie viele es sind;
+den Inhalt liefert das Programm auf Nachfrage -- immer nur rund um das, was
+zu sehen ist. Weit entfernte Zeilen vergisst die Tabelle wieder, der
+Speicher bleibt klein, egal wie lang sie ist.
+
+| Built-in | Wirkung |
+|---|---|
+| `GUI_TABLE_VIRTUAL(tbl, zeilen)` | virtueller Modus mit dieser Zeilenzahl; nochmals gerufen (etwa nach einem anderen Filter): neue Zahl, alles Gelieferte veraltet |
+| `GUI_TABLE_NEED_FROM(tbl)` | erste Zeile, die die Tabelle gerade braucht (sichtbar oder eine Seite davor/danach); -1 = nichts |
+| `GUI_TABLE_NEED_COUNT(tbl)` | wie viele ab dort am Stück fehlen (höchstens 1000) |
+| `GUI_TABLE_SUPPLY(tbl, ab, zellen)` | Zeilen ab `ab` liefern: `ARRAY OF STRING` für eine Zeile, 2D-Feld für mehrere |
+
+```basic
+IMPORT "gui"
+DIM win AS GUI_WINDOW : win = GUI_WINDOW("Kunden", 0, 0, 600, 400)
+DIM tbl AS GUI_WIDGET : tbl = GUI_TABLE(win, 10, 10, 580, 380)
+GUI_TABLE_HEADERS(tbl, ["Nr", "Name"])
+GUI_TABLE_VIRTUAL(tbl, 5000000)
+' je Bild nach GUI_UPDATE:
+SUB nachliefern()
+    DIM von AS INTEGER : von = GUI_TABLE_NEED_FROM(tbl)
+    IF von < 0 THEN EXIT SUB
+    DIM r AS INTEGER
+    FOR r = von TO von + GUI_TABLE_NEED_COUNT(tbl) - 1
+        GUI_TABLE_SUPPLY(tbl, r, [STR$(r), "Kunde " + STR$(r)])
+    NEXT
+END SUB
+```
+
+Mit einer Datenbank liefert eine Abfrage mit `LIMIT anzahl OFFSET von` die
+Zeilen, `SELECT COUNT(*)` die Zahl. **Sortieren und Filtern macht das
+Programm** (`ORDER BY`, `WHERE`): ein Klick auf den Kopf setzt nur
+`GUI_TABLE_SORT_COL`/`GUI_TABLE_SORT_DESC` und lässt alles neu anfragen,
+ebenso ein Filter in der Filterzeile (`GUI_TABLE_GET_FILTER`) -- danach mit
+`GUI_TABLE_VIRTUAL` die neue Zahl setzen. Auswahl, Tastatur, Bearbeiten und
+`GUI_TABLE_GET_CELL` arbeiten mit Zeilennummern wie sonst; eine nicht
+gelieferte Zelle ist leer. Nicht virtuell: `GUI_TABLE_ADD_ROW`,
+`GUI_TABLE_REMOVE_ROW` und `GUI_TABLE_ROW_COLOR` (Fehler -- Farben je Zelle
+gehen), Baumtabellen. `GUI_TABLE_ROWS` und `GUI_TABLE_CLEAR` beenden den
+Modus. Höchstens rund 44 Millionen Zeilen bei 24 Punkten Zeilenhöhe (der
+Bildlauf rechnet in Punkten).
 
 ## Baum (Tree-View)
 
