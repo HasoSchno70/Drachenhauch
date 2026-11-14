@@ -403,13 +403,17 @@ FUNCTION prozessStartenDatei(art AS STRING, datei AS STRING) AS BOOLEAN
     ' jeden weiteren Start stehen.
     DIM sa AS ARRAY OF STRING : sa = startWoerter(startWert$(datei, FALSE))
     DIM su AS MAP OF STRING : su = startUmgebung(startWert$(datei, TRUE))
+    DIM eigeneUmg AS INTEGER : eigeneUmg = LEN(MAPKEYS(su))
+    ' Aus der IDE gestartet: Strg+Umschalt+I oeffnet den gui-Inspektor
+    ' (DHRT_INSPEKTOR); eine eigene Angabe in der Umgebung gewinnt.
+    IF NOT MAPHAS(su, "DHRT_INSPEKTOR") THEN MAPPUT(su, "DHRT_INSPEKTOR", "1")
     IF LEN(sa) > 0 THEN
         prozess = PROCESS_START("dhrt", art, prozessDatei, "--", sa, su)
     ELSE
         prozess = PROCESS_START("dhrt", art, prozessDatei, su)
     END IF
-    IF LEN(sa) > 0 OR LEN(MAPKEYS(su)) > 0 THEN
-        protokoll("start mit " + STR$(LEN(sa)) + " argumenten " + STR$(LEN(MAPKEYS(su))) + " umgebung")
+    IF LEN(sa) > 0 OR eigeneUmg > 0 THEN
+        protokoll("start mit " + STR$(LEN(sa)) + " argumenten " + STR$(eigeneUmg) + " umgebung")
     END IF
     lichtstreif(1500)
     pluginEreignis("gestartet", prozessDatei)

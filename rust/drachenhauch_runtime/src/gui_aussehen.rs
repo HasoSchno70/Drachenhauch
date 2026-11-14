@@ -66,6 +66,12 @@ pub(super) fn bild_zur_zeit(dauern: &[f64], uhr: f64) -> usize {
     dauern.len() - 1
 }
 
+/// Eine Animation als Text (`puls 700ms immer`) -- fuer den Inspektor.
+pub(super) fn anim_text(a: AnimStil) -> String {
+    let n = if a.anzahl == 0 { "immer".to_string() } else if a.anzahl == 1 { "einmal".to_string() } else { a.anzahl.to_string() };
+    format!("{} {}ms {}", ARTEN.get(a.art as usize).unwrap_or(&"?"), a.dauer, n)
+}
+
 /// `animation: art [dauer] [einmal|N]` lesen.
 pub(super) fn anim_lesen(wert: &str, zeile: usize) -> Result<AnimStil, String> {
     let mut art = 0u8;
@@ -171,7 +177,7 @@ impl Gui {
             F_BILD => {
                 let Some((pfad, _)) = self.w_bild(w, false) else { return true };
                 let Some(Some(haut)) = self.haeute.get(&pfad) else { return true };
-                let bild = &haut.bilder[bild_zur_zeit(&haut.dauern, self.uhr)];
+                let bild = &haut.bilder[bild_zur_zeit(&haut.dauern, self.haut_uhr())];
                 let ix = ((px / b as f64) * haut.b as f64).floor().clamp(0.0, haut.b as f64 - 1.0) as usize;
                 let iy = ((py / h as f64) * haut.h as f64).floor().clamp(0.0, haut.h as f64 - 1.0) as usize;
                 bild.alpha.get(iy * haut.b as usize + ix).map(|&a| a >= 32).unwrap_or(true)
@@ -260,6 +266,7 @@ impl Gui {
     /// Die Matrix fuer das Zeichnen eines Widgets: (dx, dy, Winkel, Massstab)
     /// in Bildpunkten, None = keine Animation laeuft.
     pub(super) fn anim_matrix(&self, wi: usize, idx: usize, w: &Widget) -> Option<(f32, f32, f32, f32)> {
+        if self.ruhig { return None; }
         let au = w.aussehen.as_ref()?;
         let druck = self.press_origin == Some((wi, idx));
         let (a, t0) = au.lauf.or_else(|| au.stil_lauf.filter(|l| Some(l.0) == self.w_stil_anim(w, druck)))?;
@@ -276,10 +283,13 @@ impl Gui {
     /// Laeuft gerade eine Animation (eigene oder aus der Stildatei)?
     fn animiert(&self, wi: usize, idx: usize, w: &Widget) -> bool { self.anim_matrix(wi, idx, w).is_some() }
 
+    /// Die Uhr fuer GIF-Haeute: ohne Bewegung steht sie auf dem ersten Bild.
+    fn haut_uhr(&self) -> f64 { if self.ruhig { 0.0 } else { self.uhr } }
+
     /// Eine Bildhaut zeichnen; FALSE, wenn das Bild (noch) fehlt.
     pub(super) fn haut_zeichnen(&self, g: &mut Graphics, pfad: &str, rand: i32, x: i32, y: i32, b: i32, h: i32) -> bool {
         let Some(Some(haut)) = self.haeute.get(pfad) else { return false };
-        let tex = haut.bilder[bild_zur_zeit(&haut.dauern, self.uhr)].tex;
+        let tex = haut.bilder[bild_zur_zeit(&haut.dauern, self.haut_uhr())].tex;
         if rand > 0 { g.nine_slice(tex, x, y, b, h, rand).is_ok() } else { g.draw_image_rect(tex, x, y, b, h); true }
     }
 

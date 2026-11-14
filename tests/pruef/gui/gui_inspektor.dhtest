@@ -1,0 +1,300 @@
+' Inspektor, ruhige Bewegung und Stildatei neu laden (gui_inspektor.rs,
+' gui_stil.rs). GUI_INSPECT$ ist der Text der Tafel; ein Klick bei offenem
+' Inspektor waehlt ein Widget und erreicht es nicht. GUI_SET_MOTION /
+' "Animationen reduzieren" des Systems halten Animationen und GIF-Haeute an.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== gui_inspect nennt regeln mit zeile und was je schicht gilt
+TRY
+    SCREEN(400, 300, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Haupt", 0, 0, 400, 300)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "Los", 20, 30, 120, 40)
+DIM l AS GUI_WIDGET : l = GUI_LABEL(w, "x", 20, 100)
+GUI_SET_NAME(b, "los")
+GUI_ADD_CLASS(b, "menue")
+GUI_STYLESHEET("button { radius: 4 }" + CHR$(10) + "label { fg: #00FF00 }" + CHR$(10) + "button.menue { bg: #112233; form: pille }" + CHR$(10) + CHR$(10) + "#los:hover { bg: #445566; animation: puls 700ms }")
+GUI_UPDATE()
+PRINT GUI_INSPECT$(b)
+PRINT "---"
+PRINT GUI_INSPECT$(l)
+--- erwartet
+button #los .menue .standard
+fenster "Haupt"  lage 20 30 120 40
+zustand normal
+form pille
+stildatei GUI_STYLESHEET
+  zeile 1: button
+  zeile 3: button.menue
+  zeile 5: #los:hover
+  basis: bg #112233, radius 4, form pille
+  hover: bg #445566, animation puls 700ms immer
+---
+label
+fenster "Haupt"  lage 20 100 8 16
+zustand normal
+stildatei GUI_STYLESHEET
+  zeile 2: label
+  basis: fg #00FF00
+
+=== ein klick bei offenem inspektor waehlt und erreicht das widget nicht
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 300)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "Los", 20, 20, 120, 40)
+DIM c AS GUI_WIDGET : c = GUI_BUTTON(w, "Zwei", 20, 120, 120, 40)
+GUI_INSPECTOR(TRUE)
+PRINT "an "; GUI_INSPECTOR(); " gewaehlt vorher "; GUI_INSPECTOR_SELECTED()
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER
+DIM klicks AS INTEGER
+DIM wahl_b AS BOOLEAN
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    IF GUI_CLICKED(b) OR GUI_CLICKED(c) THEN klicks = klicks + 1
+    IF n = 8 THEN
+        wahl_b = GUI_INSPECTOR_SELECTED() = b
+        GUI_INSPECTOR(FALSE)
+    END IF
+    CLS(0) : GUI_DRAW() : FLIP()
+WEND
+PRINT "gewaehlt los "; wahl_b; " klicks "; klicks; " aus "; GUI_INSPECTOR(); " wahl danach "; GUI_INSPECTOR_SELECTED()
+--- datei ev.txt
+c 6
+e 1 7 60 40 0 0
+e 2 6 0 0 0 0
+e 3 5 0 0 0 0
+e 11 7 60 140 0 0
+e 12 6 0 0 0 0
+e 13 5 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=30
+--- erwartet
+an TRUE gewaehlt vorher -1
+gewaehlt los TRUE klicks 1 aus FALSE wahl danach -1
+
+=== strg umschalt i schaltet den inspektor mit dhrt_inspektor
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 300)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "Los", 20, 20, 120, 40)
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER
+DIM an_bei AS INTEGER : an_bei = -1
+DIM aus_bei AS INTEGER : aus_bei = -1
+' Feste Bildzahl: ESC wuerde QUITREQUESTED ausloesen.
+FOR n = 1 TO 20
+    GUI_UPDATE()
+    IF GUI_INSPECTOR() AND an_bei < 0 THEN an_bei = n
+    IF NOT GUI_INSPECTOR() AND an_bei > 0 AND aus_bei < 0 THEN aus_bei = n
+    CLS(0) : GUI_DRAW() : FLIP()
+NEXT
+PRINT "an "; an_bei > 0; " wieder aus "; aus_bei > an_bei
+--- datei ev.txt
+c 9
+e 1 7 300 250 0 0
+e 2 2 341 0 0 0
+e 2 2 340 0 0 0
+e 3 2 73 0 0 0
+e 4 1 73 0 0 0
+e 4 1 340 0 0 0
+e 4 1 341 0 0 0
+e 9 2 256 0 0 0
+e 10 1 256 0 0 0
+
+--- umgebung
+DHRT_FRAMES=25
+DHRT_INSPEKTOR=1
+--- erwartet
+an TRUE wieder aus TRUE
+
+=== ohne dhrt_inspektor tut strg umschalt i nichts
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 300)
+AUTOMATION_PLAY("ev.txt")
+DIM je AS BOOLEAN
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_INSPECTOR() THEN je = TRUE
+    CLS(0) : GUI_DRAW() : FLIP()
+WEND
+PRINT "je an "; je
+--- datei ev.txt
+c 7
+e 1 7 300 250 0 0
+e 2 2 341 0 0 0
+e 2 2 340 0 0 0
+e 3 2 73 0 0 0
+e 4 1 73 0 0 0
+e 4 1 340 0 0 0
+e 4 1 341 0 0 0
+
+--- umgebung
+DHRT_FRAMES=20
+DHRT_INSPEKTOR=
+--- erwartet
+je an FALSE
+
+=== animationen reduzieren haelt die drehung an
+' Wie "die drehung ist im bild" in gui_formen.dhtest: nach einer Viertelrunde
+' steht der Knopf senkrecht -- ausser die Bewegung ist aus.
+TRY
+    SCREEN(400, 300, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 300)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "", 140, 135, 120, 30)
+GUI_SET_NAME(b, "dreh")
+GUI_STYLESHEET("#dreh { bg: #FF0000; border: #FF0000; animation: drehen 2400ms }")
+DIM rt AS INTEGER : rt = RENDERTARGET_NEW(400, 300)
+FUNCTION rot_oben() AS BOOLEAN
+    RENDERTARGET_BEGIN(rt) : CLS(0) : GUI_DRAW() : RENDERTARGET_END()
+    DIM bild AS IMAGE : bild = RENDERTARGET_IMAGE(rt)
+    RETURN (GETPIXEL(bild, 200, 105) BAND &HFFFFFF) = &HFF0000
+END FUNCTION
+SUB bilder(anzahl AS INTEGER)
+    DIM k AS INTEGER
+    FOR k = 1 TO anzahl
+        GUI_UPDATE() : CLS(0) : FLIP()
+    NEXT
+END SUB
+PRINT "system ruhig "; GUI_SYSTEM_REDUCED_MOTION()
+bilder(36)
+PRINT "system: bewegung "; GUI_MOTION(); " rot oben "; rot_oben(); " laeuft "; GUI_ANIMATING(b)
+GUI_SET_MOTION("an")
+PRINT "an: bewegung "; GUI_MOTION(); " rot oben "; rot_oben()
+GUI_SET_MOTION("aus")
+bilder(2)
+PRINT "aus: bewegung "; GUI_MOTION(); " rot oben "; rot_oben()
+GUI_SET_MOTION("SYSTEM")
+TRY
+    GUI_SET_MOTION("halb")
+CATCH e2
+    PRINT e2
+END TRY
+--- umgebung
+DHRT_FRAMES=200
+DHRT_SYSTEM_WENIGER_BEWEGUNG=1
+--- erwartet
+system ruhig TRUE
+system: bewegung FALSE rot oben FALSE laeuft FALSE
+an: bewegung TRUE rot oben TRUE
+aus: bewegung FALSE rot oben FALSE
+GUI_SET_MOTION: 'halb' -- erwartet "system", "an" oder "aus"
+
+=== ohne bewegung zeigt ein gif sein erstes bild
+TRY
+    SCREEN(400, 300, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+IMPORT "imgfx"
+DIM a AS INTEGER : a = IMAGE_NEW(80, 80)
+IMAGE_FILL_RECT(a, 0, 0, 79, 79, RGB(255, 0, 0))
+DIM b AS INTEGER : b = IMAGE_NEW(80, 80)
+IMAGE_FILL_RECT(b, 0, 0, 79, 79, RGB(0, 0, 255))
+IMAGE_SAVE_GIF([a, b], "lauf.gif", [200, 200])
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 300)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM k AS GUI_WIDGET : k = GUI_BUTTON(w, "", 100, 100, 80, 80)
+GUI_SET_NAME(k, "lauf")
+GUI_STYLESHEET("#lauf { bild: lauf.gif }")
+GUI_SET_MOTION("aus")
+DIM rt AS INTEGER : rt = RENDERTARGET_NEW(400, 300)
+DIM n AS INTEGER
+FOR n = 1 TO 18
+    GUI_UPDATE() : CLS(0) : FLIP()
+NEXT
+RENDERTARGET_BEGIN(rt) : CLS(0) : GUI_DRAW() : RENDERTARGET_END()
+DIM bild AS IMAGE : bild = RENDERTARGET_IMAGE(rt)
+PRINT "nach 300 ms rot "; (GETPIXEL(bild, 140, 140) BAND &HFFFFFF) = &HFF0000
+--- umgebung
+DHRT_FRAMES=200
+--- erwartet
+nach 300 ms rot TRUE
+
+=== eine beobachtete stildatei laedt sich beim speichern neu
+' Mit beobachten liest die gui die Datei jede halbe Sekunde der gui-Uhr; ein
+' Fehler laesst die alte gelten und steht in GUI_STYLESHEET_ERROR$.
+TRY
+    SCREEN(400, 300, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 300)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "Los", 20, 20, 120, 40)
+WRITEALL("thema.dhstil", "button { bg: #102030 }")
+GUI_STYLESHEET_LOAD("thema.dhstil", TRUE)
+FUNCTION warten(farbe AS INTEGER) AS INTEGER
+    DIM k AS INTEGER
+    FOR k = 1 TO 120
+        GUI_UPDATE() : CLS(0) : GUI_DRAW() : FLIP()
+        IF GUI_GET_COLOR(b, "bg") = farbe THEN RETURN k
+    NEXT
+    RETURN -1
+END FUNCTION
+GUI_UPDATE()
+PRINT "erst "; HEX$(GUI_GET_COLOR(b, "bg")); " fehler '"; GUI_STYLESHEET_ERROR$(); "'"
+WRITEALL("thema.dhstil", "button { bg: #405060 }")
+PRINT "neu geladen "; warten(&H405060) > 0
+WRITEALL("thema.dhstil", "button { bg: #708090" + CHR$(10) + "  rand: blau }")
+DIM k AS INTEGER
+FOR k = 1 TO 60
+    GUI_UPDATE() : CLS(0) : GUI_DRAW() : FLIP()
+NEXT
+PRINT "kaputt: bleibt "; HEX$(GUI_GET_COLOR(b, "bg")); " fehler "; GUI_STYLESHEET_ERROR$()
+WRITEALL("thema.dhstil", "button { bg: #A0B0C0 }")
+PRINT "wieder gut "; warten(&HA0B0C0) > 0; " fehler '"; GUI_STYLESHEET_ERROR$(); "'"
+GUI_STYLESHEET_LOAD("thema.dhstil")
+WRITEALL("thema.dhstil", "button { bg: #010203 }")
+PRINT "ohne beobachten "; warten(&H010203)
+--- umgebung
+DHRT_FRAMES=600
+--- enthaelt
+erst 102030 fehler ''
+neu geladen TRUE
+kaputt: bleibt 405060 fehler GUI_STYLESHEET_LOAD (thema.dhstil): Zeile
+wieder gut TRUE fehler ''
+ohne beobachten -1
+
+=== falsche aufrufe sind fehler
+TRY
+    SCREEN(400, 300, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 300)
+TRY
+    PRINT GUI_INSPECT$(12345)
+CATCH e1
+    PRINT e1
+END TRY
+TRY
+    GUI_STYLESHEET_LOAD("gibtsnicht.dhstil", TRUE)
+CATCH e2
+    PRINT e2
+END TRY
+--- enthaelt
+GUI_INSPECT$:
+GUI_STYLESHEET_LOAD: 'gibtsnicht.dhstil' laesst sich nicht lesen

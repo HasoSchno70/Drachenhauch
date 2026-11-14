@@ -48,6 +48,51 @@ pub fn jetzt() -> Aussehen {
     a
 }
 
+static RUHIG_MERK: Mutex<Option<(Instant, bool)>> = Mutex::new(None);
+const RUHIG_GILT: Duration = Duration::from_secs(5);
+
+/// Will das System weniger Bewegung ("Animationen reduzieren")? Die
+/// Antwort gilt fuenf Sekunden; `DHRT_SYSTEM_WENIGER_BEWEGUNG=1|0` legt sie
+/// fest. Unbekannt = nein.
+pub fn weniger_bewegung() -> bool {
+    if let Ok(v) = std::env::var("DHRT_SYSTEM_WENIGER_BEWEGUNG") {
+        if let Some(b) = dunkel_aus_text(&v) { return b; }
+    }
+    let mut m = RUHIG_MERK.lock().unwrap_or_else(|e| e.into_inner());
+    match *m {
+        Some((t, b)) if t.elapsed() < RUHIG_GILT => b,
+        _ => {
+            let b = ruhig_vom_system().unwrap_or(false);
+            *m = Some((Instant::now(), b));
+            b
+        }
+    }
+}
+
+/// GNOME `enable-animations`: `false` heisst weniger Bewegung.
+pub fn gnome_ruhig(antwort: &str) -> Option<bool> {
+    match antwort.trim() { "false" => Some(true), "true" => Some(false), _ => None }
+}
+
+#[cfg(windows)]
+fn ruhig_vom_system() -> Option<bool> {
+    use windows::Win32::UI::WindowsAndMessaging::{SystemParametersInfoW, SPI_GETCLIENTAREAANIMATION, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS};
+    let mut an: i32 = 1;
+    let r = unsafe { SystemParametersInfoW(SPI_GETCLIENTAREAANIMATION, 0, Some(&mut an as *mut i32 as *mut _), SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS(0)) };
+    if r.is_ok() { Some(an == 0) } else { None }
+}
+#[cfg(target_os = "macos")]
+fn ruhig_vom_system() -> Option<bool> {
+    // Ohne den Schluessel (Fehler) ist die Bewegung an.
+    Some(befehl("defaults", &["read", "com.apple.universalaccess", "reduceMotion"]).map(|s| s.trim() == "1").unwrap_or(false))
+}
+#[cfg(target_os = "linux")]
+fn ruhig_vom_system() -> Option<bool> {
+    befehl("gsettings", &["get", "org.gnome.desktop.interface", "enable-animations"]).and_then(|s| gnome_ruhig(&s))
+}
+#[cfg(not(any(windows, target_os = "macos", target_os = "linux")))]
+fn ruhig_vom_system() -> Option<bool> { None }
+
 fn dunkel_aus_text(v: &str) -> Option<bool> {
     match v.trim().to_lowercase().as_str() {
         "1" | "ja" | "true" | "dunkel" | "dark" => Some(true),
@@ -185,6 +230,9 @@ mod tests {
         assert_eq!(gnome_dunkel("Kein solches Schema"), None);
         assert_eq!(gnome_akzent("'teal'"), Some(0x2190A4));
         assert_eq!(gnome_akzent("'magenta'"), None);
+        assert_eq!(gnome_ruhig("false"), Some(true));
+        assert_eq!(gnome_ruhig("true"), Some(false));
+        assert_eq!(gnome_ruhig("No such key"), None);
     }
 
     #[test]

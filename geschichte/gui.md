@@ -1109,3 +1109,32 @@ im Browser als 100 ms. Fall "ein animiertes gif laeuft in der bildhaut"
 (rot links, dann blau rechts, dann wieder rot; Gegenprobe: immer Bild 0).
 Beim ersten Entwurf des Falls stand `IMAGE_FILL_RECT` mit Breite/Hoehe --
 es nimmt zwei Ecken.
+
+## Inspektor, Stildatei live, ruhige Bewegung (2026-11-14)
+
+Nach den Formen und Animationen fragte der Nutzer, was die gui noch
+salonfaehig macht. Gebaut (`gui_inspektor.rs`):
+- **Ruhige Bewegung**: `systemaussehen::weniger_bewegung` (Windows
+  `SPI_GETCLIENTAREAANIMATION`, macOS `com.apple.universalaccess
+  reduceMotion`, GNOME `enable-animations`; fuenf Sekunden gemerkt,
+  `DHRT_SYSTEM_WENIGER_BEWEGUNG` fuer Pruefungen). Gefragt wird nur, wenn
+  sich etwas bewegen koennte (`bewegung_pass`) -- unter macOS/Linux kostet
+  die Frage einen Prozess. `GUI_SET_MOTION` ueberstimmt. Ohne Bewegung
+  liefert `anim_matrix` nichts und `haut_uhr` steht auf 0; `GUI_ANIMATING`
+  laeuft weiter ab (ein Programm, das aufs Ende wartet, haengt sonst).
+- **Inspektor**: `GUI_INSPECTOR`, Strg+Umschalt+I mit `DHRT_INSPEKTOR=1`,
+  ESC schliesst. Der Druck geht ueber dieselbe Weiche wie Popover und Toasts
+  (`ueber_weg`) -- er erreicht kein Widget. Die Tafel ist der Text von
+  `GUI_INSPECT$`; welche Regeln passen, sagt `Stildatei::passend`, dieselbe
+  Pruefung, aus der `aufloesen` jetzt baut (vorher stand sie nur dort). Jede
+  Regel merkt sich Zeile und Selektor.
+- **Stildatei live**: `GUI_STYLESHEET_LOAD(pfad, TRUE)` liest die Datei jede
+  halbe Sekunde der gui-Uhr und vergleicht den Text (nicht die Zeit der
+  Datei: die ist auf manchen Dateisystemen sekundengenau). Ein Fehler laesst
+  die alte gelten, Toast im obersten Fenster, `GUI_STYLESHEET_ERROR$`.
+Funde beim Bau: in der gui heisst ESC 27 (eingespielt wird raylibs 256, die
+Laufzeit uebersetzt); ESC in einer Aufnahme loest QUITREQUESTED aus, der
+Tastenfall laeuft darum eine feste Bildzahl. Die Lage im Inspektor ist die
+des Programms (GUI_SET_BOUNDS), nicht die auf dem Schirm -- erst stand dort
+die Titelleiste mit drin. Pruefung `tests/pruef/gui/gui_inspektor.dhtest`
+(8 Faelle, zehn Gegenproben).

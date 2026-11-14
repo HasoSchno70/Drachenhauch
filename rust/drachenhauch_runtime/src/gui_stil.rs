@@ -129,7 +129,43 @@ pub(super) struct FormStil {
     pub rand: Option<i32>,
 }
 
+/// Die Namen der Schichten, wie der Inspektor sie zeigt.
+pub(super) const SCHICHT_NAMEN: [&str; 5] = ["basis", "hover", "focus", "active", "disabled"];
+
+fn farbe_text(f: &StilFarbe) -> String {
+    match f {
+        StilFarbe::Fest(v) => format!("#{:06X}", v & 0xFFFFFF),
+        StilFarbe::Thema(n) => format!("thema {}", n),
+    }
+}
+
 impl StilWerte {
+    /// Was diese Schicht setzt, als eine Zeile (`bg #2E6E9E, form pille`);
+    /// leer, wenn nichts.
+    pub(super) fn beschreiben(&self) -> String {
+        let mut t: Vec<String> = Vec::new();
+        for (r, f) in &self.farben { t.push(format!("{} {}", r, farbe_text(f))); }
+        if let Some(v) = self.radius { t.push(format!("radius {}", v)); }
+        if let Some(v) = self.groesse { t.push(format!("groesse {}", v)); }
+        if let Some(v) = self.stil { t.push(format!("stil {}", crate::schnitt::stil_text(v))); }
+        if let Some((a, b)) = self.abstand { t.push(format!("abstand {} {}", a, b)); }
+        if let Some(v) = self.randbreite { t.push(format!("randbreite {}", v)); }
+        if let Some(sch) = &self.schatten {
+            let f = sch.farbe.as_ref().map(|f| format!(" {}", farbe_text(f))).unwrap_or_default();
+            t.push(format!("schatten {} {} {}{}", sch.dx, sch.dy, sch.weich, f));
+        }
+        if let Some(v) = self.verlauf { t.push(format!("verlauf {}", v)); }
+        if let Some(v) = self.glanz { t.push(format!("glanz {}", v)); }
+        if let Some(v) = self.fase { t.push(format!("fase {}", v)); }
+        if let Some(v) = self.uebergang { t.push(format!("uebergang {}", v)); }
+        for (k, d) in &self.uebergang_je { t.push(format!("uebergang {} {}", ROLLEN.get(*k).unwrap_or(&"?"), d)); }
+        if let Some(v) = self.form { t.push(format!("form {}", super::aussehen::FORMEN.get(v as usize).unwrap_or(&"?"))); }
+        if let Some(v) = &self.bild { t.push(format!("bild {}", v)); }
+        if let Some(v) = self.bildrand { t.push(format!("bildrand {}", v)); }
+        if let Some(a) = self.animation { t.push(format!("animation {}", super::aussehen::anim_text(a))); }
+        t.join(", ")
+    }
+
     fn farbe(&self, rolle: &str) -> Option<&StilFarbe> {
         self.farben.iter().find(|(r, _)| r == rolle).map(|(_, f)| f)
     }
@@ -203,7 +239,7 @@ fn vorfahren_passen(vf: &[(Teil, bool)], kette: &[Glied]) -> bool {
 }
 
 #[derive(Clone, Debug)]
-struct Regel { sel: Selektor, werte: StilWerte }
+struct Regel { sel: Selektor, werte: StilWerte, zeile: usize, kopf: String }
 
 /// Eine gelesene Stildatei.
 #[derive(Clone, Debug, Default)]
@@ -406,9 +442,10 @@ pub(super) fn lesen(text: &str, thema: &dyn Fn(&str) -> bool) -> Result<Stildate
         if rumpf.contains('{') { return Err(format!("Zeile {}: '{{' im Rumpf -- Regeln lassen sich nicht schachteln", zeile_von(&t, auf + 1 + rumpf.find('{').unwrap()))); }
         // Kopfzeile: die erste nicht leere Zeile vor der Klammer.
         let kopf_zeile = zeile_von(&t, pos + kopf.len() - kopf.trim_start().len());
-        let selektoren: Vec<Selektor> = kopf.split(',')
-            .map(|s| selektor_lesen(s, kopf_zeile)).collect::<Result<_, _>>()?;
-        let mit_zustand = selektoren.iter().any(|s| s.schicht != BASIS);
+        let selektoren: Vec<(Selektor, String)> = kopf.split(',')
+            .map(|s| selektor_lesen(s, kopf_zeile).map(|sel| (sel, s.split_whitespace().collect::<Vec<_>>().join(" "))))
+            .collect::<Result<_, _>>()?;
+        let mit_zustand = selektoren.iter().any(|(s, _)| s.schicht != BASIS);
         let mut werte = StilWerte::default();
         let mut off = auf + 1;
         for decl in rumpf.split(|c| c == ';' || c == '\n') {
@@ -468,7 +505,7 @@ pub(super) fn lesen(text: &str, thema: &dyn Fn(&str) -> bool) -> Result<Stildate
                 _ => return Err(format!("Zeile {}: Eigenschaft '{}' gibt es nicht -- bekannt sind {}", zeile, name, EIGENSCHAFTEN)),
             }
         }
-        for sel in selektoren { regeln.push(Regel { sel, werte: werte.clone() }); }
+        for (sel, k) in selektoren { regeln.push(Regel { sel, werte: werte.clone(), zeile: kopf_zeile, kopf: k }); }
         pos = zu + 1;
     }
     if !t[pos..].trim().is_empty() {
@@ -483,6 +520,14 @@ impl Stildatei {
     /// Aufloesen fuer ein Widget dieser Art mit diesen Klassen; `kette` sind
     /// seine Behaelter und das Fenster, das naechste zuerst.
     pub(super) fn aufloesen(&self, art: &str, klassen: &[String], name: &str, an: bool, kette: &[Glied]) -> StilAufgeloest {
+        let mut o: StilAufgeloest = Default::default();
+        for r in self.passend(art, klassen, name, an, kette) { o[r.sel.schicht].uebernehmen(&r.werte); }
+        o
+    }
+    /// Die Regeln, die auf ein Widget passen, in der Reihenfolge, in der sie
+    /// wirken (Gewicht, dann Stelle) -- die EINE Pruefung fuer Aufloesen
+    /// und Inspektor.
+    fn passend(&self, art: &str, klassen: &[String], name: &str, an: bool, kette: &[Glied]) -> Vec<&Regel> {
         let mut passend: Vec<(u32, usize, &Regel)> = self.regeln.iter().enumerate().filter(|(_, r)| {
             let s = &r.sel;
             s.art.as_ref().map(|a| a == art).unwrap_or(true)
@@ -492,9 +537,11 @@ impl Stildatei {
                 && vorfahren_passen(&s.vorfahren, kette)
         }).map(|(i, r)| (r.sel.gewicht, i, r)).collect();
         passend.sort_by_key(|(g, i, _)| (*g, *i));
-        let mut o: StilAufgeloest = Default::default();
-        for (_, _, r) in passend { o[r.sel.schicht].uebernehmen(&r.werte); }
-        o
+        passend.into_iter().map(|(_, _, r)| r).collect()
+    }
+    /// Fuer den Inspektor: (Zeile, Selektor, Schicht) je passender Regel.
+    pub(super) fn passend_kurz(&self, art: &str, klassen: &[String], name: &str, an: bool, kette: &[Glied]) -> Vec<(usize, String, usize)> {
+        self.passend(art, klassen, name, an, kette).into_iter().map(|r| (r.zeile, r.kopf.clone(), r.sel.schicht)).collect()
     }
 }
 
@@ -502,12 +549,50 @@ impl Gui {
     // ================================================================ Befehle
     /// GUI_STYLESHEET(text$): eine Stildatei setzen ("" = keine).
     pub fn stylesheet(&mut self, text: &str) -> Result<(), String> {
+        self.stil_beob = None;
+        self.stil_fehler.clear();
+        self.stil_quelle = "GUI_STYLESHEET".into();
         self.stylesheet_aus(text, "GUI_STYLESHEET")
     }
-    pub fn stylesheet_load(&mut self, pfad: &str) -> Result<(), String> {
+    /// GUI_STYLESHEET_LOAD(pfad$ [, beobachten]): mit beobachten liest die
+    /// gui die Datei jede halbe Sekunde (Uhr der gui) und uebernimmt sie,
+    /// sobald sie sich geaendert hat -- ein Fehler darin laesst die alte
+    /// gelten und steht in GUI_STYLESHEET_ERROR$ (und als Toast).
+    pub fn stylesheet_load(&mut self, pfad: &str, beobachten: bool) -> Result<(), String> {
         let text = std::fs::read_to_string(pfad)
             .map_err(|e| format!("GUI_STYLESHEET_LOAD: '{}' laesst sich nicht lesen: {}", pfad, e))?;
-        self.stylesheet_aus(&text, &format!("GUI_STYLESHEET_LOAD ({})", pfad))
+        self.stylesheet_aus(&text, &format!("GUI_STYLESHEET_LOAD ({})", pfad))?;
+        self.stil_fehler.clear();
+        self.stil_quelle = pfad.to_string();
+        self.stil_beob = if beobachten { Some((pfad.to_string(), text, self.uhr)) } else { None };
+        Ok(())
+    }
+    /// GUI_STYLESHEET_ERROR$(): der Fehler beim letzten Neuladen ("" = gut).
+    pub fn stylesheet_error(&self) -> String { self.stil_fehler.clone() }
+
+    /// In GUI_UPDATE: eine beobachtete Stildatei neu lesen, wenn sie sich
+    /// geaendert hat.
+    pub(super) fn stil_beobachten(&mut self) {
+        let Some((pfad, alt, zuletzt)) = self.stil_beob.as_ref() else { return };
+        if self.uhr - zuletzt < 0.5 { return; }
+        let pfad = pfad.clone();
+        let neu = std::fs::read_to_string(&pfad);
+        let gleich = neu.as_ref().map(|t| t == alt).unwrap_or(true);
+        if let Some(b) = self.stil_beob.as_mut() { b.2 = self.uhr; }
+        if gleich { return; }
+        let text = neu.unwrap_or_default();
+        if let Some(b) = self.stil_beob.as_mut() { b.1 = text.clone(); }
+        match self.stylesheet_aus(&text, &format!("GUI_STYLESHEET_LOAD ({})", pfad)) {
+            Ok(()) => self.stil_fehler.clear(),
+            Err(e) => {
+                eprintln!("{}", e);
+                // Sichtbar, wo man gerade hinschaut: als Toast im obersten Fenster.
+                if let Some(&wi) = self.z_order.iter().rev().find(|&&wi| self.windows[wi].alive && self.windows[wi].visible) {
+                    let _ = self.toast(wi as i64, e.clone(), "fehler", 6000.0);
+                }
+                self.stil_fehler = e;
+            }
+        }
     }
     fn stylesheet_aus(&mut self, text: &str, f: &str) -> Result<(), String> {
         let thema = |n: &str| self.theme.contains_key(n);
@@ -591,7 +676,7 @@ impl Gui {
     /// zuerst. Behaelter ist, wer Kinder fuehrt: ein Layout (seine Kinder-
     /// liste), sonst Reiterwerk/Akkordeon/Assistent (`tc_von`) und das
     /// rollende Panel (`panel_von`) -- beide je Bild nachgefuehrt.
-    fn ketten(win: &Window) -> Vec<Vec<Glied>> {
+    pub(super) fn ketten(win: &Window) -> Vec<Vec<Glied>> {
         let n = win.widgets.len();
         let mut eltern = vec![-1i32; n];
         for (j, w) in win.widgets.iter().enumerate() {
