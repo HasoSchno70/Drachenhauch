@@ -1221,3 +1221,62 @@ WEND
 --- erwartet
 maus geht durch True
 nativ TRUE
+
+=== eine zeichenflaeche im nativen fenster zeigt, was das programm malt
+' In eine Zeichenflaeche malt das Programm nach GUI_DRAW selbst. Diese
+' Befehle gingen immer ins Hauptfenster -- im echten Fenster blieb die
+' Flaeche leer. GUI_CANVAS_BEGIN/END leiten sie in das Fenster um, in dem
+' die Flaeche steht: der rote Kasten steht bei (120, 70) im nativen
+' Fenster, und nur in der Flaeche (der Kasten reicht weit ueber sie
+' hinaus, bei (240, 140) bleibt der Hintergrund). GUI_CANVAS_MOUSE sieht den Zeiger durch dieses Fenster: ein
+' Druck bei (70, 50) ist relativ zur Flaeche (Inhalt ab 21, 21) bei (49, 29).
+IMPORT "helfer.dh"
+DIM kennung AS STRING : kennung = "Flaeche-" + STR$(MILLIS()) + "-" + STR$(INT(RND() * 1000000))
+DIM kind AS INTEGER : kind = PROCESS_START("dhrt", "run", CWD$() + "/flaeche.dh", "--", kennung)
+DIM px AS STRING : px = ps$("fensterpixel.ps1", kennung, "120,70;240,140")
+DIM s AS STRING : s = ps$("fenstersender.ps1", kennung, "roh:512:0:3276870+roh:513:1:3276870;roh:514:0:3276870")
+DIM k AS STRING : k = auslesen$(kind, 30000)
+IF INSTR(auslesenFehler, "Kein Fenster moeglich") >= 0 THEN
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    END
+END IF
+PRINT px; k;
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/fenstersender.dh"
+FUNCTION hilfe$(name AS STRING) AS STRING
+    RETURN "{sammlung}/../_hilfen/" + name
+END FUNCTION
+FUNCTION ps$(skriptname AS STRING, a AS STRING, b AS STRING) AS STRING
+    DIM p AS INTEGER : p = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", hilfe$(skriptname), a, b)
+    RETURN auslesen$(p, 30000)
+END FUNCTION
+--- datei flaeche.dh
+IMPORT "gui"
+SCREEN(400, 300, "Haupt-" + ARG$(0), 1)
+DIM d AS GUI_WINDOW : d = GUI_WINDOW(ARG$(0), 60, 60, 260, 160)
+DIM cv AS GUI_WIDGET : cv = GUI_CANVAS(d, 20, 20, 200, 100)
+DIM nativ AS BOOLEAN : nativ = GUI_WINDOW_NATIVE(d, TRUE)
+DIM t0 AS INTEGER : t0 = MILLIS()
+DIM gedrueckt AS STRING : gedrueckt = "nie"
+DIM x AS INTEGER
+DIM y AS INTEGER
+DIM unten AS BOOLEAN
+WHILE NOT QUITREQUESTED() AND MILLIS() - t0 < 7000
+    GUI_UPDATE()
+    (x, y, unten) = GUI_CANVAS_MOUSE(cv)
+    IF unten AND gedrueckt = "nie" THEN gedrueckt = STR$(x) + "," + STR$(y)
+    CLS(&H202830)
+    GUI_DRAW()
+    GUI_CANVAS_BEGIN(cv)
+    BOX(GUI_CANVAS_X(cv), GUI_CANVAS_Y(cv), GUI_CANVAS_X(cv) + 400, GUI_CANVAS_Y(cv) + 400, &HFF0000)
+    GUI_CANVAS_END()
+    FLIP()
+WEND
+PRINT "nativ "; nativ
+PRINT "druck auf der flaeche "; gedrueckt
+--- system windows
+--- erwartet
+120,70 #FF0000
+240,140 #18222E
+nativ TRUE
+druck auf der flaeche 49,29

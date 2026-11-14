@@ -471,6 +471,8 @@ Native, blocking standard dialogs (no IMPORT needed — like the file dialogs):
 | `GUI_CANVAS(win, x, y, w, h)` | GUI_WIDGET | free drawing surface -- you paint into it with the normal drawing commands, **after** `GUI_DRAW` |
 | `GUI_CANVAS_X(canvas)` / `GUI_CANVAS_Y(canvas)` | INTEGER | **absolute** screen position of the surface (moves with the window) |
 | `GUI_CANVAS_W(canvas)` / `GUI_CANVAS_H(canvas)` | INTEGER | size of the surface |
+| `GUI_CANVAS_BEGIN(canvas)` / `GUI_CANVAS_END()` | — | the drawing commands in between go into the surface: clipped to it, and if it is in a real window, into that window's picture |
+| `GUI_CANVAS_MOUSE(canvas)` | TUPLE | (x, y, pressed): the pointer relative to the surface and the left button -- in a real window too |
 | `GUI_SET_ENABLED(wdg, on)` | — | make a widget usable or disable it (disabled = greyed out, takes no clicks) |
 | `GUI_ENABLED(wdg)` | BOOLEAN | is it usable? |
 | `GUI_SET_FONT(wdg, font)` | — | own font for this widget |
@@ -1332,8 +1334,37 @@ FLIP()
 ```
 
 `GUI_CANVAS_X/Y/W/H` return the **absolute** content area (it follows the
-window when it is moved). You draw **after** `GUI_DRAW` and clip to the area
-yourself.
+window when it is moved). You draw **after** `GUI_DRAW`.
+
+**With `GUI_CANVAS_BEGIN` and `GUI_CANVAS_END`** the drawing is clipped to the
+surface -- and it lands where the surface is: in a **real window**
+(`GUI_WINDOW_NATIVE`) too. Without them the drawing commands always go to the
+main window, and a surface in a real window would stay empty. Menus and
+popups lying above the surface come back on top. `MOUSEX`/`MOUSEY` speak of
+the main window; `GUI_CANVAS_MOUSE` sees the pointer through the surface's
+window, relative to it:
+
+```basic
+IMPORT "gui"
+SCREEN(400, 300, "Malen", 1)
+DIM win AS GUI_WINDOW : win = GUI_WINDOW("Malen", 20, 20, 300, 220)
+DIM cv AS GUI_WIDGET : cv = GUI_CANVAS(win, 10, 10, 280, 180)
+DIM nativ AS BOOLEAN : nativ = GUI_WINDOW_NATIVE(win, TRUE)
+DIM x AS INTEGER
+DIM y AS INTEGER
+DIM unten AS BOOLEAN
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    (x, y, unten) = GUI_CANVAS_MOUSE(cv)
+    CLS(0)
+    GUI_DRAW()
+    GUI_CANVAS_BEGIN(cv)
+    BOX(GUI_CANVAS_X(cv), GUI_CANVAS_Y(cv), GUI_CANVAS_X(cv) + 280, GUI_CANVAS_Y(cv) + 180, &H101820)
+    IF unten THEN CIRCLE(GUI_CANVAS_X(cv) + x, GUI_CANVAS_Y(cv) + y, 8, &H30FFA0)
+    GUI_CANVAS_END()
+    FLIP()
+WEND
+```
 
 ### A window above what was drawn: `GUI_DRAW_WINDOW`
 

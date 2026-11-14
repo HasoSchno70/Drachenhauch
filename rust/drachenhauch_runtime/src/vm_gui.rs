@@ -1536,6 +1536,26 @@ impl<'p> Vm<'p> {
             // obendrauf. Fuer Programme, die in eine GUI_CANVAS malen: deren
             // Inhalt entsteht per Bauart nach GUI_DRAW und deckt sonst jedes
             // Fenster zu, das darueber liegt.
+            // Zeichenflaeche: Malen umleiten (auch ins echte Fenster) und die
+            // Maus relativ zu ihr.
+            "gui_canvas_begin" => {
+                let h = gi(a, 0, "GUI_CANVAS_BEGIN")?;
+                let g = self.gfx.as_mut().ok_or("GUI_CANVAS_BEGIN: vor SCREEN aufgerufen")?;
+                self.gui.canvas_begin(g, h)?;
+                Value::Nil
+            }
+            "gui_canvas_end" => {
+                if !a.is_empty() { return Err("GUI_CANVAS_END: erwartet keine Argumente".into()); }
+                let g = self.gfx.as_mut().ok_or("GUI_CANVAS_END: vor SCREEN aufgerufen")?;
+                self.gui.canvas_end(g)?;
+                Value::Nil
+            }
+            "gui_canvas_mouse" => {
+                let h = gi(a, 0, "GUI_CANVAS_MOUSE")?;
+                let g = self.gfx.as_mut().ok_or("GUI_CANVAS_MOUSE: vor SCREEN aufgerufen")?;
+                let (x, y, unten) = self.gui.canvas_mouse(g, h)?;
+                Value::Tuple(std::rc::Rc::new(vec![Value::Int(x), Value::Int(y), Value::Bool(unten)]))
+            }
             "gui_draw_window" => {
                 let h = gi(a, 0, "GUI_DRAW_WINDOW")?;
                 let g = self.gfx.as_mut().ok_or("GUI_DRAW_WINDOW: vor SCREEN aufgerufen")?;

@@ -631,6 +631,60 @@ impl Gui {
         let (ax, ay, ww, wh) = self.abs_rect(wi, w);
         Ok((ax + 1, ay + 1, (ww - 2).max(0), (wh - 2).max(0)))   // Inhalt ohne Rahmen
     }
+    /// GUI_CANVAS_BEGIN(canvas): die folgenden Zeichenbefehle gehen in die
+    /// Zeichenflaeche -- zugeschnitten auf sie, und steht sie in einem echten
+    /// Fenster (GUI_WINDOW_NATIVE), in DESSEN Bild. Ohne das landete, was das
+    /// Programm nach GUI_DRAW malt, immer im Hauptfenster: eine Flaeche im
+    /// echten Fenster blieb leer.
+    pub fn canvas_begin(&mut self, g: &mut Graphics, h: i64) -> Result<(), String> {
+        if self.canvas_offen.is_some() {
+            return Err("GUI_CANVAS_BEGIN: eine Zeichenflaeche ist schon offen -- erst GUI_CANVAS_END".into());
+        }
+        let (cx, cy, cw, ch) = self.canvas_rect(h)?;
+        let (wi, _) = Self::dec_widget(h);
+        let mut id = self.windows.get(wi).map(|w| w.nativ).unwrap_or(0);
+        if id != 0 && !g.nativ_beginnen(id) { id = 0; }
+        g.push_clip(cx, cy, cw, ch);
+        self.canvas_offen = Some(id);
+        Ok(())
+    }
+
+    /// GUI_CANVAS_END(): zurueck ins Hauptfenster. In einem echten Fenster
+    /// kommt dabei, was ueber der Flaeche liegt (Menues, Klapplisten,
+    /// Popups, Hilfetext), wieder obenauf -- es war ja schon gezeichnet.
+    pub fn canvas_end(&mut self, g: &mut Graphics) -> Result<(), String> {
+        let Some(id) = self.canvas_offen.take() else {
+            return Err("GUI_CANVAS_END: keine Zeichenflaeche offen (GUI_CANVAS_BEGIN)".into());
+        };
+        g.pop_clip();
+        if id != 0 {
+            g.sicht_setzen(Some(id));
+            let mut eigner: Vec<usize> = Vec::new();
+            for wi in self.open_menu.map(|m| m.0).into_iter().chain(self.open_dropdown.map(|d| d.0)) {
+                if !eigner.contains(&wi) && self.windows.get(wi).map(|w| w.nativ == id).unwrap_or(false) { eigner.push(wi); }
+            }
+            for wi in eigner { self.popups_zeichnen(g, wi); }
+            self.draw_top_flaeche(g, id);
+            g.sicht_setzen(None);
+            g.nativ_beenden();
+        }
+        Ok(())
+    }
+
+    /// GUI_CANVAS_MOUSE(canvas): (x, y, gedrueckt) -- der Zeiger relativ zur
+    /// Zeichenflaeche und die linke Taste, gesehen durch das Fenster, in dem
+    /// sie steht (auch ein echtes). Steht der Zeiger ueber einem anderen
+    /// Fenster, liegt (x, y) weit draussen.
+    pub fn canvas_mouse(&self, g: &mut Graphics, h: i64) -> Result<(i64, i64, bool), String> {
+        let (cx, cy, _, _) = self.canvas_rect(h)?;
+        let (wi, _) = Self::dec_widget(h);
+        let id = self.windows.get(wi).map(|w| w.nativ).unwrap_or(0);
+        g.sicht_setzen(Some(id));
+        let (mx, my, unten) = (g.mouse_x(), g.mouse_y(), g.mouse_button(0));
+        g.sicht_setzen(None);
+        Ok((mx - cx as i64, my - cy as i64, unten))
+    }
+
     // Item-Auswahl: Dropdown UND ListBox (beide nutzen items/sel).
     pub(super) fn item_widget(&self, h: i64, fn_: &str) -> Result<&Widget, String> {
         let w = self.wdg(h, fn_)?;

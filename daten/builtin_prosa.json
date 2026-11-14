@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 2426,
+ "count": 2429,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -587,7 +587,10 @@
   "GUI_BUTTON_GET_VARIANT$": "STRING — die Knopfart als Name",
   "GUI_BUTTON_VARIANT": "Knopfart: standard, primaer, erfolg, warnung, gefahr, umriss, flach, link",
   "GUI_CANVAS": "GUI_WIDGET — freie Zeichenflaeche -- hinein malt man mit den normalen Zeichenbefehlen, nach GUI_DRAW",
+  "GUI_CANVAS_BEGIN": "die Zeichenbefehle dazwischen gehen in die Flaeche: zugeschnitten auf sie, und steht sie in einem echten Fenster, in dessen Bild",
+  "GUI_CANVAS_END": "die Zeichenbefehle dazwischen gehen in die Flaeche: zugeschnitten auf sie, und steht sie in einem echten Fenster, in dessen Bild",
   "GUI_CANVAS_H": "INTEGER — Groesse der Flaeche",
+  "GUI_CANVAS_MOUSE": "TUPLE — (x, y, gedrueckt): der Zeiger relativ zur Flaeche und die linke Taste -- auch in einem echten Fenster",
   "GUI_CANVAS_W": "INTEGER — Groesse der Flaeche",
   "GUI_CANVAS_X": "INTEGER — absolute Bildschirmposition der Flaeche (wandert mit dem Fenster)",
   "GUI_CANVAS_Y": "INTEGER — absolute Bildschirmposition der Flaeche (wandert mit dem Fenster)",
