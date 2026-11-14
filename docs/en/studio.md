@@ -41,7 +41,10 @@ debugger. On top of that custom controls and databases in the project.
 | Status bar | message, name, position and size of the selected control, zoom (click: 100 %) |
 
 The panels can be moved, stacked as tabs and detached, as in the IDE. The View
-menu offers a light and a dark appearance.
+menu offers a light and a dark appearance. **View -> "Dialogs as separate windows"** turns the Studio's dialogs
+(event, method, variable, menu editor) into real windows of the system --
+they may go beyond the edge of the Studio and onto the second screen;
+remembered in `studio.json`, off by default.
 
 **The interface comes in German and in English.** View -> "English
 interface" switches; the choice is stored in `studio.json` next to the

@@ -407,6 +407,11 @@ SUB befehle()
         mitteNachziehen()
         punkteFuer = ""
     END IF
+    IF GUI_CLICKED(miDialogeEigen) THEN
+        dialogeEigen = GUI_MENU_CHECKED(miDialogeEigen)
+        stSchalterSetzen("dialoge_eigen", dialogeEigen)
+        protokoll("dialoge eigen " + IIF(dialogeEigen, "an", "aus"))
+    END IF
     IF GUI_CLICKED(miSprache) THEN spracheWechseln()
     IF GUI_CLICKED(miUeber) THEN ueberZeigen()
     IF GUI_CLICKED(miStarten) OR t = tbStart THEN starten()

@@ -175,6 +175,8 @@ Vergrößern	Zoom in
 Verkleinern	Zoom out
 Originalgröße	Actual size
 Helles Erscheinungsbild	Light appearance
+Dialoge als eigene Fenster	Dialogs as separate windows
+Die Einstellung lässt sich nicht sichern:	The setting cannot be saved:
 Hilfe	Help
 Über Drachenhauch Studio	About Drachenhauch Studio
 Neues Projekt (Strg+Umschalt+N)	New project (Ctrl+Shift+N)

@@ -43,7 +43,10 @@ ein Debugger. Dazu eigene Controls und Datenbanken im Projekt.
 
 Die Leisten lassen sich wie in der IDE verschieben, als Reiter stapeln und
 abtrennen. Unter Ansicht gibt es ein helles und ein dunkles
-Erscheinungsbild.
+Erscheinungsbild. **Ansicht -> „Dialoge als eigene Fenster“** macht die
+Dialoge des Studios (Ereignis, Methode, Variable, Menü-Editor) zu echten
+Fenstern des Systems -- sie dürfen über den Rand des Studios und auf den
+zweiten Schirm; gemerkt in `studio.json`, aus per Vorgabe.
 
 **Die Oberfläche gibt es auf Deutsch und auf Englisch.** Ansicht ->
 „English interface“ schaltet um; die Wahl steht in `studio.json` neben der

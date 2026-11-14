@@ -461,3 +461,40 @@ umbenannt TRUE
 |        start.text = "gedrueckt"
 |    END SUB
 |END CLASS
+
+=== mit dem schalter geht der ereignisdialog als eigenes fenster auf
+' Ansicht -> "Dialoge als eigene Fenster" (studio.json: dialoge_eigen): der
+' Ereignis-Dialog eines Doppelklicks wird ein echtes Fenster des Systems.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+DIM m AS STRING : m = CWD$() + "/m.log"
+slStarten(m, "", 6, p)
+DIM fx AS INTEGER
+DIM fy AS INTEGER
+(fx, fy) = slLage(m, "fenster")
+slHin(10, 10)
+slKlick(fx + 90, fy + 55)
+slKlick(fx + 90, fy + 55)
+slWarten(10)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = slStarten(log, CWD$() + "/ev.txt", slBild + 10, p)
+PRINT "dialog "; slHat(log, "ereignisdialog knopf1 Klick,MausRein,MausRaus,Abgelegt")
+PRINT "eigenes fenster "; slHat(log, "dialog eigen an")
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei studio.json
+{"dialoge_eigen": true}
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"}]}
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":520,"h":360,"widgets":[
+{"kind":"button","name":"knopf1","text":"Eins","x":40,"y":40,"w":100,"h":30}]}
+--- system windows
+--- erwartet
+dialog TRUE
+eigenes fenster TRUE

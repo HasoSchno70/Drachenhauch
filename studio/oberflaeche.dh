@@ -77,6 +77,7 @@ DIM miGroesser AS INTEGER
 DIM miKleiner AS INTEGER
 DIM miNormal AS INTEGER
 DIM miHell AS INTEGER
+DIM miDialogeEigen AS INTEGER
 DIM miUeber AS INTEGER
 DIM miSprache AS INTEGER
 DIM miStarten AS INTEGER
@@ -206,6 +207,7 @@ SUB oberflaecheAnlegen()
     miNormal = GUI_MENU_ITEM(m, tr$("Originalgröße"), kz$("Strg+0"))
     GUI_MENU_SEPARATOR(m)
     miHell = GUI_MENU_ITEM(m, tr$("Helles Erscheinungsbild")) : GUI_MENU_CHECK(miHell, hell)
+    miDialogeEigen = GUI_MENU_ITEM(m, tr$("Dialoge als eigene Fenster")) : GUI_MENU_CHECK(miDialogeEigen, dialogeEigen)
     ' Der Name der ANDEREN Sprache in ihr selbst -- wer die jetzige nicht
     ' liest, findet so den Weg heraus.
     miSprache = GUI_MENU_ITEM(m, IIF(englisch, "Deutsche Oberfläche (beim nächsten Start)", "English interface (at the next start)"))
