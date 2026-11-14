@@ -8560,11 +8560,42 @@ fn glyph_textur(pfad: &str, gid: u16, px: f32) -> Option<(raylib::ffi::Texture2D
 /// Einen Lauf geformt zeichnen (formung.rs); liefert seine Breite. None,
 /// wenn die Schrift sich nicht formen laesst -- dann zeichnet raylib.
 fn zeichne_geformt(pfad: &str, txt: &str, x: f32, y: f32, size: f32, col: Color) -> Option<f32> {
+    zeichne_geformt_mit(pfad, txt, x, y, size, col, None)
+}
+
+/// Wie `zeichne_geformt`; mit `schraeg` = Some(Grundlinie) GENEIGT wie
+/// `zeichne_schraeg` (nachgebildetes Kursiv): jede Glyphe als Viereck, die
+/// oberen Ecken weiter rechts als die unteren.
+fn zeichne_geformt_mit(pfad: &str, txt: &str, x: f32, y: f32, size: f32, col: Color, schraeg: Option<f32>) -> Option<f32> {
+    use raylib::ffi;
     let g = crate::formung::formen(pfad, txt, size)?;
     let grund = y + g.grundlinie;
     for &(gid, gx, gy) in &g.glyphen {
-        if let Some((tex, links, oben)) = glyph_textur(pfad, gid, size) {
-            unsafe { raylib::ffi::DrawTexture(tex, (x + gx + links).round() as i32, (grund + gy - oben).round() as i32, col.into()); }
+        let Some((tex, links, oben)) = glyph_textur(pfad, gid, size) else { continue };
+        let (dx, dy) = ((x + gx + links).round(), (grund + gy - oben).round());
+        match schraeg {
+            None => unsafe { ffi::DrawTexture(tex, dx as i32, dy as i32, col.into()); },
+            Some(grundlinie) => {
+                let (dw, dh) = (tex.width as f32, tex.height as f32);
+                let v = |yy: f32| (grundlinie - yy) * crate::schnitt::NEIGUNG;
+                unsafe {
+                    ffi::rlCheckRenderBatchLimit(4);
+                    ffi::rlSetTexture(tex.id);
+                    ffi::rlBegin(ffi::RL_QUADS as i32);
+                    ffi::rlColor4ub(col.r, col.g, col.b, col.a);
+                    ffi::rlNormal3f(0.0, 0.0, 1.0);
+                    ffi::rlTexCoord2f(0.0, 0.0);
+                    ffi::rlVertex2f(dx + v(dy), dy);
+                    ffi::rlTexCoord2f(0.0, 1.0);
+                    ffi::rlVertex2f(dx + v(dy + dh), dy + dh);
+                    ffi::rlTexCoord2f(1.0, 1.0);
+                    ffi::rlVertex2f(dx + dw + v(dy + dh), dy + dh);
+                    ffi::rlTexCoord2f(1.0, 0.0);
+                    ffi::rlVertex2f(dx + dw + v(dy), dy);
+                    ffi::rlEnd();
+                    ffi::rlSetTexture(0);
+                }
+            }
         }
     }
     Some(g.breite)
@@ -8827,7 +8858,7 @@ fn zeichne_text_stil<D: RaylibDraw>(d: &mut D, h: i64, txt: &str, x: f32, y: f32
                     zeichne_schraeg(&std_font, txt, x0, y, sz, sz / 10.0, col, grund);
                 }
                 Some(basis) => {
-                    if txt.is_ascii() || ausweich.is_empty() {
+                    if (txt.is_ascii() || ausweich.is_empty()) && !formen_noetig(h, 0, txt) {
                         sdf::mit(h, || zeichne_schraeg(basis, txt, x0, y, size, spacing, col, grund));
                     } else {
                         let basis_hat = |c: u32| -> bool {
@@ -8840,6 +8871,13 @@ fn zeichne_text_stil<D: RaylibDraw>(d: &mut D, h: i64, txt: &str, x: f32, y: f32
                             let f = if fi == 0 { basis } else { &ausweich[fi - 1].font };
                             if !erster { cx += spacing; }
                             erster = false;
+                            // Geformt (formung.rs), geneigt wie die anderen Laeufe.
+                            if formen_noetig(h, fi, &lauf) {
+                                if let Some(b) = lauf_pfad(h, fi, ausweich).and_then(|p| zeichne_geformt_mit(&p, &lauf, cx, y, size, col, Some(grund))) {
+                                    cx += b;
+                                    continue;
+                                }
+                            }
                             cx += sdf::mit(if fi == 0 { h } else { -1 },
                                            || zeichne_schraeg(f, &lauf, cx, y, size, spacing, col, grund));
                         }

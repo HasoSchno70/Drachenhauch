@@ -55,3 +55,41 @@ END TRY
 FONT_LIGATURES(7, TRUE)
 --- fehler
 FONT_LIGATURES: 7 ist keine mit LOADFONT geladene Schrift
+
+=== kursiv bleibt geformt
+' Nachgebildetes Kursiv (TEXT_STYLE "kursiv", Nirmala hat keinen
+' Kursivschnitt) neigt die geformten Glyphen: "क्ष" bleibt EIN Konjunkt,
+' etwas breiter als aufrecht (die Neigung) -- Glyphe fuer Glyphe waere es
+' fast dreimal so breit. Gemessen am rechten Rand der Tinte.
+FUNCTION rechts(s AS STRING) AS INTEGER
+    DIM rt AS INTEGER : rt = RENDERTARGET_NEW(200, 60)
+    RENDERTARGET_BEGIN(rt)
+    TEXT(4, 4, s, WHITE)
+    RENDERTARGET_END()
+    DIM b AS IMAGE : b = RENDERTARGET_IMAGE(rt)
+    DIM leer AS INTEGER : leer = GETPIXEL(b, 199, 59)
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR x = 199 TO 0 STEP -1
+        FOR y = 0 TO 59
+            IF GETPIXEL(b, x, y) <> leer THEN RETURN x
+        NEXT
+    NEXT
+    RETURN -1
+END FUNCTION
+TRY
+    SCREEN(200, 100, "Formung", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+SET_WINDOW_POS(-3000, -3000)
+DIM f AS INTEGER : f = LOADFONT("C:/Windows/Fonts/Nirmala.ttc", 40)
+SETFONT(f, 40)
+DIM aufrecht AS INTEGER : aufrecht = rechts("क्ष")
+TEXT_STYLE("kursiv")
+DIM geneigt AS INTEGER : geneigt = rechts("क्ष")
+PRINT "geneigt breiter "; geneigt > aufrecht; " aber ein konjunkt "; geneigt < aufrecht + 15
+--- system windows
+--- erwartet
+geneigt breiter TRUE aber ein konjunkt TRUE

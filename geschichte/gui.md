@@ -1020,3 +1020,24 @@ schmaler als seine Teile; mit Ligaturen ruecken "AV" zusammen; Fehler fuer
 eine fremde Schrift), zwei Gegenproben; Sichtprobe mit TEXT, gui-Label und
 Textfeld. Offen: die Schreibmarke springt zeichenweise durch Konjunkte;
 nachgebildetes Fett/Kursiv gilt in geformten Laeufen nicht.
+
+## Nachschliff nach den Luecken (2026-11-14)
+
+- **Klick-Faelle unabhaengig vom Zeiger:** unter `DHRT_OHNE_EINGABE`
+  bekommen jetzt auch echte Fenster, abgerissene Leisten und Popup-Fenster
+  `MOUSE_PASSTHROUGH` und keinen Fokus beim Zeigen -- wie das Hauptfenster
+  (`stillfenster.rs`). Vorher meldete Windows den echten Zeiger ueber ihnen,
+  und drei Faelle (Massstab, Teilflaeche) fielen je nach Lage der Maus.
+  Geprueft am Fensterstil (`WS_EX_TRANSPARENT`), nicht mit dem Zeiger des
+  Nutzers.
+- **Schreibmarke ueber Silben:** `schreibrichtung::stelle_erlaubt` -- keine
+  Marke vor einem Zeichen, das sich anlehnt (Bidi-Klasse NSM, die
+  tragenden Vokalzeichen der parallel gebauten indischen Bloecke, Thai,
+  Lao, Khmer, Myanmar), keine hinter einem Virama vor einem Buchstaben,
+  keine an einem Joiner. Pfeile in Textfeld und Textbereich und der Klick
+  (`caret_index_at`) fragen sie; die Ruecktaste bleibt zeichenweise.
+- **Kursiv geformt:** `zeichne_geformt_mit` neigt die Glyphen-Texturen wie
+  `zeichne_schraeg`; Fett ging schon (zwei Zuege durch `zeichne_text`).
+Pruefung: `native_fenster.dhtest` (Fensterstil), `gui_silben_marke.dhtest`
+(Pfeile eingespielt), `textformung.dhtest` (Kursiv am Tintenrand), Rust-Test
+`schreibmarke_springt_ueber_silben`; je eine Gegenprobe.

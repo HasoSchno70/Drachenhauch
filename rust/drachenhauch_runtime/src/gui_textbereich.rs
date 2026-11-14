@@ -701,12 +701,12 @@ impl Gui {
             let (k_zurueck, k_vor) = if richtung::zeile_rtl(&chars[rows[row].1..rows[row].2]) { (KEY_RIGHT, KEY_LEFT) } else { (KEY_LEFT, KEY_RIGHT) };
             if g.key_pressed(k_zurueck) {
                 let (lo, hi) = (c.min(a), c.max(a));
-                if !shift && lo != hi { c = lo; } else { c = (c - 1).max(0); }
+                if !shift && lo != hi { c = lo; } else { c = crate::schreibrichtung::stelle_zurueck(&chars, c as usize) as i32; }
                 if !shift { a = c; }
             }
             if g.key_pressed(k_vor) {
                 let (lo, hi) = (c.min(a), c.max(a));
-                if !shift && lo != hi { c = hi; } else { c = (c + 1).min(len); }
+                if !shift && lo != hi { c = hi; } else { c = (crate::schreibrichtung::stelle_vor(&chars, c as usize) as i32).min(len); }
                 if !shift { a = c; }
             }
             // Mit Strg an den Anfang bzw. das Ende des ganzen Textes -- ohne

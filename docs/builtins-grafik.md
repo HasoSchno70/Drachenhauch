@@ -547,9 +547,11 @@ wie `=>`), Unterschneidung (AV rückt zusammen) und was die Schrift sonst an
 Regeln mitbringt. Aus per Vorgabe -- gewöhnlicher Text bleibt beim
 schnellsten Weg.
 
-Was (noch) nicht geht: die Schreibmarke springt in einem geformten Text
-Zeichen für Zeichen, auch mitten durch einen Konjunkt; Fett und Kursiv
-nachgebildeter Schnitte gelten in geformten Läufen nicht.
+In Textfeldern und Textbereichen springen Pfeile und Klick über eine
+ganze Silbe (क्षि, ein Akzent mit seinem Buchstaben) statt in sie hinein;
+die Rücktaste nimmt ein Zeichen nach dem anderen zurück, wie Tastaturen für
+indische Schriften es gewohnt sind. Nachgebildetes Fett und Kursiv
+(`TEXT_STYLE`) gilt auch in geformtem Text.
 
 `TEXT_WIDTH` misst denselben Weg, den `TEXT` zeichnet — auch über die
 Ausweich-Schriften hinweg: ein zentrierter Text mit Umlaut oder Kanji sitzt
