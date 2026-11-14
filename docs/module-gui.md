@@ -72,6 +72,7 @@ IMPORT "gui"
 | `GUI_WINDOW_NATIVE(win, an)` | BOOLEAN | das Fenster als **echtes OS-Fenster** (eigene Titelleiste, Taskleiste, zweiter Monitor) bzw. zurück ins Hauptfenster; `FALSE` heißt bei `an`: Rückfall, es bleibt ein gui-Fenster |
 | `GUI_WINDOW_IS_NATIVE(win)` | BOOLEAN | ist es gerade ein echtes OS-Fenster? |
 | `GUI_WINDOW_NATIVE_SCALE(win)` | FLOAT | um wie viel das native Fenster auf seinem Schirm größer gezeichnet wird als im Hauptfenster (Pixeldichte seines Schirms durch die des Hauptfensters); 1.0 im Hauptfenster |
+| `GUI_POPUP_WINDOWS()` | INTEGER | wie viele Popups gerade als eigenes Fenster über den Rand ihres nativen Fensters stehen (0 = alle in ihrem Fenster) |
 | `GUI_WINDOW_VISIBLE(win, an)` | — | Sichtbarkeit setzen |
 | `GUI_WINDOW_FRONT(win)` | — | Fenster nach vorn holen, ohne ihm den Fokus zu geben -- fuer eine Vorschlagsliste oder einen Tooltip, der beim Tippen ueber dem Text liegen soll. Per `GUI_WINDOW_VISIBLE` eingeblendet liegt ein Fenster sonst hinter dem zuletzt angeklickten |
 | `GUI_WINDOW_SHOWN(win)` | BOOLEAN | ist das Fenster gerade sichtbar? Das Gegenstueck zum Setzer -- ohne den Getter muesste ein Programm sich merken, was es selbst gesetzt hat, und laege daneben, sobald der Nutzer das Fenster ueber sein Kreuz schliesst |
@@ -750,9 +751,19 @@ WEND
   Klick hinein erreicht nichts und holt den Dialog nach vorn. Enter und
   ESC drücken Standard- und Abbrechen-Knopf wie sonst.
 - Kontextmenü, Hilfetext, Vorschläge, aufgeklappter Monat, Zellauswahl und
-  das Überlauf-Menü der Werkzeugleiste stehen im nativen Fenster (in
-  seinen Grenzen). Die Umwandlung einer Eingabemethode (IME) erscheint an
-  der Schreibmarke des Fensters, das den Fokus hat.
+  das Überlauf-Menü der Werkzeugleiste stehen im nativen Fenster. Die
+  Umwandlung einer Eingabemethode (IME) erscheint an der Schreibmarke des
+  Fensters, das den Fokus hat.
+- **Popups über den Rand:** ein Kontextmenü (samt Untermenüs), ein
+  Leistenmenü, eine Klappliste, die Vorschläge eines Felds, ein
+  aufgeklappter Monat oder das Rechtschreib-Menü, das über den Rand seines
+  nativen Fensters ragt, bekommt ein eigenes randloses Fenster ohne Fokus
+  und ohne Eintrag in der Taskleiste -- ausweichen muss es erst am Rand des
+  Schirms. Klicks darin wirken wie im nativen Fenster. Unter Wayland (der
+  Compositor bestimmt die Lage) und mit `DHRT_OHNE_POPUP_FENSTER=1` weicht
+  es stattdessen am Rand seines nativen Fensters aus. `GUI_POPUP_WINDOWS()`
+  zählt die offenen Popup-Fenster. Im Hauptfenster bleibt es, wie es war:
+  Popups weichen an seinem Rand aus.
 - **Pixeldichte:** steht das native Fenster auf einem Schirm mit anderer
   Skalierung als das Hauptfenster (100 % neben 150 %), wird es dort
   entsprechend größer gezeichnet -- Linien glatt, Schrift in voller Größe
@@ -772,7 +783,6 @@ WEND
   6 Zeichen a, 7 Fokus a (0/1), 8 Rad (a, b), 9 Zeiger drinnen a (0/1).
   Von Hand geschrieben braucht ein Klick ohne vorherige Bewegung im Fenster
   ein `9` davor oder nur den Druck -- der Druck hält den Zeiger.
-- **Noch nicht:** Popups über den Rand des nativen Fensters hinaus.
 - Beispiel: [`examples/219_echte_fenster.dh`](../examples/219_echte_fenster.dh)
   (Palette, modaler Dialog, abreißbare Leisten).
 - Während eines modalen Dialogs gelten nur **seine** Menüs (Kontextmenü,

@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 2413,
+ "count": 2414,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -827,6 +827,7 @@
   "GUI_POPOVER_CLOSED": "BOOLEAN — hat ihn der Nutzer in diesem Bild geschlossen (Klick daneben oder ESC)?",
   "GUI_POPOVER_HIDE": "den Popover verbergen",
   "GUI_POPOVER_SHOW": "den Popover zeigen, an sein Widget legen (am Bildschirmrand weicht er aus) und nach vorn holen",
+  "GUI_POPUP_WINDOWS": "INTEGER — wie viele Popups gerade als eigenes Fenster über den Rand ihres nativen Fensters stehen (0 = alle in ihrem Fenster)",
   "GUI_PROGRESS": "Ein Fortschrittsbalken.",
   "GUI_PROGRESS_SET": "laufendes Band statt Wert, für alles, dessen Dauer man nicht kennt",
   "GUI_PROMPT": "GUI_WINDOW — Frage mit Eingabefeld (Vorgabe markiert; ohne knoepfe$ OK/Abbrechen)",

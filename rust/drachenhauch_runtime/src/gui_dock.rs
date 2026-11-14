@@ -1262,8 +1262,9 @@ impl Gui {
             let eigen = |s: &Gui, p: Option<(usize, usize)>| p.map(|p| p.0 == wi).unwrap_or(false) && s.popup_flaeche(wi) == id;
             if eigen(self, self.open_menu) || eigen(self, self.open_dropdown) { self.popups_zeichnen(g, wi); }
             self.draw_top_flaeche(g, id);
-            g.sicht_setzen(Some(0));
             g.nativ_beenden();
+            self.popup_fenster_zeichnen(g, id);
+            g.sicht_setzen(Some(0));
             self.zurueckgeben();
         }
     }

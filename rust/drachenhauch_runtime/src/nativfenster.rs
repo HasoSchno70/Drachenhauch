@@ -210,6 +210,8 @@ mod glfw {
         pub fn glfwSetCharCallback(f: *mut c_void, r: Option<FnUint>) -> Option<FnUint>;
         pub fn glfwSetWindowFocusCallback(f: *mut c_void, r: Option<FnInt>) -> Option<FnInt>;
         pub fn glfwSetWindowSizeCallback(f: *mut c_void, r: Option<FnGroesse>) -> Option<FnGroesse>;
+        pub fn glfwGetMonitors(anzahl: *mut c_int) -> *mut *mut c_void;
+        pub fn glfwGetMonitorWorkarea(m: *mut c_void, x: *mut c_int, y: *mut c_int, b: *mut c_int, h: *mut c_int);
         #[cfg(windows)]
         pub fn glfwGetWin32Window(f: *mut c_void) -> *mut c_void;
         // X11 (Stufe 4: Besitzer unter Linux). Unter Wayland melden beide
@@ -326,6 +328,18 @@ pub fn moeglich() -> bool {
         && std::env::var("DHRT_OHNE_NATIVE_FENSTER").map(|v| v != "1").unwrap_or(true)
 }
 
+/// Duerfen Popups als eigene Fenster ueber den Rand eines nativen Fensters
+/// hinaus? Nicht unter Wayland: dort bestimmt der Compositor die Lage, ein
+/// Menue stuende irgendwo -- dann bleibt es im Fenster und weicht am Rand
+/// aus wie bisher. `DHRT_OHNE_POPUP_FENSTER=1` schaltet es ab.
+pub fn popups_moeglich() -> bool {
+    if !moeglich() || std::env::var("DHRT_OHNE_POPUP_FENSTER").map(|v| v == "1").unwrap_or(false) { return false; }
+    #[cfg(all(feature = "graphics", target_os = "linux"))]
+    unsafe { return glfw::glfwGetPlatform() == glfw::PLATFORM_X11; }
+    #[allow(unreachable_code)]
+    true
+}
+
 impl Fenster {
     /// Ein Fenster anlegen, Kontext mit `haupt` geteilt. `None`, wo es keine
     /// echten Fenster gibt oder GLFW es ablehnt -- der Aufrufer bleibt dann
@@ -340,9 +354,12 @@ impl Fenster {
     /// `vor_zeigen` bekommt das Fenster des Systems (HWND), bevor es zum
     /// ersten Mal sichtbar wird -- der Adapter fuer Bildschirmleser verlangt
     /// ein Fenster, das noch nie zu sehen war (Stufe 4).
+    /// `popup` = Some((Besitzer, Massstab)): ein Popup ueber dem Rand eines
+    /// anderen nativen Fensters -- ohne Fokus beim Zeigen, ohne Eintrag in
+    /// der Taskleiste, ueber dem Besitzer, mit dessen Massstab.
     #[allow(clippy::too_many_arguments)]
     pub fn anlegen(haupt: *mut c_void, haupt_dichte: f32, titel: &str, b: i32, h: i32, x: i32, y: i32, groesse_aenderbar: bool, rahmen: bool,
-                   vor_zeigen: &mut dyn FnMut(usize)) -> Option<(Fenster, f32)> {
+                   popup: Option<(*mut c_void, f32)>, vor_zeigen: &mut dyn FnMut(usize)) -> Option<(Fenster, f32)> {
         if !moeglich() || haupt.is_null() { return None; }
         #[cfg(all(feature = "graphics", any(windows, target_os = "linux")))]
         unsafe {
@@ -356,6 +373,8 @@ impl Fenster {
             // sonst springt es sichtbar von (0,0) an seinen Platz.
             glfwWindowHint(VISIBLE, 0);
             glfwWindowHint(DECORATED, rahmen as c_int);
+            // Ein Popup nimmt dem Fenster, aus dem es kommt, nicht den Fokus.
+            if popup.is_some() { glfwWindowHint(FOCUS_ON_SHOW, 0); }
             let t = CString::new(titel.replace('\0', " ")).ok()?;
             let f = glfwCreateWindow(b.max(1), h.max(1), t.as_ptr(), std::ptr::null_mut(), haupt);
             glfwDefaultWindowHints();
@@ -390,10 +409,18 @@ impl Fenster {
             (gl.gen_framebuffers)(1, &mut fbo);
             glfwMakeContextCurrent(haupt);
             let fenster = Fenster { handle: f, gl, fbo, titel: titel.to_string() };
-            // Jetzt steht es auf seinem Schirm -- dessen Dichte gilt.
-            let k = verhaeltnis(fenster.dichte(), haupt_dichte, massstab_vorgabe());
+            // Jetzt steht es auf seinem Schirm -- dessen Dichte gilt. Ein
+            // Popup nimmt die seines Besitzers: es zeigt einen Ausschnitt von
+            // dessen Flaeche, auch wenn es auf den Nachbarschirm ragt.
+            let k = match popup {
+                Some((_, k)) => k,
+                None => verhaeltnis(fenster.dichte(), haupt_dichte, massstab_vorgabe()),
+            };
             if k != 1.0 { glfwSetWindowSize(f, pixel(b.max(1), k), pixel(h.max(1), k)); }
-            vor_zeigen(os_handle(f));
+            match popup {
+                Some((besitzer, _)) => fenster.popup_stil(besitzer),
+                None => vor_zeigen(os_handle(f)),
+            }
             glfwShowWindow(f);
             Some((fenster, k))
         }
@@ -484,6 +511,7 @@ impl Fenster {
         #[cfg(all(feature = "graphics", any(windows, target_os = "linux")))]
         unsafe { glfw::glfwSetWindowSize(self.handle, b.max(1), h.max(1)); }
     }
+    pub fn titel(&self) -> &str { &self.titel }
     pub fn titel_setzen(&mut self, titel: &str) {
         if titel == self.titel { return; }
         self.titel = titel.to_string();
@@ -538,6 +566,67 @@ impl Fenster {
             }
             XFlush(d);
         }
+    }
+
+    /// Ein Popup (Menue, Vorschlaege) ueber dem Rand eines nativen Fensters:
+    /// unter Windows ein Werkzeugfenster ohne Taskleisten-Eintrag, das beim
+    /// Klicken nicht aktiv wird (der Fokus bleibt im Fenster, aus dem es
+    /// kommt), mit dem Besitzer darunter. Unter Linux (X11) gehoert es dem
+    /// Besitzer ueber WM_TRANSIENT_FOR. Vor dem ersten Zeigen aufrufen.
+    #[allow(unused_variables)]
+    pub fn popup_stil(&self, besitzer: *mut c_void) {
+        #[cfg(all(feature = "graphics", windows))]
+        unsafe {
+            use windows::Win32::Foundation::HWND;
+            use windows::Win32::UI::WindowsAndMessaging::{GetWindowLongPtrW, SetWindowLongPtrW, GWLP_HWNDPARENT, GWL_EXSTYLE,
+                WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_APPWINDOW};
+            let ich = glfw::glfwGetWin32Window(self.handle);
+            let b = glfw::glfwGetWin32Window(besitzer);
+            if ich.is_null() { return; }
+            let ex = GetWindowLongPtrW(HWND(ich), GWL_EXSTYLE);
+            let ex = (ex | (WS_EX_NOACTIVATE.0 | WS_EX_TOOLWINDOW.0) as isize) & !(WS_EX_APPWINDOW.0 as isize);
+            SetWindowLongPtrW(HWND(ich), GWL_EXSTYLE, ex);
+            if !b.is_null() { SetWindowLongPtrW(HWND(ich), GWLP_HWNDPARENT, b as isize); }
+        }
+        #[cfg(all(feature = "graphics", target_os = "linux"))]
+        unsafe {
+            use glfw::*;
+            if glfwGetPlatform() != PLATFORM_X11 { return; }
+            let d = glfwGetX11Display();
+            let (ich, b) = (glfwGetX11Window(self.handle), glfwGetX11Window(besitzer));
+            if d.is_null() || ich == 0 || b == 0 { return; }
+            XSetTransientForHint(d, ich, b);
+            XFlush(d);
+        }
+    }
+
+    /// Der Arbeitsbereich (ohne Taskleiste) des Schirms, auf dem die Mitte
+    /// des Fensters steht: (x, y, Breite, Hoehe) in Systempunkten -- so weit
+    /// darf ein Popup ueber den Fensterrand hinaus.
+    pub fn arbeitsflaeche(&self) -> Option<(i32, i32, i32, i32)> {
+        #[cfg(all(feature = "graphics", any(windows, target_os = "linux")))]
+        unsafe {
+            use glfw::*;
+            let (mut fx, mut fy, mut fb, mut fh) = (0, 0, 0, 0);
+            glfwGetWindowPos(self.handle, &mut fx, &mut fy);
+            glfwGetFramebufferSize(self.handle, &mut fb, &mut fh);
+            let (mx, my) = (fx + fb / 2, fy + fh / 2);
+            let mut n: c_int = 0;
+            let liste = glfwGetMonitors(&mut n);
+            if liste.is_null() || n <= 0 { return None; }
+            let mut erste = None;
+            for i in 0..n as usize {
+                let m = *liste.add(i);
+                let (mut x, mut y, mut b, mut h) = (0, 0, 0, 0);
+                glfwGetMonitorWorkarea(m, &mut x, &mut y, &mut b, &mut h);
+                if b <= 0 || h <= 0 { continue; }
+                if erste.is_none() { erste = Some((x, y, b, h)); }
+                if mx >= x && mx < x + b && my >= y && my < y + h { return Some((x, y, b, h)); }
+            }
+            return erste;
+        }
+        #[allow(unreachable_code)]
+        None
     }
 
     /// Das Fenster als Zahl -- fuer Tests (Fensternachrichten) und Handles.

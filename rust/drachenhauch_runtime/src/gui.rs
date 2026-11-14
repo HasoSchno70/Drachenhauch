@@ -21,6 +21,8 @@ use crate::value::{Rueckruf, Value};
 mod dock;
 #[path = "gui_ueber.rs"]
 mod ueber;
+#[path = "gui_popupfenster.rs"]
+mod popupfenster;
 #[path = "gui_stil.rs"]
 mod stil;
 #[path = "gui_bausteine.rs"]
@@ -3741,6 +3743,10 @@ pub struct Gui {
     pub(super) teil_druck: Option<(usize, u32)>,
     /// Die nativen Fenster aller Teilflaechen (zum Aufraeumen).
     pub(super) teil_ids: Vec<u32>,
+    /// Popups ueber den Rand nativer Fenster (gui_popupfenster.rs).
+    pub(super) popup_fenster: Vec<popupfenster::PopupFenster>,
+    /// Wie weit Popups je nativer Flaeche reichen duerfen (`grenze`).
+    pub(super) grenzen: Vec<(u32, (i32, i32, i32, i32))>,
     focus_window: Option<usize>,
     focus_widget: Option<(usize, usize)>,
     // Offener modaler Dialog. Solange einer steht, bekommt NUR er Eingaben --
@@ -3966,7 +3972,7 @@ impl Gui {
     pub fn new() -> Gui {
         Gui {
             schrift: None,
-            windows: Vec::new(), z_order: Vec::new(), flaeche: 0, fokus_flaeche: 0, nativ_fokus_wunsch: None, leihe: None, teil_druck: None, teil_ids: Vec::new(),
+            windows: Vec::new(), z_order: Vec::new(), flaeche: 0, fokus_flaeche: 0, nativ_fokus_wunsch: None, leihe: None, teil_druck: None, teil_ids: Vec::new(), popup_fenster: Vec::new(), grenzen: Vec::new(),
             ta_zerlegung: std::cell::RefCell::new(HashMap::new()),
             focus_window: None, focus_widget: None, modal: None, modal_vorher: Vec::new(), modal_fokus: Vec::new(), cp_drag: None,
             drag_window: None, drag_dx: 0, drag_dy: 0,
@@ -5302,8 +5308,10 @@ impl Gui {
         g.sicht_setzen(Some(id));
         self.draw_window_sicht(g, wi);
         self.draw_top_flaeche(g, id);
-        g.sicht_setzen(Some(0));
         g.nativ_beenden();
+        // Was davon ueber den Rand ragt, zeigt sein eigenes Fenster.
+        self.popup_fenster_zeichnen(g, id);
+        g.sicht_setzen(Some(0));
     }
     /// Ein Druck auf einer anderen Oberflaeche schliesst die Popups eines
     /// Fensters, das nicht auf ihr steht -- wie ein Klick daneben. Sonst
@@ -5376,7 +5384,8 @@ impl Gui {
         // Die Teilflaechen abgerissener Leisten (Stufe 3b) gehoeren keinem
         // gui-Fenster -- die fuehrt dock_raus_abgleich.
         let lebend: Vec<u32> = self.windows.iter().filter(|w| w.alive && w.nativ != 0).map(|w| w.nativ)
-            .chain(self.teil_ids.iter().copied()).collect();
+            .chain(self.teil_ids.iter().copied())
+            .chain(self.popup_fenster.iter().map(|p| p.id)).collect();
         for id in g.nativ_ids() { if !lebend.contains(&id) { g.nativ_schliessen(id); } }
         for wi in 0..self.windows.len() {
             let id = self.windows[wi].nativ;

@@ -272,6 +272,10 @@ struct NativPlatz {
     /// Der Adapter fuer Bildschirmleser dieses Fensters (Stufe 4) -- jedes
     /// Fenster des Systems hat seinen eigenen Baum.
     a11y: Option<crate::a11y::A11y>,
+    /// Ein Popup-Fenster (Menue ueber den Rand): zeigt den Ausschnitt ab
+    /// (x, y) der Flaeche `eigner`; Zeiger und Knoepfe darin gelten fuer
+    /// sie, in ihren Koordinaten.
+    alias: Option<(u32, i32, i32)>,
 }
 impl NativPlatz {
     fn neu(id: u32, f: crate::nativfenster::Fenster, rt: usize, b: i32, h: i32, k: f32) -> Self {
@@ -280,7 +284,7 @@ impl NativPlatz {
             id, f, rt, b, h, k, pb: pixel(b, k), ph: pixel(h, k), sichtbar: true, e: Default::default(),
             knopf_vorher: [false; MAUSTASTEN], knopf_halt: [crate::flanken::Halt::default(); MAUSTASTEN],
             taste_vorher: vec![false; TASTATUR], taste_halt: vec![crate::flanken::Halt::default(); TASTATUR],
-            zeichen: Vec::new(), schliessen: false, groesse_neu: None, system_groesse: None, besessen: false, a11y: None,
+            zeichen: Vec::new(), schliessen: false, groesse_neu: None, system_groesse: None, besessen: false, a11y: None, alias: None,
         }
     }
 }
@@ -301,9 +305,12 @@ struct RenderTarget {
     /// Verhaeltnis zum Hauptfenster -- seine Befehle sind in Punkten der gui,
     /// sein Ziel ist in Pixeln seines Schirms (`RT_MASS`).
     mass: f32,
+    /// Abspiel-Versatz in Punkten: das Ziel zeigt die Flaeche ab dieser
+    /// Stelle (ein Popup-Fenster zeigt einen Ausschnitt seines Eigners).
+    versatz: (f32, f32),
 }
 impl RenderTarget {
-    fn neu(rt: RenderTexture2D, behalten: bool) -> Self { RenderTarget { rt, cmds: Vec::new(), behalten, mass: 1.0 } }
+    fn neu(rt: RenderTexture2D, behalten: bool) -> Self { RenderTarget { rt, cmds: Vec::new(), behalten, mass: 1.0, versatz: (0.0, 0.0) } }
 }
 
 thread_local! {
@@ -312,13 +319,24 @@ thread_local! {
     /// Scissor fragen hier nach -- Text wird in voller Groesse gesetzt statt
     /// vergroessert (sonst unscharf), und der Scissor spricht Pixel.
     static RT_MASS: std::cell::Cell<f32> = const { std::cell::Cell::new(1.0) };
+    /// Versatz des Ziels, das gerade abgespielt wird (`RenderTarget::versatz`),
+    /// in Punkten -- wie der Massstab fuer Text und Scissor.
+    static RT_VERSATZ: std::cell::Cell<(f32, f32)> = const { std::cell::Cell::new((0.0, 0.0)) };
 }
 /// Zeichnet `f` ohne die Matrix des Abspiel-Massstabs und gibt ihm den
 /// Faktor mit, um den es Lage und Groesse selbst vergroessern soll.
 fn ohne_rt_matrix<R>(f: impl FnOnce(f32) -> R) -> R {
     let m = RT_MASS.with(|c| c.get());
-    if m == 1.0 { return f(1.0); }
-    unsafe { raylib::ffi::rlPushMatrix(); raylib::ffi::rlScalef(1.0 / m, 1.0 / m, 1.0); }
+    let (vx, vy) = RT_VERSATZ.with(|c| c.get());
+    if m == 1.0 && vx == 0.0 && vy == 0.0 { return f(1.0); }
+    // Die Matrix des Abspielens ist S(m) * T(-v); Text setzt seine Lage
+    // selbst mal m. Gebraucht wird T(-v*m) = S(m) T(-v) * T(v) S(1/m) T(-v*m).
+    unsafe {
+        raylib::ffi::rlPushMatrix();
+        raylib::ffi::rlTranslatef(vx, vy, 0.0);
+        raylib::ffi::rlScalef(1.0 / m, 1.0 / m, 1.0);
+        raylib::ffi::rlTranslatef(-vx * m, -vy * m, 0.0);
+    }
     let r = f(m);
     unsafe { raylib::ffi::rlPopMatrix(); }
     r
@@ -2698,7 +2716,7 @@ impl Graphics {
         let dichte = self.haupt_dichte();
         let mut a11y = None;
         let (f, k) = crate::nativfenster::Fenster::anlegen(self.haupt_glfw as *mut std::ffi::c_void, dichte, titel, b, h, x, y, aenderbar, rahmen,
-            &mut |os| { a11y = crate::a11y::A11y::neu(os as *mut std::ffi::c_void); })?;
+            None, &mut |os| { a11y = crate::a11y::A11y::neu(os as *mut std::ffi::c_void); })?;
         let rt = match render_ziel(&mut self.rl, &self.thread, pixel(b, k) as u32, pixel(h, k) as u32) {
             Ok(rt) => rt,
             Err(_) => { f.schliessen(self.haupt_glfw as *mut std::ffi::c_void); return None; }
@@ -2716,6 +2734,64 @@ impl Graphics {
         self.nativ.push(p);
         Some(id)
     }
+    /// Popups als eigene Fenster ueber den Rand der nativen (nicht unter
+    /// Wayland, siehe `nativfenster::popups_moeglich`).
+    pub fn nativ_popups_moeglich(&self) -> bool { crate::nativfenster::popups_moeglich() }
+    /// Ein Popup-Fenster ueber dem Rand der Flaeche `eigner`: es zeigt deren
+    /// Ausschnitt (x, y, b, h) -- Punkte in ihren Koordinaten, auch
+    /// ausserhalb ihres Fensters. Zeiger und Knoepfe darin gehen an `eigner`.
+    pub fn nativ_popup_anlegen(&mut self, eigner: u32, x: i32, y: i32, b: i32, h: i32) -> Option<u32> {
+        use crate::nativfenster::pixel;
+        let (b, h) = (b.max(1), h.max(1));
+        let ep = self.nativ_platz(eigner)?;
+        let (k, besitzer, titel) = (ep.k, ep.f.handle() as *mut std::ffi::c_void, format!("{} Popup", ep.f.titel()));
+        let (lx, ly) = ep.f.lage();
+        let (f, k) = crate::nativfenster::Fenster::anlegen(self.haupt_glfw as *mut std::ffi::c_void, self.haupt_dichte(), &titel, b, h,
+            lx + pixel(x, k), ly + pixel(y, k), false, false, Some((besitzer, k)), &mut |_| {})?;
+        let rt = match render_ziel(&mut self.rl, &self.thread, pixel(b, k) as u32, pixel(h, k) as u32) {
+            Ok(rt) => rt,
+            Err(_) => { f.schliessen(self.haupt_glfw as *mut std::ffi::c_void); return None; }
+        };
+        let mut ziel = RenderTarget::neu(rt, false);
+        ziel.mass = k;
+        ziel.versatz = (x as f32, y as f32);
+        let platz = match self.nativ_frei.pop() {
+            Some(i) => { self.render_targets[i] = ziel; i }
+            None => { self.render_targets.push(ziel); self.render_targets.len() - 1 }
+        };
+        let id = self.nativ_naechste;
+        self.nativ_naechste += 1;
+        let mut p = NativPlatz::neu(id, f, platz, b, h, k);
+        p.alias = Some((eigner, x, y));
+        self.nativ.push(p);
+        Some(id)
+    }
+    /// Ausschnitt eines Popup-Fensters neu setzen (ein Untermenue wandert,
+    /// eine Liste waechst); Lage und Groesse folgen.
+    pub fn nativ_popup_setzen(&mut self, id: u32, x: i32, y: i32, b: i32, h: i32) {
+        use crate::nativfenster::pixel;
+        let Some((eigner, ax, ay)) = self.nativ_platz(id).and_then(|p| p.alias) else { return };
+        let Some(lage) = self.nativ_platz(eigner).map(|e| e.f.lage()) else { return };
+        let k = self.nativ_platz(id).map(|p| p.k).unwrap_or(1.0);
+        self.nativ_groesse(id, b, h, true);
+        if let Some(p) = self.nativ_platz_mut(id) {
+            let rt = p.rt;
+            if (ax, ay) != (x, y) { p.alias = Some((eigner, x, y)); }
+            p.f.lage_setzen(lage.0 + pixel(x, k), lage.1 + pixel(y, k));
+            self.render_targets[rt].versatz = (x as f32, y as f32);
+        }
+    }
+    /// Wie weit darf ein Popup der Flaeche `id` reichen? Der Arbeitsbereich
+    /// ihres Schirms, in Punkten ihrer Koordinaten: (x0, y0, x1, y1).
+    pub fn nativ_arbeitsflaeche(&self, id: u32) -> Option<(i32, i32, i32, i32)> {
+        let p = self.nativ_platz(id)?;
+        let (ax, ay, ab, ah) = p.f.arbeitsflaeche()?;
+        let (lx, ly) = p.f.lage();
+        let pt = |v: i32| crate::nativfenster::punkte(v as f64, p.k).floor() as i32;
+        Some((pt(ax - lx), pt(ay - ly), pt(ax + ab - lx), pt(ay + ah - ly)))
+    }
+    /// Groesse einer Flaeche in Punkten.
+    pub fn nativ_punkte(&self, id: u32) -> Option<(i32, i32)> { self.nativ_platz(id).map(|p| (p.b, p.h)) }
     /// Dichte des Schirms, auf dem das Hauptfenster steht (Bezug fuer den
     /// Massstab der nativen Fenster).
     fn haupt_dichte(&self) -> f32 { self.rl.get_window_scale_dpi().x }
@@ -2808,7 +2884,7 @@ impl Graphics {
     /// geschickten Fensternachrichten (Pruefungen), und waehrend eine Taste
     /// haengt, meldet das Fenster mit dem Druck den Zeiger auch ausserhalb.
     pub fn zeiger_bildschirm(&self) -> (i32, i32) {
-        let z = self.zeiger_flaeche();
+        let z = self.zeiger_fenster();
         if z != 0 {
             if let Some(p) = self.nativ_platz(z) {
                 let (x, y) = p.f.lage();
@@ -2825,12 +2901,20 @@ impl Graphics {
     pub fn sicht_setzen(&mut self, s: Option<u32>) { self.sicht = s; }
     /// Ueber welcher Oberflaeche steht der Zeiger? (0 = Hauptfenster)
     pub fn zeiger_flaeche(&self) -> u32 {
+        let roh = self.zeiger_fenster();
+        self.nativ_platz(roh).and_then(|p| p.alias).map(|a| a.0).unwrap_or(roh)
+    }
+    /// Ueber welchem Fenster steht der Zeiger wirklich -- ein Popup-Fenster
+    /// ist hier es selbst, nicht sein Eigner.
+    fn zeiger_fenster(&self) -> u32 {
         let drinnen: Vec<(u32, bool)> = self.nativ.iter().map(|p| (p.id, p.e.drinnen && p.sichtbar)).collect();
         crate::nativfenster::zeiger_flaeche(self.nativ_gefangen, &drinnen)
     }
     /// Welche Oberflaeche hat den Tastaturfokus des Systems? (0 = das
     /// Hauptfenster oder keine der nativen)
-    pub fn fokus_flaeche(&self) -> u32 { self.nativ.iter().find(|p| p.e.fokus).map(|p| p.id).unwrap_or(0) }
+    pub fn fokus_flaeche(&self) -> u32 {
+        self.nativ.iter().find(|p| p.e.fokus).map(|p| p.alias.map(|a| a.0).unwrap_or(p.id)).unwrap_or(0)
+    }
     /// Mauslage in der Sicht der gui: Some, wenn sie gerade durch eine
     /// Oberflaeche schaut -- weit draussen, wenn der Zeiger nicht dort ist.
     fn nativ_maus(&self) -> Option<(i64, i64)> {
@@ -2838,9 +2922,12 @@ impl Graphics {
         let z = self.zeiger_flaeche();
         if s != z { return Some((-100_000, -100_000)); }
         if s == 0 { return None; }
-        // Pixel des Fensters -> Punkte der gui (Massstab des Schirms).
+        // Pixel des Fensters -> Punkte der gui (Massstab des Schirms); in
+        // einem Popup-Fenster dazu dessen Versatz in der Flaeche.
         use crate::nativfenster::punkte;
-        self.nativ_platz(s).map(|p| (punkte(p.e.maus.0, p.k).floor() as i64, punkte(p.e.maus.1, p.k).floor() as i64))
+        let p = self.nativ_platz(self.zeiger_fenster())?;
+        let (vx, vy) = p.alias.map(|a| (a.1 as i64, a.2 as i64)).unwrap_or((0, 0));
+        Some((punkte(p.e.maus.0, p.k).floor() as i64 + vx, punkte(p.e.maus.1, p.k).floor() as i64 + vy))
     }
     /// (unten, neu, los) einer Maustaste in der Sicht der gui, wenn sie
     /// durch ein natives Fenster schaut oder der Zeiger nicht in ihrer ist.
@@ -2850,7 +2937,7 @@ impl Graphics {
         let z = self.zeiger_flaeche();
         if s != z { return Some((false, false, false)); }
         if s == 0 { return None; }
-        let p = self.nativ_platz(s)?;
+        let p = self.nativ_platz(self.zeiger_fenster())?;
         let k = b as usize;
         let (jetzt, vorher, h) = (p.e.knopf_unten[k], p.knopf_vorher[k], p.knopf_halt[k]);
         Some((jetzt || h.unten, (jetzt && !vorher) || h.neu, (!jetzt && vorher) || h.los))
@@ -2871,7 +2958,7 @@ impl Graphics {
         let z = self.zeiger_flaeche();
         if s != z { return Some((0.0, 0.0)); }
         if s == 0 { return None; }
-        self.nativ_platz(s).map(|p| p.e.rad)
+        self.nativ_platz(self.zeiger_fenster()).map(|p| p.e.rad)
     }
     /// Einmal je Bild, nach EndDrawing: zeigen, Eingang abholen.
     fn nativ_bild(&mut self) {
@@ -2949,6 +3036,8 @@ impl Graphics {
         let haupt_d = self.haupt_dichte();
         let wechsel: Vec<(u32, i32, i32, f32)> = self.nativ.iter()
             .filter(|p| self.nativ_gefangen != Some(p.id))
+            // Ein Popup-Fenster behaelt den Massstab seines Eigners.
+            .filter(|p| p.alias.is_none())
             .filter_map(|p| {
                 let k = crate::nativfenster::verhaeltnis(p.f.dichte(), haupt_d, crate::nativfenster::massstab_vorgabe());
                 ((k - p.k).abs() > 0.005).then_some((p.id, p.b, p.h, k))
@@ -8081,6 +8170,8 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
                 // Rueckkopplung/Nachzieheffekten.
                 let behalten = render_targets[i].behalten;
                 let m = render_targets[i].mass;
+                let (vx, vy) = render_targets[i].versatz;
+                let abbild = m != 1.0 || vx != 0.0 || vy != 0.0;
                 let mut tx = rl.begin_texture_mode(thread, &mut render_targets[i].rt);
                 let clear = if behalten { None } else { Some(clear_rt) };
                 // Maßstab 1, NICHT der Fenster-Maßstab `s`: ein Render-Target
@@ -8093,11 +8184,16 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
                 // Ein natives Fenster auf einem Schirm anderer Dichte: die
                 // Matrix vergroessert die Geometrie (glatt, ohne Rundung je
                 // Ecke), Text und Scissor lesen `RT_MASS`.
-                if m != 1.0 { RT_MASS.with(|c| c.set(m)); unsafe { raylib::ffi::rlPushMatrix(); raylib::ffi::rlScalef(m, m, 1.0); } }
+                // Ein Popup-Fenster zeigt seinen Eigner ab dem Versatz.
+                if abbild {
+                    RT_MASS.with(|c| c.set(m));
+                    RT_VERSATZ.with(|c| c.set((vx, vy)));
+                    unsafe { raylib::ffi::rlPushMatrix(); raylib::ffi::rlScalef(m, m, 1.0); raylib::ffi::rlTranslatef(-vx, -vy, 0.0); }
+                }
                 render_scene(&mut tx, 1, clear, &synth, &[0], textures, fonts, ausweich, font_glyphs,
                     &[], cam, &[], None, (-1, -1, -1, -1), &empty_set, &empty_map, &empty_emis,
                     (false, 0, 0, 0), &[], None, None, None, None);
-                if m != 1.0 { unsafe { raylib::ffi::rlPopMatrix(); } RT_MASS.with(|c| c.set(1.0)); }
+                if abbild { unsafe { raylib::ffi::rlPopMatrix(); } RT_MASS.with(|c| c.set(1.0)); RT_VERSATZ.with(|c| c.set((0.0, 0.0))); }
             }
         }
         let rts: &[RenderTarget] = render_targets;
@@ -9313,9 +9409,10 @@ fn render_scene<D: RaylibDraw>(
                         // Der Scissor sieht die Matrix nicht -- ein Ziel mit
                         // eigenem Massstab (natives Fenster) rechnet ihn hier.
                         let m = RT_MASS.with(|c| c.get());
-                        let px = |v: i32| if m == 1.0 { v } else { (v as f32 * m).round() as i32 };
-                        let mut rx = px(x * s); let mut ry = px(y * s);
-                        let mut rw = px((x + w) * s) - rx; let mut rh = px((y + h) * s) - ry;
+                        let (vx, vy) = RT_VERSATZ.with(|c| c.get());
+                        let px = |v: i32, o: f32| if m == 1.0 && o == 0.0 { v } else { ((v as f32 - o) * m).round() as i32 };
+                        let mut rx = px(x * s, vx); let mut ry = px(y * s, vy);
+                        let mut rw = px((x + w) * s, vx) - rx; let mut rh = px((y + h) * s, vy) - ry;
                         if let Some(&(cx, cy, cw, ch)) = clip_stack.last() {
                             let nx = rx.max(cx); let ny = ry.max(cy);
                             let nx2 = (rx + rw).min(cx + cw); let ny2 = (ry + rh).min(cy + ch);

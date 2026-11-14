@@ -254,6 +254,9 @@ impl<'p> Vm<'p> {
             "gui_window_native_scale" => { let n = "GUI_WINDOW_NATIVE_SCALE";
                 if a.len() != 1 { return Err(format!("{}: erwartet (win)", n)); }
                 Value::Float(self.gui.window_native_scale(self.gfx.as_ref(), gi(a,0,n)?)?) }
+            "gui_popup_windows" => {
+                if !a.is_empty() { return Err("GUI_POPUP_WINDOWS: erwartet keine Argumente".into()); }
+                Value::Int(self.gui.popup_windows()) }
             "gui_window_front" => { self.gui.window_front(gi(a,0,"GUI_WINDOW_FRONT")?)?; Value::Nil }
             "gui_window_visible" => { self.gui.window_visible(gi(a,0,"GUI_WINDOW_VISIBLE")?, gbool(a,1,"GUI_WINDOW_VISIBLE")?)?; Value::Nil }
             "gui_window_shown" => Value::Bool(self.gui.window_shown(gi(a,0,"GUI_WINDOW_SHOWN")?)?),

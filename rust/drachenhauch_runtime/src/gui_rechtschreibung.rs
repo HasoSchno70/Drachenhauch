@@ -171,7 +171,7 @@ impl Gui {
 
     /// Lage des Menues: (x, y, Breite, Hoehe, Zeilenhoehe). Am Bildschirmrand
     /// weicht es aus wie ein Kontextmenue.
-    fn rs_rect(&self, g: &Graphics) -> Option<(i32, i32, i32, i32, i32)> {
+    pub(super) fn rs_rect(&self, g: &Graphics) -> Option<(i32, i32, i32, i32, i32)> {
         let m = self.rs_menue.as_ref()?;
         let ih = self.sk(24);
         let pad = self.sk(10);
@@ -179,8 +179,9 @@ impl Gui {
         let h = m.eintraege.len() as i32 * ih + 2 + self.sk(5);
         let mut x = m.x;
         let mut y = m.y;
-        if self.schirm_b > 0 && x + b > self.schirm_b { x = (m.x - b).max(0); }
-        if self.schirm_h > 0 && y + h > self.schirm_h { y = (m.y - h).max(0); }
+        let (x0, y0, x1, y1) = self.rs_fenster().map(|wi| self.grenze(wi)).unwrap_or((0, 0, self.schirm().0, self.schirm().1));
+        if x + b > x1 { x = (m.x - b).max(x0); }
+        if y + h > y1 { y = (m.y - h).max(y0); }
         Some((x, y, b, h, ih))
     }
 

@@ -46,6 +46,7 @@ impl Gui {
         // Weg E: erst abgleichen, was an den nativen Fenstern geschah, dann
         // durch die Oberflaeche unter dem Zeiger schauen.
         self.nativ_abgleich(g);
+        self.grenzen_auffrischen(g);
         self.flaeche = g.zeiger_flaeche();
         // Stufe 3b: Tastatur in einer Teilflaeche, der Zeiger aber ueber
         // dem Hauptfenster (Windows meldet ihn nach dem Klick gern als
@@ -72,6 +73,9 @@ impl Gui {
         self.dock_pass(g);
         // Weg E, Stufe 3: abgerissene Leisten als eigene Fenster fuehren.
         self.dock_raus_abgleich(g);
+        // Popups ueber den Rand nativer Fenster: nach der Bedienung, die sie
+        // oeffnet, schliesst oder verschiebt.
+        self.popup_fenster_abgleich(g);
         self.stil_pass();
         self.rs_pass(g.delta());
         for wi in 0..self.windows.len() {

@@ -275,9 +275,9 @@ impl Gui {
         let (ax, ay, aw, ah) = self.datum_anker()?;
         let pw = aw.max(self.sk(252));
         let ph = self.sk(236);
-        let (sb, sh) = self.schirm();
-        let x = ax.min(sb - pw).max(0);
-        let y = if ay + ah + ph > sh && ay - ph >= 0 { ay - ph } else { ay + ah };
+        let (x0, y0, x1, y1) = self.datum_auf.map(|d| self.grenze(d.0)).unwrap_or((0, 0, self.schirm().0, self.schirm().1));
+        let x = ax.min(x1 - pw).max(x0);
+        let y = if ay + ah + ph > y1 && ay - ph >= y0 { ay - ph } else { ay + ah };
         Some((x, y, pw, ph))
     }
 
@@ -922,8 +922,8 @@ impl Gui {
         let n = self.windows[wi].widgets[idx].items.len() as i32;
         let ih = self.sk(DROPDOWN_ITEM_H);
         let rows = n.min(DD_MAX_ZEILEN).max(1);
-        let schirm = if self.schirm_h > 0 { self.schirm_h } else { i32::MAX / 4 };
-        let (unten, oben) = (schirm - (ay + h), ay);
+        let (_, y0, _, y1) = self.grenze(wi);
+        let (unten, oben) = (y1 - (ay + h), ay - y0);
         if rows * ih > unten && oben > unten {
             let r = rows.min((oben / ih).max(1));
             (ax, ay - r * ih, w, r * ih)

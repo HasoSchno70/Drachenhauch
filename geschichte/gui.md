@@ -903,3 +903,38 @@ Neubau) und `zelltext_kurz_und_lang`; Fall in `gui_tabelle_tempo.dhtest`
 (10000 Zellen in 100000 Zeilen; mit 2000 blieb die Gegenprobe mit dem
 vollen Neubau knapp unter der Zeitgrenze -- erst geschaerft greift sie). Offen: ein
 virtueller Modus fuer Daten, die nicht in den Speicher passen (Punkt C).
+
+## Popups ueber den Rand nativer Fenster (2026-11-14)
+
+Der letzte offene Punkt von Weg E. Ein Kontextmenue in einer kleinen
+Palette wich bis dahin am Rand des HAUPTfensters aus (die Popups fragten
+dessen Masse, `schirm()`), und was ueber den Rand des nativen Fensters
+ragte, war abgeschnitten.
+- Ein Popup, das ueber den Rand seines nativen Fensters ragt, bekommt ein
+  eigenes randloses Fenster (Windows: `WS_EX_TOOLWINDOW|WS_EX_NOACTIVATE`,
+  Besitzer das native Fenster; X11: `WM_TRANSIENT_FOR`; GLFW
+  `FOCUS_ON_SHOW` aus). Es ist ein ALIAS seiner Flaeche: sein Render-Ziel
+  spielt die obere Schicht der Flaeche ab einem Versatz ab
+  (`RenderTarget::versatz`, `RT_VERSATZ` fuer Text und Scissor wie der
+  Massstab), und Zeiger und Knoepfe darin meldet die Laufzeit als die der
+  Flaeche, plus Versatz (`zeiger_fenster` gegen `zeiger_flaeche`). Darum
+  blieben alle Treffertests unangetastet.
+- Wie weit ein Popup reicht, fragt es an EINER Stelle: `grenze(wi)` -- im
+  nativen Fenster der Arbeitsbereich seines Schirms (in seinen
+  Koordinaten), ohne Popup-Fenster sein eigener Rand, im Hauptfenster wie
+  bisher dessen Rand. Kontextmenue, Leistenmenue, Untermenues, Klappliste,
+  Vorschlaege, Monat und Rechtschreib-Menue rechnen damit.
+- Die Fenster gleicht `popup_fenster_abgleich` nach der Bedienung ab (eine
+  Teilflaeche rechnet dabei durch ihre Leihe), gezeichnet werden sie mit
+  ihrer Flaeche (`nativ_zeichnen`, `teile_zeichnen`).
+- Nicht unter Wayland (der Compositor bestimmt die Lage);
+  `DHRT_OHNE_POPUP_FENSTER=1` schaltet es ab. `GUI_POPUP_WINDOWS()` zaehlt
+  die offenen.
+Pruefung: zwei Faelle in `native_fenster.dhtest` -- das Menue bekommt ein
+Fenster und ein Klick darin waehlt Eintrag 8 (Gegenprobe: ohne Abgleich
+"kein Fenster"); ohne Popup-Fenster weicht es am Rand des nativen Fensters
+aus (Gegenprobe: mit den Massen des Hauptfensters traf derselbe Klick
+Eintrag 1). Fund nebenbei: steht der echte Zeiger ueber der Stelle, an der
+die Probefenster aufgehen, fallen die Klick-Faelle mit Massstab und
+Teilflaeche -- mit und ohne diese Aenderung (Windows meldet den echten
+Zeiger).

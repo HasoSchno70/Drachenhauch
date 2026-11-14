@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/en und dem englischen Buch von `dhrt doku prosa` -- NICHT von Hand aendern. Der Hover nimmt sie mit DHRT_LANG=en.",
- "count": 2405,
+ "count": 2406,
  "docs": {
   "ABS": "Absolute value.",
   "ACOS": "Arc sine/cosine (x in [-1, 1])",
@@ -826,6 +826,7 @@
   "GUI_POPOVER_CLOSED": "BOOLEAN — did the user close it in this frame (click beside it or ESC)?",
   "GUI_POPOVER_HIDE": "hide the popover",
   "GUI_POPOVER_SHOW": "show the popover, place it at its widget (it moves aside at the screen edge) and bring it to the front",
+  "GUI_POPUP_WINDOWS": "INTEGER — how many popups are standing as a window of their own beyond the edge of their native window right now (0 = all inside their window)",
   "GUI_PROGRESS": "A progress bar.",
   "GUI_PROGRESS_SET": "a running band instead of a value, for anything whose duration is unknown",
   "GUI_PROMPT": "GUI_WINDOW — question with an input field (default value selected; without knoepfe$ OK/Cancel)",

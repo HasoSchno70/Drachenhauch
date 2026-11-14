@@ -72,6 +72,7 @@ IMPORT "gui"
 | `GUI_WINDOW_NATIVE(win, an)` | BOOLEAN | the window as a **real OS window** (own title bar, taskbar, second monitor) or back into the main window; `FALSE` with `an` means: fallback, it stays a gui window |
 | `GUI_WINDOW_IS_NATIVE(win)` | BOOLEAN | is it a real OS window right now? |
 | `GUI_WINDOW_NATIVE_SCALE(win)` | FLOAT | how much larger the native window is drawn on its screen than in the main window (its screen's pixel density divided by the main window's); 1.0 in the main window |
+| `GUI_POPUP_WINDOWS()` | INTEGER | how many popups are standing as a window of their own beyond the edge of their native window right now (0 = all inside their window) |
 | `GUI_WINDOW_VISIBLE(win, an)` | — | set visibility |
 | `GUI_WINDOW_FRONT(win)` | — | bring the window to the front without giving it focus -- for a suggestion list or a tooltip that should lie over the text while typing. Shown via `GUI_WINDOW_VISIBLE`, a window otherwise lies behind the one clicked last |
 | `GUI_WINDOW_SHOWN(win)` | BOOLEAN | is the window currently visible? The counterpart to the setter -- without the getter a program would have to remember what it set itself, and would be wrong as soon as the user closes the window with its cross |
@@ -749,9 +750,19 @@ WEND
   nothing and brings the dialog to the front. Enter and ESC press the
   default and cancel button as usual.
 - Context menu, tooltip, suggestions, an opened month, cell choice and the
-  toolbar's overflow menu are shown in the native window (within its
-  bounds). The composition of an input method (IME) appears at the cursor
-  of the window that has the focus.
+  toolbar's overflow menu are shown in the native window. The composition
+  of an input method (IME) appears at the cursor of the window that has
+  the focus.
+- **Popups beyond the edge:** a context menu (with its submenus), a menu
+  bar menu, a drop-down list, a field's suggestions, an opened month or the
+  spelling menu that reaches beyond the edge of its native window gets a
+  borderless window of its own, without focus and without a taskbar entry
+  -- it only has to give way at the edge of the screen. Clicks in it work
+  as in the native window. Under Wayland (the compositor decides the
+  position) and with `DHRT_OHNE_POPUP_FENSTER=1` it gives way at the edge
+  of its native window instead. `GUI_POPUP_WINDOWS()` counts the open popup
+  windows. In the main window everything stays as it was: popups give way
+  at its edge.
 - **Pixel density:** if the native window is on a screen with a different
   scaling than the main window (100 % next to 150 %), it is drawn larger
   there -- lines smooth, text set at full size instead of magnified. Drag
@@ -769,7 +780,6 @@ WEND
   a, 7 focus a (0/1), 8 wheel (a, b), 9 pointer inside a (0/1). Written by
   hand, a click without a move in the window first needs a `9` before it,
   or only the press -- the press holds the pointer.
-- **Not yet:** popups beyond the edge of the native window.
 - Example: [`examples/219_echte_fenster.dh`](../../examples/219_echte_fenster.dh)
   (palette, modal dialog, tear-off panels).
 - While a modal dialog is open, only **its** menus work (context menu,

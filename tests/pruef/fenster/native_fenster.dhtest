@@ -1055,3 +1055,119 @@ END IF
 gesendet
 aufgenommen TRUE klicks 1 druck im fenster TRUE
 abgespielt klicks 1
+
+=== ein kontextmenue ueber den rand bekommt ein eigenes fenster
+' Popups ueber den Rand: das Kontextmenue des Felds (zehn Eintraege, 244
+' hoch) ragt aus dem 140 hohen nativen Fenster. Es bekommt ein eigenes
+' randloses Fenster "<Titel> Popup" -- fensterpixel.ps1 findet es -- und
+' ein Klick darauf (Eintrag 8, ganz ausserhalb des nativen Fensters) waehlt
+' den Eintrag. Danach geht das Popup-Fenster wieder zu.
+IMPORT "helfer.dh"
+DIM kennung AS STRING : kennung = "Rand-" + STR$(MILLIS()) + "-" + STR$(INT(RND() * 1000000))
+DIM kind AS INTEGER : kind = PROCESS_START("dhrt", "run", CWD$() + "/rand.dh", "--", kennung)
+DIM s AS STRING : s = ps$("fenstersender.ps1", kennung, "roh:512:0:6553660;roh:516:2:6553660;roh:517:0:6553660")
+DIM px AS STRING : px = ps$("fensterpixel.ps1", kennung + " Popup", "groesse")
+DIM s2 AS STRING : s2 = ps$("fenstersender.ps1", kennung + " Popup", "roh:512:0:11927602;roh:513:1:11927602;roh:514:0:11927602")
+DIM k AS STRING : k = auslesen$(kind, 30000)
+IF INSTR(auslesenFehler, "Kein Fenster moeglich") >= 0 THEN
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    END
+END IF
+PRINT "popup-fenster "; TRIM$(px)
+PRINT k;
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/fenstersender.dh"
+FUNCTION hilfe$(name AS STRING) AS STRING
+    RETURN "{sammlung}/../_hilfen/" + name
+END FUNCTION
+FUNCTION ps$(skriptname AS STRING, a AS STRING, b AS STRING) AS STRING
+    DIM p AS INTEGER : p = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", hilfe$(skriptname), a, b)
+    RETURN auslesen$(p, 30000)
+END FUNCTION
+--- datei rand.dh
+IMPORT "gui"
+SCREEN(500, 300, "Haupt-" + ARG$(0), 1)
+DIM d AS GUI_WINDOW : d = GUI_WINDOW(ARG$(0), 60, 60, 260, 140)
+DIM feld AS GUI_WIDGET : feld = GUI_TEXTINPUT(d, 30, 90, 200, 26)
+DIM kontext AS INTEGER : kontext = GUI_CONTEXT(d)
+DIM e[10] AS INTEGER
+FOR i = 0 TO 9
+    e[i] = GUI_MENU_ITEM(kontext, "Eintrag " + STR$(i + 1))
+NEXT
+GUI_CONTEXT_WIDGET(kontext, feld)
+DIM nativ AS BOOLEAN : nativ = GUI_WINDOW_NATIVE(d, TRUE)
+DIM t0 AS INTEGER : t0 = MILLIS()
+DIM hoechst AS INTEGER
+DIM geklickt AS STRING
+WHILE NOT QUITREQUESTED() AND MILLIS() - t0 < 8000
+    GUI_UPDATE()
+    IF GUI_POPUP_WINDOWS() > hoechst THEN hoechst = GUI_POPUP_WINDOWS()
+    FOR i = 0 TO 9
+        IF GUI_CLICKED(e[i]) THEN geklickt = geklickt + " " + STR$(i + 1)
+    NEXT
+    CLS(&H202830) : GUI_DRAW() : FLIP()
+WEND
+PRINT "nativ "; nativ; " popup-fenster "; hoechst; " danach "; GUI_POPUP_WINDOWS()
+PRINT "gewaehlt"; geklickt
+--- system windows
+--- erwartet
+popup-fenster groesse 110x244
+nativ TRUE popup-fenster 1 danach 0
+gewaehlt 8
+
+=== ohne popup-fenster weicht das menue am rand des nativen fensters aus
+' DHRT_OHNE_POPUP_FENSTER=1 (so auch unter Wayland): kein eigenes Fenster,
+' das Menue weicht am Rand des NATIVEN Fensters aus -- es passt weder
+' darunter noch darueber und steht darum oben (y 0). Ein Klick auf (70, 62)
+' trifft dort Eintrag 3. Bis 2026.48 wich es am Rand des Hauptfensters aus
+' (300 hoch, y 56): derselbe Klick traf Eintrag 1.
+IMPORT "helfer.dh"
+DIM kennung AS STRING : kennung = "Rand-" + STR$(MILLIS()) + "-" + STR$(INT(RND() * 1000000))
+DIM kind AS INTEGER : kind = PROCESS_START("dhrt", "run", CWD$() + "/rand.dh", "--", kennung)
+DIM s AS STRING : s = ps$("fenstersender.ps1", kennung, "roh:512:0:6553660;roh:516:2:6553660;roh:517:0:6553660;roh:512:0:4063302;roh:513:1:4063302;roh:514:0:4063302")
+DIM k AS STRING : k = auslesen$(kind, 30000)
+IF INSTR(auslesenFehler, "Kein Fenster moeglich") >= 0 THEN
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    END
+END IF
+PRINT k;
+--- umgebung
+DHRT_OHNE_POPUP_FENSTER=1
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/fenstersender.dh"
+FUNCTION hilfe$(name AS STRING) AS STRING
+    RETURN "{sammlung}/../_hilfen/" + name
+END FUNCTION
+FUNCTION ps$(skriptname AS STRING, a AS STRING, b AS STRING) AS STRING
+    DIM p AS INTEGER : p = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", hilfe$(skriptname), a, b)
+    RETURN auslesen$(p, 30000)
+END FUNCTION
+--- datei rand.dh
+IMPORT "gui"
+SCREEN(500, 300, "Haupt-" + ARG$(0), 1)
+DIM d AS GUI_WINDOW : d = GUI_WINDOW(ARG$(0), 60, 60, 260, 140)
+DIM feld AS GUI_WIDGET : feld = GUI_TEXTINPUT(d, 30, 90, 200, 26)
+DIM kontext AS INTEGER : kontext = GUI_CONTEXT(d)
+DIM e[10] AS INTEGER
+FOR i = 0 TO 9
+    e[i] = GUI_MENU_ITEM(kontext, "Eintrag " + STR$(i + 1))
+NEXT
+GUI_CONTEXT_WIDGET(kontext, feld)
+DIM nativ AS BOOLEAN : nativ = GUI_WINDOW_NATIVE(d, TRUE)
+DIM t0 AS INTEGER : t0 = MILLIS()
+DIM hoechst AS INTEGER
+DIM geklickt AS STRING
+WHILE NOT QUITREQUESTED() AND MILLIS() - t0 < 7000
+    GUI_UPDATE()
+    IF GUI_POPUP_WINDOWS() > hoechst THEN hoechst = GUI_POPUP_WINDOWS()
+    FOR i = 0 TO 9
+        IF GUI_CLICKED(e[i]) THEN geklickt = geklickt + " " + STR$(i + 1)
+    NEXT
+    CLS(&H202830) : GUI_DRAW() : FLIP()
+WEND
+PRINT "nativ "; nativ; " popup-fenster "; hoechst
+PRINT "gewaehlt"; geklickt
+--- system windows
+--- erwartet
+nativ TRUE popup-fenster 0
+gewaehlt 3

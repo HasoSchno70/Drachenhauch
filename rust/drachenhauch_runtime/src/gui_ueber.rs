@@ -494,6 +494,11 @@ impl Gui {
         false
     }
 
+    /// Hat ein Feld des Fensters gerade seine Vorschlaege offen?
+    pub(super) fn vorschlaege_offen(&self, wi: usize) -> bool {
+        self.windows.get(wi).map(|w| w.widgets.iter().any(|x| x.feld.as_ref().map(|z| z.offen).unwrap_or(false))).unwrap_or(false)
+    }
+
     /// Lage der Vorschlagsliste: (x, y, b, h, zeilen, zeilenhoehe). Unter
     /// dem Feld, nach oben, wenn unten kein Platz ist.
     pub(super) fn vorschlag_rect(&self, wi: usize, i: usize) -> Option<(i32, i32, i32, i32, i32, i32)> {
@@ -504,7 +509,8 @@ impl Gui {
         let ih = self.sk(DROPDOWN_ITEM_H);
         let zeilen = VORSCHLAG_ZEILEN.min(z.treffer.len() as i32);
         let h = zeilen * ih + 2;
-        let y = if self.schirm_h > 0 && ay + fh + h > self.schirm_h && ay - h >= 0 { ay - h } else { ay + fh };
+        let (_, y0, _, y1) = self.grenze(wi);
+        let y = if ay + fh + h > y1 && ay - h >= y0 { ay - h } else { ay + fh };
         Some((ax, y, fw.max(self.sk(120)), h, zeilen, ih))
     }
 
