@@ -23,6 +23,10 @@ mod dock;
 mod ueber;
 #[path = "gui_popupfenster.rs"]
 mod popupfenster;
+#[path = "gui_aussehen.rs"]
+mod aussehen;
+#[path = "gui_inspektor.rs"]
+mod inspektor;
 #[path = "gui_stil.rs"]
 mod stil;
 #[path = "gui_bausteine.rs"]
@@ -3397,6 +3401,8 @@ pub struct Widget {
     bau: Option<Box<bausteine::Bauzusatz>>,
     /// Rechtschreibung (GUI_SPELL).
     rs: Option<Box<rechtschreibung::RsZusatz>>,
+    /// Eigene Form und Animationen (gui_aussehen.rs) -- nur bei Bedarf.
+    aussehen: Option<Box<aussehen::Aussehen>>,
 }
 
 /// Datenbank-Buchfuehrung eines Formulars (siehe `Window::form_db`).
@@ -3786,8 +3792,27 @@ pub struct Gui {
     /// Wie weit Popups je nativer Flaeche reichen duerfen (`grenze`).
     pub(super) grenzen: Vec<(u32, (i32, i32, i32, i32))>,
     /// Offene Zeichenflaeche (GUI_CANVAS_BEGIN): die Flaeche, in die gerade
-    /// gezeichnet wird (0 = Hauptfenster).
-    pub(super) canvas_offen: Option<u32>,
+    /// gezeichnet wird (0 = Hauptfenster), und ob dafuer ein Gastfenster
+    /// geliehen ist (Teilflaeche einer abgerissenen Leiste).
+    pub(super) canvas_offen: Option<(u32, bool)>,
+    /// Uhr der gui in Sekunden (Summe der DELTA()) -- fuer Animationen.
+    pub(super) uhr: f64,
+    /// Geladene Bildhaeute nach Pfad (None = nicht ladbar).
+    haeute: std::collections::HashMap<String, Option<aussehen::Haut>>,
+    /// GUI_SET_MOTION: 0 = wie das System, 1 = an, 2 = aus; `ruhig` ist,
+    /// was gerade gilt (bewegung_pass).
+    bewegung: u8,
+    ruhig: bool,
+    /// Inspektor (gui_inspektor.rs): an, gewaehltes Widget, Taste erlaubt
+    /// (DHRT_INSPEKTOR=1).
+    insp_an: bool,
+    insp_wahl: i64,
+    insp_taste: bool,
+    /// Woher die Stildatei kam, eine beobachtete Datei (Pfad, letzter
+    /// Text, letzte Pruefung) und der Fehler beim letzten Neuladen.
+    stil_quelle: String,
+    stil_beob: Option<(String, String, f64)>,
+    stil_fehler: String,
     focus_window: Option<usize>,
     focus_widget: Option<(usize, usize)>,
     // Offener modaler Dialog. Solange einer steht, bekommt NUR er Eingaben --
@@ -4013,7 +4038,7 @@ impl Gui {
     pub fn new() -> Gui {
         Gui {
             schrift: None,
-            windows: Vec::new(), z_order: Vec::new(), flaeche: 0, fokus_flaeche: 0, nativ_fokus_wunsch: None, leihe: None, teil_druck: None, teil_ids: Vec::new(), popup_fenster: Vec::new(), grenzen: Vec::new(), canvas_offen: None,
+            windows: Vec::new(), z_order: Vec::new(), flaeche: 0, fokus_flaeche: 0, nativ_fokus_wunsch: None, leihe: None, teil_druck: None, teil_ids: Vec::new(), popup_fenster: Vec::new(), grenzen: Vec::new(), canvas_offen: None, uhr: 0.0, haeute: std::collections::HashMap::new(), bewegung: 0, ruhig: false, insp_an: false, insp_wahl: -1, insp_taste: std::env::var("DHRT_INSPEKTOR").map(|v| v.trim() == "1").unwrap_or(false), stil_quelle: String::new(), stil_beob: None, stil_fehler: String::new(),
             ta_zerlegung: std::cell::RefCell::new(HashMap::new()),
             focus_window: None, focus_widget: None, modal: None, modal_vorher: Vec::new(), modal_fokus: Vec::new(), cp_drag: None,
             drag_window: None, drag_dx: 0, drag_dy: 0,
@@ -5150,6 +5175,7 @@ impl Gui {
             name: String::new(), klassen: Vec::new(), stil_auf: None, stil_key: None,
             bau: None,
             rs: None,
+            aussehen: None,
         }
     }
 

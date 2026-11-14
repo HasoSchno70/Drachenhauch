@@ -259,7 +259,11 @@ Einzelheiten stehen in der Geschichte des Bereichs.
   `vorher` / `zwischen` / `nochmal` / `nachher` / `seriell` / `langsam` /
   `zeitgrenze` / `system`. Platzhalter `{sammlung}`, `{fall}`.
 - **Jede neue Prüfung bekommt eine Gegenprobe**: die Stelle verfälschen, bauen,
-  zusehen, dass genau dieser Fall fällt, zurücksetzen. Ein grüner Fall, der
+  zusehen, dass genau dieser Fall fällt, zurücksetzen. Gebaut wird dafür mit
+  `python rust/build_runtime.py --hardware --gegenprobe` (Profil ohne LTO,
+  ein Neubau ~25 s statt ~4 min) und geprüft mit
+  `rust/drachenhauch_runtime/target/gegenprobe/dhrt test …`; die
+  release-Laufzeit bleibt dabei unberührt. Ein grüner Fall, der
   auch ohne die Änderung grün wäre, ist wertlos -- das ist hier oft passiert.
   Die Gegenprobe verfälscht die EINE Stelle, nicht die ganze Änderung: fällt
   der Fall dann nur an „Variable nicht deklariert“, ist nichts bewiesen.
@@ -368,6 +372,9 @@ rust\drachenhauch_runtime\target\release\dhrt test tests\pruef --schnell   # ohn
 rust\drachenhauch_runtime\target\release\dhrt test tests\pruef\module\json.dhtest --filter Text
 rust\drachenhauch_runtime\target\release\dhrt pruef      # Doku, Namen, Pfade, Meldungen, Uebersetzung
 ```
+- `--gegenprobe` baut mit dem Profil `gegenprobe` (wie release, ohne LTO,
+  inkrementell) nach `target/gegenprobe/` -- für Gegenproben, nicht für
+  Messungen oder Pakete.
 - **Nur `rust/build_runtime.py` baut verlässlich** (CFLAGS für die
   Tipp-Warteschlange, cmake/libclang-Suche); `cargo build --bin dhrt` allein
   kann veraltete Ergebnisse liefern. In einem Worktree mit langem Pfad

@@ -1,0 +1,81 @@
+' ============================================================
+'  gui: eigene Formen, Bildhaeute und Animationen -- ein Spielmenue
+' ============================================================
+'    form        Pille, Kreis, Raute -- gezeichnet UND getroffen in ihrer
+'                Form: ein Klick neben dem Kreis trifft nicht
+'    bild        ein Stern als Bildhaut; mit "form: bild" ist er auch nur
+'                dort zu treffen, wo das Bild nicht durchsichtig ist
+'    animation   die Menuepunkte pulsieren beim Ueberfahren, das Zahnrad
+'                dreht sich, der Stern schwebt
+'    GUI_ANIMATE "Spielen" ohne Namen laesst das Feld einmal wackeln
+'
+'  Alles Aussehen steht in EINER Stildatei (GUI_STYLESHEET), die Formen
+'  gelten fuer jeden Knopf der Klasse "menue".
+' ============================================================
+IMPORT "gui"
+IMPORT "imgfx"
+
+SCREEN(720, 460, "Formen und Animationen", 1)
+GUI_SCALE(1.0)
+
+' Die Bildhaut: ein Stern, aussen durchsichtig -- hier gemalt, damit das
+' Beispiel keine Bilddatei braucht.
+DIM stern_pfad AS STRING : stern_pfad = PATHJOIN(TEMPDIR$(), "dh_stern.png")
+DIM st AS INTEGER : st = IMAGE_NEW(120, 120)
+DIM xs AS ARRAY OF INTEGER
+DIM ys AS ARRAY OF INTEGER
+DIM k AS INTEGER
+FOR k = 0 TO 9
+    DIM r AS FLOAT : r = IIF(k MOD 2 = 0, 58, 24)
+    DIM wnk AS FLOAT : wnk = -PI / 2 + k * PI / 5
+    ARRAY_PUSH(xs, 60 + INT(r * COS(wnk)))
+    ARRAY_PUSH(ys, 62 + INT(r * SIN(wnk)))
+NEXT
+IMAGE_FILL_POLY(st, xs, ys, RGB(240, 190, 40))
+IMAGE_SAVE(st, stern_pfad, TRUE)
+
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Drachenhort", 0, 0, 720, 460)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM titel AS GUI_WIDGET : titel = GUI_LABEL(w, "DRACHENHORT", 40, 30)
+GUI_SET_NAME(titel, "titel")
+DIM spielen AS GUI_WIDGET : spielen = GUI_BUTTON(w, "Spielen", 40, 110, 220, 56)
+DIM optionen AS GUI_WIDGET : optionen = GUI_BUTTON(w, "Optionen", 40, 180, 220, 56)
+DIM ende AS GUI_WIDGET : ende = GUI_BUTTON(w, "Ende", 40, 250, 220, 56)
+GUI_ADD_CLASS(spielen, "menue") : GUI_ADD_CLASS(optionen, "menue") : GUI_ADD_CLASS(ende, "menue")
+DIM name AS GUI_WIDGET : name = GUI_TEXTINPUT(w, 40, 340, 220, 32, "Dein Name")
+DIM zahnrad AS GUI_WIDGET : zahnrad = GUI_BUTTON(w, "", 330, 110, 70, 70)
+GUI_SET_ICON(zahnrad, "einstellungen")
+GUI_SET_NAME(zahnrad, "zahnrad")
+DIM raute AS GUI_WIDGET : raute = GUI_BUTTON(w, "Karte", 440, 105, 140, 80)
+GUI_SET_NAME(raute, "raute")
+DIM stern AS GUI_WIDGET : stern = GUI_BUTTON(w, "", 470, 230, 130, 130)
+GUI_SET_NAME(stern, "stern")
+DIM meldung AS GUI_WIDGET : meldung = GUI_LABEL(w, "", 330, 400)
+
+GUI_STYLESHEET("#titel { groesse: 34; stil: fett; fg: #F0C040 }" + CHR$(10) + _
+    "button.menue { form: pille; bg: #2E6E9E; groesse: 20 }" + CHR$(10) + _
+    "button.menue:hover { bg: #3C8CC8; animation: puls 700ms }" + CHR$(10) + _
+    "#zahnrad { form: kreis; bg: #6C3483; animation: drehen 6000ms }" + CHR$(10) + _
+    "#raute { form: raute; bg: #1E8449 }" + CHR$(10) + _
+    "#raute:hover { animation: wackeln 400ms einmal }" + CHR$(10) + _
+    "#stern { form: bild; bild: " + stern_pfad + "; animation: schweben 1600ms }")
+
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_CLICKED(spielen) THEN
+        IF TRIM$(GUI_TEXT(name)) = "" THEN
+            GUI_ANIMATE(name, "wackeln", 300)
+            GUI_SET_TEXT(meldung, "Erst einen Namen eingeben.")
+        ELSE
+            GUI_SET_TEXT(meldung, "Los geht's, " + GUI_TEXT(name) + "!")
+        END IF
+    END IF
+    IF GUI_CLICKED(optionen) THEN GUI_SET_TEXT(meldung, "Optionen ...")
+    IF GUI_CLICKED(zahnrad) THEN GUI_SET_TEXT(meldung, "Zahnrad (nur im Kreis zu treffen)")
+    IF GUI_CLICKED(raute) THEN GUI_SET_TEXT(meldung, "Karte (nur in der Raute zu treffen)")
+    IF GUI_CLICKED(stern) THEN GUI_SET_TEXT(meldung, "Stern -- nur auf den Zacken, nicht daneben")
+    IF GUI_CLICKED(ende) THEN EXIT WHILE
+    CLS(&H151C28)
+    GUI_DRAW()
+    FLIP()
+WEND

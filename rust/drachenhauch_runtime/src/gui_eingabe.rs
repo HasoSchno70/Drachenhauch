@@ -76,7 +76,10 @@ impl Gui {
         // Popups ueber den Rand nativer Fenster: nach der Bedienung, die sie
         // oeffnet, schliesst oder verschiebt.
         self.popup_fenster_abgleich(g);
+        self.stil_beobachten();
         self.stil_pass();
+        self.aussehen_pass(g);
+        self.bewegung_pass();
         self.rs_pass(g.delta());
         for wi in 0..self.windows.len() {
             for i in 0..self.windows[wi].widgets.len() {
@@ -150,6 +153,8 @@ impl Gui {
         // Das Rechtschreib-Menue (gui_rechtschreibung.rs): ein Rechtsklick auf
         // ein falsches Wort geht dem Kontextmenue des Programms vor.
         let ueber_weg = ueber_weg || self.rs_druck(g, mx, my, just_pressed, right_just);
+        // Inspektor: ein Druck waehlt ein Widget, erreicht es aber nicht.
+        let ueber_weg = ueber_weg || ((just_pressed || right_just) && self.inspektor_druck(g, mx, my));
         let just_pressed = just_pressed && !ueber_weg;
         let right_just = right_just && !ueber_weg;
         if just_pressed { self.fluss_druck(mx, my); }
@@ -187,7 +192,8 @@ impl Gui {
         let menu_consumed = self.menu_input(mx, my, just_pressed, right_just, g);
         self.untermenues_folgen(g, mx, my);
         self.kuerzel_gefeuert = false;
-        if !menu_consumed { self.kuerzel_pruefen(g); self.mn_pruefen(g); }
+        if self.flaeche == 0 { self.inspektor_tasten(g); }
+        if !menu_consumed && !self.kuerzel_gefeuert { self.kuerzel_pruefen(g); self.mn_pruefen(g); }
 
         // Inhalts-Scroll: Mausrad ueber scrollbarem Fenster.
         if let Some(top) = self.topmost_at(mx, my) {
@@ -297,7 +303,7 @@ impl Gui {
                     (self.abs_rect(top, w), w.kind, self.widget_shown(top, w) && w.enabled && w.kind != Kind::Layout
                         && self.im_panel_sichtbar(top, w, mx, my))
                 };
-                if active && Self::in_rect(mx, my, r) {
+                if active && Self::in_rect(mx, my, r) && self.form_trifft(&self.windows[top].widgets[i], r, mx, my) {
                     self.windows[top].widgets[i].hovered = true;
                     if kind == Kind::Table {
                         self.table_hover(top, i, mx, my, g);
@@ -644,8 +650,9 @@ impl Gui {
             }
             if let Some((wi, i)) = self.press_origin {
                 let r = { let w = &self.windows[wi].widgets[i]; self.abs_rect(wi, w) };
+                let in_form = Self::in_rect(mx, my, r) && self.form_trifft(&self.windows[wi].widgets[i], r, mx, my);
                 let w = &mut self.windows[wi].widgets[i];
-                let fire = if matches!(w.kind, Kind::Button | Kind::Card) && Self::in_rect(mx, my, r) {
+                let fire = if matches!(w.kind, Kind::Button | Kind::Card) && in_form {
                     w.clicked = true; w.on_click.clone()
                 } else { None };
                 if let Some(f) = fire { self.pending.push(f); }

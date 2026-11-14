@@ -342,6 +342,7 @@ IMPORT "gui"
 | `GUI_THEME_PRESET(name$)` | — | Look: dark/light/retro/contrast + **modern_dark/modern_light** (rund + Schatten) |
 | `GUI_SYSTEM_DARK()` | BOOLEAN | steht das Betriebssystem auf dunkel? (Windows, macOS, GNOME; unbekannt = `FALSE`) |
 | `GUI_SYSTEM_ACCENT()` | INTEGER | die Akzentfarbe des Betriebssystems, -1 wenn unbekannt |
+| `GUI_SYSTEM_REDUCED_MOTION()` | BOOLEAN | will das Betriebssystem weniger Bewegung („Animationen reduzieren“; Windows, macOS, GNOME; unbekannt = `FALSE`)? |
 | `GUI_METRIC_SET(key$, wert)` / `GUI_METRIC_GET(key$)` | — / INT | Layout-Größe setzen/lesen |
 | `GUI_SET_COLOR(widget, rolle$, farbe)` | — | eine Farbe pro Widget (bg/fg/border/accent, bei Knöpfen auch hover/pressed; -1 entfernt) |
 | `GUI_RESET()` | — | Fenster/Widgets löschen + Theme/Metriken zurücksetzen |
@@ -486,7 +487,8 @@ Native, blockierende Standarddialoge (kein IMPORT nötig — wie die Datei-Dialo
 | `GUI_STYLE_GET(name$, prop$)` | INTEGER | ein Wert des Stils, -1 wenn er ihn nicht setzt (unbekannter Stil = Fehler) |
 | `GUI_APPLY_STYLE(widget, name$)` | — | einen benannten Stil auf ein Widget uebertragen -- spart, ihn Widget fuer Widget zu wiederholen |
 | `GUI_STYLESHEET(text$)` | — | eine Stildatei setzen: Regeln nach Art, Klasse, Name und Zustand wie in CSS ("" = keine) -- siehe [Stildatei](#7-stildatei-regeln-nach-art-klasse-name-und-zustand) |
-| `GUI_STYLESHEET_LOAD(pfad$)` | — | dasselbe aus einer Datei (üblich `.dhstil`) |
+| `GUI_STYLESHEET_LOAD(pfad$ [, beobachten])` | — | dasselbe aus einer Datei (üblich `.dhstil`); mit `beobachten` = `TRUE` lädt die gui sie neu, sobald sie gespeichert wird ([Abschnitt 9](#9-inspektor-stildatei-live-und-ruhige-bewegung)) |
+| `GUI_STYLESHEET_ERROR$()` | STRING | der Fehler beim letzten Neuladen einer beobachteten Stildatei, `""` = in Ordnung |
 | `GUI_ADD_CLASS(wdg, klasse$)` | — | eine Klasse anhängen; sie wirkt sofort und solange sie dran ist |
 | `GUI_REMOVE_CLASS(wdg, klasse$)` | — | eine Klasse wegnehmen |
 | `GUI_HAS_CLASS(wdg, klasse$)` | BOOLEAN | trägt das Widget die Klasse (die Knopfart zählt mit)? |
@@ -2504,6 +2506,92 @@ gedämpft.
 Eigenschaft, krumme Farbe, unbekannte Art) -- nichts wird still übergangen,
 sonst suchte man ihn im Programm. Name und Klassen stehen in der `.dhform`
 (`name`, `klassen`). `GUI_GET_COLOR` sagt, welche Farbe gerade gilt.
+
+### 8. Eigene Formen, Bildhäute und Animationen
+
+Ein Knopf muss kein Rechteck sein. Die Stildatei kennt dafür drei
+Eigenschaften mehr, dazu kommen vier Befehle:
+
+| Eigenschaft / Befehl | Wirkung |
+|---|---|
+| `form: rechteck \| pille \| kreis \| raute \| bild` | Form eines Knopfs -- für das Zeichnen **und** den Treffer: ein Klick neben dem Kreis trifft nicht. `bild` nimmt die Deckkraft der Bildhaut (durchsichtig = daneben), so wird jede Form möglich. Nur in Regeln ohne Zustand |
+| `bild: datei.png` / `bildrand: 12` | Bildhaut: statt Fläche und Rand zeichnet der Knopf das Bild, `bildrand` als 9-Slice (Ecken bleiben, die Mitte wächst mit); Sinnbild und Text liegen darüber. Ein animiertes GIF läuft ab (mit seinen Bilddauern, ohne Ende; bei `form: bild` trifft das Bild, das gerade zu sehen ist). Auch je Zustand (`:hover`, `:active`, `:disabled`, `:checked`) |
+| `animation: puls \| wackeln \| schweben \| huepfen \| drehen [Dauer ms] [einmal \| Anzahl]` | das ganze Widget bewegt sich um seine Mitte; auch je Zustand: `button:hover { animation: puls }` pulsiert nur beim Überfahren |
+| `GUI_SET_SHAPE(knopf, form$)` / `GUI_GET_SHAPE$(knopf)` | eigene Form setzen (`""` = wieder die Stildatei) bzw. die Form, die gilt |
+| `GUI_ANIMATE(wdg, art$ [, dauer_ms [, anzahl]])` | eine Animation starten -- etwa einmal wackeln bei falscher Eingabe; `anzahl` 0 = ohne Ende (Vorgabe 1), `art$` `""` hält an |
+| `GUI_ANIMATING(wdg)` | läuft gerade eine Animation? |
+
+```basic
+IMPORT "gui"
+SCREEN(600, 260, "Spielmenue", 1)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Menue", 10, 10, 580, 240)
+DIM start AS GUI_WIDGET : start = GUI_BUTTON(w, "Start", 20, 20, 160, 50)
+DIM ende AS GUI_WIDGET : ende = GUI_BUTTON(w, "Ende", 220, 20, 80, 80)
+DIM name AS GUI_WIDGET : name = GUI_TEXTINPUT(w, 20, 120, 280, 30, "Name")
+GUI_ADD_CLASS(start, "menue")
+GUI_SET_NAME(ende, "ende")
+GUI_STYLESHEET("button.menue { form: pille; bg: #2E9E5B }" + CHR$(10) + "button.menue:hover { animation: puls 700ms }" + CHR$(10) + "#ende { form: kreis; bg: #C0392B }")
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_CLICKED(start) AND GUI_TEXT(name) = "" THEN GUI_ANIMATE(name, "wackeln", 300)
+    CLS(&H202830) : GUI_DRAW() : FLIP()
+WEND
+```
+
+Eine Animation verschiebt, dreht oder vergrößert nur das Bild des Widgets;
+seine Lage und sein Treffer bleiben, wo sie sind. Die Zeit läuft mit
+`DELTA()` (ohne Fenster unter `DHRT_FRAMES` fest 1/60 s je Bild). Bildhäute
+lädt die gui beim ersten Gebrauch, relativ zum Programm; alle GIFs laufen
+mit derselben Uhr.
+
+### 9. Inspektor, Stildatei live und ruhige Bewegung
+
+Drei Hilfen fürs Gestalten und für die Barrierefreiheit:
+
+| Befehl | Rückgabe | Wirkung |
+|---|---|---|
+| `GUI_INSPECTOR([an])` | BOOLEAN ohne Argument | Inspektor zeigen (`TRUE`) oder schließen; ohne Argument: ist er offen? |
+| `GUI_INSPECTOR_SELECTED()` | GUI_WIDGET | das Widget, das im Inspektor gewählt ist, -1 = keins |
+| `GUI_INSPECT$(widget)` | STRING | was der Inspektor über ein Widget zeigt: Art, Name, Klassen, Lage, Zustand, Form, die passenden Regeln der Stildatei mit Zeile und was je Zustand gilt |
+| `GUI_SET_MOTION(modus$)` | — | `"system"` (Vorgabe): wie das Betriebssystem; `"an"`: Animationen immer; `"aus"`: nie |
+| `GUI_MOTION()` | BOOLEAN | spielt die gui gerade Bewegung ab? |
+
+**Inspektor.** Wie die Entwicklerwerkzeuge eines Browsers: ist er offen,
+umrandet er das Widget unter dem Zeiger und nennt Art, Name und Größe; ein
+Klick wählt es -- der Klick erreicht das Widget **nicht** -- und eine Tafel
+zeigt, was `GUI_INSPECT$` liefert. ESC schließt ihn. Mit der
+Umgebungsvariablen `DHRT_INSPEKTOR=1` öffnet und schließt **Strg+Umschalt+I**
+ihn in jedem Programm, ohne dass es dafür eine Zeile braucht; ohne sie ist
+die Taste frei für das Programm.
+
+```
+button #los .menue .standard
+fenster "Haupt"  lage 20 30 120 40
+zustand hover
+form pille
+stildatei thema.dhstil
+  zeile 1: button
+  zeile 3: button.menue
+  zeile 5: #los:hover
+  basis: bg #112233, radius 4, form pille
+  hover: bg #445566, animation puls 700ms immer
+```
+
+**Stildatei live.** `GUI_STYLESHEET_LOAD("thema.dhstil", TRUE)` beobachtet
+die Datei: jede halbe Sekunde (Uhr der gui) schaut die gui nach und
+übernimmt sie, sobald sie sich geändert hat. Man ändert die Farben im
+Editor, speichert -- und das laufende Programm sieht sofort anders aus. Ein
+Fehler darin lässt die bisherige Stildatei gelten, erscheint als Toast im
+obersten Fenster und steht in `GUI_STYLESHEET_ERROR$()`.
+
+**Ruhige Bewegung.** Wer im Betriebssystem „Animationen reduzieren“
+eingestellt hat (Windows: Animationseffekte aus; macOS: Bewegung
+reduzieren; GNOME: Animationen aus), bekommt ruhige Programme: Animationen
+aus Stildatei und `GUI_ANIMATE` stehen still, ein animiertes GIF zeigt sein
+erstes Bild. `GUI_ANIMATING` läuft trotzdem ab wie sonst, ein Programm, das
+auf das Ende wartet, wartet also nicht ewig. Farbübergänge bleiben, sie
+bewegen nichts. `GUI_SET_MOTION` überstimmt das System, etwa für einen
+eigenen Schalter in den Einstellungen.
 
 ## Callbacks: GUI_ON_CLICK
 

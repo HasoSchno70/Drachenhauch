@@ -1224,7 +1224,8 @@ impl Gui {
             // und werden von hinten zuerst gefunden). Ein rollendes Panel
             // ebenso.
             let (r, active) = { let w = &self.windows[win].widgets[i]; (self.abs_rect(win, w), self.widget_shown(win, w) && w.enabled && w.kind != Kind::Layout && w.panel.is_none() && self.im_panel_sichtbar(win, w, mx, my)) };
-            if active && Self::in_rect(mx, my, r) && !self.luft_fuer_kinder(win, i, mx, my) { hit = Some(i); break; }
+            if active && Self::in_rect(mx, my, r) && self.form_trifft(&self.windows[win].widgets[i], r, mx, my)
+                && !self.luft_fuer_kinder(win, i, mx, my) { hit = Some(i); break; }
         }
         let i = match hit { Some(i) => i, None => { self.focus_widget = None; return; } };
         // Ziehen beginnt mit dem Druck -- ob es eines wird, entscheidet die

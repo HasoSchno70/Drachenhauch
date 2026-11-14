@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 2478,
+ "count": 2489,
  "builtins": [
   {
    "name": "ABS",
@@ -4137,6 +4137,72 @@
    "module": "gui"
   },
   {
+   "name": "GUI_SET_SHAPE",
+   "kind": "core",
+   "signature": "GUI_SET_SHAPE(knopf, form$)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_GET_SHAPE$",
+   "kind": "core",
+   "signature": "GUI_GET_SHAPE$(knopf) AS STRING",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_ANIMATE",
+   "kind": "core",
+   "signature": "GUI_ANIMATE(wdg, art$ [, dauer_ms [, anzahl]])",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_ANIMATING",
+   "kind": "core",
+   "signature": "GUI_ANIMATING(wdg) AS BOOLEAN",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_STYLESHEET_ERROR$",
+   "kind": "core",
+   "signature": "GUI_STYLESHEET_ERROR$() AS STRING",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_SYSTEM_REDUCED_MOTION",
+   "kind": "core",
+   "signature": "GUI_SYSTEM_REDUCED_MOTION() AS BOOLEAN",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_SET_MOTION",
+   "kind": "core",
+   "signature": "GUI_SET_MOTION(modus$)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_MOTION",
+   "kind": "core",
+   "signature": "GUI_MOTION() AS BOOLEAN",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_INSPECTOR",
+   "kind": "core",
+   "signature": "GUI_INSPECTOR([an])",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_INSPECTOR_SELECTED",
+   "kind": "core",
+   "signature": "GUI_INSPECTOR_SELECTED()",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_INSPECT$",
+   "kind": "core",
+   "signature": "GUI_INSPECT$(widget) AS STRING",
+   "module": "gui"
+  },
+  {
    "name": "GUI_CANVAS_H",
    "kind": "core",
    "signature": "GUI_CANVAS_H(canvas)",
@@ -4451,7 +4517,7 @@
   {
    "name": "GUI_STYLESHEET_LOAD",
    "kind": "core",
-   "signature": "GUI_STYLESHEET_LOAD(pfad$)",
+   "signature": "GUI_STYLESHEET_LOAD(pfad$ [, beobachten])",
    "module": "gui"
   },
   {

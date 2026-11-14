@@ -45,6 +45,25 @@ FUNCTION stEinstellung$(pfad AS STRING, schluessel AS STRING) AS STRING
     RETURN LOWER$(TRIM$(w))
 END FUNCTION
 
+' Ein Schalter aus einer JSON-Datei (fehlt er, gilt FALSE).
+FUNCTION stSchalter(pfad AS STRING, schluessel AS STRING) AS BOOLEAN
+    IF NOT FILEEXISTS(pfad) THEN RETURN FALSE
+    DIM an AS BOOLEAN : an = FALSE
+    TRY
+        DIM j AS JSON_HANDLE : j = JSON_LOAD(pfad)
+        IF JSON_HAS(j, schluessel) THEN
+            IF JSON_TYPE(j, schluessel) = "boolean" THEN an = JSON_GET_BOOL(j, schluessel)
+        END IF
+    CATCH stFehler
+        an = FALSE
+    END TRY
+    RETURN an
+END FUNCTION
+
+' Dialoge des Studios als echte Fenster (GUI_WINDOW_NATIVE): Ansicht ->
+' "Dialoge als eigene Fenster", gemerkt in studio.json, aus per Vorgabe.
+DIM dialogeEigen AS BOOLEAN : dialogeEigen = stSchalter(stKonfigPfad, "dialoge_eigen")
+
 DIM sprache AS STRING : sprache = LOWER$(TRIM$(GETENV$("DH_STUDIO_SPRACHE")))
 IF sprache = "" THEN sprache = stEinstellung$(stKonfigPfad, "sprache")
 IF sprache = "" AND stIdeFragen THEN
@@ -125,6 +144,34 @@ FUNCTION kz$(k AS STRING) AS STRING
     NEXT
     RETURN aus
 END FUNCTION
+
+' Einen Schalter in studio.json setzen (die anderen Eintraege bleiben).
+SUB stSchalterSetzen(schluessel AS STRING, an AS BOOLEAN)
+    DIM j AS JSON_HANDLE : j = JSON_PARSE("{}")
+    IF FILEEXISTS(stKonfigPfad) THEN
+        TRY
+            j = JSON_LOAD(stKonfigPfad)
+        CATCH stFehler4
+            j = JSON_PARSE("{}")
+        END TRY
+    END IF
+    JSON_SET_BOOL(j, schluessel, an)
+    TRY
+        IF DIRNAME(stKonfigPfad) <> "" AND NOT DIREXISTS(DIRNAME(stKonfigPfad)) THEN MKDIR(DIRNAME(stKonfigPfad))
+        WRITEALL(stKonfigPfad, JSON_STRINGIFY(j))
+    CATCH stFehler5
+        status(tr$("Die Einstellung lässt sich nicht sichern:") + " " + stKonfigPfad)
+    END TRY
+END SUB
+
+' Ein eben gebauter modaler Dialog des Studios als echtes Fenster, wenn der
+' Schalter an ist -- ueber den Rand des Studios, auf den zweiten Schirm.
+' Wo es keine echten Fenster gibt, bleibt er im Studio.
+SUB dialogEigen(w AS GUI_WINDOW)
+    IF NOT dialogeEigen THEN RETURN
+    DIM ist AS BOOLEAN : ist = GUI_WINDOW_NATIVE(w, TRUE)
+    protokoll("dialog eigen " + IIF(ist, "an", "nicht moeglich"))
+END SUB
 
 ' Die Sprache wechselt beim naechsten Start: die Fenster sind gebaut, und
 ' jede Beschriftung einzeln nachzuziehen hiesse, jede zweimal zu kennen.

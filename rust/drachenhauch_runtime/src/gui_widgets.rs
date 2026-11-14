@@ -640,20 +640,46 @@ impl Gui {
         if self.canvas_offen.is_some() {
             return Err("GUI_CANVAS_BEGIN: eine Zeichenflaeche ist schon offen -- erst GUI_CANVAS_END".into());
         }
+        self.canvas_rect(h)?;
+        let (wi, i) = Self::dec_widget(h);
+        // In einer abgerissenen Leiste aus Widgets des Gastfensters (Stufe
+        // 3b): das Gastfenster bis GUI_CANVAS_END verschoben ausleihen, wie
+        // beim Zeichnen der Teilflaeche -- dazwischen nennen GUI_CANVAS_X/Y
+        // die Lage in ihr.
+        let (mut id, mut teil) = (self.windows.get(wi).map(|w| w.nativ).unwrap_or(0), false);
+        if let Some((k, f)) = self.canvas_teil(wi, i) {
+            self.leihen(wi, k, f);
+            id = f;
+            teil = true;
+        }
+        if id != 0 && !g.nativ_beginnen(id) {
+            if teil { self.zurueckgeben(); teil = false; }
+            id = 0;
+        }
         let (cx, cy, cw, ch) = self.canvas_rect(h)?;
-        let (wi, _) = Self::dec_widget(h);
-        let mut id = self.windows.get(wi).map(|w| w.nativ).unwrap_or(0);
-        if id != 0 && !g.nativ_beginnen(id) { id = 0; }
         g.push_clip(cx, cy, cw, ch);
-        self.canvas_offen = Some(id);
+        self.canvas_offen = Some((id, teil));
         Ok(())
+    }
+
+    /// Steht das Widget in der Teilflaeche einer abgerissenen Leiste?
+    /// (Gruppe, Flaeche)
+    fn canvas_teil(&self, wi: usize, i: usize) -> Option<(usize, u32)> {
+        let w = self.windows.get(wi)?;
+        let d = w.dock.as_deref()?;
+        let von = w.widgets.get(i)?.dock_von;
+        if von < 0 { return None; }
+        let k = d.leisten.get(von as usize)?.schwebt;
+        if k < 0 || !d.teilflaeche(k as usize) { return None; }
+        let f = d.schweben.get(k as usize)?.flaeche;
+        (f != 0).then_some((k as usize, f))
     }
 
     /// GUI_CANVAS_END(): zurueck ins Hauptfenster. In einem echten Fenster
     /// kommt dabei, was ueber der Flaeche liegt (Menues, Klapplisten,
     /// Popups, Hilfetext), wieder obenauf -- es war ja schon gezeichnet.
     pub fn canvas_end(&mut self, g: &mut Graphics) -> Result<(), String> {
-        let Some(id) = self.canvas_offen.take() else {
+        let Some((id, teil)) = self.canvas_offen.take() else {
             return Err("GUI_CANVAS_END: keine Zeichenflaeche offen (GUI_CANVAS_BEGIN)".into());
         };
         g.pop_clip();
@@ -661,13 +687,14 @@ impl Gui {
             g.sicht_setzen(Some(id));
             let mut eigner: Vec<usize> = Vec::new();
             for wi in self.open_menu.map(|m| m.0).into_iter().chain(self.open_dropdown.map(|d| d.0)) {
-                if !eigner.contains(&wi) && self.windows.get(wi).map(|w| w.nativ == id).unwrap_or(false) { eigner.push(wi); }
+                if !eigner.contains(&wi) && self.windows.get(wi).is_some() && self.popup_flaeche(wi) == id { eigner.push(wi); }
             }
             for wi in eigner { self.popups_zeichnen(g, wi); }
             self.draw_top_flaeche(g, id);
             g.sicht_setzen(None);
             g.nativ_beenden();
         }
+        if teil { self.zurueckgeben(); }
         Ok(())
     }
 
@@ -675,13 +702,21 @@ impl Gui {
     /// Zeichenflaeche und die linke Taste, gesehen durch das Fenster, in dem
     /// sie steht (auch ein echtes). Steht der Zeiger ueber einem anderen
     /// Fenster, liegt (x, y) weit draussen.
-    pub fn canvas_mouse(&self, g: &mut Graphics, h: i64) -> Result<(i64, i64, bool), String> {
-        let (cx, cy, _, _) = self.canvas_rect(h)?;
-        let (wi, _) = Self::dec_widget(h);
-        let id = self.windows.get(wi).map(|w| w.nativ).unwrap_or(0);
+    pub fn canvas_mouse(&mut self, g: &mut Graphics, h: i64) -> Result<(i64, i64, bool), String> {
+        self.canvas_rect(h)?;
+        let (wi, i) = Self::dec_widget(h);
+        let mut id = self.windows.get(wi).map(|w| w.nativ).unwrap_or(0);
+        // Schon ausgeliehen (zwischen GUI_CANVAS_BEGIN und _END)? Dann nicht
+        // ein zweites Mal.
+        let teil = if self.leihe.is_none() { self.canvas_teil(wi, i) } else { None };
+        if let Some((k, f)) = teil { self.leihen(wi, k, f); id = f; }
+        else if let Some(l) = self.leihe.as_ref().filter(|l| l.wi == wi) { id = l.id; }
+        let r = self.canvas_rect(h);
         g.sicht_setzen(Some(id));
         let (mx, my, unten) = (g.mouse_x(), g.mouse_y(), g.mouse_button(0));
         g.sicht_setzen(None);
+        if teil.is_some() { self.zurueckgeben(); }
+        let (cx, cy, _, _) = r?;
         Ok((mx - cx as i64, my - cy as i64, unten))
     }
 
@@ -1431,6 +1466,28 @@ impl Gui {
         }
     }
     /// Textfarbe eines Knopfes: eigene vor lesbarer vor Thema.
+    /// Flaeche und Rand eines gefuellten Knopfs im jetzigen Zustand --
+    /// dieselbe Rechnung wie der Knopf im Zeichnen, fuer die eigenen
+    /// Formen (gui_aussehen.rs).
+    pub(super) fn knopf_farben(&self, wi: usize, idx: usize, wdg: &Widget) -> (i64, i64) {
+        let grund = self.knopf_grund(wdg);
+        let mut bg = grund.unwrap_or_else(|| self.th("widget_bg"));
+        if !wdg.enabled && grund.is_some() && !self.stil_hat(wdg, "bg", stil::AUS) {
+            bg = mischen(bg, self.th("widget_bg"), 0.65);
+        }
+        let bg_h = wdg.ov.get("hover").copied().or_else(|| self.stil_farbe(wdg, "bg", stil::HOVER))
+            .unwrap_or(shade(bg, if grund.is_some() { 18 } else { 30 }));
+        let bg_d = wdg.ov.get("pressed").copied().or_else(|| self.stil_farbe(wdg, "bg", stil::AKTIV))
+            .unwrap_or(shade(bg, -30));
+        let (eh, ed) = if wdg.enabled { (Self::rolle_t(wdg, "bg", 0), Self::rolle_t(wdg, "bg", 2)) } else { (0.0, 0.0) };
+        bg = mischen(mischen(bg, bg_h, eh), bg_d, ed);
+        let rahmen = if self.windows[wi].default_btn == idx as i32 && wdg.variante != 1 {
+            self.wcol(wdg, "accent", "accent")
+        } else if let (Some(gr), None) = (grund, self.eigen(wdg, "border")) {
+            shade(gr, -40)
+        } else { self.wcol(wdg, "border", "widget_border") };
+        (bg, rahmen)
+    }
     pub(super) fn knopf_text(&self, w: &Widget) -> i64 {
         if !w.enabled { return self.stil_farbe(w, "fg", stil::AUS).unwrap_or_else(|| self.th("muted_fg")); }
         if let Some(c) = self.eigen(w, "fg") { return self.stil_misch(w, "fg", c); }

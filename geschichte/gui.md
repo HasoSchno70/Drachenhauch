@@ -1054,6 +1054,87 @@ kommen Menues, Klapplisten und die obere Schicht dieser Flaeche wieder
 obenauf (sie waren schon gezeichnet). `GUI_CANVAS_MOUSE(cv)` liefert
 (x, y, gedrueckt) relativ zur Flaeche, gesehen durch ihr Fenster
 (`sicht_setzen`). Eine Flaeche in einer abgerissenen Teilflaeche (3b) ist
-noch nicht umgeleitet (das Gastfenster ist dort nur geliehen).
+seit demselben Tag ebenfalls umgeleitet: `GUI_CANVAS_BEGIN` leiht
+das Gastfenster bis `GUI_CANVAS_END` aus wie `teile_zeichnen` (`canvas_teil`),
+`GUI_CANVAS_MOUSE` fuer die Abfrage.
 Pruefung: Fall in `native_fenster.dhtest` (roter Kasten im nativen Fenster,
 zugeschnitten; Druck relativ zur Flaeche), drei Gegenproben.
+
+## Studio: Dialoge als eigene Fenster (2026-11-14)
+
+Ansicht -> "Dialoge als eigene Fenster" (`studio.json`: `dialoge_eigen`, aus
+per Vorgabe): die modalen Dialoge des Studios -- Ereignis, Methode, Variable,
+Menue-Editor -- werden echte Fenster (`dialogEigen` nach
+`GUI_WINDOW_MODAL`). Aus per Vorgabe, weil die Pruefungen des Studios ihre
+Tasten in das Hauptfenster einspielen. Fund: `JSON_TYPE` nennt einen
+Wahrheitswert "boolean", nicht "bool".
+Pruefung: Fall in `werkzeug_studio2.dhtest` (Doppelklick oeffnet den
+Ereignis-Dialog als echtes Fenster), Gegenprobe.
+
+## Eigene Formen, Bildhaeute und Animationen (2026-11-14)
+
+Frage des Nutzers: Knoepfe mit eigener Form und Animationen, damit GUIs
+anders aussehen koennen. Entwurf `docs/intern/entwurf-gui-formen.md`, Stufe 1
+gebaut (`gui_aussehen.rs`):
+- Stildatei: `form` (rechteck, pille, kreis, raute, bild -- nur ohne
+  Zustand), `bild`/`bildrand` (Bildhaut, 9-Slice, auch je Zustand),
+  `animation` (puls, wackeln, schweben, huepfen, drehen; Dauer, einmal,
+  Anzahl; auch je Zustand). Befehle `GUI_SET_SHAPE`/`GUI_GET_SHAPE$`,
+  `GUI_ANIMATE`, `GUI_ANIMATING`.
+- Form = Treffer: die vier Stellen, die bisher nur das Rechteck fragten
+  (Ueberfahren, Druecken, Loslassen, GUI_HIT_TEST), fragen jetzt auch
+  `form_trifft`; `form: bild` nimmt die Deckkraft der Bildhaut (geladen in
+  `aussehen_pass`, wo es Graphics gibt).
+- Animation: `Cmd::Verformung` -- eine Matrix um die Mitte des Widgets beim
+  Abspielen (rlPushMatrix). Text geht mit, auch in einem echten Fenster mit
+  eigenem Massstab: `ohne_rt_matrix` nimmt nur die Matrix des Ziels heraus,
+  eine Verformung darunter bleibt (nachgerechnet: M W M^-1 auf die mal m
+  gesetzten Textlagen ergibt die verformte Lage). Die Uhr der gui ist die
+  Summe der DELTA() -- ohne FLIP steht sie (erster Testentwurf: Animationen
+  liefen in einer Schleife nur aus GUI_UPDATE nie ab).
+- Fund: das Ende einer Animation stand an zwei Stellen (Zeichnen und
+  Aufraeumen), die Gegenprobe an einer blieb gruen -- jetzt `vorbei`.
+Pruefung: `tests/pruef/gui/gui_formen.dhtest` (Treffer von Kreis, Raute,
+Pille und Stern; eingespielter Klick neben und in den Kreis; GUI_ANIMATE
+laeuft und endet; Drehung im Bild nach einer Viertelrunde; Fehler), vier
+Gegenproben; Rust-Tests in `gui_aussehen.rs`. Beispiel
+`examples/220_formen_und_animationen.dh` (Spielmenue).
+
+Nachtrag am selben Tag, auf Frage des Nutzers: ein animiertes GIF als
+Bildhaut zeigte nur sein erstes Bild (`load_texture`). Jetzt laedt
+`haut_laden` ein `.gif` mit `image_load_gif` (alle Einzelbilder) und
+`gifschreiber::dauern`; `bild_zur_zeit` waehlt das Bild nach der Uhr der
+gui, fuer Zeichnen UND Treffer (`form: bild`). Dauern bis 10 ms gelten wie
+im Browser als 100 ms. Fall "ein animiertes gif laeuft in der bildhaut"
+(rot links, dann blau rechts, dann wieder rot; Gegenprobe: immer Bild 0).
+Beim ersten Entwurf des Falls stand `IMAGE_FILL_RECT` mit Breite/Hoehe --
+es nimmt zwei Ecken.
+
+## Inspektor, Stildatei live, ruhige Bewegung (2026-11-14)
+
+Nach den Formen und Animationen fragte der Nutzer, was die gui noch
+salonfaehig macht. Gebaut (`gui_inspektor.rs`):
+- **Ruhige Bewegung**: `systemaussehen::weniger_bewegung` (Windows
+  `SPI_GETCLIENTAREAANIMATION`, macOS `com.apple.universalaccess
+  reduceMotion`, GNOME `enable-animations`; fuenf Sekunden gemerkt,
+  `DHRT_SYSTEM_WENIGER_BEWEGUNG` fuer Pruefungen). Gefragt wird nur, wenn
+  sich etwas bewegen koennte (`bewegung_pass`) -- unter macOS/Linux kostet
+  die Frage einen Prozess. `GUI_SET_MOTION` ueberstimmt. Ohne Bewegung
+  liefert `anim_matrix` nichts und `haut_uhr` steht auf 0; `GUI_ANIMATING`
+  laeuft weiter ab (ein Programm, das aufs Ende wartet, haengt sonst).
+- **Inspektor**: `GUI_INSPECTOR`, Strg+Umschalt+I mit `DHRT_INSPEKTOR=1`,
+  ESC schliesst. Der Druck geht ueber dieselbe Weiche wie Popover und Toasts
+  (`ueber_weg`) -- er erreicht kein Widget. Die Tafel ist der Text von
+  `GUI_INSPECT$`; welche Regeln passen, sagt `Stildatei::passend`, dieselbe
+  Pruefung, aus der `aufloesen` jetzt baut (vorher stand sie nur dort). Jede
+  Regel merkt sich Zeile und Selektor.
+- **Stildatei live**: `GUI_STYLESHEET_LOAD(pfad, TRUE)` liest die Datei jede
+  halbe Sekunde der gui-Uhr und vergleicht den Text (nicht die Zeit der
+  Datei: die ist auf manchen Dateisystemen sekundengenau). Ein Fehler laesst
+  die alte gelten, Toast im obersten Fenster, `GUI_STYLESHEET_ERROR$`.
+Funde beim Bau: in der gui heisst ESC 27 (eingespielt wird raylibs 256, die
+Laufzeit uebersetzt); ESC in einer Aufnahme loest QUITREQUESTED aus, der
+Tastenfall laeuft darum eine feste Bildzahl. Die Lage im Inspektor ist die
+des Programms (GUI_SET_BOUNDS), nicht die auf dem Schirm -- erst stand dort
+die Titelleiste mit drin. Pruefung `tests/pruef/gui/gui_inspektor.dhtest`
+(8 Faelle, zehn Gegenproben).

@@ -938,7 +938,13 @@ impl<'p> Vm<'p> {
             "gui_infobar_shown" => Value::Bool(self.gui.infobar_shown(gi(a,0,"GUI_INFOBAR_SHOWN")?)?),
             // Stildatei, Name, Klassen (gui_stil.rs).
             "gui_stylesheet" => { self.gui.stylesheet(&gs(a,0,"GUI_STYLESHEET")?)?; Value::Nil }
-            "gui_stylesheet_load" => { self.gui.stylesheet_load(&gs(a,0,"GUI_STYLESHEET_LOAD")?)?; Value::Nil }
+            "gui_stylesheet_load" => { let n = "GUI_STYLESHEET_LOAD";
+                if a.is_empty() || a.len() > 2 { return Err(format!("{}: erwartet (pfad$ [, beobachten])", n)); }
+                let beob = if a.len() == 2 { gbool(a,1,n)? } else { false };
+                self.gui.stylesheet_load(&gs(a,0,n)?, beob)?; Value::Nil }
+            "gui_stylesheet_error$" => { let n = "GUI_STYLESHEET_ERROR$";
+                if !a.is_empty() { return Err(format!("{}: erwartet keine Argumente", n)); }
+                Value::str_rc(&self.gui.stylesheet_error()) }
             "gui_set_name" => { self.gui.set_name(gi(a,0,"GUI_SET_NAME")?, &gs(a,1,"GUI_SET_NAME")?)?; Value::Nil }
             "gui_get_name$" | "gui_get_name" => Value::str_rc(&self.gui.get_name(gi(a,0,"GUI_GET_NAME$")?)?),
             "gui_add_class" => { self.gui.add_class(gi(a,0,"GUI_ADD_CLASS")?, &gs(a,1,"GUI_ADD_CLASS")?)?; Value::Nil }
@@ -1149,6 +1155,24 @@ impl<'p> Vm<'p> {
             "gui_system_dark" => { let n = "GUI_SYSTEM_DARK";
                 if !a.is_empty() { return Err(format!("{}: erwartet keine Argumente", n)); }
                 Value::Bool(crate::systemaussehen::jetzt().dunkel == Some(true)) }
+            "gui_system_reduced_motion" => { let n = "GUI_SYSTEM_REDUCED_MOTION";
+                if !a.is_empty() { return Err(format!("{}: erwartet keine Argumente", n)); }
+                Value::Bool(crate::systemaussehen::weniger_bewegung()) }
+            "gui_set_motion" => { let n = "GUI_SET_MOTION";
+                if a.len() != 1 { return Err(format!("{}: erwartet (modus$)", n)); }
+                self.gui.set_motion(&gs(a,0,n)?)?; Value::Nil }
+            "gui_motion" => { let n = "GUI_MOTION";
+                if !a.is_empty() { return Err(format!("{}: erwartet keine Argumente", n)); }
+                Value::Bool(self.gui.bewegung_offen()) }
+            "gui_inspector" => { let n = "GUI_INSPECTOR";
+                if a.len() > 1 { return Err(format!("{}: erwartet ([an])", n)); }
+                if a.len() == 1 { self.gui.inspector(gbool(a,0,n)?); Value::Nil } else { Value::Bool(self.gui.inspector_on()) } }
+            "gui_inspector_selected" => { let n = "GUI_INSPECTOR_SELECTED";
+                if !a.is_empty() { return Err(format!("{}: erwartet keine Argumente", n)); }
+                Value::Int(self.gui.inspector_selected()) }
+            "gui_inspect$" => { let n = "GUI_INSPECT$";
+                if a.len() != 1 { return Err(format!("{}: erwartet (widget)", n)); }
+                Value::str_rc(&self.gui.inspect(gi(a,0,n)?)?) }
             "gui_system_accent" => { let n = "GUI_SYSTEM_ACCENT";
                 if !a.is_empty() { return Err(format!("{}: erwartet keine Argumente", n)); }
                 Value::Int(crate::systemaussehen::jetzt().akzent.unwrap_or(-1)) }
@@ -1538,6 +1562,21 @@ impl<'p> Vm<'p> {
             // Fenster zu, das darueber liegt.
             // Zeichenflaeche: Malen umleiten (auch ins echte Fenster) und die
             // Maus relativ zu ihr.
+            // Eigene Form und Animationen (gui_aussehen.rs).
+            "gui_set_shape" => { let n = "GUI_SET_SHAPE";
+                if a.len() != 2 { return Err(format!("{}: erwartet (knopf, form$)", n)); }
+                self.gui.set_shape(gi(a,0,n)?, &gs(a,1,n)?)?; Value::Nil }
+            "gui_get_shape$" => { let n = "GUI_GET_SHAPE$";
+                if a.len() != 1 { return Err(format!("{}: erwartet (knopf)", n)); }
+                Value::str_rc(self.gui.get_shape(gi(a,0,n)?)?) }
+            "gui_animate" => { let n = "GUI_ANIMATE";
+                if a.len() < 2 || a.len() > 4 { return Err(format!("{}: erwartet (wdg, art$ [, dauer_ms [, anzahl]])", n)); }
+                let dauer = if a.len() >= 3 { Some(gi(a,2,n)?) } else { None };
+                let anzahl = if a.len() >= 4 { Some(gi(a,3,n)?) } else { None };
+                self.gui.animate(gi(a,0,n)?, &gs(a,1,n)?, dauer, anzahl)?; Value::Nil }
+            "gui_animating" => { let n = "GUI_ANIMATING";
+                if a.len() != 1 { return Err(format!("{}: erwartet (wdg)", n)); }
+                Value::Bool(self.gui.animating(gi(a,0,n)?)?) }
             "gui_canvas_begin" => {
                 let h = gi(a, 0, "GUI_CANVAS_BEGIN")?;
                 let g = self.gfx.as_mut().ok_or("GUI_CANVAS_BEGIN: vor SCREEN aufgerufen")?;

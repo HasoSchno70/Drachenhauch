@@ -342,6 +342,7 @@ IMPORT "gui"
 | `GUI_THEME_PRESET(name$)` | — | look: dark/light/retro/contrast + **modern_dark/modern_light** (rounded + shadows) |
 | `GUI_SYSTEM_DARK()` | BOOLEAN | is the operating system set to dark? (Windows, macOS, GNOME; unknown = `FALSE`) |
 | `GUI_SYSTEM_ACCENT()` | INTEGER | the accent colour of the operating system, -1 if unknown |
+| `GUI_SYSTEM_REDUCED_MOTION()` | BOOLEAN | does the operating system ask for less motion ("reduce animations"; Windows, macOS, GNOME; unknown = `FALSE`)? |
 | `GUI_METRIC_SET(key$, wert)` / `GUI_METRIC_GET(key$)` | — / INT | set/read a layout size |
 | `GUI_SET_COLOR(widget, rolle$, farbe)` | — | one colour per widget (bg/fg/border/accent, for buttons also hover/pressed; -1 removes it) |
 | `GUI_RESET()` | — | delete windows/widgets + reset theme/metrics |
@@ -486,7 +487,8 @@ Native, blocking standard dialogs (no IMPORT needed — like the file dialogs):
 | `GUI_STYLE_GET(name$, prop$)` | INTEGER | a value of the style, -1 if it does not set it (unknown style = error) |
 | `GUI_APPLY_STYLE(widget, name$)` | — | apply a named style to a widget -- saves repeating it widget by widget |
 | `GUI_STYLESHEET(text$)` | — | set a stylesheet: rules by kind, class, name and state as in CSS ("" = none) -- see [Stylesheet](#7-stylesheet-rules-by-kind-class-name-and-state) |
-| `GUI_STYLESHEET_LOAD(pfad$)` | — | the same from a file (usually `.dhstil`) |
+| `GUI_STYLESHEET_LOAD(pfad$ [, beobachten])` | — | the same from a file (usually `.dhstil`); with `beobachten` = `TRUE` the gui reloads it as soon as it is saved ([section 9](#9-inspector-live-stylesheet-and-calm-motion)) |
+| `GUI_STYLESHEET_ERROR$()` | STRING | the error from the last reload of a watched stylesheet, `""` = fine |
 | `GUI_ADD_CLASS(wdg, klasse$)` | — | add a class; it takes effect at once and as long as it stays |
 | `GUI_REMOVE_CLASS(wdg, klasse$)` | — | remove a class |
 | `GUI_HAS_CLASS(wdg, klasse$)` | BOOLEAN | does the widget carry the class (the button variant counts too)? |
@@ -2489,6 +2491,92 @@ malformed colour, unknown kind) -- nothing is silently skipped, otherwise
 you would look for it in the program. Name and classes are stored in the
 `.dhform` (`name`, `klassen`). `GUI_GET_COLOR` tells which colour applies
 right now.
+
+### 8. Shapes of your own, image skins and animations
+
+A button does not have to be a rectangle. The stylesheet knows three more
+properties for it, plus four commands:
+
+| Property / command | Effect |
+|---|---|
+| `form: rechteck \| pille \| kreis \| raute \| bild` | shape of a button (rectangle, pill, circle, diamond, image) -- for drawing **and** hit testing: a click beside the circle misses. `bild` takes the opacity of the image skin (transparent = beside), which makes any shape possible. Only in rules without a state |
+| `bild: datei.png` / `bildrand: 12` | image skin: instead of surface and border the button draws the image, `bildrand` as a 9-slice (corners stay, the middle grows); icon and text lie on top. An animated GIF plays (with its frame durations, endlessly; with `form: bild` the frame on screen is what gets hit). Also per state (`:hover`, `:active`, `:disabled`, `:checked`) |
+| `animation: puls \| wackeln \| schweben \| huepfen \| drehen [duration ms] [einmal \| count]` | the whole widget moves around its centre (pulse, wobble, float, bounce, spin); also per state: `button:hover { animation: puls }` pulses only while hovered |
+| `GUI_SET_SHAPE(knopf, form$)` / `GUI_GET_SHAPE$(knopf)` | set a shape of its own (`""` = the stylesheet again) or the shape in effect |
+| `GUI_ANIMATE(wdg, art$ [, dauer_ms [, anzahl]])` | start an animation -- say wobble once on wrong input; `anzahl` 0 = endless (default 1), `art$` `""` stops |
+| `GUI_ANIMATING(wdg)` | is an animation running right now? |
+
+```basic
+IMPORT "gui"
+SCREEN(600, 260, "Spielmenue", 1)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Menue", 10, 10, 580, 240)
+DIM start AS GUI_WIDGET : start = GUI_BUTTON(w, "Start", 20, 20, 160, 50)
+DIM ende AS GUI_WIDGET : ende = GUI_BUTTON(w, "Ende", 220, 20, 80, 80)
+DIM name AS GUI_WIDGET : name = GUI_TEXTINPUT(w, 20, 120, 280, 30, "Name")
+GUI_ADD_CLASS(start, "menue")
+GUI_SET_NAME(ende, "ende")
+GUI_STYLESHEET("button.menue { form: pille; bg: #2E9E5B }" + CHR$(10) + "button.menue:hover { animation: puls 700ms }" + CHR$(10) + "#ende { form: kreis; bg: #C0392B }")
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_CLICKED(start) AND GUI_TEXT(name) = "" THEN GUI_ANIMATE(name, "wackeln", 300)
+    CLS(&H202830) : GUI_DRAW() : FLIP()
+WEND
+```
+
+An animation only moves, turns or enlarges the widget's picture; its
+position and its hit area stay where they are. Time runs with `DELTA()`
+(without a window under `DHRT_FRAMES` a fixed 1/60 s per frame). The gui
+loads image skins at first use, relative to the program; all GIFs run on
+the same clock.
+
+### 9. Inspector, live stylesheet and calm motion
+
+Three helpers for designing and for accessibility:
+
+| Command | Returns | Effect |
+|---|---|---|
+| `GUI_INSPECTOR([an])` | BOOLEAN without argument | show the inspector (`TRUE`) or close it; without argument: is it open? |
+| `GUI_INSPECTOR_SELECTED()` | GUI_WIDGET | the widget selected in the inspector, -1 = none |
+| `GUI_INSPECT$(widget)` | STRING | what the inspector shows about a widget: kind, name, classes, position, state, shape, the matching stylesheet rules with their line and what applies per state |
+| `GUI_SET_MOTION(modus$)` | — | `"system"` (default): like the operating system; `"an"`: animations always; `"aus"`: never |
+| `GUI_MOTION()` | BOOLEAN | is the gui playing motion right now? |
+
+**Inspector.** Like a browser's developer tools: while it is open it
+outlines the widget under the pointer and names its kind, name and size; a
+click selects it -- the click does **not** reach the widget -- and a panel
+shows what `GUI_INSPECT$` returns. ESC closes it. With the environment
+variable `DHRT_INSPEKTOR=1`, **Ctrl+Shift+I** opens and closes it in any
+program without a line of code; without it the key stays free for the
+program.
+
+```
+button #los .menue .standard
+fenster "Haupt"  lage 20 30 120 40
+zustand hover
+form pille
+stildatei thema.dhstil
+  zeile 1: button
+  zeile 3: button.menue
+  zeile 5: #los:hover
+  basis: bg #112233, radius 4, form pille
+  hover: bg #445566, animation puls 700ms immer
+```
+
+**Live stylesheet.** `GUI_STYLESHEET_LOAD("thema.dhstil", TRUE)` watches
+the file: every half second (gui clock) the gui looks and takes it over as
+soon as it has changed. Change the colours in the editor, save -- and the
+running program looks different at once. An error in it keeps the previous
+stylesheet, shows as a toast in the topmost window and is in
+`GUI_STYLESHEET_ERROR$()`.
+
+**Calm motion.** Whoever has set "reduce animations" in the operating
+system (Windows: animation effects off; macOS: reduce motion; GNOME:
+animations off) gets calm programs: animations from the stylesheet and
+`GUI_ANIMATE` stand still, an animated GIF shows its first frame.
+`GUI_ANIMATING` still runs its course, so a program waiting for the end
+does not wait forever. Colour transitions stay, they move nothing.
+`GUI_SET_MOTION` overrules the system, say for a switch of your own in the
+settings.
 
 ## Callbacks: GUI_ON_CLICK
 
