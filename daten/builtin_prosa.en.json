@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/en und dem englischen Buch von `dhrt doku prosa` -- NICHT von Hand aendern. Der Hover nimmt sie mit DHRT_LANG=en.",
- "count": 2417,
+ "count": 2418,
  "docs": {
   "ABS": "Absolute value.",
   "ACOS": "Arc sine/cosine (x in [-1, 1])",
@@ -496,6 +496,7 @@
   "FONT_GLYPH_WIDTH": "how far TEXT advances after this character at groesse points — measured like TEXT_WIDTH, without switching the active font",
   "FONT_HAS_GLYPH": "does the font itself have a glyph for it? If not, TEXT draws it with the fallback font; -1 = built-in font",
   "FONT_HAS_STYLE": "TRUE if this face exists as a file -- otherwise the runtime imitates it",
+  "FONT_LIGATURES": "switch the ligatures and kerning of a font loaded with LOADFONT on or off: its text then goes through text shaping (fi ligatures, the joined characters of a programming font, tighter pairs like “AV”)",
   "FONT_STYLE": "the real bold/italic face of a loaded font (looks for the file next to it, e.g. segoeuib.ttf for segoeui.ttf); if there is none, font itself comes back",
   "FONT_TO_IMAGE": "the characters erstes..letztes (default 32..126, at most 256) as an image in the format of LOADFONT_IMAGE: each character white in a transparent field, magenta (&HFF00FF) outside and in between. That turns a vector font into a pixel font that you can touch up and load again with LOADFONT_IMAGE(bild, &HFF00FF, erstes)",
   "FORMAT$": "printf style. FORMAT$(42, \"%05d\") → \"00042\". Six specifiers: %d/%i, %f, %x, %X, %s — plus %% for a literal percent sign. Width, zeros and precision as usual (%05d, %-6d, %.2f). Anything else reports \"unknown specifier\", and a mask without any placeholder (such as the VB mask \"#,##0.00\") is an error too -- dots between thousands come from ZAHL$",

@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 2425,
+ "count": 2426,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -497,6 +497,7 @@
   "FONT_GLYPH_WIDTH": "wie weit TEXT nach diesem Zeichen weiterrückt, bei groesse Punkten — gemessen wie TEXT_WIDTH, ohne die aktive Schrift umzustellen",
   "FONT_HAS_GLYPH": "hat die Schrift selbst ein Zeichen dafür? Wenn nicht, zeichnet TEXT es mit der Ausweich-Schrift; -1 = eingebaute Schrift",
   "FONT_HAS_STYLE": "TRUE, wenn es diesen Schnitt als Datei gibt -- sonst bildet die Laufzeit ihn nach",
+  "FONT_LIGATURES": "die Ligaturen und die Unterschneidung einer mit LOADFONT geladenen Schrift ein- oder ausschalten: ihr Text geht dann durch die Textformung (fi-Ligaturen, die Zeichenverbindungen einer Programmierschrift, enger gesetzte Paare wie „AV“)",
   "FONT_STYLE": "der echte fette/kursive Schnitt einer geladenen Schrift (sucht die Datei daneben, z. B. segoeuib.ttf zu segoeui.ttf); gibt es keinen, kommt font selbst zurück",
   "FONT_TO_IMAGE": "die Zeichen erstes..letztes (Vorgabe 32..126, höchstens 256) als Bild im Format von LOADFONT_IMAGE: jedes Zeichen weiß in einem durchsichtigen Feld, Magenta (&HFF00FF) außen und dazwischen. So wird aus einer Vektorschrift eine Pixelschrift, die man nachbearbeiten und mit LOADFONT_IMAGE(bild, &HFF00FF, erstes) wieder laden kann",
   "FORMAT$": "printf-Stil. FORMAT$(42, \"%05d\") → \"00042\". Sechs Spezifizierer: %d/%i, %f, %x, %X, %s — dazu %% für ein wörtliches Prozentzeichen. Breite, Nullen und Genauigkeit wie gewohnt (%05d, %-6d, %.2f). Alles andere meldet „unbekannter Spezifizierer“, eine Maske ganz ohne Platzhalter (etwa die VB-Maske \"#,##0.00\") ebenfalls einen Fehler -- Tausenderpunkte schreibt ZAHL$",

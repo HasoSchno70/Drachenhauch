@@ -1703,6 +1703,12 @@ fn ausweich_datei_fuer(c: u32) -> &'static [&'static str] {
     let hangul = matches!(c, 0x1100..=0x11FF | 0x3130..=0x318F | 0xA960..=0xA97F | 0xAC00..=0xD7FF);
     let emoji = ist_emoji(c);
     let thai = matches!(c, 0xE00..=0xE7F);
+    // Schriften, die erst die Formung richtig setzt (formung.rs) -- hier nur,
+    // WELCHE Datei sie hat.
+    let indisch = matches!(c, 0x0900..=0x0DFF | 0xA8E0..=0xA8FF | 0x1CD0..=0x1CFF);
+    let myanmar = matches!(c, 0x1000..=0x109F | 0xA9E0..=0xA9FF | 0xAA60..=0xAA7F);
+    let khmer_lao = matches!(c, 0x0E80..=0x0EFF | 0x1780..=0x17FF | 0x19E0..=0x19FF);
+    let tibet = matches!(c, 0x0F00..=0x0FFF);
     #[cfg(target_os = "windows")]
     {
         // Sammlungen (.ttc) loest `schrift_laden` auf -- MS Gothic (japanische
@@ -1713,11 +1719,17 @@ fn ausweich_datei_fuer(c: u32) -> &'static [&'static str] {
         if hangul { return &["C:/Windows/Fonts/malgun.ttf", "C:/Windows/Fonts/gulim.ttc"]; }
         if emoji { return &["C:/Windows/Fonts/seguiemj.ttf", "C:/Windows/Fonts/seguisym.ttf"]; }
         if thai { return &["C:/Windows/Fonts/leelawui.ttf", "C:/Windows/Fonts/segoeui.ttf"]; }
+        if indisch { return &["C:/Windows/Fonts/Nirmala.ttc", "C:/Windows/Fonts/Nirmala.ttf", "C:/Windows/Fonts/mangal.ttf"]; }
+        if myanmar { return &["C:/Windows/Fonts/mmrtext.ttf"]; }
+        if khmer_lao { return &["C:/Windows/Fonts/leelawui.ttf", "C:/Windows/Fonts/LeelawUI.ttf"]; }
+        if tibet { return &["C:/Windows/Fonts/himalaya.ttf"]; }
         return &["C:/Windows/Fonts/segoeui.ttf", "C:/Windows/Fonts/seguisym.ttf", "C:/Windows/Fonts/arial.ttf"];
     }
     #[cfg(target_os = "macos")]
     {
-        let _ = (hangul, emoji, thai);
+        let _ = (hangul, emoji, thai, myanmar, khmer_lao, tibet);
+        if indisch { return &["/System/Library/Fonts/Kohinoor.ttc", "/System/Library/Fonts/Supplemental/ITFDevanagari.ttc",
+                              "/System/Library/Fonts/Supplemental/Arial Unicode.ttf"]; }
         if cjk || hangul || thai { return &["/System/Library/Fonts/Supplemental/Arial Unicode.ttf", "/Library/Fonts/Arial Unicode.ttf",
                                              "/System/Library/Fonts/PingFang.ttc", "/System/Library/Fonts/Hiragino Sans GB.ttc"]; }
         return &["/System/Library/Fonts/Supplemental/Arial Unicode.ttf", "/System/Library/Fonts/Helvetica.ttc"];
@@ -1732,6 +1744,25 @@ fn ausweich_datei_fuer(c: u32) -> &'static [&'static str] {
                      "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc"];
         }
         if thai { return &["/usr/share/fonts/truetype/noto/NotoSansThai-Regular.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"]; }
+        if indisch {
+            // Je Block die Noto-Schrift (fonts-noto-core), dazu Lohit.
+            return match c {
+                0x0980..=0x09FF => &["/usr/share/fonts/truetype/noto/NotoSansBengali-Regular.ttf"],
+                0x0A00..=0x0A7F => &["/usr/share/fonts/truetype/noto/NotoSansGurmukhi-Regular.ttf"],
+                0x0A80..=0x0AFF => &["/usr/share/fonts/truetype/noto/NotoSansGujarati-Regular.ttf"],
+                0x0B00..=0x0B7F => &["/usr/share/fonts/truetype/noto/NotoSansOriya-Regular.ttf"],
+                0x0B80..=0x0BFF => &["/usr/share/fonts/truetype/noto/NotoSansTamil-Regular.ttf"],
+                0x0C00..=0x0C7F => &["/usr/share/fonts/truetype/noto/NotoSansTelugu-Regular.ttf"],
+                0x0C80..=0x0CFF => &["/usr/share/fonts/truetype/noto/NotoSansKannada-Regular.ttf"],
+                0x0D00..=0x0D7F => &["/usr/share/fonts/truetype/noto/NotoSansMalayalam-Regular.ttf"],
+                0x0D80..=0x0DFF => &["/usr/share/fonts/truetype/noto/NotoSansSinhala-Regular.ttf"],
+                _ => &["/usr/share/fonts/truetype/noto/NotoSansDevanagari-Regular.ttf",
+                       "/usr/share/fonts/truetype/lohit-devanagari/Lohit-Devanagari.ttf"],
+            };
+        }
+        if myanmar { return &["/usr/share/fonts/truetype/noto/NotoSansMyanmar-Regular.ttf"]; }
+        if khmer_lao { return &["/usr/share/fonts/truetype/noto/NotoSansKhmer-Regular.ttf", "/usr/share/fonts/truetype/noto/NotoSansLao-Regular.ttf"]; }
+        if tibet { return &["/usr/share/fonts/truetype/noto/NotoSerifTibetan-Regular.ttf"]; }
         return &["/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "/usr/share/fonts/TTF/DejaVuSans.ttf",
                  "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf"];
     }
@@ -1870,12 +1901,12 @@ unsafe fn leere_textur(w: i32, h: i32) -> u32 {
 
 /// Eine eingebaute Schrift steht in `font_herkunft` als "eingebaut:sans" --
 /// so laufen sie und eine Datei durch dieselben Wege (Laden, Schnitte).
-const EINGEBAUT_VORSATZ: &str = "eingebaut:";
+pub(crate) const EINGEBAUT_VORSATZ: &str = "eingebaut:";
 
 #[cfg(feature = "schriften")]
-fn eingebaute_schrift(name: &str) -> Option<&'static [u8]> { crate::schriften::eingebaute_schrift(name) }
+pub(crate) fn eingebaute_schrift(name: &str) -> Option<&'static [u8]> { crate::schriften::eingebaute_schrift(name) }
 #[cfg(not(feature = "schriften"))]
-fn eingebaute_schrift(_name: &str) -> Option<&'static [u8]> { None }
+pub(crate) fn eingebaute_schrift(_name: &str) -> Option<&'static [u8]> { None }
 
 /// LOADFONT("sans", 32): ein Name der eingebauten DejaVu-Schriften (sans,
 /// serif, mono, je mit -fett/-kursiv/-fett-kursiv). Eine Datei gleichen
@@ -2396,7 +2427,7 @@ impl Graphics {
         let s = &*self.visuell(s);
         self.glyphen_pruefen(h, s);
         let basis = self.font_von(h);
-        if s.is_ascii() || basis.is_none() {
+        if (s.is_ascii() && !formen_noetig(h, 0, s)) || basis.is_none() {
             return match basis {
                 Some(f) => f.measure_text(s, size, self.text_spacing).x,
                 None => std_breite(s, size, &self.ausweich),
@@ -2408,7 +2439,8 @@ impl Graphics {
             let f = if fi == 0 { basis.unwrap() } else { &self.ausweich[fi - 1].font };
             if !erster { breite += self.text_spacing; }
             erster = false;
-            breite += f.measure_text(&lauf, size, self.text_spacing).x;
+            let geformt = if formen_noetig(h, fi, &lauf) { lauf_pfad(h, fi, &self.ausweich).and_then(|p| breite_geformt(&p, &lauf, size)) } else { None };
+            breite += geformt.unwrap_or_else(|| f.measure_text(&lauf, size, self.text_spacing).x);
         }
         breite
     }
@@ -4860,6 +4892,7 @@ impl Graphics {
                             let fs = self.font_sizes.get(basis as usize).copied().unwrap_or(groesse);
                             self.font_sizes.push(fs);
                             self.font_herkunft.push((kand.clone(), zeichen.clone(), groesse));
+                            crate::formung::schrift_merken((self.font_herkunft.len() - 1) as i64, &kand);
                             ergebnis = ((self.fonts.len() - 1) as i64, s & !v);
                             break 'suche;
                         }
@@ -4987,6 +5020,7 @@ impl Graphics {
         self.fonts.push(f);
         self.font_sizes.push(size.max(4));   // SETFONT uebernimmt diese Groesse
         self.font_herkunft.push((path.to_string(), chars, size.max(4)));
+        crate::formung::schrift_merken((self.font_herkunft.len() - 1) as i64, path);
         Ok((self.fonts.len() - 1) as i64)
     }
 
@@ -5010,6 +5044,7 @@ impl Graphics {
         self.fonts.push(f);
         self.font_sizes.push(size.max(4));
         self.font_herkunft.push((path.to_string(), chars, size.max(4)));
+        crate::formung::schrift_merken((self.font_herkunft.len() - 1) as i64, path);
         Ok((self.fonts.len() - 1) as i64)
     }
 
@@ -5089,6 +5124,7 @@ impl Graphics {
         self.fonts.push(f);
         self.font_sizes.push(0);   // Sentinel: Default-Font wendet seine Groesse NICHT an
         self.font_herkunft.push((path.to_string(), chars, size.max(4)));
+        crate::formung::schrift_merken((self.font_herkunft.len() - 1) as i64, path);
         Ok((self.fonts.len() - 1) as i64)
     }
     /// Aktiven Font setzen (-1 = Default). Ungueltige Handles -> Fehler.
@@ -8473,10 +8509,70 @@ fn std_breite(txt: &str, size: f32, ausweich: &[Ausweich]) -> f32 {
         b += if fi == 0 { std.measure_text(&lauf, sz, sp).x } else {
             let f = &ausweich[fi - 1].font;
             let (fsz, _) = an_pixelschrift(f, sz);
-            f.measure_text(&lauf, fsz, sp).x
+            let geformt = if formen_noetig(-1, fi, &lauf) { lauf_pfad(-1, fi, ausweich).and_then(|p| breite_geformt(&p, &lauf, fsz)) } else { None };
+            geformt.unwrap_or_else(|| f.measure_text(&lauf, fsz, sp).x)
         };
     }
     b
+}
+
+/// Muss dieser Lauf geformt werden? Zeichen einer komplexen Schrift, oder
+/// die Ligaturen seiner Schrift sind an (formung.rs).
+fn formen_noetig(h: i64, fi: usize, lauf: &str) -> bool {
+    crate::formung::braucht(lauf) || (fi == 0 && h >= 0 && crate::formung::ligaturen(h))
+}
+
+/// Die Datei der Schrift eines Laufs: 0 = die gewaehlte (Handle `h`),
+/// k > 0 = Ausweich-Schrift k-1. None fuer die eingebaute Pixelschrift.
+fn lauf_pfad(h: i64, fi: usize, ausweich: &[Ausweich]) -> Option<String> {
+    if fi > 0 { return ausweich.get(fi - 1).map(|a| a.datei.clone()); }
+    if h == FONT_AUSWEICH { return ausweich.first().map(|a| a.datei.clone()); }
+    if h < 0 { return None; }
+    crate::formung::pfad_von(h)
+}
+
+thread_local! {
+    /// Geformte Glyphen als Texturen: (Datei, Glyphe, Groesse*16) ->
+    /// (Textur, links, oben). None merkt sich eine leere Glyphe.
+    static GLYPH_TEX: std::cell::RefCell<std::collections::HashMap<(String, u16, u32), Option<(raylib::ffi::Texture2D, f32, f32)>>> =
+        std::cell::RefCell::new(std::collections::HashMap::new());
+}
+
+fn glyph_textur(pfad: &str, gid: u16, px: f32) -> Option<(raylib::ffi::Texture2D, f32, f32)> {
+    let k = (pfad.to_string(), gid, (px * 16.0).round() as u32);
+    if let Some(t) = GLYPH_TEX.with(|m| m.borrow().get(&k).copied()) { return t; }
+    let t = crate::formung::rastern(pfad, gid, px).and_then(|b| {
+        // Weiss mit Deckkraft: die Farbe kommt beim Zeichnen als Toenung.
+        let mut daten: Vec<u8> = Vec::with_capacity(b.b * b.h * 2);
+        for &a in &b.deckung { daten.push(255); daten.push(a); }
+        let img = raylib::ffi::Image {
+            data: daten.as_mut_ptr() as *mut std::ffi::c_void, width: b.b as i32, height: b.h as i32, mipmaps: 1,
+            format: raylib::ffi::PixelFormat::PIXELFORMAT_UNCOMPRESSED_GRAY_ALPHA as i32,
+        };
+        let tex = unsafe { raylib::ffi::LoadTextureFromImage(img) };
+        drop(daten);
+        (tex.id != 0).then_some((tex, b.links, b.oben))
+    });
+    GLYPH_TEX.with(|m| { m.borrow_mut().insert(k, t); });
+    t
+}
+
+/// Einen Lauf geformt zeichnen (formung.rs); liefert seine Breite. None,
+/// wenn die Schrift sich nicht formen laesst -- dann zeichnet raylib.
+fn zeichne_geformt(pfad: &str, txt: &str, x: f32, y: f32, size: f32, col: Color) -> Option<f32> {
+    let g = crate::formung::formen(pfad, txt, size)?;
+    let grund = y + g.grundlinie;
+    for &(gid, gx, gy) in &g.glyphen {
+        if let Some((tex, links, oben)) = glyph_textur(pfad, gid, size) {
+            unsafe { raylib::ffi::DrawTexture(tex, (x + gx + links).round() as i32, (grund + gy - oben).round() as i32, col.into()); }
+        }
+    }
+    Some(g.breite)
+}
+
+/// Breite eines geformten Laufs (dieselbe Formung wie beim Zeichnen).
+fn breite_geformt(pfad: &str, txt: &str, size: f32) -> Option<f32> {
+    crate::formung::formen(pfad, txt, size).map(|g| g.breite)
 }
 
 fn font_zu_handle<'a>(h: i64, fonts: &'a [Font], ausweich: &'a [Ausweich]) -> Option<&'a Font> {
@@ -8529,6 +8625,13 @@ fn zeichne_text<D: RaylibDraw>(d: &mut D, h: i64, txt: &str, x: f32, y: f32, siz
             for (fi, lauf) in text_laeufe(-1, &txt, std_hat, ausweich) {
                 if !erster { cx += sp; }
                 erster = false;
+                if fi > 0 && formen_noetig(-1, fi, &lauf) {
+                    let (fsz, dy) = an_pixelschrift(&ausweich[fi - 1].font, sz);
+                    if let Some(b) = lauf_pfad(-1, fi, ausweich).and_then(|p| zeichne_geformt(&p, &lauf, cx, y + dy, fsz, col)) {
+                        cx += b;
+                        continue;
+                    }
+                }
                 if fi == 0 {
                     d.draw_text_ex(&std, &lauf, Vector2::new(cx, y), sz, sp, col);
                     cx += std.measure_text(&lauf, sz, sp).x;
@@ -8542,7 +8645,7 @@ fn zeichne_text<D: RaylibDraw>(d: &mut D, h: i64, txt: &str, x: f32, y: f32, siz
             return;
         }
     };
-    if txt.is_ascii() || ausweich.is_empty() {
+    if (txt.is_ascii() || ausweich.is_empty()) && !formen_noetig(h, 0, txt) {
         sdf::mit(h, || d.draw_text_ex(basis, txt, Vector2::new(x, y), size, spacing, col));
         return;
     }
@@ -8557,6 +8660,12 @@ fn zeichne_text<D: RaylibDraw>(d: &mut D, h: i64, txt: &str, x: f32, y: f32, siz
         let f = if fi == 0 { basis } else { &ausweich[fi - 1].font };
         if !erster { cx += spacing; }
         erster = false;
+        if formen_noetig(h, fi, &lauf) {
+            if let Some(b) = lauf_pfad(h, fi, ausweich).and_then(|p| zeichne_geformt(&p, &lauf, cx, y, size, col)) {
+                cx += b;
+                continue;
+            }
+        }
         sdf::mit(if fi == 0 { h } else { -1 }, || d.draw_text_ex(f, &lauf, Vector2::new(cx, y), size, spacing, col));
         cx += f.measure_text(&lauf, size, spacing).x;
     }
@@ -8678,7 +8787,7 @@ fn miss_text(h: i64, txt: &str, size: f32, spacing: f32, fonts: &[Font],
         Some(f) => f,
         None => return std_breite(txt, size, ausweich),
     };
-    if txt.is_ascii() || ausweich.is_empty() { return basis.measure_text(txt, size, spacing).x; }
+    if (txt.is_ascii() || ausweich.is_empty()) && !formen_noetig(h, 0, txt) { return basis.measure_text(txt, size, spacing).x; }
     let basis_hat = |c: u32| -> bool {
         if h == FONT_AUSWEICH { ausweich.first().map_or(false, |a| a.hat.contains(&c)) }
         else { font_glyphs.get(h as usize).map_or(false, |m| m.contains(&c)) }
@@ -8689,7 +8798,8 @@ fn miss_text(h: i64, txt: &str, size: f32, spacing: f32, fonts: &[Font],
         let f = if fi == 0 { basis } else { &ausweich[fi - 1].font };
         if !erster { b += spacing; }
         erster = false;
-        b += f.measure_text(&lauf, size, spacing).x;
+        let geformt = if formen_noetig(h, fi, &lauf) { lauf_pfad(h, fi, ausweich).and_then(|p| breite_geformt(&p, &lauf, size)) } else { None };
+        b += geformt.unwrap_or_else(|| f.measure_text(&lauf, size, spacing).x);
     }
     b
 }

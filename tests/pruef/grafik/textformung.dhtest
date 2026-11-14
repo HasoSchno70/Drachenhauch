@@ -1,0 +1,57 @@
+' Volle Textformung (formung.rs): Laeufe aus indischen und
+' suedostasiatischen Schriften und, auf Wunsch, die Ligaturen einer
+' Schrift gehen durch rustybuzz statt Glyphe fuer Glyphe durch raylib.
+' Gemessen wird ueber dieselbe Formung wie gezeichnet -- darum pruefen die
+' Faelle Breiten: ein Konjunkt ist EINE Glyphe, schmaler als seine Teile
+' einzeln; Unterschneidung (Kerning) kennt raylib nicht, die Formung schon.
+' Ohne Fenster ueberspringen die Faelle.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== ein konjunkt ist schmaler als seine teile
+' Nirmala UI (Windows) traegt Devanagari. "क्ष" = Ka, Virama, Ssa: geformt
+' eine Glyphe; Glyphe fuer Glyphe drei, mit dem Virama als eigenem Zeichen.
+TRY
+    SCREEN(200, 100, "Formung", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+DIM f AS INTEGER : f = LOADFONT("C:/Windows/Fonts/Nirmala.ttc", 40)
+SETFONT(f, 40)
+DIM ganz AS INTEGER : ganz = TEXT_WIDTH("क्ष")
+DIM teile AS INTEGER : teile = TEXT_WIDTH("क") + TEXT_WIDTH("ष")
+PRINT "konjunkt schmaler als ka plus ssa "; ganz < teile; " und nicht leer "; ganz > 10
+--- system windows
+--- erwartet
+konjunkt schmaler als ka plus ssa TRUE und nicht leer TRUE
+
+=== ligaturen bringen die unterschneidung der schrift
+' Mit FONT_LIGATURES geht auch lateinischer Text durch die Formung -- und
+' bekommt deren Unterschneidung: "AV" ruecken zusammen. Die eingebaute
+' Schrift "sans" (DejaVu Sans) hat das Paar.
+TRY
+    SCREEN(200, 100, "Formung", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+DIM f AS INTEGER : f = LOADFONT("sans", 40)
+SETFONT(f, 40)
+DIM vorher AS INTEGER : vorher = TEXT_WIDTH("AVAV")
+FONT_LIGATURES(f, TRUE)
+DIM nachher AS INTEGER : nachher = TEXT_WIDTH("AVAV")
+FONT_LIGATURES(f, FALSE)
+PRINT "enger "; nachher < vorher; " wieder wie vorher "; TEXT_WIDTH("AVAV") = vorher
+--- erwartet
+enger TRUE wieder wie vorher TRUE
+
+=== ligaturen nur fuer geladene schriften
+TRY
+    SCREEN(200, 100, "Formung", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+FONT_LIGATURES(7, TRUE)
+--- fehler
+FONT_LIGATURES: 7 ist keine mit LOADFONT geladene Schrift

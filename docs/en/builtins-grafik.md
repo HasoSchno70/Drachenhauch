@@ -410,6 +410,7 @@ a second canvas with its own memory, where a rectangle is enough.
 | `FONT_GLYPH_BOX(font, zeichen$, groesse)` → TUPLE | the rectangle `(x, y, width, height)` the glyph really covers, relative to the point where `TEXT(x, y, zeichen$)` puts it at `groesse` — read from the font file. That places a character exactly: centred in a button, a clef on its line |
 | `FONT_BASELINE(font, groesse)` → FLOAT | how far below the top edge where `TEXT` puts the text the baseline lies |
 | `FONT_TO_IMAGE(font[, erstes[, letztes]])` → IMAGE | the characters `erstes`..`letztes` (default 32..126, at most 256) as an image in the format of `LOADFONT_IMAGE`: each character white in a transparent field, magenta (`&HFF00FF`) outside and in between. That turns a vector font into a pixel font that you can touch up and load again with `LOADFONT_IMAGE(bild, &HFF00FF, erstes)` |
+| `FONT_LIGATURES(font, an)` | switch the **ligatures** and kerning of a font loaded with `LOADFONT` on or off: its text then goes through text shaping (fi ligatures, the joined characters of a programming font, tighter pairs like “AV”) |
 | `SETFONT(font[, groesse])` | set the active font; `SETFONT(-1)` = default font. Without `groesse` the size the font was loaded at applies afterwards; with `groesse` everything is drawn at that size from now on (like `SETFONT` + `TEXT_SIZE`) -- load sharp, draw small: `SETFONT(LOADFONT("sans", 32), 16)` |
 | `TEXT_SPACING(px)` | letter spacing for TTF (native) |
 | `TEXT_LINE_SPACING(px)` | line spacing for multi-line text |
@@ -522,10 +523,30 @@ CJK fonts of Windows all exist only in this form). A file that still does not
 yield a font is an error.
 
 **Limits:** emoji come out in one colour (raylib does not rasterize colour
-fonts); Arabic and Hebrew appear character by character from left to right
-without the letters joining — text shaping and right-to-left are not built.
-Whoever wants a particular glyph form (Japanese instead of Chinese forms)
-loads their font themselves.
+fonts). Whoever wants a particular glyph form (Japanese instead of Chinese
+forms) loads their font themselves. Hebrew and Arabic run from right to
+left, Arabic joined ([module-gui.md](module-gui.md#right-to-left)).
+
+### Text shaping: Indic scripts and ligatures
+
+Some scripts only come into being when they are set: in Devanagari,
+Bengali, Tamil and the other Indic scripts characters merge into
+**conjuncts** (क + ् + ष = क्ष), a vowel sign stands **before** the
+consonant it is written after (कि); Thai, Lao, Khmer, Myanmar and Tibetan
+stack characters. The runtime sets such runs with **text shaping**
+(rustybuzz, like HarfBuzz) instead of character by character -- in `TEXT`,
+in every `gui` widget and when measuring (`TEXT_WIDTH`), with your own font
+or the system's fallback font (Windows: Nirmala UI, Leelawadee UI, Myanmar
+Text, Microsoft Himalaya; macOS: Kohinoor; Linux: the Noto fonts).
+
+With `FONT_LIGATURES(font, TRUE)` **all** text of that font goes through
+shaping: ligatures (fi, the joined characters of a programming font such as
+`=>`), kerning (AV moves closer) and whatever other rules the font brings.
+Off by default -- ordinary text keeps the fastest path.
+
+What does not work (yet): in shaped text the cursor moves character by
+character, even through the middle of a conjunct; emulated bold and italic
+do not apply in shaped runs.
 
 `TEXT_WIDTH` measures along the same path that `TEXT` draws — across the
 fallback fonts too: a centred text with an umlaut or kanji sits where it was

@@ -4196,8 +4196,9 @@ Reihenfolge, in der er getippt wurde.
 |---|---|
 | `TEXT_VISUAL$(text$ [, richtung$])` | Der Text so, wie er dasteht -- für eigene Ausgaben wie Dateien oder Bilder. `richtung$` = `auto` (Vorgabe), `ltr` oder `rtl` |
 
-Was (noch) nicht geht: Ligaturen anderer Schriften und indische Schriften
-(dafür bräuchte es eine volle Textformung); die Ausrichtung folgt nicht der
+Indische und südostasiatische Schriften und die Ligaturen einer Schrift
+setzt die Textformung ([builtins-grafik.md](builtins-grafik.md#textformung-indische-schriften-und-ligaturen)).
+Was (noch) nicht geht: die Ausrichtung folgt nicht der
 Richtung -- eine Zeile von rechts nach links steht links, solange
 `GUI_SET_ALIGN` nichts anderes sagt; in einer solchen Zeile eines
 Textbereichs fallen Fett, Kursiv und Unterstrichen weg (die Farben der

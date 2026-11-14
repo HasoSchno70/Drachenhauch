@@ -4177,8 +4177,9 @@ typed.
 |---|---|
 | `TEXT_VISUAL$(text$ [, direction$])` | The text as it is displayed -- for your own output such as files or images. `direction$` = `auto` (default), `ltr` or `rtl` |
 
-What does not work (yet): ligatures of other scripts and Indic scripts
-(that would need full text shaping); alignment does not follow direction --
+Indic and Southeast Asian scripts and the ligatures of a font are set by
+text shaping ([builtins-grafik.md](builtins-grafik.md#text-shaping-indic-scripts-and-ligatures)).
+What does not work (yet): alignment does not follow direction --
 a right-to-left line stays on the left unless `GUI_SET_ALIGN` says
 otherwise; in such a line of a text area bold, italic and underline are
 dropped (the colours of the highlighting stay); end-of-line hints and

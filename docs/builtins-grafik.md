@@ -409,6 +409,7 @@ zweite Zeichenfläche samt Speicher, wo ein Rechteck genügt.
 | `FONT_GLYPH_BOX(font, zeichen$, groesse)` → TUPLE | das Rechteck `(x, y, breite, hoehe)`, das die Glyphe wirklich bedeckt, relativ zu dem Punkt, an den `TEXT(x, y, zeichen$)` sie bei `groesse` setzt — aus der Schriftdatei gelesen. Damit sitzt ein Zeichen genau: mittig in einem Knopf, ein Notenschlüssel auf seiner Linie |
 | `FONT_BASELINE(font, groesse)` → FLOAT | wie weit unter der Oberkante, an die `TEXT` den Text setzt, die Grundlinie liegt |
 | `FONT_TO_IMAGE(font[, erstes[, letztes]])` → IMAGE | die Zeichen `erstes`..`letztes` (Vorgabe 32..126, höchstens 256) als Bild im Format von `LOADFONT_IMAGE`: jedes Zeichen weiß in einem durchsichtigen Feld, Magenta (`&HFF00FF`) außen und dazwischen. So wird aus einer Vektorschrift eine Pixelschrift, die man nachbearbeiten und mit `LOADFONT_IMAGE(bild, &HFF00FF, erstes)` wieder laden kann |
+| `FONT_LIGATURES(font, an)` | die **Ligaturen** und die Unterschneidung einer mit `LOADFONT` geladenen Schrift ein- oder ausschalten: ihr Text geht dann durch die Textformung (fi-Ligaturen, die Zeichenverbindungen einer Programmierschrift, enger gesetzte Paare wie „AV“) |
 | `SETFONT(font[, groesse])` | aktive Schrift setzen; `SETFONT(-1)` = Default-Font. Ohne `groesse` gilt danach die Größe, mit der die Schrift geladen wurde; mit `groesse` wird ab jetzt so groß gezeichnet (wie `SETFONT` + `TEXT_SIZE`) -- scharf laden, klein zeichnen: `SETFONT(LOADFONT("sans", 32), 16)` |
 | `TEXT_SPACING(px)` | Buchstabenabstand für TTF (nativ) |
 | `TEXT_LINE_SPACING(px)` | Zeilenabstand für mehrzeiligen Text |
@@ -522,11 +523,33 @@ der falschen Schrift ohne Meldung. Die Runtime löst jetzt die erste Schrift
 der Sammlung heraus (die CJK-Schriften von Windows liegen alle nur so vor).
 Eine Datei, die trotzdem keine Schrift ergibt, ist ein Fehler.
 
-**Grenzen:** Emoji kommen einfarbig (raylib rastert keine Farbschriften);
-Arabisch und Hebräisch erscheinen Zeichen für Zeichen von links nach rechts
-ohne Verbindung der Buchstaben — Textformung und Rechts-nach-links sind
-nicht gebaut. Wer eine bestimmte Glyphenform will (japanische statt
-chinesische Formen), lädt seine Schrift selbst.
+**Grenzen:** Emoji kommen einfarbig (raylib rastert keine Farbschriften).
+Wer eine bestimmte Glyphenform will (japanische statt chinesische Formen),
+lädt seine Schrift selbst. Hebräisch und Arabisch stehen von rechts nach
+links, Arabisch verbunden ([module-gui.md](module-gui.md#rechts-nach-links)).
+
+### Textformung: indische Schriften und Ligaturen
+
+Manche Schriften entstehen erst beim Setzen: in Devanagari, Bengali,
+Tamil und den anderen indischen Schriften verschmelzen Zeichen zu
+**Konjunkten** (क + ् + ष = क्ष), ein Vokalzeichen steht **vor** dem
+Konsonanten, hinter dem es geschrieben wird (कि); Thai, Lao, Khmer, Myanmar
+und Tibetisch stapeln Zeichen. Solche Läufe setzt die Laufzeit mit einer
+**Textformung** (rustybuzz, wie HarfBuzz) statt Zeichen für Zeichen -- in
+`TEXT`, in jedem `gui`-Widget und beim Messen (`TEXT_WIDTH`), mit der
+eigenen Schrift oder der Ausweich-Schrift des Systems (Windows: Nirmala UI,
+Leelawadee UI, Myanmar Text, Microsoft Himalaya; macOS: Kohinoor; Linux:
+die Noto-Schriften).
+
+Mit `FONT_LIGATURES(font, TRUE)` geht **jeder** Text dieser Schrift durch
+die Formung: Ligaturen (fi, die Zeichenverbindungen einer Programmierschrift
+wie `=>`), Unterschneidung (AV rückt zusammen) und was die Schrift sonst an
+Regeln mitbringt. Aus per Vorgabe -- gewöhnlicher Text bleibt beim
+schnellsten Weg.
+
+Was (noch) nicht geht: die Schreibmarke springt in einem geformten Text
+Zeichen für Zeichen, auch mitten durch einen Konjunkt; Fett und Kursiv
+nachgebildeter Schnitte gelten in geformten Läufen nicht.
 
 `TEXT_WIDTH` misst denselben Weg, den `TEXT` zeichnet — auch über die
 Ausweich-Schriften hinweg: ein zentrierter Text mit Umlaut oder Kanji sitzt

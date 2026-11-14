@@ -645,6 +645,16 @@ impl<'p> Vm<'p> {
                 let (x, y, b, h) = g!().font_glyph_box(gi(a,0,"FONT_GLYPH_BOX")?, c, zahl_arg(a,2,"FONT_GLYPH_BOX")?)?;
                 Value::Tuple(std::rc::Rc::new(vec![Value::Float(x), Value::Float(y), Value::Float(b), Value::Float(h)]))
             }
+            // Ligaturen einer Schrift (formung.rs): ihre Laeufe gehen durch
+            // die Formung (rustybuzz) statt Glyphe fuer Glyphe durch raylib.
+            "font_ligatures" => { let n = "FONT_LIGATURES";
+                if a.len() != 2 { return Err(format!("{}: erwartet (font, an)", n)); }
+                let h = gi(a,0,n)?;
+                let _ = g!();
+                if !crate::formung::ligaturen_setzen(h, a[1].truthy()) {
+                    return Err(format!("{}: {} ist keine mit LOADFONT geladene Schrift", n, h));
+                }
+                Value::Nil }
             "loadfont" => {
                 if a.len() > 3 { return Err("LOADFONT: erwartet (pfad$, groesse[, zeichen$])".into()); }
                 if a.len() == 3 {

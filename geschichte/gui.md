@@ -990,3 +990,33 @@ PowerShell/Windows Forms als fremdem Programm: Bild hinaus und herein samt
 Farbe, Dateien hinaus und herein, Ziehen ohne Taste), vier Gegenproben.
 Das Ziehen selbst mit gedrueckter Taste ist nicht automatisch geprueft --
 es braucht den echten Zeiger.
+
+## Volle Textformung (2026-11-14)
+
+Der letzte Rest von Paket 3 (`docs/intern/entwurf-gui-wie-gtk.md`):
+indische und suedostasiatische Schriften und die Ligaturen einer Schrift.
+- raylib zeichnet nach Codepunkt aus einem Atlas; die Glyphen einer
+  Formung (ein Konjunkt) haben oft keinen. Darum ein zweiter Weg nach
+  Glyphennummer in `formung.rs`: rustybuzz formt (es war schon fuer das
+  pdf-Modul da und kam jetzt ins Feature graphics), ttf-parser liefert die
+  Umrisse, ein Flaechen-Rasterer (aufsummierte Flaechenanteile je Pixel,
+  nonzero) macht Glyphenbilder; `graphics.rs` haelt sie als Texturen
+  (weiss mit Deckkraft, die Farbe kommt als Toenung) und zeichnet sie an
+  die Lagen der Formung.
+- Welcher Lauf geformt wird, entscheidet `formen_noetig` an EINER Stelle
+  fuer Zeichnen und Messen (`zeichne_text`, `miss_text`, `breite_mit`,
+  `std_breite`): Zeichen aus Devanagari bis Sinhala, Thai/Lao, Tibetisch,
+  Myanmar, Khmer ... (`formung::braucht`), oder `FONT_LIGATURES` ist fuer
+  die Schrift an. Sonst bleibt alles bei raylib.
+- Massstab wie raylib (`stbtt_ScaleForPixelHeight`: Ober- bis Unterlaenge
+  = Groesse), nicht die Em-Groesse -- sonst stuende geformter Text groesser
+  neben dem anderen.
+- Die Ausweich-Liste kannte nur CJK, Hangul, Emoji, Thai: jetzt auch
+  indische Schriften (Nirmala UI, Kohinoor, Noto je Block), Myanmar, Khmer/
+  Lao, Tibetisch -- vorher erschienen sie als Fragezeichen bzw. Kaestchen.
+Pruefung: Rust-Tests des Rasterers (Quadrat, halbe Pixel) und von
+`braucht`; `tests/pruef/grafik/textformung.dhtest` (ein Konjunkt ist
+schmaler als seine Teile; mit Ligaturen ruecken "AV" zusammen; Fehler fuer
+eine fremde Schrift), zwei Gegenproben; Sichtprobe mit TEXT, gui-Label und
+Textfeld. Offen: die Schreibmarke springt zeichenweise durch Konjunkte;
+nachgebildetes Fett/Kursiv gilt in geformten Laeufen nicht.
