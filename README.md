@@ -106,6 +106,7 @@ happen *next to* a game — tools, reports, small services:
 | **Look by rules** | a stylesheet like CSS: `button.gefahr:hover { bg: #E74C3C }`, rules by kind, class, name and state, live classes, colours from the theme ([more](docs/en/module-gui.md#7-stylesheet-rules-by-kind-class-name-and-state)) |
 | **Spell checking** | red squiggles in text fields and text areas, suggestions on right-click, the Windows spell checker or Hunspell dictionaries, usable without a window ([more](docs/en/module-gui.md#spell-checking)) |
 | **Right to left** | Hebrew and Arabic in the right order and Arabic joined, in all drawn text, with click, caret and selection in text fields and text areas ([more](docs/en/module-gui.md#right-to-left)) |
+| **Every script** | Devanagari, Tamil, Thai, Khmer and the other scripts that need shaping are set properly (conjuncts, reordered vowel signs), ligatures and kerning on request ([more](docs/en/builtins-grafik.md#text-shaping-indic-scripts-and-ligatures)) |
 | **Building blocks** | a wrapping tile layout with selection, Alt letters on buttons and labels, labels shortened with "...", slider marks, a spinner, marked days in the date picker, size groups, a font chooser ([more](docs/en/module-gui.md#building-blocks-flow-layout-alt-letters-marks)) |
 
 None of it needs a window. A Drachenhauch program can be a console
