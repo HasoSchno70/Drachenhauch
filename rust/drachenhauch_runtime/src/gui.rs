@@ -3785,6 +3785,9 @@ pub struct Gui {
     pub(super) popup_fenster: Vec<popupfenster::PopupFenster>,
     /// Wie weit Popups je nativer Flaeche reichen duerfen (`grenze`).
     pub(super) grenzen: Vec<(u32, (i32, i32, i32, i32))>,
+    /// Offene Zeichenflaeche (GUI_CANVAS_BEGIN): die Flaeche, in die gerade
+    /// gezeichnet wird (0 = Hauptfenster).
+    pub(super) canvas_offen: Option<u32>,
     focus_window: Option<usize>,
     focus_widget: Option<(usize, usize)>,
     // Offener modaler Dialog. Solange einer steht, bekommt NUR er Eingaben --
@@ -4010,7 +4013,7 @@ impl Gui {
     pub fn new() -> Gui {
         Gui {
             schrift: None,
-            windows: Vec::new(), z_order: Vec::new(), flaeche: 0, fokus_flaeche: 0, nativ_fokus_wunsch: None, leihe: None, teil_druck: None, teil_ids: Vec::new(), popup_fenster: Vec::new(), grenzen: Vec::new(),
+            windows: Vec::new(), z_order: Vec::new(), flaeche: 0, fokus_flaeche: 0, nativ_fokus_wunsch: None, leihe: None, teil_druck: None, teil_ids: Vec::new(), popup_fenster: Vec::new(), grenzen: Vec::new(), canvas_offen: None,
             ta_zerlegung: std::cell::RefCell::new(HashMap::new()),
             focus_window: None, focus_widget: None, modal: None, modal_vorher: Vec::new(), modal_fokus: Vec::new(), cp_drag: None,
             drag_window: None, drag_dx: 0, drag_dy: 0,

@@ -471,6 +471,8 @@ Native, blockierende Standarddialoge (kein IMPORT nötig — wie die Datei-Dialo
 | `GUI_CANVAS(win, x, y, w, h)` | GUI_WIDGET | freie Zeichenflaeche -- hinein malt man mit den normalen Zeichenbefehlen, **nach** `GUI_DRAW` |
 | `GUI_CANVAS_X(canvas)` / `GUI_CANVAS_Y(canvas)` | INTEGER | **absolute** Bildschirmposition der Flaeche (wandert mit dem Fenster) |
 | `GUI_CANVAS_W(canvas)` / `GUI_CANVAS_H(canvas)` | INTEGER | Groesse der Flaeche |
+| `GUI_CANVAS_BEGIN(canvas)` / `GUI_CANVAS_END()` | — | die Zeichenbefehle dazwischen gehen in die Flaeche: zugeschnitten auf sie, und steht sie in einem echten Fenster, in dessen Bild |
+| `GUI_CANVAS_MOUSE(canvas)` | TUPLE | (x, y, gedrueckt): der Zeiger relativ zur Flaeche und die linke Taste -- auch in einem echten Fenster |
 | `GUI_SET_ENABLED(wdg, on)` | — | Widget bedienbar machen oder sperren (gesperrt = ausgegraut, nimmt keine Klicks) |
 | `GUI_ENABLED(wdg)` | BOOLEAN | ist es bedienbar? |
 | `GUI_SET_FONT(wdg, font)` | — | eigene Schrift fuer dieses Widget |
@@ -1336,8 +1338,37 @@ FLIP()
 ```
 
 `GUI_CANVAS_X/Y/W/H` liefern den **absoluten** Inhaltsbereich (folgt dem Fenster
-beim Verschieben). Du zeichnest **nach** `GUI_DRAW` und clippst selbst auf den
-Bereich.
+beim Verschieben). Du zeichnest **nach** `GUI_DRAW`.
+
+**Mit `GUI_CANVAS_BEGIN` und `GUI_CANVAS_END`** ist das Malen auf die Fläche
+zugeschnitten -- und es landet dort, wo die Fläche steht: auch in einem
+**echten Fenster** (`GUI_WINDOW_NATIVE`). Ohne die beiden gehen die
+Zeichenbefehle immer ins Hauptfenster, eine Fläche im echten Fenster bliebe
+leer. Menüs und Popups, die über der Fläche liegen, kommen dabei wieder
+obenauf. `MOUSEX`/`MOUSEY` sprechen vom Hauptfenster; `GUI_CANVAS_MOUSE` sieht
+den Zeiger durch das Fenster der Fläche, relativ zu ihr:
+
+```basic
+IMPORT "gui"
+SCREEN(400, 300, "Malen", 1)
+DIM win AS GUI_WINDOW : win = GUI_WINDOW("Malen", 20, 20, 300, 220)
+DIM cv AS GUI_WIDGET : cv = GUI_CANVAS(win, 10, 10, 280, 180)
+DIM nativ AS BOOLEAN : nativ = GUI_WINDOW_NATIVE(win, TRUE)
+DIM x AS INTEGER
+DIM y AS INTEGER
+DIM unten AS BOOLEAN
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    (x, y, unten) = GUI_CANVAS_MOUSE(cv)
+    CLS(0)
+    GUI_DRAW()
+    GUI_CANVAS_BEGIN(cv)
+    BOX(GUI_CANVAS_X(cv), GUI_CANVAS_Y(cv), GUI_CANVAS_X(cv) + 280, GUI_CANVAS_Y(cv) + 180, &H101820)
+    IF unten THEN CIRCLE(GUI_CANVAS_X(cv) + x, GUI_CANVAS_Y(cv) + y, 8, &H30FFA0)
+    GUI_CANVAS_END()
+    FLIP()
+WEND
+```
 
 ### Ein Fenster über dem Gezeichneten: `GUI_DRAW_WINDOW`
 

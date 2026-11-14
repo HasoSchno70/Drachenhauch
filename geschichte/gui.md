@@ -1041,3 +1041,19 @@ nachgebildetes Fett/Kursiv gilt in geformten Laeufen nicht.
 Pruefung: `native_fenster.dhtest` (Fensterstil), `gui_silben_marke.dhtest`
 (Pfeile eingespielt), `textformung.dhtest` (Kursiv am Tintenrand), Rust-Test
 `schreibmarke_springt_ueber_silben`; je eine Gegenprobe.
+
+## Zeichenflaeche im echten Fenster (2026-11-14)
+
+Gefunden bei der Frage "laufen alle Widgets in echten Fenstern?": in eine
+Zeichenflaeche malt das Programm nach GUI_DRAW selbst, und diese Befehle
+gingen immer ins Hauptfenster -- eine Flaeche im echten Fenster blieb leer,
+das Gemalte stand an falscher Stelle im Hauptfenster.
+`GUI_CANVAS_BEGIN(cv)`/`GUI_CANVAS_END()` schneiden auf die Flaeche zu und
+leiten in das Render-Ziel des echten Fensters um (`nativ_beginnen`); am Ende
+kommen Menues, Klapplisten und die obere Schicht dieser Flaeche wieder
+obenauf (sie waren schon gezeichnet). `GUI_CANVAS_MOUSE(cv)` liefert
+(x, y, gedrueckt) relativ zur Flaeche, gesehen durch ihr Fenster
+(`sicht_setzen`). Eine Flaeche in einer abgerissenen Teilflaeche (3b) ist
+noch nicht umgeleitet (das Gastfenster ist dort nur geliehen).
+Pruefung: Fall in `native_fenster.dhtest` (roter Kasten im nativen Fenster,
+zugeschnitten; Druck relativ zur Flaeche), drei Gegenproben.

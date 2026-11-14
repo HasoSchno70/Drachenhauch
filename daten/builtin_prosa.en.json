@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/en und dem englischen Buch von `dhrt doku prosa` -- NICHT von Hand aendern. Der Hover nimmt sie mit DHRT_LANG=en.",
- "count": 2418,
+ "count": 2421,
  "docs": {
   "ABS": "Absolute value.",
   "ACOS": "Arc sine/cosine (x in [-1, 1])",
@@ -586,7 +586,10 @@
   "GUI_BUTTON_GET_VARIANT$": "STRING — the button kind as a name",
   "GUI_BUTTON_VARIANT": "button kind: standard, primaer (primary), erfolg (success), warnung (warning), gefahr (danger), umriss (outline), flach (flat), link",
   "GUI_CANVAS": "GUI_WIDGET — free drawing surface -- you paint into it with the normal drawing commands, after GUI_DRAW",
+  "GUI_CANVAS_BEGIN": "the drawing commands in between go into the surface: clipped to it, and if it is in a real window, into that window's picture",
+  "GUI_CANVAS_END": "the drawing commands in between go into the surface: clipped to it, and if it is in a real window, into that window's picture",
   "GUI_CANVAS_H": "INTEGER — size of the surface",
+  "GUI_CANVAS_MOUSE": "TUPLE — (x, y, pressed): the pointer relative to the surface and the left button -- in a real window too",
   "GUI_CANVAS_W": "INTEGER — size of the surface",
   "GUI_CANVAS_X": "INTEGER — absolute screen position of the surface (moves with the window)",
   "GUI_CANVAS_Y": "INTEGER — absolute screen position of the surface (moves with the window)",
