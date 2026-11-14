@@ -910,8 +910,13 @@ impl Gui {
         }
         // Tooltip ganz zuletzt, wenn die Maus lange genug ruht.
         if self.tip_fenster().map(hier).unwrap_or(f == 0) { self.draw_tooltip(g); }
-        // Der Inspektor ueber allem, nur auf der Hauptflaeche.
-        if f == 0 { self.inspektor_zeichnen(g); }
+        // Funken, Befehlspalette und Inspektor ueber allem, nur auf der
+        // Hauptflaeche.
+        if f == 0 {
+            self.funken_zeichnen(g);
+            if self.palette.is_some() { self.palette_zeichnen(g); }
+            self.inspektor_zeichnen(g);
+        }
     }
 
     /// Alles hinter dem modalen Dialog abdunkeln. Das ist nicht Deko: ohne

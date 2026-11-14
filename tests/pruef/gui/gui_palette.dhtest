@@ -1,0 +1,225 @@
+' Befehlspalette (gui_palette.rs): Strg+Umschalt+P sucht ueber Menueleiste
+' und Werkzeugleisten des Fensters; Enter oder Klick loest aus wie Maus und
+' Kuerzel. Ein Menuekuerzel des Programms geht vor. GUI_PALETTE_ITEMS$ ist
+' die Liste, die die Palette zeigt (`>` = gewaehlt).
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== die palette sammelt menues untermenues und leisten
+TRY
+    SCREEN(500, 300, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 500, 300)
+DIM mD AS INTEGER : mD = GUI_MENU(w, "&Datei")
+DIM a1 AS INTEGER : a1 = GUI_MENU_ITEM(mD, "Neu", "Strg+N")
+DIM a2 AS INTEGER : a2 = GUI_MENU_ITEM(mD, "Speichern", "Strg+S")
+DIM a3 AS INTEGER : a3 = GUI_MENU_ITEM(mD, "Alles speichern ...")
+DIM a4 AS INTEGER : a4 = GUI_MENU_ITEM(mD, "Drucken")
+GUI_MENU_ENABLE(a4, FALSE)
+DIM zm AS INTEGER : zm = GUI_SUBMENU(mD, "Zuletzt")
+DIM a5 AS INTEGER : a5 = GUI_MENU_ITEM(zm, "brief.txt")
+DIM tb AS GUI_WIDGET : tb = GUI_TOOLBAR(w, 0, 0, 500, 34)
+GUI_TOOLBAR_ADD(tb, "neu", "Neu")
+GUI_TOOLBAR_ADD(tb, "start", "Programm starten")
+PRINT "zu "; GUI_PALETTE()
+GUI_PALETTE(TRUE)
+PRINT "offen "; GUI_PALETTE()
+PRINT GUI_PALETTE_ITEMS$()
+PRINT "---"
+GUI_PALETTE_FILTER("spei")
+PRINT GUI_PALETTE_ITEMS$()
+PRINT "---"
+GUI_PALETTE_FILTER("zbr")
+PRINT GUI_PALETTE_ITEMS$()
+PRINT "---"
+GUI_PALETTE_FILTER("gibtsnicht")
+PRINT "leer '"; GUI_PALETTE_ITEMS$(); "'"
+GUI_PALETTE(FALSE)
+PRINT "zu "; GUI_PALETTE(); " items '"; GUI_PALETTE_ITEMS$(); "'"
+TRY
+    GUI_PALETTE_FILTER("x")
+CATCH e1
+    PRINT e1
+END TRY
+--- erwartet
+zu FALSE
+offen TRUE
+>Datei › Neu	Strg+N
+Datei › Speichern	Strg+S
+Datei › Alles speichern
+Datei › Zuletzt › brief.txt
+Programm starten
+---
+>Datei › Speichern	Strg+S
+Datei › Alles speichern
+---
+>Datei › Zuletzt › brief.txt
+---
+leer ''
+zu FALSE items ''
+GUI_PALETTE_FILTER: die Palette ist nicht offen -- erst GUI_PALETTE(TRUE)
+
+=== enter loest den gewaehlten eintrag aus und runter waehlt den naechsten
+IMPORT "gui"
+SCREEN(500, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 500, 300)
+DIM mD AS INTEGER : mD = GUI_MENU(w, "Datei")
+DIM a1 AS INTEGER : a1 = GUI_MENU_ITEM(mD, "Speichern", "Strg+S")
+DIM a2 AS INTEGER : a2 = GUI_MENU_ITEM(mD, "Alles speichern")
+DIM tb AS GUI_WIDGET : tb = GUI_TOOLBAR(w, 0, 0, 500, 34)
+GUI_TOOLBAR_ADD(tb, "start", "Programm starten")
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER
+DIM log AS STRING
+FOR n = 1 TO 30
+    IF n = 2 OR n = 12 OR n = 22 THEN
+        GUI_PALETTE(TRUE)
+        IF n = 2 THEN GUI_PALETTE_FILTER("spei")
+        IF n = 22 THEN GUI_PALETTE_FILTER("start")
+    END IF
+    GUI_UPDATE()
+    IF GUI_CLICKED(a1) THEN log = log + " speichern@" + STR$(n)
+    IF GUI_CLICKED(a2) THEN log = log + " alles@" + STR$(n)
+    IF GUI_TOOLBAR_CLICKED(tb) >= 0 THEN log = log + " leiste" + STR$(GUI_TOOLBAR_CLICKED(tb)) + "@" + STR$(n)
+    CLS(0) : GUI_DRAW() : FLIP()
+NEXT
+PRINT "folge"; log; " offen "; GUI_PALETTE()
+--- datei ev.txt
+c 8
+e 1 7 450 280 0 0
+e 5 2 257 0 0 0
+e 6 1 257 0 0 0
+e 14 2 264 0 0 0
+e 15 1 264 0 0 0
+e 16 2 257 0 0 0
+e 17 1 257 0 0 0
+e 24 2 257 0 0 0
+
+--- umgebung
+DHRT_FRAMES=40
+--- erwartet
+folge speichern@6 alles@17 leiste0@25 offen FALSE
+
+=== strg umschalt p oeffnet esc schliesst und ein menuekuerzel geht vor
+IMPORT "gui"
+SCREEN(500, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 500, 300)
+DIM mD AS INTEGER : mD = GUI_MENU(w, "Datei")
+DIM a1 AS INTEGER : a1 = GUI_MENU_ITEM(mD, "Speichern", "Strg+S")
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER
+DIM log AS STRING
+DIM eigen AS INTEGER : eigen = -1
+FOR n = 1 TO 40
+    IF n = 15 THEN GUI_PALETTE_KEY(FALSE)
+    IF n = 22 THEN
+        GUI_PALETTE_KEY(TRUE)
+        eigen = GUI_MENU_ITEM(mD, "Eigene Palette", "Strg+Umschalt+P")
+    END IF
+    GUI_UPDATE()
+    IF GUI_PALETTE() THEN log = log + " offen@" + STR$(n)
+    IF eigen >= 0 THEN
+        IF GUI_CLICKED(eigen) THEN log = log + " eigen@" + STR$(n)
+    END IF
+    CLS(0) : GUI_DRAW() : FLIP()
+NEXT
+PRINT "folge"; log
+--- datei ev.txt
+c 16
+e 1 7 450 280 0 0
+e 2 2 341 0 0 0
+e 2 2 340 0 0 0
+e 3 2 80 0 0 0
+e 4 1 80 0 0 0
+e 4 1 340 0 0 0
+e 4 1 341 0 0 0
+e 6 2 256 0 0 0
+e 7 1 256 0 0 0
+e 16 2 341 0 0 0
+e 16 2 340 0 0 0
+e 17 2 80 0 0 0
+e 18 1 80 0 0 0
+e 25 2 80 0 0 0
+e 26 1 80 0 0 0
+e 26 1 340 0 0 0
+
+--- umgebung
+DHRT_FRAMES=50
+--- erwartet
+folge offen@4 offen@5 offen@6 eigen@26
+
+=== die palette nimmt die tasten dem textfeld darunter
+' Ein Textfeld hat den Fokus; die Palette ist offen: Ruecktaste kuerzt die
+' Suche, nicht den Text im Feld. Danach kommt der Fokus zurueck.
+IMPORT "gui"
+SCREEN(500, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 500, 300)
+DIM mD AS INTEGER : mD = GUI_MENU(w, "Bearbeiten")
+DIM a1 AS INTEGER : a1 = GUI_MENU_ITEM(mD, "Kopieren")
+DIM a2 AS INTEGER : a2 = GUI_MENU_ITEM(mD, "Einfuegen")
+DIM tf AS GUI_WIDGET : tf = GUI_TEXTINPUT(w, 20, 100, 200, 30)
+GUI_SET_TEXT(tf, "Hallo")
+GUI_FOCUS(tf)
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER
+FOR n = 1 TO 12
+    IF n = 2 THEN
+        GUI_PALETTE(TRUE)
+        GUI_PALETTE_FILTER("kopx")
+    END IF
+    GUI_UPDATE()
+    CLS(0) : GUI_DRAW() : FLIP()
+NEXT
+PRINT "feld "; GUI_TEXT(tf); " palette "; GUI_PALETTE_ITEMS$()
+GUI_PALETTE(FALSE)
+PRINT "fokus zurueck "; GUI_FOCUSED() = tf
+--- datei ev.txt
+c 3
+e 1 7 450 280 0 0
+e 4 2 259 0 0 0
+e 5 1 259 0 0 0
+
+--- umgebung
+DHRT_FRAMES=20
+--- erwartet
+feld Hallo palette >Bearbeiten › Kopieren
+fokus zurueck TRUE
+
+=== ein klick neben die palette schliesst sie und erreicht nichts
+IMPORT "gui"
+SCREEN(500, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 500, 300)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM mD AS INTEGER : mD = GUI_MENU(w, "Datei")
+DIM a1 AS INTEGER : a1 = GUI_MENU_ITEM(mD, "Neu")
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "Unten", 10, 230, 120, 40)
+GUI_PALETTE(TRUE)
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER
+DIM klicks AS INTEGER
+FOR n = 1 TO 14
+    GUI_UPDATE()
+    IF GUI_CLICKED(b) THEN klicks = klicks + 1
+    CLS(0) : GUI_DRAW() : FLIP()
+NEXT
+PRINT "offen "; GUI_PALETTE(); " klicks "; klicks
+--- datei ev.txt
+c 6
+e 1 7 60 260 0 0
+e 3 6 0 0 0 0
+e 4 5 0 0 0 0
+e 7 7 60 285 0 0
+e 8 6 0 0 0 0
+e 9 5 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=20
+--- erwartet
+offen FALSE klicks 1

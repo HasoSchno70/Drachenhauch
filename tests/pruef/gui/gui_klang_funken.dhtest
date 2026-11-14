@@ -1,0 +1,218 @@
+' Klangthemen und Funken (gui_effekte.rs). `klang`/`effekt` in der Stildatei
+' gelten zum Anlass ihrer Schicht: ohne Zustand beim Klick, :hover beim
+' Hineinfahren, :active beim Druecken, :focus beim Fokus. GUI_SOUND_LOG$
+' nennt, was gewuenscht wurde -- auch ohne Soundkarte.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== die stildatei klingt beim hineinfahren druecken und klicken
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 300)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "Los", 20, 20, 120, 40)
+DIM l AS GUI_WIDGET : l = GUI_LABEL(w, "still", 20, 200)
+GUI_STYLESHEET("button { klang: klick }" + CHR$(10) + "button:hover { klang: tick 40% }" + CHR$(10) + "button:active { klang: plopp }" + CHR$(10) + "label { klang: ping }")
+AUTOMATION_PLAY("ev.txt")
+DIM log AS STRING
+DIM n AS INTEGER
+FOR n = 1 TO 24
+    GUI_UPDATE()
+    DIM t AS STRING : t = GUI_SOUND_LOG$()
+    IF t <> "" THEN log = log + "[" + STR$(n) + "]" + t
+    CLS(0) : GUI_DRAW() : FLIP()
+NEXT
+PRINT "folge "; GUI_SOUNDS(); " "; log
+PRINT GUI_INSPECT$(b)
+--- datei ev.txt
+c 6
+e 1 7 300 250 0 0
+e 3 7 60 40 0 0
+e 6 6 0 0 0 0
+e 8 5 0 0 0 0
+e 11 7 300 250 0 0
+e 14 7 60 40 0 0
+
+--- umgebung
+DHRT_FRAMES=30
+--- enthaelt
+folge TRUE [4]tick[7]plopp[9]klick[15]tick
+  basis: klang klick
+  hover: klang tick 40%
+  active: klang plopp
+
+=== gui_set_sounds false schweigt
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 300)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "Los", 20, 20, 120, 40)
+GUI_STYLESHEET("button { klang: klick }" + CHR$(10) + "button:hover { klang: tick }")
+GUI_SET_SOUNDS(FALSE)
+AUTOMATION_PLAY("ev.txt")
+DIM log AS STRING
+DIM n AS INTEGER
+FOR n = 1 TO 12
+    GUI_UPDATE()
+    log = log + GUI_SOUND_LOG$()
+    CLS(0) : GUI_DRAW() : FLIP()
+NEXT
+GUI_SOUND("ping")
+PRINT "an "; GUI_SOUNDS(); " gehoert '"; log; GUI_SOUND_LOG$(); "' geklickt "; GUI_CLICKED(b) OR TRUE
+--- datei ev.txt
+c 3
+e 1 7 60 40 0 0
+e 3 6 0 0 0 0
+e 5 5 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=20
+--- erwartet
+an FALSE gehoert '' geklickt TRUE
+
+=== gui_sound und falsche angaben
+TRY
+    SCREEN(400, 300, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 300)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "x", 20, 20, 120, 30)
+GUI_SOUND("ERFOLG")
+GUI_SOUND("toene/tusch.wav", 60)
+PRINT "log "; GUI_SOUND_LOG$(); " danach '"; GUI_SOUND_LOG$(); "'"
+TRY
+    GUI_SOUND("quietsch")
+CATCH e1
+    PRINT e1
+END TRY
+TRY
+    GUI_SOUND("klick", 300)
+CATCH e2
+    PRINT e2
+END TRY
+TRY
+    GUI_STYLESHEET("button { klang: klick 250% }")
+CATCH e3
+    PRINT e3
+END TRY
+TRY
+    GUI_STYLESHEET("button { effekt: feuerwerk }")
+CATCH e4
+    PRINT e4
+END TRY
+TRY
+    GUI_BURST(b, "feuerwerk")
+CATCH e5
+    PRINT e5
+END TRY
+TRY
+    GUI_BURST(b, "funken", 9999)
+CATCH e6
+    PRINT e6
+END TRY
+--- enthaelt
+log erfolg,toene/tusch.wav danach ''
+GUI_SOUND: klang 'quietsch' unbekannt -- klick, tick, ping, plopp, fehler, erfolg oder eine Datei
+GUI_SOUND: Lautstaerke 300 muss 0..200 sein
+Zeile 1: klang -- Lautstaerke '250%' muss 0%..200% sein
+Zeile 1: effekt 'feuerwerk' unbekannt -- funken, konfetti, sterne
+GUI_BURST: effekt 'feuerwerk' unbekannt
+GUI_BURST: anzahl 9999 muss 1..500 sein
+
+=== funken fliegen und vergehen
+TRY
+    SCREEN(400, 300, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 300)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "", 160, 130, 80, 40)
+PRINT "vorher "; GUI_BURSTING()
+GUI_BURST(b, "funken")
+GUI_BURST(b, "konfetti", 10)
+PRINT "gleich "; GUI_BURSTING()
+DIM rt AS INTEGER : rt = RENDERTARGET_NEW(400, 300)
+DIM n AS INTEGER
+FOR n = 1 TO 6
+    GUI_UPDATE() : CLS(0) : FLIP()
+NEXT
+' Funken sind gelb bis orange: rot hoch, gruen mittel, blau niedrig --
+' ausserhalb des Knopfs gezaehlt.
+RENDERTARGET_BEGIN(rt) : CLS(0) : GUI_DRAW() : RENDERTARGET_END()
+DIM bild AS IMAGE : bild = RENDERTARGET_IMAGE(rt)
+DIM x AS INTEGER
+DIM y AS INTEGER
+DIM gelb AS INTEGER
+FOR y = 60 TO 240
+    FOR x = 90 TO 310
+        IF NOT (x >= 158 AND x <= 242 AND y >= 128 AND y <= 172) THEN
+            DIM c AS INTEGER : c = GETPIXEL(bild, x, y)
+            IF ((c \ 65536) BAND 255) > 200 AND ((c \ 256) BAND 255) > 80 AND (c BAND 255) < 140 THEN gelb = gelb + 1
+        END IF
+    NEXT
+NEXT
+PRINT "gelbe punkte "; gelb > 15
+FOR n = 1 TO 150
+    GUI_UPDATE() : CLS(0) : GUI_DRAW() : FLIP()
+NEXT
+PRINT "nach zweieinhalb sekunden "; GUI_BURSTING()
+--- umgebung
+DHRT_FRAMES=300
+--- erwartet
+vorher 0
+gleich 36
+gelbe punkte TRUE
+nach zweieinhalb sekunden 0
+
+=== effekt aus der stildatei beim klick und ohne bewegung keiner
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 300)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "Los", 20, 20, 120, 40)
+GUI_STYLESHEET("button { effekt: sterne }")
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER
+DIM nach_klick AS INTEGER : nach_klick = -1
+DIM nach_zweitem AS INTEGER : nach_zweitem = -1
+DIM bild_danach AS INTEGER : bild_danach = -1
+DIM direkt AS INTEGER : direkt = -1
+' Drei Stellen: fliegende Teilchen verschwinden, sobald die Bewegung aus ist
+' (funken_pass); GUI_BURST legt dann keine an, und ein Klick auch nicht
+' (funken_aus).
+FOR n = 1 TO 24
+    GUI_UPDATE()
+    IF nach_klick >= 0 AND bild_danach < 0 THEN
+        bild_danach = GUI_BURSTING()
+        GUI_BURST(b, "funken")
+        direkt = GUI_BURSTING()
+    END IF
+    IF GUI_CLICKED(b) AND nach_klick < 0 THEN
+        nach_klick = GUI_BURSTING()
+        GUI_SET_MOTION("aus")
+    ELSEIF GUI_CLICKED(b) THEN
+        nach_zweitem = GUI_BURSTING()
+    END IF
+    CLS(0) : GUI_DRAW() : FLIP()
+NEXT
+PRINT "erster klick "; nach_klick; " bild danach "; bild_danach; " burst ohne bewegung "; direkt; " zweiter klick "; nach_zweitem
+--- datei ev.txt
+c 5
+e 1 7 60 40 0 0
+e 3 6 0 0 0 0
+e 4 5 0 0 0 0
+e 10 6 0 0 0 0
+e 11 5 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=30
+--- erwartet
+erster klick 14 bild danach 0 burst ohne bewegung 0 zweiter klick 0

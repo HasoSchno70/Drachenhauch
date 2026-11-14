@@ -1138,3 +1138,32 @@ Tastenfall laeuft darum eine feste Bildzahl. Die Lage im Inspektor ist die
 des Programms (GUI_SET_BOUNDS), nicht die auf dem Schirm -- erst stand dort
 die Titelleiste mit drin. Pruefung `tests/pruef/gui/gui_inspektor.dhtest`
 (8 Faelle, zehn Gegenproben).
+
+## Klaenge, Funken, Befehlspalette (2026-11-14)
+
+Punkte 5, 6 und 8 der Liste "was andere GUIs nicht haben":
+- **Klangthemen** (`gui_effekte.rs`): `klang` in der Stildatei gilt zum
+  Anlass seiner Schicht -- ohne Zustand beim Klick, `:hover` beim
+  Hineinfahren, `:active` beim Druecken, `:focus` beim Fokus
+  (`effekte_anlass_pass`, verfolgt selbst, wer im letzten Bild ueberfahren,
+  gedrueckt, fokussiert war; `entered` heisst in der gui "Enter im
+  Textfeld"). Sechs eingebaute Klaenge, erzeugt mit `Audio::note` und
+  gemerkt. Die gui hat kein Audio: sie legt Wuensche ab, die VM spielt sie
+  nach GUI_UPDATE (`gui_klaenge_spielen`); ohne Soundkarte still.
+  `GUI_SOUND_LOG$` belegt den Wunsch, `tests/pruef/ton/gui_klang.dhtest`
+  misst mit `AUDIO_PEAK`, dass er am Master ankommt.
+- **Funken** (`GUI_BURST`, `effekt`): Funken, Konfetti, Sterne mit festem
+  Zufall (xorshift), ganz oben gezeichnet. Ohne Bewegung keine -- an zwei
+  Stellen mit eigenem Zweck: `funken_aus` legt keine an, `funken_pass`
+  raeumt fliegende weg, wenn die Bewegung ausgeht. Die erste Gegenprobe
+  blieb gruen, weil der Fall nur den zweiten Weg sah; jetzt prueft er beide.
+- **Befehlspalette** (`gui_palette.rs`): Strg+Umschalt+P, Menueleiste samt
+  Untermenues und Werkzeugleisten, ausloesen ueber `fire_menu_item` und
+  `tb_klick`. Ein Menuekuerzel des Programms geht vor (die IDE hat ihre
+  eigene Palette auf derselben Taste). Waehrend sie offen ist, hat kein
+  Widget den Fokus; das stand zuerst doppelt (beim Oeffnen und je Bild) --
+  eine Gegenprobe an einer der beiden waere gruen geblieben.
+Gegenproben mit dem neuen Profil `gegenprobe`: 22 Stueck in rund zehn
+Minuten (frueher je vier Minuten Bau). `GUI_PALETTE_ITEMS$` haengte
+zuerst auch leeren Kuerzeln ein TAB an -- der Pruefer schneidet Leerzeichen
+am Zeilenende der Erwartung ab, die Ausgabe nicht.

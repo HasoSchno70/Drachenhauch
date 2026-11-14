@@ -2578,6 +2578,67 @@ does not wait forever. Colour transitions stay, they move nothing.
 `GUI_SET_MOTION` overrules the system, say for a switch of your own in the
 settings.
 
+### 10. Sounds and sparks
+
+An interface you can hear and that celebrates: two more stylesheet
+properties and six commands.
+
+| Property / command | Effect |
+|---|---|
+| `klang: klick \| tick \| ping \| plopp \| fehler \| erfolg \| datei.wav [NN%]` | a sound for the rule's occasion: **without a state on click**, `:hover` on entering, `:active` on pressing, `:focus` on focus. Built-in sounds (click, tick, ping, plop, error, success) need no file; `NN%` is the volume (0..200) |
+| `effekt: funken \| konfetti \| sterne` | particles (sparks, confetti, stars) on the same occasions, drawn above everything |
+| `GUI_SOUND(name$ [, lautstaerke])` | play a gui sound (same names, volume in percent) |
+| `GUI_SET_SOUNDS(an)` / `GUI_SOUNDS()` | all gui sounds on or off -- for a "sounds" switch in the settings |
+| `GUI_SOUND_LOG$()` | the sounds requested since the last call, separated by commas (also without a sound card -- for tests) |
+| `GUI_BURST(wdg, art$ [, anzahl])` | sparks, confetti or stars at a widget, say after saving (`anzahl` 1..500, without = suiting the kind) |
+| `GUI_BURSTING()` | how many particles are flying right now |
+
+```basic
+IMPORT "gui"
+SCREEN(500, 240, "Fertig", 1)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Fertig", 10, 10, 480, 220)
+DIM ok AS GUI_WIDGET : ok = GUI_BUTTON(w, "Abschicken", 20, 20, 160, 44)
+GUI_STYLESHEET("button { klang: klick }" + CHR$(10) + "button:hover { klang: tick 40% }")
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_CLICKED(ok) THEN
+        GUI_BURST(ok, "konfetti")
+        GUI_SOUND("erfolg")
+    END IF
+    CLS(&H202830) : GUI_DRAW() : FLIP()
+WEND
+```
+
+The gui plays its sounds through the runtime's audio; without a sound card
+it stays silent, a program never breaks on it. Particles only appear while
+motion is on ([section 9](#9-inspector-live-stylesheet-and-calm-motion)):
+whoever chose "reduce animations" gets the sound but no confetti.
+
+### 11. Command palette
+
+Every program with a menu bar or toolbar has a command palette without a
+line of code: **Ctrl+Shift+P** opens, above the window with the focus, a
+search over all entries of its menu bar (submenus included, "Datei ›
+Zuletzt › brief.txt") and the buttons of its toolbars. Typing filters (a
+word start first, then a match inside a word, then scattered letters),
+Up/Down selects, Enter or a click triggers -- exactly like mouse and
+shortcut, `GUI_CLICKED` and callbacks included. ESC or a click beside it
+closes it. Disabled entries are left out, a button that a menu already
+names appears only once.
+
+| Command | Returns | Effect |
+|---|---|---|
+| `GUI_PALETTE([an])` | BOOLEAN without argument | open (`TRUE`) or close; without argument: is it open? |
+| `GUI_PALETTE_KEY(an)` | — | Ctrl+Shift+P on (default) or off |
+| `GUI_PALETTE_FILTER(text$)` | — | set the search (the palette must be open) |
+| `GUI_PALETTE_ITEMS$()` | STRING | the matching entries, per line the text and, if there is one, TAB and shortcut; the selected one starts with `>` |
+
+A shortcut of your own wins: if a menu of the program itself has
+Ctrl+Shift+P (like the IDE with its own palette), that entry fires and the
+palette stays closed. While it is open no widget has the focus -- a
+backspace shortens the search, not the text in the field below; afterwards
+the focus comes back.
+
 ## Callbacks: GUI_ON_CLICK
 
 Besides polling (`IF GUI_CLICKED(b) THEN ...`) you can register a Drachenhauch
