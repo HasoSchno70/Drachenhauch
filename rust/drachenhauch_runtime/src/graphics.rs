@@ -2894,6 +2894,8 @@ impl Graphics {
         let (x, y) = self.fenster_lage();
         (x + self.rl.get_mouse_x(), y + self.rl.get_mouse_y())
     }
+    /// Das Hauptfenster des Systems (HWND unter Windows, sonst 0).
+    pub fn haupt_os_handle(&self) -> usize { crate::nativfenster::os_handle(self.haupt_glfw as *mut std::ffi::c_void) }
     /// Der Massstab von SCREEN (Systempunkte je Punkt des Programms).
     pub fn haupt_massstab(&self) -> i32 { self.scale.max(1) }
     /// Die gui liest (Some) oder das Programm (None); Some(k) = durch die

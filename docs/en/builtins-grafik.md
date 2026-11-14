@@ -58,6 +58,13 @@ When the `camera` module is active and `CAMERA_SET` has been called, all drawing
 | `FILE_DROPPED(i)` → STRING | path of the `i`-th of them |
 | `CLIPBOARD_GET()` → STRING | read text from the clipboard; empty if another program is holding it right now |
 | `CLIPBOARD_SET(text$)` | put text into the clipboard — an **error** if that does not succeed |
+| `CLIPBOARD_SET_IMAGE(bild)` → BOOLEAN | put an `IMAGE` into the clipboard (other programs paste it as a picture) — an **error** if that does not succeed |
+| `CLIPBOARD_GET_IMAGE()` → INTEGER | the picture from the clipboard as a new `IMAGE`; `-1` if there is none |
+| `CLIPBOARD_HAS_IMAGE()` → BOOLEAN | is there a picture in it right now? |
+| `CLIPBOARD_SET_FILES(pfade)` | put files (`ARRAY OF STRING`, relative or absolute) into the clipboard — “Paste” in Explorer/Finder copies them |
+| `CLIPBOARD_GET_FILES()` → ARRAY OF STRING | files from the clipboard (empty if there are none) |
+| `DRAG_OUT_FILES(pfade)` → STRING | **drag** files out of the window (onto the desktop, into a mail program …); returns `"kopieren"`, `"verschieben"`, `"verknuepfen"` or `""` |
+| `DRAG_OUT_TEXT(text$)` → STRING | drag text out (into an editor, a text field) — like `DRAG_OUT_FILES` |
 | `GFX_PUSH()` | save the drawing state: camera, layers, light, environment, shadows, 3D camera, font, `POSTFX` |
 | `GFX_POP()` | restore it — **an error without a preceding `PUSH`** |
 | `GFX_DEPTH()` → INTEGER | how deep is the stack? |
@@ -111,6 +118,32 @@ CATCH e
     TEXT(10, 10, "Kopieren ging gerade nicht")
 END TRY
 ```
+
+### Pictures and files, dragging out
+
+Text goes through GLFW; **pictures and file lists** through the system's
+clipboard (Windows, macOS, Linux with X11 -- under Wayland via XWayland).
+`CLIPBOARD_GET_IMAGE` creates a new `IMAGE` that is drawn, edited or freed
+with `IMAGE_FREE` like any other.
+
+**Dragging out** (`DRAG_OUT_FILES`, `DRAG_OUT_TEXT`) hands the drag to the
+system: the command only returns once something was dropped or the drag
+was cancelled (ESC), and tells what the target did. It **only starts while
+the left mouse button is held** -- without a button the system would drop
+at once wherever the pointer is; then it returns `""` immediately. It is
+meant for the moment a gui drag (`GUI_DRAGGING()`) leaves the window:
+
+```basic
+IMPORT "gui"
+IF GUI_DRAGGING() AND (MOUSEX() < 0 OR MOUSEY() < 0 OR MOUSEX() >= SCREENWIDTH() OR MOUSEY() >= SCREENHEIGHT()) THEN
+    PRINT DRAG_OUT_FILES(["bericht.pdf"])
+END IF
+```
+
+Dragging out exists **only on Windows** so far (through the shell, like
+Explorer itself); on macOS and Linux it returns `""`. With
+`DHRT_ZWISCHENABLAGE=privat` (every program under `dhrt test`) pictures and
+file lists stay in the process as well.
 
 Classic game loop:
 

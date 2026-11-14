@@ -962,3 +962,31 @@ Pruefung: `gui_tabelle_virtuell.dhtest` (zehn Millionen Zeilen ohne
 Fenster, Sprung per `GUI_TABLE_SET_CURRENT`, Vergessen, Sortieren, Fehler
 beim Anhaengen), drei Gegenproben (Bedarf ohne Blick auf das Gelieferte,
 kein Vergessen, Sortieren ohne Verwerfen).
+
+## Nach aussen: Bilder, Dateien, Ziehen hinaus (2026-11-14)
+
+Die Luecke "Ziehen aus der Anwendung hinaus und Bilder ueber die
+Zwischenablage" aus `docs/intern/entwurf-gui-wie-gtk.md` (raylib/GLFW
+koennen beides nicht).
+- `ablage.rs`: Bilder und Dateilisten ueber `arboard` (Windows, macOS,
+  Linux/X11), am Feature `dialogs` wie rfd -- Text bleibt bei GLFW.
+  `CLIPBOARD_SET_IMAGE`/`_GET_IMAGE`/`_HAS_IMAGE`,
+  `CLIPBOARD_SET_FILES`/`_GET_FILES`; mit `DHRT_ZWISCHENABLAGE=privat`
+  auch sie im Prozess.
+- Ziehen hinaus (`DRAG_OUT_FILES`, `DRAG_OUT_TEXT`) unter Windows ueber die
+  Shell: Dateien als Shell-Objekte (`SHCreateShellItemArrayFromIDLists`,
+  `BHID_DataObject` -- der Explorer bekommt, was er von sich selbst
+  kennt), Text als CF_UNICODETEXT in `SHCreateDataObject`, gezogen mit
+  `SHDoDragDrop` und dessen eingebauter Ablagequelle (keine eigene
+  COM-Klasse). Beginnt nur bei gedrueckter linker Taste
+  (`GetAsyncKeyState`): ohne legte das System sofort unter dem Zeiger ab.
+  macOS/Linux: noch nicht (liefert "").
+- Fund: `STGMEDIUM` braucht das Feature `Win32_System_Com_StructuredStorage`
+  der windows-Crate; im vollen Bau kam es ueber ein anderes mit, im neuen
+  CI-Schritt `cargo check --features dialogs` (seit dem rfd-Update) nicht.
+Pruefung: `tests/pruef/module/ablage.dhtest` (privat, ueberall),
+`tests/pruef/fenster/zwischenablage_bilder.dhtest` (echte Ablage mit
+PowerShell/Windows Forms als fremdem Programm: Bild hinaus und herein samt
+Farbe, Dateien hinaus und herein, Ziehen ohne Taste), vier Gegenproben.
+Das Ziehen selbst mit gedrueckter Taste ist nicht automatisch geprueft --
+es braucht den echten Zeiger.

@@ -1,0 +1,39 @@
+' Bilder und Dateien ueber die Zwischenablage (ablage.rs), in der privaten
+' Ablage, die dhrt test jedem Programm gibt (DHRT_ZWISCHENABLAGE=privat) --
+' laeuft ueberall, auch ohne Fenster (die Dateiliste) bzw. mit einem
+' (das Bild). Die echte Ablage des Systems prueft
+' tests/pruef/fenster/zwischenablage_bilder.dhtest.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== dateien hinein und wieder heraus
+PRINT "leer "; UBOUND(CLIPBOARD_GET_FILES()) + 1
+CLIPBOARD_SET_FILES(["a.txt", "unter/b.png"])
+DIM l AS ARRAY OF STRING : l = CLIPBOARD_GET_FILES()
+PRINT UBOUND(l) + 1; " "; l[0]; " "; l[1]
+--- erwartet
+leer 0
+2 a.txt unter/b.png
+
+=== eine leere dateiliste ist ein fehler
+DIM l AS ARRAY OF STRING
+CLIPBOARD_SET_FILES(l)
+--- fehler
+CLIPBOARD_SET_FILES: keine Dateien
+
+=== ein bild hinein und wieder heraus
+' Mit Fenster (Bilder brauchen eine Grafik); ohne eines ueberspringt der Fall.
+TRY
+    SCREEN(120, 80, "Ablage", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+PRINT "vorher "; CLIPBOARD_HAS_IMAGE(); " "; CLIPBOARD_GET_IMAGE()
+DIM b AS INTEGER : b = IMAGE_NEW(40, 30, RGB(200, 30, 60))
+PRINT "gesetzt "; CLIPBOARD_SET_IMAGE(b)
+DIM c AS INTEGER : c = CLIPBOARD_GET_IMAGE()
+PRINT "zurueck "; CLIPBOARD_HAS_IMAGE(); " "; IMAGE_WIDTH(c); "x"; IMAGE_HEIGHT(c); " neues bild "; c <> b
+--- erwartet
+vorher FALSE -1
+gesetzt TRUE
+zurueck TRUE 40x30 neues bild TRUE

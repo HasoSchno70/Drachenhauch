@@ -193,6 +193,9 @@ xmrsplayer = { version = "0.13", optional = true }
 # Desktop-GUI -> ans graphics-Feature gekoppelt. Auf Windows pure-Rust (windows-sys),
 # keine C-Toolchain.
 rfd = { version = "0.18", optional = true, default-features = false, features = ["xdg-portal"] }
+# Bilder und Dateilisten ueber die Zwischenablage (CLIPBOARD_*_IMAGE/_FILES);
+# Text geht weiter ueber GLFW. Wie rfd nur auf dem Desktop (Feature dialogs).
+arboard = { version = "3", optional = true, default-features = false, features = ["image-data"] }
 # Video (Modul `video`, src/video.rs): MP4-Container in reinem Rust, H.264
 # ueber Ciscos openh264, beim Bau aus dem Quelltext uebersetzt -- beim Nutzer
 # muss nichts installiert sein. Auf dem Desktop immer dabei (build_runtime.py).
@@ -245,7 +248,7 @@ mimalloc = { version = "0.1", default-features = false }
 cpal = { version = "0.18.1", optional = true }
 
 [target.'cfg(windows)'.dependencies]
-windows = { version = "0.62", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_Graphics_Printing", "Win32_Storage_Xps", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging", "Win32_Media_MediaFoundation", "Win32_UI_Input_Ime", "Win32_UI_Input_KeyboardAndMouse", "Win32_System_WinRT", "Win32_System_Console", "Win32_System_Com", "Win32_System_Registry", "Win32_Globalization", "Foundation", "Foundation_Collections", "Media_Core", "Media_SpeechSynthesis", "Storage_Streams"] }
+windows = { version = "0.62", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_Graphics_Printing", "Win32_Storage_Xps", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging", "Win32_Media_MediaFoundation", "Win32_UI_Input_Ime", "Win32_UI_Input_KeyboardAndMouse", "Win32_System_WinRT", "Win32_System_Console", "Win32_System_Com", "Win32_System_Ole", "Win32_System_Memory", "Win32_UI_Shell_Common", "Win32_System_Com_StructuredStorage", "Win32_System_Registry", "Win32_Globalization", "Foundation", "Foundation_Collections", "Media_Core", "Media_SpeechSynthesis", "Storage_Streams"] }
 # UIA-Adapter von AccessKit: haengt sich per Subclassing an raylibs GLFW-Fenster.
 accesskit_windows = { version = "0.35", optional = true }
 
@@ -299,7 +302,7 @@ tray = ["dep:zbus"]
 # Web-Build blockieren: rfd zieht js-sys/wasm-bindgen in einer Version nach,
 # die cpals WebAudio-Host nicht mehr uebersetzt. Auf dem Desktop immer mit
 # dabei (build_runtime.py), im WASM-Build weggelassen.
-dialogs = ["dep:rfd"]
+dialogs = ["dep:rfd", "dep:arboard"]
 video = ["dep:openh264", "dep:mp4"]
 # Webcam (src/webcam.rs) als eigenes Feature wie a11y: so uebersetzt der
 # macOS- und Linux-Weg mit `cargo check --features webcam` auch in den

@@ -58,6 +58,13 @@ Wenn das `camera`-Modul aktiv ist und `CAMERA_SET` aufgerufen wurde, interpretie
 | `FILE_DROPPED(i)` → STRING | Pfad der `i`-ten davon |
 | `CLIPBOARD_GET()` → STRING | Text aus der Zwischenablage lesen; leer, wenn sie gerade ein anderes Programm hält |
 | `CLIPBOARD_SET(text$)` | Text in die Zwischenablage legen — **Fehler**, wenn das nicht gelingt |
+| `CLIPBOARD_SET_IMAGE(bild)` → BOOLEAN | ein `IMAGE` in die Zwischenablage legen (andere Programme fügen es als Bild ein) — **Fehler**, wenn das nicht gelingt |
+| `CLIPBOARD_GET_IMAGE()` → INTEGER | das Bild aus der Zwischenablage als neues `IMAGE`; `-1`, wenn keines darin ist |
+| `CLIPBOARD_HAS_IMAGE()` → BOOLEAN | liegt gerade ein Bild darin? |
+| `CLIPBOARD_SET_FILES(pfade)` | Dateien (`ARRAY OF STRING`, relativ oder absolut) in die Zwischenablage legen — „Einfügen“ im Explorer/Finder kopiert sie |
+| `CLIPBOARD_GET_FILES()` → ARRAY OF STRING | Dateien aus der Zwischenablage (leer, wenn keine darin sind) |
+| `DRAG_OUT_FILES(pfade)` → STRING | Dateien aus dem Fenster **hinausziehen** (auf den Desktop, in ein Mail-Programm …); liefert `"kopieren"`, `"verschieben"`, `"verknuepfen"` oder `""` |
+| `DRAG_OUT_TEXT(text$)` → STRING | Text hinausziehen (in einen Editor, ein Textfeld) — wie `DRAG_OUT_FILES` |
 | `GFX_PUSH()` | Zeichenzustand sichern: Kamera, Ebenen, Licht, Umgebung, Schatten, 3D-Kamera, Schrift, `POSTFX` |
 | `GFX_POP()` | ihn zurückholen — **ohne vorheriges `PUSH` ein Fehler** |
 | `GFX_DEPTH()` → INTEGER | wie tief ist der Stapel? |
@@ -112,6 +119,32 @@ CATCH e
     TEXT(10, 10, "Kopieren ging gerade nicht")
 END TRY
 ```
+
+### Bilder und Dateien, Ziehen hinaus
+
+Text geht über GLFW; **Bilder und Dateilisten** über die Zwischenablage des
+Systems (Windows, macOS, Linux mit X11 -- unter Wayland über XWayland).
+`CLIPBOARD_GET_IMAGE` legt ein neues `IMAGE` an, das man wie jedes andere
+zeichnet, bearbeitet oder mit `IMAGE_FREE` wieder freigibt.
+
+**Ziehen hinaus** (`DRAG_OUT_FILES`, `DRAG_OUT_TEXT`) übergibt den Zug dem
+System: der Befehl kehrt erst zurück, wenn abgelegt oder abgebrochen ist
+(ESC), und nennt, was das Ziel getan hat. Er beginnt **nur, solange die
+linke Maustaste gedrückt ist** -- ohne Taste legte das System sofort dort
+ab, wo der Zeiger steht; dann liefert er sofort `""`. Gedacht ist er für den
+Moment, in dem ein gui-Zug (`GUI_DRAGGING()`) das Fenster verlässt:
+
+```basic
+IMPORT "gui"
+IF GUI_DRAGGING() AND (MOUSEX() < 0 OR MOUSEY() < 0 OR MOUSEX() >= SCREENWIDTH() OR MOUSEY() >= SCREENHEIGHT()) THEN
+    PRINT DRAG_OUT_FILES(["bericht.pdf"])
+END IF
+```
+
+Ziehen hinaus gibt es bisher **nur unter Windows** (über die Shell, wie der
+Explorer selbst); unter macOS und Linux liefert es `""`. Mit
+`DHRT_ZWISCHENABLAGE=privat` (jedes Programm unter `dhrt test`) bleiben auch
+Bilder und Dateilisten im Prozess.
 
 Klassischer Game-Loop:
 

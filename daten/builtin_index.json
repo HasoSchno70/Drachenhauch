@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 2467,
+ "count": 2474,
  "builtins": [
   {
    "name": "ABS",
@@ -2238,6 +2238,48 @@
    "name": "CLIPBOARD_GET",
    "kind": "graphics",
    "signature": "CLIPBOARD_GET() AS STRING",
+   "module": "core"
+  },
+  {
+   "name": "CLIPBOARD_SET_IMAGE",
+   "kind": "graphics",
+   "signature": "CLIPBOARD_SET_IMAGE(bild) AS BOOLEAN",
+   "module": "core"
+  },
+  {
+   "name": "CLIPBOARD_GET_IMAGE",
+   "kind": "graphics",
+   "signature": "CLIPBOARD_GET_IMAGE() AS INTEGER",
+   "module": "core"
+  },
+  {
+   "name": "CLIPBOARD_HAS_IMAGE",
+   "kind": "graphics",
+   "signature": "CLIPBOARD_HAS_IMAGE() AS BOOLEAN",
+   "module": "core"
+  },
+  {
+   "name": "CLIPBOARD_SET_FILES",
+   "kind": "graphics",
+   "signature": "CLIPBOARD_SET_FILES(pfade)",
+   "module": "core"
+  },
+  {
+   "name": "CLIPBOARD_GET_FILES",
+   "kind": "graphics",
+   "signature": "CLIPBOARD_GET_FILES() AS ARRAY OF STRING",
+   "module": "core"
+  },
+  {
+   "name": "DRAG_OUT_FILES",
+   "kind": "graphics",
+   "signature": "DRAG_OUT_FILES(pfade) AS STRING",
+   "module": "core"
+  },
+  {
+   "name": "DRAG_OUT_TEXT",
+   "kind": "graphics",
+   "signature": "DRAG_OUT_TEXT(text$) AS STRING",
    "module": "core"
   },
   {
