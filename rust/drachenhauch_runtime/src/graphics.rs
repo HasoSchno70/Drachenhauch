@@ -272,6 +272,10 @@ struct NativPlatz {
     /// Der Adapter fuer Bildschirmleser dieses Fensters (Stufe 4) -- jedes
     /// Fenster des Systems hat seinen eigenen Baum.
     a11y: Option<crate::a11y::A11y>,
+    /// Ein Popup-Fenster (Menue ueber den Rand): zeigt den Ausschnitt ab
+    /// (x, y) der Flaeche `eigner`; Zeiger und Knoepfe darin gelten fuer
+    /// sie, in ihren Koordinaten.
+    alias: Option<(u32, i32, i32)>,
 }
 impl NativPlatz {
     fn neu(id: u32, f: crate::nativfenster::Fenster, rt: usize, b: i32, h: i32, k: f32) -> Self {
@@ -280,7 +284,7 @@ impl NativPlatz {
             id, f, rt, b, h, k, pb: pixel(b, k), ph: pixel(h, k), sichtbar: true, e: Default::default(),
             knopf_vorher: [false; MAUSTASTEN], knopf_halt: [crate::flanken::Halt::default(); MAUSTASTEN],
             taste_vorher: vec![false; TASTATUR], taste_halt: vec![crate::flanken::Halt::default(); TASTATUR],
-            zeichen: Vec::new(), schliessen: false, groesse_neu: None, system_groesse: None, besessen: false, a11y: None,
+            zeichen: Vec::new(), schliessen: false, groesse_neu: None, system_groesse: None, besessen: false, a11y: None, alias: None,
         }
     }
 }
@@ -301,9 +305,12 @@ struct RenderTarget {
     /// Verhaeltnis zum Hauptfenster -- seine Befehle sind in Punkten der gui,
     /// sein Ziel ist in Pixeln seines Schirms (`RT_MASS`).
     mass: f32,
+    /// Abspiel-Versatz in Punkten: das Ziel zeigt die Flaeche ab dieser
+    /// Stelle (ein Popup-Fenster zeigt einen Ausschnitt seines Eigners).
+    versatz: (f32, f32),
 }
 impl RenderTarget {
-    fn neu(rt: RenderTexture2D, behalten: bool) -> Self { RenderTarget { rt, cmds: Vec::new(), behalten, mass: 1.0 } }
+    fn neu(rt: RenderTexture2D, behalten: bool) -> Self { RenderTarget { rt, cmds: Vec::new(), behalten, mass: 1.0, versatz: (0.0, 0.0) } }
 }
 
 thread_local! {
@@ -312,13 +319,24 @@ thread_local! {
     /// Scissor fragen hier nach -- Text wird in voller Groesse gesetzt statt
     /// vergroessert (sonst unscharf), und der Scissor spricht Pixel.
     static RT_MASS: std::cell::Cell<f32> = const { std::cell::Cell::new(1.0) };
+    /// Versatz des Ziels, das gerade abgespielt wird (`RenderTarget::versatz`),
+    /// in Punkten -- wie der Massstab fuer Text und Scissor.
+    static RT_VERSATZ: std::cell::Cell<(f32, f32)> = const { std::cell::Cell::new((0.0, 0.0)) };
 }
 /// Zeichnet `f` ohne die Matrix des Abspiel-Massstabs und gibt ihm den
 /// Faktor mit, um den es Lage und Groesse selbst vergroessern soll.
 fn ohne_rt_matrix<R>(f: impl FnOnce(f32) -> R) -> R {
     let m = RT_MASS.with(|c| c.get());
-    if m == 1.0 { return f(1.0); }
-    unsafe { raylib::ffi::rlPushMatrix(); raylib::ffi::rlScalef(1.0 / m, 1.0 / m, 1.0); }
+    let (vx, vy) = RT_VERSATZ.with(|c| c.get());
+    if m == 1.0 && vx == 0.0 && vy == 0.0 { return f(1.0); }
+    // Die Matrix des Abspielens ist S(m) * T(-v); Text setzt seine Lage
+    // selbst mal m. Gebraucht wird T(-v*m) = S(m) T(-v) * T(v) S(1/m) T(-v*m).
+    unsafe {
+        raylib::ffi::rlPushMatrix();
+        raylib::ffi::rlTranslatef(vx, vy, 0.0);
+        raylib::ffi::rlScalef(1.0 / m, 1.0 / m, 1.0);
+        raylib::ffi::rlTranslatef(-vx * m, -vy * m, 0.0);
+    }
     let r = f(m);
     unsafe { raylib::ffi::rlPopMatrix(); }
     r
@@ -1685,6 +1703,12 @@ fn ausweich_datei_fuer(c: u32) -> &'static [&'static str] {
     let hangul = matches!(c, 0x1100..=0x11FF | 0x3130..=0x318F | 0xA960..=0xA97F | 0xAC00..=0xD7FF);
     let emoji = ist_emoji(c);
     let thai = matches!(c, 0xE00..=0xE7F);
+    // Schriften, die erst die Formung richtig setzt (formung.rs) -- hier nur,
+    // WELCHE Datei sie hat.
+    let indisch = matches!(c, 0x0900..=0x0DFF | 0xA8E0..=0xA8FF | 0x1CD0..=0x1CFF);
+    let myanmar = matches!(c, 0x1000..=0x109F | 0xA9E0..=0xA9FF | 0xAA60..=0xAA7F);
+    let khmer_lao = matches!(c, 0x0E80..=0x0EFF | 0x1780..=0x17FF | 0x19E0..=0x19FF);
+    let tibet = matches!(c, 0x0F00..=0x0FFF);
     #[cfg(target_os = "windows")]
     {
         // Sammlungen (.ttc) loest `schrift_laden` auf -- MS Gothic (japanische
@@ -1695,11 +1719,17 @@ fn ausweich_datei_fuer(c: u32) -> &'static [&'static str] {
         if hangul { return &["C:/Windows/Fonts/malgun.ttf", "C:/Windows/Fonts/gulim.ttc"]; }
         if emoji { return &["C:/Windows/Fonts/seguiemj.ttf", "C:/Windows/Fonts/seguisym.ttf"]; }
         if thai { return &["C:/Windows/Fonts/leelawui.ttf", "C:/Windows/Fonts/segoeui.ttf"]; }
+        if indisch { return &["C:/Windows/Fonts/Nirmala.ttc", "C:/Windows/Fonts/Nirmala.ttf", "C:/Windows/Fonts/mangal.ttf"]; }
+        if myanmar { return &["C:/Windows/Fonts/mmrtext.ttf"]; }
+        if khmer_lao { return &["C:/Windows/Fonts/leelawui.ttf", "C:/Windows/Fonts/LeelawUI.ttf"]; }
+        if tibet { return &["C:/Windows/Fonts/himalaya.ttf"]; }
         return &["C:/Windows/Fonts/segoeui.ttf", "C:/Windows/Fonts/seguisym.ttf", "C:/Windows/Fonts/arial.ttf"];
     }
     #[cfg(target_os = "macos")]
     {
-        let _ = (hangul, emoji, thai);
+        let _ = (hangul, emoji, thai, myanmar, khmer_lao, tibet);
+        if indisch { return &["/System/Library/Fonts/Kohinoor.ttc", "/System/Library/Fonts/Supplemental/ITFDevanagari.ttc",
+                              "/System/Library/Fonts/Supplemental/Arial Unicode.ttf"]; }
         if cjk || hangul || thai { return &["/System/Library/Fonts/Supplemental/Arial Unicode.ttf", "/Library/Fonts/Arial Unicode.ttf",
                                              "/System/Library/Fonts/PingFang.ttc", "/System/Library/Fonts/Hiragino Sans GB.ttc"]; }
         return &["/System/Library/Fonts/Supplemental/Arial Unicode.ttf", "/System/Library/Fonts/Helvetica.ttc"];
@@ -1714,6 +1744,25 @@ fn ausweich_datei_fuer(c: u32) -> &'static [&'static str] {
                      "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc"];
         }
         if thai { return &["/usr/share/fonts/truetype/noto/NotoSansThai-Regular.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"]; }
+        if indisch {
+            // Je Block die Noto-Schrift (fonts-noto-core), dazu Lohit.
+            return match c {
+                0x0980..=0x09FF => &["/usr/share/fonts/truetype/noto/NotoSansBengali-Regular.ttf"],
+                0x0A00..=0x0A7F => &["/usr/share/fonts/truetype/noto/NotoSansGurmukhi-Regular.ttf"],
+                0x0A80..=0x0AFF => &["/usr/share/fonts/truetype/noto/NotoSansGujarati-Regular.ttf"],
+                0x0B00..=0x0B7F => &["/usr/share/fonts/truetype/noto/NotoSansOriya-Regular.ttf"],
+                0x0B80..=0x0BFF => &["/usr/share/fonts/truetype/noto/NotoSansTamil-Regular.ttf"],
+                0x0C00..=0x0C7F => &["/usr/share/fonts/truetype/noto/NotoSansTelugu-Regular.ttf"],
+                0x0C80..=0x0CFF => &["/usr/share/fonts/truetype/noto/NotoSansKannada-Regular.ttf"],
+                0x0D00..=0x0D7F => &["/usr/share/fonts/truetype/noto/NotoSansMalayalam-Regular.ttf"],
+                0x0D80..=0x0DFF => &["/usr/share/fonts/truetype/noto/NotoSansSinhala-Regular.ttf"],
+                _ => &["/usr/share/fonts/truetype/noto/NotoSansDevanagari-Regular.ttf",
+                       "/usr/share/fonts/truetype/lohit-devanagari/Lohit-Devanagari.ttf"],
+            };
+        }
+        if myanmar { return &["/usr/share/fonts/truetype/noto/NotoSansMyanmar-Regular.ttf"]; }
+        if khmer_lao { return &["/usr/share/fonts/truetype/noto/NotoSansKhmer-Regular.ttf", "/usr/share/fonts/truetype/noto/NotoSansLao-Regular.ttf"]; }
+        if tibet { return &["/usr/share/fonts/truetype/noto/NotoSerifTibetan-Regular.ttf"]; }
         return &["/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "/usr/share/fonts/TTF/DejaVuSans.ttf",
                  "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf"];
     }
@@ -1852,12 +1901,12 @@ unsafe fn leere_textur(w: i32, h: i32) -> u32 {
 
 /// Eine eingebaute Schrift steht in `font_herkunft` als "eingebaut:sans" --
 /// so laufen sie und eine Datei durch dieselben Wege (Laden, Schnitte).
-const EINGEBAUT_VORSATZ: &str = "eingebaut:";
+pub(crate) const EINGEBAUT_VORSATZ: &str = "eingebaut:";
 
 #[cfg(feature = "schriften")]
-fn eingebaute_schrift(name: &str) -> Option<&'static [u8]> { crate::schriften::eingebaute_schrift(name) }
+pub(crate) fn eingebaute_schrift(name: &str) -> Option<&'static [u8]> { crate::schriften::eingebaute_schrift(name) }
 #[cfg(not(feature = "schriften"))]
-fn eingebaute_schrift(_name: &str) -> Option<&'static [u8]> { None }
+pub(crate) fn eingebaute_schrift(_name: &str) -> Option<&'static [u8]> { None }
 
 /// LOADFONT("sans", 32): ein Name der eingebauten DejaVu-Schriften (sans,
 /// serif, mono, je mit -fett/-kursiv/-fett-kursiv). Eine Datei gleichen
@@ -2378,7 +2427,7 @@ impl Graphics {
         let s = &*self.visuell(s);
         self.glyphen_pruefen(h, s);
         let basis = self.font_von(h);
-        if s.is_ascii() || basis.is_none() {
+        if (s.is_ascii() && !formen_noetig(h, 0, s)) || basis.is_none() {
             return match basis {
                 Some(f) => f.measure_text(s, size, self.text_spacing).x,
                 None => std_breite(s, size, &self.ausweich),
@@ -2390,7 +2439,8 @@ impl Graphics {
             let f = if fi == 0 { basis.unwrap() } else { &self.ausweich[fi - 1].font };
             if !erster { breite += self.text_spacing; }
             erster = false;
-            breite += f.measure_text(&lauf, size, self.text_spacing).x;
+            let geformt = if formen_noetig(h, fi, &lauf) { lauf_pfad(h, fi, &self.ausweich).and_then(|p| breite_geformt(&p, &lauf, size)) } else { None };
+            breite += geformt.unwrap_or_else(|| f.measure_text(&lauf, size, self.text_spacing).x);
         }
         breite
     }
@@ -2698,7 +2748,7 @@ impl Graphics {
         let dichte = self.haupt_dichte();
         let mut a11y = None;
         let (f, k) = crate::nativfenster::Fenster::anlegen(self.haupt_glfw as *mut std::ffi::c_void, dichte, titel, b, h, x, y, aenderbar, rahmen,
-            &mut |os| { a11y = crate::a11y::A11y::neu(os as *mut std::ffi::c_void); })?;
+            None, &mut |os| { a11y = crate::a11y::A11y::neu(os as *mut std::ffi::c_void); })?;
         let rt = match render_ziel(&mut self.rl, &self.thread, pixel(b, k) as u32, pixel(h, k) as u32) {
             Ok(rt) => rt,
             Err(_) => { f.schliessen(self.haupt_glfw as *mut std::ffi::c_void); return None; }
@@ -2716,6 +2766,64 @@ impl Graphics {
         self.nativ.push(p);
         Some(id)
     }
+    /// Popups als eigene Fenster ueber den Rand der nativen (nicht unter
+    /// Wayland, siehe `nativfenster::popups_moeglich`).
+    pub fn nativ_popups_moeglich(&self) -> bool { crate::nativfenster::popups_moeglich() }
+    /// Ein Popup-Fenster ueber dem Rand der Flaeche `eigner`: es zeigt deren
+    /// Ausschnitt (x, y, b, h) -- Punkte in ihren Koordinaten, auch
+    /// ausserhalb ihres Fensters. Zeiger und Knoepfe darin gehen an `eigner`.
+    pub fn nativ_popup_anlegen(&mut self, eigner: u32, x: i32, y: i32, b: i32, h: i32) -> Option<u32> {
+        use crate::nativfenster::pixel;
+        let (b, h) = (b.max(1), h.max(1));
+        let ep = self.nativ_platz(eigner)?;
+        let (k, besitzer, titel) = (ep.k, ep.f.handle() as *mut std::ffi::c_void, format!("{} Popup", ep.f.titel()));
+        let (lx, ly) = ep.f.lage();
+        let (f, k) = crate::nativfenster::Fenster::anlegen(self.haupt_glfw as *mut std::ffi::c_void, self.haupt_dichte(), &titel, b, h,
+            lx + pixel(x, k), ly + pixel(y, k), false, false, Some((besitzer, k)), &mut |_| {})?;
+        let rt = match render_ziel(&mut self.rl, &self.thread, pixel(b, k) as u32, pixel(h, k) as u32) {
+            Ok(rt) => rt,
+            Err(_) => { f.schliessen(self.haupt_glfw as *mut std::ffi::c_void); return None; }
+        };
+        let mut ziel = RenderTarget::neu(rt, false);
+        ziel.mass = k;
+        ziel.versatz = (x as f32, y as f32);
+        let platz = match self.nativ_frei.pop() {
+            Some(i) => { self.render_targets[i] = ziel; i }
+            None => { self.render_targets.push(ziel); self.render_targets.len() - 1 }
+        };
+        let id = self.nativ_naechste;
+        self.nativ_naechste += 1;
+        let mut p = NativPlatz::neu(id, f, platz, b, h, k);
+        p.alias = Some((eigner, x, y));
+        self.nativ.push(p);
+        Some(id)
+    }
+    /// Ausschnitt eines Popup-Fensters neu setzen (ein Untermenue wandert,
+    /// eine Liste waechst); Lage und Groesse folgen.
+    pub fn nativ_popup_setzen(&mut self, id: u32, x: i32, y: i32, b: i32, h: i32) {
+        use crate::nativfenster::pixel;
+        let Some((eigner, ax, ay)) = self.nativ_platz(id).and_then(|p| p.alias) else { return };
+        let Some(lage) = self.nativ_platz(eigner).map(|e| e.f.lage()) else { return };
+        let k = self.nativ_platz(id).map(|p| p.k).unwrap_or(1.0);
+        self.nativ_groesse(id, b, h, true);
+        if let Some(p) = self.nativ_platz_mut(id) {
+            let rt = p.rt;
+            if (ax, ay) != (x, y) { p.alias = Some((eigner, x, y)); }
+            p.f.lage_setzen(lage.0 + pixel(x, k), lage.1 + pixel(y, k));
+            self.render_targets[rt].versatz = (x as f32, y as f32);
+        }
+    }
+    /// Wie weit darf ein Popup der Flaeche `id` reichen? Der Arbeitsbereich
+    /// ihres Schirms, in Punkten ihrer Koordinaten: (x0, y0, x1, y1).
+    pub fn nativ_arbeitsflaeche(&self, id: u32) -> Option<(i32, i32, i32, i32)> {
+        let p = self.nativ_platz(id)?;
+        let (ax, ay, ab, ah) = p.f.arbeitsflaeche()?;
+        let (lx, ly) = p.f.lage();
+        let pt = |v: i32| crate::nativfenster::punkte(v as f64, p.k).floor() as i32;
+        Some((pt(ax - lx), pt(ay - ly), pt(ax + ab - lx), pt(ay + ah - ly)))
+    }
+    /// Groesse einer Flaeche in Punkten.
+    pub fn nativ_punkte(&self, id: u32) -> Option<(i32, i32)> { self.nativ_platz(id).map(|p| (p.b, p.h)) }
     /// Dichte des Schirms, auf dem das Hauptfenster steht (Bezug fuer den
     /// Massstab der nativen Fenster).
     fn haupt_dichte(&self) -> f32 { self.rl.get_window_scale_dpi().x }
@@ -2808,7 +2916,7 @@ impl Graphics {
     /// geschickten Fensternachrichten (Pruefungen), und waehrend eine Taste
     /// haengt, meldet das Fenster mit dem Druck den Zeiger auch ausserhalb.
     pub fn zeiger_bildschirm(&self) -> (i32, i32) {
-        let z = self.zeiger_flaeche();
+        let z = self.zeiger_fenster();
         if z != 0 {
             if let Some(p) = self.nativ_platz(z) {
                 let (x, y) = p.f.lage();
@@ -2818,6 +2926,8 @@ impl Graphics {
         let (x, y) = self.fenster_lage();
         (x + self.rl.get_mouse_x(), y + self.rl.get_mouse_y())
     }
+    /// Das Hauptfenster des Systems (HWND unter Windows, sonst 0).
+    pub fn haupt_os_handle(&self) -> usize { crate::nativfenster::os_handle(self.haupt_glfw as *mut std::ffi::c_void) }
     /// Der Massstab von SCREEN (Systempunkte je Punkt des Programms).
     pub fn haupt_massstab(&self) -> i32 { self.scale.max(1) }
     /// Die gui liest (Some) oder das Programm (None); Some(k) = durch die
@@ -2825,12 +2935,20 @@ impl Graphics {
     pub fn sicht_setzen(&mut self, s: Option<u32>) { self.sicht = s; }
     /// Ueber welcher Oberflaeche steht der Zeiger? (0 = Hauptfenster)
     pub fn zeiger_flaeche(&self) -> u32 {
+        let roh = self.zeiger_fenster();
+        self.nativ_platz(roh).and_then(|p| p.alias).map(|a| a.0).unwrap_or(roh)
+    }
+    /// Ueber welchem Fenster steht der Zeiger wirklich -- ein Popup-Fenster
+    /// ist hier es selbst, nicht sein Eigner.
+    fn zeiger_fenster(&self) -> u32 {
         let drinnen: Vec<(u32, bool)> = self.nativ.iter().map(|p| (p.id, p.e.drinnen && p.sichtbar)).collect();
         crate::nativfenster::zeiger_flaeche(self.nativ_gefangen, &drinnen)
     }
     /// Welche Oberflaeche hat den Tastaturfokus des Systems? (0 = das
     /// Hauptfenster oder keine der nativen)
-    pub fn fokus_flaeche(&self) -> u32 { self.nativ.iter().find(|p| p.e.fokus).map(|p| p.id).unwrap_or(0) }
+    pub fn fokus_flaeche(&self) -> u32 {
+        self.nativ.iter().find(|p| p.e.fokus).map(|p| p.alias.map(|a| a.0).unwrap_or(p.id)).unwrap_or(0)
+    }
     /// Mauslage in der Sicht der gui: Some, wenn sie gerade durch eine
     /// Oberflaeche schaut -- weit draussen, wenn der Zeiger nicht dort ist.
     fn nativ_maus(&self) -> Option<(i64, i64)> {
@@ -2838,9 +2956,12 @@ impl Graphics {
         let z = self.zeiger_flaeche();
         if s != z { return Some((-100_000, -100_000)); }
         if s == 0 { return None; }
-        // Pixel des Fensters -> Punkte der gui (Massstab des Schirms).
+        // Pixel des Fensters -> Punkte der gui (Massstab des Schirms); in
+        // einem Popup-Fenster dazu dessen Versatz in der Flaeche.
         use crate::nativfenster::punkte;
-        self.nativ_platz(s).map(|p| (punkte(p.e.maus.0, p.k).floor() as i64, punkte(p.e.maus.1, p.k).floor() as i64))
+        let p = self.nativ_platz(self.zeiger_fenster())?;
+        let (vx, vy) = p.alias.map(|a| (a.1 as i64, a.2 as i64)).unwrap_or((0, 0));
+        Some((punkte(p.e.maus.0, p.k).floor() as i64 + vx, punkte(p.e.maus.1, p.k).floor() as i64 + vy))
     }
     /// (unten, neu, los) einer Maustaste in der Sicht der gui, wenn sie
     /// durch ein natives Fenster schaut oder der Zeiger nicht in ihrer ist.
@@ -2850,7 +2971,7 @@ impl Graphics {
         let z = self.zeiger_flaeche();
         if s != z { return Some((false, false, false)); }
         if s == 0 { return None; }
-        let p = self.nativ_platz(s)?;
+        let p = self.nativ_platz(self.zeiger_fenster())?;
         let k = b as usize;
         let (jetzt, vorher, h) = (p.e.knopf_unten[k], p.knopf_vorher[k], p.knopf_halt[k]);
         Some((jetzt || h.unten, (jetzt && !vorher) || h.neu, (!jetzt && vorher) || h.los))
@@ -2871,7 +2992,7 @@ impl Graphics {
         let z = self.zeiger_flaeche();
         if s != z { return Some((0.0, 0.0)); }
         if s == 0 { return None; }
-        self.nativ_platz(s).map(|p| p.e.rad)
+        self.nativ_platz(self.zeiger_fenster()).map(|p| p.e.rad)
     }
     /// Einmal je Bild, nach EndDrawing: zeigen, Eingang abholen.
     fn nativ_bild(&mut self) {
@@ -2949,6 +3070,8 @@ impl Graphics {
         let haupt_d = self.haupt_dichte();
         let wechsel: Vec<(u32, i32, i32, f32)> = self.nativ.iter()
             .filter(|p| self.nativ_gefangen != Some(p.id))
+            // Ein Popup-Fenster behaelt den Massstab seines Eigners.
+            .filter(|p| p.alias.is_none())
             .filter_map(|p| {
                 let k = crate::nativfenster::verhaeltnis(p.f.dichte(), haupt_d, crate::nativfenster::massstab_vorgabe());
                 ((k - p.k).abs() > 0.005).then_some((p.id, p.b, p.h, k))
@@ -4769,6 +4892,7 @@ impl Graphics {
                             let fs = self.font_sizes.get(basis as usize).copied().unwrap_or(groesse);
                             self.font_sizes.push(fs);
                             self.font_herkunft.push((kand.clone(), zeichen.clone(), groesse));
+                            crate::formung::schrift_merken((self.font_herkunft.len() - 1) as i64, &kand);
                             ergebnis = ((self.fonts.len() - 1) as i64, s & !v);
                             break 'suche;
                         }
@@ -4896,6 +5020,7 @@ impl Graphics {
         self.fonts.push(f);
         self.font_sizes.push(size.max(4));   // SETFONT uebernimmt diese Groesse
         self.font_herkunft.push((path.to_string(), chars, size.max(4)));
+        crate::formung::schrift_merken((self.font_herkunft.len() - 1) as i64, path);
         Ok((self.fonts.len() - 1) as i64)
     }
 
@@ -4919,6 +5044,7 @@ impl Graphics {
         self.fonts.push(f);
         self.font_sizes.push(size.max(4));
         self.font_herkunft.push((path.to_string(), chars, size.max(4)));
+        crate::formung::schrift_merken((self.font_herkunft.len() - 1) as i64, path);
         Ok((self.fonts.len() - 1) as i64)
     }
 
@@ -4998,6 +5124,7 @@ impl Graphics {
         self.fonts.push(f);
         self.font_sizes.push(0);   // Sentinel: Default-Font wendet seine Groesse NICHT an
         self.font_herkunft.push((path.to_string(), chars, size.max(4)));
+        crate::formung::schrift_merken((self.font_herkunft.len() - 1) as i64, path);
         Ok((self.fonts.len() - 1) as i64)
     }
     /// Aktiven Font setzen (-1 = Default). Ungueltige Handles -> Fehler.
@@ -8081,6 +8208,8 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
                 // Rueckkopplung/Nachzieheffekten.
                 let behalten = render_targets[i].behalten;
                 let m = render_targets[i].mass;
+                let (vx, vy) = render_targets[i].versatz;
+                let abbild = m != 1.0 || vx != 0.0 || vy != 0.0;
                 let mut tx = rl.begin_texture_mode(thread, &mut render_targets[i].rt);
                 let clear = if behalten { None } else { Some(clear_rt) };
                 // Maßstab 1, NICHT der Fenster-Maßstab `s`: ein Render-Target
@@ -8093,11 +8222,16 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
                 // Ein natives Fenster auf einem Schirm anderer Dichte: die
                 // Matrix vergroessert die Geometrie (glatt, ohne Rundung je
                 // Ecke), Text und Scissor lesen `RT_MASS`.
-                if m != 1.0 { RT_MASS.with(|c| c.set(m)); unsafe { raylib::ffi::rlPushMatrix(); raylib::ffi::rlScalef(m, m, 1.0); } }
+                // Ein Popup-Fenster zeigt seinen Eigner ab dem Versatz.
+                if abbild {
+                    RT_MASS.with(|c| c.set(m));
+                    RT_VERSATZ.with(|c| c.set((vx, vy)));
+                    unsafe { raylib::ffi::rlPushMatrix(); raylib::ffi::rlScalef(m, m, 1.0); raylib::ffi::rlTranslatef(-vx, -vy, 0.0); }
+                }
                 render_scene(&mut tx, 1, clear, &synth, &[0], textures, fonts, ausweich, font_glyphs,
                     &[], cam, &[], None, (-1, -1, -1, -1), &empty_set, &empty_map, &empty_emis,
                     (false, 0, 0, 0), &[], None, None, None, None);
-                if m != 1.0 { unsafe { raylib::ffi::rlPopMatrix(); } RT_MASS.with(|c| c.set(1.0)); }
+                if abbild { unsafe { raylib::ffi::rlPopMatrix(); } RT_MASS.with(|c| c.set(1.0)); RT_VERSATZ.with(|c| c.set((0.0, 0.0))); }
             }
         }
         let rts: &[RenderTarget] = render_targets;
@@ -8375,10 +8509,70 @@ fn std_breite(txt: &str, size: f32, ausweich: &[Ausweich]) -> f32 {
         b += if fi == 0 { std.measure_text(&lauf, sz, sp).x } else {
             let f = &ausweich[fi - 1].font;
             let (fsz, _) = an_pixelschrift(f, sz);
-            f.measure_text(&lauf, fsz, sp).x
+            let geformt = if formen_noetig(-1, fi, &lauf) { lauf_pfad(-1, fi, ausweich).and_then(|p| breite_geformt(&p, &lauf, fsz)) } else { None };
+            geformt.unwrap_or_else(|| f.measure_text(&lauf, fsz, sp).x)
         };
     }
     b
+}
+
+/// Muss dieser Lauf geformt werden? Zeichen einer komplexen Schrift, oder
+/// die Ligaturen seiner Schrift sind an (formung.rs).
+fn formen_noetig(h: i64, fi: usize, lauf: &str) -> bool {
+    crate::formung::braucht(lauf) || (fi == 0 && h >= 0 && crate::formung::ligaturen(h))
+}
+
+/// Die Datei der Schrift eines Laufs: 0 = die gewaehlte (Handle `h`),
+/// k > 0 = Ausweich-Schrift k-1. None fuer die eingebaute Pixelschrift.
+fn lauf_pfad(h: i64, fi: usize, ausweich: &[Ausweich]) -> Option<String> {
+    if fi > 0 { return ausweich.get(fi - 1).map(|a| a.datei.clone()); }
+    if h == FONT_AUSWEICH { return ausweich.first().map(|a| a.datei.clone()); }
+    if h < 0 { return None; }
+    crate::formung::pfad_von(h)
+}
+
+thread_local! {
+    /// Geformte Glyphen als Texturen: (Datei, Glyphe, Groesse*16) ->
+    /// (Textur, links, oben). None merkt sich eine leere Glyphe.
+    static GLYPH_TEX: std::cell::RefCell<std::collections::HashMap<(String, u16, u32), Option<(raylib::ffi::Texture2D, f32, f32)>>> =
+        std::cell::RefCell::new(std::collections::HashMap::new());
+}
+
+fn glyph_textur(pfad: &str, gid: u16, px: f32) -> Option<(raylib::ffi::Texture2D, f32, f32)> {
+    let k = (pfad.to_string(), gid, (px * 16.0).round() as u32);
+    if let Some(t) = GLYPH_TEX.with(|m| m.borrow().get(&k).copied()) { return t; }
+    let t = crate::formung::rastern(pfad, gid, px).and_then(|b| {
+        // Weiss mit Deckkraft: die Farbe kommt beim Zeichnen als Toenung.
+        let mut daten: Vec<u8> = Vec::with_capacity(b.b * b.h * 2);
+        for &a in &b.deckung { daten.push(255); daten.push(a); }
+        let img = raylib::ffi::Image {
+            data: daten.as_mut_ptr() as *mut std::ffi::c_void, width: b.b as i32, height: b.h as i32, mipmaps: 1,
+            format: raylib::ffi::PixelFormat::PIXELFORMAT_UNCOMPRESSED_GRAY_ALPHA as i32,
+        };
+        let tex = unsafe { raylib::ffi::LoadTextureFromImage(img) };
+        drop(daten);
+        (tex.id != 0).then_some((tex, b.links, b.oben))
+    });
+    GLYPH_TEX.with(|m| { m.borrow_mut().insert(k, t); });
+    t
+}
+
+/// Einen Lauf geformt zeichnen (formung.rs); liefert seine Breite. None,
+/// wenn die Schrift sich nicht formen laesst -- dann zeichnet raylib.
+fn zeichne_geformt(pfad: &str, txt: &str, x: f32, y: f32, size: f32, col: Color) -> Option<f32> {
+    let g = crate::formung::formen(pfad, txt, size)?;
+    let grund = y + g.grundlinie;
+    for &(gid, gx, gy) in &g.glyphen {
+        if let Some((tex, links, oben)) = glyph_textur(pfad, gid, size) {
+            unsafe { raylib::ffi::DrawTexture(tex, (x + gx + links).round() as i32, (grund + gy - oben).round() as i32, col.into()); }
+        }
+    }
+    Some(g.breite)
+}
+
+/// Breite eines geformten Laufs (dieselbe Formung wie beim Zeichnen).
+fn breite_geformt(pfad: &str, txt: &str, size: f32) -> Option<f32> {
+    crate::formung::formen(pfad, txt, size).map(|g| g.breite)
 }
 
 fn font_zu_handle<'a>(h: i64, fonts: &'a [Font], ausweich: &'a [Ausweich]) -> Option<&'a Font> {
@@ -8431,6 +8625,13 @@ fn zeichne_text<D: RaylibDraw>(d: &mut D, h: i64, txt: &str, x: f32, y: f32, siz
             for (fi, lauf) in text_laeufe(-1, &txt, std_hat, ausweich) {
                 if !erster { cx += sp; }
                 erster = false;
+                if fi > 0 && formen_noetig(-1, fi, &lauf) {
+                    let (fsz, dy) = an_pixelschrift(&ausweich[fi - 1].font, sz);
+                    if let Some(b) = lauf_pfad(-1, fi, ausweich).and_then(|p| zeichne_geformt(&p, &lauf, cx, y + dy, fsz, col)) {
+                        cx += b;
+                        continue;
+                    }
+                }
                 if fi == 0 {
                     d.draw_text_ex(&std, &lauf, Vector2::new(cx, y), sz, sp, col);
                     cx += std.measure_text(&lauf, sz, sp).x;
@@ -8444,7 +8645,7 @@ fn zeichne_text<D: RaylibDraw>(d: &mut D, h: i64, txt: &str, x: f32, y: f32, siz
             return;
         }
     };
-    if txt.is_ascii() || ausweich.is_empty() {
+    if (txt.is_ascii() || ausweich.is_empty()) && !formen_noetig(h, 0, txt) {
         sdf::mit(h, || d.draw_text_ex(basis, txt, Vector2::new(x, y), size, spacing, col));
         return;
     }
@@ -8459,6 +8660,12 @@ fn zeichne_text<D: RaylibDraw>(d: &mut D, h: i64, txt: &str, x: f32, y: f32, siz
         let f = if fi == 0 { basis } else { &ausweich[fi - 1].font };
         if !erster { cx += spacing; }
         erster = false;
+        if formen_noetig(h, fi, &lauf) {
+            if let Some(b) = lauf_pfad(h, fi, ausweich).and_then(|p| zeichne_geformt(&p, &lauf, cx, y, size, col)) {
+                cx += b;
+                continue;
+            }
+        }
         sdf::mit(if fi == 0 { h } else { -1 }, || d.draw_text_ex(f, &lauf, Vector2::new(cx, y), size, spacing, col));
         cx += f.measure_text(&lauf, size, spacing).x;
     }
@@ -8580,7 +8787,7 @@ fn miss_text(h: i64, txt: &str, size: f32, spacing: f32, fonts: &[Font],
         Some(f) => f,
         None => return std_breite(txt, size, ausweich),
     };
-    if txt.is_ascii() || ausweich.is_empty() { return basis.measure_text(txt, size, spacing).x; }
+    if (txt.is_ascii() || ausweich.is_empty()) && !formen_noetig(h, 0, txt) { return basis.measure_text(txt, size, spacing).x; }
     let basis_hat = |c: u32| -> bool {
         if h == FONT_AUSWEICH { ausweich.first().map_or(false, |a| a.hat.contains(&c)) }
         else { font_glyphs.get(h as usize).map_or(false, |m| m.contains(&c)) }
@@ -8591,7 +8798,8 @@ fn miss_text(h: i64, txt: &str, size: f32, spacing: f32, fonts: &[Font],
         let f = if fi == 0 { basis } else { &ausweich[fi - 1].font };
         if !erster { b += spacing; }
         erster = false;
-        b += f.measure_text(&lauf, size, spacing).x;
+        let geformt = if formen_noetig(h, fi, &lauf) { lauf_pfad(h, fi, ausweich).and_then(|p| breite_geformt(&p, &lauf, size)) } else { None };
+        b += geformt.unwrap_or_else(|| f.measure_text(&lauf, size, spacing).x);
     }
     b
 }
@@ -9313,9 +9521,10 @@ fn render_scene<D: RaylibDraw>(
                         // Der Scissor sieht die Matrix nicht -- ein Ziel mit
                         // eigenem Massstab (natives Fenster) rechnet ihn hier.
                         let m = RT_MASS.with(|c| c.get());
-                        let px = |v: i32| if m == 1.0 { v } else { (v as f32 * m).round() as i32 };
-                        let mut rx = px(x * s); let mut ry = px(y * s);
-                        let mut rw = px((x + w) * s) - rx; let mut rh = px((y + h) * s) - ry;
+                        let (vx, vy) = RT_VERSATZ.with(|c| c.get());
+                        let px = |v: i32, o: f32| if m == 1.0 && o == 0.0 { v } else { ((v as f32 - o) * m).round() as i32 };
+                        let mut rx = px(x * s, vx); let mut ry = px(y * s, vy);
+                        let mut rw = px((x + w) * s, vx) - rx; let mut rh = px((y + h) * s, vy) - ry;
                         if let Some(&(cx, cy, cw, ch)) = clip_stack.last() {
                             let nx = rx.max(cx); let ny = ry.max(cy);
                             let nx2 = (rx + rw).min(cx + cw); let ny2 = (ry + rh).min(cy + ch);

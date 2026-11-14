@@ -229,6 +229,9 @@ Einzelheiten stehen in der Geschichte des Bereichs.
   Rundweg); Handles (Texturen) stehen nicht darin.
 - Ereignisse (`GUI_CLICKED`, `GUI_CHANGED`, Antworten) gelten genau ein Bild;
   vom Programm gesetzte Werte sind keine Bedienung.
+- Wo ein Popup am Rand ausweicht, fragt es `grenze(wi)` (im nativen
+  Fenster der Schirm, dann bekommt es ein Popup-Fenster; sonst der
+  Fensterrand) -- nie `schirm()` oder `screen_width` direkt.
 - Breiten von Beschriftungen (Reiterköpfe, Werkzeugleiste) misst
   `leisten_pass` je Bild; eine Schätzung an der Zeichenzahl gilt nur bis
   dahin. Wer eine Lage von außen braucht, fragt die Laufzeit

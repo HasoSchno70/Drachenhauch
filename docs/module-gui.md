@@ -72,6 +72,7 @@ IMPORT "gui"
 | `GUI_WINDOW_NATIVE(win, an)` | BOOLEAN | das Fenster als **echtes OS-Fenster** (eigene Titelleiste, Taskleiste, zweiter Monitor) bzw. zurück ins Hauptfenster; `FALSE` heißt bei `an`: Rückfall, es bleibt ein gui-Fenster |
 | `GUI_WINDOW_IS_NATIVE(win)` | BOOLEAN | ist es gerade ein echtes OS-Fenster? |
 | `GUI_WINDOW_NATIVE_SCALE(win)` | FLOAT | um wie viel das native Fenster auf seinem Schirm größer gezeichnet wird als im Hauptfenster (Pixeldichte seines Schirms durch die des Hauptfensters); 1.0 im Hauptfenster |
+| `GUI_POPUP_WINDOWS()` | INTEGER | wie viele Popups gerade als eigenes Fenster über den Rand ihres nativen Fensters stehen (0 = alle in ihrem Fenster) |
 | `GUI_WINDOW_VISIBLE(win, an)` | — | Sichtbarkeit setzen |
 | `GUI_WINDOW_FRONT(win)` | — | Fenster nach vorn holen, ohne ihm den Fokus zu geben -- fuer eine Vorschlagsliste oder einen Tooltip, der beim Tippen ueber dem Text liegen soll. Per `GUI_WINDOW_VISIBLE` eingeblendet liegt ein Fenster sonst hinter dem zuletzt angeklickten |
 | `GUI_WINDOW_SHOWN(win)` | BOOLEAN | ist das Fenster gerade sichtbar? Das Gegenstueck zum Setzer -- ohne den Getter muesste ein Programm sich merken, was es selbst gesetzt hat, und laege daneben, sobald der Nutzer das Fenster ueber sein Kreuz schliesst |
@@ -750,9 +751,19 @@ WEND
   Klick hinein erreicht nichts und holt den Dialog nach vorn. Enter und
   ESC drücken Standard- und Abbrechen-Knopf wie sonst.
 - Kontextmenü, Hilfetext, Vorschläge, aufgeklappter Monat, Zellauswahl und
-  das Überlauf-Menü der Werkzeugleiste stehen im nativen Fenster (in
-  seinen Grenzen). Die Umwandlung einer Eingabemethode (IME) erscheint an
-  der Schreibmarke des Fensters, das den Fokus hat.
+  das Überlauf-Menü der Werkzeugleiste stehen im nativen Fenster. Die
+  Umwandlung einer Eingabemethode (IME) erscheint an der Schreibmarke des
+  Fensters, das den Fokus hat.
+- **Popups über den Rand:** ein Kontextmenü (samt Untermenüs), ein
+  Leistenmenü, eine Klappliste, die Vorschläge eines Felds, ein
+  aufgeklappter Monat oder das Rechtschreib-Menü, das über den Rand seines
+  nativen Fensters ragt, bekommt ein eigenes randloses Fenster ohne Fokus
+  und ohne Eintrag in der Taskleiste -- ausweichen muss es erst am Rand des
+  Schirms. Klicks darin wirken wie im nativen Fenster. Unter Wayland (der
+  Compositor bestimmt die Lage) und mit `DHRT_OHNE_POPUP_FENSTER=1` weicht
+  es stattdessen am Rand seines nativen Fensters aus. `GUI_POPUP_WINDOWS()`
+  zählt die offenen Popup-Fenster. Im Hauptfenster bleibt es, wie es war:
+  Popups weichen an seinem Rand aus.
 - **Pixeldichte:** steht das native Fenster auf einem Schirm mit anderer
   Skalierung als das Hauptfenster (100 % neben 150 %), wird es dort
   entsprechend größer gezeichnet -- Linien glatt, Schrift in voller Größe
@@ -772,7 +783,6 @@ WEND
   6 Zeichen a, 7 Fokus a (0/1), 8 Rad (a, b), 9 Zeiger drinnen a (0/1).
   Von Hand geschrieben braucht ein Klick ohne vorherige Bewegung im Fenster
   ein `9` davor oder nur den Druck -- der Druck hält den Zeiger.
-- **Noch nicht:** Popups über den Rand des nativen Fensters hinaus.
 - Beispiel: [`examples/219_echte_fenster.dh`](../examples/219_echte_fenster.dh)
   (Palette, modaler Dialog, abreißbare Leisten).
 - Während eines modalen Dialogs gelten nur **seine** Menüs (Kontextmenü,
@@ -1846,8 +1856,52 @@ je Bild). Gemessen mit einer Million Zeilen zu fünf Spalten: Füllen per
 `GUI_TABLE_ADD_ROW` rund 0,7 s, Sortieren 0,13 s, Filtern 0,04 s, eine Zelle
 setzen (auch in einer sortierten oder gefilterten Tabelle) 3 ms, Speicher
 rund 350 MB. Kurze Zelltexte (bis 22 Byte) kosten keine eigene Zuteilung.
-Für Datenmengen, die nicht in den Speicher passen, liest man aus der
-Datenbank seitenweise (`LIMIT`/`OFFSET`).
+Für Datenmengen, die nicht in den Speicher passen: die virtuelle Tabelle.
+
+### Virtuelle Tabelle
+
+Bei Millionen Zeilen aus einer Datenbank muss die Tabelle sie nicht alle
+halten. `GUI_TABLE_VIRTUAL(tbl, zeilen)` sagt ihr nur, wie viele es sind;
+den Inhalt liefert das Programm auf Nachfrage -- immer nur rund um das, was
+zu sehen ist. Weit entfernte Zeilen vergisst die Tabelle wieder, der
+Speicher bleibt klein, egal wie lang sie ist.
+
+| Built-in | Wirkung |
+|---|---|
+| `GUI_TABLE_VIRTUAL(tbl, zeilen)` | virtueller Modus mit dieser Zeilenzahl; nochmals gerufen (etwa nach einem anderen Filter): neue Zahl, alles Gelieferte veraltet |
+| `GUI_TABLE_NEED_FROM(tbl)` | erste Zeile, die die Tabelle gerade braucht (sichtbar oder eine Seite davor/danach); -1 = nichts |
+| `GUI_TABLE_NEED_COUNT(tbl)` | wie viele ab dort am Stück fehlen (höchstens 1000) |
+| `GUI_TABLE_SUPPLY(tbl, ab, zellen)` | Zeilen ab `ab` liefern: `ARRAY OF STRING` für eine Zeile, 2D-Feld für mehrere |
+
+```basic
+IMPORT "gui"
+DIM win AS GUI_WINDOW : win = GUI_WINDOW("Kunden", 0, 0, 600, 400)
+DIM tbl AS GUI_WIDGET : tbl = GUI_TABLE(win, 10, 10, 580, 380)
+GUI_TABLE_HEADERS(tbl, ["Nr", "Name"])
+GUI_TABLE_VIRTUAL(tbl, 5000000)
+' je Bild nach GUI_UPDATE:
+SUB nachliefern()
+    DIM von AS INTEGER : von = GUI_TABLE_NEED_FROM(tbl)
+    IF von < 0 THEN EXIT SUB
+    DIM r AS INTEGER
+    FOR r = von TO von + GUI_TABLE_NEED_COUNT(tbl) - 1
+        GUI_TABLE_SUPPLY(tbl, r, [STR$(r), "Kunde " + STR$(r)])
+    NEXT
+END SUB
+```
+
+Mit einer Datenbank liefert eine Abfrage mit `LIMIT anzahl OFFSET von` die
+Zeilen, `SELECT COUNT(*)` die Zahl. **Sortieren und Filtern macht das
+Programm** (`ORDER BY`, `WHERE`): ein Klick auf den Kopf setzt nur
+`GUI_TABLE_SORT_COL`/`GUI_TABLE_SORT_DESC` und lässt alles neu anfragen,
+ebenso ein Filter in der Filterzeile (`GUI_TABLE_GET_FILTER`) -- danach mit
+`GUI_TABLE_VIRTUAL` die neue Zahl setzen. Auswahl, Tastatur, Bearbeiten und
+`GUI_TABLE_GET_CELL` arbeiten mit Zeilennummern wie sonst; eine nicht
+gelieferte Zelle ist leer. Nicht virtuell: `GUI_TABLE_ADD_ROW`,
+`GUI_TABLE_REMOVE_ROW` und `GUI_TABLE_ROW_COLOR` (Fehler -- Farben je Zelle
+gehen), Baumtabellen. `GUI_TABLE_ROWS` und `GUI_TABLE_CLEAR` beenden den
+Modus. Höchstens rund 44 Millionen Zeilen bei 24 Punkten Zeilenhöhe (der
+Bildlauf rechnet in Punkten).
 
 ## Baum (Tree-View)
 
@@ -4142,8 +4196,9 @@ Reihenfolge, in der er getippt wurde.
 |---|---|
 | `TEXT_VISUAL$(text$ [, richtung$])` | Der Text so, wie er dasteht -- für eigene Ausgaben wie Dateien oder Bilder. `richtung$` = `auto` (Vorgabe), `ltr` oder `rtl` |
 
-Was (noch) nicht geht: Ligaturen anderer Schriften und indische Schriften
-(dafür bräuchte es eine volle Textformung); die Ausrichtung folgt nicht der
+Indische und südostasiatische Schriften und die Ligaturen einer Schrift
+setzt die Textformung ([builtins-grafik.md](builtins-grafik.md#textformung-indische-schriften-und-ligaturen)).
+Was (noch) nicht geht: die Ausrichtung folgt nicht der
 Richtung -- eine Zeile von rechts nach links steht links, solange
 `GUI_SET_ALIGN` nichts anderes sagt; in einer solchen Zeile eines
 Textbereichs fallen Fett, Kursiv und Unterstrichen weg (die Farben der

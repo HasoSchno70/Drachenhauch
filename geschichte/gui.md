@@ -903,3 +903,120 @@ Neubau) und `zelltext_kurz_und_lang`; Fall in `gui_tabelle_tempo.dhtest`
 (10000 Zellen in 100000 Zeilen; mit 2000 blieb die Gegenprobe mit dem
 vollen Neubau knapp unter der Zeitgrenze -- erst geschaerft greift sie). Offen: ein
 virtueller Modus fuer Daten, die nicht in den Speicher passen (Punkt C).
+
+## Popups ueber den Rand nativer Fenster (2026-11-14)
+
+Der letzte offene Punkt von Weg E. Ein Kontextmenue in einer kleinen
+Palette wich bis dahin am Rand des HAUPTfensters aus (die Popups fragten
+dessen Masse, `schirm()`), und was ueber den Rand des nativen Fensters
+ragte, war abgeschnitten.
+- Ein Popup, das ueber den Rand seines nativen Fensters ragt, bekommt ein
+  eigenes randloses Fenster (Windows: `WS_EX_TOOLWINDOW|WS_EX_NOACTIVATE`,
+  Besitzer das native Fenster; X11: `WM_TRANSIENT_FOR`; GLFW
+  `FOCUS_ON_SHOW` aus). Es ist ein ALIAS seiner Flaeche: sein Render-Ziel
+  spielt die obere Schicht der Flaeche ab einem Versatz ab
+  (`RenderTarget::versatz`, `RT_VERSATZ` fuer Text und Scissor wie der
+  Massstab), und Zeiger und Knoepfe darin meldet die Laufzeit als die der
+  Flaeche, plus Versatz (`zeiger_fenster` gegen `zeiger_flaeche`). Darum
+  blieben alle Treffertests unangetastet.
+- Wie weit ein Popup reicht, fragt es an EINER Stelle: `grenze(wi)` -- im
+  nativen Fenster der Arbeitsbereich seines Schirms (in seinen
+  Koordinaten), ohne Popup-Fenster sein eigener Rand, im Hauptfenster wie
+  bisher dessen Rand. Kontextmenue, Leistenmenue, Untermenues, Klappliste,
+  Vorschlaege, Monat und Rechtschreib-Menue rechnen damit.
+- Die Fenster gleicht `popup_fenster_abgleich` nach der Bedienung ab (eine
+  Teilflaeche rechnet dabei durch ihre Leihe), gezeichnet werden sie mit
+  ihrer Flaeche (`nativ_zeichnen`, `teile_zeichnen`).
+- Nicht unter Wayland (der Compositor bestimmt die Lage);
+  `DHRT_OHNE_POPUP_FENSTER=1` schaltet es ab. `GUI_POPUP_WINDOWS()` zaehlt
+  die offenen.
+Pruefung: zwei Faelle in `native_fenster.dhtest` -- das Menue bekommt ein
+Fenster und ein Klick darin waehlt Eintrag 8 (Gegenprobe: ohne Abgleich
+"kein Fenster"); ohne Popup-Fenster weicht es am Rand des nativen Fensters
+aus (Gegenprobe: mit den Massen des Hauptfensters traf derselbe Klick
+Eintrag 1). Fund nebenbei: steht der echte Zeiger ueber der Stelle, an der
+die Probefenster aufgehen, fallen die Klick-Faelle mit Massstab und
+Teilflaeche -- mit und ohne diese Aenderung (Windows meldet den echten
+Zeiger).
+
+## Virtuelle Tabelle (2026-11-14)
+
+Punkt C der grossen Tabellen: Daten, die nicht in den Speicher passen.
+`GUI_TABLE_VIRTUAL(tbl, n)` gibt der Tabelle nur die Zeilenzahl; sie haelt
+die gelieferten Zeilen in einer Tabelle nach Zeilennummer (`Virtuell`) und
+sagt mit `GUI_TABLE_NEED_FROM`/`_COUNT`, was ihr im sichtbaren Bereich
+samt einer Seite davor und danach fehlt; `GUI_TABLE_SUPPLY` liefert.
+Mehr als acht Seiten (mindestens 2000 Zeilen) Vorrat: was weiter als zwei
+Seiten weg liegt, fliegt raus.
+- Kein Rueckruf aus dem Zeichnen heraus: die gui ist dort ausgeliehen, und
+  ein Rueckruf haette in den Maschinencode-Bereich gemusst. Nachfrage und
+  Lieferung gehen ueber die Bildschleife des Programms, wie bei
+  `LVS_OWNERDATA` mit Cache-Hinweis.
+- Die Tabelle fragt ueber `ansicht`, `ansicht_len`, `zeilen_zahl` und
+  `zeile` statt `view`/`rows` direkt -- virtuell ist Ansicht = Daten
+  (das Programm sortiert und filtert). Eine andere Sortierung, ein Filter
+  oder eine neue Zahl verwerfen alles Gelieferte.
+- Grenze: der Bildlauf rechnet in i32-Punkten, also hoechstens
+  (i32::MAX/2)/Zeilenhoehe Zeilen (rund 44 Mio. bei 24).
+Pruefung: `gui_tabelle_virtuell.dhtest` (zehn Millionen Zeilen ohne
+Fenster, Sprung per `GUI_TABLE_SET_CURRENT`, Vergessen, Sortieren, Fehler
+beim Anhaengen), drei Gegenproben (Bedarf ohne Blick auf das Gelieferte,
+kein Vergessen, Sortieren ohne Verwerfen).
+
+## Nach aussen: Bilder, Dateien, Ziehen hinaus (2026-11-14)
+
+Die Luecke "Ziehen aus der Anwendung hinaus und Bilder ueber die
+Zwischenablage" aus `docs/intern/entwurf-gui-wie-gtk.md` (raylib/GLFW
+koennen beides nicht).
+- `ablage.rs`: Bilder und Dateilisten ueber `arboard` (Windows, macOS,
+  Linux/X11), am Feature `dialogs` wie rfd -- Text bleibt bei GLFW.
+  `CLIPBOARD_SET_IMAGE`/`_GET_IMAGE`/`_HAS_IMAGE`,
+  `CLIPBOARD_SET_FILES`/`_GET_FILES`; mit `DHRT_ZWISCHENABLAGE=privat`
+  auch sie im Prozess.
+- Ziehen hinaus (`DRAG_OUT_FILES`, `DRAG_OUT_TEXT`) unter Windows ueber die
+  Shell: Dateien als Shell-Objekte (`SHCreateShellItemArrayFromIDLists`,
+  `BHID_DataObject` -- der Explorer bekommt, was er von sich selbst
+  kennt), Text als CF_UNICODETEXT in `SHCreateDataObject`, gezogen mit
+  `SHDoDragDrop` und dessen eingebauter Ablagequelle (keine eigene
+  COM-Klasse). Beginnt nur bei gedrueckter linker Taste
+  (`GetAsyncKeyState`): ohne legte das System sofort unter dem Zeiger ab.
+  macOS/Linux: noch nicht (liefert "").
+- Fund: `STGMEDIUM` braucht das Feature `Win32_System_Com_StructuredStorage`
+  der windows-Crate; im vollen Bau kam es ueber ein anderes mit, im neuen
+  CI-Schritt `cargo check --features dialogs` (seit dem rfd-Update) nicht.
+Pruefung: `tests/pruef/module/ablage.dhtest` (privat, ueberall),
+`tests/pruef/fenster/zwischenablage_bilder.dhtest` (echte Ablage mit
+PowerShell/Windows Forms als fremdem Programm: Bild hinaus und herein samt
+Farbe, Dateien hinaus und herein, Ziehen ohne Taste), vier Gegenproben.
+Das Ziehen selbst mit gedrueckter Taste ist nicht automatisch geprueft --
+es braucht den echten Zeiger.
+
+## Volle Textformung (2026-11-14)
+
+Der letzte Rest von Paket 3 (`docs/intern/entwurf-gui-wie-gtk.md`):
+indische und suedostasiatische Schriften und die Ligaturen einer Schrift.
+- raylib zeichnet nach Codepunkt aus einem Atlas; die Glyphen einer
+  Formung (ein Konjunkt) haben oft keinen. Darum ein zweiter Weg nach
+  Glyphennummer in `formung.rs`: rustybuzz formt (es war schon fuer das
+  pdf-Modul da und kam jetzt ins Feature graphics), ttf-parser liefert die
+  Umrisse, ein Flaechen-Rasterer (aufsummierte Flaechenanteile je Pixel,
+  nonzero) macht Glyphenbilder; `graphics.rs` haelt sie als Texturen
+  (weiss mit Deckkraft, die Farbe kommt als Toenung) und zeichnet sie an
+  die Lagen der Formung.
+- Welcher Lauf geformt wird, entscheidet `formen_noetig` an EINER Stelle
+  fuer Zeichnen und Messen (`zeichne_text`, `miss_text`, `breite_mit`,
+  `std_breite`): Zeichen aus Devanagari bis Sinhala, Thai/Lao, Tibetisch,
+  Myanmar, Khmer ... (`formung::braucht`), oder `FONT_LIGATURES` ist fuer
+  die Schrift an. Sonst bleibt alles bei raylib.
+- Massstab wie raylib (`stbtt_ScaleForPixelHeight`: Ober- bis Unterlaenge
+  = Groesse), nicht die Em-Groesse -- sonst stuende geformter Text groesser
+  neben dem anderen.
+- Die Ausweich-Liste kannte nur CJK, Hangul, Emoji, Thai: jetzt auch
+  indische Schriften (Nirmala UI, Kohinoor, Noto je Block), Myanmar, Khmer/
+  Lao, Tibetisch -- vorher erschienen sie als Fragezeichen bzw. Kaestchen.
+Pruefung: Rust-Tests des Rasterers (Quadrat, halbe Pixel) und von
+`braucht`; `tests/pruef/grafik/textformung.dhtest` (ein Konjunkt ist
+schmaler als seine Teile; mit Ligaturen ruecken "AV" zusammen; Fehler fuer
+eine fremde Schrift), zwei Gegenproben; Sichtprobe mit TEXT, gui-Label und
+Textfeld. Offen: die Schreibmarke springt zeichenweise durch Konjunkte;
+nachgebildetes Fett/Kursiv gilt in geformten Laeufen nicht.

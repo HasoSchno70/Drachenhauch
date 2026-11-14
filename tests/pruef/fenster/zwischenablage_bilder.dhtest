@@ -1,0 +1,128 @@
+' Bilder und Dateien ueber die ECHTE Zwischenablage des Systems, mit
+' PowerShell (Windows Forms) als fremdem Programm: was Drachenhauch
+' hineinlegt, liest das andere Programm, und umgekehrt. Dazu das Ziehen
+' hinaus: ohne gedrueckte Maustaste beginnt es nicht (sonst legte das
+' System sofort dort ab, wo der Zeiger steht).
+' Jeder Fall setzt DHRT_ZWISCHENABLAGE=system; seriell, weil die Ablage
+' systemweit ist.
+' Format: docs/werkzeuge.md, dhrt test.
+--- seriell
+
+=== ein bild geht hinaus und eines kommt herein
+TRY
+    SCREEN(120, 80, "Ablage", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "helfer.dh"
+DIM b AS INTEGER : b = IMAGE_NEW(40, 30, RGB(200, 30, 60))
+PRINT "gesetzt "; CLIPBOARD_SET_IMAGE(b)
+PRINT "fremd liest "; ps$("bild_lesen", "")
+PRINT ps$("bild_setzen", "17x9")
+DIM c AS INTEGER : c = CLIPBOARD_GET_IMAGE()
+PRINT "herein "; IMAGE_WIDTH(c); "x"; IMAGE_HEIGHT(c)
+IMAGE_SAVE(c, CWD$() + "/herein.png")
+PRINT "punkt "; ps$("datei_punkt", CWD$() + "/herein.png")
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/uialeser.dh"
+FUNCTION ps$(was AS STRING, a AS STRING) AS STRING
+    DIM p AS INTEGER : p = PROCESS_START("powershell", "-NoProfile", "-STA", "-ExecutionPolicy", "Bypass", "-File", CWD$() + "/ablage.ps1", was, a)
+    RETURN TRIM$(auslesen$(p, 30000))
+END FUNCTION
+--- datei ablage.ps1
+param([string]$Was, [string]$A)
+Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+function hex($c) { "{0:X2}{1:X2}{2:X2}" -f $c.R, $c.G, $c.B }
+switch ($Was) {
+  "bild_lesen" {
+    $i = [System.Windows.Forms.Clipboard]::GetImage()
+    if ($i -eq $null) { "kein Bild" } else { "$($i.Width)x$($i.Height) " + (hex $i.GetPixel(5, 5)) }
+  }
+  "bild_setzen" {
+    $m = $A -split "x"
+    $bmp = New-Object System.Drawing.Bitmap ([int]$m[0]), ([int]$m[1])
+    for ($y = 0; $y -lt $bmp.Height; $y++) { for ($x = 0; $x -lt $bmp.Width; $x++) { $bmp.SetPixel($x, $y, [System.Drawing.Color]::FromArgb(255, 20, 180, 90)) } }
+    [System.Windows.Forms.Clipboard]::SetImage($bmp)
+    "fremd gesetzt $A"
+  }
+  "datei_punkt" {
+    $bmp = New-Object System.Drawing.Bitmap $A
+    hex $bmp.GetPixel(3, 3)
+    $bmp.Dispose()
+  }
+  "dateien_lesen" {
+    $l = [System.Windows.Forms.Clipboard]::GetFileDropList()
+    ($l | ForEach-Object { Split-Path $_ -Leaf }) -join ","
+  }
+  "dateien_setzen" {
+    $c = New-Object System.Collections.Specialized.StringCollection
+    foreach ($p in ($A -split ";")) { [void]$c.Add($p) }
+    [System.Windows.Forms.Clipboard]::SetFileDropList($c)
+    "fremd gesetzt"
+  }
+}
+--- system windows
+--- umgebung
+DHRT_ZWISCHENABLAGE=system
+--- erwartet
+gesetzt TRUE
+fremd liest 40x30 C81E3C
+fremd gesetzt 17x9
+herein 17x9
+punkt 14B45A
+
+=== dateien gehen hinaus und kommen herein
+IMPORT "helfer.dh"
+CLIPBOARD_SET_FILES(["eins.txt", CWD$() + "/zwei.txt"])
+PRINT "fremd liest "; ps$("dateien_lesen", "")
+PRINT ps$("dateien_setzen", CWD$() + "\zwei.txt;" + CWD$() + "\eins.txt")
+DIM l AS ARRAY OF STRING : l = CLIPBOARD_GET_FILES()
+PRINT "herein "; UBOUND(l) + 1; " "; INSTR(l[0], "zwei.txt") > 0; " "; INSTR(l[1], "eins.txt") > 0
+--- datei eins.txt
+1
+--- datei zwei.txt
+2
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/uialeser.dh"
+FUNCTION ps$(was AS STRING, a AS STRING) AS STRING
+    DIM p AS INTEGER : p = PROCESS_START("powershell", "-NoProfile", "-STA", "-ExecutionPolicy", "Bypass", "-File", CWD$() + "/ablage.ps1", was, a)
+    RETURN TRIM$(auslesen$(p, 30000))
+END FUNCTION
+--- datei ablage.ps1
+param([string]$Was, [string]$A)
+Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+switch ($Was) {
+  "dateien_lesen" {
+    $l = [System.Windows.Forms.Clipboard]::GetFileDropList()
+    ($l | ForEach-Object { Split-Path $_ -Leaf }) -join ","
+  }
+  "dateien_setzen" {
+    $c = New-Object System.Collections.Specialized.StringCollection
+    foreach ($p in ($A -split ";")) { [void]$c.Add($p) }
+    [System.Windows.Forms.Clipboard]::SetFileDropList($c)
+    "fremd gesetzt"
+  }
+}
+--- system windows
+--- umgebung
+DHRT_ZWISCHENABLAGE=system
+--- erwartet
+fremd liest eins.txt,zwei.txt
+fremd gesetzt
+herein 2 TRUE TRUE
+
+=== ziehen hinaus beginnt nicht ohne gedrueckte taste
+' Ohne Taste legte das System sofort dort ab, wo der Zeiger steht -- etwa
+' auf dem Desktop. Der Befehl kehrt sofort mit "" zurueck.
+TRY
+    SCREEN(120, 80, "Ablage", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+DIM t0 AS INTEGER : t0 = MILLIS()
+PRINT "text ["; DRAG_OUT_TEXT("hallo"); "] dateien ["; DRAG_OUT_FILES(["x.txt"]); "] sofort "; MILLIS() - t0 < 1000
+--- system windows
+--- erwartet
+text [] dateien [] sofort TRUE

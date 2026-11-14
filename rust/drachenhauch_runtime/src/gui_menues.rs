@@ -185,17 +185,19 @@ impl Gui {
             // Ein Kontextmenue am Rand weicht aus: ueber der Maus statt
             // darunter, links von ihr statt rechts -- sonst lief es aus dem
             // Bild, und die unteren Eintraege waren nicht zu erreichen.
+            // Bis wohin: `grenze` (im nativen Fenster der Schirm, wenn das
+            // Menue ein eigenes Fenster bekommt -- gui_popupfenster.rs).
             let (w, h) = self.popup_size(g, wi, mi);
-            let (sb, sh) = self.schirm();
-            let px = if cx + w > sb && cx - w >= 0 { cx - w } else { cx.min(sb - w).max(0) };
-            let py = if cy + h > sh && cy - h >= 0 { cy - h } else { cy.min(sh - h).max(0) };
+            let (x0, y0, x1, y1) = self.grenze(wi);
+            let px = if cx + w > x1 && cx - w >= x0 { cx - w } else { cx.min(x1 - w).max(x0) };
+            let py = if cy + h > y1 && cy - h >= y0 { cy - h } else { cy.min(y1 - h).max(y0) };
             out.push((wi, mi, px, py));
         } else if let Some((wi, mi)) = self.open_menu {
             let toff = (if self.windows[wi].chrome { self.m("title_h") } else { 0 }) + self.sk(MENUBAR_H);
-            if let Some((_, x0, _)) = self.menubar_slots(g, wi).into_iter().find(|(m, _, _)| *m == mi) {
+            if let Some((_, sx, _)) = self.menubar_slots(g, wi).into_iter().find(|(m, _, _)| *m == mi) {
                 let (w, _) = self.popup_size(g, wi, mi);
-                let (sb, _) = self.schirm();
-                out.push((wi, mi, x0.min(sb - w).max(0), self.windows[wi].y + toff));
+                let (x0, _, x1, _) = self.grenze(wi);
+                out.push((wi, mi, sx.min(x1 - w).max(x0), self.windows[wi].y + toff));
             }
         }
         if let Some(&(wi, _, _, _)) = out.first() {
@@ -203,10 +205,10 @@ impl Gui {
                 // Ein Untermenue, das rechts nicht passt, klappt LINKS vom
                 // Elternmenue auf; unten schiebt es sich hoch.
                 let (w, h) = self.popup_size(g, wi, smi);
-                let (sb, sh) = self.schirm();
+                let (x0, y0, x1, y1) = self.grenze(wi);
                 let eltern_x = out.last().map(|e| e.2).unwrap_or(px);
-                let px = if px + w > sb { (eltern_x - w + 4).max(0) } else { px };
-                let py = py.min(sh - h).max(0);
+                let px = if px + w > x1 { (eltern_x - w + 4).max(x0) } else { px };
+                let py = py.min(y1 - h).max(y0);
                 out.push((wi, smi, px, py));
             }
         }

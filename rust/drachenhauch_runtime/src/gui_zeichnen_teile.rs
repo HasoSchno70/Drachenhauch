@@ -674,7 +674,7 @@ impl Gui {
             // Farben, Inhalte und die Auswahl haengen an den DATEN, die Lage
             // an der Ansicht -- werden die verwechselt, faerbt eine sortierte
             // Tabelle die falschen Zeilen.
-            let ri = match t.view.get(r as usize) { Some(&x) => x, None => continue };
+            let ri = match t.ansicht(r as usize) { Some(x) => x, None => continue };
             let row_y = body_y + r * gm.row_h - t.scroll_y;
             // Zebra nach der ANSICHTSzeile, nicht nach der Datenzeile --
             // sonst waeren die Streifen nach dem Filtern unregelmaessig.
@@ -776,7 +776,7 @@ impl Gui {
         }
         // Leer ist eine Aussage: "Keine Treffer" statt einer Flaeche, die
         // aussieht, als sei die Tabelle kaputt (wie bei der Liste).
-        if t.view.is_empty() && !t.leer_text.is_empty() {
+        if t.ansicht_len() == 0 && !t.leer_text.is_empty() {
             let muted = self.leise(bg);
             self.leer_hinweis(g, wdg, body_x, body_y + self.sk(10), body_w, &t.leer_text, muted);
         }

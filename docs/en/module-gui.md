@@ -72,6 +72,7 @@ IMPORT "gui"
 | `GUI_WINDOW_NATIVE(win, an)` | BOOLEAN | the window as a **real OS window** (own title bar, taskbar, second monitor) or back into the main window; `FALSE` with `an` means: fallback, it stays a gui window |
 | `GUI_WINDOW_IS_NATIVE(win)` | BOOLEAN | is it a real OS window right now? |
 | `GUI_WINDOW_NATIVE_SCALE(win)` | FLOAT | how much larger the native window is drawn on its screen than in the main window (its screen's pixel density divided by the main window's); 1.0 in the main window |
+| `GUI_POPUP_WINDOWS()` | INTEGER | how many popups are standing as a window of their own beyond the edge of their native window right now (0 = all inside their window) |
 | `GUI_WINDOW_VISIBLE(win, an)` | — | set visibility |
 | `GUI_WINDOW_FRONT(win)` | — | bring the window to the front without giving it focus -- for a suggestion list or a tooltip that should lie over the text while typing. Shown via `GUI_WINDOW_VISIBLE`, a window otherwise lies behind the one clicked last |
 | `GUI_WINDOW_SHOWN(win)` | BOOLEAN | is the window currently visible? The counterpart to the setter -- without the getter a program would have to remember what it set itself, and would be wrong as soon as the user closes the window with its cross |
@@ -749,9 +750,19 @@ WEND
   nothing and brings the dialog to the front. Enter and ESC press the
   default and cancel button as usual.
 - Context menu, tooltip, suggestions, an opened month, cell choice and the
-  toolbar's overflow menu are shown in the native window (within its
-  bounds). The composition of an input method (IME) appears at the cursor
-  of the window that has the focus.
+  toolbar's overflow menu are shown in the native window. The composition
+  of an input method (IME) appears at the cursor of the window that has
+  the focus.
+- **Popups beyond the edge:** a context menu (with its submenus), a menu
+  bar menu, a drop-down list, a field's suggestions, an opened month or the
+  spelling menu that reaches beyond the edge of its native window gets a
+  borderless window of its own, without focus and without a taskbar entry
+  -- it only has to give way at the edge of the screen. Clicks in it work
+  as in the native window. Under Wayland (the compositor decides the
+  position) and with `DHRT_OHNE_POPUP_FENSTER=1` it gives way at the edge
+  of its native window instead. `GUI_POPUP_WINDOWS()` counts the open popup
+  windows. In the main window everything stays as it was: popups give way
+  at its edge.
 - **Pixel density:** if the native window is on a screen with a different
   scaling than the main window (100 % next to 150 %), it is drawn larger
   there -- lines smooth, text set at full size instead of magnified. Drag
@@ -769,7 +780,6 @@ WEND
   a, 7 focus a (0/1), 8 wheel (a, b), 9 pointer inside a (0/1). Written by
   hand, a click without a move in the window first needs a `9` before it,
   or only the press -- the press holds the pointer.
-- **Not yet:** popups beyond the edge of the native window.
 - Example: [`examples/219_echte_fenster.dh`](../../examples/219_echte_fenster.dh)
   (palette, modal dialog, tear-off panels).
 - While a modal dialog is open, only **its** menus work (context menu,
@@ -1839,8 +1849,51 @@ Measured with a million rows of five columns: filling with
 `GUI_TABLE_ADD_ROW` about 0.7 s, sorting 0.13 s, filtering 0.04 s, setting
 one cell (also in a sorted or filtered table) 3 ms, memory about 350 MB.
 Short cell texts (up to 22 bytes) need no allocation of their own. For data
-that does not fit into memory, read from the database page by page
-(`LIMIT`/`OFFSET`).
+that does not fit into memory: the virtual table.
+
+### Virtual table
+
+With millions of rows from a database the table does not have to hold
+them all. `GUI_TABLE_VIRTUAL(tbl, zeilen)` only tells it how many there
+are; the program supplies the content on request -- always just around
+what is visible. The table forgets rows far away again, so memory stays
+small however long it is.
+
+| Built-in | Effect |
+|---|---|
+| `GUI_TABLE_VIRTUAL(tbl, zeilen)` | virtual mode with this row count; called again (say after another filter): new count, everything supplied is outdated |
+| `GUI_TABLE_NEED_FROM(tbl)` | first row the table needs right now (visible or a page before/after); -1 = nothing |
+| `GUI_TABLE_NEED_COUNT(tbl)` | how many are missing in a row from there (at most 1000) |
+| `GUI_TABLE_SUPPLY(tbl, ab, zellen)` | supply rows from `ab`: `ARRAY OF STRING` for one row, a 2D array for several |
+
+```basic
+IMPORT "gui"
+DIM win AS GUI_WINDOW : win = GUI_WINDOW("Kunden", 0, 0, 600, 400)
+DIM tbl AS GUI_WIDGET : tbl = GUI_TABLE(win, 10, 10, 580, 380)
+GUI_TABLE_HEADERS(tbl, ["Nr", "Name"])
+GUI_TABLE_VIRTUAL(tbl, 5000000)
+' each frame after GUI_UPDATE:
+SUB nachliefern()
+    DIM von AS INTEGER : von = GUI_TABLE_NEED_FROM(tbl)
+    IF von < 0 THEN EXIT SUB
+    DIM r AS INTEGER
+    FOR r = von TO von + GUI_TABLE_NEED_COUNT(tbl) - 1
+        GUI_TABLE_SUPPLY(tbl, r, [STR$(r), "Kunde " + STR$(r)])
+    NEXT
+END SUB
+```
+
+With a database, a query with `LIMIT anzahl OFFSET von` supplies the rows,
+`SELECT COUNT(*)` the count. **Sorting and filtering are the program's
+job** (`ORDER BY`, `WHERE`): a click on the header only sets
+`GUI_TABLE_SORT_COL`/`GUI_TABLE_SORT_DESC` and has everything requested
+anew, as does a filter in the filter row (`GUI_TABLE_GET_FILTER`) -- then
+set the new count with `GUI_TABLE_VIRTUAL`. Selection, keyboard, editing
+and `GUI_TABLE_GET_CELL` work with row numbers as usual; a cell not
+supplied is empty. Not virtual: `GUI_TABLE_ADD_ROW`, `GUI_TABLE_REMOVE_ROW`
+and `GUI_TABLE_ROW_COLOR` (an error -- colours per cell work), tree
+tables. `GUI_TABLE_ROWS` and `GUI_TABLE_CLEAR` end the mode. At most about
+44 million rows at a row height of 24 points (scrolling counts in points).
 
 ## Tree (tree view)
 
@@ -4124,8 +4177,9 @@ typed.
 |---|---|
 | `TEXT_VISUAL$(text$ [, direction$])` | The text as it is displayed -- for your own output such as files or images. `direction$` = `auto` (default), `ltr` or `rtl` |
 
-What does not work (yet): ligatures of other scripts and Indic scripts
-(that would need full text shaping); alignment does not follow direction --
+Indic and Southeast Asian scripts and the ligatures of a font are set by
+text shaping ([builtins-grafik.md](builtins-grafik.md#text-shaping-indic-scripts-and-ligatures)).
+What does not work (yet): alignment does not follow direction --
 a right-to-left line stays on the left unless `GUI_SET_ALIGN` says
 otherwise; in such a line of a text area bold, italic and underline are
 dropped (the colours of the highlighting stay); end-of-line hints and

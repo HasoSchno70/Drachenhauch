@@ -1,6 +1,6 @@
 # Entwurf: Mehrere OS-Fenster in Drachenhauch
 
-> **Stand 12.11.2026: Weg E, Stufen 1 und 2 sind gebaut, samt Massstab je Schirm; Stufen 3 (Leisten abreissen) und 4 (Bildschirmleser, Aufnahmen, Besitzer unter Linux, Beispiel) ebenso; offen bleiben Popups ueber den Fensterrand** (`GUI_WINDOW_NATIVE`,
+> **Stand 12.11.2026: Weg E, Stufen 1 und 2 sind gebaut, samt Massstab je Schirm; Stufen 3 (Leisten abreissen) und 4 (Bildschirmleser, Aufnahmen, Besitzer unter Linux, Beispiel) ebenso; seit 14.11. auch Popups ueber den Fensterrand (eigene Popup-Fenster)** (`GUI_WINDOW_NATIVE`,
 > Windows und Linux; macOS Rueckfall) -- Abschnitt 8. Davor geplant: ein
 > gui-Fenster als echtes OS-Fenster im SELBEN Prozess -- gezeichnet wird
 > weiter in raylibs Kontext, ein zweites GLFW-Fenster zeigt das Bild nur und
@@ -411,7 +411,7 @@ von macOS und Linux, Handbuch, ein Beispielprogramm.
 | rlgl-Zustand beim Kontextwechsel | Weg E insgesamt | Stufe 0 klaert es zuerst |
 | Wayland erlaubt keine eigene Fensterlage | Fenster stehen, wo der Compositor will | Lage als Wunsch; Rueckfall bleibt |
 | zwei `SwapBuffers` mit Vsync halbieren die Bildrate | ruckelnde Fenster | zweites Fenster mit Intervall 0 |
-| Popup-Menues ueber den Rand des zweiten Fensters | abgeschnittene Menues | zuerst innerhalb; spaeter Popups als eigene Fenster |
+| Popup-Menues ueber den Rand des zweiten Fensters | abgeschnittene Menues | gebaut 14.11.: Popups als eigene Fenster (`gui_popupfenster.rs`), unter Wayland weichen sie am Fensterrand aus |
 | AccessKit haengt am Hauptfenster (Subclassing) | Bildschirmleser sieht nur eines | Stufe 4, ein Adapter je Fenster |
 
 ### Nebeneinander mit den anderen Wegen

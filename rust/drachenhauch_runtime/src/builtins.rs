@@ -691,7 +691,7 @@ fn csv_aus_array(v: &Value, fn_: &str) -> Result<Vec<Vec<String>>, String> {
 }
 
 /// 1D-ARRAY OF STRING -> `Vec<String>` (Dateilisten, Eintragsnamen).
-fn str_array(v: &Value, fn_: &str) -> Result<Vec<String>, String> {
+pub(crate) fn str_array(v: &Value, fn_: &str) -> Result<Vec<String>, String> {
     match v {
         Value::Array(a) => {
             let arr = a.borrow();
@@ -701,7 +701,7 @@ fn str_array(v: &Value, fn_: &str) -> Result<Vec<String>, String> {
     }
 }
 
-fn new_str_array(items: Vec<String>) -> Value {
+pub(crate) fn new_str_array(items: Vec<String>) -> Value {
     let n = items.len() as i64;
     let mut arr = DhArray::new("string".to_string(), vec![n], || Value::str_rc(""));
     for (i, s) in items.into_iter().enumerate() {

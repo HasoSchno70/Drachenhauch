@@ -18,7 +18,8 @@ Rechtschreibung** (2026-10-31, `rechtschreibung.rs` und
 `gui_rechtschreibung.rs`, Abschnitt „Rechtschreibung“) und **Rechts nach
 links samt arabischen Formen** (2026-10-31, `schreibrichtung.rs` und
 `gui_richtung.rs`, Abschnitt „Rechts nach links“); die volle Textformung
-(Ligaturen anderer Schriften, indische Schriften) noch nicht.
+(Ligaturen anderer Schriften, indische Schriften) seit 2026-11-14
+(`formung.rs`).
 
 ## Gemessen statt vermutet: große Tabellen sind keine Lücke
 

@@ -60,6 +60,9 @@ mod objschreiber;
 mod schnitt;
 mod rechtschreibung;
 mod schreibrichtung;
+#[cfg(any(feature = "graphics", feature = "pdf"))]
+#[allow(dead_code)]
+mod formung;
 mod geld;
 mod httpd;
 #[cfg(feature = "smtp")]
@@ -140,6 +143,7 @@ mod usb;
 mod wifi;
 #[cfg(feature = "dialogs")]
 mod filedialog;
+mod ablage;
 #[cfg(feature = "graphics")]
 mod graphics;
 #[cfg(feature = "graphics")]

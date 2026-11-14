@@ -58,6 +58,13 @@ Wenn das `camera`-Modul aktiv ist und `CAMERA_SET` aufgerufen wurde, interpretie
 | `FILE_DROPPED(i)` → STRING | Pfad der `i`-ten davon |
 | `CLIPBOARD_GET()` → STRING | Text aus der Zwischenablage lesen; leer, wenn sie gerade ein anderes Programm hält |
 | `CLIPBOARD_SET(text$)` | Text in die Zwischenablage legen — **Fehler**, wenn das nicht gelingt |
+| `CLIPBOARD_SET_IMAGE(bild)` → BOOLEAN | ein `IMAGE` in die Zwischenablage legen (andere Programme fügen es als Bild ein) — **Fehler**, wenn das nicht gelingt |
+| `CLIPBOARD_GET_IMAGE()` → INTEGER | das Bild aus der Zwischenablage als neues `IMAGE`; `-1`, wenn keines darin ist |
+| `CLIPBOARD_HAS_IMAGE()` → BOOLEAN | liegt gerade ein Bild darin? |
+| `CLIPBOARD_SET_FILES(pfade)` | Dateien (`ARRAY OF STRING`, relativ oder absolut) in die Zwischenablage legen — „Einfügen“ im Explorer/Finder kopiert sie |
+| `CLIPBOARD_GET_FILES()` → ARRAY OF STRING | Dateien aus der Zwischenablage (leer, wenn keine darin sind) |
+| `DRAG_OUT_FILES(pfade)` → STRING | Dateien aus dem Fenster **hinausziehen** (auf den Desktop, in ein Mail-Programm …); liefert `"kopieren"`, `"verschieben"`, `"verknuepfen"` oder `""` |
+| `DRAG_OUT_TEXT(text$)` → STRING | Text hinausziehen (in einen Editor, ein Textfeld) — wie `DRAG_OUT_FILES` |
 | `GFX_PUSH()` | Zeichenzustand sichern: Kamera, Ebenen, Licht, Umgebung, Schatten, 3D-Kamera, Schrift, `POSTFX` |
 | `GFX_POP()` | ihn zurückholen — **ohne vorheriges `PUSH` ein Fehler** |
 | `GFX_DEPTH()` → INTEGER | wie tief ist der Stapel? |
@@ -112,6 +119,32 @@ CATCH e
     TEXT(10, 10, "Kopieren ging gerade nicht")
 END TRY
 ```
+
+### Bilder und Dateien, Ziehen hinaus
+
+Text geht über GLFW; **Bilder und Dateilisten** über die Zwischenablage des
+Systems (Windows, macOS, Linux mit X11 -- unter Wayland über XWayland).
+`CLIPBOARD_GET_IMAGE` legt ein neues `IMAGE` an, das man wie jedes andere
+zeichnet, bearbeitet oder mit `IMAGE_FREE` wieder freigibt.
+
+**Ziehen hinaus** (`DRAG_OUT_FILES`, `DRAG_OUT_TEXT`) übergibt den Zug dem
+System: der Befehl kehrt erst zurück, wenn abgelegt oder abgebrochen ist
+(ESC), und nennt, was das Ziel getan hat. Er beginnt **nur, solange die
+linke Maustaste gedrückt ist** -- ohne Taste legte das System sofort dort
+ab, wo der Zeiger steht; dann liefert er sofort `""`. Gedacht ist er für den
+Moment, in dem ein gui-Zug (`GUI_DRAGGING()`) das Fenster verlässt:
+
+```basic
+IMPORT "gui"
+IF GUI_DRAGGING() AND (MOUSEX() < 0 OR MOUSEY() < 0 OR MOUSEX() >= SCREENWIDTH() OR MOUSEY() >= SCREENHEIGHT()) THEN
+    PRINT DRAG_OUT_FILES(["bericht.pdf"])
+END IF
+```
+
+Ziehen hinaus gibt es bisher **nur unter Windows** (über die Shell, wie der
+Explorer selbst); unter macOS und Linux liefert es `""`. Mit
+`DHRT_ZWISCHENABLAGE=privat` (jedes Programm unter `dhrt test`) bleiben auch
+Bilder und Dateilisten im Prozess.
 
 Klassischer Game-Loop:
 
@@ -376,6 +409,7 @@ zweite Zeichenfläche samt Speicher, wo ein Rechteck genügt.
 | `FONT_GLYPH_BOX(font, zeichen$, groesse)` → TUPLE | das Rechteck `(x, y, breite, hoehe)`, das die Glyphe wirklich bedeckt, relativ zu dem Punkt, an den `TEXT(x, y, zeichen$)` sie bei `groesse` setzt — aus der Schriftdatei gelesen. Damit sitzt ein Zeichen genau: mittig in einem Knopf, ein Notenschlüssel auf seiner Linie |
 | `FONT_BASELINE(font, groesse)` → FLOAT | wie weit unter der Oberkante, an die `TEXT` den Text setzt, die Grundlinie liegt |
 | `FONT_TO_IMAGE(font[, erstes[, letztes]])` → IMAGE | die Zeichen `erstes`..`letztes` (Vorgabe 32..126, höchstens 256) als Bild im Format von `LOADFONT_IMAGE`: jedes Zeichen weiß in einem durchsichtigen Feld, Magenta (`&HFF00FF`) außen und dazwischen. So wird aus einer Vektorschrift eine Pixelschrift, die man nachbearbeiten und mit `LOADFONT_IMAGE(bild, &HFF00FF, erstes)` wieder laden kann |
+| `FONT_LIGATURES(font, an)` | die **Ligaturen** und die Unterschneidung einer mit `LOADFONT` geladenen Schrift ein- oder ausschalten: ihr Text geht dann durch die Textformung (fi-Ligaturen, die Zeichenverbindungen einer Programmierschrift, enger gesetzte Paare wie „AV“) |
 | `SETFONT(font[, groesse])` | aktive Schrift setzen; `SETFONT(-1)` = Default-Font. Ohne `groesse` gilt danach die Größe, mit der die Schrift geladen wurde; mit `groesse` wird ab jetzt so groß gezeichnet (wie `SETFONT` + `TEXT_SIZE`) -- scharf laden, klein zeichnen: `SETFONT(LOADFONT("sans", 32), 16)` |
 | `TEXT_SPACING(px)` | Buchstabenabstand für TTF (nativ) |
 | `TEXT_LINE_SPACING(px)` | Zeilenabstand für mehrzeiligen Text |
@@ -489,11 +523,33 @@ der falschen Schrift ohne Meldung. Die Runtime löst jetzt die erste Schrift
 der Sammlung heraus (die CJK-Schriften von Windows liegen alle nur so vor).
 Eine Datei, die trotzdem keine Schrift ergibt, ist ein Fehler.
 
-**Grenzen:** Emoji kommen einfarbig (raylib rastert keine Farbschriften);
-Arabisch und Hebräisch erscheinen Zeichen für Zeichen von links nach rechts
-ohne Verbindung der Buchstaben — Textformung und Rechts-nach-links sind
-nicht gebaut. Wer eine bestimmte Glyphenform will (japanische statt
-chinesische Formen), lädt seine Schrift selbst.
+**Grenzen:** Emoji kommen einfarbig (raylib rastert keine Farbschriften).
+Wer eine bestimmte Glyphenform will (japanische statt chinesische Formen),
+lädt seine Schrift selbst. Hebräisch und Arabisch stehen von rechts nach
+links, Arabisch verbunden ([module-gui.md](module-gui.md#rechts-nach-links)).
+
+### Textformung: indische Schriften und Ligaturen
+
+Manche Schriften entstehen erst beim Setzen: in Devanagari, Bengali,
+Tamil und den anderen indischen Schriften verschmelzen Zeichen zu
+**Konjunkten** (क + ् + ष = क्ष), ein Vokalzeichen steht **vor** dem
+Konsonanten, hinter dem es geschrieben wird (कि); Thai, Lao, Khmer, Myanmar
+und Tibetisch stapeln Zeichen. Solche Läufe setzt die Laufzeit mit einer
+**Textformung** (rustybuzz, wie HarfBuzz) statt Zeichen für Zeichen -- in
+`TEXT`, in jedem `gui`-Widget und beim Messen (`TEXT_WIDTH`), mit der
+eigenen Schrift oder der Ausweich-Schrift des Systems (Windows: Nirmala UI,
+Leelawadee UI, Myanmar Text, Microsoft Himalaya; macOS: Kohinoor; Linux:
+die Noto-Schriften).
+
+Mit `FONT_LIGATURES(font, TRUE)` geht **jeder** Text dieser Schrift durch
+die Formung: Ligaturen (fi, die Zeichenverbindungen einer Programmierschrift
+wie `=>`), Unterschneidung (AV rückt zusammen) und was die Schrift sonst an
+Regeln mitbringt. Aus per Vorgabe -- gewöhnlicher Text bleibt beim
+schnellsten Weg.
+
+Was (noch) nicht geht: die Schreibmarke springt in einem geformten Text
+Zeichen für Zeichen, auch mitten durch einen Konjunkt; Fett und Kursiv
+nachgebildeter Schnitte gelten in geformten Läufen nicht.
 
 `TEXT_WIDTH` misst denselben Weg, den `TEXT` zeichnet — auch über die
 Ausweich-Schriften hinweg: ein zentrierter Text mit Umlaut oder Kanji sitzt

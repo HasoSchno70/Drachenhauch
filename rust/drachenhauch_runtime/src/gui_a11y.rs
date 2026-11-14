@@ -323,13 +323,13 @@ impl Gui {
                     nodes.push((kid, kopf));
                     kinder.push(kid);
                     // Datenzeilen in der sichtbaren Reihenfolge
-                    for (r, &dz) in t.view.iter().enumerate().take(400) {
+                    for (r, dz) in (0..t.ansicht_len().min(400)).filter_map(|r| t.ansicht(r).map(|d| (r, d))) {
                         let mut zeile = Node::new(Role::Row);
                         zeile.set_row_index(r + 1);
                         zeile.set_selected(t.selected == dz as i32);
                         zeile.add_action(Action::Click);
                         let mut zellen = Vec::new();
-                        if let Some(row) = t.rows.get(dz) {
+                        if let Some(row) = t.zeile(dz) {
                             for (c, cell) in row.iter().enumerate().take(63) {
                                 let mut z = Node::new(Role::Cell);
                                 let text = match cell.kind() {
@@ -650,7 +650,7 @@ impl Gui {
                     (Kind::Table, Action::Click) => {
                         // k = Zeile * 64 (+ Spalte + 1): die Zeile waehlen.
                         let r = k / 64;
-                        let ok = { let w = &mut self.windows[wi].widgets[i]; match w.tbl.as_mut() { Some(t) => match t.view.get(r).copied() { Some(dz) => { t.selected = dz as i32; true } None => false }, None => false } };
+                        let ok = { let w = &mut self.windows[wi].widgets[i]; match w.tbl.as_mut() { Some(t) => match t.ansicht(r) { Some(dz) => { t.selected = dz as i32; true } None => false }, None => false } };
                         if ok { self.focus_widget = Some((wi, i)); self.focus_window = Some(wi); let f = self.windows[wi].widgets[i].on_change.clone(); if let Some(f) = f { self.pending.push(f); } }
                     }
                     _ => {}

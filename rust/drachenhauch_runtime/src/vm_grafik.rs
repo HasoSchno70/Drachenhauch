@@ -406,6 +406,44 @@ impl<'p> Vm<'p> {
                 }
                 Value::Nil
             }
+            // Bilder und Dateien ueber die Zwischenablage, Ziehen hinaus
+            // (ablage.rs) -- Text geht oben ueber GLFW.
+            "clipboard_set_image" => { let n = "CLIPBOARD_SET_IMAGE";
+                if a.len() != 1 { return Err(format!("{}: erwartet (bild)", n)); }
+                let (px, b, h) = g!().image_rgba(gi(a,0,n)?, n)?;
+                match crate::ablage::bild_setzen(b, h, px) {
+                    Ok(()) => Value::Bool(true),
+                    Err(e) => return Err(format!("{}: {}", n, e)),
+                } }
+            "clipboard_get_image" => { let n = "CLIPBOARD_GET_IMAGE";
+                if !a.is_empty() { return Err(format!("{}: erwartet keine Argumente", n)); }
+                match crate::ablage::bild_holen() {
+                    Some(b) => {
+                        let bild = g!().image_new(b.b as i32, b.h as i32, Some(0))?;
+                        g!().image_punkte_setzen(bild, &b.px)?;
+                        Value::Int(bild)
+                    }
+                    None => Value::Int(-1),
+                } }
+            "clipboard_has_image" => {
+                if !a.is_empty() { return Err("CLIPBOARD_HAS_IMAGE: erwartet keine Argumente".into()); }
+                Value::Bool(crate::ablage::bild_holen().is_some()) }
+            "clipboard_set_files" => { let n = "CLIPBOARD_SET_FILES";
+                if a.len() != 1 { return Err(format!("{}: erwartet (pfade)", n)); }
+                if let Err(e) = crate::ablage::dateien_setzen(&crate::builtins::str_array(&a[0], n)?) { return Err(format!("{}: {}", n, e)); }
+                Value::Nil }
+            "clipboard_get_files" => {
+                if !a.is_empty() { return Err("CLIPBOARD_GET_FILES: erwartet keine Argumente".into()); }
+                crate::builtins::new_str_array(crate::ablage::dateien_holen()) }
+            "drag_out_files" => { let n = "DRAG_OUT_FILES";
+                if a.len() != 1 { return Err(format!("{}: erwartet (pfade)", n)); }
+                let pfade = crate::builtins::str_array(&a[0], n)?;
+                if pfade.is_empty() { return Err(format!("{}: keine Dateien", n)); }
+                Value::str_rc(crate::ablage::ziehen(g!().haupt_os_handle(), &pfade, "")) }
+            "drag_out_text" => { let n = "DRAG_OUT_TEXT";
+                if a.len() != 1 { return Err(format!("{}: erwartet (text$)", n)); }
+                let s = gs(a,0,n)?.to_string();
+                Value::str_rc(crate::ablage::ziehen(g!().haupt_os_handle(), &[], &s)) }
             "files_dropped" => Value::Int(g!().dropped_files().len() as i64),
             "file_dropped" => {
                 let i = gi(a, 0, "FILE_DROPPED")? as usize;
@@ -607,6 +645,16 @@ impl<'p> Vm<'p> {
                 let (x, y, b, h) = g!().font_glyph_box(gi(a,0,"FONT_GLYPH_BOX")?, c, zahl_arg(a,2,"FONT_GLYPH_BOX")?)?;
                 Value::Tuple(std::rc::Rc::new(vec![Value::Float(x), Value::Float(y), Value::Float(b), Value::Float(h)]))
             }
+            // Ligaturen einer Schrift (formung.rs): ihre Laeufe gehen durch
+            // die Formung (rustybuzz) statt Glyphe fuer Glyphe durch raylib.
+            "font_ligatures" => { let n = "FONT_LIGATURES";
+                if a.len() != 2 { return Err(format!("{}: erwartet (font, an)", n)); }
+                let h = gi(a,0,n)?;
+                let _ = g!();
+                if !crate::formung::ligaturen_setzen(h, a[1].truthy()) {
+                    return Err(format!("{}: {} ist keine mit LOADFONT geladene Schrift", n, h));
+                }
+                Value::Nil }
             "loadfont" => {
                 if a.len() > 3 { return Err("LOADFONT: erwartet (pfad$, groesse[, zeichen$])".into()); }
                 if a.len() == 3 {

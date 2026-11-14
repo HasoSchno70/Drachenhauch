@@ -814,7 +814,7 @@ impl Gui {
         let n_cols = t.n_cols();
         // SICHTBARE Zeilen -- Filter und Sortierung bestimmen, was gezeichnet
         // und getroffen wird. Der Rest der Geometrie kennt keinen Unterschied.
-        let n_rows = t.view.len();
+        let n_rows = t.ansicht_len();
         let row_h = t.row_h;
         let header_h = t.head_total();
         // Mehr feste Spalten als vorhanden waeren ein leerer Scrollbereich --
@@ -1043,7 +1043,7 @@ impl Gui {
     /// hat keinen sinnvollen Text zum Tippen.
     pub(super) fn table_begin_edit(&mut self, wi: usize, idx: usize, r: i32, c: i32) {
         let t = match self.windows[wi].widgets[idx].tbl.as_mut() { Some(t) => t, None => return };
-        if r < 0 || c < 0 || r as usize >= t.rows.len() { return; }
+        if r < 0 || c < 0 || r as usize >= t.zeilen_zahl() { return; }
         if !t.col_editable(c as usize) { return; }
         let art = t.cell(r as usize, c as usize).map(|x| x.kind()).unwrap_or(CellKind::Text);
         if art != CellKind::Text { return; }
@@ -1198,7 +1198,7 @@ impl Gui {
     pub(super) fn table_schritt(&mut self, wi: usize, i: usize, dv: i32, dp: i32, anhaengen: bool) {
         let t = match self.windows[wi].widgets[i].tbl.as_mut() { Some(t) => t, None => return };
         let order = t.order();
-        let (nv, np) = (t.view.len() as i32, order.len() as i32);
+        let (nv, np) = (t.ansicht_len() as i32, order.len() as i32);
         if nv == 0 || np == 0 { return; }
         let mut vi = t.view_of(t.cur_r).max(0);
         let mut p = t.pos_of(t.cur_c).max(0);
@@ -1253,16 +1253,18 @@ impl Gui {
         let wiederholt = tipp.chars().all(|c| c == erster);
         let such: String = if wiederholt { erster.to_string() } else { tipp };
         let spalte = if t.sort_col >= 0 { t.sort_col as usize } else { gm.order[0] };
-        let n = t.view.len();
+        let n = t.ansicht_len();
         if n == 0 { return true; }
         let pos = t.view_of(t.selected);
         let start = match pos { p if p >= 0 && wiederholt => p as usize + 1, p if p >= 0 => p as usize, _ => 0 };
-        let treffer = (0..n).map(|d| (start + d) % n).find(|&v| {
-            let r = t.view[v];
+        // Virtuell sucht es nur in den gelieferten Zeilen (die anderen kennt
+        // die Tabelle nicht).
+        let treffer = (0..n).map(|d| (start + d) % n).take(if t.virt.is_some() { 5000 } else { n }).find(|&v| {
+            let Some(r) = t.ansicht(v) else { return false };
             t.cell(r, spalte).map(|c| c.text.to_lowercase().starts_with(&such)).unwrap_or(false)
         });
         if let Some(v) = treffer {
-            let r = t.view[v] as i32;
+            let r = t.ansicht(v).unwrap_or(0) as i32;
             if r != t.selected {
                 t.auswahl_setzen(r);
                 t.cur_r = r;

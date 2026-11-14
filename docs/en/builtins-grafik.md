@@ -58,6 +58,13 @@ When the `camera` module is active and `CAMERA_SET` has been called, all drawing
 | `FILE_DROPPED(i)` → STRING | path of the `i`-th of them |
 | `CLIPBOARD_GET()` → STRING | read text from the clipboard; empty if another program is holding it right now |
 | `CLIPBOARD_SET(text$)` | put text into the clipboard — an **error** if that does not succeed |
+| `CLIPBOARD_SET_IMAGE(bild)` → BOOLEAN | put an `IMAGE` into the clipboard (other programs paste it as a picture) — an **error** if that does not succeed |
+| `CLIPBOARD_GET_IMAGE()` → INTEGER | the picture from the clipboard as a new `IMAGE`; `-1` if there is none |
+| `CLIPBOARD_HAS_IMAGE()` → BOOLEAN | is there a picture in it right now? |
+| `CLIPBOARD_SET_FILES(pfade)` | put files (`ARRAY OF STRING`, relative or absolute) into the clipboard — “Paste” in Explorer/Finder copies them |
+| `CLIPBOARD_GET_FILES()` → ARRAY OF STRING | files from the clipboard (empty if there are none) |
+| `DRAG_OUT_FILES(pfade)` → STRING | **drag** files out of the window (onto the desktop, into a mail program …); returns `"kopieren"`, `"verschieben"`, `"verknuepfen"` or `""` |
+| `DRAG_OUT_TEXT(text$)` → STRING | drag text out (into an editor, a text field) — like `DRAG_OUT_FILES` |
 | `GFX_PUSH()` | save the drawing state: camera, layers, light, environment, shadows, 3D camera, font, `POSTFX` |
 | `GFX_POP()` | restore it — **an error without a preceding `PUSH`** |
 | `GFX_DEPTH()` → INTEGER | how deep is the stack? |
@@ -111,6 +118,32 @@ CATCH e
     TEXT(10, 10, "Kopieren ging gerade nicht")
 END TRY
 ```
+
+### Pictures and files, dragging out
+
+Text goes through GLFW; **pictures and file lists** through the system's
+clipboard (Windows, macOS, Linux with X11 -- under Wayland via XWayland).
+`CLIPBOARD_GET_IMAGE` creates a new `IMAGE` that is drawn, edited or freed
+with `IMAGE_FREE` like any other.
+
+**Dragging out** (`DRAG_OUT_FILES`, `DRAG_OUT_TEXT`) hands the drag to the
+system: the command only returns once something was dropped or the drag
+was cancelled (ESC), and tells what the target did. It **only starts while
+the left mouse button is held** -- without a button the system would drop
+at once wherever the pointer is; then it returns `""` immediately. It is
+meant for the moment a gui drag (`GUI_DRAGGING()`) leaves the window:
+
+```basic
+IMPORT "gui"
+IF GUI_DRAGGING() AND (MOUSEX() < 0 OR MOUSEY() < 0 OR MOUSEX() >= SCREENWIDTH() OR MOUSEY() >= SCREENHEIGHT()) THEN
+    PRINT DRAG_OUT_FILES(["bericht.pdf"])
+END IF
+```
+
+Dragging out exists **only on Windows** so far (through the shell, like
+Explorer itself); on macOS and Linux it returns `""`. With
+`DHRT_ZWISCHENABLAGE=privat` (every program under `dhrt test`) pictures and
+file lists stay in the process as well.
 
 Classic game loop:
 
@@ -377,6 +410,7 @@ a second canvas with its own memory, where a rectangle is enough.
 | `FONT_GLYPH_BOX(font, zeichen$, groesse)` → TUPLE | the rectangle `(x, y, width, height)` the glyph really covers, relative to the point where `TEXT(x, y, zeichen$)` puts it at `groesse` — read from the font file. That places a character exactly: centred in a button, a clef on its line |
 | `FONT_BASELINE(font, groesse)` → FLOAT | how far below the top edge where `TEXT` puts the text the baseline lies |
 | `FONT_TO_IMAGE(font[, erstes[, letztes]])` → IMAGE | the characters `erstes`..`letztes` (default 32..126, at most 256) as an image in the format of `LOADFONT_IMAGE`: each character white in a transparent field, magenta (`&HFF00FF`) outside and in between. That turns a vector font into a pixel font that you can touch up and load again with `LOADFONT_IMAGE(bild, &HFF00FF, erstes)` |
+| `FONT_LIGATURES(font, an)` | switch the **ligatures** and kerning of a font loaded with `LOADFONT` on or off: its text then goes through text shaping (fi ligatures, the joined characters of a programming font, tighter pairs like “AV”) |
 | `SETFONT(font[, groesse])` | set the active font; `SETFONT(-1)` = default font. Without `groesse` the size the font was loaded at applies afterwards; with `groesse` everything is drawn at that size from now on (like `SETFONT` + `TEXT_SIZE`) -- load sharp, draw small: `SETFONT(LOADFONT("sans", 32), 16)` |
 | `TEXT_SPACING(px)` | letter spacing for TTF (native) |
 | `TEXT_LINE_SPACING(px)` | line spacing for multi-line text |
@@ -489,10 +523,30 @@ CJK fonts of Windows all exist only in this form). A file that still does not
 yield a font is an error.
 
 **Limits:** emoji come out in one colour (raylib does not rasterize colour
-fonts); Arabic and Hebrew appear character by character from left to right
-without the letters joining — text shaping and right-to-left are not built.
-Whoever wants a particular glyph form (Japanese instead of Chinese forms)
-loads their font themselves.
+fonts). Whoever wants a particular glyph form (Japanese instead of Chinese
+forms) loads their font themselves. Hebrew and Arabic run from right to
+left, Arabic joined ([module-gui.md](module-gui.md#right-to-left)).
+
+### Text shaping: Indic scripts and ligatures
+
+Some scripts only come into being when they are set: in Devanagari,
+Bengali, Tamil and the other Indic scripts characters merge into
+**conjuncts** (क + ् + ष = क्ष), a vowel sign stands **before** the
+consonant it is written after (कि); Thai, Lao, Khmer, Myanmar and Tibetan
+stack characters. The runtime sets such runs with **text shaping**
+(rustybuzz, like HarfBuzz) instead of character by character -- in `TEXT`,
+in every `gui` widget and when measuring (`TEXT_WIDTH`), with your own font
+or the system's fallback font (Windows: Nirmala UI, Leelawadee UI, Myanmar
+Text, Microsoft Himalaya; macOS: Kohinoor; Linux: the Noto fonts).
+
+With `FONT_LIGATURES(font, TRUE)` **all** text of that font goes through
+shaping: ligatures (fi, the joined characters of a programming font such as
+`=>`), kerning (AV moves closer) and whatever other rules the font brings.
+Off by default -- ordinary text keeps the fastest path.
+
+What does not work (yet): in shaped text the cursor moves character by
+character, even through the middle of a conjunct; emulated bold and italic
+do not apply in shaped runs.
 
 `TEXT_WIDTH` measures along the same path that `TEXT` draws — across the
 fallback fonts too: a centred text with an umlaut or kanji sits where it was

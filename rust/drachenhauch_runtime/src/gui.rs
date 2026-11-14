@@ -21,6 +21,8 @@ use crate::value::{Rueckruf, Value};
 mod dock;
 #[path = "gui_ueber.rs"]
 mod ueber;
+#[path = "gui_popupfenster.rs"]
+mod popupfenster;
 #[path = "gui_stil.rs"]
 mod stil;
 #[path = "gui_bausteine.rs"]
@@ -917,9 +919,22 @@ impl Cell {
     fn set_align(&mut self, v: i8) { if v != self.align() { self.stil_mut().align = v; } }
 }
 
+/// Virtueller Modus einer Tabelle (GUI_TABLE_VIRTUAL): sie hat `n` Zeilen,
+/// haelt aber nur die, die das Programm geliefert hat -- rund um das, was
+/// zu sehen ist. Die Daten liegen beim Programm (meist eine Datenbank, die
+/// selbst sortiert und filtert); die Tabelle sagt, welche Zeilen sie
+/// braucht (`bedarf`), und vergisst ferne wieder.
+#[derive(Clone, Default)]
+pub(super) struct Virtuell {
+    n: usize,
+    cache: std::collections::HashMap<usize, Vec<Cell>>,
+}
+
 pub struct TableState {
     headers: Vec<String>,
     rows: Vec<Vec<Cell>>,
+    /// Virtueller Modus: Zeilenzahl und gelieferte Zeilen statt `rows`/`view`.
+    virt: Option<Box<Virtuell>>,
     col_widths: Option<Vec<i32>>,
     /// Ausrichtung je Spalte (0/1/2). Kuerzer als die Spaltenzahl = Rest links.
     col_align: Vec<i8>,
@@ -1097,6 +1112,7 @@ impl Default for TableState {
             sort_col: -1, sort_desc: false, sortable: true,
             filters: vec![], filter_row: false, filter_focus: -1,
             view: vec![],
+            virt: None,
             zellmodus: false, cur_r: -1, cur_c: -1, ber_r: -1, ber_c: -1, zell_zug: false,
             zeilen_anhaengen: false, col_typ: vec![], col_wahl: vec![], wahl_pos: -1,
             sicht_holen: false,
@@ -1114,16 +1130,34 @@ impl TableState {
     /// die Pruefung ganz umgehen und brachte `draw_table` zum Absturz.
     /// Ueber diese eine Quelle kann kein Index mehr danebengreifen.
     fn n_cols(&self) -> usize {
-        self.rows.iter().map(|r| r.len()).chain(std::iter::once(self.headers.len())).max().unwrap_or(0)
+        let virt = self.virt.as_ref().map(|v| v.cache.values().map(|r| r.len()).max().unwrap_or(0)).unwrap_or(0);
+        self.rows.iter().map(|r| r.len()).chain([self.headers.len(), virt]).max().unwrap_or(0)
+    }
+    /// Die Zellen einer Datenzeile -- im virtuellen Modus nur, wenn sie
+    /// geliefert ist.
+    fn zeile(&self, r: usize) -> Option<&Vec<Cell>> {
+        match &self.virt { Some(v) => v.cache.get(&r), None => self.rows.get(r) }
     }
     fn cell(&self, r: usize, c: usize) -> Option<&Cell> {
-        self.rows.get(r).and_then(|row| row.get(c))
+        self.zeile(r).and_then(|row| row.get(c))
     }
     /// Zelle zum Schreiben, notfalls bis dorthin auffuellen.
     fn cell_mut(&mut self, r: usize, c: usize) -> Option<&mut Cell> {
-        let row = self.rows.get_mut(r)?;
+        let row = match self.virt.as_deref_mut() {
+            Some(v) => { if r >= v.n { return None; } v.cache.entry(r).or_default() }
+            None => self.rows.get_mut(r)?,
+        };
         while row.len() <= c { row.push(Cell::text(String::new())); }
         row.get_mut(c)
+    }
+    /// Wie viele Datenzeilen hat die Tabelle? (Virtuell: die angesagten.)
+    fn zeilen_zahl(&self) -> usize { self.virt.as_ref().map(|v| v.n).unwrap_or(self.rows.len()) }
+    /// Wie viele Zeilen zeigt sie (nach Filter und Sortierung)?
+    fn ansicht_len(&self) -> usize { self.virt.as_ref().map(|v| v.n).unwrap_or(self.view.len()) }
+    /// Ansichtszeile -> Datenzeile; virtuell sind beide gleich (das
+    /// Programm liefert schon sortiert und gefiltert).
+    fn ansicht(&self, i: usize) -> Option<usize> {
+        match &self.virt { Some(v) => (i < v.n).then_some(i), None => self.view.get(i).copied() }
     }
     fn header(&self, c: usize) -> &str {
         self.headers.get(c).map(|s| s.as_str()).unwrap_or("")
@@ -1157,6 +1191,10 @@ impl TableState {
     /// sonst textweise. Ohne das stuende "10" vor "9" -- in einer
     /// Punktespalte die haeufigste Enttaeuschung an einer Tabelle.
     fn rebuild_view(&mut self) {
+        // Virtuell sortiert und filtert das Programm: eine andere Sortierung
+        // oder ein anderer Filter heisst, alle gelieferten Zeilen sind
+        // veraltet -- die Tabelle fragt sie neu an.
+        if let Some(v) = self.virt.as_deref_mut() { v.cache.clear(); return; }
         if self.baum { return self.rebuild_baum(); }
         // Die Filter EINMAL klein schreiben, nicht je Zeile (1 Mio. Zeilen:
         // 137 ms, davon der groesste Teil fuer immer dieselbe Umwandlung).
@@ -1194,6 +1232,7 @@ impl TableState {
     /// Haengt weder Filter noch Sortierung an der Spalte, bleibt alles, wie
     /// es ist; im Baum der volle Neubau.
     fn zelle_geaendert(&mut self, r: usize, c: usize) {
+        if self.virt.is_some() { return; }
         if self.baum { return self.rebuild_view(); }
         let gefiltert = self.filters.get(c).map(|f| !f.is_empty()).unwrap_or(false);
         let sortiert = self.sort_col == c as i32;
@@ -1337,11 +1376,12 @@ impl TableState {
     /// nur das Zeichnen und der Treffertest arbeiten mit der Ansicht.
     fn data_row(&self, view_i: i32) -> i32 {
         if view_i < 0 { return -1; }
-        self.view.get(view_i as usize).map(|&r| r as i32).unwrap_or(-1)
+        self.ansicht(view_i as usize).map(|r| r as i32).unwrap_or(-1)
     }
     /// Datenzeile -> Ansichtszeile (-1 wenn wegefiltert).
     fn view_of(&self, data_r: i32) -> i32 {
         if data_r < 0 { return -1; }
+        if let Some(v) = &self.virt { return if (data_r as usize) < v.n { data_r } else { -1 }; }
         self.view.iter().position(|&r| r as i32 == data_r).map(|i| i as i32).unwrap_or(-1)
     }
 
@@ -1405,7 +1445,7 @@ impl TableState {
         let (von, bis) = (ia.min(ib), ia.max(ib));
         self.sel_rows.clear();
         for i in von..=bis {
-            if let Some(&d) = self.view.get(i as usize) { self.sel_rows.push(d as i32); }
+            if let Some(d) = self.ansicht(i as usize) { self.sel_rows.push(d as i32); }
         }
         self.selected = r;
     }
@@ -1473,7 +1513,7 @@ impl TableState {
         let order = self.order();
         let mut zeilen = Vec::new();
         for vi in v1..=v2 {
-            let r = match self.view.get(vi) { Some(&r) => r, None => continue };
+            let r = match self.ansicht(vi) { Some(r) => r, None => continue };
             let z: Vec<String> = (p1..=p2).map(|p| self.zell_text(r, order[p])).collect();
             zeilen.push(z.join("\t"));
         }
@@ -1483,7 +1523,7 @@ impl TableState {
     /// Spalten und unpassende Werte werden UEBERGANGEN, nicht halb geschrieben;
     /// eine Hakenzelle nimmt 1/0/ja/nein. Liefert, ob geschrieben wurde.
     fn zelle_schreiben(&mut self, r: usize, c: usize, s: &str) -> bool {
-        if !self.col_editable(c) || r >= self.rows.len() { return false; }
+        if !self.col_editable(c) || r >= self.zeilen_zahl() { return false; }
         let kind = self.cell(r, c).map(|x| x.kind()).unwrap_or(CellKind::Text);
         match kind {
             CellKind::Check => {
@@ -1523,8 +1563,8 @@ impl TableState {
         if zeilen.last().map(|z| z.trim_end_matches('\r').is_empty()).unwrap_or(false) { zeilen.pop(); }
         let mut ziele: Vec<usize> = Vec::new();
         for i in 0..zeilen.len() {
-            if let Some(&r) = self.view.get(vc + i) { ziele.push(r); }
-            else if self.zeilen_anhaengen { ziele.push(self.zeile_anhaengen()); }
+            if let Some(r) = self.ansicht(vc + i) { ziele.push(r); }
+            else if self.zeilen_anhaengen && self.virt.is_none() { ziele.push(self.zeile_anhaengen()); }
             else { break; }
         }
         let mut n = 0;
@@ -1553,7 +1593,7 @@ impl TableState {
     fn bereich_leeren(&mut self) -> i64 {
         let (v1, v2, p1, p2) = match self.bereich() { Some(b) => b, None => return 0 };
         let order = self.order();
-        let rows: Vec<usize> = (v1..=v2).filter_map(|v| self.view.get(v).copied()).collect();
+        let rows: Vec<usize> = (v1..=v2).filter_map(|v| self.ansicht(v)).collect();
         let mut n = 0;
         for r in rows {
             for p in p1..=p2 {
@@ -3741,6 +3781,10 @@ pub struct Gui {
     pub(super) teil_druck: Option<(usize, u32)>,
     /// Die nativen Fenster aller Teilflaechen (zum Aufraeumen).
     pub(super) teil_ids: Vec<u32>,
+    /// Popups ueber den Rand nativer Fenster (gui_popupfenster.rs).
+    pub(super) popup_fenster: Vec<popupfenster::PopupFenster>,
+    /// Wie weit Popups je nativer Flaeche reichen duerfen (`grenze`).
+    pub(super) grenzen: Vec<(u32, (i32, i32, i32, i32))>,
     focus_window: Option<usize>,
     focus_widget: Option<(usize, usize)>,
     // Offener modaler Dialog. Solange einer steht, bekommt NUR er Eingaben --
@@ -3966,7 +4010,7 @@ impl Gui {
     pub fn new() -> Gui {
         Gui {
             schrift: None,
-            windows: Vec::new(), z_order: Vec::new(), flaeche: 0, fokus_flaeche: 0, nativ_fokus_wunsch: None, leihe: None, teil_druck: None, teil_ids: Vec::new(),
+            windows: Vec::new(), z_order: Vec::new(), flaeche: 0, fokus_flaeche: 0, nativ_fokus_wunsch: None, leihe: None, teil_druck: None, teil_ids: Vec::new(), popup_fenster: Vec::new(), grenzen: Vec::new(),
             ta_zerlegung: std::cell::RefCell::new(HashMap::new()),
             focus_window: None, focus_widget: None, modal: None, modal_vorher: Vec::new(), modal_fokus: Vec::new(), cp_drag: None,
             drag_window: None, drag_dx: 0, drag_dy: 0,
@@ -5302,8 +5346,10 @@ impl Gui {
         g.sicht_setzen(Some(id));
         self.draw_window_sicht(g, wi);
         self.draw_top_flaeche(g, id);
-        g.sicht_setzen(Some(0));
         g.nativ_beenden();
+        // Was davon ueber den Rand ragt, zeigt sein eigenes Fenster.
+        self.popup_fenster_zeichnen(g, id);
+        g.sicht_setzen(Some(0));
     }
     /// Ein Druck auf einer anderen Oberflaeche schliesst die Popups eines
     /// Fensters, das nicht auf ihr steht -- wie ein Klick daneben. Sonst
@@ -5376,7 +5422,8 @@ impl Gui {
         // Die Teilflaechen abgerissener Leisten (Stufe 3b) gehoeren keinem
         // gui-Fenster -- die fuehrt dock_raus_abgleich.
         let lebend: Vec<u32> = self.windows.iter().filter(|w| w.alive && w.nativ != 0).map(|w| w.nativ)
-            .chain(self.teil_ids.iter().copied()).collect();
+            .chain(self.teil_ids.iter().copied())
+            .chain(self.popup_fenster.iter().map(|p| p.id)).collect();
         for id in g.nativ_ids() { if !lebend.contains(&id) { g.nativ_schliessen(id); } }
         for wi in 0..self.windows.len() {
             let id = self.windows[wi].nativ;
