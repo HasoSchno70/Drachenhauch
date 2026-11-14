@@ -242,6 +242,7 @@ mod glfw {
     pub const VISIBLE: c_int = 0x0002_0004;
     pub const DECORATED: c_int = 0x0002_0005;
     pub const FOCUS_ON_SHOW: c_int = 0x0002_000C;
+    pub const MOUSE_PASSTHROUGH: c_int = 0x0002_000D;
 
     pub unsafe extern "C" fn r_knopf(f: *mut c_void, knopf: c_int, aktion: c_int, _m: c_int) {
         mit_eingang(f, |e| knopf_buchen(e, knopf, aktion));
@@ -375,6 +376,12 @@ impl Fenster {
             glfwWindowHint(DECORATED, rahmen as c_int);
             // Ein Popup nimmt dem Fenster, aus dem es kommt, nicht den Fokus.
             if popup.is_some() { glfwWindowHint(FOCUS_ON_SHOW, 0); }
+            // Unter `dhrt test` (DHRT_OHNE_EINGABE) wie das Hauptfenster
+            // (stillfenster.rs): ohne Fokus auf, die echte Maus geht durch --
+            // geschickte Nachrichten kommen trotzdem an. Sonst meldete Windows
+            // den echten Zeiger, sobald er ueber dem Fenster stand, und ein
+            // Fall klickte daneben.
+            if crate::stillfenster::an() { glfwWindowHint(FOCUS_ON_SHOW, 0); glfwWindowHint(MOUSE_PASSTHROUGH, 1); }
             let t = CString::new(titel.replace('\0', " ")).ok()?;
             let f = glfwCreateWindow(b.max(1), h.max(1), t.as_ptr(), std::ptr::null_mut(), haupt);
             glfwDefaultWindowHints();

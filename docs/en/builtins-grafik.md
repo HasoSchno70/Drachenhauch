@@ -544,9 +544,10 @@ shaping: ligatures (fi, the joined characters of a programming font such as
 `=>`), kerning (AV moves closer) and whatever other rules the font brings.
 Off by default -- ordinary text keeps the fastest path.
 
-What does not work (yet): in shaped text the cursor moves character by
-character, even through the middle of a conjunct; emulated bold and italic
-do not apply in shaped runs.
+In text inputs and text areas arrows and clicks jump over a whole
+syllable (क्षि, an accent with its letter) instead of into it; backspace
+takes back one character at a time, as keyboards for Indic scripts are used
+to. Emulated bold and italic (`TEXT_STYLE`) apply to shaped text as well.
 
 `TEXT_WIDTH` measures along the same path that `TEXT` draws — across the
 fallback fonts too: a centred text with an umlaut or kanji sits where it was

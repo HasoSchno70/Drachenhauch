@@ -1065,7 +1065,8 @@ impl Gui {
             let mid = (breite(n - 1) + breite(n)) / 2;
             if target_px < mid { hi = n; } else { lo = n + 1; }
         }
-        (lo - 1) as i32
+        // Nicht mitten in eine Silbe (ein Konjunkt ist EINE Glyphe).
+        crate::schreibrichtung::stelle_runden(chars, lo - 1) as i32
     }
 
     /// Volles Editieren des fokussierten TextInputs: Zeichen einfuegen, Backspace/
@@ -1323,12 +1324,12 @@ impl Gui {
         let (k_zurueck, k_vor) = if richtung::zeile_rtl(chars) { (KEY_RIGHT, KEY_LEFT) } else { (KEY_LEFT, KEY_RIGHT) };
         if g.key_pressed(k_zurueck) {
             let (lo, hi) = ((*caret).min(*anchor), (*caret).max(*anchor));
-            if !shift && lo != hi { *caret = lo; } else { *caret = (*caret - 1).max(0); }
+            if !shift && lo != hi { *caret = lo; } else { *caret = crate::schreibrichtung::stelle_zurueck(chars, *caret as usize) as i32; }
             if !shift { *anchor = *caret; }
         }
         if g.key_pressed(k_vor) {
             let (lo, hi) = ((*caret).min(*anchor), (*caret).max(*anchor));
-            if !shift && lo != hi { *caret = hi; } else { *caret = (*caret + 1).min(len); }
+            if !shift && lo != hi { *caret = hi; } else { *caret = (crate::schreibrichtung::stelle_vor(chars, *caret as usize) as i32).min(len); }
             if !shift { *anchor = *caret; }
         }
         if g.key_pressed(KEY_HOME) { *caret = 0; if !shift { *anchor = 0; } }

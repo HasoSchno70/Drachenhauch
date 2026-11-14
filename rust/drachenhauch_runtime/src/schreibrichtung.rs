@@ -278,6 +278,67 @@ fn formen(z: &[char]) -> (Vec<char>, Vec<usize>) {
     (aus, herkunft)
 }
 
+// ------------------------------------------------------------ Schreibmarke
+
+/// Darf zwischen `z[i-1]` und `z[i]` eine Schreibmarke stehen? Nicht vor
+/// einem Zeichen, das sich an das vorige lehnt (Vokalzeichen, Akzent,
+/// Nukta, Anusvara ...), nicht hinter einem Virama vor dem naechsten
+/// Konsonanten (ein Konjunkt wie क्ष ist EINE Silbe), nicht an einem
+/// Joiner. Die Formung (formung.rs) setzt solche Folgen als eine Glyphe --
+/// eine Marke mittendrin stuende irgendwo in ihr.
+pub fn stelle_erlaubt(z: &[char], i: usize) -> bool {
+    if i == 0 || i >= z.len() { return true; }
+    let (vor, c) = (z[i - 1], z[i]);
+    if c.is_ascii() && vor.is_ascii() { return true; }
+    if lehnt_an(c) || c == '\u{200C}' || c == '\u{200D}' || vor == '\u{200D}' { return false; }
+    !(ist_virama(vor) && c.is_alphabetic())
+}
+
+/// Die naechste erlaubte Stelle hinter `pos` (hoechstens `z.len()`).
+pub fn stelle_vor(z: &[char], pos: usize) -> usize {
+    let mut p = (pos + 1).min(z.len());
+    while p < z.len() && !stelle_erlaubt(z, p) { p += 1; }
+    p
+}
+
+/// Die naechste erlaubte Stelle vor `pos` (mindestens 0).
+pub fn stelle_zurueck(z: &[char], pos: usize) -> usize {
+    let mut p = pos.min(z.len()).saturating_sub(1);
+    while p > 0 && !stelle_erlaubt(z, p) { p -= 1; }
+    p
+}
+
+/// `pos` auf eine erlaubte Stelle bringen (nach vorn gerundet).
+pub fn stelle_runden(z: &[char], pos: usize) -> usize {
+    let pos = pos.min(z.len());
+    if stelle_erlaubt(z, pos) { pos } else { stelle_zurueck(z, pos) }
+}
+
+/// Lehnt sich das Zeichen an das vorige? Nicht-tragende Zeichen (Akzente,
+/// die meisten Vokalzeichen) erkennt die Bidi-Klasse NSM; die tragenden
+/// Vokalzeichen der indischen Schriften stehen in jedem Block an derselben
+/// Stelle (die Bloecke 0900..0DFF sind parallel gebaut), dazu Thai, Lao,
+/// Khmer und Myanmar.
+fn lehnt_an(c: char) -> bool {
+    if c.is_ascii() { return false; }
+    if unicode_bidi::bidi_class(c) == unicode_bidi::BidiClass::NSM { return true; }
+    let u = c as u32;
+    match u {
+        0x0900..=0x0DFF => matches!((u - 0x0900) % 0x80, 0x01..=0x03 | 0x3A..=0x4F | 0x51..=0x57 | 0x62..=0x63),
+        0x0E31 | 0x0E34..=0x0E3A | 0x0E47..=0x0E4E => true,
+        0x0EB1 | 0x0EB4..=0x0EBC | 0x0EC8..=0x0ECD => true,
+        0x102B..=0x103E | 0x1056..=0x1059 | 0x105E..=0x1060 | 0x1062..=0x1064 | 0x1067..=0x106D => true,
+        0x17B4..=0x17D3 => true,
+        _ => false,
+    }
+}
+
+/// Virama (Halant) der indischen Schriften, Coeng (Khmer), Myanmar.
+fn ist_virama(c: char) -> bool {
+    let u = c as u32;
+    ((0x0900..=0x0DFF).contains(&u) && ((u - 0x0900) % 0x80 == 0x4D || u == 0x0DCA)) || u == 0x17D2 || u == 0x1039
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -368,5 +429,25 @@ mod tests {
         assert_eq!(basis(&z("abc שלום")), Some(false));
         assert_eq!(basis(&z("שלום abc")), Some(true));
         assert_eq!(basis(&z("abc")), None);
+    }
+
+    #[test]
+    fn schreibmarke_springt_ueber_silben() {
+        // क्षि = Ka, Virama, Ssa, i-Vokalzeichen: EINE Silbe.
+        let z: Vec<char> = "aक्षिb".chars().collect();
+        assert_eq!(stelle_vor(&z, 0), 1);
+        assert_eq!(stelle_vor(&z, 1), 5);
+        assert_eq!(stelle_zurueck(&z, 5), 1);
+        assert_eq!(stelle_runden(&z, 3), 1);
+        // Ein Akzent als eigenes Zeichen gehoert zu seinem Buchstaben.
+        let e: Vec<char> = "e\u{301}x".chars().collect();
+        assert_eq!(stelle_vor(&e, 0), 2);
+        // Lateinisch bleibt Zeichen fuer Zeichen.
+        let l: Vec<char> = "abc".chars().collect();
+        assert_eq!(stelle_vor(&l, 1), 2);
+        assert_eq!(stelle_zurueck(&l, 2), 1);
+        // Thai: ein Vokal ueber dem Konsonanten lehnt sich an.
+        let t: Vec<char> = "\u{0E01}\u{0E34}\u{0E02}".chars().collect();
+        assert_eq!(stelle_vor(&t, 0), 2);
     }
 }

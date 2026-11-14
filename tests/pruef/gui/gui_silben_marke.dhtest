@@ -1,0 +1,51 @@
+' Die Schreibmarke springt ueber eine Silbe, die die Textformung als EINE
+' Glyphe setzt (formung.rs): "aक्षिb" -- Ka, Virama, Ssa und das
+' i-Vokalzeichen sind eine Silbe. Pfeil rechts hinter dem "a" landet
+' hinter der ganzen Silbe (Spalte 6), Pfeil links wieder davor (Spalte 2);
+' Zeichen fuer Zeichen stuende die Marke mitten im Konjunkt (Spalte 3).
+' Pfeiltasten echt eingespielt (AUTOMATION_PLAY).
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== pfeile springen ueber den konjunkt
+IMPORT "gui"
+SCREEN(400, 200, "T", 1)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 5, 5, 380, 180)
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(w, 10, 10, 300, 100)
+GUI_SET_TEXT(ta, "aक्षिb")
+GUI_FOCUS(ta)
+GUI_TEXTAREA_GOTO(ta, 1, 2)
+DIM n AS INTEGER
+DIM z AS INTEGER
+DIM s AS INTEGER
+(z, s) = GUI_TEXTAREA_CURSOR(ta)
+PRINT "vorher "; s
+' Die Wiedergabe beginnt beim ERSTEN Ereignis: rechts in Bild 1-3,
+' links in Bild 8-10.
+AUTOMATION_PLAY("ev.txt")
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    IF n = 6 THEN
+        (z, s) = GUI_TEXTAREA_CURSOR(ta)
+        PRINT "nach rechts "; s
+    END IF
+    IF n = 16 THEN
+        (z, s) = GUI_TEXTAREA_CURSOR(ta)
+        PRINT "nach links "; s
+    END IF
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 2
+e 4 2 262 0 0 0 // rechts runter
+e 6 1 262 0 0 0 // rechts hoch
+e 11 2 263 0 0 0 // links runter
+e 13 1 263 0 0 0 // links hoch
+--- umgebung
+DHRT_FRAMES=20
+--- erwartet
+vorher 2
+nach rechts 6
+nach links 2

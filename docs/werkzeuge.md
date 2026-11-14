@@ -176,6 +176,9 @@ nachgeschickte Fensternachrichten (`_hilfen/fenstersender.ps1`) kommen
 weiter an -- man kann also während eines Laufs weiterarbeiten, ohne in einen
 Fall zu tippen. Vorher stand dann „BSCREEN“ statt „SCREEN“ in der IDE eines
 Falls, und eine Maus über dem Fenster nahm einem Fall seinen Tooltip.
+Dasselbe gilt für echte Fenster (`GUI_WINDOW_NATIVE`, abgerissene Leisten,
+Popup-Fenster) -- sonst meldete Windows den echten Zeiger, sobald er über
+ihnen stand, und ein Klick-Fall traf daneben.
 `DHRT_OHNE_EINGABE=0` in `--- umgebung` schaltet es für einen Fall ab.
 
 **Eine Zwischenablage je Prozess:** dieselben Programme bekommen
