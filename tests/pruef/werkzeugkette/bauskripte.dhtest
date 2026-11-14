@@ -77,3 +77,25 @@ pruefe("build_wasm.py")
 --- erwartet
 build_runtime.py importe 7, fremde: keine
 build_wasm.py importe 6, fremde: keine
+
+=== das profil gegenprobe baut ohne lto und das bauskript nimmt es
+' Gegenproben bauen nach jeder verfaelschten Zeile neu; mit LTO kostet das
+' Minuten (CLAUDE.md, Pruefsammlungen). Das Profil muss vom release-Profil
+' erben (gleiche Optimierung, gleiches Verhalten) und LTO abschalten, und
+' `--gegenprobe` muss es an cargo geben.
+DIM cargo AS STRING : cargo = READALL$(ARG$(0) + "/rust/drachenhauch_runtime/Cargo.toml")
+DIM ab AS INTEGER : ab = INSTR(cargo, "[profile.gegenprobe]")
+DIM teil AS STRING
+IF ab >= 0 THEN
+    teil = MID$(cargo, ab)
+    DIM ende AS INTEGER : ende = INSTR(MID$(teil, 1), CHR$(10) + "[")
+    IF ende >= 0 THEN teil = LEFT$(teil, ende + 1)
+END IF
+PRINT "profil da "; ab >= 0; " erbt release "; INSTR(teil, "inherits = " + CHR$(34) + "release" + CHR$(34)) >= 0; " ohne lto "; INSTR(teil, "lto = false") >= 0
+DIM skript AS STRING : skript = READALL$(ARG$(0) + "/rust/build_runtime.py")
+PRINT "skript gibt das profil weiter "; INSTR(skript, "[" + CHR$(34) + "--profile" + CHR$(34) + ", " + CHR$(34) + "gegenprobe" + CHR$(34) + "]") >= 0
+--- argumente
+{sammlung}/../../..
+--- erwartet
+profil da TRUE erbt release TRUE ohne lto TRUE
+skript gibt das profil weiter TRUE

@@ -18,6 +18,8 @@ Aufruf:
     python rust\\build_runtime.py --hardware  # + serial/usb/bt/wifi/midi
     python rust\\build_runtime.py --laufzeiten  # + die zwei kleinen Laufzeiten
                                               #   fuer `dhrt --export --schlank`
+    python rust\\build_runtime.py --gegenprobe  # Profil `gegenprobe`: ohne LTO,
+                                              #   inkrementell, nach target/gegenprobe/
 
 Ohne Grafik (`--no-graphics`) baut der pure VM-Kern ganz ohne C-Toolchain.
 
@@ -117,6 +119,14 @@ def main() -> int:
 
     env = dict(os.environ)
 
+    # `--gegenprobe` baut mit dem Profil gleichen Namens (Cargo.toml): wie
+    # release, aber ohne LTO -- fuer die vielen Neubauten einer Gegenprobe
+    # (ein Neubau nach einer Zeile ~25 s statt ~4 min).
+    gegenprobe = "--gegenprobe" in args
+    if gegenprobe and ("--test" in args or "--laufzeiten" in args or "--debug" in args):
+        print("FEHLER: --gegenprobe baut nur die volle Laufzeit (nicht mit --test, --laufzeiten, --debug)")
+        return 2
+
     if graphics:
         setup_rc = _setup_windows_toolchain(env) if system == "Windows" else _setup_unix_toolchain(env)
         if setup_rc != 0:
@@ -133,7 +143,9 @@ def main() -> int:
         cmd = ["cargo", "test"]
     else:
         cmd = ["cargo", "build"]
-        if release:
+        if gegenprobe:
+            cmd += ["--profile", "gegenprobe"]
+        elif release:
             cmd.append("--release")
 
     # Feature-Auswahl: graphics (raylib) + Daten-Tier (db/net/http) sind der

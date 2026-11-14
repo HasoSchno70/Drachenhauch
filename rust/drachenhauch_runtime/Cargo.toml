@@ -344,6 +344,18 @@ full = ["graphics", "dialogs", "video", "db", "net", "http", "smtp", "pdf", "phy
 opt-level = 3
 lto = true
 
+# Fuer Gegenproben (`python rust/build_runtime.py --gegenprobe`): wie release,
+# aber ohne LTO und inkrementell. Eine Gegenprobe baut nach jeder verfaelschten
+# Zeile neu; mit LTO kostet das jedes Mal den ganzen Schritt ueber alle
+# Zeilen (Minuten), so nur die geaenderten Teile. Das Verhalten ist dasselbe --
+# LTO aendert die Optimierung, nicht die Bedeutung. Ergebnis in
+# target/gegenprobe/, die release-Laufzeit bleibt unberuehrt.
+[profile.gegenprobe]
+inherits = "release"
+lto = false
+incremental = true
+codegen-units = 256
+
 # Stufe 0 von Weg E (docs/intern/entwurf-native-fenster.md): Wegwerf-Probe,
 # braucht raylib -- ohne graphics (CI, cargo test) wird sie nicht gebaut.
 [[example]]

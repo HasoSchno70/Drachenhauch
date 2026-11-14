@@ -189,3 +189,18 @@ Playground die Quelle selbst, **Pyodide braucht es nicht**.
 Doku/Grenzen: [docs/web-playground.md](docs/web-playground.md).
 Tests [`tests/pruef/werkzeugkette/build_wasm.dhtest`](tests/pruef/werkzeugkette/build_wasm.dhtest) (Geruest/Harness,
 nicht der emscripten-Build; bis 2026-09-21 pytest).
+
+## Profil fuer Gegenproben (2026-11-14)
+
+Zehn Gegenproben fuer den gui-Inspektor dauerten rund 45 Minuten: jede
+verfaelschte Zeile kostete einen vollen release-Bau mit `lto = true` (etwa
+vier Minuten, der LTO-Schritt laeuft ueber alle 130.000 Zeilen, egal was
+sich aenderte); der Testlauf selbst brauchte vier Sekunden. Jetzt gibt es
+`[profile.gegenprobe]` (erbt release, `lto = false`, inkrementell, 256
+Codegen-Einheiten) und `python rust/build_runtime.py --gegenprobe`, Ergebnis
+in `target/gegenprobe/`. Gemessen: erster Bau 140 s, danach je verfaelschter
+Zeile 26 s und 25 s fuer den Rueckbau; dieselbe Gegenprobe fiel im selben
+Fall wie im release-Bau. Die Option prueft ihre Begleiter vor der Suche nach
+cmake (mit `--test`, `--laufzeiten`, `--debug` ist sie ein Fehler).
+`bauskripte.dhtest` haelt fest, dass das Profil ohne LTO bleibt und das
+Skript es weitergibt.
