@@ -1171,3 +1171,53 @@ PRINT "gewaehlt"; geklickt
 --- erwartet
 nativ TRUE popup-fenster 0
 gewaehlt 3
+
+=== unter dhrt test laesst das native fenster die echte maus durch
+' Wie das Hauptfenster (stillfenster.rs): mit DHRT_OHNE_EINGABE geht die
+' echte Maus durch das native Fenster (WS_EX_TRANSPARENT), nur geschickte
+' Nachrichten kommen an. Vorher meldete Windows den echten Zeiger, sobald er
+' ueber dem Fenster stand -- die Klick-Faelle mit Massstab und Teilflaeche
+' fielen dann, je nachdem, wo der Nutzer die Maus liegen hatte.
+IMPORT "helfer.dh"
+DIM kennung AS STRING : kennung = "Still-" + STR$(MILLIS()) + "-" + STR$(INT(RND() * 1000000))
+DIM kind AS INTEGER : kind = PROCESS_START("dhrt", "run", CWD$() + "/still.dh", "--", kennung)
+DIM p AS INTEGER : p = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", CWD$() + "/stil.ps1", kennung)
+DIM s AS STRING : s = auslesen$(p, 30000)
+DIM k AS STRING : k = auslesen$(kind, 30000)
+IF INSTR(auslesenFehler, "Kein Fenster moeglich") >= 0 THEN
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    END
+END IF
+PRINT s; k;
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/fenstersender.dh"
+--- datei stil.ps1
+param([string]$Titel)
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+public static class S {
+  [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern IntPtr FindWindow(string k, string t);
+  [DllImport("user32.dll")] public static extern IntPtr GetWindowLongPtr(IntPtr h, int i);
+}
+"@
+$h = [IntPtr]::Zero
+for ($i = 0; $i -lt 100 -and $h -eq [IntPtr]::Zero; $i++) { $h = [S]::FindWindow([NullString]::Value, $Titel); if ($h -eq [IntPtr]::Zero) { Start-Sleep -Milliseconds 100 } }
+if ($h -eq [IntPtr]::Zero) { "kein Fenster"; exit 2 }
+Start-Sleep -Milliseconds 500
+$ex = [S]::GetWindowLongPtr($h, -20).ToInt64()
+"maus geht durch " + (($ex -band 0x20) -ne 0)
+--- datei still.dh
+IMPORT "gui"
+SCREEN(400, 300, "Haupt-" + ARG$(0), 1)
+DIM p AS GUI_WINDOW : p = GUI_WINDOW(ARG$(0), 40, 40, 240, 160)
+PRINT "nativ "; GUI_WINDOW_NATIVE(p, TRUE)
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE NOT QUITREQUESTED() AND MILLIS() - t0 < 3000
+    GUI_UPDATE()
+    CLS(&H202830) : GUI_DRAW() : FLIP()
+WEND
+--- system windows
+--- erwartet
+maus geht durch True
+nativ TRUE

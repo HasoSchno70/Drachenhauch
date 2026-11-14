@@ -179,7 +179,10 @@ all (maximizing, `WINDOW_FOCUS`). Recordings (`AUTOMATION_PLAY`) and posted
 window messages (`_hilfen/fenstersender.ps1`) still arrive -- so you can keep
 working during a run without typing into a case. Before this, "BSCREEN"
 appeared instead of "SCREEN" in a case's IDE, and a mouse over the window
-took a case's tooltip away. `DHRT_OHNE_EINGABE=0` in `--- umgebung` switches
+took a case's tooltip away. The same holds for real windows (`GUI_WINDOW_NATIVE`, torn-off panels,
+popup windows) -- otherwise Windows reported the real pointer as soon as it
+was over them, and a click case missed.
+`DHRT_OHNE_EINGABE=0` in `--- umgebung` switches
 it off for one case.
 
 **One clipboard per process:** the same programs get
