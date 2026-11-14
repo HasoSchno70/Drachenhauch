@@ -3786,8 +3786,9 @@ pub struct Gui {
     /// Wie weit Popups je nativer Flaeche reichen duerfen (`grenze`).
     pub(super) grenzen: Vec<(u32, (i32, i32, i32, i32))>,
     /// Offene Zeichenflaeche (GUI_CANVAS_BEGIN): die Flaeche, in die gerade
-    /// gezeichnet wird (0 = Hauptfenster).
-    pub(super) canvas_offen: Option<u32>,
+    /// gezeichnet wird (0 = Hauptfenster), und ob dafuer ein Gastfenster
+    /// geliehen ist (Teilflaeche einer abgerissenen Leiste).
+    pub(super) canvas_offen: Option<(u32, bool)>,
     focus_window: Option<usize>,
     focus_widget: Option<(usize, usize)>,
     // Offener modaler Dialog. Solange einer steht, bekommt NUR er Eingaben --

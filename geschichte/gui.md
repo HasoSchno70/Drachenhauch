@@ -1054,6 +1054,19 @@ kommen Menues, Klapplisten und die obere Schicht dieser Flaeche wieder
 obenauf (sie waren schon gezeichnet). `GUI_CANVAS_MOUSE(cv)` liefert
 (x, y, gedrueckt) relativ zur Flaeche, gesehen durch ihr Fenster
 (`sicht_setzen`). Eine Flaeche in einer abgerissenen Teilflaeche (3b) ist
-noch nicht umgeleitet (das Gastfenster ist dort nur geliehen).
+seit demselben Tag ebenfalls umgeleitet: `GUI_CANVAS_BEGIN` leiht
+das Gastfenster bis `GUI_CANVAS_END` aus wie `teile_zeichnen` (`canvas_teil`),
+`GUI_CANVAS_MOUSE` fuer die Abfrage.
 Pruefung: Fall in `native_fenster.dhtest` (roter Kasten im nativen Fenster,
 zugeschnitten; Druck relativ zur Flaeche), drei Gegenproben.
+
+## Studio: Dialoge als eigene Fenster (2026-11-14)
+
+Ansicht -> "Dialoge als eigene Fenster" (`studio.json`: `dialoge_eigen`, aus
+per Vorgabe): die modalen Dialoge des Studios -- Ereignis, Methode, Variable,
+Menue-Editor -- werden echte Fenster (`dialogEigen` nach
+`GUI_WINDOW_MODAL`). Aus per Vorgabe, weil die Pruefungen des Studios ihre
+Tasten in das Hauptfenster einspielen. Fund: `JSON_TYPE` nennt einen
+Wahrheitswert "boolean", nicht "bool".
+Pruefung: Fall in `werkzeug_studio2.dhtest` (Doppelklick oeffnet den
+Ereignis-Dialog als echtes Fenster), Gegenprobe.

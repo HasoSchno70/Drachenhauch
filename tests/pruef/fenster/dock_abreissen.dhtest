@@ -793,3 +793,77 @@ knopf der leiste TRUE
 ohne das hauptfenster TRUE
 wo fenster klicks liste 1 haupt 0
 text ||
+
+=== eine zeichenflaeche in der teilflaeche zeigt, was das programm malt
+' Eine Zeichenflaeche in einer abgerissenen Leiste aus Widgets des
+' Gastfensters: GUI_CANVAS_BEGIN leiht das Gastfenster aus wie das Zeichnen
+' der Teilflaeche -- dazwischen nennt GUI_CANVAS_X/Y die Lage in ihr, und
+' der rote Kasten steht bei (60, 60) in der Teilflaeche, nicht im
+' Hauptfenster. GUI_CANVAS_MOUSE sieht den Zeiger durch die Teilflaeche.
+IMPORT "helfer.dh"
+DIM kennung AS STRING : kennung = "Malleiste-" + STR$(MILLIS()) + "-" + STR$(INT(RND() * 1000000))
+DIM kind AS INTEGER : kind = PROCESS_START("dhrt", "run", CWD$() + "/mal.dh", "--", kennung)
+DIM pp AS INTEGER : pp = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", pixel_skript$(), kennung, "60,60;300,150")
+DIM px AS STRING : px = auslesen$(pp, 30000)
+DIM sp AS INTEGER : sp = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", skript$(), kennung, "roh:512:0:3932220+roh:513:1:3932220;roh:514:0:3932220")
+DIM s AS STRING : s = auslesen$(sp, 30000)
+DIM k AS STRING : k = auslesen$(kind, 30000)
+IF INSTR(auslesenFehler, "Kein Fenster moeglich") >= 0 THEN
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    END
+END IF
+PRINT px; k;
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/fenstersender.dh"
+FUNCTION skript$() AS STRING
+    RETURN "{sammlung}/../_hilfen/fenstersender.ps1"
+END FUNCTION
+FUNCTION pixel_skript$() AS STRING
+    RETURN "{sammlung}/../_hilfen/fensterpixel.ps1"
+END FUNCTION
+--- datei mal.dh
+IMPORT "gui"
+SCREEN(700, 500, "Haupt-" + ARG$(0), 1)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Dock", 0, 0, 700, 500)
+GUI_WINDOW_CHROME(w, FALSE)
+GUI_DOCK(w, 0, 0, 700, 500)
+GUI_DOCK_PANEL(w, "dateien", "Dateien", "links")
+GUI_DOCK_PANEL(w, "liste", ARG$(0), "schwebend")
+DIM cv AS GUI_WIDGET : cv = GUI_CANVAS(w, 0, 0, 10, 10)
+GUI_DOCK_ADD(w, "liste", cv)
+GUI_DOCK_FLOAT(w, "liste", 200, 100, 400, 180)
+SUB verteilen()
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    DIM b AS INTEGER
+    DIM h AS INTEGER
+    (x, y, b, h) = GUI_DOCK_RECT(w, "liste")
+    IF b > 0 THEN GUI_SET_BOUNDS(cv, x + 10, y + 10, 160, 80)
+END SUB
+verteilen()
+GUI_DOCK_MOVE(w, "liste", "fenster")
+DIM gedrueckt AS STRING : gedrueckt = "nie"
+DIM mx AS INTEGER
+DIM my AS INTEGER
+DIM unten AS BOOLEAN
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE NOT QUITREQUESTED() AND MILLIS() - t0 < 7000
+    GUI_UPDATE()
+    IF GUI_DOCK_CHANGED(w) THEN verteilen()
+    (mx, my, unten) = GUI_CANVAS_MOUSE(cv)
+    IF unten AND gedrueckt = "nie" THEN gedrueckt = STR$(mx) + "," + STR$(my)
+    CLS(&H202830)
+    GUI_DRAW()
+    GUI_CANVAS_BEGIN(cv)
+    BOX(GUI_CANVAS_X(cv), GUI_CANVAS_Y(cv), GUI_CANVAS_X(cv) + 600, GUI_CANVAS_Y(cv) + 600, &HFF0000)
+    GUI_CANVAS_END()
+    FLIP()
+WEND
+PRINT "wo "; GUI_DOCK_WHERE$(w, "liste")
+PRINT "druck auf der flaeche "; gedrueckt
+--- system windows
+--- erwartet
+60,60 #FF0000
+300,150 #18222E
+wo fenster
+druck auf der flaeche 48,27
