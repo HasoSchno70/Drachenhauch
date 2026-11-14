@@ -2498,7 +2498,7 @@ properties for it, plus four commands:
 | Property / command | Effect |
 |---|---|
 | `form: rechteck \| pille \| kreis \| raute \| bild` | shape of a button (rectangle, pill, circle, diamond, image) -- for drawing **and** hit testing: a click beside the circle misses. `bild` takes the opacity of the image skin (transparent = beside), which makes any shape possible. Only in rules without a state |
-| `bild: datei.png` / `bildrand: 12` | image skin: instead of surface and border the button draws the image, `bildrand` as a 9-slice (corners stay, the middle grows); icon and text lie on top. Also per state (`:hover`, `:active`, `:disabled`, `:checked`) |
+| `bild: datei.png` / `bildrand: 12` | image skin: instead of surface and border the button draws the image, `bildrand` as a 9-slice (corners stay, the middle grows); icon and text lie on top. An animated GIF plays (with its frame durations, endlessly; with `form: bild` the frame on screen is what gets hit). Also per state (`:hover`, `:active`, `:disabled`, `:checked`) |
 | `animation: puls \| wackeln \| schweben \| huepfen \| drehen [duration ms] [einmal \| count]` | the whole widget moves around its centre (pulse, wobble, float, bounce, spin); also per state: `button:hover { animation: puls }` pulses only while hovered |
 | `GUI_SET_SHAPE(knopf, form$)` / `GUI_GET_SHAPE$(knopf)` | set a shape of its own (`""` = the stylesheet again) or the shape in effect |
 | `GUI_ANIMATE(wdg, art$ [, dauer_ms [, anzahl]])` | start an animation -- say wobble once on wrong input; `anzahl` 0 = endless (default 1), `art$` `""` stops |
@@ -2524,7 +2524,8 @@ WEND
 An animation only moves, turns or enlarges the widget's picture; its
 position and its hit area stay where they are. Time runs with `DELTA()`
 (without a window under `DHRT_FRAMES` a fixed 1/60 s per frame). The gui
-loads image skins at first use, relative to the program.
+loads image skins at first use, relative to the program; all GIFs run on
+the same clock.
 
 ## Callbacks: GUI_ON_CLICK
 

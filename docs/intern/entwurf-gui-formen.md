@@ -46,7 +46,8 @@ viele Widgets gilt; dazu zwei Befehle für das Programm.
 
 ## Stufe 2 (offen)
 
-- Bildfolgen (`animation: bilder atlas.png 8 12fps`) für Spielmenüs.
+- Bildfolgen aus einem Atlas (`animation: bilder atlas.png 8 12fps`) für
+  Spielmenüs. Animierte GIFs als Bildhaut laufen schon (2026-11-14).
 - Eigene Abläufe (`@ablauf name { 0% {...} 100% {...} }`) mit Farbe und
   Deckkraft.
 - Formen und Bildhäute auch für Kästchen, Schalter, Regler.

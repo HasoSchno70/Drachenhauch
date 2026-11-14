@@ -43,8 +43,28 @@ pub(super) struct Aussehen {
     pub stil_lauf: Option<(AnimStil, f64)>,
 }
 
-/// Ein geladenes Bild einer Bildhaut: Textur, Groesse, Deckkraft je Pixel.
-pub(super) struct Haut { pub tex: i64, pub b: u32, pub h: u32, pub alpha: Vec<u8> }
+/// Eine geladene Bildhaut: ihre Einzelbilder (eines bei PNG & Co., alle
+/// eines animierten GIFs), deren Groesse und Dauer.
+pub(super) struct Haut { pub bilder: Vec<HautBild>, pub b: u32, pub h: u32, pub dauern: Vec<f64> }
+/// Ein Einzelbild: Textur und Deckkraft je Pixel (fuer `form: bild`).
+pub(super) struct HautBild { pub tex: i64, pub alpha: Vec<u8> }
+
+/// Dauer eines GIF-Einzelbilds in ms; 0 und sehr kurze Angaben zeigen
+/// Browser als 100 ms, ebenso hier (sonst flimmerten alte GIFs).
+pub(super) fn gif_dauer(ms: i64) -> f64 { if ms <= 10 { 100.0 } else { ms as f64 } }
+
+/// Welches Einzelbild gilt zur Uhr (Sekunden)? Alle Bildhaeute laufen
+/// mit derselben Uhr der gui, ohne Ende, wie ein GIF im Browser.
+pub(super) fn bild_zur_zeit(dauern: &[f64], uhr: f64) -> usize {
+    let gesamt: f64 = dauern.iter().sum();
+    if dauern.len() < 2 || gesamt <= 0.0 { return 0; }
+    let mut t = (uhr * 1000.0).rem_euclid(gesamt);
+    for (k, d) in dauern.iter().enumerate() {
+        if t < *d { return k; }
+        t -= d;
+    }
+    dauern.len() - 1
+}
 
 /// `animation: art [dauer] [einmal|N]` lesen.
 pub(super) fn anim_lesen(wert: &str, zeile: usize) -> Result<AnimStil, String> {
@@ -151,9 +171,10 @@ impl Gui {
             F_BILD => {
                 let Some((pfad, _)) = self.w_bild(w, false) else { return true };
                 let Some(Some(haut)) = self.haeute.get(&pfad) else { return true };
+                let bild = &haut.bilder[bild_zur_zeit(&haut.dauern, self.uhr)];
                 let ix = ((px / b as f64) * haut.b as f64).floor().clamp(0.0, haut.b as f64 - 1.0) as usize;
                 let iy = ((py / h as f64) * haut.h as f64).floor().clamp(0.0, haut.h as f64 - 1.0) as usize;
-                haut.alpha.get(iy * haut.b as usize + ix).map(|&a| a >= 32).unwrap_or(true)
+                bild.alpha.get(iy * haut.b as usize + ix).map(|&a| a >= 32).unwrap_or(true)
             }
             _ => true,
         }
@@ -180,10 +201,7 @@ impl Gui {
                 }
             }
             for p in fehlt {
-                let haut = g.load_texture(&p).ok().and_then(|tex| {
-                    let (px, b, h) = g.image_rgba(tex, "bild").ok()?;
-                    Some(Haut { tex, b, h, alpha: px.chunks(4).map(|c| c[3]).collect() })
-                });
+                let haut = Self::haut_laden(g, &p);
                 self.haeute.insert(p, haut);
             }
         }
@@ -212,6 +230,33 @@ impl Gui {
         }
     }
 
+    /// Eine Bildhaut laden: ein GIF mit allen Einzelbildern und ihren
+    /// Dauern (IMAGE_LOAD_GIF/IMAGE_GIF_DELAYS), alles andere als ein Bild.
+    /// None = nicht lesbar (der Knopf zeichnet sich dann wie ohne Haut).
+    fn haut_laden(g: &mut Graphics, pfad: &str) -> Option<Haut> {
+        let texturen = if pfad.to_ascii_lowercase().ends_with(".gif") {
+            g.image_load_gif(pfad).ok()?
+        } else {
+            vec![g.load_texture(pfad).ok()?]
+        };
+        let mut bilder = Vec::with_capacity(texturen.len());
+        let (mut b, mut h) = (0, 0);
+        for tex in texturen {
+            let (px, bb, hh) = g.image_rgba(tex, "bild").ok()?;
+            (b, h) = (bb, hh);
+            bilder.push(HautBild { tex, alpha: px.chunks(4).map(|c| c[3]).collect() });
+        }
+        if bilder.is_empty() { return None; }
+        let mut dauern = vec![100.0; bilder.len()];
+        if bilder.len() > 1 {
+            let aufgeloest = crate::builtins::resolve_asset_path(pfad);
+            if let Ok(d) = std::fs::read(&aufgeloest).map_err(|e| e.to_string()).and_then(|d| crate::gifschreiber::dauern(&d)) {
+                for (k, ms) in d.into_iter().take(dauern.len()).enumerate() { dauern[k] = gif_dauer(ms); }
+            }
+        }
+        Some(Haut { bilder, b, h, dauern })
+    }
+
     /// Die Matrix fuer das Zeichnen eines Widgets: (dx, dy, Winkel, Massstab)
     /// in Bildpunkten, None = keine Animation laeuft.
     pub(super) fn anim_matrix(&self, wi: usize, idx: usize, w: &Widget) -> Option<(f32, f32, f32, f32)> {
@@ -234,7 +279,8 @@ impl Gui {
     /// Eine Bildhaut zeichnen; FALSE, wenn das Bild (noch) fehlt.
     pub(super) fn haut_zeichnen(&self, g: &mut Graphics, pfad: &str, rand: i32, x: i32, y: i32, b: i32, h: i32) -> bool {
         let Some(Some(haut)) = self.haeute.get(pfad) else { return false };
-        if rand > 0 { g.nine_slice(haut.tex, x, y, b, h, rand).is_ok() } else { g.draw_image_rect(haut.tex, x, y, b, h); true }
+        let tex = haut.bilder[bild_zur_zeit(&haut.dauern, self.uhr)].tex;
+        if rand > 0 { g.nine_slice(tex, x, y, b, h, rand).is_ok() } else { g.draw_image_rect(tex, x, y, b, h); true }
     }
 
     // ================================================================ Befehle
@@ -292,6 +338,20 @@ mod tests {
         assert_eq!(anim_lesen("drehen 2000ms 3", 1).unwrap(), AnimStil { art: 5, dauer: 2000, anzahl: 3 });
         assert!(anim_lesen("tanzen", 1).is_err());
         assert!(anim_lesen("puls 10ms", 1).is_err());
+    }
+
+    #[test]
+    fn gif_bilder_nach_der_uhr() {
+        let d = [100.0, 200.0, 100.0];
+        assert_eq!(bild_zur_zeit(&d, 0.0), 0);
+        assert_eq!(bild_zur_zeit(&d, 0.099), 0);
+        assert_eq!(bild_zur_zeit(&d, 0.1), 1);
+        assert_eq!(bild_zur_zeit(&d, 0.299), 1);
+        assert_eq!(bild_zur_zeit(&d, 0.35), 2);
+        assert_eq!(bild_zur_zeit(&d, 0.45), 0); // von vorn
+        assert_eq!(bild_zur_zeit(&[100.0], 5.0), 0);
+        assert_eq!(gif_dauer(0), 100.0);
+        assert_eq!(gif_dauer(40), 40.0);
     }
 
     #[test]

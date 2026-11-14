@@ -168,6 +168,46 @@ vorher rot FALSE nach einer viertelrunde rot TRUE
 --- umgebung
 DHRT_FRAMES=200
 
+=== ein animiertes gif laeuft in der bildhaut
+' Zwei Bilder zu 200 ms: links rot, dann rechts blau (der Rest jeweils
+' durchsichtig). Mit form: bild wandert auch der Treffer mit.
+TRY
+    SCREEN(400, 300, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+IMPORT "imgfx"
+DIM a AS INTEGER : a = IMAGE_NEW(80, 80)
+IMAGE_FILL_RECT(a, 0, 0, 39, 79, RGB(255, 0, 0))
+DIM b AS INTEGER : b = IMAGE_NEW(80, 80)
+IMAGE_FILL_RECT(b, 40, 0, 79, 79, RGB(0, 0, 255))
+IMAGE_SAVE_GIF([a, b], "lauf.gif", [200, 200])
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 300)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM k AS GUI_WIDGET : k = GUI_BUTTON(w, "", 100, 100, 80, 80)
+GUI_SET_NAME(k, "lauf")
+GUI_STYLESHEET("#lauf { form: bild; bild: lauf.gif }")
+DIM rt AS INTEGER : rt = RENDERTARGET_NEW(400, 300)
+DIM n AS INTEGER
+FOR n = 1 TO 36
+    GUI_UPDATE()
+    IF n = 3 OR n = 18 OR n = 33 THEN
+        RENDERTARGET_BEGIN(rt) : CLS(0) : GUI_DRAW() : RENDERTARGET_END()
+        DIM bild AS IMAGE : bild = RENDERTARGET_IMAGE(rt)
+        PRINT "bild "; n; " links rot "; (GETPIXEL(bild, 120, 140) BAND &HFFFFFF) = &HFF0000; " rechts blau "; (GETPIXEL(bild, 160, 140) BAND &HFFFFFF) = &HFF; _
+            " trifft links "; GUI_HIT_TEST(120, 140) = k; " rechts "; GUI_HIT_TEST(160, 140) = k
+    END IF
+    CLS(0) : FLIP()
+NEXT
+--- erwartet
+bild 3 links rot TRUE rechts blau FALSE trifft links TRUE rechts FALSE
+bild 18 links rot FALSE rechts blau TRUE trifft links FALSE rechts TRUE
+bild 33 links rot TRUE rechts blau FALSE trifft links TRUE rechts FALSE
+--- umgebung
+DHRT_FRAMES=200
+
 === falsche angaben sind fehler
 TRY
     SCREEN(400, 300, "T", 1)

@@ -2513,7 +2513,7 @@ Eigenschaften mehr, dazu kommen vier Befehle:
 | Eigenschaft / Befehl | Wirkung |
 |---|---|
 | `form: rechteck \| pille \| kreis \| raute \| bild` | Form eines Knopfs -- für das Zeichnen **und** den Treffer: ein Klick neben dem Kreis trifft nicht. `bild` nimmt die Deckkraft der Bildhaut (durchsichtig = daneben), so wird jede Form möglich. Nur in Regeln ohne Zustand |
-| `bild: datei.png` / `bildrand: 12` | Bildhaut: statt Fläche und Rand zeichnet der Knopf das Bild, `bildrand` als 9-Slice (Ecken bleiben, die Mitte wächst mit); Sinnbild und Text liegen darüber. Auch je Zustand (`:hover`, `:active`, `:disabled`, `:checked`) |
+| `bild: datei.png` / `bildrand: 12` | Bildhaut: statt Fläche und Rand zeichnet der Knopf das Bild, `bildrand` als 9-Slice (Ecken bleiben, die Mitte wächst mit); Sinnbild und Text liegen darüber. Ein animiertes GIF läuft ab (mit seinen Bilddauern, ohne Ende; bei `form: bild` trifft das Bild, das gerade zu sehen ist). Auch je Zustand (`:hover`, `:active`, `:disabled`, `:checked`) |
 | `animation: puls \| wackeln \| schweben \| huepfen \| drehen [Dauer ms] [einmal \| Anzahl]` | das ganze Widget bewegt sich um seine Mitte; auch je Zustand: `button:hover { animation: puls }` pulsiert nur beim Überfahren |
 | `GUI_SET_SHAPE(knopf, form$)` / `GUI_GET_SHAPE$(knopf)` | eigene Form setzen (`""` = wieder die Stildatei) bzw. die Form, die gilt |
 | `GUI_ANIMATE(wdg, art$ [, dauer_ms [, anzahl]])` | eine Animation starten -- etwa einmal wackeln bei falscher Eingabe; `anzahl` 0 = ohne Ende (Vorgabe 1), `art$` `""` hält an |
@@ -2539,7 +2539,8 @@ WEND
 Eine Animation verschiebt, dreht oder vergrößert nur das Bild des Widgets;
 seine Lage und sein Treffer bleiben, wo sie sind. Die Zeit läuft mit
 `DELTA()` (ohne Fenster unter `DHRT_FRAMES` fest 1/60 s je Bild). Bildhäute
-lädt die gui beim ersten Gebrauch, relativ zum Programm.
+lädt die gui beim ersten Gebrauch, relativ zum Programm; alle GIFs laufen
+mit derselben Uhr.
 
 ## Callbacks: GUI_ON_CLICK
 

@@ -1099,3 +1099,13 @@ Pille und Stern; eingespielter Klick neben und in den Kreis; GUI_ANIMATE
 laeuft und endet; Drehung im Bild nach einer Viertelrunde; Fehler), vier
 Gegenproben; Rust-Tests in `gui_aussehen.rs`. Beispiel
 `examples/220_formen_und_animationen.dh` (Spielmenue).
+
+Nachtrag am selben Tag, auf Frage des Nutzers: ein animiertes GIF als
+Bildhaut zeigte nur sein erstes Bild (`load_texture`). Jetzt laedt
+`haut_laden` ein `.gif` mit `image_load_gif` (alle Einzelbilder) und
+`gifschreiber::dauern`; `bild_zur_zeit` waehlt das Bild nach der Uhr der
+gui, fuer Zeichnen UND Treffer (`form: bild`). Dauern bis 10 ms gelten wie
+im Browser als 100 ms. Fall "ein animiertes gif laeuft in der bildhaut"
+(rot links, dann blau rechts, dann wieder rot; Gegenprobe: immer Bild 0).
+Beim ersten Entwurf des Falls stand `IMAGE_FILL_RECT` mit Breite/Hoehe --
+es nimmt zwei Ecken.

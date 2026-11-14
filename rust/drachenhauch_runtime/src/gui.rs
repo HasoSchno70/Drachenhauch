@@ -3796,7 +3796,7 @@ pub struct Gui {
     /// Uhr der gui in Sekunden (Summe der DELTA()) -- fuer Animationen.
     pub(super) uhr: f64,
     /// Geladene Bildhaeute nach Pfad (None = nicht ladbar).
-    pub(super) haeute: std::collections::HashMap<String, Option<aussehen::Haut>>,
+    haeute: std::collections::HashMap<String, Option<aussehen::Haut>>,
     focus_window: Option<usize>,
     focus_widget: Option<(usize, usize)>,
     // Offener modaler Dialog. Solange einer steht, bekommt NUR er Eingaben --
