@@ -1538,6 +1538,21 @@ impl<'p> Vm<'p> {
             // Fenster zu, das darueber liegt.
             // Zeichenflaeche: Malen umleiten (auch ins echte Fenster) und die
             // Maus relativ zu ihr.
+            // Eigene Form und Animationen (gui_aussehen.rs).
+            "gui_set_shape" => { let n = "GUI_SET_SHAPE";
+                if a.len() != 2 { return Err(format!("{}: erwartet (knopf, form$)", n)); }
+                self.gui.set_shape(gi(a,0,n)?, &gs(a,1,n)?)?; Value::Nil }
+            "gui_get_shape$" => { let n = "GUI_GET_SHAPE$";
+                if a.len() != 1 { return Err(format!("{}: erwartet (knopf)", n)); }
+                Value::str_rc(self.gui.get_shape(gi(a,0,n)?)?) }
+            "gui_animate" => { let n = "GUI_ANIMATE";
+                if a.len() < 2 || a.len() > 4 { return Err(format!("{}: erwartet (wdg, art$ [, dauer_ms [, anzahl]])", n)); }
+                let dauer = if a.len() >= 3 { Some(gi(a,2,n)?) } else { None };
+                let anzahl = if a.len() >= 4 { Some(gi(a,3,n)?) } else { None };
+                self.gui.animate(gi(a,0,n)?, &gs(a,1,n)?, dauer, anzahl)?; Value::Nil }
+            "gui_animating" => { let n = "GUI_ANIMATING";
+                if a.len() != 1 { return Err(format!("{}: erwartet (wdg)", n)); }
+                Value::Bool(self.gui.animating(gi(a,0,n)?)?) }
             "gui_canvas_begin" => {
                 let h = gi(a, 0, "GUI_CANVAS_BEGIN")?;
                 let g = self.gfx.as_mut().ok_or("GUI_CANVAS_BEGIN: vor SCREEN aufgerufen")?;

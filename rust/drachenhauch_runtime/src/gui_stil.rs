@@ -45,7 +45,7 @@ pub(super) const FOKUS: usize = 2;
 pub(super) const AKTIV: usize = 3;
 pub(super) const AUS: usize = 4;
 
-const EIGENSCHAFTEN: &str = "bg, fg, border, accent, radius, groesse, stil, abstand, randbreite, schatten, verlauf, glanz, fase, uebergang (auch je Farbe: uebergang: 120, bg 400)";
+const EIGENSCHAFTEN: &str = "bg, fg, border, accent, radius, groesse, stil, abstand, randbreite, schatten, verlauf, glanz, fase, uebergang (auch je Farbe: uebergang: 120, bg 400), form, bild, bildrand, animation";
 const ZUSTAENDE: &str = ":hover, :focus, :active, :disabled, :checked";
 
 /// Eine Farbe aus der Stildatei: fest oder ein Name des Themas (dann folgt
@@ -71,6 +71,13 @@ pub(super) struct StilWerte {
     /// Dauer je Farbrolle (`uebergang: bg 400, border 0`) -- die Rollen ohne
     /// eigene Dauer nehmen `uebergang` bzw. die Metrik.
     uebergang_je: Vec<(usize, i32)>,
+    /// Form eines Knopfs (gui_aussehen.rs: FORMEN).
+    pub(super) form: Option<u8>,
+    /// Bildhaut (Pfad) und ihr 9-Slice-Rand in Pixeln des Bildes.
+    pub(super) bild: Option<String>,
+    pub(super) bildrand: Option<i32>,
+    /// Animation (auch je Zustand).
+    pub(super) animation: Option<super::aussehen::AnimStil>,
 }
 
 /// Die Farbrollen, die eine eigene Dauer haben koennen -- ihre Stelle ist
@@ -147,6 +154,10 @@ impl StilWerte {
             self.uebergang_je.retain(|(x, _)| *x != k);
             self.uebergang_je.push((k, d));
         }
+        if o.form.is_some() { self.form = o.form; }
+        if o.bild.is_some() { self.bild = o.bild.clone(); }
+        if o.bildrand.is_some() { self.bildrand = o.bildrand; }
+        if o.animation.is_some() { self.animation = o.animation; }
     }
 }
 
@@ -410,7 +421,7 @@ pub(super) fn lesen(text: &str, thema: &dyn Fn(&str) -> bool) -> Result<Stildate
             let wert = wert.trim();
             let form = matches!(name.as_str(), "abstand" | "padding" | "innenabstand" | "randbreite" | "border-width"
                 | "border_width" | "schatten" | "shadow" | "verlauf" | "gradient" | "glanz" | "gloss" | "fase" | "bevel"
-                | "uebergang" | "transition");
+                | "uebergang" | "transition" | "form" | "shape");
             if form && mit_zustand {
                 return Err(format!("Zeile {}: '{}' gilt nur in Regeln ohne :hover, :focus, :active, :disabled -- eine Form, die mit dem Zustand springt, waere ein Wackeln", zeile, name));
             }
@@ -442,6 +453,18 @@ pub(super) fn lesen(text: &str, thema: &dyn Fn(&str) -> bool) -> Result<Stildate
                     if alle.is_some() { werte.uebergang = alle; }
                     for (k, d) in je { werte.uebergang_je.retain(|(x, _)| *x != k); werte.uebergang_je.push((k, d)); }
                 }
+                "form" | "shape" => {
+                    let f = wert.trim().trim_matches('"').to_lowercase();
+                    let n = super::aussehen::FORMEN.iter().position(|x| !x.is_empty() && *x == f)
+                        .ok_or_else(|| format!("Zeile {}: form '{}' unbekannt -- rechteck, pille, kreis, raute, bild", zeile, wert))?;
+                    werte.form = Some(n as u8);
+                }
+                "bild" | "image" => {
+                    let p = wert.trim().trim_matches('"').trim_matches('\'').to_string();
+                    werte.bild = if p.is_empty() || p == "keins" || p == "none" { None } else { Some(p) };
+                }
+                "bildrand" | "image-border" => werte.bildrand = Some(zahl_lesen_stil(wert, zeile, "bildrand", 0, 200)?),
+                "animation" => werte.animation = Some(super::aussehen::anim_lesen(wert, zeile)?),
                 _ => return Err(format!("Zeile {}: Eigenschaft '{}' gibt es nicht -- bekannt sind {}", zeile, name, EIGENSCHAFTEN)),
             }
         }

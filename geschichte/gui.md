@@ -1070,3 +1070,32 @@ Tasten in das Hauptfenster einspielen. Fund: `JSON_TYPE` nennt einen
 Wahrheitswert "boolean", nicht "bool".
 Pruefung: Fall in `werkzeug_studio2.dhtest` (Doppelklick oeffnet den
 Ereignis-Dialog als echtes Fenster), Gegenprobe.
+
+## Eigene Formen, Bildhaeute und Animationen (2026-11-14)
+
+Frage des Nutzers: Knoepfe mit eigener Form und Animationen, damit GUIs
+anders aussehen koennen. Entwurf `docs/intern/entwurf-gui-formen.md`, Stufe 1
+gebaut (`gui_aussehen.rs`):
+- Stildatei: `form` (rechteck, pille, kreis, raute, bild -- nur ohne
+  Zustand), `bild`/`bildrand` (Bildhaut, 9-Slice, auch je Zustand),
+  `animation` (puls, wackeln, schweben, huepfen, drehen; Dauer, einmal,
+  Anzahl; auch je Zustand). Befehle `GUI_SET_SHAPE`/`GUI_GET_SHAPE$`,
+  `GUI_ANIMATE`, `GUI_ANIMATING`.
+- Form = Treffer: die vier Stellen, die bisher nur das Rechteck fragten
+  (Ueberfahren, Druecken, Loslassen, GUI_HIT_TEST), fragen jetzt auch
+  `form_trifft`; `form: bild` nimmt die Deckkraft der Bildhaut (geladen in
+  `aussehen_pass`, wo es Graphics gibt).
+- Animation: `Cmd::Verformung` -- eine Matrix um die Mitte des Widgets beim
+  Abspielen (rlPushMatrix). Text geht mit, auch in einem echten Fenster mit
+  eigenem Massstab: `ohne_rt_matrix` nimmt nur die Matrix des Ziels heraus,
+  eine Verformung darunter bleibt (nachgerechnet: M W M^-1 auf die mal m
+  gesetzten Textlagen ergibt die verformte Lage). Die Uhr der gui ist die
+  Summe der DELTA() -- ohne FLIP steht sie (erster Testentwurf: Animationen
+  liefen in einer Schleife nur aus GUI_UPDATE nie ab).
+- Fund: das Ende einer Animation stand an zwei Stellen (Zeichnen und
+  Aufraeumen), die Gegenprobe an einer blieb gruen -- jetzt `vorbei`.
+Pruefung: `tests/pruef/gui/gui_formen.dhtest` (Treffer von Kreis, Raute,
+Pille und Stern; eingespielter Klick neben und in den Kreis; GUI_ANIMATE
+laeuft und endet; Drehung im Bild nach einer Viertelrunde; Fehler), vier
+Gegenproben; Rust-Tests in `gui_aussehen.rs`. Beispiel
+`examples/220_formen_und_animationen.dh` (Spielmenue).

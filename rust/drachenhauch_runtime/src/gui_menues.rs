@@ -638,7 +638,7 @@ impl Gui {
             // unsichtbare Controls selektiert.
             for i in (0..win.widgets.len()).rev() {
                 let wd = &win.widgets[i];
-                if wd.kind != Kind::Layout && self.widget_shown(wi, wd) && Self::in_rect(mx, my, self.abs_rect(wi, wd))
+                if wd.kind != Kind::Layout && self.widget_shown(wi, wd) && self.trifft(wi, wd, mx, my)
                     && self.im_panel_sichtbar(wi, wd, mx, my) {
                     return Self::enc_widget(wi, i);
                 }

@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/en und dem englischen Buch von `dhrt doku prosa` -- NICHT von Hand aendern. Der Hover nimmt sie mit DHRT_LANG=en.",
- "count": 2421,
+ "count": 2425,
  "docs": {
   "ABS": "Absolute value.",
   "ACOS": "Arc sine/cosine (x in [-1, 1])",
@@ -567,6 +567,8 @@
   "GUI_ACCORDION_TOGGLED": "INTEGER — which section was toggled in this frame (-1 = none)",
   "GUI_ACTIVE_TAB": "INTEGER — index of the active tab",
   "GUI_ADD_CLASS": "add a class; it takes effect at once and as long as it stays",
+  "GUI_ANIMATE": "start an animation -- say wobble once on wrong input; anzahl 0 = endless (default 1), art$ \"\" stops",
+  "GUI_ANIMATING": "is an animation running right now?",
   "GUI_ANNOUNCE": "hand a sentence to the user's screen reader — it speaks it with its voice (polite: after the current sentence; urgent: immediately). Without an assistive program nothing happens. For everything that would otherwise only appear in a status line: \"Invoice saved\", \"3 rows deleted\"",
   "GUI_ANSWER": "INTEGER — 0 = still open, otherwise the number of the button (1-based): 1 = OK/Yes, 2 = Cancel/No",
   "GUI_APPLY_STYLE": "apply a named style to a widget -- saves repeating it widget by widget",
@@ -729,6 +731,7 @@
   "GUI_GET_MIN_W": "INTEGER — the minimum size that was set, 0 = none",
   "GUI_GET_NAME$": "STRING — the widget's name (\"\" = none)",
   "GUI_GET_ROUND": "— / BOOLEAN — draw a button round instead of square (for buttons with only an icon)",
+  "GUI_GET_SHAPE$": "set a shape of its own (\"\" = the stylesheet again) or the shape in effect",
   "GUI_GET_TAB_INDEX": "read the index that was set (0 = creation order)",
   "GUI_GET_W": "INTEGER — position and size of the widget in the window (counterpart to GUI_SET_BOUNDS)",
   "GUI_GET_WRAP": "INTEGER — the wrap width, 0 = off",
@@ -896,6 +899,7 @@
   "GUI_SET_NAME": "the name that #name in the stylesheet refers to",
   "GUI_SET_PICKED_COLOR": "set the colour",
   "GUI_SET_ROUND": "— / BOOLEAN — draw a button round instead of square (for buttons with only an icon)",
+  "GUI_SET_SHAPE": "set a shape of its own (\"\" = the stylesheet again) or the shape in effect",
   "GUI_SET_TAB": "assign a widget to a tab (-1 = visible on all tabs)",
   "GUI_SET_TAB_INDEX": "set the tab order: widgets with an index above 0 first, ascending; 0 (default) = order of creation",
   "GUI_SET_TEXT": "set the text",

@@ -23,6 +23,8 @@ mod dock;
 mod ueber;
 #[path = "gui_popupfenster.rs"]
 mod popupfenster;
+#[path = "gui_aussehen.rs"]
+mod aussehen;
 #[path = "gui_stil.rs"]
 mod stil;
 #[path = "gui_bausteine.rs"]
@@ -3397,6 +3399,8 @@ pub struct Widget {
     bau: Option<Box<bausteine::Bauzusatz>>,
     /// Rechtschreibung (GUI_SPELL).
     rs: Option<Box<rechtschreibung::RsZusatz>>,
+    /// Eigene Form und Animationen (gui_aussehen.rs) -- nur bei Bedarf.
+    aussehen: Option<Box<aussehen::Aussehen>>,
 }
 
 /// Datenbank-Buchfuehrung eines Formulars (siehe `Window::form_db`).
@@ -3789,6 +3793,10 @@ pub struct Gui {
     /// gezeichnet wird (0 = Hauptfenster), und ob dafuer ein Gastfenster
     /// geliehen ist (Teilflaeche einer abgerissenen Leiste).
     pub(super) canvas_offen: Option<(u32, bool)>,
+    /// Uhr der gui in Sekunden (Summe der DELTA()) -- fuer Animationen.
+    pub(super) uhr: f64,
+    /// Geladene Bildhaeute nach Pfad (None = nicht ladbar).
+    pub(super) haeute: std::collections::HashMap<String, Option<aussehen::Haut>>,
     focus_window: Option<usize>,
     focus_widget: Option<(usize, usize)>,
     // Offener modaler Dialog. Solange einer steht, bekommt NUR er Eingaben --
@@ -4014,7 +4022,7 @@ impl Gui {
     pub fn new() -> Gui {
         Gui {
             schrift: None,
-            windows: Vec::new(), z_order: Vec::new(), flaeche: 0, fokus_flaeche: 0, nativ_fokus_wunsch: None, leihe: None, teil_druck: None, teil_ids: Vec::new(), popup_fenster: Vec::new(), grenzen: Vec::new(), canvas_offen: None,
+            windows: Vec::new(), z_order: Vec::new(), flaeche: 0, fokus_flaeche: 0, nativ_fokus_wunsch: None, leihe: None, teil_druck: None, teil_ids: Vec::new(), popup_fenster: Vec::new(), grenzen: Vec::new(), canvas_offen: None, uhr: 0.0, haeute: std::collections::HashMap::new(),
             ta_zerlegung: std::cell::RefCell::new(HashMap::new()),
             focus_window: None, focus_widget: None, modal: None, modal_vorher: Vec::new(), modal_fokus: Vec::new(), cp_drag: None,
             drag_window: None, drag_dx: 0, drag_dy: 0,
@@ -5151,6 +5159,7 @@ impl Gui {
             name: String::new(), klassen: Vec::new(), stil_auf: None, stil_key: None,
             bau: None,
             rs: None,
+            aussehen: None,
         }
     }
 

@@ -1,0 +1,212 @@
+' Eigene Formen, Bildhaeute und Animationen (gui_aussehen.rs,
+' docs/intern/entwurf-gui-formen.md Stufe 1). Die Form gilt fuer Zeichnen
+' UND Treffer: GUI_HIT_TEST, Ueberfahren, Druecken und Loslassen fragen
+' dieselbe Stelle (`form_trifft`) -- ein Klick neben dem Kreis trifft nicht.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== kreis und raute treffen nur in ihrer form
+TRY
+    SCREEN(400, 300, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 300)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM kr AS GUI_WIDGET : kr = GUI_BUTTON(w, "Kreis", 20, 20, 80, 80)
+DIM ra AS GUI_WIDGET : ra = GUI_BUTTON(w, "Raute", 150, 20, 120, 80)
+DIM pi AS GUI_WIDGET : pi = GUI_BUTTON(w, "Pille", 20, 150, 140, 40)
+GUI_SET_NAME(kr, "kreis") : GUI_SET_NAME(ra, "raute")
+GUI_STYLESHEET("#kreis { form: kreis }" + CHR$(10) + "#raute { form: raute }")
+GUI_SET_SHAPE(pi, "pille")
+GUI_UPDATE()
+PRINT "formen "; GUI_GET_SHAPE$(kr); " "; GUI_GET_SHAPE$(ra); " "; GUI_GET_SHAPE$(pi)
+PRINT "kreis mitte "; GUI_HIT_TEST(60, 60) = kr; " ecke "; GUI_HIT_TEST(23, 23) = kr; " rand innen "; GUI_HIT_TEST(60, 22) = kr
+PRINT "raute mitte "; GUI_HIT_TEST(210, 60) = ra; " ecke "; GUI_HIT_TEST(154, 24) = ra; " spitze "; GUI_HIT_TEST(266, 60) = ra
+PRINT "pille mitte "; GUI_HIT_TEST(90, 170) = pi; " ecke "; GUI_HIT_TEST(21, 151) = pi
+GUI_SET_SHAPE(pi, "")
+PRINT "pille zurueck "; GUI_GET_SHAPE$(pi); " ecke "; GUI_HIT_TEST(21, 151) = pi
+--- erwartet
+formen kreis raute pille
+kreis mitte TRUE ecke FALSE rand innen TRUE
+raute mitte TRUE ecke FALSE spitze TRUE
+pille mitte TRUE ecke FALSE
+pille zurueck rechteck ecke TRUE
+
+=== eine bildhaut gibt die form vor
+' form: bild nimmt die Deckkraft des Bildes: ein Stern trifft in der Mitte,
+' nicht in der durchsichtigen Ecke daneben.
+TRY
+    SCREEN(400, 300, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+IMPORT "imgfx"
+DIM st AS INTEGER : st = IMAGE_NEW(100, 100)
+IMAGE_FILL_POLY(st, [50, 62, 96, 68, 80, 50, 20, 32, 4, 38], [2, 36, 38, 60, 96, 74, 96, 60, 38, 36], RGB(240, 190, 40))
+IMAGE_SAVE(st, "stern.png", TRUE)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 300)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM s AS GUI_WIDGET : s = GUI_BUTTON(w, "", 100, 100, 100, 100)
+GUI_SET_NAME(s, "stern")
+GUI_STYLESHEET("#stern { form: bild; bild: stern.png }")
+GUI_UPDATE()
+GUI_UPDATE()
+PRINT "form "; GUI_GET_SHAPE$(s); " mitte "; GUI_HIT_TEST(150, 160) = s; " ecke "; GUI_HIT_TEST(104, 104) = s; " zacke "; GUI_HIT_TEST(150, 106) = s
+--- erwartet
+form bild mitte TRUE ecke FALSE zacke TRUE
+
+=== ein klick neben dem kreis trifft nicht
+' Eingespielte Klicks: einer in die Ecke des Rechtecks (ausserhalb des
+' Kreises), einer in die Mitte. Nur der zweite ist ein Klick.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 300)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM kr AS GUI_WIDGET : kr = GUI_BUTTON(w, "Kreis", 20, 20, 80, 80)
+GUI_SET_SHAPE(kr, "kreis")
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER
+DIM klicks AS INTEGER
+DIM erst AS INTEGER : erst = -1
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    IF GUI_CLICKED(kr) THEN
+        klicks = klicks + 1
+        erst = n
+    END IF
+    CLS(0) : GUI_DRAW() : FLIP()
+WEND
+PRINT "klicks "; klicks; " erst nach dem zweiten druck "; erst > 8
+--- datei ev.txt
+c 6
+e 1 7 23 23 0 0
+e 2 6 0 0 0 0
+e 3 5 0 0 0 0
+e 11 7 60 60 0 0
+e 12 6 0 0 0 0
+e 13 5 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=30
+--- erwartet
+klicks 1 erst nach dem zweiten druck TRUE
+
+=== gui_animate laeuft und endet
+TRY
+    SCREEN(400, 300, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 300)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "Falsch", 20, 20, 120, 30)
+PRINT "vorher "; GUI_ANIMATING(b)
+GUI_ANIMATE(b, "wackeln", 200, 2)
+PRINT "gleich "; GUI_ANIMATING(b)
+DIM n AS INTEGER
+FOR n = 1 TO 30
+    GUI_UPDATE() : CLS(0) : GUI_DRAW() : FLIP()
+NEXT
+PRINT "nach einer halben sekunde "; GUI_ANIMATING(b)
+GUI_ANIMATE(b, "puls", 300, 0)
+FOR n = 1 TO 60
+    GUI_UPDATE() : CLS(0) : GUI_DRAW() : FLIP()
+NEXT
+PRINT "ohne ende "; GUI_ANIMATING(b)
+GUI_ANIMATE(b, "")
+PRINT "angehalten "; GUI_ANIMATING(b)
+--- erwartet
+vorher FALSE
+gleich TRUE
+nach einer halben sekunde FALSE
+ohne ende TRUE
+angehalten FALSE
+--- umgebung
+DHRT_FRAMES=200
+
+=== die drehung ist im bild
+' animation: drehen 2400ms -- nach 600 ms (36 Bilder zu 1/60 s) steht der
+' flache Knopf senkrecht: oberhalb seines Rechtecks ist dann seine Farbe.
+TRY
+    SCREEN(400, 300, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 300)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "", 140, 135, 120, 30)
+GUI_SET_NAME(b, "dreh")
+GUI_STYLESHEET("#dreh { bg: #FF0000; border: #FF0000; animation: drehen 2400ms }")
+DIM n AS INTEGER
+DIM rt AS INTEGER : rt = RENDERTARGET_NEW(400, 300)
+DIM vorher AS INTEGER
+DIM nachher AS INTEGER
+FOR n = 1 TO 37
+    GUI_UPDATE()
+    IF n = 1 OR n = 37 THEN
+        RENDERTARGET_BEGIN(rt)
+        CLS(0)
+        GUI_DRAW()
+        RENDERTARGET_END()
+        DIM bild AS IMAGE : bild = RENDERTARGET_IMAGE(rt)
+        IF n = 1 THEN vorher = GETPIXEL(bild, 200, 105) ELSE nachher = GETPIXEL(bild, 200, 105)
+    END IF
+    CLS(0) : FLIP()
+NEXT
+PRINT "vorher rot "; (vorher BAND &HFFFFFF) = &HFF0000; " nach einer viertelrunde rot "; (nachher BAND &HFFFFFF) = &HFF0000
+--- erwartet
+vorher rot FALSE nach einer viertelrunde rot TRUE
+--- umgebung
+DHRT_FRAMES=200
+
+=== falsche angaben sind fehler
+TRY
+    SCREEN(400, 300, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 300)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "x", 20, 20, 120, 30)
+DIM l AS GUI_WIDGET : l = GUI_LABEL(w, "y", 20, 80)
+TRY
+    GUI_SET_SHAPE(b, "stern")
+CATCH e1
+    PRINT e1
+END TRY
+TRY
+    GUI_SET_SHAPE(l, "kreis")
+CATCH e2
+    PRINT e2
+END TRY
+TRY
+    GUI_ANIMATE(b, "tanzen")
+CATCH e3
+    PRINT e3
+END TRY
+TRY
+    GUI_STYLESHEET("button:hover { form: kreis }")
+CATCH e4
+    PRINT e4
+END TRY
+TRY
+    GUI_STYLESHEET("button { animation: puls 10ms }")
+CATCH e5
+    PRINT e5
+END TRY
+--- enthaelt
+GUI_SET_SHAPE: Form 'stern' unbekannt
+GUI_SET_SHAPE: nur fuer Knoepfe
+GUI_ANIMATE: 'tanzen' unbekannt
+'form' gilt nur in Regeln ohne :hover
+Dauer 10 ms ausserhalb 50..20000

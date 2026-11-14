@@ -126,6 +126,10 @@ enum Cmd {
     // den vorigen wieder her. Koordinaten logisch (pre-scale), beim Replay * s.
     ScissorPush(i32, i32, i32, i32),
     ScissorPop,
+    /// Verformung um (cx, cy): verschieben (dx, dy), drehen (Grad),
+    /// vergroessern -- bis VerformungEnde (Animationen der gui).
+    Verformung(i32, i32, f32, f32, f32, f32),
+    VerformungEnde,
     // 2D-Extras (Batch 1): dicke Linien, runde Rechtecke, Gradienten, Splines.
     LineEx(i32, i32, i32, i32, f32, Color),            // x1,y1,x2,y2, thick, color
     RoundRect(i32, i32, i32, i32, i32, Color, bool),   // x1,y1,x2,y2, radius, color, filled
@@ -2928,6 +2932,13 @@ impl Graphics {
     }
     /// Das Hauptfenster des Systems (HWND unter Windows, sonst 0).
     pub fn haupt_os_handle(&self) -> usize { crate::nativfenster::os_handle(self.haupt_glfw as *mut std::ffi::c_void) }
+    /// Alles bis `verformung_beenden` um (cx, cy) verschoben, gedreht
+    /// (Grad) und vergroessert zeichnen -- die Animationen der gui.
+    pub fn verformung_beginnen(&mut self, cx: i32, cy: i32, dx: f32, dy: f32, ang: f32, sc: f32) {
+        let (cx, cy) = self.w2s(cx, cy);
+        self.emit(Cmd::Verformung(cx, cy, dx, dy, ang, sc));
+    }
+    pub fn verformung_beenden(&mut self) { self.emit(Cmd::VerformungEnde); }
     /// Der Massstab von SCREEN (Systempunkte je Punkt des Programms).
     pub fn haupt_massstab(&self) -> i32 { self.scale.max(1) }
     /// Die gui liest (Some) oder das Programm (None); Some(k) = durch die
@@ -9571,6 +9582,20 @@ fn render_scene<D: RaylibDraw>(
                         clip_stack.push((rx, ry, rw, rh));
                         unsafe { raylib::ffi::BeginScissorMode(rx, ry, rw, rh); }
                     }
+                    Cmd::Verformung(cx, cy, dx, dy, ang, sc) => unsafe {
+                        let sf = s as f32;
+                        let (mx, my) = ((*cx * s) as f32, (*cy * s) as f32);
+                        raylib::ffi::rlDrawRenderBatchActive();
+                        raylib::ffi::rlPushMatrix();
+                        raylib::ffi::rlTranslatef(mx + dx * sf, my + dy * sf, 0.0);
+                        raylib::ffi::rlRotatef(*ang, 0.0, 0.0, 1.0);
+                        raylib::ffi::rlScalef(*sc, *sc, 1.0);
+                        raylib::ffi::rlTranslatef(-mx, -my, 0.0);
+                    },
+                    Cmd::VerformungEnde => unsafe {
+                        raylib::ffi::rlDrawRenderBatchActive();
+                        raylib::ffi::rlPopMatrix();
+                    },
                     Cmd::ScissorPop => {
                         clip_stack.pop();
                         match clip_stack.last() {

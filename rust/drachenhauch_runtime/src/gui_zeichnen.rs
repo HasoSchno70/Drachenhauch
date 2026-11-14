@@ -684,11 +684,19 @@ impl Gui {
         // Die Rundung aus der Stildatei gilt fuer jede Flaeche dieses Widgets.
         let vorher = self.rad_jetzt.replace(self.w_radius(wdg));
         let form_vorher = self.form_jetzt.replace(self.w_form(wdg));
-        if wdg.stil_auf.is_some() {
+        // Animation (gui_aussehen.rs): das ganze Widget um seine Mitte
+        // verschoben, gedreht oder vergroessert -- Lage und Treffer bleiben.
+        let anim = if wdg.aussehen.is_some() { self.anim_matrix(wi, idx, wdg) } else { None };
+        if let Some((dx, dy, ang, sc)) = anim {
+            let (ax, ay, w, h) = self.abs_rect(wi, wdg);
+            g.verformung_beginnen(ax + w / 2, ay + h / 2, dx, dy, ang, sc);
+        }
+        if wdg.stil_auf.is_some() && !matches!(self.w_form_art(wdg), aussehen::F_KREIS | aussehen::F_RAUTE | aussehen::F_BILD) {
             let (ax, ay, w, h) = self.abs_rect(wi, wdg);
             self.schatten_zeichnen(g, wdg, ax, ay, w, h);
         }
         self.draw_widget_innen(g, wi, idx, wdg);
+        if anim.is_some() { g.verformung_beenden(); }
         self.form_jetzt.set(form_vorher);
         self.rad_jetzt.set(vorher);
     }
@@ -758,7 +766,39 @@ impl Gui {
                 let pressed = self.press_origin == Some((wi, idx));
                 // Uebergaenge: eh = ueberfahren, ed = gedrueckt (beide 0..1).
                 let (eh, ed) = if wdg.enabled { (weich(wdg.ueber_t), weich(wdg.druck_t)) } else { (0.0, 0.0) };
-                if icon_only {
+                // Eigene Form und Bildhaut (gui_aussehen.rs): Bild statt
+                // Flaeche, oder Pille, Kreis, Raute in den Farben des
+                // gefuellten Knopfs. Treffer: `form_trifft`.
+                let haut = self.w_bild(wdg, pressed);
+                let form = self.w_form_art(wdg);
+                let eigen_flaeche = match haut.as_ref() {
+                    Some((pfad, rand)) => self.haut_zeichnen(g, pfad, *rand, ax, ay, w, h),
+                    None => false,
+                };
+                if eigen_flaeche {
+                } else if matches!(form, aussehen::F_PILLE | aussehen::F_KREIS | aussehen::F_RAUTE) {
+                    let (bg, rahmen) = self.knopf_farben(wi, idx, wdg);
+                    match form {
+                        aussehen::F_PILLE => {
+                            let r = (w.min(h) / 2).max(2);
+                            g.round_rect(ax, ay, ax + w - 1, ay + h - 1, r, bg, true);
+                            g.round_rect(ax, ay, ax + w - 1, ay + h - 1, r, rahmen, false);
+                        }
+                        aussehen::F_KREIS => {
+                            let r = (w.min(h) / 2).max(2);
+                            let (cx, cy) = (ax + w / 2, ay + h / 2);
+                            g.circle(cx, cy, r, bg);
+                            g.circle_outline(cx, cy, r, rahmen);
+                        }
+                        _ => {
+                            let (o, rr, u, l) = ((ax + w / 2, ay), (ax + w - 1, ay + h / 2), (ax + w / 2, ay + h - 1), (ax, ay + h / 2));
+                            g.triangle(o.0, o.1, rr.0, rr.1, u.0, u.1, bg);
+                            g.triangle(o.0, o.1, u.0, u.1, l.0, l.1, bg);
+                            g.line(o.0, o.1, rr.0, rr.1, rahmen); g.line(rr.0, rr.1, u.0, u.1, rahmen);
+                            g.line(u.0, u.1, l.0, l.1, rahmen); g.line(l.0, l.1, o.0, o.1, rahmen);
+                        }
+                    }
+                } else if icon_only {
                     // Flacher Toolbar-Look: Flaeche nur bei Hover/Press --
                     // sie blendet ein, statt aufzutauchen.
                     let bgc = self.wcol(wdg, "bg", "widget_bg");

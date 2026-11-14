@@ -2490,6 +2490,42 @@ you would look for it in the program. Name and classes are stored in the
 `.dhform` (`name`, `klassen`). `GUI_GET_COLOR` tells which colour applies
 right now.
 
+### 8. Shapes of your own, image skins and animations
+
+A button does not have to be a rectangle. The stylesheet knows three more
+properties for it, plus four commands:
+
+| Property / command | Effect |
+|---|---|
+| `form: rechteck \| pille \| kreis \| raute \| bild` | shape of a button (rectangle, pill, circle, diamond, image) -- for drawing **and** hit testing: a click beside the circle misses. `bild` takes the opacity of the image skin (transparent = beside), which makes any shape possible. Only in rules without a state |
+| `bild: datei.png` / `bildrand: 12` | image skin: instead of surface and border the button draws the image, `bildrand` as a 9-slice (corners stay, the middle grows); icon and text lie on top. Also per state (`:hover`, `:active`, `:disabled`, `:checked`) |
+| `animation: puls \| wackeln \| schweben \| huepfen \| drehen [duration ms] [einmal \| count]` | the whole widget moves around its centre (pulse, wobble, float, bounce, spin); also per state: `button:hover { animation: puls }` pulses only while hovered |
+| `GUI_SET_SHAPE(knopf, form$)` / `GUI_GET_SHAPE$(knopf)` | set a shape of its own (`""` = the stylesheet again) or the shape in effect |
+| `GUI_ANIMATE(wdg, art$ [, dauer_ms [, anzahl]])` | start an animation -- say wobble once on wrong input; `anzahl` 0 = endless (default 1), `art$` `""` stops |
+| `GUI_ANIMATING(wdg)` | is an animation running right now? |
+
+```basic
+IMPORT "gui"
+SCREEN(600, 260, "Spielmenue", 1)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Menue", 10, 10, 580, 240)
+DIM start AS GUI_WIDGET : start = GUI_BUTTON(w, "Start", 20, 20, 160, 50)
+DIM ende AS GUI_WIDGET : ende = GUI_BUTTON(w, "Ende", 220, 20, 80, 80)
+DIM name AS GUI_WIDGET : name = GUI_TEXTINPUT(w, 20, 120, 280, 30, "Name")
+GUI_ADD_CLASS(start, "menue")
+GUI_SET_NAME(ende, "ende")
+GUI_STYLESHEET("button.menue { form: pille; bg: #2E9E5B }" + CHR$(10) + "button.menue:hover { animation: puls 700ms }" + CHR$(10) + "#ende { form: kreis; bg: #C0392B }")
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_CLICKED(start) AND GUI_TEXT(name) = "" THEN GUI_ANIMATE(name, "wackeln", 300)
+    CLS(&H202830) : GUI_DRAW() : FLIP()
+WEND
+```
+
+An animation only moves, turns or enlarges the widget's picture; its
+position and its hit area stay where they are. Time runs with `DELTA()`
+(without a window under `DHRT_FRAMES` a fixed 1/60 s per frame). The gui
+loads image skins at first use, relative to the program.
+
 ## Callbacks: GUI_ON_CLICK
 
 Besides polling (`IF GUI_CLICKED(b) THEN ...`) you can register a Drachenhauch

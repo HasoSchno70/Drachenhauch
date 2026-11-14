@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 2429,
+ "count": 2433,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -568,6 +568,8 @@
   "GUI_ACCORDION_TOGGLED": "INTEGER — welcher Abschnitt in diesem Bild umgeklappt wurde (-1 = keiner)",
   "GUI_ACTIVE_TAB": "INTEGER — aktiver Reiter-Index",
   "GUI_ADD_CLASS": "eine Klasse anhängen; sie wirkt sofort und solange sie dran ist",
+  "GUI_ANIMATE": "eine Animation starten -- etwa einmal wackeln bei falscher Eingabe; anzahl 0 = ohne Ende (Vorgabe 1), art$ \"\" hält an",
+  "GUI_ANIMATING": "läuft gerade eine Animation?",
   "GUI_ANNOUNCE": "einen Satz an den Bildschirmleser des Nutzers geben — er spricht ihn mit seiner Stimme (höflich: nach dem laufenden Satz; dringend: sofort). Ohne Hilfsprogramm passiert nichts. Für alles, was sonst nur in einer Statuszeile steht: „Rechnung gespeichert“, „3 Zeilen gelöscht“",
   "GUI_ANSWER": "INTEGER — 0 = noch offen, sonst die Nummer des Knopfs (1-basiert): 1 = OK/Ja, 2 = Abbrechen/Nein",
   "GUI_APPLY_STYLE": "einen benannten Stil auf ein Widget uebertragen -- spart, ihn Widget fuer Widget zu wiederholen",
@@ -730,6 +732,7 @@
   "GUI_GET_MIN_W": "INTEGER — das gesetzte Mindestmaß, 0 = keins",
   "GUI_GET_NAME$": "STRING — der Name des Widgets (\"\" = keiner)",
   "GUI_GET_ROUND": "— / BOOLEAN — Knopf rund statt eckig zeichnen (für Knöpfe mit nur einem Sinnbild)",
+  "GUI_GET_SHAPE$": "eigene Form setzen (\"\" = wieder die Stildatei) bzw. die Form, die gilt",
   "GUI_GET_TAB_INDEX": "den gesetzten Index lesen (0 = Anlege-Reihenfolge)",
   "GUI_GET_W": "INTEGER — Lage und Groesse des Widgets im Fenster (Gegenstueck zu GUI_SET_BOUNDS)",
   "GUI_GET_WRAP": "INTEGER — die Umbruchbreite, 0 = aus",
@@ -897,6 +900,7 @@
   "GUI_SET_NAME": "der Name, den #name in der Stildatei meint",
   "GUI_SET_PICKED_COLOR": "Farbe setzen",
   "GUI_SET_ROUND": "— / BOOLEAN — Knopf rund statt eckig zeichnen (für Knöpfe mit nur einem Sinnbild)",
+  "GUI_SET_SHAPE": "eigene Form setzen (\"\" = wieder die Stildatei) bzw. die Form, die gilt",
   "GUI_SET_TAB": "Widget einem Reiter zuordnen (-1 = auf allen Reitern sichtbar)",
   "GUI_SET_TAB_INDEX": "Tab-Reihenfolge festlegen: Widgets mit Index über 0 zuerst, aufsteigend; 0 (Vorgabe) = Reihenfolge des Anlegens",
   "GUI_SET_TEXT": "Text setzen",

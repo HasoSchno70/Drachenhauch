@@ -1466,6 +1466,28 @@ impl Gui {
         }
     }
     /// Textfarbe eines Knopfes: eigene vor lesbarer vor Thema.
+    /// Flaeche und Rand eines gefuellten Knopfs im jetzigen Zustand --
+    /// dieselbe Rechnung wie der Knopf im Zeichnen, fuer die eigenen
+    /// Formen (gui_aussehen.rs).
+    pub(super) fn knopf_farben(&self, wi: usize, idx: usize, wdg: &Widget) -> (i64, i64) {
+        let grund = self.knopf_grund(wdg);
+        let mut bg = grund.unwrap_or_else(|| self.th("widget_bg"));
+        if !wdg.enabled && grund.is_some() && !self.stil_hat(wdg, "bg", stil::AUS) {
+            bg = mischen(bg, self.th("widget_bg"), 0.65);
+        }
+        let bg_h = wdg.ov.get("hover").copied().or_else(|| self.stil_farbe(wdg, "bg", stil::HOVER))
+            .unwrap_or(shade(bg, if grund.is_some() { 18 } else { 30 }));
+        let bg_d = wdg.ov.get("pressed").copied().or_else(|| self.stil_farbe(wdg, "bg", stil::AKTIV))
+            .unwrap_or(shade(bg, -30));
+        let (eh, ed) = if wdg.enabled { (Self::rolle_t(wdg, "bg", 0), Self::rolle_t(wdg, "bg", 2)) } else { (0.0, 0.0) };
+        bg = mischen(mischen(bg, bg_h, eh), bg_d, ed);
+        let rahmen = if self.windows[wi].default_btn == idx as i32 && wdg.variante != 1 {
+            self.wcol(wdg, "accent", "accent")
+        } else if let (Some(gr), None) = (grund, self.eigen(wdg, "border")) {
+            shade(gr, -40)
+        } else { self.wcol(wdg, "border", "widget_border") };
+        (bg, rahmen)
+    }
     pub(super) fn knopf_text(&self, w: &Widget) -> i64 {
         if !w.enabled { return self.stil_farbe(w, "fg", stil::AUS).unwrap_or_else(|| self.th("muted_fg")); }
         if let Some(c) = self.eigen(w, "fg") { return self.stil_misch(w, "fg", c); }

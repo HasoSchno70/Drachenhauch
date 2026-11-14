@@ -77,6 +77,7 @@ impl Gui {
         // oeffnet, schliesst oder verschiebt.
         self.popup_fenster_abgleich(g);
         self.stil_pass();
+        self.aussehen_pass(g);
         self.rs_pass(g.delta());
         for wi in 0..self.windows.len() {
             for i in 0..self.windows[wi].widgets.len() {
@@ -297,7 +298,7 @@ impl Gui {
                     (self.abs_rect(top, w), w.kind, self.widget_shown(top, w) && w.enabled && w.kind != Kind::Layout
                         && self.im_panel_sichtbar(top, w, mx, my))
                 };
-                if active && Self::in_rect(mx, my, r) {
+                if active && Self::in_rect(mx, my, r) && self.form_trifft(&self.windows[top].widgets[i], r, mx, my) {
                     self.windows[top].widgets[i].hovered = true;
                     if kind == Kind::Table {
                         self.table_hover(top, i, mx, my, g);
@@ -644,8 +645,9 @@ impl Gui {
             }
             if let Some((wi, i)) = self.press_origin {
                 let r = { let w = &self.windows[wi].widgets[i]; self.abs_rect(wi, w) };
+                let in_form = Self::in_rect(mx, my, r) && self.form_trifft(&self.windows[wi].widgets[i], r, mx, my);
                 let w = &mut self.windows[wi].widgets[i];
-                let fire = if matches!(w.kind, Kind::Button | Kind::Card) && Self::in_rect(mx, my, r) {
+                let fire = if matches!(w.kind, Kind::Button | Kind::Card) && in_form {
                     w.clicked = true; w.on_click.clone()
                 } else { None };
                 if let Some(f) = fire { self.pending.push(f); }
