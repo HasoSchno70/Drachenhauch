@@ -83,7 +83,9 @@ Neuer Builtin:
    Eintrag hat. Danach dhrt neu bauen (eingebettet).
 4. Ein Fall in einer Prüfsammlung (`tests/pruef/<thema>/*.dhtest`), mit
    Gegenprobe (siehe Prüfsammlungen).
-5. Neues Keyword: `lexer::KEYWORDS` ergänzen, `dhrt doku grammatik`.
+5. `dhrt doku grammatik` -- die VS-Code-Grammatik kennt jeden Builtin
+   (sonst fällt `doku_pruefungen` in der CI); ein neues Keyword zusätzlich
+   in `lexer::KEYWORDS`.
 6. **Familien:** jede Aufrufstelle merkt sich die Familie, die geantwortet hat
    (`Instr::familie`, `Vm::builtin_rufen`/`familie_rufen`). Eine Familie darf
    nur am NAMEN absagen; sagt sie je nach Argument ab, obwohl eine spätere den
