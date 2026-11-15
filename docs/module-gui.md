@@ -316,6 +316,7 @@ IMPORT "gui"
 | `GUI_TABLE_HEADERS(tbl, headers)` | — | Spaltentitel setzen (1D ARRAY OF STRING) |
 | `GUI_TABLE_ROWS(tbl, cells)` | — | Datenzeilen setzen (2D ARRAY OF STRING) |
 | `GUI_TABLE_COL_WIDTHS(tbl, widths)` | — | Spaltenbreiten (1D ARRAY OF INTEGER; NIL = Auto) |
+| `GUI_TABLE_GET_COL_WIDTHS(tbl)` | ARRAY OF INTEGER | die Breiten, die gerade gelten (eigene oder verteilte), je Datenspalte |
 | `GUI_TABLE_SELECTED(tbl)` | INTEGER | selektierte Zeile (-1 wenn keine) |
 | `GUI_TABLE_SET_SELECTED(tbl, row)` | — | Selektion setzen (-1 = keine) |
 | `GUI_TABLE_CLICKED(tbl)` | INTEGER | in diesem Frame geklickte Zeile (-1) |

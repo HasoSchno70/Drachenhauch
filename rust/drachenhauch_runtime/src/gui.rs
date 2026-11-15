@@ -3770,6 +3770,10 @@ fn kuerzel_parsen(s: &str) -> Result<(u8, i64), String> {
 // Aufgeloestes Tabellen-Layout (einzige Wahrheit fuer Hit-Test + Zeichnen).
 struct TGeom {
     ax: i32, ay: i32, w: i32, h: i32,
+    /// Gespiegelt (GUI_WINDOW_RTL): die erste Spalte steht rechts. Gerechnet
+    /// wird wie links; `col_x`/`col_clip`/`edge_at` spiegeln um die Mitte
+    /// des Rumpfs -- alle Treffer und alles Zeichnen geht durch sie.
+    rtl: bool,
     n_cols: usize, n_rows: usize, col_widths: Vec<i32>,
     /// Zeilen- und Kopfhoehe sind einstellbar (Bilder in Zellen brauchen
     /// Platz) -- sie stehen hier, damit Treffertest und Zeichnen dieselbe

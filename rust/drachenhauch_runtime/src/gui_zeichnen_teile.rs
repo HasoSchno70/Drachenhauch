@@ -213,6 +213,11 @@ impl Gui {
         // Mit Rollbalken enden die Zeilen vor ihm.
         let bar = self.list_bar_geom(wi, idx);
         let wz = if bar.is_some() { w - self.sk(8) - 2 } else { w };
+        // Gespiegelt (GUI_WINDOW_RTL): Einzug, Dreieck, Kaestchen, Sinnbild
+        // und Name von rechts -- gerechnet wird wie links, gespiegelt wird
+        // beim Setzen (`sp`: linke Kante eines Stuecks der Breite `b`).
+        let rtl = self.windows[wi].rtl;
+        let sp = |x: i32, b: i32| -> i32 { if rtl { ax + wz - (x - ax) - b } else { x } };
         g.push_clip(ax + 1, ay + 1, w - 2, h - 2);
         if zeilen.is_empty() && !t.leer_text.is_empty() {
             let muted = self.leise(self.wcol(wdg, "bg", "widget_bg"));
@@ -246,11 +251,13 @@ impl Gui {
             if node.has_children {
                 // Der Winkel dreht sich mit: ">" zu, "v" offen, dazwischen
                 // um 90 Grad gedreht (dieselben drei Punkte).
-                let cx = tx + self.sk(TREE_TOGGLE_W) / 2;
+                let cx = sp(tx + self.sk(TREE_TOGGLE_W) / 2, 0);
                 let a = weich(t.auf_t.get(ni).copied().unwrap_or(if node.expanded { 1.0 } else { 0.0 }));
                 let (sn, cs) = (a * std::f64::consts::FRAC_PI_2).sin_cos();
+                // Gespiegelt zeigt der zugeklappte Winkel nach links.
+                let s = if rtl { -1.0 } else { 1.0 };
                 let dreh = |dx: f64, dy: f64| -> (i32, i32) {
-                    (cx + (dx * cs - dy * sn).round() as i32, cy + (dx * sn + dy * cs).round() as i32)
+                    (cx + (s * (dx * cs - dy * sn)).round() as i32, cy + (dx * sn + dy * cs).round() as i32)
                 };
                 let (p1, p2, p3) = (dreh(-2.0, -4.0), dreh(2.0, 0.0), dreh(-2.0, 4.0));
                 g.line(p1.0, p1.1, p2.0, p2.1, fg);
@@ -261,6 +268,7 @@ impl Gui {
                 // Kaestchen wie bei der Liste: Rahmen, gefuellt mit Haken --
                 // aber GANZ LINKS, vor dem Dreieck (siehe tree_kast_w).
                 let (bx, cs) = self.tree_kast(ax, node.level);
+                let bx = sp(bx, cs);
                 let by = ry + (self.sk(TREE_ROW_H) - cs) / 2;
                 g.rect(bx, by, bx + cs - 1, by + cs - 1, self.wcol(wdg, "border", "widget_border"));
                 if t.checks.get(ni).copied().unwrap_or(false) {
@@ -275,16 +283,17 @@ impl Gui {
                 // Platz fuer das Sinnbild bekommt JEDE Zeile, sobald eine
                 // eines hat -- sonst staenden die Namen versetzt.
                 if node.icon >= 0 {
-                    g.draw_image_rect(node.icon, lx, ry + 2, isz, isz);
+                    g.draw_image_rect(node.icon, sp(lx, isz), ry + 2, isz, isz);
                 } else if !node.sym.is_empty() {
                     // Ein eingebautes Sinnbild in der Farbe des Namens, etwas
                     // kleiner als die Zeile, damit es nicht an den Nachbarn klebt.
                     let s = (isz - 2).max(8);
-                    sinnbild(g, &node.sym, lx + (isz - s) / 2, ry + (self.sk(TREE_ROW_H) - s) / 2, s, farbe, true);
+                    sinnbild(g, &node.sym, sp(lx, isz) + (isz - s) / 2, ry + (self.sk(TREE_ROW_H) - s) / 2, s, farbe, true);
                 }
                 lx += isz + 3;
             }
-            self.wtext(g, wdg, lx, ry + (self.sk(TREE_ROW_H) - self.wsize(g, wdg)).max(0) / 2, node.label.clone(), farbe);
+            let nx = if rtl { sp(lx, self.wtext_width(g, wdg, &node.label)) } else { lx };
+            self.wtext(g, wdg, nx, ry + (self.sk(TREE_ROW_H) - self.wsize(g, wdg)).max(0) / 2, node.label.clone(), farbe);
             if teil { g.pop_clip(); }
         }
         // Rollbalken wie bei der Liste.
@@ -533,6 +542,13 @@ impl Gui {
 
     /// x-Lage von Text in einer Zelle nach Ausrichtung. Getrennt, weil Kopf-
     /// und Datenzellen dieselbe Regel brauchen.
+    /// Gespiegelt gilt "links" als Anfang der Zeile, also rechts (und
+    /// umgekehrt); "mitte" bleibt.
+    pub(super) fn tbl_ausrichtung(al: i8, rtl: bool) -> i8 {
+        if !rtl { return al; }
+        match al { 2 => 0, 1 => 1, _ => 2 }
+    }
+
     pub(super) fn align_x(links: i32, breite: i32, textbreite: i32, align: i8, pad: i32) -> i32 {
         match align {
             1 => links + (breite - textbreite) / 2,
@@ -597,7 +613,7 @@ impl Gui {
                                        (90i64 << 24) | (accent & 0xFFFFFF));
                         }
                     }
-                    let al = *t.col_align.get(c).unwrap_or(&0);
+                    let al = Self::tbl_ausrichtung(*t.col_align.get(c).unwrap_or(&0), gm.rtl);
                     // Platz fuer den Sortierpfeil freihalten, sonst schreibt
                     // ein langer Titel darueber.
                     let pfeil_platz = if t.sort_col == c as i32 { 14 } else { 0 };
@@ -745,7 +761,7 @@ impl Gui {
                         }
                         (cx + o, (cw - o).max(1))
                     } else { (cx, cw) };
-                    self.draw_cell(g, wdg, t, ri, c, dx, row_y, dw, gm.row_h, fg, accent, border);
+                    self.draw_cell(g, wdg, t, ri, c, dx, row_y, dw, gm.row_h, fg, accent, border, gm.rtl);
                     g.pop_clip();
                 }
                 if t.grid && p < gm.n_cols - 1 && cx + cw > kx && cx + cw < kx + kw {
@@ -811,11 +827,11 @@ impl Gui {
     #[allow(clippy::too_many_arguments)]
     pub(super) fn draw_cell(&self, g: &mut Graphics, wdg: &Widget, t: &TableState,
                  r: usize, c: usize, cx: i32, cy: i32, cw: i32, ch: i32,
-                 fg_thema: i64, accent: i64, border: i64) {
+                 fg_thema: i64, accent: i64, border: i64, rtl: bool) {
         let leer = Cell::text(String::new());
         let cell = t.cell(r, c).unwrap_or(&leer);
         let fgc = Self::cell_fg(t, r, c, fg_thema);
-        let al = t.align_of(r, c);
+        let al = Self::tbl_ausrichtung(t.align_of(r, c), rtl);
         let schrift = self.wsize(g, wdg);
 
         // Wird DIESE Zelle gerade bearbeitet? Dann ein Eingabefeld statt Text.

@@ -333,3 +333,160 @@ PRINT GUI_GET_ALIGN$(t)
 DHRT_FRAMES=1
 --- erwartet
 rechts
+
+=== gespiegelt steht der baum rechts und der winkel klappt auf
+' Einzug, Winkel und Name von rechts (gui_zeichnen_teile.rs `sp`); der
+' Klick auf den Winkel am rechten Rand klappt auf, weil der Treffer mit
+' gespiegelter Maus rechnet. GUI_TREE_ITEM_RECT beginnt am linken Rand.
+IMPORT "gui"
+SCREEN(480, 220, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 480, 220)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM b AS GUI_WIDGET : b = GUI_TREE(w, 20, 20, 300, 150)
+DIM wurzel AS INTEGER : wurzel = GUI_TREE_ADD(b, -1, "Ordner")
+DIM kind AS INTEGER : kind = GUI_TREE_ADD(b, wurzel, "Datei")
+GUI_SET_NAME(b, "b")
+GUI_STYLESHEET("#b { fg: #FF0000 }")
+GUI_WINDOW_RTL(w, TRUE)
+DIM rt AS INTEGER : rt = RENDERTARGET_NEW(480, 220)
+FUNCTION rot_zwischen(x0 AS INTEGER, x1 AS INTEGER) AS BOOLEAN
+    RENDERTARGET_BEGIN(rt) : CLS(0) : GUI_DRAW() : RENDERTARGET_END()
+    DIM bild AS IMAGE : bild = RENDERTARGET_IMAGE(rt)
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR x = x0 TO x1
+        FOR y = 22 TO 40
+            IF (GETPIXEL(bild, x, y) BAND &HFFFFFF) = &HFF0000 THEN RETURN TRUE
+        NEXT
+    NEXT
+    RETURN FALSE
+END FUNCTION
+GUI_UPDATE()
+' Der Baum liegt gespiegelt bei 160..460; der Name am rechten Rand.
+PRINT "name links "; rot_zwischen(162, 300); " rechts "; rot_zwischen(380, 458)
+DIM r AS TUPLE : r = GUI_TREE_ITEM_RECT(b, wurzel)
+PRINT "rechteck ab "; r[0]
+PRINT "zu "; GUI_TREE_ITEM_RECT(b, kind)[2] = 0
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER
+FOR n = 1 TO 20
+    GUI_UPDATE()
+    CLS(0) : GUI_DRAW() : FLIP()
+NEXT
+PRINT "auf "; GUI_TREE_ITEM_RECT(b, kind)[2] > 0
+--- datei ev.txt
+c 4
+e 0 7 10 10 0 0
+e 2 7 449 31 0 0
+e 3 6 0 0 0 0
+e 4 5 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=30
+--- erwartet
+name links FALSE rechts TRUE
+rechteck ab 160
+zu TRUE
+auf TRUE
+
+=== gespiegelt steht die erste spalte rechts und ihr kopf sortiert
+' col_x, col_clip und edge_at spiegeln um die Mitte des Rumpfs (gui_richtext.rs
+' `tbl_spiegel`); Treffer und Zeichnen gehen durch sie. Ein Klick ganz rechts
+' in den Kopf sortiert darum nach der ERSTEN Spalte; der Text der Zellen
+' steht rechts.
+IMPORT "gui"
+SCREEN(480, 220, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 480, 220)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM t AS GUI_WIDGET : t = GUI_TABLE(w, 20, 20, 300, 150)
+GUI_TABLE_HEADERS(t, ["A", "B", "C"])
+GUI_TABLE_ADD_ROW(t, ["3", "x", "y"])
+GUI_TABLE_ADD_ROW(t, ["1", "x", "y"])
+GUI_TABLE_ADD_ROW(t, ["2", "x", "y"])
+GUI_SET_NAME(t, "t")
+GUI_STYLESHEET("#t { fg: #FF0000 }")
+GUI_WINDOW_RTL(w, TRUE)
+DIM rt AS INTEGER : rt = RENDERTARGET_NEW(480, 220)
+FUNCTION rot_zwischen(x0 AS INTEGER, x1 AS INTEGER) AS BOOLEAN
+    RENDERTARGET_BEGIN(rt) : CLS(0) : GUI_DRAW() : RENDERTARGET_END()
+    DIM bild AS IMAGE : bild = RENDERTARGET_IMAGE(rt)
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR x = x0 TO x1
+        FOR y = 50 TO 110
+            IF (GETPIXEL(bild, x, y) BAND &HFFFFFF) = &HFF0000 THEN RETURN TRUE
+        NEXT
+    NEXT
+    RETURN FALSE
+END FUNCTION
+GUI_UPDATE()
+' Die Tabelle liegt gespiegelt bei 160..460: Spalte A rechts (360..460),
+' ihr Text am rechten Rand der Spalte.
+PRINT "a rechts "; rot_zwischen(430, 458); " a links "; rot_zwischen(362, 400)
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER
+FOR n = 1 TO 20
+    GUI_UPDATE()
+    CLS(0) : GUI_DRAW() : FLIP()
+NEXT
+PRINT "sortiert nach "; GUI_TABLE_SORT_COL(t)
+--- datei ev.txt
+c 4
+e 0 7 10 10 0 0
+e 2 7 420 31 0 0
+e 3 6 0 0 0 0
+e 4 5 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=30
+--- erwartet
+a rechts TRUE a links FALSE
+sortiert nach 0
+
+=== gespiegelt waechst eine spalte nach links und links klappt im baum auf
+' Die Kante zum Ziehen liegt gespiegelt am LINKEN Ende der Spalte, und
+' wer sie nach links zieht, macht die Spalte breiter. Im Baum zeigt "auf"
+' nach links: der Pfeil nach links klappt auf.
+IMPORT "gui"
+SCREEN(480, 380, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 480, 380)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM t AS GUI_WIDGET : t = GUI_TABLE(w, 20, 20, 300, 150)
+GUI_TABLE_HEADERS(t, ["A", "B", "C"])
+GUI_TABLE_ADD_ROW(t, ["1", "x", "y"])
+GUI_TABLE_COL_WIDTHS(t, [100, 90, 90])
+DIM b AS GUI_WIDGET : b = GUI_TREE(w, 20, 200, 300, 150)
+DIM wurzel AS INTEGER : wurzel = GUI_TREE_ADD(b, -1, "Ordner")
+DIM kind AS INTEGER : kind = GUI_TREE_ADD(b, wurzel, "Datei")
+GUI_WINDOW_RTL(w, TRUE)
+GUI_UPDATE()
+' Spalte A liegt gespiegelt bei 359..459, ihre Kante links bei 359.
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER
+FOR n = 1 TO 40
+    GUI_UPDATE()
+    IF n = 25 THEN GUI_TREE_SET_SELECTED(b, wurzel) : GUI_FOCUS(b)
+    CLS(0) : GUI_DRAW() : FLIP()
+NEXT
+PRINT "a breiter "; GUI_TABLE_GET_COL_WIDTHS(t)[0] > 110
+PRINT "baum auf "; GUI_TREE_ITEM_RECT(b, kind)[2] > 0
+--- datei ev.txt
+c 9
+e 0 7 10 10 0 0
+e 2 7 359 30 0 0
+e 3 6 0 0 0 0
+e 5 7 345 30 0 0
+e 7 7 329 30 0 0
+e 9 5 0 0 0 0
+e 28 2 263 0 0 0
+e 29 1 263 0 0 0
+e 30 7 10 10 0 0
+
+--- umgebung
+DHRT_FRAMES=45
+--- erwartet
+a breiter TRUE
+baum auf TRUE

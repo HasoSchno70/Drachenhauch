@@ -316,6 +316,7 @@ IMPORT "gui"
 | `GUI_TABLE_HEADERS(tbl, headers)` | — | set the column titles (1D ARRAY OF STRING) |
 | `GUI_TABLE_ROWS(tbl, cells)` | — | set the data rows (2D ARRAY OF STRING) |
 | `GUI_TABLE_COL_WIDTHS(tbl, widths)` | — | column widths (1D ARRAY OF INTEGER; NIL = auto) |
+| `GUI_TABLE_GET_COL_WIDTHS(tbl)` | ARRAY OF INTEGER | the widths in effect (own or distributed), per data column |
 | `GUI_TABLE_SELECTED(tbl)` | INTEGER | selected row (-1 if none) |
 | `GUI_TABLE_SET_SELECTED(tbl, row)` | — | set the selection (-1 = none) |
 | `GUI_TABLE_CLICKED(tbl)` | INTEGER | row clicked in this frame (-1) |
