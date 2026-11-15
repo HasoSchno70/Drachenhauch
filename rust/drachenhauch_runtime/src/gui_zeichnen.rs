@@ -753,6 +753,7 @@ impl Gui {
         // Die Rundung aus der Stildatei gilt fuer jede Flaeche dieses Widgets.
         let vorher = self.rad_jetzt.replace(self.w_radius(wdg));
         let form_vorher = self.form_jetzt.replace(self.w_form(wdg));
+        let bahn_vorher = self.bahn_jetzt.replace(self.w_farbverlauf(wdg));
         // Animation und Gleiten (gui_aussehen.rs): das ganze Widget um seine
         // Mitte verschoben, gedreht oder vergroessert -- Lage und Treffer
         // bleiben.
@@ -781,6 +782,7 @@ impl Gui {
         if anim.is_some() { g.verformung_beenden(); }
         if deck.is_some() { g.schicht_ende(); }
         self.form_jetzt.set(form_vorher);
+        self.bahn_jetzt.replace(bahn_vorher);
         self.rad_jetzt.set(vorher);
     }
 
@@ -861,16 +863,33 @@ impl Gui {
                 if eigen_flaeche {
                 } else if matches!(form, aussehen::F_PILLE | aussehen::F_KREIS | aussehen::F_RAUTE) {
                     let (bg, rahmen) = self.knopf_farben(wi, idx, wdg);
+                    // Ein Farbverlauf (Stildatei `farbverlauf`) fuellt Pille und
+                    // Kreis; Ueberfahren und Druecken legen einen hellen bzw.
+                    // dunklen Schleier darueber (die Mischfarbe gibt es dann nicht).
+                    let bahn = self.bahn_jetzt.borrow().clone();
+                    let schleier = if ed > 0.0 { deckkraft(0x000000, ed * 0.22) } else { deckkraft(0xFFFFFF, eh * 0.16) };
                     match form {
                         aussehen::F_PILLE => {
                             let r = (w.min(h) / 2).max(2);
-                            g.round_rect(ax, ay, ax + w - 1, ay + h - 1, r, bg, true);
+                            match &bahn {
+                                Some((f, wk, ph, zy)) => {
+                                    g.farbbahn(ax, ay, ax + w - 1, ay + h - 1, r, f, *wk, *ph, *zy);
+                                    if eh > 0.0 || ed > 0.0 { g.round_rect(ax, ay, ax + w - 1, ay + h - 1, r, schleier, true); }
+                                }
+                                None => g.round_rect(ax, ay, ax + w - 1, ay + h - 1, r, bg, true),
+                            }
                             g.round_rect(ax, ay, ax + w - 1, ay + h - 1, r, rahmen, false);
                         }
                         aussehen::F_KREIS => {
                             let r = (w.min(h) / 2).max(2);
                             let (cx, cy) = (ax + w / 2, ay + h / 2);
-                            g.circle(cx, cy, r, bg);
+                            match &bahn {
+                                Some((f, wk, ph, zy)) => {
+                                    g.farbbahn(cx - r, cy - r, cx + r - 1, cy + r - 1, r, f, *wk, *ph, *zy);
+                                    if eh > 0.0 || ed > 0.0 { g.circle(cx, cy, r, schleier); }
+                                }
+                                None => g.circle(cx, cy, r, bg),
+                            }
                             g.circle_outline(cx, cy, r, rahmen);
                         }
                         _ => {

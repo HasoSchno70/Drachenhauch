@@ -4032,6 +4032,9 @@ pub struct Gui {
     /// Stildatei), None = die Metrik. Gesetzt in `draw_widget`, gelesen in
     /// `flaeche` -- so gilt sie fuer jede Flaeche des Widgets.
     rad_jetzt: std::cell::Cell<Option<i32>>,
+    /// Der Farbverlauf des Widgets, das gerade gezeichnet wird (Stildatei
+    /// `farbverlauf`) -- `flaeche` nimmt ihn statt der Grundfarbe.
+    bahn_jetzt: std::cell::RefCell<Option<(Vec<i64>, f32, f32, bool)>>,
     /// Verlauf, Glanz, Fase und Rand des Widgets, das gerade gezeichnet wird.
     form_jetzt: std::cell::Cell<stil::FormStil>,
     /// Alt-Buchstaben (GUI_MNEMONICS): `&` im Text markiert sie.
@@ -4134,7 +4137,7 @@ impl Gui {
             scroll_drag: None,
             was_mouse_down: false, zug_feld: None, frame_count: 0, takt: 0.0, kontrast_modus: 0, hoch_kontrast: false, bedarf: std::cell::Cell::new(f64::INFINITY),
             theme: default_theme(), metrics: default_metrics(),
-            stil: None, stil_stand: 0, rad_jetzt: std::cell::Cell::new(None), form_jetzt: std::cell::Cell::new(stil::FormStil::default()),
+            stil: None, stil_stand: 0, rad_jetzt: std::cell::Cell::new(None), bahn_jetzt: std::cell::RefCell::new(None), form_jetzt: std::cell::Cell::new(stil::FormStil::default()),
             mnemonics: false, label_zug: None, label_wahl: None, gruppen: HashMap::new(), schriftwahl: Vec::new(),
             styles: HashMap::new(),
             pending: Vec::new(),

@@ -131,6 +131,12 @@ enum Cmd {
     /// Alpha wird mitinterpoliert, damit auch Glanzkanten (weiss -> unsichtbar)
     /// damit gehen.
     RoundGradient(i32, i32, i32, i32, i32, Color, Color),
+    /// Farbverlauf ueber mehrere Farben, in jedem Winkel, rund wie
+    /// `RoundGradient` (zeilenweise, Eckeneinzug aus dem Radius): Rechteck,
+    /// Radius, Farben, Winkel (Grad, 0 = nach rechts, 90 = nach unten),
+    /// Phase 0..1 und ob die Farben im Kreis laufen (die letzte geht wieder
+    /// in die erste ueber -- so wandert der Verlauf ohne Naht).
+    Farbbahn(i32, i32, i32, i32, i32, Vec<Color>, f32, f32, bool),
     /// Kreisring-Ausschnitt: cx, cy, r_innen, r_aussen, winkel_von, winkel_bis,
     /// Farbe, gefuellt. Deckt Kuchenstueck (r_innen = 0), Donut-Segment und
     /// Tacho-Bogen mit EINER Variante ab -- raylibs `draw_ring` kann alle drei.
@@ -4588,6 +4594,19 @@ impl Graphics {
         let (x1, y1) = self.w2s(x1, y1);
         let (x2, y2) = self.w2s(x2, y2);
         self.emit(Cmd::RoundGradient(x1, y1, x2, y2, self.ssize(radius), col(oben), col(unten)));
+    }
+
+    /// Farbverlauf ueber `farben` (mindestens zwei) in einem runden Rechteck
+    /// (siehe `Cmd::Farbbahn`). `zyklisch`: die Farben laufen im Kreis, `phase`
+    /// (0..1) schiebt sie in Richtung des Winkels weiter.
+    #[allow(clippy::too_many_arguments)]
+    pub fn farbbahn(&mut self, x1: i32, y1: i32, x2: i32, y2: i32, radius: i32,
+                    farben: &[i64], winkel: f32, phase: f32, zyklisch: bool) {
+        if farben.len() < 2 { return; }
+        let (x1, y1) = self.w2s(x1, y1);
+        let (x2, y2) = self.w2s(x2, y2);
+        let f: Vec<Color> = farben.iter().map(|&c| col(c)).collect();
+        self.emit(Cmd::Farbbahn(x1, y1, x2, y2, self.ssize(radius), f, winkel, phase, zyklisch));
     }
 
     /// Kreisring-Ausschnitt (Kuchenstueck bei `r_in` = 0, Donut/Tacho-Bogen
@@ -9660,6 +9679,22 @@ fn render_scene<D: RaylibDraw>(
                             d.draw_rectangle(x + einzug, y + zeile, breite, 1, c);
                         }
                     }
+                    Cmd::Farbbahn(x1, y1, x2, y2, radius, farben, winkel, phase, zyklisch) => {
+                        let x = (*x1).min(*x2) * s;
+                        let y = (*y1).min(*y2) * s;
+                        let w = ((x2 - x1).abs() + 1) * s;
+                        let h = ((y2 - y1).abs() + 1) * s;
+                        let r = (*radius * s).clamp(0, w / 2).min(h / 2);
+                        let bahn = Bahn::neu(w, h, *winkel, *phase);
+                        for zeile in 0..h {
+                            let einzug = ecken_einzug(r, h, zeile);
+                            if w - 2 * einzug <= 0 { continue; }
+                            for (a, b, cl, cr) in bahn.zeile(farben, *zyklisch, einzug, w - einzug, zeile, y + zeile) {
+                                if cl == cr { d.draw_rectangle(x + a, y + zeile, b - a, 1, cl); }
+                                else { d.draw_rectangle_gradient_h(x + a, y + zeile, b - a, 1, cl, cr); }
+                            }
+                        }
+                    }
                     Cmd::Ring(cx, cy, ri, ro, von, bis, col, filled) => {
                         let mitte = Vector2::new((cx * s) as f32, (cy * s) as f32);
                         let (ri, ro) = (ri * s as f32, ro * s as f32);
@@ -10075,6 +10110,162 @@ fn neun_spannen(start: i32, laenge: i32, r: i32) -> ([i32; 3], [i32; 3]) {
 /// eingerueckt werden. `dy` ist der senkrechte Abstand zur Mitte des
 /// Eckenkreises (Zeilenmitte, daher die 0.5), der Einzug folgt daraus per
 /// Kreisgleichung.
+/// Die Lage eines Farbverlaufs (`Cmd::Farbbahn`) in einem Rechteck der
+/// Groesse `w` x `h`: `t` ist die Stelle im Verlauf, entlang der Richtung des
+/// Winkels von 0 (Anfang) bis 1 (Ende), verschoben um die Phase.
+pub(crate) struct Bahn { cos: f32, sin: f32, laenge: f32, w: f32, h: f32, phase: f32 }
+
+impl Bahn {
+    pub(crate) fn neu(w: i32, h: i32, winkel: f32, phase: f32) -> Bahn {
+        let (sin, cos) = winkel.to_radians().sin_cos();
+        // So lang ist das Rechteck in Richtung des Winkels: die Ecken liegen
+        // genau bei 0 und 1.
+        let laenge = ((w as f32) * cos.abs() + (h as f32) * sin.abs()).max(1.0);
+        Bahn { cos, sin, laenge, w: w as f32, h: h as f32, phase }
+    }
+    /// Die Stelle im Verlauf am Punkt (x, y), relativ zum Rechteck.
+    fn t(&self, x: f32, y: f32) -> f32 {
+        ((x - self.w / 2.0) * self.cos + (y - self.h / 2.0) * self.sin) / self.laenge + 0.5 - self.phase
+    }
+    /// Die Stuecke einer Zeile von `xl` bis `xr` (ausschliesslich): je
+    /// (von, bis, Farbe links, Farbe rechts), dazwischen gerade gemischt.
+    /// Ein Stueck endet dort, wo der Verlauf eine seiner Farben erreicht --
+    /// so bleibt der Knick genau, auch bei sechs Farben und schraeg.
+    /// Laeuft der Verlauf in der Zeile nicht weiter (senkrecht), ist es ein
+    /// Stueck in einer Farbe, gezittert wie `verlauf_farbe` (sonst Stufen).
+    pub(crate) fn zeile(&self, farben: &[Color], zyklisch: bool, xl: i32, xr: i32, zeile: i32, pos: i32) -> Vec<(i32, i32, Color, Color)> {
+        let mut aus = Vec::new();
+        let n = farben.len();
+        if n < 2 || xr <= xl { return aus; }
+        let m = if zyklisch { n } else { n - 1 } as f32;
+        let y = zeile as f32 + 0.5;
+        let schritt = self.cos / self.laenge;
+        // t an der linken Kante eines Bildpunkts x
+        let kante = |x: i32| self.t(x as f32, y);
+        if (schritt * (xr - xl) as f32).abs() < 1.0 / 1024.0 {
+            let t = self.t((xl + xr) as f32 / 2.0, y);
+            let (i, j, lokal) = bahn_abschnitt(n, zyklisch, m, t);
+            let c = verlauf_farbe(farben[i], farben[j], lokal, pos);
+            aus.push((xl, xr, c, c));
+            return aus;
+        }
+        let mut x = xl;
+        while x < xr {
+            let t0 = kante(x);
+            // Die naechste Farbe in Laufrichtung (Grenze zwischen zwei
+            // Abschnitten). Liegt t0 durch Rundung knapp vor einer Grenze, gilt
+            // es als auf ihr -- sonst bliebe ein Splitter von einem Punkt.
+            let u = t0 * m;
+            let grenze = if schritt > 0.0 { ((u + 1e-3).floor() + 1.0) / m } else { ((u - 1e-3).ceil() - 1.0) / m };
+            let ende = if !zyklisch && ((schritt > 0.0 && t0 >= 1.0) || (schritt < 0.0 && t0 <= 0.0)) {
+                xr
+            } else {
+                let xg = x as f32 + (grenze - t0) / schritt;
+                (xg.round() as i32).clamp(x + 1, xr)
+            };
+            let t1 = kante(ende);
+            let (i, j, _) = bahn_abschnitt(n, zyklisch, m, (t0 + t1) / 2.0);
+            let abschnitt = ((t0 + t1) / 2.0 * m).floor();
+            let mischen = |t: f32| -> Color {
+                let lokal = if !zyklisch && (t <= 0.0 || t >= 1.0) { if t <= 0.0 { 0.0 } else { 1.0 } }
+                            else { (t * m - abschnitt).clamp(0.0, 1.0) };
+                farbe_mischen(farben[i], farben[j], lokal)
+            };
+            aus.push((x, ende, mischen(t0), mischen(t1)));
+            x = ende;
+        }
+        aus
+    }
+}
+
+/// Welche zwei Farben an der Stelle `t` gemischt werden und wie weit (0..1).
+fn bahn_abschnitt(n: usize, zyklisch: bool, m: f32, t: f32) -> (usize, usize, f32) {
+    if zyklisch {
+        let u = (t * m).rem_euclid(m);
+        let i = (u.floor() as usize).min(n - 1);
+        (i, (i + 1) % n, u - i as f32)
+    } else {
+        let u = (t.clamp(0.0, 1.0)) * m;
+        let i = (u.floor() as usize).min(n - 2);
+        (i, i + 1, (u - i as f32).clamp(0.0, 1.0))
+    }
+}
+
+fn farbe_mischen(a: Color, b: Color, t: f32) -> Color {
+    let k = |x: u8, y: u8| (x as f32 + (y as f32 - x as f32) * t).round().clamp(0.0, 255.0) as u8;
+    Color::new(k(a.r, b.r), k(a.g, b.g), k(a.b, b.b), k(a.a, b.a))
+}
+
+#[cfg(test)]
+mod farbbahn_tests {
+    use super::*;
+    const ROT: Color = Color { r: 255, g: 0, b: 0, a: 255 };
+    const BLAU: Color = Color { r: 0, g: 0, b: 255, a: 255 };
+    const GRUEN: Color = Color { r: 0, g: 255, b: 0, a: 255 };
+    /// Die Farbe am Bildpunkt x einer Zeile (aus den Stuecken gemischt, wie
+    /// der Zeichner es tut).
+    fn bei(st: &[(i32, i32, Color, Color)], x: i32) -> Color {
+        let &(a, b, l, r) = st.iter().find(|s| s.0 <= x && x < s.1).expect("Stueck");
+        farbe_mischen(l, r, (x as f32 + 0.5 - a as f32) / (b - a) as f32)
+    }
+    #[test]
+    fn waagerecht_von_links_nach_rechts() {
+        let b = Bahn::neu(100, 10, 0.0, 0.0);
+        let st = b.zeile(&[ROT, BLAU], false, 0, 100, 5, 5);
+        assert_eq!(st.first().unwrap().0, 0);
+        assert_eq!(st.last().unwrap().1, 100);
+        assert!(bei(&st, 0).r > 250 && bei(&st, 99).b > 250, "{:?}", st);
+        let mitte = bei(&st, 50);
+        assert!((mitte.r as i32 - 127).abs() < 6 && (mitte.b as i32 - 127).abs() < 6, "{:?}", mitte);
+    }
+    #[test]
+    fn drei_farben_knicken_genau_in_der_mitte() {
+        let b = Bahn::neu(200, 10, 0.0, 0.0);
+        let st = b.zeile(&[ROT, GRUEN, BLAU], false, 0, 200, 5, 5);
+        assert_eq!(st.len(), 2, "{:?}", st);
+        assert_eq!(st[0].1, 100);
+        assert!(bei(&st, 100).g > 250);
+    }
+    #[test]
+    fn senkrecht_ist_eine_zeile_einfarbig() {
+        let b = Bahn::neu(100, 50, 90.0, 0.0);
+        let oben = b.zeile(&[ROT, BLAU], false, 0, 100, 0, 0);
+        let unten = b.zeile(&[ROT, BLAU], false, 0, 100, 49, 49);
+        assert_eq!(oben.len(), 1);
+        assert!(oben[0].2.r > 240 && unten[0].2.b > 240, "{:?} {:?}", oben, unten);
+    }
+    #[test]
+    fn im_kreis_kommt_die_erste_farbe_wieder_und_die_phase_schiebt() {
+        let b = Bahn::neu(300, 10, 0.0, 0.0);
+        let st = b.zeile(&[ROT, GRUEN, BLAU], true, 0, 300, 5, 5);
+        // Drei Abschnitte: rot->gruen, gruen->blau, blau->rot.
+        assert_eq!(st.len(), 3, "{:?}", st);
+        assert!(bei(&st, 299).r > 240);
+        // Ein Drittel weiter steht gruen, wo vorher rot war.
+        let c = Bahn::neu(300, 10, 0.0, -1.0 / 3.0);
+        let st2 = c.zeile(&[ROT, GRUEN, BLAU], true, 0, 300, 5, 5);
+        assert!(bei(&st2, 0).g > 240, "{:?}", st2);
+        // Die Phase laeuft nahtlos: 1 ist wie 0.
+        let d = Bahn::neu(300, 10, 0.0, 1.0);
+        assert_eq!(d.zeile(&[ROT, GRUEN, BLAU], true, 0, 300, 5, 5), st);
+    }
+    #[test]
+    fn schraeg_und_rueckwaerts_deckt_die_zeile_lueckenlos() {
+        for winkel in [0.0f32, 30.0, 135.0, 180.0, 225.0, 300.0] {
+            for phase in [0.0f32, 0.37, 0.91] {
+                let b = Bahn::neu(160, 90, winkel, phase);
+                for zeile in [0, 45, 89] {
+                    let st = b.zeile(&[ROT, GRUEN, BLAU, ROT], phase > 0.0, 7, 151, zeile, zeile);
+                    assert_eq!(st.first().unwrap().0, 7);
+                    assert_eq!(st.last().unwrap().1, 151);
+                    for w in st.windows(2) { assert_eq!(w[0].1, w[1].0, "Luecke bei {} Grad", winkel); }
+                    for s in &st { assert!(s.1 > s.0); }
+                }
+            }
+        }
+    }
+}
+
 /// Schwellen einer geordneten Zitterung ueber 16 Zeilen (eindimensionale
 /// Bayer-Folge): aufeinander folgende Werte liegen weit auseinander, darum
 /// verteilen sich die aufgerundeten Zeilen gleichmaessig statt in Klumpen.

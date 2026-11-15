@@ -45,7 +45,7 @@ pub(super) const FOKUS: usize = 2;
 pub(super) const AKTIV: usize = 3;
 pub(super) const AUS: usize = 4;
 
-const EIGENSCHAFTEN: &str = "bg, fg, border, accent, radius, groesse, stil, abstand, randbreite, schatten, verlauf, glanz, fase, uebergang (auch je Farbe: uebergang: 120, bg 400), form, bild, bildrand, animation, klang, effekt, gleiten, unschaerfe, griff";
+const EIGENSCHAFTEN: &str = "bg, fg, border, accent, radius, groesse, stil, abstand, randbreite, schatten, verlauf, farbverlauf, glanz, fase, uebergang (auch je Farbe: uebergang: 120, bg 400), form, bild, bildrand, animation, klang, effekt, gleiten, unschaerfe, griff";
 const ZUSTAENDE: &str = ":hover, :focus, :active, :disabled, :checked";
 
 /// Eine Farbe aus der Stildatei: fest oder ein Name des Themas (dann folgt
@@ -65,6 +65,8 @@ pub(super) struct StilWerte {
     randbreite: Option<i32>,
     schatten: Option<Schatten>,
     verlauf: Option<i32>,
+    /// Farbverlauf der Flaeche (`farbverlauf: #A #B 45 wandert 6s`).
+    pub(super) farbverlauf: Option<Farbverlauf>,
     glanz: Option<i32>,
     fase: Option<i32>,
     uebergang: Option<i32>,
@@ -130,6 +132,12 @@ fn uebergang_lesen(wert: &str, zeile: usize) -> Result<(Option<i32>, Vec<(usize,
 #[derive(Clone, Debug, PartialEq)]
 pub(super) struct Schatten { dx: i32, dy: i32, weich: i32, farbe: Option<StilFarbe> }
 
+/// Ein Farbverlauf statt der einen Grundfarbe: Farben (2..6), Winkel in
+/// Grad (0 = nach rechts, 90 = nach unten) und wie lange er braucht, um
+/// einmal durchzuwandern (ms, 0 = er steht). Keine Farben = `aus`.
+#[derive(Clone, Debug, PartialEq)]
+pub(super) struct Farbverlauf { pub farben: Vec<StilFarbe>, pub winkel: i32, pub wandert: i32 }
+
 /// Was `flaeche` beim Zeichnen eines Widgets statt der Metriken nimmt.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub(super) struct FormStil {
@@ -165,6 +173,13 @@ impl StilWerte {
             t.push(format!("schatten {} {} {}{}", sch.dx, sch.dy, sch.weich, f));
         }
         if let Some(v) = self.verlauf { t.push(format!("verlauf {}", v)); }
+        if let Some(fv) = &self.farbverlauf {
+            if fv.farben.is_empty() { t.push("farbverlauf aus".into()); } else {
+                let f: Vec<String> = fv.farben.iter().map(farbe_text).collect();
+                let w = if fv.wandert > 0 { format!(" wandert {}ms", fv.wandert) } else { String::new() };
+                t.push(format!("farbverlauf {} {}{}", f.join(" "), fv.winkel, w));
+            }
+        }
         if let Some(v) = self.glanz { t.push(format!("glanz {}", v)); }
         if let Some(v) = self.fase { t.push(format!("fase {}", v)); }
         if let Some(v) = self.uebergang { t.push(format!("uebergang {}", v)); }
@@ -199,6 +214,7 @@ impl StilWerte {
         if o.randbreite.is_some() { self.randbreite = o.randbreite; }
         if o.schatten.is_some() { self.schatten = o.schatten.clone(); }
         if o.verlauf.is_some() { self.verlauf = o.verlauf; }
+        if o.farbverlauf.is_some() { self.farbverlauf = o.farbverlauf.clone(); }
         if o.glanz.is_some() { self.glanz = o.glanz; }
         if o.fase.is_some() { self.fase = o.fase; }
         if o.uebergang.is_some() { self.uebergang = o.uebergang; }
@@ -589,6 +605,54 @@ fn zahl_lesen_stil(wert: &str, zeile: usize, was: &str, von: i32, bis: i32) -> R
     }
 }
 
+/// `farbverlauf: #A #B [#C ...] [winkel] [wandert [dauer]]` oder `aus`.
+/// Zwei bis sechs Farben (auch Namen des Themas), der Winkel in Grad
+/// (0 = nach rechts, 90 = nach unten, `grad` darf dahinter stehen), die
+/// Dauer einer Runde in ms oder s (Vorgabe 6 s).
+fn farbverlauf_lesen(wert: &str, zeile: usize, thema: &dyn Fn(&str) -> bool) -> Result<Farbverlauf, String> {
+    let teile: Vec<&str> = wert.split_whitespace().collect();
+    if matches!(teile.as_slice(), [w] if matches!(w.to_lowercase().as_str(), "aus" | "keiner" | "none")) {
+        return Ok(Farbverlauf { farben: Vec::new(), winkel: 0, wandert: 0 });
+    }
+    let fehler = || format!("Zeile {}: farbverlauf erwartet 2 bis 6 Farben, dann wahlweise einen Winkel und 'wandert [dauer]' -- etwa '#FF6B6B #845EC2 45 wandert 6s', erhalten '{}'", zeile, wert.trim());
+    let mut farben = Vec::new();
+    let mut winkel: Option<i32> = None;
+    let mut wandert = 0;
+    let mut k = 0;
+    while k < teile.len() {
+        let t = teile[k].to_lowercase();
+        if t == "wandert" || t == "wandern" || t == "moving" {
+            wandert = 6000;
+            if let Some(d) = teile.get(k + 1) {
+                if let Some(ms) = dauer_lesen(d) {
+                    if !(500..=60000).contains(&ms) {
+                        return Err(format!("Zeile {}: farbverlauf: eine Runde dauert 500 ms bis 60 s, erhalten '{}'", zeile, d));
+                    }
+                    wandert = ms;
+                    k += 1;
+                }
+            }
+        } else if let Some(n) = t.trim_end_matches("grad").trim_end_matches("deg").parse::<i32>().ok().filter(|_| winkel.is_none() && !farben.is_empty()) {
+            winkel = Some(n.rem_euclid(360));
+        } else if wandert == 0 && winkel.is_none() {
+            farben.push(farbe_lesen(teile[k], zeile, thema).map_err(|_| fehler())?);
+        } else {
+            return Err(fehler());
+        }
+        k += 1;
+    }
+    if !(2..=6).contains(&farben.len()) { return Err(fehler()); }
+    Ok(Farbverlauf { farben, winkel: winkel.unwrap_or(0), wandert })
+}
+
+/// `6000`, `6000ms` oder `6s` in Millisekunden.
+fn dauer_lesen(s: &str) -> Option<i32> {
+    let s = s.to_lowercase();
+    if let Some(v) = s.strip_suffix("ms") { return v.parse().ok(); }
+    if let Some(v) = s.strip_suffix('s') { return v.replace(',', ".").parse::<f64>().ok().map(|x| (x * 1000.0).round() as i32); }
+    s.parse().ok()
+}
+
 /// `schatten: weich` oder `schatten: dx dy weich [farbe]`.
 fn schatten_lesen(wert: &str, zeile: usize, thema: &dyn Fn(&str) -> bool) -> Result<Schatten, String> {
     let teile: Vec<&str> = wert.split_whitespace().collect();
@@ -657,7 +721,7 @@ pub(super) fn lesen(text: &str, thema: &dyn Fn(&str) -> bool) -> Result<Stildate
             let name = name.trim().to_lowercase();
             let wert = wert.trim();
             let form = matches!(name.as_str(), "abstand" | "padding" | "innenabstand" | "randbreite" | "border-width"
-                | "border_width" | "schatten" | "shadow" | "verlauf" | "gradient" | "glanz" | "gloss" | "fase" | "bevel"
+                | "border_width" | "schatten" | "shadow" | "verlauf" | "gradient" | "farbverlauf" | "fill-gradient" | "glanz" | "gloss" | "fase" | "bevel"
                 | "uebergang" | "transition" | "form" | "shape" | "gleiten" | "layout-transition" | "unschaerfe" | "blur");
             if form && mit_zustand {
                 return Err(format!("Zeile {}: '{}' gilt nur in Regeln ohne :hover, :focus, :active, :disabled -- eine Form, die mit dem Zustand springt, waere ein Wackeln", zeile, name));
@@ -683,6 +747,7 @@ pub(super) fn lesen(text: &str, thema: &dyn Fn(&str) -> bool) -> Result<Stildate
                 "randbreite" | "border-width" | "border_width" => werte.randbreite = Some(zahl_lesen_stil(wert, zeile, "randbreite", 0, 8)?),
                 "schatten" | "shadow" => werte.schatten = Some(schatten_lesen(wert, zeile, thema)?),
                 "verlauf" | "gradient" => werte.verlauf = Some(zahl_lesen_stil(wert, zeile, "verlauf", 0, 64)?),
+                "farbverlauf" | "fill-gradient" => werte.farbverlauf = Some(farbverlauf_lesen(wert, zeile, thema)?),
                 "glanz" | "gloss" => werte.glanz = Some(zahl_lesen_stil(wert, zeile, "glanz", 0, 100)?),
                 "fase" | "bevel" => werte.fase = Some(zahl_lesen_stil(wert, zeile, "fase", 0, 1)?),
                 "uebergang" | "transition" => {
@@ -1108,6 +1173,21 @@ impl Gui {
                                   rand: s[BASIS].randbreite.map(|r| if r > 0 { self.sk(r).max(1) } else { 0 }) },
             None => FormStil::default(),
         }
+    }
+    /// Der Farbverlauf der Flaeche: Farben (aufgeloest), Winkel und Phase
+    /// (0..1) jetzt, und ob er im Kreis laeuft -- None = die eine Grundfarbe.
+    /// Ein wandernder meldet, dass er das naechste Bild braucht; mit
+    /// `GUI_SET_MOTION("aus")` steht er.
+    pub(super) fn w_farbverlauf(&self, w: &Widget) -> Option<(Vec<i64>, f32, f32, bool)> {
+        let fv = w.stil_auf.as_ref()?[BASIS].farbverlauf.as_ref()?;
+        if fv.farben.len() < 2 { return None; }
+        let farben: Vec<i64> = fv.farben.iter().map(|f| self.stil_wert(f)).collect();
+        let wandert = fv.wandert > 0;
+        let phase = if wandert && !self.ruhig {
+            self.bild_in(0.0);
+            ((self.uhr * 1000.0 / fv.wandert as f64).fract()) as f32
+        } else { 0.0 };
+        Some((farben, fv.winkel as f32, phase, wandert))
     }
     /// Innenabstand (senkrecht, waagerecht) in Bildpunkten, None = wie bisher.
     pub(super) fn w_abstand(&self, w: &Widget) -> Option<(i32, i32)> {

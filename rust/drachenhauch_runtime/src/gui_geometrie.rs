@@ -471,7 +471,13 @@ impl Gui {
         let rad = self.rad_jetzt.get().unwrap_or_else(|| self.m("corner_radius"));
         let anteil = self.verlauf_anteil(y2 - y1);
         let grad = (self.m_form("gradient") as f64 * anteil).round() as i32;
-        if grad > 0 {
+        // Ein Farbverlauf aus der Stildatei ersetzt die Grundfarbe; Glanz,
+        // Fase und Rand kommen wie sonst darueber.
+        let bahn = self.bahn_jetzt.borrow().clone();
+        if let Some((farben, winkel, phase, zyklisch)) = bahn {
+            g.farbbahn(x1, y1, x2, y2, rad, &farben, winkel, phase, zyklisch);
+            if grad > 0 && !tief { self.gloss(g, x1, y1, x2, y2, rad, anteil); }
+        } else if grad > 0 {
             // Erhaben: hell oben, dunkel unten. Versenkt: genau umgekehrt --
             // so faellt das Licht scheinbar weiter von oben ein, die Flaeche
             // liegt aber tiefer.
