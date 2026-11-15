@@ -354,6 +354,7 @@ Built with `rust/build_wasm.py`; the harness lives in `web/`.
 | `98_coroutines.dh` | **coroutines/`YIELD`**: generators, `FOR EACH` drain, send/return dialog, `CORO_RESULT`, method coroutine |
 | `154_chart.dh` | **charts**: all six kinds, themes, mouse interaction |
 | `156_gui_alle_widgets.dh` | **all 22 GUI widgets** in one fullscreen application, each with a real job |
+| `222_gui_gesamtschau.dh` | **the gui in a tour**: ten stations over a moving background -- glass, animations from the stylesheet, colour emoji, a table with a million rows, live stylesheet, right to left, frugal idle and the built-in accessibility check |
 | [Glutfaden](https://github.com/HasoSchno70/Glutfaden) | **Glutfaden** — the cross-stitch editor PySticky in Drachenhauch, with GTK 3 through foreign libraries: part and back stitches, layers, image import, PDF/HTML/OXS export, printing (its own repository since 2026-11) |
 | [Funkenflug](https://github.com/HasoSchno70/Funkenflug) | **Funkenflug** — a schematic editor with GTK 3: hierarchy and buses, ERC, netlist/SPICE, simulation with ngspice, perfboard layout with Gerber and 3D preview, KiCad import (its own repository) |
 | [Kühlschrank](https://github.com/HasoSchno70/Kuehlschrank-Drachenhauch) | **Fridge manager** — a Drachenhauch Studio project with 13 windows, SQLite, reports, charts and barcode lookup (its own repository) |

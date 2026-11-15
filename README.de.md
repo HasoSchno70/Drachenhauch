@@ -343,6 +343,7 @@ Gebaut wird mit `rust/build_wasm.py`, das Gerüst liegt in `web/`.
 | `98_coroutines.dh` | **Coroutines/YIELD**: Generatoren, `FOR EACH`-Drain, send/return-Dialog, `CORO_RESULT`, Methoden-Coroutine |
 | `154_chart.dh` | **Diagramme**: alle sechs Arten, Themen, Maus-Interaktion |
 | `156_gui_alle_widgets.dh` | **alle 22 GUI-Widgets** in einer Vollbild-Anwendung, jedes mit echter Aufgabe |
+| `222_gui_gesamtschau.dh` | **die gui in einem Rundgang**: zehn Stationen über bewegtem Hintergrund -- Glas, Animationen aus der Stildatei, Farb-Emoji, eine Tabelle mit einer Million Zeilen, Stildatei live, rechts nach links, sparsamer Leerlauf und die eingebaute Prüfung der Barrierefreiheit |
 | [Glutfaden](https://github.com/HasoSchno70/Glutfaden) | **Glutfaden** — der Kreuzstich-Editor PySticky in Drachenhauch, mit GTK 3 über fremde Bibliotheken: Teil- und Rückstiche, Ebenen, Bildimport, PDF/HTML/OXS-Export, Drucken (seit 2026-11 ein eigenes Repo) |
 | [Funkenflug](https://github.com/HasoSchno70/Funkenflug) | **Funkenflug** — ein Schaltplan-Editor mit GTK 3: Hierarchie und Busse, ERC, Netzliste/SPICE, Simulation mit ngspice, Lochraster-Platine mit Gerber und 3D-Ansicht, KiCad-Import (eigenes Repo) |
 | [Kühlschrank](https://github.com/HasoSchno70/Kuehlschrank-Drachenhauch) | **Kühlschrank-Verwaltung** — ein Projekt im Drachenhauch Studio mit 13 Fenstern, SQLite, Berichten, Diagrammen und Barcode-Abfrage (eigenes Repo) |

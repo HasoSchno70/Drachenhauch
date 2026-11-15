@@ -2988,6 +2988,15 @@ See [examples/45_gui.dh](../../examples/45_gui.dh): a window with a slider (mirr
 label), checkbox, text input and start button — movable and
 closable.
 
+**Everything at once, as a tour:**
+[examples/222_gui_gesamtschau.dh](../../examples/222_gui_gesamtschau.dh) --
+ten stations over a moving background: glass, shapes and
+animations from the stylesheet, colour emoji and scripts of the world, a
+table with a million rows, the stylesheet to edit, tools
+(palette, inspector, real window) and the accessibility
+check. At the top, theme, right to left, motion, sounds,
+frugal and contrast switch the whole interface.
+
 **All 22 widget kinds in one application:**
 [examples/156_gui_alle_widgets.dh](../../examples/156_gui_alle_widgets.dh) —
 fullscreen, borderless window (the form *is* the screen), menu bar,

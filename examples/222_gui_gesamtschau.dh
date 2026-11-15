@@ -1,0 +1,555 @@
+' ============================================================
+'  DRACHENHAUCH -- die gui in einem Rundgang
+' ============================================================
+'  Zehn Stationen, links zu waehlen, jede lebendig:
+'    Willkommen       Glas ueber einem bewegten Hintergrund, schwebende
+'                     Karten, ein Knopf mit Konfetti
+'    Bedienelemente   Knoepfe in allen Arten, Kaestchen, Schalter, Regler,
+'                     Drehknopf, Zahlenfeld, Klappliste, Fortschritt
+'    Text & Emoji     Code-Feld, gesetzter Text, Emoji in Farbe, Schriften
+'                     aus aller Welt
+'    Daten            eine Tabelle mit einer Million Zeilen (virtuell),
+'                     Baum, Baumtabelle, Liste
+'    Auswahl          Farbe, Datum, Uhrzeit, Pfadleiste
+'    Aufbau           Reiter, Akkordeon, Assistent
+'    Lebendig         Formen, Animationen, Klaenge, Funken, Lichtstreif
+'    Stildatei live   die Stildatei dieser Schau -- aendern und anwenden
+'    Werkzeuge        Befehlspalette, Inspektor, Toast, Infoleiste,
+'                     Dialog, echtes Zweitfenster
+'    Barrierefreiheit die eingebaute Pruefung (GUI_A11Y_CHECK$)
+'
+'  Die Leiste oben wirkt auf ALLES: Thema, von rechts nach links,
+'  Bewegung, Toene, hoher Kontrast -- und "Sparsam": der Hintergrund steht
+'  still, das Programm schlaeft zwischen zwei Eingaben (die Anzeige oben
+'  rechts zeigt die Bilder je Sekunde fallen).
+'
+'  Strg+Umschalt+P: Befehlspalette   Strg+Umschalt+I: Inspektor (mit
+'  DHRT_INSPEKTOR=1, aus der IDE gestartet von selbst)
+'  Argument: die Station, mit der die Schau beginnt (0..9).
+' ============================================================
+IMPORT "gui"
+
+SCREEN(1280, 800, "Drachenhauch -- die gui in einem Rundgang", 1)
+WINDOW_RESIZABLE(TRUE)
+SETFPS(60)
+
+CONST NAV_B = 230
+' Kopf samt Menueleiste (26 Punkte): die Widgets im Hauptfenster stehen
+' unter der Leiste, die Fenster der Stationen auf dem Bildschirm.
+CONST MENUE_H = 26
+CONST KOPF_H = 112
+CONST FUSS_H = 30
+
+DIM themen AS ARRAY OF STRING : themen = ["glas_dunkel", "dark", "modern_dark", "glas_hell", "light", "modern_light", "contrast"]
+DIM themenNamen AS ARRAY OF STRING : themenNamen = ["Glas dunkel", "Dunkel", "Modern dunkel", "Glas hell", "Hell", "Modern hell", "Kontrast"]
+
+' Das Thema setzen -- und den Grund der Fenster durchscheinend machen, damit
+' der bewegte Hintergrund durch die ganze Oberflaeche leuchtet.
+' Helle Themen bekommen einen hellen Hintergrund (Pastell statt kraeftig).
+DIM hellerGrund AS BOOLEAN = FALSE
+SUB thema(k AS INTEGER)
+    GUI_THEME_PRESET(themen[k])
+    GUI_THEME_SET("win_bg", &H3C000000 BOR (GUI_THEME_GET("win_bg") BAND &HFFFFFF))
+    hellerGrund = (k >= 3 AND k <= 5)
+END SUB
+thema(0)
+
+' --------------------------------------------------- das Hauptfenster
+DIM haupt AS GUI_WINDOW : haupt = GUI_WINDOW("Rundgang", 0, 0, 1280, 800)
+GUI_WINDOW_CHROME(haupt, FALSE)
+DIM mSchau AS INTEGER : mSchau = GUI_MENU(haupt, "Schau")
+DIM miWeiter AS INTEGER : miWeiter = GUI_MENU_ITEM(mSchau, "Naechste Station", "Strg+Rechts")
+DIM miZurueck AS INTEGER : miZurueck = GUI_MENU_ITEM(mSchau, "Vorige Station", "Strg+Links")
+DIM miFeier AS INTEGER : miFeier = GUI_MENU_ITEM(mSchau, "Etwas feiern")
+GUI_MENU_SEPARATOR(mSchau)
+DIM miEnde AS INTEGER : miEnde = GUI_MENU_ITEM(mSchau, "Beenden", "Strg+Q")
+DIM mAnsicht AS INTEGER : mAnsicht = GUI_MENU(haupt, "Ansicht")
+DIM miPalette AS INTEGER : miPalette = GUI_MENU_ITEM(mAnsicht, "Befehlspalette", "Strg+Umschalt+P")
+DIM miInspektor AS INTEGER : miInspektor = GUI_MENU_ITEM(mAnsicht, "Inspektor")
+
+DIM titel AS GUI_WIDGET : titel = GUI_LABEL(haupt, "Drachenhauch gui", 24, 6)
+GUI_SET_NAME(titel, "titel")
+DIM untertitel AS GUI_WIDGET : untertitel = GUI_LABEL(haupt, "Alles, was die Oberflaeche kann -- in einem Rundgang", 26, 50)
+GUI_SET_NAME(untertitel, "untertitel")
+
+DIM themaWahl AS GUI_WIDGET : themaWahl = GUI_DROPDOWN(haupt, 560, 8, 180, 30, themenNamen)
+GUI_TOOLTIP(themaWahl, "Thema der ganzen Oberflaeche")
+DIM fpsAnzeige AS GUI_WIDGET : fpsAnzeige = GUI_LABEL(haupt, "", 1120, 14)
+GUI_SET_NAME(fpsAnzeige, "fps")
+DIM sRtl AS GUI_WIDGET : sRtl = GUI_TOGGLE(haupt, "Rechts nach links", 560, 52, FALSE)
+DIM sBewegung AS GUI_WIDGET : sBewegung = GUI_TOGGLE(haupt, "Bewegung", 750, 52, TRUE)
+DIM sToene AS GUI_WIDGET : sToene = GUI_TOGGLE(haupt, "Toene", 885, 52, TRUE)
+DIM sSparsam AS GUI_WIDGET : sSparsam = GUI_TOGGLE(haupt, "Sparsam", 990, 52, FALSE)
+DIM sKontrast AS GUI_WIDGET : sKontrast = GUI_TOGGLE(haupt, "Kontrast", 1115, 52, FALSE)
+GUI_TOOLTIP(sSparsam, "Der Hintergrund steht still, und das Programm schlaeft zwischen zwei Eingaben")
+
+DIM stationen AS ARRAY OF STRING : stationen = ["Willkommen", "Bedienelemente", "Text & Emoji", "Daten", "Auswahl", "Aufbau", "Lebendig", "Stildatei live", "Werkzeuge", "Barrierefreiheit"]
+DIM nav AS GUI_WIDGET : nav = GUI_LISTBOX(haupt, 12, KOPF_H - MENUE_H + 6, NAV_B - 22, 800 - KOPF_H - FUSS_H - 18, stationen)
+GUI_SET_NAME(nav, "nav")
+DIM fuss AS GUI_WIDGET : fuss = GUI_STATUSBAR(haupt, 0, 800 - MENUE_H - FUSS_H, 1280, FUSS_H, "Willkommen -- links eine Station waehlen")
+
+' Je Station ein eigenes, randloses Fenster im Inhaltsbereich; sichtbar ist
+' immer nur eines.
+DIM seiten AS ARRAY OF GUI_WINDOW
+FUNCTION seite(name AS STRING) AS GUI_WINDOW
+    DIM s AS GUI_WINDOW : s = GUI_WINDOW(name, NAV_B, KOPF_H, 1280 - NAV_B - 10, 800 - KOPF_H - FUSS_H - 6)
+    GUI_WINDOW_CHROME(s, FALSE)
+    GUI_WINDOW_VISIBLE(s, FALSE)
+    ARRAY_PUSH(seiten, s)
+    RETURN s
+END FUNCTION
+
+' --------------------------------------------------- 0 Willkommen
+DIM s0 AS GUI_WINDOW : s0 = seite("Willkommen")
+DIM gruss AS GUI_WIDGET : gruss = GUI_LABEL(s0, "Willkommen in der gui", 40, 24)
+GUI_SET_NAME(gruss, "gruss")
+DIM gruss2 AS GUI_WIDGET : gruss2 = GUI_LABEL(s0, "Eine Oberflaeche fuer Spiele UND Anwendungen -- in Drachenhauch geschrieben, in Rust gezeichnet.", 42, 86)
+DIM glas AS GUI_WIDGET : glas = GUI_PANEL(s0, 30, 130, 980, 270)
+GUI_ADD_CLASS(glas, "glas")
+DIM k1 AS GUI_WIDGET : k1 = GUI_CARD(s0, 60, 160, 290, 210, -1, "Lebendig", "Formen, Bildhaeute, Animationen, Klaenge und Funken -- alles aus einer Stildatei.")
+DIM k2 AS GUI_WIDGET : k2 = GUI_CARD(s0, 375, 160, 290, 210, -1, "Zugaenglich", "Bildschirmleser, Tastatur, hoher Kontrast, von rechts nach links -- und eine eingebaute Pruefung.")
+DIM k3 AS GUI_WIDGET : k3 = GUI_CARD(s0, 690, 160, 290, 210, -1, "Sparsam", "Schlaeft, solange nichts passiert: die IDE braucht im Leerlauf ein Zwoelftel der Rechenzeit.")
+GUI_SET_NAME(k1, "k1") : GUI_SET_NAME(k2, "k2") : GUI_SET_NAME(k3, "k3")
+DIM los AS GUI_WIDGET : los = GUI_BUTTON(s0, "Los geht's", 40, 430, 260, 64)
+GUI_ADD_CLASS(los, "los")
+DIM emojiZeile AS GUI_WIDGET : emojiZeile = GUI_LABEL(s0, CHR$(&H1F600) + " " + CHR$(&H1F389) + " " + CHR$(&H1F44D) + CHR$(&H1F3FD) + " " + CHR$(&H1F680) + " " + CHR$(&H1F308) + " " + CHR$(&H2728), 340, 440)
+GUI_SET_NAME(emojiZeile, "emoji")
+DIM kreisel AS GUI_WIDGET : kreisel = GUI_BUSY(s0, 950, 450, 44)
+DIM hinweis0 AS GUI_WIDGET : hinweis0 = GUI_LABEL(s0, "Tipp: Strg+Umschalt+P sucht in allen Menues -- probier oben die Schalter, sie wirken auf ALLES.", 42, 540)
+
+' --------------------------------------------------- 1 Bedienelemente
+DIM s1 AS GUI_WINDOW : s1 = seite("Bedienelemente")
+DIM arten AS ARRAY OF STRING : arten = ["standard", "primaer", "erfolg", "warnung", "gefahr", "umriss", "flach", "link"]
+DIM k AS INTEGER
+FOR k = 0 TO 7
+    DIM kn AS GUI_WIDGET : kn = GUI_BUTTON(s1, UPPER$(LEFT$(arten[k], 1)) + MID$(arten[k], 1, LEN(arten[k])), 20 + k * 124, 20, 114, 36)
+    GUI_BUTTON_VARIANT(kn, arten[k])
+NEXT
+DIM gb1 AS GUI_WIDGET : gb1 = GUI_GROUPBOX(s1, 20, 80, 300, 170, "Waehlen")
+DIM cb1 AS GUI_WIDGET : cb1 = GUI_CHECKBOX(s1, "Newsletter", 36, 110, TRUE)
+DIM cb2 AS GUI_WIDGET : cb2 = GUI_CHECKBOX(s1, "Rechnung per Post", 36, 140)
+DIM r1 AS GUI_WIDGET : r1 = GUI_RADIO(s1, "lief", "Abholen", 36, 180)
+DIM r2 AS GUI_WIDGET : r2 = GUI_RADIO(s1, "lief", "Liefern", 150, 180)
+DIM t1 AS GUI_WIDGET : t1 = GUI_TOGGLE(s1, "Dunkle Ecken", 36, 214, TRUE)
+DIM gb2 AS GUI_WIDGET : gb2 = GUI_GROUPBOX(s1, 340, 80, 400, 170, "Einstellen")
+DIM regler AS GUI_WIDGET : regler = GUI_SLIDER(s1, 356, 112, 240, 0, 100, 62)
+DIM fort AS GUI_WIDGET : fort = GUI_PROGRESS(s1, 356, 150, 240, 18)
+DIM laufband AS GUI_WIDGET : laufband = GUI_PROGRESS(s1, 356, 186, 240, 12)
+GUI_PROGRESS_SET(laufband, "unbestimmt", 1)
+DIM knopf AS GUI_WIDGET : knopf = GUI_KNOB(s1, 630, 104, 90, 0, 100, 40)
+DIM zahl AS GUI_WIDGET : zahl = GUI_SPINNER(s1, 356, 212, 120, 0, 20, 5)
+DIM frucht AS GUI_WIDGET : frucht = GUI_DROPDOWN(s1, 760, 104, 240, 30, ["Apfel", "Birne", "Kirsche", "Mango", "Quitte"])
+DIM vregler AS GUI_WIDGET : vregler = GUI_VSLIDER(s1, 960, 150, 100, 0, 10, 7)
+DIM gb3 AS GUI_WIDGET : gb3 = GUI_GROUPBOX(s1, 20, 270, 980, 190, "Formen")
+DIM pille AS GUI_WIDGET : pille = GUI_BUTTON(s1, "Pille", 40, 310, 160, 50)
+DIM kreis AS GUI_WIDGET : kreis = GUI_BUTTON(s1, "", 230, 300, 72, 72)
+DIM raute AS GUI_WIDGET : raute = GUI_BUTTON(s1, "Raute", 330, 300, 150, 80)
+GUI_SET_SHAPE(pille, "pille") : GUI_SET_SHAPE(kreis, "kreis") : GUI_SET_SHAPE(raute, "raute")
+GUI_SET_ICON(kreis, "einstellungen")
+GUI_TOOLTIP(kreis, "Einstellungen (rund -- auch der Treffer)")
+GUI_SET_NAME(kreis, "kreis") : GUI_SET_NAME(raute, "raute")
+DIM formHinweis AS GUI_WIDGET : formHinweis = GUI_LABEL(s1, "Die Form gilt auch fuer den Klick --" + CHR$(10) + "neben dem Kreis trifft man nicht.", 510, 316)
+DIM meldung1 AS GUI_WIDGET : meldung1 = GUI_LABEL(s1, "", 40, 400)
+
+' --------------------------------------------------- 2 Text & Emoji
+DIM s2 AS GUI_WINDOW : s2 = seite("Text & Emoji")
+DIM name AS GUI_WIDGET : name = GUI_TEXTINPUT(s2, 20, 20, 320, 32, "Dein Name")
+DIM code AS GUI_WIDGET : code = GUI_TEXTAREA(s2, 20, 70, 480, 300)
+GUI_TEXTAREA_SET(code, "zeilennummern", 1)
+GUI_TEXTAREA_SET(code, "aktive_zeile", 1)
+GUI_SET_TEXT(code, "' Ein Code-Feld: Nummern, aktive Zeile," + CHR$(10) + "' mehrere Marken (Alt+Klick), Faltung" + CHR$(10) + "FUNCTION gruss(name AS STRING) AS STRING" + CHR$(10) + "    RETURN " + CHR$(34) + "Hallo, " + CHR$(34) + " + name" + CHR$(10) + "END FUNCTION" + CHR$(10) + CHR$(10) + "PRINT gruss(" + CHR$(34) + "Welt" + CHR$(34) + ")")
+DIM gesetzt AS GUI_WIDGET : gesetzt = GUI_RICHTEXT(s2, 520, 20, 500, 350, "# Gesetzter Text" + CHR$(10) + CHR$(10) + "Ueberschriften, **fett**, *kursiv*, `code` und Listen:" + CHR$(10) + CHR$(10) + "- Absaetze brechen um" + CHR$(10) + "- Tabellen stehen in Spalten" + CHR$(10) + "- Verweise lassen sich anklicken" + CHR$(10) + CHR$(10) + "| Was | Wie |" + CHR$(10) + "|---|---|" + CHR$(10) + "| Markdown | ein Ausschnitt |" + CHR$(10) + "| Emoji | " + CHR$(&H1F600) + " in Farbe |")
+DIM emojiGross AS GUI_WIDGET : emojiGross = GUI_LABEL(s2, "Emoji in Farbe:  " + CHR$(&H1F600) + " " + CHR$(&H1F389) + " " + CHR$(&H1F44D) + CHR$(&H1F3FD) + " " + CHR$(&H1F680) + " " + CHR$(&H1F308) + " " + CHR$(&H1F31F) + " " + CHR$(&H1F984), 20, 396)
+GUI_SET_NAME(emojiGross, "emojigross")
+DIM schriften AS GUI_WIDGET : schriften = GUI_LABEL(s2, "Hindi " + CHR$(&H928) + CHR$(&H92E) + CHR$(&H938) + CHR$(&H94D) + CHR$(&H924) + CHR$(&H947) + "   Arabisch " + CHR$(&H645) + CHR$(&H631) + CHR$(&H62D) + CHR$(&H628) + CHR$(&H627) + "   Hebraeisch " + CHR$(&H5E9) + CHR$(&H5DC) + CHR$(&H5D5) + CHR$(&H5DD) + "   Japanisch " + CHR$(&H3053) + CHR$(&H3093) + CHR$(&H306B) + CHR$(&H3061) + CHR$(&H306F) + "   Thai " + CHR$(&HE2A) + CHR$(&HE27) + CHR$(&HE31) + CHR$(&HE2A) + CHR$(&HE14) + CHR$(&HE35), 20, 456)
+GUI_SET_NAME(schriften, "schriften")
+DIM hallo AS GUI_WIDGET : hallo = GUI_LABEL(s2, "", 360, 26)
+
+' --------------------------------------------------- 3 Daten
+DIM s3 AS GUI_WINDOW : s3 = seite("Daten")
+DIM gross AS GUI_WIDGET : gross = GUI_TABLE(s3, 20, 20, 620, 420)
+GUI_TABLE_HEADERS(gross, ["Nr", "Kunde", "Stadt", "Umsatz"])
+GUI_TABLE_VIRTUAL(gross, 1000000)
+DIM staedte AS ARRAY OF STRING : staedte = ["Berlin", "Hamburg", "Muenchen", "Koeln", "Leipzig", "Bremen", "Dresden", "Kiel"]
+DIM baum AS GUI_WIDGET : baum = GUI_TREE(s3, 660, 20, 360, 200)
+DIM bw AS INTEGER : bw = GUI_TREE_ADD(baum, -1, "Projekt")
+DIM bq AS INTEGER : bq = GUI_TREE_ADD(baum, bw, "quellen")
+GUI_TREE_ADD(baum, bq, "main.dh")
+GUI_TREE_ADD(baum, bq, "spieler.dh")
+DIM bb AS INTEGER : bb = GUI_TREE_ADD(baum, bw, "bilder")
+GUI_TREE_ADD(baum, bb, "held.png")
+GUI_TREE_ADD(baum, bw, "LIESMICH.md")
+GUI_TREE_EXPAND(baum, bw, TRUE)
+GUI_TREE_EXPAND(baum, bq, TRUE)
+DIM bt AS GUI_WIDGET : bt = GUI_TREETABLE(s3, 660, 240, 360, 200, ["Ordner", "Groesse"])
+DIM tw AS INTEGER : tw = GUI_TREETABLE_ADD(bt, -1, ["Dokumente", "1,2 GB"])
+GUI_TREETABLE_ADD(bt, tw, ["Rechnungen", "240 MB"])
+GUI_TREETABLE_ADD(bt, tw, ["Fotos", "980 MB"])
+DIM tm AS INTEGER : tm = GUI_TREETABLE_ADD(bt, -1, ["Musik", "3,4 GB"])
+GUI_TREETABLE_ADD(bt, tm, ["Jazz", "1,1 GB"])
+GUI_TREETABLE_EXPAND_ALL(bt, TRUE)
+DIM liste AS GUI_WIDGET : liste = GUI_LISTBOX(s3, 20, 476, 1000, 150, ["Milch", "Brot", "Kaese", "Aepfel", "Kaffee", "Honig"])
+DIM preise AS ARRAY OF STRING : preise = ["1,19 EUR", "2,49 EUR", "3,99 EUR", "2,79 EUR", "6,49 EUR", "4,29 EUR"]
+FOR k = 0 TO 5
+    GUI_LISTBOX_DETAIL(liste, k, preise[k])
+NEXT
+DIM datenHinweis AS GUI_WIDGET : datenHinweis = GUI_LABEL(s3, "Eine Million Zeilen: die Tabelle haelt nur, was um den sichtbaren Bereich geliefert wurde.", 22, 444)
+
+SUB tabelleLiefern()
+    DIM von AS INTEGER : von = GUI_TABLE_NEED_FROM(gross)
+    IF von < 0 THEN EXIT SUB
+    DIM r AS INTEGER
+    FOR r = von TO von + GUI_TABLE_NEED_COUNT(gross) - 1
+        GUI_TABLE_SUPPLY(gross, r, [STR$(r + 1), "Kunde " + STR$(r + 1), staedte[r MOD 8], FORMAT$((r * 37) MOD 9973 + 0.5, "%.2f") + " EUR"])
+    NEXT
+END SUB
+
+' --------------------------------------------------- 4 Auswahl
+DIM s4 AS GUI_WINDOW : s4 = seite("Auswahl")
+DIM farbe AS GUI_WIDGET : farbe = GUI_COLORPICKER(s4, 20, 20, 340, 260)
+DIM farbFeld AS GUI_WIDGET : farbFeld = GUI_PANEL(s4, 20, 300, 340, 70)
+GUI_SET_NAME(farbFeld, "farbfeld")
+DIM farbText AS GUI_WIDGET : farbText = GUI_LABEL(s4, "", 24, 380)
+DIM kalender AS GUI_WIDGET : kalender = GUI_DATEPICKER(s4, 380, 20, 320, 280)
+DIM uhr AS GUI_WIDGET : uhr = GUI_TIMEPICKER(s4, 720, 20)
+DIM datumFeld AS GUI_WIDGET : datumFeld = GUI_DATEFIELD(s4, 720, 110, 200, 32)
+DIM wahlText AS GUI_WIDGET : wahlText = GUI_LABEL(s4, "", 382, 320)
+DIM pfad AS GUI_WIDGET : pfad = GUI_BREADCRUMB(s4, 20, 430, 680, 32)
+GUI_BREADCRUMB_SET(pfad, ["Start", "Projekte", "Drachenhauch", "examples", "222_gui_gesamtschau.dh"])
+
+' --------------------------------------------------- 5 Aufbau
+DIM s5 AS GUI_WINDOW : s5 = seite("Aufbau")
+DIM reiter AS GUI_WIDGET : reiter = GUI_TABCONTROL(s5, 20, 20, 480, 280)
+DIM p1 AS INTEGER : p1 = GUI_TABCONTROL_ADD(reiter, "Allgemein")
+DIM p2 AS INTEGER : p2 = GUI_TABCONTROL_ADD(reiter, "Ansicht")
+DIM p3 AS INTEGER : p3 = GUI_TABCONTROL_ADD(reiter, "Erweitert")
+GUI_TABCONTROL_ADD_WIDGET(reiter, GUI_TEXTINPUT(s5, 40, 80, 300, 30, "Projektname"), p1)
+GUI_TABCONTROL_ADD_WIDGET(reiter, GUI_CHECKBOX(s5, "Beim Start oeffnen", 40, 130, TRUE), p1)
+GUI_TABCONTROL_ADD_WIDGET(reiter, GUI_SLIDER(s5, 40, 90, 300, 8, 32, 14), p2)
+GUI_TABCONTROL_ADD_WIDGET(reiter, GUI_LABEL(s5, "Schriftgroesse", 40, 130), p2)
+GUI_TABCONTROL_ADD_WIDGET(reiter, GUI_TOGGLE(s5, "Maschinencode", 40, 90, TRUE), p3)
+DIM akk AS GUI_WIDGET : akk = GUI_ACCORDION(s5, 520, 20, 500, 280)
+DIM a1 AS INTEGER : a1 = GUI_ACCORDION_ADD(akk, "Was ist ein Akkordeon?")
+DIM a2 AS INTEGER : a2 = GUI_ACCORDION_ADD(akk, "Wie viele Abschnitte?")
+DIM a3 AS INTEGER : a3 = GUI_ACCORDION_ADD(akk, "Und die Tastatur?")
+GUI_ACCORDION_ADD_WIDGET(akk, GUI_LABEL(s5, "Abschnitte, die auf- und zuklappen -- weich.", 12, 10), a1)
+GUI_ACCORDION_ADD_WIDGET(akk, GUI_LABEL(s5, "So viele, wie Platz ist; der Rest rollt.", 12, 10), a2)
+GUI_ACCORDION_ADD_WIDGET(akk, GUI_LABEL(s5, "Pfeile wandern, Leertaste klappt.", 12, 10), a3)
+GUI_ACCORDION_OPEN(akk, a1, TRUE)
+DIM wz AS GUI_WIDGET : wz = GUI_WIZARD(s5, 20, 320, 1000, 300)
+DIM w1 AS INTEGER : w1 = GUI_WIZARD_ADD(wz, "Willkommen")
+DIM w2 AS INTEGER : w2 = GUI_WIZARD_ADD(wz, "Deine Angaben")
+DIM w3 AS INTEGER : w3 = GUI_WIZARD_ADD(wz, "Fertig")
+GUI_WIZARD_ADD_WIDGET(wz, GUI_LABEL(s5, "Ein Assistent fuehrt Schritt fuer Schritt -- Weiter, Zurueck, Fertig.", 50, 400), w1)
+GUI_WIZARD_ADD_WIDGET(wz, GUI_TEXTINPUT(s5, 50, 400, 300, 30, "E-Mail"), w2)
+GUI_WIZARD_ADD_WIDGET(wz, GUI_LABEL(s5, "Geschafft! Der Knopf Fertig beendet den Assistenten.", 50, 400), w3)
+
+' --------------------------------------------------- 6 Lebendig
+DIM s6 AS GUI_WINDOW : s6 = seite("Lebendig")
+DIM pa AS GUI_WIDGET : pa = GUI_PANEL(s6, 30, 30, 220, 150, "schwebt")
+DIM pb AS GUI_WIDGET : pb = GUI_PANEL(s6, 280, 30, 220, 150, "pulsiert")
+DIM pc AS GUI_WIDGET : pc = GUI_PANEL(s6, 530, 30, 220, 150, "huepft")
+DIM pd AS GUI_WIDGET : pd = GUI_PANEL(s6, 780, 30, 220, 150, "eigener Ablauf")
+GUI_SET_NAME(pa, "pa") : GUI_SET_NAME(pb, "pb") : GUI_SET_NAME(pc, "pc") : GUI_SET_NAME(pd, "pd")
+DIM rad AS GUI_WIDGET : rad = GUI_BUTTON(s6, "", 60, 230, 90, 90)
+GUI_SET_NAME(rad, "rad") : GUI_SET_ICON(rad, "einstellungen") : GUI_TOOLTIP(rad, "dreht sich")
+DIM funken AS GUI_WIDGET : funken = GUI_BUTTON(s6, "Funken", 200, 240, 160, 50)
+DIM konfetti AS GUI_WIDGET : konfetti = GUI_BUTTON(s6, "Konfetti", 380, 240, 160, 50)
+DIM sterne AS GUI_WIDGET : sterne = GUI_BUTTON(s6, "Sterne", 560, 240, 160, 50)
+DIM streif AS GUI_WIDGET : streif = GUI_BUTTON(s6, "Lichtstreif", 740, 240, 180, 50)
+GUI_ADD_CLASS(funken, "fest") : GUI_ADD_CLASS(konfetti, "fest") : GUI_ADD_CLASS(sterne, "fest") : GUI_ADD_CLASS(streif, "fest")
+DIM wackel AS GUI_WIDGET : wackel = GUI_TEXTINPUT(s6, 200, 330, 340, 34, "Leer lassen und Pruefen druecken")
+DIM pruef6 AS GUI_WIDGET : pruef6 = GUI_BUTTON(s6, "Pruefen", 560, 330, 160, 34)
+DIM leben6 AS GUI_WIDGET : leben6 = GUI_LABEL(s6, "Jede Bewegung kommt aus der Stildatei (Station 'Stildatei live') oder aus GUI_ANIMATE." + CHR$(10) + "'Bewegung' oben haelt alles an -- auch die Kugeln im Hintergrund.", 32, 420)
+
+' --------------------------------------------------- 7 Stildatei live
+DIM s7 AS GUI_WINDOW : s7 = seite("Stildatei live")
+DIM stilFeld AS GUI_WIDGET : stilFeld = GUI_TEXTAREA(s7, 20, 20, 640, 600)
+GUI_TEXTAREA_SET(stilFeld, "zeilennummern", 1)
+DIM anwenden AS GUI_WIDGET : anwenden = GUI_BUTTON(s7, "Anwenden", 680, 20, 160, 38)
+GUI_BUTTON_VARIANT(anwenden, "primaer")
+DIM stilFehler AS GUI_WIDGET : stilFehler = GUI_LABEL(s7, "", 680, 70)
+DIM stilHilfe AS GUI_WIDGET : stilHilfe = GUI_RICHTEXT(s7, 680, 110, 340, 510, "## Ausprobieren" + CHR$(10) + CHR$(10) + "- Eine Farbe aendern, **Anwenden**" + CHR$(10) + "- `@breite < 1000`: das Fenster schmal ziehen -- der Titel wird klein" + CHR$(10) + "- `@hell` / `@dunkel`: oben ein anderes Thema waehlen" + CHR$(10) + "- `@hochkontrast`: oben **Kontrast** einschalten" + CHR$(10) + "- `@zeit` und `@datum`: Regeln nach der Uhr" + CHR$(10) + CHR$(10) + "Ein Fehler steht mit Zeile oben -- die alte Stildatei gilt weiter.")
+
+DIM stil AS STRING = ""
+stil = stil + "/* Die Stildatei dieser Schau -- aendern und Anwenden */" + CHR$(10)
+stil = stil + "* { gleiten: 260 }" + CHR$(10)
+stil = stil + "button { klang: klick; radius: 9 }" + CHR$(10)
+stil = stil + "button:hover { klang: tick 30% }" + CHR$(10)
+stil = stil + "#titel { groesse: 30; stil: fett; fg: #FFD166 }" + CHR$(10)
+stil = stil + "@hell #titel { fg: #7B3FC4 }" + CHR$(10)
+stil = stil + "@breite < 1000 #titel { groesse: 20 }" + CHR$(10)
+stil = stil + "#gruss { groesse: 40; stil: fett; fg: #FFFFFF; animation: weich 2600ms immer }" + CHR$(10)
+stil = stil + "@hell #gruss { fg: #2B2140 }" + CHR$(10)
+stil = stil + "panel.glas { unschaerfe: 16; bg: #40FFFFFF; radius: 18 }" + CHR$(10)
+stil = stil + "card { radius: 14; bg: #30FFFFFF; animation: schweben 3400ms }" + CHR$(10)
+stil = stil + "#nav { bg: #28FFFFFF; radius: 12 }" + CHR$(10)
+stil = stil + "#k2 { animation: schweben 3900ms }" + CHR$(10)
+stil = stil + "#k3 { animation: schweben 4400ms }" + CHR$(10)
+stil = stil + "button.los { form: pille; bg: #E0457B; groesse: 22; animation: puls 1500ms; effekt: konfetti; klang: erfolg }" + CHR$(10)
+stil = stil + "#emoji { groesse: 34 }" + CHR$(10)
+stil = stil + "#emojigross { groesse: 30 }" + CHR$(10)
+stil = stil + "#schriften { groesse: 20 }" + CHR$(10)
+stil = stil + "#kreis { bg: #6C3483; animation: drehen 6000ms }" + CHR$(10)
+stil = stil + "#raute { bg: #1E8449 }" + CHR$(10)
+stil = stil + "#raute:hover { animation: wackeln 400ms einmal }" + CHR$(10)
+stil = stil + "#pa { bg: #3A2E6E; radius: 16; animation: schweben 2400ms }" + CHR$(10)
+stil = stil + "#pb { bg: #6E2E4A; radius: 16; animation: puls 1200ms }" + CHR$(10)
+stil = stil + "#pc { bg: #2E6E5A; radius: 16; animation: huepfen 1600ms }" + CHR$(10)
+stil = stil + "#pd { bg: #6E5A2E; radius: 16; animation: kreisen 3000ms }" + CHR$(10)
+stil = stil + "#rad { form: kreis; bg: #2A6FB0; animation: drehen 4000ms }" + CHR$(10)
+stil = stil + "button.fest { form: pille }" + CHR$(10)
+stil = stil + "#fps { fg: #8FE3A1 }" + CHR$(10)
+stil = stil + "@hell #fps { fg: #1E7A3A }" + CHR$(10)
+stil = stil + "@hochkontrast button { border: #FFFF00; fg: #FFFFFF; bg: #000000 }" + CHR$(10)
+stil = stil + "@datum 12-01..12-26 #titel { fg: #E74C3C }" + CHR$(10)
+stil = stil + "@ablauf weich { 0%: deckkraft 1; 50%: deckkraft 0.75, y -4; 100%: deckkraft 1 }" + CHR$(10)
+stil = stil + "@ablauf kreisen { 0%: x 0, y 0; 25%: x 8, y -6; 50%: x 0, y -12; 75%: x -8, y -6; 100%: x 0, y 0 }" + CHR$(10)
+GUI_SET_TEXT(stilFeld, stil)
+TRY
+    GUI_STYLESHEET(stil)
+CATCH e
+    GUI_SET_TEXT(stilFehler, e)
+END TRY
+
+' --------------------------------------------------- 8 Werkzeuge
+DIM s8 AS GUI_WINDOW : s8 = seite("Werkzeuge")
+DIM bPal AS GUI_WIDGET : bPal = GUI_BUTTON(s8, "Befehlspalette", 20, 20, 220, 44)
+DIM bIns AS GUI_WIDGET : bIns = GUI_BUTTON(s8, "Inspektor", 260, 20, 220, 44)
+DIM bToast AS GUI_WIDGET : bToast = GUI_BUTTON(s8, "Toast", 500, 20, 220, 44)
+DIM bInfo AS GUI_WIDGET : bInfo = GUI_BUTTON(s8, "Infoleiste", 20, 84, 220, 44)
+DIM bDialog AS GUI_WIDGET : bDialog = GUI_BUTTON(s8, "Dialog", 260, 84, 220, 44)
+DIM bFenster AS GUI_WIDGET : bFenster = GUI_BUTTON(s8, "Echtes Fenster", 500, 84, 220, 44)
+DIM werkzeugText AS GUI_WIDGET : werkzeugText = GUI_RICHTEXT(s8, 20, 160, 700, 420, "## Werkzeuge, die jedes Programm hat" + CHR$(10) + CHR$(10) + "- **Befehlspalette** (Strg+Umschalt+P): sucht in allen Menues und Werkzeugleisten -- ohne eine Zeile Code" + CHR$(10) + "- **Inspektor**: das Widget unter dem Zeiger, die Regeln der Stildatei mit Zeile, Befunde der Barrierefreiheit" + CHR$(10) + "- **Toast** und **Infoleiste**: Meldungen, die von selbst gehen bzw. eine Antwort wollen" + CHR$(10) + "- **Dialog**: modal, mit Enter und ESC" + CHR$(10) + "- **Echtes Fenster**: ein gui-Fenster als eigenes Fenster des Systems -- ueber den Rand, auf den zweiten Schirm")
+DIM antwort AS GUI_WIDGET : antwort = GUI_LABEL(s8, "", 740, 30)
+DIM dlg AS GUI_WINDOW : dlg = -1
+DIM zweit AS GUI_WINDOW : zweit = GUI_WINDOW("Zweites Fenster", 820, 300, 320, 200)
+GUI_WINDOW_VISIBLE(zweit, FALSE)
+GUI_WINDOW_CLOSABLE(zweit, TRUE)
+DIM zweitText AS GUI_WIDGET : zweitText = GUI_LABEL(zweit, "Ich bin ein eigenes Fenster" + CHR$(10) + "des Systems -- zieh mich" + CHR$(10) + "ueber den Rand.", 20, 20)
+DIM zweitKnopf AS GUI_WIDGET : zweitKnopf = GUI_BUTTON(zweit, "Feiern", 20, 110, 140, 40)
+
+' --------------------------------------------------- 9 Barrierefreiheit
+DIM s9 AS GUI_WINDOW : s9 = seite("Barrierefreiheit")
+DIM bPruef AS GUI_WIDGET : bPruef = GUI_BUTTON(s9, "Oberflaeche pruefen", 20, 20, 240, 44)
+GUI_BUTTON_VARIANT(bPruef, "primaer")
+DIM bHeilen AS GUI_WIDGET : bHeilen = GUI_TOGGLE(s9, "Fehler beheben", 290, 30, FALSE)
+DIM befunde AS GUI_WIDGET : befunde = GUI_TEXTAREA(s9, 20, 90, 640, 530)
+GUI_TEXTAREA_SET(befunde, "umbruch", 1)
+GUI_SET_TEXT(befunde, "Rechts stehen vier Widgets, die es Menschen schwer machen." + CHR$(10) + CHR$(10) + "'Oberflaeche pruefen' zaehlt auf, was daran fehlt -- 'Fehler beheben' repariert sie, und die Pruefung laeuft gleich noch einmal.")
+DIM schlecht AS GUI_WIDGET : schlecht = GUI_GROUPBOX(s9, 690, 90, 330, 210, "Absichtlich schlecht")
+DIM blass AS GUI_WIDGET : blass = GUI_BUTTON(s9, "Blass", 710, 130, 140, 40)
+GUI_SET_COLOR(blass, "fg", &H8890A0) : GUI_SET_COLOR(blass, "bg", &HA0A8B0)
+DIM ohneName AS GUI_WIDGET : ohneName = GUI_BUTTON(s9, "", 870, 130, 40, 40)
+GUI_SET_ICON(ohneName, "schliessen")
+DIM winzig1 AS GUI_WIDGET : winzig1 = GUI_BUTTON(s9, "a", 710, 200, 16, 16)
+DIM winzig2 AS GUI_WIDGET : winzig2 = GUI_BUTTON(s9, "b", 728, 200, 16, 16)
+DIM ohneLabel AS GUI_WIDGET : ohneLabel = GUI_TEXTINPUT(s9, 710, 250, 280, 30)
+DIM a11yHinweis AS GUI_WIDGET : a11yHinweis = GUI_RICHTEXT(s9, 690, 320, 330, 300,"## Die eingebaute Pruefung" + CHR$(10) + CHR$(10) + "`GUI_A11Y_CHECK$` findet zu wenig Kontrast, Widgets ohne Namen fuer den Bildschirmleser, zu kleine Ziele und eine Tab-Reihenfolge, die springt." + CHR$(10) + CHR$(10) + "Der Inspektor nennt die Befunde je Widget.")
+
+' --------------------------------------------------- Ablauf
+DIM aktiv AS INTEGER : aktiv = -1
+SUB zeige(k AS INTEGER)
+    IF k < 0 OR k >= LEN(seiten) OR k = aktiv THEN EXIT SUB
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(seiten) - 1
+        GUI_WINDOW_VISIBLE(seiten[j], j = k)
+    NEXT
+    aktiv = k
+    GUI_LISTBOX_SET_SELECTED(nav, k)
+    GUI_STATUSBAR_SET(fuss, 0, "Station " + STR$(k + 1) + " von " + STR$(LEN(seiten)) + ": " + stationen[k])
+    ' Ein Lichtstreif zieht ueber die neue Station.
+    GUI_WINDOW_GLOW(seiten[k])
+END SUB
+
+' Fenster und Stationen an die Groesse des Bildschirms und die Richtung legen.
+SUB anordnen()
+    DIM b AS INTEGER : b = SCREENWIDTH()
+    DIM h AS INTEGER : h = SCREENHEIGHT()
+    GUI_WINDOW_SET_BOUNDS(haupt, 0, 0, b, h)
+    GUI_SET_BOUNDS(nav, 12, KOPF_H - MENUE_H + 6, NAV_B - 22, h - KOPF_H - FUSS_H - 18)
+    GUI_SET_BOUNDS(fuss, 0, h - MENUE_H - FUSS_H, b, FUSS_H)
+    DIM x AS INTEGER : x = IIF(GUI_CHECKED(sRtl), 10, NAV_B)
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(seiten) - 1
+        GUI_WINDOW_SET_BOUNDS(seiten[j], x, KOPF_H, b - NAV_B - 10, h - KOPF_H - FUSS_H - 6)
+    NEXT
+END SUB
+
+' Der bewegte Hintergrund: ein Verlauf, dessen Ecken langsam die Farbe
+' wechseln, und weiche Lichtkugeln, die darueber treiben.
+DIM zeit AS FLOAT = 0
+SUB hintergrund()
+    DIM b AS INTEGER : b = SCREENWIDTH()
+    DIM h AS INTEGER : h = SCREENHEIGHT()
+    DIM t AS FLOAT : t = zeit
+    DIM a AS INTEGER : a = INT(50 + 40 * SIN(t * 0.31))
+    GRADIENT4(0, 0, b, h, RGB(110 + a, 40, 170), RGB(30, 90 + a, 200), RGB(180, 40, 110 + a), RGB(30, 150, 160))
+    DIM j AS INTEGER
+    FOR j = 0 TO 5
+        DIM px AS FLOAT : px = b * (0.5 + 0.42 * SIN(t * (0.11 + j * 0.03) + j * 1.7))
+        DIM py AS FLOAT : py = h * (0.5 + 0.40 * COS(t * (0.09 + j * 0.025) + j * 2.3))
+        DIM r AS INTEGER : r = 220 + 90 * (j MOD 3)
+        DIM farben AS ARRAY OF INTEGER : farben = [RGBA(255, 120, 200, 200), RGBA(90, 200, 255, 200), RGBA(255, 210, 90, 180), RGBA(140, 110, 255, 200), RGBA(80, 255, 180, 170), RGBA(255, 90, 90, 170)]
+        CIRCLE_GRADIENT(INT(px), INT(py), r, farben[j], RGBA(0, 0, 0, 1))
+    NEXT
+    ' Im hellen Thema ein weisser Schleier darueber: dunkle Schrift bleibt lesbar.
+    IF hellerGrund THEN BOX(0, 0, b - 1, h - 1, RGBA(255, 255, 255, 190))
+END SUB
+
+' Rechts nach links: alle Fenster spiegeln, die Stationen wechseln die Seite.
+SUB richtung()
+    DIM j AS INTEGER
+    GUI_WINDOW_RTL(haupt, GUI_CHECKED(sRtl))
+    FOR j = 0 TO LEN(seiten) - 1
+        GUI_WINDOW_RTL(seiten[j], GUI_CHECKED(sRtl))
+    NEXT
+    anordnen()
+END SUB
+
+' Aufruf: dhrt run 222_gui_gesamtschau.dh -- [station] [thema] [rtl]
+' (fuer Bilder der einzelnen Stationen; ohne Argumente beginnt der Rundgang vorn)
+anordnen()
+DIM start AS INTEGER : start = 0
+IF ARGC() > 0 THEN start = VAL(ARG$(0))
+IF ARGC() > 1 THEN
+    GUI_DROPDOWN_SET_SELECTED(themaWahl, VAL(ARG$(1)))
+    thema(VAL(ARG$(1)))
+END IF
+IF ARGC() > 2 AND ARG$(2) = "rtl" THEN
+    GUI_SET_CHECKED(sRtl, TRUE)
+    richtung()
+END IF
+zeige(start)
+GUI_WINDOW_GLOW(haupt)
+GUI_BURST(titel, "sterne")
+
+DIM warB AS INTEGER : warB = SCREENWIDTH()
+DIM warH AS INTEGER : warH = SCREENHEIGHT()
+DIM bilder AS INTEGER = 0
+DIM sekunde AS FLOAT : sekunde = TIMER()
+DIM wahlStand AS STRING = ""
+
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF SCREENWIDTH() <> warB OR SCREENHEIGHT() <> warH THEN
+        warB = SCREENWIDTH() : warH = SCREENHEIGHT()
+        anordnen()
+    END IF
+
+    ' --- die Leiste oben
+    IF GUI_CHANGED(nav) THEN zeige(GUI_LISTBOX_SELECTED(nav))
+    IF GUI_CLICKED(miWeiter) THEN zeige((aktiv + 1) MOD LEN(seiten))
+    IF GUI_CLICKED(miZurueck) THEN zeige((aktiv + LEN(seiten) - 1) MOD LEN(seiten))
+    IF GUI_CLICKED(miEnde) THEN EXIT WHILE
+    IF GUI_CLICKED(miPalette) THEN GUI_PALETTE(TRUE)
+    IF GUI_CLICKED(miInspektor) THEN GUI_INSPECTOR(TRUE)
+    IF GUI_CLICKED(miFeier) THEN GUI_BURST(titel, "konfetti") : GUI_SOUND("erfolg")
+    IF GUI_CHANGED(themaWahl) THEN
+        thema(GUI_VALUE(themaWahl))
+        GUI_WINDOW_GLOW(haupt)
+    END IF
+    IF GUI_CHANGED(sRtl) THEN richtung()
+    IF GUI_CHANGED(sBewegung) THEN GUI_SET_MOTION(IIF(GUI_CHECKED(sBewegung), "system", "aus"))
+    IF GUI_CHANGED(sToene) THEN GUI_SET_SOUNDS(GUI_CHECKED(sToene))
+    IF GUI_CHANGED(sKontrast) THEN GUI_SET_CONTRAST(IIF(GUI_CHECKED(sKontrast), "hoch", "system"))
+    ' Sparsam: der Hintergrund steht, FLIP schlaeft bis zur naechsten
+    ' Eingabe oder bis die gui ein Bild braucht.
+    WINDOW_WAIT_EVENTS(IIF(GUI_CHECKED(sSparsam), 1, 0))
+
+    ' --- die Stationen
+    IF GUI_CLICKED(los) THEN zeige(1)
+    IF GUI_CLICKED(k1) THEN zeige(6)
+    IF GUI_CLICKED(k2) THEN zeige(9)
+    IF GUI_CLICKED(k3) THEN GUI_SET_CHECKED(sSparsam, TRUE) : GUI_TOAST(haupt, "Sparsam ist an -- sieh oben rechts", "info", 3000)
+    GUI_SET_VALUE(fort, GUI_VALUE(regler))
+    IF GUI_CLICKED(kreis) THEN GUI_SET_TEXT(meldung1, "Getroffen: der Kreis")
+    IF GUI_CLICKED(raute) THEN GUI_SET_TEXT(meldung1, "Getroffen: die Raute")
+    IF GUI_CHANGED(name) THEN GUI_SET_TEXT(hallo, IIF(TRIM$(GUI_TEXT(name)) = "", "", "Hallo, " + GUI_TEXT(name) + "! " + CHR$(&H1F44B)))
+    IF aktiv = 3 THEN tabelleLiefern()
+    DIM fw AS INTEGER : fw = GUI_PICKED_COLOR(farbe)
+    GUI_SET_COLOR(farbFeld, "bg", fw BAND &HFFFFFF)
+    GUI_SET_TEXT(farbText, "Gewaehlt: #" + RIGHT$("000000" + HEX$(fw BAND &HFFFFFF), 6))
+    DIM wahl AS STRING : wahl = "Datum " + GUI_DATE(kalender) + "   Uhrzeit " + GUI_TIME$(uhr)
+    IF wahl <> wahlStand THEN wahlStand = wahl : GUI_SET_TEXT(wahlText, wahl)
+    IF GUI_BREADCRUMB_CLICKED(pfad) >= 0 THEN GUI_TOAST(haupt, "Pfad: " + GUI_BREADCRUMB_TEXT$(pfad, GUI_BREADCRUMB_CLICKED(pfad)), "info", 1800)
+    IF GUI_WIZARD_FINISHED(wz) THEN GUI_BURST(wz, "konfetti") : GUI_SOUND("erfolg") : GUI_WIZARD_SET_STEP(wz, 0)
+    IF GUI_CLICKED(funken) THEN GUI_BURST(funken, "funken")
+    IF GUI_CLICKED(konfetti) THEN GUI_BURST(konfetti, "konfetti")
+    IF GUI_CLICKED(sterne) THEN GUI_BURST(sterne, "sterne")
+    IF GUI_CLICKED(streif) THEN GUI_WINDOW_GLOW(s6)
+    IF GUI_CLICKED(pruef6) THEN
+        IF TRIM$(GUI_TEXT(wackel)) = "" THEN
+            GUI_ANIMATE(wackel, "wackeln", 320)
+            GUI_SOUND("fehler")
+        ELSE
+            GUI_BURST(pruef6, "sterne")
+            GUI_SOUND("erfolg")
+        END IF
+    END IF
+    IF GUI_CLICKED(anwenden) THEN
+        TRY
+            GUI_STYLESHEET(GUI_TEXT(stilFeld))
+            GUI_SET_TEXT(stilFehler, "Angewendet.")
+            GUI_BURST(anwenden, "sterne")
+        CATCH e
+            GUI_SET_TEXT(stilFehler, e)
+            GUI_ANIMATE(stilFeld, "wackeln", 300)
+        END TRY
+    END IF
+    IF GUI_CLICKED(bPal) THEN GUI_PALETTE(TRUE)
+    IF GUI_CLICKED(bIns) THEN GUI_INSPECTOR(TRUE)
+    IF GUI_CLICKED(bToast) THEN GUI_TOAST(haupt, "Ein Toast geht von selbst " + CHR$(&H2728), "erfolg", 2500)
+    IF GUI_CLICKED(bInfo) THEN GUI_INFOBAR(s8, "Eine Infoleiste wartet auf eine Antwort.", "info", "Gut|Spaeter")
+    IF GUI_INFOBAR_ANSWER(s8) > 0 THEN GUI_SET_TEXT(antwort, "Infoleiste: Antwort " + STR$(GUI_INFOBAR_ANSWER(s8)))
+    IF GUI_CLICKED(bDialog) THEN dlg = GUI_DIALOG("Frage", "Gefaellt dir die Schau?", "janein")
+    IF dlg >= 0 THEN
+        IF GUI_ANSWER(dlg) <> 0 THEN
+            GUI_SET_TEXT(antwort, IIF(GUI_ANSWER(dlg) = 1, "Dialog: Ja " + CHR$(&H1F60A), "Dialog: Nein"))
+            IF GUI_ANSWER(dlg) = 1 THEN GUI_BURST(bDialog, "konfetti")
+            dlg = -1
+        END IF
+    END IF
+    IF GUI_CLICKED(bFenster) THEN
+        GUI_WINDOW_VISIBLE(zweit, TRUE)
+        IF NOT GUI_WINDOW_NATIVE(zweit, TRUE) THEN GUI_SET_TEXT(antwort, "Hier gibt es keine echten Fenster -- es bleibt im Hauptfenster.")
+        GUI_WINDOW_FRONT(zweit)
+    END IF
+    IF GUI_CLICKED(zweitKnopf) THEN GUI_BURST(zweitKnopf, "konfetti") : GUI_SOUND("ping")
+    IF GUI_CHANGED(bHeilen) THEN
+        IF GUI_CHECKED(bHeilen) THEN
+            GUI_SET_COLOR(blass, "fg", &H101418)
+            GUI_TOOLTIP(ohneName, "Loeschen")
+            GUI_SET_BOUNDS(winzig2, 760, 200, 16, 16)
+            GUI_TOOLTIP(ohneLabel, "Bemerkung")
+        ELSE
+            GUI_SET_COLOR(blass, "fg", &H8890A0)
+            GUI_TOOLTIP(ohneName, "")
+            GUI_SET_BOUNDS(winzig2, 728, 200, 16, 16)
+            GUI_TOOLTIP(ohneLabel, "")
+        END IF
+    END IF
+    IF GUI_CLICKED(bPruef) OR GUI_CHANGED(bHeilen) THEN
+        DIM bef AS STRING : bef = GUI_A11Y_CHECK$(s9)
+        IF bef = "" THEN
+            GUI_SET_TEXT(befunde, "Keine Befunde " + CHR$(&H2705))
+            GUI_BURST(bPruef, "sterne")
+        ELSE
+            GUI_SET_TEXT(befunde, bef)
+        END IF
+    END IF
+
+    ' --- zeichnen
+    IF NOT GUI_CHECKED(sSparsam) AND GUI_MOTION() THEN zeit = zeit + DELTA()
+    hintergrund()
+    GUI_DRAW()
+    FLIP()
+
+    ' Bilder je Sekunde -- im Sparsam-Modus faellt die Zahl.
+    bilder = bilder + 1
+    IF TIMER() - sekunde >= 1 THEN
+        GUI_SET_TEXT(fpsAnzeige, STR$(bilder) + " Bilder/s")
+        bilder = 0
+        sekunde = TIMER()
+    END IF
+WEND

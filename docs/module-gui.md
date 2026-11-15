@@ -3006,6 +3006,15 @@ Siehe [examples/45_gui.dh](../examples/45_gui.dh): Fenster mit Slider (live ins
 Label gespiegelt), Checkbox, Textfeld und Start-Button — verschiebbar und
 schließbar.
 
+**Alles auf einmal, als Rundgang:**
+[examples/222_gui_gesamtschau.dh](../examples/222_gui_gesamtschau.dh) --
+zehn Stationen über einem bewegten Hintergrund: Glas, Formen und
+Animationen aus der Stildatei, Farb-Emoji und Schriften der Welt, eine
+Tabelle mit einer Million Zeilen, die Stildatei zum Ändern, Werkzeuge
+(Palette, Inspektor, echtes Fenster) und die Prüfung der
+Barrierefreiheit. Oben schalten Thema, rechts nach links, Bewegung, Töne,
+Sparsam und Kontrast die ganze Oberfläche um.
+
 **Alle 22 Widget-Arten in einer Anwendung:**
 [examples/156_gui_alle_widgets.dh](../examples/156_gui_alle_widgets.dh) —
 Vollbild, randloses Fenster (die Form *ist* der Bildschirm), Menüleiste,
