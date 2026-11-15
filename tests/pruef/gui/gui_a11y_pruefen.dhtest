@@ -154,3 +154,60 @@ retro: ok
 contrast: ok
 modern_dark: ok
 modern_light: ok
+
+=== tab springt zurueck nach oben -- spaltenweise und mit tab-index nicht
+TRY
+    SCREEN(600, 400, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Form", 0, 0, 600, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+' Von unten nach oben angelegt: Tab laeuft gegen die Lage.
+DIM ort AS GUI_WIDGET : ort = GUI_BUTTON(w, "Ort", 20, 120, 120, 32)
+DIM name AS GUI_WIDGET : name = GUI_BUTTON(w, "Name", 20, 20, 120, 32)
+' Eine zweite Spalte rechts, oben anfangend: das ist erlaubt.
+DIM plz AS GUI_WIDGET : plz = GUI_BUTTON(w, "PLZ", 300, 20, 120, 32)
+DIM land AS GUI_WIDGET : land = GUI_BUTTON(w, "Land", 300, 120, 120, 32)
+' Dieselbe Zeile rueckwaerts.
+DIM rechts AS GUI_WIDGET : rechts = GUI_BUTTON(w, "Rechts", 300, 250, 120, 32)
+DIM links AS GUI_WIDGET : links = GUI_BUTTON(w, "Links", 20, 250, 120, 32)
+GUI_UPDATE()
+PRINT GUI_A11Y_CHECK$()
+' Der Tab-Index stellt die Reihenfolge richtig.
+GUI_SET_TAB_INDEX(name, 1) : GUI_SET_TAB_INDEX(ort, 2) : GUI_SET_TAB_INDEX(plz, 3)
+GUI_SET_TAB_INDEX(land, 4) : GUI_SET_TAB_INDEX(links, 5) : GUI_SET_TAB_INDEX(rechts, 6)
+GUI_UPDATE()
+PRINT "danach ["; GUI_A11Y_CHECK$(); "]"
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+button "Name" in "Form": Tab springt hierher zurueck (von button "Ort" in "Form") -- die Reihenfolge folgt nicht der Lage: Widgets in Lesereihenfolge anlegen oder GUI_SET_TAB_INDEX
+button "Links" in "Form": Tab springt hierher zurueck (von button "Rechts" in "Form") -- die Reihenfolge folgt nicht der Lage: Widgets in Lesereihenfolge anlegen oder GUI_SET_TAB_INDEX
+danach []
+
+=== im gespiegelten fenster gilt die leserichtung von rechts
+TRY
+    SCREEN(600, 400, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Form", 0, 0, 600, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM a AS GUI_WIDGET : a = GUI_BUTTON(w, "A", 20, 20, 120, 32)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "B", 300, 20, 120, 32)
+GUI_UPDATE()
+PRINT "links nach rechts ["; GUI_A11Y_CHECK$(); "]"
+GUI_WINDOW_RTL(w, TRUE)
+GUI_UPDATE()
+' Gespiegelt steht A rechts, B links: von rechts nach links gelesen passt es.
+PRINT "gespiegelt ["; GUI_A11Y_CHECK$(); "]"
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+links nach rechts []
+gespiegelt []

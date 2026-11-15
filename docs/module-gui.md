@@ -3856,6 +3856,10 @@ schwer macht -- mit denselben Farben und Lagen, die die gui zeichnet:
   Sinnbild heißt für den Leser wie sein Hilfetext.
 - **Zu kleine Ziele**: unter 24 × 24 Punkten nur, wenn ein Kreis von 24
   Punkten um die Mitte kein anderes Ziel berührt (WCAG 2.5.8).
+- **Tab springt zurück**: nach oben, ohne eine neue Spalte rechts zu
+  beginnen, oder in derselben Zeile gegen die Leserichtung (im gespiegelten
+  Fenster von rechts). Den Befund bekommt das Widget, zu dem Tab springt;
+  `GUI_SET_TAB_INDEX` stellt die Reihenfolge richtig (WCAG 2.4.3).
 
 ```basic
 IMPORT "gui"

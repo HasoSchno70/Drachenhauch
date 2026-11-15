@@ -13,6 +13,11 @@
 //! * **Zielgroesse** (WCAG 2.5.8): kleiner als 24 x 24 Punkte nur, wenn ein
 //!   Kreis von 24 Punkten um seine Mitte kein anderes Ziel beruehrt.
 //!
+//! * **Tab-Reihenfolge** (WCAG 2.4.3): springt Tab zurueck nach oben (ohne
+//!   eine neue Spalte rechts zu beginnen) oder in derselben Zeile gegen die
+//!   Leserichtung, verliert man sich ohne Maus. Den Befund bekommt das
+//!   Widget, zu dem gesprungen wird.
+//!
 //! Gemessen wird auf dem Grund, auf dem ein Widget steht: dem eigenen,
 //! sonst dem Fenster -- ein Panel mit eigener Farbe darunter kennt die
 //! Pruefung nicht.
@@ -77,12 +82,36 @@ impl Gui {
         }
     }
 
+    /// Spruenge der Tab-Folge gegen die Lesereihenfolge: (von, nach) je
+    /// Paar aufeinanderfolgender Widgets (der Kreis vom letzten zum ersten
+    /// zaehlt nicht).
+    pub(super) fn tab_spruenge(&self, wi: usize) -> Vec<(usize, usize)> {
+        let folge = self.tab_reihenfolge(wi);
+        let rtl = self.windows[wi].rtl;
+        let lage = |k: usize| self.abs_rect(wi, &self.windows[wi].widgets[k]);
+        folge.windows(2).filter_map(|p| {
+            let ((ax, ay, ab, ah), (bx, by, bb, bh)) = (lage(p[0]), lage(p[1]));
+            // Liegt b ganz vor a in Leserichtung (links, gespiegelt rechts)?
+            let davor = if rtl { bx >= ax + ab } else { bx + bb <= ax };
+            // ... oder beginnt es eine neue Spalte dahinter?
+            let neue_spalte = if rtl { bx + bb <= ax } else { bx >= ax + ab };
+            let darueber = by + bh <= ay;
+            let selbe_zeile = by < ay + ah && ay < by + bh;
+            ((darueber && !neue_spalte) || (selbe_zeile && davor)).then_some((p[0], p[1]))
+        }).collect()
+    }
+
     /// Die Befunde zu einem Widget (leer = in Ordnung). `ziele` sind die
-    /// Rechtecke aller bedienbaren Widgets des Fensters (fuer den Abstand).
-    pub(super) fn a11y_befunde(&self, wi: usize, i: usize, ziele: &[(usize, (i32, i32, i32, i32))]) -> Vec<String> {
+    /// Rechtecke aller bedienbaren Widgets des Fensters (fuer den Abstand),
+    /// `spruenge` die der Tab-Folge (`tab_spruenge`).
+    pub(super) fn a11y_befunde(&self, wi: usize, i: usize, ziele: &[(usize, (i32, i32, i32, i32))], spruenge: &[(usize, usize)]) -> Vec<String> {
         let w = &self.windows[wi].widgets[i];
         let mut b = Vec::new();
         if !w.alive || !self.widget_shown(wi, w) { return b; }
+        for &(von, _) in spruenge.iter().filter(|(_, nach)| *nach == i) {
+            b.push(format!("Tab springt hierher zurueck (von {}) -- die Reihenfolge folgt nicht der Lage: Widgets in Lesereihenfolge anlegen oder GUI_SET_TAB_INDEX",
+                self.a11y_bezeichnung(wi, &self.windows[wi].widgets[von])));
+        }
         if w.enabled {
             if let Some((fg, bg)) = self.schrift_und_grund(w) {
                 let k = kontrast(fg & 0xFFFFFF, bg & 0xFFFFFF);
@@ -148,8 +177,9 @@ impl Gui {
             let win = &self.windows[wi];
             if !win.alive || !win.visible { continue; }
             let ziele = self.a11y_ziele(wi);
+            let spruenge = self.tab_spruenge(wi);
             for i in 0..win.widgets.len() {
-                for b in self.a11y_befunde(wi, i, &ziele) {
+                for b in self.a11y_befunde(wi, i, &ziele, &spruenge) {
                     zeilen.push(format!("{}: {}", self.a11y_bezeichnung(wi, &win.widgets[i]), b));
                 }
             }

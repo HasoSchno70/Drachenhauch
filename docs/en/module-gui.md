@@ -3833,6 +3833,10 @@ hand -- with the same colours and positions the gui draws:
   icon is called like its tooltip for the reader.
 - **Targets too small**: below 24 × 24 points only if a circle of 24 points
   around the centre touches no other target (WCAG 2.5.8).
+- **Tab jumps back**: upwards without starting a new column to the right,
+  or within the same row against the reading direction (from the right in a
+  mirrored window). The widget Tab jumps to gets the finding;
+  `GUI_SET_TAB_INDEX` puts the order right (WCAG 2.4.3).
 
 ```basic
 IMPORT "gui"
