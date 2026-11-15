@@ -88,6 +88,13 @@ pub fn pfad_von(h: i64) -> Option<String> {
     HANDLES.with(|m| m.borrow().get(&h).map(|e| e.pfad.clone()))
 }
 
+/// Fuer farbglyphe.rs: das Gesicht einer Schrift (ttf-parser), ihre Hoehe
+/// von Ober- bis Unterlaenge und die Oberlaenge (Schrift-Einheiten).
+pub(crate) fn gesicht_info(pfad: &str) -> Option<(&'static ttf_parser::Face<'static>, f32, f32)> {
+    let g = gesicht(pfad)?;
+    Some((&g.face, g.em, g.oben))
+}
+
 fn gesicht(pfad: &str) -> Option<&'static Gesicht> {
     if let Some(g) = GESICHTER.with(|m| m.borrow().get(pfad).copied()) { return g; }
     let g = laden(pfad);
@@ -250,16 +257,22 @@ fn schritte(a: (f32, f32), d: (f32, f32), b: (f32, f32), c: (f32, f32)) -> usize
 
 /// Flaechen-Rasterer: jede Linie traegt ihren Flaechenanteil je Pixel ein,
 /// eine laufende Summe ueber die Zeile ergibt die Deckung (nonzero).
-struct Raster { b: usize, h: usize, a: Vec<f32> }
+pub(crate) struct Raster { b: usize, h: usize, a: Vec<f32> }
 
 impl Raster {
-    fn neu(b: usize, h: usize) -> Self { Raster { b, h, a: vec![0.0; b * h + 4] } }
+    pub(crate) fn neu(b: usize, h: usize) -> Self { Raster { b, h, a: vec![0.0; b * h + 4] } }
+
+    /// Die Deckung je Pixel als 0..1 (fuer farbglyphe.rs).
+    pub(crate) fn deckung(&self) -> Vec<f32> {
+        let mut summe = 0.0f32;
+        (0..self.b * self.h).map(|i| { summe += self.a[i]; summe.abs().min(1.0) }).collect()
+    }
 
     fn add(&mut self, i: isize, v: f32) {
         if i >= 0 { if let Some(x) = self.a.get_mut(i as usize) { *x += v; } }
     }
 
-    fn linie(&mut self, p0: (f32, f32), p1: (f32, f32)) {
+    pub(crate) fn linie(&mut self, p0: (f32, f32), p1: (f32, f32)) {
         if (p0.1 - p1.1).abs() < 1e-6 { return; }
         let (dir, p0, p1) = if p0.1 < p1.1 { (1.0f32, p0, p1) } else { (-1.0, p1, p0) };
         let dxdy = (p1.0 - p0.0) / (p1.1 - p0.1);

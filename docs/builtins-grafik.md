@@ -524,8 +524,15 @@ der falschen Schrift ohne Meldung. Die Runtime löst jetzt die erste Schrift
 der Sammlung heraus (die CJK-Schriften von Windows liegen alle nur so vor).
 Eine Datei, die trotzdem keine Schrift ergibt, ist ein Fehler.
 
-**Grenzen:** Emoji kommen einfarbig (raylib rastert keine Farbschriften).
-Wer eine bestimmte Glyphenform will (japanische statt chinesische Formen),
+**Emoji in Farbe.** Emoji kommen in ihren Farben, in `TEXT` wie in der
+gui: Die Runtime zeichnet die Farbglyphen der Emoji-Schrift selbst (COLR
+bei Segoe UI Emoji, Bitmaps bei Apple Color Emoji und Noto Color Emoji).
+Folgen mit Verbinder, Hauttöne und Tastenkappen setzt die Formung zu einem
+Zeichen zusammen (👍🏽 ist ein Daumen in einem Hautton, nicht zwei Zeichen).
+Die Textfarbe gilt für Emoji nicht, nur ihre Deckkraft. Flaggen fehlen in
+Segoe UI Emoji -- unter Windows stehen dort die zwei Buchstaben.
+
+**Grenzen:** Wer eine bestimmte Glyphenform will (japanische statt chinesische Formen),
 lädt seine Schrift selbst. Hebräisch und Arabisch stehen von rechts nach
 links, Arabisch verbunden ([module-gui.md](module-gui.md#rechts-nach-links)).
 
