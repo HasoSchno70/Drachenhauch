@@ -733,6 +733,9 @@ WHILE NOT beenden
     navZugZeichnen()
     IF tempoMessen THEN protokoll("tempo " + FORMAT$((GET_TIME() - tempoAb) * 1000.0, "%.2f"))
     protokollSchreiben()
+    ' Leerlauf: solange kein Programm laeuft, gebaut oder untersucht wird,
+    ' schlaeft das Studio zwischen zwei Eingaben (hoechstens 0,25 s).
+    IF lauf >= 0 OR dbgProz >= 0 OR bau >= 0 OR tempoMessen THEN WINDOW_WAIT_EVENTS(0) ELSE WINDOW_WAIT_EVENTS(0.25)
     FLIP()
 WEND
 IF lauf >= 0 THEN PROCESS_KILL(lauf)

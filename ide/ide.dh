@@ -3576,6 +3576,11 @@ WHILE NOT beenden
     IF liveAn AND GUI_WINDOW_SHOWN(winLive) THEN
         IF GUI_WINDOW_AT(GUI_WINDOW_GET_X(winLive) + 10, GUI_WINDOW_GET_Y(winLive) + 10) = winLive THEN GUI_DRAW_WINDOW(winLive)
     END IF
+    ' Leerlauf: ohne laufendes Programm, Terminal, seriellen Monitor und
+    ' Live-Vorschau schlaeft die IDE zwischen zwei Eingaben -- hoechstens
+    ' 0,25 s, damit Sichern, Pruefen und Meldungen nach der Uhr kaum spaeter
+    ' kommen. Schreibmarke und Hilfetexte weckt die gui selbst.
+    IF prozess >= 0 OR termProz >= 0 OR serVerbunden() OR liveAn THEN WINDOW_WAIT_EVENTS(0) ELSE WINDOW_WAIT_EVENTS(0.25)
     FLIP()
     glanzStartNachziehen()
 WEND
