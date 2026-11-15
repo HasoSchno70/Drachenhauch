@@ -44,6 +44,14 @@ SUB studioSchriftAus()
 END SUB
 
 CLASS StudioApp
+    ' Schlafen, solange nichts passiert: in Geoeffnet `Self.Leerlauf = TRUE`.
+    ' Das Programm zeichnet dann nur noch nach einer Eingabe, wenn ein Timer
+    ' faellig ist oder die Oberflaeche es braucht (Schreibmarke, Hilfetext,
+    ' Animation) -- sonst hoechstens einmal je Sekunde. Am Laptop spart das
+    ' Akku. Takt laeuft dann nicht mehr sechzigmal je Sekunde: wer dort
+    ' etwas nach der Uhr tut, nimmt einen Timer.
+    DIM Leerlauf AS BOOLEAN
+
     ' Nach dem Start, bevor das Startfenster aufgeht.
     SUB Geoeffnet()
     END SUB
@@ -55,6 +63,15 @@ END CLASS
 
 ' Ein Timer: ruft sein Ereignis Aktion alle `Intervall` Millisekunden, solange
 ' er aktiv ist; ohne `Wiederholen` nur einmal.
+' Leerlauf (StudioApp.Leerlauf): in wie vielen Millisekunden der naechste
+' Timer faellig ist (-1 = keiner) -- je Bild gesammelt, bei studioMalen
+' verbraucht.
+DIM studioWeckMs AS INTEGER : studioWeckMs = -1
+
+SUB studioWecken(ms AS INTEGER)
+    IF studioWeckMs < 0 OR ms < studioWeckMs THEN studioWeckMs = MAX(0, ms)
+END SUB
+
 CLASS StudioTimer
     DIM Intervall AS INTEGER
     DIM Aktiv AS BOOLEAN
@@ -64,6 +81,7 @@ CLASS StudioTimer
     SUB Starten()
         Self.Aktiv = TRUE
         Self.studioStart = MILLIS()
+        studioWecken(MAX(1, Self.Intervall))
     END SUB
 
     SUB Stoppen()
@@ -73,9 +91,13 @@ CLASS StudioTimer
     ' Je Bild gefragt: ist die Zeit um? Dann beginnt sie von vorn.
     FUNCTION studioFaellig() AS BOOLEAN
         IF NOT Self.Aktiv THEN RETURN FALSE
-        IF MILLIS() - Self.studioStart < MAX(1, Self.Intervall) THEN RETURN FALSE
+        IF MILLIS() - Self.studioStart < MAX(1, Self.Intervall) THEN
+            ' Im Leerlauf: rechtzeitig wieder wach sein.
+            studioWecken(MAX(1, Self.Intervall) - (MILLIS() - Self.studioStart))
+            RETURN FALSE
+        END IF
         Self.studioStart = MILLIS()
-        IF NOT Self.Wiederholen THEN Self.Aktiv = FALSE
+        IF NOT Self.Wiederholen THEN Self.Aktiv = FALSE ELSE studioWecken(MAX(1, Self.Intervall))
         RETURN TRUE
     END FUNCTION
 END CLASS
@@ -465,6 +487,7 @@ CLASS StudioFenster
 END CLASS
 
 DIM studioFenster AS ARRAY OF StudioFenster : studioFenster = []
+DIM studioLaufApp AS StudioApp
 DIM studioEnde AS BOOLEAN : studioEnde = FALSE
 DIM studioDieStartseite AS StudioFenster
 DIM studioDialoge AS ARRAY OF GUI_WINDOW : studioDialoge = []
@@ -615,6 +638,18 @@ SUB studioMalen()
         GUI_DRAW_WINDOW(d)
     NEXT
     GUI_DRAW_TOP()
+    ' Leerlauf: hoechstens eine Sekunde schlafen, hoechstens bis zum
+    ' naechsten Timer; die gui kuerzt selbst auf ihr naechstes Bild.
+    IF studioLaufApp IS NOT NIL THEN
+        IF studioLaufApp.Leerlauf THEN
+            DIM grenze AS FLOAT : grenze = 1.0
+            IF studioWeckMs >= 0 THEN grenze = MIN(grenze, MAX(0.001, studioWeckMs / 1000.0))
+            WINDOW_WAIT_EVENTS(grenze)
+        ELSEIF WINDOW_WAIT_EVENTS() > 0 THEN
+            WINDOW_WAIT_EVENTS(0)
+        END IF
+    END IF
+    studioWeckMs = -1
     FLIP()
     studioBildNr = studioBildNr + 1
 END SUB
@@ -627,6 +662,7 @@ SUB studioLauf(app AS StudioApp, start AS StudioFenster, b AS INTEGER, h AS INTE
     SETFPS(60)
     studioSchirmB = SCREENWIDTH() : studioSchirmH = SCREENHEIGHT()
     studioDieStartseite = start
+    studioLaufApp = app
     studioSpracheVorgabe()
     app.Geoeffnet()
     IF studioSprache <> "" THEN SETWINDOWTITLE(studioTr$(titel))

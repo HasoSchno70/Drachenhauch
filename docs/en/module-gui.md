@@ -2771,7 +2771,9 @@ WEND
 What the program itself does by the clock (an animation of its own,
 reading data from a process or the network) only wakes its own limit: then
 set `WINDOW_WAIT_EVENTS` shorter or switch it off with `0` for that time.
-IDE and Studio sleep like this while no program runs.
+IDE and Studio sleep like this while no program runs; a program from the
+Studio with `Self.Leerlauf = TRUE` in `App.Geoeffnet` (timers wake it in
+time).
 
 ## Callbacks: GUI_ON_CLICK
 

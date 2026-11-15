@@ -2788,7 +2788,9 @@ WEND
 Was das Programm selbst nach der Uhr tut (eine eigene Animation, Daten aus
 einem Prozess oder dem Netz lesen), weckt nur seine eigene Grenze: dann
 `WINDOW_WAIT_EVENTS` kürzer setzen oder für diese Zeit mit `0` ausschalten.
-IDE und Studio schlafen so, solange kein Programm läuft.
+IDE und Studio schlafen so, solange kein Programm läuft; ein Programm aus
+dem Studio mit `Self.Leerlauf = TRUE` in `App.Geoeffnet` (Timer wecken es
+rechtzeitig).
 
 ## Callbacks: GUI_ON_CLICK
 

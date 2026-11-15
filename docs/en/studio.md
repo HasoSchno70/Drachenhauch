@@ -245,6 +245,23 @@ the inspector shows name, interval, "runs at start" and "repeat", Del
 deletes it. Its event is `<Name>_Aktion`. In code it is a field of the window
 class with `Intervall`, `Aktiv`, `Wiederholen`, `Starten()` and `Stoppen()`.
 
+**Sleeping while nothing happens.** Otherwise a program draws sixty frames
+a second, even when nobody does anything. With one line in
+`App.Geoeffnet` it sleeps between two inputs:
+
+```basic
+SUB Geoeffnet()
+    Self.Leerlauf = TRUE
+END SUB
+```
+
+It then draws after every input, when a timer is due and when the
+interface needs it (caret, tooltip, animation), otherwise at most once a
+second -- on a laptop that saves battery. `Takt` then no longer runs every
+frame: whoever does something by the clock there (refresh a display, poll
+a device) takes a timer for it. More on this: `WINDOW_WAIT_EVENTS` in the
+[gui manual](module-gui.md).
+
 **Menus.** Projekt → Menüs des Fensters (Ctrl+Shift+U) opens the menu
 editor: the tree on the left, text, name and shortcut (`Strg+S`, `F5` ...)
 on the right, plus "with check mark". A new entry gets a name from its text
