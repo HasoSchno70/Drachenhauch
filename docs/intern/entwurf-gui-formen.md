@@ -44,13 +44,16 @@ viele Widgets gilt; dazu zwei Befehle für das Programm.
   anzahl]])` -- etwa einmal wackeln bei falscher Eingabe; `""` hält an --
   und `GUI_ANIMATING(wdg)`.
 
-## Stufe 2 (offen)
+## Stufe 2 (gebaut 2026-11-15)
 
-- Bildfolgen aus einem Atlas (`animation: bilder atlas.png 8 12fps`) für
-  Spielmenüs. Animierte GIFs als Bildhaut laufen schon (2026-11-14).
-- Eigene Abläufe (`@ablauf name { 0% {...} 100% {...} }`) mit Farbe und
-  Deckkraft.
-- Formen und Bildhäute auch für Kästchen, Schalter, Regler.
+- Bildfolgen aus einem Atlas: `bild: atlas.png 8 12fps` (als Bildhaut,
+  nicht als Animation -- es ist dieselbe Mechanik wie das animierte GIF).
+- Eigene Abläufe flach statt geschachtelt: `@ablauf name { 50%: y -8,
+  drehen 10 }` -- verschieben, drehen, Größe. Farbe und Deckkraft fehlen
+  noch: die Verformung ist eine Matrix, eine Farbe müsste durch jeden
+  Zeichenbefehl des Widgets.
+- Bildhäute für Kästchen, Optionen und Schalter (je Zustand). Formen
+  (`form`) bleiben bei Knöpfen; Regler offen.
 
 ## Stufe 3 (offen)
 

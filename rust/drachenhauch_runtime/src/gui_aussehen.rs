@@ -84,17 +84,104 @@ pub(super) fn bild_zur_zeit(dauern: &[f64], uhr: f64) -> usize {
 /// Eine Animation als Text (`puls 700ms immer`) -- fuer den Inspektor.
 pub(super) fn anim_text(a: AnimStil) -> String {
     let n = if a.anzahl == 0 { "immer".to_string() } else if a.anzahl == 1 { "einmal".to_string() } else { a.anzahl.to_string() };
-    format!("{} {}ms {}", ARTEN.get(a.art as usize).unwrap_or(&"?"), a.dauer, n)
+    let art = if a.art >= EIGEN { format!("@ablauf{}", a.art - EIGEN + 1) } else { ARTEN.get(a.art as usize).unwrap_or(&"?").to_string() };
+    format!("{} {}ms {}", art, a.dauer, n)
 }
 
-/// `animation: art [dauer] [einmal|N]` lesen.
-pub(super) fn anim_lesen(wert: &str, zeile: usize) -> Result<AnimStil, String> {
+/// Eigene Ablaeufe (`@ablauf name { ... }`) zaehlen als Art ab hier: Art
+/// `EIGEN + k` ist der k-te Ablauf der Stildatei.
+pub(super) const EIGEN: u8 = 100;
+
+/// Ein Schluesselbild eines eigenen Ablaufs: wo (0..1) und was dann gilt.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(super) struct Schluessel { pub p: f64, pub x: f64, pub y: f64, pub drehen: f64, pub groesse: f64 }
+
+/// Den Rumpf eines `@ablauf` lesen: `0%: x 0, y -8; 50%: drehen 10, groesse 1.1`.
+/// Fehlt 0 % oder 100 %, gilt dort die Ruhe.
+pub(super) fn ablauf_lesen(rumpf: &str, kopf_zeile: usize, zeile_bei: impl Fn(usize) -> usize) -> Result<Vec<Schluessel>, String> {
+    let mut out: Vec<Schluessel> = Vec::new();
+    let mut off = 0usize;
+    for decl in rumpf.split(|c| c == ';' || c == '\n') {
+        let zeile = zeile_bei(off);
+        off += decl.len() + 1;
+        let d = decl.trim();
+        if d.is_empty() { continue; }
+        let (wann, was) = d.split_once(':').ok_or_else(|| format!("Zeile {}: '{}' -- erwartet z.B. 50%: y -8, drehen 10", zeile, d))?;
+        let p = wann.trim().strip_suffix('%').and_then(|v| v.trim().parse::<f64>().ok()).filter(|v| (0.0..=100.0).contains(v))
+            .ok_or_else(|| format!("Zeile {}: '{}' -- ein Schluesselbild steht bei 0% bis 100%", zeile, wann.trim()))?;
+        let mut k = Schluessel { p: p / 100.0, x: 0.0, y: 0.0, drehen: 0.0, groesse: 1.0 };
+        for teil in was.split(',') {
+            let t: Vec<&str> = teil.split_whitespace().collect();
+            if t.is_empty() { continue; }
+            let wert = t.get(1).and_then(|v| v.parse::<f64>().ok())
+                .ok_or_else(|| format!("Zeile {}: '{}' -- erwartet name zahl (x, y, drehen, groesse)", zeile, teil.trim()))?;
+            match t[0].to_lowercase().as_str() {
+                "x" => k.x = wert,
+                "y" => k.y = wert,
+                "drehen" | "rotate" => k.drehen = wert,
+                "groesse" | "scale" => k.groesse = wert,
+                n => return Err(format!("Zeile {}: '{}' gibt es in einem Ablauf nicht -- x, y, drehen, groesse", zeile, n)),
+            }
+        }
+        out.push(k);
+    }
+    if out.is_empty() { return Err(format!("Zeile {}: @ablauf ohne Schluesselbilder", kopf_zeile)); }
+    out.sort_by(|a, b| a.p.partial_cmp(&b.p).unwrap_or(std::cmp::Ordering::Equal));
+    let ruhe = |p: f64| Schluessel { p, x: 0.0, y: 0.0, drehen: 0.0, groesse: 1.0 };
+    if out[0].p > 0.0 { out.insert(0, ruhe(0.0)); }
+    if out.last().map(|k| k.p < 1.0).unwrap_or(true) { out.push(ruhe(1.0)); }
+    Ok(out)
+}
+
+/// Ein eigener Ablauf bei p (0..1): zwischen den Schluesselbildern gerade
+/// verbunden. (dx, dy, Winkel, Massstab) in logischen Punkten.
+pub(super) fn ablauf_verformung(ks: &[Schluessel], p: f64) -> (f64, f64, f64, f64) {
+    let p = p.clamp(0.0, 1.0);
+    let i = ks.iter().rposition(|k| k.p <= p).unwrap_or(0);
+    let a = ks[i];
+    let b = *ks.get(i + 1).unwrap_or(&a);
+    let t = if b.p > a.p { (p - a.p) / (b.p - a.p) } else { 0.0 };
+    let m = |u: f64, v: f64| u + (v - u) * t;
+    (m(a.x, b.x), m(a.y, b.y), m(a.drehen, b.drehen), m(a.groesse, b.groesse))
+}
+
+/// `bild: datei.png [anzahl [Nfps]]` lesen -- mit Anzahl ist es eine
+/// Bildfolge (Atlas: die Bilder nebeneinander), gespeichert als
+/// `datei|anzahl|fps`. Ein Pfad mit Leerzeichen steht in Anfuehrungszeichen.
+pub(super) fn bild_lesen(wert: &str, zeile: usize) -> Result<Option<String>, String> {
+    let w = wert.trim();
+    let (pfad, rest) = if let Some(r) = w.strip_prefix('"') {
+        match r.find('"') { Some(e) => (r[..e].to_string(), r[e + 1..].trim().to_string()), None => (r.to_string(), String::new()) }
+    } else {
+        let t: Vec<&str> = w.split_whitespace().collect();
+        let zahl = |x: &str| x.trim_end_matches("fps").parse::<u32>().is_ok();
+        let n = t.iter().rev().take(2).take_while(|x| zahl(x)).count();
+        (t[..t.len() - n].join(" "), t[t.len() - n..].join(" "))
+    };
+    let pfad = pfad.trim().trim_matches('\'').to_string();
+    if pfad.is_empty() || pfad == "keins" || pfad == "none" { return Ok(None); }
+    if rest.is_empty() { return Ok(Some(pfad)); }
+    let teile: Vec<&str> = rest.split_whitespace().collect();
+    let anzahl = teile[0].parse::<u32>().ok().filter(|n| (1..=256).contains(n))
+        .ok_or_else(|| format!("Zeile {}: bild -- Anzahl der Bilder '{}' muss 1..256 sein", zeile, teile[0]))?;
+    let fps = match teile.get(1) {
+        Some(f) => f.trim_end_matches("fps").parse::<u32>().ok().filter(|n| (1..=120).contains(n))
+            .ok_or_else(|| format!("Zeile {}: bild -- '{}' muss 1fps..120fps sein", zeile, f))?,
+        None => 12,
+    };
+    Ok(Some(format!("{}|{}|{}", pfad, anzahl, fps)))
+}
+
+/// `animation: art [dauer] [einmal|N]` lesen; `eigene` sind die Namen der
+/// `@ablauf`-Bloecke der Stildatei.
+pub(super) fn anim_lesen(wert: &str, zeile: usize, eigene: &[String]) -> Result<AnimStil, String> {
     let mut art = 0u8;
     let mut dauer = 0i32;
     let mut anzahl = 0i32;
     for t in wert.split_whitespace() {
         let tl = t.to_lowercase();
         if let Some(a) = ARTEN.iter().position(|x| !x.is_empty() && *x == tl) { art = a as u8; continue; }
+        if let Some(k) = eigene.iter().position(|x| *x == tl).filter(|&k| k < 100) { art = EIGEN + k as u8; continue; }
         if tl == "einmal" || tl == "once" { anzahl = 1; continue; }
         if tl == "immer" || tl == "infinite" { anzahl = 0; continue; }
         if let Some(ms) = tl.strip_suffix("ms") {
@@ -103,7 +190,7 @@ pub(super) fn anim_lesen(wert: &str, zeile: usize) -> Result<AnimStil, String> {
         }
         if let Ok(n) = tl.parse::<i32>() { anzahl = n.max(0); continue; }
         if tl == "keine" || tl == "none" { art = 0; continue; }
-        return Err(format!("Zeile {}: animation: '{}' unbekannt -- puls, wackeln, schweben, huepfen, drehen, Dauer in ms, einmal oder eine Anzahl", zeile, t));
+        return Err(format!("Zeile {}: animation: '{}' unbekannt -- puls, wackeln, schweben, huepfen, drehen, ein @ablauf der Stildatei, Dauer in ms, einmal oder eine Anzahl", zeile, t));
     }
     if dauer == 0 { dauer = vorgabe_dauer(art); }
     if !(50..=20000).contains(&dauer) { return Err(format!("Zeile {}: animation: Dauer {} ms ausserhalb 50..20000", zeile, dauer)); }
@@ -116,7 +203,7 @@ pub(super) fn vorbei(a: AnimStil, t0: f64, uhr: f64) -> bool {
     a.anzahl > 0 && (uhr - t0) * 1000.0 >= (a.dauer as f64) * (a.anzahl as f64)
 }
 
-fn vorgabe_dauer(art: u8) -> i32 { match art { 2 => 400, 4 => 600, 5 => 1200, _ => 900 } }
+fn vorgabe_dauer(art: u8) -> i32 { match art { 2 => 400, 4 => 600, 5 => 1200, a if a >= EIGEN => 1000, _ => 900 } }
 
 /// Die Verformung einer Animation zur Phase `p` (0..1 einer Runde) und
 /// dem Anteil `rest` (1 am Anfang, 0 am Ende einer endlichen Animation):
@@ -284,6 +371,27 @@ impl Gui {
     /// Dauern (IMAGE_LOAD_GIF/IMAGE_GIF_DELAYS), alles andere als ein Bild.
     /// None = nicht lesbar (der Knopf zeichnet sich dann wie ohne Haut).
     fn haut_laden(g: &mut Graphics, pfad: &str) -> Option<Haut> {
+        // Bildfolge aus einem Atlas (`bild: figur.png 8 12fps`, gespeichert als
+        // `figur.png|8|12`): die Bilder stehen nebeneinander.
+        let teile: Vec<&str> = pfad.split('|').collect();
+        if teile.len() == 3 {
+            let (n, fps) = (teile[1].parse::<u32>().ok()?, teile[2].parse::<u32>().ok()?);
+            let tex = g.load_texture(teile[0]).ok()?;
+            let (px, b, h) = g.image_rgba(tex, "bild").ok()?;
+            let fb = b / n.max(1);
+            if fb == 0 { return None; }
+            let mut bilder = Vec::with_capacity(n as usize);
+            for k in 0..n {
+                let mut stueck = vec![0u8; (fb * h * 4) as usize];
+                for z in 0..h {
+                    let q = ((z * b + k * fb) * 4) as usize;
+                    stueck[(z * fb * 4) as usize..((z + 1) * fb * 4) as usize].copy_from_slice(&px[q..q + (fb * 4) as usize]);
+                }
+                let t = g.textur_aus_rgba(&stueck, fb, h).ok()?;
+                bilder.push(HautBild { tex: t, alpha: stueck.chunks(4).map(|c| c[3]).collect() });
+            }
+            return Some(Haut { bilder, b: fb, h, dauern: vec![1000.0 / fps.max(1) as f64; n as usize] });
+        }
         let texturen = if pfad.to_ascii_lowercase().ends_with(".gif") {
             g.image_load_gif(pfad).ok()?
         } else {
@@ -321,7 +429,11 @@ impl Gui {
                 let gesamt = (a.dauer as f64) * (a.anzahl as f64);
                 let p = (vergangen / a.dauer as f64).fract();
                 let rest = if a.anzahl > 0 { 1.0 - vergangen / gesamt } else { 1.0 };
-                let (dx, dy, ang, sc) = verformung(a.art, p, rest);
+                let (dx, dy, ang, sc) = if a.art >= EIGEN {
+                    // Eigener Ablauf der Stildatei -- steht er nicht (mehr) da, ruht es.
+                    self.stil.as_ref().and_then(|d| d.ablaeufe.get((a.art - EIGEN) as usize))
+                        .map(|(_, ks)| ablauf_verformung(ks, p)).unwrap_or((0.0, 0.0, 0.0, 1.0))
+                } else { verformung(a.art, p, rest) };
                 (self.sk_f(dx), self.sk_f(dy), ang as f32, sc as f32)
             });
         let gleit = au.gleit.filter(|&(_, t0, d)| (self.uhr - t0) * 1000.0 < d).map(|(von, t0, d)| {
@@ -385,13 +497,15 @@ impl Gui {
     pub fn animate(&mut self, h: i64, art: &str, dauer: Option<i64>, anzahl: Option<i64>) -> Result<(), String> {
         let a = art.trim().to_lowercase();
         let uhr = self.uhr;
-        let w = self.wdg_mut(h, "GUI_ANIMATE")?;
         if a.is_empty() {
-            if let Some(au) = w.aussehen.as_mut() { au.lauf = None; }
+            if let Some(au) = self.wdg_mut(h, "GUI_ANIMATE")?.aussehen.as_mut() { au.lauf = None; }
             return Ok(());
         }
-        let n = ARTEN.iter().position(|x| !x.is_empty() && *x == a)
-            .ok_or_else(|| format!("GUI_ANIMATE: '{}' unbekannt -- puls, wackeln, schweben, huepfen, drehen oder \"\"", art))? as u8;
+        let eigene: Vec<String> = self.stil.as_ref().map(|d| d.ablaeufe.iter().map(|(n, _)| n.clone()).collect()).unwrap_or_default();
+        let n = ARTEN.iter().position(|x| !x.is_empty() && *x == a).map(|n| n as u8)
+            .or_else(|| eigene.iter().position(|x| *x == a).filter(|&k| k < 100).map(|k| EIGEN + k as u8))
+            .ok_or_else(|| format!("GUI_ANIMATE: '{}' unbekannt -- puls, wackeln, schweben, huepfen, drehen, ein @ablauf der Stildatei oder \"\"", art))?;
+        let w = self.wdg_mut(h, "GUI_ANIMATE")?;
         let dauer = dauer.map(|d| d as i32).unwrap_or_else(|| vorgabe_dauer(n));
         if !(50..=20000).contains(&dauer) { return Err(format!("GUI_ANIMATE: Dauer {} ms ausserhalb 50..20000", dauer)); }
         let anzahl = anzahl.unwrap_or(1).clamp(0, 1_000_000) as i32;
@@ -412,11 +526,11 @@ mod tests {
 
     #[test]
     fn animation_lesen() {
-        assert_eq!(anim_lesen("puls", 1).unwrap(), AnimStil { art: 1, dauer: 900, anzahl: 0 });
-        assert_eq!(anim_lesen("wackeln 300ms einmal", 1).unwrap(), AnimStil { art: 2, dauer: 300, anzahl: 1 });
-        assert_eq!(anim_lesen("drehen 2000ms 3", 1).unwrap(), AnimStil { art: 5, dauer: 2000, anzahl: 3 });
-        assert!(anim_lesen("tanzen", 1).is_err());
-        assert!(anim_lesen("puls 10ms", 1).is_err());
+        assert_eq!(anim_lesen("puls", 1, &[]).unwrap(), AnimStil { art: 1, dauer: 900, anzahl: 0 });
+        assert_eq!(anim_lesen("wackeln 300ms einmal", 1, &[]).unwrap(), AnimStil { art: 2, dauer: 300, anzahl: 1 });
+        assert_eq!(anim_lesen("drehen 2000ms 3", 1, &[]).unwrap(), AnimStil { art: 5, dauer: 2000, anzahl: 3 });
+        assert!(anim_lesen("tanzen", 1, &[]).is_err());
+        assert!(anim_lesen("puls 10ms", 1, &[]).is_err());
     }
 
     #[test]
@@ -431,6 +545,26 @@ mod tests {
         assert_eq!(bild_zur_zeit(&[100.0], 5.0), 0);
         assert_eq!(gif_dauer(0), 100.0);
         assert_eq!(gif_dauer(40), 40.0);
+    }
+
+    #[test]
+    fn ablaeufe_und_bildfolgen_lesen() {
+        let ks = ablauf_lesen("50%: y -10, drehen 20\n100%: groesse 2", 1, |_| 1).unwrap();
+        assert_eq!(ks.len(), 3, "0 % kommt als Ruhe dazu");
+        assert_eq!(ablauf_verformung(&ks, 0.0), (0.0, 0.0, 0.0, 1.0));
+        assert_eq!(ablauf_verformung(&ks, 0.5), (0.0, -10.0, 20.0, 1.0));
+        assert_eq!(ablauf_verformung(&ks, 0.25), (0.0, -5.0, 10.0, 1.0));
+        assert_eq!(ablauf_verformung(&ks, 1.0), (0.0, 0.0, 0.0, 2.0));
+        assert!(ablauf_lesen("120%: x 1", 3, |_| 3).unwrap_err().contains("0% bis 100%"));
+        assert!(ablauf_lesen("50%: farbe 1", 3, |_| 3).unwrap_err().contains("x, y, drehen, groesse"));
+        assert_eq!(bild_lesen("figur.png 8 12fps", 1).unwrap(), Some("figur.png|8|12".to_string()));
+        assert_eq!(bild_lesen("figur.png 4", 1).unwrap(), Some("figur.png|4|12".to_string()));
+        assert_eq!(bild_lesen("\"mein bild.png\" 2 6fps", 1).unwrap(), Some("mein bild.png|2|6".to_string()));
+        assert_eq!(bild_lesen("knopf.png", 1).unwrap(), Some("knopf.png".to_string()));
+        assert_eq!(bild_lesen("keins", 1).unwrap(), None);
+        assert!(bild_lesen("figur.png 0", 1).is_err());
+        let a = anim_lesen("tanz 800ms", 1, &["tanz".to_string()]).unwrap();
+        assert_eq!((a.art, a.dauer), (EIGEN, 800));
     }
 
     #[test]

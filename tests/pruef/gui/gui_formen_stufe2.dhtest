@@ -1,0 +1,160 @@
+' Formen Stufe 2 (docs/intern/entwurf-gui-formen.md): Bildfolgen aus einem
+' Atlas (`bild: atlas.png 4 10fps`), eigene Ablaeufe (`@ablauf name { 50%:
+' y -40 }`) und Bildhaeute fuer Kaestchen, Option und Schalter, auch je
+' Zustand (`:checked`). Gezaehlt wird im Renderziel nach festen Bildern
+' (DHRT_FRAMES: 1/60 s je Bild).
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== eine bildfolge aus dem atlas laeuft durch
+TRY
+    SCREEN(400, 300, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+IMPORT "imgfx"
+' Vier Bilder zu 40x40 nebeneinander: rot, gruen, blau, gelb.
+DIM a AS INTEGER : a = IMAGE_NEW(160, 40)
+IMAGE_FILL_RECT(a, 0, 0, 39, 39, RGB(255, 0, 0))
+IMAGE_FILL_RECT(a, 40, 0, 79, 39, RGB(0, 255, 0))
+IMAGE_FILL_RECT(a, 80, 0, 119, 39, RGB(0, 0, 255))
+IMAGE_FILL_RECT(a, 120, 0, 159, 39, RGB(255, 255, 0))
+IMAGE_SAVE(a, "atlas.png", TRUE)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 300)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM k AS GUI_WIDGET : k = GUI_BUTTON(w, "", 100, 100, 80, 80)
+GUI_SET_NAME(k, "k")
+GUI_STYLESHEET("#k { bild: atlas.png 4 10fps }")
+DIM rt AS INTEGER : rt = RENDERTARGET_NEW(400, 300)
+DIM n AS INTEGER
+DIM folge AS STRING
+FOR n = 1 TO 26
+    GUI_UPDATE()
+    IF n = 3 OR n = 9 OR n = 15 OR n = 21 THEN
+        RENDERTARGET_BEGIN(rt) : CLS(0) : GUI_DRAW() : RENDERTARGET_END()
+        DIM bild AS IMAGE : bild = RENDERTARGET_IMAGE(rt)
+        folge = folge + " " + HEX$(GETPIXEL(bild, 140, 140) BAND &HFFFFFF)
+    END IF
+    CLS(0) : FLIP()
+NEXT
+PRINT "folge"; folge
+PRINT GUI_INSPECT$(k)
+--- umgebung
+DHRT_FRAMES=100
+--- enthaelt
+folge FF0000 FF00 FF FFFF00
+  basis: bild atlas.png 4 10fps
+
+=== ein eigener ablauf hebt den knopf
+TRY
+    SCREEN(400, 300, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 300)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "", 140, 140, 120, 30)
+GUI_SET_NAME(b, "k")
+' Der Ablauf steht UNTER der Regel, die ihn nennt.
+GUI_STYLESHEET("#k { bg: #FF0000; border: #FF0000; animation: hoch 1000ms einmal }" + CHR$(10) + "@ablauf hoch {" + CHR$(10) + "  50%: y -40" + CHR$(10) + "}")
+DIM rt AS INTEGER : rt = RENDERTARGET_NEW(400, 300)
+FUNCTION rot_oben() AS BOOLEAN
+    RENDERTARGET_BEGIN(rt) : CLS(0) : GUI_DRAW() : RENDERTARGET_END()
+    DIM bild AS IMAGE : bild = RENDERTARGET_IMAGE(rt)
+    RETURN (GETPIXEL(bild, 200, 115) BAND &HFFFFFF) = &HFF0000
+END FUNCTION
+DIM n AS INTEGER
+GUI_UPDATE()
+PRINT "am anfang oben "; rot_oben()
+FOR n = 1 TO 30
+    GUI_UPDATE() : CLS(0) : FLIP()
+NEXT
+PRINT "nach der halben zeit oben "; rot_oben(); " laeuft "; GUI_ANIMATING(b)
+FOR n = 1 TO 40
+    GUI_UPDATE() : CLS(0) : FLIP()
+NEXT
+PRINT "danach oben "; rot_oben(); " laeuft "; GUI_ANIMATING(b)
+GUI_ANIMATE(b, "hoch", 400)
+PRINT "per befehl "; GUI_ANIMATING(b)
+--- umgebung
+DHRT_FRAMES=200
+--- erwartet
+am anfang oben FALSE
+nach der halben zeit oben TRUE laeuft TRUE
+danach oben FALSE laeuft FALSE
+per befehl TRUE
+
+=== kaestchen und schalter tragen eine haut je zustand
+TRY
+    SCREEN(400, 300, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+IMPORT "imgfx"
+DIM r AS INTEGER : r = IMAGE_NEW(16, 16)
+IMAGE_FILL_RECT(r, 0, 0, 15, 15, RGB(255, 0, 0))
+IMAGE_SAVE(r, "aus.png", TRUE)
+DIM gr AS INTEGER : gr = IMAGE_NEW(16, 16)
+IMAGE_FILL_RECT(gr, 0, 0, 15, 15, RGB(0, 255, 0))
+IMAGE_SAVE(gr, "an.png", TRUE)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 300)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM c AS GUI_WIDGET : c = GUI_CHECKBOX(w, "Kaestchen", 20, 20)
+DIM t AS GUI_WIDGET : t = GUI_TOGGLE(w, "Schalter", 20, 80, FALSE)
+GUI_STYLESHEET("checkbox, toggle { bild: aus.png }" + CHR$(10) + "checkbox:checked, toggle:checked { bild: an.png }")
+DIM rt AS INTEGER : rt = RENDERTARGET_NEW(400, 300)
+FUNCTION farben$() AS STRING
+    GUI_UPDATE() : GUI_UPDATE()
+    RENDERTARGET_BEGIN(rt) : CLS(0) : GUI_DRAW() : RENDERTARGET_END()
+    DIM bild AS IMAGE : bild = RENDERTARGET_IMAGE(rt)
+    DIM cy AS INTEGER : cy = GUI_GET_Y(c) + GUI_GET_H(c) \ 2
+    DIM ty AS INTEGER : ty = GUI_GET_Y(t) + GUI_GET_H(t) \ 2
+    RETURN HEX$(GETPIXEL(bild, 24, cy) BAND &HFFFFFF) + " " + HEX$(GETPIXEL(bild, 26, ty) BAND &HFFFFFF)
+END FUNCTION
+PRINT "aus "; farben$()
+GUI_SET_CHECKED(c, TRUE)
+GUI_SET_CHECKED(t, TRUE)
+PRINT "an "; farben$()
+--- erwartet
+aus FF0000 FF0000
+an FF00 FF00
+
+=== falsche ablaeufe und bildfolgen sind fehler
+TRY
+    SCREEN(400, 300, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 300)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "x", 20, 20, 120, 30)
+DIM fehler AS ARRAY OF STRING
+fehler = ["@ablauf puls { 50%: y 1 }", "@ablauf a { 150%: y 1 }", "@ablauf a { 50%: farbe 1 }", "button { animation: gibtsnicht }", "button { bild: a.png 0 }", "button { bild: a.png 4 500fps }"]
+DIM i AS INTEGER
+FOR i = 0 TO LEN(fehler) - 1
+    TRY
+        GUI_STYLESHEET(fehler[i])
+        PRINT "kein fehler bei "; fehler[i]
+    CATCH e1
+        PRINT e1
+    END TRY
+NEXT
+TRY
+    GUI_ANIMATE(b, "gibtsnicht")
+CATCH e2
+    PRINT e2
+END TRY
+--- enthaelt
+@ablauf 'puls' -- den Namen hat schon eine eingebaute Animation
+'150%' -- ein Schluesselbild steht bei 0% bis 100%
+'farbe' gibt es in einem Ablauf nicht -- x, y, drehen, groesse
+animation: 'gibtsnicht' unbekannt
+bild -- Anzahl der Bilder '0' muss 1..256 sein
+bild -- '500fps' muss 1fps..120fps sein
+GUI_ANIMATE: 'gibtsnicht' unbekannt

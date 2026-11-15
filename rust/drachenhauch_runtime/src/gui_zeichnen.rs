@@ -680,6 +680,22 @@ impl Gui {
         self.feld_symbole_zeichnen(g, wdg, ax, ay, w, h);
     }
 
+    /// Kaestchen, Option, Schalter mit Bildhaut: das Bild in der Groesse des
+    /// Kennzeichens (Schalter doppelt so breit), daneben der Text. FALSE =
+    /// keine Haut (oder sie fehlt), dann zeichnet die gewohnte Art.
+    fn kennhaut(&self, g: &mut Graphics, wi: usize, idx: usize, wdg: &Widget, ax: i32, ay: i32, h: i32, pad: i32) -> bool {
+        let gedrueckt = self.press_origin == Some((wi, idx));
+        let Some((pfad, rand)) = self.w_bild(wdg, gedrueckt) else { return false };
+        let ks = if wdg.kind == Kind::Toggle { self.m("check_size").max(self.sk(14)).min(h) } else { self.m("check_size").min(h).max(8) };
+        let kb = if wdg.kind == Kind::Toggle { ks * 2 } else { ks };
+        let ky = ay + (h - ks) / 2;
+        if !self.haut_zeichnen(g, &pfad, rand, ax, ky, kb, ks) { return false; }
+        if !wdg.text.is_empty() {
+            self.wtext_mn(g, wdg, ax + kb + pad, ky + (ks - self.wsize(g, wdg)).max(0) / 2, &wdg.text, self.txt_col(wdg));
+        }
+        true
+    }
+
     pub(super) fn draw_widget(&self, g: &mut Graphics, wi: usize, idx: usize, wdg: &Widget) {
         // Die Rundung aus der Stildatei gilt fuer jede Flaeche dieses Widgets.
         let vorher = self.rad_jetzt.replace(self.w_radius(wdg));
@@ -934,6 +950,9 @@ impl Gui {
                     }
                 }
             }
+            // Bildhaut (Stildatei `bild`, auch `:checked`): statt Kaestchen,
+            // Punkt oder Rinne das Bild, daneben die Beschriftung.
+            Kind::Checkbox | Kind::Radio | Kind::Toggle if self.kennhaut(g, wi, idx, wdg, ax, ay, h, pad) => {}
             Kind::Checkbox => {
                 // Das Kaestchen ist so gross wie die Metrik, nicht wie das
                 // Rechteck: das reicht seit dem Automass ueber den Text.

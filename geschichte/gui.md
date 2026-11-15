@@ -1220,3 +1220,13 @@ am Zeilenende der Erwartung ab, die Ausgabe nicht.
   Hauptfensters DARUEBER zeigt den Unterschied. Die Palette nimmt jetzt
   auch die Kontextmenues des Fensters auf (was die Menueleiste schon
   nennt, nur einmal).
+- **Formen Stufe 2**: Bildfolgen aus einem Atlas (`bild: figur.png 8
+  12fps`, intern `figur.png|8|12` als Schluessel der Haut -- dieselbe
+  Mechanik wie das animierte GIF, `textur_aus_rgba` schneidet die Bilder);
+  eigene Ablaeufe als flacher Block `@ablauf name { 50%: y -8 }` (kein
+  Schachteln -- der Leser kennt nur `{}` je Regel); die Namen sammelt ein
+  Vorlauf, damit eine Regel einen Ablauf weiter unten nennen darf (die
+  Gegenprobe ohne Vorlauf fiel genau daran). Art `EIGEN + k`. Bildhaeute
+  jetzt auch fuer Kaestchen, Optionen und Schalter (`kennhaut`, ein Arm
+  vor den gewohnten -- `:checked` kommt ueber die Aufloesung schon in die
+  Grundschicht).

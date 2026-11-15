@@ -5822,6 +5822,14 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         })
     }
 
+    /// Eine Textur aus RGBA-Pixeln (Bildfolgen der gui, gui_aussehen.rs).
+    pub fn textur_aus_rgba(&mut self, px: &[u8], w: u32, h: u32) -> Result<i64, String> {
+        if w == 0 || h == 0 || px.len() < (w as usize) * (h as usize) * 4 { return Err("Textur: falsche Groesse".into()); }
+        let img = Image::gen_image_color(w as i32, h as i32, Color::new(0, 0, 0, 0));
+        unsafe { std::ptr::copy_nonoverlapping(px.as_ptr(), img.data as *mut u8, (w as usize) * (h as usize) * 4); }
+        self.push_tex_from_image(img)
+    }
+
     /// IMAGE_LOAD_GIF: alle Einzelbilder eines GIFs als eigene Bilder (raylib
     /// setzt sie schon zusammen, auch wenn ein Bild nur einen Teil erneuert).
     /// Eine Datei, die kein GIF ist, ergibt ein einziges Bild.

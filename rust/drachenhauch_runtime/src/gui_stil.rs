@@ -168,9 +168,10 @@ impl StilWerte {
         if let Some(v) = self.uebergang { t.push(format!("uebergang {}", v)); }
         for (k, d) in &self.uebergang_je { t.push(format!("uebergang {} {}", ROLLEN.get(*k).unwrap_or(&"?"), d)); }
         if let Some(v) = self.form { t.push(format!("form {}", super::aussehen::FORMEN.get(v as usize).unwrap_or(&"?"))); }
-        if let Some(v) = &self.bild { t.push(format!("bild {}", v)); }
+        if let Some(v) = &self.bild { if !v.contains('|') { t.push(format!("bild {}", v)); } }
         if let Some(v) = self.bildrand { t.push(format!("bildrand {}", v)); }
         if let Some(a) = self.animation { t.push(format!("animation {}", super::aussehen::anim_text(a))); }
+        if let Some(b) = &self.bild { if b.contains('|') { t.retain(|x| !x.starts_with("bild ")); t.push(format!("bild {}", b.replacen('|', " ", 1).replacen('|', " ", 1) + "fps")); } }
         if let Some((k, l)) = &self.klang { t.push(if *l == 100 { format!("klang {}", k) } else { format!("klang {} {}%", k, l) }); }
         if let Some(e) = self.effekt { t.push(format!("effekt {}", super::effekte::EFFEKTE.get(e as usize).unwrap_or(&"?"))); }
         if let Some(v) = self.gleiten { t.push(format!("gleiten {}ms", v)); }
@@ -330,6 +331,9 @@ pub(super) struct Stildatei {
     pub(super) mit_vorfahren: bool,
     /// Haengt eine Regel an Zeit oder Datum? Dann fragt `stil_pass` die Uhr.
     pub(super) mit_bedingung: bool,
+    /// Eigene Ablaeufe (`@ablauf name { 0%: x 0; 50%: y -8 }`), ihre Namen
+    /// und Schluesselbilder (gui_aussehen.rs).
+    pub(super) ablaeufe: Vec<(String, Vec<super::aussehen::Schluessel>)>,
     /// Die Uhr, gegen die Bedingungen gelten (Monat*100+Tag, Minute) --
     /// von `stil_pass` gesetzt.
     pub(super) uhr: (u16, u16),
@@ -515,6 +519,12 @@ pub(super) fn lesen(text: &str, thema: &dyn Fn(&str) -> bool) -> Result<Stildate
     let t = ohne_kommentare(text)?;
     let mut regeln = Vec::new();
     let mut pos = 0;
+    // Erst die Namen eigener Ablaeufe -- eine Regel darf einen nennen, der
+    // weiter unten steht.
+    let ablauf_namen: Vec<String> = t.match_indices("@ablauf").filter_map(|(p, _)| {
+        t[p + 7..].split(|c: char| c.is_whitespace() || c == '{').find(|x| !x.is_empty()).map(|n| n.to_lowercase())
+    }).collect();
+    let mut ablaeufe: Vec<(String, Vec<super::aussehen::Schluessel>)> = Vec::new();
     while let Some(rel) = t[pos..].find('{') {
         let auf = pos + rel;
         let kopf = &t[pos..auf];
@@ -527,6 +537,15 @@ pub(super) fn lesen(text: &str, thema: &dyn Fn(&str) -> bool) -> Result<Stildate
         if rumpf.contains('{') { return Err(format!("Zeile {}: '{{' im Rumpf -- Regeln lassen sich nicht schachteln", zeile_von(&t, auf + 1 + rumpf.find('{').unwrap()))); }
         // Kopfzeile: die erste nicht leere Zeile vor der Klammer.
         let kopf_zeile = zeile_von(&t, pos + kopf.len() - kopf.trim_start().len());
+        if let Some(name) = kopf.trim().strip_prefix("@ablauf") {
+            let name = name.trim().to_lowercase();
+            if name.is_empty() || !ist_name(&name) { return Err(format!("Zeile {}: @ablauf braucht einen Namen (Buchstaben, Ziffern, _ und -)", kopf_zeile)); }
+            if super::aussehen::ARTEN.contains(&name.as_str()) { return Err(format!("Zeile {}: @ablauf '{}' -- den Namen hat schon eine eingebaute Animation", kopf_zeile, name)); }
+            let schluessel = super::aussehen::ablauf_lesen(rumpf, kopf_zeile, |o| zeile_von(&t, auf + 1 + o))?;
+            ablaeufe.push((name, schluessel));
+            pos = zu + 1;
+            continue;
+        }
         let (bed, kopf, bed_text) = bedingung_lesen(kopf, kopf_zeile)?;
         let kopf = kopf.as_str();
         let selektoren: Vec<(Selektor, String)> = kopf.split(',')
@@ -583,12 +602,9 @@ pub(super) fn lesen(text: &str, thema: &dyn Fn(&str) -> bool) -> Result<Stildate
                         .ok_or_else(|| format!("Zeile {}: form '{}' unbekannt -- rechteck, pille, kreis, raute, bild", zeile, wert))?;
                     werte.form = Some(n as u8);
                 }
-                "bild" | "image" => {
-                    let p = wert.trim().trim_matches('"').trim_matches('\'').to_string();
-                    werte.bild = if p.is_empty() || p == "keins" || p == "none" { None } else { Some(p) };
-                }
+                "bild" | "image" => werte.bild = super::aussehen::bild_lesen(wert, zeile)?,
                 "bildrand" | "image-border" => werte.bildrand = Some(zahl_lesen_stil(wert, zeile, "bildrand", 0, 200)?),
-                "animation" => werte.animation = Some(super::aussehen::anim_lesen(wert, zeile)?),
+                "animation" => werte.animation = Some(super::aussehen::anim_lesen(wert, zeile, &ablauf_namen)?),
                 "unschaerfe" | "blur" => werte.unschaerfe = Some(zahl_lesen_stil(wert, zeile, "unschaerfe", 0, 40)?),
                 "gleiten" | "layout-transition" => {
                     let w = wert.trim().trim_end_matches("ms").trim();
@@ -611,7 +627,7 @@ pub(super) fn lesen(text: &str, thema: &dyn Fn(&str) -> bool) -> Result<Stildate
     }
     let mit_vorfahren = regeln.iter().any(|r: &Regel| !r.sel.vorfahren.is_empty());
     let mit_bedingung = regeln.iter().any(|r: &Regel| r.bed.is_some());
-    Ok(Stildatei { regeln, mit_vorfahren, mit_bedingung, uhr: (0, 0) })
+    Ok(Stildatei { regeln, mit_vorfahren, mit_bedingung, uhr: (0, 0), ablaeufe })
 }
 
 impl Stildatei {
