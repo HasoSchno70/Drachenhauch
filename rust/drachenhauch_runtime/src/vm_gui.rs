@@ -1614,6 +1614,9 @@ impl<'p> Vm<'p> {
                 let dauer = if a.len() >= 3 { Some(gi(a,2,n)?) } else { None };
                 let anzahl = if a.len() >= 4 { Some(gi(a,3,n)?) } else { None };
                 self.gui.animate(gi(a,0,n)?, &gs(a,1,n)?, dauer, anzahl)?; Value::Nil }
+            "gui_gliding" => { let n = "GUI_GLIDING";
+                if a.len() != 1 { return Err(format!("{}: erwartet (wdg)", n)); }
+                Value::Bool(self.gui.gliding(gi(a,0,n)?)?) }
             "gui_animating" => { let n = "GUI_ANIMATING";
                 if a.len() != 1 { return Err(format!("{}: erwartet (wdg)", n)); }
                 Value::Bool(self.gui.animating(gi(a,0,n)?)?) }

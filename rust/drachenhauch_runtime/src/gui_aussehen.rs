@@ -41,6 +41,21 @@ pub(super) struct Aussehen {
     pub lauf: Option<(AnimStil, f64)>,
     /// Die Animation der Stildatei, die gerade gilt, und seit wann.
     pub stil_lauf: Option<(AnimStil, f64)>,
+    /// Gleiten (`gleiten` in der Stildatei): die zuletzt gesehene Lage im
+    /// Fenster (x, y, b, h), ob es sichtbar war, und ein laufendes Gleiten
+    /// (Startrechteck, Beginn, Dauer in ms).
+    pub lage: Option<[f64; 4]>,
+    pub sichtbar: bool,
+    pub gleit: Option<([f64; 4], f64, f64)>,
+}
+
+/// Langsam auslaufen (ease-out, kubisch).
+fn auslaufen(p: f64) -> f64 { let q = 1.0 - p.clamp(0.0, 1.0); 1.0 - q * q * q }
+
+/// Wo steht ein gleitendes Widget gerade (Rechteck im Fenster)?
+pub(super) fn gleit_rechteck(von: [f64; 4], ziel: [f64; 4], t0: f64, dauer: f64, uhr: f64) -> [f64; 4] {
+    let p = auslaufen((uhr - t0) * 1000.0 / dauer.max(1.0));
+    [0, 1, 2, 3].map(|k| von[k] + (ziel[k] - von[k]) * p)
 }
 
 /// Eine geladene Bildhaut: ihre Einzelbilder (eines bei PNG & Co., alle
@@ -212,9 +227,38 @@ impl Gui {
             }
         }
         let gedrueckt = self.press_origin;
+        // Sichtbar je Widget -- vorab, die Schleife unten haelt die Fenster
+        // veraenderlich.
+        let gezeigt: Vec<Vec<bool>> = self.windows.iter().enumerate()
+            .map(|(wi, win)| win.widgets.iter().map(|w| w.alive && self.widget_shown(wi, w)).collect()).collect();
+        let ruhig = self.ruhig;
         for (wi, win) in self.windows.iter_mut().enumerate() {
             for (i, w) in win.widgets.iter_mut().enumerate() {
                 if w.aussehen.is_none() && w.stil_auf.is_none() { continue; }
+                // Gleiten: hat sich die Lage geaendert, gleitet das Bild vom
+                // alten Rechteck (oder von da, wo es gerade gleitet) zum neuen;
+                // wird es sichtbar, waechst es aus 92 % auf.
+                let ms = w.stil_auf.as_ref().and_then(|s| s[stil::BASIS].gleiten).unwrap_or(0);
+                if ms > 0 || w.aussehen.as_ref().map(|a| a.lage.is_some()).unwrap_or(false) {
+                    let jetzt_lage = [w.x as f64, w.y as f64, w.w as f64, w.h as f64];
+                    let zu_sehen = gezeigt[wi][i];
+                    let au = w.aussehen.get_or_insert_with(Default::default);
+                    if ms <= 0 || ruhig {
+                        au.gleit = None;
+                    } else if let Some(alt) = au.lage {
+                        let bewegt = (0..4).any(|k| (alt[k] - jetzt_lage[k]).abs() > 0.5);
+                        if bewegt {
+                            let von = match au.gleit { Some((v, t0, d)) => gleit_rechteck(v, alt, t0, d, uhr), None => alt };
+                            au.gleit = Some((von, uhr, ms as f64));
+                        } else if zu_sehen && !au.sichtbar {
+                            let [x, y, b, h] = jetzt_lage;
+                            au.gleit = Some(([x + b * 0.04, y + h * 0.04, b * 0.92, h * 0.92], uhr, ms as f64));
+                        }
+                    }
+                    if let Some((_, t0, d)) = au.gleit { if (uhr - t0) * 1000.0 >= d { au.gleit = None; } }
+                    au.lage = Some(jetzt_lage);
+                    au.sichtbar = zu_sehen;
+                }
                 let druck = gedrueckt == Some((wi, i));
                 let jetzt = {
                     let s = w.stil_auf.as_ref();
@@ -263,20 +307,45 @@ impl Gui {
         Some(Haut { bilder, b, h, dauern })
     }
 
-    /// Die Matrix fuer das Zeichnen eines Widgets: (dx, dy, Winkel, Massstab)
-    /// in Bildpunkten, None = keine Animation laeuft.
-    pub(super) fn anim_matrix(&self, wi: usize, idx: usize, w: &Widget) -> Option<(f32, f32, f32, f32)> {
+    /// Die Matrix fuer das Zeichnen eines Widgets: (dx, dy, Winkel,
+    /// Massstab x, Massstab y) in Bildpunkten -- Animation und Gleiten
+    /// zusammen; None = nichts laeuft.
+    pub(super) fn anim_matrix(&self, wi: usize, idx: usize, w: &Widget) -> Option<(f32, f32, f32, f32, f32)> {
         if self.ruhig { return None; }
         let au = w.aussehen.as_ref()?;
         let druck = self.press_origin == Some((wi, idx));
-        let (a, t0) = au.lauf.or_else(|| au.stil_lauf.filter(|l| Some(l.0) == self.w_stil_anim(w, druck)))?;
-        if vorbei(a, t0, self.uhr) { return None; }
-        let vergangen = (self.uhr - t0) * 1000.0;
-        let gesamt = (a.dauer as f64) * (a.anzahl as f64);
-        let p = (vergangen / a.dauer as f64).fract();
-        let rest = if a.anzahl > 0 { 1.0 - vergangen / gesamt } else { 1.0 };
-        let (dx, dy, ang, sc) = verformung(a.art, p, rest);
-        Some((self.sk_f(dx), self.sk_f(dy), ang as f32, sc as f32))
+        let anim = au.lauf.or_else(|| au.stil_lauf.filter(|l| Some(l.0) == self.w_stil_anim(w, druck)))
+            .filter(|&(a, t0)| !vorbei(a, t0, self.uhr))
+            .map(|(a, t0)| {
+                let vergangen = (self.uhr - t0) * 1000.0;
+                let gesamt = (a.dauer as f64) * (a.anzahl as f64);
+                let p = (vergangen / a.dauer as f64).fract();
+                let rest = if a.anzahl > 0 { 1.0 - vergangen / gesamt } else { 1.0 };
+                let (dx, dy, ang, sc) = verformung(a.art, p, rest);
+                (self.sk_f(dx), self.sk_f(dy), ang as f32, sc as f32)
+            });
+        let gleit = au.gleit.filter(|&(_, t0, d)| (self.uhr - t0) * 1000.0 < d).map(|(von, t0, d)| {
+            let ziel = [w.x as f64, w.y as f64, w.w as f64, w.h as f64];
+            let r = gleit_rechteck(von, ziel, t0, d, self.uhr);
+            let dx = (r[0] + r[2] / 2.0) - (ziel[0] + ziel[2] / 2.0);
+            let dy = (r[1] + r[3] / 2.0) - (ziel[1] + ziel[3] / 2.0);
+            let sx = if ziel[2] > 0.0 { r[2] / ziel[2] } else { 1.0 };
+            let sy = if ziel[3] > 0.0 { r[3] / ziel[3] } else { 1.0 };
+            (dx as f32, dy as f32, sx as f32, sy as f32)
+        });
+        match (anim, gleit) {
+            (None, None) => None,
+            (a, g) => {
+                let (adx, ady, ang, sc) = a.unwrap_or((0.0, 0.0, 0.0, 1.0));
+                let (gdx, gdy, gsx, gsy) = g.unwrap_or((0.0, 0.0, 1.0, 1.0));
+                Some((adx + gdx, ady + gdy, ang, sc * gsx, sc * gsy))
+            }
+        }
+    }
+    /// GUI_GLIDING(wdg): gleitet das Widget gerade?
+    pub fn gliding(&self, h: i64) -> Result<bool, String> {
+        let w = self.wdg(h, "GUI_GLIDING")?;
+        Ok(w.aussehen.as_ref().and_then(|a| a.gleit).map(|(_, t0, d)| (self.uhr - t0) * 1000.0 < d).unwrap_or(false))
     }
     fn sk_f(&self, v: f64) -> f32 { (v * self.scale) as f32 }
 
@@ -362,6 +431,16 @@ mod tests {
         assert_eq!(bild_zur_zeit(&[100.0], 5.0), 0);
         assert_eq!(gif_dauer(0), 100.0);
         assert_eq!(gif_dauer(40), 40.0);
+    }
+
+    #[test]
+    fn gleiten_laeuft_aus() {
+        let von = [0.0, 0.0, 100.0, 20.0];
+        let ziel = [50.0, 10.0, 200.0, 20.0];
+        assert_eq!(gleit_rechteck(von, ziel, 1.0, 200.0, 1.0), von);
+        assert_eq!(gleit_rechteck(von, ziel, 1.0, 200.0, 1.2), ziel);
+        let halb = gleit_rechteck(von, ziel, 1.0, 200.0, 1.1);
+        assert!(halb[0] > 25.0 && halb[0] < 50.0, "laeuft aus: nach der halben Zeit mehr als die Haelfte, {}", halb[0]);
     }
 
     #[test]

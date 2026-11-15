@@ -1,0 +1,101 @@
+' Weiche Layout-Uebergaenge (gui_aussehen.rs, `gleiten` in der Stildatei):
+' aendert sich Lage oder Groesse eines Widgets, gleitet sein BILD vom alten
+' zum neuen Rechteck; der Treffer steht sofort an der neuen Stelle. Ein
+' Widget, das sichtbar wird, waechst auf. Ohne Bewegung kein Gleiten.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== ein verschobener knopf gleitet und trifft sofort am ziel
+TRY
+    SCREEN(400, 200, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "", 20, 80, 120, 40)
+GUI_SET_NAME(b, "k")
+GUI_STYLESHEET("#k { bg: #FF0000; border: #FF0000; gleiten: 300 }")
+DIM rt AS INTEGER : rt = RENDERTARGET_NEW(400, 200)
+FUNCTION rot(x AS INTEGER) AS BOOLEAN
+    RENDERTARGET_BEGIN(rt) : CLS(0) : GUI_DRAW() : RENDERTARGET_END()
+    DIM bild AS IMAGE : bild = RENDERTARGET_IMAGE(rt)
+    RETURN (GETPIXEL(bild, x, 100) BAND &HFFFFFF) = &HFF0000
+END FUNCTION
+DIM n AS INTEGER
+FOR n = 1 TO 3
+    GUI_UPDATE() : CLS(0) : FLIP()
+NEXT
+PRINT "vorher gleitet "; GUI_GLIDING(b); " alt rot "; rot(100)
+GUI_SET_BOUNDS(b, 220, 80, 120, 40)
+GUI_UPDATE()
+PRINT "gleich gleitet "; GUI_GLIDING(b); " bild noch alt "; rot(100); " ziel noch leer "; NOT rot(320); " treffer am ziel "; GUI_HIT_TEST(280, 100) = b
+FOR n = 1 TO 25
+    GUI_UPDATE() : CLS(0) : FLIP()
+NEXT
+PRINT "danach gleitet "; GUI_GLIDING(b); " alt leer "; NOT rot(100); " ziel rot "; rot(320)
+PRINT GUI_INSPECT$(b)
+--- umgebung
+DHRT_FRAMES=100
+--- enthaelt
+vorher gleitet FALSE alt rot TRUE
+gleich gleitet TRUE bild noch alt TRUE ziel noch leer TRUE treffer am ziel TRUE
+danach gleitet FALSE alt leer TRUE ziel rot TRUE
+basis: bg #FF0000, border #FF0000, gleiten 300ms
+
+=== erscheinen waechst auf und ohne bewegung gleitet nichts
+TRY
+    SCREEN(400, 200, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 200)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "Los", 20, 80, 120, 40)
+GUI_STYLESHEET("* { gleiten: 200 }")
+DIM n AS INTEGER
+FOR n = 1 TO 2
+    GUI_UPDATE() : CLS(0) : FLIP()
+NEXT
+GUI_SET_VISIBLE(b, FALSE)
+GUI_UPDATE()
+GUI_SET_VISIBLE(b, TRUE)
+GUI_UPDATE()
+PRINT "erscheint gleitet "; GUI_GLIDING(b)
+FOR n = 1 TO 20
+    GUI_UPDATE() : CLS(0) : FLIP()
+NEXT
+GUI_SET_MOTION("aus")
+GUI_SET_BOUNDS(b, 200, 80, 120, 40)
+GUI_UPDATE()
+PRINT "ohne bewegung gleitet "; GUI_GLIDING(b)
+--- umgebung
+DHRT_FRAMES=100
+--- erwartet
+erscheint gleitet TRUE
+ohne bewegung gleitet FALSE
+
+=== gleiten ist fehler im zustand und ausser bereich
+TRY
+    SCREEN(400, 200, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 200)
+TRY
+    GUI_STYLESHEET("button:hover { gleiten: 200 }")
+CATCH e1
+    PRINT e1
+END TRY
+TRY
+    GUI_STYLESHEET("button { gleiten: 5000ms }")
+CATCH e2
+    PRINT e2
+END TRY
+--- enthaelt
+'gleiten' gilt nur in Regeln ohne :hover
+gleiten

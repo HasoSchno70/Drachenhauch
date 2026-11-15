@@ -684,12 +684,13 @@ impl Gui {
         // Die Rundung aus der Stildatei gilt fuer jede Flaeche dieses Widgets.
         let vorher = self.rad_jetzt.replace(self.w_radius(wdg));
         let form_vorher = self.form_jetzt.replace(self.w_form(wdg));
-        // Animation (gui_aussehen.rs): das ganze Widget um seine Mitte
-        // verschoben, gedreht oder vergroessert -- Lage und Treffer bleiben.
+        // Animation und Gleiten (gui_aussehen.rs): das ganze Widget um seine
+        // Mitte verschoben, gedreht oder vergroessert -- Lage und Treffer
+        // bleiben.
         let anim = if wdg.aussehen.is_some() { self.anim_matrix(wi, idx, wdg) } else { None };
-        if let Some((dx, dy, ang, sc)) = anim {
+        if let Some((dx, dy, ang, sx, sy)) = anim {
             let (ax, ay, w, h) = self.abs_rect(wi, wdg);
-            g.verformung_beginnen(ax + w / 2, ay + h / 2, dx, dy, ang, sc);
+            g.verformung_beginnen(ax + w / 2, ay + h / 2, dx, dy, ang, sx, sy);
         }
         if wdg.stil_auf.is_some() && !matches!(self.w_form_art(wdg), aussehen::F_KREIS | aussehen::F_RAUTE | aussehen::F_BILD) {
             let (ax, ay, w, h) = self.abs_rect(wi, wdg);

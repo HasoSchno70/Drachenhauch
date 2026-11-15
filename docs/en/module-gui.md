@@ -2523,6 +2523,8 @@ properties for it, plus four commands:
 | `GUI_SET_SHAPE(knopf, form$)` / `GUI_GET_SHAPE$(knopf)` | set a shape of its own (`""` = the stylesheet again) or the shape in effect |
 | `GUI_ANIMATE(wdg, art$ [, dauer_ms [, anzahl]])` | start an animation -- say wobble once on wrong input; `anzahl` 0 = endless (default 1), `art$` `""` stops |
 | `GUI_ANIMATING(wdg)` | is an animation running right now? |
+| `gleiten: 200` | smooth layout transitions (duration in ms, 0..2000): when position or size change (layout, `GUI_SET_BOUNDS`, window size), the picture glides from the old to the new rectangle, easing out; a widget that becomes visible grows in. The hit area is at the target at once. Only in rules without a state; `* { gleiten: 200 }` applies to the whole application |
+| `GUI_GLIDING(wdg)` | is the widget gliding right now? |
 
 ```basic
 IMPORT "gui"

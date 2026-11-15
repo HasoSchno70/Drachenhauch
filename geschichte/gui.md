@@ -1181,3 +1181,10 @@ am Zeilenende der Erwartung ab, die Ausgabe nicht.
   als neu. `GUI_STYLESHEET_CLOCK` haelt die Uhr fest und loest bewusst NICHT
   selbst neu auf -- sonst haette der Test den Weg der echten Uhr nie
   beruehrt (die Gegenprobe "Umschlag erkennt nichts" waere gruen geblieben).
+- **Gleiten** (`gleiten: 200` in der Stildatei, `GUI_GLIDING`): die Matrix
+  der Animationen bekam einen Massstab je Achse (`Cmd::Verformung` mit
+  sx, sy); `aussehen_pass` merkt sich je Widget die letzte Lage im Fenster
+  (w.x/y/w/h -- nicht `abs_rect`, sonst gliche jedes Rollen einem Umzug)
+  und startet ein Gleiten vom Rechteck, das gerade zu sehen ist. Zuerst
+  meldete `GUI_GLIDING` bei ruhiger Bewegung pauschal "nein" -- dann haette
+  der Test nie gesehen, ob das Gleiten ohne Bewegung ueberhaupt startet.

@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/en und dem englischen Buch von `dhrt doku prosa` -- NICHT von Hand aendern. Der Hover nimmt sie mit DHRT_LANG=en.",
- "count": 2443,
+ "count": 2444,
  "docs": {
   "ABS": "Absolute value.",
   "ACOS": "Arc sine/cosine (x in [-1, 1])",
@@ -739,6 +739,7 @@
   "GUI_GET_WRAP": "INTEGER — the wrap width, 0 = off",
   "GUI_GET_X": "read the current dimensions",
   "GUI_GET_Y": "INTEGER — position and size of the widget in the window (counterpart to GUI_SET_BOUNDS)",
+  "GUI_GLIDING": "is the widget gliding right now?",
   "GUI_GRID": "GUI_WIDGET — grid: table in cell mode -- current cell, range, typing edits, Ctrl+C/V as tab-separated text",
   "GUI_GROUPBOX": "GUI_WIDGET — framed group with an inset title",
   "GUI_HAS_CLASS": "BOOLEAN — does the widget carry the class (the button variant counts too)?",

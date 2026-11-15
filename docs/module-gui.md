@@ -2538,6 +2538,8 @@ Eigenschaften mehr, dazu kommen vier Befehle:
 | `GUI_SET_SHAPE(knopf, form$)` / `GUI_GET_SHAPE$(knopf)` | eigene Form setzen (`""` = wieder die Stildatei) bzw. die Form, die gilt |
 | `GUI_ANIMATE(wdg, art$ [, dauer_ms [, anzahl]])` | eine Animation starten -- etwa einmal wackeln bei falscher Eingabe; `anzahl` 0 = ohne Ende (Vorgabe 1), `art$` `""` hält an |
 | `GUI_ANIMATING(wdg)` | läuft gerade eine Animation? |
+| `gleiten: 200` | weiche Layout-Übergänge (Dauer in ms, 0..2000): ändern sich Lage oder Größe (Layout, `GUI_SET_BOUNDS`, Fenstergröße), gleitet das Bild vom alten zum neuen Rechteck, langsam auslaufend; ein Widget, das sichtbar wird, wächst auf. Der Treffer steht sofort am Ziel. Nur in Regeln ohne Zustand; `* { gleiten: 200 }` gilt für die ganze Anwendung |
+| `GUI_GLIDING(wdg)` | gleitet das Widget gerade? |
 
 ```basic
 IMPORT "gui"
