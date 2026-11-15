@@ -2537,7 +2537,7 @@ Eigenschaften mehr, dazu kommen vier Befehle:
 | `bild: figur.png 8 12fps` | Bildfolge aus einem Atlas: 8 gleich breite Bilder nebeneinander, 12 je Sekunde (Vorgabe 12, 1..120), ohne Ende -- wie ein animiertes GIF, auch für `form: bild`. Ein Pfad mit Leerzeichen steht in Anführungszeichen. Bildhäute gelten für Knöpfe und für **Kästchen, Optionen und Schalter** (dort statt des Kennzeichens, die Beschriftung daneben), je Zustand: `checkbox:checked { bild: an.png }` |
 | `griff: knopf.png` | Regler mit Haut: `bild` ist die Rinne (über das ganze Rechteck, mit `bildrand` als 9-Slice), `griff` der Griff -- quadratisch, so hoch (beim senkrechten Regler so breit) wie der Regler, an der Stelle des Werts. Fehlt eine der beiden Häute, kommt dort die gewohnte Form. Auch je Zustand (`slider:active { griff: gedrueckt.png }`) und als Bildfolge |
 | `@ablauf name { 0%: x 0; 50%: y -8, drehen 10; 100%: groesse 1.1 }` | ein eigener Ablauf: Schlüsselbilder mit `x`, `y` (Punkte), `drehen` (Grad) und `groesse` (Maßstab), dazwischen gerade verbunden; fehlt 0 % oder 100 %, ruht es dort. Danach gilt der Name wie eine eingebaute Art: `animation: name 800ms`, `GUI_ANIMATE(wdg, "name")`; er darf vor oder nach der Regel stehen, die ihn nennt |
-| `@ablauf name { 50%: deckkraft 0.3, farbe #FF8080 }` | Deckkraft (0..1) und Farbton (`#RRGGBB`, weiß = keiner) in einem Ablauf -- dazu die eingebaute Art `blinken` (Deckkraft 1 → 0,35 → 1). Das Widget kommt dafür in eine eigene Schicht, die mit Deckkraft und Ton aufgelegt wird; nur auf der Hauptfläche ohne POSTFX, anderswo bleibt es voll sichtbar |
+| `@ablauf name { 50%: deckkraft 0.3, farbe #FF8080 }` | Deckkraft (0..1) und Farbton (`#RRGGBB`, weiß = keiner) in einem Ablauf -- dazu die eingebaute Art `blinken` (Deckkraft 1 → 0,35 → 1). Das Widget kommt dafür in eine eigene Schicht, die mit Deckkraft und Ton aufgelegt wird -- auf der Hauptfläche (auch mit POSTFX), in echten Fenstern und in Renderzielen |
 | `animation: puls \| wackeln \| schweben \| huepfen \| drehen \| blinken [Dauer ms] [einmal \| Anzahl]` | das ganze Widget bewegt sich um seine Mitte; auch je Zustand: `button:hover { animation: puls }` pulsiert nur beim Überfahren |
 | `GUI_SET_SHAPE(knopf, form$)` / `GUI_GET_SHAPE$(knopf)` | eigene Form setzen (`""` = wieder die Stildatei) bzw. die Form, die gilt |
 | `GUI_ANIMATE(wdg, art$ [, dauer_ms [, anzahl]])` | eine Animation starten -- etwa einmal wackeln bei falscher Eingabe; `anzahl` 0 = ohne Ende (Vorgabe 1), `art$` `""` hält an |
@@ -4442,15 +4442,16 @@ Reihenfolge, in der er getippt wurde.
 | Befehl | Was er tut |
 |---|---|
 | `TEXT_VISUAL$(text$ [, richtung$])` | Der Text so, wie er dasteht -- für eigene Ausgaben wie Dateien oder Bilder. `richtung$` = `auto` (Vorgabe), `ltr` oder `rtl` |
-| `GUI_WINDOW_RTL(win, an)` | das ganze Fenster von rechts nach links: die Lage jedes Widgets gespiegelt an der Breite des Fensters, die Menüleiste und die Werkzeugleiste beginnen rechts, Kästchen, Optionen und Schalter tragen ihr Kennzeichen rechts vom Text, ein Regler wächst nach links (Ziehen und Pfeiltasten auch). Das Programm setzt und liest seine Lagen weiter von links (`GUI_GET_X`); Zeichnen, Klick und `GUI_HIT_TEST` gehen über die gespiegelte |
+| `GUI_WINDOW_RTL(win, an)` | das ganze Fenster von rechts nach links: die Lage jedes Widgets gespiegelt an der Breite des Fensters, die Menüleiste und die Werkzeugleiste beginnen rechts, Kästchen, Optionen und Schalter tragen ihr Kennzeichen rechts vom Text, ein Regler wächst nach links (Ziehen und Pfeiltasten auch), ein Textfeld ohne `GUI_SET_ALIGN` steht rechtsbündig. Das Programm setzt und liest seine Lagen weiter von links (`GUI_GET_X`); Zeichnen, Klick und `GUI_HIT_TEST` gehen über die gespiegelte |
 | `GUI_WINDOW_IS_RTL(win)` | steht das Fenster von rechts nach links? |
 
 Indische und südostasiatische Schriften und die Ligaturen einer Schrift
 setzt die Textformung ([builtins-grafik.md](builtins-grafik.md#textformung-indische-schriften-und-ligaturen)).
 Was (noch) nicht geht: die Ausrichtung folgt nicht der
 Richtung -- eine Zeile von rechts nach links steht links, solange
-`GUI_SET_ALIGN` nichts anderes sagt; in einem gespiegelten Fenster
-(`GUI_WINDOW_RTL`) bleiben Textfelder, Tabellen und Bäume innen, wie sie
+`GUI_SET_ALIGN` nichts anderes sagt (im gespiegelten Fenster steht ein
+einzeiliges Textfeld von selbst rechts); in einem gespiegelten Fenster
+(`GUI_WINDOW_RTL`) bleiben Textbereiche, Tabellen und Bäume innen, wie sie
 sind (Text linksbündig, Spalten und Einrückung von links); in einer solchen Zeile eines
 Textbereichs fallen Fett, Kursiv und Unterstrichen weg (die Farben der
 Einfärbung bleiben); Hinweise am Zeilenende und Farbfelder rechnen weiter

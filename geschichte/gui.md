@@ -1276,3 +1276,19 @@ am Zeilenende der Erwartung ab, die Ausgabe nicht.
   an -- der erste Fall fiel daran, bevor er etwas pruefte. Die Zeichen
   (GUI_CUSTOM_TEXT$) prueft kein Fall: eingespielte Tasten fuellen die
   Zeichen-Warteschlange nicht.
+- **Kleine Luecken nach Stufe 3 (2026-11-15).** Die Textlage eines
+  einzeiligen Feldes rechneten FUENF Stellen: Zeichnen und Marke mit
+  Ausrichtung, Linksklick, Rechtsklick und Rechtschreibung ohne -- in einem
+  rechtsbuendigen Feld (`GUI_SET_ALIGN`) setzte der Klick die Marke ans
+  Ende statt an den Text. Jetzt `ti_text_lage` als einzige Quelle; ein
+  Feld im gespiegelten Fenster steht ohne eigene Ausrichtung rechts. Der
+  Platzhalter steht nach SEINER Breite (vorher lief er rechtsbuendig aus
+  dem Feld). Die Schicht fuer Deckkraft/Farbton gilt jetzt auch in
+  Renderzielen, echten Fenstern und mit POSTFX: `schicht_abschliessen`
+  kehrt ins aeussere Ziel zurueck (EndTextureMode fuehrt sonst auf den
+  Schirm), setzt danach die Matrix des Fenster-Abbilds neu (BeginTextureMode
+  setzt sie zurueck) und haelt ein Ziel je Groesse. Belegt sind jetzt auch
+  der gespiegelte Schalter und Regler im Bild und `GUI_CUSTOM_TEXT$` --
+  ueber Zeichen-Ereignisse eines echten Fensters (Art 6), die im
+  Hauptfenster fehlen. Nicht durch einen Fall belegt: Massstab und Versatz
+  eines Fensters (anderer Schirm, Popup) innerhalb einer Schicht.

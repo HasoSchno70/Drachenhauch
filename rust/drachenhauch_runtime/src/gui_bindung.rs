@@ -1379,12 +1379,8 @@ impl Gui {
             Kind::TextInput => {
                 let (anz, caret_anz) = self.anzeige_mit_vorschau(wdg);
                 let anzeige: String = anz.iter().collect();
-                let (sl, sr) = self.ti_rand(wdg);
-                let inner = (w - 10 - sl - sr).max(1);
                 let tw = self.wtext_width(g, wdg, &anzeige);
-                let (tx, scroll) = if wdg.align >= 1 && tw <= inner {
-                    (if wdg.align == 1 { ax + 5 + sl + (inner - tw) / 2 } else { ax + 5 + sl + inner - tw }, 0)
-                } else { (ax + 5 + sl, wdg.scroll) };
+                let (tx, scroll) = self.ti_text_lage(wi, wdg, ax, w, tw);
                 let cx = tx + self.zeilen_x(g, wdg, &anz, caret_anz.max(0) as usize) - scroll;
                 Some((cx, ay + 3, (h - 7).max(1)))
             }

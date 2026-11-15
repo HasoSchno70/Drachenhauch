@@ -129,3 +129,137 @@ e 11 1 263 0 0 0
 DHRT_FRAMES=40
 --- erwartet
 klick rechts aussen 0.0 nach pfeil links 0.5
+
+=== rechtsbuendiges feld setzt die marke beim klick dorthin wo der text steht
+' Die Textlage eines Feldes rechnet EINE Stelle (gui_ueber.rs
+' `ti_text_lage`) fuer Zeichnen, Marke, Klick, Rechtsklick und
+' Rechtschreibung. Vorher rechnete der Klick ohne Ausrichtung: links neben
+' den rechts stehenden Text geklickt, landete die Marke am Ende, und Entf
+' loeschte nichts.
+IMPORT "gui"
+SCREEN(480, 220, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 480, 220)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM t AS GUI_WIDGET : t = GUI_TEXTINPUT(w, 20, 80, 300, 30)
+GUI_SET_TEXT(t, "abc")
+GUI_SET_ALIGN(t, "right")
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER
+FOR n = 1 TO 20
+    GUI_UPDATE()
+    CLS(0) : GUI_DRAW() : FLIP()
+NEXT
+PRINT "text "; GUI_TEXT(t)
+--- datei ev.txt
+c 5
+e 0 7 10 10 0 0
+e 2 7 250 95 0 0
+e 3 6 0 0 0 0
+e 4 5 0 0 0 0
+e 6 2 261 0 0 0
+e 7 1 261 0 0 0
+
+--- umgebung
+DHRT_FRAMES=30
+--- erwartet
+text bc
+
+=== gespiegelt steht ein feld ohne ausrichtung rechts und der klick trifft den text
+IMPORT "gui"
+SCREEN(480, 220, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 480, 220)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM t AS GUI_WIDGET : t = GUI_TEXTINPUT(w, 20, 80, 300, 30)
+GUI_SET_TEXT(t, "abc")
+GUI_SET_NAME(t, "t")
+GUI_STYLESHEET("#t { fg: #FF0000 }")
+GUI_WINDOW_RTL(w, TRUE)
+DIM rt AS INTEGER : rt = RENDERTARGET_NEW(480, 220)
+FUNCTION rot_zwischen(x0 AS INTEGER, x1 AS INTEGER) AS BOOLEAN
+    RENDERTARGET_BEGIN(rt) : CLS(0) : GUI_DRAW() : RENDERTARGET_END()
+    DIM bild AS IMAGE : bild = RENDERTARGET_IMAGE(rt)
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR x = x0 TO x1
+        FOR y = 82 TO 107
+            IF (GETPIXEL(bild, x, y) BAND &HFFFFFF) = &HFF0000 THEN RETURN TRUE
+        NEXT
+    NEXT
+    RETURN FALSE
+END FUNCTION
+GUI_UPDATE()
+' Das Feld liegt gespiegelt bei 160..460; der Text am rechten Rand.
+PRINT "text links "; rot_zwischen(162, 300); " rechts "; rot_zwischen(400, 458)
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER
+FOR n = 1 TO 20
+    GUI_UPDATE()
+    CLS(0) : GUI_DRAW() : FLIP()
+NEXT
+PRINT "text "; GUI_TEXT(t)
+--- datei ev.txt
+c 5
+e 0 7 10 10 0 0
+e 2 7 390 95 0 0
+e 3 6 0 0 0 0
+e 4 5 0 0 0 0
+e 6 2 261 0 0 0
+e 7 1 261 0 0 0
+
+--- umgebung
+DHRT_FRAMES=30
+--- erwartet
+text links FALSE rechts TRUE
+text bc
+
+=== gespiegelt steht der knopf des schalters links und der regler fuellt von rechts
+' Bildproben zu Stufe 2 (gui_zeichnen.rs, Kind::Toggle `kx`, Kind::Slider
+' `lage`/`gesp`): ein eingeschalteter Schalter hat seinen Knopf links, die
+' rote Rinne rechts davon; ein Regler auf einem Viertel hat den Griff bei
+' drei Vierteln, und mit Verlauf ist die Rinne von rechts gefuellt.
+TRY
+    SCREEN(480, 260, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 480, 260)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM t AS GUI_WIDGET : t = GUI_TOGGLE(w, "", 20, 20, TRUE)
+GUI_SET_NAME(t, "t")
+DIM s AS GUI_WIDGET : s = GUI_SLIDER(w, 20, 100, 300, 0, 100, 25)
+GUI_SET_BOUNDS(s, 20, 100, 300, 24)
+GUI_SET_NAME(s, "s")
+DIM v AS GUI_WIDGET : v = GUI_SLIDER(w, 20, 180, 300, 0, 100, 25)
+GUI_SET_BOUNDS(v, 20, 180, 300, 24)
+GUI_SET_NAME(v, "v")
+GUI_STYLESHEET("#t, #s { accent: #FF0000; verlauf: 0; glanz: 0; fase: 0 }" + CHR$(10) + "#v { accent: #FF0000; verlauf: 16 }")
+GUI_WINDOW_RTL(w, TRUE)
+DIM rt AS INTEGER : rt = RENDERTARGET_NEW(480, 260)
+DIM n AS INTEGER
+FOR n = 1 TO 30
+    GUI_UPDATE() : CLS(0) : FLIP()
+NEXT
+RENDERTARGET_BEGIN(rt) : CLS(0) : GUI_DRAW() : RENDERTARGET_END()
+CLS(0) : FLIP()
+DIM bild AS IMAGE : bild = RENDERTARGET_IMAGE(rt)
+FUNCTION rot(x AS INTEGER, y AS INTEGER) AS BOOLEAN
+    DIM c AS INTEGER : c = GETPIXEL(bild, x, y)
+    RETURN ((c \ 65536) BAND 255) > 150 AND ((c \ 256) BAND 255) < 90 AND (c BAND 255) < 90
+END FUNCTION
+DIM ty AS INTEGER : ty = GUI_GET_Y(t) + GUI_GET_H(t) \ 2
+' gespiegelt endet das Rechteck des Schalters bei 480 - 20 = 460
+PRINT "schalter rechts in der rinne rot "; rot(452, ty)
+' Regler s: 160..460; Griff bei drei Vierteln, nicht bei einem
+PRINT "griff bei drei vierteln "; rot(160 + 225, 112); " bei einem viertel "; rot(160 + 75, 112)
+' Regler v (mit Verlauf): rechts gefuellt, links leer
+PRINT "rinne rechts "; rot(450, 192); " links "; rot(175, 192)
+--- umgebung
+DHRT_FRAMES=40
+--- erwartet
+schalter rechts in der rinne rot TRUE
+griff bei drei vierteln TRUE bei einem viertel FALSE
+rinne rechts TRUE links FALSE

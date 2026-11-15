@@ -333,14 +333,19 @@ thread_local! {
     /// die Szene fuer POSTFX). Renderziele und echte Fenster: None, dort
     /// bleibt es bei der durchscheinenden Flaeche darueber.
     static UNSCHAERFE_ZIEL: std::cell::Cell<Option<(i32, i32)>> = const { std::cell::Cell::new(None) };
-    /// Groesse der Hauptflaeche, wenn sie DIREKT gezeichnet wird -- nur dort
-    /// darf `Cmd::SchichtAnfang` in ein eigenes Ziel umlenken (aus einem
-    /// Renderziel fuehrte EndTextureMode auf den Schirm statt zurueck).
-    static SCHICHT_ZIEL: std::cell::Cell<Option<(i32, i32)>> = const { std::cell::Cell::new(None) };
+    /// Wohin `Cmd::SchichtAnfang` umlenken darf: Groesse (Pixel) des Ziels,
+    /// das gerade abgespielt wird, und das Renderziel, in das die Schicht
+    /// danach zurueckkehrt (None = der Schirm). Gesetzt fuer die Hauptflaeche
+    /// (direkt und in die Szene fuer POSTFX), Renderziele und echte Fenster
+    /// -- vorher nur direkt, weil EndTextureMode aus einem Renderziel auf
+    /// den Schirm fuehrte statt zurueck.
+    static SCHICHT_ZIEL: std::cell::Cell<Option<(i32, i32, Option<raylib::ffi::RenderTexture2D>)>> = const { std::cell::Cell::new(None) };
     /// Die laufende Schicht: (Deckkraft, Farbton), None = keine.
     static SCHICHT_LAEUFT: std::cell::Cell<Option<(u8, Color)>> = const { std::cell::Cell::new(None) };
-    /// Das Renderziel der Schicht, wiederverwendet solange die Groesse passt.
-    static SCHICHT_RT: std::cell::Cell<Option<(raylib::ffi::RenderTexture2D, i32, i32)>> = const { std::cell::Cell::new(None) };
+    /// Die Renderziele der Schichten je Groesse (Hauptflaeche, Fenster und
+    /// Renderziele sind verschieden gross; eins je Groesse, sonst wuerde in
+    /// jedem Bild neu angelegt).
+    static SCHICHT_RT: std::cell::RefCell<Vec<(raylib::ffi::RenderTexture2D, i32, i32)>> = const { std::cell::RefCell::new(Vec::new()) };
     /// Massstab des Ziels, das gerade abgespielt wird (siehe
     /// `RenderTarget::mass`). Die Geometrie skaliert eine Matrix; Text und
     /// Scissor fragen hier nach -- Text wird in voller Groesse gesetzt statt
@@ -8267,8 +8272,10 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
                 // Glas darf aus diesem Ziel zuruecklesen (echte Fenster,
                 // Renderziele des Programms) -- in seiner Groesse.
                 let (rw, rh) = (render_targets[i].rt.texture.width, render_targets[i].rt.texture.height);
+                let roh: raylib::ffi::RenderTexture2D = *render_targets[i].rt;
                 let mut tx = rl.begin_texture_mode(thread, &mut render_targets[i].rt);
                 UNSCHAERFE_ZIEL.with(|z| z.set(Some((rw, rh))));
+                SCHICHT_ZIEL.with(|z| z.set(Some((rw, rh, Some(roh)))));
                 let clear = if behalten { None } else { Some(clear_rt) };
                 // Maßstab 1, NICHT der Fenster-Maßstab `s`: ein Render-Target
                 // hat seine EIGENE Pixelgroesse. Mit `s` wurde der Inhalt im
@@ -8289,8 +8296,10 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
                 render_scene(&mut tx, 1, clear, &synth, &[0], textures, fonts, ausweich, font_glyphs,
                     &[], cam, &[], None, (-1, -1, -1, -1), &empty_set, &empty_map, &empty_emis,
                     (false, 0, 0, 0), &[], None, None, None, None);
+                schicht_abschliessen();
                 if abbild { unsafe { raylib::ffi::rlPopMatrix(); } RT_MASS.with(|c| c.set(1.0)); RT_VERSATZ.with(|c| c.set((0.0, 0.0))); }
                 UNSCHAERFE_ZIEL.with(|z| z.set(None));
+                SCHICHT_ZIEL.with(|z| z.set(None));
             }
         }
         let rts: &[RenderTarget] = render_targets;
@@ -8302,10 +8311,14 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         if let Some((idx, rt)) = postfx {
             // 1) Szene in die RenderTexture rendern.
             {
+                let roh: raylib::ffi::RenderTexture2D = **rt;
                 let mut tx = rl.begin_texture_mode(thread, rt);
                 UNSCHAERFE_ZIEL.with(|z| z.set(Some((tw as i32, th as i32))));
+                SCHICHT_ZIEL.with(|z| z.set(Some((tw as i32, th as i32, Some(roh)))));
                 render_scene(&mut tx, s, Some(clear_color), layers, &order, textures, fonts, ausweich, font_glyphs, cmds3d, cam, models, light_shader.as_mut(), mat_locs, nmap_set, pbr_ref, emis_ref, ibl, rts, skybox, cam_view, cam_proj, inst_ffi);
+                schicht_abschliessen();
                 UNSCHAERFE_ZIEL.with(|z| z.set(None));
+                SCHICHT_ZIEL.with(|z| z.set(None));
             }
             // 2) RT per Fragment-Shader auf den Screen praesentieren (Y-flip).
             let src = Rectangle::new(0.0, 0.0, tw, -th);
@@ -8354,12 +8367,11 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         } else {
             let mut d = rl.begin_drawing(thread);
             UNSCHAERFE_ZIEL.with(|z| z.set(Some((tw as i32, th as i32))));
-            SCHICHT_ZIEL.with(|z| z.set(Some((tw as i32, th as i32))));
+            SCHICHT_ZIEL.with(|z| z.set(Some((tw as i32, th as i32, None))));
             render_scene(&mut d, s, Some(clear_color), layers, &order, textures, fonts, ausweich, font_glyphs, cmds3d, cam, models, light_shader.as_mut(), mat_locs, nmap_set, pbr_ref, emis_ref, ibl, rts, skybox, cam_view, cam_proj, inst_ffi);
+            schicht_abschliessen();
             UNSCHAERFE_ZIEL.with(|z| z.set(None));
             SCHICHT_ZIEL.with(|z| z.set(None));
-            // Eine Schicht ohne Ende (darf nicht vorkommen) nicht offen lassen.
-            if SCHICHT_LAEUFT.with(|z| z.take()).is_some() { unsafe { raylib::ffi::EndTextureMode(); } }
         }
         // Web (emscripten): nach dem Praesentieren (EndDrawing oben beim Drop des
         // Draw-Handles) ans Browser-Event-Loop yielden -- sonst blockiert der
@@ -9730,39 +9742,21 @@ fn render_scene<D: RaylibDraw>(
                         raylib::ffi::rlTranslatef(-mx, -my, 0.0);
                     },
                     Cmd::SchichtAnfang(_, farbe) => {
-                        if let (Some((tw, th)), None) = (SCHICHT_ZIEL.with(|z| z.get()), SCHICHT_LAEUFT.with(|z| z.get())) {
+                        if let (Some((tw, th, _)), None) = (SCHICHT_ZIEL.with(|z| z.get()), SCHICHT_LAEUFT.with(|z| z.get())) {
                             unsafe {
                                 raylib::ffi::rlDrawRenderBatchActive();
-                                let rt = match SCHICHT_RT.with(|z| z.get()) {
-                                    Some((rt, w, h)) if w == tw && h == th => rt,
-                                    alt => {
-                                        if let Some((rt, _, _)) = alt { raylib::ffi::UnloadRenderTexture(rt); }
-                                        let rt = raylib::ffi::LoadRenderTexture(tw, th);
-                                        SCHICHT_RT.with(|z| z.set(Some((rt, tw, th))));
-                                        rt
-                                    }
-                                };
+                                let rt = schicht_rt(tw, th);
+                                // BeginTextureMode setzt die Matrix zurueck --
+                                // das Abbild eines Fensters (RT_MASS,
+                                // RT_VERSATZ) gilt in der Schicht weiter.
                                 raylib::ffi::BeginTextureMode(rt);
                                 raylib::ffi::ClearBackground(raylib::ffi::Color { r: 0, g: 0, b: 0, a: 0 });
+                                rt_abbild_setzen();
                             }
                             SCHICHT_LAEUFT.with(|z| z.set(Some((farbe.a, *farbe))));
                         }
                     }
-                    Cmd::SchichtEnde => {
-                        if let Some((_, farbe)) = SCHICHT_LAEUFT.with(|z| z.get()) {
-                            SCHICHT_LAEUFT.with(|z| z.set(None));
-                            if let Some((rt, w, h)) = SCHICHT_RT.with(|z| z.get()) {
-                                unsafe {
-                                    raylib::ffi::rlDrawRenderBatchActive();
-                                    raylib::ffi::EndTextureMode();
-                                    let quelle = raylib::ffi::Rectangle { x: 0.0, y: 0.0, width: w as f32, height: -(h as f32) };
-                                    let f = raylib::ffi::Color { r: farbe.r, g: farbe.g, b: farbe.b, a: farbe.a };
-                                    raylib::ffi::DrawTextureRec(rt.texture, quelle, raylib::ffi::Vector2 { x: 0.0, y: 0.0 }, f);
-                                    raylib::ffi::rlDrawRenderBatchActive();
-                                }
-                            }
-                        }
-                    }
+                    Cmd::SchichtEnde => schicht_abschliessen(),
                     Cmd::Unschaerfe(x1, y1, x2, y2, r, ecke) => {
                         if let Some((tw, th)) = UNSCHAERFE_ZIEL.with(|z| z.get()) {
                             let x = (*x1).min(*x2) * s; let y = (*y1).min(*y2) * s;
@@ -9791,6 +9785,52 @@ fn render_scene<D: RaylibDraw>(
             if cur_blend != 0 { unsafe { raylib::ffi::EndBlendMode(); } }
 }
 
+
+/// Das Renderziel einer Schicht in dieser Groesse (angelegt beim ersten Mal).
+unsafe fn schicht_rt(tw: i32, th: i32) -> raylib::ffi::RenderTexture2D {
+    SCHICHT_RT.with(|v| {
+        let mut v = v.borrow_mut();
+        if let Some(&(rt, _, _)) = v.iter().find(|(_, w, h)| *w == tw && *h == th) { return rt; }
+        // Mehr Groessen als Fenster gibt es kaum; die aelteste geht.
+        if v.len() >= 8 { let (alt, _, _) = v.remove(0); raylib::ffi::UnloadRenderTexture(alt); }
+        let rt = raylib::ffi::LoadRenderTexture(tw, th);
+        v.push((rt, tw, th));
+        rt
+    })
+}
+
+/// Die Matrix fuer das Abbild des Ziels, das gerade abgespielt wird (Massstab
+/// und Versatz eines echten Fensters), nach einem BeginTextureMode erneut.
+unsafe fn rt_abbild_setzen() {
+    let m = RT_MASS.with(|c| c.get());
+    let (vx, vy) = RT_VERSATZ.with(|c| c.get());
+    if m != 1.0 || vx != 0.0 || vy != 0.0 {
+        raylib::ffi::rlScalef(m, m, 1.0);
+        raylib::ffi::rlTranslatef(-vx, -vy, 0.0);
+    }
+}
+
+/// Die laufende Schicht beenden: zurueck ins aeussere Ziel (oder auf den
+/// Schirm) und dort mit Deckkraft und Farbton auflegen. Ohne laufende
+/// Schicht nichts -- auch der Abschluss eines Ziels ruft es, damit eine
+/// Schicht ohne Ende nicht offen bleibt.
+fn schicht_abschliessen() {
+    let Some((_, farbe)) = SCHICHT_LAEUFT.with(|z| z.take()) else { return };
+    let Some((w, h, aussen)) = SCHICHT_ZIEL.with(|z| z.get()) else { return };
+    let rt = unsafe { schicht_rt(w, h) };
+    unsafe {
+        raylib::ffi::rlDrawRenderBatchActive();
+        raylib::ffi::EndTextureMode();
+        // EndTextureMode fuehrt auf den Schirm -- aus einem Renderziel
+        // (Fenster, POSTFX-Szene) wieder hinein.
+        if let Some(a) = aussen { raylib::ffi::BeginTextureMode(a); }
+        let quelle = raylib::ffi::Rectangle { x: 0.0, y: 0.0, width: w as f32, height: -(h as f32) };
+        let f = raylib::ffi::Color { r: farbe.r, g: farbe.g, b: farbe.b, a: farbe.a };
+        raylib::ffi::DrawTextureRec(rt.texture, quelle, raylib::ffi::Vector2 { x: 0.0, y: 0.0 }, f);
+        raylib::ffi::rlDrawRenderBatchActive();
+        if aussen.is_some() { rt_abbild_setzen(); }
+    }
+}
 
 // === Radiance-`.hdr`-(RGBE)-Loader ===
 // raylib-sys 5.5.1 ist ohne SUPPORT_FILEFORMAT_HDR gebaut, daher dekodieren wir

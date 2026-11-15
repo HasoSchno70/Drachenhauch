@@ -1,7 +1,7 @@
 ' Ablaeufe mit Deckkraft und Farbton (gui_aussehen.rs `anim_deck`,
 ' graphics.rs `Cmd::SchichtAnfang`): das Widget kommt in eine Schicht, die
-' mit Deckkraft und Ton aufgelegt wird -- nur auf der Hauptflaeche, darum
-' Bildschirmfotos. DHRT_FRAMES legt fest, bei welchem Bild das Foto kommt
+' mit Deckkraft und Ton aufgelegt wird -- auf der Hauptflaeche, mit
+' POSTFX, in Renderzielen und echten Fenstern. DHRT_FRAMES legt fest, bei welchem Bild das Foto kommt
 ' (1/60 s je Bild).
 ' Format: docs/werkzeuge.md, dhrt test.
 
@@ -74,3 +74,79 @@ END TRY
 blinkt TRUE
 'farbe blau' -- erwartet farbe #RRGGBB
 'deckkraft halb' -- erwartet name zahl
+
+=== im renderziel faerbt der ablauf den knopf und was danach kommt bleibt im ziel
+' Die Schicht kehrt ins aeussere Ziel zurueck (graphics.rs
+' `schicht_abschliessen`) -- Renderziele des Programms und echte Fenster
+' laufen durch dieselbe Schleife. Vorher galt die Schicht nur auf der
+' Hauptflaeche, der Knopf blieb weiss. Der zweite Knopf kommt NACH der
+' Schicht: er muss im Ziel landen, nicht auf dem Schirm.
+TRY
+    SCREEN(400, 200, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "", 140, 80, 120, 40)
+GUI_SET_NAME(b, "k")
+DIM b2 AS GUI_WIDGET : b2 = GUI_BUTTON(w, "", 20, 140, 80, 40)
+GUI_SET_NAME(b2, "z")
+GUI_STYLESHEET("#k { bg: #FFFFFF; border: #FFFFFF; animation: blau 1000ms }" + CHR$(10) + "#z { bg: #00FF00; border: #00FF00 }" + CHR$(10) + "@ablauf blau { 0%: farbe #0000FF; 100%: farbe #0000FF }")
+DIM rt AS INTEGER : rt = RENDERTARGET_NEW(400, 200)
+DIM n AS INTEGER
+FOR n = 1 TO 5
+    GUI_UPDATE() : CLS(0) : FLIP()
+NEXT
+RENDERTARGET_BEGIN(rt) : CLS(0) : GUI_DRAW() : RENDERTARGET_END()
+CLS(0) : FLIP()
+DIM bild AS IMAGE : bild = RENDERTARGET_IMAGE(rt)
+FUNCTION farbe$(x AS INTEGER, y AS INTEGER) AS STRING
+    DIM c AS INTEGER : c = GETPIXEL(bild, x, y) BAND &HFFFFFF
+    IF c = &H0000FF THEN RETURN "blau"
+    IF c = &HFFFFFF THEN RETURN "weiss"
+    IF c = &H00FF00 THEN RETURN "gruen"
+    RETURN "anders"
+END FUNCTION
+PRINT "knopf "; farbe$(200, 100); " daneben "; farbe$(100, 100); " zweiter "; farbe$(60, 160)
+--- umgebung
+DHRT_FRAMES=20
+--- erwartet
+knopf blau daneben anders zweiter gruen
+
+=== mit posteffekt faerbt der ablauf den knopf
+' POSTFX zeichnet die Szene in ein Renderziel und legt sie mit dem Shader
+' auf den Schirm -- die Schicht kehrt dorthin zurueck.
+TRY
+    SCREEN(400, 200, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "", 140, 80, 120, 40)
+GUI_SET_NAME(b, "k")
+DIM b2 AS GUI_WIDGET : b2 = GUI_BUTTON(w, "", 20, 140, 80, 40)
+GUI_SET_NAME(b2, "z")
+GUI_STYLESHEET("#k { bg: #FFFFFF; border: #FFFFFF; animation: blau 1000ms }" + CHR$(10) + "#z { bg: #00FF00; border: #00FF00 }" + CHR$(10) + "@ablauf blau { 0%: farbe #0000FF; 100%: farbe #0000FF }")
+DIM sh AS INTEGER : sh = SHADER_LOAD("durch.fs")
+POSTFX(sh)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE() : CLS(0) : GUI_DRAW() : FLIP()
+WEND
+--- datei durch.fs
+#version 330
+in vec2 fragTexCoord;
+uniform sampler2D texture0;
+out vec4 finalColor;
+void main() { finalColor = texture(texture0, fragTexCoord); }
+
+--- umgebung
+DHRT_FRAMES=10
+--- bild
+200 100 #0000FF +-40
+60 160 #00FF00 +-40

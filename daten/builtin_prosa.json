@@ -1190,7 +1190,7 @@
   "GUI_WINDOW_NATIVE": "BOOLEAN — das Fenster als echtes OS-Fenster (eigene Titelleiste, Taskleiste, zweiter Monitor) bzw. zurück ins Hauptfenster; FALSE heißt bei an: Rückfall, es bleibt ein gui-Fenster",
   "GUI_WINDOW_NATIVE_SCALE": "FLOAT — um wie viel das native Fenster auf seinem Schirm größer gezeichnet wird als im Hauptfenster (Pixeldichte seines Schirms durch die des Hauptfensters); 1.0 im Hauptfenster",
   "GUI_WINDOW_RESIZABLE": "am unteren-rechten Griff größenveränderbar (Default: aus)",
-  "GUI_WINDOW_RTL": "das ganze Fenster von rechts nach links: die Lage jedes Widgets gespiegelt an der Breite des Fensters, die Menüleiste und die Werkzeugleiste beginnen rechts, Kästchen, Optionen und Schalter tragen ihr Kennzeichen rechts vom Text, ein Regler wächst nach links (Ziehen und Pfeiltasten auch). Das Programm setzt und liest seine Lagen weiter von links (GUI_GET_X); Zeichnen, Klick und GUI_HIT_TEST gehen …",
+  "GUI_WINDOW_RTL": "das ganze Fenster von rechts nach links: die Lage jedes Widgets gespiegelt an der Breite des Fensters, die Menüleiste und die Werkzeugleiste beginnen rechts, Kästchen, Optionen und Schalter tragen ihr Kennzeichen rechts vom Text, ein Regler wächst nach links (Ziehen und Pfeiltasten auch), ein Textfeld ohne GUI_SET_ALIGN steht rechtsbündig. Das Programm setzt und liest seine Lagen weiter von links …",
   "GUI_WINDOW_SCROLLABLE": "Inhalt scrollt, wenn er höher als das Fenster ist (Mausrad + Scrollbalken). Inhaltshöhe automatisch aus den Widgets. Default: aus",
   "GUI_WINDOW_SET_BOUNDS": "Fenster bewegen/skalieren/lesen",
   "GUI_WINDOW_SET_MAX_SIZE": "Maximalgröße beim Resizen (0 = keine)",
