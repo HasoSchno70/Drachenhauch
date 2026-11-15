@@ -34,7 +34,7 @@ impl Gui {
         r.ziehen = false;
         // Der Satz gehoert zum ALTEN Text -- `stand` zuruecksetzen heisst
         // "beim naechsten GUI_UPDATE neu setzen".
-        r.stand = (usize::MAX, 0, 0, 0);
+        r.stand = (usize::MAX, 0, 0, 0, 0);
         r.satz_aktuell = false;
         r.ziel_ue = None;
         r.ziel_suche = None;
@@ -46,8 +46,8 @@ impl Gui {
                                   "farbe_schluessel", "farbe_name", "farbe_operator"];
         let k = key.to_lowercase();
         match k.as_str() {
-            "groesse" | "size" => { r.basis = wert.max(0.0) as i32; r.stand = (usize::MAX, 0, 0, 0); }
-            "codeschrift" | "code_font" => { r.code_font = wert as i64; r.stand = (usize::MAX, 0, 0, 0); }
+            "groesse" | "size" => { r.basis = wert.max(0.0) as i32; r.stand = (usize::MAX, 0, 0, 0, 0); }
+            "codeschrift" | "code_font" => { r.code_font = wert as i64; r.stand = (usize::MAX, 0, 0, 0, 0); }
             _ if ARTEN.contains(&k.as_str()) => {
                 let n = ARTEN.iter().position(|a| *a == k).unwrap();
                 r.code_farben[n] = if wert < 0.0 { None } else { Some(wert as i64) };
@@ -61,7 +61,7 @@ impl Gui {
     pub fn richtext_code_buttons(&mut self, h: i64, knoepfe: &str) -> Result<(), String> {
         let r = self.rt_mut(h, "GUI_RICHTEXT_CODE_BUTTONS")?;
         r.code_knoepfe = knoepfe.split('|').map(|k| k.trim().to_string()).filter(|k| !k.is_empty()).collect();
-        r.stand = (usize::MAX, 0, 0, 0);
+        r.stand = (usize::MAX, 0, 0, 0, 0);
         r.satz_aktuell = false;
         Ok(())
     }
@@ -363,7 +363,9 @@ impl Gui {
                     let b = if r.basis > 0 { r.basis } else { self.wsize(g, w) };
                     (w.w, b, r.quelle.chars().count())
                 };
-                let stand = (quell_len, breite, basis, (self.scale * 100.0) as i32);
+                // Mit dem Stand der Schriften: ein Emoji, das erst nach dem
+                // ersten Satz nachgeladen wurde, ist breiter als sein `?`.
+                let stand = (quell_len, breite, basis, (self.scale * 100.0) as i32, g.schrift_stand());
                 if self.windows[wi].widgets[i].rich.as_ref().unwrap().stand == stand { continue; }
                 self.rt_setzen(g, wi, i, breite, basis);
                 let r = self.windows[wi].widgets[i].rich.as_mut().unwrap();

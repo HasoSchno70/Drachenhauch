@@ -35,7 +35,7 @@ stildatei GUI_STYLESHEET
   hover: bg #445566, animation puls 700ms immer
 ---
 label
-fenster "Haupt"  lage 20 100 8 16
+fenster "Haupt"  lage 20 100 10 16
 zustand normal
 stildatei GUI_STYLESHEET
   zeile 2: label

@@ -675,3 +675,40 @@ e 15 7 10 10 0 0
 DHRT_FRAMES=30
 --- erwartet
 an stelle 0 1 an stelle 1 0
+
+=== gespiegelt misst eine beschriftung ihre breite am text
+' Bis 2026.50 behielt ein GUI_LABEL die geschaetzte Breite (8 je Zeichen):
+' im gespiegelten Fenster lief eine grosse Schrift ueber den rechten Rand.
+' Jetzt misst GUI_UPDATE sie wie bei Kaestchen und Schalter -- bis das
+' Programm eine Groesse setzt.
+TRY
+    SCREEN(400, 200, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+SET_WINDOW_POS(-3000, -3000)
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+GUI_WINDOW_RTL(w, TRUE)
+DIM l AS GUI_WIDGET : l = GUI_LABEL(w, "Drachenhauch", 10, 10)
+DIM f AS GUI_WIDGET : f = GUI_LABEL(w, "Drachenhauch", 10, 80)
+GUI_STYLESHEET("label { groesse: 30 }")
+GUI_SET_BOUNDS(f, 10, 80, 60, 40)
+' Die Stildatei loest GUI_UPDATE an seinem Ende auf -- gemessen wird ab dem zweiten.
+GUI_UPDATE()
+GUI_UPDATE()
+DIM gemessen AS INTEGER : gemessen = GUI_GET_W(l)
+GUI_AUTOSIZE(l)
+PRINT "breite wie gemessen "; GUI_GET_W(l) = gemessen; " groesser als geschaetzt "; gemessen > 12 * 8
+PRINT "gesetzte breite bleibt "; GUI_GET_W(f)
+GUI_SET_WRAP(f, 0)
+GUI_UPDATE()
+PRINT "ohne umbruch wieder gemessen "; GUI_GET_W(f) = gemessen
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+breite wie gemessen TRUE groesser als geschaetzt TRUE
+gesetzte breite bleibt 60
+ohne umbruch wieder gemessen TRUE

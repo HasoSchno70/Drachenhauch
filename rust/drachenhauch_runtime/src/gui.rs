@@ -356,11 +356,15 @@ fn gloss_unten(y1: i32, y2: i32, rad: i32) -> i32 {
     if rad * 2 >= y2 - y1 { y2 } else { y1 + (y2 - y1) / 2 }
 }
 
+/// Heller oder dunkler -- die Deckkraft (oberstes Byte) bleibt. Bis
+/// 2026.50 fiel sie weg: unter den Glas-Themen (Verlauf, Glanz) wurde eine
+/// halbdurchsichtige Flaeche (`bg: #40FFFFFF`) deckend weiss -- gefunden mit
+/// der Gesamtschau (examples/222).
 fn shade(color: i64, delta: i32) -> i64 {
     let r = (((color >> 16) & 0xFF) as i32 + delta).clamp(0, 255);
     let g = (((color >> 8) & 0xFF) as i32 + delta).clamp(0, 255);
     let b = ((color & 0xFF) as i32 + delta).clamp(0, 255);
-    ((r << 16) | (g << 8) | b) as i64
+    (color & 0xFF00_0000) | ((r << 16) | (g << 8) | b) as i64
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -2556,7 +2560,7 @@ struct RichState {
     quelle: String,
     zeilen: Vec<RtZeile>,
     inhalt_h: i32,
-    stand: (usize, i32, i32, i32),   // (Quelllaenge, Breite, Basisgroesse, Massstab*100)
+    stand: (usize, i32, i32, i32, u64),   // (Quelllaenge, Breite, Basisgroesse, Massstab*100, Schriftstand)
     scroll: i32,
     basis: i32,          // 0 = Groesse des Widgets/Themas
     code_font: i64,      // -1 = dieselbe Schrift wie der Fliesstext
@@ -5696,6 +5700,11 @@ impl Gui {
     pub fn label(&mut self, win: i64, text: String, x: i32, y: i32, color: Option<i64>) -> Result<i64, String> {
         let w = (text.chars().count() as i32 * 8).max(1);
         let mut wd = Self::blank(Kind::Label, x, y, w, 16); wd.text = text;
+        // Die Breite folgt dem Text (gemessen in jedem GUI_UPDATE), bis das
+        // Programm eine setzt -- die Schaetzung oben gilt nur bis dahin. Bis
+        // 2026.50 blieb sie stehen: im gespiegelten Fenster lief eine grosse
+        // Schrift dann ueber den rechten Rand (gesehen in der Gesamtschau).
+        wd.auto_w = true;
         let h = self.add_widget(win, "GUI_LABEL", wd)?;
         if let Some(c) = color { let (wi, i) = Self::dec_widget(h); self.windows[wi].widgets[i].color = c; }
         Ok(h)

@@ -147,9 +147,14 @@ impl Gui {
         let pad = self.m("pad");
         let rad = self.m("corner_radius");
         let shadow = self.m("shadow");
+        // Ein durchscheinender Grund (Deckkraft 1..254 im obersten Byte; 0 heisst
+        // deckend) zeigte den Schatten durch die ganze Flaeche -- das Fenster
+        // wurde grau statt hell (gesehen in der Gesamtschau, Glas hell).
+        let a = (self.th("win_bg") >> 24) & 0xFF;
+        let durchscheinend = a != 0 && a != 0xFF;
         // Fenster-Schatten (modern): weiche, halbtransparente Lagen nach unten/rechts
         // versetzt -> das Fenster "schwebt" ueberm Hintergrund statt aufgeklebt.
-        if shadow > 0 {
+        if shadow > 0 && !durchscheinend {
             for k in 0..3 {
                 let off = 3 + k * 3;
                 let grow = k * 2;

@@ -835,7 +835,11 @@ GUI_LABEL(win, text$, x, y[, farbe]) -> GUI_WIDGET
 ```
 
 Statischer Text. Default-Farbe weiß. Mit `GUI_SET_TEXT(lbl, ...)` jederzeit
-änderbar (z. B. um einen Slider-Wert live anzuzeigen).
+änderbar (z. B. um einen Slider-Wert live anzuzeigen). Die Breite folgt dem
+Text (gemessen in `GUI_UPDATE`, auch mit Schrift und Größe aus der
+Stildatei), bis `GUI_SET_BOUNDS` oder `GUI_SET_WRAP` eine festlegt -- erst
+dann wirkt `GUI_SET_ALIGN`. Im gespiegelten Fenster (`GUI_WINDOW_RTL`) endet
+der Text so genau am Rand.
 
 ```basic
 GUI_SET_WRAP(lbl, 220)              ' bei 220 px an Wortgrenzen umbrechen

@@ -1408,6 +1408,8 @@ pub struct Graphics {
     richtung_roh: std::cell::Cell<bool>,
     /// Codepunkte, die keine Datei liefern konnte -- nicht jedes Bild neu.
     glyphen_unmoeglich: std::collections::HashSet<u32>,
+    /// Zaehlt jedes Nachladen von Glyphen (ausweich_nachladen).
+    schrift_stand: u64,
     /// Welche Ausweich-Datei ein Zeichen schon nicht hatte: dann fragt das
     /// naechste Bild die naechste der Liste. Vorher galt das Zeichen nach der
     /// ersten vorhandenen Datei als unmoeglich -- 🗘 kam als "?", weil Segoe
@@ -2297,6 +2299,7 @@ impl Graphics {
             glyphen_fehlend: std::cell::RefCell::new(std::collections::HashSet::new()),
             richtung_roh: std::cell::Cell::new(false),
             glyphen_unmoeglich: std::collections::HashSet::new(),
+            schrift_stand: 0,
             glyphen_versucht: std::collections::HashSet::new(),
             eigen_fehlt: std::cell::RefCell::new(std::collections::HashMap::new()),
             eigen_nie: std::collections::HashSet::new(),
@@ -2486,6 +2489,9 @@ impl Graphics {
     /// Datei, damit nichts verloren geht. Ein Zeichen, das keine Datei
     /// liefert, wandert nach `glyphen_unmoeglich` und bleibt ein `?`.
     fn ausweich_nachladen(&mut self) {
+        // Was jetzt nachgeladen wird, misst kuenftig anders: wer Breiten
+        // aufhebt (der gesetzte Text der gui), setzt neu (`schrift_stand`).
+        if !self.eigen_fehlt.borrow().is_empty() || !self.glyphen_fehlend.borrow().is_empty() { self.schrift_stand += 1; }
         for c in self.eigene_nachbacken() { self.glyphen_fehlend.borrow_mut().insert(c); }
         let fehlend: Vec<u32> = self.glyphen_fehlend.borrow_mut().drain().collect();
         if fehlend.is_empty() { return; }
@@ -5019,6 +5025,10 @@ impl Graphics {
     /// Breite mit Stil: der echte Schnitt, wenn geladen, sonst die Grundschrift
     /// plus der Versatz des Ersatz-Fetts. Kursiv und Linien aendern die
     /// Breite nicht.
+    /// Wie oft schon Glyphen nachgeladen wurden -- aendert er sich, misst
+    /// derselbe Text womoeglich anders (ein Emoji kam erst als `?`).
+    pub fn schrift_stand(&self) -> u64 { self.schrift_stand }
+
     pub fn text_width_stil(&self, s: &str, size: i32, font: i64, stil: u8) -> i32 {
         let size = size.max(1);
         let (h, emu) = self.schnitt_da(font, stil);
