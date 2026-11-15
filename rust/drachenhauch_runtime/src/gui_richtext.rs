@@ -775,18 +775,22 @@ impl Gui {
     /// zeigt ein Baum eine frisch angelegte Datei erst, wenn ihn jemand von
     /// Hand auffrischt -- und darauf zu kommen ist niemandes Aufgabe.
     pub(super) fn dateibaeume_auffrischen(&mut self, jetzt: f64) {
+        let mut bedarf = f64::INFINITY;
         for win in self.windows.iter_mut() {
             if !win.alive || !win.visible { continue; }
             for wdg in win.widgets.iter_mut() {
                 let Some(t) = wdg.tree.as_mut() else { continue };
                 let takt = match t.datei.as_ref() {
                     Some(d) if d.auffrischen > 0.0 && jetzt >= d.naechste => d.auffrischen,
+                    Some(d) if d.auffrischen > 0.0 => { bedarf = bedarf.min(d.naechste - jetzt); continue; }
                     _ => continue,
                 };
                 t.datei.as_mut().unwrap().naechste = jetzt + takt;
+                bedarf = bedarf.min(takt);
                 dateibaum_neu(t);
             }
         }
+        self.bild_in(bedarf);
     }
 
     /// Lage und Groesse des Kaestchens in einer Baumzeile -- EINE Quelle fuer

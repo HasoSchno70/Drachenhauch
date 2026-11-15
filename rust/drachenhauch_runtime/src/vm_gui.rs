@@ -1591,6 +1591,9 @@ impl<'p> Vm<'p> {
                 self.gui.teile_zeichnen(g);
                 Value::Nil
             }
+            // Wann braucht die gui das naechste Bild? (Sekunden, -1 = erst
+            // bei einer Eingabe) -- nach GUI_DRAW, vor FLIP (leerlauf.rs).
+            "gui_next_frame" => Value::Float(self.gui.next_frame()),
             "gui_draw_top" => {
                 let g = self.gfx.as_mut().ok_or("GUI_DRAW_TOP: vor SCREEN aufgerufen")?;
                 self.gui.draw_top(g);

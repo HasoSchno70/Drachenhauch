@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/en und dem englischen Buch von `dhrt doku prosa` -- NICHT von Hand aendern. Der Hover nimmt sie mit DHRT_LANG=en.",
- "count": 2450,
+ "count": 2452,
  "docs": {
   "ABS": "Absolute value.",
   "ACOS": "Arc sine/cosine (x in [-1, 1])",
@@ -833,6 +833,7 @@
   "GUI_MNEMONICS": "Alt letters: & in the text of a button, check box, radio button, toggle or label marks it (&& = one &)",
   "GUI_MODAL": "BOOLEAN — is a dialog or a modal window currently up?",
   "GUI_MOTION": "BOOLEAN — is the gui playing motion right now?",
+  "GUI_NEXT_FRAME": "FLOAT — in how many seconds the gui needs the next frame (after GUI_DRAW, before FLIP); 0 = at once, -1 = only on an input",
   "GUI_ON_BLUR": "loses it — the point at which you validate an input",
   "GUI_ON_CHANGE": "FUNCREF callback on value change (slider/TextInput/checkbox/table selection)",
   "GUI_ON_CLICK": "FUNCREF callback on click (button/checkbox)",
@@ -2358,6 +2359,7 @@
   "WINDOW_HIDDEN": "query the window's state",
   "WINDOW_HIDE": "make the window disappear, from the taskbar too, and bring it back — for tools that live in the tray",
   "WINDOW_ICON": "Sets the window icon from an image loaded with LOADIMAGE.",
+  "WINDOW_IDLE_WAIT": "how long the last FLIP was allowed to wait at most (seconds, 0 = not at all)",
   "WINDOW_IS_FULLSCREEN": "is it running in fullscreen right now?",
   "WINDOW_MAXIMIZE": "bring the window to screen size",
   "WINDOW_MAXIMIZED": "query the window's state",
@@ -2378,7 +2380,7 @@
   "WINDOW_SHOW": "make the window disappear, from the taskbar too, and bring it back — for tools that live in the tray",
   "WINDOW_TOPMOST": "keep the window always in the foreground",
   "WINDOW_UNDECORATED": "window frame/title bar off (TRUE) / on (FALSE)",
-  "WINDOW_WAIT_EVENTS": "FLIP waits for input, at most this long — a tool that only reacts to clicks then needs hardly any CPU time; 0 switches it off",
+  "WINDOW_WAIT_EVENTS": "FLIP waits for input, at most this long — a tool that only reacts to clicks then needs hardly any CPU time; 0 switches it off, without an argument: the duration set. After an input it runs on for 0.35 s without waiting, also while a mouse button is held; the gui shortens the wait to its next frame (caret, tooltip, animation, toast — GUI_NEXT_FRAME); with a fixed frame count (DHRT_FRAMES) it never …",
   "WINDOW_X": "position of the window's top left corner (px)",
   "WINDOW_Y": "position of the window's top left corner (px)",
   "WORLD_TO_SCREEN_X": "FLOAT — where does a point of the world land on the screen? — for labels above characters",

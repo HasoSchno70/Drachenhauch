@@ -1609,6 +1609,7 @@ impl Gui {
                     // Laufendes Band: die Zeit treibt es, nicht der Wert --
                     // fuer alles, dessen Dauer man nicht kennt.
                     let bw = (w / 3).max(8);
+                    self.bild_in(0.0);
                     let t = (g.get_time() * 0.6).fract();
                     let x0 = ax + 1 - bw + (t * (w - 2 + bw) as f64) as i32;
                     g.push_clip(ax + 1, ay + 1, (w - 2).max(0), (h - 2).max(0));

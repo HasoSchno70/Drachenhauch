@@ -26,32 +26,6 @@ extern "C" {
 use raylib::core::shaders::RaylibShader;   // get_shader_location auf Shader
 use raylib::core::texture::RaylibRenderTexture2D;   // .texture() auf RenderTexture2D
 
-/// Der Faden hinter WINDOW_WAIT_EVENTS: weckt ein wartendes Fenster
-/// spaetestens nach der eingestellten Dauer (glfwPostEmptyEvent ist von
-/// jedem Faden aus erlaubt). Einmal gestartet, schlaeft er bei 0 nur.
-mod warten {
-    use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-    static MS: AtomicU64 = AtomicU64::new(0);
-    static LAEUFT: AtomicBool = AtomicBool::new(false);
-    unsafe extern "C" {
-        fn glfwPostEmptyEvent();
-    }
-    pub fn setzen(ms: u64) {
-        MS.store(ms, Ordering::SeqCst);
-        if ms > 0 && !LAEUFT.swap(true, Ordering::SeqCst) {
-            std::thread::spawn(|| loop {
-                let ms = MS.load(Ordering::SeqCst);
-                std::thread::sleep(std::time::Duration::from_millis(if ms > 0 { ms } else { 100 }));
-                if MS.load(Ordering::SeqCst) > 0 {
-                    unsafe { glfwPostEmptyEvent(); }
-                }
-            });
-        }
-    }
-    /// Beim Abraeumen des Fensters: nicht mehr wecken.
-    pub fn aus() { MS.store(0, Ordering::SeqCst); }
-}
-
 /// Das Format einer Bilddatei an ihren ersten Bytes, als Endung fuer
 /// raylibs LoadImageFromMemory. None = keins, das dhrt laden kann.
 fn bildformat(b: &[u8]) -> Option<&'static str> {
@@ -1205,7 +1179,7 @@ fn web_leinwand_groesse(w: i32, h: i32) {
 impl Drop for Graphics {
     // Ein Tray-Symbol bliebe sonst als Geist stehen, bis jemand mit der Maus
     // darueberfaehrt.
-    fn drop(&mut self) { warten::aus(); crate::tray::weg(); }
+    fn drop(&mut self) { crate::leerlauf::aus(); crate::tray::weg(); }
 }
 
 pub struct Graphics {
@@ -1475,6 +1449,15 @@ pub struct Graphics {
     atlases: Vec<Atlas>,
     pub frame_count: u64,
     max_frames: Option<u64>,
+    /// WINDOW_WAIT_EVENTS: hoechstens so lange wartet FLIP (0 = nie).
+    warten_max: f64,
+    /// Was die gui fuer dieses Bild meldete (Sekunden bis zum naechsten).
+    bild_bedarf: f64,
+    /// Stand des Eingabezaehlers (leerlauf.rs) und wann er sich zuletzt aenderte.
+    leerlauf_stand: u64,
+    leerlauf_eingabe: std::time::Instant,
+    /// Die Frist des letzten FLIP (Sekunden, 0 = ohne Warten).
+    leerlauf_frist_zuletzt: f64,
     screenshot: Option<String>,
     // --- Kontaktbogen (DHRT_CONTACT) ---------------------------------------
     // Ein einzelner Screenshot zeigt einen AUGENBLICK. Vieles geht aber erst
@@ -2147,6 +2130,8 @@ impl Graphics {
         let (mut rl, thread) = Graphics::fenster_bauen(builder)?;
         // Klicks zwischen zwei Bildern mitzaehlen (flanken.rs).
         crate::flanken::einhaengen();
+        // Eingaben fuer den Leerlauf zaehlen (leerlauf.rs).
+        crate::leerlauf::einhaengen();
         let haupt_glfw = crate::nativfenster::aktueller_kontext();
         let _ = crate::flanken::abholen();
         let _ = crate::flanken::tasten_abholen();
@@ -2315,6 +2300,10 @@ impl Graphics {
             atlases: Vec::new(),
             frame_count: 0,
             max_frames,
+            warten_max: 0.0, bild_bedarf: f64::INFINITY, leerlauf_stand: 0,
+            // Ohne Eingabe seit dem Start kein Nachlauf: eine Sekunde zurueck.
+            leerlauf_eingabe: std::time::Instant::now().checked_sub(std::time::Duration::from_secs(1)).unwrap_or_else(std::time::Instant::now),
+            leerlauf_frist_zuletzt: 0.0,
             screenshot,
             contact_path, contact_every, contact_cols, contact_max,
             contact_shots: Vec::new(), contact_written: false,
@@ -4242,12 +4231,46 @@ impl Graphics {
     /// dann keine Rechenzeit, waehrend nichts passiert. 0 schaltet ab.
     /// raylibs EnableEventWaiting wartet unbegrenzt; die Hoechstdauer kommt
     /// aus einem Faden, der das Fenster mit glfwPostEmptyEvent weckt.
+    ///
+    /// Wie lange GENAU, entscheidet `leerlauf_frist` je Bild: nach einer
+    /// Eingabe laeuft es kurz ohne Warten nach, und die gui kuerzt die Frist
+    /// auf das Bild, das sie als naechstes braucht (leerlauf.rs).
     pub fn wait_events(&mut self, sekunden: f64) {
-        let ms = if sekunden > 0.0 { (sekunden * 1000.0).round().max(1.0) as u64 } else { 0 };
-        warten::setzen(ms);
-        unsafe {
-            if ms > 0 { raylib::ffi::EnableEventWaiting(); } else { raylib::ffi::DisableEventWaiting(); }
-        }
+        self.warten_max = if sekunden > 0.0 { sekunden } else { 0.0 };
+        if self.warten_max <= 0.0 { crate::leerlauf::frist(0.0); }
+    }
+    /// WINDOW_WAIT_EVENTS() ohne Argument: die eingestellte Grenze.
+    pub fn wait_events_get(&self) -> f64 { self.warten_max }
+
+    /// Die gui sagt vor FLIP, in wie vielen Sekunden sie das naechste Bild
+    /// braucht (unendlich = keins).
+    pub fn bild_bedarf(&mut self, sekunden: f64) {
+        if sekunden < self.bild_bedarf { self.bild_bedarf = sekunden; }
+    }
+
+    /// Wie lange das letzte FLIP warten durfte (Sekunden, 0 = gar nicht) --
+    /// fuer Pruefungen (WINDOW_IDLE_WAIT).
+    pub fn leerlauf_zuletzt(&self) -> f64 { self.leerlauf_frist_zuletzt }
+
+    /// Einmal je Bild, vor dem Zeigen: die Frist fuer das Warten in
+    /// PollInputEvents setzen.
+    fn leerlauf_frist(&mut self) {
+        let bedarf = std::mem::replace(&mut self.bild_bedarf, f64::INFINITY);
+        if self.warten_max <= 0.0 { self.leerlauf_frist_zuletzt = 0.0; return; }
+        let jetzt = std::time::Instant::now();
+        let n = crate::leerlauf::ereignisse();
+        if n != self.leerlauf_stand { self.leerlauf_stand = n; self.leerlauf_eingabe = jetzt; }
+        let ruhe = jetzt.duration_since(self.leerlauf_eingabe).as_secs_f64();
+        // Eine gehaltene Maustaste (Ziehen ueber den Rand rollt weiter, ohne
+        // dass sich etwas bewegt), eine laufende Aufnahme oder ein Testlauf
+        // mit fester Bildzahl: nicht warten.
+        let gehalten = [MouseButton::MOUSE_BUTTON_LEFT, MouseButton::MOUSE_BUTTON_RIGHT, MouseButton::MOUSE_BUTTON_MIDDLE]
+            .iter().any(|&k| self.rl.is_mouse_button_down(k))
+            || self.nativ.iter().any(|p| p.e.knopf_unten.iter().any(|&k| k));
+        let f = if self.auto_playing || self.max_frames.is_some() { 0.0 }
+            else { crate::leerlauf::frist_berechnen(self.warten_max, ruhe, bedarf, gehalten) };
+        self.leerlauf_frist_zuletzt = f;
+        crate::leerlauf::frist(f);
     }
 
     pub fn light_ambient(&mut self, col_: i64, intensity: f64) {
@@ -7357,6 +7380,13 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     pub fn delta(&self) -> f64 {
         if self.max_frames.is_some() { 1.0 / 60.0 } else { self.rl.get_frame_time() as f64 }
     }
+    /// Sekunden seit dem Start fuer Uhren, die nicht von Bild zu Bild
+    /// rechnen (Schreibmarke, Hilfetext der gui): die Wanduhr -- `delta`
+    /// ist die Dauer des VORIGEN Bildes und hinkt nach einem Schlaf im
+    /// Leerlauf um eben diesen hinterher. Mit fester Bildzahl 1/60 s je Bild.
+    pub fn uhr_jetzt(&self) -> f64 {
+        if self.max_frames.is_some() { (self.flips + 1) as f64 / 60.0 } else { self.rl.get_time() }
+    }
     pub fn fps(&self) -> i64 { self.rl.get_fps() as i64 }
     pub fn set_target_fps(&mut self, n: i64) { self.rl.set_target_fps(n.max(0) as u32); }
     pub fn set_window_title(&mut self, title: &str) { self.titel = title.to_string(); self.rl.set_window_title(&self.thread, title); }
@@ -8192,6 +8222,7 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     }
 
     pub fn flip(&mut self) {
+        self.leerlauf_frist();
         self.zeiger_anwenden();
         crate::stillfenster::zurueckgeben(fenster_handle(&mut self.rl));
         self.flips += 1;

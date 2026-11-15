@@ -94,6 +94,7 @@ impl Gui {
     /// Je Bild am Ende von GUI_UPDATE: Wellen nachziehen, nach der Pause
     /// pruefen.
     pub(super) fn rs_pass(&mut self, dt: f64) {
+        let mut bedarf = f64::INFINITY;
         for wi in 0..self.windows.len() {
             for i in 0..self.windows[wi].widgets.len() {
                 let w = &mut self.windows[wi].widgets[i];
@@ -109,7 +110,7 @@ impl Gui {
                 }
                 if z.faellig < 0.0 { continue; }
                 z.faellig -= dt;
-                if z.faellig > 0.0 { continue; }
+                if z.faellig > 0.0 { bedarf = bedarf.min(z.faellig); continue; }
                 z.faellig = -1.0;
                 match rs::fehler(z.h, &w.text) {
                     Ok(f) => z.fehler = f,
@@ -118,6 +119,7 @@ impl Gui {
                 }
             }
         }
+        self.bild_in(bedarf);
         if let Some(m) = self.rs_menue.as_ref() {
             let weg = self.windows.get(m.wi).and_then(|w| w.widgets.get(m.i))
                 .map(|w| !w.alive || w.rs.is_none() || !w.text.chars().skip(m.start).take(m.laenge).eq(m.wort.chars()))

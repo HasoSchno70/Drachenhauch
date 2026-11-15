@@ -245,7 +245,19 @@ fn weich(t: f32) -> f64 {
 /// Einen Uebergangswert um einen Schritt an sein Ziel heranfuehren.
 fn naeher(t: &mut f32, ziel: f32, schritt: f32) {
     if *t < ziel { *t = (*t + schritt).min(ziel); } else { *t = (*t - schritt).max(ziel); }
+    if *t != ziel { unterwegs(); }
 }
+
+thread_local! {
+    /// Ein weicher Uebergang hat in diesem Bild sein Ziel noch nicht
+    /// erreicht (naeher, Blende) -- dann braucht die gui das naechste Bild
+    /// sofort (leerlauf.rs).
+    static UNTERWEGS: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+fn unterwegs() { UNTERWEGS.with(|u| u.set(true)); }
+
+/// Hilfetext erscheint nach so langem Verweilen (Sekunden).
+const TIPP_PAUSE: f64 = 0.5;
 
 /// Ein Zeilen-Uebergang: die Zeile unter der Maus blendet ein, die vorige
 /// gleichzeitig aus. Zwei Plaetze reichen -- faehrt die Maus schnell ueber
@@ -271,6 +283,7 @@ impl Blende {
             self.alt_t = (self.alt_t - s).max(0.0);
             if self.alt_t <= 0.0 { self.alt = -1; }
         }
+        if (self.akt >= 0 && self.akt_t < 1.0) || self.alt >= 0 { unterwegs(); }
     }
     fn anteil(&self, k: i32) -> f64 {
         if k < 0 { return 0.0; }
@@ -3980,6 +3993,13 @@ pub struct Gui {
     /// markiert, und das erste Tippen haette sie ersetzt.
     zug_feld: Option<(usize, usize)>,
     frame_count: i64,
+    /// Sekunden seit dem Start (`Graphics::uhr_jetzt`, je GUI_UPDATE) --
+    /// fuer Schreibmarke und Hilfetext (bis 2026.49 zaehlten beide Bilder;
+    /// schlaeft das Programm im Leerlauf, gibt es keine Bilder zu zaehlen).
+    takt: f64,
+    /// In wie vielen Sekunden die gui das naechste Bild braucht (unendlich =
+    /// keins) -- gesammelt waehrend GUI_UPDATE/GUI_DRAW, abgeholt bei FLIP.
+    bedarf: std::cell::Cell<f64>,
     theme: HashMap<String, i64>,
     metrics: HashMap<String, i32>,
     /// Die Stildatei (GUI_STYLESHEET, gui_stil.rs) und ihr Stand -- jede
@@ -4011,10 +4031,10 @@ pub struct Gui {
     // mitten im State-Update die GUI re-entrant veraendern.
     pending: Vec<Rueckruf>,
     // Tooltip-Dwell: ueber welchem Widget (Fenster, Widget) ruht die Maus und seit
-    // welchem frame_count? Mausbewegung/Klick setzt den Timer zurueck; nach
-    // TOOLTIP_DELAY ruhenden Frames zeigt draw() den Hilfetext.
+    // welchem `takt`? Mausbewegung/Klick setzt den Timer zurueck; nach
+    // TIPP_PAUSE Sekunden Ruhe zeigt draw() den Hilfetext.
     hover_w: Option<(usize, usize)>,
-    hover_frame: i64,
+    hover_takt: f64,
     /// Knopf einer Werkzeugleiste unter der Maus (-1 = keiner) -- ein Wechsel
     /// startet den Tooltip-Verweil neu, wie ein Wechsel des Widgets.
     hover_teil: i32,
@@ -4038,7 +4058,7 @@ pub struct Gui {
     /// Tooltip am Widget, das per TASTATUR den Fokus bekam, und seit welchem
     /// Bild -- ohne das stand der Hilfetext nur der Maus zur Verfuegung.
     tip_fokus: Option<(usize, usize)>,
-    tip_fokus_frame: i64,
+    tip_fokus_takt: f64,
     // --- Barrierefreiheit (Weg C): Ansage und ob ein Hilfsprogramm zuhoert
     ansage: String,
     ansage_dringend: bool,
@@ -4058,7 +4078,6 @@ const ITEM_FLAG: i64 = 1 << 61;
 const MENUBAR_H: i32 = 26;        // Hoehe der Menueleiste (unter der Titelleiste)
 const MENU_ITEM_H: i32 = 24;      // Hoehe einer Dropdown-Zeile
 const TABBAR_H: i32 = 30;         // Hoehe der Reiter-Leiste
-const TOOLTIP_DELAY: i64 = 30;    // Ruhe-Frames bis ein Tooltip erscheint (~0.5s @60fps)
 
 fn enc_menu(win: usize, m: usize) -> i64 { MENU_FLAG | ((win as i64) << WIDGET_SHIFT) | m as i64 }
 fn dec_menu(h: i64) -> (usize, usize) {
@@ -4091,15 +4110,15 @@ impl Gui {
             open_menu: None, context_open: None, kontext_neu: None, rs_menue: None, sub_chain: Vec::new(), tasten_mod: (false, false),
             kuerzel_gefeuert: false, was_right_down: false, was_mitte_down: false,
             scroll_drag: None,
-            was_mouse_down: false, zug_feld: None, frame_count: 0,
+            was_mouse_down: false, zug_feld: None, frame_count: 0, takt: 0.0, bedarf: std::cell::Cell::new(f64::INFINITY),
             theme: default_theme(), metrics: default_metrics(),
             stil: None, stil_stand: 0, rad_jetzt: std::cell::Cell::new(None), form_jetzt: std::cell::Cell::new(stil::FormStil::default()),
             mnemonics: false, label_zug: None, label_wahl: None, gruppen: HashMap::new(), schriftwahl: Vec::new(),
             styles: HashMap::new(),
             pending: Vec::new(),
-            hover_w: None, hover_frame: 0, hover_teil: -1, leiste_popup: None, hover_x: 0, hover_y: 0,
+            hover_w: None, hover_takt: 0.0, hover_teil: -1, leiste_popup: None, hover_x: 0, hover_y: 0,
             scale: 1.0,
-            menu_cursor: None, alt_allein: false, tip_fokus: None, tip_fokus_frame: 0,
+            menu_cursor: None, alt_allein: false, tip_fokus: None, tip_fokus_takt: 0.0,
             ansage: String::new(), ansage_dringend: false, ansage_nr: 0, screenreader: false,
         }
     }
@@ -5273,6 +5292,23 @@ impl Gui {
     /// koennen, ohne neu gebaut zu werden.
     pub fn window_title(&mut self, h: i64, titel: &str) -> Result<(), String> {
         self.win_mut(h, "GUI_WINDOW_TITLE")?.title = titel.to_string(); Ok(())
+    }
+
+    /// Das naechste Bild wird in `sekunden` gebraucht (0 = sofort).
+    pub(super) fn bild_in(&self, sekunden: f64) {
+        if sekunden < self.bedarf.get() { self.bedarf.set(sekunden.max(0.0)); }
+    }
+    /// Was dieses Bild ueber das naechste weiss -- bei FLIP abgeholt
+    /// (leerlauf.rs); danach sammelt das naechste Bild neu.
+    pub fn bild_bedarf_nehmen(&self) -> f64 {
+        let b = self.bedarf.replace(f64::INFINITY);
+        if UNTERWEGS.with(|u| u.replace(false)) { 0.0 } else { b }
+    }
+    /// GUI_NEXT_FRAME(): in wie vielen Sekunden die gui das naechste Bild
+    /// braucht, -1 = erst bei einer Eingabe (nach GUI_DRAW, vor FLIP).
+    pub fn next_frame(&self) -> f64 {
+        let b = if UNTERWEGS.with(|u| u.get()) { 0.0 } else { self.bedarf.get() };
+        if b.is_finite() { b } else { -1.0 }
     }
 
     /// GUI_WINDOW_GLOW(win [, farbe [, dauer_ms]]): einen Durchgang starten.

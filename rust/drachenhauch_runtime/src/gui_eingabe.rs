@@ -32,6 +32,7 @@ impl Gui {
     }
 
     pub fn update(&mut self, g: &mut Graphics) {
+        self.takt = g.uhr_jetzt();
         // GUI_CHANGED: den Stand vor der Bedienung merken
         for wi in 0..self.windows.len() {
             for i in 0..self.windows[wi].widgets.len() {
@@ -82,7 +83,10 @@ impl Gui {
         self.bewegung_pass();
         self.effekte_anlass_pass();
         self.funken_pass(g.delta().clamp(0.0, 0.25));
+        if !self.funken.is_empty() { self.bild_in(0.0); }
         self.rs_pass(g.delta());
+        // Eine beobachtete Stildatei wird alle 0,5 s gelesen.
+        if self.stil_beob.is_some() { self.bild_in(0.5); }
         for wi in 0..self.windows.len() {
             for i in 0..self.windows[wi].widgets.len() {
                 if self.windows[wi].widgets[i].beobachtet {
@@ -489,7 +493,7 @@ impl Gui {
         }).unwrap_or(-1);
         if teil != self.hover_teil {
             self.hover_teil = teil;
-            self.hover_frame = self.frame_count;
+            self.hover_takt = self.takt;
         }
         if mx != self.hover_x || my != self.hover_y || is_down {
             // Die Maus uebernimmt: der Tastatur-Tooltip und der
@@ -499,7 +503,7 @@ impl Gui {
         }
         if tip_cur != self.hover_w || mx != self.hover_x || my != self.hover_y || is_down {
             self.hover_w = tip_cur;
-            self.hover_frame = self.frame_count;
+            self.hover_takt = self.takt;
         }
         self.hover_x = mx;
         self.hover_y = my;
@@ -761,7 +765,7 @@ impl Gui {
                     // Der Hilfetext erscheint nach kurzem Verweilen auch hier
                     // -- bisher stand er nur der Maus zur Verfuegung.
                     self.tip_fokus = Some((top, ni));
-                    self.tip_fokus_frame = self.frame_count;
+                    self.tip_fokus_takt = self.takt;
                     // Nur ein Textfeld bekommt Caret + Markierung -- bei einem
                     // Knopf waeren beide bedeutungslos.
                     if nimmt_text_w(&self.windows[top].widgets[ni]) {

@@ -81,6 +81,18 @@ pub(super) fn bild_zur_zeit(dauern: &[f64], uhr: f64) -> usize {
     dauern.len() - 1
 }
 
+/// Sekunden bis zum naechsten Bild einer Bildfolge (None = nur ein Bild).
+pub(super) fn rest_bis_wechsel(dauern: &[f64], uhr: f64) -> Option<f64> {
+    let gesamt: f64 = dauern.iter().sum();
+    if dauern.len() < 2 || gesamt <= 0.0 { return None; }
+    let mut t = (uhr * 1000.0).rem_euclid(gesamt);
+    for d in dauern {
+        if t < *d { return Some((d - t) / 1000.0); }
+        t -= d;
+    }
+    Some(0.0)
+}
+
 /// Eine Animation als Text (`puls 700ms immer`) -- fuer den Inspektor.
 pub(super) fn anim_text(a: AnimStil) -> String {
     let n = if a.anzahl == 0 { "immer".to_string() } else if a.anzahl == 1 { "einmal".to_string() } else { a.anzahl.to_string() };
@@ -352,6 +364,7 @@ impl Gui {
         let gezeigt: Vec<Vec<bool>> = self.windows.iter().enumerate()
             .map(|(wi, win)| win.widgets.iter().map(|w| w.alive && self.widget_shown(wi, w)).collect()).collect();
         let ruhig = self.ruhig;
+        let mut laeuft = false;
         for (wi, win) in self.windows.iter_mut().enumerate() {
             for (i, w) in win.widgets.iter_mut().enumerate() {
                 if w.aussehen.is_none() && w.stil_auf.is_none() { continue; }
@@ -395,9 +408,14 @@ impl Gui {
                     if let Some((a, t0)) = au.lauf {
                         if vorbei(a, t0, uhr) { au.lauf = None; }
                     }
+                    // Was sichtbar laeuft, braucht das naechste Bild sofort.
+                    if gezeigt[wi][i] && (au.gleit.is_some() || (!ruhig && (au.lauf.is_some() || au.stil_lauf.is_some()))) {
+                        laeuft = true;
+                    }
                 }
             }
         }
+        if laeuft { self.bild_in(0.0); }
     }
 
     /// Eine Bildhaut laden: ein GIF mit allen Einzelbildern und ihren
@@ -523,6 +541,7 @@ impl Gui {
     pub(super) fn haut_zeichnen(&self, g: &mut Graphics, pfad: &str, rand: i32, x: i32, y: i32, b: i32, h: i32) -> bool {
         let Some(Some(haut)) = self.haeute.get(pfad) else { return false };
         let tex = haut.bilder[bild_zur_zeit(&haut.dauern, self.haut_uhr())].tex;
+        if !self.ruhig { if let Some(r) = rest_bis_wechsel(&haut.dauern, self.uhr) { self.bild_in(r); } }
         if rand > 0 { g.nine_slice(tex, x, y, b, h, rand).is_ok() } else { g.draw_image_rect(tex, x, y, b, h); true }
     }
 

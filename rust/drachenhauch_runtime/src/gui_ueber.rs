@@ -556,6 +556,8 @@ impl Gui {
             let d = (dt / ue) as f32;
             if auf { (t + d).min(1.0) } else { (t - d).max(0.0) }
         };
+        // Wann braucht die gui das naechste Bild? (leerlauf.rs)
+        let mut bedarf = f64::INFINITY;
         for wi in 0..self.windows.len() {
             if self.ist_offener_pop(wi) { self.pop_lage(wi); }
             let win = &mut self.windows[wi];
@@ -565,10 +567,13 @@ impl Gui {
                     if t.rest <= 0.0 { t.weg = true; }
                 }
                 t.t = schritt(t.t, !t.weg);
+                if t.t > 0.0 && t.t < 1.0 { bedarf = 0.0; }
+                if !t.weg && t.rest >= 0.0 { bedarf = bedarf.min(t.rest); }
             }
             win.toasts.retain(|t| !(t.weg && t.t <= 0.0));
             if let Some(i) = win.info.as_mut() {
                 i.t = schritt(i.t, !i.weg);
+                if i.t > 0.0 && i.t < 1.0 { bedarf = 0.0; }
                 if i.weg && i.t <= 0.0 && i.antwort == 0 { win.info = None; }
             }
             for w in win.widgets.iter_mut() {
@@ -577,12 +582,14 @@ impl Gui {
                         z.suche_rest -= dt;
                         // Mit Spielraum: 9 x 1/60 s ist in Kommazahlen nicht ganz 0,15.
                         if z.suche_rest <= 1e-6 { z.suche_rest = -1.0; z.suche_neu = true; }
+                        else { bedarf = bedarf.min(z.suche_rest); }
                     }
                 }
             }
             self.toast_lage(g, wi);
             self.info_lage(g, wi);
         }
+        self.bild_in(bedarf);
         // Eine Vorschlagsliste ohne Fokus geht zu; die Maus darueber markiert.
         for wi in 0..self.windows.len() {
             for i in 0..self.windows[wi].widgets.len() {

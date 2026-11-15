@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 2507,
+ "count": 2509,
  "builtins": [
   {
    "name": "ABS",
@@ -4194,6 +4194,12 @@
    "name": "GUI_GLIDING",
    "kind": "core",
    "signature": "GUI_GLIDING(wdg) AS BOOLEAN",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_NEXT_FRAME",
+   "kind": "core",
+   "signature": "GUI_NEXT_FRAME() AS FLOAT",
    "module": "gui"
   },
   {
@@ -14789,7 +14795,13 @@
   {
    "name": "WINDOW_WAIT_EVENTS",
    "kind": "graphics",
-   "signature": "WINDOW_WAIT_EVENTS(sekunden)",
+   "signature": "WINDOW_WAIT_EVENTS([sekunden])",
+   "module": "core"
+  },
+  {
+   "name": "WINDOW_IDLE_WAIT",
+   "kind": "graphics",
+   "signature": "WINDOW_IDLE_WAIT() AS FLOAT",
    "module": "core"
   },
   {

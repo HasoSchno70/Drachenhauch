@@ -245,21 +245,26 @@ mod glfw {
     pub const MOUSE_PASSTHROUGH: c_int = 0x0002_000D;
 
     pub unsafe extern "C" fn r_knopf(f: *mut c_void, knopf: c_int, aktion: c_int, _m: c_int) {
+        crate::leerlauf::ereignis();
         mit_eingang(f, |e| knopf_buchen(e, knopf, aktion));
     }
     pub unsafe extern "C" fn r_taste(f: *mut c_void, taste: c_int, _scan: c_int, aktion: c_int, _m: c_int) {
+        crate::leerlauf::ereignis();
         mit_eingang(f, |e| taste_buchen(e, taste, aktion));
     }
     pub unsafe extern "C" fn r_lage(f: *mut c_void, x: f64, y: f64) {
+        crate::leerlauf::ereignis();
         mit_eingang(f, |e| e.maus = (x, y));
     }
     pub unsafe extern "C" fn r_drinnen(f: *mut c_void, drin: c_int) {
         mit_eingang(f, |e| e.drinnen = drin != 0);
     }
     pub unsafe extern "C" fn r_rad(f: *mut c_void, x: f64, y: f64) {
+        crate::leerlauf::ereignis();
         mit_eingang(f, |e| { e.rad.0 += x; e.rad.1 += y; });
     }
     pub unsafe extern "C" fn r_zeichen(f: *mut c_void, c: u32) {
+        crate::leerlauf::ereignis();
         mit_eingang(f, |e| if let Some(z) = char::from_u32(c) { e.zeichen.push(z) });
     }
     pub unsafe extern "C" fn r_fokus(f: *mut c_void, an: c_int) {

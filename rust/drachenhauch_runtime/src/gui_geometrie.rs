@@ -301,8 +301,14 @@ impl Gui {
     }
     /// Ob der Text-Caret in diesem Frame sichtbar ist (Blink-Takt) --
     /// gemeinsam fuer TextInput/TextArea.
+    ///
+    /// `caret_period` zaehlt in Sechzigstelsekunden (frueher Bilder bei 60
+    /// Bildern je Sekunde); die Marke meldet, wann sie umschlaegt.
     pub(super) fn caret_blink_on(&self) -> bool {
-        (self.frame_count / self.m("caret_period").max(1) as i64) % 2 == 0
+        let p = self.m("caret_period").max(1) as f64 / 60.0;
+        let phase = (self.takt / p + 1e-6).floor();
+        self.bild_in((phase + 1.0) * p - self.takt);
+        (phase as i64) % 2 == 0
     }
     /// Text mit per-Widget-Font/-Groesse (sonst unveraendert via g.text).
     /// Schriftgroesse dieses Widgets in Pixeln.
@@ -622,6 +628,7 @@ impl Gui {
         let dt = g.delta();
         // Lichtstreifen der Fenster weiterschieben.
         for win in self.windows.iter_mut() { win.glanz.weiter(dt as f32); }
+        if self.windows.iter().any(|w| w.alive && w.visible && w.glanz.t >= 0.0) { self.bild_in(0.0); }
         let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
         let dauer = self.m("uebergang").max(0) as f32;
         let schritt = if dauer > 0.0 { (dt as f32 * 1000.0 / dauer).clamp(0.0, 1.0) } else { 1.0 };

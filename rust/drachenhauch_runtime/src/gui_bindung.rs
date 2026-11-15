@@ -1015,18 +1015,25 @@ impl Gui {
     }
 
     /// Zeichnet den Hilfetext des aktuell verweilten Widgets (nahe der Maus),
-    /// sobald TOOLTIP_DELAY ruhende Frames vergangen sind -- oder den des
+    /// sobald TIPP_PAUSE Sekunden Ruhe vergangen sind -- oder den des
     /// Widgets, das per Tastatur den Fokus bekam (unter dem Widget). Die
     /// Maus gewinnt. Mehrzeilig (\n), am Bildschirmrand zurueckgeklemmt.
     pub(super) fn draw_tooltip(&self, g: &mut Graphics) {
         let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
         let (sw, sh) = (g.screen_width() as i32, g.screen_height() as i32);
-        let per_maus = self.hover_w
-            .filter(|_| self.frame_count - self.hover_frame >= TOOLTIP_DELAY)
-            .and_then(|(wi, i)| self.tip_text(wi, i).map(|t| (t, mx + 14, my + 18)));
+        // Noch nicht so lange verweilt: sagen, wann der Text faellig ist,
+        // damit ein schlafendes Programm dann aufwacht (leerlauf.rs).
+        let rest = |seit: f64| TIPP_PAUSE - (self.takt - seit) - 1e-6;
+        let per_maus = self.hover_w.and_then(|(wi, i)| {
+            let t = self.tip_text(wi, i)?;
+            let r = rest(self.hover_takt);
+            if r > 0.0 { self.bild_in(r); return None; }
+            Some((t, mx + 14, my + 18))
+        });
         let anker = per_maus.or_else(|| {
             let (wi, i) = self.tip_fokus?;
-            if self.frame_count - self.tip_fokus_frame < TOOLTIP_DELAY { return None; }
+            let r = rest(self.tip_fokus_takt);
+            if r > 0.0 { if self.focus_widget == Some((wi, i)) { self.bild_in(r); } return None; }
             if self.focus_widget != Some((wi, i)) { return None; }
             if self.modal.is_some_and(|m| m != wi) { return None; }
             let w = self.windows.get(wi)?.widgets.get(i)?;

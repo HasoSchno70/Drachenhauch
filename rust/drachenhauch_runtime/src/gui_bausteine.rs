@@ -613,6 +613,7 @@ impl Gui {
             return;
         }
         let n = 12;
+        self.bild_in(0.0);
         let kopf = ((g.get_time() * 1.2).fract() * n as f64) as i32;
         let pr = (r / 5).max(2);
         for k in 0..n {
