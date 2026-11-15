@@ -2706,6 +2706,41 @@ WEND
 Keys and characters only arrive while the widget has the focus; they hold
 for exactly one frame, like `GUI_CLICKED`.
 
+### 13. Sleeping while nothing happens
+
+Otherwise an application redraws every frame, even when nobody does
+anything -- on a laptop that costs battery. With
+`WINDOW_WAIT_EVENTS(sekunden)` `FLIP` sleeps until an input arrives, at most
+this long. The gui itself knows when it needs the next frame and wakes the
+program in time: to flip the caret, when a tooltip is due, a toast leaves,
+a file tree refreshes or a stylesheet rule by time of day flips.
+Animations, transitions, sparks and the glow get every frame. After an input it runs on for 0.35 s without waiting, and also
+while a mouse button is held.
+
+| Command | Result | Effect |
+|---|---|---|
+| `GUI_NEXT_FRAME()` | FLOAT | in how many seconds the gui needs the next frame (after `GUI_DRAW`, before `FLIP`); 0 = at once, -1 = only on an input |
+
+```basic
+IMPORT "gui"
+SCREEN(420, 200, "Ruhig", 1)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Ruhig", 10, 10, 400, 180)
+DIM name AS GUI_WIDGET : name = GUI_TEXTINPUT(w, 20, 20, 240, 28, "Name")
+' Ohne Eingabe hoechstens einmal je Sekunde ein Bild statt sechzig.
+WINDOW_WAIT_EVENTS(1)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(&H202830)
+    GUI_DRAW()
+    FLIP()
+WEND
+```
+
+What the program itself does by the clock (an animation of its own,
+reading data from a process or the network) only wakes its own limit: then
+set `WINDOW_WAIT_EVENTS` shorter or switch it off with `0` for that time.
+IDE and Studio sleep like this while no program runs.
+
 ## Callbacks: GUI_ON_CLICK
 
 Besides polling (`IF GUI_CLICKED(b) THEN ...`) you can register a Drachenhauch
