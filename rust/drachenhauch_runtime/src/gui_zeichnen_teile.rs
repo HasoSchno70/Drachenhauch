@@ -217,7 +217,9 @@ impl Gui {
         // und Name von rechts -- gerechnet wird wie links, gespiegelt wird
         // beim Setzen (`sp`: linke Kante eines Stuecks der Breite `b`).
         let rtl = self.windows[wi].rtl;
-        let sp = |x: i32, b: i32| -> i32 { if rtl { ax + wz - (x - ax) - b } else { x } };
+        // Mit dem Balken links ist die Achse die ganze Breite: Zeilen liegen
+        // rechts von ihm.
+        let sp = |x: i32, b: i32| -> i32 { if rtl { ax + w - (x - ax) - b } else { x } };
         g.push_clip(ax + 1, ay + 1, w - 2, h - 2);
         if zeilen.is_empty() && !t.leer_text.is_empty() {
             let muted = self.leise(self.wcol(wdg, "bg", "widget_bg"));
@@ -238,11 +240,13 @@ impl Gui {
             let indent = node.level * self.sk(TREE_INDENT);
             let markiert = if t.multi { t.sel.get(ni).copied().unwrap_or(false) }
                            else { ni as i32 == t.selected };
+            // Die Zeile: neben dem Balken (gespiegelt rechts von ihm).
+            let (zx0, zx1) = if rtl { (ax + w - wz + 1, ax + w - 2) } else { (ax + 1, ax + wz - 2) };
             if markiert {
-                g.box_fill(ax + 1, ry, ax + wz - 2, ry + self.sk(TREE_ROW_H) - 1, shade(acc, -110));
+                g.box_fill(zx0, ry, zx1, ry + self.sk(TREE_ROW_H) - 1, shade(acc, -110));
             } else if wdg.zeile_b.anteil(ni as i32) > 0.0 {
                 let a = wdg.zeile_b.anteil(ni as i32);
-                g.box_fill(ax + 1, ry, ax + wz - 2, ry + self.sk(TREE_ROW_H) - 1, deckkraft(shade(self.wcol(wdg, "bg", "widget_bg"), 18), a));
+                g.box_fill(zx0, ry, zx1, ry + self.sk(TREE_ROW_H) - 1, deckkraft(shade(self.wcol(wdg, "bg", "widget_bg"), 18), a));
             }
             // Auf-/Zuklapp-Dreieck (nur bei Kindknoten), hinter der
             // Kaestchen-Spalte.
@@ -310,7 +314,8 @@ impl Gui {
             g.box_fill(ex, ey, ex + ew - 1, ey + eh - 1, shade(self.wcol(wdg, "bg", "widget_bg"), 12));
             g.rect(ex, ey, ex + ew - 1, ey + eh - 1, acc);
             let text: String = e.text.iter().collect();
-            let tx = self.baum_text_x(t, ax, e.k);
+            // Gespiegelt steht der Name rechts im Feld.
+            let tx = if rtl { ex + ew - self.sk(3) - self.wtext_width(g, wdg, &text) } else { self.baum_text_x(t, ax, e.k) };
             let ty = ey + (eh - self.wsize(g, wdg)).max(0) / 2;
             let x_bei = |g: &mut Graphics, n: i32| -> i32 {
                 let vor: String = e.text.iter().take(n.max(0) as usize).collect();
@@ -800,7 +805,7 @@ impl Gui {
 
         // Senkrechte Bildlaufleiste.
         if gm.need_v {
-            let sb_x = ax + gm.body_w_raw - self.sk(TBL_SCROLL_W) + 1;
+            let sb_x = gm.vbar_x;
             let track = body_h;
             let handle = Self::handle_height(track, body_h, gm.total_h);
             let ratio = if gm.max_scroll_y > 0 { t.scroll_y as f64 / gm.max_scroll_y as f64 } else { 0.0 };

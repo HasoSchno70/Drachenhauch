@@ -1353,4 +1353,14 @@ am Zeilenende der Erwartung ab, die Ausgabe nicht.
   des Rumpfs) rechts; GUI_SET_ALIGN gilt fuer Textbereiche,
   GUI_TABLE_GET_COL_WIDTHS ist die fehlende Abfrage. GUI_A11Y_CHECK$ kennt
   die Tab-Reihenfolge (Spruenge zurueck, spaltenweise Formulare erlaubt).
+- **RTL-Reste (2026-11-15).** Lange Zeilen im gespiegelten Textbereich:
+  `ta_versatz` wird negativ (Zeilenende am rechten Rand) und zaehlt
+  `scroll_x` doppelt dazu, weil der Ursprung es einmal abzieht; das
+  Nachfuehren der Marke rechnet im Spiegel mit dem Abstand zum
+  Zeilenende. Rollbalken links bei Baum (Achse des Spiegelns ist dann die
+  ganze Breite), Tabelle (`vbar_x`, der Rumpf beginnt hinter dem Balken)
+  und Textbereich. Das Umbenennen-Feld im Baum schreibt rechts. Listen
+  spiegeln ihr Inneres noch nicht (rund fuenfzehn eigene x-Stellen) und
+  behalten den Balken rechts. GUI_TREE_EDIT endet ohne Fokus auf dem Baum im
+  naechsten Bild -- im Fall erst GUI_FOCUS.
 

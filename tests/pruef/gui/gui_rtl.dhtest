@@ -490,3 +490,188 @@ DHRT_FRAMES=45
 --- erwartet
 a breiter TRUE
 baum auf TRUE
+
+=== gespiegelt zeigt eine lange zeile ihr ende rechts und pos1 holt den anfang
+' Breiter als das Feld: rechtsbuendig steht das Zeilenende am rechten Rand
+' (ta_versatz), Pos1 rollt den Anfang an den linken (die Marke haelt im
+' Spiegel den Abstand zum Zeilenende).
+IMPORT "gui"
+SCREEN(480, 220, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 480, 220)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM t AS GUI_WIDGET : t = GUI_TEXTAREA(w, 20, 40, 300, 120)
+GUI_SET_TEXT(t, "x" + SPACE$(150) + "x")
+GUI_SET_NAME(t, "t")
+GUI_STYLESHEET("#t { fg: #FF0000 }")
+GUI_WINDOW_RTL(w, TRUE)
+DIM rt AS INTEGER : rt = RENDERTARGET_NEW(480, 220)
+FUNCTION rot_zwischen(x0 AS INTEGER, x1 AS INTEGER) AS BOOLEAN
+    RENDERTARGET_BEGIN(rt) : CLS(0) : GUI_DRAW() : RENDERTARGET_END()
+    DIM bild AS IMAGE : bild = RENDERTARGET_IMAGE(rt)
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR x = x0 TO x1
+        FOR y = 44 TO 62
+            IF (GETPIXEL(bild, x, y) BAND &HFFFFFF) = &HFF0000 THEN RETURN TRUE
+        NEXT
+    NEXT
+    RETURN FALSE
+END FUNCTION
+GUI_UPDATE()
+' Der Bereich liegt gespiegelt bei 160..460.
+PRINT "anfangs links "; rot_zwischen(165, 200); " rechts "; rot_zwischen(410, 455)
+GUI_FOCUS(t)
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER
+FOR n = 1 TO 20
+    GUI_UPDATE()
+    CLS(0) : GUI_DRAW() : FLIP()
+NEXT
+PRINT "nach pos1 links "; rot_zwischen(165, 200); " rechts "; rot_zwischen(410, 455)
+--- datei ev.txt
+c 3
+e 0 7 10 10 0 0
+e 2 2 268 0 0 0
+e 3 1 268 0 0 0
+
+--- umgebung
+DHRT_FRAMES=30
+--- erwartet
+anfangs links FALSE rechts TRUE
+nach pos1 links TRUE rechts FALSE
+
+=== gespiegelt schreibt das umbenennen im baum rechts und der balken steht links
+' Das Umbenennen-Feld reicht vom Balken bis vor das Dreieck, der Name steht
+' rechts darin. Der Rollbalken steht links: ein Klick unten auf ihn rollt.
+IMPORT "gui"
+SCREEN(480, 220, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 480, 220)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM b AS GUI_WIDGET : b = GUI_TREE(w, 20, 20, 300, 150)
+DIM erster AS INTEGER : erster = GUI_TREE_ADD(b, -1, "Ordner")
+DIM k AS INTEGER
+FOR k = 1 TO 30
+    GUI_TREE_ADD(b, -1, "Eintrag " + STR$(k))
+NEXT
+GUI_SET_NAME(b, "b")
+GUI_STYLESHEET("#b { fg: #FF0000 }")
+GUI_WINDOW_RTL(w, TRUE)
+GUI_UPDATE()
+' Ohne Fokus auf dem Baum endete das Feld im naechsten Bild gleich wieder.
+GUI_FOCUS(b)
+GUI_TREE_EDIT(b, erster)
+GUI_UPDATE()
+DIM rt AS INTEGER : rt = RENDERTARGET_NEW(480, 220)
+FUNCTION rot_zwischen(x0 AS INTEGER, x1 AS INTEGER) AS BOOLEAN
+    RENDERTARGET_BEGIN(rt) : CLS(0) : GUI_DRAW() : RENDERTARGET_END()
+    DIM bild AS IMAGE : bild = RENDERTARGET_IMAGE(rt)
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR x = x0 TO x1
+        FOR y = 22 TO 40
+            IF (GETPIXEL(bild, x, y) BAND &HFFFFFF) = &HFF0000 THEN RETURN TRUE
+        NEXT
+    NEXT
+    RETURN FALSE
+END FUNCTION
+' Der Baum liegt gespiegelt bei 160..460; der Name im Feld rechts.
+PRINT "umbenennen links "; rot_zwischen(175, 300); " rechts "; rot_zwischen(380, 445)
+GUI_TREE_EDITED(b)
+DIM vorher AS INTEGER : vorher = GUI_TREE_ITEM_RECT(b, erster)[1]
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER
+FOR n = 1 TO 20
+    GUI_UPDATE()
+    CLS(0) : GUI_DRAW() : FLIP()
+NEXT
+PRINT "gerollt "; GUI_TREE_ITEM_RECT(b, erster)[1] < vorher
+--- datei ev.txt
+c 4
+e 0 7 10 10 0 0
+e 2 7 165 160 0 0
+e 3 6 0 0 0 0
+e 4 5 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=30
+--- erwartet
+umbenennen links FALSE rechts TRUE
+gerollt TRUE
+
+=== gespiegelt steht der rollbalken der tabelle links
+IMPORT "gui"
+SCREEN(480, 220, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 480, 220)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM t AS GUI_WIDGET : t = GUI_TABLE(w, 20, 20, 300, 150)
+GUI_TABLE_HEADERS(t, ["A", "B"])
+DIM k AS INTEGER
+FOR k = 1 TO 40
+    GUI_TABLE_ADD_ROW(t, [STR$(k), "x"])
+NEXT
+GUI_WINDOW_RTL(w, TRUE)
+GUI_UPDATE()
+' Erst unten links auf den Balken (rollt), dann in die erste sichtbare Zeile.
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER
+FOR n = 1 TO 30
+    GUI_UPDATE()
+    CLS(0) : GUI_DRAW() : FLIP()
+NEXT
+PRINT "gewaehlt nach dem rollen "; GUI_TABLE_SELECTED(t) >= 10
+--- datei ev.txt
+c 7
+e 0 7 10 10 0 0
+e 2 7 166 160 0 0
+e 3 6 0 0 0 0
+e 4 5 0 0 0 0
+e 10 7 300 55 0 0
+e 11 6 0 0 0 0
+e 12 5 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=40
+--- erwartet
+gewaehlt nach dem rollen TRUE
+
+=== gespiegelt zieht man eine spalte nach links an ihren nachbarn vorbei
+' Umsortieren nach der Lage der Nachbarn: im Spiegel steht die Spalte
+' davor rechts. A (rechts, 360..460) ueber die Mitte von B gezogen tauscht.
+IMPORT "gui"
+SCREEN(480, 220, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 480, 220)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM t AS GUI_WIDGET : t = GUI_TABLE(w, 20, 20, 300, 150)
+GUI_TABLE_HEADERS(t, ["A", "B", "C"])
+GUI_TABLE_ADD_ROW(t, ["1", "x", "y"])
+GUI_TABLE_COL_WIDTHS(t, [100, 100, 98])
+GUI_TABLE_SET(t, "spalten_verschiebbar", 1)
+GUI_WINDOW_RTL(w, TRUE)
+GUI_UPDATE()
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER
+FOR n = 1 TO 30
+    GUI_UPDATE()
+    CLS(0) : GUI_DRAW() : FLIP()
+NEXT
+PRINT "an stelle 0 "; GUI_TABLE_COL_AT(t, 0); " an stelle 1 "; GUI_TABLE_COL_AT(t, 1)
+--- datei ev.txt
+c 9
+e 0 7 10 10 0 0
+e 2 7 420 30 0 0
+e 3 6 0 0 0 0
+e 5 7 400 30 0 0
+e 7 7 360 30 0 0
+e 9 7 330 30 0 0
+e 11 7 290 30 0 0
+e 13 5 0 0 0 0
+e 15 7 10 10 0 0
+
+--- umgebung
+DHRT_FRAMES=30
+--- erwartet
+an stelle 0 1 an stelle 1 0

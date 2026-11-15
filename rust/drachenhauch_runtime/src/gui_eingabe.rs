@@ -1391,7 +1391,11 @@ impl Gui {
     pub(super) fn ta_versatz(&self, g: &Graphics, wi: usize, wdg: &Widget, zeile: &[char], innen: i32) -> i32 {
         let a = self.ti_ausrichtung(wi, wdg);
         if a != 1 && a != 2 { return 0; }
-        let frei = (innen - self.zeilen_x(g, wdg, zeile, zeile.len())).max(0);
+        let frei = innen - self.zeilen_x(g, wdg, zeile, zeile.len());
+        // Breiter als das Feld: rechtsbuendig steht das Zeilenende am rechten
+        // Rand, und `scroll_x` legt den linken Teil frei (der Ursprung
+        // `tx0` zieht ihn einmal ab, darum zweimal dazu).
+        if frei < 0 { return if a == 2 { frei + 2 * wdg.scroll_x } else { 0 }; }
         if a == 1 { frei / 2 } else { frei }
     }
 
