@@ -1259,3 +1259,10 @@ am Zeilenende der Erwartung ab, die Ausgabe nicht.
   `widget_rtl` sucht das Fenster am Zeiger des Widgets), der Regler waechst
   nach links -- beim Zeichnen, Ziehen (`drag_slider`) und mit den
   Pfeiltasten. Textfelder, Tabellen und Baeume bleiben innen, wie sie sind.
+- **Glas auch in echten Fenstern und Renderzielen**: beide spielt dieselbe
+  Schleife ab; dort steht `UNSCHAERFE_ZIEL` jetzt auf der Groesse des
+  Ziels. Zurueckgelesen wird in Pixeln des Ziels -- unter der Matrix eines
+  echten Fensters auf dichterem Schirm (`RT_MASS`) oder eines
+  Popup-Fensters mit Versatz (`RT_VERSATZ`) --, zurueckgelegt in seinen
+  Punkten (`DrawTexturePro`). Die Grenze "grau" im neuen Fall war erst zu
+  eng (0xCA an der Kante) -- gemessen, nicht geraten, vor dem Anpassen.

@@ -8264,7 +8264,11 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
                 let m = render_targets[i].mass;
                 let (vx, vy) = render_targets[i].versatz;
                 let abbild = m != 1.0 || vx != 0.0 || vy != 0.0;
+                // Glas darf aus diesem Ziel zuruecklesen (echte Fenster,
+                // Renderziele des Programms) -- in seiner Groesse.
+                let (rw, rh) = (render_targets[i].rt.texture.width, render_targets[i].rt.texture.height);
                 let mut tx = rl.begin_texture_mode(thread, &mut render_targets[i].rt);
+                UNSCHAERFE_ZIEL.with(|z| z.set(Some((rw, rh))));
                 let clear = if behalten { None } else { Some(clear_rt) };
                 // Maßstab 1, NICHT der Fenster-Maßstab `s`: ein Render-Target
                 // hat seine EIGENE Pixelgroesse. Mit `s` wurde der Inhalt im
@@ -8286,6 +8290,7 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
                     &[], cam, &[], None, (-1, -1, -1, -1), &empty_set, &empty_map, &empty_emis,
                     (false, 0, 0, 0), &[], None, None, None, None);
                 if abbild { unsafe { raylib::ffi::rlPopMatrix(); } RT_MASS.with(|c| c.set(1.0)); RT_VERSATZ.with(|c| c.set((0.0, 0.0))); }
+                UNSCHAERFE_ZIEL.with(|z| z.set(None));
             }
         }
         let rts: &[RenderTarget] = render_targets;
@@ -8998,8 +9003,15 @@ pub(crate) fn kasten_unschaerfe(px: &mut [u8], b: usize, h: usize, r: usize) {
 
 /// `Cmd::Unschaerfe` abspielen: den Bereich aus dem Ziel zuruecklesen,
 /// unscharf machen, mit runden Ecken wieder hinlegen.
-unsafe fn unschaerfe_zeichnen(x: i32, y: i32, w: i32, h: i32, r: i32, ecke: i32, tw: i32, th: i32) {
+#[allow(clippy::too_many_arguments)]
+unsafe fn unschaerfe_zeichnen(x: i32, y: i32, w: i32, h: i32, r: i32, ecke: i32, tw: i32, th: i32, m: f32, (vx, vy): (f32, f32)) {
     use raylib::ffi;
+    // In einem Ziel mit eigenem Massstab (echtes Fenster auf dichterem
+    // Schirm, Popup-Fenster mit Versatz) liegen die Pixel unter einer Matrix:
+    // gelesen wird in Pixeln des Ziels, gezeichnet zurueck in seinen Punkten.
+    let px = |v: i32, o: f32| ((v as f32 - o) * m).round() as i32;
+    let (x, y, w, h) = (px(x, vx), px(y, vy), (w as f32 * m).round() as i32, (h as f32 * m).round() as i32);
+    let (r, ecke) = ((r as f32 * m).round() as i32, (ecke as f32 * m).round() as i32);
     let (x0, y0) = (x.max(0), y.max(0));
     let (x1, y1) = ((x + w).min(tw), (y + h).min(th));
     if x1 <= x0 || y1 <= y0 || r <= 0 { return; }
@@ -9032,7 +9044,9 @@ unsafe fn unschaerfe_zeichnen(x: i32, y: i32, w: i32, h: i32, r: i32, ecke: i32,
     let bild = ffi::Image { data: px.as_mut_ptr() as *mut _, width: bw as i32, height: bh as i32, mipmaps: 1,
         format: raylib::consts::PixelFormat::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 as i32 };
     let tex = ffi::LoadTextureFromImage(bild);
-    ffi::DrawTexture(tex, x0, y0, ffi::Color { r: 255, g: 255, b: 255, a: 255 });
+    let ziel = ffi::Rectangle { x: x0 as f32 / m + vx, y: y0 as f32 / m + vy, width: bw as f32 / m, height: bh as f32 / m };
+    ffi::DrawTexturePro(tex, ffi::Rectangle { x: 0.0, y: 0.0, width: bw as f32, height: bh as f32 }, ziel,
+        ffi::Vector2 { x: 0.0, y: 0.0 }, 0.0, ffi::Color { r: 255, g: 255, b: 255, a: 255 });
     ffi::rlDrawRenderBatchActive();
     ffi::UnloadTexture(tex);
 }
@@ -9753,7 +9767,9 @@ fn render_scene<D: RaylibDraw>(
                         if let Some((tw, th)) = UNSCHAERFE_ZIEL.with(|z| z.get()) {
                             let x = (*x1).min(*x2) * s; let y = (*y1).min(*y2) * s;
                             let w = ((x2 - x1).abs() + 1) * s; let h = ((y2 - y1).abs() + 1) * s;
-                            unsafe { unschaerfe_zeichnen(x, y, w, h, *r * s, *ecke * s, tw, th); }
+                            let m = RT_MASS.with(|c| c.get());
+                            let v = RT_VERSATZ.with(|c| c.get());
+                            unsafe { unschaerfe_zeichnen(x, y, w, h, *r * s, *ecke * s, tw, th, m, v); }
                         }
                     }
                     Cmd::VerformungEnde => unsafe {

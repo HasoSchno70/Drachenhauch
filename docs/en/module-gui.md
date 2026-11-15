@@ -2529,7 +2529,7 @@ properties for it, plus four commands:
 | `GUI_ANIMATING(wdg)` | is an animation running right now? |
 | `gleiten: 200` | smooth layout transitions (duration in ms, 0..2000): when position or size change (layout, `GUI_SET_BOUNDS`, window size), the picture glides from the old to the new rectangle, easing out; a widget that becomes visible grows in. The hit area is at the target at once. Only in rules without a state; `* { gleiten: 200 }` applies to the whole application |
 | `GUI_GLIDING(wdg)` | is the widget gliding right now? |
-| `unschaerfe: 12` | glass: what is drawn behind the widget (an image, a map, other widgets) lies blurred beneath it (radius 0..40); a surface with opacity shows through: `panel.glas { unschaerfe: 12; bg: #60FFFFFF; radius: 14 }`. Only on the main surface -- in real windows and render targets only the translucent surface remains. Only in rules without a state |
+| `unschaerfe: 12` | glass: what is drawn behind the widget (an image, a map, other widgets) lies blurred beneath it (radius 0..40); a surface with opacity shows through: `panel.glas { unschaerfe: 12; bg: #60FFFFFF; radius: 14 }`. Works on the main surface, in real windows and in render targets. Only in rules without a state |
 
 ```basic
 IMPORT "gui"
