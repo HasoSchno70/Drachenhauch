@@ -155,6 +155,8 @@ impl Gui {
                 if !self.stil_fehler.is_empty() { z.push(format!("fehler beim neu laden: {}", self.stil_fehler)); }
             }
         }
+        // Barrierefreiheit (gui_pruefen.rs): was an diesem Widget auffaellt.
+        for b in self.a11y_befunde(wi, i, &self.a11y_ziele(wi)) { z.push(format!("barrierefreiheit: {}", b)); }
         Ok(z.join("\n"))
     }
 

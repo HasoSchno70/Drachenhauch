@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 2463,
+ "count": 2464,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -555,6 +555,7 @@
   "GRADIENTV": "Rechteck mit vertikalem Farbverlauf (oben→unten)",
   "GREEN": "Kanal 0..255 aus &HRRGGBB",
   "GRID3D": "Bodenraster — hilft ungemein beim Einschätzen von Entfernungen",
+  "GUI_A11Y_CHECK$": "die Oberfläche prüfen: eine Zeile je Befund, \"\" = nichts gefunden; ohne Fenster alle sichtbaren",
   "GUI_ACCORDION": "GUI_WIDGET — Akkordeon: Abschnitte mit Kopf, die auf- und zuklappen; was darunter liegt, rückt beim Aufklappen nach unten",
   "GUI_ACCORDION_ADD": "INTEGER — einen Abschnitt anhängen (zu), liefert seine Nummer",
   "GUI_ACCORDION_ADD_WIDGET": "ein Widget in einen Abschnitt legen; seine Lage gilt ab dem Abschnitt (unter dem Kopf)",

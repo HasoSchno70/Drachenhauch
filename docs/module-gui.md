@@ -3841,6 +3841,34 @@ Was das Programm beisteuern kann:
 | `GUI_SCREENREADER()` | `TRUE`, sobald ein Hilfsprogramm den Baum angefordert hat — etwa um mehr anzusagen oder Bewegung abzuschalten |
 | `GUI_SET_TAB_INDEX(wdg, index)` | Tab-Reihenfolge festlegen: Widgets mit Index über 0 zuerst, aufsteigend; 0 (Vorgabe) = Reihenfolge des Anlegens |
 | `GUI_GET_TAB_INDEX(wdg)` | den gesetzten Index lesen (0 = Anlege-Reihenfolge) |
+| `GUI_A11Y_CHECK$([win])` | die Oberfläche prüfen: eine Zeile je Befund, `""` = nichts gefunden; ohne Fenster alle sichtbaren |
+
+**Selbst prüfen.** `GUI_A11Y_CHECK$` findet, was eine Oberfläche für
+Menschen mit schwacher Sicht, mit Bildschirmleser oder unruhiger Hand
+schwer macht -- mit denselben Farben und Lagen, die die gui zeichnet:
+
+- **Kontrast** der Schrift auf ihrem Grund unter 4,5:1 (große Schrift ab
+  24 Punkten: 3:1, WCAG 1.4.3); abgeschaltete Widgets zählen nicht.
+- **Kein Name** für den Bildschirmleser: ein bedienbares Widget ohne Text,
+  ohne Beschriftung davor und ohne `GUI_TOOLTIP`. Ein Knopf nur mit
+  Sinnbild heißt für den Leser wie sein Hilfetext.
+- **Zu kleine Ziele**: unter 24 × 24 Punkten nur, wenn ein Kreis von 24
+  Punkten um die Mitte kein anderes Ziel berührt (WCAG 2.5.8).
+
+```basic
+IMPORT "gui"
+SCREEN(420, 200, "Pruefen", 1)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Pruefen", 10, 10, 400, 180)
+DIM weg AS GUI_WIDGET : weg = GUI_BUTTON(w, "", 20, 20, 32, 32)
+DIM befund AS STRING : befund = GUI_A11Y_CHECK$()
+IF befund <> "" THEN PRINT befund
+' button bei 20,20 in "Pruefen": kein Name fuer den Bildschirmleser -- ...
+```
+
+Gemessen wird auf dem eigenen Grund eines Widgets, sonst auf dem des
+Fensters -- ein farbiges Panel darunter kennt die Prüfung nicht. Der
+Inspektor (`GUI_INSPECTOR`) nennt die Befunde zum gewählten Widget; die
+eingebauten Themen bestehen die Prüfung.
 
 **Beschriftungen.** Ein Eingabefeld hat keinen eigenen Text; der
 Bildschirmleser nimmt die **Beschriftung links daneben** (gleiche Zeile)

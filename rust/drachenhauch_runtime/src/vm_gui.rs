@@ -1193,6 +1193,10 @@ impl<'p> Vm<'p> {
             "gui_system_reduced_motion" => { let n = "GUI_SYSTEM_REDUCED_MOTION";
                 if !a.is_empty() { return Err(format!("{}: erwartet keine Argumente", n)); }
                 Value::Bool(crate::systemaussehen::weniger_bewegung()) }
+            "gui_a11y_check$" => { let n = "GUI_A11Y_CHECK$";
+                if a.len() > 1 { return Err(format!("{}: erwartet ([win])", n)); }
+                let nur = if a.len() == 1 { Some(gi(a,0,n)?) } else { None };
+                Value::str_rc(&self.gui.a11y_check(nur)?) }
             "gui_set_contrast" => { let n = "GUI_SET_CONTRAST";
                 if a.len() != 1 { return Err(format!("{}: erwartet (modus$)", n)); }
                 self.gui.set_contrast(&gs(a,0,n)?)?; Value::Nil }

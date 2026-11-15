@@ -309,6 +309,8 @@ DIM kindAus AS STRING : kindAus = auslesen$(kind, 40000)
 IF INSTR(auslesenFehler, "Kein Fenster moeglich") >= 0 THEN PRINT "UEBERSPRINGEN: kein Fenster moeglich"
 PRINT "knopf "; (INSTR(leser, "N: ControlType.Button [Farbrad]") >= 0)
 PRINT "kaestchen "; (INSTR(leser, "N: ControlType.CheckBox [Nachtmodus]") >= 0)
+' Ein Knopf nur mit Sinnbild heisst wie sein Hilfetext (gui_a11y.rs).
+PRINT "sinnbild "; (INSTR(leser, "N: ControlType.Button [Loeschen]") >= 0)
 IF PROCESS_CODE(ps) <> 0 THEN PRINT leser
 PRINT kindAus;
 --- datei helfer.dh
@@ -322,6 +324,8 @@ DIM rad AS GUI_WIDGET : rad = GUI_CUSTOM(w, 10, 10, 120, 60)
 GUI_SET_TEXT(rad, "Farbrad")
 DIM nacht AS GUI_WIDGET : nacht = GUI_CUSTOM(w, 10, 90, 120, 40, "checkbox")
 GUI_SET_TEXT(nacht, "Nachtmodus")
+DIM weg AS GUI_WIDGET : weg = GUI_BUTTON(w, "", 150, 10, 32, 32)
+GUI_TOOLTIP(weg, "Loeschen")
 DIM fertig AS BOOLEAN : fertig = FALSE
 WHILE NOT QUITREQUESTED() AND NOT fertig
     GUI_UPDATE()
@@ -360,6 +364,7 @@ $btn.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invok
 leser rueckgabe 0
 knopf TRUE
 kaestchen TRUE
+sinnbild TRUE
 geklickt
 
 === speak ohne gui spricht ueber den leser

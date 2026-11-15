@@ -1325,4 +1325,16 @@ am Zeilenende der Erwartung ab, die Ausgabe nicht.
   `increaseContrast`, GNOME `high-contrast`), `GUI_SET_CONTRAST` zum
   Ueberstimmen und Pruefen. Die Gegenprobe gegen das Neuaufloesen traf drei
   Faelle zugleich -- alle haengen an derselben Stelle.
+- **Barrierefreiheit pruefen (2026-11-15).** `GUI_A11Y_CHECK$` (gui_pruefen.rs):
+  Kontrast mit den Farben des Zeichnens (`knopf_text`/`knopf_grund`,
+  `txt_col`), Name nach derselben Regel wie der AccessKit-Baum,
+  Zielgroesse nach WCAG 2.5.8 MIT der Ausnahme fuer Abstand (die
+  Vorgaben sind klein: Kaestchen 16 hoch, Regler 14 -- eine starre
+  24x24-Pruefung haette jedes Kaestchen gemeldet). Der erste Lauf ueber die
+  eigenen Themen fand acht Befunde: `lesbar_auf` waehlte nach Luma 160 und
+  setzte weisse Schrift auf Cyan (2,1:1), Gruen (3,4) und Orange (2,7) --
+  jetzt nach dem hoeheren WCAG-Kontrast; der Akzent von `modern_light`
+  (0x2A7DE1) lag als Schrift bei 4,0:1 -> 0x1D6DCE. Ein Knopf nur mit
+  Sinnbild hiess fuer den Bildschirmleser "Knopf" (der Hilfetext war nur
+  Beschreibung) -- jetzt ist er sein Name. Der Inspektor nennt die Befunde.
 

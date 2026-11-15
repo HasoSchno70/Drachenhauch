@@ -27,6 +27,8 @@ mod popupfenster;
 mod aussehen;
 #[path = "gui_inspektor.rs"]
 mod inspektor;
+#[path = "gui_pruefen.rs"]
+mod pruefen;
 #[path = "gui_effekte.rs"]
 mod effekte;
 #[path = "gui_palette.rs"]
@@ -230,7 +232,9 @@ fn preset(name: &str) -> Option<HashMap<String, i64>> {
             ("win_bg", 0xFAFBFC), ("win_border", 0xD8DEE6), ("title_bg", 0xEFF2F5),
             ("title_bg_focus", 0xFFFFFF), ("title_fg", 0x1F2733), ("widget_bg", 0xFFFFFF),
             ("widget_border", 0xCBD3DD), ("text_fg", 0x1F2733), ("muted_fg", 0x8A93A0),
-            ("accent", 0x2A7DE1), ("close_hover", 0xE03B3B)])),
+            // Akzent 0x2A7DE1 -> 0x1D6DCE (2026-11-15): als Schrift auf dem
+            // Grund 4,0:1, mit weisser Schrift 4,1:1 -- jetzt 4,9 und 5,1.
+            ("accent", 0x1D6DCE), ("close_hover", 0xE03B3B)])),
         _ => None,
     }
 }
@@ -3002,9 +3006,14 @@ fn kontrast(a: i64, b: i64) -> f64 {
     (la.max(lb) + 0.05) / (la.min(lb) + 0.05)
 }
 
+///
+/// Gewaehlt wird die Schrift mit dem hoeheren Kontrast nach WCAG. Bis
+/// 2026.49 entschied eine Helligkeitsgrenze (Luma 160): auf dem Cyan des
+/// dunklen Themas ergab das weisse Schrift mit 2,1:1 statt dunkler mit 7,9:1,
+/// auf Gruen und Orange ebenso -- gefunden mit GUI_A11Y_CHECK$.
 fn lesbar_auf(bg: i64) -> i64 {
-    let (r, g, b) = (((bg >> 16) & 0xFF) as f64, ((bg >> 8) & 0xFF) as f64, (bg & 0xFF) as f64);
-    if 0.299 * r + 0.587 * g + 0.114 * b > 160.0 { 0x1C2026 } else { 0xFFFFFF }
+    let bg = bg & 0xFFFFFF;
+    if kontrast(0x1C2026, bg) > kontrast(0xFFFFFF, bg) { 0x1C2026 } else { 0xFFFFFF }
 }
 
 /// Knopfarten (GUI_BUTTON_VARIANT). Index = Wert im Widget-Feld `variante`.

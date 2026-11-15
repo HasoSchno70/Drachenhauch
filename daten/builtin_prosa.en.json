@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/en und dem englischen Buch von `dhrt doku prosa` -- NICHT von Hand aendern. Der Hover nimmt sie mit DHRT_LANG=en.",
- "count": 2455,
+ "count": 2456,
  "docs": {
   "ABS": "Absolute value.",
   "ACOS": "Arc sine/cosine (x in [-1, 1])",
@@ -554,6 +554,7 @@
   "GRADIENTV": "rectangle with a vertical colour gradient (top→bottom)",
   "GREEN": "channel 0..255 from &HRRGGBB",
   "GRID3D": "ground grid — helps enormously with judging distances",
+  "GUI_A11Y_CHECK$": "check the interface: one line per finding, \"\" = nothing found; without a window all visible ones",
   "GUI_ACCORDION": "GUI_WIDGET — accordion: sections with a header that expand and collapse; whatever lies below moves down when expanding",
   "GUI_ACCORDION_ADD": "INTEGER — append a section (collapsed), returns its number",
   "GUI_ACCORDION_ADD_WIDGET": "put a widget in a section; its position counts from the section (below the header)",
