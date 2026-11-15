@@ -966,6 +966,12 @@ pub struct Vm<'p> {
     // Audio-Geraet (lazy bei erstem LOADSOUND/PLAYSOUND/PLAYMUSIC initialisiert).
     #[cfg(feature = "graphics")]
     audio: Option<crate::audio::Audio>,
+    /// Klaenge der gui (vm_gui.rs `gui_klaenge_spielen`): Name/Pfad -> Slot
+    /// (-1 = liess sich nicht laden), und ob es gar kein Audio gibt.
+    #[cfg(feature = "graphics")]
+    gui_klang_slots: std::collections::HashMap<String, i64>,
+    #[cfg(feature = "graphics")]
+    gui_klang_kaputt: bool,
     // Retained-Mode-GUI (Modul gui): persistente Fenster/Widgets.
     #[cfg(feature = "graphics")]
     gui: crate::gui::Gui,
@@ -1225,6 +1231,10 @@ impl<'p> Vm<'p> {
             gfx: None,
             #[cfg(feature = "graphics")]
             audio: None,
+            #[cfg(feature = "graphics")]
+            gui_klang_slots: std::collections::HashMap::new(),
+            #[cfg(feature = "graphics")]
+            gui_klang_kaputt: false,
             #[cfg(feature = "graphics")]
             gui: crate::gui::Gui::new(),
             gui_tausch: None,

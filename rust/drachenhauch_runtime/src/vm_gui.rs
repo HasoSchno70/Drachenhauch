@@ -1155,6 +1155,38 @@ impl<'p> Vm<'p> {
             "gui_system_dark" => { let n = "GUI_SYSTEM_DARK";
                 if !a.is_empty() { return Err(format!("{}: erwartet keine Argumente", n)); }
                 Value::Bool(crate::systemaussehen::jetzt().dunkel == Some(true)) }
+            "gui_sound" => { let n = "GUI_SOUND";
+                if a.is_empty() || a.len() > 2 { return Err(format!("{}: erwartet (name$ [, lautstaerke])", n)); }
+                let laut = if a.len() == 2 { gi(a,1,n)? } else { 100 };
+                self.gui.sound(&gs(a,0,n)?, laut)?; Value::Nil }
+            "gui_set_sounds" => { let n = "GUI_SET_SOUNDS";
+                if a.len() != 1 { return Err(format!("{}: erwartet (an)", n)); }
+                self.gui.set_sounds(gbool(a,0,n)?); Value::Nil }
+            "gui_sounds" => { let n = "GUI_SOUNDS";
+                if !a.is_empty() { return Err(format!("{}: erwartet keine Argumente", n)); }
+                Value::Bool(self.gui.sounds()) }
+            "gui_sound_log$" => { let n = "GUI_SOUND_LOG$";
+                if !a.is_empty() { return Err(format!("{}: erwartet keine Argumente", n)); }
+                Value::str_rc(&self.gui.sound_log()) }
+            "gui_burst" => { let n = "GUI_BURST";
+                if a.len() < 2 || a.len() > 3 { return Err(format!("{}: erwartet (wdg, art$ [, anzahl])", n)); }
+                let anzahl = if a.len() == 3 { Some(gi(a,2,n)?) } else { None };
+                self.gui.burst(gi(a,0,n)?, &gs(a,1,n)?, anzahl)?; Value::Nil }
+            "gui_bursting" => { let n = "GUI_BURSTING";
+                if !a.is_empty() { return Err(format!("{}: erwartet keine Argumente", n)); }
+                Value::Int(self.gui.bursting()) }
+            "gui_palette" => { let n = "GUI_PALETTE";
+                if a.len() > 1 { return Err(format!("{}: erwartet ([an])", n)); }
+                if a.len() == 1 { self.gui.palette_oeffnen(gbool(a,0,n)?); Value::Nil } else { Value::Bool(self.gui.palette_offen()) } }
+            "gui_palette_key" => { let n = "GUI_PALETTE_KEY";
+                if a.len() != 1 { return Err(format!("{}: erwartet (an)", n)); }
+                self.gui.palette_taste(gbool(a,0,n)?); Value::Nil }
+            "gui_palette_filter" => { let n = "GUI_PALETTE_FILTER";
+                if a.len() != 1 { return Err(format!("{}: erwartet (text$)", n)); }
+                self.gui.palette_filter(&gs(a,0,n)?)?; Value::Nil }
+            "gui_palette_items$" => { let n = "GUI_PALETTE_ITEMS$";
+                if !a.is_empty() { return Err(format!("{}: erwartet keine Argumente", n)); }
+                Value::str_rc(&self.gui.palette_items()) }
             "gui_system_reduced_motion" => { let n = "GUI_SYSTEM_REDUCED_MOTION";
                 if !a.is_empty() { return Err(format!("{}: erwartet keine Argumente", n)); }
                 Value::Bool(crate::systemaussehen::weniger_bewegung()) }
@@ -1514,6 +1546,11 @@ impl<'p> Vm<'p> {
                         self.gui.ime_vorschau(vorschau);
                     }
                     self.gui.update(g);
+                    // Klaenge der gui (Stildatei `klang`, GUI_SOUND) spielen --
+                    // die gui hat kein Audio, die VM schon.
+                    let klaenge = self.gui.klaenge_abholen();
+                    if !klaenge.is_empty() { self.gui_klaenge_spielen(klaenge); }
+                    let g = self.gfx.as_mut().unwrap();
                     // Danach: hat ein Textfeld den Fokus (dann gehoert die
                     // Umwandlung dem Feld), und wo steht seine Schreibmarke
                     // (Kandidatenliste der IME, Weg B).
@@ -1910,6 +1947,40 @@ impl<'p> Vm<'p> {
             _ => return Ok(None),
         };
         Ok(Some(r))
+    }
+
+    /// Die Klaenge der gui spielen: eingebaute erzeugt (einmal, dann
+    /// gemerkt), Dateien geladen (ebenso). Ohne Soundkarte bleibt es still
+    /// -- ein Klang der Oberflaeche darf nie ein Programm abbrechen.
+    #[cfg(feature = "graphics")]
+    fn gui_klaenge_spielen(&mut self, klaenge: Vec<(String, i32)>) {
+        if self.gui_klang_kaputt { return; }
+        if self.audio_mut().is_err() { self.gui_klang_kaputt = true; return; }
+        for (name, laut) in klaenge {
+            let slot = match self.gui_klang_slots.get(&name) {
+                Some(&s) => s,
+                None => {
+                    let au = self.audio.as_mut().unwrap();
+                    // (Welle, Hz, Dauer, Angriff, Abfall, Halten, Ausklang, Pegel, Gleiten)
+                    let neu = match name.as_str() {
+                        "klick" => au.note("triangle", 1900.0, 6, 0, 6, 0.0, 10, 0.45, 0.0, 0.0, 0.0, -3.0),
+                        "tick" => au.note("sine", 2600.0, 4, 0, 4, 0.0, 8, 0.30, 0.0, 0.0, 0.0, 0.0),
+                        "ping" => au.note("sine", 1320.0, 30, 2, 30, 0.3, 260, 0.35, 0.0, 0.0, 4.0, 0.0),
+                        "plopp" => au.note("sine", 520.0, 45, 1, 40, 0.0, 30, 0.55, 0.0, 0.0, 0.0, -12.0),
+                        "fehler" => au.note("square", 196.0, 110, 2, 60, 0.5, 80, 0.25, 0.0, 0.0, 6.0, -2.0),
+                        "erfolg" => au.note("triangle", 660.0, 120, 3, 60, 0.6, 160, 0.40, 0.0, 0.0, 5.0, 7.0),
+                        pfad => au.load_sound(pfad),
+                    };
+                    match neu {
+                        Ok(s) => { self.gui_klang_slots.insert(name.clone(), s); s }
+                        Err(e) => { eprintln!("gui-Klang '{}': {}", name, e); self.gui_klang_slots.insert(name.clone(), -1); -1 }
+                    }
+                }
+            };
+            if slot >= 0 {
+                if let Some(au) = self.audio.as_mut() { let _ = au.play_sound(slot, laut as f64 / 100.0); }
+            }
+        }
     }
 
     /// Audio-Geraet lazy initialisieren (bei erstem Sound-/Musik-Builtin).

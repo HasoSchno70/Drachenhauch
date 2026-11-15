@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 2489,
+ "count": 2499,
  "builtins": [
   {
    "name": "ABS",
@@ -4200,6 +4200,66 @@
    "name": "GUI_INSPECT$",
    "kind": "core",
    "signature": "GUI_INSPECT$(widget) AS STRING",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_SOUND",
+   "kind": "core",
+   "signature": "GUI_SOUND(name$ [, lautstaerke])",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_SET_SOUNDS",
+   "kind": "core",
+   "signature": "GUI_SET_SOUNDS(an)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_SOUNDS",
+   "kind": "core",
+   "signature": "GUI_SOUNDS() AS BOOLEAN",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_SOUND_LOG$",
+   "kind": "core",
+   "signature": "GUI_SOUND_LOG$() AS STRING",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_BURST",
+   "kind": "core",
+   "signature": "GUI_BURST(wdg, art$ [, anzahl])",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_BURSTING",
+   "kind": "core",
+   "signature": "GUI_BURSTING() AS INTEGER",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_PALETTE",
+   "kind": "core",
+   "signature": "GUI_PALETTE([an])",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_PALETTE_KEY",
+   "kind": "core",
+   "signature": "GUI_PALETTE_KEY(an)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_PALETTE_FILTER",
+   "kind": "core",
+   "signature": "GUI_PALETTE_FILTER(text$)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_PALETTE_ITEMS$",
+   "kind": "core",
+   "signature": "GUI_PALETTE_ITEMS$() AS STRING",
    "module": "gui"
   },
   {

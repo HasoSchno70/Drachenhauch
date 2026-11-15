@@ -2593,6 +2593,68 @@ auf das Ende wartet, wartet also nicht ewig. Farbübergänge bleiben, sie
 bewegen nichts. `GUI_SET_MOTION` überstimmt das System, etwa für einen
 eigenen Schalter in den Einstellungen.
 
+### 10. Klänge und Funken
+
+Eine Oberfläche, die man hört und die sich freut: zwei Eigenschaften der
+Stildatei mehr und sechs Befehle.
+
+| Eigenschaft / Befehl | Wirkung |
+|---|---|
+| `klang: klick \| tick \| ping \| plopp \| fehler \| erfolg \| datei.wav [NN%]` | ein Klang zum Anlass der Regel: **ohne Zustand beim Klick**, `:hover` beim Hineinfahren, `:active` beim Drücken, `:focus` beim Fokus. Eingebaute Klänge brauchen keine Datei; `NN%` ist die Lautstärke (0..200) |
+| `effekt: funken \| konfetti \| sterne` | Teilchen zu denselben Anlässen, gezeichnet über allem |
+| `GUI_SOUND(name$ [, lautstaerke])` | einen Klang der gui spielen (dieselben Namen, Lautstärke in Prozent) |
+| `GUI_SET_SOUNDS(an)` / `GUI_SOUNDS()` | alle Klänge der gui an oder aus -- für einen Schalter „Töne“ in den Einstellungen |
+| `GUI_SOUND_LOG$()` | die gewünschten Klänge seit dem letzten Aufruf, durch Komma getrennt (auch ohne Soundkarte -- für Prüfungen) |
+| `GUI_BURST(wdg, art$ [, anzahl])` | Funken, Konfetti oder Sterne an einem Widget, etwa nach dem Speichern (`anzahl` 1..500, ohne = passend zur Art) |
+| `GUI_BURSTING()` | wie viele Teilchen gerade fliegen |
+
+```basic
+IMPORT "gui"
+SCREEN(500, 240, "Fertig", 1)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Fertig", 10, 10, 480, 220)
+DIM ok AS GUI_WIDGET : ok = GUI_BUTTON(w, "Abschicken", 20, 20, 160, 44)
+GUI_STYLESHEET("button { klang: klick }" + CHR$(10) + "button:hover { klang: tick 40% }")
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_CLICKED(ok) THEN
+        GUI_BURST(ok, "konfetti")
+        GUI_SOUND("erfolg")
+    END IF
+    CLS(&H202830) : GUI_DRAW() : FLIP()
+WEND
+```
+
+Die gui spielt ihre Klänge über das Audio der Laufzeit; ohne Soundkarte
+bleibt es still, ein Programm bricht daran nie ab. Teilchen gibt es nur,
+solange Bewegung an ist ([Abschnitt 9](#9-inspektor-stildatei-live-und-ruhige-bewegung)):
+wer „Animationen reduzieren“ gewählt hat, bekommt den Klang, aber kein
+Konfetti.
+
+### 11. Befehlspalette
+
+Jedes Programm mit einer Menüleiste oder Werkzeugleiste hat eine
+Befehlspalette, ohne eine Zeile dafür: **Strg+Umschalt+P** öffnet über dem
+Fenster mit dem Fokus eine Suche über alle Einträge seiner Menüleiste (samt
+Untermenüs, „Datei › Zuletzt › brief.txt“) und die Knöpfe seiner
+Werkzeugleisten. Tippen filtert (ein Wortanfang zuerst, dann ein Treffer im
+Wort, dann verstreute Buchstaben), Hoch/Runter wählt, Enter oder ein Klick
+löst aus -- genau wie Maus und Kürzel, `GUI_CLICKED` und Rückrufe inklusive.
+ESC oder ein Klick daneben schließt sie. Gesperrte Einträge fehlen, ein
+Knopf, den schon ein Menü nennt, steht nur einmal da.
+
+| Befehl | Rückgabe | Wirkung |
+|---|---|---|
+| `GUI_PALETTE([an])` | BOOLEAN ohne Argument | öffnen (`TRUE`) oder schließen; ohne Argument: ist sie offen? |
+| `GUI_PALETTE_KEY(an)` | — | Strg+Umschalt+P an (Vorgabe) oder aus |
+| `GUI_PALETTE_FILTER(text$)` | — | die Suche setzen (die Palette muss offen sein) |
+| `GUI_PALETTE_ITEMS$()` | STRING | die passenden Einträge, je Zeile der Text und, wenn es eins gibt, TAB und Kürzel; der gewählte beginnt mit `>` |
+
+Ein eigenes Kürzel geht vor: hat ein Menü des Programms selbst
+Strg+Umschalt+P (wie die IDE mit ihrer eigenen Palette), löst es seinen
+Eintrag aus, und die Palette bleibt zu. Solange sie offen ist, hat kein
+Widget den Fokus -- eine Rücktaste kürzt die Suche, nicht den Text im Feld
+darunter; danach kommt der Fokus zurück.
+
 ## Callbacks: GUI_ON_CLICK
 
 Neben dem Polling (`IF GUI_CLICKED(b) THEN ...`) kannst du eine Drachenhauch-

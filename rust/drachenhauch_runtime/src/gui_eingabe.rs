@@ -80,6 +80,8 @@ impl Gui {
         self.stil_pass();
         self.aussehen_pass(g);
         self.bewegung_pass();
+        self.effekte_anlass_pass();
+        self.funken_pass(g.delta().clamp(0.0, 0.25));
         self.rs_pass(g.delta());
         for wi in 0..self.windows.len() {
             for i in 0..self.windows[wi].widgets.len() {
@@ -155,6 +157,8 @@ impl Gui {
         let ueber_weg = ueber_weg || self.rs_druck(g, mx, my, just_pressed, right_just);
         // Inspektor: ein Druck waehlt ein Widget, erreicht es aber nicht.
         let ueber_weg = ueber_weg || ((just_pressed || right_just) && self.inspektor_druck(g, mx, my));
+        // Befehlspalette: ein Druck waehlt oder schliesst sie.
+        let ueber_weg = ueber_weg || ((just_pressed || right_just) && self.palette.is_some() && self.palette_druck(g, mx, my));
         let just_pressed = just_pressed && !ueber_weg;
         let right_just = right_just && !ueber_weg;
         if just_pressed { self.fluss_druck(mx, my); }
@@ -193,7 +197,11 @@ impl Gui {
         self.untermenues_folgen(g, mx, my);
         self.kuerzel_gefeuert = false;
         if self.flaeche == 0 { self.inspektor_tasten(g); }
+        if self.palette.is_some() { self.kuerzel_gefeuert = true; }
         if !menu_consumed && !self.kuerzel_gefeuert { self.kuerzel_pruefen(g); self.mn_pruefen(g); }
+        // Die Palette nach den Menuekuerzeln (eines des Programms gewinnt),
+        // vor den Widgets (ihre Tasten erreichen kein Textfeld).
+        if self.flaeche == 0 { self.palette_pass(g); }
 
         // Inhalts-Scroll: Mausrad ueber scrollbarem Fenster.
         if let Some(top) = self.topmost_at(mx, my) {

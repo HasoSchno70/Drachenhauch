@@ -1,0 +1,39 @@
+' Klaenge der gui kommen am Mischer an (gui_effekte.rs, vm_gui.rs
+' `gui_klaenge_spielen`). GUI_SOUND_LOG$ in gui_klang_funken.dhtest belegt
+' nur den Wunsch; hier misst AUDIO_PEAK den Master: nach GUI_SOUND und
+' einem GUI_UPDATE ist es laut, mit GUI_SET_SOUNDS(FALSE) still.
+' Format: docs/werkzeuge.md, dhrt test.
+--- seriell
+
+=== ein klang der gui ist am master zu hoeren
+TRY
+    SCREEN(300, 200, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+SET_WINDOW_POS(-3000, -3000)
+IMPORT "gui"
+IMPORT "audio"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 300, 200)
+FUNCTION spitze_nach(ms AS INTEGER) AS FLOAT
+    DIM hoch AS FLOAT
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < ms
+        DIM p AS FLOAT : p = AUDIO_PEAK()
+        IF p > hoch THEN hoch = p
+        SLEEP(5)
+    WEND
+    RETURN hoch
+END FUNCTION
+DIM ruhe AS FLOAT : ruhe = spitze_nach(150)
+GUI_SOUND("ping")
+GUI_UPDATE()
+DIM laut AS FLOAT : laut = spitze_nach(400)
+GUI_SET_SOUNDS(FALSE)
+GUI_SOUND("ping")
+GUI_UPDATE()
+DIM still AS FLOAT : still = spitze_nach(400)
+PRINT "vorher still "; ruhe < 0.001; " ping laut "; laut > 0.02; " ausgeschaltet still "; still < 0.001
+--- erwartet
+vorher still TRUE ping laut TRUE ausgeschaltet still TRUE

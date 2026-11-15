@@ -45,7 +45,7 @@ pub(super) const FOKUS: usize = 2;
 pub(super) const AKTIV: usize = 3;
 pub(super) const AUS: usize = 4;
 
-const EIGENSCHAFTEN: &str = "bg, fg, border, accent, radius, groesse, stil, abstand, randbreite, schatten, verlauf, glanz, fase, uebergang (auch je Farbe: uebergang: 120, bg 400), form, bild, bildrand, animation";
+const EIGENSCHAFTEN: &str = "bg, fg, border, accent, radius, groesse, stil, abstand, randbreite, schatten, verlauf, glanz, fase, uebergang (auch je Farbe: uebergang: 120, bg 400), form, bild, bildrand, animation, klang, effekt";
 const ZUSTAENDE: &str = ":hover, :focus, :active, :disabled, :checked";
 
 /// Eine Farbe aus der Stildatei: fest oder ein Name des Themas (dann folgt
@@ -78,6 +78,10 @@ pub(super) struct StilWerte {
     pub(super) bildrand: Option<i32>,
     /// Animation (auch je Zustand).
     pub(super) animation: Option<super::aussehen::AnimStil>,
+    /// Klang (Name oder Pfad, Lautstaerke %) und Effekt zum Anlass der
+    /// Schicht (gui_effekte.rs).
+    pub(super) klang: Option<(String, i32)>,
+    pub(super) effekt: Option<u8>,
 }
 
 /// Die Farbrollen, die eine eigene Dauer haben koennen -- ihre Stelle ist
@@ -163,6 +167,8 @@ impl StilWerte {
         if let Some(v) = &self.bild { t.push(format!("bild {}", v)); }
         if let Some(v) = self.bildrand { t.push(format!("bildrand {}", v)); }
         if let Some(a) = self.animation { t.push(format!("animation {}", super::aussehen::anim_text(a))); }
+        if let Some((k, l)) = &self.klang { t.push(if *l == 100 { format!("klang {}", k) } else { format!("klang {} {}%", k, l) }); }
+        if let Some(e) = self.effekt { t.push(format!("effekt {}", super::effekte::EFFEKTE.get(e as usize).unwrap_or(&"?"))); }
         t.join(", ")
     }
 
@@ -194,6 +200,8 @@ impl StilWerte {
         if o.bild.is_some() { self.bild = o.bild.clone(); }
         if o.bildrand.is_some() { self.bildrand = o.bildrand; }
         if o.animation.is_some() { self.animation = o.animation; }
+        if o.klang.is_some() { self.klang = o.klang.clone(); }
+        if o.effekt.is_some() { self.effekt = o.effekt; }
     }
 }
 
@@ -502,6 +510,8 @@ pub(super) fn lesen(text: &str, thema: &dyn Fn(&str) -> bool) -> Result<Stildate
                 }
                 "bildrand" | "image-border" => werte.bildrand = Some(zahl_lesen_stil(wert, zeile, "bildrand", 0, 200)?),
                 "animation" => werte.animation = Some(super::aussehen::anim_lesen(wert, zeile)?),
+                "klang" | "sound" => werte.klang = Some(super::effekte::klang_lesen(wert, zeile)?),
+                "effekt" | "effect" => werte.effekt = Some(super::effekte::effekt_lesen(wert, zeile)?),
                 _ => return Err(format!("Zeile {}: Eigenschaft '{}' gibt es nicht -- bekannt sind {}", zeile, name, EIGENSCHAFTEN)),
             }
         }
