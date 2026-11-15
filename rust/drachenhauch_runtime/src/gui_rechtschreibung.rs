@@ -139,9 +139,10 @@ impl Gui {
                 Kind::TextArea => self.ta_index_at(g, wi, i, mx, my).map(|k| (wi, i, k)),
                 Kind::TextInput => {
                     let ms = self.mass(g, w);
-                    let (ax, _, _, _) = self.abs_rect(wi, w);
+                    let (ax, _, fw, _) = self.abs_rect(wi, w);
                     let chars: Vec<char> = w.text.chars().collect();
-                    let k = Self::caret_index_at(g, &chars, mx - (ax + 5 + self.ti_rand(w).0) + w.scroll, ms);
+                    let (tx, roll) = self.ti_text_lage(wi, w, ax, fw, self.wtext_width(g, w, &w.text));
+                    let k = Self::caret_index_at(g, &chars, mx - tx + roll, ms);
                     Some((wi, i, k))
                 }
                 _ => None,

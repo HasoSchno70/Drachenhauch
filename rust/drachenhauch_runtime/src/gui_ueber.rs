@@ -363,6 +363,26 @@ impl Gui {
             None => (l, r),
         }
     }
+    /// Wo der Text eines einzeiligen Feldes beginnt und wie weit er gerollt
+    /// ist: (x des Textanfangs, Rollweite). Die EINE Stelle fuer Zeichnen,
+    /// Marke, Klick, Rechtsklick und Rechtschreibung -- vorher rechneten drei
+    /// davon ohne Ausrichtung, und ein rechtsbuendiges Feld setzte die Marke
+    /// beim Klick daneben. `tw` = Breite des sichtbaren Texts. Ausgerichtet
+    /// wird nur, solange der Text hineinpasst; im Fenster von rechts nach
+    /// links steht ein Feld ohne GUI_SET_ALIGN rechts.
+    pub(super) fn ti_text_lage(&self, wi: usize, wdg: &Widget, ax: i32, w: i32, tw: i32) -> (i32, i32) {
+        let (sl, sr) = self.ti_rand(wdg);
+        let rechts = if wdg.frei { self.sk(DD_PFEIL_B) } else { 0 };
+        let inner = (w - 10 - rechts - sl - sr).max(1);
+        let align = self.ti_ausrichtung(wi, wdg);
+        if align >= 1 && tw <= inner {
+            (if align == 1 { ax + 5 + sl + (inner - tw) / 2 } else { ax + 5 + sl + inner - tw }, 0)
+        } else { (ax + 5 + sl, wdg.scroll) }
+    }
+    /// Die wirksame Ausrichtung: GUI_SET_ALIGN, sonst rechts im gespiegelten Fenster.
+    pub(super) fn ti_ausrichtung(&self, wi: usize, wdg: &Widget) -> i32 {
+        if wdg.align < 0 && self.windows.get(wi).map_or(false, |w| w.rtl) { 2 } else { wdg.align as i32 }
+    }
     /// Nur der Platz der Sinnbilder (fuer Treffer und Zeichnen der Sinnbilder).
     pub(super) fn ti_symbole(&self, w: &Widget) -> (i32, i32) {
         let Some(z) = w.feld.as_ref() else { return (0, 0) };

@@ -1188,7 +1188,10 @@ impl Gui {
         if g.mouse_button(0) {
             let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
             let (sl, sr) = self.ti_rand(&self.windows[wi].widgets[i]);
-            let target = mx - (ax + 5 + sl) + scroll;
+            let sicht: String = sichtbar(&chars).into_iter().collect();
+            let tw = self.wtext_width(g, &self.windows[wi].widgets[i], &sicht);
+            let (tx, roll) = self.ti_text_lage(wi, &self.windows[wi].widgets[i], ax, fw, tw);
+            let target = mx - tx + roll;
             let idx = Self::caret_index_at(g, &sichtbar(&chars), target, ms);
             if !self.was_mouse_down {
                 // Ueber einem Sinnbild setzt der Druck keine Marke.

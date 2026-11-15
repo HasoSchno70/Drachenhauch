@@ -1141,12 +1141,13 @@ impl Gui {
     pub(super) fn ti_rechtsklick(&mut self, g: &Graphics, wi: usize, i: usize, mx: i32) {
         if !self.windows[wi].widgets[i].enabled { return; }
         let ms = self.mass(g, &self.windows[wi].widgets[i]);
-        let (ax, _, _, _) = self.abs_rect(wi, &self.windows[wi].widgets[i]);
+        let (ax, _, fw, _) = self.abs_rect(wi, &self.windows[wi].widgets[i]);
         let w = &self.windows[wi].widgets[i];
         let chars: Vec<char> = if w.passwort { vec!['\u{2022}'; w.text.chars().count()] }
                                else { w.text.chars().collect() };
-        let sl = self.ti_rand(w).0;
-        let idx = Self::caret_index_at(g, &chars, mx - (ax + 5 + sl) + w.scroll, ms);
+        let tw = self.wtext_width(g, w, &chars.iter().collect::<String>());
+        let (tx, roll) = self.ti_text_lage(wi, w, ax, fw, tw);
+        let idx = Self::caret_index_at(g, &chars, mx - tx + roll, ms);
         let w = &mut self.windows[wi].widgets[i];
         let (lo, hi) = (w.caret.min(w.sel_anchor), w.caret.max(w.sel_anchor));
         if !(lo != hi && idx >= lo && idx <= hi) { w.caret = idx; w.sel_anchor = idx; }

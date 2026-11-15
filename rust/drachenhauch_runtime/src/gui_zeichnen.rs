@@ -632,13 +632,10 @@ impl Gui {
         let ty = ay + (h - self.wsize(g, wdg)).max(0) / 2;
         // Sinnbilder links/rechts (Suchfeld, GUI_TEXTINPUT_ICON) nehmen Platz.
         let (sl, sr) = self.ti_rand(wdg);
-        let inner = (w - 10 - rechts - sl - sr).max(1);
         let tw = self.wtext_width(g, wdg, &anzeige);
         // Ausrichtung nur, solange der Text hineinpasst -- sonst gilt
         // links mit Rollen, damit die Schreibmarke sichtbar bleibt.
-        let (tx, scroll) = if wdg.align >= 1 && tw <= inner {
-            (if wdg.align == 1 { ax + 5 + sl + (inner - tw) / 2 } else { ax + 5 + sl + inner - tw }, 0)
-        } else { (ax + 5 + sl, wdg.scroll) };
+        let (tx, scroll) = self.ti_text_lage(wi, wdg, ax, w, tw);
         // Inhalt auf das Feld-Innere clippen (langer Text laeuft nicht raus).
         g.push_clip(ax + 2 + sl, ay + 1, (w - 4 - rechts - sl - sr).max(0), (h - 2).max(0));
         if anzeige.is_empty() {
@@ -646,7 +643,11 @@ impl Gui {
             // verschwand er mit dem Fokus, und ein Feld, das beim Start den
             // Fokus hat, zeigte ihn nie (Dogfooding 2026-10-09).
             if !wdg.placeholder.is_empty() {
-                self.wtext(g, wdg, tx, ty, wdg.placeholder.clone(), self.leise(self.wcol(wdg, "bg", "win_bg")));
+                // Rechts- oder mittig ausgerichtet steht der Platzhalter nach
+                // SEINER Breite -- die Marke des leeren Feldes nach der Breite 0.
+                let pw = self.wtext_width(g, wdg, &wdg.placeholder);
+                let (px, _) = self.ti_text_lage(wi, wdg, ax, w, pw);
+                self.wtext(g, wdg, px, ty, wdg.placeholder.clone(), self.leise(self.wcol(wdg, "bg", "win_bg")));
             }
         } else {
             let chars: Vec<char> = anz_chars;
