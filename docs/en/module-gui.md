@@ -2569,7 +2569,8 @@ click selects it -- the click does **not** reach the widget -- and a panel
 shows what `GUI_INSPECT$` returns. ESC closes it. With the environment
 variable `DHRT_INSPEKTOR=1`, **Ctrl+Shift+I** opens and closes it in any
 program without a line of code; without it the key stays free for the
-program.
+program. In a real window (`GUI_WINDOW_NATIVE`) it selects that window's
+widgets, and the panel stands there.
 
 ```
 button #los .menue .standard
@@ -2641,7 +2642,8 @@ whoever chose "reduce animations" gets the sound but no confetti.
 Every program with a menu bar or toolbar has a command palette without a
 line of code: **Ctrl+Shift+P** opens, above the window with the focus, a
 search over all entries of its menu bar (submenus included, "Datei ›
-Zuletzt › brief.txt") and the buttons of its toolbars. Typing filters (a
+Zuletzt › brief.txt"), its context menus and the buttons of its toolbars;
+in a real window it stands in that window. Typing filters (a
 word start first, then a match inside a word, then scattered letters),
 Up/Down selects, Enter or a click triggers -- exactly like mouse and
 shortcut, `GUI_CLICKED` and callbacks included. ESC or a click beside it

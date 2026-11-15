@@ -196,12 +196,12 @@ impl Gui {
         let menu_consumed = self.menu_input(mx, my, just_pressed, right_just, g);
         self.untermenues_folgen(g, mx, my);
         self.kuerzel_gefeuert = false;
-        if self.flaeche == 0 { self.inspektor_tasten(g); }
+        self.inspektor_tasten(g);
         if self.palette.is_some() { self.kuerzel_gefeuert = true; }
         if !menu_consumed && !self.kuerzel_gefeuert { self.kuerzel_pruefen(g); self.mn_pruefen(g); }
         // Die Palette nach den Menuekuerzeln (eines des Programms gewinnt),
         // vor den Widgets (ihre Tasten erreichen kein Textfeld).
-        if self.flaeche == 0 { self.palette_pass(g); }
+        self.palette_pass(g);
 
         // Inhalts-Scroll: Mausrad ueber scrollbarem Fenster.
         if let Some(top) = self.topmost_at(mx, my) {

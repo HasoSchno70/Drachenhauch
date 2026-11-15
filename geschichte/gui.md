@@ -1209,3 +1209,14 @@ am Zeilenende der Erwartung ab, die Ausgabe nicht.
   Glas wirkt ueber Widgets darunter (ein Hintergrundbild), nicht durch das
   Fenster hindurch. Der Test braucht deshalb ein Bildschirmfoto statt eines
   Renderziels.
+- **Palette und Inspektor in echten Fenstern**: beide fragten nur die
+  Hauptflaeche (`flaeche == 0`). Jetzt steht die Palette im Inhalt ihres
+  Fensters (`pal_lage` aus dessen Rechteck, gezeichnet, wo `popup_flaeche`
+  hinzeigt; ein Druck auf einer anderen Flaeche schliesst sie), der
+  Inspektor waehlt ueber `hit_test_auf(Some(f))` nur unter den Fenstern der
+  Flaeche, auf der gedrueckt wurde. Die erste Gegenprobe dafuer blieb gruen:
+  im Fall lag das echte Fenster in der Reihenfolge oben, und der alte
+  Treffertest fand zufaellig das Richtige -- erst ein Fenster des
+  Hauptfensters DARUEBER zeigt den Unterschied. Die Palette nimmt jetzt
+  auch die Kontextmenues des Fensters auf (was die Menueleiste schon
+  nennt, nur einmal).

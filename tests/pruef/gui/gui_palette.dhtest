@@ -223,3 +223,25 @@ e 9 5 0 0 0 0
 DHRT_FRAMES=20
 --- erwartet
 offen FALSE klicks 1
+
+=== die palette nimmt kontextmenues auf und nennt nichts doppelt
+TRY
+    SCREEN(500, 300, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 500, 300)
+DIM mB AS INTEGER : mB = GUI_MENU(w, "Bearbeiten")
+DIM a1 AS INTEGER : a1 = GUI_MENU_ITEM(mB, "Kopieren", "Strg+C")
+DIM k AS INTEGER : k = GUI_CONTEXT(w)
+DIM k1 AS INTEGER : k1 = GUI_MENU_ITEM(k, "Kopieren")
+DIM k2 AS INTEGER : k2 = GUI_MENU_ITEM(k, "Umbenennen")
+GUI_PALETTE(TRUE)
+PRINT GUI_PALETTE_ITEMS$()
+GUI_PALETTE_FILTER("umben")
+GUI_UPDATE()
+--- erwartet
+>Bearbeiten › Kopieren	Strg+C
+Kontextmenue › Umbenennen

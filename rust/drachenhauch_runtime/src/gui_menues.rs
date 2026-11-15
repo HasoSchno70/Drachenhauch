@@ -622,10 +622,15 @@ impl Gui {
         -1
     }
 
-    pub fn hit_test(&self, mx: i32, my: i32) -> i64 {
+    pub fn hit_test(&self, mx: i32, my: i32) -> i64 { self.hit_test_auf(None, mx, my) }
+    /// Wie GUI_HIT_TEST, aber nur unter den Fenstern einer Flaeche (Some(f),
+    /// 0 = Hauptfenster) -- fuer den Inspektor in echten Fenstern, deren
+    /// Koordinaten mit denen des Hauptfensters nichts zu tun haben.
+    pub(super) fn hit_test_auf(&self, f: Option<u32>, mx: i32, my: i32) -> i64 {
         for &wi in self.z_order.iter().rev() {
             let win = &self.windows[wi];
             if !win.alive || !win.visible { continue; }
+            if f.is_some_and(|f| self.popup_flaeche(wi) != f) { continue; }
             if !Self::in_rect(mx, my, self.sicht_rect(wi)) { continue; }
             if self.dock_gast_verdeckt(wi, mx, my) { continue; }
             let (mx, my) = self.ins_fenster(wi, mx, my);

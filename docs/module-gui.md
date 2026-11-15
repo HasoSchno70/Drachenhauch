@@ -2584,7 +2584,8 @@ Klick wählt es -- der Klick erreicht das Widget **nicht** -- und eine Tafel
 zeigt, was `GUI_INSPECT$` liefert. ESC schließt ihn. Mit der
 Umgebungsvariablen `DHRT_INSPEKTOR=1` öffnet und schließt **Strg+Umschalt+I**
 ihn in jedem Programm, ohne dass es dafür eine Zeile braucht; ohne sie ist
-die Taste frei für das Programm.
+die Taste frei für das Programm. In einem echten Fenster
+(`GUI_WINDOW_NATIVE`) wählt er dessen Widgets, und die Tafel steht dort.
 
 ```
 button #los .menue .standard
@@ -2657,8 +2658,8 @@ Konfetti.
 Jedes Programm mit einer Menüleiste oder Werkzeugleiste hat eine
 Befehlspalette, ohne eine Zeile dafür: **Strg+Umschalt+P** öffnet über dem
 Fenster mit dem Fokus eine Suche über alle Einträge seiner Menüleiste (samt
-Untermenüs, „Datei › Zuletzt › brief.txt“) und die Knöpfe seiner
-Werkzeugleisten. Tippen filtert (ein Wortanfang zuerst, dann ein Treffer im
+Untermenüs, „Datei › Zuletzt › brief.txt“), seine Kontextmenüs und die
+Knöpfe seiner Werkzeugleisten; in einem echten Fenster steht sie in diesem. Tippen filtert (ein Wortanfang zuerst, dann ein Treffer im
 Wort, dann verstreute Buchstaben), Hoch/Runter wählt, Enter oder ein Klick
 löst aus -- genau wie Maus und Kürzel, `GUI_CLICKED` und Rückrufe inklusive.
 ESC oder ein Klick daneben schließt sie. Gesperrte Einträge fehlen, ein
