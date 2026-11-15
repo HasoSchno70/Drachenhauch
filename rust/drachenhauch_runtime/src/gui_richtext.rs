@@ -837,7 +837,7 @@ impl Gui {
             }
         };
         let col_widths: Vec<i32> = order.iter().map(|&c| roh[c]).collect();
-        let body_x = ax + 1;
+        let body_x_ltr = ax + 1;
         let body_y = ay + header_h;
         let body_w_raw = ww - 2;
         let body_h_raw = hh - header_h - 1;
@@ -848,9 +848,13 @@ impl Gui {
         if need_h && total_h > body_h_raw - self.sk(TBL_SCROLL_W) { need_v = true; }
         let body_w = body_w_raw - if need_v { self.sk(TBL_SCROLL_W) } else { 0 };
         let body_h = body_h_raw - if need_h { self.sk(TBL_SCROLL_W) } else { 0 };
+        // Gespiegelt steht der senkrechte Balken links, der Rumpf rechts davon.
+        let rtl = self.windows[wi].rtl;
+        let body_x = if rtl && need_v { body_x_ltr + self.sk(TBL_SCROLL_W) } else { body_x_ltr };
+        let vbar_x = if rtl { ax + 1 } else { ax + body_w_raw - self.sk(TBL_SCROLL_W) + 1 };
         let frozen_w: i32 = col_widths.iter().take(frozen).sum();
         TGeom {
-            ax, ay, w: ww, h: hh, rtl: self.windows[wi].rtl, n_cols, n_rows, col_widths, row_h, header_h,
+            ax, ay, w: ww, h: hh, rtl, vbar_x, n_cols, n_rows, col_widths, row_h, header_h,
             scroll_x: t.scroll_x, frozen, frozen_w, order,
             body_x, body_y, body_w, body_h, body_w_raw, total_w, total_h,
             need_v, need_h,
@@ -914,7 +918,7 @@ impl Gui {
         }
         let gm = self.table_geom(wi, idx);
         if gm.need_v {
-            let sb_x = gm.ax + gm.body_w_raw - self.sk(TBL_SCROLL_W) + 1;
+            let sb_x = gm.vbar_x;
             if Self::in_rect(mx, my, (sb_x, gm.body_y, self.sk(TBL_SCROLL_W), gm.body_h)) {
                 let off = Self::handle_height(gm.body_h, gm.body_h, gm.total_h) / 2;
                 { let t = self.windows[wi].widgets[idx].tbl.as_mut().unwrap(); t.drag_v = true; t.drag_off = off; }

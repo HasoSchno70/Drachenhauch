@@ -776,9 +776,25 @@ impl Gui {
         let gut = self.ta_gutter(g, &self.windows[wi].widgets[i], starts2.len());
         let sicht = (fw - 2 * pad - gut).max(1);
         let mut sx = self.windows[wi].widgets[i].scroll_x;
+        // Rechtsbuendig (gespiegeltes Fenster) und breiter als das Feld: der
+        // Abstand der Marke zum Zeilenende zaehlt, `scroll_x` schiebt den
+        // linken Teil herein (gui_eingabe.rs `ta_versatz`).
+        let rechts = {
+            let w = &self.windows[wi].widgets[i];
+            let zeile_ende = rows2[crow.max(0) as usize].2;
+            let innen = self.ta_innen(g, w, starts2.len());
+            let breite = self.zeilen_x(g, w, &chars[zeilen_start..zeile_ende.min(chars.len())], zeile_ende.min(chars.len()) - zeilen_start);
+            (self.ti_ausrichtung(wi, w) == 2 && breite > innen).then_some((breite, innen))
+        };
         if !gerollt {
-            if marke_px - sx > sicht - self.sk(8) { sx = marke_px - sicht + self.sk(8); }
-            if marke_px - sx < 0 { sx = marke_px; }
+            if let Some((breite, innen)) = rechts {
+                let bis_ende = breite - marke_px;
+                if sx > bis_ende - self.sk(8) { sx = bis_ende - self.sk(8); }
+                if sx < bis_ende - innen { sx = bis_ende - innen; }
+            } else {
+                if marke_px - sx > sicht - self.sk(8) { sx = marke_px - sicht + self.sk(8); }
+                if marke_px - sx < 0 { sx = marke_px; }
+            }
         }
         sx = sx.max(0);
         if self.windows[wi].widgets[i].umbruch { sx = 0; }
@@ -857,7 +873,9 @@ impl Gui {
         let sicht = ((h - 2 * 5) / lh).max(1);
         if n <= sicht { return None; }
         let bw = 5;
-        let (tx, ty, th) = (ax + w - 2 - bw, ay + 2, (h - 4).max(1));
+        // Gespiegelt steht der Balken links.
+        let tx = if self.windows[wi].rtl { ax + 2 } else { ax + w - 2 - bw };
+        let (ty, th) = (ay + 2, (h - 4).max(1));
         let thh = ((th as i64 * sicht as i64 / n.max(1) as i64) as i32).clamp(12.min(th), th);
         let max = (n - sicht).max(1);
         let thy = ty + ((th - thh) as i64 * wd.scroll.clamp(0, max) as i64 / max as i64) as i32;

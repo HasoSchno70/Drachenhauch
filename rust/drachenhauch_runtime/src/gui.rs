@@ -3774,6 +3774,8 @@ struct TGeom {
     /// wird wie links; `col_x`/`col_clip`/`edge_at` spiegeln um die Mitte
     /// des Rumpfs -- alle Treffer und alles Zeichnen geht durch sie.
     rtl: bool,
+    /// Linke Kante des senkrechten Rollbalkens (gespiegelt links).
+    vbar_x: i32,
     n_cols: usize, n_rows: usize, col_widths: Vec<i32>,
     /// Zeilen- und Kopfhoehe sind einstellbar (Bilder in Zellen brauchen
     /// Platz) -- sie stehen hier, damit Treffertest und Zeichnen dieselbe

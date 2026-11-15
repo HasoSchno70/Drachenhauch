@@ -1225,7 +1225,11 @@ impl Gui {
         if max <= 0 { return None; }
         let (ax, ay, aw, ah) = self.abs_rect(wi, w);
         let bw = self.sk(8);
-        let (tx, ty, th) = (ax + aw - 1 - bw, ay + 1, (ah - 2).max(1));
+        // Ein gespiegelter Baum hat den Balken links (die Liste spiegelt ihr
+        // Inneres noch nicht und behaelt ihn rechts).
+        let links = w.kind == Kind::Tree && self.windows[wi].rtl;
+        let tx = if links { ax + 1 } else { ax + aw - 1 - bw };
+        let (ty, th) = (ay + 1, (ah - 2).max(1));
         let inhalt = max + w.h;
         let thh = ((th as i64 * w.h as i64 / inhalt.max(1) as i64) as i32).clamp(self.sk(16).min(th), th);
         let thy = ty + ((th - thh) as f64 * (Self::roll_ist(w) / max as f64).clamp(0.0, 1.0)) as i32;
@@ -1386,7 +1390,13 @@ impl Gui {
         let rh = self.sk(TREE_ROW_H);
         let bar = if self.list_bar_geom(wi, i).is_some() { self.sk(8) + 2 } else { 0 };
         let x0 = self.baum_text_x(t, ax, e.k) - self.sk(3);
-        Some((x0, ay + 1 + pos * rh - t.scroll, (ax + aw - 2 - bar - x0).max(8), rh))
+        let y = ay + 1 + pos * rh - t.scroll;
+        if self.windows[wi].rtl {
+            // Gespiegelt: vom Balken (links) bis vor das Sinnbild.
+            let x1 = ax + aw - (x0 - ax);
+            return Some((ax + 2 + bar, y, (x1 - ax - 2 - bar).max(8), rh));
+        }
+        Some((x0, y, (ax + aw - 2 - bar - x0).max(8), rh))
     }
     /// Umbenennen-Feld von Liste ODER Baum -- fuer die Stellen, die beides
     /// gleich behandeln (Klick daneben, Fokus weg).
