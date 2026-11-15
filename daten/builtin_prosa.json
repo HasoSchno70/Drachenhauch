@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 2450,
+ "count": 2451,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -946,6 +946,7 @@
   "GUI_STATUSBAR_TIP": "Tooltip eines Feldes",
   "GUI_STATUSBAR_TIP$": "STRING — Tooltip eines Feldes lesen",
   "GUI_STYLESHEET": "eine Stildatei setzen: Regeln nach Art, Klasse, Name und Zustand wie in CSS (\"\" = keine) -- siehe Stildatei",
+  "GUI_STYLESHEET_CLOCK": "die Uhr für @zeit/@datum festhalten: \"12-24\", \"21:30\", \"12-24 21:30\" oder \"2026-12-24 21:30\" (ein fehlender Teil kommt von der echten Uhr); \"\" = wieder die echte Uhr -- zum Ansehen eines Weihnachts- oder Nachtaussehens",
   "GUI_STYLESHEET_ERROR$": "STRING — der Fehler beim letzten Neuladen einer beobachteten Stildatei, \"\" = in Ordnung",
   "GUI_STYLESHEET_LOAD": "dasselbe aus einer Datei (üblich .dhstil); mit beobachten = TRUE lädt die gui sie neu, sobald sie gespeichert wird (Abschnitt 9)",
   "GUI_STYLE_GET": "INTEGER — ein Wert des Stils, -1 wenn er ihn nicht setzt (unbekannter Stil = Fehler)",

@@ -942,6 +942,9 @@ impl<'p> Vm<'p> {
                 if a.is_empty() || a.len() > 2 { return Err(format!("{}: erwartet (pfad$ [, beobachten])", n)); }
                 let beob = if a.len() == 2 { gbool(a,1,n)? } else { false };
                 self.gui.stylesheet_load(&gs(a,0,n)?, beob)?; Value::Nil }
+            "gui_stylesheet_clock" => { let n = "GUI_STYLESHEET_CLOCK";
+                if a.len() != 1 { return Err(format!("{}: erwartet (zeit$)", n)); }
+                self.gui.stylesheet_clock(&gs(a,0,n)?)?; Value::Nil }
             "gui_stylesheet_error$" => { let n = "GUI_STYLESHEET_ERROR$";
                 if !a.is_empty() { return Err(format!("{}: erwartet keine Argumente", n)); }
                 Value::str_rc(&self.gui.stylesheet_error()) }

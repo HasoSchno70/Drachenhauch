@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/en und dem englischen Buch von `dhrt doku prosa` -- NICHT von Hand aendern. Der Hover nimmt sie mit DHRT_LANG=en.",
- "count": 2442,
+ "count": 2443,
  "docs": {
   "ABS": "Absolute value.",
   "ACOS": "Arc sine/cosine (x in [-1, 1])",
@@ -945,6 +945,7 @@
   "GUI_STATUSBAR_TIP": "tooltip of a field",
   "GUI_STATUSBAR_TIP$": "STRING — read the tooltip of a field",
   "GUI_STYLESHEET": "set a stylesheet: rules by kind, class, name and state as in CSS (\"\" = none) -- see Stylesheet",
+  "GUI_STYLESHEET_CLOCK": "fix the clock for @zeit/@datum: \"12-24\", \"21:30\", \"12-24 21:30\" or \"2026-12-24 21:30\" (a missing part comes from the real clock); \"\" = the real clock again -- to look at a Christmas or night look ahead of time",
   "GUI_STYLESHEET_ERROR$": "STRING — the error from the last reload of a watched stylesheet, \"\" = fine",
   "GUI_STYLESHEET_LOAD": "the same from a file (usually .dhstil); with beobachten = TRUE the gui reloads it as soon as it is saved (section 9)",
   "GUI_STYLE_GET": "INTEGER — a value of the style, -1 if it does not set it (unknown style = error)",

@@ -489,6 +489,7 @@ Native, blocking standard dialogs (no IMPORT needed — like the file dialogs):
 | `GUI_STYLESHEET(text$)` | — | set a stylesheet: rules by kind, class, name and state as in CSS ("" = none) -- see [Stylesheet](#7-stylesheet-rules-by-kind-class-name-and-state) |
 | `GUI_STYLESHEET_LOAD(pfad$ [, beobachten])` | — | the same from a file (usually `.dhstil`); with `beobachten` = `TRUE` the gui reloads it as soon as it is saved ([section 9](#9-inspector-live-stylesheet-and-calm-motion)) |
 | `GUI_STYLESHEET_ERROR$()` | STRING | the error from the last reload of a watched stylesheet, `""` = fine |
+| `GUI_STYLESHEET_CLOCK(zeit$)` | — | fix the clock for `@zeit`/`@datum`: `"12-24"`, `"21:30"`, `"12-24 21:30"` or `"2026-12-24 21:30"` (a missing part comes from the real clock); `""` = the real clock again -- to look at a Christmas or night look ahead of time |
 | `GUI_ADD_CLASS(wdg, klasse$)` | — | add a class; it takes effect at once and as long as it stays |
 | `GUI_REMOVE_CLASS(wdg, klasse$)` | — | remove a class |
 | `GUI_HAS_CLASS(wdg, klasse$)` | BOOLEAN | does the widget carry the class (the button variant counts too)? |
@@ -2491,6 +2492,23 @@ malformed colour, unknown kind) -- nothing is silently skipped, otherwise
 you would look for it in the program. Name and classes are stored in the
 `.dhform` (`name`, `klassen`). `GUI_GET_COLOR` tells which colour applies
 right now.
+
+**Rules by time and date.** A condition may stand in front of a rule;
+then it only applies at that time:
+
+```
+@zeit 20:00-06:00 button { bg: #22252E }            /* nachts gedaempft */
+@datum 12-01..12-26 #titel { fg: #E74C3C }           /* Advent */
+@datum 12-31 @zeit 18:00-24:00 button { effekt: funken }
+```
+
+`@zeit from-to` (to exclusive) and `@datum MM-DD..MM-DD` (to inclusive, a
+single day without `..`) may reach across midnight or the turn of the year;
+several conditions apply together (English aliases `@time`, `@date`). The
+gui asks the local time each frame and resolves anew as soon as a condition
+flips -- a running program switches to its night look at 20:00 by itself.
+`GUI_STYLESHEET_CLOCK("12-24 21:00")` fixes the clock to look at it ahead
+of time.
 
 ### 8. Shapes of your own, image skins and animations
 

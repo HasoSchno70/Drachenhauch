@@ -1167,3 +1167,17 @@ Gegenproben mit dem neuen Profil `gegenprobe`: 22 Stueck in rund zehn
 Minuten (frueher je vier Minuten Bau). `GUI_PALETTE_ITEMS$` haengte
 zuerst auch leeren Kuerzeln ein TAB an -- der Pruefer schneidet Leerzeichen
 am Zeilenende der Erwartung ab, die Ausgabe nicht.
+
+## Stildatei nach Zeit und Datum, Beispiel 221 (2026-11-15)
+
+- Beispiel `221_klang_funken_palette.dh` (ein Notizbuch): Klangthema aus
+  einer Zeile, Funken und Konfetti, Schalter fuer Toene und Bewegung, die
+  Palette. Erst lief der Hinweis rechts aus dem Fenster und die
+  Statusleiste lag unter der Menueleiste ausserhalb -- gesehen am Bild.
+- `@zeit 20:00-06:00` und `@datum 12-01..12-26` vor einer Regel
+  (`bedingung_lesen`, ohne Schachteln: die Bedingung gehoert zur Regel, so
+  bleibt der Leser flach). `stil_pass` stellt die Uhr der Stildatei und
+  vergleicht, welche Bedingungen gelten; schlaegt eine um, gilt die Datei
+  als neu. `GUI_STYLESHEET_CLOCK` haelt die Uhr fest und loest bewusst NICHT
+  selbst neu auf -- sonst haette der Test den Weg der echten Uhr nie
+  beruehrt (die Gegenprobe "Umschlag erkennt nichts" waere gruen geblieben).

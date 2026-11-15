@@ -489,6 +489,7 @@ Native, blockierende Standarddialoge (kein IMPORT nötig — wie die Datei-Dialo
 | `GUI_STYLESHEET(text$)` | — | eine Stildatei setzen: Regeln nach Art, Klasse, Name und Zustand wie in CSS ("" = keine) -- siehe [Stildatei](#7-stildatei-regeln-nach-art-klasse-name-und-zustand) |
 | `GUI_STYLESHEET_LOAD(pfad$ [, beobachten])` | — | dasselbe aus einer Datei (üblich `.dhstil`); mit `beobachten` = `TRUE` lädt die gui sie neu, sobald sie gespeichert wird ([Abschnitt 9](#9-inspektor-stildatei-live-und-ruhige-bewegung)) |
 | `GUI_STYLESHEET_ERROR$()` | STRING | der Fehler beim letzten Neuladen einer beobachteten Stildatei, `""` = in Ordnung |
+| `GUI_STYLESHEET_CLOCK(zeit$)` | — | die Uhr für `@zeit`/`@datum` festhalten: `"12-24"`, `"21:30"`, `"12-24 21:30"` oder `"2026-12-24 21:30"` (ein fehlender Teil kommt von der echten Uhr); `""` = wieder die echte Uhr -- zum Ansehen eines Weihnachts- oder Nachtaussehens |
 | `GUI_ADD_CLASS(wdg, klasse$)` | — | eine Klasse anhängen; sie wirkt sofort und solange sie dran ist |
 | `GUI_REMOVE_CLASS(wdg, klasse$)` | — | eine Klasse wegnehmen |
 | `GUI_HAS_CLASS(wdg, klasse$)` | BOOLEAN | trägt das Widget die Klasse (die Knopfart zählt mit)? |
@@ -2506,6 +2507,23 @@ gedämpft.
 Eigenschaft, krumme Farbe, unbekannte Art) -- nichts wird still übergangen,
 sonst suchte man ihn im Programm. Name und Klassen stehen in der `.dhform`
 (`name`, `klassen`). `GUI_GET_COLOR` sagt, welche Farbe gerade gilt.
+
+**Regeln nach Zeit und Datum.** Vor einer Regel darf eine Bedingung
+stehen; dann gilt sie nur zu dieser Zeit:
+
+```
+@zeit 20:00-06:00 button { bg: #22252E }            /* nachts gedaempft */
+@datum 12-01..12-26 #titel { fg: #E74C3C }           /* Advent */
+@datum 12-31 @zeit 18:00-24:00 button { effekt: funken }
+```
+
+`@zeit von-bis` (bis ausschließlich) und `@datum MM-TT..MM-TT` (bis
+einschließlich, ein einzelner Tag ohne `..`) dürfen über Mitternacht bzw.
+den Jahreswechsel reichen; mehrere Bedingungen gelten zusammen. Die gui
+fragt die Ortszeit je Bild und löst neu auf, sobald eine Bedingung
+umschlägt -- ein laufendes Programm wechselt um 20:00 von selbst ins
+Nachtaussehen. `GUI_STYLESHEET_CLOCK("12-24 21:00")` hält die Uhr fest, um
+es vorab anzusehen.
 
 ### 8. Eigene Formen, Bildhäute und Animationen
 

@@ -247,7 +247,71 @@ fn vorfahren_passen(vf: &[(Teil, bool)], kette: &[Glied]) -> bool {
 }
 
 #[derive(Clone, Debug)]
-struct Regel { sel: Selektor, werte: StilWerte, zeile: usize, kopf: String }
+struct Regel { sel: Selektor, werte: StilWerte, zeile: usize, kopf: String, bed: Option<Bedingung> }
+
+/// `@zeit 20:00-06:00` und `@datum 12-01..12-26` vor einer Regel: sie gilt
+/// nur dann. Zeit in Minuten ab Mitternacht (bis ausschliesslich), Datum als
+/// Monat*100+Tag (bis einschliesslich); beide duerfen ueber Mitternacht bzw.
+/// den Jahreswechsel reichen.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(super) struct Bedingung { zeit: Option<(u16, u16)>, datum: Option<(u16, u16)> }
+
+impl Bedingung {
+    /// Gilt sie zu (Monat*100+Tag, Minute des Tages)?
+    pub(super) fn gilt(&self, md: u16, minute: u16) -> bool {
+        let zeit = self.zeit.map(|(a, b)| if a <= b { minute >= a && minute < b } else { minute >= a || minute < b }).unwrap_or(true);
+        let datum = self.datum.map(|(a, b)| if a <= b { md >= a && md <= b } else { md >= a || md <= b }).unwrap_or(true);
+        zeit && datum
+    }
+}
+
+fn uhrzeit_lesen(t: &str) -> Option<u16> {
+    let (h, m) = t.trim().split_once(':')?;
+    let (h, m): (u16, u16) = (h.parse().ok()?, m.parse().ok()?);
+    if h > 24 || m > 59 || (h == 24 && m > 0) { return None; }
+    Some(h * 60 + m)
+}
+fn tag_lesen(t: &str) -> Option<u16> {
+    let (mo, d) = t.trim().split_once('-')?;
+    let (mo, d): (u16, u16) = (mo.parse().ok()?, d.parse().ok()?);
+    let max = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    if !(1..=12).contains(&mo) || d < 1 || d > max[(mo - 1) as usize] { return None; }
+    Some(mo * 100 + d)
+}
+
+/// Bedingungen vorn im Kopf einer Regel lesen: (Bedingung, Rest des Kopfs,
+/// ihr Text fuer den Inspektor).
+fn bedingung_lesen(kopf: &str, zeile: usize) -> Result<(Option<Bedingung>, String, String), String> {
+    let mut b = Bedingung { zeit: None, datum: None };
+    let mut texte: Vec<String> = Vec::new();
+    let mut rest = kopf.trim_start();
+    while rest.starts_with('@') {
+        let mut teile = rest.splitn(3, char::is_whitespace).filter(|x| !x.is_empty());
+        let wort = teile.next().unwrap_or("").to_lowercase();
+        let arg = teile.next().unwrap_or("");
+        let weiter = rest.find(arg).map(|p| &rest[p + arg.len()..]).unwrap_or("");
+        match wort.as_str() {
+            "@zeit" | "@time" => {
+                let (a, z) = arg.split_once('-').and_then(|(a, z)| Some((uhrzeit_lesen(a)?, uhrzeit_lesen(z)?)))
+                    .ok_or_else(|| format!("Zeile {}: @zeit erwartet von-bis wie 20:00-06:00, erhalten '{}'", zeile, arg))?;
+                b.zeit = Some((a, z));
+            }
+            "@datum" | "@date" => {
+                let (a, z) = match arg.split_once("..") {
+                    Some((a, z)) => (tag_lesen(a), tag_lesen(z)),
+                    None => (tag_lesen(arg), tag_lesen(arg)),
+                };
+                let (a, z) = a.zip(z).ok_or_else(|| format!("Zeile {}: @datum erwartet Monat-Tag wie 12-24 oder 12-01..12-26, erhalten '{}'", zeile, arg))?;
+                b.datum = Some((a, z));
+            }
+            _ => return Err(format!("Zeile {}: '{}' unbekannt -- vor einer Regel stehen @zeit oder @datum", zeile, wort)),
+        }
+        texte.push(format!("{} {}", wort, arg));
+        rest = weiter.trim_start();
+    }
+    let bed = if texte.is_empty() { None } else { Some(b) };
+    Ok((bed, rest.to_string(), texte.join(" ")))
+}
 
 /// Eine gelesene Stildatei.
 #[derive(Clone, Debug, Default)]
@@ -256,6 +320,11 @@ pub(super) struct Stildatei {
     /// Hat irgendeine Regel Vorfahren? Nur dann muss `stil_pass` die Kette
     /// ueber jedem Widget bauen.
     pub(super) mit_vorfahren: bool,
+    /// Haengt eine Regel an Zeit oder Datum? Dann fragt `stil_pass` die Uhr.
+    pub(super) mit_bedingung: bool,
+    /// Die Uhr, gegen die Bedingungen gelten (Monat*100+Tag, Minute) --
+    /// von `stil_pass` gesetzt.
+    pub(super) uhr: (u16, u16),
 }
 
 /// Die Aufloesung eines Widgets: je Schicht, was gilt.
@@ -450,6 +519,8 @@ pub(super) fn lesen(text: &str, thema: &dyn Fn(&str) -> bool) -> Result<Stildate
         if rumpf.contains('{') { return Err(format!("Zeile {}: '{{' im Rumpf -- Regeln lassen sich nicht schachteln", zeile_von(&t, auf + 1 + rumpf.find('{').unwrap()))); }
         // Kopfzeile: die erste nicht leere Zeile vor der Klammer.
         let kopf_zeile = zeile_von(&t, pos + kopf.len() - kopf.trim_start().len());
+        let (bed, kopf, bed_text) = bedingung_lesen(kopf, kopf_zeile)?;
+        let kopf = kopf.as_str();
         let selektoren: Vec<(Selektor, String)> = kopf.split(',')
             .map(|s| selektor_lesen(s, kopf_zeile).map(|sel| (sel, s.split_whitespace().collect::<Vec<_>>().join(" "))))
             .collect::<Result<_, _>>()?;
@@ -515,7 +586,10 @@ pub(super) fn lesen(text: &str, thema: &dyn Fn(&str) -> bool) -> Result<Stildate
                 _ => return Err(format!("Zeile {}: Eigenschaft '{}' gibt es nicht -- bekannt sind {}", zeile, name, EIGENSCHAFTEN)),
             }
         }
-        for (sel, k) in selektoren { regeln.push(Regel { sel, werte: werte.clone(), zeile: kopf_zeile, kopf: k }); }
+        for (sel, k) in selektoren {
+            let kopf = if bed_text.is_empty() { k } else { format!("{} {}", bed_text, k) };
+            regeln.push(Regel { sel, werte: werte.clone(), zeile: kopf_zeile, kopf, bed });
+        }
         pos = zu + 1;
     }
     if !t[pos..].trim().is_empty() {
@@ -523,7 +597,8 @@ pub(super) fn lesen(text: &str, thema: &dyn Fn(&str) -> bool) -> Result<Stildate
         return Err(format!("Zeile {}: '{}' -- eine Regel braucht einen Rumpf in {{ }}", zeile_von(&t, t.len() - rest.len()), rest.lines().next().unwrap_or("").trim()));
     }
     let mit_vorfahren = regeln.iter().any(|r: &Regel| !r.sel.vorfahren.is_empty());
-    Ok(Stildatei { regeln, mit_vorfahren })
+    let mit_bedingung = regeln.iter().any(|r: &Regel| r.bed.is_some());
+    Ok(Stildatei { regeln, mit_vorfahren, mit_bedingung, uhr: (0, 0) })
 }
 
 impl Stildatei {
@@ -545,9 +620,15 @@ impl Stildatei {
                 && s.name.as_ref().map(|n| n == name).unwrap_or(true)
                 && (!s.an || an)
                 && vorfahren_passen(&s.vorfahren, kette)
+                && r.bed.map(|b| b.gilt(self.uhr.0, self.uhr.1)).unwrap_or(true)
         }).map(|(i, r)| (r.sel.gewicht, i, r)).collect();
         passend.sort_by_key(|(g, i, _)| (*g, *i));
         passend.into_iter().map(|(_, _, r)| r).collect()
+    }
+    /// Welche Bedingungen gelten gerade (je Regel mit Bedingung, in der
+    /// Reihenfolge der Datei)? Aendert sich das, loest `stil_pass` neu auf.
+    pub(super) fn bedingungen_jetzt(&self, md: u16, minute: u16) -> Vec<bool> {
+        self.regeln.iter().filter_map(|r| r.bed.map(|b| b.gilt(md, minute))).collect()
     }
     /// Fuer den Inspektor: (Zeile, Selektor, Schicht) je passender Regel.
     pub(super) fn passend_kurz(&self, art: &str, klassen: &[String], name: &str, an: bool, kette: &[Glied]) -> Vec<(usize, String, usize)> {
@@ -577,6 +658,38 @@ impl Gui {
         self.stil_beob = if beobachten { Some((pfad.to_string(), text, self.uhr)) } else { None };
         Ok(())
     }
+    /// GUI_STYLESHEET_CLOCK(zeit$): die Uhr fuer `@zeit`/`@datum` festhalten
+    /// -- "12-24", "21:30", "12-24 21:30" oder "2026-12-24 21:30"; ein
+    /// fehlender Teil kommt von der echten Uhr. "" = wieder die echte Uhr.
+    /// Neu aufgeloest wird im naechsten GUI_UPDATE, wenn eine Bedingung
+    /// umschlaegt -- derselbe Weg wie bei der echten Uhr.
+    pub fn stylesheet_clock(&mut self, text: &str) -> Result<(), String> {
+        let t = text.trim();
+        if t.is_empty() { self.stil_uhr_fest = None; return Ok(()); }
+        let mut md = None;
+        let mut minute = None;
+        for teil in t.split_whitespace() {
+            if teil.contains(':') {
+                minute = Some(uhrzeit_lesen(teil).filter(|&m| m < 24 * 60).ok_or_else(|| format!("GUI_STYLESHEET_CLOCK: Uhrzeit '{}' -- erwartet HH:MM", teil))?);
+            } else {
+                // "2026-12-24" oder "12-24"
+                let ohne_jahr = if teil.matches('-').count() == 2 { teil.splitn(2, '-').nth(1).unwrap_or("") } else { teil };
+                md = Some(tag_lesen(ohne_jahr).ok_or_else(|| format!("GUI_STYLESHEET_CLOCK: Datum '{}' -- erwartet MM-TT oder JJJJ-MM-TT", teil))?);
+            }
+        }
+        self.stil_uhr_fest = Some((md, minute));
+        Ok(())
+    }
+    /// Die Uhr der Stildatei: (Monat*100+Tag, Minute des Tages).
+    pub(super) fn stil_uhr_jetzt(&self) -> (u16, u16) {
+        let (_, mo, d, h, mi, _) = crate::builtins::local_datetime();
+        let echt = ((mo * 100 + d) as u16, (h * 60 + mi) as u16);
+        match self.stil_uhr_fest {
+            Some((md, minute)) => (md.unwrap_or(echt.0), minute.unwrap_or(echt.1)),
+            None => echt,
+        }
+    }
+
     /// GUI_STYLESHEET_ERROR$(): der Fehler beim letzten Neuladen ("" = gut).
     pub fn stylesheet_error(&self) -> String { self.stil_fehler.clone() }
 
@@ -648,6 +761,15 @@ impl Gui {
     /// Am Ende von GUI_UPDATE: jedes Widget, bei dem sich etwas geaendert
     /// hat, neu aufloesen.
     pub(super) fn stil_pass(&mut self) {
+        // Regeln nach Zeit und Datum: die Uhr stellen; schlaegt eine
+        // Bedingung um, gilt die Stildatei als neu (stil_stand).
+        if self.stil.as_ref().map(|d| d.mit_bedingung).unwrap_or(false) {
+            let (md, minute) = self.stil_uhr_jetzt();
+            let datei = self.stil.as_mut().unwrap();
+            datei.uhr = (md, minute);
+            let jetzt = datei.bedingungen_jetzt(md, minute);
+            if jetzt != self.stil_bed { self.stil_bed = jetzt; self.stil_stand += 1; }
+        }
         let Some(datei) = self.stil.as_ref() else {
             for win in self.windows.iter_mut() { for w in win.widgets.iter_mut() { w.stil_auf = None; w.stil_key = None; } }
             return;
@@ -897,6 +1019,24 @@ mod tests {
         let d = lesen("checkbox { fg: #111111 } checkbox { fg: #222222 } checkbox:checked { fg: #333333 }", &th).unwrap();
         assert_eq!(d.aufloesen("checkbox", &[], "", false, &[])[BASIS].farbe("fg"), Some(&StilFarbe::Fest(0x222222)));
         assert_eq!(d.aufloesen("checkbox", &[], "", true, &[])[BASIS].farbe("fg"), Some(&StilFarbe::Fest(0x333333)));
+    }
+
+    #[test]
+    fn regeln_nach_zeit_und_datum() {
+        let d = lesen("button { radius: 1 }\n@zeit 20:00-06:00 button { radius: 2 }\n@datum 12-20..01-06 @zeit 16:00-24:00 button { radius: 3 }", &th).unwrap();
+        assert!(d.mit_bedingung);
+        let r = |md: u16, min: u16| { let mut d = d.clone(); d.uhr = (md, min); d.aufloesen("button", &[], "", false, &[])[BASIS].radius };
+        assert_eq!(r(615, 12 * 60), Some(1));       // Mittag im Juni
+        assert_eq!(r(615, 23 * 60), Some(2));       // Nacht, ueber Mitternacht
+        assert_eq!(r(615, 5 * 60 + 59), Some(2));
+        assert_eq!(r(615, 6 * 60), Some(1));        // bis ausschliesslich
+        assert_eq!(r(1224, 17 * 60), Some(3));      // Advent am Nachmittag
+        assert_eq!(r(103, 22 * 60), Some(3));       // ueber den Jahreswechsel, spaeter in der Datei
+        assert_eq!(r(1224, 10 * 60), Some(1));
+        assert!(lesen("@zeit 25:00-06:00 button { radius: 1 }", &th).unwrap_err().contains("@zeit"));
+        assert!(lesen("@datum 02-30 button { radius: 1 }", &th).unwrap_err().contains("@datum"));
+        assert!(lesen("@wetter regen button { radius: 1 }", &th).unwrap_err().contains("'@wetter' unbekannt"));
+        assert!(!lesen("button { radius: 1 }", &th).unwrap().mit_bedingung);
     }
 
     #[test]
