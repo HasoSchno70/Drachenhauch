@@ -263,3 +263,73 @@ DHRT_FRAMES=40
 schalter rechts in der rinne rot TRUE
 griff bei drei vierteln TRUE bei einem viertel FALSE
 rinne rechts TRUE links FALSE
+
+=== gespiegelt steht der textbereich rechts und der klick trifft den text
+' Wie beim Feld: ohne eigene Ausrichtung rueckt jede Zeile nach rechts
+' (gui_eingabe.rs `ta_versatz`). Der Klick links vom Text setzt die Marke
+' vor das erste Zeichen -- ohne den Versatz im Treffer laege sie am
+' Zeilenende, und Entf naehme den Zeilenumbruch.
+IMPORT "gui"
+SCREEN(480, 220, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 480, 220)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM t AS GUI_WIDGET : t = GUI_TEXTAREA(w, 20, 40, 300, 120)
+GUI_SET_TEXT(t, "abc" + CHR$(10) + "xy")
+GUI_SET_NAME(t, "t")
+GUI_STYLESHEET("#t { fg: #FF0000 }")
+GUI_WINDOW_RTL(w, TRUE)
+DIM rt AS INTEGER : rt = RENDERTARGET_NEW(480, 220)
+FUNCTION rot_zwischen(x0 AS INTEGER, x1 AS INTEGER) AS BOOLEAN
+    RENDERTARGET_BEGIN(rt) : CLS(0) : GUI_DRAW() : RENDERTARGET_END()
+    DIM bild AS IMAGE : bild = RENDERTARGET_IMAGE(rt)
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR x = x0 TO x1
+        FOR y = 44 TO 80
+            IF (GETPIXEL(bild, x, y) BAND &HFFFFFF) = &HFF0000 THEN RETURN TRUE
+        NEXT
+    NEXT
+    RETURN FALSE
+END FUNCTION
+GUI_UPDATE()
+' Der Bereich liegt gespiegelt bei 160..460; der Text am rechten Rand.
+PRINT "text links "; rot_zwischen(162, 300); " rechts "; rot_zwischen(400, 458)
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER
+FOR n = 1 TO 20
+    GUI_UPDATE()
+    CLS(0) : GUI_DRAW() : FLIP()
+NEXT
+PRINT "text "; REPLACE$(GUI_TEXT(t), CHR$(10), "|")
+--- datei ev.txt
+c 5
+e 0 7 10 10 0 0
+e 2 7 390 50 0 0
+e 3 6 0 0 0 0
+e 4 5 0 0 0 0
+e 6 2 261 0 0 0
+e 7 1 261 0 0 0
+
+--- umgebung
+DHRT_FRAMES=30
+--- erwartet
+text links FALSE rechts TRUE
+text bc|xy
+
+=== ein textbereich laesst sich ausrichten
+TRY
+    SCREEN(400, 200, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 200)
+DIM t AS GUI_WIDGET : t = GUI_TEXTAREA(w, 20, 20, 300, 100)
+GUI_SET_ALIGN(t, "rechts")
+PRINT GUI_GET_ALIGN$(t)
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+rechts

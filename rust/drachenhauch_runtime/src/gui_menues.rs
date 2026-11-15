@@ -766,8 +766,8 @@ impl Gui {
         let a = parse_align(wie).ok_or_else(|| format!(
             "GUI_SET_ALIGN: '{}' unbekannt -- links, mitte oder rechts", wie))?;
         let w = self.wdg_mut(h, "GUI_SET_ALIGN")?;
-        if !matches!(w.kind, Kind::Label | Kind::Button | Kind::TextInput) {
-            return Err("GUI_SET_ALIGN: nur Beschriftung, Knopf und Textfeld haben eine Ausrichtung".into());
+        if !matches!(w.kind, Kind::Label | Kind::Button | Kind::TextInput | Kind::TextArea) {
+            return Err("GUI_SET_ALIGN: nur Beschriftung, Knopf, Textfeld und Textbereich haben eine Ausrichtung".into());
         }
         w.align = a;
         Ok(())
