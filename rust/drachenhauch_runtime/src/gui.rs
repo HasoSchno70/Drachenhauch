@@ -3446,6 +3446,9 @@ pub struct Window {
     /// Fokus, keine Rueckrufe. Ein Form-Designer legt so echte Widgets auf
     /// die Flaeche und verwaltet die Maus selbst (GUI_HIT_TEST geht weiter).
     entwurf: bool,
+    /// Rechts nach links (GUI_WINDOW_RTL): die Lage der Widgets gespiegelt
+    /// (`abs_rect`), die Menueleiste von rechts.
+    rtl: bool,
     /// Vergroesserung beim Zeichnen (GUI_WINDOW_ZOOM), nur im Entwurfsmodus:
     /// das Fenster bekommt dort keine Eingabe, also muss nur GUI_HIT_TEST
     /// (und wo ein Fenster liegt) die Mauslage zurueckrechnen.
@@ -4191,7 +4194,7 @@ impl Gui {
         let idx = self.windows.len();
         self.windows.push(Window {
             title, name: String::new(), x, y, w, h, widgets: Vec::new(),
-            movable: true, closable: false, visible: true, entwurf: false, zoom: 1.0, zuschnitt: None,
+            movable: true, closable: false, visible: true, entwurf: false, rtl: false, zoom: 1.0, zuschnitt: None,
             resizable: false, pruefung_live: false, form_stand: Vec::new(), form_db: Vec::new(), chrome: true, min_w: 0, min_h: 0, max_w: 0, max_h: 0,
             base_w: w, base_h: h,
             close_clicked: false, alive: true, dlg: false, answer: 0,

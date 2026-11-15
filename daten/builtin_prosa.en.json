@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/en und dem englischen Buch von `dhrt doku prosa` -- NICHT von Hand aendern. Der Hover nimmt sie mit DHRT_LANG=en.",
- "count": 2445,
+ "count": 2447,
  "docs": {
   "ABS": "Absolute value.",
   "ACOS": "Arc sine/cosine (x in [-1, 1])",
@@ -1180,11 +1180,13 @@
   "GUI_WINDOW_GLOW_SET": "configure the streak of light: farbe (colour), dauer (duration), pause (ms until it returns, 0 = once), richtung (direction: rechts/links/unten/oben), breite (width), staerke (strength, 0..1), rand (edge), art (kind: streif, lampe or rahmen)",
   "GUI_WINDOW_GLOW_STOP": "stop the streak of light",
   "GUI_WINDOW_IS_NATIVE": "BOOLEAN — is it a real OS window right now?",
+  "GUI_WINDOW_IS_RTL": "is the window right to left?",
   "GUI_WINDOW_MODAL": "make one of your own windows modal: everything else lies behind the overlay and accepts no input",
   "GUI_WINDOW_MOVABLE": "movable by its title bar (default: on)",
   "GUI_WINDOW_NATIVE": "BOOLEAN — the window as a real OS window (own title bar, taskbar, second monitor) or back into the main window; FALSE with an means: fallback, it stays a gui window",
   "GUI_WINDOW_NATIVE_SCALE": "FLOAT — how much larger the native window is drawn on its screen than in the main window (its screen's pixel density divided by the main window's); 1.0 in the main window",
   "GUI_WINDOW_RESIZABLE": "resizable by the lower-right grip (default: off)",
+  "GUI_WINDOW_RTL": "the whole window right to left: the position of every widget mirrored at the window's width, the menu bar starts on the right. The program keeps setting and reading its positions from the left (GUI_GET_X); drawing, clicks and GUI_HIT_TEST go through the mirrored one",
   "GUI_WINDOW_SCROLLABLE": "content scrolls when it is taller than the window (mouse wheel + scroll bar). Content height determined automatically from the widgets. Default: off",
   "GUI_WINDOW_SET_BOUNDS": "move/resize/read a window",
   "GUI_WINDOW_SET_MAX_SIZE": "maximum size when resizing (0 = none)",

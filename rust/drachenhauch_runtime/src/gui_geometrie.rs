@@ -16,7 +16,11 @@ impl Gui {
                 .and_then(|p| p.panel.as_ref()).map(|p| p.scroll).unwrap_or(0)
         } else { 0 };
         let win = &self.windows[win];
-        (win.x + w.x, win.y + toff + w.y - sy - sp, w.w, w.h)
+        // Rechts nach links: gespiegelt an der Breite des Fensters -- EINE
+        // Stelle, die Zeichnen, Treffer und Tastatur gemeinsam fragen; das
+        // Programm sieht weiter seine eigenen Lagen (GUI_GET_X).
+        let x = if win.rtl { win.w - w.x - w.w } else { w.x };
+        (win.x + x, win.y + toff + w.y - sy - sp, w.w, w.h)
     }
     /// Steckt das Widget in einem rollenden Panel, zaehlt es nur innerhalb
     /// von dessen Flaeche -- was herausgerollt ist, ist weder zu sehen noch

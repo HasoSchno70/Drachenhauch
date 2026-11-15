@@ -49,10 +49,13 @@ impl Gui {
         let win = &self.windows[wi];
         let pad = self.m("pad");
         let mut x = win.x + pad;
+        let mut rechts = win.x + win.w - pad;
         let mut out = Vec::new();
         for (mi, m) in win.menus.iter().enumerate() {
             if !m.in_bar { continue; }
             let wlbl = self.ctext_width(g, &m.label) + pad * 2;
+            // Rechts nach links: das erste Menue ganz rechts.
+            if win.rtl { out.push((mi, rechts - wlbl, rechts)); rechts -= wlbl; continue; }
             out.push((mi, x, x + wlbl));
             x += wlbl;
         }

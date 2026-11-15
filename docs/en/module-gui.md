@@ -4382,12 +4382,16 @@ typed.
 | Command | What it does |
 |---|---|
 | `TEXT_VISUAL$(text$ [, direction$])` | The text as it is displayed -- for your own output such as files or images. `direction$` = `auto` (default), `ltr` or `rtl` |
+| `GUI_WINDOW_RTL(win, an)` | the whole window right to left: the position of every widget mirrored at the window's width, the menu bar starts on the right. The program keeps setting and reading its positions from the left (`GUI_GET_X`); drawing, clicks and `GUI_HIT_TEST` go through the mirrored one |
+| `GUI_WINDOW_IS_RTL(win)` | is the window right to left? |
 
 Indic and Southeast Asian scripts and the ligatures of a font are set by
 text shaping ([builtins-grafik.md](builtins-grafik.md#text-shaping-indic-scripts-and-ligatures)).
 What does not work (yet): alignment does not follow direction --
 a right-to-left line stays on the left unless `GUI_SET_ALIGN` says
-otherwise; in such a line of a text area bold, italic and underline are
+otherwise; a mirrored window (`GUI_WINDOW_RTL`) mirrors the positions, not
+the inside of the widgets (the check box stays left of its text, a slider
+grows to the right, the toolbar starts on the left); in such a line of a text area bold, italic and underline are
 dropped (the colours of the highlighting stay); end-of-line hints and
 colour swatches still use the logical position. The pdf module does not
 reorder -- use `TEXT_VISUAL$` before `PDF_TEXT` there.

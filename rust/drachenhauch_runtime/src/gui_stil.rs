@@ -866,6 +866,15 @@ impl Gui {
             k
         }).collect()
     }
+    /// GUI_WINDOW_RTL(win, an): rechts nach links -- die Widgets gespiegelt,
+    /// die Menueleiste von rechts.
+    pub fn window_rtl(&mut self, h: i64, an: bool) -> Result<(), String> {
+        self.win_mut(h, "GUI_WINDOW_RTL")?.rtl = an;
+        Ok(())
+    }
+    pub fn window_is_rtl(&self, h: i64) -> Result<bool, String> {
+        self.windows.get(h as usize).map(|w| w.rtl).ok_or_else(|| "GUI_WINDOW_IS_RTL: ungueltiges GUI_WINDOW-Handle".to_string())
+    }
     /// GUI_WINDOW_SET_NAME(win, name$): ein Name fuer `window#name` in der
     /// Stildatei.
     pub fn window_set_name(&mut self, h: i64, name: &str) -> Result<(), String> {

@@ -1614,6 +1614,12 @@ impl<'p> Vm<'p> {
                 let dauer = if a.len() >= 3 { Some(gi(a,2,n)?) } else { None };
                 let anzahl = if a.len() >= 4 { Some(gi(a,3,n)?) } else { None };
                 self.gui.animate(gi(a,0,n)?, &gs(a,1,n)?, dauer, anzahl)?; Value::Nil }
+            "gui_window_rtl" => { let n = "GUI_WINDOW_RTL";
+                if a.len() != 2 { return Err(format!("{}: erwartet (win, an)", n)); }
+                self.gui.window_rtl(gi(a,0,n)?, gbool(a,1,n)?)?; Value::Nil }
+            "gui_window_is_rtl" => { let n = "GUI_WINDOW_IS_RTL";
+                if a.len() != 1 { return Err(format!("{}: erwartet (win)", n)); }
+                Value::Bool(self.gui.window_is_rtl(gi(a,0,n)?)?) }
             "gui_state$" => { let n = "GUI_STATE$";
                 if !a.is_empty() { return Err(format!("{}: erwartet keine Argumente", n)); }
                 Value::str_rc(&self.gui.state_text()) }

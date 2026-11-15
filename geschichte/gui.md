@@ -1230,3 +1230,9 @@ am Zeilenende der Erwartung ab, die Ausgabe nicht.
   jetzt auch fuer Kaestchen, Optionen und Schalter (`kennhaut`, ein Arm
   vor den gewohnten -- `:checked` kommt ueber die Aufloesung schon in die
   Grundschicht).
+- **Gespiegeltes Fenster, Stufe 1** (`GUI_WINDOW_RTL`): gespiegelt wird
+  in `abs_rect` -- der einen Lage, die Zeichnen, Treffer, Tastatur und
+  Bildschirmleser fragen -- und in `menubar_slots`, die Menueleiste,
+  Druck und Popup gemeinsam fragen. Das Innere der Widgets (Kaestchen
+  links vom Text, Reglerrichtung, Werkzeugleiste, Textausrichtung im
+  Feld) bleibt fuer eine zweite Stufe.
