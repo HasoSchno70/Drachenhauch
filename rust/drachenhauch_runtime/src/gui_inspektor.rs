@@ -142,7 +142,7 @@ impl Gui {
             None => z.push("stildatei: keine".into()),
             Some(datei) => {
                 let kette = if datei.mit_vorfahren { Self::ketten(win).into_iter().nth(i).unwrap_or_default() } else { Vec::new() };
-                let regeln = datei.passend_kurz(w.kind.as_str(), &kl, &w.name, w.checked, &kette);
+                let regeln = datei.passend_kurz(w.kind.as_str(), &kl, &w.name, w.checked, &kette, &self.stil_lage(wi));
                 z.push(format!("stildatei {}{}", self.stil_quelle,
                     if regeln.is_empty() { " -- keine Regel passt".to_string() } else { String::new() }));
                 for (zeile, sel, _) in regeln { z.push(format!("  zeile {}: {}", zeile, sel)); }

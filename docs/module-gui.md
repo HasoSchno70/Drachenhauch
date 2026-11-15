@@ -2525,6 +2525,38 @@ umschlägt -- ein laufendes Programm wechselt um 20:00 von selbst ins
 Nachtaussehen. `GUI_STYLESHEET_CLOCK("12-24 21:00")` hält die Uhr fest, um
 es vorab anzusehen.
 
+**Regeln nach der Lage.** Ebenso vor einer Regel, auch zusammen mit
+`@zeit`:
+
+```
+@breite < 600 button { groesse: 12; abstand: 4 }     /* schmales Fenster */
+@hoehe <= 400 #bild { groesse: 10 }
+@dunkel #logo { bild: logo_hell.png }
+@hell #logo { bild: logo_dunkel.png }
+@hochkontrast button { border: #FFFF00; fg: #FFFFFF; bg: #000000 }
+@rtl #zurueck { bild: pfeil_rechts.png }
+```
+
+| Bedingung | gilt, wenn |
+|---|---|
+| `@breite < n`, `<=`, `>`, `>=` | das Fenster des Widgets so breit ist (logische Punkte, wie `GUI_WINDOW_GET_W`) |
+| `@hoehe < n` … | dasselbe für die Höhe |
+| `@dunkel` / `@hell` | das Thema der gui dunkel bzw. hell ist (Leuchtdichte von `win_bg`; `GUI_THEME_PRESET`, `GUI_SYSTEM_DARK`) |
+| `@hochkontrast` | hoher Kontrast gilt: wie das System (Windows, macOS, GNOME), `GUI_SET_CONTRAST` überstimmt |
+| `@rtl` / `@ltr` | das Fenster gespiegelt ist bzw. nicht (`GUI_WINDOW_RTL`) |
+
+Jedes Fenster hat seine eigene Lage: ein schmales Nebenfenster nimmt die
+Regel für schmale Fenster, das breite Hauptfenster daneben nicht. Wird
+ein Fenster schmal oder das Thema dunkel, löst die gui im nächsten
+`GUI_UPDATE` neu auf. Der Inspektor zeigt eine Regel mit Bedingung nur,
+solange sie gilt.
+
+| Befehl | Ergebnis | Wirkung |
+|---|---|---|
+| `GUI_SET_CONTRAST(modus$)` | — | `"system"` (Vorgabe): wie das Betriebssystem; `"hoch"`: `@hochkontrast` gilt immer; `"normal"`: nie |
+| `GUI_HIGH_CONTRAST()` | BOOLEAN | gilt gerade hoher Kontrast? |
+| `GUI_SYSTEM_HIGH_CONTRAST()` | BOOLEAN | will das System hohen Kontrast? (`DHRT_SYSTEM_HOHER_KONTRAST=1` legt die Antwort fest) |
+
 ### 8. Eigene Formen, Bildhäute und Animationen
 
 Ein Knopf muss kein Rechteck sein. Die Stildatei kennt dafür drei

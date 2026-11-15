@@ -1313,4 +1313,16 @@ am Zeilenende der Erwartung ab, die Ausgabe nicht.
   Studios noch nicht: ihr Ereignis `Takt` laeuft je Bild, und Programme
   verlassen sich darauf. Falle beim Test: eine Beilage ohne Zeilenende
   verlor die zweite Mausbewegung (Kommentarzeile ans Ende).
+- **Stildatei nach der Lage (2026-11-15).** Neben `@zeit`/`@datum` jetzt
+  `@breite`/`@hoehe` mit Vergleich, `@dunkel`/`@hell`, `@hochkontrast`,
+  `@rtl`/`@ltr`. Die Lage gilt je FENSTER: `stil_pass` stellt sie in der
+  Stildatei ein (wie die Uhr) und haengt einen Hash der geltenden
+  Bedingungen an den Schluessel jedes Widgets -- das globale Merken
+  (`stil_bed` + `stil_stand += 1`) ist damit weg, auch fuer die Uhr. Der
+  Inspektor bekommt die Lage seines Widgets ausdruecklich. Hoher Kontrast:
+  `systemaussehen::hoher_kontrast` (Windows SPI_GETHIGHCONTRAST mit eigener
+  Struktur statt eines weiteren Features der windows-Crate, macOS
+  `increaseContrast`, GNOME `high-contrast`), `GUI_SET_CONTRAST` zum
+  Ueberstimmen und Pruefen. Die Gegenprobe gegen das Neuaufloesen traf drei
+  Faelle zugleich -- alle haengen an derselben Stelle.
 

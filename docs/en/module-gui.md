@@ -2510,6 +2510,38 @@ flips -- a running program switches to its night look at 20:00 by itself.
 `GUI_STYLESHEET_CLOCK("12-24 21:00")` fixes the clock to look at it ahead
 of time.
 
+**Rules by situation.** Likewise in front of a rule, also together with
+`@zeit`:
+
+```
+@breite < 600 button { groesse: 12; abstand: 4 }     /* schmales Fenster */
+@hoehe <= 400 #bild { groesse: 10 }
+@dunkel #logo { bild: logo_hell.png }
+@hell #logo { bild: logo_dunkel.png }
+@hochkontrast button { border: #FFFF00; fg: #FFFFFF; bg: #000000 }
+@rtl #zurueck { bild: pfeil_rechts.png }
+```
+
+| Condition | applies when |
+|---|---|
+| `@breite < n`, `<=`, `>`, `>=` | the widget's window is this wide (logical points, like `GUI_WINDOW_GET_W`; alias `@width`) |
+| `@hoehe < n` … | the same for the height (alias `@height`) |
+| `@dunkel` / `@hell` | the gui's theme is dark or light (luminance of `win_bg`; `GUI_THEME_PRESET`, `GUI_SYSTEM_DARK`; aliases `@dark`, `@light`) |
+| `@hochkontrast` | high contrast applies: like the system (Windows, macOS, GNOME), `GUI_SET_CONTRAST` overrides (alias `@high-contrast`) |
+| `@rtl` / `@ltr` | the window is mirrored or not (`GUI_WINDOW_RTL`) |
+
+Every window has its own situation: a narrow side window takes the rule
+for narrow windows, the wide main window next to it does not. When a
+window becomes narrow or the theme dark, the gui resolves anew in the next
+`GUI_UPDATE`. The inspector shows a rule with a condition only while it
+applies.
+
+| Command | Result | Effect |
+|---|---|---|
+| `GUI_SET_CONTRAST(modus$)` | — | `"system"` (default): like the operating system; `"hoch"`: `@hochkontrast` always applies; `"normal"`: never |
+| `GUI_HIGH_CONTRAST()` | BOOLEAN | does high contrast apply right now? |
+| `GUI_SYSTEM_HIGH_CONTRAST()` | BOOLEAN | does the system want high contrast? (`DHRT_SYSTEM_HOHER_KONTRAST=1` fixes the answer) |
+
 ### 8. Shapes of your own, image skins and animations
 
 A button does not have to be a rectangle. The stylesheet knows three more

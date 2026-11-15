@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 2460,
+ "count": 2463,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -747,6 +747,7 @@
   "GUI_GRID": "GUI_WIDGET — Gitter: Tabelle im Zellmodus -- aktuelle Zelle, Bereich, Tippen bearbeitet, Strg+C/V als Tabulator-Text",
   "GUI_GROUPBOX": "GUI_WIDGET — gerahmte Gruppe mit eingelassenem Titel",
   "GUI_HAS_CLASS": "BOOLEAN — trägt das Widget die Klasse (die Knopfart zählt mit)?",
+  "GUI_HIGH_CONTRAST": "BOOLEAN — gilt gerade hoher Kontrast?",
   "GUI_HIT_TEST": "oberstes Widget am Bildschirmpunkt, oder -1 (Selektion im Editor)",
   "GUI_HOVERED": "BOOLEAN — Maus über dem Widget?",
   "GUI_ICON_BUTTON": "GUI_WIDGET — Knopf mit Icon (Textur-Handle oder Name eines eingebauten Sinnbilds); ohne Text = flacher Toolbar-Button",
@@ -900,6 +901,7 @@
   "GUI_SET_BOUNDS": "Widget verschieben/skalieren (fenster-relativ)",
   "GUI_SET_CHECKED": "Checkbox setzen",
   "GUI_SET_COLOR": "eine Farbe pro Widget (bg/fg/border/accent, bei Knöpfen auch hover/pressed; -1 entfernt)",
+  "GUI_SET_CONTRAST": "\"system\" (Vorgabe): wie das Betriebssystem; \"hoch\": @hochkontrast gilt immer; \"normal\": nie",
   "GUI_SET_CURSOR": "— / STRING — eigene Zeigerform über einem Widget (etwa einer Zeichenfläche); auto oder \"\" = die gui entscheidet",
   "GUI_SET_DATE": "Datum setzen",
   "GUI_SET_DROPDOWN": "Eintraege ersetzen",
@@ -960,6 +962,7 @@
   "GUI_SUBMENU": "Menü-Handle — Untermenü — öffnet beim Überfahren rechts daneben, beliebig tief",
   "GUI_SYSTEM_ACCENT": "INTEGER — die Akzentfarbe des Betriebssystems, -1 wenn unbekannt",
   "GUI_SYSTEM_DARK": "BOOLEAN — steht das Betriebssystem auf dunkel? (Windows, macOS, GNOME; unbekannt = FALSE)",
+  "GUI_SYSTEM_HIGH_CONTRAST": "BOOLEAN — will das System hohen Kontrast? (DHRT_SYSTEM_HOHER_KONTRAST=1 legt die Antwort fest)",
   "GUI_SYSTEM_REDUCED_MOTION": "BOOLEAN — will das Betriebssystem weniger Bewegung („Animationen reduzieren“; Windows, macOS, GNOME; unbekannt = FALSE)?",
   "GUI_TABCONTROL": "GUI_WIDGET — Reiter innerhalb eines Fensters (Karteikasten); passen die Köpfe nicht in die Breite, werden die breitesten zuerst schmaler und ihr Titel gekürzt",
   "GUI_TABCONTROL_ADD": "INTEGER — eine Seite anhängen, liefert ihre Nummer",

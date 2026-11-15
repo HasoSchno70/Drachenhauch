@@ -69,6 +69,49 @@ pub fn weniger_bewegung() -> bool {
     }
 }
 
+static KONTRAST_MERK: Mutex<Option<(Instant, bool)>> = Mutex::new(None);
+
+/// Will das System hohen Kontrast? Die Antwort gilt fuenf Sekunden;
+/// `DHRT_SYSTEM_HOHER_KONTRAST=1|0` legt sie fest. Unbekannt = nein.
+pub fn hoher_kontrast() -> bool {
+    if let Ok(v) = std::env::var("DHRT_SYSTEM_HOHER_KONTRAST") {
+        if let Some(b) = dunkel_aus_text(&v) { return b; }
+    }
+    let mut m = KONTRAST_MERK.lock().unwrap_or_else(|e| e.into_inner());
+    match *m {
+        Some((t, b)) if t.elapsed() < RUHIG_GILT => b,
+        _ => {
+            let b = kontrast_vom_system().unwrap_or(false);
+            *m = Some((Instant::now(), b));
+            b
+        }
+    }
+}
+
+#[cfg(windows)]
+fn kontrast_vom_system() -> Option<bool> {
+    use windows::Win32::UI::WindowsAndMessaging::{SystemParametersInfoW, SPI_GETHIGHCONTRAST, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS};
+    // HIGHCONTRASTW selbst -- dafuer eigens ein Feature der windows-Crate
+    // (Win32_UI_Accessibility) waere zu viel.
+    #[repr(C)]
+    struct Hoch { groesse: u32, flaggen: u32, schema: *mut u16 }
+    const AN: u32 = 0x0000_0001; // HCF_HIGHCONTRASTON
+    let mut hc = Hoch { groesse: std::mem::size_of::<Hoch>() as u32, flaggen: 0, schema: std::ptr::null_mut() };
+    let r = unsafe { SystemParametersInfoW(SPI_GETHIGHCONTRAST, hc.groesse, Some(&mut hc as *mut Hoch as *mut _), SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS(0)) };
+    if r.is_ok() { Some(hc.flaggen & AN != 0) } else { None }
+}
+#[cfg(target_os = "macos")]
+fn kontrast_vom_system() -> Option<bool> {
+    Some(befehl("defaults", &["read", "com.apple.universalaccess", "increaseContrast"]).map(|s| s.trim() == "1").unwrap_or(false))
+}
+#[cfg(target_os = "linux")]
+fn kontrast_vom_system() -> Option<bool> {
+    befehl("gsettings", &["get", "org.gnome.desktop.a11y.interface", "high-contrast"])
+        .and_then(|s| match s.trim() { "true" => Some(true), "false" => Some(false), _ => None })
+}
+#[cfg(not(any(windows, target_os = "macos", target_os = "linux")))]
+fn kontrast_vom_system() -> Option<bool> { None }
+
 /// GNOME `enable-animations`: `false` heisst weniger Bewegung.
 pub fn gnome_ruhig(antwort: &str) -> Option<bool> {
     match antwort.trim() { "false" => Some(true), "true" => Some(false), _ => None }

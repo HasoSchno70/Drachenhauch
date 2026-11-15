@@ -2992,7 +2992,7 @@ fn natuerlich_vergleichen(a: &str, b: &str) -> std::cmp::Ordering {
 /// Gewichtet wie das Auge (Gruen zaehlt am meisten) -- ein gelber Knopf mit
 /// weisser Schrift ist sonst unlesbar, obwohl sein Rotanteil niedrig ist.
 /// Relative Leuchtdichte nach WCAG (0 = schwarz, 1 = weiss).
-fn leuchtdichte(c: i64) -> f64 {
+pub(super) fn leuchtdichte(c: i64) -> f64 {
     let k = |v: i64| { let s = v as f64 / 255.0; if s <= 0.03928 { s / 12.92 } else { ((s + 0.055) / 1.055).powf(2.4) } };
     0.2126 * k((c >> 16) & 0xFF) + 0.7152 * k((c >> 8) & 0xFF) + 0.0722 * k(c & 0xFF)
 }
@@ -3845,9 +3845,8 @@ pub struct Gui {
     stil_quelle: String,
     stil_beob: Option<(String, String, f64)>,
     stil_fehler: String,
-    /// Stildatei nach Zeit und Datum: welche Bedingungen zuletzt galten, und
-    /// eine festgehaltene Uhr (GUI_STYLESHEET_CLOCK; None = die echte).
-    stil_bed: Vec<bool>,
+    /// Stildatei nach Zeit und Datum: eine festgehaltene Uhr
+    /// (GUI_STYLESHEET_CLOCK; None = die echte).
     stil_uhr_fest: Option<(Option<u16>, Option<u16>)>,
     /// Klaenge (gui_effekte.rs): an/aus, Wuensche fuer die VM, Protokoll
     /// fuer GUI_SOUND_LOG$.
@@ -3997,6 +3996,10 @@ pub struct Gui {
     /// fuer Schreibmarke und Hilfetext (bis 2026.49 zaehlten beide Bilder;
     /// schlaeft das Programm im Leerlauf, gibt es keine Bilder zu zaehlen).
     takt: f64,
+    /// GUI_SET_CONTRAST: 0 = wie das System, 1 = hoch, 2 = normal; und was
+    /// gerade gilt (fuer `@hochkontrast` in der Stildatei).
+    kontrast_modus: u8,
+    hoch_kontrast: bool,
     /// In wie vielen Sekunden die gui das naechste Bild braucht (unendlich =
     /// keins) -- gesammelt waehrend GUI_UPDATE/GUI_DRAW, abgeholt bei FLIP.
     bedarf: std::cell::Cell<f64>,
@@ -4096,7 +4099,7 @@ impl Gui {
     pub fn new() -> Gui {
         Gui {
             schrift: None,
-            windows: Vec::new(), z_order: Vec::new(), flaeche: 0, fokus_flaeche: 0, nativ_fokus_wunsch: None, leihe: None, teil_druck: None, teil_ids: Vec::new(), popup_fenster: Vec::new(), grenzen: Vec::new(), canvas_offen: None, uhr: 0.0, haeute: std::collections::HashMap::new(), bewegung: 0, ruhig: false, insp_an: false, insp_wahl: -1, insp_taste: std::env::var("DHRT_INSPEKTOR").map(|v| v.trim() == "1").unwrap_or(false), stil_quelle: String::new(), stil_beob: None, stil_fehler: String::new(), stil_bed: Vec::new(), stil_uhr_fest: None, klang_an: true, klang_warte: Vec::new(), klang_log: Vec::new(), funken: Vec::new(), funken_saat: 0x9E37_79B9_7F4A_7C15, vorher_ueber: Vec::new(), vorher_druck: None, vorher_fokus: None, palette: None, pal_taste: true,
+            windows: Vec::new(), z_order: Vec::new(), flaeche: 0, fokus_flaeche: 0, nativ_fokus_wunsch: None, leihe: None, teil_druck: None, teil_ids: Vec::new(), popup_fenster: Vec::new(), grenzen: Vec::new(), canvas_offen: None, uhr: 0.0, haeute: std::collections::HashMap::new(), bewegung: 0, ruhig: false, insp_an: false, insp_wahl: -1, insp_taste: std::env::var("DHRT_INSPEKTOR").map(|v| v.trim() == "1").unwrap_or(false), stil_quelle: String::new(), stil_beob: None, stil_fehler: String::new(), stil_uhr_fest: None, klang_an: true, klang_warte: Vec::new(), klang_log: Vec::new(), funken: Vec::new(), funken_saat: 0x9E37_79B9_7F4A_7C15, vorher_ueber: Vec::new(), vorher_druck: None, vorher_fokus: None, palette: None, pal_taste: true,
             ta_zerlegung: std::cell::RefCell::new(HashMap::new()),
             focus_window: None, focus_widget: None, modal: None, modal_vorher: Vec::new(), modal_fokus: Vec::new(), cp_drag: None,
             drag_window: None, drag_dx: 0, drag_dy: 0,
@@ -4110,7 +4113,7 @@ impl Gui {
             open_menu: None, context_open: None, kontext_neu: None, rs_menue: None, sub_chain: Vec::new(), tasten_mod: (false, false),
             kuerzel_gefeuert: false, was_right_down: false, was_mitte_down: false,
             scroll_drag: None,
-            was_mouse_down: false, zug_feld: None, frame_count: 0, takt: 0.0, bedarf: std::cell::Cell::new(f64::INFINITY),
+            was_mouse_down: false, zug_feld: None, frame_count: 0, takt: 0.0, kontrast_modus: 0, hoch_kontrast: false, bedarf: std::cell::Cell::new(f64::INFINITY),
             theme: default_theme(), metrics: default_metrics(),
             stil: None, stil_stand: 0, rad_jetzt: std::cell::Cell::new(None), form_jetzt: std::cell::Cell::new(stil::FormStil::default()),
             mnemonics: false, label_zug: None, label_wahl: None, gruppen: HashMap::new(), schriftwahl: Vec::new(),
