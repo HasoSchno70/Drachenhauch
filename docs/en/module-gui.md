@@ -489,6 +489,7 @@ Native, blocking standard dialogs (no IMPORT needed — like the file dialogs):
 | `GUI_STYLESHEET(text$)` | — | set a stylesheet: rules by kind, class, name and state as in CSS ("" = none) -- see [Stylesheet](#7-stylesheet-rules-by-kind-class-name-and-state) |
 | `GUI_STYLESHEET_LOAD(pfad$ [, beobachten])` | — | the same from a file (usually `.dhstil`); with `beobachten` = `TRUE` the gui reloads it as soon as it is saved ([section 9](#9-inspector-live-stylesheet-and-calm-motion)) |
 | `GUI_STYLESHEET_ERROR$()` | STRING | the error from the last reload of a watched stylesheet, `""` = fine |
+| `GUI_STYLESHEET_CLOCK(zeit$)` | — | fix the clock for `@zeit`/`@datum`: `"12-24"`, `"21:30"`, `"12-24 21:30"` or `"2026-12-24 21:30"` (a missing part comes from the real clock); `""` = the real clock again -- to look at a Christmas or night look ahead of time |
 | `GUI_ADD_CLASS(wdg, klasse$)` | — | add a class; it takes effect at once and as long as it stays |
 | `GUI_REMOVE_CLASS(wdg, klasse$)` | — | remove a class |
 | `GUI_HAS_CLASS(wdg, klasse$)` | BOOLEAN | does the widget carry the class (the button variant counts too)? |
@@ -2492,6 +2493,23 @@ you would look for it in the program. Name and classes are stored in the
 `.dhform` (`name`, `klassen`). `GUI_GET_COLOR` tells which colour applies
 right now.
 
+**Rules by time and date.** A condition may stand in front of a rule;
+then it only applies at that time:
+
+```
+@zeit 20:00-06:00 button { bg: #22252E }            /* nachts gedaempft */
+@datum 12-01..12-26 #titel { fg: #E74C3C }           /* Advent */
+@datum 12-31 @zeit 18:00-24:00 button { effekt: funken }
+```
+
+`@zeit from-to` (to exclusive) and `@datum MM-DD..MM-DD` (to inclusive, a
+single day without `..`) may reach across midnight or the turn of the year;
+several conditions apply together (English aliases `@time`, `@date`). The
+gui asks the local time each frame and resolves anew as soon as a condition
+flips -- a running program switches to its night look at 20:00 by itself.
+`GUI_STYLESHEET_CLOCK("12-24 21:00")` fixes the clock to look at it ahead
+of time.
+
 ### 8. Shapes of your own, image skins and animations
 
 A button does not have to be a rectangle. The stylesheet knows three more
@@ -2501,10 +2519,17 @@ properties for it, plus four commands:
 |---|---|
 | `form: rechteck \| pille \| kreis \| raute \| bild` | shape of a button (rectangle, pill, circle, diamond, image) -- for drawing **and** hit testing: a click beside the circle misses. `bild` takes the opacity of the image skin (transparent = beside), which makes any shape possible. Only in rules without a state |
 | `bild: datei.png` / `bildrand: 12` | image skin: instead of surface and border the button draws the image, `bildrand` as a 9-slice (corners stay, the middle grows); icon and text lie on top. An animated GIF plays (with its frame durations, endlessly; with `form: bild` the frame on screen is what gets hit). Also per state (`:hover`, `:active`, `:disabled`, `:checked`) |
-| `animation: puls \| wackeln \| schweben \| huepfen \| drehen [duration ms] [einmal \| count]` | the whole widget moves around its centre (pulse, wobble, float, bounce, spin); also per state: `button:hover { animation: puls }` pulses only while hovered |
+| `bild: figur.png 8 12fps` | frame sequence from an atlas: 8 equally wide frames side by side, 12 per second (default 12, 1..120), endlessly -- like an animated GIF, also for `form: bild`. A path with spaces stands in quotes. Image skins apply to buttons and to **check boxes, radio buttons and switches** (there instead of the mark, the label beside it), per state: `checkbox:checked { bild: an.png }` |
+| `griff: knopf.png` | slider with skin: `bild` is the track (over the whole rectangle, with `bildrand` as a 9-slice), `griff` the handle -- square, as tall (for a vertical slider as wide) as the slider, at the position of the value. If one of the two skins is missing, the usual shape appears there. Also per state (`slider:active { griff: gedrueckt.png }`) and as a frame sequence |
+| `@ablauf name { 0%: x 0; 50%: y -8, drehen 10; 100%: groesse 1.1 }` | an animation of your own: keyframes with `x`, `y` (points), `drehen` (degrees, rotate) and `groesse` (scale), joined straight in between; if 0 % or 100 % is missing, it rests there. Then the name works like a built-in kind: `animation: name 800ms`, `GUI_ANIMATE(wdg, "name")`; it may stand before or after the rule that names it |
+| `@ablauf name { 50%: deckkraft 0.3, farbe #FF8080 }` | opacity (0..1) and tint (`#RRGGBB`, white = none) in an animation -- plus the built-in kind `blinken` (blink: opacity 1 → 0.35 → 1). For this the widget goes into a layer of its own, laid on with opacity and tint; only on the main surface without POSTFX, elsewhere it stays fully visible |
+| `animation: puls \| wackeln \| schweben \| huepfen \| drehen \| blinken [duration ms] [einmal \| count]` | the whole widget moves around its centre (pulse, wobble, float, bounce, spin); also per state: `button:hover { animation: puls }` pulses only while hovered |
 | `GUI_SET_SHAPE(knopf, form$)` / `GUI_GET_SHAPE$(knopf)` | set a shape of its own (`""` = the stylesheet again) or the shape in effect |
 | `GUI_ANIMATE(wdg, art$ [, dauer_ms [, anzahl]])` | start an animation -- say wobble once on wrong input; `anzahl` 0 = endless (default 1), `art$` `""` stops |
 | `GUI_ANIMATING(wdg)` | is an animation running right now? |
+| `gleiten: 200` | smooth layout transitions (duration in ms, 0..2000): when position or size change (layout, `GUI_SET_BOUNDS`, window size), the picture glides from the old to the new rectangle, easing out; a widget that becomes visible grows in. The hit area is at the target at once. Only in rules without a state; `* { gleiten: 200 }` applies to the whole application |
+| `GUI_GLIDING(wdg)` | is the widget gliding right now? |
+| `unschaerfe: 12` | glass: what is drawn behind the widget (an image, a map, other widgets) lies blurred beneath it (radius 0..40); a surface with opacity shows through: `panel.glas { unschaerfe: 12; bg: #60FFFFFF; radius: 14 }`. Works on the main surface, in real windows and in render targets. Only in rules without a state |
 
 ```basic
 IMPORT "gui"
@@ -2538,6 +2563,7 @@ Three helpers for designing and for accessibility:
 | `GUI_INSPECTOR([an])` | BOOLEAN without argument | show the inspector (`TRUE`) or close it; without argument: is it open? |
 | `GUI_INSPECTOR_SELECTED()` | GUI_WIDGET | the widget selected in the inspector, -1 = none |
 | `GUI_INSPECT$(widget)` | STRING | what the inspector shows about a widget: kind, name, classes, position, state, shape, the matching stylesheet rules with their line and what applies per state |
+| `GUI_STATE$()` | STRING | the state of all visible windows as text: one line per widget with a state (texts, ticks, values, selection) -- the expectation `dhrt aufnehmen` writes ([werkzeuge.md](werkzeuge.md#dhrt-aufnehmen--operating-a-program-as-a-test-case)) |
 | `GUI_SET_MOTION(modus$)` | — | `"system"` (default): like the operating system; `"an"`: animations always; `"aus"`: never |
 | `GUI_MOTION()` | BOOLEAN | is the gui playing motion right now? |
 
@@ -2547,7 +2573,8 @@ click selects it -- the click does **not** reach the widget -- and a panel
 shows what `GUI_INSPECT$` returns. ESC closes it. With the environment
 variable `DHRT_INSPEKTOR=1`, **Ctrl+Shift+I** opens and closes it in any
 program without a line of code; without it the key stays free for the
-program.
+program. In a real window (`GUI_WINDOW_NATIVE`) it selects that window's
+widgets, and the panel stands there.
 
 ```
 button #los .menue .standard
@@ -2619,7 +2646,8 @@ whoever chose "reduce animations" gets the sound but no confetti.
 Every program with a menu bar or toolbar has a command palette without a
 line of code: **Ctrl+Shift+P** opens, above the window with the focus, a
 search over all entries of its menu bar (submenus included, "Datei ›
-Zuletzt › brief.txt") and the buttons of its toolbars. Typing filters (a
+Zuletzt › brief.txt"), its context menus and the buttons of its toolbars;
+in a real window it stands in that window. Typing filters (a
 word start first, then a match inside a word, then scattered letters),
 Up/Down selects, Enter or a click triggers -- exactly like mouse and
 shortcut, `GUI_CLICKED` and callbacks included. ESC or a click beside it
@@ -2638,6 +2666,45 @@ Ctrl+Shift+P (like the IDE with its own palette), that entry fires and the
 palette stays closed. While it is open no widget has the focus -- a
 backspace shortens the search, not the text in the field below; afterwards
 the focus comes back.
+
+### 12. Self-drawn widgets
+
+When no shape and no skin will do: `GUI_CUSTOM` is a widget the program
+paints itself -- like a drawing surface, with `GUI_CANVAS_BEGIN` /
+`GUI_CANVAS_END` and `GUI_CANVAS_MOUSE` --, but the gui looks after it like
+any other: it gets the focus with Tab (focus ring included), a click via
+mouse, Enter or space (`GUI_CLICKED`), the keys of the frame and a role for
+the screen reader.
+
+| Command | Returns | Effect |
+|---|---|---|
+| `GUI_CUSTOM(win, x, y, w, h [, rolle$])` | GUI_WIDGET | a self-drawn widget; `rolle$` (role) = `"button"` (default), `"checkbox"` (tick via `GUI_SET_CHECKED`/`GUI_CHECKED`) or `"slider"` (value via `GUI_SET_VALUE`/`GUI_VALUE`); `GUI_SET_TEXT` sets the name for the screen reader |
+| `GUI_CUSTOM_KEY(wdg)` | INTEGER | the key it got this frame (arrows, Home/End, Page up/down, Enter, space, Backspace, Delete, ESC -- codes like `KEYHIT`), 0 = none |
+| `GUI_CUSTOM_TEXT$(wdg)` | STRING | the characters it got this frame |
+
+```basic
+IMPORT "gui"
+SCREEN(420, 240, "Eigen", 1)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Eigen", 10, 10, 400, 220)
+DIM nacht AS GUI_WIDGET : nacht = GUI_CUSTOM(w, 20, 20, 160, 60, "checkbox")
+GUI_SET_TEXT(nacht, "Nachtmodus")
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_CLICKED(nacht) THEN GUI_SET_CHECKED(nacht, NOT GUI_CHECKED(nacht))
+    CLS(&H202830)
+    GUI_DRAW()
+    GUI_CANVAS_BEGIN(nacht)
+    DIM x AS INTEGER : x = GUI_CANVAS_X(nacht)
+    DIM y AS INTEGER : y = GUI_CANVAS_Y(nacht)
+    BOX(x, y, x + 158, y + 58, IIF(GUI_CHECKED(nacht), &H203060, &HE0C060))
+    TEXT(x + 10, y + 20, IIF(GUI_CHECKED(nacht), "Mond", "Sonne"), WHITE)
+    GUI_CANVAS_END()
+    FLIP()
+WEND
+```
+
+Keys and characters only arrive while the widget has the focus; they hold
+for exactly one frame, like `GUI_CLICKED`.
 
 ## Callbacks: GUI_ON_CLICK
 
@@ -4356,12 +4423,16 @@ typed.
 | Command | What it does |
 |---|---|
 | `TEXT_VISUAL$(text$ [, direction$])` | The text as it is displayed -- for your own output such as files or images. `direction$` = `auto` (default), `ltr` or `rtl` |
+| `GUI_WINDOW_RTL(win, an)` | the whole window right to left: the position of every widget mirrored at the window's width, the menu bar and the toolbar start on the right, check boxes, radio buttons and switches carry their mark to the right of the text, a slider grows to the left (dragging and arrow keys too). The program keeps setting and reading its positions from the left (`GUI_GET_X`); drawing, clicks and `GUI_HIT_TEST` go through the mirrored one |
+| `GUI_WINDOW_IS_RTL(win)` | is the window right to left? |
 
 Indic and Southeast Asian scripts and the ligatures of a font are set by
 text shaping ([builtins-grafik.md](builtins-grafik.md#text-shaping-indic-scripts-and-ligatures)).
 What does not work (yet): alignment does not follow direction --
 a right-to-left line stays on the left unless `GUI_SET_ALIGN` says
-otherwise; in such a line of a text area bold, italic and underline are
+otherwise; in a mirrored window (`GUI_WINDOW_RTL`) text fields, tables and trees
+keep their inside as it is (text left-aligned, columns and indentation from
+the left); in such a line of a text area bold, italic and underline are
 dropped (the colours of the highlighting stay); end-of-line hints and
 colour swatches still use the logical position. The pdf module does not
 reorder -- use `TEXT_VISUAL$` before `PDF_TEXT` there.

@@ -49,10 +49,13 @@ impl Gui {
         let win = &self.windows[wi];
         let pad = self.m("pad");
         let mut x = win.x + pad;
+        let mut rechts = win.x + win.w - pad;
         let mut out = Vec::new();
         for (mi, m) in win.menus.iter().enumerate() {
             if !m.in_bar { continue; }
             let wlbl = self.ctext_width(g, &m.label) + pad * 2;
+            // Rechts nach links: das erste Menue ganz rechts.
+            if win.rtl { out.push((mi, rechts - wlbl, rechts)); rechts -= wlbl; continue; }
             out.push((mi, x, x + wlbl));
             x += wlbl;
         }
@@ -680,23 +683,97 @@ impl Gui {
         self.feld_symbole_zeichnen(g, wdg, ax, ay, w, h);
     }
 
+    /// Kaestchen, Option, Schalter mit Bildhaut: das Bild in der Groesse des
+    /// Kennzeichens (Schalter doppelt so breit), daneben der Text. FALSE =
+    /// keine Haut (oder sie fehlt), dann zeichnet die gewohnte Art.
+    fn kennhaut(&self, g: &mut Graphics, wi: usize, idx: usize, wdg: &Widget, ax: i32, ay: i32, h: i32, pad: i32) -> bool {
+        let gedrueckt = self.press_origin == Some((wi, idx));
+        let Some((pfad, rand)) = self.w_bild(wdg, gedrueckt) else { return false };
+        let ks = if wdg.kind == Kind::Toggle { self.m("check_size").max(self.sk(14)).min(h) } else { self.m("check_size").min(h).max(8) };
+        let kb = if wdg.kind == Kind::Toggle { ks * 2 } else { ks };
+        let ky = ay + (h - ks) / 2;
+        let ax = self.kenn_x(wi, ax, wdg.w, kb);
+        if !self.haut_zeichnen(g, &pfad, rand, ax, ky, kb, ks) { return false; }
+        if !wdg.text.is_empty() {
+            self.wtext_mn(g, wdg, self.kenn_text_x(g, wi, wdg, ax, kb, pad), ky + (ks - self.wsize(g, wdg)).max(0) / 2, &wdg.text, self.txt_col(wdg));
+        }
+        true
+    }
+
+    /// Wo steht das Kennzeichen (Kaestchen, Punkt, Rinne) der Breite `kb` in
+    /// einem Widget der Breite `w`? Links -- in einem Fenster von rechts
+    /// nach links rechts.
+    fn kenn_x(&self, wi: usize, ax: i32, w: i32, kb: i32) -> i32 {
+        if self.windows[wi].rtl { ax + w - kb } else { ax }
+    }
+    /// Wo beginnt der Text neben dem Kennzeichen (bei `kx`, Breite `kb`)?
+    fn kenn_text_x(&self, g: &Graphics, wi: usize, wdg: &Widget, kx: i32, kb: i32, pad: i32) -> i32 {
+        if self.windows[wi].rtl { kx - pad - self.wtext_width(g, wdg, &wdg.text) } else { kx + kb + pad }
+    }
+
+    /// Ein Regler mit Haut: die Rinne ueber das ganze Rechteck (9-Slice mit
+    /// `bildrand`), der Griff quadratisch (so hoch bzw. breit wie der
+    /// Regler) an der Stelle des Werts. Fehlt eine der beiden Haeute, kommt
+    /// dort die gewohnte Form. FALSE = keine Haut.
+    #[allow(clippy::too_many_arguments)]
+    fn reglerhaut(&self, g: &mut Graphics, wi: usize, idx: usize, wdg: &Widget, ax: i32, ay: i32, w: i32, h: i32) -> bool {
+        let gedrueckt = self.press_origin == Some((wi, idx));
+        let rinne = self.w_bild(wdg, gedrueckt);
+        let griff = self.w_griff(wdg, gedrueckt);
+        if rinne.is_none() && griff.is_none() { return false; }
+        let span = wdg.max - wdg.min;
+        let ratio = if span != 0.0 { ((wdg.value - wdg.min) / span).clamp(0.0, 1.0) } else { 0.0 };
+        // Rechts nach links waechst ein waagerechter Regler von rechts.
+        let ratio = if self.windows[wi].rtl && !wdg.vert { 1.0 - ratio } else { ratio };
+        let gezeichnet = rinne.map(|(p, r)| self.haut_zeichnen(g, &p, r, ax, ay, w, h)).unwrap_or(false);
+        if !gezeichnet {
+            if wdg.vert { g.box_fill(ax + w / 2 - 1, ay, ax + w / 2 + 1, ay + h - 1, self.wcol(wdg, "bg", "widget_bg")); }
+            else { g.box_fill(ax, ay + h / 2 - 1, ax + w - 1, ay + h / 2 + 1, self.wcol(wdg, "bg", "widget_bg")); }
+        }
+        let (gx, gy, gs) = if wdg.vert {
+            let gs = w;
+            (ax, ay + ((1.0 - ratio) * (h - gs) as f64) as i32, gs)
+        } else {
+            let gs = h;
+            (ax + (ratio * (w - gs) as f64) as i32, ay, gs)
+        };
+        let griff_da = griff.map(|p| self.haut_zeichnen(g, &p, 0, gx, gy, gs, gs)).unwrap_or(false);
+        if !griff_da { self.knauf(g, gx + gs / 2, gy + gs / 2, (gs / 2).max(5), self.griff_farbe(wdg)); }
+        self.regler_marken_zeichnen(g, wdg, ax, ay, w, h);
+        true
+    }
+
     pub(super) fn draw_widget(&self, g: &mut Graphics, wi: usize, idx: usize, wdg: &Widget) {
         // Die Rundung aus der Stildatei gilt fuer jede Flaeche dieses Widgets.
         let vorher = self.rad_jetzt.replace(self.w_radius(wdg));
         let form_vorher = self.form_jetzt.replace(self.w_form(wdg));
-        // Animation (gui_aussehen.rs): das ganze Widget um seine Mitte
-        // verschoben, gedreht oder vergroessert -- Lage und Treffer bleiben.
+        // Animation und Gleiten (gui_aussehen.rs): das ganze Widget um seine
+        // Mitte verschoben, gedreht oder vergroessert -- Lage und Treffer
+        // bleiben.
         let anim = if wdg.aussehen.is_some() { self.anim_matrix(wi, idx, wdg) } else { None };
-        if let Some((dx, dy, ang, sc)) = anim {
+        // Deckkraft und Farbton (Ablauf, `blinken`): eine Schicht AUSSEN um
+        // die Verformung -- das Renderziel der Schicht faengt mit neuer
+        // Matrix an.
+        let deck = if wdg.aussehen.is_some() { self.anim_deck(wi, idx, wdg) } else { None };
+        if let Some((a, ton)) = deck { g.schicht_anfang(a, ton); }
+        if let Some((dx, dy, ang, sx, sy)) = anim {
             let (ax, ay, w, h) = self.abs_rect(wi, wdg);
-            g.verformung_beginnen(ax + w / 2, ay + h / 2, dx, dy, ang, sc);
+            g.verformung_beginnen(ax + w / 2, ay + h / 2, dx, dy, ang, sx, sy);
         }
         if wdg.stil_auf.is_some() && !matches!(self.w_form_art(wdg), aussehen::F_KREIS | aussehen::F_RAUTE | aussehen::F_BILD) {
             let (ax, ay, w, h) = self.abs_rect(wi, wdg);
             self.schatten_zeichnen(g, wdg, ax, ay, w, h);
+            // Glas (Stildatei `unschaerfe`): was dahinter liegt, unscharf --
+            // die Flaeche des Widgets darueber scheint durch, wenn ihre Farbe
+            // Deckkraft hat (`bg: #A0202630`).
+            if let Some(r) = wdg.stil_auf.as_ref().and_then(|s| s[stil::BASIS].unschaerfe).filter(|&r| r > 0) {
+                let ecke = self.w_radius(wdg).unwrap_or_else(|| self.m("corner_radius"));
+                g.unschaerfe(ax, ay, w, h, self.sk(r), ecke);
+            }
         }
         self.draw_widget_innen(g, wi, idx, wdg);
         if anim.is_some() { g.verformung_beenden(); }
+        if deck.is_some() { g.schicht_ende(); }
         self.form_jetzt.set(form_vorher);
         self.rad_jetzt.set(vorher);
     }
@@ -926,10 +1003,15 @@ impl Gui {
                     }
                 }
             }
+            // Bildhaut (Stildatei `bild`, auch `:checked`): statt Kaestchen,
+            // Punkt oder Rinne das Bild, daneben die Beschriftung.
+            Kind::Checkbox | Kind::Radio | Kind::Toggle if self.kennhaut(g, wi, idx, wdg, ax, ay, h, pad) => {}
             Kind::Checkbox => {
                 // Das Kaestchen ist so gross wie die Metrik, nicht wie das
                 // Rechteck: das reicht seit dem Automass ueber den Text.
                 let cs = self.m("check_size").min(h).max(8);
+                // Rechts nach links: das Kennzeichen rechts, der Text davor.
+                let ax = self.kenn_x(wi, ax, w, cs);
                 let (ay, w, h) = (ay + (h - cs) / 2, cs, cs);
                 let acc = self.acc_col(wdg);
                 let bordc = self.wcol(wdg, "border", "widget_border");
@@ -961,13 +1043,18 @@ impl Gui {
                     if wdg.ueber_t > 0.0 { g.rect(ax - 1, ay - 1, ax + w, ay + h, deckkraft(acc, weich(wdg.ueber_t))); }
                     if wdg.checked { g.box_fill(ax + 3, ay + 3, ax + w - 4, ay + h - 4, acc); }
                 }
-                self.wtext_mn(g, wdg, ax + w + pad, ay, &wdg.text, self.txt_col(wdg));
+                self.wtext_mn(g, wdg, self.kenn_text_x(g, wi, wdg, ax, w, pad), ay, &wdg.text, self.txt_col(wdg));
             }
             Kind::Slider if wdg.vert => self.draw_vslider(g, wdg, ax, ay, w, h),
+            // Regler mit Bildhaut: Rinne (`bild`) und Griff (`griff`).
+            Kind::Slider if self.reglerhaut(g, wi, idx, wdg, ax, ay, w, h) => {}
             Kind::Slider => {
                 let handle_w = self.m("slider_handle_w");
                 let span = wdg.max - wdg.min;
                 let ratio = if span != 0.0 { (wdg.value - wdg.min) / span } else { 0.0 };
+                // Rechts nach links: von rechts gefuellt, der Griff gespiegelt.
+                let gesp = self.windows[wi].rtl;
+                let lage = if gesp { 1.0 - ratio } else { ratio };
                 let acc = self.acc_col(wdg);
                 if self.m_form("gradient") > 0 {
                     // Rinne: schmal und versenkt. Der zurueckgelegte Teil wird
@@ -977,17 +1064,24 @@ impl Gui {
                     self.fbox_tief(g, ax, ty, ax + w - 1, tb,
                                    self.wcol(wdg, "bg", "widget_bg"),
                                    self.wcol(wdg, "border", "widget_border"));
-                    let bis = ax + (ratio * (w - 1) as f64) as i32;
-                    if bis > ax + 2 {
-                        g.round_gradient(ax + 1, ty + 1, bis, tb - 1, 3,
-                                         shade(acc, 24), shade(acc, -18));
+                    if gesp {
+                        let von = ax + w - 1 - (ratio * (w - 1) as f64) as i32;
+                        if von < ax + w - 3 {
+                            g.round_gradient(von, ty + 1, ax + w - 2, tb - 1, 3, shade(acc, 24), shade(acc, -18));
+                        }
+                    } else {
+                        let bis = ax + (ratio * (w - 1) as f64) as i32;
+                        if bis > ax + 2 {
+                            g.round_gradient(ax + 1, ty + 1, bis, tb - 1, 3,
+                                             shade(acc, 24), shade(acc, -18));
+                        }
                     }
-                    let hx = ax + (ratio * (w - handle_w) as f64) as i32 + handle_w / 2;
+                    let hx = ax + (lage * (w - handle_w) as f64) as i32 + handle_w / 2;
                     self.knauf(g, hx, ay + h / 2, (h / 2).max(5), self.griff_farbe(wdg));
                 } else {
                     g.box_fill(ax, ay + h / 2 - 1, ax + w - 1, ay + h / 2 + 1, self.wcol(wdg, "bg", "widget_bg"));
                     g.rect(ax, ay, ax + w - 1, ay + h - 1, self.wcol(wdg, "border", "widget_border"));
-                    let hx = ax + (ratio * (w - handle_w) as f64) as i32;
+                    let hx = ax + (lage * (w - handle_w) as f64) as i32;
                     g.box_fill(hx, ay, hx + handle_w - 1, ay + h - 1, acc);
                 }
                 self.regler_marken_zeichnen(g, wdg, ax, ay, w, h);
@@ -996,6 +1090,7 @@ impl Gui {
                 // Die Pille ist doppelt so breit wie hoch; das Rechteck
                 // reicht ueber die Beschriftung.
                 let ph = self.m("check_size").max(self.sk(14)).min(h);
+                let ax = self.kenn_x(wi, ax, w, ph * 2);
                 let (ay, w, h) = (ay + (h - ph) / 2, ph * 2, ph);
                 let acc = self.acc_col(wdg);
                 let aus = self.wcol(wdg, "bg", "widget_bg");
@@ -1006,10 +1101,12 @@ impl Gui {
                 let bahn = mischen(aus, acc, mix);
                 self.fbox_tief_w(g, wdg.kind, ax, ay, ax + w - 1, ay + h - 1, bahn,
                                self.wcol(wdg, "border", "widget_border"));
-                let kx = ax + r + ((w - h) as f64 * mix) as i32;
+                // Rechts nach links steht "an" links.
+                let weg = ((w - h) as f64 * mix) as i32;
+                let kx = if self.windows[wi].rtl { ax + w - r - weg } else { ax + r + weg };
                 self.knauf(g, kx, ay + r, r - 2, self.griff_farbe(wdg));
                 if !wdg.text.is_empty() {
-                    self.wtext_mn(g, wdg, ax + w + pad, ay + (h - self.wsize(g, wdg)).max(0) / 2, &wdg.text, self.txt_col(wdg));
+                    self.wtext_mn(g, wdg, self.kenn_text_x(g, wi, wdg, ax, w, pad), ay + (h - self.wsize(g, wdg)).max(0) / 2, &wdg.text, self.txt_col(wdg));
                 }
             }
             Kind::Knob => {
@@ -1488,6 +1585,8 @@ impl Gui {
             }
             Kind::Radio => {
                 let cs = self.m("check_size").min(h).max(8);
+                // Rechts nach links: das Kennzeichen rechts, der Text davor.
+                let ax = self.kenn_x(wi, ax, w, cs);
                 let (ay, w, h) = (ay + (h - cs) / 2, cs, cs);
                 let acc = self.acc_col(wdg);
                 let (cx, cy, r) = (ax + w / 2, ay + h / 2, (w / 2).max(2));
@@ -1498,7 +1597,7 @@ impl Gui {
                     g.circle(cx, cy, (r - 1).max(1), self.th("win_bg"));
                 }
                 if wdg.checked { g.circle(cx, cy, (r - 4).max(1), acc); }   // Punkt
-                self.wtext_mn(g, wdg, ax + w + pad, ay, &wdg.text, self.txt_col(wdg));
+                self.wtext_mn(g, wdg, self.kenn_text_x(g, wi, wdg, ax, w, pad), ay, &wdg.text, self.txt_col(wdg));
             }
             Kind::Progress if Self::ist_kreisel(wdg) => self.kreisel_zeichnen(g, wdg, ax, ay, w, h),
             Kind::Progress => {
@@ -1714,6 +1813,9 @@ impl Gui {
                 if wdg.sel >= 0 { self.draw_bild(g, wdg, ax, ay, w, h); }
             }
             Kind::Card => self.draw_karte(g, wi, idx, ax, ay, w, h),
+            // Selbst gezeichnet: die gui malt nichts (den Fokusring malt
+            // `draw_widget` wie bei jedem Widget).
+            Kind::Eigen => {}
             Kind::Canvas => {
                 // Platzhalter-Flaeche; der User malt nach GUI_DRAW mit normalen
                 // Befehlen in den per GUI_CANVAS_X/Y/W/H gelieferten Bereich.

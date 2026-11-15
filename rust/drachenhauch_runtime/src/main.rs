@@ -112,6 +112,7 @@ mod syntax;
 mod symbole;
 mod lsp;
 mod paket;
+mod aufnahme;
 mod meldung;
 mod doku;
 mod pruef;
@@ -527,6 +528,11 @@ fn main() -> ExitCode {
         // `dhrt pruef ...` -- die Doku-Pruefer.
         if raw.len() >= 2 && raw[1] == "pruef" {
             return pruef::main(&raw[2..]);
+        }
+        // `dhrt aufnehmen programm.dh ziel.dhtest [name] [--bilder N]` -- die
+        // Bedienung aufnehmen und als Fall einer Pruefsammlung anhaengen.
+        if raw.len() >= 2 && raw[1] == "aufnehmen" {
+            return aufnahme::main(&raw[2..]);
         }
         // `dhrt paket ...` -- Bibliotheken holen und teilen.
         if raw.len() >= 2 && raw[1] == "paket" {

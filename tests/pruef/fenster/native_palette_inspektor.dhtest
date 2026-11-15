@@ -1,0 +1,92 @@
+' Befehlspalette und Inspektor in einem echten OS-Fenster (gui_palette.rs,
+' gui_inspektor.rs; Weg E): die Palette steht in der Flaeche ihres Fensters
+' und nimmt dort die Tasten, der Inspektor waehlt dort -- ein Klick im
+' echten Fenster trifft dessen Widget, nicht eins des Hauptfensters an
+' derselben Stelle. Eingespielt ueber `n`-Zeilen der Aufnahme (Bild,
+' Flaeche 1 = das erste echte Fenster, Art: 0 Maus, 1/2 Maustaste, 3/4
+' Taste mit raylib-Code, 7 Fokus, 9 drinnen).
+' Format: docs/werkzeuge.md, dhrt test.
+--- seriell
+
+--- langsam
+=== enter in der palette eines echten fensters loest dessen eintrag aus
+IMPORT "gui"
+SCREEN(500, 300, "Palette-Haupt", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM h AS GUI_WINDOW : h = GUI_WINDOW("Haupt", 0, 0, 500, 300)
+DIM mh AS INTEGER : mh = GUI_MENU(h, "Haupt")
+DIM hh AS INTEGER : hh = GUI_MENU_ITEM(mh, "Hauptding")
+DIM d AS GUI_WINDOW : d = GUI_WINDOW("Palette-Echt", 40, 40, 300, 200)
+DIM md AS INTEGER : md = GUI_MENU(d, "Datei")
+DIM sp AS INTEGER : sp = GUI_MENU_ITEM(md, "Speichern")
+PRINT "nativ "; GUI_WINDOW_NATIVE(d, TRUE)
+PRINT "ereignisse "; AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER
+DIM klick AS INTEGER : klick = -1
+DIM liste AS STRING
+FOR n = 1 TO 40
+    IF n = 10 THEN
+        GUI_PALETTE(TRUE)
+        liste = GUI_PALETTE_ITEMS$()
+    END IF
+    GUI_UPDATE()
+    IF GUI_CLICKED(sp) AND klick < 0 THEN klick = n
+    CLS(0) : GUI_DRAW() : FLIP()
+NEXT
+PRINT "liste "; liste
+PRINT "ausgeloest "; klick > 10; " offen "; GUI_PALETTE()
+--- datei ev.txt
+c 0
+n 2 1 9 1 0
+n 2 1 7 1 0
+n 2 1 0 150 120
+n 20 1 3 257 0
+n 21 1 4 257 0
+
+--- umgebung
+DHRT_FRAMES=60
+--- system windows
+--- erwartet
+nativ TRUE
+ereignisse 5
+liste >Datei › Speichern
+ausgeloest TRUE offen FALSE
+
+=== der inspektor waehlt im echten fenster dessen knopf
+IMPORT "gui"
+SCREEN(500, 300, "Insp-Haupt", 1)
+SET_WINDOW_POS(-3000, -3000)
+' Das echte Fenster zuerst: das Fenster des Hauptfensters liegt danach in
+' der Reihenfolge OBEN -- ein Treffertest ohne Blick auf die Flaeche faende
+' bei (90, 55) dessen Knopf.
+DIM d AS GUI_WINDOW : d = GUI_WINDOW("Insp-Echt", 40, 40, 240, 160)
+DIM dk AS GUI_WIDGET : dk = GUI_BUTTON(d, "Echt", 20, 40, 140, 30)
+PRINT "nativ "; GUI_WINDOW_NATIVE(d, TRUE)
+DIM h AS GUI_WINDOW : h = GUI_WINDOW("Haupt", 0, 0, 500, 300)
+GUI_WINDOW_CHROME(h, FALSE)
+' Ein Knopf des Hauptfensters an derselben Stelle wie der im echten Fenster.
+DIM hk AS GUI_WIDGET : hk = GUI_BUTTON(h, "Haupt", 0, 0, 500, 300)
+GUI_INSPECTOR(TRUE)
+PRINT "ereignisse "; AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER
+DIM klicks AS INTEGER
+FOR n = 1 TO 40
+    GUI_UPDATE()
+    IF GUI_CLICKED(dk) OR GUI_CLICKED(hk) THEN klicks = klicks + 1
+    CLS(0) : GUI_DRAW() : FLIP()
+NEXT
+PRINT "gewaehlt echt "; GUI_INSPECTOR_SELECTED() = dk; " haupt "; GUI_INSPECTOR_SELECTED() = hk; " klicks "; klicks
+--- datei ev.txt
+c 0
+n 5 1 9 1 0
+n 5 1 0 90 55
+n 6 1 1 0 0
+n 8 1 2 0 0
+
+--- umgebung
+DHRT_FRAMES=60
+--- system windows
+--- erwartet
+nativ TRUE
+ereignisse 4
+gewaehlt echt TRUE haupt FALSE klicks 0

@@ -506,6 +506,21 @@ impl Gui {
         let (auf, ab) = (g.key_pressed(KEY_UP), g.key_pressed(KEY_DOWN));
         let (links, rechts) = (g.key_pressed(KEY_LEFT), g.key_pressed(KEY_RIGHT));
         match kind {
+            Kind::Eigen => {
+                // Die Tasten dieses Bildes merkt sich das Widget, Enter und
+                // Leertaste sind ausserdem ein Klick.
+                let taste = [KEY_LEFT, KEY_RIGHT, KEY_UP, KEY_DOWN, KEY_HOME, KEY_END, KEY_PAGEUP, KEY_PAGEDOWN,
+                    KEY_ENTER, KEY_SPACE, KEY_BACKSPACE, KEY_DELETE, KEY_ESC].into_iter().find(|&k| g.key_repeat(k)).unwrap_or(0);
+                let text: String = g.pop_text_input().chars().filter(|c| !c.is_control() && *c != ' ').collect();
+                let w = &mut self.windows[wi].widgets[i];
+                w.eigen_taste = taste;
+                w.eigen_text = text;
+                if ausloesen {
+                    w.clicked = true;
+                    let f = w.on_click.clone();
+                    if let Some(f) = f { self.pending.push(f); }
+                }
+            }
             Kind::Button | Kind::Card => {
                 if ausloesen {
                     let w = &mut self.windows[wi].widgets[i];
@@ -547,6 +562,8 @@ impl Gui {
                 // Pos1/Ende springen an die Enden.
                 let (lo, hi, v) = { let w = &self.windows[wi].widgets[i]; (w.min, w.max, w.value) };
                 let schritt = (hi - lo) / 20.0;
+                // Rechts nach links: links heisst mehr (ein waagerechter Regler).
+                let (rechts, links) = if self.windows[wi].rtl && self.windows[wi].widgets[i].kind == Kind::Slider && !self.windows[wi].widgets[i].vert { (links, rechts) } else { (rechts, links) };
                 // Eingerastet: von Marke zu Marke.
                 let hoch = Self::regler_nachbar(&self.windows[wi].widgets[i], v, true);
                 let runter = Self::regler_nachbar(&self.windows[wi].widgets[i], v, false);
@@ -1240,7 +1257,7 @@ impl Gui {
         let kind = self.windows[win].widgets[i].kind;
         self.focus_widget = if kind.fokussierbar() { Some((win, i)) } else { None };
         match kind {
-            Kind::Button | Kind::Card => self.press_origin = Some((win, i)),
+            Kind::Button | Kind::Card | Kind::Eigen => self.press_origin = Some((win, i)),
             Kind::StatusBar => {
                 let k = self.sb_treffer(win, i, mx);
                 let w = &mut self.windows[win].widgets[i];

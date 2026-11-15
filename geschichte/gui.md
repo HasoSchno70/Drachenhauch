@@ -1167,3 +1167,112 @@ Gegenproben mit dem neuen Profil `gegenprobe`: 22 Stueck in rund zehn
 Minuten (frueher je vier Minuten Bau). `GUI_PALETTE_ITEMS$` haengte
 zuerst auch leeren Kuerzeln ein TAB an -- der Pruefer schneidet Leerzeichen
 am Zeilenende der Erwartung ab, die Ausgabe nicht.
+
+## Stildatei nach Zeit und Datum, Beispiel 221 (2026-11-15)
+
+- Beispiel `221_klang_funken_palette.dh` (ein Notizbuch): Klangthema aus
+  einer Zeile, Funken und Konfetti, Schalter fuer Toene und Bewegung, die
+  Palette. Erst lief der Hinweis rechts aus dem Fenster und die
+  Statusleiste lag unter der Menueleiste ausserhalb -- gesehen am Bild.
+- `@zeit 20:00-06:00` und `@datum 12-01..12-26` vor einer Regel
+  (`bedingung_lesen`, ohne Schachteln: die Bedingung gehoert zur Regel, so
+  bleibt der Leser flach). `stil_pass` stellt die Uhr der Stildatei und
+  vergleicht, welche Bedingungen gelten; schlaegt eine um, gilt die Datei
+  als neu. `GUI_STYLESHEET_CLOCK` haelt die Uhr fest und loest bewusst NICHT
+  selbst neu auf -- sonst haette der Test den Weg der echten Uhr nie
+  beruehrt (die Gegenprobe "Umschlag erkennt nichts" waere gruen geblieben).
+- **Gleiten** (`gleiten: 200` in der Stildatei, `GUI_GLIDING`): die Matrix
+  der Animationen bekam einen Massstab je Achse (`Cmd::Verformung` mit
+  sx, sy); `aussehen_pass` merkt sich je Widget die letzte Lage im Fenster
+  (w.x/y/w/h -- nicht `abs_rect`, sonst gliche jedes Rollen einem Umzug)
+  und startet ein Gleiten vom Rechteck, das gerade zu sehen ist. Zuerst
+  meldete `GUI_GLIDING` bei ruhiger Bewegung pauschal "nein" -- dann haette
+  der Test nie gesehen, ob das Gleiten ohne Bewegung ueberhaupt startet.
+- **Aufnahme als Testfall** (`dhrt aufnehmen`, aufnahme.rs; `GUI_STATE$`,
+  gui_zustand.rs): dhrt startet sich selbst mit `DHRT_AUFNEHMEN` und
+  `DHRT_GUI_ZUSTAND_DATEI`; die Laufzeit nimmt nach SCREEN auf und
+  schreibt am Ende (`Vm::run`, auch nach EXIT) Aufnahme und Zustand. Der
+  Fall spielt ueber `DHRT_ABSPIELEN` ab -- relativ zu DHRT_START_DIR, weil
+  das Programm unter `--- programm` als Kopie in `_programm/` laeuft, die
+  Beilage aber im Fallordner liegt (die Gegenprobe "Pfad wie gegeben"
+  fiel genau dort). Ohne Hand am Geraet nimmt eine Pruefung nichts auf; die
+  Gegenprobe "Aufnahme am Ende nicht geschrieben" blieb darum zuerst gruen
+  -- jetzt ist eine fehlende Aufnahmedatei ein Fehler von `aufnehmen`.
+- **Glas** (`unschaerfe` in der Stildatei, `Cmd::Unschaerfe`): die
+  Laufzeit zeichnet direkt in den Bildpuffer, ein Szenenziel gibt es nur mit
+  POSTFX. Darum liest das Abspielen den Bereich zurueck
+  (`rlReadScreenPixels`), macht ihn auf der CPU mit zwei Kastenfiltern
+  unscharf, setzt die Ecken durchsichtig und legt ihn als Textur hin. Nur
+  wo `UNSCHAERFE_ZIEL` gesetzt ist (Hauptflaeche direkt oder in die Szene
+  fuer POSTFX); in Renderzielen und echten Fenstern stimmt die Groesse fuer
+  das Zuruecklesen nicht. Fenster selbst haben eine deckende Grundflaeche --
+  Glas wirkt ueber Widgets darunter (ein Hintergrundbild), nicht durch das
+  Fenster hindurch. Der Test braucht deshalb ein Bildschirmfoto statt eines
+  Renderziels.
+- **Palette und Inspektor in echten Fenstern**: beide fragten nur die
+  Hauptflaeche (`flaeche == 0`). Jetzt steht die Palette im Inhalt ihres
+  Fensters (`pal_lage` aus dessen Rechteck, gezeichnet, wo `popup_flaeche`
+  hinzeigt; ein Druck auf einer anderen Flaeche schliesst sie), der
+  Inspektor waehlt ueber `hit_test_auf(Some(f))` nur unter den Fenstern der
+  Flaeche, auf der gedrueckt wurde. Die erste Gegenprobe dafuer blieb gruen:
+  im Fall lag das echte Fenster in der Reihenfolge oben, und der alte
+  Treffertest fand zufaellig das Richtige -- erst ein Fenster des
+  Hauptfensters DARUEBER zeigt den Unterschied. Die Palette nimmt jetzt
+  auch die Kontextmenues des Fensters auf (was die Menueleiste schon
+  nennt, nur einmal).
+- **Formen Stufe 2**: Bildfolgen aus einem Atlas (`bild: figur.png 8
+  12fps`, intern `figur.png|8|12` als Schluessel der Haut -- dieselbe
+  Mechanik wie das animierte GIF, `textur_aus_rgba` schneidet die Bilder);
+  eigene Ablaeufe als flacher Block `@ablauf name { 50%: y -8 }` (kein
+  Schachteln -- der Leser kennt nur `{}` je Regel); die Namen sammelt ein
+  Vorlauf, damit eine Regel einen Ablauf weiter unten nennen darf (die
+  Gegenprobe ohne Vorlauf fiel genau daran). Art `EIGEN + k`. Bildhaeute
+  jetzt auch fuer Kaestchen, Optionen und Schalter (`kennhaut`, ein Arm
+  vor den gewohnten -- `:checked` kommt ueber die Aufloesung schon in die
+  Grundschicht).
+- **Gespiegeltes Fenster, Stufe 1** (`GUI_WINDOW_RTL`): gespiegelt wird
+  in `abs_rect` -- der einen Lage, die Zeichnen, Treffer, Tastatur und
+  Bildschirmleser fragen -- und in `menubar_slots`, die Menueleiste,
+  Druck und Popup gemeinsam fragen. Das Innere der Widgets (Kaestchen
+  links vom Text, Reglerrichtung, Werkzeugleiste, Textausrichtung im
+  Feld) bleibt fuer eine zweite Stufe.
+
+## Offene Punkte nach den Restpunkten (2026-11-15)
+
+- **Regler mit Haut**: `bild` ist die Rinne, neu `griff` der Griff
+  (`reglerhaut`, ein Arm vor dem gewohnten Regler). Die Ladeschleife der
+  Haeute nimmt jetzt auch `griff` -- die Gegenprobe ohne das zeigte den
+  gewohnten Knauf statt des Bildes.
+- **Deckkraft und Farbton in Ablaeufen** (`deckkraft`, `farbe`, Art
+  `blinken`): die Verformung ist eine Matrix, eine Farbe muesste sonst
+  durch jeden Zeichenbefehl des Widgets. Statt dessen `Cmd::SchichtAnfang`
+  /`SchichtEnde`: das Widget in ein Renderziel (Groesse des Schirms,
+  wiederverwendet), dann mit Deckkraft und Ton aufgelegt. Die Schicht liegt
+  AUSSEN um die Verformung, weil BeginTextureMode die Matrix zuruecksetzt.
+  Nur wenn die Hauptflaeche direkt gezeichnet wird (`SCHICHT_ZIEL`): aus
+  einem Renderziel heraus fuehrte EndTextureMode auf den Schirm statt
+  zurueck in das Ziel.
+- **Rechts nach links, Stufe 2**: Kennzeichen von Kaestchen, Option und
+  Schalter rechts vom Text (`kenn_x`/`kenn_text_x`, auch mit Haut), der
+  Knopf des Schalters steht fuer "an" links, die Werkzeugleiste gespiegelt
+  in `tb_layout` (die eine Quelle fuer Zeichnen, Treffer und Ueberlauf;
+  `widget_rtl` sucht das Fenster am Zeiger des Widgets), der Regler waechst
+  nach links -- beim Zeichnen, Ziehen (`drag_slider`) und mit den
+  Pfeiltasten. Textfelder, Tabellen und Baeume bleiben innen, wie sie sind.
+- **Glas auch in echten Fenstern und Renderzielen**: beide spielt dieselbe
+  Schleife ab; dort steht `UNSCHAERFE_ZIEL` jetzt auf der Groesse des
+  Ziels. Zurueckgelesen wird in Pixeln des Ziels -- unter der Matrix eines
+  echten Fensters auf dichterem Schirm (`RT_MASS`) oder eines
+  Popup-Fensters mit Versatz (`RT_VERSATZ`) --, zurueckgelegt in seinen
+  Punkten (`DrawTexturePro`). Die Grenze "grau" im neuen Fall war erst zu
+  eng (0xCA an der Kante) -- gemessen, nicht geraten, vor dem Anpassen.
+- **Selbst gezeichnete Widgets** (Formen Stufe 3, `GUI_CUSTOM`): eine
+  eigene Art `Kind::Eigen` statt einer Sonderregel je Zeichenflaeche --
+  `Kind::fokussierbar` ist die EINE Quelle fuer Tab-Zyklus, Klick-Fokus und
+  Fokusring und fragt nur die Art. Druck, Loslassen, Enter/Leertaste und
+  der Klick des Bildschirmlesers gehen den Weg des Knopfs; gemalt wird
+  ueber `canvas_rect` (GUI_CANVAS_*), die Rolle (button, checkbox, slider)
+  steht in `group`. GUI_CHECKED/GUI_VALUE nahmen das Widget zuerst nicht
+  an -- der erste Fall fiel daran, bevor er etwas pruefte. Die Zeichen
+  (GUI_CUSTOM_TEXT$) prueft kein Fall: eingespielte Tasten fuellen die
+  Zeichen-Warteschlange nicht.

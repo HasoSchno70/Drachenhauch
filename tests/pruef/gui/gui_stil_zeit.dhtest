@@ -1,0 +1,104 @@
+' Regeln der Stildatei nach Zeit und Datum (gui_stil.rs `bedingung_lesen`,
+' `stil_pass`): `@zeit 20:00-06:00` und `@datum 12-01..12-26` vor einer
+' Regel. GUI_STYLESHEET_CLOCK haelt die Uhr fest; schlaegt eine Bedingung
+' um, loest das naechste GUI_UPDATE neu auf -- derselbe Weg wie bei der
+' echten Uhr.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== nacht und advent schalten das aussehen um
+TRY
+    SCREEN(400, 300, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 300)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "Normal", 20, 20, 120, 30)
+DIM f AS GUI_WIDGET : f = GUI_BUTTON(w, "Fest", 20, 70, 120, 30)
+GUI_ADD_CLASS(f, "fest")
+GUI_STYLESHEET("button { bg: #111111 }" + CHR$(10) + _
+    "@zeit 20:00-06:00 button { bg: #222222 }" + CHR$(10) + _
+    "@datum 12-20..01-06 button.fest { bg: #CC0000 }")
+SUB zeige(uhr AS STRING)
+    GUI_STYLESHEET_CLOCK(uhr)
+    GUI_UPDATE()
+    PRINT uhr; ": normal "; HEX$(GUI_GET_COLOR(b, "bg")); " fest "; HEX$(GUI_GET_COLOR(f, "bg"))
+END SUB
+zeige("06-15 12:00")
+zeige("06-15 21:30")
+zeige("06-15 05:59")
+zeige("06-15 06:00")
+zeige("12-24 12:00")
+zeige("2027-01-03 23:00")
+zeige("01-07 12:00")
+PRINT GUI_INSPECT$(f)
+--- enthaelt
+06-15 12:00: normal 111111 fest 111111
+06-15 21:30: normal 222222 fest 222222
+06-15 05:59: normal 222222 fest 222222
+06-15 06:00: normal 111111 fest 111111
+12-24 12:00: normal 111111 fest CC0000
+2027-01-03 23:00: normal 222222 fest CC0000
+01-07 12:00: normal 111111 fest 111111
+  zeile 1: button
+
+=== der inspektor nennt die bedingung
+TRY
+    SCREEN(400, 300, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 300)
+DIM f AS GUI_WIDGET : f = GUI_BUTTON(w, "Fest", 20, 70, 120, 30)
+GUI_ADD_CLASS(f, "fest")
+GUI_STYLESHEET("button { bg: #111111 }" + CHR$(10) + "@datum 12-24 @zeit 18:00-24:00 button.fest { bg: #CC0000 }")
+GUI_STYLESHEET_CLOCK("12-24 19:00")
+GUI_UPDATE()
+PRINT GUI_INSPECT$(f)
+--- enthaelt
+  zeile 2: @datum 12-24 @zeit 18:00-24:00 button.fest
+  basis: bg #CC0000
+
+=== falsche bedingungen und uhren sind fehler
+TRY
+    SCREEN(400, 300, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 300)
+TRY
+    GUI_STYLESHEET("@zeit 8-9 button { radius: 1 }")
+CATCH e1
+    PRINT e1
+END TRY
+TRY
+    GUI_STYLESHEET(CHR$(10) + "@datum 13-01 button { radius: 1 }")
+CATCH e2
+    PRINT e2
+END TRY
+TRY
+    GUI_STYLESHEET("@wetter regen button { radius: 1 }")
+CATCH e3
+    PRINT e3
+END TRY
+TRY
+    GUI_STYLESHEET_CLOCK("25:00")
+CATCH e4
+    PRINT e4
+END TRY
+TRY
+    GUI_STYLESHEET_CLOCK("02-30")
+CATCH e5
+    PRINT e5
+END TRY
+--- enthaelt
+Zeile 1: @zeit erwartet von-bis wie 20:00-06:00, erhalten '8-9'
+Zeile 2: @datum erwartet Monat-Tag wie 12-24 oder 12-01..12-26, erhalten '13-01'
+Zeile 1: '@wetter' unbekannt -- vor einer Regel stehen @zeit oder @datum
+GUI_STYLESHEET_CLOCK: Uhrzeit '25:00' -- erwartet HH:MM
+GUI_STYLESHEET_CLOCK: Datum '02-30' -- erwartet MM-TT oder JJJJ-MM-TT

@@ -58,7 +58,8 @@ Asset- und IMPORT-Pfade) und hinterlegt den Ort des Aufrufers als
 `dhrt --export datei.dh [ziel]` hängt den Bytecode an eine Kopie der eigenen
 Exe und kopiert `assets/`. Weitere Einstiege: `dhrt --check`, `dhrt lsp`,
 `dhrt debug`, `dhrt profile`, `dhrt test`, `dhrt bild`, `dhrt fmt`,
-`dhrt paket`, `dhrt doku`, `dhrt pruef`, `dhrt call`.
+`dhrt paket`, `dhrt doku`, `dhrt pruef`, `dhrt call`, `dhrt aufnehmen` (Bedienung als
+Prüffall, `docs/werkzeuge.md`).
 
 ## Built-ins erweitern
 

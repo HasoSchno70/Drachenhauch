@@ -82,10 +82,27 @@ impl Gui {
     /// Ein Druck bei offenem Inspektor: waehlt das Widget darunter (auf der
     /// Tafel: nichts). TRUE = verbraucht, kein Widget sieht ihn.
     pub(super) fn inspektor_druck(&mut self, g: &Graphics, mx: i32, my: i32) -> bool {
-        if !self.insp_an || self.flaeche != 0 { return false; }
-        if Self::in_rect(mx, my, self.insp_tafel(g).0) { return true; }
-        self.insp_wahl = self.hit_test(mx, my);
+        if !self.insp_an { return false; }
+        let f = self.flaeche;
+        if self.insp_flaeche() == f && Self::in_rect(mx, my, self.insp_tafel(g).0) { return true; }
+        self.insp_wahl = self.hit_test_auf(Some(f), mx, my);
         true
+    }
+
+    /// Auf welcher Flaeche steht die Tafel? Wo das gewaehlte Widget lebt,
+    /// sonst im Hauptfenster.
+    fn insp_flaeche(&self) -> u32 {
+        let wahl = self.inspector_selected();
+        if wahl < 0 { return 0; }
+        self.popup_flaeche(Self::dec_widget(wahl).0)
+    }
+    /// Der Bereich, in dem die Tafel steht: der Schirm, in einem echten
+    /// Fenster dessen Rechteck.
+    fn insp_bereich(&self, g: &Graphics, f: u32) -> (i32, i32, i32, i32) {
+        if f != 0 {
+            if let Some(win) = self.windows.iter().find(|w| w.alive && w.nativ == f) { return (win.x, win.y, win.w, win.h); }
+        }
+        (0, 0, g.screen_width() as i32, g.screen_height() as i32)
     }
 
     /// GUI_INSPECT$(widget): was der Inspektor ueber ein Widget weiss.
@@ -152,7 +169,7 @@ impl Gui {
         }
         let pad = self.sk(8);
         let lh = self.ctext_height(g) + self.sk(3);
-        let sb = g.screen_width() as i32;
+        let (bx, by, sb, _) = self.insp_bereich(g, self.insp_flaeche());
         // Hoechstens die halbe Breite; laengere Zeilen brechen an ", " und
         // doppelten Leerzeichen um, der Rest eingerueckt.
         let platz = (sb / 2).max(self.sk(240)) - pad * 2;
@@ -163,11 +180,11 @@ impl Gui {
         let rechts = if wahl >= 0 {
             let (wi, _) = Self::dec_widget(wahl);
             let (x, _, b, _) = self.abs_rect(wi, &self.windows[wi].widgets[Self::dec_widget(wahl).1]);
-            x + b / 2 < sb / 2
+            x + b / 2 < bx + sb / 2
         } else { true };
         let m = self.sk(8);
-        let x = if rechts { sb - breite - m } else { m };
-        ((x, m, breite, hoehe), zeilen)
+        let x = if rechts { bx + sb - breite - m } else { bx + m };
+        ((x, by + m, breite, hoehe), zeilen)
     }
 
     /// Eine Zeile der Tafel auf `platz` Pixel umbrechen.
@@ -198,13 +215,16 @@ impl Gui {
         out
     }
 
-    /// Zeichnen, ganz oben (draw_top auf der Hauptflaeche).
-    pub(super) fn inspektor_zeichnen(&self, g: &mut Graphics) {
+    /// Zeichnen, ganz oben auf der Flaeche `f` (0 = Hauptfenster): Rahmen um
+    /// das Widget unter dem Zeiger und um das gewaehlte, wenn sie hier leben;
+    /// die Tafel dort, wo das gewaehlte lebt.
+    pub(super) fn inspektor_zeichnen(&self, g: &mut Graphics, f: u32) {
         if !self.insp_an { return; }
         let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
         let ((tx, ty, tb, th), zeilen) = self.insp_tafel(g);
+        let tafel_hier = self.insp_flaeche() == f;
         // Unter dem Zeiger: duenner Rahmen und ein Schild mit Art und Groesse.
-        let unter = if Self::in_rect(mx, my, (tx, ty, tb, th)) { -1 } else { self.hit_test(mx, my) };
+        let unter = if tafel_hier && Self::in_rect(mx, my, (tx, ty, tb, th)) { -1 } else { self.hit_test_auf(Some(f), mx, my) };
         if unter >= 0 && unter != self.insp_wahl {
             let (wi, i) = Self::dec_widget(unter);
             let w = &self.windows[wi].widgets[i];
@@ -220,12 +240,13 @@ impl Gui {
             self.ctext(g, x + self.sk(4), sy + self.sk(2), schild, 0x0A0D12);
         }
         let wahl = self.inspector_selected();
-        if wahl >= 0 {
+        if wahl >= 0 && tafel_hier {
             let (wi, i) = Self::dec_widget(wahl);
             let (x, y, b, h) = self.abs_rect(wi, &self.windows[wi].widgets[i]);
             g.rect(x - 1, y - 1, x + b, y + h, I_WAHL);
             g.rect(x - 2, y - 2, x + b + 1, y + h + 1, I_WAHL);
         }
+        if !tafel_hier { return; }
         // Die Tafel.
         let rad = self.sk(6);
         g.round_rect(tx + 2, ty + 3, tx + tb + 1, ty + th + 2, rad, 0x50i64 << 24, true);

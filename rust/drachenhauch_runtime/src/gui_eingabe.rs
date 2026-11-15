@@ -121,6 +121,7 @@ impl Gui {
             if let Some(d) = win.dock.as_deref_mut() { d.geaendert = false; d.geschlossen.clear(); }
             for wdg in win.widgets.iter_mut() {
                 wdg.clicked = false; wdg.hovered = false; wdg.entered = false; wdg.abgelegt = false;
+                if wdg.kind == Kind::Eigen { wdg.eigen_taste = 0; wdg.eigen_text.clear(); }
                 if let Some(l) = wdg.leiste.as_mut() { l.hover = -1; l.geklickt = -1; }
                 if let Some(l) = wdg.list.as_mut() { l.hover = -1; l.bearbeitet = None; }
                 wdg.zeile_jetzt = -1;
@@ -196,12 +197,12 @@ impl Gui {
         let menu_consumed = self.menu_input(mx, my, just_pressed, right_just, g);
         self.untermenues_folgen(g, mx, my);
         self.kuerzel_gefeuert = false;
-        if self.flaeche == 0 { self.inspektor_tasten(g); }
+        self.inspektor_tasten(g);
         if self.palette.is_some() { self.kuerzel_gefeuert = true; }
         if !menu_consumed && !self.kuerzel_gefeuert { self.kuerzel_pruefen(g); self.mn_pruefen(g); }
         // Die Palette nach den Menuekuerzeln (eines des Programms gewinnt),
         // vor den Widgets (ihre Tasten erreichen kein Textfeld).
-        if self.flaeche == 0 { self.palette_pass(g); }
+        self.palette_pass(g);
 
         // Inhalts-Scroll: Mausrad ueber scrollbarem Fenster.
         if let Some(top) = self.topmost_at(mx, my) {
@@ -660,7 +661,7 @@ impl Gui {
                 let r = { let w = &self.windows[wi].widgets[i]; self.abs_rect(wi, w) };
                 let in_form = Self::in_rect(mx, my, r) && self.form_trifft(&self.windows[wi].widgets[i], r, mx, my);
                 let w = &mut self.windows[wi].widgets[i];
-                let fire = if matches!(w.kind, Kind::Button | Kind::Card) && in_form {
+                let fire = if matches!(w.kind, Kind::Button | Kind::Card | Kind::Eigen) && in_form {
                     w.clicked = true; w.on_click.clone()
                 } else { None };
                 if let Some(f) = fire { self.pending.push(f); }

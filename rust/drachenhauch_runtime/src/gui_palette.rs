@@ -80,7 +80,20 @@ impl Gui {
             if !m.in_bar { continue; }
             menue(win, wi, mi, &format!("{} \u{203A} ", sauber(&m.label)), 0, &mut out);
         }
-        let schon: Vec<String> = out.iter().map(|e| e.text.rsplit(" \u{203A} ").next().unwrap_or("").to_lowercase()).collect();
+        let letzter = |t: &str| t.rsplit(" \u{203A} ").next().unwrap_or("").to_lowercase();
+        let mut schon: Vec<String> = out.iter().map(|e| letzter(&e.text)).collect();
+        // Kontextmenues des Fensters -- was die Menueleiste schon nennt, nur
+        // einmal.
+        for (mi, m) in win.menus.iter().enumerate() {
+            if m.in_bar || m.unter { continue; }
+            let kopf = if m.label.trim().is_empty() { "Kontextmenue".to_string() } else { sauber(&m.label) };
+            let mut neu: Vec<PalEintrag> = Vec::new();
+            menue(win, wi, mi, &format!("{} \u{203A} ", kopf), 0, &mut neu);
+            for e in neu {
+                let k = letzter(&e.text);
+                if !schon.contains(&k) { schon.push(k); out.push(e); }
+            }
+        }
         for (i, w) in win.widgets.iter().enumerate() {
             if !w.alive || w.kind != Kind::Toolbar || !self.widget_shown(wi, w) || !w.enabled { continue; }
             let Some(l) = w.leiste.as_ref() else { continue };
@@ -209,21 +222,26 @@ impl Gui {
     /// Zeichnen und Druck.
     fn pal_lage(&self, g: &Graphics) -> Option<((i32, i32, i32, i32), i32, i32)> {
         let p = self.palette.as_ref()?;
-        let sb = g.screen_width() as i32;
-        let sh = g.screen_height() as i32;
-        let b = self.sk(560).min(sb - self.sk(24)).max(self.sk(200));
+        // Im Inhalt ihres Fensters (auch eines echten: dessen Flaeche).
+        let win = self.windows.get(p.wi)?;
+        let oben = self.content_top(p.wi);
+        let (fx, fy, sb, sh) = (win.x, win.y + oben, win.w, (win.h - oben).max(1));
+        let b = self.sk(560).min(sb - self.sk(24)).max(self.sk(160));
         let zh = self.ctext_height(g) + self.sk(10);
         let kopf = zh + self.sk(12);
         let zeilen = p.treffer.len().min(PAL_ZEILEN).max(1) as i32;
         let h = kopf + zeilen * zh + self.sk(8);
-        let x = (sb - b) / 2;
-        let y = (sh / 8).min(self.sk(80)).max(self.sk(8));
+        let x = fx + (sb - b) / 2;
+        let y = fy + (sh / 8).min(self.sk(80)).max(self.sk(8));
         Some(((x, y, b, h), kopf, zh))
     }
 
     /// Ein Druck bei offener Palette: auf einem Eintrag loest er aus,
     /// daneben schliesst er sie. Immer verbraucht.
     pub(super) fn palette_druck(&mut self, g: &Graphics, mx: i32, my: i32) -> bool {
+        // Ein Druck auf einer anderen Flaeche ist "daneben".
+        let ihre = self.palette.as_ref().map(|p| self.popup_flaeche(p.wi)).unwrap_or(0);
+        if ihre != self.flaeche { self.palette_oeffnen(false); return true; }
         let Some(((x, y, b, h), kopf, zh)) = self.pal_lage(g) else { return false };
         if !Self::in_rect(mx, my, (x, y, b, h)) { self.palette_oeffnen(false); return true; }
         if my >= y + kopf {

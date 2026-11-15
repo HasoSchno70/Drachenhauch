@@ -1,0 +1,102 @@
+' Glas (Stildatei `unschaerfe`, graphics.rs `Cmd::Unschaerfe`): was hinter
+' einem Widget gezeichnet ist, liegt unscharf darunter; eine Flaeche mit
+' Deckkraft (`bg: #20FFFFFF`) scheint durch. Nur auf der Hauptflaeche --
+' darum ein Bildschirmfoto, kein Renderziel.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== hinter glas wird eine kante grau
+TRY
+    SCREEN(400, 240, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+IMPORT "imgfx"
+' Links schwarz, rechts weiss -- die Kante liegt mitten unter dem Glas.
+DIM bild AS INTEGER : bild = IMAGE_NEW(400, 240)
+IMAGE_FILL_RECT(bild, 0, 0, 199, 239, RGB(0, 0, 0))
+IMAGE_FILL_RECT(bild, 200, 0, 399, 239, RGB(255, 255, 255))
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 240)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM hg AS GUI_WIDGET : hg = GUI_IMAGE(w, 0, 0, 400, 240, bild)
+DIM p AS GUI_WIDGET : p = GUI_PANEL(w, 100, 50, 200, 140, "")
+GUI_SET_NAME(p, "glas")
+GUI_STYLESHEET("#glas { unschaerfe: 16; bg: #20FFFFFF; radius: 0; border: #20FFFFFF }")
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE() : CLS(0) : GUI_DRAW() : FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=4
+--- bild
+groesse 400 240
+194 120 #8A8A8A +-70
+206 120 #8A8A8A +-70
+40 120 #000000 +-8
+360 120 #FFFFFF +-8
+
+=== der inspektor nennt das glas und falsche werte sind fehler
+TRY
+    SCREEN(400, 240, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 240)
+DIM p AS GUI_WIDGET : p = GUI_PANEL(w, 100, 50, 200, 140, "")
+GUI_STYLESHEET("panel { unschaerfe: 8 }")
+GUI_UPDATE()
+PRINT GUI_INSPECT$(p)
+TRY
+    GUI_STYLESHEET("panel { unschaerfe: 99 }")
+CATCH e1
+    PRINT e1
+END TRY
+TRY
+    GUI_STYLESHEET("panel:hover { unschaerfe: 4 }")
+CATCH e2
+    PRINT e2
+END TRY
+--- enthaelt
+  basis: unschaerfe 8
+unschaerfe
+'unschaerfe' gilt nur in Regeln ohne :hover
+
+=== glas wirkt auch in einem renderziel
+' Echte Fenster und Renderziele des Programms werden in derselben Schleife
+' abgespielt (graphics.rs, UNSCHAERFE_ZIEL je Ziel) -- hier ein Renderziel.
+TRY
+    SCREEN(400, 240, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+IMPORT "imgfx"
+DIM bild AS INTEGER : bild = IMAGE_NEW(400, 240)
+IMAGE_FILL_RECT(bild, 0, 0, 199, 239, RGB(0, 0, 0))
+IMAGE_FILL_RECT(bild, 200, 0, 399, 239, RGB(255, 255, 255))
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 240)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM hg AS GUI_WIDGET : hg = GUI_IMAGE(w, 0, 0, 400, 240, bild)
+DIM p AS GUI_WIDGET : p = GUI_PANEL(w, 100, 50, 200, 140, "")
+GUI_SET_NAME(p, "glas")
+GUI_STYLESHEET("#glas { unschaerfe: 16; bg: #20FFFFFF; radius: 0; border: #20FFFFFF }")
+DIM rt AS INTEGER : rt = RENDERTARGET_NEW(400, 240)
+DIM n AS INTEGER
+FOR n = 1 TO 3
+    GUI_UPDATE() : CLS(0) : FLIP()
+NEXT
+RENDERTARGET_BEGIN(rt) : CLS(0) : GUI_DRAW() : RENDERTARGET_END()
+CLS(0) : FLIP()
+DIM b AS IMAGE : b = RENDERTARGET_IMAGE(rt)
+FUNCTION grau(c AS INTEGER) AS BOOLEAN
+    DIM r AS INTEGER : r = (c \ 65536) BAND 255
+    RETURN r > 40 AND r < 230
+END FUNCTION
+PRINT "links an der kante grau "; grau(GETPIXEL(b, 194, 120)); " rechts "; grau(GETPIXEL(b, 206, 120)); " weit links schwarz "; (GETPIXEL(b, 40, 120) BAND &HFFFFFF) < &H101010
+--- umgebung
+DHRT_FRAMES=20
+--- erwartet
+links an der kante grau TRUE rechts TRUE weit links schwarz TRUE

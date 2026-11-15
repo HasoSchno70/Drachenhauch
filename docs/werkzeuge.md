@@ -334,6 +334,47 @@ Das Format selbst prüft `tests/pruef/werkzeugkette/dhrt_test_format.dhtest` —
 Sammlung, die der Fall schreibt, mit erwarteten Meldungen, Zeilennummern und
 Bilanz.
 
+## `dhrt aufnehmen` — Bedienung als Prüffall
+
+```
+dhrt aufnehmen programm.dh tests/meine.dhtest ["Name des Falls"] [--bilder N]
+```
+
+startet das Programm; man bedient es und schließt das Fenster. Dann hängt
+`dhrt aufnehmen` einen fertigen Fall an die Sammlung an (legt sie an, wenn
+es sie noch nicht gibt):
+
+```
+=== Name des Falls
+--- programm ../programm.dh
+--- datei aufnahme.txt
+c 12
+e 0 7 120 80 0 0
+...
+--- umgebung
+DHRT_FRAMES=412
+DHRT_ABSPIELEN=aufnahme.txt
+DHRT_GUI_ZUSTAND=1
+DHRT_ABSEITS=1
+--- enthaelt
+gui-zustand
+fenster "Notizbuch"
+  textarea(1) "Einkauf: Milch"
+  toggle(1) "Toene" aus
+```
+
+Erwartet wird der **Zustand der gui am Ende** (`GUI_STATE$`): Texte von
+Feldern und Beschriftungen, Haken, Werte, Auswahl -- je sichtbarem Widget
+eine Zeile, benannt nach `GUI_SET_NAME` oder nach der Nummer unter den
+Widgets derselben Art. Was nicht stimmen soll, löscht man aus dem Block;
+was dazu soll, schreibt man dazu. Das Programm braucht dafür keine Zeile:
+die Laufzeit spielt die Aufnahme nach `SCREEN` ab, wenn
+`DHRT_ABSPIELEN=datei` gesetzt ist (relativ zum Ort des Aufrufers, also
+zum Fallordner), und gibt am Ende den Zustand aus, wenn
+`DHRT_GUI_ZUSTAND=1` gesetzt ist. Die Aufnahme bekommt ein Ereignis in
+Bild 0 vorangestellt, damit die Bilder der Wiedergabe stimmen; `--bilder N`
+beendet das Programm nach N Bildern (für Skripte).
+
 ## `dhrt fmt` — einheitlich schreiben
 
 ```bash

@@ -295,6 +295,73 @@ fokus kaestchen
 haken
 geklickt Anna
 
+=== ein fremder leser sieht selbst gezeichnete widgets mit ihrer rolle
+' GUI_CUSTOM (Formen Stufe 3): das Programm malt selbst, die gui meldet
+' Rolle und Namen -- ein Knopf und ein Kaestchen; der Leser loest den Knopf
+' aus.
+IMPORT "helfer.dh"
+DIM kennung AS STRING : kennung = "Eigen-" + STR$(MILLIS()) + "-" + STR$(INT(RND() * 1000000))
+DIM kind AS INTEGER : kind = PROCESS_START("dhrt", "run", "--bilder", "1500", CWD$() + "/eigen.dh", "--", kennung)
+DIM ps AS INTEGER : ps = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", CWD$() + "/leser.ps1", kennung)
+DIM leser AS STRING : leser = auslesen$(ps, 60000)
+PRINT "leser rueckgabe "; PROCESS_CODE(ps)
+DIM kindAus AS STRING : kindAus = auslesen$(kind, 40000)
+IF INSTR(auslesenFehler, "Kein Fenster moeglich") >= 0 THEN PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+PRINT "knopf "; (INSTR(leser, "N: ControlType.Button [Farbrad]") >= 0)
+PRINT "kaestchen "; (INSTR(leser, "N: ControlType.CheckBox [Nachtmodus]") >= 0)
+IF PROCESS_CODE(ps) <> 0 THEN PRINT leser
+PRINT kindAus;
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/uialeser.dh"
+--- datei eigen.dh
+IMPORT "gui"
+SCREEN(400, 300, ARG$(0), 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Eigen", 10, 10, 360, 260)
+DIM rad AS GUI_WIDGET : rad = GUI_CUSTOM(w, 10, 10, 120, 60)
+GUI_SET_TEXT(rad, "Farbrad")
+DIM nacht AS GUI_WIDGET : nacht = GUI_CUSTOM(w, 10, 90, 120, 40, "checkbox")
+GUI_SET_TEXT(nacht, "Nachtmodus")
+DIM fertig AS BOOLEAN : fertig = FALSE
+WHILE NOT QUITREQUESTED() AND NOT fertig
+    GUI_UPDATE()
+    IF GUI_CLICKED(rad) THEN PRINT "geklickt" : fertig = TRUE
+    CLS(0) : GUI_DRAW() : FLIP()
+WEND
+--- datei leser.ps1
+param([string]$Titel)
+Add-Type -AssemblyName UIAutomationClient
+Add-Type -AssemblyName UIAutomationTypes
+$A = [System.Windows.Automation.AutomationElement]
+$Alle = [System.Windows.Automation.TreeScope]::Descendants
+$Wahr = [System.Windows.Automation.Condition]::TrueCondition
+$win = $null
+$kids = $null
+for ($i = 0; $i -lt 150; $i++) {
+    $p = Get-Process | Where-Object { $_.MainWindowTitle -eq $Titel } | Select-Object -First 1
+    if ($p -and $p.MainWindowHandle -ne 0) {
+        $win = $A::FromHandle($p.MainWindowHandle)
+        $kids = $win.FindAll($Alle, $Wahr)
+        if ($kids.Count -ge 3) { break }
+    }
+    Start-Sleep -Milliseconds 100
+}
+if (-not $win) { "kein Fenster"; exit 2 }
+foreach ($k in $kids) { "N: " + $k.Current.ControlType.ProgrammaticName + " [" + $k.Current.Name + "]" }
+$btn = $null
+foreach ($k in $win.FindAll($Alle, $Wahr)) {
+    if ($k.Current.ControlType.ProgrammaticName -eq "ControlType.Button" -and $k.Current.Name -eq "Farbrad") { $btn = $k }
+}
+if (-not $btn) { "Element fehlt"; exit 3 }
+$btn.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+"fertig"
+--- system windows
+--- erwartet
+leser rueckgabe 0
+knopf TRUE
+kaestchen TRUE
+geklickt
+
 === speak ohne gui spricht ueber den leser
 ' SPEAK fragt zuerst den Bildschirmleser (docs/intern/entwurf-speak.md, Weg C): laeuft
 ' einer, geht der Satz als Ansage in den Baum -- auch in einem Programm OHNE

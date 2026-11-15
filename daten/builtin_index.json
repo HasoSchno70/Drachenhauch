@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 2499,
+ "count": 2507,
  "builtins": [
   {
    "name": "ABS",
@@ -4155,9 +4155,57 @@
    "module": "gui"
   },
   {
+   "name": "GUI_WINDOW_RTL",
+   "kind": "core",
+   "signature": "GUI_WINDOW_RTL(win, an)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_WINDOW_IS_RTL",
+   "kind": "core",
+   "signature": "GUI_WINDOW_IS_RTL(win) AS BOOLEAN",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_CUSTOM",
+   "kind": "core",
+   "signature": "GUI_CUSTOM(win, x, y, w, h [, rolle$]) AS GUI_WIDGET",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_CUSTOM_KEY",
+   "kind": "core",
+   "signature": "GUI_CUSTOM_KEY(wdg) AS INTEGER",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_CUSTOM_TEXT$",
+   "kind": "core",
+   "signature": "GUI_CUSTOM_TEXT$(wdg) AS STRING",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_STATE$",
+   "kind": "core",
+   "signature": "GUI_STATE$() AS STRING",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_GLIDING",
+   "kind": "core",
+   "signature": "GUI_GLIDING(wdg) AS BOOLEAN",
+   "module": "gui"
+  },
+  {
    "name": "GUI_ANIMATING",
    "kind": "core",
    "signature": "GUI_ANIMATING(wdg) AS BOOLEAN",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_STYLESHEET_CLOCK",
+   "kind": "core",
+   "signature": "GUI_STYLESHEET_CLOCK(zeit$)",
    "module": "gui"
   },
   {

@@ -3056,3 +3056,15 @@ Funde beim Testen:
 - Zwei Sammlungen mit Aufnahmen (`6_12` und `lesbarkeit`) nebeneinander
   liessen sechs Faelle in die Zeitgrenze laufen; einzeln und im vollen Lauf
   gruen.
+
+## Vervollstaendigung hinter AS nur mit Typen (2026-11-15)
+
+Der volle Testlauf nach `GUI_WINDOW_RTL` fiel in "hinter AS setzt die
+vervollstaendigung nur den typ": `DIM w AS GUI_WIN` + Strg+Leer setzte
+`GUI_WINDOW_RTL`. `lsp::vervollstaendigung` bot hinter `AS` alles an und
+nahm den ersten Treffer in der Reihenfolge des Index -- der neue Befehl
+stand dort vor dem Typ. Statt die Eintraege im Index umzustellen (das
+haette nur die Reihenfolge versteckt), bietet sie hinter `AS` und `OF` jetzt
+nur Typen: Klassen, Strukturen, Aufzaehlungen des Textes, die Grundtypen,
+die Typen der Module (`preprocess::modul_typen`) und was Befehle laut Index
+liefern (`... AS IMAGE`). Rust-Test `hinter_as_nur_typen` mit Gegenprobe.

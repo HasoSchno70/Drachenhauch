@@ -1,0 +1,80 @@
+' ============================================================
+'  gui: Klaenge, Funken und die Befehlspalette -- ein kleines Notizbuch
+' ============================================================
+'    klang       jeder Knopf klickt, Ueberfahren tickt leise -- eine Zeile
+'                in der Stildatei fuer die ganze Anwendung
+'    effekt      "Speichern" sprueht Funken; ein gesichertes Notizbuch
+'                bekommt Konfetti (GUI_BURST) und den Klang "erfolg"
+'    Palette     Strg+Umschalt+P sucht ueber Menue und Werkzeugleiste --
+'                ohne eine Zeile Code dafuer
+'    Schalter    "Toene" (GUI_SET_SOUNDS) und "Bewegung" (GUI_SET_MOTION)
+'                gehoeren in jede Einstellung: wer weniger will, bekommt
+'                weniger
+' ============================================================
+IMPORT "gui"
+
+SCREEN(760, 480, "Klang, Funken, Palette", 1)
+GUI_SCALE(1.0)
+
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Notizbuch", 0, 0, 760, 480)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM mDatei AS INTEGER : mDatei = GUI_MENU(w, "Datei")
+DIM miNeu AS INTEGER : miNeu = GUI_MENU_ITEM(mDatei, "Neu", "Strg+N")
+DIM miSpeichern AS INTEGER : miSpeichern = GUI_MENU_ITEM(mDatei, "Speichern", "Strg+S")
+DIM miEnde AS INTEGER : miEnde = GUI_MENU_ITEM(mDatei, "Beenden", "Strg+Q")
+DIM mAnsicht AS INTEGER : mAnsicht = GUI_MENU(w, "Ansicht")
+DIM miPalette AS INTEGER : miPalette = GUI_MENU_ITEM(mAnsicht, "Befehlspalette")
+DIM miFeier AS INTEGER : miFeier = GUI_MENU_ITEM(mAnsicht, "Etwas feiern")
+
+DIM tb AS GUI_WIDGET : tb = GUI_TOOLBAR(w, 0, 0, 760, 34)
+GUI_TOOLBAR_ADD(tb, "neu", "Neu")
+GUI_TOOLBAR_ADD(tb, "sichern", "Speichern")
+GUI_TOOLBAR_ADD(tb, "suchen", "Befehlspalette (Strg+Umschalt+P)")
+
+DIM text AS GUI_WIDGET : text = GUI_TEXTAREA(w, 20, 50, 470, 300, "Hier schreiben ...")
+DIM speichern AS GUI_WIDGET : speichern = GUI_BUTTON(w, "Speichern", 520, 50, 200, 44)
+GUI_SET_NAME(speichern, "speichern")
+DIM leeren AS GUI_WIDGET : leeren = GUI_BUTTON(w, "Leeren", 520, 104, 200, 44)
+GUI_ADD_CLASS(leeren, "gefahr")
+DIM toene AS GUI_WIDGET : toene = GUI_TOGGLE(w, "Toene", 520, 180, TRUE)
+DIM bewegung AS GUI_WIDGET : bewegung = GUI_TOGGLE(w, "Bewegung", 520, 220, TRUE)
+DIM hinweis AS GUI_WIDGET : hinweis = GUI_LABEL(w, "Strg+Umschalt+P:", 520, 270)
+DIM hinweis2 AS GUI_WIDGET : hinweis2 = GUI_LABEL(w, "alle Befehle suchen", 520, 292)
+DIM sb AS GUI_WIDGET : sb = GUI_STATUSBAR(w, 0, 424, 760, 28, "Bereit")
+
+' Eine Zeile fuer die Toene der ganzen Anwendung, dazu je Knopf, was ihn
+' besonders macht.
+GUI_STYLESHEET("button { klang: klick }" + CHR$(10) + _
+    "button:hover { klang: tick 35% }" + CHR$(10) + _
+    "#speichern { effekt: funken }" + CHR$(10) + _
+    "button.gefahr { klang: plopp }")
+
+SUB sichern()
+    GUI_BURST(speichern, "konfetti")
+    GUI_SOUND("erfolg")
+    GUI_STATUSBAR_SET(sb, 0, "Gespeichert (" + STR$(LEN(GUI_TEXT(text))) + " Zeichen)")
+END SUB
+
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_CLICKED(speichern) OR GUI_CLICKED(miSpeichern) OR GUI_TOOLBAR_CLICKED(tb) = 1 THEN sichern()
+    IF GUI_CLICKED(miNeu) OR GUI_TOOLBAR_CLICKED(tb) = 0 THEN
+        GUI_SET_TEXT(text, "")
+        GUI_STATUSBAR_SET(sb, 0, "Neu")
+    END IF
+    IF GUI_CLICKED(leeren) THEN
+        GUI_SET_TEXT(text, "")
+        GUI_ANIMATE(text, "wackeln", 300)
+    END IF
+    IF GUI_CLICKED(miPalette) OR GUI_TOOLBAR_CLICKED(tb) = 2 THEN GUI_PALETTE(TRUE)
+    IF GUI_CLICKED(miFeier) THEN
+        GUI_BURST(hinweis, "sterne")
+        GUI_SOUND("ping")
+    END IF
+    IF GUI_CHANGED(toene) THEN GUI_SET_SOUNDS(GUI_CHECKED(toene))
+    IF GUI_CHANGED(bewegung) THEN GUI_SET_MOTION(IIF(GUI_CHECKED(bewegung), "system", "aus"))
+    IF GUI_CLICKED(miEnde) THEN EXIT WHILE
+    CLS(&H1B2029)
+    GUI_DRAW()
+    FLIP()
+WEND

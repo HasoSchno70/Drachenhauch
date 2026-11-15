@@ -308,7 +308,20 @@ impl Gui {
     /// EINE Quelle fuer Zeichnen, Treffertest, Tooltip und Barrierefreiheit.
     /// Passt alles, bleibt die Liste der versteckten leer und es gibt keinen
     /// Knopf. Beschriftungen zaehlen, sobald `leisten_pass` sie gemessen hat.
-    pub(super) fn tb_layout(&self, ax: i32, _ay: i32, w: i32, h: i32, wdg: &Widget) -> (Vec<(usize, i32, i32)>, Vec<usize>, Option<(i32, i32)>) {
+    /// Wie `tb_layout_ltr`, in einem Fenster von rechts nach links
+    /// gespiegelt: der erste Knopf rechts, der Ueberlauf links.
+    pub(super) fn tb_layout(&self, ax: i32, ay: i32, w: i32, h: i32, wdg: &Widget) -> (Vec<(usize, i32, i32)>, Vec<usize>, Option<(i32, i32)>) {
+        let (geo, versteckt, chev) = self.tb_layout_ltr(ax, ay, w, h, wdg);
+        if !self.widget_rtl(wdg) { return (geo, versteckt, chev); }
+        let sp = |x0: i32, x1: i32| (2 * ax + w - x1, 2 * ax + w - x0);
+        (geo.into_iter().map(|(k, x0, x1)| { let (a, b) = sp(x0, x1); (k, a, b) }).collect(), versteckt, chev.map(|(x0, x1)| sp(x0, x1)))
+    }
+    /// Steht das Widget in einem Fenster von rechts nach links?
+    pub(super) fn widget_rtl(&self, wdg: &Widget) -> bool {
+        let z = wdg as *const Widget;
+        self.windows.iter().any(|win| win.rtl && win.widgets.as_ptr_range().contains(&z))
+    }
+    fn tb_layout_ltr(&self, ax: i32, _ay: i32, w: i32, h: i32, wdg: &Widget) -> (Vec<(usize, i32, i32)>, Vec<usize>, Option<(i32, i32)>) {
         let l = match wdg.leiste.as_ref() { Some(l) => l, None => return (Vec::new(), Vec::new(), None) };
         let rand = self.sk(4);
         let luft = self.sk(2);
@@ -618,6 +631,37 @@ impl Gui {
         let f = w.on_click.clone();
         if let Some(f) = f { self.pending.push(f); }
     }
+    /// GUI_CUSTOM(win, x, y, w, h [, rolle$]): ein selbst gezeichnetes
+    /// Widget. Gemalt wird wie in eine Zeichenflaeche (GUI_CANVAS_BEGIN/END,
+    /// GUI_CANVAS_MOUSE); die gui gibt ihm Fokus (Tab, Fokusring), einen
+    /// Klick (Maus, Enter, Leertaste -> GUI_CLICKED), die Tasten und Zeichen
+    /// des Bildes und eine Rolle fuer den Bildschirmleser: "button"
+    /// (Vorgabe), "checkbox" (GUI_SET_CHECKED), "slider" (GUI_SET_VALUE);
+    /// den Namen setzt GUI_SET_TEXT.
+    pub fn custom(&mut self, win: i64, x: i32, y: i32, w: i32, h: i32, rolle: &str) -> Result<i64, String> {
+        let r = rolle.trim().to_lowercase();
+        let r = if r.is_empty() { "button".to_string() } else { r };
+        if !matches!(r.as_str(), "button" | "checkbox" | "slider") {
+            return Err(format!("GUI_CUSTOM: Rolle '{}' -- button, checkbox oder slider", rolle));
+        }
+        let mut wd = Self::blank(Kind::Eigen, x, y, w, h);
+        wd.group = r;
+        self.add_widget(win, "GUI_CUSTOM", wd)
+    }
+    /// GUI_CUSTOM_KEY(wdg): die Taste, die das Widget in diesem Bild bekam
+    /// (Codes wie KEYHIT: KEY_LEFT, KEY_ENTER ...), 0 = keine.
+    pub fn custom_key(&self, h: i64) -> Result<i64, String> {
+        let w = self.wdg(h, "GUI_CUSTOM_KEY")?;
+        if w.kind != Kind::Eigen { return Err("GUI_CUSTOM_KEY: Widget ist kein GUI_CUSTOM".into()); }
+        Ok(w.eigen_taste)
+    }
+    /// GUI_CUSTOM_TEXT$(wdg): die Zeichen, die es in diesem Bild bekam.
+    pub fn custom_text(&self, h: i64) -> Result<String, String> {
+        let w = self.wdg(h, "GUI_CUSTOM_TEXT$")?;
+        if w.kind != Kind::Eigen { return Err("GUI_CUSTOM_TEXT$: Widget ist kein GUI_CUSTOM".into()); }
+        Ok(w.eigen_text.clone())
+    }
+
     pub fn canvas(&mut self, win: i64, x: i32, y: i32, w: i32, h: i32) -> Result<i64, String> {
         let wd = Self::blank(Kind::Canvas, x, y, w, h);
         self.add_widget(win, "GUI_CANVAS", wd)
@@ -627,7 +671,7 @@ impl Gui {
     pub fn canvas_rect(&self, h: i64) -> Result<(i32, i32, i32, i32), String> {
         let (wi, _) = Self::dec_widget(h);
         let w = self.wdg(h, "GUI_CANVAS_*")?;
-        if w.kind != Kind::Canvas { return Err("GUI_CANVAS_*: Widget ist kein canvas".into()); }
+        if w.kind != Kind::Canvas && w.kind != Kind::Eigen { return Err("GUI_CANVAS_*: Widget ist kein canvas (GUI_CANVAS oder GUI_CUSTOM)".into()); }
         let (ax, ay, ww, wh) = self.abs_rect(wi, w);
         Ok((ax + 1, ay + 1, (ww - 2).max(0), (wh - 2).max(0)))   // Inhalt ohne Rahmen
     }

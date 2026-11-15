@@ -41,6 +41,12 @@ const HARDWARE_MODULES: &[&str] = &["serial", "usb", "bt", "wifi", "firmata", "m
 /// der Rust-Compiler `DIM x AS VEC2` & Co. akzeptiert, sobald das Modul
 /// importiert wurde (entspricht Pythons `EXTERNAL_TYPES` nach `load_module`).
 /// Module ohne eigenen Typ stehen nicht in der Tabelle.
+/// Alle Typnamen der Module (klein) -- fuer die Vervollstaendigung hinter
+/// `AS` (lsp.rs).
+pub(crate) fn modul_typen() -> impl Iterator<Item = &'static str> {
+    MODULE_TYPES.iter().flat_map(|(_, t)| t.iter().copied())
+}
+
 const MODULE_TYPES: &[(&str, &[&str])] = &[
     ("animfsm", &["anim_fsm"]),
     ("astar", &["astar_grid"]),

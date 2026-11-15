@@ -1199,10 +1199,13 @@ impl Gui {
 
     pub(super) fn drag_slider(&mut self, wi: usize, i: usize, mx: i32, my: i32) {
         let (ax, ay, _, _) = self.abs_rect(wi, &self.windows[wi].widgets[i]);
-        let w = &mut self.windows[wi].widgets[i];
         // Senkrecht waechst der Wert nach OBEN -- wie an jedem Mischpult.
+        let gesp = self.windows[wi].rtl;
+        let w = &mut self.windows[wi].widgets[i];
         let rel = if w.vert { 1.0 - ((my - ay) as f64 / (w.h - 1).max(1) as f64).clamp(0.0, 1.0) }
                   else { ((mx - ax) as f64 / (w.w - 1).max(1) as f64).clamp(0.0, 1.0) };
+        // Rechts nach links waechst der Wert nach links.
+        let rel = if gesp && !w.vert { 1.0 - rel } else { rel };
         let new_val = Self::regler_einrasten(w, w.min + rel * (w.max - w.min));
         if new_val != w.value {
             w.value = new_val;

@@ -31,6 +31,8 @@ mod inspektor;
 mod effekte;
 #[path = "gui_palette.rs"]
 mod palette;
+#[path = "gui_zustand.rs"]
+mod zustand;
 #[path = "gui_stil.rs"]
 mod stil;
 #[path = "gui_bausteine.rs"]
@@ -353,6 +355,10 @@ pub enum Kind {
     ColorPicker, DatePicker,
     Layout, TabControl, RichText, TimePicker, Accordion, Wizard,
     StatusBar, Breadcrumb, Card,
+    /// Selbst gezeichnet (GUI_CUSTOM): das Programm malt wie in eine
+    /// Zeichenflaeche, die gui fuehrt Fokus, Tasten, Klick und
+    /// Bildschirmleser (gui_widgets.rs `custom`).
+    Eigen,
 }
 
 impl Kind {
@@ -372,6 +378,7 @@ impl Kind {
             Kind::RichText => "richtext", Kind::TimePicker => "timepicker",
             Kind::StatusBar => "statusbar", Kind::Breadcrumb => "breadcrumb",
             Kind::Card => "card",
+            Kind::Eigen => "custom",
         }
     }
     fn from_str(s: &str) -> Option<Kind> {
@@ -390,6 +397,7 @@ impl Kind {
             "richtext" => Kind::RichText, "timepicker" => Kind::TimePicker,
             "statusbar" => Kind::StatusBar, "breadcrumb" => Kind::Breadcrumb,
             "card" => Kind::Card,
+            "custom" => Kind::Eigen,
             _ => return None,
         })
     }
@@ -3382,6 +3390,10 @@ pub struct Widget {
     frei: bool,
     // Enter im Textfeld -- GENAU EIN BILD lang, wie `clicked`.
     entered: bool,
+    /// Selbst gezeichnetes Widget: die Taste und die Zeichen dieses Bildes
+    /// (GUI_CUSTOM_KEY, GUI_CUSTOM_TEXT$) -- ein Bild lang, wie `clicked`.
+    eigen_taste: i64,
+    eigen_text: String,
     on_enter: Option<Rueckruf>,
     // Rueckgaengig beim Tippen (Textfeld und Textbereich): der Stand VOR einer
     // Aenderung samt Schreibmarke. Anschlaege innerhalb von 0,8 s sind EIN
@@ -3444,6 +3456,9 @@ pub struct Window {
     /// Fokus, keine Rueckrufe. Ein Form-Designer legt so echte Widgets auf
     /// die Flaeche und verwaltet die Maus selbst (GUI_HIT_TEST geht weiter).
     entwurf: bool,
+    /// Rechts nach links (GUI_WINDOW_RTL): die Lage der Widgets gespiegelt
+    /// (`abs_rect`), die Menueleiste von rechts.
+    rtl: bool,
     /// Vergroesserung beim Zeichnen (GUI_WINDOW_ZOOM), nur im Entwurfsmodus:
     /// das Fenster bekommt dort keine Eingabe, also muss nur GUI_HIT_TEST
     /// (und wo ein Fenster liegt) die Mauslage zurueckrechnen.
@@ -3817,6 +3832,10 @@ pub struct Gui {
     stil_quelle: String,
     stil_beob: Option<(String, String, f64)>,
     stil_fehler: String,
+    /// Stildatei nach Zeit und Datum: welche Bedingungen zuletzt galten, und
+    /// eine festgehaltene Uhr (GUI_STYLESHEET_CLOCK; None = die echte).
+    stil_bed: Vec<bool>,
+    stil_uhr_fest: Option<(Option<u16>, Option<u16>)>,
     /// Klaenge (gui_effekte.rs): an/aus, Wuensche fuer die VM, Protokoll
     /// fuer GUI_SOUND_LOG$.
     klang_an: bool,
@@ -4058,7 +4077,7 @@ impl Gui {
     pub fn new() -> Gui {
         Gui {
             schrift: None,
-            windows: Vec::new(), z_order: Vec::new(), flaeche: 0, fokus_flaeche: 0, nativ_fokus_wunsch: None, leihe: None, teil_druck: None, teil_ids: Vec::new(), popup_fenster: Vec::new(), grenzen: Vec::new(), canvas_offen: None, uhr: 0.0, haeute: std::collections::HashMap::new(), bewegung: 0, ruhig: false, insp_an: false, insp_wahl: -1, insp_taste: std::env::var("DHRT_INSPEKTOR").map(|v| v.trim() == "1").unwrap_or(false), stil_quelle: String::new(), stil_beob: None, stil_fehler: String::new(), klang_an: true, klang_warte: Vec::new(), klang_log: Vec::new(), funken: Vec::new(), funken_saat: 0x9E37_79B9_7F4A_7C15, vorher_ueber: Vec::new(), vorher_druck: None, vorher_fokus: None, palette: None, pal_taste: true,
+            windows: Vec::new(), z_order: Vec::new(), flaeche: 0, fokus_flaeche: 0, nativ_fokus_wunsch: None, leihe: None, teil_druck: None, teil_ids: Vec::new(), popup_fenster: Vec::new(), grenzen: Vec::new(), canvas_offen: None, uhr: 0.0, haeute: std::collections::HashMap::new(), bewegung: 0, ruhig: false, insp_an: false, insp_wahl: -1, insp_taste: std::env::var("DHRT_INSPEKTOR").map(|v| v.trim() == "1").unwrap_or(false), stil_quelle: String::new(), stil_beob: None, stil_fehler: String::new(), stil_bed: Vec::new(), stil_uhr_fest: None, klang_an: true, klang_warte: Vec::new(), klang_log: Vec::new(), funken: Vec::new(), funken_saat: 0x9E37_79B9_7F4A_7C15, vorher_ueber: Vec::new(), vorher_druck: None, vorher_fokus: None, palette: None, pal_taste: true,
             ta_zerlegung: std::cell::RefCell::new(HashMap::new()),
             focus_window: None, focus_widget: None, modal: None, modal_vorher: Vec::new(), modal_fokus: Vec::new(), cp_drag: None,
             drag_window: None, drag_dx: 0, drag_dy: 0,
@@ -4185,7 +4204,7 @@ impl Gui {
         let idx = self.windows.len();
         self.windows.push(Window {
             title, name: String::new(), x, y, w, h, widgets: Vec::new(),
-            movable: true, closable: false, visible: true, entwurf: false, zoom: 1.0, zuschnitt: None,
+            movable: true, closable: false, visible: true, entwurf: false, rtl: false, zoom: 1.0, zuschnitt: None,
             resizable: false, pruefung_live: false, form_stand: Vec::new(), form_db: Vec::new(), chrome: true, min_w: 0, min_h: 0, max_w: 0, max_h: 0,
             base_w: w, base_h: h,
             close_clicked: false, alive: true, dlg: false, answer: 0,
@@ -5190,7 +5209,7 @@ impl Gui {
             zeit: [12, 0, 0], zeit_sek: false,
             step: 1.0,
             align: -1, wrap: false, passwort: false, nur_lesen: false, maxlaenge: 0, zahlen: 0, frei: false,
-            entered: false, on_enter: None, undo: Vec::new(), redo: Vec::new(), undo_zeit: -10.0,
+            entered: false, eigen_taste: 0, eigen_text: String::new(), on_enter: None, undo: Vec::new(), redo: Vec::new(), undo_zeit: -10.0,
             feld: None,
             name: String::new(), klassen: Vec::new(), stil_auf: None, stil_key: None,
             bau: None,

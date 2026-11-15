@@ -918,8 +918,15 @@ pub fn vervollstaendigung(text: &str, basis: Option<&Path>, z0: usize, c0: usize
                 }).collect();
         }
     }
-    let (praefix, _) = symbole::praefix_bei(text, z0, c0);
+    let (praefix, anfang) = symbole::praefix_bei(text, z0, c0);
     let pl = praefix.to_lowercase();
+    // Hinter `AS` (und `ARRAY OF`) steht ein TYP -- Befehle gehoeren nicht
+    // dorthin. Sonst nahm `DIM w AS GUI_WIN` den ersten passenden Befehl in
+    // der Reihenfolge des Index, und ein neuer Befehl GUI_WINDOW_RTL schob
+    // sich vor den Typ GUI_WINDOW.
+    let zeile: Vec<char> = text.split('\n').nth(z0).unwrap_or("").chars().collect();
+    let davor: String = zeile[..anfang.min(zeile.len())].iter().collect();
+    if hinter_as(&davor) { return typ_vorschlaege(text, &pl); }
     let mut gesehen: std::collections::HashSet<String> = std::collections::HashSet::new();
     let mut out = Vec::new();
     let mut add = |label: &str, art: i64, detail: &str| {
@@ -957,6 +964,45 @@ pub fn vervollstaendigung(text: &str, basis: Option<&Path>, z0: usize, c0: usize
     for (n, _) in crate::vm::DEFAULT_KEYS { add(&n.to_uppercase(), CK_CONSTANT, "Konstante"); }
     for k in crate::lexer::KEYWORDS { add(&k.to_uppercase(), CK_KEYWORD, "Keyword"); }
     add("REM", CK_KEYWORD, "Keyword");
+    out
+}
+
+/// Steht vor der Marke `AS ` oder `OF ` (ein eigenes Wort, dahinter Leerraum)?
+fn hinter_as(davor: &str) -> bool {
+    let t = davor.trim_end();
+    if t.len() == davor.len() { return false; }
+    let wort: String = t.chars().rev().take_while(|c| c.is_alphanumeric() || *c == '_').collect::<String>().chars().rev().collect();
+    wort.eq_ignore_ascii_case("as") || wort.eq_ignore_ascii_case("of")
+}
+
+/// Typen fuer hinter `AS`: die Klassen, Strukturen und Aufzaehlungen des
+/// Textes, die Grundtypen, die Typen der Module und was Befehle laut Index
+/// liefern (`... AS IMAGE`).
+fn typ_vorschlaege(text: &str, pl: &str) -> Vec<Value> {
+    let mut gesehen: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut out = Vec::new();
+    let mut add = |label: &str, art: i64, detail: &str| {
+        let k = label.to_lowercase();
+        if k.is_empty() || gesehen.contains(&k) || (!pl.is_empty() && !k.starts_with(pl)) { return; }
+        gesehen.insert(k);
+        out.push(json!({"label": label, "kind": art, "detail": detail}));
+    };
+    for d in symbole::definitionen(text) {
+        if matches!(d.art, "class" | "struct" | "enum") { add(&d.name, CK_CLASS, d.art); }
+    }
+    for t in ["INTEGER", "FLOAT", "STRING", "BOOLEAN", "FUNCREF", "TUPLE", "ARRAY", "MAP"] { add(t, CK_KEYWORD, "Typ"); }
+    let mut modul: Vec<String> = crate::preprocess::modul_typen().map(|t| t.to_uppercase()).collect();
+    modul.sort();
+    for t in &modul { add(t, CK_CLASS, "Typ (Modul)"); }
+    let mut geliefert: Vec<String> = crate::compiler::builtin_eintraege().iter().filter_map(|(_, sig, _)| {
+        let g = sig.to_uppercase();
+        let p = g.rfind(" AS ")?;
+        let t: String = g[p + 4..].trim().chars().take_while(|c| c.is_ascii_alphanumeric() || *c == '_').collect();
+        if t.is_empty() { None } else { Some(t) }
+    }).collect();
+    geliefert.sort();
+    geliefert.dedup();
+    for t in &geliefert { add(t, CK_CLASS, "Typ"); }
     out
 }
 
@@ -1596,6 +1642,28 @@ pub fn serve() -> std::process::ExitCode {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn hinter_as_nur_typen() {
+        let namen = |t: &str, s: usize| -> Vec<String> {
+            super::vervollstaendigung(t, None, 0, s).iter().filter_map(|e| e["label"].as_str().map(str::to_string)).collect()
+        };
+        let a = namen("DIM w AS GUI_WIN", 16);
+        assert_eq!(a.first().map(|s| s.as_str()), Some("GUI_WINDOW"), "{:?}", a);
+        assert!(!a.iter().any(|n| n == "GUI_WINDOW_RTL"), "ein Befehl ist kein Typ: {:?}", a);
+        let b = namen("DIM bilder AS ARRAY OF IMA", 26);
+        assert!(b.iter().any(|n| n == "IMAGE"), "{:?}", b);
+        let c = namen("CLASS Tier\nEND CLASS\nDIM t AS Ti", 0);
+        let _ = c;
+        let d = super::vervollstaendigung("CLASS Tier\nEND CLASS\nDIM t AS Ti", None, 2, 11);
+        assert_eq!(d.first().and_then(|e| e["label"].as_str()), Some("Tier"));
+        // Ohne AS bleibt alles wie gehabt: auch die Befehle.
+        let e = namen("x = GUI_WIN", 11);
+        assert!(e.iter().any(|n| n == "GUI_WINDOW_RTL"), "{:?}", e);
+        // "class" oder "has" sind kein AS.
+        assert!(!super::hinter_as("DIM klass "));
+        assert!(super::hinter_as("dim x as "));
+    }
+
     #[test]
     fn klassen_mit_mitgliedern_ohne_uebersetzen() {
         // Ein Fehler im Text (das IF ohne END) haelt nichts auf.

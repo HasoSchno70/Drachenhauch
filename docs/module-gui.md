@@ -489,6 +489,7 @@ Native, blockierende Standarddialoge (kein IMPORT nötig — wie die Datei-Dialo
 | `GUI_STYLESHEET(text$)` | — | eine Stildatei setzen: Regeln nach Art, Klasse, Name und Zustand wie in CSS ("" = keine) -- siehe [Stildatei](#7-stildatei-regeln-nach-art-klasse-name-und-zustand) |
 | `GUI_STYLESHEET_LOAD(pfad$ [, beobachten])` | — | dasselbe aus einer Datei (üblich `.dhstil`); mit `beobachten` = `TRUE` lädt die gui sie neu, sobald sie gespeichert wird ([Abschnitt 9](#9-inspektor-stildatei-live-und-ruhige-bewegung)) |
 | `GUI_STYLESHEET_ERROR$()` | STRING | der Fehler beim letzten Neuladen einer beobachteten Stildatei, `""` = in Ordnung |
+| `GUI_STYLESHEET_CLOCK(zeit$)` | — | die Uhr für `@zeit`/`@datum` festhalten: `"12-24"`, `"21:30"`, `"12-24 21:30"` oder `"2026-12-24 21:30"` (ein fehlender Teil kommt von der echten Uhr); `""` = wieder die echte Uhr -- zum Ansehen eines Weihnachts- oder Nachtaussehens |
 | `GUI_ADD_CLASS(wdg, klasse$)` | — | eine Klasse anhängen; sie wirkt sofort und solange sie dran ist |
 | `GUI_REMOVE_CLASS(wdg, klasse$)` | — | eine Klasse wegnehmen |
 | `GUI_HAS_CLASS(wdg, klasse$)` | BOOLEAN | trägt das Widget die Klasse (die Knopfart zählt mit)? |
@@ -2507,6 +2508,23 @@ Eigenschaft, krumme Farbe, unbekannte Art) -- nichts wird still übergangen,
 sonst suchte man ihn im Programm. Name und Klassen stehen in der `.dhform`
 (`name`, `klassen`). `GUI_GET_COLOR` sagt, welche Farbe gerade gilt.
 
+**Regeln nach Zeit und Datum.** Vor einer Regel darf eine Bedingung
+stehen; dann gilt sie nur zu dieser Zeit:
+
+```
+@zeit 20:00-06:00 button { bg: #22252E }            /* nachts gedaempft */
+@datum 12-01..12-26 #titel { fg: #E74C3C }           /* Advent */
+@datum 12-31 @zeit 18:00-24:00 button { effekt: funken }
+```
+
+`@zeit von-bis` (bis ausschließlich) und `@datum MM-TT..MM-TT` (bis
+einschließlich, ein einzelner Tag ohne `..`) dürfen über Mitternacht bzw.
+den Jahreswechsel reichen; mehrere Bedingungen gelten zusammen. Die gui
+fragt die Ortszeit je Bild und löst neu auf, sobald eine Bedingung
+umschlägt -- ein laufendes Programm wechselt um 20:00 von selbst ins
+Nachtaussehen. `GUI_STYLESHEET_CLOCK("12-24 21:00")` hält die Uhr fest, um
+es vorab anzusehen.
+
 ### 8. Eigene Formen, Bildhäute und Animationen
 
 Ein Knopf muss kein Rechteck sein. Die Stildatei kennt dafür drei
@@ -2516,10 +2534,17 @@ Eigenschaften mehr, dazu kommen vier Befehle:
 |---|---|
 | `form: rechteck \| pille \| kreis \| raute \| bild` | Form eines Knopfs -- für das Zeichnen **und** den Treffer: ein Klick neben dem Kreis trifft nicht. `bild` nimmt die Deckkraft der Bildhaut (durchsichtig = daneben), so wird jede Form möglich. Nur in Regeln ohne Zustand |
 | `bild: datei.png` / `bildrand: 12` | Bildhaut: statt Fläche und Rand zeichnet der Knopf das Bild, `bildrand` als 9-Slice (Ecken bleiben, die Mitte wächst mit); Sinnbild und Text liegen darüber. Ein animiertes GIF läuft ab (mit seinen Bilddauern, ohne Ende; bei `form: bild` trifft das Bild, das gerade zu sehen ist). Auch je Zustand (`:hover`, `:active`, `:disabled`, `:checked`) |
-| `animation: puls \| wackeln \| schweben \| huepfen \| drehen [Dauer ms] [einmal \| Anzahl]` | das ganze Widget bewegt sich um seine Mitte; auch je Zustand: `button:hover { animation: puls }` pulsiert nur beim Überfahren |
+| `bild: figur.png 8 12fps` | Bildfolge aus einem Atlas: 8 gleich breite Bilder nebeneinander, 12 je Sekunde (Vorgabe 12, 1..120), ohne Ende -- wie ein animiertes GIF, auch für `form: bild`. Ein Pfad mit Leerzeichen steht in Anführungszeichen. Bildhäute gelten für Knöpfe und für **Kästchen, Optionen und Schalter** (dort statt des Kennzeichens, die Beschriftung daneben), je Zustand: `checkbox:checked { bild: an.png }` |
+| `griff: knopf.png` | Regler mit Haut: `bild` ist die Rinne (über das ganze Rechteck, mit `bildrand` als 9-Slice), `griff` der Griff -- quadratisch, so hoch (beim senkrechten Regler so breit) wie der Regler, an der Stelle des Werts. Fehlt eine der beiden Häute, kommt dort die gewohnte Form. Auch je Zustand (`slider:active { griff: gedrueckt.png }`) und als Bildfolge |
+| `@ablauf name { 0%: x 0; 50%: y -8, drehen 10; 100%: groesse 1.1 }` | ein eigener Ablauf: Schlüsselbilder mit `x`, `y` (Punkte), `drehen` (Grad) und `groesse` (Maßstab), dazwischen gerade verbunden; fehlt 0 % oder 100 %, ruht es dort. Danach gilt der Name wie eine eingebaute Art: `animation: name 800ms`, `GUI_ANIMATE(wdg, "name")`; er darf vor oder nach der Regel stehen, die ihn nennt |
+| `@ablauf name { 50%: deckkraft 0.3, farbe #FF8080 }` | Deckkraft (0..1) und Farbton (`#RRGGBB`, weiß = keiner) in einem Ablauf -- dazu die eingebaute Art `blinken` (Deckkraft 1 → 0,35 → 1). Das Widget kommt dafür in eine eigene Schicht, die mit Deckkraft und Ton aufgelegt wird; nur auf der Hauptfläche ohne POSTFX, anderswo bleibt es voll sichtbar |
+| `animation: puls \| wackeln \| schweben \| huepfen \| drehen \| blinken [Dauer ms] [einmal \| Anzahl]` | das ganze Widget bewegt sich um seine Mitte; auch je Zustand: `button:hover { animation: puls }` pulsiert nur beim Überfahren |
 | `GUI_SET_SHAPE(knopf, form$)` / `GUI_GET_SHAPE$(knopf)` | eigene Form setzen (`""` = wieder die Stildatei) bzw. die Form, die gilt |
 | `GUI_ANIMATE(wdg, art$ [, dauer_ms [, anzahl]])` | eine Animation starten -- etwa einmal wackeln bei falscher Eingabe; `anzahl` 0 = ohne Ende (Vorgabe 1), `art$` `""` hält an |
 | `GUI_ANIMATING(wdg)` | läuft gerade eine Animation? |
+| `gleiten: 200` | weiche Layout-Übergänge (Dauer in ms, 0..2000): ändern sich Lage oder Größe (Layout, `GUI_SET_BOUNDS`, Fenstergröße), gleitet das Bild vom alten zum neuen Rechteck, langsam auslaufend; ein Widget, das sichtbar wird, wächst auf. Der Treffer steht sofort am Ziel. Nur in Regeln ohne Zustand; `* { gleiten: 200 }` gilt für die ganze Anwendung |
+| `GUI_GLIDING(wdg)` | gleitet das Widget gerade? |
+| `unschaerfe: 12` | Glas: was hinter dem Widget gezeichnet ist (ein Bild, eine Karte, andere Widgets), liegt unscharf darunter (Radius 0..40); eine Fläche mit Deckkraft scheint durch: `panel.glas { unschaerfe: 12; bg: #60FFFFFF; radius: 14 }`. Wirkt auf der Hauptfläche, in echten Fenstern und in Renderzielen. Nur in Regeln ohne Zustand |
 
 ```basic
 IMPORT "gui"
@@ -2553,6 +2578,7 @@ Drei Hilfen fürs Gestalten und für die Barrierefreiheit:
 | `GUI_INSPECTOR([an])` | BOOLEAN ohne Argument | Inspektor zeigen (`TRUE`) oder schließen; ohne Argument: ist er offen? |
 | `GUI_INSPECTOR_SELECTED()` | GUI_WIDGET | das Widget, das im Inspektor gewählt ist, -1 = keins |
 | `GUI_INSPECT$(widget)` | STRING | was der Inspektor über ein Widget zeigt: Art, Name, Klassen, Lage, Zustand, Form, die passenden Regeln der Stildatei mit Zeile und was je Zustand gilt |
+| `GUI_STATE$()` | STRING | der Zustand aller sichtbaren Fenster als Text: je Widget mit Zustand eine Zeile (Texte, Haken, Werte, Auswahl) -- die Erwartung, die `dhrt aufnehmen` schreibt ([werkzeuge.md](werkzeuge.md#dhrt-aufnehmen--bedienung-als-prüffall)) |
 | `GUI_SET_MOTION(modus$)` | — | `"system"` (Vorgabe): wie das Betriebssystem; `"an"`: Animationen immer; `"aus"`: nie |
 | `GUI_MOTION()` | BOOLEAN | spielt die gui gerade Bewegung ab? |
 
@@ -2562,7 +2588,8 @@ Klick wählt es -- der Klick erreicht das Widget **nicht** -- und eine Tafel
 zeigt, was `GUI_INSPECT$` liefert. ESC schließt ihn. Mit der
 Umgebungsvariablen `DHRT_INSPEKTOR=1` öffnet und schließt **Strg+Umschalt+I**
 ihn in jedem Programm, ohne dass es dafür eine Zeile braucht; ohne sie ist
-die Taste frei für das Programm.
+die Taste frei für das Programm. In einem echten Fenster
+(`GUI_WINDOW_NATIVE`) wählt er dessen Widgets, und die Tafel steht dort.
 
 ```
 button #los .menue .standard
@@ -2635,8 +2662,8 @@ Konfetti.
 Jedes Programm mit einer Menüleiste oder Werkzeugleiste hat eine
 Befehlspalette, ohne eine Zeile dafür: **Strg+Umschalt+P** öffnet über dem
 Fenster mit dem Fokus eine Suche über alle Einträge seiner Menüleiste (samt
-Untermenüs, „Datei › Zuletzt › brief.txt“) und die Knöpfe seiner
-Werkzeugleisten. Tippen filtert (ein Wortanfang zuerst, dann ein Treffer im
+Untermenüs, „Datei › Zuletzt › brief.txt“), seine Kontextmenüs und die
+Knöpfe seiner Werkzeugleisten; in einem echten Fenster steht sie in diesem. Tippen filtert (ein Wortanfang zuerst, dann ein Treffer im
 Wort, dann verstreute Buchstaben), Hoch/Runter wählt, Enter oder ein Klick
 löst aus -- genau wie Maus und Kürzel, `GUI_CLICKED` und Rückrufe inklusive.
 ESC oder ein Klick daneben schließt sie. Gesperrte Einträge fehlen, ein
@@ -2654,6 +2681,45 @@ Strg+Umschalt+P (wie die IDE mit ihrer eigenen Palette), löst es seinen
 Eintrag aus, und die Palette bleibt zu. Solange sie offen ist, hat kein
 Widget den Fokus -- eine Rücktaste kürzt die Suche, nicht den Text im Feld
 darunter; danach kommt der Fokus zurück.
+
+### 12. Selbst gezeichnete Widgets
+
+Wenn keine Form und keine Haut reicht: `GUI_CUSTOM` ist ein Widget, das
+das Programm selbst malt -- wie eine Zeichenfläche, mit `GUI_CANVAS_BEGIN`
+/ `GUI_CANVAS_END` und `GUI_CANVAS_MOUSE` --, um das sich die gui aber wie
+um jedes andere kümmert: Es bekommt den Fokus mit Tab (samt Fokusring),
+einen Klick über Maus, Enter oder Leertaste (`GUI_CLICKED`), die Tasten des
+Bildes und eine Rolle für den Bildschirmleser.
+
+| Befehl | Rückgabe | Wirkung |
+|---|---|---|
+| `GUI_CUSTOM(win, x, y, w, h [, rolle$])` | GUI_WIDGET | ein selbst gezeichnetes Widget; `rolle$` = `"button"` (Vorgabe), `"checkbox"` (Haken über `GUI_SET_CHECKED`/`GUI_CHECKED`) oder `"slider"` (Wert über `GUI_SET_VALUE`/`GUI_VALUE`); den Namen für den Bildschirmleser setzt `GUI_SET_TEXT` |
+| `GUI_CUSTOM_KEY(wdg)` | INTEGER | die Taste, die es in diesem Bild bekam (Pfeile, Pos1/Ende, Bild auf/ab, Enter, Leertaste, Rück, Entf, ESC -- Codes wie `KEYHIT`), 0 = keine |
+| `GUI_CUSTOM_TEXT$(wdg)` | STRING | die Zeichen, die es in diesem Bild bekam |
+
+```basic
+IMPORT "gui"
+SCREEN(420, 240, "Eigen", 1)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Eigen", 10, 10, 400, 220)
+DIM nacht AS GUI_WIDGET : nacht = GUI_CUSTOM(w, 20, 20, 160, 60, "checkbox")
+GUI_SET_TEXT(nacht, "Nachtmodus")
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_CLICKED(nacht) THEN GUI_SET_CHECKED(nacht, NOT GUI_CHECKED(nacht))
+    CLS(&H202830)
+    GUI_DRAW()
+    GUI_CANVAS_BEGIN(nacht)
+    DIM x AS INTEGER : x = GUI_CANVAS_X(nacht)
+    DIM y AS INTEGER : y = GUI_CANVAS_Y(nacht)
+    BOX(x, y, x + 158, y + 58, IIF(GUI_CHECKED(nacht), &H203060, &HE0C060))
+    TEXT(x + 10, y + 20, IIF(GUI_CHECKED(nacht), "Mond", "Sonne"), WHITE)
+    GUI_CANVAS_END()
+    FLIP()
+WEND
+```
+
+Tasten und Zeichen kommen nur, solange das Widget den Fokus hat; sie gelten
+genau ein Bild, wie `GUI_CLICKED`.
 
 ## Callbacks: GUI_ON_CLICK
 
@@ -4376,12 +4442,16 @@ Reihenfolge, in der er getippt wurde.
 | Befehl | Was er tut |
 |---|---|
 | `TEXT_VISUAL$(text$ [, richtung$])` | Der Text so, wie er dasteht -- für eigene Ausgaben wie Dateien oder Bilder. `richtung$` = `auto` (Vorgabe), `ltr` oder `rtl` |
+| `GUI_WINDOW_RTL(win, an)` | das ganze Fenster von rechts nach links: die Lage jedes Widgets gespiegelt an der Breite des Fensters, die Menüleiste und die Werkzeugleiste beginnen rechts, Kästchen, Optionen und Schalter tragen ihr Kennzeichen rechts vom Text, ein Regler wächst nach links (Ziehen und Pfeiltasten auch). Das Programm setzt und liest seine Lagen weiter von links (`GUI_GET_X`); Zeichnen, Klick und `GUI_HIT_TEST` gehen über die gespiegelte |
+| `GUI_WINDOW_IS_RTL(win)` | steht das Fenster von rechts nach links? |
 
 Indische und südostasiatische Schriften und die Ligaturen einer Schrift
 setzt die Textformung ([builtins-grafik.md](builtins-grafik.md#textformung-indische-schriften-und-ligaturen)).
 Was (noch) nicht geht: die Ausrichtung folgt nicht der
 Richtung -- eine Zeile von rechts nach links steht links, solange
-`GUI_SET_ALIGN` nichts anderes sagt; in einer solchen Zeile eines
+`GUI_SET_ALIGN` nichts anderes sagt; in einem gespiegelten Fenster
+(`GUI_WINDOW_RTL`) bleiben Textfelder, Tabellen und Bäume innen, wie sie
+sind (Text linksbündig, Spalten und Einrückung von links); in einer solchen Zeile eines
 Textbereichs fallen Fett, Kursiv und Unterstrichen weg (die Farben der
 Einfärbung bleiben); Hinweise am Zeilenende und Farbfelder rechnen weiter
 mit der logischen Lage. Das pdf-Modul ordnet nicht -- dort hilft

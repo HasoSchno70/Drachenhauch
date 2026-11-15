@@ -127,8 +127,18 @@ enum Cmd {
     ScissorPush(i32, i32, i32, i32),
     ScissorPop,
     /// Verformung um (cx, cy): verschieben (dx, dy), drehen (Grad),
-    /// vergroessern -- bis VerformungEnde (Animationen der gui).
-    Verformung(i32, i32, f32, f32, f32, f32),
+    /// vergroessern je Achse -- bis VerformungEnde (Animationen und Gleiten
+    /// der gui).
+    Verformung(i32, i32, f32, f32, f32, f32, f32),
+    /// Was bisher gezeichnet ist, in diesem Rechteck unscharf (Glas):
+    /// x1, y1, x2, y2, Radius der Unschaerfe, Eckenradius -- nur auf der
+    /// Hauptflaeche (`UNSCHAERFE_ZIEL`), sonst nichts.
+    Unschaerfe(i32, i32, i32, i32, i32, i32),
+    /// Eine Schicht: was bis SchichtEnde kommt, in ein Renderziel, das dann
+    /// mit Deckkraft und Farbton aufgelegt wird (Ablaeufe der gui) -- nur
+    /// auf der Hauptflaeche ohne POSTFX (`SCHICHT_ZIEL`), sonst wie ohne.
+    SchichtAnfang(u8, Color),
+    SchichtEnde,
     VerformungEnde,
     // 2D-Extras (Batch 1): dicke Linien, runde Rechtecke, Gradienten, Splines.
     LineEx(i32, i32, i32, i32, f32, Color),            // x1,y1,x2,y2, thick, color
@@ -318,6 +328,19 @@ impl RenderTarget {
 }
 
 thread_local! {
+    /// Groesse (Pixel) des Ziels, aus dem `Cmd::Unschaerfe` zuruecklesen
+    /// darf -- nur waehrend die Hauptflaeche abgespielt wird (direkt oder in
+    /// die Szene fuer POSTFX). Renderziele und echte Fenster: None, dort
+    /// bleibt es bei der durchscheinenden Flaeche darueber.
+    static UNSCHAERFE_ZIEL: std::cell::Cell<Option<(i32, i32)>> = const { std::cell::Cell::new(None) };
+    /// Groesse der Hauptflaeche, wenn sie DIREKT gezeichnet wird -- nur dort
+    /// darf `Cmd::SchichtAnfang` in ein eigenes Ziel umlenken (aus einem
+    /// Renderziel fuehrte EndTextureMode auf den Schirm statt zurueck).
+    static SCHICHT_ZIEL: std::cell::Cell<Option<(i32, i32)>> = const { std::cell::Cell::new(None) };
+    /// Die laufende Schicht: (Deckkraft, Farbton), None = keine.
+    static SCHICHT_LAEUFT: std::cell::Cell<Option<(u8, Color)>> = const { std::cell::Cell::new(None) };
+    /// Das Renderziel der Schicht, wiederverwendet solange die Groesse passt.
+    static SCHICHT_RT: std::cell::Cell<Option<(raylib::ffi::RenderTexture2D, i32, i32)>> = const { std::cell::Cell::new(None) };
     /// Massstab des Ziels, das gerade abgespielt wird (siehe
     /// `RenderTarget::mass`). Die Geometrie skaliert eine Matrix; Text und
     /// Scissor fragen hier nach -- Text wird in voller Groesse gesetzt statt
@@ -2934,11 +2957,23 @@ impl Graphics {
     pub fn haupt_os_handle(&self) -> usize { crate::nativfenster::os_handle(self.haupt_glfw as *mut std::ffi::c_void) }
     /// Alles bis `verformung_beenden` um (cx, cy) verschoben, gedreht
     /// (Grad) und vergroessert zeichnen -- die Animationen der gui.
-    pub fn verformung_beginnen(&mut self, cx: i32, cy: i32, dx: f32, dy: f32, ang: f32, sc: f32) {
+    pub fn verformung_beginnen(&mut self, cx: i32, cy: i32, dx: f32, dy: f32, ang: f32, sx: f32, sy: f32) {
         let (cx, cy) = self.w2s(cx, cy);
-        self.emit(Cmd::Verformung(cx, cy, dx, dy, ang, sc));
+        self.emit(Cmd::Verformung(cx, cy, dx, dy, ang, sx, sy));
     }
     pub fn verformung_beenden(&mut self) { self.emit(Cmd::VerformungEnde); }
+    /// Glas: was bis hierher gezeichnet ist, im Rechteck unscharf zeichnen
+    /// (gui `unschaerfe`). Radius und Ecke in Punkten.
+    /// Schicht mit Deckkraft (0..255) und Farbton (0xRRGGBB, weiss = keiner).
+    pub fn schicht_anfang(&mut self, deckkraft: u8, farbton: i64) {
+        let c = Color::new(((farbton >> 16) & 0xFF) as u8, ((farbton >> 8) & 0xFF) as u8, (farbton & 0xFF) as u8, deckkraft);
+        self.emit(Cmd::SchichtAnfang(deckkraft, c));
+    }
+    pub fn schicht_ende(&mut self) { self.emit(Cmd::SchichtEnde); }
+    pub fn unschaerfe(&mut self, x: i32, y: i32, w: i32, h: i32, radius: i32, ecke: i32) {
+        let (x1, y1) = self.w2s(x, y); let (x2, y2) = self.w2s(x + w - 1, y + h - 1);
+        self.emit(Cmd::Unschaerfe(x1, y1, x2, y2, self.ssize(radius), self.ssize(ecke)));
+    }
     /// Der Massstab von SCREEN (Systempunkte je Punkt des Programms).
     pub fn haupt_massstab(&self) -> i32 { self.scale.max(1) }
     /// Die gui liest (Some) oder das Programm (None); Some(k) = durch die
@@ -5806,6 +5841,14 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         })
     }
 
+    /// Eine Textur aus RGBA-Pixeln (Bildfolgen der gui, gui_aussehen.rs).
+    pub fn textur_aus_rgba(&mut self, px: &[u8], w: u32, h: u32) -> Result<i64, String> {
+        if w == 0 || h == 0 || px.len() < (w as usize) * (h as usize) * 4 { return Err("Textur: falsche Groesse".into()); }
+        let img = Image::gen_image_color(w as i32, h as i32, Color::new(0, 0, 0, 0));
+        unsafe { std::ptr::copy_nonoverlapping(px.as_ptr(), img.data as *mut u8, (w as usize) * (h as usize) * 4); }
+        self.push_tex_from_image(img)
+    }
+
     /// IMAGE_LOAD_GIF: alle Einzelbilder eines GIFs als eigene Bilder (raylib
     /// setzt sie schon zusammen, auch wenn ein Bild nur einen Teil erneuert).
     /// Eine Datei, die kein GIF ist, ergibt ein einziges Bild.
@@ -8221,7 +8264,11 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
                 let m = render_targets[i].mass;
                 let (vx, vy) = render_targets[i].versatz;
                 let abbild = m != 1.0 || vx != 0.0 || vy != 0.0;
+                // Glas darf aus diesem Ziel zuruecklesen (echte Fenster,
+                // Renderziele des Programms) -- in seiner Groesse.
+                let (rw, rh) = (render_targets[i].rt.texture.width, render_targets[i].rt.texture.height);
                 let mut tx = rl.begin_texture_mode(thread, &mut render_targets[i].rt);
+                UNSCHAERFE_ZIEL.with(|z| z.set(Some((rw, rh))));
                 let clear = if behalten { None } else { Some(clear_rt) };
                 // Maßstab 1, NICHT der Fenster-Maßstab `s`: ein Render-Target
                 // hat seine EIGENE Pixelgroesse. Mit `s` wurde der Inhalt im
@@ -8243,6 +8290,7 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
                     &[], cam, &[], None, (-1, -1, -1, -1), &empty_set, &empty_map, &empty_emis,
                     (false, 0, 0, 0), &[], None, None, None, None);
                 if abbild { unsafe { raylib::ffi::rlPopMatrix(); } RT_MASS.with(|c| c.set(1.0)); RT_VERSATZ.with(|c| c.set((0.0, 0.0))); }
+                UNSCHAERFE_ZIEL.with(|z| z.set(None));
             }
         }
         let rts: &[RenderTarget] = render_targets;
@@ -8255,7 +8303,9 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
             // 1) Szene in die RenderTexture rendern.
             {
                 let mut tx = rl.begin_texture_mode(thread, rt);
+                UNSCHAERFE_ZIEL.with(|z| z.set(Some((tw as i32, th as i32))));
                 render_scene(&mut tx, s, Some(clear_color), layers, &order, textures, fonts, ausweich, font_glyphs, cmds3d, cam, models, light_shader.as_mut(), mat_locs, nmap_set, pbr_ref, emis_ref, ibl, rts, skybox, cam_view, cam_proj, inst_ffi);
+                UNSCHAERFE_ZIEL.with(|z| z.set(None));
             }
             // 2) RT per Fragment-Shader auf den Screen praesentieren (Y-flip).
             let src = Rectangle::new(0.0, 0.0, tw, -th);
@@ -8303,7 +8353,13 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
             }
         } else {
             let mut d = rl.begin_drawing(thread);
+            UNSCHAERFE_ZIEL.with(|z| z.set(Some((tw as i32, th as i32))));
+            SCHICHT_ZIEL.with(|z| z.set(Some((tw as i32, th as i32))));
             render_scene(&mut d, s, Some(clear_color), layers, &order, textures, fonts, ausweich, font_glyphs, cmds3d, cam, models, light_shader.as_mut(), mat_locs, nmap_set, pbr_ref, emis_ref, ibl, rts, skybox, cam_view, cam_proj, inst_ffi);
+            UNSCHAERFE_ZIEL.with(|z| z.set(None));
+            SCHICHT_ZIEL.with(|z| z.set(None));
+            // Eine Schicht ohne Ende (darf nicht vorkommen) nicht offen lassen.
+            if SCHICHT_LAEUFT.with(|z| z.take()).is_some() { unsafe { raylib::ffi::EndTextureMode(); } }
         }
         // Web (emscripten): nach dem Praesentieren (EndDrawing oben beim Drop des
         // Draw-Handles) ans Browser-Event-Loop yielden -- sonst blockiert der
@@ -8912,6 +8968,87 @@ fn zeichne_text_stil<D: RaylibDraw>(d: &mut D, h: i64, txt: &str, x: f32, y: f32
             d.draw_rectangle_rec(raylib::math::Rectangle::new(x, y + dy, b, dicke), col);
         }
     }
+}
+
+/// Kastenfilter, waagerecht und senkrecht (RGB, Deckkraft bleibt) -- zweimal
+/// angewandt ist das schon nah an einer Gaussglocke.
+pub(crate) fn kasten_unschaerfe(px: &mut [u8], b: usize, h: usize, r: usize) {
+    if r == 0 || b == 0 || h == 0 { return; }
+    let mut tmp = vec![0u8; px.len()];
+    // waagerecht: px -> tmp
+    for y in 0..h {
+        for k in 0..3 {
+            let mut summe: i64 = 0;
+            let at = |x: i64| -> i64 { let x = x.clamp(0, b as i64 - 1) as usize; px[(y * b + x) * 4 + k] as i64 };
+            for x in -(r as i64)..=(r as i64) { summe += at(x); }
+            for x in 0..b {
+                tmp[(y * b + x) * 4 + k] = (summe / (2 * r as i64 + 1)) as u8;
+                summe += at(x as i64 + r as i64 + 1) - at(x as i64 - r as i64);
+            }
+        }
+    }
+    // senkrecht: tmp -> px
+    for x in 0..b {
+        for k in 0..3 {
+            let mut summe: i64 = 0;
+            let at = |y: i64| -> i64 { let y = y.clamp(0, h as i64 - 1) as usize; tmp[(y * b + x) * 4 + k] as i64 };
+            for y in -(r as i64)..=(r as i64) { summe += at(y); }
+            for y in 0..h {
+                px[(y * b + x) * 4 + k] = (summe / (2 * r as i64 + 1)) as u8;
+                summe += at(y as i64 + r as i64 + 1) - at(y as i64 - r as i64);
+            }
+        }
+    }
+}
+
+/// `Cmd::Unschaerfe` abspielen: den Bereich aus dem Ziel zuruecklesen,
+/// unscharf machen, mit runden Ecken wieder hinlegen.
+#[allow(clippy::too_many_arguments)]
+unsafe fn unschaerfe_zeichnen(x: i32, y: i32, w: i32, h: i32, r: i32, ecke: i32, tw: i32, th: i32, m: f32, (vx, vy): (f32, f32)) {
+    use raylib::ffi;
+    // In einem Ziel mit eigenem Massstab (echtes Fenster auf dichterem
+    // Schirm, Popup-Fenster mit Versatz) liegen die Pixel unter einer Matrix:
+    // gelesen wird in Pixeln des Ziels, gezeichnet zurueck in seinen Punkten.
+    let px = |v: i32, o: f32| ((v as f32 - o) * m).round() as i32;
+    let (x, y, w, h) = (px(x, vx), px(y, vy), (w as f32 * m).round() as i32, (h as f32 * m).round() as i32);
+    let (r, ecke) = ((r as f32 * m).round() as i32, (ecke as f32 * m).round() as i32);
+    let (x0, y0) = (x.max(0), y.max(0));
+    let (x1, y1) = ((x + w).min(tw), (y + h).min(th));
+    if x1 <= x0 || y1 <= y0 || r <= 0 { return; }
+    ffi::rlDrawRenderBatchActive();
+    let roh = ffi::rlReadScreenPixels(tw, th);
+    if roh.is_null() { return; }
+    let alles = std::slice::from_raw_parts(roh, (tw as usize) * (th as usize) * 4);
+    let (bw, bh) = ((x1 - x0) as usize, (y1 - y0) as usize);
+    let mut px = vec![0u8; bw * bh * 4];
+    for z in 0..bh {
+        let q = ((y0 as usize + z) * tw as usize + x0 as usize) * 4;
+        px[z * bw * 4..(z + 1) * bw * 4].copy_from_slice(&alles[q..q + bw * 4]);
+    }
+    ffi::MemFree(roh as *mut _);
+    // Zwei Kastenfilter mit 2/3 des Radius: etwa die Glocke von CSS blur().
+    let rr = (r as usize * 2 / 3).max(1);
+    kasten_unschaerfe(&mut px, bw, bh, rr);
+    kasten_unschaerfe(&mut px, bw, bh, rr);
+    // Deckend, ausser ausserhalb der runden Ecken.
+    let e = ecke.max(0) as f64;
+    for zy in 0..bh {
+        for zx in 0..bw {
+            let (gx, gy) = ((x0 - x) as f64 + zx as f64 + 0.5, (y0 - y) as f64 + zy as f64 + 0.5);
+            let dx = (e - gx).max(gx - (w as f64 - e)).max(0.0);
+            let dy = (e - gy).max(gy - (h as f64 - e)).max(0.0);
+            let drin = e <= 0.0 || dx * dx + dy * dy <= e * e;
+            px[(zy * bw + zx) * 4 + 3] = if drin { 255 } else { 0 };
+        }
+    }
+    let bild = ffi::Image { data: px.as_mut_ptr() as *mut _, width: bw as i32, height: bh as i32, mipmaps: 1,
+        format: raylib::consts::PixelFormat::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 as i32 };
+    let tex = ffi::LoadTextureFromImage(bild);
+    let ziel = ffi::Rectangle { x: x0 as f32 / m + vx, y: y0 as f32 / m + vy, width: bw as f32 / m, height: bh as f32 / m };
+    ffi::DrawTexturePro(tex, ffi::Rectangle { x: 0.0, y: 0.0, width: bw as f32, height: bh as f32 }, ziel,
+        ffi::Vector2 { x: 0.0, y: 0.0 }, 0.0, ffi::Color { r: 255, g: 255, b: 255, a: 255 });
+    ffi::rlDrawRenderBatchActive();
+    ffi::UnloadTexture(tex);
 }
 
 fn render_scene<D: RaylibDraw>(
@@ -9582,16 +9719,59 @@ fn render_scene<D: RaylibDraw>(
                         clip_stack.push((rx, ry, rw, rh));
                         unsafe { raylib::ffi::BeginScissorMode(rx, ry, rw, rh); }
                     }
-                    Cmd::Verformung(cx, cy, dx, dy, ang, sc) => unsafe {
+                    Cmd::Verformung(cx, cy, dx, dy, ang, sx, sy) => unsafe {
                         let sf = s as f32;
                         let (mx, my) = ((*cx * s) as f32, (*cy * s) as f32);
                         raylib::ffi::rlDrawRenderBatchActive();
                         raylib::ffi::rlPushMatrix();
                         raylib::ffi::rlTranslatef(mx + dx * sf, my + dy * sf, 0.0);
                         raylib::ffi::rlRotatef(*ang, 0.0, 0.0, 1.0);
-                        raylib::ffi::rlScalef(*sc, *sc, 1.0);
+                        raylib::ffi::rlScalef(*sx, *sy, 1.0);
                         raylib::ffi::rlTranslatef(-mx, -my, 0.0);
                     },
+                    Cmd::SchichtAnfang(_, farbe) => {
+                        if let (Some((tw, th)), None) = (SCHICHT_ZIEL.with(|z| z.get()), SCHICHT_LAEUFT.with(|z| z.get())) {
+                            unsafe {
+                                raylib::ffi::rlDrawRenderBatchActive();
+                                let rt = match SCHICHT_RT.with(|z| z.get()) {
+                                    Some((rt, w, h)) if w == tw && h == th => rt,
+                                    alt => {
+                                        if let Some((rt, _, _)) = alt { raylib::ffi::UnloadRenderTexture(rt); }
+                                        let rt = raylib::ffi::LoadRenderTexture(tw, th);
+                                        SCHICHT_RT.with(|z| z.set(Some((rt, tw, th))));
+                                        rt
+                                    }
+                                };
+                                raylib::ffi::BeginTextureMode(rt);
+                                raylib::ffi::ClearBackground(raylib::ffi::Color { r: 0, g: 0, b: 0, a: 0 });
+                            }
+                            SCHICHT_LAEUFT.with(|z| z.set(Some((farbe.a, *farbe))));
+                        }
+                    }
+                    Cmd::SchichtEnde => {
+                        if let Some((_, farbe)) = SCHICHT_LAEUFT.with(|z| z.get()) {
+                            SCHICHT_LAEUFT.with(|z| z.set(None));
+                            if let Some((rt, w, h)) = SCHICHT_RT.with(|z| z.get()) {
+                                unsafe {
+                                    raylib::ffi::rlDrawRenderBatchActive();
+                                    raylib::ffi::EndTextureMode();
+                                    let quelle = raylib::ffi::Rectangle { x: 0.0, y: 0.0, width: w as f32, height: -(h as f32) };
+                                    let f = raylib::ffi::Color { r: farbe.r, g: farbe.g, b: farbe.b, a: farbe.a };
+                                    raylib::ffi::DrawTextureRec(rt.texture, quelle, raylib::ffi::Vector2 { x: 0.0, y: 0.0 }, f);
+                                    raylib::ffi::rlDrawRenderBatchActive();
+                                }
+                            }
+                        }
+                    }
+                    Cmd::Unschaerfe(x1, y1, x2, y2, r, ecke) => {
+                        if let Some((tw, th)) = UNSCHAERFE_ZIEL.with(|z| z.get()) {
+                            let x = (*x1).min(*x2) * s; let y = (*y1).min(*y2) * s;
+                            let w = ((x2 - x1).abs() + 1) * s; let h = ((y2 - y1).abs() + 1) * s;
+                            let m = RT_MASS.with(|c| c.get());
+                            let v = RT_VERSATZ.with(|c| c.get());
+                            unsafe { unschaerfe_zeichnen(x, y, w, h, *r * s, *ecke * s, tw, th, m, v); }
+                        }
+                    }
                     Cmd::VerformungEnde => unsafe {
                         raylib::ffi::rlDrawRenderBatchActive();
                         raylib::ffi::rlPopMatrix();
@@ -10390,3 +10570,18 @@ fn vorschau_strichzug(img: &mut Image, punkte: &[(f64, f64)], strichel: (f64, f6
     }
 }
 
+#[cfg(test)]
+mod unschaerfe_tests {
+    use super::kasten_unschaerfe;
+
+    #[test]
+    fn eine_kante_wird_weich_und_flaechen_bleiben() {
+        // 20x1: links schwarz, rechts weiss.
+        let mut px: Vec<u8> = (0..20).flat_map(|x| { let v = if x < 10 { 0 } else { 255 }; [v, v, v, 255] }).collect();
+        kasten_unschaerfe(&mut px, 20, 1, 3);
+        assert_eq!(px[0], 0, "weit links bleibt schwarz");
+        assert_eq!(px[19 * 4], 255, "weit rechts bleibt weiss");
+        assert!(px[9 * 4] > 60 && px[9 * 4] < 200, "an der Kante grau: {}", px[9 * 4]);
+        assert_eq!(px[9 * 4 + 3], 255, "Deckkraft bleibt");
+    }
+}

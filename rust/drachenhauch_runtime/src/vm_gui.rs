@@ -942,6 +942,9 @@ impl<'p> Vm<'p> {
                 if a.is_empty() || a.len() > 2 { return Err(format!("{}: erwartet (pfad$ [, beobachten])", n)); }
                 let beob = if a.len() == 2 { gbool(a,1,n)? } else { false };
                 self.gui.stylesheet_load(&gs(a,0,n)?, beob)?; Value::Nil }
+            "gui_stylesheet_clock" => { let n = "GUI_STYLESHEET_CLOCK";
+                if a.len() != 1 { return Err(format!("{}: erwartet (zeit$)", n)); }
+                self.gui.stylesheet_clock(&gs(a,0,n)?)?; Value::Nil }
             "gui_stylesheet_error$" => { let n = "GUI_STYLESHEET_ERROR$";
                 if !a.is_empty() { return Err(format!("{}: erwartet keine Argumente", n)); }
                 Value::str_rc(&self.gui.stylesheet_error()) }
@@ -1611,6 +1614,28 @@ impl<'p> Vm<'p> {
                 let dauer = if a.len() >= 3 { Some(gi(a,2,n)?) } else { None };
                 let anzahl = if a.len() >= 4 { Some(gi(a,3,n)?) } else { None };
                 self.gui.animate(gi(a,0,n)?, &gs(a,1,n)?, dauer, anzahl)?; Value::Nil }
+            "gui_custom" => { let n = "GUI_CUSTOM";
+                if a.len() < 5 || a.len() > 6 { return Err(format!("{}: erwartet (win, x, y, w, h [, rolle$])", n)); }
+                let rolle = if a.len() == 6 { gs(a,5,n)?.to_string() } else { String::new() };
+                Value::Int(self.gui.custom(gi(a,0,n)?, gi(a,1,n)? as i32, gi(a,2,n)? as i32, gi(a,3,n)? as i32, gi(a,4,n)? as i32, &rolle)?) }
+            "gui_custom_key" => { let n = "GUI_CUSTOM_KEY";
+                if a.len() != 1 { return Err(format!("{}: erwartet (wdg)", n)); }
+                Value::Int(self.gui.custom_key(gi(a,0,n)?)?) }
+            "gui_custom_text$" => { let n = "GUI_CUSTOM_TEXT$";
+                if a.len() != 1 { return Err(format!("{}: erwartet (wdg)", n)); }
+                Value::str_rc(&self.gui.custom_text(gi(a,0,n)?)?) }
+            "gui_window_rtl" => { let n = "GUI_WINDOW_RTL";
+                if a.len() != 2 { return Err(format!("{}: erwartet (win, an)", n)); }
+                self.gui.window_rtl(gi(a,0,n)?, gbool(a,1,n)?)?; Value::Nil }
+            "gui_window_is_rtl" => { let n = "GUI_WINDOW_IS_RTL";
+                if a.len() != 1 { return Err(format!("{}: erwartet (win)", n)); }
+                Value::Bool(self.gui.window_is_rtl(gi(a,0,n)?)?) }
+            "gui_state$" => { let n = "GUI_STATE$";
+                if !a.is_empty() { return Err(format!("{}: erwartet keine Argumente", n)); }
+                Value::str_rc(&self.gui.state_text()) }
+            "gui_gliding" => { let n = "GUI_GLIDING";
+                if a.len() != 1 { return Err(format!("{}: erwartet (wdg)", n)); }
+                Value::Bool(self.gui.gliding(gi(a,0,n)?)?) }
             "gui_animating" => { let n = "GUI_ANIMATING";
                 if a.len() != 1 { return Err(format!("{}: erwartet (wdg)", n)); }
                 Value::Bool(self.gui.animating(gi(a,0,n)?)?) }
@@ -1981,6 +2006,49 @@ impl<'p> Vm<'p> {
                 if let Some(au) = self.audio.as_mut() { let _ = au.play_sound(slot, laut as f64 / 100.0); }
             }
         }
+    }
+
+    /// Nach dem ersten SCREEN: `DHRT_ABSPIELEN` spielt eine Aufnahme ab,
+    /// `DHRT_AUFNEHMEN` nimmt auf (aufnahme.rs). Ein relativer Pfad gilt vom
+    /// Ort des Aufrufers aus (DHRT_START_DIR) -- in einem Fall mit
+    /// `--- programm` laeuft das Programm als Kopie anderswo, die Beilage
+    /// liegt im Fallordner.
+    #[cfg(feature = "graphics")]
+    pub(super) fn aufnahme_beginn(&mut self) -> R<()> {
+        fn pfad(v: &str) -> String {
+            let p = std::path::Path::new(v);
+            if p.is_absolute() { return v.to_string(); }
+            match std::env::var("DHRT_START_DIR") {
+                Ok(d) if !d.is_empty() => std::path::Path::new(&d).join(p).to_string_lossy().to_string(),
+                _ => v.to_string(),
+            }
+        }
+        let g = self.gfx.as_mut().unwrap();
+        if let Ok(v) = std::env::var("DHRT_ABSPIELEN") {
+            if !v.trim().is_empty() { g.automation_play(&pfad(v.trim())).map_err(|e| format!("DHRT_ABSPIELEN: {}", e))?; }
+        }
+        if let Ok(v) = std::env::var("DHRT_AUFNEHMEN") {
+            if !v.trim().is_empty() { g.automation_record(&pfad(v.trim())).map_err(|e| format!("DHRT_AUFNEHMEN: {}", e))?; }
+        }
+        Ok(())
+    }
+    /// Am Ende des Programms: eine laufende Aufnahme schreiben; den Zustand
+    /// der gui ausgeben (`DHRT_GUI_ZUSTAND=1`) bzw. in eine Datei schreiben
+    /// (`DHRT_GUI_ZUSTAND_DATEI`).
+    #[cfg(feature = "graphics")]
+    pub(super) fn aufnahme_ende(&mut self) {
+        if let Some(g) = self.gfx.as_mut() {
+            if g.automation_recording() {
+                if let Err(e) = g.automation_stop() { eprintln!("{}", e); }
+            }
+        }
+        if self.gfx.is_none() { return; }
+        let ausgeben = std::env::var("DHRT_GUI_ZUSTAND").map(|v| v.trim() == "1").unwrap_or(false);
+        let datei = std::env::var("DHRT_GUI_ZUSTAND_DATEI").ok().filter(|v| !v.trim().is_empty());
+        if !ausgeben && datei.is_none() { return; }
+        let text = format!("gui-zustand\n{}\n", self.gui.state_text());
+        if ausgeben { self.out.push_str(&text); self.flush_out(); }
+        if let Some(d) = datei { if let Err(e) = std::fs::write(d.trim(), &text) { eprintln!("DHRT_GUI_ZUSTAND_DATEI: {}", e); } }
     }
 
     /// Audio-Geraet lazy initialisieren (bei erstem Sound-/Musik-Builtin).
