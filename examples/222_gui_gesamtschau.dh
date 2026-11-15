@@ -246,7 +246,7 @@ GUI_WIZARD_ADD_WIDGET(wz, GUI_LABEL(s5, "Geschafft! Der Knopf Fertig beendet den
 
 ' --------------------------------------------------- 6 Lebendig
 DIM s6 AS GUI_WINDOW : s6 = seite("Lebendig")
-DIM pa AS GUI_WIDGET : pa = GUI_PANEL(s6, 30, 30, 220, 150, "schwebt")
+DIM pa AS GUI_WIDGET : pa = GUI_PANEL(s6, 30, 30, 220, 150, "schwebt und wandert")
 DIM pb AS GUI_WIDGET : pb = GUI_PANEL(s6, 280, 30, 220, 150, "pulsiert")
 DIM pc AS GUI_WIDGET : pc = GUI_PANEL(s6, 530, 30, 220, 150, "huepft")
 DIM pd AS GUI_WIDGET : pd = GUI_PANEL(s6, 780, 30, 220, 150, "eigener Ablauf")
@@ -260,7 +260,7 @@ DIM streif AS GUI_WIDGET : streif = GUI_BUTTON(s6, "Lichtstreif", 740, 240, 180,
 GUI_ADD_CLASS(funken, "fest") : GUI_ADD_CLASS(konfetti, "fest") : GUI_ADD_CLASS(sterne, "fest") : GUI_ADD_CLASS(streif, "fest")
 DIM wackel AS GUI_WIDGET : wackel = GUI_TEXTINPUT(s6, 200, 330, 340, 34, "Leer lassen und Pruefen druecken")
 DIM pruef6 AS GUI_WIDGET : pruef6 = GUI_BUTTON(s6, "Pruefen", 560, 330, 160, 34)
-DIM leben6 AS GUI_WIDGET : leben6 = GUI_LABEL(s6, "Jede Bewegung kommt aus der Stildatei (Station 'Stildatei live') oder aus GUI_ANIMATE." + CHR$(10) + "'Bewegung' oben haelt alles an -- auch die Kugeln im Hintergrund.", 32, 420)
+DIM leben6 AS GUI_WIDGET : leben6 = GUI_LABEL(s6, "Jede Bewegung kommt aus der Stildatei (Station 'Stildatei live') oder aus GUI_ANIMATE," + CHR$(10) + "auch der wandernde Farbverlauf. 'Bewegung' oben haelt alles an -- auch die Kugeln im Hintergrund.", 32, 420)
 
 ' --------------------------------------------------- 7 Stildatei live
 DIM s7 AS GUI_WINDOW : s7 = seite("Stildatei live")
@@ -286,14 +286,14 @@ stil = stil + "card { radius: 14; bg: #30FFFFFF; animation: schweben 3400ms }" +
 stil = stil + "#nav { bg: #28FFFFFF; radius: 12 }" + CHR$(10)
 stil = stil + "#k2 { animation: schweben 3900ms }" + CHR$(10)
 stil = stil + "#k3 { animation: schweben 4400ms }" + CHR$(10)
-stil = stil + "button.los { form: pille; bg: #E0457B; groesse: 22; animation: puls 1500ms; effekt: konfetti; klang: erfolg }" + CHR$(10)
+stil = stil + "button.los { form: pille; bg: #E0457B; farbverlauf: #FF6F91 #FF9671 #F9C74F #FF6F91 0 wandert 4s; groesse: 22; animation: puls 1500ms; effekt: konfetti; klang: erfolg }" + CHR$(10)
 stil = stil + "#emoji { groesse: 34 }" + CHR$(10)
 stil = stil + "#emojigross { groesse: 30 }" + CHR$(10)
 stil = stil + "#schriften { groesse: 20 }" + CHR$(10)
 stil = stil + "#kreis { bg: #6C3483; animation: drehen 6000ms }" + CHR$(10)
 stil = stil + "#raute { bg: #1E8449 }" + CHR$(10)
 stil = stil + "#raute:hover { animation: wackeln 400ms einmal }" + CHR$(10)
-stil = stil + "#pa { bg: #3A2E6E; radius: 16; animation: schweben 2400ms }" + CHR$(10)
+stil = stil + "#pa { bg: #3A2E6E; farbverlauf: #3A2E6E #845EC2 #2C73D2 #00C9A7 45 wandert 5s; radius: 16; animation: schweben 2400ms }" + CHR$(10)
 stil = stil + "#pb { bg: #6E2E4A; radius: 16; animation: puls 1200ms }" + CHR$(10)
 stil = stil + "#pc { bg: #2E6E5A; radius: 16; animation: huepfen 1600ms }" + CHR$(10)
 stil = stil + "#pd { bg: #6E5A2E; radius: 16; animation: kreisen 3000ms }" + CHR$(10)
