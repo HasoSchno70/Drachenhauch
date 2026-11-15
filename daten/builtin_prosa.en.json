@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/en und dem englischen Buch von `dhrt doku prosa` -- NICHT von Hand aendern. Der Hover nimmt sie mit DHRT_LANG=en.",
- "count": 2456,
+ "count": 2457,
  "docs": {
   "ABS": "Absolute value.",
   "ACOS": "Arc sine/cosine (x in [-1, 1])",
@@ -1002,6 +1002,7 @@
   "GUI_TABLE_FILTER": "set a filter (empty text = no filter)",
   "GUI_TABLE_GET": "FLOAT — read one of these settings back",
   "GUI_TABLE_GET_CELL": "read cell content",
+  "GUI_TABLE_GET_COL_WIDTHS": "ARRAY OF INTEGER the widths in effect (own or distributed), per data column",
   "GUI_TABLE_GET_FILTER": "read the filter that is set",
   "GUI_TABLE_GET_VALUE": "check mark (0/1) or bar (0..1)",
   "GUI_TABLE_HEADERS": "set the column titles (1D ARRAY OF STRING)",
@@ -1194,7 +1195,7 @@
   "GUI_WINDOW_NATIVE": "BOOLEAN — the window as a real OS window (own title bar, taskbar, second monitor) or back into the main window; FALSE with an means: fallback, it stays a gui window",
   "GUI_WINDOW_NATIVE_SCALE": "FLOAT — how much larger the native window is drawn on its screen than in the main window (its screen's pixel density divided by the main window's); 1.0 in the main window",
   "GUI_WINDOW_RESIZABLE": "resizable by the lower-right grip (default: off)",
-  "GUI_WINDOW_RTL": "the whole window right to left: the position of every widget mirrored at the window's width, the menu bar and the toolbar start on the right, check boxes, radio buttons and switches carry their mark to the right of the text, a slider grows to the left (dragging and arrow keys too), a text field without GUI_SET_ALIGN is right-aligned. The program keeps setting and reading its positions from the …",
+  "GUI_WINDOW_RTL": "the whole window right to left: the position of every widget mirrored at the window's width, the menu bar and the toolbar start on the right, check boxes, radio buttons and switches carry their mark to the right of the text, a slider grows to the left (dragging and arrow keys too), a text field or text area without GUI_SET_ALIGN is right-aligned, a table starts with its first column on the right …",
   "GUI_WINDOW_SCROLLABLE": "content scrolls when it is taller than the window (mouse wheel + scroll bar). Content height determined automatically from the widgets. Default: off",
   "GUI_WINDOW_SET_BOUNDS": "move/resize/read a window",
   "GUI_WINDOW_SET_MAX_SIZE": "maximum size when resizing (0 = none)",

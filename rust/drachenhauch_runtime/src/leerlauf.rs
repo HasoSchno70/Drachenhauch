@@ -171,13 +171,13 @@ pub fn einhaengen() {
         let f = glfwGetCurrentContext();
         if f.is_null() { return; }
         let a = glfwSetCursorPosCallback(f, Some(r_lage)).map(|x| x as usize).unwrap_or(0);
-        merken(&V_LAGE, a, r_lage as usize);
+        merken(&V_LAGE, a, r_lage as *const () as usize);
         let a = glfwSetScrollCallback(f, Some(r_rad)).map(|x| x as usize).unwrap_or(0);
-        merken(&V_RAD, a, r_rad as usize);
+        merken(&V_RAD, a, r_rad as *const () as usize);
         let a = glfwSetCharCallback(f, Some(r_zeichen)).map(|x| x as usize).unwrap_or(0);
-        merken(&V_ZEICHEN, a, r_zeichen as usize);
+        merken(&V_ZEICHEN, a, r_zeichen as *const () as usize);
         let a = glfwSetDropCallback(f, Some(r_ablage)).map(|x| x as usize).unwrap_or(0);
-        merken(&V_ABLAGE, a, r_ablage as usize);
+        merken(&V_ABLAGE, a, r_ablage as *const () as usize);
     }
 }
 

@@ -1517,7 +1517,7 @@ GUI_WINDOW_CONTENT_*: ungueltiges GUI_WINDOW-Handle	GUI_WINDOW_CONTENT_*: invali
 GUI_WINDOW_WIDGET_COUNT: ungueltiges GUI_WINDOW-Handle	GUI_WINDOW_WIDGET_COUNT: invalid GUI_WINDOW handle
 GUI_WINDOW_WIDGET: ungueltiges GUI_WINDOW-Handle	GUI_WINDOW_WIDGET: invalid GUI_WINDOW handle
 GUI_SET_ALIGN: '{}' unbekannt -- links, mitte oder rechts	GUI_SET_ALIGN: '{}' unknown -- links, mitte or rechts
-GUI_SET_ALIGN: nur Beschriftung, Knopf und Textfeld haben eine Ausrichtung	GUI_SET_ALIGN: only labels, buttons and text fields have an alignment
+GUI_SET_ALIGN: nur Beschriftung, Knopf, Textfeld und Textbereich haben eine Ausrichtung	GUI_SET_ALIGN: only labels, buttons, text fields and text areas have an alignment
 GUI_SET_WRAP: breite muss >= 0 sein (0 = aus)	GUI_SET_WRAP: width must be >= 0 (0 = off)
 GUI_SET_WRAP: nur eine Beschriftung (GUI_LABEL) kann umbrechen	GUI_SET_WRAP: only a label (GUI_LABEL) can wrap
 GUI_TEXTINPUT_SET: das Widget ist kein GUI_TEXTINPUT	GUI_TEXTINPUT_SET: the widget is not a GUI_TEXTINPUT

@@ -76,7 +76,7 @@ DHRT_FRAMES=1
 --- erwartet
 TRUE
 GUI_SET_ALIGN: 'oben' unbekannt -- links, mitte oder rechts
-GUI_SET_ALIGN: nur Beschriftung, Knopf und Textfeld haben eine Ausrichtung
+GUI_SET_ALIGN: nur Beschriftung, Knopf, Textfeld und Textbereich haben eine Ausrichtung
 
 === einfuegen ueber die zwischenablage geht ueberhaupt
 ' Die Gegenprobe fuer alles Weitere: ohne Filter kommt an, was in der
