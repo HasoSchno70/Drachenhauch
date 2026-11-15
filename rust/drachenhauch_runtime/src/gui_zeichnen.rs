@@ -699,6 +699,36 @@ impl Gui {
         true
     }
 
+    /// Ein Regler mit Haut: die Rinne ueber das ganze Rechteck (9-Slice mit
+    /// `bildrand`), der Griff quadratisch (so hoch bzw. breit wie der
+    /// Regler) an der Stelle des Werts. Fehlt eine der beiden Haeute, kommt
+    /// dort die gewohnte Form. FALSE = keine Haut.
+    #[allow(clippy::too_many_arguments)]
+    fn reglerhaut(&self, g: &mut Graphics, wi: usize, idx: usize, wdg: &Widget, ax: i32, ay: i32, w: i32, h: i32) -> bool {
+        let gedrueckt = self.press_origin == Some((wi, idx));
+        let rinne = self.w_bild(wdg, gedrueckt);
+        let griff = self.w_griff(wdg, gedrueckt);
+        if rinne.is_none() && griff.is_none() { return false; }
+        let span = wdg.max - wdg.min;
+        let ratio = if span != 0.0 { ((wdg.value - wdg.min) / span).clamp(0.0, 1.0) } else { 0.0 };
+        let gezeichnet = rinne.map(|(p, r)| self.haut_zeichnen(g, &p, r, ax, ay, w, h)).unwrap_or(false);
+        if !gezeichnet {
+            if wdg.vert { g.box_fill(ax + w / 2 - 1, ay, ax + w / 2 + 1, ay + h - 1, self.wcol(wdg, "bg", "widget_bg")); }
+            else { g.box_fill(ax, ay + h / 2 - 1, ax + w - 1, ay + h / 2 + 1, self.wcol(wdg, "bg", "widget_bg")); }
+        }
+        let (gx, gy, gs) = if wdg.vert {
+            let gs = w;
+            (ax, ay + ((1.0 - ratio) * (h - gs) as f64) as i32, gs)
+        } else {
+            let gs = h;
+            (ax + (ratio * (w - gs) as f64) as i32, ay, gs)
+        };
+        let griff_da = griff.map(|p| self.haut_zeichnen(g, &p, 0, gx, gy, gs, gs)).unwrap_or(false);
+        if !griff_da { self.knauf(g, gx + gs / 2, gy + gs / 2, (gs / 2).max(5), self.griff_farbe(wdg)); }
+        self.regler_marken_zeichnen(g, wdg, ax, ay, w, h);
+        true
+    }
+
     pub(super) fn draw_widget(&self, g: &mut Graphics, wi: usize, idx: usize, wdg: &Widget) {
         // Die Rundung aus der Stildatei gilt fuer jede Flaeche dieses Widgets.
         let vorher = self.rad_jetzt.replace(self.w_radius(wdg));
@@ -994,6 +1024,8 @@ impl Gui {
                 self.wtext_mn(g, wdg, ax + w + pad, ay, &wdg.text, self.txt_col(wdg));
             }
             Kind::Slider if wdg.vert => self.draw_vslider(g, wdg, ax, ay, w, h),
+            // Regler mit Bildhaut: Rinne (`bild`) und Griff (`griff`).
+            Kind::Slider if self.reglerhaut(g, wi, idx, wdg, ax, ay, w, h) => {}
             Kind::Slider => {
                 let handle_w = self.m("slider_handle_w");
                 let span = wdg.max - wdg.min;

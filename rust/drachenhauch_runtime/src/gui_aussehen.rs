@@ -240,6 +240,17 @@ impl Gui {
         schicht(stil::BASIS)
     }
 
+    /// Die Haut des Griffs eines Reglers fuer den jetzigen Zustand (wie
+    /// `w_bild`).
+    pub(super) fn w_griff(&self, w: &Widget, gedrueckt: bool) -> Option<String> {
+        let s = w.stil_auf.as_ref()?;
+        let schicht = |k: usize| s[k].griff.clone();
+        if !w.enabled { if let Some(b) = schicht(stil::AUS) { return Some(b); } }
+        if gedrueckt { if let Some(b) = schicht(stil::AKTIV) { return Some(b); } }
+        if w.hovered || w.ueber_t > 0.5 { if let Some(b) = schicht(stil::HOVER) { return Some(b); } }
+        schicht(stil::BASIS)
+    }
+
     /// Die Animation der Stildatei fuer den jetzigen Zustand.
     fn w_stil_anim(&self, w: &Widget, gedrueckt: bool) -> Option<AnimStil> {
         let s = w.stil_auf.as_ref()?;
@@ -302,7 +313,7 @@ impl Gui {
                 for w in &win.widgets {
                     let Some(s) = w.stil_auf.as_ref() else { continue };
                     for schicht in s.iter() {
-                        if let Some(p) = schicht.bild.as_ref() {
+                        for p in [schicht.bild.as_ref(), schicht.griff.as_ref()].into_iter().flatten() {
                             if !self.haeute.contains_key(p) && !fehlt.contains(p) { fehlt.push(p.clone()); }
                         }
                     }

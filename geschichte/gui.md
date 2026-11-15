@@ -1236,3 +1236,10 @@ am Zeilenende der Erwartung ab, die Ausgabe nicht.
   Druck und Popup gemeinsam fragen. Das Innere der Widgets (Kaestchen
   links vom Text, Reglerrichtung, Werkzeugleiste, Textausrichtung im
   Feld) bleibt fuer eine zweite Stufe.
+
+## Offene Punkte nach den Restpunkten (2026-11-15)
+
+- **Regler mit Haut**: `bild` ist die Rinne, neu `griff` der Griff
+  (`reglerhaut`, ein Arm vor dem gewohnten Regler). Die Ladeschleife der
+  Haeute nimmt jetzt auch `griff` -- die Gegenprobe ohne das zeigte den
+  gewohnten Knauf statt des Bildes.

@@ -45,7 +45,7 @@ pub(super) const FOKUS: usize = 2;
 pub(super) const AKTIV: usize = 3;
 pub(super) const AUS: usize = 4;
 
-const EIGENSCHAFTEN: &str = "bg, fg, border, accent, radius, groesse, stil, abstand, randbreite, schatten, verlauf, glanz, fase, uebergang (auch je Farbe: uebergang: 120, bg 400), form, bild, bildrand, animation, klang, effekt, gleiten, unschaerfe";
+const EIGENSCHAFTEN: &str = "bg, fg, border, accent, radius, groesse, stil, abstand, randbreite, schatten, verlauf, glanz, fase, uebergang (auch je Farbe: uebergang: 120, bg 400), form, bild, bildrand, animation, klang, effekt, gleiten, unschaerfe, griff";
 const ZUSTAENDE: &str = ":hover, :focus, :active, :disabled, :checked";
 
 /// Eine Farbe aus der Stildatei: fest oder ein Name des Themas (dann folgt
@@ -86,6 +86,8 @@ pub(super) struct StilWerte {
     pub(super) gleiten: Option<i32>,
     /// Glas: was hinter dem Widget liegt, unscharf (Radius in Punkten).
     pub(super) unschaerfe: Option<i32>,
+    /// Bildhaut des Griffs eines Reglers (Rinne: `bild`).
+    pub(super) griff: Option<String>,
 }
 
 /// Die Farbrollen, die eine eigene Dauer haben koennen -- ihre Stelle ist
@@ -176,6 +178,7 @@ impl StilWerte {
         if let Some(e) = self.effekt { t.push(format!("effekt {}", super::effekte::EFFEKTE.get(e as usize).unwrap_or(&"?"))); }
         if let Some(v) = self.gleiten { t.push(format!("gleiten {}ms", v)); }
         if let Some(v) = self.unschaerfe { t.push(format!("unschaerfe {}", v)); }
+        if let Some(v) = &self.griff { t.push(format!("griff {}", v.replacen('|', " ", 1).replacen('|', " ", 1))); }
         t.join(", ")
     }
 
@@ -211,6 +214,7 @@ impl StilWerte {
         if o.effekt.is_some() { self.effekt = o.effekt; }
         if o.gleiten.is_some() { self.gleiten = o.gleiten; }
         if o.unschaerfe.is_some() { self.unschaerfe = o.unschaerfe; }
+        if o.griff.is_some() { self.griff = o.griff.clone(); }
     }
 }
 
@@ -603,6 +607,7 @@ pub(super) fn lesen(text: &str, thema: &dyn Fn(&str) -> bool) -> Result<Stildate
                     werte.form = Some(n as u8);
                 }
                 "bild" | "image" => werte.bild = super::aussehen::bild_lesen(wert, zeile)?,
+                "griff" | "handle-image" => werte.griff = super::aussehen::bild_lesen(wert, zeile)?,
                 "bildrand" | "image-border" => werte.bildrand = Some(zahl_lesen_stil(wert, zeile, "bildrand", 0, 200)?),
                 "animation" => werte.animation = Some(super::aussehen::anim_lesen(wert, zeile, &ablauf_namen)?),
                 "unschaerfe" | "blur" => werte.unschaerfe = Some(zahl_lesen_stil(wert, zeile, "unschaerfe", 0, 40)?),
