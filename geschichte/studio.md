@@ -558,3 +558,16 @@ Inspektor auch fuer Bilder. Test "bildspalten" in
 breites Bild fuellt, NULL/kaputt leer); vier Verfaelschungen fallen, der
 weggenommene `imgfx`-Import im erzeugten Code ist gleichwertig (das
 Datenbank-Element importiert es schon).
+- **Leerlauf fuer Programme aus dem Studio (2026-11-15).** `StudioApp.Leerlauf`
+  (aus per Vorgabe, weil `Takt` sonst nicht mehr je Bild laeuft und
+  Programme sich darauf verlassen): `studioMalen` setzt vor FLIP
+  `WINDOW_WAIT_EVENTS`, hoechstens 1 s, hoechstens bis zum naechsten Timer
+  (`studioWecken`). Ein Timer meldet seine Frist an drei Stellen -- beim
+  Starten, solange er wartet, und nach dem Feuern; fehlte die letzte,
+  tickte ein Timer von 0,3 s in 1,65 s nur dreimal statt fuenfmal. Die
+  Stelle "beim Starten" blieb in der Gegenprobe zuerst gruen: gleich nach
+  dem Start zeichnet die gui ohnehin ohne Pause -- der Fall startet den
+  Timer darum erst, wenn das Programm schon schlaeft. Die globale Variable
+  heisst `studioLaufApp`, weil das erzeugte main.dh schon `studioDieApp`
+  anlegt.
+

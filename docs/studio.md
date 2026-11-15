@@ -249,6 +249,23 @@ ihn, der Inspektor zeigt Name, Intervall, „Läuft beim Start“ und
 ist er ein Feld der Fensterklasse mit `Intervall`, `Aktiv`, `Wiederholen`,
 `Starten()` und `Stoppen()`.
 
+**Schlafen, solange nichts passiert.** Ein Programm zeichnet sonst sechzig
+Bilder je Sekunde, auch wenn niemand etwas tut. Mit einer Zeile in
+`App.Geoeffnet` schläft es zwischen zwei Eingaben:
+
+```basic
+SUB Geoeffnet()
+    Self.Leerlauf = TRUE
+END SUB
+```
+
+Es zeichnet dann nach jeder Eingabe, wenn ein Timer fällig ist und wenn
+die Oberfläche es braucht (Schreibmarke, Hilfetext, Animation), sonst
+höchstens einmal je Sekunde -- am Laptop spart das Akku. `Takt` läuft dann
+nicht mehr in jedem Bild: Wer dort etwas nach der Uhr tut (eine Anzeige
+auffrischen, ein Gerät abfragen), nimmt dafür einen Timer. Mehr dazu:
+`WINDOW_WAIT_EVENTS` im [Handbuch der gui](module-gui.md).
+
 **Menüs.** Projekt → Menüs des Fensters (Strg+Umschalt+U) öffnet den
 Menü-Editor: links der Baum, rechts Text, Name und Kürzel (`Strg+S`, `F5`
 ...), dazu „Mit Haken“. Ein neuer Eintrag bekommt einen Namen aus seinem

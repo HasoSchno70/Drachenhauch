@@ -1337,4 +1337,20 @@ am Zeilenende der Erwartung ab, die Ausgabe nicht.
   (0x2A7DE1) lag als Schrift bei 4,0:1 -> 0x1D6DCE. Ein Knopf nur mit
   Sinnbild hiess fuer den Bildschirmleser "Knopf" (der Hilfetext war nur
   Beschreibung) -- jetzt ist er sein Name. Der Inspektor nennt die Befunde.
+- **Farb-Emoji, RTL innen, Tab-Reihenfolge (2026-11-15).** Emoji liefen
+  ueber die Ausweich-Schriften und raylibs Atlas -- einfarbig. Jetzt gehen
+  Emoji-Laeufe durch die Formung (`formen_noetig`), und `glyph_textur`
+  malt eine Farbglyphe als RGBA (farbglyphe.rs: Painter fuer COLR v0/v1 auf
+  dem Rasterer der Formung, Bitmaps aus sbix/CBDT ueber raylibs PNG);
+  gezeichnet wird sie ungetoent. Fund: die gui-Schrift (DejaVu Sans) hat
+  😀 selbst als Umriss und backte es aus der eigenen Datei -- Emoji ab
+  U+1F000 fragen jetzt nicht die eigene Datei (`farb_emoji`). Eine zweite
+  Stelle (Bevorzugung in `text_laeufe`) blieb in der Gegenprobe gruen, weil
+  die erste sie ueberfluessig machte -- wieder herausgenommen. Im
+  gespiegelten Fenster stehen jetzt auch Textbereiche (`ta_versatz`, eine
+  Quelle fuer elf Stellen), Baeume (Spiegeln beim Setzen, Treffer mit
+  gespiegelter Maus) und Tabellen (`col_x`/`col_clip`/`edge_at` um die Mitte
+  des Rumpfs) rechts; GUI_SET_ALIGN gilt fuer Textbereiche,
+  GUI_TABLE_GET_COL_WIDTHS ist die fehlende Abfrage. GUI_A11Y_CHECK$ kennt
+  die Tab-Reihenfolge (Spruenge zurueck, spaltenweise Formulare erlaubt).
 

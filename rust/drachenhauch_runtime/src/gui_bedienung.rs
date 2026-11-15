@@ -829,6 +829,8 @@ impl Gui {
                 }
             }
             Kind::Tree => {
+                // Gespiegelt zeigt "auf" nach links: die Pfeile tauschen.
+                let (links, rechts) = if self.windows[wi].rtl { (rechts, links) } else { (links, rechts) };
                 let (vis, sel, hat_kinder, offen, eltern) = {
                     let t = match self.windows[wi].widgets[i].tree.as_ref() {
                         Some(t) => t, None => return,

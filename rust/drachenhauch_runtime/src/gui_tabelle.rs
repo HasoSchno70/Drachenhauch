@@ -79,6 +79,20 @@ impl Gui {
         Ok(())
     }
 
+    /// GUI_TABLE_GET_COL_WIDTHS(tbl): die Breiten, die gerade gelten -- die
+    /// eigenen oder die verteilten, in Reihenfolge der DATENspalten und in
+    /// logischen Punkten (wie GUI_TABLE_COL_WIDTHS sie nimmt).
+    pub fn table_get_col_widths(&self, h: i64) -> Result<Vec<i64>, String> {
+        self.tbl_ref(h, "GUI_TABLE_GET_COL_WIDTHS")?;
+        let (wi, i) = Self::dec_widget(h);
+        let gm = self.table_geom(wi, i);
+        let mut roh = vec![0i64; gm.n_cols];
+        for (p, &c) in gm.order.iter().enumerate() {
+            if c < roh.len() && p < gm.col_widths.len() { roh[c] = self.unsk(gm.col_widths[p]) as i64; }
+        }
+        Ok(roh)
+    }
+
     // --- Zellen einzeln ------------------------------------------------------
 
     /// Zeile/Spalte pruefen und melden, WELCHE Angabe daneben lag -- ein blosses

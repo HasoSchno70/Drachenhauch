@@ -316,6 +316,7 @@ IMPORT "gui"
 | `GUI_TABLE_HEADERS(tbl, headers)` | — | set the column titles (1D ARRAY OF STRING) |
 | `GUI_TABLE_ROWS(tbl, cells)` | — | set the data rows (2D ARRAY OF STRING) |
 | `GUI_TABLE_COL_WIDTHS(tbl, widths)` | — | column widths (1D ARRAY OF INTEGER; NIL = auto) |
+| `GUI_TABLE_GET_COL_WIDTHS(tbl)` | ARRAY OF INTEGER | the widths in effect (own or distributed), per data column |
 | `GUI_TABLE_SELECTED(tbl)` | INTEGER | selected row (-1 if none) |
 | `GUI_TABLE_SET_SELECTED(tbl, row)` | — | set the selection (-1 = none) |
 | `GUI_TABLE_CLICKED(tbl)` | INTEGER | row clicked in this frame (-1) |
@@ -2771,7 +2772,9 @@ WEND
 What the program itself does by the clock (an animation of its own,
 reading data from a process or the network) only wakes its own limit: then
 set `WINDOW_WAIT_EVENTS` shorter or switch it off with `0` for that time.
-IDE and Studio sleep like this while no program runs.
+IDE and Studio sleep like this while no program runs; a program from the
+Studio with `Self.Leerlauf = TRUE` in `App.Geoeffnet` (timers wake it in
+time).
 
 ## Callbacks: GUI_ON_CLICK
 
@@ -3831,6 +3834,10 @@ hand -- with the same colours and positions the gui draws:
   icon is called like its tooltip for the reader.
 - **Targets too small**: below 24 × 24 points only if a circle of 24 points
   around the centre touches no other target (WCAG 2.5.8).
+- **Tab jumps back**: upwards without starting a new column to the right,
+  or within the same row against the reading direction (from the right in a
+  mirrored window). The widget Tab jumps to gets the finding;
+  `GUI_SET_TAB_INDEX` puts the order right (WCAG 2.4.3).
 
 ```basic
 IMPORT "gui"
@@ -4518,7 +4525,7 @@ typed.
 | Command | What it does |
 |---|---|
 | `TEXT_VISUAL$(text$ [, direction$])` | The text as it is displayed -- for your own output such as files or images. `direction$` = `auto` (default), `ltr` or `rtl` |
-| `GUI_WINDOW_RTL(win, an)` | the whole window right to left: the position of every widget mirrored at the window's width, the menu bar and the toolbar start on the right, check boxes, radio buttons and switches carry their mark to the right of the text, a slider grows to the left (dragging and arrow keys too), a text field without `GUI_SET_ALIGN` is right-aligned. The program keeps setting and reading its positions from the left (`GUI_GET_X`); drawing, clicks and `GUI_HIT_TEST` go through the mirrored one |
+| `GUI_WINDOW_RTL(win, an)` | the whole window right to left: the position of every widget mirrored at the window's width, the menu bar and the toolbar start on the right, check boxes, radio buttons and switches carry their mark to the right of the text, a slider grows to the left (dragging and arrow keys too), a text field or text area without `GUI_SET_ALIGN` is right-aligned, a table starts with its first column on the right (the edge to drag lies on the left), a tree indents from the right (the left arrow expands). The program keeps setting and reading its positions from the left (`GUI_GET_X`); drawing, clicks and `GUI_HIT_TEST` go through the mirrored one |
 | `GUI_WINDOW_IS_RTL(win)` | is the window right to left? |
 
 Indic and Southeast Asian scripts and the ligatures of a font are set by
@@ -4526,9 +4533,9 @@ text shaping ([builtins-grafik.md](builtins-grafik.md#text-shaping-indic-scripts
 What does not work (yet): alignment does not follow direction --
 a right-to-left line stays on the left unless `GUI_SET_ALIGN` says
 otherwise (in a mirrored window a single-line text field is right-aligned
-by itself); in a mirrored window (`GUI_WINDOW_RTL`) text areas, tables and trees
-keep their inside as it is (text left-aligned, columns and indentation from
-the left); in such a line of a text area bold, italic and underline are
+by itself); in a mirrored window (`GUI_WINDOW_RTL`) text areas are
+right-aligned as well, tables have their first column on the right and trees
+indent from the right; in such a line of a text area bold, italic and underline are
 dropped (the colours of the highlighting stay); end-of-line hints and
 colour swatches still use the logical position. The pdf module does not
 reorder -- use `TEXT_VISUAL$` before `PDF_TEXT` there.

@@ -523,9 +523,17 @@ any message. The runtime now extracts the first font of the collection (the
 CJK fonts of Windows all exist only in this form). A file that still does not
 yield a font is an error.
 
-**Limits:** emoji come out in one colour (raylib does not rasterize colour
-fonts). Whoever wants a particular glyph form (Japanese instead of Chinese
-forms) loads their font themselves. Hebrew and Arabic run from right to
+**Emoji in colour.** Emoji come in their colours, in `TEXT` as in the gui:
+the runtime draws the colour glyphs of the emoji font itself (COLR for
+Segoe UI Emoji, bitmaps for Apple Color Emoji and Noto Color Emoji).
+Sequences with a joiner, skin tones and keycaps are put together into one
+character by text shaping (👍🏽 is a thumb in a skin tone, not two
+characters). The text colour does not apply to emoji, only its opacity.
+Flags are missing from Segoe UI Emoji -- on Windows the two letters appear
+there.
+
+**Limits:** whoever wants a particular glyph form (Japanese instead of
+Chinese forms) loads their font themselves. Hebrew and Arabic run from right to
 left, Arabic joined ([module-gui.md](module-gui.md#right-to-left)).
 
 ### Text shaping: Indic scripts and ligatures

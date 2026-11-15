@@ -316,6 +316,7 @@ IMPORT "gui"
 | `GUI_TABLE_HEADERS(tbl, headers)` | — | Spaltentitel setzen (1D ARRAY OF STRING) |
 | `GUI_TABLE_ROWS(tbl, cells)` | — | Datenzeilen setzen (2D ARRAY OF STRING) |
 | `GUI_TABLE_COL_WIDTHS(tbl, widths)` | — | Spaltenbreiten (1D ARRAY OF INTEGER; NIL = Auto) |
+| `GUI_TABLE_GET_COL_WIDTHS(tbl)` | ARRAY OF INTEGER | die Breiten, die gerade gelten (eigene oder verteilte), je Datenspalte |
 | `GUI_TABLE_SELECTED(tbl)` | INTEGER | selektierte Zeile (-1 wenn keine) |
 | `GUI_TABLE_SET_SELECTED(tbl, row)` | — | Selektion setzen (-1 = keine) |
 | `GUI_TABLE_CLICKED(tbl)` | INTEGER | in diesem Frame geklickte Zeile (-1) |
@@ -2788,7 +2789,9 @@ WEND
 Was das Programm selbst nach der Uhr tut (eine eigene Animation, Daten aus
 einem Prozess oder dem Netz lesen), weckt nur seine eigene Grenze: dann
 `WINDOW_WAIT_EVENTS` kürzer setzen oder für diese Zeit mit `0` ausschalten.
-IDE und Studio schlafen so, solange kein Programm läuft.
+IDE und Studio schlafen so, solange kein Programm läuft; ein Programm aus
+dem Studio mit `Self.Leerlauf = TRUE` in `App.Geoeffnet` (Timer wecken es
+rechtzeitig).
 
 ## Callbacks: GUI_ON_CLICK
 
@@ -3854,6 +3857,10 @@ schwer macht -- mit denselben Farben und Lagen, die die gui zeichnet:
   Sinnbild heißt für den Leser wie sein Hilfetext.
 - **Zu kleine Ziele**: unter 24 × 24 Punkten nur, wenn ein Kreis von 24
   Punkten um die Mitte kein anderes Ziel berührt (WCAG 2.5.8).
+- **Tab springt zurück**: nach oben, ohne eine neue Spalte rechts zu
+  beginnen, oder in derselben Zeile gegen die Leserichtung (im gespiegelten
+  Fenster von rechts). Den Befund bekommt das Widget, zu dem Tab springt;
+  `GUI_SET_TAB_INDEX` stellt die Reihenfolge richtig (WCAG 2.4.3).
 
 ```basic
 IMPORT "gui"
@@ -4539,7 +4546,7 @@ Reihenfolge, in der er getippt wurde.
 | Befehl | Was er tut |
 |---|---|
 | `TEXT_VISUAL$(text$ [, richtung$])` | Der Text so, wie er dasteht -- für eigene Ausgaben wie Dateien oder Bilder. `richtung$` = `auto` (Vorgabe), `ltr` oder `rtl` |
-| `GUI_WINDOW_RTL(win, an)` | das ganze Fenster von rechts nach links: die Lage jedes Widgets gespiegelt an der Breite des Fensters, die Menüleiste und die Werkzeugleiste beginnen rechts, Kästchen, Optionen und Schalter tragen ihr Kennzeichen rechts vom Text, ein Regler wächst nach links (Ziehen und Pfeiltasten auch), ein Textfeld ohne `GUI_SET_ALIGN` steht rechtsbündig. Das Programm setzt und liest seine Lagen weiter von links (`GUI_GET_X`); Zeichnen, Klick und `GUI_HIT_TEST` gehen über die gespiegelte |
+| `GUI_WINDOW_RTL(win, an)` | das ganze Fenster von rechts nach links: die Lage jedes Widgets gespiegelt an der Breite des Fensters, die Menüleiste und die Werkzeugleiste beginnen rechts, Kästchen, Optionen und Schalter tragen ihr Kennzeichen rechts vom Text, ein Regler wächst nach links (Ziehen und Pfeiltasten auch), ein Textfeld oder Textbereich ohne `GUI_SET_ALIGN` steht rechtsbündig, eine Tabelle beginnt mit der ersten Spalte rechts (die Kante zum Ziehen liegt links), ein Baum rückt von rechts ein (der Pfeil nach links klappt auf). Das Programm setzt und liest seine Lagen weiter von links (`GUI_GET_X`); Zeichnen, Klick und `GUI_HIT_TEST` gehen über die gespiegelte |
 | `GUI_WINDOW_IS_RTL(win)` | steht das Fenster von rechts nach links? |
 
 Indische und südostasiatische Schriften und die Ligaturen einer Schrift
@@ -4548,8 +4555,8 @@ Was (noch) nicht geht: die Ausrichtung folgt nicht der
 Richtung -- eine Zeile von rechts nach links steht links, solange
 `GUI_SET_ALIGN` nichts anderes sagt (im gespiegelten Fenster steht ein
 einzeiliges Textfeld von selbst rechts); in einem gespiegelten Fenster
-(`GUI_WINDOW_RTL`) bleiben Textbereiche, Tabellen und Bäume innen, wie sie
-sind (Text linksbündig, Spalten und Einrückung von links); in einer solchen Zeile eines
+(`GUI_WINDOW_RTL`) stehen auch Textbereiche rechtsbündig, Tabellen mit der
+ersten Spalte rechts und Bäume mit Einrückung von rechts; in einer solchen Zeile eines
 Textbereichs fallen Fett, Kursiv und Unterstrichen weg (die Farben der
 Einfärbung bleiben); Hinweise am Zeilenende und Farbfelder rechnen weiter
 mit der logischen Lage. Das pdf-Modul ordnet nicht -- dort hilft

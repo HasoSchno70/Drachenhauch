@@ -1376,6 +1376,25 @@ impl Gui {
     }
 
     /// Breite, auf die ein Textbereich umbricht (0 = kein Umbruch).
+    /// Sichtbare Breite fuer den Text eines Textbereichs (ohne Rand,
+    /// Nummernspalte und Rollbalken) -- gegen sie richtet `ta_versatz` aus.
+    pub(super) fn ta_innen(&self, g: &Graphics, wdg: &Widget, zeilen: usize) -> i32 {
+        let gutter = self.ta_gutter(g, wdg, zeilen);
+        (wdg.w - 2 * 5 - gutter - self.sk(8)).max(self.sk(20))
+    }
+
+    /// Wie weit eine Zeile des Textbereichs nach rechts rueckt: rechts
+    /// (GUI_SET_ALIGN "rechts", im gespiegelten Fenster ohne eigene
+    /// Ausrichtung) um den freien Platz, mittig um die Haelfte. EINE Quelle
+    /// fuer Zeichnen, Schreibmarke, Auswahl, Treffer und Eingabemethode;
+    /// eine Zeile, die breiter ist als das Feld, beginnt links und rollt.
+    pub(super) fn ta_versatz(&self, g: &Graphics, wi: usize, wdg: &Widget, zeile: &[char], innen: i32) -> i32 {
+        let a = self.ti_ausrichtung(wi, wdg);
+        if a != 1 && a != 2 { return 0; }
+        let frei = (innen - self.zeilen_x(g, wdg, zeile, zeile.len())).max(0);
+        if a == 1 { frei / 2 } else { frei }
+    }
+
     pub(super) fn ta_breite(&self, g: &Graphics, wdg: &Widget, zeilen: usize) -> i32 {
         if !wdg.umbruch { return 0; }
         let gutter = self.ta_gutter(g, wdg, zeilen);
@@ -1562,7 +1581,7 @@ impl Gui {
     /// je (Zeile ab 0, x, y, b, h) -- EINE Quelle fuer Zeichnen, Klick und
     /// Zeiger. Ein Hinweis steht an der LETZTEN sichtbaren Reihe seiner Zeile
     /// (bei Umbruch), hinter dem Text und hinter der Faltmarke.
-    pub(super) fn ta_hinweis_rects(&self, g: &Graphics, wdg: &Widget, ax: i32, ay: i32, chars: &[char],
+    pub(super) fn ta_hinweis_rects(&self, g: &Graphics, wi: usize, wdg: &Widget, ax: i32, ay: i32, chars: &[char],
                         starts: &[usize], rows: &[(usize, usize, usize)], sicht: i32)
                         -> Vec<(usize, i32, i32, i32, i32)> {
         let mut v = Vec::new();
@@ -1580,6 +1599,7 @@ impl Gui {
             let Some((_, txt)) = wdg.hinweise.iter().find(|(z, _)| *z == li) else { continue };
             let zeile: String = chars[rs..re].iter().collect();
             let breite = self.wtext_width(g, wdg, &zeile);
+            let tx0 = tx0 + self.ta_versatz(g, wi, wdg, &chars[rs..re], self.ta_innen(g, wdg, starts.len()));
             let mut ende_x = tx0 + breite;
             if let Some(&(_, b)) = wdg.gefaltet.iter().find(|&&(v, _)| v == li + 1) {
                 let t = format!("... {} Zeilen", b - li - 1);
@@ -1592,7 +1612,7 @@ impl Gui {
         v
     }
 
-    pub(super) fn ta_farbfeld_rects(&self, g: &Graphics, wdg: &Widget, ax: i32, ay: i32,
+    pub(super) fn ta_farbfeld_rects(&self, g: &Graphics, wi: usize, wdg: &Widget, ax: i32, ay: i32,
                          chars: &[char], rows: &[(usize, usize, usize)],
                          starts_len: usize, view_lines: i32)
                          -> Vec<(usize, i32, i32, i32)> {
@@ -1615,7 +1635,8 @@ impl Gui {
             if zeile < 0 || zeile >= view_lines { continue; }
             let nummer = belegt.entry(r).or_insert(0);
             let ganze: String = chars[rows[r].1..rows[r].2].iter().collect();
-            let x = tx0 + self.wtext_width(g, wdg, &ganze) + luecke * 2
+            let x = tx0 + self.ta_versatz(g, wi, wdg, &chars[rows[r].1..rows[r].2], self.ta_innen(g, wdg, starts_len))
+                    + self.wtext_width(g, wdg, &ganze) + luecke * 2
                     + *nummer * (kante + luecke);
             *nummer += 1;
             let y = ay + pad + zeile * lh + (lh - kante) / 2;

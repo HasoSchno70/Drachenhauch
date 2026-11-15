@@ -88,7 +88,7 @@ impl Gui {
         let (rli, lstart, lend) = rows[row as usize];
         let gut = self.ta_gutter(g, wd, starts.len());
         if mx < ax + pad + gut { return Ok((0, 0)); }
-        let target = mx - (ax + pad + gut - wd.scroll_x);
+        let target = mx - (ax + pad + gut - wd.scroll_x) - self.ta_versatz(g, wi, wd, &chars[lstart..lend], self.ta_innen(g, wd, starts.len()));
         let ms = self.mass(g, wd);
         let sub = &chars[lstart..lend];
         if let Some(lage) = Self::rtl_lage_mit(g, sub, |s| ms.breite(g, s)) {
@@ -343,7 +343,7 @@ impl Gui {
             if !self.was_mouse_down && Self::in_rect(mx, my, (ax, ay, fw, fh))
                && !self.windows[wi].widgets[i].farbfelder.is_empty() {
                 let sicht = ((fh - 2 * pad) / lh).max(1);
-                let treffer = self.ta_farbfeld_rects(g, wref, ax, ay, &chars, &rows,
+                let treffer = self.ta_farbfeld_rects(g, wi, wref, ax, ay, &chars, &rows,
                                                      starts.len(), sicht)
                     .into_iter()
                     .find(|&(_, fx, fy, kante)| Self::in_rect(mx, my, (fx, fy, kante, kante)));
@@ -359,7 +359,7 @@ impl Gui {
                && Self::in_rect(mx, my, (ax, ay, fw, fh)) {
                 let sicht = ((fh - 2 * pad) / lh).max(1);
                 let koepfe = Self::ta_koepfe(wref, &rows, sicht, scroll).len() as i32;
-                let treffer = self.ta_hinweis_rects(g, wref, ax, ay, &chars, &starts, &rows, sicht)
+                let treffer = self.ta_hinweis_rects(g, wi, wref, ax, ay, &chars, &starts, &rows, sicht)
                     .into_iter()
                     .find(|&(_, hx, hy, hb, hh)| hy >= ay + pad + koepfe * lh
                           && Self::in_rect(mx, my, (hx, hy, hb, hh)));
@@ -416,7 +416,8 @@ impl Gui {
             let gut = self.ta_gutter(g, &self.windows[wi].widgets[i],
                                      starts.len());
             let sx = self.windows[wi].widgets[i].scroll_x;
-            let target = mx - (ax + pad + gut - sx);
+            let vers = { let w = &self.windows[wi].widgets[i]; self.ta_versatz(g, wi, w, &chars[lstart..lend], self.ta_innen(g, w, starts.len())) };
+            let target = mx - (ax + pad + gut - sx) - vers;
             let sub: Vec<char> = chars[lstart..lend].to_vec();
             let off = Self::caret_index_at(g, &sub, target, ms) as usize;
             let idx = (lstart + off) as i32;
@@ -883,7 +884,7 @@ impl Gui {
         let (_, lstart, lend) = rows[row.min(rows.len() - 1)];
         let gut = self.ta_gutter(g, wd, starts.len());
         if mx < ax + pad + gut { return None; }
-        let target = mx - (ax + pad + gut - wd.scroll_x);
+        let target = mx - (ax + pad + gut - wd.scroll_x) - self.ta_versatz(g, wi, wd, &chars[lstart..lend], self.ta_innen(g, wd, starts.len()));
         let ms = self.mass(g, wd);
         let sub: Vec<char> = chars[lstart..lend].to_vec();
         Some((lstart + Self::caret_index_at(g, &sub, target, ms) as usize) as i32)

@@ -156,7 +156,7 @@ impl Gui {
             }
         }
         // Barrierefreiheit (gui_pruefen.rs): was an diesem Widget auffaellt.
-        for b in self.a11y_befunde(wi, i, &self.a11y_ziele(wi)) { z.push(format!("barrierefreiheit: {}", b)); }
+        for b in self.a11y_befunde(wi, i, &self.a11y_ziele(wi), &self.tab_spruenge(wi)) { z.push(format!("barrierefreiheit: {}", b)); }
         Ok(z.join("\n"))
     }
 

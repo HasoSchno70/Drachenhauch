@@ -850,7 +850,7 @@ impl Gui {
         let body_h = body_h_raw - if need_h { self.sk(TBL_SCROLL_W) } else { 0 };
         let frozen_w: i32 = col_widths.iter().take(frozen).sum();
         TGeom {
-            ax, ay, w: ww, h: hh, n_cols, n_rows, col_widths, row_h, header_h,
+            ax, ay, w: ww, h: hh, rtl: self.windows[wi].rtl, n_cols, n_rows, col_widths, row_h, header_h,
             scroll_x: t.scroll_x, frozen, frozen_w, order,
             body_x, body_y, body_w, body_h, body_w_raw, total_w, total_h,
             need_v, need_h,
@@ -1134,17 +1134,25 @@ impl Gui {
         let bis = c.min(gm.col_widths.len());
         let mut x = gm.body_x + gm.col_widths[..bis].iter().sum::<i32>();
         if c >= gm.frozen { x -= gm.scroll_x; }
+        if gm.rtl { x = Self::tbl_spiegel(gm, x, gm.col_widths.get(c).copied().unwrap_or(0)); }
         x
+    }
+
+    /// Linke Kante eines Stuecks der Breite `b`, das links bei `x` laege --
+    /// gespiegelt um die Mitte des Rumpfs.
+    pub(super) fn tbl_spiegel(gm: &TGeom, x: i32, b: i32) -> i32 {
+        2 * gm.body_x + gm.body_w - x - b
     }
 
     /// Bereich, in dem die Spalte `c` sichtbar sein darf. Ohne dieses Clipping
     /// schoebe sich eine gescrollte Spalte unter den festen Block.
     pub(super) fn col_clip(gm: &TGeom, c: usize) -> (i32, i32) {
-        if c < gm.frozen {
+        let (x, b) = if c < gm.frozen {
             (gm.body_x, gm.frozen_w)
         } else {
             (gm.body_x + gm.frozen_w, (gm.body_w - gm.frozen_w).max(0))
-        }
+        };
+        if gm.rtl { (Self::tbl_spiegel(gm, x, b), b) } else { (x, b) }
     }
 
     /// Liegt `mx` auf der rechten Kante einer Spalte? Liefert deren Index.
@@ -1152,7 +1160,8 @@ impl Gui {
     /// man auf den Punkt genau treffen muss, findet niemand.
     pub(super) fn edge_at(gm: &TGeom, mx: i32, grab: i32) -> i32 {
         for c in 0..gm.col_widths.len() {
-            let rechts = Self::col_x(gm, c) + gm.col_widths[c];
+            // Die Kante liegt am ENDE der Spalte -- gespiegelt links.
+            let rechts = if gm.rtl { Self::col_x(gm, c) } else { Self::col_x(gm, c) + gm.col_widths[c] };
             if (mx - rechts).abs() <= grab { return c as i32; }
         }
         -1
@@ -1713,13 +1722,16 @@ impl Gui {
             t.head_drag = Some((pos, x0, true));
             // Ueber die Mitte des Nachbarn hinaus -> tauschen. Kein Warten auf
             // das Loslassen: man soll SEHEN, wo die Spalte landet.
-            let mitte_links = if pos > 0 { Self::col_x(&gm, pos - 1) + gm.col_widths[pos - 1] / 2 } else { i32::MIN };
-            let mitte_rechts = if pos + 1 < gm.n_cols { Self::col_x(&gm, pos + 1) + gm.col_widths[pos + 1] / 2 } else { i32::MAX };
-            if mx < mitte_links {
+            let mitte = |p: usize| Self::col_x(&gm, p) + gm.col_widths[p] / 2;
+            // Davor heisst links, gespiegelt rechts.
+            let vor = |m: i32| if gm.rtl { mx > m } else { mx < m };
+            let mitte_links = if pos > 0 { Some(mitte(pos - 1)) } else { None };
+            let mitte_rechts = if pos + 1 < gm.n_cols { Some(mitte(pos + 1)) } else { None };
+            if mitte_links.is_some_and(vor) {
                 t.move_col(pos, pos - 1);
                 pos -= 1;
                 t.head_drag = Some((pos, x0, true));
-            } else if mx > mitte_rechts {
+            } else if mitte_rechts.is_some_and(|m| !vor(m) && m != mx) {
                 t.move_col(pos, pos + 1);
                 pos += 1;
                 t.head_drag = Some((pos, x0, true));
@@ -1728,7 +1740,8 @@ impl Gui {
         }
         if t.drag_col >= 0 {
             let c = t.drag_col as usize;
-            let neu = (t.drag_col_w + (mx - t.drag_col_x)).max(spalte_min);
+            let zug = if gm.rtl { t.drag_col_x - mx } else { mx - t.drag_col_x };
+            let neu = (t.drag_col_w + zug).max(spalte_min);
             if let Some(cw) = t.col_widths.as_mut() {
                 if c < cw.len() { cw[c] = neu; }
             }

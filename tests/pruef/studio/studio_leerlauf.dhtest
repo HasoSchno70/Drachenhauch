@@ -1,0 +1,130 @@
+' Leerlauf in Programmen aus dem Studio (studio/laufzeit.dh,
+' StudioApp.Leerlauf): mit dem Schalter schlaeft das Programm zwischen zwei
+' Eingaben -- aber ein Timer weckt es rechtzeitig. Ohne den Schalter laeuft
+' Takt wie bisher in jedem Bild. Die Faelle bauen ein Programm von Hand, so
+' wie das Studio es erzeugt (App, Fenster mit Timer, studioLauf), und messen
+' in echter Zeit.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== mit leerlauf schlaeft das programm, und der timer tickt trotzdem
+IMPORT "laufzeit_hier.dh"
+CLASS App EXTENDS StudioApp
+    SUB Geoeffnet()
+        Self.Leerlauf = TRUE
+    END SUB
+END CLASS
+CLASS Haupt EXTENDS StudioFenster
+    DIM uhr AS StudioTimer
+    DIM n AS INTEGER
+    DIM bilder AS INTEGER
+    DIM start AS FLOAT
+    DIM laengste AS FLOAT
+    SUB studioAufbauen()
+        Self.studioWin = GUI_WINDOW("Haupt", 0, 0, 300, 200)
+        Self.uhr = NEW StudioTimer()
+        Self.uhr.Intervall = 300
+        Self.uhr.Wiederholen = TRUE
+        Self.uhr.Starten()
+        Self.start = TIMER()
+    END SUB
+    SUB studioTakt()
+        IF Self.uhr.studioFaellig() THEN Self.n = Self.n + 1
+    END SUB
+    SUB Takt()
+        Self.bilder = Self.bilder + 1
+        Self.laengste = MAX(Self.laengste, WINDOW_IDLE_WAIT())
+        IF TIMER() - Self.start > 1.65 THEN
+            ' 1,65 s mit einem Timer von 0,3 s: fuenfmal.
+            PRINT "timer "; IIF(Self.n >= 4 AND Self.n <= 6, "tickt", "tickte " + STR$(Self.n) + "mal")
+            ' Ohne Leerlauf rund 100 Bilder; mit ihm je Timer eines oder zwei.
+            PRINT "bilder "; IIF(Self.bilder < 40, "wenige", STR$(Self.bilder))
+            PRINT "frist "; IIF(Self.laengste > 0 AND Self.laengste <= 0.31, "bis zum timer", STR$(Self.laengste))
+            Self.Zumachen()
+        END IF
+    END SUB
+END CLASS
+TRY
+    studioLauf(NEW App(), NEW Haupt(), 300, 200, "T", FALSE)
+CATCH e
+    IF INSTR(e, "Kein Fenster") >= 0 THEN PRINT "UEBERSPRINGEN: kein Fenster moeglich" ELSE PRINT e
+END TRY
+--- datei laufzeit_hier.dh
+IMPORT "{sammlung}/../../../studio/laufzeit.dh"
+--- erwartet
+timer tickt
+bilder wenige
+frist bis zum timer
+
+=== ohne leerlauf laeuft takt in jedem bild
+IMPORT "laufzeit_hier.dh"
+CLASS Haupt EXTENDS StudioFenster
+    DIM bilder AS INTEGER
+    DIM start AS FLOAT
+    SUB studioAufbauen()
+        Self.studioWin = GUI_WINDOW("Haupt", 0, 0, 300, 200)
+        Self.start = TIMER()
+    END SUB
+    SUB Takt()
+        Self.bilder = Self.bilder + 1
+        IF TIMER() - Self.start > 1.0 THEN
+            PRINT "bilder "; IIF(Self.bilder > 40, "viele", STR$(Self.bilder))
+            PRINT "frist "; WINDOW_IDLE_WAIT()
+            Self.Zumachen()
+        END IF
+    END SUB
+END CLASS
+TRY
+    studioLauf(NEW StudioApp(), NEW Haupt(), 300, 200, "T", FALSE)
+CATCH e
+    IF INSTR(e, "Kein Fenster") >= 0 THEN PRINT "UEBERSPRINGEN: kein Fenster moeglich" ELSE PRINT e
+END TRY
+--- datei laufzeit_hier.dh
+IMPORT "{sammlung}/../../../studio/laufzeit.dh"
+--- erwartet
+bilder viele
+frist 0.0
+
+=== ein timer, der erst in takt startet, weckt schon im selben bild
+' Gestartet nach dem Abgleich der Timer (in Takt, wie aus einem Ereignis)
+' und erst, wenn das Programm schon schlaeft: Starten meldet seine Frist
+' selbst -- sonst schliefe das Bild bis zur Grenze von einer Sekunde, und
+' der erste Tick kaeme so spaet.
+IMPORT "laufzeit_hier.dh"
+CLASS App EXTENDS StudioApp
+    SUB Geoeffnet()
+        Self.Leerlauf = TRUE
+    END SUB
+END CLASS
+CLASS Haupt EXTENDS StudioFenster
+    DIM uhr AS StudioTimer
+    DIM auf AS FLOAT
+    DIM gestartet AS FLOAT
+    SUB studioAufbauen()
+        Self.studioWin = GUI_WINDOW("Haupt", 0, 0, 300, 200)
+        Self.uhr = NEW StudioTimer()
+        Self.uhr.Intervall = 200
+        Self.auf = TIMER()
+    END SUB
+    SUB studioTakt()
+        IF Self.uhr.studioFaellig() THEN
+            DIM dauer AS FLOAT : dauer = TIMER() - Self.gestartet
+            PRINT "erster tick "; IIF(dauer < 0.5, "rechtzeitig", "nach " + STR$(dauer) + " s")
+            Self.Zumachen()
+        END IF
+    END SUB
+    SUB Takt()
+        IF Self.gestartet = 0 AND TIMER() - Self.auf > 0.6 THEN
+            Self.uhr.Starten()
+            Self.gestartet = TIMER()
+        END IF
+    END SUB
+END CLASS
+TRY
+    studioLauf(NEW App(), NEW Haupt(), 300, 200, "T", FALSE)
+CATCH e
+    IF INSTR(e, "Kein Fenster") >= 0 THEN PRINT "UEBERSPRINGEN: kein Fenster moeglich" ELSE PRINT e
+END TRY
+--- datei laufzeit_hier.dh
+IMPORT "{sammlung}/../../../studio/laufzeit.dh"
+--- erwartet
+erster tick rechtzeitig

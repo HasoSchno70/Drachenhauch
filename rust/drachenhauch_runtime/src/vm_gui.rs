@@ -1281,6 +1281,12 @@ impl<'p> Vm<'p> {
             "gui_table_headers" => { self.gui.table_set_headers(gi(a,0,"GUI_TABLE_HEADERS")?, gstrs(a,1,"GUI_TABLE_HEADERS")?)?; Value::Nil }
             "gui_table_rows" => { self.gui.table_set_rows(gi(a,0,"GUI_TABLE_ROWS")?, gstrs2(a,1,"GUI_TABLE_ROWS")?)?; Value::Nil }
             "gui_table_col_widths" => { self.gui.table_set_col_widths(gi(a,0,"GUI_TABLE_COL_WIDTHS")?, gints_opt(a,1,"GUI_TABLE_COL_WIDTHS")?)?; Value::Nil }
+            "gui_table_get_col_widths" => {
+                let v = self.gui.table_get_col_widths(gi(a,0,"GUI_TABLE_GET_COL_WIDTHS")?)?;
+                let mut arr = crate::value::DhArray::new("integer".to_string(), vec![v.len() as i64], || Value::Int(0));
+                for (i, b) in v.into_iter().enumerate() { arr.cells.set(i, Value::Int(b)); }
+                Value::Array(std::rc::Rc::new(std::cell::RefCell::new(arr)))
+            }
             "gui_table_selected" => Value::Int(self.gui.table_selected(gi(a,0,"GUI_TABLE_SELECTED")?)?),
             "gui_table_set_selected" => { self.gui.table_set_selected(gi(a,0,"GUI_TABLE_SET_SELECTED")?, gi(a,1,"GUI_TABLE_SET_SELECTED")?)?; Value::Nil }
             "gui_table_clicked" => Value::Int(self.gui.table_clicked(gi(a,0,"GUI_TABLE_CLICKED")?)?),

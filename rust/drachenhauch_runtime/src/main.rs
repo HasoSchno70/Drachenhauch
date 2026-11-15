@@ -63,6 +63,9 @@ mod schreibrichtung;
 #[cfg(any(feature = "graphics", feature = "pdf"))]
 #[allow(dead_code)]
 mod formung;
+// Farbige Glyphen (Emoji): COLR-Maler und Bitmaps aus sbix/CBDT.
+#[cfg(feature = "graphics")]
+mod farbglyphe;
 mod geld;
 mod httpd;
 #[cfg(feature = "smtp")]

@@ -1185,6 +1185,8 @@ impl Gui {
                     let gutter = self.ta_gutter(g, wdg, starts.len());
                     let rows = self.ta_rows(g, wdg, &chars, &starts, self.ta_breite(g, wdg, starts.len()));
                     let tx0 = ax + pad + gutter - wdg.scroll_x;
+                    // Ausrichtung je Zeile (rechts im gespiegelten Fenster).
+                    let innen = self.ta_innen(g, wdg, starts.len());
                     // Marken: ein Farbhauch ueber der ganzen Zeile, unter allem
                     // anderen. Nur die erste sichtbare Zeile eines umgebrochenen
                     // Absatzes traegt ihn, wie die Zeilennummer.
@@ -1235,8 +1237,9 @@ impl Gui {
                         for r in 0..view_lines {
                             let ri = scroll + r;
                             if ri < 0 || ri as usize >= rows.len() { continue; }
-                            let (li, rs, _) = rows[ri as usize];
+                            let (li, rs, re) = rows[ri as usize];
                             if rs != starts[li] { continue; }
+                            let tx0 = tx0 + self.ta_versatz(g, wi, wdg, &chars[rs..re], innen);
                             let tiefe = Self::ta_einzug_tiefe(&chars, &starts, li, breite);
                             let y = ay + pad + r * lh;
                             for k in 1..tiefe {
@@ -1274,6 +1277,7 @@ impl Gui {
                                 let b = hi.min(lend);
                                 if b < a || (a == b && hi <= lend) { continue; }
                                 let zeile = &chars[lstart as usize..lend as usize];
+                                let tx0 = tx0 + self.ta_versatz(g, wi, wdg, zeile, innen);
                                 let y = ay + pad + r * lh;
                                 let mut stuecke = self.zeilen_bereiche(g, wdg, zeile, (a - lstart) as usize, (b - lstart) as usize);
                                 stuecke.retain(|s| s.0 != s.1);
@@ -1287,13 +1291,14 @@ impl Gui {
                             }
                         }
                     }
-                    let hin_rects = self.ta_hinweis_rects(g, wdg, ax, ay, &chars, &starts, &rows, view_lines);
+                    let hin_rects = self.ta_hinweis_rects(g, wi, wdg, ax, ay, &chars, &starts, &rows, view_lines);
                     for r in 0..view_lines {
                         let ri = scroll + r;
                         if ri < 0 || ri as usize >= rows.len() { continue; }
                         let (li, rs, re) = rows[ri as usize];
                         let y = ay + pad + r * lh;
                         let zeile: String = chars[rs..re].iter().collect();
+                        let tx0 = tx0 + self.ta_versatz(g, wi, wdg, &chars[rs..re], innen);
                         let geformt = wdg.formatiert && wdg.stile_text == wdg.text
                             && wdg.stile.len() == chars.len()
                             && wdg.stile[rs..re].iter().any(|&b| b != 0);
@@ -1357,6 +1362,7 @@ impl Gui {
                                 let a = s.max(rs).min(re);
                                 let b = e.max(a).min(re);
                                 let zeile = &chars[rs..re];
+                                let tx0 = tx0 + self.ta_versatz(g, wi, wdg, zeile, innen);
                                 let mut stuecke = self.zeilen_bereiche(g, wdg, zeile, a - rs, b - rs);
                                 stuecke.retain(|s| s.0 != s.1);
                                 if stuecke.is_empty() { let x = self.zeilen_x(g, wdg, zeile, a - rs); stuecke.push((x, x)); }
@@ -1381,7 +1387,7 @@ impl Gui {
                     // Rahmen -- ohne ihn verschwaende ein dunkles Feld im
                     // dunklen Grund.
                     for (k, fx, fy, kante) in
-                            self.ta_farbfeld_rects(g, wdg, ax, ay, &chars, &rows, starts.len(), view_lines) {
+                            self.ta_farbfeld_rects(g, wi, wdg, ax, ay, &chars, &rows, starts.len(), view_lines) {
                         let farbe = wdg.farbfelder[k].2;
                         g.box_fill(fx, fy, fx + kante, fy + kante, farbe);
                         g.rect(fx, fy, fx + kante, fy + kante, self.th("widget_border"));
@@ -1437,9 +1443,11 @@ impl Gui {
                     let von = wdg.caret.clamp(0, chars.len() as i32) as usize;
                     let bis = (von + wdg.vorschau.chars().count()).min(chars.len());
                     let tx0 = ax + pad + self.ta_gutter(g, wdg, starts.len()) - wdg.scroll_x;
+                    let innen = self.ta_innen(g, wdg, starts.len());
                     for (r, &(_, rs, re)) in rows.iter().enumerate() {
                         let (a, b) = (von.max(rs), bis.min(re));
                         if b <= a { continue; }
+                        let tx0 = tx0 + self.ta_versatz(g, wi, wdg, &chars[rs..re], innen);
                         let y = ay + pad + (r as i32 - scroll) * lh + lh - 3;
                         if y < ay + 2 || y > ay + h - 3 { continue; }
                         for (x0, x1) in self.zeilen_bereiche(g, wdg, &chars[rs..re], a - rs, b - rs) {
@@ -1459,6 +1467,7 @@ impl Gui {
                         let (_, ms, mend) = rows[mrow];
                         let me = (ms + (mc - ms as i32).max(0) as usize).min(chars.len());
                         let mx = ax + pad + self.ta_gutter(g, wdg, starts.len()) - wdg.scroll_x
+                                 + self.ta_versatz(g, wi, wdg, &chars[ms..mend], self.ta_innen(g, wdg, starts.len()))
                                  + self.zeilen_x(g, wdg, &chars[ms..mend], me - ms);
                         let my = ay + pad + (mrow as i32 - scroll) * lh;
                         if my >= ay + 2 && my + lh <= ay + h
@@ -1470,6 +1479,7 @@ impl Gui {
                     let (_, lstart, lend) = rows[crow];
                     let cend = (lstart + (caret_anz - lstart as i32).max(0) as usize).min(chars.len());
                     let cx = ax + pad + self.ta_gutter(g, wdg, starts.len()) - wdg.scroll_x
+                             + self.ta_versatz(g, wi, wdg, &chars[lstart..lend], self.ta_innen(g, wdg, starts.len()))
                              + self.zeilen_x(g, wdg, &chars[lstart..lend], cend - lstart);
                     let cy = ay + pad + (crow as i32 - scroll) * lh;
                     // Auch die Schreibmarke bleibt rechts der Nummernspalte --
@@ -1508,6 +1518,7 @@ impl Gui {
                             let re = rows.iter().find(|r| r.1 == rs).map(|r| r.2)
                                 .unwrap_or_else(|| starts.get(li + 1).map(|&n| n.saturating_sub(1)).unwrap_or(chars.len()));
                             let zeile: String = chars[rs..re.max(rs)].iter().collect();
+                            let tx0 = tx0 + self.ta_versatz(g, wi, wdg, &chars[rs..re.max(rs)], self.ta_innen(g, wdg, starts.len()));
                             g.push_clip(ax + 2 + gutter, y0, (w - 4 - gutter).max(0), (y + lh - y0).max(0));
                             if wdg.spans.is_empty() { self.wtext(g, wdg, tx0, y, zeile, fg); }
                             else { self.zeile_bunt(g, wdg, tx0, y, &zeile, rs, fg, ax + 2 + gutter, ax + w - 2); }

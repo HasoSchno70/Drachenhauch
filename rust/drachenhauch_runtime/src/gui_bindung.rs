@@ -516,7 +516,7 @@ impl Gui {
                 if w.hinweise_klickbar && !w.hinweise.is_empty() {
                     let rows = self.ta_rows(g, w, &chars, &starts, self.ta_breite(g, w, starts.len()));
                     let sicht = ((bh - 10) / self.ta_line_h(g, w)).max(1);
-                    if self.ta_hinweis_rects(g, w, ax, ay, &chars, &starts, &rows, sicht)
+                    if self.ta_hinweis_rects(g, wi, w, ax, ay, &chars, &starts, &rows, sicht)
                         .into_iter().any(|(_, hx, hy, hb, hh)| Self::in_rect(mx, my, (hx, hy, hb, hh))) {
                         return Some("hand");
                     }
@@ -524,7 +524,7 @@ impl Gui {
                 if !w.farbfelder.is_empty() {
                     let rows = self.ta_rows(g, w, &chars, &starts, self.ta_breite(g, w, starts.len()));
                     let sicht = ((bh - 10) / self.ta_line_h(g, w)).max(1);
-                    if self.ta_farbfeld_rects(g, w, ax, ay, &chars, &rows, starts.len(), sicht)
+                    if self.ta_farbfeld_rects(g, wi, w, ax, ay, &chars, &rows, starts.len(), sicht)
                         .into_iter().any(|(_, fx, fy, k)| Self::in_rect(mx, my, (fx, fy, k, k))) {
                         return Some("hand");
                     }
@@ -1401,6 +1401,7 @@ impl Gui {
                 let (_, lstart, lend) = *rows.get(crow)?;
                 let cend = (lstart + (caret_anz - lstart as i32).max(0) as usize).min(chars.len());
                 let cx = ax + pad + self.ta_gutter(g, wdg, starts.len()) - wdg.scroll_x
+                         + self.ta_versatz(g, wi, wdg, &chars[lstart..lend], self.ta_innen(g, wdg, starts.len()))
                          + self.zeilen_x(g, wdg, &chars[lstart..lend], cend - lstart);
                 let cy = ay + pad + (crow as i32 - wdg.scroll) * lh;
                 Some((cx, cy, lh))

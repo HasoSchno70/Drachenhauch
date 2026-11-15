@@ -1254,10 +1254,23 @@ impl Gui {
         let (ax, ay, aw, _) = self.abs_rect(wi, w);
         let rh = self.sk(TREE_ROW_H);
         let x = ax + 4 + self.tree_kast_w(t) + t.nodes[node as usize].level * self.sk(TREE_INDENT) + self.sk(TREE_TOGGLE_W);
+        if self.windows[wi].rtl {
+            // Gespiegelt: vom linken Rand bis vor das Dreieck.
+            let b = (self.baum_zeilenbreite(wi, Self::dec_widget(h).1) - (x - ax)).max(0);
+            return Ok((ax, ay + 1 + row * rh - t.scroll, b, rh));
+        }
         Ok((x, ay + 1 + row * rh - t.scroll, (aw - (x - ax)).max(0), rh))
+    }
+    /// Breite der Zeilen eines Baums (ohne Rollbalken) -- dieselbe wie im
+    /// Zeichnen (`wz`), die Achse fuers Spiegeln.
+    pub(super) fn baum_zeilenbreite(&self, wi: usize, idx: usize) -> i32 {
+        let w = self.abs_rect(wi, &self.windows[wi].widgets[idx]).2;
+        if self.list_bar_geom(wi, idx).is_some() { w - self.sk(8) - 2 } else { w }
     }
     pub(super) fn tree_press(&mut self, wi: usize, idx: usize, mx: i32, my: i32) {
         let (ax, ay, _w, _h) = self.abs_rect(wi, &self.windows[wi].widgets[idx]);
+        // Gespiegelt: dieselbe Rechnung wie links, mit gespiegelter Maus.
+        let mx = if self.windows[wi].rtl { ax + self.baum_zeilenbreite(wi, idx) - (mx - ax) } else { mx };
         let t = self.windows[wi].widgets[idx].tree.as_ref().unwrap();
         let vis = Self::tree_visible(t);
         let row = (my - (ay + 1) + t.scroll) / self.sk(TREE_ROW_H);

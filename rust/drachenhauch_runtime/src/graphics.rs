@@ -1705,7 +1705,19 @@ fn zeichen_aus_namen(spez: &str) -> Result<String, String> {
 /// "Pfeile und Symbole" (Stern, Quadrate: U+2B00..U+2BFF). Vorher landeten
 /// Wecker und Stoppuhr bei Segoe UI, das sie nicht hat -- in der
 /// Kuehlschrank-App stand "? Vorbereitung" und "? Ablaufende verwerten".
+/// Zeichen, die aus der Emoji-Schrift kommen sollen, auch wenn die eigene
+/// Datei eines Fonts eine einfarbige Glyphe haette -- DejaVu Sans, die
+/// Schrift der gui, hat 😀 als Umriss (`glyphen_pruefen` fragt dann nicht
+/// die eigene Datei). Symbole wie ☀ oder ✔ bleiben im Font: ohne
+/// Variantenwahl werden sie als Text dargestellt.
+fn farb_emoji(c: u32) -> bool {
+    c >= 0x1F000 || matches!(c, 0x200D | 0xFE0F | 0x20E3)
+}
+
 fn ist_emoji(c: u32) -> bool {
+    // Was eine Emoji-Folge zusammenhaelt, gehoert in DIESELBE Schrift --
+    // sonst zerfiele die Folge in zwei Laeufe, und die Formung saehe sie nie.
+    if matches!(c, 0x200D | 0xFE0F | 0x20E3 | 0x1F1E6..=0x1F1FF | 0x1FA70..=0x1FAFF | 0x1F3FB..=0x1F3FF) { return true; }
     matches!(c, 0x231A..=0x23FF | 0x2600..=0x27BF | 0x2B00..=0x2BFF | 0x1F000..=0x1FAFF)
 }
 
@@ -2429,8 +2441,11 @@ impl Graphics {
         let eigene_datei = h >= 0 && self.font_herkunft.get(h as usize).map_or(false, |(p, _, n)| !p.is_empty() && *n > 0);
         for ch in s.chars() {
             let c = ch as u32;
+            let farb = farb_emoji(c);
             if c < 0x80 || self.font_hat(h, c) { continue; }
-            if eigene_datei && !self.eigen_nie.contains(&(h, c)) {
+            // Ein Emoji nicht aus der eigenen Datei nachbacken: dort waere
+            // es eine Silhouette, die Ausweich-Schrift hat es in Farbe.
+            if eigene_datei && !farb && !self.eigen_nie.contains(&(h, c)) {
                 self.eigen_fehlt.borrow_mut().entry(h).or_default().insert(c);
                 continue;
             }
@@ -8630,6 +8645,9 @@ fn std_breite(txt: &str, size: f32, ausweich: &[Ausweich]) -> f32 {
 /// die Ligaturen seiner Schrift sind an (formung.rs).
 fn formen_noetig(h: i64, fi: usize, lauf: &str) -> bool {
     crate::formung::braucht(lauf) || (fi == 0 && h >= 0 && crate::formung::ligaturen(h))
+        // Emoji aus einer Ausweich-Schrift: die Formung setzt Folgen (ZWJ,
+        // Hautton, Flaggen) zusammen, und `glyph_textur` malt sie in Farbe.
+        || (fi > 0 && lauf.chars().any(|c| ist_emoji(c as u32)))
 }
 
 /// Die Datei der Schrift eines Laufs: 0 = die gewaehlte (Handle `h`),
@@ -8644,13 +8662,52 @@ fn lauf_pfad(h: i64, fi: usize, ausweich: &[Ausweich]) -> Option<String> {
 thread_local! {
     /// Geformte Glyphen als Texturen: (Datei, Glyphe, Groesse*16) ->
     /// (Textur, links, oben). None merkt sich eine leere Glyphe.
-    static GLYPH_TEX: std::cell::RefCell<std::collections::HashMap<(String, u16, u32), Option<(raylib::ffi::Texture2D, f32, f32)>>> =
+    static GLYPH_TEX: std::cell::RefCell<std::collections::HashMap<(String, u16, u32), Option<(raylib::ffi::Texture2D, f32, f32, bool)>>> =
         std::cell::RefCell::new(std::collections::HashMap::new());
 }
 
-fn glyph_textur(pfad: &str, gid: u16, px: f32) -> Option<(raylib::ffi::Texture2D, f32, f32)> {
+/// Eine Farbglyphe (farbglyphe.rs) als RGBA-Textur: (Textur, links, oben).
+fn farbglyph_textur(pfad: &str, gid: u16, px: f32) -> Option<(raylib::ffi::Texture2D, f32, f32)> {
+    use raylib::ffi;
+    match crate::farbglyphe::rastern(pfad, gid, px)? {
+        crate::farbglyphe::Farbglyphe::Bild(mut b) => {
+            let img = ffi::Image {
+                data: b.rgba.as_mut_ptr() as *mut std::ffi::c_void, width: b.b as i32, height: b.h as i32, mipmaps: 1,
+                format: ffi::PixelFormat::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 as i32,
+            };
+            let tex = unsafe { ffi::LoadTextureFromImage(img) };
+            if tex.id == 0 { return None; }
+            unsafe { ffi::SetTextureFilter(tex, 1 /*BILINEAR*/); }
+            Some((tex, b.links, b.oben))
+        }
+        crate::farbglyphe::Farbglyphe::Png { daten, x, y, skala } => {
+            let endung = std::ffi::CString::new(".png").ok()?;
+            let mut img = unsafe { ffi::LoadImageFromMemory(endung.as_ptr(), daten.as_ptr(), daten.len() as i32) };
+            if img.data.is_null() || img.width <= 0 { return None; }
+            let (b, h) = ((img.width as f32 * skala).round().max(1.0) as i32, (img.height as f32 * skala).round().max(1.0) as i32);
+            unsafe { ffi::ImageResize(&mut img, b, h); }
+            let tex = unsafe { ffi::LoadTextureFromImage(img) };
+            unsafe { ffi::UnloadImage(img); }
+            if tex.id == 0 { return None; }
+            unsafe { ffi::SetTextureFilter(tex, 1 /*BILINEAR*/); }
+            // Der Versatz der Strike: x ab Stift, y = Unterkante ueber der Grundlinie.
+            Some((tex, x * skala, y * skala + h as f32))
+        }
+    }
+}
+
+fn glyph_textur(pfad: &str, gid: u16, px: f32) -> Option<(raylib::ffi::Texture2D, f32, f32, bool)> {
     let k = (pfad.to_string(), gid, (px * 16.0).round() as u32);
     if let Some(t) = GLYPH_TEX.with(|m| m.borrow().get(&k).copied()) { return t; }
+    // Eine Farbglyphe (Emoji) kommt als RGBA und wird beim Zeichnen nicht
+    // getoent; misslingt sie, bleibt die einfarbige Silhouette.
+    if crate::farbglyphe::farbig(pfad, gid) {
+        if let Some((tex, l, o)) = farbglyph_textur(pfad, gid, px) {
+            let t = Some((tex, l, o, true));
+            GLYPH_TEX.with(|m| { m.borrow_mut().insert(k, t); });
+            return t;
+        }
+    }
     let t = crate::formung::rastern(pfad, gid, px).and_then(|b| {
         // Weiss mit Deckkraft: die Farbe kommt beim Zeichnen als Toenung.
         let mut daten: Vec<u8> = Vec::with_capacity(b.b * b.h * 2);
@@ -8661,7 +8718,7 @@ fn glyph_textur(pfad: &str, gid: u16, px: f32) -> Option<(raylib::ffi::Texture2D
         };
         let tex = unsafe { raylib::ffi::LoadTextureFromImage(img) };
         drop(daten);
-        (tex.id != 0).then_some((tex, b.links, b.oben))
+        (tex.id != 0).then_some((tex, b.links, b.oben, false))
     });
     GLYPH_TEX.with(|m| { m.borrow_mut().insert(k, t); });
     t
@@ -8681,7 +8738,9 @@ fn zeichne_geformt_mit(pfad: &str, txt: &str, x: f32, y: f32, size: f32, col: Co
     let g = crate::formung::formen(pfad, txt, size)?;
     let grund = y + g.grundlinie;
     for &(gid, gx, gy) in &g.glyphen {
-        let Some((tex, links, oben)) = glyph_textur(pfad, gid, size) else { continue };
+        let Some((tex, links, oben, farbig)) = glyph_textur(pfad, gid, size) else { continue };
+        // Eine Farbglyphe behaelt ihre Farben; nur die Deckkraft gilt.
+        let col = if farbig { Color::new(255, 255, 255, col.a) } else { col };
         let (dx, dy) = ((x + gx + links).round(), (grund + gy - oben).round());
         match schraeg {
             None => unsafe { ffi::DrawTexture(tex, dx as i32, dy as i32, col.into()); },
