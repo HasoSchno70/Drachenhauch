@@ -49,9 +49,9 @@ viele Widgets gilt; dazu zwei Befehle für das Programm.
 - Bildfolgen aus einem Atlas: `bild: atlas.png 8 12fps` (als Bildhaut,
   nicht als Animation -- es ist dieselbe Mechanik wie das animierte GIF).
 - Eigene Abläufe flach statt geschachtelt: `@ablauf name { 50%: y -8,
-  drehen 10 }` -- verschieben, drehen, Größe. Farbe und Deckkraft fehlen
-  noch: die Verformung ist eine Matrix, eine Farbe müsste durch jeden
-  Zeichenbefehl des Widgets.
+  drehen 10 }` -- verschieben, drehen, Größe; seit 2026-11-15 auch
+  `deckkraft` und `farbe` über eine Schicht (Renderziel, mit Deckkraft und
+  Ton aufgelegt) statt durch jeden Zeichenbefehl.
 - Bildhäute für Kästchen, Optionen und Schalter (je Zustand). Formen
   (`form`) bleiben bei Knöpfen; Regler offen.
 

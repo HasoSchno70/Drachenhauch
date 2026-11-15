@@ -1243,3 +1243,12 @@ am Zeilenende der Erwartung ab, die Ausgabe nicht.
   (`reglerhaut`, ein Arm vor dem gewohnten Regler). Die Ladeschleife der
   Haeute nimmt jetzt auch `griff` -- die Gegenprobe ohne das zeigte den
   gewohnten Knauf statt des Bildes.
+- **Deckkraft und Farbton in Ablaeufen** (`deckkraft`, `farbe`, Art
+  `blinken`): die Verformung ist eine Matrix, eine Farbe muesste sonst
+  durch jeden Zeichenbefehl des Widgets. Statt dessen `Cmd::SchichtAnfang`
+  /`SchichtEnde`: das Widget in ein Renderziel (Groesse des Schirms,
+  wiederverwendet), dann mit Deckkraft und Ton aufgelegt. Die Schicht liegt
+  AUSSEN um die Verformung, weil BeginTextureMode die Matrix zuruecksetzt.
+  Nur wenn die Hauptflaeche direkt gezeichnet wird (`SCHICHT_ZIEL`): aus
+  einem Renderziel heraus fuehrte EndTextureMode auf den Schirm statt
+  zurueck in das Ziel.

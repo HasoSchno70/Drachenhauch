@@ -135,7 +135,7 @@ IMPORT "gui"
 DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 300)
 DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "x", 20, 20, 120, 30)
 DIM fehler AS ARRAY OF STRING
-fehler = ["@ablauf puls { 50%: y 1 }", "@ablauf a { 150%: y 1 }", "@ablauf a { 50%: farbe 1 }", "button { animation: gibtsnicht }", "button { bild: a.png 0 }", "button { bild: a.png 4 500fps }"]
+fehler = ["@ablauf puls { 50%: y 1 }", "@ablauf a { 150%: y 1 }", "@ablauf a { 50%: schwanz 1 }", "button { animation: gibtsnicht }", "button { bild: a.png 0 }", "button { bild: a.png 4 500fps }"]
 DIM i AS INTEGER
 FOR i = 0 TO LEN(fehler) - 1
     TRY
@@ -153,7 +153,7 @@ END TRY
 --- enthaelt
 @ablauf 'puls' -- den Namen hat schon eine eingebaute Animation
 '150%' -- ein Schluesselbild steht bei 0% bis 100%
-'farbe' gibt es in einem Ablauf nicht -- x, y, drehen, groesse
+'schwanz' gibt es in einem Ablauf nicht -- x, y, drehen, groesse
 animation: 'gibtsnicht' unbekannt
 bild -- Anzahl der Bilder '0' muss 1..256 sein
 bild -- '500fps' muss 1fps..120fps sein

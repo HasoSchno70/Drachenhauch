@@ -1,0 +1,76 @@
+' Ablaeufe mit Deckkraft und Farbton (gui_aussehen.rs `anim_deck`,
+' graphics.rs `Cmd::SchichtAnfang`): das Widget kommt in eine Schicht, die
+' mit Deckkraft und Ton aufgelegt wird -- nur auf der Hauptflaeche, darum
+' Bildschirmfotos. DHRT_FRAMES legt fest, bei welchem Bild das Foto kommt
+' (1/60 s je Bild).
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== in der mitte des ablaufs ist der knopf fast weg
+TRY
+    SCREEN(400, 200, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "", 140, 80, 120, 40)
+GUI_SET_NAME(b, "k")
+GUI_STYLESHEET("#k { bg: #FF0000; border: #FF0000; animation: weg 1000ms }" + CHR$(10) + "@ablauf weg { 50%: deckkraft 0 }")
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE() : CLS(0) : GUI_DRAW() : FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=31
+--- bild
+200 100 nicht #FF0000 +-100
+200 100 #18222E +-24
+
+=== ein farbton faerbt den weissen knopf blau
+TRY
+    SCREEN(400, 200, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "", 140, 80, 120, 40)
+GUI_SET_NAME(b, "k")
+GUI_STYLESHEET("#k { bg: #FFFFFF; border: #FFFFFF; animation: blau 1000ms }" + CHR$(10) + "@ablauf blau { 0%: farbe #0000FF; 100%: farbe #0000FF }")
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE() : CLS(0) : GUI_DRAW() : FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=10
+--- bild
+200 100 #0000FF +-40
+
+=== blinken laeuft und ein falscher farbton ist ein fehler
+TRY
+    SCREEN(400, 200, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 200)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "x", 140, 80, 120, 40)
+GUI_ANIMATE(b, "blinken", 600, 2)
+PRINT "blinkt "; GUI_ANIMATING(b)
+TRY
+    GUI_STYLESHEET("@ablauf a { 50%: farbe blau }")
+CATCH e1
+    PRINT e1
+END TRY
+TRY
+    GUI_STYLESHEET("@ablauf a { 50%: deckkraft halb }")
+CATCH e2
+    PRINT e2
+END TRY
+--- enthaelt
+blinkt TRUE
+'farbe blau' -- erwartet farbe #RRGGBB
+'deckkraft halb' -- erwartet name zahl

@@ -25,7 +25,7 @@ pub(super) const F_RAUTE: u8 = 4;
 pub(super) const F_BILD: u8 = 5;
 
 /// Animationsarten.
-pub(super) const ARTEN: [&str; 6] = ["", "puls", "wackeln", "schweben", "huepfen", "drehen"];
+pub(super) const ARTEN: [&str; 7] = ["", "puls", "wackeln", "schweben", "huepfen", "drehen", "blinken"];
 
 /// Eine Animation aus der Stildatei oder GUI_ANIMATE: Art, Dauer einer
 /// Runde in ms, Anzahl Runden (0 = ohne Ende).
@@ -94,7 +94,10 @@ pub(super) const EIGEN: u8 = 100;
 
 /// Ein Schluesselbild eines eigenen Ablaufs: wo (0..1) und was dann gilt.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub(super) struct Schluessel { pub p: f64, pub x: f64, pub y: f64, pub drehen: f64, pub groesse: f64 }
+pub(super) struct Schluessel { pub p: f64, pub x: f64, pub y: f64, pub drehen: f64, pub groesse: f64,
+    /// Deckkraft 0..1 und Farbton (RGB, weiss = keiner) -- ueber eine Schicht
+    /// (graphics.rs `Cmd::SchichtAnfang`).
+    pub deckkraft: f64, pub farbe: [f64; 3] }
 
 /// Den Rumpf eines `@ablauf` lesen: `0%: x 0, y -8; 50%: drehen 10, groesse 1.1`.
 /// Fehlt 0 % oder 100 %, gilt dort die Ruhe.
@@ -109,25 +112,33 @@ pub(super) fn ablauf_lesen(rumpf: &str, kopf_zeile: usize, zeile_bei: impl Fn(us
         let (wann, was) = d.split_once(':').ok_or_else(|| format!("Zeile {}: '{}' -- erwartet z.B. 50%: y -8, drehen 10", zeile, d))?;
         let p = wann.trim().strip_suffix('%').and_then(|v| v.trim().parse::<f64>().ok()).filter(|v| (0.0..=100.0).contains(v))
             .ok_or_else(|| format!("Zeile {}: '{}' -- ein Schluesselbild steht bei 0% bis 100%", zeile, wann.trim()))?;
-        let mut k = Schluessel { p: p / 100.0, x: 0.0, y: 0.0, drehen: 0.0, groesse: 1.0 };
+        let mut k = Schluessel { p: p / 100.0, x: 0.0, y: 0.0, drehen: 0.0, groesse: 1.0, deckkraft: 1.0, farbe: [255.0; 3] };
         for teil in was.split(',') {
             let t: Vec<&str> = teil.split_whitespace().collect();
             if t.is_empty() { continue; }
+            if matches!(t[0].to_lowercase().as_str(), "farbe" | "color") {
+                let h = t.get(1).map(|v| v.trim_start_matches('#')).filter(|h| h.len() == 6)
+                    .and_then(|h| i64::from_str_radix(h, 16).ok())
+                    .ok_or_else(|| format!("Zeile {}: '{}' -- erwartet farbe #RRGGBB", zeile, teil.trim()))?;
+                k.farbe = [((h >> 16) & 0xFF) as f64, ((h >> 8) & 0xFF) as f64, (h & 0xFF) as f64];
+                continue;
+            }
             let wert = t.get(1).and_then(|v| v.parse::<f64>().ok())
-                .ok_or_else(|| format!("Zeile {}: '{}' -- erwartet name zahl (x, y, drehen, groesse)", zeile, teil.trim()))?;
+                .ok_or_else(|| format!("Zeile {}: '{}' -- erwartet name zahl (x, y, drehen, groesse, deckkraft)", zeile, teil.trim()))?;
             match t[0].to_lowercase().as_str() {
+                "deckkraft" | "opacity" => k.deckkraft = wert.clamp(0.0, 1.0),
                 "x" => k.x = wert,
                 "y" => k.y = wert,
                 "drehen" | "rotate" => k.drehen = wert,
                 "groesse" | "scale" => k.groesse = wert,
-                n => return Err(format!("Zeile {}: '{}' gibt es in einem Ablauf nicht -- x, y, drehen, groesse", zeile, n)),
+                n => return Err(format!("Zeile {}: '{}' gibt es in einem Ablauf nicht -- x, y, drehen, groesse, deckkraft, farbe", zeile, n)),
             }
         }
         out.push(k);
     }
     if out.is_empty() { return Err(format!("Zeile {}: @ablauf ohne Schluesselbilder", kopf_zeile)); }
     out.sort_by(|a, b| a.p.partial_cmp(&b.p).unwrap_or(std::cmp::Ordering::Equal));
-    let ruhe = |p: f64| Schluessel { p, x: 0.0, y: 0.0, drehen: 0.0, groesse: 1.0 };
+    let ruhe = |p: f64| Schluessel { p, x: 0.0, y: 0.0, drehen: 0.0, groesse: 1.0, deckkraft: 1.0, farbe: [255.0; 3] };
     if out[0].p > 0.0 { out.insert(0, ruhe(0.0)); }
     if out.last().map(|k| k.p < 1.0).unwrap_or(true) { out.push(ruhe(1.0)); }
     Ok(out)
@@ -136,13 +147,24 @@ pub(super) fn ablauf_lesen(rumpf: &str, kopf_zeile: usize, zeile_bei: impl Fn(us
 /// Ein eigener Ablauf bei p (0..1): zwischen den Schluesselbildern gerade
 /// verbunden. (dx, dy, Winkel, Massstab) in logischen Punkten.
 pub(super) fn ablauf_verformung(ks: &[Schluessel], p: f64) -> (f64, f64, f64, f64) {
+    let k = ablauf_bei(ks, p);
+    (k.x, k.y, k.drehen, k.groesse)
+}
+/// Das Schluesselbild bei p, zwischen den Nachbarn gerade verbunden.
+pub(super) fn ablauf_bei(ks: &[Schluessel], p: f64) -> Schluessel {
     let p = p.clamp(0.0, 1.0);
     let i = ks.iter().rposition(|k| k.p <= p).unwrap_or(0);
     let a = ks[i];
     let b = *ks.get(i + 1).unwrap_or(&a);
     let t = if b.p > a.p { (p - a.p) / (b.p - a.p) } else { 0.0 };
     let m = |u: f64, v: f64| u + (v - u) * t;
-    (m(a.x, b.x), m(a.y, b.y), m(a.drehen, b.drehen), m(a.groesse, b.groesse))
+    Schluessel { p, x: m(a.x, b.x), y: m(a.y, b.y), drehen: m(a.drehen, b.drehen), groesse: m(a.groesse, b.groesse),
+        deckkraft: m(a.deckkraft, b.deckkraft), farbe: [0, 1, 2].map(|c| m(a.farbe[c], b.farbe[c])) }
+}
+
+/// Deckkraft der eingebauten Arten (nur `blinken` hat eine): 1 -> 0.35 -> 1.
+pub(super) fn deckkraft_bei(art: u8, p: f64) -> f64 {
+    if art == 6 { 0.35 + 0.65 * 0.5 * (1.0 + (2.0 * std::f64::consts::PI * p).cos()) } else { 1.0 }
 }
 
 /// `bild: datei.png [anzahl [Nfps]]` lesen -- mit Anzahl ist es eine
@@ -203,7 +225,7 @@ pub(super) fn vorbei(a: AnimStil, t0: f64, uhr: f64) -> bool {
     a.anzahl > 0 && (uhr - t0) * 1000.0 >= (a.dauer as f64) * (a.anzahl as f64)
 }
 
-fn vorgabe_dauer(art: u8) -> i32 { match art { 2 => 400, 4 => 600, 5 => 1200, a if a >= EIGEN => 1000, _ => 900 } }
+fn vorgabe_dauer(art: u8) -> i32 { match art { 2 => 400, 4 => 600, 5 => 1200, 6 => 1000, a if a >= EIGEN => 1000, _ => 900 } }
 
 /// Die Verformung einer Animation zur Phase `p` (0..1 einer Runde) und
 /// dem Anteil `rest` (1 am Anfang, 0 am Ende einer endlichen Animation):
@@ -465,6 +487,25 @@ impl Gui {
             }
         }
     }
+    /// Deckkraft und Farbton der laufenden Animation (Ablauf mit
+    /// `deckkraft`/`farbe`, oder `blinken`); None = voll und ohne Ton.
+    pub(super) fn anim_deck(&self, wi: usize, idx: usize, w: &Widget) -> Option<(u8, i64)> {
+        if self.ruhig { return None; }
+        let au = w.aussehen.as_ref()?;
+        let druck = self.press_origin == Some((wi, idx));
+        let (a, t0) = au.lauf.or_else(|| au.stil_lauf.filter(|l| Some(l.0) == self.w_stil_anim(w, druck)))
+            .filter(|&(a, t0)| !vorbei(a, t0, self.uhr))?;
+        let p = ((self.uhr - t0) * 1000.0 / a.dauer as f64).fract();
+        let (deck, farbe) = if a.art >= EIGEN {
+            let ks = &self.stil.as_ref()?.ablaeufe.get((a.art - EIGEN) as usize)?.1;
+            let k = ablauf_bei(ks, p);
+            (k.deckkraft, k.farbe)
+        } else { (deckkraft_bei(a.art, p), [255.0; 3]) };
+        let a8 = (deck * 255.0).round().clamp(0.0, 255.0) as u8;
+        let ton = ((farbe[0].round() as i64) << 16) | ((farbe[1].round() as i64) << 8) | (farbe[2].round() as i64);
+        if a8 == 255 && ton == 0xFFFFFF { None } else { Some((a8, ton)) }
+    }
+
     /// GUI_GLIDING(wdg): gleitet das Widget gerade?
     pub fn gliding(&self, h: i64) -> Result<bool, String> {
         let w = self.wdg(h, "GUI_GLIDING")?;

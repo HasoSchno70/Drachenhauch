@@ -134,6 +134,11 @@ enum Cmd {
     /// x1, y1, x2, y2, Radius der Unschaerfe, Eckenradius -- nur auf der
     /// Hauptflaeche (`UNSCHAERFE_ZIEL`), sonst nichts.
     Unschaerfe(i32, i32, i32, i32, i32, i32),
+    /// Eine Schicht: was bis SchichtEnde kommt, in ein Renderziel, das dann
+    /// mit Deckkraft und Farbton aufgelegt wird (Ablaeufe der gui) -- nur
+    /// auf der Hauptflaeche ohne POSTFX (`SCHICHT_ZIEL`), sonst wie ohne.
+    SchichtAnfang(u8, Color),
+    SchichtEnde,
     VerformungEnde,
     // 2D-Extras (Batch 1): dicke Linien, runde Rechtecke, Gradienten, Splines.
     LineEx(i32, i32, i32, i32, f32, Color),            // x1,y1,x2,y2, thick, color
@@ -328,6 +333,14 @@ thread_local! {
     /// die Szene fuer POSTFX). Renderziele und echte Fenster: None, dort
     /// bleibt es bei der durchscheinenden Flaeche darueber.
     static UNSCHAERFE_ZIEL: std::cell::Cell<Option<(i32, i32)>> = const { std::cell::Cell::new(None) };
+    /// Groesse der Hauptflaeche, wenn sie DIREKT gezeichnet wird -- nur dort
+    /// darf `Cmd::SchichtAnfang` in ein eigenes Ziel umlenken (aus einem
+    /// Renderziel fuehrte EndTextureMode auf den Schirm statt zurueck).
+    static SCHICHT_ZIEL: std::cell::Cell<Option<(i32, i32)>> = const { std::cell::Cell::new(None) };
+    /// Die laufende Schicht: (Deckkraft, Farbton), None = keine.
+    static SCHICHT_LAEUFT: std::cell::Cell<Option<(u8, Color)>> = const { std::cell::Cell::new(None) };
+    /// Das Renderziel der Schicht, wiederverwendet solange die Groesse passt.
+    static SCHICHT_RT: std::cell::Cell<Option<(raylib::ffi::RenderTexture2D, i32, i32)>> = const { std::cell::Cell::new(None) };
     /// Massstab des Ziels, das gerade abgespielt wird (siehe
     /// `RenderTarget::mass`). Die Geometrie skaliert eine Matrix; Text und
     /// Scissor fragen hier nach -- Text wird in voller Groesse gesetzt statt
@@ -2951,6 +2964,12 @@ impl Graphics {
     pub fn verformung_beenden(&mut self) { self.emit(Cmd::VerformungEnde); }
     /// Glas: was bis hierher gezeichnet ist, im Rechteck unscharf zeichnen
     /// (gui `unschaerfe`). Radius und Ecke in Punkten.
+    /// Schicht mit Deckkraft (0..255) und Farbton (0xRRGGBB, weiss = keiner).
+    pub fn schicht_anfang(&mut self, deckkraft: u8, farbton: i64) {
+        let c = Color::new(((farbton >> 16) & 0xFF) as u8, ((farbton >> 8) & 0xFF) as u8, (farbton & 0xFF) as u8, deckkraft);
+        self.emit(Cmd::SchichtAnfang(deckkraft, c));
+    }
+    pub fn schicht_ende(&mut self) { self.emit(Cmd::SchichtEnde); }
     pub fn unschaerfe(&mut self, x: i32, y: i32, w: i32, h: i32, radius: i32, ecke: i32) {
         let (x1, y1) = self.w2s(x, y); let (x2, y2) = self.w2s(x + w - 1, y + h - 1);
         self.emit(Cmd::Unschaerfe(x1, y1, x2, y2, self.ssize(radius), self.ssize(ecke)));
@@ -8330,8 +8349,12 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         } else {
             let mut d = rl.begin_drawing(thread);
             UNSCHAERFE_ZIEL.with(|z| z.set(Some((tw as i32, th as i32))));
+            SCHICHT_ZIEL.with(|z| z.set(Some((tw as i32, th as i32))));
             render_scene(&mut d, s, Some(clear_color), layers, &order, textures, fonts, ausweich, font_glyphs, cmds3d, cam, models, light_shader.as_mut(), mat_locs, nmap_set, pbr_ref, emis_ref, ibl, rts, skybox, cam_view, cam_proj, inst_ffi);
             UNSCHAERFE_ZIEL.with(|z| z.set(None));
+            SCHICHT_ZIEL.with(|z| z.set(None));
+            // Eine Schicht ohne Ende (darf nicht vorkommen) nicht offen lassen.
+            if SCHICHT_LAEUFT.with(|z| z.take()).is_some() { unsafe { raylib::ffi::EndTextureMode(); } }
         }
         // Web (emscripten): nach dem Praesentieren (EndDrawing oben beim Drop des
         // Draw-Handles) ans Browser-Event-Loop yielden -- sonst blockiert der
@@ -9692,6 +9715,40 @@ fn render_scene<D: RaylibDraw>(
                         raylib::ffi::rlScalef(*sx, *sy, 1.0);
                         raylib::ffi::rlTranslatef(-mx, -my, 0.0);
                     },
+                    Cmd::SchichtAnfang(_, farbe) => {
+                        if let (Some((tw, th)), None) = (SCHICHT_ZIEL.with(|z| z.get()), SCHICHT_LAEUFT.with(|z| z.get())) {
+                            unsafe {
+                                raylib::ffi::rlDrawRenderBatchActive();
+                                let rt = match SCHICHT_RT.with(|z| z.get()) {
+                                    Some((rt, w, h)) if w == tw && h == th => rt,
+                                    alt => {
+                                        if let Some((rt, _, _)) = alt { raylib::ffi::UnloadRenderTexture(rt); }
+                                        let rt = raylib::ffi::LoadRenderTexture(tw, th);
+                                        SCHICHT_RT.with(|z| z.set(Some((rt, tw, th))));
+                                        rt
+                                    }
+                                };
+                                raylib::ffi::BeginTextureMode(rt);
+                                raylib::ffi::ClearBackground(raylib::ffi::Color { r: 0, g: 0, b: 0, a: 0 });
+                            }
+                            SCHICHT_LAEUFT.with(|z| z.set(Some((farbe.a, *farbe))));
+                        }
+                    }
+                    Cmd::SchichtEnde => {
+                        if let Some((_, farbe)) = SCHICHT_LAEUFT.with(|z| z.get()) {
+                            SCHICHT_LAEUFT.with(|z| z.set(None));
+                            if let Some((rt, w, h)) = SCHICHT_RT.with(|z| z.get()) {
+                                unsafe {
+                                    raylib::ffi::rlDrawRenderBatchActive();
+                                    raylib::ffi::EndTextureMode();
+                                    let quelle = raylib::ffi::Rectangle { x: 0.0, y: 0.0, width: w as f32, height: -(h as f32) };
+                                    let f = raylib::ffi::Color { r: farbe.r, g: farbe.g, b: farbe.b, a: farbe.a };
+                                    raylib::ffi::DrawTextureRec(rt.texture, quelle, raylib::ffi::Vector2 { x: 0.0, y: 0.0 }, f);
+                                    raylib::ffi::rlDrawRenderBatchActive();
+                                }
+                            }
+                        }
+                    }
                     Cmd::Unschaerfe(x1, y1, x2, y2, r, ecke) => {
                         if let Some((tw, th)) = UNSCHAERFE_ZIEL.with(|z| z.get()) {
                             let x = (*x1).min(*x2) * s; let y = (*y1).min(*y2) * s;

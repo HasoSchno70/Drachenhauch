@@ -737,6 +737,11 @@ impl Gui {
         // Mitte verschoben, gedreht oder vergroessert -- Lage und Treffer
         // bleiben.
         let anim = if wdg.aussehen.is_some() { self.anim_matrix(wi, idx, wdg) } else { None };
+        // Deckkraft und Farbton (Ablauf, `blinken`): eine Schicht AUSSEN um
+        // die Verformung -- das Renderziel der Schicht faengt mit neuer
+        // Matrix an.
+        let deck = if wdg.aussehen.is_some() { self.anim_deck(wi, idx, wdg) } else { None };
+        if let Some((a, ton)) = deck { g.schicht_anfang(a, ton); }
         if let Some((dx, dy, ang, sx, sy)) = anim {
             let (ax, ay, w, h) = self.abs_rect(wi, wdg);
             g.verformung_beginnen(ax + w / 2, ay + h / 2, dx, dy, ang, sx, sy);
@@ -754,6 +759,7 @@ impl Gui {
         }
         self.draw_widget_innen(g, wi, idx, wdg);
         if anim.is_some() { g.verformung_beenden(); }
+        if deck.is_some() { g.schicht_ende(); }
         self.form_jetzt.set(form_vorher);
         self.rad_jetzt.set(vorher);
     }
