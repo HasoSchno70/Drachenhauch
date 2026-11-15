@@ -355,6 +355,10 @@ pub enum Kind {
     ColorPicker, DatePicker,
     Layout, TabControl, RichText, TimePicker, Accordion, Wizard,
     StatusBar, Breadcrumb, Card,
+    /// Selbst gezeichnet (GUI_CUSTOM): das Programm malt wie in eine
+    /// Zeichenflaeche, die gui fuehrt Fokus, Tasten, Klick und
+    /// Bildschirmleser (gui_widgets.rs `custom`).
+    Eigen,
 }
 
 impl Kind {
@@ -374,6 +378,7 @@ impl Kind {
             Kind::RichText => "richtext", Kind::TimePicker => "timepicker",
             Kind::StatusBar => "statusbar", Kind::Breadcrumb => "breadcrumb",
             Kind::Card => "card",
+            Kind::Eigen => "custom",
         }
     }
     fn from_str(s: &str) -> Option<Kind> {
@@ -392,6 +397,7 @@ impl Kind {
             "richtext" => Kind::RichText, "timepicker" => Kind::TimePicker,
             "statusbar" => Kind::StatusBar, "breadcrumb" => Kind::Breadcrumb,
             "card" => Kind::Card,
+            "custom" => Kind::Eigen,
             _ => return None,
         })
     }
@@ -3384,6 +3390,10 @@ pub struct Widget {
     frei: bool,
     // Enter im Textfeld -- GENAU EIN BILD lang, wie `clicked`.
     entered: bool,
+    /// Selbst gezeichnetes Widget: die Taste und die Zeichen dieses Bildes
+    /// (GUI_CUSTOM_KEY, GUI_CUSTOM_TEXT$) -- ein Bild lang, wie `clicked`.
+    eigen_taste: i64,
+    eigen_text: String,
     on_enter: Option<Rueckruf>,
     // Rueckgaengig beim Tippen (Textfeld und Textbereich): der Stand VOR einer
     // Aenderung samt Schreibmarke. Anschlaege innerhalb von 0,8 s sind EIN
@@ -5199,7 +5209,7 @@ impl Gui {
             zeit: [12, 0, 0], zeit_sek: false,
             step: 1.0,
             align: -1, wrap: false, passwort: false, nur_lesen: false, maxlaenge: 0, zahlen: 0, frei: false,
-            entered: false, on_enter: None, undo: Vec::new(), redo: Vec::new(), undo_zeit: -10.0,
+            entered: false, eigen_taste: 0, eigen_text: String::new(), on_enter: None, undo: Vec::new(), redo: Vec::new(), undo_zeit: -10.0,
             feld: None,
             name: String::new(), klassen: Vec::new(), stil_auf: None, stil_key: None,
             bau: None,

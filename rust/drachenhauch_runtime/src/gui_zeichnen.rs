@@ -1813,6 +1813,9 @@ impl Gui {
                 if wdg.sel >= 0 { self.draw_bild(g, wdg, ax, ay, w, h); }
             }
             Kind::Card => self.draw_karte(g, wi, idx, ax, ay, w, h),
+            // Selbst gezeichnet: die gui malt nichts (den Fokusring malt
+            // `draw_widget` wie bei jedem Widget).
+            Kind::Eigen => {}
             Kind::Canvas => {
                 // Platzhalter-Flaeche; der User malt nach GUI_DRAW mit normalen
                 // Befehlen in den per GUI_CANVAS_X/Y/W/H gelieferten Bereich.

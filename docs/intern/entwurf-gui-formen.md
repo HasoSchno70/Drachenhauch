@@ -55,7 +55,7 @@ viele Widgets gilt; dazu zwei Befehle für das Programm.
 - Bildhäute für Kästchen, Optionen und Schalter (je Zustand). Formen
   (`form`) bleiben bei Knöpfen; Regler offen.
 
-## Stufe 3 (offen)
+## Stufe 3 (gebaut 2026-11-15: `GUI_CUSTOM`)
 
 - Selbst gezeichnete Widgets: das Programm malt (wie in eine Zeichenfläche,
   `GUI_CANVAS_BEGIN`), die gui führt Fokus, Tastatur, Klick und

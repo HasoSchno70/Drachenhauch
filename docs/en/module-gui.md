@@ -2667,6 +2667,45 @@ palette stays closed. While it is open no widget has the focus -- a
 backspace shortens the search, not the text in the field below; afterwards
 the focus comes back.
 
+### 12. Self-drawn widgets
+
+When no shape and no skin will do: `GUI_CUSTOM` is a widget the program
+paints itself -- like a drawing surface, with `GUI_CANVAS_BEGIN` /
+`GUI_CANVAS_END` and `GUI_CANVAS_MOUSE` --, but the gui looks after it like
+any other: it gets the focus with Tab (focus ring included), a click via
+mouse, Enter or space (`GUI_CLICKED`), the keys of the frame and a role for
+the screen reader.
+
+| Command | Returns | Effect |
+|---|---|---|
+| `GUI_CUSTOM(win, x, y, w, h [, rolle$])` | GUI_WIDGET | a self-drawn widget; `rolle$` (role) = `"button"` (default), `"checkbox"` (tick via `GUI_SET_CHECKED`/`GUI_CHECKED`) or `"slider"` (value via `GUI_SET_VALUE`/`GUI_VALUE`); `GUI_SET_TEXT` sets the name for the screen reader |
+| `GUI_CUSTOM_KEY(wdg)` | INTEGER | the key it got this frame (arrows, Home/End, Page up/down, Enter, space, Backspace, Delete, ESC -- codes like `KEYHIT`), 0 = none |
+| `GUI_CUSTOM_TEXT$(wdg)` | STRING | the characters it got this frame |
+
+```basic
+IMPORT "gui"
+SCREEN(420, 240, "Eigen", 1)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Eigen", 10, 10, 400, 220)
+DIM nacht AS GUI_WIDGET : nacht = GUI_CUSTOM(w, 20, 20, 160, 60, "checkbox")
+GUI_SET_TEXT(nacht, "Nachtmodus")
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_CLICKED(nacht) THEN GUI_SET_CHECKED(nacht, NOT GUI_CHECKED(nacht))
+    CLS(&H202830)
+    GUI_DRAW()
+    GUI_CANVAS_BEGIN(nacht)
+    DIM x AS INTEGER : x = GUI_CANVAS_X(nacht)
+    DIM y AS INTEGER : y = GUI_CANVAS_Y(nacht)
+    BOX(x, y, x + 158, y + 58, IIF(GUI_CHECKED(nacht), &H203060, &HE0C060))
+    TEXT(x + 10, y + 20, IIF(GUI_CHECKED(nacht), "Mond", "Sonne"), WHITE)
+    GUI_CANVAS_END()
+    FLIP()
+WEND
+```
+
+Keys and characters only arrive while the widget has the focus; they hold
+for exactly one frame, like `GUI_CLICKED`.
+
 ## Callbacks: GUI_ON_CLICK
 
 Besides polling (`IF GUI_CLICKED(b) THEN ...`) you can register a Drachenhauch

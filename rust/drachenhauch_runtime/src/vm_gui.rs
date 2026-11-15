@@ -1614,6 +1614,16 @@ impl<'p> Vm<'p> {
                 let dauer = if a.len() >= 3 { Some(gi(a,2,n)?) } else { None };
                 let anzahl = if a.len() >= 4 { Some(gi(a,3,n)?) } else { None };
                 self.gui.animate(gi(a,0,n)?, &gs(a,1,n)?, dauer, anzahl)?; Value::Nil }
+            "gui_custom" => { let n = "GUI_CUSTOM";
+                if a.len() < 5 || a.len() > 6 { return Err(format!("{}: erwartet (win, x, y, w, h [, rolle$])", n)); }
+                let rolle = if a.len() == 6 { gs(a,5,n)?.to_string() } else { String::new() };
+                Value::Int(self.gui.custom(gi(a,0,n)?, gi(a,1,n)? as i32, gi(a,2,n)? as i32, gi(a,3,n)? as i32, gi(a,4,n)? as i32, &rolle)?) }
+            "gui_custom_key" => { let n = "GUI_CUSTOM_KEY";
+                if a.len() != 1 { return Err(format!("{}: erwartet (wdg)", n)); }
+                Value::Int(self.gui.custom_key(gi(a,0,n)?)?) }
+            "gui_custom_text$" => { let n = "GUI_CUSTOM_TEXT$";
+                if a.len() != 1 { return Err(format!("{}: erwartet (wdg)", n)); }
+                Value::str_rc(&self.gui.custom_text(gi(a,0,n)?)?) }
             "gui_window_rtl" => { let n = "GUI_WINDOW_RTL";
                 if a.len() != 2 { return Err(format!("{}: erwartet (win, an)", n)); }
                 self.gui.window_rtl(gi(a,0,n)?, gbool(a,1,n)?)?; Value::Nil }

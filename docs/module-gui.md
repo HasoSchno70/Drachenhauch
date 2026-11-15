@@ -2682,6 +2682,45 @@ Eintrag aus, und die Palette bleibt zu. Solange sie offen ist, hat kein
 Widget den Fokus -- eine Rücktaste kürzt die Suche, nicht den Text im Feld
 darunter; danach kommt der Fokus zurück.
 
+### 12. Selbst gezeichnete Widgets
+
+Wenn keine Form und keine Haut reicht: `GUI_CUSTOM` ist ein Widget, das
+das Programm selbst malt -- wie eine Zeichenfläche, mit `GUI_CANVAS_BEGIN`
+/ `GUI_CANVAS_END` und `GUI_CANVAS_MOUSE` --, um das sich die gui aber wie
+um jedes andere kümmert: Es bekommt den Fokus mit Tab (samt Fokusring),
+einen Klick über Maus, Enter oder Leertaste (`GUI_CLICKED`), die Tasten des
+Bildes und eine Rolle für den Bildschirmleser.
+
+| Befehl | Rückgabe | Wirkung |
+|---|---|---|
+| `GUI_CUSTOM(win, x, y, w, h [, rolle$])` | GUI_WIDGET | ein selbst gezeichnetes Widget; `rolle$` = `"button"` (Vorgabe), `"checkbox"` (Haken über `GUI_SET_CHECKED`/`GUI_CHECKED`) oder `"slider"` (Wert über `GUI_SET_VALUE`/`GUI_VALUE`); den Namen für den Bildschirmleser setzt `GUI_SET_TEXT` |
+| `GUI_CUSTOM_KEY(wdg)` | INTEGER | die Taste, die es in diesem Bild bekam (Pfeile, Pos1/Ende, Bild auf/ab, Enter, Leertaste, Rück, Entf, ESC -- Codes wie `KEYHIT`), 0 = keine |
+| `GUI_CUSTOM_TEXT$(wdg)` | STRING | die Zeichen, die es in diesem Bild bekam |
+
+```basic
+IMPORT "gui"
+SCREEN(420, 240, "Eigen", 1)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Eigen", 10, 10, 400, 220)
+DIM nacht AS GUI_WIDGET : nacht = GUI_CUSTOM(w, 20, 20, 160, 60, "checkbox")
+GUI_SET_TEXT(nacht, "Nachtmodus")
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_CLICKED(nacht) THEN GUI_SET_CHECKED(nacht, NOT GUI_CHECKED(nacht))
+    CLS(&H202830)
+    GUI_DRAW()
+    GUI_CANVAS_BEGIN(nacht)
+    DIM x AS INTEGER : x = GUI_CANVAS_X(nacht)
+    DIM y AS INTEGER : y = GUI_CANVAS_Y(nacht)
+    BOX(x, y, x + 158, y + 58, IIF(GUI_CHECKED(nacht), &H203060, &HE0C060))
+    TEXT(x + 10, y + 20, IIF(GUI_CHECKED(nacht), "Mond", "Sonne"), WHITE)
+    GUI_CANVAS_END()
+    FLIP()
+WEND
+```
+
+Tasten und Zeichen kommen nur, solange das Widget den Fokus hat; sie gelten
+genau ein Bild, wie `GUI_CLICKED`.
+
 ## Callbacks: GUI_ON_CLICK
 
 Neben dem Polling (`IF GUI_CLICKED(b) THEN ...`) kannst du eine Drachenhauch-

@@ -506,6 +506,21 @@ impl Gui {
         let (auf, ab) = (g.key_pressed(KEY_UP), g.key_pressed(KEY_DOWN));
         let (links, rechts) = (g.key_pressed(KEY_LEFT), g.key_pressed(KEY_RIGHT));
         match kind {
+            Kind::Eigen => {
+                // Die Tasten dieses Bildes merkt sich das Widget, Enter und
+                // Leertaste sind ausserdem ein Klick.
+                let taste = [KEY_LEFT, KEY_RIGHT, KEY_UP, KEY_DOWN, KEY_HOME, KEY_END, KEY_PAGEUP, KEY_PAGEDOWN,
+                    KEY_ENTER, KEY_SPACE, KEY_BACKSPACE, KEY_DELETE, KEY_ESC].into_iter().find(|&k| g.key_repeat(k)).unwrap_or(0);
+                let text: String = g.pop_text_input().chars().filter(|c| !c.is_control() && *c != ' ').collect();
+                let w = &mut self.windows[wi].widgets[i];
+                w.eigen_taste = taste;
+                w.eigen_text = text;
+                if ausloesen {
+                    w.clicked = true;
+                    let f = w.on_click.clone();
+                    if let Some(f) = f { self.pending.push(f); }
+                }
+            }
             Kind::Button | Kind::Card => {
                 if ausloesen {
                     let w = &mut self.windows[wi].widgets[i];
@@ -1242,7 +1257,7 @@ impl Gui {
         let kind = self.windows[win].widgets[i].kind;
         self.focus_widget = if kind.fokussierbar() { Some((win, i)) } else { None };
         match kind {
-            Kind::Button | Kind::Card => self.press_origin = Some((win, i)),
+            Kind::Button | Kind::Card | Kind::Eigen => self.press_origin = Some((win, i)),
             Kind::StatusBar => {
                 let k = self.sb_treffer(win, i, mx);
                 let w = &mut self.windows[win].widgets[i];

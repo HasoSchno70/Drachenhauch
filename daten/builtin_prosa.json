@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 2455,
+ "count": 2458,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -617,6 +617,9 @@
   "GUI_CONTEXT_TABS": "Kontextmenü an die Reiterleiste des Fensters binden: es öffnet beim Rechtsklick auf einen Reiter",
   "GUI_CONTEXT_WIDGET": "Kontextmenü an ein Widget binden: es öffnet nur beim Rechtsklick darauf (Liste, Baum, Tabelle wählen dabei ihre Zeile, ein Textbereich setzt die Marke; nicht in seiner Nummernspalte, die gehört GUI_TEXTAREA_GUTTER_CLICKED); -1 bindet es wieder ans Fenster",
   "GUI_CURSORS": "Zeigerformen je nach Stelle im Widget (Vorgabe an): Textstrich über Text, Hand über allem Anklickbaren, Doppelpfeil an Trennern, Spaltenkanten und am Fenstergriff",
+  "GUI_CUSTOM": "GUI_WIDGET — ein selbst gezeichnetes Widget; rolle$ = \"button\" (Vorgabe), \"checkbox\" (Haken über GUI_SET_CHECKED/GUI_CHECKED) oder \"slider\" (Wert über GUI_SET_VALUE/GUI_VALUE); den Namen für den Bildschirmleser setzt GUI_SET_TEXT",
+  "GUI_CUSTOM_KEY": "INTEGER — die Taste, die es in diesem Bild bekam (Pfeile, Pos1/Ende, Bild auf/ab, Enter, Leertaste, Rück, Entf, ESC -- Codes wie KEYHIT), 0 = keine",
+  "GUI_CUSTOM_TEXT$": "STRING — die Zeichen, die es in diesem Bild bekam",
   "GUI_DATE": "gewähltes Datum als JJJJ-MM-TT",
   "GUI_DATEFIELD": "Datumsfeld: zeigt das Datum und klappt beim Klick (Leertaste, F4, Alt+Ab) den Monat auf; ein Tag übernimmt, ESC klappt nur zu, Enter gilt zugeklappt dem Formular -- sonst wie GUI_DATEPICKER",
   "GUI_DATEPICKER": "Monatsgitter mit Blätterpfeilen",

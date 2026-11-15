@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/en und dem englischen Buch von `dhrt doku prosa` -- NICHT von Hand aendern. Der Hover nimmt sie mit DHRT_LANG=en.",
- "count": 2447,
+ "count": 2450,
  "docs": {
   "ABS": "Absolute value.",
   "ACOS": "Arc sine/cosine (x in [-1, 1])",
@@ -616,6 +616,9 @@
   "GUI_CONTEXT_TABS": "bind a context menu to the window's tab bar: it opens on a right-click on a tab",
   "GUI_CONTEXT_WIDGET": "bind a context menu to a widget: it only opens on a right-click on it (list box, tree, table select their row while doing so, a text area sets the cursor; not in its line-number column, which belongs to GUI_TEXTAREA_GUTTER_CLICKED); -1 binds it back to the window",
   "GUI_CURSORS": "mouse pointer shapes depending on the spot in the widget (default on): text beam over text, hand over anything clickable, double arrow at dividers, column edges and the window grip",
+  "GUI_CUSTOM": "GUI_WIDGET — a self-drawn widget; rolle$ (role) = \"button\" (default), \"checkbox\" (tick via GUI_SET_CHECKED/GUI_CHECKED) or \"slider\" (value via GUI_SET_VALUE/GUI_VALUE); GUI_SET_TEXT sets the name for the screen reader",
+  "GUI_CUSTOM_KEY": "INTEGER — the key it got this frame (arrows, Home/End, Page up/down, Enter, space, Backspace, Delete, ESC -- codes like KEYHIT), 0 = none",
+  "GUI_CUSTOM_TEXT$": "STRING — the characters it got this frame",
   "GUI_DATE": "chosen date as JJJJ-MM-TT",
   "GUI_DATEFIELD": "date field: shows the date and drops down the month on a click (Space, F4, Alt+Down); a day takes it, ESC only closes, Enter belongs to the form while closed -- otherwise like GUI_DATEPICKER",
   "GUI_DATEPICKER": "month grid with paging arrows",

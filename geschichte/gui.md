@@ -1266,3 +1266,13 @@ am Zeilenende der Erwartung ab, die Ausgabe nicht.
   Popup-Fensters mit Versatz (`RT_VERSATZ`) --, zurueckgelegt in seinen
   Punkten (`DrawTexturePro`). Die Grenze "grau" im neuen Fall war erst zu
   eng (0xCA an der Kante) -- gemessen, nicht geraten, vor dem Anpassen.
+- **Selbst gezeichnete Widgets** (Formen Stufe 3, `GUI_CUSTOM`): eine
+  eigene Art `Kind::Eigen` statt einer Sonderregel je Zeichenflaeche --
+  `Kind::fokussierbar` ist die EINE Quelle fuer Tab-Zyklus, Klick-Fokus und
+  Fokusring und fragt nur die Art. Druck, Loslassen, Enter/Leertaste und
+  der Klick des Bildschirmlesers gehen den Weg des Knopfs; gemalt wird
+  ueber `canvas_rect` (GUI_CANVAS_*), die Rolle (button, checkbox, slider)
+  steht in `group`. GUI_CHECKED/GUI_VALUE nahmen das Widget zuerst nicht
+  an -- der erste Fall fiel daran, bevor er etwas pruefte. Die Zeichen
+  (GUI_CUSTOM_TEXT$) prueft kein Fall: eingespielte Tasten fuellen die
+  Zeichen-Warteschlange nicht.

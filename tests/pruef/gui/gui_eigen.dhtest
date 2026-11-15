@@ -1,0 +1,102 @@
+' Selbst gezeichnete Widgets (GUI_CUSTOM, Formen Stufe 3): gemalt wie eine
+' Zeichenflaeche, aber mit Fokus (Tab), Klick (Maus, Enter, Leertaste),
+' den Tasten des Bildes (GUI_CUSTOM_KEY) und einer Rolle fuer den
+' Bildschirmleser.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== tab enter und pfeil erreichen das eigene widget
+IMPORT "gui"
+SCREEN(400, 240, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 240)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "Davor", 20, 20, 100, 30)
+DIM c AS GUI_WIDGET : c = GUI_CUSTOM(w, 20, 80, 160, 60)
+GUI_SET_TEXT(c, "Farbrad")
+GUI_FOCUS(b)
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER
+DIM log AS STRING
+FOR n = 1 TO 40
+    GUI_UPDATE()
+    IF GUI_FOCUSED() = c AND INSTR(log, "fokus") < 0 THEN log = log + " fokus@" + STR$(n)
+    IF GUI_CLICKED(c) THEN log = log + " klick@" + STR$(n)
+    IF GUI_CUSTOM_KEY(c) = KEY_RIGHT THEN log = log + " rechts@" + STR$(n)
+    IF GUI_CLICKED(b) THEN log = log + " knopf"
+    CLS(0) : GUI_DRAW() : FLIP()
+NEXT
+PRINT "folge"; log; " art "; GUI_KIND(c)
+--- datei ev.txt
+c 7
+e 0 7 390 230 0 0
+e 3 2 258 0 0 0
+e 4 1 258 0 0 0
+e 8 2 257 0 0 0
+e 9 1 257 0 0 0
+e 13 2 262 0 0 0
+e 14 1 262 0 0 0
+
+--- umgebung
+DHRT_FRAMES=50
+--- erwartet
+folge fokus@5 klick@10 rechts@15 art custom
+
+=== ein mausklick klickt und das programm malt hinein
+IMPORT "gui"
+SCREEN(400, 240, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 240)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM c AS GUI_WIDGET : c = GUI_CUSTOM(w, 20, 80, 160, 60, "checkbox")
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER
+DIM klicks AS INTEGER
+FOR n = 1 TO 20
+    GUI_UPDATE()
+    IF GUI_CLICKED(c) THEN
+        klicks = klicks + 1
+        GUI_SET_CHECKED(c, NOT GUI_CHECKED(c))
+    END IF
+    CLS(0) : GUI_DRAW()
+    GUI_CANVAS_BEGIN(c)
+    BOX(GUI_CANVAS_X(c), GUI_CANVAS_Y(c), GUI_CANVAS_X(c) + 20, GUI_CANVAS_Y(c) + 20, IIF(GUI_CHECKED(c), &H00FF00, &HFF0000))
+    GUI_CANVAS_END()
+    FLIP()
+NEXT
+PRINT "klicks "; klicks; " an "; GUI_CHECKED(c); " fokus "; GUI_FOCUSED() = c
+--- datei ev.txt
+c 3
+e 0 7 100 110 0 0
+e 3 6 0 0 0 0
+e 4 5 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=20
+--- erwartet
+klicks 1 an TRUE fokus TRUE
+--- bild
+30 90 #00FF00
+
+=== falsche rollen und arten sind fehler
+TRY
+    SCREEN(400, 240, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 240)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "x", 20, 20, 100, 30)
+TRY
+    DIM c AS GUI_WIDGET : c = GUI_CUSTOM(w, 20, 80, 160, 60, "kreisel")
+CATCH e1
+    PRINT e1
+END TRY
+TRY
+    PRINT GUI_CUSTOM_KEY(b)
+CATCH e2
+    PRINT e2
+END TRY
+--- enthaelt
+GUI_CUSTOM: Rolle 'kreisel' -- button, checkbox oder slider
+GUI_CUSTOM_KEY: Widget ist kein GUI_CUSTOM

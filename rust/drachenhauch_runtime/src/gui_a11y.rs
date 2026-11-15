@@ -217,6 +217,31 @@ impl Gui {
                 n.add_action(Action::Click);
                 n
             }
+            // Selbst gezeichnet: die Rolle, die das Programm gesagt hat.
+            Kind::Eigen => match w.group.as_str() {
+                "checkbox" => {
+                    let mut n = Node::new(Role::CheckBox);
+                    n.set_label(w.text.clone());
+                    n.set_toggled(if w.checked { Toggled::True } else { Toggled::False });
+                    n.add_action(Action::Click);
+                    n
+                }
+                "slider" => {
+                    let mut n = Node::new(Role::Slider);
+                    n.set_label(w.text.clone());
+                    n.set_numeric_value(w.value);
+                    n.set_min_numeric_value(w.min);
+                    n.set_max_numeric_value(w.max);
+                    n.set_value(zahl_kurz(w.value));
+                    n
+                }
+                _ => {
+                    let mut n = Node::new(Role::Button);
+                    n.set_label(w.text.clone());
+                    n.add_action(Action::Click);
+                    n
+                }
+            },
             Kind::Card => {
                 // Ein Knopf, dessen Beschreibung der Bildschirmleser nach dem
                 // Titel vorliest.
@@ -696,7 +721,7 @@ impl Gui {
     /// Leertaste (`widget_keys`), damit `clicked` und die Rueckrufe stimmen.
     pub(super) fn a11y_klick(&mut self, wi: usize, i: usize, kind: Kind) {
         match kind {
-            Kind::Button | Kind::Card => {
+            Kind::Button | Kind::Card | Kind::Eigen => {
                 let w = &mut self.windows[wi].widgets[i];
                 w.clicked = true;
                 let f = w.on_click.clone();

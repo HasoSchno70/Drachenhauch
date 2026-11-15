@@ -246,13 +246,13 @@ impl Gui {
     pub fn hovered(&self, h: i64) -> Result<bool, String> { Ok(self.wdg(h, "GUI_HOVERED")?.hovered) }
     pub fn checked(&self, h: i64) -> Result<bool, String> {
         let w = self.wdg(h, "GUI_CHECKED")?;
-        if !matches!(w.kind, Kind::Checkbox | Kind::Radio | Kind::Toggle) { return Err("GUI_CHECKED: Widget ist keine checkbox/radio/toggle".into()); }
+        if !matches!(w.kind, Kind::Checkbox | Kind::Radio | Kind::Toggle | Kind::Eigen) { return Err("GUI_CHECKED: Widget ist keine checkbox/radio/toggle".into()); }
         Ok(w.checked)
     }
     pub fn value(&self, h: i64) -> Result<f64, String> {
         let w = self.wdg(h, "GUI_VALUE")?;
         match w.kind {
-            Kind::Slider | Kind::Progress | Kind::Spinner | Kind::Knob => Ok(w.value),
+            Kind::Slider | Kind::Progress | Kind::Spinner | Kind::Knob | Kind::Eigen => Ok(w.value),
             Kind::Splitter => Ok(if w.group == "v" { w.x as f64 } else { w.y as f64 }),
             _ => Err("GUI_VALUE: Widget ist kein slider/progress/spinner/splitter/knob".into()),
         }
@@ -321,7 +321,7 @@ impl Gui {
     }
     pub fn set_checked(&mut self, h: i64, f: bool) -> Result<(), String> {
         let kind = self.wdg(h, "GUI_SET_CHECKED")?.kind;
-        if !matches!(kind, Kind::Checkbox | Kind::Radio | Kind::Toggle) { return Err("GUI_SET_CHECKED: Widget ist keine checkbox/radio/toggle".into()); }
+        if !matches!(kind, Kind::Checkbox | Kind::Radio | Kind::Toggle | Kind::Eigen) { return Err("GUI_SET_CHECKED: Widget ist keine checkbox/radio/toggle".into()); }
         {
             let w = self.wdg_mut(h, "GUI_SET_CHECKED")?;
             w.checked = f;
@@ -337,6 +337,8 @@ impl Gui {
         let w = self.wdg_mut(h, "GUI_SET_VALUE")?;
         match w.kind {
             Kind::Slider | Kind::Progress | Kind::Spinner | Kind::Knob => { w.value = v.clamp(w.min, w.max); }
+            // Selbst gezeichnet: der Wert gehoert dem Programm (Rolle "slider").
+            Kind::Eigen => { w.value = v; }
             Kind::Splitter => {
                 let c = (v.round() as i32).clamp(w.min as i32, w.max as i32);
                 if w.group == "v" { w.x = c; } else { w.y = c; }
