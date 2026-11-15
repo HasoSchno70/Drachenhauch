@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 2458,
+ "count": 2460,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -834,6 +834,7 @@
   "GUI_MNEMONICS": "Alt-Buchstaben: & im Text von Knopf, Kästchen, Radio, Kippschalter und Beschriftung markiert ihn (&& = ein &)",
   "GUI_MODAL": "BOOLEAN — steht gerade ein Dialog oder ein modales Fenster?",
   "GUI_MOTION": "BOOLEAN — spielt die gui gerade Bewegung ab?",
+  "GUI_NEXT_FRAME": "FLOAT — in wie vielen Sekunden die gui das nächste Bild braucht (nach GUI_DRAW, vor FLIP); 0 = sofort, -1 = erst bei einer Eingabe",
   "GUI_ON_BLUR": "verliert sie — der Punkt, an dem man eine Eingabe prüft",
   "GUI_ON_CHANGE": "FUNCREF-Callback bei Wertänderung (Slider/TextInput/Checkbox/Table-Selektion)",
   "GUI_ON_CLICK": "FUNCREF-Callback bei Klick (Button/Checkbox)",
@@ -2365,6 +2366,7 @@
   "WINDOW_HIDDEN": "Zustand des Fensters abfragen",
   "WINDOW_HIDE": "das Fenster verschwinden lassen, auch aus der Taskleiste, und zurückholen — für Werkzeuge, die im Tray leben",
   "WINDOW_ICON": "Setzt das Fenstersymbol aus einem per LOADIMAGE geladenen Bild.",
+  "WINDOW_IDLE_WAIT": "wie lange das letzte FLIP höchstens warten durfte (Sekunden, 0 = gar nicht)",
   "WINDOW_IS_FULLSCREEN": "läuft es gerade im Vollbild?",
   "WINDOW_MAXIMIZE": "Fenster auf Bildschirmgröße bringen",
   "WINDOW_MAXIMIZED": "Zustand des Fensters abfragen",
@@ -2385,7 +2387,7 @@
   "WINDOW_SHOW": "das Fenster verschwinden lassen, auch aus der Taskleiste, und zurückholen — für Werkzeuge, die im Tray leben",
   "WINDOW_TOPMOST": "Fenster immer im Vordergrund halten",
   "WINDOW_UNDECORATED": "Fensterrahmen/Titelleiste aus (TRUE) / ein (FALSE)",
-  "WINDOW_WAIT_EVENTS": "FLIP wartet auf eine Eingabe, höchstens so lange — ein Werkzeug, das nur auf Klicks reagiert, braucht dann kaum Rechenzeit; 0 schaltet ab",
+  "WINDOW_WAIT_EVENTS": "FLIP wartet auf eine Eingabe, höchstens so lange — ein Werkzeug, das nur auf Klicks reagiert, braucht dann kaum Rechenzeit; 0 schaltet ab, ohne Argument: die eingestellte Dauer. Nach einer Eingabe läuft es 0,35 s ohne Warten nach, bei gedrückter Maustaste auch; die gui kürzt die Frist auf ihr nächstes Bild (Schreibmarke, Hilfetext, Animation, Toast — GUI_NEXT_FRAME); mit fester Bildzahl …",
   "WINDOW_X": "Position der linken oberen Fensterecke (px)",
   "WINDOW_Y": "Position der linken oberen Fensterecke (px)",
   "WORLD_TO_SCREEN_X": "FLOAT — wo landet ein Punkt der Welt auf dem Bildschirm? — für Beschriftungen über Figuren",

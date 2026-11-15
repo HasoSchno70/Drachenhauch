@@ -1,0 +1,226 @@
+' Leerlauf (leerlauf.rs, Gui::bild_in): mit WINDOW_WAIT_EVENTS schlaeft
+' FLIP, solange nichts passiert -- aber nur so lange, wie die gui kein Bild
+' braucht. GUI_NEXT_FRAME() sagt nach GUI_DRAW, wann sie das naechste
+' braucht (-1 = erst bei einer Eingabe), WINDOW_IDLE_WAIT() nach FLIP, wie
+' lange es warten durfte. Die ersten Faelle laufen mit fester Bildzahl
+' (1/60 s je Bild), die letzten in echter Zeit.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== ohne bewegung braucht die gui kein bild
+TRY
+    SCREEN(400, 200, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 200)
+DIM t AS GUI_WIDGET : t = GUI_TEXTINPUT(w, 20, 20, 200, 28)
+DIM k AS GUI_WIDGET : k = GUI_BUTTON(w, "Knopf", 20, 70, 120, 30)
+DIM n AS INTEGER = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE() : CLS(0) : GUI_DRAW()
+    n = n + 1
+    IF n = 5 THEN PRINT GUI_NEXT_FRAME()
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=6
+--- erwartet
+-1.0
+
+=== die schreibmarke meldet, wann sie umschlaegt
+TRY
+    SCREEN(400, 200, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 200)
+DIM t AS GUI_WIDGET : t = GUI_TEXTINPUT(w, 20, 20, 200, 28)
+GUI_FOCUS(t)
+DIM n AS INTEGER = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE() : CLS(0) : GUI_DRAW()
+    n = n + 1
+    ' Bild 5: der Takt steht bei 5/60 s, die Marke schlaegt bei 16/60 s um.
+    IF n = 5 THEN PRINT ROUND(GUI_NEXT_FRAME() * 60)
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=6
+--- erwartet
+11
+
+=== eine laufende animation braucht jedes bild
+TRY
+    SCREEN(400, 200, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 200)
+DIM k AS GUI_WIDGET : k = GUI_BUTTON(w, "Knopf", 20, 70, 120, 30)
+GUI_ANIMATE(k, "puls", 700, 0)
+DIM n AS INTEGER = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE() : CLS(0) : GUI_DRAW()
+    n = n + 1
+    IF n = 5 THEN PRINT GUI_NEXT_FRAME()
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=6
+--- erwartet
+0.0
+
+=== ein toast meldet, wann er geht
+TRY
+    SCREEN(400, 200, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 200)
+GUI_TOAST(w, "Hallo", "info", 1200)
+DIM n AS INTEGER = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE() : CLS(0) : GUI_DRAW()
+    n = n + 1
+    ' Eingeblendet ist er laengst; nach 30 Bildern bleiben 1,2 - 0,5 s.
+    IF n = 30 THEN PRINT ROUND(GUI_NEXT_FRAME() * 10)
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=31
+--- erwartet
+7
+
+=== ein hilfetext meldet, wann er faellig ist
+TRY
+    SCREEN(400, 200, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 200)
+DIM k AS GUI_WIDGET : k = GUI_BUTTON(w, "Knopf", 20, 70, 120, 30)
+GUI_WINDOW_CHROME(w, FALSE)
+GUI_TOOLTIP(k, "Hilfe")
+' Mit ausgeschaltetem Uebergang misst nur der Hilfetext.
+GUI_METRIC_SET("uebergang", 0)
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE() : CLS(0) : GUI_DRAW()
+    n = n + 1
+    ' Die Maus (Aufnahme-Bild 1) sieht GUI_UPDATE in Bild 3; in Bild 11
+    ' bleiben von der halben Sekunde Verweilen 0,5 - 8/60 s.
+    IF n = 11 THEN PRINT ROUND(GUI_NEXT_FRAME() * 60)
+    FLIP()
+WEND
+--- datei ev.txt
+c 2
+e 0 7 10 10 0 0
+e 1 7 60 85 0 0
+# Ende (die letzte Zeile einer Beilage geht sonst verloren)
+--- umgebung
+DHRT_FRAMES=12
+--- erwartet
+22
+
+=== ein weicher uebergang braucht bilder, bis er am ziel ist
+TRY
+    SCREEN(400, 200, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 200)
+DIM k AS GUI_WIDGET : k = GUI_BUTTON(w, "Knopf", 20, 70, 120, 30)
+GUI_WINDOW_CHROME(w, FALSE)
+GUI_METRIC_SET("uebergang", 300)
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE() : CLS(0) : GUI_DRAW()
+    n = n + 1
+    ' Bild 3: die Maus kam eben, das Einblenden laeuft; Bild 40: fertig.
+    IF n = 3 OR n = 40 THEN PRINT GUI_NEXT_FRAME()
+    FLIP()
+WEND
+--- datei ev.txt
+c 2
+e 0 7 10 10 0 0
+e 1 7 60 85 0 0
+# Ende (die letzte Zeile einer Beilage geht sonst verloren)
+--- umgebung
+DHRT_FRAMES=41
+--- erwartet
+0.0
+-1.0
+
+=== in ruhe schlaeft flip bis zur grenze des programms
+TRY
+    SCREEN(400, 200, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 200)
+DIM k AS GUI_WIDGET : k = GUI_BUTTON(w, "Knopf", 20, 70, 120, 30)
+WINDOW_WAIT_EVENTS(0.4)
+PRINT WINDOW_WAIT_EVENTS()
+DIM start AS FLOAT : start = TIMER()
+DIM n AS INTEGER = 0
+DIM zuletzt AS FLOAT = 0
+WHILE TIMER() - start < 1.5
+    GUI_UPDATE() : CLS(0) : GUI_DRAW() : FLIP()
+    zuletzt = WINDOW_IDLE_WAIT()
+    n = n + 1
+WEND
+PRINT zuletzt
+' Ohne Warten waeren es rund 90 Bilder; mit 0,35 s Nachlauf und dann
+' 0,4 s je Bild hoechstens gut 30.
+PRINT IIF(n < 45, "wenige Bilder", "zu viele Bilder: " + STR$(n))
+--- erwartet
+0.4
+0.4
+wenige Bilder
+
+=== mit fokus im textfeld wacht flip zur schreibmarke auf
+TRY
+    SCREEN(400, 200, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 200)
+DIM t AS GUI_WIDGET : t = GUI_TEXTINPUT(w, 20, 20, 200, 28)
+GUI_FOCUS(t)
+WINDOW_WAIT_EVENTS(5)
+DIM start AS FLOAT : start = TIMER()
+DIM laengste AS FLOAT = 0
+DIM n AS INTEGER = 0
+WHILE TIMER() - start < 1.2
+    GUI_UPDATE() : CLS(0) : GUI_DRAW() : FLIP()
+    laengste = MAX(laengste, WINDOW_IDLE_WAIT())
+    n = n + 1
+WEND
+' Gewartet wurde -- aber nie laenger als bis zum naechsten Umschlagen.
+IF laengste <= 0 THEN
+    PRINT "nie gewartet"
+ELSEIF laengste <= 0.27 THEN
+    PRINT "bis zur marke"
+ELSE
+    PRINT "frist " + STR$(laengste)
+END IF
+--- erwartet
+bis zur marke

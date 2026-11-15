@@ -50,7 +50,8 @@ When the `camera` module is active and `CAMERA_SET` has been called, all drawing
 | `NOTIFY_CLICKED()` → BOOLEAN | was the notification clicked in this frame? (Windows) |
 | `WINDOW_DPI_X()` / `WINDOW_DPI_Y()` → FLOAT | screen scaling (1.0 normal, 2.0 HiDPI) — without it a program cannot know whether its pixel sizes come out tiny on the target device |
 | `WINDOW_RENDER_WIDTH()` / `WINDOW_RENDER_HEIGHT()` → INTEGER | the window's real pixel size — larger than `SCREENWIDTH()`/`SCREENHEIGHT()` on a HiDPI screen |
-| `WINDOW_WAIT_EVENTS(sekunden)` | `FLIP` waits for input, at most this long — a tool that only reacts to clicks then needs hardly any CPU time; `0` switches it off |
+| `WINDOW_WAIT_EVENTS([sekunden])` | `FLIP` waits for input, at most this long — a tool that only reacts to clicks then needs hardly any CPU time; `0` switches it off, without an argument: the duration set. After an input it runs on for 0.35 s without waiting, also while a mouse button is held; the gui shortens the wait to its next frame (caret, tooltip, animation, toast — `GUI_NEXT_FRAME`); with a fixed frame count (`DHRT_FRAMES`) it never waits |
+| `WINDOW_IDLE_WAIT()` → FLOAT | how long the last `FLIP` was allowed to wait at most (seconds, 0 = not at all) |
 | `FPS()` → INTEGER | measured frames per second |
 | `DRAWFPS(x, y[, farbe])` | show the frame rate as “60 FPS” in the built-in font, in screen coordinates (the camera does not apply); without a colour green, below 30 orange, below 15 red |
 | `SETFPS(n)` | target frame rate; `0` = as fast as possible |

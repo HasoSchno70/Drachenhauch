@@ -41,6 +41,7 @@ static T_VORHER: AtomicUsize = AtomicUsize::new(0);
 type TastenRueckruf = unsafe extern "C" fn(*mut std::ffi::c_void, i32, i32, i32, i32);
 
 unsafe extern "C" fn tasten_rueckruf(fenster: *mut std::ffi::c_void, taste: i32, scan: i32, aktion: i32, mods: i32) {
+    crate::leerlauf::ereignis();
     taste_zaehlen(taste, aktion);
     let v = T_VORHER.load(Ordering::SeqCst);
     if v != 0 {
@@ -77,6 +78,7 @@ pub fn tasten_abholen() -> Vec<(usize, u32, u32)> {
 type Rueckruf = unsafe extern "C" fn(*mut std::ffi::c_void, i32, i32, i32);
 
 unsafe extern "C" fn rueckruf(fenster: *mut std::ffi::c_void, taste: i32, aktion: i32, mods: i32) {
+    crate::leerlauf::ereignis();
     zaehlen(taste, aktion);
     let v = VORHER.load(Ordering::SeqCst);
     if v != 0 {

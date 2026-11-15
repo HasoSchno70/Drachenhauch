@@ -741,6 +741,10 @@ impl<'p> Vm<'p> {
             "imagewidth" | "image_width" => Value::Int(g!().image_width(gi(a,0,"IMAGE_WIDTH")?)?),
             "imageheight" | "image_height" => Value::Int(g!().image_height(gi(a,0,"IMAGE_HEIGHT")?)?),
             "flip" => {
+                // Wann die gui das naechste Bild braucht -- FLIP darf im
+                // Leerlauf (WINDOW_WAIT_EVENTS) nur so lange schlafen.
+                let bedarf = self.gui.bild_bedarf_nehmen();
+                g!().bild_bedarf(bedarf);
                 g!().flip();
                 // Gesammelte PRINT-Zeilen eines Spiels gehen spaetestens nach
                 // 50 ms hinaus, nicht erst beim Beenden.
@@ -882,6 +886,8 @@ impl<'p> Vm<'p> {
             "window_dpi_x" => Value::Float(g!().window_dpi_x()),
             "window_render_width" => Value::Int(g!().render_size().0),
             "window_render_height" => Value::Int(g!().render_size().1),
+            "window_wait_events" if a.is_empty() => Value::Float(g!().wait_events_get()),
+            "window_idle_wait" => Value::Float(g!().leerlauf_zuletzt()),
             "window_wait_events" => {
                 let s = need_f(a, 0, "WINDOW_WAIT_EVENTS")?;
                 if !s.is_finite() || s < 0.0 {

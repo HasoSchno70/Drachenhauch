@@ -50,7 +50,8 @@ Wenn das `camera`-Modul aktiv ist und `CAMERA_SET` aufgerufen wurde, interpretie
 | `NOTIFY_CLICKED()` → BOOLEAN | wurde die Mitteilung in diesem Bild angeklickt? (Windows) |
 | `WINDOW_DPI_X()` / `WINDOW_DPI_Y()` → FLOAT | Bildschirm-Skalierung (1.0 normal, 2.0 HiDPI) — ohne sie weiß ein Programm nicht, ob seine Pixelgrößen auf dem Zielgerät winzig herauskommen |
 | `WINDOW_RENDER_WIDTH()` / `WINDOW_RENDER_HEIGHT()` → INTEGER | die echte Pixelgröße des Fensters — auf einem HiDPI-Schirm größer als `SCREENWIDTH()`/`SCREENHEIGHT()` |
-| `WINDOW_WAIT_EVENTS(sekunden)` | `FLIP` wartet auf eine Eingabe, höchstens so lange — ein Werkzeug, das nur auf Klicks reagiert, braucht dann kaum Rechenzeit; `0` schaltet ab |
+| `WINDOW_WAIT_EVENTS([sekunden])` | `FLIP` wartet auf eine Eingabe, höchstens so lange — ein Werkzeug, das nur auf Klicks reagiert, braucht dann kaum Rechenzeit; `0` schaltet ab, ohne Argument: die eingestellte Dauer. Nach einer Eingabe läuft es 0,35 s ohne Warten nach, bei gedrückter Maustaste auch; die gui kürzt die Frist auf ihr nächstes Bild (Schreibmarke, Hilfetext, Animation, Toast — `GUI_NEXT_FRAME`); mit fester Bildzahl (`DHRT_FRAMES`) wartet es nie |
+| `WINDOW_IDLE_WAIT()` → FLOAT | wie lange das letzte `FLIP` höchstens warten durfte (Sekunden, 0 = gar nicht) |
 | `FPS()` → INTEGER | gemessene Bilder je Sekunde |
 | `DRAWFPS(x, y[, farbe])` | die Bildrate als „60 FPS“ in der eingebauten Schrift zeigen, in Bildschirmkoordinaten (die Kamera gilt nicht); ohne Farbe grün, unter 30 orange, unter 15 rot |
 | `SETFPS(n)` | Ziel-Bildrate; `0` = so schnell wie möglich |

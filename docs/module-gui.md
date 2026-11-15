@@ -2721,6 +2721,43 @@ WEND
 Tasten und Zeichen kommen nur, solange das Widget den Fokus hat; sie gelten
 genau ein Bild, wie `GUI_CLICKED`.
 
+### 13. Schlafen, solange nichts passiert
+
+Eine Anwendung zeichnet sonst jedes Bild neu, auch wenn niemand etwas tut
+-- am Laptop kostet das Akku. Mit `WINDOW_WAIT_EVENTS(sekunden)` schläft
+`FLIP`, bis eine Eingabe kommt, höchstens so lange. Die gui weiß dabei
+selbst, wann sie das nächste Bild braucht, und weckt das Programm
+rechtzeitig: zum Umschlagen der Schreibmarke, wenn ein Hilfetext fällig
+ist, ein Toast geht, ein Dateibaum auffrischt oder eine Regel der
+Stildatei nach Uhrzeit umschlägt. Animationen, Übergänge, Funken und der
+Lichtstreif bekommen jedes Bild. Nach einer Eingabe
+läuft es 0,35 s ohne Warten nach, solange eine Maustaste gedrückt ist
+auch.
+
+| Befehl | Ergebnis | Wirkung |
+|---|---|---|
+| `GUI_NEXT_FRAME()` | FLOAT | in wie vielen Sekunden die gui das nächste Bild braucht (nach `GUI_DRAW`, vor `FLIP`); 0 = sofort, -1 = erst bei einer Eingabe |
+
+```basic
+IMPORT "gui"
+SCREEN(420, 200, "Ruhig", 1)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Ruhig", 10, 10, 400, 180)
+DIM name AS GUI_WIDGET : name = GUI_TEXTINPUT(w, 20, 20, 240, 28, "Name")
+' Ohne Eingabe hoechstens einmal je Sekunde ein Bild statt sechzig.
+WINDOW_WAIT_EVENTS(1)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(&H202830)
+    GUI_DRAW()
+    FLIP()
+WEND
+```
+
+Was das Programm selbst nach der Uhr tut (eine eigene Animation, Daten aus
+einem Prozess oder dem Netz lesen), weckt nur seine eigene Grenze: dann
+`WINDOW_WAIT_EVENTS` kürzer setzen oder für diese Zeit mit `0` ausschalten.
+IDE und Studio schlafen so, solange kein Programm läuft.
+
 ## Callbacks: GUI_ON_CLICK
 
 Neben dem Polling (`IF GUI_CLICKED(b) THEN ...`) kannst du eine Drachenhauch-

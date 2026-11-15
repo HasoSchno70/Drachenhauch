@@ -1292,3 +1292,25 @@ am Zeilenende der Erwartung ab, die Ausgabe nicht.
   ueber Zeichen-Ereignisse eines echten Fensters (Art 6), die im
   Hauptfenster fehlen. Nicht durch einen Fall belegt: Massstab und Versatz
   eines Fensters (anderer Schirm, Popup) innerhalb einer Schicht.
+- **Leerlauf (2026-11-15).** Programme mit Oberflaeche zeichneten sechzig
+  Bilder je Sekunde, auch ohne Eingabe; `WINDOW_WAIT_EVENTS` gab es, aber
+  mit einem Weck-Faden in festem Takt, und die gui wusste nichts davon --
+  Schreibmarke und Hilfetext zaehlten BILDER (`frame_count`), haetten im
+  Schlaf also stillgestanden. Jetzt: `leerlauf.rs` setzt je Bild eine
+  Frist (Faden mit Condvar statt Takt), gewartet wird weiter in raylibs
+  PollInputEvents (nur dort wird die Eingabe zur Flanke dieses Bildes).
+  Eigene GLFW-Rueckrufe vor denen von raylib zaehlen jede Eingabe; danach
+  0,35 s Nachlauf ohne Warten, mit gehaltener Maustaste auch. Die gui
+  meldet ihren Bedarf an der Stelle, die nach der Uhr zeichnet
+  (`Gui::bild_in`): Schreibmarke und Hilfetext (jetzt nach `takt` in
+  Sekunden), Animationen, Gleiten, Bildhaeute (bis zum naechsten Bild der
+  Folge), Toasts, Suchpause, Dateibaum, Rechtschreibpause, Kreisel,
+  laufendes Band, Lichtstreif, Zeitregeln der Stildatei (zur vollen
+  Minute); `naeher`/`Blende::schritt` melden jeden Uebergang, der sein Ziel
+  noch nicht erreicht hat. `GUI_NEXT_FRAME()` und `WINDOW_IDLE_WAIT()` zum
+  Pruefen. IDE und Studio-Editor schlafen bis 0,25 s, solange kein
+  Programm, Terminal oder serieller Monitor laeuft. Die Programme des
+  Studios noch nicht: ihr Ereignis `Takt` laeuft je Bild, und Programme
+  verlassen sich darauf. Falle beim Test: eine Beilage ohne Zeilenende
+  verlor die zweite Mausbewegung (Kommentarzeile ans Ende).
+

@@ -798,6 +798,11 @@ impl Gui {
         // Regeln nach Zeit und Datum: die Uhr stellen; schlaegt eine
         // Bedingung um, gilt die Stildatei als neu (stil_stand).
         if self.stil.as_ref().map(|d| d.mit_bedingung).unwrap_or(false) {
+            // Zur naechsten vollen Minute kann eine Bedingung umschlagen.
+            if self.stil_uhr_fest.is_none() {
+                let s = crate::builtins::local_datetime().5 as f64;
+                self.bild_in((60.0 - s).max(0.5));
+            }
             let (md, minute) = self.stil_uhr_jetzt();
             let datei = self.stil.as_mut().unwrap();
             datei.uhr = (md, minute);

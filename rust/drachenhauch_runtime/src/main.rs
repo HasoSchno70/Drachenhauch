@@ -168,6 +168,9 @@ mod tray;
 // Klicks, die ganz zwischen zwei Bildern liegen (Zaehler + Regel, mit Tests).
 #[cfg(any(test, feature = "graphics"))]
 mod flanken;
+// Schlafen, solange nichts passiert: Frist je Bild, Eingaben zaehlen.
+#[cfg(any(test, feature = "graphics"))]
+mod leerlauf;
 // Eingebaute Zeigerbilder (kopieren, stift, pipette ...): rein, mit Tests.
 #[cfg(any(test, feature = "graphics"))]
 mod zeigerbilder;

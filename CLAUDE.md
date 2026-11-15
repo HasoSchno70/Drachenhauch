@@ -235,6 +235,11 @@ Einzelheiten stehen in der Geschichte des Bereichs.
 - Wo ein Popup am Rand ausweicht, fragt es `grenze(wi)` (im nativen
   Fenster der Schirm, dann bekommt es ein Popup-Fenster; sonst der
   Fensterrand) -- nie `schirm()` oder `screen_width` direkt.
+- Wer in der gui etwas nach der Uhr zeichnet oder weiterzaehlt, meldet
+  mit `bild_in(sekunden)`, wann er das naechste Bild braucht (ein
+  Uebergang ueber `naeher` tut es von selbst) -- sonst steht es im
+  Leerlauf (`WINDOW_WAIT_EVENTS`, leerlauf.rs) still. Zeit nach `takt`
+  oder `uhr`, nie nach gezaehlten Bildern.
 - Breiten von Beschriftungen (Reiterköpfe, Werkzeugleiste) misst
   `leisten_pass` je Bild; eine Schätzung an der Zeichenzahl gilt nur bis
   dahin. Wer eine Lage von außen braucht, fragt die Laufzeit
