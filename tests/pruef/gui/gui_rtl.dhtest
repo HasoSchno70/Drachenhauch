@@ -63,3 +63,69 @@ e 18 5 0 0 0 0
 DHRT_FRAMES=50
 --- erwartet
 folge knopf speichern
+
+=== stufe 2 kennzeichen rechts werkzeugleiste von rechts regler waechst nach links
+TRY
+    SCREEN(480, 260, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 480, 260)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM tb AS GUI_WIDGET : tb = GUI_TOOLBAR(w, 0, 0, 480, 32)
+GUI_TOOLBAR_ADD(tb, "neu", "Neu")
+GUI_TOOLBAR_ADD(tb, "sichern", "Sichern")
+DIM c AS GUI_WIDGET : c = GUI_CHECKBOX(w, "Merken", 20, 50, TRUE)
+GUI_SET_NAME(c, "c")
+DIM s AS GUI_WIDGET : s = GUI_SLIDER(w, 20, 180, 300, 0, 10, 0)
+GUI_STYLESHEET("#c { accent: #FF0000 }")
+DIM rt AS INTEGER : rt = RENDERTARGET_NEW(480, 260)
+FUNCTION rot_bei(x AS INTEGER, y AS INTEGER) AS BOOLEAN
+    RENDERTARGET_BEGIN(rt) : CLS(0) : GUI_DRAW() : RENDERTARGET_END()
+    DIM bild AS IMAGE : bild = RENDERTARGET_IMAGE(rt)
+    RETURN (GETPIXEL(bild, x, y) BAND &HFFFFFF) = &HFF0000
+END FUNCTION
+GUI_UPDATE() : GUI_UPDATE()
+DIM cy AS INTEGER : cy = GUI_GET_Y(c) + GUI_GET_H(c) \ 2
+DIM cl AS INTEGER : cl = GUI_GET_X(c) + 6
+DIM cr AS INTEGER : cr = GUI_GET_X(c) + GUI_GET_W(c) - 6
+PRINT "ltr kaestchen links "; rot_bei(cl, cy); " rechts "; rot_bei(cr, cy); " erster knopf vorn "; GUI_TOOLBAR_ITEM_X(tb, 0) < GUI_TOOLBAR_ITEM_X(tb, 1)
+GUI_WINDOW_RTL(w, TRUE)
+GUI_UPDATE() : GUI_UPDATE()
+PRINT "rtl kaestchen links "; rot_bei(cl, cy); " rechts "; rot_bei(480 - 20 - 6, cy); " erster knopf vorn "; GUI_TOOLBAR_ITEM_X(tb, 0) < GUI_TOOLBAR_ITEM_X(tb, 1)
+--- erwartet
+ltr kaestchen links TRUE rechts FALSE erster knopf vorn TRUE
+rtl kaestchen links FALSE rechts TRUE erster knopf vorn FALSE
+
+=== gespiegelt nimmt der regler den wert von rechts und links heisst mehr
+IMPORT "gui"
+SCREEN(480, 260, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 480, 260)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM s AS GUI_WIDGET : s = GUI_SLIDER(w, 20, 100, 300, 0, 10, 5)
+GUI_SET_BOUNDS(s, 20, 100, 300, 24)
+GUI_WINDOW_RTL(w, TRUE)
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER
+DIM nach_klick AS FLOAT : nach_klick = -1
+FOR n = 1 TO 30
+    GUI_UPDATE()
+    IF n = 6 THEN nach_klick = GUI_VALUE(s)
+    CLS(0) : GUI_DRAW() : FLIP()
+NEXT
+PRINT "klick rechts aussen "; nach_klick; " nach pfeil links "; GUI_VALUE(s)
+--- datei ev.txt
+c 5
+e 0 7 459 112 0 0
+e 2 6 0 0 0 0
+e 3 5 0 0 0 0
+e 10 2 263 0 0 0
+e 11 1 263 0 0 0
+
+--- umgebung
+DHRT_FRAMES=40
+--- erwartet
+klick rechts aussen 0.0 nach pfeil links 0.5

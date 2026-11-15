@@ -692,11 +692,23 @@ impl Gui {
         let ks = if wdg.kind == Kind::Toggle { self.m("check_size").max(self.sk(14)).min(h) } else { self.m("check_size").min(h).max(8) };
         let kb = if wdg.kind == Kind::Toggle { ks * 2 } else { ks };
         let ky = ay + (h - ks) / 2;
+        let ax = self.kenn_x(wi, ax, wdg.w, kb);
         if !self.haut_zeichnen(g, &pfad, rand, ax, ky, kb, ks) { return false; }
         if !wdg.text.is_empty() {
-            self.wtext_mn(g, wdg, ax + kb + pad, ky + (ks - self.wsize(g, wdg)).max(0) / 2, &wdg.text, self.txt_col(wdg));
+            self.wtext_mn(g, wdg, self.kenn_text_x(g, wi, wdg, ax, kb, pad), ky + (ks - self.wsize(g, wdg)).max(0) / 2, &wdg.text, self.txt_col(wdg));
         }
         true
+    }
+
+    /// Wo steht das Kennzeichen (Kaestchen, Punkt, Rinne) der Breite `kb` in
+    /// einem Widget der Breite `w`? Links -- in einem Fenster von rechts
+    /// nach links rechts.
+    fn kenn_x(&self, wi: usize, ax: i32, w: i32, kb: i32) -> i32 {
+        if self.windows[wi].rtl { ax + w - kb } else { ax }
+    }
+    /// Wo beginnt der Text neben dem Kennzeichen (bei `kx`, Breite `kb`)?
+    fn kenn_text_x(&self, g: &Graphics, wi: usize, wdg: &Widget, kx: i32, kb: i32, pad: i32) -> i32 {
+        if self.windows[wi].rtl { kx - pad - self.wtext_width(g, wdg, &wdg.text) } else { kx + kb + pad }
     }
 
     /// Ein Regler mit Haut: die Rinne ueber das ganze Rechteck (9-Slice mit
@@ -711,6 +723,8 @@ impl Gui {
         if rinne.is_none() && griff.is_none() { return false; }
         let span = wdg.max - wdg.min;
         let ratio = if span != 0.0 { ((wdg.value - wdg.min) / span).clamp(0.0, 1.0) } else { 0.0 };
+        // Rechts nach links waechst ein waagerechter Regler von rechts.
+        let ratio = if self.windows[wi].rtl && !wdg.vert { 1.0 - ratio } else { ratio };
         let gezeichnet = rinne.map(|(p, r)| self.haut_zeichnen(g, &p, r, ax, ay, w, h)).unwrap_or(false);
         if !gezeichnet {
             if wdg.vert { g.box_fill(ax + w / 2 - 1, ay, ax + w / 2 + 1, ay + h - 1, self.wcol(wdg, "bg", "widget_bg")); }
@@ -996,6 +1010,8 @@ impl Gui {
                 // Das Kaestchen ist so gross wie die Metrik, nicht wie das
                 // Rechteck: das reicht seit dem Automass ueber den Text.
                 let cs = self.m("check_size").min(h).max(8);
+                // Rechts nach links: das Kennzeichen rechts, der Text davor.
+                let ax = self.kenn_x(wi, ax, w, cs);
                 let (ay, w, h) = (ay + (h - cs) / 2, cs, cs);
                 let acc = self.acc_col(wdg);
                 let bordc = self.wcol(wdg, "border", "widget_border");
@@ -1027,7 +1043,7 @@ impl Gui {
                     if wdg.ueber_t > 0.0 { g.rect(ax - 1, ay - 1, ax + w, ay + h, deckkraft(acc, weich(wdg.ueber_t))); }
                     if wdg.checked { g.box_fill(ax + 3, ay + 3, ax + w - 4, ay + h - 4, acc); }
                 }
-                self.wtext_mn(g, wdg, ax + w + pad, ay, &wdg.text, self.txt_col(wdg));
+                self.wtext_mn(g, wdg, self.kenn_text_x(g, wi, wdg, ax, w, pad), ay, &wdg.text, self.txt_col(wdg));
             }
             Kind::Slider if wdg.vert => self.draw_vslider(g, wdg, ax, ay, w, h),
             // Regler mit Bildhaut: Rinne (`bild`) und Griff (`griff`).
@@ -1036,6 +1052,9 @@ impl Gui {
                 let handle_w = self.m("slider_handle_w");
                 let span = wdg.max - wdg.min;
                 let ratio = if span != 0.0 { (wdg.value - wdg.min) / span } else { 0.0 };
+                // Rechts nach links: von rechts gefuellt, der Griff gespiegelt.
+                let gesp = self.windows[wi].rtl;
+                let lage = if gesp { 1.0 - ratio } else { ratio };
                 let acc = self.acc_col(wdg);
                 if self.m_form("gradient") > 0 {
                     // Rinne: schmal und versenkt. Der zurueckgelegte Teil wird
@@ -1045,17 +1064,24 @@ impl Gui {
                     self.fbox_tief(g, ax, ty, ax + w - 1, tb,
                                    self.wcol(wdg, "bg", "widget_bg"),
                                    self.wcol(wdg, "border", "widget_border"));
-                    let bis = ax + (ratio * (w - 1) as f64) as i32;
-                    if bis > ax + 2 {
-                        g.round_gradient(ax + 1, ty + 1, bis, tb - 1, 3,
-                                         shade(acc, 24), shade(acc, -18));
+                    if gesp {
+                        let von = ax + w - 1 - (ratio * (w - 1) as f64) as i32;
+                        if von < ax + w - 3 {
+                            g.round_gradient(von, ty + 1, ax + w - 2, tb - 1, 3, shade(acc, 24), shade(acc, -18));
+                        }
+                    } else {
+                        let bis = ax + (ratio * (w - 1) as f64) as i32;
+                        if bis > ax + 2 {
+                            g.round_gradient(ax + 1, ty + 1, bis, tb - 1, 3,
+                                             shade(acc, 24), shade(acc, -18));
+                        }
                     }
-                    let hx = ax + (ratio * (w - handle_w) as f64) as i32 + handle_w / 2;
+                    let hx = ax + (lage * (w - handle_w) as f64) as i32 + handle_w / 2;
                     self.knauf(g, hx, ay + h / 2, (h / 2).max(5), self.griff_farbe(wdg));
                 } else {
                     g.box_fill(ax, ay + h / 2 - 1, ax + w - 1, ay + h / 2 + 1, self.wcol(wdg, "bg", "widget_bg"));
                     g.rect(ax, ay, ax + w - 1, ay + h - 1, self.wcol(wdg, "border", "widget_border"));
-                    let hx = ax + (ratio * (w - handle_w) as f64) as i32;
+                    let hx = ax + (lage * (w - handle_w) as f64) as i32;
                     g.box_fill(hx, ay, hx + handle_w - 1, ay + h - 1, acc);
                 }
                 self.regler_marken_zeichnen(g, wdg, ax, ay, w, h);
@@ -1064,6 +1090,7 @@ impl Gui {
                 // Die Pille ist doppelt so breit wie hoch; das Rechteck
                 // reicht ueber die Beschriftung.
                 let ph = self.m("check_size").max(self.sk(14)).min(h);
+                let ax = self.kenn_x(wi, ax, w, ph * 2);
                 let (ay, w, h) = (ay + (h - ph) / 2, ph * 2, ph);
                 let acc = self.acc_col(wdg);
                 let aus = self.wcol(wdg, "bg", "widget_bg");
@@ -1074,10 +1101,12 @@ impl Gui {
                 let bahn = mischen(aus, acc, mix);
                 self.fbox_tief_w(g, wdg.kind, ax, ay, ax + w - 1, ay + h - 1, bahn,
                                self.wcol(wdg, "border", "widget_border"));
-                let kx = ax + r + ((w - h) as f64 * mix) as i32;
+                // Rechts nach links steht "an" links.
+                let weg = ((w - h) as f64 * mix) as i32;
+                let kx = if self.windows[wi].rtl { ax + w - r - weg } else { ax + r + weg };
                 self.knauf(g, kx, ay + r, r - 2, self.griff_farbe(wdg));
                 if !wdg.text.is_empty() {
-                    self.wtext_mn(g, wdg, ax + w + pad, ay + (h - self.wsize(g, wdg)).max(0) / 2, &wdg.text, self.txt_col(wdg));
+                    self.wtext_mn(g, wdg, self.kenn_text_x(g, wi, wdg, ax, w, pad), ay + (h - self.wsize(g, wdg)).max(0) / 2, &wdg.text, self.txt_col(wdg));
                 }
             }
             Kind::Knob => {
@@ -1556,6 +1585,8 @@ impl Gui {
             }
             Kind::Radio => {
                 let cs = self.m("check_size").min(h).max(8);
+                // Rechts nach links: das Kennzeichen rechts, der Text davor.
+                let ax = self.kenn_x(wi, ax, w, cs);
                 let (ay, w, h) = (ay + (h - cs) / 2, cs, cs);
                 let acc = self.acc_col(wdg);
                 let (cx, cy, r) = (ax + w / 2, ay + h / 2, (w / 2).max(2));
@@ -1566,7 +1597,7 @@ impl Gui {
                     g.circle(cx, cy, (r - 1).max(1), self.th("win_bg"));
                 }
                 if wdg.checked { g.circle(cx, cy, (r - 4).max(1), acc); }   // Punkt
-                self.wtext_mn(g, wdg, ax + w + pad, ay, &wdg.text, self.txt_col(wdg));
+                self.wtext_mn(g, wdg, self.kenn_text_x(g, wi, wdg, ax, w, pad), ay, &wdg.text, self.txt_col(wdg));
             }
             Kind::Progress if Self::ist_kreisel(wdg) => self.kreisel_zeichnen(g, wdg, ax, ay, w, h),
             Kind::Progress => {

@@ -1252,3 +1252,10 @@ am Zeilenende der Erwartung ab, die Ausgabe nicht.
   Nur wenn die Hauptflaeche direkt gezeichnet wird (`SCHICHT_ZIEL`): aus
   einem Renderziel heraus fuehrte EndTextureMode auf den Schirm statt
   zurueck in das Ziel.
+- **Rechts nach links, Stufe 2**: Kennzeichen von Kaestchen, Option und
+  Schalter rechts vom Text (`kenn_x`/`kenn_text_x`, auch mit Haut), der
+  Knopf des Schalters steht fuer "an" links, die Werkzeugleiste gespiegelt
+  in `tb_layout` (die eine Quelle fuer Zeichnen, Treffer und Ueberlauf;
+  `widget_rtl` sucht das Fenster am Zeiger des Widgets), der Regler waechst
+  nach links -- beim Zeichnen, Ziehen (`drag_slider`) und mit den
+  Pfeiltasten. Textfelder, Tabellen und Baeume bleiben innen, wie sie sind.

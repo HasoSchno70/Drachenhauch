@@ -547,6 +547,8 @@ impl Gui {
                 // Pos1/Ende springen an die Enden.
                 let (lo, hi, v) = { let w = &self.windows[wi].widgets[i]; (w.min, w.max, w.value) };
                 let schritt = (hi - lo) / 20.0;
+                // Rechts nach links: links heisst mehr (ein waagerechter Regler).
+                let (rechts, links) = if self.windows[wi].rtl && self.windows[wi].widgets[i].kind == Kind::Slider && !self.windows[wi].widgets[i].vert { (links, rechts) } else { (rechts, links) };
                 // Eingerastet: von Marke zu Marke.
                 let hoch = Self::regler_nachbar(&self.windows[wi].widgets[i], v, true);
                 let runter = Self::regler_nachbar(&self.windows[wi].widgets[i], v, false);

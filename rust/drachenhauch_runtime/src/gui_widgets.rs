@@ -308,7 +308,20 @@ impl Gui {
     /// EINE Quelle fuer Zeichnen, Treffertest, Tooltip und Barrierefreiheit.
     /// Passt alles, bleibt die Liste der versteckten leer und es gibt keinen
     /// Knopf. Beschriftungen zaehlen, sobald `leisten_pass` sie gemessen hat.
-    pub(super) fn tb_layout(&self, ax: i32, _ay: i32, w: i32, h: i32, wdg: &Widget) -> (Vec<(usize, i32, i32)>, Vec<usize>, Option<(i32, i32)>) {
+    /// Wie `tb_layout_ltr`, in einem Fenster von rechts nach links
+    /// gespiegelt: der erste Knopf rechts, der Ueberlauf links.
+    pub(super) fn tb_layout(&self, ax: i32, ay: i32, w: i32, h: i32, wdg: &Widget) -> (Vec<(usize, i32, i32)>, Vec<usize>, Option<(i32, i32)>) {
+        let (geo, versteckt, chev) = self.tb_layout_ltr(ax, ay, w, h, wdg);
+        if !self.widget_rtl(wdg) { return (geo, versteckt, chev); }
+        let sp = |x0: i32, x1: i32| (2 * ax + w - x1, 2 * ax + w - x0);
+        (geo.into_iter().map(|(k, x0, x1)| { let (a, b) = sp(x0, x1); (k, a, b) }).collect(), versteckt, chev.map(|(x0, x1)| sp(x0, x1)))
+    }
+    /// Steht das Widget in einem Fenster von rechts nach links?
+    pub(super) fn widget_rtl(&self, wdg: &Widget) -> bool {
+        let z = wdg as *const Widget;
+        self.windows.iter().any(|win| win.rtl && win.widgets.as_ptr_range().contains(&z))
+    }
+    fn tb_layout_ltr(&self, ax: i32, _ay: i32, w: i32, h: i32, wdg: &Widget) -> (Vec<(usize, i32, i32)>, Vec<usize>, Option<(i32, i32)>) {
         let l = match wdg.leiste.as_ref() { Some(l) => l, None => return (Vec::new(), Vec::new(), None) };
         let rand = self.sk(4);
         let luft = self.sk(2);

@@ -4403,17 +4403,16 @@ Reihenfolge, in der er getippt wurde.
 | Befehl | Was er tut |
 |---|---|
 | `TEXT_VISUAL$(text$ [, richtung$])` | Der Text so, wie er dasteht -- für eigene Ausgaben wie Dateien oder Bilder. `richtung$` = `auto` (Vorgabe), `ltr` oder `rtl` |
-| `GUI_WINDOW_RTL(win, an)` | das ganze Fenster von rechts nach links: die Lage jedes Widgets gespiegelt an der Breite des Fensters, die Menüleiste beginnt rechts. Das Programm setzt und liest seine Lagen weiter von links (`GUI_GET_X`); Zeichnen, Klick und `GUI_HIT_TEST` gehen über die gespiegelte |
+| `GUI_WINDOW_RTL(win, an)` | das ganze Fenster von rechts nach links: die Lage jedes Widgets gespiegelt an der Breite des Fensters, die Menüleiste und die Werkzeugleiste beginnen rechts, Kästchen, Optionen und Schalter tragen ihr Kennzeichen rechts vom Text, ein Regler wächst nach links (Ziehen und Pfeiltasten auch). Das Programm setzt und liest seine Lagen weiter von links (`GUI_GET_X`); Zeichnen, Klick und `GUI_HIT_TEST` gehen über die gespiegelte |
 | `GUI_WINDOW_IS_RTL(win)` | steht das Fenster von rechts nach links? |
 
 Indische und südostasiatische Schriften und die Ligaturen einer Schrift
 setzt die Textformung ([builtins-grafik.md](builtins-grafik.md#textformung-indische-schriften-und-ligaturen)).
 Was (noch) nicht geht: die Ausrichtung folgt nicht der
 Richtung -- eine Zeile von rechts nach links steht links, solange
-`GUI_SET_ALIGN` nichts anderes sagt; ein gespiegeltes Fenster
-(`GUI_WINDOW_RTL`) spiegelt die Lagen, nicht das Innere der Widgets
-(das Kästchen steht weiter links vom Text, ein Regler wächst nach rechts,
-die Werkzeugleiste beginnt links); in einer solchen Zeile eines
+`GUI_SET_ALIGN` nichts anderes sagt; in einem gespiegelten Fenster
+(`GUI_WINDOW_RTL`) bleiben Textfelder, Tabellen und Bäume innen, wie sie
+sind (Text linksbündig, Spalten und Einrückung von links); in einer solchen Zeile eines
 Textbereichs fallen Fett, Kursiv und Unterstrichen weg (die Farben der
 Einfärbung bleiben); Hinweise am Zeilenende und Farbfelder rechnen weiter
 mit der logischen Lage. Das pdf-Modul ordnet nicht -- dort hilft
