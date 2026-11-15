@@ -1189,7 +1189,7 @@
   "GUI_WINDOW_NATIVE": "BOOLEAN — the window as a real OS window (own title bar, taskbar, second monitor) or back into the main window; FALSE with an means: fallback, it stays a gui window",
   "GUI_WINDOW_NATIVE_SCALE": "FLOAT — how much larger the native window is drawn on its screen than in the main window (its screen's pixel density divided by the main window's); 1.0 in the main window",
   "GUI_WINDOW_RESIZABLE": "resizable by the lower-right grip (default: off)",
-  "GUI_WINDOW_RTL": "the whole window right to left: the position of every widget mirrored at the window's width, the menu bar and the toolbar start on the right, check boxes, radio buttons and switches carry their mark to the right of the text, a slider grows to the left (dragging and arrow keys too). The program keeps setting and reading its positions from the left (GUI_GET_X); drawing, clicks and GUI_HIT_TEST go …",
+  "GUI_WINDOW_RTL": "the whole window right to left: the position of every widget mirrored at the window's width, the menu bar and the toolbar start on the right, check boxes, radio buttons and switches carry their mark to the right of the text, a slider grows to the left (dragging and arrow keys too), a text field without GUI_SET_ALIGN is right-aligned. The program keeps setting and reading its positions from the …",
   "GUI_WINDOW_SCROLLABLE": "content scrolls when it is taller than the window (mouse wheel + scroll bar). Content height determined automatically from the widgets. Default: off",
   "GUI_WINDOW_SET_BOUNDS": "move/resize/read a window",
   "GUI_WINDOW_SET_MAX_SIZE": "maximum size when resizing (0 = none)",

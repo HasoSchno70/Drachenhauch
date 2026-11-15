@@ -2522,7 +2522,7 @@ properties for it, plus four commands:
 | `bild: figur.png 8 12fps` | frame sequence from an atlas: 8 equally wide frames side by side, 12 per second (default 12, 1..120), endlessly -- like an animated GIF, also for `form: bild`. A path with spaces stands in quotes. Image skins apply to buttons and to **check boxes, radio buttons and switches** (there instead of the mark, the label beside it), per state: `checkbox:checked { bild: an.png }` |
 | `griff: knopf.png` | slider with skin: `bild` is the track (over the whole rectangle, with `bildrand` as a 9-slice), `griff` the handle -- square, as tall (for a vertical slider as wide) as the slider, at the position of the value. If one of the two skins is missing, the usual shape appears there. Also per state (`slider:active { griff: gedrueckt.png }`) and as a frame sequence |
 | `@ablauf name { 0%: x 0; 50%: y -8, drehen 10; 100%: groesse 1.1 }` | an animation of your own: keyframes with `x`, `y` (points), `drehen` (degrees, rotate) and `groesse` (scale), joined straight in between; if 0 % or 100 % is missing, it rests there. Then the name works like a built-in kind: `animation: name 800ms`, `GUI_ANIMATE(wdg, "name")`; it may stand before or after the rule that names it |
-| `@ablauf name { 50%: deckkraft 0.3, farbe #FF8080 }` | opacity (0..1) and tint (`#RRGGBB`, white = none) in an animation -- plus the built-in kind `blinken` (blink: opacity 1 → 0.35 → 1). For this the widget goes into a layer of its own, laid on with opacity and tint; only on the main surface without POSTFX, elsewhere it stays fully visible |
+| `@ablauf name { 50%: deckkraft 0.3, farbe #FF8080 }` | opacity (0..1) and tint (`#RRGGBB`, white = none) in an animation -- plus the built-in kind `blinken` (blink: opacity 1 → 0.35 → 1). For this the widget goes into a layer of its own, laid on with opacity and tint -- on the main surface (POSTFX included), in real windows and in render targets |
 | `animation: puls \| wackeln \| schweben \| huepfen \| drehen \| blinken [duration ms] [einmal \| count]` | the whole widget moves around its centre (pulse, wobble, float, bounce, spin); also per state: `button:hover { animation: puls }` pulses only while hovered |
 | `GUI_SET_SHAPE(knopf, form$)` / `GUI_GET_SHAPE$(knopf)` | set a shape of its own (`""` = the stylesheet again) or the shape in effect |
 | `GUI_ANIMATE(wdg, art$ [, dauer_ms [, anzahl]])` | start an animation -- say wobble once on wrong input; `anzahl` 0 = endless (default 1), `art$` `""` stops |
@@ -4423,14 +4423,15 @@ typed.
 | Command | What it does |
 |---|---|
 | `TEXT_VISUAL$(text$ [, direction$])` | The text as it is displayed -- for your own output such as files or images. `direction$` = `auto` (default), `ltr` or `rtl` |
-| `GUI_WINDOW_RTL(win, an)` | the whole window right to left: the position of every widget mirrored at the window's width, the menu bar and the toolbar start on the right, check boxes, radio buttons and switches carry their mark to the right of the text, a slider grows to the left (dragging and arrow keys too). The program keeps setting and reading its positions from the left (`GUI_GET_X`); drawing, clicks and `GUI_HIT_TEST` go through the mirrored one |
+| `GUI_WINDOW_RTL(win, an)` | the whole window right to left: the position of every widget mirrored at the window's width, the menu bar and the toolbar start on the right, check boxes, radio buttons and switches carry their mark to the right of the text, a slider grows to the left (dragging and arrow keys too), a text field without `GUI_SET_ALIGN` is right-aligned. The program keeps setting and reading its positions from the left (`GUI_GET_X`); drawing, clicks and `GUI_HIT_TEST` go through the mirrored one |
 | `GUI_WINDOW_IS_RTL(win)` | is the window right to left? |
 
 Indic and Southeast Asian scripts and the ligatures of a font are set by
 text shaping ([builtins-grafik.md](builtins-grafik.md#text-shaping-indic-scripts-and-ligatures)).
 What does not work (yet): alignment does not follow direction --
 a right-to-left line stays on the left unless `GUI_SET_ALIGN` says
-otherwise; in a mirrored window (`GUI_WINDOW_RTL`) text fields, tables and trees
+otherwise (in a mirrored window a single-line text field is right-aligned
+by itself); in a mirrored window (`GUI_WINDOW_RTL`) text areas, tables and trees
 keep their inside as it is (text left-aligned, columns and indentation from
 the left); in such a line of a text area bold, italic and underline are
 dropped (the colours of the highlighting stay); end-of-line hints and
