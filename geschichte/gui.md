@@ -1198,3 +1198,14 @@ am Zeilenende der Erwartung ab, die Ausgabe nicht.
   fiel genau dort). Ohne Hand am Geraet nimmt eine Pruefung nichts auf; die
   Gegenprobe "Aufnahme am Ende nicht geschrieben" blieb darum zuerst gruen
   -- jetzt ist eine fehlende Aufnahmedatei ein Fehler von `aufnehmen`.
+- **Glas** (`unschaerfe` in der Stildatei, `Cmd::Unschaerfe`): die
+  Laufzeit zeichnet direkt in den Bildpuffer, ein Szenenziel gibt es nur mit
+  POSTFX. Darum liest das Abspielen den Bereich zurueck
+  (`rlReadScreenPixels`), macht ihn auf der CPU mit zwei Kastenfiltern
+  unscharf, setzt die Ecken durchsichtig und legt ihn als Textur hin. Nur
+  wo `UNSCHAERFE_ZIEL` gesetzt ist (Hauptflaeche direkt oder in die Szene
+  fuer POSTFX); in Renderzielen und echten Fenstern stimmt die Groesse fuer
+  das Zuruecklesen nicht. Fenster selbst haben eine deckende Grundflaeche --
+  Glas wirkt ueber Widgets darunter (ein Hintergrundbild), nicht durch das
+  Fenster hindurch. Der Test braucht deshalb ein Bildschirmfoto statt eines
+  Renderziels.

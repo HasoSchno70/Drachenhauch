@@ -2540,6 +2540,7 @@ Eigenschaften mehr, dazu kommen vier Befehle:
 | `GUI_ANIMATING(wdg)` | läuft gerade eine Animation? |
 | `gleiten: 200` | weiche Layout-Übergänge (Dauer in ms, 0..2000): ändern sich Lage oder Größe (Layout, `GUI_SET_BOUNDS`, Fenstergröße), gleitet das Bild vom alten zum neuen Rechteck, langsam auslaufend; ein Widget, das sichtbar wird, wächst auf. Der Treffer steht sofort am Ziel. Nur in Regeln ohne Zustand; `* { gleiten: 200 }` gilt für die ganze Anwendung |
 | `GUI_GLIDING(wdg)` | gleitet das Widget gerade? |
+| `unschaerfe: 12` | Glas: was hinter dem Widget gezeichnet ist (ein Bild, eine Karte, andere Widgets), liegt unscharf darunter (Radius 0..40); eine Fläche mit Deckkraft scheint durch: `panel.glas { unschaerfe: 12; bg: #60FFFFFF; radius: 14 }`. Nur auf der Hauptfläche -- in echten Fenstern und Renderzielen bleibt die durchscheinende Fläche allein. Nur in Regeln ohne Zustand |
 
 ```basic
 IMPORT "gui"

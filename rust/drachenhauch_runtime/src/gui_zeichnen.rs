@@ -695,6 +695,13 @@ impl Gui {
         if wdg.stil_auf.is_some() && !matches!(self.w_form_art(wdg), aussehen::F_KREIS | aussehen::F_RAUTE | aussehen::F_BILD) {
             let (ax, ay, w, h) = self.abs_rect(wi, wdg);
             self.schatten_zeichnen(g, wdg, ax, ay, w, h);
+            // Glas (Stildatei `unschaerfe`): was dahinter liegt, unscharf --
+            // die Flaeche des Widgets darueber scheint durch, wenn ihre Farbe
+            // Deckkraft hat (`bg: #A0202630`).
+            if let Some(r) = wdg.stil_auf.as_ref().and_then(|s| s[stil::BASIS].unschaerfe).filter(|&r| r > 0) {
+                let ecke = self.w_radius(wdg).unwrap_or_else(|| self.m("corner_radius"));
+                g.unschaerfe(ax, ay, w, h, self.sk(r), ecke);
+            }
         }
         self.draw_widget_innen(g, wi, idx, wdg);
         if anim.is_some() { g.verformung_beenden(); }

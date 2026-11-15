@@ -45,7 +45,7 @@ pub(super) const FOKUS: usize = 2;
 pub(super) const AKTIV: usize = 3;
 pub(super) const AUS: usize = 4;
 
-const EIGENSCHAFTEN: &str = "bg, fg, border, accent, radius, groesse, stil, abstand, randbreite, schatten, verlauf, glanz, fase, uebergang (auch je Farbe: uebergang: 120, bg 400), form, bild, bildrand, animation, klang, effekt, gleiten";
+const EIGENSCHAFTEN: &str = "bg, fg, border, accent, radius, groesse, stil, abstand, randbreite, schatten, verlauf, glanz, fase, uebergang (auch je Farbe: uebergang: 120, bg 400), form, bild, bildrand, animation, klang, effekt, gleiten, unschaerfe";
 const ZUSTAENDE: &str = ":hover, :focus, :active, :disabled, :checked";
 
 /// Eine Farbe aus der Stildatei: fest oder ein Name des Themas (dann folgt
@@ -84,6 +84,8 @@ pub(super) struct StilWerte {
     pub(super) effekt: Option<u8>,
     /// Gleiten bei Lageaenderung, Dauer in ms (gui_aussehen.rs).
     pub(super) gleiten: Option<i32>,
+    /// Glas: was hinter dem Widget liegt, unscharf (Radius in Punkten).
+    pub(super) unschaerfe: Option<i32>,
 }
 
 /// Die Farbrollen, die eine eigene Dauer haben koennen -- ihre Stelle ist
@@ -172,6 +174,7 @@ impl StilWerte {
         if let Some((k, l)) = &self.klang { t.push(if *l == 100 { format!("klang {}", k) } else { format!("klang {} {}%", k, l) }); }
         if let Some(e) = self.effekt { t.push(format!("effekt {}", super::effekte::EFFEKTE.get(e as usize).unwrap_or(&"?"))); }
         if let Some(v) = self.gleiten { t.push(format!("gleiten {}ms", v)); }
+        if let Some(v) = self.unschaerfe { t.push(format!("unschaerfe {}", v)); }
         t.join(", ")
     }
 
@@ -206,6 +209,7 @@ impl StilWerte {
         if o.klang.is_some() { self.klang = o.klang.clone(); }
         if o.effekt.is_some() { self.effekt = o.effekt; }
         if o.gleiten.is_some() { self.gleiten = o.gleiten; }
+        if o.unschaerfe.is_some() { self.unschaerfe = o.unschaerfe; }
     }
 }
 
@@ -541,7 +545,7 @@ pub(super) fn lesen(text: &str, thema: &dyn Fn(&str) -> bool) -> Result<Stildate
             let wert = wert.trim();
             let form = matches!(name.as_str(), "abstand" | "padding" | "innenabstand" | "randbreite" | "border-width"
                 | "border_width" | "schatten" | "shadow" | "verlauf" | "gradient" | "glanz" | "gloss" | "fase" | "bevel"
-                | "uebergang" | "transition" | "form" | "shape" | "gleiten" | "layout-transition");
+                | "uebergang" | "transition" | "form" | "shape" | "gleiten" | "layout-transition" | "unschaerfe" | "blur");
             if form && mit_zustand {
                 return Err(format!("Zeile {}: '{}' gilt nur in Regeln ohne :hover, :focus, :active, :disabled -- eine Form, die mit dem Zustand springt, waere ein Wackeln", zeile, name));
             }
@@ -585,6 +589,7 @@ pub(super) fn lesen(text: &str, thema: &dyn Fn(&str) -> bool) -> Result<Stildate
                 }
                 "bildrand" | "image-border" => werte.bildrand = Some(zahl_lesen_stil(wert, zeile, "bildrand", 0, 200)?),
                 "animation" => werte.animation = Some(super::aussehen::anim_lesen(wert, zeile)?),
+                "unschaerfe" | "blur" => werte.unschaerfe = Some(zahl_lesen_stil(wert, zeile, "unschaerfe", 0, 40)?),
                 "gleiten" | "layout-transition" => {
                     let w = wert.trim().trim_end_matches("ms").trim();
                     werte.gleiten = Some(zahl_lesen_stil(w, zeile, "gleiten", 0, 2000)?);
