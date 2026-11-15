@@ -341,6 +341,46 @@ The project's collections live under `tests/pruef/`; the CI calls
 The format itself is checked by `tests/pruef/werkzeugkette/dhrt_test_format.dhtest` — on a
 collection the case writes, with expected messages, line numbers and summary.
 
+## `dhrt aufnehmen` — operating a program as a test case
+
+```
+dhrt aufnehmen programm.dh tests/meine.dhtest ["Name des Falls"] [--bilder N]
+```
+
+starts the program; you operate it and close the window. Then `dhrt
+aufnehmen` (record) appends a finished case to the collection (creating it
+if it does not exist yet):
+
+```
+=== Name des Falls
+--- programm ../programm.dh
+--- datei aufnahme.txt
+c 12
+e 0 7 120 80 0 0
+...
+--- umgebung
+DHRT_FRAMES=412
+DHRT_ABSPIELEN=aufnahme.txt
+DHRT_GUI_ZUSTAND=1
+DHRT_ABSEITS=1
+--- enthaelt
+gui-zustand
+fenster "Notizbuch"
+  textarea(1) "Einkauf: Milch"
+  toggle(1) "Toene" aus
+```
+
+What is expected is the **state of the gui at the end** (`GUI_STATE$`):
+texts of fields and labels, ticks, values, selection -- one line per
+visible widget, named after `GUI_SET_NAME` or after its number among the
+widgets of the same kind. Delete from the block what need not match; add
+what should. The program needs no line for it: the runtime plays the
+recording after `SCREEN` when `DHRT_ABSPIELEN=file` is set (relative to the
+caller's location, i.e. the case folder) and prints the state at the end
+when `DHRT_GUI_ZUSTAND=1` is set. The recording gets an event in frame 0
+put in front so that the frames of the replay match; `--bilder N` ends the
+program after N frames (for scripts).
+
 ## `dhrt fmt` — writing consistently
 
 ```bash

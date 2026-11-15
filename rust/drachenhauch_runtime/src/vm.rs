@@ -1341,7 +1341,12 @@ impl<'p> Vm<'p> {
     }
 
     pub fn run(&mut self) -> R<()> {
-        self.exec(&self.prog.main, Vec::new(), None)?;
+        let r = self.exec(&self.prog.main, Vec::new(), None);
+        // `dhrt aufnehmen` und aufgenommene Faelle (aufnahme.rs): Aufnahme
+        // schreiben, Zustand der gui ausgeben -- auch nach EXIT oder Fehler.
+        #[cfg(feature = "graphics")]
+        self.aufnahme_ende();
+        r?;
         Ok(())
     }
 

@@ -31,6 +31,8 @@ mod inspektor;
 mod effekte;
 #[path = "gui_palette.rs"]
 mod palette;
+#[path = "gui_zustand.rs"]
+mod zustand;
 #[path = "gui_stil.rs"]
 mod stil;
 #[path = "gui_bausteine.rs"]

@@ -210,8 +210,11 @@ impl<'p> Vm<'p> {
                 if scale < 1 { return Err("SCREEN: skala muss >= 1 sein".into()); }
                 match self.gfx.as_mut() {
                     Some(gfx) => gfx.reconfigure(w, h, &title, scale),
-                    None => self.gfx = Some(crate::graphics::Graphics::new(w, h, &title, scale)
-                        .map_err(|e| format!("SCREEN: {}", e))?),
+                    None => {
+                        self.gfx = Some(crate::graphics::Graphics::new(w, h, &title, scale)
+                            .map_err(|e| format!("SCREEN: {}", e))?);
+                        self.aufnahme_beginn()?;
+                    }
                 }
                 Value::Nil
             }

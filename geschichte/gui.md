@@ -1188,3 +1188,13 @@ am Zeilenende der Erwartung ab, die Ausgabe nicht.
   und startet ein Gleiten vom Rechteck, das gerade zu sehen ist. Zuerst
   meldete `GUI_GLIDING` bei ruhiger Bewegung pauschal "nein" -- dann haette
   der Test nie gesehen, ob das Gleiten ohne Bewegung ueberhaupt startet.
+- **Aufnahme als Testfall** (`dhrt aufnehmen`, aufnahme.rs; `GUI_STATE$`,
+  gui_zustand.rs): dhrt startet sich selbst mit `DHRT_AUFNEHMEN` und
+  `DHRT_GUI_ZUSTAND_DATEI`; die Laufzeit nimmt nach SCREEN auf und
+  schreibt am Ende (`Vm::run`, auch nach EXIT) Aufnahme und Zustand. Der
+  Fall spielt ueber `DHRT_ABSPIELEN` ab -- relativ zu DHRT_START_DIR, weil
+  das Programm unter `--- programm` als Kopie in `_programm/` laeuft, die
+  Beilage aber im Fallordner liegt (die Gegenprobe "Pfad wie gegeben"
+  fiel genau dort). Ohne Hand am Geraet nimmt eine Pruefung nichts auf; die
+  Gegenprobe "Aufnahme am Ende nicht geschrieben" blieb darum zuerst gruen
+  -- jetzt ist eine fehlende Aufnahmedatei ein Fehler von `aufnehmen`.
