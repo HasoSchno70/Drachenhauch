@@ -2510,6 +2510,38 @@ flips -- a running program switches to its night look at 20:00 by itself.
 `GUI_STYLESHEET_CLOCK("12-24 21:00")` fixes the clock to look at it ahead
 of time.
 
+**Rules by situation.** Likewise in front of a rule, also together with
+`@zeit`:
+
+```
+@breite < 600 button { groesse: 12; abstand: 4 }     /* schmales Fenster */
+@hoehe <= 400 #bild { groesse: 10 }
+@dunkel #logo { bild: logo_hell.png }
+@hell #logo { bild: logo_dunkel.png }
+@hochkontrast button { border: #FFFF00; fg: #FFFFFF; bg: #000000 }
+@rtl #zurueck { bild: pfeil_rechts.png }
+```
+
+| Condition | applies when |
+|---|---|
+| `@breite < n`, `<=`, `>`, `>=` | the widget's window is this wide (logical points, like `GUI_WINDOW_GET_W`; alias `@width`) |
+| `@hoehe < n` … | the same for the height (alias `@height`) |
+| `@dunkel` / `@hell` | the gui's theme is dark or light (luminance of `win_bg`; `GUI_THEME_PRESET`, `GUI_SYSTEM_DARK`; aliases `@dark`, `@light`) |
+| `@hochkontrast` | high contrast applies: like the system (Windows, macOS, GNOME), `GUI_SET_CONTRAST` overrides (alias `@high-contrast`) |
+| `@rtl` / `@ltr` | the window is mirrored or not (`GUI_WINDOW_RTL`) |
+
+Every window has its own situation: a narrow side window takes the rule
+for narrow windows, the wide main window next to it does not. When a
+window becomes narrow or the theme dark, the gui resolves anew in the next
+`GUI_UPDATE`. The inspector shows a rule with a condition only while it
+applies.
+
+| Command | Result | Effect |
+|---|---|---|
+| `GUI_SET_CONTRAST(modus$)` | — | `"system"` (default): like the operating system; `"hoch"`: `@hochkontrast` always applies; `"normal"`: never |
+| `GUI_HIGH_CONTRAST()` | BOOLEAN | does high contrast apply right now? |
+| `GUI_SYSTEM_HIGH_CONTRAST()` | BOOLEAN | does the system want high contrast? (`DHRT_SYSTEM_HOHER_KONTRAST=1` fixes the answer) |
+
 ### 8. Shapes of your own, image skins and animations
 
 A button does not have to be a rectangle. The stylesheet knows three more
@@ -3786,6 +3818,34 @@ What the program can contribute:
 | `GUI_SCREENREADER()` | `TRUE` as soon as an assistive program has requested the tree — for example to announce more or to switch off motion |
 | `GUI_SET_TAB_INDEX(wdg, index)` | set the tab order: widgets with an index above 0 first, ascending; 0 (default) = order of creation |
 | `GUI_GET_TAB_INDEX(wdg)` | read the index that was set (0 = creation order) |
+| `GUI_A11Y_CHECK$([win])` | check the interface: one line per finding, `""` = nothing found; without a window all visible ones |
+
+**Checking it yourself.** `GUI_A11Y_CHECK$` finds what makes an interface
+hard for people with weak sight, with a screen reader or with an unsteady
+hand -- with the same colours and positions the gui draws:
+
+- **Contrast** of text on its background below 4.5:1 (large text from 24
+  points: 3:1, WCAG 1.4.3); disabled widgets do not count.
+- **No name** for the screen reader: an operable widget without text,
+  without a label in front and without `GUI_TOOLTIP`. A button with only an
+  icon is called like its tooltip for the reader.
+- **Targets too small**: below 24 × 24 points only if a circle of 24 points
+  around the centre touches no other target (WCAG 2.5.8).
+
+```basic
+IMPORT "gui"
+SCREEN(420, 200, "Pruefen", 1)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Pruefen", 10, 10, 400, 180)
+DIM weg AS GUI_WIDGET : weg = GUI_BUTTON(w, "", 20, 20, 32, 32)
+DIM befund AS STRING : befund = GUI_A11Y_CHECK$()
+IF befund <> "" THEN PRINT befund
+' button bei 20,20 in "Pruefen": kein Name fuer den Bildschirmleser -- ...
+```
+
+It measures on a widget's own background, otherwise on the window's -- a
+coloured panel underneath is unknown to the check. The inspector
+(`GUI_INSPECTOR`) names the findings for the selected widget; the built-in
+themes pass the check.
 
 **Labels.** An input field has no text of its own; the screen reader takes
 the **label to its left** (same row) or **directly above it** (same left

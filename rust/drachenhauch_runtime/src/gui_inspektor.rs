@@ -142,7 +142,7 @@ impl Gui {
             None => z.push("stildatei: keine".into()),
             Some(datei) => {
                 let kette = if datei.mit_vorfahren { Self::ketten(win).into_iter().nth(i).unwrap_or_default() } else { Vec::new() };
-                let regeln = datei.passend_kurz(w.kind.as_str(), &kl, &w.name, w.checked, &kette);
+                let regeln = datei.passend_kurz(w.kind.as_str(), &kl, &w.name, w.checked, &kette, &self.stil_lage(wi));
                 z.push(format!("stildatei {}{}", self.stil_quelle,
                     if regeln.is_empty() { " -- keine Regel passt".to_string() } else { String::new() }));
                 for (zeile, sel, _) in regeln { z.push(format!("  zeile {}: {}", zeile, sel)); }
@@ -155,6 +155,8 @@ impl Gui {
                 if !self.stil_fehler.is_empty() { z.push(format!("fehler beim neu laden: {}", self.stil_fehler)); }
             }
         }
+        // Barrierefreiheit (gui_pruefen.rs): was an diesem Widget auffaellt.
+        for b in self.a11y_befunde(wi, i, &self.a11y_ziele(wi)) { z.push(format!("barrierefreiheit: {}", b)); }
         Ok(z.join("\n"))
     }
 

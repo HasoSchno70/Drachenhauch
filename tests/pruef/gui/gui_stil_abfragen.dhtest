@@ -1,0 +1,122 @@
+' Stildatei nach der Lage (gui_stil.rs `Bedingung`, `Lage`): @breite und
+' @hoehe (das Fenster des Widgets), @dunkel / @hell (das Thema der gui),
+' @hochkontrast (System oder GUI_SET_CONTRAST), @rtl / @ltr. Welche Regeln
+' gelten, sagt GUI_INSPECT$ -- dieselbe Pruefung wie beim Aufloesen.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== ein schmales fenster nimmt die regel fuer schmale fenster
+TRY
+    SCREEN(700, 400, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 700, 400)
+DIM k AS GUI_WIDGET : k = GUI_BUTTON(w, "Knopf", 20, 70, 120, 30)
+GUI_STYLESHEET("button { radius: 1 }" + CHR$(10) + "@breite < 600 button { radius: 9 }")
+GUI_UPDATE()
+PRINT "breit "; INSTR(GUI_INSPECT$(k), "radius 9") >= 0
+GUI_WINDOW_SET_BOUNDS(w, 0, 0, 500, 400)
+GUI_UPDATE()
+PRINT "schmal "; INSTR(GUI_INSPECT$(k), "radius 9") >= 0
+GUI_WINDOW_SET_BOUNDS(w, 0, 0, 650, 400)
+GUI_UPDATE()
+PRINT "wieder breit "; INSTR(GUI_INSPECT$(k), "radius 9") >= 0
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+breit FALSE
+schmal TRUE
+wieder breit FALSE
+
+=== hoher kontrast vom programm und vom system
+TRY
+    SCREEN(400, 200, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 200)
+DIM k AS GUI_WIDGET : k = GUI_BUTTON(w, "Knopf", 20, 70, 120, 30)
+GUI_STYLESHEET("@hochkontrast button { border: #FFFF00 }")
+GUI_UPDATE()
+' Die Umgebung sagt: das System will hohen Kontrast.
+PRINT "system "; GUI_SYSTEM_HIGH_CONTRAST(); " "; INSTR(GUI_INSPECT$(k), "#FFFF00") >= 0
+GUI_SET_CONTRAST("normal")
+GUI_UPDATE()
+PRINT "normal "; GUI_HIGH_CONTRAST(); " "; INSTR(GUI_INSPECT$(k), "#FFFF00") >= 0
+GUI_SET_CONTRAST("hoch")
+GUI_UPDATE()
+PRINT "hoch "; GUI_HIGH_CONTRAST(); " "; INSTR(GUI_INSPECT$(k), "#FFFF00") >= 0
+--- umgebung
+DHRT_FRAMES=2
+DHRT_SYSTEM_HOHER_KONTRAST=1
+--- erwartet
+system TRUE TRUE
+normal FALSE FALSE
+hoch TRUE TRUE
+
+=== dunkles und helles thema
+TRY
+    SCREEN(400, 200, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 200)
+DIM k AS GUI_WIDGET : k = GUI_BUTTON(w, "Knopf", 20, 70, 120, 30)
+GUI_THEME_PRESET("dark")
+GUI_STYLESHEET("@dunkel button { radius: 3 }" + CHR$(10) + "@hell button { radius: 4 }")
+GUI_UPDATE()
+PRINT "dark "; INSTR(GUI_INSPECT$(k), "radius 3") >= 0; " "; INSTR(GUI_INSPECT$(k), "radius 4") >= 0
+GUI_THEME_PRESET("light")
+GUI_UPDATE()
+PRINT "light "; INSTR(GUI_INSPECT$(k), "radius 3") >= 0; " "; INSTR(GUI_INSPECT$(k), "radius 4") >= 0
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+dark TRUE FALSE
+light FALSE TRUE
+
+=== ein gespiegeltes fenster nimmt die regel fuer rtl
+TRY
+    SCREEN(400, 200, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+DIM a AS GUI_WINDOW : a = GUI_WINDOW("A", 0, 0, 200, 200)
+DIM b AS GUI_WINDOW : b = GUI_WINDOW("B", 200, 0, 200, 200)
+DIM ka AS GUI_WIDGET : ka = GUI_BUTTON(a, "A", 20, 70, 120, 30)
+DIM kb AS GUI_WIDGET : kb = GUI_BUTTON(b, "B", 20, 70, 120, 30)
+GUI_WINDOW_RTL(b, TRUE)
+GUI_STYLESHEET("@rtl button { radius: 6 }" + CHR$(10) + "@ltr button { radius: 2 }")
+GUI_UPDATE()
+' Je Fenster seine eigene Lage.
+PRINT "a "; INSTR(GUI_INSPECT$(ka), "radius 2") >= 0; " b "; INSTR(GUI_INSPECT$(kb), "radius 6") >= 0
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+a TRUE b TRUE
+
+=== ein falscher vergleich ist ein fehler mit zeile
+TRY
+    SCREEN(400, 200, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+TRY
+    GUI_STYLESHEET("button { radius: 1 }" + CHR$(10) + "@breite 600 button { radius: 2 }")
+CATCH e
+    PRINT e
+END TRY
+--- umgebung
+DHRT_FRAMES=2
+--- enthaelt
+Zeile 2: @breite erwartet einen Vergleich wie < 600 oder >= 900

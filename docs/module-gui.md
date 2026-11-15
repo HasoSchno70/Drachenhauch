@@ -2525,6 +2525,38 @@ umschlägt -- ein laufendes Programm wechselt um 20:00 von selbst ins
 Nachtaussehen. `GUI_STYLESHEET_CLOCK("12-24 21:00")` hält die Uhr fest, um
 es vorab anzusehen.
 
+**Regeln nach der Lage.** Ebenso vor einer Regel, auch zusammen mit
+`@zeit`:
+
+```
+@breite < 600 button { groesse: 12; abstand: 4 }     /* schmales Fenster */
+@hoehe <= 400 #bild { groesse: 10 }
+@dunkel #logo { bild: logo_hell.png }
+@hell #logo { bild: logo_dunkel.png }
+@hochkontrast button { border: #FFFF00; fg: #FFFFFF; bg: #000000 }
+@rtl #zurueck { bild: pfeil_rechts.png }
+```
+
+| Bedingung | gilt, wenn |
+|---|---|
+| `@breite < n`, `<=`, `>`, `>=` | das Fenster des Widgets so breit ist (logische Punkte, wie `GUI_WINDOW_GET_W`) |
+| `@hoehe < n` … | dasselbe für die Höhe |
+| `@dunkel` / `@hell` | das Thema der gui dunkel bzw. hell ist (Leuchtdichte von `win_bg`; `GUI_THEME_PRESET`, `GUI_SYSTEM_DARK`) |
+| `@hochkontrast` | hoher Kontrast gilt: wie das System (Windows, macOS, GNOME), `GUI_SET_CONTRAST` überstimmt |
+| `@rtl` / `@ltr` | das Fenster gespiegelt ist bzw. nicht (`GUI_WINDOW_RTL`) |
+
+Jedes Fenster hat seine eigene Lage: ein schmales Nebenfenster nimmt die
+Regel für schmale Fenster, das breite Hauptfenster daneben nicht. Wird
+ein Fenster schmal oder das Thema dunkel, löst die gui im nächsten
+`GUI_UPDATE` neu auf. Der Inspektor zeigt eine Regel mit Bedingung nur,
+solange sie gilt.
+
+| Befehl | Ergebnis | Wirkung |
+|---|---|---|
+| `GUI_SET_CONTRAST(modus$)` | — | `"system"` (Vorgabe): wie das Betriebssystem; `"hoch"`: `@hochkontrast` gilt immer; `"normal"`: nie |
+| `GUI_HIGH_CONTRAST()` | BOOLEAN | gilt gerade hoher Kontrast? |
+| `GUI_SYSTEM_HIGH_CONTRAST()` | BOOLEAN | will das System hohen Kontrast? (`DHRT_SYSTEM_HOHER_KONTRAST=1` legt die Antwort fest) |
+
 ### 8. Eigene Formen, Bildhäute und Animationen
 
 Ein Knopf muss kein Rechteck sein. Die Stildatei kennt dafür drei
@@ -3809,6 +3841,34 @@ Was das Programm beisteuern kann:
 | `GUI_SCREENREADER()` | `TRUE`, sobald ein Hilfsprogramm den Baum angefordert hat — etwa um mehr anzusagen oder Bewegung abzuschalten |
 | `GUI_SET_TAB_INDEX(wdg, index)` | Tab-Reihenfolge festlegen: Widgets mit Index über 0 zuerst, aufsteigend; 0 (Vorgabe) = Reihenfolge des Anlegens |
 | `GUI_GET_TAB_INDEX(wdg)` | den gesetzten Index lesen (0 = Anlege-Reihenfolge) |
+| `GUI_A11Y_CHECK$([win])` | die Oberfläche prüfen: eine Zeile je Befund, `""` = nichts gefunden; ohne Fenster alle sichtbaren |
+
+**Selbst prüfen.** `GUI_A11Y_CHECK$` findet, was eine Oberfläche für
+Menschen mit schwacher Sicht, mit Bildschirmleser oder unruhiger Hand
+schwer macht -- mit denselben Farben und Lagen, die die gui zeichnet:
+
+- **Kontrast** der Schrift auf ihrem Grund unter 4,5:1 (große Schrift ab
+  24 Punkten: 3:1, WCAG 1.4.3); abgeschaltete Widgets zählen nicht.
+- **Kein Name** für den Bildschirmleser: ein bedienbares Widget ohne Text,
+  ohne Beschriftung davor und ohne `GUI_TOOLTIP`. Ein Knopf nur mit
+  Sinnbild heißt für den Leser wie sein Hilfetext.
+- **Zu kleine Ziele**: unter 24 × 24 Punkten nur, wenn ein Kreis von 24
+  Punkten um die Mitte kein anderes Ziel berührt (WCAG 2.5.8).
+
+```basic
+IMPORT "gui"
+SCREEN(420, 200, "Pruefen", 1)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Pruefen", 10, 10, 400, 180)
+DIM weg AS GUI_WIDGET : weg = GUI_BUTTON(w, "", 20, 20, 32, 32)
+DIM befund AS STRING : befund = GUI_A11Y_CHECK$()
+IF befund <> "" THEN PRINT befund
+' button bei 20,20 in "Pruefen": kein Name fuer den Bildschirmleser -- ...
+```
+
+Gemessen wird auf dem eigenen Grund eines Widgets, sonst auf dem des
+Fensters -- ein farbiges Panel darunter kennt die Prüfung nicht. Der
+Inspektor (`GUI_INSPECTOR`) nennt die Befunde zum gewählten Widget; die
+eingebauten Themen bestehen die Prüfung.
 
 **Beschriftungen.** Ein Eingabefeld hat keinen eigenen Text; der
 Bildschirmleser nimmt die **Beschriftung links daneben** (gleiche Zeile)

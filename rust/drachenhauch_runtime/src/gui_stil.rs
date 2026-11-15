@@ -266,16 +266,65 @@ struct Regel { sel: Selektor, werte: StilWerte, zeile: usize, kopf: String, bed:
 /// nur dann. Zeit in Minuten ab Mitternacht (bis ausschliesslich), Datum als
 /// Monat*100+Tag (bis einschliesslich); beide duerfen ueber Mitternacht bzw.
 /// den Jahreswechsel reichen.
+///
+/// Dazu die Lage des Fensters (`Lage`): `@breite < 600`, `@hoehe >= 500`
+/// (logische Groesse des Fensters, in dem das Widget steht), `@dunkel` /
+/// `@hell` (das Thema der gui), `@hochkontrast` (das System will hohen
+/// Kontrast, GUI_SET_CONTRAST ueberstimmt), `@rtl` / `@ltr`
+/// (GUI_WINDOW_RTL). Mehrere vor einer Regel muessen alle gelten.
+#[derive(Clone, Copy, Debug, PartialEq, Default)]
+pub(super) struct Bedingung {
+    zeit: Option<(u16, u16)>,
+    datum: Option<(u16, u16)>,
+    breite: Option<(Vergleich, i32)>,
+    hoehe: Option<(Vergleich, i32)>,
+    dunkel: Option<bool>,
+    kontrast: bool,
+    rtl: Option<bool>,
+}
+
+/// `<`, `<=`, `>`, `>=` vor einer Zahl.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub(super) struct Bedingung { zeit: Option<(u16, u16)>, datum: Option<(u16, u16)> }
+pub(super) enum Vergleich { Kleiner, KleinerGleich, Groesser, GroesserGleich }
+
+impl Vergleich {
+    fn trifft(self, a: i32, b: i32) -> bool {
+        match self { Vergleich::Kleiner => a < b, Vergleich::KleinerGleich => a <= b, Vergleich::Groesser => a > b, Vergleich::GroesserGleich => a >= b }
+    }
+}
+
+/// Wogegen die Bedingungen ausser Zeit und Datum gelten: das Fenster des
+/// Widgets und die gui (von `stil_pass` je Fenster gesetzt).
+#[derive(Clone, Copy, Debug, PartialEq, Default, Hash)]
+pub(super) struct Lage { pub breite: i32, pub hoehe: i32, pub dunkel: bool, pub kontrast: bool, pub rtl: bool }
 
 impl Bedingung {
-    /// Gilt sie zu (Monat*100+Tag, Minute des Tages)?
-    pub(super) fn gilt(&self, md: u16, minute: u16) -> bool {
+    /// Gilt sie zu (Monat*100+Tag, Minute des Tages) in dieser Lage?
+    pub(super) fn gilt(&self, md: u16, minute: u16, lage: &Lage) -> bool {
         let zeit = self.zeit.map(|(a, b)| if a <= b { minute >= a && minute < b } else { minute >= a || minute < b }).unwrap_or(true);
         let datum = self.datum.map(|(a, b)| if a <= b { md >= a && md <= b } else { md >= a || md <= b }).unwrap_or(true);
         zeit && datum
+            && self.breite.map(|(v, n)| v.trifft(lage.breite, n)).unwrap_or(true)
+            && self.hoehe.map(|(v, n)| v.trifft(lage.hoehe, n)).unwrap_or(true)
+            && self.dunkel.map(|d| d == lage.dunkel).unwrap_or(true)
+            && (!self.kontrast || lage.kontrast)
+            && self.rtl.map(|r| r == lage.rtl).unwrap_or(true)
     }
+    /// Haengt sie an der Uhr? (Dann weckt die gui zur vollen Minute.)
+    fn nach_uhr(&self) -> bool { self.zeit.is_some() || self.datum.is_some() }
+}
+
+/// `<600`, `>=900` (der Vergleich darf auch vom Wert getrennt stehen).
+fn vergleich_lesen(t: &str) -> Option<(Vergleich, i32)> {
+    let t = t.trim();
+    let (v, rest) = if let Some(r) = t.strip_prefix("<=") { (Vergleich::KleinerGleich, r) }
+        else if let Some(r) = t.strip_prefix(">=") { (Vergleich::GroesserGleich, r) }
+        else if let Some(r) = t.strip_prefix('<') { (Vergleich::Kleiner, r) }
+        else if let Some(r) = t.strip_prefix('>') { (Vergleich::Groesser, r) }
+        else { return None };
+    let n: i32 = rest.trim().trim_end_matches("px").parse().ok()?;
+    if n < 0 { return None; }
+    Some((v, n))
 }
 
 fn uhrzeit_lesen(t: &str) -> Option<u16> {
@@ -295,14 +344,48 @@ fn tag_lesen(t: &str) -> Option<u16> {
 /// Bedingungen vorn im Kopf einer Regel lesen: (Bedingung, Rest des Kopfs,
 /// ihr Text fuer den Inspektor).
 fn bedingung_lesen(kopf: &str, zeile: usize) -> Result<(Option<Bedingung>, String, String), String> {
-    let mut b = Bedingung { zeit: None, datum: None };
+    let mut b = Bedingung::default();
     let mut texte: Vec<String> = Vec::new();
     let mut rest = kopf.trim_start();
+    // Ein Wort bis zum naechsten Leerraum nehmen; `nach` steht danach.
+    fn nimm<'a>(nach: &mut &'a str) -> &'a str {
+        let e = nach.find(char::is_whitespace).unwrap_or(nach.len());
+        let a = &nach[..e];
+        *nach = nach[e..].trim_start();
+        a
+    }
     while rest.starts_with('@') {
-        let mut teile = rest.splitn(3, char::is_whitespace).filter(|x| !x.is_empty());
-        let wort = teile.next().unwrap_or("").to_lowercase();
-        let arg = teile.next().unwrap_or("");
-        let weiter = rest.find(arg).map(|p| &rest[p + arg.len()..]).unwrap_or("");
+        // Das Wort endet am Leerraum oder an einem Vergleich (`@breite<600`).
+        let ende = rest[1..].find(|c: char| c.is_whitespace() || matches!(c, '<' | '>' | '=')).map(|p| p + 1).unwrap_or(rest.len());
+        let wort = rest[..ende].to_lowercase();
+        let mut nach = rest[ende..].trim_start();
+        // Bedingungen ohne Wert
+        let ohne: Option<fn(&mut Bedingung)> = match wort.as_str() {
+            "@dunkel" | "@dark" => Some(|b| b.dunkel = Some(true)),
+            "@hell" | "@light" => Some(|b| b.dunkel = Some(false)),
+            "@hochkontrast" | "@high-contrast" => Some(|b| b.kontrast = true),
+            "@rtl" => Some(|b| b.rtl = Some(true)),
+            "@ltr" => Some(|b| b.rtl = Some(false)),
+            _ => None,
+        };
+        if let Some(setzen) = ohne {
+            setzen(&mut b);
+            texte.push(wort);
+            rest = nach;
+            continue;
+        }
+        if matches!(wort.as_str(), "@breite" | "@width" | "@hoehe" | "@height") {
+            let mut arg = nimm(&mut nach).to_string();
+            if matches!(arg.as_str(), "<" | "<=" | ">" | ">=") { arg.push_str(nimm(&mut nach)); }
+            let v = vergleich_lesen(&arg)
+                .ok_or_else(|| format!("Zeile {}: {} erwartet einen Vergleich wie < 600 oder >= 900, erhalten '{}'", zeile, wort, arg))?;
+            if matches!(wort.as_str(), "@breite" | "@width") { b.breite = Some(v); } else { b.hoehe = Some(v); }
+            texte.push(format!("{} {}", wort, arg));
+            rest = nach;
+            continue;
+        }
+        let arg = nimm(&mut nach);
+        let weiter = nach;
         match wort.as_str() {
             "@zeit" | "@time" => {
                 let (a, z) = arg.split_once('-').and_then(|(a, z)| Some((uhrzeit_lesen(a)?, uhrzeit_lesen(z)?)))
@@ -317,10 +400,10 @@ fn bedingung_lesen(kopf: &str, zeile: usize) -> Result<(Option<Bedingung>, Strin
                 let (a, z) = a.zip(z).ok_or_else(|| format!("Zeile {}: @datum erwartet Monat-Tag wie 12-24 oder 12-01..12-26, erhalten '{}'", zeile, arg))?;
                 b.datum = Some((a, z));
             }
-            _ => return Err(format!("Zeile {}: '{}' unbekannt -- vor einer Regel stehen @zeit oder @datum", zeile, wort)),
+            _ => return Err(format!("Zeile {}: '{}' unbekannt -- vor einer Regel stehen @zeit, @datum, @breite, @hoehe, @dunkel, @hell, @hochkontrast, @rtl oder @ltr", zeile, wort)),
         }
         texte.push(format!("{} {}", wort, arg));
-        rest = weiter.trim_start();
+        rest = weiter;
     }
     let bed = if texte.is_empty() { None } else { Some(b) };
     Ok((bed, rest.to_string(), texte.join(" ")))
@@ -333,8 +416,15 @@ pub(super) struct Stildatei {
     /// Hat irgendeine Regel Vorfahren? Nur dann muss `stil_pass` die Kette
     /// ueber jedem Widget bauen.
     pub(super) mit_vorfahren: bool,
-    /// Haengt eine Regel an Zeit oder Datum? Dann fragt `stil_pass` die Uhr.
+    /// Haengt eine Regel an einer Bedingung? Dann fragt `stil_pass` Uhr
+    /// und Lage.
     pub(super) mit_bedingung: bool,
+    /// ... an Zeit oder Datum (dann weckt die gui zur vollen Minute)?
+    pub(super) mit_uhr: bool,
+    /// ... am hohen Kontrast (dann fragt die gui das System)?
+    pub(super) mit_kontrast: bool,
+    /// Die Lage, gegen die `aufloesen` gerade gilt (je Fenster gesetzt).
+    pub(super) lage: Lage,
     /// Eigene Ablaeufe (`@ablauf name { 0%: x 0; 50%: y -8 }`), ihre Namen
     /// und Schluesselbilder (gui_aussehen.rs).
     pub(super) ablaeufe: Vec<(String, Vec<super::aussehen::Schluessel>)>,
@@ -632,7 +722,9 @@ pub(super) fn lesen(text: &str, thema: &dyn Fn(&str) -> bool) -> Result<Stildate
     }
     let mit_vorfahren = regeln.iter().any(|r: &Regel| !r.sel.vorfahren.is_empty());
     let mit_bedingung = regeln.iter().any(|r: &Regel| r.bed.is_some());
-    Ok(Stildatei { regeln, mit_vorfahren, mit_bedingung, uhr: (0, 0), ablaeufe })
+    let mit_uhr = regeln.iter().any(|r: &Regel| r.bed.map(|b| b.nach_uhr()).unwrap_or(false));
+    let mit_kontrast = regeln.iter().any(|r: &Regel| r.bed.map(|b| b.kontrast).unwrap_or(false));
+    Ok(Stildatei { regeln, mit_vorfahren, mit_bedingung, mit_uhr, mit_kontrast, lage: Lage::default(), uhr: (0, 0), ablaeufe })
 }
 
 impl Stildatei {
@@ -640,13 +732,13 @@ impl Stildatei {
     /// seine Behaelter und das Fenster, das naechste zuerst.
     pub(super) fn aufloesen(&self, art: &str, klassen: &[String], name: &str, an: bool, kette: &[Glied]) -> StilAufgeloest {
         let mut o: StilAufgeloest = Default::default();
-        for r in self.passend(art, klassen, name, an, kette) { o[r.sel.schicht].uebernehmen(&r.werte); }
+        for r in self.passend(art, klassen, name, an, kette, &self.lage) { o[r.sel.schicht].uebernehmen(&r.werte); }
         o
     }
     /// Die Regeln, die auf ein Widget passen, in der Reihenfolge, in der sie
     /// wirken (Gewicht, dann Stelle) -- die EINE Pruefung fuer Aufloesen
     /// und Inspektor.
-    fn passend(&self, art: &str, klassen: &[String], name: &str, an: bool, kette: &[Glied]) -> Vec<&Regel> {
+    fn passend(&self, art: &str, klassen: &[String], name: &str, an: bool, kette: &[Glied], lage: &Lage) -> Vec<&Regel> {
         let mut passend: Vec<(u32, usize, &Regel)> = self.regeln.iter().enumerate().filter(|(_, r)| {
             let s = &r.sel;
             s.art.as_ref().map(|a| a == art).unwrap_or(true)
@@ -654,19 +746,19 @@ impl Stildatei {
                 && s.name.as_ref().map(|n| n == name).unwrap_or(true)
                 && (!s.an || an)
                 && vorfahren_passen(&s.vorfahren, kette)
-                && r.bed.map(|b| b.gilt(self.uhr.0, self.uhr.1)).unwrap_or(true)
+                && r.bed.map(|b| b.gilt(self.uhr.0, self.uhr.1, lage)).unwrap_or(true)
         }).map(|(i, r)| (r.sel.gewicht, i, r)).collect();
         passend.sort_by_key(|(g, i, _)| (*g, *i));
         passend.into_iter().map(|(_, _, r)| r).collect()
     }
     /// Welche Bedingungen gelten gerade (je Regel mit Bedingung, in der
     /// Reihenfolge der Datei)? Aendert sich das, loest `stil_pass` neu auf.
-    pub(super) fn bedingungen_jetzt(&self, md: u16, minute: u16) -> Vec<bool> {
-        self.regeln.iter().filter_map(|r| r.bed.map(|b| b.gilt(md, minute))).collect()
+    pub(super) fn bedingungen_jetzt(&self, md: u16, minute: u16, lage: &Lage) -> Vec<bool> {
+        self.regeln.iter().filter_map(|r| r.bed.map(|b| b.gilt(md, minute, lage))).collect()
     }
     /// Fuer den Inspektor: (Zeile, Selektor, Schicht) je passender Regel.
-    pub(super) fn passend_kurz(&self, art: &str, klassen: &[String], name: &str, an: bool, kette: &[Glied]) -> Vec<(usize, String, usize)> {
-        self.passend(art, klassen, name, an, kette).into_iter().map(|r| (r.zeile, r.kopf.clone(), r.sel.schicht)).collect()
+    pub(super) fn passend_kurz(&self, art: &str, klassen: &[String], name: &str, an: bool, kette: &[Glied], lage: &Lage) -> Vec<(usize, String, usize)> {
+        self.passend(art, klassen, name, an, kette, lage).into_iter().map(|r| (r.zeile, r.kopf.clone(), r.sel.schicht)).collect()
     }
 }
 
@@ -797,19 +889,22 @@ impl Gui {
     pub(super) fn stil_pass(&mut self) {
         // Regeln nach Zeit und Datum: die Uhr stellen; schlaegt eine
         // Bedingung um, gilt die Stildatei als neu (stil_stand).
-        if self.stil.as_ref().map(|d| d.mit_bedingung).unwrap_or(false) {
+        let mit_bedingung = self.stil.as_ref().map(|d| d.mit_bedingung).unwrap_or(false);
+        if mit_bedingung {
             // Zur naechsten vollen Minute kann eine Bedingung umschlagen.
-            if self.stil_uhr_fest.is_none() {
+            if self.stil_uhr_fest.is_none() && self.stil.as_ref().map(|d| d.mit_uhr).unwrap_or(false) {
                 let s = crate::builtins::local_datetime().5 as f64;
                 self.bild_in((60.0 - s).max(0.5));
             }
+            if self.stil.as_ref().map(|d| d.mit_kontrast).unwrap_or(false) { self.kontrast_pass(); }
             let (md, minute) = self.stil_uhr_jetzt();
             let datei = self.stil.as_mut().unwrap();
             datei.uhr = (md, minute);
-            let jetzt = datei.bedingungen_jetzt(md, minute);
-            if jetzt != self.stil_bed { self.stil_bed = jetzt; self.stil_stand += 1; }
         }
-        let Some(datei) = self.stil.as_ref() else {
+        // Was fuer alle Fenster gleich ist: Thema und Kontrast.
+        let dunkel = self.thema_dunkel();
+        let kontrast = self.hoch_kontrast;
+        let Some(datei) = self.stil.as_mut() else {
             for win in self.windows.iter_mut() { for w in win.widgets.iter_mut() { w.stil_auf = None; w.stil_key = None; } }
             return;
         };
@@ -822,6 +917,16 @@ impl Gui {
             // Behaelter, wird neu aufgeloest, ohne dass jede Stelle, die das
             // tut, daran denken muss.
             let ketten: Vec<Vec<Glied>> = if mit_vorfahren { Self::ketten(win) } else { Vec::new() };
+            // Die Lage dieses Fensters; welche Bedingungen hier gelten, steht
+            // als Hash im Schluessel -- schlaegt eine um (das Fenster wird
+            // schmal, das Thema dunkel), loest es neu auf.
+            datei.lage = Lage { breite: win.w, hoehe: win.h, dunkel, kontrast, rtl: win.rtl };
+            let bhash = if mit_bedingung {
+                use std::hash::{Hash, Hasher};
+                let mut h = std::collections::hash_map::DefaultHasher::new();
+                datei.bedingungen_jetzt(datei.uhr.0, datei.uhr.1, &datei.lage).hash(&mut h);
+                h.finish()
+            } else { 0 };
             for (i, w) in win.widgets.iter_mut().enumerate() {
                 if !w.alive { continue; }
                 let kette: &[Glied] = ketten.get(i).map(|k| k.as_slice()).unwrap_or(&[]);
@@ -830,7 +935,7 @@ impl Gui {
                     let mut h = std::collections::hash_map::DefaultHasher::new();
                     kette.hash(&mut h);
                     h.finish()
-                };
+                } ^ bhash.rotate_left(29);
                 let key = (stand, w.checked, w.enabled, w.variante, khash);
                 if w.stil_key == Some(key) { continue; }
                 let mut kl = w.klassen.clone();
@@ -843,6 +948,37 @@ impl Gui {
             }
         }
     }
+    /// Ist das Thema der gui dunkel? (Leuchtdichte des Fenstergrunds)
+    pub(super) fn thema_dunkel(&self) -> bool { super::leuchtdichte(self.th("win_bg")) < 0.2 }
+
+    /// Die Lage eines Fensters fuer die Bedingungen der Stildatei.
+    pub(super) fn stil_lage(&self, wi: usize) -> Lage {
+        let win = &self.windows[wi];
+        Lage { breite: win.w, hoehe: win.h, dunkel: self.thema_dunkel(), kontrast: self.hoch_kontrast, rtl: win.rtl }
+    }
+
+    /// Hoher Kontrast: eingestellt oder vom System (GUI_SET_CONTRAST).
+    pub(super) fn kontrast_pass(&mut self) {
+        self.hoch_kontrast = match self.kontrast_modus {
+            1 => true,
+            2 => false,
+            _ => crate::systemaussehen::hoher_kontrast(),
+        };
+    }
+    /// GUI_SET_CONTRAST(modus$): "system" (Vorgabe), "hoch", "normal".
+    pub fn set_contrast(&mut self, modus: &str) -> Result<(), String> {
+        self.kontrast_modus = match modus.trim().to_lowercase().as_str() {
+            "system" | "" => 0,
+            "hoch" | "high" | "an" | "on" => 1,
+            "normal" | "aus" | "off" => 2,
+            _ => return Err(format!("GUI_SET_CONTRAST: '{}' -- erwartet \"system\", \"hoch\" oder \"normal\"", modus)),
+        };
+        self.kontrast_pass();
+        Ok(())
+    }
+    /// GUI_HIGH_CONTRAST(): gilt gerade hoher Kontrast?
+    pub fn high_contrast(&mut self) -> bool { self.kontrast_pass(); self.hoch_kontrast }
+
     /// Je Widget die Kette seiner Behaelter bis zum Fenster, das naechste
     /// zuerst. Behaelter ist, wer Kinder fuehrt: ein Layout (seine Kinder-
     /// liste), sonst Reiterwerk/Akkordeon/Assistent (`tc_von`) und das
@@ -1085,6 +1221,33 @@ mod tests {
         assert!(lesen("@datum 02-30 button { radius: 1 }", &th).unwrap_err().contains("@datum"));
         assert!(lesen("@wetter regen button { radius: 1 }", &th).unwrap_err().contains("'@wetter' unbekannt"));
         assert!(!lesen("button { radius: 1 }", &th).unwrap().mit_bedingung);
+    }
+
+    #[test]
+    fn regeln_nach_der_lage_des_fensters() {
+        let d = lesen("button { radius: 1 }
+@breite < 600 button { radius: 2 }
+@breite>=600 @dunkel button { radius: 3 }
+@hochkontrast button { radius: 4 }
+@rtl @hoehe <= 300 button { radius: 5 }", &th).unwrap();
+        assert!(d.mit_bedingung && !d.mit_uhr && d.mit_kontrast);
+        let r = |breite: i32, hoehe: i32, dunkel: bool, kontrast: bool, rtl: bool| {
+            let mut d = d.clone();
+            d.lage = Lage { breite, hoehe, dunkel, kontrast, rtl };
+            d.aufloesen("button", &[], "", false, &[])[BASIS].radius
+        };
+        assert_eq!(r(800, 600, false, false, false), Some(1));
+        assert_eq!(r(599, 600, false, false, false), Some(2));   // < ist streng
+        assert_eq!(r(600, 600, false, false, false), Some(1));
+        assert_eq!(r(600, 600, true, false, false), Some(3));    // beide muessen gelten
+        assert_eq!(r(400, 600, false, true, false), Some(4));    // spaeter in der Datei gewinnt
+        assert_eq!(r(800, 300, false, false, true), Some(5));
+        assert_eq!(r(800, 301, false, false, true), Some(1));
+        assert!(lesen("@breite 600 button { radius: 1 }", &th).unwrap_err().contains("@breite"));
+        assert!(lesen("@hoehe < breit button { radius: 1 }", &th).unwrap_err().contains("@hoehe"));
+        // Ohne Wert steht der Selektor gleich dahinter.
+        let h = lesen("@hell label { radius: 7 }", &th).unwrap();
+        assert_eq!(h.aufloesen("label", &[], "", false, &[])[BASIS].radius, Some(7));
     }
 
     #[test]

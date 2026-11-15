@@ -99,6 +99,6 @@ END TRY
 --- enthaelt
 Zeile 1: @zeit erwartet von-bis wie 20:00-06:00, erhalten '8-9'
 Zeile 2: @datum erwartet Monat-Tag wie 12-24 oder 12-01..12-26, erhalten '13-01'
-Zeile 1: '@wetter' unbekannt -- vor einer Regel stehen @zeit oder @datum
+Zeile 1: '@wetter' unbekannt -- vor einer Regel stehen @zeit, @datum, @breite, @hoehe, @dunkel, @hell, @hochkontrast, @rtl oder @ltr
 GUI_STYLESHEET_CLOCK: Uhrzeit '25:00' -- erwartet HH:MM
 GUI_STYLESHEET_CLOCK: Datum '02-30' -- erwartet MM-TT oder JJJJ-MM-TT

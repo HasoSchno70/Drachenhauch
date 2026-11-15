@@ -558,6 +558,11 @@ impl Gui {
             } else if !w.tooltip.is_empty() {
                 n.set_label(w.tooltip.clone());
             }
+        } else if w.text.trim().is_empty() && !w.tooltip.is_empty()
+            && matches!(w.kind, Kind::Button | Kind::Card | Kind::Checkbox | Kind::Toggle | Kind::Radio | Kind::Eigen) {
+            // Ein Knopf nur mit Sinnbild: der Hilfetext ist sein Name, sonst
+            // hiesse er fuer den Bildschirmleser nur "Knopf".
+            n.set_label(w.tooltip.clone());
         }
         if !kinder.is_empty() { n.set_children(kinder); }
         nodes.push((id, n));

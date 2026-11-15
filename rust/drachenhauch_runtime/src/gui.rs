@@ -27,6 +27,8 @@ mod popupfenster;
 mod aussehen;
 #[path = "gui_inspektor.rs"]
 mod inspektor;
+#[path = "gui_pruefen.rs"]
+mod pruefen;
 #[path = "gui_effekte.rs"]
 mod effekte;
 #[path = "gui_palette.rs"]
@@ -230,7 +232,9 @@ fn preset(name: &str) -> Option<HashMap<String, i64>> {
             ("win_bg", 0xFAFBFC), ("win_border", 0xD8DEE6), ("title_bg", 0xEFF2F5),
             ("title_bg_focus", 0xFFFFFF), ("title_fg", 0x1F2733), ("widget_bg", 0xFFFFFF),
             ("widget_border", 0xCBD3DD), ("text_fg", 0x1F2733), ("muted_fg", 0x8A93A0),
-            ("accent", 0x2A7DE1), ("close_hover", 0xE03B3B)])),
+            // Akzent 0x2A7DE1 -> 0x1D6DCE (2026-11-15): als Schrift auf dem
+            // Grund 4,0:1, mit weisser Schrift 4,1:1 -- jetzt 4,9 und 5,1.
+            ("accent", 0x1D6DCE), ("close_hover", 0xE03B3B)])),
         _ => None,
     }
 }
@@ -2992,7 +2996,7 @@ fn natuerlich_vergleichen(a: &str, b: &str) -> std::cmp::Ordering {
 /// Gewichtet wie das Auge (Gruen zaehlt am meisten) -- ein gelber Knopf mit
 /// weisser Schrift ist sonst unlesbar, obwohl sein Rotanteil niedrig ist.
 /// Relative Leuchtdichte nach WCAG (0 = schwarz, 1 = weiss).
-fn leuchtdichte(c: i64) -> f64 {
+pub(super) fn leuchtdichte(c: i64) -> f64 {
     let k = |v: i64| { let s = v as f64 / 255.0; if s <= 0.03928 { s / 12.92 } else { ((s + 0.055) / 1.055).powf(2.4) } };
     0.2126 * k((c >> 16) & 0xFF) + 0.7152 * k((c >> 8) & 0xFF) + 0.0722 * k(c & 0xFF)
 }
@@ -3002,9 +3006,14 @@ fn kontrast(a: i64, b: i64) -> f64 {
     (la.max(lb) + 0.05) / (la.min(lb) + 0.05)
 }
 
+///
+/// Gewaehlt wird die Schrift mit dem hoeheren Kontrast nach WCAG. Bis
+/// 2026.49 entschied eine Helligkeitsgrenze (Luma 160): auf dem Cyan des
+/// dunklen Themas ergab das weisse Schrift mit 2,1:1 statt dunkler mit 7,9:1,
+/// auf Gruen und Orange ebenso -- gefunden mit GUI_A11Y_CHECK$.
 fn lesbar_auf(bg: i64) -> i64 {
-    let (r, g, b) = (((bg >> 16) & 0xFF) as f64, ((bg >> 8) & 0xFF) as f64, (bg & 0xFF) as f64);
-    if 0.299 * r + 0.587 * g + 0.114 * b > 160.0 { 0x1C2026 } else { 0xFFFFFF }
+    let bg = bg & 0xFFFFFF;
+    if kontrast(0x1C2026, bg) > kontrast(0xFFFFFF, bg) { 0x1C2026 } else { 0xFFFFFF }
 }
 
 /// Knopfarten (GUI_BUTTON_VARIANT). Index = Wert im Widget-Feld `variante`.
@@ -3845,9 +3854,8 @@ pub struct Gui {
     stil_quelle: String,
     stil_beob: Option<(String, String, f64)>,
     stil_fehler: String,
-    /// Stildatei nach Zeit und Datum: welche Bedingungen zuletzt galten, und
-    /// eine festgehaltene Uhr (GUI_STYLESHEET_CLOCK; None = die echte).
-    stil_bed: Vec<bool>,
+    /// Stildatei nach Zeit und Datum: eine festgehaltene Uhr
+    /// (GUI_STYLESHEET_CLOCK; None = die echte).
     stil_uhr_fest: Option<(Option<u16>, Option<u16>)>,
     /// Klaenge (gui_effekte.rs): an/aus, Wuensche fuer die VM, Protokoll
     /// fuer GUI_SOUND_LOG$.
@@ -3997,6 +4005,10 @@ pub struct Gui {
     /// fuer Schreibmarke und Hilfetext (bis 2026.49 zaehlten beide Bilder;
     /// schlaeft das Programm im Leerlauf, gibt es keine Bilder zu zaehlen).
     takt: f64,
+    /// GUI_SET_CONTRAST: 0 = wie das System, 1 = hoch, 2 = normal; und was
+    /// gerade gilt (fuer `@hochkontrast` in der Stildatei).
+    kontrast_modus: u8,
+    hoch_kontrast: bool,
     /// In wie vielen Sekunden die gui das naechste Bild braucht (unendlich =
     /// keins) -- gesammelt waehrend GUI_UPDATE/GUI_DRAW, abgeholt bei FLIP.
     bedarf: std::cell::Cell<f64>,
@@ -4096,7 +4108,7 @@ impl Gui {
     pub fn new() -> Gui {
         Gui {
             schrift: None,
-            windows: Vec::new(), z_order: Vec::new(), flaeche: 0, fokus_flaeche: 0, nativ_fokus_wunsch: None, leihe: None, teil_druck: None, teil_ids: Vec::new(), popup_fenster: Vec::new(), grenzen: Vec::new(), canvas_offen: None, uhr: 0.0, haeute: std::collections::HashMap::new(), bewegung: 0, ruhig: false, insp_an: false, insp_wahl: -1, insp_taste: std::env::var("DHRT_INSPEKTOR").map(|v| v.trim() == "1").unwrap_or(false), stil_quelle: String::new(), stil_beob: None, stil_fehler: String::new(), stil_bed: Vec::new(), stil_uhr_fest: None, klang_an: true, klang_warte: Vec::new(), klang_log: Vec::new(), funken: Vec::new(), funken_saat: 0x9E37_79B9_7F4A_7C15, vorher_ueber: Vec::new(), vorher_druck: None, vorher_fokus: None, palette: None, pal_taste: true,
+            windows: Vec::new(), z_order: Vec::new(), flaeche: 0, fokus_flaeche: 0, nativ_fokus_wunsch: None, leihe: None, teil_druck: None, teil_ids: Vec::new(), popup_fenster: Vec::new(), grenzen: Vec::new(), canvas_offen: None, uhr: 0.0, haeute: std::collections::HashMap::new(), bewegung: 0, ruhig: false, insp_an: false, insp_wahl: -1, insp_taste: std::env::var("DHRT_INSPEKTOR").map(|v| v.trim() == "1").unwrap_or(false), stil_quelle: String::new(), stil_beob: None, stil_fehler: String::new(), stil_uhr_fest: None, klang_an: true, klang_warte: Vec::new(), klang_log: Vec::new(), funken: Vec::new(), funken_saat: 0x9E37_79B9_7F4A_7C15, vorher_ueber: Vec::new(), vorher_druck: None, vorher_fokus: None, palette: None, pal_taste: true,
             ta_zerlegung: std::cell::RefCell::new(HashMap::new()),
             focus_window: None, focus_widget: None, modal: None, modal_vorher: Vec::new(), modal_fokus: Vec::new(), cp_drag: None,
             drag_window: None, drag_dx: 0, drag_dy: 0,
@@ -4110,7 +4122,7 @@ impl Gui {
             open_menu: None, context_open: None, kontext_neu: None, rs_menue: None, sub_chain: Vec::new(), tasten_mod: (false, false),
             kuerzel_gefeuert: false, was_right_down: false, was_mitte_down: false,
             scroll_drag: None,
-            was_mouse_down: false, zug_feld: None, frame_count: 0, takt: 0.0, bedarf: std::cell::Cell::new(f64::INFINITY),
+            was_mouse_down: false, zug_feld: None, frame_count: 0, takt: 0.0, kontrast_modus: 0, hoch_kontrast: false, bedarf: std::cell::Cell::new(f64::INFINITY),
             theme: default_theme(), metrics: default_metrics(),
             stil: None, stil_stand: 0, rad_jetzt: std::cell::Cell::new(None), form_jetzt: std::cell::Cell::new(stil::FormStil::default()),
             mnemonics: false, label_zug: None, label_wahl: None, gruppen: HashMap::new(), schriftwahl: Vec::new(),
