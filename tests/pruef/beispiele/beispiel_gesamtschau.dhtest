@@ -72,7 +72,7 @@ station 6 geprueft TRUE rtl TRUE
 ' echte Fenster (ein zweites Fenster des Systems) und der Inspektor.
 prBild = prBild + 1
 IF prBild = 3 THEN prAufnahme()
-DIM prK AS ARRAY OF INTEGER : prK = [kreis, raute, konfetti, sterne, streif, pruef6, anwenden, bToast, bDialog, bPal, bInfo, los, k1]
+DIM prK AS ARRAY OF GUI_WIDGET : prK = [kreis, raute, konfetti, sterne, streif, pruef6, anwenden, bToast, bDialog, bPal, bInfo, los, k1]
 DIM prNamen AS ARRAY OF STRING : prNamen = ["kreis", "raute", "konfetti", "sterne", "streif", "pruef6", "anwenden", "toast", "dialog", "palette", "info", "los", "karte"]
 DIM prI AS INTEGER
 FOR prI = 0 TO LEN(prK) - 1
