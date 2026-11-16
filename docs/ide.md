@@ -224,7 +224,10 @@ bekäme. Diese Bausteine kamen mit ihr:
   Probleme, Hilfe) liegen einen Ton **dunkler** als der Editor, bündig mit
   dem Fenstergrund, eckig und nur durch eine feine Linie getrennt; die
   Ordner im Baum sind gedämpft. So liegt die Arbeit vorn, der Rand tritt
-  zurück -- und der Nebel zieht auf dem dunklen Grund sichtbar durch.
+  zurück -- und der Nebel zieht auf dem dunklen Grund sichtbar durch. Der
+  aktive Reiter trägt die Farbe des Editors mit dem Akzent oben, die leere
+  Ausgabe sagt, wie man sie füllt („F5 startet das Programm“), und die
+  Statusleiste steht in einem gedämpften Akzent, solange ein Programm läuft.
 - **Einrückungslinien** (`GUI_TEXTAREA_SET(ta, "einzugslinien", 1)`): ein
   feiner Strich je Stufe, unter dem Text. Die Breite einer Stufe wird an
   `tabbreite` Leerzeichen gemessen, und eine leere Zeile nimmt die kleinere

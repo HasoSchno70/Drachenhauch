@@ -1857,6 +1857,8 @@ DIM kartenZug AS BOOLEAN : kartenZug = FALSE
 DIM kartenZiel AS INTEGER : kartenZiel = -1
 DIM lblAusgabe AS GUI_WIDGET : lblAusgabe = GUI_LABEL(win, "", 0, 0)   ' der Reiterknopf sagt schon "Ausgabe"
 DIM lstAusgabe AS GUI_WIDGET : lstAusgabe = GUI_LISTBOX(win, 0, 0, 10, 10, [])
+' Leer ist eine Aussage: wo die Ausgabe hinkommt und wie man sie bekommt.
+GUI_LISTBOX_PLACEHOLDER(lstAusgabe, tr$("Noch keine Ausgabe -- F5 startet das Programm."))
 ' Nur passende Zeilen zeigen (Teiltext, Gross/klein egal); die Zeilen selbst
 ' bleiben, leer zeigt wieder alle.
 DIM tfAusgabeFilter AS GUI_WIDGET : tfAusgabeFilter = GUI_TEXTINPUT(win, 0, 0, 10, 10, tr$("Filter"))
@@ -1928,7 +1930,7 @@ GUI_MENU_SEPARATOR(ctxProbleme)
 DIM miPTAlle AS INTEGER : miPTAlle = GUI_MENU_ITEM(ctxProbleme, tr$("Alle anhaken"))
 DIM miPTKeine AS INTEGER : miPTKeine = GUI_MENU_ITEM(ctxProbleme, tr$("Keinen anhaken"))
 GUI_CONTEXT_WIDGET(ctxProbleme, lstProbleme)
-GUI_LISTBOX_PLACEHOLDER(lstProbleme, tr$("Keine Probleme gefunden"))
+GUI_LISTBOX_PLACEHOLDER(lstProbleme, CHR$(&H2713) + " " + tr$("Keine Probleme gefunden"))
 ' Unter den Problemen steht die Hilfe zum Wort unter der Schreibmarke. Leer
 ' sah der Streifen wie ein Lagefehler aus -- darum ein eigener Kopf und ein
 ' Hinweis, solange es nichts zu sagen gibt.
@@ -3026,6 +3028,7 @@ WHILE NOT beenden
     IF (prozess >= 0) <> wzStoppAn THEN
         wzStoppAn = prozess >= 0
         GUI_TOOLBAR_ENABLE(leiste, wzStopp, wzStoppAn)
+        statusLauf(wzStoppAn)
     END IF
     IF (tabAnzahl > 0) <> wzSichernAn THEN
         wzSichernAn = tabAnzahl > 0

@@ -225,7 +225,10 @@ as well. These building blocks came with it:
   help) lie one shade **darker** than the editor, flush with the window
   background, square and only separated by a fine line; folders in the
   tree are muted. So the work is in front, the edge steps back -- and the
-  mist drifts visibly over the dark ground.
+  mist drifts visibly over the dark ground. The active tab carries the
+  editor's colour with the accent at the top, the empty output says how to
+  fill it ("F5 runs the program"), and the status bar stands in a muted
+  accent while a program runs.
 - **Indent guides** (`GUI_TEXTAREA_SET(ta, "einzugslinien", 1)`): a
   fine stroke per level, below the text. The width of a level is measured on
   `tabbreite` spaces, and an empty line takes the smaller

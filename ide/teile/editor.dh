@@ -136,6 +136,10 @@ END SUB
 SUB nebelAnwenden()
     DIM an AS BOOLEAN : an = nebelAn AND NOT hell
     GUI_METRIC_SET("nebel", IIF(an, 12, 0))
+    ' Der aktive Reiter gehoert zum Editor: seine Farbe, der Akzent oben,
+    ' keine Linie dazwischen. Im hellen Thema wie das Thema.
+    GUI_THEME_SET("reiter", IIF(hell, -1, &H232A33))
+    GUI_METRIC_SET("reiter_oben", IIF(hell, 0, 1))
     IF hell THEN
         GUI_STYLESHEET("")
         RETURN
@@ -149,6 +153,19 @@ SUB nebelAnwenden()
     DIM rand AS STRING
     rand = "{ verlauf: 0; glanz: 0; radius: 0; bg: #12171D; border: #262E38" + IIF(an, "; nebel: 14%", "") + " }"
     GUI_STYLESHEET("listbox, tree, textarea, richtext, table, panel " + rand + CHR$(10) + "textarea.code { bg: #232A33; nebel: aus }")
+END SUB
+
+' Die Statusleiste zeigt aus dem Augenwinkel, dass ein Programm laeuft: in
+' einem gedaempften Akzent, die Schrift darauf lesbar; danach wieder wie
+' das Thema.
+SUB statusLauf(an AS BOOLEAN)
+    IF an THEN
+        GUI_SET_COLOR(lblStatus, "bg", farbMisch(GUI_THEME_GET("win_bg"), GUI_THEME_GET("accent"), 0.55))
+        GUI_SET_COLOR(lblStatus, "fg", &HFFFFFF)
+    ELSE
+        GUI_SET_COLOR(lblStatus, "bg", -1)
+        GUI_SET_COLOR(lblStatus, "fg", -1)
+    END IF
 END SUB
 
 SUB nebelSetzen(an AS BOOLEAN)

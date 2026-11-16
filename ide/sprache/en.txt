@@ -155,6 +155,7 @@ Geänderte Zeilen am Rand	Changed lines in the margin
 Zeilenumbruch	Word wrap
 Einrückungslinien	Indent guides
 Drachenhauch-Nebel	Dragon's breath mist
+Noch keine Ausgabe -- F5 startet das Programm.	No output yet -- F5 runs the program.
 Drachenhauch-Nebel (dunkles Thema)	Dragon's breath mist (dark theme)
 Mitlaufender Blockkopf	Sticky block header
 Klammerpaare farbig	Coloured bracket pairs
