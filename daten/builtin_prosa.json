@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 2467,
+ "count": 2468,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -803,6 +803,7 @@
   "GUI_LISTBOX_ITEM_RECT": "TUPLE — wo Eintrag i auf dem Bildschirm steht (x, y, b, h), in Bildschirmpunkten wie GUI_HIT_TEST; weggefiltert (0, 0, 0, 0) -- für Prüfungen mit echten Klicks, die Zeilenhöhe hängt an Schrift und Stildatei",
   "GUI_LISTBOX_MOVE": "zählen, lesen, umbeschriften, verschieben",
   "GUI_LISTBOX_PLACEHOLDER": "Hinweis, der erscheint, wenn nichts zu sehen ist",
+  "GUI_LISTBOX_PLACEHOLDER$": "STRING — der gesetzte Hinweis (\"\" = keiner)",
   "GUI_LISTBOX_REMOVE": "INTEGER / — / — Einträge einzeln (auch bei Klapplisten); pos weglassen = hinten anhängen",
   "GUI_LISTBOX_SCROLL_TO": "so rollen, dass der Eintrag zu sehen ist",
   "GUI_LISTBOX_SELECT": "Mehrfachauswahl wie bei der Tabelle",

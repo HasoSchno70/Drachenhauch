@@ -415,3 +415,21 @@ banane rueckt auf TRUE
 apfel weg TRUE
 gewaehlt 3
 GUI_LISTBOX_ITEM_RECT: Eintrag 9 ausserhalb [0..4]
+
+=== der hinweis der leeren liste laesst sich abfragen
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 300, 200)
+DIM lb AS GUI_WIDGET : lb = GUI_LISTBOX(w, 10, 10, 200, 100, [])
+PRINT "["; GUI_LISTBOX_PLACEHOLDER$(lb); "]"
+GUI_LISTBOX_PLACEHOLDER(lb, "Noch nichts da")
+PRINT "["; GUI_LISTBOX_PLACEHOLDER$(lb); "]"
+DIM t AS GUI_WIDGET : t = GUI_TEXTINPUT(w, 10, 120, 200, 28)
+TRY
+    PRINT GUI_LISTBOX_PLACEHOLDER$(t)
+CATCH e
+    PRINT "fehler bei feld"
+END TRY
+--- erwartet
+[]
+[Noch nichts da]
+fehler bei feld

@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/en und dem englischen Buch von `dhrt doku prosa` -- NICHT von Hand aendern. Der Hover nimmt sie mit DHRT_LANG=en.",
- "count": 2459,
+ "count": 2460,
  "docs": {
   "ABS": "Absolute value.",
   "ACOS": "Arc sine/cosine (x in [-1, 1])",
@@ -802,6 +802,7 @@
   "GUI_LISTBOX_ITEM_RECT": "TUPLE — where item i is on screen (x, y, w, h), in screen pixels like GUI_HIT_TEST; filtered out (0, 0, 0, 0) -- for tests with real clicks, the row height depends on font and stylesheet",
   "GUI_LISTBOX_MOVE": "count, read, relabel, move",
   "GUI_LISTBOX_PLACEHOLDER": "hint that appears when there is nothing to see",
+  "GUI_LISTBOX_PLACEHOLDER$": "STRING — the hint that is set (\"\" = none)",
   "GUI_LISTBOX_REMOVE": "INTEGER / — / — entries one by one (also for dropdowns); omit pos = append at the end",
   "GUI_LISTBOX_SCROLL_TO": "scroll so that the entry is visible",
   "GUI_LISTBOX_SELECT": "multi-selection as in the table",

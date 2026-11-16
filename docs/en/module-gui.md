@@ -459,6 +459,7 @@ Native, blocking standard dialogs (no IMPORT needed — like the file dialogs):
 | `GUI_LISTBOX_VIEW_COUNT(lb)` | INTEGER | number of visible rows |
 | `GUI_LISTBOX_VIEW_ROW(lb, k)` | INTEGER | the k-th visible row as an entry number, -1 = none |
 | `GUI_LISTBOX_PLACEHOLDER(lb, text$)` | — | hint that appears when there is nothing to see |
+| `GUI_LISTBOX_PLACEHOLDER$(lb)` | STRING | the hint that is set (`""` = none) |
 | `GUI_LISTBOX_SPANS(lb, eintrag, starts, laengen, farben)` | — | colour sections of an entry (characters from 0, three equally long ARRAY OF INTEGER; empty removes them) -- say, the keyword in one colour, the name in another. On the selection and when disabled one colour applies. The row height of a list box follows its font (`GUI_SET_FONT_SIZE`) |
 | `GUI_LISTBOX_SORT(lb[, absteigend])` | — | sort naturally ("File 9" before "File 10"), within the groups |
 | `GUI_LISTBOX_FIND(lb, text$[, ab])` | INTEGER | next entry from `ab` on that contains the substring, -1 = none |
@@ -2283,7 +2284,7 @@ GUI_THEME(accent)                   ' short form of GUI_THEME_SET("accent", ...)
 
 Valid keys: `win_bg`, `win_border`, `title_bg`, `title_bg_focus`,
 `title_fg`, `widget_bg`, `widget_border`, `text_fg`, `muted_fg`, `accent`,
-`close_hover`, `nebel` (colour of the dragon's breath mist, default turquoise `#73F2D9`).
+`close_hover`, `nebel` (colour of the dragon's breath mist, default turquoise `#73F2D9`), `reiter` (surface of the active tab of the window tab bar `GUI_TABS`; -1 = `widget_bg`, the default).
 
 ```basic
 GUI_THEME_SET("win_bg", RGB(20, 20, 30))
@@ -2302,7 +2303,7 @@ Keys: `title_h` (title bar height), `slider_h`, `check_size`,
 `corner_radius` (rounded corners for window/title bar/buttons/TextInput/Dropdown/
 Progress/Panel + tick-mark checkbox; 0 = square/flat), `shadow` (soft
 window shadow in pixels; 0 = off), `uebergang` (duration of the transitions in
-milliseconds, default 120; 0 = jump, see [Transitions](#transitions)), `nebel` (dragon's breath mist in the window background, strength in %, 0 = none; colour from the theme `nebel`, for surfaces the stylesheet property `nebel`); plus the four metrics of the sculpted look (`gradient`, `gloss`, `bevel`, `verlauf_hoehe`, see [A sculpted look](#a-sculpted-look-the-glass-themes)). **Note:** sizes that feed into the widget dimensions
+milliseconds, default 120; 0 = jump, see [Transitions](#transitions)), `nebel` (dragon's breath mist in the window background, strength in %, 0 = none; colour from the theme `nebel`, for surfaces the stylesheet property `nebel`), `reiter_oben` (1 = the active tab of `GUI_TABS` carries the accent as a line at the top and merges into the surface below without a line, like a tab on an editor; 0 = underline, default); plus the four metrics of the sculpted look (`gradient`, `gloss`, `bevel`, `verlauf_hoehe`, see [A sculpted look](#a-sculpted-look-the-glass-themes)). **Note:** sizes that feed into the widget dimensions
 (`check_size`, `slider_h`) only affect **newly created** widgets —
 best set them before building the UI. `title_h`/`pad`/`caret_period`/`corner_radius`/
 `shadow` take effect immediately.

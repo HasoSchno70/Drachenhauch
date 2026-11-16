@@ -459,6 +459,7 @@ Native, blockierende Standarddialoge (kein IMPORT nötig — wie die Datei-Dialo
 | `GUI_LISTBOX_VIEW_COUNT(lb)` | INTEGER | Zahl der sichtbaren Zeilen |
 | `GUI_LISTBOX_VIEW_ROW(lb, k)` | INTEGER | die k-te sichtbare Zeile als Eintragsnummer, -1 = keine |
 | `GUI_LISTBOX_PLACEHOLDER(lb, text$)` | — | Hinweis, der erscheint, wenn nichts zu sehen ist |
+| `GUI_LISTBOX_PLACEHOLDER$(lb)` | STRING | der gesetzte Hinweis (`""` = keiner) |
 | `GUI_LISTBOX_SPANS(lb, eintrag, starts, laengen, farben)` | — | Abschnitte eines Eintrags einfärben (Zeichen ab 0, drei gleich lange ARRAY OF INTEGER; leer nimmt sie weg) -- etwa das Schlüsselwort in einer, den Namen in einer anderen Farbe. Auf der Auswahl und gesperrt gilt eine Farbe. Die Zeilenhöhe einer Liste folgt ihrer Schrift (`GUI_SET_FONT_SIZE`) |
 | `GUI_LISTBOX_SORT(lb[, absteigend])` | — | natürlich sortieren („Datei 9“ vor „Datei 10“), innerhalb der Gruppen |
 | `GUI_LISTBOX_FIND(lb, text$[, ab])` | INTEGER | nächster Eintrag ab `ab`, der den Teiltext enthält, -1 = keiner |
@@ -2298,7 +2299,7 @@ GUI_THEME(accent)                   ' Kurzform für GUI_THEME_SET("accent", ...)
 
 Gültige Schlüssel: `win_bg`, `win_border`, `title_bg`, `title_bg_focus`,
 `title_fg`, `widget_bg`, `widget_border`, `text_fg`, `muted_fg`, `accent`,
-`close_hover`, `nebel` (Farbe des Drachenhauch-Nebels, Vorgabe Türkis `#73F2D9`).
+`close_hover`, `nebel` (Farbe des Drachenhauch-Nebels, Vorgabe Türkis `#73F2D9`), `reiter` (Fläche des aktiven Reiters der Fensterleiste `GUI_TABS`; -1 = `widget_bg`, die Vorgabe).
 
 ```basic
 GUI_THEME_SET("win_bg", RGB(20, 20, 30))
@@ -2317,7 +2318,7 @@ Schlüssel: `title_h` (Titelleisten-Höhe), `slider_h`, `check_size`,
 `corner_radius` (runde Ecken für Fenster/Titelleiste/Buttons/TextInput/Dropdown/
 Progress/Panel + Häkchen-Checkbox; 0 = eckig/flach), `shadow` (weicher
 Fenster-Schatten in Pixeln; 0 = aus), `uebergang` (Dauer der Übergänge in
-Millisekunden, Vorgabe 120; 0 = springen, siehe [Übergänge](#übergänge)), `nebel` (Drachenhauch-Nebel im Fenstergrund, Stärke in %, 0 = keiner; Farbe aus dem Thema `nebel`, für Flächen die Stildatei-Eigenschaft `nebel`); dazu die vier Metriken des plastischen Looks (`gradient`, `gloss`, `bevel`, `verlauf_hoehe`, siehe [Plastischer Look](#plastischer-look-die-glas-themen)). **Hinweis:** Größen, die in die Widget-Maße
+Millisekunden, Vorgabe 120; 0 = springen, siehe [Übergänge](#übergänge)), `nebel` (Drachenhauch-Nebel im Fenstergrund, Stärke in %, 0 = keiner; Farbe aus dem Thema `nebel`, für Flächen die Stildatei-Eigenschaft `nebel`), `reiter_oben` (1 = der aktive Reiter von `GUI_TABS` trägt den Akzent als Strich oben und geht ohne Linie in die Fläche darunter über, wie ein Reiter am Editor; 0 = Unterstrich, Vorgabe); dazu die vier Metriken des plastischen Looks (`gradient`, `gloss`, `bevel`, `verlauf_hoehe`, siehe [Plastischer Look](#plastischer-look-die-glas-themen)). **Hinweis:** Größen, die in die Widget-Maße
 einfließen (`check_size`, `slider_h`), wirken nur auf **neu angelegte** Widgets —
 am besten vor dem UI-Aufbau setzen. `title_h`/`pad`/`caret_period`/`corner_radius`/
 `shadow` wirken sofort.

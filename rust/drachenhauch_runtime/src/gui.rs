@@ -121,6 +121,8 @@ fn default_theme() -> HashMap<String, i64> {
         ("accent", 0x2BC4E8), ("close_hover", 0xC04848),
         // Farbe des Drachenhauch-Nebels (Metrik `nebel`, Stildatei `nebel`).
         ("nebel", 0x73F2D9),
+        // Flaeche des aktiven Reiters der Fensterleiste; -1 = widget_bg.
+        ("reiter", -1),
     ].iter().map(|(k, v)| (k.to_string(), *v as i64)).collect()
 }
 
@@ -145,6 +147,10 @@ fn default_metrics() -> HashMap<String, i32> {
         ("uebergang", 120),
         // nebel: Staerke des Nebels im Fenstergrund in % (0 = keiner).
         ("nebel", 0),
+        // reiter_oben: 1 = der aktive Reiter der Fensterleiste traegt den
+        // Akzent als Strich OBEN und geht ohne Linie in die Flaeche darunter
+        // ueber (wie ein Reiter am Editor); 0 = Unterstrich (Vorgabe).
+        ("reiter_oben", 0),
     ].iter().map(|(k, v)| (k.to_string(), *v as i32)).collect()
 }
 
