@@ -712,3 +712,73 @@ DHRT_FRAMES=2
 breite wie gemessen TRUE groesser als geschaetzt TRUE
 gesetzte breite bleibt 60
 ohne umbruch wieder gemessen TRUE
+
+=== gespiegelt steht die liste rechts, das kaestchen rechts und der balken links
+' Listen spiegeln ihr Inneres wie Baum und Tabelle (gui_zeichnen.rs, Block
+' `blk`): Text rechtsbuendig, Kaestchen rechts (der Klick dort kippt den
+' Haken), Zusatztext links, Rollbalken links.
+TRY
+    SCREEN(400, 240, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+SET_WINDOW_POS(-3000, -3000)
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 240)
+GUI_WINDOW_CHROME(w, FALSE)
+GUI_WINDOW_RTL(w, TRUE)
+DIM namen AS ARRAY OF STRING
+DIM n AS INTEGER
+FOR n = 0 TO 29
+    ARRAY_PUSH(namen, "Eintrag " + STR$(n))
+NEXT
+DIM lb AS GUI_WIDGET : lb = GUI_LISTBOX(w, 20, 20, 300, 160, namen)
+GUI_LISTBOX_SET(lb, "kaestchen", 1)
+GUI_LISTBOX_DETAIL(lb, 1, "neben")
+DIM ziel AS INTEGER : ziel = RENDERTARGET_NEW(400, 240)
+GUI_UPDATE()
+DIM r2 AS TUPLE : r2 = GUI_LISTBOX_ITEM_RECT(lb, 2)
+DIM r0 AS TUPLE : r0 = GUI_LISTBOX_ITEM_RECT(lb, 0)
+DIM oben0 AS INTEGER : oben0 = r0[1]
+' Kaestchen der Zeile 2 rechts, dann den Balken links nach unten ziehen.
+DIM ev AS STRING
+ev = "c 9" + CHR$(10)
+ev = ev + "e 0 7 " + STR$(r2[0] + r2[2] - 10) + " " + STR$(r2[1] + r2[3] \ 2) + " 0 0" + CHR$(10)
+ev = ev + "e 2 6 0 0 0 0" + CHR$(10) + "e 3 5 0 0 0 0" + CHR$(10)
+ev = ev + "e 10 7 " + STR$(r0[0] + 5) + " " + STR$(r0[1] + 8) + " 0 0" + CHR$(10)
+ev = ev + "e 12 6 0 0 0 0" + CHR$(10)
+ev = ev + "e 14 7 " + STR$(r0[0] + 5) + " " + STR$(r0[1] + 60) + " 0 0" + CHR$(10)
+ev = ev + "e 16 7 " + STR$(r0[0] + 5) + " " + STR$(r0[1] + 120) + " 0 0" + CHR$(10)
+ev = ev + "e 18 5 0 0 0 0" + CHR$(10)
+ev = ev + "e 19 7 380 230 0 0" + CHR$(10) + CHR$(10)
+WRITEALL("ev.txt", ev)
+' Text der Zeile 3 im Bild: rechts ja, links nein.
+RENDERTARGET_BEGIN(ziel) : CLS(0) : GUI_DRAW() : RENDERTARGET_END()
+DIM b AS IMAGE : b = RENDERTARGET_IMAGE(ziel)
+DIM r3 AS TUPLE : r3 = GUI_LISTBOX_ITEM_RECT(lb, 3)
+DIM links AS INTEGER = 0
+DIM rechts AS INTEGER = 0
+DIM x AS INTEGER
+DIM y AS INTEGER
+FOR y = r3[1] + 2 TO r3[1] + r3[3] - 3
+    FOR x = r3[0] + 20 TO r3[0] + 120
+        IF (GETPIXEL(b, x, y) BAND &HFF) > 180 THEN links = links + 1
+    NEXT
+    FOR x = r3[0] + r3[2] - 130 TO r3[0] + r3[2] - 30
+        IF (GETPIXEL(b, x, y) BAND &HFF) > 180 THEN rechts = rechts + 1
+    NEXT
+NEXT
+PRINT "text rechts "; rechts > 10; " links leer "; links = 0
+AUTOMATION_PLAY("ev.txt")
+FOR n = 1 TO 30
+    GUI_UPDATE() : CLS(0) : GUI_DRAW() : FLIP()
+NEXT
+PRINT "haken 2 "; GUI_LISTBOX_CHECKED(lb, 2); " auswahl "; GUI_LISTBOX_SELECTED(lb)
+PRINT "gerollt "; GUI_LISTBOX_ITEM_RECT(lb, 0)[1] < oben0
+--- umgebung
+DHRT_FRAMES=40
+--- erwartet
+text rechts TRUE links leer TRUE
+haken 2 TRUE auswahl -1
+gerollt TRUE
