@@ -119,6 +119,8 @@ fn default_theme() -> HashMap<String, i64> {
         ("title_bg_focus", 0x1C7DA0), ("title_fg", 0xE6F7FF), ("widget_bg", 0x26323F),
         ("widget_border", 0x46586E), ("text_fg", 0xFFFFFF), ("muted_fg", 0x7A8AA0),
         ("accent", 0x2BC4E8), ("close_hover", 0xC04848),
+        // Farbe des Drachenhauch-Nebels (Metrik `nebel`, Stildatei `nebel`).
+        ("nebel", 0x73F2D9),
     ].iter().map(|(k, v)| (k.to_string(), *v as i64)).collect()
 }
 
@@ -141,6 +143,8 @@ fn default_metrics() -> HashMap<String, i32> {
         // Kippschalter weich nachlaufen (0 = springen). Das Endbild ist
         // dasselbe -- nur der Weg dorthin blendet.
         ("uebergang", 120),
+        // nebel: Staerke des Nebels im Fenstergrund in % (0 = keiner).
+        ("nebel", 0),
     ].iter().map(|(k, v)| (k.to_string(), *v as i32)).collect()
 }
 
@@ -4047,6 +4051,12 @@ pub struct Gui {
     /// Der Farbverlauf des Widgets, das gerade gezeichnet wird (Stildatei
     /// `farbverlauf`) -- `flaeche` nimmt ihn statt der Grundfarbe.
     bahn_jetzt: std::cell::RefCell<Option<(Vec<i64>, f32, f32, bool)>>,
+    /// Nebel des Widgets, das gerade gezeichnet wird: (Staerke 0..1, Farbe).
+    nebel_jetzt: std::cell::Cell<Option<(f64, i64)>>,
+    /// Die Uhr des Nebels: laeuft nur mit gezeichneten Bildern und nicht bei
+    /// "Bewegung aus" -- im Leerlauf steht er, und er springt beim Aufwachen
+    /// nicht um die verschlafene Zeit weiter. Er fordert kein Bild an.
+    nebel_uhr: f64,
     /// Verlauf, Glanz, Fase und Rand des Widgets, das gerade gezeichnet wird.
     form_jetzt: std::cell::Cell<stil::FormStil>,
     /// Alt-Buchstaben (GUI_MNEMONICS): `&` im Text markiert sie.
@@ -4149,7 +4159,7 @@ impl Gui {
             scroll_drag: None,
             was_mouse_down: false, zug_feld: None, frame_count: 0, takt: 0.0, kontrast_modus: 0, hoch_kontrast: false, bedarf: std::cell::Cell::new(f64::INFINITY),
             theme: default_theme(), metrics: default_metrics(),
-            stil: None, stil_stand: 0, rad_jetzt: std::cell::Cell::new(None), bahn_jetzt: std::cell::RefCell::new(None), form_jetzt: std::cell::Cell::new(stil::FormStil::default()),
+            stil: None, stil_stand: 0, rad_jetzt: std::cell::Cell::new(None), bahn_jetzt: std::cell::RefCell::new(None), nebel_jetzt: std::cell::Cell::new(None), nebel_uhr: 0.0, form_jetzt: std::cell::Cell::new(stil::FormStil::default()),
             mnemonics: false, label_zug: None, label_wahl: None, gruppen: HashMap::new(), schriftwahl: Vec::new(),
             styles: HashMap::new(),
             pending: Vec::new(),

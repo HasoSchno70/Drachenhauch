@@ -47,6 +47,8 @@ SUB uiSchrift(groesse AS INTEGER)
 END SUB
 
 SUB feldEinrichten(ta AS GUI_WIDGET)
+    ' Ein Code-Feld bleibt frei vom Nebel (Stildatei: textarea.code).
+    GUI_ADD_CLASS(ta, "code")
     wasserzeichenSetzen(ta)
     IF codeFont >= 0 THEN GUI_SET_FONT(ta, codeFont)
     GUI_SET_FONT_SIZE(ta, codeGroesse)
@@ -125,6 +127,29 @@ SUB geruestSetzen(an AS BOOLEAN)
     konfigSichern()
     GUI_SET_TEXT(lblStatus, IIF(an, tr$("Gerüst beim Tippen an."), tr$("Gerüst beim Tippen aus.")))
     protokoll("geruest " + IIF(an, "an", "aus"))
+END SUB
+
+' Drachenhauch-Nebel: im dunklen Thema ein tuerkiser Nebel im Fenstergrund
+' (Metrik `nebel`) und auf den grossen Flaechen (Stildatei), die dafuer flach
+' werden -- ohne die hellen Verlaeufe. Code-Felder bleiben frei. Er laeuft
+' nur, waehrend die IDE ohnehin zeichnet, und steht im Leerlauf.
+SUB nebelAnwenden()
+    DIM an AS BOOLEAN : an = nebelAn AND NOT hell
+    GUI_METRIC_SET("nebel", IIF(an, 12, 0))
+    IF an THEN
+        GUI_STYLESHEET("listbox, tree, textarea, richtext, table, panel { verlauf: 0; glanz: 0; nebel: 14% }" + CHR$(10) + "textarea.code { nebel: aus }")
+    ELSE
+        GUI_STYLESHEET("")
+    END IF
+END SUB
+
+SUB nebelSetzen(an AS BOOLEAN)
+    nebelAn = an
+    GUI_MENU_CHECK(miNebel, an)
+    nebelAnwenden()
+    konfigSichern()
+    GUI_SET_TEXT(lblStatus, IIF(an, tr$("Drachenhauch-Nebel an."), tr$("Drachenhauch-Nebel aus.")))
+    protokoll("nebel " + IIF(an, "an", "aus"))
 END SUB
 
 ' Einrueckungslinien: ein Strich je Stufe, unter dem Text. Wie der Umbruch
@@ -337,6 +362,7 @@ SUB einstellungenZeigen()
     GUI_SET_CHECKED(cbRegex, regexAn)
     GUI_SET_CHECKED(cbVorschlag, vorschlagAn)
     GUI_SET_CHECKED(cbLinien, linienAn)
+    GUI_SET_CHECKED(cbNebel, nebelAn)
     GUI_SET_CHECKED(cbGeruest, geruestAn)
     GUI_SET_CHECKED(cbVorschau, vorschauAn)
     GUI_SET_CHECKED(cbKlammern, klammernAn)
@@ -380,6 +406,7 @@ SUB einstellungenNachziehen()
         konfigSichern()
     END IF
     IF GUI_CHECKED(cbLinien) <> linienAn THEN linienSetzen(GUI_CHECKED(cbLinien))
+    IF GUI_CHECKED(cbNebel) <> nebelAn THEN nebelSetzen(GUI_CHECKED(cbNebel))
     IF GUI_CHECKED(cbGeruest) <> geruestAn THEN geruestSetzen(GUI_CHECKED(cbGeruest))
     IF GUI_CHECKED(cbKlammern) <> klammernAn THEN klammernSetzen(GUI_CHECKED(cbKlammern))
     IF GUI_CHECKED(cbFormatSichern) <> formatSichernAn THEN befehl("format_sichern")

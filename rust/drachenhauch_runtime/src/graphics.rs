@@ -137,6 +137,11 @@ enum Cmd {
     /// Phase 0..1 und ob die Farben im Kreis laufen (die letzte geht wieder
     /// in die erste ueber -- so wandert der Verlauf ohne Naht).
     Farbbahn(i32, i32, i32, i32, i32, Vec<Color>, f32, f32, bool),
+    /// Drachenhauch-Nebel ueber einer Flaeche (gui `nebel`): Rechteck, Radius,
+    /// Farbe, Staerke 0..1, Zeit der Nebeluhr. Weiche Schwaden aus verdrehtem
+    /// Rauschen (NEBEL_GLSL), additiv -- in Bildschirmlage, darum laufen sie
+    /// ueber benachbarte Flaechen ohne Naht weiter.
+    Nebel(i32, i32, i32, i32, i32, Color, f32, f32),
     /// Kreisring-Ausschnitt: cx, cy, r_innen, r_aussen, winkel_von, winkel_bis,
     /// Farbe, gefuellt. Deckt Kuchenstueck (r_innen = 0), Donut-Segment und
     /// Tacho-Bogen mit EINER Variante ab -- raylibs `draw_ring` kann alle drei.
@@ -334,7 +339,42 @@ thread_local! {
     /// Versatz des Ziels, das gerade abgespielt wird (`RenderTarget::versatz`),
     /// in Punkten -- wie der Massstab fuer Text und Scissor.
     static RT_VERSATZ: std::cell::Cell<(f32, f32)> = const { std::cell::Cell::new((0.0, 0.0)) };
+    /// Der Nebel-Shader (einmal geladen, `Graphics::nebel`) samt den Lagen
+    /// seiner Uniforms: Zeit, Massstab, Farbe, Staerke. Echte Fenster teilen
+    /// den Kontext mit dem Hauptfenster, also auch ihn.
+    static NEBEL_SH: std::cell::Cell<Option<(raylib::ffi::Shader, [i32; 4])>> = const { std::cell::Cell::new(None) };
 }
+
+/// Der Nebel: weiche Schwaden aus fbm-Rauschen mit Domain-Warping, die mit
+/// der Zeit treiben. Ausgabe ist die Farbe mit der Deckkraft des Nebels;
+/// gezeichnet wird additiv.
+const NEBEL_GLSL: &str = r#"#version 330
+in vec2 fragTexCoord;
+in vec4 fragColor;
+uniform float uZeit;
+uniform float uMass;
+uniform vec3 uFarbe;
+uniform float uStaerke;
+out vec4 finalColor;
+float hash(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+float noise(vec2 p) {
+    vec2 i = floor(p); vec2 f = fract(p); vec2 u = f * f * (3.0 - 2.0 * f);
+    return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), u.x), mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x), u.y);
+}
+float fbm(vec2 p) {
+    float v = 0.0; float a = 0.5;
+    for (int k = 0; k < 5; k++) { v += a * noise(p); p = p * 2.03 + vec2(17.1, 9.2); a *= 0.5; }
+    return v;
+}
+void main() {
+    vec2 uv = gl_FragCoord.xy / (430.0 * uMass);
+    float t = uZeit;
+    vec2 q = vec2(fbm(uv + vec2(0.0, t * 0.020)), fbm(uv + vec2(5.2, 1.3) - vec2(t * 0.016, 0.0)));
+    float n = fbm(uv * 0.8 + 1.8 * q + vec2(t * 0.011, -t * 0.007));
+    n = smoothstep(0.30, 0.92, n);
+    finalColor = vec4(uFarbe, uStaerke * n * fragColor.a);
+}
+"#;
 /// Zeichnet `f` ohne die Matrix des Abspiel-Massstabs und gibt ihm den
 /// Faktor mit, um den es Lage und Groesse selbst vergroessern soll.
 fn ohne_rt_matrix<R>(f: impl FnOnce(f32) -> R) -> R {
@@ -1563,6 +1603,8 @@ pub struct Graphics {
     // Post-Processing (Shader): die Szene wird in `scene_rt` gerendert und beim
     // FLIP per Fragment-Shader (Index in `shaders`) auf den Screen praesentiert.
     shaders: Vec<Shader>,
+    /// Der Nebel-Shader: Platz in `shaders` + 1; 0 = noch nicht geladen, -1 = geht nicht.
+    nebel_sh: i64,
     /// Zusaetzliche Sampler je Shader: (Uniform-Position, Textur).
     /// Sie werden ERST beim Zeichnen gesetzt -- `SetShaderValueTexture` ruft
     /// intern `glUniform1i` und wirkt damit auf das GERADE AKTIVE Programm.
@@ -2214,7 +2256,7 @@ impl Graphics {
             zeiger_glfw: std::collections::HashMap::new(), zeiger_eigene: std::collections::HashMap::new(),
             ansage: String::new(), ansage_dringend: false, ansage_nr: 0,
             fullscreen: false, pre_fullscreen: None,
-            shaders: Vec::new(), shader_textures: HashMap::new(),
+            shaders: Vec::new(), nebel_sh: 0, shader_textures: HashMap::new(),
             post_shader_idx: None, post_massstab: 1.0, post_klein: None,
             gfx_stack: Vec::new(), clip_tiefe: 0, scene_rt,
             abgelegt: Vec::new(),
@@ -4607,6 +4649,28 @@ impl Graphics {
         let (x2, y2) = self.w2s(x2, y2);
         let f: Vec<Color> = farben.iter().map(|&c| col(c)).collect();
         self.emit(Cmd::Farbbahn(x1, y1, x2, y2, self.ssize(radius), f, winkel, phase, zyklisch));
+    }
+
+    /// Nebel ueber einem runden Rechteck (siehe `Cmd::Nebel`); `staerke`
+    /// 0..1, `zeit` die Nebeluhr in Sekunden. Laedt den Shader beim ersten Mal;
+    /// laesst er sich nicht uebersetzen, bleibt die Flaeche ohne Nebel.
+    #[allow(clippy::too_many_arguments)]
+    pub fn nebel(&mut self, x1: i32, y1: i32, x2: i32, y2: i32, radius: i32, farbe: i64, staerke: f64, zeit: f64) {
+        if staerke <= 0.0 { return; }
+        if self.nebel_sh == 0 {
+            let h = self.load_shader(NEBEL_GLSL);
+            self.nebel_sh = if h >= 0 { h + 1 } else { -1 };
+            if let Some(sh) = usize::try_from(h).ok().and_then(|i| self.shaders.get_mut(i)) {
+                let lagen = [sh.get_shader_location("uZeit"), sh.get_shader_location("uMass"),
+                             sh.get_shader_location("uFarbe"), sh.get_shader_location("uStaerke")];
+                let roh: raylib::ffi::Shader = **sh;
+                NEBEL_SH.with(|c| c.set(Some((roh, lagen))));
+            }
+        }
+        if self.nebel_sh < 0 { return; }
+        let (x1, y1) = self.w2s(x1, y1);
+        let (x2, y2) = self.w2s(x2, y2);
+        self.emit(Cmd::Nebel(x1, y1, x2, y2, self.ssize(radius), col(farbe), staerke.clamp(0.0, 1.0) as f32, zeit as f32));
     }
 
     /// Kreisring-Ausschnitt (Kuchenstueck bei `r_in` = 0, Donut/Tacho-Bogen
@@ -9677,6 +9741,37 @@ fn render_scene<D: RaylibDraw>(
                             let t = if h > 1 { zeile as f32 / (h - 1) as f32 } else { 0.0 };
                             let c = verlauf_farbe(*c1, *c2, t, y + zeile);
                             d.draw_rectangle(x + einzug, y + zeile, breite, 1, c);
+                        }
+                    }
+                    Cmd::Nebel(x1, y1, x2, y2, radius, farbe, staerke, zeit) => {
+                        if let Some((sh, lagen)) = NEBEL_SH.with(|c| c.get()) {
+                            let x = (*x1).min(*x2) * s;
+                            let y = (*y1).min(*y2) * s;
+                            let w = ((x2 - x1).abs() + 1) * s;
+                            let h = ((y2 - y1).abs() + 1) * s;
+                            let half = (w.min(h) as f32) * 0.5;
+                            let rund = if half > 0.0 { ((*radius * s) as f32 / half).clamp(0.0, 1.0) } else { 0.0 };
+                            let mass = s as f32 * RT_MASS.with(|c| c.get());
+                            let f = [farbe.r as f32 / 255.0, farbe.g as f32 / 255.0, farbe.b as f32 / 255.0];
+                            unsafe {
+                                use raylib::ffi;
+                                ffi::BeginShaderMode(sh);
+                                let setze = |lage: i32, wert: *const f32, art: i32| {
+                                    if lage >= 0 { ffi::SetShaderValue(sh, lage, wert as *const std::ffi::c_void, art); }
+                                };
+                                setze(lagen[0], zeit as *const f32, ffi::ShaderUniformDataType::SHADER_UNIFORM_FLOAT as i32);
+                                setze(lagen[1], &mass as *const f32, ffi::ShaderUniformDataType::SHADER_UNIFORM_FLOAT as i32);
+                                setze(lagen[2], f.as_ptr(), ffi::ShaderUniformDataType::SHADER_UNIFORM_VEC3 as i32);
+                                setze(lagen[3], staerke as *const f32, ffi::ShaderUniformDataType::SHADER_UNIFORM_FLOAT as i32);
+                                ffi::BeginBlendMode(ffi::BlendMode::BLEND_ADDITIVE as i32);
+                                let weiss = ffi::Color { r: 255, g: 255, b: 255, a: 255 };
+                                if rund > 0.0 {
+                                    ffi::DrawRectangleRounded(ffi::Rectangle { x: x as f32, y: y as f32, width: w as f32, height: h as f32 }, rund, 12, weiss);
+                                } else { ffi::DrawRectangle(x, y, w, h, weiss); }
+                                ffi::EndBlendMode();
+                                if cur_blend != 0 { ffi::BeginBlendMode(cur_blend); }
+                                ffi::EndShaderMode();
+                            }
                         }
                     }
                     Cmd::Farbbahn(x1, y1, x2, y2, radius, farben, winkel, phase, zyklisch) => {

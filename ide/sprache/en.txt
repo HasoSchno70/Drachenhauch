@@ -150,6 +150,8 @@ Dieselbe Datei nebeneinander	Same file side by side
 Geänderte Zeilen am Rand	Changed lines in the margin
 Zeilenumbruch	Word wrap
 Einrückungslinien	Indent guides
+Drachenhauch-Nebel	Dragon's breath mist
+Drachenhauch-Nebel (dunkles Thema)	Dragon's breath mist (dark theme)
 Mitlaufender Blockkopf	Sticky block header
 Klammerpaare farbig	Coloured bracket pairs
 Fehlertext am Zeilenende	Error text at line end
@@ -382,6 +384,8 @@ Gerüst beim Tippen an.	Scaffold while typing on.
 Gerüst beim Tippen aus.	Scaffold while typing off.
 Einrückungslinien an.	Indent guides on.
 Einrückungslinien aus.	Indent guides off.
+Drachenhauch-Nebel an.	Dragon's breath mist on.
+Drachenhauch-Nebel aus.	Dragon's breath mist off.
 Mitlaufender Blockkopf an.	Sticky block header on.
 Mitlaufender Blockkopf aus.	Sticky block header off.
 Zeilenumbruch an.	Word wrap on.

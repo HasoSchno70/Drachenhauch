@@ -843,6 +843,8 @@ DIM prBild AS INTEGER
 --- programm ../../../ide/ide.dh nach SETFPS(60)
 --- einschub nach     trefferNachziehen()
     prBild = prBild + 1
+    ' Der Nebel zieht von Bild zu Bild -- angehalten, damit nur die Karte zaehlt.
+    IF prBild = 3 THEN GUI_SET_MOTION("aus")
     IF prBild = 5 THEN minimapSetzen(TRUE)
     IF prBild = 10 THEN befehl("ersetzen")
     IF prBild = 30 THEN

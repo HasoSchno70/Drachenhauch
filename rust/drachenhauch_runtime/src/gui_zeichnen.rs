@@ -168,6 +168,9 @@ impl Gui {
         // Fenster-Hintergrund (rund, wenn corner_radius > 0).
         if rad > 0 { g.round_rect(x, y, x + w - 1, y + h - 1, rad, self.th("win_bg"), true); }
         else { g.box_fill(x, y, x + w - 1, y + h - 1, self.th("win_bg")); }
+        // Drachenhauch-Nebel im Grund (Metrik `nebel`, Farbe `nebel`).
+        let nebel = self.m_roh("nebel");
+        if nebel > 0 { g.nebel(x, y, x + w - 1, y + h - 1, rad, self.th("nebel"), nebel as f64 / 100.0, self.nebel_uhr); }
         let toff = if win.chrome { th } else { 0 };   // Inhalts-Oberkante
         if win.chrome {
             let title_bg = if focused { self.th("title_bg_focus") } else { self.th("title_bg") };
@@ -754,6 +757,7 @@ impl Gui {
         let vorher = self.rad_jetzt.replace(self.w_radius(wdg));
         let form_vorher = self.form_jetzt.replace(self.w_form(wdg));
         let bahn_vorher = self.bahn_jetzt.replace(self.w_farbverlauf(wdg));
+        let nebel_vorher = self.nebel_jetzt.replace(self.w_nebel(wdg));
         // Animation und Gleiten (gui_aussehen.rs): das ganze Widget um seine
         // Mitte verschoben, gedreht oder vergroessert -- Lage und Treffer
         // bleiben.
@@ -783,6 +787,7 @@ impl Gui {
         if deck.is_some() { g.schicht_ende(); }
         self.form_jetzt.set(form_vorher);
         self.bahn_jetzt.replace(bahn_vorher);
+        self.nebel_jetzt.set(nebel_vorher);
         self.rad_jetzt.set(vorher);
     }
 

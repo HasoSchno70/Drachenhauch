@@ -2283,7 +2283,7 @@ GUI_THEME(accent)                   ' short form of GUI_THEME_SET("accent", ...)
 
 Valid keys: `win_bg`, `win_border`, `title_bg`, `title_bg_focus`,
 `title_fg`, `widget_bg`, `widget_border`, `text_fg`, `muted_fg`, `accent`,
-`close_hover`.
+`close_hover`, `nebel` (colour of the dragon's breath mist, default turquoise `#73F2D9`).
 
 ```basic
 GUI_THEME_SET("win_bg", RGB(20, 20, 30))
@@ -2570,6 +2570,7 @@ properties for it, plus four commands:
 | `GUI_GLIDING(wdg)` | is the widget gliding right now? |
 | `unschaerfe: 12` | glass: what is drawn behind the widget (an image, a map, other widgets) lies blurred beneath it (radius 0..40); a surface with opacity shows through: `panel.glas { unschaerfe: 12; bg: #60FFFFFF; radius: 14 }`. Works on the main surface, in real windows and in render targets. Only in rules without a state |
 | `farbverlauf: #FF6B6B #845EC2 #2C73D2 45 wandert 6s` | colour gradient instead of the single base colour: 2 to 6 colours (also names of the theme), then optionally the angle in degrees (0 = to the right, 90 = downwards, 45 = diagonally to the bottom right) and `wandert [duration]` -- then the colours run in a circle (the last blends back into the first) and move seamlessly in the direction of the angle, one round in the duration (`ms` or `s`, 500 ms to 60 s, default 6 s). For panels, cards, buttons (also `form: pille` and `kreis`) and every other surface of the widget; rounding, gloss and border come on top. The gui picks a button's text by all colours of the gradient (the one more readable at its least favourable point), and `GUI_A11Y_CHECK$` measures against that point. With `GUI_SET_MOTION("aus")` it stands still; a moving one reports in idle mode that it needs every frame. `farbverlauf: aus` takes back an inherited one (English alias `fill-gradient`). Only in rules without a state |
+| `nebel: 12%` / `nebel: 12% #73F2D9` / `nebel: aus` | dragon's breath mist: soft wisps drift over the surface (above the base colour, below border and text), strength 0..40 %, colour otherwise the theme's (`nebel`). It lies in screen position and therefore drifts seamlessly across neighbouring surfaces. Its clock only runs while frames are drawn: in idle mode it stands still (it requests no frame) and does not jump on waking; with `GUI_SET_MOTION("aus")` it stands entirely. For the window background the metric `nebel` (English alias `mist`). Only in rules without a state |
 
 ```basic
 IMPORT "gui"
@@ -3050,6 +3051,7 @@ complete look instead of several things you have to combine by hand:
 | `gloss` | strength of the gloss edge, 0…100 |
 | `bevel` | 1 = light line at the top, dark one at the bottom |
 | `verlauf_hoehe` | from this height on, both fade out; 0 = the same everywhere |
+| `nebel` | dragon's breath mist in the **window background**, strength in % (0 = none, default); colour from the theme (`nebel`), for surfaces the stylesheet property `nebel` |
 
 Settable individually via `GUI_METRIC_SET`. All **existing** themes are still
 at 0 — programs that have already been written look unchanged.

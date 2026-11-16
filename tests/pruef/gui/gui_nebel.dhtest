@@ -1,0 +1,184 @@
+' Drachenhauch-Nebel (Stildatei `nebel`, Metrik `nebel`, Themenfarbe `nebel`;
+' gezeichnet als `Cmd::Nebel` mit eigenem Shader in graphics.rs): weiche
+' Schwaden ueber einer Flaeche bzw. dem Fenstergrund. Seine Uhr laeuft nur
+' mit gezeichneten Bildern (1/60 s je Bild bei fester Bildzahl) und steht bei
+' "Bewegung aus"; er fordert selbst kein Bild an.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== eine flaeche mit nebel ist nicht mehr glatt, eine ohne schon
+TRY
+    SCREEN(400, 200, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+GUI_THEME_PRESET("dark")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM a AS GUI_WIDGET : a = GUI_PANEL(w, 10, 10, 180, 180, "")
+DIM b AS GUI_WIDGET : b = GUI_PANEL(w, 210, 10, 180, 180, "")
+GUI_SET_NAME(a, "a")
+GUI_STYLESHEET("#a { nebel: 30% }")
+DIM ziel AS INTEGER : ziel = RENDERTARGET_NEW(400, 200)
+FUNCTION spanne(x0 AS INTEGER) AS INTEGER
+    DIM bild AS IMAGE : bild = RENDERTARGET_IMAGE(ziel)
+    DIM lo AS INTEGER = 255
+    DIM hi AS INTEGER = 0
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR x = x0 + 10 TO x0 + 160 STEP 5
+        FOR y = 20 TO 170 STEP 5
+            DIM g AS INTEGER : g = (GETPIXEL(bild, x, y) \ 256) BAND 255
+            lo = MIN(lo, g) : hi = MAX(hi, g)
+        NEXT
+    NEXT
+    RETURN hi - lo
+END FUNCTION
+DIM n AS INTEGER
+FOR n = 1 TO 3
+    GUI_UPDATE()
+    RENDERTARGET_BEGIN(ziel) : CLS(0) : GUI_DRAW() : RENDERTARGET_END()
+    FLIP()
+NEXT
+PRINT "mit nebel bewegt "; spanne(10) > 3; " ohne glatt "; spanne(210) = 0
+--- umgebung
+DHRT_FRAMES=4
+--- erwartet
+mit nebel bewegt TRUE ohne glatt TRUE
+
+=== der fenstergrund nimmt die metrik nebel und die farbe des themas
+TRY
+    SCREEN(400, 200, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+GUI_THEME_PRESET("dark")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM ziel AS INTEGER : ziel = RENDERTARGET_NEW(400, 200)
+FUNCTION gruen_spanne() AS INTEGER
+    DIM bild AS IMAGE : bild = RENDERTARGET_IMAGE(ziel)
+    DIM lo AS INTEGER = 255
+    DIM hi AS INTEGER = 0
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR x = 10 TO 390 STEP 6
+        FOR y = 10 TO 190 STEP 6
+            DIM g AS INTEGER : g = (GETPIXEL(bild, x, y) \ 256) BAND 255
+            lo = MIN(lo, g) : hi = MAX(hi, g)
+        NEXT
+    NEXT
+    RETURN hi - lo
+END FUNCTION
+SUB bild()
+    GUI_UPDATE()
+    RENDERTARGET_BEGIN(ziel) : CLS(0) : GUI_DRAW() : RENDERTARGET_END()
+    FLIP()
+END SUB
+bild()
+DIM ohne AS INTEGER : ohne = gruen_spanne()
+GUI_METRIC_SET("nebel", 30)
+bild()
+DIM mit AS INTEGER : mit = gruen_spanne()
+' Rot statt Tuerkis: im gruenen Kanal tut sich dann nichts.
+GUI_THEME_SET("nebel", &HFF0000)
+bild()
+PRINT "ohne "; ohne = 0; " mit "; mit > 3; " rot laesst gruen "; gruen_spanne() = 0; " farbe "; HEX$(GUI_THEME_GET("nebel"))
+--- umgebung
+DHRT_FRAMES=4
+--- erwartet
+ohne TRUE mit TRUE rot laesst gruen TRUE farbe FF0000
+
+=== der nebel zieht mit den bildern, steht ohne bewegung und will kein bild
+TRY
+    SCREEN(400, 200, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+GUI_THEME_PRESET("dark")
+GUI_METRIC_SET("nebel", 30)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM ziel AS INTEGER : ziel = RENDERTARGET_NEW(400, 200)
+FUNCTION abdruck() AS INTEGER
+    DIM bild AS IMAGE : bild = RENDERTARGET_IMAGE(ziel)
+    DIM s AS INTEGER = 0
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR x = 10 TO 390 STEP 7
+        FOR y = 10 TO 190 STEP 7
+            s = s + ((GETPIXEL(bild, x, y) \ 256) BAND 255) * ((x + y) MOD 13 + 1)
+        NEXT
+    NEXT
+    RETURN s
+END FUNCTION
+DIM n AS INTEGER = 0
+DIM d1 AS INTEGER
+DIM d2 AS INTEGER
+DIM d3 AS INTEGER
+DIM d4 AS INTEGER
+DIM bedarf AS FLOAT
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    RENDERTARGET_BEGIN(ziel) : CLS(0) : GUI_DRAW() : RENDERTARGET_END()
+    n = n + 1
+    IF n = 5 THEN d1 = abdruck() : bedarf = GUI_NEXT_FRAME()
+    IF n = 125 THEN d2 = abdruck() : GUI_SET_MOTION("aus")
+    IF n = 130 THEN d3 = abdruck()
+    IF n = 190 THEN d4 = abdruck()
+    FLIP()
+WEND
+PRINT "will kein bild "; bedarf
+PRINT "zieht "; d1 <> d2
+PRINT "steht ohne bewegung "; d3 = d4
+--- umgebung
+DHRT_FRAMES=192
+--- erwartet
+will kein bild -1.0
+zieht TRUE
+steht ohne bewegung TRUE
+
+=== falsche werte sind fehler und der inspektor nennt den nebel
+TRY
+    SCREEN(400, 200, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 200)
+DIM p AS GUI_WIDGET : p = GUI_PANEL(w, 20, 20, 200, 100, "")
+DIM q AS GUI_WIDGET : q = GUI_PANEL(w, 240, 20, 100, 100, "")
+GUI_ADD_CLASS(p, "dunst")
+GUI_STYLESHEET("panel.dunst { nebel: 12% #FFB070 }" + CHR$(10) + "panel { nebel: aus }")
+GUI_UPDATE()
+PRINT GUI_INSPECT$(p)
+PRINT GUI_INSPECT$(q)
+DIM falsch AS ARRAY OF STRING
+falsch = ["panel { nebel: 50% }", "panel { nebel: viel }", "panel { nebel: 12% gelb }", "panel:hover { nebel: 12% }"]
+DIM i AS INTEGER
+FOR i = 0 TO LEN(falsch) - 1
+    TRY
+        GUI_STYLESHEET(falsch[i])
+        PRINT "kein fehler: "; falsch[i]
+    CATCH e2
+        PRINT e2
+    END TRY
+NEXT
+TRY
+    GUI_METRIC_SET("nebel", 12)
+    PRINT "metrik "; GUI_METRIC_GET("nebel")
+CATCH e3
+    PRINT e3
+END TRY
+--- enthaelt
+basis: nebel 12% #FFB070
+basis: nebel aus
+nebel erwartet eine Staerke 0..40 %
+'nebel' gilt nur in Regeln ohne :hover
+metrik 12

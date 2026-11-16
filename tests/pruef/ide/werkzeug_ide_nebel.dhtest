@@ -1,0 +1,54 @@
+' Drachenhauch-Nebel in der IDE (ide/teile/editor.dh `nebelAnwenden`): im
+' dunklen Thema zieht ein tuerkiser Nebel durch den Fenstergrund (Metrik
+' `nebel`) und die grossen Flaechen (Stildatei, flach statt der hellen
+' Verlaeufe); Code-Felder (`textarea.code`) bleiben frei. Ansicht >
+' Drachenhauch-Nebel schaltet ihn ab, die Konfiguration merkt es sich, und im
+' hellen Thema gibt es keinen.
+
+=== der nebel zieht im dunklen thema, der code bleibt frei, der schalter merkt sich
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 10 THEN
+    protokoll("pr an " + STR$(GUI_METRIC_GET("nebel")) + " haken " + STR$(GUI_MENU_CHECKED(miNebel)))
+    protokoll("pr code frei " + STR$(INSTR(GUI_INSPECT$(reiter[aktiverTab].feld), "nebel aus") >= 0))
+    protokoll("pr liste nebel " + STR$(INSTR(GUI_INSPECT$(lstProbleme), "nebel 14%") >= 0))
+    befehl("nebel")
+    protokoll("pr aus " + STR$(GUI_METRIC_GET("nebel")) + " haken " + STR$(GUI_MENU_CHECKED(miNebel)) + " liste " + STR$(INSTR(GUI_INSPECT$(lstProbleme), "nebel") >= 0))
+    befehl("nebel")
+    befehl("thema")
+    protokoll("pr hell " + STR$(GUI_METRIC_GET("nebel")))
+    befehl("thema")
+    befehl("nebel")
+    EXIT(0)
+END IF
+--- argumente
+haupt.dh
+--- umgebung
+DHRT_FRAMES=60
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+--- datei haupt.dh
+PRINT 1
+
+--- nachher
+IMPORT "json"
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 6) = "nebel " THEN PRINT L[i]
+NEXT
+DIM k AS JSON_HANDLE : k = JSON_PARSE(READALL$("_programm/ide.json"))
+PRINT "gemerkt "; JSON_GET_BOOL(k, "nebel")
+--- erwartet
+pr an 12 haken TRUE
+pr code frei TRUE
+pr liste nebel TRUE
+nebel aus
+pr aus 0 haken FALSE liste FALSE
+nebel an
+pr hell 0
+nebel aus
+gemerkt FALSE
