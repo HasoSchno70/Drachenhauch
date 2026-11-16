@@ -57,6 +57,9 @@ thema(0)
 ' --------------------------------------------------- das Hauptfenster
 DIM haupt AS GUI_WINDOW : haupt = GUI_WINDOW("Rundgang", 0, 0, 1280, 800)
 GUI_WINDOW_CHROME(haupt, FALSE)
+' Es bleibt hinter den Fenstern der Stationen, auch wenn man hineinklickt --
+' sonst verdeckte es sie nach dem ersten Klick in die Navigation.
+GUI_WINDOW_BACKGROUND(haupt, TRUE)
 DIM mSchau AS INTEGER : mSchau = GUI_MENU(haupt, "Schau")
 DIM miWeiter AS INTEGER : miWeiter = GUI_MENU_ITEM(mSchau, "Naechste Station", "Strg+Rechts")
 DIM miZurueck AS INTEGER : miZurueck = GUI_MENU_ITEM(mSchau, "Vorige Station", "Strg+Links")
@@ -336,6 +339,7 @@ GUI_BUTTON_VARIANT(bPruef, "primaer")
 DIM bHeilen AS GUI_WIDGET : bHeilen = GUI_TOGGLE(s9, "Fehler beheben", 290, 30, FALSE)
 DIM befunde AS GUI_WIDGET : befunde = GUI_TEXTAREA(s9, 20, 90, 640, 530)
 GUI_TEXTAREA_SET(befunde, "umbruch", 1)
+GUI_TOOLTIP(befunde, "Befunde der Pruefung")   ' sonst waere das Feld selbst ein Befund (ohne Namen)
 GUI_SET_TEXT(befunde, "Rechts stehen vier Widgets, die es Menschen schwer machen." + CHR$(10) + CHR$(10) + "'Oberflaeche pruefen' zaehlt auf, was daran fehlt -- 'Fehler beheben' repariert sie, und die Pruefung laeuft gleich noch einmal.")
 DIM schlecht AS GUI_WIDGET : schlecht = GUI_GROUPBOX(s9, 690, 90, 330, 210, "Absichtlich schlecht")
 DIM blass AS GUI_WIDGET : blass = GUI_BUTTON(s9, "Blass", 710, 130, 140, 40)
@@ -446,7 +450,7 @@ WHILE NOT QUITREQUESTED()
     IF GUI_CLICKED(miInspektor) THEN GUI_INSPECTOR(TRUE)
     IF GUI_CLICKED(miFeier) THEN GUI_BURST(titel, "konfetti") : GUI_SOUND("erfolg")
     IF GUI_CHANGED(themaWahl) THEN
-        thema(GUI_VALUE(themaWahl))
+        thema(GUI_DROPDOWN_SELECTED(themaWahl))
         GUI_WINDOW_GLOW(haupt)
     END IF
     IF GUI_CHANGED(sRtl) THEN richtung()
