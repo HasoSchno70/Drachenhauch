@@ -1157,7 +1157,7 @@ FUNCTION sichern(i AS INTEGER, alsNeu AS BOOLEAN) AS BOOLEAN
     IF i < 0 THEN RETURN FALSE
     DIM pfad AS STRING : pfad = reiter[i].pfad
     IF pfad = "" OR alsNeu THEN
-        pfad = FILE_SAVE_DIALOG("Sichern unter", "programm.dh", "dh")
+        pfad = FILE_SAVE_DIALOG(tr$("Sichern unter"), "programm.dh", "dh")
         IF pfad = "" THEN RETURN FALSE
     END IF
     DIM text AS STRING : text = GUI_TEXT(reiter[i].feld)

@@ -52,6 +52,31 @@ PRINT "fehlt "; fehlt
 genug texte TRUE
 fehlt 0
 
+=== kein schluessel steht zweimal in der tafel
+' Zwei Zeilen mit demselben deutschen Schluessel: es gilt still die
+' zuletzt gelesene. So stand die Quelle eines Plugins einmal mit "@version"
+' und einmal mit "@ref" darin (gefunden 2026-11-16).
+DIM wurzel AS STRING : wurzel = ARG$(0)
+DIM gesehen AS MAP OF INTEGER : gesehen = {}
+DIM doppelt AS INTEGER = 0
+DIM z AS STRING
+FOR EACH z IN READLINES(wurzel + "/ide/sprache/en.txt")
+    DIM t AS INTEGER : t = INSTR(z, CHR$(9))
+    IF t <= 0 THEN CONTINUE
+    DIM k AS STRING : k = LEFT$(z, t)
+    IF MAPHAS(gesehen, k) THEN
+        doppelt = doppelt + 1
+        PRINT "doppelt: "; k
+    ELSE
+        MAPPUT(gesehen, k, 1)
+    END IF
+NEXT
+PRINT "doppelt "; doppelt
+--- argumente
+{sammlung}/../../..
+--- erwartet
+doppelt 0
+
 === englisch: menue, palette, knoepfe, kuerzel
 AUTOMATION_PLAY("ev.txt")
 DIM prBild AS INTEGER : prBild = 0
