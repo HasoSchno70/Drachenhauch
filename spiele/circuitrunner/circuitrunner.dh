@@ -39,7 +39,6 @@ CONST BX = 0                   ' Board-Ursprung im Render-Target
 CONST BY = 0
 
 CONST TICK_MS = 120            ' eine Spielwelt-Stufe (Bewegung)
-CONST MON_EVERY = 1            ' Monster ziehen mit Spielertempo (CCLP1/MS-treu); Teeth/Blob via *2 halb
 
 ' ----- Tile-Codes (= Tileset-Zellen) ---------------------------------
 CONST T_FLOOR = &H00
@@ -105,34 +104,10 @@ DIM dyv[4] AS INTEGER
 ' ----- Weltzustand ---------------------------------------------------
 DIM terr[NCELL] AS INTEGER            ' Terrain/Items/Geraete
 
+' Monster und Bloecke sind Objekte (Klassen Monster/Kiste weiter unten,
+' nach den uebrigen Globalen); hier nur die Obergrenzen.
 CONST MAXMOB = 320
-DIM mob_x[MAXMOB] AS INTEGER
-DIM mob_y[MAXMOB] AS INTEGER
-DIM mob_dir[MAXMOB] AS INTEGER
-DIM mob_type[MAXMOB] AS INTEGER
-DIM mob_alive[MAXMOB] AS BOOLEAN
-DIM mob_trapped[MAXMOB] AS BOOLEAN
-DIM mob_ox[MAXMOB] AS INTEGER
-DIM mob_oy[MAXMOB] AS INTEGER
-DIM nmob AS INTEGER
-DIM mob_did AS BOOLEAN          ' Ergebnis des letzten mob_try
-
-' Umsortier-Puffer fuer die MS-Bewegungsreihenfolge (0x0A-Monsterliste)
-DIM mord[MAXMOB] AS INTEGER
-DIM mplaced[MAXMOB] AS BOOLEAN
-DIM tmob_x[MAXMOB] AS INTEGER
-DIM tmob_y[MAXMOB] AS INTEGER
-DIM tmob_dir[MAXMOB] AS INTEGER
-DIM tmob_type[MAXMOB] AS INTEGER
-
 CONST MAXBLK = 320
-DIM blk_x[MAXBLK] AS INTEGER
-DIM blk_y[MAXBLK] AS INTEGER
-DIM blk_alive[MAXBLK] AS BOOLEAN
-DIM blk_ox[MAXBLK] AS INTEGER
-DIM blk_oy[MAXBLK] AS INTEGER
-DIM blk_sdir[MAXBLK] AS INTEGER   ' Rutsch-Richtung (-1 = ruht)
-DIM nblk AS INTEGER
 DIM pushed_blk AS INTEGER          ' diesen Tick geschobener Block (kein Sofort-Rutsch)
 
 ' Geraete-Verdrahtung (Falle/Cloner): bx,by -> tx,ty
@@ -268,6 +243,313 @@ DIM pw_input AS STRING          ' aktuell getipptes Passwort
 DIM pw_msg AS STRING            ' Rueckmeldung der Passwort-Eingabe
 DIM next_pw AS STRING           ' Passwort des naechsten Levels (im Sieg-Overlay)
 
+' Feind-Tempo: Monster ziehen jeden mon_takt-ten Spielschritt. 2 = ruhig
+' (halbes Spielertempo, Vorgabe), 1 = original (Spielertempo wie im
+' MS-Regelwerk, auf das manche Fansite-Level knapp getimt sind). Taste T im
+' Menue schaltet um, die Wahl steht in der Sicherung.
+CONST TAKT_RUHIG = 2
+CONST TAKT_ORIGINAL = 1
+DIM mon_takt AS INTEGER : mon_takt = TAKT_ORIGINAL
+
+' ----------------------------------------------------------------------
+'  FIGUREN -- alles, was sich auf dem Brett bewegt
+' ----------------------------------------------------------------------
+' Eine Figur steht auf einer Zelle und weiss, wo sie vor ihrem letzten
+' Schritt stand -- daraus gleitet sie im Bild von Zelle zu Zelle.
+CLASS Figur
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    DIM ox AS INTEGER
+    DIM oy AS INTEGER
+    DIM lebt AS BOOLEAN
+
+    SUB Init(nx AS INTEGER, ny AS INTEGER)
+        x = nx
+        y = ny
+        ox = nx
+        oy = ny
+        lebt = TRUE
+    END SUB
+
+    ' Vor einem Spielschritt: die jetzige Lage wird die alte.
+    SUB merken()
+        ox = x
+        oy = y
+    END SUB
+
+    FUNCTION steht_auf(zx AS INTEGER, zy AS INTEGER) AS BOOLEAN
+        RETURN lebt AND x = zx AND y = zy
+    END FUNCTION
+
+    ' Lage im Bild, t = 0 (alte Zelle) .. 1 (neue Zelle)
+    FUNCTION bild_x(t AS FLOAT) AS FLOAT
+        RETURN ox + (x - ox) * t
+    END FUNCTION
+
+    FUNCTION bild_y(t AS FLOAT) AS FLOAT
+        RETURN oy + (y - oy) * t
+    END FUNCTION
+END CLASS
+
+' Ein schiebbarer Block. Auf Eis und Laufband rutscht er weiter.
+CLASS Kiste EXTENDS Figur
+    DIM rutscht AS INTEGER          ' Rutsch-Richtung, -1 = ruht
+
+    SUB Init(nx AS INTEGER, ny AS INTEGER)
+        SUPER.Init(nx, ny)
+        rutscht = -1
+    END SUB
+END CLASS
+
+' Ein Monster. Boden (Laufband, Eis), Fallen und Kollisionen sind fuer alle
+' gleich; WOHIN es von sich aus zieht, sagt jede Art selbst (waehlen).
+CLASS Monster EXTENDS Figur
+    DIM richtung AS INTEGER         ' 0=N 1=W 2=S 3=E
+    DIM gefangen AS BOOLEAN
+
+    SUB Init(nx AS INTEGER, ny AS INTEGER, r AS INTEGER)
+        SUPER.Init(nx, ny)
+        richtung = r
+        gefangen = FALSE
+    END SUB
+
+    ' Nummer der Art = Zeile im Kachelsatz (&H40 + art * 4 + richtung).
+    ABSTRACT FUNCTION art() AS INTEGER
+    ' Die eigene Zugwahl auf normalem Boden.
+    ABSTRACT SUB waehlen()
+
+    ' Zieht nur jeden wievielten Zug des Grundtakts (Zahn und Blob: halb so oft).
+    FUNCTION traegheit() AS INTEGER
+        RETURN 1
+    END FUNCTION
+
+    FUNCTION kachel() AS INTEGER
+        RETURN &H40 + art() * 4 + richtung
+    END FUNCTION
+
+    ' Ist der Boden t fuer diese Art eine Wand?
+    FUNCTION meidet(t AS INTEGER) AS BOOLEAN
+        IF t = T_WALL OR t = T_INVWALL OR t = T_HIDDEN OR t = T_WALL_SE THEN RETURN TRUE
+        IF t = T_WALLN OR t = T_WALLW OR t = T_WALLS OR t = T_WALLE THEN RETURN TRUE
+        IF t = T_BLUEBLOCK_W OR t = T_BLUEBLOCK_F THEN RETURN TRUE
+        IF t = T_TOGGLE_C THEN RETURN TRUE
+        IF t = T_SOCKET OR t = T_EXIT OR t = T_CLONER THEN RETURN TRUE
+        IF t = T_DOOR_BLUE OR t = T_DOOR_RED OR t = T_DOOR_GREEN OR t = T_DOOR_YELLOW THEN RETURN TRUE
+        IF t = T_CHIP OR t = T_DIRT THEN RETURN TRUE
+        IF t = T_KEY_BLUE OR t = T_KEY_RED OR t = T_KEY_GREEN OR t = T_KEY_YELLOW THEN RETURN TRUE
+        IF t = T_FLIPPERS OR t = T_FIREBOOTS OR t = T_ICESKATES OR t = T_SUCTION THEN RETURN TRUE
+        IF t = T_THIEF OR t = T_HINT THEN RETURN TRUE
+        RETURN t = T_WATER OR t = T_FIRE
+    END FUNCTION
+
+    FUNCTION kann(zx AS INTEGER, zy AS INTEGER, d AS INTEGER) AS BOOLEAN
+        IF NOT inb(zx, zy) THEN RETURN FALSE
+        IF edge_blocked(x, y, d) THEN RETURN FALSE
+        IF meidet(terr[cidx(zx, zy)]) THEN RETURN FALSE
+        IF block_at(zx, zy) >= 0 THEN RETURN FALSE
+        RETURN mob_at(zx, zy) < 0
+    END FUNCTION
+
+    ' Einen Schritt in Richtung d versuchen. TRUE = gezogen.
+    FUNCTION versuche(d AS INTEGER) AS BOOLEAN
+        IF NOT kann(x + dxv[d], y + dyv[d], d) THEN RETURN FALSE
+        x = x + dxv[d]
+        y = y + dyv[d]
+        richtung = d
+        RETURN TRUE
+    END FUNCTION
+
+    ' Die erste der vier Richtungen, die geht.
+    FUNCTION der_reihe_nach(a AS INTEGER, b AS INTEGER, c AS INTEGER, e AS INTEGER) AS BOOLEAN
+        IF versuche(a) THEN RETURN TRUE
+        IF versuche(b) THEN RETURN TRUE
+        IF versuche(c) THEN RETURN TRUE
+        RETURN versuche(e)
+    END FUNCTION
+
+    ' Ein Zug: Laufband und Eis bestimmen, sonst die Art.
+    SUB ziehen()
+        DIM hier AS INTEGER : hier = terr[cidx(x, y)]
+        DIM fdir AS INTEGER : fdir = force_dir(hier)
+        IF fdir >= 0 THEN
+            versuche(fdir)
+            RETURN
+        END IF
+        IF ist_eis(hier) THEN
+            ' gleiten; Ecken lenken um, an der Wand kehrt es um
+            DIM sd AS INTEGER : sd = richtung
+            IF hier <> T_ICE THEN sd = corner_redirect(hier, sd)
+            richtung = sd
+            IF NOT versuche(sd) THEN
+                richtung = turn_back(sd)
+                versuche(richtung)
+            END IF
+            RETURN
+        END IF
+        waehlen()
+    END SUB
+
+    ' Was der Boden mit einem Monster macht, das ihn betritt.
+    SUB betreten()
+        DIM t AS INTEGER : t = terr[cidx(x, y)]
+        IF t = T_BOMB THEN
+            terr[cidx(x, y)] = T_FLOOR
+            lebt = FALSE
+        ELSEIF t = T_TRAP THEN
+            gefangen = TRUE
+        ELSEIF t = T_BTN_GREEN THEN
+            toggle_walls()
+        ELSEIF t = T_BTN_BLUE THEN
+            reverse_tanks()
+        END IF
+    END SUB
+END CLASS
+
+' Kaefer: haelt sich an die linke Wand.
+CLASS Kaefer EXTENDS Monster
+    FUNCTION art() AS INTEGER
+        RETURN 0
+    END FUNCTION
+    SUB waehlen()
+        der_reihe_nach(turn_left(richtung), richtung, turn_right(richtung), turn_back(richtung))
+    END SUB
+END CLASS
+
+' Feuerball: geradeaus, sonst rechts, links, zurueck. Feuer macht ihm nichts.
+CLASS Feuerball EXTENDS Monster
+    FUNCTION art() AS INTEGER
+        RETURN 1
+    END FUNCTION
+    FUNCTION meidet(t AS INTEGER) AS BOOLEAN
+        IF t = T_FIRE THEN RETURN FALSE
+        RETURN SUPER.meidet(t)
+    END FUNCTION
+    SUB waehlen()
+        der_reihe_nach(richtung, turn_right(richtung), turn_left(richtung), turn_back(richtung))
+    END SUB
+END CLASS
+
+' Ball: prallt an der Wand zurueck.
+CLASS Ball EXTENDS Monster
+    FUNCTION art() AS INTEGER
+        RETURN 2
+    END FUNCTION
+    SUB waehlen()
+        IF NOT versuche(richtung) THEN versuche(turn_back(richtung))
+    END SUB
+END CLASS
+
+' Panzer: nur geradeaus, sonst bleibt er stehen. Der blaue Knopf wendet ihn.
+CLASS Panzer EXTENDS Monster
+    FUNCTION art() AS INTEGER
+        RETURN 3
+    END FUNCTION
+    SUB waehlen()
+        versuche(richtung)
+    END SUB
+END CLASS
+
+' Gleiter: geradeaus, sonst links, rechts, zurueck. Er schwimmt.
+CLASS Gleiter EXTENDS Monster
+    FUNCTION art() AS INTEGER
+        RETURN 4
+    END FUNCTION
+    FUNCTION meidet(t AS INTEGER) AS BOOLEAN
+        IF t = T_WATER THEN RETURN FALSE
+        RETURN SUPER.meidet(t)
+    END FUNCTION
+    SUB waehlen()
+        der_reihe_nach(richtung, turn_left(richtung), turn_right(richtung), turn_back(richtung))
+    END SUB
+END CLASS
+
+' Zahn: verfolgt den Spieler, die laengere Achse zuerst -- halb so schnell.
+CLASS Zahn EXTENDS Monster
+    FUNCTION art() AS INTEGER
+        RETURN 5
+    END FUNCTION
+    FUNCTION traegheit() AS INTEGER
+        RETURN 2
+    END FUNCTION
+    SUB waehlen()
+        DIM dx AS INTEGER : dx = px - x
+        DIM dy AS INTEGER : dy = py - y
+        DIM dh AS INTEGER : dh = IIF(dx < 0, 1, 3)
+        DIM dv AS INTEGER : dv = IIF(dy < 0, 0, 2)
+        IF ABS(dx) >= ABS(dy) THEN
+            IF dx <> 0 THEN
+                IF versuche(dh) THEN RETURN
+            END IF
+            IF dy <> 0 THEN
+                IF versuche(dv) THEN RETURN
+            END IF
+        ELSE
+            IF dy <> 0 THEN
+                IF versuche(dv) THEN RETURN
+            END IF
+            IF dx <> 0 THEN
+                IF versuche(dh) THEN RETURN
+            END IF
+        END IF
+    END SUB
+END CLASS
+
+' Laeufer: geradeaus; an der Wand wuerfelt er eine neue Richtung.
+CLASS Laeufer EXTENDS Monster
+    FUNCTION art() AS INTEGER
+        RETURN 6
+    END FUNCTION
+    SUB waehlen()
+        IF versuche(richtung) THEN RETURN
+        DIM versuch AS INTEGER
+        FOR versuch = 1 TO 6
+            IF versuche(RANDINT(0, 3)) THEN RETURN
+        NEXT
+    END SUB
+END CLASS
+
+' Blob: irrt zufaellig umher -- halb so schnell.
+CLASS Blob EXTENDS Monster
+    FUNCTION art() AS INTEGER
+        RETURN 7
+    END FUNCTION
+    FUNCTION traegheit() AS INTEGER
+        RETURN 2
+    END FUNCTION
+    SUB waehlen()
+        versuche(RANDINT(0, 3))
+    END SUB
+END CLASS
+
+' Pantoffeltierchen: haelt sich an die rechte Wand.
+CLASS Pantoffel EXTENDS Monster
+    FUNCTION art() AS INTEGER
+        RETURN 8
+    END FUNCTION
+    SUB waehlen()
+        der_reihe_nach(turn_right(richtung), richtung, turn_left(richtung), turn_back(richtung))
+    END SUB
+END CLASS
+
+' Das Monster einer Art -- beim Laden des Levels und beim Klonen.
+FUNCTION neues_monster(a AS INTEGER, nx AS INTEGER, ny AS INTEGER, r AS INTEGER) AS Monster
+    SELECT CASE a
+        CASE 0 : RETURN NEW Kaefer(nx, ny, r)
+        CASE 1 : RETURN NEW Feuerball(nx, ny, r)
+        CASE 2 : RETURN NEW Ball(nx, ny, r)
+        CASE 3 : RETURN NEW Panzer(nx, ny, r)
+        CASE 4 : RETURN NEW Gleiter(nx, ny, r)
+        CASE 5 : RETURN NEW Zahn(nx, ny, r)
+        CASE 6 : RETURN NEW Laeufer(nx, ny, r)
+        CASE 7 : RETURN NEW Blob(nx, ny, r)
+    END SELECT
+    RETURN NEW Pantoffel(nx, ny, r)
+END FUNCTION
+
+' Monster in Zugreihenfolge, Bloecke
+DIM mobs AS ARRAY OF Monster
+DIM kisten AS ARRAY OF Kiste
+
 ' ----------------------------------------------------------------------
 '  HELFER
 ' ----------------------------------------------------------------------
@@ -305,22 +587,25 @@ FUNCTION turn_back(d AS INTEGER) AS INTEGER
     RETURN (d + 2) MOD 4
 END FUNCTION
 
+' Nummer des lebenden Monsters bzw. Blocks auf (x,y), -1 = keins
 FUNCTION mob_at(x AS INTEGER, y AS INTEGER) AS INTEGER
     DIM i AS INTEGER
-    FOR i = 0 TO nmob - 1
-        IF mob_alive[i] AND mob_x[i] = x AND mob_y[i] = y THEN RETURN i
+    FOR i = 0 TO LEN(mobs) - 1
+        IF mobs[i].steht_auf(x, y) THEN RETURN i
     NEXT
-
     RETURN -1
 END FUNCTION
 
 FUNCTION block_at(x AS INTEGER, y AS INTEGER) AS INTEGER
     DIM i AS INTEGER
-    FOR i = 0 TO nblk - 1
-        IF blk_alive[i] AND blk_x[i] = x AND blk_y[i] = y THEN RETURN i
+    FOR i = 0 TO LEN(kisten) - 1
+        IF kisten[i].steht_auf(x, y) THEN RETURN i
     NEXT
-
     RETURN -1
+END FUNCTION
+
+FUNCTION ist_eis(t AS INTEGER) AS BOOLEAN
+    RETURN t = T_ICE OR t = T_ICE_NW2 OR t = T_ICE_NE2 OR t = T_ICE_SE2 OR t = T_ICE_SW2
 END FUNCTION
 
 ' Blockiert eine duenne Wand die Bewegung von (x,y) in Richtung d?
@@ -344,34 +629,6 @@ FUNCTION edge_blocked(x AS INTEGER, y AS INTEGER, d AS INTEGER) AS BOOLEAN
     IF here = T_WALL_SE AND (d = 2 OR d = 3) THEN RETURN TRUE
     IF there = T_WALL_SE AND (d = 0 OR d = 1) THEN RETURN TRUE
     RETURN FALSE
-END FUNCTION
-
-' Ist das Terrain bei (x,y) fuer ein Monster eine Wand?
-FUNCTION mob_solid(mt AS INTEGER, t AS INTEGER) AS BOOLEAN
-    IF t = T_WALL OR t = T_INVWALL OR t = T_HIDDEN OR t = T_WALL_SE THEN RETURN TRUE
-    IF t = T_WALLN OR t = T_WALLW OR t = T_WALLS OR t = T_WALLE THEN RETURN TRUE
-    IF t = T_BLUEBLOCK_W OR t = T_BLUEBLOCK_F THEN RETURN TRUE
-    IF t = T_TOGGLE_C THEN RETURN TRUE
-    IF t = T_SOCKET OR t = T_EXIT OR t = T_CLONER THEN RETURN TRUE
-    IF t = T_DOOR_BLUE OR t = T_DOOR_RED OR t = T_DOOR_GREEN OR t = T_DOOR_YELLOW THEN RETURN TRUE
-    IF t = T_CHIP OR t = T_DIRT THEN RETURN TRUE
-    IF t = T_KEY_BLUE OR t = T_KEY_RED OR t = T_KEY_GREEN OR t = T_KEY_YELLOW THEN RETURN TRUE
-    IF t = T_FLIPPERS OR t = T_FIREBOOTS OR t = T_ICESKATES OR t = T_SUCTION THEN RETURN TRUE
-    IF t = T_THIEF OR t = T_HINT THEN RETURN TRUE
-
-    ' Wasser ist Wand ausser fuer Gleiter(4); Feuer Wand ausser Feuerball(1)
-    IF t = T_WATER AND mt <> 4 THEN RETURN TRUE
-    IF t = T_FIRE AND mt <> 1 THEN RETURN TRUE
-    RETURN FALSE
-END FUNCTION
-
-FUNCTION mob_can_enter(idx AS INTEGER, x AS INTEGER, y AS INTEGER, d AS INTEGER) AS BOOLEAN
-    IF NOT inb(x, y) THEN RETURN FALSE
-    IF edge_blocked(mob_x[idx], mob_y[idx], d) THEN RETURN FALSE
-    IF mob_solid(mob_type[idx], terr[cidx(x, y)]) THEN RETURN FALSE
-    IF block_at(x, y) >= 0 THEN RETURN FALSE
-    IF mob_at(x, y) >= 0 THEN RETURN FALSE
-    RETURN TRUE
 END FUNCTION
 
 ' ----------------------------------------------------------------------
@@ -582,8 +839,8 @@ SUB load_level(idx AS INTEGER)
     up = JSON_GET_STRING(js, base + "upper")
     lo = JSON_GET_STRING(js, base + "lower")
 
-    nmob = 0
-    nblk = 0
+    mobs = []
+    kisten = []
     chips_left = 0
     px = 1
     py = 1
@@ -601,25 +858,12 @@ SUB load_level(idx AS INTEGER)
         cy = i \ GW
         IF uc >= &H40 AND uc <= &H63 THEN
             ' Monster
-            IF nmob < MAXMOB THEN
-                mob_x[nmob] = cx
-                mob_y[nmob] = cy
-                mob_type[nmob] = (uc - &H40) \ 4
-                mob_dir[nmob] = (uc - &H40) MOD 4
-                mob_alive[nmob] = TRUE
-                mob_trapped[nmob] = FALSE
-                nmob = nmob + 1
-            END IF
+            IF LEN(mobs) < MAXMOB THEN ARRAY_PUSH(mobs, neues_monster((uc - &H40) \ 4, cx, cy, (uc - &H40) MOD 4))
 
             terr[i] = lc
         ELSEIF uc = T_BLOCK OR (uc >= &H0E AND uc <= &H11) THEN
             ' Block (auch Clone-Block)
-            IF nblk < MAXBLK THEN
-                blk_x[nblk] = cx
-                blk_y[nblk] = cy
-                blk_alive[nblk] = TRUE
-                nblk = nblk + 1
-            END IF
+            IF LEN(kisten) < MAXBLK THEN ARRAY_PUSH(kisten, NEW Kiste(cx, cy))
 
             terr[i] = lc
         ELSEIF uc >= T_CHIP_N AND uc <= &H6F THEN
@@ -668,18 +912,6 @@ SUB load_level(idx AS INTEGER)
     poy = py
     anim_t = 1.0
     tick_timer = 0.0
-    DIM gi AS INTEGER
-    FOR gi = 0 TO nmob - 1
-        mob_ox[gi] = mob_x[gi]
-        mob_oy[gi] = mob_y[gi]
-    NEXT
-
-    FOR gi = 0 TO nblk - 1
-        blk_ox[gi] = blk_x[gi]
-        blk_oy[gi] = blk_y[gi]
-        blk_sdir[gi] = -1
-    NEXT
-
     pushed_blk = -1
     lvl_best = best_for(idx)
 END SUB
@@ -732,66 +964,28 @@ END SUB
 ' NICHT in Map-Lesereihenfolge. CCLP1-Puzzles sind darauf getimt.
 ' Monster, die nicht in der Liste stehen, haengen wir in Lesereihenfolge an.
 SUB reorder_monsters(idx AS INTEGER)
-    IF nmob = 0 THEN RETURN
-    DIM base AS STRING
-    base = "levels." + STR$(idx) + "."
+    IF LEN(mobs) = 0 THEN RETURN
     DIM ms AS STRING
-    ms = JSON_GET_STRING(js, base + "monsters")
+    ms = JSON_GET_STRING(js, "levels." + STR$(idx) + ".monsters")
     IF LEN(ms) = 0 THEN RETURN
-    DIM k AS INTEGER
-    FOR k = 0 TO nmob - 1
-        mplaced[k] = FALSE
-    NEXT
-
-    DIM nord AS INTEGER
-    nord = 0
-    DIM recs AS ARRAY OF STRING
-    recs = SPLIT$(ms, ";")
-    DIM r AS INTEGER
-    FOR r = 0 TO LEN(recs) - 1
-        DIM p AS ARRAY OF STRING
-        p = SPLIT$(recs[r], ",")
+    DIM geordnet AS ARRAY OF Monster : geordnet = []
+    DIM rec AS STRING
+    FOR EACH rec IN SPLIT$(ms, ";")
+        DIM p AS ARRAY OF STRING : p = SPLIT$(rec, ",")
         IF LEN(p) >= 2 THEN
-            DIM mx AS INTEGER
-            DIM my AS INTEGER
-            mx = VAL(p[0])
-            my = VAL(p[1])
-            DIM j AS INTEGER
-            FOR j = 0 TO nmob - 1
-                IF NOT mplaced[j] AND mob_x[j] = mx AND mob_y[j] = my THEN
-                    mord[nord] = j
-                    nord = nord + 1
-                    mplaced[j] = TRUE
-                    BREAK
-                END IF
-            NEXT
+            DIM j AS INTEGER : j = mob_at(VAL(p[0]), VAL(p[1]))
+            IF j >= 0 THEN
+                ARRAY_PUSH(geordnet, mobs[j])
+                ARRAY_REMOVE_AT(mobs, j)
+            END IF
         END IF
     NEXT
-
-    ' restliche Monster (nicht gelistet) in Lesereihenfolge
-    FOR k = 0 TO nmob - 1
-        IF NOT mplaced[k] THEN
-            mord[nord] = k
-            nord = nord + 1
-            mplaced[k] = TRUE
-        END IF
+    ' die uebrigen (nicht gelistet) in Lesereihenfolge dahinter
+    DIM m AS Monster
+    FOR EACH m IN mobs
+        ARRAY_PUSH(geordnet, m)
     NEXT
-
-    ' Arrays gemaess Permutation neu aufbauen (alive=TRUE/trapped=FALSE bei Load,
-    ' ox/oy werden danach aus x/y gesetzt -- nur x/y/dir/type permutieren)
-    FOR k = 0 TO nmob - 1
-        tmob_x[k] = mob_x[k]
-        tmob_y[k] = mob_y[k]
-        tmob_dir[k] = mob_dir[k]
-        tmob_type[k] = mob_type[k]
-    NEXT
-
-    FOR k = 0 TO nmob - 1
-        mob_x[k] = tmob_x[mord[k]]
-        mob_y[k] = tmob_y[mord[k]]
-        mob_dir[k] = tmob_dir[mord[k]]
-        mob_type[k] = tmob_type[mord[k]]
-    NEXT
+    mobs = geordnet
 END SUB
 
 ' ----------------------------------------------------------------------
@@ -1037,40 +1231,40 @@ FUNCTION block_can_move(fx AS INTEGER, fy AS INTEGER, tx AS INTEGER, ty AS INTEG
     RETURN TRUE
 END FUNCTION
 
-' Block von (fx,fy) nach (tx,ty) schieben (inkl. Wasser->Dreck, Bombe).
+' Block bi nach (tx,ty) schieben (inkl. Wasser->Dreck, Bombe).
 SUB push_block(bi AS INTEGER, tx AS INTEGER, ty AS INTEGER)
-    DIM t AS INTEGER
-    t = terr[cidx(tx, ty)]
+    DIM k AS Kiste : k = kisten[bi]
+    DIM t AS INTEGER : t = terr[cidx(tx, ty)]
     IF t = T_WATER THEN
         terr[cidx(tx, ty)] = T_DIRT
-        blk_alive[bi] = FALSE
+        k.lebt = FALSE
         sfx_block()
         RETURN
     END IF
 
     IF t = T_BOMB THEN
         terr[cidx(tx, ty)] = T_FLOOR
-        blk_alive[bi] = FALSE
+        k.lebt = FALSE
         sfx_die()
         RETURN
     END IF
 
     DIM d AS INTEGER
-    IF tx > blk_x[bi] THEN
+    IF tx > k.x THEN
         d = 3
-    ELSEIF tx < blk_x[bi] THEN
+    ELSEIF tx < k.x THEN
         d = 1
-    ELSEIF ty < blk_y[bi] THEN
+    ELSEIF ty < k.y THEN
         d = 0
     ELSE
         d = 2
     END IF
 
-    blk_x[bi] = tx
-    blk_y[bi] = ty
+    k.x = tx
+    k.y = ty
     IF t = T_DIRT THEN terr[cidx(tx, ty)] = T_FLOOR
     pushed_blk = bi
-    set_block_slide(bi, d)
+    set_block_slide(k, d)
     sfx_block()
 
     ' Block toggelt gruenen Knopf
@@ -1078,64 +1272,57 @@ SUB push_block(bi AS INTEGER, tx AS INTEGER, ty AS INTEGER)
 END SUB
 
 ' Rutsch-Richtung eines Blocks aus seiner aktuellen Kachel bestimmen
-SUB set_block_slide(bi AS INTEGER, d AS INTEGER)
-    DIM t AS INTEGER
-    t = terr[cidx(blk_x[bi], blk_y[bi])]
-    DIM fdir AS INTEGER
-    fdir = force_dir(t)
+SUB set_block_slide(k AS Kiste, d AS INTEGER)
+    DIM t AS INTEGER : t = terr[cidx(k.x, k.y)]
+    DIM fdir AS INTEGER : fdir = force_dir(t)
     IF t = T_ICE THEN
-        blk_sdir[bi] = d
-    ELSEIF t = T_ICE_NW2 OR t = T_ICE_NE2 OR t = T_ICE_SE2 OR t = T_ICE_SW2 THEN
-        blk_sdir[bi] = corner_redirect(t, d)
+        k.rutscht = d
+    ELSEIF ist_eis(t) THEN
+        k.rutscht = corner_redirect(t, d)
     ELSEIF fdir >= 0 THEN
-        blk_sdir[bi] = fdir
+        k.rutscht = fdir
     ELSE
-        blk_sdir[bi] = -1
+        k.rutscht = -1
     END IF
 END SUB
 
 ' Rutschende Bloecke einen Schritt weiterbewegen (1 Zelle/Tick)
 SUB advance_blocks()
     DIM i AS INTEGER
-    FOR i = 0 TO nblk - 1
-        IF blk_alive[i] AND blk_sdir[i] >= 0 AND i <> pushed_blk THEN
-            DIM d AS INTEGER
-            d = blk_sdir[i]
-            DIM here AS INTEGER
-            here = terr[cidx(blk_x[i], blk_y[i])]
-            IF here = T_ICE_NW2 OR here = T_ICE_NE2 OR here = T_ICE_SE2 OR here = T_ICE_SW2 THEN
+    FOR i = 0 TO LEN(kisten) - 1
+        DIM k AS Kiste : k = kisten[i]
+        IF k.lebt AND k.rutscht >= 0 AND i <> pushed_blk THEN
+            DIM d AS INTEGER : d = k.rutscht
+            DIM here AS INTEGER : here = terr[cidx(k.x, k.y)]
+            IF ist_eis(here) AND here <> T_ICE THEN
                 d = corner_redirect(here, d)
             ELSE
-                DIM fd2 AS INTEGER
-                fd2 = force_dir(here)
+                DIM fd2 AS INTEGER : fd2 = force_dir(here)
                 IF fd2 >= 0 THEN d = fd2
             END IF
 
-            blk_sdir[i] = d
-            DIM tx AS INTEGER
-            DIM ty AS INTEGER
-            tx = blk_x[i] + dxv[d]
-            ty = blk_y[i] + dyv[d]
-            DIM tt AS INTEGER
-            tt = tat(tx, ty)
+            k.rutscht = d
+            DIM tx AS INTEGER : tx = k.x + dxv[d]
+            DIM ty AS INTEGER : ty = k.y + dyv[d]
+            DIM tt AS INTEGER : tt = tat(tx, ty)
             IF tt = T_WATER THEN
                 terr[cidx(tx, ty)] = T_DIRT
-                blk_alive[i] = FALSE
+                k.lebt = FALSE
             ELSEIF tt = T_BOMB THEN
                 terr[cidx(tx, ty)] = T_FLOOR
-                blk_alive[i] = FALSE
+                k.lebt = FALSE
                 sfx_die()
             ELSEIF tx = px AND ty = py THEN
-                blk_x[i] = tx
-                blk_y[i] = ty
+                k.x = tx
+                k.y = ty
                 player_die("Von einem Block zerquetscht!")
-            ELSEIF block_can_move(blk_x[i], blk_y[i], tx, ty, d) THEN
-                blk_x[i] = tx
-                blk_y[i] = ty
+            ELSEIF block_can_move(k.x, k.y, tx, ty, d) THEN
+                k.x = tx
+                k.y = ty
                 IF tt = T_DIRT THEN terr[cidx(tx, ty)] = T_FLOOR
-                set_block_slide(i, d)
+                set_block_slide(k, d)
             ELSE
-                blk_sdir[i] = -1
+                k.rutscht = -1
             END IF
         END IF
     NEXT
@@ -1467,13 +1654,10 @@ SUB toggle_walls()
 END SUB
 
 SUB reverse_tanks()
-    DIM i AS INTEGER
-    FOR i = 0 TO nmob - 1
-        IF mob_alive[i] AND mob_type[i] = 3 THEN
-            mob_dir[i] = turn_back(mob_dir[i])
-        END IF
+    DIM m AS Monster
+    FOR EACH m IN mobs
+        IF m.lebt AND m IS Panzer THEN m.richtung = turn_back(m.richtung)
     NEXT
-
     sfx_door()
 END SUB
 
@@ -1486,43 +1670,20 @@ SUB fire_cloners(bx AS INTEGER, by AS INTEGER)
     NEXT
 END SUB
 
+' Das Monster auf dem Kloner schickt eine Kopie in seine Blickrichtung.
 SUB clone_one(mx AS INTEGER, my AS INTEGER)
-    DIM src AS INTEGER
-    src = mob_at(mx, my)
-    IF src < 0 THEN RETURN
-    DIM d AS INTEGER
-    d = mob_dir[src]
-    DIM nx AS INTEGER
-    DIM ny AS INTEGER
-    nx = mx + dxv[d]
-    ny = my + dyv[d]
-    IF nmob < MAXMOB AND mob_can_enter(src, nx, ny, d) THEN
-        mob_x[nmob] = nx
-        mob_y[nmob] = ny
-        mob_dir[nmob] = d
-        mob_type[nmob] = mob_type[src]
-        mob_alive[nmob] = TRUE
-        mob_trapped[nmob] = FALSE
-        mob_ox[nmob] = nx
-        mob_oy[nmob] = ny
-        nmob = nmob + 1
-    END IF
+    DIM src AS INTEGER : src = mob_at(mx, my)
+    IF src < 0 OR LEN(mobs) >= MAXMOB THEN RETURN
+    DIM vorbild AS Monster : vorbild = mobs[src]
+    DIM d AS INTEGER : d = vorbild.richtung
+    DIM nx AS INTEGER : nx = mx + dxv[d]
+    DIM ny AS INTEGER : ny = my + dyv[d]
+    IF vorbild.kann(nx, ny, d) THEN ARRAY_PUSH(mobs, neues_monster(vorbild.art(), nx, ny, d))
 END SUB
 
 ' ----------------------------------------------------------------------
-'  MONSTER-KI
+'  MONSTER
 ' ----------------------------------------------------------------------
-SUB mob_try(idx AS INTEGER, d AS INTEGER)
-    ' versucht Bewegung; bei Erfolg world-update; setzt mob_did
-    mob_did = FALSE
-    IF mob_can_enter(idx, mob_x[idx] + dxv[d], mob_y[idx] + dyv[d], d) THEN
-        mob_x[idx] = mob_x[idx] + dxv[d]
-        mob_y[idx] = mob_y[idx] + dyv[d]
-        mob_dir[idx] = d
-        mob_did = TRUE
-    END IF
-END SUB
-
 SUB update_traps()
     ' Falle offen, solange ihr brauner Knopf belegt ist (Spieler/Block/Monster)
     DIM i AS INTEGER
@@ -1531,153 +1692,34 @@ SUB update_traps()
         held = (px = trap_bx[i] AND py = trap_by[i])
         IF block_at(trap_bx[i], trap_by[i]) >= 0 THEN held = TRUE
         IF mob_at(trap_bx[i], trap_by[i]) >= 0 THEN held = TRUE
-        DIM m AS INTEGER
-        m = mob_at(trap_tx[i], trap_ty[i])
-        IF m >= 0 THEN mob_trapped[m] = NOT held
+        DIM m AS INTEGER : m = mob_at(trap_tx[i], trap_ty[i])
+        IF m >= 0 THEN mobs[m].gefangen = NOT held
     NEXT
 END SUB
 
+' Zieht ein Monster in diesem Spielschritt? Grundtakt (Feind-Tempo) mal
+' der Traegheit der Art.
+FUNCTION zieht_jetzt(m AS Monster) AS BOOLEAN
+    RETURN (tickcount MOD (mon_takt * m.traegheit())) = 0
+END FUNCTION
+
 SUB move_monsters()
+    ' Ein Kloner haengt neue Monster hinten an -- sie ziehen erst im naechsten
+    ' Schritt (bis hier wie mit der festen Anzahl vom Schleifenbeginn).
+    DIM n AS INTEGER : n = LEN(mobs)
     DIM i AS INTEGER
-    FOR i = 0 TO nmob - 1
-        IF NOT mob_alive[i] THEN
-            ' skip
-        ELSEIF mob_trapped[i] THEN
-            ' in Falle gefangen
-        ELSE
-            DIM mt AS INTEGER
-            mt = mob_type[i]
-            DIM period AS INTEGER
-            period = MON_EVERY
-            IF mt = 5 OR mt = 7 THEN period = MON_EVERY * 2
-            IF (tickcount MOD period) = 0 THEN
-                mob_ox[i] = mob_x[i]
-                mob_oy[i] = mob_y[i]
-                ai_move(i, mt)
-                mob_terrain(i)
-            END IF
+    FOR i = 0 TO n - 1
+        DIM m AS Monster : m = mobs[i]
+        IF m.lebt AND NOT m.gefangen AND zieht_jetzt(m) THEN
+            m.merken()
+            m.ziehen()
+            m.betreten()
         END IF
     NEXT
 
     ' Kollision Monster-auf-Spieler
     IF mob_at(px, py) >= 0 AND state = "play" THEN
         player_die("Von einem Roboter erwischt!")
-    END IF
-END SUB
-
-SUB ai_move(i AS INTEGER, mt AS INTEGER)
-    DIM here AS INTEGER
-    here = terr[cidx(mob_x[i], mob_y[i])]
-
-    ' --- Force-Boden: Richtung erzwingen ---
-    DIM fdir AS INTEGER
-    fdir = force_dir(here)
-    IF fdir >= 0 THEN
-        mob_try(i, fdir)
-        RETURN
-    END IF
-
-    ' --- Eis: gleiten (Ecken lenken um, an Wand umkehren) ---
-    IF here = T_ICE OR here = T_ICE_NW2 OR here = T_ICE_NE2 OR here = T_ICE_SE2 OR here = T_ICE_SW2 THEN
-        DIM sd AS INTEGER
-        sd = mob_dir[i]
-        IF here <> T_ICE THEN sd = corner_redirect(here, sd)
-        mob_dir[i] = sd
-        mob_try(i, sd)
-        IF NOT mob_did THEN
-            mob_dir[i] = turn_back(sd)
-            mob_try(i, mob_dir[i])
-        END IF
-
-        RETURN
-    END IF
-
-    DIM d AS INTEGER
-    d = mob_dir[i]
-    IF mt = 0 THEN
-        ' Kaefer: linke Wand
-        mob_order4(i, turn_left(d), d, turn_right(d), turn_back(d))
-    ELSEIF mt = 8 THEN
-        ' Paramecium: rechte Wand
-        mob_order4(i, turn_right(d), d, turn_left(d), turn_back(d))
-    ELSEIF mt = 4 THEN
-        ' Gleiter: vor, links, rechts, zurueck
-        mob_order4(i, d, turn_left(d), turn_right(d), turn_back(d))
-    ELSEIF mt = 1 THEN
-        ' Feuerball: vor, rechts, links, zurueck
-        mob_order4(i, d, turn_right(d), turn_left(d), turn_back(d))
-    ELSEIF mt = 2 THEN
-        ' Ball: vor, sonst zurueck (prallt)
-        mob_try(i, d)
-        IF NOT mob_did THEN mob_try(i, turn_back(d))
-    ELSEIF mt = 3 THEN
-        ' Tank: nur vor; sonst stehen
-        mob_try(i, d)
-    ELSEIF mt = 6 THEN
-        ' Walker: vor; sonst zufaellige neue Richtung
-        mob_try(i, d)
-        IF NOT mob_did THEN
-            DIM tries AS INTEGER
-            tries = 0
-            WHILE tries < 6 AND NOT mob_did
-                mob_try(i, RANDINT(0, 3))
-                tries = tries + 1
-            WEND
-        END IF
-    ELSEIF mt = 7 THEN
-        ' Blob: zufaellig
-        mob_try(i, RANDINT(0, 3))
-    ELSEIF mt = 5 THEN
-        ' Teeth: verfolgt den Spieler
-        teeth_chase(i)
-    END IF
-END SUB
-
-SUB mob_order4(i AS INTEGER, a AS INTEGER, b AS INTEGER, c AS INTEGER, e AS INTEGER)
-    mob_try(i, a)
-    IF mob_did THEN RETURN
-    mob_try(i, b)
-    IF mob_did THEN RETURN
-    mob_try(i, c)
-    IF mob_did THEN RETURN
-    mob_try(i, e)
-END SUB
-
-SUB teeth_chase(i AS INTEGER)
-    DIM dx AS INTEGER
-    DIM dy AS INTEGER
-    dx = px - mob_x[i]
-    dy = py - mob_y[i]
-    DIM dh AS INTEGER
-    DIM dv AS INTEGER
-    dh = 3
-    IF dx < 0 THEN dh = 1
-    dv = 2
-    IF dy < 0 THEN dv = 0
-
-    ' groessere Achse zuerst
-    IF ABS(dx) >= ABS(dy) THEN
-        IF dx <> 0 THEN mob_try(i, dh)
-        IF NOT mob_did AND dy <> 0 THEN mob_try(i, dv)
-    ELSE
-        IF dy <> 0 THEN mob_try(i, dv)
-        IF NOT mob_did AND dx <> 0 THEN mob_try(i, dh)
-    END IF
-END SUB
-
-' Terrain-Folgen, wenn ein Monster eine Zelle betritt
-SUB mob_terrain(i AS INTEGER)
-    DIM t AS INTEGER
-    t = terr[cidx(mob_x[i], mob_y[i])]
-    IF t = T_BOMB THEN
-        terr[cidx(mob_x[i], mob_y[i])] = T_FLOOR
-        mob_alive[i] = FALSE
-    ELSEIF t = T_TRAP THEN
-        mob_trapped[i] = TRUE
-    ELSEIF t = T_BTN_GREEN THEN
-        toggle_walls()
-    ELSEIF t = T_BTN_BLUE THEN
-        reverse_tanks()
     END IF
 END SUB
 
@@ -1695,10 +1737,9 @@ SUB world_tick()
     pushed_blk = -1
     pox = px
     poy = py
-    DIM oi AS INTEGER
-    FOR oi = 0 TO nblk - 1
-        blk_ox[oi] = blk_x[oi]
-        blk_oy[oi] = blk_y[oi]
+    DIM k AS Kiste
+    FOR EACH k IN kisten
+        k.merken()
     NEXT
 
     ' --- Spieler ---
@@ -1834,33 +1875,19 @@ SUB draw_board()
     NEXT
 
     ' Bloecke (interpoliert)
-    DIM i AS INTEGER
-    FOR i = 0 TO nblk - 1
-        IF blk_alive[i] THEN
-            DIM bfx AS FLOAT
-            DIM bfy AS FLOAT
-            bfx = blk_ox[i] + (blk_x[i] - blk_ox[i]) * ease
-            bfy = blk_oy[i] + (blk_y[i] - blk_oy[i]) * ease
-            draw_tile(T_BLOCK, INT((bfx - camfx) * TILE), INT((bfy - camfy) * TILE))
-        END IF
+    DIM k AS Kiste
+    FOR EACH k IN kisten
+        IF k.lebt THEN draw_tile(T_BLOCK, INT((k.bild_x(ease) - camfx) * TILE), INT((k.bild_y(ease) - camfy) * TILE))
     NEXT
 
-    ' Monster (interpoliert)
-    FOR i = 0 TO nmob - 1
-        IF mob_alive[i] THEN
-            DIM mp AS INTEGER
-            mp = MON_EVERY
-            IF mob_type[i] = 5 OR mob_type[i] = 7 THEN mp = MON_EVERY * 2
-            DIM mph AS FLOAT
-            mph = ((tickcount MOD mp) + ease) / mp
+    ' Monster (interpoliert ueber ihren ganzen Zugtakt)
+    DIM m AS Monster
+    FOR EACH m IN mobs
+        IF m.lebt THEN
+            DIM mp AS INTEGER : mp = mon_takt * m.traegheit()
+            DIM mph AS FLOAT : mph = ((tickcount MOD mp) + ease) / mp
             IF mph > 1.0 THEN mph = 1.0
-            DIM mfx AS FLOAT
-            DIM mfy AS FLOAT
-            mfx = mob_ox[i] + (mob_x[i] - mob_ox[i]) * mph
-            mfy = mob_oy[i] + (mob_y[i] - mob_oy[i]) * mph
-            DIM mc AS INTEGER
-            mc = &H40 + mob_type[i] * 4 + mob_dir[i]
-            draw_tile(mc, INT((mfx - camfx) * TILE), INT((mfy - camfy) * TILE))
+            draw_tile(m.kachel(), INT((m.bild_x(mph) - camfx) * TILE), INT((m.bild_y(mph) - camfy) * TILE))
         END IF
     NEXT
 

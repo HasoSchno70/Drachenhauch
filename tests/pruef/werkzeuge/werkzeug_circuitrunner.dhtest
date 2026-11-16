@@ -30,10 +30,10 @@ prSchreiben(prH)
 js = JSON_LOAD(prSynth$())
 nlevels = JSON_LEN(js, "levels")
 load_level(0)
-PRINT "NMOB=" + STR$(nmob)
+PRINT "NMOB=" + STR$(LEN(mobs))
 DIM prK AS INTEGER
-FOR prK = 0 TO nmob - 1
-    PRINT "M " + STR$(mob_x[prK]) + " " + STR$(mob_y[prK])
+FOR prK = 0 TO LEN(mobs) - 1
+    PRINT "M " + STR$(mobs[prK].x) + " " + STR$(mobs[prK].y)
 NEXT
 EXIT(0)
 --- programm ../../../spiele/circuitrunner/circuitrunner.dh nach '  HAUPTSCHLEIFE
@@ -202,7 +202,7 @@ FOR prT = 0 TO 2
     want_dir = -1
     world_tick()
 NEXT
-PRINT "POS " + STR$(mob_x[0]) + " " + STR$(mob_y[0])
+PRINT "POS " + STR$(mobs[0].x) + " " + STR$(mobs[0].y)
 EXIT(0)
 --- programm ../../../spiele/circuitrunner/circuitrunner.dh nach '  HAUPTSCHLEIFE
 --- ersetzen CONST SAVEPATH = "circuitrunner.save"
