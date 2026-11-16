@@ -10,6 +10,7 @@
 '    P               Passwort eingeben (Level anspringen, im Menue/Intro)
 '    ESC             zurueck / Menue
 '    LEER / ENTER    bestaetigen
+'    T               Feind-Tempo ruhig/original (im Menue)
 '
 '  Fortschritt + Bestzeiten werden in  circuitrunner.save  gesichert.
 '
@@ -249,7 +250,17 @@ DIM next_pw AS STRING           ' Passwort des naechsten Levels (im Sieg-Overlay
 ' Menue schaltet um, die Wahl steht in der Sicherung.
 CONST TAKT_RUHIG = 2
 CONST TAKT_ORIGINAL = 1
-DIM mon_takt AS INTEGER : mon_takt = TAKT_ORIGINAL
+DIM mon_takt AS INTEGER : mon_takt = TAKT_RUHIG
+
+SUB tempo_umschalten()
+    mon_takt = IIF(mon_takt = TAKT_RUHIG, TAKT_ORIGINAL, TAKT_RUHIG)
+    SAVE_SET_INT(sav, "einstellung/feindtempo", mon_takt)
+    SAVE_WRITE(sav, SAVEPATH)
+END SUB
+
+FUNCTION tempo_name() AS STRING
+    RETURN IIF(mon_takt = TAKT_RUHIG, "ruhig", "original")
+END FUNCTION
 
 ' ----------------------------------------------------------------------
 '  FIGUREN -- alles, was sich auf dem Brett bewegt
@@ -2138,6 +2149,7 @@ SUB draw_menu()
     DIM mhint AS STRING
     mhint = "M = Musik an"
     IF music_on THEN mhint = "M = Musik aus"
+    mhint = mhint + "      T = Feind-Tempo: " + tempo_name()
     ct(cx, INT(SH * 0.95), sc_sm, mhint, RGB(120, 134, 160))
 END SUB
 
@@ -2381,6 +2393,8 @@ scan_sets()
 sel_set = 0
 sav = SAVE_LOAD_OR_NEW(SAVEPATH)
 SAVE_SET_VERSION(sav, 1)
+mon_takt = SAVE_GET_INT_OR(sav, "einstellung/feindtempo", TAKT_RUHIG)
+IF mon_takt <> TAKT_ORIGINAL THEN mon_takt = TAKT_RUHIG
 cur_setkey = ""
 lvl_best = -1
 pw_input = ""
@@ -2400,6 +2414,7 @@ INPUT_BIND("password", KEY_P)
 INPUT_BIND("delchar", KEY_BACKSPACE)
 INPUT_BIND("continue", KEY_C)
 INPUT_BIND("mute", KEY_M)
+INPUT_BIND("tempo", KEY_T)
 INPUT_BIND("mus_down", KEY_F1)
 INPUT_BIND("mus_up", KEY_F2)
 INPUT_BIND("sfx_down", KEY_F3)
@@ -2478,6 +2493,7 @@ WHILE NOT QUITREQUESTED()
 
     IF state = "menu" THEN
         IF INPUT_PRESSED("back") THEN BREAK
+        IF INPUT_PRESSED("tempo") THEN tempo_umschalten()
         IF INPUT_PRESSED("up") AND sel_set > 0 THEN sel_set = sel_set - 1
         IF INPUT_PRESSED("down") AND sel_set < nsets - 1 THEN sel_set = sel_set + 1
         IF INPUT_PRESSED("confirm") AND nsets > 0 THEN

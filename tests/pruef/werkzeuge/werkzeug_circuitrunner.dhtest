@@ -181,9 +181,10 @@ IMPORT "{sammlung}/../_hilfen/circuitlevel.dh"
 tat: 47
 hinweis da: TRUE
 
-=== monster ziehen im spielertempo
-' Ein Feuerball im freien Korridor zieht je world_tick einen Schritt geradeaus:
-' Start (3,5), drei Ticks nach rechts -> (6,5). Bei Halbtempo waere x < 6.
+=== monster ziehen im originaltempo mit dem spieler
+' Feind-Tempo "original" (Taste T im Menue): ein Feuerball im freien Korridor
+' zieht je world_tick einen Schritt geradeaus: Start (3,5), drei Ticks nach
+' rechts -> (6,5). Bei Halbtempo waere x < 6.
 IMPORT "circuit.dh"
 DIM prOben AS ARRAY OF INTEGER : prOben = prLeer()
 DIM prUnten AS ARRAY OF INTEGER : prUnten = prLeer()
@@ -196,6 +197,7 @@ prSchreiben(prH)
 js = JSON_LOAD(prSynth$())
 nlevels = JSON_LEN(js, "levels")
 load_level(0)
+mon_takt = TAKT_ORIGINAL
 state = "play"
 DIM prT AS INTEGER
 FOR prT = 0 TO 2
@@ -214,6 +216,48 @@ IMPORT "{sammlung}/../_hilfen/circuitlevel.dh"
 
 --- erwartet
 POS 6 5
+
+=== monster ziehen im ruhigen tempo halb so schnell
+' Die Vorgabe ("ruhig", auch ohne Sicherung): derselbe Feuerball zieht nur
+' jeden zweiten world_tick -- nach vier Ticks steht er auf (5,5), nicht (7,5).
+' Dazu: die Vorgabe ist ruhig, T schaltet um, und die Wahl steht in der
+' Sicherung.
+IMPORT "circuit.dh"
+DIM prOben AS ARRAY OF INTEGER : prOben = prLeer()
+DIM prUnten AS ARRAY OF INTEGER : prUnten = prLeer()
+prOben[1 * 32 + 1] = &H6C
+prOben[5 * 32 + 3] = &H47
+prOben[1 * 32 + 30] = &H15
+DIM prH AS JSON_HANDLE : prH = prSet("SpeedTest")
+prLevel(prH, "Speed", 1, 0, "", "ABCD", prOben, prUnten, "")
+prSchreiben(prH)
+js = JSON_LOAD(prSynth$())
+nlevels = JSON_LEN(js, "levels")
+load_level(0)
+state = "play"
+DIM prT AS INTEGER
+PRINT "vorgabe " + tempo_name()
+FOR prT = 0 TO 3
+    want_dir = -1
+    world_tick()
+NEXT
+PRINT "POS " + STR$(mobs[0].x) + " " + STR$(mobs[0].y)
+tempo_umschalten()
+DIM prSav AS SAVE_HANDLE : prSav = SAVE_LOAD(SAVEPATH)
+PRINT "umgeschaltet " + tempo_name() + " gesichert " + STR$(SAVE_GET_INT_OR(prSav, "einstellung/feindtempo", 0))
+EXIT(0)
+--- programm ../../../spiele/circuitrunner/circuitrunner.dh nach '  HAUPTSCHLEIFE
+--- ersetzen CONST SAVEPATH = "circuitrunner.save"
+CONST SAVEPATH = "{fall}/circuitrunner.save"
+CHDIR("{sammlung}/../../../spiele/circuitrunner")
+
+--- datei _programm/circuit.dh
+IMPORT "{sammlung}/../_hilfen/circuitlevel.dh"
+
+--- erwartet
+vorgabe ruhig
+POS 5 5
+umgeschaltet original gesichert 1
 
 === konverter liest ein dat im rundweg
 ' Bis 2026-09-14 tests/test_circuitrunner.py gegen convert_dat.py. Die .dat

@@ -29,11 +29,17 @@ wählen, mit LEER/ENTER starten.
 | N | Level überspringen (Entwicklung) |
 | P | Passwort eingeben → Level anspringen (Menü/Intro) |
 | M | Musik an/aus |
+| T | Feind-Tempo umschalten (Menü): *ruhig* oder *original* |
 | F1 / F2 | Musik leiser / lauter |
 | F3 / F4 | Effekte leiser / lauter |
 | F5 | Lösung aufzeichnen (nochmal = beenden) |
 | F6 | aufgezeichnete Lösung abspielen |
 | ESC | zurück / Menü |
+
+**Feind-Tempo.** Vorgabe ist *ruhig*: die Roboter ziehen halb so oft wie du
+(Zahn und Blob noch einmal halb so oft). *original* lässt sie im Spielertempo
+laufen wie im MS-Regelwerk -- manche Fansite-Level sind genau darauf getimt.
+Die Wahl steht in der Sicherung.
 
 Ein **Gamepad** ist gleichwertig belegt: Steuerkreuz bewegt, **A**/**Start**
 bestätigt, **B** geht zurück, **Y** startet den Level neu. Beim Sterben und beim
