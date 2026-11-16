@@ -136,11 +136,19 @@ END SUB
 SUB nebelAnwenden()
     DIM an AS BOOLEAN : an = nebelAn AND NOT hell
     GUI_METRIC_SET("nebel", IIF(an, 12, 0))
-    IF an THEN
-        GUI_STYLESHEET("listbox, tree, textarea, richtext, table, panel { verlauf: 0; glanz: 0; nebel: 14% }" + CHR$(10) + "textarea.code { nebel: aus }")
-    ELSE
+    IF hell THEN
         GUI_STYLESHEET("")
+        RETURN
     END IF
+    ' Der ruhige Look (dunkles Thema): die Raender einen Ton DUNKLER als der
+    ' Editor, buendig (Fenstergrund = Grund der Flaechen, eckig, nur eine
+    ' feine Linie dazwischen), ohne Verlauf und Glanz -- die Arbeit liegt
+    ' vorn, der Rand tritt zurueck. Darauf zieht der Nebel; das Code-Feld
+    ' behaelt seinen Grund und bleibt frei.
+    GUI_THEME_SET("win_bg", RAND_GRUND)
+    DIM rand AS STRING
+    rand = "{ verlauf: 0; glanz: 0; radius: 0; bg: #12171D; border: #262E38" + IIF(an, "; nebel: 14%", "") + " }"
+    GUI_STYLESHEET("listbox, tree, textarea, richtext, table, panel " + rand + CHR$(10) + "textarea.code { bg: #232A33; nebel: aus }")
 END SUB
 
 SUB nebelSetzen(an AS BOOLEAN)

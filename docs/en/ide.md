@@ -221,6 +221,11 @@ as well. These building blocks came with it:
   clear. It only moves while the IDE draws anyway; in idle mode it stands
   still, and entirely with the system's "reduce motion" (stylesheet
   `nebel`, metric `nebel`).
+- **Calm look** (dark theme): the edges (tree, outline, output, problems,
+  help) lie one shade **darker** than the editor, flush with the window
+  background, square and only separated by a fine line; folders in the
+  tree are muted. So the work is in front, the edge steps back -- and the
+  mist drifts visibly over the dark ground.
 - **Indent guides** (`GUI_TEXTAREA_SET(ta, "einzugslinien", 1)`): a
   fine stroke per level, below the text. The width of a level is measured on
   `tabbreite` spaces, and an empty line takes the smaller

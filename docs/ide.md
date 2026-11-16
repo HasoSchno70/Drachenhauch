@@ -220,6 +220,11 @@ bekäme. Diese Bausteine kamen mit ihr:
   flach sind -- statt der hellen Verläufe. Die Code-Felder bleiben frei.
   Er zieht nur, solange die IDE ohnehin zeichnet; im Leerlauf steht er, und
   mit „Bewegung aus“ des Systems ganz (Stildatei `nebel`, Metrik `nebel`).
+- **Ruhiger Look** (dunkles Thema): die Ränder (Baum, Gliederung, Ausgabe,
+  Probleme, Hilfe) liegen einen Ton **dunkler** als der Editor, bündig mit
+  dem Fenstergrund, eckig und nur durch eine feine Linie getrennt; die
+  Ordner im Baum sind gedämpft. So liegt die Arbeit vorn, der Rand tritt
+  zurück -- und der Nebel zieht auf dem dunklen Grund sichtbar durch.
 - **Einrückungslinien** (`GUI_TEXTAREA_SET(ta, "einzugslinien", 1)`): ein
   feiner Strich je Stufe, unter dem Text. Die Breite einer Stufe wird an
   `tabbreite` Leerzeichen gemessen, und eine leere Zeile nimmt die kleinere
