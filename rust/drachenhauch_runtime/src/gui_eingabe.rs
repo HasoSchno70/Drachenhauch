@@ -33,6 +33,7 @@ impl Gui {
 
     pub fn update(&mut self, g: &mut Graphics) {
         self.takt = g.uhr_jetzt();
+        if !self.ruhig { self.nebel_uhr += g.delta().clamp(0.0, 0.05); }
         // GUI_CHANGED: den Stand vor der Bedienung merken
         for wi in 0..self.windows.len() {
             for i in 0..self.windows[wi].widgets.len() {

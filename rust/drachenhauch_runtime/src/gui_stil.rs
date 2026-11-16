@@ -45,7 +45,7 @@ pub(super) const FOKUS: usize = 2;
 pub(super) const AKTIV: usize = 3;
 pub(super) const AUS: usize = 4;
 
-const EIGENSCHAFTEN: &str = "bg, fg, border, accent, radius, groesse, stil, abstand, randbreite, schatten, verlauf, farbverlauf, glanz, fase, uebergang (auch je Farbe: uebergang: 120, bg 400), form, bild, bildrand, animation, klang, effekt, gleiten, unschaerfe, griff";
+const EIGENSCHAFTEN: &str = "bg, fg, border, accent, radius, groesse, stil, abstand, randbreite, schatten, verlauf, farbverlauf, nebel, glanz, fase, uebergang (auch je Farbe: uebergang: 120, bg 400), form, bild, bildrand, animation, klang, effekt, gleiten, unschaerfe, griff";
 const ZUSTAENDE: &str = ":hover, :focus, :active, :disabled, :checked";
 
 /// Eine Farbe aus der Stildatei: fest oder ein Name des Themas (dann folgt
@@ -67,6 +67,8 @@ pub(super) struct StilWerte {
     verlauf: Option<i32>,
     /// Farbverlauf der Flaeche (`farbverlauf: #A #B 45 wandert 6s`).
     pub(super) farbverlauf: Option<Farbverlauf>,
+    /// Drachenhauch-Nebel: Staerke in % (0 = aus) und Farbe (sonst die des Themas).
+    pub(super) nebel: Option<(i32, Option<StilFarbe>)>,
     glanz: Option<i32>,
     fase: Option<i32>,
     uebergang: Option<i32>,
@@ -173,6 +175,10 @@ impl StilWerte {
             t.push(format!("schatten {} {} {}{}", sch.dx, sch.dy, sch.weich, f));
         }
         if let Some(v) = self.verlauf { t.push(format!("verlauf {}", v)); }
+        if let Some((n, f)) = &self.nebel {
+            if *n == 0 { t.push("nebel aus".into()); }
+            else { t.push(format!("nebel {}%{}", n, f.as_ref().map(|f| format!(" {}", farbe_text(f))).unwrap_or_default())); }
+        }
         if let Some(fv) = &self.farbverlauf {
             if fv.farben.is_empty() { t.push("farbverlauf aus".into()); } else {
                 let f: Vec<String> = fv.farben.iter().map(farbe_text).collect();
@@ -215,6 +221,7 @@ impl StilWerte {
         if o.schatten.is_some() { self.schatten = o.schatten.clone(); }
         if o.verlauf.is_some() { self.verlauf = o.verlauf; }
         if o.farbverlauf.is_some() { self.farbverlauf = o.farbverlauf.clone(); }
+        if o.nebel.is_some() { self.nebel = o.nebel.clone(); }
         if o.glanz.is_some() { self.glanz = o.glanz; }
         if o.fase.is_some() { self.fase = o.fase; }
         if o.uebergang.is_some() { self.uebergang = o.uebergang; }
@@ -645,6 +652,23 @@ fn farbverlauf_lesen(wert: &str, zeile: usize, thema: &dyn Fn(&str) -> bool) -> 
     Ok(Farbverlauf { farben, winkel: winkel.unwrap_or(0), wandert })
 }
 
+/// `nebel: 12%` oder `nebel: 12% #73F2D9` (Staerke 0..40 %, Farbe sonst die
+/// des Themas `nebel`), `nebel: aus`.
+fn nebel_lesen(wert: &str, zeile: usize, thema: &dyn Fn(&str) -> bool) -> Result<(i32, Option<StilFarbe>), String> {
+    let teile: Vec<&str> = wert.split_whitespace().collect();
+    let fehler = || format!("Zeile {}: nebel erwartet eine Staerke 0..40 % und wahlweise eine Farbe -- etwa '12%' oder '12% #73F2D9', oder 'aus'; erhalten '{}'", zeile, wert.trim());
+    match teile.as_slice() {
+        [w] if matches!(w.to_lowercase().as_str(), "aus" | "keiner" | "none") => Ok((0, None)),
+        [n] | [n, _] => {
+            let staerke: i32 = n.trim_end_matches('%').parse().map_err(|_| fehler())?;
+            if !(0..=40).contains(&staerke) { return Err(fehler()); }
+            let farbe = match teile.get(1) { Some(f) => Some(farbe_lesen(f, zeile, thema).map_err(|_| fehler())?), None => None };
+            Ok((staerke, farbe))
+        }
+        _ => Err(fehler()),
+    }
+}
+
 /// `6000`, `6000ms` oder `6s` in Millisekunden.
 fn dauer_lesen(s: &str) -> Option<i32> {
     let s = s.to_lowercase();
@@ -721,7 +745,7 @@ pub(super) fn lesen(text: &str, thema: &dyn Fn(&str) -> bool) -> Result<Stildate
             let name = name.trim().to_lowercase();
             let wert = wert.trim();
             let form = matches!(name.as_str(), "abstand" | "padding" | "innenabstand" | "randbreite" | "border-width"
-                | "border_width" | "schatten" | "shadow" | "verlauf" | "gradient" | "farbverlauf" | "fill-gradient" | "glanz" | "gloss" | "fase" | "bevel"
+                | "border_width" | "schatten" | "shadow" | "verlauf" | "gradient" | "farbverlauf" | "fill-gradient" | "nebel" | "mist" | "glanz" | "gloss" | "fase" | "bevel"
                 | "uebergang" | "transition" | "form" | "shape" | "gleiten" | "layout-transition" | "unschaerfe" | "blur");
             if form && mit_zustand {
                 return Err(format!("Zeile {}: '{}' gilt nur in Regeln ohne :hover, :focus, :active, :disabled -- eine Form, die mit dem Zustand springt, waere ein Wackeln", zeile, name));
@@ -748,6 +772,7 @@ pub(super) fn lesen(text: &str, thema: &dyn Fn(&str) -> bool) -> Result<Stildate
                 "schatten" | "shadow" => werte.schatten = Some(schatten_lesen(wert, zeile, thema)?),
                 "verlauf" | "gradient" => werte.verlauf = Some(zahl_lesen_stil(wert, zeile, "verlauf", 0, 64)?),
                 "farbverlauf" | "fill-gradient" => werte.farbverlauf = Some(farbverlauf_lesen(wert, zeile, thema)?),
+                "nebel" | "mist" => werte.nebel = Some(nebel_lesen(wert, zeile, thema)?),
                 "glanz" | "gloss" => werte.glanz = Some(zahl_lesen_stil(wert, zeile, "glanz", 0, 100)?),
                 "fase" | "bevel" => werte.fase = Some(zahl_lesen_stil(wert, zeile, "fase", 0, 1)?),
                 "uebergang" | "transition" => {
@@ -1191,6 +1216,13 @@ impl Gui {
     /// `GUI_SET_MOTION("aus")` steht er.
     /// Nur die Farben des Verlaufs (fuer Schrift und Pruefung), ohne ein
     /// Bild anzufordern.
+    /// Der Nebel des Widgets: (Staerke 0..1, Farbe) -- None = keiner.
+    pub(super) fn w_nebel(&self, w: &Widget) -> Option<(f64, i64)> {
+        let (n, f) = w.stil_auf.as_ref()?[BASIS].nebel.as_ref()?;
+        if *n <= 0 { return None; }
+        let farbe = f.as_ref().map(|f| self.stil_wert(f)).unwrap_or_else(|| self.th("nebel"));
+        Some((*n as f64 / 100.0, farbe))
+    }
     pub(super) fn w_verlauf_farben(&self, w: &Widget) -> Option<Vec<i64>> {
         let fv = w.stil_auf.as_ref()?[BASIS].farbverlauf.as_ref()?;
         if fv.farben.len() < 2 { return None; }

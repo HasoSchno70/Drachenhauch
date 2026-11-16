@@ -504,6 +504,11 @@ impl Gui {
         } else {
             g.box_fill(x1, y1, x2, y2, fill);
         }
+        // Drachenhauch-Nebel (Stildatei `nebel`): ueber der Fuellung, unter
+        // Fase, Rand und allem, was das Widget darauf schreibt.
+        if let Some((staerke, farbe)) = self.nebel_jetzt.get() {
+            g.nebel(x1, y1, x2, y2, rad, farbe, staerke, self.nebel_uhr);
+        }
         self.bevel(g, x1, y1, x2, y2, rad, tief, anteil);
         // Randbreite aus der Stildatei: 0 = kein Rand, mehr = Ringe nach innen.
         let breite = self.form_jetzt.get().rand.unwrap_or(1);

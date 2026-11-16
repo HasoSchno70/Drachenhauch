@@ -2298,7 +2298,7 @@ GUI_THEME(accent)                   ' Kurzform für GUI_THEME_SET("accent", ...)
 
 Gültige Schlüssel: `win_bg`, `win_border`, `title_bg`, `title_bg_focus`,
 `title_fg`, `widget_bg`, `widget_border`, `text_fg`, `muted_fg`, `accent`,
-`close_hover`.
+`close_hover`, `nebel` (Farbe des Drachenhauch-Nebels, Vorgabe Türkis `#73F2D9`).
 
 ```basic
 GUI_THEME_SET("win_bg", RGB(20, 20, 30))
@@ -2585,6 +2585,7 @@ Eigenschaften mehr, dazu kommen vier Befehle:
 | `GUI_GLIDING(wdg)` | gleitet das Widget gerade? |
 | `unschaerfe: 12` | Glas: was hinter dem Widget gezeichnet ist (ein Bild, eine Karte, andere Widgets), liegt unscharf darunter (Radius 0..40); eine Fläche mit Deckkraft scheint durch: `panel.glas { unschaerfe: 12; bg: #60FFFFFF; radius: 14 }`. Wirkt auf der Hauptfläche, in echten Fenstern und in Renderzielen. Nur in Regeln ohne Zustand |
 | `farbverlauf: #FF6B6B #845EC2 #2C73D2 45 wandert 6s` | Farbverlauf statt der einen Grundfarbe: 2 bis 6 Farben (auch Namen des Themas), dann wahlweise der Winkel in Grad (0 = nach rechts, 90 = nach unten, 45 = schräg nach rechts unten) und `wandert [Dauer]` -- dann laufen die Farben im Kreis (die letzte geht wieder in die erste über) und wandern ohne Naht in Richtung des Winkels, eine Runde in der Dauer (`ms` oder `s`, 500 ms bis 60 s, Vorgabe 6 s). Für Panels, Karten, Knöpfe (auch `form: pille` und `kreis`) und jede andere Fläche des Widgets; Rundung, Glanz und Rand kommen darüber. Die Schrift eines Knopfs wählt die gui nach allen Farben des Verlaufs (die, die an seiner ungünstigsten Stelle besser lesbar ist), und `GUI_A11Y_CHECK$` misst gegen diese Stelle. Mit `GUI_SET_MOTION("aus")` steht er; ein wandernder meldet im Leerlauf, dass er jedes Bild braucht. `farbverlauf: aus` nimmt einen geerbten zurück. Nur in Regeln ohne Zustand |
+| `nebel: 12%` / `nebel: 12% #73F2D9` / `nebel: aus` | Drachenhauch-Nebel: weiche Schwaden ziehen über die Fläche (über der Grundfarbe, unter Rand und Schrift), Stärke 0..40 %, Farbe sonst die des Themas (`nebel`). Er liegt in Bildschirmlage und zieht darum ohne Naht über benachbarte Flächen. Seine Uhr läuft nur, solange Bilder gezeichnet werden: im Leerlauf steht er (er fordert kein Bild an) und springt beim Aufwachen nicht; mit `GUI_SET_MOTION("aus")` steht er ganz. Für den Fenstergrund die Metrik `nebel`. Nur in Regeln ohne Zustand |
 
 ```basic
 IMPORT "gui"
@@ -3068,6 +3069,7 @@ kompletter Look statt mehrerer Dinge, die man von Hand kombinieren muss:
 | `gloss` | Stärke der Glanzkante, 0…100 |
 | `bevel` | 1 = helle Linie oben, dunkle unten |
 | `verlauf_hoehe` | ab dieser Höhe klingt beides aus; 0 = überall gleich |
+| `nebel` | Drachenhauch-Nebel im **Fenstergrund**, Stärke in % (0 = keiner, Vorgabe); Farbe aus dem Thema (`nebel`), für Flächen die Stildatei-Eigenschaft `nebel` |
 
 Einzeln setzbar über `GUI_METRIC_SET`. Alle **bestehenden** Themen stehen
 weiterhin auf 0 — schon geschriebene Programme sehen unverändert aus.
