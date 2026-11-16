@@ -1189,6 +1189,13 @@ impl Gui {
     /// (0..1) jetzt, und ob er im Kreis laeuft -- None = die eine Grundfarbe.
     /// Ein wandernder meldet, dass er das naechste Bild braucht; mit
     /// `GUI_SET_MOTION("aus")` steht er.
+    /// Nur die Farben des Verlaufs (fuer Schrift und Pruefung), ohne ein
+    /// Bild anzufordern.
+    pub(super) fn w_verlauf_farben(&self, w: &Widget) -> Option<Vec<i64>> {
+        let fv = w.stil_auf.as_ref()?[BASIS].farbverlauf.as_ref()?;
+        if fv.farben.len() < 2 { return None; }
+        Some(fv.farben.iter().map(|f| self.stil_wert(f)).collect())
+    }
     pub(super) fn w_farbverlauf(&self, w: &Widget) -> Option<(Vec<i64>, f32, f32, bool)> {
         let fv = w.stil_auf.as_ref()?[BASIS].farbverlauf.as_ref()?;
         if fv.farben.len() < 2 { return None; }

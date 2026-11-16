@@ -64,6 +64,11 @@ impl Gui {
                 // Umriss, flach und Verweis haben keine Flaeche.
                 let bg = if matches!(w.variante, 5 | 6 | 7) && self.knopf_grund(w).is_none() { fenster }
                     else { self.knopf_grund(w).unwrap_or_else(|| self.wcol(w, "bg", "widget_bg")) };
+                // Ein Farbverlauf: gemessen gegen seine unguenstigste Farbe.
+                let bg = match self.w_verlauf_farben(w) {
+                    Some(f) => f.into_iter().min_by(|&a, &b| kontrast(fg, a & 0xFFFFFF).total_cmp(&kontrast(fg, b & 0xFFFFFF))).unwrap_or(bg),
+                    None => bg,
+                };
                 Some((fg, bg))
             }
             Kind::Label => {

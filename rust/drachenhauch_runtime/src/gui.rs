@@ -3015,6 +3015,14 @@ fn kontrast(a: i64, b: i64) -> f64 {
 /// 2026.49 entschied eine Helligkeitsgrenze (Luma 160): auf dem Cyan des
 /// dunklen Themas ergab das weisse Schrift mit 2,1:1 statt dunkler mit 7,9:1,
 /// auf Gruen und Orange ebenso -- gefunden mit GUI_A11Y_CHECK$.
+/// Lesbare Schrift auf einem Farbverlauf: die der beiden, deren schlechtester
+/// Kontrast ueber alle Farben hoeher ist -- auf Gelb nach Cyan dunkel, auch
+/// wenn `bg` dunkel ist.
+fn lesbar_auf_allen(farben: &[i64]) -> i64 {
+    let schlechtester = |fg: i64| farben.iter().map(|&c| kontrast(fg, c & 0xFFFFFF)).fold(f64::INFINITY, f64::min);
+    if schlechtester(0x1C2026) > schlechtester(0xFFFFFF) { 0x1C2026 } else { 0xFFFFFF }
+}
+
 fn lesbar_auf(bg: i64) -> i64 {
     let bg = bg & 0xFFFFFF;
     if kontrast(0x1C2026, bg) > kontrast(0xFFFFFF, bg) { 0x1C2026 } else { 0xFFFFFF }

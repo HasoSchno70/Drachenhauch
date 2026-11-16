@@ -1545,6 +1545,8 @@ impl Gui {
     pub(super) fn knopf_text(&self, w: &Widget) -> i64 {
         if !w.enabled { return self.stil_farbe(w, "fg", stil::AUS).unwrap_or_else(|| self.th("muted_fg")); }
         if let Some(c) = self.eigen(w, "fg") { return self.stil_misch(w, "fg", c); }
+        // Auf einem Farbverlauf zaehlen alle seine Farben, nicht `bg`.
+        if let Some(f) = self.w_verlauf_farben(w) { return self.stil_misch(w, "fg", lesbar_auf_allen(&f)); }
         let c = match w.variante {
             5 | 7 => self.wcol(w, "accent", "accent"),
             6 => self.th("text_fg"),

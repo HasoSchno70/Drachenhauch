@@ -135,3 +135,60 @@ farbverlauf aus
 farbverlauf erwartet 2 bis 6 Farben
 eine Runde dauert 500 ms bis 60 s
 'farbverlauf' gilt nur in Regeln ohne :hover
+
+=== auf einem hellen verlauf ist die schrift dunkel
+' Die Schrift eines Knopfs richtet sich nach allen Farben des Verlaufs, nicht
+' nach `bg`: auf Gelb nach Cyan ist sie dunkel, auch wenn `bg` dunkel ist.
+TRY
+    SCREEN(400, 200, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM k AS GUI_WIDGET : k = GUI_BUTTON(w, "MMMMMM", 50, 50, 300, 80)
+GUI_SET_NAME(k, "k")
+GUI_STYLESHEET("#k { bg: #202020; groesse: 30; farbverlauf: #FFFF00 #00FFFF }")
+DIM ziel AS INTEGER : ziel = RENDERTARGET_NEW(400, 200)
+DIM n AS INTEGER
+FOR n = 1 TO 3
+    GUI_UPDATE()
+    RENDERTARGET_BEGIN(ziel) : CLS(0) : GUI_DRAW() : RENDERTARGET_END()
+    FLIP()
+NEXT
+DIM b AS IMAGE : b = RENDERTARGET_IMAGE(ziel)
+DIM dunkel AS INTEGER = 0
+DIM x AS INTEGER
+DIM y AS INTEGER
+FOR x = 60 TO 340
+    FOR y = 60 TO 120
+        DIM p AS INTEGER : p = GETPIXEL(b, x, y) BAND &HFFFFFF
+        IF ((p \ 65536) BAND 255) < 90 AND ((p \ 256) BAND 255) < 90 AND (p BAND 255) < 90 THEN dunkel = dunkel + 1
+    NEXT
+NEXT
+PRINT "dunkle schrift "; dunkel > 40
+PRINT "pruefung "; GUI_A11Y_CHECK$(w) = ""
+--- umgebung
+DHRT_FRAMES=4
+--- erwartet
+dunkle schrift TRUE
+pruefung TRUE
+
+=== die pruefung misst gegen die unguenstigste farbe des verlaufs
+TRY
+    SCREEN(400, 200, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 200)
+DIM k AS GUI_WIDGET : k = GUI_BUTTON(w, "Weiss auf Grau", 50, 50, 300, 60)
+GUI_SET_NAME(k, "k")
+GUI_STYLESHEET("#k { bg: #202020; fg: #FFFFFF; farbverlauf: #202020 #D0D0D0 }")
+GUI_UPDATE()
+PRINT GUI_A11Y_CHECK$(w)
+--- enthaelt
+(Schrift #FFFFFF auf #D0D0D0)
