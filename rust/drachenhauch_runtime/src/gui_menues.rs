@@ -499,7 +499,7 @@ impl Gui {
             match k.as_str() {
                 "font" => w.font = v,
                 "font_size" => w.font_size = v as i32,
-                _ => { w.ov.insert(k, v); }   // bg/fg/border/accent
+                _ => { w.ov.insert(k, v); }   // bg/fg/border/accent/hover/pressed
             }
         }
         Ok(())

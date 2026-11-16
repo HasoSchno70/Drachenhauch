@@ -486,7 +486,7 @@ Native, blockierende Standarddialoge (kein IMPORT nötig — wie die Datei-Dialo
 | `GUI_GET_FONT_SIZE(wdg)` | INTEGER | die eigene Schriftgröße, 0 = die des Themas |
 | `GUI_SET_FONT_STYLE(wdg, stil$)` | — | Schriftstil fuer dieses Widget: `fett`, `kursiv`, `unterstrichen`, `durchgestrichen`, verbunden mit `+`; `"normal"` nimmt ihn weg. Echte Schnitte, wo es sie als Datei gibt, sonst nachgebildet |
 | `GUI_GET_FONT_STYLE$(wdg)` | STRING | der Stil des Widgets, z. B. `"fett+unterstrichen"` |
-| `GUI_STYLE_SET(name$, prop$, wert)` | — | benannten Stil festlegen (`bg`, `fg`, `border`, `accent`, `font`, `font_size`) |
+| `GUI_STYLE_SET(name$, prop$, wert)` | — | benannten Stil festlegen (`bg`, `fg`, `border`, `accent`, `hover`, `pressed`, `font`, `font_size`) |
 | `GUI_STYLE_GET(name$, prop$)` | INTEGER | ein Wert des Stils, -1 wenn er ihn nicht setzt (unbekannter Stil = Fehler) |
 | `GUI_APPLY_STYLE(widget, name$)` | — | einen benannten Stil auf ein Widget uebertragen -- spart, ihn Widget fuer Widget zu wiederholen |
 | `GUI_STYLESHEET(text$)` | — | eine Stildatei setzen: Regeln nach Art, Klasse, Name und Zustand wie in CSS ("" = keine) -- siehe [Stildatei](#7-stildatei-regeln-nach-art-klasse-name-und-zustand) |
@@ -2317,7 +2317,7 @@ Schlüssel: `title_h` (Titelleisten-Höhe), `slider_h`, `check_size`,
 `corner_radius` (runde Ecken für Fenster/Titelleiste/Buttons/TextInput/Dropdown/
 Progress/Panel + Häkchen-Checkbox; 0 = eckig/flach), `shadow` (weicher
 Fenster-Schatten in Pixeln; 0 = aus), `uebergang` (Dauer der Übergänge in
-Millisekunden, Vorgabe 120; 0 = springen, siehe [Übergänge](#übergänge)). **Hinweis:** Größen, die in die Widget-Maße
+Millisekunden, Vorgabe 120; 0 = springen, siehe [Übergänge](#übergänge)), `nebel` (Drachenhauch-Nebel im Fenstergrund, Stärke in %, 0 = keiner; Farbe aus dem Thema `nebel`, für Flächen die Stildatei-Eigenschaft `nebel`); dazu die vier Metriken des plastischen Looks (`gradient`, `gloss`, `bevel`, `verlauf_hoehe`, siehe [Plastischer Look](#plastischer-look-die-glas-themen)). **Hinweis:** Größen, die in die Widget-Maße
 einfließen (`check_size`, `slider_h`), wirken nur auf **neu angelegte** Widgets —
 am besten vor dem UI-Aufbau setzen. `title_h`/`pad`/`caret_period`/`corner_radius`/
 `shadow` wirken sofort.
@@ -2404,7 +2404,7 @@ Einen Style einmal definieren und auf viele Widgets anwenden — spart das
 wiederholte `GUI_SET_COLOR`/`GUI_SET_FONT`:
 
 ```basic
-GUI_STYLE_SET("primary", "bg", RGB(32, 80, 192))   ' props: bg/fg/border/accent
+GUI_STYLE_SET("primary", "bg", RGB(32, 80, 192))   ' props: bg/fg/border/accent/hover/pressed
 GUI_STYLE_SET("primary", "fg", &HFFFFFF)            '        + font / font_size
 GUI_STYLE_SET("primary", "font_size", 18)
 
@@ -3019,7 +3019,7 @@ Tabelle mit einer Million Zeilen, die Stildatei zum Ändern, Werkzeuge
 Barrierefreiheit. Oben schalten Thema, rechts nach links, Bewegung, Töne,
 Sparsam und Kontrast die ganze Oberfläche um.
 
-**Alle 22 Widget-Arten in einer Anwendung:**
+**22 Widget-Arten in einer Anwendung:**
 [examples/156_gui_alle_widgets.dh](../examples/156_gui_alle_widgets.dh) —
 Vollbild, randloses Fenster (die Form *ist* der Bildschirm), Menüleiste,
 Werkzeugleiste, Kontextmenü und drei Reiter. Kein Schaukasten: jedes Widget
@@ -3069,7 +3069,6 @@ kompletter Look statt mehrerer Dinge, die man von Hand kombinieren muss:
 | `gloss` | Stärke der Glanzkante, 0…100 |
 | `bevel` | 1 = helle Linie oben, dunkle unten |
 | `verlauf_hoehe` | ab dieser Höhe klingt beides aus; 0 = überall gleich |
-| `nebel` | Drachenhauch-Nebel im **Fenstergrund**, Stärke in % (0 = keiner, Vorgabe); Farbe aus dem Thema (`nebel`), für Flächen die Stildatei-Eigenschaft `nebel` |
 
 Einzeln setzbar über `GUI_METRIC_SET`. Alle **bestehenden** Themen stehen
 weiterhin auf 0 — schon geschriebene Programme sehen unverändert aus.

@@ -62,7 +62,7 @@ Each module is activated with `IMPORT "<name>"` and provides its own commands.
 | `tiled` | [Tiled](https://www.mapeditor.org/) map loader (JSON). Tile layers, object layers, tile + object properties | [module-tiled.md](module-tiled.md) |
 | `tile_collide` | Box-vs-tilemap collision: TILE_SWEEP_X/Y with the separate-axis pattern. Classic platformer | [module-tile-collide.md](module-tile-collide.md) |
 | `controller` | Character controller with coyote time, jump buffer, variable jump height. Classic "feel-good" platformer mechanics | [module-controller.md](module-controller.md) |
-| `gui` | Retained-mode user interfaces: windows and widgets as persistent objects, 22 widget kinds including a table | [module-gui.md](module-gui.md) |
+| `gui` | Retained-mode user interfaces: windows and widgets as persistent objects, 34 widget kinds including a table | [module-gui.md](module-gui.md) |
 | `chart` | Charts: pie/donut, bar, line/area, gauge, bar gauge, LED — with mouse and tooltip | [module-chart.md](module-chart.md) |
 | `g3d` | 3D graphics: shapes, loaded and procedural models, skeletal animation, light and shadows, clicking in 3D space | [module-g3d.md](module-g3d.md) |
 | `m3d` | 3D math: VEC3/VEC4/QUAT/MAT4 for hierarchical transforms, custom cameras, instancing | [module-m3d.md](module-m3d.md) |
@@ -146,6 +146,8 @@ Working notes, not user documentation — they explain why something is the way 
 - **[Release 2026.49](../releases/release-2026.49.en.md)** — what is new in this version
 - **[Release 2026.48](../releases/release-2026.48.en.md)** — what is new in this version
 - **[Release 2026.47](../releases/release-2026.47.en.md)** — what is new in this version
+- **[Release 2026.46](../releases/release-2026.46.en.md)** — what is new in this version
+- **[Release 2026.45](../releases/release-2026.45.md)** (German) — what is new in this version
 - **[Release 2026.44](../releases/release-2026.44.md)** (German) — what is new in this version
 - **[Release 2026.43](../releases/release-2026.43.md)** (German) — what is new in this version
 - **[Release 2026.42](../releases/release-2026.42.md)** (German) — what is new in this version

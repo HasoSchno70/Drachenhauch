@@ -486,7 +486,7 @@ Native, blocking standard dialogs (no IMPORT needed — like the file dialogs):
 | `GUI_GET_FONT_SIZE(wdg)` | INTEGER | its own font size, 0 = the theme's |
 | `GUI_SET_FONT_STYLE(wdg, stil$)` | — | font style for this widget: `fett` (bold), `kursiv` (italic), `unterstrichen` (underlined), `durchgestrichen` (strikethrough), joined with `+`; `"normal"` removes it. Real font faces where they exist as files, otherwise emulated |
 | `GUI_GET_FONT_STYLE$(wdg)` | STRING | the widget's style, e.g. `"fett+unterstrichen"` |
-| `GUI_STYLE_SET(name$, prop$, wert)` | — | define a named style (`bg`, `fg`, `border`, `accent`, `font`, `font_size`) |
+| `GUI_STYLE_SET(name$, prop$, wert)` | — | define a named style (`bg`, `fg`, `border`, `accent`, `hover`, `pressed`, `font`, `font_size`) |
 | `GUI_STYLE_GET(name$, prop$)` | INTEGER | a value of the style, -1 if it does not set it (unknown style = error) |
 | `GUI_APPLY_STYLE(widget, name$)` | — | apply a named style to a widget -- saves repeating it widget by widget |
 | `GUI_STYLESHEET(text$)` | — | set a stylesheet: rules by kind, class, name and state as in CSS ("" = none) -- see [Stylesheet](#7-stylesheet-rules-by-kind-class-name-and-state) |
@@ -2302,7 +2302,7 @@ Keys: `title_h` (title bar height), `slider_h`, `check_size`,
 `corner_radius` (rounded corners for window/title bar/buttons/TextInput/Dropdown/
 Progress/Panel + tick-mark checkbox; 0 = square/flat), `shadow` (soft
 window shadow in pixels; 0 = off), `uebergang` (duration of the transitions in
-milliseconds, default 120; 0 = jump, see [Transitions](#transitions)). **Note:** sizes that feed into the widget dimensions
+milliseconds, default 120; 0 = jump, see [Transitions](#transitions)), `nebel` (dragon's breath mist in the window background, strength in %, 0 = none; colour from the theme `nebel`, for surfaces the stylesheet property `nebel`); plus the four metrics of the sculpted look (`gradient`, `gloss`, `bevel`, `verlauf_hoehe`, see [A sculpted look](#a-sculpted-look-the-glass-themes)). **Note:** sizes that feed into the widget dimensions
 (`check_size`, `slider_h`) only affect **newly created** widgets —
 best set them before building the UI. `title_h`/`pad`/`caret_period`/`corner_radius`/
 `shadow` take effect immediately.
@@ -2389,7 +2389,7 @@ Define a style once and apply it to many widgets — saves the
 repeated `GUI_SET_COLOR`/`GUI_SET_FONT`:
 
 ```basic
-GUI_STYLE_SET("primary", "bg", RGB(32, 80, 192))   ' props: bg/fg/border/accent
+GUI_STYLE_SET("primary", "bg", RGB(32, 80, 192))   ' props: bg/fg/border/accent/hover/pressed
 GUI_STYLE_SET("primary", "fg", &HFFFFFF)            '        + font / font_size
 GUI_STYLE_SET("primary", "font_size", 18)
 
@@ -3001,7 +3001,7 @@ table with a million rows, the stylesheet to edit, tools
 check. At the top, theme, right to left, motion, sounds,
 frugal and contrast switch the whole interface.
 
-**All 22 widget kinds in one application:**
+**22 widget kinds in one application:**
 [examples/156_gui_alle_widgets.dh](../../examples/156_gui_alle_widgets.dh) —
 fullscreen, borderless window (the form *is* the screen), menu bar,
 toolbar, context menu and three tabs. Not a showcase: every widget
@@ -3051,7 +3051,6 @@ complete look instead of several things you have to combine by hand:
 | `gloss` | strength of the gloss edge, 0…100 |
 | `bevel` | 1 = light line at the top, dark one at the bottom |
 | `verlauf_hoehe` | from this height on, both fade out; 0 = the same everywhere |
-| `nebel` | dragon's breath mist in the **window background**, strength in % (0 = none, default); colour from the theme (`nebel`), for surfaces the stylesheet property `nebel` |
 
 Settable individually via `GUI_METRIC_SET`. All **existing** themes are still
 at 0 — programs that have already been written look unchanged.

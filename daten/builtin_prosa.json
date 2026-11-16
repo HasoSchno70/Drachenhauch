@@ -959,7 +959,7 @@
   "GUI_STYLESHEET_ERROR$": "STRING — der Fehler beim letzten Neuladen einer beobachteten Stildatei, \"\" = in Ordnung",
   "GUI_STYLESHEET_LOAD": "dasselbe aus einer Datei (üblich .dhstil); mit beobachten = TRUE lädt die gui sie neu, sobald sie gespeichert wird (Abschnitt 9)",
   "GUI_STYLE_GET": "INTEGER — ein Wert des Stils, -1 wenn er ihn nicht setzt (unbekannter Stil = Fehler)",
-  "GUI_STYLE_SET": "benannten Stil festlegen (bg, fg, border, accent, font, font_size)",
+  "GUI_STYLE_SET": "benannten Stil festlegen (bg, fg, border, accent, hover, pressed, font, font_size)",
   "GUI_SUBMENU": "Menü-Handle — Untermenü — öffnet beim Überfahren rechts daneben, beliebig tief",
   "GUI_SYSTEM_ACCENT": "INTEGER — die Akzentfarbe des Betriebssystems, -1 wenn unbekannt",
   "GUI_SYSTEM_DARK": "BOOLEAN — steht das Betriebssystem auf dunkel? (Windows, macOS, GNOME; unbekannt = FALSE)",

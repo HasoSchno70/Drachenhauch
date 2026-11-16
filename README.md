@@ -58,7 +58,7 @@ WEND
 </table>
 
 All nine ship as examples — click an image to jump to its source.
-The IDE shows the same gallery with **21 demos** on its start page, each one
+The IDE shows the same gallery with **24 demos** on its start page, each one
 launchable with a double click.
 
 ### Applications with a user interface
@@ -120,7 +120,7 @@ Details in the [manual](docs/en/README.md); how it got there is in the
 
 ## Download
 
-**[Download Drachenhauch](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — for Windows a single installer (about 60 MB), for macOS a `.dmg`, for Linux a `.tar.gz` (x86_64, and aarch64 for the [Raspberry Pi](docs/en/raspberry-pi.md)); currently version 2026.46.
+**[Download Drachenhauch](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — for Windows a single installer (about 60 MB), for macOS a `.dmg`, for Linux a `.tar.gz` (x86_64, and aarch64 for the [Raspberry Pi](docs/en/raspberry-pi.md)); currently version 2026.50.
 
 You do **not** need Python installed. It ships the complete development environment, the `dhrt` runtime, all examples with their assets, the textbook in both languages as `.docx` and `.epub`, and the ESP32 skeleton. The Windows installer is unsigned, so SmartScreen will speak up on first launch; the macOS app is not notarised yet.
 
@@ -223,7 +223,7 @@ Full documentation lives in [docs/en/](docs/en/README.md) — the English transl
 | [`input`](docs/en/module-input.md) | named actions instead of key codes, edge detection, gamepad |
 | [`timer`](docs/en/module-timer.md) | scheduled actions (`TIMER_AFTER`/`EVERY`) + a `COOLDOWN` rate limiter |
 | [`video`](docs/en/module-video.md) | play videos (MP4/H.264), every frame an `IMAGE` |
-| [`tween`](docs/en/module-tween.md) | interpolate values smoothly, 13 easings |
+| [`tween`](docs/en/module-tween.md) | interpolate values smoothly, 19 easings |
 | [`curves`](docs/en/module-curves.md) | Bézier, Catmull-Rom, Hermite, smoothstep — pure functions |
 | [`astar`](docs/en/module-astar.md) | A* pathfinding on a tile grid |
 | [`ecs`](docs/en/module-ecs.md) | entity-component-system with bulk operations for hot loops |
@@ -252,7 +252,7 @@ Full documentation lives in [docs/en/](docs/en/README.md) — the English transl
 
 | Module | What for |
 |---|---|
-| [`gui`](docs/en/module-gui.md) | 22 retained-mode widget kinds — including a **professional table** (sort, filter, frozen and reorderable columns, edit cells in place). Glass themes, toggles, knobs, 9-slice skins. [All widgets](examples/156_gui_alle_widgets.dh) · [table](examples/157_gui_tabelle.dh) · [against SQLite](examples/158_gui_tabelle_sqlite.dh) |
+| [`gui`](docs/en/module-gui.md) | 34 retained-mode widget kinds — including a **professional table** (sort, filter, frozen and reorderable columns, edit cells in place). Glass themes, toggles, knobs, 9-slice skins. [All widgets](examples/156_gui_alle_widgets.dh) · [table](examples/157_gui_tabelle.dh) · [against SQLite](examples/158_gui_tabelle_sqlite.dh) |
 | [`ui`](docs/en/module-ui.md) | the same in immediate mode: nothing to set up, redrawn every frame |
 | [`chart`](docs/en/module-chart.md) | six chart kinds (pie, bar, line, gauge, bar gauge, LED chain), four themes, mouse interaction — [demo](examples/154_chart.dh) |
 
@@ -353,7 +353,7 @@ Built with `rust/build_wasm.py`; the harness lives in `web/`.
 | `77_tiled_platformer.dh` | **mini platformer**: Tiled level + atlas + tile collision + Z-layers + input mapping |
 | `98_coroutines.dh` | **coroutines/`YIELD`**: generators, `FOR EACH` drain, send/return dialog, `CORO_RESULT`, method coroutine |
 | `154_chart.dh` | **charts**: all six kinds, themes, mouse interaction |
-| `156_gui_alle_widgets.dh` | **all 22 GUI widgets** in one fullscreen application, each with a real job |
+| `156_gui_alle_widgets.dh` | **22 GUI widgets** in one fullscreen application, each with a real job |
 | `222_gui_gesamtschau.dh` | **the gui in a tour**: ten stations over a moving background -- glass, animations from the stylesheet, colour emoji, a table with a million rows, live stylesheet, right to left, frugal idle and the built-in accessibility check |
 | [Glutfaden](https://github.com/HasoSchno70/Glutfaden) | **Glutfaden** — the cross-stitch editor PySticky in Drachenhauch, with GTK 3 through foreign libraries: part and back stitches, layers, image import, PDF/HTML/OXS export, printing (its own repository since 2026-11) |
 | [Funkenflug](https://github.com/HasoSchno70/Funkenflug) | **Funkenflug** — a schematic editor with GTK 3: hierarchy and buses, ERC, netlist/SPICE, simulation with ngspice, perfboard layout with Gerber and 3D preview, KiCad import (its own repository) |
@@ -385,7 +385,7 @@ Pipeline: **source → preprocessor → lexer → parser → compiler → VM**; 
 | 3D | camera + primitives ([demo](examples/82_3d_intro.dh)), OBJ/GLTF models, procedural meshes up to heightmap terrain, **skeletal animation** for rigged GLTF/IQM ([demo](examples/108_skeletal_anim.dh)), billboards, ray hits and mouse picking — on real surfaces, not just bounding volumes ([demo](examples/151_picking_flaechen.dh)) |
 | Lighting | physically based (Cook-Torrance), up to 4 lights, `MODEL_PBR` for metalness and roughness ([demo](examples/95_pbr.dh)); emissive glow ([demo](examples/110_emissive_glow.dh)), PCF shadows ([demo](examples/93_shadows.dh)), normal maps ([demo](examples/94_normalmap.dh)), depth fog ([demo](examples/92_fog.dh)) and environment light — analytical ([demo](examples/96_ibl.dh)) as well as real HDR cubemap IBL ([demo](examples/99_ibl_hdr.dh)) |
 | Sound | **Kira** on its own audio thread (replaced raylib audio on 2026-06-13): sounds, music, `.mod`/`.xm` through a pure-Rust player |
-| Interface | `gui` with 22 retained-mode widget kinds (themes, dragging, z-order, focus, FUNCREF callbacks) and `ui` in immediate mode |
+| Interface | `gui` with 34 retained-mode widget kinds (themes, dragging, z-order, focus, FUNCREF callbacks) and `ui` in immediate mode |
 | Frame and loop | game loop (`DELTA`/`FPS`/`SETFPS`), GPU shaders and post-processing (`SHADER_LOAD`/`POSTFX`), TTF fonts ([demo](examples/87_ttf_fonts.dh)), gamepad |
 | Recording input | `AUTOMATION_RECORD`/`PLAY` for attract mode, replayable bug reports and automated playtests ([docs](docs/en/automation.md), [demo](examples/153_automation.dh)) |
 | Modules | **all of them** — including the formerly Python-only ones: `regex`, `tiled`, `tile_collide`, `controller`, extended `audio`; plus feature-gated `db` (rusqlite), `net`, `mqtt`, `html` (ureq) and the hardware side `serial`, `firmata`, `usb`, `wifi`, `bt` |

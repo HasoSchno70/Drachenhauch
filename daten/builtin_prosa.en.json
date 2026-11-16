@@ -958,7 +958,7 @@
   "GUI_STYLESHEET_ERROR$": "STRING — the error from the last reload of a watched stylesheet, \"\" = fine",
   "GUI_STYLESHEET_LOAD": "the same from a file (usually .dhstil); with beobachten = TRUE the gui reloads it as soon as it is saved (section 9)",
   "GUI_STYLE_GET": "INTEGER — a value of the style, -1 if it does not set it (unknown style = error)",
-  "GUI_STYLE_SET": "define a named style (bg, fg, border, accent, font, font_size)",
+  "GUI_STYLE_SET": "define a named style (bg, fg, border, accent, hover, pressed, font, font_size)",
   "GUI_SUBMENU": "menu handle — submenu — opens to the right on hover, any depth",
   "GUI_SYSTEM_ACCENT": "INTEGER — the accent colour of the operating system, -1 if unknown",
   "GUI_SYSTEM_DARK": "BOOLEAN — is the operating system set to dark? (Windows, macOS, GNOME; unknown = FALSE)",
