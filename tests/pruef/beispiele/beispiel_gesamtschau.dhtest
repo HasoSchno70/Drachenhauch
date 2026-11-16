@@ -144,3 +144,65 @@ DHRT_FRAMES=430
 folge kreis@1 raute@1 konfetti@6 sterne@6 streif@6 pruef6@6 anwenden@7 toast@8 dialog@8 palette@8 info@8 heilen los@1 karte@6
 station 6 | Getroffen: die Raute | Dialog: Ja 😊 | Angewendet.
 befunde nach dem heilen: Keine Befunde ✅
+
+=== inspektor waehlt ohne zu druecken und das echte fenster kommt
+' Der Inspektor: ein Klick waehlt das Widget, erreicht es aber nicht, ESC
+' schliesst ihn. "Echtes Fenster" zeigt das zweite gui-Fenster als eigenes
+' Fenster des Systems (wo es keins gibt, sagt die Schau es).
+prBild = prBild + 1
+IF prBild = 3 THEN prAufnahme()
+IF GUI_CLICKED(bToast) THEN prLog = prLog + " toast"
+IF GUI_CLICKED(bIns) THEN prLog = prLog + " inspektor"
+IF GUI_CLICKED(bFenster) THEN prLog = prLog + " fenster"
+IF prBild = 40 THEN PRINT "inspektor offen "; GUI_INSPECTOR()
+IF prBild = 60 THEN PRINT "gewaehlt toast "; GUI_INSPECTOR_SELECTED() = bToast
+IF prBild = 80 THEN PRINT "nach esc offen "; GUI_INSPECTOR()
+IF prBild = 130 THEN
+    PRINT "folge"; prLog
+    PRINT "zweites fenster "; GUI_WINDOW_SHOWN(zweit); " echt oder gesagt "; GUI_WINDOW_IS_NATIVE(zweit) OR INSTR(GUI_TEXT(antwort), "keine echten") >= 0
+    GUI_WINDOW_NATIVE(zweit, FALSE)
+    EXIT(0)
+END IF
+--- programm ../../../examples/222_gui_gesamtschau.dh nach     FLIP()
+--- einschub nach DIM wahlStand AS STRING = ""
+DIM prBild AS INTEGER = 0
+DIM prLog AS STRING = ""
+DIM prEv AS STRING = ""
+DIM prN AS INTEGER = 0
+' Mitte eines Widgets auf dem Schirm: Fensterlage, Oberkante des Inhalts
+' (im Hauptfenster die Menueleiste), Lage im Fenster.
+FUNCTION prMitte(win AS GUI_WINDOW, w AS GUI_WIDGET, oben AS INTEGER) AS STRING
+    RETURN STR$(GUI_WINDOW_GET_X(win) + GUI_GET_X(w) + GUI_GET_W(w) \ 2) + " " + STR$(GUI_WINDOW_GET_Y(win) + oben + GUI_GET_Y(w) + GUI_GET_H(w) \ 2)
+END FUNCTION
+FUNCTION prNav(i AS INTEGER) AS STRING
+    DIM r AS TUPLE : r = GUI_LISTBOX_ITEM_RECT(nav, i)
+    RETURN STR$(r[0] + r[2] \ 2) + " " + STR$(r[1] + r[3] \ 2)
+END FUNCTION
+SUB prKlick(f AS INTEGER, lage AS STRING)
+    prEv = prEv + "e " + STR$(f) + " 7 " + lage + " 0 0" + CHR$(10)
+    prEv = prEv + "e " + STR$(f + 2) + " 6 0 0 0 0" + CHR$(10)
+    prEv = prEv + "e " + STR$(f + 3) + " 5 0 0 0 0" + CHR$(10)
+    prN = prN + 3
+END SUB
+SUB prTaste(f AS INTEGER, code AS INTEGER)
+    prEv = prEv + "e " + STR$(f) + " 2 " + STR$(code) + " 0 0 0" + CHR$(10)
+    prEv = prEv + "e " + STR$(f + 1) + " 1 " + STR$(code) + " 0 0 0" + CHR$(10)
+    prN = prN + 2
+END SUB
+SUB prAufnahme()
+    prKlick(0, prNav(8))
+    prKlick(15, prMitte(s8, bIns, 0))
+    prKlick(45, prMitte(s8, bToast, 0))       ' waehlt, drueckt nicht
+    prTaste(65, 256)                          ' ESC schliesst den Inspektor
+    prKlick(90, prMitte(s8, bFenster, 0))
+    WRITEALL("prev.txt", "c " + STR$(prN) + CHR$(10) + prEv + CHR$(10))
+    AUTOMATION_PLAY("prev.txt")
+END SUB
+--- umgebung
+DHRT_FRAMES=140
+--- erwartet
+inspektor offen TRUE
+gewaehlt toast TRUE
+nach esc offen FALSE
+folge inspektor fenster
+zweites fenster TRUE echt oder gesagt TRUE
