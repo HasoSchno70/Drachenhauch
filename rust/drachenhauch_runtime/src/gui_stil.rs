@@ -1083,6 +1083,17 @@ impl Gui {
         self.win_mut(h, "GUI_WINDOW_RTL")?.rtl = an;
         Ok(())
     }
+    /// GUI_WINDOW_BACKGROUND(win, an): das Fenster bleibt hinter allen
+    /// anderen, auch wenn man hineinklickt oder GUI_WINDOW_FRONT ruft.
+    pub fn window_background(&mut self, h: i64, an: bool) -> Result<(), String> {
+        self.win_mut(h, "GUI_WINDOW_BACKGROUND")?.hinten = an;
+        self.hinten_ordnen();
+        Ok(())
+    }
+    pub fn window_is_background(&self, h: i64) -> Result<bool, String> {
+        self.windows.get(h as usize).filter(|_| h >= 0).map(|w| w.hinten)
+            .ok_or_else(|| "GUI_WINDOW_IS_BACKGROUND: ungueltiges GUI_WINDOW-Handle".to_string())
+    }
     pub fn window_is_rtl(&self, h: i64) -> Result<bool, String> {
         self.windows.get(h as usize).map(|w| w.rtl).ok_or_else(|| "GUI_WINDOW_IS_RTL: ungueltiges GUI_WINDOW-Handle".to_string())
     }

@@ -75,6 +75,8 @@ IMPORT "gui"
 | `GUI_POPUP_WINDOWS()` | INTEGER | how many popups are standing as a window of their own beyond the edge of their native window right now (0 = all inside their window) |
 | `GUI_WINDOW_VISIBLE(win, an)` | — | set visibility |
 | `GUI_WINDOW_FRONT(win)` | — | bring the window to the front without giving it focus -- for a suggestion list or a tooltip that should lie over the text while typing. Shown via `GUI_WINDOW_VISIBLE`, a window otherwise lies behind the one clicked last |
+| `GUI_WINDOW_BACKGROUND(win, an)` | — | background window: it stays behind all other windows, even when clicked into or with `GUI_WINDOW_FRONT` (it still gets the focus). For a borderless main window with sub-windows on top -- without it the first click into the main window brought it to the front, and it covered the sub-windows and their clicks |
+| `GUI_WINDOW_IS_BACKGROUND(win)` | BOOLEAN | is it a background window? |
 | `GUI_WINDOW_SHOWN(win)` | BOOLEAN | is the window currently visible? The counterpart to the setter -- without the getter a program would have to remember what it set itself, and would be wrong as soon as the user closes the window with its cross |
 | `GUI_WINDOW_RESIZABLE(win, an)` | — | resizable by the lower-right grip (default: off) |
 | `GUI_WINDOW_SCROLLABLE(win, an)` | — | content scrolls when it is taller than the window (mouse wheel + scroll bar). Content height determined automatically from the widgets. Default: off |

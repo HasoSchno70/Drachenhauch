@@ -1649,6 +1649,12 @@ impl<'p> Vm<'p> {
             "gui_window_rtl" => { let n = "GUI_WINDOW_RTL";
                 if a.len() != 2 { return Err(format!("{}: erwartet (win, an)", n)); }
                 self.gui.window_rtl(gi(a,0,n)?, gbool(a,1,n)?)?; Value::Nil }
+            "gui_window_background" => { let n = "GUI_WINDOW_BACKGROUND";
+                if a.len() != 2 { return Err(format!("{}: erwartet (win, an)", n)); }
+                self.gui.window_background(gi(a,0,n)?, gbool(a,1,n)?)?; Value::Nil }
+            "gui_window_is_background" => { let n = "GUI_WINDOW_IS_BACKGROUND";
+                if a.len() != 1 { return Err(format!("{}: erwartet (win)", n)); }
+                Value::Bool(self.gui.window_is_background(gi(a,0,n)?)?) }
             "gui_window_is_rtl" => { let n = "GUI_WINDOW_IS_RTL";
                 if a.len() != 1 { return Err(format!("{}: erwartet (win)", n)); }
                 Value::Bool(self.gui.window_is_rtl(gi(a,0,n)?)?) }

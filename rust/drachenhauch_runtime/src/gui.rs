@@ -3485,6 +3485,10 @@ pub struct Window {
     /// Rechts nach links (GUI_WINDOW_RTL): die Lage der Widgets gespiegelt
     /// (`abs_rect`), die Menueleiste von rechts.
     rtl: bool,
+    /// Hintergrundfenster (GUI_WINDOW_BACKGROUND): bleibt hinter allen
+    /// anderen, auch wenn man hineinklickt -- ein randloses Hauptfenster,
+    /// ueber dem Unterfenster liegen, verdeckte sie sonst nach dem ersten Klick.
+    hinten: bool,
     /// Vergroesserung beim Zeichnen (GUI_WINDOW_ZOOM), nur im Entwurfsmodus:
     /// das Fenster bekommt dort keine Eingabe, also muss nur GUI_HIT_TEST
     /// (und wo ein Fenster liegt) die Mauslage zurueckrechnen.
@@ -4248,7 +4252,7 @@ impl Gui {
         let idx = self.windows.len();
         self.windows.push(Window {
             title, name: String::new(), x, y, w, h, widgets: Vec::new(),
-            movable: true, closable: false, visible: true, entwurf: false, rtl: false, zoom: 1.0, zuschnitt: None,
+            movable: true, closable: false, visible: true, entwurf: false, rtl: false, hinten: false, zoom: 1.0, zuschnitt: None,
             resizable: false, pruefung_live: false, form_stand: Vec::new(), form_db: Vec::new(), chrome: true, min_w: 0, min_h: 0, max_w: 0, max_h: 0,
             base_w: w, base_h: h,
             close_clicked: false, alive: true, dlg: false, answer: 0,

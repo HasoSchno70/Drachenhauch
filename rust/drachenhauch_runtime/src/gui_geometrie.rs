@@ -249,11 +249,20 @@ impl Gui {
         }
         None
     }
+    /// Die Hintergrundfenster ganz nach hinten, in ihrer Reihenfolge.
+    pub(super) fn hinten_ordnen(&mut self) {
+        let (mut hinten, vorn): (Vec<usize>, Vec<usize>) = self.z_order.iter()
+            .partition(|&&i| self.windows.get(i).map(|w| w.hinten).unwrap_or(false));
+        hinten.extend(vorn);
+        self.z_order = hinten;
+    }
     pub(super) fn bring_to_front(&mut self, wi: usize) {
         // Ein angedocktes Fenster bringt sein Gastfenster nach vorn -- es
         // selbst steht immer direkt darueber (dock_ordnen).
         let h = self.windows[wi].dock_host;
         let wi = if h >= 0 && self.windows.get(h as usize).map(|w| w.alive).unwrap_or(false) { h as usize } else { wi };
+        // Ein Hintergrundfenster bleibt hinten (Fokus bekommt es trotzdem).
+        if self.windows[wi].hinten { return; }
         if self.z_order.last() == Some(&wi) && !self.windows.iter().any(|w| w.dock_host == wi as i32) { return; }
         self.z_order.retain(|&i| i != wi);
         self.z_order.push(wi);

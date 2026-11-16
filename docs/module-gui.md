@@ -75,6 +75,8 @@ IMPORT "gui"
 | `GUI_POPUP_WINDOWS()` | INTEGER | wie viele Popups gerade als eigenes Fenster über den Rand ihres nativen Fensters stehen (0 = alle in ihrem Fenster) |
 | `GUI_WINDOW_VISIBLE(win, an)` | — | Sichtbarkeit setzen |
 | `GUI_WINDOW_FRONT(win)` | — | Fenster nach vorn holen, ohne ihm den Fokus zu geben -- fuer eine Vorschlagsliste oder einen Tooltip, der beim Tippen ueber dem Text liegen soll. Per `GUI_WINDOW_VISIBLE` eingeblendet liegt ein Fenster sonst hinter dem zuletzt angeklickten |
+| `GUI_WINDOW_BACKGROUND(win, an)` | — | Hintergrundfenster: es bleibt hinter allen anderen Fenstern, auch wenn man hineinklickt oder `GUI_WINDOW_FRONT` ruft (den Fokus bekommt es trotzdem). Für ein randloses Hauptfenster, über dem Unterfenster liegen -- ohne das holte der erste Klick ins Hauptfenster es nach vorn, und es verdeckte die Unterfenster samt ihren Klicks |
+| `GUI_WINDOW_IS_BACKGROUND(win)` | BOOLEAN | ist es ein Hintergrundfenster? |
 | `GUI_WINDOW_SHOWN(win)` | BOOLEAN | ist das Fenster gerade sichtbar? Das Gegenstueck zum Setzer -- ohne den Getter muesste ein Programm sich merken, was es selbst gesetzt hat, und laege daneben, sobald der Nutzer das Fenster ueber sein Kreuz schliesst |
 | `GUI_WINDOW_RESIZABLE(win, an)` | — | am unteren-rechten Griff größenveränderbar (Default: aus) |
 | `GUI_WINDOW_SCROLLABLE(win, an)` | — | Inhalt scrollt, wenn er höher als das Fenster ist (Mausrad + Scrollbalken). Inhaltshöhe automatisch aus den Widgets. Default: aus |
