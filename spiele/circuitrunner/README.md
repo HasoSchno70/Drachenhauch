@@ -100,15 +100,16 @@ so können keine unlösbaren Level entstehen:
 dhrt run circuitrunner\make_demo_levels.dh     # -> levels/circuit_runner.json
 ```
 
-## Grafik (64×64, supersampled)
+## Grafik (128×128, supersampled)
 
 Alle Kacheln werden **programmatisch** erzeugt (`make_tiles.dh`) in ein
-Master-Sheet `assets/tiles.png` (16×14 Zellen à 64 px; intern 4× supersampled
-auf 256 × 256 gezeichnet und verkleinert — detailliert/farbig statt flach
-8-bit), in dem die **Zellen-Position dem Tile-Code entspricht**. Die Engine
-zeichnet jede Kachel/Figur per `DRAWIMAGEPART(sheet, code)`. Dazu schreibt es
-`assets/tiles.json` (Code → Name) und `assets/_contact.png` (Kontaktbogen
-zum Nachsehen).
+Master-Sheet `assets/tiles.png` (16×14 Zellen à 128 px; gedacht in
+64er-Einheiten, gezeichnet auf 512 × 512 und in zwei Halbierungen verkleinert
+— detailliert/farbig statt flach 8-bit), in dem die **Zellen-Position dem
+Tile-Code entspricht**. Die Engine liest die Kachelgröße aus `tiles.json` und
+zeichnet jede Kachel/Figur per `DRAWIMAGEPARTEX(sheet, code)`. Dazu schreibt
+es `assets/tiles.json` (Code → Name, Kachelgröße) und `assets/_contact.png`
+(Kontaktbogen zum Nachsehen).
 
 ```
 dhrt run spiele/circuitrunner/make_tiles.dh
@@ -123,10 +124,21 @@ nicht mehr — das war das Format des Qt-Sprite-Editors. Die
 HUD-Icons zeichnet die Engine direkt aus dem Sheet (`DRAWIMAGEPARTEX`), skaliert
 in nativer Auflösung — keine separaten Icon-Dateien.
 
-Gerendert wird zweischichtig: das Spielfeld kommt pixelgenau aus einem
-Render-Target (ganzzahlig hochskaliert), HUD/Menü-Text und Icons dagegen in
-**nativer Bildschirmauflösung** (TTF-Font `assets/font.ttf`, Skalierung via
-`TEXTROT`) — dadurch ist die Schrift gestochen scharf statt klobig.
+Gerendert wird zweischichtig: das Spielfeld kommt aus einem Render-Target in
+voller Bildschirmgröße (92 % der Höhe, **stufenlos** — das Blatt hat
+Mipmaps und wird weich gefiltert; bis 2026-11 wurde es nur ganzzahlig
+vergrößert und blieb auf 1080p bei 576 Punkten). HUD/Menü-Text und Icons
+kommen in **nativer Bildschirmauflösung** (TTF-Font `assets/font.ttf`,
+Skalierung via `TEXTROT`).
+
+Dazu, nur fürs Auge (die Spiellogik kennt es nicht): Figuren gleiten von
+Zelle zu Zelle und werfen weiche Schatten, Chips, Schlüssel, Stiefel, Ausgang
+und Feuer leuchten pulsierend, der Runner hat ein eigenes Licht, Aufsammeln,
+Explosionen und Wasser sprühen Funken, beim Tod wackelt das Brett und färbt
+sich kurz rot. Menü, Intro, Sieg und Tod sind Glas-Karten mit Neon-Rand, und
+unten läuft eine Parade der Bewohner vorbei. Die Funken würfeln mit einem
+eigenen Zufall — `RANDINT` bleibt der Spiellogik vorbehalten, damit
+aufgezeichnete Lösungen (F5/F6) dieselbe Würfelfolge sehen.
 
 ## Levelformat (JSON-Set)
 

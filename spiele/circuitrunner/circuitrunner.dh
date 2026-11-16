@@ -33,11 +33,7 @@ CONST FULLSCREEN = TRUE
 CONST GW = 32
 CONST GH = 32
 CONST NCELL = 1024
-CONST TILE = 64
 CONST VIEW = 9                 ' sichtbare Kacheln je Achse
-CONST BLOG = 576               ' Board-Render-Target = VIEW*TILE
-CONST BX = 0                   ' Board-Ursprung im Render-Target
-CONST BY = 0
 
 CONST TICK_MS = 120            ' eine Spielwelt-Stufe (Bewegung)
 
@@ -209,8 +205,9 @@ DIM demo_frames AS INTEGER     ' Bilder seit Demo-Start (ersetzt die Wanduhr)
 ' Bildschirm-Layout (native Aufloesung; Text/Icons scharf, Board pixelig)
 DIM SW AS INTEGER
 DIM SH AS INTEGER
-DIM bscale AS INTEGER          ' ganzzahlige Board-Vergroesserung
-DIM bsize AS INTEGER           ' BLOG * bscale
+DIM bsize AS INTEGER           ' Kantenlaenge des Spielfelds auf dem Schirm
+DIM ts AS FLOAT                ' eine Kachel auf dem Schirm (bsize / VIEW)
+DIM KP AS INTEGER              ' eine Kachel im Blatt assets/tiles.png (tiles.json "tile")
 DIM board_x AS INTEGER
 DIM board_y AS INTEGER
 DIM hud_x AS INTEGER
@@ -562,6 +559,76 @@ DIM mobs AS ARRAY OF Monster
 DIM kisten AS ARRAY OF Kiste
 
 ' ----------------------------------------------------------------------
+'  EFFEKTE -- nur fuers Auge, die Spiellogik kennt sie nicht
+' ----------------------------------------------------------------------
+' Ein Funke fliegt in Brett-Koordinaten (Zellen) und verglimmt.
+CLASS Funke
+    DIM x AS FLOAT
+    DIM y AS FLOAT
+    DIM vx AS FLOAT
+    DIM vy AS FLOAT
+    DIM alter AS FLOAT
+    DIM dauer AS FLOAT
+    DIM farbe AS INTEGER
+    DIM groesse AS FLOAT
+
+    ' dt in Sekunden; FALSE = verglueht
+    FUNCTION weiter(dt AS FLOAT) AS BOOLEAN
+        alter = alter + dt
+        x = x + vx * dt
+        y = y + vy * dt
+        vx = vx * (1.0 - 2.2 * dt)
+        vy = vy * (1.0 - 2.2 * dt) + 1.6 * dt
+        RETURN alter < dauer
+    END FUNCTION
+END CLASS
+
+DIM funkenflug AS ARRAY OF Funke
+DIM schreck_t AS FLOAT            ' Sekunden seit dem letzten Tod (Wackeln, Rot)
+DIM sieg_t AS FLOAT               ' Sekunden seit dem Erreichen des Ausgangs
+DIM fx_zeit AS FLOAT              ' laufende Zeit fuer Pulsieren und Schweben
+' Eigener Zufall fuer Effekte: RANDINT gehoert der Spiellogik (Aufnahmen
+' einer Loesung brauchen dieselbe Wuerfelfolge).
+DIM fx_saat AS INTEGER : fx_saat = 12345
+
+FUNCTION fx_rnd() AS FLOAT
+    fx_saat = (fx_saat * 1103515245 + 12345) MOD 2147483648
+    RETURN fx_saat / 2147483648.0
+END FUNCTION
+
+' n Funken aus der Mitte der Zelle (cx, cy)
+SUB funken(cx AS INTEGER, cy AS INTEGER, farbe AS INTEGER, n AS INTEGER)
+    DIM i AS INTEGER
+    FOR i = 1 TO n
+        IF LEN(funkenflug) >= 400 THEN RETURN
+        DIM f AS Funke : f = NEW Funke()
+        DIM w AS FLOAT : w = fx_rnd() * 6.2832
+        DIM v AS FLOAT : v = 1.2 + fx_rnd() * 3.2
+        f.x = cx + 0.5
+        f.y = cy + 0.5
+        f.vx = COS(w) * v
+        f.vy = SIN(w) * v - 1.0
+        f.dauer = 0.35 + fx_rnd() * 0.45
+        f.farbe = farbe
+        f.groesse = 0.03 + fx_rnd() * 0.05
+        ARRAY_PUSH(funkenflug, f)
+    NEXT
+END SUB
+
+SUB funken_weiter(dt AS FLOAT)
+    fx_zeit = fx_zeit + dt
+    schreck_t = schreck_t + dt
+    sieg_t = sieg_t + dt
+    IF LEN(funkenflug) = 0 THEN RETURN
+    DIM bleiben AS ARRAY OF Funke : bleiben = []
+    DIM f AS Funke
+    FOR EACH f IN funkenflug
+        IF f.weiter(dt) THEN ARRAY_PUSH(bleiben, f)
+    NEXT
+    funkenflug = bleiben
+END SUB
+
+' ----------------------------------------------------------------------
 '  HELFER
 ' ----------------------------------------------------------------------
 FUNCTION cidx(x AS INTEGER, y AS INTEGER) AS INTEGER
@@ -852,6 +919,7 @@ SUB load_level(idx AS INTEGER)
 
     mobs = []
     kisten = []
+    funkenflug = []
     chips_left = 0
     px = 1
     py = 1
@@ -1187,6 +1255,8 @@ END SUB
 SUB player_die(msg AS STRING)
     state = "dead"
     death_msg = msg
+    schreck_t = 0.0
+    funken(px, py, RGB(255, 80, 70), 30)
     sfx_die()
     rumble(0.8, 0.35)         ' der Tod ist auch in den Haenden zu spueren
     demo_stop()               ' eine gescheiterte Runde ist keine Loesung
@@ -1250,6 +1320,7 @@ SUB push_block(bi AS INTEGER, tx AS INTEGER, ty AS INTEGER)
         terr[cidx(tx, ty)] = T_DIRT
         k.lebt = FALSE
         sfx_block()
+        funken(tx, ty, RGB(120, 190, 255), 14)
         RETURN
     END IF
 
@@ -1257,6 +1328,7 @@ SUB push_block(bi AS INTEGER, tx AS INTEGER, ty AS INTEGER)
         terr[cidx(tx, ty)] = T_FLOOR
         k.lebt = FALSE
         sfx_die()
+        funken(tx, ty, RGB(255, 160, 60), 28)
         RETURN
     END IF
 
@@ -1319,10 +1391,12 @@ SUB advance_blocks()
             IF tt = T_WATER THEN
                 terr[cidx(tx, ty)] = T_DIRT
                 k.lebt = FALSE
+                funken(tx, ty, RGB(120, 190, 255), 14)
             ELSEIF tt = T_BOMB THEN
                 terr[cidx(tx, ty)] = T_FLOOR
                 k.lebt = FALSE
                 sfx_die()
+                funken(tx, ty, RGB(255, 160, 60), 28)
             ELSEIF tx = px AND ty = py THEN
                 k.x = tx
                 k.y = ty
@@ -1353,6 +1427,7 @@ SUB land_on()
         terr[cidx(px, py)] = T_FLOOR
         IF chips_left > 0 THEN chips_left = chips_left - 1
         sfx_chip()
+        funken(px, py, RGB(80, 255, 160), 16)
         RETURN
     END IF
 
@@ -1360,6 +1435,7 @@ SUB land_on()
         keys_blue = keys_blue + 1
         terr[cidx(px, py)] = T_FLOOR
         sfx_chip()
+        funken(px, py, RGB(80, 140, 255), 12)
         RETURN
     END IF
 
@@ -1367,6 +1443,7 @@ SUB land_on()
         keys_red = keys_red + 1
         terr[cidx(px, py)] = T_FLOOR
         sfx_chip()
+        funken(px, py, RGB(255, 90, 90), 12)
         RETURN
     END IF
 
@@ -1374,6 +1451,7 @@ SUB land_on()
         keys_green = keys_green + 1
         terr[cidx(px, py)] = T_FLOOR
         sfx_chip()
+        funken(px, py, RGB(90, 235, 120), 12)
         RETURN
     END IF
 
@@ -1381,6 +1459,7 @@ SUB land_on()
         keys_yellow = keys_yellow + 1
         terr[cidx(px, py)] = T_FLOOR
         sfx_chip()
+        funken(px, py, RGB(255, 215, 80), 12)
         RETURN
     END IF
 
@@ -1388,6 +1467,7 @@ SUB land_on()
         has_flippers = TRUE
         terr[cidx(px, py)] = T_FLOOR
         sfx_chip()
+        funken(px, py, RGB(90, 160, 255), 12)
         RETURN
     END IF
 
@@ -1395,6 +1475,7 @@ SUB land_on()
         has_fireboots = TRUE
         terr[cidx(px, py)] = T_FLOOR
         sfx_chip()
+        funken(px, py, RGB(255, 140, 60), 12)
         RETURN
     END IF
 
@@ -1402,6 +1483,7 @@ SUB land_on()
         has_iceskates = TRUE
         terr[cidx(px, py)] = T_FLOOR
         sfx_chip()
+        funken(px, py, RGB(180, 230, 255), 12)
         RETURN
     END IF
 
@@ -1409,6 +1491,7 @@ SUB land_on()
         has_suction = TRUE
         terr[cidx(px, py)] = T_FLOOR
         sfx_chip()
+        funken(px, py, RGB(190, 140, 255), 12)
         RETURN
     END IF
 
@@ -1442,6 +1525,7 @@ SUB land_on()
     IF t = T_SOCKET THEN
         terr[cidx(px, py)] = T_FLOOR
         sfx_door()
+        funken(px, py, RGB(110, 255, 200), 18)
         RETURN
     END IF
 
@@ -1471,6 +1555,9 @@ SUB land_on()
 
     IF t = T_EXIT THEN
         state = "win"
+        sieg_t = 0.0
+        funken(px, py, RGB(90, 230, 255), 40)
+        funken(px, py, RGB(255, 225, 120), 20)
         record_win()
         sfx_win()
         rumble(0.4, 0.18)     ' kurzer Erfolgs-Stups, schwaecher als der Tod
@@ -1826,17 +1913,73 @@ FUNCTION anim_base(code AS INTEGER) AS INTEGER
     RETURN -1
 END FUNCTION
 
-SUB draw_tile(code AS INTEGER, sx AS INTEGER, sy AS INTEGER)
-    DIM cell AS INTEGER
-    cell = code
-    DIM ab AS INTEGER
-    ab = anim_base(code)
-    IF ab >= 0 THEN cell = ab + (anim_frame MOD 4)
-    DIM srcx AS INTEGER
-    DIM srcy AS INTEGER
-    srcx = (cell MOD 16) * TILE
-    srcy = (cell \ 16) * TILE
-    DRAWIMAGEPART(tiles, srcx, srcy, TILE, TILE, sx, sy)
+' Pixel-Kante einer Zellen-Koordinate (relativ zur Kamera). Jede Kachel
+' reicht von kante(f) bis kante(f + 1) -- so bleibt zwischen Nachbarn keine
+' Fuge, auch wenn eine Kachel 110,4 Pixel breit ist.
+FUNCTION kante(f AS FLOAT) AS INTEGER
+    RETURN INT(FLOOR(f * ts))
+END FUNCTION
+
+FUNCTION kachel_zelle(code AS INTEGER) AS INTEGER
+    DIM ab AS INTEGER : ab = anim_base(code)
+    IF ab >= 0 THEN RETURN ab + (anim_frame MOD 4)
+    RETURN code
+END FUNCTION
+
+' Kachel code an die Zelle (fx, fy) relativ zur Kamera
+SUB draw_tile(code AS INTEGER, fx AS FLOAT, fy AS FLOAT)
+    DIM cell AS INTEGER : cell = kachel_zelle(code)
+    DIM x0 AS INTEGER : x0 = kante(fx)
+    DIM y0 AS INTEGER : y0 = kante(fy)
+    DRAWIMAGEPARTEX(tiles, (cell MOD 16) * KP, (cell \ 16) * KP, KP, KP, x0, y0, kante(fx + 1.0) - x0, kante(fy + 1.0) - y0)
+END SUB
+
+' Figur (Monster, Spieler, Block) mit Groesse und Toenung, um die
+' Zellmitte; dy hebt sie an (Schweben).
+SUB draw_sprite(code AS INTEGER, fx AS FLOAT, fy AS FLOAT, skala AS FLOAT, dy AS FLOAT, tint AS INTEGER)
+    DIM cell AS INTEGER : cell = kachel_zelle(code)
+    DIM g AS FLOAT : g = ts * skala
+    DIM mx AS FLOAT : mx = (fx + 0.5) * ts
+    DIM my AS FLOAT : my = (fy + 0.5 - dy) * ts
+    DRAWIMAGEPARTEX(tiles, (cell MOD 16) * KP, (cell \ 16) * KP, KP, KP, INT(mx - g / 2.0), INT(my - g / 2.0), INT(g), INT(g), tint)
+END SUB
+
+' Weicher Schatten unter einer Figur
+SUB draw_schatten(fx AS FLOAT, fy AS FLOAT, breite AS FLOAT, staerke AS INTEGER)
+    DIM mx AS FLOAT : mx = (fx + 0.5) * ts
+    DIM my AS FLOAT : my = (fy + 0.88) * ts
+    ELLIPSE(INT(mx - ts * breite), INT(my - ts * 0.09), INT(mx + ts * breite), INT(my + ts * 0.09), RGBA(0, 0, 0, staerke))
+END SUB
+
+' Leuchten einer Kachel: Farbe, -1 = leuchtet nicht
+FUNCTION leuchtfarbe(t AS INTEGER) AS INTEGER
+    IF t = T_CHIP THEN RETURN RGB(80, 255, 160)
+    IF t = T_EXIT THEN RETURN RGB(80, 230, 255)
+    IF t = T_TELEPORT THEN RETURN RGB(110, 190, 255)
+    IF t = T_SOCKET THEN RETURN IIF(chips_left = 0, RGB(110, 255, 200), -1)
+    IF t = T_KEY_BLUE THEN RETURN RGB(80, 140, 255)
+    IF t = T_KEY_RED THEN RETURN RGB(255, 90, 90)
+    IF t = T_KEY_GREEN THEN RETURN RGB(90, 235, 120)
+    IF t = T_KEY_YELLOW THEN RETURN RGB(255, 215, 80)
+    IF t = T_FLIPPERS THEN RETURN RGB(90, 160, 255)
+    IF t = T_FIREBOOTS THEN RETURN RGB(255, 140, 60)
+    IF t = T_ICESKATES THEN RETURN RGB(180, 230, 255)
+    IF t = T_SUCTION THEN RETURN RGB(190, 140, 255)
+    IF t = T_FIRE THEN RETURN RGB(255, 120, 30)
+    IF t = T_BOMB THEN RETURN RGB(255, 70, 50)
+    IF t = T_HINT THEN RETURN RGB(255, 225, 120)
+    IF t = T_BTN_RED THEN RETURN RGB(255, 80, 80)
+    IF t = T_BTN_GREEN THEN RETURN RGB(80, 255, 120)
+    IF t = T_BTN_BLUE THEN RETURN RGB(90, 150, 255)
+    RETURN -1
+END FUNCTION
+
+' Weicher Schein um die Zellmitte (additiv; vorher BLEND_MODE("add"))
+SUB schein(fx AS FLOAT, fy AS FLOAT, farbe AS INTEGER, radius AS FLOAT, staerke AS INTEGER)
+    DIM r AS INTEGER : r = (farbe SHR 16) BAND 255
+    DIM g AS INTEGER : g = (farbe SHR 8) BAND 255
+    DIM b AS INTEGER : b = farbe BAND 255
+    CIRCLE_GRADIENT(INT((fx + 0.5) * ts), INT((fy + 0.5) * ts), INT(radius * ts), RGBA(r, g, b, MAX(1, MIN(255, staerke))), RGBA(r, g, b, 0))
 END SUB
 
 DIM camx AS INTEGER
@@ -1862,47 +2005,69 @@ SUB draw_board()
     bcx = INT(camfx)
     bcy = INT(camfy)
 
+    ' --- Boden und Gelaende ---
+    CLS(RGB(10, 13, 20))
     DIM vy AS INTEGER
     DIM vx AS INTEGER
     FOR vy = 0 TO VIEW
         FOR vx = 0 TO VIEW
-            DIM cx AS INTEGER
-            DIM cy AS INTEGER
-            cx = bcx + vx
-            cy = bcy + vy
-            DIM sx AS INTEGER
-            DIM sy AS INTEGER
-            sx = INT((cx - camfx) * TILE)
-            sy = INT((cy - camfy) * TILE)
+            DIM cx AS INTEGER : cx = bcx + vx
+            DIM cy AS INTEGER : cy = bcy + vy
             IF inb(cx, cy) THEN
-                draw_tile(T_FLOOR, sx, sy)
-                DIM t AS INTEGER
-                t = terr[cidx(cx, cy)]
-                IF t <> T_FLOOR THEN draw_tile(t, sx, sy)
+                draw_tile(T_FLOOR, cx - camfx, cy - camfy)
+                DIM t AS INTEGER : t = terr[cidx(cx, cy)]
+                IF t <> T_FLOOR THEN draw_tile(t, cx - camfx, cy - camfy)
             ELSE
-                draw_tile(T_WALL, sx, sy)
+                draw_tile(T_WALL, cx - camfx, cy - camfy)
             END IF
         NEXT
     NEXT
 
-    ' Bloecke (interpoliert)
+    ' --- Leuchten: Chips, Schluessel, Ausgang, Feuer ... (additiv, pulsierend) ---
+    BLEND_MODE("add")
+    FOR vy = 0 TO VIEW
+        FOR vx = 0 TO VIEW
+            DIM lx AS INTEGER : lx = bcx + vx
+            DIM ly AS INTEGER : ly = bcy + vy
+            IF inb(lx, ly) THEN
+                DIM lf AS INTEGER : lf = leuchtfarbe(terr[cidx(lx, ly)])
+                IF lf >= 0 THEN
+                    DIM puls AS FLOAT : puls = 0.5 + 0.5 * SIN(fx_zeit * 3.2 + lx * 0.9 + ly * 1.3)
+                    schein(lx - camfx, ly - camfy, lf, 0.62 + 0.08 * puls, INT(46 + 44 * puls))
+                END IF
+            END IF
+        NEXT
+    NEXT
+    BLEND_MODE("alpha")
+
+    ' --- Schatten ---
     DIM k AS Kiste
     FOR EACH k IN kisten
-        IF k.lebt THEN draw_tile(T_BLOCK, INT((k.bild_x(ease) - camfx) * TILE), INT((k.bild_y(ease) - camfy) * TILE))
+        IF k.lebt THEN draw_schatten(k.bild_x(ease) - camfx, k.bild_y(ease) - camfy, 0.40, 120)
     NEXT
-
-    ' Monster (interpoliert ueber ihren ganzen Zugtakt)
     DIM m AS Monster
     FOR EACH m IN mobs
-        IF m.lebt THEN
-            DIM mp AS INTEGER : mp = mon_takt * m.traegheit()
-            DIM mph AS FLOAT : mph = ((tickcount MOD mp) + ease) / mp
-            IF mph > 1.0 THEN mph = 1.0
-            draw_tile(m.kachel(), INT((m.bild_x(mph) - camfx) * TILE), INT((m.bild_y(mph) - camfy) * TILE))
-        END IF
+        IF m.lebt THEN draw_schatten(m.bild_x(zug_anteil(m, ease)) - camfx, m.bild_y(zug_anteil(m, ease)) - camfy, 0.30, 100)
+    NEXT
+    draw_schatten(pfx - camfx, pfy - camfy, 0.28, 110)
+
+    ' --- Bloecke ---
+    FOR EACH k IN kisten
+        IF k.lebt THEN draw_tile(T_BLOCK, k.bild_x(ease) - camfx, k.bild_y(ease) - camfy)
     NEXT
 
-    ' Spieler (interpoliert, Geh-Frame wechselt pro Tick)
+    ' --- Monster: gleiten ueber ihren ganzen Zugtakt, schweben ein wenig ---
+    DIM mi AS INTEGER : mi = 0
+    FOR EACH m IN mobs
+        IF m.lebt THEN
+            DIM mph AS FLOAT : mph = zug_anteil(m, ease)
+            DIM schweb AS FLOAT : schweb = 0.025 + 0.025 * SIN(fx_zeit * 5.0 + mi * 1.7)
+            draw_sprite(m.kachel(), m.bild_x(mph) - camfx, m.bild_y(mph) - camfy, 1.0, schweb, IIF(m.gefangen, RGB(150, 150, 170), -1))
+        END IF
+        mi = mi + 1
+    NEXT
+
+    ' --- Spieler: eigenes Licht, Geh-Frame je Tick, in Ruhe atmet er ---
     DIM moving AS BOOLEAN
     moving = (pox <> px OR poy <> py)
     DIM pc AS INTEGER
@@ -1912,17 +2077,95 @@ SUB draw_board()
     ELSEIF moving AND (tickcount MOD 2) = 1 THEN
         pc = &H70 + pdir
     END IF
+    BLEND_MODE("add")
+    schein(pfx - camfx, pfy - camfy, RGB(90, 200, 255), 1.15, 34)
+    BLEND_MODE("alpha")
+    DIM atem AS FLOAT : atem = 0.0
+    IF NOT moving AND NOT on_water THEN atem = 0.02 + 0.02 * SIN(fx_zeit * 3.0)
+    DIM ptint AS INTEGER : ptint = -1
+    IF state = "dead" THEN ptint = RGB(255, 120, 120)
+    draw_sprite(pc, pfx - camfx, pfy - camfy, 1.0, atem, ptint)
 
-    draw_tile(pc, INT((pfx - camfx) * TILE), INT((pfy - camfy) * TILE))
+    ' --- Funken ---
+    IF LEN(funkenflug) > 0 THEN
+        BLEND_MODE("add")
+        DIM f AS Funke
+        FOR EACH f IN funkenflug
+            DIM rest AS FLOAT : rest = 1.0 - f.alter / f.dauer
+            DIM fr AS INTEGER : fr = (f.farbe SHR 16) BAND 255
+            DIM fg AS INTEGER : fg = (f.farbe SHR 8) BAND 255
+            DIM fb AS INTEGER : fb = f.farbe BAND 255
+            DIM rr AS INTEGER : rr = MAX(2, INT(f.groesse * ts * (0.4 + rest)))
+            CIRCLE_GRADIENT(INT((f.x - camfx) * ts), INT((f.y - camfy) * ts), rr * 3, RGBA(fr, fg, fb, INT(120 * rest) + 1), RGBA(fr, fg, fb, 0))
+            CIRCLE(INT((f.x - camfx) * ts), INT((f.y - camfy) * ts), rr, RGBA(MIN(255, fr + 80), MIN(255, fg + 80), MIN(255, fb + 80), INT(230 * rest) + 1))
+        NEXT
+        BLEND_MODE("alpha")
+    END IF
+
+    ' --- Vignette: das Brett dunkelt zum Rand hin ab ---
+    DIM vg AS INTEGER : vg = INT(bsize * 0.10)
+    GRADIENTV(0, 0, bsize, vg, RGBA(6, 9, 15, 150), RGBA(6, 9, 15, 0))
+    GRADIENTV(0, bsize - vg, bsize, bsize, RGBA(6, 9, 15, 0), RGBA(6, 9, 15, 150))
+    GRADIENTH(0, 0, vg, bsize, RGBA(6, 9, 15, 150), RGBA(6, 9, 15, 0))
+    GRADIENTH(bsize - vg, 0, bsize, bsize, RGBA(6, 9, 15, 0), RGBA(6, 9, 15, 150))
+
+    ' --- Tod: kurz rot; Sieg: der Ausgang strahlt ---
+    IF state = "dead" AND schreck_t < 0.6 THEN
+        BOX(0, 0, bsize, bsize, RGBA(200, 30, 30, INT(110 * (1.0 - schreck_t / 0.6)) + 1))
+    END IF
+    IF state = "win" THEN
+        BLEND_MODE("add")
+        schein(pfx - camfx, pfy - camfy, RGB(90, 230, 255), 1.0 + MIN(2.5, sieg_t * 3.0), INT(90 * MAX(0.25, 1.0 - sieg_t)))
+        BLEND_MODE("alpha")
+    END IF
+END SUB
+
+' Wie weit ein Monster in seinem Zug ist (0..1): es zieht nur jeden
+' mon_takt * traegheit-ten Spielschritt und gleitet ueber diese ganze Zeit.
+FUNCTION zug_anteil(m AS Monster, ease AS FLOAT) AS FLOAT
+    DIM mp AS INTEGER : mp = mon_takt * m.traegheit()
+    DIM a AS FLOAT : a = ((tickcount MOD mp) + ease) / mp
+    IF a > 1.0 THEN a = 1.0
+    RETURN a
+END FUNCTION
+
+' Hintergrund des ganzen Schirms: dunkler Verlauf, darin ziehen zwei
+' weiche Lichter langsam ihre Bahn (Neon hinter Glas).
+SUB hintergrund()
+    GRADIENTV(0, 0, SW, SH, RGB(16, 22, 36), RGB(6, 8, 14))
+    BLEND_MODE("add")
+    DIM r AS INTEGER : r = INT(SH * 0.55)
+    CIRCLE_GRADIENT(INT(SW * (0.30 + 0.12 * SIN(fx_zeit * 0.11))), INT(SH * (0.35 + 0.10 * COS(fx_zeit * 0.13))), r, RGBA(30, 90, 120, 34), RGBA(30, 90, 120, 0))
+    CIRCLE_GRADIENT(INT(SW * (0.72 + 0.10 * COS(fx_zeit * 0.09))), INT(SH * (0.70 + 0.08 * SIN(fx_zeit * 0.12))), r, RGBA(70, 40, 120, 30), RGBA(70, 40, 120, 0))
+    BLEND_MODE("alpha")
+    ' feines Leiterbahn-Raster
+    DIM schritt AS INTEGER : schritt = MAX(24, SH \ 18)
+    DIM gx AS INTEGER
+    FOR gx = 0 TO SW STEP schritt
+        LINE(gx, 0, gx, SH, RGBA(80, 140, 170, 10))
+    NEXT
+    DIM gy AS INTEGER
+    FOR gy = 0 TO SH STEP schritt
+        LINE(0, gy, SW, gy, RGBA(80, 140, 170, 10))
+    NEXT
+END SUB
+
+' Rahmen ums Spielfeld: Neon-Kante mit weichem Schein nach aussen.
+SUB brett_rahmen(x AS INTEGER, y AS INTEGER)
+    DIM i AS INTEGER
+    FOR i = 1 TO 6
+        RECTROUND(x - i * 2, y - i * 2, x + bsize + i * 2, y + bsize + i * 2, 10 + i * 2, RGBA(70, 200, 220, 46 - i * 7))
+    NEXT
+    RECTROUND(x - 1, y - 1, x + bsize + 1, y + bsize + 1, 8, RGB(70, 170, 190))
 END SUB
 
 SUB ct(cx AS INTEGER, cy AS INTEGER, scale AS FLOAT, s AS STRING, col AS INTEGER)
     TEXTROT(cx, cy, s, 0, scale, col)
 END SUB
 
-' HUD-Icon direkt aus dem Tileset skaliert zeichnen (nativ, scharf)
+' HUD-Icon direkt aus dem Tileset skaliert zeichnen (weich gefiltert)
 SUB draw_icon(code AS INTEGER, x AS INTEGER, y AS INTEGER)
-    DRAWIMAGEPARTEX(tiles, (code MOD 16) * TILE, (code \ 16) * TILE, TILE, TILE, x, y, ic_sz, ic_sz)
+    DRAWIMAGEPARTEX(tiles, (code MOD 16) * KP, (code \ 16) * KP, KP, KP, x, y, ic_sz, ic_sz)
 END SUB
 
 ' Vertikale HUD-Position als Bruchteil der Panel-Hoehe
@@ -1932,8 +2175,8 @@ END FUNCTION
 
 ' Gerundetes Sub-Panel mit Neon-Rand
 SUB hud_panel(x0 AS INTEGER, y0 AS INTEGER, x1 AS INTEGER, y1 AS INTEGER)
-    BOXROUND(x0, y0, x1, y1, 9, RGB(15, 21, 33))
-    RECTROUND(x0, y0, x1, y1, 9, RGB(42, 84, 104))
+    BOXROUND(x0, y0, x1, y1, 9, RGBA(14, 20, 32, 200))
+    RECTROUND(x0, y0, x1, y1, 9, RGBA(60, 130, 150, 190))
 END SUB
 
 ' zentriertes Sektions-Label (gedimmtes Neon)
@@ -1990,14 +2233,13 @@ SUB draw_hud()
     DIM kw AS INTEGER
     kw = (ix1 - ix0) \ 4
 
-    ' --- Aussen-Panel (Verlauf + Neon-Rahmen) ---
-    GRADIENTV(x0, board_y, x1, board_y + bsize, RGB(23, 31, 47), RGB(12, 16, 26))
-    RECTROUND(x0, board_y, x1, board_y + bsize, 12, RGB(58, 112, 132))
+    ' --- Aussen-Panel (Glas + Neon-Rahmen) ---
+    glas_karte(x0, board_y, x1, board_y + bsize, RGB(58, 150, 170))
 
     ' --- Header ---
     GRADIENTV(ix0, hb(0.012), ix1, hb(0.068), RGB(16, 60, 66), RGB(13, 28, 40))
     RECTROUND(ix0, hb(0.012), ix1, hb(0.068), 8, RGB(64, 158, 154))
-    ct(cxp, hb(0.040), sc_med, "CIRCUIT RUNNER", RGB(122, 246, 234))
+    glow_text(cxp, hb(0.040), sc_med, "CIRCUIT RUNNER", RGB(122, 246, 234))
 
     ' --- Level + Fortschrittsbalken ---
     ct(cxp, hb(0.090), sc_sm, "LEVEL " + STR$(cur_level + 1) + " / " + STR$(nlevels), RGB(216, 224, 238))
@@ -2092,17 +2334,71 @@ SUB draw_hint()
     bx1 = board_x + bsize
     by1 = board_y + bsize
     by0 = by1 - INT(SH * 0.20)
-    BOX(bx0, by0, bx1, by1, RGB(16, 22, 32))
-    RECT(bx0, by0, bx1, by1, RGB(80, 200, 220))
-    ct((bx0 + bx1) \ 2, by0 + INT(SH * 0.035), sc_sm, "HINWEIS", RGB(110, 238, 226))
+    glas_karte(bx0 + 10, by0, bx1 - 10, by1 - 10, RGB(80, 200, 220))
+    glow_text((bx0 + bx1) \ 2, by0 + INT(SH * 0.035), sc_sm, "HINWEIS", RGB(110, 238, 226))
     draw_wrapped(lvl_hint, bx0 + INT(SW * 0.02), by0 + INT(SH * 0.08), bx1 - INT(SW * 0.02), RGB(206, 220, 236))
+END SUB
+
+' Glas-Karte: halbdurchsichtig, abgerundet, Neon-Rand mit weichem Schein.
+SUB glas_karte(x0 AS INTEGER, y0 AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, rand AS INTEGER)
+    DIM r AS INTEGER : r = (rand SHR 16) BAND 255
+    DIM g AS INTEGER : g = (rand SHR 8) BAND 255
+    DIM b AS INTEGER : b = rand BAND 255
+    DIM i AS INTEGER
+    FOR i = 1 TO 5
+        RECTROUND(x0 - i * 2, y0 - i * 2, x1 + i * 2, y1 + i * 2, 14 + i * 2, RGBA(r, g, b, 40 - i * 7))
+    NEXT
+    BOXROUND(x0, y0, x1, y1, 14, RGBA(10, 14, 24, 236))
+    RECTROUND(x0, y0, x1, y1, 14, RGBA(r, g, b, 210))
+END SUB
+
+' Leuchtschrift: ein weicher Schein in der Farbe, darueber die Schrift.
+SUB glow_text(cx AS INTEGER, cy AS INTEGER, scale AS FLOAT, s AS STRING, col AS INTEGER)
+    DIM r AS INTEGER : r = (col SHR 16) BAND 255
+    DIM g AS INTEGER : g = (col SHR 8) BAND 255
+    DIM b AS INTEGER : b = col BAND 255
+    DIM d AS INTEGER : d = MAX(2, INT(SH * 0.0025))
+    BLEND_MODE("add")
+    TEXTROT(cx - d, cy, s, 0, scale, RGBA(r, g, b, 60))
+    TEXTROT(cx + d, cy, s, 0, scale, RGBA(r, g, b, 60))
+    TEXTROT(cx, cy - d, s, 0, scale, RGBA(r, g, b, 60))
+    TEXTROT(cx, cy + d, s, 0, scale, RGBA(r, g, b, 60))
+    BLEND_MODE("alpha")
+    TEXTROT(cx, cy, s, 0, scale, col)
+END SUB
+
+' Die Bewohner des Spiels laufen am unteren Rand vorbei: der Runner vorweg,
+' die Roboter hinterher.
+SUB parade(y AS INTEGER)
+    DIM g AS INTEGER : g = INT(SH * 0.075)
+    DIM abstand AS INTEGER : abstand = INT(g * 1.6)
+    DIM n AS INTEGER : n = 10
+    DIM laenge AS INTEGER : laenge = SW + (n + 2) * abstand
+    DIM kopf AS INTEGER : kopf = INT(fx_zeit * SH * 0.11) + SW
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        DIM code AS INTEGER
+        DIM luecke AS INTEGER : luecke = 0
+        IF i = 0 THEN
+            code = IIF(INT(fx_zeit * 6.0) MOD 2 = 0, T_CHIP_N + 3, &H70 + 3)
+        ELSE
+            code = &H40 + ((i - 1) MOD 9) * 4 + 3
+            luecke = abstand
+        END IF
+        DIM x AS INTEGER : x = kopf - i * abstand - luecke
+        x = ((x MOD laenge) + laenge) MOD laenge - (n + 1) * abstand
+        DIM hop AS INTEGER : hop = INT(ABS(SIN(fx_zeit * 7.0 + i * 0.8)) * g * 0.10)
+        ELLIPSE(x + g \ 5, y + g - g \ 10, x + g - g \ 5, y + g + g \ 12, RGBA(0, 0, 0, 90))
+        DRAWIMAGEPARTEX(tiles, (code MOD 16) * KP, (code \ 16) * KP, KP, KP, x, y - hop, g, g)
+    NEXT
 END SUB
 
 SUB draw_menu()
     DIM cx AS INTEGER
     cx = SW \ 2
-    ct(cx, INT(SH * 0.13), sc_big, "CIRCUIT RUNNER", RGB(110, 238, 226))
-    ct(cx, INT(SH * 0.22), sc_sm, "waehle ein Level-Set", RGB(150, 162, 184))
+    glow_text(cx, INT(SH * 0.13), sc_big * 1.25, "CIRCUIT RUNNER", RGB(110, 238, 226))
+    ct(cx, INT(SH * 0.215), sc_sm, "waehle ein Level-Set", RGB(150, 162, 184))
+    parade(INT(SH * 0.70))
     IF nsets = 0 THEN
         ct(cx, SH \ 2, sc_med, "Keine Sets in levels/", RGB(245, 130, 130))
         RETURN
@@ -2115,9 +2411,11 @@ SUB draw_menu()
     hi = lo + 6
     IF hi > nsets - 1 THEN hi = nsets - 1
     DIM yy AS INTEGER
-    yy = INT(SH * 0.37)
+    yy = INT(SH * 0.34)
     DIM lh AS INTEGER
-    lh = INT(BASEH * sc_med * 1.5)
+    lh = INT(BASEH * sc_med * 1.7)
+    DIM kb AS INTEGER : kb = INT(SW * 0.21)
+    glas_karte(cx - kb, yy - lh, cx + kb, yy + (hi - lo) * lh + lh, RGB(70, 190, 210))
     DIM si AS INTEGER
     FOR si = lo TO hi
         DIM lab AS STRING
@@ -2125,8 +2423,9 @@ SUB draw_menu()
         DIM col AS INTEGER
         col = RGB(160, 172, 196)
         IF si = sel_set THEN
-            lab = "> " + lab + " <"
-            col = RGB(120, 244, 160)
+            BOXROUND(cx - kb + 12, yy - lh \ 2 + 4, cx + kb - 12, yy + lh \ 2 - 4, 10, RGBA(80, 230, 170, 40))
+            RECTROUND(cx - kb + 12, yy - lh \ 2 + 4, cx + kb - 12, yy + lh \ 2 - 4, 10, RGBA(110, 244, 170, 150))
+            col = RGB(140, 250, 180)
         END IF
 
         ct(cx, yy, sc_med, lab, col)
@@ -2156,10 +2455,15 @@ END SUB
 SUB draw_intro()
     DIM cx AS INTEGER
     cx = SW \ 2
+    glas_karte(INT(SW * 0.14), INT(SH * 0.14), INT(SW * 0.86), INT(SH * 0.66), RGB(70, 190, 210))
     ct(cx, INT(SH * 0.22), sc_med, "Level " + STR$(cur_level + 1), RGB(110, 238, 226))
-    ct(cx, INT(SH * 0.34), sc_big, lvl_title, RGB(232, 238, 248))
+    glow_text(cx, INT(SH * 0.33), sc_big, lvl_title, RGB(232, 238, 248))
+    DIM eckdaten AS STRING
+    eckdaten = STR$(chips_total) + " Daten-Chips     Zeit: " + IIF(lvl_time > 0, fmt_time(lvl_time), "frei")
+    ct(cx, INT(SH * 0.40), sc_sm, eckdaten, RGB(150, 200, 240))
+    parade(INT(SH * 0.74))
     IF lvl_best >= 0 THEN
-        ct(cx, INT(SH * 0.43), sc_sm, "Bestzeit  " + score_label(lvl_best), RGB(244, 222, 120))
+        ct(cx, INT(SH * 0.45), sc_sm, "Bestzeit  " + score_label(lvl_best), RGB(244, 222, 120))
     END IF
 
     IF LEN(lvl_hint) > 0 THEN
@@ -2173,7 +2477,7 @@ END SUB
 SUB draw_password()
     DIM cx AS INTEGER
     cx = SW \ 2
-    ct(cx, INT(SH * 0.22), sc_med, "PASSWORT", RGB(110, 238, 226))
+    glow_text(cx, INT(SH * 0.22), sc_med, "PASSWORT", RGB(110, 238, 226))
     ct(cx, INT(SH * 0.31), sc_sm, "Set: " + set_name[sel_set], RGB(150, 162, 184))
 
     ' Eingabefeld
@@ -2187,8 +2491,7 @@ SUB draw_password()
     by0 = INT(SH * 0.40)
     DIM bw AS INTEGER
     bw = INT(SW * 0.30)
-    BOX(cx - bw \ 2, by0, cx + bw \ 2, by0 + INT(SH * 0.10), RGB(20, 26, 38))
-    RECT(cx - bw \ 2, by0, cx + bw \ 2, by0 + INT(SH * 0.10), RGB(80, 200, 220))
+    glas_karte(cx - bw \ 2, by0, cx + bw \ 2, by0 + INT(SH * 0.10), RGB(80, 200, 220))
     ct(cx, by0 + INT(SH * 0.05), sc_big, disp, RGB(232, 238, 248))
     IF LEN(pw_msg) > 0 THEN
         ct(cx, INT(SH * 0.60), sc_med, pw_msg, RGB(245, 130, 130))
@@ -2200,43 +2503,46 @@ END SUB
 SUB draw_done()
     DIM cx AS INTEGER
     cx = SW \ 2
-    ct(cx, INT(SH * 0.34), sc_big, "ALLE LEVEL GESCHAFFT!", RGB(120, 244, 160))
+    glow_text(cx, INT(SH * 0.34), sc_big, "ALLE LEVEL GESCHAFFT!", RGB(120, 244, 160))
+    parade(INT(SH * 0.76))
     ct(cx, INT(SH * 0.50), sc_med, "Gut gemacht, Runner.", RGB(224, 230, 240))
     ct(cx, INT(SH * 0.64), sc_med, "LEER = Menue", RGB(200, 214, 232))
 END SUB
 
+' Sieg/Tod: eine Glas-Karte mitten ueber dem Brett -- das Brett bleibt
+' darunter zu sehen.
 SUB draw_overlay(kind AS STRING)
-    DIM cx AS INTEGER
-    cx = SW \ 2
-    DIM x0 AS INTEGER
-    DIM x1 AS INTEGER
-    DIM y0 AS INTEGER
-    DIM y1 AS INTEGER
-    x0 = INT(SW * 0.26)
-    x1 = INT(SW * 0.74)
-    y0 = INT(SH * 0.36)
-    y1 = INT(SH * 0.66)
+    DIM cx AS INTEGER : cx = board_x + bsize \ 2
+    DIM cy AS INTEGER : cy = board_y + bsize \ 2
+    DIM hb2 AS INTEGER : hb2 = INT(bsize * 0.40)
+    DIM x0 AS INTEGER : x0 = cx - hb2
+    DIM x1 AS INTEGER : x1 = cx + hb2
+    DIM zl AS INTEGER : zl = INT(BASEH * sc_sm * 1.7)
     IF kind = "win" THEN
-        BOX(x0, y0, x1, y1, RGB(14, 32, 24))
-        RECT(x0, y0, x1, y1, RGB(80, 222, 142))
-        ct(cx, INT(SH * 0.42), sc_big, "GESCHAFFT!", RGB(120, 244, 160))
-        ct(cx, INT(SH * 0.50), sc_med, "Zeit  " + score_label(win_secs), RGB(224, 234, 228))
+        DIM y0 AS INTEGER : y0 = cy - INT(bsize * 0.17)
+        DIM y1 AS INTEGER : y1 = cy + INT(bsize * 0.17)
+        glas_karte(x0, y0, x1, y1, RGB(80, 222, 142))
+        DIM yy AS INTEGER : yy = y0 + INT(bsize * 0.065)
+        glow_text(cx, yy, sc_big, "GESCHAFFT!", RGB(120, 244, 160))
+        yy = yy + INT(zl * 1.6)
+        ct(cx, yy, sc_med, "Zeit  " + score_label(win_secs), RGB(224, 234, 228))
+        yy = yy + zl
         IF new_record THEN
-            ct(cx, INT(SH * 0.555), sc_sm, "NEUER REKORD!", RGB(244, 222, 120))
+            glow_text(cx, yy, sc_sm, "NEUER REKORD!", RGB(244, 222, 120))
         ELSEIF lvl_best >= 0 THEN
-            ct(cx, INT(SH * 0.555), sc_sm, "Bestzeit  " + score_label(lvl_best), RGB(180, 200, 214))
+            ct(cx, yy, sc_sm, "Bestzeit  " + score_label(lvl_best), RGB(180, 200, 214))
         END IF
-
+        yy = yy + zl
         IF LEN(next_pw) > 0 THEN
-            ct(cx, INT(SH * 0.595), sc_sm, "Passwort Level " + STR$(cur_level + 2) + ":  " + next_pw, RGB(110, 238, 226))
+            ct(cx, yy, sc_sm, "Passwort Level " + STR$(cur_level + 2) + ":  " + next_pw, RGB(110, 238, 226))
         END IF
-
-        ct(cx, INT(SH * 0.635), sc_med, "LEER = weiter", RGB(204, 224, 214))
+        ct(cx, y1 - INT(zl * 0.9), sc_med, "LEER = weiter", RGB(204, 224, 214))
     ELSE
-        BOX(x0, y0, x1, y1, RGB(34, 16, 16))
-        RECT(x0, y0, x1, y1, RGB(224, 92, 92))
-        ct(cx, INT(SH * 0.47), sc_med, death_msg, RGB(246, 134, 134))
-        ct(cx, INT(SH * 0.55), sc_sm, "R / LEER = nochmal", RGB(232, 204, 204))
+        DIM ty0 AS INTEGER : ty0 = cy - INT(bsize * 0.11)
+        DIM ty1 AS INTEGER : ty1 = cy + INT(bsize * 0.11)
+        glas_karte(x0, ty0, x1, ty1, RGB(224, 92, 92))
+        glow_text(cx, cy - zl \ 2, sc_med, death_msg, RGB(250, 140, 140))
+        ct(cx, cy + INT(zl * 0.9), sc_sm, "R / LEER = nochmal", RGB(232, 204, 204))
     END IF
 END SUB
 
@@ -2307,20 +2613,21 @@ WINDOW_ESC_QUIT(FALSE)
 
 ' Eigenes Fenstersymbol statt des Standardsymbols der Laufzeit: der Daten-Chip
 ' aus dem Kachelsatz (Kachel T_CHIP, also Spalte 2 der obersten Zeile).
+' Kachelgroesse im Blatt aus tiles.json (make_tiles.dh schreibt sie mit)
+DIM kachel_js AS JSON_HANDLE : kachel_js = JSON_LOAD("assets/tiles.json")
+KP = JSON_GET_INT(kachel_js, "tile")
 DIM icon_sheet AS IMAGE : icon_sheet = LOADIMAGE("assets/tiles.png")
-WINDOW_ICON(IMAGE_CROP(icon_sheet, T_CHIP * TILE, 0, TILE, TILE))
+WINDOW_ICON(IMAGE_CROP(icon_sheet, T_CHIP * KP, 0, KP, KP))
 
 SW = SCREENWIDTH()
 SH = SCREENHEIGHT()
 
-' Board so gross wie moeglich (ganzzahlige Vergroesserung), HUD rechts daneben
-bscale = (SH * 92) \ (100 * BLOG)
-IF bscale < 1 THEN bscale = 1
-WHILE BLOG * bscale > (SW * 58) \ 100 AND bscale > 1
-    bscale = bscale - 1
-WEND
-
-bsize = BLOG * bscale
+' Board so gross wie moeglich -- stufenlos, die Kacheln werden weich
+' gefiltert (bis 2026-11 nur ganzzahlig vergroessert: auf 1080p blieb das
+' Brett bei 576 Punkten). HUD rechts daneben.
+bsize = (SH * 92) \ 100
+IF bsize > (SW * 58) \ 100 THEN bsize = (SW * 58) \ 100
+ts = bsize / VIEW
 board_x = INT(SW * 0.04)
 board_y = (SH - bsize) \ 2
 hud_x = board_x + bsize + INT(SW * 0.03)
@@ -2335,8 +2642,9 @@ dyv[2] = 1
 dxv[3] = 1
 dyv[3] = 0
 
-rtb = RENDERTARGET_NEW(BLOG, BLOG)
+rtb = RENDERTARGET_NEW(bsize, bsize)
 tiles = LOADIMAGE("assets/tiles.png")
+IMAGE_MIPMAPS(tiles)          ' weich verkleinern statt Pixeltreppe
 
 ' Soundeffekte laden (fehlt der Ordner, faellt sfx_* auf Synth-Toene zurueck)
 snd_ok = FALSE
@@ -2443,7 +2751,7 @@ WHILE NOT QUITREQUESTED()
     IF NOT WINDOW_FOCUSED() THEN
         DIM pause_ms AS INTEGER : pause_ms = MILLIS()
         WHILE NOT WINDOW_FOCUSED() AND NOT QUITREQUESTED()
-            CLS(RGB(8, 10, 16))
+            hintergrund()
             ct(SCREENWIDTH() \ 2, SCREENHEIGHT() \ 2, 3.0, "PAUSE", RGB(244, 222, 120))
             FLIP()
         WEND
@@ -2451,6 +2759,7 @@ WHILE NOT QUITREQUESTED()
     END IF
 
     INPUT_UPDATE()
+    funken_weiter(MIN(DELTA(), 0.1))
     anim_ms = anim_ms + DELTA() * 1000.0
     IF anim_ms >= 520.0 THEN anim_ms = anim_ms - 520.0
     anim_frame = INT(anim_ms / 130.0) MOD 4
@@ -2599,7 +2908,7 @@ WHILE NOT QUITREQUESTED()
         RENDERTARGET_END()
     END IF
 
-    CLS(RGB(12, 16, 24))
+    hintergrund()
     IF state = "menu" THEN
         draw_menu()
     ELSEIF state = "password" THEN
@@ -2609,7 +2918,16 @@ WHILE NOT QUITREQUESTED()
     ELSEIF state = "done" THEN
         draw_done()
     ELSE
-        RENDERTARGET_DRAW(rtb, board_x, board_y, bscale)
+        ' Beim Tod wackelt das Brett kurz.
+        DIM wx AS INTEGER : wx = 0
+        DIM wy AS INTEGER : wy = 0
+        IF state = "dead" AND schreck_t < 0.35 THEN
+            DIM wst AS FLOAT : wst = (0.35 - schreck_t) * SH * 0.03
+            wx = INT(SIN(schreck_t * 90.0) * wst)
+            wy = INT(COS(schreck_t * 70.0) * wst)
+        END IF
+        brett_rahmen(board_x + wx, board_y + wy)
+        RENDERTARGET_DRAW(rtb, board_x + wx, board_y + wy, 1)
         draw_hud()
         IF state = "play" AND tat(px, py) = T_HINT THEN draw_hint()
         IF state = "win" THEN draw_overlay("win")

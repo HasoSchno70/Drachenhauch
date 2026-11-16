@@ -1,6 +1,6 @@
 {
   "image": "tiles.png",
-  "tile": 64,
+  "tile": 128,
   "cols": 16,
   "codes": {
     "0x00": "floor",

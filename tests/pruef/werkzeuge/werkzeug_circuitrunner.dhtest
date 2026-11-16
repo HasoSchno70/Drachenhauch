@@ -259,6 +259,72 @@ vorgabe ruhig
 POS 5 5
 umgeschaltet original gesichert 1
 
+=== das brett fuellt den schirm und alles zeichnet
+' Seit 2026-11 waechst das Brett stufenlos auf 92 % der Schirmhoehe (vorher
+' nur ganzzahlig: auf 1080p blieb es bei 576 Punkten), die Kacheln kommen
+' in 128 Punkten aus dem Blatt. Dazu jeder Zeichenweg einmal: Brett mit
+' Leuchten, Schatten, Funken, Tod (rot, Karte), Sieg, Menue, Intro, Hinweis.
+IMPORT "circuit.dh"
+DIM prOben AS ARRAY OF INTEGER : prOben = prLeer()
+DIM prUnten AS ARRAY OF INTEGER : prUnten = prLeer()
+prOben[1 * 32 + 1] = &H6C
+prOben[1 * 32 + 3] = &H02
+prOben[2 * 32 + 3] = &H64
+prOben[3 * 32 + 5] = &H47
+prOben[4 * 32 + 2] = &H0A
+prOben[5 * 32 + 5] = &H15
+DIM prH AS JSON_HANDLE : prH = prSet("Bild")
+prLevel(prH, "B", 1, 0, "Ein Hinweis zum Lesen.", "ABCD", prOben, prUnten, "")
+prSchreiben(prH)
+js = JSON_LOAD(prSynth$())
+nlevels = JSON_LEN(js, "levels")
+load_level(0)
+state = "play"
+PRINT "kachel im blatt " + STR$(KP)
+DIM prSoll AS INTEGER : prSoll = MIN((SH * 92) \ 100, (SW * 58) \ 100)
+PRINT "brett " + STR$(bsize = prSoll) + " kachel " + STR$(ABS(ts * VIEW - bsize) < 0.01)
+funken(px, py, RGB(80, 255, 160), 20)
+funken_weiter(0.05)
+SUB prMalen()
+    RENDERTARGET_BEGIN(rtb)
+    draw_board()
+    RENDERTARGET_END()
+    hintergrund()
+    brett_rahmen(board_x, board_y)
+    RENDERTARGET_DRAW(rtb, board_x, board_y, 1)
+    draw_hud()
+    draw_hint()
+    FLIP()
+END SUB
+prMalen()
+player_die("Probe")
+funken_weiter(0.1)
+prMalen()
+draw_overlay("dead")
+state = "win"
+sieg_t = 0.2
+prMalen()
+draw_overlay("win")
+draw_menu()
+draw_intro()
+FLIP()
+PRINT "funken " + STR$(LEN(funkenflug) > 0) + " gezeichnet"
+EXIT(0)
+--- programm ../../../spiele/circuitrunner/circuitrunner.dh nach '  HAUPTSCHLEIFE
+--- ersetzen CONST SAVEPATH = "circuitrunner.save"
+CONST SAVEPATH = "{fall}/circuitrunner.save"
+CHDIR("{sammlung}/../../../spiele/circuitrunner")
+
+--- datei _programm/circuit.dh
+IMPORT "{sammlung}/../_hilfen/circuitlevel.dh"
+
+--- umgebung
+DH_OHNE_AUDIO=1
+--- erwartet
+kachel im blatt 128
+brett TRUE kachel TRUE
+funken TRUE gezeichnet
+
 === konverter liest ein dat im rundweg
 ' Bis 2026-09-14 tests/test_circuitrunner.py gegen convert_dat.py. Die .dat
 ' schreibt der Fall selbst (RLE und Kopf nach seasip.info/ccfile.html) -- ein
@@ -524,7 +590,8 @@ TRUE
 === kachelsatz wird gezeichnet
 ' make_tiles.dh schreibt tiles.json Byte fuer Byte wie die eingecheckte Datei
 ' (die hat bis 2026-09-14 make_tiles.py geschrieben), dazu ein Blatt aus
-' 16 x 14 Zellen zu 64 Punkten: belegte Zellen decken, freie bleiben leer.
+' 16 x 14 Zellen zu 128 Punkten (bis 2026-11 waren es 64): belegte Zellen
+' decken, freie bleiben leer.
 FUNCTION lauf$(p AS INTEGER) AS STRING
     DIM aus AS STRING : aus = ""
     DIM leer AS INTEGER : leer = 0
@@ -557,7 +624,7 @@ PRINT FILEEXISTS("kacheln/_contact.png")
 DIM b AS IMAGE : b = LOADIMAGE("kacheln/tiles.png")
 PRINT IMAGEWIDTH(b); " "; IMAGEHEIGHT(b)
 ' 0x00 Boden deckt ganz, 0x20 gibt es nicht, 0x40 Kaefer hat einen Rand
-PRINT GETALPHA(b, 32, 32); " "; GETALPHA(b, 32, 2 * 64 + 32); " "; GETALPHA(b, 1, 4 * 64 + 1); " "; GETALPHA(b, 32, 4 * 64 + 35)
+PRINT GETALPHA(b, 64, 64); " "; GETALPHA(b, 64, 2 * 128 + 64); " "; GETALPHA(b, 2, 4 * 128 + 2); " "; GETALPHA(b, 64, 4 * 128 + 70)
 --- argumente
 {sammlung}/../../../spiele/circuitrunner/make_tiles.dh
 {sammlung}/../../../spiele/circuitrunner/assets/tiles.json
@@ -565,7 +632,7 @@ PRINT GETALPHA(b, 32, 32); " "; GETALPHA(b, 32, 2 * 64 + 32); " "; GETALPHA(b, 1
 TRUE
 TRUE
 TRUE
-1024 896
+2048 1792
 255 0 0 255
 
 === soundeffekte kommen von der richtigen adresse
