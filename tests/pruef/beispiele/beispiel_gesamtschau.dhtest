@@ -1,0 +1,208 @@
+' Die Gesamtschau examples/222_gui_gesamtschau.dh mit echten Klicks bedient:
+' Navigation, Themenwahl (Klappliste, Pfeiltasten, Enter), ein Knopf der
+' Station NACH einem Klick ins Hauptfenster, dann der Schalter rechts nach
+' links. Zwei Funde stehen dahinter: das Hauptfenster kam beim Klick nach
+' vorn und verdeckte die Station samt ihren Knoepfen (jetzt
+' GUI_WINDOW_BACKGROUND), und die Themenwahl las die Klappliste mit
+' GUI_VALUE -- ein Laufzeitfehler bei jedem Themenwechsel.
+' Der Einschub hinter FLIP() schreibt die Aufnahme mit den echten Lagen
+' (erst dort steht die Geometrie fest) und protokolliert, was ankam.
+' Format: docs/werkzeuge.md, dhrt test.
+
+--- langsam
+=== klicks erreichen die station auch nach einem klick ins hauptfenster
+prBild = prBild + 1
+IF prBild = 3 THEN prAufnahme()
+IF GUI_CLICKED(funken) THEN prLog = prLog + " funken"
+IF GUI_CLICKED(bPruef) THEN prLog = prLog + " pruefen"
+IF GUI_CHANGED(themaWahl) THEN prLog = prLog + " thema" + STR$(GUI_DROPDOWN_SELECTED(themaWahl))
+IF GUI_CHANGED(sRtl) THEN prLog = prLog + " rtl"
+IF prBild = 230 THEN
+    PRINT "folge"; prLog
+    PRINT "station "; aktiv; " geprueft "; LEFT$(GUI_TEXT(befunde), 6) <> "Rechts"; " rtl "; GUI_WINDOW_IS_RTL(haupt)
+    EXIT(0)
+END IF
+--- programm ../../../examples/222_gui_gesamtschau.dh nach     FLIP()
+--- einschub nach DIM wahlStand AS STRING = ""
+DIM prBild AS INTEGER = 0
+DIM prLog AS STRING = ""
+DIM prEv AS STRING = ""
+DIM prN AS INTEGER = 0
+' Mitte eines Widgets auf dem Schirm: Fensterlage, Oberkante des Inhalts
+' (im Hauptfenster die Menueleiste), Lage im Fenster.
+FUNCTION prMitte(win AS GUI_WINDOW, w AS GUI_WIDGET, oben AS INTEGER) AS STRING
+    RETURN STR$(GUI_WINDOW_GET_X(win) + GUI_GET_X(w) + GUI_GET_W(w) \ 2) + " " + STR$(GUI_WINDOW_GET_Y(win) + oben + GUI_GET_Y(w) + GUI_GET_H(w) \ 2)
+END FUNCTION
+FUNCTION prNav(i AS INTEGER) AS STRING
+    DIM r AS TUPLE : r = GUI_LISTBOX_ITEM_RECT(nav, i)
+    RETURN STR$(r[0] + r[2] \ 2) + " " + STR$(r[1] + r[3] \ 2)
+END FUNCTION
+SUB prKlick(f AS INTEGER, lage AS STRING)
+    prEv = prEv + "e " + STR$(f) + " 7 " + lage + " 0 0" + CHR$(10)
+    prEv = prEv + "e " + STR$(f + 2) + " 6 0 0 0 0" + CHR$(10)
+    prEv = prEv + "e " + STR$(f + 3) + " 5 0 0 0 0" + CHR$(10)
+    prN = prN + 3
+END SUB
+SUB prTaste(f AS INTEGER, code AS INTEGER)
+    prEv = prEv + "e " + STR$(f) + " 2 " + STR$(code) + " 0 0 0" + CHR$(10)
+    prEv = prEv + "e " + STR$(f + 1) + " 1 " + STR$(code) + " 0 0 0" + CHR$(10)
+    prN = prN + 2
+END SUB
+SUB prAufnahme()
+    prKlick(0, prNav(9))                     ' Station Barrierefreiheit
+    prKlick(20, prMitte(haupt, themaWahl, MENUE_H))
+    prTaste(30, 264) : prTaste(34, 264) : prTaste(38, 264)
+    prTaste(44, 257)                         ' Enter: Thema 3 (Glas hell)
+    prKlick(70, prMitte(s9, bPruef, 0))      ' Knopf der Station nach Klicks oben
+    prKlick(100, prNav(6))                   ' Station Lebendig
+    prKlick(120, prMitte(s6, funken, 0))
+    prKlick(140, prMitte(haupt, sRtl, MENUE_H))
+    WRITEALL("prev.txt", "c " + STR$(prN) + CHR$(10) + prEv + CHR$(10))
+    AUTOMATION_PLAY("prev.txt")
+END SUB
+--- umgebung
+DHRT_FRAMES=240
+--- erwartet
+folge thema3 pruefen funken rtl
+station 6 geprueft TRUE rtl TRUE
+
+=== fast jeder knopf der schau tut, was er soll
+' Jede Station einmal, ihre Knoepfe der Reihe nach: ein Fehler, der nur
+' beim Klick laeuft (wie die Themenwahl), faellt so auf. Ausgelassen: das
+' echte Fenster (ein zweites Fenster des Systems) und der Inspektor.
+prBild = prBild + 1
+IF prBild = 3 THEN prAufnahme()
+DIM prK AS ARRAY OF GUI_WIDGET : prK = [kreis, raute, konfetti, sterne, streif, pruef6, anwenden, bToast, bDialog, bPal, bInfo, los, k1]
+DIM prNamen AS ARRAY OF STRING : prNamen = ["kreis", "raute", "konfetti", "sterne", "streif", "pruef6", "anwenden", "toast", "dialog", "palette", "info", "los", "karte"]
+DIM prI AS INTEGER
+FOR prI = 0 TO LEN(prK) - 1
+    IF GUI_CLICKED(prK[prI]) THEN prLog = prLog + " " + prNamen[prI] + "@" + STR$(aktiv)
+NEXT
+IF GUI_CHANGED(bHeilen) THEN prLog = prLog + " heilen"
+IF prBild = 420 THEN
+    PRINT "folge"; prLog
+    PRINT "station "; aktiv; " | "; GUI_TEXT(meldung1); " | "; GUI_TEXT(antwort); " | "; GUI_TEXT(stilFehler)
+    PRINT "befunde nach dem heilen: "; GUI_TEXT(befunde)
+    EXIT(0)
+END IF
+--- programm ../../../examples/222_gui_gesamtschau.dh nach     FLIP()
+--- einschub nach DIM wahlStand AS STRING = ""
+DIM prBild AS INTEGER = 0
+DIM prLog AS STRING = ""
+DIM prEv AS STRING = ""
+DIM prN AS INTEGER = 0
+' Mitte eines Widgets auf dem Schirm: Fensterlage, Oberkante des Inhalts
+' (im Hauptfenster die Menueleiste), Lage im Fenster.
+FUNCTION prMitte(win AS GUI_WINDOW, w AS GUI_WIDGET, oben AS INTEGER) AS STRING
+    RETURN STR$(GUI_WINDOW_GET_X(win) + GUI_GET_X(w) + GUI_GET_W(w) \ 2) + " " + STR$(GUI_WINDOW_GET_Y(win) + oben + GUI_GET_Y(w) + GUI_GET_H(w) \ 2)
+END FUNCTION
+FUNCTION prNav(i AS INTEGER) AS STRING
+    DIM r AS TUPLE : r = GUI_LISTBOX_ITEM_RECT(nav, i)
+    RETURN STR$(r[0] + r[2] \ 2) + " " + STR$(r[1] + r[3] \ 2)
+END FUNCTION
+SUB prKlick(f AS INTEGER, lage AS STRING)
+    prEv = prEv + "e " + STR$(f) + " 7 " + lage + " 0 0" + CHR$(10)
+    prEv = prEv + "e " + STR$(f + 2) + " 6 0 0 0 0" + CHR$(10)
+    prEv = prEv + "e " + STR$(f + 3) + " 5 0 0 0 0" + CHR$(10)
+    prN = prN + 3
+END SUB
+SUB prTaste(f AS INTEGER, code AS INTEGER)
+    prEv = prEv + "e " + STR$(f) + " 2 " + STR$(code) + " 0 0 0" + CHR$(10)
+    prEv = prEv + "e " + STR$(f + 1) + " 1 " + STR$(code) + " 0 0 0" + CHR$(10)
+    prN = prN + 2
+END SUB
+SUB prAufnahme()
+    prKlick(0, prNav(1))
+    prKlick(15, prMitte(s1, kreis, 0))
+    prKlick(30, prMitte(s1, raute, 0))
+    prKlick(45, prNav(6))
+    prKlick(60, prMitte(s6, konfetti, 0))
+    prKlick(75, prMitte(s6, sterne, 0))
+    prKlick(90, prMitte(s6, streif, 0))
+    prKlick(105, prMitte(s6, pruef6, 0))
+    prKlick(120, prNav(7))
+    prKlick(135, prMitte(s7, anwenden, 0))
+    prKlick(150, prNav(8))
+    prKlick(165, prMitte(s8, bToast, 0))
+    prKlick(180, prMitte(s8, bDialog, 0))
+    prTaste(200, 257)                         ' Enter: Ja
+    prKlick(220, prMitte(s8, bPal, 0))
+    prTaste(240, 256)                         ' ESC schliesst die Palette
+    prKlick(255, prMitte(s8, bInfo, 0))
+    prKlick(275, prNav(9))
+    prKlick(290, prMitte(s9, bHeilen, 0))
+    prKlick(310, prNav(0))
+    prKlick(325, prMitte(s0, los, 0))         ' springt zu Station 2
+    prKlick(345, prNav(0))
+    prKlick(360, prMitte(s0, k1, 0))          ' Karte: springt zu Lebendig
+    WRITEALL("prev.txt", "c " + STR$(prN) + CHR$(10) + prEv + CHR$(10))
+    AUTOMATION_PLAY("prev.txt")
+END SUB
+--- umgebung
+DHRT_FRAMES=430
+--- erwartet
+folge kreis@1 raute@1 konfetti@6 sterne@6 streif@6 pruef6@6 anwenden@7 toast@8 dialog@8 palette@8 info@8 heilen los@1 karte@6
+station 6 | Getroffen: die Raute | Dialog: Ja 😊 | Angewendet.
+befunde nach dem heilen: Keine Befunde ✅
+
+=== inspektor waehlt ohne zu druecken und das echte fenster kommt
+' Der Inspektor: ein Klick waehlt das Widget, erreicht es aber nicht, ESC
+' schliesst ihn. "Echtes Fenster" zeigt das zweite gui-Fenster als eigenes
+' Fenster des Systems (wo es keins gibt, sagt die Schau es).
+prBild = prBild + 1
+IF prBild = 3 THEN prAufnahme()
+IF GUI_CLICKED(bToast) THEN prLog = prLog + " toast"
+IF GUI_CLICKED(bIns) THEN prLog = prLog + " inspektor"
+IF GUI_CLICKED(bFenster) THEN prLog = prLog + " fenster"
+IF prBild = 40 THEN PRINT "inspektor offen "; GUI_INSPECTOR()
+IF prBild = 60 THEN PRINT "gewaehlt toast "; GUI_INSPECTOR_SELECTED() = bToast
+IF prBild = 80 THEN PRINT "nach esc offen "; GUI_INSPECTOR()
+IF prBild = 130 THEN
+    PRINT "folge"; prLog
+    PRINT "zweites fenster "; GUI_WINDOW_SHOWN(zweit); " echt oder gesagt "; GUI_WINDOW_IS_NATIVE(zweit) OR INSTR(GUI_TEXT(antwort), "keine echten") >= 0
+    GUI_WINDOW_NATIVE(zweit, FALSE)
+    EXIT(0)
+END IF
+--- programm ../../../examples/222_gui_gesamtschau.dh nach     FLIP()
+--- einschub nach DIM wahlStand AS STRING = ""
+DIM prBild AS INTEGER = 0
+DIM prLog AS STRING = ""
+DIM prEv AS STRING = ""
+DIM prN AS INTEGER = 0
+' Mitte eines Widgets auf dem Schirm: Fensterlage, Oberkante des Inhalts
+' (im Hauptfenster die Menueleiste), Lage im Fenster.
+FUNCTION prMitte(win AS GUI_WINDOW, w AS GUI_WIDGET, oben AS INTEGER) AS STRING
+    RETURN STR$(GUI_WINDOW_GET_X(win) + GUI_GET_X(w) + GUI_GET_W(w) \ 2) + " " + STR$(GUI_WINDOW_GET_Y(win) + oben + GUI_GET_Y(w) + GUI_GET_H(w) \ 2)
+END FUNCTION
+FUNCTION prNav(i AS INTEGER) AS STRING
+    DIM r AS TUPLE : r = GUI_LISTBOX_ITEM_RECT(nav, i)
+    RETURN STR$(r[0] + r[2] \ 2) + " " + STR$(r[1] + r[3] \ 2)
+END FUNCTION
+SUB prKlick(f AS INTEGER, lage AS STRING)
+    prEv = prEv + "e " + STR$(f) + " 7 " + lage + " 0 0" + CHR$(10)
+    prEv = prEv + "e " + STR$(f + 2) + " 6 0 0 0 0" + CHR$(10)
+    prEv = prEv + "e " + STR$(f + 3) + " 5 0 0 0 0" + CHR$(10)
+    prN = prN + 3
+END SUB
+SUB prTaste(f AS INTEGER, code AS INTEGER)
+    prEv = prEv + "e " + STR$(f) + " 2 " + STR$(code) + " 0 0 0" + CHR$(10)
+    prEv = prEv + "e " + STR$(f + 1) + " 1 " + STR$(code) + " 0 0 0" + CHR$(10)
+    prN = prN + 2
+END SUB
+SUB prAufnahme()
+    prKlick(0, prNav(8))
+    prKlick(15, prMitte(s8, bIns, 0))
+    prKlick(45, prMitte(s8, bToast, 0))       ' waehlt, drueckt nicht
+    prTaste(65, 256)                          ' ESC schliesst den Inspektor
+    prKlick(90, prMitte(s8, bFenster, 0))
+    WRITEALL("prev.txt", "c " + STR$(prN) + CHR$(10) + prEv + CHR$(10))
+    AUTOMATION_PLAY("prev.txt")
+END SUB
+--- umgebung
+DHRT_FRAMES=140
+--- erwartet
+inspektor offen TRUE
+gewaehlt toast TRUE
+nach esc offen FALSE
+folge inspektor fenster
+zweites fenster TRUE echt oder gesagt TRUE

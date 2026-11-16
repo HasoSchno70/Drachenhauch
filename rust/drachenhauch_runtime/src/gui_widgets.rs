@@ -1225,9 +1225,8 @@ impl Gui {
         if max <= 0 { return None; }
         let (ax, ay, aw, ah) = self.abs_rect(wi, w);
         let bw = self.sk(8);
-        // Ein gespiegelter Baum hat den Balken links (die Liste spiegelt ihr
-        // Inneres noch nicht und behaelt ihn rechts).
-        let links = w.kind == Kind::Tree && self.windows[wi].rtl;
+        // Gespiegelt stehen Baum und Liste mit dem Balken links.
+        let links = self.windows[wi].rtl;
         let tx = if links { ax + 1 } else { ax + aw - 1 - bw };
         let (ty, th) = (ay + 1, (ah - 2).max(1));
         let inhalt = max + w.h;
@@ -1324,7 +1323,10 @@ impl Gui {
         // beim Oeffnen nicht springt.
         let box_w = self.list_box_w(w);
         let x0 = if box_w > 0 { ax + box_w - self.sk(3) } else { ax + 1 };
-        Some((x0, ay + pos * ih - w.value as i32, (ax + aw - 2 - bar - x0).max(8), ih))
+        let breite = (ax + aw - 2 - bar - x0).max(8);
+        // Gespiegelt: dasselbe Feld an der Breite der Liste gespiegelt.
+        let x0 = if self.windows[wi].rtl { 2 * ax + aw - x0 - breite } else { x0 };
+        Some((x0, ay + pos * ih - w.value as i32, breite, ih))
     }
     /// Wo der Text einer Listenzeile beginnt: hinter Kaestchen und Sinnbild.
     pub(super) fn list_text_x(&self, w: &Widget, ax: i32) -> i32 {
@@ -1545,6 +1547,8 @@ impl Gui {
     pub(super) fn knopf_text(&self, w: &Widget) -> i64 {
         if !w.enabled { return self.stil_farbe(w, "fg", stil::AUS).unwrap_or_else(|| self.th("muted_fg")); }
         if let Some(c) = self.eigen(w, "fg") { return self.stil_misch(w, "fg", c); }
+        // Auf einem Farbverlauf zaehlen alle seine Farben, nicht `bg`.
+        if let Some(f) = self.w_verlauf_farben(w) { return self.stil_misch(w, "fg", lesbar_auf_allen(&f)); }
         let c = match w.variante {
             5 | 7 => self.wcol(w, "accent", "accent"),
             6 => self.th("text_fg"),

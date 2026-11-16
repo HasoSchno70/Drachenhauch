@@ -1102,7 +1102,25 @@ pub(super) fn coerce_array(value: Value, elem: &str, ctx: &str) -> R<Value> {
     // den Namen der Vorfahrin kommt keine Katze in ein Feld von Hunden.
     if crate::value::klasse_erbt(&ist, elem) { return Ok(value); }
     if ist == "any" { return any_feld_annehmen(value, elem, ctx); }
+    // Ein frisches Literal an ein Feld eines Modul-Typs: `[a, b]` aus zwei
+    // GUI_WIDGET ist ein ARRAY OF INTEGER, weil die Handles der gui ganze
+    // Zahlen sind -- bis 2026.50 scheiterte `DIM k AS ARRAY OF GUI_WIDGET :
+    // k = [a, b]` daran (gefunden beim Klick-Test der Gesamtschau). Nimmt der
+    // Typ jedes Element als Einzelwert an, nimmt das Feld seinen Typ an; wie
+    // beim FLOAT-Ziel oben nur, wenn es sonst niemandem gehoert. Bei einer
+    // Klasse passt eine Zahl nie, dort bleibt es beim Fehler unten.
+    if Rc::strong_count(arr) == 1 && modul_typ(elem)
+        && arr.borrow().cells.to_values().into_iter().all(|v| coerce(v, elem, ctx).is_ok()) {
+        return any_feld_annehmen(value, elem, ctx);
+    }
     Err(format!("{}: Erwartet {}, erhalten ARRAY OF {}", ctx, ziel, typ_lesbar(&ist)))
+}
+
+/// Ein Typ, den kein einfacher Wert, Feld, MAP oder TUPLE beschreibt: ein
+/// Modul-Typ (GUI_WIDGET, JSON_HANDLE ...) oder eine Klasse.
+fn modul_typ(t: &str) -> bool {
+    !matches!(t, "" | "any" | "integer" | "float" | "string" | "boolean" | "tuple" | "funcref" | "geld")
+        && !t.starts_with("array:") && !t.starts_with("map:")
 }
 
 /// Ein Feld ohne Elementtyp (ARRAY OF ANY, etwa ein Literal mit Objekten

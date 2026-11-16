@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/en und dem englischen Buch von `dhrt doku prosa` -- NICHT von Hand aendern. Der Hover nimmt sie mit DHRT_LANG=en.",
- "count": 2457,
+ "count": 2459,
  "docs": {
   "ABS": "Absolute value.",
   "ACOS": "Arc sine/cosine (x in [-1, 1])",
@@ -1167,6 +1167,7 @@
   "GUI_VSLIDER": "GUI_WIDGET — vertical slider — h is the length, the value grows upwards",
   "GUI_WINDOW": "GUI_WINDOW — create a window",
   "GUI_WINDOW_AT": "topmost visible window at the screen point, or -1 -- whoever evaluates the mouse wheel themselves asks here whether their area is currently on top",
+  "GUI_WINDOW_BACKGROUND": "background window: it stays behind all other windows, even when clicked into or with GUI_WINDOW_FRONT (it still gets the focus). For a borderless main window with sub-windows on top -- without it the first click into the main window brought it to the front, and it covered the sub-windows and their clicks",
   "GUI_WINDOW_CANCEL": "cancel button: ESC triggers it (-1 = none)",
   "GUI_WINDOW_CHROME": "draw title bar/border/buttons? Off = borderless, content starts at the top (so that a form can fill the OS window). Default: on",
   "GUI_WINDOW_CLIP": "show a window in design mode only in this part of the screen (logical points like GUI_WINDOW_SET_BOUNDS): what lies outside is not drawn and takes no click (GUI_HIT_TEST, GUI_WINDOW_AT). b or h ≤ 0 removes the clip. Outside design mode it is an error",
@@ -1188,6 +1189,7 @@
   "GUI_WINDOW_GLOWING": "BOOLEAN — is a streak of light running (also during the pause between two)?",
   "GUI_WINDOW_GLOW_SET": "configure the streak of light: farbe (colour), dauer (duration), pause (ms until it returns, 0 = once), richtung (direction: rechts/links/unten/oben), breite (width), staerke (strength, 0..1), rand (edge), art (kind: streif, lampe or rahmen)",
   "GUI_WINDOW_GLOW_STOP": "stop the streak of light",
+  "GUI_WINDOW_IS_BACKGROUND": "BOOLEAN — is it a background window?",
   "GUI_WINDOW_IS_NATIVE": "BOOLEAN — is it a real OS window right now?",
   "GUI_WINDOW_IS_RTL": "is the window right to left?",
   "GUI_WINDOW_MODAL": "make one of your own windows modal: everything else lies behind the overlay and accepts no input",

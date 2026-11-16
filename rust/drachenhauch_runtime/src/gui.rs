@@ -356,11 +356,15 @@ fn gloss_unten(y1: i32, y2: i32, rad: i32) -> i32 {
     if rad * 2 >= y2 - y1 { y2 } else { y1 + (y2 - y1) / 2 }
 }
 
+/// Heller oder dunkler -- die Deckkraft (oberstes Byte) bleibt. Bis
+/// 2026.50 fiel sie weg: unter den Glas-Themen (Verlauf, Glanz) wurde eine
+/// halbdurchsichtige Flaeche (`bg: #40FFFFFF`) deckend weiss -- gefunden mit
+/// der Gesamtschau (examples/222).
 fn shade(color: i64, delta: i32) -> i64 {
     let r = (((color >> 16) & 0xFF) as i32 + delta).clamp(0, 255);
     let g = (((color >> 8) & 0xFF) as i32 + delta).clamp(0, 255);
     let b = ((color & 0xFF) as i32 + delta).clamp(0, 255);
-    ((r << 16) | (g << 8) | b) as i64
+    (color & 0xFF00_0000) | ((r << 16) | (g << 8) | b) as i64
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -2556,7 +2560,7 @@ struct RichState {
     quelle: String,
     zeilen: Vec<RtZeile>,
     inhalt_h: i32,
-    stand: (usize, i32, i32, i32),   // (Quelllaenge, Breite, Basisgroesse, Massstab*100)
+    stand: (usize, i32, i32, i32, u64),   // (Quelllaenge, Breite, Basisgroesse, Massstab*100, Schriftstand)
     scroll: i32,
     basis: i32,          // 0 = Groesse des Widgets/Themas
     code_font: i64,      // -1 = dieselbe Schrift wie der Fliesstext
@@ -3011,6 +3015,14 @@ fn kontrast(a: i64, b: i64) -> f64 {
 /// 2026.49 entschied eine Helligkeitsgrenze (Luma 160): auf dem Cyan des
 /// dunklen Themas ergab das weisse Schrift mit 2,1:1 statt dunkler mit 7,9:1,
 /// auf Gruen und Orange ebenso -- gefunden mit GUI_A11Y_CHECK$.
+/// Lesbare Schrift auf einem Farbverlauf: die der beiden, deren schlechtester
+/// Kontrast ueber alle Farben hoeher ist -- auf Gelb nach Cyan dunkel, auch
+/// wenn `bg` dunkel ist.
+fn lesbar_auf_allen(farben: &[i64]) -> i64 {
+    let schlechtester = |fg: i64| farben.iter().map(|&c| kontrast(fg, c & 0xFFFFFF)).fold(f64::INFINITY, f64::min);
+    if schlechtester(0x1C2026) > schlechtester(0xFFFFFF) { 0x1C2026 } else { 0xFFFFFF }
+}
+
 fn lesbar_auf(bg: i64) -> i64 {
     let bg = bg & 0xFFFFFF;
     if kontrast(0x1C2026, bg) > kontrast(0xFFFFFF, bg) { 0x1C2026 } else { 0xFFFFFF }
@@ -3481,6 +3493,10 @@ pub struct Window {
     /// Rechts nach links (GUI_WINDOW_RTL): die Lage der Widgets gespiegelt
     /// (`abs_rect`), die Menueleiste von rechts.
     rtl: bool,
+    /// Hintergrundfenster (GUI_WINDOW_BACKGROUND): bleibt hinter allen
+    /// anderen, auch wenn man hineinklickt -- ein randloses Hauptfenster,
+    /// ueber dem Unterfenster liegen, verdeckte sie sonst nach dem ersten Klick.
+    hinten: bool,
     /// Vergroesserung beim Zeichnen (GUI_WINDOW_ZOOM), nur im Entwurfsmodus:
     /// das Fenster bekommt dort keine Eingabe, also muss nur GUI_HIT_TEST
     /// (und wo ein Fenster liegt) die Mauslage zurueckrechnen.
@@ -4028,6 +4044,9 @@ pub struct Gui {
     /// Stildatei), None = die Metrik. Gesetzt in `draw_widget`, gelesen in
     /// `flaeche` -- so gilt sie fuer jede Flaeche des Widgets.
     rad_jetzt: std::cell::Cell<Option<i32>>,
+    /// Der Farbverlauf des Widgets, das gerade gezeichnet wird (Stildatei
+    /// `farbverlauf`) -- `flaeche` nimmt ihn statt der Grundfarbe.
+    bahn_jetzt: std::cell::RefCell<Option<(Vec<i64>, f32, f32, bool)>>,
     /// Verlauf, Glanz, Fase und Rand des Widgets, das gerade gezeichnet wird.
     form_jetzt: std::cell::Cell<stil::FormStil>,
     /// Alt-Buchstaben (GUI_MNEMONICS): `&` im Text markiert sie.
@@ -4130,7 +4149,7 @@ impl Gui {
             scroll_drag: None,
             was_mouse_down: false, zug_feld: None, frame_count: 0, takt: 0.0, kontrast_modus: 0, hoch_kontrast: false, bedarf: std::cell::Cell::new(f64::INFINITY),
             theme: default_theme(), metrics: default_metrics(),
-            stil: None, stil_stand: 0, rad_jetzt: std::cell::Cell::new(None), form_jetzt: std::cell::Cell::new(stil::FormStil::default()),
+            stil: None, stil_stand: 0, rad_jetzt: std::cell::Cell::new(None), bahn_jetzt: std::cell::RefCell::new(None), form_jetzt: std::cell::Cell::new(stil::FormStil::default()),
             mnemonics: false, label_zug: None, label_wahl: None, gruppen: HashMap::new(), schriftwahl: Vec::new(),
             styles: HashMap::new(),
             pending: Vec::new(),
@@ -4241,7 +4260,7 @@ impl Gui {
         let idx = self.windows.len();
         self.windows.push(Window {
             title, name: String::new(), x, y, w, h, widgets: Vec::new(),
-            movable: true, closable: false, visible: true, entwurf: false, rtl: false, zoom: 1.0, zuschnitt: None,
+            movable: true, closable: false, visible: true, entwurf: false, rtl: false, hinten: false, zoom: 1.0, zuschnitt: None,
             resizable: false, pruefung_live: false, form_stand: Vec::new(), form_db: Vec::new(), chrome: true, min_w: 0, min_h: 0, max_w: 0, max_h: 0,
             base_w: w, base_h: h,
             close_clicked: false, alive: true, dlg: false, answer: 0,
@@ -5696,6 +5715,11 @@ impl Gui {
     pub fn label(&mut self, win: i64, text: String, x: i32, y: i32, color: Option<i64>) -> Result<i64, String> {
         let w = (text.chars().count() as i32 * 8).max(1);
         let mut wd = Self::blank(Kind::Label, x, y, w, 16); wd.text = text;
+        // Die Breite folgt dem Text (gemessen in jedem GUI_UPDATE), bis das
+        // Programm eine setzt -- die Schaetzung oben gilt nur bis dahin. Bis
+        // 2026.50 blieb sie stehen: im gespiegelten Fenster lief eine grosse
+        // Schrift dann ueber den rechten Rand (gesehen in der Gesamtschau).
+        wd.auto_w = true;
         let h = self.add_widget(win, "GUI_LABEL", wd)?;
         if let Some(c) = color { let (wi, i) = Self::dec_widget(h); self.windows[wi].widgets[i].color = c; }
         Ok(h)

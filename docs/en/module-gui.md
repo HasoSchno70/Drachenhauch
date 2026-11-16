@@ -75,6 +75,8 @@ IMPORT "gui"
 | `GUI_POPUP_WINDOWS()` | INTEGER | how many popups are standing as a window of their own beyond the edge of their native window right now (0 = all inside their window) |
 | `GUI_WINDOW_VISIBLE(win, an)` | — | set visibility |
 | `GUI_WINDOW_FRONT(win)` | — | bring the window to the front without giving it focus -- for a suggestion list or a tooltip that should lie over the text while typing. Shown via `GUI_WINDOW_VISIBLE`, a window otherwise lies behind the one clicked last |
+| `GUI_WINDOW_BACKGROUND(win, an)` | — | background window: it stays behind all other windows, even when clicked into or with `GUI_WINDOW_FRONT` (it still gets the focus). For a borderless main window with sub-windows on top -- without it the first click into the main window brought it to the front, and it covered the sub-windows and their clicks |
+| `GUI_WINDOW_IS_BACKGROUND(win)` | BOOLEAN | is it a background window? |
 | `GUI_WINDOW_SHOWN(win)` | BOOLEAN | is the window currently visible? The counterpart to the setter -- without the getter a program would have to remember what it set itself, and would be wrong as soon as the user closes the window with its cross |
 | `GUI_WINDOW_RESIZABLE(win, an)` | — | resizable by the lower-right grip (default: off) |
 | `GUI_WINDOW_SCROLLABLE(win, an)` | — | content scrolls when it is taller than the window (mouse wheel + scroll bar). Content height determined automatically from the widgets. Default: off |
@@ -832,7 +834,11 @@ GUI_LABEL(win, text$, x, y[, farbe]) -> GUI_WIDGET
 ```
 
 Static text. Default colour white. Can be changed at any time with
-`GUI_SET_TEXT(lbl, ...)` (e.g. to show a slider value live).
+`GUI_SET_TEXT(lbl, ...)` (e.g. to show a slider value live). The width
+follows the text (measured in `GUI_UPDATE`, also with font and size from the
+stylesheet) until `GUI_SET_BOUNDS` or `GUI_SET_WRAP` sets one -- only then
+does `GUI_SET_ALIGN` take effect. In a mirrored window (`GUI_WINDOW_RTL`)
+the text thus ends exactly at the edge.
 
 ```basic
 GUI_SET_WRAP(lbl, 220)              ' wrap at word boundaries at 220 px
@@ -2563,6 +2569,7 @@ properties for it, plus four commands:
 | `gleiten: 200` | smooth layout transitions (duration in ms, 0..2000): when position or size change (layout, `GUI_SET_BOUNDS`, window size), the picture glides from the old to the new rectangle, easing out; a widget that becomes visible grows in. The hit area is at the target at once. Only in rules without a state; `* { gleiten: 200 }` applies to the whole application |
 | `GUI_GLIDING(wdg)` | is the widget gliding right now? |
 | `unschaerfe: 12` | glass: what is drawn behind the widget (an image, a map, other widgets) lies blurred beneath it (radius 0..40); a surface with opacity shows through: `panel.glas { unschaerfe: 12; bg: #60FFFFFF; radius: 14 }`. Works on the main surface, in real windows and in render targets. Only in rules without a state |
+| `farbverlauf: #FF6B6B #845EC2 #2C73D2 45 wandert 6s` | colour gradient instead of the single base colour: 2 to 6 colours (also names of the theme), then optionally the angle in degrees (0 = to the right, 90 = downwards, 45 = diagonally to the bottom right) and `wandert [duration]` -- then the colours run in a circle (the last blends back into the first) and move seamlessly in the direction of the angle, one round in the duration (`ms` or `s`, 500 ms to 60 s, default 6 s). For panels, cards, buttons (also `form: pille` and `kreis`) and every other surface of the widget; rounding, gloss and border come on top. The gui picks a button's text by all colours of the gradient (the one more readable at its least favourable point), and `GUI_A11Y_CHECK$` measures against that point. With `GUI_SET_MOTION("aus")` it stands still; a moving one reports in idle mode that it needs every frame. `farbverlauf: aus` takes back an inherited one (English alias `fill-gradient`). Only in rules without a state |
 
 ```basic
 IMPORT "gui"
@@ -2983,6 +2990,15 @@ result in the same JSON.
 See [examples/45_gui.dh](../../examples/45_gui.dh): a window with a slider (mirrored live into the
 label), checkbox, text input and start button — movable and
 closable.
+
+**Everything at once, as a tour:**
+[examples/222_gui_gesamtschau.dh](../../examples/222_gui_gesamtschau.dh) --
+ten stations over a moving background: glass, shapes and
+animations from the stylesheet, colour emoji and scripts of the world, a
+table with a million rows, the stylesheet to edit, tools
+(palette, inspector, real window) and the accessibility
+check. At the top, theme, right to left, motion, sounds,
+frugal and contrast switch the whole interface.
 
 **All 22 widget kinds in one application:**
 [examples/156_gui_alle_widgets.dh](../../examples/156_gui_alle_widgets.dh) —
@@ -4525,7 +4541,7 @@ typed.
 | Command | What it does |
 |---|---|
 | `TEXT_VISUAL$(text$ [, direction$])` | The text as it is displayed -- for your own output such as files or images. `direction$` = `auto` (default), `ltr` or `rtl` |
-| `GUI_WINDOW_RTL(win, an)` | the whole window right to left: the position of every widget mirrored at the window's width, the menu bar and the toolbar start on the right, check boxes, radio buttons and switches carry their mark to the right of the text, a slider grows to the left (dragging and arrow keys too), a text field or text area without `GUI_SET_ALIGN` is right-aligned, a table starts with its first column on the right (the edge to drag lies on the left), a tree indents from the right (the left arrow expands, renaming happens on the right). Tree, table and text area have their scroll bar on the left; a line wider than the text area shows its end on the right and scrolls to the left. Lists keep their inside as it is. The program keeps setting and reading its positions from the left (`GUI_GET_X`); drawing, clicks and `GUI_HIT_TEST` go through the mirrored one |
+| `GUI_WINDOW_RTL(win, an)` | the whole window right to left: the position of every widget mirrored at the window's width, the menu bar and the toolbar start on the right, check boxes, radio buttons and switches carry their mark to the right of the text, a slider grows to the left (dragging and arrow keys too), a text field or text area without `GUI_SET_ALIGN` is right-aligned, a table starts with its first column on the right (the edge to drag lies on the left), a tree indents from the right (the left arrow expands, renaming happens on the right). Tree, list, table and text area have their scroll bar on the left; a line wider than the text area shows its end on the right and scrolls to the left. A list is right-aligned, check boxes on the right, detail text on the left. The program keeps setting and reading its positions from the left (`GUI_GET_X`); drawing, clicks and `GUI_HIT_TEST` go through the mirrored one |
 | `GUI_WINDOW_IS_RTL(win)` | is the window right to left? |
 
 Indic and Southeast Asian scripts and the ligatures of a font are set by

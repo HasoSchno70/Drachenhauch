@@ -147,9 +147,14 @@ impl Gui {
         let pad = self.m("pad");
         let rad = self.m("corner_radius");
         let shadow = self.m("shadow");
+        // Ein durchscheinender Grund (Deckkraft 1..254 im obersten Byte; 0 heisst
+        // deckend) zeigte den Schatten durch die ganze Flaeche -- das Fenster
+        // wurde grau statt hell (gesehen in der Gesamtschau, Glas hell).
+        let a = (self.th("win_bg") >> 24) & 0xFF;
+        let durchscheinend = a != 0 && a != 0xFF;
         // Fenster-Schatten (modern): weiche, halbtransparente Lagen nach unten/rechts
         // versetzt -> das Fenster "schwebt" ueberm Hintergrund statt aufgeklebt.
-        if shadow > 0 {
+        if shadow > 0 && !durchscheinend {
             for k in 0..3 {
                 let off = 3 + k * 3;
                 let grow = k * 2;
@@ -748,6 +753,7 @@ impl Gui {
         // Die Rundung aus der Stildatei gilt fuer jede Flaeche dieses Widgets.
         let vorher = self.rad_jetzt.replace(self.w_radius(wdg));
         let form_vorher = self.form_jetzt.replace(self.w_form(wdg));
+        let bahn_vorher = self.bahn_jetzt.replace(self.w_farbverlauf(wdg));
         // Animation und Gleiten (gui_aussehen.rs): das ganze Widget um seine
         // Mitte verschoben, gedreht oder vergroessert -- Lage und Treffer
         // bleiben.
@@ -776,6 +782,7 @@ impl Gui {
         if anim.is_some() { g.verformung_beenden(); }
         if deck.is_some() { g.schicht_ende(); }
         self.form_jetzt.set(form_vorher);
+        self.bahn_jetzt.replace(bahn_vorher);
         self.rad_jetzt.set(vorher);
     }
 
@@ -856,16 +863,33 @@ impl Gui {
                 if eigen_flaeche {
                 } else if matches!(form, aussehen::F_PILLE | aussehen::F_KREIS | aussehen::F_RAUTE) {
                     let (bg, rahmen) = self.knopf_farben(wi, idx, wdg);
+                    // Ein Farbverlauf (Stildatei `farbverlauf`) fuellt Pille und
+                    // Kreis; Ueberfahren und Druecken legen einen hellen bzw.
+                    // dunklen Schleier darueber (die Mischfarbe gibt es dann nicht).
+                    let bahn = self.bahn_jetzt.borrow().clone();
+                    let schleier = if ed > 0.0 { deckkraft(0x000000, ed * 0.22) } else { deckkraft(0xFFFFFF, eh * 0.16) };
                     match form {
                         aussehen::F_PILLE => {
                             let r = (w.min(h) / 2).max(2);
-                            g.round_rect(ax, ay, ax + w - 1, ay + h - 1, r, bg, true);
+                            match &bahn {
+                                Some((f, wk, ph, zy)) => {
+                                    g.farbbahn(ax, ay, ax + w - 1, ay + h - 1, r, f, *wk, *ph, *zy);
+                                    if eh > 0.0 || ed > 0.0 { g.round_rect(ax, ay, ax + w - 1, ay + h - 1, r, schleier, true); }
+                                }
+                                None => g.round_rect(ax, ay, ax + w - 1, ay + h - 1, r, bg, true),
+                            }
                             g.round_rect(ax, ay, ax + w - 1, ay + h - 1, r, rahmen, false);
                         }
                         aussehen::F_KREIS => {
                             let r = (w.min(h) / 2).max(2);
                             let (cx, cy) = (ax + w / 2, ay + h / 2);
-                            g.circle(cx, cy, r, bg);
+                            match &bahn {
+                                Some((f, wk, ph, zy)) => {
+                                    g.farbbahn(cx - r, cy - r, cx + r - 1, cy + r - 1, r, f, *wk, *ph, *zy);
+                                    if eh > 0.0 || ed > 0.0 { g.circle(cx, cy, r, schleier); }
+                                }
+                                None => g.circle(cx, cy, r, bg),
+                            }
                             g.circle_outline(cx, cy, r, rahmen);
                         }
                         _ => {
@@ -1677,6 +1701,13 @@ impl Gui {
                 let bar = self.list_bar_geom(wi, idx);
                 let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
                 let wz = if bar.is_some() { w - self.sk(8) - 2 } else { w };
+                // Rechts nach links: gerechnet wird weiter von links, gespiegelt
+                // erst hier -- ein Block (x, Breite) an der Breite der Liste, wie
+                // im Baum. Der Rollbalken steht dann links (`list_bar_geom`),
+                // die Zeilen beginnen hinter ihm.
+                let gesp = self.windows[wi].rtl;
+                let blk = |x: i32, bw: i32| if gesp { 2 * ax + w - x - bw } else { x };
+                let (sx1, sx2) = { let x = blk(ax + 1, wz - 2); (x, x + wz - 3) };
                 g.push_clip(ax + 1, ay + 1, w - 2, h - 2);
                 if ansicht.is_empty() {
                     // Leer ist eine Aussage: "keine Treffer" statt einer Flaeche,
@@ -1697,10 +1728,14 @@ impl Gui {
                         let ty = iy + (ih - self.wsize(g, wdg)).max(0) / 2;
                         let kc = mischen(acc, fg, 0.35);
                         let it = &Self::sichtbar_vorn(it, wz);
-                        self.wtext(g, wdg, ax + pad, ty, it.clone(), kc);
-                        self.wtext(g, wdg, ax + pad + 1, ty, it.clone(), kc);
-                        let tw = self.wtext_width(g, wdg, it) + self.sk(8);
-                        g.line(ax + pad + tw, iy + ih / 2, ax + w - pad, iy + ih / 2, self.wcol(wdg, "border", "widget_border"));
+                        let tbw = self.wtext_width(g, wdg, it);
+                        let kx = blk(ax + pad, tbw);
+                        self.wtext(g, wdg, kx, ty, it.clone(), kc);
+                        self.wtext(g, wdg, kx + 1, ty, it.clone(), kc);
+                        let tw = tbw + self.sk(8);
+                        let (l1, l2) = (ax + pad + tw, ax + w - pad);
+                        let (l1, l2) = if gesp { (blk(l2, 0), blk(l1, 0)) } else { (l1, l2) };
+                        g.line(l1, iy + ih / 2, l2, iy + ih / 2, self.wcol(wdg, "border", "widget_border"));
                         continue;
                     }
                     let gewaehlt = match l {
@@ -1708,16 +1743,16 @@ impl Gui {
                         _ => k as i32 == wdg.sel,
                     };
                     if gewaehlt {
-                        g.box_fill(ax + 1, iy, ax + wz - 2, iy + ih - 1, shade(acc, -110));
+                        g.box_fill(sx1, iy, sx2, iy + ih - 1, shade(acc, -110));
                     } else if !aus && wdg.zeile_b.anteil(k as i32) > 0.0 {
                         let a = wdg.zeile_b.anteil(k as i32);
-                        g.box_fill(ax + 1, iy, ax + wz - 2, iy + ih - 1, deckkraft(shade(self.wcol(wdg, "bg", "widget_bg"), 22), a));
+                        g.box_fill(sx1, iy, sx2, iy + ih - 1, deckkraft(shade(self.wcol(wdg, "bg", "widget_bg"), 22), a));
                     }
                     let mut tx = ax + pad;
                     if box_w > 0 {
                         // Kaestchen wie das Checkbox-Widget: Rahmen, gefuellt mit Haken.
                         let cs = (ih - 8).max(8);
-                        let bx = ax + 4;
+                        let bx = blk(ax + 4, cs);
                         let by = iy + (ih - cs) / 2;
                         let an = l.and_then(|l| l.checks.get(k).copied()).unwrap_or(false);
                         g.rect(bx, by, bx + cs - 1, by + cs - 1, self.wcol(wdg, "border", "widget_border"));
@@ -1728,7 +1763,7 @@ impl Gui {
                     }
                     if let Some(ic) = l.and_then(|l| l.icons.get(k).copied()).filter(|&i| i >= 0) {
                         let isz = ih - 4;
-                        g.draw_image_rect(ic, tx, iy + 2, isz, isz);
+                        g.draw_image_rect(ic, blk(tx, isz), iy + 2, isz, isz);
                     }
                     tx += icon_w + if icon_w > 0 { 2 } else { 0 };
                     // Auf der Auswahl folgt die Schrift dem GRUND: im hellen Thema
@@ -1744,12 +1779,12 @@ impl Gui {
                         Some(d) => {
                             let dw = self.wtext_width(g, wdg, d);
                             let dx = ax + wz - pad - dw;
-                            self.wtext(g, wdg, dx, ty, d.clone(), if gewaehlt { mischen(fg, muted, 0.4) } else { muted });
+                            self.wtext(g, wdg, blk(dx, dw), ty, d.clone(), if gewaehlt { mischen(fg, muted, 0.4) } else { muted });
                             dx - self.sk(10)
                         }
                         None => ax + wz - 2,
                     };
-                    g.push_clip(tx, iy, (rechts - tx).max(0), ih);
+                    g.push_clip(blk(tx, (rechts - tx).max(0)), iy, (rechts - tx).max(0), ih);
                     let spans = l.and_then(|l| l.spans.get(k)).filter(|s| !s.is_empty());
                     match spans {
                         // Auf der Auswahl und gesperrt: EINE Farbe, die dort
@@ -1771,17 +1806,20 @@ impl Gui {
                                 pos = e;
                             }
                             if pos < zeichen.len() { laeufe.push((pos, zeichen.len(), farbe)); }
+                            let ganz: String = zeichen.iter().collect();
+                            let basis = blk(tx, self.wtext_width(g, wdg, &ganz));
                             for (a, e, c) in laeufe {
                                 let vor: String = zeichen[..a].iter().collect();
                                 let teil: String = zeichen[a..e].iter().collect();
-                                let x = tx + self.wtext_width(g, wdg, &vor);
+                                let x = basis + self.wtext_width(g, wdg, &vor);
                                 self.wtext(g, wdg, x, ty, teil, c);
                             }
                         }
                         _ => {
                             let t = self.mit_auslassung(g, wdg, it, rechts - tx)
                                 .unwrap_or_else(|| Self::sichtbar_vorn(it, rechts - tx));
-                            self.wtext(g, wdg, tx, ty, t, farbe)
+                            let tw = self.wtext_width(g, wdg, &t);
+                            self.wtext(g, wdg, blk(tx, tw), ty, t, farbe)
                         }
                     }
                     g.pop_clip();
@@ -1804,7 +1842,7 @@ impl Gui {
                     g.box_fill(ex, ey, ex + ew - 1, ey + eh - 1, bg);
                     g.rect(ex, ey, ex + ew - 1, ey + eh - 1, acc);
                     let text: String = e.text.iter().collect();
-                    let tx = self.list_text_x(wdg, ax);
+                    let tx = if gesp { ex + ew - self.w_pad(wdg) - self.wtext_width(g, wdg, &text) } else { self.list_text_x(wdg, ax) };
                     let ty = ey + (eh - self.wsize(g, wdg)).max(0) / 2;
                     let x_bei = |g: &mut Graphics, n: i32| -> i32 {
                         let vor: String = e.text.iter().take(n.max(0) as usize).collect();

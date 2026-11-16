@@ -21,7 +21,8 @@ namen = ["155_gui_glas", "156_gui_alle_widgets", "182_gui_tastatur_massstab", _
          "186_farbe_und_datum", "187_tilemap_editor", "188_bild_erzeugen", _
          "189_sprite_editor", "200_gui_akkordeon_assistent", _
          "209_pausenwecker", "210_klassendiagramm", "219_echte_fenster", _
-         "220_formen_und_animationen", "221_klang_funken_palette"]
+         "220_formen_und_animationen", "221_klang_funken_palette", _
+         "222_gui_gesamtschau"]
 DIM i AS INTEGER
 FOR i = 0 TO LEN(namen) - 1
     DIM pfad AS STRING : pfad = ordner + "/" + namen[i] + ".dh"
@@ -90,3 +91,64 @@ NEXT
 219_echte_fenster endet
 220_formen_und_animationen endet
 221_klang_funken_palette endet
+222_gui_gesamtschau endet
+
+=== die gesamtschau zeigt jede station auch gespiegelt und hell
+' 222_gui_gesamtschau nimmt [station] [thema] [rtl] -- hier jede der zehn
+' Stationen einmal, dazu gespiegelt und im hellen Glas. Ein Laufzeitfehler
+' in einer Station (falscher Builtin, falsches Handle) faellt so auf, auch
+' wenn der Rundgang sonst nur die erste zeigt.
+DIM pfad AS STRING : pfad = ARG$(0) + "/222_gui_gesamtschau.dh"
+DIM laeufe AS ARRAY OF STRING
+laeufe = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "3 0 rtl", "9 0 rtl", "0 3", "1 4"]
+DIM i AS INTEGER
+FOR i = 0 TO LEN(laeufe) - 1
+    DIM a AS ARRAY OF STRING : a = SPLIT$(laeufe[i], " ")
+    DIM p AS INTEGER
+    IF LEN(a) = 1 THEN
+        p = PROCESS_START("dhrt", "run", "--bilder", "20", pfad, "--", a[0])
+    ELSEIF LEN(a) = 2 THEN
+        p = PROCESS_START("dhrt", "run", "--bilder", "20", pfad, "--", a[0], a[1])
+    ELSE
+        p = PROCESS_START("dhrt", "run", "--bilder", "20", pfad, "--", a[0], a[1], a[2])
+    END IF
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    DIM fehler AS STRING : fehler = ""
+    WHILE PROCESS_RUNNING(p) AND MILLIS() - t0 < 25000
+        DIM weg AS STRING : weg = PROCESS_READ$(p)
+        fehler = fehler + PROCESS_ERR$(p)
+        SLEEP(20)
+    WEND
+    IF PROCESS_RUNNING(p) THEN
+        PROCESS_KILL(p)
+        PRINT laeufe[i]; " endet NICHT"
+        CONTINUE
+    END IF
+    DIM stille AS INTEGER : stille = 0
+    WHILE stille < 5
+        DIM rest AS STRING : rest = PROCESS_ERR$(p)
+        IF rest = "" THEN
+            stille = stille + 1
+            SLEEP(30)
+        ELSE
+            fehler = fehler + rest
+            stille = 0
+        END IF
+    WEND
+    IF PROCESS_CODE(p) <> 0 THEN
+        DIM grund AS STRING : grund = REPLACE$(TRIM$(SPLIT$(fehler, CHR$(10))[0]), CHR$(13), "")
+        ' Scheitert schon der erste Lauf, gibt es hier kein Fenster (oder keinen
+        ' Bau mit Grafik) -- wie im Fall oben. Danach ist jeder Fehler einer.
+        IF i = 0 THEN
+            PRINT "UEBERSPRINGEN: " + grund
+            EXIT(0)
+        END IF
+        PRINT laeufe[i]; ": "; grund
+        CONTINUE
+    END IF
+NEXT
+PRINT "alle stationen laufen"
+--- argumente
+{sammlung}/../../../examples
+--- erwartet
+alle stationen laufen

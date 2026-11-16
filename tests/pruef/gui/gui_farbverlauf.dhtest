@@ -1,0 +1,194 @@
+' Farbverlauf der Flaechen (Stildatei `farbverlauf`, gui_stil.rs; gezeichnet
+' als `Cmd::Farbbahn` in graphics.rs): mehrere Farben, ein Winkel, und mit
+' `wandert` laeuft er im Kreis -- nach der Uhr, mit GUI_SET_MOTION("aus")
+' steht er. Mit fester Bildzahl ist ein Bild 1/60 s.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== ein panel laeuft von rot nach blau und bleibt rund
+TRY
+    SCREEN(400, 200, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM p AS GUI_WIDGET : p = GUI_PANEL(w, 50, 50, 300, 100, "")
+GUI_SET_NAME(p, "p")
+GUI_STYLESHEET("#p { radius: 20; randbreite: 0; farbverlauf: #FF0000 #0000FF }")
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE() : CLS(&H000000) : GUI_DRAW() : FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=4
+--- bild
+groesse 400 200
+56 100 #FC0003 +-12
+344 100 #0300FC +-12
+200 100 #800080 +-14
+51 51 #18222E +-24
+
+=== senkrecht mit drei farben und als pille
+TRY
+    SCREEN(400, 200, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM p AS GUI_WIDGET : p = GUI_PANEL(w, 20, 20, 160, 160, "")
+DIM k AS GUI_WIDGET : k = GUI_BUTTON(w, "", 220, 80, 160, 40)
+GUI_SET_NAME(p, "p") : GUI_SET_NAME(k, "k")
+GUI_STYLESHEET("#p { radius: 0; randbreite: 0; farbverlauf: #FF0000 #00FF00 #0000FF 90 } #k { form: pille; farbverlauf: #FFFF00 #00FFFF }")
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE() : CLS(&H000000) : GUI_DRAW() : FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=4
+--- bild
+groesse 400 200
+100 22 #FF0000 +-16
+100 100 #00FF00 +-16
+100 177 #0000FF +-16
+224 100 #FFFF00 +-24
+376 100 #00FFFF +-24
+
+=== ein wandernder verlauf laeuft und braucht jedes bild, ohne bewegung steht er
+TRY
+    SCREEN(400, 200, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM p AS GUI_WIDGET : p = GUI_PANEL(w, 50, 50, 300, 100, "")
+GUI_SET_NAME(p, "p")
+GUI_STYLESHEET("#p { radius: 0; randbreite: 0; farbverlauf: #FF0000 #0000FF wandert 1000ms }")
+DIM ziel AS INTEGER : ziel = RENDERTARGET_NEW(400, 200)
+FUNCTION rot_bei() AS INTEGER
+    DIM b AS IMAGE : b = RENDERTARGET_IMAGE(ziel)
+    RETURN (GETPIXEL(b, 200, 100) \ 65536) BAND 255
+END FUNCTION
+DIM n AS INTEGER = 0
+DIM r1 AS INTEGER
+DIM r2 AS INTEGER
+DIM r3 AS INTEGER
+DIM r4 AS INTEGER
+DIM bedarf AS FLOAT
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    RENDERTARGET_BEGIN(ziel) : CLS(0) : GUI_DRAW() : RENDERTARGET_END()
+    n = n + 1
+    ' Eine halbe Runde (30 Bilder) spaeter steht in der Mitte die andere Farbe.
+    IF n = 5 THEN r1 = rot_bei() : bedarf = GUI_NEXT_FRAME()
+    IF n = 35 THEN r2 = rot_bei() : GUI_SET_MOTION("aus")
+    IF n = 40 THEN r3 = rot_bei()
+    IF n = 70 THEN r4 = rot_bei() : PRINT "ohne bewegung bedarf "; GUI_NEXT_FRAME()
+    FLIP()
+WEND
+PRINT "bedarf "; bedarf
+PRINT "laeuft "; ABS(r1 - r2) > 120
+PRINT "steht "; r3 = r4
+--- umgebung
+DHRT_FRAMES=72
+--- erwartet
+ohne bewegung bedarf -1.0
+bedarf 0.0
+laeuft TRUE
+steht TRUE
+
+=== falsche werte sind fehler und der inspektor nennt den verlauf
+TRY
+    SCREEN(400, 200, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 200)
+DIM p AS GUI_WIDGET : p = GUI_PANEL(w, 20, 20, 200, 100, "")
+GUI_ADD_CLASS(p, "bunt")
+DIM schlicht AS GUI_WIDGET : schlicht = GUI_PANEL(w, 240, 20, 100, 100, "")
+GUI_STYLESHEET("panel.bunt { farbverlauf: #FF6B6B accent #2C73D2 45grad wandert 4s }" + CHR$(10) + "panel { farbverlauf: aus }")
+GUI_UPDATE()
+PRINT GUI_INSPECT$(p)
+PRINT GUI_INSPECT$(schlicht)
+DIM falsch AS ARRAY OF STRING
+falsch = ["panel { farbverlauf: #FF0000 }", "panel { farbverlauf: #FF0000 #00FF00 wandert 100ms }", "panel { farbverlauf: #FF0000 gelb }", "panel:hover { farbverlauf: #FF0000 #00FF00 }"]
+DIM i AS INTEGER
+FOR i = 0 TO LEN(falsch) - 1
+    TRY
+        GUI_STYLESHEET(falsch[i])
+        PRINT "kein fehler: "; falsch[i]
+    CATCH e2
+        PRINT e2
+    END TRY
+NEXT
+--- enthaelt
+farbverlauf #FF6B6B thema accent #2C73D2 45 wandert 4000ms
+farbverlauf aus
+farbverlauf erwartet 2 bis 6 Farben
+eine Runde dauert 500 ms bis 60 s
+'farbverlauf' gilt nur in Regeln ohne :hover
+
+=== auf einem hellen verlauf ist die schrift dunkel
+' Die Schrift eines Knopfs richtet sich nach allen Farben des Verlaufs, nicht
+' nach `bg`: auf Gelb nach Cyan ist sie dunkel, auch wenn `bg` dunkel ist.
+TRY
+    SCREEN(400, 200, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM k AS GUI_WIDGET : k = GUI_BUTTON(w, "MMMMMM", 50, 50, 300, 80)
+GUI_SET_NAME(k, "k")
+GUI_STYLESHEET("#k { bg: #202020; groesse: 30; farbverlauf: #FFFF00 #00FFFF }")
+DIM ziel AS INTEGER : ziel = RENDERTARGET_NEW(400, 200)
+DIM n AS INTEGER
+FOR n = 1 TO 3
+    GUI_UPDATE()
+    RENDERTARGET_BEGIN(ziel) : CLS(0) : GUI_DRAW() : RENDERTARGET_END()
+    FLIP()
+NEXT
+DIM b AS IMAGE : b = RENDERTARGET_IMAGE(ziel)
+DIM dunkel AS INTEGER = 0
+DIM x AS INTEGER
+DIM y AS INTEGER
+FOR x = 60 TO 340
+    FOR y = 60 TO 120
+        DIM p AS INTEGER : p = GETPIXEL(b, x, y) BAND &HFFFFFF
+        IF ((p \ 65536) BAND 255) < 90 AND ((p \ 256) BAND 255) < 90 AND (p BAND 255) < 90 THEN dunkel = dunkel + 1
+    NEXT
+NEXT
+PRINT "dunkle schrift "; dunkel > 40
+PRINT "pruefung "; GUI_A11Y_CHECK$(w) = ""
+--- umgebung
+DHRT_FRAMES=4
+--- erwartet
+dunkle schrift TRUE
+pruefung TRUE
+
+=== die pruefung misst gegen die unguenstigste farbe des verlaufs
+TRY
+    SCREEN(400, 200, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 200)
+DIM k AS GUI_WIDGET : k = GUI_BUTTON(w, "Weiss auf Grau", 50, 50, 300, 60)
+GUI_SET_NAME(k, "k")
+GUI_STYLESHEET("#k { bg: #202020; fg: #FFFFFF; farbverlauf: #202020 #D0D0D0 }")
+GUI_UPDATE()
+PRINT GUI_A11Y_CHECK$(w)
+--- enthaelt
+(Schrift #FFFFFF auf #D0D0D0)

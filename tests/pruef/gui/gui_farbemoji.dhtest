@@ -93,3 +93,53 @@ PRINT "text gelb "; gelb_in(15, 105, 90, 180) > 40
 DHRT_FRAMES=8
 --- erwartet
 text gelb TRUE
+
+=== im gesetzten text steht die schrift hinter dem emoji
+' Die Emoji-Schrift kommt auf Zuruf: GUI_RICHTEXT setzte seine Zeilen,
+' bevor ihre Glyphen da waren, und merkte sich die Lage -- in einer Zelle
+' lag der Text danach ueber dem Emoji (gesehen in der Gesamtschau). Jetzt
+' setzt er neu, sobald Glyphen nachgeladen sind (`schrift_stand`).
+' Gemessen: die blaue Schrift beginnt erst hinter dem gelben Gesicht.
+IF NOT FILEEXISTS("C:/Windows/Fonts/seguiemj.ttf") THEN
+    PRINT "UEBERSPRINGEN: keine Farb-Emoji-Schrift"
+    EXIT(0)
+END IF
+TRY
+    SCREEN(400, 200, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM rt AS GUI_WIDGET : rt = GUI_RICHTEXT(w, 10, 10, 380, 180, "| A | B |" + CHR$(10) + "|---|---|" + CHR$(10) + "| x | " + CHR$(&H1F600) + " IIII |")
+GUI_SET_COLOR(rt, "fg", &H4060FF)
+DIM ziel AS INTEGER : ziel = RENDERTARGET_NEW(400, 200)
+DIM k AS INTEGER
+FOR k = 1 TO 4
+    GUI_UPDATE()
+    RENDERTARGET_BEGIN(ziel) : CLS(&H202830) : GUI_DRAW()
+    RENDERTARGET_END()
+    FLIP()
+NEXT
+DIM bild AS IMAGE : bild = RENDERTARGET_IMAGE(ziel)
+DIM gelbEnde AS INTEGER = -1
+DIM blauAnfang AS INTEGER = 999
+DIM x AS INTEGER
+DIM y AS INTEGER
+FOR x = 40 TO 300
+    FOR y = 55 TO 95
+        DIM p AS INTEGER : p = GETPIXEL(bild, x, y) BAND &HFFFFFF
+        DIM r AS INTEGER : r = (p \ 65536) BAND 255
+        DIM g AS INTEGER : g = (p \ 256) BAND 255
+        DIM b AS INTEGER : b = p BAND 255
+        IF r > 200 AND g > 150 AND b < 110 THEN gelbEnde = x
+        IF b > 200 AND r < 120 AND x < blauAnfang THEN blauAnfang = x
+    NEXT
+NEXT
+PRINT "emoji da "; gelbEnde > 0; " schrift dahinter "; blauAnfang > gelbEnde
+--- umgebung
+DHRT_FRAMES=4
+--- erwartet
+emoji da TRUE schrift dahinter TRUE

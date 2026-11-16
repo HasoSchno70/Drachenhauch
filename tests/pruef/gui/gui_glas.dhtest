@@ -100,3 +100,59 @@ PRINT "links an der kante grau "; grau(GETPIXEL(b, 194, 120)); " rechts "; grau(
 DHRT_FRAMES=20
 --- erwartet
 links an der kante grau TRUE rechts TRUE weit links schwarz TRUE
+
+=== eine durchscheinende flaeche bleibt im glas-thema durchscheinend
+' Der Verlauf der Glas-Themen hellt den Grund mit `shade` auf und ab --
+' bis 2026.50 verlor er dabei die Deckkraft, und `bg: #20FFFFFF` wurde
+' deckend weiss (gesehen in der Gesamtschau, 222_gui_gesamtschau.dh).
+TRY
+    SCREEN(400, 240, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+IMPORT "imgfx"
+GUI_THEME_PRESET("glas_dunkel")
+DIM bild AS INTEGER : bild = IMAGE_NEW(400, 240)
+IMAGE_FILL_RECT(bild, 0, 0, 199, 239, RGB(0, 0, 0))
+IMAGE_FILL_RECT(bild, 200, 0, 399, 239, RGB(255, 255, 255))
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 240)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM hg AS GUI_WIDGET : hg = GUI_IMAGE(w, 0, 0, 400, 240, bild)
+DIM p AS GUI_WIDGET : p = GUI_PANEL(w, 100, 50, 200, 140, "")
+GUI_SET_NAME(p, "glas")
+GUI_STYLESHEET("#glas { bg: #20FFFFFF; radius: 0; border: #20FFFFFF }")
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE() : CLS(0) : GUI_DRAW() : FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=4
+--- bild
+groesse 400 240
+150 120 #202020 +-40
+250 120 #FFFFFF +-24
+
+=== unter einem durchscheinenden fenster liegt kein schatten
+' Der Schatten der Glas-Themen schien durch einen durchscheinenden
+' Fenstergrund -- die ganze Flaeche wurde grau statt hell.
+TRY
+    SCREEN(400, 240, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+GUI_THEME_PRESET("glas_hell")
+GUI_THEME_SET("win_bg", &H3CE2E8EF)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 100, 50, 200, 140)
+GUI_WINDOW_CHROME(w, FALSE)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE() : CLS(&HFFFFFF) : GUI_DRAW() : FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=4
+--- bild
+groesse 400 240
+200 120 #F8F9FB +-16
+20 20 #FFFFFF +-4

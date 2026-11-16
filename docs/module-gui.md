@@ -75,6 +75,8 @@ IMPORT "gui"
 | `GUI_POPUP_WINDOWS()` | INTEGER | wie viele Popups gerade als eigenes Fenster über den Rand ihres nativen Fensters stehen (0 = alle in ihrem Fenster) |
 | `GUI_WINDOW_VISIBLE(win, an)` | — | Sichtbarkeit setzen |
 | `GUI_WINDOW_FRONT(win)` | — | Fenster nach vorn holen, ohne ihm den Fokus zu geben -- fuer eine Vorschlagsliste oder einen Tooltip, der beim Tippen ueber dem Text liegen soll. Per `GUI_WINDOW_VISIBLE` eingeblendet liegt ein Fenster sonst hinter dem zuletzt angeklickten |
+| `GUI_WINDOW_BACKGROUND(win, an)` | — | Hintergrundfenster: es bleibt hinter allen anderen Fenstern, auch wenn man hineinklickt oder `GUI_WINDOW_FRONT` ruft (den Fokus bekommt es trotzdem). Für ein randloses Hauptfenster, über dem Unterfenster liegen -- ohne das holte der erste Klick ins Hauptfenster es nach vorn, und es verdeckte die Unterfenster samt ihren Klicks |
+| `GUI_WINDOW_IS_BACKGROUND(win)` | BOOLEAN | ist es ein Hintergrundfenster? |
 | `GUI_WINDOW_SHOWN(win)` | BOOLEAN | ist das Fenster gerade sichtbar? Das Gegenstueck zum Setzer -- ohne den Getter muesste ein Programm sich merken, was es selbst gesetzt hat, und laege daneben, sobald der Nutzer das Fenster ueber sein Kreuz schliesst |
 | `GUI_WINDOW_RESIZABLE(win, an)` | — | am unteren-rechten Griff größenveränderbar (Default: aus) |
 | `GUI_WINDOW_SCROLLABLE(win, an)` | — | Inhalt scrollt, wenn er höher als das Fenster ist (Mausrad + Scrollbalken). Inhaltshöhe automatisch aus den Widgets. Default: aus |
@@ -835,7 +837,11 @@ GUI_LABEL(win, text$, x, y[, farbe]) -> GUI_WIDGET
 ```
 
 Statischer Text. Default-Farbe weiß. Mit `GUI_SET_TEXT(lbl, ...)` jederzeit
-änderbar (z. B. um einen Slider-Wert live anzuzeigen).
+änderbar (z. B. um einen Slider-Wert live anzuzeigen). Die Breite folgt dem
+Text (gemessen in `GUI_UPDATE`, auch mit Schrift und Größe aus der
+Stildatei), bis `GUI_SET_BOUNDS` oder `GUI_SET_WRAP` eine festlegt -- erst
+dann wirkt `GUI_SET_ALIGN`. Im gespiegelten Fenster (`GUI_WINDOW_RTL`) endet
+der Text so genau am Rand.
 
 ```basic
 GUI_SET_WRAP(lbl, 220)              ' bei 220 px an Wortgrenzen umbrechen
@@ -2578,6 +2584,7 @@ Eigenschaften mehr, dazu kommen vier Befehle:
 | `gleiten: 200` | weiche Layout-Übergänge (Dauer in ms, 0..2000): ändern sich Lage oder Größe (Layout, `GUI_SET_BOUNDS`, Fenstergröße), gleitet das Bild vom alten zum neuen Rechteck, langsam auslaufend; ein Widget, das sichtbar wird, wächst auf. Der Treffer steht sofort am Ziel. Nur in Regeln ohne Zustand; `* { gleiten: 200 }` gilt für die ganze Anwendung |
 | `GUI_GLIDING(wdg)` | gleitet das Widget gerade? |
 | `unschaerfe: 12` | Glas: was hinter dem Widget gezeichnet ist (ein Bild, eine Karte, andere Widgets), liegt unscharf darunter (Radius 0..40); eine Fläche mit Deckkraft scheint durch: `panel.glas { unschaerfe: 12; bg: #60FFFFFF; radius: 14 }`. Wirkt auf der Hauptfläche, in echten Fenstern und in Renderzielen. Nur in Regeln ohne Zustand |
+| `farbverlauf: #FF6B6B #845EC2 #2C73D2 45 wandert 6s` | Farbverlauf statt der einen Grundfarbe: 2 bis 6 Farben (auch Namen des Themas), dann wahlweise der Winkel in Grad (0 = nach rechts, 90 = nach unten, 45 = schräg nach rechts unten) und `wandert [Dauer]` -- dann laufen die Farben im Kreis (die letzte geht wieder in die erste über) und wandern ohne Naht in Richtung des Winkels, eine Runde in der Dauer (`ms` oder `s`, 500 ms bis 60 s, Vorgabe 6 s). Für Panels, Karten, Knöpfe (auch `form: pille` und `kreis`) und jede andere Fläche des Widgets; Rundung, Glanz und Rand kommen darüber. Die Schrift eines Knopfs wählt die gui nach allen Farben des Verlaufs (die, die an seiner ungünstigsten Stelle besser lesbar ist), und `GUI_A11Y_CHECK$` misst gegen diese Stelle. Mit `GUI_SET_MOTION("aus")` steht er; ein wandernder meldet im Leerlauf, dass er jedes Bild braucht. `farbverlauf: aus` nimmt einen geerbten zurück. Nur in Regeln ohne Zustand |
 
 ```basic
 IMPORT "gui"
@@ -3001,6 +3008,15 @@ ergibt dieselbe JSON.
 Siehe [examples/45_gui.dh](../examples/45_gui.dh): Fenster mit Slider (live ins
 Label gespiegelt), Checkbox, Textfeld und Start-Button — verschiebbar und
 schließbar.
+
+**Alles auf einmal, als Rundgang:**
+[examples/222_gui_gesamtschau.dh](../examples/222_gui_gesamtschau.dh) --
+zehn Stationen über einem bewegten Hintergrund: Glas, Formen und
+Animationen aus der Stildatei, Farb-Emoji und Schriften der Welt, eine
+Tabelle mit einer Million Zeilen, die Stildatei zum Ändern, Werkzeuge
+(Palette, Inspektor, echtes Fenster) und die Prüfung der
+Barrierefreiheit. Oben schalten Thema, rechts nach links, Bewegung, Töne,
+Sparsam und Kontrast die ganze Oberfläche um.
 
 **Alle 22 Widget-Arten in einer Anwendung:**
 [examples/156_gui_alle_widgets.dh](../examples/156_gui_alle_widgets.dh) —
@@ -4546,7 +4562,7 @@ Reihenfolge, in der er getippt wurde.
 | Befehl | Was er tut |
 |---|---|
 | `TEXT_VISUAL$(text$ [, richtung$])` | Der Text so, wie er dasteht -- für eigene Ausgaben wie Dateien oder Bilder. `richtung$` = `auto` (Vorgabe), `ltr` oder `rtl` |
-| `GUI_WINDOW_RTL(win, an)` | das ganze Fenster von rechts nach links: die Lage jedes Widgets gespiegelt an der Breite des Fensters, die Menüleiste und die Werkzeugleiste beginnen rechts, Kästchen, Optionen und Schalter tragen ihr Kennzeichen rechts vom Text, ein Regler wächst nach links (Ziehen und Pfeiltasten auch), ein Textfeld oder Textbereich ohne `GUI_SET_ALIGN` steht rechtsbündig, eine Tabelle beginnt mit der ersten Spalte rechts (die Kante zum Ziehen liegt links), ein Baum rückt von rechts ein (der Pfeil nach links klappt auf, umbenannt wird rechts). Bei Baum, Tabelle und Textbereich steht der Rollbalken links; eine Zeile, breiter als der Textbereich, zeigt ihr Ende rechts und rollt nach links. Listen bleiben innen, wie sie sind. Das Programm setzt und liest seine Lagen weiter von links (`GUI_GET_X`); Zeichnen, Klick und `GUI_HIT_TEST` gehen über die gespiegelte |
+| `GUI_WINDOW_RTL(win, an)` | das ganze Fenster von rechts nach links: die Lage jedes Widgets gespiegelt an der Breite des Fensters, die Menüleiste und die Werkzeugleiste beginnen rechts, Kästchen, Optionen und Schalter tragen ihr Kennzeichen rechts vom Text, ein Regler wächst nach links (Ziehen und Pfeiltasten auch), ein Textfeld oder Textbereich ohne `GUI_SET_ALIGN` steht rechtsbündig, eine Tabelle beginnt mit der ersten Spalte rechts (die Kante zum Ziehen liegt links), ein Baum rückt von rechts ein (der Pfeil nach links klappt auf, umbenannt wird rechts). Bei Baum, Liste, Tabelle und Textbereich steht der Rollbalken links; eine Zeile, breiter als der Textbereich, zeigt ihr Ende rechts und rollt nach links. Eine Liste steht rechtsbündig, Kästchen rechts, Zusatztext links. Das Programm setzt und liest seine Lagen weiter von links (`GUI_GET_X`); Zeichnen, Klick und `GUI_HIT_TEST` gehen über die gespiegelte |
 | `GUI_WINDOW_IS_RTL(win)` | steht das Fenster von rechts nach links? |
 
 Indische und südostasiatische Schriften und die Ligaturen einer Schrift

@@ -1444,7 +1444,8 @@ impl Gui {
                 }
             }
             Kind::ListBox => {
-                let (ax, _, _, _) = self.abs_rect(win, &self.windows[win].widgets[i]);
+                let (ax, _, aw, _) = self.abs_rect(win, &self.windows[win].widgets[i]);
+                let gesp = self.windows[win].rtl;
                 let row = self.liste_zeile(win, i, my);
                 let n = self.windows[win].widgets[i].items.len() as i32;
                 if row < 0 || row >= n { return; }
@@ -1461,7 +1462,8 @@ impl Gui {
                 let mut geaendert = false;
                 // Klick auf das Kaestchen kippt NUR den Haken -- die Auswahl
                 // bleibt, sonst waehlte man beim Abhaken jedes Mal um.
-                if box_w > 0 && mx < ax + box_w {
+                // Das Kaestchen steht gespiegelt rechts.
+                if box_w > 0 && if gesp { mx >= ax + aw - box_w } else { mx < ax + box_w } {
                     if let Some(l) = w.list.as_mut() {
                         l.sync(n as usize);
                         l.checks[row as usize] = !l.checks[row as usize];

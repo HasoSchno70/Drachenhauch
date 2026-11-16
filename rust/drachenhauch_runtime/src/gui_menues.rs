@@ -306,7 +306,7 @@ impl Gui {
         if w.kind == Kind::RichText {
             let t = w.text.clone();
             if let Some(r) = w.rich.as_mut() {
-                r.quelle = t; r.scroll = 0; r.stand = (usize::MAX, 0, 0, 0);
+                r.quelle = t; r.scroll = 0; r.stand = (usize::MAX, 0, 0, 0, 0);
                 r.hat_auswahl = false; r.ziehen = false;
             }
         }
@@ -796,6 +796,8 @@ impl Gui {
         }
         w.wrap = breite > 0;
         if breite > 0 { w.w = breite; w.bw = breite; }
+        // Umbrechen hat eine feste Breite; ohne Umbruch misst sie wieder der Text.
+        w.auto_w = breite == 0;
         Ok(())
     }
 

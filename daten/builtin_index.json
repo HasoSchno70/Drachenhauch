@@ -7815,6 +7815,18 @@
    "module": "gui"
   },
   {
+   "name": "GUI_WINDOW_BACKGROUND",
+   "kind": "core",
+   "signature": "GUI_WINDOW_BACKGROUND(win, an)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_WINDOW_IS_BACKGROUND",
+   "kind": "core",
+   "signature": "GUI_WINDOW_IS_BACKGROUND(win) AS BOOLEAN",
+   "module": "gui"
+  },
+  {
    "name": "GUI_WINDOW_VISIBLE",
    "kind": "core",
    "signature": "GUI_WINDOW_VISIBLE(win, flag)",

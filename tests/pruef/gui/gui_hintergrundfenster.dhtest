@@ -1,0 +1,91 @@
+' Hintergrundfenster (GUI_WINDOW_BACKGROUND, gui_geometrie.rs
+' `bring_to_front`/`hinten_ordnen`): ein randloses Hauptfenster ueber den
+' ganzen Schirm, darueber ein Unterfenster. Ein Klick ins Hauptfenster holte
+' es nach vorn -- es verdeckte das Unterfenster samt dessen Knoepfen (gesehen
+' in der Gesamtschau, 222_gui_gesamtschau.dh: nach einem Klick in die
+' Navigation gingen die Knoepfe der Station nicht mehr).
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== ohne hintergrund verdeckt das angeklickte hauptfenster den knopf
+IMPORT "gui"
+SCREEN(480, 240, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM haupt AS GUI_WINDOW : haupt = GUI_WINDOW("H", 0, 0, 480, 240)
+GUI_WINDOW_CHROME(haupt, FALSE)
+DIM unter AS GUI_WINDOW : unter = GUI_WINDOW("U", 200, 40, 260, 180)
+GUI_WINDOW_CHROME(unter, FALSE)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(unter, "Los", 20, 20, 120, 40)
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER
+DIM log AS STRING
+FOR n = 1 TO 30
+    GUI_UPDATE()
+    IF GUI_CLICKED(b) THEN log = log + " knopf"
+    CLS(0) : GUI_DRAW() : FLIP()
+NEXT
+PRINT "folge"; log; " oben "; GUI_WINDOW_AT(280, 80) = haupt
+--- datei ev.txt
+c 6
+e 0 7 60 120 0 0
+e 2 6 0 0 0 0
+e 3 5 0 0 0 0
+e 10 7 280 80 0 0
+e 11 6 0 0 0 0
+e 12 5 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=40
+--- erwartet
+folge oben TRUE
+
+=== ein hintergrundfenster bleibt hinten und der knopf darueber geht
+IMPORT "gui"
+SCREEN(480, 240, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM haupt AS GUI_WINDOW : haupt = GUI_WINDOW("H", 0, 0, 480, 240)
+GUI_WINDOW_CHROME(haupt, FALSE)
+DIM unter AS GUI_WINDOW : unter = GUI_WINDOW("U", 200, 40, 260, 180)
+GUI_WINDOW_CHROME(unter, FALSE)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(unter, "Los", 20, 20, 120, 40)
+DIM feld AS GUI_WIDGET : feld = GUI_TEXTINPUT(haupt, 20, 20, 150, 28)
+' Das Hauptfenster liegt gerade oben -- als Hintergrund muss es sofort
+' nach hinten.
+GUI_WINDOW_FRONT(haupt)
+GUI_WINDOW_BACKGROUND(haupt, TRUE)
+PRINT "hinten "; GUI_WINDOW_IS_BACKGROUND(haupt); " "; GUI_WINDOW_IS_BACKGROUND(unter); " sofort oben unter "; GUI_WINDOW_AT(280, 80) = unter
+GUI_WINDOW_FRONT(haupt)
+PRINT "nach front oben unter "; GUI_WINDOW_AT(280, 80) = unter
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER
+DIM log AS STRING
+FOR n = 1 TO 30
+    GUI_UPDATE()
+    IF GUI_CLICKED(b) THEN log = log + " knopf"
+    CLS(0) : GUI_DRAW() : FLIP()
+NEXT
+PRINT "folge"; log; " oben unter "; GUI_WINDOW_AT(280, 80) = unter
+GUI_WINDOW_BACKGROUND(haupt, FALSE)
+GUI_WINDOW_FRONT(haupt)
+PRINT "wieder normal "; GUI_WINDOW_IS_BACKGROUND(haupt); " oben haupt "; GUI_WINDOW_AT(280, 80) = haupt
+TRY
+    GUI_WINDOW_BACKGROUND(99, TRUE)
+CATCH e
+    PRINT e
+END TRY
+--- datei ev.txt
+c 6
+e 0 7 60 120 0 0
+e 2 6 0 0 0 0
+e 3 5 0 0 0 0
+e 10 7 280 80 0 0
+e 11 6 0 0 0 0
+e 12 5 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=40
+--- erwartet
+hinten TRUE FALSE sofort oben unter TRUE
+nach front oben unter TRUE
+folge knopf oben unter TRUE
+wieder normal FALSE oben haupt TRUE
+GUI_WINDOW_BACKGROUND: ungueltiges GUI_WINDOW-Handle
