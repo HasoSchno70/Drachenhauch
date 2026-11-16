@@ -1161,6 +1161,7 @@ END SUB
 SUB themaAnwenden()
     IF hell THEN GUI_THEME_PRESET("glas_hell") ELSE GUI_THEME_PRESET("glas_dunkel")
     themaFeinschliff()
+    nebelAnwenden()
     codeFarben(hell)
     eigeneFarben(hell)
     bereichsFarben()

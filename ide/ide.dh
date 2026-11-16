@@ -518,6 +518,9 @@ DIM glSelAlt AS INTEGER : glSelAlt = -1
 DIM gliederungSchluessel AS STRING : gliederungSchluessel = ""
 
 DIM hell AS BOOLEAN : hell = FALSE
+' Drachenhauch-Nebel: im dunklen Thema zieht ein tuerkiser Nebel durch den
+' Grund und die Raender (statt der hellen Verlaeufe), der Code bleibt frei.
+DIM nebelAn AS BOOLEAN : nebelAn = TRUE
 ' Die Vorgabe ist auch das Ziel von Strg+0 ("Schrift normal").
 CONST SCHRIFT_NORMAL AS INTEGER = 16
 DIM codeGroesse AS INTEGER : codeGroesse = SCHRIFT_NORMAL
@@ -1180,6 +1183,7 @@ grossKlein = kBool("gross_klein", grossKlein)
 ganzesWort = kBool("ganzes_wort", ganzesWort)
 vorschlagAn = kBool("vorschlag", vorschlagAn)
 linienAn = kBool("linien", linienAn)
+nebelAn = kBool("nebel", nebelAn)
 kopfAn = kBool("blockkopf", kopfAn)
 klammerFarbenAn = kBool("klammer_farben", klammerFarbenAn)
 waermeAn = kBool("profil_waerme", waermeAn)
@@ -1241,6 +1245,7 @@ IF JSON_HAS(konfig, "lesezeichen") THEN
 END IF
 autoSichern = MAX(0, MIN(120, kInt("autosichern", autoSichern)))
 IF hell THEN GUI_THEME_PRESET("glas_hell") : themaFeinschliff()
+nebelAnwenden()
 codeFarben(hell)
 
 ' offene Dialoge (0 = keiner)
@@ -1525,6 +1530,8 @@ DIM miUmbruch AS INTEGER : miUmbruch = GUI_MENU_ITEM(mAnsicht, tr$("Zeilenumbruc
 GUI_MENU_CHECK(miUmbruch, FALSE)
 DIM miLinien AS INTEGER : miLinien = GUI_MENU_ITEM(mAnsicht, tr$("Einrückungslinien"))
 GUI_MENU_CHECK(miLinien, linienAn)
+DIM miNebel AS INTEGER : miNebel = GUI_MENU_ITEM(mAnsicht, tr$("Drachenhauch-Nebel"))
+GUI_MENU_CHECK(miNebel, nebelAn)
 DIM miKopf AS INTEGER : miKopf = GUI_MENU_ITEM(mAnsicht, tr$("Mitlaufender Blockkopf"))
 DIM miKlFarben AS INTEGER : miKlFarben = GUI_MENU_ITEM(mAnsicht, tr$("Klammerpaare farbig"))
 GUI_MENU_CHECK(miKlFarben, klammerFarbenAn)
@@ -2276,6 +2283,7 @@ DIM lblMassHinweis AS GUI_WIDGET : lblMassHinweis = GUI_LABEL(winEinst, "", 400,
 ' Der Startbildschirm (IDE oder Studio): an = jedes Mal fragen, aus = gleich
 ' die IDE.
 DIM cbStartwahl AS GUI_WIDGET : cbStartwahl = GUI_CHECKBOX(winEinst, tr$("Beim Start fragen: IDE oder Studio"), 400, 394, TRUE)
+DIM cbNebel AS GUI_WIDGET : cbNebel = GUI_CHECKBOX(winEinst, tr$("Drachenhauch-Nebel (dunkles Thema)"), 400, 424, TRUE)
 DIM massWahlStand AS INTEGER : massWahlStand = 0
 DIM lblSchrift AS GUI_WIDGET : lblSchrift = GUI_LABEL(winEinst, tr$("Schriftgröße"), 16, 290)
 DIM spSchrift AS GUI_WIDGET : spSchrift = GUI_SPINNER(winEinst, 200, 286, 90, 10, 32, 16)
