@@ -108,17 +108,24 @@ CONST MAXBLK = 320
 DIM pushed_blk AS INTEGER          ' diesen Tick geschobener Block (kein Sofort-Rutsch)
 
 ' Geraete-Verdrahtung (Falle/Cloner): bx,by -> tx,ty
+' Ein Draht verbindet einen Knopf mit dem Geraet, das er steuert.
+CLASS Draht
+    DIM knopf_x AS INTEGER
+    DIM knopf_y AS INTEGER
+    DIM ziel_x AS INTEGER
+    DIM ziel_y AS INTEGER
+
+    SUB Init(kx AS INTEGER, ky AS INTEGER, zx AS INTEGER, zy AS INTEGER)
+        knopf_x = kx
+        knopf_y = ky
+        ziel_x = zx
+        ziel_y = zy
+    END SUB
+END CLASS
+
 CONST MAXWIRE = 256
-DIM trap_bx[MAXWIRE] AS INTEGER
-DIM trap_by[MAXWIRE] AS INTEGER
-DIM trap_tx[MAXWIRE] AS INTEGER
-DIM trap_ty[MAXWIRE] AS INTEGER
-DIM ntrap AS INTEGER
-DIM clone_bx[MAXWIRE] AS INTEGER
-DIM clone_by[MAXWIRE] AS INTEGER
-DIM clone_mx[MAXWIRE] AS INTEGER
-DIM clone_my[MAXWIRE] AS INTEGER
-DIM nclone AS INTEGER
+DIM fallen AS ARRAY OF Draht       ' brauner Knopf -> Falle
+DIM kloner AS ARRAY OF Draht       ' roter Knopf -> Kloner
 
 ' Spieler
 DIM px AS INTEGER
@@ -224,11 +231,20 @@ DIM sc_sm AS FLOAT
 DIM ic_sz AS INTEGER          ' HUD-Icon-Groesse (direkt aus dem Tileset via DRAWIMAGEPARTEX)
 
 ' Level-Set-Auswahl (alle .json in levels/ + levels/_downloaded/)
+CLASS LevelSet
+    DIM pfad AS STRING
+    DIM name AS STRING
+    DIM anzahl AS INTEGER
+
+    SUB Init(p AS STRING, n AS STRING, a AS INTEGER)
+        pfad = p
+        name = n
+        anzahl = a
+    END SUB
+END CLASS
+
 CONST MAXSETS = 64
-DIM set_path[MAXSETS] AS STRING
-DIM set_name[MAXSETS] AS STRING
-DIM set_count[MAXSETS] AS INTEGER
-DIM nsets AS INTEGER
+DIM sets AS ARRAY OF LevelSet
 DIM sel_set AS INTEGER
 
 ' Persistenz (Bestzeiten + Fortschritt) und Passwort-Eingabe
@@ -713,41 +729,37 @@ END FUNCTION
 '  LEVEL-SETS FINDEN
 ' ----------------------------------------------------------------------
 SUB scan_sets()
-    nsets = 0
+    sets = []
     add_sets_in("levels")
     add_sets_in("levels/_downloaded")
 END SUB
 
 SUB add_sets_in(dir AS STRING)
     IF NOT DIREXISTS(dir) THEN RETURN
-    DIM files AS ARRAY OF STRING
-    files = DIRLIST(dir)
-    DIM i AS INTEGER
-    FOR i = 0 TO LEN(files) - 1
-        DIM fn AS STRING
-        fn = files[i]
-        IF RIGHT$(LOWER$(fn), 5) = ".json" AND nsets < MAXSETS THEN
-            DIM path AS STRING
-            path = PATHJOIN(dir, fn)
+    DIM fn AS STRING
+    FOR EACH fn IN DIRLIST(dir)
+        IF RIGHT$(LOWER$(fn), 5) = ".json" AND LEN(sets) < MAXSETS THEN
+            DIM path AS STRING : path = PATHJOIN(dir, fn)
             TRY
-                DIM h AS JSON_HANDLE
-                h = JSON_LOAD(path)
-                DIM cnt AS INTEGER
-                cnt = JSON_LEN(h, "levels")
+                DIM h AS JSON_HANDLE : h = JSON_LOAD(path)
+                DIM cnt AS INTEGER : cnt = JSON_LEN(h, "levels")
                 IF cnt > 0 THEN
-                    set_path[nsets] = path
-                    DIM nm AS STRING
-                    nm = JSON_GET_STRING(h, "name")
+                    DIM nm AS STRING : nm = JSON_GET_STRING(h, "name")
                     IF LEN(nm) = 0 THEN nm = fn
-                    set_name[nsets] = nm
-                    set_count[nsets] = cnt
-                    nsets = nsets + 1
+                    ARRAY_PUSH(sets, NEW LevelSet(path, nm, cnt))
                 END IF
             CATCH e
                 ' ungueltige JSON ueberspringen
             END TRY
         END IF
     NEXT
+END SUB
+
+' Das gewaehlte Set laden.
+SUB set_laden()
+    js = JSON_LOAD(sets[sel_set].pfad)
+    nlevels = JSON_LEN(js, "levels")
+    cur_setkey = set_key(sets[sel_set].name)
 END SUB
 
 ' ----------------------------------------------------------------------
@@ -996,48 +1008,22 @@ SUB load_level(idx AS INTEGER)
 END SUB
 
 SUB load_wires(idx AS INTEGER)
-    ntrap = 0
-    nclone = 0
-    DIM base AS STRING
-    base = "levels." + STR$(idx) + "."
-    DIM ts AS STRING
-    ts = JSON_GET_STRING(js, base + "traps")
-    IF LEN(ts) > 0 THEN
-        DIM recs AS ARRAY OF STRING
-        recs = SPLIT$(ts, ";")
-        DIM r AS INTEGER
-        FOR r = 0 TO LEN(recs) - 1
-            DIM p AS ARRAY OF STRING
-            p = SPLIT$(recs[r], ",")
-            IF LEN(p) >= 4 AND ntrap < MAXWIRE THEN
-                trap_bx[ntrap] = VAL(p[0])
-                trap_by[ntrap] = VAL(p[1])
-                trap_tx[ntrap] = VAL(p[2])
-                trap_ty[ntrap] = VAL(p[3])
-                ntrap = ntrap + 1
-            END IF
-        NEXT
-    END IF
-
-    DIM cs AS STRING
-    cs = JSON_GET_STRING(js, base + "cloners")
-    IF LEN(cs) > 0 THEN
-        DIM recs2 AS ARRAY OF STRING
-        recs2 = SPLIT$(cs, ";")
-        DIM r2 AS INTEGER
-        FOR r2 = 0 TO LEN(recs2) - 1
-            DIM p2 AS ARRAY OF STRING
-            p2 = SPLIT$(recs2[r2], ",")
-            IF LEN(p2) >= 4 AND nclone < MAXWIRE THEN
-                clone_bx[nclone] = VAL(p2[0])
-                clone_by[nclone] = VAL(p2[1])
-                clone_mx[nclone] = VAL(p2[2])
-                clone_my[nclone] = VAL(p2[3])
-                nclone = nclone + 1
-            END IF
-        NEXT
-    END IF
+    DIM base AS STRING : base = "levels." + STR$(idx) + "."
+    fallen = draehte_lesen(JSON_GET_STRING(js, base + "traps"))
+    kloner = draehte_lesen(JSON_GET_STRING(js, base + "cloners"))
 END SUB
+
+' "kx,ky,zx,zy;kx,ky,zx,zy;..." -> Draehte
+FUNCTION draehte_lesen(text AS STRING) AS ARRAY OF Draht
+    DIM liste AS ARRAY OF Draht : liste = []
+    IF LEN(text) = 0 THEN RETURN liste
+    DIM rec AS STRING
+    FOR EACH rec IN SPLIT$(text, ";")
+        DIM p AS ARRAY OF STRING : p = SPLIT$(rec, ",")
+        IF LEN(p) >= 4 AND LEN(liste) < MAXWIRE THEN ARRAY_PUSH(liste, NEW Draht(VAL(p[0]), VAL(p[1]), VAL(p[2]), VAL(p[3])))
+    NEXT
+    RETURN liste
+END FUNCTION
 
 ' MS-Ruleset: Monster ziehen in der Reihenfolge der 0x0A-Bewegungsliste,
 ' NICHT in Map-Lesereihenfolge. CCLP1-Puzzles sind darauf getimt.
@@ -1413,188 +1399,106 @@ SUB advance_blocks()
     NEXT
 END SUB
 
+' Etwas Aufsammelbares unter dem Spieler: weg vom Boden, Ton, Funken.
+SUB aufheben(farbe AS INTEGER)
+    terr[cidx(px, py)] = T_FLOOR
+    sfx_chip()
+    funken(px, py, farbe, 12)
+END SUB
+
+' Eine Tuer oder der Sockel gibt nach.
+SUB oeffnen()
+    terr[cidx(px, py)] = T_FLOOR
+    sfx_door()
+END SUB
+
 ' Effekte beim Betreten von (px,py)
 SUB land_on()
-    DIM t AS INTEGER
-    t = terr[cidx(px, py)]
+    DIM t AS INTEGER : t = terr[cidx(px, py)]
     on_water = FALSE
-    IF t = T_DIRT THEN
-        terr[cidx(px, py)] = T_FLOOR
-        RETURN
-    END IF
-
-    IF t = T_CHIP THEN
-        terr[cidx(px, py)] = T_FLOOR
-        IF chips_left > 0 THEN chips_left = chips_left - 1
-        sfx_chip()
-        funken(px, py, RGB(80, 255, 160), 16)
-        RETURN
-    END IF
-
-    IF t = T_KEY_BLUE THEN
-        keys_blue = keys_blue + 1
-        terr[cidx(px, py)] = T_FLOOR
-        sfx_chip()
-        funken(px, py, RGB(80, 140, 255), 12)
-        RETURN
-    END IF
-
-    IF t = T_KEY_RED THEN
-        keys_red = keys_red + 1
-        terr[cidx(px, py)] = T_FLOOR
-        sfx_chip()
-        funken(px, py, RGB(255, 90, 90), 12)
-        RETURN
-    END IF
-
-    IF t = T_KEY_GREEN THEN
-        keys_green = keys_green + 1
-        terr[cidx(px, py)] = T_FLOOR
-        sfx_chip()
-        funken(px, py, RGB(90, 235, 120), 12)
-        RETURN
-    END IF
-
-    IF t = T_KEY_YELLOW THEN
-        keys_yellow = keys_yellow + 1
-        terr[cidx(px, py)] = T_FLOOR
-        sfx_chip()
-        funken(px, py, RGB(255, 215, 80), 12)
-        RETURN
-    END IF
-
-    IF t = T_FLIPPERS THEN
-        has_flippers = TRUE
-        terr[cidx(px, py)] = T_FLOOR
-        sfx_chip()
-        funken(px, py, RGB(90, 160, 255), 12)
-        RETURN
-    END IF
-
-    IF t = T_FIREBOOTS THEN
-        has_fireboots = TRUE
-        terr[cidx(px, py)] = T_FLOOR
-        sfx_chip()
-        funken(px, py, RGB(255, 140, 60), 12)
-        RETURN
-    END IF
-
-    IF t = T_ICESKATES THEN
-        has_iceskates = TRUE
-        terr[cidx(px, py)] = T_FLOOR
-        sfx_chip()
-        funken(px, py, RGB(180, 230, 255), 12)
-        RETURN
-    END IF
-
-    IF t = T_SUCTION THEN
-        has_suction = TRUE
-        terr[cidx(px, py)] = T_FLOOR
-        sfx_chip()
-        funken(px, py, RGB(190, 140, 255), 12)
-        RETURN
-    END IF
-
-    IF t = T_DOOR_BLUE THEN
-        keys_blue = keys_blue - 1
-        terr[cidx(px, py)] = T_FLOOR
-        sfx_door()
-        RETURN
-    END IF
-
-    IF t = T_DOOR_RED THEN
-        keys_red = keys_red - 1
-        terr[cidx(px, py)] = T_FLOOR
-        sfx_door()
-        RETURN
-    END IF
-
-    IF t = T_DOOR_GREEN THEN
-        terr[cidx(px, py)] = T_FLOOR
-        sfx_door()
-        RETURN
-    END IF
-
-    IF t = T_DOOR_YELLOW THEN
-        keys_yellow = keys_yellow - 1
-        terr[cidx(px, py)] = T_FLOOR
-        sfx_door()
-        RETURN
-    END IF
-
-    IF t = T_SOCKET THEN
-        terr[cidx(px, py)] = T_FLOOR
-        sfx_door()
-        funken(px, py, RGB(110, 255, 200), 18)
-        RETURN
-    END IF
-
-    IF t = T_THIEF THEN
-        has_flippers = FALSE
-        has_fireboots = FALSE
-        has_iceskates = FALSE
-        has_suction = FALSE
-        sfx_blocked()
-        RETURN
-    END IF
-
-    IF t = T_BTN_GREEN THEN
-        toggle_walls()
-        RETURN
-    END IF
-
-    IF t = T_BTN_BLUE THEN
-        reverse_tanks()
-        RETURN
-    END IF
-
-    IF t = T_BTN_RED THEN
-        fire_cloners(px, py)
-        RETURN
-    END IF
-
-    IF t = T_EXIT THEN
-        state = "win"
-        sieg_t = 0.0
-        funken(px, py, RGB(90, 230, 255), 40)
-        funken(px, py, RGB(255, 225, 120), 20)
-        record_win()
-        sfx_win()
-        rumble(0.4, 0.18)     ' kurzer Erfolgs-Stups, schwaecher als der Tod
-        demo_stop()           ' hier endet die Aufnahme: DAS ist die Loesung
-        RETURN
-    END IF
-
-    IF t = T_WATER THEN
-        IF has_flippers THEN
-            on_water = TRUE
-        ELSE
-            player_die("Ertrunken!")
-        END IF
-
-        RETURN
-    END IF
-
-    IF t = T_FIRE THEN
-        IF NOT has_fireboots THEN player_die("Verbrannt!")
-        RETURN
-    END IF
-
-    IF t = T_BOMB THEN
-        terr[cidx(px, py)] = T_FLOOR
-        player_die("In die Luft gesprengt!")
-        RETURN
-    END IF
-
-    IF t = T_TELEPORT THEN
-        do_teleport()
-        RETURN
-    END IF
-
-    IF t = T_PASSONCE THEN
-        terr[cidx(px, py)] = T_WALL    ' wird hinter dir zur Wand
-        RETURN
-    END IF
+    SELECT CASE t
+        CASE T_DIRT
+            terr[cidx(px, py)] = T_FLOOR
+        CASE T_CHIP
+            terr[cidx(px, py)] = T_FLOOR
+            IF chips_left > 0 THEN chips_left = chips_left - 1
+            sfx_chip()
+            funken(px, py, RGB(80, 255, 160), 16)
+        CASE T_KEY_BLUE
+            keys_blue = keys_blue + 1
+            aufheben(RGB(80, 140, 255))
+        CASE T_KEY_RED
+            keys_red = keys_red + 1
+            aufheben(RGB(255, 90, 90))
+        CASE T_KEY_GREEN
+            keys_green = keys_green + 1
+            aufheben(RGB(90, 235, 120))
+        CASE T_KEY_YELLOW
+            keys_yellow = keys_yellow + 1
+            aufheben(RGB(255, 215, 80))
+        CASE T_FLIPPERS
+            has_flippers = TRUE
+            aufheben(RGB(90, 160, 255))
+        CASE T_FIREBOOTS
+            has_fireboots = TRUE
+            aufheben(RGB(255, 140, 60))
+        CASE T_ICESKATES
+            has_iceskates = TRUE
+            aufheben(RGB(180, 230, 255))
+        CASE T_SUCTION
+            has_suction = TRUE
+            aufheben(RGB(190, 140, 255))
+        CASE T_DOOR_BLUE
+            keys_blue = keys_blue - 1
+            oeffnen()
+        CASE T_DOOR_RED
+            keys_red = keys_red - 1
+            oeffnen()
+        CASE T_DOOR_GREEN
+            oeffnen()                      ' gruene Schluessel bleiben
+        CASE T_DOOR_YELLOW
+            keys_yellow = keys_yellow - 1
+            oeffnen()
+        CASE T_SOCKET
+            oeffnen()
+            funken(px, py, RGB(110, 255, 200), 18)
+        CASE T_THIEF
+            has_flippers = FALSE
+            has_fireboots = FALSE
+            has_iceskates = FALSE
+            has_suction = FALSE
+            sfx_blocked()
+        CASE T_BTN_GREEN
+            toggle_walls()
+        CASE T_BTN_BLUE
+            reverse_tanks()
+        CASE T_BTN_RED
+            fire_cloners(px, py)
+        CASE T_EXIT
+            state = "win"
+            sieg_t = 0.0
+            funken(px, py, RGB(90, 230, 255), 40)
+            funken(px, py, RGB(255, 225, 120), 20)
+            record_win()
+            sfx_win()
+            rumble(0.4, 0.18)     ' kurzer Erfolgs-Stups, schwaecher als der Tod
+            demo_stop()           ' hier endet die Aufnahme: DAS ist die Loesung
+        CASE T_WATER
+            IF has_flippers THEN
+                on_water = TRUE
+            ELSE
+                player_die("Ertrunken!")
+            END IF
+        CASE T_FIRE
+            IF NOT has_fireboots THEN player_die("Verbrannt!")
+        CASE T_BOMB
+            terr[cidx(px, py)] = T_FLOOR
+            player_die("In die Luft gesprengt!")
+        CASE T_TELEPORT
+            do_teleport()
+        CASE T_PASSONCE
+            terr[cidx(px, py)] = T_WALL    ' wird hinter dir zur Wand
+    END SELECT
 END SUB
 
 ' Eis-/Force-Rutschzustand nach dem Landen bestimmen
@@ -1760,11 +1664,9 @@ SUB reverse_tanks()
 END SUB
 
 SUB fire_cloners(bx AS INTEGER, by AS INTEGER)
-    DIM i AS INTEGER
-    FOR i = 0 TO nclone - 1
-        IF clone_bx[i] = bx AND clone_by[i] = by THEN
-            clone_one(clone_mx[i], clone_my[i])
-        END IF
+    DIM d AS Draht
+    FOR EACH d IN kloner
+        IF d.knopf_x = bx AND d.knopf_y = by THEN clone_one(d.ziel_x, d.ziel_y)
     NEXT
 END SUB
 
@@ -1784,13 +1686,13 @@ END SUB
 ' ----------------------------------------------------------------------
 SUB update_traps()
     ' Falle offen, solange ihr brauner Knopf belegt ist (Spieler/Block/Monster)
-    DIM i AS INTEGER
-    FOR i = 0 TO ntrap - 1
+    DIM d AS Draht
+    FOR EACH d IN fallen
         DIM held AS BOOLEAN
-        held = (px = trap_bx[i] AND py = trap_by[i])
-        IF block_at(trap_bx[i], trap_by[i]) >= 0 THEN held = TRUE
-        IF mob_at(trap_bx[i], trap_by[i]) >= 0 THEN held = TRUE
-        DIM m AS INTEGER : m = mob_at(trap_tx[i], trap_ty[i])
+        held = (px = d.knopf_x AND py = d.knopf_y)
+        IF block_at(d.knopf_x, d.knopf_y) >= 0 THEN held = TRUE
+        IF mob_at(d.knopf_x, d.knopf_y) >= 0 THEN held = TRUE
+        DIM m AS INTEGER : m = mob_at(d.ziel_x, d.ziel_y)
         IF m >= 0 THEN mobs[m].gefangen = NOT held
     NEXT
 END SUB
@@ -1887,29 +1789,31 @@ END SUB
 ' ----------------------------------------------------------------------
 ' Animierte Kacheln: Frame-0-Zelle (Sheet-Zeilen 8-9). -1 = statisch.
 FUNCTION anim_base(code AS INTEGER) AS INTEGER
-    IF code = T_WATER THEN RETURN 128
-    IF code = T_FIRE THEN RETURN 132
-    IF code = T_FORCE_S THEN RETURN 136
-    IF code = T_FORCE_N THEN RETURN 140
-    IF code = T_FORCE_E THEN RETURN 144
-    IF code = T_FORCE_W THEN RETURN 148
-    IF code = T_FORCE_RND THEN RETURN 152
-    IF code = T_EXIT THEN RETURN 156
-    IF code = T_TELEPORT THEN RETURN 160
-    IF code = T_BOMB THEN RETURN 164
-    IF code = T_TOGGLE_C THEN RETURN 168
-    IF code = T_TOGGLE_O THEN RETURN 172
-    IF code = T_SOCKET THEN RETURN 176
-    IF code = T_CLONER THEN RETURN 180
-    IF code = T_THIEF THEN RETURN 184
-    IF code = T_KEY_BLUE THEN RETURN 188
-    IF code = T_KEY_RED THEN RETURN 192
-    IF code = T_KEY_GREEN THEN RETURN 196
-    IF code = T_KEY_YELLOW THEN RETURN 200
-    IF code = T_FLIPPERS THEN RETURN 204
-    IF code = T_FIREBOOTS THEN RETURN 208
-    IF code = T_ICESKATES THEN RETURN 212
-    IF code = T_SUCTION THEN RETURN 216
+    SELECT CASE code
+        CASE T_WATER : RETURN 128
+        CASE T_FIRE : RETURN 132
+        CASE T_FORCE_S : RETURN 136
+        CASE T_FORCE_N : RETURN 140
+        CASE T_FORCE_E : RETURN 144
+        CASE T_FORCE_W : RETURN 148
+        CASE T_FORCE_RND : RETURN 152
+        CASE T_EXIT : RETURN 156
+        CASE T_TELEPORT : RETURN 160
+        CASE T_BOMB : RETURN 164
+        CASE T_TOGGLE_C : RETURN 168
+        CASE T_TOGGLE_O : RETURN 172
+        CASE T_SOCKET : RETURN 176
+        CASE T_CLONER : RETURN 180
+        CASE T_THIEF : RETURN 184
+        CASE T_KEY_BLUE : RETURN 188
+        CASE T_KEY_RED : RETURN 192
+        CASE T_KEY_GREEN : RETURN 196
+        CASE T_KEY_YELLOW : RETURN 200
+        CASE T_FLIPPERS : RETURN 204
+        CASE T_FIREBOOTS : RETURN 208
+        CASE T_ICESKATES : RETURN 212
+        CASE T_SUCTION : RETURN 216
+    END SELECT
     RETURN -1
 END FUNCTION
 
@@ -2399,7 +2303,7 @@ SUB draw_menu()
     glow_text(cx, INT(SH * 0.13), sc_big * 1.25, "CIRCUIT RUNNER", RGB(110, 238, 226))
     ct(cx, INT(SH * 0.215), sc_sm, "waehle ein Level-Set", RGB(150, 162, 184))
     parade(INT(SH * 0.70))
-    IF nsets = 0 THEN
+    IF LEN(sets) = 0 THEN
         ct(cx, SH \ 2, sc_med, "Keine Sets in levels/", RGB(245, 130, 130))
         RETURN
     END IF
@@ -2409,7 +2313,7 @@ SUB draw_menu()
     IF lo < 0 THEN lo = 0
     DIM hi AS INTEGER
     hi = lo + 6
-    IF hi > nsets - 1 THEN hi = nsets - 1
+    IF hi > LEN(sets) - 1 THEN hi = LEN(sets) - 1
     DIM yy AS INTEGER
     yy = INT(SH * 0.34)
     DIM lh AS INTEGER
@@ -2419,7 +2323,7 @@ SUB draw_menu()
     DIM si AS INTEGER
     FOR si = lo TO hi
         DIM lab AS STRING
-        lab = set_name[si] + "    " + STR$(set_count[si]) + " Level"
+        lab = sets[si].name + "    " + STR$(sets[si].anzahl) + " Level"
         DIM col AS INTEGER
         col = RGB(160, 172, 196)
         IF si = sel_set THEN
@@ -2433,14 +2337,14 @@ SUB draw_menu()
     NEXT
 
     DIM mx AS INTEGER
-    mx = SAVE_GET_INT_OR(sav, set_key(set_name[sel_set]) + "/max", 0)
+    mx = SAVE_GET_INT_OR(sav, set_key(sets[sel_set].name) + "/max", 0)
     DIM hint AS STRING
     hint = "Pfeile waehlen   LEER = Start   P = Passwort   ESC = Ende"
     IF mx > 0 THEN
         DIM nx AS INTEGER
         nx = mx + 1
-        IF nx > set_count[sel_set] THEN nx = set_count[sel_set]
-        ct(cx, INT(SH * 0.82), sc_sm, "Fortschritt: Level " + STR$(mx) + " / " + STR$(set_count[sel_set]), RGB(150, 200, 240))
+        IF nx > sets[sel_set].anzahl THEN nx = sets[sel_set].anzahl
+        ct(cx, INT(SH * 0.82), sc_sm, "Fortschritt: Level " + STR$(mx) + " / " + STR$(sets[sel_set].anzahl), RGB(150, 200, 240))
         hint = "LEER = Start   C = Weiter ab Level " + STR$(nx) + "   P = Passwort   ESC = Ende"
     END IF
 
@@ -2478,7 +2382,7 @@ SUB draw_password()
     DIM cx AS INTEGER
     cx = SW \ 2
     glow_text(cx, INT(SH * 0.22), sc_med, "PASSWORT", RGB(110, 238, 226))
-    ct(cx, INT(SH * 0.31), sc_sm, "Set: " + set_name[sel_set], RGB(150, 162, 184))
+    ct(cx, INT(SH * 0.31), sc_sm, "Set: " + sets[sel_set].name, RGB(150, 162, 184))
 
     ' Eingabefeld
     DIM disp AS STRING
@@ -2804,30 +2708,25 @@ WHILE NOT QUITREQUESTED()
         IF INPUT_PRESSED("back") THEN BREAK
         IF INPUT_PRESSED("tempo") THEN tempo_umschalten()
         IF INPUT_PRESSED("up") AND sel_set > 0 THEN sel_set = sel_set - 1
-        IF INPUT_PRESSED("down") AND sel_set < nsets - 1 THEN sel_set = sel_set + 1
-        IF INPUT_PRESSED("confirm") AND nsets > 0 THEN
-            js = JSON_LOAD(set_path[sel_set])
-            nlevels = JSON_LEN(js, "levels")
-            cur_setkey = set_key(set_name[sel_set])
+        IF INPUT_PRESSED("down") AND sel_set < LEN(sets) - 1 THEN sel_set = sel_set + 1
+        IF INPUT_PRESSED("confirm") AND LEN(sets) > 0 THEN
+            set_laden()
             cur_level = 0
             load_level(cur_level)
             state = "intro"
         END IF
 
-        IF INPUT_PRESSED("password") AND nsets > 0 THEN
-            js = JSON_LOAD(set_path[sel_set])
-            nlevels = JSON_LEN(js, "levels")
-            cur_setkey = set_key(set_name[sel_set])
+        IF INPUT_PRESSED("password") AND LEN(sets) > 0 THEN
+            set_laden()
             pw_input = ""
             pw_msg = ""
             state = "password"
         END IF
 
-        IF INPUT_PRESSED("continue") AND nsets > 0 THEN
-            cur_setkey = set_key(set_name[sel_set])
+        IF INPUT_PRESSED("continue") AND LEN(sets) > 0 THEN
+            cur_setkey = set_key(sets[sel_set].name)
             IF SAVE_GET_INT_OR(sav, cur_setkey + "/max", 0) > 0 THEN
-                js = JSON_LOAD(set_path[sel_set])
-                nlevels = JSON_LEN(js, "levels")
+                set_laden()
                 cur_level = SAVE_GET_INT_OR(sav, cur_setkey + "/max", 0)
                 IF cur_level > nlevels - 1 THEN cur_level = nlevels - 1
                 IF cur_level < 0 THEN cur_level = 0
