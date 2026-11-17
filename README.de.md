@@ -6,7 +6,15 @@
 
 <p align="center"><em><a href="README.md">English</a> · Deutsch</em></p>
 
-**Drachenhauch** ist eine moderne BASIC-Programmiersprache für **2D- und 3D-Spiele und Anwendungen mit grafischer Oberfläche** — und für die Kommandozeilen-Werkzeuge und kleinen Dienste, die dazugehören. Mit eigener Entwicklungsumgebung, dem **Drachenhauch Studio** für Anwendungen mit Oberfläche im Stil von Xojo, Sprite-, Karten- und Klang-Editoren; ein Befehl macht aus einem Programm eine eigenständige `.exe`. Läuft unter Windows, macOS und Linux und als WebAssembly im Browser.
+<p align="center"><b>Spiele und Anwendungen in einem BASIC, das mitdenkt.</b><br>
+Lesbar wie BASIC, streng wie Pascal, und alles ist dabei.</p>
+
+<p align="center"><b><a href="docs/schnellstart.md">In fünf Minuten loslegen</a></b> ·
+<a href="https://hasoschno70.github.io/Drachenhauch/spielwiese/index.html?lang=de">Im Browser ausprobieren</a> ·
+<a href="https://github.com/HasoSchno70/Drachenhauch/releases/latest">Herunterladen</a> ·
+<a href="docs/README.md">Handbuch</a></p>
+
+**Drachenhauch** ist eine moderne BASIC-Programmiersprache für **2D- und 3D-Spiele und Anwendungen mit grafischer Oberfläche** — und für die Kommandozeilen-Werkzeuge und kleinen Dienste, die dazugehören. Fehler zeigen sich, bevor das Programm läuft. Mit eigener Entwicklungsumgebung, dem **Drachenhauch Studio** für Anwendungen mit Oberfläche im Stil von Xojo, Sprite-, Karten- und Klang-Editoren; ein Befehl macht aus einem Programm eine eigenständige `.exe`. Läuft unter Windows, macOS und Linux und als WebAssembly im Browser.
 
 Ein BASIC im Geist von QB64, FreeBASIC oder Blitz Basic, mit dem Werkzeugkasten von PICO-8 oder LÖVE für Spiele und den Formularen und Tabellen von Visual Basic für Anwendungen — leicht anzufangen, streng genug, um damit zu wachsen.
 
@@ -36,6 +44,23 @@ WHILE NOT QUITREQUESTED()
     SLEEP(16)
 WEND
 ```
+
+## Warum Drachenhauch
+
+- **Eine Datei ist ein Programm.** Kein Projektgerüst, kein Paketmanager: `SCREEN`, zeichnen, `FLIP` — das ist ein Spiel. `dhrt --export` macht daraus ein eigenständiges Programm zum Weitergeben.
+- **Fehler vor dem Lauf.** Jede Variable hat einen Typ. Ein vertippter Name, ein fehlendes Argument oder Text, wo eine Zahl hingehört, wird mit Datei und Zeile gemeldet, bevor das Programm startet — in der IDE schon beim Tippen.
+- **Alles dabei.** 2D- und 3D-Grafik, Ton, Physik, Fenster und Tabellen, SQLite, PostgreSQL und MySQL, PDF, Netzwerk und serielle Schnittstellen sind eingebaut. Nichts nachzuinstallieren, nichts aktuell zu halten.
+- **Mit sich selbst gebaut.** Die IDE, das Drachenhauch Studio und alle Editoren sind Drachenhauch-Programme. Was die trägt, trägt auch deine Anwendung — und heiße Schleifen laufen als Maschinencode.
+
+## Drei Wege hinein
+
+<table>
+<tr>
+<td width="33%" valign="top"><b>Ein Spiel bauen</b><br>Mit einer Spielschleife aus zwanzig Zeilen anfangen, dann wachsen: Sprites, Tiled-Karten, Partikel, Physik und Shader. <a href="spiele/circuitrunner">Circuit Runner</a> liegt als ganzes Knobelspiel bei.</td>
+<td width="33%" valign="top"><b>Eine Anwendung bauen</b><br>Fenster im <a href="docs/studio.md">Drachenhauch Studio</a> zusammenklicken und die Ereignisse schreiben: Formulare, Tabellen an einer Datenbank, Berichte und Drucken.</td>
+<td width="33%" valign="top"><b>Programmieren lernen</b><br>Lesbarer Code, eine IDE mit Debugger und dem Handbuch auf F1, der <a href="docs/schnellstart.md">Schnellstart</a> und ein <a href="buecher/einstieg">Buch für Einsteiger</a>.</td>
+</tr>
+</table>
 
 ## Was damit geht
 

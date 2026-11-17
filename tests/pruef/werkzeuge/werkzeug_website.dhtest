@@ -289,3 +289,82 @@ PRINT "kein verweis "; NOT hat("site/index.html", "spielwiese") AND NOT hat("sit
 --- erwartet
 kein ordner TRUE
 kein verweis TRUE
+
+=== der schnellstart steht vorn und liefert die kostprobe
+' Gibt es docs/schnellstart.md, ist "In fuenf Minuten loslegen" der volle
+' Knopf der Startseite (die Spielwiese rueckt in die zweite Reihe), und der
+' Code auf der Startseite ist der erste Drachenhauch-Block des Schnellstarts
+' in der Sprache der Seite, samt Verweis auf das Startprojekt der Spielwiese.
+' Die drei Wege bringen ihre Bilder aus .github/bilder mit.
+--- programm ../../../tools/website.dh
+--- argumente
+--wurzel
+{fall}/repo
+--ziel
+{fall}/site
+--adresse
+https://example.org/dh
+--spielwiese
+{fall}/web
+--- datei repo/docs/en/README.md
+# Manual
+--- datei repo/docs/README.md
+# Handbuch
+--- datei repo/docs/en/schnellstart.md
+# Quick start
+
+```bash
+dhrt run x.dh
+```
+
+```basic
+' catch the stars
+PRINT "probe"
+```
+--- datei repo/docs/schnellstart.md
+# Schnellstart
+
+```bash
+dhrt run x.dh
+```
+
+```basic
+' fang die Sterne
+PRINT "probe"
+```
+--- datei repo/.github/bilder/circuitrunner.png
+png
+--- datei web/index.html
+<html>spielwiese</html>
+--- datei web/playground.js
+// js
+--- datei web/beispiele.js
+// beispiele
+--- datei web/dhrt.js
+// dhrt
+--- datei web/dhrt.wasm
+wasm
+--- datei web/program.dh
+PRINT 1
+--- nachher
+FUNCTION hat(datei AS STRING, teil AS STRING) AS BOOLEAN
+    RETURN INSTR(JOIN$(READLINES(datei), CHR$(10)), teil) >= 0
+END FUNCTION
+DIM q AS STRING : q = CHR$(34)
+PRINT "schnellstart voll en "; hat("site/index.html", "<a class=" + q + "knopf" + q + " href=" + q + "en/schnellstart.html" + q + ">Start in five minutes</a>")
+PRINT "schnellstart voll de "; hat("site/de.html", "<a class=" + q + "knopf" + q + " href=" + q + "de/schnellstart.html" + q + ">In fünf Minuten loslegen</a>")
+PRINT "spielwiese zweit "; hat("site/index.html", "<a class=" + q + "knopf zweit" + q + " href=" + q + "spielwiese/index.html?lang=en" + q + ">")
+PRINT "kostprobe en "; hat("site/index.html", "' catch the stars") AND NOT hat("site/index.html", "fang die Sterne")
+PRINT "kostprobe de "; hat("site/de.html", "' fang die Sterne")
+PRINT "kein shell-block "; NOT hat("site/index.html", "dhrt run x.dh")
+PRINT "startprojekt "; hat("site/index.html", "spielwiese/index.html?lang=en&amp;beispiel=spiel")
+PRINT "wege "; hat("site/index.html", "<div class=" + q + "wege" + q + ">") AND FILEEXISTS("site/bilder/circuitrunner.png")
+--- erwartet
+schnellstart voll en TRUE
+schnellstart voll de TRUE
+spielwiese zweit TRUE
+kostprobe en TRUE
+kostprobe de TRUE
+kein shell-block TRUE
+startprojekt TRUE
+wege TRUE
