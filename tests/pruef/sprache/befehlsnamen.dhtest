@@ -98,3 +98,31 @@ PRINT "neu hat text "; INSTR(neu, "gehalten") >= 0; " nennt sich nicht neu "; IN
 --- erwartet
 alt TRUE
 neu hat text TRUE nennt sich nicht neu TRUE
+
+=== gui setzt mit GUI_SET_X und liest mit GUI_GET_X
+TRY
+    SCREEN(300, 200, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 300, 200)
+DIM t AS GUI_WIDGET : t = GUI_TEXTINPUT(w, 10, 10, 200, 30, "eins")
+GUI_SET_TEXT(t, "zwei")
+PRINT GUI_GET_TEXT$(t); " "; GUI_GET_TEXT(t) = GUI_TEXT(t)
+GUI_SET_TOOLTIP(t, "Hilfe")
+PRINT GUI_GET_TOOLTIP$(t); " "; GUI_TOOLTIP$(t)
+GUI_SET_ENABLED(t, FALSE)
+GUI_SET_VISIBLE(t, FALSE)
+PRINT GUI_GET_ENABLED(t); " "; GUI_GET_VISIBLE(t)
+DIM lb AS GUI_WIDGET : lb = GUI_LISTBOX(w, 10, 50, 200, 100, ["a"])
+GUI_LISTBOX_ITEMS(lb, ["x", "y", "z"])
+PRINT GUI_LISTBOX_COUNT(lb)
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+zwei TRUE
+Hilfe Hilfe
+FALSE FALSE
+3

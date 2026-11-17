@@ -96,6 +96,29 @@ sind Rückruf-Zeitgeber aus dem Modul `timer`.
 | `AUDIO_MUSIC_SET_PITCH(faktor)` | Musik-Pitch (1.0 = normal; ueberlebt LOAD/QUEUE — Slow-Motion-Effekt) — bisher `AUDIO_MUSIC_PITCH` |
 | `SET_COUNT(menge)` | Anzahl der Elemente — bisher `SET_SIZE` |
 
+### gui: `GUI_SET_X` setzt, `GUI_GET_X` liest
+
+| Name | Was es tut |
+|---|---|
+| `GUI_GET_TEXT$(wdg)` | STRING — Text (Label/Button/TextInput) — bisher `GUI_TEXT` |
+| `GUI_GET_VALUE(wdg)` | FLOAT — Slider-Wert — bisher `GUI_VALUE` |
+| `GUI_GET_CHECKED(wdg)` | BOOLEAN — Checkbox-Zustand — bisher `GUI_CHECKED` |
+| `GUI_GET_ENABLED(wdg)` | BOOLEAN — ist es bedienbar? — bisher `GUI_ENABLED` |
+| `GUI_GET_VISIBLE(wdg)` | ein-/ausblenden (unsichtbar = nicht gezeichnet, nicht interaktiv) — bisher `GUI_VISIBLE` |
+| `GUI_GET_ACTIVE_TAB(win)` | INTEGER — aktiver Reiter-Index — bisher `GUI_ACTIVE_TAB` |
+| `GUI_GET_DATE$(picker)` | gewähltes Datum als JJJJ-MM-TT — bisher `GUI_DATE` |
+| `GUI_GET_TIME$(tp)` | STRING — die Uhrzeit als HH:MM:SS — wie TIME$(), auch ohne Sekundenfeld — bisher `GUI_TIME$` |
+| `GUI_GET_ERROR$(feld)` | STRING / — / — Meldung lesen, von außen setzen (z. B. aus der Datenbank), alle löschen — bisher `GUI_ERROR` |
+| `GUI_GET_PICKED_COLOR(picker)` | gewählte Farbe (0xRRGGBB) — bisher `GUI_PICKED_COLOR` |
+| `GUI_GET_MOTION()` | BOOLEAN — spielt die gui gerade Bewegung ab? — bisher `GUI_MOTION` |
+| `GUI_GET_SOUNDS()` | alle Klänge der gui an oder aus -- für einen Schalter „Töne“ in den Einstellungen — bisher `GUI_SOUNDS` |
+| `GUI_SET_TOOLTIP(wdg, text)` | Hover-Hilfetext (mehrzeilig via \n; "" entfernt ihn) — bisher `GUI_TOOLTIP` |
+| `GUI_GET_TOOLTIP$(wdg)` | STRING — der gesetzte Hilfetext ("" ohne) — bisher `GUI_TOOLTIP$` |
+| `GUI_DOCK_SET_TITLE(win, name$, titel$)` | den Reiter neu beschriften — bisher `GUI_DOCK_TITLE` |
+| `GUI_DOCK_GET_TITLE$(win, name$)` | STRING — die Beschriftung des Reiters — bisher `GUI_DOCK_TITLE$` |
+| `GUI_STATUSBAR_SET_TIP(sb, feld, tip$)` | Tooltip eines Feldes — bisher `GUI_STATUSBAR_TIP` |
+| `GUI_STATUSBAR_GET_TIP$(sb, feld)` | STRING — Tooltip eines Feldes lesen — bisher `GUI_STATUSBAR_TIP$` |
+
 ### Fenster und Schirm
 
 | Name | Was es tut |

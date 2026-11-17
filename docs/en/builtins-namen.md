@@ -95,6 +95,29 @@ hand are callback timers from the `timer` module.
 | `AUDIO_MUSIC_SET_PITCH(faktor)` | music pitch (1.0 = normal; survives LOAD/QUEUE — slow-motion effect) — formerly `AUDIO_MUSIC_PITCH` |
 | `SET_COUNT(menge)` | number of elements — formerly `SET_SIZE` |
 
+### gui: `GUI_SET_X` sets, `GUI_GET_X` reads
+
+| Name | What it does |
+|---|---|
+| `GUI_GET_TEXT$(wdg)` | STRING — text (label/button/TextInput) — formerly `GUI_TEXT` |
+| `GUI_GET_VALUE(wdg)` | FLOAT — slider value — formerly `GUI_VALUE` |
+| `GUI_GET_CHECKED(wdg)` | BOOLEAN — checkbox state — formerly `GUI_CHECKED` |
+| `GUI_GET_ENABLED(wdg)` | BOOLEAN — is it usable? — formerly `GUI_ENABLED` |
+| `GUI_GET_VISIBLE(wdg)` | show/hide (invisible = not drawn, not interactive) — formerly `GUI_VISIBLE` |
+| `GUI_GET_ACTIVE_TAB(win)` | INTEGER — index of the active tab — formerly `GUI_ACTIVE_TAB` |
+| `GUI_GET_DATE$(picker)` | chosen date as JJJJ-MM-TT — formerly `GUI_DATE` |
+| `GUI_GET_TIME$(tp)` | STRING — the time as HH:MM:SS — like TIME$(), even without a seconds field — formerly `GUI_TIME$` |
+| `GUI_GET_ERROR$(feld)` | STRING / — / — read the message, set it from outside (e.g. from the database), clear all — formerly `GUI_ERROR` |
+| `GUI_GET_PICKED_COLOR(picker)` | chosen colour (0xRRGGBB) — formerly `GUI_PICKED_COLOR` |
+| `GUI_GET_MOTION()` | BOOLEAN — is the gui playing motion right now? — formerly `GUI_MOTION` |
+| `GUI_GET_SOUNDS()` | all gui sounds on or off -- for a "sounds" switch in the settings — formerly `GUI_SOUNDS` |
+| `GUI_SET_TOOLTIP(wdg, text)` | hover help text (multi-line via \n; "" removes it) — formerly `GUI_TOOLTIP` |
+| `GUI_GET_TOOLTIP$(wdg)` | STRING — the help text that was set ("" if none) — formerly `GUI_TOOLTIP$` |
+| `GUI_DOCK_SET_TITLE(win, name$, titel$)` | relabel the tab — formerly `GUI_DOCK_TITLE` |
+| `GUI_DOCK_GET_TITLE$(win, name$)` | STRING — the label of the tab — formerly `GUI_DOCK_TITLE$` |
+| `GUI_STATUSBAR_SET_TIP(sb, feld, tip$)` | tooltip of a field — formerly `GUI_STATUSBAR_TIP` |
+| `GUI_STATUSBAR_GET_TIP$(sb, feld)` | STRING — read the tooltip of a field — formerly `GUI_STATUSBAR_TIP$` |
+
 ### window and screen
 
 | Name | What it does |
