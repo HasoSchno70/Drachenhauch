@@ -181,7 +181,7 @@ WEND`,
 CONST DICKE = 8
 SCREEN(480, 320, "Malen", 2)
 
-DIM blatt AS INTEGER : blatt = RENDERTARGET_NEW(480, 320)
+DIM blatt AS INTEGER : blatt = RENDERTARGET_NEW(480, 320, TRUE)   ' TRUE: das Blatt behaelt, was darauf steht
 RENDERTARGET_CLEAR(blatt, RGB(250, 248, 240))
 DIM farbe AS INTEGER : farbe = RGB(220, 80, 40)
 DIM altX AS INTEGER : altX = MOUSE_X()
@@ -210,7 +210,7 @@ WEND`,
 CONST SIZE = 8
 SCREEN(480, 320, "Paint", 2)
 
-DIM sheet AS INTEGER : sheet = RENDERTARGET_NEW(480, 320)
+DIM sheet AS INTEGER : sheet = RENDERTARGET_NEW(480, 320, TRUE)   ' TRUE: the sheet keeps what is drawn on it
 RENDERTARGET_CLEAR(sheet, RGB(250, 248, 240))
 DIM colour AS INTEGER : colour = RGB(220, 80, 40)
 DIM lastX AS INTEGER : lastX = MOUSE_X()
