@@ -118,6 +118,22 @@ in bauteil"). Ein zweites `DIM` mit **gleichem** Typ bleibt eine Warnung.
 Dasselbe gilt für `CATCH e` (Typ `STRING`) und ein späteres `DIM e AS …`
 mit anderem Typ.
 
+**Egal ist nicht beliebig.** Weil `cw` und `CW` derselbe Name sind, warnt
+`dhrt --check` (im Editor die gelbe Linie), wenn ein eigener Name anders
+geschrieben ist als bei seiner Deklaration — sonst liest man zwei Dinge, wo
+eins ist:
+
+```basic
+CONST CW = 4
+PRINT cw                       ' Warnung: 'cw' ist als 'CW' angelegt ...
+```
+
+Strg+. schreibt die Stelle — oder gleich alle der Datei — so wie angelegt,
+`dhrt fmt --schreibweise` tut es für ganze Dateien. Welche Deklaration gemeint
+ist, entscheidet der Bereich: eine lokale `cw` in einer SUB ist dort richtig
+geschrieben, auch wenn es global eine `CW` gibt. Befehle und Schlüsselwörter
+(`len`, `Print`) schreibt jeder, wie er will.
+
 > **Reservierte Wörter nicht als Variablennamen.** Manche kurze Namen sind
 > Schlüsselwörter und können nicht als Bezeichner dienen — neben den
 > offensichtlichen (`to`, `step`, `mod`, `end`, `next`, `new`, `class`, `in`)

@@ -19,6 +19,7 @@ mod animfsm;
 mod appstart;
 mod ast;
 mod namensraum;
+mod schreibweise;
 mod astar;
 // Audio-Backend (Kira/cpal, src/audio.rs) -- mit `graphics` eingebunden
 // (raylib bleibt fuer Fenster/Input).
@@ -503,9 +504,10 @@ fn main() -> ExitCode {
         if raw.len() >= 2 && raw[1] == "fmt" {
             let nur_pruefen = raw[2..].iter().any(|a| a == "--pruefen");
             let einruecken = raw[2..].iter().any(|a| a == "--einruecken");
+            let schreibweise = raw[2..].iter().any(|a| a == "--schreibweise");
             let dateien: Vec<String> = raw[2..].iter()
                 .filter(|a| !a.starts_with("--")).cloned().collect();
-            return fmt_main(&dateien, nur_pruefen, einruecken);
+            return fmt_main(&dateien, nur_pruefen, einruecken, schreibweise);
         }
         // `dhrt test [pfad ...]` -- Pruefprogramme suchen und laufen lassen.
         // Ohne Pfad das aktuelle Verzeichnis.
@@ -1001,10 +1003,13 @@ fn formatiere(quelle: &str, einruecken: bool, einheit: &str) -> Option<String> {
     Some(zeilen.iter().map(|z| z.trim_end()).collect::<Vec<_>>().join("\n"))
 }
 
-/// `dhrt fmt [--pruefen] [--einruecken] <datei ...>`
-fn fmt_main(dateien: &[String], nur_pruefen: bool, einruecken: bool) -> ExitCode {
+/// `dhrt fmt [--pruefen] [--einruecken] [--schreibweise] <datei ...>`
+///
+/// `--schreibweise`: eigene Namen so schreiben, wie sie angelegt sind
+/// (`schreibweise.rs`) -- nur, was in der Datei selbst angelegt ist.
+fn fmt_main(dateien: &[String], nur_pruefen: bool, einruecken: bool, schreibweise: bool) -> ExitCode {
     if dateien.is_empty() {
-        eprintln!("Verwendung: dhrt fmt [--pruefen] [--einruecken] <datei.dh ...>");
+        eprintln!("Verwendung: dhrt fmt [--pruefen] [--einruecken] [--schreibweise] <datei.dh ...>");
         return ExitCode::from(2);
     }
     let mut geaendert = 0usize;
@@ -1023,7 +1028,7 @@ fn fmt_main(dateien: &[String], nur_pruefen: bool, einruecken: bool) -> ExitCode
             fehler += 1;
             continue;
         };
-        let mut neu = neu;
+        let mut neu = if schreibweise { schreibweise::angleichen(&neu) } else { neu };
         if endet_mit_umbruch { neu.push('\n'); }
         let neu = if crlf { neu.replace('\n', "\r\n") } else { neu };
         if neu == roh { continue; }

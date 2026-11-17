@@ -229,6 +229,7 @@ FUNCTION braucht einen Wert bei RETURN	A FUNCTION needs a value with RETURN
 {} darf nicht innerhalb eines Unterprogramms oder Blocks stehen -- SUB, FUNCTION, CLASS, STRUCT und ENUM gehoeren auf die oberste Ebene des Programms	{} must not be inside a subroutine or block -- SUB, FUNCTION, CLASS, STRUCT and ENUM belong at the top level of the program
 Lokale Variable '{}' verdeckt die gleichnamige Konstante -- Drachenhauch ignoriert Gross-/Kleinschreibung. Innerhalb dieser Funktion meint der Name ab hier die Variable, nicht die Konstante.	Local variable '{}' hides the constant of the same name -- Drachenhauch ignores upper/lower case. Inside this function the name means the variable from here on, not the constant.
 {} '{}' verdeckt die gleichnamige Konstante -- Drachenhauch ignoriert Gross-/Kleinschreibung. {}	{} '{}' hides the constant of the same name -- Drachenhauch ignores upper/lower case. {}
+'{}' ist als '{}' angelegt -- Gross-/Kleinschreibung zaehlt nicht, es ist derselbe Name. Bitte so schreiben wie dort.	'{}' was declared as '{}' -- upper/lower case does not matter, it is the same name. Please write it the same way as there.
 Feld	Field
 Parameter	Parameter
 In den Methoden der Klasse meint der Name das Feld, nicht die Konstante.	In the methods of the class the name means the field, not the constant.
@@ -506,6 +507,8 @@ dhrt fmt: {}: laesst sich nicht lesen (Syntaxfehler?) -- unveraendert gelassen	d
 # ---------------------------------------------------------------- Sprachserver
 '{}' wird angelegt, aber nie benutzt.	'{}' is declared but never used.
 Ersetzen durch {}	Replace with {}
+So schreiben wie angelegt: {}	Write as declared: {}
+Alle Namen der Datei so schreiben wie angelegt	Write all names in the file as declared
 Durch <> ersetzen	Replace with <>
 Klammern setzen	Add parentheses
 {} ergaenzen	Add {}

@@ -116,6 +116,22 @@ line that used the variable in the wrong sense ("field 'x' does not exist in
 bauteil"). A second `DIM` with the **same** type stays a warning. The same holds
 for `CATCH e` (type `STRING`) and a later `DIM e AS …` with another type.
 
+**Not mattering is not anything goes.** Because `cw` and `CW` are the same
+name, `dhrt --check` (the yellow line in the editor) warns when a name of
+your own is written differently from its declaration — otherwise you read two
+things where there is one:
+
+```basic
+CONST CW = 4
+PRINT cw                       ' Warnung: 'cw' ist als 'CW' angelegt ...
+```
+
+Ctrl+. writes the spot — or all of them in the file — as declared, and
+`dhrt fmt --schreibweise` does it for whole files. Which declaration is meant
+is decided by the scope: a local `cw` in a SUB is spelled correctly there, even
+if there is a global `CW`. Commands and keywords (`len`, `Print`) everyone
+writes as they like.
+
 > **No reserved words as variable names.** Some short names are
 > keywords and cannot serve as identifiers — besides the
 > obvious ones (`to`, `step`, `mod`, `end`, `next`, `new`, `class`, `in`)

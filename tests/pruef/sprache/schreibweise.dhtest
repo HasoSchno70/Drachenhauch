@@ -1,0 +1,89 @@
+' Eigene Namen so schreiben, wie sie angelegt sind (schreibweise.rs). Gross
+' und klein zaehlen weiter nicht -- `cw` und `CW` sind derselbe Name --, aber
+' wer anders schreibt als bei der Deklaration, bekommt eine Warnung mit
+' Schnellkorrektur, und `dhrt fmt --schreibweise` gleicht die Datei an.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== abweichende schreibweise wird gemeldet
+IMPORT "json"
+DIM NL AS STRING : NL = CHR$(10)
+' Zeile 3: globale Variable und Konstante; 6: die lokale verdeckt CW, `CW`
+' dort meint die lokale; 11: Feld; 14: Methode hinter dem Punkt; 16: eigene
+' Funktion mit $.
+DIM q AS STRING
+q = "CONST CW = 4" + NL + "DIM Wert AS INTEGER" + NL + "wert = cw * 2" + NL
+q = q + "SUB s()" + NL + "    DIM cw AS INTEGER" + NL + "    CW = 1" + NL + "END SUB" + NL
+q = q + "CLASS Punkt" + NL + "    DIM xPos AS INTEGER" + NL + "    SUB Setzen(neuX AS INTEGER)" + NL + "        xpos = neuX" + NL + "    END SUB" + NL + "END CLASS" + NL
+q = q + "DIM p AS Punkt : p = NEW Punkt()" + NL + "p.setzen(3)" + NL
+q = q + "FUNCTION zahl$(x AS INTEGER) AS STRING" + NL + "    RETURN STR$(x)" + NL + "END FUNCTION" + NL + "PRINT ZAHL$(Wert)" + NL
+DIM j AS JSON_HANDLE : j = JSON_PARSE("{" + CHR$(34) + "d" + CHR$(34) + ":" + CODE_CHECK$(q) + "}")
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(j, "d") - 1
+    DIM m AS STRING : m = JSON_GET_STRING(j, "d." + STR$(i) + ".meldung")
+    IF INSTR(m, "angelegt") >= 0 THEN PRINT JSON_GET_INT(j, "d." + STR$(i) + ".zeile"); " "; LEFT$(m, INSTR(m, " --"))
+NEXT
+--- erwartet
+3 'wert' ist als 'Wert' angelegt
+3 'cw' ist als 'CW' angelegt
+6 'CW' ist als 'cw' angelegt
+11 'xpos' ist als 'xPos' angelegt
+15 'setzen' ist als 'Setzen' angelegt
+19 'ZAHL$' ist als 'zahl$' angelegt
+
+=== befehle schluesselwoerter enum-werte und bereiche bleiben still
+' LEN neben einer Variable len meint den Befehl; Schluesselwoerter schreibt
+' jeder, wie er will; St.DIVE ist ein Wert der Aufzaehlung, nicht die
+' Methode Dive; ein Parameter `cw` in einer SUB ist in ihr gleich geschrieben.
+DIM NL AS STRING : NL = CHR$(10)
+DIM q AS STRING
+q = "DIM len AS INTEGER" + NL + "len = LEN(" + CHR$(34) + "abc" + CHR$(34) + ")" + NL + "print len" + NL
+q = q + "ENUM St = ENTER, DIVE" + NL + "CLASS G" + NL + "    SUB Dive()" + NL + "    END SUB" + NL + "END CLASS" + NL + "PRINT St.DIVE" + NL
+q = q + "CONST CW = 1" + NL + "SUB f(cw AS INTEGER)" + NL + "    PRINT cw" + NL + "END SUB" + NL + "f(CW)" + NL
+' Eine eigene text$ ist nicht der Befehl TEXT (Notenblatt).
+q = q + "FUNCTION text$(s AS STRING) AS STRING" + NL + "    RETURN s" + NL + "END FUNCTION" + NL + "TEXT(1, 2, text$(" + CHR$(34) + "a" + CHR$(34) + "))" + NL
+PRINT "meldungen "; CODE_CHECK$(q)
+--- erwartet
+meldungen []
+
+=== die schnellkorrektur schreibt wie angelegt
+IMPORT "json"
+DIM NL AS STRING : NL = CHR$(10)
+DIM q AS STRING : q = "CONST CW = 4" + NL + "DIM Wert AS INTEGER" + NL + "wert = cw * 2 + cw"
+DIM j AS JSON_HANDLE : j = JSON_PARSE("{" + CHR$(34) + "d" + CHR$(34) + ":" + CODE_CHECK$(q) + "}")
+DIM i AS INTEGER
+DIM k AS INTEGER
+FOR i = 0 TO JSON_LEN(j, "d") - 1
+    DIM p AS STRING : p = "d." + STR$(i)
+    IF NOT JSON_HAS(j, p + ".korrekturen") THEN CONTINUE
+    FOR k = 0 TO JSON_LEN(j, p + ".korrekturen") - 1
+        DIM kp AS STRING : kp = p + ".korrekturen." + STR$(k)
+        PRINT JSON_GET_STRING(j, kp + ".titel"); ": "; JSON_LEN(j, kp + ".aenderungen"); " Stellen, erste @"; JSON_GET_INT(j, kp + ".aenderungen.0.zeile"); ":"; JSON_GET_INT(j, kp + ".aenderungen.0.spalte"); " ["; JSON_GET_STRING(j, kp + ".aenderungen.0.text"); "]"
+    NEXT
+NEXT
+--- erwartet
+So schreiben wie angelegt: Wert: 1 Stellen, erste @3:1 [Wert]
+Alle Namen der Datei so schreiben wie angelegt: 3 Stellen, erste @3:1 [Wert]
+So schreiben wie angelegt: CW: 2 Stellen, erste @3:8 [CW]
+Alle Namen der Datei so schreiben wie angelegt: 3 Stellen, erste @3:1 [Wert]
+
+=== die meldung gibt es auch englisch
+DIM NL AS STRING : NL = CHR$(10)
+PRINT CODE_CHECK$("CONST CW = 4" + NL + "PRINT cw")
+--- umgebung
+DHRT_LANG=en
+--- enthaelt
+'cw' was declared as 'CW' -- upper/lower case does not matter, it is the same name.
+
+=== dhrt fmt --schreibweise gleicht die datei an
+IMPORT "helfer.dh"
+WRITEALL("probe.dh", "CONST CW = 4" + CHR$(10) + "DIM Wert AS INTEGER" + CHR$(10) + "wert = cw * 2" + CHR$(10))
+dlStarten(["fmt", "--schreibweise", "probe.dh"])
+PRINT "rueckgabe "; dlCode
+PRINT READALL$("probe.dh")
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
+--- erwartet
+rueckgabe 0
+CONST CW = 4
+DIM Wert AS INTEGER
+Wert = CW * 2
