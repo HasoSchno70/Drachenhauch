@@ -87,3 +87,18 @@ rueckgabe 0
 CONST CW = 4
 DIM Wert AS INTEGER
 Wert = CW * 2
+
+=== text in einer escape-kette ist kein name
+' Das Studio schreibt Formulare als !"{\"name\":\"eins\",\"text\":\"Eins\"}"
+' -- bis 2026-11 endete die Kette im Scanner am \" (symbole.rs), und `Eins`
+' galt als anders geschriebener Name `eins`.
+DIM NL AS STRING : NL = CHR$(10)
+DIM q AS STRING
+q = "DIM eins AS INTEGER" + NL + "PRINT !" + CHR$(34) + "{\" + CHR$(34) + "text\" + CHR$(34) + ":\" + CHR$(34) + "Eins\" + CHR$(34) + "}" + CHR$(34) + ", eins" + NL
+PRINT q
+PRINT "meldungen "; CODE_CHECK$(q)
+--- erwartet
+DIM eins AS INTEGER
+PRINT !"{\"text\":\"Eins\"}", eins
+
+meldungen []

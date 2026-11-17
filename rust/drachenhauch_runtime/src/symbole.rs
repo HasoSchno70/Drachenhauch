@@ -86,9 +86,18 @@ pub fn ohne_kommentare_und_texte(zeile: &str) -> String {
             continue;
         }
         if ch == '"' {
+            // `!"...\"..."`: in der Escape-Form endet ein `\"` die Kette NICHT
+            // (bis 2026-11 tat es das hier -- aus `!"\"Eins\""` wurde Code).
+            let escape = i > 0 && z[i - 1] == '!';
             out.push(' ');
             i += 1;
             while i < n {
+                if escape && z[i] == '\\' && i + 1 < n {
+                    out.push(' ');
+                    out.push(' ');
+                    i += 2;
+                    continue;
+                }
                 if z[i] == '"' {
                     out.push(' ');
                     i += 1;

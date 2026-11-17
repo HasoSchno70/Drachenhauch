@@ -304,6 +304,14 @@ PRINT TEXT$(\"b\")";
     }
 
     #[test]
+    fn escape_ketten_sind_text() {
+        // Das Studio schreibt Formulare als `!"{\"text\":\"Eins\"}"` -- `Eins`
+        // ist Text, kein Name (vorher endete die Kette am `\"`).
+        let q = "DIM eins AS INTEGER\nPRINT !\"{\\\"text\\\":\\\"Eins\\\"}\", eins";
+        assert!(pruefen(q).is_empty(), "{:?}", pruefen(q));
+    }
+
+    #[test]
     fn angleichen_schreibt_wie_angelegt() {
         let q = "CONST CW = 4\nDIM Wert AS INTEGER\nwert = cw * 2 + cw";
         assert_eq!(angleichen(q), "CONST CW = 4\nDIM Wert AS INTEGER\nWert = CW * 2 + CW");
