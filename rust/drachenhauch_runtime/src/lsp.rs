@@ -869,6 +869,30 @@ fn signatur(name: &str) -> Option<&'static str> {
 /// aus `docs/` sind Tabellenzellen. `name` kommt ohne `$` an.
 pub fn builtin_doku(name: &str) -> Option<(String, String)> {
     let klein = name.to_lowercase();
+    // Leitlinie (namen.rs): ein bisheriger Name nennt den neuen, ein neuer ohne
+    // eigenen Text zeigt den des bisherigen.
+    let neu = crate::namen::neu(&klein).or_else(|| crate::namen::neu(&format!("{}$", klein)));
+    if let Some(n) = neu {
+        let (sig, text) = builtin_doku_ohne_namen(name)?;
+        let zusatz = if crate::meldung::englisch() {
+            format!("New name: {} (same effect; this one stays valid).", n.to_uppercase())
+        } else {
+            format!("Neuer Name: {} (gleiche Wirkung; dieser bleibt gueltig).", n.to_uppercase())
+        };
+        let text = if text.is_empty() { zusatz } else { format!("{}\n\n{}", text, zusatz) };
+        return Some((sig, text));
+    }
+    let eigen = builtin_doku_ohne_namen(name);
+    if matches!(&eigen, Some((_, t)) if !t.is_empty()) { return eigen; }
+    let bisher = crate::namen::bisher(&klein).or_else(|| crate::namen::bisher(&format!("{}$", klein)));
+    match bisher.and_then(|b| builtin_doku_ohne_namen(b.trim_end_matches('$'))) {
+        Some((_, t)) if !t.is_empty() => Some((eigen.map(|e| e.0).unwrap_or_else(|| name.to_uppercase()), t)),
+        _ => eigen,
+    }
+}
+
+fn builtin_doku_ohne_namen(name: &str) -> Option<(String, String)> {
+    let klein = name.to_lowercase();
     // Auf Englisch: die englische Kurzbeschreibung, sonst nur die Signatur --
     // die Handdoku und die deutsche Prosa sind deutsch.
     if crate::meldung::englisch() {

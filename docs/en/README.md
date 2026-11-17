@@ -18,6 +18,7 @@ Drachenhauch is a BASIC dialect with Pascal-strict typing and OOP, for games and
 ### Built-in commands
 
 - **[Standard built-ins](builtins-core.md)** — math, strings, bitwise, maps, file I/O, conversion, time/random
+- **[Command names](builtins-namen.md)** — how commands are named, and the new names for the old ones (`IMAGE_LOAD` for `LOADIMAGE`, `KEY_DOWN` for `KEYPRESSED` …)
 - **[Graphics built-ins](builtins-grafik.md)** — SCREEN, CLS, BOX, CIRCLE, LOADIMAGE, sound, tilemap, input, **`LOAD_ASSETS`** (bulk preloader), **sprite atlas + batch draw**, **Z-layer rendering**
 - **[Performance](../intern/PERFORMANCE.md)** (German) — historical benchmark numbers + a list of optimizations shipped (the Python paths they were compared against have been removed since stage B; production = `dhrt`)
 
