@@ -1,0 +1,100 @@
+' Befehlsnamen nach der Leitlinie (docs/builtins-namen.md): neue Namen fuer
+' alte Befehle (namen.rs), das freie `$` bei Text-Befehlen, englische
+' Modulnamen und der Hover, der beim alten Namen den neuen nennt. Die alten
+' Namen bleiben gueltig -- jeder Fall rechnet beide Wege und vergleicht.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== neue namen tun dasselbe wie die alten
+DIM pfad AS STRING : pfad = PATH_JOIN(STARTDIR$(), "probe.txt")
+FILE_WRITE(pfad, "eins" + CHR$(10) + "zwei")
+PRINT "datei "; FILE_EXISTS(pfad) = FILEEXISTS(pfad); " "; FILE_SIZE(pfad) = FILESIZE(pfad)
+PRINT "lesen "; FILE_READ$(pfad) = READALL$(pfad); " "; LEN(FILE_READ_LINES(pfad))
+FILE_APPEND(pfad, CHR$(10) + "drei")
+DIM f AS FILE : f = FILE_OPEN(pfad, "r")
+PRINT "handle "; FILE_READ_LINE$(f); " "; FILE_EOF(f)
+FILE_CLOSE(f)
+PRINT "pfad "; PATH_DIR(pfad) = DIRNAME(pfad); " "; PATH_BASE(pfad)
+FILE_DELETE(pfad)
+PRINT "weg "; FILE_EXISTS(pfad)
+DIM m AS MAP OF INTEGER
+MAP_PUT(m, "a", 1)
+MAP_PUT(m, "b", 2)
+PRINT "map "; MAP_COUNT(m); " "; MAPSIZE(m); " "; MAP_GET(m, "b"); " "; MAP_GET_OR(m, "c", 9); " "; MAP_HAS(m, "a")
+MAP_REMOVE(m, "a")
+PRINT "keys "; JOIN$(MAP_KEYS(m), ",")
+DIM s AS MAP OF INTEGER
+SET_ADD(s, 7)
+SET_ADD(s, 3)
+PRINT "menge "; SET_COUNT(s) = SET_SIZE(s)
+DIM feld[3, 4] AS INTEGER
+PRINT "feld "; ARRAY_DIM_COUNT(feld); " "; ARRAY_DIM_SIZE(feld, 1) = DIMSIZE(feld, 1)
+PRINT "weiter "; MOVE_TOWARD(0.0, 10.0, 3.0)
+--- erwartet
+datei TRUE TRUE
+lesen TRUE 2
+handle eins FALSE
+pfad TRUE probe.txt
+weg FALSE
+map 2 2 2 9 TRUE
+keys b
+menge TRUE
+feld 2 TRUE
+weiter 3.0
+
+=== zeit und geld heissen auch englisch
+IMPORT "time"
+IMPORT "money"
+DIM t AS INTEGER : t = TIME_FROM_PARTS(2026, 11, 17, 9, 30)
+PRINT TIME_WEEKDAY(t); " "; ZEIT_WOCHENTAG(t); " "; TIME_TEXT$(t)
+PRINT TIME_PART(TIME_ADD(t, 3600), "stunde"); " "; TIME_DIFF(TIME_ADD(t, 90), t); " "; TIME_DURATION$(4000) = ZEIT_DAUER$(4000)
+PRINT TIME_CAN_PARSE("2026-11-17"); " "; TIME_TO_UNIX(TIME_FROM_UNIX(1000)) = 1000
+DIM g AS GELD : g = MONEY_NEW("19,99")
+PRINT MONEY_TEXT$(g); " "; MONEY_CENTS(g); " "; MONEY_TEXT$(MONEY_FROM_CENTS(-5)); " "; MONEY_TEXT$(MONEY_ABS(MONEY_FROM_CENTS(-5)))
+PRINT LEN(MONEY_SPLIT(g, 3)); " "; MONEY_VALUE(MONEY_ROUND(g, 0))
+--- erwartet
+2 2 2026-11-17 09:30:00
+10 90 TRUE
+TRUE TRUE
+19,99 € 1999 -0,05 € 0,05 €
+3 20.0
+
+=== das dollarzeichen ist bei textbefehlen frei
+' Ohne $, wo der Befehl eins hat; mit $, wo er keins hat; ein $ an einem
+' Befehl, der keinen Text liefert, bleibt ein Fehler.
+PRINT ENV_GET("DH_GIBT_ES_NICHT", "vorgabe"); " "; GETENV("DH_GIBT_ES_NICHT", "v2"); " "; GETENV$("DH_GIBT_ES_NICHT", "v3")
+PRINT LEFT("abc", 2); " "; PATHJOIN$("a", "b") = PATHJOIN("a", "b"); " "; PATH_JOIN$("a", "b") = PATHJOIN("a", "b")
+TRY
+    PRINT LEN$("abc")
+CATCH e
+    PRINT "len$ "; INSTR(e, "LEN$") >= 0
+END TRY
+--- erwartet
+vorgabe v2 v3
+ab TRUE TRUE
+len$ TRUE
+
+=== check kennt neue namen, das freie dollar und englische module
+' Keine Warnung fuer neue Namen, fuer PATHJOIN$ und fuer IMPORT "time" mit
+' einem Befehl aus zeit; LEN$ bleibt ein unbekannter Befehl.
+DIM q AS STRING
+q = "IMPORT " + CHR$(34) + "time" + CHR$(34) + CHR$(10)
+q = q + "PRINT TIME_NOW()" + CHR$(10)
+q = q + "PRINT FILE_EXISTS(" + CHR$(34) + "x" + CHR$(34) + ")" + CHR$(10)
+q = q + "PRINT PATHJOIN$(" + CHR$(34) + "a" + CHR$(34) + ", " + CHR$(34) + "b" + CHR$(34) + ")" + CHR$(10)
+PRINT "sauber "; CODE_CHECK$(q)
+PRINT "len$ "; INSTR(CODE_CHECK$("PRINT LEN$(" + CHR$(34) + "a" + CHR$(34) + ")" + CHR$(10)), "LEN$") >= 0
+DIM ohne AS STRING : ohne = CODE_CHECK$("PRINT TIME_NOW()" + CHR$(10))
+PRINT "ohne import "; INSTR(ohne, "zeit") >= 0
+--- erwartet
+sauber []
+len$ TRUE
+ohne import TRUE
+
+=== der hover nennt beim alten namen den neuen
+DIM alt AS STRING : alt = CODE_HOVER$("PRINT KEYPRESSED(32)", 1, 8)
+PRINT "alt "; INSTR(alt, "KEY_DOWN") >= 0
+DIM neu AS STRING : neu = CODE_HOVER$("PRINT KEY_DOWN(32)", 1, 8)
+PRINT "neu hat text "; INSTR(neu, "gehalten") >= 0; " nennt sich nicht neu "; INSTR(neu, "Neuer Name") < 0
+--- erwartet
+alt TRUE
+neu hat text TRUE nennt sich nicht neu TRUE

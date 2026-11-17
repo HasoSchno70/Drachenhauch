@@ -18,6 +18,7 @@ mod animfsm;
 // Programm statt eines Shell-Starters).
 mod appstart;
 mod ast;
+mod namen;
 mod namensraum;
 mod astar;
 // Audio-Backend (Kira/cpal, src/audio.rs) -- mit `graphics` eingebunden

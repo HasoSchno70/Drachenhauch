@@ -224,7 +224,7 @@ pub fn modul_verfuegbar(name: &str) -> bool {
 /// Modul-Aufloesung ist case-insensitiv (Python importiert `name.lower()`).
 fn is_known_module(rel: &str) -> bool {
     let low = rel.to_lowercase();
-    MODULES.contains(&low.as_str())
+    MODULES.contains(&crate::namen::modul(&low))
 }
 
 /// Ist das Hardware-Modul `m` in DIESEM dhrt-Build einkompiliert? Fuer
@@ -514,7 +514,8 @@ fn process_inner(
                 };
                 out.push(format!("' === IMPORT MODULE {}{} ===", rel, tag));
                 herkunft.push(Herkunft { datei: datei.to_string(), zeile: line_idx as u32, pfad: pfad.to_string() });
-                let low = rel.to_lowercase();
+                // `IMPORT "time"` ist `IMPORT "zeit"` (englische Modulnamen, namen.rs).
+                let low = crate::namen::modul(&rel.to_lowercase()).to_string();
                 optional_merken(&low, optional);
                 let alias_lc = alias.as_ref().map(|a| a.to_lowercase());
                 let entry = (low, alias_lc);
