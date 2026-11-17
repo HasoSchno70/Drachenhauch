@@ -387,6 +387,7 @@ program after N frames (for scripts).
 dhrt fmt datei.dh ...            # Schlüsselwörter groß, Leerraum am Ende weg
 dhrt fmt --einruecken datei.dh   # zusätzlich neu einrücken
 dhrt fmt --pruefen datei.dh      # schreibt nicht, meldet nur (Rückgabewert 1)
+dhrt fmt --schreibweise datei.dh # eigene Namen so schreiben wie angelegt
 ```
 
 **The default is lossless.** It writes keywords in upper case and removes
@@ -399,7 +400,11 @@ untouched.
 
 What is written in upper case is the word that stands there (`elif` →
 `ELIF`), not its canonical name (`ELSEIF`): the spelling is made consistent,
-not the vocabulary. Names, built-ins and classes stay as they are.
+not the vocabulary. Names, built-ins and classes stay as they are — except
+with `--schreibweise` (spelling): then names of your own are written as at
+their declaration (`CONST CW` … `cw` → `CW`; the rule is in the
+[language](sprache.md)). What is declared in an imported file this run does
+not know, and leaves it alone.
 
 **`--einruecken` (indent) is deliberately not the default.** The formatter
 only knows the blocks of the *language*. A group set by hand, which the

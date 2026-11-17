@@ -345,7 +345,9 @@ fn einfaches_dim(zeile: &str) -> Option<String> {
 /// Warnung fuer lokale Variablen bleibt, wie sie war. `source` = die
 /// gemergte Quelle, auf die sich die Zeilen der Warnungen beziehen.
 pub fn verdeckung_filtern(warns: Vec<(u32, String)>, source: &str) -> Vec<(u32, String)> {
-    let warns = schreibweise_pruefen(warns, source);
+    let mut warns = schreibweise_pruefen(warns, source);
+    // Eigene Namen so geschrieben wie angelegt (schreibweise.rs).
+    warns.extend(crate::schreibweise::warnungen(source));
     if !warns.iter().any(|(_, m)| (m.starts_with("Parameter '") || m.starts_with("Feld '"))
                                   && m.contains("' verdeckt die gleichnamige Konstante")) {
         return warns;
@@ -492,6 +494,22 @@ pub fn korrekturen_mit(kx: &KorrKontext, z0: usize, von: usize, bis: usize, meld
     let wortzeichen = |c: char| c.is_alphanumeric() || c == '_' || c == '$';
     let ist_wort = !wort.is_empty() && wort.chars().all(wortzeichen);
     let mut aus: Vec<(String, Vec<Aenderung>)> = Vec::new();
+
+    // "'cw' ist als 'CW' angelegt" -- in der Zeile so schreiben wie dort,
+    // oder gleich alle Abweichungen der Datei.
+    if let Some((geschrieben, angelegt)) = crate::schreibweise::aus_meldung(meldung) {
+        let alle = crate::schreibweise::pruefen(kx.text);
+        let zeile: Vec<Aenderung> = alle.iter()
+            .filter(|a| a.zeile == z0 + 1 && a.geschrieben == geschrieben && a.angelegt == angelegt)
+            .map(|a| (z0, a.spalte - 1, a.spalte_ende - 1, a.angelegt.trim_end_matches('$').to_string())).collect();
+        if !zeile.is_empty() {
+            aus.push((format!("So schreiben wie angelegt: {}", angelegt), zeile));
+        }
+        if alle.len() > 1 {
+            aus.push(("Alle Namen der Datei so schreiben wie angelegt".to_string(), alle.iter()
+                .map(|a| (a.zeile - 1, a.spalte - 1, a.spalte_ende - 1, a.angelegt.trim_end_matches('$').to_string())).collect()));
+        }
+    }
 
     // "Meintest du CIRCLE, CIRCLES?" / "Meintest du 'zaehler'?"
     if let Some(p) = meldung.find("Meintest du ") {
@@ -1824,8 +1842,11 @@ END SUB";
             (6, "etwas anderes".to_string()),
         ];
         let r = verdeckung_filtern(w, q);
-        assert_eq!(r.iter().map(|(z, _)| *z).collect::<Vec<_>>(), vec![3, 6]);
+        // Zeile 4: `N` meint in f den Parameter `n` -- dazu die Warnung der
+        // Schreibweise (schreibweise.rs), genau der Fall, um den es geht.
+        assert_eq!(r.iter().map(|(z, _)| *z).collect::<Vec<_>>(), vec![3, 6, 4]);
         assert!(r[1].1 == "etwas anderes");
+        assert!(r[2].1.starts_with("'N' ist als 'n' angelegt"), "{}", r[2].1);
     }
 
     #[test]

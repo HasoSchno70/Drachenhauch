@@ -381,6 +381,7 @@ beendet das Programm nach N Bildern (für Skripte).
 dhrt fmt datei.dh ...            # Schlüsselwörter groß, Leerraum am Ende weg
 dhrt fmt --einruecken datei.dh   # zusätzlich neu einrücken
 dhrt fmt --pruefen datei.dh      # schreibt nicht, meldet nur (Rückgabewert 1)
+dhrt fmt --schreibweise datei.dh # eigene Namen so schreiben wie angelegt
 ```
 
 **Die Vorgabe ist verlustfrei.** Sie schreibt Schlüsselwörter groß und
@@ -392,7 +393,11 @@ Ein `end` in einer Zeichenkette oder einem Kommentar bleibt darum unberührt.
 
 Groß geschrieben wird das Wort, das dasteht (`elif` → `ELIF`), nicht sein
 kanonischer Name (`ELSEIF`): vereinheitlicht wird die Schreibweise, nicht der
-Wortschatz. Namen, Builtins und Klassen bleiben, wie sie sind.
+Wortschatz. Namen, Builtins und Klassen bleiben, wie sie sind — außer mit
+`--schreibweise`: dann stehen eigene Namen so da wie bei ihrer Deklaration
+(`CONST CW` … `cw` → `CW`; die Regel steht in der [Sprache](sprache.md)).
+Was in einer importierten Datei angelegt ist, kennt der Lauf nicht und lässt
+es stehen.
 
 **`--einruecken` ist bewusst nicht die Vorgabe.** Der Formatierer kennt nur
 die Blöcke der *Sprache*. Eine von Hand gesetzte Gruppe, die die Sprache nicht
