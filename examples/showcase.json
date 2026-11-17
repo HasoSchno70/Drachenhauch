@@ -147,7 +147,7 @@
     "title": "GUI im Glas-Look",
     "desc": "Drehregler, Schieber und Listen mit Verlauf, Glanz und Fase.",
     "frames": 120,
-    "hinweis": "Zwei GUI-Karten statt der Vollbild-Anwendung 156_gui_alle_widgets: die zeigt zwar alle 22 Widget-Arten, ist aber auf Vorschaubreite heruntergerechnet nur noch graues Rauschen."
+    "hinweis": "Zwei GUI-Karten statt der Vollbild-Anwendung 156_gui_alle_widgets: die zeigt zwar 22 Widget-Arten, ist aber auf Vorschaubreite heruntergerechnet nur noch graues Rauschen."
   },
   {
     "file": "157_gui_tabelle.dh",

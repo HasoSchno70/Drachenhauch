@@ -8,7 +8,7 @@
 IMPORT "gui"
 PRINT GUI_THEME_GET("window_bg")
 --- fehler
-GUI_THEME_GET: unbekannter Schluessel 'window_bg' (bekannt: accent, close_hover, muted_fg, nebel, text_fg, title_bg, title_bg_focus, title_fg, widget_bg, widget_border, win_bg, win_border)
+GUI_THEME_GET: unbekannter Schluessel 'window_bg' (bekannt: accent, close_hover, muted_fg, nebel, reiter, text_fg, title_bg, title_bg_focus, title_fg, widget_bg, widget_border, win_bg, win_border)
 
 === thema setzen ebenso
 IMPORT "gui"

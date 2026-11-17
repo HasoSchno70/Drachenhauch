@@ -15,7 +15,10 @@ IF prBild = 10 THEN
     protokoll("pr code frei " + STR$(INSTR(GUI_INSPECT$(reiter[aktiverTab].feld), "nebel aus") >= 0))
     protokoll("pr liste nebel " + STR$(INSTR(GUI_INSPECT$(lstProbleme), "nebel 14%") >= 0))
     befehl("nebel")
-    protokoll("pr aus " + STR$(GUI_METRIC_GET("nebel")) + " haken " + STR$(GUI_MENU_CHECKED(miNebel)) + " liste " + STR$(INSTR(GUI_INSPECT$(lstProbleme), "nebel") >= 0))
+END IF
+' Die Stildatei loest GUI_UPDATE auf -- der ausgeschaltete Stand ein Bild spaeter.
+IF prBild = 11 THEN
+    protokoll("pr aus " + STR$(GUI_METRIC_GET("nebel")) + " haken " + STR$(GUI_MENU_CHECKED(miNebel)) + " liste " + STR$(INSTR(GUI_INSPECT$(lstProbleme), "nebel 14%") >= 0))
     befehl("nebel")
     befehl("thema")
     protokoll("pr hell " + STR$(GUI_METRIC_GET("nebel")))
@@ -52,3 +55,100 @@ nebel an
 pr hell 0
 nebel aus
 gemerkt FALSE
+
+=== im dunklen thema liegen die raender unter dem editor, buendig
+' Der ruhige Look (nebelAnwenden, bereichsFarben): Fenstergrund und
+' Raender einen Ton DUNKLER als das Code-Feld, eckig -- die Arbeit liegt
+' vorn. Im hellen Thema bleibt alles beim Thema.
+DIM prBild AS INTEGER : prBild = 0
+FUNCTION prHell(c AS INTEGER) AS INTEGER
+    RETURN ((c \ 65536) BAND 255) + ((c \ 256) BAND 255) + (c BAND 255)
+END FUNCTION
+--- programm ../../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 10 THEN
+    DIM prEditor AS INTEGER : prEditor = GUI_GET_COLOR(reiter[aktiverTab].feld, "bg")
+    protokoll("pr grund " + COLOR_HEX$(GUI_THEME_GET("win_bg")) + " editor " + COLOR_HEX$(prEditor))
+    protokoll("pr raender dunkler " + STR$(prHell(GUI_GET_COLOR(baum, "bg")) < prHell(prEditor)) + " " + STR$(prHell(GUI_GET_COLOR(lstAusgabe, "bg")) < prHell(prEditor)))
+    protokoll("pr eckig " + STR$(INSTR(GUI_INSPECT$(lstProbleme), "radius 0") >= 0))
+    befehl("thema")
+END IF
+IF prBild = 12 THEN
+    protokoll("pr hell grund " + COLOR_HEX$(GUI_THEME_GET("win_bg")) + " eckig " + STR$(INSTR(GUI_INSPECT$(lstProbleme), "radius 0") >= 0))
+    befehl("thema")
+    EXIT(0)
+END IF
+--- argumente
+haupt.dh
+--- umgebung
+DHRT_FRAMES=60
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+--- datei haupt.dh
+PRINT 1
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " THEN PRINT L[i]
+NEXT
+--- erwartet
+pr grund #12171D editor #232A33
+pr raender dunkler TRUE TRUE
+pr eckig TRUE
+pr hell grund #E2E8EF eckig FALSE
+
+=== der reiter gehoert zum editor, leeres sagt etwas, der lauf faerbt die statusleiste
+' Punkte 4 bis 6 des ruhigen Looks: der aktive Reiter in der Farbe des
+' Editors mit dem Akzent oben (`reiter`, `reiter_oben`), Hinweise in der
+' leeren Ausgabe und der leeren Problemliste, und die Statusleiste in einem
+' Akzent, solange ein Programm laeuft (statusLauf) -- danach wieder neutral.
+DIM prBild AS INTEGER : prBild = 0
+DIM prLief AS BOOLEAN : prLief = FALSE
+--- programm ../../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 10 THEN
+    protokoll("pr reiter " + COLOR_HEX$(GUI_THEME_GET("reiter")) + " oben " + STR$(GUI_METRIC_GET("reiter_oben")))
+    protokoll("pr ausgabe leer: " + GUI_LISTBOX_PLACEHOLDER$(lstAusgabe))
+    protokoll("pr probleme mit haken " + STR$(LEFT$(GUI_LISTBOX_PLACEHOLDER$(lstProbleme), 1) = CHR$(&H2713)))
+    protokoll("pr status vorher " + STR$(GUI_GET_COLOR(lblStatus, "bg")))
+    befehl("start")
+END IF
+IF prBild > 10 THEN
+    IF NOT prLief AND prozess >= 0 AND GUI_GET_COLOR(lblStatus, "bg") <> -1 THEN
+        prLief = TRUE
+        protokoll("pr status beim lauf gefaerbt")
+    END IF
+    IF prLief AND prozess < 0 AND GUI_GET_COLOR(lblStatus, "bg") = -1 THEN
+        protokoll("pr status danach neutral")
+        EXIT(0)
+    END IF
+END IF
+--- argumente
+haupt.dh
+--- umgebung
+DHRT_FRAMES=900
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+--- datei haupt.dh
+SLEEP(400)
+PRINT 1
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " THEN PRINT L[i]
+NEXT
+--- erwartet
+pr reiter #232A33 oben 1
+pr ausgabe leer: Noch keine Ausgabe -- F5 startet das Programm.
+pr probleme mit haken TRUE
+pr status vorher -1
+pr status beim lauf gefaerbt
+pr status danach neutral

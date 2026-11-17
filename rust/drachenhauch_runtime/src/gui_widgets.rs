@@ -1142,6 +1142,11 @@ impl Gui {
     pub fn list_placeholder(&mut self, h: i64, text: String) -> Result<(), String> {
         self.list_mut(h, "GUI_LISTBOX_PLACEHOLDER")?.leer_text = text; Ok(())
     }
+    /// GUI_LISTBOX_PLACEHOLDER$(lb): der Hinweis der leeren Liste ("" = keiner).
+    pub fn list_placeholder_get(&self, h: i64) -> Result<String, String> {
+        let w = self.list_ref(h, "GUI_LISTBOX_PLACEHOLDER$")?;
+        Ok(w.list.as_ref().map(|l| l.leer_text.clone()).unwrap_or_default())
+    }
     /// Sortieren -- natuerlich ("Datei 9" vor "Datei 10"), und INNERHALB der
     /// Gruppen, wenn es Gruppenkoepfe gibt: sonst risse Sortieren die Koepfe
     /// von ihren Eintraegen weg. Alles, was an einem Eintrag haengt, reist mit,

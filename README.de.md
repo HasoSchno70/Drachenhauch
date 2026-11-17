@@ -58,7 +58,7 @@ WEND
 </table>
 
 Alle neun sind mitgelieferte Beispiele — ein Klick aufs Bild führt zum Quelltext.
-Die Entwicklungsumgebung zeigt dieselbe Galerie mit **21 Demos** auf ihrer
+Die Entwicklungsumgebung zeigt dieselbe Galerie mit **24 Demos** auf ihrer
 Startseite, jede per Doppelklick startbar.
 
 ### Anwendungen mit Oberfläche
@@ -111,7 +111,7 @@ Nachzulesen im [Handbuch](docs/README.md); wie es dazu kam, steht in der
 
 ## Herunterladen
 
-**[Drachenhauch herunterladen](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — für Windows ein Installer (rund 60 MB), für macOS eine `.dmg`, für Linux ein `.tar.gz` (x86_64, und aarch64 für den [Raspberry Pi](docs/raspberry-pi.md)); aktuell Fassung 2026.46.
+**[Drachenhauch herunterladen](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — für Windows ein Installer (rund 60 MB), für macOS eine `.dmg`, für Linux ein `.tar.gz` (x86_64, und aarch64 für den [Raspberry Pi](docs/raspberry-pi.md)); aktuell Fassung 2026.50.
 
 Python muss dafür **nicht** installiert sein. Mit dabei sind die komplette Entwicklungsumgebung, die Runtime `dhrt`, alle Beispiele samt Assets, beide Bücher (*Der Einstieg* und *Das Lehrbuch*, letzteres in beiden Sprachen) als `.docx` und `.epub` sowie das ESP32-Grundgerüst. Der Windows-Installer ist nicht signiert, SmartScreen meldet sich also beim ersten Start; die macOS-App ist noch nicht beglaubigt.
 
@@ -212,7 +212,7 @@ Vollständige Doku im [docs/](docs/README.md)-Ordner:
 | [`input`](docs/module-input.md) | benannte Aktionen statt Tastencodes, Flankenerkennung, Gamepad |
 | [`timer`](docs/module-timer.md) | geplante Aktionen (`TIMER_AFTER`/`EVERY`) + `COOLDOWN`-Ratenbegrenzer |
 | [`video`](docs/module-video.md) | Videos abspielen (MP4/H.264), jedes Bild ein `IMAGE` |
-| [`tween`](docs/module-tween.md) | Werte weich überführen, 13 Verlaufskurven |
+| [`tween`](docs/module-tween.md) | Werte weich überführen, 19 Verlaufskurven |
 | [`curves`](docs/module-curves.md) | Bézier, Catmull-Rom, Hermite, Smoothstep — reine Funktionen |
 | [`astar`](docs/module-astar.md) | A*-Wegfindung auf einem Kachelgitter |
 | [`ecs`](docs/module-ecs.md) | Entity-Component-System mit Massen-Operationen für heiße Schleifen |
@@ -241,7 +241,7 @@ Vollständige Doku im [docs/](docs/README.md)-Ordner:
 
 | Modul | Wofür |
 |---|---|
-| [`gui`](docs/module-gui.md) | 24 Widget-Arten mit bleibendem Zustand — darunter eine **professionelle Tabelle** (sortieren, filtern, feste und umsortierbare Spalten, Zellen bearbeiten). Plastische Glas-Themen, Kippschalter, Drehregler, 9-Slice-Skins. **Vollstaendig ohne Maus bedienbar** (TAB durch alle Widgets, Fokus-Ring), **`GUI_SCALE`** fuer hochaufloesende Bildschirme und modale Dialoge im eigenen Thema. [Alle Widgets](examples/156_gui_alle_widgets.dh) · [Tastatur/Massstab/Dialog](examples/182_gui_tastatur_massstab.dh) · [Tabelle](examples/157_gui_tabelle.dh) · [an SQLite](examples/158_gui_tabelle_sqlite.dh) Das mehrzeilige Textfeld ist ein **Code-Feld**: Syntax-Einfaerbung ueber `SYNTAX_SPANS`, Zeilennummern, aktive Zeile, Tabulator. Eigene Schrift fuer die ganze Oberflaeche (`SETFONT`); bei grossen Dateien faerbt `GUI_TEXTAREA_VIEW` nur den sichtbaren Ausschnitt (30.000 Zeilen: 272 ms -> 2,1 ms je Anschlag). Dazu **Farbwaehler** und **Datumswaehler**. |
+| [`gui`](docs/module-gui.md) | 34 Widget-Arten mit bleibendem Zustand — darunter eine **professionelle Tabelle** (sortieren, filtern, feste und umsortierbare Spalten, Zellen bearbeiten). Plastische Glas-Themen, Kippschalter, Drehregler, 9-Slice-Skins. **Vollstaendig ohne Maus bedienbar** (TAB durch alle Widgets, Fokus-Ring), **`GUI_SCALE`** fuer hochaufloesende Bildschirme und modale Dialoge im eigenen Thema. [Alle Widgets](examples/156_gui_alle_widgets.dh) · [Tastatur/Massstab/Dialog](examples/182_gui_tastatur_massstab.dh) · [Tabelle](examples/157_gui_tabelle.dh) · [an SQLite](examples/158_gui_tabelle_sqlite.dh) Das mehrzeilige Textfeld ist ein **Code-Feld**: Syntax-Einfaerbung ueber `SYNTAX_SPANS`, Zeilennummern, aktive Zeile, Tabulator. Eigene Schrift fuer die ganze Oberflaeche (`SETFONT`); bei grossen Dateien faerbt `GUI_TEXTAREA_VIEW` nur den sichtbaren Ausschnitt (30.000 Zeilen: 272 ms -> 2,1 ms je Anschlag). Dazu **Farbwaehler** und **Datumswaehler**. |
 | [`ui`](docs/module-ui.md) | dasselbe als Immediate-Mode: kein Aufbau, alles pro Bild neu gezeichnet |
 | [`chart`](docs/module-chart.md) | sechs Diagrammarten (Kuchen, Balken, Linie, Tacho, Leiste, LED-Kette), vier Themen, Maus-Interaktion — [Demo](examples/154_chart.dh) |
 
@@ -342,7 +342,7 @@ Gebaut wird mit `rust/build_wasm.py`, das Gerüst liegt in `web/`.
 | `77_tiled_platformer.dh` | **Mini-Platformer**: Tiled-Level + Atlas + Tile-Kollision + Z-Layer + Input-Mapping |
 | `98_coroutines.dh` | **Coroutines/YIELD**: Generatoren, `FOR EACH`-Drain, send/return-Dialog, `CORO_RESULT`, Methoden-Coroutine |
 | `154_chart.dh` | **Diagramme**: alle sechs Arten, Themen, Maus-Interaktion |
-| `156_gui_alle_widgets.dh` | **alle 22 GUI-Widgets** in einer Vollbild-Anwendung, jedes mit echter Aufgabe |
+| `156_gui_alle_widgets.dh` | **22 GUI-Widgets** in einer Vollbild-Anwendung, jedes mit echter Aufgabe |
 | `222_gui_gesamtschau.dh` | **die gui in einem Rundgang**: zehn Stationen über bewegtem Hintergrund -- Glas, Animationen aus der Stildatei, Farb-Emoji, eine Tabelle mit einer Million Zeilen, Stildatei live, rechts nach links, sparsamer Leerlauf und die eingebaute Prüfung der Barrierefreiheit |
 | [Glutfaden](https://github.com/HasoSchno70/Glutfaden) | **Glutfaden** — der Kreuzstich-Editor PySticky in Drachenhauch, mit GTK 3 über fremde Bibliotheken: Teil- und Rückstiche, Ebenen, Bildimport, PDF/HTML/OXS-Export, Drucken (seit 2026-11 ein eigenes Repo) |
 | [Funkenflug](https://github.com/HasoSchno70/Funkenflug) | **Funkenflug** — ein Schaltplan-Editor mit GTK 3: Hierarchie und Busse, ERC, Netzliste/SPICE, Simulation mit ngspice, Lochraster-Platine mit Gerber und 3D-Ansicht, KiCad-Import (eigenes Repo) |
@@ -400,7 +400,7 @@ Pipeline: **Source → Preprocessor → Lexer → Parser → Compiler → VM**, 
 | 3D | Kamera + Grundkörper ([Demo](examples/82_3d_intro.dh)), Modelle in OBJ/GLTF, prozedurale Netze bis zum Höhenfeld-Gelände, **Skelett-Animation** geriggter GLTF/IQM ([Demo](examples/108_skeletal_anim.dh)), Billboards, Strahl-Treffer und Maus-Auswahl — auch auf echter Fläche statt nur Hüllkörper ([Demo](examples/151_picking_flaechen.dh)) |
 | Beleuchtung | physikalisch (Cook-Torrance), bis 4 Lichter, `MODEL_PBR` für Metall und Rauheit ([Demo](examples/95_pbr.dh)); Eigenleuchten ([Demo](examples/110_emissive_glow.dh)), Schlagschatten mit PCF ([Demo](examples/93_shadows.dh)), Normal-Maps ([Demo](examples/94_normalmap.dh)), Tiefennebel ([Demo](examples/92_fog.dh)) und Umgebungslicht — analytisch ([Demo](examples/96_ibl.dh)) wie als echte HDR-Cubemap ([Demo](examples/99_ibl_hdr.dh)) |
 | Klang | **Kira** auf eigenem Audio-Thread (löste 2026-06-13 raylibs Audio ab): Klänge, Musik, `.mod`/`.xm` über einen reinen Rust-Abspieler |
-| Oberfläche | `gui` mit 22 Widget-Arten (bleibender Zustand, Themen, Ziehen, Z-Reihenfolge, Fokus, FUNCREF-Rückrufe) und `ui` im Immediate-Mode |
+| Oberfläche | `gui` mit 34 Widget-Arten (bleibender Zustand, Themen, Ziehen, Z-Reihenfolge, Fokus, FUNCREF-Rückrufe) und `ui` im Immediate-Mode |
 | Bild und Ablauf | Spielschleife (`DELTA`/`FPS`/`SETFPS`), GPU-Shader und Nachbearbeitung (`SHADER_LOAD`/`POSTFX`), TTF-Schriften ([Demo](examples/87_ttf_fonts.dh)), Gamepad |
 | Eingabe aufzeichnen | `AUTOMATION_RECORD`/`PLAY` für Demo-Modus, nachspielbare Fehlerberichte und automatische Spieltests ([Doku](docs/automation.md), [Demo](examples/153_automation.dh)) |
 | Module | **alle** — auch die früher Python-eigenen: `regex`, `tiled`, `tile_collide`, `controller`, das erweiterte `audio`; dazu per Feature `db` (rusqlite), `net`, `mqtt`, `html` (ureq) und die Hardware-Seite `serial`, `firmata`, `usb`, `wifi`, `bt` |

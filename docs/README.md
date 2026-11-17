@@ -63,7 +63,7 @@ Jedes Modul wird mit `IMPORT "<name>"` aktiviert und stellt eigene Befehle berei
 | `tiled` | [Tiled](https://www.mapeditor.org/)-Map-Loader (JSON). Tile-Layer, Object-Layer, Tile- + Object-Properties | [module-tiled.md](module-tiled.md) |
 | `tile_collide` | Box-vs-Tilemap-Kollision: TILE_SWEEP_X/Y mit separat-Achsen-Pattern. Klassischer Platformer | [module-tile-collide.md](module-tile-collide.md) |
 | `controller` | Character-Controller mit Coyote-Time, Jump-Buffer, Variable-Jump-Height. Klassische "feel-good"-Platformer-Mechanik | [module-controller.md](module-controller.md) |
-| `gui` | Retained-Mode-Oberflächen: Fenster und Widgets als persistente Objekte, 22 Widget-Arten inkl. Tabelle | [module-gui.md](module-gui.md) |
+| `gui` | Retained-Mode-Oberflächen: Fenster und Widgets als persistente Objekte, 34 Widget-Arten inkl. Tabelle | [module-gui.md](module-gui.md) |
 | `chart` | Diagramme: Kuchen/Donut, Balken, Linie/Fläche, Tacho, Leiste, LED — mit Maus und Tooltip | [module-chart.md](module-chart.md) |
 | `g3d` | 3D-Grafik: Formen, geladene und prozedurale Modelle, Skelett-Animation, Licht und Schatten, Anklicken im Raum | [module-g3d.md](module-g3d.md) |
 | `m3d` | 3D-Mathematik: VEC3/VEC4/QUAT/MAT4 für hierarchische Transforms, eigene Kameras, Instancing | [module-m3d.md](module-m3d.md) |
@@ -150,6 +150,8 @@ Arbeitsnotizen, keine Anwender-Doku — sie erklären, warum etwas so ist, wie e
 - **[Release 2026.49](releases/release-2026.49.md)** — was in dieser Fassung neu ist
 - **[Release 2026.48](releases/release-2026.48.md)** — was in dieser Fassung neu ist
 - **[Release 2026.47](releases/release-2026.47.md)** — was in dieser Fassung neu ist
+- **[Release 2026.46](releases/release-2026.46.md)** — was in dieser Fassung neu ist
+- **[Release 2026.45](releases/release-2026.45.md)** — was in dieser Fassung neu ist
 - **[Release 2026.44](releases/release-2026.44.md)** — was in dieser Fassung neu ist
 - **[Release 2026.43](releases/release-2026.43.md)** — was in dieser Fassung neu ist
 - **[Release 2026.42](releases/release-2026.42.md)** — was in dieser Fassung neu ist

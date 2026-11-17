@@ -222,8 +222,18 @@ impl Gui {
             for (ti, x0, x1) in self.tab_slots(g, wi) {
                 let active = win.active_tab == ti as i32;
                 if active {
-                    g.box_fill(x0, by + 3, x1 - 1, by + tboff - 1, self.th("widget_bg"));
-                    g.box_fill(x0, by + tboff - 2, x1 - 1, by + tboff - 1, self.th("accent"));  // Akzent-Unterstrich
+                    // Flaeche aus dem Thema (`reiter`, -1 = widget_bg). Mit
+                    // `reiter_oben` steht der Akzent oben und der Reiter reicht
+                    // bis an die Flaeche darunter (ueber deren Trennlinie).
+                    let r = self.th("reiter");
+                    let flaeche = if r >= 0 { r } else { self.th("widget_bg") };
+                    if self.m_roh("reiter_oben") > 0 {
+                        g.box_fill(x0, by + 2, x1 - 1, by + tboff - 1, flaeche);
+                        g.box_fill(x0, by + 2, x1 - 1, by + 3, self.th("accent"));  // Akzent oben
+                    } else {
+                        g.box_fill(x0, by + 3, x1 - 1, by + tboff - 1, flaeche);
+                        g.box_fill(x0, by + tboff - 2, x1 - 1, by + tboff - 1, self.th("accent"));  // Akzent-Unterstrich
+                    }
                 }
                 let fg = if active { self.th("text_fg") } else { self.th("muted_fg") };
                 let th14 = self.ctext_height(g);
@@ -1898,7 +1908,10 @@ impl Gui {
             Kind::StatusBar => {
                 // Streifen mit einer Oberkante; die Felder durch feine Striche
                 // getrennt. Ein klickbares Feld hebt sich unter der Maus ab.
-                let bg = shade(self.th("win_bg"), 6);
+                // Eigener Grund (GUI_SET_COLOR, Stildatei) vor dem des Themas --
+                // bis 2026.50 ging ein gesetzter Grund hier still verloren.
+                let bg = wdg.ov.get("bg").copied().or_else(|| self.stil_farbe(wdg, "bg", stil::BASIS))
+                    .unwrap_or_else(|| shade(self.th("win_bg"), 6));
                 g.box_fill(ax, ay, ax + w - 1, ay + h - 1, bg);
                 g.line(ax, ay, ax + w - 1, ay, self.th("win_border"));
                 if let Some(s) = wdg.status.as_ref() {

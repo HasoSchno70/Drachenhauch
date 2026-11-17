@@ -1,0 +1,80 @@
+' Der aktive Reiter der Fensterleiste (GUI_TABS): Flaeche aus der
+' Themenfarbe `reiter` (-1 = widget_bg), mit der Metrik `reiter_oben` der
+' Akzent oben und der Reiter bis an die Flaeche darunter -- wie ein Reiter am
+' Editor (die IDE im dunklen Thema). Dazu die Statusleiste, die einen
+' gesetzten Grund (GUI_SET_COLOR) bis 2026.50 still uebergangen hat.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== der aktive reiter traegt den akzent unten oder mit reiter_oben oben
+TRY
+    SCREEN(400, 200, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+GUI_THEME_PRESET("dark")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+GUI_TABS(w, ["eins", "zwei"])
+DIM ziel AS INTEGER : ziel = RENDERTARGET_NEW(400, 200)
+DIM akzent AS INTEGER : akzent = GUI_THEME_GET("accent") BAND &HFFFFFF
+' Erste und letzte Zeile in Akzentfarbe bei x = 6 (im aktiven Reiter, vor
+' dem Text), und die Farbe darunter.
+SUB messen(was AS STRING)
+    GUI_UPDATE()
+    RENDERTARGET_BEGIN(ziel) : CLS(0) : GUI_DRAW() : RENDERTARGET_END()
+    FLIP()
+    DIM b AS IMAGE : b = RENDERTARGET_IMAGE(ziel)
+    DIM erste AS INTEGER = -1
+    DIM letzte AS INTEGER = -1
+    DIM y AS INTEGER
+    FOR y = 0 TO 40
+        IF (GETPIXEL(b, 6, y) BAND &HFFFFFF) = akzent THEN
+            IF erste < 0 THEN erste = y
+            letzte = y
+        END IF
+    NEXT
+    PRINT was; " akzent "; erste; "-"; letzte; " flaeche "; HEX$(GETPIXEL(b, 6, letzte + IIF(erste < 6, 4, -5)) BAND &HFFFFFF)
+END SUB
+messen("vorgabe")
+GUI_THEME_SET("reiter", &H232A33)
+GUI_METRIC_SET("reiter_oben", 1)
+messen("oben")
+PRINT "schluessel "; GUI_THEME_GET("reiter") = &H232A33; " "; GUI_METRIC_GET("reiter_oben")
+--- umgebung
+DHRT_FRAMES=4
+--- enthaelt
+vorgabe akzent 28-29 flaeche 26323F
+oben akzent 2-3 flaeche 232A33
+schluessel TRUE 1
+
+=== die statusleiste nimmt einen gesetzten grund und gibt ihn wieder ab
+TRY
+    SCREEN(400, 200, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+GUI_THEME_PRESET("dark")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM sb AS GUI_WIDGET : sb = GUI_STATUSBAR(w, 0, 170, 400, 30, "")
+DIM ziel AS INTEGER : ziel = RENDERTARGET_NEW(400, 200)
+FUNCTION grund() AS STRING
+    GUI_UPDATE()
+    RENDERTARGET_BEGIN(ziel) : CLS(0) : GUI_DRAW() : RENDERTARGET_END()
+    FLIP()
+    RETURN HEX$(GETPIXEL(RENDERTARGET_IMAGE(ziel), 200, 185) BAND &HFFFFFF)
+END FUNCTION
+DIM vorher AS STRING : vorher = grund()
+GUI_SET_COLOR(sb, "bg", &H2FA8D8)
+PRINT "gesetzt "; grund()
+GUI_SET_COLOR(sb, "bg", -1)
+PRINT "zurueck "; grund() = vorher
+--- umgebung
+DHRT_FRAMES=4
+--- erwartet
+gesetzt 2FA8D8
+zurueck TRUE

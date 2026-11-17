@@ -1665,7 +1665,7 @@ SUB dateienVergleichen()
     DIM anderer AS STRING : anderer = GUI_FILETREE_SELECTED$(baum)
     IF anderer <> "" AND GUI_FILETREE_IS_DIR(baum) THEN anderer = ""
     IF anderer <> "" AND gleicherWeg(anderer, reiter[aktiverTab].pfad) THEN anderer = ""
-    IF anderer = "" THEN anderer = FILE_OPEN_DIALOG("Womit vergleichen?", "dh")
+    IF anderer = "" THEN anderer = FILE_OPEN_DIALOG(tr$("Womit vergleichen?"), "dh")
     IF anderer = "" THEN RETURN
     DIM meiner AS STRING : meiner = reiter[aktiverTab].pfad
     DIM text AS STRING : text = ""

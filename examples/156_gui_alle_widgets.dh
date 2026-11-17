@@ -254,7 +254,7 @@ DIM notiz AS GUI_WIDGET
 notiz = GUI_TEXTAREA(win, 30, TOP + 50, innW - 260, innH - 90, "Hier tippen ...")
 GUI_SET_TAB(notiz, 2)
 
-GUI_SET_TEXT(notiz, "Diese Anwendung zeigt alle 22 Widget-Arten des" + CHR$(10) + _
+GUI_SET_TEXT(notiz, "Diese Anwendung zeigt 22 Widget-Arten des" + CHR$(10) + _
              "gui-Moduls -- und jede tut etwas." + CHR$(10) + CHR$(10) + _
              "Werkstatt: Baum filtert, Tabelle waehlt, Editor schreibt zurueck." + CHR$(10) + _
              "Regler: Knoepfe und Schalter formen die Kurve." + CHR$(10) + CHR$(10) + _
@@ -391,7 +391,7 @@ WHILE NOT QUITREQUESTED()
     IF GUI_CLICKED(miModD) THEN GUI_THEME_PRESET("modern_dark")
     IF GUI_CLICKED(miModH) THEN GUI_THEME_PRESET("modern_light")
     IF GUI_CLICKED(miUeber) OR GUI_CLICKED(cxHilfe) THEN
-        GUI_MESSAGE("Ueber", "Alle 22 Widget-Arten des gui-Moduls" + CHR$(10) + _
+        GUI_MESSAGE("Ueber", "22 Widget-Arten des gui-Moduls" + CHR$(10) + _
                     "in einer Anwendung -- und jede tut etwas.")
     END IF
     IF GUI_CLICKED(cxAlle) THEN

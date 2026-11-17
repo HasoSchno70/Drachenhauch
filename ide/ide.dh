@@ -196,7 +196,7 @@ SUB codeFarben(licht AS BOOLEAN)
         B_ORDNER = &H8A5E00 : B_DH = &H0B5FA0 : B_WERKZEUG = &HA8500C : B_TEST = &H2A7A30
         B_DATEN = &H83379A : B_TEXT = &H4B5563 : B_BILD = &HA82A62 : B_KLANG = &H107468
     ELSE
-        B_ORDNER = &HE8C468 : B_DH = &H6FC3F0 : B_WERKZEUG = &HE89A5A : B_TEST = &H8FD98C
+        B_ORDNER = &H8FA3BA : B_DH = &H6FC3F0 : B_WERKZEUG = &HE89A5A : B_TEST = &H8FD98C
         B_DATEN = &HD8A0E8 : B_TEXT = &HC0C8D4 : B_BILD = &HF08AB0 : B_KLANG = &H7FD8C8
     END IF
 END SUB
@@ -258,7 +258,9 @@ DIM TON_PROBLEME AS INTEGER : TON_PROBLEME = &H3B7BD8
 DIM TON_DEBUG AS INTEGER : TON_DEBUG = &H3B7BD8
 
 SUB bereichsFarben()
-    DIM grund AS INTEGER : grund = GUI_THEME_GET("widget_bg")
+    ' Im dunklen Thema liegen die Raender einen Ton unter dem Editor (RAND_GRUND,
+    ' siehe nebelAnwenden), im hellen auf der Flaeche des Themas.
+    DIM grund AS INTEGER : grund = IIF(hell, GUI_THEME_GET("widget_bg"), RAND_GRUND)
     ' Ein HAUCH: mit 20 % standen Ausgabe tuerkis und Probleme braun neben
     ' dem blauen Projekt, drei kraeftige Farben um den Code -- unruhig. Bei
     ' 9 % erkennt man den Bereich noch, ohne dass er sich vordraengt.
@@ -521,6 +523,8 @@ DIM hell AS BOOLEAN : hell = FALSE
 ' Drachenhauch-Nebel: im dunklen Thema zieht ein tuerkiser Nebel durch den
 ' Grund und die Raender (statt der hellen Verlaeufe), der Code bleibt frei.
 DIM nebelAn AS BOOLEAN : nebelAn = TRUE
+' Grund der Raender und des Fensters im ruhigen Look (dunkler als der Editor).
+CONST RAND_GRUND = &H12171D
 ' Die Vorgabe ist auch das Ziel von Strg+0 ("Schrift normal").
 CONST SCHRIFT_NORMAL AS INTEGER = 16
 DIM codeGroesse AS INTEGER : codeGroesse = SCHRIFT_NORMAL
@@ -1853,6 +1857,8 @@ DIM kartenZug AS BOOLEAN : kartenZug = FALSE
 DIM kartenZiel AS INTEGER : kartenZiel = -1
 DIM lblAusgabe AS GUI_WIDGET : lblAusgabe = GUI_LABEL(win, "", 0, 0)   ' der Reiterknopf sagt schon "Ausgabe"
 DIM lstAusgabe AS GUI_WIDGET : lstAusgabe = GUI_LISTBOX(win, 0, 0, 10, 10, [])
+' Leer ist eine Aussage: wo die Ausgabe hinkommt und wie man sie bekommt.
+GUI_LISTBOX_PLACEHOLDER(lstAusgabe, tr$("Noch keine Ausgabe -- F5 startet das Programm."))
 ' Nur passende Zeilen zeigen (Teiltext, Gross/klein egal); die Zeilen selbst
 ' bleiben, leer zeigt wieder alle.
 DIM tfAusgabeFilter AS GUI_WIDGET : tfAusgabeFilter = GUI_TEXTINPUT(win, 0, 0, 10, 10, tr$("Filter"))
@@ -1924,7 +1930,7 @@ GUI_MENU_SEPARATOR(ctxProbleme)
 DIM miPTAlle AS INTEGER : miPTAlle = GUI_MENU_ITEM(ctxProbleme, tr$("Alle anhaken"))
 DIM miPTKeine AS INTEGER : miPTKeine = GUI_MENU_ITEM(ctxProbleme, tr$("Keinen anhaken"))
 GUI_CONTEXT_WIDGET(ctxProbleme, lstProbleme)
-GUI_LISTBOX_PLACEHOLDER(lstProbleme, tr$("Keine Probleme gefunden"))
+GUI_LISTBOX_PLACEHOLDER(lstProbleme, CHR$(&H2713) + " " + tr$("Keine Probleme gefunden"))
 ' Unter den Problemen steht die Hilfe zum Wort unter der Schreibmarke. Leer
 ' sah der Streifen wie ein Lagefehler aus -- darum ein eigener Kopf und ein
 ' Hinweis, solange es nichts zu sagen gibt.
@@ -3022,6 +3028,7 @@ WHILE NOT beenden
     IF (prozess >= 0) <> wzStoppAn THEN
         wzStoppAn = prozess >= 0
         GUI_TOOLBAR_ENABLE(leiste, wzStopp, wzStoppAn)
+        statusLauf(wzStoppAn)
     END IF
     IF (tabAnzahl > 0) <> wzSichernAn THEN
         wzSichernAn = tabAnzahl > 0

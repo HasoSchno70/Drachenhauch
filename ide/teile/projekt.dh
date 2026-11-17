@@ -2074,7 +2074,7 @@ SUB neuProjektNachziehen()
     IF GUI_CLICKED(btnNpOrt) THEN
         DIM w AS STRING : w = ""
         TRY
-            w = FOLDER_DIALOG("Wo soll das Projekt liegen?")
+            w = FOLDER_DIALOG(tr$("Wo soll das Projekt liegen?"))
         CATCH e
             w = ""
         END TRY

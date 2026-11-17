@@ -62,8 +62,8 @@ satz unter dem titel TRUE
 
 === die bereiche tragen ihre farbe in beiden themen
 ' Die Ausgabe ist blaeulich wie alle Bereiche (seit 2026.47 ein Ton fuer
-' alle): 9 % Blau in die Widget-Farbe des dunklen Themas, 7 % in die des
-' hellen. Der Wechsel des Themas mischt neu --
+' alle): 9 % Blau in den Grund der Raender (RAND_GRUND, dunkler als der
+' Editor) im dunklen Thema, 7 % in die Widget-Farbe des hellen. Der Wechsel des Themas mischt neu --
 ' sonst trueg das helle Thema die dunklen Toene.
 befehl("thema")
 EXIT(0)
@@ -80,12 +80,12 @@ FOR i = 0 TO LEN(L) - 1
     IF LEFT$(L[i], 14) = "bereichsfarben" THEN PRINT L[i]
 NEXT
 --- erwartet
-bereichsfarben #39475B
+bereichsfarben #16202E
 bereichsfarben #EEF3FB
 
 === der projektbaum faerbt nach dateiart, in beiden themen
-' Ordner gold, Quelltext blau -- im hellen Thema dunklere Toene derselben
-' Farben, sonst stuende Hellgelb auf Weiss.
+' Ordner gedaempft graublau (dunkles Thema) bzw. gold (helles), Quelltext
+' blau -- im hellen Thema dunklere Toene, sonst stuende Hellgelb auf Weiss.
 befehl("thema")
 EXIT(0)
 --- programm ../../../ide/ide.dh nach protokoll("bereit")
@@ -101,7 +101,7 @@ FOR i = 0 TO LEN(L) - 1
     IF LEFT$(L[i], 10) = "baumfarben" THEN PRINT L[i]
 NEXT
 --- erwartet
-baumfarben #E8C468 #6FC3F0
+baumfarben #8FA3BA #6FC3F0
 baumfarben #8A5E00 #0B5FA0
 
 === eigene baumfarben aus farben.json

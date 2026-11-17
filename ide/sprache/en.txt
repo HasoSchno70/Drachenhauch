@@ -17,6 +17,10 @@ Zuletzt geöffnet	Recently opened
 -	-
 Sichern	Save
 Sichern unter ...	Save as ...
+Sichern unter	Save as
+Datei öffnen	Open file
+Womit vergleichen?	Compare with what?
+Wo soll das Projekt liegen?	Where should the project go?
 Listing drucken	Print listing
 Listing als PDF neben die Quelle	Listing as PDF next to the source
 Reiter schließen	Close tab
@@ -151,6 +155,7 @@ Geänderte Zeilen am Rand	Changed lines in the margin
 Zeilenumbruch	Word wrap
 Einrückungslinien	Indent guides
 Drachenhauch-Nebel	Dragon's breath mist
+Noch keine Ausgabe -- F5 startet das Programm.	No output yet -- F5 runs the program.
 Drachenhauch-Nebel (dunkles Thema)	Dragon's breath mist (dark theme)
 Mitlaufender Blockkopf	Sticky block header
 Klammerpaare farbig	Coloured bracket pairs
@@ -211,7 +216,6 @@ Angezeigte Zeilen kopieren	Copy shown lines
 Ausgabe sichern ...	Save output ...
 Befehl unten eingeben, Enter führt ihn aus -- cd, dir/ls, git, dhrt ...	Type a command below, Enter runs it -- cd, dir/ls, git, dhrt ...
 Ausgabe	Output
-Terminal (Alt+3)	Terminal (Alt+3)
 Abbrechen	Cancel
 Probleme	Problems
 Treffer anspringen	Go to hit
@@ -898,7 +902,6 @@ Suche abgebrochen nach 	Search cancelled after
  Treffer	 matches
  Reiter, geschlossen: 	 tabs, closed: 
 (neu)	(new)
- Dateien	 files
  (bei 500 abgebrochen, weitere nicht gezeigt)	 (stopped at 500, more not shown)
  -- Umschalt+F7 zeigt wieder die Probleme	 -- Shift+F7 shows the problems again
  (neu, 	 (new, 
@@ -930,7 +933,6 @@ Pakete	Packages
 Pakete des Projekts	Project packages
 Pakete des Projekts ...	Project packages ...
 Prüfsumme 	Checksum 
-Quelle (github:nutzer/repo@stand, https-Adresse oder Ordner), dahinter wahlweise --als name:	Source (github:user/repo@version, https address or folder), optionally followed by --als name:
 dhrt paket 	dhrt paket 
 dhrt paket ist nicht zu starten: 	dhrt paket cannot be started: 
 dhrt paket läuft noch.	dhrt paket is still running.
@@ -942,8 +944,6 @@ Plugins neu laden	Reload plugins
 Plugin-Ordner öffnen	Open plugin folder
 Plugins neu geladen: 	Plugins reloaded: 
 Das Plugin läuft nicht: 	The plugin is not running: 
-Haken = beim Start laden. Ein Plugin liegt in plugins/<name>/plugin.dh.	Tick = load at startup. A plugin lives in plugins/<name>/plugin.dh.
-Keine Plugins -- „Plugin-Ordner öffnen“ legt den Ordner an.	No plugins -- “Open plugin folder” creates the folder.
 Neu laden	Reload
 Ordner öffnen	Open folder
 Klassendiagramm	Class diagram

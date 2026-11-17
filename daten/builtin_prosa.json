@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 2610,
+ "count": 2611,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -863,6 +863,7 @@
   "GUI_LISTBOX_ITEM_RECT": "TUPLE — wo Eintrag i auf dem Bildschirm steht (x, y, b, h), in Bildschirmpunkten wie GUI_HIT_TEST; weggefiltert (0, 0, 0, 0) -- für Prüfungen mit echten Klicks, die Zeilenhöhe hängt an Schrift und Stildatei",
   "GUI_LISTBOX_MOVE": "zählen, lesen, umbeschriften, verschieben",
   "GUI_LISTBOX_PLACEHOLDER": "Hinweis, der erscheint, wenn nichts zu sehen ist",
+  "GUI_LISTBOX_PLACEHOLDER$": "STRING — der gesetzte Hinweis (\"\" = keiner)",
   "GUI_LISTBOX_REMOVE": "INTEGER / — / — Einträge einzeln (auch bei Klapplisten); pos weglassen = hinten anhängen",
   "GUI_LISTBOX_SCROLL_TO": "so rollen, dass der Eintrag zu sehen ist",
   "GUI_LISTBOX_SELECT": "Mehrfachauswahl wie bei der Tabelle",
@@ -1022,7 +1023,7 @@
   "GUI_STYLESHEET_ERROR$": "STRING — der Fehler beim letzten Neuladen einer beobachteten Stildatei, \"\" = in Ordnung",
   "GUI_STYLESHEET_LOAD": "dasselbe aus einer Datei (üblich .dhstil); mit beobachten = TRUE lädt die gui sie neu, sobald sie gespeichert wird (Abschnitt 9)",
   "GUI_STYLE_GET": "INTEGER — ein Wert des Stils, -1 wenn er ihn nicht setzt (unbekannter Stil = Fehler)",
-  "GUI_STYLE_SET": "benannten Stil festlegen (bg, fg, border, accent, font, font_size)",
+  "GUI_STYLE_SET": "benannten Stil festlegen (bg, fg, border, accent, hover, pressed, font, font_size)",
   "GUI_SUBMENU": "Menü-Handle — Untermenü — öffnet beim Überfahren rechts daneben, beliebig tief",
   "GUI_SYSTEM_ACCENT": "INTEGER — die Akzentfarbe des Betriebssystems, -1 wenn unbekannt",
   "GUI_SYSTEM_DARK": "BOOLEAN — steht das Betriebssystem auf dunkel? (Windows, macOS, GNOME; unbekannt = FALSE)",

@@ -891,6 +891,9 @@ impl<'p> Vm<'p> {
             "gui_textinput_get" => { let n = "GUI_TEXTINPUT_GET";
                 if a.len() != 2 { return Err(format!("{}: erwartet (tf, key$)", n)); }
                 Value::Int(self.gui.textinput_get(gi(a,0,n)?, &gs(a,1,n)?)? as i64) }
+            "gui_listbox_placeholder$" => { let n = "GUI_LISTBOX_PLACEHOLDER$";
+                if a.len() != 1 { return Err(format!("{}: erwartet (lb)", n)); }
+                Value::str_rc(&self.gui.list_placeholder_get(gi(a,0,n)?)?) }
             "gui_textinput_placeholder$" => { let n = "GUI_TEXTINPUT_PLACEHOLDER$";
                 if a.len() != 1 { return Err(format!("{}: erwartet (tf)", n)); }
                 Value::str_rc(&self.gui.textinput_placeholder(gi(a,0,n)?)?) }

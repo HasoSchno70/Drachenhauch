@@ -193,7 +193,7 @@ SUB befehl(k AS STRING)
     SELECT CASE k
         CASE "neu" : tabOeffnen("", "")
         CASE "oeffnen"
-            DIM p AS STRING : p = FILE_OPEN_DIALOG("Datei öffnen", "dh")
+            DIM p AS STRING : p = FILE_OPEN_DIALOG(tr$("Datei öffnen"), "dh")
             IF p <> "" THEN dateiOeffnen(p)
         CASE "schnell" : schnellOeffnen()
         CASE "todo" : projektSuchen("TODO", "FIXME")
