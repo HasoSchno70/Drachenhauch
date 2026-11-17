@@ -122,6 +122,8 @@ impl fmt::Display for Typ {
 /// FLOAT, `RND(6)` aber INTEGER -- das entscheidet der Aufrufer an der
 /// Argumentzahl (hier nicht in der Tabelle).
 pub fn builtin_typ(name: &str) -> Option<Typ> {
+    // Ein neuer Name der Leitlinie (`namen.rs`) hat den Typ des bisherigen.
+    let name = crate::namen::bisher(name).unwrap_or(name);
     Some(match name {
         "str$" | "str" | "chr$" | "chr" | "left$" | "left" | "right$" | "right"
         | "mid$" | "mid" | "upper$" | "upper" | "lower$" | "lower" | "trim$" | "trim" | "ltrim$" | "rtrim$"

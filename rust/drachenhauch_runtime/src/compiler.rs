@@ -738,6 +738,43 @@ fn arity_text(min: usize, max: usize) -> String {
     else { format!("{} bis {}", min, max) }
 }
 
+/// Builtins, die laut Index Text liefern (`... AS STRING` / `-> STRING`).
+fn builtin_liefert_text(name: &str) -> bool {
+    use std::sync::OnceLock;
+    static SET: OnceLock<std::collections::HashSet<String>> = OnceLock::new();
+    SET.get_or_init(|| {
+        builtin_eintraege().iter().filter(|(_, sig, _)| {
+            let s = sig.trim_end().to_uppercase();
+            s.ends_with("AS STRING") || s.ends_with("-> STRING")
+        }).map(|(n, _, _)| n.to_lowercase()).collect()
+    }).contains(name)
+}
+
+/// Der Name, unter dem die Laufzeit einen Builtin kennt (klein):
+///
+/// * ein neuer Name der Leitlinie (`key_down`) wird der bisherige
+///   (`keypressed`, Tabelle in `namen.rs`);
+/// * das `$` ist bei Text-Befehlen frei: fehlt es (`env_get` fuer
+///   `env_get$`) oder steht es zu viel (`clipboard_get$` fuer
+///   `clipboard_get`, das Text liefert), gilt die vorhandene Form. Nur wenn
+///   der Name so, wie er dasteht, unbekannt ist -- `GUI_TOOLTIP` (setzt) und
+///   `GUI_TOOLTIP$` (liest) bleiben zwei Befehle. Ein `$` an einem Befehl,
+///   der keinen Text liefert (`LEN$`), bleibt ein Fehler.
+pub(crate) fn builtin_kanonisch(name: &str) -> String {
+    let low = name.to_lowercase();
+    if let Some(b) = crate::namen::bisher(&low) { return b.to_string(); }
+    if is_known_builtin(&low) { return name.to_string(); }
+    if let Some(ohne) = low.strip_suffix('$') {
+        let ziel = crate::namen::bisher(ohne).map(str::to_string).unwrap_or_else(|| ohne.to_string());
+        if known_builtins().contains(&ziel) && builtin_liefert_text(&ziel) { return ziel; }
+    } else {
+        let mit = format!("{}$", low);
+        if let Some(b) = crate::namen::bisher(&mit) { return b.to_string(); }
+        if known_builtins().contains(&mit) { return mit; }
+    }
+    name.to_string()
+}
+
 /// Ist `name` ein dhrt-Builtin? Interne `__`-Builtins (compiler-emittiert) und
 /// der Fall „Index konnte nicht geladen werden" (leeres Set) gelten als bekannt,
 /// damit nie faelschlich gewarnt wird.
@@ -872,13 +909,13 @@ impl Compiler {
     fn resolve_builtin_alias(&self, name: &str) -> String {
         for (alias, module) in &self.builtin_aliases {
             if name == alias {
-                return module.clone();
+                return builtin_kanonisch(module);
             }
             if let Some(rest) = name.strip_prefix(&format!("{}_", alias)) {
-                return format!("{}_{}", module, rest);
+                return builtin_kanonisch(&format!("{}_{}", module, rest));
             }
         }
-        name.to_string()
+        builtin_kanonisch(name)
     }
 
     fn alloc_slot(&mut self, name: &str) {

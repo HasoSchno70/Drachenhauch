@@ -98,6 +98,13 @@ Neuer Builtin:
    gerade hält.
 8. Liefert er IMMER denselben Typ, darf er in `typen::builtin_typ` -- nur
    nachgemessen, jeder Weg ("endet auf `$` = Text" ist falsch: `SPLIT$`).
+9. **Der Name folgt `docs/builtins-namen.md`** (`BEREICH_DING_TUN`, `_SET_`/
+   `_GET_`, `_DOWN`/`_HIT`, `_FREE`, `_COUNT`, englisch). Einen alten Befehl
+   nicht umbenennen, sondern ihm einen neuen Namen geben: Tabelle in
+   `rust/drachenhauch_runtime/src/namen.rs` (der Compiler bildet ihn auf den
+   alten ab, die Laufzeit merkt nichts), Index-Eintrag, Zeile in beiden
+   `builtins-namen.md`. Das `$` an Text-Befehlen ist frei
+   (`compiler::builtin_kanonisch`).
 
 ## Neues Modul, IMPORT-Auflösung
 

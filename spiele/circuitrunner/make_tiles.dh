@@ -1,10 +1,11 @@
-' Tileset-Generator fuer CIRCUIT RUNNER -- 64x64, supersampled + geschattet.
+' Tileset-Generator fuer CIRCUIT RUNNER -- 128x128, supersampled + geschattet.
 '
-' Erzeugt ein Master-Sheet assets/tiles.png (16 Spalten x 14 Zeilen, je 64 px),
-' Zellen-Position = Chip's-Challenge-Tile-Code (0x00..0xDB). Jede Kachel wird in
-' vierfacher Aufloesung (256 x 256) mit Formen und Verlaeufen gezeichnet und dann
-' auf 64 px verkleinert -- detailliert und farbig, aber weiter im klaren
-' Sprite-Stil. Dazu assets/tiles.json (Code -> Name) und assets/_contact.png
+' Erzeugt ein Master-Sheet assets/tiles.png (16 Spalten x 14 Zeilen, je 128 px),
+' Zellen-Position = Chip's-Challenge-Tile-Code (0x00..0xDB). Gedacht wird in
+' 64er-Einheiten (S); gezeichnet in achtfacher Aufloesung (512 x 512) mit Formen
+' und Verlaeufen, dann auf 128 px verkleinert -- so bleibt das Spielfeld auch
+' auf einem grossen Schirm scharf (bis 2026-11 waren es 64 px, und das Spiel
+' vergroesserte sie pixelig). Dazu assets/tiles.json (Code -> Name) und assets/_contact.png
 ' (Kontaktbogen der ersten 160 Zellen mit ihrer Nummer).
 '
 '     dhrt run spiele/circuitrunner/make_tiles.dh [-- zielordner]
@@ -17,9 +18,10 @@
 IMPORT "imgfx"
 IMPORT "json"
 
-CONST S = 64          ' finale Kantenlaenge
-CONST SUPER = 4       ' Supersampling-Faktor
-CONST ARBEIT = 256    ' Arbeits-Kantenlaenge
+CONST S = 64          ' Entwurfs-Einheiten je Kante (alle Koordinaten unten)
+CONST KANTE = 128     ' Kantenlaenge einer Kachel im Blatt
+CONST SUPER = 8       ' Arbeits-Pixel je Entwurfs-Einheit
+CONST ARBEIT = 512    ' Arbeits-Kantenlaenge = S * SUPER
 
 DIM programmOrdner AS STRING : programmOrdner = CWD$()
 
@@ -148,7 +150,7 @@ FUNCTION puls(frame AS INTEGER) AS FLOAT
 END FUNCTION
 
 ' ------------------------------------------------------------------ Leinwand
-' Gezeichnet wird auf `lw` (256 x 256), gedacht wird in 64er-Einheiten: jeder
+' Gezeichnet wird auf `lw` (512 x 512), gedacht wird in 64er-Einheiten: jeder
 ' Helfer rechnet mit SUPER hoch, wie `P._s` in der Python-Fassung.
 DIM lw AS IMAGE
 
@@ -225,18 +227,32 @@ FUNCTION pt$(x AS FLOAT, y AS FLOAT) AS STRING
 END FUNCTION
 
 FUNCTION fertig(glanz AS BOOLEAN) AS IMAGE
-    ' Weicher Schein hinter der Kachel, dann auf 64 px verkleinern.
+    ' Weicher Schein hinter der Kachel, dann auf KANTE verkleinern -- in zwei
+    ' Halbierungen, damit jedes Ziel-Pixel ueber alle Arbeits-Pixel mittelt.
     DIM klein AS IMAGE
     IF glanz THEN
-        DIM g AS IMAGE : g = IMAGE_BLUR(lw, 5)
+        DIM g AS IMAGE : g = IMAGE_BLUR(lw, 5 * SUPER \ 4)
         IMAGE_DRAW_IMAGE(g, lw, 0, 0)
-        klein = IMAGE_SCALE(g, S, S)
-        IMAGE_FREE(g)
+        klein = verkleinern(g)
     ELSE
-        klein = IMAGE_SCALE(lw, S, S)
+        klein = verkleinern(lw)
+        lw = NIL
     END IF
-    IMAGE_FREE(lw)
+    IF lw IS NOT NIL THEN IMAGE_FREE(lw)
     RETURN klein
+END FUNCTION
+
+' Halbieren, bis KANTE erreicht ist (gibt das Eingangsbild frei).
+FUNCTION verkleinern(b AS IMAGE) AS IMAGE
+    DIM jetzt AS IMAGE : jetzt = b
+    DIM seite AS INTEGER : seite = ARBEIT
+    WHILE seite > KANTE
+        seite = seite \ 2
+        DIM halb AS IMAGE : halb = IMAGE_SCALE(jetzt, seite, seite)
+        IMAGE_FREE(jetzt)
+        jetzt = halb
+    WEND
+    RETURN jetzt
 END FUNCTION
 
 ' ====================================================== TERRAIN
@@ -1242,9 +1258,9 @@ FOR i = 0 TO 255
     END IF
 NEXT
 DIM zeilen AS INTEGER : zeilen = hoechster \ SPALTEN + 1
-DIM blatt AS IMAGE : blatt = IMAGE_NEW(SPALTEN * S, zeilen * S)
+DIM blatt AS IMAGE : blatt = IMAGE_NEW(SPALTEN * KANTE, zeilen * KANTE)
 FOR i = 0 TO 255
-    IF belegt[i] THEN IMAGE_DRAW_IMAGE(blatt, zellen[i], (i MOD SPALTEN) * S, (i \ SPALTEN) * S)
+    IF belegt[i] THEN IMAGE_DRAW_IMAGE(blatt, zellen[i], (i MOD SPALTEN) * KANTE, (i \ SPALTEN) * KANTE)
 NEXT
 IMAGE_SAVE(blatt, ziel + "/tiles.png")
 
@@ -1252,7 +1268,7 @@ IMAGE_SAVE(blatt, ziel + "/tiles.png")
 DIM nam AS ARRAY OF STRING : nam = namen()
 DIM js AS JSON_HANDLE : js = JSON_PARSE("{}")
 JSON_SET_STRING(js, "image", "tiles.png")
-JSON_SET_INT(js, "tile", S)
+JSON_SET_INT(js, "tile", KANTE)
 JSON_SET_INT(js, "cols", SPALTEN)
 DIM codes AS JSON_HANDLE : codes = JSON_PARSE("{}")
 FOR i = 0 TO 255
@@ -1262,8 +1278,7 @@ JSON_SET_JSON(js, "codes", codes)
 WRITEALL(ziel + "/tiles.json", JSON_PRETTY(js))
 
 ' --- Kontaktbogen der ersten 160 Zellen mit Nummer (zur Kontrolle von Hand)
-CONST GROSS = 2
-DIM zelle AS INTEGER : zelle = S * GROSS
+DIM zelle AS INTEGER : zelle = KANTE
 DIM rand AS INTEGER : rand = 4
 DIM beschr AS INTEGER : beschr = 11
 DIM bogen AS IMAGE : bogen = IMAGE_NEW(SPALTEN * (zelle + rand) + rand, 10 * (zelle + beschr + rand) + rand, &H181C26)
@@ -1272,13 +1287,11 @@ FOR i = 0 TO 159
     DIM by AS INTEGER : by = rand + (i \ SPALTEN) * (zelle + beschr + rand)
     IMAGE_FRAME(bogen, bx, by, bx + zelle, by + zelle, 1, &H2E3444)
     IF belegt[i] THEN
-        DIM vergr AS IMAGE : vergr = IMAGE_SCALE_NN(zellen[i], zelle, zelle)
-        IMAGE_DRAW_IMAGE(bogen, vergr, bx, by)
-        IMAGE_FREE(vergr)
+        IMAGE_DRAW_IMAGE(bogen, zellen[i], bx, by)
     END IF
     IMAGE_DRAW_TEXT(bogen, bx + 1, by + zelle + 1, hex2$(i), 10, &H96A0B4)
 NEXT
 IMAGE_SAVE(bogen, ziel + "/_contact.png")
 
-PRINT "tiles.png (" + STR$(SPALTEN) + "x" + STR$(zeilen) + " a " + STR$(S) + "px, SS=" + STR$(SUPER) + ") -- " + STR$(anzahl) + " Kacheln"
+PRINT "tiles.png (" + STR$(SPALTEN) + "x" + STR$(zeilen) + " a " + STR$(KANTE) + "px, SS=" + STR$(ARBEIT \ KANTE) + ") -- " + STR$(anzahl) + " Kacheln"
 PRINT "fertig."

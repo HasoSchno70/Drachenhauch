@@ -10,6 +10,7 @@
 '    P               Passwort eingeben (Level anspringen, im Menue/Intro)
 '    ESC             zurueck / Menue
 '    LEER / ENTER    bestaetigen
+'    T               Feind-Tempo ruhig/original (im Menue)
 '
 '  Fortschritt + Bestzeiten werden in  circuitrunner.save  gesichert.
 '
@@ -32,14 +33,9 @@ CONST FULLSCREEN = TRUE
 CONST GW = 32
 CONST GH = 32
 CONST NCELL = 1024
-CONST TILE = 64
 CONST VIEW = 9                 ' sichtbare Kacheln je Achse
-CONST BLOG = 576               ' Board-Render-Target = VIEW*TILE
-CONST BX = 0                   ' Board-Ursprung im Render-Target
-CONST BY = 0
 
 CONST TICK_MS = 120            ' eine Spielwelt-Stufe (Bewegung)
-CONST MON_EVERY = 1            ' Monster ziehen mit Spielertempo (CCLP1/MS-treu); Teeth/Blob via *2 halb
 
 ' ----- Tile-Codes (= Tileset-Zellen) ---------------------------------
 CONST T_FLOOR = &H00
@@ -105,48 +101,31 @@ DIM dyv[4] AS INTEGER
 ' ----- Weltzustand ---------------------------------------------------
 DIM terr[NCELL] AS INTEGER            ' Terrain/Items/Geraete
 
+' Monster und Bloecke sind Objekte (Klassen Monster/Kiste weiter unten,
+' nach den uebrigen Globalen); hier nur die Obergrenzen.
 CONST MAXMOB = 320
-DIM mob_x[MAXMOB] AS INTEGER
-DIM mob_y[MAXMOB] AS INTEGER
-DIM mob_dir[MAXMOB] AS INTEGER
-DIM mob_type[MAXMOB] AS INTEGER
-DIM mob_alive[MAXMOB] AS BOOLEAN
-DIM mob_trapped[MAXMOB] AS BOOLEAN
-DIM mob_ox[MAXMOB] AS INTEGER
-DIM mob_oy[MAXMOB] AS INTEGER
-DIM nmob AS INTEGER
-DIM mob_did AS BOOLEAN          ' Ergebnis des letzten mob_try
-
-' Umsortier-Puffer fuer die MS-Bewegungsreihenfolge (0x0A-Monsterliste)
-DIM mord[MAXMOB] AS INTEGER
-DIM mplaced[MAXMOB] AS BOOLEAN
-DIM tmob_x[MAXMOB] AS INTEGER
-DIM tmob_y[MAXMOB] AS INTEGER
-DIM tmob_dir[MAXMOB] AS INTEGER
-DIM tmob_type[MAXMOB] AS INTEGER
-
 CONST MAXBLK = 320
-DIM blk_x[MAXBLK] AS INTEGER
-DIM blk_y[MAXBLK] AS INTEGER
-DIM blk_alive[MAXBLK] AS BOOLEAN
-DIM blk_ox[MAXBLK] AS INTEGER
-DIM blk_oy[MAXBLK] AS INTEGER
-DIM blk_sdir[MAXBLK] AS INTEGER   ' Rutsch-Richtung (-1 = ruht)
-DIM nblk AS INTEGER
 DIM pushed_blk AS INTEGER          ' diesen Tick geschobener Block (kein Sofort-Rutsch)
 
 ' Geraete-Verdrahtung (Falle/Cloner): bx,by -> tx,ty
+' Ein Draht verbindet einen Knopf mit dem Geraet, das er steuert.
+CLASS Draht
+    DIM knopf_x AS INTEGER
+    DIM knopf_y AS INTEGER
+    DIM ziel_x AS INTEGER
+    DIM ziel_y AS INTEGER
+
+    SUB Init(kx AS INTEGER, ky AS INTEGER, zx AS INTEGER, zy AS INTEGER)
+        knopf_x = kx
+        knopf_y = ky
+        ziel_x = zx
+        ziel_y = zy
+    END SUB
+END CLASS
+
 CONST MAXWIRE = 256
-DIM trap_bx[MAXWIRE] AS INTEGER
-DIM trap_by[MAXWIRE] AS INTEGER
-DIM trap_tx[MAXWIRE] AS INTEGER
-DIM trap_ty[MAXWIRE] AS INTEGER
-DIM ntrap AS INTEGER
-DIM clone_bx[MAXWIRE] AS INTEGER
-DIM clone_by[MAXWIRE] AS INTEGER
-DIM clone_mx[MAXWIRE] AS INTEGER
-DIM clone_my[MAXWIRE] AS INTEGER
-DIM nclone AS INTEGER
+DIM fallen AS ARRAY OF Draht       ' brauner Knopf -> Falle
+DIM kloner AS ARRAY OF Draht       ' roter Knopf -> Kloner
 
 ' Spieler
 DIM px AS INTEGER
@@ -233,8 +212,9 @@ DIM demo_frames AS INTEGER     ' Bilder seit Demo-Start (ersetzt die Wanduhr)
 ' Bildschirm-Layout (native Aufloesung; Text/Icons scharf, Board pixelig)
 DIM SW AS INTEGER
 DIM SH AS INTEGER
-DIM bscale AS INTEGER          ' ganzzahlige Board-Vergroesserung
-DIM bsize AS INTEGER           ' BLOG * bscale
+DIM bsize AS INTEGER           ' Kantenlaenge des Spielfelds auf dem Schirm
+DIM ts AS FLOAT                ' eine Kachel auf dem Schirm (bsize / VIEW)
+DIM KP AS INTEGER              ' eine Kachel im Blatt assets/tiles.png (tiles.json "tile")
 DIM board_x AS INTEGER
 DIM board_y AS INTEGER
 DIM hud_x AS INTEGER
@@ -251,11 +231,20 @@ DIM sc_sm AS FLOAT
 DIM ic_sz AS INTEGER          ' HUD-Icon-Groesse (direkt aus dem Tileset via DRAWIMAGEPARTEX)
 
 ' Level-Set-Auswahl (alle .json in levels/ + levels/_downloaded/)
+CLASS LevelSet
+    DIM pfad AS STRING
+    DIM name AS STRING
+    DIM anzahl AS INTEGER
+
+    SUB Init(p AS STRING, n AS STRING, a AS INTEGER)
+        pfad = p
+        name = n
+        anzahl = a
+    END SUB
+END CLASS
+
 CONST MAXSETS = 64
-DIM set_path[MAXSETS] AS STRING
-DIM set_name[MAXSETS] AS STRING
-DIM set_count[MAXSETS] AS INTEGER
-DIM nsets AS INTEGER
+DIM sets AS ARRAY OF LevelSet
 DIM sel_set AS INTEGER
 
 ' Persistenz (Bestzeiten + Fortschritt) und Passwort-Eingabe
@@ -267,6 +256,393 @@ DIM new_record AS BOOLEAN
 DIM pw_input AS STRING          ' aktuell getipptes Passwort
 DIM pw_msg AS STRING            ' Rueckmeldung der Passwort-Eingabe
 DIM next_pw AS STRING           ' Passwort des naechsten Levels (im Sieg-Overlay)
+
+' Feind-Tempo: Monster ziehen jeden mon_takt-ten Spielschritt. 2 = ruhig
+' (halbes Spielertempo, Vorgabe), 1 = original (Spielertempo wie im
+' MS-Regelwerk, auf das manche Fansite-Level knapp getimt sind). Taste T im
+' Menue schaltet um, die Wahl steht in der Sicherung.
+CONST TAKT_RUHIG = 2
+CONST TAKT_ORIGINAL = 1
+DIM mon_takt AS INTEGER : mon_takt = TAKT_RUHIG
+
+SUB tempo_umschalten()
+    mon_takt = IIF(mon_takt = TAKT_RUHIG, TAKT_ORIGINAL, TAKT_RUHIG)
+    SAVE_SET_INT(sav, "einstellung/feindtempo", mon_takt)
+    SAVE_WRITE(sav, SAVEPATH)
+END SUB
+
+FUNCTION tempo_name() AS STRING
+    RETURN IIF(mon_takt = TAKT_RUHIG, "ruhig", "original")
+END FUNCTION
+
+' ----------------------------------------------------------------------
+'  FIGUREN -- alles, was sich auf dem Brett bewegt
+' ----------------------------------------------------------------------
+' Eine Figur steht auf einer Zelle und weiss, wo sie vor ihrem letzten
+' Schritt stand -- daraus gleitet sie im Bild von Zelle zu Zelle.
+CLASS Figur
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    DIM ox AS INTEGER
+    DIM oy AS INTEGER
+    DIM lebt AS BOOLEAN
+
+    SUB Init(nx AS INTEGER, ny AS INTEGER)
+        x = nx
+        y = ny
+        ox = nx
+        oy = ny
+        lebt = TRUE
+    END SUB
+
+    ' Vor einem Spielschritt: die jetzige Lage wird die alte.
+    SUB merken()
+        ox = x
+        oy = y
+    END SUB
+
+    FUNCTION steht_auf(zx AS INTEGER, zy AS INTEGER) AS BOOLEAN
+        RETURN lebt AND x = zx AND y = zy
+    END FUNCTION
+
+    ' Lage im Bild, t = 0 (alte Zelle) .. 1 (neue Zelle)
+    FUNCTION bild_x(t AS FLOAT) AS FLOAT
+        RETURN ox + (x - ox) * t
+    END FUNCTION
+
+    FUNCTION bild_y(t AS FLOAT) AS FLOAT
+        RETURN oy + (y - oy) * t
+    END FUNCTION
+END CLASS
+
+' Ein schiebbarer Block. Auf Eis und Laufband rutscht er weiter.
+CLASS Kiste EXTENDS Figur
+    DIM rutscht AS INTEGER          ' Rutsch-Richtung, -1 = ruht
+
+    SUB Init(nx AS INTEGER, ny AS INTEGER)
+        SUPER.Init(nx, ny)
+        rutscht = -1
+    END SUB
+END CLASS
+
+' Ein Monster. Boden (Laufband, Eis), Fallen und Kollisionen sind fuer alle
+' gleich; WOHIN es von sich aus zieht, sagt jede Art selbst (waehlen).
+CLASS Monster EXTENDS Figur
+    DIM richtung AS INTEGER         ' 0=N 1=W 2=S 3=E
+    DIM gefangen AS BOOLEAN
+
+    SUB Init(nx AS INTEGER, ny AS INTEGER, r AS INTEGER)
+        SUPER.Init(nx, ny)
+        richtung = r
+        gefangen = FALSE
+    END SUB
+
+    ' Nummer der Art = Zeile im Kachelsatz (&H40 + art * 4 + richtung).
+    ABSTRACT FUNCTION art() AS INTEGER
+    ' Die eigene Zugwahl auf normalem Boden.
+    ABSTRACT SUB waehlen()
+
+    ' Zieht nur jeden wievielten Zug des Grundtakts (Zahn und Blob: halb so oft).
+    FUNCTION traegheit() AS INTEGER
+        RETURN 1
+    END FUNCTION
+
+    FUNCTION kachel() AS INTEGER
+        RETURN &H40 + art() * 4 + richtung
+    END FUNCTION
+
+    ' Ist der Boden t fuer diese Art eine Wand?
+    FUNCTION meidet(t AS INTEGER) AS BOOLEAN
+        IF t = T_WALL OR t = T_INVWALL OR t = T_HIDDEN OR t = T_WALL_SE THEN RETURN TRUE
+        IF t = T_WALLN OR t = T_WALLW OR t = T_WALLS OR t = T_WALLE THEN RETURN TRUE
+        IF t = T_BLUEBLOCK_W OR t = T_BLUEBLOCK_F THEN RETURN TRUE
+        IF t = T_TOGGLE_C THEN RETURN TRUE
+        IF t = T_SOCKET OR t = T_EXIT OR t = T_CLONER THEN RETURN TRUE
+        IF t = T_DOOR_BLUE OR t = T_DOOR_RED OR t = T_DOOR_GREEN OR t = T_DOOR_YELLOW THEN RETURN TRUE
+        IF t = T_CHIP OR t = T_DIRT THEN RETURN TRUE
+        IF t = T_KEY_BLUE OR t = T_KEY_RED OR t = T_KEY_GREEN OR t = T_KEY_YELLOW THEN RETURN TRUE
+        IF t = T_FLIPPERS OR t = T_FIREBOOTS OR t = T_ICESKATES OR t = T_SUCTION THEN RETURN TRUE
+        IF t = T_THIEF OR t = T_HINT THEN RETURN TRUE
+        RETURN t = T_WATER OR t = T_FIRE
+    END FUNCTION
+
+    FUNCTION kann(zx AS INTEGER, zy AS INTEGER, d AS INTEGER) AS BOOLEAN
+        IF NOT inb(zx, zy) THEN RETURN FALSE
+        IF edge_blocked(x, y, d) THEN RETURN FALSE
+        IF meidet(terr[cidx(zx, zy)]) THEN RETURN FALSE
+        IF block_at(zx, zy) >= 0 THEN RETURN FALSE
+        RETURN mob_at(zx, zy) < 0
+    END FUNCTION
+
+    ' Einen Schritt in Richtung d versuchen. TRUE = gezogen.
+    FUNCTION versuche(d AS INTEGER) AS BOOLEAN
+        IF NOT kann(x + dxv[d], y + dyv[d], d) THEN RETURN FALSE
+        x = x + dxv[d]
+        y = y + dyv[d]
+        richtung = d
+        RETURN TRUE
+    END FUNCTION
+
+    ' Die erste der vier Richtungen, die geht.
+    FUNCTION der_reihe_nach(a AS INTEGER, b AS INTEGER, c AS INTEGER, e AS INTEGER) AS BOOLEAN
+        IF versuche(a) THEN RETURN TRUE
+        IF versuche(b) THEN RETURN TRUE
+        IF versuche(c) THEN RETURN TRUE
+        RETURN versuche(e)
+    END FUNCTION
+
+    ' Ein Zug: Laufband und Eis bestimmen, sonst die Art.
+    SUB ziehen()
+        DIM hier AS INTEGER : hier = terr[cidx(x, y)]
+        DIM fdir AS INTEGER : fdir = force_dir(hier)
+        IF fdir >= 0 THEN
+            versuche(fdir)
+            RETURN
+        END IF
+        IF ist_eis(hier) THEN
+            ' gleiten; Ecken lenken um, an der Wand kehrt es um
+            DIM sd AS INTEGER : sd = richtung
+            IF hier <> T_ICE THEN sd = corner_redirect(hier, sd)
+            richtung = sd
+            IF NOT versuche(sd) THEN
+                richtung = turn_back(sd)
+                versuche(richtung)
+            END IF
+            RETURN
+        END IF
+        waehlen()
+    END SUB
+
+    ' Was der Boden mit einem Monster macht, das ihn betritt.
+    SUB betreten()
+        DIM t AS INTEGER : t = terr[cidx(x, y)]
+        IF t = T_BOMB THEN
+            terr[cidx(x, y)] = T_FLOOR
+            lebt = FALSE
+        ELSEIF t = T_TRAP THEN
+            gefangen = TRUE
+        ELSEIF t = T_BTN_GREEN THEN
+            toggle_walls()
+        ELSEIF t = T_BTN_BLUE THEN
+            reverse_tanks()
+        END IF
+    END SUB
+END CLASS
+
+' Kaefer: haelt sich an die linke Wand.
+CLASS Kaefer EXTENDS Monster
+    FUNCTION art() AS INTEGER
+        RETURN 0
+    END FUNCTION
+    SUB waehlen()
+        der_reihe_nach(turn_left(richtung), richtung, turn_right(richtung), turn_back(richtung))
+    END SUB
+END CLASS
+
+' Feuerball: geradeaus, sonst rechts, links, zurueck. Feuer macht ihm nichts.
+CLASS Feuerball EXTENDS Monster
+    FUNCTION art() AS INTEGER
+        RETURN 1
+    END FUNCTION
+    FUNCTION meidet(t AS INTEGER) AS BOOLEAN
+        IF t = T_FIRE THEN RETURN FALSE
+        RETURN SUPER.meidet(t)
+    END FUNCTION
+    SUB waehlen()
+        der_reihe_nach(richtung, turn_right(richtung), turn_left(richtung), turn_back(richtung))
+    END SUB
+END CLASS
+
+' Ball: prallt an der Wand zurueck.
+CLASS Ball EXTENDS Monster
+    FUNCTION art() AS INTEGER
+        RETURN 2
+    END FUNCTION
+    SUB waehlen()
+        IF NOT versuche(richtung) THEN versuche(turn_back(richtung))
+    END SUB
+END CLASS
+
+' Panzer: nur geradeaus, sonst bleibt er stehen. Der blaue Knopf wendet ihn.
+CLASS Panzer EXTENDS Monster
+    FUNCTION art() AS INTEGER
+        RETURN 3
+    END FUNCTION
+    SUB waehlen()
+        versuche(richtung)
+    END SUB
+END CLASS
+
+' Gleiter: geradeaus, sonst links, rechts, zurueck. Er schwimmt.
+CLASS Gleiter EXTENDS Monster
+    FUNCTION art() AS INTEGER
+        RETURN 4
+    END FUNCTION
+    FUNCTION meidet(t AS INTEGER) AS BOOLEAN
+        IF t = T_WATER THEN RETURN FALSE
+        RETURN SUPER.meidet(t)
+    END FUNCTION
+    SUB waehlen()
+        der_reihe_nach(richtung, turn_left(richtung), turn_right(richtung), turn_back(richtung))
+    END SUB
+END CLASS
+
+' Zahn: verfolgt den Spieler, die laengere Achse zuerst -- halb so schnell.
+CLASS Zahn EXTENDS Monster
+    FUNCTION art() AS INTEGER
+        RETURN 5
+    END FUNCTION
+    FUNCTION traegheit() AS INTEGER
+        RETURN 2
+    END FUNCTION
+    SUB waehlen()
+        DIM dx AS INTEGER : dx = px - x
+        DIM dy AS INTEGER : dy = py - y
+        DIM dh AS INTEGER : dh = IIF(dx < 0, 1, 3)
+        DIM dv AS INTEGER : dv = IIF(dy < 0, 0, 2)
+        IF ABS(dx) >= ABS(dy) THEN
+            IF dx <> 0 THEN
+                IF versuche(dh) THEN RETURN
+            END IF
+            IF dy <> 0 THEN
+                IF versuche(dv) THEN RETURN
+            END IF
+        ELSE
+            IF dy <> 0 THEN
+                IF versuche(dv) THEN RETURN
+            END IF
+            IF dx <> 0 THEN
+                IF versuche(dh) THEN RETURN
+            END IF
+        END IF
+    END SUB
+END CLASS
+
+' Laeufer: geradeaus; an der Wand wuerfelt er eine neue Richtung.
+CLASS Laeufer EXTENDS Monster
+    FUNCTION art() AS INTEGER
+        RETURN 6
+    END FUNCTION
+    SUB waehlen()
+        IF versuche(richtung) THEN RETURN
+        DIM versuch AS INTEGER
+        FOR versuch = 1 TO 6
+            IF versuche(RANDINT(0, 3)) THEN RETURN
+        NEXT
+    END SUB
+END CLASS
+
+' Blob: irrt zufaellig umher -- halb so schnell.
+CLASS Blob EXTENDS Monster
+    FUNCTION art() AS INTEGER
+        RETURN 7
+    END FUNCTION
+    FUNCTION traegheit() AS INTEGER
+        RETURN 2
+    END FUNCTION
+    SUB waehlen()
+        versuche(RANDINT(0, 3))
+    END SUB
+END CLASS
+
+' Pantoffeltierchen: haelt sich an die rechte Wand.
+CLASS Pantoffel EXTENDS Monster
+    FUNCTION art() AS INTEGER
+        RETURN 8
+    END FUNCTION
+    SUB waehlen()
+        der_reihe_nach(turn_right(richtung), richtung, turn_left(richtung), turn_back(richtung))
+    END SUB
+END CLASS
+
+' Das Monster einer Art -- beim Laden des Levels und beim Klonen.
+FUNCTION neues_monster(a AS INTEGER, nx AS INTEGER, ny AS INTEGER, r AS INTEGER) AS Monster
+    SELECT CASE a
+        CASE 0 : RETURN NEW Kaefer(nx, ny, r)
+        CASE 1 : RETURN NEW Feuerball(nx, ny, r)
+        CASE 2 : RETURN NEW Ball(nx, ny, r)
+        CASE 3 : RETURN NEW Panzer(nx, ny, r)
+        CASE 4 : RETURN NEW Gleiter(nx, ny, r)
+        CASE 5 : RETURN NEW Zahn(nx, ny, r)
+        CASE 6 : RETURN NEW Laeufer(nx, ny, r)
+        CASE 7 : RETURN NEW Blob(nx, ny, r)
+    END SELECT
+    RETURN NEW Pantoffel(nx, ny, r)
+END FUNCTION
+
+' Monster in Zugreihenfolge, Bloecke
+DIM mobs AS ARRAY OF Monster
+DIM kisten AS ARRAY OF Kiste
+
+' ----------------------------------------------------------------------
+'  EFFEKTE -- nur fuers Auge, die Spiellogik kennt sie nicht
+' ----------------------------------------------------------------------
+' Ein Funke fliegt in Brett-Koordinaten (Zellen) und verglimmt.
+CLASS Funke
+    DIM x AS FLOAT
+    DIM y AS FLOAT
+    DIM vx AS FLOAT
+    DIM vy AS FLOAT
+    DIM alter AS FLOAT
+    DIM dauer AS FLOAT
+    DIM farbe AS INTEGER
+    DIM groesse AS FLOAT
+
+    ' dt in Sekunden; FALSE = verglueht
+    FUNCTION weiter(dt AS FLOAT) AS BOOLEAN
+        alter = alter + dt
+        x = x + vx * dt
+        y = y + vy * dt
+        vx = vx * (1.0 - 2.2 * dt)
+        vy = vy * (1.0 - 2.2 * dt) + 1.6 * dt
+        RETURN alter < dauer
+    END FUNCTION
+END CLASS
+
+DIM funkenflug AS ARRAY OF Funke
+DIM schreck_t AS FLOAT            ' Sekunden seit dem letzten Tod (Wackeln, Rot)
+DIM sieg_t AS FLOAT               ' Sekunden seit dem Erreichen des Ausgangs
+DIM fx_zeit AS FLOAT              ' laufende Zeit fuer Pulsieren und Schweben
+' Eigener Zufall fuer Effekte: RANDINT gehoert der Spiellogik (Aufnahmen
+' einer Loesung brauchen dieselbe Wuerfelfolge).
+DIM fx_saat AS INTEGER : fx_saat = 12345
+
+FUNCTION fx_rnd() AS FLOAT
+    fx_saat = (fx_saat * 1103515245 + 12345) MOD 2147483648
+    RETURN fx_saat / 2147483648.0
+END FUNCTION
+
+' n Funken aus der Mitte der Zelle (cx, cy)
+SUB funken(cx AS INTEGER, cy AS INTEGER, farbe AS INTEGER, n AS INTEGER)
+    DIM i AS INTEGER
+    FOR i = 1 TO n
+        IF LEN(funkenflug) >= 400 THEN RETURN
+        DIM f AS Funke : f = NEW Funke()
+        DIM w AS FLOAT : w = fx_rnd() * 6.2832
+        DIM v AS FLOAT : v = 1.2 + fx_rnd() * 3.2
+        f.x = cx + 0.5
+        f.y = cy + 0.5
+        f.vx = COS(w) * v
+        f.vy = SIN(w) * v - 1.0
+        f.dauer = 0.35 + fx_rnd() * 0.45
+        f.farbe = farbe
+        f.groesse = 0.03 + fx_rnd() * 0.05
+        ARRAY_PUSH(funkenflug, f)
+    NEXT
+END SUB
+
+SUB funken_weiter(dt AS FLOAT)
+    fx_zeit = fx_zeit + dt
+    schreck_t = schreck_t + dt
+    sieg_t = sieg_t + dt
+    IF LEN(funkenflug) = 0 THEN RETURN
+    DIM bleiben AS ARRAY OF Funke : bleiben = []
+    DIM f AS Funke
+    FOR EACH f IN funkenflug
+        IF f.weiter(dt) THEN ARRAY_PUSH(bleiben, f)
+    NEXT
+    funkenflug = bleiben
+END SUB
 
 ' ----------------------------------------------------------------------
 '  HELFER
@@ -305,22 +681,25 @@ FUNCTION turn_back(d AS INTEGER) AS INTEGER
     RETURN (d + 2) MOD 4
 END FUNCTION
 
+' Nummer des lebenden Monsters bzw. Blocks auf (x,y), -1 = keins
 FUNCTION mob_at(x AS INTEGER, y AS INTEGER) AS INTEGER
     DIM i AS INTEGER
-    FOR i = 0 TO nmob - 1
-        IF mob_alive[i] AND mob_x[i] = x AND mob_y[i] = y THEN RETURN i
+    FOR i = 0 TO LEN(mobs) - 1
+        IF mobs[i].steht_auf(x, y) THEN RETURN i
     NEXT
-
     RETURN -1
 END FUNCTION
 
 FUNCTION block_at(x AS INTEGER, y AS INTEGER) AS INTEGER
     DIM i AS INTEGER
-    FOR i = 0 TO nblk - 1
-        IF blk_alive[i] AND blk_x[i] = x AND blk_y[i] = y THEN RETURN i
+    FOR i = 0 TO LEN(kisten) - 1
+        IF kisten[i].steht_auf(x, y) THEN RETURN i
     NEXT
-
     RETURN -1
+END FUNCTION
+
+FUNCTION ist_eis(t AS INTEGER) AS BOOLEAN
+    RETURN t = T_ICE OR t = T_ICE_NW2 OR t = T_ICE_NE2 OR t = T_ICE_SE2 OR t = T_ICE_SW2
 END FUNCTION
 
 ' Blockiert eine duenne Wand die Bewegung von (x,y) in Richtung d?
@@ -346,73 +725,41 @@ FUNCTION edge_blocked(x AS INTEGER, y AS INTEGER, d AS INTEGER) AS BOOLEAN
     RETURN FALSE
 END FUNCTION
 
-' Ist das Terrain bei (x,y) fuer ein Monster eine Wand?
-FUNCTION mob_solid(mt AS INTEGER, t AS INTEGER) AS BOOLEAN
-    IF t = T_WALL OR t = T_INVWALL OR t = T_HIDDEN OR t = T_WALL_SE THEN RETURN TRUE
-    IF t = T_WALLN OR t = T_WALLW OR t = T_WALLS OR t = T_WALLE THEN RETURN TRUE
-    IF t = T_BLUEBLOCK_W OR t = T_BLUEBLOCK_F THEN RETURN TRUE
-    IF t = T_TOGGLE_C THEN RETURN TRUE
-    IF t = T_SOCKET OR t = T_EXIT OR t = T_CLONER THEN RETURN TRUE
-    IF t = T_DOOR_BLUE OR t = T_DOOR_RED OR t = T_DOOR_GREEN OR t = T_DOOR_YELLOW THEN RETURN TRUE
-    IF t = T_CHIP OR t = T_DIRT THEN RETURN TRUE
-    IF t = T_KEY_BLUE OR t = T_KEY_RED OR t = T_KEY_GREEN OR t = T_KEY_YELLOW THEN RETURN TRUE
-    IF t = T_FLIPPERS OR t = T_FIREBOOTS OR t = T_ICESKATES OR t = T_SUCTION THEN RETURN TRUE
-    IF t = T_THIEF OR t = T_HINT THEN RETURN TRUE
-
-    ' Wasser ist Wand ausser fuer Gleiter(4); Feuer Wand ausser Feuerball(1)
-    IF t = T_WATER AND mt <> 4 THEN RETURN TRUE
-    IF t = T_FIRE AND mt <> 1 THEN RETURN TRUE
-    RETURN FALSE
-END FUNCTION
-
-FUNCTION mob_can_enter(idx AS INTEGER, x AS INTEGER, y AS INTEGER, d AS INTEGER) AS BOOLEAN
-    IF NOT inb(x, y) THEN RETURN FALSE
-    IF edge_blocked(mob_x[idx], mob_y[idx], d) THEN RETURN FALSE
-    IF mob_solid(mob_type[idx], terr[cidx(x, y)]) THEN RETURN FALSE
-    IF block_at(x, y) >= 0 THEN RETURN FALSE
-    IF mob_at(x, y) >= 0 THEN RETURN FALSE
-    RETURN TRUE
-END FUNCTION
-
 ' ----------------------------------------------------------------------
 '  LEVEL-SETS FINDEN
 ' ----------------------------------------------------------------------
 SUB scan_sets()
-    nsets = 0
+    sets = []
     add_sets_in("levels")
     add_sets_in("levels/_downloaded")
 END SUB
 
 SUB add_sets_in(dir AS STRING)
     IF NOT DIREXISTS(dir) THEN RETURN
-    DIM files AS ARRAY OF STRING
-    files = DIRLIST(dir)
-    DIM i AS INTEGER
-    FOR i = 0 TO LEN(files) - 1
-        DIM fn AS STRING
-        fn = files[i]
-        IF RIGHT$(LOWER$(fn), 5) = ".json" AND nsets < MAXSETS THEN
-            DIM path AS STRING
-            path = PATHJOIN(dir, fn)
+    DIM fn AS STRING
+    FOR EACH fn IN DIRLIST(dir)
+        IF RIGHT$(LOWER$(fn), 5) = ".json" AND LEN(sets) < MAXSETS THEN
+            DIM path AS STRING : path = PATHJOIN(dir, fn)
             TRY
-                DIM h AS JSON_HANDLE
-                h = JSON_LOAD(path)
-                DIM cnt AS INTEGER
-                cnt = JSON_LEN(h, "levels")
+                DIM h AS JSON_HANDLE : h = JSON_LOAD(path)
+                DIM cnt AS INTEGER : cnt = JSON_LEN(h, "levels")
                 IF cnt > 0 THEN
-                    set_path[nsets] = path
-                    DIM nm AS STRING
-                    nm = JSON_GET_STRING(h, "name")
+                    DIM nm AS STRING : nm = JSON_GET_STRING(h, "name")
                     IF LEN(nm) = 0 THEN nm = fn
-                    set_name[nsets] = nm
-                    set_count[nsets] = cnt
-                    nsets = nsets + 1
+                    ARRAY_PUSH(sets, NEW LevelSet(path, nm, cnt))
                 END IF
             CATCH e
                 ' ungueltige JSON ueberspringen
             END TRY
         END IF
     NEXT
+END SUB
+
+' Das gewaehlte Set laden.
+SUB set_laden()
+    js = JSON_LOAD(sets[sel_set].pfad)
+    nlevels = JSON_LEN(js, "levels")
+    cur_setkey = set_key(sets[sel_set].name)
 END SUB
 
 ' ----------------------------------------------------------------------
@@ -582,8 +929,9 @@ SUB load_level(idx AS INTEGER)
     up = JSON_GET_STRING(js, base + "upper")
     lo = JSON_GET_STRING(js, base + "lower")
 
-    nmob = 0
-    nblk = 0
+    mobs = []
+    kisten = []
+    funkenflug = []
     chips_left = 0
     px = 1
     py = 1
@@ -601,25 +949,12 @@ SUB load_level(idx AS INTEGER)
         cy = i \ GW
         IF uc >= &H40 AND uc <= &H63 THEN
             ' Monster
-            IF nmob < MAXMOB THEN
-                mob_x[nmob] = cx
-                mob_y[nmob] = cy
-                mob_type[nmob] = (uc - &H40) \ 4
-                mob_dir[nmob] = (uc - &H40) MOD 4
-                mob_alive[nmob] = TRUE
-                mob_trapped[nmob] = FALSE
-                nmob = nmob + 1
-            END IF
+            IF LEN(mobs) < MAXMOB THEN ARRAY_PUSH(mobs, neues_monster((uc - &H40) \ 4, cx, cy, (uc - &H40) MOD 4))
 
             terr[i] = lc
         ELSEIF uc = T_BLOCK OR (uc >= &H0E AND uc <= &H11) THEN
             ' Block (auch Clone-Block)
-            IF nblk < MAXBLK THEN
-                blk_x[nblk] = cx
-                blk_y[nblk] = cy
-                blk_alive[nblk] = TRUE
-                nblk = nblk + 1
-            END IF
+            IF LEN(kisten) < MAXBLK THEN ARRAY_PUSH(kisten, NEW Kiste(cx, cy))
 
             terr[i] = lc
         ELSEIF uc >= T_CHIP_N AND uc <= &H6F THEN
@@ -668,130 +1003,54 @@ SUB load_level(idx AS INTEGER)
     poy = py
     anim_t = 1.0
     tick_timer = 0.0
-    DIM gi AS INTEGER
-    FOR gi = 0 TO nmob - 1
-        mob_ox[gi] = mob_x[gi]
-        mob_oy[gi] = mob_y[gi]
-    NEXT
-
-    FOR gi = 0 TO nblk - 1
-        blk_ox[gi] = blk_x[gi]
-        blk_oy[gi] = blk_y[gi]
-        blk_sdir[gi] = -1
-    NEXT
-
     pushed_blk = -1
     lvl_best = best_for(idx)
 END SUB
 
 SUB load_wires(idx AS INTEGER)
-    ntrap = 0
-    nclone = 0
-    DIM base AS STRING
-    base = "levels." + STR$(idx) + "."
-    DIM ts AS STRING
-    ts = JSON_GET_STRING(js, base + "traps")
-    IF LEN(ts) > 0 THEN
-        DIM recs AS ARRAY OF STRING
-        recs = SPLIT$(ts, ";")
-        DIM r AS INTEGER
-        FOR r = 0 TO LEN(recs) - 1
-            DIM p AS ARRAY OF STRING
-            p = SPLIT$(recs[r], ",")
-            IF LEN(p) >= 4 AND ntrap < MAXWIRE THEN
-                trap_bx[ntrap] = VAL(p[0])
-                trap_by[ntrap] = VAL(p[1])
-                trap_tx[ntrap] = VAL(p[2])
-                trap_ty[ntrap] = VAL(p[3])
-                ntrap = ntrap + 1
-            END IF
-        NEXT
-    END IF
-
-    DIM cs AS STRING
-    cs = JSON_GET_STRING(js, base + "cloners")
-    IF LEN(cs) > 0 THEN
-        DIM recs2 AS ARRAY OF STRING
-        recs2 = SPLIT$(cs, ";")
-        DIM r2 AS INTEGER
-        FOR r2 = 0 TO LEN(recs2) - 1
-            DIM p2 AS ARRAY OF STRING
-            p2 = SPLIT$(recs2[r2], ",")
-            IF LEN(p2) >= 4 AND nclone < MAXWIRE THEN
-                clone_bx[nclone] = VAL(p2[0])
-                clone_by[nclone] = VAL(p2[1])
-                clone_mx[nclone] = VAL(p2[2])
-                clone_my[nclone] = VAL(p2[3])
-                nclone = nclone + 1
-            END IF
-        NEXT
-    END IF
+    DIM base AS STRING : base = "levels." + STR$(idx) + "."
+    fallen = draehte_lesen(JSON_GET_STRING(js, base + "traps"))
+    kloner = draehte_lesen(JSON_GET_STRING(js, base + "cloners"))
 END SUB
+
+' "kx,ky,zx,zy;kx,ky,zx,zy;..." -> Draehte
+FUNCTION draehte_lesen(text AS STRING) AS ARRAY OF Draht
+    DIM liste AS ARRAY OF Draht : liste = []
+    IF LEN(text) = 0 THEN RETURN liste
+    DIM rec AS STRING
+    FOR EACH rec IN SPLIT$(text, ";")
+        DIM p AS ARRAY OF STRING : p = SPLIT$(rec, ",")
+        IF LEN(p) >= 4 AND LEN(liste) < MAXWIRE THEN ARRAY_PUSH(liste, NEW Draht(VAL(p[0]), VAL(p[1]), VAL(p[2]), VAL(p[3])))
+    NEXT
+    RETURN liste
+END FUNCTION
 
 ' MS-Ruleset: Monster ziehen in der Reihenfolge der 0x0A-Bewegungsliste,
 ' NICHT in Map-Lesereihenfolge. CCLP1-Puzzles sind darauf getimt.
 ' Monster, die nicht in der Liste stehen, haengen wir in Lesereihenfolge an.
 SUB reorder_monsters(idx AS INTEGER)
-    IF nmob = 0 THEN RETURN
-    DIM base AS STRING
-    base = "levels." + STR$(idx) + "."
+    IF LEN(mobs) = 0 THEN RETURN
     DIM ms AS STRING
-    ms = JSON_GET_STRING(js, base + "monsters")
+    ms = JSON_GET_STRING(js, "levels." + STR$(idx) + ".monsters")
     IF LEN(ms) = 0 THEN RETURN
-    DIM k AS INTEGER
-    FOR k = 0 TO nmob - 1
-        mplaced[k] = FALSE
-    NEXT
-
-    DIM nord AS INTEGER
-    nord = 0
-    DIM recs AS ARRAY OF STRING
-    recs = SPLIT$(ms, ";")
-    DIM r AS INTEGER
-    FOR r = 0 TO LEN(recs) - 1
-        DIM p AS ARRAY OF STRING
-        p = SPLIT$(recs[r], ",")
+    DIM geordnet AS ARRAY OF Monster : geordnet = []
+    DIM rec AS STRING
+    FOR EACH rec IN SPLIT$(ms, ";")
+        DIM p AS ARRAY OF STRING : p = SPLIT$(rec, ",")
         IF LEN(p) >= 2 THEN
-            DIM mx AS INTEGER
-            DIM my AS INTEGER
-            mx = VAL(p[0])
-            my = VAL(p[1])
-            DIM j AS INTEGER
-            FOR j = 0 TO nmob - 1
-                IF NOT mplaced[j] AND mob_x[j] = mx AND mob_y[j] = my THEN
-                    mord[nord] = j
-                    nord = nord + 1
-                    mplaced[j] = TRUE
-                    BREAK
-                END IF
-            NEXT
+            DIM j AS INTEGER : j = mob_at(VAL(p[0]), VAL(p[1]))
+            IF j >= 0 THEN
+                ARRAY_PUSH(geordnet, mobs[j])
+                ARRAY_REMOVE_AT(mobs, j)
+            END IF
         END IF
     NEXT
-
-    ' restliche Monster (nicht gelistet) in Lesereihenfolge
-    FOR k = 0 TO nmob - 1
-        IF NOT mplaced[k] THEN
-            mord[nord] = k
-            nord = nord + 1
-            mplaced[k] = TRUE
-        END IF
+    ' die uebrigen (nicht gelistet) in Lesereihenfolge dahinter
+    DIM m AS Monster
+    FOR EACH m IN mobs
+        ARRAY_PUSH(geordnet, m)
     NEXT
-
-    ' Arrays gemaess Permutation neu aufbauen (alive=TRUE/trapped=FALSE bei Load,
-    ' ox/oy werden danach aus x/y gesetzt -- nur x/y/dir/type permutieren)
-    FOR k = 0 TO nmob - 1
-        tmob_x[k] = mob_x[k]
-        tmob_y[k] = mob_y[k]
-        tmob_dir[k] = mob_dir[k]
-        tmob_type[k] = mob_type[k]
-    NEXT
-
-    FOR k = 0 TO nmob - 1
-        mob_x[k] = tmob_x[mord[k]]
-        mob_y[k] = tmob_y[mord[k]]
-        mob_dir[k] = tmob_dir[mord[k]]
-        mob_type[k] = tmob_type[mord[k]]
-    NEXT
+    mobs = geordnet
 END SUB
 
 ' ----------------------------------------------------------------------
@@ -982,6 +1241,8 @@ END SUB
 SUB player_die(msg AS STRING)
     state = "dead"
     death_msg = msg
+    schreck_t = 0.0
+    funken(px, py, RGB(255, 80, 70), 30)
     sfx_die()
     rumble(0.8, 0.35)         ' der Tod ist auch in den Haenden zu spueren
     demo_stop()               ' eine gescheiterte Runde ist keine Loesung
@@ -1037,40 +1298,42 @@ FUNCTION block_can_move(fx AS INTEGER, fy AS INTEGER, tx AS INTEGER, ty AS INTEG
     RETURN TRUE
 END FUNCTION
 
-' Block von (fx,fy) nach (tx,ty) schieben (inkl. Wasser->Dreck, Bombe).
+' Block bi nach (tx,ty) schieben (inkl. Wasser->Dreck, Bombe).
 SUB push_block(bi AS INTEGER, tx AS INTEGER, ty AS INTEGER)
-    DIM t AS INTEGER
-    t = terr[cidx(tx, ty)]
+    DIM k AS Kiste : k = kisten[bi]
+    DIM t AS INTEGER : t = terr[cidx(tx, ty)]
     IF t = T_WATER THEN
         terr[cidx(tx, ty)] = T_DIRT
-        blk_alive[bi] = FALSE
+        k.lebt = FALSE
         sfx_block()
+        funken(tx, ty, RGB(120, 190, 255), 14)
         RETURN
     END IF
 
     IF t = T_BOMB THEN
         terr[cidx(tx, ty)] = T_FLOOR
-        blk_alive[bi] = FALSE
+        k.lebt = FALSE
         sfx_die()
+        funken(tx, ty, RGB(255, 160, 60), 28)
         RETURN
     END IF
 
     DIM d AS INTEGER
-    IF tx > blk_x[bi] THEN
+    IF tx > k.x THEN
         d = 3
-    ELSEIF tx < blk_x[bi] THEN
+    ELSEIF tx < k.x THEN
         d = 1
-    ELSEIF ty < blk_y[bi] THEN
+    ELSEIF ty < k.y THEN
         d = 0
     ELSE
         d = 2
     END IF
 
-    blk_x[bi] = tx
-    blk_y[bi] = ty
+    k.x = tx
+    k.y = ty
     IF t = T_DIRT THEN terr[cidx(tx, ty)] = T_FLOOR
     pushed_blk = bi
-    set_block_slide(bi, d)
+    set_block_slide(k, d)
     sfx_block()
 
     ' Block toggelt gruenen Knopf
@@ -1078,238 +1341,164 @@ SUB push_block(bi AS INTEGER, tx AS INTEGER, ty AS INTEGER)
 END SUB
 
 ' Rutsch-Richtung eines Blocks aus seiner aktuellen Kachel bestimmen
-SUB set_block_slide(bi AS INTEGER, d AS INTEGER)
-    DIM t AS INTEGER
-    t = terr[cidx(blk_x[bi], blk_y[bi])]
-    DIM fdir AS INTEGER
-    fdir = force_dir(t)
+SUB set_block_slide(k AS Kiste, d AS INTEGER)
+    DIM t AS INTEGER : t = terr[cidx(k.x, k.y)]
+    DIM fdir AS INTEGER : fdir = force_dir(t)
     IF t = T_ICE THEN
-        blk_sdir[bi] = d
-    ELSEIF t = T_ICE_NW2 OR t = T_ICE_NE2 OR t = T_ICE_SE2 OR t = T_ICE_SW2 THEN
-        blk_sdir[bi] = corner_redirect(t, d)
+        k.rutscht = d
+    ELSEIF ist_eis(t) THEN
+        k.rutscht = corner_redirect(t, d)
     ELSEIF fdir >= 0 THEN
-        blk_sdir[bi] = fdir
+        k.rutscht = fdir
     ELSE
-        blk_sdir[bi] = -1
+        k.rutscht = -1
     END IF
 END SUB
 
 ' Rutschende Bloecke einen Schritt weiterbewegen (1 Zelle/Tick)
 SUB advance_blocks()
     DIM i AS INTEGER
-    FOR i = 0 TO nblk - 1
-        IF blk_alive[i] AND blk_sdir[i] >= 0 AND i <> pushed_blk THEN
-            DIM d AS INTEGER
-            d = blk_sdir[i]
-            DIM here AS INTEGER
-            here = terr[cidx(blk_x[i], blk_y[i])]
-            IF here = T_ICE_NW2 OR here = T_ICE_NE2 OR here = T_ICE_SE2 OR here = T_ICE_SW2 THEN
+    FOR i = 0 TO LEN(kisten) - 1
+        DIM k AS Kiste : k = kisten[i]
+        IF k.lebt AND k.rutscht >= 0 AND i <> pushed_blk THEN
+            DIM d AS INTEGER : d = k.rutscht
+            DIM here AS INTEGER : here = terr[cidx(k.x, k.y)]
+            IF ist_eis(here) AND here <> T_ICE THEN
                 d = corner_redirect(here, d)
             ELSE
-                DIM fd2 AS INTEGER
-                fd2 = force_dir(here)
+                DIM fd2 AS INTEGER : fd2 = force_dir(here)
                 IF fd2 >= 0 THEN d = fd2
             END IF
 
-            blk_sdir[i] = d
-            DIM tx AS INTEGER
-            DIM ty AS INTEGER
-            tx = blk_x[i] + dxv[d]
-            ty = blk_y[i] + dyv[d]
-            DIM tt AS INTEGER
-            tt = tat(tx, ty)
+            k.rutscht = d
+            DIM tx AS INTEGER : tx = k.x + dxv[d]
+            DIM ty AS INTEGER : ty = k.y + dyv[d]
+            DIM tt AS INTEGER : tt = tat(tx, ty)
             IF tt = T_WATER THEN
                 terr[cidx(tx, ty)] = T_DIRT
-                blk_alive[i] = FALSE
+                k.lebt = FALSE
+                funken(tx, ty, RGB(120, 190, 255), 14)
             ELSEIF tt = T_BOMB THEN
                 terr[cidx(tx, ty)] = T_FLOOR
-                blk_alive[i] = FALSE
+                k.lebt = FALSE
                 sfx_die()
+                funken(tx, ty, RGB(255, 160, 60), 28)
             ELSEIF tx = px AND ty = py THEN
-                blk_x[i] = tx
-                blk_y[i] = ty
+                k.x = tx
+                k.y = ty
                 player_die("Von einem Block zerquetscht!")
-            ELSEIF block_can_move(blk_x[i], blk_y[i], tx, ty, d) THEN
-                blk_x[i] = tx
-                blk_y[i] = ty
+            ELSEIF block_can_move(k.x, k.y, tx, ty, d) THEN
+                k.x = tx
+                k.y = ty
                 IF tt = T_DIRT THEN terr[cidx(tx, ty)] = T_FLOOR
-                set_block_slide(i, d)
+                set_block_slide(k, d)
             ELSE
-                blk_sdir[i] = -1
+                k.rutscht = -1
             END IF
         END IF
     NEXT
 END SUB
 
+' Etwas Aufsammelbares unter dem Spieler: weg vom Boden, Ton, Funken.
+SUB aufheben(farbe AS INTEGER)
+    terr[cidx(px, py)] = T_FLOOR
+    sfx_chip()
+    funken(px, py, farbe, 12)
+END SUB
+
+' Eine Tuer oder der Sockel gibt nach.
+SUB oeffnen()
+    terr[cidx(px, py)] = T_FLOOR
+    sfx_door()
+END SUB
+
 ' Effekte beim Betreten von (px,py)
 SUB land_on()
-    DIM t AS INTEGER
-    t = terr[cidx(px, py)]
+    DIM t AS INTEGER : t = terr[cidx(px, py)]
     on_water = FALSE
-    IF t = T_DIRT THEN
-        terr[cidx(px, py)] = T_FLOOR
-        RETURN
-    END IF
-
-    IF t = T_CHIP THEN
-        terr[cidx(px, py)] = T_FLOOR
-        IF chips_left > 0 THEN chips_left = chips_left - 1
-        sfx_chip()
-        RETURN
-    END IF
-
-    IF t = T_KEY_BLUE THEN
-        keys_blue = keys_blue + 1
-        terr[cidx(px, py)] = T_FLOOR
-        sfx_chip()
-        RETURN
-    END IF
-
-    IF t = T_KEY_RED THEN
-        keys_red = keys_red + 1
-        terr[cidx(px, py)] = T_FLOOR
-        sfx_chip()
-        RETURN
-    END IF
-
-    IF t = T_KEY_GREEN THEN
-        keys_green = keys_green + 1
-        terr[cidx(px, py)] = T_FLOOR
-        sfx_chip()
-        RETURN
-    END IF
-
-    IF t = T_KEY_YELLOW THEN
-        keys_yellow = keys_yellow + 1
-        terr[cidx(px, py)] = T_FLOOR
-        sfx_chip()
-        RETURN
-    END IF
-
-    IF t = T_FLIPPERS THEN
-        has_flippers = TRUE
-        terr[cidx(px, py)] = T_FLOOR
-        sfx_chip()
-        RETURN
-    END IF
-
-    IF t = T_FIREBOOTS THEN
-        has_fireboots = TRUE
-        terr[cidx(px, py)] = T_FLOOR
-        sfx_chip()
-        RETURN
-    END IF
-
-    IF t = T_ICESKATES THEN
-        has_iceskates = TRUE
-        terr[cidx(px, py)] = T_FLOOR
-        sfx_chip()
-        RETURN
-    END IF
-
-    IF t = T_SUCTION THEN
-        has_suction = TRUE
-        terr[cidx(px, py)] = T_FLOOR
-        sfx_chip()
-        RETURN
-    END IF
-
-    IF t = T_DOOR_BLUE THEN
-        keys_blue = keys_blue - 1
-        terr[cidx(px, py)] = T_FLOOR
-        sfx_door()
-        RETURN
-    END IF
-
-    IF t = T_DOOR_RED THEN
-        keys_red = keys_red - 1
-        terr[cidx(px, py)] = T_FLOOR
-        sfx_door()
-        RETURN
-    END IF
-
-    IF t = T_DOOR_GREEN THEN
-        terr[cidx(px, py)] = T_FLOOR
-        sfx_door()
-        RETURN
-    END IF
-
-    IF t = T_DOOR_YELLOW THEN
-        keys_yellow = keys_yellow - 1
-        terr[cidx(px, py)] = T_FLOOR
-        sfx_door()
-        RETURN
-    END IF
-
-    IF t = T_SOCKET THEN
-        terr[cidx(px, py)] = T_FLOOR
-        sfx_door()
-        RETURN
-    END IF
-
-    IF t = T_THIEF THEN
-        has_flippers = FALSE
-        has_fireboots = FALSE
-        has_iceskates = FALSE
-        has_suction = FALSE
-        sfx_blocked()
-        RETURN
-    END IF
-
-    IF t = T_BTN_GREEN THEN
-        toggle_walls()
-        RETURN
-    END IF
-
-    IF t = T_BTN_BLUE THEN
-        reverse_tanks()
-        RETURN
-    END IF
-
-    IF t = T_BTN_RED THEN
-        fire_cloners(px, py)
-        RETURN
-    END IF
-
-    IF t = T_EXIT THEN
-        state = "win"
-        record_win()
-        sfx_win()
-        rumble(0.4, 0.18)     ' kurzer Erfolgs-Stups, schwaecher als der Tod
-        demo_stop()           ' hier endet die Aufnahme: DAS ist die Loesung
-        RETURN
-    END IF
-
-    IF t = T_WATER THEN
-        IF has_flippers THEN
-            on_water = TRUE
-        ELSE
-            player_die("Ertrunken!")
-        END IF
-
-        RETURN
-    END IF
-
-    IF t = T_FIRE THEN
-        IF NOT has_fireboots THEN player_die("Verbrannt!")
-        RETURN
-    END IF
-
-    IF t = T_BOMB THEN
-        terr[cidx(px, py)] = T_FLOOR
-        player_die("In die Luft gesprengt!")
-        RETURN
-    END IF
-
-    IF t = T_TELEPORT THEN
-        do_teleport()
-        RETURN
-    END IF
-
-    IF t = T_PASSONCE THEN
-        terr[cidx(px, py)] = T_WALL    ' wird hinter dir zur Wand
-        RETURN
-    END IF
+    SELECT CASE t
+        CASE T_DIRT
+            terr[cidx(px, py)] = T_FLOOR
+        CASE T_CHIP
+            terr[cidx(px, py)] = T_FLOOR
+            IF chips_left > 0 THEN chips_left = chips_left - 1
+            sfx_chip()
+            funken(px, py, RGB(80, 255, 160), 16)
+        CASE T_KEY_BLUE
+            keys_blue = keys_blue + 1
+            aufheben(RGB(80, 140, 255))
+        CASE T_KEY_RED
+            keys_red = keys_red + 1
+            aufheben(RGB(255, 90, 90))
+        CASE T_KEY_GREEN
+            keys_green = keys_green + 1
+            aufheben(RGB(90, 235, 120))
+        CASE T_KEY_YELLOW
+            keys_yellow = keys_yellow + 1
+            aufheben(RGB(255, 215, 80))
+        CASE T_FLIPPERS
+            has_flippers = TRUE
+            aufheben(RGB(90, 160, 255))
+        CASE T_FIREBOOTS
+            has_fireboots = TRUE
+            aufheben(RGB(255, 140, 60))
+        CASE T_ICESKATES
+            has_iceskates = TRUE
+            aufheben(RGB(180, 230, 255))
+        CASE T_SUCTION
+            has_suction = TRUE
+            aufheben(RGB(190, 140, 255))
+        CASE T_DOOR_BLUE
+            keys_blue = keys_blue - 1
+            oeffnen()
+        CASE T_DOOR_RED
+            keys_red = keys_red - 1
+            oeffnen()
+        CASE T_DOOR_GREEN
+            oeffnen()                      ' gruene Schluessel bleiben
+        CASE T_DOOR_YELLOW
+            keys_yellow = keys_yellow - 1
+            oeffnen()
+        CASE T_SOCKET
+            oeffnen()
+            funken(px, py, RGB(110, 255, 200), 18)
+        CASE T_THIEF
+            has_flippers = FALSE
+            has_fireboots = FALSE
+            has_iceskates = FALSE
+            has_suction = FALSE
+            sfx_blocked()
+        CASE T_BTN_GREEN
+            toggle_walls()
+        CASE T_BTN_BLUE
+            reverse_tanks()
+        CASE T_BTN_RED
+            fire_cloners(px, py)
+        CASE T_EXIT
+            state = "win"
+            sieg_t = 0.0
+            funken(px, py, RGB(90, 230, 255), 40)
+            funken(px, py, RGB(255, 225, 120), 20)
+            record_win()
+            sfx_win()
+            rumble(0.4, 0.18)     ' kurzer Erfolgs-Stups, schwaecher als der Tod
+            demo_stop()           ' hier endet die Aufnahme: DAS ist die Loesung
+        CASE T_WATER
+            IF has_flippers THEN
+                on_water = TRUE
+            ELSE
+                player_die("Ertrunken!")
+            END IF
+        CASE T_FIRE
+            IF NOT has_fireboots THEN player_die("Verbrannt!")
+        CASE T_BOMB
+            terr[cidx(px, py)] = T_FLOOR
+            player_die("In die Luft gesprengt!")
+        CASE T_TELEPORT
+            do_teleport()
+        CASE T_PASSONCE
+            terr[cidx(px, py)] = T_WALL    ' wird hinter dir zur Wand
+    END SELECT
 END SUB
 
 ' Eis-/Force-Rutschzustand nach dem Landen bestimmen
@@ -1467,217 +1656,70 @@ SUB toggle_walls()
 END SUB
 
 SUB reverse_tanks()
-    DIM i AS INTEGER
-    FOR i = 0 TO nmob - 1
-        IF mob_alive[i] AND mob_type[i] = 3 THEN
-            mob_dir[i] = turn_back(mob_dir[i])
-        END IF
+    DIM m AS Monster
+    FOR EACH m IN mobs
+        IF m.lebt AND m IS Panzer THEN m.richtung = turn_back(m.richtung)
     NEXT
-
     sfx_door()
 END SUB
 
 SUB fire_cloners(bx AS INTEGER, by AS INTEGER)
-    DIM i AS INTEGER
-    FOR i = 0 TO nclone - 1
-        IF clone_bx[i] = bx AND clone_by[i] = by THEN
-            clone_one(clone_mx[i], clone_my[i])
-        END IF
+    DIM d AS Draht
+    FOR EACH d IN kloner
+        IF d.knopf_x = bx AND d.knopf_y = by THEN clone_one(d.ziel_x, d.ziel_y)
     NEXT
 END SUB
 
+' Das Monster auf dem Kloner schickt eine Kopie in seine Blickrichtung.
 SUB clone_one(mx AS INTEGER, my AS INTEGER)
-    DIM src AS INTEGER
-    src = mob_at(mx, my)
-    IF src < 0 THEN RETURN
-    DIM d AS INTEGER
-    d = mob_dir[src]
-    DIM nx AS INTEGER
-    DIM ny AS INTEGER
-    nx = mx + dxv[d]
-    ny = my + dyv[d]
-    IF nmob < MAXMOB AND mob_can_enter(src, nx, ny, d) THEN
-        mob_x[nmob] = nx
-        mob_y[nmob] = ny
-        mob_dir[nmob] = d
-        mob_type[nmob] = mob_type[src]
-        mob_alive[nmob] = TRUE
-        mob_trapped[nmob] = FALSE
-        mob_ox[nmob] = nx
-        mob_oy[nmob] = ny
-        nmob = nmob + 1
-    END IF
+    DIM src AS INTEGER : src = mob_at(mx, my)
+    IF src < 0 OR LEN(mobs) >= MAXMOB THEN RETURN
+    DIM vorbild AS Monster : vorbild = mobs[src]
+    DIM d AS INTEGER : d = vorbild.richtung
+    DIM nx AS INTEGER : nx = mx + dxv[d]
+    DIM ny AS INTEGER : ny = my + dyv[d]
+    IF vorbild.kann(nx, ny, d) THEN ARRAY_PUSH(mobs, neues_monster(vorbild.art(), nx, ny, d))
 END SUB
 
 ' ----------------------------------------------------------------------
-'  MONSTER-KI
+'  MONSTER
 ' ----------------------------------------------------------------------
-SUB mob_try(idx AS INTEGER, d AS INTEGER)
-    ' versucht Bewegung; bei Erfolg world-update; setzt mob_did
-    mob_did = FALSE
-    IF mob_can_enter(idx, mob_x[idx] + dxv[d], mob_y[idx] + dyv[d], d) THEN
-        mob_x[idx] = mob_x[idx] + dxv[d]
-        mob_y[idx] = mob_y[idx] + dyv[d]
-        mob_dir[idx] = d
-        mob_did = TRUE
-    END IF
-END SUB
-
 SUB update_traps()
     ' Falle offen, solange ihr brauner Knopf belegt ist (Spieler/Block/Monster)
-    DIM i AS INTEGER
-    FOR i = 0 TO ntrap - 1
+    DIM d AS Draht
+    FOR EACH d IN fallen
         DIM held AS BOOLEAN
-        held = (px = trap_bx[i] AND py = trap_by[i])
-        IF block_at(trap_bx[i], trap_by[i]) >= 0 THEN held = TRUE
-        IF mob_at(trap_bx[i], trap_by[i]) >= 0 THEN held = TRUE
-        DIM m AS INTEGER
-        m = mob_at(trap_tx[i], trap_ty[i])
-        IF m >= 0 THEN mob_trapped[m] = NOT held
+        held = (px = d.knopf_x AND py = d.knopf_y)
+        IF block_at(d.knopf_x, d.knopf_y) >= 0 THEN held = TRUE
+        IF mob_at(d.knopf_x, d.knopf_y) >= 0 THEN held = TRUE
+        DIM m AS INTEGER : m = mob_at(d.ziel_x, d.ziel_y)
+        IF m >= 0 THEN mobs[m].gefangen = NOT held
     NEXT
 END SUB
 
+' Zieht ein Monster in diesem Spielschritt? Grundtakt (Feind-Tempo) mal
+' der Traegheit der Art.
+FUNCTION zieht_jetzt(m AS Monster) AS BOOLEAN
+    RETURN (tickcount MOD (mon_takt * m.traegheit())) = 0
+END FUNCTION
+
 SUB move_monsters()
+    ' Ein Kloner haengt neue Monster hinten an -- sie ziehen erst im naechsten
+    ' Schritt (bis hier wie mit der festen Anzahl vom Schleifenbeginn).
+    DIM n AS INTEGER : n = LEN(mobs)
     DIM i AS INTEGER
-    FOR i = 0 TO nmob - 1
-        IF NOT mob_alive[i] THEN
-            ' skip
-        ELSEIF mob_trapped[i] THEN
-            ' in Falle gefangen
-        ELSE
-            DIM mt AS INTEGER
-            mt = mob_type[i]
-            DIM period AS INTEGER
-            period = MON_EVERY
-            IF mt = 5 OR mt = 7 THEN period = MON_EVERY * 2
-            IF (tickcount MOD period) = 0 THEN
-                mob_ox[i] = mob_x[i]
-                mob_oy[i] = mob_y[i]
-                ai_move(i, mt)
-                mob_terrain(i)
-            END IF
+    FOR i = 0 TO n - 1
+        DIM m AS Monster : m = mobs[i]
+        IF m.lebt AND NOT m.gefangen AND zieht_jetzt(m) THEN
+            m.merken()
+            m.ziehen()
+            m.betreten()
         END IF
     NEXT
 
     ' Kollision Monster-auf-Spieler
     IF mob_at(px, py) >= 0 AND state = "play" THEN
         player_die("Von einem Roboter erwischt!")
-    END IF
-END SUB
-
-SUB ai_move(i AS INTEGER, mt AS INTEGER)
-    DIM here AS INTEGER
-    here = terr[cidx(mob_x[i], mob_y[i])]
-
-    ' --- Force-Boden: Richtung erzwingen ---
-    DIM fdir AS INTEGER
-    fdir = force_dir(here)
-    IF fdir >= 0 THEN
-        mob_try(i, fdir)
-        RETURN
-    END IF
-
-    ' --- Eis: gleiten (Ecken lenken um, an Wand umkehren) ---
-    IF here = T_ICE OR here = T_ICE_NW2 OR here = T_ICE_NE2 OR here = T_ICE_SE2 OR here = T_ICE_SW2 THEN
-        DIM sd AS INTEGER
-        sd = mob_dir[i]
-        IF here <> T_ICE THEN sd = corner_redirect(here, sd)
-        mob_dir[i] = sd
-        mob_try(i, sd)
-        IF NOT mob_did THEN
-            mob_dir[i] = turn_back(sd)
-            mob_try(i, mob_dir[i])
-        END IF
-
-        RETURN
-    END IF
-
-    DIM d AS INTEGER
-    d = mob_dir[i]
-    IF mt = 0 THEN
-        ' Kaefer: linke Wand
-        mob_order4(i, turn_left(d), d, turn_right(d), turn_back(d))
-    ELSEIF mt = 8 THEN
-        ' Paramecium: rechte Wand
-        mob_order4(i, turn_right(d), d, turn_left(d), turn_back(d))
-    ELSEIF mt = 4 THEN
-        ' Gleiter: vor, links, rechts, zurueck
-        mob_order4(i, d, turn_left(d), turn_right(d), turn_back(d))
-    ELSEIF mt = 1 THEN
-        ' Feuerball: vor, rechts, links, zurueck
-        mob_order4(i, d, turn_right(d), turn_left(d), turn_back(d))
-    ELSEIF mt = 2 THEN
-        ' Ball: vor, sonst zurueck (prallt)
-        mob_try(i, d)
-        IF NOT mob_did THEN mob_try(i, turn_back(d))
-    ELSEIF mt = 3 THEN
-        ' Tank: nur vor; sonst stehen
-        mob_try(i, d)
-    ELSEIF mt = 6 THEN
-        ' Walker: vor; sonst zufaellige neue Richtung
-        mob_try(i, d)
-        IF NOT mob_did THEN
-            DIM tries AS INTEGER
-            tries = 0
-            WHILE tries < 6 AND NOT mob_did
-                mob_try(i, RANDINT(0, 3))
-                tries = tries + 1
-            WEND
-        END IF
-    ELSEIF mt = 7 THEN
-        ' Blob: zufaellig
-        mob_try(i, RANDINT(0, 3))
-    ELSEIF mt = 5 THEN
-        ' Teeth: verfolgt den Spieler
-        teeth_chase(i)
-    END IF
-END SUB
-
-SUB mob_order4(i AS INTEGER, a AS INTEGER, b AS INTEGER, c AS INTEGER, e AS INTEGER)
-    mob_try(i, a)
-    IF mob_did THEN RETURN
-    mob_try(i, b)
-    IF mob_did THEN RETURN
-    mob_try(i, c)
-    IF mob_did THEN RETURN
-    mob_try(i, e)
-END SUB
-
-SUB teeth_chase(i AS INTEGER)
-    DIM dx AS INTEGER
-    DIM dy AS INTEGER
-    dx = px - mob_x[i]
-    dy = py - mob_y[i]
-    DIM dh AS INTEGER
-    DIM dv AS INTEGER
-    dh = 3
-    IF dx < 0 THEN dh = 1
-    dv = 2
-    IF dy < 0 THEN dv = 0
-
-    ' groessere Achse zuerst
-    IF ABS(dx) >= ABS(dy) THEN
-        IF dx <> 0 THEN mob_try(i, dh)
-        IF NOT mob_did AND dy <> 0 THEN mob_try(i, dv)
-    ELSE
-        IF dy <> 0 THEN mob_try(i, dv)
-        IF NOT mob_did AND dx <> 0 THEN mob_try(i, dh)
-    END IF
-END SUB
-
-' Terrain-Folgen, wenn ein Monster eine Zelle betritt
-SUB mob_terrain(i AS INTEGER)
-    DIM t AS INTEGER
-    t = terr[cidx(mob_x[i], mob_y[i])]
-    IF t = T_BOMB THEN
-        terr[cidx(mob_x[i], mob_y[i])] = T_FLOOR
-        mob_alive[i] = FALSE
-    ELSEIF t = T_TRAP THEN
-        mob_trapped[i] = TRUE
-    ELSEIF t = T_BTN_GREEN THEN
-        toggle_walls()
-    ELSEIF t = T_BTN_BLUE THEN
-        reverse_tanks()
     END IF
 END SUB
 
@@ -1695,10 +1737,9 @@ SUB world_tick()
     pushed_blk = -1
     pox = px
     poy = py
-    DIM oi AS INTEGER
-    FOR oi = 0 TO nblk - 1
-        blk_ox[oi] = blk_x[oi]
-        blk_oy[oi] = blk_y[oi]
+    DIM k AS Kiste
+    FOR EACH k IN kisten
+        k.merken()
     NEXT
 
     ' --- Spieler ---
@@ -1748,43 +1789,101 @@ END SUB
 ' ----------------------------------------------------------------------
 ' Animierte Kacheln: Frame-0-Zelle (Sheet-Zeilen 8-9). -1 = statisch.
 FUNCTION anim_base(code AS INTEGER) AS INTEGER
-    IF code = T_WATER THEN RETURN 128
-    IF code = T_FIRE THEN RETURN 132
-    IF code = T_FORCE_S THEN RETURN 136
-    IF code = T_FORCE_N THEN RETURN 140
-    IF code = T_FORCE_E THEN RETURN 144
-    IF code = T_FORCE_W THEN RETURN 148
-    IF code = T_FORCE_RND THEN RETURN 152
-    IF code = T_EXIT THEN RETURN 156
-    IF code = T_TELEPORT THEN RETURN 160
-    IF code = T_BOMB THEN RETURN 164
-    IF code = T_TOGGLE_C THEN RETURN 168
-    IF code = T_TOGGLE_O THEN RETURN 172
-    IF code = T_SOCKET THEN RETURN 176
-    IF code = T_CLONER THEN RETURN 180
-    IF code = T_THIEF THEN RETURN 184
-    IF code = T_KEY_BLUE THEN RETURN 188
-    IF code = T_KEY_RED THEN RETURN 192
-    IF code = T_KEY_GREEN THEN RETURN 196
-    IF code = T_KEY_YELLOW THEN RETURN 200
-    IF code = T_FLIPPERS THEN RETURN 204
-    IF code = T_FIREBOOTS THEN RETURN 208
-    IF code = T_ICESKATES THEN RETURN 212
-    IF code = T_SUCTION THEN RETURN 216
+    SELECT CASE code
+        CASE T_WATER : RETURN 128
+        CASE T_FIRE : RETURN 132
+        CASE T_FORCE_S : RETURN 136
+        CASE T_FORCE_N : RETURN 140
+        CASE T_FORCE_E : RETURN 144
+        CASE T_FORCE_W : RETURN 148
+        CASE T_FORCE_RND : RETURN 152
+        CASE T_EXIT : RETURN 156
+        CASE T_TELEPORT : RETURN 160
+        CASE T_BOMB : RETURN 164
+        CASE T_TOGGLE_C : RETURN 168
+        CASE T_TOGGLE_O : RETURN 172
+        CASE T_SOCKET : RETURN 176
+        CASE T_CLONER : RETURN 180
+        CASE T_THIEF : RETURN 184
+        CASE T_KEY_BLUE : RETURN 188
+        CASE T_KEY_RED : RETURN 192
+        CASE T_KEY_GREEN : RETURN 196
+        CASE T_KEY_YELLOW : RETURN 200
+        CASE T_FLIPPERS : RETURN 204
+        CASE T_FIREBOOTS : RETURN 208
+        CASE T_ICESKATES : RETURN 212
+        CASE T_SUCTION : RETURN 216
+    END SELECT
     RETURN -1
 END FUNCTION
 
-SUB draw_tile(code AS INTEGER, sx AS INTEGER, sy AS INTEGER)
-    DIM cell AS INTEGER
-    cell = code
-    DIM ab AS INTEGER
-    ab = anim_base(code)
-    IF ab >= 0 THEN cell = ab + (anim_frame MOD 4)
-    DIM srcx AS INTEGER
-    DIM srcy AS INTEGER
-    srcx = (cell MOD 16) * TILE
-    srcy = (cell \ 16) * TILE
-    DRAWIMAGEPART(tiles, srcx, srcy, TILE, TILE, sx, sy)
+' Pixel-Kante einer Zellen-Koordinate (relativ zur Kamera). Jede Kachel
+' reicht von kante(f) bis kante(f + 1) -- so bleibt zwischen Nachbarn keine
+' Fuge, auch wenn eine Kachel 110,4 Pixel breit ist.
+FUNCTION kante(f AS FLOAT) AS INTEGER
+    RETURN INT(FLOOR(f * ts))
+END FUNCTION
+
+FUNCTION kachel_zelle(code AS INTEGER) AS INTEGER
+    DIM ab AS INTEGER : ab = anim_base(code)
+    IF ab >= 0 THEN RETURN ab + (anim_frame MOD 4)
+    RETURN code
+END FUNCTION
+
+' Kachel code an die Zelle (fx, fy) relativ zur Kamera
+SUB draw_tile(code AS INTEGER, fx AS FLOAT, fy AS FLOAT)
+    DIM cell AS INTEGER : cell = kachel_zelle(code)
+    DIM x0 AS INTEGER : x0 = kante(fx)
+    DIM y0 AS INTEGER : y0 = kante(fy)
+    DRAWIMAGEPARTEX(tiles, (cell MOD 16) * KP, (cell \ 16) * KP, KP, KP, x0, y0, kante(fx + 1.0) - x0, kante(fy + 1.0) - y0)
+END SUB
+
+' Figur (Monster, Spieler, Block) mit Groesse und Toenung, um die
+' Zellmitte; dy hebt sie an (Schweben).
+SUB draw_sprite(code AS INTEGER, fx AS FLOAT, fy AS FLOAT, skala AS FLOAT, dy AS FLOAT, tint AS INTEGER)
+    DIM cell AS INTEGER : cell = kachel_zelle(code)
+    DIM g AS FLOAT : g = ts * skala
+    DIM mx AS FLOAT : mx = (fx + 0.5) * ts
+    DIM my AS FLOAT : my = (fy + 0.5 - dy) * ts
+    DRAWIMAGEPARTEX(tiles, (cell MOD 16) * KP, (cell \ 16) * KP, KP, KP, INT(mx - g / 2.0), INT(my - g / 2.0), INT(g), INT(g), tint)
+END SUB
+
+' Weicher Schatten unter einer Figur
+SUB draw_schatten(fx AS FLOAT, fy AS FLOAT, breite AS FLOAT, staerke AS INTEGER)
+    DIM mx AS FLOAT : mx = (fx + 0.5) * ts
+    DIM my AS FLOAT : my = (fy + 0.88) * ts
+    ELLIPSE(INT(mx - ts * breite), INT(my - ts * 0.09), INT(mx + ts * breite), INT(my + ts * 0.09), RGBA(0, 0, 0, staerke))
+END SUB
+
+' Leuchten einer Kachel: Farbe, -1 = leuchtet nicht
+FUNCTION leuchtfarbe(t AS INTEGER) AS INTEGER
+    IF t = T_CHIP THEN RETURN RGB(80, 255, 160)
+    IF t = T_EXIT THEN RETURN RGB(80, 230, 255)
+    IF t = T_TELEPORT THEN RETURN RGB(110, 190, 255)
+    IF t = T_SOCKET THEN RETURN IIF(chips_left = 0, RGB(110, 255, 200), -1)
+    IF t = T_KEY_BLUE THEN RETURN RGB(80, 140, 255)
+    IF t = T_KEY_RED THEN RETURN RGB(255, 90, 90)
+    IF t = T_KEY_GREEN THEN RETURN RGB(90, 235, 120)
+    IF t = T_KEY_YELLOW THEN RETURN RGB(255, 215, 80)
+    IF t = T_FLIPPERS THEN RETURN RGB(90, 160, 255)
+    IF t = T_FIREBOOTS THEN RETURN RGB(255, 140, 60)
+    IF t = T_ICESKATES THEN RETURN RGB(180, 230, 255)
+    IF t = T_SUCTION THEN RETURN RGB(190, 140, 255)
+    IF t = T_FIRE THEN RETURN RGB(255, 120, 30)
+    IF t = T_BOMB THEN RETURN RGB(255, 70, 50)
+    IF t = T_HINT THEN RETURN RGB(255, 225, 120)
+    IF t = T_BTN_RED THEN RETURN RGB(255, 80, 80)
+    IF t = T_BTN_GREEN THEN RETURN RGB(80, 255, 120)
+    IF t = T_BTN_BLUE THEN RETURN RGB(90, 150, 255)
+    RETURN -1
+END FUNCTION
+
+' Weicher Schein um die Zellmitte (additiv; vorher BLEND_MODE("add"))
+SUB schein(fx AS FLOAT, fy AS FLOAT, farbe AS INTEGER, radius AS FLOAT, staerke AS INTEGER)
+    DIM r AS INTEGER : r = (farbe SHR 16) BAND 255
+    DIM g AS INTEGER : g = (farbe SHR 8) BAND 255
+    DIM b AS INTEGER : b = farbe BAND 255
+    CIRCLE_GRADIENT(INT((fx + 0.5) * ts), INT((fy + 0.5) * ts), INT(radius * ts), RGBA(r, g, b, MAX(1, MIN(255, staerke))), RGBA(r, g, b, 0))
 END SUB
 
 DIM camx AS INTEGER
@@ -1810,61 +1909,69 @@ SUB draw_board()
     bcx = INT(camfx)
     bcy = INT(camfy)
 
+    ' --- Boden und Gelaende ---
+    CLS(RGB(10, 13, 20))
     DIM vy AS INTEGER
     DIM vx AS INTEGER
     FOR vy = 0 TO VIEW
         FOR vx = 0 TO VIEW
-            DIM cx AS INTEGER
-            DIM cy AS INTEGER
-            cx = bcx + vx
-            cy = bcy + vy
-            DIM sx AS INTEGER
-            DIM sy AS INTEGER
-            sx = INT((cx - camfx) * TILE)
-            sy = INT((cy - camfy) * TILE)
+            DIM cx AS INTEGER : cx = bcx + vx
+            DIM cy AS INTEGER : cy = bcy + vy
             IF inb(cx, cy) THEN
-                draw_tile(T_FLOOR, sx, sy)
-                DIM t AS INTEGER
-                t = terr[cidx(cx, cy)]
-                IF t <> T_FLOOR THEN draw_tile(t, sx, sy)
+                draw_tile(T_FLOOR, cx - camfx, cy - camfy)
+                DIM t AS INTEGER : t = terr[cidx(cx, cy)]
+                IF t <> T_FLOOR THEN draw_tile(t, cx - camfx, cy - camfy)
             ELSE
-                draw_tile(T_WALL, sx, sy)
+                draw_tile(T_WALL, cx - camfx, cy - camfy)
             END IF
         NEXT
     NEXT
 
-    ' Bloecke (interpoliert)
-    DIM i AS INTEGER
-    FOR i = 0 TO nblk - 1
-        IF blk_alive[i] THEN
-            DIM bfx AS FLOAT
-            DIM bfy AS FLOAT
-            bfx = blk_ox[i] + (blk_x[i] - blk_ox[i]) * ease
-            bfy = blk_oy[i] + (blk_y[i] - blk_oy[i]) * ease
-            draw_tile(T_BLOCK, INT((bfx - camfx) * TILE), INT((bfy - camfy) * TILE))
-        END IF
+    ' --- Leuchten: Chips, Schluessel, Ausgang, Feuer ... (additiv, pulsierend) ---
+    BLEND_MODE("add")
+    FOR vy = 0 TO VIEW
+        FOR vx = 0 TO VIEW
+            DIM lx AS INTEGER : lx = bcx + vx
+            DIM ly AS INTEGER : ly = bcy + vy
+            IF inb(lx, ly) THEN
+                DIM lf AS INTEGER : lf = leuchtfarbe(terr[cidx(lx, ly)])
+                IF lf >= 0 THEN
+                    DIM puls AS FLOAT : puls = 0.5 + 0.5 * SIN(fx_zeit * 3.2 + lx * 0.9 + ly * 1.3)
+                    schein(lx - camfx, ly - camfy, lf, 0.62 + 0.08 * puls, INT(46 + 44 * puls))
+                END IF
+            END IF
+        NEXT
+    NEXT
+    BLEND_MODE("alpha")
+
+    ' --- Schatten ---
+    DIM k AS Kiste
+    FOR EACH k IN kisten
+        IF k.lebt THEN draw_schatten(k.bild_x(ease) - camfx, k.bild_y(ease) - camfy, 0.40, 120)
+    NEXT
+    DIM m AS Monster
+    FOR EACH m IN mobs
+        IF m.lebt THEN draw_schatten(m.bild_x(zug_anteil(m, ease)) - camfx, m.bild_y(zug_anteil(m, ease)) - camfy, 0.30, 100)
+    NEXT
+    draw_schatten(pfx - camfx, pfy - camfy, 0.28, 110)
+
+    ' --- Bloecke ---
+    FOR EACH k IN kisten
+        IF k.lebt THEN draw_tile(T_BLOCK, k.bild_x(ease) - camfx, k.bild_y(ease) - camfy)
     NEXT
 
-    ' Monster (interpoliert)
-    FOR i = 0 TO nmob - 1
-        IF mob_alive[i] THEN
-            DIM mp AS INTEGER
-            mp = MON_EVERY
-            IF mob_type[i] = 5 OR mob_type[i] = 7 THEN mp = MON_EVERY * 2
-            DIM mph AS FLOAT
-            mph = ((tickcount MOD mp) + ease) / mp
-            IF mph > 1.0 THEN mph = 1.0
-            DIM mfx AS FLOAT
-            DIM mfy AS FLOAT
-            mfx = mob_ox[i] + (mob_x[i] - mob_ox[i]) * mph
-            mfy = mob_oy[i] + (mob_y[i] - mob_oy[i]) * mph
-            DIM mc AS INTEGER
-            mc = &H40 + mob_type[i] * 4 + mob_dir[i]
-            draw_tile(mc, INT((mfx - camfx) * TILE), INT((mfy - camfy) * TILE))
+    ' --- Monster: gleiten ueber ihren ganzen Zugtakt, schweben ein wenig ---
+    DIM mi AS INTEGER : mi = 0
+    FOR EACH m IN mobs
+        IF m.lebt THEN
+            DIM mph AS FLOAT : mph = zug_anteil(m, ease)
+            DIM schweb AS FLOAT : schweb = 0.025 + 0.025 * SIN(fx_zeit * 5.0 + mi * 1.7)
+            draw_sprite(m.kachel(), m.bild_x(mph) - camfx, m.bild_y(mph) - camfy, 1.0, schweb, IIF(m.gefangen, RGB(150, 150, 170), -1))
         END IF
+        mi = mi + 1
     NEXT
 
-    ' Spieler (interpoliert, Geh-Frame wechselt pro Tick)
+    ' --- Spieler: eigenes Licht, Geh-Frame je Tick, in Ruhe atmet er ---
     DIM moving AS BOOLEAN
     moving = (pox <> px OR poy <> py)
     DIM pc AS INTEGER
@@ -1874,17 +1981,95 @@ SUB draw_board()
     ELSEIF moving AND (tickcount MOD 2) = 1 THEN
         pc = &H70 + pdir
     END IF
+    BLEND_MODE("add")
+    schein(pfx - camfx, pfy - camfy, RGB(90, 200, 255), 1.15, 34)
+    BLEND_MODE("alpha")
+    DIM atem AS FLOAT : atem = 0.0
+    IF NOT moving AND NOT on_water THEN atem = 0.02 + 0.02 * SIN(fx_zeit * 3.0)
+    DIM ptint AS INTEGER : ptint = -1
+    IF state = "dead" THEN ptint = RGB(255, 120, 120)
+    draw_sprite(pc, pfx - camfx, pfy - camfy, 1.0, atem, ptint)
 
-    draw_tile(pc, INT((pfx - camfx) * TILE), INT((pfy - camfy) * TILE))
+    ' --- Funken ---
+    IF LEN(funkenflug) > 0 THEN
+        BLEND_MODE("add")
+        DIM f AS Funke
+        FOR EACH f IN funkenflug
+            DIM rest AS FLOAT : rest = 1.0 - f.alter / f.dauer
+            DIM fr AS INTEGER : fr = (f.farbe SHR 16) BAND 255
+            DIM fg AS INTEGER : fg = (f.farbe SHR 8) BAND 255
+            DIM fb AS INTEGER : fb = f.farbe BAND 255
+            DIM rr AS INTEGER : rr = MAX(2, INT(f.groesse * ts * (0.4 + rest)))
+            CIRCLE_GRADIENT(INT((f.x - camfx) * ts), INT((f.y - camfy) * ts), rr * 3, RGBA(fr, fg, fb, INT(120 * rest) + 1), RGBA(fr, fg, fb, 0))
+            CIRCLE(INT((f.x - camfx) * ts), INT((f.y - camfy) * ts), rr, RGBA(MIN(255, fr + 80), MIN(255, fg + 80), MIN(255, fb + 80), INT(230 * rest) + 1))
+        NEXT
+        BLEND_MODE("alpha")
+    END IF
+
+    ' --- Vignette: das Brett dunkelt zum Rand hin ab ---
+    DIM vg AS INTEGER : vg = INT(bsize * 0.10)
+    GRADIENTV(0, 0, bsize, vg, RGBA(6, 9, 15, 150), RGBA(6, 9, 15, 0))
+    GRADIENTV(0, bsize - vg, bsize, bsize, RGBA(6, 9, 15, 0), RGBA(6, 9, 15, 150))
+    GRADIENTH(0, 0, vg, bsize, RGBA(6, 9, 15, 150), RGBA(6, 9, 15, 0))
+    GRADIENTH(bsize - vg, 0, bsize, bsize, RGBA(6, 9, 15, 0), RGBA(6, 9, 15, 150))
+
+    ' --- Tod: kurz rot; Sieg: der Ausgang strahlt ---
+    IF state = "dead" AND schreck_t < 0.6 THEN
+        BOX(0, 0, bsize, bsize, RGBA(200, 30, 30, INT(110 * (1.0 - schreck_t / 0.6)) + 1))
+    END IF
+    IF state = "win" THEN
+        BLEND_MODE("add")
+        schein(pfx - camfx, pfy - camfy, RGB(90, 230, 255), 1.0 + MIN(2.5, sieg_t * 3.0), INT(90 * MAX(0.25, 1.0 - sieg_t)))
+        BLEND_MODE("alpha")
+    END IF
+END SUB
+
+' Wie weit ein Monster in seinem Zug ist (0..1): es zieht nur jeden
+' mon_takt * traegheit-ten Spielschritt und gleitet ueber diese ganze Zeit.
+FUNCTION zug_anteil(m AS Monster, ease AS FLOAT) AS FLOAT
+    DIM mp AS INTEGER : mp = mon_takt * m.traegheit()
+    DIM a AS FLOAT : a = ((tickcount MOD mp) + ease) / mp
+    IF a > 1.0 THEN a = 1.0
+    RETURN a
+END FUNCTION
+
+' Hintergrund des ganzen Schirms: dunkler Verlauf, darin ziehen zwei
+' weiche Lichter langsam ihre Bahn (Neon hinter Glas).
+SUB hintergrund()
+    GRADIENTV(0, 0, SW, SH, RGB(16, 22, 36), RGB(6, 8, 14))
+    BLEND_MODE("add")
+    DIM r AS INTEGER : r = INT(SH * 0.55)
+    CIRCLE_GRADIENT(INT(SW * (0.30 + 0.12 * SIN(fx_zeit * 0.11))), INT(SH * (0.35 + 0.10 * COS(fx_zeit * 0.13))), r, RGBA(30, 90, 120, 34), RGBA(30, 90, 120, 0))
+    CIRCLE_GRADIENT(INT(SW * (0.72 + 0.10 * COS(fx_zeit * 0.09))), INT(SH * (0.70 + 0.08 * SIN(fx_zeit * 0.12))), r, RGBA(70, 40, 120, 30), RGBA(70, 40, 120, 0))
+    BLEND_MODE("alpha")
+    ' feines Leiterbahn-Raster
+    DIM schritt AS INTEGER : schritt = MAX(24, SH \ 18)
+    DIM gx AS INTEGER
+    FOR gx = 0 TO SW STEP schritt
+        LINE(gx, 0, gx, SH, RGBA(80, 140, 170, 10))
+    NEXT
+    DIM gy AS INTEGER
+    FOR gy = 0 TO SH STEP schritt
+        LINE(0, gy, SW, gy, RGBA(80, 140, 170, 10))
+    NEXT
+END SUB
+
+' Rahmen ums Spielfeld: Neon-Kante mit weichem Schein nach aussen.
+SUB brett_rahmen(x AS INTEGER, y AS INTEGER)
+    DIM i AS INTEGER
+    FOR i = 1 TO 6
+        RECTROUND(x - i * 2, y - i * 2, x + bsize + i * 2, y + bsize + i * 2, 10 + i * 2, RGBA(70, 200, 220, 46 - i * 7))
+    NEXT
+    RECTROUND(x - 1, y - 1, x + bsize + 1, y + bsize + 1, 8, RGB(70, 170, 190))
 END SUB
 
 SUB ct(cx AS INTEGER, cy AS INTEGER, scale AS FLOAT, s AS STRING, col AS INTEGER)
     TEXTROT(cx, cy, s, 0, scale, col)
 END SUB
 
-' HUD-Icon direkt aus dem Tileset skaliert zeichnen (nativ, scharf)
+' HUD-Icon direkt aus dem Tileset skaliert zeichnen (weich gefiltert)
 SUB draw_icon(code AS INTEGER, x AS INTEGER, y AS INTEGER)
-    DRAWIMAGEPARTEX(tiles, (code MOD 16) * TILE, (code \ 16) * TILE, TILE, TILE, x, y, ic_sz, ic_sz)
+    DRAWIMAGEPARTEX(tiles, (code MOD 16) * KP, (code \ 16) * KP, KP, KP, x, y, ic_sz, ic_sz)
 END SUB
 
 ' Vertikale HUD-Position als Bruchteil der Panel-Hoehe
@@ -1894,8 +2079,8 @@ END FUNCTION
 
 ' Gerundetes Sub-Panel mit Neon-Rand
 SUB hud_panel(x0 AS INTEGER, y0 AS INTEGER, x1 AS INTEGER, y1 AS INTEGER)
-    BOXROUND(x0, y0, x1, y1, 9, RGB(15, 21, 33))
-    RECTROUND(x0, y0, x1, y1, 9, RGB(42, 84, 104))
+    BOXROUND(x0, y0, x1, y1, 9, RGBA(14, 20, 32, 200))
+    RECTROUND(x0, y0, x1, y1, 9, RGBA(60, 130, 150, 190))
 END SUB
 
 ' zentriertes Sektions-Label (gedimmtes Neon)
@@ -1952,14 +2137,13 @@ SUB draw_hud()
     DIM kw AS INTEGER
     kw = (ix1 - ix0) \ 4
 
-    ' --- Aussen-Panel (Verlauf + Neon-Rahmen) ---
-    GRADIENTV(x0, board_y, x1, board_y + bsize, RGB(23, 31, 47), RGB(12, 16, 26))
-    RECTROUND(x0, board_y, x1, board_y + bsize, 12, RGB(58, 112, 132))
+    ' --- Aussen-Panel (Glas + Neon-Rahmen) ---
+    glas_karte(x0, board_y, x1, board_y + bsize, RGB(58, 150, 170))
 
     ' --- Header ---
     GRADIENTV(ix0, hb(0.012), ix1, hb(0.068), RGB(16, 60, 66), RGB(13, 28, 40))
     RECTROUND(ix0, hb(0.012), ix1, hb(0.068), 8, RGB(64, 158, 154))
-    ct(cxp, hb(0.040), sc_med, "CIRCUIT RUNNER", RGB(122, 246, 234))
+    glow_text(cxp, hb(0.040), sc_med, "CIRCUIT RUNNER", RGB(122, 246, 234))
 
     ' --- Level + Fortschrittsbalken ---
     ct(cxp, hb(0.090), sc_sm, "LEVEL " + STR$(cur_level + 1) + " / " + STR$(nlevels), RGB(216, 224, 238))
@@ -2054,18 +2238,72 @@ SUB draw_hint()
     bx1 = board_x + bsize
     by1 = board_y + bsize
     by0 = by1 - INT(SH * 0.20)
-    BOX(bx0, by0, bx1, by1, RGB(16, 22, 32))
-    RECT(bx0, by0, bx1, by1, RGB(80, 200, 220))
-    ct((bx0 + bx1) \ 2, by0 + INT(SH * 0.035), sc_sm, "HINWEIS", RGB(110, 238, 226))
+    glas_karte(bx0 + 10, by0, bx1 - 10, by1 - 10, RGB(80, 200, 220))
+    glow_text((bx0 + bx1) \ 2, by0 + INT(SH * 0.035), sc_sm, "HINWEIS", RGB(110, 238, 226))
     draw_wrapped(lvl_hint, bx0 + INT(SW * 0.02), by0 + INT(SH * 0.08), bx1 - INT(SW * 0.02), RGB(206, 220, 236))
+END SUB
+
+' Glas-Karte: halbdurchsichtig, abgerundet, Neon-Rand mit weichem Schein.
+SUB glas_karte(x0 AS INTEGER, y0 AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, rand AS INTEGER)
+    DIM r AS INTEGER : r = (rand SHR 16) BAND 255
+    DIM g AS INTEGER : g = (rand SHR 8) BAND 255
+    DIM b AS INTEGER : b = rand BAND 255
+    DIM i AS INTEGER
+    FOR i = 1 TO 5
+        RECTROUND(x0 - i * 2, y0 - i * 2, x1 + i * 2, y1 + i * 2, 14 + i * 2, RGBA(r, g, b, 40 - i * 7))
+    NEXT
+    BOXROUND(x0, y0, x1, y1, 14, RGBA(10, 14, 24, 236))
+    RECTROUND(x0, y0, x1, y1, 14, RGBA(r, g, b, 210))
+END SUB
+
+' Leuchtschrift: ein weicher Schein in der Farbe, darueber die Schrift.
+SUB glow_text(cx AS INTEGER, cy AS INTEGER, scale AS FLOAT, s AS STRING, col AS INTEGER)
+    DIM r AS INTEGER : r = (col SHR 16) BAND 255
+    DIM g AS INTEGER : g = (col SHR 8) BAND 255
+    DIM b AS INTEGER : b = col BAND 255
+    DIM d AS INTEGER : d = MAX(2, INT(SH * 0.0025))
+    BLEND_MODE("add")
+    TEXTROT(cx - d, cy, s, 0, scale, RGBA(r, g, b, 60))
+    TEXTROT(cx + d, cy, s, 0, scale, RGBA(r, g, b, 60))
+    TEXTROT(cx, cy - d, s, 0, scale, RGBA(r, g, b, 60))
+    TEXTROT(cx, cy + d, s, 0, scale, RGBA(r, g, b, 60))
+    BLEND_MODE("alpha")
+    TEXTROT(cx, cy, s, 0, scale, col)
+END SUB
+
+' Die Bewohner des Spiels laufen am unteren Rand vorbei: der Runner vorweg,
+' die Roboter hinterher.
+SUB parade(y AS INTEGER)
+    DIM g AS INTEGER : g = INT(SH * 0.075)
+    DIM abstand AS INTEGER : abstand = INT(g * 1.6)
+    DIM n AS INTEGER : n = 10
+    DIM laenge AS INTEGER : laenge = SW + (n + 2) * abstand
+    DIM kopf AS INTEGER : kopf = INT(fx_zeit * SH * 0.11) + SW
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        DIM code AS INTEGER
+        DIM luecke AS INTEGER : luecke = 0
+        IF i = 0 THEN
+            code = IIF(INT(fx_zeit * 6.0) MOD 2 = 0, T_CHIP_N + 3, &H70 + 3)
+        ELSE
+            code = &H40 + ((i - 1) MOD 9) * 4 + 3
+            luecke = abstand
+        END IF
+        DIM x AS INTEGER : x = kopf - i * abstand - luecke
+        x = ((x MOD laenge) + laenge) MOD laenge - (n + 1) * abstand
+        DIM hop AS INTEGER : hop = INT(ABS(SIN(fx_zeit * 7.0 + i * 0.8)) * g * 0.10)
+        ELLIPSE(x + g \ 5, y + g - g \ 10, x + g - g \ 5, y + g + g \ 12, RGBA(0, 0, 0, 90))
+        DRAWIMAGEPARTEX(tiles, (code MOD 16) * KP, (code \ 16) * KP, KP, KP, x, y - hop, g, g)
+    NEXT
 END SUB
 
 SUB draw_menu()
     DIM cx AS INTEGER
     cx = SW \ 2
-    ct(cx, INT(SH * 0.13), sc_big, "CIRCUIT RUNNER", RGB(110, 238, 226))
-    ct(cx, INT(SH * 0.22), sc_sm, "waehle ein Level-Set", RGB(150, 162, 184))
-    IF nsets = 0 THEN
+    glow_text(cx, INT(SH * 0.13), sc_big * 1.25, "CIRCUIT RUNNER", RGB(110, 238, 226))
+    ct(cx, INT(SH * 0.215), sc_sm, "waehle ein Level-Set", RGB(150, 162, 184))
+    parade(INT(SH * 0.70))
+    IF LEN(sets) = 0 THEN
         ct(cx, SH \ 2, sc_med, "Keine Sets in levels/", RGB(245, 130, 130))
         RETURN
     END IF
@@ -2075,20 +2313,23 @@ SUB draw_menu()
     IF lo < 0 THEN lo = 0
     DIM hi AS INTEGER
     hi = lo + 6
-    IF hi > nsets - 1 THEN hi = nsets - 1
+    IF hi > LEN(sets) - 1 THEN hi = LEN(sets) - 1
     DIM yy AS INTEGER
-    yy = INT(SH * 0.37)
+    yy = INT(SH * 0.34)
     DIM lh AS INTEGER
-    lh = INT(BASEH * sc_med * 1.5)
+    lh = INT(BASEH * sc_med * 1.7)
+    DIM kb AS INTEGER : kb = INT(SW * 0.21)
+    glas_karte(cx - kb, yy - lh, cx + kb, yy + (hi - lo) * lh + lh, RGB(70, 190, 210))
     DIM si AS INTEGER
     FOR si = lo TO hi
         DIM lab AS STRING
-        lab = set_name[si] + "    " + STR$(set_count[si]) + " Level"
+        lab = sets[si].name + "    " + STR$(sets[si].anzahl) + " Level"
         DIM col AS INTEGER
         col = RGB(160, 172, 196)
         IF si = sel_set THEN
-            lab = "> " + lab + " <"
-            col = RGB(120, 244, 160)
+            BOXROUND(cx - kb + 12, yy - lh \ 2 + 4, cx + kb - 12, yy + lh \ 2 - 4, 10, RGBA(80, 230, 170, 40))
+            RECTROUND(cx - kb + 12, yy - lh \ 2 + 4, cx + kb - 12, yy + lh \ 2 - 4, 10, RGBA(110, 244, 170, 150))
+            col = RGB(140, 250, 180)
         END IF
 
         ct(cx, yy, sc_med, lab, col)
@@ -2096,14 +2337,14 @@ SUB draw_menu()
     NEXT
 
     DIM mx AS INTEGER
-    mx = SAVE_GET_INT_OR(sav, set_key(set_name[sel_set]) + "/max", 0)
+    mx = SAVE_GET_INT_OR(sav, set_key(sets[sel_set].name) + "/max", 0)
     DIM hint AS STRING
     hint = "Pfeile waehlen   LEER = Start   P = Passwort   ESC = Ende"
     IF mx > 0 THEN
         DIM nx AS INTEGER
         nx = mx + 1
-        IF nx > set_count[sel_set] THEN nx = set_count[sel_set]
-        ct(cx, INT(SH * 0.82), sc_sm, "Fortschritt: Level " + STR$(mx) + " / " + STR$(set_count[sel_set]), RGB(150, 200, 240))
+        IF nx > sets[sel_set].anzahl THEN nx = sets[sel_set].anzahl
+        ct(cx, INT(SH * 0.82), sc_sm, "Fortschritt: Level " + STR$(mx) + " / " + STR$(sets[sel_set].anzahl), RGB(150, 200, 240))
         hint = "LEER = Start   C = Weiter ab Level " + STR$(nx) + "   P = Passwort   ESC = Ende"
     END IF
 
@@ -2111,16 +2352,22 @@ SUB draw_menu()
     DIM mhint AS STRING
     mhint = "M = Musik an"
     IF music_on THEN mhint = "M = Musik aus"
+    mhint = mhint + "      T = Feind-Tempo: " + tempo_name()
     ct(cx, INT(SH * 0.95), sc_sm, mhint, RGB(120, 134, 160))
 END SUB
 
 SUB draw_intro()
     DIM cx AS INTEGER
     cx = SW \ 2
+    glas_karte(INT(SW * 0.14), INT(SH * 0.14), INT(SW * 0.86), INT(SH * 0.66), RGB(70, 190, 210))
     ct(cx, INT(SH * 0.22), sc_med, "Level " + STR$(cur_level + 1), RGB(110, 238, 226))
-    ct(cx, INT(SH * 0.34), sc_big, lvl_title, RGB(232, 238, 248))
+    glow_text(cx, INT(SH * 0.33), sc_big, lvl_title, RGB(232, 238, 248))
+    DIM eckdaten AS STRING
+    eckdaten = STR$(chips_total) + " Daten-Chips     Zeit: " + IIF(lvl_time > 0, fmt_time(lvl_time), "frei")
+    ct(cx, INT(SH * 0.40), sc_sm, eckdaten, RGB(150, 200, 240))
+    parade(INT(SH * 0.74))
     IF lvl_best >= 0 THEN
-        ct(cx, INT(SH * 0.43), sc_sm, "Bestzeit  " + score_label(lvl_best), RGB(244, 222, 120))
+        ct(cx, INT(SH * 0.45), sc_sm, "Bestzeit  " + score_label(lvl_best), RGB(244, 222, 120))
     END IF
 
     IF LEN(lvl_hint) > 0 THEN
@@ -2134,8 +2381,8 @@ END SUB
 SUB draw_password()
     DIM cx AS INTEGER
     cx = SW \ 2
-    ct(cx, INT(SH * 0.22), sc_med, "PASSWORT", RGB(110, 238, 226))
-    ct(cx, INT(SH * 0.31), sc_sm, "Set: " + set_name[sel_set], RGB(150, 162, 184))
+    glow_text(cx, INT(SH * 0.22), sc_med, "PASSWORT", RGB(110, 238, 226))
+    ct(cx, INT(SH * 0.31), sc_sm, "Set: " + sets[sel_set].name, RGB(150, 162, 184))
 
     ' Eingabefeld
     DIM disp AS STRING
@@ -2148,8 +2395,7 @@ SUB draw_password()
     by0 = INT(SH * 0.40)
     DIM bw AS INTEGER
     bw = INT(SW * 0.30)
-    BOX(cx - bw \ 2, by0, cx + bw \ 2, by0 + INT(SH * 0.10), RGB(20, 26, 38))
-    RECT(cx - bw \ 2, by0, cx + bw \ 2, by0 + INT(SH * 0.10), RGB(80, 200, 220))
+    glas_karte(cx - bw \ 2, by0, cx + bw \ 2, by0 + INT(SH * 0.10), RGB(80, 200, 220))
     ct(cx, by0 + INT(SH * 0.05), sc_big, disp, RGB(232, 238, 248))
     IF LEN(pw_msg) > 0 THEN
         ct(cx, INT(SH * 0.60), sc_med, pw_msg, RGB(245, 130, 130))
@@ -2161,43 +2407,46 @@ END SUB
 SUB draw_done()
     DIM cx AS INTEGER
     cx = SW \ 2
-    ct(cx, INT(SH * 0.34), sc_big, "ALLE LEVEL GESCHAFFT!", RGB(120, 244, 160))
+    glow_text(cx, INT(SH * 0.34), sc_big, "ALLE LEVEL GESCHAFFT!", RGB(120, 244, 160))
+    parade(INT(SH * 0.76))
     ct(cx, INT(SH * 0.50), sc_med, "Gut gemacht, Runner.", RGB(224, 230, 240))
     ct(cx, INT(SH * 0.64), sc_med, "LEER = Menue", RGB(200, 214, 232))
 END SUB
 
+' Sieg/Tod: eine Glas-Karte mitten ueber dem Brett -- das Brett bleibt
+' darunter zu sehen.
 SUB draw_overlay(kind AS STRING)
-    DIM cx AS INTEGER
-    cx = SW \ 2
-    DIM x0 AS INTEGER
-    DIM x1 AS INTEGER
-    DIM y0 AS INTEGER
-    DIM y1 AS INTEGER
-    x0 = INT(SW * 0.26)
-    x1 = INT(SW * 0.74)
-    y0 = INT(SH * 0.36)
-    y1 = INT(SH * 0.66)
+    DIM cx AS INTEGER : cx = board_x + bsize \ 2
+    DIM cy AS INTEGER : cy = board_y + bsize \ 2
+    DIM hb2 AS INTEGER : hb2 = INT(bsize * 0.40)
+    DIM x0 AS INTEGER : x0 = cx - hb2
+    DIM x1 AS INTEGER : x1 = cx + hb2
+    DIM zl AS INTEGER : zl = INT(BASEH * sc_sm * 1.7)
     IF kind = "win" THEN
-        BOX(x0, y0, x1, y1, RGB(14, 32, 24))
-        RECT(x0, y0, x1, y1, RGB(80, 222, 142))
-        ct(cx, INT(SH * 0.42), sc_big, "GESCHAFFT!", RGB(120, 244, 160))
-        ct(cx, INT(SH * 0.50), sc_med, "Zeit  " + score_label(win_secs), RGB(224, 234, 228))
+        DIM y0 AS INTEGER : y0 = cy - INT(bsize * 0.17)
+        DIM y1 AS INTEGER : y1 = cy + INT(bsize * 0.17)
+        glas_karte(x0, y0, x1, y1, RGB(80, 222, 142))
+        DIM yy AS INTEGER : yy = y0 + INT(bsize * 0.065)
+        glow_text(cx, yy, sc_big, "GESCHAFFT!", RGB(120, 244, 160))
+        yy = yy + INT(zl * 1.6)
+        ct(cx, yy, sc_med, "Zeit  " + score_label(win_secs), RGB(224, 234, 228))
+        yy = yy + zl
         IF new_record THEN
-            ct(cx, INT(SH * 0.555), sc_sm, "NEUER REKORD!", RGB(244, 222, 120))
+            glow_text(cx, yy, sc_sm, "NEUER REKORD!", RGB(244, 222, 120))
         ELSEIF lvl_best >= 0 THEN
-            ct(cx, INT(SH * 0.555), sc_sm, "Bestzeit  " + score_label(lvl_best), RGB(180, 200, 214))
+            ct(cx, yy, sc_sm, "Bestzeit  " + score_label(lvl_best), RGB(180, 200, 214))
         END IF
-
+        yy = yy + zl
         IF LEN(next_pw) > 0 THEN
-            ct(cx, INT(SH * 0.595), sc_sm, "Passwort Level " + STR$(cur_level + 2) + ":  " + next_pw, RGB(110, 238, 226))
+            ct(cx, yy, sc_sm, "Passwort Level " + STR$(cur_level + 2) + ":  " + next_pw, RGB(110, 238, 226))
         END IF
-
-        ct(cx, INT(SH * 0.635), sc_med, "LEER = weiter", RGB(204, 224, 214))
+        ct(cx, y1 - INT(zl * 0.9), sc_med, "LEER = weiter", RGB(204, 224, 214))
     ELSE
-        BOX(x0, y0, x1, y1, RGB(34, 16, 16))
-        RECT(x0, y0, x1, y1, RGB(224, 92, 92))
-        ct(cx, INT(SH * 0.47), sc_med, death_msg, RGB(246, 134, 134))
-        ct(cx, INT(SH * 0.55), sc_sm, "R / LEER = nochmal", RGB(232, 204, 204))
+        DIM ty0 AS INTEGER : ty0 = cy - INT(bsize * 0.11)
+        DIM ty1 AS INTEGER : ty1 = cy + INT(bsize * 0.11)
+        glas_karte(x0, ty0, x1, ty1, RGB(224, 92, 92))
+        glow_text(cx, cy - zl \ 2, sc_med, death_msg, RGB(250, 140, 140))
+        ct(cx, cy + INT(zl * 0.9), sc_sm, "R / LEER = nochmal", RGB(232, 204, 204))
     END IF
 END SUB
 
@@ -2268,20 +2517,21 @@ WINDOW_ESC_QUIT(FALSE)
 
 ' Eigenes Fenstersymbol statt des Standardsymbols der Laufzeit: der Daten-Chip
 ' aus dem Kachelsatz (Kachel T_CHIP, also Spalte 2 der obersten Zeile).
+' Kachelgroesse im Blatt aus tiles.json (make_tiles.dh schreibt sie mit)
+DIM kachel_js AS JSON_HANDLE : kachel_js = JSON_LOAD("assets/tiles.json")
+KP = JSON_GET_INT(kachel_js, "tile")
 DIM icon_sheet AS IMAGE : icon_sheet = LOADIMAGE("assets/tiles.png")
-WINDOW_ICON(IMAGE_CROP(icon_sheet, T_CHIP * TILE, 0, TILE, TILE))
+WINDOW_ICON(IMAGE_CROP(icon_sheet, T_CHIP * KP, 0, KP, KP))
 
 SW = SCREENWIDTH()
 SH = SCREENHEIGHT()
 
-' Board so gross wie moeglich (ganzzahlige Vergroesserung), HUD rechts daneben
-bscale = (SH * 92) \ (100 * BLOG)
-IF bscale < 1 THEN bscale = 1
-WHILE BLOG * bscale > (SW * 58) \ 100 AND bscale > 1
-    bscale = bscale - 1
-WEND
-
-bsize = BLOG * bscale
+' Board so gross wie moeglich -- stufenlos, die Kacheln werden weich
+' gefiltert (bis 2026-11 nur ganzzahlig vergroessert: auf 1080p blieb das
+' Brett bei 576 Punkten). HUD rechts daneben.
+bsize = (SH * 92) \ 100
+IF bsize > (SW * 58) \ 100 THEN bsize = (SW * 58) \ 100
+ts = bsize / VIEW
 board_x = INT(SW * 0.04)
 board_y = (SH - bsize) \ 2
 hud_x = board_x + bsize + INT(SW * 0.03)
@@ -2296,8 +2546,9 @@ dyv[2] = 1
 dxv[3] = 1
 dyv[3] = 0
 
-rtb = RENDERTARGET_NEW(BLOG, BLOG)
+rtb = RENDERTARGET_NEW(bsize, bsize)
 tiles = LOADIMAGE("assets/tiles.png")
+IMAGE_MIPMAPS(tiles)          ' weich verkleinern statt Pixeltreppe
 
 ' Soundeffekte laden (fehlt der Ordner, faellt sfx_* auf Synth-Toene zurueck)
 snd_ok = FALSE
@@ -2354,6 +2605,8 @@ scan_sets()
 sel_set = 0
 sav = SAVE_LOAD_OR_NEW(SAVEPATH)
 SAVE_SET_VERSION(sav, 1)
+mon_takt = SAVE_GET_INT_OR(sav, "einstellung/feindtempo", TAKT_RUHIG)
+IF mon_takt <> TAKT_ORIGINAL THEN mon_takt = TAKT_RUHIG
 cur_setkey = ""
 lvl_best = -1
 pw_input = ""
@@ -2373,6 +2626,7 @@ INPUT_BIND("password", KEY_P)
 INPUT_BIND("delchar", KEY_BACKSPACE)
 INPUT_BIND("continue", KEY_C)
 INPUT_BIND("mute", KEY_M)
+INPUT_BIND("tempo", KEY_T)
 INPUT_BIND("mus_down", KEY_F1)
 INPUT_BIND("mus_up", KEY_F2)
 INPUT_BIND("sfx_down", KEY_F3)
@@ -2401,7 +2655,7 @@ WHILE NOT QUITREQUESTED()
     IF NOT WINDOW_FOCUSED() THEN
         DIM pause_ms AS INTEGER : pause_ms = MILLIS()
         WHILE NOT WINDOW_FOCUSED() AND NOT QUITREQUESTED()
-            CLS(RGB(8, 10, 16))
+            hintergrund()
             ct(SCREENWIDTH() \ 2, SCREENHEIGHT() \ 2, 3.0, "PAUSE", RGB(244, 222, 120))
             FLIP()
         WEND
@@ -2409,6 +2663,7 @@ WHILE NOT QUITREQUESTED()
     END IF
 
     INPUT_UPDATE()
+    funken_weiter(MIN(DELTA(), 0.1))
     anim_ms = anim_ms + DELTA() * 1000.0
     IF anim_ms >= 520.0 THEN anim_ms = anim_ms - 520.0
     anim_frame = INT(anim_ms / 130.0) MOD 4
@@ -2451,31 +2706,27 @@ WHILE NOT QUITREQUESTED()
 
     IF state = "menu" THEN
         IF INPUT_PRESSED("back") THEN BREAK
+        IF INPUT_PRESSED("tempo") THEN tempo_umschalten()
         IF INPUT_PRESSED("up") AND sel_set > 0 THEN sel_set = sel_set - 1
-        IF INPUT_PRESSED("down") AND sel_set < nsets - 1 THEN sel_set = sel_set + 1
-        IF INPUT_PRESSED("confirm") AND nsets > 0 THEN
-            js = JSON_LOAD(set_path[sel_set])
-            nlevels = JSON_LEN(js, "levels")
-            cur_setkey = set_key(set_name[sel_set])
+        IF INPUT_PRESSED("down") AND sel_set < LEN(sets) - 1 THEN sel_set = sel_set + 1
+        IF INPUT_PRESSED("confirm") AND LEN(sets) > 0 THEN
+            set_laden()
             cur_level = 0
             load_level(cur_level)
             state = "intro"
         END IF
 
-        IF INPUT_PRESSED("password") AND nsets > 0 THEN
-            js = JSON_LOAD(set_path[sel_set])
-            nlevels = JSON_LEN(js, "levels")
-            cur_setkey = set_key(set_name[sel_set])
+        IF INPUT_PRESSED("password") AND LEN(sets) > 0 THEN
+            set_laden()
             pw_input = ""
             pw_msg = ""
             state = "password"
         END IF
 
-        IF INPUT_PRESSED("continue") AND nsets > 0 THEN
-            cur_setkey = set_key(set_name[sel_set])
+        IF INPUT_PRESSED("continue") AND LEN(sets) > 0 THEN
+            cur_setkey = set_key(sets[sel_set].name)
             IF SAVE_GET_INT_OR(sav, cur_setkey + "/max", 0) > 0 THEN
-                js = JSON_LOAD(set_path[sel_set])
-                nlevels = JSON_LEN(js, "levels")
+                set_laden()
                 cur_level = SAVE_GET_INT_OR(sav, cur_setkey + "/max", 0)
                 IF cur_level > nlevels - 1 THEN cur_level = nlevels - 1
                 IF cur_level < 0 THEN cur_level = 0
@@ -2556,7 +2807,7 @@ WHILE NOT QUITREQUESTED()
         RENDERTARGET_END()
     END IF
 
-    CLS(RGB(12, 16, 24))
+    hintergrund()
     IF state = "menu" THEN
         draw_menu()
     ELSEIF state = "password" THEN
@@ -2566,7 +2817,16 @@ WHILE NOT QUITREQUESTED()
     ELSEIF state = "done" THEN
         draw_done()
     ELSE
-        RENDERTARGET_DRAW(rtb, board_x, board_y, bscale)
+        ' Beim Tod wackelt das Brett kurz.
+        DIM wx AS INTEGER : wx = 0
+        DIM wy AS INTEGER : wy = 0
+        IF state = "dead" AND schreck_t < 0.35 THEN
+            DIM wst AS FLOAT : wst = (0.35 - schreck_t) * SH * 0.03
+            wx = INT(SIN(schreck_t * 90.0) * wst)
+            wy = INT(COS(schreck_t * 70.0) * wst)
+        END IF
+        brett_rahmen(board_x + wx, board_y + wy)
+        RENDERTARGET_DRAW(rtb, board_x + wx, board_y + wy, 1)
         draw_hud()
         IF state = "play" AND tat(px, py) = T_HINT THEN draw_hint()
         IF state = "win" THEN draw_overlay("win")

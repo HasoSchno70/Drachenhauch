@@ -18,6 +18,7 @@ Drachenhauch ist ein BASIC-Dialekt mit Pascal-strikter Typisierung und OOP, für
 ### Eingebaute Befehle
 
 - **[Standard-Built-ins](builtins-core.md)** — Math, Strings, Bitwise, Maps, File-I/O, Konvertierung, Zeit/Random
+- **[Befehlsnamen](builtins-namen.md)** — wie Befehle heißen, und die neuen Namen für die alten (`IMAGE_LOAD` statt `LOADIMAGE`, `KEY_DOWN` statt `KEYPRESSED` …)
 - **[Grafik-Built-ins](builtins-grafik.md)** — SCREEN, CLS, BOX, CIRCLE, LOADIMAGE, Sound, Tilemap, Eingabe, **`LOAD_ASSETS`** (Bulk-Preloader), **Sprite-Atlas + Batch-Draw**, **Z-Layer-Rendering**
 - **[Performance](intern/PERFORMANCE.md)** — historische Bench-Zahlen + Liste umgesetzter Optimierungen (die verglichenen Python-Pfade sind seit Stufe B entfernt; Produktion = `dhrt`)
 

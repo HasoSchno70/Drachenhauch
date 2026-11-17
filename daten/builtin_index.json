@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 2517,
+ "count": 2660,
  "builtins": [
   {
    "name": "ABS",
@@ -99,6 +99,12 @@
    "module": "core"
   },
   {
+   "name": "FILE_APPEND",
+   "kind": "core",
+   "signature": "FILE_APPEND(p: STRING, text: STRING [, kodierung$])",
+   "module": "core"
+  },
+  {
    "name": "APPROX",
    "kind": "core",
    "signature": "APPROX(a, b [, eps])",
@@ -126,6 +132,12 @@
    "name": "ARGPATH$",
    "kind": "core",
    "signature": "ARGPATH$(nummer) AS STRING",
+   "module": "dhrt"
+  },
+  {
+   "name": "ARG_PATH$",
+   "kind": "core",
+   "signature": "ARG_PATH$(nummer) AS STRING",
    "module": "dhrt"
   },
   {
@@ -681,6 +693,12 @@
    "module": "audio"
   },
   {
+   "name": "AUDIO_MUSIC_SET_PITCH",
+   "kind": "core",
+   "signature": "AUDIO_MUSIC_SET_PITCH(faktor)",
+   "module": "audio"
+  },
+  {
    "name": "AUDIO_MUSIC_PLAY",
    "kind": "core",
    "signature": "AUDIO_MUSIC_PLAY([loops[, fade_in_ms[, easing$]]])",
@@ -981,6 +999,12 @@
    "module": "core"
   },
   {
+   "name": "PATH_BASE",
+   "kind": "core",
+   "signature": "PATH_BASE(p: STRING)",
+   "module": "core"
+  },
+  {
    "name": "BATCH_DRAW",
    "kind": "graphics",
    "signature": "BATCH_DRAW(atlas, name: STRING, x, y [, tint: INTEGER])",
@@ -1032,6 +1056,12 @@
    "name": "BOXROUND",
    "kind": "graphics",
    "signature": "BOXROUND(x1, y1, x2, y2, radius[, color])",
+   "module": "core"
+  },
+  {
+   "name": "BOX_ROUND",
+   "kind": "graphics",
+   "signature": "BOX_ROUND(x1, y1, x2, y2, radius[, color])",
    "module": "core"
   },
   {
@@ -1194,6 +1224,12 @@
    "name": "BUFFER_AUS_ZEIGER",
    "kind": "core",
    "signature": "BUFFER_AUS_ZEIGER(zeiger, laenge) AS BUFFER",
+   "module": "dhrt"
+  },
+  {
+   "name": "BUFFER_FROM_POINTER",
+   "kind": "core",
+   "signature": "BUFFER_FROM_POINTER(zeiger, laenge) AS BUFFER",
    "module": "dhrt"
   },
   {
@@ -2217,6 +2253,12 @@
    "module": "core"
   },
   {
+   "name": "CIRCLE_OUTLINE",
+   "kind": "graphics",
+   "signature": "CIRCLE_OUTLINE(x, y, r[, color])",
+   "module": "core"
+  },
+  {
    "name": "CIRCLES",
    "kind": "graphics",
    "signature": "CIRCLES(xs, ys, rs, farbe [, anzahl])",
@@ -2292,6 +2334,12 @@
    "name": "CLOSEFILE",
    "kind": "core",
    "signature": "CLOSEFILE(f)",
+   "module": "core"
+  },
+  {
+   "name": "FILE_CLOSE",
+   "kind": "core",
+   "signature": "FILE_CLOSE(f)",
    "module": "core"
   },
   {
@@ -2442,6 +2490,12 @@
    "name": "COPYFILE",
    "kind": "core",
    "signature": "COPYFILE(src, dst)",
+   "module": "core"
+  },
+  {
+   "name": "FILE_COPY",
+   "kind": "core",
+   "signature": "FILE_COPY(src, dst)",
    "module": "core"
   },
   {
@@ -2787,6 +2841,12 @@
    "module": "dhrt"
   },
   {
+   "name": "FILE_DELETE",
+   "kind": "core",
+   "signature": "FILE_DELETE(pfad)",
+   "module": "dhrt"
+  },
+  {
    "name": "DELTA",
    "kind": "graphics",
    "signature": "DELTA()",
@@ -2799,9 +2859,21 @@
    "module": "core"
   },
   {
+   "name": "ARRAY_DIM_COUNT",
+   "kind": "core",
+   "signature": "ARRAY_DIM_COUNT(arr)",
+   "module": "core"
+  },
+  {
    "name": "DIMSIZE",
    "kind": "core",
    "signature": "DIMSIZE(arr, n)",
+   "module": "core"
+  },
+  {
+   "name": "ARRAY_DIM_SIZE",
+   "kind": "core",
+   "signature": "ARRAY_DIM_SIZE(arr, n)",
    "module": "core"
   },
   {
@@ -2811,9 +2883,21 @@
    "module": "dhrt"
   },
   {
+   "name": "DIR_EXISTS",
+   "kind": "core",
+   "signature": "DIR_EXISTS(pfad) AS BOOLEAN",
+   "module": "dhrt"
+  },
+  {
    "name": "DIRLIST",
    "kind": "core",
    "signature": "DIRLIST(pfad [, muster$]) AS ARRAY OF STRING",
+   "module": "dhrt"
+  },
+  {
+   "name": "DIR_LIST",
+   "kind": "core",
+   "signature": "DIR_LIST(pfad [, muster$]) AS ARRAY OF STRING",
    "module": "dhrt"
   },
   {
@@ -2823,9 +2907,21 @@
    "module": "dhrt"
   },
   {
+   "name": "DIR_LIST_REC",
+   "kind": "core",
+   "signature": "DIR_LIST_REC(pfad$ [, muster$]) AS ARRAY OF STRING",
+   "module": "dhrt"
+  },
+  {
    "name": "DIRNAME",
    "kind": "core",
    "signature": "DIRNAME(p: STRING)",
+   "module": "core"
+  },
+  {
+   "name": "PATH_DIR",
+   "kind": "core",
+   "signature": "PATH_DIR(p: STRING)",
    "module": "core"
   },
   {
@@ -2835,9 +2931,21 @@
    "module": "core"
   },
   {
+   "name": "FILE_SAME",
+   "kind": "core",
+   "signature": "FILE_SAME(a$, b$)",
+   "module": "core"
+  },
+  {
    "name": "REALPATH$",
    "kind": "core",
    "signature": "REALPATH$(pfad$)",
+   "module": "core"
+  },
+  {
+   "name": "PATH_REAL$",
+   "kind": "core",
+   "signature": "PATH_REAL$(pfad$)",
    "module": "core"
   },
   {
@@ -2847,9 +2955,21 @@
    "module": "core"
   },
   {
+   "name": "DRAW_IMAGE",
+   "kind": "graphics",
+   "signature": "DRAW_IMAGE(img, x, y)",
+   "module": "core"
+  },
+  {
    "name": "DRAWIMAGEFLIPPED",
    "kind": "graphics",
    "signature": "DRAWIMAGEFLIPPED(img, x, y[, flipX[, flipY]])",
+   "module": "core"
+  },
+  {
+   "name": "DRAW_IMAGE_FLIPPED",
+   "kind": "graphics",
+   "signature": "DRAW_IMAGE_FLIPPED(img, x, y[, flipX[, flipY]])",
    "module": "core"
   },
   {
@@ -2859,9 +2979,21 @@
    "module": "core"
   },
   {
+   "name": "DRAW_IMAGE_PART",
+   "kind": "graphics",
+   "signature": "DRAW_IMAGE_PART(img, sx, sy, sw, sh, x, y)",
+   "module": "core"
+  },
+  {
    "name": "DRAWIMAGEPARTEX",
    "kind": "graphics",
    "signature": "DRAWIMAGEPARTEX(img, sx, sy, sw, sh, x, y, w, h [, farbe])",
+   "module": "core"
+  },
+  {
+   "name": "DRAW_IMAGE_PART_EX",
+   "kind": "graphics",
+   "signature": "DRAW_IMAGE_PART_EX(img, sx, sy, sw, sh, x, y, w, h [, farbe])",
    "module": "core"
   },
   {
@@ -2871,9 +3003,21 @@
    "module": "core"
   },
   {
+   "name": "DRAW_IMAGE_ROT",
+   "kind": "graphics",
+   "signature": "DRAW_IMAGE_ROT(img, x, y, angle_deg [, scale [, tint]])",
+   "module": "core"
+  },
+  {
    "name": "DRAWTILEMAP",
    "kind": "graphics",
    "signature": "DRAWTILEMAP(tileset, map_arr, tw, th, sx, sy)",
+   "module": "core"
+  },
+  {
+   "name": "DRAW_TILEMAP",
+   "kind": "graphics",
+   "signature": "DRAW_TILEMAP(tileset, map_arr, tw, th, sx, sy)",
    "module": "core"
   },
   {
@@ -3081,9 +3225,21 @@
    "module": "core"
   },
   {
+   "name": "ELLIPSE_OUTLINE",
+   "kind": "graphics",
+   "signature": "ELLIPSE_OUTLINE(x1, y1, x2, y2[, color[, width]])",
+   "module": "core"
+  },
+  {
    "name": "ENDOFFILE",
    "kind": "core",
    "signature": "ENDOFFILE(f)",
+   "module": "core"
+  },
+  {
+   "name": "FILE_EOF",
+   "kind": "core",
+   "signature": "FILE_EOF(f)",
    "module": "core"
   },
   {
@@ -3345,6 +3501,12 @@
    "module": "core"
   },
   {
+   "name": "FILE_EXISTS",
+   "kind": "core",
+   "signature": "FILE_EXISTS(p: STRING)",
+   "module": "core"
+  },
+  {
    "name": "FILE_ENCODING$",
    "kind": "core",
    "signature": "FILE_ENCODING$(pfad) AS STRING",
@@ -3357,6 +3519,12 @@
    "module": "dhrt"
   },
   {
+   "name": "FILE_SIZE",
+   "kind": "core",
+   "signature": "FILE_SIZE(pfad) AS INTEGER",
+   "module": "dhrt"
+  },
+  {
    "name": "FILES_DROPPED",
    "kind": "graphics",
    "signature": "FILES_DROPPED() AS INTEGER",
@@ -3366,6 +3534,12 @@
    "name": "FILETIME",
    "kind": "core",
    "signature": "FILETIME(pfad$) AS INTEGER",
+   "module": "dhrt"
+  },
+  {
+   "name": "FILE_TIME",
+   "kind": "core",
+   "signature": "FILE_TIME(pfad$) AS INTEGER",
    "module": "dhrt"
   },
   {
@@ -3627,9 +3801,21 @@
    "module": "geld"
   },
   {
+   "name": "MONEY_ABS",
+   "kind": "core",
+   "signature": "MONEY_ABS(g: GELD) AS GELD",
+   "module": "geld"
+  },
+  {
    "name": "GELD_AUS_CENT",
    "kind": "core",
    "signature": "GELD_AUS_CENT(cent: INTEGER) AS GELD",
+   "module": "geld"
+  },
+  {
+   "name": "MONEY_FROM_CENTS",
+   "kind": "core",
+   "signature": "MONEY_FROM_CENTS(cent: INTEGER) AS GELD",
    "module": "geld"
   },
   {
@@ -3639,9 +3825,21 @@
    "module": "geld"
   },
   {
+   "name": "MONEY_CENTS",
+   "kind": "core",
+   "signature": "MONEY_CENTS(g: GELD) AS INTEGER",
+   "module": "geld"
+  },
+  {
    "name": "GELD_NEU",
    "kind": "core",
    "signature": "GELD_NEU(betrag) AS GELD",
+   "module": "geld"
+  },
+  {
+   "name": "MONEY_NEW",
+   "kind": "core",
+   "signature": "MONEY_NEW(betrag) AS GELD",
    "module": "geld"
   },
   {
@@ -3651,9 +3849,21 @@
    "module": "geld"
   },
   {
+   "name": "MONEY_ROUND",
+   "kind": "core",
+   "signature": "MONEY_ROUND(g: GELD [, stellen]) AS GELD",
+   "module": "geld"
+  },
+  {
    "name": "GELD_TEILEN",
    "kind": "core",
    "signature": "GELD_TEILEN(g: GELD, anzahl) AS ARRAY OF GELD",
+   "module": "geld"
+  },
+  {
+   "name": "MONEY_SPLIT",
+   "kind": "core",
+   "signature": "MONEY_SPLIT(g: GELD, anzahl) AS ARRAY OF GELD",
    "module": "geld"
   },
   {
@@ -3663,9 +3873,21 @@
    "module": "geld"
   },
   {
+   "name": "MONEY_TEXT$",
+   "kind": "core",
+   "signature": "MONEY_TEXT$(g: GELD [, symbol$]) AS STRING",
+   "module": "geld"
+  },
+  {
    "name": "GELD_ZAHL",
    "kind": "core",
    "signature": "GELD_ZAHL(g: GELD) AS FLOAT",
+   "module": "geld"
+  },
+  {
+   "name": "MONEY_VALUE",
+   "kind": "core",
+   "signature": "MONEY_VALUE(g: GELD) AS FLOAT",
    "module": "geld"
   },
   {
@@ -3771,15 +3993,33 @@
    "module": "core"
   },
   {
+   "name": "IMAGE_GET_ALPHA",
+   "kind": "graphics",
+   "signature": "IMAGE_GET_ALPHA(img, x, y)",
+   "module": "core"
+  },
+  {
    "name": "GETENV$",
    "kind": "core",
    "signature": "GETENV$(name, vorgabe = \"\") AS STRING",
    "module": "dhrt"
   },
   {
+   "name": "ENV_GET$",
+   "kind": "core",
+   "signature": "ENV_GET$(name, vorgabe = \"\") AS STRING",
+   "module": "dhrt"
+  },
+  {
    "name": "GETPIXEL",
    "kind": "graphics",
    "signature": "GETPIXEL(img, x, y)",
+   "module": "core"
+  },
+  {
+   "name": "IMAGE_GET_PIXEL",
+   "kind": "graphics",
+   "signature": "IMAGE_GET_PIXEL(img, x, y)",
    "module": "core"
   },
   {
@@ -3996,6 +4236,12 @@
    "name": "GUI_ACTIVE_TAB",
    "kind": "core",
    "signature": "GUI_ACTIVE_TAB(win) AS INTEGER",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_GET_ACTIVE_TAB",
+   "kind": "core",
+   "signature": "GUI_GET_ACTIVE_TAB(win) AS INTEGER",
    "module": "gui"
   },
   {
@@ -4263,6 +4509,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_GET_MOTION",
+   "kind": "core",
+   "signature": "GUI_GET_MOTION() AS BOOLEAN",
+   "module": "gui"
+  },
+  {
    "name": "GUI_INSPECTOR",
    "kind": "core",
    "signature": "GUI_INSPECTOR([an])",
@@ -4296,6 +4548,12 @@
    "name": "GUI_SOUNDS",
    "kind": "core",
    "signature": "GUI_SOUNDS() AS BOOLEAN",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_GET_SOUNDS",
+   "kind": "core",
+   "signature": "GUI_GET_SOUNDS() AS BOOLEAN",
    "module": "gui"
   },
   {
@@ -4398,6 +4656,12 @@
    "name": "GUI_CHECKED",
    "kind": "core",
    "signature": "GUI_CHECKED(wdg)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_GET_CHECKED",
+   "kind": "core",
+   "signature": "GUI_GET_CHECKED(wdg)",
    "module": "gui"
   },
   {
@@ -4683,6 +4947,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_GET_DATE$",
+   "kind": "core",
+   "signature": "GUI_GET_DATE$(picker)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_DATEFIELD",
    "kind": "core",
    "signature": "GUI_DATEFIELD(win, x, y, w, h)",
@@ -4797,9 +5067,21 @@
    "module": "gui"
   },
   {
+   "name": "GUI_DOCK_SET_TITLE",
+   "kind": "core",
+   "signature": "GUI_DOCK_SET_TITLE(win, name$, titel$)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_DOCK_TITLE$",
    "kind": "core",
    "signature": "GUI_DOCK_TITLE$(win, name$) AS STRING",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_DOCK_GET_TITLE$",
+   "kind": "core",
+   "signature": "GUI_DOCK_GET_TITLE$(win, name$) AS STRING",
    "module": "gui"
   },
   {
@@ -4836,6 +5118,12 @@
    "name": "GUI_DOCK_SIZE",
    "kind": "core",
    "signature": "GUI_DOCK_SIZE(win, bereich$, px)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_DOCK_SET_SIZE",
+   "kind": "core",
+   "signature": "GUI_DOCK_SET_SIZE(win, bereich$, px)",
    "module": "gui"
   },
   {
@@ -5019,6 +5307,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_GET_ENABLED",
+   "kind": "core",
+   "signature": "GUI_GET_ENABLED(wdg)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_ENTERED",
    "kind": "core",
    "signature": "GUI_ENTERED(tf)",
@@ -5028,6 +5322,12 @@
    "name": "GUI_ERROR",
    "kind": "core",
    "signature": "GUI_ERROR(feld)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_GET_ERROR$",
+   "kind": "core",
+   "signature": "GUI_GET_ERROR$(feld)",
    "module": "gui"
   },
   {
@@ -5811,6 +6111,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_GET_PICKED_COLOR",
+   "kind": "core",
+   "signature": "GUI_GET_PICKED_COLOR(picker)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_PROGRESS",
    "kind": "core",
    "signature": "GUI_PROGRESS(win, x, y, w, h)",
@@ -6075,6 +6381,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_DROPDOWN_ITEMS",
+   "kind": "core",
+   "signature": "GUI_DROPDOWN_ITEMS(dd, items)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_SET_ENABLED",
    "kind": "core",
    "signature": "GUI_SET_ENABLED(wdg, on)",
@@ -6150,6 +6462,12 @@
    "name": "GUI_SET_LISTBOX",
    "kind": "core",
    "signature": "GUI_SET_LISTBOX(lb, items)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_LISTBOX_ITEMS",
+   "kind": "core",
+   "signature": "GUI_LISTBOX_ITEMS(lb, items)",
    "module": "gui"
   },
   {
@@ -6339,9 +6657,21 @@
    "module": "gui"
   },
   {
+   "name": "GUI_STATUSBAR_SET_TIP",
+   "kind": "core",
+   "signature": "GUI_STATUSBAR_SET_TIP(sb, feld, tip$)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_STATUSBAR_TIP$",
    "kind": "core",
    "signature": "GUI_STATUSBAR_TIP$(sb, feld) AS STRING",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_STATUSBAR_GET_TIP$",
+   "kind": "core",
+   "signature": "GUI_STATUSBAR_GET_TIP$(sb, feld) AS STRING",
    "module": "gui"
   },
   {
@@ -6801,6 +7131,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_GET_TEXT$",
+   "kind": "core",
+   "signature": "GUI_GET_TEXT$(wdg)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_TEXTAREA",
    "kind": "core",
    "signature": "GUI_TEXTAREA(win, x, y, w, h[, platzhalter$])",
@@ -7191,6 +7527,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_GET_TIME$",
+   "kind": "core",
+   "signature": "GUI_GET_TIME$(tp) AS STRING",
+   "module": "gui"
+  },
+  {
    "name": "GUI_TIMEPICKER",
    "kind": "core",
    "signature": "GUI_TIMEPICKER(win, x, y, w = 0, h = 0) AS GUI_WIDGET",
@@ -7353,9 +7695,21 @@
    "module": "gui"
   },
   {
+   "name": "GUI_SET_TOOLTIP",
+   "kind": "core",
+   "signature": "GUI_SET_TOOLTIP(wdg, text)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_TOOLTIP$",
    "kind": "core",
    "signature": "GUI_TOOLTIP$(wdg) AS STRING",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_GET_TOOLTIP$",
+   "kind": "core",
+   "signature": "GUI_GET_TOOLTIP$(wdg) AS STRING",
    "module": "gui"
   },
   {
@@ -7575,9 +7929,21 @@
    "module": "gui"
   },
   {
+   "name": "GUI_GET_VALUE",
+   "kind": "core",
+   "signature": "GUI_GET_VALUE(wdg)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_VISIBLE",
    "kind": "core",
    "signature": "GUI_VISIBLE(wdg)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_GET_VISIBLE",
+   "kind": "core",
+   "signature": "GUI_GET_VISIBLE(wdg)",
    "module": "gui"
   },
   {
@@ -8499,6 +8865,12 @@
    "module": "input"
   },
   {
+   "name": "INPUT_DOWN",
+   "kind": "core",
+   "signature": "INPUT_DOWN(action: STRING)",
+   "module": "input"
+  },
+  {
    "name": "INPUT_JOY_AXIS",
    "kind": "core",
    "signature": "INPUT_JOY_AXIS(pad_idx: INTEGER, axis_name: STRING)",
@@ -8520,6 +8892,12 @@
    "name": "INPUT_PRESSED",
    "kind": "core",
    "signature": "INPUT_PRESSED(action: STRING)",
+   "module": "input"
+  },
+  {
+   "name": "INPUT_HIT",
+   "kind": "core",
+   "signature": "INPUT_HIT(action: STRING)",
    "module": "input"
   },
   {
@@ -8634,6 +9012,12 @@
    "name": "JOYSTICK_BUTTON",
    "kind": "graphics",
    "signature": "JOYSTICK_BUTTON(idx: Zahl, btn: Zahl)",
+   "module": "core"
+  },
+  {
+   "name": "JOYSTICK_DOWN",
+   "kind": "graphics",
+   "signature": "JOYSTICK_DOWN(idx: Zahl, btn: Zahl)",
    "module": "core"
   },
   {
@@ -8865,9 +9249,21 @@
    "module": "core"
   },
   {
+   "name": "KEY_HIT",
+   "kind": "graphics",
+   "signature": "KEY_HIT(taste: Code oder Buchstabe) -> BOOLEAN",
+   "module": "core"
+  },
+  {
    "name": "KEYPRESSED",
    "kind": "graphics",
    "signature": "KEYPRESSED(taste: Code oder Buchstabe)",
+   "module": "core"
+  },
+  {
+   "name": "KEY_DOWN",
+   "kind": "graphics",
+   "signature": "KEY_DOWN(taste: Code oder Buchstabe)",
    "module": "core"
   },
   {
@@ -8877,9 +9273,21 @@
    "module": "core"
   },
   {
+   "name": "KEY_RELEASED",
+   "kind": "graphics",
+   "signature": "KEY_RELEASED(taste: Code oder Buchstabe) -> BOOLEAN",
+   "module": "core"
+  },
+  {
    "name": "KEYREPEAT",
    "kind": "graphics",
    "signature": "KEYREPEAT(taste: Code oder Buchstabe) -> BOOLEAN",
+   "module": "core"
+  },
+  {
+   "name": "KEY_REPEAT",
+   "kind": "graphics",
+   "signature": "KEY_REPEAT(taste: Code oder Buchstabe) -> BOOLEAN",
    "module": "core"
   },
   {
@@ -9057,9 +9465,21 @@
    "module": "core"
   },
   {
+   "name": "FONT_LOAD",
+   "kind": "graphics",
+   "signature": "FONT_LOAD(pfad$, groesse[, zeichen$])",
+   "module": "core"
+  },
+  {
    "name": "LOADFONT_IMAGE",
    "kind": "graphics",
    "signature": "LOADFONT_IMAGE(bild: IMAGE, trennfarbe: Zahl, erstes_zeichen: Zahl) -> FONT",
+   "module": "core"
+  },
+  {
+   "name": "FONT_LOAD_IMAGE",
+   "kind": "graphics",
+   "signature": "FONT_LOAD_IMAGE(bild: IMAGE, trennfarbe: Zahl, erstes_zeichen: Zahl) -> FONT",
    "module": "core"
   },
   {
@@ -9069,15 +9489,33 @@
    "module": "core"
   },
   {
+   "name": "IMAGE_LOAD",
+   "kind": "graphics",
+   "signature": "IMAGE_LOAD(path: STRING)",
+   "module": "core"
+  },
+  {
    "name": "LOADMODEL",
    "kind": "graphics",
    "signature": "LOADMODEL(pfad$: STRING) AS INTEGER",
    "module": "g3d"
   },
   {
+   "name": "MODEL_LOAD",
+   "kind": "graphics",
+   "signature": "MODEL_LOAD(pfad$: STRING) AS INTEGER",
+   "module": "g3d"
+  },
+  {
    "name": "LOADSOUND",
    "kind": "graphics",
    "signature": "LOADSOUND(path: STRING)",
+   "module": "core"
+  },
+  {
+   "name": "SOUND_LOAD",
+   "kind": "graphics",
+   "signature": "SOUND_LOAD(path: STRING)",
    "module": "core"
   },
   {
@@ -9147,9 +9585,21 @@
    "module": "core"
   },
   {
+   "name": "MAP_CLEAR",
+   "kind": "core",
+   "signature": "MAP_CLEAR(m)",
+   "module": "core"
+  },
+  {
    "name": "MAPGET",
    "kind": "core",
    "signature": "MAPGET(m, k)",
+   "module": "core"
+  },
+  {
+   "name": "MAP_GET",
+   "kind": "core",
+   "signature": "MAP_GET(m, k)",
    "module": "core"
   },
   {
@@ -9159,9 +9609,21 @@
    "module": "core"
   },
   {
+   "name": "MAP_GET_OR",
+   "kind": "core",
+   "signature": "MAP_GET_OR(m, k, default)",
+   "module": "core"
+  },
+  {
    "name": "MAPHAS",
    "kind": "core",
    "signature": "MAPHAS(m, k)",
+   "module": "core"
+  },
+  {
+   "name": "MAP_HAS",
+   "kind": "core",
+   "signature": "MAP_HAS(m, k)",
    "module": "core"
   },
   {
@@ -9171,9 +9633,21 @@
    "module": "core"
   },
   {
+   "name": "MAP_ITEMS",
+   "kind": "core",
+   "signature": "MAP_ITEMS(m)",
+   "module": "core"
+  },
+  {
    "name": "MAPKEYS",
    "kind": "core",
    "signature": "MAPKEYS(m)",
+   "module": "core"
+  },
+  {
+   "name": "MAP_KEYS",
+   "kind": "core",
+   "signature": "MAP_KEYS(m)",
    "module": "core"
   },
   {
@@ -9183,9 +9657,21 @@
    "module": "core"
   },
   {
+   "name": "MAP_PUT",
+   "kind": "core",
+   "signature": "MAP_PUT(m, k, v)",
+   "module": "core"
+  },
+  {
    "name": "MAPREMOVE",
    "kind": "core",
    "signature": "MAPREMOVE(m, k)",
+   "module": "core"
+  },
+  {
+   "name": "MAP_REMOVE",
+   "kind": "core",
+   "signature": "MAP_REMOVE(m, k)",
    "module": "core"
   },
   {
@@ -9195,9 +9681,21 @@
    "module": "core"
   },
   {
+   "name": "MAP_COUNT",
+   "kind": "core",
+   "signature": "MAP_COUNT(m)",
+   "module": "core"
+  },
+  {
    "name": "MAPVALUES",
    "kind": "core",
    "signature": "MAPVALUES(m)",
+   "module": "core"
+  },
+  {
+   "name": "MAP_VALUES",
+   "kind": "core",
+   "signature": "MAP_VALUES(m)",
    "module": "core"
   },
   {
@@ -9885,9 +10383,21 @@
    "module": "core"
   },
   {
+   "name": "MOUSE_DOWN",
+   "kind": "graphics",
+   "signature": "MOUSE_DOWN(n: Zahl)",
+   "module": "core"
+  },
+  {
    "name": "MOUSEWHEEL",
    "kind": "graphics",
    "signature": "MOUSEWHEEL()",
+   "module": "core"
+  },
+  {
+   "name": "MOUSE_WHEEL",
+   "kind": "graphics",
+   "signature": "MOUSE_WHEEL()",
    "module": "core"
   },
   {
@@ -9897,9 +10407,21 @@
    "module": "core"
   },
   {
+   "name": "MOUSE_WHEEL_X",
+   "kind": "graphics",
+   "signature": "MOUSE_WHEEL_X() -> FLOAT",
+   "module": "core"
+  },
+  {
    "name": "MOUSEWHEEL_Y",
    "kind": "graphics",
    "signature": "MOUSEWHEEL_Y() -> FLOAT",
+   "module": "core"
+  },
+  {
+   "name": "MOUSE_WHEEL_Y",
+   "kind": "graphics",
+   "signature": "MOUSE_WHEEL_Y() -> FLOAT",
    "module": "core"
   },
   {
@@ -9909,9 +10431,21 @@
    "module": "core"
   },
   {
+   "name": "MOUSE_X",
+   "kind": "graphics",
+   "signature": "MOUSE_X()",
+   "module": "core"
+  },
+  {
    "name": "MOUSEY",
    "kind": "graphics",
    "signature": "MOUSEY()",
+   "module": "core"
+  },
+  {
+   "name": "MOUSE_Y",
+   "kind": "graphics",
+   "signature": "MOUSE_Y()",
    "module": "core"
   },
   {
@@ -9993,9 +10527,21 @@
    "module": "core"
   },
   {
+   "name": "MOUSE_SET_VISIBLE",
+   "kind": "graphics",
+   "signature": "MOUSE_SET_VISIBLE(an: BOOLEAN)",
+   "module": "core"
+  },
+  {
    "name": "MOVETOWARD",
    "kind": "core",
    "signature": "MOVETOWARD(cur, ziel, maxdelta)",
+   "module": "core"
+  },
+  {
+   "name": "MOVE_TOWARD",
+   "kind": "core",
+   "signature": "MOVE_TOWARD(cur, ziel, maxdelta)",
    "module": "core"
   },
   {
@@ -10263,15 +10809,33 @@
    "module": "dhrt"
   },
   {
+   "name": "DOC_OPEN",
+   "kind": "core",
+   "signature": "DOC_OPEN(pfad$)",
+   "module": "dhrt"
+  },
+  {
    "name": "OPENFILE",
    "kind": "core",
    "signature": "OPENFILE(path: STRING, mode: STRING [, kodierung$])",
    "module": "core"
   },
   {
+   "name": "FILE_OPEN",
+   "kind": "core",
+   "signature": "FILE_OPEN(path: STRING, mode: STRING [, kodierung$])",
+   "module": "core"
+  },
+  {
    "name": "OPENURL",
    "kind": "graphics",
    "signature": "OPENURL(adresse: STRING)",
+   "module": "core"
+  },
+  {
+   "name": "URL_OPEN",
+   "kind": "graphics",
+   "signature": "URL_OPEN(adresse: STRING)",
    "module": "core"
   },
   {
@@ -10410,6 +10974,12 @@
    "name": "PATHJOIN",
    "kind": "core",
    "signature": "PATHJOIN(a, b, ...) AS STRING",
+   "module": "dhrt"
+  },
+  {
+   "name": "PATH_JOIN",
+   "kind": "core",
+   "signature": "PATH_JOIN(a, b, ...) AS STRING",
    "module": "dhrt"
   },
   {
@@ -11043,9 +11613,21 @@
    "module": "core"
   },
   {
+   "name": "MUSIC_PLAY",
+   "kind": "graphics",
+   "signature": "MUSIC_PLAY(path$[, loops[, volume]])",
+   "module": "core"
+  },
+  {
    "name": "PLAYSOUND",
    "kind": "graphics",
    "signature": "PLAYSOUND(s[, loops[, volume]])",
+   "module": "core"
+  },
+  {
+   "name": "SOUND_PLAY",
+   "kind": "graphics",
+   "signature": "SOUND_PLAY(s[, loops[, volume]])",
    "module": "core"
   },
   {
@@ -11076,6 +11658,12 @@
    "name": "POLYGONOUTLINE",
    "kind": "graphics",
    "signature": "POLYGONOUTLINE(points[, color[, width]])",
+   "module": "core"
+  },
+  {
+   "name": "POLYGON_OUTLINE",
+   "kind": "graphics",
+   "signature": "POLYGON_OUTLINE(points[, color[, width]])",
    "module": "core"
   },
   {
@@ -11259,9 +11847,21 @@
    "module": "core"
   },
   {
+   "name": "QUIT_REQUESTED",
+   "kind": "graphics",
+   "signature": "QUIT_REQUESTED()",
+   "module": "core"
+  },
+  {
    "name": "STARTDIR$",
    "kind": "core",
    "signature": "STARTDIR$() AS STRING",
+   "module": "dhrt"
+  },
+  {
+   "name": "START_DIR$",
+   "kind": "core",
+   "signature": "START_DIR$() AS STRING",
    "module": "dhrt"
   },
   {
@@ -11373,9 +11973,21 @@
    "module": "core"
   },
   {
+   "name": "FILE_READ$",
+   "kind": "core",
+   "signature": "FILE_READ$(f [, kodierung$])",
+   "module": "core"
+  },
+  {
    "name": "READALL_BYTES",
    "kind": "core",
    "signature": "READALL_BYTES(pfad) AS BUFFER",
+   "module": "dhrt"
+  },
+  {
+   "name": "FILE_READ_BYTES",
+   "kind": "core",
+   "signature": "FILE_READ_BYTES(pfad) AS BUFFER",
    "module": "dhrt"
   },
   {
@@ -11385,9 +11997,21 @@
    "module": "core"
   },
   {
+   "name": "FILE_READ_LINE$",
+   "kind": "core",
+   "signature": "FILE_READ_LINE$(f)",
+   "module": "core"
+  },
+  {
    "name": "READLINES",
    "kind": "core",
    "signature": "READLINES(pfad [, kodierung$]) AS ARRAY OF STRING",
+   "module": "dhrt"
+  },
+  {
+   "name": "FILE_READ_LINES",
+   "kind": "core",
+   "signature": "FILE_READ_LINES(pfad [, kodierung$]) AS ARRAY OF STRING",
    "module": "dhrt"
   },
   {
@@ -11406,6 +12030,12 @@
    "name": "RECTROUND",
    "kind": "graphics",
    "signature": "RECTROUND(x1, y1, x2, y2, radius[, color])",
+   "module": "core"
+  },
+  {
+   "name": "RECT_ROUND",
+   "kind": "graphics",
+   "signature": "RECT_ROUND(x1, y1, x2, y2, radius[, color])",
    "module": "core"
   },
   {
@@ -11658,6 +12288,12 @@
    "name": "SAVESCREENSHOT",
    "kind": "graphics",
    "signature": "SAVESCREENSHOT(path: STRING)",
+   "module": "core"
+  },
+  {
+   "name": "SCREENSHOT_SAVE",
+   "kind": "graphics",
+   "signature": "SCREENSHOT_SAVE(path: STRING)",
    "module": "core"
   },
   {
@@ -11961,9 +12597,21 @@
    "module": "core"
   },
   {
+   "name": "SCREEN_HEIGHT",
+   "kind": "graphics",
+   "signature": "SCREEN_HEIGHT()",
+   "module": "core"
+  },
+  {
    "name": "SCREENWIDTH",
    "kind": "graphics",
    "signature": "SCREENWIDTH()",
+   "module": "core"
+  },
+  {
+   "name": "SCREEN_WIDTH",
+   "kind": "graphics",
+   "signature": "SCREEN_WIDTH()",
    "module": "core"
   },
   {
@@ -12081,9 +12729,21 @@
    "module": "dhrt"
   },
   {
+   "name": "ENV_SET",
+   "kind": "core",
+   "signature": "ENV_SET(name, wert)",
+   "module": "dhrt"
+  },
+  {
    "name": "SETFONT",
    "kind": "graphics",
    "signature": "SETFONT(handle: INTEGER [, groesse: INTEGER])",
+   "module": "core"
+  },
+  {
+   "name": "FONT_SET",
+   "kind": "graphics",
+   "signature": "FONT_SET(handle: INTEGER [, groesse: INTEGER])",
    "module": "core"
   },
   {
@@ -12093,9 +12753,21 @@
    "module": "core"
   },
   {
+   "name": "WINDOW_SET_FPS",
+   "kind": "graphics",
+   "signature": "WINDOW_SET_FPS(n: INTEGER)",
+   "module": "core"
+  },
+  {
    "name": "SETWINDOWTITLE",
    "kind": "graphics",
    "signature": "SETWINDOWTITLE(title: STRING)",
+   "module": "core"
+  },
+  {
+   "name": "WINDOW_SET_TITLE",
+   "kind": "graphics",
+   "signature": "WINDOW_SET_TITLE(title: STRING)",
    "module": "core"
   },
   {
@@ -12114,6 +12786,12 @@
    "name": "SET_FULLSCREEN",
    "kind": "graphics",
    "signature": "SET_FULLSCREEN(fs: BOOLEAN)",
+   "module": "core"
+  },
+  {
+   "name": "WINDOW_SET_FULLSCREEN",
+   "kind": "graphics",
+   "signature": "WINDOW_SET_FULLSCREEN(fs: BOOLEAN)",
    "module": "core"
   },
   {
@@ -12141,15 +12819,33 @@
    "module": "dhrt"
   },
   {
+   "name": "SET_COUNT",
+   "kind": "core",
+   "signature": "SET_COUNT(menge) AS INTEGER",
+   "module": "dhrt"
+  },
+  {
    "name": "SET_WINDOW_MONITOR",
    "kind": "graphics",
    "signature": "SET_WINDOW_MONITOR(i: INTEGER)",
    "module": "dhrt"
   },
   {
+   "name": "WINDOW_SET_MONITOR",
+   "kind": "graphics",
+   "signature": "WINDOW_SET_MONITOR(i: INTEGER)",
+   "module": "dhrt"
+  },
+  {
    "name": "SET_WINDOW_POS",
    "kind": "graphics",
    "signature": "SET_WINDOW_POS(x: INTEGER, y: INTEGER)",
+   "module": "dhrt"
+  },
+  {
+   "name": "WINDOW_SET_POS",
+   "kind": "graphics",
+   "signature": "WINDOW_SET_POS(x: INTEGER, y: INTEGER)",
    "module": "dhrt"
   },
   {
@@ -12747,9 +13443,21 @@
    "module": "core"
   },
   {
+   "name": "MUSIC_STOP",
+   "kind": "graphics",
+   "signature": "MUSIC_STOP()",
+   "module": "core"
+  },
+  {
    "name": "STOPSOUND",
    "kind": "graphics",
    "signature": "STOPSOUND(s)",
+   "module": "core"
+  },
+  {
+   "name": "SOUND_STOP",
+   "kind": "graphics",
+   "signature": "SOUND_STOP(s)",
    "module": "core"
   },
   {
@@ -12882,6 +13590,12 @@
    "name": "TEXT_AUS_ZEIGER$",
    "kind": "core",
    "signature": "TEXT_AUS_ZEIGER$(zeiger [, breit]) AS STRING",
+   "module": "dhrt"
+  },
+  {
+   "name": "TEXT_FROM_POINTER$",
+   "kind": "core",
+   "signature": "TEXT_FROM_POINTER$(zeiger [, breit]) AS STRING",
    "module": "dhrt"
   },
   {
@@ -13359,6 +14073,12 @@
    "module": "core"
   },
   {
+   "name": "TRIANGLE_OUTLINE",
+   "kind": "graphics",
+   "signature": "TRIANGLE_OUTLINE(x1, y1, x2, y2, x3, y3[, color[, width]])",
+   "module": "core"
+  },
+  {
    "name": "TRIM",
    "kind": "core",
    "signature": "TRIM$(s: STRING)",
@@ -13590,6 +14310,12 @@
    "name": "UNLOADSOUND",
    "kind": "graphics",
    "signature": "UNLOADSOUND(s)",
+   "module": "core"
+  },
+  {
+   "name": "SOUND_FREE",
+   "kind": "graphics",
+   "signature": "SOUND_FREE(s)",
    "module": "core"
   },
   {
@@ -14061,6 +14787,12 @@
    "module": "core"
   },
   {
+   "name": "KEY_WAIT",
+   "kind": "graphics",
+   "signature": "KEY_WAIT()",
+   "module": "core"
+  },
+  {
    "name": "WEIGHTED_CHOICE",
    "kind": "core",
    "signature": "WEIGHTED_CHOICE(werte, gewichte)",
@@ -14313,15 +15045,33 @@
    "module": "dhrt"
   },
   {
+   "name": "FILE_WRITE",
+   "kind": "core",
+   "signature": "FILE_WRITE(pfad, text [, kodierung$])",
+   "module": "dhrt"
+  },
+  {
    "name": "WRITEALL_BYTES",
    "kind": "core",
    "signature": "WRITEALL_BYTES(pfad, puffer)",
    "module": "dhrt"
   },
   {
+   "name": "FILE_WRITE_BYTES",
+   "kind": "core",
+   "signature": "FILE_WRITE_BYTES(pfad, puffer)",
+   "module": "dhrt"
+  },
+  {
    "name": "WRITELINE",
    "kind": "core",
    "signature": "WRITELINE(f, text)",
+   "module": "core"
+  },
+  {
+   "name": "FILE_WRITE_LINE",
+   "kind": "core",
+   "signature": "FILE_WRITE_LINE(f, text)",
    "module": "core"
   },
   {
@@ -14487,9 +15237,21 @@
    "module": "zeit"
   },
   {
+   "name": "TIME_FROM_PARTS",
+   "kind": "core",
+   "signature": "TIME_FROM_PARTS(jahr: INTEGER, monat: INTEGER, tag: INTEGER, stunde: INTEGER = 0, minute: INTEGER = 0, sekunde: INTEGER = 0) AS INTEGER",
+   "module": "zeit"
+  },
+  {
    "name": "ZEIT_DAUER$",
    "kind": "core",
    "signature": "ZEIT_DAUER$(sekunden: INTEGER) AS STRING",
+   "module": "zeit"
+  },
+  {
+   "name": "TIME_DURATION$",
+   "kind": "core",
+   "signature": "TIME_DURATION$(sekunden: INTEGER) AS STRING",
    "module": "zeit"
   },
   {
@@ -14499,9 +15261,21 @@
    "module": "zeit"
   },
   {
+   "name": "TIME_DIFF",
+   "kind": "core",
+   "signature": "TIME_DIFF(zeit: INTEGER, frueher: INTEGER) AS INTEGER",
+   "module": "zeit"
+  },
+  {
    "name": "ZEIT_FORMAT$",
    "kind": "core",
    "signature": "ZEIT_FORMAT$(zeit: INTEGER, muster: STRING) AS STRING",
+   "module": "zeit"
+  },
+  {
+   "name": "TIME_FORMAT$",
+   "kind": "core",
+   "signature": "TIME_FORMAT$(zeit: INTEGER, muster: STRING) AS STRING",
    "module": "zeit"
   },
   {
@@ -14511,9 +15285,21 @@
    "module": "zeit"
   },
   {
+   "name": "TIME_NOW",
+   "kind": "core",
+   "signature": "TIME_NOW() AS INTEGER",
+   "module": "zeit"
+  },
+  {
    "name": "ZEIT_UNIX",
    "kind": "core",
    "signature": "ZEIT_UNIX() AS FLOAT",
+   "module": "zeit"
+  },
+  {
+   "name": "TIME_UNIX",
+   "kind": "core",
+   "signature": "TIME_UNIX() AS FLOAT",
    "module": "zeit"
   },
   {
@@ -14523,9 +15309,21 @@
    "module": "zeit"
   },
   {
+   "name": "TIME_FROM_UNIX",
+   "kind": "core",
+   "signature": "TIME_FROM_UNIX(unix_sekunden) AS INTEGER",
+   "module": "zeit"
+  },
+  {
    "name": "ZEIT_NACH_UNIX",
    "kind": "core",
    "signature": "ZEIT_NACH_UNIX(zeit) AS INTEGER",
+   "module": "zeit"
+  },
+  {
+   "name": "TIME_TO_UNIX",
+   "kind": "core",
+   "signature": "TIME_TO_UNIX(zeit) AS INTEGER",
    "module": "zeit"
   },
   {
@@ -14535,9 +15333,21 @@
    "module": "zeit"
   },
   {
+   "name": "TIME_CAN_PARSE",
+   "kind": "core",
+   "signature": "TIME_CAN_PARSE(text: STRING) AS BOOLEAN",
+   "module": "zeit"
+  },
+  {
    "name": "ZEIT_PARSE",
    "kind": "core",
    "signature": "ZEIT_PARSE(text: STRING) AS INTEGER",
+   "module": "zeit"
+  },
+  {
+   "name": "TIME_PARSE",
+   "kind": "core",
+   "signature": "TIME_PARSE(text: STRING) AS INTEGER",
    "module": "zeit"
   },
   {
@@ -14547,9 +15357,21 @@
    "module": "zeit"
   },
   {
+   "name": "TIME_ADD",
+   "kind": "core",
+   "signature": "TIME_ADD(zeit: INTEGER, sekunden: INTEGER) AS INTEGER",
+   "module": "zeit"
+  },
+  {
    "name": "ZEIT_TEIL",
    "kind": "core",
    "signature": "ZEIT_TEIL(zeit: INTEGER, feld: STRING) AS INTEGER",
+   "module": "zeit"
+  },
+  {
+   "name": "TIME_PART",
+   "kind": "core",
+   "signature": "TIME_PART(zeit: INTEGER, feld: STRING) AS INTEGER",
    "module": "zeit"
   },
   {
@@ -14559,9 +15381,21 @@
    "module": "zeit"
   },
   {
+   "name": "TIME_TEXT$",
+   "kind": "core",
+   "signature": "TIME_TEXT$(zeit: INTEGER) AS STRING",
+   "module": "zeit"
+  },
+  {
    "name": "ZEIT_WOCHENTAG",
    "kind": "core",
    "signature": "ZEIT_WOCHENTAG(zeit: INTEGER) AS INTEGER",
+   "module": "zeit"
+  },
+  {
+   "name": "TIME_WEEKDAY",
+   "kind": "core",
+   "signature": "TIME_WEEKDAY(zeit: INTEGER) AS INTEGER",
    "module": "zeit"
   },
   {
@@ -14655,6 +15489,12 @@
    "module": "core"
   },
   {
+   "name": "PIE_OUTLINE",
+   "kind": "graphics",
+   "signature": "PIE_OUTLINE(x, y, r, von_grad, bis_grad[, farbe])",
+   "module": "core"
+  },
+  {
    "name": "CIRCLE_GRADIENT",
    "kind": "graphics",
    "signature": "CIRCLE_GRADIENT(x, y, r, innen, aussen)",
@@ -14685,6 +15525,12 @@
    "module": "core"
   },
   {
+   "name": "NGON_OUTLINE",
+   "kind": "graphics",
+   "signature": "NGON_OUTLINE(x, y, ecken, r, winkel[, farbe[, breite]])",
+   "module": "core"
+  },
+  {
    "name": "LINEDASHED",
    "kind": "graphics",
    "signature": "LINEDASHED(x1, y1, x2, y2, strich, luecke[, farbe])",
@@ -14694,6 +15540,12 @@
    "name": "DRAWIMAGE9",
    "kind": "graphics",
    "signature": "DRAWIMAGE9(bild, x, y, breite, hoehe, links, oben, rechts, unten[, farbe])",
+   "module": "core"
+  },
+  {
+   "name": "DRAW_IMAGE_9",
+   "kind": "graphics",
+   "signature": "DRAW_IMAGE_9(bild, x, y, breite, hoehe, links, oben, rechts, unten[, farbe])",
    "module": "core"
   },
   {
@@ -14892,6 +15744,12 @@
    "name": "DRAWFPS",
    "kind": "graphics",
    "signature": "DRAWFPS(x, y[, farbe])",
+   "module": "core"
+  },
+  {
+   "name": "DRAW_FPS",
+   "kind": "graphics",
+   "signature": "DRAW_FPS(x, y[, farbe])",
    "module": "core"
   },
   {

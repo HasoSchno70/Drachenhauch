@@ -185,6 +185,7 @@ Three shorter books build one finished program each, chapter by chapter:
 Full documentation lives in [docs/en/](docs/en/README.md) — the English translation of the German manual in [docs/](docs/README.md). Design notes, audits and release notes stay German only:
 
 - **[Language reference](docs/en/sprache.md)** — variables, types, `ENUM`, `SELECT CASE`, functions with defaults and named arguments, classes, try/catch, f-strings, coroutines (`YIELD` + `CORO_*`)
+- **[Command names](docs/en/builtins-namen.md)** — how commands are named (`IMAGE_LOAD`, `KEY_DOWN`, `FILE_EXISTS`, `TIME_NOW` …), the recommended way per area, and the new names for the old ones; the old ones keep working
 - **[Standard built-ins](docs/en/builtins-core.md)** — math, strings, maps, file I/O, …
 - **[Graphics built-ins](docs/en/builtins-grafik.md)** — native runtime (dhrt/raylib), Z-layers, sprite atlas, asset preloader
 - **[Performance](docs/intern/PERFORMANCE.md)** (German) — benchmark numbers + optimizations shipped (spec ops, inline caches, typed arrays, ECS bulk ops, …)
