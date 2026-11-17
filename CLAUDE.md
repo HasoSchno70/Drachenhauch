@@ -338,8 +338,10 @@ Einzelheiten stehen in der Geschichte des Bereichs.
   signiert mit Hardened Runtime und `installer/posix/dhrt.entitlements`
   (Maschinencode, Mikrofon, Kamera).
 - Pakete und Installer nehmen nur, was git kennt (`gitFremdSammeln`).
-- Der Web-Bau schaltet `graphics schriften` ein; was dort nicht übersetzt,
-  fällt in der Website-CI auf.
+- Der Web-Bau schaltet `graphics schriften physik` ein (`FEATURES` in
+  `rust/build_wasm.py`); was dort nicht übersetzt, fällt in der Website-CI
+  auf. Wer ein Feature abspaltet, das ein Beispiel der Spielwiese braucht,
+  nimmt es dort mit auf (`physik` fehlte so sechs Wochen).
 
 ## Arbeitsablauf: Branch + Pull Request
 
