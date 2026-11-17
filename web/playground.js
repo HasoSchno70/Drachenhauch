@@ -162,7 +162,17 @@
   sessionStorage.removeItem(RUN_FLAG);
   // Quelle-Auswahl: bei einem Run-Reload das, was laeuft; sonst ein Share-Link
   // (#gb=...) falls vorhanden; sonst die zuletzt editierte bzw. die Default-Quelle.
-  const shared = hashSrc();
+  // `?beispiel=<id>` oeffnet ein Startprojekt aus beispiele.js und startet es
+  // (Verweise aus dem Schnellstart und von der Startseite) -- wie ein
+  // Share-Link, nur ohne die Quelle in der Adresse.
+  const beispielQuelle = (function () {
+    const m = location.search.match(/[?&]beispiel=([a-z0-9_-]+)/i);
+    if (!m || !Array.isArray(window.DH_BEISPIELE)) return null;
+    const b = window.DH_BEISPIELE.find(function (e) { return e.id === m[1]; });
+    return b && b.src ? ((EN && b.src_en) || b.src) : null;
+  })();
+  const ausHash = hashSrc();
+  const shared = ausHash !== null ? ausHash : beispielQuelle;
   const fromShare = !doRun && shared !== null;
   srcEl.value = doRun ? (saved !== null ? saved : srcEl.value)
               : (shared !== null ? shared : (saved !== null ? saved : DEFAULT_SRC));
@@ -243,7 +253,7 @@
       knopf.title = (EN ? b.titel_en : b.titel)
         || (EN ? "Load and run this example" : "Beispiel laden und starten");
       knopf.addEventListener("click", function () {
-        if (!b.datei) { srcEl.value = b.src; runBtn.click(); return; }
+        if (!b.datei) { srcEl.value = (EN && b.src_en) || b.src; runBtn.click(); return; }
         // Aus einer Datei: die Quelle liegt neben der Seite (program.dh wird
         // vom Build dorthin kopiert). Absichtlich NICHT aus dem virtuellen
         // Dateisystem gelesen -- dort wird /program.dh vor jedem Lauf mit dem
