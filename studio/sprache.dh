@@ -71,7 +71,7 @@ IF sprache = "" AND stIdeFragen THEN
     IF stIde = "" THEN stIde = PATHJOIN(DIRNAME(stKonfigPfad), "ide.json")
     sprache = stEinstellung$(stIde, "sprache")
 END IF
-IF sprache = "" AND LEFT$(LOWER$(GETENV$("DHRT_LANG")), 2) = "en" THEN sprache = "en"
+IF sprache = "" THEN sprache = RUNTIME_LANGUAGE$()
 IF sprache <> "en" THEN sprache = "de"
 
 DIM englisch AS BOOLEAN : englisch = FALSE
@@ -94,7 +94,7 @@ IF sprache = "en" THEN
 END IF
 ' Die Meldungen der Laufzeit in derselben Sprache: Pruefen (CODE_CHECK$ laeuft
 ' in diesem Prozess) und jedes gestartete Programm, das die Variable erbt.
-IF englisch AND GETENV$("DHRT_LANG") = "" THEN SETENV("DHRT_LANG", "en")
+IF GETENV$("DHRT_LANG") = "" THEN SETENV("DHRT_LANG", IIF(englisch, "en", "de"))
 
 FUNCTION tr$(t AS STRING) AS STRING
     IF NOT englisch THEN RETURN t

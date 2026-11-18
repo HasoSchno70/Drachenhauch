@@ -541,11 +541,12 @@ as well. These building blocks came with it:
   dialogs and status line are English, shortcuts are then called `Ctrl+Shift+O`
   (the runtime understands both spellings, also in `tasten.json`).
   The switch happens at the next start (`sprache` in the `ide.json`,
-  `DH_IDE_SPRACHE=en` overrides). Every display text goes through `tr$("...")`,
+  `DH_IDE_SPRACHE=en` overrides); without a setting the IDE speaks the
+  language of the runtime, i.e. of the system (German only on a German one). Every display text goes through `tr$("...")`,
   the table is in `ide/sprache/en.txt` (per line German, tab,
   English); `tests/pruef/ide/werkzeug_ide_englisch.dhtest` reports every text without
   a translation. The runtime's messages follow: the IDE sets
-  `DHRT_LANG=en`, so check messages, hints and the errors of
+  `DHRT_LANG` to its language, so check messages, hints and the errors of
   started programs come in English, as far as the catalogue knows them (see
   [rust-runtime.md](rust-runtime.md), "Meldungen auf Englisch"). German
   remain: the manual, the descriptions of the examples, the IDE's own messages

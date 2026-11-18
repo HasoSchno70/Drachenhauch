@@ -258,6 +258,10 @@ Einzelheiten stehen in der Geschichte des Bereichs.
   (`GUI_TABCONTROL_ITEM_RECT` & Co.), statt sie nachzurechnen.
 
 **Meldungen, Doku, Website**
+- Ohne `DHRT_LANG` spricht dhrt die Sprache des Systems (Deutsch nur auf
+  einem deutschen, `meldung::sprache`); `dhrt test` spielt seinen Fällen ein
+  deutsches System (`DHRT_SYSTEM_LANG=de`), damit die Erwartungen auf
+  englischen CI-Läufern halten.
 - Meldungen deutsch schreiben. Wer eine Meldung ändert, die in
   `daten/meldungen.en.txt` steht, zieht die Vorlage mit (`dhrt pruef meldungen`);
   setzt sie sich aus mehreren Literalen zusammen, markiert `[[wort]]`/`[[]]`

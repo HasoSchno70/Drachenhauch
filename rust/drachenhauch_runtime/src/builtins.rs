@@ -4291,6 +4291,12 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         // das nicht unterscheiden.
         "terminal" => { arity!(0); Ok(Value::Bool(ausgabe_ist_terminal())) }
         "terminal_width" => { arity!(0); Ok(Value::Int(terminal_breite())) }
+        // Die Sprache des Systems (`"de"`, `"en"`, `"fr"`, leer = unbekannt)
+        // und die, in der die Laufzeit gerade spricht (`"de"`/`"en"`:
+        // DHRT_LANG, sonst das System). IDE und Studio nehmen die zweite als
+        // Vorgabe; ein Programm kann mit der ersten seine Texte waehlen.
+        "system_language$" | "system_language" => { arity!(0); Ok(Value::str_rc(crate::meldung::systemsprache())) }
+        "runtime_language$" | "runtime_language" => { arity!(0); Ok(Value::str_rc(crate::meldung::sprache().to_string())) }
         "getenv$" | "getenv" => {
             if a.is_empty() || a.len() > 2 { return err(format!("GETENV$: erwartet 1..2 Argumente, erhalten {}", a.len())); }
             let name_ = need_str(&a[0], "GETENV$")?;

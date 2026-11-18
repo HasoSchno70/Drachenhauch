@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 2660,
+ "count": 2662,
  "builtins": [
   {
    "name": "ABS",
@@ -4002,6 +4002,18 @@
    "name": "GETENV$",
    "kind": "core",
    "signature": "GETENV$(name, default = \"\") AS STRING",
+   "module": "dhrt"
+  },
+  {
+   "name": "RUNTIME_LANGUAGE$",
+   "kind": "core",
+   "signature": "RUNTIME_LANGUAGE$() AS STRING",
+   "module": "dhrt"
+  },
+  {
+   "name": "SYSTEM_LANGUAGE$",
+   "kind": "core",
+   "signature": "SYSTEM_LANGUAGE$() AS STRING",
    "module": "dhrt"
   },
   {

@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/en und dem englischen Buch von `dhrt doku prosa` -- NICHT von Hand aendern. Der Hover nimmt sie mit DHRT_LANG=en.",
- "count": 2603,
+ "count": 2605,
  "docs": {
   "ABS": "Absolute value.",
   "ACOS": "Arc sine/cosine (x in [-1, 1])",
@@ -2025,6 +2025,7 @@
   "ROUND": "INT conversion",
   "ROUND_HALF_UP": "commercial rounding: away from zero",
   "RTRIM$": "remove whitespace on the left only / right only",
+  "RUNTIME_LANGUAGE$": "the language the runtime currently writes its messages in: \"de\" or \"en\" — DHRT_LANG, otherwise the system (German only on a German system)",
   "SAMEFILE": "do both paths mean the same file? A text comparison goes wrong with / versus \\, with a .. in the path, with short 8.3 names and (on Windows) with upper/lower case",
   "SAMPLE_FROM_BUFFER": "sample from raw 16-bit PCM (little endian, signed, mono)",
   "SAMPLE_FROM_SOUND": "a SOUND (from SPEAK_SOUND, AUDIO_NOTE, LOADSOUND ...) as a sample, channels averaged to mono, sample rate kept",
@@ -2233,6 +2234,7 @@
   "STOPMUSIC": "one stream at a time. Refilling happens on the audio thread, not in the game loop: there is no update_stream call per FLIP (exactly the point where raylib audio crackled). Music loops endlessly — play_music passes on loops = -1, which becomes a loop_region(0.0..) in Kira.",
   "STR$": "Value to string. Bools become \"TRUE\"/\"FALSE\", floats like 3.0 become \"3.0\".",
   "SYNTAX_SPANS": "split Drachenhauch source code",
+  "SYSTEM_LANGUAGE$": "the language of the system as two letters (\"de\", \"en\", \"fr\" …), \"\" if unknown — e.g. to pick a program's texts",
   "TAN": "Trigonometry (x in radians)",
   "TASK_CANCEL": "discard the result",
   "TASK_PENDING": "tasks that have not been fetched yet",

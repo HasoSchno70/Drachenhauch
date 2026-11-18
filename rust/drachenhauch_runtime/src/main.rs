@@ -1436,10 +1436,15 @@ fn sammlung_laufen(exe: &std::path::Path, pfad: &std::path::Path, filter: Option
                         .env_remove("DHRT_FRAMES").env_remove("DHRT_SCREENSHOT")
                         .env_remove("DHRT_CONTACT").env_remove("DHRT_CONTACT_MAX")
                         .env_remove("DHRT_CONTACT_COLS").env_remove("DHRT_CONTACT_EVERY")
-                        // Die Erwartungen stehen deutsch da -- eine englische
-                        // IDE, aus der die Pruefung startet, darf sie nicht kippen.
-                        // Ein Fall, der Englisch will, sagt es in `--- umgebung`.
-                        .env_remove("DHRT_LANG")
+                        // Die Erwartungen stehen deutsch da -- weder eine
+                        // englische IDE, aus der die Pruefung startet, noch ein
+                        // englisches System (CI-Laeufer) darf sie kippen: ohne
+                        // DHRT_LANG spricht die Laufzeit die Systemsprache, also
+                        // wird ein deutsches System gespielt. DHRT_LANG selbst
+                        // bleibt frei, damit eine Englisch eingestellte IDE im
+                        // Fall es setzen kann. Ein Fall, der Englisch will, sagt
+                        // es in `--- umgebung`.
+                        .env_remove("DHRT_LANG").env("DHRT_SYSTEM_LANG", "de")
                         // Fenster ohne echte Tastatur/Maus (stillfenster.rs): wer
                         // waehrend des Laufs tippt, schreibt sonst in einen Fall.
                         .env("DHRT_OHNE_EINGABE", "1")
@@ -1466,7 +1471,7 @@ fn sammlung_laufen(exe: &std::path::Path, pfad: &std::path::Path, filter: Option
                         .current_dir(&dir)
                         .stdin(std::process::Stdio::null())
                         .env_remove("DHRT_FRAMES").env_remove("DHRT_SCREENSHOT")
-                        .env_remove("DHRT_LANG").env("DHRT_OHNE_EINGABE", "1")
+                        .env_remove("DHRT_LANG").env("DHRT_SYSTEM_LANG", "de").env("DHRT_OHNE_EINGABE", "1")
                         .env("DHRT_ZWISCHENABLAGE", "privat");
                     let l = test_lauf(cmd, None, frist).map_err(|e| format!("{}: {}", name, e))?;
                     if l.abgelaufen {
@@ -1731,7 +1736,7 @@ fn test_main(args: &[String]) -> ExitCode {
         let mut cmd = std::process::Command::new(&exe);
         cmd.arg("run").arg(d)
             .stdin(std::process::Stdio::null())
-            .env_remove("DHRT_LANG").env("DHRT_OHNE_EINGABE", "1")
+            .env_remove("DHRT_LANG").env("DHRT_SYSTEM_LANG", "de").env("DHRT_OHNE_EINGABE", "1")
             .env("DHRT_ZWISCHENABLAGE", "privat");
         let r = test_lauf(cmd, None, grenze.map(|s| t0 + std::time::Duration::from_secs(s)));
         let dauer = t0.elapsed().as_secs_f64();

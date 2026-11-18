@@ -193,7 +193,7 @@ node build_epub.js [--lang en]        # -> .epub (reflows to the reader's font s
 dhrt run tools/buch_bauen.dh -- buecher/referenz [--lang en]   # two-pass build with page numbers in the TOC
 ```
 
-One thing stays German on purpose: the run-time error messages quoted in Appendix D, because that is how `dhrt` prints them by default. With `DHRT_LANG=en` the runtime prints its messages in English.
+One thing stays German on purpose: the run-time error messages quoted in Appendix D, because that is how `dhrt` prints them on a German system. On any other system, or with `DHRT_LANG=en`, the runtime prints its messages in English.
 
 ### More books (German)
 

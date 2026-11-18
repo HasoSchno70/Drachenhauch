@@ -291,7 +291,11 @@ with IMPORT, `file` gives its path.
 
 ### Messages in English (`DHRT_LANG=en`)
 
-With `DHRT_LANG=en` (also `en_US` etc.) dhrt writes its messages in English:
+Without a setting dhrt speaks the language of the system: German on a German
+system, English otherwise (since 2026.52; before, always German).
+`DHRT_LANG=de` or `DHRT_LANG=en` (also `en_US` etc.) fixes the language. A
+program asks for it with `RUNTIME_LANGUAGE$()`, for the system's with
+`SYSTEM_LANGUAGE$()`. English looks like this:
 
 ```
 Runtime error in game.dh:42: Index 10 outside [0..2] in dimension 1
@@ -328,8 +332,11 @@ people coming from other BASICs). The most specific template wins.
   not depend on an environment variable.
 - **Quick fixes** still read the German sentence; only their title is
   translated.
-- **`dhrt test`** removes `DHRT_LANG` from its cases (their expectations are
-  written in German); a case that wants English sets it in `--- umgebung`.
+- **`dhrt test`** removes `DHRT_LANG` from its cases and plays a German
+  system for them (`DHRT_SYSTEM_LANG=de`) -- their expectations are written
+  in German, also on an English CI runner. A case that wants English sets
+  `DHRT_LANG` in `--- umgebung`, one that checks the system language sets
+  `DHRT_SYSTEM_LANG` there.
 - **`dhrt pruef meldungen`** checks the catalogue against the source code:
   every German template must still appear with its fixed pieces in a literal,
   and the placeholders must match. Where a message is put together from
@@ -342,7 +349,8 @@ people coming from other BASICs). The most specific template wins.
   the fixed characters of ALL templates that apply. Otherwise a general joint
   like `{} -- {}` would cut a sentence at the wrong place.
 
-The IDE sets `DHRT_LANG=en` when its user interface is English.
+The IDE and the Studio set `DHRT_LANG` to the language of their user
+interface; without a setting that follows the runtime, i.e. the system.
 
 ## Step 1: `.dhc` serialization
 

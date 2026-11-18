@@ -541,11 +541,12 @@ bekäme. Diese Bausteine kamen mit ihr:
   Dialoge und Statuszeile sind englisch, Kürzel heißen dann `Ctrl+Shift+O`
   (die Laufzeit versteht beide Schreibweisen, auch in `tasten.json`).
   Gewechselt wird beim nächsten Start (`sprache` in der `ide.json`,
-  `DH_IDE_SPRACHE=en` übersteuert). Jeder Anzeigetext geht durch `tr$("...")`,
+  `DH_IDE_SPRACHE=en` übersteuert); ohne Einstellung spricht die IDE die
+  Sprache der Laufzeit, also des Systems (Deutsch nur auf einem deutschen). Jeder Anzeigetext geht durch `tr$("...")`,
   die Tabelle steht in `ide/sprache/en.txt` (je Zeile Deutsch, Tabulator,
   Englisch); `tests/pruef/ide/werkzeug_ide_englisch.dhtest` meldet jeden Text ohne
   Übersetzung. Die Meldungen der Laufzeit folgen: die IDE setzt
-  `DHRT_LANG=en`, also kommen Prüfmeldungen, Hinweise und die Fehler
+  `DHRT_LANG` auf ihre Sprache, also kommen Prüfmeldungen, Hinweise und die Fehler
   gestarteter Programme englisch, soweit der Katalog sie kennt (siehe
   [rust-runtime.md](rust-runtime.md), „Meldungen auf Englisch"). Deutsch
   bleiben: das Handbuch, die Beschreibungen der Beispiele, eigene Meldungen

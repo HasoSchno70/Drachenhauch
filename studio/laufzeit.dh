@@ -894,10 +894,11 @@ FUNCTION SpracheWaehlen(code AS STRING) AS BOOLEAN
     RETURN TRUE
 END FUNCTION
 
-' Vor App.Geoeffnet: ohne Wahl Englisch, wenn DHRT_LANG englisch ist (und
-' die Tafel da ist), sonst die Sprache der Quelle.
+' Vor App.Geoeffnet: ohne Wahl Englisch, wenn die Laufzeit englisch spricht
+' (DHRT_LANG, sonst ein nicht deutsches System) und die Tafel da ist, sonst
+' die Sprache der Quelle.
 SUB studioSpracheVorgabe()
-    IF NOT studioSprachGewaehlt THEN SpracheWaehlen(IIF(LEFT$(LOWER$(GETENV$("DHRT_LANG")), 2) = "en", "en", ""))
+    IF NOT studioSprachGewaehlt THEN SpracheWaehlen(IIF(RUNTIME_LANGUAGE$() = "en", "en", ""))
 END SUB
 
 ' Die gewaehlte Sprache, "" = die der Quelle.

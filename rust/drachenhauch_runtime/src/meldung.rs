@@ -1,4 +1,5 @@
-//! Meldungen auf Englisch (`DHRT_LANG=en`).
+//! Meldungen auf Englisch (`DHRT_LANG=en`, ohne die Variable auf einem
+//! System, das nicht Deutsch spricht).
 //!
 //! Die Laufzeit schreibt ihre Meldungen an rund 1600 Stellen deutsch -- und
 //! dort bleiben sie: der Code, die Pruefsammlungen und die Schnellkorrekturen
@@ -44,14 +45,82 @@ pub struct Vorlage {
 /// Soll Englisch ausgegeben werden? Bei jedem Aufruf gelesen: die IDE setzt
 /// die Variable erst nach dem Start (SETENV), und `CODE_CHECK$` laeuft im
 /// selben Prozess.
-pub fn englisch() -> bool {
+pub fn englisch() -> bool { sprache() == "en" }
+
+/// Die Sprache der Meldungen, `"de"` oder `"en"`: `DHRT_LANG`, wenn gesetzt
+/// (`en`, `en_US`, `en-GB` = Englisch, alles andere Deutsch); sonst die des
+/// Systems -- Deutsch nur auf einem deutschen System (seit 2026-11-18;
+/// vorher galt ohne `DHRT_LANG` immer Deutsch, und wer kein Deutsch las,
+/// musste die Variable erst finden). `RUNTIME_LANGUAGE$()` im Programm.
+pub fn sprache() -> &'static str {
     match std::env::var("DHRT_LANG") {
-        Ok(s) => {
+        Ok(s) if !s.trim().is_empty() => {
             let s = s.trim().to_ascii_lowercase();
-            s == "en" || s.starts_with("en_") || s.starts_with("en-")
+            if s == "en" || s.starts_with("en_") || s.starts_with("en-") { "en" } else { "de" }
         }
-        Err(_) => false,
+        _ => if system_deutsch() { "de" } else { "en" },
     }
+}
+
+/// Die Unit-Tests vergleichen deutsche Saetze -- auf jedem Laeufer, gleich
+/// welche Sprache sein System spricht.
+#[cfg(test)]
+fn system_deutsch() -> bool { true }
+#[cfg(not(test))]
+fn system_deutsch() -> bool { systemsprache() == "de" }
+
+/// Die Sprache des Systems als zwei kleine Buchstaben (`"de"`, `"en"`,
+/// `"fr"`), leer, wenn sie sich nicht bestimmen laesst (`C`, `POSIX`).
+/// `DHRT_SYSTEM_LANG` ersetzt sie -- fuer Pruefungen, die ein fremdes System
+/// spielen. `SYSTEM_LANGUAGE$()` im Programm.
+pub fn systemsprache() -> String {
+    if let Ok(s) = std::env::var("DHRT_SYSTEM_LANG") {
+        if !s.trim().is_empty() { return kuerzel(&s); }
+    }
+    static S: OnceLock<String> = OnceLock::new();
+    S.get_or_init(|| kuerzel(&system_roh())).clone()
+}
+
+/// `de_DE.UTF-8`, `de-AT`, `German` -> `de`; `C`, `POSIX` -> leer.
+fn kuerzel(s: &str) -> String {
+    let w: String = s.trim().chars().take_while(|c| c.is_ascii_alphabetic()).collect::<String>().to_ascii_lowercase();
+    match w.as_str() {
+        "c" | "posix" | "" => String::new(),
+        "german" | "deutsch" => "de".into(),
+        "english" => "en".into(),
+        _ if w.len() >= 2 => w[..2].to_string(),
+        _ => String::new(),
+    }
+}
+
+/// Die Oberflaechensprache von Windows (nicht das Zahlenformat).
+#[cfg(windows)]
+fn system_roh() -> String {
+    use windows::Win32::Globalization::{GetUserDefaultUILanguage, LCIDToLocaleName};
+    let mut puffer = [0u16; 85];
+    // SAFETY: reine Abfragen; der Puffer hat die Groesse, die die Funktion
+    // fuer einen Namen hoechstens braucht (LOCALE_NAME_MAX_LENGTH).
+    let n = unsafe { LCIDToLocaleName(GetUserDefaultUILanguage() as u32, Some(&mut puffer), 0) };
+    if n <= 1 { return String::new(); }
+    String::from_utf16_lossy(&puffer[..(n as usize - 1)])
+}
+
+/// Wie gettext: LANGUAGE vor LC_ALL vor LC_MESSAGES vor LANG. Ein Programm,
+/// das unter macOS aus dem Finder startet, hat keine davon -- dort fragt es
+/// die Einstellung des Systems.
+#[cfg(not(windows))]
+fn system_roh() -> String {
+    for v in ["LANGUAGE", "LC_ALL", "LC_MESSAGES", "LANG"] {
+        if let Ok(s) = std::env::var(v) {
+            let erstes = s.split(':').next().unwrap_or("").to_string();
+            if !kuerzel(&erstes).is_empty() { return erstes; }
+        }
+    }
+    #[cfg(target_os = "macos")]
+    if let Ok(o) = std::process::Command::new("defaults").args(["read", "-g", "AppleLocale"]).output() {
+        return String::from_utf8_lossy(&o.stdout).trim().to_string();
+    }
+    String::new()
 }
 
 /// Ein festes Wort je Sprache (Rahmen wie "Laufzeitfehler in").
@@ -246,6 +315,18 @@ pub fn katalog_text() -> &'static str { KATALOG }
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn systemsprache_als_kuerzel() {
+        assert_eq!(kuerzel("de_DE.UTF-8"), "de");
+        assert_eq!(kuerzel("de-AT"), "de");
+        assert_eq!(kuerzel("en_US"), "en");
+        assert_eq!(kuerzel("fr"), "fr");
+        assert_eq!(kuerzel("German"), "de");
+        assert_eq!(kuerzel("C.UTF-8"), "");
+        assert_eq!(kuerzel("POSIX"), "");
+        assert_eq!(kuerzel(""), "");
+    }
 
     #[test]
     fn ganze_vorlagen_und_platzhalter() {

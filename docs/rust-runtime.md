@@ -284,8 +284,11 @@ Befund in einer per IMPORT eingebundenen, nennt `file` deren Pfad.
 
 ### Meldungen auf Englisch (`DHRT_LANG=en`)
 
-Mit `DHRT_LANG=en` (auch `en_US` usw.) schreibt dhrt seine Meldungen
-englisch:
+Ohne Einstellung spricht dhrt die Sprache des Systems: Deutsch auf einem
+deutschen System, sonst Englisch (seit 2026.52; vorher immer Deutsch).
+`DHRT_LANG=de` oder `DHRT_LANG=en` (auch `en_US` usw.) legt die Sprache fest.
+Ein Programm fragt sie mit `RUNTIME_LANGUAGE$()`, die des Systems mit
+`SYSTEM_LANGUAGE$()`. Englisch sieht so aus:
 
 ```
 Runtime error in game.dh:42: Index 10 outside [0..2] in dimension 1
@@ -321,9 +324,11 @@ darum genügen für zusammengesetzte Meldungen die Teile (`{} -- Aufruf: {}`,
   hängt nicht an einer Umgebungsvariable.
 - **Schnellkorrekturen** lesen weiter den deutschen Satz; nur ihr Titel wird
   übersetzt.
-- **`dhrt test`** nimmt seinen Fällen `DHRT_LANG` weg (ihre Erwartungen
-  stehen deutsch da); ein Fall, der Englisch will, setzt es in
-  `--- umgebung`.
+- **`dhrt test`** nimmt seinen Fällen `DHRT_LANG` weg und spielt ihnen ein
+  deutsches System (`DHRT_SYSTEM_LANG=de`) -- ihre Erwartungen stehen
+  deutsch da, auch auf einem englischen CI-Läufer. Ein Fall, der Englisch
+  will, setzt `DHRT_LANG` in `--- umgebung`, einer, der die Systemsprache
+  prüft, setzt dort `DHRT_SYSTEM_LANG`.
 - **`dhrt pruef meldungen`** prüft den Katalog gegen den Quelltext: jede
   deutsche Vorlage muss in ihren festen Stücken noch in einem Literal stehen,
   die Platzhalter müssen passen. Wo eine Meldung aus mehreren Literalen
@@ -336,7 +341,8 @@ darum genügen für zusammengesetzte Meldungen die Teile (`{} -- Aufruf: {}`,
   werden die festen Zeichen ALLER Vorlagen, die greifen. Sonst schnitte eine
   allgemeine Fuge wie `{} -- {}` einen Satz an der falschen Stelle durch.
 
-Die IDE setzt `DHRT_LANG=en`, wenn ihre Oberfläche englisch ist.
+Die IDE und das Studio setzen `DHRT_LANG` auf die Sprache ihrer Oberfläche;
+die folgt ohne Einstellung der Laufzeit, also dem System.
 
 ## Schritt 1: `.dhc`-Serialisierung
 

@@ -162,10 +162,39 @@ PRINT "gemerkt "; JSON_GET_STRING(k, "sprache")
 --- erwartet
 pr knopf Neue Datei
 pr palette Sichern | Strg+S
-pr dhrt_lang []
+pr dhrt_lang [de]
 sprache en
 pr jetzt noch Neue Datei
 gemerkt en
+
+=== ohne einstellung folgt die ide dem system
+' Seit 2026.52: ohne `sprache` in der ide.json spricht die IDE die Sprache
+' der Laufzeit (RUNTIME_LANGUAGE$), also die des Systems -- hier ein
+' englisches -- und gibt sie an ihre Programme weiter.
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 20 THEN
+    protokoll("pr knopf " + GUI_TEXT(btnWkNeu))
+    protokoll("pr dhrt_lang [" + GETENV$("DHRT_LANG") + "]")
+    EXIT(0)
+END IF
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+DHRT_SYSTEM_LANG=en_GB
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " THEN PRINT L[i]
+NEXT
+--- erwartet
+pr knopf New file
+pr dhrt_lang [en]
 
 === eine eigene tastenbelegung auf englisch geschrieben gilt
 ' "Ctrl+Shift+O" ist dieselbe Taste wie die Vorgabe "Strg+Umschalt+O" von

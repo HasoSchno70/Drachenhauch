@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 2611,
+ "count": 2613,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -2030,6 +2030,7 @@
   "ROUND": "INT-Konvertierung",
   "ROUND_HALF_UP": "kaufmännisch runden: von der Null weg",
   "RTRIM$": "Whitespace nur links / nur rechts entfernen",
+  "RUNTIME_LANGUAGE$": "die Sprache, in der die Laufzeit gerade ihre Meldungen schreibt: \"de\" oder \"en\" — DHRT_LANG, sonst das System (Deutsch nur auf einem deutschen System)",
   "SAMEFILE": "meinen beide Pfade dieselbe Datei? Ein Textvergleich irrt bei / gegen \\, bei einem .. im Pfad, bei kurzen 8.3-Namen und (unter Windows) bei Groß/klein",
   "SAMPLE_FROM_BUFFER": "Sample aus rohem 16-Bit-PCM (little endian, vorzeichenbehaftet, mono)",
   "SAMPLE_FROM_SOUND": "ein SOUND (aus SPEAK_SOUND, AUDIO_NOTE, LOADSOUND ...) als Sample, Kanäle auf Mono gemittelt, Abtastrate übernommen",
@@ -2240,6 +2241,7 @@
   "STOPMUSIC": "ein Stream gleichzeitig. Nachgefüllt wird auf dem Audio-Thread, nicht im Game-Loop: einen update_stream-Aufruf pro FLIP gibt es nicht (genau der Punkt, an dem raylib-Audio knackte). Musik loopt endlos — play_music reicht loops = -1 weiter, was in Kira eine loop_region(0.0..) wird.",
   "STR$": "Wert nach String. Bools werden zu \"TRUE\"/\"FALSE\", Floats wie 3.0 zu \"3.0\".",
   "SYNTAX_SPANS": "Drachenhauch-Quelltext zerlegen",
+  "SYSTEM_LANGUAGE$": "die Sprache des Systems als zwei Buchstaben (\"de\", \"en\", \"fr\" …), \"\" wenn unbekannt — etwa um die Texte eines Programms zu wählen",
   "TAN": "Trigonometrie (x in Radiant)",
   "TASK_CANCEL": "Ergebnis verwerfen",
   "TASK_PENDING": "Aufträge, die noch nicht abgeholt sind",

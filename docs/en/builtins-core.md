@@ -1168,6 +1168,8 @@ worked.
 | `STARTDIR$()` → STRING | the folder the program was called from |
 | `GETENV$(name$ [, default$])` → STRING | read an environment variable |
 | `SETENV(name$, value$)` | set an environment variable (this program + its children) |
+| `SYSTEM_LANGUAGE$()` → STRING | the language of the system as two letters (`"de"`, `"en"`, `"fr"` …), `""` if unknown — e.g. to pick a program's texts |
+| `RUNTIME_LANGUAGE$()` → STRING | the language the runtime currently writes its messages in: `"de"` or `"en"` — `DHRT_LANG`, otherwise the system (German only on a German system) |
 | `CWD$()` → STRING | current working directory |
 | `CHDIR(path$)` | change the working directory |
 | `EXEPATH$()` → STRING | path of the running program file |

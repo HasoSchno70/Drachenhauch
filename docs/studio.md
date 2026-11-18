@@ -322,7 +322,9 @@ die Knöpfe der Dialoge oben. Im Code geht jeder Anzeigetext durch `tr$`:
 | `trf$(text$, werte)` | ein Text mit `{0}`, `{1}` ...: erst übersetzt, dann eingesetzt |
 
 Gewählt wird vor dem ersten Fenster, in `App.Geoeffnet`; ohne Wahl ist es
-Englisch, wenn `DHRT_LANG` englisch ist und die Tafel `en.txt` da ist. Ein
+Englisch, wenn die Laufzeit englisch spricht (`RUNTIME_LANGUAGE$()`:
+`DHRT_LANG`, sonst ein System, das nicht Deutsch spricht) und die Tafel
+`en.txt` da ist. Ein
 Wechsel gilt für Fenster, die danach aufgebaut werden. Was das Programm aus
 einem Widget zurückliest (der Text einer Klappliste), ist die Übersetzung --
 verglichen wird mit `tr$("...")`. Mit `DH_STUDIO_SPRACHLUECKEN=datei`

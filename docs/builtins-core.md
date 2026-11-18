@@ -1170,6 +1170,8 @@ geklappt hat.
 | `STARTDIR$()` → STRING | der Ordner, aus dem das Programm aufgerufen wurde |
 | `GETENV$(name$ [, default$])` → STRING | Umgebungsvariable lesen |
 | `SETENV(name$, value$)` | Umgebungsvariable setzen (dieses Programm + seine Kinder) |
+| `SYSTEM_LANGUAGE$()` → STRING | die Sprache des Systems als zwei Buchstaben (`"de"`, `"en"`, `"fr"` …), `""` wenn unbekannt — etwa um die Texte eines Programms zu wählen |
+| `RUNTIME_LANGUAGE$()` → STRING | die Sprache, in der die Laufzeit gerade ihre Meldungen schreibt: `"de"` oder `"en"` — `DHRT_LANG`, sonst das System (Deutsch nur auf einem deutschen System) |
 | `CWD$()` → STRING | aktuelles Arbeitsverzeichnis |
 | `CHDIR(path$)` | Arbeitsverzeichnis wechseln |
 | `EXEPATH$()` → STRING | Pfad der laufenden Programmdatei |
