@@ -4868,6 +4868,10 @@ impl Compiler {
         }
         json!({
             "format": "dhc", "version": 1,
+            // Die Fassung, die uebersetzt hat: Bytecode gehoert zu ihr
+            // (docs/stabilitaet.md), `model::load_program` weist eine
+            // fremde ab, statt sie still falsch laufen zu lassen.
+            "dhrt": env!("CARGO_PKG_VERSION"),
             "n_globals": n_globals,
             "global_names": global_names,
             "main": main.zu_json(), "functions": Value::Object(functions),

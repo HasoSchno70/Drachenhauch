@@ -106,3 +106,17 @@ PRINT [n * 2 FOR n IN (1, 2, 3) WHERE n > 1]
 gleich TRUE
 codes 0 0
 zeilen 9
+
+=== bytecode einer anderen fassung wird abgewiesen
+' Seit 2026.52 traegt jede .dhc die Fassung, die sie uebersetzt hat; eine
+' fremde laeuft nicht still anders, sondern sagt, was zu tun ist.
+IMPORT "helfer.dh"
+WRITEALL("alt.dhc", "{" + CHR$(34) + "format" + CHR$(34) + ": " + CHR$(34) + "dhc" + CHR$(34) + ", " + CHR$(34) + "dhrt" + CHR$(34) + ": " + CHR$(34) + "1999.1.0" + CHR$(34) + "}")
+dlStarten([CWD$() + "/alt.dhc"])
+PRINT "rueckgabe "; dlCode
+PRINT INSTR(dlAus + dlErr, "Diese .dhc stammt aus dhrt 1999.1, diese Laufzeit ist") >= 0
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
+--- erwartet
+rueckgabe 1
+TRUE
