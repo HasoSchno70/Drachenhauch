@@ -1,4 +1,5 @@
-' Schlanker Export (`dhrt --export datei.dh ziel --schlank`): die kleinste
+' Schlanker Export (`dhrt --export datei.dh ziel`, seit 2026.52 die Vorgabe,
+' vorher mit `--schlank`; `--voll` nimmt die ganze Laufzeit): die kleinste
 ' Laufzeit aus laufzeiten/ neben dhrt, der keiner der gerufenen Befehle
 ' fehlt. Gefragt werden die Laufzeiten selbst (`--fehlende`), nicht eine
 ' Liste -- die waere beim naechsten neuen Befehl still falsch.
@@ -11,12 +12,14 @@
 IMPORT "lauf.dh"
 pruefen()
 DIM namen AS ARRAY OF STRING : namen = ["--fehlende", "len", "db_open", "screen", "pdf_new", "phys2d_new", "midi_note_name$", "waitkey", "gui_window", "audio_play"]
+PRINT "mini: "; REPLACE$(TRIM$(lauf$(mini$(), namen)), CHR$(10), " ")
 PRINT "konsole: "; REPLACE$(TRIM$(lauf$(konsole$(), namen)), CHR$(10), " ")
 PRINT "spiel: "; REPLACE$(TRIM$(lauf$(spiel$(), namen)), CHR$(10), " ")
 PRINT "voll: ["; TRIM$(lauf$(EXEPATH$(), namen)); "]"
 --- datei lauf.dh
 IMPORT "{sammlung}/../_hilfen/schlanklauf.dh"
 --- erwartet
+mini: db_open screen pdf_new phys2d_new waitkey gui_window audio_play
 konsole: screen pdf_new phys2d_new waitkey gui_window audio_play
 spiel: db_open pdf_new
 voll: []
@@ -44,11 +47,12 @@ TRUE TRUE
 kleiner TRUE
 antwort 42
 
-=== passt es in beide, nimmt er die kleinere
+=== passt es in mehrere, nimmt er die kleinste
+' "Hallo Welt" braucht nur den Kern: dhrt-mini.
 IMPORT "lauf.dh"
 pruefen()
 DIM aus AS STRING : aus = lauf$(EXEPATH$(), ["--export", "hallo.dh", "ziel", "--schlank"])
-PRINT INSTR(zeile$(aus, "Schlank:"), "dhrt-konsole") >= 0
+PRINT INSTR(zeile$(aus, "Schlank:"), "dhrt-mini") >= 0
 --- datei hallo.dh
 PRINT "hallo"
 --- datei lauf.dh
@@ -149,10 +153,26 @@ TRUE TRUE TRUE
 voll TRUE
 pdf TRUE
 
-=== ohne --schlank bleibt es bei der vollen laufzeit
+=== ohne schalter nimmt der export die kleinste laufzeit
+' Seit 2026.52 schlank von selbst -- "Hallo Welt" brachte sonst die ganze
+' Laufzeit mit.
 IMPORT "lauf.dh"
 pruefen()
-DIM aus AS STRING : aus = lauf$(EXEPATH$(), ["--export", "prog.dh", "ziel"])
+DIM aus AS STRING : aus = lauf$(EXEPATH$(), ["--export", "hallo.dh", "ziel"])
+PRINT "schlank "; zeile$(aus, "Schlank:") <> ""
+PRINT "kleiner "; FILESIZE(PATHJOIN(CWD$(), "ziel/hallo" + endung)) < FILESIZE(EXEPATH$())
+--- datei hallo.dh
+PRINT "hallo"
+--- datei lauf.dh
+IMPORT "{sammlung}/../_hilfen/schlanklauf.dh"
+--- erwartet
+schlank TRUE
+kleiner TRUE
+
+=== mit --voll bleibt es bei der vollen laufzeit
+IMPORT "lauf.dh"
+pruefen()
+DIM aus AS STRING : aus = lauf$(EXEPATH$(), ["--export", "prog.dh", "ziel", "--voll"])
 PRINT "ohne meldung "; zeile$(aus, "Schlank:") = ""
 PRINT "voll "; FILESIZE(PATHJOIN(CWD$(), "ziel/prog" + endung)) > FILESIZE(EXEPATH$())
 --- datei prog.dh

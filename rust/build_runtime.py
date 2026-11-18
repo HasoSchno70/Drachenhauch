@@ -183,6 +183,9 @@ def main() -> int:
 # was das Programm benutzt. Der Maschinencode bleibt in beiden -- ohne ihn
 # rechneten Programme bis zu hundertmal langsamer.
 LAUFZEITEN = [
+    # Nur Kern und Maschinencode (2026-11-18): "Hallo Welt" und Werkzeuge
+    # ohne Datenbank und Netz -- 16 MB statt 22 (konsole) bzw. 45 (voll).
+    ("mini", ["jit", "ffi"]),
     ("konsole", ["db", "pg", "mysql", "net", "http", "smtp", "jit", "ffi"]),
     # "schriften": LOADFONT("sans") -- ohne sie brach ein schlank exportiertes
     # Spiel damit ab, obwohl der Befehl da war (Fassung 2026.31).

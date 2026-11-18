@@ -1045,27 +1045,30 @@ Argumenten mit `ARGPATH$` (siehe [builtins-core.md](builtins-core.md)). In der *
 **Strg+F6** bündelt die aktive Datei nach `<name>_dist/` neben der Quelle, schlank
 (siehe unten); die Ausgabe des Exports läuft unten links mit (siehe [ide.md](ide.md)).
 
-**Schlanker Export** (`--schlank`): Die volle Laufzeit trägt alles mit (Grafik,
-Ton, PDF mit eingebetteten Schriften, Datenbank, Netz, Video, Hardware) und ist
-rund 37 MB groß. Neben ihr liegen zwei kleinere in `laufzeiten/`:
-`dhrt-konsole` (Daten, Netz, Mail, Maschinencode; 19 MB) und `dhrt-spiel`
+**Schlanker Export** (seit 2026.52 die Vorgabe, vorher `--schlank`; `--voll`
+nimmt die volle Laufzeit): Die volle Laufzeit trägt alles mit (Grafik, Ton,
+PDF mit eingebetteten Schriften, Datenbank, Netz, Video, Hardware) und ist
+rund 45 MB groß. Neben ihr liegen drei kleinere in `laufzeiten/`:
+`dhrt-mini` (Kern und Maschinencode; 16 MB -- „Hallo Welt“ und Werkzeuge),
+`dhrt-konsole` (dazu Daten, Netz, Mail; 22 MB) und `dhrt-spiel`
 (Grafik, Ton, Dialoge, Physik, die eingebauten Schriften für
-`LOADFONT("sans")`, Maschinencode; 27 MB). Mit `--schlank` nimmt der
-Export die kleinste, der keiner der Befehle fehlt, die das Programm aufruft --
+`LOADFONT("sans")`, Maschinencode; 35 MB). Der
+Export nimmt die kleinste, der keiner der Befehle fehlt, die das Programm aufruft --
 auch in einem Unterprogramm, das nie läuft. **Gefragt werden die Laufzeiten
 selbst** (`dhrt-konsole --fehlende name …`: jeder Name wird mit absichtlich
 unsinnigen Argumenten gerufen; ein vorhandener Befehl scheitert an ihnen, ein
 fehlender sagt, dass er fehlt), nicht eine Liste -- eine Liste wäre beim
 nächsten neuen Befehl still falsch, und das Programm bräche erst beim Kunden ab.
-Der Export sagt, welche er genommen hat (`Schlank: dhrt-konsole (16,1 MB statt
-32,9 MB)`), und wenn keine passt, warum (`dhrt-konsole fehlt PDF_NEW`). Der
-Maschinencode bleibt in beiden: ohne ihn rechneten Programme bis zu hundertmal
+Der Export sagt, welche er genommen hat (`Schlank: dhrt-mini (16,4 MB statt
+45,3 MB)`), und wenn keine passt, warum (`dhrt-konsole fehlt PDF_NEW`). Der
+Maschinencode bleibt in allen: ohne ihn rechneten Programme bis zu hundertmal
 langsamer. Gebaut werden die kleinen mit `python rust/build_runtime.py
 --laufzeiten`; der Installer und die Pakete für macOS und Linux bringen sie mit.
 Geprüft in [tests/pruef/werkzeugkette/export_schlank.dhtest](../tests/pruef/werkzeugkette/export_schlank.dhtest).
 
 ```
-dhrt --export werkzeug.dh --schlank
+dhrt --export werkzeug.dh
+dhrt --export werkzeug.dh --voll
 ```
 
 Verifiziert: `89_heightmap.dh` exportiert (~3.7 MB Exe), die Exe **ohne

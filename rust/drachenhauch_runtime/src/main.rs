@@ -365,11 +365,12 @@ dhrt -- die Drachenhauch-Runtime
                                (--einruecken richtet auch die Einrueckung,
                                 --pruefen schreibt nicht, meldet nur)
   dhrt --check <datei.dh> ...  nur uebersetzen und Probleme als JSON melden
-  dhrt --export <datei.dh>     zu einer eigenstaendigen .exe buendeln
+  dhrt --export <datei.dh>     zu einer eigenstaendigen .exe buendeln, mit der
+                               kleinsten Laufzeit, der nichts fehlt (--voll: die ganze)
   dhrt debug <datei.dh>        Debug-Sitzung (JSON-Protokoll, fuer den Editor)
   dhrt profile <datei.dh>      Laufzeit je Zeile messen
   dhrt lsp                     Sprachserver (LSP ueber stdin/stdout, fuer VS Code)
-  dhrt doku <prosa|grammatik|referenz>  Doku-Werkzeuge (dhrt doku fuer die Uebersicht)
+  dhrt doku <prosa|grammatik|aenderungen|referenz>  Doku-Werkzeuge (dhrt doku fuer die Uebersicht)
   dhrt pruef [bloecke|namen|zaehlungen|konstanten|pfade]  Doku gegen die Wirklichkeit
   dhrt paket <hole|entferne|liste|neu>  Bibliotheken holen und teilen (dhrt paket fuer die Uebersicht)
   dhrt bild <datei> <ziel.png> [bilder]
@@ -645,7 +646,10 @@ fn main() -> ExitCode {
             // Ausgabeverzeichnis -- sonst landete das Bundle in einem Ordner
             // namens "--mit-daten".
             let mit_daten = raw.iter().any(|a| a == "--mit-daten");
-            let schlank = raw.iter().any(|a| a == "--schlank");
+            // Seit 2026.52 schlank von selbst: die kleinste Laufzeit, der
+            // nichts fehlt ("Hallo Welt" brachte sonst 45 MB mit). `--voll`
+            // nimmt die ganze, `--schlank` bleibt erlaubt.
+            let schlank = !raw.iter().any(|a| a == "--voll");
             let out = raw.iter().skip(3).find(|a| !a.starts_with("--")).map(|s| s.as_str());
             return export_main(&raw[2], out, mit_daten, schlank);
         }

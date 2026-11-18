@@ -47,7 +47,7 @@ WEND
 
 ## Why Drachenhauch
 
-- **One file is a program.** No project setup, no package manager: `SCREEN`, draw, `FLIP` — that is a game. `dhrt --export` makes it a standalone program you can hand on.
+- **One file is a program.** No project setup, no package manager: `SCREEN`, draw, `FLIP` — that is a game. `dhrt --export` makes it a standalone program you can hand on: about 16 MB for a tool, 35 MB for a game.
 - **Mistakes before the run.** Every variable has a type. A misspelled name, a missing argument or text where a number belongs is reported with file and line before the program starts — in the IDE while you type.
 - **Everything included.** 2D and 3D graphics, sound, physics, windows and tables, SQLite, PostgreSQL and MySQL, PDF, network and serial ports are built in. Nothing to install, nothing to keep in sync.
 - **Built with itself.** The IDE, Drachenhauch Studio and every editor are Drachenhauch programs. What carries them carries your application too — and hot loops run as machine code.
@@ -415,7 +415,7 @@ Pipeline: **source → preprocessor → lexer → parser → compiler → VM**; 
 | Frame and loop | game loop (`DELTA`/`FPS`/`SETFPS`), GPU shaders and post-processing (`SHADER_LOAD`/`POSTFX`), TTF fonts ([demo](examples/87_ttf_fonts.dh)), gamepad |
 | Recording input | `AUTOMATION_RECORD`/`PLAY` for attract mode, replayable bug reports and automated playtests ([docs](docs/en/automation.md), [demo](examples/153_automation.dh)) |
 | Modules | **all of them** — including the formerly Python-only ones: `regex`, `tiled`, `tile_collide`, `controller`, extended `audio`; plus feature-gated `db` (rusqlite), `net`, `mqtt`, `html` (ureq) and the hardware side `serial`, `firmata`, `usb`, `wifi`, `bt` |
-| Shipping | `dhrt --export file.dh` (or Ctrl+F6 in the IDE) bundles bytecode + `assets/` into a standalone `.exe` |
+| Shipping | `dhrt --export file.dh` (or Ctrl+F6 in the IDE) bundles bytecode + `assets/` into a standalone `.exe`, with the smallest runtime that has every command the program calls (16 MB without a window, 35 MB for a game; `--voll` for the full one) |
 
 Only the build script still needs Python. The heavier modules come in with
 `build_runtime.py --hardware` or `--full` — **a build without those flags leaves

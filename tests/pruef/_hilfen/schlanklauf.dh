@@ -3,11 +3,14 @@ DIM endung AS STRING : endung = IIF(RIGHT$(LOWER$(EXEPATH$()), 4) = ".exe", ".ex
 FUNCTION konsole$() AS STRING
     RETURN PATHJOIN(DIRNAME(EXEPATH$()), "laufzeiten/dhrt-konsole" + endung)
 END FUNCTION
+FUNCTION mini$() AS STRING
+    RETURN PATHJOIN(DIRNAME(EXEPATH$()), "laufzeiten/dhrt-mini" + endung)
+END FUNCTION
 FUNCTION spiel$() AS STRING
     RETURN PATHJOIN(DIRNAME(EXEPATH$()), "laufzeiten/dhrt-spiel" + endung)
 END FUNCTION
 SUB pruefen()
-    IF NOT FILEEXISTS(konsole$()) OR NOT FILEEXISTS(spiel$()) THEN
+    IF NOT FILEEXISTS(konsole$()) OR NOT FILEEXISTS(spiel$()) OR NOT FILEEXISTS(mini$()) THEN
         PRINT "UEBERSPRINGEN: keine kleinen Laufzeiten neben dhrt (build_runtime.py --laufzeiten)"
         EXIT(0)
     END IF

@@ -110,7 +110,15 @@ dhrt --export spiel.dh
 
 macht aus dem Programm eine eigenständige Datei, die ohne installiertes
 Drachenhauch läuft (in der IDE: **Ausführen → Als eigenständiges Programm
-exportieren**, Strg+F6).
+exportieren**, Strg+F6). Der Export nimmt die kleinste Laufzeit, der keiner
+der Befehle des Programms fehlt:
+
+| Programm | Größe der Datei |
+|---|---|
+| ohne Fenster („Hallo Welt“, ein Werkzeug) | etwa 16 MB |
+| mit Datenbank, Netz oder Mail | etwa 22 MB |
+| ein Spiel oder ein Fenster | etwa 35 MB |
+| PDF, Video, Hardware | etwa 45 MB (die volle Laufzeit) |
 
 ## Wie es weitergeht
 

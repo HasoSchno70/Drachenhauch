@@ -1084,28 +1084,31 @@ its arguments with `ARGPATH$` (see [builtins-core.md](builtins-core.md)). In the
 lean (see below); the export's output scrolls along at the bottom left (see
 [ide.md](ide.md)).
 
-**Lean export** (`--schlank`): the full runtime carries everything (graphics,
+**Lean export** (the default since 2026.52, before that `--schlank`; `--voll`
+takes the full runtime): the full runtime carries everything (graphics,
 sound, PDF with embedded fonts, database, network, video, hardware) and is
-about 37 MB in size. Next to it, two smaller ones live in `laufzeiten/`:
-`dhrt-konsole` (data, network, mail, machine code; 19 MB) and `dhrt-spiel`
+about 45 MB in size. Next to it, three smaller ones live in `laufzeiten/`:
+`dhrt-mini` (core and machine code; 16 MB -- "Hello world" and tools),
+`dhrt-konsole` (plus data, network, mail; 22 MB) and `dhrt-spiel`
 (graphics, sound, dialogs, physics, the built-in fonts for
-`LOADFONT("sans")`, machine code; 27 MB). With `--schlank` the
+`LOADFONT("sans")`, machine code; 35 MB). The
 export takes the smallest one that lacks none of the commands the program
 calls -- even in a subroutine that never runs. **The runtimes themselves are
 asked** (`dhrt-konsole --fehlende name …`: every name is called with
 deliberately nonsensical arguments; a command that exists fails on them, a
 missing one says that it is missing), not a list -- a list would be silently
 wrong with the next new command, and the program would only break at the
-customer's. The export says which one it took (`Schlank: dhrt-konsole (16,1 MB
-statt 32,9 MB)`), and if none fits, why (`dhrt-konsole fehlt PDF_NEW`). The
-machine code stays in both: without it programs would compute up to a hundred
+customer's. The export says which one it took (`Schlank: dhrt-mini (16,4 MB
+statt 45,3 MB)`), and if none fits, why (`dhrt-konsole fehlt PDF_NEW`). The
+machine code stays in all of them: without it programs would compute up to a hundred
 times slower. The small ones are built with `python rust/build_runtime.py
 --laufzeiten`; the installer and the packages for macOS and Linux ship them.
 Checked in
 [tests/pruef/werkzeugkette/export_schlank.dhtest](../../tests/pruef/werkzeugkette/export_schlank.dhtest).
 
 ```
-dhrt --export werkzeug.dh --schlank
+dhrt --export werkzeug.dh
+dhrt --export werkzeug.dh --voll
 ```
 
 Verified: `89_heightmap.dh` exported (~3.7 MB exe), the exe started **without

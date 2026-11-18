@@ -107,7 +107,15 @@ dhrt --export spiel.dh
 ```
 
 turns the program into a standalone file that runs without Drachenhauch
-installed (in the IDE: **Run → Export as standalone program**, Ctrl+F6).
+installed (in the IDE: **Run → Export as standalone program**, Ctrl+F6). The
+export takes the smallest runtime that lacks none of the program's commands:
+
+| Program | File size |
+|---|---|
+| without a window ("Hello world", a tool) | about 16 MB |
+| with a database, network or mail | about 22 MB |
+| a game or a window | about 35 MB |
+| PDF, video, hardware | about 45 MB (the full runtime) |
 
 ## Where to go next
 
