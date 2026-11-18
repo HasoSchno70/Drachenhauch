@@ -10,6 +10,7 @@ Drachenhauch is a BASIC dialect with Pascal-strict typing and OOP, for games and
 
 ### The language
 
+- **[Quick start](schnellstart.md)** — five minutes to your own program: playground, install, first game, first window
 - **[Switching over](umstieg.md)** — from QBasic, VB, Blitz or Python: what things are called here
 - **[Language reference](sprache.md)** — variables, types, operators, control flow (IF, SELECT CASE, WHILE, FOR), functions, classes, try/catch, imports
 - **[Foreign libraries](ffi.md)** — `DECLARE … LIB`: call functions from DLLs, `.so` and `.dylib` files (Windows API, C library, device drivers)

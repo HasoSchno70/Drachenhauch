@@ -15,7 +15,7 @@ eingebettet (`main.rs` liest `/program.dh` zuerst, dann `/program.dhc`).
 Ablauf (mit vollstaendiger Toolchain):
   1. `<datei.dh>` -> `web/program.dh` (Quelle, kopiert) + `web/program.dhc`
      (Fallback, via Python-Compiler -- nur Build-Zeit, nicht im Browser noetig)
-  2. `cargo build --target wasm32-unknown-emscripten --features "graphics schriften" --release`
+  2. `cargo build --target wasm32-unknown-emscripten --features "graphics schriften physik" --release`
      mit emscripten-Linker-Flags (ASYNCIFY fuer den blockierenden VM-Loop,
      GLFW3 fuer raylib, `--embed-file program.dh@/program.dh` + `.dhc`).
   3. `dhrt.js` + `dhrt.wasm` nach `web/` kopieren.
@@ -38,6 +38,10 @@ ROOT = Path(__file__).resolve().parent.parent
 CRATE = ROOT / "rust" / "drachenhauch_runtime"
 WEB = ROOT / "web"
 TARGET = "wasm32-unknown-emscripten"
+# Was der Browser-Bau einschaltet. `physik` ist seit dem schlanken Export
+# (#341) ein eigenes Feature und fehlte hier bis 2026-11-17 -- das
+# Physik-Beispiel der Spielwiese starb mit "ohne das Feature `physik`".
+FEATURES = "graphics schriften physik"
 
 
 def _first_glob(base: Path, pattern: str) -> Path | None:
@@ -216,7 +220,7 @@ def _print_manual(info: dict, out_dir: str | Path = WEB) -> None:
     print("\nQuelle wurde bereits eingebettet. Manueller Build-Befehl:")
     print(f'  set EMCC_CFLAGS={" ".join(emcc_flags(out_dir))}')
     print(f"  cargo build --manifest-path {CRATE / 'Cargo.toml'} \\")
-    print(f"    --target {TARGET} --features \"graphics schriften\" --release")
+    print(f"    --target {TARGET} --features \"{FEATURES}\" --release")
     print(f"  -> {release_ordner(out_dir).as_posix()}/dhrt.{{js,wasm}} "
           "(und deps/dhrt.data) nach web/ kopieren")
 
@@ -368,7 +372,7 @@ def build(dh_path: str | Path, out_dir: str | Path = WEB) -> int:
     if erzwinge_relink(env["EMCC_CFLAGS"], rel, paket_stempel(out_dir)):
         print("Flags oder Datenpaket geaendert -- es wird neu gelinkt.")
     cmd = ["cargo", "build", "--manifest-path", str(CRATE / "Cargo.toml"),
-           "--target", TARGET, "--features", "graphics schriften", "--release"]
+           "--target", TARGET, "--features", FEATURES, "--release"]
     print("Build:", " ".join(cmd))
     rc = subprocess.run(cmd, cwd=str(Path(out_dir)), env=env).returncode
     if rc != 0:

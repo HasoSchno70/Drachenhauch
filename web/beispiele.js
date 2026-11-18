@@ -20,6 +20,221 @@ window.DH_BEISPIELE = [
     titel: "Das Programm laden, mit dem dieser Build gemacht wurde",
     titel_en: "Load the program this build was made with",
   },
+  // --- Die drei Startprojekte aus dem Schnellstart (docs/schnellstart.md).
+  // `id` macht sie ueber `?beispiel=<id>` direkt aufrufbar, `src_en` ist
+  // dieselbe Quelle mit englischen Kommentaren und Texten. String.raw, damit
+  // ein `\` (Ganzzahl-Division) so ankommt, wie er dasteht.
+  {
+    id: "spiel",
+    name: "★ Mini-Spiel",
+    name_en: "★ Mini game",
+    titel: "Startprojekt: Sterne sammeln -- TEMPO oder STERNE aendern",
+    titel_en: "Starter project: collect stars -- change SPEED or STARS",
+    src: String.raw`' Mini-Spiel: Sammle die Sterne! Pfeiltasten bewegen den Drachen.
+' Zum Ausprobieren: TEMPO oder STERNE aendern und neu starten.
+CONST TEMPO = 220.0
+CONST STERNE = 5
+SCREEN(480, 320, "Mini-Spiel", 2)
+
+DIM x AS FLOAT = 240.0
+DIM y AS FLOAT = 160.0
+DIM sx[STERNE] AS INTEGER
+DIM sy[STERNE] AS INTEGER
+DIM punkte AS INTEGER = 0
+DIM i AS INTEGER
+FOR i = 0 TO STERNE - 1
+    sx[i] = RANDINT(20, 460)
+    sy[i] = RANDINT(40, 300)
+NEXT
+
+WHILE NOT QUITREQUESTED()
+    DIM dt AS FLOAT : dt = DELTA()
+    IF KEY_DOWN(KEY_LEFT) THEN x = x - TEMPO * dt
+    IF KEY_DOWN(KEY_RIGHT) THEN x = x + TEMPO * dt
+    IF KEY_DOWN(KEY_UP) THEN y = y - TEMPO * dt
+    IF KEY_DOWN(KEY_DOWN) THEN y = y + TEMPO * dt
+    x = CLAMP(x, 14.0, 466.0)
+    y = CLAMP(y, 14.0, 306.0)
+    FOR i = 0 TO STERNE - 1
+        IF ABS(x - sx[i]) < 20 AND ABS(y - sy[i]) < 20 THEN
+            punkte = punkte + 1
+            sx[i] = RANDINT(20, 460)
+            sy[i] = RANDINT(40, 300)
+        END IF
+    NEXT
+
+    CLS(RGB(16, 22, 36))
+    FOR i = 0 TO STERNE - 1
+        CIRCLE(sx[i], sy[i], 7, RGB(255, 220, 80))
+    NEXT
+    CIRCLE(INT(x), INT(y), 14, RGB(255, 120, 40))
+    CIRCLE(INT(x) + 5, INT(y) - 4, 3, RGB(255, 255, 255))
+    TEXT(10, 8, "Punkte: " + STR$(punkte), RGB(230, 236, 248))
+    FLIP()
+WEND`,
+    src_en: String.raw`' Mini game: collect the stars! Arrow keys move the dragon.
+' Try it: change SPEED or STARS and run again.
+CONST SPEED = 220.0
+CONST STARS = 5
+SCREEN(480, 320, "Mini game", 2)
+
+DIM x AS FLOAT = 240.0
+DIM y AS FLOAT = 160.0
+DIM sx[STARS] AS INTEGER
+DIM sy[STARS] AS INTEGER
+DIM score AS INTEGER = 0
+DIM i AS INTEGER
+FOR i = 0 TO STARS - 1
+    sx[i] = RANDINT(20, 460)
+    sy[i] = RANDINT(40, 300)
+NEXT
+
+WHILE NOT QUITREQUESTED()
+    DIM dt AS FLOAT : dt = DELTA()
+    IF KEY_DOWN(KEY_LEFT) THEN x = x - SPEED * dt
+    IF KEY_DOWN(KEY_RIGHT) THEN x = x + SPEED * dt
+    IF KEY_DOWN(KEY_UP) THEN y = y - SPEED * dt
+    IF KEY_DOWN(KEY_DOWN) THEN y = y + SPEED * dt
+    x = CLAMP(x, 14.0, 466.0)
+    y = CLAMP(y, 14.0, 306.0)
+    FOR i = 0 TO STARS - 1
+        IF ABS(x - sx[i]) < 20 AND ABS(y - sy[i]) < 20 THEN
+            score = score + 1
+            sx[i] = RANDINT(20, 460)
+            sy[i] = RANDINT(40, 300)
+        END IF
+    NEXT
+
+    CLS(RGB(16, 22, 36))
+    FOR i = 0 TO STARS - 1
+        CIRCLE(sx[i], sy[i], 7, RGB(255, 220, 80))
+    NEXT
+    CIRCLE(INT(x), INT(y), 14, RGB(255, 120, 40))
+    CIRCLE(INT(x) + 5, INT(y) - 4, 3, RGB(255, 255, 255))
+    TEXT(10, 8, "Score: " + STR$(score), RGB(230, 236, 248))
+    FLIP()
+WEND`,
+  },
+  {
+    id: "formular",
+    name: "★ Formular",
+    name_en: "★ Form",
+    titel: "Startprojekt: ein Fenster mit Eingabe, Knopf und Liste",
+    titel_en: "Starter project: a window with input, button and list",
+    src: String.raw`' Formular: ein Fenster mit Eingabe, Knopf und Liste.
+' Zum Ausprobieren: den Gruss aendern oder einen zweiten Knopf dazubauen.
+IMPORT "gui"
+SCREEN(420, 300, "Formular", 1)
+
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Gruesse", 10, 10, 400, 280)
+GUI_LABEL(w, "Wie heisst du?", 20, 20)
+DIM eingabe AS GUI_WIDGET : eingabe = GUI_TEXTINPUT(w, 20, 46, 240, 30, "Name")
+DIM knopf AS GUI_WIDGET : knopf = GUI_BUTTON(w, "Gruessen", 270, 46, 110, 30)
+DIM liste AS GUI_WIDGET : liste = GUI_LISTBOX(w, 20, 90, 360, 160, [])
+GUI_LISTBOX_PLACEHOLDER(liste, "Noch niemand gegruesst.")
+
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_CLICKED(knopf) OR GUI_ENTERED(eingabe) THEN
+        IF GUI_GET_TEXT$(eingabe) <> "" THEN
+            GUI_LISTBOX_ADD(liste, "Hallo, " + GUI_GET_TEXT$(eingabe) + "!")
+            GUI_SET_TEXT(eingabe, "")
+        END IF
+    END IF
+    CLS(RGB(30, 34, 44))
+    GUI_DRAW()
+    FLIP()
+WEND`,
+    src_en: String.raw`' Form: a window with an input, a button and a list.
+' Try it: change the greeting or add a second button.
+IMPORT "gui"
+SCREEN(420, 300, "Form", 1)
+
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Greetings", 10, 10, 400, 280)
+GUI_LABEL(w, "What is your name?", 20, 20)
+DIM nameInput AS GUI_WIDGET : nameInput = GUI_TEXTINPUT(w, 20, 46, 240, 30, "Name")
+DIM button AS GUI_WIDGET : button = GUI_BUTTON(w, "Greet", 270, 46, 110, 30)
+DIM list AS GUI_WIDGET : list = GUI_LISTBOX(w, 20, 90, 360, 160, [])
+GUI_LISTBOX_PLACEHOLDER(list, "Nobody greeted yet.")
+
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_CLICKED(button) OR GUI_ENTERED(nameInput) THEN
+        IF GUI_GET_TEXT$(nameInput) <> "" THEN
+            GUI_LISTBOX_ADD(list, "Hello, " + GUI_GET_TEXT$(nameInput) + "!")
+            GUI_SET_TEXT(nameInput, "")
+        END IF
+    END IF
+    CLS(RGB(30, 34, 44))
+    GUI_DRAW()
+    FLIP()
+WEND`,
+  },
+  {
+    id: "malen",
+    name: "★ Malen",
+    name_en: "★ Paint",
+    titel: "Startprojekt: mit der Maus malen -- DICKE aendern",
+    titel_en: "Starter project: paint with the mouse -- change SIZE",
+    src: String.raw`' Malen: mit gedrueckter Maustaste zeichnen.
+' LEER = neue Farbe, C = Blatt leeren. Zum Ausprobieren: DICKE aendern.
+CONST DICKE = 8
+SCREEN(480, 320, "Malen", 2)
+
+DIM blatt AS INTEGER : blatt = RENDERTARGET_NEW(480, 320, TRUE)   ' TRUE: das Blatt behaelt, was darauf steht
+RENDERTARGET_CLEAR(blatt, RGB(250, 248, 240))
+DIM farbe AS INTEGER : farbe = RGB(220, 80, 40)
+DIM altX AS INTEGER : altX = MOUSE_X()
+DIM altY AS INTEGER : altY = MOUSE_Y()
+
+WHILE NOT QUITREQUESTED()
+    IF MOUSE_DOWN(0) THEN
+        RENDERTARGET_BEGIN(blatt)
+        LINEW(altX, altY, MOUSE_X(), MOUSE_Y(), DICKE, farbe)
+        CIRCLE(MOUSE_X(), MOUSE_Y(), DICKE \ 2, farbe)
+        RENDERTARGET_END()
+    END IF
+    altX = MOUSE_X()
+    altY = MOUSE_Y()
+    IF KEY_HIT(KEY_SPACE) THEN farbe = HSV(RANDINT(0, 359), 0.75, 0.9)
+    IF KEY_HIT(KEY_C) THEN RENDERTARGET_CLEAR(blatt, RGB(250, 248, 240))
+
+    CLS()
+    RENDERTARGET_DRAW(blatt, 0, 0)
+    BOX(8, 8, 28, 28, farbe)
+    TEXT(36, 12, "LEER = Farbe, C = leeren", RGB(60, 60, 70))
+    FLIP()
+WEND`,
+    src_en: String.raw`' Paint: draw while holding the mouse button.
+' SPACE = new colour, C = clear the sheet. Try it: change SIZE.
+CONST SIZE = 8
+SCREEN(480, 320, "Paint", 2)
+
+DIM sheet AS INTEGER : sheet = RENDERTARGET_NEW(480, 320, TRUE)   ' TRUE: the sheet keeps what is drawn on it
+RENDERTARGET_CLEAR(sheet, RGB(250, 248, 240))
+DIM colour AS INTEGER : colour = RGB(220, 80, 40)
+DIM lastX AS INTEGER : lastX = MOUSE_X()
+DIM lastY AS INTEGER : lastY = MOUSE_Y()
+
+WHILE NOT QUITREQUESTED()
+    IF MOUSE_DOWN(0) THEN
+        RENDERTARGET_BEGIN(sheet)
+        LINEW(lastX, lastY, MOUSE_X(), MOUSE_Y(), SIZE, colour)
+        CIRCLE(MOUSE_X(), MOUSE_Y(), SIZE \ 2, colour)
+        RENDERTARGET_END()
+    END IF
+    lastX = MOUSE_X()
+    lastY = MOUSE_Y()
+    IF KEY_HIT(KEY_SPACE) THEN colour = HSV(RANDINT(0, 359), 0.75, 0.9)
+    IF KEY_HIT(KEY_C) THEN RENDERTARGET_CLEAR(sheet, RGB(250, 248, 240))
+
+    CLS()
+    RENDERTARGET_DRAW(sheet, 0, 0)
+    BOX(8, 8, 28, 28, colour)
+    TEXT(36, 12, "SPACE = colour, C = clear", RGB(60, 60, 70))
+    FLIP()
+WEND`,
+  },
   {
     name: "Hallo",
     name_en: "Hello",
@@ -154,6 +369,7 @@ window.DH_BEISPIELE = [
     src: [
       "' Im Browser ist nichts zu HOEREN -- aber das Spektrum ist echt:",
       "' der Mix wird vollstaendig gerechnet, nur nicht ausgegeben.",
+      'IMPORT "audio"',
       'SCREEN(480, 300, "Spektrum", 1)',
       "DIM ton AS SOUND",
       "DIM spek[32] AS FLOAT",

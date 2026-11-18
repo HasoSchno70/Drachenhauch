@@ -660,7 +660,41 @@ DIM beispiele AS ARRAY OF STRING : beispiele = ["99_ibl_hdr", "93_shadows", "104
 DIM beispielEn AS ARRAY OF STRING : beispielEn = ["HDR lighting", "Shadows", "GPU instancing", "Skeletal animation", "Additive blending", "Demoscene", "Particles", "Charts", "User interfaces"]
 DIM beispielDe AS ARRAY OF STRING : beispielDe = ["HDR-Beleuchtung", "Schatten", "GPU-Instancing", "Skelett-Animation", "Additives Blenden", "Demoszene", "Partikel", "Diagramme", "Oberflächen"]
 
-DIM BEISPIEL AS STRING : BEISPIEL = "IMPORT ""sprite""" + CHR$(10) + CHR$(10) + "SCREEN(320, 240, ""Hello World"", 2)" + CHR$(10) + CHR$(10) + "DIM hero AS SPRITE" + CHR$(10) + "hero = SPRITE_NEW(LOADIMAGE(""assets/hero.png""), 16, 16)" + CHR$(10) + "SPRITE_SET_POS(hero, 100.0, 100.0)" + CHR$(10) + CHR$(10) + "WHILE NOT QUITREQUESTED()" + CHR$(10) + "    CLS()" + CHR$(10) + "    SPRITE_DRAW(hero)" + CHR$(10) + "    FLIP()" + CHR$(10) + "WEND"
+' Der Code auf der Startseite ist der erste Drachenhauch-Block des
+' Schnellstarts -- eine Quelle, von `dhrt pruef` mitgeprueft, und der Leser
+' findet ihn dort erklaert wieder. Fehlt die Seite, entfaellt der Abschnitt.
+FUNCTION ersterCode$(datei AS STRING) AS STRING
+    IF NOT FILEEXISTS(datei) THEN RETURN ""
+    DIM zeilen AS ARRAY OF STRING : zeilen = READLINES(datei)
+    DIM aus AS ARRAY OF STRING : aus = []
+    DIM drin AS BOOLEAN = FALSE
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(zeilen) - 1
+        DIM z AS STRING : z = zeilen[i]
+        IF drin THEN
+            IF STARTSWITH(TRIM$(z), "```") THEN RETURN JOIN$(aus, CHR$(10))
+            ARRAY_PUSH(aus, z)
+        ELSEIF STARTSWITH(TRIM$(z), "```basic") THEN
+            drin = TRUE
+        END IF
+    NEXT
+    RETURN ""
+END FUNCTION
+
+' Ein Kasten unter "Warum Drachenhauch"
+FUNCTION grund$(titel AS STRING, text AS STRING) AS STRING
+    RETURN "<div class=" + CHR$(34) + "grund" + CHR$(34) + "><h3>" + titel + "</h3><p>" + text + "</p></div>" + CHR$(10)
+END FUNCTION
+
+' Ein Weg hinein: Bild, Ueberschrift, Text, Verweise (fertiges HTML)
+FUNCTION weg$(bild AS STRING, titel AS STRING, text AS STRING, verweise AS STRING) AS STRING
+    DIM q AS STRING : q = CHR$(34)
+    RETURN "<div class=" + q + "weg" + q + "><img src=" + q + "bilder/" + bild + q + " alt=" + q + esc$(titel) + q + " loading=" + q + "lazy" + q + "><div><h3>" + titel + "</h3><p>" + text + "</p><p class=" + q + "mehr" + q + ">" + verweise + "</p></div></div>" + CHR$(10)
+END FUNCTION
+
+FUNCTION verweisA$(href AS STRING, text AS STRING) AS STRING
+    RETURN "<a href=" + CHR$(34) + href + CHR$(34) + ">" + text + "</a>"
+END FUNCTION
 
 SUB startseite(sprache AS STRING)
     DIM en AS BOOLEAN : en = sprache = "en"
@@ -684,21 +718,78 @@ SUB startseite(sprache AS STRING)
     DIM h AS STRING : h = kopf$(sprache, titel, beschreibung, pfad, IIF(en, "de.html", "index.html"), "", ld)
     h = h + "<main class=" + q + "start" + q + ">" + CHR$(10)
     h = h + "<section class=" + q + "held" + q + "><img class=" + q + "schriftzug" + q + " src=" + q + "bilder/schriftzug.png" + q + " alt=" + q + "Drachenhauch" + q + " width=" + q + "560" + q + ">" + CHR$(10)
+    ' Knoepfe: der Schnellstart vorn, wenn es ihn gibt; sonst die Spielwiese,
+    ' sonst der Download (genau einer ist der volle Knopf)
+    DIM mitStart AS BOOLEAN : mitStart = MAPHAS(gibt, "schnellstart")
+    DIM erster AS STRING : erster = "knopf"
+    DIM knoepfe AS STRING
+    IF mitStart THEN
+        knoepfe = "<a class=" + q + erster + q + " href=" + q + sprache + "/schnellstart.html" + q + ">" + IIF(en, "Start in five minutes", "In fünf Minuten loslegen") + "</a>"
+        erster = "knopf zweit"
+    END IF
+    IF mitSpielwiese THEN
+        knoepfe = knoepfe + "<a class=" + q + erster + q + " href=" + q + spielwieseUrl$("", sprache) + q + ">" + IIF(en, "Try it in your browser", "Im Browser ausprobieren") + "</a>"
+        erster = "knopf zweit"
+    END IF
+    knoepfe = knoepfe + "<a class=" + q + erster + q + " href=" + q + REPO + "/releases/latest" + q + ">" + IIF(en, "Download", "Herunterladen") + "</a>"
+    knoepfe = knoepfe + "<a class=" + q + "knopf zweit" + q + " href=" + q + sprache + "/umstieg.html" + q + ">" + IIF(en, "Coming from another BASIC?", "Umstieg aus einem anderen BASIC") + "</a>"
     IF en THEN
         h = h + "<p class=" + q + "spruch" + q + ">Let your ideas breathe fire.</p>" + CHR$(10)
-        h = h + "<h1>A modern BASIC for games and desktop applications</h1>" + CHR$(10)
-        h = h + "<p><strong>Drachenhauch</strong> (German for <em>dragon's breath</em>) is a programming language for writing <strong>2D and 3D games and desktop applications with a GUI</strong> — and the command-line tools and small services that go with them. It comes with its own IDE, Drachenhauch Studio for GUI applications, and sprite, tilemap and sound editors, and turns a program into a standalone <code>.exe</code> with one command. Windows, macOS and Linux, and the browser via WebAssembly.</p>" + CHR$(10)
-        h = h + "<p>A BASIC in the spirit of QB64, FreeBASIC or Blitz Basic, with the batteries of PICO-8 or LÖVE for games and the forms and tables of Visual Basic for applications — easy to start with, strict enough to grow up with.</p>" + CHR$(10)
-        h = h + "<p class=" + q + "knoepfe" + q + ">" + IIF(mitSpielwiese, "<a class=" + q + "knopf" + q + " href=" + q + spielwieseUrl$("", "en") + q + ">Try it in your browser</a>", "") + "<a class=" + q + IIF(mitSpielwiese, "knopf zweit", "knopf") + q + " href=" + q + REPO + "/releases/latest" + q + ">Download</a><a class=" + q + "knopf zweit" + q + " href=" + q + "en/index.html" + q + ">Read the manual</a><a class=" + q + "knopf zweit" + q + " href=" + q + "en/umstieg.html" + q + ">Coming from another BASIC?</a></p>" + CHR$(10)
+        h = h + "<h1>Games and desktop apps in a BASIC that checks your work</h1>" + CHR$(10)
+        h = h + "<p class=" + q + "kern" + q + ">Readable like BASIC, strict like Pascal, with everything in the box: one language for <strong>2D and 3D games</strong> and for <strong>applications with windows, tables and a database</strong>. Mistakes show up before the program runs, and one command turns it into a standalone program.</p>" + CHR$(10)
+        h = h + "<p><strong>Drachenhauch</strong> (German for <em>dragon's breath</em>) comes with its own IDE, Drachenhauch Studio for GUI applications and editors for sprites, maps and sound. Windows, macOS and Linux, and the browser via WebAssembly. A BASIC in the spirit of QB64, FreeBASIC or Blitz Basic, with the batteries of PICO-8 or LÖVE for games and the forms of Visual Basic for applications.</p>" + CHR$(10)
     ELSE
         h = h + "<p class=" + q + "spruch" + q + ">Feuer frei für deine Ideen.</p>" + CHR$(10)
-        h = h + "<h1>Ein modernes BASIC für Spiele und Anwendungen</h1>" + CHR$(10)
-        h = h + "<p><strong>Drachenhauch</strong> ist eine Programmiersprache für <strong>2D- und 3D-Spiele und Anwendungen mit grafischer Oberfläche</strong> — und für die Kommandozeilen-Werkzeuge und kleinen Dienste, die dazugehören. Mit eigener Entwicklungsumgebung, dem Drachenhauch Studio für Anwendungen und Sprite-, Karten- und Klang-Editoren; ein Befehl macht aus einem Programm eine eigenständige <code>.exe</code>. Windows, macOS und Linux und als WebAssembly im Browser.</p>" + CHR$(10)
-        h = h + "<p>Ein BASIC im Geist von QB64, FreeBASIC oder Blitz Basic, mit dem Werkzeugkasten von PICO-8 oder LÖVE für Spiele und den Formularen und Tabellen von Visual Basic für Anwendungen — leicht anzufangen, streng genug, um damit zu wachsen.</p>" + CHR$(10)
-        h = h + "<p class=" + q + "knoepfe" + q + ">" + IIF(mitSpielwiese, "<a class=" + q + "knopf" + q + " href=" + q + spielwieseUrl$("", "de") + q + ">Im Browser ausprobieren</a>", "") + "<a class=" + q + IIF(mitSpielwiese, "knopf zweit", "knopf") + q + " href=" + q + REPO + "/releases/latest" + q + ">Herunterladen</a><a class=" + q + "knopf zweit" + q + " href=" + q + "de/index.html" + q + ">Zum Handbuch</a><a class=" + q + "knopf zweit" + q + " href=" + q + "de/umstieg.html" + q + ">Umstieg aus einem anderen BASIC</a></p>" + CHR$(10)
+        h = h + "<h1>Spiele und Anwendungen in einem BASIC, das mitdenkt</h1>" + CHR$(10)
+        h = h + "<p class=" + q + "kern" + q + ">Lesbar wie BASIC, streng wie Pascal, und alles ist dabei: eine Sprache für <strong>2D- und 3D-Spiele</strong> und für <strong>Anwendungen mit Fenstern, Tabellen und Datenbank</strong>. Fehler zeigen sich, bevor das Programm läuft, und ein Befehl macht daraus ein eigenständiges Programm.</p>" + CHR$(10)
+        h = h + "<p><strong>Drachenhauch</strong> bringt eine eigene Entwicklungsumgebung mit, das Drachenhauch Studio für Anwendungen und Editoren für Sprites, Karten und Klang. Windows, macOS und Linux und als WebAssembly im Browser. Ein BASIC im Geist von QB64, FreeBASIC oder Blitz Basic, mit dem Werkzeugkasten von PICO-8 oder LÖVE für Spiele und den Formularen von Visual Basic für Anwendungen.</p>" + CHR$(10)
     END IF
+    h = h + "<p class=" + q + "knoepfe" + q + ">" + knoepfe + "</p>" + CHR$(10)
     h = h + "</section>" + CHR$(10)
-    h = h + "<section><pre><code class=" + q + "language-basic" + q + ">" + code$(BEISPIEL, "basic") + "</code></pre></section>" + CHR$(10)
+
+    ' Ein ganzes Spiel als Kostprobe -- aus dem Schnellstart
+    DIM probe AS STRING : probe = ersterCode$(IIF(en, PATHJOIN(wurzel, "docs", "en", "schnellstart.md"), PATHJOIN(wurzel, "docs", "schnellstart.md")))
+    IF probe <> "" THEN
+        h = h + "<section><h2>" + IIF(en, "A whole game in under 30 lines", "Ein ganzes Spiel in unter 30 Zeilen") + "</h2><pre><code class=" + q + "language-basic" + q + ">" + code$(probe, "basic") + "</code></pre>" + CHR$(10)
+        h = h + "<p class=" + q + "unter-code" + q + ">" + IIF(en, "Arrow keys move the dragon, the stars give points. ", "Pfeiltasten bewegen den Drachen, die Sterne geben Punkte. ")
+        IF mitSpielwiese THEN h = h + verweisA$(spielwieseUrl$("", sprache) + "&amp;beispiel=spiel", IIF(en, "Play it in your browser", "Im Browser spielen")) + " · "
+        h = h + verweisA$(sprache + "/schnellstart.html", IIF(en, "explained step by step", "Schritt für Schritt erklärt")) + "</p></section>" + CHR$(10)
+    END IF
+
+    ' Warum Drachenhauch
+    h = h + "<section><h2>" + IIF(en, "Why Drachenhauch", "Warum Drachenhauch") + "</h2><div class=" + q + "gruende" + q + ">" + CHR$(10)
+    IF en THEN
+        h = h + grund$("One file is a program", "No project setup, no package manager: <code>SCREEN</code>, draw, <code>FLIP</code> — that is a game. <code>dhrt --export</code> makes it a standalone program you can hand on.")
+        h = h + grund$("Mistakes before the run", "Every variable has a type. A misspelled name, a missing argument or text where a number belongs is reported with file and line before the program starts — in the IDE while you type.")
+        h = h + grund$("Everything included", "2D and 3D graphics, sound, physics, windows and tables, SQLite, PostgreSQL and MySQL, PDF, network and serial ports are built in. Nothing to install, nothing to keep in sync.")
+        h = h + grund$("Built with itself", "The IDE, Drachenhauch Studio and every editor are Drachenhauch programs. What carries them carries your application too — and hot loops run as machine code.")
+    ELSE
+        h = h + grund$("Eine Datei ist ein Programm", "Kein Projektgerüst, kein Paketmanager: <code>SCREEN</code>, zeichnen, <code>FLIP</code> — das ist ein Spiel. <code>dhrt --export</code> macht daraus ein eigenständiges Programm zum Weitergeben.")
+        h = h + grund$("Fehler vor dem Lauf", "Jede Variable hat einen Typ. Ein vertippter Name, ein fehlendes Argument oder Text, wo eine Zahl hingehört, wird mit Datei und Zeile gemeldet, bevor das Programm startet — in der IDE schon beim Tippen.")
+        h = h + grund$("Alles dabei", "2D- und 3D-Grafik, Ton, Physik, Fenster und Tabellen, SQLite, PostgreSQL und MySQL, PDF, Netzwerk und serielle Schnittstellen sind eingebaut. Nichts nachzuinstallieren, nichts aktuell zu halten.")
+        h = h + grund$("Mit sich selbst gebaut", "Die IDE, das Drachenhauch Studio und alle Editoren sind Drachenhauch-Programme. Was die trägt, trägt auch deine Anwendung — und heiße Schleifen laufen als Maschinencode.")
+    END IF
+    h = h + "</div></section>" + CHR$(10)
+
+    ' Drei Wege hinein
+    DIM sw AS STRING : sw = spielwieseUrl$("", sprache) + "&amp;beispiel="
+    DIM vSpiel AS STRING
+    DIM vForm AS STRING
+    IF mitSpielwiese THEN
+        vSpiel = verweisA$(sw + "spiel", IIF(en, "Mini game in the browser", "Mini-Spiel im Browser")) + " "
+        vForm = verweisA$(sw + "formular", IIF(en, "Form in the browser", "Formular im Browser")) + " "
+    END IF
+    h = h + "<section><h2>" + IIF(en, "Three ways in", "Drei Wege hinein") + "</h2><div class=" + q + "wege" + q + ">" + CHR$(10)
+    IF en THEN
+        h = h + weg$("circuitrunner.png", "Make a game", "Start with a game loop of twenty lines, then grow into sprites, Tiled maps, particles, physics and shaders. Circuit Runner, a complete puzzle game, is in the box.", vSpiel + verweisA$("en/builtins-grafik.html", "Graphics and input"))
+        h = h + weg$("studio_en.png", "Build an application", "Click windows together in Drachenhauch Studio and write the events: forms, tables bound to a database, reports and printing — like Visual Basic, on three systems.", vForm + verweisA$("en/studio.html", "Drachenhauch Studio"))
+        h = h + weg$("ide_en.png", "Learn to program", "Readable code, an IDE with debugger and the manual on F1, and a book for beginners that leads chapter by chapter to your own game.", verweisA$("en/schnellstart.html", "Quick start") + " " + verweisA$(REPO + "/tree/main/buecher/einstieg", "The beginners' book"))
+    ELSE
+        h = h + weg$("circuitrunner.png", "Ein Spiel bauen", "Mit einer Spielschleife aus zwanzig Zeilen anfangen, dann wachsen: Sprites, Tiled-Karten, Partikel, Physik und Shader. Circuit Runner, ein ganzes Knobelspiel, liegt bei.", vSpiel + verweisA$("de/builtins-grafik.html", "Grafik und Eingabe"))
+        h = h + weg$("studio.png", "Eine Anwendung bauen", "Fenster im Drachenhauch Studio zusammenklicken und die Ereignisse schreiben: Formulare, Tabellen an einer Datenbank, Berichte und Drucken — wie Visual Basic, auf drei Systemen.", vForm + verweisA$("de/studio.html", "Drachenhauch Studio"))
+        h = h + weg$("ide.png", "Programmieren lernen", "Lesbarer Code, eine IDE mit Debugger und dem Handbuch auf F1, dazu ein Buch für Einsteiger, das Kapitel für Kapitel zum eigenen Spiel führt.", verweisA$("de/schnellstart.html", "Schnellstart") + " " + verweisA$(REPO + "/tree/main/buecher/einstieg", "Das Einsteigerbuch"))
+    END IF
+    h = h + "</div></section>" + CHR$(10)
     h = h + "<section><h2>" + IIF(en, "What it can do", "Was damit geht") + "</h2><div class=" + q + "galerie" + q + ">" + CHR$(10)
     DIM b AS INTEGER
     FOR b = 0 TO LEN(beispiele) - 1
@@ -746,6 +837,9 @@ DIM STIL AS STRING : STIL = ":root{--grund:#fbfaf7;--text:#1d1b22;--leise:#5d586
     + ".held{text-align:center;padding-top:20px}.schriftzug{width:min(560px,90%)}.spruch{font-size:1.2rem;color:var(--leise);margin:0}.held h1{margin-top:.4em}.held p{text-align:left}.held p.spruch{text-align:center}" _
     + ".knoepfe{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}.knopf{display:inline-block;padding:10px 20px;border-radius:999px;background:var(--akzent);color:#fff;text-decoration:none;font-weight:600}.knopf.zweit{background:none;color:var(--akzent);border:2px solid var(--akzent)}" _
     + ".galerie{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px}.galerie a{display:block;text-decoration:none;color:var(--text)}.galerie img{border-radius:8px;display:block;aspect-ratio:4/3;object-fit:cover;width:100%}.galerie span{display:block;padding:4px 2px;font-weight:600}" _
+    + ".held p.kern{font-size:1.15rem;line-height:1.55}.unter-code{text-align:center;color:var(--leise);font-size:.95em}" _
+    + ".gruende{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:16px}.grund{background:var(--fl);border:1px solid var(--rand);border-radius:10px;padding:14px 16px}.grund h3{margin:0 0 .35em;font-size:1.05rem}.grund p{margin:0;font-size:.95em}" _
+    + ".wege{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px}.weg{display:flex;flex-direction:column;background:var(--fl);border:1px solid var(--rand);border-radius:10px;overflow:hidden}.weg img{display:block;width:100%;aspect-ratio:16/9;object-fit:cover;object-position:top left}.weg>div{padding:12px 16px 14px}.weg h3{margin:0 0 .3em}.weg p{margin:.2em 0 .6em;font-size:.95em}.weg .mehr a{display:inline-block;margin-right:14px;font-weight:600}" _
     + ".quelle{margin-top:3em;font-size:.9em}.fuss{border-top:1px solid var(--rand);text-align:center;color:var(--leise);font-size:.9em;padding:10px 20px}"
 
 ' --- llms.txt ---------------------------------------------------------------
@@ -824,6 +918,11 @@ bildKopieren(PATHJOIN(wurzel, "daten", "bilder", "schriftzug.png"), "schriftzug.
 DIM bi AS INTEGER
 FOR bi = 0 TO LEN(beispiele) - 1
     bildKopieren(PATHJOIN(wurzel, "examples", "screenshots", beispiele[bi] + ".png"), beispiele[bi] + ".png")
+NEXT
+' die drei Wege hinein
+DIM wegBilder AS ARRAY OF STRING : wegBilder = ["circuitrunner.png", "studio.png", "studio_en.png", "ide.png", "ide_en.png"]
+FOR bi = 0 TO LEN(wegBilder) - 1
+    bildKopieren(PATHJOIN(wurzel, ".github", "bilder", wegBilder[bi]), wegBilder[bi])
 NEXT
 
 ' sitemap.xml

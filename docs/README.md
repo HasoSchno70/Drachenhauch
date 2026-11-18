@@ -10,6 +10,7 @@ Drachenhauch ist ein BASIC-Dialekt mit Pascal-strikter Typisierung und OOP, für
 
 ### Die Sprache
 
+- **[Schnellstart](schnellstart.md)** — in fünf Minuten zum eigenen Programm: Spielwiese, Installation, erstes Spiel, erstes Fenster
 - **[Umstieg](umstieg.md)** — aus QBasic, VB, Blitz oder Python: was hier anders heißt
 - **[Sprachreferenz](sprache.md)** — Variablen, Typen, Operatoren, Kontrollfluss (IF, SELECT CASE, WHILE, FOR), Funktionen, Klassen, Try/Catch, Imports
 - **[Fremde Bibliotheken](ffi.md)** — `DECLARE … LIB`: Funktionen aus DLLs, `.so` und `.dylib` aufrufen (Windows-API, C-Bibliothek, Gerätetreiber)

@@ -6,7 +6,15 @@
 
 <p align="center"><em>English · <a href="README.de.md">Deutsch</a></em></p>
 
-**Drachenhauch** (German for *dragon's breath*) is a modern BASIC programming language for writing **2D and 3D games and desktop applications with a GUI** — and the command-line tools and small services that go with them. It comes with its own IDE, **Drachenhauch Studio** for GUI applications in the style of Xojo, sprite, tilemap and sound editors, and turns a program into a standalone `.exe` with one command. Runs on Windows, macOS and Linux, and in the browser via WebAssembly.
+<p align="center"><b>Games and desktop apps in a BASIC that checks your work.</b><br>
+Readable like BASIC, strict like Pascal, with everything in the box.</p>
+
+<p align="center"><b><a href="docs/en/schnellstart.md">Start in five minutes</a></b> ·
+<a href="https://hasoschno70.github.io/Drachenhauch/spielwiese/index.html?lang=en">Try it in your browser</a> ·
+<a href="https://github.com/HasoSchno70/Drachenhauch/releases/latest">Download</a> ·
+<a href="docs/en/README.md">Manual</a></p>
+
+**Drachenhauch** (German for *dragon's breath*) is a modern BASIC programming language for writing **2D and 3D games and desktop applications with a GUI** — and the command-line tools and small services that go with them. Mistakes show up before the program runs. It comes with its own IDE, **Drachenhauch Studio** for GUI applications in the style of Xojo, sprite, tilemap and sound editors, and turns a program into a standalone `.exe` with one command. Runs on Windows, macOS and Linux, and in the browser via WebAssembly.
 
 Think of it as a BASIC in the spirit of QB64, FreeBASIC or Blitz Basic, with the batteries of PICO-8 or LÖVE for games and the forms and tables of Visual Basic for applications — easy to start with, strict enough to grow up with.
 
@@ -36,6 +44,23 @@ WHILE NOT QUITREQUESTED()
     SLEEP(16)
 WEND
 ```
+
+## Why Drachenhauch
+
+- **One file is a program.** No project setup, no package manager: `SCREEN`, draw, `FLIP` — that is a game. `dhrt --export` makes it a standalone program you can hand on.
+- **Mistakes before the run.** Every variable has a type. A misspelled name, a missing argument or text where a number belongs is reported with file and line before the program starts — in the IDE while you type.
+- **Everything included.** 2D and 3D graphics, sound, physics, windows and tables, SQLite, PostgreSQL and MySQL, PDF, network and serial ports are built in. Nothing to install, nothing to keep in sync.
+- **Built with itself.** The IDE, Drachenhauch Studio and every editor are Drachenhauch programs. What carries them carries your application too — and hot loops run as machine code.
+
+## Three ways in
+
+<table>
+<tr>
+<td width="33%" valign="top"><b>Make a game</b><br>Start with a game loop of twenty lines, then grow into sprites, Tiled maps, particles, physics and shaders. <a href="spiele/circuitrunner">Circuit Runner</a> is a complete puzzle game in the box.</td>
+<td width="33%" valign="top"><b>Build an application</b><br>Click windows together in <a href="docs/en/studio.md">Drachenhauch Studio</a> and write the events: forms, tables bound to a database, reports and printing.</td>
+<td width="33%" valign="top"><b>Learn to program</b><br>Readable code, an IDE with debugger and the manual on F1, the <a href="docs/en/schnellstart.md">quick start</a> and a <a href="buecher/einstieg">book for beginners</a>.</td>
+</tr>
+</table>
 
 ## What it can do
 
