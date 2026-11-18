@@ -581,7 +581,7 @@ wie getippt über die Tipp-Warteschlange, die 256 Zeichen je Bild fasst
 | `IMAGEWIDTH(image)`, `IMAGEHEIGHT(image)` → INTEGER | Pixelgröße; gleichwertig `IMAGE_WIDTH`/`IMAGE_HEIGHT` im Namensschema der übrigen `IMAGE_*`-Befehle |
 | `GETPIXEL(image, x, y)` → INTEGER | Pixelfarbe (`&HRRGGBB`) an `(x, y)` lesen; `-1` bei Index außerhalb. Gegenstück zu `PLOT` (schreiben) — für Kollision per Pixel, Maskierung, Farb-Sampling |
 | `GETALPHA(image, x, y)` → INTEGER | Deckkraft an `(x, y)`, `0..255`; `-1` bei Index außerhalb. Nötig, weil `GETPIXEL` eine **Farbe** liefert und dort Deckkraft 0 *deckend* bedeutet — ein durchsichtiger Punkt käme als schwarzer zurück |
-| `DRAWIMAGE(image, x, y)` | Bild bei (x, y) zeichnen |
+| `DRAWIMAGE(image, x, y, w = -1, h = -1, angle = 0.0, tint = -1, flip_x = FALSE, flip_y = FALSE, sx = 0, sy = 0, sw = -1, sh = -1)` | Bild bei (x, y) zeichnen. Alles Weitere geht benannt: `w`/`h` Zielgröße, `angle` Grad um die Mitte, `tint` Tönung (ihr Alpha ist die Deckkraft), `flip_x`/`flip_y` spiegeln, `sx, sy, sw, sh` ein Ausschnitt — etwa `DRAW_IMAGE(held, x, y, angle: 30, flip_x: TRUE)` |
 | `DRAWIMAGEPART(image, sx, sy, sw, sh, x, y)` | Sub-Rechteck aus Sheet zeichnen |
 | `DRAWIMAGEPARTEX(image, sx, sy, sw, sh, x, y, w, h [, color])` | Sub-Rechteck auf die Größe `w` x `h` gezogen; `color` tönt es, ihr Alpha ist die Deckkraft (`RGBA(255, 255, 255, 128)` = halb durchsichtig) |
 | `DRAWIMAGEFLIPPED(image, x, y[, flip_x[, flip_y]])` | mit Spiegelung |

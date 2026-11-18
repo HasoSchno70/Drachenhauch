@@ -144,7 +144,7 @@ sind Rückruf-Zeitgeber aus dem Modul `timer`.
 
 | Name | Was es tut |
 |---|---|
-| `DRAW_IMAGE(image, x, y)` | Bild bei (x, y) zeichnen — bisher `DRAWIMAGE` |
+| `DRAW_IMAGE(image, x, y, w = -1, h = -1, angle = 0.0, tint = -1, flip_x = FALSE, flip_y = FALSE, sx = 0, sy = 0, sw = -1, sh = -1)` | Bild bei (x, y) zeichnen. Alles Weitere geht benannt: `w`/`h` Zielgröße, `angle` Grad um die Mitte, `tint` Tönung (ihr Alpha ist die Deckkraft), `flip_x`/`flip_y` spiegeln, `sx, sy, sw, sh` ein Ausschnitt — etwa `DRAW_IMAGE(held, x, y, angle: 30, flip_x: TRUE)` — bisher `DRAWIMAGE` |
 | `DRAW_IMAGE_FLIPPED(image, x, y[, flip_x[, flip_y]])` | mit Spiegelung — bisher `DRAWIMAGEFLIPPED` |
 | `DRAW_IMAGE_PART(image, sx, sy, sw, sh, x, y)` | Sub-Rechteck aus Sheet zeichnen — bisher `DRAWIMAGEPART` |
 | `DRAW_IMAGE_PART_EX(image, sx, sy, sw, sh, x, y, w, h [, color])` | Sub-Rechteck auf die Größe w x h gezogen; color tönt es, ihr Alpha ist die Deckkraft (RGBA(255, 255, 255, … — bisher `DRAWIMAGEPARTEX` |
@@ -201,7 +201,7 @@ sind Rückruf-Zeitgeber aus dem Modul `timer`.
 | `FILE_WRITE_LINE(f, text)` | schreibt + \n — bisher `WRITELINE` |
 | `FILE_EOF(f)` | beim Ende? — bisher `ENDOFFILE` |
 | `DIR_EXISTS(path)` | Verzeichnis vorhanden? — bisher `DIREXISTS` |
-| `DIR_LIST(path [, pattern$])` | Eintragsnamen (sortiert), optional gefiltert — bisher `DIRLIST` |
+| `DIR_LIST(path, pattern$ = "", recursive = FALSE)` | Eintragsnamen (sortiert), optional gefiltert; mit `recursive: TRUE` wie `DIR_LIST_REC` — bisher `DIRLIST` |
 | `DIR_LIST_REC(path$ [, pattern$])` | wie oben, aber rekursiv — nur Dateien, Pfade relativ mit / — bisher `DIRLIST_REC` |
 | `PATH_JOIN(a, b, ...)` | Pfadteile mit / verbinden — bisher `PATHJOIN` |
 | `PATH_DIR(p: STRING)` | Verzeichnis-Anteil (ohne letzten Bestandteil) — bisher `DIRNAME` |

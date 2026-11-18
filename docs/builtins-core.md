@@ -976,7 +976,7 @@ Pfadbasiert, ohne FILE-Handle *(nur native Runtime)*:
 | `FILE_ENCODING$(path$)` → STRING | was `"auto"` wählen würde: `utf8`, `utf8bom`, `cp1252` oder `binaer` (siehe Kodierungen) |
 | `DELETEFILE(path$)`, `RENAME(alt$, neu$)` | löschen / umbenennen·verschieben |
 | `DIREXISTS(path$)` → BOOLEAN | Verzeichnis vorhanden? |
-| `DIRLIST(path$[, pattern$])` → ARRAY OF STRING | Eintragsnamen (sortiert), optional gefiltert |
+| `DIRLIST(path$, pattern$ = "", recursive = FALSE)` → ARRAY OF STRING | Eintragsnamen (sortiert), optional gefiltert; mit `recursive: TRUE` wie `DIRLIST_REC` |
 | `DIRLIST_REC(path$[, pattern$])` → ARRAY OF STRING | wie oben, aber rekursiv — nur Dateien, Pfade relativ mit `/` |
 | `RMDIR(path$[, with_content])` | Verzeichnis löschen (leer; mit `TRUE` samt Inhalt) |
 | `FILETIME(path$)` → INTEGER | zuletzt geändert, Sekunden wie im Modul `zeit` |

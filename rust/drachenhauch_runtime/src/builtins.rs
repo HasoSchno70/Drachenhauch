@@ -3504,9 +3504,17 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         // --- Datei/Verzeichnis (WP3, pfadbasiert -- kein FILE-Handle) ---
         "direxists" => { arity!(1); Ok(Value::Bool(std::path::Path::new(need_str(&a[0], "DIREXISTS")?).is_dir())) }
         "dirlist" => {
-            arity!(1, 2);
+            // DIR_LIST(pfad [, muster [, recursive]]) -- mit recursive = TRUE
+            // wie DIR_LIST_REC. Ein leeres Muster heisst "alles", damit
+            // `DIR_LIST(p, recursive: TRUE)` ohne Muster geht.
+            arity!(1, 3);
             let path = need_str(&a[0], "DIRLIST")?;
-            let muster = if a.len() > 1 { Some(need_str(&a[1], "DIRLIST")?) } else { None };
+            let muster = if a.len() > 1 { Some(need_str(&a[1], "DIRLIST")?).filter(|m| !m.is_empty()) } else { None };
+            if a.len() > 2 && a[2].truthy() {
+                let mut raus: Vec<String> = Vec::new();
+                baum_lesen(std::path::Path::new(path), "", muster, &mut raus, "DIRLIST")?;
+                return Ok(new_str_array(raus));
+            }
             Ok(new_str_array(verzeichnis_lesen(path, muster, "DIRLIST")?))
         }
         "dirlist_rec" => {

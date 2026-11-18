@@ -144,7 +144,7 @@ hand are callback timers from the `timer` module.
 
 | Name | What it does |
 |---|---|
-| `DRAW_IMAGE(image, x, y)` | draw the image at (x, y) — formerly `DRAWIMAGE` |
+| `DRAW_IMAGE(image, x, y, w = -1, h = -1, angle = 0.0, tint = -1, flip_x = FALSE, flip_y = FALSE, sx = 0, sy = 0, sw = -1, sh = -1)` | draw the image at (x, y). Everything else goes by name: `w`/`h` target size, `angle` degrees about the centre, `tint` tint (its alpha is the opacity), `flip_x`/`flip_y` mirror, `sx, sy, sw, sh` a section — e.g. `DRAW_IMAGE(hero, x, y, angle: 30, flip_x: TRUE)` — formerly `DRAWIMAGE` |
 | `DRAW_IMAGE_FLIPPED(image, x, y[, flip_x[, flip_y]])` | with mirroring — formerly `DRAWIMAGEFLIPPED` |
 | `DRAW_IMAGE_PART(image, sx, sy, sw, sh, x, y)` | draw a sub-rectangle from a sheet — formerly `DRAWIMAGEPART` |
 | `DRAW_IMAGE_PART_EX(image, sx, sy, sw, sh, x, y, w, h [, color])` | a sub-rectangle stretched to w x h; color tints it, its alpha is the opacity (RGBA(255, 255, 255, 128) = … — formerly `DRAWIMAGEPARTEX` |
@@ -201,7 +201,7 @@ hand are callback timers from the `timer` module.
 | `FILE_WRITE_LINE(f, text)` | writes + \n — formerly `WRITELINE` |
 | `FILE_EOF(f)` | at the end? — formerly `ENDOFFILE` |
 | `DIR_EXISTS(path)` | directory present? — formerly `DIREXISTS` |
-| `DIR_LIST(path [, pattern$])` | entry names (sorted), optionally filtered — formerly `DIRLIST` |
+| `DIR_LIST(path, pattern$ = "", recursive = FALSE)` | entry names (sorted), optionally filtered; with `recursive: TRUE` like `DIR_LIST_REC` — formerly `DIRLIST` |
 | `DIR_LIST_REC(path$ [, pattern$])` | as above, but recursive — files only, relative paths with / — formerly `DIRLIST_REC` |
 | `PATH_JOIN(a, b, ...)` | join path parts with / — formerly `PATHJOIN` |
 | `PATH_DIR(p: STRING)` | directory part (without the last component) — formerly `DIRNAME` |

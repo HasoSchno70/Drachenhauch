@@ -1,0 +1,97 @@
+' DRAW_IMAGE fasst die Bildbefehle zusammen (2026-11-18): Zielgroesse,
+' Drehung, Toenung, Spiegeln und Ausschnitt gehen als benannte Argumente,
+' (x, y) bleibt die linke obere Ecke. Das Bild ist 20 x 10, links rot,
+' rechts blau.
+
+=== zielgroesse
+SCREEN(100, 60, "Test", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM b AS IMAGE : b = IMAGE_NEW(20, 10, &HFF0000)
+IMAGE_DRAW_RECT(b, 10, 0, 10, 10, &H0000FF)
+WHILE NOT QUITREQUESTED()
+    CLS(&H000000)
+    DRAW_IMAGE(b, 10, 10, w: 40, h: 20)
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=3
+--- bild
+15 15 #FF0000 +-2
+45 25 #0000FF +-2
+55 15 #000000 +-2
+15 35 #000000 +-2
+
+=== spiegeln
+SCREEN(100, 60, "Test", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM b AS IMAGE : b = IMAGE_NEW(20, 10, &HFF0000)
+IMAGE_DRAW_RECT(b, 10, 0, 10, 10, &H0000FF)
+WHILE NOT QUITREQUESTED()
+    CLS(&H000000)
+    DRAW_IMAGE(b, 10, 10, flip_x: TRUE)
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=3
+--- bild
+12 15 #0000FF +-2
+27 15 #FF0000 +-2
+
+=== ausschnitt
+SCREEN(100, 60, "Test", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM b AS IMAGE : b = IMAGE_NEW(20, 10, &HFF0000)
+IMAGE_DRAW_RECT(b, 10, 0, 10, 10, &H0000FF)
+WHILE NOT QUITREQUESTED()
+    CLS(&H000000)
+    DRAW_IMAGE(b, 10, 10, w: 40, sx: 10)
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=3
+--- bild
+12 15 #0000FF +-2
+45 15 #0000FF +-2
+55 15 #000000 +-2
+
+=== drehung um die mitte
+' 180 Grad um die Mitte: blau links, rot rechts, an derselben Stelle.
+SCREEN(100, 60, "Test", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM b AS IMAGE : b = IMAGE_NEW(20, 10, &HFF0000)
+IMAGE_DRAW_RECT(b, 10, 0, 10, 10, &H0000FF)
+WHILE NOT QUITREQUESTED()
+    CLS(&H000000)
+    DRAW_IMAGE(b, 10, 10, angle: 180)
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=3
+--- bild
+12 15 #0000FF +-2
+27 15 #FF0000 +-2
+35 15 #000000 +-2
+
+=== toenung mit deckkraft
+SCREEN(100, 60, "Test", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM b AS IMAGE : b = IMAGE_NEW(20, 10, &HFFFFFF)
+WHILE NOT QUITREQUESTED()
+    CLS(&H000000)
+    DRAW_IMAGE(b, 10, 10, tint: RGBA(255, 255, 255, 128))
+    DRAW_IMAGE(b, 50, 10)
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=3
+--- bild
+15 15 #808080 +-6
+55 15 #FFFFFF +-2
+
+=== zu viele argumente sind ein fehler
+SCREEN(100, 60, "Test", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM b AS IMAGE : b = IMAGE_NEW(4, 4, &HFFFFFF)
+DRAW_IMAGE(b, 0, 0, 1, 2, 3.0, 4, FALSE, FALSE, 0, 0, 1, 1, 9)
+--- fehler
+DRAW_IMAGE: erwartet 3..13 Argumente, erhalten 14

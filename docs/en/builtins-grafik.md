@@ -578,7 +578,7 @@ of 16 would have silently shortened a confirmed sentence).
 | `IMAGEWIDTH(image)`, `IMAGEHEIGHT(image)` → INTEGER | pixel size; equivalently `IMAGE_WIDTH`/`IMAGE_HEIGHT` in the naming scheme of the other `IMAGE_*` commands |
 | `GETPIXEL(image, x, y)` → INTEGER | read the pixel colour (`&HRRGGBB`) at `(x, y)`; `-1` for an index outside. Counterpart to `PLOT` (write) — for per-pixel collision, masking, colour sampling |
 | `GETALPHA(image, x, y)` → INTEGER | opacity at `(x, y)`, `0..255`; `-1` for an index outside. Needed because `GETPIXEL` returns a **colour**, and there opacity 0 means *opaque* — a transparent pixel would come back as a black one |
-| `DRAWIMAGE(image, x, y)` | draw the image at (x, y) |
+| `DRAWIMAGE(image, x, y, w = -1, h = -1, angle = 0.0, tint = -1, flip_x = FALSE, flip_y = FALSE, sx = 0, sy = 0, sw = -1, sh = -1)` | draw the image at (x, y). Everything else goes by name: `w`/`h` target size, `angle` degrees about the centre, `tint` tint (its alpha is the opacity), `flip_x`/`flip_y` mirror, `sx, sy, sw, sh` a section — e.g. `DRAW_IMAGE(hero, x, y, angle: 30, flip_x: TRUE)` |
 | `DRAWIMAGEPART(image, sx, sy, sw, sh, x, y)` | draw a sub-rectangle from a sheet |
 | `DRAWIMAGEPARTEX(image, sx, sy, sw, sh, x, y, w, h [, color])` | a sub-rectangle stretched to `w` x `h`; `color` tints it, its alpha is the opacity (`RGBA(255, 255, 255, 128)` = half transparent) |
 | `DRAWIMAGEFLIPPED(image, x, y[, flip_x[, flip_y]])` | with mirroring |

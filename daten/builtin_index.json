@@ -2891,13 +2891,13 @@
   {
    "name": "DIRLIST",
    "kind": "core",
-   "signature": "DIRLIST(path [, pattern$]) AS ARRAY OF STRING",
+   "signature": "DIRLIST(path, pattern$ = \"\", recursive = FALSE) AS ARRAY OF STRING",
    "module": "dhrt"
   },
   {
    "name": "DIR_LIST",
    "kind": "core",
-   "signature": "DIR_LIST(path [, pattern$]) AS ARRAY OF STRING",
+   "signature": "DIR_LIST(path, pattern$ = \"\", recursive = FALSE) AS ARRAY OF STRING",
    "module": "dhrt"
   },
   {
@@ -2951,13 +2951,13 @@
   {
    "name": "DRAWIMAGE",
    "kind": "graphics",
-   "signature": "DRAWIMAGE(image, x, y)",
+   "signature": "DRAWIMAGE(image, x, y, w = -1, h = -1, angle = 0.0, tint = -1, flip_x = FALSE, flip_y = FALSE, sx = 0, sy = 0, sw = -1, sh = -1)",
    "module": "core"
   },
   {
    "name": "DRAW_IMAGE",
    "kind": "graphics",
-   "signature": "DRAW_IMAGE(image, x, y)",
+   "signature": "DRAW_IMAGE(image, x, y, w = -1, h = -1, angle = 0.0, tint = -1, flip_x = FALSE, flip_y = FALSE, sx = 0, sy = 0, sw = -1, sh = -1)",
    "module": "core"
   },
   {

@@ -975,7 +975,7 @@ Path-based, without a FILE handle *(native runtime only)*:
 | `FILE_ENCODING$(path$)` → STRING | what `"auto"` would choose: `utf8`, `utf8bom`, `cp1252` or `binaer` (see encodings) |
 | `DELETEFILE(path$)`, `RENAME(alt$, neu$)` | delete / rename·move |
 | `DIREXISTS(path$)` → BOOLEAN | directory present? |
-| `DIRLIST(path$[, pattern$])` → ARRAY OF STRING | entry names (sorted), optionally filtered |
+| `DIRLIST(path$, pattern$ = "", recursive = FALSE)` → ARRAY OF STRING | entry names (sorted), optionally filtered; with `recursive: TRUE` like `DIRLIST_REC` |
 | `DIRLIST_REC(path$[, pattern$])` → ARRAY OF STRING | as above, but recursive — files only, relative paths with `/` |
 | `RMDIR(path$[, with_content])` | delete a directory (empty; with `TRUE` including its contents) |
 | `FILETIME(path$)` → INTEGER | last modified, seconds as in the module `zeit` |

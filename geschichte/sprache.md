@@ -1056,3 +1056,40 @@ Child-Klassen erben sie automatisch.
   die Modul-Registry wird zuerst konsultiert.
 
 **Beispiel:** [examples/70_operator.dh](examples/70_operator.dh).
+
+## Benannte Argumente an Builtins (2026-11-18)
+
+Bis hierher gingen `name: wert` nur bei SUB/FUNCTION/NEW; Builtins meldeten
+"Named-Args nur bei SUB/FUNCTION". Ziel war, Drachenhauch "salonfaehig" zu
+machen: lesbare Aufrufe und weniger Varianten-Befehle.
+
+- **Woher die Namen kommen:** aus der Signatur in `daten/builtin_index.json`
+  (`compiler::signatur_params`). Der Compiler legt die Werte in die
+  Reihenfolge der Signatur (`builtin_benannt`), danach sieht der Aufruf aus,
+  als stuenden alle Werte an ihrer Stelle -- Laufzeit und Sonderwege merken
+  nichts. Das `$` am Namen ist frei, ein Schluesselwort darf Name sein
+  (`new:`, `image:`, `to:`; `lexer::keyword_text`).
+- **Luecken:** wer einen spaeteren optionalen Parameter benennt, bekommt die
+  davor aus ihrer Vorgabe im Index (`color = &HFFFFFF`). 91 Vorgaben wurden
+  am Code nachgemessen (ein Helfer las jeden `args.len()`-Zweig); 11 haben
+  keine, weil Weglassen etwas anderes heisst als jeder Wert (Fensterfarbe
+  behalten, Groesse des Quellbildes ...). Dort sagt die Meldung, was mit
+  anzugeben ist.
+- **Namen englisch:** 1030 Signaturen von deutschen auf englische Namen
+  (`farbe` -> `color`, `pfad` -> `path`), die Befehlstabellen der Doku Stelle
+  fuer Stelle mit. Funde dabei: der positionsweise Abgleich ueberschrieb
+  bessere englische Doku-Namen (`key` -> `k`, `cmp` -> `descending` der
+  anderen SORT-Form) und die fremden Formen in `umstieg.md` -- dort wurde
+  der Index nachgezogen bzw. die Seite ausgenommen. `dhrt pruef parameter`
+  haelt Tabellen und Index seitdem zusammen (Umlaut im Namen = Befund,
+  Setzer `GUI_TOOLTIP` und Leser `GUI_TOOLTIP$` getrennt).
+- **Varianten zusammengefasst:** `DRAW_IMAGE` nimmt `w, h, angle, tint,
+  flip_x, flip_y, sx, sy, sw, sh` (deckt FLIPPED, PART, PART_EX und die
+  Drehung ab; (x, y) bleibt die linke obere Ecke), `DIR_LIST` nimmt
+  `recursive`. Die alten Befehle bleiben.
+- **IDE:** ein Parameter mit Vorgabe gehoert nicht ins Geruest der
+  Vervollstaendigung (sonst `DRAW_IMAGE(image, x, y, w, h, ...)`).
+- **Offen:** `ELLIPSE_OUTLINE`, `TRIANGLE_OUTLINE`, `POLYGON_OUTLINE` nennen
+  ein `width`, das der Code nie liest; `RANGE(a, b, step)` vertauscht die
+  Bedeutung von `a` mit der Zahl der Argumente; `IMAGE_DRAW_IMAGE` liest
+  `tint` je nach Argumentzahl an anderer Stelle.
