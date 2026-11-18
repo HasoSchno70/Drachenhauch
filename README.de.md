@@ -136,7 +136,7 @@ Nachzulesen im [Handbuch](docs/README.md); wie es dazu kam, steht in der
 
 ## Herunterladen
 
-**[Drachenhauch herunterladen](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — für Windows ein Installer (rund 60 MB), für macOS eine `.dmg`, für Linux ein `.tar.gz` (x86_64, und aarch64 für den [Raspberry Pi](docs/raspberry-pi.md)); aktuell Fassung 2026.52.
+**[Drachenhauch herunterladen](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — für Windows ein Installer (rund 65 MB), für macOS eine `.dmg`, für Linux ein `.tar.gz` (x86_64, und aarch64 für den [Raspberry Pi](docs/raspberry-pi.md)); aktuell Fassung 2026.52.
 
 Python muss dafür **nicht** installiert sein. Mit dabei sind die komplette Entwicklungsumgebung, die Runtime `dhrt`, alle Beispiele samt Assets, beide Bücher (*Der Einstieg* und *Das Lehrbuch*, letzteres in beiden Sprachen) als `.docx` und `.epub` sowie das ESP32-Grundgerüst. Der Windows-Installer ist nicht signiert, SmartScreen meldet sich also beim ersten Start; die macOS-App ist noch nicht beglaubigt.
 
@@ -173,8 +173,8 @@ rust/drachenhauch_runtime/target/release/dhrt run ide/ide.dh
 
 | Ausgabe | Zum Drucken (A4) | Fürs Lesegerät |
 |---|---|---|
-| **Deutsch** — 575 Seiten | [Drachenhauch-Lehrbuch.docx](buecher/referenz/buch/Drachenhauch-Lehrbuch.docx?raw=1) | [.epub](buecher/referenz/buch/Drachenhauch-Lehrbuch.epub?raw=1) |
-| **English** — 566 pages | [Drachenhauch-Handbook.docx](buecher/referenz/buch/Drachenhauch-Handbook.docx?raw=1) | [.epub](buecher/referenz/buch/Drachenhauch-Handbook.epub?raw=1) |
+| **Deutsch** — 576 Seiten | [Drachenhauch-Lehrbuch.docx](buecher/referenz/buch/Drachenhauch-Lehrbuch.docx?raw=1) | [.epub](buecher/referenz/buch/Drachenhauch-Lehrbuch.epub?raw=1) |
+| **English** — 567 pages | [Drachenhauch-Handbook.docx](buecher/referenz/buch/Drachenhauch-Handbook.docx?raw=1) | [.epub](buecher/referenz/buch/Drachenhauch-Handbook.epub?raw=1) |
 
 Beide Sprachen entstehen aus **denselben** Kapitelquellen (`content/NN_*.js`): die Renderer bekommen ein `H`, das jede Zeichenkette vorher durch den Katalog `i18n/en.json` schickt. Ein zweiter Satz englischer Kapiteldateien wäre binnen eines Monats vom deutschen abgedriftet — so kann er es nicht. Fehlt ein Eintrag, bleibt der deutsche Satz stehen und das Buch baut trotzdem; `node fehlend.js en` zählt, wo noch welche fehlen.
 
