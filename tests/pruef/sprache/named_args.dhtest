@@ -160,6 +160,23 @@ PRINT TIME_FROM_PARTS(day: 18, month: 11, year: 2026) = TIME_FROM_PARTS(2026, 11
 TRUE
 TRUE
 
+=== range mit namen
+' Der erste Parameter heisst start_or_stop: allein ist er das Ende.
+DIM i AS INTEGER
+DIM s AS STRING : s = ""
+FOR EACH i IN RANGE(start_or_stop: 3)
+    s = s + STR$(i)
+NEXT
+PRINT s
+s = ""
+FOR EACH i IN RANGE(start_or_stop: 10, stop: 0, step: -3)
+    s = s + STR$(i) + " "
+NEXT
+PRINT TRIM$(s)
+--- erwartet
+012
+10 7 4 1
+
 === builtin unbekannter parametername
 PRINT ABS(wert: -5)
 --- fehler

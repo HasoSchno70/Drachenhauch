@@ -420,6 +420,7 @@ See also [Language reference → Arrays](sprache.md#arrays).
 | `ARRAY_AVG(arr)` → FLOAT | average (the array must not be empty) |
 | `ARRAY_MIN(arr)`, `ARRAY_MAX(arr)` | smallest / largest element |
 | `ARRAY_FILL(arr, value)` | fill all elements with `value` (IN PLACE, every dimension) |
+| `RANGE(start_or_stop[, stop[, step]])` → TUPLE | number sequence without the end: with one argument from 0 (`RANGE(4)` = 0, 1, 2, 3), with two from–to (`RANGE(2, 5)` = 2, 3, 4), with `step` in steps, also backwards (`RANGE(10, 0, -3)` = 10, 7, 4, 1) |
 | `ARRAY_COPY(arr)` → ARRAY | independent copy (same shape/type) |
 
 **Dynamic 1D arrays** (grow/shrink IN PLACE):

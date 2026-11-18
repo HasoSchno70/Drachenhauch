@@ -8645,7 +8645,7 @@
   {
    "name": "IMAGE_DRAW_IMAGE",
    "kind": "core",
-   "signature": "IMAGE_DRAW_IMAGE(target, source, x, y [, qx = 0, qy = 0, qb, qh] [, tint])",
+   "signature": "IMAGE_DRAW_IMAGE(target, source, x, y [, qx = 0, qy = 0, qb = -1, qh = -1] [, tint])",
    "module": "imgfx"
   },
   {
@@ -11939,7 +11939,7 @@
   {
    "name": "RANGE",
    "kind": "core",
-   "signature": "RANGE(a[, b[, step]])",
+   "signature": "RANGE(start_or_stop[, stop[, step]])",
    "module": "core"
   },
   {

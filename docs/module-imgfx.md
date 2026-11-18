@@ -133,7 +133,7 @@ und ueberhaupt nichts speichern.
 |---|---|
 | `IMAGE_NEW(width, height [, color])` | IMAGE — ein neues Bild; **ohne Farbe vollstaendig durchsichtig** |
 | `IMAGE_CLEAR(image [, x, y, b, h])` | einen Bereich vollstaendig durchsichtig machen — der Radierer; ohne Rechteck das ganze Bild |
-| `IMAGE_DRAW_IMAGE(target, source, x, y [, qx, qy, qb, qh] [, tint])` | ein Bild in ein anderes zeichnen, mit Deckkraft gemischt; wahlweise nur ein Ausschnitt der Quelle |
+| `IMAGE_DRAW_IMAGE(target, source, x, y [, qx, qy, qb, qh] [, tint])` | ein Bild in ein anderes zeichnen, mit Deckkraft gemischt; wahlweise nur ein Ausschnitt der Quelle (`qb`/`qh` = -1: bis zum Rand, so geht auch `tint:` allein) |
 | `IMAGE_SAVE(image, path$ [, with_alpha])` | das Bild in eine Datei schreiben (`.png`, `.bmp`, `.jpg`, `.tga`); mit `FALSE` ohne Deckkraft-Kanal (RGB) — Druckdienste lehnen ein PNG mit Alphakanal ab, auch wenn jeder Punkt deckend ist. Die Deckkraft wird dabei weggelassen, nicht verrechnet: wer einen Grund will, legt das Bild vorher auf ein deckendes |
 | `GETALPHA(image, x, y)` | Deckkraft eines Bildpunkts, 0..255; `-1` ausserhalb (core, kein IMPORT noetig) |
 | `IMAGE_FREE(image)` | das Bild und seine Grafikspeicher-Textur freigeben |

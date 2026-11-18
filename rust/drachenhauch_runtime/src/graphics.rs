@@ -4954,9 +4954,19 @@ impl Graphics {
         let (x1, y1) = self.w2s(x1, y1); let (x2, y2) = self.w2s(x2, y2); let (x3, y3) = self.w2s(x3, y3);
         self.emit(Cmd::Triangle(x1, y1, x2, y2, x3, y3, col(c)));
     }
-    pub fn triangle_outline(&mut self, x1: i32, y1: i32, x2: i32, y2: i32, x3: i32, y3: i32, c: i64) {
+    /// `width`: `None` = der 1px-Strich wie bisher; `Some(w)` ein geschlossener
+    /// Linienzug dieser Dicke (mit `cam_zoom` wie `arc`). Bis 2026-11-18
+    /// nannte die Signatur ein `width`, das niemand las.
+    #[allow(clippy::too_many_arguments)]
+    pub fn triangle_outline(&mut self, x1: i32, y1: i32, x2: i32, y2: i32, x3: i32, y3: i32, c: i64, width: Option<f64>) {
         let (x1, y1) = self.w2s(x1, y1); let (x2, y2) = self.w2s(x2, y2); let (x3, y3) = self.w2s(x3, y3);
-        self.emit(Cmd::TriLines(x1, y1, x2, y2, x3, y3, col(c)));
+        match width {
+            None => self.emit(Cmd::TriLines(x1, y1, x2, y2, x3, y3, col(c))),
+            Some(w) => {
+                let thick = (w * self.cam_zoom).max(1.0) as f32;
+                self.emit(Cmd::Poly(vec![(x1, y1), (x2, y2), (x3, y3)], thick, col(c), true));
+            }
+        }
     }
     fn ellipse_box(x1: i32, y1: i32, x2: i32, y2: i32) -> (i32, i32, i32, i32) {
         let x = x1.min(x2); let y = y1.min(y2);
@@ -4968,10 +4978,24 @@ impl Graphics {
         let (cx, cy, rh, rv) = Self::ellipse_box(x1, y1, x2, y2);
         self.emit(Cmd::Ellipse(cx, cy, rh, rv, col(c), true));
     }
-    pub fn ellipse_outline(&mut self, x1: i32, y1: i32, x2: i32, y2: i32, c: i64) {
+    /// `width` wie bei `triangle_outline`: mit Dicke als geschlossener
+    /// Linienzug aus 64 Punkten (derselbe Weg wie `arc`).
+    pub fn ellipse_outline(&mut self, x1: i32, y1: i32, x2: i32, y2: i32, c: i64, width: Option<f64>) {
         let (x1, y1) = self.w2s(x1, y1); let (x2, y2) = self.w2s(x2, y2);
         let (cx, cy, rh, rv) = Self::ellipse_box(x1, y1, x2, y2);
-        self.emit(Cmd::Ellipse(cx, cy, rh, rv, col(c), false));
+        match width {
+            None => self.emit(Cmd::Ellipse(cx, cy, rh, rv, col(c), false)),
+            Some(w) => {
+                let n = 64;
+                let pts: Vec<(i32, i32)> = (0..n).map(|i| {
+                    let t = std::f64::consts::TAU * (i as f64) / (n as f64);
+                    ((cx as f64 + rh as f64 * t.cos()).round() as i32,
+                     (cy as f64 - rv as f64 * t.sin()).round() as i32)
+                }).collect();
+                let thick = (w * self.cam_zoom).max(1.0) as f32;
+                self.emit(Cmd::Poly(pts, thick, col(c), true));
+            }
+        }
     }
     /// `width`: `None` = klassischer 1px-Strich (zoom-unabhaengig, wie vor
     /// Einfuehrung des Width-Parameters). `Some(w)` skaliert wie bei
@@ -4997,6 +5021,17 @@ impl Graphics {
         let pts: Vec<(i32, i32)> = flat.chunks(2).map(|p| { let (x, y) = self.w2s(p[0], p[1]); (x, y) }).collect();
         if filled { self.emit(Cmd::FillPoly(pts, col(c))); }
         else { self.emit(Cmd::Poly(pts, 1.0, col(c), true)); }
+        Ok(())
+    }
+    /// POLYGON_OUTLINE mit Dicke (`width`, mit `cam_zoom` wie `arc`).
+    pub fn polygon_outline(&mut self, flat: &[i32], c: i64, width: Option<f64>) -> Result<(), String> {
+        let Some(w) = width else { return self.polygon(flat, c, false) };
+        if flat.len() < 6 || flat.len() % 2 != 0 {
+            return Err("POLYGON: braucht mindestens 3 Punkte (6 Werte)".into());
+        }
+        let pts: Vec<(i32, i32)> = flat.chunks(2).map(|p| { let (x, y) = self.w2s(p[0], p[1]); (x, y) }).collect();
+        let thick = (w * self.cam_zoom).max(1.0) as f32;
+        self.emit(Cmd::Poly(pts, thick, col(c), true));
         Ok(())
     }
     pub fn text(&mut self, x: i32, y: i32, s: String, c: i64) {
@@ -6347,7 +6382,12 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
                             quelle: Option<(i32, i32, i32, i32)>, tint: i64)
                             -> Result<(), String> {
         let mut s = self.src_image(src, "IMAGE_DRAW_IMAGE")?;
-        let q = quelle.unwrap_or((0, 0, s.width, s.height));
+        // qb/qh = -1: bis zum Rand -- die Vorgabe, mit der ein benanntes
+        // `tint:` die Luecke davor fuellt.
+        let q = quelle.map(|(qx, qy, qb, qh)| (qx, qy,
+            if qb == -1 { s.width - qx } else { qb },
+            if qh == -1 { s.height - qy } else { qh }))
+            .unwrap_or((0, 0, s.width, s.height));
         if q.2 <= 0 || q.3 <= 0 {
             return Err("IMAGE_DRAW_IMAGE: Quellbreite und -hoehe muessen > 0 sein".into());
         }

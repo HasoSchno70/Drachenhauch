@@ -419,6 +419,7 @@ Siehe auch [Sprachreferenz → Arrays](sprache.md#arrays).
 | `ARRAY_AVG(arr)` → FLOAT | Durchschnitt (Array darf nicht leer sein) |
 | `ARRAY_MIN(arr)`, `ARRAY_MAX(arr)` | kleinstes / größtes Element |
 | `ARRAY_FILL(arr, value)` | alle Elemente mit `value` füllen (IN PLACE, jede Dimension) |
+| `RANGE(start_or_stop[, stop[, step]])` → TUPLE | Zahlenfolge ohne das Ende: mit einem Argument ab 0 (`RANGE(4)` = 0, 1, 2, 3), mit zweien von–bis (`RANGE(2, 5)` = 2, 3, 4), mit `step` in Schritten, auch rückwärts (`RANGE(10, 0, -3)` = 10, 7, 4, 1) |
 | `ARRAY_COPY(arr)` → ARRAY | unabhängige Kopie (gleiche Form/Typ) |
 
 **Dynamische 1D-Arrays** (wachsen/schrumpfen IN PLACE):

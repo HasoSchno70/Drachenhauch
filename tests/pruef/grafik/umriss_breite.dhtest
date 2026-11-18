@@ -1,0 +1,61 @@
+' Umrisse mit Dicke (2026-11-18): ELLIPSE_OUTLINE, TRIANGLE_OUTLINE und
+' POLYGON_OUTLINE nannten ein `width`, das der Code nie las -- mit benannten
+' Argumenten (`width: 6`) haette es still nichts bewirkt. Ohne `width`
+' bleibt der 1px-Strich. Geprueft wird ein Punkt 2 px innerhalb der Kante:
+' bei 6 px Dicke farbig, bei 1 px Grund.
+
+=== ellipse mit dicke
+SCREEN(100, 60, "Test", 1)
+SET_WINDOW_POS(-3000, -3000)
+WHILE NOT QUITREQUESTED()
+    CLS(&H000000)
+    ELLIPSE_OUTLINE(10, 10, 90, 50, &HFFFFFF, width: 6)
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=3
+--- bild
+50 12 #FFFFFF +-40
+50 30 #000000 +-2
+
+=== ellipse ohne dicke bleibt duenn
+SCREEN(100, 60, "Test", 1)
+SET_WINDOW_POS(-3000, -3000)
+WHILE NOT QUITREQUESTED()
+    CLS(&H000000)
+    ELLIPSE_OUTLINE(10, 10, 90, 50, &HFFFFFF)
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=3
+--- bild
+50 13 #000000 +-2
+
+=== dreieck mit dicke
+SCREEN(100, 60, "Test", 1)
+SET_WINDOW_POS(-3000, -3000)
+WHILE NOT QUITREQUESTED()
+    CLS(&H000000)
+    TRIANGLE_OUTLINE(10, 50, 90, 50, 50, 10, &HFFFFFF, width: 6)
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=3
+--- bild
+50 48 #FFFFFF +-40
+50 40 #000000 +-2
+
+=== vieleck mit dicke
+SCREEN(100, 60, "Test", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM p AS ARRAY OF INTEGER : p = [10, 10, 90, 10, 90, 50, 10, 50]
+WHILE NOT QUITREQUESTED()
+    CLS(&H000000)
+    POLYGON_OUTLINE(p, &HFFFFFF, 6)
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=3
+--- bild
+50 12 #FFFFFF +-40
+50 30 #000000 +-2
