@@ -373,8 +373,10 @@ auch `cargo check` ohne das Feature `jit` (ein verrutschtes `cfg` fällt sonst
 erst in der CI auf).
 
 Eine Fassung: PR mit Nummer (`Cargo.toml`), Notizen deutsch und englisch
-(`docs/releases/release-<fassung>.md` und `.en.md`, im Release englisch zuerst)
-und Büchern; nach dem Merge
+(`docs/releases/release-<fassung>.md` und `.en.md`, im Release englisch zuerst;
+der erste Abschnitt „Was sich für bestehende Programme ändert“ landet über
+`dhrt doku aenderungen` im Änderungsprotokoll, `docs/stabilitaet.md` sagt,
+was nicht brechen darf) und Büchern; nach dem Merge
 `git tag v<fassung>` auf den Merge-Commit und pushen. `release.yml` baut daraus
 Installer, Pakete und Prüfsummen und legt einen Release-**Entwurf** an, den der
 Nutzer veröffentlicht.

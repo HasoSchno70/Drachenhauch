@@ -389,6 +389,11 @@ CHDIR(ARG$(0))
 dlStarten(["doku", "grammatik", "--pruefen"])
 IF dlCode <> 0 THEN PRINT dlAus; dlErr
 PRINT "grammatik: rueckgabe "; dlCode
+' Das Aenderungsprotokoll (docs/aenderungen.md, docs/en/) kommt aus den
+' Notizen der Fassungen -- wer eine Notiz schreibt, erzeugt es neu.
+dlStarten(["doku", "aenderungen", "--pruefen"])
+IF dlCode <> 0 THEN PRINT dlAus; dlErr
+PRINT "aenderungen: rueckgabe "; dlCode
 DIM node AS BOOLEAN : node = TRUE
 TRY
     DIM p AS INTEGER : p = PROCESS_START("node", "--version")
@@ -412,6 +417,7 @@ PRINT "prosa: rueckgabe "; dlCode
 IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 grammatik: rueckgabe 0
+aenderungen: rueckgabe 0
 prosa: rueckgabe 0
 
 === die kurzbeschreibungen sind brauchbar
