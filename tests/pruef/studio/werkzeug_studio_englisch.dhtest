@@ -139,7 +139,7 @@ IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- erwartet
 probe sprache de
-probe dhrt_lang []
+probe dhrt_lang [de]
 probe status Neues Projekt. Bausteine aus der Bibliothek ins Fenster ziehen.
 probe bibliothek Knöpfe und Schalter | Knopf
 probe inspektor Fenster
