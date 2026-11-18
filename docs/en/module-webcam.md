@@ -36,14 +36,14 @@ WEBCAM_CLOSE(cam)
 | Command | What it does |
 |---|---|
 | `WEBCAM_DEVICES()` → ARRAY OF STRING | the names of all cameras; empty if the computer has none |
-| `WEBCAM_OPEN([geraet$ [, breite, hoehe]])` → WEBCAM | open a camera — without a name the first one. A name matches exactly or as a part, ignoring case; an unknown one is an error that lists the available ones. `breite`/`hoehe` (width/height) are a wish the camera gets as close to as it can (0 = what it suggests) |
-| `WEBCAM_CLOSE(kamera)` | close the camera and free its picture |
-| `WEBCAM_UPDATE(kamera)` → BOOLEAN | has a new picture arrived since the last question? Then it is now in the camera's image |
-| `WEBCAM_IMAGE(kamera)` → IMAGE | the camera's image with the most recent picture (fetches it itself). It is always the same `IMAGE` — unless the camera changes its size, then there is a new one |
-| `WEBCAM_WIDTH(kamera)` / `WEBCAM_HEIGHT(kamera)` → INTEGER | the size the camera really delivers |
-| `WEBCAM_FRAMES(kamera)` → INTEGER | how many pictures arrived since opening — shows whether anything is coming at all, and the frame rate |
-| `WEBCAM_NAME$(kamera)` → STRING | the name of the open camera |
-| `WEBCAM_ERROR$(kamera)` → STRING | what the camera reported after opening (unplugged, busy) — otherwise `""` |
+| `WEBCAM_OPEN([device$ [, width, height]])` → WEBCAM | open a camera — without a name the first one. A name matches exactly or as a part, ignoring case; an unknown one is an error that lists the available ones. `width`/`height` (width/height) are a wish the camera gets as close to as it can (0 = what it suggests) |
+| `WEBCAM_CLOSE(camera)` | close the camera and free its picture |
+| `WEBCAM_UPDATE(camera)` → BOOLEAN | has a new picture arrived since the last question? Then it is now in the camera's image |
+| `WEBCAM_IMAGE(camera)` → IMAGE | the camera's image with the most recent picture (fetches it itself). It is always the same `IMAGE` — unless the camera changes its size, then there is a new one |
+| `WEBCAM_WIDTH(camera)` / `WEBCAM_HEIGHT(camera)` → INTEGER | the size the camera really delivers |
+| `WEBCAM_FRAMES(camera)` → INTEGER | how many pictures arrived since opening — shows whether anything is coming at all, and the frame rate |
+| `WEBCAM_NAME$(camera)` → STRING | the name of the open camera |
+| `WEBCAM_ERROR$(camera)` → STRING | what the camera reported after opening (unplugged, busy) — otherwise `""` |
 
 The image needs graphics: without `SCREEN`, `WEBCAM_OPEN` creates a hidden
 window, like `LOADIMAGE`.

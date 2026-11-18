@@ -93,6 +93,9 @@ enum Cmd {
     TexturePartExTint(usize, i32, i32, i32, i32, i32, i32, i32, i32, Color), // Ausschnitt skaliert, getoent
     TextureFlipped(usize, i32, i32, i32, i32, bool, bool), // tex, x, y, dw, dh, flip_h, flip_v
     TextureRot(usize, i32, i32, f32, f32, Color),      // tex, cx, cy, winkel_grad, skala (inkl. cam_zoom), tint (um Zentrum)
+    // DRAW_IMAGE mit allem: tex, src(sx,sy,sw,sh), dst(dx,dy,dw,dh; dw/dh zoom-skaliert),
+    // winkel_grad (um die Mitte des Ziels), flip_x, flip_y, tint
+    TextureVoll(usize, i32, i32, i32, i32, i32, i32, i32, i32, f32, bool, bool, Color),
     AtlasDraw(usize, i32, i32, i32, i32, i32, i32, i32, i32, bool, bool, Color), // tex, sx,sy,sw,sh, dx,dy, dw,dh, flip_h, flip_v, tint
     // tex, src(sx,sy,sw,sh), dst(dx,dy,dw,dh), flip_x, flip_y, tint
     SpriteDraw(usize, i32, i32, i32, i32, i32, i32, i32, i32, bool, bool, Color),
@@ -6538,6 +6541,27 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         self.emit(Cmd::TextureFlipped(i, x, y, dw, dh, fh, fv));
         Ok(())
     }
+    /// DRAW_IMAGE mit benannten Zusaetzen: Ausschnitt (`sx, sy, sw, sh`; -1 =
+    /// bis zum Rand), Zielgroesse (`w, h`; -1 = Groesse des Ausschnitts),
+    /// Drehung in Grad um die Mitte des Ziels, Spiegeln und Toenung. (x, y)
+    /// bleibt die linke obere Ecke des ungedrehten Ziels -- wie bei
+    /// `DRAW_IMAGE(bild, x, y)`, damit ein Zusatz das Bild nicht verschiebt.
+    #[allow(clippy::too_many_arguments)]
+    pub fn draw_image_voll(&mut self, idx: i64, x: i32, y: i32, w: i32, h: i32, angle_deg: f32,
+                           tint: i64, fx: bool, fy: bool,
+                           sx: i32, sy: i32, sw: i32, sh: i32) -> Result<(), String> {
+        let i = idx as usize;
+        if !self.tex_ok(idx) { return Err(self.tex_fehler(idx, "DRAW_IMAGE")); }
+        let (tw, th) = (self.textures[i].tex.width, self.textures[i].tex.height);
+        let sw = if sw < 0 { tw - sx } else { sw };
+        let sh = if sh < 0 { th - sy } else { sh };
+        let w = if w < 0 { sw } else { w };
+        let h = if h < 0 { sh } else { h };
+        let (dw, dh) = (self.ssize(w), self.ssize(h));
+        let (dx, dy) = self.w2s(x, y);
+        self.emit(Cmd::TextureVoll(i, sx, sy, sw, sh, dx, dy, dw, dh, angle_deg, fx, fy, col(tint)));
+        Ok(())
+    }
     /// Rotierter Sprite-Blit: zeichnet das Bild **zentriert** auf (x,y), gedreht
     /// um `angle_deg` Grad (um das Zentrum), skaliert mit `scale`, getoent mit
     /// `tint` (None = unveraendert). Ideal fuer physics2d (`x,y = BODY_X/Y`,
@@ -9697,6 +9721,15 @@ fn render_scene<D: RaylibDraw>(
                         // dst-Position = Zentrum; origin = halbe Groesse -> Drehung um die Mitte.
                         let dst = Rectangle::new((cx * s) as f32, (cy * s) as f32, w, h);
                         d.draw_texture_pro(t, src, dst, Vector2::new(w / 2.0, h / 2.0), *ang, *tint);
+                    }
+                    Cmd::TextureVoll(i, sx, sy, sw, sh, dx, dy, dw, dh, ang, fx, fy, tint) => {
+                        let src = Rectangle::new(*sx as f32, *sy as f32,
+                            if *fx { -(*sw as f32) } else { *sw as f32 },
+                            if *fy { -(*sh as f32) } else { *sh as f32 });
+                        let (w, h) = ((dw * s) as f32, (dh * s) as f32);
+                        // Um die Mitte drehen: Position = Mitte, Ursprung = halbe Groesse.
+                        let dst = Rectangle::new((dx * s) as f32 + w / 2.0, (dy * s) as f32 + h / 2.0, w, h);
+                        d.draw_texture_pro(&textures[*i].tex, src, dst, Vector2::new(w / 2.0, h / 2.0), *ang, *tint);
                     }
                     Cmd::AtlasDraw(i, sx, sy, sw, sh, dx, dy, dw, dh, fh, fv, tint) => {
                         let src = Rectangle::new(*sx as f32, *sy as f32,

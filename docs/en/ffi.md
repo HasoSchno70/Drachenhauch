@@ -218,9 +218,9 @@ an array of bytes, a struct. Three commands connect `ZEIGER` and
 
 | Command | what it does |
 |---|---|
-| `TEXT_AUS_ZEIGER$(zeiger [, breit])` | copies the text behind a pointer up to the null character (UTF-8; with `breit` (wide) = TRUE `wchar_t`, i.e. UTF-16 on Windows); 0 gives `""` |
-| `BUFFER_AUS_ZEIGER(zeiger, laenge)` | copies `laenge` (length) bytes behind a pointer into a new BUFFER; 0 bytes give an empty one, a null pointer with a length is an error |
-| `BUFFER_ZEIGER(puffer)` | the address of the bytes of a BUFFER, for a struct field that points to another buffer; an empty buffer gives 0 |
+| `TEXT_AUS_ZEIGER$(pointer [, wide])` | copies the text behind a pointer up to the null character (UTF-8; with `wide` (wide) = TRUE `wchar_t`, i.e. UTF-16 on Windows); 0 gives `""` |
+| `BUFFER_AUS_ZEIGER(pointer, length)` | copies `length` (length) bytes behind a pointer into a new BUFFER; 0 bytes give an empty one, a null pointer with a length is an error |
+| `BUFFER_ZEIGER(buffer)` | the address of the bytes of a BUFFER, for a struct field that points to another buffer; an empty buffer gives 0 |
 
 ```basic
 DECLARE FUNCTION malloc LIB "c" (n AS ZEIGER) AS ZEIGER
@@ -304,8 +304,8 @@ PRINT SIZEOF(Linie), OFFSETOF(Linie, name)   ' 48  20
 
 | Command | what it does |
 |---|---|
-| `SIZEOF(typ)` | size of a `STRUCT … LAYOUT C` or of a type word in bytes, computed at compile time |
-| `OFFSETOF(struct, feld)` | position of a field in the struct in bytes, computed at compile time |
+| `SIZEOF(type)` | size of a `STRUCT … LAYOUT C` or of a type word in bytes, computed at compile time |
+| `OFFSETOF(struct, field)` | position of a field in the struct in bytes, computed at compile time |
 
 Some structs want their own size in the first field before the call --
 on Windows, for example, `MEMORYSTATUSEX` for `GlobalMemoryStatusEx`:

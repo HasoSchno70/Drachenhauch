@@ -10,9 +10,9 @@ IMPORT "tween"
 
 | Function | Return value | Meaning |
 |---|---|---|
-| `TWEEN_NEW(start, end, dauer_ms[, easing$])` | TWEEN (one-shot) | move a value once from `start` to `end` |
-| `TWEEN_NEW_LOOP(start, end, dauer_ms[, easing$])` | TWEEN (forever, jumps back) | like TWEEN_NEW, jumps back to the start at the end |
-| `TWEEN_NEW_PINGPONG(start, end, dauer_ms[, easing$])` | TWEEN (forever, back & forth) | like TWEEN_NEW, runs backwards at the end |
+| `TWEEN_NEW(start, end, duration_ms[, easing$])` | TWEEN (one-shot) | move a value once from `start` to `end` |
+| `TWEEN_NEW_LOOP(start, end, duration_ms[, easing$])` | TWEEN (forever, jumps back) | like TWEEN_NEW, jumps back to the start at the end |
+| `TWEEN_NEW_PINGPONG(start, end, duration_ms[, easing$])` | TWEEN (forever, back & forth) | like TWEEN_NEW, runs backwards at the end |
 | `TWEEN_VALUE(t)` | FLOAT | current value -- what you draw |
 | `TWEEN_PROGRESS(t)` | FLOAT (0.0 .. 1.0) | how far along is it? (0 = start, 1 = end) |
 | `TWEEN_DONE(t)` | BOOLEAN (always FALSE for loop/pingpong) | has it finished? |
@@ -45,9 +45,9 @@ For **continuous background animations** there are two endless variants:
 
 | Built-in | Behaviour | Use case |
 |---|---|---|
-| `TWEEN_NEW(start, end, ms)` | once, clamps at the end | pop-in, fade-out, transitions |
-| `TWEEN_NEW_LOOP(start, end, ms)` | repeats (start → end → start → end …) | conveyor stripes, rotating spinners, BPM-pulsing UI |
-| `TWEEN_NEW_PINGPONG(start, end, ms)` | back & forth (start → end → start → end → start …) | idle bobs, breathing scale, swing effects |
+| `TWEEN_NEW(start, end, duration_ms[, easing$])` | once, clamps at the end | pop-in, fade-out, transitions |
+| `TWEEN_NEW_LOOP(start, end, duration_ms[, easing$])` | repeats (start → end → start → end …) | conveyor stripes, rotating spinners, BPM-pulsing UI |
+| `TWEEN_NEW_PINGPONG(start, end, duration_ms[, easing$])` | back & forth (start → end → start → end → start …) | idle bobs, breathing scale, swing effects |
 
 Loop and pingpong tweens are **never** "done" — `TWEEN_DONE(t)` always returns `FALSE` for them. They run forever until you pause them.
 

@@ -29,7 +29,7 @@ Motor stoppt).
 | Funktion | Rückgabe | Bedeutung |
 |---|---|---|
 | `MQTT_CONNECT(host$, port, client_id$[, keepalive_s[, user$[, pass$]]])` | MQTT_HANDLE | Verbindung zum Broker aufbauen (`keepalive_s` Vorgabe 60); `mqtts://host` verbindet verschluesselt |
-| `MQTT_TLS_CA(pfad$)` | — | eigene CA (PEM-Datei) fuer jedes folgende `mqtts://`-Verbinden; `""` = wieder die oeffentlichen Wurzeln |
+| `MQTT_TLS_CA(path$)` | — | eigene CA (PEM-Datei) fuer jedes folgende `mqtts://`-Verbinden; `""` = wieder die oeffentlichen Wurzeln |
 | `MQTT_DISCONNECT(handle)` | — | Verbindung schliessen |
 | `MQTT_IS_CONNECTED(handle)` | BOOLEAN | steht die Verbindung noch? |
 | `MQTT_PUBLISH(handle, topic$, payload$[, retain[, qos]])` | BOOLEAN | Nachricht auf ein Topic senden; `retain` laesst der Broker sie fuer spaetere Abonnenten aufheben, `qos` 0 oder 1. FALSE, wenn die Verbindung weg ist |
@@ -37,7 +37,7 @@ Motor stoppt).
 | `MQTT_UNSUBSCRIBE(handle, topic$)` | BOOLEAN | ein Abonnement beenden |
 | `MQTT_PENDING(handle)` | INTEGER | wie viele QoS-1-Nachrichten der Broker noch nicht bestaetigt hat |
 | `MQTT_FLUSH(handle[, ms])` | BOOLEAN | warten, bis alle QoS-1-Nachrichten bestaetigt sind (Vorgabe 2000 ms); FALSE, wenn die Zeit um ist |
-| `MQTT_WILL(topic$, inhalt$[, retain])` | — | der **letzte Wille** fuer das naechste `MQTT_CONNECT`: reisst die Verbindung ohne Abmeldung ab, veroeffentlicht der Broker diese Nachricht |
+| `MQTT_WILL(topic$, content$[, retain])` | — | der **letzte Wille** fuer das naechste `MQTT_CONNECT`: reisst die Verbindung ohne Abmeldung ab, veroeffentlicht der Broker diese Nachricht |
 | `MQTT_UPDATE(handle)` | — | **pro Frame aufrufen**: liest eingegangene Nachrichten ein und haelt die Verbindung mit PINGREQ am Leben |
 | `MQTT_NEXT_MESSAGE(handle)` | BOOLEAN | eine Nachricht weiterruecken; FALSE, wenn die Warteschlange leer ist |
 | `MQTT_MESSAGE_TOPIC(handle)` | STRING | Topic der aktuellen Nachricht |

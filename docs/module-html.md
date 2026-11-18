@@ -164,13 +164,13 @@ Für alles, was in einer Schleife läuft, gibt es darum denselben Abruf zum Nach
 
 | Funktion | Wirkung |
 |---|---|
-| `HTTP_REQUEST_START(methode$, url$ [, rumpf [, kopfzeilen]])` → INTEGER | startet **jede** Anfrage im Hintergrund |
+| `HTTP_REQUEST_START(method$, url$ [, body [, headers]])` → INTEGER | startet **jede** Anfrage im Hintergrund |
 | `HTTP_GET_START(url$)` → INTEGER | Kurzform davon für GET |
-| `HTTP_READY(abruf)` → BOOLEAN | ist die Antwort da? (fragt nach, wartet nicht) |
-| `HTTP_RESULT(abruf)` → STRING | holt den Body ab und gibt den Platz frei |
-| `HTTP_CANCEL(abruf)` | Abruf verwerfen (unbekannte Nummer = No-Op) |
+| `HTTP_READY(request)` → BOOLEAN | ist die Antwort da? (fragt nach, wartet nicht) |
+| `HTTP_RESULT(request)` → STRING | holt den Body ab und gibt den Platz frei |
+| `HTTP_CANCEL(request)` | Abruf verwerfen (unbekannte Nummer = No-Op) |
 | `HTTP_PENDING()` → INTEGER | wie viele Abrufe noch offen sind |
-| `HTTP_URL$(abruf)` → STRING | die URL eines laufenden Abrufs |
+| `HTTP_URL$(request)` → STRING | die URL eines laufenden Abrufs |
 
 Das Muster ist dasselbe wie bei `INPUT_UPDATE()`/`TIMER_UPDATE()`: einmal pro Frame nachsehen.
 

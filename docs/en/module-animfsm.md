@@ -70,7 +70,7 @@ SPRITE_DRAW(hero)
 | Built-in | Effect |
 |---|---|
 | `ANIM_FSM_LOAD(pfad$) AS ANIM_FSM` | load + validate a `.dhanim`, starting in the default state |
-| `ANIM_FSM_SETUP(fsm, sprite)` | register the frame ranges of all states as sprite animations + play the default |
+| `ANIM_FSM_SETUP(fsm, sp)` | register the frame ranges of all states as sprite animations + play the default |
 | `ANIM_FSM_UPDATE(fsm, sprite, dt_ms) AS BOOLEAN` | advance the animation, evaluate transitions, play on a change. TRUE = state changed |
 | `ANIM_FSM_FORCE(fsm, sprite, state$) AS BOOLEAN` | force a state (without conditions) — e.g. reset/respawn |
 | `ANIM_FSM_SET_BOOL/FLOAT/INT(fsm, name$, wert)` | set a parameter |

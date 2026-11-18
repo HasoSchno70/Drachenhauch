@@ -63,22 +63,22 @@ CHART_LABEL(c, 0, "Mo")                ' Kategorie beschriften
 
 | Befehl | Wirkung |
 |---|---|
-| `CHART_SERIES(c, name$ [, farbe])` | Reihe anlegen → Index |
-| `CHART_ADD(c, name$, wert [, farbe])` | Kategorie + Wert in Reihe 0 → Index; die Farbe gilt für das Segment, bei einem Balken mit einer Reihe für den Balken |
-| `CHART_DATA(c, reihe, werte)` | Werte einer Reihe komplett ersetzen (`ARRAY OF FLOAT`); die Punktzahl folgt der Liste, auch nach unten |
-| `CHART_SET_POINT(c, reihe, punkt, wert)` | Einzelnen Wert ändern |
-| `CHART_PUSH(c, reihe, wert)` | Wert hinten anhängen (Live-Kurven, siehe `fenster`) |
-| `CHART_VALUE(c, wert)` | Kurzform für Reihe 0, Punkt 0 — der Tacho-Weg |
-| `CHART_LABEL(c, punkt, text$)` | Kategorie beschriften |
-| `CHART_X(c, xwerte)` | Liniendiagramm: echte x-Werte je Punkt (z. B. Zeitstempel), aufsteigend; `[]` = wieder gleiche Abstände |
-| `CHART_GET(c, reihe, punkt)` | Wert auslesen |
-| `CHART_COUNT(c)` / `CHART_SERIES_COUNT(c)` | Anzahl Punkte / Reihen |
-| `CHART_CLEAR(c)` | Daten verwerfen |
-| `CHART_STAT(c, reihe, kennzahl$)` | `anzahl`/`summe`/`mittel`/`min`/`max` |
-| `CHART_BOUNDS(c, x, y, b, h)` | Feld verschieben/skalieren |
-| `CHART_ZONE(c, von, bis, farbe [, name$])` / `CHART_ZONE_CLEAR(c)` | Farbzonen der Tacho-Skala, wahlweise beschriftet |
-| `CHART_UPDATE(c, sekunden)` | Animation weiterlaufen lassen (siehe unten) |
-| `CHART_DRAW(c)` | Zeichnen (braucht `SCREEN`) |
+| `CHART_SERIES(chart, name$ [, color])` | Reihe anlegen → Index |
+| `CHART_ADD(chart, name$, value [, color])` | Kategorie + Wert in Reihe 0 → Index; die Farbe gilt für das Segment, bei einem Balken mit einer Reihe für den Balken |
+| `CHART_DATA(chart, series, values)` | Werte einer Reihe komplett ersetzen (`ARRAY OF FLOAT`); die Punktzahl folgt der Liste, auch nach unten |
+| `CHART_SET_POINT(chart, series, point, value)` | Einzelnen Wert ändern |
+| `CHART_PUSH(chart, series, value)` | Wert hinten anhängen (Live-Kurven, siehe `fenster`) |
+| `CHART_VALUE(chart, value)` | Kurzform für Reihe 0, Punkt 0 — der Tacho-Weg |
+| `CHART_LABEL(chart, point, text$)` | Kategorie beschriften |
+| `CHART_X(chart, x_values)` | Liniendiagramm: echte x-Werte je Punkt (z. B. Zeitstempel), aufsteigend; `[]` = wieder gleiche Abstände |
+| `CHART_GET(chart, series, point)` | Wert auslesen |
+| `CHART_COUNT(chart)` / `CHART_SERIES_COUNT(c)` | Anzahl Punkte / Reihen |
+| `CHART_CLEAR(chart)` | Daten verwerfen |
+| `CHART_STAT(chart, series, stat$)` | `anzahl`/`summe`/`mittel`/`min`/`max` |
+| `CHART_BOUNDS(chart, x, y, width, height)` | Feld verschieben/skalieren |
+| `CHART_ZONE(chart, from, to, color [, name$])` / `CHART_ZONE_CLEAR(c)` | Farbzonen der Tacho-Skala, wahlweise beschriftet |
+| `CHART_UPDATE(chart, seconds)` | Animation weiterlaufen lassen (siehe unten) |
+| `CHART_DRAW(chart)` | Zeichnen (braucht `SCREEN`) |
 
 ## Aussehen einstellen
 
@@ -328,12 +328,12 @@ END IF
 
 | Befehl | Liefert |
 |---|---|
-| `CHART_HOVER(c)` | Punkt unter der Maus, `-1` = keiner |
-| `CHART_HOVER_SERIES(c)` | Reihe unter der Maus, `-1` = keine |
-| `CHART_HOVER_LABEL$(c)` | Beschriftung dieses Punktes (`""` = keiner) |
-| `CHART_HOVER_VALUE(c)` | sein Wert |
-| `CHART_CLICKED(c)` | in **diesem** Bild angeklickter Punkt, sonst `-1` |
-| `CHART_CLICKED_SERIES(c)` | zugehörige Reihe |
+| `CHART_HOVER(chart)` | Punkt unter der Maus, `-1` = keiner |
+| `CHART_HOVER_SERIES(chart)` | Reihe unter der Maus, `-1` = keine |
+| `CHART_HOVER_LABEL$(chart)` | Beschriftung dieses Punktes (`""` = keiner) |
+| `CHART_HOVER_VALUE(chart)` | sein Wert |
+| `CHART_CLICKED(chart)` | in **diesem** Bild angeklickter Punkt, sonst `-1` |
+| `CHART_CLICKED_SERIES(chart)` | zugehörige Reihe |
 
 Alle Werte gelten **nach** `CHART_DRAW` — vorher stehen sie auf `-1`.
 

@@ -47,7 +47,7 @@ WEND
 
 ## Warum Drachenhauch
 
-- **Eine Datei ist ein Programm.** Kein Projektgerüst, kein Paketmanager: `SCREEN`, zeichnen, `FLIP` — das ist ein Spiel. `dhrt --export` macht daraus ein eigenständiges Programm zum Weitergeben.
+- **Eine Datei ist ein Programm.** Kein Projektgerüst, kein Paketmanager: `SCREEN`, zeichnen, `FLIP` — das ist ein Spiel. `dhrt --export` macht daraus ein eigenständiges Programm zum Weitergeben: etwa 16 MB für ein Werkzeug, 35 MB für ein Spiel.
 - **Fehler vor dem Lauf.** Jede Variable hat einen Typ. Ein vertippter Name, ein fehlendes Argument oder Text, wo eine Zahl hingehört, wird mit Datei und Zeile gemeldet, bevor das Programm startet — in der IDE schon beim Tippen.
 - **Alles dabei.** 2D- und 3D-Grafik, Ton, Physik, Fenster und Tabellen, SQLite, PostgreSQL und MySQL, PDF, Netzwerk und serielle Schnittstellen sind eingebaut. Nichts nachzuinstallieren, nichts aktuell zu halten.
 - **Mit sich selbst gebaut.** Die IDE, das Drachenhauch Studio und alle Editoren sind Drachenhauch-Programme. Was die trägt, trägt auch deine Anwendung — und heiße Schleifen laufen als Maschinencode.
@@ -198,7 +198,7 @@ Drei kürzere Bücher bauen je ein fertiges Programm, Kapitel für Kapitel:
 
 Vollständige Doku im [docs/](docs/README.md)-Ordner:
 
-- **[Sprachreferenz](docs/sprache.md)** — Variablen, Typen, `ENUM`, `SELECT CASE`, Funktionen mit Defaults und Named Arguments, Klassen, Try/Catch, f-Strings, Escape-Folgen mit `!"…\n…"`, Coroutines (`YIELD` + `CORO_*`)
+- **[Sprachreferenz](docs/sprache.md)** — Variablen, Typen, `ENUM`, `SELECT CASE`, Funktionen mit Defaults und Named Arguments (auch an eingebauten Befehlen: `CIRCLE(x: 10, y: 20, r: 5)`), Klassen, Try/Catch, f-Strings, Escape-Folgen mit `!"…\n…"`, Coroutines (`YIELD` + `CORO_*`)
 - **[Standard-Built-ins](docs/builtins-core.md)** — Math, Strings, Maps, File-I/O, …
 - **[Grafik-Built-ins](docs/builtins-grafik.md)** — native Runtime (dhrt/raylib), Z-Layer, Sprite-Atlas, Asset-Preloader
 - **[Performance](docs/intern/PERFORMANCE.md)** — Bench-Zahlen + umgesetzte Optimierungen (Spec-Ops, IC, Typed Arrays, ECS Bulk-Ops, …)
@@ -360,7 +360,7 @@ Gebaut wird mit `rust/build_wasm.py`, das Gerüst liegt in `web/`.
 | `49_pong_scene.dh` | Pong, strukturiert mit `scene` + `save` (Highscore) |
 | `50_enum.dh` | ENUM in Compact- und Block-Form |
 | `51_astar.dh` | A*-Pathfinding mit ASCII-Render |
-| `52_named_args.dh` | Named Arguments in SUB/FUNCTION/NEW |
+| `52_named_args.dh` | Named Arguments in SUB/FUNCTION/NEW und eingebauten Befehlen |
 | `73_ecs_bullets.dh` | ECS mit pro-Entity-Loop (klassisches Pattern) |
 | `75_preloader.dh` | `LOAD_ASSETS` — alle Bilder/Sounds aus einem Manifest |
 | `76_layers_atlas.dh` | Z-Layer + Sprite-Atlas: 600 Tiles aus einem Atlas, in Z-Reihenfolge zusammengesetzt |
@@ -429,7 +429,7 @@ Pipeline: **Source → Preprocessor → Lexer → Parser → Compiler → VM**, 
 | Bild und Ablauf | Spielschleife (`DELTA`/`FPS`/`SETFPS`), GPU-Shader und Nachbearbeitung (`SHADER_LOAD`/`POSTFX`), TTF-Schriften ([Demo](examples/87_ttf_fonts.dh)), Gamepad |
 | Eingabe aufzeichnen | `AUTOMATION_RECORD`/`PLAY` für Demo-Modus, nachspielbare Fehlerberichte und automatische Spieltests ([Doku](docs/automation.md), [Demo](examples/153_automation.dh)) |
 | Module | **alle** — auch die früher Python-eigenen: `regex`, `tiled`, `tile_collide`, `controller`, das erweiterte `audio`; dazu per Feature `db` (rusqlite), `net`, `mqtt`, `html` (ureq) und die Hardware-Seite `serial`, `firmata`, `usb`, `wifi`, `bt` |
-| Ausliefern | `dhrt --export datei.dh` (oder Strg+F6 in der IDE) bündelt Bytecode + `assets/` zu einer eigenständigen `.exe` |
+| Ausliefern | `dhrt --export datei.dh` (oder Strg+F6 in der IDE) bündelt Bytecode + `assets/` zu einer eigenständigen `.exe`, mit der kleinsten Laufzeit, die alle Befehle des Programms hat (16 MB ohne Fenster, 35 MB für ein Spiel; `--voll` für die volle) |
 
 Python braucht nur noch das Bauskript. Die schweren Module kommen mit
 `build_runtime.py --hardware` bzw. `--full` dazu — **ein Bau ohne diese Schalter

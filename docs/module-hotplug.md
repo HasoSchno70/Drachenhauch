@@ -28,7 +28,7 @@ liefern — wer gemeldet bekommt, dass `COM5` da ist, öffnet `COM5`.
 | `HOTPLUG_KIND$()` → STRING | Art der geholten Meldung, etwa `"serial"` |
 | `HOTPLUG_NAME$()` → STRING | Name des Geräts |
 | `HOTPLUG_ADDED()` → BOOLEAN | TRUE = angesteckt, FALSE = abgezogen |
-| `HOTPLUG_LIST(art$)` → ARRAY OF STRING | was von dieser Art gerade da ist, geordnet |
+| `HOTPLUG_LIST(kind$)` → ARRAY OF STRING | was von dieser Art gerade da ist, geordnet |
 | `HOTPLUG_KINDS()` → ARRAY OF STRING | welche Arten dieser Bau beobachtet |
 | `HOTPLUG_INTERVAL(ms)` | wie oft nachgesehen wird (100..10000, Vorgabe 500) |
 

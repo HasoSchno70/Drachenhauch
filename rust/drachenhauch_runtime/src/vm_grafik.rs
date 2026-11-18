@@ -723,8 +723,25 @@ impl<'p> Vm<'p> {
             "text_spacing" => { g!().set_text_spacing(gi(a,0,"TEXT_SPACING")? as i32); Value::Nil }
             "loadimage" => Value::Int(g!().load_texture(gs(a,0,"LOADIMAGE")?)?),
             "drawimage" => {
-                let idx = gi(a, 0, "DRAWIMAGE")?;
-                g!().draw_image(idx, gi(a,1,"DRAWIMAGE")? as i32, gi(a,2,"DRAWIMAGE")? as i32)?; Value::Nil
+                let idx = gi(a, 0, "DRAW_IMAGE")?;
+                let (x, y) = (gi(a,1,"DRAW_IMAGE")? as i32, gi(a,2,"DRAW_IMAGE")? as i32);
+                if a.len() <= 3 {
+                    g!().draw_image(idx, x, y)?;
+                } else {
+                    // DRAW_IMAGE(image, x, y [, w, h, angle, tint, flip_x, flip_y,
+                    // sx, sy, sw, sh]) -- gedacht fuer benannte Argumente:
+                    // DRAW_IMAGE(held, x, y, angle: 30, flip_x: TRUE).
+                    if a.len() > 13 {
+                        return Err(format!("DRAW_IMAGE: erwartet 3..13 Argumente, erhalten {}", a.len()));
+                    }
+                    let ganz = |i: usize, vorgabe: i64| -> Result<i64, String> {
+                        if a.len() > i { gi(a, i, "DRAW_IMAGE") } else { Ok(vorgabe) } };
+                    let angle = if a.len() > 5 { need_f(a, 5, "DRAW_IMAGE")? as f32 } else { 0.0 };
+                    g!().draw_image_voll(idx, x, y, ganz(3, -1)? as i32, ganz(4, -1)? as i32, angle,
+                        ganz(6, -1)?, gflag(a, 7), gflag(a, 8),
+                        ganz(9, 0)? as i32, ganz(10, 0)? as i32, ganz(11, -1)? as i32, ganz(12, -1)? as i32)?;
+                }
+                Value::Nil
             }
             "drawimagerot" => {
                 // DRAWIMAGEROT(img, x, y, winkel_grad [, skala [, tint]]) -- zentriert + gedreht.

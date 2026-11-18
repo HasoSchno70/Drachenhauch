@@ -37,12 +37,12 @@ outside Windows: `TIME$()` ran two hours behind in Berlin in summer, and
 |---|---|
 | `ZEIT_JETZT()` → INTEGER | now, as a point in time |
 | `ZEIT_UNIX()` → FLOAT | now as **Unix time**: seconds since 1970 in UTC, with fraction (like Python's `time.time()`) |
-| `ZEIT_AUS_UNIX(sekunden)` → INTEGER | Unix seconds to a point in local time (with that day's daylight saving time) |
-| `ZEIT_NACH_UNIX(zeit)` → INTEGER | point in local time to Unix seconds |
+| `ZEIT_AUS_UNIX(unix_seconds)` → INTEGER | Unix seconds to a point in local time (with that day's daylight saving time) |
+| `ZEIT_NACH_UNIX(time)` → INTEGER | point in local time to Unix seconds |
 | `ZEIT_PARSE(text$)` → INTEGER | text to point in time; aborts on anything unreadable |
 | `ZEIT_LESBAR(text$)` → BOOLEAN | could the text be read? (asks, does not abort) |
-| `ZEIT_TEXT$(zeit)` → STRING | point in time as `JJJJ-MM-TT hh:mm:ss` (YYYY-MM-DD hh:mm:ss) |
-| `ZEIT_AUS_TEILEN(jahr, monat, tag [, stunde, minute, sekunde])` → INTEGER | point in time from individual values |
+| `ZEIT_TEXT$(time)` → STRING | point in time as `JJJJ-MM-TT hh:mm:ss` (YYYY-MM-DD hh:mm:ss) |
+| `ZEIT_AUS_TEILEN(year, month, day [, hour, minute, second])` → INTEGER | point in time from individual values |
 
 `ZEIT_PARSE` understands the notations you come across in databases and web
 APIs:
@@ -92,9 +92,9 @@ can be written to the database this way and calculated back out again.
 
 | Function | Effect |
 |---|---|
-| `ZEIT_PLUS(zeit, sekunden)` → INTEGER | add seconds (negative = back) |
-| `ZEIT_DIFF(zeit, frueher)` → INTEGER | distance in seconds (negative if `zeit` is earlier) |
-| `ZEIT_DAUER$(sekunden)` → STRING | seconds as a readable span |
+| `ZEIT_PLUS(time, seconds)` → INTEGER | add seconds (negative = back) |
+| `ZEIT_DIFF(time, earlier)` → INTEGER | distance in seconds (negative if `time` is earlier) |
+| `ZEIT_DAUER$(seconds)` → STRING | seconds as a readable span |
 
 ```basic
 IMPORT "zeit"
@@ -134,9 +134,9 @@ long to go" and "how long ago".
 
 | Function | Effect |
 |---|---|
-| `ZEIT_TEIL(zeit, feld$)` → INTEGER | one field: `jahr`, `monat`, `tag`, `stunde`, `minute`, `sekunde` (year, month, day, hour, minute, second) |
-| `ZEIT_WOCHENTAG(zeit)` → INTEGER | 1 = Monday … 7 = Sunday |
-| `ZEIT_FORMAT$(zeit, muster$)` → STRING | point in time according to a pattern |
+| `ZEIT_TEIL(time, part$)` → INTEGER | one field: `jahr`, `monat`, `tag`, `stunde`, `minute`, `sekunde` (year, month, day, hour, minute, second) |
+| `ZEIT_WOCHENTAG(time)` → INTEGER | 1 = Monday … 7 = Sunday |
+| `ZEIT_FORMAT$(time, pattern$)` → STRING | point in time according to a pattern |
 
 The patterns are written in the same language as the display itself:
 

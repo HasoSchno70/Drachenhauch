@@ -365,11 +365,12 @@ dhrt -- die Drachenhauch-Runtime
                                (--einruecken richtet auch die Einrueckung,
                                 --pruefen schreibt nicht, meldet nur)
   dhrt --check <datei.dh> ...  nur uebersetzen und Probleme als JSON melden
-  dhrt --export <datei.dh>     zu einer eigenstaendigen .exe buendeln
+  dhrt --export <datei.dh>     zu einer eigenstaendigen .exe buendeln, mit der
+                               kleinsten Laufzeit, der nichts fehlt (--voll: die ganze)
   dhrt debug <datei.dh>        Debug-Sitzung (JSON-Protokoll, fuer den Editor)
   dhrt profile <datei.dh>      Laufzeit je Zeile messen
   dhrt lsp                     Sprachserver (LSP ueber stdin/stdout, fuer VS Code)
-  dhrt doku <prosa|grammatik|referenz>  Doku-Werkzeuge (dhrt doku fuer die Uebersicht)
+  dhrt doku <prosa|grammatik|aenderungen|referenz>  Doku-Werkzeuge (dhrt doku fuer die Uebersicht)
   dhrt pruef [bloecke|namen|zaehlungen|konstanten|pfade]  Doku gegen die Wirklichkeit
   dhrt paket <hole|entferne|liste|neu>  Bibliotheken holen und teilen (dhrt paket fuer die Uebersicht)
   dhrt bild <datei> <ziel.png> [bilder]
@@ -645,7 +646,10 @@ fn main() -> ExitCode {
             // Ausgabeverzeichnis -- sonst landete das Bundle in einem Ordner
             // namens "--mit-daten".
             let mit_daten = raw.iter().any(|a| a == "--mit-daten");
-            let schlank = raw.iter().any(|a| a == "--schlank");
+            // Seit 2026.52 schlank von selbst: die kleinste Laufzeit, der
+            // nichts fehlt ("Hallo Welt" brachte sonst 45 MB mit). `--voll`
+            // nimmt die ganze, `--schlank` bleibt erlaubt.
+            let schlank = !raw.iter().any(|a| a == "--voll");
             let out = raw.iter().skip(3).find(|a| !a.starts_with("--")).map(|s| s.as_str());
             return export_main(&raw[2], out, mit_daten, schlank);
         }
@@ -781,6 +785,10 @@ fn schluesselwoerter_gross(quelle: &str, toks: &[lexer::Token]) -> Vec<String> {
     for (i, t) in toks.iter().enumerate() {
         let kontext = declare.contains(&i);
         if !ist_schluesselwort(t.tt) && !kontext { continue; }
+        // Ein Schluesselwort als Name eines benannten Arguments
+        // (`REPLACE$(s, old: "-", new: "+")`) ist ein Name, kein Befehl.
+        if !kontext && i > 0 && toks.get(i + 1).map(|n| n.tt) == Some(lexer::Tt::Colon)
+            && matches!(toks[i - 1].tt, lexer::Tt::Lparen | lexer::Tt::Comma) { continue; }
         let Some(zeile) = zeilen.get_mut(t.line.saturating_sub(1)) else { continue };
         let start = t.col.saturating_sub(1);        // col ist 1-basiert
         // Das Wort an dieser Stelle abgreifen (Buchstaben/Ziffern/Unterstrich)
@@ -1432,10 +1440,15 @@ fn sammlung_laufen(exe: &std::path::Path, pfad: &std::path::Path, filter: Option
                         .env_remove("DHRT_FRAMES").env_remove("DHRT_SCREENSHOT")
                         .env_remove("DHRT_CONTACT").env_remove("DHRT_CONTACT_MAX")
                         .env_remove("DHRT_CONTACT_COLS").env_remove("DHRT_CONTACT_EVERY")
-                        // Die Erwartungen stehen deutsch da -- eine englische
-                        // IDE, aus der die Pruefung startet, darf sie nicht kippen.
-                        // Ein Fall, der Englisch will, sagt es in `--- umgebung`.
-                        .env_remove("DHRT_LANG")
+                        // Die Erwartungen stehen deutsch da -- weder eine
+                        // englische IDE, aus der die Pruefung startet, noch ein
+                        // englisches System (CI-Laeufer) darf sie kippen: ohne
+                        // DHRT_LANG spricht die Laufzeit die Systemsprache, also
+                        // wird ein deutsches System gespielt. DHRT_LANG selbst
+                        // bleibt frei, damit eine Englisch eingestellte IDE im
+                        // Fall es setzen kann. Ein Fall, der Englisch will, sagt
+                        // es in `--- umgebung`.
+                        .env_remove("DHRT_LANG").env("DHRT_SYSTEM_LANG", "de")
                         // Fenster ohne echte Tastatur/Maus (stillfenster.rs): wer
                         // waehrend des Laufs tippt, schreibt sonst in einen Fall.
                         .env("DHRT_OHNE_EINGABE", "1")
@@ -1462,7 +1475,7 @@ fn sammlung_laufen(exe: &std::path::Path, pfad: &std::path::Path, filter: Option
                         .current_dir(&dir)
                         .stdin(std::process::Stdio::null())
                         .env_remove("DHRT_FRAMES").env_remove("DHRT_SCREENSHOT")
-                        .env_remove("DHRT_LANG").env("DHRT_OHNE_EINGABE", "1")
+                        .env_remove("DHRT_LANG").env("DHRT_SYSTEM_LANG", "de").env("DHRT_OHNE_EINGABE", "1")
                         .env("DHRT_ZWISCHENABLAGE", "privat");
                     let l = test_lauf(cmd, None, frist).map_err(|e| format!("{}: {}", name, e))?;
                     if l.abgelaufen {
@@ -1727,7 +1740,7 @@ fn test_main(args: &[String]) -> ExitCode {
         let mut cmd = std::process::Command::new(&exe);
         cmd.arg("run").arg(d)
             .stdin(std::process::Stdio::null())
-            .env_remove("DHRT_LANG").env("DHRT_OHNE_EINGABE", "1")
+            .env_remove("DHRT_LANG").env("DHRT_SYSTEM_LANG", "de").env("DHRT_OHNE_EINGABE", "1")
             .env("DHRT_ZWISCHENABLAGE", "privat");
         let r = test_lauf(cmd, None, grenze.map(|s| t0 + std::time::Duration::from_secs(s)));
         let dauer = t0.elapsed().as_secs_f64();

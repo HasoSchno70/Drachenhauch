@@ -29,13 +29,13 @@ and then you know what you are doing.
 
 | Function | Purpose |
 |---|---|
-| `GELD_NEU(betrag)` → GELD | from text (`"19,99"`, `"1.234,56"`) or a number |
+| `GELD_NEU(amount)` → GELD | from text (`"19,99"`, `"1.234,56"`) or a number |
 | `GELD_AUS_CENT(cent)` → GELD | from whole cents |
 | `GELD_CENT(g)` → INTEGER | to whole cents, rounded commercially (half up) |
 | `GELD_ZAHL(g)` → FLOAT | step out deliberately (display in charts or the like) |
 | `GELD_TEXT$(g [, symbol$])` → STRING | `19,99 €`, symbol selectable |
-| `GELD_RUNDEN(g [, stellen])` → GELD | commercial rounding, 2 places by default |
-| `GELD_TEILEN(g, anzahl)` → ARRAY OF GELD | split up **without losing a cent** |
+| `GELD_RUNDEN(g [, digits])` → GELD | commercial rounding, 2 places by default |
+| `GELD_TEILEN(g, count)` → ARRAY OF GELD | split up **without losing a cent** |
 | `GELD_ABS(g)` → GELD | amount without sign |
 
 In addition, the operators: `+` `-` between two amounts, `*` `/` with a number,

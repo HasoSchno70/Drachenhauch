@@ -37,7 +37,7 @@ monitor** with a plot (View → Serial monitor, Alt+4, see [IDE](ide.md)).
 | `SERIAL_READLINE(handle)` | STRING (up to newline) | read a line -- up to the line break or until the timeout kicks in |
 | `SERIAL_AVAILABLE(handle)` | INTEGER (bytes waiting in the input buffer) | how much is ready? (without waiting) |
 | `SERIAL_FLUSH(handle)` | — (clear input and output buffers) | discard buffers |
-| `SERIAL_TIMEOUT(handle, sekunden)` | — (set the read timeout, default 1.0 s) | how long a read waits at most |
+| `SERIAL_TIMEOUT(handle, seconds)` | — (set the read timeout, default 1.0 s) | how long a read waits at most |
 
 ## Bytes ↔ STRING
 

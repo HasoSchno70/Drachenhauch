@@ -37,16 +37,16 @@ SMTP_CLOSE(m)
 | Function | Purpose |
 |---|---|
 | `SMTP_NEW()` → SMTP | new message |
-| `SMTP_SERVER(m, host$, port [, sicherheit$])` | where it is submitted |
-| `SMTP_LOGIN(m, benutzer$, kennwort$)` | login (omit = without) |
-| `SMTP_FROM(m, adresse$ [, name$])` | sender |
-| `SMTP_TO(m, adresse$ [, name$])` | recipient — can be called several times |
-| `SMTP_CC(m, adresse$ [, name$])` | copy recipient (CC) |
-| `SMTP_BCC(m, adresse$)` | blind copy |
-| `SMTP_SUBJECT(m, betreff$)` | set the subject line |
+| `SMTP_SERVER(m, host$, port [, security$])` | where it is submitted |
+| `SMTP_LOGIN(m, user$, password$)` | login (omit = without) |
+| `SMTP_FROM(m, address$ [, name$])` | sender |
+| `SMTP_TO(m, address$ [, name$])` | recipient — can be called several times |
+| `SMTP_CC(m, address$ [, name$])` | copy recipient (CC) |
+| `SMTP_BCC(m, address$)` | blind copy |
+| `SMTP_SUBJECT(m, subject$)` | set the subject line |
 | `SMTP_TEXT(m, text$)` | message as plain text |
 | `SMTP_HTML(m, html$)` | message as HTML |
-| `SMTP_ATTACH(m, pfad$ [, name$])` | attach a file — can be called several times |
+| `SMTP_ATTACH(m, path$ [, name$])` | attach a file — can be called several times |
 | `SMTP_TIMEOUT(m, ms)` | time limit per step (default 30 000) |
 | `SMTP_MESSAGE$(m)` → STRING | the finished message, **without** sending |
 | `SMTP_SEND(m)` | send it |

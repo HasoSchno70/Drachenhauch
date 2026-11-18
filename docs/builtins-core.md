@@ -55,9 +55,9 @@ sie spätestens nach 50 ms hinaus -- vor `SLEEP`, `INPUT`, `EPRINT` und bei
 | `ASC(s$)` → INTEGER | Codepoint des ersten Zeichens. `ASC("Anna")` = 65. |
 | `RGB(r, g, b)` → INTEGER | 3 Zahlen (0..255) zu 24-Bit-Farbe. `RGB(255, 128, 0)` = `&HFF8000`. Kommazahlen werden **gerundet** (`x * 255 / 640` geht also) -- geklemmt wird nicht, 255.6 ist weiterhin zu gross. |
 | `HEX$(n)` → STRING | INT zu Hex-Großbuchstaben (ohne Präfix). `HEX$(255)` = `"FF"`. |
-| `NUMFMT$(zahl [, nachkommastellen])` → STRING | grosse Zahlen kurz schreiben (`1.2K`, `3.4M`) — für Punktestände und Idle-Spiele |
-| `ZAHL$(zahl [, stellen])` → STRING | Zahl deutsch mit Tausenderpunkten und Dezimalkomma (`400.000`, `1.234.567,89`); mit `stellen` kaufmännisch gerundet |
-| `ENUM_NAME(enum, wert)` → STRING | zu einem ENUM-Wert seinen Namen zurückgeben — für Anzeige und Fehlersuche |
+| `NUMFMT$(number [, decimals])` → STRING | grosse Zahlen kurz schreiben (`1.2K`, `3.4M`) — für Punktestände und Idle-Spiele |
+| `ZAHL$(number [, digits])` → STRING | Zahl deutsch mit Tausenderpunkten und Dezimalkomma (`400.000`, `1.234.567,89`); mit `digits` kaufmännisch gerundet |
+| `ENUM_NAME(enum, value)` → STRING | zu einem ENUM-Wert seinen Namen zurückgeben — für Anzeige und Fehlersuche |
 
 ```basic
 DIM s AS STRING
@@ -86,27 +86,27 @@ PRINT HEX$(RGB(255, 0, 0))  ' "FF0000"
 | `SIN(x)`, `COS(x)`, `TAN(x)` | Trigonometrie (x in Radiant) |
 | `ATAN(x)`, `ATAN2(y, x)` | Arcus-Tangens |
 | `ASIN(x)`, `ACOS(x)` | Arcus-Sinus/-Cosinus (x in `[-1, 1]`) |
-| `SQR(x)` | Quadratwurzel (x ≥ 0) |
+| `SQR(v)` | Quadratwurzel (x ≥ 0) |
 | `HYPOT(x, y)` | `SQR(x*x + y*y)` ohne Overflow |
-| `POW(b, e)` | b hoch e |
+| `POW(base, exponent)` | b hoch e |
 | `EXP(x)` | e^x |
 | `LOG(x[, base])` | Logarithmus, default natürlich |
 | `DEG(rad)`, `RAD(grad)` | Radiant ↔ Grad |
 | `FLOOR(x)`, `CEIL(x)`, `ROUND(x)` | INT-Konvertierung |
-| `ROUND(x, dezimalstellen)` → FLOAT | auf N Nachkommastellen runden, **zur geraden Zahl** (siehe unten) |
-| `ROUND_HALF_UP(x[, dezimalstellen])` | kaufmännisch runden: von der Null weg |
-| `MIN(a, b, ...)`, `MAX(a, b, ...)` | variadic |
+| `ROUND(x, digits)` → FLOAT | auf N Nachkommastellen runden, **zur geraden Zahl** (siehe unten) |
+| `ROUND_HALF_UP(x[, decimals])` | kaufmännisch runden: von der Null weg |
+| `MIN(a, ...)`, `MAX(a, b, ...)` | variadic |
 | `CLAMP(v, lo, hi)` | beschränkt v auf `[lo, hi]` |
 | `LERP(a, b, t)` | lineare Interpolation a..b (t nicht geklemmt) |
 | `REMAP(v, in_lo, in_hi, out_lo, out_hi)` | linear umskalieren |
 | `FRAC(x)` | Nachkommaanteil (vorzeichenbehaftet): `x - TRUNC(x)` |
-| `SIGN(x)` | -1, 0 oder 1 |
+| `SIGN(v)` | -1, 0 oder 1 |
 | `LOG10(x)` | Zehnerlogarithmus |
 | `CLAMP01(v)` | auf `[0, 1]` beschränken |
 | `WRAP(v, lo, hi)` | v zyklisch in `[lo, hi)` falten (Winkel/Index-Umlauf) |
 | `PINGPONG(t, len)` | in `[0, len]` hin- und herpendeln (Dreieckswelle) |
-| `MOVETOWARD(cur, ziel, maxd)` | cur um max. `maxd` Richtung `ziel` bewegen |
-| `SMOOTHSTEP(e0, e1, x)` | weicher 0→1-Übergang (Hermite), geklemmt |
+| `MOVETOWARD(cur, target, maxdelta)` | cur um max. `maxd` Richtung `target` bewegen |
+| `SMOOTHSTEP(edge0, edge1, x)` | weicher 0→1-Übergang (Hermite), geklemmt |
 | `APPROX(a, b[, eps])` → BOOLEAN | `\|a-b\| ≤ eps` (Default `1e-6`) |
 
 ### Runden: zwei Regeln, und sie sind nicht dasselbe
@@ -136,7 +136,7 @@ liefert `2.68`.
 
 | Funktion | Rückgabe | Zweck |
 |---|---|---|
-| `CENT(betrag)` | INTEGER | einen Betrag in ganze Cent umrechnen — **rundet**, statt abzuschneiden; nimmt auch geschriebene Beträge (`"19,99"`, `"1.234,56"`) |
+| `CENT(amount)` | INTEGER | einen Betrag in ganze Cent umrechnen — **rundet**, statt abzuschneiden; nimmt auch geschriebene Beträge (`"19,99"`, `"1.234,56"`) |
 | `EURO$(cent [, symbol$])` | STRING | Cent-Betrag in deutscher Schreibweise anzeigen (`1999` wird zu `19,99 €`) |
 
 
@@ -226,8 +226,8 @@ organische Bewegung).
 | `NOISE(x)` → FLOAT | Rauschwert entlang einer Linie — etwa für ein wanderndes Flackern |
 | `NOISE2(x, y)` → FLOAT | Rauschwert auf einer Fläche — Gelände, Wolken, Marmor |
 | `NOISE3(x, y, z)` → FLOAT | Rauschwert im Raum — Höhlen, oder Fläche plus Zeit als dritte Achse |
-| `FBM(x, y, oktaven)` → FLOAT | mehrere Rauschlagen übereinander: grobe Form plus feine Details |
-| `FBM3(x, y, z, oktaven)` → FLOAT | dasselbe im Raum |
+| `FBM(x, y, octaves)` → FLOAT | mehrere Rauschlagen übereinander: grobe Form plus feine Details |
+| `FBM3(x, y, z, octaves)` → FLOAT | dasselbe im Raum |
 
 An ganzzahligen Gitterpunkten ist Perlin definitionsgemäß 0 — wer `NOISE2(1, 2)`
 abfragt, bekommt darum immer 0 und sollte krumme Werte einsetzen.
@@ -281,7 +281,7 @@ PRINT COLOR_LERP(0, &HFFFFFF, 0.5)  ' 8421504 (= &H808080)
 | Funktion | Rückgabe | Zweck |
 |---|---|---|
 | `COMPRESS$(text$)` | STRING | Text zusammenpacken (DEFLATE); das Ergebnis ist Base64, weil Zeichenketten hier UTF-8 sind und roher Packer-Ausgang keins wäre |
-| `DECOMPRESS$(gepackt$)` | STRING | wieder auspacken |
+| `DECOMPRESS$(packed$)` | STRING | wieder auspacken |
 
 Bei Spielstand-artigem Text bringt das ungefähr das Neunfache an Ersparnis. Es
 läuft auch ohne Fenster, also in reinen Konsolenprogrammen.
@@ -292,17 +292,17 @@ Funktionen mit `$`-Suffix gibt es auch ohne (`UPPER$` ≡ `UPPER`).
 
 | Funktion | Zweck |
 |---|---|
-| `LEN(s)` → INTEGER | Länge (auch für Arrays; bei einer MAP die Zahl der Einträge) |
+| `LEN(v)` → INTEGER | Länge (auch für Arrays; bei einer MAP die Zahl der Einträge) |
 | `UPPER$(s)`, `LOWER$(s)` | Groß-/Kleinschreibung |
 | `LEFT$(s, n)`, `RIGHT$(s, n)` | erste/letzte n Zeichen |
 | `MID$(s, start[, n])` | Teilstring ab Position start (0-basiert), n Zeichen oder bis Ende |
 | `INSTR(s, sub[, start])` → INTEGER | Position von sub in s (0-basiert), oder -1 |
 | `INSTRREV(s, sub[, start])` → INTEGER | letzte Position von sub in s (mit `start`: die letzte, die dort oder davor beginnt), oder -1 |
-| `REPLACE$(s, alt, neu)` | alle Vorkommen ersetzen |
+| `REPLACE$(s, old, new)` | alle Vorkommen ersetzen |
 | `TRIM$(s)` | Whitespace vorne/hinten weg |
 | `SPLIT$(s, delim)` → ARRAY OF STRING | Zerlegen |
 | `JOIN$(arr, delim)` → STRING | Vereinen; Zahlen und Wahrheitswerte im Feld werden wie mit `STR$` geschrieben |
-| `PADL$(s, breite[, fill])`, `PADR$(...)` | Auffüllen links/rechts |
+| `PADL$(s, width[, fill])`, `PADR$(...)` | Auffüllen links/rechts |
 | `REPEAT$(s, n)` | s n-mal aneinanderhängen |
 | `SPACE$(n)` | n Leerzeichen |
 | `HEX$(n)` | INT als Hex-String |
@@ -321,14 +321,14 @@ Erweiterungen *(nur native Runtime)*:
 |---|---|
 | `LTRIM$(s)`, `RTRIM$(s)` | Whitespace nur links / nur rechts entfernen |
 | `REVERSE$(s)` | Zeichen umkehren |
-| `TEXT_VISUAL$(text[, richtung])` | der Text so, wie er dasteht: Stücke von rechts nach links umgedreht, Arabisch in seinen verbundenen Formen; `richtung` = `auto` (Vorgabe, erstes starkes Zeichen), `ltr` oder `rtl`. Für eigene Ausgaben -- `TEXT` und die gui tun das selbst |
-| `STARTSWITH(s, präfix)`, `ENDSWITH(s, suffix)` → BOOLEAN | Anfang/Ende prüfen |
-| `CONTAINS(s, teil)` → BOOLEAN | Teilstring enthalten? (Funktionsform von `teil IN s`) |
-| `COUNT(s, teil)` → INTEGER | Anzahl nicht-überlappender Vorkommen von `teil` |
+| `TEXT_VISUAL$(text[, direction])` | der Text so, wie er dasteht: Stücke von rechts nach links umgedreht, Arabisch in seinen verbundenen Formen; `direction` = `auto` (Vorgabe, erstes starkes Zeichen), `ltr` oder `rtl`. Für eigene Ausgaben -- `TEXT` und die gui tun das selbst |
+| `STARTSWITH(s, prefix)`, `ENDSWITH(s, suffix)` → BOOLEAN | Anfang/Ende prüfen |
+| `CONTAINS(s, part)` → BOOLEAN | Teilstring enthalten? (Funktionsform von `part IN s`) |
+| `COUNT(text, part)` → INTEGER | Anzahl nicht-überlappender Vorkommen von `part` |
 | `TITLE$(s)` | Anfangsbuchstabe jedes Wortes groß, Rest klein |
 | `CAMEL$(s)`, `SNAKE$(s)`, `PASCAL$(s)` | Schreibweisen für Bezeichner: aus `"max hp"`, `"MaxHp"`, `"max_hp"` oder `"max-hp"` wird `maxHp`, `max_hp`, `MaxHp`. Wörter trennen Leerraum, `_`, `-`, `.`, der Wechsel von klein auf groß und das Ende einer Abkürzung (`HTTPServer` → `http_server`) |
-| `BETWEEN$(text, links, rechts[, ab])` | was zwischen dem ersten `links` (ab Zeichen `ab`, 0-basiert wie `MID$`) und dem nächsten `rechts` steht; `""`, wenn eins fehlt |
-| `REPLACE_BETWEEN$(text, links, rechts, neu)` | jedes Stück zwischen `links` und `rechts` durch `neu` ersetzen, die Markierungen bleiben (`"{{name}}"` → `"{{?}}"`) |
+| `BETWEEN$(text, left, right[, from])` | was zwischen dem ersten `left` (ab Zeichen `from`, 0-basiert wie `MID$`) und dem nächsten `right` steht; `""`, wenn eins fehlt |
+| `REPLACE_BETWEEN$(text, left, right, new)` | jedes Stück zwischen `left` und `right` durch `new` ersetzen, die Markierungen bleiben (`"{{name}}"` → `"{{?}}"`) |
 | `NOSPACES$(s)` | jeden Leerraum entfernen (Leerzeichen, Tabulator, Umbruch) — für Eingaben wie `"DE89 3704 0044"` |
 | `BIN$(n)`, `OCT$(n)` | INTEGER als Binär-/Oktalstring (mit Vorzeichen) |
 | `ISNUMERIC(s)` → BOOLEAN | als Zahl parsebar? |
@@ -396,20 +396,20 @@ Siehe auch [Sprachreferenz → Arrays](sprache.md#arrays).
 
 | Funktion | Zweck |
 |---|---|
-| `LEN(arr)` → INTEGER | Anzahl Elemente (1. Dimension) |
+| `LEN(v)` → INTEGER | Anzahl Elemente (1. Dimension) |
 | `LBOUND(arr [, dimension])` → INTEGER | kleinster Index; Dimension ab 1, ohne Angabe die erste. 0, außer bei `DIM a[1 TO 31]` |
 | `UBOUND(arr [, dimension])` → INTEGER | größter Index; bei einem leeren Feld `LBOUND - 1` |
 | `DIMCOUNT(arr)` → INTEGER | Anzahl Dimensionen |
 | `DIMSIZE(arr, n)` → INTEGER | Größe der n-ten Dimension (0-basiert) |
-| `SORT(arr)`, `REVERSE(arr)` | 1D IN PLACE sortieren / umkehren |
-| `SORT(arr, absteigend)` | mit BOOLEAN-Flag absteigend sortieren *(nur native Runtime)* |
+| `SORT(arr[, descending])`, `REVERSE(arr)` | 1D IN PLACE sortieren / umkehren |
+| `SORT(arr, descending)` | mit BOOLEAN-Flag absteigend sortieren *(nur native Runtime)* |
 | `SORT(arr, comparator)` | mit FUNCREF-Comparator `cmp(a, b)` → INTEGER (<0/0/>0) sortieren, stabil. Auch eine gebundene Methode (`regel.cmp`) ist erlaubt *(nur native Runtime)* |
-| `ARRAY_INDEXOF(arr, v)` → INTEGER | erster Index von v, sonst -1 (bei einem Feld mit eigener Untergrenze `LBOUND - 1`) |
-| `ARRAY_MAP(arr, funktion)` → ARRAY | neues Feld mit `funktion(x)` je Element, z.B. `ARRAY_MAP(a, FUNCTION(x) x * 2)`; behält eine eigene Untergrenze |
-| `ARRAY_FILTER(arr, funktion)` → ARRAY | neues Feld mit den Elementen, für die `funktion(x)` TRUE liefert (gleicher Elementtyp) |
-| `ARRAY_OF_TYPE(arr, Typ)` → ARRAY OF Typ | neues Feld mit den Elementen, die `IS Typ` sind, in ihrer Reihenfolge. `Typ` ist ein Typname wie rechts von `IS` (Klasse samt Unterklassen, oder ein Werttyp wie `INTEGER`); das Ergebnis passt an ein `ARRAY OF Typ` |
-| `ARRAY_REDUCE(arr, funktion, start)` | faltet das Feld: `funktion(bisher, x)` je Element, beginnend mit `start` |
-| `ARRAY_FIND(arr, funktion)` → INTEGER | Index des ersten Elements, für das `funktion(x)` TRUE liefert, sonst -1 (bei einem Feld mit eigener Untergrenze `LBOUND - 1`) |
+| `ARRAY_INDEXOF(arr, value)` → INTEGER | erster Index von v, sonst -1 (bei einem Feld mit eigener Untergrenze `LBOUND - 1`) |
+| `ARRAY_MAP(arr, function)` → ARRAY | neues Feld mit `function(x)` je Element, z.B. `ARRAY_MAP(a, FUNCTION(x) x * 2)`; behält eine eigene Untergrenze |
+| `ARRAY_FILTER(arr, function)` → ARRAY | neues Feld mit den Elementen, für die `function(x)` TRUE liefert (gleicher Elementtyp) |
+| `ARRAY_OF_TYPE(arr, type)` → ARRAY OF Typ | neues Feld mit den Elementen, die `IS type` sind, in ihrer Reihenfolge. `type` ist ein Typname wie rechts von `IS` (Klasse samt Unterklassen, oder ein Werttyp wie `INTEGER`); das Ergebnis passt an ein `ARRAY OF type` |
+| `ARRAY_REDUCE(arr, function, start)` | faltet das Feld: `function(bisher, x)` je Element, beginnend mit `start` |
+| `ARRAY_FIND(arr, function)` → INTEGER | Index des ersten Elements, für das `function(x)` TRUE liefert, sonst -1 (bei einem Feld mit eigener Untergrenze `LBOUND - 1`) |
 
 **Aggregate** (1D `ARRAY OF INTEGER`/`FLOAT`) und Helfer:
 
@@ -418,18 +418,18 @@ Siehe auch [Sprachreferenz → Arrays](sprache.md#arrays).
 | `ARRAY_SUM(arr)` → INTEGER/FLOAT | Summe (INTEGER-Array → INTEGER, sonst FLOAT) |
 | `ARRAY_AVG(arr)` → FLOAT | Durchschnitt (Array darf nicht leer sein) |
 | `ARRAY_MIN(arr)`, `ARRAY_MAX(arr)` | kleinstes / größtes Element |
-| `ARRAY_FILL(arr, wert)` | alle Elemente mit `wert` füllen (IN PLACE, jede Dimension) |
+| `ARRAY_FILL(arr, value)` | alle Elemente mit `value` füllen (IN PLACE, jede Dimension) |
 | `ARRAY_COPY(arr)` → ARRAY | unabhängige Kopie (gleiche Form/Typ) |
 
 **Dynamische 1D-Arrays** (wachsen/schrumpfen IN PLACE):
 
 | Funktion | Zweck |
 |---|---|
-| `ARRAY_PUSH(arr, wert)` → INTEGER | Element ans Ende anhängen; liefert die neue Länge |
+| `ARRAY_PUSH(arr, value)` → INTEGER | Element ans Ende anhängen; liefert die neue Länge |
 | `ARRAY_POP(arr)` → T | letztes Element entfernen und zurückgeben (nicht leer) |
-| `ARRAY_INSERT(arr, idx, wert)` → INTEGER | an Index `idx` (`0..len`) einfügen; neue Länge |
+| `ARRAY_INSERT(arr, idx, value)` → INTEGER | an Index `idx` (`0..len`) einfügen; neue Länge |
 | `ARRAY_REMOVE_AT(arr, idx)` → T | Element an `idx` entfernen und zurückgeben |
-| `REDIM(arr, länge)` | auf `länge` bringen — wächst mit Typ-Default, schrumpft schneidet ab; vorhandene Werte bleiben |
+| `REDIM(arr, length)` | auf `length` bringen — wächst mit Typ-Default, schrumpft schneidet ab; vorhandene Werte bleiben |
 
 ```basic
 DIM matrix[3, 4] AS INTEGER
@@ -514,12 +514,12 @@ eine weiterzugeben.
 
 | Funktion | Zweck |
 |---|---|
-| `ZIP_LIST(archiv$)` → ARRAY OF STRING | Namen aller Einträge |
-| `ZIP_READ$(archiv$, name$)` → STRING | einen Eintrag als Text |
-| `ZIP_READ(archiv$, name$)` → BUFFER | einen Eintrag als Bytes |
-| `ZIP_EXTRACT(archiv$, ordner$)` → INTEGER | alles entpacken, liefert die Zahl der Dateien |
-| `ZIP_CREATE(archiv$, dateien)` → INTEGER | Archiv aus einer Liste von Dateipfaden |
-| `ZIP_WRITE(archiv$, namen, inhalte)` → INTEGER | Archiv aus Namen und Inhalten (Texte oder Puffer), ohne Umweg über Dateien |
+| `ZIP_LIST(archive$)` → ARRAY OF STRING | Namen aller Einträge |
+| `ZIP_READ$(archive$, name$)` → STRING | einen Eintrag als Text |
+| `ZIP_READ(archive$, name$)` → BUFFER | einen Eintrag als Bytes |
+| `ZIP_EXTRACT(archive$, folder$)` → INTEGER | alles entpacken, liefert die Zahl der Dateien |
+| `ZIP_CREATE(archive$, files)` → INTEGER | Archiv aus einer Liste von Dateipfaden |
+| `ZIP_WRITE(archive$, names, contents)` → INTEGER | Archiv aus Namen und Inhalten (Texte oder Puffer), ohne Umweg über Dateien |
 
 ```basic
 DIM namen AS ARRAY OF STRING
@@ -581,9 +581,9 @@ Konsolenprogramm gehört ein `SLEEP(10)` hinein.
 | Funktion | Zweck |
 |---|---|
 | `TASK_START(funktion[, arg1, arg2, …])` → INTEGER | starten, liefert die Auftragsnummer |
-| `TASK_READY(auftrag)` → BOOLEAN | ist das Ergebnis da? |
-| `TASK_RESULT$(auftrag)` → STRING | Ergebnis abholen (**einmal**) |
-| `TASK_CANCEL(auftrag)` | Ergebnis verwerfen |
+| `TASK_READY(job)` → BOOLEAN | ist das Ergebnis da? |
+| `TASK_RESULT$(job)` → STRING | Ergebnis abholen (**einmal**) |
+| `TASK_CANCEL(job)` | Ergebnis verwerfen |
 | `TASK_PENDING()` → INTEGER | Aufträge, die noch nicht abgeholt sind |
 
 Die Funktion schreibst du **ohne Klammern** hin: `TASK_START(BerechneKarte, 42)`.
@@ -677,10 +677,10 @@ IF PARENT_RECV$() = "neu" THEN laden()
 | Funktion | Zweck |
 |---|---|
 | `WINDOW_OPEN(datei$[, arg1, …])` → INTEGER | zweiten `dhrt run datei$` starten; Zahlen, Texte, BOOLEAN werden Kommandozeilen-Argumente (`ARGC`/`ARG$`) |
-| `WINDOW_SEND(fenster, text$)` | eine Zeile schicken — vor der Verbindung Gesendetes kommt nach, sobald das Kind `PARENT_*` ruft |
-| `WINDOW_RECV$(fenster)` → STRING | nächste Zeile vom Kind oder `""` |
-| `WINDOW_ALIVE(fenster)` → BOOLEAN | läuft der Prozess noch? |
-| `WINDOW_CLOSE(fenster)` | Prozess beenden |
+| `WINDOW_SEND(window, text$)` | eine Zeile schicken — vor der Verbindung Gesendetes kommt nach, sobald das Kind `PARENT_*` ruft |
+| `WINDOW_RECV$(window)` → STRING | nächste Zeile vom Kind oder `""` |
+| `WINDOW_ALIVE(window)` → BOOLEAN | läuft der Prozess noch? |
+| `WINDOW_CLOSE(window)` | Prozess beenden |
 | `PARENT_SEND(text$)` / `PARENT_RECV$()` | im Kind: an die Eltern / von den Eltern |
 | `PARENT_ALIVE()` → BOOLEAN | im Kind: gibt es Eltern, und leben sie? `FALSE`, wenn das Programm allein gestartet wurde — so läuft dasselbe Programm auch ohne Eltern |
 
@@ -727,12 +727,12 @@ PRINT SET_SIZE(gesehen)
 
 | Funktion | Zweck |
 |---|---|
-| `SET_ADD(menge, wert)` | aufnehmen; schon drin = kein Effekt |
-| `SET_HAS(menge, wert)` → BOOLEAN | Zugehörigkeit |
-| `SET_REMOVE(menge, wert)` → BOOLEAN | entfernen; `TRUE` wenn es drin war |
-| `SET_SIZE(menge)` → INTEGER | Anzahl der Elemente |
-| `SET_ITEMS(menge)` → ARRAY | Elemente in Aufnahme-Reihenfolge |
-| `SET_CLEAR(menge)` | alle Elemente entfernen |
+| `SET_ADD(set, value)` | aufnehmen; schon drin = kein Effekt |
+| `SET_HAS(set, value)` → BOOLEAN | Zugehörigkeit |
+| `SET_REMOVE(set, value)` → BOOLEAN | entfernen; `TRUE` wenn es drin war |
+| `SET_SIZE(set)` → INTEGER | Anzahl der Elemente |
+| `SET_ITEMS(set)` → ARRAY | Elemente in Aufnahme-Reihenfolge |
+| `SET_CLEAR(set)` | alle Elemente entfernen |
 
 **Eine Menge führt eine Elementart.** Elemente dürfen `INTEGER` **oder**
 `STRING` sein, aber nicht gemischt — die erste Aufnahme legt die Art fest,
@@ -773,11 +773,11 @@ Mueller;"Berlin; Mitte";42      SPLIT$(";") -> vier Felder statt drei
 
 | Funktion | Zweck |
 |---|---|
-| `CSV_PARSE(text$[, trenner$])` → ARRAY OF STRING | Text zerlegen, 2D (Zeilen × Spalten) |
-| `CSV_LOAD(pfad$[, trenner$[, kodierung$]])` → ARRAY OF STRING | Datei lesen, 2D |
-| `CSV_FORMAT$(tabelle[, trenner$])` → STRING | 2D-Array als CSV-Text |
-| `CSV_SAVE(pfad$, tabelle[, trenner$[, kodierung$]])` | 2D-Array in eine Datei |
-| `CSV_ROW$(felder[, trenner$])` → STRING | eine einzelne Zeile aus 1D-Array |
+| `CSV_PARSE(text$[, separator$])` → ARRAY OF STRING | Text zerlegen, 2D (Zeilen × Spalten) |
+| `CSV_LOAD(path$[, separator$[, encoding$]])` → ARRAY OF STRING | Datei lesen, 2D |
+| `CSV_FORMAT$(table[, separator$])` → STRING | 2D-Array als CSV-Text |
+| `CSV_SAVE(path$, table[, separator$[, encoding$]])` | 2D-Array in eine Datei |
+| `CSV_ROW$(fields[, separator$])` → STRING | eine einzelne Zeile aus 1D-Array |
 
 ```basic
 DIM t AS ARRAY OF STRING
@@ -955,11 +955,11 @@ Entscheidung, kein Nachtrag zu dieser.
 
 | Funktion | Zweck |
 |---|---|
-| `OPENFILE(pfad$, modus$[, kodierung$])` → FILE | Modi: `"r"` lesen, `"w"` neu schreiben, `"a"` anhängen |
+| `OPENFILE(path$, mode$[, encoding$])` → FILE | Modi: `"r"` lesen, `"w"` neu schreiben, `"a"` anhängen |
 | `CLOSEFILE(f)` | schließt |
 | `READLINE(f)` → STRING | nächste Zeile (ohne `\n`); am Dateiende `""` wie eine leere Zeile, darum `EOF(f)` fragen |
 | `EOF(f)` → BOOLEAN | TRUE, wenn aus der Datei nichts mehr zu lesen ist: `WHILE NOT EOF(f) : PRINT READLINE(f) : WEND` |
-| `READALL$(f)` → STRING | Rest komplett lesen |
+| `READALL$(f[, encoding$])` → STRING | Rest komplett lesen |
 | `ENDOFFILE(f)` → BOOLEAN | beim Ende? |
 | `WRITELINE(f, text$)` | schreibt + `\n` |
 | `WRITE(f, text$)` | schreibt ohne `\n` |
@@ -969,26 +969,26 @@ Pfadbasiert, ohne FILE-Handle *(nur native Runtime)*:
 
 | Funktion | Zweck |
 |---|---|
-| `WRITEALL(pfad$, text$[, kodierung$])` | Text komplett schreiben (überschreibt/erzeugt) |
-| `READLINES(pfad$[, kodierung$])` → ARRAY OF STRING | Datei als Zeilen-Array lesen |
-| `READALL$(pfad$[, kodierung$])` → STRING | Datei komplett als Text lesen |
-| `FILESIZE(pfad$)` → INTEGER | Größe in Bytes |
-| `FILE_ENCODING$(pfad$)` → STRING | was `"auto"` wählen würde: `utf8`, `utf8bom`, `cp1252` oder `binaer` (siehe Kodierungen) |
-| `DELETEFILE(pfad$)`, `RENAME(alt$, neu$)` | löschen / umbenennen·verschieben |
-| `DIREXISTS(pfad$)` → BOOLEAN | Verzeichnis vorhanden? |
-| `DIRLIST(pfad$[, muster$])` → ARRAY OF STRING | Eintragsnamen (sortiert), optional gefiltert |
-| `DIRLIST_REC(pfad$[, muster$])` → ARRAY OF STRING | wie oben, aber rekursiv — nur Dateien, Pfade relativ mit `/` |
-| `RMDIR(pfad$[, mit_inhalt])` | Verzeichnis löschen (leer; mit `TRUE` samt Inhalt) |
-| `FILETIME(pfad$)` → INTEGER | zuletzt geändert, Sekunden wie im Modul `zeit` |
+| `WRITEALL(path$, text$[, encoding$])` | Text komplett schreiben (überschreibt/erzeugt) |
+| `READLINES(path$[, encoding$])` → ARRAY OF STRING | Datei als Zeilen-Array lesen |
+| `READALL$(f$[, encoding$])` → STRING | Datei komplett als Text lesen |
+| `FILESIZE(path$)` → INTEGER | Größe in Bytes |
+| `FILE_ENCODING$(path$)` → STRING | was `"auto"` wählen würde: `utf8`, `utf8bom`, `cp1252` oder `binaer` (siehe Kodierungen) |
+| `DELETEFILE(path$)`, `RENAME(alt$, neu$)` | löschen / umbenennen·verschieben |
+| `DIREXISTS(path$)` → BOOLEAN | Verzeichnis vorhanden? |
+| `DIRLIST(path$, pattern$ = "", recursive = FALSE)` → ARRAY OF STRING | Eintragsnamen (sortiert), optional gefiltert; mit `recursive: TRUE` wie `DIRLIST_REC` |
+| `DIRLIST_REC(path$[, pattern$])` → ARRAY OF STRING | wie oben, aber rekursiv — nur Dateien, Pfade relativ mit `/` |
+| `RMDIR(path$[, with_content])` | Verzeichnis löschen (leer; mit `TRUE` samt Inhalt) |
+| `FILETIME(path$)` → INTEGER | zuletzt geändert, Sekunden wie im Modul `zeit` |
 | `TEMPDIR$()` → STRING | das Temp-Verzeichnis des Systems |
-| `TEMPFILE$([praefix$[, endung$]])` → STRING | freier Name im Temp-Verzeichnis, **leer angelegt** |
-| `MKDIR(pfad$)` | Verzeichnis anlegen (inkl. Eltern) |
+| `TEMPFILE$([prefix$[, extension$]])` → STRING | freier Name im Temp-Verzeichnis, **leer angelegt** |
+| `MKDIR(path$)` | Verzeichnis anlegen (inkl. Eltern) |
 | `COPYFILE(src$, dst$)` | Datei kopieren |
-| `APPENDFILE(pfad$, text$[, kodierung$])` | Text ans Ende hängen (legt die Datei an) |
+| `APPENDFILE(p$, text$[, encoding$])` | Text ans Ende hängen (legt die Datei an) |
 | `PATHJOIN(a$, b$, …)` → STRING | Pfadteile mit `/` verbinden |
-| `BASENAME(pfad$)` → STRING | letzter Pfad-Bestandteil (Datei-/Ordnername) |
-| `DIRNAME(pfad$)` → STRING | Verzeichnis-Anteil (ohne letzten Bestandteil) |
-| `REALPATH$(pfad$)` → STRING | der volle, bereinigte Pfad: absolut, `.`/`..` aufgelöst, in der Schreibweise der Platte; gibt es die Datei nicht, nur absolut gemacht und bereinigt |
+| `BASENAME(p$)` → STRING | letzter Pfad-Bestandteil (Datei-/Ordnername) |
+| `DIRNAME(p$)` → STRING | Verzeichnis-Anteil (ohne letzten Bestandteil) |
+| `REALPATH$(path$)` → STRING | der volle, bereinigte Pfad: absolut, `.`/`..` aufgelöst, in der Schreibweise der Platte; gibt es die Datei nicht, nur absolut gemacht und bereinigt |
 | `SAMEFILE(a$, b$)` → BOOLEAN | meinen beide Pfade dieselbe Datei? Ein Textvergleich irrt bei `/` gegen `\`, bei einem `..` im Pfad, bei kurzen 8.3-Namen und (unter Windows) bei Groß/klein |
 
 ```basic
@@ -1038,15 +1038,15 @@ gibt man ihn an eine `SUB`, teilen sich beide Seiten dieselben Bytes.
 
 | Funktion | Zweck |
 |---|---|
-| `BUFFER_NEW(groesse)` → BUFFER | neuer Puffer, mit Nullen gefüllt |
-| `BUFFER_LEN(b)` → INTEGER | Länge in **Bytes** |
-| `BUFFER_GET(b, pos)` → INTEGER | Byte 0..255 lesen |
-| `BUFFER_SET(b, pos, byte)` | Byte 0..255 schreiben (verändert in place) |
-| `BUFFER_FILL(b, byte)` | alles mit einem Byte füllen |
-| `BUFFER_RESIZE(b, groesse)` | wächst mit Nullen, schrumpft durch Abschneiden |
-| `BUFFER_SLICE(b, von, bis)` → BUFFER | **Kopie** der Bytes `[von, bis)` |
+| `BUFFER_NEW(size)` → BUFFER | neuer Puffer, mit Nullen gefüllt |
+| `BUFFER_LEN(buffer)` → INTEGER | Länge in **Bytes** |
+| `BUFFER_GET(buffer, position)` → INTEGER | Byte 0..255 lesen |
+| `BUFFER_SET(buffer, position, byte)` | Byte 0..255 schreiben (verändert in place) |
+| `BUFFER_FILL(buffer, byte)` | alles mit einem Byte füllen |
+| `BUFFER_RESIZE(buffer, size)` | wächst mit Nullen, schrumpft durch Abschneiden |
+| `BUFFER_SLICE(buffer, from, to)` → BUFFER | **Kopie** der Bytes `[from, to)` |
 | `BUFFER_CONCAT(a, b)` → BUFFER | neuer Puffer aus beiden |
-| `BUFFER_INDEXOF(b, nadel [, ab])` → INTEGER | erste Fundstelle, sonst `-1` |
+| `BUFFER_INDEXOF(buffer, needle [, from])` → INTEGER | erste Fundstelle, sonst `-1` |
 
 Wie bei Arrays gilt: **ein Index daneben ist ein Fehler, ein Slice klemmt.**
 `BUFFER_GET(b, 99)` auf einen 4-Byte-Puffer wirft; `BUFFER_SLICE(b, 0, 99)`
@@ -1060,9 +1060,9 @@ beschnitten — das fiele sonst erst in der fertigen Ausgabedatei auf.
 | Funktion | Zweck |
 |---|---|
 | `BUFFER_FROM_STRING(text$)` → BUFFER | Text als UTF-8-Bytes |
-| `BUFFER_TO_STRING$(b)` → STRING | Bytes als UTF-8-Text |
-| `BUFFER_TO_HEX$(b)` / `BUFFER_FROM_HEX(s$)` | Hex-Text (`"deadbeef"`) |
-| `BUFFER_TO_BASE64$(b)` / `BUFFER_FROM_BASE64(s$)` | Base64 |
+| `BUFFER_TO_STRING$(buffer)` → STRING | Bytes als UTF-8-Text |
+| `BUFFER_TO_HEX$(buffer)` / `BUFFER_FROM_HEX(s$)` | Hex-Text (`"deadbeef"`) |
+| `BUFFER_TO_BASE64$(buffer)` / `BUFFER_FROM_BASE64(s$)` | Base64 |
 
 `BUFFER_TO_STRING$` ist **streng**: sind die Bytes kein gültiges UTF-8, gibt es
 einen Fehler statt stillschweigend ersetzter Zeichen — ein `?` an der falschen
@@ -1079,8 +1079,8 @@ das gültiges UTF-8 verlangt und sonst wirft.
 
 | Funktion | Zweck |
 |---|---|
-| `BUFFER_DEFLATE(b [, format$])` → BUFFER | Bytes mit Deflate packen (`"zlib"` Vorgabe, `"roh"`) |
-| `BUFFER_INFLATE(b [, format$])` → BUFFER | gepackte Bytes entpacken (`"zlib"` Vorgabe, `"roh"`) |
+| `BUFFER_DEFLATE(buffer [, format$])` → BUFFER | Bytes mit Deflate packen (`"zlib"` Vorgabe, `"roh"`) |
+| `BUFFER_INFLATE(buffer [, format$])` → BUFFER | gepackte Bytes entpacken (`"zlib"` Vorgabe, `"roh"`) |
 
 Anders als `COMPRESS$`/`DECOMPRESS$` (Text rein, Base64 raus) arbeiten die
 beiden auf **rohen Bytes**. Die Vorgabe `"zlib"` ist das Format mit Kopf und
@@ -1121,12 +1121,12 @@ Zahl wieder heraus.
 
 | Funktion | Zweck |
 |---|---|
-| `READALL_BYTES(pfad$)` → BUFFER | ganze Datei als Bytes |
-| `WRITEALL_BYTES(pfad$, b)` | Bytes in eine Datei (überschreibt) |
-| `READ_BYTES(datei, anzahl)` → BUFFER | bis zu `anzahl` Bytes vom Handle |
-| `WRITE_BYTES(datei, b)` | Bytes ans Handle |
-| `SEEK(datei, position)` | Position setzen (0 = Anfang) |
-| `TELL(datei)` → INTEGER | aktuelle Position |
+| `READALL_BYTES(path$)` → BUFFER | ganze Datei als Bytes |
+| `WRITEALL_BYTES(path$, buffer)` | Bytes in eine Datei (überschreibt) |
+| `READ_BYTES(file, count)` → BUFFER | bis zu `count` Bytes vom Handle |
+| `WRITE_BYTES(file, buffer)` | Bytes ans Handle |
+| `SEEK(file, position)` | Position setzen (0 = Anfang) |
+| `TELL(file)` → INTEGER | aktuelle Position |
 
 ```basic
 ' Stückweise durch eine große Datei, ohne sie ganz in den Speicher zu holen
@@ -1165,20 +1165,22 @@ geklappt hat.
 | Funktion | Zweck |
 |---|---|
 | `ARGC()` → INTEGER | Anzahl der Argumente für dieses Programm |
-| `ARG$(n)` → STRING | Argument Nr. `n` (0-basiert); außerhalb → `""` |
-| `ARGPATH$(n)` → STRING | Argument Nr. `n` als **Pfad vom Aufrufort aus** (siehe unten) |
+| `ARG$(number)` → STRING | Argument Nr. `n` (0-basiert); außerhalb → `""` |
+| `ARGPATH$(number)` → STRING | Argument Nr. `n` als **Pfad vom Aufrufort aus** (siehe unten) |
 | `STARTDIR$()` → STRING | der Ordner, aus dem das Programm aufgerufen wurde |
-| `GETENV$(name$ [, vorgabe$])` → STRING | Umgebungsvariable lesen |
-| `SETENV(name$, wert$)` | Umgebungsvariable setzen (dieses Programm + seine Kinder) |
+| `GETENV$(name$ [, default$])` → STRING | Umgebungsvariable lesen |
+| `SETENV(name$, value$)` | Umgebungsvariable setzen (dieses Programm + seine Kinder) |
+| `SYSTEM_LANGUAGE$()` → STRING | die Sprache des Systems als zwei Buchstaben (`"de"`, `"en"`, `"fr"` …), `""` wenn unbekannt — etwa um die Texte eines Programms zu wählen |
+| `RUNTIME_LANGUAGE$()` → STRING | die Sprache, in der die Laufzeit gerade ihre Meldungen schreibt: `"de"` oder `"en"` — `DHRT_LANG`, sonst das System (Deutsch nur auf einem deutschen System) |
 | `CWD$()` → STRING | aktuelles Arbeitsverzeichnis |
-| `CHDIR(pfad$)` | Arbeitsverzeichnis wechseln |
+| `CHDIR(path$)` | Arbeitsverzeichnis wechseln |
 | `EXEPATH$()` → STRING | Pfad der laufenden Programmdatei |
-| `MODULE_AVAILABLE(modul$)` → BOOLEAN | ist das Modul in diesem Bau dabei? (Hardware-Module fehlen ohne `--hardware`) |
+| `MODULE_AVAILABLE(module$)` → BOOLEAN | ist das Modul in diesem Bau dabei? (Hardware-Module fehlen ohne `--hardware`) |
 | `EXIT([code])` | sofort beenden, `code` = Rückgabewert (0..255, Vorgabe 0) |
 | `EPRINT(text)` | Zeile nach **stderr** statt stdout |
-| `SHELL(programm$, ...)` → INTEGER | Programm starten, warten, Rückgabewert |
-| `SHELL_OUT$(programm$, ...)` → STRING | wie `SHELL`, sammelt aber die Ausgabe ein |
-| `STDIN([kodierung$])` → FILE | die Standardeingabe als Datei-Handle |
+| `SHELL(program$, ...)` → INTEGER | Programm starten, warten, Rückgabewert |
+| `SHELL_OUT$(program$, ...)` → STRING | wie `SHELL`, sammelt aber die Ausgabe ein |
+| `STDIN([encoding$])` → FILE | die Standardeingabe als Datei-Handle |
 | `TERMINAL()` → BOOLEAN | geht die Ausgabe in ein Terminal (nicht in eine Datei, eine Pipe, die IDE)? |
 | `TERMINAL_WIDTH()` → INTEGER | Spalten des Terminals, 0 wenn die Ausgabe in keines geht |
 
@@ -1321,12 +1323,12 @@ Nachsehen:
 
 | Funktion | Wirkung |
 |---|---|
-| `SHELL_START(programm$, ...)` → INTEGER | startet im Hintergrund, liefert die Auftragsnummer |
-| `SHELL_READY(auftrag)` → BOOLEAN | ist der Prozess fertig? |
-| `SHELL_RESULT$(auftrag)` → STRING | stdout abholen, Platz freigeben |
+| `SHELL_START(program$, ...)` → INTEGER | startet im Hintergrund, liefert die Auftragsnummer |
+| `SHELL_READY(job)` → BOOLEAN | ist der Prozess fertig? |
+| `SHELL_RESULT$(job)` → STRING | stdout abholen, Platz freigeben |
 | `SHELL_CODE()` → INTEGER | Rückgabewert des **zuletzt abgeholten** Auftrags |
 | `SHELL_ERR$()` → STRING | dessen stderr |
-| `SHELL_CANCEL(auftrag)`, `SHELL_PENDING()` | verwerfen / zählen |
+| `SHELL_CANCEL(job)`, `SHELL_PENDING()` | verwerfen / zählen |
 
 ```basic
 DIM auftrag AS INTEGER
@@ -1354,16 +1356,16 @@ schicken — dafür gibt es Prozesse mit Leitung in beide Richtungen:
 
 | Funktion | Wirkung |
 |---|---|
-| `PROCESS_START(programm$, ...)` → INTEGER | startet mit offener Eingabe und Ausgabe; `"dhrt"` als Programm meint diese Runtime selbst. Ein Feld von Texten unter den Argumenten wird ausgebreitet (`PROCESS_START("dhrt", "run", datei$, "--", argumente)`), eine MAP von Texten gibt dem Kind zusätzliche Umgebungsvariablen (nur ihm, nicht dem eigenen Programm) |
-| `PROCESS_START_DETACHED(programm$, ...)` → INTEGER | startet **losgelöst**: ohne Leitungen und ohne Nummer für die anderen `PROCESS_*`, das Kind läuft weiter, wenn dieses Programm endet (so startet der Startbildschirm der IDE das Studio und schließt sich). Argumente wie bei `PROCESS_START`; liefert die Prozessnummer des Systems |
-| `PROCESS_READ$(prozess)` → STRING | was seit dem letzten Abruf auf stdout kam (leer = nichts Neues) |
-| `PROCESS_ERR$(prozess)` → STRING | dasselbe für stderr |
-| `PROCESS_WRITE(prozess, text$)` | an die Eingabe schicken — ein `INPUT` im Kind braucht das Zeilenende `CHR$(10)` |
-| `PROCESS_CLOSE_INPUT(prozess)` | Eingabe schließen (Dateiende für das Kind) |
-| `PROCESS_RUNNING(prozess)` → BOOLEAN | läuft es noch? |
-| `PROCESS_CODE(prozess)` → INTEGER | Rückgabewert; `-1` solange es läuft oder wenn es abgebrochen wurde |
-| `PROCESS_FRONT(prozess)` | holt das sichtbare Fenster des Kindes nach vorn (Windows; TRUE, wenn es eines gab). Ein Programm im Hintergrund darf sich dort nicht selbst nach vorn holen, das darf nur, wer gerade vorn ist; ohne Fenster bekommt das Kind die Erlaubnis für sein erstes. Anderswo FALSE |
-| `PROCESS_KILL(prozess)`, `PROCESS_CLOSE(prozess)` | beenden (samt allem, was das Kind selbst gestartet hat — `cmd /C ping ...` beendet auch den `ping`) / den Platz freigeben |
+| `PROCESS_START(program$, ...)` → INTEGER | startet mit offener Eingabe und Ausgabe; `"dhrt"` als Programm meint diese Runtime selbst. Ein Feld von Texten unter den Argumenten wird ausgebreitet (`PROCESS_START("dhrt", "run", datei$, "--", argumente)`), eine MAP von Texten gibt dem Kind zusätzliche Umgebungsvariablen (nur ihm, nicht dem eigenen Programm) |
+| `PROCESS_START_DETACHED(program$, ...)` → INTEGER | startet **losgelöst**: ohne Leitungen und ohne Nummer für die anderen `PROCESS_*`, das Kind läuft weiter, wenn dieses Programm endet (so startet der Startbildschirm der IDE das Studio und schließt sich). Argumente wie bei `PROCESS_START`; liefert die Prozessnummer des Systems |
+| `PROCESS_READ$(process)` → STRING | was seit dem letzten Abruf auf stdout kam (leer = nichts Neues) |
+| `PROCESS_ERR$(process)` → STRING | dasselbe für stderr |
+| `PROCESS_WRITE(process, text$)` | an die Eingabe schicken — ein `INPUT` im Kind braucht das Zeilenende `CHR$(10)` |
+| `PROCESS_CLOSE_INPUT(process)` | Eingabe schließen (Dateiende für das Kind) |
+| `PROCESS_RUNNING(process)` → BOOLEAN | läuft es noch? |
+| `PROCESS_CODE(process)` → INTEGER | Rückgabewert; `-1` solange es läuft oder wenn es abgebrochen wurde |
+| `PROCESS_FRONT(process)` | holt das sichtbare Fenster des Kindes nach vorn (Windows; TRUE, wenn es eines gab). Ein Programm im Hintergrund darf sich dort nicht selbst nach vorn holen, das darf nur, wer gerade vorn ist; ohne Fenster bekommt das Kind die Erlaubnis für sein erstes. Anderswo FALSE |
+| `PROCESS_KILL(process)`, `PROCESS_CLOSE(process)` | beenden (samt allem, was das Kind selbst gestartet hat — `cmd /C ping ...` beendet auch den `ping`) / den Platz freigeben |
 
 ```basic
 DIM p AS INTEGER
@@ -1391,18 +1393,18 @@ Zeilen und Spalten zählen ab 1, in Zeichen.
 
 | Funktion | Rückgabe | Wirkung |
 |---|---|---|
-| `CODE_CHECK$(quelltext$[, basis$])` | STRING (JSON) | die Front-End-Kette wie `dhrt --check`: eine Liste von `{zeile, spalte, laenge, schwere, meldung}` mit `schwere` = `fehler`/`warnung`; `spalte` (ab 1) und `laenge` sagen, wo in der Zeile die Meldung hingehört -- die Stelle eines Syntaxfehlers, sonst ein in der Meldung genannter Name, sonst die Zeile ohne Einrückung; `basis$` = Ordner für `IMPORT "x.dh"` (Vorgabe: das Arbeitsverzeichnis). Zeilen sind die des Puffers, auch bei Importen |
-| `CODE_HOVER$(quelltext$, zeile, spalte [, basis$])` | STRING | Signatur und Beschreibung zum Wort an der Stelle als Markdown; leer, wenn dort kein Wort steht. Mit `basis$` (Ordner für IMPORTs, leer = Arbeitsordner) gilt hinter `objekt.` das Mitglied der Klasse des Objekts; dafür wird der Text übersetzt |
-| `CODE_COMPLETE(quelltext$, zeile, spalte [, basis$])` | ARRAY OF STRING | Vorschläge zum Wortanfang links der Stelle: eigene Symbole, Befehle, Schlüsselwörter, Konstanten; mit `basis$` hinter `objekt.` nur die Felder, PROPERTYs und Methoden seiner Klasse, hinter einem Namensraum (`kern.`) dessen oberste Definitionen ohne `PRIVATE` |
-| `CODE_DEFINITION(quelltext$, zeile, spalte)` | TUPLE (zeile, spalte) | wo das Wort definiert ist; `(-1, -1)` ohne Definition in diesem Text |
-| `CODE_REFERENCES(quelltext$, zeile, spalte)` | ARRAY OF INTEGER | die Zeilen aller Vorkommen |
-| `CODE_CLASSES$(quelltext$)` | STRING (JSON) | die Klassen und Structs des Textes mit ihren Mitgliedern, ohne zu übersetzen: je Klasse `{"name", "art", "basis", "zeile", "bis", "kommentar", "mitglieder"}` (`basis` = die Klasse hinter `EXTENDS`), je Mitglied `{"name", "art", "typ", "kopf", "zeile", "kommentar"}` mit `art` = `feld`/`konstante`/`sub`/`function`/`property` -- GET und SET einer PROPERTY sind ein Mitglied; ein halb getippter Text liefert, was zu lesen ist |
-| `CODE_METHOD_CALLS$(quelltext$[, basis$])` | STRING (JSON) | alle Methodenaufrufe, deren Klasse der Übersetzer kennt, in einem Lauf: `{"zeile", "name", "klasse", "signatur"}` (Zeile ab 1; `klasse` ist die Klasse, in der die Methode steht, `signatur` ihre Kopfzeile aus dem Quelltext) -- für Parameternamen an Aufrufen; ohne Übersetzung `[]` |
-| `CODE_TYPES$(quelltext$[, basis$])` | STRING (JSON) | Typ-Hinweise für einen Editor: je Stelle ohne geschriebenen Typ -- heute die Variablen von `FOR EACH` -- `{"zeile", "name", "typ"}` (Zeile ab 1; `MAP` liefert Schlüssel als STRING, in der Paar-Form dazu den Wert); was der Übersetzer nicht weiß, fehlt |
-| `CODE_NAMES(quelltext$)` | MAP OF INTEGER | wie oft jeder Name benutzt wird (klein, samt `$`): ohne Kommentare und Zeichenketten und ohne die Stelle, an der eine SUB/FUNCTION ihn definiert -- Aufrufe, FUNCREFs und Methoden hinter einem Punkt zählen |
-| `CODE_SYMBOLS$(quelltext$)` | STRING (JSON) | die Gliederung: `{name, art, von, bis, kinder}` — Klassen mit ihren Methoden; `art` ist `class`, `struct`, `sub`, `function`, `property` oder `enum` |
-| `CODE_FORMAT$(quelltext$ [, einruecken])` | STRING | der Quelltext formatiert wie durch `dhrt fmt`: Schlüsselwörter groß, Leerraum am Zeilenende weg, mit `einruecken` (Vorgabe TRUE) die Blöcke neu eingerückt; leer, wenn sich die Quelle nicht lesen lässt (Syntaxfehler) |
-| `CODE_RENAME$(quelltext$, zeile, spalte, neu$)` | STRING | der Quelltext mit dem Namen an dieser Stelle überall in `neu$` umbenannt — ganze Wörter, ohne Kommentare und Zeichenketten. Leer, wenn dort kein Name steht, es ein Schlüsselwort ist oder `neu$` keiner ist |
+| `CODE_CHECK$(source$[, base$])` | STRING (JSON) | die Front-End-Kette wie `dhrt --check`: eine Liste von `{zeile, spalte, laenge, schwere, meldung}` mit `schwere` = `fehler`/`warnung`; `spalte` (ab 1) und `laenge` sagen, wo in der Zeile die Meldung hingehört -- die Stelle eines Syntaxfehlers, sonst ein in der Meldung genannter Name, sonst die Zeile ohne Einrückung; `base$` = Ordner für `IMPORT "x.dh"` (Vorgabe: das Arbeitsverzeichnis). Zeilen sind die des Puffers, auch bei Importen |
+| `CODE_HOVER$(source$, line, column [, base$])` | STRING | Signatur und Beschreibung zum Wort an der Stelle als Markdown; leer, wenn dort kein Wort steht. Mit `base$` (Ordner für IMPORTs, leer = Arbeitsordner) gilt hinter `objekt.` das Mitglied der Klasse des Objekts; dafür wird der Text übersetzt |
+| `CODE_COMPLETE(source$, line, column [, base$])` | ARRAY OF STRING | Vorschläge zum Wortanfang links der Stelle: eigene Symbole, Befehle, Schlüsselwörter, Konstanten; mit `base$` hinter `objekt.` nur die Felder, PROPERTYs und Methoden seiner Klasse, hinter einem Namensraum (`kern.`) dessen oberste Definitionen ohne `PRIVATE` |
+| `CODE_DEFINITION(source$, line, column)` | TUPLE (zeile, spalte) | wo das Wort definiert ist; `(-1, -1)` ohne Definition in diesem Text |
+| `CODE_REFERENCES(source$, line, column)` | ARRAY OF INTEGER | die Zeilen aller Vorkommen |
+| `CODE_CLASSES$(source$)` | STRING (JSON) | die Klassen und Structs des Textes mit ihren Mitgliedern, ohne zu übersetzen: je Klasse `{"name", "art", "basis", "zeile", "bis", "kommentar", "mitglieder"}` (`basis` = die Klasse hinter `EXTENDS`), je Mitglied `{"name", "art", "typ", "kopf", "zeile", "kommentar"}` mit `art` = `feld`/`konstante`/`sub`/`function`/`property` -- GET und SET einer PROPERTY sind ein Mitglied; ein halb getippter Text liefert, was zu lesen ist |
+| `CODE_METHOD_CALLS$(source$[, base$])` | STRING (JSON) | alle Methodenaufrufe, deren Klasse der Übersetzer kennt, in einem Lauf: `{"zeile", "name", "klasse", "signatur"}` (Zeile ab 1; `klasse` ist die Klasse, in der die Methode steht, `signatur` ihre Kopfzeile aus dem Quelltext) -- für Parameternamen an Aufrufen; ohne Übersetzung `[]` |
+| `CODE_TYPES$(source$[, base$])` | STRING (JSON) | Typ-Hinweise für einen Editor: je Stelle ohne geschriebenen Typ -- heute die Variablen von `FOR EACH` -- `{"zeile", "name", "typ"}` (Zeile ab 1; `MAP` liefert Schlüssel als STRING, in der Paar-Form dazu den Wert); was der Übersetzer nicht weiß, fehlt |
+| `CODE_NAMES(source$)` | MAP OF INTEGER | wie oft jeder Name benutzt wird (klein, samt `$`): ohne Kommentare und Zeichenketten und ohne die Stelle, an der eine SUB/FUNCTION ihn definiert -- Aufrufe, FUNCREFs und Methoden hinter einem Punkt zählen |
+| `CODE_SYMBOLS$(source$)` | STRING (JSON) | die Gliederung: `{name, art, von, bis, kinder}` — Klassen mit ihren Methoden; `art` ist `class`, `struct`, `sub`, `function`, `property` oder `enum` |
+| `CODE_FORMAT$(source$ [, indent])` | STRING | der Quelltext formatiert wie durch `dhrt fmt`: Schlüsselwörter groß, Leerraum am Zeilenende weg, mit `indent` (Vorgabe TRUE) die Blöcke neu eingerückt; leer, wenn sich die Quelle nicht lesen lässt (Syntaxfehler) |
+| `CODE_RENAME$(source$, line, column, new$)` | STRING | der Quelltext mit dem Namen an dieser Stelle überall in `new$` umbenannt — ganze Wörter, ohne Kommentare und Zeichenketten. Leer, wenn dort kein Name steht, es ein Schlüsselwort ist oder `new$` keiner ist |
 
 ```basic
 DIM j AS JSON_HANDLE
@@ -1426,9 +1428,9 @@ Damit prüft sich ein Programm selbst — und sagt hinterher, ob es geklappt hat
 
 | Funktion | Zweck |
 |---|---|
-| `ASSERT(bedingung [, meldung$])` | schlägt fehl, wenn die Bedingung `FALSE` ist |
-| `ASSERT_EQ(ist, soll [, was$])` | dasselbe, die Meldung zeigt **beide** Werte |
-| `ASSERT_COLLECT(an)` | Sammel-Modus ein/aus (Vorgabe: aus) |
+| `ASSERT(condition [, message$])` | schlägt fehl, wenn die Bedingung `FALSE` ist |
+| `ASSERT_EQ(actual, expected [, message$])` | dasselbe, die Meldung zeigt **beide** Werte |
+| `ASSERT_COLLECT(on)` | Sammel-Modus ein/aus (Vorgabe: aus) |
 | `ASSERT_COUNT()` → INTEGER | wie viele Prüfungen gelaufen sind |
 | `ASSERT_FAILED()` → INTEGER | wie viele davon fehlgeschlagen sind |
 | `ASSERT_REPORT()` → INTEGER | Bilanz ausgeben, Zahl der Fehlschläge zurückgeben |
@@ -1521,13 +1523,13 @@ DH_LOG=debug dhrt run werkzeug.dh
 | `TIME$()` → STRING | aktuelle Uhrzeit `"HH:MM:SS"` |
 | `DATE$()` → STRING | aktuelles Datum `"YYYY-MM-DD"` |
 | `VERSION$()` → STRING | die Fassung der Laufzeit, die gerade läuft (dieselbe Zahl wie `dhrt --version`) |
-| `RND()` → FLOAT | Zufallszahl in `[0, 1)` |
+| `RND([n])` → FLOAT | Zufallszahl in `[0, 1)` |
 | `RND(n)` → INTEGER | Zufalls-INT in `[0, n)` |
 | `RANDINT(lo, hi)` → INTEGER | Zufalls-INT in `[lo, hi]` (inklusiv) |
 | `RANDF(lo, hi)` → FLOAT | Zufalls-FLOAT in `[lo, hi)` |
-| `CHOICE(array)` → T | zufälliges Element eines 1D-Arrays |
-| `WEIGHTED_CHOICE(werte, gewichte)` → T | Element aus `werte`, gewählt proportional zu `gewichte` (1D-Arrays gleicher Länge, Gewichte ≥ 0). Loot-Tabellen. |
-| `SHUFFLE(array)` | mischt ein 1D-Array IN PLACE (Fisher-Yates) |
+| `CHOICE(arr)` → T | zufälliges Element eines 1D-Arrays |
+| `WEIGHTED_CHOICE(values, weights)` → T | Element aus `values`, gewählt proportional zu `weights` (1D-Arrays gleicher Länge, Gewichte ≥ 0). Loot-Tabellen. |
+| `SHUFFLE(arr)` | mischt ein 1D-Array IN PLACE (Fisher-Yates) |
 | `RANDOMIZE([seed])` | Zufalls-Seed setzen (ohne Arg: System-Seed; eine Kommazahl wie `TIMER()` geht auch) |
 
 ```basic
@@ -1583,14 +1585,14 @@ anderes.
 
 | Funktion | Zweck |
 |---|---|
-| `SHA256$(daten)` → STRING | SHA-256 als Hex (64 Zeichen) |
-| `SHA1$(daten)` → STRING | SHA-1 — nur für Verträglichkeit mit Bestehendem |
-| `MD5$(daten)` → STRING | MD5 — nur für Verträglichkeit |
-| `SHA256_FILE$(pfad$)`, `SHA1_FILE$`, `MD5_FILE$` → STRING | dasselbe für eine Datei, blockweise gelesen |
-| `HMAC_SHA256$(schluessel, daten)` → STRING | Signatur mit geheimem Schlüssel |
+| `SHA256$(data)` → STRING | SHA-256 als Hex (64 Zeichen) |
+| `SHA1$(data)` → STRING | SHA-1 — nur für Verträglichkeit mit Bestehendem |
+| `MD5$(data)` → STRING | MD5 — nur für Verträglichkeit |
+| `SHA256_FILE$(path$)`, `SHA1_FILE$`, `MD5_FILE$` → STRING | dasselbe für eine Datei, blockweise gelesen |
+| `HMAC_SHA256$(key, data)` → STRING | Signatur mit geheimem Schlüssel |
 | `SECURE_EQUALS(a, b)` → BOOLEAN | Vergleich in konstanter Zeit |
 | `UUID4$()` → STRING | zufällige eindeutige Kennung |
-| `RANDOM_BYTES(anzahl)` → BUFFER | Zufallsbytes vom Betriebssystem |
+| `RANDOM_BYTES(count)` → BUFFER | Zufallsbytes vom Betriebssystem |
 
 `daten` und `schluessel` dürfen `STRING` (dann die UTF-8-Bytes) oder `BUFFER`
 sein — eine Signatur bildet man über die Bytes, die wirklich übertragen werden,
@@ -1667,8 +1669,8 @@ Für komplexere Sprite-Kollision siehe [Sprite-Modul](module-sprite.md) mit `SPR
 
 | Alias | Kanonisch |
 |---|---|
-| `SGN(x)` | `SIGN(x)` |
-| `SQRT(x)` | `SQR(x)` |
+| `SGN(number)` | `SIGN(x)` |
+| `SQRT(number)` | `SQR(x)` |
 | `AUDIO_SET_VOLUME(ch, v)` | `AUDIO_VOLUME(ch, v)` |
 | `AUDIO_MUSIC_SET_VOLUME(v)` | `AUDIO_MUSIC_VOLUME(v)` |
 

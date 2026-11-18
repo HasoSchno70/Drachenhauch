@@ -17,25 +17,25 @@ mitübersetzt). Beim Nutzer muss nichts installiert sein.
 
 | Funktion | Wirkung |
 |---|---|
-| `VIDEO_LOAD(pfad$)` | MP4-Datei öffnen, liefert ein `VIDEO`; das erste Bild steht gleich im Bild |
-| `VIDEO_PLAY(v)` | abspielen; ein zu Ende gelaufenes Video beginnt von vorn |
-| `VIDEO_PAUSE(v)` | anhalten, das Bild bleibt stehen |
-| `VIDEO_STOP(v)` | anhalten und an den Anfang |
-| `VIDEO_SEEK(v, sekunden)` | an eine Stelle springen (auf die Dauer begrenzt) |
-| `VIDEO_LOOP(v, an)` | am Ende von vorn beginnen statt stehenzubleiben |
-| `VIDEO_UPDATE(v)` | die Uhr des Videos um `DELTA()` weiterstellen, ohne zu zeichnen |
-| `VIDEO_DRAW(v, x, y [, breite, hoehe])` | weiterstellen und das aktuelle Bild zeichnen |
-| `VIDEO_PLAYING(v)` | spielt es gerade? |
-| `VIDEO_DONE(v)` | ist es (ohne Schleife) am Ende angekommen? |
-| `VIDEO_POSITION(v)` | Stelle in Sekunden |
-| `VIDEO_DURATION(v)` | Dauer in Sekunden |
-| `VIDEO_WIDTH(v)` | Breite in Punkten |
-| `VIDEO_HEIGHT(v)` | Höhe in Punkten |
-| `VIDEO_FRAMES(v)` | Zahl der Bilder |
-| `VIDEO_FRAME(v)` | Nummer des Bildes, das gerade im `IMAGE` steht (ab 0) |
-| `VIDEO_FPS(v)` | Bilder je Sekunde |
-| `VIDEO_IMAGE(v)` | das `IMAGE`, in das jedes neue Bild geschrieben wird |
-| `VIDEO_FREE(v)` | Video und sein Bild freigeben |
+| `VIDEO_LOAD(path$)` | MP4-Datei öffnen, liefert ein `VIDEO`; das erste Bild steht gleich im Bild |
+| `VIDEO_PLAY(video)` | abspielen; ein zu Ende gelaufenes Video beginnt von vorn |
+| `VIDEO_PAUSE(video)` | anhalten, das Bild bleibt stehen |
+| `VIDEO_STOP(video)` | anhalten und an den Anfang |
+| `VIDEO_SEEK(video, seconds)` | an eine Stelle springen (auf die Dauer begrenzt) |
+| `VIDEO_LOOP(video, on)` | am Ende von vorn beginnen statt stehenzubleiben |
+| `VIDEO_UPDATE(video)` | die Uhr des Videos um `DELTA()` weiterstellen, ohne zu zeichnen |
+| `VIDEO_DRAW(video, x, y [, width, height])` | weiterstellen und das aktuelle Bild zeichnen |
+| `VIDEO_PLAYING(video)` | spielt es gerade? |
+| `VIDEO_DONE(video)` | ist es (ohne Schleife) am Ende angekommen? |
+| `VIDEO_POSITION(video)` | Stelle in Sekunden |
+| `VIDEO_DURATION(video)` | Dauer in Sekunden |
+| `VIDEO_WIDTH(video)` | Breite in Punkten |
+| `VIDEO_HEIGHT(video)` | Höhe in Punkten |
+| `VIDEO_FRAMES(video)` | Zahl der Bilder |
+| `VIDEO_FRAME(video)` | Nummer des Bildes, das gerade im `IMAGE` steht (ab 0) |
+| `VIDEO_FPS(video)` | Bilder je Sekunde |
+| `VIDEO_IMAGE(video)` | das `IMAGE`, in das jedes neue Bild geschrieben wird |
+| `VIDEO_FREE(video)` | Video und sein Bild freigeben |
 
 ## Beispiel
 

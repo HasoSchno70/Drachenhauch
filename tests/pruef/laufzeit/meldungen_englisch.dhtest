@@ -7,7 +7,9 @@
 '
 ' Gegenprobe beim Bau: ohne die Uebersetzung an den Ausgabestellen fallen die
 ' Faelle mit englischer Erwartung; ohne das Abstreifen von DHRT_LANG im
-' Laeufer faellt "der laeufer nimmt den faellen die sprache".
+' Laeufer faellt "der laeufer nimmt den faellen die sprache". Seit 2026.52
+' spielt der Laeufer dazu ein deutsches System (DHRT_SYSTEM_LANG=de) -- ohne
+' DHRT_LANG spraeche die Laufzeit sonst die Sprache des Systems.
 
 === syntaxfehler auf englisch
 IF x > 0 THEN
@@ -128,7 +130,7 @@ NEXT
 --- datei helfer.dh
 IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
-Runtime error in p.dh:2: GUI_SCALE: the factor must be between 0.5 and 4.0 -- usage: GUI_SCALE(faktor)
+Runtime error in p.dh:2: GUI_SCALE: the factor must be between 0.5 and 4.0 -- usage: GUI_SCALE(factor)
 Runtime error in p.dh:2: GUI_TEXTAREA_SET: the widget is not a GUI_TEXTAREA
 Runtime error in p.dh:2: GUI_TABLE_SORT: widget is not a table
 p.dh:1: Parse error (13): There is no PRINT USING -- PRINT FORMAT$(value, "%6.2f") or f"{value:.2f}"
@@ -179,6 +181,70 @@ zeige(JSON_PARSE(CODE_CHECK$(quelle)))
 Ersetzen durch zaehler
 'zaehlr' is written here, but is not declared anywhere in the program with DIM or CONST. When the program runs this line stops it ("Variable 'zaehlr' is not declared"). Did you mean 'zaehler'?
 Replace with zaehler
+
+=== ohne dhrt_lang spricht die laufzeit die sprache des systems
+' Seit 2026.52: ohne DHRT_LANG Deutsch nur auf einem deutschen System.
+' DHRT_SYSTEM_LANG spielt hier das System, ein leeres DHRT_LANG gilt als
+' nicht gesetzt.
+DIM a AS INTEGER : a = 0
+PRINT RUNTIME_LANGUAGE$(); " "; SYSTEM_LANGUAGE$()
+PRINT 7 \ a
+--- umgebung
+DHRT_LANG=
+DHRT_SYSTEM_LANG=en_US.UTF-8
+--- erwartet
+en en
+--- fehler
+Runtime error in fall.dh:6: Integer division by zero
+
+=== ein deutsches system bleibt deutsch
+DIM a AS INTEGER : a = 0
+PRINT RUNTIME_LANGUAGE$(); " "; SYSTEM_LANGUAGE$()
+PRINT 7 \ a
+--- umgebung
+DHRT_LANG=
+DHRT_SYSTEM_LANG=de_AT.UTF-8
+--- erwartet
+de de
+--- fehler
+Laufzeitfehler in fall.dh:3: Integer-Division durch 0
+
+=== ein unbekanntes system spricht englisch
+' `C` und `POSIX` sagen nichts ueber die Sprache -- dann Englisch.
+PRINT RUNTIME_LANGUAGE$(); " ["; SYSTEM_LANGUAGE$(); "]"
+--- umgebung
+DHRT_LANG=
+DHRT_SYSTEM_LANG=C
+--- erwartet
+en []
+
+=== dhrt_lang geht vor dem system
+PRINT RUNTIME_LANGUAGE$(); " "; SYSTEM_LANGUAGE$()
+--- umgebung
+DHRT_LANG=de
+DHRT_SYSTEM_LANG=fr_FR
+--- erwartet
+de fr
+
+=== der laeufer haelt die faelle auch auf einem englischen system deutsch
+' Der CI-Laeufer spricht Englisch und setzt kein DHRT_LANG -- die deutschen
+' Erwartungen muessen trotzdem halten.
+IMPORT "helfer.dh"
+DIM z AS ARRAY OF STRING : z = []
+ARRAY_PUSH(z, "=== deutsch erwartet")
+ARRAY_PUSH(z, "PRINT 1 \ 0")
+ARRAY_PUSH(z, "--- fehler")
+ARRAY_PUSH(z, "Integer-Division durch 0")
+WRITEALL("s.dhtest", JOIN$(z, CHR$(10)) + CHR$(10))
+SETENV("DHRT_LANG", "")
+SETENV("DHRT_SYSTEM_LANG", "en_US")
+dlStarten(["test", "s.dhtest"])
+PRINT "rueckgabe "; dlCode
+IF dlCode <> 0 THEN PRINT dlAus
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
+--- erwartet
+rueckgabe 0
 
 === der laeufer nimmt den faellen die sprache
 ' Die Erwartungen der Pruefsammlungen stehen deutsch da. Startet jemand die

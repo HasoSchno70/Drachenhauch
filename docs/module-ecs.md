@@ -54,10 +54,10 @@ ECS_INTEGRATE_FLOAT(world, "py", "vy")
 | Funktion | Rueckgabe / Wirkung |
 |---|---|
 | `ECS_NEW_WORLD()` | ECS_WORLD — leere Welt |
-| `ECS_NEW_ENTITY(w)` | INTEGER — neue Entity-ID (>= 1) |
-| `ECS_DESTROY(w, ent)` | BOOLEAN — TRUE wenn entfernt, FALSE wenn nicht existierte |
-| `ECS_ALIVE(w, ent)` | BOOLEAN |
-| `ECS_COUNT(w)` | INTEGER — Anzahl lebender Entities |
+| `ECS_NEW_ENTITY(world)` | INTEGER — neue Entity-ID (>= 1) |
+| `ECS_DESTROY(world, ent)` | BOOLEAN — TRUE wenn entfernt, FALSE wenn nicht existierte |
+| `ECS_ALIVE(world, ent)` | BOOLEAN |
+| `ECS_COUNT(world)` | INTEGER — Anzahl lebender Entities |
 
 `ECS_DESTROY` entfernt die Entity aus allen Component-Stores (Sparse-Set-Cleanup).
 
@@ -67,11 +67,11 @@ Pro Typ ein Builtin — der Type-Check passiert beim Add (nicht beim Get).
 
 | Funktion | value-Typ |
 |---|---|
-| `ECS_ADD_INT(w, ent, name$, value)` | INTEGER |
-| `ECS_ADD_FLOAT(w, ent, name$, value)` | FLOAT (int wird akzeptiert + konvertiert) |
-| `ECS_ADD_STRING(w, ent, name$, value)` | STRING |
-| `ECS_ADD_BOOL(w, ent, name$, value)` | BOOLEAN |
-| `ECS_ADD_OBJ(w, ent, name$, value)` | beliebig (User-Klasse, MAP, ARRAY, ...) |
+| `ECS_ADD_INT(world, ent, name$, value)` | INTEGER |
+| `ECS_ADD_FLOAT(world, ent, name$, value)` | FLOAT (int wird akzeptiert + konvertiert) |
+| `ECS_ADD_STRING(world, ent, name$, value)` | STRING |
+| `ECS_ADD_BOOL(world, ent, name$, value)` | BOOLEAN |
+| `ECS_ADD_OBJ(world, ent, name$, value)` | beliebig (User-Klasse, MAP, ARRAY, ...) |
 
 Ist die Entity bereits Halter, wird der Wert ueberschrieben. Component-Name muss als Argument STRING sein (kein Identifier — Components werden zur Laufzeit angelegt).
 
@@ -79,8 +79,8 @@ Ist die Entity bereits Halter, wird der Wert ueberschrieben. Component-Name muss
 
 | Funktion | Rueckgabe |
 |---|---|
-| `ECS_HAS(w, ent, name$)` | BOOLEAN |
-| `ECS_REMOVE(w, ent, name$)` | BOOLEAN — TRUE wenn entfernt |
+| `ECS_HAS(world, ent, name$)` | BOOLEAN |
+| `ECS_REMOVE(world, ent, name$)` | BOOLEAN — TRUE wenn entfernt |
 
 ## Component-Get
 
@@ -88,15 +88,15 @@ Ist die Entity bereits Halter, wird der Wert ueberschrieben. Component-Name muss
 
 | Funktion | Rueckgabe |
 |---|---|
-| `ECS_GET_INT(w, ent, name$)` | INTEGER |
-| `ECS_GET_FLOAT(w, ent, name$)` | FLOAT |
-| `ECS_GET_STRING(w, ent, name$)` | STRING |
-| `ECS_GET_BOOL(w, ent, name$)` | BOOLEAN |
-| `ECS_GET(w, ent, name$)` | beliebig (ungetypt) |
-| `ECS_GET_OR_INT(w, ent, name$, default)` | INTEGER |
-| `ECS_GET_OR_FLOAT(w, ent, name$, default)` | FLOAT |
-| `ECS_GET_OR_STRING(w, ent, name$, default)` | STRING |
-| `ECS_GET_OR_BOOL(w, ent, name$, default)` | BOOLEAN |
+| `ECS_GET_INT(world, ent, name$)` | INTEGER |
+| `ECS_GET_FLOAT(world, ent, name$)` | FLOAT |
+| `ECS_GET_STRING(world, ent, name$)` | STRING |
+| `ECS_GET_BOOL(world, ent, name$)` | BOOLEAN |
+| `ECS_GET(world, ent, name$)` | beliebig (ungetypt) |
+| `ECS_GET_OR_INT(world, ent, name$, default)` | INTEGER |
+| `ECS_GET_OR_FLOAT(world, ent, name$, default)` | FLOAT |
+| `ECS_GET_OR_STRING(world, ent, name$, default)` | STRING |
+| `ECS_GET_OR_BOOL(world, ent, name$, default)` | BOOLEAN |
 
 `GET_OR_*` liefert `default` auch wenn der Component existiert, aber vom falschen Typ ist (z.B. STRING wo INT erwartet). Das ist defensiv — wer Type-Konflikte als Bug sehen will, nutzt die strikte `GET_*`-Variante.
 
@@ -106,9 +106,9 @@ Liefert ein `ARRAY OF INTEGER` mit den Entity-IDs, die ALLE genannten Components
 
 | Funktion | Rueckgabe |
 |---|---|
-| `ECS_QUERY(w, name$)` | ARRAY OF INTEGER |
-| `ECS_QUERY2(w, n1$, n2$)` | ARRAY OF INTEGER — Entities mit n1 UND n2 |
-| `ECS_QUERY3(w, n1$, n2$, n3$)` | ARRAY OF INTEGER — Entities mit n1 UND n2 UND n3 |
+| `ECS_QUERY(world, name$)` | ARRAY OF INTEGER |
+| `ECS_QUERY2(world, n1$, n2$)` | ARRAY OF INTEGER — Entities mit n1 UND n2 |
+| `ECS_QUERY3(world, n1$, n2$, n3$)` | ARRAY OF INTEGER — Entities mit n1 UND n2 UND n3 |
 
 **Strategie:** der Component mit den wenigsten Haltern wird als Basis gewaehlt (kleinste Iterations-Schleife), dann wird gegen die anderen Sparse-Sets getestet. Bei sparsem Component (z.B. `boss = 1 Entity`) ist Query O(kleinster-Component-Count), nicht O(world-Size).
 
@@ -122,8 +122,8 @@ Die Bulk-Ops verarbeiten eine ganze Component-Schicht in EINEM Builtin-Call, int
 
 | Funktion | Wirkung |
 |---|---|
-| `ECS_INTEGRATE_FLOAT(w, target$, delta$)` | `target += delta` fuer alle Entities mit beiden Components |
-| `ECS_INTEGRATE_INT(w, target$, delta$)` | INT-Variante |
+| `ECS_INTEGRATE_FLOAT(world, target$, delta$)` | `target += delta` fuer alle Entities mit beiden Components |
+| `ECS_INTEGRATE_INT(world, target$, delta$)` | INT-Variante |
 
 Klassische Anwendung: Position += Velocity.
 
@@ -138,10 +138,10 @@ Liefert die Anzahl bewegter Entities (= Schnittmenge).
 
 | Funktion | Wirkung |
 |---|---|
-| `ECS_SCALE_FLOAT(w, target$, factor)` | `target *= factor` fuer alle Halter |
-| `ECS_FILL_FLOAT(w, target$, value)` | alle Werte = value |
-| `ECS_FILL_INT(w, target$, value)` | INT-Variante |
-| `ECS_CLAMP_FLOAT(w, target$, lo, hi)` | clamp auf `[lo, hi]` |
+| `ECS_SCALE_FLOAT(world, target$, factor)` | `target *= factor` fuer alle Halter |
+| `ECS_FILL_FLOAT(world, target$, value)` | alle Werte = value |
+| `ECS_FILL_INT(world, target$, value)` | INT-Variante |
+| `ECS_CLAMP_FLOAT(world, target$, lo, hi)` | clamp auf `[lo, hi]` |
 
 ```basic
 ECS_SCALE_FLOAT(world, "vx", 0.95)            ' Friction
@@ -154,8 +154,8 @@ ECS_CLAMP_FLOAT(world, "py", 0.0, 480.0)
 
 | Funktion | Wirkung |
 |---|---|
-| `ECS_REMOVE_DEAD(w, name$, threshold)` | Entities mit `value <= threshold` zerstoeren |
-| `ECS_COUNT_WITH(w, name$)` | O(1) — Anzahl Halter eines Components |
+| `ECS_REMOVE_DEAD(world, name$, threshold)` | Entities mit `value <= threshold` zerstoeren |
+| `ECS_COUNT_WITH(world, name$)` | O(1) — Anzahl Halter eines Components |
 
 ```basic
 ECS_REMOVE_DEAD(world, "hp", 0)               ' Tote zerstoeren

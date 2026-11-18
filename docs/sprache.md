@@ -853,10 +853,25 @@ Greet("Dora", 50, suffix: "?")
 
 - `SUB`/`FUNCTION`-Aufrufen
 - `NEW Klasse(...)` (an die `Init`-Methode)
+- eingebauten Befehlen (`CIRCLE`, `MID$`, `GUI_BUTTON`, …). Die Namen stehen
+  in der Signatur, die der Editor beim Tippen zeigt, und in den
+  Befehlstabellen des Handbuchs:
+
+```basic
+SCREEN(320, 200, title: "Named arguments")
+CIRCLE(x: 160, y: 100, r: 40, color: RGB(255, 120, 40))
+PRINT MID$("Drachenhauch", start: 0, n: 7)
+```
+
+Bei eingebauten Befehlen gilt zusätzlich: Wer einen späteren optionalen
+Parameter benennt, gibt die davor mit an, wenn sie keine Vorgabe haben —
+`ARC(…, width: 3)` braucht auch `color`, und die Meldung sagt das. Das `$`
+am Namen ist frei (`encoding:` wie `encoding$:`), und ein Name darf ein
+Schlüsselwort sein (`to:`, `image:`, `new:`). Die Namen sind englisch und
+überall gleich ([Befehlsnamen](builtins-namen.md#die-regeln), Regel 8).
 
 **Nicht verfügbar bei**:
 
-- Built-ins (`ABS`, `CIRCLE`, `JSON_PARSE`, …) — die haben keine deklarierten Param-Namen
 - Methoden-Aufrufen `obj.method(name: ...)` — die Klasse steht erst zur Laufzeit fest, daher wirft der `dhrt`-Compiler hier.
 
 ### BYREF-Parameter (Multi-Return)
@@ -1026,7 +1041,7 @@ PRINT CORO_RESUME(c)     ' 99  (jetzt beendet: CORO_DONE(c) = TRUE)
 | Builtin | Wirkung |
 |---|---|
 | `CORO_RESUME(c)` | Fortsetzen bis zum nächsten `YIELD`; liefert den YIELD-Wert (oder den RETURN-Wert, wenn die Coroutine endet). |
-| `CORO_SEND(c, v)` | Wie `CORO_RESUME`, aber der `YIELD`-Ausdruck im Body evaluiert zu `v`. |
+| `CORO_SEND(c, value)` | Wie `CORO_RESUME`, aber der `YIELD`-Ausdruck im Body evaluiert zu `v`. |
 | `CORO_DONE(c)` | `BOOLEAN` — ob die Coroutine beendet ist. |
 | `CORO_RESULT(c)` | Finaler `RETURN`-Wert (wirft, wenn noch nicht beendet). |
 | `CORO_CLOSE(c)` | Suspendierte Coroutine abbauen. |

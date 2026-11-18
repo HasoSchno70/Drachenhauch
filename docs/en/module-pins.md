@@ -64,10 +64,10 @@ resistor (`"up"` for a button to ground) or for `"opendrain"`.
 | `GPIO_COUNT(chip)` | Number of lines of the chip |
 | `GPIO_LINE_NAME$(chip, pin)` | Name the kernel gives the line (`"GPIO17"`), empty if none |
 | `GPIO_FIND(chip, name$)` | Number of the line with this name, -1 if there is none |
-| `GPIO_MODE(chip, pin, richtung$ [, widerstand$])` | Direction `"in"`/`"out"`/`"opendrain"`, resistor `"up"`/`"down"`/`"none"` (without: stays as it is) |
-| `GPIO_WRITE(chip, pin, wert)` | Sets an output (`TRUE`/`FALSE` or 1/0); a pin that is still free becomes an output |
+| `GPIO_MODE(chip, pin, direction$ [, pull$])` | Direction `"in"`/`"out"`/`"opendrain"`, resistor `"up"`/`"down"`/`"none"` (without: stays as it is) |
+| `GPIO_WRITE(chip, pin, value)` | Sets an output (`TRUE`/`FALSE` or 1/0); a pin that is still free becomes an output |
 | `GPIO_READ(chip, pin)` | Reads the pin as `TRUE`/`FALSE`; a pin that is still free becomes an input |
-| `GPIO_WATCH(chip, pin, flanke$ [, entprellen_ms])` | Reports edges `"rising"`/`"falling"`/`"both"` as events, `"none"` stops; the kernel debounces on request |
+| `GPIO_WATCH(chip, pin, edge$ [, debounce_ms])` | Reports edges `"rising"`/`"falling"`/`"both"` as events, `"none"` stops; the kernel debounces on request |
 | `GPIO_NEXT(chip)` | Fetches the next event, `FALSE` if none is waiting — never waits |
 | `GPIO_EVENT_PIN(chip)` | Pin of the event from `GPIO_NEXT` |
 | `GPIO_EVENT_RISING(chip)` | `TRUE` for a rising edge, `FALSE` for a falling one |
@@ -137,8 +137,8 @@ separate argument (-1 = none). They talk **SMBus** as long as a request fits
 |---|---|
 | `I2C_OPEN([bus])` | Opens an I2C bus: number (default 1), `"i2c-1"` or `"/dev/i2c-1"` → `I2C_BUS` |
 | `I2C_CLOSE(bus)` | Closes the bus |
-| `I2C_WRITE(bus, adresse, daten)` | Sends bytes (array of numbers or BUFFER); the first one is the register |
-| `I2C_READ(bus, adresse, register, anzahl)` | Reads `anzahl` bytes from `register` (-1 = without register) as an array |
+| `I2C_WRITE(bus, address, data)` | Sends bytes (array of numbers or BUFFER); the first one is the register |
+| `I2C_READ(bus, address, register, count)` | Reads `count` bytes from `register` (-1 = without register) as an array |
 | `I2C_SCAN(bus)` | Addresses of all devices that answer — like `i2cdetect` |
 
 Addresses above 127 are 10-bit addresses. If nothing answers at an address,
@@ -167,13 +167,13 @@ I2C_CLOSE(bus)
 
 | Command | What it does |
 |---|---|
-| `SPI_OPEN(bus, cs [, takt_hz [, modus]])` | Opens `/dev/spidev<bus>.<cs>`; clock default 1 MHz, mode 0–3 (default 0) → `SPI_DEVICE` |
+| `SPI_OPEN(bus, cs [, clock_hz [, mode]])` | Opens `/dev/spidev<bus>.<cs>`; clock default 1 MHz, mode 0–3 (default 0) → `SPI_DEVICE` |
 | `SPI_CLOSE(spi)` | Closes the device |
-| `SPI_TRANSFER(spi, daten)` | Sends bytes and returns what came back at the same time — SPI always exchanges |
-| `SPI_WRITE(spi, daten)` | Sends bytes, the answer is dropped |
-| `SPI_READ(spi, anzahl)` | Sends zeros and returns the answer |
-| `SPI_SPEED(spi, takt_hz)` | Changes the clock |
-| `SPI_MODE(spi, modus)` | Changes the mode (0–3, clock polarity and phase) |
+| `SPI_TRANSFER(spi, data)` | Sends bytes and returns what came back at the same time — SPI always exchanges |
+| `SPI_WRITE(spi, data)` | Sends bytes, the answer is dropped |
+| `SPI_READ(spi, count)` | Sends zeros and returns the answer |
+| `SPI_SPEED(spi, clock_hz)` | Changes the clock |
+| `SPI_MODE(spi, mode)` | Changes the mode (0–3, clock polarity and phase) |
 
 ### An analogue-to-digital converter (MCP3008)
 

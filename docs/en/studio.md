@@ -320,8 +320,9 @@ displayed text goes through `tr$`:
 | `trf$(text$, werte)` | a text with `{0}`, `{1}` ...: translated first, then filled in |
 
 The choice is made before the first window, in `App.Geoeffnet`; without a
-choice it is English when `DHRT_LANG` is English and the table `en.txt`
-exists. A change applies to windows built afterwards. What the program reads
+choice it is English when the runtime speaks English (`RUNTIME_LANGUAGE$()`:
+`DHRT_LANG`, otherwise a system that does not speak German) and the table
+`en.txt` exists. A change applies to windows built afterwards. What the program reads
 back from a widget (the text of a drop-down list) is the translation --
 compare it with `tr$("...")`. With `DH_STUDIO_SPRACHLUECKEN=file` the runtime
 writes every text missing from the table into the file, once.

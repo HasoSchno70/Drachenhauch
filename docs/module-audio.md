@@ -17,7 +17,7 @@ Programm einstellen koennte.
 
 | Funktion | Wirkung |
 |---|---|
-| `AUDIO_INIT([...])` | stellt sicher, dass das Audio-System laeuft. **Nimmt Argumente entgegen und ignoriert sie** -- sie stammen aus der Mixer-Zeit und sind nur der Vertraeglichkeit halber geduldet |
+| `AUDIO_INIT([frequency[, channels[, buffer]]])` | stellt sicher, dass das Audio-System laeuft. **Nimmt Argumente entgegen und ignoriert sie** -- sie stammen aus der Mixer-Zeit und sind nur der Vertraeglichkeit halber geduldet |
 | `AUDIO_SET_NUM_CHANNELS(n)` | Anzahl gleichzeitiger Kanaele (Vorgabe **16**, hoch fuer Bullet-Hell) |
 | `AUDIO_NUM_CHANNELS()` → INTEGER | aktuelle Channel-Anzahl |
 | `AUDIO_BUSY_CHANNELS()` → INTEGER | wie viele Channels gerade spielen |
@@ -37,16 +37,16 @@ Spielt einen SOUND ab und liefert einen Channel-Handle zurueck. Mit dem kann man
 
 | Funktion | Wirkung |
 |---|---|
-| `AUDIO_PLAY(s, [loops, vol, fade_in_ms])` → AUDIO_CHANNEL | Sound starten |
+| `AUDIO_PLAY(sound[, loops[, volume[, fade_in_ms[, easing$]]]])` → AUDIO_CHANNEL | Sound starten |
 | `AUDIO_PAUSE(ch)` | Channel pausieren |
 | `AUDIO_RESUME(ch)` | wieder weiter |
-| `AUDIO_STOP(ch[, fade_out_ms])` | Channel stoppen, optional ausfaden |
+| `AUDIO_STOP(ch[, fade_out_ms[, easing$]])` | Channel stoppen, optional ausfaden |
 | `AUDIO_IS_PLAYING(ch)` → BOOLEAN | Klingt der Sound gerade? Ein mit `AUDIO_PLAY_AT` geplanter erst ab seinem Tick |
-| `AUDIO_IS_WAITING(ch)` → BOOLEAN | mit `AUDIO_PLAY_AT` geplant, aber die Uhr hat den Tick noch nicht erreicht |
-| `AUDIO_VOLUME(ch, vol)` | Lautstaerke 0..1 setzen |
+| `AUDIO_IS_WAITING(sound)` → BOOLEAN | mit `AUDIO_PLAY_AT` geplant, aber die Uhr hat den Tick noch nicht erreicht |
+| `AUDIO_VOLUME(ch, volume)` | Lautstaerke 0..1 setzen |
 | `AUDIO_GET_VOLUME(ch)` → FLOAT | aktuelle Lautstaerke |
-| `AUDIO_PAN(ch, left_vol, right_vol)` | Stereo-Pan (beide 0..1) |
-| `AUDIO_PITCH(ch, faktor)` | Tonhoehe/Geschwindigkeit: 1.0 = normal, 2.0 = Oktave hoeher, 0.5 = tiefer |
+| `AUDIO_PAN(ch, left, right)` | Stereo-Pan (beide 0..1) |
+| `AUDIO_PITCH(ch, factor)` | Tonhoehe/Geschwindigkeit: 1.0 = normal, 2.0 = Oktave hoeher, 0.5 = tiefer |
 
 **Pause/Resume global:**
 
@@ -100,8 +100,8 @@ pro Frame (FLIP), nicht-blockierend:
 | Funktion | Wirkung |
 |---|---|
 | `AUDIO_PAN_POS(ch, p)` | Position direkt setzen (beendet eine laufende Animation) |
-| `AUDIO_PAN_SLIDE(ch, von, nach, dauer_ms)` | einmalige Wanderung von → nach; bleibt am Ziel stehen |
-| `AUDIO_AUTOPAN(ch, periode_s[, tiefe])` | endloses Pendeln links↔rechts (startet links); `tiefe` 0..1 = Auslenkung um die Mitte, `periode_s <= 0` schaltet ab |
+| `AUDIO_PAN_SLIDE(ch, from, to, duration_ms[, easing$])` | einmalige Wanderung von → nach; bleibt am Ziel stehen |
+| `AUDIO_AUTOPAN(ch, period_s[, depth])` | endloses Pendeln links↔rechts (startet links); `depth` 0..1 = Auslenkung um die Mitte, `period_s <= 0` schaltet ab |
 
 ```basic
 DIM ton AS SOUND
@@ -127,16 +127,16 @@ Die native Runtime hat einen separaten Music-Channel fuer lange Tracks (laedt st
 | Funktion | Wirkung |
 |---|---|
 | `AUDIO_MUSIC_LOAD(path$)` | Track laden (laeuft noch nicht) |
-| `AUDIO_MUSIC_PLAY([loops[, fade_in_ms]])` | start (loops = -1 = endlos = Default; loops = N → N+1 Durchlaeufe) |
-| `AUDIO_MUSIC_STOP([fade_out_ms])` | stoppen, optional ausfaden (nicht-blockierend) |
+| `AUDIO_MUSIC_PLAY([loops[, fade_in_ms[, easing$]]])` | start (loops = -1 = endlos = Default; loops = N → N+1 Durchlaeufe) |
+| `AUDIO_MUSIC_STOP([fade_out_ms[, easing$]])` | stoppen, optional ausfaden (nicht-blockierend) |
 | `AUDIO_MUSIC_PAUSE()` | pausieren |
 | `AUDIO_MUSIC_RESUME()` | weiter |
-| `AUDIO_MUSIC_VOLUME(vol)` | 0..1 |
+| `AUDIO_MUSIC_VOLUME(volume)` | 0..1 |
 | `AUDIO_MUSIC_GET_VOLUME()` → FLOAT | aktuell |
-| `AUDIO_MUSIC_PITCH(faktor)` | Musik-Pitch (1.0 = normal; ueberlebt LOAD/QUEUE — Slow-Motion-Effekt) |
+| `AUDIO_MUSIC_PITCH(factor)` | Musik-Pitch (1.0 = normal; ueberlebt LOAD/QUEUE — Slow-Motion-Effekt) |
 | `AUDIO_MUSIC_GET_PITCH()` → FLOAT | aktueller Pitch |
 | `AUDIO_MUSIC_POSITION()` → FLOAT | Sekunden seit Start (von Position 0) |
-| `AUDIO_MUSIC_SEEK(sekunden)` | an diese Stelle springen (Sekunden ab Anfang) |
+| `AUDIO_MUSIC_SEEK(seconds)` | an diese Stelle springen (Sekunden ab Anfang) |
 | `AUDIO_MUSIC_BUSY()` → BOOLEAN | Spielt gerade? |
 | `AUDIO_MUSIC_QUEUE(path$)` | naechster Track, sobald der aktuelle endet |
 
@@ -189,9 +189,9 @@ Fuer prozedurale Sounds ohne Audio-Files. Liefert ein `SOUND`-Objekt, das du wie
 
 | Funktion | Wirkung |
 |---|---|
-| `AUDIO_TONE(freq_hz, dauer_ms[, waveform$[, vol]])` | Sine/Square/Saw/Triangle-Ton |
-| `AUDIO_NOISE(dauer_ms[, vol])` | Weisses Rauschen |
-| `AUDIO_NOTE(wf$, freq, dauer_ms, attack_ms, decay_ms, sustain, release_ms, vol[, vib_depth, vib_speed, detune_cents, slide_halbtoene])` | eine gehaltene Note mit echter ADSR-Hüllkurve, Vibrato, Detune-Schicht und Portamento — das Instrument für Tracker und Musik; `vib_depth` ist ein Anteil der Frequenz (0.005 = ±0,5 %), keine Halbtöne |
+| `AUDIO_TONE(freq_hz, duration_ms[, waveform$[, vol]])` | Sine/Square/Saw/Triangle-Ton |
+| `AUDIO_NOISE(duration_ms[, vol])` | Weisses Rauschen |
+| `AUDIO_NOTE(wf$, freq, duration_ms, attack_ms, decay_ms, sustain, release_ms, vol[, vib_depth, vib_speed, detune_cents, slide_semitones])` | eine gehaltene Note mit echter ADSR-Hüllkurve, Vibrato, Detune-Schicht und Portamento — das Instrument für Tracker und Musik; `vib_depth` ist ein Anteil der Frequenz (0.005 = ±0,5 %), keine Halbtöne |
 
 **Waveforms** (case-insensitive): `"sine"`, `"square"`, `"saw"`, `"triangle"`, `"noise"`.
 
@@ -284,9 +284,9 @@ Musikprogramm, das einen Song als WAV abliefern will.
 
 | Funktion | Wirkung |
 |---|---|
-| `AUDIO_SOUND_NEW(dauer_ms)` → SOUND | Stille der angegebenen Länge, als Leinwand |
-| `AUDIO_SOUND_MIX(ziel, quelle, offset_ms[, vol[, pan]])` | die Quelle ab `offset_ms` in das Ziel **addieren** |
-| `AUDIO_SOUND_NORMALIZE(sound[, spitze])` → FLOAT | die lauteste Stelle auf `spitze` bringen (Vorgabe 1.0); liefert den Faktor |
+| `AUDIO_SOUND_NEW(duration_ms)` → SOUND | Stille der angegebenen Länge, als Leinwand |
+| `AUDIO_SOUND_MIX(target, source, offset_ms[, vol[, pan]])` | die Quelle ab `offset_ms` in das Ziel **addieren** |
+| `AUDIO_SOUND_NORMALIZE(sound[, peak])` → FLOAT | die lauteste Stelle auf `peak` bringen (Vorgabe 1.0); liefert den Faktor |
 
 Drei Dinge, die man wissen muss:
 
@@ -323,8 +323,8 @@ den Synthesizer.
 
 | Funktion | Wirkung |
 |---|---|
-| `AUDIO_SOUND_WAVE(sound, anzahl)` → ARRAY OF FLOAT | `anzahl` Punkte der Wellenform, `-1..1` — zum Zeichnen |
-| `AUDIO_SAVE_WAV(sound, pfad$[, bits])` | als WAV-Datei sichern (`bits` = 16, Vorgabe, oder 8) |
+| `AUDIO_SOUND_WAVE(sound, count)` → ARRAY OF FLOAT | `count` Punkte der Wellenform, `-1..1` — zum Zeichnen |
+| `AUDIO_SAVE_WAV(sound, path$[, bits])` | als WAV-Datei sichern (`bits` = 16, Vorgabe, oder 8) |
 
 `AUDIO_SOUND_WAVE` liefert je Abschnitt das Sample mit dem **grössten Betrag**,
 mit seinem Vorzeichen — nicht den Mittelwert. Das ist der ganze Kniff: über
@@ -366,12 +366,12 @@ Drum-Sample wird so ein ganzes Instrument.
 
 | Funktion | Wirkung |
 |---|---|
-| `SAMPLE_LOAD(pfad$)` → SAMPLE | WAV/OGG/QOA laden, auf Mono normalisiert |
-| `SAMPLE_FROM_BUFFER(puffer, abtastrate)` → SAMPLE | Sample aus rohem 16-Bit-PCM (little endian, vorzeichenbehaftet, mono) |
+| `SAMPLE_LOAD(path$)` → SAMPLE | WAV/OGG/QOA laden, auf Mono normalisiert |
+| `SAMPLE_FROM_BUFFER(buffer, sample_rate)` → SAMPLE | Sample aus rohem 16-Bit-PCM (little endian, vorzeichenbehaftet, mono) |
 | `SAMPLE_FROM_SOUND(sound)` → SAMPLE | ein SOUND (aus `SPEAK_SOUND`, `AUDIO_NOTE`, `LOADSOUND` ...) als Sample, Kanäle auf Mono gemittelt, Abtastrate übernommen |
-| `SAMPLE_PLAY(sample, halbtoene, vol[, dur_ms])` → AUDIO_CHANNEL | bei relativer Tonhoehe abspielen |
-| `SAMPLE_NOTE(sample, halbtoene, dauer_ms, attack_ms, decay_ms, sustain, release_ms, vol[, slide_halbtoene])` → SOUND | eine Note als Klang bauen (nicht abspielen), Huellkurve wie `AUDIO_NOTE` |
-| `SAMPLE_SET_LOOP(sample, start, end[, art$])` | Loop-Region in Frames (fuer gehaltene Noten), `art$` = `vorwaerts` (Vorgabe) oder `pingpong` |
+| `SAMPLE_PLAY(sample, semitones, vol[, dur_ms])` → AUDIO_CHANNEL | bei relativer Tonhoehe abspielen |
+| `SAMPLE_NOTE(sample, semitones, duration_ms, attack_ms, decay_ms, sustain, release_ms, vol[, slide_semitones])` → SOUND | eine Note als Klang bauen (nicht abspielen), Huellkurve wie `AUDIO_NOTE` |
+| `SAMPLE_SET_LOOP(sample, start, end[, kind$])` | Loop-Region in Frames (fuer gehaltene Noten), `kind$` = `vorwaerts` (Vorgabe) oder `pingpong` |
 | `SAMPLE_LEN(sample)` → FLOAT | Laenge in Sekunden bei Originaltonhoehe |
 
 `halbtoene` ist relativ zur Originaltonhoehe des Samples: `0` = wie aufgenommen,
@@ -498,7 +498,7 @@ kommt, als Datei will, schneidet den Mixer mit:
 
 | Funktion | Wirkung |
 |---|---|
-| `AUDIO_RECORD_START([max_sekunden])` | den fertigen Mix mitschneiden, hinter allen Effekten und nach der Master-Lautstaerke; hoechstens `max_sekunden` (Vorgabe 600, hoechstens 3600). Ein laufender Mitschnitt beginnt von vorn |
+| `AUDIO_RECORD_START([max_seconds])` | den fertigen Mix mitschneiden, hinter allen Effekten und nach der Master-Lautstaerke; hoechstens `max_seconds` (Vorgabe 600, hoechstens 3600). Ein laufender Mitschnitt beginnt von vorn |
 | `AUDIO_RECORD_STOP()` → SOUND | beenden und als Klang liefern (Stereo, Abtastrate des Geraets); ohne laufenden Mitschnitt ein Fehler |
 | `AUDIO_RECORDING()` → BOOLEAN | laeuft ein Mitschnitt? |
 | `AUDIO_PEAK()` → FLOAT | hoechster Ausschlag am Master seit dem letzten Aufruf, nach der Master-Lautstaerke; ueber 1.0 heisst Uebersteuern |
@@ -580,13 +580,13 @@ ist der Unterschied zum `timer`-Modul, das pro Bild abgearbeitet wird.
 
 | Funktion | Rückgabe | Bedeutung |
 |---|---|---|
-| `AUDIO_CLOCK_NEW(ticks_pro_sekunde)` | AUDIO_CLOCK | Uhr anlegen — **sie startet angehalten** |
+| `AUDIO_CLOCK_NEW(ticks_per_second)` | AUDIO_CLOCK | Uhr anlegen — **sie startet angehalten** |
 | `AUDIO_CLOCK_START(clock)` | — | laufen lassen (auch nach `PAUSE` wieder) |
 | `AUDIO_CLOCK_PAUSE(clock)` | — | anhalten; der Tick-Zähler bleibt stehen |
 | `AUDIO_CLOCK_STOP(clock)` | — | anhalten und den Tick-Zähler auf 0 setzen |
 | `AUDIO_CLOCK_TICKING(clock)` | BOOLEAN | läuft sie gerade? |
 | `AUDIO_CLOCK_TICKS(clock)` | INTEGER | wie viele Ticks sind vergangen? |
-| `AUDIO_CLOCK_SET_SPEED(clock, ticks_pro_sekunde)` | — | Tempo im Lauf ändern |
+| `AUDIO_CLOCK_SET_SPEED(clock, ticks_per_second)` | — | Tempo im Lauf ändern |
 | `AUDIO_CLOCK_REMOVE(clock)` | — | Uhr abbauen |
 
 Die Umrechnung von BPM macht man selbst — `bpm / 60 * unterteilungen`:
@@ -636,7 +636,7 @@ Klangquelle im Raum. Lautstärke und Panning rechnet die Audio-Schicht selbst.
 |---|---|---|
 | `AUDIO_LISTENER_NEW(x, y, z)` | AUDIO_LISTENER | das Ohr setzen; ungedreht blickt es entlang **-Z** |
 | `AUDIO_LISTENER_SET_POSITION(listener, x, y, z)` | — | Ohr bewegen (etwa der Kamera nach) |
-| `AUDIO_LISTENER_SET_ORIENTATION(listener, yaw_grad)` | — | Blickrichtung um die Y-Achse, **in Grad** |
+| `AUDIO_LISTENER_SET_ORIENTATION(listener, yaw_deg)` | — | Blickrichtung um die Y-Achse, **in Grad** |
 | `AUDIO_LISTENER_REMOVE(listener)` | — | Listener abbauen |
 | `AUDIO_EMITTER_NEW(listener, x, y, z [, min_dist [, max_dist]])` | AUDIO_EMITTER | Klangquelle im Raum; bis `min_dist` voll laut, ab `max_dist` lautlos |
 | `AUDIO_EMITTER_SET_POSITION(emitter, x, y, z)` | — | Quelle bewegen |
@@ -659,13 +659,13 @@ Lernspiel für Kinder, die noch nicht lesen, den Sprecher im Strategiespiel
 
 | Funktion | Rückgabe | Bedeutung |
 |---|---|---|
-| `SPEAK(text$[, unterbrechen])` | — | spricht `text$`; `unterbrechen` = die laufende Ansage abbrechen und sofort sprechen, sonst hinten anhängen |
+| `SPEAK(text$[, interrupt])` | — | spricht `text$`; `interrupt` = die laufende Ansage abbrechen und sofort sprechen, sonst hinten anhängen |
 | `SPEAK_STOP()` | — | alles Laufende und Geplante verwerfen |
 | `SPEAKING()` | BOOLEAN | läuft oder wartet noch eine Ansage? |
 | `SPEAK_WAIT()` | — | blockiert, bis alles gesprochen ist (für Konsolenprogramme vor `INPUT`; im Spiel lieber `SPEAKING()` abfragen) |
 | `SPEAK_VOICE(name$)` | — | Stimme wählen (ein Name aus `SPEAK_VOICES()`, Groß/Klein egal); leer = Systemstimme. Unbekannt = Fehler |
 | `SPEAK_VOICES()` | ARRAY OF STRING | die installierten Stimmen, z. B. `Katja`, `Stefan`, `Hedda` |
-| `SPEAK_RATE(faktor)` | — | Tempo 0.5 (halb so schnell) .. 2.0 (doppelt), Vorgabe 1.0 |
+| `SPEAK_RATE(factor)` | — | Tempo 0.5 (halb so schnell) .. 2.0 (doppelt), Vorgabe 1.0 |
 | `SPEAK_SOUND(text$)` | SOUND | nur synthetisieren — ein Klang wie aus `AUDIO_NOTE`, für `AUDIO_PLAY`, `AUDIO_PLAY_ON(emitter)`, `AUDIO_SOUND_MIX`, `AUDIO_SAVE_WAV` |
 
 ```basic

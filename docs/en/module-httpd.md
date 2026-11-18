@@ -30,10 +30,10 @@ lies beneath it.
 | `HTTPD_QUERY$(s, name$)` → STRING | a value from `?a=1&b=2` (decoded) |
 | `HTTPD_HEADER$(s, name$)` → STRING | a header (case does not matter) |
 | `HTTPD_BODY$(s)` → STRING | the body (with `POST`) |
-| `HTTPD_SEND(s, code, typ$, inhalt$)` | reply and close |
-| `HTTPD_SET_HEADER(s, name$, wert$)` | a header for **all** following replies; an empty value removes it |
-| `HTTPD_SEND_FILE(s, code, pfad$)` | serve a specific file |
-| `HTTPD_SEND_DIR(s, ordner$[, start$])` → BOOLEAN | resolve the requested path **safely** inside the folder |
+| `HTTPD_SEND(s, code, type$, content$)` | reply and close |
+| `HTTPD_SET_HEADER(s, name$, value$)` | a header for **all** following replies; an empty value removes it |
+| `HTTPD_SEND_FILE(s, code, path$)` | serve a specific file |
+| `HTTPD_SEND_DIR(s, folder$[, start$])` → BOOLEAN | resolve the requested path **safely** inside the folder |
 | `HTTPD_STOP(s)` | stop the server |
 
 ## The pattern

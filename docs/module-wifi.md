@@ -22,7 +22,7 @@ Auf sonstigen Plattformen (BSD, ...) wirft jeder Aufruf `DHRuntimeError` mit ein
 | `WIFI_CURRENT()` | STRING (aktuelle SSID, "" wenn nicht verbunden) | mit welchem Netz ist der Rechner verbunden? |
 | `WIFI_SIGNAL()` | INTEGER (0..100, -1 wenn nicht verbunden) | Empfangsstaerke der aktuellen Verbindung |
 | `WIFI_SCAN()` | STRING (multi-line `ssid\|signal_pct`, sortiert nach Signal) | erreichbare Netze suchen |
-| `WIFI_CONNECT(ssid$, pass$)` | BOOLEAN (Profil anlegen + Connect-Befehl absetzen) | mit einem Netz verbinden -- legt dabei ein Windows-Profil an |
+| `WIFI_CONNECT(ssid$, password$)` | BOOLEAN (Profil anlegen + Connect-Befehl absetzen) | mit einem Netz verbinden -- legt dabei ein Windows-Profil an |
 | `WIFI_DISCONNECT()` | BOOLEAN | Verbindung trennen |
 | `WIFI_PROFILES()` | STRING (multi-line gespeicherter Profile) | welche Netze sind gespeichert? |
 | `WIFI_DELETE_PROFILE(name$)` | BOOLEAN | gespeichertes Netz vergessen |

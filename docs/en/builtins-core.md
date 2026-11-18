@@ -56,9 +56,9 @@ the pause begins.
 | `ASC(s$)` → INTEGER | Code point of the first character. `ASC("Anna")` = 65. |
 | `RGB(r, g, b)` → INTEGER | 3 numbers (0..255) to a 24-bit colour. `RGB(255, 128, 0)` = `&HFF8000`. Decimal numbers are **rounded** (so `x * 255 / 640` works) -- there is no clamping, 255.6 is still too large. |
 | `HEX$(n)` → STRING | INT to upper-case hex (without prefix). `HEX$(255)` = `"FF"`. |
-| `NUMFMT$(zahl [, nachkommastellen])` → STRING | write large numbers briefly (`1.2K`, `3.4M`) — for scores and idle games |
-| `ZAHL$(zahl [, stellen])` → STRING | a number in German notation with dots between thousands and a decimal comma (`400.000`, `1.234.567,89`); with `stellen` rounded commercially |
-| `ENUM_NAME(enum, wert)` → STRING | return the name for an ENUM value — for display and debugging |
+| `NUMFMT$(number [, decimals])` → STRING | write large numbers briefly (`1.2K`, `3.4M`) — for scores and idle games |
+| `ZAHL$(number [, digits])` → STRING | a number in German notation with dots between thousands and a decimal comma (`400.000`, `1.234.567,89`); with `digits` rounded commercially |
+| `ENUM_NAME(enum, value)` → STRING | return the name for an ENUM value — for display and debugging |
 
 ```basic
 DIM s AS STRING
@@ -87,27 +87,27 @@ PRINT HEX$(RGB(255, 0, 0))  ' "FF0000"
 | `SIN(x)`, `COS(x)`, `TAN(x)` | Trigonometry (x in radians) |
 | `ATAN(x)`, `ATAN2(y, x)` | Arc tangent |
 | `ASIN(x)`, `ACOS(x)` | Arc sine/cosine (x in `[-1, 1]`) |
-| `SQR(x)` | Square root (x ≥ 0) |
+| `SQR(v)` | Square root (x ≥ 0) |
 | `HYPOT(x, y)` | `SQR(x*x + y*y)` without overflow |
-| `POW(b, e)` | b to the power of e |
+| `POW(base, exponent)` | b to the power of e |
 | `EXP(x)` | e^x |
 | `LOG(x[, base])` | Logarithm, natural by default |
 | `DEG(rad)`, `RAD(grad)` | Radians ↔ degrees |
 | `FLOOR(x)`, `CEIL(x)`, `ROUND(x)` | INT conversion |
-| `ROUND(x, dezimalstellen)` → FLOAT | round to N decimal places, **to the even number** (see below) |
-| `ROUND_HALF_UP(x[, dezimalstellen])` | commercial rounding: away from zero |
-| `MIN(a, b, ...)`, `MAX(a, b, ...)` | variadic |
+| `ROUND(x, digits)` → FLOAT | round to N decimal places, **to the even number** (see below) |
+| `ROUND_HALF_UP(x[, decimals])` | commercial rounding: away from zero |
+| `MIN(a, ...)`, `MAX(a, b, ...)` | variadic |
 | `CLAMP(v, lo, hi)` | restricts v to `[lo, hi]` |
 | `LERP(a, b, t)` | linear interpolation a..b (t not clamped) |
 | `REMAP(v, in_lo, in_hi, out_lo, out_hi)` | rescale linearly |
 | `FRAC(x)` | fractional part (signed): `x - TRUNC(x)` |
-| `SIGN(x)` | -1, 0 or 1 |
+| `SIGN(v)` | -1, 0 or 1 |
 | `LOG10(x)` | base-10 logarithm |
 | `CLAMP01(v)` | restrict to `[0, 1]` |
 | `WRAP(v, lo, hi)` | fold v cyclically into `[lo, hi)` (angle/index wrap-around) |
 | `PINGPONG(t, len)` | swing back and forth in `[0, len]` (triangle wave) |
-| `MOVETOWARD(cur, ziel, maxd)` | move cur by at most `maxd` towards `ziel` |
-| `SMOOTHSTEP(e0, e1, x)` | smooth 0→1 transition (Hermite), clamped |
+| `MOVETOWARD(cur, target, maxdelta)` | move cur by at most `maxd` towards `target` |
+| `SMOOTHSTEP(edge0, edge1, x)` | smooth 0→1 transition (Hermite), clamped |
 | `APPROX(a, b[, eps])` → BOOLEAN | `\|a-b\| ≤ eps` (default `1e-6`) |
 
 ### Rounding: two rules, and they are not the same
@@ -137,7 +137,7 @@ returns `2.68`.
 
 | Function | Returns | Purpose |
 |---|---|---|
-| `CENT(betrag)` | INTEGER | convert an amount into whole cents — **rounds** instead of truncating; also accepts written amounts (`"19,99"`, `"1.234,56"`) |
+| `CENT(amount)` | INTEGER | convert an amount into whole cents — **rounds** instead of truncating; also accepts written amounts (`"19,99"`, `"1.234,56"`) |
 | `EURO$(cent [, symbol$])` | STRING | display a cent amount in German notation (`1999` becomes `19,99 €`) |
 
 
@@ -227,8 +227,8 @@ organic movement).
 | `NOISE(x)` → FLOAT | noise value along a line — for example for a wandering flicker |
 | `NOISE2(x, y)` → FLOAT | noise value on a surface — terrain, clouds, marble |
 | `NOISE3(x, y, z)` → FLOAT | noise value in space — caves, or a surface plus time as the third axis |
-| `FBM(x, y, oktaven)` → FLOAT | several noise layers stacked: coarse shape plus fine detail |
-| `FBM3(x, y, z, oktaven)` → FLOAT | the same in space |
+| `FBM(x, y, octaves)` → FLOAT | several noise layers stacked: coarse shape plus fine detail |
+| `FBM3(x, y, z, octaves)` → FLOAT | the same in space |
 
 At integer grid points Perlin is 0 by definition — whoever queries `NOISE2(1, 2)`
 therefore always gets 0 and should use non-integer values.
@@ -282,7 +282,7 @@ PRINT COLOR_LERP(0, &HFFFFFF, 0.5)  ' 8421504 (= &H808080)
 | Function | Returns | Purpose |
 |---|---|---|
 | `COMPRESS$(text$)` | STRING | pack text (DEFLATE); the result is Base64, because strings are UTF-8 here and raw compressor output would not be |
-| `DECOMPRESS$(gepackt$)` | STRING | unpack again |
+| `DECOMPRESS$(packed$)` | STRING | unpack again |
 
 For savegame-like text this saves roughly a factor of nine. It
 also runs without a window, so in pure console programs.
@@ -293,17 +293,17 @@ Functions with a `$` suffix also exist without it (`UPPER$` ≡ `UPPER`).
 
 | Function | Purpose |
 |---|---|
-| `LEN(s)` → INTEGER | length (also for arrays; for a MAP the number of entries) |
+| `LEN(v)` → INTEGER | length (also for arrays; for a MAP the number of entries) |
 | `UPPER$(s)`, `LOWER$(s)` | upper/lower case |
 | `LEFT$(s, n)`, `RIGHT$(s, n)` | first/last n characters |
 | `MID$(s, start[, n])` | substring from position start (0-based), n characters or to the end |
 | `INSTR(s, sub[, start])` → INTEGER | position of sub in s (0-based), or -1 |
 | `INSTRREV(s, sub[, start])` → INTEGER | last position of sub in s (with `start`: the last one beginning there or before), or -1 |
-| `REPLACE$(s, alt, neu)` | replace all occurrences |
+| `REPLACE$(s, old, new)` | replace all occurrences |
 | `TRIM$(s)` | remove whitespace at the front/back |
 | `SPLIT$(s, delim)` → ARRAY OF STRING | split |
 | `JOIN$(arr, delim)` → STRING | join; numbers and booleans in the array are written as with `STR$` |
-| `PADL$(s, breite[, fill])`, `PADR$(...)` | pad on the left/right |
+| `PADL$(s, width[, fill])`, `PADR$(...)` | pad on the left/right |
 | `REPEAT$(s, n)` | concatenate s n times |
 | `SPACE$(n)` | n spaces |
 | `HEX$(n)` | INT as a hex string |
@@ -323,13 +323,13 @@ Extensions *(native runtime only)*:
 | `LTRIM$(s)`, `RTRIM$(s)` | remove whitespace on the left only / right only |
 | `REVERSE$(s)` | reverse the characters |
 | `TEXT_VISUAL$(text[, direction])` | the text as it is displayed: right-to-left runs reversed, Arabic in its joined forms; `direction` = `auto` (default, first strong character), `ltr` or `rtl`. For your own output -- `TEXT` and the gui do this themselves |
-| `STARTSWITH(s, präfix)`, `ENDSWITH(s, suffix)` → BOOLEAN | check start/end |
-| `CONTAINS(s, teil)` → BOOLEAN | substring contained? (function form of `teil IN s`) |
-| `COUNT(s, teil)` → INTEGER | number of non-overlapping occurrences of `teil` |
+| `STARTSWITH(s, prefix)`, `ENDSWITH(s, suffix)` → BOOLEAN | check start/end |
+| `CONTAINS(s, part)` → BOOLEAN | substring contained? (function form of `part IN s`) |
+| `COUNT(text, part)` → INTEGER | number of non-overlapping occurrences of `part` |
 | `TITLE$(s)` | first letter of each word upper case, the rest lower case |
 | `CAMEL$(s)`, `SNAKE$(s)`, `PASCAL$(s)` | identifier notations: `"max hp"`, `"MaxHp"`, `"max_hp"` or `"max-hp"` become `maxHp`, `max_hp`, `MaxHp`. Words are separated by whitespace, `_`, `-`, `.`, the change from lower to upper case and the end of an abbreviation (`HTTPServer` → `http_server`) |
-| `BETWEEN$(text, links, rechts[, ab])` | what lies between the first `links` (from character `ab`, 0-based like `MID$`) and the next `rechts`; `""` if one of them is missing |
-| `REPLACE_BETWEEN$(text, links, rechts, neu)` | replace every piece between `links` and `rechts` with `neu`, the markers stay (`"{{name}}"` → `"{{?}}"`) |
+| `BETWEEN$(text, left, right[, from])` | what lies between the first `left` (from character `from`, 0-based like `MID$`) and the next `right`; `""` if one of them is missing |
+| `REPLACE_BETWEEN$(text, left, right, new)` | replace every piece between `left` and `right` with `new`, the markers stay (`"{{name}}"` → `"{{?}}"`) |
 | `NOSPACES$(s)` | remove all whitespace (spaces, tabs, line breaks) — for input like `"DE89 3704 0044"` |
 | `BIN$(n)`, `OCT$(n)` | INTEGER as a binary/octal string (with sign) |
 | `ISNUMERIC(s)` → BOOLEAN | parseable as a number? |
@@ -397,20 +397,20 @@ See also [Language reference → Arrays](sprache.md#arrays).
 
 | Function | Purpose |
 |---|---|
-| `LEN(arr)` → INTEGER | number of elements (1st dimension) |
+| `LEN(v)` → INTEGER | number of elements (1st dimension) |
 | `LBOUND(arr [, dimension])` → INTEGER | smallest index; dimension counts from 1, the first if omitted. 0, except with `DIM a[1 TO 31]` |
 | `UBOUND(arr [, dimension])` → INTEGER | largest index; for an empty array `LBOUND - 1` |
 | `DIMCOUNT(arr)` → INTEGER | number of dimensions |
 | `DIMSIZE(arr, n)` → INTEGER | size of the n-th dimension (0-based) |
-| `SORT(arr)`, `REVERSE(arr)` | sort / reverse a 1D array IN PLACE |
-| `SORT(arr, absteigend)` | sort descending with a BOOLEAN flag *(native runtime only)* |
+| `SORT(arr[, descending])`, `REVERSE(arr)` | sort / reverse a 1D array IN PLACE |
+| `SORT(arr, descending)` | sort descending with a BOOLEAN flag *(native runtime only)* |
 | `SORT(arr, comparator)` | sort with a FUNCREF comparator `cmp(a, b)` → INTEGER (<0/0/>0), stable. A bound method (`regel.cmp`) is allowed too *(native runtime only)* |
-| `ARRAY_INDEXOF(arr, v)` → INTEGER | first index of v, otherwise -1 (`LBOUND - 1` for an array with a lower bound of its own) |
-| `ARRAY_MAP(arr, funktion)` → ARRAY | new array with `funktion(x)` for each element, e.g. `ARRAY_MAP(a, FUNCTION(x) x * 2)`; keeps a lower bound of its own |
-| `ARRAY_FILTER(arr, funktion)` → ARRAY | new array with the elements for which `funktion(x)` returns TRUE (same element type) |
-| `ARRAY_OF_TYPE(arr, Typ)` → ARRAY OF Typ | new array with the elements that are `IS Typ`, in their order. `Typ` is a type name as on the right of `IS` (a class including its subclasses, or a value type such as `INTEGER`); the result fits an `ARRAY OF Typ` |
-| `ARRAY_REDUCE(arr, funktion, start)` | folds the array: `funktion(bisher, x)` for each element, starting with `start` |
-| `ARRAY_FIND(arr, funktion)` → INTEGER | index of the first element for which `funktion(x)` returns TRUE, otherwise -1 (`LBOUND - 1` for an array with a lower bound of its own) |
+| `ARRAY_INDEXOF(arr, value)` → INTEGER | first index of v, otherwise -1 (`LBOUND - 1` for an array with a lower bound of its own) |
+| `ARRAY_MAP(arr, function)` → ARRAY | new array with `function(x)` for each element, e.g. `ARRAY_MAP(a, FUNCTION(x) x * 2)`; keeps a lower bound of its own |
+| `ARRAY_FILTER(arr, function)` → ARRAY | new array with the elements for which `function(x)` returns TRUE (same element type) |
+| `ARRAY_OF_TYPE(arr, type)` → ARRAY OF Typ | new array with the elements that are `IS type`, in their order. `type` is a type name as on the right of `IS` (a class including its subclasses, or a value type such as `INTEGER`); the result fits an `ARRAY OF type` |
+| `ARRAY_REDUCE(arr, function, start)` | folds the array: `function(bisher, x)` for each element, starting with `start` |
+| `ARRAY_FIND(arr, function)` → INTEGER | index of the first element for which `function(x)` returns TRUE, otherwise -1 (`LBOUND - 1` for an array with a lower bound of its own) |
 
 **Aggregates** (1D `ARRAY OF INTEGER`/`FLOAT`) and helpers:
 
@@ -419,18 +419,18 @@ See also [Language reference → Arrays](sprache.md#arrays).
 | `ARRAY_SUM(arr)` → INTEGER/FLOAT | sum (INTEGER array → INTEGER, otherwise FLOAT) |
 | `ARRAY_AVG(arr)` → FLOAT | average (the array must not be empty) |
 | `ARRAY_MIN(arr)`, `ARRAY_MAX(arr)` | smallest / largest element |
-| `ARRAY_FILL(arr, wert)` | fill all elements with `wert` (IN PLACE, every dimension) |
+| `ARRAY_FILL(arr, value)` | fill all elements with `value` (IN PLACE, every dimension) |
 | `ARRAY_COPY(arr)` → ARRAY | independent copy (same shape/type) |
 
 **Dynamic 1D arrays** (grow/shrink IN PLACE):
 
 | Function | Purpose |
 |---|---|
-| `ARRAY_PUSH(arr, wert)` → INTEGER | append an element at the end; returns the new length |
+| `ARRAY_PUSH(arr, value)` → INTEGER | append an element at the end; returns the new length |
 | `ARRAY_POP(arr)` → T | remove and return the last element (not empty) |
-| `ARRAY_INSERT(arr, idx, wert)` → INTEGER | insert at index `idx` (`0..len`); new length |
+| `ARRAY_INSERT(arr, idx, value)` → INTEGER | insert at index `idx` (`0..len`); new length |
 | `ARRAY_REMOVE_AT(arr, idx)` → T | remove and return the element at `idx` |
-| `REDIM(arr, länge)` | bring to `länge` — grows with the type default, shrinking cuts off; existing values stay |
+| `REDIM(arr, length)` | bring to `length` — grows with the type default, shrinking cuts off; existing values stay |
 
 ```basic
 DIM matrix[3, 4] AS INTEGER
@@ -515,12 +515,12 @@ as one.
 
 | Function | Purpose |
 |---|---|
-| `ZIP_LIST(archiv$)` → ARRAY OF STRING | names of all entries |
-| `ZIP_READ$(archiv$, name$)` → STRING | one entry as text |
-| `ZIP_READ(archiv$, name$)` → BUFFER | one entry as bytes |
-| `ZIP_EXTRACT(archiv$, ordner$)` → INTEGER | extract everything, returns the number of files |
-| `ZIP_CREATE(archiv$, dateien)` → INTEGER | archive from a list of file paths |
-| `ZIP_WRITE(archiv$, namen, inhalte)` → INTEGER | archive from names and contents (texts or buffers), without a detour through files |
+| `ZIP_LIST(archive$)` → ARRAY OF STRING | names of all entries |
+| `ZIP_READ$(archive$, name$)` → STRING | one entry as text |
+| `ZIP_READ(archive$, name$)` → BUFFER | one entry as bytes |
+| `ZIP_EXTRACT(archive$, folder$)` → INTEGER | extract everything, returns the number of files |
+| `ZIP_CREATE(archive$, files)` → INTEGER | archive from a list of file paths |
+| `ZIP_WRITE(archive$, names, contents)` → INTEGER | archive from names and contents (texts or buffers), without a detour through files |
 
 ```basic
 DIM namen AS ARRAY OF STRING
@@ -582,9 +582,9 @@ console program, put a `SLEEP(10)` in it.
 | Function | Purpose |
 |---|---|
 | `TASK_START(funktion[, arg1, arg2, …])` → INTEGER | start, returns the task number |
-| `TASK_READY(auftrag)` → BOOLEAN | is the result there? |
-| `TASK_RESULT$(auftrag)` → STRING | fetch the result (**once**) |
-| `TASK_CANCEL(auftrag)` | discard the result |
+| `TASK_READY(job)` → BOOLEAN | is the result there? |
+| `TASK_RESULT$(job)` → STRING | fetch the result (**once**) |
+| `TASK_CANCEL(job)` | discard the result |
 | `TASK_PENDING()` → INTEGER | tasks that have not been fetched yet |
 
 You write the function **without parentheses**: `TASK_START(BerechneKarte, 42)`.
@@ -676,10 +676,10 @@ IF PARENT_RECV$() = "neu" THEN laden()
 | Function | Purpose |
 |---|---|
 | `WINDOW_OPEN(datei$[, arg1, …])` → INTEGER | start a second `dhrt run datei$`; numbers, texts, BOOLEAN become command-line arguments (`ARGC`/`ARG$`) |
-| `WINDOW_SEND(fenster, text$)` | send one line — anything sent before the connection is delivered as soon as the child calls `PARENT_*` |
-| `WINDOW_RECV$(fenster)` → STRING | next line from the child or `""` |
-| `WINDOW_ALIVE(fenster)` → BOOLEAN | is the process still running? |
-| `WINDOW_CLOSE(fenster)` | end the process |
+| `WINDOW_SEND(window, text$)` | send one line — anything sent before the connection is delivered as soon as the child calls `PARENT_*` |
+| `WINDOW_RECV$(window)` → STRING | next line from the child or `""` |
+| `WINDOW_ALIVE(window)` → BOOLEAN | is the process still running? |
+| `WINDOW_CLOSE(window)` | end the process |
 | `PARENT_SEND(text$)` / `PARENT_RECV$()` | in the child: to the parent / from the parent |
 | `PARENT_ALIVE()` → BOOLEAN | in the child: is there a parent, and is it alive? `FALSE` if the program was started on its own — that way the same program also runs without a parent |
 
@@ -726,12 +726,12 @@ PRINT SET_SIZE(gesehen)
 
 | Function | Purpose |
 |---|---|
-| `SET_ADD(menge, wert)` | add; already in it = no effect |
-| `SET_HAS(menge, wert)` → BOOLEAN | membership |
-| `SET_REMOVE(menge, wert)` → BOOLEAN | remove; `TRUE` if it was in it |
-| `SET_SIZE(menge)` → INTEGER | number of elements |
-| `SET_ITEMS(menge)` → ARRAY | elements in insertion order |
-| `SET_CLEAR(menge)` | remove all elements |
+| `SET_ADD(set, value)` | add; already in it = no effect |
+| `SET_HAS(set, value)` → BOOLEAN | membership |
+| `SET_REMOVE(set, value)` → BOOLEAN | remove; `TRUE` if it was in it |
+| `SET_SIZE(set)` → INTEGER | number of elements |
+| `SET_ITEMS(set)` → ARRAY | elements in insertion order |
+| `SET_CLEAR(set)` | remove all elements |
 
 **A set holds one kind of element.** Elements may be `INTEGER` **or**
 `STRING`, but not mixed — the first addition fixes the kind,
@@ -772,11 +772,11 @@ Mueller;"Berlin; Mitte";42      SPLIT$(";") -> vier Felder statt drei
 
 | Function | Purpose |
 |---|---|
-| `CSV_PARSE(text$[, trenner$])` → ARRAY OF STRING | split text, 2D (rows × columns) |
-| `CSV_LOAD(pfad$[, trenner$[, kodierung$]])` → ARRAY OF STRING | read a file, 2D |
-| `CSV_FORMAT$(tabelle[, trenner$])` → STRING | 2D array as CSV text |
-| `CSV_SAVE(pfad$, tabelle[, trenner$[, kodierung$]])` | 2D array into a file |
-| `CSV_ROW$(felder[, trenner$])` → STRING | a single row from a 1D array |
+| `CSV_PARSE(text$[, separator$])` → ARRAY OF STRING | split text, 2D (rows × columns) |
+| `CSV_LOAD(path$[, separator$[, encoding$]])` → ARRAY OF STRING | read a file, 2D |
+| `CSV_FORMAT$(table[, separator$])` → STRING | 2D array as CSV text |
+| `CSV_SAVE(path$, table[, separator$[, encoding$]])` | 2D array into a file |
+| `CSV_ROW$(fields[, separator$])` → STRING | a single row from a 1D array |
 
 ```basic
 DIM t AS ARRAY OF STRING
@@ -954,11 +954,11 @@ not an addendum to this one.
 
 | Function | Purpose |
 |---|---|
-| `OPENFILE(pfad$, modus$[, kodierung$])` → FILE | modes: `"r"` read, `"w"` write anew, `"a"` append |
+| `OPENFILE(path$, mode$[, encoding$])` → FILE | modes: `"r"` read, `"w"` write anew, `"a"` append |
 | `CLOSEFILE(f)` | closes |
 | `READLINE(f)` → STRING | next line (without `\n`); at the end of the file `""` like an empty line, so ask `EOF(f)` |
 | `EOF(f)` → BOOLEAN | TRUE when there is nothing more to read from the file: `WHILE NOT EOF(f) : PRINT READLINE(f) : WEND` |
-| `READALL$(f)` → STRING | read the whole rest |
+| `READALL$(f[, encoding$])` → STRING | read the whole rest |
 | `ENDOFFILE(f)` → BOOLEAN | at the end? |
 | `WRITELINE(f, text$)` | writes + `\n` |
 | `WRITE(f, text$)` | writes without `\n` |
@@ -968,26 +968,26 @@ Path-based, without a FILE handle *(native runtime only)*:
 
 | Function | Purpose |
 |---|---|
-| `WRITEALL(pfad$, text$[, kodierung$])` | write text completely (overwrites/creates) |
-| `READLINES(pfad$[, kodierung$])` → ARRAY OF STRING | read a file as an array of lines |
-| `READALL$(pfad$[, kodierung$])` → STRING | read a whole file as text |
-| `FILESIZE(pfad$)` → INTEGER | size in bytes |
-| `FILE_ENCODING$(pfad$)` → STRING | what `"auto"` would choose: `utf8`, `utf8bom`, `cp1252` or `binaer` (see encodings) |
-| `DELETEFILE(pfad$)`, `RENAME(alt$, neu$)` | delete / rename·move |
-| `DIREXISTS(pfad$)` → BOOLEAN | directory present? |
-| `DIRLIST(pfad$[, muster$])` → ARRAY OF STRING | entry names (sorted), optionally filtered |
-| `DIRLIST_REC(pfad$[, muster$])` → ARRAY OF STRING | as above, but recursive — files only, relative paths with `/` |
-| `RMDIR(pfad$[, mit_inhalt])` | delete a directory (empty; with `TRUE` including its contents) |
-| `FILETIME(pfad$)` → INTEGER | last modified, seconds as in the module `zeit` |
+| `WRITEALL(path$, text$[, encoding$])` | write text completely (overwrites/creates) |
+| `READLINES(path$[, encoding$])` → ARRAY OF STRING | read a file as an array of lines |
+| `READALL$(f$[, encoding$])` → STRING | read a whole file as text |
+| `FILESIZE(path$)` → INTEGER | size in bytes |
+| `FILE_ENCODING$(path$)` → STRING | what `"auto"` would choose: `utf8`, `utf8bom`, `cp1252` or `binaer` (see encodings) |
+| `DELETEFILE(path$)`, `RENAME(alt$, neu$)` | delete / rename·move |
+| `DIREXISTS(path$)` → BOOLEAN | directory present? |
+| `DIRLIST(path$, pattern$ = "", recursive = FALSE)` → ARRAY OF STRING | entry names (sorted), optionally filtered; with `recursive: TRUE` like `DIRLIST_REC` |
+| `DIRLIST_REC(path$[, pattern$])` → ARRAY OF STRING | as above, but recursive — files only, relative paths with `/` |
+| `RMDIR(path$[, with_content])` | delete a directory (empty; with `TRUE` including its contents) |
+| `FILETIME(path$)` → INTEGER | last modified, seconds as in the module `zeit` |
 | `TEMPDIR$()` → STRING | the system's temp directory |
-| `TEMPFILE$([praefix$[, endung$]])` → STRING | a free name in the temp directory, **created empty** |
-| `MKDIR(pfad$)` | create a directory (including parents) |
+| `TEMPFILE$([prefix$[, extension$]])` → STRING | a free name in the temp directory, **created empty** |
+| `MKDIR(path$)` | create a directory (including parents) |
 | `COPYFILE(src$, dst$)` | copy a file |
-| `APPENDFILE(pfad$, text$[, kodierung$])` | append text at the end (creates the file) |
+| `APPENDFILE(p$, text$[, encoding$])` | append text at the end (creates the file) |
 | `PATHJOIN(a$, b$, …)` → STRING | join path parts with `/` |
-| `BASENAME(pfad$)` → STRING | last path component (file/folder name) |
-| `DIRNAME(pfad$)` → STRING | directory part (without the last component) |
-| `REALPATH$(pfad$)` → STRING | the full, cleaned-up path: absolute, `.`/`..` resolved, in the spelling on disk; if the file does not exist, only made absolute and cleaned up |
+| `BASENAME(p$)` → STRING | last path component (file/folder name) |
+| `DIRNAME(p$)` → STRING | directory part (without the last component) |
+| `REALPATH$(path$)` → STRING | the full, cleaned-up path: absolute, `.`/`..` resolved, in the spelling on disk; if the file does not exist, only made absolute and cleaned up |
 | `SAMEFILE(a$, b$)` → BOOLEAN | do both paths mean the same file? A text comparison goes wrong with `/` versus `\`, with a `..` in the path, with short 8.3 names and (on Windows) with upper/lower case |
 
 ```basic
@@ -1037,15 +1037,15 @@ pass it to a `SUB` and both sides share the same bytes.
 
 | Function | Purpose |
 |---|---|
-| `BUFFER_NEW(groesse)` → BUFFER | new buffer, filled with zeros |
-| `BUFFER_LEN(b)` → INTEGER | length in **bytes** |
-| `BUFFER_GET(b, pos)` → INTEGER | read a byte 0..255 |
-| `BUFFER_SET(b, pos, byte)` | write a byte 0..255 (modifies in place) |
-| `BUFFER_FILL(b, byte)` | fill everything with one byte |
-| `BUFFER_RESIZE(b, groesse)` | grows with zeros, shrinks by cutting off |
-| `BUFFER_SLICE(b, von, bis)` → BUFFER | **copy** of the bytes `[von, bis)` |
+| `BUFFER_NEW(size)` → BUFFER | new buffer, filled with zeros |
+| `BUFFER_LEN(buffer)` → INTEGER | length in **bytes** |
+| `BUFFER_GET(buffer, position)` → INTEGER | read a byte 0..255 |
+| `BUFFER_SET(buffer, position, byte)` | write a byte 0..255 (modifies in place) |
+| `BUFFER_FILL(buffer, byte)` | fill everything with one byte |
+| `BUFFER_RESIZE(buffer, size)` | grows with zeros, shrinks by cutting off |
+| `BUFFER_SLICE(buffer, from, to)` → BUFFER | **copy** of the bytes `[from, to)` |
 | `BUFFER_CONCAT(a, b)` → BUFFER | new buffer made of both |
-| `BUFFER_INDEXOF(b, nadel [, ab])` → INTEGER | first occurrence, otherwise `-1` |
+| `BUFFER_INDEXOF(buffer, needle [, from])` → INTEGER | first occurrence, otherwise `-1` |
 
 As with arrays: **an index out of range is an error, a slice clamps.**
 `BUFFER_GET(b, 99)` on a 4-byte buffer throws; `BUFFER_SLICE(b, 0, 99)`
@@ -1059,9 +1059,9 @@ trimmed — otherwise it would only show up in the finished output file.
 | Function | Purpose |
 |---|---|
 | `BUFFER_FROM_STRING(text$)` → BUFFER | text as UTF-8 bytes |
-| `BUFFER_TO_STRING$(b)` → STRING | bytes as UTF-8 text |
-| `BUFFER_TO_HEX$(b)` / `BUFFER_FROM_HEX(s$)` | hex text (`"deadbeef"`) |
-| `BUFFER_TO_BASE64$(b)` / `BUFFER_FROM_BASE64(s$)` | Base64 |
+| `BUFFER_TO_STRING$(buffer)` → STRING | bytes as UTF-8 text |
+| `BUFFER_TO_HEX$(buffer)` / `BUFFER_FROM_HEX(s$)` | hex text (`"deadbeef"`) |
+| `BUFFER_TO_BASE64$(buffer)` / `BUFFER_FROM_BASE64(s$)` | Base64 |
 
 `BUFFER_TO_STRING$` is **strict**: if the bytes are not valid UTF-8, there is
 an error instead of silently replaced characters — a `?` in the wrong
@@ -1078,8 +1078,8 @@ which demands valid UTF-8 and throws otherwise.
 
 | Function | Purpose |
 |---|---|
-| `BUFFER_DEFLATE(b [, format$])` → BUFFER | compress bytes with Deflate (`"zlib"` default, `"roh"` = raw) |
-| `BUFFER_INFLATE(b [, format$])` → BUFFER | decompress compressed bytes (`"zlib"` default, `"roh"` = raw) |
+| `BUFFER_DEFLATE(buffer [, format$])` → BUFFER | compress bytes with Deflate (`"zlib"` default, `"roh"` = raw) |
+| `BUFFER_INFLATE(buffer [, format$])` → BUFFER | decompress compressed bytes (`"zlib"` default, `"roh"` = raw) |
 
 Unlike `COMPRESS$`/`DECOMPRESS$` (text in, Base64 out), these two
 work on **raw bytes**. The default `"zlib"` is the format with a header and
@@ -1120,12 +1120,12 @@ number would come back out.
 
 | Function | Purpose |
 |---|---|
-| `READALL_BYTES(pfad$)` → BUFFER | the whole file as bytes |
-| `WRITEALL_BYTES(pfad$, b)` | bytes into a file (overwrites) |
-| `READ_BYTES(datei, anzahl)` → BUFFER | up to `anzahl` bytes from the handle |
-| `WRITE_BYTES(datei, b)` | bytes to the handle |
-| `SEEK(datei, position)` | set the position (0 = start) |
-| `TELL(datei)` → INTEGER | current position |
+| `READALL_BYTES(path$)` → BUFFER | the whole file as bytes |
+| `WRITEALL_BYTES(path$, buffer)` | bytes into a file (overwrites) |
+| `READ_BYTES(file, count)` → BUFFER | up to `count` bytes from the handle |
+| `WRITE_BYTES(file, buffer)` | bytes to the handle |
+| `SEEK(file, position)` | set the position (0 = start) |
+| `TELL(file)` → INTEGER | current position |
 
 ```basic
 ' Piece by piece through a large file without loading it fully into memory
@@ -1163,20 +1163,22 @@ worked.
 | Function | Purpose |
 |---|---|
 | `ARGC()` → INTEGER | number of arguments for this program |
-| `ARG$(n)` → STRING | argument no. `n` (0-based); out of range → `""` |
-| `ARGPATH$(n)` → STRING | argument no. `n` as a **path from where the program was called** (see below) |
+| `ARG$(number)` → STRING | argument no. `n` (0-based); out of range → `""` |
+| `ARGPATH$(number)` → STRING | argument no. `n` as a **path from where the program was called** (see below) |
 | `STARTDIR$()` → STRING | the folder the program was called from |
-| `GETENV$(name$ [, vorgabe$])` → STRING | read an environment variable |
-| `SETENV(name$, wert$)` | set an environment variable (this program + its children) |
+| `GETENV$(name$ [, default$])` → STRING | read an environment variable |
+| `SETENV(name$, value$)` | set an environment variable (this program + its children) |
+| `SYSTEM_LANGUAGE$()` → STRING | the language of the system as two letters (`"de"`, `"en"`, `"fr"` …), `""` if unknown — e.g. to pick a program's texts |
+| `RUNTIME_LANGUAGE$()` → STRING | the language the runtime currently writes its messages in: `"de"` or `"en"` — `DHRT_LANG`, otherwise the system (German only on a German system) |
 | `CWD$()` → STRING | current working directory |
-| `CHDIR(pfad$)` | change the working directory |
+| `CHDIR(path$)` | change the working directory |
 | `EXEPATH$()` → STRING | path of the running program file |
-| `MODULE_AVAILABLE(modul$)` → BOOLEAN | is the module in this build? (hardware modules are missing without `--hardware`) |
+| `MODULE_AVAILABLE(module$)` → BOOLEAN | is the module in this build? (hardware modules are missing without `--hardware`) |
 | `EXIT([code])` | end immediately, `code` = return value (0..255, default 0) |
 | `EPRINT(text)` | line to **stderr** instead of stdout |
-| `SHELL(programm$, ...)` → INTEGER | start a program, wait, return value |
-| `SHELL_OUT$(programm$, ...)` → STRING | like `SHELL`, but collects the output |
-| `STDIN([kodierung$])` → FILE | standard input as a file handle |
+| `SHELL(program$, ...)` → INTEGER | start a program, wait, return value |
+| `SHELL_OUT$(program$, ...)` → STRING | like `SHELL`, but collects the output |
+| `STDIN([encoding$])` → FILE | standard input as a file handle |
 | `TERMINAL()` → BOOLEAN | does the output go to a terminal (not into a file, a pipe, the IDE)? |
 | `TERMINAL_WIDTH()` → INTEGER | columns of the terminal, 0 if the output does not go to one |
 
@@ -1319,12 +1321,12 @@ to poll:
 
 | Function | Effect |
 |---|---|
-| `SHELL_START(programm$, ...)` → INTEGER | starts in the background, returns the task number |
-| `SHELL_READY(auftrag)` → BOOLEAN | has the process finished? |
-| `SHELL_RESULT$(auftrag)` → STRING | fetch stdout, free the slot |
+| `SHELL_START(program$, ...)` → INTEGER | starts in the background, returns the task number |
+| `SHELL_READY(job)` → BOOLEAN | has the process finished? |
+| `SHELL_RESULT$(job)` → STRING | fetch stdout, free the slot |
 | `SHELL_CODE()` → INTEGER | return value of the **most recently fetched** task |
 | `SHELL_ERR$()` → STRING | its stderr |
-| `SHELL_CANCEL(auftrag)`, `SHELL_PENDING()` | discard / count |
+| `SHELL_CANCEL(job)`, `SHELL_PENDING()` | discard / count |
 
 ```basic
 DIM auftrag AS INTEGER
@@ -1352,16 +1354,16 @@ has to show what a program prints *while* it runs, and send it input
 
 | Function | Effect |
 |---|---|
-| `PROCESS_START(programm$, ...)` → INTEGER | starts with open input and output; `"dhrt"` as the program means this runtime itself. An array of texts among the arguments is spread out (`PROCESS_START("dhrt", "run", datei$, "--", argumente)`), a MAP of texts gives the child additional environment variables (only it, not your own program) |
-| `PROCESS_START_DETACHED(programm$, ...)` → INTEGER | starts **detached**: without pipes and without a number for the other `PROCESS_*`, the child keeps running when this program ends (this is how the IDE's start screen launches the studio and closes). Arguments as with `PROCESS_START`; returns the system's process id |
-| `PROCESS_READ$(prozess)` → STRING | what has arrived on stdout since the last call (empty = nothing new) |
-| `PROCESS_ERR$(prozess)` → STRING | the same for stderr |
-| `PROCESS_WRITE(prozess, text$)` | send to the input — an `INPUT` in the child needs the line ending `CHR$(10)` |
-| `PROCESS_CLOSE_INPUT(prozess)` | close the input (end of file for the child) |
-| `PROCESS_RUNNING(prozess)` → BOOLEAN | is it still running? |
-| `PROCESS_CODE(prozess)` → INTEGER | return value; `-1` while it is running or if it was aborted |
-| `PROCESS_FRONT(prozess)` | brings the child's visible window to the front (Windows; TRUE if there was one). A program in the background may not bring itself to the front there — only whoever is currently in front may do so; without a window the child gets permission for its first one. Elsewhere FALSE |
-| `PROCESS_KILL(prozess)`, `PROCESS_CLOSE(prozess)` | end it (including everything the child started itself — `cmd /C ping ...` also ends the `ping`) / free the slot |
+| `PROCESS_START(program$, ...)` → INTEGER | starts with open input and output; `"dhrt"` as the program means this runtime itself. An array of texts among the arguments is spread out (`PROCESS_START("dhrt", "run", datei$, "--", argumente)`), a MAP of texts gives the child additional environment variables (only it, not your own program) |
+| `PROCESS_START_DETACHED(program$, ...)` → INTEGER | starts **detached**: without pipes and without a number for the other `PROCESS_*`, the child keeps running when this program ends (this is how the IDE's start screen launches the studio and closes). Arguments as with `PROCESS_START`; returns the system's process id |
+| `PROCESS_READ$(process)` → STRING | what has arrived on stdout since the last call (empty = nothing new) |
+| `PROCESS_ERR$(process)` → STRING | the same for stderr |
+| `PROCESS_WRITE(process, text$)` | send to the input — an `INPUT` in the child needs the line ending `CHR$(10)` |
+| `PROCESS_CLOSE_INPUT(process)` | close the input (end of file for the child) |
+| `PROCESS_RUNNING(process)` → BOOLEAN | is it still running? |
+| `PROCESS_CODE(process)` → INTEGER | return value; `-1` while it is running or if it was aborted |
+| `PROCESS_FRONT(process)` | brings the child's visible window to the front (Windows; TRUE if there was one). A program in the background may not bring itself to the front there — only whoever is currently in front may do so; without a window the child gets permission for its first one. Elsewhere FALSE |
+| `PROCESS_KILL(process)`, `PROCESS_CLOSE(process)` | end it (including everything the child started itself — `cmd /C ping ...` also ends the `ping`) / free the slot |
 
 ```basic
 DIM p AS INTEGER
@@ -1389,18 +1391,18 @@ Lines and columns count from 1, in characters.
 
 | Function | Returns | Effect |
 |---|---|---|
-| `CODE_CHECK$(quelltext$[, basis$])` | STRING (JSON) | the front-end chain like `dhrt --check`: a list of `{zeile, spalte, laenge, schwere, meldung}` with `schwere` = `fehler`/`warnung`; `spalte` (from 1) and `laenge` say where in the line the message belongs -- the location of a syntax error, otherwise a name mentioned in the message, otherwise the line without indentation; `basis$` = folder for `IMPORT "x.dh"` (default: the working directory). Lines are those of the buffer, even with imports |
-| `CODE_HOVER$(quelltext$, zeile, spalte [, basis$])` | STRING | signature and description of the word at that position as Markdown; empty if there is no word there. With `basis$` (folder for IMPORTs, empty = working folder) it describes the member of the object's class after `object.`; for that the text is compiled |
-| `CODE_COMPLETE(quelltext$, zeile, spalte [, basis$])` | ARRAY OF STRING | suggestions for the word beginning to the left of the position: own symbols, commands, keywords, constants; with `basis$`, after `object.` only the fields, PROPERTYs and methods of its class, after a namespace (`kern.`) its top-level definitions without `PRIVATE` |
-| `CODE_DEFINITION(quelltext$, zeile, spalte)` | TUPLE (zeile, spalte) | where the word is defined; `(-1, -1)` if there is no definition in this text |
-| `CODE_REFERENCES(quelltext$, zeile, spalte)` | ARRAY OF INTEGER | the lines of all occurrences |
-| `CODE_CLASSES$(quelltext$)` | STRING (JSON) | the classes and structs of the text with their members, without compiling: per class `{"name", "art", "basis", "zeile", "bis", "kommentar", "mitglieder"}` (`basis` = the class after `EXTENDS`), per member `{"name", "art", "typ", "kopf", "zeile", "kommentar"}` with `art` = `feld`/`konstante`/`sub`/`function`/`property` -- GET and SET of a PROPERTY are one member; a half-typed text yields what can be read |
-| `CODE_METHOD_CALLS$(quelltext$[, basis$])` | STRING (JSON) | all method calls whose class the compiler knows, in one pass: `{"zeile", "name", "klasse", "signatur"}` (line from 1; `klasse` is the class the method is declared in, `signatur` its header line from the source) -- for parameter names at calls; `[]` without a successful compile |
-| `CODE_TYPES$(quelltext$[, basis$])` | STRING (JSON) | type hints for an editor: for each place without a written type -- today the variables of `FOR EACH` -- `{"zeile", "name", "typ"}` (line from 1; `MAP` yields keys as STRING, in the pair form plus the value); what the compiler does not know is left out |
-| `CODE_NAMES(quelltext$)` | MAP OF INTEGER | how often each name is used (lower case, including `$`): without comments and strings and without the place where a SUB/FUNCTION defines it -- calls, FUNCREFs and methods after a dot count |
-| `CODE_SYMBOLS$(quelltext$)` | STRING (JSON) | the outline: `{name, art, von, bis, kinder}` — classes with their methods; `art` is `class`, `struct`, `sub`, `function`, `property` or `enum` |
-| `CODE_FORMAT$(quelltext$ [, einruecken])` | STRING | the source formatted as by `dhrt fmt`: keywords in upper case, trailing whitespace removed, with `einruecken` (default TRUE) the blocks re-indented; empty if the source cannot be read (syntax error) |
-| `CODE_RENAME$(quelltext$, zeile, spalte, neu$)` | STRING | the source with the name at this position renamed to `neu$` everywhere — whole words, without comments and strings. Empty if there is no name there, it is a keyword or `neu$` is not a name |
+| `CODE_CHECK$(source$[, base$])` | STRING (JSON) | the front-end chain like `dhrt --check`: a list of `{zeile, spalte, laenge, schwere, meldung}` with `schwere` = `fehler`/`warnung`; `spalte` (from 1) and `laenge` say where in the line the message belongs -- the location of a syntax error, otherwise a name mentioned in the message, otherwise the line without indentation; `base$` = folder for `IMPORT "x.dh"` (default: the working directory). Lines are those of the buffer, even with imports |
+| `CODE_HOVER$(source$, line, column [, base$])` | STRING | signature and description of the word at that position as Markdown; empty if there is no word there. With `base$` (folder for IMPORTs, empty = working folder) it describes the member of the object's class after `object.`; for that the text is compiled |
+| `CODE_COMPLETE(source$, line, column [, base$])` | ARRAY OF STRING | suggestions for the word beginning to the left of the position: own symbols, commands, keywords, constants; with `base$`, after `object.` only the fields, PROPERTYs and methods of its class, after a namespace (`kern.`) its top-level definitions without `PRIVATE` |
+| `CODE_DEFINITION(source$, line, column)` | TUPLE (zeile, spalte) | where the word is defined; `(-1, -1)` if there is no definition in this text |
+| `CODE_REFERENCES(source$, line, column)` | ARRAY OF INTEGER | the lines of all occurrences |
+| `CODE_CLASSES$(source$)` | STRING (JSON) | the classes and structs of the text with their members, without compiling: per class `{"name", "art", "basis", "zeile", "bis", "kommentar", "mitglieder"}` (`basis` = the class after `EXTENDS`), per member `{"name", "art", "typ", "kopf", "zeile", "kommentar"}` with `art` = `feld`/`konstante`/`sub`/`function`/`property` -- GET and SET of a PROPERTY are one member; a half-typed text yields what can be read |
+| `CODE_METHOD_CALLS$(source$[, base$])` | STRING (JSON) | all method calls whose class the compiler knows, in one pass: `{"zeile", "name", "klasse", "signatur"}` (line from 1; `klasse` is the class the method is declared in, `signatur` its header line from the source) -- for parameter names at calls; `[]` without a successful compile |
+| `CODE_TYPES$(source$[, base$])` | STRING (JSON) | type hints for an editor: for each place without a written type -- today the variables of `FOR EACH` -- `{"zeile", "name", "typ"}` (line from 1; `MAP` yields keys as STRING, in the pair form plus the value); what the compiler does not know is left out |
+| `CODE_NAMES(source$)` | MAP OF INTEGER | how often each name is used (lower case, including `$`): without comments and strings and without the place where a SUB/FUNCTION defines it -- calls, FUNCREFs and methods after a dot count |
+| `CODE_SYMBOLS$(source$)` | STRING (JSON) | the outline: `{name, art, von, bis, kinder}` — classes with their methods; `art` is `class`, `struct`, `sub`, `function`, `property` or `enum` |
+| `CODE_FORMAT$(source$ [, indent])` | STRING | the source formatted as by `dhrt fmt`: keywords in upper case, trailing whitespace removed, with `indent` (default TRUE) the blocks re-indented; empty if the source cannot be read (syntax error) |
+| `CODE_RENAME$(source$, line, column, new$)` | STRING | the source with the name at this position renamed to `new$` everywhere — whole words, without comments and strings. Empty if there is no name there, it is a keyword or `new$` is not a name |
 
 ```basic
 DIM j AS JSON_HANDLE
@@ -1424,9 +1426,9 @@ With these a program checks itself — and says afterwards whether it worked.
 
 | Function | Purpose |
 |---|---|
-| `ASSERT(bedingung [, meldung$])` | fails if the condition is `FALSE` |
-| `ASSERT_EQ(ist, soll [, was$])` | the same, the message shows **both** values |
-| `ASSERT_COLLECT(an)` | collect mode on/off (default: off) |
+| `ASSERT(condition [, message$])` | fails if the condition is `FALSE` |
+| `ASSERT_EQ(actual, expected [, message$])` | the same, the message shows **both** values |
+| `ASSERT_COLLECT(on)` | collect mode on/off (default: off) |
 | `ASSERT_COUNT()` → INTEGER | how many checks have run |
 | `ASSERT_FAILED()` → INTEGER | how many of them failed |
 | `ASSERT_REPORT()` → INTEGER | print the summary, return the number of failures |
@@ -1519,13 +1521,13 @@ DH_LOG=debug dhrt run werkzeug.dh
 | `TIME$()` → STRING | current time `"HH:MM:SS"` |
 | `DATE$()` → STRING | current date `"YYYY-MM-DD"` |
 | `VERSION$()` → STRING | the version of the runtime that is currently running (the same number as `dhrt --version`) |
-| `RND()` → FLOAT | random number in `[0, 1)` |
+| `RND([n])` → FLOAT | random number in `[0, 1)` |
 | `RND(n)` → INTEGER | random INT in `[0, n)` |
 | `RANDINT(lo, hi)` → INTEGER | random INT in `[lo, hi]` (inclusive) |
 | `RANDF(lo, hi)` → FLOAT | random FLOAT in `[lo, hi)` |
-| `CHOICE(array)` → T | random element of a 1D array |
-| `WEIGHTED_CHOICE(werte, gewichte)` → T | element from `werte`, chosen in proportion to `gewichte` (1D arrays of equal length, weights ≥ 0). Loot tables. |
-| `SHUFFLE(array)` | shuffles a 1D array IN PLACE (Fisher-Yates) |
+| `CHOICE(arr)` → T | random element of a 1D array |
+| `WEIGHTED_CHOICE(values, weights)` → T | element from `values`, chosen in proportion to `weights` (1D arrays of equal length, weights ≥ 0). Loot tables. |
+| `SHUFFLE(arr)` | shuffles a 1D array IN PLACE (Fisher-Yates) |
 | `RANDOMIZE([seed])` | set the random seed (without an argument: system seed; a decimal number like `TIMER()` works too) |
 
 ```basic
@@ -1581,14 +1583,14 @@ else.
 
 | Function | Purpose |
 |---|---|
-| `SHA256$(daten)` → STRING | SHA-256 as hex (64 characters) |
-| `SHA1$(daten)` → STRING | SHA-1 — only for compatibility with existing things |
-| `MD5$(daten)` → STRING | MD5 — only for compatibility |
-| `SHA256_FILE$(pfad$)`, `SHA1_FILE$`, `MD5_FILE$` → STRING | the same for a file, read block by block |
-| `HMAC_SHA256$(schluessel, daten)` → STRING | signature with a secret key |
+| `SHA256$(data)` → STRING | SHA-256 as hex (64 characters) |
+| `SHA1$(data)` → STRING | SHA-1 — only for compatibility with existing things |
+| `MD5$(data)` → STRING | MD5 — only for compatibility |
+| `SHA256_FILE$(path$)`, `SHA1_FILE$`, `MD5_FILE$` → STRING | the same for a file, read block by block |
+| `HMAC_SHA256$(key, data)` → STRING | signature with a secret key |
 | `SECURE_EQUALS(a, b)` → BOOLEAN | comparison in constant time |
 | `UUID4$()` → STRING | random unique identifier |
-| `RANDOM_BYTES(anzahl)` → BUFFER | random bytes from the operating system |
+| `RANDOM_BYTES(count)` → BUFFER | random bytes from the operating system |
 
 `daten` and `schluessel` may be `STRING` (then the UTF-8 bytes) or `BUFFER`
 — a signature is formed over the bytes that are actually transmitted,
@@ -1665,8 +1667,8 @@ For more complex sprite collision see the [sprite module](module-sprite.md) with
 
 | Alias | Canonical |
 |---|---|
-| `SGN(x)` | `SIGN(x)` |
-| `SQRT(x)` | `SQR(x)` |
+| `SGN(number)` | `SIGN(x)` |
+| `SQRT(number)` | `SQR(x)` |
 | `AUDIO_SET_VOLUME(ch, v)` | `AUDIO_VOLUME(ch, v)` |
 | `AUDIO_MUSIC_SET_VOLUME(v)` | `AUDIO_MUSIC_VOLUME(v)` |
 

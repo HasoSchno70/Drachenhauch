@@ -108,9 +108,9 @@ from ten seconds ago.
 
 | Function | Effect |
 |---|---|
-| `MIDI_NOTE_ON(h, kanal, note, anschlag)` | Strike a note |
-| `MIDI_NOTE_OFF(h, kanal, note)` | Note off |
-| `MIDI_CC(h, kanal, nr, wert)` | Controller (e.g. 7 = volume) |
+| `MIDI_NOTE_ON(h, channel, note, velocity)` | Strike a note |
+| `MIDI_NOTE_OFF(h, channel, note)` | Note off |
+| `MIDI_CC(h, channel, nr, value)` | Controller (e.g. 7 = volume) |
 | `MIDI_SEND(h, status, d1, d2)` | Raw message, for everything else |
 
 ```basic
@@ -160,7 +160,7 @@ Being the clock yourself — for a device that should follow Drachenhauch:
 | `MIDI_START(h)` | start (FA): the device begins from the top |
 | `MIDI_STOP(h)` | stop (FC) |
 | `MIDI_CONTINUE(h)` | continue (FB): from where it stood |
-| `MIDI_SONG_POSITION(h, sechzehntel)` | jump to a position (0..16383 sixteenths) |
+| `MIDI_SONG_POSITION(h, sixteenths)` | jump to a position (0..16383 sixteenths) |
 
 The thread computes every tick from a fixed start, not from the previous one —
 so no delay adds up. If the computer stalls for longer than one tick, it
@@ -174,23 +174,23 @@ tempo changes are already included) and in **quarter notes** (writing):
 
 | Function | Effect |
 |---|---|
-| `MIDI_FILE_LOAD(pfad$)` → MIDI_FILE | read a file (format 0, 1 and 2) |
-| `MIDI_FILE_NEW([ticks_je_viertel])` → MIDI_FILE | an empty file (default 480) |
-| `MIDI_FILE_SAVE(mf, pfad$)` | write (format 1) |
+| `MIDI_FILE_LOAD(path$)` → MIDI_FILE | read a file (format 0, 1 and 2) |
+| `MIDI_FILE_NEW([ticks_per_quarter])` → MIDI_FILE | an empty file (default 480) |
+| `MIDI_FILE_SAVE(mf, path$)` | write (format 1) |
 | `MIDI_FILE_FREE(mf)` | release |
 | `MIDI_FILE_TRACKS(mf)` → INTEGER | number of tracks |
 | `MIDI_FILE_PPQ(mf)` → INTEGER | ticks per quarter; 0 for a file that counts in SMPTE frames |
 | `MIDI_FILE_DURATION(mf)` → FLOAT | length in seconds |
 | `MIDI_FILE_TEMPO(mf)` → FLOAT | tempo at the start (120 if none is given) |
-| `MIDI_FILE_TRACK_NAME$(mf, spur)` → STRING | name of a track |
+| `MIDI_FILE_TRACK_NAME$(mf, track)` → STRING | name of a track |
 | `MIDI_FILE_NOTES(mf)` → INTEGER | number of notes (note on and note off combined) |
 | `MIDI_FILE_NOTE(mf, i)` → TUPLE | `(beginn, dauer, kanal, note, anschlag, spur)`: start, duration, channel, note, velocity, track; ordered by start |
 | `MIDI_FILE_EVENTS(mf)` → INTEGER | number of channel messages over all tracks |
 | `MIDI_FILE_EVENT(mf, i)` → TUPLE | `(sekunde, spur, status, kanal, d1, d2)`, in time order; `status` as with `MIDI_STATUS` (144 = note on) |
-| `MIDI_FILE_ADD_NOTE(mf, spur, kanal, note, anschlag, beginn, dauer)` | a note; start and duration in quarter notes |
-| `MIDI_FILE_ADD_EVENT(mf, spur, zeitpunkt, status, d1 [, d2])` | another channel message (program 192, controller 176, ...; channel in the status byte) |
-| `MIDI_FILE_SET_TEMPO(mf, bpm [, zeitpunkt])` | tempo from a point in time (default 0) |
-| `MIDI_FILE_SET_TRACK_NAME(mf, spur, name$)` | name a track |
+| `MIDI_FILE_ADD_NOTE(mf, track, channel, note, velocity, start, duration)` | a note; start and duration in quarter notes |
+| `MIDI_FILE_ADD_EVENT(mf, track, time, status, d1 [, d2])` | another channel message (program 192, controller 176, ...; channel in the status byte) |
+| `MIDI_FILE_SET_TEMPO(mf, bpm [, time])` | tempo from a point in time (default 0) |
+| `MIDI_FILE_SET_TRACK_NAME(mf, track, name$)` | name a track |
 
 Tracks are created on first use (0..127). The tempo map is in track 0, as most
 programs expect.
@@ -229,7 +229,7 @@ the old program.
 
 | Function | Effect |
 |---|---|
-| `MIDI_FILE_PLAY(h, mf [, ab_sekunde])` | play the file on an output, in a thread of its own |
+| `MIDI_FILE_PLAY(h, mf [, from_second])` | play the file on an output, in a thread of its own |
 | `MIDI_FILE_STOP(h)` | stop; notes still sounding are switched off |
 | `MIDI_FILE_PLAYING(h)` → BOOLEAN | is it still playing? |
 | `MIDI_FILE_POSITION(h)` → FLOAT | where it is, in seconds |

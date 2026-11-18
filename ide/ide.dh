@@ -946,7 +946,9 @@ END FUNCTION
 ' deutsch -- ein fehlender Eintrag ist ein Schoenheitsfehler, kein Absturz;
 ' tests/pruef/ide/werkzeug_ide_englisch.dhtest prueft, dass keiner fehlt.
 ' Gewechselt wird beim naechsten Start: die Fenster sind dann schon gebaut.
-DIM sprache AS STRING : sprache = "de"
+' Ohne Einstellung die Sprache der Laufzeit: DHRT_LANG, sonst das System
+' (Deutsch nur auf einem deutschen System, seit 2026-11-18).
+DIM sprache AS STRING : sprache = RUNTIME_LANGUAGE$()
 sprache = kText("sprache", sprache)
 IF GETENV$("DH_IDE_SPRACHE") <> "" THEN sprache = GETENV$("DH_IDE_SPRACHE")
 DIM englisch AS BOOLEAN : englisch = LOWER$(sprache) = "en"
@@ -972,7 +974,9 @@ END IF
 ' (CODE_CHECK$ laeuft in diesem Prozess) und jedes gestartete Programm, das
 ' die Variable erbt. Eine Pruefsammlung (`dhrt test`) nimmt sie ihren
 ' Faellen wieder weg -- deren Erwartungen stehen deutsch da.
-IF englisch AND GETENV$("DHRT_LANG") = "" THEN SETENV("DHRT_LANG", "en")
+' Auch eine deutsche IDE auf einem englischen System sagt es weiter, sonst
+' sprachen ihre Programme die Systemsprache.
+IF GETENV$("DHRT_LANG") = "" THEN SETENV("DHRT_LANG", IIF(englisch, "en", "de"))
 
 FUNCTION tr$(t AS STRING) AS STRING
     IF NOT englisch THEN RETURN t

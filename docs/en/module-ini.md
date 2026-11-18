@@ -35,9 +35,9 @@ all of that, and whoever knows the language therefore knows this module too.
 | Function | Purpose |
 |---|---|
 | `INI_PARSE(text$)` → MAP OF STRING | from a string |
-| `INI_LOAD(pfad$[, kodierung$])` → MAP OF STRING | from a file |
+| `INI_LOAD(path$[, encoding$])` → MAP OF STRING | from a file |
 | `INI_TEXT$(m)` → STRING | back into INI text |
-| `INI_SAVE(pfad$, m[, kodierung$])` | to a file |
+| `INI_SAVE(path$, m[, encoding$])` | to a file |
 
 ## Example
 

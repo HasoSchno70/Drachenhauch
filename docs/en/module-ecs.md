@@ -54,10 +54,10 @@ ECS_INTEGRATE_FLOAT(world, "py", "vy")
 | Function | Return value / effect |
 |---|---|
 | `ECS_NEW_WORLD()` | ECS_WORLD — empty world |
-| `ECS_NEW_ENTITY(w)` | INTEGER — new entity ID (>= 1) |
-| `ECS_DESTROY(w, ent)` | BOOLEAN — TRUE if removed, FALSE if it did not exist |
-| `ECS_ALIVE(w, ent)` | BOOLEAN |
-| `ECS_COUNT(w)` | INTEGER — number of living entities |
+| `ECS_NEW_ENTITY(world)` | INTEGER — new entity ID (>= 1) |
+| `ECS_DESTROY(world, ent)` | BOOLEAN — TRUE if removed, FALSE if it did not exist |
+| `ECS_ALIVE(world, ent)` | BOOLEAN |
+| `ECS_COUNT(world)` | INTEGER — number of living entities |
 
 `ECS_DESTROY` removes the entity from all component stores (sparse-set cleanup).
 
@@ -67,11 +67,11 @@ One built-in per type — the type check happens on add (not on get).
 
 | Function | value type |
 |---|---|
-| `ECS_ADD_INT(w, ent, name$, value)` | INTEGER |
-| `ECS_ADD_FLOAT(w, ent, name$, value)` | FLOAT (an int is accepted + converted) |
-| `ECS_ADD_STRING(w, ent, name$, value)` | STRING |
-| `ECS_ADD_BOOL(w, ent, name$, value)` | BOOLEAN |
-| `ECS_ADD_OBJ(w, ent, name$, value)` | anything (user class, MAP, ARRAY, ...) |
+| `ECS_ADD_INT(world, ent, name$, value)` | INTEGER |
+| `ECS_ADD_FLOAT(world, ent, name$, value)` | FLOAT (an int is accepted + converted) |
+| `ECS_ADD_STRING(world, ent, name$, value)` | STRING |
+| `ECS_ADD_BOOL(world, ent, name$, value)` | BOOLEAN |
+| `ECS_ADD_OBJ(world, ent, name$, value)` | anything (user class, MAP, ARRAY, ...) |
 
 If the entity already holds the component, the value is overwritten. The component name must be passed as a STRING argument (not an identifier — components are created at run time).
 
@@ -79,8 +79,8 @@ If the entity already holds the component, the value is overwritten. The compone
 
 | Function | Return value |
 |---|---|
-| `ECS_HAS(w, ent, name$)` | BOOLEAN |
-| `ECS_REMOVE(w, ent, name$)` | BOOLEAN — TRUE if removed |
+| `ECS_HAS(world, ent, name$)` | BOOLEAN |
+| `ECS_REMOVE(world, ent, name$)` | BOOLEAN — TRUE if removed |
 
 ## Component get
 
@@ -88,15 +88,15 @@ If the entity already holds the component, the value is overwritten. The compone
 
 | Function | Return value |
 |---|---|
-| `ECS_GET_INT(w, ent, name$)` | INTEGER |
-| `ECS_GET_FLOAT(w, ent, name$)` | FLOAT |
-| `ECS_GET_STRING(w, ent, name$)` | STRING |
-| `ECS_GET_BOOL(w, ent, name$)` | BOOLEAN |
-| `ECS_GET(w, ent, name$)` | anything (untyped) |
-| `ECS_GET_OR_INT(w, ent, name$, default)` | INTEGER |
-| `ECS_GET_OR_FLOAT(w, ent, name$, default)` | FLOAT |
-| `ECS_GET_OR_STRING(w, ent, name$, default)` | STRING |
-| `ECS_GET_OR_BOOL(w, ent, name$, default)` | BOOLEAN |
+| `ECS_GET_INT(world, ent, name$)` | INTEGER |
+| `ECS_GET_FLOAT(world, ent, name$)` | FLOAT |
+| `ECS_GET_STRING(world, ent, name$)` | STRING |
+| `ECS_GET_BOOL(world, ent, name$)` | BOOLEAN |
+| `ECS_GET(world, ent, name$)` | anything (untyped) |
+| `ECS_GET_OR_INT(world, ent, name$, default)` | INTEGER |
+| `ECS_GET_OR_FLOAT(world, ent, name$, default)` | FLOAT |
+| `ECS_GET_OR_STRING(world, ent, name$, default)` | STRING |
+| `ECS_GET_OR_BOOL(world, ent, name$, default)` | BOOLEAN |
 
 `GET_OR_*` also returns `default` when the component exists but has the wrong type (e.g. STRING where INT is expected). That is defensive — if you want to treat type conflicts as bugs, use the strict `GET_*` variant.
 
@@ -106,9 +106,9 @@ Returns an `ARRAY OF INTEGER` with the entity IDs that have ALL the named compon
 
 | Function | Return value |
 |---|---|
-| `ECS_QUERY(w, name$)` | ARRAY OF INTEGER |
-| `ECS_QUERY2(w, n1$, n2$)` | ARRAY OF INTEGER — entities with n1 AND n2 |
-| `ECS_QUERY3(w, n1$, n2$, n3$)` | ARRAY OF INTEGER — entities with n1 AND n2 AND n3 |
+| `ECS_QUERY(world, name$)` | ARRAY OF INTEGER |
+| `ECS_QUERY2(world, n1$, n2$)` | ARRAY OF INTEGER — entities with n1 AND n2 |
+| `ECS_QUERY3(world, n1$, n2$, n3$)` | ARRAY OF INTEGER — entities with n1 AND n2 AND n3 |
 
 **Strategy:** the component with the fewest holders is chosen as the base (smallest iteration loop), then it is tested against the other sparse sets. For a sparse component (e.g. `boss = 1 entity`) a query is O(smallest component count), not O(world size).
 
@@ -122,8 +122,8 @@ The bulk ops process a whole component layer in ONE built-in call, internally as
 
 | Function | Effect |
 |---|---|
-| `ECS_INTEGRATE_FLOAT(w, target$, delta$)` | `target += delta` for all entities with both components |
-| `ECS_INTEGRATE_INT(w, target$, delta$)` | INT variant |
+| `ECS_INTEGRATE_FLOAT(world, target$, delta$)` | `target += delta` for all entities with both components |
+| `ECS_INTEGRATE_INT(world, target$, delta$)` | INT variant |
 
 Classic use: position += velocity.
 
@@ -138,10 +138,10 @@ Returns the number of entities moved (= the intersection).
 
 | Function | Effect |
 |---|---|
-| `ECS_SCALE_FLOAT(w, target$, factor)` | `target *= factor` for all holders |
-| `ECS_FILL_FLOAT(w, target$, value)` | all values = value |
-| `ECS_FILL_INT(w, target$, value)` | INT variant |
-| `ECS_CLAMP_FLOAT(w, target$, lo, hi)` | clamp to `[lo, hi]` |
+| `ECS_SCALE_FLOAT(world, target$, factor)` | `target *= factor` for all holders |
+| `ECS_FILL_FLOAT(world, target$, value)` | all values = value |
+| `ECS_FILL_INT(world, target$, value)` | INT variant |
+| `ECS_CLAMP_FLOAT(world, target$, lo, hi)` | clamp to `[lo, hi]` |
 
 ```basic
 ECS_SCALE_FLOAT(world, "vx", 0.95)            ' Friction
@@ -154,8 +154,8 @@ ECS_CLAMP_FLOAT(world, "py", 0.0, 480.0)
 
 | Function | Effect |
 |---|---|
-| `ECS_REMOVE_DEAD(w, name$, threshold)` | destroy entities with `value <= threshold` |
-| `ECS_COUNT_WITH(w, name$)` | O(1) — number of holders of a component |
+| `ECS_REMOVE_DEAD(world, name$, threshold)` | destroy entities with `value <= threshold` |
+| `ECS_COUNT_WITH(world, name$)` | O(1) — number of holders of a component |
 
 ```basic
 ECS_REMOVE_DEAD(world, "hp", 0)               ' destroy the dead

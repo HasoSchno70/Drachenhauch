@@ -218,9 +218,9 @@ soll, ein Feld von Bytes, ein Struct. Drei Befehle verbinden `ZEIGER` und
 
 | Befehl | was es tut |
 |---|---|
-| `TEXT_AUS_ZEIGER$(zeiger [, breit])` | kopiert den Text hinter einem Zeiger bis zum Nullzeichen (UTF-8; mit `breit` = TRUE `wchar_t`, also UTF-16 unter Windows); 0 ergibt `""` |
-| `BUFFER_AUS_ZEIGER(zeiger, laenge)` | kopiert `laenge` Bytes hinter einem Zeiger in einen neuen BUFFER; 0 Bytes ergeben einen leeren, ein Nullzeiger mit Länge ist ein Fehler |
-| `BUFFER_ZEIGER(puffer)` | die Adresse der Bytes eines BUFFER, für ein Struct-Feld, das auf einen anderen Puffer zeigt; ein leerer Puffer ergibt 0 |
+| `TEXT_AUS_ZEIGER$(pointer [, wide])` | kopiert den Text hinter einem Zeiger bis zum Nullzeichen (UTF-8; mit `wide` = TRUE `wchar_t`, also UTF-16 unter Windows); 0 ergibt `""` |
+| `BUFFER_AUS_ZEIGER(pointer, length)` | kopiert `length` Bytes hinter einem Zeiger in einen neuen BUFFER; 0 Bytes ergeben einen leeren, ein Nullzeiger mit Länge ist ein Fehler |
+| `BUFFER_ZEIGER(buffer)` | die Adresse der Bytes eines BUFFER, für ein Struct-Feld, das auf einen anderen Puffer zeigt; ein leerer Puffer ergibt 0 |
 
 ```basic
 DECLARE FUNCTION malloc LIB "c" (n AS ZEIGER) AS ZEIGER
@@ -304,8 +304,8 @@ PRINT SIZEOF(Linie), OFFSETOF(Linie, name)   ' 48  20
 
 | Befehl | was es tut |
 |---|---|
-| `SIZEOF(typ)` | Größe eines `STRUCT … LAYOUT C` oder eines Typworts in Bytes, beim Übersetzen gerechnet |
-| `OFFSETOF(struct, feld)` | Stelle eines Feldes im Struct in Bytes, beim Übersetzen gerechnet |
+| `SIZEOF(type)` | Größe eines `STRUCT … LAYOUT C` oder eines Typworts in Bytes, beim Übersetzen gerechnet |
+| `OFFSETOF(struct, field)` | Stelle eines Feldes im Struct in Bytes, beim Übersetzen gerechnet |
 
 Manche Structs wollen vor dem Aufruf ihre eigene Größe im ersten Feld --
 unter Windows etwa `MEMORYSTATUSEX` für `GlobalMemoryStatusEx`:

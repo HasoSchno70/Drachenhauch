@@ -15,6 +15,8 @@ Drachenhauch is a BASIC dialect with Pascal-strict typing and OOP, for games and
 - **[Language reference](sprache.md)** — variables, types, operators, control flow (IF, SELECT CASE, WHILE, FOR), functions, classes, try/catch, imports
 - **[Foreign libraries](ffi.md)** — `DECLARE … LIB`: call functions from DLLs, `.so` and `.dylib` files (Windows API, C library, device drivers)
 - **[Variable scope](scope.md)** — where a variable is visible: globally, in functions, in methods — and why there is no block scoping
+- **[Stability](stabilitaet.md)** — what stays fixed from version to version (language, command names, arguments, files) and what may change
+- **[Change log](aenderungen.md)** — what changes for existing programs in each version, collected from the release notes
 
 ### Built-in commands
 

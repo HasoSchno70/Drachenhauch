@@ -284,8 +284,11 @@ Befund in einer per IMPORT eingebundenen, nennt `file` deren Pfad.
 
 ### Meldungen auf Englisch (`DHRT_LANG=en`)
 
-Mit `DHRT_LANG=en` (auch `en_US` usw.) schreibt dhrt seine Meldungen
-englisch:
+Ohne Einstellung spricht dhrt die Sprache des Systems: Deutsch auf einem
+deutschen System, sonst Englisch (seit 2026.52; vorher immer Deutsch).
+`DHRT_LANG=de` oder `DHRT_LANG=en` (auch `en_US` usw.) legt die Sprache fest.
+Ein Programm fragt sie mit `RUNTIME_LANGUAGE$()`, die des Systems mit
+`SYSTEM_LANGUAGE$()`. Englisch sieht so aus:
 
 ```
 Runtime error in game.dh:42: Index 10 outside [0..2] in dimension 1
@@ -321,9 +324,11 @@ darum genügen für zusammengesetzte Meldungen die Teile (`{} -- Aufruf: {}`,
   hängt nicht an einer Umgebungsvariable.
 - **Schnellkorrekturen** lesen weiter den deutschen Satz; nur ihr Titel wird
   übersetzt.
-- **`dhrt test`** nimmt seinen Fällen `DHRT_LANG` weg (ihre Erwartungen
-  stehen deutsch da); ein Fall, der Englisch will, setzt es in
-  `--- umgebung`.
+- **`dhrt test`** nimmt seinen Fällen `DHRT_LANG` weg und spielt ihnen ein
+  deutsches System (`DHRT_SYSTEM_LANG=de`) -- ihre Erwartungen stehen
+  deutsch da, auch auf einem englischen CI-Läufer. Ein Fall, der Englisch
+  will, setzt `DHRT_LANG` in `--- umgebung`, einer, der die Systemsprache
+  prüft, setzt dort `DHRT_SYSTEM_LANG`.
 - **`dhrt pruef meldungen`** prüft den Katalog gegen den Quelltext: jede
   deutsche Vorlage muss in ihren festen Stücken noch in einem Literal stehen,
   die Platzhalter müssen passen. Wo eine Meldung aus mehreren Literalen
@@ -336,7 +341,8 @@ darum genügen für zusammengesetzte Meldungen die Teile (`{} -- Aufruf: {}`,
   werden die festen Zeichen ALLER Vorlagen, die greifen. Sonst schnitte eine
   allgemeine Fuge wie `{} -- {}` einen Satz an der falschen Stelle durch.
 
-Die IDE setzt `DHRT_LANG=en`, wenn ihre Oberfläche englisch ist.
+Die IDE und das Studio setzen `DHRT_LANG` auf die Sprache ihrer Oberfläche;
+die folgt ohne Einstellung der Laufzeit, also dem System.
 
 ## Schritt 1: `.dhc`-Serialisierung
 
@@ -1039,27 +1045,30 @@ Argumenten mit `ARGPATH$` (siehe [builtins-core.md](builtins-core.md)). In der *
 **Strg+F6** bündelt die aktive Datei nach `<name>_dist/` neben der Quelle, schlank
 (siehe unten); die Ausgabe des Exports läuft unten links mit (siehe [ide.md](ide.md)).
 
-**Schlanker Export** (`--schlank`): Die volle Laufzeit trägt alles mit (Grafik,
-Ton, PDF mit eingebetteten Schriften, Datenbank, Netz, Video, Hardware) und ist
-rund 37 MB groß. Neben ihr liegen zwei kleinere in `laufzeiten/`:
-`dhrt-konsole` (Daten, Netz, Mail, Maschinencode; 19 MB) und `dhrt-spiel`
+**Schlanker Export** (seit 2026.52 die Vorgabe, vorher `--schlank`; `--voll`
+nimmt die volle Laufzeit): Die volle Laufzeit trägt alles mit (Grafik, Ton,
+PDF mit eingebetteten Schriften, Datenbank, Netz, Video, Hardware) und ist
+rund 45 MB groß. Neben ihr liegen drei kleinere in `laufzeiten/`:
+`dhrt-mini` (Kern und Maschinencode; 16 MB -- „Hallo Welt“ und Werkzeuge),
+`dhrt-konsole` (dazu Daten, Netz, Mail; 22 MB) und `dhrt-spiel`
 (Grafik, Ton, Dialoge, Physik, die eingebauten Schriften für
-`LOADFONT("sans")`, Maschinencode; 27 MB). Mit `--schlank` nimmt der
-Export die kleinste, der keiner der Befehle fehlt, die das Programm aufruft --
+`LOADFONT("sans")`, Maschinencode; 35 MB). Der
+Export nimmt die kleinste, der keiner der Befehle fehlt, die das Programm aufruft --
 auch in einem Unterprogramm, das nie läuft. **Gefragt werden die Laufzeiten
 selbst** (`dhrt-konsole --fehlende name …`: jeder Name wird mit absichtlich
 unsinnigen Argumenten gerufen; ein vorhandener Befehl scheitert an ihnen, ein
 fehlender sagt, dass er fehlt), nicht eine Liste -- eine Liste wäre beim
 nächsten neuen Befehl still falsch, und das Programm bräche erst beim Kunden ab.
-Der Export sagt, welche er genommen hat (`Schlank: dhrt-konsole (16,1 MB statt
-32,9 MB)`), und wenn keine passt, warum (`dhrt-konsole fehlt PDF_NEW`). Der
-Maschinencode bleibt in beiden: ohne ihn rechneten Programme bis zu hundertmal
+Der Export sagt, welche er genommen hat (`Schlank: dhrt-mini (16,4 MB statt
+45,3 MB)`), und wenn keine passt, warum (`dhrt-konsole fehlt PDF_NEW`). Der
+Maschinencode bleibt in allen: ohne ihn rechneten Programme bis zu hundertmal
 langsamer. Gebaut werden die kleinen mit `python rust/build_runtime.py
 --laufzeiten`; der Installer und die Pakete für macOS und Linux bringen sie mit.
 Geprüft in [tests/pruef/werkzeugkette/export_schlank.dhtest](../tests/pruef/werkzeugkette/export_schlank.dhtest).
 
 ```
-dhrt --export werkzeug.dh --schlank
+dhrt --export werkzeug.dh
+dhrt --export werkzeug.dh --voll
 ```
 
 Verifiziert: `89_heightmap.dh` exportiert (~3.7 MB Exe), die Exe **ohne

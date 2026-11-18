@@ -110,6 +110,28 @@ PRINT d[0]
 a.csv,b.CSV,unter/tief.csv
 unter/tief.csv
 
+=== dir_list mit recursive wie dir_list_rec
+' DIR_LIST(pfad, muster, recursive) fasst DIR_LIST und DIR_LIST_REC
+' zusammen; ein leeres Muster heisst "alles".
+DIM d AS ARRAY OF STRING
+d = DIR_LIST("baum", recursive: TRUE)
+SORT(d)
+PRINT JOIN$(d, ",")
+d = DIR_LIST("baum", "*.csv", TRUE)
+SORT(d)
+PRINT JOIN$(d, ",")
+PRINT LEN(DIR_LIST("baum", ""))
+--- datei baum/a.csv
+1
+--- datei baum/x.txt
+3
+--- datei baum/unter/tief.csv
+4
+--- erwartet
+a.csv,unter/tief.csv,x.txt
+a.csv,unter/tief.csv
+3
+
 === rekursiv liefert nur dateien
 DIM d AS ARRAY OF STRING
 d = DIRLIST_REC("baum")

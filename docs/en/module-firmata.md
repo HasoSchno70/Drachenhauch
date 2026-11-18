@@ -41,28 +41,28 @@ capability query from the full protocol are not included.
 | Function | Returns | Meaning |
 |---|---|---|
 | `FIRMATA_PORTS()` | STRING (comma-separated list of available ports, like `SERIAL_PORTS()`) | which serial ports are there? |
-| `FIRMATA_OPEN(ziel$ [, baud])` | FIRMATA_HANDLE | establish the connection to the board: serial port or `tcp:host:port` |
+| `FIRMATA_OPEN(target$ [, baud])` | FIRMATA_HANDLE | establish the connection to the board: serial port or `tcp:host:port` |
 | `FIRMATA_CLOSE(handle)` | — | close the connection |
 | `FIRMATA_IS_OPEN(handle)` | BOOLEAN | is the connection still up? |
 | `FIRMATA_FIRMWARE$(handle)` | STRING | name and version of the firmware, e.g. `StandardFirmata.ino 2.5` |
-| `FIRMATA_PIN_MODE(handle, pin, modus)` | — | set the operating mode of a pin (input, output, PWM, analogue) |
-| `FIRMATA_DIGITAL_WRITE(handle, pin, wert)` | — | switch a pin HIGH or LOW |
+| `FIRMATA_PIN_MODE(handle, pin, mode)` | — | set the operating mode of a pin (input, output, PWM, analogue) |
+| `FIRMATA_DIGITAL_WRITE(handle, pin, value)` | — | switch a pin HIGH or LOW |
 | `FIRMATA_DIGITAL_READ(handle, pin)` | BOOLEAN | read the reported state of an input -- the value comes from the last `FIRMATA_UPDATE` |
-| `FIRMATA_ANALOG_WRITE(handle, pin, wert)` | — | output a PWM value (0..255), e.g. for brightness or motor speed |
-| `FIRMATA_ANALOG_READ(handle, kanal)` | INTEGER (0..16383) | read an analogue value -- careful, what counts here is the **channel** (A0 = 0), not the pin number |
+| `FIRMATA_ANALOG_WRITE(handle, pin, value)` | — | output a PWM value (0..255), e.g. for brightness or motor speed |
+| `FIRMATA_ANALOG_READ(handle, channel)` | INTEGER (0..16383) | read an analogue value -- careful, what counts here is the **channel** (A0 = 0), not the pin number |
 | `FIRMATA_SERVO_ATTACH(handle, pin [, min_us, max_us])` | — | attach a servo to a pin; the pulse widths for 0 and 180 degrees (default 544 and 2400) |
-| `FIRMATA_SERVO_WRITE(handle, pin, winkel)` | — | set a servo to an angle 0..180 |
-| `FIRMATA_I2C_CONFIG(handle [, verzoegerung_us])` | — | switch I2C on; otherwise the first I2C request does it by itself |
-| `FIRMATA_I2C_WRITE(handle, adresse, bytes)` | — | send bytes to an I2C device (array of numbers or BUFFER) |
-| `FIRMATA_I2C_READ(handle, adresse, register, anzahl)` | ARRAY OF INTEGER | read and wait for the answer (at most one second); register -1 = none |
-| `FIRMATA_I2C_REQUEST(handle, adresse, register, anzahl [, dauernd])` | — | have bytes read without waiting; with `dauernd` the board reports again and again |
-| `FIRMATA_I2C_DATA(handle, adresse [, register])` | ARRAY OF INTEGER | the bytes reported last, empty if nothing has arrived yet |
-| `FIRMATA_I2C_STOP(handle, adresse)` | — | end continuous reading |
-| `FIRMATA_STEPPER_CONFIG(handle, motor, art$, pin1, pin2 [, pin3, pin4])` | — | set up stepper motor 0..9: `treiber` (step + direction), `zweidraht`, `dreidraht`, `vierdraht` |
-| `FIRMATA_STEPPER_SPEED(handle, motor, schritte_je_s)` | — | maximum speed |
-| `FIRMATA_STEPPER_ACCEL(handle, motor, schritte_je_s2)` | — | acceleration, 0 = none |
-| `FIRMATA_STEPPER_MOVE(handle, motor, schritte)` | — | move by that many steps, the sign is the direction |
-| `FIRMATA_STEPPER_TO(handle, motor, ziel)` | — | move to a position |
+| `FIRMATA_SERVO_WRITE(handle, pin, angle)` | — | set a servo to an angle 0..180 |
+| `FIRMATA_I2C_CONFIG(handle [, delay_us])` | — | switch I2C on; otherwise the first I2C request does it by itself |
+| `FIRMATA_I2C_WRITE(handle, address, bytes)` | — | send bytes to an I2C device (array of numbers or BUFFER) |
+| `FIRMATA_I2C_READ(handle, address, register, count)` | ARRAY OF INTEGER | read and wait for the answer (at most one second); register -1 = none |
+| `FIRMATA_I2C_REQUEST(handle, address, register, count [, continuous])` | — | have bytes read without waiting; with `continuous` the board reports again and again |
+| `FIRMATA_I2C_DATA(handle, address [, register])` | ARRAY OF INTEGER | the bytes reported last, empty if nothing has arrived yet |
+| `FIRMATA_I2C_STOP(handle, address)` | — | end continuous reading |
+| `FIRMATA_STEPPER_CONFIG(handle, motor, kind$, pin1, pin2 [, pin3, pin4])` | — | set up stepper motor 0..9: `treiber` (step + direction), `zweidraht`, `dreidraht`, `vierdraht` |
+| `FIRMATA_STEPPER_SPEED(handle, motor, steps_per_s)` | — | maximum speed |
+| `FIRMATA_STEPPER_ACCEL(handle, motor, steps_per_s2)` | — | acceleration, 0 = none |
+| `FIRMATA_STEPPER_MOVE(handle, motor, steps)` | — | move by that many steps, the sign is the direction |
+| `FIRMATA_STEPPER_TO(handle, motor, target)` | — | move to a position |
 | `FIRMATA_STEPPER_STOP(handle, motor)` | — | stop |
 | `FIRMATA_STEPPER_ZERO(handle, motor)` | — | the current position becomes 0 |
 | `FIRMATA_STEPPER_POSITION(handle, motor)` | INTEGER | last reported position (and asks for the next one at the same time) |

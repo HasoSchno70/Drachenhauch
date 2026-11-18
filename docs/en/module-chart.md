@@ -63,22 +63,22 @@ CHART_LABEL(c, 0, "Mo")                ' label a category
 
 | Command | Effect |
 |---|---|
-| `CHART_SERIES(c, name$ [, farbe])` | create a series → index |
-| `CHART_ADD(c, name$, wert [, farbe])` | category + value in series 0 → index; the colour applies to the slice, for a bar chart with one series to the bar |
-| `CHART_DATA(c, reihe, werte)` | replace all values of a series (`ARRAY OF FLOAT`); the number of points follows the list, downwards too |
-| `CHART_SET_POINT(c, reihe, punkt, wert)` | change a single value |
-| `CHART_PUSH(c, reihe, wert)` | append a value at the end (live curves, see `fenster`) |
-| `CHART_VALUE(c, wert)` | short form for series 0, point 0 — the gauge way |
-| `CHART_LABEL(c, punkt, text$)` | label a category |
-| `CHART_X(c, xwerte)` | line chart: real x values per point (e.g. timestamps), ascending; `[]` = equal spacing again |
-| `CHART_GET(c, reihe, punkt)` | read a value |
-| `CHART_COUNT(c)` / `CHART_SERIES_COUNT(c)` | number of points / series |
-| `CHART_CLEAR(c)` | discard the data |
-| `CHART_STAT(c, reihe, kennzahl$)` | `anzahl`/`summe`/`mittel`/`min`/`max` (count/sum/mean/min/max) |
-| `CHART_BOUNDS(c, x, y, b, h)` | move/resize the area |
-| `CHART_ZONE(c, von, bis, farbe [, name$])` / `CHART_ZONE_CLEAR(c)` | colour zones of the gauge scale, optionally labelled |
-| `CHART_UPDATE(c, sekunden)` | keep the animation running (see below) |
-| `CHART_DRAW(c)` | draw (needs `SCREEN`) |
+| `CHART_SERIES(chart, name$ [, color])` | create a series → index |
+| `CHART_ADD(chart, name$, value [, color])` | category + value in series 0 → index; the colour applies to the slice, for a bar chart with one series to the bar |
+| `CHART_DATA(chart, series, values)` | replace all values of a series (`ARRAY OF FLOAT`); the number of points follows the list, downwards too |
+| `CHART_SET_POINT(chart, series, point, value)` | change a single value |
+| `CHART_PUSH(chart, series, value)` | append a value at the end (live curves, see `fenster`) |
+| `CHART_VALUE(chart, value)` | short form for series 0, point 0 — the gauge way |
+| `CHART_LABEL(chart, point, text$)` | label a category |
+| `CHART_X(chart, x_values)` | line chart: real x values per point (e.g. timestamps), ascending; `[]` = equal spacing again |
+| `CHART_GET(chart, series, point)` | read a value |
+| `CHART_COUNT(chart)` / `CHART_SERIES_COUNT(c)` | number of points / series |
+| `CHART_CLEAR(chart)` | discard the data |
+| `CHART_STAT(chart, series, stat$)` | `anzahl`/`summe`/`mittel`/`min`/`max` (count/sum/mean/min/max) |
+| `CHART_BOUNDS(chart, x, y, width, height)` | move/resize the area |
+| `CHART_ZONE(chart, from, to, color [, name$])` / `CHART_ZONE_CLEAR(c)` | colour zones of the gauge scale, optionally labelled |
+| `CHART_UPDATE(chart, seconds)` | keep the animation running (see below) |
+| `CHART_DRAW(chart)` | draw (needs `SCREEN`) |
 
 ## Configuring the look
 
@@ -331,12 +331,12 @@ END IF
 
 | Command | Returns |
 |---|---|
-| `CHART_HOVER(c)` | point under the mouse, `-1` = none |
-| `CHART_HOVER_SERIES(c)` | series under the mouse, `-1` = none |
-| `CHART_HOVER_LABEL$(c)` | label of this point (`""` = none) |
-| `CHART_HOVER_VALUE(c)` | its value |
-| `CHART_CLICKED(c)` | point clicked in **this** frame, otherwise `-1` |
-| `CHART_CLICKED_SERIES(c)` | the corresponding series |
+| `CHART_HOVER(chart)` | point under the mouse, `-1` = none |
+| `CHART_HOVER_SERIES(chart)` | series under the mouse, `-1` = none |
+| `CHART_HOVER_LABEL$(chart)` | label of this point (`""` = none) |
+| `CHART_HOVER_VALUE(chart)` | its value |
+| `CHART_CLICKED(chart)` | point clicked in **this** frame, otherwise `-1` |
+| `CHART_CLICKED_SERIES(chart)` | the corresponding series |
 
 All values apply **after** `CHART_DRAW` — before that they are `-1`.
 

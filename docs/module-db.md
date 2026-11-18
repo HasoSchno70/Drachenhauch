@@ -10,7 +10,7 @@ IMPORT "db"
 
 | Funktion | Rückgabe | Bedeutung |
 |---|---|---|
-| `DB_OPEN(ziel$)` | DB_CONN | Datenbank oeffnen: eine Datei (angelegt, wenn es sie nicht gibt; `":memory:"` = fluechtig), `postgres://...` oder `mysql://...` |
+| `DB_OPEN(target$)` | DB_CONN | Datenbank oeffnen: eine Datei (angelegt, wenn es sie nicht gibt; `":memory:"` = fluechtig), `postgres://...` oder `mysql://...` |
 | `DB_CLOSE(conn)` | — | Verbindung schliessen |
 | `DB_EXEC(conn, sql$, ...)` | INTEGER (rowcount) | SQL ohne Ergebnismenge (INSERT/UPDATE/DELETE/CREATE); Werte mit `?` binden, liefert die Zahl betroffener Zeilen |
 | `DB_QUERY(conn, sql$, ...)` | DB_RESULT | SELECT ausfuehren und einen Cursor auf das Ergebnis liefern |
@@ -249,9 +249,9 @@ statt zum Warten — dasselbe Muster wie `HTTP_GET_START`:
 | Funktion | Wirkung |
 |---|---|
 | `DB_QUERY_START(ziel$, sql$ [, params…])` → INTEGER | startet im Hintergrund, liefert sofort die Auftragsnummer (eine Datei oder ein Server, wie bei `DB_OPEN`) |
-| `DB_QUERY_READY(auftrag)` → BOOLEAN | ist das Ergebnis da? (fragt nach, wartet nicht) |
-| `DB_QUERY_RESULT(auftrag)` → DB_RESULT | Ergebnis abholen und den Platz freigeben |
-| `DB_QUERY_CANCEL(auftrag)` | verwerfen (unbekannte Nummer = wirkungslos) |
+| `DB_QUERY_READY(job)` → BOOLEAN | ist das Ergebnis da? (fragt nach, wartet nicht) |
+| `DB_QUERY_RESULT(job)` → DB_RESULT | Ergebnis abholen und den Platz freigeben |
+| `DB_QUERY_CANCEL(job)` | verwerfen (unbekannte Nummer = wirkungslos) |
 | `DB_QUERY_PENDING()` → INTEGER | wie viele Abfragen noch offen sind |
 
 ```basic

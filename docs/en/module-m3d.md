@@ -74,7 +74,7 @@ Rotation without gimbal lock.
 | `QUAT_IDENTITY()` | QUAT | no rotation |
 | `QUAT_NEW(x, y, z, w)` | QUAT | from the four components — rarely needed, usually you use `QUAT_FROM_*` |
 | `QUAT_X(q)` / `QUAT_Y(q)` / `QUAT_Z(q)` / `QUAT_W(q)` | FLOAT | read a single component |
-| `QUAT_FROM_AXIS_ANGLE(ax, ay, az, winkel)` | QUAT | rotation around an axis (angle in radians) |
+| `QUAT_FROM_AXIS_ANGLE(ax, ay, az, angle)` | QUAT | rotation around an axis (angle in radians) |
 | `QUAT_FROM_EULER(pitch, yaw, roll)` | QUAT | rotation from the three Euler angles (radians) |
 | `QUAT_MUL(a, b)` | QUAT | two rotations one after the other — first `b`, then `a` |
 | `QUAT_NORMALIZE(q)` | QUAT | bring to length 1; sensible after many concatenations, otherwise scaling creeps in |
@@ -92,10 +92,10 @@ Operator: `a * b` = composition (first b, then a — like matrix multiplication)
 | `MAT4_IDENTITY()` | MAT4 | changes nothing — the starting point of every chain |
 | `MAT4_TRANSLATE(x, y, z)` | MAT4 | translate |
 | `MAT4_SCALE(x, y, z)` | MAT4 | scale (per axis) |
-| `MAT4_ROTATE_X(winkel)` / `MAT4_ROTATE_Y(winkel)` / `MAT4_ROTATE_Z(winkel)` | MAT4 | rotate around a principal axis (radians) |
-| `MAT4_ROTATE_AXIS(ax, ay, az, winkel)` | MAT4 | rotate around an arbitrary axis (radians) |
+| `MAT4_ROTATE_X(angle)` / `MAT4_ROTATE_Y(angle)` / `MAT4_ROTATE_Z(angle)` | MAT4 | rotate around a principal axis (radians) |
+| `MAT4_ROTATE_AXIS(ax, ay, az, angle)` | MAT4 | rotate around an arbitrary axis (radians) |
 | `MAT4_FROM_QUAT(q)` | MAT4 | rotation from a quaternion |
-| `MAT4_TRS(pos, rot, scale)` | MAT4 | translation, rotation and scaling in one (= T·R·S) — the usual way to a model matrix |
+| `MAT4_TRS(pos, rotation, scale)` | MAT4 | translation, rotation and scaling in one (= T·R·S) — the usual way to a model matrix |
 | `MAT4_MUL(a, b)` | MAT4 | concatenate matrices — first `b`, then `a` |
 | `MAT4_INVERT(m)` | MAT4 | inverse; **throws at determinant 0** (for example after `MAT4_SCALE(0, …)`) |
 | `MAT4_TRANSPOSE(m)` | MAT4 | swap rows and columns |

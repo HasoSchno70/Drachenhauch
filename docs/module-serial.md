@@ -38,7 +38,7 @@ Monitor** mit Kurve (Ansicht → Serieller Monitor, Alt+4, siehe
 | `SERIAL_READLINE(handle)` | STRING (bis Newline) | eine Zeile lesen -- bis zum Zeilenumbruch oder bis der Timeout greift |
 | `SERIAL_AVAILABLE(handle)` | INTEGER (wartende Bytes im Eingangspuffer) | wie viel liegt bereit? (ohne zu warten) |
 | `SERIAL_FLUSH(handle)` | — (Eingangs- und Ausgangspuffer leeren) | Puffer verwerfen |
-| `SERIAL_TIMEOUT(handle, sekunden)` | — (Read-Timeout setzen, Default 1.0 s) | wie lange ein Lesen hoechstens wartet |
+| `SERIAL_TIMEOUT(handle, seconds)` | — (Read-Timeout setzen, Default 1.0 s) | wie lange ein Lesen hoechstens wartet |
 
 ## Bytes ↔ STRING
 

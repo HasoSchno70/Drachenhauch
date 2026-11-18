@@ -17,9 +17,9 @@ Needs a window (`SCREEN`) and the native runtime `dhrt`.
 
 | Command | Effect |
 |---|---|
-| `AUTOMATION_RECORD(datei$)` | start recording (a running playback ends) |
+| `AUTOMATION_RECORD(file$)` | start recording (a running playback ends) |
 | `AUTOMATION_STOP()` → INTEGER | ends recording **or** playback; writes the recording to its file and returns the number of events |
-| `AUTOMATION_PLAY(datei$)` → INTEGER | load a recording and play it from the next frame on; returns the number of events loaded |
+| `AUTOMATION_PLAY(file$)` → INTEGER | load a recording and play it from the next frame on; returns the number of events loaded |
 | `AUTOMATION_RECORDING()` → BOOLEAN | is a recording running? |
 | `AUTOMATION_PLAYING()` → BOOLEAN | is a playback running? (becomes FALSE by itself after the last event) |
 | `AUTOMATION_FRAME()` → INTEGER | frame number within the playback (0 = first) |

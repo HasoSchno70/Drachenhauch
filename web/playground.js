@@ -205,6 +205,11 @@
     locateFile: function (pfad) { return pfad + window.DH_CACHE_BUSTER; },
     canvas: document.getElementById("canvas"),
     noInitialRun: true,   // wir rufen main() selbst auf (zuverlässiger als auto-run)
+    // Die Meldungen der Laufzeit in der Sprache der Seite: ohne DHRT_LANG
+    // spräche sie die des Systems, und das ist im Browser keins (`C`).
+    // `ENV` ist die Umgebung, die emscripten dem Programm gibt (global, das
+    // Modul ist nicht gekapselt).
+    preRun: [function () { if (typeof ENV === "object") ENV.DHRT_LANG = sprache; }],
     print: log,
     printErr: log,
     onRuntimeInitialized: function () {

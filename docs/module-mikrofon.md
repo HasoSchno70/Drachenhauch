@@ -35,7 +35,7 @@ WEND
 | Befehl | Was es tut |
 |---|---|
 | `MIC_DEVICES()` → ARRAY OF STRING | die Namen aller Eingänge, der Standard zuerst; leer, wenn der Rechner keinen hat |
-| `MIC_START([geraet$])` | einen Eingang öffnen — ohne Namen den Standard. Ein Name passt genau oder als Teiltext ohne Groß/klein (`"USB"` findet „Mikrofon (USB Audio Device)"); ein unbekannter ist ein Fehler, der die vorhandenen nennt. Ein laufender Eingang wird vorher geschlossen |
+| `MIC_START([device$])` | einen Eingang öffnen — ohne Namen den Standard. Ein Name passt genau oder als Teiltext ohne Groß/klein (`"USB"` findet „Mikrofon (USB Audio Device)"); ein unbekannter ist ein Fehler, der die vorhandenen nennt. Ein laufender Eingang wird vorher geschlossen |
 | `MIC_STOP()` | den Eingang schließen; eine laufende Aufnahme fällt weg |
 | `MIC_ACTIVE()` → BOOLEAN | läuft ein Eingang (und hat er keinen Fehler gemeldet)? |
 | `MIC_ERROR$()` → STRING | der Fehler, den das Gerät gemeldet hat (abgezogen, verweigert) — sonst `""` |
@@ -53,8 +53,8 @@ Alles weiter unten verlangt einen laufenden Eingang; ohne ist es ein Fehler
 | `MIC_LEVEL()` → FLOAT | höchster Ausschlag seit dem letzten Aufruf, 0 bis 1 — einmal je Bild gefragt ist das eine Pegelanzeige, die keinen Knacks verpasst |
 | `MIC_RMS()` → FLOAT | Effektivwert der letzten 50 ms — das, was man als Lautstärke hört (ein Sinus mit Ausschlag 1 hat 0,707) |
 | `MIC_PITCH()` → FLOAT | Grundton in Hz, 50 bis 2000; 0, wenn es leise ist oder kein Ton heraussticht (Rauschen, Sprache zwischen zwei Silben) |
-| `MIC_FFT(baender)` | füllt ein `ARRAY OF FLOAT` mit Bandpegeln 0..1, logarithmisch verteilt, mit Nachleuchten und eigener Verstärkung — dieselbe Rechnung wie `AUDIO_FFT`, aber vom Eingang |
-| `MIC_WAVE(werte)` | füllt ein `ARRAY OF FLOAT` mit den jüngsten Werten (-1..1), älteste zuerst; höchstens 8192 |
+| `MIC_FFT(bands)` | füllt ein `ARRAY OF FLOAT` mit Bandpegeln 0..1, logarithmisch verteilt, mit Nachleuchten und eigener Verstärkung — dieselbe Rechnung wie `AUDIO_FFT`, aber vom Eingang |
+| `MIC_WAVE(values)` | füllt ein `ARRAY OF FLOAT` mit den jüngsten Werten (-1..1), älteste zuerst; höchstens 8192 |
 
 `MIC_PITCH` rechnet nach dem YIN-Verfahren und trifft auch Töne mit vielen
 Obertönen (Gitarre, Stimme, Sägezahn) auf ihren Grundton. Aus der Frequenz
@@ -82,10 +82,10 @@ WEND
 
 | Befehl | Was es tut |
 |---|---|
-| `MIC_RECORD_START([max_sekunden])` | ab jetzt mitschreiben, höchstens `max_sekunden` (Vorgabe 600, höchstens 3600); eine laufende Aufnahme beginnt von vorn |
+| `MIC_RECORD_START([max_seconds])` | ab jetzt mitschreiben, höchstens `max_seconds` (Vorgabe 600, höchstens 3600); eine laufende Aufnahme beginnt von vorn |
 | `MIC_RECORDING()` → BOOLEAN | läuft eine Aufnahme? |
 | `MIC_RECORD_STOP()` → SOUND | die Aufnahme beenden und als Klang liefern — abspielen, mischen, mit `AUDIO_SAVE_WAV` sichern. Braucht die Ton-Ausgabe |
-| `MIC_RECORD_SAVE(pfad$)` → INTEGER | die Aufnahme beenden und als WAV (16 Bit, ein Kanal) sichern; liefert die Zahl der Werte. Geht auch ohne Ton-Ausgabe |
+| `MIC_RECORD_SAVE(path$)` → INTEGER | die Aufnahme beenden und als WAV (16 Bit, ein Kanal) sichern; liefert die Zahl der Werte. Geht auch ohne Ton-Ausgabe |
 
 ```basic
 IMPORT "audio"

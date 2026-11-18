@@ -47,7 +47,7 @@ WEND
 
 ## Why Drachenhauch
 
-- **One file is a program.** No project setup, no package manager: `SCREEN`, draw, `FLIP` — that is a game. `dhrt --export` makes it a standalone program you can hand on.
+- **One file is a program.** No project setup, no package manager: `SCREEN`, draw, `FLIP` — that is a game. `dhrt --export` makes it a standalone program you can hand on: about 16 MB for a tool, 35 MB for a game.
 - **Mistakes before the run.** Every variable has a type. A misspelled name, a missing argument or text where a number belongs is reported with file and line before the program starts — in the IDE while you type.
 - **Everything included.** 2D and 3D graphics, sound, physics, windows and tables, SQLite, PostgreSQL and MySQL, PDF, network and serial ports are built in. Nothing to install, nothing to keep in sync.
 - **Built with itself.** The IDE, Drachenhauch Studio and every editor are Drachenhauch programs. What carries them carries your application too — and hot loops run as machine code.
@@ -193,7 +193,7 @@ node build_epub.js [--lang en]        # -> .epub (reflows to the reader's font s
 dhrt run tools/buch_bauen.dh -- buecher/referenz [--lang en]   # two-pass build with page numbers in the TOC
 ```
 
-One thing stays German on purpose: the run-time error messages quoted in Appendix D, because that is how `dhrt` prints them by default. With `DHRT_LANG=en` the runtime prints its messages in English.
+One thing stays German on purpose: the run-time error messages quoted in Appendix D, because that is how `dhrt` prints them on a German system. On any other system, or with `DHRT_LANG=en`, the runtime prints its messages in English.
 
 ### More books (German)
 
@@ -209,7 +209,7 @@ Three shorter books build one finished program each, chapter by chapter:
 
 Full documentation lives in [docs/en/](docs/en/README.md) — the English translation of the German manual in [docs/](docs/README.md). Design notes, audits and release notes stay German only:
 
-- **[Language reference](docs/en/sprache.md)** — variables, types, `ENUM`, `SELECT CASE`, functions with defaults and named arguments, classes, try/catch, f-strings, coroutines (`YIELD` + `CORO_*`)
+- **[Language reference](docs/en/sprache.md)** — variables, types, `ENUM`, `SELECT CASE`, functions with defaults and named arguments (built-in commands too: `CIRCLE(x: 10, y: 20, r: 5)`), classes, try/catch, f-strings, coroutines (`YIELD` + `CORO_*`)
 - **[Command names](docs/en/builtins-namen.md)** — how commands are named (`IMAGE_LOAD`, `KEY_DOWN`, `FILE_EXISTS`, `TIME_NOW` …), the recommended way per area, and the new names for the old ones; the old ones keep working
 - **[Standard built-ins](docs/en/builtins-core.md)** — math, strings, maps, file I/O, …
 - **[Graphics built-ins](docs/en/builtins-grafik.md)** — native runtime (dhrt/raylib), Z-layers, sprite atlas, asset preloader
@@ -372,7 +372,7 @@ Built with `rust/build_wasm.py`; the harness lives in `web/`.
 | `49_pong_scene.dh` | Pong, structured with `scene` + `save` (highscore) |
 | `50_enum.dh` | ENUM in compact and block form |
 | `51_astar.dh` | A* pathfinding with an ASCII render |
-| `52_named_args.dh` | named arguments in SUB/FUNCTION/NEW |
+| `52_named_args.dh` | named arguments in SUB/FUNCTION/NEW and built-in commands |
 | `73_ecs_bullets.dh` | ECS with a per-entity loop (classic pattern) |
 | `75_preloader.dh` | `LOAD_ASSETS` — every image/sound from one manifest |
 | `76_layers_atlas.dh` | Z-layers + sprite atlas: 600 tiles from one atlas, composited in z-order |
@@ -415,7 +415,7 @@ Pipeline: **source → preprocessor → lexer → parser → compiler → VM**; 
 | Frame and loop | game loop (`DELTA`/`FPS`/`SETFPS`), GPU shaders and post-processing (`SHADER_LOAD`/`POSTFX`), TTF fonts ([demo](examples/87_ttf_fonts.dh)), gamepad |
 | Recording input | `AUTOMATION_RECORD`/`PLAY` for attract mode, replayable bug reports and automated playtests ([docs](docs/en/automation.md), [demo](examples/153_automation.dh)) |
 | Modules | **all of them** — including the formerly Python-only ones: `regex`, `tiled`, `tile_collide`, `controller`, extended `audio`; plus feature-gated `db` (rusqlite), `net`, `mqtt`, `html` (ureq) and the hardware side `serial`, `firmata`, `usb`, `wifi`, `bt` |
-| Shipping | `dhrt --export file.dh` (or Ctrl+F6 in the IDE) bundles bytecode + `assets/` into a standalone `.exe` |
+| Shipping | `dhrt --export file.dh` (or Ctrl+F6 in the IDE) bundles bytecode + `assets/` into a standalone `.exe`, with the smallest runtime that has every command the program calls (16 MB without a window, 35 MB for a game; `--voll` for the full one) |
 
 Only the build script still needs Python. The heavier modules come in with
 `build_runtime.py --hardware` or `--full` — **a build without those flags leaves

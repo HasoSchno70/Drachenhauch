@@ -32,17 +32,17 @@ already covers.
 
 | Function | Purpose |
 |---|---|
-| `XLSX_NEW([blattname$])` → XLSX | new workbook (first sheet is called `Tabelle1`) |
+| `XLSX_NEW([sheet$])` → XLSX | new workbook (first sheet is called `Tabelle1`) |
 | `XLSX_SHEET(x, name$)` | another sheet — and it becomes the active one |
 | `XLSX_SHEET_COUNT(x)` → INTEGER | how many sheets |
-| `XLSX_SET(x, zeile, spalte, text$)` | text cell |
-| `XLSX_SET_NUM(x, zeile, spalte, zahl)` | number cell |
-| `XLSX_SET_DATE(x, zeile, spalte, zeit[, muster$])` | date cell |
-| `XLSX_BOLD(x, zeile, spalte[, an])` | make a cell bold |
-| `XLSX_BOLD_ROW(x, zeile[, an])` | whole row bold (the header row) |
-| `XLSX_FORMAT(x, zeile, spalte, muster$)` | number format |
-| `XLSX_COL_WIDTH(x, spalte, breite)` | column width in characters |
-| `XLSX_SAVE(x, pfad$)` | write |
+| `XLSX_SET(x, row, column, text$)` | text cell |
+| `XLSX_SET_NUM(x, row, column, number)` | number cell |
+| `XLSX_SET_DATE(x, row, column, time[, pattern$])` | date cell |
+| `XLSX_BOLD(x, row, column[, on])` | make a cell bold |
+| `XLSX_BOLD_ROW(x, row[, on])` | whole row bold (the header row) |
+| `XLSX_FORMAT(x, row, column, pattern$)` | number format |
+| `XLSX_COL_WIDTH(x, column, width)` | column width in characters |
+| `XLSX_SAVE(x, path$)` | write |
 | `XLSX_CLOSE(x)` | free memory |
 
 **Row and column are 0-based** — as everywhere in Drachenhauch. Excel

@@ -76,9 +76,14 @@ Neuer Builtin:
    stimmen**, der Compiler leitet die erlaubte Argumentzahl daraus ab. Formen:
    `NAME(a, b [, c])`, `NAME(a, b = "")`, `NAME(a, b, ...)`,
    `NAME(6..8 Argumente)`; `NAME(*args)` schaltet die Prüfung ab (nur wenn es
-   wirklich offen ist). Parameter mit Namen, nicht "N..M Argumente".
+   wirklich offen ist). Parameter mit Namen, nicht "N..M Argumente" -- die
+   Namen sind englisch und Schnittstelle (benannte Argumente,
+   `CIRCLE(x: 1, y: 2, r: 3)`; Regel 8 in `docs/builtins-namen.md`), und ein
+   optionaler mit bekannter Vorgabe schreibt sie hin (`color = -1`), damit
+   ein später benannter ihn überspringen kann.
 3. Die Kurzbeschreibung kommt als Tabellenzeile ``| `NAME(args)` | was es tut |``
-   ins passende `docs/module-*.md` UND `docs/en/module-*.md`; `dhrt doku prosa`
+   ins passende `docs/module-*.md` UND `docs/en/module-*.md`, mit den
+   Parameternamen des Index (`dhrt pruef parameter`); `dhrt doku prosa`
    sammelt sie nach `daten/builtin_prosa.json` (und `.en.json`).
    `builtin_docs.json` ist für ausführlichere Texte und gewinnt, wo es einen
    Eintrag hat. Danach dhrt neu bauen (eingebettet).
@@ -253,6 +258,10 @@ Einzelheiten stehen in der Geschichte des Bereichs.
   (`GUI_TABCONTROL_ITEM_RECT` & Co.), statt sie nachzurechnen.
 
 **Meldungen, Doku, Website**
+- Ohne `DHRT_LANG` spricht dhrt die Sprache des Systems (Deutsch nur auf
+  einem deutschen, `meldung::sprache`); `dhrt test` spielt seinen Fällen ein
+  deutsches System (`DHRT_SYSTEM_LANG=de`), damit die Erwartungen auf
+  englischen CI-Läufern halten.
 - Meldungen deutsch schreiben. Wer eine Meldung ändert, die in
   `daten/meldungen.en.txt` steht, zieht die Vorlage mit (`dhrt pruef meldungen`);
   setzt sie sich aus mehreren Literalen zusammen, markiert `[[wort]]`/`[[]]`
@@ -364,8 +373,10 @@ auch `cargo check` ohne das Feature `jit` (ein verrutschtes `cfg` fällt sonst
 erst in der CI auf).
 
 Eine Fassung: PR mit Nummer (`Cargo.toml`), Notizen deutsch und englisch
-(`docs/releases/release-<fassung>.md` und `.en.md`, im Release englisch zuerst)
-und Büchern; nach dem Merge
+(`docs/releases/release-<fassung>.md` und `.en.md`, im Release englisch zuerst;
+der erste Abschnitt „Was sich für bestehende Programme ändert“ landet über
+`dhrt doku aenderungen` im Änderungsprotokoll, `docs/stabilitaet.md` sagt,
+was nicht brechen darf) und Büchern; nach dem Merge
 `git tag v<fassung>` auf den Merge-Commit und pushen. `release.yml` baut daraus
 Installer, Pakete und Prüfsummen und legt einen Release-**Entwurf** an, den der
 Nutzer veröffentlicht.

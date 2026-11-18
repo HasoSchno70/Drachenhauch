@@ -30,8 +30,8 @@ module.exports = (H) => [
     { out: ["200 60 60"] }),
 
   H.h2("Zeichnen"),
-  H.cmd("DRAWIMAGE", 'DRAWIMAGE(img, x, y)',
-    "Zeichnet das ganze Bild mit der linken oberen Ecke bei (x, y).",
+  H.cmd("DRAWIMAGE", 'DRAWIMAGE(img, x, y[, w, h, angle, tint, flip_x, flip_y, sx, sy, sw, sh])',
+    "Zeichnet das ganze Bild mit der linken oberen Ecke bei (x, y). Alles Weitere geht benannt: w/h Zielgröße, angle Grad um die Mitte, tint Tönung, flip_x/flip_y spiegeln, sx, sy, sw, sh ein Ausschnitt -- etwa DRAWIMAGE(held, x, y, angle: 30, flip_x: TRUE).",
     [
       'CLS()',
       'DRAWIMAGE(held, 100, 80)',

@@ -17,19 +17,19 @@ IMPORT "ui"
 | `UI_PROGRESS(x, y, w, h, value, max[, fg, bg])` | — | read-only progress bar |
 | `UI_PANEL(x, y, w, h[, title$[, bg]])` | — | container with an optional title |
 | `UI_TEXTFIELD(id$, x, y, w, h[, placeholder$])` | STRING | current input text |
-| `UI_TEXTFIELD_SET(id$, value$)` | — | set the value programmatically |
+| `UI_TEXTFIELD_SET(id$, text$)` | — | set the value programmatically |
 | `UI_RADIO(id$, x, y, options[, default_idx])` | INTEGER | selected index |
 | `UI_TABLE(id$, x, y, w, h, headers, cells[, cell_colors[, col_widths[, cell_bg_colors]]])` | INTEGER | index of the clicked row (-1 if none) |
 | `UI_TABLE_SELECTED(id$)` | INTEGER | persistently selected row (-1 if none) |
 | `UI_TABLE_SET_SELECTED(id$, row)` | — | set the selection programmatically (-1 = none) |
 | `UI_TABLE_HEADER_CLICK(id$)` | INTEGER | header column clicked in this frame (-1) — sorting hook |
-| `UI_WINDOW_BEGIN(id$, titel$, x, y, w, h)` | BOOLEAN | movable window; FALSE if collapsed |
+| `UI_WINDOW_BEGIN(id$, title$, x, y, width, height)` | BOOLEAN | movable window; FALSE if collapsed |
 | `UI_WINDOW_END()` | — | close the window (always pair them) |
 | `UI_END_FRAME()` | — | **mandatory** at the end of every frame before `FLIP()` |
 | `UI_RESET()` | — | clear all UI state + reset theme/metrics |
-| `UI_THEME_SET(key$, farbe)` / `UI_THEME_GET(key$)` | — / INT | set/read a single theme colour |
+| `UI_THEME_SET(key$, color)` / `UI_THEME_GET(key$)` | — / INT | set/read a single theme colour |
 | `UI_THEME_PRESET(name$)` | — | colour scheme: dark/light/retro/contrast |
-| `UI_METRIC_SET(key$, wert)` / `UI_METRIC_GET(key$)` | — / INT | set/read a layout size |
+| `UI_METRIC_SET(key$, value)` / `UI_METRIC_GET(key$)` | — / INT | set/read a layout size |
 
 ## Concept: immediate mode
 

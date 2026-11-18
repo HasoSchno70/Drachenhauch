@@ -1077,6 +1077,45 @@ PRINT "erstes argument " ; LEFT$(inhalt$("spiel.dh"), LEN("CIRCLE(10, y, r)")) =
 platzhalter 1 von 3 TRUE
 erstes argument TRUE
 
+=== parameter mit vorgabe stehen nicht im geruest
+' Seit benannte Argumente an Builtins gehen, schreibt der Index Vorgaben aus
+' (`hour: INTEGER = 0`). Wie `[, c]` sind sie optional -- ohne das bekam
+' DRAW_IMAGE ein Geruest mit dreizehn Stellen.
+AUTOMATION_PLAY("ev.txt")
+--- programm ../../../ide/ide.dh nach SETFPS(60)
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+IMPORT "zeit"
+TIME_FROM_PA
+--- datei _programm/ev.txt
+c 14
+e 20 2 264 0 0 0
+e 22 1 264 0 0 0
+e 30 2 269 0 0 0
+e 32 1 269 0 0 0
+e 50 2 341 0 0 0
+e 50 2 32 0 0 0
+e 52 1 32 0 0 0
+e 52 1 341 0 0 0
+e 80 2 257 0 0 0
+e 82 1 257 0 0 0
+e 110 2 341 0 0 0
+e 110 2 83 0 0 0
+e 112 1 83 0 0 0
+e 112 1 341 0 0 0
+
+--- nachher
+DIM z AS ARRAY OF STRING : z = READLINES("spiel.dh")
+PRINT z[1]
+--- erwartet
+TIME_FROM_PARTS(year, month, day)
+
 === hinter AS setzt die vervollstaendigung nur den typ
 ' Beim Dogfooding 2026-09-30 gefunden: `DIM w AS GUI_WIN` + Strg+Leer
 ' setzte `GUI_WINDOW(title, x, y, w, h)` -- ein Typ nimmt keine Argumente.

@@ -21,50 +21,50 @@ Wenn das `camera`-Modul aktiv ist und `CAMERA_SET` aufgerufen wurde, interpretie
 
 | Funktion | Zweck |
 |---|---|
-| `SCREEN(w, h[, titel$[, scale]])` | öffnet Fenster mit logischer Größe `w × h`. `scale > 1` macht jeden logischen Pixel größer (Retro-Look). |
+| `SCREEN(w, h[, title$[, scale]])` | öffnet Fenster mit logischer Größe `w × h`. `scale > 1` macht jeden logischen Pixel größer (Retro-Look). |
 | `FLIP()` | Frame an den Bildschirm ausgeben (synchronisiert auf 60 FPS) |
 | `CLS([color])` | Buffer mit `color` füllen (Default: schwarz) |
 | `SLEEP(ms)` | wartet ms Millisekunden, ohne dass das Fenster einfriert |
 | `QUITREQUESTED()` → BOOLEAN | TRUE wenn das Programm enden soll: Fenster-X / Alt+F4, das Bildlimit von `DHRT_FRAMES`/`--bilder` — **und per raylib-Default auch `ESC`**, AUSSER in einem Programm mit `gui`: dort gehoert `ESC` ab dem ersten `GUI_UPDATE` den Widgets (Dialog abbrechen, Klappliste schliessen), sonst beendete jedes Abbrechen das ganze Programm. `WINDOW_ESC_QUIT` setzt es ausdruecklich |
 | `WINDOW_CLOSE_REQUESTED()` → BOOLEAN | TRUE, wenn der NUTZER das Fenster schliessen will (Kreuz, Alt+F4, die Beenden-Taste) -- ohne das Bildlimit. Das Fenster bleibt dabei offen: ein Programm mit ungesicherter Arbeit fragt erst nach und endet dann selbst. Ein Ereignis, kein Zustand -- es gilt ein Bild lang |
-| `WINDOW_RESIZABLE(an)` | darf der Nutzer das Fenster ziehen? (Vorgabe: nein) |
+| `WINDOW_RESIZABLE(flag)` | darf der Nutzer das Fenster ziehen? (Vorgabe: nein) |
 | `WINDOW_MIN_SIZE(w, h)` | kleinste Fenstergröße beim Ziehen |
 | `WINDOW_MAX_SIZE(w, h)` | größte Fenstergröße beim Ziehen |
 | `WINDOW_MAXIMIZE()` | Fenster auf Bildschirmgröße bringen |
 | `WINDOW_MINIMIZE()` | Fenster in die Leiste legen |
 | `WINDOW_RESTORE()` | aus maximiert oder minimiert zurückholen |
-| `SETWINDOWTITLE(titel$)` | Fenstertitel im Lauf ändern — etwa für den Dateinamen oder den Punktestand |
-| `SET_FULLSCREEN(an)` | Vollbild ein- oder ausschalten |
+| `SETWINDOWTITLE(title$)` | Fenstertitel im Lauf ändern — etwa für den Dateinamen oder den Punktestand |
+| `SET_FULLSCREEN(fs)` | Vollbild ein- oder ausschalten |
 | `WINDOW_IS_FULLSCREEN()` → BOOLEAN | läuft es gerade im Vollbild? |
 | `WINDOW_FOCUSED()` → BOOLEAN | ist das Fenster im Vordergrund? — damit pausiert man, wenn der Nutzer wegklickt |
 | `WINDOW_MINIMIZED()` / `WINDOW_MAXIMIZED()` / `WINDOW_HIDDEN()` → BOOLEAN | Zustand des Fensters abfragen |
 | `WINDOW_FOCUS()` | das eigene Fenster nach vorne holen |
 | `WINDOW_HIDE()` / `WINDOW_SHOW()` | das Fenster verschwinden lassen, auch aus der Taskleiste, und zurückholen — für Werkzeuge, die im Tray leben |
-| `TRAY_SHOW([bild[, hinweis$]])` | ein Symbol im Infobereich zeigen — unter Windows in der Taskleiste, unter macOS in der Menüleiste, unter Linux in der Leiste des Desktops (über D-Bus); ohne Bild das aus `WINDOW_ICON`, sonst das Standardsymbol; der Hinweis erscheint beim Darüberfahren (Vorgabe: der Fenstertitel) |
+| `TRAY_SHOW([image[, hint$]])` | ein Symbol im Infobereich zeigen — unter Windows in der Taskleiste, unter macOS in der Menüleiste, unter Linux in der Leiste des Desktops (über D-Bus); ohne Bild das aus `WINDOW_ICON`, sonst das Standardsymbol; der Hinweis erscheint beim Darüberfahren (Vorgabe: der Fenstertitel) |
 | `TRAY_HIDE()` / `TRAY_SHOWN()` → BOOLEAN | das Symbol entfernen; steht es gerade da? Beim Programmende verschwindet es von selbst |
-| `TRAY_TOOLTIP(hinweis$)` | den Hinweis ändern (etwa einen Fortschritt) |
-| `TRAY_MENU(eintraege$)` | das Menü der rechten Maustaste (macOS auch Ctrl+Klick); die Einträge stehen durch senkrechte Striche getrennt in einem Text, ein einzelnes `-` ist ein Trenner, höchstens 64 Einträge |
+| `TRAY_TOOLTIP(hint$)` | den Hinweis ändern (etwa einen Fortschritt) |
+| `TRAY_MENU(entries$)` | das Menü der rechten Maustaste (macOS auch Ctrl+Klick); die Einträge stehen durch senkrechte Striche getrennt in einem Text, ein einzelnes `-` ist ein Trenner, höchstens 64 Einträge |
 | `TRAY_CLICKED()` / `TRAY_DOUBLE_CLICKED()` → BOOLEAN | wurde das Symbol in diesem Bild angeklickt? Gilt genau ein Bild, wie `GUI_CLICKED`; einen Doppelklick meldet Linux nicht |
 | `TRAY_MENU_CLICKED$()` → STRING | der Text des Menüeintrags, der in diesem Bild gewählt wurde, sonst `""` |
-| `NOTIFY(titel$[, text$])` | eine Mitteilung des Systems — unter Windows am Tray-Symbol (ohne Symbol legt sie eins an), unter macOS über `osascript`, unter Linux über `notify-send` |
+| `NOTIFY(title$[, text$])` | eine Mitteilung des Systems — unter Windows am Tray-Symbol (ohne Symbol legt sie eins an), unter macOS über `osascript`, unter Linux über `notify-send` |
 | `NOTIFY_CLICKED()` → BOOLEAN | wurde die Mitteilung in diesem Bild angeklickt? (Windows) |
 | `WINDOW_DPI_X()` / `WINDOW_DPI_Y()` → FLOAT | Bildschirm-Skalierung (1.0 normal, 2.0 HiDPI) — ohne sie weiß ein Programm nicht, ob seine Pixelgrößen auf dem Zielgerät winzig herauskommen |
 | `WINDOW_RENDER_WIDTH()` / `WINDOW_RENDER_HEIGHT()` → INTEGER | die echte Pixelgröße des Fensters — auf einem HiDPI-Schirm größer als `SCREENWIDTH()`/`SCREENHEIGHT()` |
-| `WINDOW_WAIT_EVENTS([sekunden])` | `FLIP` wartet auf eine Eingabe, höchstens so lange — ein Werkzeug, das nur auf Klicks reagiert, braucht dann kaum Rechenzeit; `0` schaltet ab, ohne Argument: die eingestellte Dauer. Nach einer Eingabe läuft es 0,35 s ohne Warten nach, bei gedrückter Maustaste auch; die gui kürzt die Frist auf ihr nächstes Bild (Schreibmarke, Hilfetext, Animation, Toast — `GUI_NEXT_FRAME`); mit fester Bildzahl (`DHRT_FRAMES`) wartet es nie |
+| `WINDOW_WAIT_EVENTS([seconds])` | `FLIP` wartet auf eine Eingabe, höchstens so lange — ein Werkzeug, das nur auf Klicks reagiert, braucht dann kaum Rechenzeit; `0` schaltet ab, ohne Argument: die eingestellte Dauer. Nach einer Eingabe läuft es 0,35 s ohne Warten nach, bei gedrückter Maustaste auch; die gui kürzt die Frist auf ihr nächstes Bild (Schreibmarke, Hilfetext, Animation, Toast — `GUI_NEXT_FRAME`); mit fester Bildzahl (`DHRT_FRAMES`) wartet es nie |
 | `WINDOW_IDLE_WAIT()` → FLOAT | wie lange das letzte `FLIP` höchstens warten durfte (Sekunden, 0 = gar nicht) |
 | `FPS()` → INTEGER | gemessene Bilder je Sekunde |
-| `DRAWFPS(x, y[, farbe])` | die Bildrate als „60 FPS“ in der eingebauten Schrift zeigen, in Bildschirmkoordinaten (die Kamera gilt nicht); ohne Farbe grün, unter 30 orange, unter 15 rot |
+| `DRAWFPS(x, y[, color])` | die Bildrate als „60 FPS“ in der eingebauten Schrift zeigen, in Bildschirmkoordinaten (die Kamera gilt nicht); ohne Farbe grün, unter 30 orange, unter 15 rot |
 | `SETFPS(n)` | Ziel-Bildrate; `0` = so schnell wie möglich |
 | `FILES_DROPPED()` → INTEGER | wie viele Dateien wurden in diesem Bild ins Fenster gezogen oder (macOS) vom Finder übergeben? Gilt genau ein Bild, beliebig oft abfragbar |
 | `FILE_DROPPED(i)` → STRING | Pfad der `i`-ten davon |
 | `CLIPBOARD_GET()` → STRING | Text aus der Zwischenablage lesen; leer, wenn sie gerade ein anderes Programm hält |
 | `CLIPBOARD_SET(text$)` | Text in die Zwischenablage legen — **Fehler**, wenn das nicht gelingt |
-| `CLIPBOARD_SET_IMAGE(bild)` → BOOLEAN | ein `IMAGE` in die Zwischenablage legen (andere Programme fügen es als Bild ein) — **Fehler**, wenn das nicht gelingt |
+| `CLIPBOARD_SET_IMAGE(image)` → BOOLEAN | ein `IMAGE` in die Zwischenablage legen (andere Programme fügen es als Bild ein) — **Fehler**, wenn das nicht gelingt |
 | `CLIPBOARD_GET_IMAGE()` → INTEGER | das Bild aus der Zwischenablage als neues `IMAGE`; `-1`, wenn keines darin ist |
 | `CLIPBOARD_HAS_IMAGE()` → BOOLEAN | liegt gerade ein Bild darin? |
-| `CLIPBOARD_SET_FILES(pfade)` | Dateien (`ARRAY OF STRING`, relativ oder absolut) in die Zwischenablage legen — „Einfügen“ im Explorer/Finder kopiert sie |
+| `CLIPBOARD_SET_FILES(paths)` | Dateien (`ARRAY OF STRING`, relativ oder absolut) in die Zwischenablage legen — „Einfügen“ im Explorer/Finder kopiert sie |
 | `CLIPBOARD_GET_FILES()` → ARRAY OF STRING | Dateien aus der Zwischenablage (leer, wenn keine darin sind) |
-| `DRAG_OUT_FILES(pfade)` → STRING | Dateien aus dem Fenster **hinausziehen** (auf den Desktop, in ein Mail-Programm …); liefert `"kopieren"`, `"verschieben"`, `"verknuepfen"` oder `""` |
+| `DRAG_OUT_FILES(paths)` → STRING | Dateien aus dem Fenster **hinausziehen** (auf den Desktop, in ein Mail-Programm …); liefert `"kopieren"`, `"verschieben"`, `"verknuepfen"` oder `""` |
 | `DRAG_OUT_TEXT(text$)` → STRING | Text hinausziehen (in einen Editor, ein Textfeld) — wie `DRAG_OUT_FILES` |
 | `GFX_PUSH()` | Zeichenzustand sichern: Kamera, Ebenen, Licht, Umgebung, Schatten, 3D-Kamera, Schrift, `POSTFX` |
 | `GFX_POP()` | ihn zurückholen — **ohne vorheriges `PUSH` ein Fehler** |
@@ -186,7 +186,7 @@ Display-Infos und das Platzieren des Programmfensters auf dem Desktop. Monitor-I
 
 | Funktion | Zweck |
 |---|---|
-| `SCREEN_NATIVE([titel$])` | Vollbild in der **echten Auflösung** des aktuellen Monitors |
+| `SCREEN_NATIVE([title$])` | Vollbild in der **echten Auflösung** des aktuellen Monitors |
 
 `SCREEN_NATIVE()` ist der direkte Weg zu scharfem Vollbild und ersetzt `SCREEN(...)`:
 
@@ -211,10 +211,10 @@ Der Fenster-Hintergrund kann durchscheinen, sodass der Desktop sichtbar bleibt �
 
 | Funktion | Zweck |
 |---|---|
-| `SCREEN_TRANSPARENT(w, h[, titel$[, scale]])` | öffnet ein Fenster mit **transparentem** Hintergrund; `w`/`h` = 0 → ganzer aktueller Monitor (Vollbild-Overlay) |
+| `SCREEN_TRANSPARENT(w, h[, title$[, scale]])` | öffnet ein Fenster mit **transparentem** Hintergrund; `w`/`h` = 0 → ganzer aktueller Monitor (Vollbild-Overlay) |
 | `WINDOW_UNDECORATED(flag)` | Fensterrahmen/Titelleiste aus (`TRUE`) / ein (`FALSE`) |
 | `WINDOW_TOPMOST(flag)` | Fenster immer im Vordergrund halten |
-| `WINDOW_ESC_QUIT(an)` | `ESC` als Fenster-Schliessen-Taste an/aus (raylib-Default: **an**, mit `gui` ab dem ersten `GUI_UPDATE` **aus**). Mit `FALSE` ist `ESC` eine ganz normale Taste (`QUITREQUESTED` wird dann nur noch durch Fenster-X / Alt+F4 ausgelöst) — für Spiele, die `ESC` fürs Pause-/Hauptmenü nutzen. Ein ausdrueckliches `WINDOW_ESC_QUIT(TRUE)` gilt auch mit `gui` |
+| `WINDOW_ESC_QUIT(on)` | `ESC` als Fenster-Schliessen-Taste an/aus (raylib-Default: **an**, mit `gui` ab dem ersten `GUI_UPDATE` **aus**). Mit `FALSE` ist `ESC` eine ganz normale Taste (`QUITREQUESTED` wird dann nur noch durch Fenster-X / Alt+F4 ausgelöst) — für Spiele, die `ESC` fürs Pause-/Hauptmenü nutzen. Ein ausdrueckliches `WINDOW_ESC_QUIT(TRUE)` gilt auch mit `gui` |
 | `WINDOW_PASSTHROUGH(flag)` | Maus-Klicks zum Desktop **durchreichen** (klick-durchlässiges Widget) |
 
 **Wichtig:** `SCREEN_TRANSPARENT(...)` muss die **allererste** Grafik-Anweisung sein (vor `LOADIMAGE`/`SCREEN`/…). Transparenz ist ein Fenster-Erzeugungs-Flag und lässt sich nicht nachträglich setzen. `WINDOW_UNDECORATED`/`WINDOW_TOPMOST`/`WINDOW_PASSTHROUGH` dagegen jederzeit. `WINDOW_PASSTHROUGH(TRUE)` braucht ein randloses Fenster (`WINDOW_UNDECORATED(TRUE)`); die Tastatur (z. B. `ESC`) erreicht das Fenster dann nur, solange es den Fokus hat — nach einem Desktop-Klick zum Beenden Stop-Knopf im Editor bzw. `Alt+F4`.
@@ -251,9 +251,9 @@ Echte Windows-Dialoge zum Auswählen von Dateien/Ordnern. Alle drei sind **block
 
 | Funktion | Zweck |
 |---|---|
-| `FILE_OPEN_DIALOG([titel$[, endungen$]])` → STRING | Datei zum Öffnen wählen |
-| `FILE_SAVE_DIALOG([titel$[, default$[, endungen$]]])` → STRING | Datei zum Speichern wählen (`default$` = vorgeschlagener Dateiname) |
-| `FOLDER_DIALOG([titel$])` → STRING | Ordner wählen |
+| `FILE_OPEN_DIALOG([title$[, extensions$]])` → STRING | Datei zum Öffnen wählen |
+| `FILE_SAVE_DIALOG([title$[, default$[, extensions$]]])` → STRING | Datei zum Speichern wählen (`default$` = vorgeschlagener Dateiname) |
+| `FOLDER_DIALOG([title$])` → STRING | Ordner wählen |
 
 ```basic
 DIM pfad AS STRING
@@ -274,28 +274,28 @@ Farbe wird als 24-Bit-INTEGER (`&HRRGGBB`) angegeben, am einfachsten via `RGB(r,
 |---|---|
 | `PLOT(x, y[, color])` | einzelnes Pixel |
 | `LINE(x1, y1, x2, y2[, color])` | Linie (1px) |
-| `LINEW(x1, y1, x2, y2, breite[, color])` | Linie mit Strichbreite (Float) |
+| `LINEW(x1, y1, x2, y2, width[, color])` | Linie mit Strichbreite (Float) |
 | `BOX(x1, y1, x2, y2[, color])` | gefülltes Rechteck |
 | `RECT(x1, y1, x2, y2[, color])` | Rechteck-Rahmen (1px) |
 | `BOXROUND(x1, y1, x2, y2, radius[, color])` | gefülltes Rechteck mit runden Ecken |
 | `RECTROUND(x1, y1, x2, y2, radius[, color])` | Rechteck-Rahmen mit runden Ecken |
-| `GRADIENTV(x1, y1, x2, y2, farbe1, farbe2)` | Rechteck mit **vertikalem** Farbverlauf (oben→unten) |
-| `GRADIENTH(x1, y1, x2, y2, farbe1, farbe2)` | Rechteck mit **horizontalem** Farbverlauf (links→rechts) |
-| `GRADIENT4(x1, y1, x2, y2, oben_links, oben_rechts, unten_rechts, unten_links)` | Rechteck mit je einer Farbe in jeder Ecke, im Uhrzeigersinn ab oben links; dazwischen wird gemischt |
-| `BOXROT(x, y, breite, hoehe, winkel[, farbe])` | gefülltes Rechteck **zentriert** auf (x, y), um seine Mitte gedreht (Grad, im Uhrzeigersinn wie `DRAWIMAGEROT`) |
+| `GRADIENTV(x1, y1, x2, y2, color1, color2)` | Rechteck mit **vertikalem** Farbverlauf (oben→unten) |
+| `GRADIENTH(x1, y1, x2, y2, color1, color2)` | Rechteck mit **horizontalem** Farbverlauf (links→rechts) |
+| `GRADIENT4(x1, y1, x2, y2, top_left, top_right, bottom_right, bottom_left)` | Rechteck mit je einer Farbe in jeder Ecke, im Uhrzeigersinn ab oben links; dazwischen wird gemischt |
+| `BOXROT(x, y, width, height, angle[, color])` | gefülltes Rechteck **zentriert** auf (x, y), um seine Mitte gedreht (Grad, im Uhrzeigersinn wie `DRAWIMAGEROT`) |
 | `CIRCLE(x, y, r[, color])` | gefüllter Kreis |
 | `CIRCLEOUTLINE(x, y, r[, color])` | Kreis nur als Kontur (Gegenstück zu `CIRCLE`) |
-| `CIRCLE_GRADIENT(x, y, r, innen, aussen)` | Kreis mit Verlauf von der Mitte (`innen`) zum Rand (`aussen`); mit `RGBA` als Randfarbe ein weicher Schein |
-| `PIE(x, y, r, von_grad, bis_grad[, farbe])` | gefülltes Kreisstück (Tortenstück); Winkel in **Grad**, 0 = rechts, im Uhrzeigersinn |
-| `PIEOUTLINE(x, y, r, von_grad, bis_grad[, farbe])` | Kreisstück nur als Kontur, mit beiden Radien |
-| `NGON(x, y, ecken, r, winkel[, farbe])` | gefülltes regelmäßiges Vieleck (3..1000 Ecken) um (x, y), Radius bis zu den Ecken, um `winkel` Grad gedreht |
-| `NGONOUTLINE(x, y, ecken, r, winkel[, farbe[, breite]])` | regelmäßiges Vieleck nur als Kontur; `breite` wie bei `LINEW` |
-| `LINEDASHED(x1, y1, x2, y2, strich, luecke[, farbe])` | gestrichelte Linie, Strich- und Lückenlänge in Punkten |
-| `SPLINE(xs, ys[, color[, breite]])` | weiche Catmull-Rom-Kurve durch die Punkte; `xs`/`ys` sind `ARRAY OF INTEGER` gleicher Länge |
-| `SPLINE_BASIS(xs, ys[, farbe[, breite]])` | B-Spline: noch weicher als `SPLINE`, läuft aber **nicht** durch die Punkte, sondern wird von ihnen gezogen (mindestens 4) |
-| `SPLINE_BEZIER(xs, ys[, farbe[, breite]])` | Kette kubischer Bézierkurven: Anfang, dann je zwei Kontrollpunkte und ein Ende (4, 7, 10 … Punkte) — so wie Zeichenprogramme Pfade speichern |
-| `BEZIER(x1, y1, kx, ky, x2, y2[, farbe[, breite]])` | quadratische Bézierkurve von (x1, y1) nach (x2, y2), zum Kontrollpunkt (kx, ky) hin gebogen |
-| `BEZIER3(x1, y1, k1x, k1y, k2x, k2y, x2, y2[, farbe[, breite]])` | kubische Bézierkurve mit zwei Kontrollpunkten (S-Kurven, Verbindungslinien zwischen Knoten) |
+| `CIRCLE_GRADIENT(x, y, r, inner, outer)` | Kreis mit Verlauf von der Mitte (`inner`) zum Rand (`outer`); mit `RGBA` als Randfarbe ein weicher Schein |
+| `PIE(x, y, r, from_deg, to_deg[, color])` | gefülltes Kreisstück (Tortenstück); Winkel in **Grad**, 0 = rechts, im Uhrzeigersinn |
+| `PIEOUTLINE(x, y, r, from_deg, to_deg[, color])` | Kreisstück nur als Kontur, mit beiden Radien |
+| `NGON(x, y, corners, r, angle[, color])` | gefülltes regelmäßiges Vieleck (3..1000 Ecken) um (x, y), Radius bis zu den Ecken, um `angle` Grad gedreht |
+| `NGONOUTLINE(x, y, corners, r, angle[, color[, width]])` | regelmäßiges Vieleck nur als Kontur; `width` wie bei `LINEW` |
+| `LINEDASHED(x1, y1, x2, y2, dash, gap[, color])` | gestrichelte Linie, Strich- und Lückenlänge in Punkten |
+| `SPLINE(xs, ys[, color[, width]])` | weiche Catmull-Rom-Kurve durch die Punkte; `xs`/`ys` sind `ARRAY OF INTEGER` gleicher Länge |
+| `SPLINE_BASIS(xs, ys[, color[, width]])` | B-Spline: noch weicher als `SPLINE`, läuft aber **nicht** durch die Punkte, sondern wird von ihnen gezogen (mindestens 4) |
+| `SPLINE_BEZIER(xs, ys[, color[, width]])` | Kette kubischer Bézierkurven: Anfang, dann je zwei Kontrollpunkte und ein Ende (4, 7, 10 … Punkte) — so wie Zeichenprogramme Pfade speichern |
+| `BEZIER(x1, y1, kx, ky, x2, y2[, color[, width]])` | quadratische Bézierkurve von (x1, y1) nach (x2, y2), zum Kontrollpunkt (kx, ky) hin gebogen |
+| `BEZIER3(x1, y1, k1x, k1y, k2x, k2y, x2, y2[, color[, width]])` | kubische Bézierkurve mit zwei Kontrollpunkten (S-Kurven, Verbindungslinien zwischen Knoten) |
 | `TRIANGLE(x1, y1, x2, y2, x3, y3[, color])` | gefülltes Dreieck |
 | `TRIANGLEOUTLINE(x1, y1, x2, y2, x3, y3[, color[, width]])` | Dreieck nur als Kontur |
 | `POLYGON(points[, color])` | gefülltes Polygon — `points` ist ein `ARRAY OF INTEGER` mit `[x1, y1, x2, y2, …]` (mind. 3 Punkte) |
@@ -304,7 +304,7 @@ Farbe wird als 24-Bit-INTEGER (`&HRRGGBB`) angegeben, am einfachsten via `RGB(r,
 | `ELLIPSEOUTLINE(x1, y1, x2, y2[, color[, width]])` | Ellipse nur als Kontur |
 | `ARC(x1, y1, x2, y2, start_rad, end_rad[, color[, width]])` | Bogen-Segment in der Bounding-Box; Winkel in Radiant, gegen den Uhrzeigersinn. `width` (Float, optional) = Strichbreite; ohne Angabe 1px (zoom-unabhaengig), mit Angabe wie `LINEW`/`SPLINE` mit `CAMERA_SET`-Zoom skaliert |
 | `TEXT(x, y, s$[, color])` | Text bei (x, y) |
-| `TEXTROT(x, y, s$, winkel[, skala[, farbe]])` | Text **zentriert** auf (x, y), um das Zentrum gedreht (Grad, wie `DRAWIMAGEROT`) und skaliert — für Score-Popups, schräge Labels. Nutzt aktiven Font/Größe |
+| `TEXTROT(x, y, s$, angle[, scale[, color]])` | Text **zentriert** auf (x, y), um das Zentrum gedreht (Grad, wie `DRAWIMAGEROT`) und skaliert — für Score-Popups, schräge Labels. Nutzt aktiven Font/Größe |
 
 > **Eckpunkt-Reihenfolge egal:** gefülltes `TRIANGLE` und `POLYGON` zeichnen
 > unabhängig von der Wicklung — ob die Punkte im oder gegen den Uhrzeigersinn
@@ -346,8 +346,8 @@ Farben können einen **Alpha-Kanal** tragen (`&Haarrggbb`, oberstes Byte = Deckk
 | Funktion | Zweck |
 |---|---|
 | `RGBA(r, g, b, a)` → INTEGER | Farbe mit Alpha (`a` 0..255, 255 = voll deckend) |
-| `ALPHA(farbe)` → INTEGER | Alpha-Kanal (0..255) aus einer Farbe lesen |
-| `BLEND_MODE(modus$)` | Mischmodus für folgende Draws: `"alpha"` (Standard), `"add"` (additiv – Glow/Licht), `"mult"` (multiplikativ – Schatten/Tönung), `"subtract"` |
+| `ALPHA(color)` → INTEGER | Alpha-Kanal (0..255) aus einer Farbe lesen |
+| `BLEND_MODE(name$)` | Mischmodus für folgende Draws: `"alpha"` (Standard), `"add"` (additiv – Glow/Licht), `"mult"` (multiplikativ – Schatten/Tönung), `"subtract"` |
 
 `BLEND_MODE` gilt bis zum nächsten Aufruf — nach einem Effekt mit `BLEND_MODE("alpha")` zurückstellen.
 
@@ -364,7 +364,7 @@ BLEND_MODE("alpha")          ' zurück zum Normal-Modus
 
 | Funktion | Wirkung |
 |---|---|
-| `SCISSOR(x, y, breite, hoehe)` | Folgende Draws werden auf dieses Rechteck beschnitten |
+| `SCISSOR(x, y, width, height)` | Folgende Draws werden auf dieses Rechteck beschnitten |
 | `SCISSOR_END()` | Die oberste Beschränkung zurücknehmen |
 | `SCISSOR_DEPTH()` → INTEGER | Wie viele Clips gerade offen sind |
 
@@ -395,23 +395,23 @@ zweite Zeichenfläche samt Speicher, wo ein Rechteck genügt.
 | Funktion | Wirkung |
 |---|---|
 | `TEXT(x, y, s$[, color])` | Text bei (x, y) in der aktiven Schrift |
-| `TEXT_SIZE(px)` | Schriftgröße für folgende `TEXT`-Aufrufe (4–400) |
+| `TEXT_SIZE(size)` | Schriftgröße für folgende `TEXT`-Aufrufe (4–400) |
 | `TEXT_WIDTH(s$)` | Pixelbreite von `s$` in der aktiven Schrift/Größe |
 | `TEXT_HEIGHT()` | Zeilenhöhe der aktiven Schrift |
-| `TEXT_STYLE(stil$)` | Stil für folgende `TEXT`-Aufrufe: `fett`, `kursiv`, `unterstrichen`, `durchgestrichen`, verbunden mit `+` (`"fett+unterstrichen"`); `"normal"` schaltet zurück |
+| `TEXT_STYLE(style$)` | Stil für folgende `TEXT`-Aufrufe: `fett`, `kursiv`, `unterstrichen`, `durchgestrichen`, verbunden mit `+` (`"fett+unterstrichen"`); `"normal"` schaltet zurück |
 | `TEXT_GET_STYLE$()` | der gesetzte Stil als Text, z. B. `"fett+kursiv"` |
-| `TEXT_BOLD(an)` / `TEXT_ITALIC(an)` | nur Fett bzw. Kursiv an- oder ausschalten, der Rest des Stils bleibt |
-| `FONT_STYLE(font, stil$)` → FONT | der echte fette/kursive Schnitt einer geladenen Schrift (sucht die Datei daneben, z. B. `segoeuib.ttf` zu `segoeui.ttf`); gibt es keinen, kommt `font` selbst zurück |
-| `FONT_HAS_STYLE(font, stil$)` | TRUE, wenn es diesen Schnitt als Datei gibt -- sonst bildet die Laufzeit ihn nach |
-| `LOADFONT(pfad$, groesse[, zeichen$])` → FONT | TTF/OTF/TTC laden → FONT-Handle (INTEGER); `zeichen$` = Schriftblöcke (`"kyrillisch, griechisch"`, `"japanisch"`, `"emoji"` …) oder die Zeichen selbst, die gebacken werden sollen. Statt eines Pfads geht auch eine **eingebaute Schrift**: `"sans"`, `"serif"`, `"mono"` (DejaVu, je mit `-fett`, `-kursiv`, `-fett-kursiv`) und `"noten"` (Noto Music: Schlüssel, Notenköpfe, Pausen, Vorzeichen aus dem Block „Musical Symbols“, SIL OFL). Ein Zeichen, das nicht gebacken wurde, holt das nächste Bild aus derselben Datei nach |
-| `LOADFONT_SDF(pfad$, groesse[, zeichen$])` → FONT | eine Schrift, die bei **jeder** Größe scharf bleibt: gebacken als Abstandsfeld, gezeichnet mit einem Shader, der die Kante einen Punkt weich hält. Eine gewöhnliche Schrift verschwimmt, sobald sie größer gezeichnet wird, als sie gebacken wurde (Titel, Kamera-Zoom). Ohne `zeichen$` ASCII und Latin-1 samt €; das Backen kostet je Zeichen mehr als bei `LOADFONT` (rund 130 ms für diese Auswahl) |
-| `FONT_HAS_GLYPH(font, zeichen$)` → BOOLEAN | hat die Schrift selbst ein Zeichen dafür? Wenn nicht, zeichnet `TEXT` es mit der Ausweich-Schrift; `-1` = eingebaute Schrift |
-| `FONT_GLYPH_WIDTH(font, zeichen$, groesse)` → FLOAT | wie weit `TEXT` nach diesem Zeichen weiterrückt, bei `groesse` Punkten — gemessen wie `TEXT_WIDTH`, ohne die aktive Schrift umzustellen |
-| `FONT_GLYPH_BOX(font, zeichen$, groesse)` → TUPLE | das Rechteck `(x, y, breite, hoehe)`, das die Glyphe wirklich bedeckt, relativ zu dem Punkt, an den `TEXT(x, y, zeichen$)` sie bei `groesse` setzt — aus der Schriftdatei gelesen. Damit sitzt ein Zeichen genau: mittig in einem Knopf, ein Notenschlüssel auf seiner Linie |
-| `FONT_BASELINE(font, groesse)` → FLOAT | wie weit unter der Oberkante, an die `TEXT` den Text setzt, die Grundlinie liegt |
-| `FONT_TO_IMAGE(font[, erstes[, letztes]])` → IMAGE | die Zeichen `erstes`..`letztes` (Vorgabe 32..126, höchstens 256) als Bild im Format von `LOADFONT_IMAGE`: jedes Zeichen weiß in einem durchsichtigen Feld, Magenta (`&HFF00FF`) außen und dazwischen. So wird aus einer Vektorschrift eine Pixelschrift, die man nachbearbeiten und mit `LOADFONT_IMAGE(bild, &HFF00FF, erstes)` wieder laden kann |
-| `FONT_LIGATURES(font, an)` | die **Ligaturen** und die Unterschneidung einer mit `LOADFONT` geladenen Schrift ein- oder ausschalten: ihr Text geht dann durch die Textformung (fi-Ligaturen, die Zeichenverbindungen einer Programmierschrift, enger gesetzte Paare wie „AV“) |
-| `SETFONT(font[, groesse])` | aktive Schrift setzen; `SETFONT(-1)` = Default-Font. Ohne `groesse` gilt danach die Größe, mit der die Schrift geladen wurde; mit `groesse` wird ab jetzt so groß gezeichnet (wie `SETFONT` + `TEXT_SIZE`) -- scharf laden, klein zeichnen: `SETFONT(LOADFONT("sans", 32), 16)` |
+| `TEXT_BOLD(on)` / `TEXT_ITALIC(on)` | nur Fett bzw. Kursiv an- oder ausschalten, der Rest des Stils bleibt |
+| `FONT_STYLE(font, style$)` → FONT | der echte fette/kursive Schnitt einer geladenen Schrift (sucht die Datei daneben, z. B. `segoeuib.ttf` zu `segoeui.ttf`); gibt es keinen, kommt `font` selbst zurück |
+| `FONT_HAS_STYLE(font, style$)` | TRUE, wenn es diesen Schnitt als Datei gibt -- sonst bildet die Laufzeit ihn nach |
+| `LOADFONT(path$, size[, chars$])` → FONT | TTF/OTF/TTC laden → FONT-Handle (INTEGER); `chars$` = Schriftblöcke (`"kyrillisch, griechisch"`, `"japanisch"`, `"emoji"` …) oder die Zeichen selbst, die gebacken werden sollen. Statt eines Pfads geht auch eine **eingebaute Schrift**: `"sans"`, `"serif"`, `"mono"` (DejaVu, je mit `-fett`, `-kursiv`, `-fett-kursiv`) und `"noten"` (Noto Music: Schlüssel, Notenköpfe, Pausen, Vorzeichen aus dem Block „Musical Symbols“, SIL OFL). Ein Zeichen, das nicht gebacken wurde, holt das nächste Bild aus derselben Datei nach |
+| `LOADFONT_SDF(path$, size[, chars$])` → FONT | eine Schrift, die bei **jeder** Größe scharf bleibt: gebacken als Abstandsfeld, gezeichnet mit einem Shader, der die Kante einen Punkt weich hält. Eine gewöhnliche Schrift verschwimmt, sobald sie größer gezeichnet wird, als sie gebacken wurde (Titel, Kamera-Zoom). Ohne `chars$` ASCII und Latin-1 samt €; das Backen kostet je Zeichen mehr als bei `LOADFONT` (rund 130 ms für diese Auswahl) |
+| `FONT_HAS_GLYPH(font, char$)` → BOOLEAN | hat die Schrift selbst ein Zeichen dafür? Wenn nicht, zeichnet `TEXT` es mit der Ausweich-Schrift; `-1` = eingebaute Schrift |
+| `FONT_GLYPH_WIDTH(font, chars$, size)` → FLOAT | wie weit `TEXT` nach diesem Zeichen weiterrückt, bei `size` Punkten — gemessen wie `TEXT_WIDTH`, ohne die aktive Schrift umzustellen |
+| `FONT_GLYPH_BOX(font, char$, size)` → TUPLE | das Rechteck `(x, y, breite, hoehe)`, das die Glyphe wirklich bedeckt, relativ zu dem Punkt, an den `TEXT(x, y, char$)` sie bei `size` setzt — aus der Schriftdatei gelesen. Damit sitzt ein Zeichen genau: mittig in einem Knopf, ein Notenschlüssel auf seiner Linie |
+| `FONT_BASELINE(font, size)` → FLOAT | wie weit unter der Oberkante, an die `TEXT` den Text setzt, die Grundlinie liegt |
+| `FONT_TO_IMAGE(font[, first[, last]])` → IMAGE | die Zeichen `first`..`last` (Vorgabe 32..126, höchstens 256) als Bild im Format von `LOADFONT_IMAGE`: jedes Zeichen weiß in einem durchsichtigen Feld, Magenta (`&HFF00FF`) außen und dazwischen. So wird aus einer Vektorschrift eine Pixelschrift, die man nachbearbeiten und mit `LOADFONT_IMAGE(bild, &HFF00FF, first)` wieder laden kann |
+| `FONT_LIGATURES(font, on)` | die **Ligaturen** und die Unterschneidung einer mit `LOADFONT` geladenen Schrift ein- oder ausschalten: ihr Text geht dann durch die Textformung (fi-Ligaturen, die Zeichenverbindungen einer Programmierschrift, enger gesetzte Paare wie „AV“) |
+| `SETFONT(font[, size])` | aktive Schrift setzen; `SETFONT(-1)` = Default-Font. Ohne `size` gilt danach die Größe, mit der die Schrift geladen wurde; mit `size` wird ab jetzt so groß gezeichnet (wie `SETFONT` + `TEXT_SIZE`) -- scharf laden, klein zeichnen: `SETFONT(LOADFONT("sans", 32), 16)` |
 | `TEXT_SPACING(px)` | Buchstabenabstand für TTF (nativ) |
 | `TEXT_LINE_SPACING(px)` | Zeilenabstand für mehrzeiligen Text |
 
@@ -578,15 +578,15 @@ wie getippt über die Tipp-Warteschlange, die 256 Zeichen je Bild fasst
 | Funktion | Zweck |
 |---|---|
 | `LOADIMAGE(path$)` → IMAGE | Datei laden (PNG, JPG, BMP, …) |
-| `IMAGEWIDTH(img)`, `IMAGEHEIGHT(img)` → INTEGER | Pixelgröße; gleichwertig `IMAGE_WIDTH`/`IMAGE_HEIGHT` im Namensschema der übrigen `IMAGE_*`-Befehle |
-| `GETPIXEL(img, x, y)` → INTEGER | Pixelfarbe (`&HRRGGBB`) an `(x, y)` lesen; `-1` bei Index außerhalb. Gegenstück zu `PLOT` (schreiben) — für Kollision per Pixel, Maskierung, Farb-Sampling |
-| `GETALPHA(img, x, y)` → INTEGER | Deckkraft an `(x, y)`, `0..255`; `-1` bei Index außerhalb. Nötig, weil `GETPIXEL` eine **Farbe** liefert und dort Deckkraft 0 *deckend* bedeutet — ein durchsichtiger Punkt käme als schwarzer zurück |
-| `DRAWIMAGE(img, x, y)` | Bild bei (x, y) zeichnen |
-| `DRAWIMAGEPART(img, sx, sy, sw, sh, x, y)` | Sub-Rechteck aus Sheet zeichnen |
-| `DRAWIMAGEPARTEX(img, sx, sy, sw, sh, x, y, w, h [, farbe])` | Sub-Rechteck auf die Größe `w` x `h` gezogen; `farbe` tönt es, ihr Alpha ist die Deckkraft (`RGBA(255, 255, 255, 128)` = halb durchsichtig) |
-| `DRAWIMAGEFLIPPED(img, x, y[, flipX[, flipY]])` | mit Spiegelung |
-| `DRAWIMAGEROT(img, x, y, winkel[, skala[, tint]])` | **zentriert** auf (x,y), um `winkel` **Grad** gedreht (um die Mitte), optional skaliert + getönt. Ideal für rotierte Sprites / `physics2d` (`winkel = DEG(PHYS2D_BODY_ANGLE(...))`). Camera-aware. |
-| `DRAWIMAGE9(img, x, y, breite, hoehe, links, oben, rechts, unten[, tint])` | **9-Slice**: das Bild in das Rechteck gestreckt, die vier Ecken in ihrer Größe, die Ränder nur in einer Richtung, die Mitte in beiden — für Rahmen, Panels und Knöpfe, die beliebig groß werden, ohne zu verzerren. Ränder in Pixeln des Bildes; passt das Ziel nicht, werden die Ecken im Verhältnis kleiner. Camera-aware. |
+| `IMAGEWIDTH(image)`, `IMAGEHEIGHT(image)` → INTEGER | Pixelgröße; gleichwertig `IMAGE_WIDTH`/`IMAGE_HEIGHT` im Namensschema der übrigen `IMAGE_*`-Befehle |
+| `GETPIXEL(image, x, y)` → INTEGER | Pixelfarbe (`&HRRGGBB`) an `(x, y)` lesen; `-1` bei Index außerhalb. Gegenstück zu `PLOT` (schreiben) — für Kollision per Pixel, Maskierung, Farb-Sampling |
+| `GETALPHA(image, x, y)` → INTEGER | Deckkraft an `(x, y)`, `0..255`; `-1` bei Index außerhalb. Nötig, weil `GETPIXEL` eine **Farbe** liefert und dort Deckkraft 0 *deckend* bedeutet — ein durchsichtiger Punkt käme als schwarzer zurück |
+| `DRAWIMAGE(image, x, y, w = -1, h = -1, angle = 0.0, tint = -1, flip_x = FALSE, flip_y = FALSE, sx = 0, sy = 0, sw = -1, sh = -1)` | Bild bei (x, y) zeichnen. Alles Weitere geht benannt: `w`/`h` Zielgröße, `angle` Grad um die Mitte, `tint` Tönung (ihr Alpha ist die Deckkraft), `flip_x`/`flip_y` spiegeln, `sx, sy, sw, sh` ein Ausschnitt — etwa `DRAW_IMAGE(held, x, y, angle: 30, flip_x: TRUE)` |
+| `DRAWIMAGEPART(image, sx, sy, sw, sh, x, y)` | Sub-Rechteck aus Sheet zeichnen |
+| `DRAWIMAGEPARTEX(image, sx, sy, sw, sh, x, y, w, h [, color])` | Sub-Rechteck auf die Größe `w` x `h` gezogen; `color` tönt es, ihr Alpha ist die Deckkraft (`RGBA(255, 255, 255, 128)` = halb durchsichtig) |
+| `DRAWIMAGEFLIPPED(image, x, y[, flip_x[, flip_y]])` | mit Spiegelung |
+| `DRAWIMAGEROT(image, x, y, angle_deg[, scale[, tint]])` | **zentriert** auf (x,y), um `angle_deg` **Grad** gedreht (um die Mitte), optional skaliert + getönt. Ideal für rotierte Sprites / `physics2d` (`angle_deg = DEG(PHYS2D_BODY_ANGLE(...))`). Camera-aware. |
+| `DRAWIMAGE9(image, x, y, width, height, left, top, right, bottom[, tint])` | **9-Slice**: das Bild in das Rechteck gestreckt, die vier Ecken in ihrer Größe, die Ränder nur in einer Richtung, die Mitte in beiden — für Rahmen, Panels und Knöpfe, die beliebig groß werden, ohne zu verzerren. Ränder in Pixeln des Bildes; passt das Ziel nicht, werden die Ecken im Verhältnis kleiner. Camera-aware. |
 
 ```basic
 SCREEN(320, 240, "Bilder", 2)
@@ -658,10 +658,10 @@ Ein **Sprite-Atlas** ist EIN großes Bild mit benannten Sub-Rects (`x, y, w, h`)
 
 | Funktion | Zweck |
 |---|---|
-| `ATLAS_LOAD(manifest_path$)` → SPRITE_ATLAS | Atlas aus JSON-Manifest laden |
-| `ATLAS_DRAW(atlas, name$, x, y)` | einzelnes Sub-Sprite zeichnen (Camera-aware) |
+| `ATLAS_LOAD(path$)` → SPRITE_ATLAS | Atlas aus JSON-Manifest laden |
+| `ATLAS_DRAW(atlas, name$, x, y[, tint])` | einzelnes Sub-Sprite zeichnen (Camera-aware) |
 | `ATLAS_DRAW_FLIPPED(atlas, name$, x, y[, flip_x[, flip_y[, tint]]])` | Sub-Sprite mit Spiegelung (X/Y, je `TRUE`/`FALSE` oder `1`/`0`); optional `tint` |
-| `BATCH_DRAW(atlas, name$, x, y)` | **Zweitname für `ATLAS_DRAW`** — zeichnet sofort, sammelt nichts |
+| `BATCH_DRAW(atlas, name$, x, y[, tint])` | **Zweitname für `ATLAS_DRAW`** — zeichnet sofort, sammelt nichts |
 | `BATCH_FLUSH()` | **tut nichts** (No-Op) — nur damit alter Code weiterläuft |
 
 **Manifest-Format:**
@@ -845,10 +845,10 @@ Befehl, nicht das Zeichnen selbst.
 
 | Funktion | Zweck |
 |---|---|
-| `PLOTS(xs, ys, farbe [, anzahl])` | viele Pixel; `farbe` als Zahl gilt für alle, als ARRAY je Pixel |
-| `BOXES(x1s, y1s, x2s, y2s, farbe [, anzahl])` | viele Rechtecke |
-| `CIRCLES(xs, ys, rs, farbe [, anzahl])` | viele Kreise |
-| `LINES(x1s, y1s, x2s, y2s, farbe [, anzahl])` | viele Linien |
+| `PLOTS(xs, ys, color [, count])` | viele Pixel; `color` als Zahl gilt für alle, als ARRAY je Pixel |
+| `BOXES(x1s, y1s, x2s, y2s, color [, count])` | viele Rechtecke |
+| `CIRCLES(xs, ys, rs, color [, count])` | viele Kreise |
+| `LINES(x1s, y1s, x2s, y2s, color [, count])` | viele Linien |
 
 **`anzahl` weglassen heißt „das ganze Array"** — ein fest dimensionierter Puffer
 schleppt seine ungenutzten Plätze also mit ins Bild. Wer nur die ersten `n`
@@ -862,14 +862,14 @@ lässt.
 
 | Funktion | Zweck |
 |---|---|
-| `GENTEX_COLOR(breite, hoehe, farbe)` | einfarbige Fläche |
-| `GENTEX_GRADIENT(breite, hoehe, farbe1, farbe2 [, vertikal])` | linearer Verlauf |
-| `GENTEX_GRADIENT_BOX(breite, hoehe, dichte, farbe1, farbe2)` | rechteckiger Verlauf von innen nach außen — Vignetten |
-| `GENTEX_RADIAL(breite, hoehe, innen, aussen [, dichte])` | runder Verlauf von der Mitte nach außen — weiche Lichter und Glows, additiv gezeichnet. `dichte` (0..1, Vorgabe 0) ist der Anteil des Radius in voller Innenfarbe: 0 = weich ab der Mitte, 1 = Scheibe; mehr ist ein Fehler |
-| `GENTEX_CHECKED(breite, hoehe, feld_x, feld_y, farbe1, farbe2)` | Schachbrett |
-| `GENTEX_PERLIN(breite, hoehe, skala)` | Perlin-Rauschen — Wolken, Gelände, Marmor |
-| `GENTEX_CELLULAR(breite, hoehe, kachel)` | Zellrauschen (Voronoi) — Steinboden, Risse, Schuppen |
-| `GENTEX_NOISE(breite, hoehe, anteil)` | Weißrauschen — Sternenfelder, Filmkorn |
+| `GENTEX_COLOR(width, height, color)` | einfarbige Fläche |
+| `GENTEX_GRADIENT(width, height, color1, color2 [, vertical])` | linearer Verlauf |
+| `GENTEX_GRADIENT_BOX(w, h, density, c1, c2)` | rechteckiger Verlauf von innen nach außen — Vignetten |
+| `GENTEX_RADIAL(w, h, inner_color, outer_color [, density])` | runder Verlauf von der Mitte nach außen — weiche Lichter und Glows, additiv gezeichnet. `density` (0..1, Vorgabe 0) ist der Anteil des Radius in voller Innenfarbe: 0 = weich ab der Mitte, 1 = Scheibe; mehr ist ein Fehler |
+| `GENTEX_CHECKED(width, height, cell_x, cell_y, color1, color2)` | Schachbrett |
+| `GENTEX_PERLIN(width, height, scale)` | Perlin-Rauschen — Wolken, Gelände, Marmor |
+| `GENTEX_CELLULAR(w, h, tile)` | Zellrauschen (Voronoi) — Steinboden, Risse, Schuppen |
+| `GENTEX_NOISE(w, h, fraction)` | Weißrauschen — Sternenfelder, Filmkorn |
 
 ## Render-Ziele
 
@@ -878,12 +878,12 @@ wie auf das Fenster — für Spiegel, Minikarten, Bild-im-Bild oder Nachzieheffe
 
 | Funktion | Zweck |
 |---|---|
-| `RENDERTARGET_NEW(breite, hoehe [, behalten])` → INTEGER | Ziel anlegen. `behalten = TRUE` lässt den Inhalt über das Bild hinaus stehen — die Voraussetzung für Schweife |
-| `RENDERTARGET_BEGIN(ziel)` | ab jetzt dorthin zeichnen |
+| `RENDERTARGET_NEW(w, h [, keep])` → INTEGER | Ziel anlegen. `keep = TRUE` lässt den Inhalt über das Bild hinaus stehen — die Voraussetzung für Schweife |
+| `RENDERTARGET_BEGIN(target)` | ab jetzt dorthin zeichnen |
 | `RENDERTARGET_END()` | zurück auf das Fenster |
-| `RENDERTARGET_DRAW(ziel, x, y [, skala [, tint [, gespiegelt]]])` | das Ziel wie ein Bild aufs Fenster stempeln |
-| `RENDERTARGET_CLEAR(ziel [, farbe])` | von Hand leeren — nötig, wenn `behalten` an ist |
-| `RENDERTARGET_IMAGE(ziel)` → IMAGE | der Inhalt als Bild — was seit `RENDERTARGET_BEGIN` gezeichnet wurde, wird dafür **sofort** abgespielt, nicht erst beim `FLIP`. So kommt ein Diagramm in ein PDF (`PDF_IMAGE`) oder eine Datei (`IMAGE_SAVE`) |
+| `RENDERTARGET_DRAW(rt, x, y [, scale [, tint [, mirrored]]])` | das Ziel wie ein Bild aufs Fenster stempeln |
+| `RENDERTARGET_CLEAR(rt [, color])` | von Hand leeren — nötig, wenn `behalten` an ist |
+| `RENDERTARGET_IMAGE(rt)` → IMAGE | der Inhalt als Bild — was seit `RENDERTARGET_BEGIN` gezeichnet wurde, wird dafür **sofort** abgespielt, nicht erst beim `FLIP`. So kommt ein Diagramm in ein PDF (`PDF_IMAGE`) oder eine Datei (`IMAGE_SAVE`) |
 
 Ohne `behalten` wird das Ziel zu Beginn jedes Bildes durchsichtig geleert. Ein
 Schweif entsteht dagegen so: `behalten = TRUE`, und pro Bild ein
@@ -897,14 +897,14 @@ eines anderen Ziels tut nichts.
 
 | Funktion | Zweck |
 |---|---|
-| `SHADER_LOAD(pfad_oder_glsl$)` → INTEGER | Fragment-Shader laden — aus einer Datei oder direkt als Quelltext; `-1` bei Fehler |
-| `POSTFX(shader [, massstab])` | jedes fertige Bild durch diesen Shader schicken; `-1` schaltet ab. `massstab` (0.25..1, Vorgabe 1) lässt den Shader in kleinerer Auflösung rechnen und vergrößert das Ergebnis weich — für aufwendige Shader auf schwachen Grafikchips (bei 0.7 etwa die Hälfte der Arbeit); Text im Bild wird dabei etwas weicher |
-| `SHADER_SET(shader, name$, wert)` | eine Zahl an ein `uniform float` geben |
+| `SHADER_LOAD(src$)` → INTEGER | Fragment-Shader laden — aus einer Datei oder direkt als Quelltext; `-1` bei Fehler |
+| `POSTFX(shader [, scale])` | jedes fertige Bild durch diesen Shader schicken; `-1` schaltet ab. `scale` (0.25..1, Vorgabe 1) lässt den Shader in kleinerer Auflösung rechnen und vergrößert das Ergebnis weich — für aufwendige Shader auf schwachen Grafikchips (bei 0.7 etwa die Hälfte der Arbeit); Text im Bild wird dabei etwas weicher |
+| `SHADER_SET(shader, name$, v)` | eine Zahl an ein `uniform float` geben |
 | `SHADER_SET2(shader, name$, x, y)` | zwei Werte (`vec2`) |
 | `SHADER_SET3(shader, name$, x, y, z)` | drei Werte (`vec3`) |
-| `SHADER_SET_ARRAY(shader, name$, werte)` | ein `uniform float[]` aus einem `ARRAY OF FLOAT` füllen — Lichtpositionen, Verlaufsstufen |
+| `SHADER_SET_ARRAY(shader, name$, values)` | ein `uniform float[]` aus einem `ARRAY OF FLOAT` füllen — Lichtpositionen, Verlaufsstufen |
 | `SHADER_SET_MATRIX(shader, name$, mat)` | eine `MAT4` aus [`m3d`](module-m3d.md) übergeben |
-| `SHADER_SET_TEXTURE(shader, name$, bild)` | einen **zweiten** Sampler belegen — Masken, Paletten, Überblendungen |
+| `SHADER_SET_TEXTURE(shader, name$, image)` | einen **zweiten** Sampler belegen — Masken, Paletten, Überblendungen |
 
 `SHADER_SET_TEXTURE` wird gemerkt und erst beim Zeichnen gesetzt. Der Grund ist
 eine Eigenheit von raylib: die Zuweisung wirkt auf das *gerade aktive*
@@ -915,17 +915,17 @@ Sampler bliebe schwarz.
 
 | Funktion | Zweck |
 |---|---|
-| `KEYPRESSED(code)` → BOOLEAN | TRUE **solange** die Taste mit SDL-Code `code` gehalten wird — jedes Frame erneut. Für Bewegen/Lenken. |
-| `KEYHIT(code)` → BOOLEAN | TRUE nur in **dem einen Frame**, in dem die Taste heruntergeht. Für Schießen, Springen, Umschalten. |
+| `KEYPRESSED(key)` → BOOLEAN | TRUE **solange** die Taste mit SDL-Code `code` gehalten wird — jedes Frame erneut. Für Bewegen/Lenken. |
+| `KEYHIT(key)` → BOOLEAN | TRUE nur in **dem einen Frame**, in dem die Taste heruntergeht. Für Schießen, Springen, Umschalten. |
 | | *Buchstaben:* `KEY_A`…`KEY_Z` sind die klare Schreibweise. `ASC("s")` und `ASC("S")` meinen beide dieselbe Taste — bis 2026-08-31 traf die **große** Schreibweise still gar nichts, was wie ein vergessener Aufruf aussah. |
 | | *Lage oder Beschriftung:* ein Tastencode meint die **Lage** der Taste nach der US-Tastatur — `KEY_Z` ist auf einer deutschen Tastatur die Taste mit dem Y, auf einer französischen die mit dem W. Für WASD ist das richtig. Für Kürzel wie Strg+Z schreibt man den **Buchstaben als Text**: `KEYHIT("z")` meint die Taste, auf der das Z steht (auch für `KEYPRESSED`, `KEYRELEASED`, `KEYREPEAT`; Buchstaben, Ziffern und das Leerzeichen). |
-| `KEYRELEASED(code)` → BOOLEAN | TRUE in dem Frame, in dem die Taste losgelassen wird — etwa „aufladen und beim Loslassen feuern“ |
-| `KEYREPEAT(code)` → BOOLEAN | wie `KEYHIT`, feuert beim Halten aber zusätzlich mit der System-Tastenwiederholung. Für Textcursor und Mengen-Eingabe. |
+| `KEYRELEASED(key)` → BOOLEAN | TRUE in dem Frame, in dem die Taste losgelassen wird — etwa „aufladen und beim Loslassen feuern“ |
+| `KEYREPEAT(key)` → BOOLEAN | wie `KEYHIT`, feuert beim Halten aber zusätzlich mit der System-Tastenwiederholung. Für Textcursor und Mengen-Eingabe. |
 | `MOUSEX()`, `MOUSEY()` → INTEGER | aktuelle Mausposition (in logischen Pixeln) |
 | `MOUSEBUTTON(n)` → BOOLEAN | TRUE wenn Maustaste n gedrückt — **`0`=links, `1`=rechts, `2`=mitte** (raylib-Reihenfolge: rechts vor mitte!) |
 | `MOUSEWHEEL()` → INTEGER | Mausrad-Delta seit dem letzten Aufruf (+ hoch / − runter / 0) |
-| `MOUSE_VISIBLE(an)` | OS-Cursor zeigen/verstecken — verstecken, wenn das Spiel ein eigenes Fadenkreuz/Cursor-Sprite zeichnet |
-| `MOUSE_LOCK(an)` | Cursor **fangen**: verstecken + im Fenster einsperren (relative Bewegung) — für First-Person-/Kamera-Maussteuerung; `FALSE` gibt frei |
+| `MOUSE_VISIBLE(on)` | OS-Cursor zeigen/verstecken — verstecken, wenn das Spiel ein eigenes Fadenkreuz/Cursor-Sprite zeichnet |
+| `MOUSE_LOCK(on)` | Cursor **fangen**: verstecken + im Fenster einsperren (relative Bewegung) — für First-Person-/Kamera-Maussteuerung; `FALSE` gibt frei |
 | `MOUSE_HIDDEN()` → BOOLEAN | ist der Cursor gerade versteckt/gefangen? |
 | `SCREENWIDTH()`, `SCREENHEIGHT()` → INTEGER | logische Fenstergröße (wie an `SCREEN` übergeben); 0 vor `SCREEN` |
 | `MOUSE_HIT(n)` → BOOLEAN | TRUE nur in **dem einen Frame**, in dem die Maustaste heruntergeht |
@@ -938,7 +938,7 @@ Sampler bliebe schwarz.
 | `MOUSE_ON_SCREEN()` → BOOLEAN | ist der Zeiger überhaupt im Fenster? |
 | `MOUSE_CURSOR(form$)` | Zeigerform: `default`, `ibeam`, `crosshair`, `hand`, `resize_ew`, `resize_ns`, `resize_nwse`, `resize_nesw`, `resize_all`, `not_allowed`, dazu `warten`, `arbeitet`, `hilfe` (unter Windows die echten Systemzeiger, die Sanduhr dreht sich), `kopieren`, `stift`, `pipette` und eigene aus `MOUSE_CURSOR_NEW`; bleibt stehen und hat Vorrang vor der gui, `auto` gibt den Zeiger an die gui zurück |
 | `MOUSE_CURSOR_GET$()` | die Zeigerform, die gerade gilt (die des Programms, sonst die der gui, sonst `default`) |
-| `MOUSE_CURSOR_NEW(bild, bx, by)` | ein Zeiger aus einem Bild (bis 256x256, Brennpunkt `bx`,`by`); liefert den Namen (`eigen1` ...), der dann für `MOUSE_CURSOR` und `GUI_SET_CURSOR` gilt. Das Bild wird kopiert |
+| `MOUSE_CURSOR_NEW(image, bx, by)` | ein Zeiger aus einem Bild (bis 256x256, Brennpunkt `bx`,`by`); liefert den Namen (`eigen1` ...), der dann für `MOUSE_CURSOR` und `GUI_SET_CURSOR` gilt. Das Bild wird kopiert |
 | `KEY_ANY_HIT()` → INTEGER | Code der zuletzt gedrückten Taste, `-1` = keine — fuer Belegungsdialoge |
 | `KEY_NAME$(code)` → STRING | Anzeigename einer Taste (`LEER`, `LINKS`, `UMSCHALT`, `F5` …) |
 | `INKEY$()` → STRING | zuletzt getipptes Zeichen oder `""` — wartet **nicht**, für Texteingabe im Spielablauf |
@@ -1016,10 +1016,10 @@ gehalten" und „genau jetzt gedrückt".
 | `JOYSTICK_HIT(idx, btn)` → BOOLEAN | genau in diesem Bild gedrückt |
 | `JOYSTICK_RELEASED(idx, btn)` → BOOLEAN | genau in diesem Bild losgelassen |
 | `JOYSTICK_ANY_BUTTON()` → INTEGER | zuletzt gedrückter Knopf, `-1` = keiner — für Belegungsdialoge |
-| `JOYSTICK_AXIS(idx, achse)` → FLOAT | Stellung einer Analogachse, `-1.0` bis `+1.0` |
+| `JOYSTICK_AXIS(idx, axis)` → FLOAT | Stellung einer Analogachse, `-1.0` bis `+1.0` |
 | `JOYSTICK_AXIS_COUNT(idx)` → INTEGER | wie viele Achsen hat das Gerät? |
 | `JOYSTICK_HAT_X(idx, hat)` / `JOYSTICK_HAT_Y(idx, hat)` → INTEGER | Steuerkreuz als `-1`, `0` oder `+1` je Achse |
-| `JOYSTICK_RUMBLE(idx, links, rechts, dauer_s)` | Vibration; die beiden Motoren getrennt (je `0.0`–`1.0`) |
+| `JOYSTICK_RUMBLE(idx, left, right, duration_s)` | Vibration; die beiden Motoren getrennt (je `0.0`–`1.0`) |
 | `JOYSTICK_MAPPINGS(sdl_db$)` → INTEGER | Belegungen aus der SDL-GameControllerDB nachladen — damit werden exotische Geräte richtig zugeordnet |
 
 Für die Knöpfe gibt es Konstanten (`JOY_BUTTON_A` … `JOY_BUTTON_Y`, `JOY_DPAD_*`).

@@ -120,8 +120,8 @@ module.exports = (H) => [
       'MKDIR("saves")',
       'PRINT DIREXISTS("saves")',
     ], { out: ["TRUE"] }),
-  H.cmd("DIRLIST", 'DIRLIST(pfad$[, muster$])',
-    "Liefert die Namen der Einträge eines Verzeichnisses als (sortiertes) ARRAY OF STRING. Ein Muster wie \"*.txt\" siebt vor",
+  H.cmd("DIRLIST", 'DIRLIST(pfad$[, muster$[, recursive]])',
+    "Liefert die Namen der Einträge eines Verzeichnisses als (sortiertes) ARRAY OF STRING. Mit recursive = TRUE wie DIRLIST_REC (auch benannt: DIRLIST(pfad$, recursive: TRUE)). Ein Muster wie \"*.txt\" siebt vor",
     [
       'MKDIR("ordner")',
       'WRITEALL("ordner/datei.txt", "x")',

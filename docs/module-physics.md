@@ -28,7 +28,7 @@ IMPORT "physics"
 | `PHYSICS_LINES_HIT(ax,ay,bx,by, cx,cy,dx,dy)` | schneiden sich zwei **Strecken**? (nicht die unendlichen Geraden) | `BOOLEAN` |
 | `PHYSICS_LINES_X(ax,ay,bx,by, cx,cy,dx,dy)` | X des Schnittpunkts — **`NAN`, wenn es keinen gibt**, also erst `PHYSICS_LINES_HIT` fragen | `FLOAT` |
 | `PHYSICS_LINES_Y(ax,ay,bx,by, cx,cy,dx,dy)` | Y des Schnittpunkts (ebenso `NAN`) | `FLOAT` |
-| `PHYSICS_POINT_LINE(px,py, ax,ay, bx,by, dicke)` | liegt der Punkt auf der Strecke? `dicke` gibt den erlaubten Abstand — für Klicks auf dünne Linien | `BOOLEAN` |
+| `PHYSICS_POINT_LINE(px,py, ax,ay, bx,by, thickness)` | liegt der Punkt auf der Strecke? `thickness` gibt den erlaubten Abstand — für Klicks auf dünne Linien | `BOOLEAN` |
 | `PHYSICS_CIRCLE_LINE(cx,cy,r, ax,ay, bx,by)` | berührt ein Kreis die Strecke? | `BOOLEAN` |
 | `PHYSICS_POINT_POLY(px, py, xs, ys)` | Punkt im Vieleck (Strahl-Verfahren — funktioniert auch bei konkaven Formen) | `BOOLEAN` |
 | `PHYSICS_DISTANCE3(x1,y1,z1, x2,y2,z2)` | Abstand zweier Punkte im Raum | `FLOAT` |

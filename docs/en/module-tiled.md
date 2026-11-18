@@ -76,23 +76,23 @@ IMPORT "tiled"
 
 | Function | Returns | Meaning |
 |---|---|---|
-| `TILED_NEW(breite, hoehe, kachel_w, kachel_h)` | TILED_MAP | create an empty map -- without a layer and without a tileset |
+| `TILED_NEW(width, height, tile_w, tile_h)` | TILED_MAP | create an empty map -- without a layer and without a tileset |
 | `TILED_ADD_LAYER(m, name$)` | INTEGER (index) | append an empty tile layer |
-| `TILED_ADD_TILESET(m, bild$, kachelzahl)` | INTEGER (index) | append a tileset; the runtime assigns the `firstgid` itself |
+| `TILED_ADD_TILESET(m, image$, tile_count)` | INTEGER (index) | append a tileset; the runtime assigns the `firstgid` itself |
 | `TILED_TILESET_TILES(m, idx)` | INTEGER | how many tiles does this tileset have? |
 | `TILED_ADD_OBJECT_LAYER(m, name$)` | INTEGER (index) | append an object layer |
-| `TILED_ADD_OBJECT(m, ebene$, name$, typ$, x, y, w, h)` | INTEGER (index) | put an object into an object layer |
-| `TILED_TILE_SET_PROP(m, gid, key$, wert)` | — | set a property of a tile |
+| `TILED_ADD_OBJECT(m, layer$, name$, type$, x, y, w, h)` | INTEGER (index) | put an object into an object layer |
+| `TILED_TILE_SET_PROP(m, gid, key$, value)` | — | set a property of a tile |
 | `TILED_TILE_REMOVE_PROP(m, gid, key$)` | — | remove a property of a tile |
-| `TILED_OBJECT_SET_PROP(m, ebene$, idx, key$, wert)` | — | set a property of an object |
-| `TILED_OBJECT_REMOVE_PROP(m, ebene$, idx, key$)` | — | remove a property of an object |
-| `TILED_REMOVE_OBJECT(m, ebene$, idx)` | — | remove an object |
-| `TILED_OBJECT_SET_NAME(m, ebene$, idx, name$)` | — | rename an object |
-| `TILED_OBJECT_SET_TYPE(m, ebene$, idx, typ$)` | — | change its type |
-| `TILED_OBJECT_SET_RECT(m, ebene$, idx, x, y, w, h)` | — | change position and size |
+| `TILED_OBJECT_SET_PROP(m, layer$, idx, key$, value)` | — | set a property of an object |
+| `TILED_OBJECT_REMOVE_PROP(m, layer$, idx, key$)` | — | remove a property of an object |
+| `TILED_REMOVE_OBJECT(m, layer$, idx)` | — | remove an object |
+| `TILED_OBJECT_SET_NAME(m, layer$, idx, name$)` | — | rename an object |
+| `TILED_OBJECT_SET_TYPE(m, layer$, idx, type$)` | — | change its type |
+| `TILED_OBJECT_SET_RECT(m, layer$, idx, x, y, w, h)` | — | change position and size |
 | `TILED_TILE_PROP_KEYS(m, gid)` | ARRAY OF STRING | which properties does this tile have? |
-| `TILED_OBJECT_PROP_KEYS(m, ebene$, idx)` | ARRAY OF STRING | the same for an object |
-| `TILED_SAVE(m, pfad$)` | — | write the map as Tiled JSON |
+| `TILED_OBJECT_PROP_KEYS(m, layer$, idx)` | ARRAY OF STRING | the same for an object |
+| `TILED_SAVE(m, path$)` | — | write the map as Tiled JSON |
 
 ```basic
 IMPORT "tiled"
@@ -183,9 +183,9 @@ typo in the size does not eat up the memory.
 |---|---|---|
 | `TILED_LAYER_RENAME(m, idx, name$)` | — | rename a layer |
 | `TILED_LAYER_VISIBLE(m, idx)` | BOOLEAN | is the layer shown? |
-| `TILED_LAYER_SET_VISIBLE(m, idx, an)` | — | show or hide a layer |
+| `TILED_LAYER_SET_VISIBLE(m, idx, on)` | — | show or hide a layer |
 | `TILED_REMOVE_LAYER(m, idx)` | — | remove a layer |
-| `TILED_MOVE_LAYER(m, von, nach)` | — | move a layer to another position |
+| `TILED_MOVE_LAYER(m, from, to)` | — | move a layer to another position |
 
 Visibility is **not just display** -- Tiled saves it in the file.
 Without `TILED_LAYER_SET_VISIBLE`, a hidden layer therefore could not be saved

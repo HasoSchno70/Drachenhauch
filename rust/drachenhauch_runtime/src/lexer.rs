@@ -90,6 +90,13 @@ mod keyword_tests {
     }
 }
 
+/// Das Wort zu einem Schluesselwort-Token (`Tt::Image` -> "image"); `None`
+/// fuer alles andere. Fuer benannte Argumente, deren Name ein
+/// Schluesselwort ist.
+pub(crate) fn keyword_text(t: Tt) -> Option<&'static str> {
+    KEYWORDS.iter().copied().find(|k| keyword(k) == Some(t))
+}
+
 /// Keyword-Lookup (lowercase) -> Tt; muss zu `KEYWORDS` oben passen (Test).
 pub(crate) fn keyword(text: &str) -> Option<Tt> {
     use Tt::*;

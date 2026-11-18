@@ -1269,6 +1269,10 @@ FUNCTION signaturNamen(sig AS STRING, mitOptionalen AS BOOLEAN) AS ARRAY OF STRI
     DIM stueck AS STRING
     FOR EACH stueck IN SPLIT$(innen, ",")
         DIM t AS STRING : t = TRIM$(stueck)
+        ' Ein Parameter mit Vorgabe (`hour: INTEGER = 0`) ist optional wie
+        ' einer in `[ ]` -- ohne das bekam DRAW_IMAGE ein Geruest mit
+        ' dreizehn Stellen.
+        IF INSTR(t, "=") >= 0 AND NOT mitOptionalen THEN BREAK
         IF LEFT$(UPPER$(t), 6) = "BYREF " THEN t = TRIM$(MID$(t, 6))
         DIM als AS INTEGER : als = INSTR(UPPER$(t), " AS ")
         IF als >= 0 THEN t = TRIM$(LEFT$(t, als))

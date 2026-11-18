@@ -27,14 +27,14 @@ text = "<name>" + XML_ESCAPE$(kunde) + "</name>"
 | Function | Purpose |
 |---|---|
 | `XML_PARSE(text$)` → XML_HANDLE | from a string |
-| `XML_LOAD(pfad$[, kodierung$])` → XML_HANDLE | from a file |
+| `XML_LOAD(path$[, encoding$])` → XML_HANDLE | from a file |
 | `XML_NAME$(k)` → STRING | the name of the element |
-| `XML_TEXT$(k[, pfad$])` → STRING | the text (including that of the children) |
-| `XML_ATTR$(k, name$[, vorgabe$])` → STRING | an attribute |
-| `XML_HAS(k, pfad$)` → BOOLEAN | does the path exist? |
-| `XML_FIND(k, pfad$)` → XML_HANDLE | jump there |
-| `XML_COUNT(k, pfad$)` → INTEGER | how many with the same name? |
-| `XML_AT(k, pfad$, i)` → XML_HANDLE | the i-th of them (0-based) |
+| `XML_TEXT$(k[, path$])` → STRING | the text (including that of the children) |
+| `XML_ATTR$(k, name$[, default$])` → STRING | an attribute |
+| `XML_HAS(k, path$)` → BOOLEAN | does the path exist? |
+| `XML_FIND(k, path$)` → XML_HANDLE | jump there |
+| `XML_COUNT(k, path$)` → INTEGER | how many with the same name? |
+| `XML_AT(k, path$, i)` → XML_HANDLE | the i-th of them (0-based) |
 | `XML_CHILD_COUNT(k)` / `XML_CHILD(k, i)` | walk through an unknown tree |
 | `XML_ATTR_NAMES(k)` → ARRAY OF STRING | all attribute names |
 | `XML_ESCAPE$(text$)` → STRING | replace the five special characters |

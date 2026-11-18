@@ -23,8 +23,8 @@ Für die Mathematik dahinter (Vektoren, Quaternionen, Matrizen) gibt es das Modu
 | Funktion | Rückgabe | Bedeutung |
 |---|---|---|
 | `CAMERA3D(px, py, pz, tx, ty, tz, fovy)` | — | Kamera setzen: Standort, Blickziel, Öffnungswinkel in Grad (üblich 45). Oben ist +Y |
-| `CAMERA3D_UPDATE(modus)` | — | raylib die Kamera bewegen lassen: `1` frei, `2` umkreisend, `3` Ego, `4` Verfolger — liest selbst Maus und WASD |
-| `CAMERA3D_MOVE(vor, rechts, hoch, gieren, neigen[, zoom])` | — | die Kamera vom Programm aus bewegen (in Einheiten, vor/rechts auf der Bodenebene) und drehen (Grad: gieren nach rechts, neigen nach oben, höchstens 89 Grad); `zoom` ändert den Abstand zum Ziel (positiv = weiter weg). Für eigene Tastenbelegung, Gamepad oder Kamerafahrten; gilt ab der Lage, die `CAMERA3D` zuletzt gesetzt hat — `CAMERA3D` also nicht in jedem Bild neu aufrufen |
+| `CAMERA3D_UPDATE(mode)` | — | raylib die Kamera bewegen lassen: `1` frei, `2` umkreisend, `3` Ego, `4` Verfolger — liest selbst Maus und WASD |
+| `CAMERA3D_MOVE(forward, right, up, yaw, pitch[, zoom])` | — | die Kamera vom Programm aus bewegen (in Einheiten, vor/right auf der Bodenebene) und drehen (Grad: yaw nach right, pitch nach oben, höchstens 89 Grad); `zoom` ändert den Abstand zum Ziel (positiv = weiter weg). Für eigene Tastenbelegung, Gamepad oder Kamerafahrten; gilt ab der Lage, die `CAMERA3D` zuletzt gesetzt hat — `CAMERA3D` also nicht in jedem Bild neu aufrufen |
 | `CAMERA3D_X()` / `CAMERA3D_Y()` / `CAMERA3D_Z()` | FLOAT | wo steht die Kamera gerade? |
 | `CAMERA3D_TARGET_X()` / `CAMERA3D_TARGET_Y()` / `CAMERA3D_TARGET_Z()` | FLOAT | worauf blickt sie? |
 
@@ -35,89 +35,89 @@ Hilfslinien. Wer dieselbe Form oft braucht, nimmt ein Modell (siehe unten).
 
 | Funktion | Bedeutung |
 |---|---|
-| `CUBE(x, y, z, breite, hoehe, tiefe, farbe)` | gefüllter Quader |
-| `CUBE_WIRES(x, y, z, breite, hoehe, tiefe, farbe)` | derselbe als Drahtgitter |
-| `CUBE_MATRIX_WIRES(mat [, farbe])` | die 12 Kanten eines Würfels (Kante 1, Mitte im Ursprung) durch eine Welt-Matrix aus `m3d` -- der Umriss eines gedrehten Klotzes, etwa aus `physics3d`; Größe über die Skalierung der Matrix |
-| `SPHERE(x, y, z, radius, farbe)` | Kugel um einen Mittelpunkt |
-| `SPHERE_WIRES(x, y, z, radius, farbe)` | Kugel als Drahtgitter |
-| `CYLINDER(x, y, z, r_oben, r_unten, hoehe, farbe)` | Zylinder — mit `r_oben = 0` wird ein Kegel daraus |
-| `CYLINDER_WIRES(x, y, z, r_oben, r_unten, hoehe, farbe)` | derselbe als Drahtgitter |
-| `CYLINDER_EX(x1, y1, z1, x2, y2, z2, r_anfang, r_ende, farbe)` | Zylinder (oder Kegel) von einem Punkt zum anderen, in jeder Richtung — Rohre, Äste, Strahlen |
-| `CAPSULE(x1, y1, z1, x2, y2, z2, r, farbe)` | Kapsel zwischen zwei Punkten (Zylinder mit Halbkugeln) — die übliche Form für Figuren und ihre Kollision |
-| `CAPSULE_WIRES(x1, y1, z1, x2, y2, z2, r, farbe)` | dieselbe als Drahtgitter |
-| `TRIANGLE3D(x1, y1, z1, x2, y2, z2, x3, y3, z3, farbe)` | freies Dreieck im Raum, von beiden Seiten sichtbar |
-| `CIRCLE3D(x, y, z, r, farbe)` | Kreislinie flach auf dem Boden — Zielmarke, Reichweite, Schattenrand |
-| `BBOX_WIRES(x1, y1, z1, x2, y2, z2, farbe)` | Quader als Kanten zwischen zwei Ecken (die Reihenfolge ist egal); mit `MODEL_BBOX` der Rahmen um ein Modell |
-| `PLANE(x, y, z, size_x, size_z, farbe)` | flache Ebene in der XZ-Fläche (Boden) |
-| `LINE3D(x1, y1, z1, x2, y2, z2, farbe)` | Linie zwischen zwei Punkten |
-| `POINT3D(x, y, z, farbe)` | einzelner Punkt |
-| `GRID3D(linien, abstand)` | Bodenraster — hilft ungemein beim Einschätzen von Entfernungen |
-| `BILLBOARD(bild, x, y, z, groesse, farbe)` | Bild im Raum, das sich immer zur Kamera dreht (Bäume, Funken, Beschriftungen) |
-| `BILLBOARD_PART(bild, sx, sy, sb, sh, x, y, z, groesse, farbe)` | nur ein Ausschnitt des Bildes — ein Einzelbild aus einem Sprite-Blatt, so laufen Figuren in 3D; `groesse` ist die Höhe, die Breite folgt dem Ausschnitt |
-| `BILLBOARD_EX(bild, x, y, z, breite, hoehe, winkel, farbe)` | mit eigener Breite und Höhe, um seine Mitte gedreht (Grad) — Funken, die sich drehen, gestreckte Strahlen |
+| `CUBE(x, y, z, width, height, depth, color)` | gefüllter Quader |
+| `CUBE_WIRES(x, y, z, width, height, depth, color)` | derselbe als Drahtgitter |
+| `CUBE_MATRIX_WIRES(mat [, color])` | die 12 Kanten eines Würfels (Kante 1, Mitte im Ursprung) durch eine Welt-Matrix aus `m3d` -- der Umriss eines gedrehten Klotzes, etwa aus `physics3d`; Größe über die Skalierung der Matrix |
+| `SPHERE(x, y, z, radius, color)` | Kugel um einen Mittelpunkt |
+| `SPHERE_WIRES(x, y, z, radius, color)` | Kugel als Drahtgitter |
+| `CYLINDER(x, y, z, r_top, r_bottom, height, color)` | Zylinder — mit `r_top = 0` wird ein Kegel daraus |
+| `CYLINDER_WIRES(x, y, z, r_top, r_bottom, height, color)` | derselbe als Drahtgitter |
+| `CYLINDER_EX(x1, y1, z1, x2, y2, z2, r_start, r_end, color)` | Zylinder (oder Kegel) von einem Punkt zum anderen, in jeder Richtung — Rohre, Äste, Strahlen |
+| `CAPSULE(x1, y1, z1, x2, y2, z2, r, color)` | Kapsel zwischen zwei Punkten (Zylinder mit Halbkugeln) — die übliche Form für Figuren und ihre Kollision |
+| `CAPSULE_WIRES(x1, y1, z1, x2, y2, z2, r, color)` | dieselbe als Drahtgitter |
+| `TRIANGLE3D(x1, y1, z1, x2, y2, z2, x3, y3, z3, color)` | freies Dreieck im Raum, von beiden Seiten sichtbar |
+| `CIRCLE3D(x, y, z, r, color)` | Kreislinie flach auf dem Boden — Zielmarke, Reichweite, Schattenrand |
+| `BBOX_WIRES(x1, y1, z1, x2, y2, z2, color)` | Quader als Kanten zwischen zwei Ecken (die Reihenfolge ist egal); mit `MODEL_BBOX` der Rahmen um ein Modell |
+| `PLANE(x, y, z, size_x, size_z, color)` | flache Ebene in der XZ-Fläche (Boden) |
+| `LINE3D(x1, y1, z1, x2, y2, z2, color)` | Linie zwischen zwei Punkten |
+| `POINT3D(x, y, z, color)` | einzelner Punkt |
+| `GRID3D(lines, spacing)` | Bodenraster — hilft ungemein beim Einschätzen von Entfernungen |
+| `BILLBOARD(image, x, y, z, size, color)` | Bild im Raum, das sich immer zur Kamera dreht (Bäume, Funken, Beschriftungen) |
+| `BILLBOARD_PART(image, sx, sy, sb, sh, x, y, z, size, color)` | nur ein Ausschnitt des Bildes — ein Einzelbild aus einem Sprite-Blatt, so laufen Figuren in 3D; `size` ist die Höhe, die Breite folgt dem Ausschnitt |
+| `BILLBOARD_EX(image, x, y, z, width, height, angle, color)` | mit eigener Breite und Höhe, um seine Mitte gedreht (Grad) — Funken, die sich drehen, gestreckte Strahlen |
 
 ### Modelle
 
 | Funktion | Rückgabe | Bedeutung |
 |---|---|---|
-| `LOADMODEL(pfad$)` | INTEGER | Modell aus einer Datei laden (OBJ, GLTF, IQM …) |
-| `MESH_CUBE(breite, hoehe, tiefe)` | INTEGER | Quader als Modell — ohne Datei |
-| `MESH_SPHERE(radius, ringe, segmente)` | INTEGER | Kugel; mehr Ringe und Segmente = runder und teurer |
-| `MESH_CYLINDER(radius, hoehe, segmente)` | INTEGER | Zylinder |
-| `MESH_TORUS(radius, dicke, rad_seg, seiten)` | INTEGER | Ring |
-| `MESH_KNOT(radius, dicke, rad_seg, seiten)` | INTEGER | Kleeblattknoten |
-| `MESH_PLANE(breite, laenge, res_x, res_z)` | INTEGER | Ebene mit Unterteilung |
-| `MESH_HEIGHTMAP(bild, groesse_x, groesse_y, groesse_z)` | INTEGER | Gelände aus einem Graustufenbild: hell = hoch, `groesse_y` bestimmt wie hoch |
-| `MESH_CONE(radius, hoehe, segmente)` | INTEGER | Kegel, der auf dem Boden steht (y von 0 bis `hoehe`) |
-| `MESH_HEMISPHERE(radius, ringe, segmente)` | INTEGER | obere Hälfte einer Kugel, unten offen — Kuppeln, Hügel |
-| `MESH_POLY(seiten, radius)` | INTEGER | flaches regelmäßiges Vieleck auf dem Boden (3 bis 256 Seiten) |
-| `MESH_CUBICMAP(bild, breite, hoehe, tiefe)` | INTEGER | Labyrinth aus einem Bild: jeder weiße Punkt wird ein Würfel der Größe `breite` x `hoehe` x `tiefe`, jeder schwarze bekommt Boden und eine Decke, die man von innen sieht; andere Farben bleiben leer. Punkt (x, y) liegt bei x·breite, y·tiefe. Mit `MODEL_LIT` und einem Licht, sonst sehen Wände und Gänge gleich aus |
-| `MODEL(modell, x, y, z, skala, farbe)` | — | zeichnen |
-| `MODEL_EX(modell, x, y, z, achse_x, achse_y, achse_z, winkel_grad, skala, farbe)` | — | zeichnen und um eine Achse drehen |
-| `MODEL_WIRES(modell, x, y, z, skala, farbe)` | — | als Drahtgitter zeichnen |
-| `MODEL_MATRIX_WIRES(handle, mat [, farbe])` | — | Drahtgitter mit einer Welt-Matrix aus `m3d`, das Gegenstück zu `MODEL_MATRIX` -- für gedrehte Körper (Physik, Bones); `MODEL_WIRES` kennt nur Lage und Größe. Gezeichnet wird jedes Dreieck, ein Würfel also mit Diagonalen -- für seine 12 Kanten `CUBE_MATRIX_WIRES`. Liegt das Gitter genau auf den Flächen, wirkt es gestrichelt -- dann die Matrix um ein halbes Prozent größer skalieren |
-| `MODEL_BBOX(modell)` | TUPLE | Hüllquader `(min_x, min_y, min_z, max_x, max_y, max_z)` in den eigenen Koordinaten des Modells (ohne Lage und Skala beim Zeichnen) — für Kollisionen und um ein Modell auf den Boden zu stellen |
-| `MODEL_SAVE(modell, pfad$)` | — | alle Teile des Modells als Wavefront-OBJ schreiben (`.obj`) — ein Labyrinth aus `MESH_CUBICMAP` oder ein Gelände in Blender weiterbearbeiten, mit `LOADMODEL` zurückholen. Ohne Material, Textur und Animation; die Texturkoordinaten werden so geschrieben, dass sie nach `LOADMODEL` wieder richtig herum stehen |
-| `MODEL_TEXTURE(modell, bild)` | — | ein Bild als Oberfläche auflegen |
-| `MODEL_TEXTURE_NORMAL(modell, bild)` | — | Normal-Map für Oberflächenstruktur (wirkt nur mit `MODEL_LIT`) |
+| `LOADMODEL(path$)` | INTEGER | Modell aus einer Datei laden (OBJ, GLTF, IQM …) |
+| `MESH_CUBE(width, height, depth)` | INTEGER | Quader als Modell — ohne Datei |
+| `MESH_SPHERE(radius, rings, segments)` | INTEGER | Kugel; mehr Ringe und Segmente = runder und teurer |
+| `MESH_CYLINDER(radius, height, segments)` | INTEGER | Zylinder |
+| `MESH_TORUS(radius, thickness, rad_seg, pages)` | INTEGER | Ring |
+| `MESH_KNOT(radius, thickness, rad_seg, pages)` | INTEGER | Kleeblattknoten |
+| `MESH_PLANE(width, length, res_x, res_z)` | INTEGER | Ebene mit Unterteilung |
+| `MESH_HEIGHTMAP(image, size_x, size_y, size_z)` | INTEGER | Gelände aus einem Graustufenbild: hell = hoch, `size_y` bestimmt wie hoch |
+| `MESH_CONE(radius, height, segments)` | INTEGER | Kegel, der auf dem Boden steht (y von 0 bis `height`) |
+| `MESH_HEMISPHERE(radius, rings, segments)` | INTEGER | obere Hälfte einer Kugel, unten offen — Kuppeln, Hügel |
+| `MESH_POLY(pages, radius)` | INTEGER | flaches regelmäßiges Vieleck auf dem Boden (3 bis 256 Seiten) |
+| `MESH_CUBICMAP(image, width, height, depth)` | INTEGER | Labyrinth aus einem Bild: jeder weiße Punkt wird ein Würfel der Größe `width` x `height` x `depth`, jeder schwarze bekommt Boden und eine Decke, die man von innen sieht; andere Farben bleiben leer. Punkt (x, y) liegt bei x·width, y·depth. Mit `MODEL_LIT` und einem Licht, sonst sehen Wände und Gänge gleich aus |
+| `MODEL(model, x, y, z, scale, color)` | — | zeichnen |
+| `MODEL_EX(model, x, y, z, axis_x, axis_y, axis_z, angle_deg, scale, color)` | — | zeichnen und um eine Achse drehen |
+| `MODEL_WIRES(model, x, y, z, scale, color)` | — | als Drahtgitter zeichnen |
+| `MODEL_MATRIX_WIRES(handle, mat [, color])` | — | Drahtgitter mit einer Welt-Matrix aus `m3d`, das Gegenstück zu `MODEL_MATRIX` -- für gedrehte Körper (Physik, Bones); `MODEL_WIRES` kennt nur Lage und Größe. Gezeichnet wird jedes Dreieck, ein Würfel also mit Diagonalen -- für seine 12 Kanten `CUBE_MATRIX_WIRES`. Liegt das Gitter genau auf den Flächen, wirkt es gestrichelt -- dann die Matrix um ein halbes Prozent größer skalieren |
+| `MODEL_BBOX(model)` | TUPLE | Hüllquader `(min_x, min_y, min_z, max_x, max_y, max_z)` in den eigenen Koordinaten des Modells (ohne Lage und Skala beim Zeichnen) — für Kollisionen und um ein Modell auf den Boden zu stellen |
+| `MODEL_SAVE(model, path$)` | — | alle Teile des Modells als Wavefront-OBJ schreiben (`.obj`) — ein Labyrinth aus `MESH_CUBICMAP` oder ein Gelände in Blender weiterbearbeiten, mit `LOADMODEL` zurückholen. Ohne Material, Textur und Animation; die Texturkoordinaten werden so geschrieben, dass sie nach `LOADMODEL` wieder richtig herum stehen |
+| `MODEL_TEXTURE(model, image)` | — | ein Bild als Oberfläche auflegen |
+| `MODEL_TEXTURE_NORMAL(model, image)` | — | Normal-Map für Oberflächenstruktur (wirkt nur mit `MODEL_LIT`) |
 
 ### Bewegte Modelle (Skelett)
 
 | Funktion | Rückgabe | Bedeutung |
 |---|---|---|
-| `MODEL_LOAD_ANIMS(pfad$)` | INTEGER | Animationen aus einer Datei laden (GLTF/IQM) |
+| `MODEL_LOAD_ANIMS(path$)` | INTEGER | Animationen aus einer Datei laden (GLTF/IQM) |
 | `MODEL_ANIM_COUNT(set)` | INTEGER | wie viele Animationen sind darin? |
 | `MODEL_ANIM_NAME(set, idx)` | STRING | Name einer Animation |
 | `MODEL_ANIM_FRAMES(set, idx)` | INTEGER | wie viele Einzelbilder hat sie? |
-| `MODEL_ANIMATE(modell, set, anim, frame)` | — | Modell in diese Haltung bringen; `frame` läuft im Kreis |
-| `MODEL_ANIMATE_BLEND(modell, set, anim_a, frame_a, anim_b, frame_b, blend)` | — | weich zwischen zwei Animationen überblenden (`blend` 0 = ganz A, 1 = ganz B) — für Gehen nach Rennen ohne Sprung |
+| `MODEL_ANIMATE(model, set, anim, frame)` | — | Modell in diese Haltung bringen; `frame` läuft im Kreis |
+| `MODEL_ANIMATE_BLEND(model, set, anim_a, frame_a, anim_b, frame_b, blend)` | — | weich zwischen zwei Animationen überblenden (`blend` 0 = ganz A, 1 = ganz B) — für Gehen nach Rennen ohne Sprung |
 
 ### Licht und Material
 
 | Funktion | Rückgabe | Bedeutung |
 |---|---|---|
 | `LIGHT_ENABLE()` | — | Beleuchtung einschalten (einmalig; es gibt kein Gegenstück zum Ausschalten) |
-| `LIGHT_AMBIENT(farbe, staerke)` | — | Grundhelligkeit, damit Schattenseiten nicht schwarz absaufen |
-| `LIGHT_DIRECTIONAL(x, y, z, farbe)` | INTEGER | Licht aus einer Richtung, wie die Sonne — liefert die Lichtnummer |
-| `LIGHT_POINT(x, y, z, farbe)` | INTEGER | Licht von einem Punkt aus, wie eine Lampe |
-| `LIGHT_SET_POS(licht, x, y, z)` | — | Licht bewegen |
-| `LIGHT_SET_COLOR(licht, farbe)` | — | Lichtfarbe ändern |
-| `LIGHT_SET_ENABLED(licht [, an])` | — | einzelnes Licht an- oder ausschalten |
-| `LIGHT_FOG(farbe, dichte)` | — | Nebel mit der Entfernung; lässt Weites verblassen |
-| `MODEL_LIT(modell)` | — | dieses Modell wird beleuchtet (sonst zeichnet es flach). Die Deckkraft der Farbe gilt auch beleuchtet: `MODEL(m, x, y, z, 1.0, RGBA(80, 160, 255, 100))` ist halbdurchsichtig -- durchsichtige Modelle zuletzt zeichnen, sonst verdecken sie, was danach kommt (bis 2026.27 blieb ein beleuchtetes Modell deckend) |
-| `MODEL_PBR(modell, metalness, roughness)` | — | Materialverhalten: `metalness` 0 = Kunststoff, 1 = Metall; `roughness` 0 = spiegelnd, 1 = matt |
-| `MODEL_EMISSIVE(modell, farbe, staerke)` | — | das Modell leuchtet selbst — auch durch den Nebel hindurch |
+| `LIGHT_AMBIENT(color, strength)` | — | Grundhelligkeit, damit Schattenseiten nicht schwarz absaufen |
+| `LIGHT_DIRECTIONAL(x, y, z, color)` | INTEGER | Licht aus einer Richtung, wie die Sonne — liefert die Lichtnummer |
+| `LIGHT_POINT(x, y, z, color)` | INTEGER | Licht von einem Punkt aus, wie eine Lampe |
+| `LIGHT_SET_POS(light, x, y, z)` | — | Licht bewegen |
+| `LIGHT_SET_COLOR(light, color)` | — | Lichtfarbe ändern |
+| `LIGHT_SET_ENABLED(light [, on])` | — | einzelnes Licht an- oder ausschalten |
+| `LIGHT_FOG(color, density)` | — | Nebel mit der Entfernung; lässt Weites verblassen |
+| `MODEL_LIT(model)` | — | dieses Modell wird beleuchtet (sonst zeichnet es flach). Die Deckkraft der Farbe gilt auch beleuchtet: `MODEL(m, x, y, z, 1.0, RGBA(80, 160, 255, 100))` ist halbdurchsichtig -- durchsichtige Modelle zuletzt zeichnen, sonst verdecken sie, was danach kommt (bis 2026.27 blieb ein beleuchtetes Modell deckend) |
+| `MODEL_PBR(model, metalness, roughness)` | — | Materialverhalten: `metalness` 0 = Kunststoff, 1 = Metall; `roughness` 0 = spiegelnd, 1 = matt |
+| `MODEL_EMISSIVE(model, color, strength)` | — | das Modell leuchtet selbst — auch durch den Nebel hindurch |
 
 ### Umgebung und Schatten
 
 | Funktion | Rückgabe | Bedeutung |
 |---|---|---|
-| `LIGHT_ENV(himmel, boden, intensitaet)` | — | Umgebungslicht aus zwei Farben — Metalle spiegeln es |
-| `LIGHT_ENV_HDR(pfad$ [, intensitaet])` | — | echtes Panorama aus einer `.hdr`-Datei statt der Zwei-Farben-Näherung |
-| `SKYBOX(an)` | — | das Panorama auch als Hintergrund zeigen (braucht `LIGHT_ENV_HDR`) |
-| `SKYBOX_IMAGE(bild)` | — | Himmel aus einem gewöhnlichen Bild statt einer `.hdr`-Datei: sechs Felder als Streifen (6:1 oder 1:6) oder als Kreuz (4:3 oder 3:4), Reihenfolge +X, −X, +Y, −Y, +Z, −Z; zeigt ihn gleich an, `SKYBOX(FALSE)` blendet ihn aus |
-| `SHADOW_ENABLE([aufloesung])` | — | Schattenwurf einschalten; das erste gerichtete Licht wirft ihn |
-| `SHADOW_AREA(groesse, dist)` | — | welcher Ausschnitt Schatten bekommt — klein = scharf, groß = deckt mehr ab |
+| `LIGHT_ENV(sky, floor, intensity)` | — | Umgebungslicht aus zwei Farben — Metalle spiegeln es |
+| `LIGHT_ENV_HDR(path$ [, intensity])` | — | echtes Panorama aus einer `.hdr`-Datei statt der Zwei-Farben-Näherung |
+| `SKYBOX(on)` | — | das Panorama auch als Hintergrund zeigen (braucht `LIGHT_ENV_HDR`) |
+| `SKYBOX_IMAGE(image)` | — | Himmel aus einem gewöhnlichen Bild statt einer `.hdr`-Datei: sechs Felder als Streifen (6:1 oder 1:6) oder als Kreuz (4:3 oder 3:4), Reihenfolge +X, −X, +Y, −Y, +Z, −Z; zeigt ihn gleich an, `SKYBOX(FALSE)` blendet ihn aus |
+| `SHADOW_ENABLE([resolution])` | — | Schattenwurf einschalten; das erste gerichtete Licht wirft ihn |
+| `SHADOW_AREA(size, dist)` | — | welcher Ausschnitt Schatten bekommt — klein = scharf, groß = deckt mehr ab |
 | `SHADOW_TARGET(x, y, z)` | — | worauf dieser Ausschnitt zentriert ist (meist die Spielfigur) |
 
 ### Anklicken und Treffer
@@ -134,16 +134,16 @@ Einheitsrichtung mal Entfernung.
 |---|---|---|
 | `PICK_BOX(cx, cy, cz, sx, sy, sz)` | FLOAT | trifft der Mauszeiger diesen Quader? (Mittelpunkt und volle Größe) |
 | `PICK_SPHERE(cx, cy, cz, r)` | FLOAT | … diese Kugel? |
-| `PICK_MODEL(modell, px, py, pz [, skala])` | FLOAT | … dieses Modell? (echte Dreiecke, nicht nur ein Hüllkörper) |
+| `PICK_MODEL(model, px, py, pz [, scale])` | FLOAT | … dieses Modell? (echte Dreiecke, nicht nur ein Hüllkörper) |
 | `PICK_TRI(x1, y1, z1, x2, y2, z2, x3, y3, z3)` | FLOAT | … dieses Dreieck? |
 | `PICK_QUAD(x1, y1, z1, x2, y2, z2, x3, y3, z3, x4, y4, z4)` | FLOAT | … dieses Viereck? Die Punkte müssen **reihum** liegen |
 | `RAY_HIT_BOX(ox, oy, oz, dx, dy, dz, cx, cy, cz, sx, sy, sz)` | FLOAT | eigener Strahl gegen einen Quader |
 | `RAY_HIT_SPHERE(ox, oy, oz, dx, dy, dz, cx, cy, cz, r)` | FLOAT | eigener Strahl gegen eine Kugel |
-| `RAY_HIT_MODEL(modell, ox, oy, oz, dx, dy, dz, px, py, pz [, skala])` | FLOAT | eigener Strahl gegen ein Modell |
+| `RAY_HIT_MODEL(model, ox, oy, oz, dx, dy, dz, px, py, pz [, scale])` | FLOAT | eigener Strahl gegen ein Modell |
 | `RAY_HIT_TRI(ox, oy, oz, dx, dy, dz, x1, y1, z1, x2, y2, z2, x3, y3, z3)` | FLOAT | eigener Strahl gegen ein Dreieck |
 | `RAY_HIT_QUAD(ox, oy, oz, dx, dy, dz, x1, y1, z1, x2, y2, z2, x3, y3, z3, x4, y4, z4)` | FLOAT | eigener Strahl gegen ein Viereck |
-| `MOUSE_GROUND_X(hoehe)` / `MOUSE_GROUND_Z(hoehe)` | FLOAT | wo trifft der Mauszeiger die waagerechte Ebene auf dieser Höhe? |
-| `MOUSE_GROUND_HIT(hoehe)` | BOOLEAN | trifft er sie überhaupt? (bei Blick zum Himmel nicht) |
+| `MOUSE_GROUND_X(plane_y)` / `MOUSE_GROUND_Z(plane_y)` | FLOAT | wo trifft der Mauszeiger die waagerechte Ebene auf dieser Höhe? |
+| `MOUSE_GROUND_HIT(plane_y)` | BOOLEAN | trifft er sie überhaupt? (bei Blick zum Himmel nicht) |
 | `SCREEN_TO_WORLD_DIR_X(sx, sy)` / `SCREEN_TO_WORLD_DIR_Y(sx, sy)` / `SCREEN_TO_WORLD_DIR_Z(sx, sy)` | FLOAT | Richtung des Strahls durch einen Bildschirmpunkt — für eigene Treffertests |
 | `WORLD_TO_SCREEN_X(wx, wy, wz)` / `WORLD_TO_SCREEN_Y(wx, wy, wz)` | FLOAT | wo landet ein Punkt der Welt auf dem Bildschirm? — für Beschriftungen über Figuren |
 

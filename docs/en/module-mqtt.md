@@ -28,7 +28,7 @@ message that must arrive (a command that stops a motor).
 | Function | Returns | Meaning |
 |---|---|---|
 | `MQTT_CONNECT(host$, port, client_id$[, keepalive_s[, user$[, pass$]]])` | MQTT_HANDLE | establish the connection to the broker (`keepalive_s` default 60); `mqtts://host` connects encrypted |
-| `MQTT_TLS_CA(pfad$)` | — | your own CA (PEM file) for every following `mqtts://` connection; `""` = the public roots again |
+| `MQTT_TLS_CA(path$)` | — | your own CA (PEM file) for every following `mqtts://` connection; `""` = the public roots again |
 | `MQTT_DISCONNECT(handle)` | — | close the connection |
 | `MQTT_IS_CONNECTED(handle)` | BOOLEAN | is the connection still up? |
 | `MQTT_PUBLISH(handle, topic$, payload$[, retain[, qos]])` | BOOLEAN | send a message to a topic; with `retain` the broker keeps it for later subscribers, `qos` 0 or 1. FALSE if the connection is gone |
@@ -36,7 +36,7 @@ message that must arrive (a command that stops a motor).
 | `MQTT_UNSUBSCRIBE(handle, topic$)` | BOOLEAN | end a subscription |
 | `MQTT_PENDING(handle)` | INTEGER | how many QoS 1 messages the broker has not acknowledged yet |
 | `MQTT_FLUSH(handle[, ms])` | BOOLEAN | wait until all QoS 1 messages are acknowledged (default 2000 ms); FALSE when the time is up |
-| `MQTT_WILL(topic$, inhalt$[, retain])` | — | the **last will** for the next `MQTT_CONNECT`: if the connection breaks without a disconnect, the broker publishes this message |
+| `MQTT_WILL(topic$, content$[, retain])` | — | the **last will** for the next `MQTT_CONNECT`: if the connection breaks without a disconnect, the broker publishes this message |
 | `MQTT_UPDATE(handle)` | — | **call once per frame**: reads in received messages and keeps the connection alive with PINGREQ |
 | `MQTT_NEXT_MESSAGE(handle)` | BOOLEAN | advance by one message; FALSE when the queue is empty |
 | `MQTT_MESSAGE_TOPIC(handle)` | STRING | topic of the current message |

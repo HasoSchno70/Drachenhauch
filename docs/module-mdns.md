@@ -64,13 +64,13 @@ PRINT MDNS_ANNOUNCE("Wetterstation", "_http._tcp", 8080, "pfad=/")
 | Befehl | Was es tut |
 |---|---|
 | `MDNS_RESOLVE$(name$ [, ms])` → STRING | die IPv4-Adresse zu `name.local`, `""` wenn bis `ms` (Vorgabe 1500) niemand antwortet |
-| `MDNS_BROWSE(dienst$ [, ms])` → INTEGER | alle Dienste dieses Typs suchen, die bis `ms` (Vorgabe 2000) antworten; liefert ihre Zahl. Fehlende Angaben (Port, Adresse) werden nachgefragt |
+| `MDNS_BROWSE(service$ [, ms])` → INTEGER | alle Dienste dieses Typs suchen, die bis `ms` (Vorgabe 2000) antworten; liefert ihre Zahl. Fehlende Angaben (Port, Adresse) werden nachgefragt |
 | `MDNS_SERVICE_NAME$(index)` → STRING | Name eines gefundenen Dienstes (ab 0, nach Namen sortiert), etwa `"Kueche"` |
 | `MDNS_SERVICE_HOST$(index)` → STRING | sein Rechnername, etwa `"kueche.local"` |
 | `MDNS_SERVICE_ADDRESS$(index)` → STRING | seine IPv4-Adresse |
 | `MDNS_SERVICE_PORT(index)` → INTEGER | sein Port |
-| `MDNS_SERVICE_TXT$(index, schluessel$)` → STRING | ein Eintrag seiner TXT-Angaben (`pfad=/`), `""` wenn es ihn nicht gibt |
-| `MDNS_ANNOUNCE(name$, dienst$, port [, txt$])` → STRING | einen eigenen Dienst ankündigen; liefert den Rechnernamen, unter dem er zu finden ist (`name.local`, klein, Leerzeichen als `-`). `txt$` wie `"pfad=/;version=2"`. Mehrfach aufgerufen kommen weitere Dienste dazu |
+| `MDNS_SERVICE_TXT$(index, key$)` → STRING | ein Eintrag seiner TXT-Angaben (`pfad=/`), `""` wenn es ihn nicht gibt |
+| `MDNS_ANNOUNCE(name$, service$, port [, text$])` → STRING | einen eigenen Dienst ankündigen; liefert den Rechnernamen, unter dem er zu finden ist (`name.local`, klein, Leerzeichen als `-`). `text$` wie `"pfad=/;version=2"`. Mehrfach aufgerufen kommen weitere Dienste dazu |
 | `MDNS_STOP()` | alle Ankündigungen zurückziehen |
 
 `ms` liegt zwischen 50 und 30000. Die Fragen gehen nach 0, 300 und 900 ms

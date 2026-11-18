@@ -23,8 +23,8 @@ IMPORT "particles"
 | `PARTICLE_DRAW(sys)` | draw (camera-aware) |
 | `PARTICLE_COUNT(sys)` → INTEGER | number of living particles |
 | `PARTICLE_CLEAR(sys)` | delete all |
-| `PARTICLE_SET_MODE(sys, modus$)` | appearance of the particles: `circle`, `pixel`, `square`, `streak` or `glow` |
-| `PARTICLE_SET_COLOR_END(sys, farbe)` | colour at the end of the lifetime — the particles change colour on the way (fire: yellow to red) |
+| `PARTICLE_SET_MODE(sys, mode$)` | appearance of the particles: `circle`, `pixel`, `square`, `streak` or `glow` |
+| `PARTICLE_SET_COLOR_END(sys, color)` | colour at the end of the lifetime — the particles change colour on the way (fire: yellow to red) |
 
 ## Defaults
 

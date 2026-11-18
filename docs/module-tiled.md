@@ -76,23 +76,23 @@ IMPORT "tiled"
 
 | Funktion | Rueckgabe | Bedeutung |
 |---|---|---|
-| `TILED_NEW(breite, hoehe, kachel_w, kachel_h)` | TILED_MAP | eine leere Karte anlegen -- ohne Ebene und ohne Tileset |
+| `TILED_NEW(width, height, tile_w, tile_h)` | TILED_MAP | eine leere Karte anlegen -- ohne Ebene und ohne Tileset |
 | `TILED_ADD_LAYER(m, name$)` | INTEGER (Index) | eine leere Kachel-Ebene anhaengen |
-| `TILED_ADD_TILESET(m, bild$, kachelzahl)` | INTEGER (Index) | ein Tileset anhaengen; die `firstgid` vergibt die Laufzeit selbst |
+| `TILED_ADD_TILESET(m, image$, tile_count)` | INTEGER (Index) | ein Tileset anhaengen; die `firstgid` vergibt die Laufzeit selbst |
 | `TILED_TILESET_TILES(m, idx)` | INTEGER | wie viele Kacheln hat dieses Tileset? |
 | `TILED_ADD_OBJECT_LAYER(m, name$)` | INTEGER (Index) | eine Objekt-Ebene anhaengen |
-| `TILED_ADD_OBJECT(m, ebene$, name$, typ$, x, y, w, h)` | INTEGER (Index) | ein Objekt in eine Objekt-Ebene legen |
-| `TILED_TILE_SET_PROP(m, gid, key$, wert)` | — | Eigenschaft einer Kachel setzen |
+| `TILED_ADD_OBJECT(m, layer$, name$, type$, x, y, w, h)` | INTEGER (Index) | ein Objekt in eine Objekt-Ebene legen |
+| `TILED_TILE_SET_PROP(m, gid, key$, value)` | — | Eigenschaft einer Kachel setzen |
 | `TILED_TILE_REMOVE_PROP(m, gid, key$)` | — | Eigenschaft einer Kachel entfernen |
-| `TILED_OBJECT_SET_PROP(m, ebene$, idx, key$, wert)` | — | Eigenschaft eines Objekts setzen |
-| `TILED_OBJECT_REMOVE_PROP(m, ebene$, idx, key$)` | — | Eigenschaft eines Objekts entfernen |
-| `TILED_REMOVE_OBJECT(m, ebene$, idx)` | — | ein Objekt entfernen |
-| `TILED_OBJECT_SET_NAME(m, ebene$, idx, name$)` | — | ein Objekt umbenennen |
-| `TILED_OBJECT_SET_TYPE(m, ebene$, idx, typ$)` | — | seinen Typ aendern |
-| `TILED_OBJECT_SET_RECT(m, ebene$, idx, x, y, w, h)` | — | Lage und Groesse aendern |
+| `TILED_OBJECT_SET_PROP(m, layer$, idx, key$, value)` | — | Eigenschaft eines Objekts setzen |
+| `TILED_OBJECT_REMOVE_PROP(m, layer$, idx, key$)` | — | Eigenschaft eines Objekts entfernen |
+| `TILED_REMOVE_OBJECT(m, layer$, idx)` | — | ein Objekt entfernen |
+| `TILED_OBJECT_SET_NAME(m, layer$, idx, name$)` | — | ein Objekt umbenennen |
+| `TILED_OBJECT_SET_TYPE(m, layer$, idx, type$)` | — | seinen Typ aendern |
+| `TILED_OBJECT_SET_RECT(m, layer$, idx, x, y, w, h)` | — | Lage und Groesse aendern |
 | `TILED_TILE_PROP_KEYS(m, gid)` | ARRAY OF STRING | welche Eigenschaften hat diese Kachel? |
-| `TILED_OBJECT_PROP_KEYS(m, ebene$, idx)` | ARRAY OF STRING | dasselbe fuer ein Objekt |
-| `TILED_SAVE(m, pfad$)` | — | die Karte als Tiled-JSON schreiben |
+| `TILED_OBJECT_PROP_KEYS(m, layer$, idx)` | ARRAY OF STRING | dasselbe fuer ein Objekt |
+| `TILED_SAVE(m, path$)` | — | die Karte als Tiled-JSON schreiben |
 
 ```basic
 IMPORT "tiled"
@@ -183,9 +183,9 @@ Tippfehler in der Groesse nicht den Speicher frisst.
 |---|---|---|
 | `TILED_LAYER_RENAME(m, idx, name$)` | — | eine Ebene umbenennen |
 | `TILED_LAYER_VISIBLE(m, idx)` | BOOLEAN | ist die Ebene eingeblendet? |
-| `TILED_LAYER_SET_VISIBLE(m, idx, an)` | — | Ebene ein- oder ausblenden |
+| `TILED_LAYER_SET_VISIBLE(m, idx, on)` | — | Ebene ein- oder ausblenden |
 | `TILED_REMOVE_LAYER(m, idx)` | — | eine Ebene entfernen |
-| `TILED_MOVE_LAYER(m, von, nach)` | — | eine Ebene an eine andere Stelle setzen |
+| `TILED_MOVE_LAYER(m, from, to)` | — | eine Ebene an eine andere Stelle setzen |
 
 Die Sichtbarkeit ist **nicht nur Anzeige** -- Tiled speichert sie in der Datei.
 Ohne `TILED_LAYER_SET_VISIBLE` liess sich eine ausgeblendete Ebene also gar nicht

@@ -15,6 +15,8 @@ Drachenhauch ist ein BASIC-Dialekt mit Pascal-strikter Typisierung und OOP, für
 - **[Sprachreferenz](sprache.md)** — Variablen, Typen, Operatoren, Kontrollfluss (IF, SELECT CASE, WHILE, FOR), Funktionen, Klassen, Try/Catch, Imports
 - **[Fremde Bibliotheken](ffi.md)** — `DECLARE … LIB`: Funktionen aus DLLs, `.so` und `.dylib` aufrufen (Windows-API, C-Bibliothek, Gerätetreiber)
 - **[Variablen-Scope](scope.md)** — wo eine Variable gilt: global, in Funktionen, in Methoden — und warum es kein Block-Scoping gibt
+- **[Stabilität](stabilitaet.md)** — was von Fassung zu Fassung fest bleibt (Sprache, Befehlsnamen, Argumente, Dateien) und was sich ändern darf
+- **[Änderungsprotokoll](aenderungen.md)** — was sich in jeder Fassung für bestehende Programme ändert, aus den Notizen gesammelt
 
 ### Eingebaute Befehle
 

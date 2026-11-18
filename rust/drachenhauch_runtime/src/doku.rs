@@ -480,9 +480,142 @@ fn referenz_main(args: &[String]) -> ExitCode {
     }
 }
 
+// ============================================================ aenderungen
+
+/// Die Ueberschrift des Abschnitts, den das Aenderungsprotokoll sammelt.
+const AE_DE: &str = "## Was sich für bestehende Programme ändert";
+const AE_EN: &str = "## What changes for existing programs";
+
+/// `2026.51` aus `release-2026.51.md`, als sortierbares Paar.
+fn fassung_von(name: &str) -> Option<(u32, u32, String)> {
+    let kern = name.strip_prefix("release-")?.strip_suffix(".md")?;
+    if kern.ends_with(".en") { return None; }
+    let (j, n) = kern.split_once('.')?;
+    Some((j.parse().ok()?, n.parse().ok()?, kern.to_string()))
+}
+
+/// Der Abschnitt unter `kopf` bis zur naechsten `## `-Ueberschrift, ohne
+/// Leerzeilen am Rand. Unterueberschriften werden fett (sonst stuenden sie
+/// im Protokoll auf derselben Ebene wie die Fassungen), Verweise zeigen vom
+/// Protokoll aus (`zu_releases` = Weg vom Protokoll nach docs/releases/).
+fn abschnitt(text: &str, kopf: &str, zu_releases: &str) -> Option<String> {
+    let text = text.replace("\r\n", "\n");
+    let mut zeilen = text.lines();
+    zeilen.by_ref().find(|z| z.trim_end() == kopf)?;
+    let mut raus: Vec<String> = Vec::new();
+    let mut im_code = false;
+    for z in zeilen {
+        if z.starts_with("```") { im_code = !im_code; }
+        if !im_code && z.starts_with("## ") { break; }
+        if !im_code && z.starts_with('#') {
+            raus.push(format!("**{}**", z.trim_start_matches('#').trim()));
+        } else {
+            raus.push(z.to_string());
+        }
+    }
+    while raus.first().is_some_and(|z| z.trim().is_empty()) { raus.remove(0); }
+    while raus.last().is_some_and(|z| z.trim().is_empty()) { raus.pop(); }
+    if raus.is_empty() { return None; }
+    static VERWEIS: OnceLock<Regex> = OnceLock::new();
+    let verweis = VERWEIS.get_or_init(|| Regex::new(r"\]\(([^)#\s]+)(#[^)\s]*)?\)").unwrap());
+    let roh = raus.join("\n");
+    Some(verweis.replace_all(&roh, |c: &regex::Captures| {
+        let ziel = &c[1];
+        let marke = c.get(2).map(|m| m.as_str()).unwrap_or("");
+        if ziel.contains("://") || ziel.starts_with('/') || ziel.starts_with("mailto:") {
+            return c[0].to_string();
+        }
+        format!("]({}{})", pfad_kuerzen(&format!("{}{}", zu_releases, ziel)), marke)
+    }).into_owned())
+}
+
+/// `releases/../builtins-namen.md` -> `builtins-namen.md`.
+fn pfad_kuerzen(p: &str) -> String {
+    let mut teile: Vec<&str> = Vec::new();
+    for t in p.split('/') {
+        match t {
+            "." | "" => {}
+            ".." if teile.last().is_some_and(|l| *l != "..") => { teile.pop(); }
+            _ => teile.push(t),
+        }
+    }
+    teile.join("/")
+}
+
+/// docs/aenderungen.md und docs/en/aenderungen.md aus den Notizen der
+/// Fassungen: je Fassung ihr Abschnitt "Was sich fuer bestehende Programme
+/// aendert", die neueste zuerst. Englisch, wo es englische Notizen gibt; sonst
+/// steht der deutsche Abschnitt mit einem Hinweis da (gleiche Gliederung und
+/// gleiche Codebloecke wie das deutsche Protokoll -- `dhrt pruef uebersetzung`).
+pub fn aenderungen(wurzel: &Path) -> Result<(String, String), String> {
+    let ordner = wurzel.join("docs/releases");
+    let mut fassungen: Vec<(u32, u32, String)> = std::fs::read_dir(&ordner)
+        .map_err(|e| format!("{}: {}", ordner.display(), e))?
+        .filter_map(|e| e.ok())
+        .filter_map(|e| fassung_von(&e.file_name().to_string_lossy()))
+        .collect();
+    fassungen.sort_by(|a, b| (b.0, b.1).cmp(&(a.0, a.1)));
+    let mut de = String::from(
+"# Änderungsprotokoll
+
+Was sich in jeder Fassung für **bestehende Programme** ändert, die neueste
+zuerst -- gesammelt aus den Notizen der Fassungen. Was fest bleibt und was
+sich ändern darf, sagt [Stabilität](stabilitaet.md).
+
+*Erzeugt mit `dhrt doku aenderungen` aus `docs/releases/`; Änderungen gehören
+in die Notizen, nicht hierher.*
+");
+    let mut en = String::from(
+"# Change log
+
+What changes for **existing programs** in each version, newest first --
+collected from the release notes. What stays fixed and what may change is
+described in [Stability](stabilitaet.md).
+
+*Generated with `dhrt doku aenderungen` from `docs/releases/`; changes belong
+in the release notes, not here.*
+");
+    for (_, _, f) in &fassungen {
+        let text = std::fs::read_to_string(ordner.join(format!("release-{}.md", f))).unwrap_or_default();
+        let text_en = std::fs::read_to_string(ordner.join(format!("release-{}.en.md", f))).ok();
+        let teil_de = abschnitt(&text, AE_DE, "releases/");
+        de.push_str(&format!("\n## {}\n\n", f));
+        match &teil_de {
+            Some(t) => de.push_str(&format!("{}\n\n", t)),
+            None => de.push_str("Die Notizen dieser Fassung haben dafür keinen eigenen Abschnitt.\n\n"),
+        }
+        de.push_str(&format!("[Alle Notizen zu {}](releases/release-{}.md)\n", f, f));
+        en.push_str(&format!("\n## {}\n\n", f));
+        let teil_en = text_en.as_deref().and_then(|t| abschnitt(t, AE_EN, "../releases/"));
+        // Englisch nur, wenn es dieselben Codebloecke hat -- sonst stimmten
+        // die beiden Protokolle nicht mehr ueberein.
+        let bloecke = |t: &str| t.split("```").skip(1).step_by(2).map(str::to_string).collect::<Vec<_>>();
+        match (&teil_de, teil_en) {
+            (Some(d), Some(e)) if bloecke(d) == bloecke(&e) => en.push_str(&format!("{}\n\n", e)),
+            (Some(_), _) => {
+                let d = abschnitt(&text, AE_DE, "../releases/").unwrap_or_default();
+                en.push_str(&format!("*Only in German so far:*\n\n{}\n\n", d));
+            }
+            (None, _) => en.push_str("The notes for this version have no separate section for this.\n\n"),
+        }
+        let notiz = if text_en.is_some() { format!("release-{}.en.md", f) } else { format!("release-{}.md", f) };
+        en.push_str(&format!("[All notes for {}](../releases/{})\n", f, notiz));
+    }
+    Ok((de, en))
+}
+
+fn aenderungen_main(pruefen: bool) -> ExitCode {
+    let wurzel = match repo_wurzel() { Ok(w) => w, Err(e) => { eprintln!("{}", e); return ExitCode::from(2); } };
+    let (de, en) = match aenderungen(&wurzel) { Ok(t) => t, Err(e) => { eprintln!("{}", e); return ExitCode::from(2); } };
+    let a = abliefern(&wurzel.join("docs/aenderungen.md"), &de, pruefen, "Änderungsprotokoll", "dhrt doku aenderungen");
+    let b = abliefern(&wurzel.join("docs/en/aenderungen.md"), &en, pruefen, "Change log", "dhrt doku aenderungen");
+    if a == ExitCode::SUCCESS && b == ExitCode::SUCCESS { ExitCode::SUCCESS } else { ExitCode::from(1) }
+}
+
 pub const HILFE: &str = "\
 dhrt doku prosa [--pruefen]        builtin_prosa.json aus docs/ und dem Referenzbuch erzeugen
 dhrt doku grammatik [--pruefen]    VS-Code-Grammatik aus Schluesselwoertern und Index erzeugen
+dhrt doku aenderungen [--pruefen]  Aenderungsprotokoll (docs/aenderungen.md, docs/en/) aus den Notizen der Fassungen
 dhrt doku referenz <datei.dh ...> [-o ziel.md]
                                    Referenz aus dem Quelltext (Signaturen + Kommentarbloecke)
   --pruefen schreibt nichts und meldet mit Rueckgabe 1, wenn die Datei nicht mehr passt";
@@ -492,6 +625,7 @@ pub fn main(args: &[String]) -> ExitCode {
     match args.first().map(String::as_str) {
         Some("prosa") => prosa_main(pruefen),
         Some("grammatik") => grammatik_main(pruefen),
+        Some("aenderungen") => aenderungen_main(pruefen),
         Some("referenz") => referenz_main(&args[1..]),
         _ => { println!("{}", HILFE); ExitCode::from(2) }
     }
@@ -500,6 +634,27 @@ pub fn main(args: &[String]) -> ExitCode {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn aenderungen_nimmt_den_abschnitt_und_richtet_verweise() {
+        let notiz = [
+            "# Drachenhauch 2026.9", "", "## Was sich für bestehende Programme ändert", "",
+            "* **A** siehe [Namen](../builtins-namen.md#regeln) und [Web](https://x.y/z)",
+            "### Unterpunkt", "```basic", "## kein Kopf im Code", "```", "", "## Neu", "", "anderes", "",
+        ].join("\n");
+        let notiz = notiz.as_str();
+        let t = abschnitt(notiz, AE_DE, "releases/").unwrap();
+        assert!(t.starts_with("* **A** siehe [Namen](builtins-namen.md#regeln)"), "{}", t);
+        assert!(t.contains("[Web](https://x.y/z)"));
+        assert!(t.contains("**Unterpunkt**"));
+        assert!(t.contains("## kein Kopf im Code"));
+        assert!(!t.contains("anderes"));
+        let en = abschnitt(notiz, AE_DE, "../releases/").unwrap();
+        assert!(en.contains("[Namen](../builtins-namen.md#regeln)"), "{}", en);
+        assert!(abschnitt(&["# x", "", "## Neu", ""].join("\n"), AE_DE, "releases/").is_none());
+        assert_eq!(fassung_von("release-2026.9.md").map(|f| (f.0, f.1)), Some((2026, 9)));
+        assert!(fassung_von("release-2026.9.en.md").is_none());
+    }
 
     #[test]
     fn saeubern_entfernt_markdown_und_kuerzt() {

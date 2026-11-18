@@ -21,207 +21,207 @@ IMPORT "gui"
 
 | Function | Returns | Purpose |
 |---|---|---|
-| `GUI_WINDOW(titel$, x, y, w, h)` | GUI_WINDOW | create a window |
-| `GUI_WINDOW_MOVABLE(win, an)` | — | movable by its title bar (default: on) |
-| `GUI_WINDOW_TITLE(win, titel$)` | — | change the title bar text later (name of the document, "Commands" / "Open file") |
-| `GUI_WINDOW_GLOW(win [, farbe [, dauer_ms]])` | — | a streak of light sweeps across the window (default warm, 1200 ms, left to right) -- see [Streak of light](#light-sweep) |
-| `GUI_WINDOW_GLOW_SET(win, schluessel$, wert)` | — | configure the streak of light: `farbe` (colour), `dauer` (duration), `pause` (ms until it returns, 0 = once), `richtung` (direction: rechts/links/unten/oben), `breite` (width), `staerke` (strength, 0..1), `rand` (edge), `art` (kind: `streif`, `lampe` or `rahmen`) |
+| `GUI_WINDOW(title$, x, y, w, h)` | GUI_WINDOW | create a window |
+| `GUI_WINDOW_MOVABLE(win, flag)` | — | movable by its title bar (default: on) |
+| `GUI_WINDOW_TITLE(win, title$)` | — | change the title bar text later (name of the document, "Commands" / "Open file") |
+| `GUI_WINDOW_GLOW(win [, color [, duration_ms]])` | — | a streak of light sweeps across the window (default warm, 1200 ms, left to right) -- see [Streak of light](#light-sweep) |
+| `GUI_WINDOW_GLOW_SET(win, key$, value)` | — | configure the streak of light: `farbe` (colour), `dauer` (duration), `pause` (ms until it returns, 0 = once), `richtung` (direction: rechts/links/unten/oben), `breite` (width), `staerke` (strength, 0..1), `rand` (edge), `art` (kind: `streif`, `lampe` or `rahmen`) |
 | `GUI_WINDOW_GLOW_STOP(win)` | — | stop the streak of light |
 | `GUI_WINDOW_GLOWING(win)` | BOOLEAN | is a streak of light running (also during the pause between two)? |
-| `GUI_POPOVER(anker, b, h [, seite$])` | GUI_WINDOW | a borderless box with an arrow, attached to a widget (`unten` below, `oben` above, `rechts` right, `links` left); starts hidden -- see [Popover, toast and info bar](#popover-toast-and-info-bar) |
+| `GUI_POPOVER(anchor, b, h [, side$])` | GUI_WINDOW | a borderless box with an arrow, attached to a widget (`unten` below, `oben` above, `rechts` right, `links` left); starts hidden -- see [Popover, toast and info bar](#popover-toast-and-info-bar) |
 | `GUI_POPOVER_SHOW(pop)` | — | show the popover, place it at its widget (it moves aside at the screen edge) and bring it to the front |
 | `GUI_POPOVER_HIDE(pop)` | — | hide the popover |
 | `GUI_POPOVER_CLOSED(pop)` | BOOLEAN | did the user close it in this frame (click beside it or ESC)? |
-| `GUI_TOAST(win, text$ [, art$ [, ms]])` | — | a message at the bottom of the window that fades out after `ms` (default 3000, 0 = until clicked); kind `info`, `erfolg` (success), `warnung` (warning), `fehler` (error) |
+| `GUI_TOAST(win, text$ [, kind$ [, ms]])` | — | a message at the bottom of the window that fades out after `ms` (default 3000, 0 = until clicked); kind `info`, `erfolg` (success), `warnung` (warning), `fehler` (error) |
 | `GUI_TOAST_COUNT(win)` | INTEGER | how many messages are showing (at most four)? |
 | `GUI_TOAST_CLEAR(win)` | — | fade out all messages |
-| `GUI_INFOBAR(win, text$ [, art$ [, knoepfe$]])` | — | a bar at the top of the content with text, up to four buttons (`"Reload\|Keep"`) and a cross |
+| `GUI_INFOBAR(win, text$ [, kind$ [, buttons$]])` | — | a bar at the top of the content with text, up to four buttons (`"Reload\|Keep"`) and a cross |
 | `GUI_INFOBAR_ANSWER(win)` | INTEGER | clicked in this frame: button number from 1, -1 = the cross, 0 = nothing |
 | `GUI_INFOBAR_SHOWN(win)` | BOOLEAN | is the info bar showing? |
 | `GUI_INFOBAR_HIDE(win)` | — | hide the info bar |
 | `GUI_INFOBAR_BUTTON_RECT(win, k)` | TUPLE | where button `k` is (from 1; 0 = the cross) -- (x, y, b, h), after the first GUI_UPDATE |
 | `GUI_DOCK(win, x, y, w, h)` | — | set up a dock on the window or set its rectangle -- panels on the left, right and bottom, the centre stays with the program (see [Dock](#dock-dockable-panels)) |
-| `GUI_DOCK_SET(win, schluessel$, n)` | — | dimensions of the dock: `kopf` (height of the tab row, 22), `rand` (margin, 8), `abstand` (between groups, 8), `fuge` (above the bottom area, 2) |
-| `GUI_DOCK_PANEL(win, name$, titel$, bereich$)` | — | a panel as a new group at the end of `links` (left), `rechts` (right), `unten` (bottom) or `schwebend` (floating) |
-| `GUI_DOCK_TAB(win, name$, titel$, neben$)` | — | a panel as a tab in the group of another one |
-| `GUI_DOCK_ADD(win, name$, wdg)` | — | a widget belongs to the panel: visible only when the panel is, on top when it floats |
-| `GUI_DOCK_WINDOW(win, name$, fenster)` | — | a whole window (for instance from `GUI_FROM_JSON`) as the content of the panel -- borderless, above the host window |
+| `GUI_DOCK_SET(win, key$, n)` | — | dimensions of the dock: `kopf` (height of the tab row, 22), `rand` (margin, 8), `abstand` (between groups, 8), `fuge` (above the bottom area, 2) |
+| `GUI_DOCK_PANEL(win, name$, title$, area$)` | — | a panel as a new group at the end of `links` (left), `rechts` (right), `unten` (bottom) or `schwebend` (floating) |
+| `GUI_DOCK_TAB(win, name$, title$, beside$)` | — | a panel as a tab in the group of another one |
+| `GUI_DOCK_ADD(win, name$, widget)` | — | a widget belongs to the panel: visible only when the panel is, on top when it floats |
+| `GUI_DOCK_WINDOW(win, name$, window)` | — | a whole window (for instance from `GUI_FROM_JSON`) as the content of the panel -- borderless, above the host window |
 | `GUI_DOCK_RECT(win, name$)` | TUPLE | the content rectangle of the panel (x, y, w, h); (0, 0, 0, 0) when it is not shown |
 | `GUI_DOCK_TAB_RECT(win, name$)` | TUPLE | where the tab of the panel is (x, y, w, h) |
 | `GUI_DOCK_HEAD_RECT(win, name$)` | TUPLE | the free part of the header right of the tabs -- room for the panel's filter, counters, buttons |
 | `GUI_DOCK_CENTER(win)` | TUPLE | the rectangle of the centre (x, y, w, h) |
 | `GUI_DOCK_SHOWN(win, name$)` | BOOLEAN | is the content of the panel shown (front tab, area on, not hidden)? |
 | `GUI_DOCK_WHERE$(win, name$)` | STRING | `links`, `rechts`, `unten`, `schwebend`, `fenster` (torn off, a system window of its own) or `zu` (hidden) |
-| `GUI_DOCK_SHOW(win, name$, an)` | — | hide a panel or show it again (then in front) |
+| `GUI_DOCK_SHOW(win, name$, on)` | — | hide a panel or show it again (then in front) |
 | `GUI_DOCK_ACTIVATE(win, name$)` | — | bring the panel's tab to the front |
-| `GUI_DOCK_TITLE(win, name$, titel$)` | — | relabel the tab |
+| `GUI_DOCK_TITLE(win, name$, title$)` | — | relabel the tab |
 | `GUI_DOCK_TITLE$(win, name$)` | STRING | the label of the tab |
-| `GUI_DOCK_CLOSABLE(win, name$, an)` | — | a cross on the tab: a click hides the panel and reports it |
+| `GUI_DOCK_CLOSABLE(win, name$, on)` | — | a cross on the tab: a click hides the panel and reports it |
 | `GUI_DOCK_CLOSED$(win)` | STRING | the panel whose cross was clicked in this frame ("" = none) |
 | `GUI_DOCK_CHANGED(win)` | BOOLEAN | did a rectangle change in this frame (dragged, switched, detached)? Then lay out the contents again |
-| `GUI_DOCK_AREA(win, bereich$, an)` | — | show or hide an area |
-| `GUI_DOCK_AREA_SHOWN(win, bereich$)` | BOOLEAN | does the area show anything? |
-| `GUI_DOCK_SIZE(win, bereich$, px)` | — | width (left/right) or height (bottom) of an area |
-| `GUI_DOCK_SHARE(win, name$, anteil)` | — | the share of the panel's group in its area, compared with the other groups there |
-| `GUI_DOCK_GET_SIZE(win, bereich$)` | INTEGER | width or height of an area |
+| `GUI_DOCK_AREA(win, area$, on)` | — | show or hide an area |
+| `GUI_DOCK_AREA_SHOWN(win, area$)` | BOOLEAN | does the area show anything? |
+| `GUI_DOCK_SIZE(win, area$, px)` | — | width (left/right) or height (bottom) of an area |
+| `GUI_DOCK_SHARE(win, name$, fraction)` | — | the share of the panel's group in its area, compared with the other groups there |
+| `GUI_DOCK_GET_SIZE(win, area$)` | INTEGER | width or height of an area |
 | `GUI_DOCK_FLOAT(win, name$, x, y, w, h)` | — | detach a panel (floating at this place) |
-| `GUI_DOCK_MOVE(win, name$, bereich$ [, neben$])` | — | dock a panel: as a new group in the area or as a tab next to `neben$`; `fenster` tears it off as a window of its own (where there are no real windows, it stays floating) |
+| `GUI_DOCK_MOVE(win, name$, area$ [, beside$])` | — | dock a panel: as a new group in the area or as a tab next to `beside$`; `fenster` tears it off as a window of its own (where there are no real windows, it stays floating) |
 | `GUI_DOCK_STATE$(win)` | STRING | the arrangement as JSON (areas, groups, front tabs, sizes, floating, hidden) |
-| `GUI_DOCK_SET_STATE(win, stand$)` | — | take over an arrangement; panels that do not exist yet get their place as soon as they are registered |
-| `GUI_WINDOW_CLOSABLE(win, an)` | — | show a close button (default: off) |
-| `GUI_WINDOW_NATIVE(win, an)` | BOOLEAN | the window as a **real OS window** (own title bar, taskbar, second monitor) or back into the main window; `FALSE` with `an` means: fallback, it stays a gui window |
+| `GUI_DOCK_SET_STATE(win, state$)` | — | take over an arrangement; panels that do not exist yet get their place as soon as they are registered |
+| `GUI_WINDOW_CLOSABLE(win, flag)` | — | show a close button (default: off) |
+| `GUI_WINDOW_NATIVE(win, on)` | BOOLEAN | the window as a **real OS window** (own title bar, taskbar, second monitor) or back into the main window; `FALSE` with `on` means: fallback, it stays a gui window |
 | `GUI_WINDOW_IS_NATIVE(win)` | BOOLEAN | is it a real OS window right now? |
 | `GUI_WINDOW_NATIVE_SCALE(win)` | FLOAT | how much larger the native window is drawn on its screen than in the main window (its screen's pixel density divided by the main window's); 1.0 in the main window |
 | `GUI_POPUP_WINDOWS()` | INTEGER | how many popups are standing as a window of their own beyond the edge of their native window right now (0 = all inside their window) |
-| `GUI_WINDOW_VISIBLE(win, an)` | — | set visibility |
+| `GUI_WINDOW_VISIBLE(win, flag)` | — | set visibility |
 | `GUI_WINDOW_FRONT(win)` | — | bring the window to the front without giving it focus -- for a suggestion list or a tooltip that should lie over the text while typing. Shown via `GUI_WINDOW_VISIBLE`, a window otherwise lies behind the one clicked last |
-| `GUI_WINDOW_BACKGROUND(win, an)` | — | background window: it stays behind all other windows, even when clicked into or with `GUI_WINDOW_FRONT` (it still gets the focus). For a borderless main window with sub-windows on top -- without it the first click into the main window brought it to the front, and it covered the sub-windows and their clicks |
+| `GUI_WINDOW_BACKGROUND(win, on)` | — | background window: it stays behind all other windows, even when clicked into or with `GUI_WINDOW_FRONT` (it still gets the focus). For a borderless main window with sub-windows on top -- without it the first click into the main window brought it to the front, and it covered the sub-windows and their clicks |
 | `GUI_WINDOW_IS_BACKGROUND(win)` | BOOLEAN | is it a background window? |
 | `GUI_WINDOW_SHOWN(win)` | BOOLEAN | is the window currently visible? The counterpart to the setter -- without the getter a program would have to remember what it set itself, and would be wrong as soon as the user closes the window with its cross |
-| `GUI_WINDOW_RESIZABLE(win, an)` | — | resizable by the lower-right grip (default: off) |
-| `GUI_WINDOW_SCROLLABLE(win, an)` | — | content scrolls when it is taller than the window (mouse wheel + scroll bar). Content height determined automatically from the widgets. Default: off |
-| `GUI_WINDOW_CHROME(win, an)` | — | draw title bar/border/buttons? Off = borderless, content starts at the top (so that a form can fill the OS window). Default: on |
-| `GUI_WINDOW_DESIGN(win, an)` | — | design mode: the window is drawn, but its widgets receive no input (no hover, click, focus, callback; no dragging the border either). A form designer places real widgets on the surface this way and handles the mouse itself — `GUI_HIT_TEST` and all setters keep working. Default: off |
-| `GUI_WINDOW_ZOOM(win, faktor)` | — | draw a window in design mode magnified (0.25 to 4): the position stays, the area grows. Geometry seen from outside stays unmagnified, `GUI_HIT_TEST` and `GUI_WINDOW_AT` convert the mouse back. Drawing goes through an intermediate surface that is magnified smoothly — text is somewhat soft at 150–200 %. Outside design mode it is an error (the window would accept input, and the mouse would miss) |
+| `GUI_WINDOW_RESIZABLE(win, flag)` | — | resizable by the lower-right grip (default: off) |
+| `GUI_WINDOW_SCROLLABLE(win, flag)` | — | content scrolls when it is taller than the window (mouse wheel + scroll bar). Content height determined automatically from the widgets. Default: off |
+| `GUI_WINDOW_CHROME(win, flag)` | — | draw title bar/border/buttons? Off = borderless, content starts at the top (so that a form can fill the OS window). Default: on |
+| `GUI_WINDOW_DESIGN(win, flag)` | — | design mode: the window is drawn, but its widgets receive no input (no hover, click, focus, callback; no dragging the border either). A form designer places real widgets on the surface this way and handles the mouse itself — `GUI_HIT_TEST` and all setters keep working. Default: off |
+| `GUI_WINDOW_ZOOM(win, factor)` | — | draw a window in design mode magnified (0.25 to 4): the position stays, the area grows. Geometry seen from outside stays unmagnified, `GUI_HIT_TEST` and `GUI_WINDOW_AT` convert the mouse back. Drawing goes through an intermediate surface that is magnified smoothly — text is somewhat soft at 150–200 %. Outside design mode it is an error (the window would accept input, and the mouse would miss) |
 | `GUI_WINDOW_GET_ZOOM(win)` | FLOAT | the factor of `GUI_WINDOW_ZOOM` |
 | `GUI_WINDOW_CLIP(win, x, y, b, h)` | — | show a window in design mode only in this part of the screen (logical points like `GUI_WINDOW_SET_BOUNDS`): what lies outside is not drawn and takes no click (`GUI_HIT_TEST`, `GUI_WINDOW_AT`). `b` or `h` ≤ 0 removes the clip. Outside design mode it is an error |
 | `GUI_WINDOW_SET_MIN_SIZE(win, w, h)` | — | minimum size when resizing (0 = none) |
 | `GUI_WINDOW_SET_MAX_SIZE(win, w, h)` | — | maximum size when resizing (0 = none) |
 | `GUI_SEPARATOR(win, x, y, w)` | GUI_WIDGET | decorative divider line (horizontal) |
 | `GUI_GROUPBOX(win, x, y, w, h, title$)` | GUI_WIDGET | framed group with an inset title |
-| `GUI_BIND(wdg, schluessel$[, formular$])` | — | **data binding**: the widget carries a key (column name) — see [Data binding](#data-binding) |
-| `GUI_FORM_GET(win[, formular$])` / `GUI_FORM_SET(win, map[, formular$])` | MAP OF STRING / — | read all bound values / set them from a MAP |
+| `GUI_BIND(widget, key$[, form$])` | — | **data binding**: the widget carries a key (column name) — see [Data binding](#data-binding) |
+| `GUI_FORM_GET(win[, form$])` / `GUI_FORM_SET(win, map[, form$])` | MAP OF STRING / — | read all bound values / set them from a MAP |
 | `GUI_FORM_CLEAR` / `GUI_FORM_CLEAN` / `GUI_FORM_CHANGED(win[, formular$])` | — / — / BOOL | clear / mark as saved / changed since the last set? |
-| `GUI_FORM_LOAD(win, db, tabelle$, id[, formular$])` | BOOL | load the row `WHERE id = ?` into the widgets |
-| `GUI_FORM_SAVE(win, db, tabelle$, id[, formular$[, ueberschreiben]])` | INTEGER | INSERT (id < 0) or UPDATE, returns the id -- **0 if nothing was saved** (row deleted or changed in the meantime) |
-| `GUI_FORM_VERSION(win, spalte$[, formular$])` | — | version column: SAVE only saves while the row still carries the state it was loaded with (empty = off) — see [Data binding](#data-binding) |
-| `GUI_FORM_CONFLICT$(win[, formular$])` | STRING | why the last SAVE saved nothing: `geaendert` (changed), `geloescht` (deleted) or empty |
+| `GUI_FORM_LOAD(win, db, table$, id[, form$])` | BOOL | load the row `WHERE id = ?` into the widgets |
+| `GUI_FORM_SAVE(win, db, table$, id[, form$[, overwrite]])` | INTEGER | INSERT (id < 0) or UPDATE, returns the id -- **0 if nothing was saved** (row deleted or changed in the meantime) |
+| `GUI_FORM_VERSION(win, column$[, form$])` | — | version column: SAVE only saves while the row still carries the state it was loaded with (empty = off) — see [Data binding](#data-binding) |
+| `GUI_FORM_CONFLICT$(win[, form$])` | STRING | why the last SAVE saved nothing: `geaendert` (changed), `geloescht` (deleted) or empty |
 | `GUI_TEXTAREA_SET(ta, "umbruch", 1)` | — | text area wraps at word boundaries (notes, letters) |
-| `GUI_SET_MIN_SIZE(wdg, min_w, min_h)` | — | minimum size: a weighted child in a container and an anchored widget do not shrink below it |
-| `GUI_GET_MIN_W(wdg)` / `GUI_GET_MIN_H(wdg)` | INTEGER | the minimum size that was set, 0 = none |
+| `GUI_SET_MIN_SIZE(widget, min_w, min_h)` | — | minimum size: a weighted child in a container and an anchored widget do not shrink below it |
+| `GUI_GET_MIN_W(widget)` / `GUI_GET_MIN_H(widget)` | INTEGER | the minimum size that was set, 0 = none |
 | `GUI_LAYOUT_MIN_W(layout)` / `GUI_LAYOUT_MIN_H(layout)` | INTEGER | what a container needs at least — the value for `WINDOW_MIN_SIZE` |
 | `GUI_RULE(feld, art$[, a, b][, muster$][, meldung$])` | — | attach a **validation rule**: `pflicht` (required), `zahl` (number), `ganz` (integer), `bereich a b` (range), `laenge min max` (length), `email`, `datum` (date), `muster regex$` (pattern) — see [Form validation](#form-validation) |
 | `GUI_VALIDATE(win)` / `GUI_VALIDATE_WIDGET(feld)` | INTEGER / STRING | check all rules of the window (number of errors, the first field gets focus) / one field (message or "") |
-| `GUI_ERROR(feld)` / `GUI_SET_ERROR(feld, meldung$)` / `GUI_CLEAR_ERRORS(win)` | STRING / — / — | read the message, set it from outside (e.g. from the database), clear all |
-| `GUI_ERROR_LABEL(feld, label)` / `GUI_VALIDATE_LIVE(win, an)` / `GUI_RULES_CLEAR(feld)` | — | a label shows the message / check when leaving a field / remove the rules |
+| `GUI_ERROR(field)` / `GUI_SET_ERROR(field, meldung$)` / `GUI_CLEAR_ERRORS(win)` | STRING / — / — | read the message, set it from outside (e.g. from the database), clear all |
+| `GUI_ERROR_LABEL(field, label)` / `GUI_VALIDATE_LIVE(win, an)` / `GUI_RULES_CLEAR(field)` | — | a label shows the message / check when leaving a field / remove the rules |
 | `GUI_VSLIDER(win, x, y, h, min, max, default)` | GUI_WIDGET | **vertical slider** — `h` is the length, the value grows upwards |
 | `GUI_PROGRESS_SET(progress, "unbestimmt", 1)` | — | a running band instead of a value, for anything whose duration is unknown |
-| `GUI_IMAGE_MODE(image, modus$)` / `GUI_IMAGE_MODE_GET(image)` | — / STRING | `strecken` (stretch, default), `einpassen` (fit), `fuellen` (fill), `mitte` (centre), `kacheln` (tile) |
-| `GUI_TREE_ICON(tree, node, bild)` / `GUI_TREE_COLOR(tree, node, farbe)` | — | icon and text colour per tree node; instead of an image also the name of a built-in icon (`"ordner"`), `""` removes it |
-| `GUI_PANEL_ADD(panel, wdg)` / `GUI_PANEL_REMOVE` / `GUI_PANEL_SCROLL(panel, y)` / `GUI_PANEL_SCROLL_GET(panel)` | — | a **panel that scrolls its children** (mouse wheel, scroll bar) — see [Finishing touches](#finishing-touches-slider-progress-image-tree-panel-dragging) |
-| `GUI_DRAGGABLE(wdg, an)` / `GUI_DROP_TARGET(wdg, an)` | — | **dragging between widgets**: source and drop target |
+| `GUI_IMAGE_MODE(image, mode$)` / `GUI_IMAGE_MODE_GET(image)` | — / STRING | `strecken` (stretch, default), `einpassen` (fit), `fuellen` (fill), `mitte` (centre), `kacheln` (tile) |
+| `GUI_TREE_ICON(tree, node, image)` / `GUI_TREE_COLOR(tree, node, farbe)` | — | icon and text colour per tree node; instead of an image also the name of a built-in icon (`"ordner"`), `""` removes it |
+| `GUI_PANEL_ADD(panel, widget)` / `GUI_PANEL_REMOVE` / `GUI_PANEL_SCROLL(panel, y)` / `GUI_PANEL_SCROLL_GET(panel)` | — | a **panel that scrolls its children** (mouse wheel, scroll bar) — see [Finishing touches](#finishing-touches-slider-progress-image-tree-panel-dragging) |
+| `GUI_DRAGGABLE(widget, on)` / `GUI_DROP_TARGET(widget, on)` | — | **dragging between widgets**: source and drop target |
 | `GUI_DRAGGING()` / `GUI_DROPPED(wdg)` / `GUI_DROP_TEXT()` / `GUI_DROP_SOURCE()` / `GUI_DRAG_INDEX()` / `GUI_DROP_INDEX()` | GUI_WIDGET / BOOL / STRING / GUI_WIDGET / INTEGER / INTEGER | current drag, drop in this frame, what was dragged, from where, which row, onto which row |
-| `GUI_CURSORS(an)` | — | mouse pointer shapes depending on the spot in the widget (default on): text beam over text, hand over anything clickable, double arrow at dividers, column edges and the window grip |
-| `GUI_SET_CURSOR(wdg, form$)` / `GUI_GET_CURSOR$(wdg)` | — / STRING | a custom pointer shape over a widget (say, a canvas); `auto` or `""` = the gui decides |
-| `GUI_LAYOUT(win, art$, x, y, w, h)` | GUI_WIDGET | invisible **layout container**: `zeile` (row), `spalte` (column), `fluss` (flow, wrapping) or `raster:N` (grid) — distributes its children in every `GUI_UPDATE` (see [Layout](#layout-size-by-content-and-containers)) |
-| `GUI_LAYOUT_ADD(layout, wdg[, gewicht])` / `GUI_LAYOUT_SPACER(layout[, gewicht])` / `GUI_LAYOUT_REMOVE(layout, wdg)` | — | append a child (weight 0 = its own size, from 1 = share of the remaining space), empty space, detach |
-| `GUI_LAYOUT_SET(layout, key$, wert)` | — | `abstand` (spacing), `rand` (margin), `ausrichtung` (alignment, 0/1/2 across), `dehnen` (stretch across, default on), `rahmen` (frame, visible while developing), `auswahl` (selection: in a flow layout a click selects a child) |
+| `GUI_CURSORS(on)` | — | mouse pointer shapes depending on the spot in the widget (default on): text beam over text, hand over anything clickable, double arrow at dividers, column edges and the window grip |
+| `GUI_SET_CURSOR(widget, form$)` / `GUI_GET_CURSOR$(widget)` | — / STRING | a custom pointer shape over a widget (say, a canvas); `auto` or `""` = the gui decides |
+| `GUI_LAYOUT(win, kind$, x, y, w, h)` | GUI_WIDGET | invisible **layout container**: `zeile` (row), `spalte` (column), `fluss` (flow, wrapping) or `raster:N` (grid) — distributes its children in every `GUI_UPDATE` (see [Layout](#layout-size-by-content-and-containers)) |
+| `GUI_LAYOUT_ADD(layout, widget[, weight])` / `GUI_LAYOUT_SPACER(layout[, weight])` / `GUI_LAYOUT_REMOVE(layout, widget)` | — | append a child (weight 0 = its own size, from 1 = share of the remaining space), empty space, detach |
+| `GUI_LAYOUT_SET(layout, key$, value)` | — | `abstand` (spacing), `rand` (margin), `ausrichtung` (alignment, 0/1/2 across), `dehnen` (stretch across, default on), `rahmen` (frame, visible while developing), `auswahl` (selection: in a flow layout a click selects a child) |
 | `GUI_LAYOUT_SELECTED(layout)` | GUI_WIDGET | child selected in a flow layout with `auswahl` (-1 = none); a click selects, `GUI_CLICKED(layout)` reports it -- see [Building blocks](#building-blocks-flow-layout-alt-letters-marks) |
-| `GUI_LAYOUT_SELECT(layout, wdg)` | — | select a child (-1 = none) |
-| `GUI_MNEMONICS(an)` | — | Alt letters: `&` in the text of a button, check box, radio button, toggle or label marks it (`&&` = one `&`) |
-| `GUI_LABEL_SET(lbl, key$, wert)` | — | `kuerzen` (shorten: `aus` off, `ende` end, `mitte` middle, `anfang` start -- with "..." to fit the width, the tooltip shows the whole text), `auswaehlbar` (selectable with the mouse, Ctrl+C copies) |
-| `GUI_LABEL_SELECTION$(lbl)` | STRING | what is selected in a selectable label |
-| `GUI_SLIDER_SET(sl, key$, wert)` | — | `marken` (that many evenly spaced marks, 0 or 2..101), `wert_zeigen` (show value), `einrasten` (snap to the marks), `stellen` (decimal places of the display) |
-| `GUI_SLIDER_MARK(sl, wert [, text$])` | — | a mark at this value, labelled below the slider |
+| `GUI_LAYOUT_SELECT(layout, widget)` | — | select a child (-1 = none) |
+| `GUI_MNEMONICS(on)` | — | Alt letters: `&` in the text of a button, check box, radio button, toggle or label marks it (`&&` = one `&`) |
+| `GUI_LABEL_SET(label, key$, value)` | — | `kuerzen` (shorten: `aus` off, `ende` end, `mitte` middle, `anfang` start -- with "..." to fit the width, the tooltip shows the whole text), `auswaehlbar` (selectable with the mouse, Ctrl+C copies) |
+| `GUI_LABEL_SELECTION$(label)` | STRING | what is selected in a selectable label |
+| `GUI_SLIDER_SET(sl, key$, value)` | — | `marken` (that many evenly spaced marks, 0 or 2..101), `wert_zeigen` (show value), `einrasten` (snap to the marks), `stellen` (decimal places of the display) |
+| `GUI_SLIDER_MARK(sl, value [, text$])` | — | a mark at this value, labelled below the slider |
 | `GUI_SLIDER_CLEAR_MARKS(sl)` | — | remove all marks |
 | `GUI_BUSY(win, x, y, d)` | GUI_WIDGET | a spinner (rotating dots) for something of unknown duration; with `GUI_PROGRESS_SET(k, "unbestimmt", 0)` a ring that shows the value |
-| `GUI_DATE_MARK(dp, datum$ [, farbe])` | — | mark a day in the date picker (a dot under the number; default accent) |
-| `GUI_DATE_UNMARK(dp, datum$)` | — | remove a mark |
+| `GUI_DATE_MARK(dp, date$ [, color])` | — | mark a day in the date picker (a dot under the number; default accent) |
+| `GUI_DATE_UNMARK(dp, date$)` | — | remove a mark |
 | `GUI_DATE_CLEAR_MARKS(dp)` | — | remove all marks |
-| `GUI_DATE_MARKED(dp, datum$)` | BOOLEAN | is the day marked? |
-| `GUI_SIZE_GROUP(wdg, gruppe$ [, art$])` | — | all widgets of a group get the same size, the largest (`breite` width, `hoehe` height, `beide` both; group "" = leave) |
-| `GUI_FONT_DIALOG(titel$ [, groesse])` | GUI_WINDOW | modal font chooser: search field, list of system fonts, size, preview; answer through `GUI_ANSWER` |
+| `GUI_DATE_MARKED(dp, date$)` | BOOLEAN | is the day marked? |
+| `GUI_SIZE_GROUP(widget, group$ [, kind$])` | — | all widgets of a group get the same size, the largest (`breite` width, `hoehe` height, `beide` both; group "" = leave) |
+| `GUI_FONT_DIALOG(title$ [, size])` | GUI_WINDOW | modal font chooser: search field, list of system fonts, size, preview; answer through `GUI_ANSWER` |
 | `GUI_FONT_DIALOG_PATH$(dlg)` | STRING | the chosen font -- for `LOADFONT` (readable after the answer too) |
 | `GUI_FONT_DIALOG_SIZE(dlg)` | INTEGER | the chosen size |
-| `GUI_AUTOSIZE(wdg)` | — | width and height from the content; a width or height of `0` when creating means the same |
-| `GUI_SET_ANCHOR(wdg, edges$)` | — | anchoring: which edges the widget sticks to (subset of `"lrtb"`, default `"lt"` = top-left). When the window is resized, the widgets flow along: left+right → stretch, only right → move along, none → centre (likewise top/bottom). |
-| `GUI_GET_ANCHOR$(wdg)` | STRING | the edges it sticks to, in the order `"lrtb"` (default `"lt"`) |
+| `GUI_AUTOSIZE(widget)` | — | width and height from the content; a width or height of `0` when creating means the same |
+| `GUI_SET_ANCHOR(widget, edges$)` | — | anchoring: which edges the widget sticks to (subset of `"lrtb"`, default `"lt"` = top-left). When the window is resized, the widgets flow along: left+right → stretch, only right → move along, none → centre (likewise top/bottom). |
+| `GUI_GET_ANCHOR$(widget)` | STRING | the edges it sticks to, in the order `"lrtb"` (default `"lt"`) |
 | `GUI_WINDOW_CLOSED(win)` | BOOLEAN | was the window closed? |
 | `GUI_BUTTON(win, text$, x, y, w, h)` | GUI_WIDGET | button |
-| `GUI_BUTTON_VARIANT(knopf, art$)` | — | button kind: `standard`, `primaer` (primary), `erfolg` (success), `warnung` (warning), `gefahr` (danger), `umriss` (outline), `flach` (flat), `link` |
-| `GUI_BUTTON_GET_VARIANT$(knopf)` | STRING | the button kind as a name |
+| `GUI_BUTTON_VARIANT(button, kind$)` | — | button kind: `standard`, `primaer` (primary), `erfolg` (success), `warnung` (warning), `gefahr` (danger), `umriss` (outline), `flach` (flat), `link` |
+| `GUI_BUTTON_GET_VARIANT$(button)` | STRING | the button kind as a name |
 | `GUI_ICON_BUTTON(win, x, y, w, h, tex[, text$])` | GUI_WIDGET | button with an icon (texture handle or name of a built-in icon); without text = flat toolbar button |
 | `GUI_SET_ICON(button, tex)` | — | set/replace a button's icon (-1 removes it) |
 | `GUI_GET_ICON$(button)` / `GUI_GET_ICON(button)` | STRING / INTEGER | the built-in icon (`""` if none) or the texture (-1 if none) |
-| `GUI_SET_ROUND(widget, an)` / `GUI_GET_ROUND(widget)` | — / BOOLEAN | draw a button round instead of square (for buttons with only an icon) |
+| `GUI_SET_ROUND(widget, round)` / `GUI_GET_ROUND(widget)` | — / BOOLEAN | draw a button round instead of square (for buttons with only an icon) |
 | `GUI_TOOLBAR(win, x, y, w, h)` | GUI_WIDGET | toolbar: with entries (`GUI_TOOLBAR_ADD`) it lays out, draws and reports its buttons itself; without entries a flat strip |
-| `GUI_TOOLBAR_ADD(tb, sinnbild[, tip$[, text$]])` | INTEGER | append a button — `sinnbild` is the name of a built-in icon or an image; returns the number of the entry |
+| `GUI_TOOLBAR_ADD(tb, icon[, tip$[, text$]])` | INTEGER | append a button — `icon` is the name of a built-in icon or an image; returns the number of the entry |
 | `GUI_TOOLBAR_SEPARATOR(tb)` | INTEGER | vertical separator as an entry |
 | `GUI_TOOLBAR_SPACER(tb)` | INTEGER | gap that pushes the rest of the bar to the right |
 | `GUI_TOOLBAR_CLICKED(tb)` | INTEGER | number of the button clicked in this frame, otherwise -1 |
 | `GUI_TOOLBAR_COUNT(tb)` | INTEGER | number of entries (separators and gaps count) |
 | `GUI_TOOLBAR_CLEAR(tb)` | — | remove all entries |
-| `GUI_TOOLBAR_ENABLE(tb, eintrag, an)` | — | disable or enable a button |
-| `GUI_TOOLBAR_ENABLED(tb, eintrag)` | BOOLEAN | whether a button can be used |
-| `GUI_TOOLBAR_CHECKABLE(tb, eintrag, an)` | — | make a button toggleable: a click switches it on and off |
-| `GUI_TOOLBAR_SET_CHECKED(tb, eintrag, an)` | — | switch a toggleable button on or off |
-| `GUI_TOOLBAR_CHECKED(tb, eintrag)` | BOOLEAN | whether a toggleable button is switched on |
-| `GUI_TOOLBAR_SET_ICON(tb, eintrag, sinnbild)` | — | change the icon of an entry (name or image) |
-| `GUI_TOOLBAR_SET_TIP(tb, eintrag, tip$)` | — | tooltip of an entry |
-| `GUI_TOOLBAR_SET_TEXT(tb, eintrag, text$)` | — | label of an entry |
-| `GUI_TOOLBAR_SET(tb, schluessel$, wert)` | — | `beschriftung` (0/1: text next to the icon), `symbolgroesse` (icon size in points, 0 = from the height) |
-| `GUI_TOOLBAR_GET(tb, schluessel$)` | INTEGER | reads `beschriftung` and `symbolgroesse` back |
-| `GUI_TOOLBAR_ITEM_X(tb, eintrag)` | INTEGER | left edge of an entry in the window (like `GUI_GET_X`) |
-| `GUI_TOOLBAR_ITEM_W(tb, eintrag)` | INTEGER | width of an entry |
+| `GUI_TOOLBAR_ENABLE(tb, entry, on)` | — | disable or enable a button |
+| `GUI_TOOLBAR_ENABLED(tb, entry)` | BOOLEAN | whether a button can be used |
+| `GUI_TOOLBAR_CHECKABLE(tb, entry, on)` | — | make a button toggleable: a click switches it on and off |
+| `GUI_TOOLBAR_SET_CHECKED(tb, entry, on)` | — | switch a toggleable button on or off |
+| `GUI_TOOLBAR_CHECKED(tb, entry)` | BOOLEAN | whether a toggleable button is switched on |
+| `GUI_TOOLBAR_SET_ICON(tb, entry, icon)` | — | change the icon of an entry (name or image) |
+| `GUI_TOOLBAR_SET_TIP(tb, entry, tip$)` | — | tooltip of an entry |
+| `GUI_TOOLBAR_SET_TEXT(tb, entry, text$)` | — | label of an entry |
+| `GUI_TOOLBAR_SET(tb, key$, value)` | — | `beschriftung` (0/1: text next to the icon), `symbolgroesse` (icon size in points, 0 = from the height) |
+| `GUI_TOOLBAR_GET(tb, key$)` | INTEGER | reads `beschriftung` and `symbolgroesse` back |
+| `GUI_TOOLBAR_ITEM_X(tb, entry)` | INTEGER | left edge of an entry in the window (like `GUI_GET_X`) |
+| `GUI_TOOLBAR_ITEM_W(tb, entry)` | INTEGER | width of an entry |
 | `GUI_TOOLBAR_OVERFLOW(tb)` | INTEGER | how many buttons are currently in the » menu (0 = everything fits) |
 | `GUI_STATUSBAR(win, x, y, w, h[, text$])` | GUI_WIDGET | status bar; `text$` is the first field |
-| `GUI_STATUSBAR_ADD(sb, text$, breite[, ausrichtung$])` | INTEGER | append a field: `breite` (width) in points, 0 = shares the rest; `links`/`mitte`/`rechts` (left/centre/right). A text that does not fit ends in `...` |
-| `GUI_STATUSBAR_SET(sb, feld, text$)` | — | text of a field (`GUI_SET_TEXT` means field 0) |
-| `GUI_STATUSBAR_TEXT$(sb, feld)` | STRING | text of a field |
-| `GUI_STATUSBAR_TIP(sb, feld, tip$)` | — | tooltip of a field |
-| `GUI_STATUSBAR_TIP$(sb, feld)` | STRING | read the tooltip of a field |
-| `GUI_STATUSBAR_CLICKABLE(sb, feld, an)` | — | make a field clickable |
+| `GUI_STATUSBAR_ADD(sb, text$, width[, align$])` | INTEGER | append a field: `width` (width) in points, 0 = shares the rest; `links`/`mitte`/`rechts` (left/centre/right). A text that does not fit ends in `...` |
+| `GUI_STATUSBAR_SET(sb, field, text$)` | — | text of a field (`GUI_SET_TEXT` means field 0) |
+| `GUI_STATUSBAR_TEXT$(sb, field)` | STRING | text of a field |
+| `GUI_STATUSBAR_TIP(sb, field, tip$)` | — | tooltip of a field |
+| `GUI_STATUSBAR_TIP$(sb, field)` | STRING | read the tooltip of a field |
+| `GUI_STATUSBAR_CLICKABLE(sb, field, on)` | — | make a field clickable |
 | `GUI_STATUSBAR_CLICKED(sb)` | INTEGER | number of the field clicked in this frame, otherwise -1 |
 | `GUI_STATUSBAR_COUNT(sb)` | INTEGER | number of fields |
-| `GUI_STATUSBAR_FIELD_X(sb, feld)` | INTEGER | left edge of a field in the window |
-| `GUI_STATUSBAR_FIELD_W(sb, feld)` | INTEGER | width of a field |
+| `GUI_STATUSBAR_FIELD_X(sb, field)` | INTEGER | left edge of a field in the window |
+| `GUI_STATUSBAR_FIELD_W(sb, field)` | INTEGER | width of a field |
 | `GUI_BREADCRUMB(win, x, y, w, h)` | GUI_WIDGET | breadcrumb bar |
-| `GUI_BREADCRUMB_ADD(bc, text$[, wert$])` | INTEGER | append a part, with an invisible value |
-| `GUI_BREADCRUMB_SET(bc, teile)` | — | all parts at once (ARRAY OF STRING); the same path again changes nothing |
+| `GUI_BREADCRUMB_ADD(bc, text$[, value$])` | INTEGER | append a part, with an invisible value |
+| `GUI_BREADCRUMB_SET(bc, parts)` | — | all parts at once (ARRAY OF STRING); the same path again changes nothing |
 | `GUI_BREADCRUMB_CLEAR(bc)` | — | remove all parts |
 | `GUI_BREADCRUMB_COUNT(bc)` | INTEGER | number of parts |
 | `GUI_BREADCRUMB_CLICKED(bc)` | INTEGER | number of the part clicked in this frame, otherwise -1 |
-| `GUI_BREADCRUMB_TEXT$(bc, teil)` | STRING | text of a part |
-| `GUI_BREADCRUMB_DATA$(bc, teil)` | STRING | invisible value of a part |
+| `GUI_BREADCRUMB_TEXT$(bc, part)` | STRING | text of a part |
+| `GUI_BREADCRUMB_DATA$(bc, part)` | STRING | invisible value of a part |
 | `GUI_BREADCRUMB_FIRST_VISIBLE(bc)` | INTEGER | first visible part; the ones before it sit under "…" |
-| `GUI_LABEL(win, text$, x, y[, farbe])` | GUI_WIDGET | text |
-| `GUI_SET_ALIGN(wdg, wie$)` | — | align text left, `mitte` (centre) or `rechts` (right) (label, button, text input) |
-| `GUI_GET_ALIGN$(wdg)` | STRING | the alignment that was set; `""` = the default of the kind |
-| `GUI_SET_WRAP(label, breite)` | — | wrap a label at word boundaries at `breite` pixels (0 = off); the height follows the text |
+| `GUI_LABEL(win, text$, x, y[, color])` | GUI_WIDGET | text |
+| `GUI_SET_ALIGN(widget, align$)` | — | align text left, `mitte` (centre) or `rechts` (right) (label, button, text input) |
+| `GUI_GET_ALIGN$(widget)` | STRING | the alignment that was set; `""` = the default of the kind |
+| `GUI_SET_WRAP(label, width)` | — | wrap a label at word boundaries at `width` pixels (0 = off); the height follows the text |
 | `GUI_GET_WRAP(label)` | INTEGER | the wrap width, 0 = off |
-| `GUI_WINDOW_DEFAULT(win, knopf)` | — | default button: Enter in the window triggers it (-1 = none) |
-| `GUI_WINDOW_CANCEL(win, knopf)` | — | cancel button: ESC triggers it (-1 = none) |
+| `GUI_WINDOW_DEFAULT(win, button)` | — | default button: Enter in the window triggers it (-1 = none) |
+| `GUI_WINDOW_CANCEL(win, button)` | — | cancel button: ESC triggers it (-1 = none) |
 | `GUI_CHECKBOX(win, label$, x, y[, default])` | GUI_WIDGET | toggle |
 | `GUI_SLIDER(win, x, y, w, min, max[, default])` | GUI_WIDGET | value slider |
 | `GUI_SPINNER(win, x, y, w, min, max[, default[, step]])` | GUI_WIDGET | number field with +/- (click/mouse wheel/arrow keys; value via `GUI_VALUE`). With the focus it also takes typed numbers (comma like point): the first keystroke replaces the selected value, a number within the range applies while typing, Enter or moving the focus clamps to min/max (Enter reports `GUI_ENTERED`), Esc brings back the earlier value; an integer field stays integer |
 | `GUI_SPLITTER(win, x, y, length, orient$, min, max)` | GUI_WIDGET | movable divider (`"v"`/`"h"`); position via `GUI_VALUE` |
-| `GUI_PANEL(win, x, y, w, h[, titel$])` | GUI_WIDGET | container (decoration) |
-| `GUI_TEXTINPUT(win, x, y, w, h[, platzhalter$])` | GUI_WIDGET | single-line input field (cursor + selection, Ctrl+Z/Y); the placeholder stays, dimmed, until something is typed -- also with focus |
-| `GUI_TEXTINPUT_SET(tf, key$, wert)` | — | `passwort` (password), `nur_lesen` (read-only), `maxlaenge` (max length), `zahlen` (numbers: 0 free, 1 integer, 2 decimal, 3 amount of money in cents), `suche` (search field with magnifier and cross) |
+| `GUI_PANEL(win, x, y, w, h[, title$])` | GUI_WIDGET | container (decoration) |
+| `GUI_TEXTINPUT(win, x, y, w, h[, placeholder$])` | GUI_WIDGET | single-line input field (cursor + selection, Ctrl+Z/Y); the placeholder stays, dimmed, until something is typed -- also with focus |
+| `GUI_TEXTINPUT_SET(tf, key$, value)` | — | `passwort` (password), `nur_lesen` (read-only), `maxlaenge` (max length), `zahlen` (numbers: 0 free, 1 integer, 2 decimal, 3 amount of money in cents), `suche` (search field with magnifier and cross) |
 | `GUI_TEXTINPUT_GET(tf, key$)` | INTEGER | reads the same keys back (switches as 0/1) |
 | `GUI_TEXTINPUT_PLACEHOLDER$(tf)` | STRING | the grey text in the empty field (also of a `GUI_TEXTAREA`) |
 | `GUI_UNDO(tf)` / `GUI_REDO(tf)` | BOOLEAN | one step back or forward again, like Ctrl+Z / Ctrl+Y (text field and text area); `TRUE` if there was one |
 | `GUI_CAN_UNDO(tf)` / `GUI_CAN_REDO(tf)` | BOOLEAN | is there a step? -- for a menu item that is greyed out otherwise |
 | `GUI_UNDO_CLEAR(tf)` | — | forget the history (after loading a file) |
-| `GUI_TEXTINPUT_ICON(tf, links$, rechts$)` | — | a built-in symbol on the left and right inside the field ("" = none) -- see [Search field, symbols, suggestions](#search-field-symbols-suggestions) |
+| `GUI_TEXTINPUT_ICON(tf, left$, right$)` | — | a built-in symbol on the left and right inside the field ("" = none) -- see [Search field, symbols, suggestions](#search-field-symbols-suggestions) |
 | `GUI_ICON_CLICKED(tf)` | INTEGER | symbol clicked in this frame: 1 left, 2 right, 0 none |
 | `GUI_SEARCH_CHANGED(tf)` | BOOLEAN | a search field reports its text: 150 ms after the last keystroke, at once on Enter, the cross and ESC |
-| `GUI_TEXTINPUT_COMPLETION(tf, eintraege)` | — | suggestions while typing: entries that start with what was typed first, then entries that contain it ([] = none) |
+| `GUI_TEXTINPUT_COMPLETION(tf, entries)` | — | suggestions while typing: entries that start with what was typed first, then entries that contain it ([] = none) |
 | `GUI_COMPLETION_CHOSEN(tf)` | INTEGER | suggestion taken in this frame (index into `eintraege`, -1 = none) |
 | `GUI_COMPLETION_OPEN(tf)` | BOOLEAN | is the suggestion list open? |
 | `GUI_ENTERED(tf)` | BOOLEAN | was Enter pressed in the text input in this frame? |
 | `GUI_ON_ENTER(tf, handler)` | — | callback for it |
-| `GUI_TEXTAREA(win, x, y, w, h[, platzhalter$])` | GUI_WIDGET | **multi-line** text field (ENTER = new line, scrolls vertically and horizontally, arrows, selection via mouse drag/Shift+arrow, Ctrl+A/C/X/V). Can be coloured as a **code field** — see [Code field](#the-textarea-as-a-code-field) |
+| `GUI_TEXTAREA(win, x, y, w, h[, placeholder$])` | GUI_WIDGET | **multi-line** text field (ENTER = new line, scrolls vertically and horizontally, arrows, selection via mouse drag/Shift+arrow, Ctrl+A/C/X/V). Can be coloured as a **code field** — see [Code field](#the-textarea-as-a-code-field) |
 | `GUI_TABLE(win, x, y, w, h[, headers, cells])` | GUI_WIDGET | scrollable table (header + body) |
 | `GUI_TREE(win, x, y, w, h)` | GUI_WIDGET | tree view (expandable/collapsible, scrollable) |
 | `GUI_TREE_ADD(tree, parent, label$)` | INT | append a node (parent = -1 = root), returns the node id |
 | `GUI_TREE_CLEAR(tree)` | — | delete all nodes |
 | `GUI_TREE_SELECTED(tree)` / `GUI_TREE_SET_SELECTED(tree, node)` | INT / — | read/set the selected node (-1 = none) |
 | `GUI_TREE_LABEL(tree, node)` | STRING | text of a node |
-| `GUI_TABCONTROL_ITEM_RECT(tc, seite)` | TUPLE | (x, y, w, h) of a page's tab head on screen, from the same calculation as drawing and clicking -- for tests with real clicks |
+| `GUI_TABCONTROL_ITEM_RECT(tc, page)` | TUPLE | (x, y, w, h) of a page's tab head on screen, from the same calculation as drawing and clicking -- for tests with real clicks |
 | `GUI_TREE_ITEM_RECT(tree, node)` | TUPLE | (x, y, w, h) of a node on screen, x at the start of its label; under a collapsed one (0, 0, 0, 0) -- for tests with real clicks |
 | `GUI_TREE_EXPAND(tree, node, flag)` | — | expand/collapse a node |
-| `GUI_TREE_SET(tree, key$, wert)` | — | setting on the tree: `mehrfachauswahl` (multi-select), `kaestchen` (checkboxes), `bearbeitbar` (editable: F2 renames) |
+| `GUI_TREE_SET(tree, key$, value)` | — | setting on the tree: `mehrfachauswahl` (multi-select), `kaestchen` (checkboxes), `bearbeitbar` (editable: F2 renames) |
 | `GUI_TREE_EDIT(tree, node)` | — | rename a node: input field over the name, everything selected (not for the file tree) |
 | `GUI_TREE_EDITED(tree)` | INTEGER | node renamed in this frame, -1 = none |
 | `GUI_TREE_EDITING(tree)` | INTEGER | node currently being renamed, -1 = none |
@@ -229,31 +229,31 @@ IMPORT "gui"
 | `GUI_TREE_SEL_COUNT(tree)` | INTEGER | how many nodes are selected |
 | `GUI_TREE_SEL_NODE(tree, i)` | INTEGER | the i-th selected node id (-1 = no more) |
 | `GUI_TREE_IS_SELECTED(tree, node)` | BOOLEAN | is this node selected? |
-| `GUI_TREE_SELECT(tree, node, an)` | — | add a node to the selection or take it out |
+| `GUI_TREE_SELECT(tree, node, on)` | — | add a node to the selection or take it out |
 | `GUI_TREE_CLEAR_SELECTION(tree)` | — | clear the selection |
 | `GUI_TREE_CHECKED(tree, node)` | BOOLEAN | is the check mark set on this node (only with `kaestchen`)? |
-| `GUI_TREE_SET_CHECKED(tree, node, an)` | — | set or remove the check mark |
-| `GUI_FILETREE(win, x, y, w, h, wurzel$ = ".")` | GUI_WIDGET | file tree: fetches its nodes from disk itself, each folder only when it is expanded |
-| `GUI_FILETREE_SET(ft, key$, wert)` | — | `ordner_zuerst` (folders first), `verborgene` (hidden files), `nur_ordner` (folders only), `mehrfachauswahl` (multi-select), `kaestchen` (checkboxes), `klick_klappt` (click expands), `nach_art` (files of a folder in the order of the `GUI_FILETREE_ICON` patterns, else `GUI_FILETREE_COLOR`, then by name), `auffrischen` (refresh, milliseconds, 0 = never) |
-| `GUI_FILETREE_FILTER(ft, muster$)` | — | which files it shows (`*.dh;*.md`, empty = all) |
-| `GUI_FILETREE_SKIP(ft, namen$)` | — | names or patterns it skips — folders and files alike (`target;__pycache__;_*`) |
-| `GUI_FILETREE_SET_ROOT(ft, pfad$)` / `GUI_FILETREE_ROOT$(ft)` | — / STRING | set and read the root folder |
+| `GUI_TREE_SET_CHECKED(tree, node, on)` | — | set or remove the check mark |
+| `GUI_FILETREE(win, x, y, w, h, root$ = ".")` | GUI_WIDGET | file tree: fetches its nodes from disk itself, each folder only when it is expanded |
+| `GUI_FILETREE_SET(ft, key$, value)` | — | `ordner_zuerst` (folders first), `verborgene` (hidden files), `nur_ordner` (folders only), `mehrfachauswahl` (multi-select), `kaestchen` (checkboxes), `klick_klappt` (click expands), `nach_art` (files of a folder in the order of the `GUI_FILETREE_ICON` patterns, else `GUI_FILETREE_COLOR`, then by name), `auffrischen` (refresh, milliseconds, 0 = never) |
+| `GUI_FILETREE_FILTER(ft, pattern$)` | — | which files it shows (`*.dh;*.md`, empty = all) |
+| `GUI_FILETREE_SKIP(ft, names$)` | — | names or patterns it skips — folders and files alike (`target;__pycache__;_*`) |
+| `GUI_FILETREE_SET_ROOT(ft, path$)` / `GUI_FILETREE_ROOT$(ft)` | — / STRING | set and read the root folder |
 | `GUI_FILETREE_REFRESH(ft)` | — | read from disk again now |
 | `GUI_FILETREE_SELECTED$(ft)` | STRING | full path of the selection (empty = none) |
-| `GUI_FILETREE_SELECT(ft, pfad$)` | — | select a path; the folders above it expand for that, and the row is scrolled into view |
+| `GUI_FILETREE_SELECT(ft, path$)` | — | select a path; the folders above it expand for that, and the row is scrolled into view |
 | `GUI_FILETREE_ACTIVATED$(ft)` | STRING | what was opened in this frame by double click or Enter (empty = nothing) |
-| `GUI_FILETREE_IS_DIR(ft, pfad$ = "")` | BOOLEAN | is it a folder? Without a path the selection counts |
-| `GUI_FILETREE_EXPAND(ft, pfad$, an)` | — | expand or collapse a folder |
+| `GUI_FILETREE_IS_DIR(ft, path$ = "")` | BOOLEAN | is it a folder? Without a path the selection counts |
+| `GUI_FILETREE_EXPAND(ft, path$, on)` | — | expand or collapse a folder |
 | `GUI_FILETREE_COUNT(ft)` / `GUI_FILETREE_PATH$(ft, i)` | INTEGER / STRING | count and read the visible rows |
 | `GUI_FILETREE_SEL_COUNT(ft)` / `GUI_FILETREE_SEL_PATH$(ft, i)` | INTEGER / STRING | count and read the multi-selection |
-| `GUI_FILETREE_CHECKED(ft, pfad$)` / `GUI_FILETREE_SET_CHECKED(ft, pfad$, an)` | BOOLEAN / — | read and set the check mark on a path |
+| `GUI_FILETREE_CHECKED(ft, path$)` / `GUI_FILETREE_SET_CHECKED(ft, path$, an)` | BOOLEAN / — | read and set the check mark on a path |
 | `GUI_FILETREE_CHECKED_COUNT(ft)` / `GUI_FILETREE_CHECKED_PATH$(ft, i)` | INTEGER / STRING | all checked paths, including those currently collapsed |
-| `GUI_FILETREE_ICONS(ft, ordnerbild, dateibild)` | — | icons for folders and files (-1 = none) |
-| `GUI_FILETREE_COLOR(ft, muster$, farbe)` | — | text colour per file type: patterns as with the filter (`"*.json;*.ini"`), `"/"` for folders; the first match wins, -1 removes the colour |
-| `GUI_FILETREE_ICON(ft, muster$, sinnbild$)` | — | built-in icon per file type, same rule as the colour, drawn in the colour of the name; a folder with `"ordner"` shows `"ordner_offen"` when expanded, `""` removes it |
+| `GUI_FILETREE_ICONS(ft, folder_icon, file_icon)` | — | icons for folders and files (-1 = none) |
+| `GUI_FILETREE_COLOR(tree, pattern$, color)` | — | text colour per file type: patterns as with the filter (`"*.json;*.ini"`), `"/"` for folders; the first match wins, -1 removes the colour |
+| `GUI_FILETREE_ICON(ft, pattern$, icon$)` | — | built-in icon per file type, same rule as the colour, drawn in the colour of the name; a folder with `"ordner"` shows `"ordner_offen"` when expanded, `""` removes it |
 | `GUI_TABCONTROL(win, x, y, w, h)` | GUI_WIDGET | tabs **inside** a window (card index); if the heads do not fit the width, the widest get narrower first and their title is shortened |
-| `GUI_TABCONTROL_ADD(tc, titel$)` | INTEGER | append a page, returns its number |
-| `GUI_TABCONTROL_ADD_WIDGET(tc, wdg, seite)` | — | put a widget on a page; it keeps its position in the window |
+| `GUI_TABCONTROL_ADD(tc, title$)` | INTEGER | append a page, returns its number |
+| `GUI_TABCONTROL_ADD_WIDGET(tc, widget, page)` | — | put a widget on a page; it keeps its position in the window |
 | `GUI_TABCONTROL_PAGE(tc)` / `GUI_TABCONTROL_SET_PAGE(tc, seite)` | INTEGER / — | read and set the front page |
 | `GUI_TABCONTROL_COUNT(tc)` | INTEGER | how many pages there are |
 | `GUI_TABCONTROL_TITLE$(tc, i)` / `GUI_TABCONTROL_SET_TITLE(tc, i, titel$)` | STRING / — | read and set the label of a page |
@@ -262,16 +262,16 @@ IMPORT "gui"
 | `GUI_TABCONTROL_CLOSED(tc)` | INTEGER | which page is to close in this frame (cross or middle mouse button), -1 = none; the program removes it itself |
 | `GUI_RICHTEXT(win, x, y, w, h, text$ = "")` | GUI_WIDGET | **typeset text**: Markdown is typeset instead of merely displayed |
 | `GUI_RICHTEXT_SET_TEXT(rt, text$)` | — | set new Markdown source (`GUI_SET_TEXT` does the same) |
-| `GUI_RICHTEXT_SET(rt, key$, wert)` | — | `groesse` (base font size), `codeschrift` (FONT handle for code blocks) and the colours of the code blocks `farbe_kommentar`/`farbe_text`/`farbe_zahl`/`farbe_schluessel`/`farbe_name`/`farbe_operator` (-1 = default matching the background) |
+| `GUI_RICHTEXT_SET(rt, key$, value)` | — | `groesse` (base font size), `codeschrift` (FONT handle for code blocks) and the colours of the code blocks `farbe_kommentar`/`farbe_text`/`farbe_zahl`/`farbe_schluessel`/`farbe_name`/`farbe_operator` (-1 = default matching the background) |
 | `GUI_RICHTEXT_HEADINGS(rt)` | ARRAY OF STRING | the headings (`#` to `###`) without markup, from the source -- correct right after `SET_TEXT` |
 | `GUI_RICHTEXT_HEADING_LEVELS(rt)` | ARRAY OF INTEGER | their levels 1..3, in the same order |
-| `GUI_RICHTEXT_CODE_BUTTONS(rt, knoepfe$)` | — | buttons on every code block, separated with `\|` (e.g. `"Kopieren\|Starten"`); empty = none. The block gets a strip at the top for them |
+| `GUI_RICHTEXT_CODE_BUTTONS(rt, buttons$)` | — | buttons on every code block, separated with `\|` (e.g. `"Kopieren\|Starten"`); empty = none. The block gets a strip at the top for them |
 | `GUI_RICHTEXT_CODE_ACTION$(rt)` | STRING | label of the code button pressed in this frame (empty = none); also fires `GUI_ON_CLICK` |
 | `GUI_RICHTEXT_CODE$(rt)` | STRING | the code of the block on which a button was last pressed (without the fences) |
 | `GUI_RICHTEXT_GOTO_HEADING(rt, nr)` | — | scroll to heading number `nr`; before typesetting the jump is queued |
 | `GUI_RICHTEXT_HEADING_AT(rt)` | INTEGER | which section the top edge is in (-1 = before the first) -- for a table of contents that follows along |
 | `GUI_RICHTEXT_LINK$(rt)` | STRING | which link was clicked in this frame (empty = none) |
-| `GUI_RICHTEXT_FIND(rt, text$, ab = -1)` | INTEGER | scroll to the first match; returns its y or -1 (0 = queued: right after `SET_TEXT` the search only runs once the new text is typeset) |
+| `GUI_RICHTEXT_FIND(rt, text$, from = -1)` | INTEGER | scroll to the first match; returns its y or -1 (0 = queued: right after `SET_TEXT` the search only runs once the new text is typeset) |
 | `GUI_RICHTEXT_SCROLL(rt, y)` / `GUI_RICHTEXT_SCROLL_GET(rt)` | — / INTEGER | set and read the view offset |
 | `GUI_RICHTEXT_HEIGHT(rt)` | INTEGER | how tall the typeset text has become |
 | `GUI_RICHTEXT_SELECTION$(rt)` | STRING | the selected text, lines separated by line breaks (empty = no selection) |
@@ -282,39 +282,39 @@ IMPORT "gui"
 | `GUI_RICHTEXT_MARK_ALL(rt, text$)` | INTEGER | highlight all matches faintly (empty = off); returns their number |
 | `GUI_TIMEPICKER(win, x, y, w = 0, h = 0)` | GUI_WIDGET | time of day: fields with arrows for hour, minute and (optionally) second |
 | `GUI_TIME$(tp)` | STRING | the time as `HH:MM:SS` — like `TIME$()`, even without a seconds field |
-| `GUI_SET_TIME(tp, zeit$)` | — | set the time (`HH:MM` or `HH:MM:SS`; invalid values are an error) |
-| `GUI_TIMEPICKER_SET(tp, key$, wert)` | — | `sekunden` (third field, seconds) and `schritt` (step size of the minute) |
+| `GUI_SET_TIME(tp, time$)` | — | set the time (`HH:MM` or `HH:MM:SS`; invalid values are an error) |
+| `GUI_TIMEPICKER_SET(tp, key$, value)` | — | `sekunden` (third field, seconds) and `schritt` (step size of the minute) |
 | `GUI_ACCORDION(win, x, y, w, h)` | GUI_WIDGET | **accordion**: sections with a header that expand and collapse; whatever lies below moves down when expanding |
-| `GUI_ACCORDION_ADD(acc, titel$)` | INTEGER | append a section (collapsed), returns its number |
-| `GUI_ACCORDION_ADD_WIDGET(acc, wdg, abschnitt)` | — | put a widget in a section; its position counts from the section (below the header) |
-| `GUI_ACCORDION_OPEN(acc, abschnitt, an)` | — | expand or collapse a section; without `mehrere`, expanding closes the others |
-| `GUI_ACCORDION_IS_OPEN(acc, abschnitt)` | BOOLEAN | is the section open? |
+| `GUI_ACCORDION_ADD(acc, title$)` | INTEGER | append a section (collapsed), returns its number |
+| `GUI_ACCORDION_ADD_WIDGET(acc, widget, section)` | — | put a widget in a section; its position counts from the section (below the header) |
+| `GUI_ACCORDION_OPEN(acc, section, on)` | — | expand or collapse a section; without `mehrere`, expanding closes the others |
+| `GUI_ACCORDION_IS_OPEN(acc, section)` | BOOLEAN | is the section open? |
 | `GUI_ACCORDION_COUNT(acc)` | INTEGER | how many sections there are |
-| `GUI_ACCORDION_TITLE$(acc, abschnitt)` / `GUI_ACCORDION_SET_TITLE(acc, abschnitt, titel$)` | STRING / — | read and set the header of a section |
-| `GUI_ACCORDION_SET_HEIGHT(acc, abschnitt, px)` | — | fixed height of an open section (0 = by content) |
-| `GUI_ACCORDION_SET(acc, key$, wert)` | — | `mehrere` (several): several sections open at once (off by default) |
+| `GUI_ACCORDION_TITLE$(acc, section)` / `GUI_ACCORDION_SET_TITLE(acc, section, titel$)` | STRING / — | read and set the header of a section |
+| `GUI_ACCORDION_SET_HEIGHT(acc, section, px)` | — | fixed height of an open section (0 = by content) |
+| `GUI_ACCORDION_SET(acc, key$, value)` | — | `mehrere` (several): several sections open at once (off by default) |
 | `GUI_ACCORDION_TOGGLED(acc)` | INTEGER | which section was toggled in this frame (-1 = none) |
 | `GUI_WIZARD(win, x, y, w, h)` | GUI_WIDGET | **wizard**: steps with a step indicator and Back/Next/Finish/Cancel |
-| `GUI_WIZARD_ADD(wz, titel$)` | INTEGER | append a step, returns its number |
-| `GUI_WIZARD_ADD_WIDGET(wz, wdg, schritt)` | — | put a widget on a step; it keeps its position in the window |
+| `GUI_WIZARD_ADD(wz, title$)` | INTEGER | append a step, returns its number |
+| `GUI_WIZARD_ADD_WIDGET(wz, widget, step)` | — | put a widget on a step; it keeps its position in the window |
 | `GUI_WIZARD_STEP(wz)` / `GUI_WIZARD_SET_STEP(wz, schritt)` | INTEGER / — | read and set the current step |
 | `GUI_WIZARD_COUNT(wz)` | INTEGER | how many steps there are |
 | `GUI_WIZARD_NEXT(wz)` | BOOLEAN | like the Next button (on the last step: Finish); FALSE if disabled or the validation fails |
 | `GUI_WIZARD_BACK(wz)` | BOOLEAN | like the Back button; FALSE on the first step |
-| `GUI_WIZARD_ENABLE_NEXT(wz, an)` | — | disable or enable Next/Finish |
+| `GUI_WIZARD_ENABLE_NEXT(wz, on)` | — | disable or enable Next/Finish |
 | `GUI_WIZARD_CHANGED(wz)` | BOOLEAN | step changed in this frame? |
 | `GUI_WIZARD_FINISHED(wz)` | BOOLEAN | Finish pressed in this frame? |
 | `GUI_WIZARD_CANCELLED(wz)` | BOOLEAN | Cancel pressed in this frame? |
-| `GUI_WIZARD_LABELS(wz, zurueck$, weiter$, fertig$, abbrechen$)` | — | labels of the four buttons (say, for an English interface) |
-| `GUI_WIZARD_SET(wz, key$, wert)` | — | `pruefen` (validate): Next only once the fields of this step satisfy their `GUI_RULE`s |
-| `GUI_TREETABLE(win, x, y, w, h [, kopf])` | GUI_WIDGET | **tree table**: a table whose rows form a tree (indentation and triangle in the first column) |
-| `GUI_TREETABLE_ADD(tt, eltern, zellen)` | INTEGER | append a row under `eltern` (parent, -1 = top level); returns the data row |
-| `GUI_TREETABLE_EXPAND(tt, zeile, an)` | — | expand or collapse a row |
-| `GUI_TREETABLE_EXPAND_ALL(tt, an)` | — | expand or collapse everything |
-| `GUI_TREETABLE_EXPANDED(tt, zeile)` | BOOLEAN | is the row expanded? |
-| `GUI_TREETABLE_PARENT(tt, zeile)` | INTEGER | parent row (-1 = top level) |
-| `GUI_TREETABLE_LEVEL(tt, zeile)` | INTEGER | depth in the tree (0 = top level) |
-| `GUI_TREETABLE_SET_PARENT(tt, zeile, eltern)` | — | move a row to another parent; under itself or one of its descendants is an error |
+| `GUI_WIZARD_LABELS(wz, back$, next$, finish$, cancel$)` | — | labels of the four buttons (say, for an English interface) |
+| `GUI_WIZARD_SET(wz, key$, value)` | — | `pruefen` (validate): Next only once the fields of this step satisfy their `GUI_RULE`s |
+| `GUI_TREETABLE(win, x, y, w, h [, header])` | GUI_WIDGET | **tree table**: a table whose rows form a tree (indentation and triangle in the first column) |
+| `GUI_TREETABLE_ADD(tt, parent, cells)` | INTEGER | append a row under `parent` (parent, -1 = top level); returns the data row |
+| `GUI_TREETABLE_EXPAND(tt, row, on)` | — | expand or collapse a row |
+| `GUI_TREETABLE_EXPAND_ALL(tt, on)` | — | expand or collapse everything |
+| `GUI_TREETABLE_EXPANDED(tt, row)` | BOOLEAN | is the row expanded? |
+| `GUI_TREETABLE_PARENT(tt, row)` | INTEGER | parent row (-1 = top level) |
+| `GUI_TREETABLE_LEVEL(tt, row)` | INTEGER | depth in the tree (0 = top level) |
+| `GUI_TREETABLE_SET_PARENT(tt, row, parent)` | — | move a row to another parent; under itself or one of its descendants is an error |
 | `GUI_TABLE_HEADERS(tbl, headers)` | — | set the column titles (1D ARRAY OF STRING) |
 | `GUI_TABLE_ROWS(tbl, cells)` | — | set the data rows (2D ARRAY OF STRING) |
 | `GUI_TABLE_COL_WIDTHS(tbl, widths)` | — | column widths (1D ARRAY OF INTEGER; NIL = auto) |
@@ -324,7 +324,7 @@ IMPORT "gui"
 | `GUI_TABLE_CLICKED(tbl)` | INTEGER | row clicked in this frame (-1) |
 | `GUI_TABLE_ROW_COUNT(tbl)` | INTEGER | number of data rows |
 | `GUI_UPDATE()` | — | **required** every frame: process mouse/keys |
-| `GUI_DRAW([obenauf])` | — | draw all windows (back→front); `obenauf`=FALSE leaves out the context menu and tooltip |
+| `GUI_DRAW([on_top])` | — | draw all windows (back→front); `on_top`=FALSE leaves out the context menu and tooltip |
 | `GUI_DRAW_TOP()` | — | only what lies above all windows: open menu (bar or context), open dropdown list, tooltip |
 | `GUI_DRAW_WINDOW(win)` | — | draw ONE window again, above everything added since `GUI_DRAW` |
 | `GUI_CLICKED(widget)` | BOOLEAN | clicked in this frame? Applies to button, menu entry, **checkbox, toggle and radio** and to a click on a list entry -- also the one already selected |
@@ -336,18 +336,18 @@ IMPORT "gui"
 | `GUI_SET_TEXT(widget, text$)` | — | set the text |
 | `GUI_TOOLTIP(widget, text$)` | — | hover help text (multi-line via `\n`; "" removes it) |
 | `GUI_TOOLTIP$(widget)` | STRING | the help text that was set ("" if none) |
-| `GUI_SET_CHECKED(widget, an)` | — | set a checkbox |
-| `GUI_SET_VALUE(widget, wert)` | — | set the slider value (gets clamped) |
-| `GUI_ON_CLICK(widget, funcref)` | — | FUNCREF callback on click (button/checkbox) |
-| `GUI_ON_CHANGE(widget, funcref)` | — | FUNCREF callback on value change (slider/TextInput/checkbox/table selection) |
+| `GUI_SET_CHECKED(widget, flag)` | — | set a checkbox |
+| `GUI_SET_VALUE(widget, value)` | — | set the slider value (gets clamped) |
+| `GUI_ON_CLICK(widget, handler)` | — | FUNCREF callback on click (button/checkbox) |
+| `GUI_ON_CHANGE(widget, handler)` | — | FUNCREF callback on value change (slider/TextInput/checkbox/table selection) |
 | `GUI_THEME(accent)` | — | change the accent colour (RGB) (short form) |
-| `GUI_THEME_SET(key$, farbe)` / `GUI_THEME_GET(key$)` | — / INT | set/read a single theme colour |
+| `GUI_THEME_SET(key$, color)` / `GUI_THEME_GET(key$)` | — / INT | set/read a single theme colour |
 | `GUI_THEME_PRESET(name$)` | — | look: dark/light/retro/contrast + **modern_dark/modern_light** (rounded + shadows) |
 | `GUI_SYSTEM_DARK()` | BOOLEAN | is the operating system set to dark? (Windows, macOS, GNOME; unknown = `FALSE`) |
 | `GUI_SYSTEM_ACCENT()` | INTEGER | the accent colour of the operating system, -1 if unknown |
 | `GUI_SYSTEM_REDUCED_MOTION()` | BOOLEAN | does the operating system ask for less motion ("reduce animations"; Windows, macOS, GNOME; unknown = `FALSE`)? |
-| `GUI_METRIC_SET(key$, wert)` / `GUI_METRIC_GET(key$)` | — / INT | set/read a layout size |
-| `GUI_SET_COLOR(widget, rolle$, farbe)` | — | one colour per widget (bg/fg/border/accent, for buttons also hover/pressed; -1 removes it) |
+| `GUI_METRIC_SET(key$, value)` / `GUI_METRIC_GET(key$)` | — / INT | set/read a layout size |
+| `GUI_SET_COLOR(widget, role$, color)` | — | one colour per widget (bg/fg/border/accent, for buttons also hover/pressed; -1 removes it) |
 | `GUI_RESET()` | — | delete windows/widgets + reset theme/metrics |
 
 **A press belongs to the window on top:** a text area with focus only reacts to a press that begins inside it and whose window is on top there — a list over the code can be clicked and dragged without the cursor jumping or text getting selected underneath.
@@ -362,15 +362,15 @@ IMPORT "gui"
 | `GUI_CONTEXT(win)` | menu handle | **context menu** (by right-click in the window) |
 | `GUI_CONTEXT_TABS(menu)` | — | bind a context menu to the window's tab bar: it opens on a right-click on a tab |
 | `GUI_TAB_CONTEXT(win)` | INTEGER | on which tab the tab bar's context menu last opened (-1 = never yet) |
-| `GUI_CONTEXT_WIDGET(menu, wdg)` | — | bind a context menu to a widget: it only opens on a right-click on it (list box, tree, table select their row while doing so, a text area sets the cursor; not in its line-number column, which belongs to `GUI_TEXTAREA_GUTTER_CLICKED`); `-1` binds it back to the window |
+| `GUI_CONTEXT_WIDGET(menu, widget)` | — | bind a context menu to a widget: it only opens on a right-click on it (list box, tree, table select their row while doing so, a text area sets the cursor; not in its line-number column, which belongs to `GUI_TEXTAREA_GUTTER_CLICKED`); `-1` binds it back to the window |
 | `GUI_SUBMENU(menu, label$)` | menu handle | **submenu** — opens to the right on hover, any depth |
-| `GUI_MENU_ITEM(menu, label$[, kuerzel$])` | item handle | append an entry — handle for `GUI_CLICKED`; `kuerzel$` (shortcut) e.g. `"Strg+S"` |
+| `GUI_MENU_ITEM(menu, label$[, shortcut$])` | item handle | append an entry — handle for `GUI_CLICKED`; `shortcut$` (shortcut) e.g. `"Strg+S"` |
 | `GUI_MENU_SEPARATOR(menu)` | — | append a separator line |
-| `GUI_MENU_SHORTCUT(item, kuerzel$)` | — | set a shortcut or remove it with `""` |
-| `GUI_MENU_ENABLE(item, an)` | — | disable an entry (grey, no click, no shortcut) or enable it |
-| `GUI_MENU_CHECK(item, an)` | — | makes the entry a **check-mark entry** and sets it; afterwards a click toggles it by itself |
+| `GUI_MENU_SHORTCUT(item, shortcut$)` | — | set a shortcut or remove it with `""` |
+| `GUI_MENU_ENABLE(item, on)` | — | disable an entry (grey, no click, no shortcut) or enable it |
+| `GUI_MENU_CHECK(item, on)` | — | makes the entry a **check-mark entry** and sets it; afterwards a click toggles it by itself |
 | `GUI_MENU_CHECKED(item)` | BOOLEAN | state of the check mark |
-| `GUI_MENU_ICON(item, bild)` | — | icon to the left of the text (name of a built-in icon or texture handle as with `GUI_ICON_BUTTON`, -1 removes it) |
+| `GUI_MENU_ICON(item, image)` | — | icon to the left of the text (name of a built-in icon or texture handle as with `GUI_ICON_BUTTON`, -1 removes it) |
 | `GUI_MENU_TEXT(item, label$)` | — | change the label ("Pause" / "Continue") |
 
 Clicks are evaluated as with buttons via `GUI_CLICKED(item)`. The menu bar pushes the window content down automatically; a click on a menu opens the dropdown, a click elsewhere closes it. Complete example: [`examples/129_gui_menu.dh`](../../examples/129_gui_menu.dh).
@@ -410,7 +410,7 @@ it nor the text changes -- a key that moves it pulls the view back to it.
 | Function | Returns | Purpose |
 |---|---|---|
 | `GUI_TABS(win, labels)` | — | create a tab bar (`labels` = ARRAY/TUPLE of strings); active tab → 0 |
-| `GUI_SET_TAB(widget, seite)` | — | assign a widget to a tab (`-1` = visible on all tabs) |
+| `GUI_SET_TAB(widget, page)` | — | assign a widget to a tab (`-1` = visible on all tabs) |
 | `GUI_ACTIVE_TAB(win)` | INTEGER | index of the active tab |
 | `GUI_SET_ACTIVE_TAB(win, i)` | — | switch tabs |
 
@@ -422,8 +422,8 @@ Native, blocking standard dialogs (no IMPORT needed — like the file dialogs):
 
 | Function | Returns | Purpose |
 |---|---|---|
-| `GUI_MESSAGE(titel$, text$)` | — | info box with OK |
-| `GUI_CONFIRM(titel$, text$[, stil$])` | BOOLEAN | confirmation question → `TRUE` on agreement |
+| `GUI_MESSAGE(title$, text$)` | — | info box with OK |
+| `GUI_CONFIRM(title$, text$[, style$])` | BOOLEAN | confirmation question → `TRUE` on agreement |
 | `GUI_RADIO(win, group$, text$, x, y)` | GUI_WIDGET | radio button; all with the same `group$` exclude each other |
 | `GUI_RADIO_SELECTED(radio)` | INTEGER | which one of the group is selected? (creation order from 0, `-1` = none) |
 | `GUI_DROPDOWN(win, x, y, w, h, items)` | GUI_WIDGET | drop-down selection list; the popup is drawn above all other widgets |
@@ -433,7 +433,7 @@ Native, blocking standard dialogs (no IMPORT needed — like the file dialogs):
 | `GUI_DROPDOWN_SET_SELECTED(dd, i)` | — | set the selection from the program |
 | `GUI_SET_DROPDOWN(dd, items)` | — | replace the entries |
 | `GUI_DROPDOWN_PLACEHOLDER(dd, text$)` | — | hint in the box while nothing is selected ("Please choose") |
-| `GUI_DROPDOWN_SET(dd, key$, wert)` | — | setting of the dropdown; `bearbeitbar` (editable) = you may type into the field, including what is not in the list (combo box) |
+| `GUI_DROPDOWN_SET(dd, key$, value)` | — | setting of the dropdown; `bearbeitbar` (editable) = you may type into the field, including what is not in the list (combo box) |
 | `GUI_LISTBOX(win, x, y, w, h, items)` | GUI_WIDGET | scrollable selection list (the mouse wheel scrolls; with the Ctrl key held down no widget scrolls, see the section "Ctrl+wheel belongs to the program") |
 | `GUI_LISTBOX_SELECTED(lb)` | INTEGER | index of the selection (`-1` = none) |
 | `GUI_LISTBOX_TEXT(lb)` | STRING | text of the selection |
@@ -441,28 +441,28 @@ Native, blocking standard dialogs (no IMPORT needed — like the file dialogs):
 | `GUI_SET_LISTBOX(lb, items)` | — | replace the entries |
 | `GUI_LISTBOX_ADD(lb, text$[, pos])` / `GUI_LISTBOX_REMOVE(lb, i)` / `GUI_LISTBOX_CLEAR(lb)` | INTEGER / — / — | entries one by one (also for dropdowns); omit `pos` = append at the end |
 | `GUI_LISTBOX_COUNT(lb)` / `GUI_LISTBOX_ITEM(lb, i)` / `GUI_LISTBOX_SET_ITEM(lb, i, text$)` / `GUI_LISTBOX_MOVE(lb, von, nach)` | — | count, read, relabel, move |
-| `GUI_LISTBOX_SET(lb, key$, wert)` | — | `mehrfachauswahl` (multi-select), `kaestchen` (checkboxes), `bearbeitbar` (editable: F2 renames) |
-| `GUI_LISTBOX_ICON(lb, i, bild)` / `GUI_LISTBOX_COLOR(lb, i, farbe)` | — | icon and text colour per entry (-1 = none / theme) |
+| `GUI_LISTBOX_SET(lb, key$, value)` | — | `mehrfachauswahl` (multi-select), `kaestchen` (checkboxes), `bearbeitbar` (editable: F2 renames) |
+| `GUI_LISTBOX_ICON(lb, i, image)` / `GUI_LISTBOX_COLOR(lb, i, farbe)` | — | icon and text colour per entry (-1 = none / theme) |
 | `GUI_LISTBOX_CHECKED(lb, i)` / `GUI_LISTBOX_SET_CHECKED(lb, i, an)` | BOOLEAN / — | check mark per entry (with `kaestchen`) |
 | `GUI_LISTBOX_IS_SELECTED(lb, i)` / `GUI_LISTBOX_SELECT(lb, i, an)` / `GUI_LISTBOX_SEL_COUNT(lb)` / `GUI_LISTBOX_SEL_ROW(lb, k)` / `GUI_LISTBOX_CLEAR_SELECTION(lb)` | — | multi-selection as in the table |
-| `GUI_LISTBOX_SET_DATA(lb, i, wert$)` | — | invisible value per entry (an ID, a path, a tax rate) -- also for dropdowns; a bound dropdown with values binds the value instead of the number |
+| `GUI_LISTBOX_SET_DATA(lb, i, value$)` | — | invisible value per entry (an ID, a path, a tax rate) -- also for dropdowns; a bound dropdown with values binds the value instead of the number |
 | `GUI_LISTBOX_DATA$(lb, i)` | STRING | read the invisible value of an entry |
-| `GUI_LISTBOX_FIND_DATA(lb, wert$)` | INTEGER | first entry with this value, -1 = none |
+| `GUI_LISTBOX_FIND_DATA(lb, value$)` | INTEGER | first entry with this value, -1 = none |
 | `GUI_LISTBOX_DETAIL(lb, i, text$)` | — | extra text on the right of the entry, dimmed (shortcut, size, line number) |
 | `GUI_LISTBOX_ITEM_RECT(lb, i)` | TUPLE | where item i is on screen (x, y, w, h), in screen pixels like `GUI_HIT_TEST`; filtered out (0, 0, 0, 0) -- for tests with real clicks, the row height depends on font and stylesheet |
 | `GUI_LISTBOX_TIP(lb, i, text$)` | — | tooltip per entry. Without one, an entry that does not fit the row (it ends with "...") shows its whole text when hovered |
-| `GUI_LISTBOX_ENABLE(lb, i, an)` | — | disable an entry: visible, but neither clickable nor reachable with the arrow keys |
+| `GUI_LISTBOX_ENABLE(lb, i, on)` | — | disable an entry: visible, but neither clickable nor reachable with the arrow keys |
 | `GUI_LISTBOX_ENABLED(lb, i)` | BOOLEAN | whether an entry is selectable |
-| `GUI_LISTBOX_HEADER(lb, i, an)` | — | make an entry a group header: structures the list, is not selectable |
+| `GUI_LISTBOX_HEADER(lb, i, on)` | — | make an entry a group header: structures the list, is not selectable |
 | `GUI_LISTBOX_FILTER(lb, text$)` | — | only show entries whose text or extra text contains the substring (empty = all) |
 | `GUI_LISTBOX_GET_FILTER$(lb)` | STRING | the current filter |
 | `GUI_LISTBOX_VIEW_COUNT(lb)` | INTEGER | number of visible rows |
 | `GUI_LISTBOX_VIEW_ROW(lb, k)` | INTEGER | the k-th visible row as an entry number, -1 = none |
 | `GUI_LISTBOX_PLACEHOLDER(lb, text$)` | — | hint that appears when there is nothing to see |
 | `GUI_LISTBOX_PLACEHOLDER$(lb)` | STRING | the hint that is set (`""` = none) |
-| `GUI_LISTBOX_SPANS(lb, eintrag, starts, laengen, farben)` | — | colour sections of an entry (characters from 0, three equally long ARRAY OF INTEGER; empty removes them) -- say, the keyword in one colour, the name in another. On the selection and when disabled one colour applies. The row height of a list box follows its font (`GUI_SET_FONT_SIZE`) |
-| `GUI_LISTBOX_SORT(lb[, absteigend])` | — | sort naturally ("File 9" before "File 10"), within the groups |
-| `GUI_LISTBOX_FIND(lb, text$[, ab])` | INTEGER | next entry from `ab` on that contains the substring, -1 = none |
+| `GUI_LISTBOX_SPANS(lb, entry, starts, lengths, colors)` | — | colour sections of an entry (characters from 0, three equally long ARRAY OF INTEGER; empty removes them) -- say, the keyword in one colour, the name in another. On the selection and when disabled one colour applies. The row height of a list box follows its font (`GUI_SET_FONT_SIZE`) |
+| `GUI_LISTBOX_SORT(lb[, descending])` | — | sort naturally ("File 9" before "File 10"), within the groups |
+| `GUI_LISTBOX_FIND(lb, text$[, from])` | INTEGER | next entry from `from` on that contains the substring, -1 = none |
 | `GUI_LISTBOX_SCROLL_TO(lb, i)` | — | scroll so that the entry is visible |
 | `GUI_LISTBOX_EDIT(lb, i)` | — | rename entry i: input field over the row, everything selected |
 | `GUI_LISTBOX_EDITED(lb)` | INTEGER | entry renamed in this frame, -1 = none |
@@ -470,7 +470,7 @@ Native, blocking standard dialogs (no IMPORT needed — like the file dialogs):
 | `GUI_DOUBLE_CLICKED(lb)` | BOOLEAN | double click (or Enter) on an entry, for one frame; also for tables and trees |
 | `GUI_IMAGE(win, x, y, w, h, image)` | GUI_WIDGET | image or icon in the window |
 | `GUI_SET_IMAGE(widget, image)` | — | replace the image (also that of a card) |
-| `GUI_CARD(win, x, y, w, h, bild[, titel$[, text$]])` | GUI_WIDGET | card: image at the top, title, description -- the whole thing is a button (`GUI_CLICKED`, Enter/Space); `bild` -1 = without |
+| `GUI_CARD(win, x, y, w, h, image[, title$[, text$]])` | GUI_WIDGET | card: image at the top, title, description -- the whole thing is a button (`GUI_CLICKED`, Enter/Space); `image` -1 = without |
 | `GUI_CARD_SET_TEXT(card, text$)` | — | set the description of a card (the title is set by `GUI_SET_TEXT`) |
 | `GUI_CARD_TEXT$(card)` | STRING | description of a card |
 | `GUI_CANVAS(win, x, y, w, h)` | GUI_WIDGET | free drawing surface -- you paint into it with the normal drawing commands, **after** `GUI_DRAW` |
@@ -478,39 +478,39 @@ Native, blocking standard dialogs (no IMPORT needed — like the file dialogs):
 | `GUI_CANVAS_W(canvas)` / `GUI_CANVAS_H(canvas)` | INTEGER | size of the surface |
 | `GUI_CANVAS_BEGIN(canvas)` / `GUI_CANVAS_END()` | — | the drawing commands in between go into the surface: clipped to it, and if it is in a real window, into that window's picture |
 | `GUI_CANVAS_MOUSE(canvas)` | TUPLE | (x, y, pressed): the pointer relative to the surface and the left button -- in a real window too |
-| `GUI_SET_ENABLED(wdg, on)` | — | make a widget usable or disable it (disabled = greyed out, takes no clicks) |
-| `GUI_ENABLED(wdg)` | BOOLEAN | is it usable? |
-| `GUI_SET_FONT(wdg, font)` | — | own font for this widget |
-| `GUI_FONT(font [, groesse])` | — | the gui's own font: it measures and draws with it, whatever font the program currently has active via `SETFONT` (without `groesse` the current text size); `-1` = the program's active font, the pixel font included (without `GUI_FONT` and without `SETFONT` the gui uses the built-in Sans) |
+| `GUI_SET_ENABLED(widget, on)` | — | make a widget usable or disable it (disabled = greyed out, takes no clicks) |
+| `GUI_ENABLED(widget)` | BOOLEAN | is it usable? |
+| `GUI_SET_FONT(widget, font)` | — | own font for this widget |
+| `GUI_FONT(font [, size])` | — | the gui's own font: it measures and draws with it, whatever font the program currently has active via `SETFONT` (without `size` the current text size); `-1` = the program's active font, the pixel font included (without `GUI_FONT` and without `SETFONT` the gui uses the built-in Sans) |
 | `GUI_FONT_GET()` | TUPLE | `(font, groesse)` of the own font, `(-1, 0)` without |
-| `GUI_SET_FONT_SIZE(wdg, px)` | — | own font size for this widget |
-| `GUI_GET_FONT_SIZE(wdg)` | INTEGER | its own font size, 0 = the theme's |
-| `GUI_SET_FONT_STYLE(wdg, stil$)` | — | font style for this widget: `fett` (bold), `kursiv` (italic), `unterstrichen` (underlined), `durchgestrichen` (strikethrough), joined with `+`; `"normal"` removes it. Real font faces where they exist as files, otherwise emulated |
-| `GUI_GET_FONT_STYLE$(wdg)` | STRING | the widget's style, e.g. `"fett+unterstrichen"` |
-| `GUI_STYLE_SET(name$, prop$, wert)` | — | define a named style (`bg`, `fg`, `border`, `accent`, `hover`, `pressed`, `font`, `font_size`) |
+| `GUI_SET_FONT_SIZE(widget, px)` | — | own font size for this widget |
+| `GUI_GET_FONT_SIZE(widget)` | INTEGER | its own font size, 0 = the theme's |
+| `GUI_SET_FONT_STYLE(widget, style$)` | — | font style for this widget: `fett` (bold), `kursiv` (italic), `unterstrichen` (underlined), `durchgestrichen` (strikethrough), joined with `+`; `"normal"` removes it. Real font faces where they exist as files, otherwise emulated |
+| `GUI_GET_FONT_STYLE$(widget)` | STRING | the widget's style, e.g. `"fett+unterstrichen"` |
+| `GUI_STYLE_SET(name$, prop$, value)` | — | define a named style (`bg`, `fg`, `border`, `accent`, `hover`, `pressed`, `font`, `font_size`) |
 | `GUI_STYLE_GET(name$, prop$)` | INTEGER | a value of the style, -1 if it does not set it (unknown style = error) |
 | `GUI_APPLY_STYLE(widget, name$)` | — | apply a named style to a widget -- saves repeating it widget by widget |
 | `GUI_STYLESHEET(text$)` | — | set a stylesheet: rules by kind, class, name and state as in CSS ("" = none) -- see [Stylesheet](#7-stylesheet-rules-by-kind-class-name-and-state) |
-| `GUI_STYLESHEET_LOAD(pfad$ [, beobachten])` | — | the same from a file (usually `.dhstil`); with `beobachten` = `TRUE` the gui reloads it as soon as it is saved ([section 9](#9-inspector-live-stylesheet-and-calm-motion)) |
+| `GUI_STYLESHEET_LOAD(path$ [, watch])` | — | the same from a file (usually `.dhstil`); with `watch` = `TRUE` the gui reloads it as soon as it is saved ([section 9](#9-inspector-live-stylesheet-and-calm-motion)) |
 | `GUI_STYLESHEET_ERROR$()` | STRING | the error from the last reload of a watched stylesheet, `""` = fine |
-| `GUI_STYLESHEET_CLOCK(zeit$)` | — | fix the clock for `@zeit`/`@datum`: `"12-24"`, `"21:30"`, `"12-24 21:30"` or `"2026-12-24 21:30"` (a missing part comes from the real clock); `""` = the real clock again -- to look at a Christmas or night look ahead of time |
-| `GUI_ADD_CLASS(wdg, klasse$)` | — | add a class; it takes effect at once and as long as it stays |
-| `GUI_REMOVE_CLASS(wdg, klasse$)` | — | remove a class |
-| `GUI_HAS_CLASS(wdg, klasse$)` | BOOLEAN | does the widget carry the class (the button variant counts too)? |
-| `GUI_SET_NAME(wdg, name$)` | — | the name that `#name` in the stylesheet refers to |
-| `GUI_GET_NAME$(wdg)` | STRING | the widget's name ("" = none) |
+| `GUI_STYLESHEET_CLOCK(time$)` | — | fix the clock for `@time`/`@datum`: `"12-24"`, `"21:30"`, `"12-24 21:30"` or `"2026-12-24 21:30"` (a missing part comes from the real clock); `""` = the real clock again -- to look at a Christmas or night look ahead of time |
+| `GUI_ADD_CLASS(widget, class$)` | — | add a class; it takes effect at once and as long as it stays |
+| `GUI_REMOVE_CLASS(widget, class$)` | — | remove a class |
+| `GUI_HAS_CLASS(widget, class$)` | BOOLEAN | does the widget carry the class (the button variant counts too)? |
+| `GUI_SET_NAME(widget, name$)` | — | the name that `#name` in the stylesheet refers to |
+| `GUI_GET_NAME$(widget)` | STRING | the widget's name ("" = none) |
 | `GUI_WINDOW_SET_NAME(win, name$)` | — | a window's name, which `window#name` in the stylesheet means ("" = none; stored in the `.dhform`) |
 | `GUI_WINDOW_GET_NAME$(win)` | STRING | the window's name ("" = none) |
-| `GUI_GET_COLOR(wdg, rolle$)` | INTEGER | the colour that `GUI_SET_COLOR` or the stylesheet sets in the current state (`bg`, `fg`, `border`, `accent`); -1 = the theme decides |
-| `GUI_GET_Y(wdg)` / `GUI_GET_W(wdg)` / `GUI_GET_H(wdg)` | INTEGER | position and size of the widget in the window (counterpart to `GUI_SET_BOUNDS`) |
+| `GUI_GET_COLOR(widget, role$)` | INTEGER | the colour that `GUI_SET_COLOR` or the stylesheet sets in the current state (`bg`, `fg`, `border`, `accent`); -1 = the theme decides |
+| `GUI_GET_Y(widget)` / `GUI_GET_W(widget)` / `GUI_GET_H(widget)` | INTEGER | position and size of the widget in the window (counterpart to `GUI_SET_BOUNDS`) |
 | `GUI_WINDOW_GET_Y(win)` / `GUI_WINDOW_GET_W(win)` / `GUI_WINDOW_GET_H(win)` | INTEGER | position and size of the window on the screen |
 | `GUI_WINDOW_CONTENT_W(win)` / `GUI_WINDOW_CONTENT_H(win)` | INTEGER | width and height of the content area below the title, menu and tab bar -- widget coordinates count from there; a status bar sits at the bottom without guessing the height of the menu bar |
-| `GUI_TABLE_SET(tbl, schluessel$, wert)` | — | set a table setting (`zebra`, `gitter`, `zeilenhoehe`, `filterzeile`, `feste_spalten`, ...) |
-| `GUI_TABLE_GET(tbl, schluessel$)` | FLOAT | read one of these settings back |
+| `GUI_TABLE_SET(tbl, key$, value)` | — | set a table setting (`zebra`, `gitter`, `zeilenhoehe`, `filterzeile`, `feste_spalten`, ...) |
+| `GUI_TABLE_GET(tbl, key$)` | FLOAT | read one of these settings back |
 | `GUI_TABLE_CLICKED_COL(tbl)` | INTEGER | which column was clicked? -- for cells of the kind `knopf` (button) |
 | `GUI_TABLE_VIEW_COUNT(tbl)` | INTEGER | how many rows are currently VISIBLE? (after filtering) |
 | `GUI_TABLE_VIEW_ROW(tbl, i)` | INTEGER | which **data row** is at visible position `i`? -- sorting and filtering do not rearrange the data |
-| `GUI_GRID(win, x, y, w, h, headers, zeilen = 0)` | GUI_WIDGET | **grid**: table in cell mode -- current cell, range, typing edits, Ctrl+C/V as tab-separated text |
+| `GUI_GRID(win, x, y, w, h, headers, rows = 0)` | GUI_WIDGET | **grid**: table in cell mode -- current cell, range, typing edits, Ctrl+C/V as tab-separated text |
 
 `stil$` labels the buttons: `"ok"` (default) shows **OK/Cancel**,
 `"janein"` shows **Yes/No**. The difference is not cosmetic — with a
@@ -544,12 +544,12 @@ clicks.
 
 | Function | Returns | Purpose |
 |---|---|---|
-| `GUI_DIALOG(titel$, text$[, stil$])` | GUI_WINDOW | open a modal dialog (`"ok"` = default, `"janein"`, or **your own buttons** separated with `\|`: `"Speichern\|Verwerfen\|Abbrechen"`) |
-| `GUI_PROMPT(titel$, text$[, vorgabe$[, knoepfe$]])` | GUI_WINDOW | question **with an input field** (default value selected; without `knoepfe$` OK/Cancel) |
+| `GUI_DIALOG(title$, text$[, style$])` | GUI_WINDOW | open a modal dialog (`"ok"` = default, `"janein"`, or **your own buttons** separated with `\|`: `"Speichern\|Verwerfen\|Abbrechen"`) |
+| `GUI_PROMPT(title$, text$[, default$[, buttons$]])` | GUI_WINDOW | question **with an input field** (default value selected; without `buttons$` OK/Cancel) |
 | `GUI_ANSWER(dialog)` | INTEGER | `0` = still open, otherwise the **number of the button** (1-based): `1` = OK/Yes, `2` = Cancel/No |
 | `GUI_DIALOG_TEXT(dialog)` | STRING | what was typed into the input field of a `GUI_PROMPT` — also after the answer |
 | `GUI_MODAL()` | BOOLEAN | is a dialog or a modal window currently up? |
-| `GUI_WINDOW_MODAL(win, an)` | — | make one of **your own** windows modal: everything else lies behind the overlay and accepts no input |
+| `GUI_WINDOW_MODAL(win, on)` | — | make one of **your own** windows modal: everything else lies behind the overlay and accepts no input |
 
 **Your own buttons** (since 2026-09-04): one to five labels, separated with
 `|`. The answer is the number of the button. **Enter presses the first,
@@ -1526,15 +1526,15 @@ Every cell carries text, its own **foreground and background colour**, an
 
 | Built-in | Effect |
 |---|---|
-| `GUI_TABLE_SET_CELL(tbl, zeile, spalte, text$)` | cell content |
-| `GUI_TABLE_GET_CELL(tbl, zeile, spalte)` | read cell content |
-| `GUI_TABLE_CELL_COLOR(tbl, z, s, vordergrund, hintergrund)` | colours; `-1` = not set |
+| `GUI_TABLE_SET_CELL(tbl, row, column, text$)` | cell content |
+| `GUI_TABLE_GET_CELL(tbl, row, column)` | read cell content |
+| `GUI_TABLE_CELL_COLOR(tbl, row, column, foreground, background)` | colours; `-1` = not set |
 | `GUI_TABLE_CELL_ALIGN(tbl, z, s, "links"/"mitte"/"rechts")` | alignment of this cell |
-| `GUI_TABLE_CELL_KIND(tbl, z, s, art$)` | kind (see the table above) |
-| `GUI_TABLE_CELL_IMAGE(tbl, z, s, bild)` | set an image (sets the kind along with it) |
-| `GUI_TABLE_CELL_VALUE(tbl, z, s, wert)` / `GUI_TABLE_GET_VALUE(...)` | check mark (0/1) or bar (0..1) |
-| `GUI_TABLE_ROW_COLOR(tbl, zeile, vg, hg)` | colour a whole row — **one** call instead of one per column |
-| `GUI_TABLE_COL_ALIGN(tbl, spalte, wie$)` | alignment of the whole column |
+| `GUI_TABLE_CELL_KIND(tbl, row, column, kind$)` | kind (see the table above) |
+| `GUI_TABLE_CELL_IMAGE(tbl, row, column, image)` | set an image (sets the kind along with it) |
+| `GUI_TABLE_CELL_VALUE(tbl, row, column, value)` / `GUI_TABLE_GET_VALUE(...)` | check mark (0/1) or bar (0..1) |
+| `GUI_TABLE_ROW_COLOR(tbl, row, foreground, background)` | colour a whole row — **one** call instead of one per column |
+| `GUI_TABLE_COL_ALIGN(tbl, column, align$)` | alignment of the whole column |
 
 **Colours in three levels:** cell → row → zebra. `-1` means “not set” and
 passes on to the next level — so you colour a whole row with one call and can
@@ -1545,8 +1545,8 @@ still let individual cells stand out. Selection and hover lie
 
 | Built-in | Effect |
 |---|---|
-| `GUI_TABLE_ADD_ROW(tbl, zellen)` | append a row → new row index |
-| `GUI_TABLE_REMOVE_ROW(tbl, zeile)` | remove a row (the selection moves along) |
+| `GUI_TABLE_ADD_ROW(tbl, cells)` | append a row → new row index |
+| `GUI_TABLE_REMOVE_ROW(tbl, row)` | remove a row (the selection moves along) |
 | `GUI_TABLE_CLEAR(tbl)` | all rows gone |
 
 ### Sorting
@@ -1558,7 +1558,7 @@ that, `100` would come before `9`.
 
 | Built-in | Effect |
 |---|---|
-| `GUI_TABLE_SORT(tbl, spalte, absteigend)` | from the program; column `< 0` removes the sorting |
+| `GUI_TABLE_SORT(tbl, column, descending)` | from the program; column `< 0` removes the sorting |
 | `GUI_TABLE_SORT_COL(tbl)` / `GUI_TABLE_SORT_DESC(tbl)` | read the current sorting |
 
 ### Filtering
@@ -1570,8 +1570,8 @@ input. Several columns work together (AND).
 
 | Built-in | Effect |
 |---|---|
-| `GUI_TABLE_FILTER(tbl, spalte, text$)` | set a filter (empty text = no filter) |
-| `GUI_TABLE_GET_FILTER(tbl, spalte)` | read the filter that is set |
+| `GUI_TABLE_FILTER(tbl, column, text$)` | set a filter (empty text = no filter) |
+| `GUI_TABLE_GET_FILTER(tbl, column)` | read the filter that is set |
 
 ### Operation as with the list box
 
@@ -1638,9 +1638,9 @@ valid.
 
 | Built-in | Effect |
 |---|---|
-| `GUI_TABLE_MOVE_COL(tbl, von_pos, nach_pos)` | move a column (display positions) |
+| `GUI_TABLE_MOVE_COL(tbl, from_pos, to_pos)` | move a column (display positions) |
 | `GUI_TABLE_COL_AT(tbl, pos)` | which **data column** is at this position? |
-| `GUI_TABLE_COL_POS(tbl, spalte)` | at which position is this data column? |
+| `GUI_TABLE_COL_POS(tbl, column)` | at which position is this data column? |
 | `GUI_TABLE_RESET_COLS(tbl)` | original order |
 
 Fixed columns count by **position**: if you move a column to the front, it
@@ -1662,8 +1662,8 @@ Off (then the table behaves as before: one row). With
 |---|---|
 | `GUI_TABLE_SEL_COUNT(tbl)` | number of selected rows |
 | `GUI_TABLE_SEL_ROW(tbl, i)` | i-th selected **data row**, in click order |
-| `GUI_TABLE_IS_SELECTED(tbl, zeile)` | is this data row selected? |
-| `GUI_TABLE_SELECT(tbl, zeile, an)` | add / remove a row |
+| `GUI_TABLE_IS_SELECTED(tbl, row)` | is this data row selected? |
+| `GUI_TABLE_SELECT(tbl, row, on)` | add / remove a row |
 | `GUI_TABLE_CLEAR_SELECTION(tbl)` | clear the selection |
 
 `GUI_TABLE_SELECTED` still returns the row **clicked last** — existing code
@@ -1688,7 +1688,7 @@ image has no text to type.
 
 | Built-in | Effect |
 |---|---|
-| `GUI_TABLE_COL_EDIT(tbl, spalte, an)` | enable a column for editing |
+| `GUI_TABLE_COL_EDIT(tbl, column, on)` | enable a column for editing |
 | `GUI_TABLE_EDITING_ROW(tbl)` / `GUI_TABLE_EDITING_COL(tbl)` | which cell is being edited right now (`-1` = none) |
 
 On accepting, `on_change` fires and the view (sorting + filter) is rebuilt —
@@ -1756,15 +1756,15 @@ table.
 
 | Built-in | Returns | Effect |
 |---|---|---|
-| `GUI_GRID(win, x, y, w, h, headers, zeilen = 0)` | GUI_WIDGET | table in cell mode, all columns editable |
+| `GUI_GRID(win, x, y, w, h, headers, rows = 0)` | GUI_WIDGET | table in cell mode, all columns editable |
 | `GUI_TABLE_CURRENT_ROW(tbl)` / `GUI_TABLE_CURRENT_COL(tbl)` | INTEGER | current cell (-1 = none) |
-| `GUI_TABLE_SET_CURRENT(tbl, zeile, spalte)` | — | set the current cell and scroll it into view (`-1, -1` = none) |
+| `GUI_TABLE_SET_CURRENT(tbl, row, column)` | — | set the current cell and scroll it into view (`-1, -1` = none) |
 | `GUI_TABLE_RANGE(tbl)` | TUPLE | `(anker_zeile, anker_spalte, zeile, spalte)` of the range |
-| `GUI_TABLE_SELECT_RANGE(tbl, anker_zeile, anker_spalte, zeile, spalte)` | — | set the range |
+| `GUI_TABLE_SELECT_RANGE(tbl, anchor_row, anchor_column, row, column)` | — | set the range |
 | `GUI_TABLE_COPY$(tbl)` | STRING | the range as tab-separated text |
 | `GUI_TABLE_PASTE(tbl, text$)` | INTEGER | paste tab-separated text from the current cell on; number of cells written |
-| `GUI_TABLE_COL_TYPE(tbl, spalte, art$)` | — | `text`, `ganz`, `zahl`, `auswahl` or `datum` (editing drops down the month under the cell; a day writes `YYYY-MM-DD`) |
-| `GUI_TABLE_COL_CHOICES(tbl, spalte, eintraege)` | — | entries of a choice column (makes it a choice column) |
+| `GUI_TABLE_COL_TYPE(tbl, column, kind$)` | — | `text`, `ganz`, `zahl`, `auswahl` or `datum` (editing drops down the month under the cell; a day writes `YYYY-MM-DD`) |
+| `GUI_TABLE_COL_CHOICES(tbl, column, entries)` | — | entries of a choice column (makes it a choice column) |
 
 A **number column** accepts while typing only what can become a number (`-`
 as an intermediate state, with `zahl` a comma or a point); only a real number
@@ -1903,10 +1903,10 @@ small however long it is.
 
 | Built-in | Effect |
 |---|---|
-| `GUI_TABLE_VIRTUAL(tbl, zeilen)` | virtual mode with this row count; called again (say after another filter): new count, everything supplied is outdated |
+| `GUI_TABLE_VIRTUAL(tbl, rows)` | virtual mode with this row count; called again (say after another filter): new count, everything supplied is outdated |
 | `GUI_TABLE_NEED_FROM(tbl)` | first row the table needs right now (visible or a page before/after); -1 = nothing |
 | `GUI_TABLE_NEED_COUNT(tbl)` | how many are missing in a row from there (at most 1000) |
-| `GUI_TABLE_SUPPLY(tbl, ab, zellen)` | supply rows from `ab`: `ARRAY OF STRING` for one row, a 2D array for several |
+| `GUI_TABLE_SUPPLY(tbl, from, cells)` | supply rows from `from`: `ARRAY OF STRING` for one row, a 2D array for several |
 
 ```basic
 IMPORT "gui"
@@ -2546,7 +2546,7 @@ applies.
 
 | Command | Result | Effect |
 |---|---|---|
-| `GUI_SET_CONTRAST(modus$)` | — | `"system"` (default): like the operating system; `"hoch"`: `@hochkontrast` always applies; `"normal"`: never |
+| `GUI_SET_CONTRAST(mode$)` | — | `"system"` (default): like the operating system; `"hoch"`: `@hochkontrast` always applies; `"normal"`: never |
 | `GUI_HIGH_CONTRAST()` | BOOLEAN | does high contrast apply right now? |
 | `GUI_SYSTEM_HIGH_CONTRAST()` | BOOLEAN | does the system want high contrast? (`DHRT_SYSTEM_HOHER_KONTRAST=1` fixes the answer) |
 
@@ -2564,11 +2564,11 @@ properties for it, plus four commands:
 | `@ablauf name { 0%: x 0; 50%: y -8, drehen 10; 100%: groesse 1.1 }` | an animation of your own: keyframes with `x`, `y` (points), `drehen` (degrees, rotate) and `groesse` (scale), joined straight in between; if 0 % or 100 % is missing, it rests there. Then the name works like a built-in kind: `animation: name 800ms`, `GUI_ANIMATE(wdg, "name")`; it may stand before or after the rule that names it |
 | `@ablauf name { 50%: deckkraft 0.3, farbe #FF8080 }` | opacity (0..1) and tint (`#RRGGBB`, white = none) in an animation -- plus the built-in kind `blinken` (blink: opacity 1 → 0.35 → 1). For this the widget goes into a layer of its own, laid on with opacity and tint -- on the main surface (POSTFX included), in real windows and in render targets |
 | `animation: puls \| wackeln \| schweben \| huepfen \| drehen \| blinken [duration ms] [einmal \| count]` | the whole widget moves around its centre (pulse, wobble, float, bounce, spin); also per state: `button:hover { animation: puls }` pulses only while hovered |
-| `GUI_SET_SHAPE(knopf, form$)` / `GUI_GET_SHAPE$(knopf)` | set a shape of its own (`""` = the stylesheet again) or the shape in effect |
-| `GUI_ANIMATE(wdg, art$ [, dauer_ms [, anzahl]])` | start an animation -- say wobble once on wrong input; `anzahl` 0 = endless (default 1), `art$` `""` stops |
-| `GUI_ANIMATING(wdg)` | is an animation running right now? |
+| `GUI_SET_SHAPE(button, form$)` / `GUI_GET_SHAPE$(button)` | set a shape of its own (`""` = the stylesheet again) or the shape in effect |
+| `GUI_ANIMATE(widget, kind$ [, duration_ms [, count]])` | start an animation -- say wobble once on wrong input; `count` 0 = endless (default 1), `kind$` `""` stops |
+| `GUI_ANIMATING(widget)` | is an animation running right now? |
 | `gleiten: 200` | smooth layout transitions (duration in ms, 0..2000): when position or size change (layout, `GUI_SET_BOUNDS`, window size), the picture glides from the old to the new rectangle, easing out; a widget that becomes visible grows in. The hit area is at the target at once. Only in rules without a state; `* { gleiten: 200 }` applies to the whole application |
-| `GUI_GLIDING(wdg)` | is the widget gliding right now? |
+| `GUI_GLIDING(widget)` | is the widget gliding right now? |
 | `unschaerfe: 12` | glass: what is drawn behind the widget (an image, a map, other widgets) lies blurred beneath it (radius 0..40); a surface with opacity shows through: `panel.glas { unschaerfe: 12; bg: #60FFFFFF; radius: 14 }`. Works on the main surface, in real windows and in render targets. Only in rules without a state |
 | `farbverlauf: #FF6B6B #845EC2 #2C73D2 45 wandert 6s` | colour gradient instead of the single base colour: 2 to 6 colours (also names of the theme), then optionally the angle in degrees (0 = to the right, 90 = downwards, 45 = diagonally to the bottom right) and `wandert [duration]` -- then the colours run in a circle (the last blends back into the first) and move seamlessly in the direction of the angle, one round in the duration (`ms` or `s`, 500 ms to 60 s, default 6 s). For panels, cards, buttons (also `form: pille` and `kreis`) and every other surface of the widget; rounding, gloss and border come on top. The gui picks a button's text by all colours of the gradient (the one more readable at its least favourable point), and `GUI_A11Y_CHECK$` measures against that point. With `GUI_SET_MOTION("aus")` it stands still; a moving one reports in idle mode that it needs every frame. `farbverlauf: aus` takes back an inherited one (English alias `fill-gradient`). Only in rules without a state |
 | `nebel: 12%` / `nebel: 12% #73F2D9` / `nebel: aus` | dragon's breath mist: soft wisps drift over the surface (above the base colour, below border and text), strength 0..40 %, colour otherwise the theme's (`nebel`). It lies in screen position and therefore drifts seamlessly across neighbouring surfaces. Its clock only runs while frames are drawn: in idle mode it stands still (it requests no frame) and does not jump on waking; with `GUI_SET_MOTION("aus")` it stands entirely. For the window background the metric `nebel` (English alias `mist`). Only in rules without a state |
@@ -2602,11 +2602,11 @@ Three helpers for designing and for accessibility:
 
 | Command | Returns | Effect |
 |---|---|---|
-| `GUI_INSPECTOR([an])` | BOOLEAN without argument | show the inspector (`TRUE`) or close it; without argument: is it open? |
+| `GUI_INSPECTOR([on])` | BOOLEAN without argument | show the inspector (`TRUE`) or close it; without argument: is it open? |
 | `GUI_INSPECTOR_SELECTED()` | GUI_WIDGET | the widget selected in the inspector, -1 = none |
 | `GUI_INSPECT$(widget)` | STRING | what the inspector shows about a widget: kind, name, classes, position, state, shape, the matching stylesheet rules with their line and what applies per state |
 | `GUI_STATE$()` | STRING | the state of all visible windows as text: one line per widget with a state (texts, ticks, values, selection) -- the expectation `dhrt aufnehmen` writes ([werkzeuge.md](werkzeuge.md#dhrt-aufnehmen--operating-a-program-as-a-test-case)) |
-| `GUI_SET_MOTION(modus$)` | — | `"system"` (default): like the operating system; `"an"`: animations always; `"aus"`: never |
+| `GUI_SET_MOTION(mode$)` | — | `"system"` (default): like the operating system; `"an"`: animations always; `"aus"`: never |
 | `GUI_MOTION()` | BOOLEAN | is the gui playing motion right now? |
 
 **Inspector.** Like a browser's developer tools: while it is open it
@@ -2656,10 +2656,10 @@ properties and six commands.
 |---|---|
 | `klang: klick \| tick \| ping \| plopp \| fehler \| erfolg \| datei.wav [NN%]` | a sound for the rule's occasion: **without a state on click**, `:hover` on entering, `:active` on pressing, `:focus` on focus. Built-in sounds (click, tick, ping, plop, error, success) need no file; `NN%` is the volume (0..200) |
 | `effekt: funken \| konfetti \| sterne` | particles (sparks, confetti, stars) on the same occasions, drawn above everything |
-| `GUI_SOUND(name$ [, lautstaerke])` | play a gui sound (same names, volume in percent) |
-| `GUI_SET_SOUNDS(an)` / `GUI_SOUNDS()` | all gui sounds on or off -- for a "sounds" switch in the settings |
+| `GUI_SOUND(name$ [, volume])` | play a gui sound (same names, volume in percent) |
+| `GUI_SET_SOUNDS(on)` / `GUI_SOUNDS()` | all gui sounds on or off -- for a "sounds" switch in the settings |
 | `GUI_SOUND_LOG$()` | the sounds requested since the last call, separated by commas (also without a sound card -- for tests) |
-| `GUI_BURST(wdg, art$ [, anzahl])` | sparks, confetti or stars at a widget, say after saving (`anzahl` 1..500, without = suiting the kind) |
+| `GUI_BURST(widget, kind$ [, count])` | sparks, confetti or stars at a widget, say after saving (`count` 1..500, without = suiting the kind) |
 | `GUI_BURSTING()` | how many particles are flying right now |
 
 ```basic
@@ -2698,8 +2698,8 @@ names appears only once.
 
 | Command | Returns | Effect |
 |---|---|---|
-| `GUI_PALETTE([an])` | BOOLEAN without argument | open (`TRUE`) or close; without argument: is it open? |
-| `GUI_PALETTE_KEY(an)` | — | Ctrl+Shift+P on (default) or off |
+| `GUI_PALETTE([on])` | BOOLEAN without argument | open (`TRUE`) or close; without argument: is it open? |
+| `GUI_PALETTE_KEY(on)` | — | Ctrl+Shift+P on (default) or off |
 | `GUI_PALETTE_FILTER(text$)` | — | set the search (the palette must be open) |
 | `GUI_PALETTE_ITEMS$()` | STRING | the matching entries, per line the text and, if there is one, TAB and shortcut; the selected one starts with `>` |
 
@@ -2720,9 +2720,9 @@ the screen reader.
 
 | Command | Returns | Effect |
 |---|---|---|
-| `GUI_CUSTOM(win, x, y, w, h [, rolle$])` | GUI_WIDGET | a self-drawn widget; `rolle$` (role) = `"button"` (default), `"checkbox"` (tick via `GUI_SET_CHECKED`/`GUI_CHECKED`) or `"slider"` (value via `GUI_SET_VALUE`/`GUI_VALUE`); `GUI_SET_TEXT` sets the name for the screen reader |
-| `GUI_CUSTOM_KEY(wdg)` | INTEGER | the key it got this frame (arrows, Home/End, Page up/down, Enter, space, Backspace, Delete, ESC -- codes like `KEYHIT`), 0 = none |
-| `GUI_CUSTOM_TEXT$(wdg)` | STRING | the characters it got this frame |
+| `GUI_CUSTOM(win, x, y, w, h [, role$])` | GUI_WIDGET | a self-drawn widget; `role$` (role) = `"button"` (default), `"checkbox"` (tick via `GUI_SET_CHECKED`/`GUI_CHECKED`) or `"slider"` (value via `GUI_SET_VALUE`/`GUI_VALUE`); `GUI_SET_TEXT` sets the name for the screen reader |
+| `GUI_CUSTOM_KEY(widget)` | INTEGER | the key it got this frame (arrows, Home/End, Page up/down, Enter, space, Backspace, Delete, ESC -- codes like `KEYHIT`), 0 = none |
+| `GUI_CUSTOM_TEXT$(widget)` | STRING | the characters it got this frame |
 
 ```basic
 IMPORT "gui"
@@ -2890,15 +2890,15 @@ stable while doing so (deleting only marks as "dead", it does not shift any indi
 
 | Built-in | Effect |
 |---|---|
-| `GUI_SET_BOUNDS(wdg, x, y, w, h)` | move/resize a widget (relative to the window) |
+| `GUI_SET_BOUNDS(widget, x, y, w, h)` | move/resize a widget (relative to the window) |
 | `GUI_GET_X/Y/W/H(wdg)` → INTEGER | read the current dimensions |
-| `GUI_SET_VISIBLE(wdg, an)` / `GUI_VISIBLE(wdg)` → BOOLEAN | show/hide (invisible = not drawn, not interactive) |
-| `GUI_SHOWN(wdg)` → BOOLEAN | is it on screen right now? Unlike `GUI_VISIBLE` it also accounts for the window and hidden tab pages (window tabs and tab controls) -- a canvas on a page in the background can skip drawing |
-| `GUI_DESTROY(wdg)` | remove a widget (the handle becomes invalid, others stay valid) |
-| `GUI_KIND(wdg)` → STRING | `"button"`/`"label"`/`"checkbox"`/`"slider"`/`"textinput"`/`"panel"`/`"table"` |
-| `GUI_FOCUS(wdg)` | set the keyboard focus (e.g. on a TextInput); `GUI_FOCUS(-1)` releases it, the keys then belong to the program |
+| `GUI_SET_VISIBLE(widget, on)` / `GUI_VISIBLE(widget)` → BOOLEAN | show/hide (invisible = not drawn, not interactive) |
+| `GUI_SHOWN(widget)` → BOOLEAN | is it on screen right now? Unlike `GUI_VISIBLE` it also accounts for the window and hidden tab pages (window tabs and tab controls) -- a canvas on a page in the background can skip drawing |
+| `GUI_DESTROY(widget)` | remove a widget (the handle becomes invalid, others stay valid) |
+| `GUI_KIND(widget)` → STRING | `"button"`/`"label"`/`"checkbox"`/`"slider"`/`"textinput"`/`"panel"`/`"table"` |
+| `GUI_FOCUS(widget)` | set the keyboard focus (e.g. on a TextInput); `GUI_FOCUS(-1)` releases it, the keys then belong to the program |
 | `GUI_FOCUSED()` → GUI_WIDGET | which widget has the keyboard focus? (`-1` = none) |
-| `GUI_SCALE(faktor)` | display scale (0.5–4.0), **before** the first window |
+| `GUI_SCALE(factor)` | display scale (0.5–4.0), **before** the first window |
 | `GUI_SCALE_GET()` → FLOAT | current scale |
 | `GUI_HIT_TEST(x, y)` → GUI_WIDGET | topmost widget at the screen point, or `-1` (selection in the editor) |
 | `GUI_WINDOW_AT(x, y)` → GUI_WINDOW | topmost visible window at the screen point, or `-1` -- whoever evaluates the mouse wheel themselves asks here whether their area is currently on top |
@@ -2935,8 +2935,8 @@ saved.
 
 | Built-in | Effect |
 |---|---|
-| `GUI_SAVE(win, pfad$)` | save a window as a JSON file |
-| `GUI_LOAD(pfad$)` → GUI_WINDOW | load a JSON file, new window, returns the handle |
+| `GUI_SAVE(win, path$)` | save a window as a JSON file |
+| `GUI_LOAD(path$)` → GUI_WINDOW | load a JSON file, new window, returns the handle |
 | `GUI_TO_JSON(win)` → STRING | window as a JSON string (for network/embedding/the `json` module) |
 | `GUI_FROM_JSON(json$)` → GUI_WINDOW | build a window from a JSON string |
 
@@ -3745,13 +3745,13 @@ Seven callbacks per widget, all via FUNCREF (without parameters):
 
 | Command | When |
 |---|---|
-| `GUI_ON_CLICK(w, fn)` | clicked |
-| `GUI_ON_CHANGE(w, fn)` | value/text changed |
-| `GUI_ON_HOVER(w, fn)` | mouse **enters** the widget |
-| `GUI_ON_LEAVE(w, fn)` | mouse leaves it |
-| `GUI_ON_FOCUS(w, fn)` | receives the input |
-| `GUI_ON_BLUR(w, fn)` | loses it — the point at which you validate an input |
-| `GUI_ON_ENTER(tf, fn)` | Enter in the text input (only `GUI_TEXTINPUT`) |
+| `GUI_ON_CLICK(widget, handler)` | clicked |
+| `GUI_ON_CHANGE(widget, handler)` | value/text changed |
+| `GUI_ON_HOVER(widget, fn)` | mouse **enters** the widget |
+| `GUI_ON_LEAVE(widget, fn)` | mouse leaves it |
+| `GUI_ON_FOCUS(widget, fn)` | receives the input |
+| `GUI_ON_BLUR(widget, fn)` | loses it — the point at which you validate an input |
+| `GUI_ON_ENTER(tf, handler)` | Enter in the text input (only `GUI_TEXTINPUT`) |
 
 The last four are **edges**: they fire on the transition, not in every
 frame while the state lasts. They are triggered in `GUI_UPDATE`; the
@@ -3835,10 +3835,10 @@ What the program can contribute:
 
 | Command | Description |
 |---|---|
-| `GUI_ANNOUNCE(text$[, dringend])` | hand a sentence to the user's screen reader — it speaks it with its voice (polite: after the current sentence; urgent: immediately). Without an assistive program nothing happens. For everything that would otherwise only appear in a status line: "Invoice saved", "3 rows deleted" |
+| `GUI_ANNOUNCE(text$[, urgent])` | hand a sentence to the user's screen reader — it speaks it with its voice (polite: after the current sentence; urgent: immediately). Without an assistive program nothing happens. For everything that would otherwise only appear in a status line: "Invoice saved", "3 rows deleted" |
 | `GUI_SCREENREADER()` | `TRUE` as soon as an assistive program has requested the tree — for example to announce more or to switch off motion |
-| `GUI_SET_TAB_INDEX(wdg, index)` | set the tab order: widgets with an index above 0 first, ascending; 0 (default) = order of creation |
-| `GUI_GET_TAB_INDEX(wdg)` | read the index that was set (0 = creation order) |
+| `GUI_SET_TAB_INDEX(widget, index)` | set the tab order: widgets with an index above 0 first, ascending; 0 (default) = order of creation |
+| `GUI_GET_TAB_INDEX(widget)` | read the index that was set (0 = creation order) |
 | `GUI_A11Y_CHECK$([win])` | check the interface: one line per finding, `""` = nothing found; without a window all visible ones |
 
 **Checking it yourself.** `GUI_A11Y_CHECK$` finds what makes an interface
@@ -3967,7 +3967,7 @@ displays the text with `GUI_RICHTEXT`.
 | Command | Effect |
 |---|---|
 | `GUI_TEXTAREA_SET(ta, "formatiert", 1)` | switches formatting on (0 = off, the formatting is dropped) |
-| `GUI_TEXTAREA_STYLE(ta, stil$[, an])` | apply a style to the selection (`an` = TRUE, the default) or remove it; without a selection it applies to the next thing typed |
+| `GUI_TEXTAREA_STYLE(ta, style$[, on])` | apply a style to the selection (`on` = TRUE, the default) or remove it; without a selection it applies to the next thing typed |
 | `GUI_TEXTAREA_GET_STYLE$(ta)` | what applies to the whole selection, without a selection the style of the next thing typed (`"normal"`, `"fett+kursiv"` ...) |
 | `GUI_TEXTAREA_MARKDOWN$(ta)` | the text including formatting as Markdown |
 | `GUI_TEXTAREA_SET_MARKDOWN(ta, md$)` | set the text from Markdown (switches formatting on) |
@@ -4007,51 +4007,51 @@ usable code field.
 
 | Function | Effect |
 |---|---|
-| `GUI_TEXTAREA_SET(ta, schluessel$, wert)` | `zeilennummern` (line numbers), `aktive_zeile` (active line), `tab_fuegt_ein` (Tab inserts), `tabbreite` (tab width), `umbruch` (wrap), `auto_einzug` (auto-indent), `einzugslinien` (a fine line per indentation level, beneath the text; the first level stays free, it would lie on the left edge), `kopfzeilen` (sticky block headers, at most n: if the header line of a block from `GUI_TEXTAREA_FOLDABLE` has scrolled out at the top, it stays pinned; a click jumps there, 0 = off), `hinweise_klickbar` (hints accept clicks, see `GUI_TEXTAREA_HINT_CLICKED`) |
-| `GUI_TEXTAREA_SPANS(ta, starts, laengen, farben)` | draw characters `start … start+laenge` in `farbe` |
-| `SYNTAX_SPANS(quelltext$)` → (starts, laengen, arten) | split Drachenhauch source code |
+| `GUI_TEXTAREA_SET(ta, key$, value)` | `zeilennummern` (line numbers), `aktive_zeile` (active line), `tab_fuegt_ein` (Tab inserts), `tabbreite` (tab width), `umbruch` (wrap), `auto_einzug` (auto-indent), `einzugslinien` (a fine line per indentation level, beneath the text; the first level stays free, it would lie on the left edge), `kopfzeilen` (sticky block headers, at most n: if the header line of a block from `GUI_TEXTAREA_FOLDABLE` has scrolled out at the top, it stays pinned; a click jumps there, 0 = off), `hinweise_klickbar` (hints accept clicks, see `GUI_TEXTAREA_HINT_CLICKED`) |
+| `GUI_TEXTAREA_SPANS(ta, starts, lengths, colors)` | draw characters `start … start+laenge` in `farbe` |
+| `SYNTAX_SPANS(source$)` → (starts, laengen, arten) | split Drachenhauch source code |
 | `GUI_TEXTAREA_VIEW(ta)` → (erste_zeile, zeilen, start_zeichen, laenge_zeichen) | which part is currently visible? |
 | `GUI_TEXTAREA_CURSOR(ta)` → (zeile, spalte) | where the cursor is (from 1, in characters) |
 | `GUI_TEXTAREA_CARET_XY(ta)` → (x, y, hoehe) | where the cursor is on the screen, in logical points like `GUI_WINDOW_SET_BOUNDS` (also without focus) -- for a suggestion list at the cursor; (-1, -1, 0) if the field is not visible |
 | `GUI_TEXTAREA_POS_AT(ta, x, y)` → (zeile, spalte) | which character lies under the screen point (from 1; the same calculation as the click). (0, 0) next to the text: outside, in the line-number column, below the last line, behind the end of the line -- for tooltips on hover and Ctrl+click |
-| `GUI_TEXTAREA_GOTO(ta, zeile[, spalte])` | set the cursor, clear the selection, scroll the view so that the line is in the middle |
-| `GUI_TEXTAREA_HINTS(ta, zeilen, texte [, farbe])` | put dimmed text behind the end of lines (from 1), for example the values of the variables when the debugger stops; follows its line like a marker, empty lists clear, `GUI_SET_TEXT` too. `farbe` may be an array, one per hint (`-1` = dimmed) |
-| `GUI_TEXTAREA_HINT$(ta, zeile)` | the hint behind a line (from 1), "" if none -- after moving along while typing, as it is drawn |
+| `GUI_TEXTAREA_GOTO(ta, line[, column])` | set the cursor, clear the selection, scroll the view so that the line is in the middle |
+| `GUI_TEXTAREA_HINTS(ta, lines, texts [, color])` | put dimmed text behind the end of lines (from 1), for example the values of the variables when the debugger stops; follows its line like a marker, empty lists clear, `GUI_SET_TEXT` too. `color` may be an array, one per hint (`-1` = dimmed) |
+| `GUI_TEXTAREA_HINT$(ta, line)` | the hint behind a line (from 1), "" if none -- after moving along while typing, as it is drawn |
 | `GUI_TEXTAREA_HINT_COUNT(ta)` | how many lines carry a hint |
-| `GUI_TEXTAREA_SCROLL(ta, zeile)` | scroll the view so that the line is at the top -- without moving the cursor, like the mouse wheel (for an overview map) |
+| `GUI_TEXTAREA_SCROLL(ta, line)` | scroll the view so that the line is at the top -- without moving the cursor, like the mouse wheel (for an overview map) |
 | `GUI_TEXTAREA_SELECT(ta, z1, s1, z2, s2)` | select a range, cursor at the end |
 | `GUI_TEXTAREA_SELECTION$(ta)` → STRING | the selected text |
 | `GUI_TEXTAREA_SELECTION_RANGE(ta)` → (z1, s1, z2, s2) | start and end of the selection (from 1, ordered); without a selection the cursor is at both ends — this way an editor knows WHICH lines to indent or comment out |
 | `GUI_TEXTAREA_INSERT(ta, text$)` | replaces the selection or inserts at the cursor — an undo step of its own, `GUI_ON_CHANGE` fires as when typing |
-| `GUI_TEXTAREA_MARKS(ta, zeilen, farben)` | markers per line: a dot in the line-number column and a tint of colour over the line — breakpoints, the stopped line, error lines. Replaces all previous ones, two empty arrays clear; when the field is edited, they move with their line |
-| `GUI_TEXTAREA_LINE_COLORS(ta, zeilen, farben)` | a colour band behind whole lines (lines from 1, colours with opacity in the top byte, without it a quarter) -- for example a profile as heat in the code; separate from the markers, moves with its line, empty lists clear |
+| `GUI_TEXTAREA_MARKS(ta, lines, colors)` | markers per line: a dot in the line-number column and a tint of colour over the line — breakpoints, the stopped line, error lines. Replaces all previous ones, two empty arrays clear; when the field is edited, they move with their line |
+| `GUI_TEXTAREA_LINE_COLORS(ta, lines, colors)` | a colour band behind whole lines (lines from 1, colours with opacity in the top byte, without it a quarter) -- for example a profile as heat in the code; separate from the markers, moves with its line, empty lists clear |
 | `GUI_TEXTAREA_LINE_COLORS_GET(ta)` | the lines of the line colours as they stand now (in the order they were set) |
 | `GUI_TEXTAREA_MARKS_GET(ta)` | the lines of the markers as they stand now (ARRAY OF INTEGER, in the order they were set) -- this is how a program learns where its breakpoint has slipped to while typing |
-| `GUI_TEXTAREA_BACKGROUND(ta, bild, deckkraft = 24)` | lay an image faintly behind the text: fitted into the inner area, centred, does not scroll along. Opacity 0..255, `bild` < 0 removes it -- this is how the IDE puts the logotype behind the code |
-| `GUI_TEXTAREA_SQUIGGLES(ta, starts, laengen, farben)` | wavy lines under character ranges (start from 0, length in characters, 0 = a short piece at that spot) -- errors and warnings where they are. Replaces all previous ones, empty arrays clear; a change to the text removes them like the colour spans |
-| `GUI_TEXTAREA_SWATCHES(ta, starts, laengen, farben)` | colour swatches: a small square behind the piece. Which spot in the text MEANS a colour only the caller knows -- the IDE looks for `&H` literals |
-| `GUI_TEXTAREA_GUTTER_CLICKED(ta [, taste])` → INTEGER | which line (from 1) was clicked in the line-number column in this frame, 0 = none; `taste` 0 = left (default), 1 = right. Applies for one frame like `GUI_CLICKED`; a left click there does NOT set the cursor, the fold arrow still toggles. For breakpoints and bookmarks |
+| `GUI_TEXTAREA_BACKGROUND(ta, image, opacity = 24)` | lay an image faintly behind the text: fitted into the inner area, centred, does not scroll along. Opacity 0..255, `image` < 0 removes it -- this is how the IDE puts the logotype behind the code |
+| `GUI_TEXTAREA_SQUIGGLES(ta, starts, lengths, colors)` | wavy lines under character ranges (start from 0, length in characters, 0 = a short piece at that spot) -- errors and warnings where they are. Replaces all previous ones, empty arrays clear; a change to the text removes them like the colour spans |
+| `GUI_TEXTAREA_SWATCHES(ta, starts, lengths, colors)` | colour swatches: a small square behind the piece. Which spot in the text MEANS a colour only the caller knows -- the IDE looks for `&H` literals |
+| `GUI_TEXTAREA_GUTTER_CLICKED(ta [, key])` → INTEGER | which line (from 1) was clicked in the line-number column in this frame, 0 = none; `key` 0 = left (default), 1 = right. Applies for one frame like `GUI_CLICKED`; a left click there does NOT set the cursor, the fold arrow still toggles. For breakpoints and bookmarks |
 | `GUI_TEXTAREA_HINT_CLICKED(ta)` → INTEGER | which hint (`GUI_TEXTAREA_HINTS`) was clicked in this frame: its line from 1, 0 = none; only with `GUI_TEXTAREA_SET(ta, "hinweise_klickbar", 1)` (then a hand as the pointer, the cursor stays put); applies for one frame |
 | `GUI_TEXTAREA_SWATCH_CLICKED(ta)` → INTEGER | which colour swatch was clicked in this frame (-1 = none); applies for one frame like `GUI_CLICKED`, the cursor stays put |
-| `GUI_TEXTAREA_INDENT_WORDS(ta, anfang, ende, aus)` | three word lists for indentation: the line starts with it, it ends with it, or the word alone in a line moves it back (while typing; a pasted block with several lines stays as it is) |
-| `GUI_TABS_CLOSABLE(win, an)` | every tab gets a cross. Nothing is closed — the runtime only reports which one was hit |
+| `GUI_TEXTAREA_INDENT_WORDS(ta, start, end, off)` | three word lists for indentation: the line starts with it, it ends with it, or the word alone in a line moves it back (while typing; a pasted block with several lines stays as it is) |
+| `GUI_TABS_CLOSABLE(win, on)` | every tab gets a cross. Nothing is closed — the runtime only reports which one was hit |
 | `GUI_TAB_CLOSED(win)` | which tab should be closed in this frame (-1 = none). Hit by the cross or the middle mouse button |
 | `GUI_TEXTAREA_TAB_HIT(ta)` | was Tab pressed in this frame? Only with `GUI_TEXTAREA_SET(ta, "tab_meldet", 1)` — then the field does not indent and does not look for abbreviations, it only reports |
-| `GUI_TEXTAREA_CLOSE_WORDS(ta, oeffner, schluesse)` | the scaffold that grows along: if the line opens a block, the line break puts the closing line right underneath |
-| `GUI_TEXTAREA_SHARE(ansicht, von)` | a second view of the same text: `ansicht` shows what is in `von` (both in the same window), and what is changed in one of the two is in the other after `GUI_UPDATE`. Each keeps its cursor, view and folding; a cursor behind a change moves along. The history lies with the owner — Ctrl+Z in the view undoes there. `-1` removes the link |
-| `GUI_TEXTAREA_PAIRS(ta, paare$)` | close brackets while typing: every two characters are a pair (`"()[]{}"` plus two quotation marks), empty = off. The opening one puts the closing one right behind it, before an identical closing one you only step over it, a selection is wrapped, Backspace between an empty pair takes both. Quotation marks do not pair behind a word and not in an open string; nothing is paired before a word. Pasting from the clipboard bypasses this |
-| `GUI_TEXTAREA_ABBREV(ta, woerter)` | abbreviations: if one of these words stands to the left of the cursor, Tab reports it instead of indenting. What goes in its place is set by the caller — the runtime knows no snippets |
+| `GUI_TEXTAREA_CLOSE_WORDS(ta, openers, closers)` | the scaffold that grows along: if the line opens a block, the line break puts the closing line right underneath |
+| `GUI_TEXTAREA_SHARE(view, from)` | a second view of the same text: `view` shows what is in `from` (both in the same window), and what is changed in one of the two is in the other after `GUI_UPDATE`. Each keeps its cursor, view and folding; a cursor behind a change moves along. The history lies with the owner — Ctrl+Z in the view undoes there. `-1` removes the link |
+| `GUI_TEXTAREA_PAIRS(ta, pairs$)` | close brackets while typing: every two characters are a pair (`"()[]{}"` plus two quotation marks), empty = off. The opening one puts the closing one right behind it, before an identical closing one you only step over it, a selection is wrapped, Backspace between an empty pair takes both. Quotation marks do not pair behind a word and not in an open string; nothing is paired before a word. Pasting from the clipboard bypasses this |
+| `GUI_TEXTAREA_ABBREV(ta, words)` | abbreviations: if one of these words stands to the left of the cursor, Tab reports it instead of indenting. What goes in its place is set by the caller — the runtime knows no snippets |
 | `GUI_TEXTAREA_ABBREV_HIT(ta)` → INTEGER | which abbreviation Tab hit in this frame (-1 = none); applies for one frame like `GUI_CLICKED` |
 | `GUI_TEXTAREA_SELECT_COLUMNS(ta, z1, s1, z2, s2)` → INTEGER | column selection: a RECTANGLE instead of a run. Each line gets its own cursor with its own selection, typing goes into all of them at once; a line that is too short gets its cursor at the end instead of dropping out. With the mouse: **hold Alt and drag**. Returns the number of cursors |
-| `GUI_TEXTAREA_ADD_CARET(ta, zeile[, spalte])` → INTEGER | set an additional cursor; returns how many there are afterwards. Two at the same spot become one |
+| `GUI_TEXTAREA_ADD_CARET(ta, line[, column])` → INTEGER | set an additional cursor; returns how many there are afterwards. Two at the same spot become one |
 | `GUI_TEXTAREA_CARETS(ta)` → INTEGER | how many cursors the field currently has (at least 1) |
 | `GUI_TEXTAREA_CLEAR_CARETS(ta)` | back to a single cursor |
-| `GUI_TEXTAREA_FOLDABLE(ta, von_zeilen, bis_zeilen)` | which blocks can be folded: two arrays of equal length with header line and last line. What a block is only the program knows — the runtime knows no language here |
-| `GUI_TEXTAREA_FOLD(ta, zeile[, an])` → BOOLEAN | collapse or expand the innermost foldable block around `zeile`; without `an`, toggle. Returns whether it is collapsed afterwards |
-| `GUI_TEXTAREA_FOLD_ALL(ta[, zu])` → INTEGER | collapse everything (only the outer blocks) or expand everything; returns the number of collapsed blocks |
-| `GUI_TEXTAREA_FOLDED(ta, zeile)` → BOOLEAN | is the line hidden in a collapsed block? |
+| `GUI_TEXTAREA_FOLDABLE(ta, start_lines, end_lines)` | which blocks can be folded: two arrays of equal length with header line and last line. What a block is only the program knows — the runtime knows no language here |
+| `GUI_TEXTAREA_FOLD(ta, line[, on])` → BOOLEAN | collapse or expand the innermost foldable block around `line`; without `on`, toggle. Returns whether it is collapsed afterwards |
+| `GUI_TEXTAREA_FOLD_ALL(ta[, closed])` → INTEGER | collapse everything (only the outer blocks) or expand everything; returns the number of collapsed blocks |
+| `GUI_TEXTAREA_FOLDED(ta, line)` → BOOLEAN | is the line hidden in a collapsed block? |
 | `GUI_TEXTAREA_FOLDS(ta)` → ARRAY OF INTEGER | the header lines of the collapsed blocks, ascending |
-| `GUI_TEXTAREA_FIND(ta, text$[, ab_zeile[, ab_spalte[, genau]]])` → (zeile, spalte) | next match from the given spot, `(-1, -1)` if there is none; without `genau` regardless of upper/lower case. No wrap-around — at the end search again from `1, 1` |
+| `GUI_TEXTAREA_FIND(ta, text$[, from_line[, from_column[, exact]]])` → (zeile, spalte) | next match from the given spot, `(-1, -1)` if there is none; without `exact` regardless of upper/lower case. No wrap-around — at the end search again from `1, 1` |
 
 ```basic
 DIM ta AS GUI_WIDGET
@@ -4197,14 +4197,14 @@ have to rebuild by hand.
 |---|---|
 | `GUI_COLORPICKER(win, x, y, w, h)` → GUI_WIDGET | saturation/brightness field plus hue strip |
 | `GUI_PICKED_COLOR(picker)` → INTEGER | chosen colour (`0xRRGGBB`) |
-| `GUI_SET_PICKED_COLOR(picker, farbe)` | set the colour |
+| `GUI_SET_PICKED_COLOR(picker, color)` | set the colour |
 | `GUI_DATEPICKER(win, x, y, w, h)` → GUI_WIDGET | month grid with paging arrows |
 | `GUI_DATEFIELD(win, x, y, w, h)` → GUI_WIDGET | date field: shows the date and drops down the month on a click (Space, F4, Alt+Down); a day takes it, ESC only closes, Enter belongs to the form while closed -- otherwise like GUI_DATEPICKER |
 | `GUI_DATE(picker)` → STRING | chosen date as `JJJJ-MM-TT` |
-| `GUI_SET_DATE(picker, datum$)` | set the date |
-| `GUI_COLORPICKER_SET(picker, schluessel$, wert)` | `alpha` (0/1) — show an opacity strip |
-| `GUI_DATEPICKER_SET(picker, schluessel$, wert)` | `wochenbeginn` (start of week: 0 = Monday … 6 = Sunday) |
-| `GUI_DATE_RANGE(picker, von$, bis$)` | allowed range (empty text = no limit) |
+| `GUI_SET_DATE(picker, date$)` | set the date |
+| `GUI_COLORPICKER_SET(picker, key$, value)` | `alpha` (0/1) — show an opacity strip |
+| `GUI_DATEPICKER_SET(picker, key$, value)` | `wochenbeginn` (start of week: 0 = Monday … 6 = Sunday) |
+| `GUI_DATE_RANGE(picker, from$, to$)` | allowed range (empty text = no limit) |
 
 Both report changes via `GUI_ON_CHANGE`.
 
@@ -4299,7 +4299,7 @@ Two core built-ins (no `IMPORT` needed) that did not exist before:
 
 | Function | Effect |
 |---|---|
-| `COLOR_HEX$(farbe)` → STRING | `"#RRGGBB"`, with opacity `"#AARRGGBB"` |
+| `COLOR_HEX$(color)` → STRING | `"#RRGGBB"`, with opacity `"#AARRGGBB"` |
 | `COLOR_FROM_HEX(text$)` → INTEGER | `#RGB`, `#RRGGBB`, `#AARRGGBB` — with or without `#`, also `0x`/`&H` |
 
 Without them **a program cannot turn hex text into a colour at all**:
@@ -4341,10 +4341,10 @@ More finely controllable:
 
 | Function | Effect |
 |---|---|
-| `SETFONT(font)` | the active font — applies to the whole interface |
-| `GUI_SET_FONT(wdg, font)` | a font of its own for this widget only |
-| `GUI_SET_FONT_SIZE(wdg, px)` | a size of its own for this widget only |
-| `GUI_SET_FONT_STYLE(wdg, stil$)` | bold, italic, underlined, strikethrough for this widget only (also stored in the `.dhform` as `font_style`) |
+| `SETFONT(font[, size])` | the active font — applies to the whole interface |
+| `GUI_SET_FONT(widget, font)` | a font of its own for this widget only |
+| `GUI_SET_FONT_SIZE(widget, px)` | a size of its own for this widget only |
+| `GUI_SET_FONT_STYLE(widget, style$)` | bold, italic, underlined, strikethrough for this widget only (also stored in the `.dhform` as `font_style`) |
 | `GUI_STYLE_SET(name$, "font", font)` + `GUI_APPLY_STYLE(wdg, name$)` | one font for a whole group |
 
 For a **pixel font** from a PNG there is `LOADFONT_IMAGE(bild, trennfarbe,
@@ -4489,17 +4489,17 @@ The commands without a window also work in a console program:
 
 | Command | What it does |
 |---|---|
-| `SPELL_SYSTEM(sprache$)` | System dictionary for a language ("de-DE", "en-US"; "en" takes the first English one) -> handle |
+| `SPELL_SYSTEM(language$)` | System dictionary for a language ("de-DE", "en-US"; "en" takes the first English one) -> handle |
 | `SPELL_LOAD(dic$ [, aff$])` | Hunspell dictionary from files (without `aff$` the `.aff` next to it) -> handle |
 | `SPELL_LANGUAGES()` | Languages for which `SPELL_SYSTEM` has a dictionary |
-| `SPELL_LANGUAGE$(h)` | Language of a dictionary |
-| `SPELL_CHECK(h, wort$)` | Is the word spelled correctly? |
-| `SPELL_SUGGEST(h, wort$ [, max])` | Suggestions for a word (at most 8 by default) |
-| `SPELL_IGNORE(h, wort$)` | The word counts as correct for the rest of the run |
-| `SPELL_ERRORS(h, text$)` | Misspelled words of a text as TUPLE (starts, lengths) in characters from 0 |
-| `SPELL_FREE(h)` | Release a dictionary; fields checking with it stop |
-| `GUI_SPELL(feld, h)` | Check a text field or text area with this dictionary, -1 turns it off |
-| `GUI_SPELL_COUNT(feld)` | How many words are currently marked as misspelled |
+| `SPELL_LANGUAGE$(dictionary)` | Language of a dictionary |
+| `SPELL_CHECK(dictionary, word$)` | Is the word spelled correctly? |
+| `SPELL_SUGGEST(dictionary, word$ [, max])` | Suggestions for a word (at most 8 by default) |
+| `SPELL_IGNORE(dictionary, word$)` | The word counts as correct for the rest of the run |
+| `SPELL_ERRORS(dictionary, text$)` | Misspelled words of a text as TUPLE (starts, lengths) in characters from 0 |
+| `SPELL_FREE(dictionary)` | Release a dictionary; fields checking with it stop |
+| `GUI_SPELL(field, dictionary)` | Check a text field or text area with this dictionary, -1 turns it off |
+| `GUI_SPELL_COUNT(field)` | How many words are currently marked as misspelled |
 
 A word is letters, plus an apostrophe between two letters; the Hunspell
 path does not check single letters and numbers. The Windows checker splits
@@ -4543,7 +4543,7 @@ typed.
 | Command | What it does |
 |---|---|
 | `TEXT_VISUAL$(text$ [, direction$])` | The text as it is displayed -- for your own output such as files or images. `direction$` = `auto` (default), `ltr` or `rtl` |
-| `GUI_WINDOW_RTL(win, an)` | the whole window right to left: the position of every widget mirrored at the window's width, the menu bar and the toolbar start on the right, check boxes, radio buttons and switches carry their mark to the right of the text, a slider grows to the left (dragging and arrow keys too), a text field or text area without `GUI_SET_ALIGN` is right-aligned, a table starts with its first column on the right (the edge to drag lies on the left), a tree indents from the right (the left arrow expands, renaming happens on the right). Tree, list, table and text area have their scroll bar on the left; a line wider than the text area shows its end on the right and scrolls to the left. A list is right-aligned, check boxes on the right, detail text on the left. The program keeps setting and reading its positions from the left (`GUI_GET_X`); drawing, clicks and `GUI_HIT_TEST` go through the mirrored one |
+| `GUI_WINDOW_RTL(win, on)` | the whole window right to left: the position of every widget mirrored at the window's width, the menu bar and the toolbar start on the right, check boxes, radio buttons and switches carry their mark to the right of the text, a slider grows to the left (dragging and arrow keys too), a text field or text area without `GUI_SET_ALIGN` is right-aligned, a table starts with its first column on the right (the edge to drag lies on the left), a tree indents from the right (the left arrow expands, renaming happens on the right). Tree, list, table and text area have their scroll bar on the left; a line wider than the text area shows its end on the right and scrolls to the left. A list is right-aligned, check boxes on the right, detail text on the left. The program keeps setting and reading its positions from the left (`GUI_GET_X`); drawing, clicks and `GUI_HIT_TEST` go through the mirrored one |
 | `GUI_WINDOW_IS_RTL(win)` | is the window right to left? |
 
 Indic and Southeast Asian scripts and the ligatures of a font are set by

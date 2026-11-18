@@ -74,7 +74,7 @@ Rotation ohne Gimbal-Lock.
 | `QUAT_IDENTITY()` | QUAT | keine Drehung |
 | `QUAT_NEW(x, y, z, w)` | QUAT | aus den vier Komponenten — selten nötig, meist nimmt man `QUAT_FROM_*` |
 | `QUAT_X(q)` / `QUAT_Y(q)` / `QUAT_Z(q)` / `QUAT_W(q)` | FLOAT | einzelne Komponente lesen |
-| `QUAT_FROM_AXIS_ANGLE(ax, ay, az, winkel)` | QUAT | Drehung um eine Achse (Winkel im Bogenmaß) |
+| `QUAT_FROM_AXIS_ANGLE(ax, ay, az, angle)` | QUAT | Drehung um eine Achse (Winkel im Bogenmaß) |
 | `QUAT_FROM_EULER(pitch, yaw, roll)` | QUAT | Drehung aus den drei Eulerwinkeln (Bogenmaß) |
 | `QUAT_MUL(a, b)` | QUAT | zwei Drehungen hintereinander — erst `b`, dann `a` |
 | `QUAT_NORMALIZE(q)` | QUAT | auf Länge 1 bringen; nach vielen Verkettungen sinnvoll, sonst schleicht sich Skalierung ein |
@@ -92,10 +92,10 @@ Operator: `a * b` = Komposition (erst b, dann a — wie Matrix-Multiplikation).
 | `MAT4_IDENTITY()` | MAT4 | verändert nichts — Ausgangspunkt jeder Kette |
 | `MAT4_TRANSLATE(x, y, z)` | MAT4 | verschieben |
 | `MAT4_SCALE(x, y, z)` | MAT4 | skalieren (je Achse) |
-| `MAT4_ROTATE_X(winkel)` / `MAT4_ROTATE_Y(winkel)` / `MAT4_ROTATE_Z(winkel)` | MAT4 | um eine Hauptachse drehen (Bogenmaß) |
-| `MAT4_ROTATE_AXIS(ax, ay, az, winkel)` | MAT4 | um eine beliebige Achse drehen (Bogenmaß) |
+| `MAT4_ROTATE_X(angle)` / `MAT4_ROTATE_Y(angle)` / `MAT4_ROTATE_Z(angle)` | MAT4 | um eine Hauptachse drehen (Bogenmaß) |
+| `MAT4_ROTATE_AXIS(ax, ay, az, angle)` | MAT4 | um eine beliebige Achse drehen (Bogenmaß) |
 | `MAT4_FROM_QUAT(q)` | MAT4 | Drehung aus einem Quaternion |
-| `MAT4_TRS(pos, rot, scale)` | MAT4 | Verschiebung, Drehung und Skalierung in einem (= T·R·S) — der übliche Weg zu einer Modell-Matrix |
+| `MAT4_TRS(pos, rotation, scale)` | MAT4 | Verschiebung, Drehung und Skalierung in einem (= T·R·S) — der übliche Weg zu einer Modell-Matrix |
 | `MAT4_MUL(a, b)` | MAT4 | Matrizen verketten — erst `b`, dann `a` |
 | `MAT4_INVERT(m)` | MAT4 | Umkehrung; **wirft bei Determinante 0** (etwa nach `MAT4_SCALE(0, …)`) |
 | `MAT4_TRANSPOSE(m)` | MAT4 | Zeilen und Spalten tauschen |

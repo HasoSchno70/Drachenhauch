@@ -695,6 +695,127 @@ fn parse_arity(sig: &str) -> Option<(usize, usize)> {
     Some((min, max))
 }
 
+/// Ein Parameter eines Builtins, wie ihn die Signatur im Index nennt -- die
+/// Grundlage benannter Argumente (`CIRCLE(x: 10, y: 20, r: 5)`).
+#[derive(Clone, Debug)]
+pub(crate) struct BuiltinParam {
+    /// klein und ohne `$` -- so wird verglichen
+    pub name: String,
+    /// wie in der Signatur, fuer Meldungen
+    pub anzeige: String,
+    pub optional: bool,
+    /// Vorgabe als Quelltext (`farbe: INTEGER = -1` -> `-1`)
+    pub vorgabe: Option<String>,
+}
+
+/// Die Parameter einer Signatur und ob sie mit `...` endet. `None`, wenn die
+/// Signatur keine Namen nennt (`*args`, `6..8 Argumente`) oder einer davon
+/// kein Name ist. Optional ist, was nach einer `[` steht oder eine Vorgabe
+/// traegt -- dieselbe Regel wie `parse_arity`.
+pub(crate) fn signatur_params(sig: &str) -> Option<(Vec<BuiltinParam>, bool)> {
+    let start = sig.find('(')?;
+    let mut tiefe = 0i32;
+    let mut ende = None;
+    for (i, c) in sig[start..].char_indices() {
+        match c {
+            '(' => tiefe += 1,
+            ')' => { tiefe -= 1; if tiefe == 0 { ende = Some(start + i); break; } }
+            _ => {}
+        }
+    }
+    let inner = sig[start + 1..ende?].trim();
+    if inner.is_empty() { return Some((Vec::new(), false)); }
+    if inner.contains('*') || inner.ends_with("Argumente") || inner.ends_with("Argument") {
+        return None;
+    }
+    let mut raus = Vec::new();
+    let mut variadisch = false;
+    let mut optional_ab = false;
+    let mut naechste_optional = false;
+    let mut tok = String::new();
+    let mut in_text = false;
+    let mut fehler = false;
+    let mut schliesse = |tok: &mut String, optional_ab: &mut bool| {
+        let t = tok.trim().to_string();
+        tok.clear();
+        if t.is_empty() { return; }
+        if t == "..." { variadisch = true; return; }
+        let (kopf, vorgabe) = match t.split_once('=') {
+            Some((k, v)) => (k.trim(), Some(v.trim().to_string())),
+            None => (t.as_str(), None),
+        };
+        let anzeige = kopf.split(':').next().unwrap_or("").trim().to_string();
+        let gueltig = {
+            let ohne = anzeige.strip_suffix('$').unwrap_or(&anzeige);
+            let mut z = ohne.chars();
+            matches!(z.next(), Some(c) if c.is_ascii_alphabetic() || c == '_')
+                && z.all(|c| c.is_ascii_alphanumeric() || c == '_')
+        };
+        if !gueltig { fehler = true; return; }
+        if vorgabe.is_some() { *optional_ab = true; }
+        raus.push(BuiltinParam {
+            name: anzeige.trim_end_matches('$').to_lowercase(),
+            anzeige,
+            optional: *optional_ab,
+            vorgabe,
+        });
+    };
+    for c in inner.chars() {
+        if in_text { tok.push(c); if c == '"' { in_text = false; } continue; }
+        match c {
+            '"' => { in_text = true; tok.push(c); }
+            '[' => {
+                if tok.trim().is_empty() { optional_ab = true; } else { naechste_optional = true; }
+            }
+            ']' => {}
+            ',' => {
+                schliesse(&mut tok, &mut optional_ab);
+                if naechste_optional { optional_ab = true; naechste_optional = false; }
+            }
+            _ => tok.push(c),
+        }
+    }
+    schliesse(&mut tok, &mut optional_ab);
+    if fehler { return None; }
+    Some((raus, variadisch))
+}
+
+/// Parameter je Builtin (klein), aus den Signaturen des Index. Ein neuer Name
+/// (`KEY_DOWN`) steht auch unter dem alten (`keydown`), auf den der Compiler
+/// ihn abbildet.
+fn builtin_params() -> &'static std::collections::HashMap<String, (Vec<BuiltinParam>, bool)> {
+    use std::sync::OnceLock;
+    static MAP: OnceLock<std::collections::HashMap<String, (Vec<BuiltinParam>, bool)>> = OnceLock::new();
+    MAP.get_or_init(|| {
+        let mut m = std::collections::HashMap::new();
+        for (n, sig, _) in builtin_eintraege() {
+            let Some(p) = signatur_params(sig) else { continue };
+            let n = n.to_lowercase();
+            if let Some(alt) = crate::namen::bisher(&n) {
+                m.entry(alt.to_string()).or_insert_with(|| p.clone());
+            }
+            m.insert(n, p);
+        }
+        m
+    })
+}
+
+/// Die Parameter des Builtins, so wie er im Quelltext steht (`name`) oder
+/// wie der Compiler ihn ruft (`kanonisch`) -- mit und ohne `$`.
+fn builtin_params_von(name: &str, kanonisch: &str) -> Option<&'static (Vec<BuiltinParam>, bool)> {
+    let m = builtin_params();
+    for n in [name, kanonisch] {
+        let low = n.to_lowercase();
+        if let Some(p) = m.get(&low) { return Some(p); }
+        let anders = match low.strip_suffix('$') {
+            Some(o) => o.to_string(),
+            None => format!("{}$", low),
+        };
+        if let Some(p) = m.get(&anders) { return Some(p); }
+    }
+    None
+}
+
 /// Herkunfts-Modul je Builtin (lowercase), aus `builtin_index.json`. `core`
 /// und `dhrt` bedeuten "kein IMPORT noetig" und stehen darum NICHT drin.
 ///
@@ -3559,7 +3680,91 @@ impl Compiler {
         Ok(())
     }
 
+    /// Benannte Argumente an einen Builtin (`CIRCLE(x: 10, y: 20, r: 5)`) in
+    /// die Reihenfolge seiner Signatur legen; eine ausgelassene Stelle davor
+    /// fuellt ihre Vorgabe aus dem Index (`farbe: INTEGER = -1`). `Ok(None)`:
+    /// gemeint ist kein Builtin (eigene Funktion, Variable, Methode,
+    /// Bibliothek) -- dort gilt der bisherige Weg. Danach sieht der Aufruf
+    /// aus, als stuenden alle Werte an ihrer Stelle; Sonderwege, Pruefungen
+    /// und Laufzeit merken nichts.
+    fn builtin_benannt(&self, name: &str, args: &[Node]) -> Result<Option<Vec<Node>>, String> {
+        if self.fn_sigs.contains_key(name) || self.ctx.local_slots.contains_key(name)
+            || self.global_vars.contains(name) || self.ffi_decls.contains_key(&name.to_lowercase()) {
+            return Ok(None);
+        }
+        if let Some(cn) = &self.ctx.current_class {
+            if self.resolve_method(cn, name) { return Ok(None); }
+        }
+        let kanonisch = self.resolve_builtin_alias(name);
+        if !is_known_builtin(&kanonisch) || kanonisch.starts_with("__") { return Ok(None); }
+        let gross = name.to_uppercase();
+        let Some((params, variadisch)) = builtin_params_von(name, &kanonisch) else {
+            return Err(format!(
+                "{}: benannte Argumente gehen hier nicht -- die Signatur dieses Befehls nennt keine Parameternamen",
+                gross));
+        };
+        let liste = || params.iter().map(|p| p.anzeige.clone()).collect::<Vec<_>>().join(", ");
+        let n_pos = args.iter().position(|a| matches!(a, Node::NamedArg { .. })).unwrap_or(args.len());
+        if args[n_pos..].iter().any(|a| !matches!(a, Node::NamedArg { .. })) {
+            return Err(format!(
+                "{}: nach einem benannten Argument muessen alle weiteren benannt sein (name: wert)",
+                gross));
+        }
+        if n_pos > params.len() {
+            return Err(format!(
+                "{}: {} Werte nach Stelle, die Signatur hat nur {} benennbare Parameter ({}){}",
+                gross, n_pos, params.len(), liste(),
+                if *variadisch { " -- die weiteren nach `...` gehen nur ohne Namen" } else { "" }));
+        }
+        let mut stellen: Vec<Option<Node>> = vec![None; params.len()];
+        for (i, a) in args[..n_pos].iter().enumerate() { stellen[i] = Some(a.clone()); }
+        for a in &args[n_pos..] {
+            let Node::NamedArg { name: an, value } = a else { continue };
+            let key = an.trim_end_matches('$').to_lowercase();
+            let Some(i) = params.iter().position(|p| p.name == key) else {
+                let hinweis = crate::aehnlich::hinweis_klein(&key, params.iter().map(|p| p.name.as_str()));
+                return Err(format!("{}: kein Parameter '{}'.{} Die Parameter heissen {}",
+                    gross, an, hinweis, liste()));
+            };
+            if stellen[i].is_some() {
+                return Err(format!("{}: Parameter '{}' ist doppelt belegt", gross, params[i].anzeige));
+            }
+            stellen[i] = Some((**value).clone());
+        }
+        let letzte = stellen.iter().rposition(|s| s.is_some()).map(|i| i + 1).unwrap_or(0);
+        let belegt: Vec<bool> = stellen.iter().map(|s| s.is_some()).collect();
+        let mut raus = Vec::with_capacity(letzte);
+        for (i, s) in stellen.into_iter().enumerate() {
+            let p = &params[i];
+            match s {
+                Some(n) => raus.push(n),
+                None if !p.optional => return Err(format!(
+                    "{}: Parameter '{}' fehlt", gross, p.anzeige)),
+                None if i >= letzte => break,
+                None => match &p.vorgabe {
+                    Some(v) => raus.push(crate::parser::parse_expression(v).map_err(|e| format!(
+                        "{}: die Vorgabe von '{}' ({}) laesst sich nicht lesen: {}", gross, p.anzeige, v, e))?),
+                    None => {
+                        let spaeter = (i + 1..letzte).filter(|&j| belegt[j])
+                            .map(|j| format!("'{}'", params[j].anzeige)).collect::<Vec<_>>().join(", ");
+                        return Err(format!(
+                            "{}: '{}' hat keine Vorgabe -- wer {} benennt, gibt '{}' mit an",
+                            gross, p.anzeige, spaeter, p.anzeige));
+                    }
+                },
+            }
+        }
+        Ok(Some(raus))
+    }
+
     fn expr_call(&mut self, callee: &Node, args: &[Node]) -> CR {
+        if let Node::Identifier(f) = callee {
+            if args.iter().any(|a| matches!(a, Node::NamedArg { .. })) {
+                if let Some(neu) = self.builtin_benannt(f, args)? {
+                    return self.expr_call(callee, &neu);
+                }
+            }
+        }
         // Ein Feld, das an einen Aufruf geht, kann dort wachsen oder schrumpfen.
         for a in args {
             let a = if let Node::NamedArg { value, .. } = a { &**value } else { a };
@@ -6679,6 +6884,64 @@ mod arity_tests {
         assert_eq!(parse_arity("DELTA()"), Some((0, 0)));
         assert_eq!(parse_arity("BILLBOARD(*args)"), None);      // absichtlich offen
         assert_eq!(parse_arity("kein_klammer_paar"), None);
+    }
+
+    #[test]
+    fn parameter_mit_namen_vorgaben_und_optionalen() {
+        use super::signatur_params;
+        let (p, var) = signatur_params("CHART_ZONE(chart, from: FLOAT, to: FLOAT, color: INTEGER, name: STRING = \"a, b\")").unwrap();
+        assert!(!var);
+        let namen: Vec<&str> = p.iter().map(|x| x.name.as_str()).collect();
+        assert_eq!(namen, ["chart", "from", "to", "color", "name"]);
+        assert_eq!(p[4].vorgabe.as_deref(), Some("\"a, b\""));
+        assert!(p[4].optional && !p[3].optional);
+        let (p, _) = signatur_params("ARC(x1, y1, x2, y2, start_rad, end_rad[, color[, width]])").unwrap();
+        assert_eq!(p.iter().filter(|x| x.optional).count(), 2);
+        let (p, var) = signatur_params("APPENDFILE(path$, text$ [, encoding$], ...)").unwrap();
+        assert!(var);
+        assert_eq!(p[2].name, "encoding");
+        assert_eq!(p[2].anzeige, "encoding$");
+        assert!(signatur_params("BILLBOARD(*args)").is_none());
+        assert!(signatur_params("GUI_RULE(2..5 Argumente)").is_none());
+    }
+
+    /// Die haeufigsten deutschen Parameternamen vor 2026-11-18 -- keiner soll
+    /// zurueckkommen.
+    const DEUTSCH: &[&str] = &["farbe", "pfad", "breite", "hoehe", "wert", "werte", "anzahl", "text_oder_puffer",
+        "zeile", "spalte", "bild", "puffer", "titel", "groesse", "winkel", "dauer", "zeit", "ziel", "quelle",
+        "datei", "kanal", "taste", "fenster", "schrift", "kodierung", "schluessel", "eintrag", "knopf", "von",
+        "bis", "an", "aus", "neu", "art", "modus", "typ", "stil", "seite", "inhalt", "faktor", "rand", "links",
+        "rechts", "oben", "unten", "mitte", "laenge", "muster", "ebene", "diagramm", "reihe", "punkt", "zahl"];
+
+    /// Jede Signatur im Index nennt brauchbare Namen: ein Name je Parameter,
+    /// keiner doppelt, englisch geschrieben. Seit benannte Argumente an
+    /// Builtins gehen, sind sie Schnittstelle (`docs/builtins-namen.md`).
+    #[test]
+    fn index_signaturen_nennen_eindeutige_namen() {
+        let mut fehler = Vec::new();
+        for (n, sig, _) in super::builtin_eintraege() {
+            let inner_offen = sig.contains("*args") || sig.contains("Argument");
+            let Some((p, _)) = super::signatur_params(sig) else {
+                if !inner_offen { fehler.push(format!("{}: unlesbar: {}", n, sig)); }
+                continue;
+            };
+            let mut gesehen = std::collections::HashSet::new();
+            for x in &p {
+                if !gesehen.insert(x.name.clone()) { fehler.push(format!("{}: '{}' doppelt", n, x.name)); }
+                if DEUTSCH.contains(&x.name.as_str()) {
+                    fehler.push(format!("{}: '{}' ist deutsch", n, x.name));
+                }
+                // Umschriebene Umlaute verraten ein deutsches Wort (`qu` ist
+                // englisch: frequency, request).
+                let ohne_qu = x.name.replace("qu", "");
+                if ["ae", "oe", "ue"].iter().any(|u| ohne_qu.contains(u))
+                    && !["value", "true", "blue", "due", "toe", "continue", "goes", "cue", "aes", "glue"]
+                        .iter().any(|w| ohne_qu.contains(w)) {
+                    fehler.push(format!("{}: '{}' sieht deutsch aus", n, x.name));
+                }
+            }
+        }
+        assert!(fehler.is_empty(), "{}", fehler.join("\n"));
     }
 }
 

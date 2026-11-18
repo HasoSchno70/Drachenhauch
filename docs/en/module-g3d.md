@@ -24,8 +24,8 @@ module [`m3d`](module-m3d.md), for an orbit camera `CAMERA_ORBIT` from
 | Function | Returns | Meaning |
 |---|---|---|
 | `CAMERA3D(px, py, pz, tx, ty, tz, fovy)` | — | set the camera: position, look-at target, field of view in degrees (usually 45). Up is +Y |
-| `CAMERA3D_UPDATE(modus)` | — | let raylib move the camera: `1` free, `2` orbital, `3` first person, `4` third person — reads mouse and WASD itself |
-| `CAMERA3D_MOVE(vor, rechts, hoch, gieren, neigen[, zoom])` | — | move the camera from the program (in units, forward/right on the ground plane) and turn it (degrees: yaw to the right, pitch upwards, at most 89 degrees); `zoom` changes the distance to the target (positive = farther away). For your own key bindings, gamepad or camera flights; works from the position that `CAMERA3D` last set — so do not call `CAMERA3D` again in every frame |
+| `CAMERA3D_UPDATE(mode)` | — | let raylib move the camera: `1` free, `2` orbital, `3` first person, `4` third person — reads mouse and WASD itself |
+| `CAMERA3D_MOVE(forward, right, up, yaw, pitch[, zoom])` | — | move the camera from the program (in units, forward/right on the ground plane) and turn it (degrees: yaw to the right, pitch upwards, at most 89 degrees); `zoom` changes the distance to the target (positive = farther away). For your own key bindings, gamepad or camera flights; works from the position that `CAMERA3D` last set — so do not call `CAMERA3D` again in every frame |
 | `CAMERA3D_X()` / `CAMERA3D_Y()` / `CAMERA3D_Z()` | FLOAT | where is the camera right now? |
 | `CAMERA3D_TARGET_X()` / `CAMERA3D_TARGET_Y()` / `CAMERA3D_TARGET_Z()` | FLOAT | what is it looking at? |
 
@@ -36,89 +36,89 @@ and guide lines. Anyone who needs the same shape often uses a model (see below).
 
 | Function | Meaning |
 |---|---|
-| `CUBE(x, y, z, breite, hoehe, tiefe, farbe)` | filled box |
-| `CUBE_WIRES(x, y, z, breite, hoehe, tiefe, farbe)` | the same as a wireframe |
-| `CUBE_MATRIX_WIRES(mat [, farbe])` | the 12 edges of a cube (edge 1, centred on the origin) through a world matrix from `m3d` -- the outline of a rotated block, e.g. from `physics3d`; size via the scale of the matrix |
-| `SPHERE(x, y, z, radius, farbe)` | sphere around a centre point |
-| `SPHERE_WIRES(x, y, z, radius, farbe)` | sphere as a wireframe |
-| `CYLINDER(x, y, z, r_oben, r_unten, hoehe, farbe)` | cylinder — with `r_oben = 0` it becomes a cone |
-| `CYLINDER_WIRES(x, y, z, r_oben, r_unten, hoehe, farbe)` | the same as a wireframe |
-| `CYLINDER_EX(x1, y1, z1, x2, y2, z2, r_anfang, r_ende, farbe)` | cylinder (or cone) from one point to another, in any direction — pipes, branches, beams |
-| `CAPSULE(x1, y1, z1, x2, y2, z2, r, farbe)` | capsule between two points (cylinder with hemispheres) — the usual shape for characters and their collision |
-| `CAPSULE_WIRES(x1, y1, z1, x2, y2, z2, r, farbe)` | the same as a wireframe |
-| `TRIANGLE3D(x1, y1, z1, x2, y2, z2, x3, y3, z3, farbe)` | free triangle in space, visible from both sides |
-| `CIRCLE3D(x, y, z, r, farbe)` | circle outline lying flat on the ground — target marker, range, shadow edge |
-| `BBOX_WIRES(x1, y1, z1, x2, y2, z2, farbe)` | box as edges between two corners (the order does not matter); with `MODEL_BBOX` the frame around a model |
-| `PLANE(x, y, z, size_x, size_z, farbe)` | flat plane in the XZ plane (ground) |
-| `LINE3D(x1, y1, z1, x2, y2, z2, farbe)` | line between two points |
-| `POINT3D(x, y, z, farbe)` | single point |
-| `GRID3D(linien, abstand)` | ground grid — helps enormously with judging distances |
-| `BILLBOARD(bild, x, y, z, groesse, farbe)` | image in space that always turns towards the camera (trees, sparks, labels) |
-| `BILLBOARD_PART(bild, sx, sy, sb, sh, x, y, z, groesse, farbe)` | only a section of the image — a single frame from a sprite sheet, that is how characters walk in 3D; `groesse` is the height, the width follows the section |
-| `BILLBOARD_EX(bild, x, y, z, breite, hoehe, winkel, farbe)` | with its own width and height, rotated around its centre (degrees) — spinning sparks, stretched beams |
+| `CUBE(x, y, z, width, height, depth, color)` | filled box |
+| `CUBE_WIRES(x, y, z, width, height, depth, color)` | the same as a wireframe |
+| `CUBE_MATRIX_WIRES(mat [, color])` | the 12 edges of a cube (edge 1, centred on the origin) through a world matrix from `m3d` -- the outline of a rotated block, e.g. from `physics3d`; size via the scale of the matrix |
+| `SPHERE(x, y, z, radius, color)` | sphere around a centre point |
+| `SPHERE_WIRES(x, y, z, radius, color)` | sphere as a wireframe |
+| `CYLINDER(x, y, z, r_top, r_bottom, height, color)` | cylinder — with `r_top = 0` it becomes a cone |
+| `CYLINDER_WIRES(x, y, z, r_top, r_bottom, height, color)` | the same as a wireframe |
+| `CYLINDER_EX(x1, y1, z1, x2, y2, z2, r_start, r_end, color)` | cylinder (or cone) from one point to another, in any direction — pipes, branches, beams |
+| `CAPSULE(x1, y1, z1, x2, y2, z2, r, color)` | capsule between two points (cylinder with hemispheres) — the usual shape for characters and their collision |
+| `CAPSULE_WIRES(x1, y1, z1, x2, y2, z2, r, color)` | the same as a wireframe |
+| `TRIANGLE3D(x1, y1, z1, x2, y2, z2, x3, y3, z3, color)` | free triangle in space, visible from both sides |
+| `CIRCLE3D(x, y, z, r, color)` | circle outline lying flat on the ground — target marker, range, shadow edge |
+| `BBOX_WIRES(x1, y1, z1, x2, y2, z2, color)` | box as edges between two corners (the order does not matter); with `MODEL_BBOX` the frame around a model |
+| `PLANE(x, y, z, size_x, size_z, color)` | flat plane in the XZ plane (ground) |
+| `LINE3D(x1, y1, z1, x2, y2, z2, color)` | line between two points |
+| `POINT3D(x, y, z, color)` | single point |
+| `GRID3D(lines, spacing)` | ground grid — helps enormously with judging distances |
+| `BILLBOARD(image, x, y, z, size, color)` | image in space that always turns towards the camera (trees, sparks, labels) |
+| `BILLBOARD_PART(image, sx, sy, sb, sh, x, y, z, size, color)` | only a section of the image — a single frame from a sprite sheet, that is how characters walk in 3D; `size` is the height, the width follows the section |
+| `BILLBOARD_EX(image, x, y, z, width, height, angle, color)` | with its own width and height, rotated around its centre (degrees) — spinning sparks, stretched beams |
 
 ### Models
 
 | Function | Returns | Meaning |
 |---|---|---|
-| `LOADMODEL(pfad$)` | INTEGER | load a model from a file (OBJ, GLTF, IQM …) |
-| `MESH_CUBE(breite, hoehe, tiefe)` | INTEGER | box as a model — without a file |
-| `MESH_SPHERE(radius, ringe, segmente)` | INTEGER | sphere; more rings and segments = rounder and more expensive |
-| `MESH_CYLINDER(radius, hoehe, segmente)` | INTEGER | cylinder |
-| `MESH_TORUS(radius, dicke, rad_seg, seiten)` | INTEGER | ring |
-| `MESH_KNOT(radius, dicke, rad_seg, seiten)` | INTEGER | trefoil knot |
-| `MESH_PLANE(breite, laenge, res_x, res_z)` | INTEGER | plane with subdivision |
-| `MESH_HEIGHTMAP(bild, groesse_x, groesse_y, groesse_z)` | INTEGER | terrain from a greyscale image: bright = high, `groesse_y` determines how high |
-| `MESH_CONE(radius, hoehe, segmente)` | INTEGER | cone standing on the ground (y from 0 to `hoehe`) |
-| `MESH_HEMISPHERE(radius, ringe, segmente)` | INTEGER | upper half of a sphere, open at the bottom — domes, hills |
-| `MESH_POLY(seiten, radius)` | INTEGER | flat regular polygon on the ground (3 to 256 sides) |
-| `MESH_CUBICMAP(bild, breite, hoehe, tiefe)` | INTEGER | maze from an image: every white point becomes a cube of size `breite` x `hoehe` x `tiefe`, every black one gets a floor and a ceiling that is visible from inside; other colours stay empty. Point (x, y) lies at x·breite, y·tiefe. Use with `MODEL_LIT` and a light, otherwise walls and corridors look the same |
-| `MODEL(modell, x, y, z, skala, farbe)` | — | draw |
-| `MODEL_EX(modell, x, y, z, achse_x, achse_y, achse_z, winkel_grad, skala, farbe)` | — | draw and rotate around an axis |
-| `MODEL_WIRES(modell, x, y, z, skala, farbe)` | — | draw as a wireframe |
-| `MODEL_MATRIX_WIRES(handle, mat [, farbe])` | — | wireframe with a world matrix from `m3d`, the counterpart of `MODEL_MATRIX` -- for rotated bodies (physics, bones); `MODEL_WIRES` only knows position and size. Every triangle is drawn, so a cube shows its diagonals -- for its 12 edges use `CUBE_MATRIX_WIRES`. If the wireframe lies exactly on the faces it looks dashed -- then scale the matrix half a percent larger |
-| `MODEL_BBOX(modell)` | TUPLE | bounding box `(min_x, min_y, min_z, max_x, max_y, max_z)` in the model's own coordinates (without the position and scale used when drawing) — for collisions and for standing a model on the ground |
-| `MODEL_SAVE(modell, pfad$)` | — | write all parts of the model as Wavefront OBJ (`.obj`) — keep editing a maze from `MESH_CUBICMAP` or a terrain in Blender, bring it back with `LOADMODEL`. Without material, texture and animation; the texture coordinates are written so that they are the right way round again after `LOADMODEL` |
-| `MODEL_TEXTURE(modell, bild)` | — | apply an image as the surface |
-| `MODEL_TEXTURE_NORMAL(modell, bild)` | — | normal map for surface structure (only works with `MODEL_LIT`) |
+| `LOADMODEL(path$)` | INTEGER | load a model from a file (OBJ, GLTF, IQM …) |
+| `MESH_CUBE(width, height, depth)` | INTEGER | box as a model — without a file |
+| `MESH_SPHERE(radius, rings, segments)` | INTEGER | sphere; more rings and segments = rounder and more expensive |
+| `MESH_CYLINDER(radius, height, segments)` | INTEGER | cylinder |
+| `MESH_TORUS(radius, thickness, rad_seg, pages)` | INTEGER | ring |
+| `MESH_KNOT(radius, thickness, rad_seg, pages)` | INTEGER | trefoil knot |
+| `MESH_PLANE(width, length, res_x, res_z)` | INTEGER | plane with subdivision |
+| `MESH_HEIGHTMAP(image, size_x, size_y, size_z)` | INTEGER | terrain from a greyscale image: bright = high, `size_y` determines how high |
+| `MESH_CONE(radius, height, segments)` | INTEGER | cone standing on the ground (y from 0 to `height`) |
+| `MESH_HEMISPHERE(radius, rings, segments)` | INTEGER | upper half of a sphere, open at the bottom — domes, hills |
+| `MESH_POLY(pages, radius)` | INTEGER | flat regular polygon on the ground (3 to 256 sides) |
+| `MESH_CUBICMAP(image, width, height, depth)` | INTEGER | maze from an image: every white point becomes a cube of size `width` x `height` x `depth`, every black one gets a floor and a ceiling that is visible from inside; other colours stay empty. Point (x, y) lies at x·width, y·depth. Use with `MODEL_LIT` and a light, otherwise walls and corridors look the same |
+| `MODEL(model, x, y, z, scale, color)` | — | draw |
+| `MODEL_EX(model, x, y, z, axis_x, axis_y, axis_z, angle_deg, scale, color)` | — | draw and rotate around an axis |
+| `MODEL_WIRES(model, x, y, z, scale, color)` | — | draw as a wireframe |
+| `MODEL_MATRIX_WIRES(handle, mat [, color])` | — | wireframe with a world matrix from `m3d`, the counterpart of `MODEL_MATRIX` -- for rotated bodies (physics, bones); `MODEL_WIRES` only knows position and size. Every triangle is drawn, so a cube shows its diagonals -- for its 12 edges use `CUBE_MATRIX_WIRES`. If the wireframe lies exactly on the faces it looks dashed -- then scale the matrix half a percent larger |
+| `MODEL_BBOX(model)` | TUPLE | bounding box `(min_x, min_y, min_z, max_x, max_y, max_z)` in the model's own coordinates (without the position and scale used when drawing) — for collisions and for standing a model on the ground |
+| `MODEL_SAVE(model, path$)` | — | write all parts of the model as Wavefront OBJ (`.obj`) — keep editing a maze from `MESH_CUBICMAP` or a terrain in Blender, bring it back with `LOADMODEL`. Without material, texture and animation; the texture coordinates are written so that they are the right way round again after `LOADMODEL` |
+| `MODEL_TEXTURE(model, image)` | — | apply an image as the surface |
+| `MODEL_TEXTURE_NORMAL(model, image)` | — | normal map for surface structure (only works with `MODEL_LIT`) |
 
 ### Animated models (skeleton)
 
 | Function | Returns | Meaning |
 |---|---|---|
-| `MODEL_LOAD_ANIMS(pfad$)` | INTEGER | load animations from a file (GLTF/IQM) |
+| `MODEL_LOAD_ANIMS(path$)` | INTEGER | load animations from a file (GLTF/IQM) |
 | `MODEL_ANIM_COUNT(set)` | INTEGER | how many animations are in it? |
 | `MODEL_ANIM_NAME(set, idx)` | STRING | name of an animation |
 | `MODEL_ANIM_FRAMES(set, idx)` | INTEGER | how many frames does it have? |
-| `MODEL_ANIMATE(modell, set, anim, frame)` | — | put the model into this pose; `frame` wraps around |
-| `MODEL_ANIMATE_BLEND(modell, set, anim_a, frame_a, anim_b, frame_b, blend)` | — | blend smoothly between two animations (`blend` 0 = all A, 1 = all B) — for walking to running without a jump |
+| `MODEL_ANIMATE(model, set, anim, frame)` | — | put the model into this pose; `frame` wraps around |
+| `MODEL_ANIMATE_BLEND(model, set, anim_a, frame_a, anim_b, frame_b, blend)` | — | blend smoothly between two animations (`blend` 0 = all A, 1 = all B) — for walking to running without a jump |
 
 ### Light and material
 
 | Function | Returns | Meaning |
 |---|---|---|
 | `LIGHT_ENABLE()` | — | switch lighting on (once; there is no counterpart for switching it off) |
-| `LIGHT_AMBIENT(farbe, staerke)` | — | base brightness, so that shadow sides do not sink into black |
-| `LIGHT_DIRECTIONAL(x, y, z, farbe)` | INTEGER | light from one direction, like the sun — returns the light number |
-| `LIGHT_POINT(x, y, z, farbe)` | INTEGER | light from a point, like a lamp |
-| `LIGHT_SET_POS(licht, x, y, z)` | — | move a light |
-| `LIGHT_SET_COLOR(licht, farbe)` | — | change the light colour |
-| `LIGHT_SET_ENABLED(licht [, an])` | — | switch a single light on or off |
-| `LIGHT_FOG(farbe, dichte)` | — | fog with distance; makes far things fade |
-| `MODEL_LIT(modell)` | — | this model is lit (otherwise it draws flat). The opacity of the colour applies when lit too: `MODEL(m, x, y, z, 1.0, RGBA(80, 160, 255, 100))` is semi-transparent -- draw transparent models last, otherwise they hide what comes after (until 2026.27 a lit model stayed opaque) |
-| `MODEL_PBR(modell, metalness, roughness)` | — | material behaviour: `metalness` 0 = plastic, 1 = metal; `roughness` 0 = mirror-like, 1 = matte |
-| `MODEL_EMISSIVE(modell, farbe, staerke)` | — | the model glows by itself — even through the fog |
+| `LIGHT_AMBIENT(color, strength)` | — | base brightness, so that shadow sides do not sink into black |
+| `LIGHT_DIRECTIONAL(x, y, z, color)` | INTEGER | light from one direction, like the sun — returns the light number |
+| `LIGHT_POINT(x, y, z, color)` | INTEGER | light from a point, like a lamp |
+| `LIGHT_SET_POS(light, x, y, z)` | — | move a light |
+| `LIGHT_SET_COLOR(light, color)` | — | change the light colour |
+| `LIGHT_SET_ENABLED(light [, on])` | — | switch a single light on or off |
+| `LIGHT_FOG(color, density)` | — | fog with distance; makes far things fade |
+| `MODEL_LIT(model)` | — | this model is lit (otherwise it draws flat). The opacity of the colour applies when lit too: `MODEL(m, x, y, z, 1.0, RGBA(80, 160, 255, 100))` is semi-transparent -- draw transparent models last, otherwise they hide what comes after (until 2026.27 a lit model stayed opaque) |
+| `MODEL_PBR(model, metalness, roughness)` | — | material behaviour: `metalness` 0 = plastic, 1 = metal; `roughness` 0 = mirror-like, 1 = matte |
+| `MODEL_EMISSIVE(model, color, strength)` | — | the model glows by itself — even through the fog |
 
 ### Environment and shadows
 
 | Function | Returns | Meaning |
 |---|---|---|
-| `LIGHT_ENV(himmel, boden, intensitaet)` | — | ambient light from two colours — metals reflect it |
-| `LIGHT_ENV_HDR(pfad$ [, intensitaet])` | — | a real panorama from a `.hdr` file instead of the two-colour approximation |
-| `SKYBOX(an)` | — | also show the panorama as the background (needs `LIGHT_ENV_HDR`) |
-| `SKYBOX_IMAGE(bild)` | — | sky from an ordinary image instead of a `.hdr` file: six faces as a strip (6:1 or 1:6) or as a cross (4:3 or 3:4), order +X, −X, +Y, −Y, +Z, −Z; shows it right away, `SKYBOX(FALSE)` hides it |
-| `SHADOW_ENABLE([aufloesung])` | — | switch shadow casting on; the first directional light casts it |
-| `SHADOW_AREA(groesse, dist)` | — | which section gets shadows — small = sharp, large = covers more |
+| `LIGHT_ENV(sky, floor, intensity)` | — | ambient light from two colours — metals reflect it |
+| `LIGHT_ENV_HDR(path$ [, intensity])` | — | a real panorama from a `.hdr` file instead of the two-colour approximation |
+| `SKYBOX(on)` | — | also show the panorama as the background (needs `LIGHT_ENV_HDR`) |
+| `SKYBOX_IMAGE(image)` | — | sky from an ordinary image instead of a `.hdr` file: six faces as a strip (6:1 or 1:6) or as a cross (4:3 or 3:4), order +X, −X, +Y, −Y, +Z, −Z; shows it right away, `SKYBOX(FALSE)` hides it |
+| `SHADOW_ENABLE([resolution])` | — | switch shadow casting on; the first directional light casts it |
+| `SHADOW_AREA(size, dist)` | — | which section gets shadows — small = sharp, large = covers more |
 | `SHADOW_TARGET(x, y, z)` | — | what that section is centred on (usually the player character) |
 
 ### Clicking and hits
@@ -134,16 +134,16 @@ length). The hit point is the origin plus the unit direction times the distance.
 |---|---|---|
 | `PICK_BOX(cx, cy, cz, sx, sy, sz)` | FLOAT | does the mouse pointer hit this box? (centre and full size) |
 | `PICK_SPHERE(cx, cy, cz, r)` | FLOAT | … this sphere? |
-| `PICK_MODEL(modell, px, py, pz [, skala])` | FLOAT | … this model? (real triangles, not just a bounding volume) |
+| `PICK_MODEL(model, px, py, pz [, scale])` | FLOAT | … this model? (real triangles, not just a bounding volume) |
 | `PICK_TRI(x1, y1, z1, x2, y2, z2, x3, y3, z3)` | FLOAT | … this triangle? |
 | `PICK_QUAD(x1, y1, z1, x2, y2, z2, x3, y3, z3, x4, y4, z4)` | FLOAT | … this quad? The points must lie **in order around it** |
 | `RAY_HIT_BOX(ox, oy, oz, dx, dy, dz, cx, cy, cz, sx, sy, sz)` | FLOAT | your own ray against a box |
 | `RAY_HIT_SPHERE(ox, oy, oz, dx, dy, dz, cx, cy, cz, r)` | FLOAT | your own ray against a sphere |
-| `RAY_HIT_MODEL(modell, ox, oy, oz, dx, dy, dz, px, py, pz [, skala])` | FLOAT | your own ray against a model |
+| `RAY_HIT_MODEL(model, ox, oy, oz, dx, dy, dz, px, py, pz [, scale])` | FLOAT | your own ray against a model |
 | `RAY_HIT_TRI(ox, oy, oz, dx, dy, dz, x1, y1, z1, x2, y2, z2, x3, y3, z3)` | FLOAT | your own ray against a triangle |
 | `RAY_HIT_QUAD(ox, oy, oz, dx, dy, dz, x1, y1, z1, x2, y2, z2, x3, y3, z3, x4, y4, z4)` | FLOAT | your own ray against a quad |
-| `MOUSE_GROUND_X(hoehe)` / `MOUSE_GROUND_Z(hoehe)` | FLOAT | where does the mouse pointer hit the horizontal plane at this height? |
-| `MOUSE_GROUND_HIT(hoehe)` | BOOLEAN | does it hit it at all? (not when looking at the sky) |
+| `MOUSE_GROUND_X(plane_y)` / `MOUSE_GROUND_Z(plane_y)` | FLOAT | where does the mouse pointer hit the horizontal plane at this height? |
+| `MOUSE_GROUND_HIT(plane_y)` | BOOLEAN | does it hit it at all? (not when looking at the sky) |
 | `SCREEN_TO_WORLD_DIR_X(sx, sy)` / `SCREEN_TO_WORLD_DIR_Y(sx, sy)` / `SCREEN_TO_WORLD_DIR_Z(sx, sy)` | FLOAT | direction of the ray through a screen point — for your own hit tests |
 | `WORLD_TO_SCREEN_X(wx, wy, wz)` / `WORLD_TO_SCREEN_Y(wx, wy, wz)` | FLOAT | where does a point of the world land on the screen? — for labels above characters |
 

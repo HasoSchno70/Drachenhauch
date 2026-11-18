@@ -10,9 +10,9 @@ IMPORT "tween"
 
 | Funktion | Rückgabe | Bedeutung |
 |---|---|---|
-| `TWEEN_NEW(start, end, dauer_ms[, easing$])` | TWEEN (one-shot) | Wert einmal von `start` nach `end` fahren |
-| `TWEEN_NEW_LOOP(start, end, dauer_ms[, easing$])` | TWEEN (forever, springt zurück) | wie TWEEN_NEW, springt am Ende zurueck an den Anfang |
-| `TWEEN_NEW_PINGPONG(start, end, dauer_ms[, easing$])` | TWEEN (forever, hin & zurück) | wie TWEEN_NEW, laeuft am Ende rueckwaerts zurueck |
+| `TWEEN_NEW(start, end, duration_ms[, easing$])` | TWEEN (one-shot) | Wert einmal von `start` nach `end` fahren |
+| `TWEEN_NEW_LOOP(start, end, duration_ms[, easing$])` | TWEEN (forever, springt zurück) | wie TWEEN_NEW, springt am Ende zurueck an den Anfang |
+| `TWEEN_NEW_PINGPONG(start, end, duration_ms[, easing$])` | TWEEN (forever, hin & zurück) | wie TWEEN_NEW, laeuft am Ende rueckwaerts zurueck |
 | `TWEEN_VALUE(t)` | FLOAT | aktueller Wert -- das, was man zeichnet |
 | `TWEEN_PROGRESS(t)` | FLOAT (0.0 .. 1.0) | wie weit ist er? (0 = Anfang, 1 = Ende) |
 | `TWEEN_DONE(t)` | BOOLEAN (immer FALSE bei loop/pingpong) | ist er durch? |
@@ -45,9 +45,9 @@ Für **kontinuierliche Hintergrund-Animationen** gibt es zwei Endlos-Varianten:
 
 | Builtin | Verhalten | Use Case |
 |---|---|---|
-| `TWEEN_NEW(start, end, ms)` | once, klemmt am Ende | Pop-In, Fade-Out, Übergänge |
-| `TWEEN_NEW_LOOP(start, end, ms)` | wiederholt sich (start → end → start → end …) | Conveyor-Streifen, rotierende Spinner, BPM-pulsierende UI |
-| `TWEEN_NEW_PINGPONG(start, end, ms)` | hin & zurück (start → end → start → end → start …) | Idle-Bobs, atmende Skala, Schaukel-Effekte |
+| `TWEEN_NEW(start, end, duration_ms[, easing$])` | once, klemmt am Ende | Pop-In, Fade-Out, Übergänge |
+| `TWEEN_NEW_LOOP(start, end, duration_ms[, easing$])` | wiederholt sich (start → end → start → end …) | Conveyor-Streifen, rotierende Spinner, BPM-pulsierende UI |
+| `TWEEN_NEW_PINGPONG(start, end, duration_ms[, easing$])` | hin & zurück (start → end → start → end → start …) | Idle-Bobs, atmende Skala, Schaukel-Effekte |
 
 Loop- und Pingpong-Tweens sind **niemals** "done" — `TWEEN_DONE(t)` liefert für sie immer `FALSE`. Sie laufen forever, bis du sie pausierst.
 

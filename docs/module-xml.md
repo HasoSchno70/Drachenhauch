@@ -27,14 +27,14 @@ text = "<name>" + XML_ESCAPE$(kunde) + "</name>"
 | Funktion | Zweck |
 |---|---|
 | `XML_PARSE(text$)` → XML_HANDLE | aus einer Zeichenkette |
-| `XML_LOAD(pfad$[, kodierung$])` → XML_HANDLE | aus einer Datei |
+| `XML_LOAD(path$[, encoding$])` → XML_HANDLE | aus einer Datei |
 | `XML_NAME$(k)` → STRING | der Name des Elements |
-| `XML_TEXT$(k[, pfad$])` → STRING | der Text (samt dem der Kinder) |
-| `XML_ATTR$(k, name$[, vorgabe$])` → STRING | ein Attribut |
-| `XML_HAS(k, pfad$)` → BOOLEAN | gibt es den Pfad? |
-| `XML_FIND(k, pfad$)` → XML_HANDLE | dorthin springen |
-| `XML_COUNT(k, pfad$)` → INTEGER | wie viele gleichnamige? |
-| `XML_AT(k, pfad$, i)` → XML_HANDLE | der i-te davon (0-basiert) |
+| `XML_TEXT$(k[, path$])` → STRING | der Text (samt dem der Kinder) |
+| `XML_ATTR$(k, name$[, default$])` → STRING | ein Attribut |
+| `XML_HAS(k, path$)` → BOOLEAN | gibt es den Pfad? |
+| `XML_FIND(k, path$)` → XML_HANDLE | dorthin springen |
+| `XML_COUNT(k, path$)` → INTEGER | wie viele gleichnamige? |
+| `XML_AT(k, path$, i)` → XML_HANDLE | der i-te davon (0-basiert) |
 | `XML_CHILD_COUNT(k)` / `XML_CHILD(k, i)` | einen unbekannten Baum durchlaufen |
 | `XML_ATTR_NAMES(k)` → ARRAY OF STRING | alle Attributnamen |
 | `XML_ESCAPE$(text$)` → STRING | die fünf Sonderzeichen ersetzen |

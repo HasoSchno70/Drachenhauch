@@ -16,7 +16,7 @@ IMPORT "camera"
 | `CAMERA_X()`, `CAMERA_Y()`, `CAMERA_ZOOM()`, `CAMERA_ROTATION()` → FLOAT | read the current values |
 | `CAMERA_FOLLOW(target_x, target_y, screen_w, screen_h)` | centres the camera on the target (rotation stays unchanged) |
 | `CAMERA_S2W_X(sx[, sy])`, `CAMERA_S2W_Y(sy[, sx])` → FLOAT | screen pixel to world coordinate (e.g. for a mouse click) |
-| `CAMERA_SHAKE(staerke[, dauer_ms])` | screen shake: random camera jolting (world pixels), decays linearly over `dauer_ms` (default 300) — runs on its own, no per-frame code. `staerke = 0` stops immediately |
+| `CAMERA_SHAKE(strength[, duration_ms])` | screen shake: random camera jolting (world pixels), decays linearly over `duration_ms` (default 300) — runs on its own, no per-frame code. `strength = 0` stops immediately |
 
 ## Concept
 

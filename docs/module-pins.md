@@ -65,10 +65,10 @@ man für den Widerstand (`"up"` für einen Taster gegen Masse) oder für
 | `GPIO_COUNT(chip)` | Zahl der Leitungen des Chips |
 | `GPIO_LINE_NAME$(chip, pin)` | Name, den der Kernel der Leitung gibt (`"GPIO17"`), leer wenn keiner |
 | `GPIO_FIND(chip, name$)` | Nummer der Leitung mit diesem Namen, -1 wenn es keine gibt |
-| `GPIO_MODE(chip, pin, richtung$ [, widerstand$])` | Richtung `"in"`/`"out"`/`"opendrain"`, Widerstand `"up"`/`"down"`/`"none"` (ohne: bleibt, wie er ist) |
-| `GPIO_WRITE(chip, pin, wert)` | Setzt einen Ausgang (`TRUE`/`FALSE` oder 1/0); ein noch freier Pin wird dabei Ausgang |
+| `GPIO_MODE(chip, pin, direction$ [, pull$])` | Richtung `"in"`/`"out"`/`"opendrain"`, Widerstand `"up"`/`"down"`/`"none"` (ohne: bleibt, wie er ist) |
+| `GPIO_WRITE(chip, pin, value)` | Setzt einen Ausgang (`TRUE`/`FALSE` oder 1/0); ein noch freier Pin wird dabei Ausgang |
 | `GPIO_READ(chip, pin)` | Liest den Pin als `TRUE`/`FALSE`; ein noch freier Pin wird dabei Eingang |
-| `GPIO_WATCH(chip, pin, flanke$ [, entprellen_ms])` | Meldet Flanken `"rising"`/`"falling"`/`"both"` als Ereignisse, `"none"` hört auf; der Kernel entprellt auf Wunsch |
+| `GPIO_WATCH(chip, pin, edge$ [, debounce_ms])` | Meldet Flanken `"rising"`/`"falling"`/`"both"` als Ereignisse, `"none"` hört auf; der Kernel entprellt auf Wunsch |
 | `GPIO_NEXT(chip)` | Holt das nächste Ereignis, `FALSE` wenn keins wartet — wartet nie |
 | `GPIO_EVENT_PIN(chip)` | Pin des Ereignisses aus `GPIO_NEXT` |
 | `GPIO_EVENT_RISING(chip)` | `TRUE` bei steigender Flanke, `FALSE` bei fallender |
@@ -138,8 +138,8 @@ mit Register), sonst über rohes I2C mit wiederholtem Start.
 |---|---|
 | `I2C_OPEN([bus])` | Öffnet einen I2C-Bus: Nummer (Vorgabe 1), `"i2c-1"` oder `"/dev/i2c-1"` → `I2C_BUS` |
 | `I2C_CLOSE(bus)` | Schließt den Bus |
-| `I2C_WRITE(bus, adresse, daten)` | Schickt Bytes (Feld aus Zahlen oder BUFFER); das erste ist das Register |
-| `I2C_READ(bus, adresse, register, anzahl)` | Liest `anzahl` Bytes ab `register` (-1 = ohne Register) als Feld |
+| `I2C_WRITE(bus, address, data)` | Schickt Bytes (Feld aus Zahlen oder BUFFER); das erste ist das Register |
+| `I2C_READ(bus, address, register, count)` | Liest `count` Bytes ab `register` (-1 = ohne Register) als Feld |
 | `I2C_SCAN(bus)` | Adressen aller Bausteine, die antworten — wie `i2cdetect` |
 
 Adressen über 127 sind 10-Bit-Adressen. Antwortet an einer Adresse nichts,
@@ -168,13 +168,13 @@ I2C_CLOSE(bus)
 
 | Befehl | Was es tut |
 |---|---|
-| `SPI_OPEN(bus, cs [, takt_hz [, modus]])` | Öffnet `/dev/spidev<bus>.<cs>`; Takt Vorgabe 1 MHz, Modus 0–3 (Vorgabe 0) → `SPI_DEVICE` |
+| `SPI_OPEN(bus, cs [, clock_hz [, mode]])` | Öffnet `/dev/spidev<bus>.<cs>`; Takt Vorgabe 1 MHz, Modus 0–3 (Vorgabe 0) → `SPI_DEVICE` |
 | `SPI_CLOSE(spi)` | Schließt das Gerät |
-| `SPI_TRANSFER(spi, daten)` | Schickt Bytes und liefert, was gleichzeitig zurückkam — SPI tauscht immer |
-| `SPI_WRITE(spi, daten)` | Schickt Bytes, die Antwort fällt weg |
-| `SPI_READ(spi, anzahl)` | Schickt Nullen und liefert die Antwort |
-| `SPI_SPEED(spi, takt_hz)` | Ändert den Takt |
-| `SPI_MODE(spi, modus)` | Ändert den Modus (0–3, Taktpolarität und -phase) |
+| `SPI_TRANSFER(spi, data)` | Schickt Bytes und liefert, was gleichzeitig zurückkam — SPI tauscht immer |
+| `SPI_WRITE(spi, data)` | Schickt Bytes, die Antwort fällt weg |
+| `SPI_READ(spi, count)` | Schickt Nullen und liefert die Antwort |
+| `SPI_SPEED(spi, clock_hz)` | Ändert den Takt |
+| `SPI_MODE(spi, mode)` | Ändert den Modus (0–3, Taktpolarität und -phase) |
 
 ### Ein Analog-Digital-Wandler (MCP3008)
 
