@@ -133,7 +133,7 @@ at all could be saved.
 |---|---|
 | `IMAGE_NEW(width, height [, color])` | IMAGE — a new image; **completely transparent without a colour** |
 | `IMAGE_CLEAR(image [, x, y, b, h])` | make an area completely transparent — the eraser; without a rectangle the whole image |
-| `IMAGE_DRAW_IMAGE(target, source, x, y [, qx, qy, qb, qh] [, tint])` | draw one image into another, blended with opacity; optionally only a section of the source |
+| `IMAGE_DRAW_IMAGE(target, source, x, y [, qx, qy, qb, qh] [, tint])` | draw one image into another, blended with opacity; optionally only a section of the source (`qb`/`qh` = -1: up to the edge, so `tint:` alone works too) |
 | `IMAGE_SAVE(image, path$ [, with_alpha])` | write the image to a file (`.png`, `.bmp`, `.jpg`, `.tga`); with `FALSE` without an opacity channel (RGB) — print services reject a PNG with an alpha channel, even if every point is opaque. The opacity is simply left out, not blended in: anyone who wants a background lays the image onto an opaque one first |
 | `GETALPHA(image, x, y)` | opacity of an image point, 0..255; `-1` outside (core, no IMPORT needed) |
 | `IMAGE_FREE(image)` | release the image and its graphics-memory texture |

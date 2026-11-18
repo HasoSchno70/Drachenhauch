@@ -1089,7 +1089,13 @@ machen: lesbare Aufrufe und weniger Varianten-Befehle.
   `recursive`. Die alten Befehle bleiben.
 - **IDE:** ein Parameter mit Vorgabe gehoert nicht ins Geruest der
   Vervollstaendigung (sonst `DRAW_IMAGE(image, x, y, w, h, ...)`).
-- **Offen:** `ELLIPSE_OUTLINE`, `TRIANGLE_OUTLINE`, `POLYGON_OUTLINE` nennen
-  ein `width`, das der Code nie liest; `RANGE(a, b, step)` vertauscht die
-  Bedeutung von `a` mit der Zahl der Argumente; `IMAGE_DRAW_IMAGE` liest
-  `tint` je nach Argumentzahl an anderer Stelle.
+- **Nachgezogen (zweiter Zweig):** `ELLIPSE_OUTLINE`, `TRIANGLE_OUTLINE`,
+  `POLYGON_OUTLINE` nannten ein `width`, das der Code nie las -- jetzt ein
+  Linienzug dieser Dicke. `RANGE` heisst im ersten Parameter ehrlich
+  `start_or_stop`. `IMAGE_DRAW_IMAGE` nimmt `qb`/`qh = -1` als "bis zum Rand",
+  damit hat jede Luecke vor `tint` eine Vorgabe.
+- **Fassungsstempel:** beim Gegenlesen der Stabilitaetszusage fiel auf, dass
+  eine `.dhc` keine Fassung trug und der (jetzt vorgegebene) schlanke Export
+  Bytecode an eine aeltere kleine Laufzeit haengen konnte. Jetzt traegt die
+  `.dhc` `"dhrt": <Fassung>`, eine fremde wird abgewiesen, und der Export
+  uebergeht kleine Laufzeiten einer anderen Fassung (`--version`).

@@ -7,6 +7,30 @@ described in [Stability](stabilitaet.md).
 *Generated with `dhrt doku aenderungen` from `docs/releases/`; changes belong
 in the release notes, not here.*
 
+## 2026.52
+
+* **Messages in the language of the system.** Without `DHRT_LANG`, dhrt
+  writes its messages in German on a German system and in English on any
+  other (before: always German). What a program sees in a `CATCH` variable
+  stays German. If you compare output, set `DHRT_LANG=de`.
+* **Without a setting, the IDE and the Studio follow the system as well.** On
+  an English Windows they start in English; in the IDE, View → "Sprache:
+  Deutsch" switches at the next start, and the Studio follows the IDE's
+  setting.
+* **`dhrt --export` takes the smallest runtime that fits on its own**
+  (before only with `--schlank`, which still works). `--voll` takes the full
+  one -- for instance for a program that checks with `IMPORT … OPTIONAL` and
+  `MODULE_AVAILABLE` at run time what the build can do.
+* **A `.dhc` from another version is rejected** ("Diese .dhc stammt aus dhrt
+  …"), instead of running differently without a word. One without a version
+  (compiled before 2026.52) runs as before.
+* **`DIRLIST(path, "")`** returns all entries (before: none).
+* **The signatures name English parameter names** (`color` instead of
+  `farbe`) -- in the hover, in completion and in the manuals. Parameters with
+  a default are no longer part of the completion scaffold.
+
+[All notes for 2026.52](../releases/release-2026.52.en.md)
+
 ## 2026.51
 
 * **New warning: spelled differently from the declaration.** Whoever

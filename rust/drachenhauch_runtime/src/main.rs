@@ -2559,6 +2559,15 @@ fn laufzeit_fehlende(laufzeit: &std::path::Path, namen: &[String]) -> Option<Vec
     }
 }
 
+/// Die Fassung einer Laufzeit nach ihrem `--version` ("dhrt 2026.52").
+fn laufzeit_fassung(laufzeit: &std::path::Path) -> Option<String> {
+    let aus = std::process::Command::new(laufzeit).arg("--version")
+        .stdin(std::process::Stdio::null()).stderr(std::process::Stdio::null())
+        .output().ok()?;
+    let text = String::from_utf8_lossy(&aus.stdout);
+    text.lines().next()?.trim().strip_prefix("dhrt ").map(|s| s.trim().to_string())
+}
+
 fn mb(bytes: u64) -> String { format!("{:.1}", bytes as f64 / (1024.0 * 1024.0)).replace('.', ",") }
 
 fn export_main(path: &str, out_dir: Option<&str>, mit_daten: bool, schlank: bool) -> ExitCode {
@@ -2599,9 +2608,21 @@ fn export_main(path: &str, out_dir: Option<&str>, mit_daten: bool, schlank: bool
         let namen: Vec<String> = gerufene_befehle(&json).into_iter().collect();
         let eigene = exe.metadata().map(|m| m.len()).unwrap_or(0);
         let kandidaten = kleine_laufzeiten(&exe);
+        // DHRT_FASSUNG_SPIELEN: nur fuer die Pruefung, dass eine kleine
+        // Laufzeit einer anderen Fassung uebergangen wird (export_schlank).
+        let eigene_fassung = std::env::var("DHRT_FASSUNG_SPIELEN").ok()
+            .filter(|s| !s.is_empty()).unwrap_or_else(fassung);
         let mut gruende: Vec<String> = Vec::new();
         for (k, groesse) in &kandidaten {
             let name = k.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+            // Eine kleine Laufzeit einer anderen Fassung bekaeme Bytecode, den
+            // sie nicht kennt (nach einem halben Update, einem alten Bau
+            // daneben) -- sie wird uebergangen, und die Ausgabe sagt warum.
+            match laufzeit_fassung(k) {
+                Some(f) if f == eigene_fassung => {}
+                Some(f) => { gruende.push(format!("{} ist Fassung {} statt {}", name, f, eigene_fassung)); continue; }
+                None => { gruende.push(format!("{} nennt keine Fassung", name)); continue; }
+            }
             match laufzeit_fehlende(k, &namen) {
                 Some(f) if f.is_empty() => {
                     println!("Schlank: {} ({} MB statt {} MB)", name, mb(*groesse), mb(eigene));

@@ -680,6 +680,17 @@ pub fn load_program(j: &J) -> Result<Program, String> {
     if fmt != "dhc" && fmt != "gbc" {
         return Err(format!("Unbekanntes Format: {:?}", fmt));
     }
+    // Bytecode einer anderen Fassung: Befehle und ihre Bedeutung koennen sich
+    // geaendert haben -- lieber klar abweisen als still anders rechnen. Eine
+    // .dhc ohne Stempel (vor 2026.52) laeuft wie bisher.
+    if let Some(f) = obj.get("dhrt").and_then(|v| v.as_str()) {
+        let eigen = env!("CARGO_PKG_VERSION");
+        if f != eigen {
+            return Err(format!(
+                "Diese .dhc stammt aus dhrt {}, diese Laufzeit ist {} -- die Quelle mit dieser Fassung neu uebersetzen",
+                f.trim_end_matches(".0"), eigen.trim_end_matches(".0")));
+        }
+    }
     let n_globals = obj.get("n_globals").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
     let global_names: Vec<String> = obj.get("global_names").and_then(|v| v.as_array())
         .map(|a| a.iter().map(|x| x.as_str().unwrap_or("").to_string()).collect())

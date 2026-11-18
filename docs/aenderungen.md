@@ -7,6 +7,31 @@ sich ändern darf, sagt [Stabilität](stabilitaet.md).
 *Erzeugt mit `dhrt doku aenderungen` aus `docs/releases/`; Änderungen gehören
 in die Notizen, nicht hierher.*
 
+## 2026.52
+
+* **Meldungen in der Sprache des Systems.** Ohne `DHRT_LANG` schreibt dhrt
+  seine Meldungen auf einem deutschen System deutsch, auf jedem anderen
+  englisch (vorher immer deutsch). Was ein Programm in einer
+  `CATCH`-Variable sieht, bleibt deutsch. Wer Ausgaben vergleicht, setzt
+  `DHRT_LANG=de`.
+* **IDE und Studio folgen ohne Einstellung ebenfalls dem System.** Auf einem
+  englischen Windows starten sie englisch; in der IDE stellt Ansicht →
+  „Sprache: Deutsch“ beim nächsten Start um, das Studio folgt der Einstellung
+  der IDE.
+* **`dhrt --export` nimmt von selbst die kleinste passende Laufzeit**
+  (vorher nur mit `--schlank`, das weiter geht). `--voll` nimmt die ganze --
+  etwa für ein Programm, das mit `IMPORT … OPTIONAL` und `MODULE_AVAILABLE`
+  zur Laufzeit nachsieht, was der Bau kann.
+* **Eine `.dhc` aus einer anderen Fassung wird abgewiesen** („Diese .dhc
+  stammt aus dhrt …“), statt still anders zu laufen. Eine ohne Fassung
+  (vor 2026.52 übersetzt) läuft wie bisher.
+* **`DIRLIST(pfad, "")`** liefert alle Einträge (vorher keinen).
+* **Die Signaturen nennen englische Parameternamen** (`color` statt
+  `farbe`) -- im Hover, in der Vervollständigung und in den Handbüchern.
+  Parameter mit Vorgabe stehen nicht mehr im Gerüst der Vervollständigung.
+
+[Alle Notizen zu 2026.52](releases/release-2026.52.md)
+
 ## 2026.51
 
 * **Neue Warnung: anders geschrieben als angelegt.** Wer `CONST CW` anlegt

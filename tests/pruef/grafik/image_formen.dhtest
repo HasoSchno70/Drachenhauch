@@ -105,11 +105,21 @@ DIM k AS IMAGE : k = IMAGE_NEW(4, 4)
 DIM s AS IMAGE : s = IMAGE_NEW(4, 4, &HFFFFFF)
 IMAGE_DRAW_IMAGE(k, s, 2, 2, &HFF0000)
 PRINT HEX$(GETPIXEL(k, 3, 3)); " "; GETALPHA(k, 3, 3); " "; GETALPHA(k, 1, 1)
+' Benannt: tint allein -- qb/qh fuellen mit -1 (bis zum Rand). Und ein
+' Ausschnitt ab qx = 2 bis zum Rand ist 2 Pixel breit.
+DIM m AS IMAGE : m = IMAGE_NEW(4, 4)
+IMAGE_DRAW_IMAGE(m, s, 0, 0, tint: &H00FF00)
+PRINT HEX$(GETPIXEL(m, 3, 3))
+DIM r AS IMAGE : r = IMAGE_NEW(4, 4)
+IMAGE_DRAW_IMAGE(r, s, 0, 0, qx: 2, qy: 0, qb: -1, qh: -1)
+PRINT GETALPHA(r, 1, 0); " "; GETALPHA(r, 2, 0)
 --- umgebung
 DHRT_FRAMES=2
 --- erwartet
 255 105
 FF0000 255 0
+FF00
+255 0
 
 === vieleck braucht gleich lange felder
 IMPORT "imgfx"

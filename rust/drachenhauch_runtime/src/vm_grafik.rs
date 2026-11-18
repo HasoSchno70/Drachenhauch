@@ -483,9 +483,10 @@ impl<'p> Vm<'p> {
             }
             "triangleoutline" => {
                 let c = if a.len() >= 7 { gi(a, 6, "TRIANGLEOUTLINE")? } else { 0xFFFFFF };
+                let breite = if a.len() >= 8 { Some(need_f(a, 7, "TRIANGLEOUTLINE")?) } else { None };
                 g!().triangle_outline(gi(a,0,"TRIANGLEOUTLINE")? as i32, gi(a,1,"TRIANGLEOUTLINE")? as i32,
                     gi(a,2,"TRIANGLEOUTLINE")? as i32, gi(a,3,"TRIANGLEOUTLINE")? as i32,
-                    gi(a,4,"TRIANGLEOUTLINE")? as i32, gi(a,5,"TRIANGLEOUTLINE")? as i32, c); Value::Nil
+                    gi(a,4,"TRIANGLEOUTLINE")? as i32, gi(a,5,"TRIANGLEOUTLINE")? as i32, c, breite); Value::Nil
             }
             "ellipse" => {
                 let c = if a.len() == 5 { gi(a, 4, "ELLIPSE")? } else { 0xFFFFFF };
@@ -493,7 +494,8 @@ impl<'p> Vm<'p> {
             }
             "ellipseoutline" => {
                 let c = if a.len() >= 5 { gi(a, 4, "ELLIPSEOUTLINE")? } else { 0xFFFFFF };
-                g!().ellipse_outline(gi(a,0,"ELLIPSEOUTLINE")? as i32, gi(a,1,"ELLIPSEOUTLINE")? as i32, gi(a,2,"ELLIPSEOUTLINE")? as i32, gi(a,3,"ELLIPSEOUTLINE")? as i32, c); Value::Nil
+                let breite = if a.len() >= 6 { Some(need_f(a, 5, "ELLIPSEOUTLINE")?) } else { None };
+                g!().ellipse_outline(gi(a,0,"ELLIPSEOUTLINE")? as i32, gi(a,1,"ELLIPSEOUTLINE")? as i32, gi(a,2,"ELLIPSEOUTLINE")? as i32, gi(a,3,"ELLIPSEOUTLINE")? as i32, c, breite); Value::Nil
             }
             "arc" => {
                 let start = match a.get(4) { Some(Value::Int(n)) => *n as f64, Some(Value::Float(f)) => *f, _ => return Err("ARC: start muss Zahl sein".into()) };
@@ -595,7 +597,13 @@ impl<'p> Vm<'p> {
                     _ => return Err("POLYGON: Punkte muessen ein ARRAY OF INTEGER sein".into()),
                 };
                 let c = if a.len() >= 2 { gi(a, 1, "POLYGON")? } else { 0xFFFFFF };
-                g!().polygon(&pts, c, filled)?; Value::Nil
+                if filled {
+                    g!().polygon(&pts, c, true)?;
+                } else {
+                    let breite = if a.len() >= 3 { Some(need_f(a, 2, "POLYGONOUTLINE")?) } else { None };
+                    g!().polygon_outline(&pts, c, breite)?;
+                }
+                Value::Nil
             }
             "text" => {
                 let c = if a.len() == 4 { gi(a, 3, "TEXT")? } else { 0xFFFFFF };
