@@ -28,7 +28,7 @@ return — whoever is told that `COM5` has appeared opens `COM5`.
 | `HOTPLUG_KIND$()` → STRING | kind of the fetched report, such as `"serial"` |
 | `HOTPLUG_NAME$()` → STRING | name of the device |
 | `HOTPLUG_ADDED()` → BOOLEAN | TRUE = plugged in, FALSE = unplugged |
-| `HOTPLUG_LIST(art$)` → ARRAY OF STRING | what of this kind is present right now, sorted |
+| `HOTPLUG_LIST(kind$)` → ARRAY OF STRING | what of this kind is present right now, sorted |
 | `HOTPLUG_KINDS()` → ARRAY OF STRING | which kinds this build watches |
 | `HOTPLUG_INTERVAL(ms)` | how often to look (100..10000, default 500) |
 

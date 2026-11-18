@@ -55,7 +55,7 @@ Sent to the broadcast address (`"255.255.255.255"` or the network's, such as
 | `OSC_OPEN([port [, bind$]])` → OSC | open a connection that listens on `port` (default 0 = a free one — enough for sending); `bind$` default `"0.0.0.0"` |
 | `OSC_CLOSE(osc)` | close the connection |
 | `OSC_PORT(osc)` → INTEGER | the port it listens on |
-| `OSC_SEND(osc, host$, port, adresse$, ...)` | send a message with any number of values; the address starts with `/` |
+| `OSC_SEND(osc, host$, port, address$, ...)` | send a message with any number of values; the address starts with `/` |
 | `OSC_NEXT(osc)` → BOOLEAN | fetch the next arrived message; FALSE if there is none. Never waits |
 | `OSC_ADDRESS$(osc)` → STRING | address of the fetched message |
 | `OSC_TYPES$(osc)` → STRING | its type tags, e.g. `"fis"` |
@@ -63,7 +63,7 @@ Sent to the broadcast address (`"255.255.255.255"` or the network's, such as
 | `OSC_ARG(osc, index)` | value number `index` (from 0) — as INTEGER, FLOAT, STRING, BOOLEAN, BUFFER or NIL |
 | `OSC_SENDER$(osc)` → STRING | the address it came from |
 | `OSC_SENDER_PORT(osc)` → INTEGER | the port it came from — a reply goes there |
-| `OSC_MATCH(muster$, adresse$)` → BOOLEAN | does the address match an OSC pattern? Per part: `?` one character, `*` any number, `[1-4]`/`[!a-z]` one out of a set, `{red,green}` one of the alternatives |
+| `OSC_MATCH(pattern$, address$)` → BOOLEAN | does the address match an OSC pattern? Per part: `?` one character, `*` any number, `[1-4]`/`[!a-z]` one out of a set, `{red,green}` one of the alternatives |
 
 A packet that is not OSC is skipped silently; at most 4096 waiting messages
 are kept (the oldest are dropped).

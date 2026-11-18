@@ -164,6 +164,57 @@ rueckgabe 1
 erfundener befehl gemeldet TRUE
 print nicht gemeldet TRUE
 
+=== parameternamen in befehlstabellen wie im index
+' Seit Builtins benannte Argumente nehmen, sind die Namen Schnittstelle: eine
+' Tabelle mit `farbe`, wo der Compiler `color` erwartet, fuehrte in einen
+' Compile-Fehler.
+IMPORT "helfer.dh"
+CHDIR(ARG$(0))
+dlStarten(["pruef", "parameter"])
+IF dlCode <> 0 THEN PRINT dlAus; dlErr
+PRINT "docs: rueckgabe "; dlCode
+dlStarten(["pruef", "parameter", "docs/en"])
+IF dlCode <> 0 THEN PRINT dlAus; dlErr
+PRINT "docs/en: rueckgabe "; dlCode
+--- argumente
+{sammlung}/../../..
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
+--- erwartet
+docs: rueckgabe 0
+docs/en: rueckgabe 0
+
+=== die parameterpruefung schlaegt an
+' Gegenprobe: ein falscher Name faellt auf, ein richtiger nicht, ebenso wenig
+' eine Zeile mit Werten statt Namen oder der Leser `GUI_TOOLTIP$` neben dem
+' Setzer `GUI_TOOLTIP`. Ein Umlaut im Namen faellt auf: so einen Namen kann
+' niemand als `name:` schreiben.
+IMPORT "helfer.dh"
+DIM fall AS STRING : fall = CWD$()
+MKDIR("probe")
+DIM nl AS STRING : nl = CHR$(10)
+WRITEALL("probe/probe.md", "| Befehl | Was |" + nl + "|---|---|" + nl + "| `CIRCLE(x, y, radius)` | falsch |" + nl + "| `ABS(v)` | richtig |" + nl + "| `MID$(" + CHR$(34) + "abc" + CHR$(34) + ", 1)` | Werte |" + nl + "| `GUI_TOOLTIP$(widget)` | Leser |" + nl + "| `STARTSWITH(s, pr" + CHR$(228) + "fix)` | Umlaut |" + nl)
+CHDIR(ARG$(0))
+dlStarten(["pruef", "parameter", fall + "/probe"])
+DIM alles AS STRING : alles = dlAus + dlErr
+PRINT "rueckgabe "; dlCode
+PRINT "circle gemeldet "; (INSTR(alles, "CIRCLE(x, y, radius)") >= 0)
+PRINT "richtiger name gemeldet "; (INSTR(alles, "ABS(v)") >= 0)
+PRINT "werte gemeldet "; (INSTR(alles, "MID$") >= 0)
+PRINT "leser gemeldet "; (INSTR(alles, "GUI_TOOLTIP$") >= 0)
+PRINT "umlaut gemeldet "; (INSTR(alles, "STARTSWITH") >= 0)
+--- argumente
+{sammlung}/../../..
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
+--- erwartet
+rueckgabe 1
+circle gemeldet TRUE
+richtiger name gemeldet FALSE
+werte gemeldet FALSE
+leser gemeldet FALSE
+umlaut gemeldet TRUE
+
 === zaehlungen und tastenkonstanten stimmen
 ' "39 Module", "183 Beispiele" -- Zahlen veralten beim naechsten Commit. Und
 ' die Liste der Tastenkonstanten gab sich als vollstaendig aus und war es nie.

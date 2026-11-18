@@ -35,7 +35,7 @@ WEND
 | Command | What it does |
 |---|---|
 | `MIC_DEVICES()` → ARRAY OF STRING | the names of all inputs, the default first; empty if the computer has none |
-| `MIC_START([geraet$])` | open an input — without a name the default. A name matches exactly or as a part, ignoring case (`"USB"` finds "Microphone (USB Audio Device)"); an unknown one is an error that lists the available ones. A running input is closed first |
+| `MIC_START([device$])` | open an input — without a name the default. A name matches exactly or as a part, ignoring case (`"USB"` finds "Microphone (USB Audio Device)"); an unknown one is an error that lists the available ones. A running input is closed first |
 | `MIC_STOP()` | close the input; a running recording is dropped |
 | `MIC_ACTIVE()` → BOOLEAN | is an input running (and has it not reported an error)? |
 | `MIC_ERROR$()` → STRING | the error the device reported (unplugged, refused) — otherwise `""` |
@@ -53,8 +53,8 @@ silent zero could not be told apart from "it is quiet".
 | `MIC_LEVEL()` → FLOAT | highest peak since the last call, 0 to 1 — asked once per frame, that is a level meter that misses no click |
 | `MIC_RMS()` → FLOAT | RMS of the last 50 ms — what you hear as loudness (a sine with peak 1 has 0.707) |
 | `MIC_PITCH()` → FLOAT | fundamental in Hz, 50 to 2000; 0 if it is quiet or no tone stands out (noise, speech between two syllables) |
-| `MIC_FFT(baender)` | fills an `ARRAY OF FLOAT` with band levels 0..1, spread logarithmically, with afterglow and its own gain — the same calculation as `AUDIO_FFT`, but from the input |
-| `MIC_WAVE(werte)` | fills an `ARRAY OF FLOAT` with the most recent values (-1..1), oldest first; at most 8192 |
+| `MIC_FFT(bands)` | fills an `ARRAY OF FLOAT` with band levels 0..1, spread logarithmically, with afterglow and its own gain — the same calculation as `AUDIO_FFT`, but from the input |
+| `MIC_WAVE(values)` | fills an `ARRAY OF FLOAT` with the most recent values (-1..1), oldest first; at most 8192 |
 
 `MIC_PITCH` uses the YIN method and also finds the fundamental of tones with
 many overtones (guitar, voice, sawtooth). The frequency becomes a note name
@@ -82,10 +82,10 @@ WEND
 
 | Command | What it does |
 |---|---|
-| `MIC_RECORD_START([max_sekunden])` | record from now on, at most `max_sekunden` (default 600, at most 3600); a running recording starts over |
+| `MIC_RECORD_START([max_seconds])` | record from now on, at most `max_seconds` (default 600, at most 3600); a running recording starts over |
 | `MIC_RECORDING()` → BOOLEAN | is a recording running? |
 | `MIC_RECORD_STOP()` → SOUND | end the recording and return it as a sound — play it, mix it, save it with `AUDIO_SAVE_WAV`. Needs sound output |
-| `MIC_RECORD_SAVE(pfad$)` → INTEGER | end the recording and save it as WAV (16 bit, one channel); returns the number of values. Works without sound output too |
+| `MIC_RECORD_SAVE(path$)` → INTEGER | end the recording and save it as WAV (16 bit, one channel); returns the number of values. Works without sound output too |
 
 ```basic
 IMPORT "audio"

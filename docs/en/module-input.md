@@ -12,14 +12,14 @@ IMPORT "input"
 
 | Function | Returns | Effect |
 |---|---|---|
-| `INPUT_BIND(action, key1, [key2], ...)` | — | action → key list (mixes keyboard + gamepad codes) |
+| `INPUT_BIND(action$, key, ...)` | — | action → key list (mixes keyboard + gamepad codes) |
 | `INPUT_UNBIND(action)` | — | delete an action |
 | `INPUT_RESET()` | — | clear all bindings + state |
 | `INPUT_UPDATE()` | — | frame snapshot (required every frame, also polls gamepads) |
 | `INPUT_HELD(action)` | BOOLEAN | currently pressed |
 | `INPUT_PRESSED(action)` | BOOLEAN | edge: pressed RIGHT NOW |
 | `INPUT_RELEASED(action)` | BOOLEAN | edge: just released |
-| `INPUT_AXIS(neg, pos)` | INTEGER | `-1 / 0 / 1` as a virtual axis |
+| `INPUT_AXIS(neg_action, pos_action)` | INTEGER | `-1 / 0 / 1` as a virtual axis |
 | `INPUT_BOUND(action)` | BOOLEAN | is the action registered? |
 
 ### Gamepad / joystick
@@ -27,8 +27,8 @@ IMPORT "input"
 | Function | Returns | Effect |
 |---|---|---|
 | `INPUT_JOY_COUNT()` | INTEGER | number of connected pads |
-| `INPUT_JOY_NAME(slot)` | STRING | pad name (e.g. "Xbox Wireless Controller") |
-| `INPUT_JOY_AXIS(slot, axis_name$)` | FLOAT | -1.0..+1.0 with dead zone |
+| `INPUT_JOY_NAME(idx)` | STRING | pad name (e.g. "Xbox Wireless Controller") |
+| `INPUT_JOY_AXIS(pad_idx, axis_name$)` | FLOAT | -1.0..+1.0 with dead zone |
 
 **Gamepad constants** (case-insensitive, like `KEY_*`):
 

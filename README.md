@@ -209,7 +209,7 @@ Three shorter books build one finished program each, chapter by chapter:
 
 Full documentation lives in [docs/en/](docs/en/README.md) — the English translation of the German manual in [docs/](docs/README.md). Design notes, audits and release notes stay German only:
 
-- **[Language reference](docs/en/sprache.md)** — variables, types, `ENUM`, `SELECT CASE`, functions with defaults and named arguments, classes, try/catch, f-strings, coroutines (`YIELD` + `CORO_*`)
+- **[Language reference](docs/en/sprache.md)** — variables, types, `ENUM`, `SELECT CASE`, functions with defaults and named arguments (built-in commands too: `CIRCLE(x: 10, y: 20, r: 5)`), classes, try/catch, f-strings, coroutines (`YIELD` + `CORO_*`)
 - **[Command names](docs/en/builtins-namen.md)** — how commands are named (`IMAGE_LOAD`, `KEY_DOWN`, `FILE_EXISTS`, `TIME_NOW` …), the recommended way per area, and the new names for the old ones; the old ones keep working
 - **[Standard built-ins](docs/en/builtins-core.md)** — math, strings, maps, file I/O, …
 - **[Graphics built-ins](docs/en/builtins-grafik.md)** — native runtime (dhrt/raylib), Z-layers, sprite atlas, asset preloader
@@ -372,7 +372,7 @@ Built with `rust/build_wasm.py`; the harness lives in `web/`.
 | `49_pong_scene.dh` | Pong, structured with `scene` + `save` (highscore) |
 | `50_enum.dh` | ENUM in compact and block form |
 | `51_astar.dh` | A* pathfinding with an ASCII render |
-| `52_named_args.dh` | named arguments in SUB/FUNCTION/NEW |
+| `52_named_args.dh` | named arguments in SUB/FUNCTION/NEW and built-in commands |
 | `73_ecs_bullets.dh` | ECS with a per-entity loop (classic pattern) |
 | `75_preloader.dh` | `LOAD_ASSETS` — every image/sound from one manifest |
 | `76_layers_atlas.dh` | Z-layers + sprite atlas: 600 tiles from one atlas, composited in z-order |

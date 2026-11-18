@@ -35,9 +35,9 @@ und wer die Sprache kennt, kennt damit auch dieses Modul.
 | Funktion | Zweck |
 |---|---|
 | `INI_PARSE(text$)` → MAP OF STRING | aus einer Zeichenkette |
-| `INI_LOAD(pfad$[, kodierung$])` → MAP OF STRING | aus einer Datei |
+| `INI_LOAD(path$[, encoding$])` → MAP OF STRING | aus einer Datei |
 | `INI_TEXT$(m)` → STRING | zurück in INI-Text |
-| `INI_SAVE(pfad$, m[, kodierung$])` | in eine Datei |
+| `INI_SAVE(path$, m[, encoding$])` | in eine Datei |
 
 ## Beispiel
 

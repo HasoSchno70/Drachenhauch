@@ -19,12 +19,12 @@ Es gibt zwei Sorten, beide mit demselben Handle-Typ `AUDIO_MOD`:
 
 | Funktion | Rückgabe | Bedeutung |
 |---|---|---|
-| `AUDIO_LFO_NEW(wellenform$, hz [, amplitude [, mitte]])` | AUDIO_MOD | schwingenden Modulator anlegen (`sine`, `triangle`, `saw`, `pulse`) |
-| `AUDIO_LFO_SET(mod [, hz [, amplitude [, mitte]]])` | — | Schwingung im Lauf ändern; weggelassene Werte bleiben |
-| `AUDIO_LFO_WAVEFORM(mod, wellenform$)` | — | Wellenform wechseln |
-| `AUDIO_TWEENER_NEW([startwert])` | AUDIO_MOD | Modulator, der auf Kommando zu einem Ziel fährt |
-| `AUDIO_TWEENER_TO(mod, ziel [, dauer_ms [, easing$]])` | — | dorthin fahren (`linear`, `in`, `out`, `inout`) |
-| `AUDIO_MODULATE(bus$, ziel$, mod, min, max)` | — | Modulator an einen Bus-Parameter binden; sein Bereich wird auf `min..max` abgebildet |
+| `AUDIO_LFO_NEW(waveform$, hz [, amplitude [, center]])` | AUDIO_MOD | schwingenden Modulator anlegen (`sine`, `triangle`, `saw`, `pulse`) |
+| `AUDIO_LFO_SET(mod [, hz [, amplitude [, center]]])` | — | Schwingung im Lauf ändern; weggelassene Werte bleiben |
+| `AUDIO_LFO_WAVEFORM(mod, waveform$)` | — | Wellenform wechseln |
+| `AUDIO_TWEENER_NEW([start_value])` | AUDIO_MOD | Modulator, der auf Kommando zu einem Ziel fährt |
+| `AUDIO_TWEENER_TO(mod, target [, duration_ms [, easing$]])` | — | dorthin fahren (`linear`, `in`, `out`, `inout`) |
+| `AUDIO_MODULATE(bus$, target$, mod, min, max)` | — | Modulator an einen Bus-Parameter binden; sein Bereich wird auf `min..max` abgebildet |
 | `AUDIO_MOD_REMOVE(mod)` | — | Modulator freigeben — der Parameter bleibt auf seinem letzten Wert stehen |
 
 ## LFO

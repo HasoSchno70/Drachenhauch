@@ -237,6 +237,22 @@ IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 klein geblieben TRUE
 
+=== fmt laesst ein schluesselwort als argumentname klein
+' `REPLACE$(s, old: "-", new: "+")`: das `new` ist der Name eines
+' benannten Arguments, kein NEW -- gross geschrieben laeuft es zwar, sieht
+' aber aus wie ein Objekt. Das echte NEW in derselben Datei wird gross.
+IMPORT "helfer.dh"
+WRITEALL("a.dh", !"CLASS K\nEND CLASS\nDIM k AS K = new K()\nPRINT REPLACE$(\"a-b\", old: \"-\", new: \"+\")\n")
+dlStarten(["fmt", CWD$() + "/a.dh"])
+DIM t AS STRING : t = dlText$("a.dh")
+PRINT "argumentname klein "; (INSTR(t, "new: ") >= 0)
+PRINT "befehl gross "; (INSTR(t, "= NEW K()") >= 0)
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
+--- erwartet
+argumentname klein TRUE
+befehl gross TRUE
+
 === fmt ruehrt die einrueckung erst mit dem flag an
 ' Die Vorgabe ist verlustfrei: sie ruehrt kein Layout an.
 IMPORT "helfer.dh"

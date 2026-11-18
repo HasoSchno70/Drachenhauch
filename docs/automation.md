@@ -17,9 +17,9 @@ Braucht ein Fenster (`SCREEN`) und die native Runtime `dhrt`.
 
 | Befehl | Wirkung |
 |---|---|
-| `AUTOMATION_RECORD(datei$)` | Aufnahme starten (eine laufende Wiedergabe endet dabei) |
+| `AUTOMATION_RECORD(file$)` | Aufnahme starten (eine laufende Wiedergabe endet dabei) |
 | `AUTOMATION_STOP()` → INTEGER | beendet Aufnahme **oder** Wiedergabe; schreibt die Aufnahme in ihre Datei und liefert die Anzahl der Ereignisse |
-| `AUTOMATION_PLAY(datei$)` → INTEGER | Aufnahme laden und ab dem nächsten Frame abspielen; liefert die Anzahl geladener Ereignisse |
+| `AUTOMATION_PLAY(file$)` → INTEGER | Aufnahme laden und ab dem nächsten Frame abspielen; liefert die Anzahl geladener Ereignisse |
 | `AUTOMATION_RECORDING()` → BOOLEAN | läuft gerade eine Aufnahme? |
 | `AUTOMATION_PLAYING()` → BOOLEAN | läuft gerade eine Wiedergabe? (wird nach dem letzten Ereignis von selbst FALSE) |
 | `AUTOMATION_FRAME()` → INTEGER | Frame-Nummer innerhalb der Wiedergabe (0 = erster) |

@@ -111,9 +111,9 @@ vor zehn Sekunden.
 
 | Funktion | Wirkung |
 |---|---|
-| `MIDI_NOTE_ON(h, kanal, note, anschlag)` | Note anschlagen |
-| `MIDI_NOTE_OFF(h, kanal, note)` | Note aus |
-| `MIDI_CC(h, kanal, nr, wert)` | Regler (z.B. 7 = Lautstärke) |
+| `MIDI_NOTE_ON(h, channel, note, velocity)` | Note anschlagen |
+| `MIDI_NOTE_OFF(h, channel, note)` | Note aus |
+| `MIDI_CC(h, channel, nr, value)` | Regler (z.B. 7 = Lautstärke) |
 | `MIDI_SEND(h, status, d1, d2)` | Rohe Nachricht, für alles Übrige |
 
 ```basic
@@ -162,7 +162,7 @@ Selbst die Uhr sein — für ein Gerät, das sich nach Drachenhauch richten soll
 | `MIDI_START(h)` | Start (FA): das Gerät beginnt von vorn |
 | `MIDI_STOP(h)` | Stopp (FC) |
 | `MIDI_CONTINUE(h)` | Weiter (FB): ab der Stelle, wo es stand |
-| `MIDI_SONG_POSITION(h, sechzehntel)` | an eine Stelle springen (0..16383 Sechzehntel) |
+| `MIDI_SONG_POSITION(h, sixteenths)` | an eine Stelle springen (0..16383 Sechzehntel) |
 
 Der Faden rechnet jeden Takt von einem festen Anfang aus, nicht vom vorigen —
 so summiert sich keine Verspätung auf. Bleibt der Rechner länger stehen als
@@ -176,23 +176,23 @@ sind schon eingerechnet) und in **Vierteln** (schreiben):
 
 | Funktion | Wirkung |
 |---|---|
-| `MIDI_FILE_LOAD(pfad$)` → MIDI_FILE | eine Datei lesen (Format 0, 1 und 2) |
-| `MIDI_FILE_NEW([ticks_je_viertel])` → MIDI_FILE | eine leere Datei (Vorgabe 480) |
-| `MIDI_FILE_SAVE(mf, pfad$)` | schreiben (Format 1) |
+| `MIDI_FILE_LOAD(path$)` → MIDI_FILE | eine Datei lesen (Format 0, 1 und 2) |
+| `MIDI_FILE_NEW([ticks_per_quarter])` → MIDI_FILE | eine leere Datei (Vorgabe 480) |
+| `MIDI_FILE_SAVE(mf, path$)` | schreiben (Format 1) |
 | `MIDI_FILE_FREE(mf)` | freigeben |
 | `MIDI_FILE_TRACKS(mf)` → INTEGER | Zahl der Spuren |
 | `MIDI_FILE_PPQ(mf)` → INTEGER | Ticks je Viertel; 0 bei einer Datei, die in SMPTE-Bildern zählt |
 | `MIDI_FILE_DURATION(mf)` → FLOAT | Länge in Sekunden |
 | `MIDI_FILE_TEMPO(mf)` → FLOAT | Tempo am Anfang (120 ohne Angabe) |
-| `MIDI_FILE_TRACK_NAME$(mf, spur)` → STRING | Name einer Spur |
+| `MIDI_FILE_TRACK_NAME$(mf, track)` → STRING | Name einer Spur |
 | `MIDI_FILE_NOTES(mf)` → INTEGER | Zahl der Noten (Note-an und Note-aus zusammengefasst) |
 | `MIDI_FILE_NOTE(mf, i)` → TUPLE | `(beginn, dauer, kanal, note, anschlag, spur)`, nach Beginn geordnet |
 | `MIDI_FILE_EVENTS(mf)` → INTEGER | Zahl der Kanalnachrichten über alle Spuren |
 | `MIDI_FILE_EVENT(mf, i)` → TUPLE | `(sekunde, spur, status, kanal, d1, d2)`, zeitlich geordnet; `status` wie `MIDI_STATUS` (144 = Note an) |
-| `MIDI_FILE_ADD_NOTE(mf, spur, kanal, note, anschlag, beginn, dauer)` | eine Note; Beginn und Dauer in Vierteln |
-| `MIDI_FILE_ADD_EVENT(mf, spur, zeitpunkt, status, d1 [, d2])` | eine andere Kanalnachricht (Programm 192, Regler 176, ...; Kanal im Statusbyte) |
-| `MIDI_FILE_SET_TEMPO(mf, bpm [, zeitpunkt])` | Tempo ab einem Zeitpunkt (Vorgabe 0) |
-| `MIDI_FILE_SET_TRACK_NAME(mf, spur, name$)` | eine Spur benennen |
+| `MIDI_FILE_ADD_NOTE(mf, track, channel, note, velocity, start, duration)` | eine Note; Beginn und Dauer in Vierteln |
+| `MIDI_FILE_ADD_EVENT(mf, track, time, status, d1 [, d2])` | eine andere Kanalnachricht (Programm 192, Regler 176, ...; Kanal im Statusbyte) |
+| `MIDI_FILE_SET_TEMPO(mf, bpm [, time])` | Tempo ab einem Zeitpunkt (Vorgabe 0) |
+| `MIDI_FILE_SET_TRACK_NAME(mf, track, name$)` | eine Spur benennen |
 
 Spuren werden beim ersten Gebrauch angelegt (0..127). Der Tempoverlauf steht in
 Spur 0, wie es die meisten Programme erwarten.
@@ -231,7 +231,7 @@ noch mit dem alten Programm.
 
 | Funktion | Wirkung |
 |---|---|
-| `MIDI_FILE_PLAY(h, mf [, ab_sekunde])` | die Datei an einem Ausgang abspielen, in einem eigenen Faden |
+| `MIDI_FILE_PLAY(h, mf [, from_second])` | die Datei an einem Ausgang abspielen, in einem eigenen Faden |
 | `MIDI_FILE_STOP(h)` | anhalten; noch klingende Noten gehen aus |
 | `MIDI_FILE_PLAYING(h)` → BOOLEAN | läuft sie noch? |
 | `MIDI_FILE_POSITION(h)` → FLOAT | wo sie steht, in Sekunden |

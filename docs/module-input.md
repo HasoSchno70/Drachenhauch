@@ -12,14 +12,14 @@ IMPORT "input"
 
 | Funktion | Rueckgabe | Wirkung |
 |---|---|---|
-| `INPUT_BIND(action, key1, [key2], ...)` | — | Action → Key-Liste (mischt Tastatur + Gamepad-Codes) |
+| `INPUT_BIND(action$, key, ...)` | — | Action → Key-Liste (mischt Tastatur + Gamepad-Codes) |
 | `INPUT_UNBIND(action)` | — | Action loeschen |
 | `INPUT_RESET()` | — | Alle Bindings + State leeren |
 | `INPUT_UPDATE()` | — | Frame-Snapshot (Pflicht jeden Frame, pollt auch Gamepads) |
 | `INPUT_HELD(action)` | BOOLEAN | Aktuell gedrueckt |
 | `INPUT_PRESSED(action)` | BOOLEAN | Edge: gerade JETZT gedrueckt |
 | `INPUT_RELEASED(action)` | BOOLEAN | Edge: gerade losgelassen |
-| `INPUT_AXIS(neg, pos)` | INTEGER | `-1 / 0 / 1` als virtuelle Achse |
+| `INPUT_AXIS(neg_action, pos_action)` | INTEGER | `-1 / 0 / 1` als virtuelle Achse |
 | `INPUT_BOUND(action)` | BOOLEAN | Ist die Action registriert? |
 
 ### Gamepad / Joystick
@@ -27,8 +27,8 @@ IMPORT "input"
 | Funktion | Rueckgabe | Wirkung |
 |---|---|---|
 | `INPUT_JOY_COUNT()` | INTEGER | Anzahl angeschlossener Pads |
-| `INPUT_JOY_NAME(slot)` | STRING | Pad-Name (z.B. "Xbox Wireless Controller") |
-| `INPUT_JOY_AXIS(slot, axis_name$)` | FLOAT | -1.0..+1.0 mit Deadzone |
+| `INPUT_JOY_NAME(idx)` | STRING | Pad-Name (z.B. "Xbox Wireless Controller") |
+| `INPUT_JOY_AXIS(pad_idx, axis_name$)` | FLOAT | -1.0..+1.0 mit Deadzone |
 
 **Gamepad-Konstanten** (case-insensitive, wie `KEY_*`):
 

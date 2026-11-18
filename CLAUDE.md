@@ -76,9 +76,14 @@ Neuer Builtin:
    stimmen**, der Compiler leitet die erlaubte Argumentzahl daraus ab. Formen:
    `NAME(a, b [, c])`, `NAME(a, b = "")`, `NAME(a, b, ...)`,
    `NAME(6..8 Argumente)`; `NAME(*args)` schaltet die Prüfung ab (nur wenn es
-   wirklich offen ist). Parameter mit Namen, nicht "N..M Argumente".
+   wirklich offen ist). Parameter mit Namen, nicht "N..M Argumente" -- die
+   Namen sind englisch und Schnittstelle (benannte Argumente,
+   `CIRCLE(x: 1, y: 2, r: 3)`; Regel 8 in `docs/builtins-namen.md`), und ein
+   optionaler mit bekannter Vorgabe schreibt sie hin (`color = -1`), damit
+   ein später benannter ihn überspringen kann.
 3. Die Kurzbeschreibung kommt als Tabellenzeile ``| `NAME(args)` | was es tut |``
-   ins passende `docs/module-*.md` UND `docs/en/module-*.md`; `dhrt doku prosa`
+   ins passende `docs/module-*.md` UND `docs/en/module-*.md`, mit den
+   Parameternamen des Index (`dhrt pruef parameter`); `dhrt doku prosa`
    sammelt sie nach `daten/builtin_prosa.json` (und `.en.json`).
    `builtin_docs.json` ist für ausführlichere Texte und gewinnt, wo es einen
    Eintrag hat. Danach dhrt neu bauen (eingebettet).

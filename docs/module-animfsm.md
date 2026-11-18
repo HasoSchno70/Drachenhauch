@@ -70,7 +70,7 @@ SPRITE_DRAW(hero)
 | Builtin | Wirkung |
 |---|---|
 | `ANIM_FSM_LOAD(pfad$) AS ANIM_FSM` | `.dhanim` laden + validieren, im Default-State |
-| `ANIM_FSM_SETUP(fsm, sprite)` | Frame-Ranges aller States als Sprite-Animationen registrieren + Default spielen |
+| `ANIM_FSM_SETUP(fsm, sp)` | Frame-Ranges aller States als Sprite-Animationen registrieren + Default spielen |
 | `ANIM_FSM_UPDATE(fsm, sprite, dt_ms) AS BOOLEAN` | Animation voranschreiben, Transitions auswerten, bei Wechsel spielen. TRUE = State gewechselt |
 | `ANIM_FSM_FORCE(fsm, sprite, state$) AS BOOLEAN` | State erzwingen (ohne Bedingungen) — z.B. Reset/Respawn |
 | `ANIM_FSM_SET_BOOL/FLOAT/INT(fsm, name$, wert)` | Parameter setzen |

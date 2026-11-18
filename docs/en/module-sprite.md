@@ -22,7 +22,7 @@ IMPORT "sprite"
 | `SPRITE_IS_FINISHED(sp)` → BOOLEAN | has a PLAY_ONCE animation reached the end? |
 | `SPRITE_SET_FRAME(sp, idx)` | set the frame manually |
 | `SPRITE_GET_FRAME(sp)` → INTEGER | current frame |
-| `SPRITE_SET_FLIP(sp, flipX, flipY)` | mirroring |
+| `SPRITE_SET_FLIP(sp, fx, fy)` | mirroring |
 | `SPRITE_SET_SCALE(sp, sx, sy)` | scaling (purely visual) |
 | `SPRITE_TINT(sp, color)` | colour tint (RGB multiply) |
 | `SPRITE_TINT_CLEAR(sp)` | reset the tint |

@@ -17,19 +17,19 @@ IMPORT "ui"
 | `UI_PROGRESS(x, y, w, h, value, max[, fg, bg])` | — | read-only Fortschrittsbalken |
 | `UI_PANEL(x, y, w, h[, title$[, bg]])` | — | Container mit optionalem Titel |
 | `UI_TEXTFIELD(id$, x, y, w, h[, placeholder$])` | STRING | aktueller Eingabe-Text |
-| `UI_TEXTFIELD_SET(id$, value$)` | — | Wert programmatisch setzen |
+| `UI_TEXTFIELD_SET(id$, text$)` | — | Wert programmatisch setzen |
 | `UI_RADIO(id$, x, y, options[, default_idx])` | INTEGER | gewählter Index |
 | `UI_TABLE(id$, x, y, w, h, headers, cells[, cell_colors[, col_widths[, cell_bg_colors]]])` | INTEGER | Index der geklickten Zeile (-1 wenn keine) |
 | `UI_TABLE_SELECTED(id$)` | INTEGER | persistent selektierte Zeile (-1 wenn keine) |
 | `UI_TABLE_SET_SELECTED(id$, row)` | — | Selektion programmatisch setzen (-1 = keine) |
 | `UI_TABLE_HEADER_CLICK(id$)` | INTEGER | in diesem Frame geklickte Header-Spalte (-1) — Sortier-Hook |
-| `UI_WINDOW_BEGIN(id$, titel$, x, y, w, h)` | BOOLEAN | verschiebbares Fenster; FALSE wenn eingeklappt |
+| `UI_WINDOW_BEGIN(id$, title$, x, y, width, height)` | BOOLEAN | verschiebbares Fenster; FALSE wenn eingeklappt |
 | `UI_WINDOW_END()` | — | Fenster abschließen (immer paaren) |
 | `UI_END_FRAME()` | — | **Pflicht** am Ende jedes Frames vor `FLIP()` |
 | `UI_RESET()` | — | allen UI-State löschen + Theme/Metriken zurücksetzen |
-| `UI_THEME_SET(key$, farbe)` / `UI_THEME_GET(key$)` | — / INT | einzelne Theme-Farbe setzen/lesen |
+| `UI_THEME_SET(key$, color)` / `UI_THEME_GET(key$)` | — / INT | einzelne Theme-Farbe setzen/lesen |
 | `UI_THEME_PRESET(name$)` | — | Farbschema: dark/light/retro/contrast |
-| `UI_METRIC_SET(key$, wert)` / `UI_METRIC_GET(key$)` | — / INT | Layout-Größe setzen/lesen |
+| `UI_METRIC_SET(key$, value)` / `UI_METRIC_GET(key$)` | — / INT | Layout-Größe setzen/lesen |
 
 ## Konzept: Immediate-Mode
 

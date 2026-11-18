@@ -62,13 +62,13 @@ PRINT MDNS_ANNOUNCE("Wetterstation", "_http._tcp", 8080, "pfad=/")
 | Command | What it does |
 |---|---|
 | `MDNS_RESOLVE$(name$ [, ms])` → STRING | the IPv4 address of `name.local`, `""` if nobody answers within `ms` (default 1500) |
-| `MDNS_BROWSE(dienst$ [, ms])` → INTEGER | look for all services of this type that answer within `ms` (default 2000); returns how many. Missing details (port, address) are asked for |
+| `MDNS_BROWSE(service$ [, ms])` → INTEGER | look for all services of this type that answer within `ms` (default 2000); returns how many. Missing details (port, address) are asked for |
 | `MDNS_SERVICE_NAME$(index)` → STRING | name of a service found (from 0, sorted by name), e.g. `"Kueche"` |
 | `MDNS_SERVICE_HOST$(index)` → STRING | its computer name, e.g. `"kueche.local"` |
 | `MDNS_SERVICE_ADDRESS$(index)` → STRING | its IPv4 address |
 | `MDNS_SERVICE_PORT(index)` → INTEGER | its port |
-| `MDNS_SERVICE_TXT$(index, schluessel$)` → STRING | an entry of its TXT data (`pfad=/`), `""` if it has none |
-| `MDNS_ANNOUNCE(name$, dienst$, port [, txt$])` → STRING | announce a service of your own; returns the computer name it can be found under (`name.local`, lower case, spaces as `-`). `txt$` like `"pfad=/;version=2"`. Called again, further services are added |
+| `MDNS_SERVICE_TXT$(index, key$)` → STRING | an entry of its TXT data (`pfad=/`), `""` if it has none |
+| `MDNS_ANNOUNCE(name$, service$, port [, text$])` → STRING | announce a service of your own; returns the computer name it can be found under (`name.local`, lower case, spaces as `-`). `text$` like `"pfad=/;version=2"`. Called again, further services are added |
 | `MDNS_STOP()` | withdraw all announcements |
 
 `ms` lies between 50 and 30000. The questions go out again after 300 and

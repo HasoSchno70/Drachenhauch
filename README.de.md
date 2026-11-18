@@ -198,7 +198,7 @@ Drei kürzere Bücher bauen je ein fertiges Programm, Kapitel für Kapitel:
 
 Vollständige Doku im [docs/](docs/README.md)-Ordner:
 
-- **[Sprachreferenz](docs/sprache.md)** — Variablen, Typen, `ENUM`, `SELECT CASE`, Funktionen mit Defaults und Named Arguments, Klassen, Try/Catch, f-Strings, Escape-Folgen mit `!"…\n…"`, Coroutines (`YIELD` + `CORO_*`)
+- **[Sprachreferenz](docs/sprache.md)** — Variablen, Typen, `ENUM`, `SELECT CASE`, Funktionen mit Defaults und Named Arguments (auch an eingebauten Befehlen: `CIRCLE(x: 10, y: 20, r: 5)`), Klassen, Try/Catch, f-Strings, Escape-Folgen mit `!"…\n…"`, Coroutines (`YIELD` + `CORO_*`)
 - **[Standard-Built-ins](docs/builtins-core.md)** — Math, Strings, Maps, File-I/O, …
 - **[Grafik-Built-ins](docs/builtins-grafik.md)** — native Runtime (dhrt/raylib), Z-Layer, Sprite-Atlas, Asset-Preloader
 - **[Performance](docs/intern/PERFORMANCE.md)** — Bench-Zahlen + umgesetzte Optimierungen (Spec-Ops, IC, Typed Arrays, ECS Bulk-Ops, …)
@@ -360,7 +360,7 @@ Gebaut wird mit `rust/build_wasm.py`, das Gerüst liegt in `web/`.
 | `49_pong_scene.dh` | Pong, strukturiert mit `scene` + `save` (Highscore) |
 | `50_enum.dh` | ENUM in Compact- und Block-Form |
 | `51_astar.dh` | A*-Pathfinding mit ASCII-Render |
-| `52_named_args.dh` | Named Arguments in SUB/FUNCTION/NEW |
+| `52_named_args.dh` | Named Arguments in SUB/FUNCTION/NEW und eingebauten Befehlen |
 | `73_ecs_bullets.dh` | ECS mit pro-Entity-Loop (klassisches Pattern) |
 | `75_preloader.dh` | `LOAD_ASSETS` — alle Bilder/Sounds aus einem Manifest |
 | `76_layers_atlas.dh` | Z-Layer + Sprite-Atlas: 600 Tiles aus einem Atlas, in Z-Reihenfolge zusammengesetzt |

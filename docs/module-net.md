@@ -16,7 +16,7 @@ IMPORT "net"
 | `NET_LISTENER_PORT(lst)` | INTEGER | tatsaechlicher Port (nach LISTEN 0) |
 | `NET_TCP_ACCEPT(lst)` | NET_SOCKET \| NIL | non-blocking: NIL wenn niemand verbindet |
 | `NET_TCP_CONNECT(host, port)` | NET_SOCKET | Client-Verbindung (5s DNS-Timeout + 5s Connect-Timeout) |
-| `NET_SEND(sock, text)` | INTEGER | gesendete Bytes; statt Text geht auch ein `BUFFER` (rohe Bytes) |
+| `NET_SEND(sock, text_or_buffer)` | INTEGER | gesendete Bytes; statt Text geht auch ein `BUFFER` (rohe Bytes) |
 | `NET_RECV(sock, max_bytes)` | STRING | leer wenn nichts da (non-blocking) |
 | `NET_RECV_BYTES(sock, max_bytes)` | BUFFER | rohe Bytes ohne UTF-8-Dekodierung, leer wenn nichts da -- fuer Binaerprotokolle |
 | `NET_PEER_ADDR(sock)` | STRING | Remote-IP |
@@ -33,7 +33,7 @@ IMPORT "net"
 | `NET_UDP_BIND(port [, bind_addr$])` | NET_UDP | UDP-Socket auf Port binden. `bind_addr$` optional, Default alle IPv4-Interfaces; `"::"` bindet stattdessen IPv6 |
 | `NET_UDP_OPEN()` | NET_UDP | UDP-Socket ohne Bind (nur Senden) |
 | `NET_UDP_PORT(sock)` | INTEGER | gebundener Port (0 wenn OPEN) |
-| `NET_UDP_SEND(sock, host, port, text)` | INTEGER | gesendete Bytes; statt Text geht auch ein `BUFFER` (rohe Bytes) |
+| `NET_UDP_SEND(sock, host, port, text_or_buffer)` | INTEGER | gesendete Bytes; statt Text geht auch ein `BUFFER` (rohe Bytes) |
 | `NET_UDP_RECV(sock, max_bytes)` | STRING | leer wenn nichts da |
 | `NET_UDP_RECV_BYTES(sock, max_bytes)` | BUFFER | ein Datagramm als rohe Bytes, leer wenn nichts da -- fuer Spielstaende und Binaerprotokolle |
 | `NET_UDP_LAST_FROM(sock)` | STRING `"host:port"` | Absender des letzten RECV (leer vor dem ersten RECV) |

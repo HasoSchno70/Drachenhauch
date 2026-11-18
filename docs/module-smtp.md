@@ -37,16 +37,16 @@ SMTP_CLOSE(m)
 | Funktion | Zweck |
 |---|---|
 | `SMTP_NEW()` → SMTP | neue Nachricht |
-| `SMTP_SERVER(m, host$, port [, sicherheit$])` | wohin eingeliefert wird |
-| `SMTP_LOGIN(m, benutzer$, kennwort$)` | Anmeldung (weglassen = ohne) |
-| `SMTP_FROM(m, adresse$ [, name$])` | Absender |
-| `SMTP_TO(m, adresse$ [, name$])` | Empfänger — mehrfach aufrufbar |
-| `SMTP_CC(m, adresse$ [, name$])` | Kopie-Empfaenger (CC) |
-| `SMTP_BCC(m, adresse$)` | Blindkopie |
-| `SMTP_SUBJECT(m, betreff$)` | Betreffzeile setzen |
+| `SMTP_SERVER(m, host$, port [, security$])` | wohin eingeliefert wird |
+| `SMTP_LOGIN(m, user$, password$)` | Anmeldung (weglassen = ohne) |
+| `SMTP_FROM(m, address$ [, name$])` | Absender |
+| `SMTP_TO(m, address$ [, name$])` | Empfänger — mehrfach aufrufbar |
+| `SMTP_CC(m, address$ [, name$])` | Kopie-Empfaenger (CC) |
+| `SMTP_BCC(m, address$)` | Blindkopie |
+| `SMTP_SUBJECT(m, subject$)` | Betreffzeile setzen |
 | `SMTP_TEXT(m, text$)` | Nachricht als reiner Text |
 | `SMTP_HTML(m, html$)` | Nachricht als HTML |
-| `SMTP_ATTACH(m, pfad$ [, name$])` | Datei anhängen — mehrfach aufrufbar |
+| `SMTP_ATTACH(m, path$ [, name$])` | Datei anhängen — mehrfach aufrufbar |
 | `SMTP_TIMEOUT(m, ms)` | Frist je Schritt (Vorgabe 30 000) |
 | `SMTP_MESSAGE$(m)` → STRING | die fertige Nachricht, **ohne** zu senden |
 | `SMTP_SEND(m)` | abschicken |

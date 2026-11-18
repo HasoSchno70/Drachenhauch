@@ -128,7 +128,7 @@ NEXT
 --- datei helfer.dh
 IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
-Runtime error in p.dh:2: GUI_SCALE: the factor must be between 0.5 and 4.0 -- usage: GUI_SCALE(faktor)
+Runtime error in p.dh:2: GUI_SCALE: the factor must be between 0.5 and 4.0 -- usage: GUI_SCALE(factor)
 Runtime error in p.dh:2: GUI_TEXTAREA_SET: the widget is not a GUI_TEXTAREA
 Runtime error in p.dh:2: GUI_TABLE_SORT: widget is not a table
 p.dh:1: Parse error (13): There is no PRINT USING -- PRINT FORMAT$(value, "%6.2f") or f"{value:.2f}"

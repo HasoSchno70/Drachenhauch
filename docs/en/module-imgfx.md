@@ -10,29 +10,29 @@ IMPORT "imgfx"
 
 | Function | Returns |
 |---|---|
-| `IMAGE_SCALE(img, w, h [, filter$])` | IMAGE (new, in `w × h`) — **bilinearly smoothed**; with `filter$` (`lanczos`, `bicubic`, `box`, `hamming`, `linear`) computed like Pillow's `Image.resize`, number for number |
-| `IMAGE_SCALE_NN(img, w, h)` | IMAGE (new, in `w × h`) — **without interpolation** (nearest neighbour), for pixel art |
-| `IMAGE_ROTATE(img, grad)` | IMAGE (new, bounding box grows if needed) — **resamples**, see below |
-| `IMAGE_ROTATE_CW(img)` | IMAGE (new, rotated 90° clockwise) — **exact**, `w × h` → `h × w` |
-| `IMAGE_ROTATE_CCW(img)` | IMAGE (new, rotated 90° counter-clockwise) — **exact** |
-| `IMAGE_FLIP(img, flipX, flipY)` | IMAGE (new, mirrored) |
-| `IMAGE_TINT(img, color)` | IMAGE (new, RGB-multiplied) |
-| `IMAGE_COPY(img)` | IMAGE (deep clone) |
+| `IMAGE_SCALE(image, w, h [, filter$])` | IMAGE (new, in `w × h`) — **bilinearly smoothed**; with `filter$` (`lanczos`, `bicubic`, `box`, `hamming`, `linear`) computed like Pillow's `Image.resize`, number for number |
+| `IMAGE_SCALE_NN(image, w, h)` | IMAGE (new, in `w × h`) — **without interpolation** (nearest neighbour), for pixel art |
+| `IMAGE_ROTATE(image, degrees)` | IMAGE (new, bounding box grows if needed) — **resamples**, see below |
+| `IMAGE_ROTATE_CW(image)` | IMAGE (new, rotated 90° clockwise) — **exact**, `w × h` → `h × w` |
+| `IMAGE_ROTATE_CCW(image)` | IMAGE (new, rotated 90° counter-clockwise) — **exact** |
+| `IMAGE_FLIP(image, flip_x, flip_y)` | IMAGE (new, mirrored) |
+| `IMAGE_TINT(image, color)` | IMAGE (new, RGB-multiplied) |
+| `IMAGE_COPY(image)` | IMAGE (deep clone) |
 
 ### More filters (also return a new IMAGE)
 
 | Function | Returns / effect |
 |---|---|
-| `IMAGE_CROP(img, x, y, w, h)` | IMAGE (new, section `w × h` starting at `x,y`) |
-| `IMAGE_RESIZE_CANVAS(img, w, h, offx, offy[, fill])` | IMAGE (new): image on a canvas `w × h` at offset `offx,offy`; free area filled with `fill` (default black) |
-| `IMAGE_BLUR(img, radius)` | IMAGE (new, Gaussian blur, `radius` in px) |
-| `IMAGE_BRIGHTNESS(img, n)` | IMAGE (new): brightness, `n` = `-255..255` |
-| `IMAGE_CONTRAST(img, n)` | IMAGE (new): contrast, `n` = `-100..100` |
-| `IMAGE_ENHANCE(img, art$, faktor)` | IMAGE (new): `brightness`, `contrast` or `saturation` like Pillow's `ImageEnhance` — `1.0` leaves the image, `0.0` gives black, grey (the mean) or greyscale, above `1.0` amplifies; opacity is kept |
-| `IMAGE_GRAYSCALE(img)` | IMAGE (new, in greyscale) |
-| `IMAGE_INVERT(img)` | IMAGE (new, colours inverted) |
-| `IMAGE_REPLACE_COLOR(img, from, to)` | IMAGE (new): replaces **exactly** the colour `from` with `to` |
-| `IMAGE_COLOR_TO_ALPHA(img, farbe [, schwelle])` | IMAGE (new): makes a background colour transparent like “Color to Alpha” in GIMP -- mixtures become semi-transparent and are unmixed, a glow stays soft; `schwelle` (threshold, 0..1) removes faint remnants completely. For cutting out logos and sprites in front of a plain background |
+| `IMAGE_CROP(image, x, y, w, h)` | IMAGE (new, section `w × h` starting at `x,y`) |
+| `IMAGE_RESIZE_CANVAS(image, w, h, offx, offy[, fill])` | IMAGE (new): image on a canvas `w × h` at offset `offx,offy`; free area filled with `fill` (default black) |
+| `IMAGE_BLUR(image, radius)` | IMAGE (new, Gaussian blur, `radius` in px) |
+| `IMAGE_BRIGHTNESS(image, n)` | IMAGE (new): brightness, `n` = `-255..255` |
+| `IMAGE_CONTRAST(image, n)` | IMAGE (new): contrast, `n` = `-100..100` |
+| `IMAGE_ENHANCE(image, kind$, factor)` | IMAGE (new): `brightness`, `contrast` or `saturation` like Pillow's `ImageEnhance` — `1.0` leaves the image, `0.0` gives black, grey (the mean) or greyscale, above `1.0` amplifies; opacity is kept |
+| `IMAGE_GRAYSCALE(image)` | IMAGE (new, in greyscale) |
+| `IMAGE_INVERT(image)` | IMAGE (new, colours inverted) |
+| `IMAGE_REPLACE_COLOR(image, from, to)` | IMAGE (new): replaces **exactly** the colour `from` with `to` |
+| `IMAGE_COLOR_TO_ALPHA(image, color [, threshold])` | IMAGE (new): makes a background colour transparent like “Color to Alpha” in GIMP -- mixtures become semi-transparent and are unmixed, a glow stays soft; `threshold` (threshold, 0..1) removes faint remnants completely. For cutting out logos and sprites in front of a plain background |
 
 ### Drawing into an image (MUTATING — changes the IMAGE passed in)
 
@@ -71,17 +71,17 @@ states side by side needs two images (`IMAGE_COPY`).
 
 | Function | Effect |
 |---|---|
-| `IMAGE_DRAW_LINE(img, x1, y1, x2, y2, color)` | line into the image |
-| `IMAGE_DRAW_CIRCLE(img, cx, cy, r, color)` | filled circle into the image |
-| `IMAGE_DRAW_RECT(img, x, y, w, h, color)` | filled rectangle into the image |
-| `IMAGE_DRAW_TEXT(img, x, y, text$, size, color[, font])` | text into the image; without `font` the built-in font as before, with `font` one loaded via `LOADFONT` or `LOADFONT_IMAGE` (blended correctly over a semi-transparent background like `IMAGE_DRAW_IMAGE`; an SDF font does not work) |
-| `IMAGE_TEXT(text$, groesse, farbe[, font])` | IMAGE — a new image exactly as large as the text (as wide as `TEXT_WIDTH` measures it), on a transparent background — for signs, labels on textures, billboards with text |
-| `IMAGE_ALPHA_MASK(bild, maske)` | IMAGE — take the opacity from a second image (soft edges) |
-| `IMAGE_ALPHA_CROP(bild, schwelle)` | IMAGE — cut away a transparent border; `schwelle` says from which opacity on a pixel counts |
-| `IMAGE_ALPHA_PREMULTIPLY(bild)` | IMAGE — premultiply the colour by the opacity; prevents dark fringes when scaling |
-| `IMAGE_DITHER(bild, r, g, b, a)` | IMAGE — reduce the colour depth and distribute the error. **Only 5,6,5,0 / 5,5,5,1 / 4,4,4,4** — anything else is rejected, because raylib would otherwise deliver an unusable format |
-| `IMAGE_PALETTE(bild, max)` | ARRAY OF INTEGER — the most frequent colours of the image |
-| `IMAGE_CHANNEL(bild, kanal)` | IMAGE — one channel (`0` red, `1` green, `2` blue, `3` opacity) as a greyscale image, for example to see and edit the opacity as a mask |
+| `IMAGE_DRAW_LINE(image, x1, y1, x2, y2, color)` | line into the image |
+| `IMAGE_DRAW_CIRCLE(image, cx, cy, r, color)` | filled circle into the image |
+| `IMAGE_DRAW_RECT(image, x, y, w, h, color)` | filled rectangle into the image |
+| `IMAGE_DRAW_TEXT(image, x, y, text$, size, color[, font])` | text into the image; without `font` the built-in font as before, with `font` one loaded via `LOADFONT` or `LOADFONT_IMAGE` (blended correctly over a semi-transparent background like `IMAGE_DRAW_IMAGE`; an SDF font does not work) |
+| `IMAGE_TEXT(text$, size, color[, font])` | IMAGE — a new image exactly as large as the text (as wide as `TEXT_WIDTH` measures it), on a transparent background — for signs, labels on textures, billboards with text |
+| `IMAGE_ALPHA_MASK(image, mask)` | IMAGE — take the opacity from a second image (soft edges) |
+| `IMAGE_ALPHA_CROP(image, threshold)` | IMAGE — cut away a transparent border; `threshold` says from which opacity on a pixel counts |
+| `IMAGE_ALPHA_PREMULTIPLY(image)` | IMAGE — premultiply the colour by the opacity; prevents dark fringes when scaling |
+| `IMAGE_DITHER(image, r, g, b, a)` | IMAGE — reduce the colour depth and distribute the error. **Only 5,6,5,0 / 5,5,5,1 / 4,4,4,4** — anything else is rejected, because raylib would otherwise deliver an unusable format |
+| `IMAGE_PALETTE(image, max)` | ARRAY OF INTEGER — the most frequent colours of the image |
+| `IMAGE_CHANNEL(image, channel)` | IMAGE — one channel (`0` red, `1` green, `2` blue, `3` opacity) as a greyscale image, for example to see and edit the opacity as a mask |
 
 ### Shapes with floating-point numbers and opacity
 
@@ -94,14 +94,14 @@ these eight are for (built for the tile generator of Circuit Runner,
 
 | Function | Effect |
 |---|---|
-| `IMAGE_FILL_RECT(bild, x0, y0, x1, y1, farbe [, deckkraft])` | rectangle from corner to corner, both bounds included |
-| `IMAGE_FRAME(bild, x0, y0, x1, y1, breite, farbe [, deckkraft])` | frame of width `breite`, drawn inwards |
-| `IMAGE_FILL_ROUNDRECT(bild, x0, y0, x1, y1, radius, farbe [, deckkraft])` | rectangle with rounded corners |
-| `IMAGE_FILL_ELLIPSE(bild, cx, cy, rx, ry, farbe [, deckkraft])` | filled ellipse around `cx, cy`; with `rx = ry` a circle |
-| `IMAGE_RING(bild, cx, cy, r, breite, farbe [, deckkraft])` | circular ring from radius `r` inwards |
-| `IMAGE_FILL_POLY(bild, xs, ys, farbe [, deckkraft])` | filled polygon from two arrays with the corner points, concave too |
-| `IMAGE_POLYLINE(bild, xs, ys, breite, farbe [, deckkraft])` | polyline of width `breite` with round joints |
-| `IMAGE_GRADIENT(bild, x0, y0, x1, y1, farbe1, farbe2 [, senkrecht [, deckkraft1, deckkraft2]])` | gradient in the rectangle, top to bottom by default; blends colour and opacity |
+| `IMAGE_FILL_RECT(image, x0, y0, x1, y1, color [, opacity])` | rectangle from corner to corner, both bounds included |
+| `IMAGE_FRAME(image, x0, y0, x1, y1, width, color [, opacity])` | frame of width `width`, drawn inwards |
+| `IMAGE_FILL_ROUNDRECT(image, x0, y0, x1, y1, radius, color [, opacity])` | rectangle with rounded corners |
+| `IMAGE_FILL_ELLIPSE(image, cx, cy, rx, ry, color [, opacity])` | filled ellipse around `cx, cy`; with `rx = ry` a circle |
+| `IMAGE_RING(image, cx, cy, r, width, color [, opacity])` | circular ring from radius `r` inwards |
+| `IMAGE_FILL_POLY(image, xs, ys, color [, opacity])` | filled polygon from two arrays with the corner points, concave too |
+| `IMAGE_POLYLINE(image, xs, ys, width, color [, opacity])` | polyline of width `width` with round joints |
+| `IMAGE_GRADIENT(image, x0, y0, x1, y1, color1, color2 [, vertical [, opacity1, opacity2]])` | gradient in the rectangle, top to bottom by default; blends colour and opacity |
 
 **Writing OVERWRITES, it does not blend.** A point gets exactly the colour
 and opacity the command names -- with `deckkraft` 0 you punch a hole into an
@@ -131,18 +131,18 @@ at all could be saved.
 
 | Function | Effect |
 |---|---|
-| `IMAGE_NEW(breite, hoehe [, farbe])` | IMAGE — a new image; **completely transparent without a colour** |
-| `IMAGE_CLEAR(bild [, x, y, b, h])` | make an area completely transparent — the eraser; without a rectangle the whole image |
-| `IMAGE_DRAW_IMAGE(ziel, quelle, x, y [, qx, qy, qb, qh] [, faerbung])` | draw one image into another, blended with opacity; optionally only a section of the source |
-| `IMAGE_SAVE(bild, pfad$ [, mit_alpha])` | write the image to a file (`.png`, `.bmp`, `.jpg`, `.tga`); with `FALSE` without an opacity channel (RGB) — print services reject a PNG with an alpha channel, even if every point is opaque. The opacity is simply left out, not blended in: anyone who wants a background lays the image onto an opaque one first |
-| `GETALPHA(bild, x, y)` | opacity of an image point, 0..255; `-1` outside (core, no IMPORT needed) |
-| `IMAGE_FREE(bild)` | release the image and its graphics-memory texture |
-| `IMAGE_FROM_BUFFER(puffer)` | IMAGE — an image from the bytes of an image file (PNG, JPG, BMP, GIF, QOI, DDS), for example from `HTTP_BYTES` or `BUFFER_FROM_BASE64`; the format is in the first bytes |
-| `IMAGE_TO_BUFFER(bild [, mit_alpha])` | BUFFER — the image as PNG bytes, without a detour through a file; with `FALSE` without an opacity channel as with `IMAGE_SAVE` |
-| `IMAGE_MIPMAPS(bild)` | INTEGER — create downscaled levels for the texture and filter trilinearly: a fine pattern on a distant 3D surface then no longer flickers. Returns the number of levels; after `IMAGE_DRAW_*` they are updated |
-| `IMAGE_SAVE_GIF(bilder, pfad$ [, fps_oder_dauern [, wiederholen [, anzahl]]])` | write several images as an **animated GIF** |
-| `IMAGE_LOAD_GIF(pfad$)` | ARRAY OF IMAGE — all frames of an animated GIF, already composed (even if a frame only renews a part); a file that is not a GIF yields a single image |
-| `IMAGE_GIF_DELAYS(pfad$)` | ARRAY OF INTEGER — the duration of each frame in milliseconds, in the same order; the counterpart of the array that `IMAGE_SAVE_GIF` takes (core, no window needed) |
+| `IMAGE_NEW(width, height [, color])` | IMAGE — a new image; **completely transparent without a colour** |
+| `IMAGE_CLEAR(image [, x, y, b, h])` | make an area completely transparent — the eraser; without a rectangle the whole image |
+| `IMAGE_DRAW_IMAGE(target, source, x, y [, qx, qy, qb, qh] [, tint])` | draw one image into another, blended with opacity; optionally only a section of the source |
+| `IMAGE_SAVE(image, path$ [, with_alpha])` | write the image to a file (`.png`, `.bmp`, `.jpg`, `.tga`); with `FALSE` without an opacity channel (RGB) — print services reject a PNG with an alpha channel, even if every point is opaque. The opacity is simply left out, not blended in: anyone who wants a background lays the image onto an opaque one first |
+| `GETALPHA(image, x, y)` | opacity of an image point, 0..255; `-1` outside (core, no IMPORT needed) |
+| `IMAGE_FREE(image)` | release the image and its graphics-memory texture |
+| `IMAGE_FROM_BUFFER(buffer)` | IMAGE — an image from the bytes of an image file (PNG, JPG, BMP, GIF, QOI, DDS), for example from `HTTP_BYTES` or `BUFFER_FROM_BASE64`; the format is in the first bytes |
+| `IMAGE_TO_BUFFER(image [, with_alpha])` | BUFFER — the image as PNG bytes, without a detour through a file; with `FALSE` without an opacity channel as with `IMAGE_SAVE` |
+| `IMAGE_MIPMAPS(image)` | INTEGER — create downscaled levels for the texture and filter trilinearly: a fine pattern on a distant 3D surface then no longer flickers. Returns the number of levels; after `IMAGE_DRAW_*` they are updated |
+| `IMAGE_SAVE_GIF(images, path$ [, fps_or_durations [, repeat [, count]]])` | write several images as an **animated GIF** |
+| `IMAGE_LOAD_GIF(path$)` | ARRAY OF IMAGE — all frames of an animated GIF, already composed (even if a frame only renews a part); a file that is not a GIF yields a single image |
+| `IMAGE_GIF_DELAYS(path$)` | ARRAY OF INTEGER — the duration of each frame in milliseconds, in the same order; the counterpart of the array that `IMAGE_SAVE_GIF` takes (core, no window needed) |
 
 ```basic
 IMPORT "imgfx"

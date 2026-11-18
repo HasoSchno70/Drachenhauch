@@ -23,14 +23,14 @@ On Windows this works with the built-in BT stack from Win 10 onwards — the Blu
 
 | Function | Returns | Meaning |
 |---|---|---|
-| `BT_SCAN(timeout_sek)` | STRING (multi-line `addr|name|rssi`), 0..300s | search for devices in range |
-| `BT_CONNECT(addr$)` | BT_HANDLE | establish a connection to a device |
+| `BT_SCAN(timeout_s)` | STRING (multi-line `addr|name|rssi`), 0..300s | search for devices in range |
+| `BT_CONNECT(address$)` | BT_HANDLE | establish a connection to a device |
 | `BT_DISCONNECT(handle)` | — | disconnect |
 | `BT_IS_CONNECTED(handle)` | BOOLEAN | is the connection still up? |
 | `BT_SERVICES(handle)` | STRING (multi-line UUIDs) | which services does the device offer? |
-| `BT_CHARACTERISTICS(handle, svc$)` | STRING (multi-line `uuid|properties`) | which characteristics does a service have -- and what can be done with them? |
+| `BT_CHARACTERISTICS(handle, svc_uuid$)` | STRING (multi-line `uuid|properties`) | which characteristics does a service have -- and what can be done with them? |
 | `BT_READ(handle, char_uuid$)` | STRING (bytes as latin-1) | read the value of a characteristic |
-| `BT_WRITE(handle, char_uuid$, daten$)` | — | write the value of a characteristic |
+| `BT_WRITE(handle, char_uuid$, payload$)` | — | write the value of a characteristic |
 
 ## Async/sync
 

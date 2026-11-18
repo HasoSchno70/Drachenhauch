@@ -26,27 +26,27 @@ PDF_SAVE(p, "rechnung.pdf")
 
 | Function | Purpose |
 |---|---|
-| `PDF_NEW([größe$[, ausrichtung$]])` → PDF | `a0`…`a6`, `letter`, `legal`; `hoch`/`quer` (portrait/landscape) |
+| `PDF_NEW([size$[, orientation$]])` → PDF | `a0`…`a6`, `letter`, `legal`; `hoch`/`quer` (portrait/landscape) |
 | `PDF_PAGE(p)` | start a new page -- `PDF_NEW` already creates the first one; while it is empty, `PDF_PAGE` does not add a second |
 | `PDF_PAGE_COUNT(p)` → INTEGER | how many so far |
 | `PDF_PAGE_WIDTH(p)` / `PDF_PAGE_HEIGHT(p)` → FLOAT | page size in mm |
-| `PDF_TITLE(p, titel$)` | title in the document information |
-| `PDF_FONT(p, schrift$, größe_pt)` | font and size |
-| `PDF_FONT_LOAD(p, pfad$, name$)` | load your own TrueType/OpenType font, afterwards available to `PDF_FONT` as `name$` |
-| `PDF_COLOR(p, farbe)` | `RGB(…)` — applies to text, strokes and fills |
-| `PDF_DASH(p, strich_mm[, luecke_mm])` | dashed for all following lines and outlines; without a gap as long as the dash, `PDF_DASH(p, 0)` solid again |
+| `PDF_TITLE(p, title$)` | title in the document information |
+| `PDF_FONT(p, font$, size_pt)` | font and size |
+| `PDF_FONT_LOAD(p, path$, name$)` | load your own TrueType/OpenType font, afterwards available to `PDF_FONT` as `name$` |
+| `PDF_COLOR(p, color)` | `RGB(…)` — applies to text, strokes and fills |
+| `PDF_DASH(p, dash_mm[, gap_mm])` | dashed for all following lines and outlines; without a gap as long as the dash, `PDF_DASH(p, 0)` solid again |
 | `PDF_LINE_WIDTH(p, mm)` | stroke width |
-| `PDF_TEXT(p, x, y, text$[, winkel])` | set text; `winkel` (angle) in degrees counter-clockwise, rotated about (x, y) |
+| `PDF_TEXT(p, x_mm, y_mm, text$[, angle])` | set text; `angle` (angle) in degrees counter-clockwise, rotated about (x, y) |
 | `PDF_TEXT_WIDTH(p, text$)` → FLOAT | width in mm, in the current font and size |
 | `PDF_LINE(p, x1, y1, x2, y2)` | draw a line |
-| `PDF_RECT(p, x, y, b, h)` / `PDF_RECT_FILL(…)` | outline / fill |
+| `PDF_RECT(p, x, y, width, height)` / `PDF_RECT_FILL(…)` | outline / fill |
 | `PDF_CIRCLE(p, x, y, r)` / `PDF_CIRCLE_FILL(…)` | circle around (x, y), outline / fill |
 | `PDF_POLYGON(p, xs, ys)` / `PDF_POLYGON_FILL(…)` | closed polygon from two arrays of equal length, at least three points |
-| `PDF_OPACITY(p, deckkraft)` / `PDF_GET_OPACITY(p)` → FLOAT | opacity 0..1 for everything that follows (watermarks) |
-| `PDF_IMAGE(p, bild, x, y, b[, h])` | place an image (`IMAGE`) in the rectangle, sizes in mm; without `h` by the aspect ratio |
-| `PDF_SAVE(p, pfad$)` | write |
-| `PDF_PRINT(p[, drucker$[, kopien[, zieldatei$]]])` | **print** — Windows via GDI, macOS/Linux via CUPS; see [Printing](#printing-and-preview) |
-| `PDF_PREVIEW(p, seite[, breite_px])` → IMAGE | the page as an image, for a preview in a window |
+| `PDF_OPACITY(p, opacity)` / `PDF_GET_OPACITY(p)` → FLOAT | opacity 0..1 for everything that follows (watermarks) |
+| `PDF_IMAGE(pdf, image, x, y, width[, height])` | place an image (`IMAGE`) in the rectangle, sizes in mm; without `h` by the aspect ratio |
+| `PDF_SAVE(p, path$)` | write |
+| `PDF_PRINT(p[, printer$[, copies[, target_file$]]])` | **print** — Windows via GDI, macOS/Linux via CUPS; see [Printing](#printing-and-preview) |
+| `PDF_PREVIEW(p, page[, width_px])` → IMAGE | the page as an image, for a preview in a window |
 | `PDF_CLOSE(p)` | free the memory |
 
 Font, size, colour, stroke width and opacity are settings of the

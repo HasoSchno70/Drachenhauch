@@ -23,14 +23,14 @@ Auf Windows funktioniert das mit dem eingebauten BT-Stack ab Win 10 — Bluetoot
 
 | Funktion | Rückgabe | Bedeutung |
 |---|---|---|
-| `BT_SCAN(timeout_sek)` | STRING (multi-line `addr|name|rssi`), 0..300s | nach Geraeten in Reichweite suchen |
-| `BT_CONNECT(addr$)` | BT_HANDLE | Verbindung zu einem Geraet aufbauen |
+| `BT_SCAN(timeout_s)` | STRING (multi-line `addr|name|rssi`), 0..300s | nach Geraeten in Reichweite suchen |
+| `BT_CONNECT(address$)` | BT_HANDLE | Verbindung zu einem Geraet aufbauen |
 | `BT_DISCONNECT(handle)` | — | Verbindung trennen |
 | `BT_IS_CONNECTED(handle)` | BOOLEAN | steht die Verbindung noch? |
 | `BT_SERVICES(handle)` | STRING (multi-line UUIDs) | welche Dienste bietet das Geraet an? |
-| `BT_CHARACTERISTICS(handle, svc$)` | STRING (multi-line `uuid|properties`) | welche Merkmale hat ein Dienst -- und was laesst sich damit tun? |
+| `BT_CHARACTERISTICS(handle, svc_uuid$)` | STRING (multi-line `uuid|properties`) | welche Merkmale hat ein Dienst -- und was laesst sich damit tun? |
 | `BT_READ(handle, char_uuid$)` | STRING (Bytes als latin-1) | Wert eines Merkmals lesen |
-| `BT_WRITE(handle, char_uuid$, daten$)` | — | Wert eines Merkmals schreiben |
+| `BT_WRITE(handle, char_uuid$, payload$)` | — | Wert eines Merkmals schreiben |
 
 ## Async/Sync
 

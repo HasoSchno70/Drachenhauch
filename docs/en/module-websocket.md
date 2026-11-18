@@ -68,7 +68,7 @@ WEND
 | `WS_PORT(server)` → INTEGER | the server's port (after port 0 the chosen one) |
 | `WS_ACCEPT(server)` → WEBSOCKET | accept a waiting connection, otherwise -1; never waits. A request that does not want a WebSocket gets 400 and does not count |
 | `WS_STOP(server)` | close the server (accepted connections stay) |
-| `WS_SEND(ws, daten)` → BOOLEAN | send a message: a text as a text message, a `BUFFER` as a binary one. FALSE if the connection is closed |
+| `WS_SEND(ws, data)` → BOOLEAN | send a message: a text as a text message, a `BUFFER` as a binary one. FALSE if the connection is closed |
 | `WS_NEXT(ws)` → BOOLEAN | fetch the next arrived message; FALSE if there is none |
 | `WS_MESSAGE$(ws)` → STRING | the fetched message as text |
 | `WS_MESSAGE_BYTES(ws)` → BUFFER | the fetched message as bytes |
@@ -78,7 +78,7 @@ WEND
 | `WS_PING(ws)` → BOOLEAN | send a ping (the other side answers by itself) |
 | `WS_PATH$(ws)` → STRING | the path a client connected with (`/room?x=1`) |
 | `WS_PEER$(ws)` → STRING | address and port of the other side |
-| `WS_CLOSE(ws [, code [, grund$]])` | close cleanly; code 1000 (default) normal, 1001 going away, 4000..4999 your own |
+| `WS_CLOSE(ws [, code [, reason$]])` | close cleanly; code 1000 (default) normal, 1001 going away, 4000..4999 your own |
 | `WS_CLOSE_CODE(ws)` → INTEGER | the code the connection closed with (1006 = broken off without goodbye), 0 while open |
 | `WS_CLOSE_REASON$(ws)` → STRING | the reason that came with it |
 

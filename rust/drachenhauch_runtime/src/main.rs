@@ -781,6 +781,10 @@ fn schluesselwoerter_gross(quelle: &str, toks: &[lexer::Token]) -> Vec<String> {
     for (i, t) in toks.iter().enumerate() {
         let kontext = declare.contains(&i);
         if !ist_schluesselwort(t.tt) && !kontext { continue; }
+        // Ein Schluesselwort als Name eines benannten Arguments
+        // (`REPLACE$(s, old: "-", new: "+")`) ist ein Name, kein Befehl.
+        if !kontext && i > 0 && toks.get(i + 1).map(|n| n.tt) == Some(lexer::Tt::Colon)
+            && matches!(toks[i - 1].tt, lexer::Tt::Lparen | lexer::Tt::Comma) { continue; }
         let Some(zeile) = zeilen.get_mut(t.line.saturating_sub(1)) else { continue };
         let start = t.col.saturating_sub(1);        // col ist 1-basiert
         // Das Wort an dieser Stelle abgreifen (Buchstaben/Ziffern/Unterstrich)

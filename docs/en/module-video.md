@@ -17,25 +17,25 @@ Nothing has to be installed on the user's machine.
 
 | Function | Effect |
 |---|---|
-| `VIDEO_LOAD(pfad$)` | open an MP4 file, returns a `VIDEO`; the first frame is in the image right away |
-| `VIDEO_PLAY(v)` | play; a video that has run to the end starts over |
-| `VIDEO_PAUSE(v)` | pause, the frame stays where it is |
-| `VIDEO_STOP(v)` | stop and go back to the start |
-| `VIDEO_SEEK(v, sekunden)` | jump to a position (clamped to the duration) |
-| `VIDEO_LOOP(v, an)` | start over at the end instead of stopping |
-| `VIDEO_UPDATE(v)` | advance the video's clock by `DELTA()` without drawing |
-| `VIDEO_DRAW(v, x, y [, breite, hoehe])` | advance and draw the current frame |
-| `VIDEO_PLAYING(v)` | is it playing right now? |
-| `VIDEO_DONE(v)` | has it (without looping) reached the end? |
-| `VIDEO_POSITION(v)` | position in seconds |
-| `VIDEO_DURATION(v)` | duration in seconds |
-| `VIDEO_WIDTH(v)` | width in pixels |
-| `VIDEO_HEIGHT(v)` | height in pixels |
-| `VIDEO_FRAMES(v)` | number of frames |
-| `VIDEO_FRAME(v)` | number of the frame currently in the `IMAGE` (from 0) |
-| `VIDEO_FPS(v)` | frames per second |
-| `VIDEO_IMAGE(v)` | the `IMAGE` that every new frame is written into |
-| `VIDEO_FREE(v)` | free the video and its image |
+| `VIDEO_LOAD(path$)` | open an MP4 file, returns a `VIDEO`; the first frame is in the image right away |
+| `VIDEO_PLAY(video)` | play; a video that has run to the end starts over |
+| `VIDEO_PAUSE(video)` | pause, the frame stays where it is |
+| `VIDEO_STOP(video)` | stop and go back to the start |
+| `VIDEO_SEEK(video, seconds)` | jump to a position (clamped to the duration) |
+| `VIDEO_LOOP(video, on)` | start over at the end instead of stopping |
+| `VIDEO_UPDATE(video)` | advance the video's clock by `DELTA()` without drawing |
+| `VIDEO_DRAW(video, x, y [, width, height])` | advance and draw the current frame |
+| `VIDEO_PLAYING(video)` | is it playing right now? |
+| `VIDEO_DONE(video)` | has it (without looping) reached the end? |
+| `VIDEO_POSITION(video)` | position in seconds |
+| `VIDEO_DURATION(video)` | duration in seconds |
+| `VIDEO_WIDTH(video)` | width in pixels |
+| `VIDEO_HEIGHT(video)` | height in pixels |
+| `VIDEO_FRAMES(video)` | number of frames |
+| `VIDEO_FRAME(video)` | number of the frame currently in the `IMAGE` (from 0) |
+| `VIDEO_FPS(video)` | frames per second |
+| `VIDEO_IMAGE(video)` | the `IMAGE` that every new frame is written into |
+| `VIDEO_FREE(video)` | free the video and its image |
 
 ## Example
 

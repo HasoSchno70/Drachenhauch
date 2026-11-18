@@ -10,29 +10,29 @@ IMPORT "imgfx"
 
 | Funktion | Rückgabe |
 |---|---|
-| `IMAGE_SCALE(img, w, h [, filter$])` | IMAGE (neu, in `w × h`) — **bilinear geglättet**; mit `filter$` (`lanczos`, `bikubisch`, `box`, `hamming`, `linear`) gerechnet wie Pillows `Image.resize`, Zahl für Zahl |
-| `IMAGE_SCALE_NN(img, w, h)` | IMAGE (neu, in `w × h`) — **ohne Interpolation** (Nearest-Neighbour), für Pixelgrafik |
-| `IMAGE_ROTATE(img, grad)` | IMAGE (neu, Bounding-Box wächst ggf.) — **tastet neu ab**, siehe unten |
-| `IMAGE_ROTATE_CW(img)` | IMAGE (neu, um 90° im Uhrzeigersinn) — **exakt**, `w × h` → `h × w` |
-| `IMAGE_ROTATE_CCW(img)` | IMAGE (neu, um 90° gegen den Uhrzeigersinn) — **exakt** |
-| `IMAGE_FLIP(img, flipX, flipY)` | IMAGE (neu, gespiegelt) |
-| `IMAGE_TINT(img, color)` | IMAGE (neu, RGB-multipliziert) |
-| `IMAGE_COPY(img)` | IMAGE (tiefer Klon) |
+| `IMAGE_SCALE(image, w, h [, filter$])` | IMAGE (neu, in `w × h`) — **bilinear geglättet**; mit `filter$` (`lanczos`, `bikubisch`, `box`, `hamming`, `linear`) gerechnet wie Pillows `Image.resize`, Zahl für Zahl |
+| `IMAGE_SCALE_NN(image, w, h)` | IMAGE (neu, in `w × h`) — **ohne Interpolation** (Nearest-Neighbour), für Pixelgrafik |
+| `IMAGE_ROTATE(image, degrees)` | IMAGE (neu, Bounding-Box wächst ggf.) — **tastet neu ab**, siehe unten |
+| `IMAGE_ROTATE_CW(image)` | IMAGE (neu, um 90° im Uhrzeigersinn) — **exakt**, `w × h` → `h × w` |
+| `IMAGE_ROTATE_CCW(image)` | IMAGE (neu, um 90° gegen den Uhrzeigersinn) — **exakt** |
+| `IMAGE_FLIP(image, flip_x, flip_y)` | IMAGE (neu, gespiegelt) |
+| `IMAGE_TINT(image, color)` | IMAGE (neu, RGB-multipliziert) |
+| `IMAGE_COPY(image)` | IMAGE (tiefer Klon) |
 
 ### Weitere Filter (geben ebenfalls ein neues IMAGE zurück)
 
 | Funktion | Rückgabe / Wirkung |
 |---|---|
-| `IMAGE_CROP(img, x, y, w, h)` | IMAGE (neu, Ausschnitt `w × h` ab `x,y`) |
-| `IMAGE_RESIZE_CANVAS(img, w, h, offx, offy[, fill])` | IMAGE (neu): Bild auf Leinwand `w × h` ab Offset `offx,offy`; freie Fläche mit `fill` (Default schwarz) |
-| `IMAGE_BLUR(img, radius)` | IMAGE (neu, Gauß-Weichzeichner, `radius` in px) |
-| `IMAGE_BRIGHTNESS(img, n)` | IMAGE (neu): Helligkeit, `n` = `-255..255` |
-| `IMAGE_CONTRAST(img, n)` | IMAGE (neu): Kontrast, `n` = `-100..100` |
-| `IMAGE_ENHANCE(img, art$, faktor)` | IMAGE (neu): `helligkeit`, `kontrast` oder `saettigung` wie Pillows `ImageEnhance` — `1.0` lässt das Bild, `0.0` ergibt Schwarz, Grau (Mittelwert) bzw. Graustufen, über `1.0` verstärkt; die Deckkraft bleibt |
-| `IMAGE_GRAYSCALE(img)` | IMAGE (neu, in Graustufen) |
-| `IMAGE_INVERT(img)` | IMAGE (neu, Farben invertiert) |
-| `IMAGE_REPLACE_COLOR(img, from, to)` | IMAGE (neu): tauscht **exakt** die Farbe `from` gegen `to` |
-| `IMAGE_COLOR_TO_ALPHA(img, farbe [, schwelle])` | IMAGE (neu): macht eine Hintergrundfarbe durchsichtig wie „Farbe zu Alpha“ in GIMP -- Mischungen werden halb durchsichtig und entmischt, ein Schein bleibt weich; `schwelle` (0..1) nimmt schwache Reste ganz weg. Zum Freistellen von Logos und Sprites vor einfarbigem Grund |
+| `IMAGE_CROP(image, x, y, w, h)` | IMAGE (neu, Ausschnitt `w × h` ab `x,y`) |
+| `IMAGE_RESIZE_CANVAS(image, w, h, offx, offy[, fill])` | IMAGE (neu): Bild auf Leinwand `w × h` ab Offset `offx,offy`; freie Fläche mit `fill` (Default schwarz) |
+| `IMAGE_BLUR(image, radius)` | IMAGE (neu, Gauß-Weichzeichner, `radius` in px) |
+| `IMAGE_BRIGHTNESS(image, n)` | IMAGE (neu): Helligkeit, `n` = `-255..255` |
+| `IMAGE_CONTRAST(image, n)` | IMAGE (neu): Kontrast, `n` = `-100..100` |
+| `IMAGE_ENHANCE(image, kind$, factor)` | IMAGE (neu): `helligkeit`, `kontrast` oder `saettigung` wie Pillows `ImageEnhance` — `1.0` lässt das Bild, `0.0` ergibt Schwarz, Grau (Mittelwert) bzw. Graustufen, über `1.0` verstärkt; die Deckkraft bleibt |
+| `IMAGE_GRAYSCALE(image)` | IMAGE (neu, in Graustufen) |
+| `IMAGE_INVERT(image)` | IMAGE (neu, Farben invertiert) |
+| `IMAGE_REPLACE_COLOR(image, from, to)` | IMAGE (neu): tauscht **exakt** die Farbe `from` gegen `to` |
+| `IMAGE_COLOR_TO_ALPHA(image, color [, threshold])` | IMAGE (neu): macht eine Hintergrundfarbe durchsichtig wie „Farbe zu Alpha“ in GIMP -- Mischungen werden halb durchsichtig und entmischt, ein Schein bleibt weich; `threshold` (0..1) nimmt schwache Reste ganz weg. Zum Freistellen von Logos und Sprites vor einfarbigem Grund |
 
 ### In ein Image zeichnen (MUTIEREND — verändert das übergebene IMAGE)
 
@@ -71,17 +71,17 @@ nebeneinander braucht, braucht zwei Bilder (`IMAGE_COPY`).
 
 | Funktion | Wirkung |
 |---|---|
-| `IMAGE_DRAW_LINE(img, x1, y1, x2, y2, color)` | Linie ins Image |
-| `IMAGE_DRAW_CIRCLE(img, cx, cy, r, color)` | gefüllter Kreis ins Image |
-| `IMAGE_DRAW_RECT(img, x, y, w, h, color)` | gefülltes Rechteck ins Image |
-| `IMAGE_DRAW_TEXT(img, x, y, text$, size, color[, font])` | Text ins Image; ohne `font` die eingebaute Schrift wie bisher, mit `font` eine per `LOADFONT` oder `LOADFONT_IMAGE` geladene (über halbdurchsichtigem Grund richtig gemischt wie `IMAGE_DRAW_IMAGE`; eine SDF-Schrift geht nicht) |
-| `IMAGE_TEXT(text$, groesse, farbe[, font])` | IMAGE — ein neues Bild, genau so groß wie der Text (so breit, wie `TEXT_WIDTH` ihn misst), auf durchsichtigem Grund — für Schilder, Beschriftungen auf Texturen, Billboards mit Text |
-| `IMAGE_ALPHA_MASK(bild, maske)` | IMAGE — Deckkraft aus einem zweiten Bild übernehmen (weiche Ränder) |
-| `IMAGE_ALPHA_CROP(bild, schwelle)` | IMAGE — durchsichtigen Rand wegschneiden; `schwelle` sagt, ab welcher Deckkraft ein Pixel zählt |
-| `IMAGE_ALPHA_PREMULTIPLY(bild)` | IMAGE — Farbe mit der Deckkraft vorab verrechnen; verhindert dunkle Säume beim Skalieren |
-| `IMAGE_DITHER(bild, r, g, b, a)` | IMAGE — Farbtiefe senken und den Fehler verteilen. **Nur 5,6,5,0 / 5,5,5,1 / 4,4,4,4** — alles andere wird abgelehnt, weil raylib sonst ein unbrauchbares Format liefert |
-| `IMAGE_PALETTE(bild, max)` | ARRAY OF INTEGER — die häufigsten Farben des Bildes |
-| `IMAGE_CHANNEL(bild, kanal)` | IMAGE — ein Kanal (`0` rot, `1` grün, `2` blau, `3` Deckkraft) als Graustufenbild, etwa die Deckkraft als Maske sehen und bearbeiten |
+| `IMAGE_DRAW_LINE(image, x1, y1, x2, y2, color)` | Linie ins Image |
+| `IMAGE_DRAW_CIRCLE(image, cx, cy, r, color)` | gefüllter Kreis ins Image |
+| `IMAGE_DRAW_RECT(image, x, y, w, h, color)` | gefülltes Rechteck ins Image |
+| `IMAGE_DRAW_TEXT(image, x, y, text$, size, color[, font])` | Text ins Image; ohne `font` die eingebaute Schrift wie bisher, mit `font` eine per `LOADFONT` oder `LOADFONT_IMAGE` geladene (über halbdurchsichtigem Grund richtig gemischt wie `IMAGE_DRAW_IMAGE`; eine SDF-Schrift geht nicht) |
+| `IMAGE_TEXT(text$, size, color[, font])` | IMAGE — ein neues Bild, genau so groß wie der Text (so breit, wie `TEXT_WIDTH` ihn misst), auf durchsichtigem Grund — für Schilder, Beschriftungen auf Texturen, Billboards mit Text |
+| `IMAGE_ALPHA_MASK(image, mask)` | IMAGE — Deckkraft aus einem zweiten Bild übernehmen (weiche Ränder) |
+| `IMAGE_ALPHA_CROP(image, threshold)` | IMAGE — durchsichtigen Rand wegschneiden; `threshold` sagt, ab welcher Deckkraft ein Pixel zählt |
+| `IMAGE_ALPHA_PREMULTIPLY(image)` | IMAGE — Farbe mit der Deckkraft vorab verrechnen; verhindert dunkle Säume beim Skalieren |
+| `IMAGE_DITHER(image, r, g, b, a)` | IMAGE — Farbtiefe senken und den Fehler verteilen. **Nur 5,6,5,0 / 5,5,5,1 / 4,4,4,4** — alles andere wird abgelehnt, weil raylib sonst ein unbrauchbares Format liefert |
+| `IMAGE_PALETTE(image, max)` | ARRAY OF INTEGER — die häufigsten Farben des Bildes |
+| `IMAGE_CHANNEL(image, channel)` | IMAGE — ein Kanal (`0` rot, `1` grün, `2` blau, `3` Deckkraft) als Graustufenbild, etwa die Deckkraft als Maske sehen und bearbeiten |
 
 ### Formen mit Kommazahlen und Deckkraft
 
@@ -94,14 +94,14 @@ Runners, `spiele/circuitrunner/make_tiles.dh`):
 
 | Funktion | Wirkung |
 |---|---|
-| `IMAGE_FILL_RECT(bild, x0, y0, x1, y1, farbe [, deckkraft])` | Rechteck von Ecke zu Ecke, beide Grenzen eingeschlossen |
-| `IMAGE_FRAME(bild, x0, y0, x1, y1, breite, farbe [, deckkraft])` | Rahmen der Breite `breite`, nach innen gezeichnet |
-| `IMAGE_FILL_ROUNDRECT(bild, x0, y0, x1, y1, radius, farbe [, deckkraft])` | Rechteck mit abgerundeten Ecken |
-| `IMAGE_FILL_ELLIPSE(bild, cx, cy, rx, ry, farbe [, deckkraft])` | gefuellte Ellipse um `cx, cy`; mit `rx = ry` ein Kreis |
-| `IMAGE_RING(bild, cx, cy, r, breite, farbe [, deckkraft])` | Kreisring vom Radius `r` nach innen |
-| `IMAGE_FILL_POLY(bild, xs, ys, farbe [, deckkraft])` | gefuelltes Vieleck aus zwei Feldern mit den Eckpunkten, auch konkav |
-| `IMAGE_POLYLINE(bild, xs, ys, breite, farbe [, deckkraft])` | Linienzug der Breite `breite` mit runden Gelenken |
-| `IMAGE_GRADIENT(bild, x0, y0, x1, y1, farbe1, farbe2 [, senkrecht [, deckkraft1, deckkraft2]])` | Verlauf im Rechteck, per Vorgabe von oben nach unten; mischt Farbe und Deckkraft |
+| `IMAGE_FILL_RECT(image, x0, y0, x1, y1, color [, opacity])` | Rechteck von Ecke zu Ecke, beide Grenzen eingeschlossen |
+| `IMAGE_FRAME(image, x0, y0, x1, y1, width, color [, opacity])` | Rahmen der Breite `width`, nach innen gezeichnet |
+| `IMAGE_FILL_ROUNDRECT(image, x0, y0, x1, y1, radius, color [, opacity])` | Rechteck mit abgerundeten Ecken |
+| `IMAGE_FILL_ELLIPSE(image, cx, cy, rx, ry, color [, opacity])` | gefuellte Ellipse um `cx, cy`; mit `rx = ry` ein Kreis |
+| `IMAGE_RING(image, cx, cy, r, width, color [, opacity])` | Kreisring vom Radius `r` nach innen |
+| `IMAGE_FILL_POLY(image, xs, ys, color [, opacity])` | gefuelltes Vieleck aus zwei Feldern mit den Eckpunkten, auch konkav |
+| `IMAGE_POLYLINE(image, xs, ys, width, color [, opacity])` | Linienzug der Breite `width` mit runden Gelenken |
+| `IMAGE_GRADIENT(image, x0, y0, x1, y1, color1, color2 [, vertical [, opacity1, opacity2]])` | Verlauf im Rechteck, per Vorgabe von oben nach unten; mischt Farbe und Deckkraft |
 
 **Geschrieben wird UEBER, nicht gemischt.** Ein Punkt bekommt genau die Farbe
 und Deckkraft, die der Befehl nennt -- mit `deckkraft` 0 stanzt man ein Loch
@@ -131,18 +131,18 @@ und ueberhaupt nichts speichern.
 
 | Funktion | Wirkung |
 |---|---|
-| `IMAGE_NEW(breite, hoehe [, farbe])` | IMAGE — ein neues Bild; **ohne Farbe vollstaendig durchsichtig** |
-| `IMAGE_CLEAR(bild [, x, y, b, h])` | einen Bereich vollstaendig durchsichtig machen — der Radierer; ohne Rechteck das ganze Bild |
-| `IMAGE_DRAW_IMAGE(ziel, quelle, x, y [, qx, qy, qb, qh] [, faerbung])` | ein Bild in ein anderes zeichnen, mit Deckkraft gemischt; wahlweise nur ein Ausschnitt der Quelle |
-| `IMAGE_SAVE(bild, pfad$ [, mit_alpha])` | das Bild in eine Datei schreiben (`.png`, `.bmp`, `.jpg`, `.tga`); mit `FALSE` ohne Deckkraft-Kanal (RGB) — Druckdienste lehnen ein PNG mit Alphakanal ab, auch wenn jeder Punkt deckend ist. Die Deckkraft wird dabei weggelassen, nicht verrechnet: wer einen Grund will, legt das Bild vorher auf ein deckendes |
-| `GETALPHA(bild, x, y)` | Deckkraft eines Bildpunkts, 0..255; `-1` ausserhalb (core, kein IMPORT noetig) |
-| `IMAGE_FREE(bild)` | das Bild und seine Grafikspeicher-Textur freigeben |
-| `IMAGE_FROM_BUFFER(puffer)` | IMAGE — ein Bild aus den Bytes einer Bilddatei (PNG, JPG, BMP, GIF, QOI, DDS), etwa aus `HTTP_BYTES` oder `BUFFER_FROM_BASE64`; das Format steht in den ersten Bytes |
-| `IMAGE_TO_BUFFER(bild [, mit_alpha])` | BUFFER — das Bild als PNG-Bytes, ohne Umweg über eine Datei; mit `FALSE` ohne Deckkraft-Kanal wie bei `IMAGE_SAVE` |
-| `IMAGE_MIPMAPS(bild)` | INTEGER — verkleinerte Stufen für die Textur anlegen und trilinear filtern: ein feines Muster auf einer fernen 3D-Fläche flimmert dann nicht mehr. Liefert die Zahl der Stufen; nach `IMAGE_DRAW_*` werden sie nachgezogen |
-| `IMAGE_SAVE_GIF(bilder, pfad$ [, fps_oder_dauern [, wiederholen [, anzahl]]])` | mehrere Bilder als **bewegtes GIF** schreiben |
-| `IMAGE_LOAD_GIF(pfad$)` | ARRAY OF IMAGE — alle Einzelbilder eines bewegten GIFs, schon zusammengesetzt (auch wenn ein Bild nur einen Teil erneuert); eine Datei, die kein GIF ist, ergibt ein einziges Bild |
-| `IMAGE_GIF_DELAYS(pfad$)` | ARRAY OF INTEGER — die Dauer jedes Einzelbilds in Millisekunden, in derselben Reihenfolge; das Gegenstück zum Feld, das `IMAGE_SAVE_GIF` nimmt (core, kein Fenster nötig) |
+| `IMAGE_NEW(width, height [, color])` | IMAGE — ein neues Bild; **ohne Farbe vollstaendig durchsichtig** |
+| `IMAGE_CLEAR(image [, x, y, b, h])` | einen Bereich vollstaendig durchsichtig machen — der Radierer; ohne Rechteck das ganze Bild |
+| `IMAGE_DRAW_IMAGE(target, source, x, y [, qx, qy, qb, qh] [, tint])` | ein Bild in ein anderes zeichnen, mit Deckkraft gemischt; wahlweise nur ein Ausschnitt der Quelle |
+| `IMAGE_SAVE(image, path$ [, with_alpha])` | das Bild in eine Datei schreiben (`.png`, `.bmp`, `.jpg`, `.tga`); mit `FALSE` ohne Deckkraft-Kanal (RGB) — Druckdienste lehnen ein PNG mit Alphakanal ab, auch wenn jeder Punkt deckend ist. Die Deckkraft wird dabei weggelassen, nicht verrechnet: wer einen Grund will, legt das Bild vorher auf ein deckendes |
+| `GETALPHA(image, x, y)` | Deckkraft eines Bildpunkts, 0..255; `-1` ausserhalb (core, kein IMPORT noetig) |
+| `IMAGE_FREE(image)` | das Bild und seine Grafikspeicher-Textur freigeben |
+| `IMAGE_FROM_BUFFER(buffer)` | IMAGE — ein Bild aus den Bytes einer Bilddatei (PNG, JPG, BMP, GIF, QOI, DDS), etwa aus `HTTP_BYTES` oder `BUFFER_FROM_BASE64`; das Format steht in den ersten Bytes |
+| `IMAGE_TO_BUFFER(image [, with_alpha])` | BUFFER — das Bild als PNG-Bytes, ohne Umweg über eine Datei; mit `FALSE` ohne Deckkraft-Kanal wie bei `IMAGE_SAVE` |
+| `IMAGE_MIPMAPS(image)` | INTEGER — verkleinerte Stufen für die Textur anlegen und trilinear filtern: ein feines Muster auf einer fernen 3D-Fläche flimmert dann nicht mehr. Liefert die Zahl der Stufen; nach `IMAGE_DRAW_*` werden sie nachgezogen |
+| `IMAGE_SAVE_GIF(images, path$ [, fps_or_durations [, repeat [, count]]])` | mehrere Bilder als **bewegtes GIF** schreiben |
+| `IMAGE_LOAD_GIF(path$)` | ARRAY OF IMAGE — alle Einzelbilder eines bewegten GIFs, schon zusammengesetzt (auch wenn ein Bild nur einen Teil erneuert); eine Datei, die kein GIF ist, ergibt ein einziges Bild |
+| `IMAGE_GIF_DELAYS(path$)` | ARRAY OF INTEGER — die Dauer jedes Einzelbilds in Millisekunden, in derselben Reihenfolge; das Gegenstück zum Feld, das `IMAGE_SAVE_GIF` nimmt (core, kein Fenster nötig) |
 
 ```basic
 IMPORT "imgfx"

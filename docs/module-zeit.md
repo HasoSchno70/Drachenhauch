@@ -37,12 +37,12 @@ und `ZEIT_PARSE("…Z")` rechnete nicht um.
 |---|---|
 | `ZEIT_JETZT()` → INTEGER | jetzt, als Zeitpunkt |
 | `ZEIT_UNIX()` → FLOAT | jetzt als **Unix-Zeit**: Sekunden seit 1970 in UTC, mit Bruchteil (wie Pythons `time.time()`) |
-| `ZEIT_AUS_UNIX(sekunden)` → INTEGER | Unix-Sekunden zu Zeitpunkt in Ortszeit (samt Sommerzeit jenes Tages) |
-| `ZEIT_NACH_UNIX(zeit)` → INTEGER | Zeitpunkt in Ortszeit zu Unix-Sekunden |
+| `ZEIT_AUS_UNIX(unix_seconds)` → INTEGER | Unix-Sekunden zu Zeitpunkt in Ortszeit (samt Sommerzeit jenes Tages) |
+| `ZEIT_NACH_UNIX(time)` → INTEGER | Zeitpunkt in Ortszeit zu Unix-Sekunden |
 | `ZEIT_PARSE(text$)` → INTEGER | Text zu Zeitpunkt; bricht bei Unlesbarem ab |
 | `ZEIT_LESBAR(text$)` → BOOLEAN | ließe sich der Text lesen? (fragt, bricht nicht ab) |
-| `ZEIT_TEXT$(zeit)` → STRING | Zeitpunkt als `JJJJ-MM-TT hh:mm:ss` |
-| `ZEIT_AUS_TEILEN(jahr, monat, tag [, stunde, minute, sekunde])` → INTEGER | Zeitpunkt aus Einzelwerten |
+| `ZEIT_TEXT$(time)` → STRING | Zeitpunkt als `JJJJ-MM-TT hh:mm:ss` |
+| `ZEIT_AUS_TEILEN(year, month, day [, hour, minute, second])` → INTEGER | Zeitpunkt aus Einzelwerten |
 
 `ZEIT_PARSE` versteht die Schreibweisen, die einem in Datenbanken und Web-APIs
 begegnen:
@@ -93,9 +93,9 @@ also so in die Datenbank schreiben und wieder herausrechnen.
 
 | Funktion | Wirkung |
 |---|---|
-| `ZEIT_PLUS(zeit, sekunden)` → INTEGER | Sekunden dazu (negativ = zurück) |
-| `ZEIT_DIFF(zeit, frueher)` → INTEGER | Abstand in Sekunden (negativ, wenn `zeit` früher liegt) |
-| `ZEIT_DAUER$(sekunden)` → STRING | Sekunden als lesbare Spanne |
+| `ZEIT_PLUS(time, seconds)` → INTEGER | Sekunden dazu (negativ = zurück) |
+| `ZEIT_DIFF(time, earlier)` → INTEGER | Abstand in Sekunden (negativ, wenn `time` früher liegt) |
+| `ZEIT_DAUER$(seconds)` → STRING | Sekunden als lesbare Spanne |
 
 ```basic
 IMPORT "zeit"
@@ -135,9 +135,9 @@ wie lange" und „wie lange her".
 
 | Funktion | Wirkung |
 |---|---|
-| `ZEIT_TEIL(zeit, feld$)` → INTEGER | ein Feld: `jahr`, `monat`, `tag`, `stunde`, `minute`, `sekunde` |
-| `ZEIT_WOCHENTAG(zeit)` → INTEGER | 1 = Montag … 7 = Sonntag |
-| `ZEIT_FORMAT$(zeit, muster$)` → STRING | Zeitpunkt nach Muster |
+| `ZEIT_TEIL(time, part$)` → INTEGER | ein Feld: `jahr`, `monat`, `tag`, `stunde`, `minute`, `sekunde` |
+| `ZEIT_WOCHENTAG(time)` → INTEGER | 1 = Montag … 7 = Sonntag |
+| `ZEIT_FORMAT$(time, pattern$)` → STRING | Zeitpunkt nach Muster |
 
 Die Muster stehen in derselben Sprache wie die Anzeige selbst:
 

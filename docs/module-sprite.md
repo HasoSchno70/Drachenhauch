@@ -22,7 +22,7 @@ IMPORT "sprite"
 | `SPRITE_IS_FINISHED(sp)` → BOOLEAN | bei PLAY_ONCE-Anim am Ende? |
 | `SPRITE_SET_FRAME(sp, idx)` | Frame manuell setzen |
 | `SPRITE_GET_FRAME(sp)` → INTEGER | aktueller Frame |
-| `SPRITE_SET_FLIP(sp, flipX, flipY)` | Spiegelung |
+| `SPRITE_SET_FLIP(sp, fx, fy)` | Spiegelung |
 | `SPRITE_SET_SCALE(sp, sx, sy)` | Skalierung (rein visuell) |
 | `SPRITE_TINT(sp, color)` | Farb-Tint (RGB-Multi) |
 | `SPRITE_TINT_CLEAR(sp)` | Tint zurück |

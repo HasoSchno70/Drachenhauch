@@ -1,4 +1,5 @@
-' Named-Arguments-Demo: SUB/FUNCTION/NEW mit Mix aus positional und named.
+' Named-Arguments-Demo: SUB/FUNCTION/NEW und eingebaute Befehle mit Mix aus
+' positional und named.
 '
 ' Regeln:
 '   - Positional muss immer vor allen Named-Args kommen.
@@ -76,3 +77,9 @@ p.Show()
 
 p = NEW Point(100, 200, color: &H00FF00)
 p.Show()
+
+' Eingebaute Befehle nehmen ihre Namen genauso -- die Namen stehen in der
+' Signatur, die der Editor beim Tippen zeigt.
+PRINT MID$("Drachenhauch", start: 0, n: 7)
+PRINT CLAMP(v: 150, lo: 0, hi: 100)
+PRINT REPLACE$("a-b-c", old: "-", new: "+")

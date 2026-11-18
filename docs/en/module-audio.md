@@ -17,7 +17,7 @@ program could set.
 
 | Function | Effect |
 |---|---|
-| `AUDIO_INIT([...])` | makes sure the audio system is running. **Accepts arguments and ignores them** -- they date from the mixer era and are only tolerated for compatibility |
+| `AUDIO_INIT([frequency[, channels[, buffer]]])` | makes sure the audio system is running. **Accepts arguments and ignores them** -- they date from the mixer era and are only tolerated for compatibility |
 | `AUDIO_SET_NUM_CHANNELS(n)` | number of simultaneous channels (default **16**, raise it for bullet hell) |
 | `AUDIO_NUM_CHANNELS()` → INTEGER | current channel count |
 | `AUDIO_BUSY_CHANNELS()` → INTEGER | how many channels are playing right now |
@@ -37,16 +37,16 @@ Plays a SOUND and returns a channel handle. With it you can pause the sound, sto
 
 | Function | Effect |
 |---|---|
-| `AUDIO_PLAY(s, [loops, vol, fade_in_ms])` → AUDIO_CHANNEL | start a sound |
+| `AUDIO_PLAY(sound[, loops[, volume[, fade_in_ms[, easing$]]]])` → AUDIO_CHANNEL | start a sound |
 | `AUDIO_PAUSE(ch)` | pause the channel |
 | `AUDIO_RESUME(ch)` | continue |
-| `AUDIO_STOP(ch[, fade_out_ms])` | stop the channel, optionally fade out |
+| `AUDIO_STOP(ch[, fade_out_ms[, easing$]])` | stop the channel, optionally fade out |
 | `AUDIO_IS_PLAYING(ch)` → BOOLEAN | Is the sound audible right now? One scheduled with `AUDIO_PLAY_AT` only from its tick on |
-| `AUDIO_IS_WAITING(ch)` → BOOLEAN | scheduled with `AUDIO_PLAY_AT`, but the clock has not reached the tick yet |
-| `AUDIO_VOLUME(ch, vol)` | set the volume 0..1 |
+| `AUDIO_IS_WAITING(sound)` → BOOLEAN | scheduled with `AUDIO_PLAY_AT`, but the clock has not reached the tick yet |
+| `AUDIO_VOLUME(ch, volume)` | set the volume 0..1 |
 | `AUDIO_GET_VOLUME(ch)` → FLOAT | current volume |
-| `AUDIO_PAN(ch, left_vol, right_vol)` | stereo pan (both 0..1) |
-| `AUDIO_PITCH(ch, faktor)` | pitch/speed: 1.0 = normal, 2.0 = an octave higher, 0.5 = lower |
+| `AUDIO_PAN(ch, left, right)` | stereo pan (both 0..1) |
+| `AUDIO_PITCH(ch, factor)` | pitch/speed: 1.0 = normal, 2.0 = an octave higher, 0.5 = lower |
 
 **Global pause/resume:**
 
@@ -100,8 +100,8 @@ frame (FLIP), non-blocking:
 | Function | Effect |
 |---|---|
 | `AUDIO_PAN_POS(ch, p)` | set the position directly (ends a running animation) |
-| `AUDIO_PAN_SLIDE(ch, von, nach, dauer_ms)` | one-time move from → to; stays at the target |
-| `AUDIO_AUTOPAN(ch, periode_s[, tiefe])` | endless swinging left↔right (starts left); `tiefe` 0..1 = deflection around the centre, `periode_s <= 0` switches it off |
+| `AUDIO_PAN_SLIDE(ch, from, to, duration_ms[, easing$])` | one-time move from → to; stays at the target |
+| `AUDIO_AUTOPAN(ch, period_s[, depth])` | endless swinging left↔right (starts left); `depth` 0..1 = deflection around the centre, `period_s <= 0` switches it off |
 
 ```basic
 DIM ton AS SOUND
@@ -126,16 +126,16 @@ The native runtime has a separate music channel for long tracks (loads by stream
 | Function | Effect |
 |---|---|
 | `AUDIO_MUSIC_LOAD(path$)` | load a track (not playing yet) |
-| `AUDIO_MUSIC_PLAY([loops[, fade_in_ms]])` | start (loops = -1 = endless = default; loops = N → N+1 passes) |
-| `AUDIO_MUSIC_STOP([fade_out_ms])` | stop, optionally fade out (non-blocking) |
+| `AUDIO_MUSIC_PLAY([loops[, fade_in_ms[, easing$]]])` | start (loops = -1 = endless = default; loops = N → N+1 passes) |
+| `AUDIO_MUSIC_STOP([fade_out_ms[, easing$]])` | stop, optionally fade out (non-blocking) |
 | `AUDIO_MUSIC_PAUSE()` | pause |
 | `AUDIO_MUSIC_RESUME()` | continue |
-| `AUDIO_MUSIC_VOLUME(vol)` | 0..1 |
+| `AUDIO_MUSIC_VOLUME(volume)` | 0..1 |
 | `AUDIO_MUSIC_GET_VOLUME()` → FLOAT | current |
-| `AUDIO_MUSIC_PITCH(faktor)` | music pitch (1.0 = normal; survives LOAD/QUEUE — slow-motion effect) |
+| `AUDIO_MUSIC_PITCH(factor)` | music pitch (1.0 = normal; survives LOAD/QUEUE — slow-motion effect) |
 | `AUDIO_MUSIC_GET_PITCH()` → FLOAT | current pitch |
 | `AUDIO_MUSIC_POSITION()` → FLOAT | seconds since start (from position 0) |
-| `AUDIO_MUSIC_SEEK(sekunden)` | jump to this point (seconds from the beginning) |
+| `AUDIO_MUSIC_SEEK(seconds)` | jump to this point (seconds from the beginning) |
 | `AUDIO_MUSIC_BUSY()` → BOOLEAN | Playing right now? |
 | `AUDIO_MUSIC_QUEUE(path$)` | next track, as soon as the current one ends |
 
@@ -188,9 +188,9 @@ For procedural sounds without audio files. Returns a `SOUND` object that you can
 
 | Function | Effect |
 |---|---|
-| `AUDIO_TONE(freq_hz, dauer_ms[, waveform$[, vol]])` | sine/square/saw/triangle tone |
-| `AUDIO_NOISE(dauer_ms[, vol])` | white noise |
-| `AUDIO_NOTE(wf$, freq, dauer_ms, attack_ms, decay_ms, sustain, release_ms, vol[, vib_depth, vib_speed, detune_cents, slide_halbtoene])` | a held note with a real ADSR envelope, vibrato, detune layer and portamento — the instrument for trackers and music; `vib_depth` is a fraction of the frequency (0.005 = ±0.5 %), not semitones |
+| `AUDIO_TONE(freq_hz, duration_ms[, waveform$[, vol]])` | sine/square/saw/triangle tone |
+| `AUDIO_NOISE(duration_ms[, vol])` | white noise |
+| `AUDIO_NOTE(wf$, freq, duration_ms, attack_ms, decay_ms, sustain, release_ms, vol[, vib_depth, vib_speed, detune_cents, slide_semitones])` | a held note with a real ADSR envelope, vibrato, detune layer and portamento — the instrument for trackers and music; `vib_depth` is a fraction of the frequency (0.005 = ±0.5 %), not semitones |
 
 **Waveforms** (case-insensitive): `"sine"`, `"square"`, `"saw"`, `"triangle"`, `"noise"`.
 
@@ -284,9 +284,9 @@ program needs that wants to deliver a song as a WAV.
 
 | Function | Effect |
 |---|---|
-| `AUDIO_SOUND_NEW(dauer_ms)` → SOUND | silence of the given length, as a canvas |
-| `AUDIO_SOUND_MIX(ziel, quelle, offset_ms[, vol[, pan]])` | **add** the source into the target from `offset_ms` |
-| `AUDIO_SOUND_NORMALIZE(sound[, spitze])` → FLOAT | bring the loudest point to `spitze` (default 1.0); returns the factor |
+| `AUDIO_SOUND_NEW(duration_ms)` → SOUND | silence of the given length, as a canvas |
+| `AUDIO_SOUND_MIX(target, source, offset_ms[, vol[, pan]])` | **add** the source into the target from `offset_ms` |
+| `AUDIO_SOUND_NORMALIZE(sound[, peak])` → FLOAT | bring the loudest point to `peak` (default 1.0); returns the factor |
 
 Three things you need to know:
 
@@ -321,8 +321,8 @@ synthesizer.
 
 | Function | Effect |
 |---|---|
-| `AUDIO_SOUND_WAVE(sound, anzahl)` → ARRAY OF FLOAT | `anzahl` points of the waveform, `-1..1` — for drawing |
-| `AUDIO_SAVE_WAV(sound, pfad$[, bits])` | save as a WAV file (`bits` = 16, the default, or 8) |
+| `AUDIO_SOUND_WAVE(sound, count)` → ARRAY OF FLOAT | `count` points of the waveform, `-1..1` — for drawing |
+| `AUDIO_SAVE_WAV(sound, path$[, bits])` | save as a WAV file (`bits` = 16, the default, or 8) |
 
 `AUDIO_SOUND_WAVE` returns, per section, the sample with the **largest
 magnitude**, with its sign — not the average. That is the whole trick:
@@ -364,12 +364,12 @@ instrument.
 
 | Function | Effect |
 |---|---|
-| `SAMPLE_LOAD(pfad$)` → SAMPLE | load WAV/OGG/QOA, normalized to mono |
-| `SAMPLE_FROM_BUFFER(puffer, abtastrate)` → SAMPLE | sample from raw 16-bit PCM (little endian, signed, mono) |
+| `SAMPLE_LOAD(path$)` → SAMPLE | load WAV/OGG/QOA, normalized to mono |
+| `SAMPLE_FROM_BUFFER(buffer, sample_rate)` → SAMPLE | sample from raw 16-bit PCM (little endian, signed, mono) |
 | `SAMPLE_FROM_SOUND(sound)` → SAMPLE | a SOUND (from `SPEAK_SOUND`, `AUDIO_NOTE`, `LOADSOUND` ...) as a sample, channels averaged to mono, sample rate kept |
-| `SAMPLE_PLAY(sample, halbtoene, vol[, dur_ms])` → AUDIO_CHANNEL | play at a relative pitch |
-| `SAMPLE_NOTE(sample, halbtoene, dauer_ms, attack_ms, decay_ms, sustain, release_ms, vol[, slide_halbtoene])` → SOUND | build a note as a sound (not play it), envelope like `AUDIO_NOTE` |
-| `SAMPLE_SET_LOOP(sample, start, end[, art$])` | loop region in frames (for held notes), `art$` = `vorwaerts` (forwards, default) or `pingpong` |
+| `SAMPLE_PLAY(sample, semitones, vol[, dur_ms])` → AUDIO_CHANNEL | play at a relative pitch |
+| `SAMPLE_NOTE(sample, semitones, duration_ms, attack_ms, decay_ms, sustain, release_ms, vol[, slide_semitones])` → SOUND | build a note as a sound (not play it), envelope like `AUDIO_NOTE` |
+| `SAMPLE_SET_LOOP(sample, start, end[, kind$])` | loop region in frames (for held notes), `kind$` = `vorwaerts` (forwards, default) or `pingpong` |
 | `SAMPLE_LEN(sample)` → FLOAT | length in seconds at the original pitch |
 
 `halbtoene` is relative to the sample's original pitch: `0` = as recorded,
@@ -496,7 +496,7 @@ as a file, record the mixer:
 
 | Function | Effect |
 |---|---|
-| `AUDIO_RECORD_START([max_sekunden])` | record the finished mix, behind all effects and after the master volume; at most `max_sekunden` (default 600, at most 3600). A running recording starts over |
+| `AUDIO_RECORD_START([max_seconds])` | record the finished mix, behind all effects and after the master volume; at most `max_seconds` (default 600, at most 3600). A running recording starts over |
 | `AUDIO_RECORD_STOP()` → SOUND | stop and return it as a sound (stereo, the device's sample rate); without a running recording an error |
 | `AUDIO_RECORDING()` → BOOLEAN | is a recording running? |
 | `AUDIO_PEAK()` → FLOAT | highest swing at the master since the last call, after the master volume; above 1.0 means clipping |
@@ -579,13 +579,13 @@ per frame.
 
 | Function | Returns | Meaning |
 |---|---|---|
-| `AUDIO_CLOCK_NEW(ticks_pro_sekunde)` | AUDIO_CLOCK | create a clock — **it starts paused** |
+| `AUDIO_CLOCK_NEW(ticks_per_second)` | AUDIO_CLOCK | create a clock — **it starts paused** |
 | `AUDIO_CLOCK_START(clock)` | — | let it run (also again after `PAUSE`) |
 | `AUDIO_CLOCK_PAUSE(clock)` | — | pause; the tick counter stays where it is |
 | `AUDIO_CLOCK_STOP(clock)` | — | stop and set the tick counter to 0 |
 | `AUDIO_CLOCK_TICKING(clock)` | BOOLEAN | is it running right now? |
 | `AUDIO_CLOCK_TICKS(clock)` | INTEGER | how many ticks have passed? |
-| `AUDIO_CLOCK_SET_SPEED(clock, ticks_pro_sekunde)` | — | change the tempo while running |
+| `AUDIO_CLOCK_SET_SPEED(clock, ticks_per_second)` | — | change the tempo while running |
 | `AUDIO_CLOCK_REMOVE(clock)` | — | dismantle the clock |
 
 You do the conversion from BPM yourself — `bpm / 60 * unterteilungen`
@@ -637,7 +637,7 @@ source in space. The audio layer computes volume and panning itself.
 |---|---|---|
 | `AUDIO_LISTENER_NEW(x, y, z)` | AUDIO_LISTENER | place the ear; unrotated it looks along **-Z** |
 | `AUDIO_LISTENER_SET_POSITION(listener, x, y, z)` | — | move the ear (e.g. following the camera) |
-| `AUDIO_LISTENER_SET_ORIENTATION(listener, yaw_grad)` | — | viewing direction around the Y axis, **in degrees** |
+| `AUDIO_LISTENER_SET_ORIENTATION(listener, yaw_deg)` | — | viewing direction around the Y axis, **in degrees** |
 | `AUDIO_LISTENER_REMOVE(listener)` | — | dismantle the listener |
 | `AUDIO_EMITTER_NEW(listener, x, y, z [, min_dist [, max_dist]])` | AUDIO_EMITTER | sound source in space; at full volume up to `min_dist`, silent from `max_dist` |
 | `AUDIO_EMITTER_SET_POSITION(emitter, x, y, z)` | — | move the source |
@@ -660,13 +660,13 @@ game (“unit ready"). Before, this was only possible with prerecorded files.
 
 | Function | Returns | Meaning |
 |---|---|---|
-| `SPEAK(text$[, unterbrechen])` | — | speaks `text$`; `unterbrechen` (interrupt) = abort the running announcement and speak immediately, otherwise append at the end |
+| `SPEAK(text$[, interrupt])` | — | speaks `text$`; `interrupt` (interrupt) = abort the running announcement and speak immediately, otherwise append at the end |
 | `SPEAK_STOP()` | — | discard everything running and scheduled |
 | `SPEAKING()` | BOOLEAN | is an announcement still running or waiting? |
 | `SPEAK_WAIT()` | — | blocks until everything has been spoken (for console programs before `INPUT`; in a game better ask `SPEAKING()`) |
 | `SPEAK_VOICE(name$)` | — | choose a voice (a name from `SPEAK_VOICES()`, case does not matter); empty = system voice. Unknown = error |
 | `SPEAK_VOICES()` | ARRAY OF STRING | the installed voices, e.g. `Katja`, `Stefan`, `Hedda` |
-| `SPEAK_RATE(faktor)` | — | rate 0.5 (half as fast) .. 2.0 (double), default 1.0 |
+| `SPEAK_RATE(factor)` | — | rate 0.5 (half as fast) .. 2.0 (double), default 1.0 |
 | `SPEAK_SOUND(text$)` | SOUND | synthesize only — a sound as from `AUDIO_NOTE`, for `AUDIO_PLAY`, `AUDIO_PLAY_ON(emitter)`, `AUDIO_SOUND_MIX`, `AUDIO_SAVE_WAV` |
 
 ```basic

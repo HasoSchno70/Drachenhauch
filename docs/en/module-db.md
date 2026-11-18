@@ -10,7 +10,7 @@ IMPORT "db"
 
 | Function | Returns | Meaning |
 |---|---|---|
-| `DB_OPEN(ziel$)` | DB_CONN | open a database: a file (created if it does not exist; `":memory:"` = volatile), `postgres://...` or `mysql://...` |
+| `DB_OPEN(target$)` | DB_CONN | open a database: a file (created if it does not exist; `":memory:"` = volatile), `postgres://...` or `mysql://...` |
 | `DB_CLOSE(conn)` | — | close the connection |
 | `DB_EXEC(conn, sql$, ...)` | INTEGER (rowcount) | SQL without a result set (INSERT/UPDATE/DELETE/CREATE); bind values with `?`, returns the number of affected rows |
 | `DB_QUERY(conn, sql$, ...)` | DB_RESULT | run a SELECT and return a cursor on the result |
@@ -249,9 +249,9 @@ of waiting for — the same pattern as `HTTP_GET_START`:
 | Function | Effect |
 |---|---|
 | `DB_QUERY_START(ziel$, sql$ [, params…])` → INTEGER | starts in the background, immediately returns the job number (a file or a server, as with `DB_OPEN`) |
-| `DB_QUERY_READY(auftrag)` → BOOLEAN | is the result there? (checks, does not wait) |
-| `DB_QUERY_RESULT(auftrag)` → DB_RESULT | fetch the result and free the slot |
-| `DB_QUERY_CANCEL(auftrag)` | discard (unknown number = no effect) |
+| `DB_QUERY_READY(job)` → BOOLEAN | is the result there? (checks, does not wait) |
+| `DB_QUERY_RESULT(job)` → DB_RESULT | fetch the result and free the slot |
+| `DB_QUERY_CANCEL(job)` | discard (unknown number = no effect) |
 | `DB_QUERY_PENDING()` → INTEGER | how many queries are still open |
 
 ```basic

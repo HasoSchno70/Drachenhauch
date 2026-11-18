@@ -23,7 +23,7 @@ IMPORT "json"
 | `JSON_TYPE(h, path$)` | STRING | what is at the path? (`object`, `array`, `string`, `number`, `boolean`, `null`) |
 | `JSON_KEYS(h, path$)` | ARRAY OF STRING | field names of an object |
 | `JSON_KEY$(name$)` | STRING | field name as a path segment: dot and backslash escaped so that names from `JSON_KEYS` can be addressed again |
-| `JSON_GET_JSON(h, pfad$)` | JSON_HANDLE | subtree at the path as a document of its own (**copy**) — the counterpart to `JSON_SET_JSON`, for example to carry a piece you do not understand along unchanged |
+| `JSON_GET_JSON(h, path$)` | JSON_HANDLE | subtree at the path as a document of its own (**copy**) — the counterpart to `JSON_SET_JSON`, for example to carry a piece you do not understand along unchanged |
 
 **Writing:**
 
@@ -31,15 +31,15 @@ IMPORT "json"
 |---|---|
 | `JSON_NEW_OBJECT()` | empty `{}` → JSON_HANDLE |
 | `JSON_NEW_ARRAY()` | empty `[]` → JSON_HANDLE |
-| `JSON_SET_STRING(h, pfad$, wert$)` | set a field (create or replace) |
-| `JSON_SET_INT(h, pfad$, wert)` | set a field as a whole number |
-| `JSON_SET_FLOAT(h, pfad$, wert)` | set a field as a decimal number |
-| `JSON_SET_BOOL(h, pfad$, wert)` | set a field as a truth value |
-| `JSON_SET_NULL(h, pfad$)` | set a field to null |
-| `JSON_SET_JSON(h, pfad$, andere)` | insert a whole document (**copy**) |
+| `JSON_SET_STRING(h, path$, value$)` | set a field (create or replace) |
+| `JSON_SET_INT(h, path$, value)` | set a field as a whole number |
+| `JSON_SET_FLOAT(h, path$, value)` | set a field as a decimal number |
+| `JSON_SET_BOOL(h, path$, value)` | set a field as a truth value |
+| `JSON_SET_NULL(h, path$)` | set a field to null |
+| `JSON_SET_JSON(h, path$, other)` | insert a whole document (**copy**) |
 | `JSON_APPEND_STRING/INT/FLOAT/BOOL/JSON(h, pfad$, wert)` | append to the array at the path |
-| `JSON_APPEND_NULL(h, pfad$)` | append a `null` to the array at the path — for lists with empty slots |
-| `JSON_REMOVE(h, pfad$)` | remove → BOOLEAN (was anything there?) |
+| `JSON_APPEND_NULL(h, path$)` | append a `null` to the array at the path — for lists with empty slots |
+| `JSON_REMOVE(h, path$)` | remove → BOOLEAN (was anything there?) |
 
 ## Path notation
 

@@ -23,7 +23,7 @@ IMPORT "json"
 | `JSON_TYPE(h, path$)` | STRING | was steht am Pfad? (`object`, `array`, `string`, `number`, `boolean`, `null`) |
 | `JSON_KEYS(h, path$)` | ARRAY OF STRING | Feldnamen eines Objekts |
 | `JSON_KEY$(name$)` | STRING | Feldname als Pfad-Segment: Punkt und Rückstrich maskiert, damit `JSON_KEYS`-Namen wieder adressierbar sind |
-| `JSON_GET_JSON(h, pfad$)` | JSON_HANDLE | Teilbaum am Pfad als eigenes Dokument (**Kopie**) — das Gegenstück zu `JSON_SET_JSON`, etwa um ein Stück, das man nicht versteht, unverändert mitzuführen |
+| `JSON_GET_JSON(h, path$)` | JSON_HANDLE | Teilbaum am Pfad als eigenes Dokument (**Kopie**) — das Gegenstück zu `JSON_SET_JSON`, etwa um ein Stück, das man nicht versteht, unverändert mitzuführen |
 
 **Schreiben:**
 
@@ -31,15 +31,15 @@ IMPORT "json"
 |---|---|
 | `JSON_NEW_OBJECT()` | leeres `{}` → JSON_HANDLE |
 | `JSON_NEW_ARRAY()` | leeres `[]` → JSON_HANDLE |
-| `JSON_SET_STRING(h, pfad$, wert$)` | Feld setzen (anlegen oder ersetzen) |
-| `JSON_SET_INT(h, pfad$, wert)` | Feld als ganze Zahl setzen |
-| `JSON_SET_FLOAT(h, pfad$, wert)` | Feld als Kommazahl setzen |
-| `JSON_SET_BOOL(h, pfad$, wert)` | Feld als Wahrheitswert setzen |
-| `JSON_SET_NULL(h, pfad$)` | Feld auf null setzen |
-| `JSON_SET_JSON(h, pfad$, andere)` | ganzes Dokument einhängen (**Kopie**) |
+| `JSON_SET_STRING(h, path$, value$)` | Feld setzen (anlegen oder ersetzen) |
+| `JSON_SET_INT(h, path$, value)` | Feld als ganze Zahl setzen |
+| `JSON_SET_FLOAT(h, path$, value)` | Feld als Kommazahl setzen |
+| `JSON_SET_BOOL(h, path$, value)` | Feld als Wahrheitswert setzen |
+| `JSON_SET_NULL(h, path$)` | Feld auf null setzen |
+| `JSON_SET_JSON(h, path$, other)` | ganzes Dokument einhängen (**Kopie**) |
 | `JSON_APPEND_STRING/INT/FLOAT/BOOL/JSON(h, pfad$, wert)` | an das Array am Pfad anhängen |
-| `JSON_APPEND_NULL(h, pfad$)` | ein `null` an das Array am Pfad anhängen — für Listen mit leeren Plätzen |
-| `JSON_REMOVE(h, pfad$)` | entfernen → BOOLEAN (war etwas da?) |
+| `JSON_APPEND_NULL(h, path$)` | ein `null` an das Array am Pfad anhängen — für Listen mit leeren Plätzen |
+| `JSON_REMOVE(h, path$)` | entfernen → BOOLEAN (war etwas da?) |
 
 ## Pfad-Notation
 

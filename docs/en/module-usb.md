@@ -23,9 +23,9 @@ python rust/build_runtime.py --hardware
 |---|---|---|
 | `USB_LIST()` | STRING (multi-line `vid:pid|product|manufacturer`) | list connected HID devices |
 | `USB_OPEN(vid, pid)` | USB_HANDLE | open a device via vendor and product ID |
-| `USB_OPEN_PATH(pfad$)` | USB_HANDLE | open a device via its system path (unambiguous when two identical ones are plugged in) |
+| `USB_OPEN_PATH(path$)` | USB_HANDLE | open a device via its system path (unambiguous when two identical ones are plugged in) |
 | `USB_CLOSE(handle)` | — | close the device |
-| `USB_WRITE(handle, daten$)` | INTEGER (bytes written) | send a report to the device |
+| `USB_WRITE(handle, data$)` | INTEGER (bytes written) | send a report to the device |
 | `USB_READ(handle, n, timeout_ms)` | STRING (bytes as latin-1) | read up to n bytes; after `timeout_ms` whatever is there is returned |
 | `USB_PRODUCT(handle)` | STRING | product name according to the device |
 | `USB_MANUFACTURER(handle)` | STRING | manufacturer name according to the device |

@@ -21,50 +21,50 @@ When the `camera` module is active and `CAMERA_SET` has been called, all drawing
 
 | Function | Purpose |
 |---|---|
-| `SCREEN(w, h[, titel$[, scale]])` | opens a window with the logical size `w × h`. `scale > 1` makes every logical pixel bigger (retro look). |
+| `SCREEN(w, h[, title$[, scale]])` | opens a window with the logical size `w × h`. `scale > 1` makes every logical pixel bigger (retro look). |
 | `FLIP()` | output the frame to the screen (synchronized to 60 FPS) |
 | `CLS([color])` | fill the buffer with `color` (default: black) |
 | `SLEEP(ms)` | waits ms milliseconds without freezing the window |
 | `QUITREQUESTED()` → BOOLEAN | TRUE when the program should end: window X / Alt+F4, the frame limit of `DHRT_FRAMES`/`--bilder` — **and, by raylib default, also `ESC`**, EXCEPT in a program with `gui`: there `ESC` belongs to the widgets from the first `GUI_UPDATE` on (cancel a dialog, close a dropdown), otherwise every cancel would end the whole program. `WINDOW_ESC_QUIT` sets it explicitly |
 | `WINDOW_CLOSE_REQUESTED()` → BOOLEAN | TRUE when the USER wants to close the window (the X, Alt+F4, the quit key) -- without the frame limit. The window stays open: a program with unsaved work asks first and then ends itself. An event, not a state -- it holds for one frame |
-| `WINDOW_RESIZABLE(an)` | may the user drag the window's size? (default: no) |
+| `WINDOW_RESIZABLE(flag)` | may the user drag the window's size? (default: no) |
 | `WINDOW_MIN_SIZE(w, h)` | smallest window size when dragging |
 | `WINDOW_MAX_SIZE(w, h)` | largest window size when dragging |
 | `WINDOW_MAXIMIZE()` | bring the window to screen size |
 | `WINDOW_MINIMIZE()` | put the window into the taskbar |
 | `WINDOW_RESTORE()` | bring it back from maximized or minimized |
-| `SETWINDOWTITLE(titel$)` | change the window title while running — for the file name or the score, say |
-| `SET_FULLSCREEN(an)` | switch fullscreen on or off |
+| `SETWINDOWTITLE(title$)` | change the window title while running — for the file name or the score, say |
+| `SET_FULLSCREEN(fs)` | switch fullscreen on or off |
 | `WINDOW_IS_FULLSCREEN()` → BOOLEAN | is it running in fullscreen right now? |
 | `WINDOW_FOCUSED()` → BOOLEAN | is the window in the foreground? — use it to pause when the user clicks away |
 | `WINDOW_MINIMIZED()` / `WINDOW_MAXIMIZED()` / `WINDOW_HIDDEN()` → BOOLEAN | query the window's state |
 | `WINDOW_FOCUS()` | bring your own window to the front |
 | `WINDOW_HIDE()` / `WINDOW_SHOW()` | make the window disappear, from the taskbar too, and bring it back — for tools that live in the tray |
-| `TRAY_SHOW([bild[, hinweis$]])` | show an icon in the notification area — on Windows in the taskbar, on macOS in the menu bar, on Linux in the desktop's panel (via D-Bus); without an image the one from `WINDOW_ICON`, otherwise the default icon; the hint appears on hover (default: the window title) |
+| `TRAY_SHOW([image[, hint$]])` | show an icon in the notification area — on Windows in the taskbar, on macOS in the menu bar, on Linux in the desktop's panel (via D-Bus); without an image the one from `WINDOW_ICON`, otherwise the default icon; the hint appears on hover (default: the window title) |
 | `TRAY_HIDE()` / `TRAY_SHOWN()` → BOOLEAN | remove the icon; is it showing right now? It disappears by itself when the program ends |
-| `TRAY_TOOLTIP(hinweis$)` | change the hint (to show progress, say) |
-| `TRAY_MENU(eintraege$)` | the right-click menu (on macOS also Ctrl+click); the entries stand in one text separated by vertical bars, a single `-` is a separator, at most 64 entries |
+| `TRAY_TOOLTIP(hint$)` | change the hint (to show progress, say) |
+| `TRAY_MENU(entries$)` | the right-click menu (on macOS also Ctrl+click); the entries stand in one text separated by vertical bars, a single `-` is a separator, at most 64 entries |
 | `TRAY_CLICKED()` / `TRAY_DOUBLE_CLICKED()` → BOOLEAN | was the icon clicked in this frame? Holds for exactly one frame, like `GUI_CLICKED`; Linux does not report a double click |
 | `TRAY_MENU_CLICKED$()` → STRING | the text of the menu entry chosen in this frame, otherwise `""` |
-| `NOTIFY(titel$[, text$])` | a system notification — under Windows at the tray icon (without an icon it creates one), under macOS via `osascript`, under Linux via `notify-send` |
+| `NOTIFY(title$[, text$])` | a system notification — under Windows at the tray icon (without an icon it creates one), under macOS via `osascript`, under Linux via `notify-send` |
 | `NOTIFY_CLICKED()` → BOOLEAN | was the notification clicked in this frame? (Windows) |
 | `WINDOW_DPI_X()` / `WINDOW_DPI_Y()` → FLOAT | screen scaling (1.0 normal, 2.0 HiDPI) — without it a program cannot know whether its pixel sizes come out tiny on the target device |
 | `WINDOW_RENDER_WIDTH()` / `WINDOW_RENDER_HEIGHT()` → INTEGER | the window's real pixel size — larger than `SCREENWIDTH()`/`SCREENHEIGHT()` on a HiDPI screen |
-| `WINDOW_WAIT_EVENTS([sekunden])` | `FLIP` waits for input, at most this long — a tool that only reacts to clicks then needs hardly any CPU time; `0` switches it off, without an argument: the duration set. After an input it runs on for 0.35 s without waiting, also while a mouse button is held; the gui shortens the wait to its next frame (caret, tooltip, animation, toast — `GUI_NEXT_FRAME`); with a fixed frame count (`DHRT_FRAMES`) it never waits |
+| `WINDOW_WAIT_EVENTS([seconds])` | `FLIP` waits for input, at most this long — a tool that only reacts to clicks then needs hardly any CPU time; `0` switches it off, without an argument: the duration set. After an input it runs on for 0.35 s without waiting, also while a mouse button is held; the gui shortens the wait to its next frame (caret, tooltip, animation, toast — `GUI_NEXT_FRAME`); with a fixed frame count (`DHRT_FRAMES`) it never waits |
 | `WINDOW_IDLE_WAIT()` → FLOAT | how long the last `FLIP` was allowed to wait at most (seconds, 0 = not at all) |
 | `FPS()` → INTEGER | measured frames per second |
-| `DRAWFPS(x, y[, farbe])` | show the frame rate as “60 FPS” in the built-in font, in screen coordinates (the camera does not apply); without a colour green, below 30 orange, below 15 red |
+| `DRAWFPS(x, y[, color])` | show the frame rate as “60 FPS” in the built-in font, in screen coordinates (the camera does not apply); without a colour green, below 30 orange, below 15 red |
 | `SETFPS(n)` | target frame rate; `0` = as fast as possible |
 | `FILES_DROPPED()` → INTEGER | how many files were dragged into the window in this frame or (macOS) handed over by the Finder? Holds for exactly one frame, can be queried any number of times |
 | `FILE_DROPPED(i)` → STRING | path of the `i`-th of them |
 | `CLIPBOARD_GET()` → STRING | read text from the clipboard; empty if another program is holding it right now |
 | `CLIPBOARD_SET(text$)` | put text into the clipboard — an **error** if that does not succeed |
-| `CLIPBOARD_SET_IMAGE(bild)` → BOOLEAN | put an `IMAGE` into the clipboard (other programs paste it as a picture) — an **error** if that does not succeed |
+| `CLIPBOARD_SET_IMAGE(image)` → BOOLEAN | put an `IMAGE` into the clipboard (other programs paste it as a picture) — an **error** if that does not succeed |
 | `CLIPBOARD_GET_IMAGE()` → INTEGER | the picture from the clipboard as a new `IMAGE`; `-1` if there is none |
 | `CLIPBOARD_HAS_IMAGE()` → BOOLEAN | is there a picture in it right now? |
-| `CLIPBOARD_SET_FILES(pfade)` | put files (`ARRAY OF STRING`, relative or absolute) into the clipboard — “Paste” in Explorer/Finder copies them |
+| `CLIPBOARD_SET_FILES(paths)` | put files (`ARRAY OF STRING`, relative or absolute) into the clipboard — “Paste” in Explorer/Finder copies them |
 | `CLIPBOARD_GET_FILES()` → ARRAY OF STRING | files from the clipboard (empty if there are none) |
-| `DRAG_OUT_FILES(pfade)` → STRING | **drag** files out of the window (onto the desktop, into a mail program …); returns `"kopieren"`, `"verschieben"`, `"verknuepfen"` or `""` |
+| `DRAG_OUT_FILES(paths)` → STRING | **drag** files out of the window (onto the desktop, into a mail program …); returns `"kopieren"`, `"verschieben"`, `"verknuepfen"` or `""` |
 | `DRAG_OUT_TEXT(text$)` → STRING | drag text out (into an editor, a text field) — like `DRAG_OUT_FILES` |
 | `GFX_PUSH()` | save the drawing state: camera, layers, light, environment, shadows, 3D camera, font, `POSTFX` |
 | `GFX_POP()` | restore it — **an error without a preceding `PUSH`** |
@@ -185,7 +185,7 @@ Display information and placing the program window on the desktop. The monitor i
 
 | Function | Purpose |
 |---|---|
-| `SCREEN_NATIVE([titel$])` | fullscreen in the **real resolution** of the current monitor |
+| `SCREEN_NATIVE([title$])` | fullscreen in the **real resolution** of the current monitor |
 
 `SCREEN_NATIVE()` is the direct route to sharp fullscreen and replaces `SCREEN(...)`:
 
@@ -210,10 +210,10 @@ The window background can show through so that the desktop stays visible — for
 
 | Function | Purpose |
 |---|---|
-| `SCREEN_TRANSPARENT(w, h[, titel$[, scale]])` | opens a window with a **transparent** background; `w`/`h` = 0 → the whole current monitor (fullscreen overlay) |
+| `SCREEN_TRANSPARENT(w, h[, title$[, scale]])` | opens a window with a **transparent** background; `w`/`h` = 0 → the whole current monitor (fullscreen overlay) |
 | `WINDOW_UNDECORATED(flag)` | window frame/title bar off (`TRUE`) / on (`FALSE`) |
 | `WINDOW_TOPMOST(flag)` | keep the window always in the foreground |
-| `WINDOW_ESC_QUIT(an)` | `ESC` as the window close key on/off (raylib default: **on**, with `gui` **off** from the first `GUI_UPDATE` on). With `FALSE`, `ESC` is a completely normal key (`QUITREQUESTED` is then only triggered by window X / Alt+F4) — for games that use `ESC` for the pause/main menu. An explicit `WINDOW_ESC_QUIT(TRUE)` applies with `gui` too |
+| `WINDOW_ESC_QUIT(on)` | `ESC` as the window close key on/off (raylib default: **on**, with `gui` **off** from the first `GUI_UPDATE` on). With `FALSE`, `ESC` is a completely normal key (`QUITREQUESTED` is then only triggered by window X / Alt+F4) — for games that use `ESC` for the pause/main menu. An explicit `WINDOW_ESC_QUIT(TRUE)` applies with `gui` too |
 | `WINDOW_PASSTHROUGH(flag)` | **pass** mouse clicks through to the desktop (click-through widget) |
 
 **Important:** `SCREEN_TRANSPARENT(...)` must be the **very first** graphics statement (before `LOADIMAGE`/`SCREEN`/…). Transparency is a window creation flag and cannot be set afterwards. `WINDOW_UNDECORATED`/`WINDOW_TOPMOST`/`WINDOW_PASSTHROUGH`, on the other hand, at any time. `WINDOW_PASSTHROUGH(TRUE)` needs a borderless window (`WINDOW_UNDECORATED(TRUE)`); the keyboard (e.g. `ESC`) then only reaches the window while it has the focus — after a desktop click, end it with the stop button in the editor or `Alt+F4`.
@@ -250,9 +250,9 @@ Real Windows dialogs for choosing files/folders. All three are **blocking** (mod
 
 | Function | Purpose |
 |---|---|
-| `FILE_OPEN_DIALOG([titel$[, endungen$]])` → STRING | choose a file to open |
-| `FILE_SAVE_DIALOG([titel$[, default$[, endungen$]]])` → STRING | choose a file to save (`default$` = suggested file name) |
-| `FOLDER_DIALOG([titel$])` → STRING | choose a folder |
+| `FILE_OPEN_DIALOG([title$[, extensions$]])` → STRING | choose a file to open |
+| `FILE_SAVE_DIALOG([title$[, default$[, extensions$]]])` → STRING | choose a file to save (`default$` = suggested file name) |
+| `FOLDER_DIALOG([title$])` → STRING | choose a folder |
 
 ```basic
 DIM pfad AS STRING
@@ -273,28 +273,28 @@ Colours are given as a 24-bit INTEGER (`&HRRGGBB`), most easily via `RGB(r, g, b
 |---|---|
 | `PLOT(x, y[, color])` | single pixel |
 | `LINE(x1, y1, x2, y2[, color])` | line (1px) |
-| `LINEW(x1, y1, x2, y2, breite[, color])` | line with a stroke width (float) |
+| `LINEW(x1, y1, x2, y2, width[, color])` | line with a stroke width (float) |
 | `BOX(x1, y1, x2, y2[, color])` | filled rectangle |
 | `RECT(x1, y1, x2, y2[, color])` | rectangle outline (1px) |
 | `BOXROUND(x1, y1, x2, y2, radius[, color])` | filled rectangle with rounded corners |
 | `RECTROUND(x1, y1, x2, y2, radius[, color])` | rectangle outline with rounded corners |
-| `GRADIENTV(x1, y1, x2, y2, farbe1, farbe2)` | rectangle with a **vertical** colour gradient (top→bottom) |
-| `GRADIENTH(x1, y1, x2, y2, farbe1, farbe2)` | rectangle with a **horizontal** colour gradient (left→right) |
-| `GRADIENT4(x1, y1, x2, y2, oben_links, oben_rechts, unten_rechts, unten_links)` | rectangle with one colour in each corner, clockwise from top left; mixed in between |
-| `BOXROT(x, y, breite, hoehe, winkel[, farbe])` | filled rectangle **centred** on (x, y), rotated about its centre (degrees, clockwise like `DRAWIMAGEROT`) |
+| `GRADIENTV(x1, y1, x2, y2, color1, color2)` | rectangle with a **vertical** colour gradient (top→bottom) |
+| `GRADIENTH(x1, y1, x2, y2, color1, color2)` | rectangle with a **horizontal** colour gradient (left→right) |
+| `GRADIENT4(x1, y1, x2, y2, top_left, top_right, bottom_right, bottom_left)` | rectangle with one colour in each corner, clockwise from top left; mixed in between |
+| `BOXROT(x, y, width, height, angle[, color])` | filled rectangle **centred** on (x, y), rotated about its centre (degrees, clockwise like `DRAWIMAGEROT`) |
 | `CIRCLE(x, y, r[, color])` | filled circle |
 | `CIRCLEOUTLINE(x, y, r[, color])` | circle as outline only (counterpart to `CIRCLE`) |
-| `CIRCLE_GRADIENT(x, y, r, innen, aussen)` | circle with a gradient from the centre (`innen`) to the edge (`aussen`); with `RGBA` as the edge colour, a soft glow |
-| `PIE(x, y, r, von_grad, bis_grad[, farbe])` | filled circle sector (pie slice); angles in **degrees**, 0 = right, clockwise |
-| `PIEOUTLINE(x, y, r, von_grad, bis_grad[, farbe])` | circle sector as outline only, with both radii |
-| `NGON(x, y, ecken, r, winkel[, farbe])` | filled regular polygon (3..1000 corners) around (x, y), radius out to the corners, rotated by `winkel` degrees |
-| `NGONOUTLINE(x, y, ecken, r, winkel[, farbe[, breite]])` | regular polygon as outline only; `breite` as with `LINEW` |
-| `LINEDASHED(x1, y1, x2, y2, strich, luecke[, farbe])` | dashed line, dash and gap length in pixels |
-| `SPLINE(xs, ys[, color[, breite]])` | smooth Catmull-Rom curve through the points; `xs`/`ys` are `ARRAY OF INTEGER` of equal length |
-| `SPLINE_BASIS(xs, ys[, farbe[, breite]])` | B-spline: even smoother than `SPLINE`, but does **not** run through the points, it is pulled by them (at least 4) |
-| `SPLINE_BEZIER(xs, ys[, farbe[, breite]])` | chain of cubic Bézier curves: start, then two control points and one end each (4, 7, 10 … points) — the way drawing programs store paths |
-| `BEZIER(x1, y1, kx, ky, x2, y2[, farbe[, breite]])` | quadratic Bézier curve from (x1, y1) to (x2, y2), bent towards the control point (kx, ky) |
-| `BEZIER3(x1, y1, k1x, k1y, k2x, k2y, x2, y2[, farbe[, breite]])` | cubic Bézier curve with two control points (S-curves, connecting lines between nodes) |
+| `CIRCLE_GRADIENT(x, y, r, inner, outer)` | circle with a gradient from the centre (`inner`) to the edge (`outer`); with `RGBA` as the edge colour, a soft glow |
+| `PIE(x, y, r, from_deg, to_deg[, color])` | filled circle sector (pie slice); angles in **degrees**, 0 = right, clockwise |
+| `PIEOUTLINE(x, y, r, from_deg, to_deg[, color])` | circle sector as outline only, with both radii |
+| `NGON(x, y, corners, r, angle[, color])` | filled regular polygon (3..1000 corners) around (x, y), radius out to the corners, rotated by `angle` degrees |
+| `NGONOUTLINE(x, y, corners, r, angle[, color[, width]])` | regular polygon as outline only; `width` as with `LINEW` |
+| `LINEDASHED(x1, y1, x2, y2, dash, gap[, color])` | dashed line, dash and gap length in pixels |
+| `SPLINE(xs, ys[, color[, width]])` | smooth Catmull-Rom curve through the points; `xs`/`ys` are `ARRAY OF INTEGER` of equal length |
+| `SPLINE_BASIS(xs, ys[, color[, width]])` | B-spline: even smoother than `SPLINE`, but does **not** run through the points, it is pulled by them (at least 4) |
+| `SPLINE_BEZIER(xs, ys[, color[, width]])` | chain of cubic Bézier curves: start, then two control points and one end each (4, 7, 10 … points) — the way drawing programs store paths |
+| `BEZIER(x1, y1, kx, ky, x2, y2[, color[, width]])` | quadratic Bézier curve from (x1, y1) to (x2, y2), bent towards the control point (kx, ky) |
+| `BEZIER3(x1, y1, k1x, k1y, k2x, k2y, x2, y2[, color[, width]])` | cubic Bézier curve with two control points (S-curves, connecting lines between nodes) |
 | `TRIANGLE(x1, y1, x2, y2, x3, y3[, color])` | filled triangle |
 | `TRIANGLEOUTLINE(x1, y1, x2, y2, x3, y3[, color[, width]])` | triangle as outline only |
 | `POLYGON(points[, color])` | filled polygon — `points` is an `ARRAY OF INTEGER` with `[x1, y1, x2, y2, …]` (at least 3 points) |
@@ -303,7 +303,7 @@ Colours are given as a 24-bit INTEGER (`&HRRGGBB`), most easily via `RGB(r, g, b
 | `ELLIPSEOUTLINE(x1, y1, x2, y2[, color[, width]])` | ellipse as outline only |
 | `ARC(x1, y1, x2, y2, start_rad, end_rad[, color[, width]])` | arc segment in the bounding box; angles in radians, counter-clockwise. `width` (float, optional) = stroke width; without it 1px (independent of zoom), with it scaled with the `CAMERA_SET` zoom like `LINEW`/`SPLINE` |
 | `TEXT(x, y, s$[, color])` | text at (x, y) |
-| `TEXTROT(x, y, s$, winkel[, skala[, farbe]])` | text **centred** on (x, y), rotated about the centre (degrees, like `DRAWIMAGEROT`) and scaled — for score pop-ups, slanted labels. Uses the active font/size |
+| `TEXTROT(x, y, s$, angle[, scale[, color]])` | text **centred** on (x, y), rotated about the centre (degrees, like `DRAWIMAGEROT`) and scaled — for score pop-ups, slanted labels. Uses the active font/size |
 
 > **Corner order does not matter:** filled `TRIANGLE` and `POLYGON` draw
 > regardless of the winding — whether the points are given clockwise or
@@ -346,8 +346,8 @@ Colours can carry an **alpha channel** (`&Haarrggbb`, top byte = opacity):
 | Function | Purpose |
 |---|---|
 | `RGBA(r, g, b, a)` → INTEGER | colour with alpha (`a` 0..255, 255 = fully opaque) |
-| `ALPHA(farbe)` → INTEGER | read the alpha channel (0..255) from a colour |
-| `BLEND_MODE(modus$)` | blend mode for subsequent draws: `"alpha"` (default), `"add"` (additive – glow/light), `"mult"` (multiplicative – shadow/tint), `"subtract"` |
+| `ALPHA(color)` → INTEGER | read the alpha channel (0..255) from a colour |
+| `BLEND_MODE(name$)` | blend mode for subsequent draws: `"alpha"` (default), `"add"` (additive – glow/light), `"mult"` (multiplicative – shadow/tint), `"subtract"` |
 
 `BLEND_MODE` applies until the next call — after an effect, set it back with `BLEND_MODE("alpha")`.
 
@@ -364,7 +364,7 @@ BLEND_MODE("alpha")          ' back to normal mode
 
 | Function | Effect |
 |---|---|
-| `SCISSOR(x, y, breite, hoehe)` | subsequent draws are clipped to this rectangle |
+| `SCISSOR(x, y, width, height)` | subsequent draws are clipped to this rectangle |
 | `SCISSOR_END()` | remove the topmost restriction |
 | `SCISSOR_DEPTH()` → INTEGER | how many clips are currently open |
 
@@ -396,23 +396,23 @@ a second canvas with its own memory, where a rectangle is enough.
 | Function | Effect |
 |---|---|
 | `TEXT(x, y, s$[, color])` | text at (x, y) in the active font |
-| `TEXT_SIZE(px)` | font size for subsequent `TEXT` calls (4–400) |
+| `TEXT_SIZE(size)` | font size for subsequent `TEXT` calls (4–400) |
 | `TEXT_WIDTH(s$)` | pixel width of `s$` in the active font/size |
 | `TEXT_HEIGHT()` | line height of the active font |
-| `TEXT_STYLE(stil$)` | style for subsequent `TEXT` calls: `fett` (bold), `kursiv` (italic), `unterstrichen` (underlined), `durchgestrichen` (strikethrough), joined with `+` (`"fett+unterstrichen"`); `"normal"` switches back |
+| `TEXT_STYLE(style$)` | style for subsequent `TEXT` calls: `fett` (bold), `kursiv` (italic), `unterstrichen` (underlined), `durchgestrichen` (strikethrough), joined with `+` (`"fett+unterstrichen"`); `"normal"` switches back |
 | `TEXT_GET_STYLE$()` | the current style as text, e.g. `"fett+kursiv"` |
-| `TEXT_BOLD(an)` / `TEXT_ITALIC(an)` | switch only bold or italic on or off; the rest of the style stays |
-| `FONT_STYLE(font, stil$)` → FONT | the real bold/italic face of a loaded font (looks for the file next to it, e.g. `segoeuib.ttf` for `segoeui.ttf`); if there is none, `font` itself comes back |
-| `FONT_HAS_STYLE(font, stil$)` | TRUE if this face exists as a file -- otherwise the runtime imitates it |
-| `LOADFONT(pfad$, groesse[, zeichen$])` → FONT | load TTF/OTF/TTC → FONT handle (INTEGER); `zeichen$` = script blocks (`"kyrillisch, griechisch"`, `"japanisch"`, `"emoji"` …) or the characters themselves that should be baked. Instead of a path a **built-in font** works too: `"sans"`, `"serif"`, `"mono"` (DejaVu, each with `-fett`, `-kursiv`, `-fett-kursiv`) and `"noten"` (Noto Music: clefs, note heads, rests, accidentals from the "Musical Symbols" block, SIL OFL). A character that was not baked is fetched from the same file in the next frame |
-| `LOADFONT_SDF(pfad$, groesse[, zeichen$])` → FONT | a font that stays sharp at **any** size: baked as a distance field, drawn with a shader that keeps the edge soft by one pixel. An ordinary font blurs as soon as it is drawn larger than it was baked (titles, camera zoom). Without `zeichen$` ASCII and Latin-1 including €; baking costs more per character than with `LOADFONT` (about 130 ms for this selection) |
-| `FONT_HAS_GLYPH(font, zeichen$)` → BOOLEAN | does the font itself have a glyph for it? If not, `TEXT` draws it with the fallback font; `-1` = built-in font |
-| `FONT_GLYPH_WIDTH(font, zeichen$, groesse)` → FLOAT | how far `TEXT` advances after this character at `groesse` points — measured like `TEXT_WIDTH`, without switching the active font |
-| `FONT_GLYPH_BOX(font, zeichen$, groesse)` → TUPLE | the rectangle `(x, y, width, height)` the glyph really covers, relative to the point where `TEXT(x, y, zeichen$)` puts it at `groesse` — read from the font file. That places a character exactly: centred in a button, a clef on its line |
-| `FONT_BASELINE(font, groesse)` → FLOAT | how far below the top edge where `TEXT` puts the text the baseline lies |
-| `FONT_TO_IMAGE(font[, erstes[, letztes]])` → IMAGE | the characters `erstes`..`letztes` (default 32..126, at most 256) as an image in the format of `LOADFONT_IMAGE`: each character white in a transparent field, magenta (`&HFF00FF`) outside and in between. That turns a vector font into a pixel font that you can touch up and load again with `LOADFONT_IMAGE(bild, &HFF00FF, erstes)` |
-| `FONT_LIGATURES(font, an)` | switch the **ligatures** and kerning of a font loaded with `LOADFONT` on or off: its text then goes through text shaping (fi ligatures, the joined characters of a programming font, tighter pairs like “AV”) |
-| `SETFONT(font[, groesse])` | set the active font; `SETFONT(-1)` = default font. Without `groesse` the size the font was loaded at applies afterwards; with `groesse` everything is drawn at that size from now on (like `SETFONT` + `TEXT_SIZE`) -- load sharp, draw small: `SETFONT(LOADFONT("sans", 32), 16)` |
+| `TEXT_BOLD(on)` / `TEXT_ITALIC(on)` | switch only bold or italic on or off; the rest of the style stays |
+| `FONT_STYLE(font, style$)` → FONT | the real bold/italic face of a loaded font (looks for the file next to it, e.g. `segoeuib.ttf` for `segoeui.ttf`); if there is none, `font` itself comes back |
+| `FONT_HAS_STYLE(font, style$)` | TRUE if this face exists as a file -- otherwise the runtime imitates it |
+| `LOADFONT(path$, size[, chars$])` → FONT | load TTF/OTF/TTC → FONT handle (INTEGER); `chars$` = script blocks (`"kyrillisch, griechisch"`, `"japanisch"`, `"emoji"` …) or the characters themselves that should be baked. Instead of a path a **built-in font** works too: `"sans"`, `"serif"`, `"mono"` (DejaVu, each with `-fett`, `-kursiv`, `-fett-kursiv`) and `"noten"` (Noto Music: clefs, note heads, rests, accidentals from the "Musical Symbols" block, SIL OFL). A character that was not baked is fetched from the same file in the next frame |
+| `LOADFONT_SDF(path$, size[, chars$])` → FONT | a font that stays sharp at **any** size: baked as a distance field, drawn with a shader that keeps the edge soft by one pixel. An ordinary font blurs as soon as it is drawn larger than it was baked (titles, camera zoom). Without `chars$` ASCII and Latin-1 including €; baking costs more per character than with `LOADFONT` (about 130 ms for this selection) |
+| `FONT_HAS_GLYPH(font, char$)` → BOOLEAN | does the font itself have a glyph for it? If not, `TEXT` draws it with the fallback font; `-1` = built-in font |
+| `FONT_GLYPH_WIDTH(font, chars$, size)` → FLOAT | how far `TEXT` advances after this character at `size` points — measured like `TEXT_WIDTH`, without switching the active font |
+| `FONT_GLYPH_BOX(font, char$, size)` → TUPLE | the rectangle `(x, y, width, height)` the glyph really covers, relative to the point where `TEXT(x, y, char$)` puts it at `size` — read from the font file. That places a character exactly: centred in a button, a clef on its line |
+| `FONT_BASELINE(font, size)` → FLOAT | how far below the top edge where `TEXT` puts the text the baseline lies |
+| `FONT_TO_IMAGE(font[, first[, last]])` → IMAGE | the characters `first`..`last` (default 32..126, at most 256) as an image in the format of `LOADFONT_IMAGE`: each character white in a transparent field, magenta (`&HFF00FF`) outside and in between. That turns a vector font into a pixel font that you can touch up and load again with `LOADFONT_IMAGE(bild, &HFF00FF, first)` |
+| `FONT_LIGATURES(font, on)` | switch the **ligatures** and kerning of a font loaded with `LOADFONT` on or off: its text then goes through text shaping (fi ligatures, the joined characters of a programming font, tighter pairs like “AV”) |
+| `SETFONT(font[, size])` | set the active font; `SETFONT(-1)` = default font. Without `size` the size the font was loaded at applies afterwards; with `size` everything is drawn at that size from now on (like `SETFONT` + `TEXT_SIZE`) -- load sharp, draw small: `SETFONT(LOADFONT("sans", 32), 16)` |
 | `TEXT_SPACING(px)` | letter spacing for TTF (native) |
 | `TEXT_LINE_SPACING(px)` | line spacing for multi-line text |
 
@@ -575,15 +575,15 @@ of 16 would have silently shortened a confirmed sentence).
 | Function | Purpose |
 |---|---|
 | `LOADIMAGE(path$)` → IMAGE | load a file (PNG, JPG, BMP, …) |
-| `IMAGEWIDTH(img)`, `IMAGEHEIGHT(img)` → INTEGER | pixel size; equivalently `IMAGE_WIDTH`/`IMAGE_HEIGHT` in the naming scheme of the other `IMAGE_*` commands |
-| `GETPIXEL(img, x, y)` → INTEGER | read the pixel colour (`&HRRGGBB`) at `(x, y)`; `-1` for an index outside. Counterpart to `PLOT` (write) — for per-pixel collision, masking, colour sampling |
-| `GETALPHA(img, x, y)` → INTEGER | opacity at `(x, y)`, `0..255`; `-1` for an index outside. Needed because `GETPIXEL` returns a **colour**, and there opacity 0 means *opaque* — a transparent pixel would come back as a black one |
-| `DRAWIMAGE(img, x, y)` | draw the image at (x, y) |
-| `DRAWIMAGEPART(img, sx, sy, sw, sh, x, y)` | draw a sub-rectangle from a sheet |
-| `DRAWIMAGEPARTEX(img, sx, sy, sw, sh, x, y, w, h [, farbe])` | a sub-rectangle stretched to `w` x `h`; `farbe` tints it, its alpha is the opacity (`RGBA(255, 255, 255, 128)` = half transparent) |
-| `DRAWIMAGEFLIPPED(img, x, y[, flipX[, flipY]])` | with mirroring |
-| `DRAWIMAGEROT(img, x, y, winkel[, skala[, tint]])` | **centred** on (x,y), rotated by `winkel` **degrees** (about the centre), optionally scaled + tinted. Ideal for rotated sprites / `physics2d` (`winkel = DEG(PHYS2D_BODY_ANGLE(...))`). Camera-aware. |
-| `DRAWIMAGE9(img, x, y, breite, hoehe, links, oben, rechts, unten[, tint])` | **9-slice**: the image stretched into the rectangle, the four corners at their own size, the edges in one direction only, the centre in both — for frames, panels and buttons that grow to any size without distorting. Edges in pixels of the image; if the target does not fit, the corners shrink proportionally. Camera-aware. |
+| `IMAGEWIDTH(image)`, `IMAGEHEIGHT(image)` → INTEGER | pixel size; equivalently `IMAGE_WIDTH`/`IMAGE_HEIGHT` in the naming scheme of the other `IMAGE_*` commands |
+| `GETPIXEL(image, x, y)` → INTEGER | read the pixel colour (`&HRRGGBB`) at `(x, y)`; `-1` for an index outside. Counterpart to `PLOT` (write) — for per-pixel collision, masking, colour sampling |
+| `GETALPHA(image, x, y)` → INTEGER | opacity at `(x, y)`, `0..255`; `-1` for an index outside. Needed because `GETPIXEL` returns a **colour**, and there opacity 0 means *opaque* — a transparent pixel would come back as a black one |
+| `DRAWIMAGE(image, x, y)` | draw the image at (x, y) |
+| `DRAWIMAGEPART(image, sx, sy, sw, sh, x, y)` | draw a sub-rectangle from a sheet |
+| `DRAWIMAGEPARTEX(image, sx, sy, sw, sh, x, y, w, h [, color])` | a sub-rectangle stretched to `w` x `h`; `color` tints it, its alpha is the opacity (`RGBA(255, 255, 255, 128)` = half transparent) |
+| `DRAWIMAGEFLIPPED(image, x, y[, flip_x[, flip_y]])` | with mirroring |
+| `DRAWIMAGEROT(image, x, y, angle_deg[, scale[, tint]])` | **centred** on (x,y), rotated by `angle_deg` **degrees** (about the centre), optionally scaled + tinted. Ideal for rotated sprites / `physics2d` (`angle_deg = DEG(PHYS2D_BODY_ANGLE(...))`). Camera-aware. |
+| `DRAWIMAGE9(image, x, y, width, height, left, top, right, bottom[, tint])` | **9-slice**: the image stretched into the rectangle, the four corners at their own size, the edges in one direction only, the centre in both — for frames, panels and buttons that grow to any size without distorting. Edges in pixels of the image; if the target does not fit, the corners shrink proportionally. Camera-aware. |
 
 ```basic
 SCREEN(320, 240, "Bilder", 2)
@@ -655,10 +655,10 @@ A **sprite atlas** is ONE big image with named sub-rects (`x, y, w, h`). Instead
 
 | Function | Purpose |
 |---|---|
-| `ATLAS_LOAD(manifest_path$)` → SPRITE_ATLAS | load an atlas from a JSON manifest |
-| `ATLAS_DRAW(atlas, name$, x, y)` | draw a single sub-sprite (camera-aware) |
+| `ATLAS_LOAD(path$)` → SPRITE_ATLAS | load an atlas from a JSON manifest |
+| `ATLAS_DRAW(atlas, name$, x, y[, tint])` | draw a single sub-sprite (camera-aware) |
 | `ATLAS_DRAW_FLIPPED(atlas, name$, x, y[, flip_x[, flip_y[, tint]]])` | sub-sprite with mirroring (X/Y, each `TRUE`/`FALSE` or `1`/`0`); optional `tint` |
-| `BATCH_DRAW(atlas, name$, x, y)` | **second name for `ATLAS_DRAW`** — draws immediately, collects nothing |
+| `BATCH_DRAW(atlas, name$, x, y[, tint])` | **second name for `ATLAS_DRAW`** — draws immediately, collects nothing |
 | `BATCH_FLUSH()` | **does nothing** (no-op) — only so that old code keeps running |
 
 **Manifest format:**
@@ -841,10 +841,10 @@ overhead per command, not the drawing itself.
 
 | Function | Purpose |
 |---|---|
-| `PLOTS(xs, ys, farbe [, anzahl])` | many pixels; `farbe` as a number applies to all, as an ARRAY per pixel |
-| `BOXES(x1s, y1s, x2s, y2s, farbe [, anzahl])` | many rectangles |
-| `CIRCLES(xs, ys, rs, farbe [, anzahl])` | many circles |
-| `LINES(x1s, y1s, x2s, y2s, farbe [, anzahl])` | many lines |
+| `PLOTS(xs, ys, color [, count])` | many pixels; `color` as a number applies to all, as an ARRAY per pixel |
+| `BOXES(x1s, y1s, x2s, y2s, color [, count])` | many rectangles |
+| `CIRCLES(xs, ys, rs, color [, count])` | many circles |
+| `LINES(x1s, y1s, x2s, y2s, color [, count])` | many lines |
 
 **Leaving out `anzahl` means “the whole array”** — so a buffer with a fixed
 size drags its unused slots into the picture. Whoever has only filled the
@@ -858,14 +858,14 @@ loaded one.
 
 | Function | Purpose |
 |---|---|
-| `GENTEX_COLOR(breite, hoehe, farbe)` | single-coloured area |
-| `GENTEX_GRADIENT(breite, hoehe, farbe1, farbe2 [, vertikal])` | linear gradient |
-| `GENTEX_GRADIENT_BOX(breite, hoehe, dichte, farbe1, farbe2)` | rectangular gradient from the inside out — vignettes |
-| `GENTEX_RADIAL(breite, hoehe, innen, aussen [, dichte])` | round gradient from the centre outwards — soft lights and glows, drawn additively. `dichte` (0..1, default 0) is the share of the radius in full inner colour: 0 = soft from the centre, 1 = a disc; more is an error |
-| `GENTEX_CHECKED(breite, hoehe, feld_x, feld_y, farbe1, farbe2)` | checkerboard |
-| `GENTEX_PERLIN(breite, hoehe, skala)` | Perlin noise — clouds, terrain, marble |
-| `GENTEX_CELLULAR(breite, hoehe, kachel)` | cellular noise (Voronoi) — stone floors, cracks, scales |
-| `GENTEX_NOISE(breite, hoehe, anteil)` | white noise — star fields, film grain |
+| `GENTEX_COLOR(width, height, color)` | single-coloured area |
+| `GENTEX_GRADIENT(width, height, color1, color2 [, vertical])` | linear gradient |
+| `GENTEX_GRADIENT_BOX(w, h, density, c1, c2)` | rectangular gradient from the inside out — vignettes |
+| `GENTEX_RADIAL(w, h, inner_color, outer_color [, density])` | round gradient from the centre outwards — soft lights and glows, drawn additively. `density` (0..1, default 0) is the share of the radius in full inner colour: 0 = soft from the centre, 1 = a disc; more is an error |
+| `GENTEX_CHECKED(width, height, cell_x, cell_y, color1, color2)` | checkerboard |
+| `GENTEX_PERLIN(width, height, scale)` | Perlin noise — clouds, terrain, marble |
+| `GENTEX_CELLULAR(w, h, tile)` | cellular noise (Voronoi) — stone floors, cracks, scales |
+| `GENTEX_NOISE(w, h, fraction)` | white noise — star fields, film grain |
 
 ## Render targets
 
@@ -874,12 +874,12 @@ A render target is an off-screen surface you draw on just like on the window
 
 | Function | Purpose |
 |---|---|
-| `RENDERTARGET_NEW(breite, hoehe [, behalten])` → INTEGER | create a target. `behalten = TRUE` keeps the contents beyond the frame — the precondition for trails |
-| `RENDERTARGET_BEGIN(ziel)` | draw there from now on |
+| `RENDERTARGET_NEW(w, h [, keep])` → INTEGER | create a target. `keep = TRUE` keeps the contents beyond the frame — the precondition for trails |
+| `RENDERTARGET_BEGIN(target)` | draw there from now on |
 | `RENDERTARGET_END()` | back to the window |
-| `RENDERTARGET_DRAW(ziel, x, y [, skala [, tint [, gespiegelt]]])` | stamp the target onto the window like an image |
-| `RENDERTARGET_CLEAR(ziel [, farbe])` | clear by hand — needed when `behalten` is on |
-| `RENDERTARGET_IMAGE(ziel)` → IMAGE | the content as an image — whatever was drawn since `RENDERTARGET_BEGIN` is played back **right away** for this, not only at `FLIP`. This gets a chart into a PDF (`PDF_IMAGE`) or a file (`IMAGE_SAVE`) |
+| `RENDERTARGET_DRAW(rt, x, y [, scale [, tint [, mirrored]]])` | stamp the target onto the window like an image |
+| `RENDERTARGET_CLEAR(rt [, color])` | clear by hand — needed when `behalten` is on |
+| `RENDERTARGET_IMAGE(rt)` → IMAGE | the content as an image — whatever was drawn since `RENDERTARGET_BEGIN` is played back **right away** for this, not only at `FLIP`. This gets a chart into a PDF (`PDF_IMAGE`) or a file (`IMAGE_SAVE`) |
 
 Without `behalten`, the target is cleared to transparent at the start of
 every frame. A trail, by contrast, comes about like this: `behalten = TRUE`,
@@ -893,14 +893,14 @@ does nothing.
 
 | Function | Purpose |
 |---|---|
-| `SHADER_LOAD(pfad_oder_glsl$)` → INTEGER | load a fragment shader — from a file or directly as source text; `-1` on error |
+| `SHADER_LOAD(src$)` → INTEGER | load a fragment shader — from a file or directly as source text; `-1` on error |
 | `POSTFX(shader [, scale])` | send every finished frame through this shader; `-1` switches it off. `scale` (0.25..1, default 1) lets the shader work at a lower resolution and enlarges the result smoothly -- for expensive shaders on weak graphics chips (at 0.7 about half the work); text in the picture becomes a little softer |
-| `SHADER_SET(shader, name$, wert)` | pass a number to a `uniform float` |
+| `SHADER_SET(shader, name$, v)` | pass a number to a `uniform float` |
 | `SHADER_SET2(shader, name$, x, y)` | two values (`vec2`) |
 | `SHADER_SET3(shader, name$, x, y, z)` | three values (`vec3`) |
-| `SHADER_SET_ARRAY(shader, name$, werte)` | fill a `uniform float[]` from an `ARRAY OF FLOAT` — light positions, gradient stops |
+| `SHADER_SET_ARRAY(shader, name$, values)` | fill a `uniform float[]` from an `ARRAY OF FLOAT` — light positions, gradient stops |
 | `SHADER_SET_MATRIX(shader, name$, mat)` | pass a `MAT4` from [`m3d`](module-m3d.md) |
-| `SHADER_SET_TEXTURE(shader, name$, bild)` | occupy a **second** sampler — masks, palettes, cross-fades |
+| `SHADER_SET_TEXTURE(shader, name$, image)` | occupy a **second** sampler — masks, palettes, cross-fades |
 
 `SHADER_SET_TEXTURE` is remembered and only set when drawing. The reason is
 a quirk of raylib: the assignment affects the *currently active* shader
@@ -911,17 +911,17 @@ sampler would stay black.
 
 | Function | Purpose |
 |---|---|
-| `KEYPRESSED(code)` → BOOLEAN | TRUE **as long as** the key with SDL code `code` is held — every frame again. For moving/steering. |
-| `KEYHIT(code)` → BOOLEAN | TRUE only in **the one frame** in which the key goes down. For shooting, jumping, toggling. |
+| `KEYPRESSED(key)` → BOOLEAN | TRUE **as long as** the key with SDL code `code` is held — every frame again. For moving/steering. |
+| `KEYHIT(key)` → BOOLEAN | TRUE only in **the one frame** in which the key goes down. For shooting, jumping, toggling. |
 | | *Letters:* `KEY_A`…`KEY_Z` are the clear spelling. `ASC("s")` and `ASC("S")` both mean the same key — until 2026-08-31 the **upper-case** spelling silently hit nothing at all, which looked like a forgotten call. |
 | | *Position or label:* a key code means the **position** of the key on the US keyboard — `KEY_Z` is the key labelled Y on a German keyboard, the one labelled W on a French one. That is right for WASD. For shortcuts like Ctrl+Z write the **letter as text**: `KEYHIT("z")` means the key the Z is printed on (also for `KEYPRESSED`, `KEYRELEASED`, `KEYREPEAT`; letters, digits and the space). |
-| `KEYRELEASED(code)` → BOOLEAN | TRUE in the frame in which the key is released — for “charge up and fire on release”, say |
-| `KEYREPEAT(code)` → BOOLEAN | like `KEYHIT`, but while held it also fires with the system key repeat. For text cursors and quantity input. |
+| `KEYRELEASED(key)` → BOOLEAN | TRUE in the frame in which the key is released — for “charge up and fire on release”, say |
+| `KEYREPEAT(key)` → BOOLEAN | like `KEYHIT`, but while held it also fires with the system key repeat. For text cursors and quantity input. |
 | `MOUSEX()`, `MOUSEY()` → INTEGER | current mouse position (in logical pixels) |
 | `MOUSEBUTTON(n)` → BOOLEAN | TRUE if mouse button n is pressed — **`0`=left, `1`=right, `2`=middle** (raylib order: right before middle!) |
 | `MOUSEWHEEL()` → INTEGER | mouse wheel delta since the last call (+ up / − down / 0) |
-| `MOUSE_VISIBLE(an)` | show/hide the OS cursor — hide it when the game draws its own crosshair/cursor sprite |
-| `MOUSE_LOCK(an)` | **capture** the cursor: hide it + lock it into the window (relative movement) — for first-person/camera mouse control; `FALSE` releases it |
+| `MOUSE_VISIBLE(on)` | show/hide the OS cursor — hide it when the game draws its own crosshair/cursor sprite |
+| `MOUSE_LOCK(on)` | **capture** the cursor: hide it + lock it into the window (relative movement) — for first-person/camera mouse control; `FALSE` releases it |
 | `MOUSE_HIDDEN()` → BOOLEAN | is the cursor hidden/captured right now? |
 | `SCREENWIDTH()`, `SCREENHEIGHT()` → INTEGER | logical window size (as passed to `SCREEN`); 0 before `SCREEN` |
 | `MOUSE_HIT(n)` → BOOLEAN | TRUE only in **the one frame** in which the mouse button goes down |
@@ -934,7 +934,7 @@ sampler would stay black.
 | `MOUSE_ON_SCREEN()` → BOOLEAN | is the pointer in the window at all? |
 | `MOUSE_CURSOR(form$)` | pointer shape: `default`, `ibeam`, `crosshair`, `hand`, `resize_ew`, `resize_ns`, `resize_nwse`, `resize_nesw`, `resize_all`, `not_allowed`, plus `warten` (wait), `arbeitet` (busy), `hilfe` (help) (under Windows the real system pointers, the hourglass spins), `kopieren` (copy), `stift` (pen), `pipette` (eyedropper) and your own from `MOUSE_CURSOR_NEW`; stays in place and takes precedence over the gui, `auto` hands the pointer back to the gui |
 | `MOUSE_CURSOR_GET$()` | the pointer shape currently in effect (the program's, otherwise the gui's, otherwise `default`) |
-| `MOUSE_CURSOR_NEW(bild, bx, by)` | a pointer from an image (up to 256x256, hot spot `bx`,`by`); returns the name (`eigen1` ...) which then works for `MOUSE_CURSOR` and `GUI_SET_CURSOR`. The image is copied |
+| `MOUSE_CURSOR_NEW(image, bx, by)` | a pointer from an image (up to 256x256, hot spot `bx`,`by`); returns the name (`eigen1` ...) which then works for `MOUSE_CURSOR` and `GUI_SET_CURSOR`. The image is copied |
 | `KEY_ANY_HIT()` → INTEGER | code of the last key pressed, `-1` = none — for key-binding dialogs |
 | `KEY_NAME$(code)` → STRING | display name of a key (`LEER`, `LINKS`, `UMSCHALT`, `F5` …) |
 | `INKEY$()` → STRING | last typed character or `""` — does **not** wait, for text input during gameplay |
@@ -1011,10 +1011,10 @@ held” and “pressed right now”.
 | `JOYSTICK_HIT(idx, btn)` → BOOLEAN | pressed in exactly this frame |
 | `JOYSTICK_RELEASED(idx, btn)` → BOOLEAN | released in exactly this frame |
 | `JOYSTICK_ANY_BUTTON()` → INTEGER | last button pressed, `-1` = none — for key-binding dialogs |
-| `JOYSTICK_AXIS(idx, achse)` → FLOAT | position of an analogue axis, `-1.0` to `+1.0` |
+| `JOYSTICK_AXIS(idx, axis)` → FLOAT | position of an analogue axis, `-1.0` to `+1.0` |
 | `JOYSTICK_AXIS_COUNT(idx)` → INTEGER | how many axes does the device have? |
 | `JOYSTICK_HAT_X(idx, hat)` / `JOYSTICK_HAT_Y(idx, hat)` → INTEGER | D-pad as `-1`, `0` or `+1` per axis |
-| `JOYSTICK_RUMBLE(idx, links, rechts, dauer_s)` | vibration; the two motors separately (each `0.0`–`1.0`) |
+| `JOYSTICK_RUMBLE(idx, left, right, duration_s)` | vibration; the two motors separately (each `0.0`–`1.0`) |
 | `JOYSTICK_MAPPINGS(sdl_db$)` → INTEGER | load mappings from the SDL GameControllerDB — this makes exotic devices map correctly |
 
 There are constants for the buttons (`JOY_BUTTON_A` … `JOY_BUTTON_Y`,

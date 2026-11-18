@@ -851,10 +851,25 @@ Greet("Dora", 50, suffix: "?")
 
 - `SUB`/`FUNCTION` calls
 - `NEW Klasse(...)` (passed to the `Init` method)
+- built-in commands (`CIRCLE`, `MID$`, `GUI_BUTTON`, …). The names are in
+  the signature the editor shows while you type, and in the command tables
+  of the manual:
+
+```basic
+SCREEN(320, 200, title: "Named arguments")
+CIRCLE(x: 160, y: 100, r: 40, color: RGB(255, 120, 40))
+PRINT MID$("Drachenhauch", start: 0, n: 7)
+```
+
+For built-in commands one more rule applies: if you name a later optional
+parameter, you also pass the ones before it that have no default —
+`ARC(…, width: 3)` needs `color` too, and the message says so. The `$` on
+the name is optional (`encoding:` as well as `encoding$:`), and a name may
+be a keyword (`to:`, `image:`, `new:`). The names are English and the same
+everywhere ([Command names](builtins-namen.md#the-rules), rule 8).
 
 **Not available for**:
 
-- Built-ins (`ABS`, `CIRCLE`, `JSON_PARSE`, …) — they have no declared parameter names
 - Method calls `obj.method(name: ...)` — the class is only known at run time, so the `dhrt` compiler throws here.
 
 ### BYREF parameters (multi-return)
@@ -1023,7 +1038,7 @@ PRINT CORO_RESUME(c)     ' 99  (now finished: CORO_DONE(c) = TRUE)
 | Built-in | Effect |
 |---|---|
 | `CORO_RESUME(c)` | Continue up to the next `YIELD`; returns the YIELD value (or the RETURN value when the coroutine ends). |
-| `CORO_SEND(c, v)` | Like `CORO_RESUME`, but the `YIELD` expression in the body evaluates to `v`. |
+| `CORO_SEND(c, value)` | Like `CORO_RESUME`, but the `YIELD` expression in the body evaluates to `v`. |
 | `CORO_DONE(c)` | `BOOLEAN` — whether the coroutine has finished. |
 | `CORO_RESULT(c)` | Final `RETURN` value (throws if not finished yet). |
 | `CORO_CLOSE(c)` | Tear down a suspended coroutine. |

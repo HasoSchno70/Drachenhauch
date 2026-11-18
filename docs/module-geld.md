@@ -29,13 +29,13 @@ schreiben und weiß dann, was man tut.
 
 | Funktion | Zweck |
 |---|---|
-| `GELD_NEU(betrag)` → GELD | aus Text (`"19,99"`, `"1.234,56"`) oder Zahl |
+| `GELD_NEU(amount)` → GELD | aus Text (`"19,99"`, `"1.234,56"`) oder Zahl |
 | `GELD_AUS_CENT(cent)` → GELD | aus ganzen Cent |
 | `GELD_CENT(g)` → INTEGER | in ganze Cent, kaufmännisch gerundet |
 | `GELD_ZAHL(g)` → FLOAT | bewusst herausgehen (Anzeige in Diagrammen o. Ä.) |
 | `GELD_TEXT$(g [, symbol$])` → STRING | `19,99 €`, Symbol wählbar |
-| `GELD_RUNDEN(g [, stellen])` → GELD | kaufmännisch, Vorgabe 2 Stellen |
-| `GELD_TEILEN(g, anzahl)` → ARRAY OF GELD | aufteilen, **ohne einen Cent zu verlieren** |
+| `GELD_RUNDEN(g [, digits])` → GELD | kaufmännisch, Vorgabe 2 Stellen |
+| `GELD_TEILEN(g, count)` → ARRAY OF GELD | aufteilen, **ohne einen Cent zu verlieren** |
 | `GELD_ABS(g)` → GELD | Betrag ohne Vorzeichen |
 
 Dazu die Operatoren: `+` `-` zwischen zwei Beträgen, `*` `/` mit einer Zahl,

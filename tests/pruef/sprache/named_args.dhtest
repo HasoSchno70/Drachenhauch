@@ -134,11 +134,83 @@ f(b: 2)
 --- fehler
 f: Parameter 'a' fehlt
 
-=== named arg on builtin raises
-' Built-ins haben keine deklarierten Param-Namen -> Fehler.
-PRINT ABS(x: -5)
+=== benannte argumente an builtins
+' Die Namen kommen aus der Signatur in daten/builtin_index.json. Ein Name
+' darf ein Schluesselwort sein (new) und ein $ tragen.
+PRINT ABS(v: -5)
+PRINT MID$("Drachenhauch", start: 0, n: 7)
+PRINT MID$(s: "Drachenhauch", n: 4, start: 2)
+PRINT CLAMP(hi: 10, lo: 0, v: 15)
+PRINT REPLACE$("a-b-c", old: "-", new: "+")
+PRINT REPLACE_BETWEEN$("a[b]c", "[", "]", new$: "X")
+--- erwartet
+5
+Drachen
+ache
+10
+a+b+c
+a[X]c
+
+=== builtin luecke bekommt die vorgabe aus dem index
+' second ist benannt, hour und minute fuellt ihre Vorgabe (= 0).
+IMPORT "zeit"
+PRINT TIME_FROM_PARTS(2026, 11, 18, second: 30) = TIME_FROM_PARTS(2026, 11, 18, 0, 0, 30)
+PRINT TIME_FROM_PARTS(day: 18, month: 11, year: 2026) = TIME_FROM_PARTS(2026, 11, 18)
+--- erwartet
+TRUE
+TRUE
+
+=== builtin unbekannter parametername
+PRINT ABS(wert: -5)
 --- fehler
-abs: Named-Args nur bei SUB/FUNCTION
+ABS: kein Parameter 'wert'. Die Parameter heissen v
+
+=== builtin luecke ohne vorgabe
+' Ohne color behaelt das Fenster seine Lichtfarbe -- kein Wert sagt dasselbe,
+' darum hat color im Index keine Vorgabe, und wer duration_ms benennt, gibt
+' color mit an.
+GUI_WINDOW_GLOW(1, duration_ms: 500)
+--- fehler
+GUI_WINDOW_GLOW: 'color' hat keine Vorgabe -- wer 'duration_ms' benennt, gibt 'color' mit an
+
+=== builtin luecke mit vorgabe aus dem index
+' ARC zeichnet ohne color weiss; der Index sagt color = &HFFFFFF. Nur
+' uebersetzt (die SUB laeuft nie) -- gezeichnet wird ohne Fenster nicht.
+SUB nie()
+    ARC(1, 2, 3, 4, 0.0, 1.0, width: 3)
+END SUB
+PRINT "uebersetzt"
+--- erwartet
+uebersetzt
+
+=== builtin pflichtparameter fehlt
+PRINT CLAMP(15, lo: 0)
+--- fehler
+CLAMP: Parameter 'hi' fehlt
+
+=== builtin doppelt belegt
+PRINT CLAMP(15, lo: 0, hi: 3, v: 1)
+--- fehler
+CLAMP: Parameter 'v' ist doppelt belegt
+
+=== builtin wert nach stelle hinter benanntem
+PRINT CLAMP(v: 15, 0, 3)
+--- fehler
+CLAMP: nach einem benannten Argument muessen alle weiteren benannt sein
+
+=== builtin ohne parameternamen
+GUI_RULE(1, x: 2)
+--- fehler
+GUI_RULE: benannte Argumente gehen hier nicht
+
+=== eigene funktion verdeckt den builtin
+' Heisst eine eigene FUNCTION wie ein Builtin, gelten ihre Namen.
+FUNCTION clamp(wert AS INTEGER, unten AS INTEGER, oben AS INTEGER) AS INTEGER
+    RETURN unten
+END FUNCTION
+PRINT clamp(oben: 1, unten: 7, wert: 3)
+--- erwartet
+7
 
 === tw and vm match
 SUB g(name AS STRING, age AS INTEGER, greet AS STRING = "Hi", excl AS STRING = ".")

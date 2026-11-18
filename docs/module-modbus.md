@@ -26,9 +26,9 @@ Datenblätter zählen ab 1 oder schreiben die Bereichsziffer davor
 
 | Funktion | Wirkung |
 |---|---|
-| `MODBUS_TCP(host$ [, port [, einheit]])` → MODBUS | Modbus TCP über das Netz; Port Vorgabe 502, Geräteadresse Vorgabe 1 |
-| `MODBUS_RTU(anschluss$ [, baud [, format$ [, einheit]]])` → MODBUS | Modbus RTU über RS-485: `"COM4"`/`"/dev/ttyUSB0"` (Feature `serial`), Baud Vorgabe 9600, Format Vorgabe `"8N1"` (`"8E1"`, `"8O1"`, `"8N2"`, ...); oder `"tcp:host:port"` für einen RTU-Umsetzer im Netz |
-| `MODBUS_UNIT(m, einheit)` | Geräteadresse für die folgenden Anfragen (0..255; bei RTU heißt 0 „an alle“, dann kommt keine Antwort) |
+| `MODBUS_TCP(host$ [, port [, unit]])` → MODBUS | Modbus TCP über das Netz; Port Vorgabe 502, Geräteadresse Vorgabe 1 |
+| `MODBUS_RTU(port$ [, baud [, format$ [, unit]]])` → MODBUS | Modbus RTU über RS-485: `"COM4"`/`"/dev/ttyUSB0"` (Feature `serial`), Baud Vorgabe 9600, Format Vorgabe `"8N1"` (`"8E1"`, `"8O1"`, `"8N2"`, ...); oder `"tcp:host:port"` für einen RTU-Umsetzer im Netz |
+| `MODBUS_UNIT(m, unit)` | Geräteadresse für die folgenden Anfragen (0..255; bei RTU heißt 0 „an alle“, dann kommt keine Antwort) |
 | `MODBUS_TIMEOUT(m, ms)` | wie lange auf eine Antwort gewartet wird (10..60000, Vorgabe 1000) |
 | `MODBUS_CLOSE(m)` | schließen |
 
@@ -49,14 +49,14 @@ MODBUS_CLOSE(zaehler)
 
 | Funktion | Wirkung |
 |---|---|
-| `MODBUS_READ_COILS(m, adresse, anzahl)` → ARRAY OF BOOLEAN | Spulen lesen (1..2000) |
-| `MODBUS_READ_DISCRETE(m, adresse, anzahl)` → ARRAY OF BOOLEAN | Eingänge lesen (1..2000) |
-| `MODBUS_READ_HOLDING(m, adresse, anzahl)` → ARRAY OF INTEGER | Halteregister lesen (1..125), Werte 0..65535 |
-| `MODBUS_READ_INPUT(m, adresse, anzahl)` → ARRAY OF INTEGER | Eingangsregister lesen (1..125) |
-| `MODBUS_WRITE_COIL(m, adresse, an)` | eine Spule setzen |
-| `MODBUS_WRITE_REGISTER(m, adresse, wert)` | ein Halteregister schreiben (0..65535 oder −32768..−1) |
-| `MODBUS_WRITE_COILS(m, adresse, werte)` | mehrere Spulen (Feld aus BOOLEAN oder 0/1, bis 1968) |
-| `MODBUS_WRITE_REGISTERS(m, adresse, werte)` | mehrere Halteregister (Feld aus Zahlen, bis 123) |
+| `MODBUS_READ_COILS(m, address, count)` → ARRAY OF BOOLEAN | Spulen lesen (1..2000) |
+| `MODBUS_READ_DISCRETE(m, address, count)` → ARRAY OF BOOLEAN | Eingänge lesen (1..2000) |
+| `MODBUS_READ_HOLDING(m, address, count)` → ARRAY OF INTEGER | Halteregister lesen (1..125), Werte 0..65535 |
+| `MODBUS_READ_INPUT(m, address, count)` → ARRAY OF INTEGER | Eingangsregister lesen (1..125) |
+| `MODBUS_WRITE_COIL(m, address, on)` | eine Spule setzen |
+| `MODBUS_WRITE_REGISTER(m, address, value)` | ein Halteregister schreiben (0..65535 oder −32768..−1) |
+| `MODBUS_WRITE_COILS(m, address, values)` | mehrere Spulen (Feld aus BOOLEAN oder 0/1, bis 1968) |
+| `MODBUS_WRITE_REGISTERS(m, address, values)` | mehrere Halteregister (Feld aus Zahlen, bis 123) |
 
 Jeder Befehl **wartet auf die Antwort**; ein Gerät antwortet in Millisekunden.
 Meldet das Gerät einen Fehler (eine „Ausnahme“), ist das ein Laufzeitfehler
@@ -80,12 +80,12 @@ heißt hier wie üblich nach den vier Bytes A (höchstes) bis D:
 
 | Funktion | Wirkung |
 |---|---|
-| `MODBUS_FLOAT(register, stelle [, folge$])` → FLOAT | zwei Register ab `stelle` als Kommazahl (float32) |
-| `MODBUS_INT32(register, stelle [, folge$])` → INTEGER | zwei Register als Ganzzahl mit Vorzeichen |
-| `MODBUS_UINT32(register, stelle [, folge$])` → INTEGER | zwei Register ohne Vorzeichen |
-| `MODBUS_INT16(wert)` → INTEGER | ein Register mit Vorzeichen lesen: 65535 → −1 |
-| `MODBUS_FLOAT_REGS(wert [, folge$])` → ARRAY OF INTEGER | eine Kommazahl als zwei Register, zum Schreiben |
-| `MODBUS_INT32_REGS(wert [, folge$])` → ARRAY OF INTEGER | eine 32-Bit-Zahl als zwei Register |
+| `MODBUS_FLOAT(register, position [, order$])` → FLOAT | zwei Register ab `position` als Kommazahl (float32) |
+| `MODBUS_INT32(register, position [, order$])` → INTEGER | zwei Register als Ganzzahl mit Vorzeichen |
+| `MODBUS_UINT32(register, position [, order$])` → INTEGER | zwei Register ohne Vorzeichen |
+| `MODBUS_INT16(value)` → INTEGER | ein Register mit Vorzeichen lesen: 65535 → −1 |
+| `MODBUS_FLOAT_REGS(value [, order$])` → ARRAY OF INTEGER | eine Kommazahl als zwei Register, zum Schreiben |
+| `MODBUS_INT32_REGS(value [, order$])` → ARRAY OF INTEGER | eine 32-Bit-Zahl als zwei Register |
 
 ```basic
 IMPORT "modbus"

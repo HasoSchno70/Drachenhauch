@@ -26,9 +26,9 @@ then subtract one or the prefix.
 
 | Function | Effect |
 |---|---|
-| `MODBUS_TCP(host$ [, port [, einheit]])` → MODBUS | Modbus TCP over the network; port default 502, device address default 1 |
-| `MODBUS_RTU(anschluss$ [, baud [, format$ [, einheit]]])` → MODBUS | Modbus RTU over RS-485: `"COM4"`/`"/dev/ttyUSB0"` (feature `serial`), baud default 9600, format default `"8N1"` (`"8E1"`, `"8O1"`, `"8N2"`, ...); or `"tcp:host:port"` for an RTU converter on the network |
-| `MODBUS_UNIT(m, einheit)` | device address for the following requests (0..255; with RTU, 0 means "to all", and no answer comes) |
+| `MODBUS_TCP(host$ [, port [, unit]])` → MODBUS | Modbus TCP over the network; port default 502, device address default 1 |
+| `MODBUS_RTU(port$ [, baud [, format$ [, unit]]])` → MODBUS | Modbus RTU over RS-485: `"COM4"`/`"/dev/ttyUSB0"` (feature `serial`), baud default 9600, format default `"8N1"` (`"8E1"`, `"8O1"`, `"8N2"`, ...); or `"tcp:host:port"` for an RTU converter on the network |
+| `MODBUS_UNIT(m, unit)` | device address for the following requests (0..255; with RTU, 0 means "to all", and no answer comes) |
 | `MODBUS_TIMEOUT(m, ms)` | how long to wait for an answer (10..60000, default 1000) |
 | `MODBUS_CLOSE(m)` | close |
 
@@ -49,14 +49,14 @@ MODBUS_CLOSE(zaehler)
 
 | Function | Effect |
 |---|---|
-| `MODBUS_READ_COILS(m, adresse, anzahl)` → ARRAY OF BOOLEAN | read coils (1..2000) |
-| `MODBUS_READ_DISCRETE(m, adresse, anzahl)` → ARRAY OF BOOLEAN | read discrete inputs (1..2000) |
-| `MODBUS_READ_HOLDING(m, adresse, anzahl)` → ARRAY OF INTEGER | read holding registers (1..125), values 0..65535 |
-| `MODBUS_READ_INPUT(m, adresse, anzahl)` → ARRAY OF INTEGER | read input registers (1..125) |
-| `MODBUS_WRITE_COIL(m, adresse, an)` | set one coil |
-| `MODBUS_WRITE_REGISTER(m, adresse, wert)` | write one holding register (0..65535 or −32768..−1) |
-| `MODBUS_WRITE_COILS(m, adresse, werte)` | several coils (array of BOOLEAN or 0/1, up to 1968) |
-| `MODBUS_WRITE_REGISTERS(m, adresse, werte)` | several holding registers (array of numbers, up to 123) |
+| `MODBUS_READ_COILS(m, address, count)` → ARRAY OF BOOLEAN | read coils (1..2000) |
+| `MODBUS_READ_DISCRETE(m, address, count)` → ARRAY OF BOOLEAN | read discrete inputs (1..2000) |
+| `MODBUS_READ_HOLDING(m, address, count)` → ARRAY OF INTEGER | read holding registers (1..125), values 0..65535 |
+| `MODBUS_READ_INPUT(m, address, count)` → ARRAY OF INTEGER | read input registers (1..125) |
+| `MODBUS_WRITE_COIL(m, address, on)` | set one coil |
+| `MODBUS_WRITE_REGISTER(m, address, value)` | write one holding register (0..65535 or −32768..−1) |
+| `MODBUS_WRITE_COILS(m, address, values)` | several coils (array of BOOLEAN or 0/1, up to 1968) |
+| `MODBUS_WRITE_REGISTERS(m, address, values)` | several holding registers (array of numbers, up to 123) |
 
 Every command **waits for the answer**; a device answers within
 milliseconds. If the device reports an error (an "exception"), that is a run
@@ -80,12 +80,12 @@ order is named after the four bytes A (highest) to D:
 
 | Function | Effect |
 |---|---|
-| `MODBUS_FLOAT(register, stelle [, folge$])` → FLOAT | two registers from `stelle` as a floating point number (float32) |
-| `MODBUS_INT32(register, stelle [, folge$])` → INTEGER | two registers as a signed integer |
-| `MODBUS_UINT32(register, stelle [, folge$])` → INTEGER | two registers, unsigned |
-| `MODBUS_INT16(wert)` → INTEGER | read one register as signed: 65535 → −1 |
-| `MODBUS_FLOAT_REGS(wert [, folge$])` → ARRAY OF INTEGER | a floating point number as two registers, for writing |
-| `MODBUS_INT32_REGS(wert [, folge$])` → ARRAY OF INTEGER | a 32-bit number as two registers |
+| `MODBUS_FLOAT(register, position [, order$])` → FLOAT | two registers from `position` as a floating point number (float32) |
+| `MODBUS_INT32(register, position [, order$])` → INTEGER | two registers as a signed integer |
+| `MODBUS_UINT32(register, position [, order$])` → INTEGER | two registers, unsigned |
+| `MODBUS_INT16(value)` → INTEGER | read one register as signed: 65535 → −1 |
+| `MODBUS_FLOAT_REGS(value [, order$])` → ARRAY OF INTEGER | a floating point number as two registers, for writing |
+| `MODBUS_INT32_REGS(value [, order$])` → ARRAY OF INTEGER | a 32-bit number as two registers |
 
 ```basic
 IMPORT "modbus"

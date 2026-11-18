@@ -11,8 +11,8 @@ IMPORT "curves"
 | Funktion | Rueckgabe | Zweck |
 |---|---|---|
 | `CURVE_LERP(a, b, t)` | FLOAT | Lineare Interpolation `a + (b - a) * t` |
-| `CURVE_SMOOTHSTEP(e0, e1, x)` | FLOAT | S-Kurve (`3t² - 2t³`), geclamped auf `[0, 1]` |
-| `CURVE_SMOOTHERSTEP(e0, e1, x)` | FLOAT | C²-stetige S-Kurve (`6t⁵ - 15t⁴ + 10t³`) |
+| `CURVE_SMOOTHSTEP(edge0, edge1, x)` | FLOAT | S-Kurve (`3t² - 2t³`), geclamped auf `[0, 1]` |
+| `CURVE_SMOOTHERSTEP(edge0, edge1, x)` | FLOAT | C²-stetige S-Kurve (`6t⁵ - 15t⁴ + 10t³`) |
 | `CURVE_BEZIER(t, p0, p1, p2, p3)` | FLOAT | Cubic Bezier 1D |
 | `CURVE_BEZIER2(t, x0,y0, x1,y1, x2,y2, x3,y3)` | TUPLE (x, y) | Cubic Bezier 2D |
 | `CURVE_CATMULL(t, p0, p1, p2, p3)` | FLOAT | Catmull-Rom 1D |

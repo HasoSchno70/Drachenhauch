@@ -163,13 +163,13 @@ For anything running in a loop there is therefore the same request for checking 
 
 | Function | Effect |
 |---|---|
-| `HTTP_REQUEST_START(methode$, url$ [, rumpf [, kopfzeilen]])` → INTEGER | starts **any** request in the background |
+| `HTTP_REQUEST_START(method$, url$ [, body [, headers]])` → INTEGER | starts **any** request in the background |
 | `HTTP_GET_START(url$)` → INTEGER | short form of it for GET |
-| `HTTP_READY(abruf)` → BOOLEAN | is the response there? (checks, does not wait) |
-| `HTTP_RESULT(abruf)` → STRING | collects the body and frees the slot |
-| `HTTP_CANCEL(abruf)` | discard a request (unknown number = no-op) |
+| `HTTP_READY(request)` → BOOLEAN | is the response there? (checks, does not wait) |
+| `HTTP_RESULT(request)` → STRING | collects the body and frees the slot |
+| `HTTP_CANCEL(request)` | discard a request (unknown number = no-op) |
 | `HTTP_PENDING()` → INTEGER | how many requests are still open |
-| `HTTP_URL$(abruf)` → STRING | the URL of a running request |
+| `HTTP_URL$(request)` → STRING | the URL of a running request |
 
 The pattern is the same as with `INPUT_UPDATE()`/`TIMER_UPDATE()`: check once per frame.
 

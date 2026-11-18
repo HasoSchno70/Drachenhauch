@@ -5,6 +5,7 @@
 //!   dhrt pruef                       alles (docs/ und CLAUDE.md)
 //!   dhrt pruef bloecke [ordner]      jeden ```basic-Block durch die Front-End-Kette
 //!   dhrt pruef namen [ordner] [--nur datei ...]   `NAME(` in Prosa/Tabellen muss ein Builtin sein
+//!   dhrt pruef parameter [ordner]    Parameternamen in Befehlstabellen wie im Index
 //!   dhrt pruef zaehlungen            "39 Module", "183 Beispiele" im README
 //!   dhrt pruef konstanten [ordner]   jede Tasten-Konstante steht in der Doku
 //!   dhrt pruef pfade [ordner] [--nur datei ...]   Pfade und Links zeigen auf Dateien, die es gibt
@@ -184,6 +185,67 @@ pub fn namen(wurzel: &Path, ordner: &Path, nur: Option<&[String]>) -> Vec<Befund
             if GEDULDET.iter().any(|(g, _)| *g == n) { continue; }
             let zeile = ohne[..m.get(0).unwrap().start()].matches('\n').count() + 1;
             funde.push((name.clone(), zeile, n, "kein Builtin dieses Namens (Tippfehler? umbenannt? entfernt?)".into()));
+        }
+    }
+    funde
+}
+
+// ============================================================ 2b. Parameternamen
+
+/// Eine Tabellenzeile `| `NAME(a, b[, c])` | ...` nennt dieselben Parameter
+/// wie die Signatur im Index, Stelle fuer Stelle (ohne `$`, ohne Gross/klein).
+/// Seit Builtins benannte Argumente nehmen (`CIRCLE(x: 1, y: 2, r: 3)`), sind
+/// die Namen Schnittstelle -- eine Tabelle mit `farbe`, wo der Compiler
+/// `color` erwartet, fuehrte in einen Compile-Fehler. Zeilen, deren Klammer
+/// etwas anderes als Namen enthaelt (Beispiele mit Werten), zaehlen nicht.
+/// Zeilen, die absichtlich andere Namen zeigen: eine zweite Form desselben
+/// Befehls (die Signatur im Index kennt nur eine) -- je mit Grund.
+const ANDERE_FORM: &[(&str, &str, &str)] = &[
+    ("SORT", "arr, comparator", "zweite Form: FUNCREF statt BOOLEAN an derselben Stelle"),
+];
+
+/// Seiten, deren Tabellen fremde Formen zeigen (andere BASICs). Dazu jeder
+/// Entwurf (`entwurf-*.md`): er haelt fest, wie es damals hiess.
+const FREMDE_FORMEN: &[&str] = &["umstieg.md"];
+
+pub fn parameter(wurzel: &Path, ordner: &Path) -> Vec<Befund> {
+    use crate::compiler::signatur_params;
+    static ZEILE: OnceLock<Regex> = OnceLock::new();
+    let zeile = re(r"^\|\s*`([A-Za-z_][A-Za-z0-9_]*\$?)(\([^`]*\))`", &ZEILE);
+    let raw = lesen(&wurzel.join("daten/builtin_index.json"));
+    let mut index: std::collections::HashMap<String, Vec<String>> = Default::default();
+    if let Ok(v) = serde_json::from_str::<serde_json::Value>(&raw) {
+        for e in v["builtins"].as_array().map(|a| a.as_slice()).unwrap_or(&[]) {
+            let (Some(n), Some(sig)) = (e["name"].as_str(), e["signature"].as_str()) else { continue };
+            let Some((p, _)) = signatur_params(sig) else { continue };
+            // Unter dem genauen Namen: `GUI_TOOLTIP` setzt, `GUI_TOOLTIP$` liest.
+            index.insert(n.to_uppercase(), p.into_iter().map(|x| x.name).collect());
+        }
+    }
+    let mut funde = Vec::new();
+    for datei in md_dateien(ordner, None) {
+        let name = datei.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+        if FREMDE_FORMEN.contains(&name.as_str()) || name.starts_with("entwurf-") { continue; }
+        for (i, z) in lesen(&datei).lines().enumerate() {
+            let Some(k) = zeile.captures(z) else { continue };
+            if ANDERE_FORM.iter().any(|(n, l, _)| k[1].eq_ignore_ascii_case(n) && k[2] == format!("({})", l)) { continue; }
+            let gross = k[1].to_uppercase();
+            let anders = match gross.strip_suffix('$') { Some(o) => o.to_string(), None => format!("{}$", gross) };
+            let Some(soll) = index.get(&gross).or_else(|| index.get(&anders)) else { continue };
+            // Ein Umlaut im Namen ist kein Beispielwert, sondern ein alter
+            // deutscher Name -- den kann niemand als `name:` schreiben.
+            if k[2].chars().any(|c| "äöüßÄÖÜ".contains(c)) && !k[2].contains('"') {
+                funde.push((name.clone(), i + 1, format!("{}{}", &k[1], &k[2]),
+                    format!("ein Name mit Umlaut -- der Index nennt ({})", soll.join(", "))));
+                continue;
+            }
+            let Some((ist, _)) = signatur_params(&format!("X{}", &k[2])) else { continue };
+            let ist: Vec<String> = ist.into_iter().map(|x| x.name).collect();
+            if ist != *soll {
+                funde.push((name.clone(), i + 1, format!("{}{}", &k[1], &k[2]),
+                    format!("der Index nennt die Parameter ({}) -- benannte Argumente nehmen diese Namen",
+                            soll.join(", "))));
+            }
         }
     }
     funde
@@ -596,6 +658,7 @@ dhrt pruef                      alle Pruefungen (docs/ und CLAUDE.md)
 dhrt pruef bloecke [ordner]     jeden ```basic-Block durch die Front-End-Kette (nur Syntax)
 dhrt pruef namen [ordner] [--nur datei ...]
                                 `NAME(` in Prosa und Tabellen muss ein Builtin sein
+dhrt pruef parameter [ordner]   Parameternamen in Befehlstabellen wie im Index
 dhrt pruef zaehlungen           Zahlen im README (Beispiele, Module) nachzaehlen
 dhrt pruef konstanten [ordner]  jede Tasten-Konstante steht in der Doku
 dhrt pruef pfade [ordner] [--nur datei ...]
@@ -623,6 +686,11 @@ pub fn main(args: &[String]) -> ExitCode {
             println!("Befehlsnamen geprueft -- {} Befund(e)", funde.len());
             ausgeben(&funde);
             code(&funde)
+        }
+        Some("parameter") => {
+            let (ordner, _) = ordner_und_nur(&wurzel, &rest);
+            let f = parameter(&wurzel, &ordner);
+            println!("Parameternamen geprueft -- {} Befund(e)", f.len()); ausgeben(&f); code(&f)
         }
         Some("zaehlungen") => { let f = zaehlungen(&wurzel); println!("Zaehlungen geprueft -- {} Befund(e)", f.len()); ausgeben(&f); code(&f) }
         Some("konstanten") => {
@@ -669,6 +737,7 @@ pub fn main(args: &[String]) -> ExitCode {
             let (n, mut funde) = bloecke(&docs);
             let claude = vec!["CLAUDE.md".to_string()];
             funde.extend(namen(&wurzel, &docs, None));
+            funde.extend(parameter(&wurzel, &docs));
             funde.extend(zaehlungen(&wurzel));
             funde.extend(konstanten(&docs));
             funde.extend(pfade(&wurzel, &docs, None));
@@ -689,6 +758,7 @@ pub fn main(args: &[String]) -> ExitCode {
                 n += n_en;
                 funde.extend(f_en);
                 funde.extend(namen(&wurzel, &en, None));
+                funde.extend(parameter(&wurzel, &en));
                 funde.extend(pfade(&wurzel, &en, None));
                 funde.extend(uebersetzung(&wurzel).1);
             }

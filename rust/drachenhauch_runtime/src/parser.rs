@@ -786,8 +786,13 @@ impl Parser {
     }
 
     fn call_arg(&mut self) -> R<Node> {
-        if self.tt(0) == Tt::Ident && self.tt(1) == Tt::Colon {
-            let name = sval(self.peek(0));
+        // `name: wert`. Der Name darf auch ein Schluesselwort sein
+        // (`DRAWIMAGE(image: held, …)`, `FILE_COPY(…, to: ziel)`): in einer
+        // Klammer kann vor einem `:` sonst nichts stehen.
+        let name = if self.tt(1) != Tt::Colon { None }
+            else if self.tt(0) == Tt::Ident { Some(sval(self.peek(0))) }
+            else { crate::lexer::keyword_text(self.tt(0)).map(str::to_string) };
+        if let Some(name) = name {
             self.pos += 2;
             let value = self.expression()?;
             return Ok(Node::NamedArg { name, value: Box::new(value) });

@@ -32,17 +32,17 @@ den CSV schon deckt.
 
 | Funktion | Zweck |
 |---|---|
-| `XLSX_NEW([blattname$])` → XLSX | neue Mappe (erstes Blatt heißt `Tabelle1`) |
+| `XLSX_NEW([sheet$])` → XLSX | neue Mappe (erstes Blatt heißt `Tabelle1`) |
 | `XLSX_SHEET(x, name$)` | weiteres Blatt — und es wird das aktive |
 | `XLSX_SHEET_COUNT(x)` → INTEGER | wie viele Blätter |
-| `XLSX_SET(x, zeile, spalte, text$)` | Textzelle |
-| `XLSX_SET_NUM(x, zeile, spalte, zahl)` | Zahlzelle |
-| `XLSX_SET_DATE(x, zeile, spalte, zeit[, muster$])` | Datumszelle |
-| `XLSX_BOLD(x, zeile, spalte[, an])` | Zelle fett setzen |
-| `XLSX_BOLD_ROW(x, zeile[, an])` | ganze Zeile fett (die Kopfzeile) |
-| `XLSX_FORMAT(x, zeile, spalte, muster$)` | Zahlenformat |
-| `XLSX_COL_WIDTH(x, spalte, breite)` | Spaltenbreite in Zeichen |
-| `XLSX_SAVE(x, pfad$)` | schreiben |
+| `XLSX_SET(x, row, column, text$)` | Textzelle |
+| `XLSX_SET_NUM(x, row, column, number)` | Zahlzelle |
+| `XLSX_SET_DATE(x, row, column, time[, pattern$])` | Datumszelle |
+| `XLSX_BOLD(x, row, column[, on])` | Zelle fett setzen |
+| `XLSX_BOLD_ROW(x, row[, on])` | ganze Zeile fett (die Kopfzeile) |
+| `XLSX_FORMAT(x, row, column, pattern$)` | Zahlenformat |
+| `XLSX_COL_WIDTH(x, column, width)` | Spaltenbreite in Zeichen |
+| `XLSX_SAVE(x, path$)` | schreiben |
 | `XLSX_CLOSE(x)` | Speicher freigeben |
 
 **Zeile und Spalte sind 0-basiert** — wie überall in Drachenhauch. Excel

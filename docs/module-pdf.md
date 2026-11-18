@@ -25,27 +25,27 @@ PDF_SAVE(p, "rechnung.pdf")
 
 | Funktion | Zweck |
 |---|---|
-| `PDF_NEW([größe$[, ausrichtung$]])` → PDF | `a0`…`a6`, `letter`, `legal`; `hoch`/`quer` |
+| `PDF_NEW([size$[, orientation$]])` → PDF | `a0`…`a6`, `letter`, `legal`; `hoch`/`quer` |
 | `PDF_PAGE(p)` | neue Seite beginnen -- die erste legt `PDF_NEW` schon an; solange sie leer ist, legt `PDF_PAGE` keine zweite an |
 | `PDF_PAGE_COUNT(p)` → INTEGER | wie viele bisher |
 | `PDF_PAGE_WIDTH(p)` / `PDF_PAGE_HEIGHT(p)` → FLOAT | Seitenmaß in mm |
-| `PDF_TITLE(p, titel$)` | Titel in den Dokument-Angaben |
-| `PDF_FONT(p, schrift$, größe_pt)` | Schrift und Größe |
-| `PDF_FONT_LOAD(p, pfad$, name$)` | eine eigene TrueType-/OpenType-Schrift laden, danach unter `name$` für `PDF_FONT` da |
-| `PDF_COLOR(p, farbe)` | `RGB(…)` — gilt für Text, Striche und Flächen |
+| `PDF_TITLE(p, title$)` | Titel in den Dokument-Angaben |
+| `PDF_FONT(p, font$, size_pt)` | Schrift und Größe |
+| `PDF_FONT_LOAD(p, path$, name$)` | eine eigene TrueType-/OpenType-Schrift laden, danach unter `name$` für `PDF_FONT` da |
+| `PDF_COLOR(p, color)` | `RGB(…)` — gilt für Text, Striche und Flächen |
 | `PDF_LINE_WIDTH(p, mm)` | Strichstärke |
-| `PDF_DASH(p, strich_mm[, luecke_mm])` | gestrichelt für alle folgenden Linien und Umrisse; ohne Lücke so lang wie der Strich, `PDF_DASH(p, 0)` wieder durchgezogen |
-| `PDF_TEXT(p, x, y, text$[, winkel])` | Text setzen; `winkel` in Grad gegen den Uhrzeigersinn, gedreht um (x, y) |
+| `PDF_DASH(p, dash_mm[, gap_mm])` | gestrichelt für alle folgenden Linien und Umrisse; ohne Lücke so lang wie der Strich, `PDF_DASH(p, 0)` wieder durchgezogen |
+| `PDF_TEXT(p, x_mm, y_mm, text$[, angle])` | Text setzen; `angle` in Grad gegen den Uhrzeigersinn, gedreht um (x, y) |
 | `PDF_TEXT_WIDTH(p, text$)` → FLOAT | Breite in mm, in der aktuellen Schrift und Größe |
 | `PDF_LINE(p, x1, y1, x2, y2)` | Linie zeichnen |
-| `PDF_RECT(p, x, y, b, h)` / `PDF_RECT_FILL(…)` | Umriss / Fläche |
+| `PDF_RECT(p, x, y, width, height)` / `PDF_RECT_FILL(…)` | Umriss / Fläche |
 | `PDF_CIRCLE(p, x, y, r)` / `PDF_CIRCLE_FILL(…)` | Kreis um (x, y), Umriss / Fläche |
 | `PDF_POLYGON(p, xs, ys)` / `PDF_POLYGON_FILL(…)` | geschlossenes Vieleck aus zwei gleich langen Feldern, mindestens drei Punkte |
-| `PDF_OPACITY(p, deckkraft)` / `PDF_GET_OPACITY(p)` → FLOAT | Deckkraft 0..1 für alles Folgende (Wasserzeichen) |
-| `PDF_IMAGE(p, bild, x, y, b[, h])` | ein Bild (`IMAGE`) in das Rechteck setzen, Maße in mm; ohne `h` nach dem Seitenverhältnis |
-| `PDF_SAVE(p, pfad$)` | schreiben |
-| `PDF_PRINT(p[, drucker$[, kopien[, zieldatei$]]])` | **drucken** — Windows über GDI, macOS/Linux über CUPS; siehe [Drucken](#drucken-und-vorschau) |
-| `PDF_PREVIEW(p, seite[, breite_px])` → IMAGE | die Seite als Bild, für eine Vorschau im Fenster |
+| `PDF_OPACITY(p, opacity)` / `PDF_GET_OPACITY(p)` → FLOAT | Deckkraft 0..1 für alles Folgende (Wasserzeichen) |
+| `PDF_IMAGE(pdf, image, x, y, width[, height])` | ein Bild (`IMAGE`) in das Rechteck setzen, Maße in mm; ohne `h` nach dem Seitenverhältnis |
+| `PDF_SAVE(p, path$)` | schreiben |
+| `PDF_PRINT(p[, printer$[, copies[, target_file$]]])` | **drucken** — Windows über GDI, macOS/Linux über CUPS; siehe [Drucken](#drucken-und-vorschau) |
+| `PDF_PREVIEW(p, page[, width_px])` → IMAGE | die Seite als Bild, für eine Vorschau im Fenster |
 | `PDF_CLOSE(p)` | Speicher freigeben |
 
 Schrift, Größe, Farbe, Strichstärke und Deckkraft sind Einstellungen des

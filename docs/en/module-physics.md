@@ -28,7 +28,7 @@ IMPORT "physics"
 | `PHYSICS_LINES_HIT(ax,ay,bx,by, cx,cy,dx,dy)` | do two **line segments** intersect? (not the infinite lines) | `BOOLEAN` |
 | `PHYSICS_LINES_X(ax,ay,bx,by, cx,cy,dx,dy)` | X of the intersection point — **`NAN` if there is none**, so ask `PHYSICS_LINES_HIT` first | `FLOAT` |
 | `PHYSICS_LINES_Y(ax,ay,bx,by, cx,cy,dx,dy)` | Y of the intersection point (likewise `NAN`) | `FLOAT` |
-| `PHYSICS_POINT_LINE(px,py, ax,ay, bx,by, dicke)` | does the point lie on the segment? `dicke` (thickness) gives the allowed distance — for clicks on thin lines | `BOOLEAN` |
+| `PHYSICS_POINT_LINE(px,py, ax,ay, bx,by, thickness)` | does the point lie on the segment? `thickness` (thickness) gives the allowed distance — for clicks on thin lines | `BOOLEAN` |
 | `PHYSICS_CIRCLE_LINE(cx,cy,r, ax,ay, bx,by)` | does a circle touch the segment? | `BOOLEAN` |
 | `PHYSICS_POINT_POLY(px, py, xs, ys)` | point in polygon (ray method — also works for concave shapes) | `BOOLEAN` |
 | `PHYSICS_DISTANCE3(x1,y1,z1, x2,y2,z2)` | distance between two points in space | `FLOAT` |
