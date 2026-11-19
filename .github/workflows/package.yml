@@ -51,6 +51,10 @@ jobs:
     env:
       CFLAGS: -DMAX_CHAR_PRESSED_QUEUE=256
       CARGO_PROFILE_RELEASE_LTO: thin
+      # Die Proben unten erwarten deutsche Meldungen ("Kein Fenster moeglich").
+      # Seit 2026.52 spricht dhrt ohne DHRT_LANG die Sprache des Systems, und
+      # die Laeufer sprechen Englisch -- der erste Release-Lauf fiel daran.
+      DHRT_LANG: de
       # Nur, damit `if:` fragen kann, ob es die Secrets gibt (secrets.* ist
       # dort nicht erlaubt). Leer ohne Secrets -> ad hoc wie bisher.
       MAC_ZERT_P12: ${{ secrets.MAC_ZERT_P12 }}
@@ -93,6 +97,8 @@ jobs:
         run: |
           set -e
           mkdir -p target/release/laufzeiten
+          CARGO_TARGET_DIR=target/laufzeit-mini cargo build --release --locked --features "jit ffi"
+          cp target/laufzeit-mini/release/dhrt target/release/laufzeiten/dhrt-mini
           CARGO_TARGET_DIR=target/laufzeit-konsole cargo build --release --locked --features "db pg mysql net http smtp jit ffi"
           cp target/laufzeit-konsole/release/dhrt target/release/laufzeiten/dhrt-konsole
           CARGO_TARGET_DIR=target/laufzeit-spiel cargo build --release --locked --features "${{ matrix.grafik }} dialogs physik jit ffi"
@@ -234,6 +240,7 @@ jobs:
           # liegt nur der Ordner laufzeiten/ (die kleinen Laufzeiten fuer
           # `dhrt --export --schlank`, seit 2026.21) -- keine weitere Datei.
           test "$(find "$APP/Contents/MacOS" -maxdepth 1 -type f)" = "$APP/Contents/MacOS/dhrt"
+          test -x "$APP/Contents/MacOS/laufzeiten/dhrt-mini"
           test -x "$APP/Contents/MacOS/laufzeiten/dhrt-konsole"
           test -x "$APP/Contents/MacOS/laufzeiten/dhrt-spiel"
           if [ -n "$DH_MAC_SIGNATUR" ]; then
