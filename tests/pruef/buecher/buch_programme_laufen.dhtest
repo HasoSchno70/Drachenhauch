@@ -1,0 +1,54 @@
+' Die Buecher "Kleine Wunder" und "Fenster, Formulare, Daten": jedes
+' Fensterprogramm, jeder Zwischenstand und jede Loesung laeuft 420 Bilder
+' ohne Laufzeitfehler. Langsam (etwa fuenf Minuten), darum eine eigene
+' Sammlung; die schnellen Pruefungen der Buecher stehen in
+' buch_wunder_anwendungen.dhtest.
+'
+' Format: docs/werkzeuge.md, dhrt test.
+
+--- langsam
+=== jedes fensterprogramm laeuft ohne laufzeitfehler
+' 420 Bilder (sieben Sekunden) je Programm, Zwischenstand oder Loesung:
+' Die erste Rakete zerplatzt nach gut zwei Sekunden, ihre Funken leben
+' bis zu zwei weitere -- erst dann verloeschen Funken und Knaller (mit 200
+' Bildern blieb ein Fehler im Nachknallen in der Gegenprobe gruen). Ohne
+' Bildschirm meldet das Kind "Kein Fenster moeglich", und dhrt test
+' zaehlt den Fall als uebersprungen.
+IMPORT "helfer.dh"
+DIM w AS STRING : w = ARG$(0) + "/buecher/"
+DIM n AS INTEGER : n = 0
+DIM o AS STRING
+FOR EACH o IN ordner(w)
+    DIM f AS STRING
+    FOR EACH f IN DIRLIST(w + o)
+        IF RIGHT$(f, 3) = ".dh" AND LEFT$(f, 7) <> "fehler_" THEN
+            IF INSTR(UPPER$(JOIN$(READLINES(w + o + "/" + f), " ")), "SCREEN(") >= 0 THEN
+                nlWarten(PROCESS_START("dhrt", "run", "--bilder", "420", w + o + "/" + f), 120000)
+                IF nlCode <> 0 OR INSTR(nlErr + nlAus, "fehler") >= 0 THEN PRINT o; "/"; f; " "; nlCode; ": "; nlAus; nlErr
+                n = n + 1
+            END IF
+        END IF
+    NEXT
+NEXT
+PRINT "genug "; n >= 12
+--- argumente
+{sammlung}/../../..
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/nodelauf.dh"
+' Jeder Ordner unter code/ beider Buecher (Kapitel, Loesungen) und ihre
+' figures/ -- ein neues Kapitel ist so von selbst dabei. Projekte des
+' Studios liegen eine Ebene tiefer und bleiben aussen vor.
+FUNCTION ordner(w AS STRING) AS ARRAY OF STRING
+    DIM aus AS ARRAY OF STRING : aus = []
+    DIM b AS STRING
+    FOR EACH b IN ["wunder", "anwendungen"]
+        DIM k AS STRING
+        FOR EACH k IN DIRLIST(w + b + "/code")
+            IF DIREXISTS(w + b + "/code/" + k) THEN ARRAY_PUSH(aus, b + "/code/" + k)
+        NEXT
+        ARRAY_PUSH(aus, b + "/buch/figures")
+    NEXT
+    RETURN aus
+END FUNCTION
+--- erwartet
+genug TRUE

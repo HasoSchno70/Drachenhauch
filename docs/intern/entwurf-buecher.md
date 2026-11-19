@@ -656,8 +656,14 @@ A steht. Jeder Teil ist ein PR.
 Rahmen und Probekapitel stehen: `buecher/wunder` (Vorwort, Kapitel 5
 Feuerwerk, Anhang A) und `buecher/anwendungen` (Vorwort, Kapitel 1 von
 Hand, Kapitel 8 im Studio, Anhang A), je als `.docx` und `.epub`.
-Geprüft von `tests/pruef/buecher/buch_wunder_anwendungen.dhtest` und
-`buch_anwendungen_studio.dhtest` (langsam).
+Geprüft von `tests/pruef/buecher/buch_wunder_anwendungen.dhtest`,
+`buch_anwendungen_studio.dhtest` und `buch_programme_laufen.dhtest` (die
+beiden letzten langsam).
+
+Danach (2026-11-19, gleicher Tag): Buch A Kapitel 0 (Werkstatt, Bilder der
+IDE über `buecher/wunder/buch/ide_bilder.dh`) und Teil I, Kapitel 1–4
+(Sternenflug, Plasma, Spirograph, Ziffernblatt), je mit Lösungen im
+Anhang.
 
 Was beim Bauen festgelegt wurde:
 
