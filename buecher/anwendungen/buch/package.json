@@ -1,0 +1,10 @@
+{
+  "name": "buecher/anwendungen",
+  "version": "1.0.0",
+  "description": "Drachenhauch - Fenster, Formulare, Daten, als .docx und .epub",
+  "private": true,
+  "type": "commonjs",
+  "dependencies": {
+    "docx": "^9.7.1"
+  }
+}
