@@ -1,0 +1,4 @@
+' Bild fuer Kapitel 3: der Spirograph mitten beim Zeichnen, mit fester
+' Saat, damit Raeder und Kurve bei jedem Bau dieselben sind.
+RANDOMIZE(5)
+IMPORT "../../code/kap03/2_spirograph.dh"

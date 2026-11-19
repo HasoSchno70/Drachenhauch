@@ -1,4 +1,4 @@
-const { neu } = require("../code_lesen");
+const { neu, stueck: stueckLoesung } = require("../code_lesen");
 
 // Anhang A: die Loesungen. Der Code kommt aus code/loesungen/ -- nur die
 // Stellen zwischen ' >>> neu und ' <<< neu, der Rest ist das Programm des
@@ -109,6 +109,47 @@ module.exports = (H) => [
   ...neu("loesungen/kap02_maus.dh").map((t) => H.code(t)),
 
   H.p("Hier steht die Wurzel (SQR) doch: Der Abstand selbst geht in den SIN, nicht nur sein Vergleich mit einer Zahl. ^ 2 ist das Quadrat. Die Lage der Maus wird einmal je Bild gelesen, vor der Schleife — 25 000-mal MOUSE_X() zu fragen, brächte nichts außer Arbeit."),
+
+  H.h2("Kapitel 3 · Spirograph"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Mit Stift 120 sitzt der Stift außerhalb des Rads, wie an einem Arm. Die Bögen der Kurve werden zu Schleifen, die sich auf dem Weg nach innen umeinander winden; die Kurve reicht weiter nach außen und weiter nach innen als vorher. Mit Stift 0 sitzt der Stift genau in der Mitte des Rads und macht dessen Drehung nicht mit: Er zeichnet einen einfachen Kreis mit dem Radius 220 - 84 = 136, den Weg der Radmitte."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Mit Rad 110 und Stift 60 entsteht eine Ellipse, liegend in der Mitte, nach einer einzigen Runde geschlossen. Mit Stift 110 wird die Ellipse ganz flach: Der Stift fährt auf einer geraden Linie hin und her, quer durch den Ring. Ein Rad, das in einem doppelt so großen Ring rollt, macht aus einer Drehung eine gerade Bewegung — das ist als Kardankreis bekannt und wurde in Maschinen benutzt, lange bevor es Rechner gab. Rechnerisch: innen / rad ist dann 1, und mit stift = 110 heben sich in kurveY die beiden SIN genau auf."),
+
+  H.h3("Drehen 3"),
+
+  H.p("Die Kurve besteht aus sichtbar geraden Stücken, ein Stern aus Ecken statt einer Rosette aus Bögen. Geschlossen ist sie trotzdem: neu = MIN(t + 0.5, bis) kürzt den letzten Schritt so, dass er genau bei ende aufhört. Im ersten Programm mit FOR … STEP wäre das anders; dort endet die Schleife beim letzten Schritt, der noch vor dem Ende liegt, und an der Naht bliebe eine Lücke."),
+
+  H.h3("Erweitern 1: Farbverlauf"),
+
+  H.p("Der Farbton wächst mit t (code/loesungen/kap03_farbverlauf.dh):"),
+
+  ...neu("loesungen/kap03_farbverlauf.dh").map((t) => H.code(t)),
+
+  H.p("Bei 21 Runden, also t bis etwa 132, wandert der Farbton um rund 790 Grad, gut zweimal durch den Farbkreis. Weil die Kurve dabei Runde um Runde neben der vorigen liegt, sieht man die Farben als breite Bänder."),
+
+  H.h3("Erweitern 2: Regler"),
+
+  H.p("Ein kleines gui-Fenster mit zwei Reglern; neueKurve nimmt Rad und Stift von dort statt vom Zufall (code/loesungen/kap03_regler.dh):"),
+
+  ...neu("loesungen/kap03_regler.dh").map((t) => H.code(t)),
+
+  H.p("GUI_CHANGED ist genau in dem Bild wahr, in dem jemand den Regler bewegt hat — wie GUI_CLICKED bei einem Knopf. Der Regler gibt eine Kommazahl, INT macht eine ganze daraus, denn ggt rechnet mit ganzen Zahlen. Mehr über das gui-Modul steht im Buch „Fenster, Formulare, Daten“."),
+
+  H.h3("Erfinden: drei Räder"),
+
+  H.p("Eine Möglichkeit ist ein eigenes kleines Programm (code/loesungen/kap03_drei_raeder.dh). Statt Ring und Rad gibt es drei Arme, jeder dreht sich am Ende des vorigen, mit eigener Länge und eigenem Tempo:"),
+
+  H.code(stueckLoesung("loesungen/kap03_drei_raeder.dh", "FUNCTION armX", "END FUNCTION")),
+  H.code(stueckLoesung("loesungen/kap03_drei_raeder.dh", "FUNCTION stiftX", "END FUNCTION")),
+
+  H.figure("kap03_drei_raeder.png", "Drei Räder, Arme 140, 70 und 30 lang, mit dem Tempo 1, -6 und 15: ein Stern mit sechs Schlaufen.", 420, 262),
+
+  H.p("armX ist die Rechnung für ein Rad, so allgemein, dass sie für alle drei passt; stiftX zählt die drei Arme zusammen. Hier zeigen benannte Argumente, wozu sie da sind: armX(t, laenge: 70, tempo: -6) liest sich ohne Nachschlagen. Mit den Tempi 1, -6 und 15 schließt sich die Kurve nach einer Runde; andere ganze Zahlen geben andere Sterne, Kommazahlen Kurven, die sich nie schließen."),
 
   H.h2("Kapitel 5 · Feuerwerk"),
 

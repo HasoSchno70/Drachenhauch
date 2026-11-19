@@ -1,0 +1,90 @@
+' Loesung zu Kapitel 3, Erweitern 1: die Kurve wechselt beim Zeichnen
+' langsam die Farbe.
+' Die Stellen, die neu sind, stehen zwischen >>> und <<<.
+CONST MX = 400
+CONST MY = 250
+CONST RINGRADIUS = 220
+CONST TEMPO = 4.0
+
+' Der groesste gemeinsame Teiler, nach Euklid.
+FUNCTION ggt(a AS INTEGER, b AS INTEGER) AS INTEGER
+    IF b = 0 THEN RETURN a
+    RETURN ggt(b, a MOD b)
+END FUNCTION
+
+' Wo der Stift steht, wenn das Rad um den Winkel t gerollt ist.
+FUNCTION kurveX(t AS FLOAT, rad AS FLOAT, stift AS FLOAT,
+                ring AS FLOAT = RINGRADIUS) AS FLOAT
+    DIM innen AS FLOAT : innen = ring - rad
+    RETURN MX + innen * COS(t) + stift * COS(innen / rad * t)
+END FUNCTION
+
+FUNCTION kurveY(t AS FLOAT, rad AS FLOAT, stift AS FLOAT,
+                ring AS FLOAT = RINGRADIUS) AS FLOAT
+    DIM innen AS FLOAT : innen = ring - rad
+    RETURN MY + innen * SIN(t) - stift * SIN(innen / rad * t)
+END FUNCTION
+
+DIM rad AS INTEGER
+DIM stift AS INTEGER
+DIM farbton AS INTEGER
+DIM t AS FLOAT
+DIM ende AS FLOAT
+DIM leinwand AS INTEGER
+
+SUB neueKurve()
+    rad = RANDINT(40, 150)
+    stift = RANDINT(20, rad)
+    farbton = RANDINT(0, 359)
+    t = 0
+    ' Geschlossen ist die Kurve nach rad / ggt Umlaeufen des Rades.
+    ende = 2 * PI * rad / ggt(RINGRADIUS, rad)
+    RENDERTARGET_CLEAR(leinwand, RGB(12, 14, 28))
+END SUB
+
+SUB raederZeichnen()
+    DIM grau AS INTEGER : grau = RGB(90, 100, 130)
+    CIRCLE_OUTLINE(MX, MY, RINGRADIUS, grau)
+    DIM rx AS FLOAT : rx = MX + (RINGRADIUS - rad) * COS(t)
+    DIM ry AS FLOAT : ry = MY + (RINGRADIUS - rad) * SIN(t)
+    CIRCLE_OUTLINE(rx, ry, rad, grau)
+    DIM sx AS FLOAT : sx = kurveX(t, rad: rad, stift: stift)
+    DIM sy AS FLOAT : sy = kurveY(t, rad: rad, stift: stift)
+    LINE(rx, ry, sx, sy, grau)
+    CIRCLE(sx, sy, 4, RGB(255, 255, 255))
+END SUB
+
+SCREEN(800, 500, "Spirograph")
+' TRUE: das Bild bleibt stehen, bis wir es selbst loeschen.
+leinwand = RENDERTARGET_NEW(800, 500, TRUE)
+neueKurve()
+DIM pause AS FLOAT
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
+    DIM dt AS FLOAT : dt = DELTA()
+    IF t < ende THEN
+        ' In kleinen Schritten weiter, damit die Kurve rund bleibt.
+        DIM bis AS FLOAT : bis = MIN(t + TEMPO * dt, ende)
+        RENDERTARGET_BEGIN(leinwand)
+        WHILE t < bis
+            DIM neu AS FLOAT : neu = MIN(t + 0.02, bis)
+            ' >>> neu
+            ' Der Farbton waechst mit t: sechs Grad je Radian Weg.
+            LINE(kurveX(t, rad: rad, stift: stift),
+                 kurveY(t, rad: rad, stift: stift),
+                 kurveX(neu, rad: rad, stift: stift),
+                 kurveY(neu, rad: rad, stift: stift),
+                 HSV(farbton + t * 6, 0.6, 1.0))
+            ' <<< neu
+            t = neu
+        WEND
+        RENDERTARGET_END()
+        pause = 2
+    ELSE
+        pause = pause - dt
+        IF pause <= 0 THEN neueKurve()
+    END IF
+    CLS(RGB(0, 0, 0))
+    RENDERTARGET_DRAW(leinwand, 0, 0)
+    IF t < ende THEN raederZeichnen()
+    FLIP()
+WEND

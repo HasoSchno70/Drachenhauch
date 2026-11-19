@@ -50,8 +50,12 @@ const H = {
 const flach = (a, acc) => { for (const x of a) Array.isArray(x) ? flach(x, acc) : acc.push(x); return acc; };
 for (const f of fs.readdirSync(path.join(HERE, "content")).filter((n) => n.endsWith(".js")).sort()) {
   datei = f;
+  // Ein Kapitel, das sich nicht laden laesst (ein Ausschnitt, dessen
+  // Anfang oder Ende es in der Datei nicht mehr gibt), ist ein Befund --
+  // still zu ueberspringen hiesse, seine Ausgaben nie zu pruefen.
   try { flach(require(path.join(HERE, "content", f))(H), []); } catch (e) {
-    process.stderr.write(`uebersprungen: ${f} (${e.message})\n`);
+    process.stderr.write(`FEHLER beim Lesen von ${f}: ${e.message}\n`);
+    process.exit(1);
   }
 }
 
