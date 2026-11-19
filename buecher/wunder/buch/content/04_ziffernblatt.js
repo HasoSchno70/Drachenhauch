@@ -93,11 +93,11 @@ module.exports = (H) => [
   H.h3("Eine Konstante ändern"),
 
   H.code(zeilen("kap04/fehler_const.dh")),
-  H.code(["220"], { out: true }),
-  H.code(["Laufzeitfehler in fehler_const.dh:3: CONST kann nicht ueberschrieben",
-          "werden"], { out: true }),
+  H.code(["fehler_const.dh:3: Compile-Fehler: Zuweisung an die Konstante",
+          "'radius' -- eine CONST behaelt ihren Wert. Was sich aendern soll,",
+          "ist eine Variable (DIM)."], { out: true }),
 
-  H.p("Die erste Zeile mit PRINT läuft noch, dann hält das Programm an. Bemerkt wird der Fehler erst beim Laufen, nicht schon vor dem Start. Wer eine Konstante ändern will, will in Wahrheit eine Variable."),
+  H.p("Der Fehler kommt vor dem Start; auch das erste PRINT läuft nicht, und in der IDE ist die Zeile schon beim Tippen unterstrichen. Wer eine Konstante ändern will, will in Wahrheit eine Variable. Ausgenommen ist nur ein Name, der in einer Funktion als Parameter oder lokale Variable die Konstante verdeckt (Kapitel 3) — dort meint er die Variable, und die darf sich ändern."),
 
   H.h3("Zwei Namen, die einer sind"),
 

@@ -80,9 +80,14 @@ module.exports = (H) => [
 
   H.h2("Was schiefgehen kann"),
 
-  H.h3("Ein schwarzes Bild"),
+  H.h3("Das Ende vergessen"),
 
-  H.pmix(["Fehlt ", ["RENDERTARGET_END()", true], ", bleibt der Bildschirm schwarz. Alles, was danach gezeichnet wird — auch ", ["RENDERTARGET_DRAW", true], " und der Text oben links —, landet weiter im kleinen Bild, und auf dem Bildschirm kommt nichts an. Eine Meldung gibt es nicht. Ein schwarzes Bild nach dem Einbau eines Render-Ziels heißt darum fast immer: BEGIN und END zählen."]),
+  H.code(zeilen("kap02/fehler_ohne_ende.dh")),
+  H.code(["Laufzeitfehler in fehler_ohne_ende.dh:7: FLIP: ein Render-Ziel ist",
+          "noch offen -- nach RENDERTARGET_BEGIN fehlt RENDERTARGET_END(). Bis",
+          "dahin geht alles Gezeichnete ins Ziel statt auf den Bildschirm"], { out: true }),
+
+  H.pmix(["Ohne ", ["RENDERTARGET_END()", true], " landet alles, was nach dem BEGIN gezeichnet wird — auch ", ["RENDERTARGET_DRAW", true], ", das das kleine Bild zeigen sollte —, im kleinen Bild selbst, und auf dem Bildschirm kommt nichts an. FLIP bemerkt das und hält das Programm mit dieser Meldung an. (Bis zur Fassung 2026.52 blieb das Bild einfach schwarz, ohne ein Wort — gefunden beim Schreiben dieses Kapitels.)"]),
 
   H.h3("Ein Plasma, das flimmert"),
 

@@ -107,9 +107,10 @@ module.exports = (H) => [
   H.h3("Ein Name, den es nicht gibt"),
 
   H.code(zeilen("kap03/fehler_name.dh")),
-  H.code(["fehler_name.dh:4: Compile-Fehler: flaeche: kein Parameter 'hohe'"], { out: true }),
+  H.code(["fehler_name.dh:4: Compile-Fehler: flaeche: kein Parameter 'hohe'.",
+          "Meintest du hoehe? Die Parameter heissen breite, hoehe"], { out: true }),
 
-  H.p("Ein vertippter Name eines Arguments fällt ebenso vor dem Start auf. Anders als bei einem vertippten Befehl schlägt die Meldung hier keinen ähnlichen Namen vor; ein Blick auf die erste Zeile der Funktion hilft."),
+  H.p("Ein vertippter Name eines Arguments fällt ebenso vor dem Start auf, und wie bei einem vertippten Befehl schlägt die Meldung den ähnlichsten vor und zählt alle Parameter auf."),
 
   H.h3("Ein Parameter verdeckt eine Konstante"),
 
