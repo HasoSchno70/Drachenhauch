@@ -1,0 +1,72 @@
+' menu -- a title or pause menu for a game: arrow keys or W/S move,
+' Enter or Space choose, Escape backs out.
+'
+'   IMPORT "menu/menu.dh"
+'   DIM m AS Menu = NEW Menu("Drachenflug", ["Start", "Options", "Quit"])
+'   ... in the loop:
+'   DIM choice AS INTEGER : choice = m.Update()
+'   IF choice = 0 THEN state = "play"
+'   IF choice = 2 OR m.Cancelled() THEN EXIT(0)
+'   m.Draw(160, 80)
+
+CLASS Menu
+    DIM heading AS STRING
+    DIM entries AS ARRAY OF STRING
+    DIM current AS INTEGER
+    DIM wasCancelled AS BOOLEAN
+    DIM normalColor AS INTEGER
+    DIM activeColor AS INTEGER
+
+    SUB Init(title AS STRING, items AS ARRAY OF STRING)
+        heading = title
+        entries = items
+        current = 0
+        normalColor = &HB0B0B0
+        activeColor = &HFFD040
+    END SUB
+
+    ' Once per frame. Returns the chosen entry (0 = the first) in the frame
+    ' it is chosen, otherwise -1.
+    FUNCTION Update() AS INTEGER
+        wasCancelled = FALSE
+        IF LEN(entries) = 0 THEN RETURN -1
+        IF KEY_HIT(KEY_DOWN) OR KEY_HIT("S") THEN current = (current + 1) MOD LEN(entries)
+        IF KEY_HIT(KEY_UP) OR KEY_HIT("W") THEN current = (current - 1 + LEN(entries)) MOD LEN(entries)
+        IF KEY_HIT(KEY_ESCAPE) THEN wasCancelled = TRUE
+        IF KEY_HIT(KEY_ENTER) OR KEY_HIT(KEY_SPACE) THEN RETURN current
+        RETURN -1
+    END FUNCTION
+
+    ' Was Escape pressed in this frame?
+    FUNCTION Cancelled() AS BOOLEAN
+        RETURN wasCancelled
+    END FUNCTION
+
+    ' The entry that is marked right now (0 = the first).
+    FUNCTION Selected() AS INTEGER
+        RETURN current
+    END FUNCTION
+
+    SUB SetSelected(index AS INTEGER)
+        IF index >= 0 AND index < LEN(entries) THEN current = index
+    END SUB
+
+    SUB SetColors(normal AS INTEGER, active AS INTEGER)
+        normalColor = normal
+        activeColor = active
+    END SUB
+
+    ' Title at (x, y), the entries below it; the marked one gets a "> ".
+    SUB Draw(x AS INTEGER, y AS INTEGER)
+        DIM lineHeight AS INTEGER : lineHeight = TEXT_HEIGHT() + 8
+        TEXT(x, y, heading, activeColor)
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(entries) - 1
+            IF i = current THEN
+                TEXT(x, y + (i + 2) * lineHeight, "> " + entries[i], activeColor)
+            ELSE
+                TEXT(x, y + (i + 2) * lineHeight, "  " + entries[i], normalColor)
+            END IF
+        NEXT
+    END SUB
+END CLASS

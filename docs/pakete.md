@@ -23,6 +23,7 @@ Es gibt keinen eigenen Server. Ein Paket kommt von dort, wo es ohnehin liegt:
 | `https://beispiel.de/hilfe.dh` | eine einzelne Datei |
 | `../libs/werkzeug` | ein lokaler Ordner (relativ zum Projekt) |
 | `../libs/werkzeug.zip` | ein lokales ZIP |
+| `github:nutzer/repo@stand#ordner/pfad` | nur dieser Ordner der Quelle -- so liegen mehrere Pakete in einem Repository |
 
 **Der Stand ist Pflicht.** `github:hans/spielkiste` ohne `@…` ist ein
 Fehler: „der neueste Stand“ wäre morgen ein anderer. Am besten nimmt man
@@ -103,6 +104,34 @@ holt, erneuert und entfernt Pakete über dieselben Befehle. Umbauten über das
 ganze Projekt (Umbenennen, Ersetzen) und die Projektsuche lassen `pakete/`
 aus: was dort liegt, überschreibt das nächste Holen. Einzelheiten im
 [Handbuch der IDE](ide.md).
+
+## Pakete zum Anfangen
+
+Im Ordner [`bibliotheken/`](../bibliotheken/) dieses Repositorys liegen
+Pakete, die man mit `#ordner` holt:
+
+| Paket | Was es tut |
+|---|---|
+| `highscores` | eine Bestenliste in einer Datei: einsortieren, abschneiden, speichern, zeichnen |
+| `menu` | ein Titel- oder Pausenmenü: Pfeile oder W/S wählen, Enter nimmt, Escape bricht ab |
+| `dialogbox` | ein Textkasten, der Buchstabe für Buchstabe tippt, umbricht und Seite für Seite blättert |
+
+```bash
+dhrt paket hole github:HasoSchno70/Drachenhauch@main#bibliotheken/highscores
+```
+
+```basic
+IMPORT "highscores/highscores.dh"
+DIM best AS Highscores = NEW Highscores("best.txt", 10)
+IF best.Qualifies(1200) THEN PRINT best.Add("Ada", 1200)
+```
+
+`@main` ist der neueste Stand; wer ihn festhalten will, nimmt den Tag einer
+Fassung (`@v2026.53` und später). Jedes Paket beschreibt sich in seiner
+`README.md`. Eine eigene Bibliothek für diese Liste: ein Pull Request mit
+einem Ordner unter `bibliotheken/` samt Prüffall in
+`tests/pruef/werkzeugkette/bibliotheken.dhtest`, oder ein eigenes Repository
+und eine Zeile hier.
 
 ## Ein eigenes Paket anbieten
 
