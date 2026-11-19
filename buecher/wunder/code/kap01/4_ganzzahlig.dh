@@ -1,0 +1,6 @@
+' Kapitel 1 -- / und \ im Vergleich.
+DIM i AS INTEGER : i = 7
+PRINT i / 2
+PRINT i \ 2
+PRINT -7 \ 2
+PRINT 8 / 2

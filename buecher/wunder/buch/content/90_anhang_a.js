@@ -34,6 +34,44 @@ module.exports = (H) => [
 
   H.p("Mit DELTA() dreht sich der Ring genauso schnell wie vorher, nur ruckeliger: Er springt jetzt fünfzehnmal je Sekunde um je 2,7 Grad statt sechzigmal um 0,67. Die Fassung mit dem festen Schritt dreht sich viermal so langsam, denn sie macht weiter 0,67 Grad je Bild, und es gibt nur noch ein Viertel der Bilder. Genau das passiert, wenn ein Rechner zu langsam ist, um sechzig Bilder zu schaffen."),
 
+  H.h2("Kapitel 1 · Sternenflug"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Mit 100 rückt alles zur Mitte: Die Sterne bleiben lange kleine Punkte und schießen erst ganz am Ende nach außen, das Bild wirkt weit und tief. Mit 900 sieht man nur noch den mittleren Teil des Sternenfelds, stark vergrößert; die Sterne verlassen das Bild schnell, der Flug wirkt rasant und flach. Das ist der Unterschied zwischen einem Weitwinkel und einem Teleobjektiv — die Brennweite eines Fotoapparats ist genau die Zahl f aus der Zeichnung."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Viertausend Sterne machen aus dem Nebel in der Mitte eine helle Wolke; ob das schöner ist, ist Geschmack. Langsamer wird das Programm nicht spürbar: Auf dem Rechner, mit dem dieses Buch entstand, lief es selbst mit zwanzigtausend Sternen viel schneller, als der Bildschirm Bilder zeigen kann. Eine Schleife über ein paar tausend Zahlen ist für einen Rechner keine Arbeit."),
+
+  H.h3("Drehen 3"),
+
+  H.p("Das Programm bricht nach einem Augenblick ab, mit der Meldung „RGB-Werte muessen 0..255 sein“. Der erste Stern, der an uns vorbeifliegt, bekommt ein negatives z, damit wird naehe = 1 - z / TIEFE größer als 1 und die Helligkeit größer als 255. Die eine Zeile schützt also drei Dinge zugleich: die Division vor der 0, das Bild vor gespiegelten Sternen und die Farbe vor Werten über 255. Wer eine solche Schutzzeile herausnimmt, sollte vorher überlegen, wer sich auf sie verlässt."),
+
+  H.h3("Erweitern 1: blaue Ferne"),
+
+  H.p("HSV mit dem festen Farbton 220 (Blau) und einer Sättigung, die mit der Nähe abnimmt (code/loesungen/kap01_farbe.dh):"),
+
+  ...neu("loesungen/kap01_farbe.dh").map((t) => H.code(t)),
+
+  H.p("Die Helligkeit hell, die bisher in alle drei Farbanteile ging, wird zum dritten Wert von HSV, geteilt durch 255, weil HSV dort eine Zahl von 0 bis 1 erwartet. So bleiben ferne Sterne dunkel und blau, nahe hell und fast weiß — wie in einer klaren Nacht, in der das Licht ferner Dinge bläulich wirkt."),
+
+  H.h3("Erweitern 2: Warp"),
+
+  H.p("Statt der Konstante TEMPO fliegen die Sterne jetzt mit einer Variablen flug, die dem gewünschten Tempo nachläuft (code/loesungen/kap01_warp.dh):"),
+
+  ...neu("loesungen/kap01_warp.dh").map((t) => H.code(t)),
+
+  H.p("Die Zeile flug = flug + (ziel - flug) * MIN(1.0, 4 * dt) holt in jeder Sekunde einen großen Teil des Abstands zum Ziel auf, zuerst schnell, dann immer langsamer; das ist der Anlauf. Das MIN verhindert, dass bei einem sehr langen Bild (dt groß) übers Ziel hinausgeschossen wird. Die Variable heißt flug und nicht tempo: Weil Drachenhauch Groß- und Kleinschreibung nicht unterscheidet, wäre tempo dasselbe wie die Konstante TEMPO, und das Programm würde nicht übersetzt. Kapitel 4 kommt darauf zurück."),
+
+  H.h3("Erfinden: ein Wirbel"),
+
+  H.p("Eine Möglichkeit (code/loesungen/kap01_wirbel.dh): Bevor ein Stern geteilt wird, dreht das Programm ihn um die Blickachse — um so mehr, je näher er ist. So scheinen die Sterne in einem Strudel auf uns zuzukommen:"),
+
+  ...neu("loesungen/kap01_wirbel.dh").map((t) => H.code(t)),
+
+  H.p("Die beiden Zeilen mit COS und SIN sind die Drehung eines Punkts um den Nullpunkt; sie kommen in Kapitel 3 und 4 wieder. Der Schweif braucht dieselbe Drehung für sein z — sonst zeigte er nicht dorthin, woher der Stern kam."),
+
   H.h2("Kapitel 5 · Feuerwerk"),
 
   H.h3("Drehen 1"),

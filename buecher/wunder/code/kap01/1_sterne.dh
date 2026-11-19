@@ -1,0 +1,31 @@
+' Kapitel 1, Schritt 1 -- zweihundert Sterne fliegen auf uns zu.
+' Jeder Stern ist drei Zahlen: x, y und seine Entfernung z.
+CONST ANZAHL = 200
+CONST BRENNWEITE = 300.0
+CONST TIEFE = 1000
+CONST TEMPO = 250.0
+
+DIM sx[ANZAHL] AS FLOAT
+DIM sy[ANZAHL] AS FLOAT
+DIM sz[ANZAHL] AS FLOAT
+
+DIM i AS INTEGER
+FOR i = 0 TO ANZAHL - 1
+    sx[i] = RANDINT(-400, 400)
+    sy[i] = RANDINT(-250, 250)
+    sz[i] = RANDINT(1, TIEFE)
+NEXT
+
+SCREEN(800, 500, "Sternenflug")
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
+    DIM dt AS FLOAT : dt = DELTA()
+    CLS(RGB(0, 0, 0))
+    FOR i = 0 TO ANZAHL - 1
+        sz[i] = sz[i] - TEMPO * dt
+        IF sz[i] < 1 THEN sz[i] = sz[i] + TIEFE
+        DIM px AS FLOAT : px = 400 + sx[i] * BRENNWEITE / sz[i]
+        DIM py AS FLOAT : py = 250 + sy[i] * BRENNWEITE / sz[i]
+        CIRCLE(px, py, 1, RGB(255, 255, 255))
+    NEXT
+    FLIP()
+WEND

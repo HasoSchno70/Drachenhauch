@@ -1,0 +1,3 @@
+DIM sz[10] AS FLOAT
+DIM i AS INTEGER : i = 7
+PRINT sz[i / 2]

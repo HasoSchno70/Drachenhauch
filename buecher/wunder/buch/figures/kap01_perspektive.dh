@@ -1,0 +1,43 @@
+' Bild fuer Kapitel 1: warum durch z geteilt wird. Von der Seite gesehen:
+' links das Auge, im Abstand BRENNWEITE die Bildebene (der Bildschirm),
+' rechts zwei Sterne in derselben Hoehe y, aber verschieden weit weg.
+' Der Strahl vom Auge zum Stern trifft die Bildebene bei y * f / z --
+' der fernere Stern landet naeher an der Mitte.
+SCREEN(800, 500, "Perspektive")
+CONST AX = 60
+CONST AY = 300
+CONST F = 160
+DIM bild AS INTEGER
+FOR bild = 1 TO 3
+    CLS(RGB(250, 250, 248))
+    DIM grau AS INTEGER : grau = RGB(150, 150, 150)
+    DIM tinte AS INTEGER : tinte = RGB(40, 40, 50)
+    ' Blickachse und Bildebene
+    LINEW(AX, AY, 780, AY, 1, grau)
+    LINEW(AX + F, 60, AX + F, 460, 3, RGB(90, 140, 200))
+    TEXT(AX + F + 8, 440, "Bildebene (Bildschirm)", RGB(90, 140, 200))
+    CIRCLE(AX, AY, 7, tinte)
+    TEXT(AX - 30, AY - 30, "Auge", tinte)
+    ' Zwei Sterne, beide 150 ueber der Achse, bei z = 300 und z = 680
+    DIM zs AS ARRAY OF INTEGER : zs = [300, 680]
+    DIM farben AS ARRAY OF INTEGER : farben = [RGB(220, 120, 40), RGB(200, 60, 120)]
+    DIM k AS INTEGER
+    FOR k = 0 TO 1
+        DIM sx AS INTEGER : sx = AX + zs[k]
+        DIM sy AS INTEGER : sy = AY - 150
+        DIM treff AS FLOAT : treff = 150 * F / zs[k]
+        LINEW(AX, AY, sx, sy, 2, farben[k])
+        CIRCLE(sx, sy, 9, farben[k])
+        CIRCLE(AX + F, AY - treff, 6, farben[k])
+        TEXT(sx - 30, sy - 30, "z = " + STR$(zs[k]), farben[k])
+        TEXT(AX + F + 14, INT(AY - treff) + 2, "y' = " + STR$(INT(treff)), farben[k])
+    NEXT
+    ' Masse
+    LINEW(AX, AY + 34, AX + F, AY + 34, 1, tinte)
+    LINEW(AX, AY + 28, AX, AY + 40, 1, tinte)
+    LINEW(AX + F, AY + 28, AX + F, AY + 40, 1, tinte)
+    TEXT(AX + 20, AY + 44, "f = Brennweite", tinte)
+    TEXT(430, 120, "beide Sterne: y = 150", tinte)
+    TEXT(430, 470, "y' = y * f / z", tinte)
+    FLIP()
+NEXT
