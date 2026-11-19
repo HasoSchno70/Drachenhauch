@@ -651,6 +651,38 @@ Empfehlung: **erst den Rahmen und die zwei Probekapitel**, dann Buch A
 Teil für Teil (es zieht neue Leute an), Buch B parallel, sobald Teil I von
 A steht. Jeder Teil ist ein PR.
 
+## Stand: die Probekapitel (2026-11-19)
+
+Rahmen und Probekapitel stehen: `buecher/wunder` (Vorwort, Kapitel 5
+Feuerwerk, Anhang A) und `buecher/anwendungen` (Vorwort, Kapitel 1 von
+Hand, Kapitel 8 im Studio, Anhang A), je als `.docx` und `.epub`.
+Geprüft von `tests/pruef/buecher/buch_wunder_anwendungen.dhtest` und
+`buch_anwendungen_studio.dhtest` (langsam).
+
+Was beim Bauen festgelegt wurde:
+
+* **Code kommt aus Dateien.** `buch/code_lesen.js` holt ganze Programme,
+  Ausschnitte (`stueck(datei, von, bis)`) und in den Lösungen die Stellen
+  zwischen `' >>> neu` und `' <<< neu`. Kein Abdruck wird abgeschrieben.
+* **Meldungen sind geprüft.** `buch/pruef_meldungen.js` lässt jedes
+  Fehlerbeispiel laufen, dessen Abdruck mit `datei.dh:N:` beginnt, und sucht
+  den Wortlaut in der Ausgabe.
+* **Bilder:** `shoot.dh` mit `SKALIERUNG` 2 (Programme 800×500); eine
+  Bedienung als `figures/<name>.txt` daneben (Klicks in Fensterpixeln, also
+  mal 2). Das Studio bedient `studio_bilder.dh` auf einer Kopie des
+  Projekts (`_studio_bilder/`, nicht versioniert); Tasten dort als
+  raylib-Codes (F5 = 294, N = 78), nicht als `KEY_*` von Drachenhauch.
+* **Tippen kann keine Aufnahme**: Sie spielt Tasten, keine Zeichen. Bilder
+  mit eingetipptem Text gibt es darum nicht; die Prüfsammlung ersetzt das
+  Lesen des Felds (`--- ersetzen TRIM$(GUI_TEXT(feld))`).
+
+Funde unterwegs: Die Vorlage „Formular“ des Studios trug Enter- und
+Esc-Knopf als Nummer, der Inspektor zeigte „(keiner)“ (behoben,
+`knoepfeBeimNamen`, `geschichte/studio.md`). Zwei Behauptungen im
+Entwurf des Kapiteltexts hielten dem Nachmessen nicht stand (`RGBA` rundet
+selbst; die vierte Zahl von `SCREEN` ist der Maßstab) -- jede Aussage
+über das Verhalten wird vor dem Schreiben ausprobiert.
+
 ## Offene Fragen
 
 * **Titel:** „Kleine Wunder“ / „Fenster, Formulare, Daten“ -- oder andere?

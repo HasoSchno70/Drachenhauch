@@ -1,0 +1,224 @@
+' Die Buecher "Kleine Wunder" (buecher/wunder) und "Fenster, Formulare,
+' Daten" (buecher/anwendungen): Code im Buch, Programme, Loesungen und die
+' abgedruckten Meldungen.
+'
+' Beide Buecher versprechen im Vorwort: jedes Programm und jede Loesung
+' liegt als Datei bei und laeuft, jede abgedruckte Ausgabe und jede
+' Fehlermeldung hat den Wortlaut, den dhrt wirklich ausgibt. Diese
+' Sammlung haelt das Versprechen fest. Die Werkzeuge im Buchverzeichnis
+' lesen die Kapitel (JavaScript-Module); ohne Node ueberspringen sich
+' diese Faelle. Das Studio-Projekt aus Kapitel 8 prueft
+' buch_anwendungen_studio.dhtest (langsam).
+'
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== alle codebloecke uebersetzen
+IMPORT "helfer.dh"
+DIM b AS STRING
+FOR EACH b IN ["wunder", "anwendungen"]
+    buchWerkzeugIn(ARG$(0), b, "pruef_codebloecke.js")
+    PRINT b; " "; nlCode; " "; (zahlVor(nlAus, "Codebloecke") >= 15)
+    IF nlCode <> 0 THEN PRINT nlAus; nlErr
+NEXT
+--- argumente
+{sammlung}/../../..
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/einstieg.dh"
+--- erwartet
+wunder 0 TRUE
+anwendungen 0 TRUE
+
+=== jeder abdruck ist die datei
+' Die Kapitel holen ihren Code mit code_lesen.js aus code/ -- der Fall
+' faengt den Tag, an dem jemand doch einen Block von Hand einfuegt.
+IMPORT "helfer.dh"
+DIM b AS STRING
+FOR EACH b IN ["wunder", "anwendungen"]
+    buchWerkzeugIn(ARG$(0), b, "pruef_abdruck.js")
+    PRINT b; " "; nlCode; " "; (zahlVor(nlAus, "Abdrucke") >= 1)
+    IF nlCode <> 0 THEN PRINT nlAus; nlErr
+NEXT
+--- argumente
+{sammlung}/../../..
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/einstieg.dh"
+--- erwartet
+wunder 0 TRUE
+anwendungen 0 TRUE
+
+=== die behaupteten ausgaben stimmen
+' Im Feuerwerk-Kapitel laufen zwei Konsolenprogramme (rueckwaerts
+' loeschen, der Funke vor der Schleife); die Schranke faengt den leeren
+' Lauf.
+IMPORT "helfer.dh"
+buchWerkzeugIn(ARG$(0), "wunder", "pruef_ausgaben.js")
+PRINT "wunder "; nlCode; " "; (zahlVor(nlAus, "ausgefuehrt") >= 2)
+IF nlCode <> 0 THEN PRINT nlAus; nlErr
+--- argumente
+{sammlung}/../../..
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/einstieg.dh"
+--- erwartet
+wunder 0 TRUE
+
+=== die abgedruckten meldungen sind die von dhrt
+' pruef_meldungen.js laesst jedes Fehlerbeispiel laufen und sucht den
+' Abdruck (Zeilen mit Leerzeichen verbunden) in der Ausgabe.
+IMPORT "helfer.dh"
+DIM b AS STRING
+FOR EACH b IN ["wunder", "anwendungen"]
+    buchWerkzeugIn(ARG$(0), b, "pruef_meldungen.js")
+    PRINT b; " "; nlCode; " "; zahlVor(nlAus, "Meldungen")
+    IF nlCode <> 0 THEN PRINT nlAus; nlErr
+NEXT
+--- argumente
+{sammlung}/../../..
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/einstieg.dh"
+--- erwartet
+wunder 0 2
+anwendungen 0 1
+
+=== jedes programm und jede loesung uebersetzt ohne befund
+' Auch ohne Warnung: ein Leser tippt es ab und soll keine Wellenlinie
+' sehen. Die Fehlerbeispiele (fehler_*) sind ausgenommen, sie sollen
+' scheitern.
+IMPORT "helfer.dh"
+DIM w AS STRING : w = ARG$(0) + "/buecher/"
+DIM n AS INTEGER : n = 0
+DIM o AS STRING
+FOR EACH o IN ["wunder/code/kap05", "wunder/code/loesungen", "wunder/buch/figures", "anwendungen/code/kap01", "anwendungen/code/loesungen", "anwendungen/buch/figures"]
+    DIM f AS STRING
+    FOR EACH f IN DIRLIST(w + o)
+        IF RIGHT$(f, 3) = ".dh" AND LEFT$(f, 7) <> "fehler_" THEN
+            nlWarten(PROCESS_START("dhrt", "--check", w + o + "/" + f), 60000)
+            IF TRIM$(nlAus) <> "[]" THEN PRINT o; "/"; f; ": "; nlAus
+            n = n + 1
+        END IF
+    NEXT
+NEXT
+PRINT "genug "; n >= 15
+--- argumente
+{sammlung}/../../..
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/nodelauf.dh"
+--- erwartet
+genug TRUE
+
+=== jedes fensterprogramm laeuft ohne laufzeitfehler
+' 420 Bilder (sieben Sekunden) je Programm, Zwischenstand oder Loesung:
+' Die erste Rakete zerplatzt nach gut zwei Sekunden, ihre Funken leben
+' bis zu zwei weitere -- erst dann verloeschen Funken und Knaller (mit 200
+' Bildern blieb ein Fehler im Nachknallen in der Gegenprobe gruen). Ohne
+' Bildschirm meldet das Kind "Kein Fenster moeglich", und dhrt test
+' zaehlt den Fall als uebersprungen.
+IMPORT "helfer.dh"
+DIM w AS STRING : w = ARG$(0) + "/buecher/"
+DIM n AS INTEGER : n = 0
+DIM o AS STRING
+FOR EACH o IN ["wunder/code/kap05", "wunder/code/loesungen", "wunder/buch/figures", "anwendungen/code/kap01", "anwendungen/code/loesungen", "anwendungen/buch/figures"]
+    DIM f AS STRING
+    FOR EACH f IN DIRLIST(w + o)
+        IF RIGHT$(f, 3) = ".dh" AND LEFT$(f, 7) <> "fehler_" THEN
+            IF INSTR(UPPER$(JOIN$(READLINES(w + o + "/" + f), " ")), "SCREEN(") >= 0 THEN
+                nlWarten(PROCESS_START("dhrt", "run", "--bilder", "420", w + o + "/" + f), 120000)
+                IF nlCode <> 0 OR INSTR(nlErr + nlAus, "fehler") >= 0 THEN PRINT o; "/"; f; " "; nlCode; ": "; nlAus; nlErr
+                n = n + 1
+            END IF
+        END IF
+    NEXT
+NEXT
+PRINT "genug "; n >= 12
+--- argumente
+{sammlung}/../../..
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/nodelauf.dh"
+--- erwartet
+genug TRUE
+
+=== mediathek kapitel 1: leer abgewiesen, ein titel aufgenommen
+' Tippen kann eine Aufnahme nicht (sie spielt Tasten, keine Zeichen) --
+' die Faelle danach setzen darum statt des Felds einen festen Titel ein.
+' Die Leerzeile hinter jeder Aufnahme ist noetig: einer Beilage ohne
+' Zeilenende fehlt ihre letzte Zeile, und das waere das Loslassen.
+--- programm ../../../buecher/anwendungen/code/kap01/3_mediathek.dh
+--- datei klick.txt
+c 4
+e 0 7 435 34 0 0
+e 10 7 435 34 0 0
+e 13 6 0 0 0 0
+e 15 5 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=40
+DHRT_ABSPIELEN=klick.txt
+DHRT_GUI_ZUSTAND=1
+DHRT_ABSEITS=1
+--- enthaelt
+  label(2) "Bitte einen Titel eingeben."
+
+=== mediathek kapitel 1: ein titel kommt in die liste
+--- programm ../../../buecher/anwendungen/code/kap01/3_mediathek.dh
+--- ersetzen TRIM$(GUI_TEXT(feld))
+TRIM$("  Momo ")
+--- datei klick.txt
+c 4
+e 0 7 435 34 0 0
+e 10 7 435 34 0 0
+e 13 6 0 0 0 0
+e 15 5 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=40
+DHRT_ABSPIELEN=klick.txt
+DHRT_GUI_ZUSTAND=1
+DHRT_ABSEITS=1
+--- enthaelt
+  label(2) "1 Titel in der Mediathek."
+  label(3) "Momo"
+
+=== loesung kapitel 1: ein doppelter titel wird abgewiesen
+--- programm ../../../buecher/anwendungen/code/loesungen/kap01_doppelt.dh
+--- ersetzen TRIM$(GUI_TEXT(feld))
+TRIM$("Momo")
+--- datei klick.txt
+c 7
+e 0 7 435 34 0 0
+e 10 7 435 34 0 0
+e 13 6 0 0 0 0
+e 15 5 0 0 0 0
+e 25 7 435 34 0 0
+e 28 6 0 0 0 0
+e 30 5 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=50
+DHRT_ABSPIELEN=klick.txt
+DHRT_GUI_ZUSTAND=1
+DHRT_ABSEITS=1
+--- enthaelt
+  label(2) "Momo steht schon in der Mediathek."
+  label(3) "Momo"
+
+=== loesung kapitel 1: leeren leert die mediathek
+--- programm ../../../buecher/anwendungen/code/loesungen/kap01_leeren.dh
+--- ersetzen TRIM$(GUI_TEXT(feld))
+TRIM$("Momo")
+--- datei klick.txt
+c 7
+e 0 7 435 34 0 0
+e 10 7 435 34 0 0
+e 13 6 0 0 0 0
+e 15 5 0 0 0 0
+e 25 7 435 264 0 0
+e 28 6 0 0 0 0
+e 30 5 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=50
+DHRT_ABSPIELEN=klick.txt
+DHRT_GUI_ZUSTAND=1
+DHRT_ABSEITS=1
+--- enthaelt
+  label(2) "Die Mediathek ist leer."
+  label(3) ""
