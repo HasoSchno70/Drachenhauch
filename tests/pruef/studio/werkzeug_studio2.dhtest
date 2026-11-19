@@ -191,6 +191,52 @@ app fenster Kundin DIM name AS STRING
 Hauptfenster.Geoeffnet PRINT "da"
 fehlt [Im Ordner liegt keine projekt.dhstudio.]
 
+=== enter- und esc-knopf als nummer werden beim laden zu namen
+' Das Studio nennt Enter- und Esc-Knopf beim Namen; GUI_SAVE und Hand
+' schreiben eine Nummer. Ohne Umwandlung zeigte der Inspektor "(keiner)",
+' und nach dem Loeschen eines Widgets davor traf Enter ein anderes.
+' Ein Name, der schon dasteht, gewinnt; eine Nummer ins Leere faellt weg.
+IMPORT "modell_imp.dh"
+DIM o AS STRING
+FOR EACH o IN ["proj", "proj2"]
+    PRINT o; " ["; projektLaden$(CWD$() + "/" + o); "]"
+    DIM d AS JSON_HANDLE : d = JSON_PARSE(elemente[1].layout)
+    PRINT "  standard "; IIF(JSON_HAS(d, "studio_standard"), JSON_GET_STRING(d, "studio_standard"), "-")
+    PRINT "  abbrechen "; IIF(JSON_HAS(d, "studio_abbrechen"), JSON_GET_STRING(d, "studio_abbrechen"), "-")
+    PRINT "  nummern "; JSON_HAS(d, "default_button"); " "; JSON_HAS(d, "cancel_button")
+NEXT
+--- datei modell_imp.dh
+IMPORT "json"
+IMPORT "regex"
+IMPORT "imgfx"
+IMPORT "{sammlung}/../../../studio/sprache.dh"
+IMPORT "{sammlung}/../../../studio/bibliothek.dh"
+IMPORT "{sammlung}/../../../studio/modell.dh"
+IMPORT "{sammlung}/../../../studio/projekt.dh"
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"}]}
+--- datei proj/Hauptfenster.dhform
+{"title":"H","name":"Hauptfenster","w":300,"h":200,"default_button":1,"cancel_button":2,"widgets":[
+{"kind":"label","name":"hinweis","text":"x","x":0,"y":0,"w":50,"h":16},
+{"kind":"button","name":"knopfOk","text":"OK","x":0,"y":30,"w":80,"h":28},
+{"kind":"button","name":"knopfZu","text":"Zu","x":90,"y":30,"w":80,"h":28}]}
+--- datei proj2/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj2","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"}]}
+--- datei proj2/Hauptfenster.dhform
+{"title":"H","name":"Hauptfenster","w":300,"h":200,"studio_standard":"knopfZu","default_button":1,"cancel_button":7,"widgets":[
+{"kind":"label","name":"hinweis","text":"x","x":0,"y":0,"w":50,"h":16},
+{"kind":"button","name":"knopfOk","text":"OK","x":0,"y":30,"w":80,"h":28},
+{"kind":"button","name":"knopfZu","text":"Zu","x":90,"y":30,"w":80,"h":28}]}
+--- erwartet
+proj []
+  standard knopfOk
+  abbrechen knopfZu
+  nummern FALSE FALSE
+proj2 []
+  standard knopfZu
+  abbrechen -
+  nummern FALSE FALSE
+
 === ein klick im navigator oeffnet die methode, und getippter code wird gesichert
 IMPORT "laeufer.dh"
 DIM p AS STRING : p = CWD$() + "/proj"

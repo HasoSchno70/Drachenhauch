@@ -467,6 +467,27 @@ FUNCTION schemaDatei$(e AS Element) AS STRING
     RETURN e.name + ".dhdb"
 END FUNCTION
 
+' Enter- und Esc-Knopf nennt das Studio beim Namen (studio_standard,
+' studio_abbrechen): eine Nummer wanderte, sobald ein Widget davor
+' geloescht wird. Ein Layout, das GUI_SAVE oder eine Hand geschrieben
+' hat, traegt sie aber als Nummer (default_button, cancel_button) -- der
+' Inspektor zeigte dann "(keiner)", und das erzeugte Programm drueckte
+' ueber die Nummer, bis sie verrutschte. Beim Laden wird daraus der Name.
+SUB knoepfeBeimNamen(d AS JSON_HANDLE)
+    DIM paare AS ARRAY OF STRING : paare = ["default_button", "studio_standard", "cancel_button", "studio_abbrechen"]
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(paare) - 1 STEP 2
+        IF JSON_HAS(d, paare[i]) THEN
+            DIM nr AS INTEGER : nr = JSON_GET_INT(d, paare[i])
+            IF NOT JSON_HAS(d, paare[i + 1]) AND nr >= 0 AND nr < JSON_LEN(d, "widgets") THEN
+                DIM np AS STRING : np = "widgets." + STR$(nr) + ".name"
+                IF JSON_HAS(d, np) THEN JSON_SET_STRING(d, paare[i + 1], JSON_GET_STRING(d, np))
+            END IF
+            JSON_REMOVE(d, paare[i])
+        END IF
+    NEXT
+END SUB
+
 ' Liefert "" oder die Fehlermeldung.
 FUNCTION projektLaden$(ordner AS STRING) AS STRING
     DIM pfad AS STRING : pfad = PATHJOIN(ordner, PROJEKT_DATEI)
@@ -496,6 +517,7 @@ FUNCTION projektLaden$(ordner AS STRING) AS STRING
             IF FILEEXISTS(lp) THEN
                 DIM d AS JSON_HANDLE : d = JSON_LOAD(lp)
                 IF NOT JSON_HAS(d, "widgets") THEN JSON_SET_JSON(d, "widgets", JSON_NEW_ARRAY())
+                knoepfeBeimNamen(d)
                 JSON_SET_STRING(d, "name", e.name)
                 e.layout = JSON_STRINGIFY(d)
             ELSE
