@@ -1,0 +1,26 @@
+' Kapitel 1, Schritt 2 -- ein Feld, ein Knopf und eine Antwort.
+IMPORT "gui"
+
+SCREEN(520, 300, "Mediathek", 1)
+DIM fenster AS GUI_WINDOW
+fenster = GUI_WINDOW("Mediathek", 0, 0, 520, 300)
+GUI_WINDOW_CHROME(fenster, FALSE)
+
+DIM beschriftung AS GUI_WIDGET
+beschriftung = GUI_LABEL(fenster, "Titel", 20, 26)
+DIM feld AS GUI_WIDGET
+feld = GUI_TEXTINPUT(fenster, 80, 20, 280, 28, "z. B. Momo")
+DIM knopf AS GUI_WIDGET
+knopf = GUI_BUTTON(fenster, "Aufnehmen", 370, 20, 130, 28)
+DIM status AS GUI_WIDGET
+status = GUI_LABEL(fenster, "Noch nichts aufgenommen.", 20, 70)
+
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_CLICKED(knopf) THEN
+        GUI_SET_TEXT(status, "Aufgenommen: " + GUI_TEXT(feld))
+    END IF
+    CLS(RGB(32, 36, 44))
+    GUI_DRAW()
+    FLIP()
+WEND

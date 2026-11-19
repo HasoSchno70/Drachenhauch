@@ -25,7 +25,7 @@ DIM schrift AS STRING : schrift = GETENV$("BUCH_FONT", "C:\Windows\Fonts\segoeui
 
 ' Mehr Bilder, wo sich etwas entwickeln muss (Animation, Partikel).
 DIM anzahl AS MAP OF INTEGER
-anzahl = {}
+anzahl = {"kap01_leer": 30}
 
 FUNCTION quelle$(name AS STRING) AS STRING
     ' Erst figures/, dann das Kapitelprogramm selbst.
@@ -57,6 +57,10 @@ FUNCTION aufnehmen(name AS STRING) AS BOOLEAN
     DIM ziel AS STRING : ziel = bilder + "/" + name + ".png"
     DIM n AS INTEGER : n = BILDER_VORGABE
     IF MAPHAS(anzahl, name) THEN n = MAPGET(anzahl, name)
+    ' Eine Bedienung (ein Klick, eine Taste) spielt eine Aufnahme neben der
+    ' Figur ab: figures/<name>.txt, Format wie AUTOMATION_PLAY.
+    DIM ev AS STRING : ev = figuren + "/" + name + ".txt"
+    SETENV("DHRT_ABSPIELEN", IIF(FILEEXISTS(ev), ev, ""))
     SETENV("DHRT_SCALE", SKALIERUNG)
     IF FILEEXISTS(schrift) THEN SETENV("DHRT_FONT", schrift)
     DIM p AS INTEGER : p = PROCESS_START("dhrt", "bild", q, ziel, STR$(n))

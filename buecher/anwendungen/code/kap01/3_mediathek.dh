@@ -1,0 +1,50 @@
+' Kapitel 1, Schritt 3 -- die erste Mediathek: Titel aufnehmen, mit
+' Knopf oder Enter, leere Eingaben abweisen, alles Bisherige zeigen.
+IMPORT "gui"
+
+DIM titel AS ARRAY OF STRING
+
+SCREEN(520, 300, "Mediathek", 1)
+DIM fenster AS GUI_WINDOW
+fenster = GUI_WINDOW("Mediathek", 0, 0, 520, 300)
+GUI_WINDOW_CHROME(fenster, FALSE)
+
+DIM beschriftung AS GUI_WIDGET
+beschriftung = GUI_LABEL(fenster, "Titel", 20, 26)
+DIM feld AS GUI_WIDGET
+feld = GUI_TEXTINPUT(fenster, 80, 20, 280, 28, "z. B. Momo")
+DIM knopf AS GUI_WIDGET
+knopf = GUI_BUTTON(fenster, "Aufnehmen", 370, 20, 130, 28)
+DIM status AS GUI_WIDGET
+status = GUI_LABEL(fenster, "Noch nichts aufgenommen.", 20, 70)
+DIM liste AS GUI_WIDGET
+liste = GUI_LABEL(fenster, "", 20, 100)
+GUI_SET_WRAP(liste, 480)
+
+' Enter im Feld drueckt den Knopf; er traegt dafuer einen Rahmen.
+GUI_WINDOW_DEFAULT(fenster, knopf)
+GUI_FOCUS(feld)
+
+SUB aufnehmen()
+    DIM t AS STRING : t = TRIM$(GUI_TEXT(feld))
+    IF t = "" THEN
+        GUI_SET_TEXT(status, "Bitte einen Titel eingeben.")
+    ELSE
+        ARRAY_PUSH(titel, t)
+        DIM n AS STRING : n = STR$(LEN(titel))
+        GUI_SET_TEXT(status, n + " Titel in der Mediathek.")
+        GUI_SET_TEXT(liste, JOIN$(titel, ", "))
+        GUI_SET_TEXT(feld, "")
+    END IF
+    GUI_FOCUS(feld)
+END SUB
+
+' Ohne Eingabe hoechstens ein Bild je Sekunde -- das schont den Akku.
+WINDOW_WAIT_EVENTS(1)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_CLICKED(knopf) THEN aufnehmen()
+    CLS(RGB(32, 36, 44))
+    GUI_DRAW()
+    FLIP()
+WEND
