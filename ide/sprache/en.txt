@@ -428,6 +428,7 @@ Keine Datei gewählt -- Strg+Klick sammelt, Umschalt+Klick spannt.	No file selec
  Datei(en) geöffnet.	 file(s) opened.
  Haken entfernt -- der Umbau geht wieder über das ganze Projekt.	 checks removed -- refactoring covers the whole project again.
  Fehler, 	 errors, 
+ Fehler, |1	 error, 
  Warnungen	 warnings
  Warnung	 warning
  Hinweis	 note

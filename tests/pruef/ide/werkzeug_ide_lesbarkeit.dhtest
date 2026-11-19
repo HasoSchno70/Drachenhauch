@@ -383,6 +383,42 @@ pr kopf |0 Fehler, 2 Warnungen| titel Probleme (2)
 pr kopf |0 Fehler, 1 Warnung| titel Probleme (1)
 pr kopf || titel Probleme
 
+=== englisch: ein fehler ist "1 error", eine warnung "1 warning"
+' Das deutsche "Fehler" ist Ein- und Mehrzahl, das englische nicht: bis
+' 2026-11-19 stand dort "1 errors". trn$ nimmt bei 1 den Eintrag
+' " Fehler, |1" der Tafel.
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 80 THEN
+    protokoll("pr kopf |" + GUI_TEXT(lblProbleme) + "|")
+    GUI_SET_TEXT(reiter[aktiverTab].feld, "PRINT gibtsnicht" + NL)
+END IF
+IF prBild = 170 THEN
+    protokoll("pr kopf |" + GUI_TEXT(lblProbleme) + "|")
+    EXIT(0)
+END IF
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=250
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+DH_IDE_SPRACHE=en
+--- datei spiel.dh
+PRINT 1 +
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " THEN PRINT L[i]
+NEXT
+--- erwartet
+pr kopf |1 error, 0 warnings|
+pr kopf |0 errors, 1 warning|
+
 === die eingabezeile steht nur, solange ein programm zuhoert
 ' Seit 2026.47: vorher stand "Eingabe fuer das laufende Programm" immer
 ' unten, auch ohne Programm. Jetzt nur waehrend eines Laufs (F5, Debugger)
