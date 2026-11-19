@@ -2013,7 +2013,7 @@
   "RENDERTARGET_BEGIN": "ab jetzt dorthin zeichnen",
   "RENDERTARGET_CLEAR": "von Hand leeren — nötig, wenn behalten an ist",
   "RENDERTARGET_DRAW": "das Ziel wie ein Bild aufs Fenster stempeln",
-  "RENDERTARGET_END": "zurück auf das Fenster",
+  "RENDERTARGET_END": "zurück auf das Fenster -- fehlt es vor FLIP, hält FLIP mit einer Meldung an (sonst ginge das ganze Bild ins Ziel)",
   "RENDERTARGET_IMAGE": "der Inhalt als Bild — was seit RENDERTARGET_BEGIN gezeichnet wurde, wird dafür sofort abgespielt, nicht erst beim FLIP. So kommt ein Diagramm in ein PDF (PDF_IMAGE) oder eine Datei (IMAGE_SAVE)",
   "RENDERTARGET_NEW": "Ziel anlegen. keep = TRUE lässt den Inhalt über das Bild hinaus stehen — die Voraussetzung für Schweife",
   "REPEAT": "Wiederholt den Block, bis die Bedingung wahr wird.",

@@ -312,6 +312,9 @@ In FUNCTION {} steht eine Zuweisung an '{}' -- in Drachenhauch liefert eine FUNC
 {}: zu viele Argumente (max {})	{}: too many arguments (at most {})
 {}: positional Argument nach Named-Arg	{}: positional argument after a named argument
 {}: kein Parameter '{}'	{}: no parameter '{}'
+{}: kein Parameter '{}'.{} Die Parameter heissen {}	{}: no parameter '{}'.{} The parameters are {}
+Zuweisung an die Konstante '{}' -- eine CONST behaelt ihren Wert. Was sich aendern soll, ist eine Variable (DIM).	Assignment to the constant '{}' -- a CONST keeps its value. What is meant to change is a variable (DIM).
+FLIP: ein Render-Ziel ist noch offen -- nach RENDERTARGET_BEGIN fehlt RENDERTARGET_END(). Bis dahin geht alles Gezeichnete ins Ziel statt auf den Bildschirm	FLIP: a render target is still open -- RENDERTARGET_END() is missing after RENDERTARGET_BEGIN. Until then everything drawn goes into the target instead of onto the screen
 {}: Parameter '{}' doppelt belegt	{}: parameter '{}' given twice
 {}: Parameter '{}' fehlt	{}: parameter '{}' is missing
 BYREF-Parameter werden bei Coroutinen (Funktionen/Subs mit YIELD) nicht unterstuetzt -- die finalen Werte stehen erst nach dem Abschluss der Coroutine fest, nicht direkt beim Aufruf.	BYREF parameters are not supported for coroutines (functions/subs with YIELD) -- the final values are only known when the coroutine has finished, not right at the call.

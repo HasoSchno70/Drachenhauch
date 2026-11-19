@@ -1099,3 +1099,36 @@ machen: lesbare Aufrufe und weniger Varianten-Befehle.
   Bytecode an eine aeltere kleine Laufzeit haengen konnte. Jetzt traegt die
   `.dhc` `"dhrt": <Fassung>`, eine fremde wird abgewiesen, und der Export
   uebergeht kleine Laufzeiten einer anderen Fassung (`--version`).
+
+## Funde aus dem Buch "Kleine Wunder" (2026-11-19)
+
+Beim Schreiben von Teil I fielen vier Stellen auf, an denen Drachenhauch
+schwieg oder unklar sprach. Je ein Fall mit Gegenprobe:
+
+- **Zuweisung an eine CONST** war erst zur Laufzeit ein Fehler ("CONST kann
+  nicht ueberschrieben werden"), `--check` meldete nichts. Jetzt ein
+  Compile-Fehler im `Node::Assign`-Zweig: "Zuweisung an die Konstante
+  'radius' -- eine CONST behaelt ihren Wert ...". Ausgenommen, wenn eine
+  lokale Variable, ein Parameter oder ein Feld gleichen Namens die Konstante
+  verdeckt. `name_collision.dhtest`. **Aendert bestehende Programme:** eines,
+  das die Zeile nie erreichte, laeuft jetzt gar nicht erst an.
+- **Vorgabe, die eine gleichnamige Konstante meint** (`ring AS FLOAT =
+  RING`): der Ausdruck-Default wird im Callee-Prolog uebersetzt, und dort
+  war der Parameter `ring` schon ein lokaler Name -- die Vorgabe las ihn
+  selbst (NIL) und brach mit "Erwartet FLOAT, erhalten NIL" ab, ohne Zeile.
+  `emit_default_prologue` verbirgt jetzt Parameter i und alle spaeteren,
+  solange Vorgabe i uebersetzt wird, und setzt die Kopfzeile der Funktion
+  als Zeile (Methoden: die der Klasse). `named_args.dhtest`.
+- **Unbekannter Name eines Arguments** einer eigenen Funktion: "kein
+  Parameter 'hohe'" ohne Vorschlag, bei Builtins gab es ihn schon. Jetzt
+  mit `aehnlich::hinweis_klein` und der Liste der Parameter.
+  `named_args.dhtest`.
+- **RENDERTARGET_BEGIN ohne END vor FLIP**: alles danach, auch das
+  RENDERTARGET_DRAW, ging ins Ziel, der Schirm blieb schwarz, ohne Meldung.
+  `Graphics::rt_vom_programm` (getrennt von `active_rt`, das auch native
+  Fenster und die Lupe setzen); FLIP haelt mit einer Meldung an.
+  `rendertarget_persistenz.dhtest`. **Aendert bestehende Programme:** eines
+  mit dem vergessenen END bricht jetzt ab, statt schwarz zu laufen.
+
+Dazu in der IDE: "1 Warnung" (deutsch) und "1 error" (englisch, ueber
+`trn$` und den Eintrag " Fehler, |1"), siehe `geschichte/ide.md`.

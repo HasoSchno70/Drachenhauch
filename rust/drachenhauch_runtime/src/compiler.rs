@@ -1245,6 +1245,17 @@ impl Compiler {
             Node::Const { name, type_name, value } =>
                 self.stmt_const(name, type_name.as_deref(), value),
             Node::Assign { name, value } => {
+                // Eine Zuweisung an eine Konstante faellt beim Uebersetzen auf,
+                // nicht erst, wenn die Zeile laeuft (bis 2026-11-19 nur zur
+                // Laufzeit, "CONST kann nicht ueberschrieben werden" -- `--check`
+                // schwieg). Eine lokale Variable, ein Parameter oder ein Feld
+                // gleichen Namens verdeckt die Konstante; dann ist es keine.
+                if !self.ctx.local_slots.contains_key(name.as_str()) && !self.is_field(name)
+                    && self.global_consts.contains(&name.to_lowercase()) {
+                    return Err(format!(
+                        "Zuweisung an die Konstante '{}' -- eine CONST behaelt ihren Wert. Was sich aendern soll, ist eine Variable (DIM).",
+                        name));
+                }
                 self.ctx.grenz_frei.insert(name.to_lowercase());
                 if let Node::Call { callee, .. } = &**value {
                     if let Node::Identifier(n) = &**callee { self.pruefe_sub_als_wert(n)?; }
@@ -5546,7 +5557,7 @@ impl Compiler {
             let saved = std::mem::replace(&mut self.ctx, ctx);
             let (alt_bereich, mein_bereich) = self.bereich_beginnen();
             let r = (|| {
-                self.emit_default_prologue(params)?;
+                self.emit_default_prologue(params, kopf)?;
                 for s in body { self.stmt(s)?; }
                 if is_sub {
                     self.ctx.emit(oc::RETURN_VOID, Value::Null);
@@ -5599,7 +5610,16 @@ impl Compiler {
     /// Der Ausdruck wird im Funktions-Ctx kompiliert -> Verweise auf fruehere
     /// Parameter loesen auf die bereits gesetzten Local-Slots auf. Muss VOR dem
     /// Body und in PARAM-REIHENFOLGE laufen (Default i darf Param < i nutzen).
-    fn emit_default_prologue(&mut self, params: &[crate::ast::Param]) -> CR {
+    ///
+    /// Parameter i und alle spaeteren sind waehrend ihres Defaults NICHT
+    /// sichtbar: `ring AS FLOAT = RING` meint die Konstante RING, nicht den
+    /// (noch leeren) Parameter gleichen Namens -- Namen kennen keine Gross-/
+    /// Kleinschreibung. Bis 2026-11-19 las der Default den Parameter selbst
+    /// und brach mit "Erwartet FLOAT, erhalten NIL" ab, ohne Zeile (der
+    /// Prolog hatte keine). `kopf` = Kopfzeile der Funktion, fuer Fehler hier.
+    fn emit_default_prologue(&mut self, params: &[crate::ast::Param], kopf: u32) -> CR {
+        let alt_zeile = self.ctx.cur_line;
+        self.ctx.cur_line = kopf;
         for (i, p) in params.iter().enumerate() {
             let def = match &p.default {
                 Some(d) if eval_literal_default(d).is_err() => d,  // nur Nicht-Literale
@@ -5610,11 +5630,18 @@ impl Compiler {
             self.ctx.emit(oc::LOAD_CONST, json!(nilc));
             self.ctx.emit(oc::EQ, Value::Null);
             let skip = self.ctx.emit(oc::JUMP_IF_FALSE, Value::Null);
-            self.expr(def)?;                       // default-Wert (Param-Refs = Locals)
+            // Parameter i.. fuer den Ausdruck verbergen, danach zurueck.
+            let verborgen: Vec<(String, usize)> = params[i..].iter()
+                .filter_map(|q| self.ctx.local_slots.remove(&q.name).map(|s| (q.name.clone(), s)))
+                .collect();
+            let r = self.expr(def);                // default-Wert (fruehere Param = Locals)
+            for (n, s) in verborgen { self.ctx.local_slots.insert(n, s); }
+            r?;
             self.ctx.emit(oc::STORE_LOCAL, json!(i));   // coerct auf Param-Typ
             let here = self.ctx.here();
             self.ctx.patch(skip, here);
         }
+        self.ctx.cur_line = alt_zeile;
         Ok(())
     }
 
@@ -5656,7 +5683,7 @@ impl Compiler {
         let saved = std::mem::replace(&mut self.ctx, ctx);
         let (alt_bereich, mein_bereich) = self.bereich_beginnen();
         let r = (|| {
-            self.emit_default_prologue(params)?;
+            self.emit_default_prologue(params, kopf)?;
             for s in body { self.stmt(s)?; }
             if is_sub {
                 self.ctx.emit(oc::RETURN_VOID, Value::Null);
@@ -5861,8 +5888,12 @@ fn resolve_args_with_sig<'a>(sig: &FnSig, name: &str, args: &'a [Node])
     for j in pos_count..args.len() {
         if let Node::NamedArg { name: an, value } = &args[j] {
             let key = an.to_lowercase();
+            // Mit Vorschlag, wie bei den Builtins: "hohe" -> "Meintest du hoehe?"
             let idx = sig.param_names.iter().position(|p| *p == key)
-                .ok_or_else(|| format!("{}: kein Parameter '{}'", name, an))?;
+                .ok_or_else(|| format!("{}: kein Parameter '{}'.{} Die Parameter heissen {}",
+                    name, an,
+                    crate::aehnlich::hinweis_klein(&key, sig.param_names.iter().map(|p| p.as_str())),
+                    sig.param_names.join(", ")))?;
             if slots[idx].is_some() {
                 return Err(format!("{}: Parameter '{}' doppelt belegt", name, an));
             }
