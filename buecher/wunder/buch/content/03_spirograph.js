@@ -140,6 +140,6 @@ module.exports = (H) => [
 
   H.h2("Zum Weiterlesen"),
 
-  H.bulletRich("Handbuch, Sprache → Funktionen und Unterprogramme: ", "Parameter, Vorgaben, benannte Argumente, BYREF und Rekursion."),
+  H.bulletRich("Handbuch, Sprache → Funktionen: SUB und FUNCTION: ", "Parameter, Vorgaben, benannte Argumente, BYREF und Rekursion."),
   H.bulletRich("Handbuch, Grafik-Befehle → Render-Ziele: ", "keep, RENDERTARGET_CLEAR und Nachzieheffekte."),
 ];

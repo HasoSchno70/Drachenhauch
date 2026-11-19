@@ -1,0 +1,30 @@
+' Loesung zu Kapitel 4, Erweitern 2: eine Stoppuhr. Leertaste startet
+' und haelt an, R stellt auf null. Der rote Zeiger zeigt die Sekunden,
+' der lange weisse die Minuten.
+IMPORT "../kap04/uhr_teile.dh"
+
+DIM gestoppt AS FLOAT
+DIM laeuft AS BOOLEAN
+
+SCREEN(800, 500, "Stoppuhr")
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
+    DIM dt AS FLOAT : dt = DELTA()
+    IF KEY_HIT(KEY_SPACE) THEN laeuft = NOT laeuft
+    IF KEY_HIT(KEY_R) THEN
+        laeuft = FALSE
+        gestoppt = 0
+    END IF
+    IF laeuft THEN gestoppt = gestoppt + dt
+    DIM minuten AS INTEGER : minuten = INT(gestoppt / 60)
+    DIM sekunden AS FLOAT : sekunden = gestoppt - minuten * 60
+    CLS(&H0B0E18)
+    ' Die Stunde bleibt bei 0, der Stundenzeiger also oben.
+    uhrZeichnen(0, minuten, sekunden)
+    TEXT_SIZE(28)
+    ' printf-Masken: zwei Stellen mit Null davor; vier Zeichen mit einer
+    ' Nachkommastelle.
+    DIM anzeige AS STRING : anzeige = FORMAT$(minuten, "%02d")
+    anzeige = anzeige + ":" + FORMAT$(sekunden, "%04.1f")
+    TEXT(UHR_X - TEXT_WIDTH(anzeige) / 2, UHR_Y + 90, anzeige, TINTE)
+    FLIP()
+WEND

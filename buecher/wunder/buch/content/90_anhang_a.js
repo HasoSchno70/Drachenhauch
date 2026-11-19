@@ -151,6 +151,45 @@ module.exports = (H) => [
 
   H.p("armX ist die Rechnung für ein Rad, so allgemein, dass sie für alle drei passt; stiftX zählt die drei Arme zusammen. Hier zeigen benannte Argumente, wozu sie da sind: armX(t, laenge: 70, tempo: -6) liest sich ohne Nachschlagen. Mit den Tempi 1, -6 und 15 schließt sich die Kurve nach einer Runde; andere ganze Zahlen geben andere Sterne, Kommazahlen Kurven, die sich nie schließen."),
 
+  H.h2("Kapitel 4 · Das Ziffernblatt"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Mit SPRUNG = 1.0 ist der Zeiger immer unterwegs: Er braucht die ganze Sekunde, um zur nächsten zu kommen, und gleitet ohne Pause — aber nicht gleichmäßig, denn weich bremst zum Ende jeder Sekunde ab und fährt am Anfang der nächsten wieder an. Man sieht ein leichtes Pulsieren. Mit 0.02 ist der Sprung so kurz, dass er bei 60 Bildern je Sekunde in ein einziges Bild fällt: Der Zeiger springt hart wie bei einer billigen Quarzuhr."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Ohne die Vierteldrehung zeigt jeder Zeiger um 90 Grad zu weit im Uhrzeigersinn. Um zwölf Uhr zeigen alle drei auf die 3, um drei Uhr auf die 6. Das Zifferblatt selbst stimmt weiter, denn zifferblatt hat sein eigenes - 90. Die Uhr geht also scheinbar drei Stunden, fünfzehn Minuten und fünfzehn Sekunden vor."),
+
+  H.h3("Drehen 3"),
+
+  H.p("Die Uhr wird hell mit dunklen Strichen, Zahlen und Zeigern, und sie bleibt gut lesbar, denn hell und dunkel tauschen nur die Plätze. Eine Änderung genügt, weil jede Stelle, die das Zifferblatt malt, BLATT benutzt, und jede, die darauf schreibt, TINTE. Hätte das Programm die Farbzahlen an jede Stelle geschrieben, müsste man sie einzeln suchen — und übersähe sicher eine."),
+
+  H.h3("Erweitern 1: Weltzeit"),
+
+  H.p("Drei Uhren in einer Schleife, jede mit eigener Mitte und kleinerem Radius; die Zeit ist dieselbe Unix-Sekunde, um einige Stunden verschoben (code/loesungen/kap04_weltzeit.dh):"),
+
+  H.code(stueckLoesung("loesungen/kap04_weltzeit.dh", "DIM staedte", "DIM abstand")),
+  H.code(stueckLoesung("loesungen/kap04_weltzeit.dh", "FOR i = 0 TO 2", "NEXT")),
+
+  H.p("Hier zahlen sich die Vorgaben von uhrZeichnen aus: mx: mx, my: 230, r: 115 setzt genau die drei Werte, die bei jeder Uhr anders sind. Dass die Verschiebung fest ist, ist eine Vereinfachung: New York und Berlin stellen ihre Uhren an verschiedenen Tagen auf Sommerzeit um, und Tokio gar nicht. Eine richtige Weltzeituhr bräuchte die Zeitzonen-Regeln, und die stehen nicht im Modul time."),
+
+  H.h3("Erweitern 2: Stoppuhr"),
+
+  H.p("Die Stoppuhr zählt ihre eigene Zeit mit DELTA() und gibt sie als Minuten und Sekunden an uhrZeichnen (code/loesungen/kap04_stoppuhr.dh):"),
+
+  H.code(stueckLoesung("loesungen/kap04_stoppuhr.dh", "IF KEY_HIT(KEY_SPACE)", "anzeige = anzeige")),
+
+  H.p("Die Uhr bekommt die Stunde 0, also steht der kurze Zeiger oben; der lange zeigt die Minuten, der rote die Sekunden mit Bruchteil — er gleitet, statt zu springen. FORMAT$ arbeitet mit Masken nach dem Muster der Sprache C: %02d ist eine ganze Zahl mit mindestens zwei Stellen und Nullen davor, %04.1f eine Kommazahl mit einer Nachkommastelle und mindestens vier Zeichen."),
+
+  H.h3("Erfinden: Mondphase"),
+
+  H.p("Eine Möglichkeit (code/loesungen/kap04_mond.dh): Der Mond braucht 29,53 Tage von Neumond zu Neumond. Kennt man einen Neumond, sagt die Zeit seither, wie weit er im laufenden Monat ist:"),
+
+  H.code(stueckLoesung("loesungen/kap04_mond.dh", "CONST NEUMOND", "END FUNCTION")),
+
+  H.p("runden - INT(runden) ist der Bruchteil, 0 bei Neumond, 0,5 bei Vollmond. Gezeichnet wird eine helle Scheibe, über die sich eine dunkle in der Farbe des Zifferblatts schiebt, und damit der Schatten nicht über das Fenster hinausragt, beschneidet SCISSOR alles Zeichnen auf ein Rechteck, bis SCISSOR_END. Das ist eine Näherung — der echte Schatten ist eine halbe Ellipse, keine Kreisscheibe —, aber auf 24 Punkten Radius sieht man den Unterschied kaum. Hier zahlt sich auch die Aufteilung von uhrZeichnen in zifferblatt und alleZeiger aus: Der Mond gehört zwischen das Blatt und die Zeiger."),
+
   H.h2("Kapitel 5 · Feuerwerk"),
 
   H.h3("Drehen 1"),

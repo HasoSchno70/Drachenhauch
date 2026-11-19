@@ -1,0 +1,28 @@
+' Kapitel 4 -- die Uhr: sie zeigt die Zeit des Rechners. Der Sekunden-
+' zeiger springt jede Sekunde weiter, aber weich, in einer Fuenftel-
+' sekunde, wie bei einer Bahnhofsuhr.
+IMPORT "time"
+IMPORT "uhr_teile.dh"
+
+CONST SPRUNG = 0.2
+
+' Von 0 nach 1: langsam los, schnell in der Mitte, sanft an.
+FUNCTION weich(x AS FLOAT) AS FLOAT
+    RETURN x * x * (3 - 2 * x)
+END FUNCTION
+
+SCREEN(800, 500, "Uhr")
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
+    ' Sekunden seit 1970, mit Bruchteil; daraus die Ortszeit.
+    DIM jetzt AS FLOAT : jetzt = TIME_UNIX()
+    DIM zeit AS INTEGER : zeit = TIME_FROM_UNIX(INT(jetzt))
+    DIM bruch AS FLOAT : bruch = jetzt - INT(jetzt)
+    DIM sek AS FLOAT : sek = TIME_PART(zeit, "sekunde")
+    ' Am Anfang jeder Sekunde faehrt der Zeiger von der vorigen her.
+    IF bruch < SPRUNG THEN sek = sek - 1 + weich(bruch / SPRUNG)
+    CLS(&H0B0E18)
+    DIM std AS INTEGER : std = TIME_PART(zeit, "stunde")
+    DIM mnt AS INTEGER : mnt = TIME_PART(zeit, "minute")
+    uhrZeichnen(std, mnt, sek)
+    FLIP()
+WEND

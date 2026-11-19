@@ -1,0 +1,29 @@
+' Loesung zu Kapitel 4, Erweitern 1: eine Weltzeituhr mit drei Staedten.
+' Die Abstaende sind fest; die Sommerzeit verschiebt sie zweimal im Jahr
+' um eine Stunde, das beachtet diese Uhr nicht.
+IMPORT "time"
+IMPORT "../kap04/uhr_teile.dh"
+
+DIM staedte AS ARRAY OF STRING
+staedte = ["New York", "Berlin", "Tokio"]
+DIM abstand AS ARRAY OF INTEGER : abstand = [-6, 0, 8]
+
+SCREEN(800, 500, "Weltzeit")
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
+    DIM jetzt AS INTEGER : jetzt = INT(TIME_UNIX())
+    CLS(&H0B0E18)
+    DIM i AS INTEGER
+    FOR i = 0 TO 2
+        ' Dieselbe Sekunde, um einige Stunden verschoben.
+        DIM z AS INTEGER : z = TIME_FROM_UNIX(jetzt + abstand[i] * 3600)
+        DIM mx AS FLOAT : mx = 140 + i * 260
+        uhrZeichnen(TIME_PART(z, "stunde"), TIME_PART(z, "minute"),
+                    TIME_PART(z, "sekunde"), mx: mx, my: 230, r: 115)
+        TEXT_SIZE(22)
+        DIM name AS STRING : name = staedte[i]
+        TEXT(mx - TEXT_WIDTH(name) / 2, 370, name, TINTE)
+        DIM uhrzeit AS STRING : uhrzeit = TIME_FORMAT$(z, "hh:mm")
+        TEXT(mx - TEXT_WIDTH(uhrzeit) / 2, 400, uhrzeit, RAND)
+    NEXT
+    FLIP()
+WEND

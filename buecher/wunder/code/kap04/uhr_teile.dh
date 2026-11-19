@@ -1,0 +1,67 @@
+' Kapitel 4 -- die Teile der Uhr: Ziffernblatt und Zeiger. Diese Datei
+' zeichnet nur; welche Zeit sie zeigt, sagt ihr das Programm, das sie
+' mit IMPORT einbindet.
+CONST UHR_X = 400
+CONST UHR_Y = 250
+CONST UHR_R = 220
+CONST BLATT = &H1C2233
+CONST RAND = &H8899BB
+CONST TINTE = &HE8E6DC
+CONST SIGNAL = &HE04040
+
+' Ein Zeiger: grad zaehlt wie auf der Uhr, 0 oben, im Uhrzeigersinn.
+SUB zeiger(mx AS FLOAT, my AS FLOAT, grad AS FLOAT,
+           laenge AS FLOAT, dicke AS FLOAT, farbe AS INTEGER)
+    DIM w AS FLOAT : w = RAD(grad - 90)
+    ' Ein Stueck ueber die Mitte hinaus, wie bei einer echten Uhr.
+    DIM hx AS FLOAT : hx = mx - COS(w) * laenge * 0.15
+    DIM hy AS FLOAT : hy = my - SIN(w) * laenge * 0.15
+    DIM sx AS FLOAT : sx = mx + COS(w) * laenge
+    DIM sy AS FLOAT : sy = my + SIN(w) * laenge
+    LINEW(hx, hy, sx, sy, dicke, farbe)
+END SUB
+
+SUB zifferblatt(mx AS FLOAT, my AS FLOAT, r AS FLOAT)
+    CIRCLE(mx, my, r, RAND)
+    CIRCLE(mx, my, r * 0.96, BLATT)
+    ' Sechzig Striche, jeder fuenfte laenger und dicker.
+    DIM i AS INTEGER
+    FOR i = 0 TO 59
+        DIM w AS FLOAT : w = RAD(i * 6 - 90)
+        DIM gross AS BOOLEAN : gross = (i MOD 5 = 0)
+        DIM innen AS FLOAT : innen = IIF(gross, 0.80, 0.87) * r
+        DIM dicke AS FLOAT : dicke = IIF(gross, 0.02, 0.008) * r
+        DIM aussen AS FLOAT : aussen = 0.92 * r
+        LINEW(mx + COS(w) * innen, my + SIN(w) * innen,
+              mx + COS(w) * aussen, my + SIN(w) * aussen, dicke, TINTE)
+    NEXT
+    ' Die Zahlen auf einem Kreis innerhalb der Striche, jede mittig.
+    TEXT_SIZE(r * 0.13)
+    DIM h AS INTEGER
+    FOR h = 1 TO 12
+        DIM wz AS FLOAT : wz = RAD(h * 30 - 90)
+        DIM zx AS FLOAT : zx = mx + COS(wz) * r * 0.66
+        DIM zy AS FLOAT : zy = my + SIN(wz) * r * 0.66
+        DIM s AS STRING : s = STR$(h)
+        TEXT(zx - TEXT_WIDTH(s) / 2, zy - r * 0.065, s, TINTE)
+    NEXT
+END SUB
+
+' Die drei Zeiger zu einer Zeit. sekunde darf einen Bruchteil haben.
+SUB alleZeiger(stunde AS INTEGER, minute AS INTEGER, sekunde AS FLOAT,
+               mx AS FLOAT, my AS FLOAT, r AS FLOAT)
+    DIM gStunde AS FLOAT : gStunde = (stunde MOD 12 + minute / 60) * 30
+    DIM gMinute AS FLOAT : gMinute = (minute + sekunde / 60) * 6
+    zeiger(mx, my, gStunde, r * 0.5, r * 0.04, TINTE)
+    zeiger(mx, my, gMinute, r * 0.78, r * 0.025, TINTE)
+    zeiger(mx, my, sekunde * 6, r * 0.86, r * 0.008 + 1, SIGNAL)
+    CIRCLE(mx, my, r * 0.035, SIGNAL)
+END SUB
+
+' Die ganze Uhr: erst das Blatt, dann die Zeiger darueber.
+SUB uhrZeichnen(stunde AS INTEGER, minute AS INTEGER, sekunde AS FLOAT,
+                mx AS FLOAT = UHR_X, my AS FLOAT = UHR_Y,
+                r AS FLOAT = UHR_R)
+    zifferblatt(mx, my, r)
+    alleZeiger(stunde, minute, sekunde, mx, my, r)
+END SUB

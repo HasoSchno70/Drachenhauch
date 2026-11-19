@@ -1,0 +1,43 @@
+' Loesung zu Kapitel 4, Erfinden: eine Uhr mit Mondphase, wie bei
+' teuren Armbanduhren -- ein kleines Fenster unter der 12 zeigt, wie
+' viel vom Mond gerade beleuchtet ist.
+IMPORT "time"
+IMPORT "../kap04/uhr_teile.dh"
+
+' Ein Neumond, den man kennt: 6. Januar 2000, 18:14 Uhr (UTC), als
+' Unix-Zeit. Von dort an wiederholt sich alles nach 29,53 Tagen.
+CONST NEUMOND = 947182440
+CONST MONAT = 29.530588
+
+' Wie weit der Mond in seinem Monat ist: 0 Neumond, 0,5 Vollmond.
+FUNCTION mondphase(unix AS FLOAT) AS FLOAT
+    DIM tage AS FLOAT : tage = (unix - NEUMOND) / 86400
+    DIM runden AS FLOAT : runden = tage / MONAT
+    RETURN runden - INT(runden)
+END FUNCTION
+
+' Der Mond: eine helle Scheibe, ueber die sich eine dunkle schiebt.
+SUB mondZeichnen(mx AS FLOAT, my AS FLOAT, r AS FLOAT, phase AS FLOAT)
+    CIRCLE(mx, my, r, &HF2E8C0)
+    ' Zunehmend kommt der Schatten von rechts nach links weg, abnehmend
+    ' kommt er von rechts wieder. Bei 0,5 ist er ganz draussen.
+    DIM versatz AS FLOAT : versatz = phase * 4 * r
+    IF phase > 0.5 THEN versatz = (phase - 1) * 4 * r
+    CIRCLE(mx - versatz, my, r * 1.02, BLATT)
+END SUB
+
+SCREEN(800, 500, "Mondphase")
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
+    DIM jetzt AS FLOAT : jetzt = TIME_UNIX()
+    DIM zeit AS INTEGER : zeit = TIME_FROM_UNIX(INT(jetzt))
+    CLS(&H0B0E18)
+    zifferblatt(UHR_X, UHR_Y, UHR_R)
+    ' Das Mondfenster: hinter den Zeigern, unter der 12.
+    ' Nur innerhalb des Fensters zeichnen: der Schatten ist groesser.
+    SCISSOR(UHR_X - 30, UHR_Y - 125, 60, 60)
+    mondZeichnen(UHR_X, UHR_Y - 95, 24, mondphase(jetzt))
+    SCISSOR_END()
+    alleZeiger(TIME_PART(zeit, "stunde"), TIME_PART(zeit, "minute"),
+               TIME_PART(zeit, "sekunde"), UHR_X, UHR_Y, UHR_R)
+    FLIP()
+WEND
