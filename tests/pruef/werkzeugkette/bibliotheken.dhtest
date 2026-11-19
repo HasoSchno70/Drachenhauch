@@ -1,0 +1,141 @@
+' Die Bibliotheken in bibliotheken/ (2026-11-19): Pakete, die man mit
+' `dhrt paket hole github:HasoSchno70/Drachenhauch@<stand>#bibliotheken/<name>`
+' holt. Geprueft wird jede fuer sich, und dass sie als Paket aus dem
+' Repository kommt (hier aus dem lokalen Ordner -- derselbe Weg mit #ordner).
+
+=== bestenliste sortiert, schneidet ab und ueberlebt das speichern
+IMPORT "helfer.dh"
+DIM best AS Highscores = NEW Highscores("best.txt", 3)
+PRINT best.Count(); " "; best.Qualifies(1)
+PRINT best.Add("Ada", 50); best.Add("Bo", 80); best.Add("Cy", 50); best.Add("Di", 10)
+PRINT best.Qualifies(40); " "; best.Qualifies(60)
+PRINT best.Add("Ed", 60)
+DIM wieder AS Highscores = NEW Highscores("best.txt", 3)
+DIM i AS INTEGER
+FOR i = 1 TO wieder.Count()
+    PRINT i; " "; wieder.NameAt$(i); " "; wieder.PointsAt(i)
+NEXT
+PRINT "[" + wieder.NameAt$(9) + "] "; wieder.PointsAt(0)
+--- datei helfer.dh
+IMPORT "{sammlung}/../../../bibliotheken/highscores/highscores.dh"
+--- erwartet
+0 TRUE
+1130
+FALSE TRUE
+2
+1 Bo 80
+2 Ed 60
+3 Ada 50
+[] 0
+
+=== eine kaputte bestenliste ist eine leere
+IMPORT "helfer.dh"
+WRITEALL("best.txt", "unsinn" + CHR$(10) + "12" + CHR$(9) + "Ok" + CHR$(10))
+DIM best AS Highscores = NEW Highscores("best.txt")
+PRINT best.Count(); " "; best.NameAt$(1)
+--- datei helfer.dh
+IMPORT "{sammlung}/../../../bibliotheken/highscores/highscores.dh"
+--- erwartet
+1 Ok
+
+=== dialogbox blaettert seiten um
+IMPORT "helfer.dh"
+DIM box AS DialogBox = NEW DialogBox(0, 0, 200, 80)
+PRINT box.Done()
+box.Say("Der Drache erwacht.")
+box.Say("Er hat Hunger.")
+PRINT box.Done(); " ["; box.Visible$(); "]"
+box.Advance()
+PRINT "["; box.Visible$(); "]"
+box.Advance()
+PRINT "["; box.Visible$(); "]"
+box.Advance()
+box.Advance()
+PRINT box.Done()
+--- datei helfer.dh
+IMPORT "{sammlung}/../../../bibliotheken/dialogbox/dialogbox.dh"
+--- erwartet
+TRUE
+FALSE []
+[Der Drache erwacht.]
+[]
+TRUE
+
+=== dialogbox tippt mit der zeit und bricht um
+IMPORT "helfer.dh"
+SCREEN(320, 200, "Test", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM box AS DialogBox = NEW DialogBox(0, 0, 200, 80)
+box.SetSpeed(10)
+box.Say("Der Drache erwacht.")
+box.Update(0.45)
+PRINT "["; box.Visible$(); "]"
+DIM z AS ARRAY OF STRING : z = box.Wrap("eins zwei drei vier fuenf sechs sieben acht", 80)
+PRINT LEN(z) > 1; " "; JOIN$(z, " ") = "eins zwei drei vier fuenf sechs sieben acht"
+box.Draw()
+FLIP()
+--- datei helfer.dh
+IMPORT "{sammlung}/../../../bibliotheken/dialogbox/dialogbox.dh"
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+[Der ]
+TRUE TRUE
+
+=== menue waehlt mit pfeil und enter
+' Pfeil runter, dann Enter: der zweite Eintrag (1).
+IMPORT "helfer.dh"
+SCREEN(320, 200, "Test", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM m AS Menu = NEW Menu("Spiel", ["Start", "Optionen", "Ende"])
+AUTOMATION_PLAY("ev.txt")
+DIM bild AS INTEGER
+DIM wahl AS INTEGER : wahl = -1
+FOR bild = 1 TO 90
+    wahl = m.Update()
+    IF wahl >= 0 THEN BREAK
+    CLS()
+    m.Draw(20, 20)
+    FLIP()
+NEXT
+PRINT wahl; " "; m.Selected()
+--- datei helfer.dh
+IMPORT "{sammlung}/../../../bibliotheken/menu/menu.dh"
+--- datei ev.txt
+c 5
+e 0 1 340 0 0 0
+e 10 2 264 0 0 0
+e 12 1 264 0 0 0
+e 20 2 257 0 0 0
+e 22 1 257 0 0 0
+
+--- umgebung
+DHRT_FRAMES=120
+--- erwartet
+1 1
+
+=== die bibliotheken kommen als paket aus dem repository
+' Derselbe Weg wie github:HasoSchno70/Drachenhauch@<stand>#bibliotheken/<name>,
+' nur aus dem lokalen Ordner.
+IMPORT "helfer.dh"
+MKDIR("projekt")
+CHDIR("projekt")
+DIM n AS STRING
+FOR EACH n IN ["highscores", "menu", "dialogbox"]
+    dlStarten(["paket", "hole", ARG$(0) + "#bibliotheken/" + n])
+    PRINT n; " "; dlCode; " "; FILEEXISTS("pakete/" + n + "/" + n + ".dh")
+NEXT
+WRITEALL("main.dh", "IMPORT " + CHR$(34) + "highscores/highscores.dh" + CHR$(34) + CHR$(10) + _
+         "DIM b AS Highscores = NEW Highscores(" + CHR$(34) + "b.txt" + CHR$(34) + ", 5)" + CHR$(10) + _
+         "PRINT b.Add(" + CHR$(34) + "Ada" + CHR$(34) + ", 3)" + CHR$(10))
+dlStarten(["main.dh"])
+PRINT "laeuft: "; TRIM$(dlAus)
+--- argumente
+{sammlung}/../../..
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
+--- erwartet
+highscores 0 TRUE
+menu 0 TRUE
+dialogbox 0 TRUE
+laeuft: 1

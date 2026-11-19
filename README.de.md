@@ -12,7 +12,8 @@ Lesbar wie BASIC, streng wie Pascal, und alles ist dabei.</p>
 <p align="center"><b><a href="docs/schnellstart.md">In fünf Minuten loslegen</a></b> ·
 <a href="https://hasoschno70.github.io/Drachenhauch/spielwiese/index.html?lang=de">Im Browser ausprobieren</a> ·
 <a href="https://github.com/HasoSchno70/Drachenhauch/releases/latest">Herunterladen</a> ·
-<a href="docs/README.md">Handbuch</a></p>
+<a href="docs/README.md">Handbuch</a> ·
+<a href="https://github.com/HasoSchno70/Drachenhauch/discussions">Gemeinschaft</a></p>
 
 **Drachenhauch** ist eine moderne BASIC-Programmiersprache für **2D- und 3D-Spiele und Anwendungen mit grafischer Oberfläche** — und für die Kommandozeilen-Werkzeuge und kleinen Dienste, die dazugehören. Fehler zeigen sich, bevor das Programm läuft. Mit eigener Entwicklungsumgebung, dem **Drachenhauch Studio** für Anwendungen mit Oberfläche im Stil von Xojo, Sprite-, Karten- und Klang-Editoren; ein Befehl macht aus einem Programm eine eigenständige `.exe`. Läuft unter Windows, macOS und Linux und als WebAssembly im Browser.
 
@@ -133,6 +134,13 @@ Konsolenanwendung sein, ein Cron-Job oder ein Spiel — dieselbe Sprache.
 
 Nachzulesen im [Handbuch](docs/README.md); wie es dazu kam, steht in der
 [Allzweck-Roadmap](docs/intern/allzweck-roadmap.md).
+
+## Gemeinschaft
+
+- **Fragen** gehören unter [Q&A](https://github.com/HasoSchno70/Drachenhauch/discussions/categories/q-a) in den Discussions -- keine Frage ist zu klein, und die Antwort hilft dem Nächsten mit.
+- **Etwas gebaut?** Zeig es unter [Show and tell](https://github.com/HasoSchno70/Drachenhauch/discussions/categories/show-and-tell); Programme zum Ausprobieren kommen in die [Galerie](docs/galerie.md).
+- **Bibliotheken** zum Holen mit `dhrt paket`: [Bestenliste, Menü, Dialogbox](docs/pakete.md#pakete-zum-anfangen) und eigene -- siehe [bibliotheken/](bibliotheken/).
+- **Fehler und Wünsche** als [Issue](https://github.com/HasoSchno70/Drachenhauch/issues/new/choose); wie man mithilft, steht in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Herunterladen
 

@@ -1,0 +1,115 @@
+' dialogbox -- a text box that types its text letter by letter, as in a
+' role-playing game. Enter or Space shows the whole page at once, then
+' turns to the next one.
+'
+'   IMPORT "dialogbox/dialogbox.dh"
+'   DIM box AS DialogBox = NEW DialogBox(20, 200, 440, 100)
+'   box.Say("The dragon wakes up.")
+'   box.Say("It is hungry.")
+'   ... in the loop:
+'   box.Update(DELTA())
+'   box.Draw()
+'   IF box.Done() THEN state = "play"
+
+CLASS DialogBox
+    DIM bx AS INTEGER
+    DIM by AS INTEGER
+    DIM bw AS INTEGER
+    DIM bh AS INTEGER
+    DIM pages AS ARRAY OF STRING
+    DIM shown AS FLOAT
+    DIM speed AS FLOAT
+    DIM textColor AS INTEGER
+    DIM backColor AS INTEGER
+
+    SUB Init(x AS INTEGER, y AS INTEGER, w AS INTEGER, h AS INTEGER)
+        bx = x
+        by = y
+        bw = w
+        bh = h
+        pages = []
+        shown = 0.0
+        speed = 40.0
+        textColor = &HFFFFFF
+        backColor = RGBA(16, 20, 40, 230)
+    END SUB
+
+    ' Queue a page of text.
+    SUB Say(text AS STRING)
+        ARRAY_PUSH(pages, text)
+    END SUB
+
+    ' Letters per second (40 by default).
+    SUB SetSpeed(lettersPerSecond AS FLOAT)
+        IF lettersPerSecond > 0 THEN speed = lettersPerSecond
+    END SUB
+
+    SUB SetColors(text AS INTEGER, back AS INTEGER)
+        textColor = text
+        backColor = back
+    END SUB
+
+    ' Once per frame with the time since the last frame (DELTA()).
+    SUB Update(dt AS FLOAT)
+        IF LEN(pages) = 0 THEN RETURN
+        shown = shown + speed * dt
+        IF KEY_HIT(KEY_ENTER) OR KEY_HIT(KEY_SPACE) THEN Advance()
+    END SUB
+
+    ' What Enter does: show the whole page, or turn to the next one.
+    SUB Advance()
+        IF LEN(pages) = 0 THEN RETURN
+        IF shown < LEN(pages[0]) THEN
+            shown = LEN(pages[0])
+        ELSE
+            ARRAY_REMOVE_AT(pages, 0)
+            shown = 0.0
+        END IF
+    END SUB
+
+    ' Nothing left to say?
+    FUNCTION Done() AS BOOLEAN
+        RETURN LEN(pages) = 0
+    END FUNCTION
+
+    ' The part of the current page that is visible right now.
+    FUNCTION Visible$() AS STRING
+        IF LEN(pages) = 0 THEN RETURN ""
+        DIM n AS INTEGER : n = INT(shown)
+        IF n > LEN(pages[0]) THEN n = LEN(pages[0])
+        RETURN LEFT$(pages[0], n)
+    END FUNCTION
+
+    SUB Draw()
+        IF LEN(pages) = 0 THEN RETURN
+        BOX(bx, by, bx + bw, by + bh, backColor)
+        RECT(bx, by, bx + bw, by + bh, textColor)
+        DIM lines AS ARRAY OF STRING : lines = Wrap(Visible$(), bw - 24)
+        DIM lineHeight AS INTEGER : lineHeight = TEXT_HEIGHT() + 4
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(lines) - 1
+            TEXT(bx + 12, by + 10 + i * lineHeight, lines[i], textColor)
+        NEXT
+        ' A small mark when the page is complete and Enter turns on.
+        IF shown >= LEN(pages[0]) THEN TEXT(bx + bw - 24, by + bh - lineHeight - 4, ">", textColor)
+    END SUB
+
+    ' Break text into lines that fit `width` pixels, at spaces.
+    FUNCTION Wrap(text AS STRING, width AS INTEGER) AS ARRAY OF STRING
+        DIM result AS ARRAY OF STRING : result = []
+        DIM line AS STRING : line = ""
+        DIM word AS STRING
+        FOR EACH word IN SPLIT$(text, " ")
+            DIM attempt AS STRING
+            IF line = "" THEN attempt = word ELSE attempt = line + " " + word
+            IF line <> "" AND TEXT_WIDTH(attempt) > width THEN
+                ARRAY_PUSH(result, line)
+                line = word
+            ELSE
+                line = attempt
+            END IF
+        NEXT
+        IF line <> "" THEN ARRAY_PUSH(result, line)
+        RETURN result
+    END FUNCTION
+END CLASS

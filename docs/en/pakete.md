@@ -23,6 +23,7 @@ There is no dedicated server. A package comes from wherever it already lives:
 | `https://beispiel.de/hilfe.dh` | a single file |
 | `../libs/werkzeug` | a local folder (relative to the project) |
 | `../libs/werkzeug.zip` | a local ZIP |
+| `github:nutzer/repo@stand#ordner/pfad` | only this folder of the source -- so several packages can live in one repository |
 
 **The version is mandatory.** `github:hans/spielkiste` without `@…` is an
 error: “the latest version” would be a different one tomorrow. Best use a tag
@@ -102,6 +103,34 @@ fetches, renews and removes packages through the same commands. Refactorings
 across the whole project (rename, replace) and the project search leave
 `pakete/` out: whatever lies there is overwritten by the next fetch. Details
 in the [IDE manual](ide.md).
+
+## Packages to start with
+
+The folder [`bibliotheken/`](../../bibliotheken/) of this repository holds
+packages that you fetch with `#ordner`:
+
+| Package | What it does |
+|---|---|
+| `highscores` | a high-score table in a file: sorting in, cutting off, saving, drawing |
+| `menu` | a title or pause menu: arrows or W/S choose, Enter takes, Escape backs out |
+| `dialogbox` | a text box that types letter by letter, wraps and turns page by page |
+
+```bash
+dhrt paket hole github:HasoSchno70/Drachenhauch@main#bibliotheken/highscores
+```
+
+```basic
+IMPORT "highscores/highscores.dh"
+DIM best AS Highscores = NEW Highscores("best.txt", 10)
+IF best.Qualifies(1200) THEN PRINT best.Add("Ada", 1200)
+```
+
+`@main` is the newest state; to pin it, use the tag of a version
+(`@v2026.53` and later). Every package describes itself in its
+`README.md`. A library of your own for this list: a pull request with a
+folder under `bibliotheken/` plus a test case in
+`tests/pruef/werkzeugkette/bibliotheken.dhtest`, or a repository of your own
+and a line here.
 
 ## Offering a package of your own
 

@@ -9,6 +9,8 @@
 //! **Kein eigener Server**: eine Quelle ist `github:nutzer/repo@stand`, eine
 //! https-Adresse (ZIP oder einzelne `.dh`) oder ein lokaler Ordner/ZIP. Ein
 //! Stand ist immer genau angegeben -- "der neueste" waere morgen ein anderer.
+//! `#ordner` hinter einer Quelle nimmt nur diesen Unterordner -- so koennen
+//! mehrere Pakete in einem Repository liegen (`bibliotheken/` in diesem).
 //!
 //! **Pakete gehoeren zum Projekt**: sie landen in `pakete/<name>/` neben der
 //! `paket.json`, und `IMPORT` sucht von der importierenden Datei aus nach
@@ -45,6 +47,8 @@ pub struct Quelle {
     pub roh: String,
     pub art: Art,
     pub name: String,
+    /// `#bibliotheken/bestenliste`: nur dieser Ordner der Quelle ist das Paket.
+    pub unterordner: Option<String>,
 }
 
 /// Eine Quelle lesen. `basis` ist der Ordner, zu dem ein lokaler Pfad
@@ -53,6 +57,20 @@ pub struct Quelle {
 pub fn quelle_lesen(roh: &str, basis: &Path) -> Result<Quelle, String> {
     let roh = roh.trim();
     if roh.is_empty() { return Err("leere Quelle".into()); }
+    if let Some((vorn, sub)) = roh.rsplit_once('#') {
+        let sub = sub.trim();
+        let vorn_schraeg = sub.starts_with('/');
+        let sub = sub.trim_end_matches('/');
+        if sub.is_empty() || vorn_schraeg || sub.contains('\\')
+            || sub.split('/').any(|t| t.is_empty() || t == "." || t == "..") {
+            return Err(format!("'{}': hinter # steht ein Ordner der Quelle (ohne .. und ohne / vorn)", roh));
+        }
+        let mut q = quelle_lesen(vorn, basis)?;
+        q.roh = roh.to_string();
+        q.name = sub.rsplit('/').next().unwrap_or(sub).to_string();
+        q.unterordner = Some(sub.to_string());
+        return Ok(q);
+    }
     if let Some(rest) = roh.strip_prefix("github:") {
         let (pfad, stand) = rest.split_once('@').ok_or_else(|| format!(
             "'{}': der Stand fehlt -- github:nutzer/repo@stand (ein Tag, Zweig oder Commit). \
@@ -62,19 +80,19 @@ pub fn quelle_lesen(roh: &str, basis: &Path) -> Result<Quelle, String> {
         if nutzer.is_empty() || repo.is_empty() || stand.is_empty() || repo.contains('/') {
             return Err(format!("'{}': erwartet github:nutzer/repo@stand", roh));
         }
-        return Ok(Quelle { roh: roh.into(), name: repo.to_string(),
+        return Ok(Quelle { roh: roh.into(), name: repo.to_string(), unterordner: None,
             art: Art::GitHub { nutzer: nutzer.into(), repo: repo.into(), stand: stand.into() } });
     }
     if roh.starts_with("https://") || roh.starts_with("http://") {
         let ohne = roh.split(['?', '#']).next().unwrap_or(roh);
         let letzt = ohne.trim_end_matches('/').rsplit('/').next().unwrap_or("");
         let name = letzt.strip_suffix(".zip").or_else(|| letzt.strip_suffix(".dh")).unwrap_or(letzt);
-        return Ok(Quelle { roh: roh.into(), name: name.to_string(), art: Art::Url(roh.into()) });
+        return Ok(Quelle { roh: roh.into(), name: name.to_string(), unterordner: None, art: Art::Url(roh.into()) });
     }
     let pfad = basis.join(roh);
     let stamm = pfad.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
     let name = stamm.strip_suffix(".zip").or_else(|| stamm.strip_suffix(".dh")).unwrap_or(&stamm).to_string();
-    Ok(Quelle { roh: roh.into(), name, art: Art::Lokal(pfad) })
+    Ok(Quelle { roh: roh.into(), name, unterordner: None, art: Art::Lokal(pfad) })
 }
 
 /// Ein Paketname wird ein Ordnername und der erste Teil jedes IMPORTs.
@@ -166,11 +184,27 @@ fn laden(url: &str, datei: &Path) -> Result<(), String> {
 /// Woran ein Paket in der Kette erkannt wird: der aufgeloeste Ordner bzw.
 /// die Adresse.
 fn schluessel(q: &Quelle) -> String {
-    match &q.art {
+    let ort = match &q.art {
         Art::Lokal(p) => p.canonicalize().unwrap_or_else(|_| p.clone()).display().to_string(),
         Art::GitHub { nutzer, repo, stand } => format!("github:{}/{}@{}", nutzer, repo, stand),
         Art::Url(u) => u.clone(),
+    };
+    // Zwei Ordner desselben Repositorys sind zwei Pakete -- sonst hielte die
+    // Kette "bestenliste braucht spielmenue" aus einem Repo fuer einen Kreis.
+    match &q.unterordner { Some(s) => format!("{}#{}", ort, s), None => ort }
+}
+
+/// Nur den Unterordner `sub` von `neu` behalten (er wird zum Paket).
+fn nur_unterordner(neu: &Path, sub: &str, roh: &str) -> Result<(), String> {
+    let quelle = neu.join(sub);
+    if !quelle.is_dir() {
+        return Err(format!("{}: die Quelle hat keinen Ordner '{}'", roh, sub));
     }
+    let zwischen = neu.with_extension("unter");
+    let _ = std::fs::remove_dir_all(&zwischen);
+    std::fs::rename(&quelle, &zwischen).map_err(|e| e.to_string())?;
+    std::fs::remove_dir_all(neu).map_err(|e| e.to_string())?;
+    std::fs::rename(&zwischen, neu).map_err(|e| e.to_string())
 }
 
 /// Was nach dem Holen festgehalten wird.
@@ -199,7 +233,16 @@ pub fn holen(q: &Quelle, ziel: &Path, erwartet: Option<&str>, kette: &mut Vec<St
     let ergebnis = (|| -> Result<Geholt, String> {
         let adresse = match &q.art {
             Art::Lokal(p) if p.is_dir() => {
-                ordner_kopieren(p, &neu)?;
+                // Mit #ordner nur diesen kopieren -- nicht erst das ganze
+                // Repository (samt target/) und dann wegwerfen.
+                match &q.unterordner {
+                    Some(sub) => {
+                        let von = p.join(sub);
+                        if !von.is_dir() { return Err(format!("{}: die Quelle hat keinen Ordner '{}'", q.roh, sub)); }
+                        ordner_kopieren(&von, &neu)?;
+                    }
+                    None => ordner_kopieren(p, &neu)?,
+                }
                 q.roh.clone()
             }
             Art::Lokal(p) => {
@@ -220,6 +263,8 @@ pub fn holen(q: &Quelle, ziel: &Path, erwartet: Option<&str>, kette: &mut Vec<St
                 url.clone()
             }
         };
+        let schon_kopiert = matches!(&q.art, Art::Lokal(p) if p.is_dir());
+        if let (Some(sub), false) = (&q.unterordner, schon_kopiert) { nur_unterordner(&neu, sub, &q.roh)?; }
         // Die Pruefsumme geht ueber den INHALT, nicht ueber die geladenen
         // Bytes: ein Server darf dasselbe ZIP neu packen (GitHub hat das 2023
         // getan), ohne dass sich etwas geaendert hat.
@@ -245,7 +290,7 @@ pub fn holen(q: &Quelle, ziel: &Path, erwartet: Option<&str>, kette: &mut Vec<St
     // seiner paket.json gilt ab dem Ordner, aus dem das Paket KAM -- nicht
     // ab der Kopie in pakete/.
     let herkunft: Option<PathBuf> = match &q.art {
-        Art::Lokal(p) if p.is_dir() => Some(p.clone()),
+        Art::Lokal(p) if p.is_dir() => Some(match &q.unterordner { Some(s) => p.join(s), None => p.clone() }),
         Art::Lokal(p) => p.parent().map(Path::to_path_buf),
         _ => None,
     };
@@ -337,7 +382,8 @@ dhrt paket neu [name]                  eine paket.json anlegen
 dhrt paket -C <ordner> ...             wie oben, als stuende man in <ordner>
 
 Quellen: github:nutzer/repo@stand, https://.../paket.zip, https://.../datei.dh,
-         ein lokaler Ordner oder ein lokales ZIP.
+         ein lokaler Ordner oder ein lokales ZIP; #ordner dahinter nimmt nur
+         diesen Ordner (github:HasoSchno70/Drachenhauch@main#bibliotheken/bestenliste).
 Die Pakete landen in pakete/<name>/ neben der paket.json; danach findet
 IMPORT \"name/datei.dh\" sie. paket.lock.json haelt fest, was geholt wurde
 (SHA-256). Beim Holen wird nichts ausgefuehrt -- aber ein Paket ist fremder
@@ -493,6 +539,21 @@ mod tests {
         assert_eq!(quelle_lesen("https://x.de/a/kiste.zip?x=1", b).unwrap().name, "kiste");
         assert_eq!(quelle_lesen("https://x.de/hilfe.dh", b).unwrap().name, "hilfe");
         assert_eq!(quelle_lesen("libs/werkzeug", b).unwrap().art, Art::Lokal(b.join("libs/werkzeug")));
+    }
+
+    #[test]
+    fn unterordner_einer_quelle() {
+        let b = Path::new("/projekt");
+        let q = quelle_lesen("github:HasoSchno70/Drachenhauch@v2026.53#bibliotheken/bestenliste", b).unwrap();
+        assert_eq!(q.name, "bestenliste");
+        assert_eq!(q.unterordner.as_deref(), Some("bibliotheken/bestenliste"));
+        assert_eq!(q.art, Art::GitHub { nutzer: "HasoSchno70".into(), repo: "Drachenhauch".into(), stand: "v2026.53".into() });
+        let a = quelle_lesen("../repo#bibliotheken/a", b).unwrap();
+        let z = quelle_lesen("../repo#bibliotheken/z", b).unwrap();
+        assert_ne!(schluessel(&a), schluessel(&z));
+        for schlecht in ["../repo#", "../repo#../x", "../repo#/x", "../repo#a//b"] {
+            assert!(quelle_lesen(schlecht, b).is_err(), "{}", schlecht);
+        }
     }
 
     #[test]

@@ -1,0 +1,107 @@
+' highscores -- the best results of a game, kept in a text file.
+'
+'   IMPORT "highscores/highscores.dh"
+'   DIM best AS Highscores = NEW Highscores("best.txt", 10)
+'   IF best.Qualifies(score) THEN best.Add("Ada", score)
+'   best.Draw(20, 40)
+'
+' The file has one line per entry, "points<TAB>name", best first. A missing
+' or broken file is an empty table, not an error -- a game starts anyway.
+
+CLASS Highscores
+    DIM filePath AS STRING
+    DIM maxEntries AS INTEGER
+    DIM entryNames AS ARRAY OF STRING
+    DIM entryPoints AS ARRAY OF INTEGER
+
+    ' path: the file; size: how many entries the table keeps.
+    SUB Init(path AS STRING, size AS INTEGER = 10)
+        filePath = path
+        maxEntries = size
+        IF maxEntries < 1 THEN maxEntries = 1
+        Load()
+    END SUB
+
+    ' Read the file again (Init does this already).
+    SUB Load()
+        entryNames = []
+        entryPoints = []
+        IF NOT FILE_EXISTS(filePath) THEN RETURN
+        DIM line AS STRING
+        FOR EACH line IN FILE_READ_LINES(filePath)
+            DIM tab AS INTEGER : tab = INSTR(line, CHR$(9))
+            IF tab > 0 THEN
+                Insert(TRIM$(MID$(line, tab + 1)), INT(VAL(LEFT$(line, tab))))
+            END IF
+        NEXT
+    END SUB
+
+    ' Write the table to its file.
+    SUB Save()
+        DIM text AS STRING : text = ""
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(entryNames) - 1
+            text = text + STR$(entryPoints[i]) + CHR$(9) + entryNames[i] + CHR$(10)
+        NEXT
+        FILE_WRITE(filePath, text)
+    END SUB
+
+    ' Would these points make it into the table?
+    FUNCTION Qualifies(points AS INTEGER) AS BOOLEAN
+        IF LEN(entryPoints) < maxEntries THEN RETURN TRUE
+        RETURN points > entryPoints[LEN(entryPoints) - 1]
+    END FUNCTION
+
+    ' Enter a result and save. Returns its place (1 = best), 0 if it did
+    ' not make it into the table.
+    FUNCTION Add(name AS STRING, points AS INTEGER) AS INTEGER
+        IF NOT Qualifies(points) THEN RETURN 0
+        DIM place AS INTEGER : place = Insert(name, points)
+        Save()
+        RETURN place
+    END FUNCTION
+
+    ' How many entries the table holds.
+    FUNCTION Count() AS INTEGER
+        RETURN LEN(entryNames)
+    END FUNCTION
+
+    ' Name and points of place `place` (1 = best).
+    FUNCTION NameAt$(place AS INTEGER) AS STRING
+        IF place < 1 OR place > LEN(entryNames) THEN RETURN ""
+        RETURN entryNames[place - 1]
+    END FUNCTION
+
+    FUNCTION PointsAt(place AS INTEGER) AS INTEGER
+        IF place < 1 OR place > LEN(entryPoints) THEN RETURN 0
+        RETURN entryPoints[place - 1]
+    END FUNCTION
+
+    ' Draw the table as text, one line per place.
+    SUB Draw(x AS INTEGER, y AS INTEGER, color AS INTEGER = &HFFFFFF)
+        DIM i AS INTEGER
+        DIM lineHeight AS INTEGER : lineHeight = TEXT_HEIGHT() + 4
+        FOR i = 0 TO LEN(entryNames) - 1
+            TEXT(x, y + i * lineHeight, STR$(i + 1) + ". " + entryNames[i], color)
+            TEXT(x + 220, y + i * lineHeight, STR$(entryPoints[i]), color)
+        NEXT
+    END SUB
+
+    ' Sort in by points (equal points: the older entry stays ahead), keep
+    ' at most maxEntries. Returns the place, 0 if it fell off the end.
+    FUNCTION Insert(name AS STRING, points AS INTEGER) AS INTEGER
+        DIM i AS INTEGER : i = 0
+        WHILE i < LEN(entryPoints)
+            IF points > entryPoints[i] THEN BREAK
+            i = i + 1
+        WEND
+        IF i >= maxEntries THEN RETURN 0
+        ARRAY_INSERT(entryNames, i, name)
+        ARRAY_INSERT(entryPoints, i, points)
+        WHILE LEN(entryNames) > maxEntries
+            ARRAY_POP(entryNames)
+            ARRAY_POP(entryPoints)
+        WEND
+        RETURN i + 1
+    END FUNCTION
+END CLASS

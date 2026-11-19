@@ -17,6 +17,7 @@ Drachenhauch is a BASIC dialect with Pascal-strict typing and OOP, for games and
 - **[Variable scope](scope.md)** — where a variable is visible: globally, in functions, in methods — and why there is no block scoping
 - **[Stability](stabilitaet.md)** — what stays fixed from version to version (language, command names, arguments, files) and what may change
 - **[Change log](aenderungen.md)** — what changes for existing programs in each version, collected from the release notes
+- **[Gallery](galerie.md)** — games, demos and applications built with Drachenhauch, and how to show your own
 
 ### Built-in commands
 

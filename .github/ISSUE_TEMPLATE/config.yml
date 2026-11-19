@@ -1,5 +1,11 @@
 blank_issues_enabled: true
 contact_links:
+  - name: "Frage / Question"
+    url: https://github.com/HasoSchno70/Drachenhauch/discussions/categories/q-a
+    about: "Fragen zur Sprache oder zu einem Programm in den Discussions / Questions about the language or a program go to the discussions"
+  - name: "Etwas gebaut? / Built something?"
+    url: https://github.com/HasoSchno70/Drachenhauch/discussions/categories/show-and-tell
+    about: "Zeig dein Programm / Show your program"
   - name: "Handbuch / Manual"
     url: https://hasoschno70.github.io/Drachenhauch/
     about: "Erst nachschlagen: Handbuch, Module, Stolpersteine / Look it up first: manual, modules, pitfalls"
