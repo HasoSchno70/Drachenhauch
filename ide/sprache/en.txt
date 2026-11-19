@@ -429,6 +429,9 @@ Keine Datei gewählt -- Strg+Klick sammelt, Umschalt+Klick spannt.	No file selec
  Haken entfernt -- der Umbau geht wieder über das ganze Projekt.	 checks removed -- refactoring covers the whole project again.
  Fehler, 	 errors, 
  Warnungen	 warnings
+ Warnung	 warning
+ Hinweis	 note
+ Hinweise	 notes
 Hier gibt es nichts zu korrigieren.	Nothing to fix here.
 Der Text hat sich seit dem Vorschlag geändert -- Strg+. noch einmal.	The text has changed since the suggestion -- press Ctrl+. again.
 Schnellkorrektur	Quick fix

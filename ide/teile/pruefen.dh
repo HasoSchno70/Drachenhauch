@@ -316,8 +316,10 @@ SUB pruefen()
             GUI_SET_TEXT(lblProbleme, "")
         ELSE
             DIM zusatz AS STRING : zusatz = ""
-            IF hinweise > 0 THEN zusatz = ", " + STR$(hinweise) + IIF(hinweise = 1, " Hinweis", " Hinweise")
-            GUI_SET_TEXT(lblProbleme, STR$(fehler) + tr$(" Fehler, ") + STR$(n - fehler - hinweise) + tr$(" Warnungen") + zusatz)
+            IF hinweise > 0 THEN zusatz = ", " + STR$(hinweise) + IIF(hinweise = 1, tr$(" Hinweis"), tr$(" Hinweise"))
+            ' Eine Warnung ist eine "Warnung", nicht "1 Warnungen".
+            DIM warnungen AS INTEGER : warnungen = n - fehler - hinweise
+            GUI_SET_TEXT(lblProbleme, STR$(fehler) + tr$(" Fehler, ") + STR$(warnungen) + IIF(warnungen = 1, tr$(" Warnung"), tr$(" Warnungen")) + zusatz)
         END IF
     END IF
     ' Gezaehlt werden Fehler und Warnungen; Hinweise sind kein Problem.
