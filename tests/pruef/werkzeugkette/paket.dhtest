@@ -129,6 +129,72 @@ IMPORT "{sammlung}/../_hilfen/pakete.dh"
 42hallo
 404: 1 TRUE
 
+=== ein unterordner der quelle ist das paket
+' `#ordner` hinter der Quelle nimmt nur diesen Ordner -- so liegen mehrere
+' Pakete in einem Repository (bibliotheken/ in Drachenhauch). Vom lokalen
+' Ordner wird nur der Unterordner kopiert, nicht das ganze Repository.
+IMPORT "helfer.dh"
+datei("libs/repo/bibliotheken/a/a.dh", "FUNCTION eins() AS INTEGER" + NL + "    RETURN 1" + NL + "END FUNCTION")
+datei("libs/repo/bibliotheken/b/b.dh", "FUNCTION zwei() AS INTEGER" + NL + "    RETURN 2" + NL + "END FUNCTION")
+datei("libs/repo/gross/riesig.txt", "nicht mitnehmen")
+datei("projekt/main.dh", "IMPORT " + Q + "a/a.dh" + Q + NL + "IMPORT " + Q + "b/b.dh" + Q + NL + "PRINT eins() + zwei()")
+CHDIR("projekt")
+dlStarten(["paket", "hole", "../libs/repo#bibliotheken/a"])
+PRINT TRIM$(dlAus); " / "; dlCode
+dlStarten(["paket", "hole", "../libs/repo#bibliotheken/b"])
+PRINT dlCode; " "; FILEEXISTS("pakete/b/b.dh"); " "; DIREXISTS("pakete/a/gross"); " "; DIREXISTS("pakete/a/bibliotheken")
+dlStarten(["main.dh"])
+PRINT "laeuft: "; TRIM$(dlAus)
+IMPORT "json"
+DIM s AS JSON_HANDLE : s = JSON_LOAD("paket.lock.json")
+PRINT "sperre: "; JSON_GET_STRING(s, "pakete.a.quelle")
+dlStarten(["paket", "hole", "../libs/repo#bibliotheken/c"])
+PRINT "fehlt: "; dlCode; " "; INSTR(dlErr, "hat keinen Ordner 'bibliotheken/c'") >= 0
+dlStarten(["paket", "hole", "../libs/repo#../aussen"])
+PRINT "heraus: "; dlCode
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/pakete.dh"
+--- erwartet
+geholt a  (../libs/repo#bibliotheken/a) / 0
+0 TRUE FALSE FALSE
+laeuft: 3
+sperre: ../libs/repo#bibliotheken/a
+fehlt: 1 TRUE
+heraus: 1
+
+=== ein unterordner aus einem zip ueber http
+' Wie github:nutzer/repo@stand#ordner: das ZIP hat einen Oberordner, der
+' faellt weg, dann bleibt nur der genannte Ordner.
+IMPORT "helfer.dh"
+MKDIR("srv")
+ZIP_WRITE("srv/repo.zip", ["repo-1.0/bibliotheken/kiste/k.dh", "repo-1.0/README.md"], _
+          ["FUNCTION k() AS INTEGER" + NL + "    RETURN 7" + NL + "END FUNCTION", "Hallo"])
+CHDIR("srv")
+DIM srv AS INTEGER : srv = PROCESS_START("dhrt", "run", ARG$(0), "--", "dateien", "0", "-", CWD$() + "/port.txt")
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE NOT FILEEXISTS("port.txt") AND MILLIS() - t0 < 15000
+    SLEEP(10)
+WEND
+SLEEP(50)
+DIM basis AS STRING : basis = "http://127.0.0.1:" + TRIM$(READLINES("port.txt")[0])
+CHDIR("..")
+datei("projekt/main.dh", "IMPORT " + Q + "kiste/k.dh" + Q + NL + "PRINT k()")
+CHDIR("projekt")
+dlStarten(["paket", "hole", basis + "/repo.zip#bibliotheken/kiste"])
+PRINT dlCode; " "; FILEEXISTS("pakete/kiste/k.dh"); " "; FILEEXISTS("pakete/kiste/README.md")
+dlStarten(["main.dh"])
+PRINT TRIM$(dlAus)
+PROCESS_KILL(srv)
+--- argumente
+{sammlung}/../_hilfen/gegenserver.dh
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/../_hilfen/pakete.dh"
+--- erwartet
+0 TRUE FALSE
+7
+
 === ein paket bringt seine eigenen pakete mit
 ' Die Abhaengigkeiten eines Pakets kommen in SEIN pakete/, und es findet sie
 ' dort zuerst -- auch wenn das Projekt eine andere Fassung desselben Pakets hat.
