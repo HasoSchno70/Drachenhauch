@@ -204,3 +204,25 @@ Fall wie im release-Bau. Die Option prueft ihre Begleiter vor der Suche nach
 cmake (mit `--test`, `--laufzeiten`, `--debug` ist sie ein Fehler).
 `bauskripte.dhtest` haelt fest, dass das Profil ohne LTO bleibt und das
 Skript es weitergibt.
+
+## Gemeinschaft: Pakete aus Unterordnern, Bibliotheken, Galerie (2026-11-19)
+
+Punkt 7 der Liste "salonfaehig": ein Ort fuer Fragen, eine Galerie und
+echte Pakete fuer `dhrt paket`.
+
+- **`#ordner` hinter einer Quelle** nimmt nur diesen Ordner
+  (`github:HasoSchno70/Drachenhauch@main#bibliotheken/highscores`). Damit
+  koennen mehrere Pakete in einem Repository liegen, ohne je ein eigenes
+  Repository. Fund beim Bauen: ein lokaler Ordner mit `#ordner` haette
+  erst das GANZE Repository (samt `target/`) kopiert und dann weggeworfen
+  -- jetzt wird nur der Unterordner kopiert. Zwei Ordner desselben
+  Repositorys sind fuer die Kreis-Pruefung zwei Pakete.
+- **Drei Bibliotheken** in `bibliotheken/` (englische Schnittstelle wie die
+  Befehle): `highscores`, `menu`, `dialogbox`; je mit README und Faellen in
+  `tests/pruef/werkzeugkette/bibliotheken.dhtest`. Fund: im Menue hiessen
+  Feld `cancelled` und Methode `Cancelled` gleich (Gross/klein zaehlt
+  nicht) -- `dhrt --check` meldete es, das Feld heisst jetzt
+  `wasCancelled`. `Select` als Methodenname geht nicht (Schluesselwort).
+- **Discussions** im Repository eingeschaltet (Kategorien Q&A, Show and
+  tell ...), `docs/galerie.md` (+en) mit den eigenen Programmen, Verweise
+  aus README, CONTRIBUTING und dem Issue-Dialog.

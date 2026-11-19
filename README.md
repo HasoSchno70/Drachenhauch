@@ -12,7 +12,8 @@ Readable like BASIC, strict like Pascal, with everything in the box.</p>
 <p align="center"><b><a href="docs/en/schnellstart.md">Start in five minutes</a></b> ·
 <a href="https://hasoschno70.github.io/Drachenhauch/spielwiese/index.html?lang=en">Try it in your browser</a> ·
 <a href="https://github.com/HasoSchno70/Drachenhauch/releases/latest">Download</a> ·
-<a href="docs/en/README.md">Manual</a></p>
+<a href="docs/en/README.md">Manual</a> ·
+<a href="https://github.com/HasoSchno70/Drachenhauch/discussions">Community</a></p>
 
 **Drachenhauch** (German for *dragon's breath*) is a modern BASIC programming language for writing **2D and 3D games and desktop applications with a GUI** — and the command-line tools and small services that go with them. Mistakes show up before the program runs. It comes with its own IDE, **Drachenhauch Studio** for GUI applications in the style of Xojo, sprite, tilemap and sound editors, and turns a program into a standalone `.exe` with one command. Runs on Windows, macOS and Linux, and in the browser via WebAssembly.
 
@@ -142,6 +143,13 @@ application, a cron job or a game — same language.
 
 Details in the [manual](docs/en/README.md); how it got there is in the
 [general-purpose roadmap](docs/intern/allzweck-roadmap.md) (German).
+
+## Community
+
+- **Questions** go to [Q&A](https://github.com/HasoSchno70/Drachenhauch/discussions/categories/q-a) in the discussions -- no question is too small, and the answer helps the next person too.
+- **Built something?** Show it under [Show and tell](https://github.com/HasoSchno70/Drachenhauch/discussions/categories/show-and-tell); programs others can try go into the [gallery](docs/en/galerie.md).
+- **Libraries** to fetch with `dhrt paket`: [highscores, menu, dialog box](docs/en/pakete.md#packages-to-start-with) and your own -- see [bibliotheken/](bibliotheken/).
+- **Bugs and wishes** as an [issue](https://github.com/HasoSchno70/Drachenhauch/issues/new/choose); how to help is in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Download
 

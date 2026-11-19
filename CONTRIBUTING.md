@@ -5,6 +5,14 @@
 Thank you for wanting to help. Bug reports, examples, documentation fixes and
 code are all welcome.
 
+## Asking and showing
+
+Questions go to [Q&A](https://github.com/HasoSchno70/Drachenhauch/discussions/categories/q-a) in the discussions,
+programs you built to [Show and tell](https://github.com/HasoSchno70/Drachenhauch/discussions/categories/show-and-tell);
+the ones others can try go into the [gallery](docs/en/galerie.md). A small
+library for everyone can become a package under [bibliotheken/](bibliotheken/)
+(a pull request with the folder and a test case).
+
 ## Reporting a bug or wishing for something
 
 Open an [issue](https://github.com/HasoSchno70/Drachenhauch/issues/new/choose).
@@ -49,6 +57,15 @@ project's terms: MIT or Apache-2.0, at the user's choice.
 
 Danke, dass du helfen willst. Fehlerberichte, Beispiele, Korrekturen am
 Handbuch und Code sind gleichermaßen willkommen.
+
+## Fragen und zeigen
+
+Fragen gehören unter [Q&A](https://github.com/HasoSchno70/Drachenhauch/discussions/categories/q-a) in den Discussions,
+eigene Programme unter [Show and tell](https://github.com/HasoSchno70/Drachenhauch/discussions/categories/show-and-tell);
+was andere ausprobieren können, kommt in die [Galerie](docs/galerie.md). Eine
+kleine Bibliothek für alle kann ein Paket unter
+[bibliotheken/](bibliotheken/) werden (ein Pull Request mit dem Ordner und
+einem Prüffall).
 
 ## Fehler melden oder etwas wünschen
 

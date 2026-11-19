@@ -17,6 +17,7 @@ Drachenhauch ist ein BASIC-Dialekt mit Pascal-strikter Typisierung und OOP, für
 - **[Variablen-Scope](scope.md)** — wo eine Variable gilt: global, in Funktionen, in Methoden — und warum es kein Block-Scoping gibt
 - **[Stabilität](stabilitaet.md)** — was von Fassung zu Fassung fest bleibt (Sprache, Befehlsnamen, Argumente, Dateien) und was sich ändern darf
 - **[Änderungsprotokoll](aenderungen.md)** — was sich in jeder Fassung für bestehende Programme ändert, aus den Notizen gesammelt
+- **[Galerie](galerie.md)** — Spiele, Demos und Anwendungen, die mit Drachenhauch gebaut sind, und wie man ein eigenes zeigt
 
 ### Eingebaute Befehle
 
