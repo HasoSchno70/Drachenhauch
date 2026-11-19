@@ -1,0 +1,22 @@
+' Kapitel 2 -- wie lange rechnet die Plasma-Formel fuer ein ganzes Bild,
+' ohne zu zeichnen? Gemessen ueber zehn Bilder mit MILLIS.
+CONST BREITE = 800
+CONST HOEHE = 500
+DIM summe AS FLOAT
+DIM start AS INTEGER : start = MILLIS()
+DIM bild AS INTEGER
+FOR bild = 1 TO 10
+    DIM t AS FLOAT : t = bild * 0.1
+    DIM y AS INTEGER
+    FOR y = 0 TO HOEHE - 1
+        DIM x AS INTEGER
+        FOR x = 0 TO BREITE - 1
+            DIM v AS FLOAT
+            v = SIN(x / 40 + t) + SIN(y / 30 - t)
+            v = v + SIN((x + y) / 60 + t)
+            summe = summe + v
+        NEXT
+    NEXT
+NEXT
+DIM ms AS INTEGER : ms = MILLIS() - start
+PRINT "Ein Bild rechnen: "; ms \ 10; " ms"

@@ -1,0 +1,31 @@
+' Kapitel 2 -- Plasma: wabernde Farben ueber das ganze Bild. Gerechnet
+' wird ein kleines Bild von 200 x 125 Punkten, gezeigt viermal so gross.
+CONST MASSSTAB = 4
+CONST KLEIN_B = 800 \ MASSSTAB
+CONST KLEIN_H = 500 \ MASSSTAB
+
+SCREEN(800, 500, "Plasma")
+DIM klein AS INTEGER : klein = RENDERTARGET_NEW(KLEIN_B, KLEIN_H)
+DIM t AS FLOAT
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
+    t = t + DELTA()
+    ' Alles bis RENDERTARGET_END zeichnet in das kleine Bild.
+    RENDERTARGET_BEGIN(klein)
+    DIM y AS INTEGER
+    FOR y = 0 TO KLEIN_H - 1
+        DIM x AS INTEGER
+        FOR x = 0 TO KLEIN_B - 1
+            ' Dieselbe Formel mit den Stellen im grossen Bild.
+            DIM gx AS FLOAT : gx = x * MASSSTAB
+            DIM gy AS FLOAT : gy = y * MASSSTAB
+            DIM v AS FLOAT
+            v = SIN(gx / 40 + t) + SIN(gy / 30 - t)
+            v = v + SIN((gx + gy) / 60 + t)
+            PLOT(x, y, HSV(v * 60 + t * 40, 0.8, 1.0))
+        NEXT
+    NEXT
+    RENDERTARGET_END()
+    RENDERTARGET_DRAW(klein, 0, 0, MASSSTAB)
+    TEXT(10, 10, STR$(FPS()) + " Bilder je Sekunde", RGB(255, 255, 255))
+    FLIP()
+WEND

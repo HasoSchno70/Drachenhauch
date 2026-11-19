@@ -28,17 +28,18 @@ function ohneKopf(rel) {
 }
 
 // Von der ersten Zeile, die (ohne Einrueckung) mit `von` beginnt, bis
-// einschliesslich der ersten Zeile danach, die mit `bis` beginnt. Die
-// gemeinsame Einrueckung faellt weg, damit ein Stueck aus einer Schleife
-// links im Kasten steht.
-function stueck(rel, von, bis) {
+// einschliesslich der `n`-ten Zeile danach, die mit `bis` beginnt (fuer
+// verschachtelte Schleifen: das zweite NEXT). Die gemeinsame Einrueckung
+// faellt weg, damit ein Stueck aus einer Schleife links im Kasten steht.
+function stueck(rel, von, bis, n = 1) {
   const z = zeilen(rel);
   const a = z.findIndex((x) => x.trim().startsWith(von));
   if (a < 0) throw new Error(`${rel}: Anfang nicht gefunden: ${von}`);
   let b = a;
   if (bis !== undefined) {
-    b = z.findIndex((x, i) => i > a && x.trim().startsWith(bis));
-    if (b < 0) throw new Error(`${rel}: Ende nicht gefunden: ${bis}`);
+    let gefunden = 0;
+    b = z.findIndex((x, i) => i > a && x.trim().startsWith(bis) && ++gefunden === n);
+    if (b < 0) throw new Error(`${rel}: Ende nicht gefunden: ${bis} (${n}.)`);
   }
   return ausruecken(z.slice(a, b + 1));
 }

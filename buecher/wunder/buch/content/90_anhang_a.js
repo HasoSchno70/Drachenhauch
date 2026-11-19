@@ -72,6 +72,44 @@ module.exports = (H) => [
 
   H.p("Die beiden Zeilen mit COS und SIN sind die Drehung eines Punkts um den Nullpunkt; sie kommen in Kapitel 3 und 4 wieder. Der Schweif braucht dieselbe Drehung für sein z — sonst zeigte er nicht dorthin, woher der Stern kam."),
 
+  H.h2("Kapitel 2 · Plasma"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Mit MASSSTAB 2 rechnet das Programm 400 × 250 Punkte, viermal so viele wie vorher; die Stufen sind kaum noch zu sehen. Auf dem Rechner, mit dem dieses Buch entstand, lief es mit Maschinencode weiter flüssig (60 Bilder je Sekunde), ohne ihn nur noch mit 17. Mit 8 sind es 100 × 62 Punkte: Das Plasma zerfällt sichtbar in Klötzchen, wie auf einem sehr alten Rechner. Mit 1 ist man wieder beim ersten Programm, 16 Bilder je Sekunde mit Maschinencode, 4 ohne. Welche Zahl die richtige ist, hängt davon ab, wie schnell der Rechner ist, auf dem das Programm läuft — 4 läuft überall."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Es ändert sich nur die erste Welle, die von links nach rechts läuft: Sie wird viermal so schmal, eine volle Schwingung dauert jetzt etwa 63 statt 250 Punkte. Das Muster bekommt dichte, senkrechte Streifen, durch die die beiden anderen Wellen hindurchwabern. Je kleiner die Zahl unter dem Bruchstrich, desto feiner die Welle."),
+
+  H.h3("Drehen 3"),
+
+  H.p("Die Farben werden blass, wie Pastellkreide oder ein Kinderzimmer. Die Sättigung sagt, wie viel Farbe in einer Farbe steckt; bei 0 bleibt nur Grau in der Helligkeit, die der dritte Wert angibt."),
+
+  H.h3("Erweitern 1: Feuer"),
+
+  H.p("v wird erst in eine Zahl w von 0 bis 1 umgerechnet. Die bestimmt dann den Farbton (0 bis 55 Grad, also Rot bis Gelb) und zugleich die Helligkeit (code/loesungen/kap02_feuer.dh):"),
+
+  ...neu("loesungen/kap02_feuer.dh").map((t) => H.code(t)),
+
+  H.p("Dass der Farbton und die Helligkeit an derselben Zahl hängen, macht das Feuer: Wo es hell ist, ist es gelb, wo es dunkel ist, rot. Die Zeit t steckt nur noch in den Wellen, nicht mehr in der Farbe — sonst liefe der Farbton aus dem Feuer heraus."),
+
+  H.h3("Erweitern 2: im Kreis"),
+
+  H.p("Für jeden Punkt den Abstand zur Mitte prüfen; innen wie bisher, außen dunkel (code/loesungen/kap02_kreis.dh):"),
+
+  ...neu("loesungen/kap02_kreis.dh").map((t) => H.code(t)),
+
+  H.p("dx * dx + dy * dy < 220 * 220 ist der Satz des Pythagoras ohne Wurzel: Der Abstand ist kleiner als 220, wenn sein Quadrat kleiner ist als 220 zum Quadrat. Die Wurzel wegzulassen spart bei 25 000 Punkten je Bild ein wenig Arbeit und ändert nichts am Ergebnis."),
+
+  H.h3("Erfinden: Wellen um die Maus"),
+
+  H.p("Eine Möglichkeit (code/loesungen/kap02_maus.dh): ein vierter Summand, der vom Abstand zur Maus abhängt. Weil t abgezogen wird, laufen die Ringe nach außen:"),
+
+  ...neu("loesungen/kap02_maus.dh").map((t) => H.code(t)),
+
+  H.p("Hier steht die Wurzel (SQR) doch: Der Abstand selbst geht in den SIN, nicht nur sein Vergleich mit einer Zahl. ^ 2 ist das Quadrat. Die Lage der Maus wird einmal je Bild gelesen, vor der Schleife — 25 000-mal MOUSE_X() zu fragen, brächte nichts außer Arbeit."),
+
   H.h2("Kapitel 5 · Feuerwerk"),
 
   H.h3("Drehen 1"),
