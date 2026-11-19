@@ -51,7 +51,7 @@ function suchen(ordner, name) {
 }
 
 const MELDUNG = /^(?:Laufzeitfehler in )?([\w.-]+\.dh):\d+: /;
-let geprueft = 0, befunde = 0;
+let geprueft = 0, befunde = 0, ohneFenster = 0;
 for (const b of bloecke) {
   const m = MELDUNG.exec(b.zeilen[0]);
   if (!m) continue;
@@ -65,10 +65,14 @@ for (const b of bloecke) {
   }
   const r = spawnSync(DHRT, ["run", path.basename(quelle)], { cwd: path.dirname(quelle), encoding: "utf8" });
   const ist = ((r.stdout || "") + "\n" + (r.stderr || "")).replace(/\r/g, "").split("\n").map((z) => z.trim());
+  // Ohne Bildschirm (CI) bricht ein Fensterprogramm schon bei SCREEN ab --
+  // dann ist ueber seine Meldung nichts zu sagen.
+  if (ist.some((z) => z.includes("Kein Fenster moeglich"))) { geprueft--; ohneFenster++; continue; }
   if (!ist.includes(soll)) {
     befunde++;
     console.log(`--- ${b.datei}: ${m[1]}\n    im Buch: ${soll}\n    dhrt:    ${ist.filter((z) => z.includes(m[1])).join(" | ") || "(keine Meldung zu der Datei)"}`);
   }
 }
-console.log(`${geprueft} Meldungen geprueft, ${befunde} mit Befund.`);
+console.log(`${geprueft} Meldungen geprueft, ${befunde} mit Befund`
+  + (ohneFenster ? `, ${ohneFenster} ohne Fenster uebersprungen.` : "."));
 process.exit(befunde ? 1 : 0);

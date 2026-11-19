@@ -8,6 +8,32 @@ module.exports = (H) => [
 
   H.p("Zu den Drehen-Übungen steht hier die Antwort mit ihrer Begründung. Zu Erweitern und Erfinden steht eine Lösung als Datei in code/loesungen; abgedruckt sind nur die Stellen, die gegenüber dem Programm des Kapitels neu sind. In den Dateien sind sie mit >>> und <<< markiert. Eine andere Lösung ist nicht falsch, nur weil sie anders aussieht — wenn sie tut, was die Aufgabe verlangt, ist sie richtig."),
 
+  H.h2("Kapitel 0 · Die Werkstatt"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Mit -40 dreht sich der Ring andersherum. Weil y auf dem Bildschirm nach unten wächst, läuft ein wachsender Winkel im Uhrzeigersinn; ein schrumpfender gegen ihn. Mit 400 dreht er sich zehnmal so schnell, eine volle Runde in 0,9 Sekunden — und auch das Atmen wird zehnmal so schnell, denn der Radius hängt am selben Winkel (drehung * 3). Ein Programm, das zwei Bewegungen an eine Größe hängt, verändert beide, wenn man an ihr dreht."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Die Farbtöne reichen jetzt nur noch von 0 bis 165 Grad: Rot, Orange, Gelb, Grün bis zu einem grünlichen Türkis. Blau, Violett und Pink fehlen, und zwischen dem letzten und dem ersten Kreis springt die Farbe von Türkis zurück nach Rot. Erst mit zwölf mal dreißig sind es die vollen 360 Grad des Farbkreises."),
+
+  H.h3("Drehen 3"),
+
+  H.p("i * 30 steht dreimal im Programm: im Winkel, im Atmen und in der Farbe. Für 24 Kreise muss es überall i * 15 heißen, denn 24 mal 15 sind wieder 360. Vergisst man den Winkel, liegen die Kreise 13 bis 24 auf denselben Stellen wie 1 bis 12 — man sieht nur zwölf. Vergisst man die Farbe, läuft der Regenbogen zweimal herum. Vergisst man das Atmen, läuft die Welle zweimal um den Ring; das ist kein Fehler, nur ein anderes Muster. Damit sich 24 Kreise nicht überlappen, darf der Radius kleiner werden, etwa 16 + SIN(…) * 6."),
+
+  H.h3("Erweitern 1: ein zweiter Ring"),
+
+  H.p("Eine zweite Schleife nach der ersten, mit kleinerem Abstand zur Mitte, kleineren Kreisen und einem Winkel, der doppelt so schnell und andersherum läuft (code/loesungen/kap00_zwei_ringe.dh):"),
+
+  ...neu("loesungen/kap00_zwei_ringe.dh").map((t) => H.code(t)),
+
+  H.p("Die Farbe ist um 180 Grad verschoben: Jeder innere Kreis hat die Gegenfarbe des äußeren Kreises mit derselben Nummer. Die Variablen heißen wi, xi und yi statt w, x und y — nötig wäre das nicht, denn ein DIM in einer Schleife fängt jede Runde neu an, aber so sieht man beim Lesen, welche Rechnung zu welchem Ring gehört."),
+
+  H.h3("Erweitern 2"),
+
+  H.p("Mit DELTA() dreht sich der Ring genauso schnell wie vorher, nur ruckeliger: Er springt jetzt fünfzehnmal je Sekunde um je 2,7 Grad statt sechzigmal um 0,67. Die Fassung mit dem festen Schritt dreht sich viermal so langsam, denn sie macht weiter 0,67 Grad je Bild, und es gibt nur noch ein Viertel der Bilder. Genau das passiert, wenn ein Rechner zu langsam ist, um sechzig Bilder zu schaffen."),
+
   H.h2("Kapitel 5 · Feuerwerk"),
 
   H.h3("Drehen 1"),
