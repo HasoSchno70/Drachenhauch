@@ -154,3 +154,46 @@ PRINT TWEEN_DONE(t)
 FALSE
 FALSE
 
+
+=== eine eigene kurve als funktion
+' Statt eines Namens nimmt TWEEN_NEW eine Funktion: Sie bekommt den
+' Fortschritt 0..1 und liefert den Anteil des Wegs. Dauer 0 = Fortschritt 1.
+' Auch aus einer Funktion heraus, die der Maschinencode rechnet.
+IMPORT "tween"
+FUNCTION halb(p AS FLOAT) AS FLOAT
+    RETURN p / 2
+END FUNCTION
+FUNCTION summe(n AS INTEGER) AS FLOAT
+    DIM t AS TWEEN : t = TWEEN_NEW(0.0, 10.0, 0, halb)
+    DIM s AS FLOAT : s = 0
+    DIM i AS INTEGER
+    FOR i = 1 TO n
+        s = s + TWEEN_VALUE(t)
+    NEXT
+    RETURN s
+END FUNCTION
+DIM a AS TWEEN : a = TWEEN_NEW(10.0, 20.0, 0, FUNCTION(p) p * p * 0.5)
+DIM b AS TWEEN : b = TWEEN_NEW(0.0, 100.0, 0, halb)
+PRINT TWEEN_VALUE(a); " "; TWEEN_VALUE(b); " "; summe(100)
+--- erwartet
+15.0 50.0 500.0
+
+=== eine kurve mit zwei werten
+IMPORT "tween"
+DIM a AS TWEEN : a = TWEEN_NEW(0.0, 1.0, 0, FUNCTION(p, q) p)
+PRINT TWEEN_VALUE(a)
+--- fehler
+TWEEN_VALUE: die Kurve nimmt 2 Wert(e)
+
+=== eine kurve die keine zahl liefert
+IMPORT "tween"
+DIM a AS TWEEN : a = TWEEN_NEW(0.0, 1.0, 0, FUNCTION(p) "weit")
+PRINT TWEEN_VALUE(a)
+--- fehler
+TWEEN_VALUE: die Kurve muss eine Zahl liefern, lieferte STRING
+
+=== eine zahl ist keine kurve
+IMPORT "tween"
+DIM a AS TWEEN : a = TWEEN_NEW(0.0, 1.0, 100, 7)
+--- fehler
+TWEEN_NEW: die Kurve ist ein Name wie "out_quad" oder eine Funktion, nicht INTEGER

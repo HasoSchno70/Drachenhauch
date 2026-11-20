@@ -455,6 +455,10 @@ Zuweisung an '.{}' bei nicht-Objekt ({})	Assignment to '.{}' on a non-object ({}
 {}: einen Koerper {} gibt es nicht -- nie angelegt oder mit PHYS2D_REMOVE entfernt (PHYS2D_BODY_EXISTS fragt danach)	{}: there is no body {} -- never created or removed with PHYS2D_REMOVE (PHYS2D_BODY_EXISTS asks)
 {}: ein Koerper kann nicht mit sich selbst verbunden werden ({})	{}: a body cannot be joined to itself ({})
 {}: die Laenge muss 0 oder mehr sein, nicht {}	{}: the length must be 0 or more, not {}
+{}: die Kurve ist ein Name wie "out_quad" oder eine Funktion, nicht {}	{}: the curve is a name like "out_quad" or a function, not {}
+TWEEN_VALUE: die Kurve nimmt {} Wert(e), TWEEN_VALUE gibt ihr 1 (den Fortschritt 0..1)	TWEEN_VALUE: the curve takes {} value(s), TWEEN_VALUE gives it 1 (the progress 0..1)
+TWEEN_VALUE: die Kurve muss eine Zahl liefern, lieferte {}	TWEEN_VALUE: the curve must return a number, it returned {}
+TWEEN_VALUE: eine eigene Kurve rechnet nur die VM	TWEEN_VALUE: only the VM computes a custom curve
 Methodenaufruf '.{}' bei NIL-Referenz{}	Method call '.{}' on a NIL reference{}
 Methodenaufruf '.{}' bei nicht-Objekt ({})	Method call '.{}' on a non-object ({})
 die Variable ist noch NIL: eine Klasse muss mit NEW angelegt werden (p = NEW Klasse())	the variable is still NIL: a class has to be created with NEW (p = NEW Class())

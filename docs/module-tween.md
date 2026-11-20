@@ -10,7 +10,7 @@ IMPORT "tween"
 
 | Funktion | Rückgabe | Bedeutung |
 |---|---|---|
-| `TWEEN_NEW(start, end, duration_ms[, easing$])` | TWEEN (one-shot) | Wert einmal von `start` nach `end` fahren |
+| `TWEEN_NEW(start, end, duration_ms[, easing$])` | TWEEN (one-shot) | Wert einmal von `start` nach `end` fahren; `easing$` ist ein Kurvenname oder eine eigene Funktion |
 | `TWEEN_NEW_LOOP(start, end, duration_ms[, easing$])` | TWEEN (forever, springt zurück) | wie TWEEN_NEW, springt am Ende zurueck an den Anfang |
 | `TWEEN_NEW_PINGPONG(start, end, duration_ms[, easing$])` | TWEEN (forever, hin & zurück) | wie TWEEN_NEW, laeuft am Ende rueckwaerts zurueck |
 | `TWEEN_VALUE(t)` | FLOAT | aktueller Wert -- das, was man zeichnet |
@@ -105,6 +105,29 @@ popup = TWEEN_NEW(0.0, 1.0, 400, "out_bounce")
 DIM wackel AS TWEEN
 wackel = TWEEN_NEW(0.0, 1.0, 600, "out_elastic")
 ```
+
+## Eine eigene Kurve
+
+Statt eines Namens nimmt `TWEEN_NEW` (ebenso `_LOOP` und `_PINGPONG`) eine
+Funktion: eine benannte, ein Lambda oder eine gebundene Methode. Sie bekommt
+den Fortschritt von 0 bis 1 und liefert, welcher Anteil des Wegs dann
+zurückgelegt ist -- 0 am Anfang, 1 am Ende, dazwischen und darüber hinaus,
+was sie will:
+
+```basic
+IMPORT "tween"
+' Zwei Stufen: erst halber Weg, dann der Rest.
+FUNCTION stufen(p AS FLOAT) AS FLOAT
+    RETURN IIF(p < 0.5, 0.5, 1.0)
+END FUNCTION
+
+DIM a AS TWEEN : a = TWEEN_NEW(0.0, 100.0, 800, stufen)
+DIM b AS TWEEN : b = TWEEN_NEW(0.0, 100.0, 800, FUNCTION(p) p * p * p)
+```
+
+`TWEEN_VALUE` ruft die Funktion bei jeder Abfrage. Nimmt sie nicht genau
+einen Wert oder liefert sie keine Zahl, bricht `TWEEN_VALUE` mit einer
+Meldung ab.
 
 ## Pause / Resume / Restart
 

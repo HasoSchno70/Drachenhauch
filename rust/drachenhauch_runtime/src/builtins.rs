@@ -4410,11 +4410,25 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             if duration < 0 { return err("TWEEN: dauer_ms muss >= 0 sein"); }
             let mode = match name { "tween_new_loop" => "loop", "tween_new_pingpong" => "pingpong", _ => "once" };
             if (mode == "loop" || mode == "pingpong") && duration == 0 { return err("TWEEN: dauer_ms muss > 0 sein"); }
-            let easing = if a.len() == 4 { need_str(&a[3], "TWEEN")?.to_lowercase() } else { "linear".to_string() };
-            if !is_easing(&easing) { return err(format!("TWEEN: unbekanntes easing '{}'", easing)); }
-            Ok(Value::Tween(Rc::new(RefCell::new(TweenObj { start, end, duration, easing, start_ms: now_ms(), paused_at: None, mode: mode.to_string() }))))
+            // Die Kurve: ein Name ("out_quad") oder eine eigene Funktion, die
+            // den Fortschritt 0..1 bekommt und den Anteil des Wegs liefert.
+            let (easing, kurve) = match a.get(3) {
+                None => ("linear".to_string(), None),
+                Some(v) if crate::value::Rueckruf::aus_wert(v).is_some() => ("funktion".to_string(), Some(v.clone())),
+                Some(Value::Str(s)) => (s.to_lowercase(), None),
+                Some(v) => return err(format!("{}: die Kurve ist ein Name wie \"out_quad\" oder eine Funktion, nicht {}",
+                                              name.to_uppercase(), v.type_name())),
+            };
+            if kurve.is_none() && !is_easing(&easing) { return err(format!("TWEEN: unbekanntes easing '{}'", easing)); }
+            Ok(Value::Tween(Rc::new(RefCell::new(TweenObj { start, end, duration, easing, start_ms: now_ms(), paused_at: None, mode: mode.to_string(), kurve }))))
         }
-        "tween_value" => { arity!(1); let t = tween_h(&a[0], "TWEEN_VALUE")?.borrow(); let p = ease(&t.easing, progress(&t)); Ok(Value::Float(t.start + (t.end - t.start) * p)) }
+        "tween_value" => {
+            arity!(1);
+            let t = tween_h(&a[0], "TWEEN_VALUE")?.borrow();
+            if t.kurve.is_some() { return err("TWEEN_VALUE: eine eigene Kurve rechnet nur die VM"); }
+            let p = ease(&t.easing, progress(&t));
+            Ok(Value::Float(t.start + (t.end - t.start) * p))
+        }
         "tween_progress" => { arity!(1); Ok(Value::Float(progress(&tween_h(&a[0], "TWEEN_PROGRESS")?.borrow()))) }
         "tween_done" => { arity!(1); let t = tween_h(&a[0], "TWEEN_DONE")?.borrow(); Ok(Value::Bool(t.mode == "once" && progress(&t) >= 1.0)) }
         "tween_restart" => { arity!(1); let mut t = tween_h(&a[0], "TWEEN_RESTART")?.borrow_mut(); t.start_ms = now_ms(); t.paused_at = None; Ok(Value::Nil) }
@@ -6511,7 +6525,7 @@ fn elapsed(t: &TweenObj) -> i64 {
     t.paused_at.unwrap_or_else(|| now_ms() - t.start_ms)
 }
 
-fn progress(t: &TweenObj) -> f64 {
+pub(crate) fn progress(t: &TweenObj) -> f64 {
     if t.duration == 0 { return 1.0; }
     let e = elapsed(t);
     if e <= 0 { return 0.0; }
@@ -6540,7 +6554,7 @@ fn ease_out_bounce(t: f64) -> f64 {
     else { let t = t - 2.625 / d1; n1 * t * t + 0.984375 }
 }
 
-fn ease(name: &str, t: f64) -> f64 {
+pub(crate) fn ease(name: &str, t: f64) -> f64 {
     use std::f64::consts::PI;
     match name {
         "linear" => t,

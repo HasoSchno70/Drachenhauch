@@ -1184,3 +1184,15 @@ eine Meldung statt (0, 0). `physics2d.dhtest` (sechs Faelle); Gegenproben:
 `gibt_es` immer wahr, ein Seil ohne Gelenk und ein Scharnier mit falschem
 Anker lassen je genau ihre Faelle fallen. `physics3d` hat dieselbe stille
 (0, 0) noch.
+
+Kapitel 11 (Sanft ankommen) sollte zeigen, wie man eine Kurve als
+Funktion uebergibt statt fuenf fast gleicher Befehle -- `TWEEN_NEW` nahm
+aber nur einen Namen. Jetzt nimmt es auch eine Funktion (FUNCREF, Lambda,
+gebundene Methode); sie bekommt den Fortschritt 0..1 und liefert den
+Anteil des Wegs. `TWEEN_NEW` bleibt rein und merkt sie sich
+(`TweenObj::kurve`), `TWEEN_VALUE` rechnet seitdem in der Familie 2
+(`Vm::tween_wert`, wie ARRAY_MAP), weil es Drachenhauch-Code ruft -- der
+Maschinencode laesst die Familie ohnehin aus, und `gerufenes_harmlos`
+kennt den Namen. Benannte Kurven rechnet dieselbe `builtins::ease`.
+`modules_tween.dhtest` (vier Faelle); Gegenprobe: ohne den Aufruf der
+Kurve fallen genau die drei, die sie betreffen.

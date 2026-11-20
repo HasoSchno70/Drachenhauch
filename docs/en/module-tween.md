@@ -10,7 +10,7 @@ IMPORT "tween"
 
 | Function | Return value | Meaning |
 |---|---|---|
-| `TWEEN_NEW(start, end, duration_ms[, easing$])` | TWEEN (one-shot) | move a value once from `start` to `end` |
+| `TWEEN_NEW(start, end, duration_ms[, easing$])` | TWEEN (one-shot) | move a value once from `start` to `end`; `easing$` is a curve name or a custom function |
 | `TWEEN_NEW_LOOP(start, end, duration_ms[, easing$])` | TWEEN (forever, jumps back) | like TWEEN_NEW, jumps back to the start at the end |
 | `TWEEN_NEW_PINGPONG(start, end, duration_ms[, easing$])` | TWEEN (forever, back & forth) | like TWEEN_NEW, runs backwards at the end |
 | `TWEEN_VALUE(t)` | FLOAT | current value -- what you draw |
@@ -105,6 +105,28 @@ popup = TWEEN_NEW(0.0, 1.0, 400, "out_bounce")
 DIM wackel AS TWEEN
 wackel = TWEEN_NEW(0.0, 1.0, 600, "out_elastic")
 ```
+
+## A custom curve
+
+Instead of a name, `TWEEN_NEW` (and likewise `_LOOP` and `_PINGPONG`) takes
+a function: a named one, a lambda or a bound method. It receives the
+progress from 0 to 1 and returns which share of the way is covered then --
+0 at the start, 1 at the end, in between and beyond whatever it likes:
+
+```basic
+IMPORT "tween"
+' Two steps: first half the way, then the rest.
+FUNCTION stufen(p AS FLOAT) AS FLOAT
+    RETURN IIF(p < 0.5, 0.5, 1.0)
+END FUNCTION
+
+DIM a AS TWEEN : a = TWEEN_NEW(0.0, 100.0, 800, stufen)
+DIM b AS TWEEN : b = TWEEN_NEW(0.0, 100.0, 800, FUNCTION(p) p * p * p)
+```
+
+`TWEEN_VALUE` calls the function on every query. If it does not take
+exactly one value or does not return a number, `TWEEN_VALUE` stops with a
+message.
 
 ## Pause / resume / restart
 
