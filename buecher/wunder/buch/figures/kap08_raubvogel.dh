@@ -1,0 +1,3 @@
+' Bild fuer Kapitel 8, Erfinden: ein Raubvogel jagt den Schwarm.
+RANDOMIZE(3)
+IMPORT "../../code/loesungen/kap08_raubvogel.dh"

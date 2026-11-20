@@ -305,4 +305,42 @@ module.exports = (H) => [
   ...neu("loesungen/kap07_feuer.dh").map((t) => H.code(t)),
 
   H.p("Die Zahlen 0.02 und 0.01 sind ausprobiert. Mit 0.2 statt 0.02 brennt der Stapel in einem Augenblick ab; mit 0.1 statt 0.01 geht das Feuer aus, bevor es das nächste Holz erreicht. Die Flammen haben eine Zufallsfarbe in jedem Bild — darum flackern sie, ohne dass es dafür eigenen Code braucht."),
+
+  H.h2("Kapitel 8 · Schwarm"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Nur noch eine Handvoll — acht, zehn Dreiecke. Die Vögel sind alle noch da, aber ohne Abstand ziehen Zusammenhalt und Ausrichtung sie aufeinander, bis mehrere genau übereinander fliegen, gleich schnell, in dieselbe Richtung. Die Regel, die am wenigsten nach Schwarm aussieht, hält ihn erst auseinander."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Kein Schwarm mehr, sondern ein Gewimmel wie bei Mücken. Vögel finden sich zu kleinen Klumpen, aber jeder fliegt in seine eigene Richtung, und die Klumpen zerfallen wieder. Zusammenhalt allein macht einen Haufen; erst die Ausrichtung macht daraus einen Schwarm, der irgendwohin fliegt."),
+
+  H.h3("Drehen 3"),
+
+  H.p("Mit SICHT 20 sieht ein Vogel kaum jemanden. Es dauert lange, bis sich kleine Gruppen finden, und große Schwärme entstehen nicht. Mit 150 sieht jeder fast den halben Himmel: Nach wenigen Sekunden gibt es einen oder zwei große Schwärme, breite Bänder, die quer über das Bild ziehen. Rechnen muss das Programm in beiden Fällen gleich viel, denn umschauen geht immer alle Vögel durch — 150 mal 150, gut zwanzigtausend Abstände in jedem Bild."),
+
+  H.h3("Erweitern 1: zur Maus"),
+
+  H.p("Eine vierte Regel, gebaut wie der Zusammenhalt, nur mit der Maus als Mitte (code/loesungen/kap08_maus.dh):"),
+
+  ...neu("loesungen/kap08_maus.dh").map((t) => H.code(t)),
+
+  H.p("Der Aufruf steht nach dem IF nachbarn > 0: Auch ein Vogel, der allein fliegt, soll zur Maus. Hält man die Taste lange gedrückt, kreist der Schwarm um die Maus, statt auf ihr zu landen — tempoHalten lässt ihn nicht langsamer werden, also schießt er immer wieder vorbei."),
+
+  H.h3("Erweitern 2: Felsen"),
+
+  H.p("Drei Felsen als drei Felder mit Mitte und Radius, und eine Regel, die von jedem wegschiebt, dem der Vogel zu nah kommt (code/loesungen/kap08_hindernisse.dh):"),
+
+  ...neu("loesungen/kap08_hindernisse.dh").map((t) => H.code(t)),
+
+  H.p("rand ist der Abstand vom Rand des Felsens, nicht von seiner Mitte. st wächst von 0, VORSICHT Punkte vor dem Rand, bis 1 am Rand. So weicht ein Vogel sanft aus, wenn er von weitem kommt, und scharf, wenn er schon fast dran ist. Die beiden Zahlen sind ausprobiert: Mit KRAFT_FELS = 900 und VORSICHT = 30 steckte in jedem fünften Bild irgendwo ein Vogel im Felsen, gedrängt vom Schwarm hinter ihm. Jetzt kommt das noch vor, aber selten und nur für einen Augenblick. Ganz verhindern könnte es erst bewegen, indem es einen Vogel gar nicht hineinlässt."),
+
+  H.h3("Erfinden: ein Raubvogel"),
+
+  H.p("Eine Möglichkeit (code/loesungen/kap08_raubvogel.dh). Der Raubvogel ist auch ein Vogel — er hat einen Ort und eine Geschwindigkeit, er fliegt und kommt am Rand wieder herein. Nur entscheidet er anders und sieht anders aus. Genau das sagt EXTENDS: Raubvogel bekommt alles von Vogel und ersetzt, was er anders macht. Die Vögel bekommen eine Regel dazu, die Flucht:"),
+
+  ...neu("loesungen/kap08_raubvogel.dh").map((t) => H.code(t)),
+
+  H.pmix(["Bewegen und Init schreibt der Raubvogel nicht selbst; ", ["NEW Raubvogel()", true], " ruft das Init von Vogel, und ", ["jaeger.bewegen(dt)", true], " das bewegen von Vogel. ", ["jaeger.entscheiden(…)", true], " dagegen ruft seine eigene Fassung. In ihr beginnt ", ["ziel", true], " als NIL und wird der Vogel mit dem kleinsten Abstand. Der Raubvogel ist mit 170 etwas langsamer als die schnellsten Vögel — sonst wäre die Jagd zu schnell vorbei."]),
 ];

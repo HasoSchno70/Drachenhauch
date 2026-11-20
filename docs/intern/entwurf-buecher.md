@@ -209,8 +209,10 @@ stauen sich, wie in den „Falling-Sand“-Spielen.
 * *Warum so:* Hier tut ein Ding etwas (es schaut sich um und lenkt) -- jetzt
   lohnt die Klasse. Warum die drei Regeln (Abstand, Ausrichtung,
   Zusammenhalt) je eine Methode sind.
-* *Was schiefgeht:* der Schwarm, der zittert, weil alle Vögel schon den
-  neuen Ort der anderen sehen.
+* *Was schiefgeht:* der Vogel ohne `NEW` (NIL); der Vogel, der sich selbst
+  sieht (Teilen durch 0). Das geplante Zittern, wenn alle Vögel schon den
+  neuen Ort der anderen sehen, gibt es nicht -- nachgemessen kaum ein
+  Unterschied; der Text sagt das und begründet die zwei Schleifen trotzdem.
 * *Übungen:* ein Raubvogel; Hindernisse; der Schwarm folgt der Maus.
 
 ### Teil III — Bewegung, die sich echt anfühlt
@@ -664,6 +666,17 @@ Danach (2026-11-19, gleicher Tag): Buch A Kapitel 0 (Werkstatt, Bilder der
 IDE über `buecher/wunder/buch/ide_bilder.dh`) und Teil I, Kapitel 1–4
 (Sternenflug, Plasma, Spirograph, Ziffernblatt), je mit Lösungen im
 Anhang.
+
+Danach (2026-11-20): Teil II, Kapitel 6–8 (Spiel des Lebens, Fallender
+Sand, Schwarm), je mit Lösungen und Bild zur Erfinden-Übung. Funde: Ein
+ENUM-Wert, den es nicht gibt, fiel erst zur Laufzeit auf und in nie
+gelaufenem Code gar nicht (behoben, Übersetzungsfehler mit Vorschlag,
+`geschichte/sprache.md`). Drei Aussagen aus dem Entwurf hielten dem
+Nachmessen nicht stand und stehen jetzt richtig im Text: Ohne Zufall
+werden die Sandhaufen nicht schief (das Wasser aber fließt nur nach links);
+der Schwarm zittert nicht, wenn Entscheiden und Bewegen in einer Schleife
+stehen; die erste Fassung der Felsen ließ in jedem fünften Bild einen Vogel
+hinein.
 
 Was beim Bauen festgelegt wurde:
 
