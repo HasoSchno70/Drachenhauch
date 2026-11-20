@@ -1,0 +1,5 @@
+' Ein Rauschwert als Grau, 0 bis 255:
+DIM v AS FLOAT : v = NOISE2(1.5, 2.5)
+DIM g AS INTEGER
+g = 128 + v * 127
+PRINT g

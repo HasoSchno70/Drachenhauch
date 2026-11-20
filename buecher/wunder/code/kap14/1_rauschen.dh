@@ -1,0 +1,39 @@
+' Kapitel 14, Schritt 1 -- zwei Arten Zufall nebeneinander: links RND,
+' jeder Punkt fuer sich; rechts NOISE2, Nachbarn haengen zusammen.
+CONST BREITE = 800
+CONST HOEHE = 500
+' Gerechnet wird auf einem halb so grossen Bild, gezeigt doppelt.
+CONST B = 400
+CONST H = 250
+
+' Eine Zahl von -1 bis 1 als Grau.
+FUNCTION grau(v AS FLOAT) AS INTEGER
+    DIM g AS INTEGER : g = CLAMP(ROUND(128 + v * 127), 0, 255)
+    RETURN RGB(g, g, g)
+END FUNCTION
+
+SUB rechnen(bild AS INTEGER)
+    RENDERTARGET_BEGIN(bild)
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 0 TO H - 1
+        FOR x = 0 TO B - 1
+            IF x < B / 2 THEN
+                PLOT(x, y, grau(RND() * 2 - 1))
+            ELSE
+                PLOT(x, y, grau(NOISE2(x * 0.04, y * 0.04)))
+            END IF
+        NEXT
+    NEXT
+    RENDERTARGET_END()
+END SUB
+
+SCREEN(BREITE, HOEHE, "Rauschen")
+DIM bild AS INTEGER : bild = RENDERTARGET_NEW(B, H, TRUE)
+rechnen(bild)
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
+    RENDERTARGET_DRAW(bild, 0, 0, 2)
+    TEXT(10, 10, "RND", RGB(255, 80, 80))
+    TEXT(BREITE / 2 + 10, 10, "NOISE2", RGB(255, 80, 80))
+    FLIP()
+WEND

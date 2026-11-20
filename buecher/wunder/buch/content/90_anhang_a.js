@@ -537,4 +537,46 @@ module.exports = (H) => [
   ...neu("loesungen/kap13_julia.dh").map((t) => H.code(t)),
 
   H.p("Die Mandelbrotmenge ist eine Landkarte der Julia-Mengen. Klickt man in ihr Inneres, ist die Julia-Menge ein zusammenhängendes Gebilde; klickt man weit draußen, zerfällt sie in Staub; und klickt man an den Rand, sieht die Julia-Menge aus wie die Mandelbrotmenge an genau dieser Stelle — Spiralen im Seepferdchental, Rüssel im Elefantental."),
+
+  H.h2("Kapitel 14 · Wolken und Landschaften"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Mit 0.03 ist das Bild ein Inselmeer: viele kleine Inseln, jede mit einem kleinen Gipfel, weil man sich viermal so schnell über die Rauschfläche bewegt und auf dieselbe Bildbreite viermal so viele Hügel kommen. Mit 0.002 sieht man von oben auf ein Stück eines großen Kontinents mit einer Küste am Rand — und alles wirkt unscharf, denn auch die feinste der sechs Lagen ist jetzt viel größer als ein Bildpunkt."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Mit einer Lage wird die Karte glatt wie Knetmasse: runde Kontinente, glatte Küsten, Berge als weiche Kuppen. Mit zehn Lagen sieht sie fast genauso aus wie mit sechs — die Lagen sieben bis zehn sind kleiner als ein Bildpunkt und haben zusammen nur wenige Prozent der Stärke. Mehr Lagen kosten Zeit und zeigen nichts."),
+
+  H.h3("Drehen 3"),
+
+  H.p("Fast alles wird Land, und aus den Meeren werden Seen mit Stränden ringsum. Die Berge werden höher und bekommen mehr Schnee. Der Meeresspiegel ist nur die Höhe, an der der Farbverlauf von Blau zu Sand wechselt — wer ihn verschiebt, verschiebt die ganze Welt."),
+
+  H.h3("Erweitern 1: eine Insel"),
+
+  H.p("Zum Rauschen kommt eine Schale: in der Mitte hoch, zum Rand hin tief (code/loesungen/kap14_inseln.dh):"),
+
+  ...neu("loesungen/kap14_inseln.dh").map((t) => H.code(t)),
+
+  H.figure("kap14_inseln.png", "Die Insel: Das Rauschen bestimmt die Küste und die Berge, die Schale sorgt dafür, dass ringsum Meer ist.", 420, 262),
+
+  H.p("d ist 0 in der Mitte und 1 an den Rändern, 2 in den Ecken. + 0.25 hebt alles an, − 0.6 · d senkt es nach außen ab. Wo die Schale das Land unter 0 drückt, ist Meer — das Rauschen entscheidet nur noch, wie die Küste verläuft und wo die Berge stehen."),
+
+  H.h3("Erweitern 2: Höhenlinien"),
+
+  H.p("Eine Höhenlinie liegt dort, wo ein Punkt und sein Nachbar auf verschiedenen Stufen liegen — FLOOR(h / LINIE) zählt die Stufen (code/loesungen/kap14_hoehenlinien.dh):"),
+
+  ...neu("loesungen/kap14_hoehenlinien.dh").map((t) => H.code(t)),
+
+  H.figure("kap14_hoehenlinien.png", "Höhenlinien alle 0.04: Wo sie dicht liegen, ist der Hang steil.", 420, 262),
+
+  H.p("Hier zahlt sich das Feld gelaende aus: Die Linie braucht die Höhe des Nachbarn, und die steht schon da. Unter Wasser gibt es keine Linien (hier > 0). Wie auf einer echten Karte liegen die Linien an steilen Hängen dicht und auf flachen Wiesen weit auseinander."),
+
+  H.h3("Erfinden: Wolken, die ziehen"),
+
+  H.p("Eine Möglichkeit (code/loesungen/kap14_wolken.dh): ein zweites Rauschen, in jedem Bild neu gerechnet, auf einem kleinen Bild, das durchsichtig über der Karte liegt:"),
+
+  ...neu("loesungen/kap14_wolken.dh").map((t) => H.code(t)),
+
+  H.pmix(["Die Wolken ziehen, weil die Zeit in die x-Koordinate eingeht: ", ["x * 0.025 - zeit * 0.15", true], " schaut jede Sekunde an einer anderen Stelle der Rauschfläche nach. Wo das Rauschen klein ist, bleibt der Himmel frei; darüber wird die Wolke dichter, bis höchstens 85 Prozent Deckkraft. Das Wolkenbild ist nur 200 mal 125 Punkte groß und wird viermal vergrößert — Wolken brauchen keine Schärfe, und so sind es pro Bild 25 000 statt 400 000 Rechnungen."]),
 ];

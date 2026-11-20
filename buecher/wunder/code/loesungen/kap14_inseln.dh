@@ -1,0 +1,91 @@
+' Loesung zu Kapitel 14, Erweitern 1: eine Insel -- zum Rand hin sinkt
+' das Land unter den Meeresspiegel.
+' Die Stellen, die neu sind, stehen zwischen >>> und <<<.
+CONST BREITE = 800
+CONST HOEHE = 500
+CONST B = 400
+CONST H = 250
+CONST MASSSTAB = 0.008
+CONST LAGEN = 6
+
+' Die Hoehen, ein Wert je Punkt -- erst die Zahlen, dann das Bild.
+DIM gelaende[0 TO B - 1, 0 TO H - 1] AS FLOAT
+
+' Der Farbverlauf: an diesen Hoehen diese Farben, dazwischen gemischt.
+DIM stufeH AS ARRAY OF FLOAT
+DIM stufeR AS ARRAY OF INTEGER
+DIM stufeG AS ARRAY OF INTEGER
+DIM stufeB AS ARRAY OF INTEGER
+
+SUB stufe(wert AS FLOAT, r AS INTEGER, g AS INTEGER, bl AS INTEGER)
+    ARRAY_PUSH(stufeH, wert)
+    ARRAY_PUSH(stufeR, r)
+    ARRAY_PUSH(stufeG, g)
+    ARRAY_PUSH(stufeB, bl)
+END SUB
+
+stufe(-0.60, 10, 30, 90)      ' tiefes Meer
+stufe(-0.02, 40, 100, 180)    ' flaches Wasser
+stufe(0.00, 220, 205, 150)    ' Strand
+stufe(0.04, 110, 170, 70)     ' Wiese
+stufe(0.20, 40, 110, 50)      ' Wald
+stufe(0.32, 120, 110, 100)    ' Fels
+stufe(0.45, 245, 245, 250)    ' Schnee
+
+' Die Farbe zu einer Hoehe: die beiden Stufen darum suchen und zwischen
+' ihren Farben so weit mischen, wie die Hoehe zwischen ihnen liegt.
+FUNCTION farbe(wert AS FLOAT) AS INTEGER
+    DIM i AS INTEGER : i = 0
+    WHILE i < LEN(stufeH) - 2 AND wert > stufeH[i + 1]
+        i = i + 1
+    WEND
+    DIM t AS FLOAT
+    t = CLAMP((wert - stufeH[i]) / (stufeH[i + 1] - stufeH[i]), 0, 1)
+    RETURN RGB(LERP(stufeR[i], stufeR[i + 1], t), _
+               LERP(stufeG[i], stufeG[i + 1], t), _
+               LERP(stufeB[i], stufeB[i + 1], t))
+END FUNCTION
+
+' Eine Gegend: dieselbe Rauschflaeche, an anderer Stelle angeschaut.
+SUB vermessen(ox AS FLOAT, oy AS FLOAT)
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 0 TO H - 1
+        FOR x = 0 TO B - 1
+            DIM fx AS FLOAT : fx = ox + x * MASSSTAB
+            DIM fy AS FLOAT : fy = oy + y * MASSSTAB
+            ' >>> neu
+            ' Abstand zur Mitte: 0 in der Mitte, 1 an den Raendern.
+            DIM dx AS FLOAT : dx = (x - B / 2) / (B / 2)
+            DIM dy AS FLOAT : dy = (y - H / 2) / (H / 2)
+            DIM d AS FLOAT : d = dx * dx + dy * dy
+            gelaende[x, y] = FBM(fx, fy, LAGEN) + 0.25 - 0.6 * d
+            ' <<< neu
+        NEXT
+    NEXT
+END SUB
+
+SUB zeichnen(bild AS INTEGER)
+    RENDERTARGET_BEGIN(bild)
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 0 TO H - 1
+        FOR x = 0 TO B - 1
+            PLOT(x, y, farbe(gelaende[x, y]))
+        NEXT
+    NEXT
+    RENDERTARGET_END()
+END SUB
+
+SCREEN(BREITE, HOEHE, "Karte")
+DIM bild AS INTEGER : bild = RENDERTARGET_NEW(B, H, TRUE)
+vermessen(10, 20)
+zeichnen(bild)
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
+    IF KEY_HIT(KEY_R) THEN
+        vermessen(RND() * 1000, RND() * 1000)
+        zeichnen(bild)
+    END IF
+    RENDERTARGET_DRAW(bild, 0, 0, 2)
+    FLIP()
+WEND

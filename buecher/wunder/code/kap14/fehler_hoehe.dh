@@ -1,0 +1,5 @@
+CONST BREITE = 400
+CONST HOEHE = 250
+' Die Hoehen der Landschaft, ein Wert je Punkt:
+DIM hoehe[0 TO BREITE - 1, 0 TO HOEHE - 1] AS FLOAT
+PRINT "angelegt"
