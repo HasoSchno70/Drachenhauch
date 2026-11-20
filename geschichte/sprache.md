@@ -1168,3 +1168,19 @@ und ein Parameter gehoert zu der SUB, in deren Zeilen er steht. Springen,
 Umbenennen und Hover fanden solche Parameter vorher ebenso wenig.
 `schreibweise.dhtest` und ein Rust-Test in `symbole.rs`; Gegenproben: jede
 der beiden Stellen allein zurueckgesetzt laesst den Fall fallen.
+
+Kapitel 10 (Baelle in der Kiste) brachte zwei Funde in `physics2d`. Die
+Gliederung plante eine Uebung "Gelenke" -- das Modul hatte keine, obwohl
+die Welt intern schon einen `ImpulseJointSet` trug. Neu sind
+`PHYS2D_ADD_HINGE` (Scharnier um einen Weltpunkt, die beiden Koerper
+stossen sich nicht), `PHYS2D_ADD_ROPE` (hoechstens so weit auseinander)
+und `PHYS2D_REMOVE_JOINT`. Und ein entfernter oder nie angelegter Koerper
+lieferte still die Lage (0, 0) und das Tempo 0 -- er schien oben links zu
+stehen. Jetzt prueft jeder Befehl mit einem Koerper die Nummer
+(`phys2d_koerper`) und bricht mit einer Meldung ab; `PHYS2D_BODY_EXISTS`
+fragt vorher. Zweimal entfernen bleibt ohne Fehler. **Aendert bestehende
+Programme:** wer einen entfernten Koerper weiter abfragt, bekommt jetzt
+eine Meldung statt (0, 0). `physics2d.dhtest` (sechs Faelle); Gegenproben:
+`gibt_es` immer wahr, ein Seil ohne Gelenk und ein Scharnier mit falschem
+Anker lassen je genau ihre Faelle fallen. `physics3d` hat dieselbe stille
+(0, 0) noch.

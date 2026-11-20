@@ -61,8 +61,12 @@ ang = PHYS2D_BODY_ANGLE(world, box)       ' Radiant -> Sprite rotieren
 | `PHYS2D_SLEEP(w, idx [, sleep])` | Körper sleep legen (ohne drittes Argument oder TRUE) bzw. wecken (FALSE) — wie `PHYS3D_SLEEP`: ein frisch aufgebauter Stapel kostet so nichts, bis ihn etwas anstößt. Ein schlafender Körper in der Luft bleibt hängen, bis ihn etwas weckt |
 | `PHYS2D_SLEEPING(w, idx) AS BOOLEAN` | schläft der Körper? |
 | `PHYS2D_LOCK_ROTATION(w, idx, locked)` | Rotation sperren — z.B. damit eine Spielfigur nicht umkippt |
-| `PHYS2D_REMOVE(w, idx)` | Körper entfernen |
+| `PHYS2D_REMOVE(w, idx)` | Körper entfernen (ein schon entfernter: nichts) |
 | `PHYS2D_COUNT(w) AS INTEGER` | Anzahl lebender Körper |
+| `PHYS2D_BODY_EXISTS(w, idx) AS BOOLEAN` | gibt es den Körper -- angelegt und nicht entfernt? Jeder andere Befehl mit einem Körper, den es nicht gibt, bricht mit einer Meldung ab |
+| `PHYS2D_ADD_HINGE(w, body_a, body_b, x, y) AS INTEGER` | Scharnier: die beiden Körper hängen am Weltpunkt (x, y) aneinander und drehen sich frei um ihn (Tür, Pendel, Kette); sie stoßen sich nicht gegenseitig. Liefert die Nummer des Gelenks |
+| `PHYS2D_ADD_ROPE(w, body_a, body_b, length) AS INTEGER` | Seil zwischen den Mittelpunkten: höchstens `length` auseinander, näher dürfen sie (Abrissbirne, Schaukel) |
+| `PHYS2D_REMOVE_JOINT(w, joint)` | ein Gelenk lösen (eines, das schon weg ist -- auch mit seinem Körper entfernt --: nichts) |
 
 ## Muster: Sprite an einen Körper koppeln
 

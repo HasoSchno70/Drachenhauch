@@ -452,6 +452,9 @@ Zuweisung an '.{}' bei NIL-Referenz{}	Assignment to '.{}' on a NIL reference{}
 Zuweisung an '.{}' bei nicht-Objekt ({})	Assignment to '.{}' on a non-object ({})
 {} ist unveraenderlich: '.{}' laesst sich lesen, aber nicht setzen -- einen neuen Wert bauen, etwa v = {}_NEW(...)	{} is immutable: '.{}' can be read but not set -- build a new value, e.g. v = {}_NEW(...)
 {} hat kein Teil '{}' -- es gibt {}	{} has no component '{}' -- there are {}
+{}: einen Koerper {} gibt es nicht -- nie angelegt oder mit PHYS2D_REMOVE entfernt (PHYS2D_BODY_EXISTS fragt danach)	{}: there is no body {} -- never created or removed with PHYS2D_REMOVE (PHYS2D_BODY_EXISTS asks)
+{}: ein Koerper kann nicht mit sich selbst verbunden werden ({})	{}: a body cannot be joined to itself ({})
+{}: die Laenge muss 0 oder mehr sein, nicht {}	{}: the length must be 0 or more, not {}
 Methodenaufruf '.{}' bei NIL-Referenz{}	Method call '.{}' on a NIL reference{}
 Methodenaufruf '.{}' bei nicht-Objekt ({})	Method call '.{}' on a non-object ({})
 die Variable ist noch NIL: eine Klasse muss mit NEW angelegt werden (p = NEW Klasse())	the variable is still NIL: a class has to be created with NEW (p = NEW Class())

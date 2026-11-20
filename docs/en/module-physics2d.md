@@ -61,8 +61,12 @@ ang = PHYS2D_BODY_ANGLE(world, box)       ' radians -> rotate the sprite
 | `PHYS2D_SLEEP(w, idx [, sleep])` | put a body to sleep (without a third argument or TRUE) or wake it (FALSE) — like `PHYS3D_SLEEP`: a freshly built stack costs nothing until something pushes it. A sleeping body in mid-air stays there until something wakes it |
 | `PHYS2D_SLEEPING(w, idx) AS BOOLEAN` | is the body asleep? |
 | `PHYS2D_LOCK_ROTATION(w, idx, locked)` | lock the rotation — e.g. so that a character does not topple over |
-| `PHYS2D_REMOVE(w, idx)` | remove a body |
+| `PHYS2D_REMOVE(w, idx)` | remove a body (one already removed: nothing) |
 | `PHYS2D_COUNT(w) AS INTEGER` | number of living bodies |
+| `PHYS2D_BODY_EXISTS(w, idx) AS BOOLEAN` | does the body exist -- created and not removed? Every other command given a body that does not exist stops with a message |
+| `PHYS2D_ADD_HINGE(w, body_a, body_b, x, y) AS INTEGER` | hinge: the two bodies hang together at the world point (x, y) and turn freely around it (door, pendulum, chain); they do not push each other. Returns the joint's number |
+| `PHYS2D_ADD_ROPE(w, body_a, body_b, length) AS INTEGER` | rope between the centres: at most `length` apart, closer is allowed (wrecking ball, swing) |
+| `PHYS2D_REMOVE_JOINT(w, joint)` | release a joint (one that is already gone -- also removed with its body --: nothing) |
 
 ## Pattern: coupling a sprite to a body
 

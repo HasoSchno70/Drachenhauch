@@ -3077,54 +3077,68 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             phys2d_h(&a[0], "PHYS2D_STEP")?.borrow_mut().step(need_num(&a[1], "PHYS2D_STEP")? as f32);
             Ok(Value::Nil)
         }
+        // Jeder Befehl, der einen Koerper meint, prueft seine Nummer
+        // (`phys2d_koerper`): vorher lieferte ein entfernter oder nie
+        // angelegter Koerper still die Lage (0, 0) und das Tempo 0.
         #[cfg(feature = "physik")]
         "phys2d_body_x" | "phys2d_body_y" => {
             arity!(2);
-            let p = phys2d_h(&a[0], "PHYS2D_BODY")?.borrow().pos(need_int(&a[1], "PHYS2D_BODY")?);
+            let f = if name == "phys2d_body_x" { "PHYS2D_BODY_X" } else { "PHYS2D_BODY_Y" };
+            let w = phys2d_h(&a[0], f)?.borrow();
+            let p = w.pos(phys2d_koerper(&w, &a[1], f)?);
             Ok(Value::Float((if name == "phys2d_body_x" { p.0 } else { p.1 }) as f64))
         }
         #[cfg(feature = "physik")]
         "phys2d_body_angle" => {
             arity!(2);
-            let ang = phys2d_h(&a[0], "PHYS2D_BODY_ANGLE")?.borrow().angle(need_int(&a[1], "PHYS2D_BODY_ANGLE")?);
-            Ok(Value::Float(ang as f64))
+            let w = phys2d_h(&a[0], "PHYS2D_BODY_ANGLE")?.borrow();
+            Ok(Value::Float(w.angle(phys2d_koerper(&w, &a[1], "PHYS2D_BODY_ANGLE")?) as f64))
         }
         #[cfg(feature = "physik")]
         "phys2d_body_vx" | "phys2d_body_vy" => {
             arity!(2);
-            let v = phys2d_h(&a[0], "PHYS2D_BODY")?.borrow().vel(need_int(&a[1], "PHYS2D_BODY")?);
+            let f = if name == "phys2d_body_vx" { "PHYS2D_BODY_VX" } else { "PHYS2D_BODY_VY" };
+            let w = phys2d_h(&a[0], f)?.borrow();
+            let v = w.vel(phys2d_koerper(&w, &a[1], f)?);
             Ok(Value::Float((if name == "phys2d_body_vx" { v.0 } else { v.1 }) as f64))
+        }
+        #[cfg(feature = "physik")]
+        "phys2d_body_exists" => {
+            arity!(2);
+            let w = phys2d_h(&a[0], "PHYS2D_BODY_EXISTS")?.borrow();
+            Ok(Value::Bool(w.gibt_es(need_int(&a[1], "PHYS2D_BODY_EXISTS")?)))
         }
         #[cfg(feature = "physik")]
         "phys2d_set_vel" => {
             arity!(4);
-            phys2d_h(&a[0], "PHYS2D_SET_VEL")?.borrow_mut().set_vel(
-                need_int(&a[1], "PHYS2D_SET_VEL")?,
-                need_num(&a[2], "PHYS2D_SET_VEL")? as f32, need_num(&a[3], "PHYS2D_SET_VEL")? as f32);
+            let mut w = phys2d_h(&a[0], "PHYS2D_SET_VEL")?.borrow_mut();
+            let i = phys2d_koerper(&w, &a[1], "PHYS2D_SET_VEL")?;
+            w.set_vel(i, need_num(&a[2], "PHYS2D_SET_VEL")? as f32, need_num(&a[3], "PHYS2D_SET_VEL")? as f32);
             Ok(Value::Nil)
         }
         #[cfg(feature = "physik")]
         "phys2d_apply_impulse" => {
             arity!(4);
-            phys2d_h(&a[0], "PHYS2D_APPLY_IMPULSE")?.borrow_mut().apply_impulse(
-                need_int(&a[1], "PHYS2D_APPLY_IMPULSE")?,
-                need_num(&a[2], "PHYS2D_APPLY_IMPULSE")? as f32, need_num(&a[3], "PHYS2D_APPLY_IMPULSE")? as f32);
+            let mut w = phys2d_h(&a[0], "PHYS2D_APPLY_IMPULSE")?.borrow_mut();
+            let i = phys2d_koerper(&w, &a[1], "PHYS2D_APPLY_IMPULSE")?;
+            w.apply_impulse(i, need_num(&a[2], "PHYS2D_APPLY_IMPULSE")? as f32,
+                            need_num(&a[3], "PHYS2D_APPLY_IMPULSE")? as f32);
             Ok(Value::Nil)
         }
         #[cfg(feature = "physik")]
         "phys2d_set_pos" => {
             arity!(4);
-            phys2d_h(&a[0], "PHYS2D_SET_POS")?.borrow_mut().set_pos(
-                need_int(&a[1], "PHYS2D_SET_POS")?,
-                need_num(&a[2], "PHYS2D_SET_POS")? as f32, need_num(&a[3], "PHYS2D_SET_POS")? as f32);
+            let mut w = phys2d_h(&a[0], "PHYS2D_SET_POS")?.borrow_mut();
+            let i = phys2d_koerper(&w, &a[1], "PHYS2D_SET_POS")?;
+            w.set_pos(i, need_num(&a[2], "PHYS2D_SET_POS")? as f32, need_num(&a[3], "PHYS2D_SET_POS")? as f32);
             Ok(Value::Nil)
         }
         #[cfg(feature = "physik")]
         "phys2d_set_dynamic" => {
             arity!(3);
-            phys2d_h(&a[0], "PHYS2D_SET_DYNAMIC")?.borrow_mut().set_dynamic(
-                need_int(&a[1], "PHYS2D_SET_DYNAMIC")?,
-                need_flag(&a[2], "PHYS2D_SET_DYNAMIC")?);
+            let mut w = phys2d_h(&a[0], "PHYS2D_SET_DYNAMIC")?.borrow_mut();
+            let i = phys2d_koerper(&w, &a[1], "PHYS2D_SET_DYNAMIC")?;
+            w.set_dynamic(i, need_flag(&a[2], "PHYS2D_SET_DYNAMIC")?);
             Ok(Value::Nil)
         }
         #[cfg(feature = "physik")]
@@ -3133,33 +3147,66 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 return Err("PHYS2D_SLEEP: erwartet 2 oder 3 Argumente (welt, koerper [, schlafen])".into());
             }
             let an = if a.len() == 3 { need_flag(&a[2], "PHYS2D_SLEEP")? } else { true };
-            phys2d_h(&a[0], "PHYS2D_SLEEP")?.borrow_mut().sleep(need_int(&a[1], "PHYS2D_SLEEP")?, an);
+            let mut w = phys2d_h(&a[0], "PHYS2D_SLEEP")?.borrow_mut();
+            let i = phys2d_koerper(&w, &a[1], "PHYS2D_SLEEP")?;
+            w.sleep(i, an);
             Ok(Value::Nil)
         }
         #[cfg(feature = "physik")]
         "phys2d_sleeping" => {
             arity!(2);
-            Ok(Value::Bool(phys2d_h(&a[0], "PHYS2D_SLEEPING")?.borrow()
-                .is_sleeping(need_int(&a[1], "PHYS2D_SLEEPING")?)))
+            let w = phys2d_h(&a[0], "PHYS2D_SLEEPING")?.borrow();
+            Ok(Value::Bool(w.is_sleeping(phys2d_koerper(&w, &a[1], "PHYS2D_SLEEPING")?)))
         }
         #[cfg(feature = "physik")]
         "phys2d_is_dynamic" => {
             arity!(2);
-            Ok(Value::Bool(phys2d_h(&a[0], "PHYS2D_IS_DYNAMIC")?.borrow()
-                .is_dynamic(need_int(&a[1], "PHYS2D_IS_DYNAMIC")?)))
+            let w = phys2d_h(&a[0], "PHYS2D_IS_DYNAMIC")?.borrow();
+            Ok(Value::Bool(w.is_dynamic(phys2d_koerper(&w, &a[1], "PHYS2D_IS_DYNAMIC")?)))
         }
         #[cfg(feature = "physik")]
         "phys2d_lock_rotation" => {
             arity!(3);
-            phys2d_h(&a[0], "PHYS2D_LOCK_ROTATION")?.borrow_mut().lock_rotation(
-                need_int(&a[1], "PHYS2D_LOCK_ROTATION")?,
-                need_flag(&a[2], "PHYS2D_LOCK_ROTATION")?);
+            let mut w = phys2d_h(&a[0], "PHYS2D_LOCK_ROTATION")?.borrow_mut();
+            let i = phys2d_koerper(&w, &a[1], "PHYS2D_LOCK_ROTATION")?;
+            w.lock_rotation(i, need_flag(&a[2], "PHYS2D_LOCK_ROTATION")?);
             Ok(Value::Nil)
         }
+        // Entfernen, was schon weg ist, schadet nicht -- kein Fehler.
         #[cfg(feature = "physik")]
         "phys2d_remove" => {
             arity!(2);
             phys2d_h(&a[0], "PHYS2D_REMOVE")?.borrow_mut().remove(need_int(&a[1], "PHYS2D_REMOVE")?);
+            Ok(Value::Nil)
+        }
+        // Gelenke: ein Scharnier um einen Punkt der Welt, ein Seil zwischen
+        // den Mittelpunkten. Beide liefern eine Nummer fuer REMOVE_JOINT.
+        #[cfg(feature = "physik")]
+        "phys2d_add_hinge" => {
+            arity!(5);
+            let f = "PHYS2D_ADD_HINGE";
+            let mut w = phys2d_h(&a[0], f)?.borrow_mut();
+            let (ka, kb) = (phys2d_koerper(&w, &a[1], f)?, phys2d_koerper(&w, &a[2], f)?);
+            if ka == kb { return Err(format!("{}: ein Koerper kann nicht mit sich selbst verbunden werden ({})", f, ka)); }
+            let (x, y) = (need_num(&a[3], f)? as f32, need_num(&a[4], f)? as f32);
+            Ok(Value::Int(w.add_hinge(ka, kb, x, y)))
+        }
+        #[cfg(feature = "physik")]
+        "phys2d_add_rope" => {
+            arity!(4);
+            let f = "PHYS2D_ADD_ROPE";
+            let mut w = phys2d_h(&a[0], f)?.borrow_mut();
+            let (ka, kb) = (phys2d_koerper(&w, &a[1], f)?, phys2d_koerper(&w, &a[2], f)?);
+            if ka == kb { return Err(format!("{}: ein Koerper kann nicht mit sich selbst verbunden werden ({})", f, ka)); }
+            let laenge = need_num(&a[3], f)?;
+            if laenge < 0.0 { return Err(format!("{}: die Laenge muss 0 oder mehr sein, nicht {}", f, laenge)); }
+            Ok(Value::Int(w.add_rope(ka, kb, laenge as f32)))
+        }
+        #[cfg(feature = "physik")]
+        "phys2d_remove_joint" => {
+            arity!(2);
+            phys2d_h(&a[0], "PHYS2D_REMOVE_JOINT")?.borrow_mut()
+                .remove_joint(need_int(&a[1], "PHYS2D_REMOVE_JOINT")?);
             Ok(Value::Nil)
         }
         #[cfg(feature = "physik")]
@@ -5868,6 +5915,15 @@ fn phys3d_h<'a>(v: &'a Value, fn_: &str) -> Result<&'a Rc<RefCell<crate::physics
 #[cfg(feature = "physik")]
 fn phys2d_h<'a>(v: &'a Value, fn_: &str) -> Result<&'a Rc<RefCell<crate::physics2d::Phys2dWorld>>, String> {
     match v { Value::Phys2d(w) => Ok(w), _ => Err(format!("{} erwartet PHYS2D_WORLD", fn_)) }
+}
+
+/// Die Nummer eines Koerpers, den es gibt -- sonst eine Meldung statt der
+/// stillen Lage (0, 0), die ein entfernter Koerper frueher lieferte.
+#[cfg(feature = "physik")]
+fn phys2d_koerper(w: &crate::physics2d::Phys2dWorld, v: &Value, fn_: &str) -> Result<i64, String> {
+    let idx = need_int(v, fn_)?;
+    if w.gibt_es(idx) { return Ok(idx); }
+    Err(format!("{}: einen Koerper {} gibt es nicht -- nie angelegt oder mit PHYS2D_REMOVE entfernt (PHYS2D_BODY_EXISTS fragt danach)", fn_, idx))
 }
 
 fn astar_xy(g: &crate::astar::AStarGrid, x: &Value, y: &Value, fn_: &str) -> Result<(), String> {
