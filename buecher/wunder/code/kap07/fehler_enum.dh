@@ -1,0 +1,8 @@
+ENUM Stoff
+    LEER
+    SAND
+    WASSER
+END ENUM
+DIM welt[1 TO 3] AS Stoff
+welt[1] = Stoff.SNAD
+PRINT welt[1]

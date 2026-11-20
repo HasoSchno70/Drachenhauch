@@ -267,4 +267,42 @@ module.exports = (H) => [
   ...neu("loesungen/kap06_alter.dh").map((t) => H.code(t)),
 
   H.p("Hier zahlt sich die Funktion lebt ein zweites Mal aus: nachbarn musste fast nicht geändert werden, weil es nie selbst auf das Feld geschaut hat. Nur das Abziehen der Zelle selbst fragt jetzt lebt statt das Feld — sonst zöge es ihr Alter ab statt einer 1."),
+
+  H.h2("Kapitel 7 · Fallender Sand"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Das Wasser wird zäh wie Honig. Unter der Düse wächst ein Buckel, der nur langsam auseinanderläuft, und auf dem Brett staut es sich, statt hinunterzufließen. Eine Zelle je Schritt ist zu langsam gegen den Nachschub; vier sind schnell genug, dass der See eben aussieht. Echtes Wasser hat keine Zellen, aber dieselbe Frage — wie schnell es nachgibt — unterscheidet auch dort Wasser von Honig."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Die Sandhaufen bleiben, wie sie waren: Ist links besetzt, rutscht ein Korn eben nach rechts, und 45 Grad ist auf beiden Seiten die einzige Schräge, die hält. Das Wasser aber fließt nur noch nach links. Es läuft am linken Ende vom Brett, füllt den Boden links von der Düse, und rechts davon bleibt es trocken. Der Unterschied: Sand bewegt sich nur, wenn er fallen kann, und das Fallen ist auf beiden Seiten gleich. Wasser bewegt sich auch waagrecht, und dort entscheidet allein s, wohin."),
+
+  H.h3("Drehen 3"),
+
+  H.p("Alles läuft viermal so schnell, und weil die Düsen je Schritt ein Korn und einen Tropfen geben, kommt in den zehn Sekunden viermal so viel heraus: ein großer Haufen, ein tiefer See. Die Formen bleiben — 45 Grad, ebenes Wasser —, denn die Regeln wissen nichts von Sekunden, nur von Zellen. TAKT bestimmt allein, wie oft sie gelten."),
+
+  H.h3("Erweitern 1: Pinselgröße"),
+
+  H.p("Der Radius wird eine Variable, und das Mausrad verstellt ihn (code/loesungen/kap07_pinsel.dh):"),
+
+  ...neu("loesungen/kap07_pinsel.dh").map((t) => H.code(t)),
+
+  H.p("MOUSE_WHEEL liefert, wie weit das Rad seit dem letzten Aufruf gedreht wurde, meist 0. CLAMP hält den Radius zwischen 1 und 12. Statt 9 steht im Vergleich jetzt radius ^ 2 — die 9 war der Radius 3 zum Quadrat, nur ohne es zu sagen."),
+
+  H.h3("Erweitern 2: Schwerkraft umdrehen"),
+
+  H.p("Aus jedem y + 1 in den Regeln wird y + g, und die Taste G kehrt g um (code/loesungen/kap07_schwerkraft.dh):"),
+
+  ...neu("loesungen/kap07_schwerkraft.dh").map((t) => H.code(t)),
+
+  H.p("Was sich außer dem Fallen noch umdrehen muss, ist die Reihenfolge des Schritts. Er muss immer beim „Boden“ anfangen, sonst fiele ein Korn in einem Schritt bis ans Ende — der Fehler aus „Warum so?“, nur nach oben. Und die Zeile, die er überspringt, wechselt mit: Fällt alles nach oben, kann in der obersten Zeile nichts mehr fallen, und die unterste muss mitrechnen."),
+
+  H.h3("Erfinden: Holz und Feuer"),
+
+  H.p("Eine Möglichkeit (code/loesungen/kap07_feuer.dh): zwei neue Stoffe im ENUM, eine neue Regel für Feuer, eine Zeile im SELECT CASE. Holz braucht keine Regel; es liegt, bis Feuer es erreicht:"),
+
+  ...neu("loesungen/kap07_feuer.dh").map((t) => H.code(t)),
+
+  H.p("Die Zahlen 0.02 und 0.01 sind ausprobiert. Mit 0.2 statt 0.02 brennt der Stapel in einem Augenblick ab; mit 0.1 statt 0.01 geht das Feuer aus, bevor es das nächste Holz erreicht. Die Flammen haben eine Zufallsfarbe in jedem Bild — darum flackern sie, ohne dass es dafür eigenen Code braucht."),
 ];

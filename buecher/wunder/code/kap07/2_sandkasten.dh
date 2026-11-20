@@ -1,0 +1,182 @@
+' Kapitel 7 -- der Sandkasten: Sand, Wasser und Stein. Mit der Maus
+' malen; 1 Sand, 2 Wasser, 3 Stein, 0 radiert. Die ersten Sekunden
+' laufen zwei Duesen von selbst.
+CONST B = 200
+CONST H = 125
+CONST ZELLE = 4
+CONST TAKT = 1.0 / 60
+
+ENUM Stoff
+    LEER
+    SAND
+    WASSER
+    STEIN
+END ENUM
+
+DIM welt[1 TO B, 1 TO H] AS Stoff
+
+' Ist (x, y) im Feld und leer?
+FUNCTION frei(x AS INTEGER, y AS INTEGER) AS BOOLEAN
+    IF x < 1 OR x > B OR y < 1 OR y > H THEN RETURN FALSE
+    RETURN welt[x, y] = Stoff.LEER
+END FUNCTION
+
+' Kann Sand dorthin? In leere Zellen und ins Wasser -- er sinkt.
+FUNCTION sandKann(x AS INTEGER, y AS INTEGER) AS BOOLEAN
+    IF frei(x, y) THEN RETURN TRUE
+    IF x < 1 OR x > B OR y < 1 OR y > H THEN RETURN FALSE
+    RETURN welt[x, y] = Stoff.WASSER
+END FUNCTION
+
+SUB tauschen(x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER)
+    DIM t AS Stoff : t = welt[x1, y1]
+    welt[x1, y1] = welt[x2, y2]
+    welt[x2, y2] = t
+END SUB
+
+' Sand faellt; geht das nicht, rutscht er schraeg nach unten.
+SUB sandFaellt(x AS INTEGER, y AS INTEGER)
+    DIM s AS INTEGER : s = IIF(RND() < 0.5, -1, 1)
+    IF sandKann(x, y + 1) THEN
+        tauschen(x, y, x, y + 1)
+    ELSEIF sandKann(x + s, y + 1) THEN
+        tauschen(x, y, x + s, y + 1)
+    ELSEIF sandKann(x - s, y + 1) THEN
+        tauschen(x, y, x - s, y + 1)
+    END IF
+END SUB
+
+' Wasser faellt wie Sand; wenn es nicht faellt, fliesst es zur Seite.
+SUB wasserFliesst(x AS INTEGER, y AS INTEGER)
+    DIM s AS INTEGER : s = IIF(RND() < 0.5, -1, 1)
+    IF frei(x, y + 1) THEN
+        tauschen(x, y, x, y + 1)
+    ELSEIF frei(x + s, y + 1) THEN
+        tauschen(x, y, x + s, y + 1)
+    ELSEIF frei(x - s, y + 1) THEN
+        tauschen(x, y, x - s, y + 1)
+    ELSE
+        ' Zur Seite, so weit es frei ist, hoechstens vier Zellen.
+        DIM weit AS INTEGER : weit = 0
+        WHILE weit < 4 AND frei(x + s * (weit + 1), y)
+            weit = weit + 1
+        WEND
+        IF weit > 0 THEN tauschen(x, y, x + s * weit, y)
+    END IF
+END SUB
+
+' Ein Schritt der Welt: von unten nach oben, Zeile fuer Zeile. Jede
+' zweite Runde andersherum von links nach rechts, damit Wasser nicht
+' immer in dieselbe Richtung fliesst.
+DIM runde AS INTEGER
+
+SUB schritt()
+    runde = runde + 1
+    DIM von AS INTEGER : von = IIF(runde MOD 2 = 0, 1, B)
+    DIM bis AS INTEGER : bis = IIF(runde MOD 2 = 0, B, 1)
+    DIM richtung AS INTEGER : richtung = IIF(runde MOD 2 = 0, 1, -1)
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = H - 1 TO 1 STEP -1
+        FOR x = von TO bis STEP richtung
+            SELECT CASE welt[x, y]
+                CASE Stoff.SAND : sandFaellt(x, y)
+                CASE Stoff.WASSER : wasserFliesst(x, y)
+            END SELECT
+        NEXT
+    NEXT
+END SUB
+
+' Die Farbe eines Stoffs. Sand und Stein streuen ein wenig nach der
+' Stelle, damit sie koernig aussehen -- an derselben Stelle gleich.
+FUNCTION farbe(st AS Stoff, x AS INTEGER, y AS INTEGER) AS INTEGER
+    DIM k AS INTEGER : k = (x * 7 + y * 13) MOD 5
+    SELECT CASE st
+        CASE Stoff.SAND : RETURN HSV(40 + k, 0.55, 0.85 + k * 0.03)
+        CASE Stoff.WASSER : RETURN RGB(60, 120, 230)
+        CASE Stoff.STEIN : RETURN HSV(220, 0.08, 0.45 + k * 0.03)
+    END SELECT
+    RETURN RGB(14, 16, 26)
+END FUNCTION
+
+SUB zeichnen(bild AS INTEGER)
+    RENDERTARGET_BEGIN(bild)
+    CLS(RGB(14, 16, 26))
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 1 TO H
+        FOR x = 1 TO B
+            IF welt[x, y] <> Stoff.LEER THEN
+                PLOT(x - 1, y - 1, farbe(welt[x, y], x, y))
+            END IF
+        NEXT
+    NEXT
+    RENDERTARGET_END()
+    RENDERTARGET_DRAW(bild, 0, 0, ZELLE)
+    TEXT(8, 8, "Pinsel: " + pinselName$(), RGB(200, 210, 230))
+    FLIP()
+END SUB
+
+' Ein Kreis aus einem Stoff um (mx, my), in Zellen.
+SUB malen(mx AS INTEGER, my AS INTEGER, st AS Stoff)
+    DIM dx AS INTEGER
+    DIM dy AS INTEGER
+    FOR dy = -3 TO 3
+        FOR dx = -3 TO 3
+            DIM x AS INTEGER : x = mx + dx
+            DIM y AS INTEGER : y = my + dy
+            IF dx * dx + dy * dy <= 9 AND x >= 1 AND x <= B THEN
+                IF y >= 1 AND y <= H THEN welt[x, y] = st
+            END IF
+        NEXT
+    NEXT
+END SUB
+
+DIM pinsel AS Stoff : pinsel = Stoff.SAND
+
+FUNCTION pinselName$() AS STRING
+    SELECT CASE pinsel
+        CASE Stoff.SAND : RETURN "Sand (1)"
+        CASE Stoff.WASSER : RETURN "Wasser (2)"
+        CASE Stoff.STEIN : RETURN "Stein (3)"
+    END SELECT
+    RETURN "Radierer (0)"
+END FUNCTION
+
+' Zwei schraege Steinbretter, damit gleich etwas passiert.
+DIM i AS INTEGER
+FOR i = 0 TO 50
+    ' Zwei Zellen dick, sonst rutscht ein Korn durch die Treppe.
+    welt[30 + i, 50 + i \ 3] = Stoff.STEIN
+    welt[30 + i, 51 + i \ 3] = Stoff.STEIN
+    welt[170 - i, 80 + i \ 3] = Stoff.STEIN
+    welt[170 - i, 81 + i \ 3] = Stoff.STEIN
+NEXT
+
+SCREEN(B * ZELLE, H * ZELLE, "Sandkasten")
+DIM bild AS INTEGER : bild = RENDERTARGET_NEW(B, H)
+DIM uhr AS FLOAT
+DIM laufzeit AS FLOAT
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
+    IF KEY_HIT(KEY_1) THEN pinsel = Stoff.SAND
+    IF KEY_HIT(KEY_2) THEN pinsel = Stoff.WASSER
+    IF KEY_HIT(KEY_3) THEN pinsel = Stoff.STEIN
+    IF KEY_HIT(KEY_0) THEN pinsel = Stoff.LEER
+    IF MOUSE_DOWN(0) THEN
+        malen(MOUSE_X() \ ZELLE + 1, MOUSE_Y() \ ZELLE + 1, pinsel)
+    END IF
+    ' Feste Schritte, 60 je Sekunde, auch wenn die Bilder schwanken.
+    DIM dt AS FLOAT : dt = DELTA()
+    laufzeit = laufzeit + dt
+    uhr = MIN(uhr + dt, 0.1)
+    WHILE uhr >= TAKT
+        ' Die ersten zehn Sekunden: links Sand, rechts Wasser.
+        IF laufzeit < 10 THEN
+            welt[50 + RANDINT(-1, 1), 1] = Stoff.SAND
+            welt[150 + RANDINT(-1, 1), 1] = Stoff.WASSER
+        END IF
+        schritt()
+        uhr = uhr - TAKT
+    WEND
+    zeichnen(bild)
+WEND
