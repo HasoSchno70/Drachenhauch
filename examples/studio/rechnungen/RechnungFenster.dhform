@@ -422,7 +422,7 @@
   "tabs": [],
   "active_tab": 0,
   "tabs_closable": false,
-  "default_button": 20,
-  "cancel_button": 21,
-  "name": "RechnungFenster"
+  "name": "RechnungFenster",
+  "studio_standard": "knopfSichern",
+  "studio_abbrechen": "knopfAbbrechen"
 }

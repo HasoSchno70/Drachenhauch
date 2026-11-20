@@ -1,0 +1,8 @@
+' Kapitel 3 -- Euklid zum Zusehen: jede Runde schreibt ihre Zahlen hin.
+FUNCTION ggt(a AS INTEGER, b AS INTEGER) AS INTEGER
+    PRINT "ggt("; a; ", "; b; ")"
+    IF b = 0 THEN RETURN a
+    RETURN ggt(b, a MOD b)
+END FUNCTION
+
+PRINT "Ergebnis: "; ggt(220, 84)

@@ -1,0 +1,31 @@
+' Kapitel 5, Schritt 1 -- ein einziger Funke: geworfen, von der
+' Schwere zurueckgeholt, und am Boden geht es von vorn los.
+CONST SCHWERE = 120.0
+
+STRUCT Funke
+    DIM x AS FLOAT
+    DIM y AS FLOAT
+    DIM vx AS FLOAT
+    DIM vy AS FLOAT
+END STRUCT
+
+SUB werfen(f AS Funke)
+    f.x = 100
+    f.y = 450
+    f.vx = 140
+    f.vy = -260
+END SUB
+
+DIM f AS Funke
+werfen(f)
+SCREEN(800, 500, "Ein Funke")
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
+    DIM dt AS FLOAT : dt = DELTA()
+    f.vy = f.vy + SCHWERE * dt
+    f.x = f.x + f.vx * dt
+    f.y = f.y + f.vy * dt
+    IF f.y > 500 THEN werfen(f)
+    CLS(RGB(8, 10, 24))
+    CIRCLE(INT(f.x), INT(f.y), 4, RGB(255, 220, 120))
+    FLIP()
+WEND

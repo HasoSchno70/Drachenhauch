@@ -3068,3 +3068,13 @@ haette nur die Reihenfolge versteckt), bietet sie hinter `AS` und `OF` jetzt
 nur Typen: Klassen, Strukturen, Aufzaehlungen des Textes, die Grundtypen,
 die Typen der Module (`preprocess::modul_typen`) und was Befehle laut Index
 liefern (`... AS IMAGE`). Rust-Test `hinter_as_nur_typen` mit Gegenprobe.
+- **"1 Warnung" (2026-11-19).** Der Kopf der Problemliste schrieb "0 Fehler,
+  1 Warnungen" -- aufgefallen an einem Bild fuer das Buch "Kleine Wunder".
+  Jetzt Einzahl, und "Hinweis"/"Hinweise" gehen durch `tr$` (standen
+  deutsch in der englischen Oberflaeche). Fall "die zahl der probleme" in
+  `werkzeug_ide_lesbarkeit.dhtest` um eine Stufe mit einer Warnung
+  erweitert, Gegenprobe gefallen. Englisch sagte bei einem Fehler weiter
+  "1 errors" -- das deutsche "Fehler" ist Ein- und Mehrzahl, der Schluessel
+  kann es nicht unterscheiden. Darum `trn$(text, n)`: bei n = 1 der
+  Eintrag "text|1" der Tafel, wenn es ihn gibt (" Fehler, |1" -> " error, ").
+  Fall "englisch: ein fehler ist 1 error" in `werkzeug_ide_lesbarkeit.dhtest`.

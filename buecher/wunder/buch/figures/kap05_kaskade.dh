@@ -1,0 +1,3 @@
+' Bild fuer Kapitel 5, Uebung Erfinden: Funken, die nachknallen.
+RANDOMIZE(4)
+IMPORT "../../code/loesungen/kap05_kaskade.dh"

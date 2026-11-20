@@ -1,0 +1,8 @@
+' Kapitel 5 -- warum das Loeschen rueckwaerts laeuft. Aus dem Feld
+' sollen alle Nullen verschwinden.
+DIM zahlen AS ARRAY OF INTEGER : zahlen = [5, 0, 0, 7]
+DIM i AS INTEGER
+FOR i = LEN(zahlen) - 1 TO 0 STEP -1
+    IF zahlen[i] = 0 THEN ARRAY_REMOVE_AT(zahlen, i)
+NEXT
+PRINT JOIN$(zahlen, ", ")

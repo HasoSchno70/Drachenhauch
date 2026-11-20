@@ -1,0 +1,70 @@
+{
+  "title": "Mediathek",
+  "name": "Hauptfenster",
+  "x": 0,
+  "y": 0,
+  "w": 520,
+  "h": 330,
+  "movable": true,
+  "closable": true,
+  "visible": true,
+  "widgets": [
+    {
+      "kind": "label",
+      "name": "beschriftungTitel",
+      "text": "Titel",
+      "x": 20,
+      "y": 26,
+      "w": 50,
+      "h": 16
+    },
+    {
+      "kind": "textinput",
+      "name": "feldTitel",
+      "text": "",
+      "placeholder": "z. B. Momo",
+      "x": 80,
+      "y": 20,
+      "w": 280,
+      "h": 28
+    },
+    {
+      "kind": "button",
+      "name": "knopfAufnehmen",
+      "text": "Aufnehmen",
+      "x": 370,
+      "y": 20,
+      "w": 130,
+      "h": 28
+    },
+    {
+      "kind": "label",
+      "name": "status",
+      "text": "Noch nichts aufgenommen.",
+      "x": 20,
+      "y": 70,
+      "w": 480,
+      "h": 16
+    },
+    {
+      "kind": "label",
+      "name": "liste",
+      "text": "",
+      "x": 20,
+      "y": 100,
+      "w": 480,
+      "h": 16,
+      "wrap": true
+    },
+    {
+      "kind": "button",
+      "name": "knopfInfo",
+      "text": "Über …",
+      "x": 370,
+      "y": 270,
+      "w": 130,
+      "h": 28
+    }
+  ],
+  "studio_standard": "knopfAufnehmen"
+}

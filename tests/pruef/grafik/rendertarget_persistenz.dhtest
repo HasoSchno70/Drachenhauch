@@ -89,3 +89,18 @@ NEXT
 SAVESCREENSHOT("out.png")
 --- erwartet
 
+
+=== flip mit offenem render-ziel nennt die zeile
+' RENDERTARGET_BEGIN ohne END: alles danach -- auch das RENDERTARGET_DRAW,
+' das das Ziel zeigen sollte -- ging ins Ziel, der Schirm blieb schwarz,
+' ohne Meldung (gefunden 2026-11-19 am Buch "Kleine Wunder"). Jetzt haelt
+' FLIP an und sagt, was fehlt.
+SCREEN(64, 64, "rt", 1)
+DIM rt AS INTEGER
+rt = RENDERTARGET_NEW(64, 64)
+RENDERTARGET_BEGIN(rt)
+PLOT(10, 10, &HFF0000)
+RENDERTARGET_DRAW(rt, 0, 0)
+FLIP()
+--- fehler
+fall.dh:11: FLIP: ein Render-Ziel ist noch offen -- nach RENDERTARGET_BEGIN fehlt RENDERTARGET_END()

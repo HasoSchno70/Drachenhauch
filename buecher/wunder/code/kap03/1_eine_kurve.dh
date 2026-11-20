@@ -1,0 +1,33 @@
+' Kapitel 3, Schritt 1 -- eine Spirograph-Kurve in einem Zug.
+' Ein kleines Rad rollt in einem grossen Ring; ein Stift im Rad
+' zeichnet die Bahn.
+CONST MX = 400
+CONST MY = 250
+
+FUNCTION kurveX(t AS FLOAT, ring AS FLOAT, rad AS FLOAT,
+                stift AS FLOAT) AS FLOAT
+    DIM innen AS FLOAT : innen = ring - rad
+    RETURN MX + innen * COS(t) + stift * COS(innen / rad * t)
+END FUNCTION
+
+FUNCTION kurveY(t AS FLOAT, ring AS FLOAT, rad AS FLOAT,
+                stift AS FLOAT) AS FLOAT
+    DIM innen AS FLOAT : innen = ring - rad
+    RETURN MY + innen * SIN(t) - stift * SIN(innen / rad * t)
+END FUNCTION
+
+SCREEN(800, 500, "Spirograph")
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
+    CLS(RGB(12, 14, 28))
+    DIM t AS FLOAT
+    DIM altX AS FLOAT : altX = kurveX(0, 220, 84, 60)
+    DIM altY AS FLOAT : altY = kurveY(0, 220, 84, 60)
+    FOR t = 0.02 TO 2 * PI * 21 STEP 0.02
+        DIM x AS FLOAT : x = kurveX(t, 220, 84, 60)
+        DIM y AS FLOAT : y = kurveY(t, 220, 84, 60)
+        LINE(altX, altY, x, y, RGB(240, 200, 120))
+        altX = x
+        altY = y
+    NEXT
+    FLIP()
+WEND

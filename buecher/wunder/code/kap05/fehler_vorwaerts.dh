@@ -1,0 +1,6 @@
+DIM zahlen AS ARRAY OF INTEGER : zahlen = [5, 0, 0, 7]
+DIM i AS INTEGER
+FOR i = 0 TO LEN(zahlen) - 1
+    IF zahlen[i] = 0 THEN ARRAY_REMOVE_AT(zahlen, i)
+NEXT
+PRINT JOIN$(zahlen, ", ")

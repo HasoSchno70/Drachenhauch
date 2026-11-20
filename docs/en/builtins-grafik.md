@@ -876,7 +876,7 @@ A render target is an off-screen surface you draw on just like on the window
 |---|---|
 | `RENDERTARGET_NEW(w, h [, keep])` → INTEGER | create a target. `keep = TRUE` keeps the contents beyond the frame — the precondition for trails |
 | `RENDERTARGET_BEGIN(target)` | draw there from now on |
-| `RENDERTARGET_END()` | back to the window |
+| `RENDERTARGET_END()` | back to the window -- if it is missing before `FLIP`, FLIP stops with a message (otherwise the whole frame would go into the target) |
 | `RENDERTARGET_DRAW(rt, x, y [, scale [, tint [, mirrored]]])` | stamp the target onto the window like an image |
 | `RENDERTARGET_CLEAR(rt [, color])` | clear by hand — needed when `behalten` is on |
 | `RENDERTARGET_IMAGE(rt)` → IMAGE | the content as an image — whatever was drawn since `RENDERTARGET_BEGIN` is played back **right away** for this, not only at `FLIP`. This gets a chart into a PDF (`PDF_IMAGE`) or a file (`IMAGE_SAVE`) |

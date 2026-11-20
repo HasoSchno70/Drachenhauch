@@ -243,3 +243,43 @@ Hi, Bob (25).
 Hi, Cara (40)!
 Hey, Dora (50).
 
+
+=== ein vertippter name einer eigenen funktion bekommt einen vorschlag
+' Wie bei den Builtins (2026-11-19, gefunden am Buch "Kleine Wunder"):
+' vorher nur "kein Parameter 'hohe'", ohne Hinweis auf "hoehe".
+FUNCTION flaeche(breite AS FLOAT, hoehe AS FLOAT = 1.0) AS FLOAT
+    RETURN breite * hoehe
+END FUNCTION
+PRINT flaeche(breite: 5, hohe: 2)
+--- fehler
+flaeche: kein Parameter 'hohe'. Meintest du hoehe? Die Parameter heissen breite, hoehe
+
+=== eine vorgabe darf die gleichnamige konstante meinen
+' `ring AS FLOAT = RING`: Namen kennen keine Gross-/Kleinschreibung, der
+' Parameter heisst wie die Konstante. Die Vorgabe meint die Konstante --
+' bis 2026-11-19 las sie den (noch leeren) Parameter selbst und brach mit
+' "Erwartet FLOAT, erhalten NIL" ab, ohne Zeile. Eine fruehere Vorgabe darf
+' weiter einen frueheren Parameter nehmen.
+CONST RING = 220
+FUNCTION innen(rad AS FLOAT, ring AS FLOAT = RING, rest AS FLOAT = ring - rad) AS FLOAT
+    RETURN rest
+END FUNCTION
+PRINT innen(84)
+PRINT innen(84, ring: 100)
+PRINT innen(84, rest: 1)
+--- erwartet
+136.0
+16.0
+1.0
+
+=== ein fehler in einer vorgabe nennt die kopfzeile der funktion
+DIM teiler AS INTEGER : teiler = 0
+FUNCTION anteil(x AS INTEGER = 10 \ teiler) AS INTEGER
+    RETURN x
+END FUNCTION
+PRINT anteil(3)
+PRINT anteil()
+--- erwartet
+3
+--- fehler
+fall.dh:2: Integer-Division durch 0

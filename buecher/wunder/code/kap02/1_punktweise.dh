@@ -1,0 +1,20 @@
+' Kapitel 2, Schritt 1 -- Plasma, Punkt fuer Punkt: jeder der 400 000
+' Bildpunkte bekommt in jedem Bild eine eigene Farbe. Schoen, aber
+' langsam -- oben links steht, wie viele Bilder je Sekunde es schafft.
+SCREEN(800, 500, "Plasma")
+DIM t AS FLOAT
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
+    t = t + DELTA()
+    DIM y AS INTEGER
+    FOR y = 0 TO 499
+        DIM x AS INTEGER
+        FOR x = 0 TO 799
+            DIM v AS FLOAT
+            v = SIN(x / 40 + t) + SIN(y / 30 - t)
+            v = v + SIN((x + y) / 60 + t)
+            PLOT(x, y, HSV(v * 60 + t * 40, 0.8, 1.0))
+        NEXT
+    NEXT
+    TEXT(10, 10, STR$(FPS()) + " Bilder je Sekunde", RGB(255, 255, 255))
+    FLIP()
+WEND

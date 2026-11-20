@@ -1,0 +1,24 @@
+' Kapitel 8 -- die Mediathek aus Kapitel 1, im Studio gebaut. Das
+' Fenster ist eine Klasse; was in Kapitel 1 Variablen waren, sind hier
+' Felder, und der Knopf ruft seine Methode selbst.
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+    DIM titel AS ARRAY OF STRING
+
+    SUB Geoeffnet()
+        GUI_FOCUS(Self.feldTitel)
+    END SUB
+
+    SUB knopfAufnehmen_Klick()
+        DIM t AS STRING : t = TRIM$(GUI_TEXT(Self.feldTitel))
+        IF t = "" THEN
+            GUI_SET_TEXT(Self.status, "Bitte einen Titel eingeben.")
+        ELSE
+            ARRAY_PUSH(Self.titel, t)
+            DIM n AS STRING : n = STR$(LEN(Self.titel))
+            GUI_SET_TEXT(Self.status, n + " Titel in der Mediathek.")
+            GUI_SET_TEXT(Self.liste, JOIN$(Self.titel, ", "))
+            GUI_SET_TEXT(Self.feldTitel, "")
+        END IF
+        GUI_FOCUS(Self.feldTitel)
+    END SUB
+END CLASS

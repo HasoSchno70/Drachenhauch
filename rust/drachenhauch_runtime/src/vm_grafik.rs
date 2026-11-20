@@ -766,6 +766,15 @@ impl<'p> Vm<'p> {
             "imagewidth" | "image_width" => Value::Int(g!().image_width(gi(a,0,"IMAGE_WIDTH")?)?),
             "imageheight" | "image_height" => Value::Int(g!().image_height(gi(a,0,"IMAGE_HEIGHT")?)?),
             "flip" => {
+                // Ein RENDERTARGET_BEGIN ohne END vor FLIP: alles seit dem
+                // BEGIN -- auch das RENDERTARGET_DRAW, das das Ziel zeigen
+                // sollte -- ging ins Ziel, der Schirm blieb schwarz, und keine
+                // Meldung sagte warum (gefunden 2026-11-19 beim Buch "Kleine
+                // Wunder", Kapitel Plasma). Jetzt ein Fehler an dieser Zeile.
+                if g!().rt_vom_programm {
+                    g!().rendertarget_end();
+                    return Err("FLIP: ein Render-Ziel ist noch offen -- nach RENDERTARGET_BEGIN fehlt RENDERTARGET_END(). Bis dahin geht alles Gezeichnete ins Ziel statt auf den Bildschirm".into());
+                }
                 // Wann die gui das naechste Bild braucht -- FLIP darf im
                 // Leerlauf (WINDOW_WAIT_EVENTS) nur so lange schlafen.
                 let bedarf = self.gui.bild_bedarf_nehmen();

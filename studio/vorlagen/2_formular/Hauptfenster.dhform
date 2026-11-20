@@ -11,8 +11,8 @@
   "resizable": true,
   "min_w": 360,
   "min_h": 330,
-  "default_button": 9,
-  "cancel_button": 10,
+  "studio_standard": "knopfOk",
+  "studio_abbrechen": "knopfAbbrechen",
   "widgets": [
     {
       "kind": "label",

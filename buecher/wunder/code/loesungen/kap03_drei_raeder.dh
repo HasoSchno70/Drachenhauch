@@ -1,0 +1,45 @@
+' Loesung zu Kapitel 3, Erfinden: drei Raeder. Jedes dreht sich auf dem
+' Rand des vorigen, mit eigener Groesse und eigenem Tempo -- wie die
+' Epizyklen, mit denen man frueher die Planetenbahnen erklaerte.
+CONST MX = 400
+CONST MY = 250
+
+' Ein Rad: wie lang sein Arm ist und wie oft es sich je Umlauf dreht.
+FUNCTION armX(t AS FLOAT, laenge AS FLOAT, tempo AS FLOAT) AS FLOAT
+    RETURN laenge * COS(tempo * t)
+END FUNCTION
+
+FUNCTION armY(t AS FLOAT, laenge AS FLOAT, tempo AS FLOAT) AS FLOAT
+    RETURN laenge * SIN(tempo * t)
+END FUNCTION
+
+FUNCTION stiftX(t AS FLOAT) AS FLOAT
+    DIM w AS FLOAT : w = MX + armX(t, laenge: 140, tempo: 1)
+    w = w + armX(t, laenge: 70, tempo: -6)
+    RETURN w + armX(t, laenge: 30, tempo: 15)
+END FUNCTION
+
+FUNCTION stiftY(t AS FLOAT) AS FLOAT
+    DIM w AS FLOAT : w = MY + armY(t, laenge: 140, tempo: 1)
+    w = w + armY(t, laenge: 70, tempo: -6)
+    RETURN w + armY(t, laenge: 30, tempo: 15)
+END FUNCTION
+
+SCREEN(800, 500, "Drei Raeder")
+DIM leinwand AS INTEGER : leinwand = RENDERTARGET_NEW(800, 500, TRUE)
+RENDERTARGET_CLEAR(leinwand, RGB(12, 14, 28))
+DIM t AS FLOAT
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
+    DIM bis AS FLOAT : bis = MIN(t + 0.6 * DELTA(), 2 * PI)
+    RENDERTARGET_BEGIN(leinwand)
+    WHILE t < bis
+        DIM neu AS FLOAT : neu = MIN(t + 0.005, bis)
+        LINE(stiftX(t), stiftY(t), stiftX(neu), stiftY(neu),
+             HSV(DEG(t) * 2, 0.6, 1.0))
+        t = neu
+    WEND
+    RENDERTARGET_END()
+    CLS(RGB(0, 0, 0))
+    RENDERTARGET_DRAW(leinwand, 0, 0)
+    FLIP()
+WEND

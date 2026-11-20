@@ -1,0 +1,65 @@
+' Bilder der IDE fuer das Buch "Kleine Wunder".
+'
+' Die IDE laeuft als Kind ueber `dhrt bild`, mit einer frischen ide.json
+' (DH_IDE_KONFIG) in einem eigenen Arbeitsordner -- sonst kaeme die
+' Sitzung des Nutzers mit ins Bild: seine offenen Reiter, seine
+' Wiederherstellung. Gestartet wird im Ordner des Kapitels, damit der
+' Dateibaum nur dessen Dateien zeigt. Die Groesse ist die des Bildschirms
+' (die IDE startet maximiert).
+'
+'     dhrt run buecher/wunder/buch/ide_bilder.dh [-- name ...]
+DIM hier AS STRING : hier = CWD$()
+DIM wurzel AS STRING : wurzel = hier + "/../../.."
+DIM ide AS STRING : ide = wurzel + "/ide/ide.dh"
+DIM bilder AS STRING : bilder = hier + "/images"
+DIM arbeit AS STRING : arbeit = hier + "/_ide_bilder"
+
+DIM nur AS ARRAY OF STRING : nur = []
+DIM a AS INTEGER
+FOR a = 0 TO ARGC() - 1
+    ARRAY_PUSH(nur, ARG$(a))
+NEXT
+
+SUB ordnerWeg(pfad AS STRING)
+    IF NOT DIREXISTS(pfad) THEN RETURN
+    DIM n AS STRING
+    FOR EACH n IN DIRLIST(pfad)
+        IF DIREXISTS(pfad + "/" + n) THEN ordnerWeg(pfad + "/" + n) ELSE DELETEFILE(pfad + "/" + n)
+    NEXT
+    RMDIR(pfad)
+END SUB
+
+' Die IDE im Ordner ../code/<kapitel> mit <datei> darin; das Bild nach
+' images/<name>.png.
+SUB ideBild(name AS STRING, kapitel AS STRING, datei AS STRING)
+    IF LEN(nur) > 0 AND ARRAY_INDEXOF(nur, name) < 0 THEN RETURN
+    ordnerWeg(arbeit)
+    MKDIR(arbeit)
+    SETENV("DH_IDE_KONFIG", arbeit + "/ide.json")
+    DIM ziel AS STRING : ziel = bilder + "/" + name + ".png"
+    IF FILEEXISTS(ziel) THEN DELETEFILE(ziel)
+    DIM zurueck AS STRING : zurueck = CWD$()
+    CHDIR(hier + "/../code/" + kapitel)
+    DIM p AS INTEGER : p = PROCESS_START("dhrt", "bild", ide, ziel, "60", "--", datei)
+    CHDIR(zurueck)
+    DIM leer AS INTEGER : leer = 0
+    DIM aus AS STRING : aus = ""
+    WHILE leer < 5
+        DIM t AS STRING : t = PROCESS_READ$(p) + PROCESS_ERR$(p)
+        aus = aus + t
+        IF t = "" AND NOT PROCESS_RUNNING(p) THEN leer = leer + 1
+        SLEEP(20)
+    WEND
+    IF FILEEXISTS(ziel) THEN
+        PRINT "  "; name; ".png"
+    ELSE
+        PRINT "  FEHLER "; name; " "; LEFT$(TRIM$(aus), 300)
+        EXIT(1)
+    END IF
+END SUB
+
+IF NOT DIREXISTS(bilder) THEN MKDIR(bilder)
+ideBild("kap00_ide", "kap00", "1_farbkreis.dh")
+ideBild("kap00_problem", "kap00", "fehler_tippfehler.dh")
+ordnerWeg(arbeit)
+PRINT "fertig"

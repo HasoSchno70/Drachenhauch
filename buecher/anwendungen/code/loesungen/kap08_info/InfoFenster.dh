@@ -1,0 +1,9 @@
+' Loesung zu Kapitel 8, Erweitern: das InfoFenster. Enter und Esc
+' druecken beide "Schliessen" (im Inspektor: Enter-Knopf, Esc-Knopf).
+CLASS InfoFenster EXTENDS InfoFenster_Basis
+    ' >>> neu
+    SUB knopfZu_Klick()
+        Self.Zumachen()
+    END SUB
+    ' <<< neu
+END CLASS

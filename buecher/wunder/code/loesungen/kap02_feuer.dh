@@ -1,0 +1,36 @@
+' Loesung zu Kapitel 2, Erweitern 1: ein Plasma in Feuerfarben. Der
+' Farbton bleibt zwischen Rot und Gelb, die Helligkeit wandert mit.
+' Die Stellen, die neu sind, stehen zwischen >>> und <<<.
+CONST MASSSTAB = 4
+CONST KLEIN_B = 800 \ MASSSTAB
+CONST KLEIN_H = 500 \ MASSSTAB
+
+SCREEN(800, 500, "Plasma")
+DIM klein AS INTEGER : klein = RENDERTARGET_NEW(KLEIN_B, KLEIN_H)
+DIM t AS FLOAT
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
+    t = t + DELTA()
+    ' Alles bis RENDERTARGET_END zeichnet in das kleine Bild.
+    RENDERTARGET_BEGIN(klein)
+    DIM y AS INTEGER
+    FOR y = 0 TO KLEIN_H - 1
+        DIM x AS INTEGER
+        FOR x = 0 TO KLEIN_B - 1
+            ' Dieselbe Formel mit den Stellen im grossen Bild.
+            DIM gx AS FLOAT : gx = x * MASSSTAB
+            DIM gy AS FLOAT : gy = y * MASSSTAB
+            DIM v AS FLOAT
+            v = SIN(gx / 40 + t) + SIN(gy / 30 - t)
+            v = v + SIN((gx + gy) / 60 + t)
+            ' >>> neu
+            ' v liegt zwischen -3 und 3; w ist dasselbe von 0 bis 1.
+            DIM w AS FLOAT : w = (v + 3) / 6
+            PLOT(x, y, HSV(w * 55, 1.0, 0.3 + w * 0.7))
+            ' <<< neu
+        NEXT
+    NEXT
+    RENDERTARGET_END()
+    RENDERTARGET_DRAW(klein, 0, 0, MASSSTAB)
+    TEXT(10, 10, STR$(FPS()) + " Bilder je Sekunde", RGB(255, 255, 255))
+    FLIP()
+WEND

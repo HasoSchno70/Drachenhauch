@@ -1,0 +1,5 @@
+node_modules/
+*.pdf
+_*.png
+toc_titles.*.json
+_studio_bilder/

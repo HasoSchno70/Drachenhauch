@@ -1,0 +1,10 @@
+' Kapitel 4, Schritt 1 -- die Uhr zu einer festen Zeit: zehn nach zehn,
+' die Zeit, die Uhren in jeder Werbung zeigen.
+IMPORT "uhr_teile.dh"
+
+SCREEN(800, 500, "Ziffernblatt")
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
+    CLS(&H0B0E18)
+    uhrZeichnen(10, 10, 30)
+    FLIP()
+WEND

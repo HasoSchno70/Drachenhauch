@@ -1,0 +1,89 @@
+' Buch "Fenster, Formulare, Daten", Kapitel 8: das Studio-Projekt der
+' Mediathek und die Loesung mit dem Info-Fenster. Das Studio laeuft als
+' Kind (_hilfen/studiolauf.dh) auf einer Kopie, drueckt F5 und laesst das
+' erzeugte Programm einige Bilder laufen.
+'
+' Das Kapitel zitiert eine Zeile aus dem erzeugten Code und eine Meldung
+' zu einem vertippten Namen -- beide prueft der Fall am echten Ergebnis.
+' Format: docs/werkzeuge.md, dhrt test.
+
+--- langsam
+=== f5 auf mediathek und loesung, die zitierte zeile, der vertippte name
+IMPORT "laeufer.dh"
+SUB kopieren(von AS STRING, nach AS STRING)
+    IF NOT DIREXISTS(nach) THEN MKDIR(nach)
+    DIM n AS STRING
+    FOR EACH n IN DIRLIST(von)
+        IF DIREXISTS(von + "/" + n) THEN
+            IF n <> "_studio" THEN kopieren(von + "/" + n, nach + "/" + n)
+        ELSE
+            COPYFILE(von + "/" + n, nach + "/" + n)
+        END IF
+    NEXT
+END SUB
+
+DIM code AS STRING : code = ARG$(1) + "/buecher/anwendungen/code/"
+DIM proj AS STRING
+FOR EACH proj IN ["kap08/mediathek", "loesungen/kap08_info"]
+    DIM p AS STRING : p = CWD$() + "/" + BASENAME(proj)
+    kopieren(code + proj, p)
+    slZeilen = []
+    slBild = 0
+    slHin(10, 10)
+    slWarten(10)
+    slTaste(294)
+    slWarten(150)
+    slAufnahmeSchreiben(CWD$() + "/ev.txt")
+    SETENV("DH_STUDIO_LAUF_BILDER", "20")
+    DIM log AS STRING : log = CWD$() + "/" + BASENAME(proj) + ".log"
+    DIM aus AS STRING : aus = slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+    PRINT BASENAME(proj); " geprueft "; slHat(log, "geprueft 0 0"); " beendet "; slHat(log, "beendet 0")
+    IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+NEXT
+
+' Die Zeile, die das Kapitel unter "Was das Studio erzeugt" zitiert.
+DIM basis AS STRING : basis = CWD$() + "/mediathek/_studio/Hauptfenster_basis.dh"
+DIM zeile AS STRING : zeile = "IF GUI_CLICKED(Self.knopfAufnehmen) THEN Self.knopfAufnehmen_Klick()"
+DIM da AS BOOLEAN : da = FALSE
+IF FILEEXISTS(basis) THEN da = INSTR(READALL(basis), zeile) >= 0
+PRINT "zeile "; da
+
+' Der vertippte Name aus "Was schiefgehen kann": dieselbe Meldung, die
+' das Buch abdruckt (dort an Leerzeichen umbrochen).
+DIM hf AS STRING : hf = CWD$() + "/mediathek/_studio/projekt/Hauptfenster.dh"
+' Ohne erzeugtes Programm (ein Fehler hielt den Start an) ist nichts zu
+' pruefen -- die Zeilen oben sagen schon, warum.
+IF NOT FILEEXISTS(hf) THEN
+    PRINT "meldung FALSE"
+    EXIT(0)
+END IF
+DIM t AS STRING : t = READALL(hf)
+WRITEALL(hf, REPLACE$(t, "TRIM$(GUI_TEXT(Self.feldTitel))", "TRIM$(GUI_TEXT(Self.feldTitle))"))
+DIM c AS INTEGER : c = PROCESS_START("dhrt", "--check", CWD$() + "/mediathek/_studio/main.dh")
+DIM cz AS STRING : cz = ""
+DIM leer AS INTEGER : leer = 0
+WHILE leer < 5
+    DIM ct AS STRING : ct = PROCESS_READ$(c)
+    IF ct <> "" THEN
+        cz = cz + ct
+        leer = 0
+    ELSEIF NOT PROCESS_RUNNING(c) THEN
+        leer = leer + 1
+        SLEEP(30)
+    END IF
+WEND
+DIM meldung AS STRING
+meldung = "HAUPTFENSTER hat kein Mitglied 'feldtitle' -- weder HAUPTFENSTER selbst noch eine ihrer Eltern- oder Kindklassen. Dieses Feld gibt es nicht, der Zugriff bricht beim Laufen ab. Meintest du 'feldtitel'?"
+PRINT "meldung "; INSTR(cz, meldung) >= 0
+IF INSTR(cz, meldung) < 0 THEN PRINT cz
+--- argumente
+{sammlung}/../../../studio/studio.dh
+{sammlung}/../../..
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- erwartet
+mediathek geprueft TRUE beendet TRUE
+kap08_info geprueft TRUE beendet TRUE
+zeile TRUE
+meldung TRUE

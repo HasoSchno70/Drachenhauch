@@ -1,0 +1,26 @@
+' Loesung zu Kapitel 0, Erweitern: ein zweiter, kleinerer Ring innen,
+' der sich andersherum dreht.
+' Die Stellen, die neu sind, stehen zwischen >>> und <<<.
+SCREEN(800, 500, "Farbkreis")
+DIM drehung AS FLOAT
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
+    drehung = drehung + 40 * DELTA()
+    CLS(RGB(8, 10, 24))
+    DIM i AS INTEGER
+    FOR i = 0 TO 11
+        DIM w AS FLOAT : w = RAD(drehung + i * 30)
+        DIM x AS FLOAT : x = 400 + COS(w) * 160
+        DIM y AS FLOAT : y = 250 + SIN(w) * 160
+        DIM r AS FLOAT : r = 30 + SIN(RAD(drehung * 3 + i * 30)) * 12
+        CIRCLE(x, y, r, HSV(i * 30, 0.8, 1.0))
+    NEXT
+    ' >>> neu
+    FOR i = 0 TO 11
+        DIM wi AS FLOAT : wi = RAD(-drehung * 2 + i * 30)
+        DIM xi AS FLOAT : xi = 400 + COS(wi) * 80
+        DIM yi AS FLOAT : yi = 250 + SIN(wi) * 80
+        CIRCLE(xi, yi, 14, HSV(i * 30 + 180, 0.6, 1.0))
+    NEXT
+    ' <<< neu
+    FLIP()
+WEND

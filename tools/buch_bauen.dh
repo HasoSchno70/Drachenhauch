@@ -569,8 +569,12 @@ SELECT CASE name
         basis = "Drachenhauch-Buch" : mitSprache = FALSE : genau = FALSE
     CASE "tippspiel"
         basis = "Drachenhauch-Tippspiel" : mitSprache = FALSE : genau = FALSE
+    CASE "wunder"
+        IF sprache = "de" THEN basis = "Drachenhauch-Wunder"
+    CASE "anwendungen"
+        IF sprache = "de" THEN basis = "Drachenhauch-Anwendungen"
     CASE ELSE
-        PRINT "Unbekanntes Buch: "; name; " (buecher/referenz, buecher/einstieg, buecher/galaga, buecher/tippspiel)"
+        PRINT "Unbekanntes Buch: "; name; " (buecher/referenz, buecher/einstieg, buecher/galaga, buecher/tippspiel, buecher/wunder, buecher/anwendungen)"
         EXIT(2)
 END SELECT
 IF basis = "" THEN

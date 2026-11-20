@@ -1,0 +1,4 @@
+' Bild fuer Kapitel 5: das ganze Feuerwerk, mit fester Saat, damit
+' das Bild bei jedem Bau dasselbe ist.
+RANDOMIZE(11)
+IMPORT "../../code/kap05/3_feuerwerk.dh"

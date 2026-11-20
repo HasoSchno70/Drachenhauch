@@ -1,0 +1,4 @@
+' Bild fuer Kapitel 1: die Mediathek nach einem Klick auf
+' "Aufnehmen" mit leerem Feld. Die Aufnahme daneben klickt in
+' Fensterpixeln, also mal SKALIERUNG (2) aus shoot.dh.
+IMPORT "../../code/kap01/3_mediathek.dh"

@@ -880,7 +880,7 @@ wie auf das Fenster — für Spiegel, Minikarten, Bild-im-Bild oder Nachzieheffe
 |---|---|
 | `RENDERTARGET_NEW(w, h [, keep])` → INTEGER | Ziel anlegen. `keep = TRUE` lässt den Inhalt über das Bild hinaus stehen — die Voraussetzung für Schweife |
 | `RENDERTARGET_BEGIN(target)` | ab jetzt dorthin zeichnen |
-| `RENDERTARGET_END()` | zurück auf das Fenster |
+| `RENDERTARGET_END()` | zurück auf das Fenster -- fehlt es vor `FLIP`, hält FLIP mit einer Meldung an (sonst ginge das ganze Bild ins Ziel) |
 | `RENDERTARGET_DRAW(rt, x, y [, scale [, tint [, mirrored]]])` | das Ziel wie ein Bild aufs Fenster stempeln |
 | `RENDERTARGET_CLEAR(rt [, color])` | von Hand leeren — nötig, wenn `behalten` an ist |
 | `RENDERTARGET_IMAGE(rt)` → IMAGE | der Inhalt als Bild — was seit `RENDERTARGET_BEGIN` gezeichnet wurde, wird dafür **sofort** abgespielt, nicht erst beim `FLIP`. So kommt ein Diagramm in ein PDF (`PDF_IMAGE`) oder eine Datei (`IMAGE_SAVE`) |

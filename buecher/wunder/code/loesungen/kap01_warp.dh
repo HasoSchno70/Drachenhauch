@@ -1,0 +1,59 @@
+' Loesung zu Kapitel 1, Erweitern 2: solange die Leertaste gedrueckt
+' ist, fliegen wir sechsmal so schnell -- mit Anlauf und Auslauf.
+' Die Stellen, die neu sind, stehen zwischen >>> und <<<.
+CONST ANZAHL = 400
+CONST BRENNWEITE = 300.0
+CONST TIEFE = 1000
+CONST TEMPO = 250.0
+
+DIM sx[ANZAHL] AS FLOAT
+DIM sy[ANZAHL] AS FLOAT
+DIM sz[ANZAHL] AS FLOAT
+
+' Ein Stern an einer zufaelligen Stelle, z frei waehlbar.
+SUB neuerStern(i AS INTEGER, z AS FLOAT)
+    sx[i] = RANDINT(-400, 400)
+    sy[i] = RANDINT(-250, 250)
+    sz[i] = z
+END SUB
+
+DIM i AS INTEGER
+FOR i = 0 TO ANZAHL - 1
+    neuerStern(i, RANDINT(1, TIEFE))
+NEXT
+
+SCREEN(800, 500, "Sternenflug")
+' >>> neu
+DIM flug AS FLOAT : flug = TEMPO
+' <<< neu
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
+    DIM dt AS FLOAT : dt = DELTA()
+    ' >>> neu
+    ' Das Ziel springt, flug folgt ihm in etwa einer halben Sekunde.
+    ' (flug, nicht tempo: das hiesse wie die CONST TEMPO.)
+    DIM ziel AS FLOAT : ziel = TEMPO
+    IF KEY_DOWN(KEY_SPACE) THEN ziel = TEMPO * 6
+    flug = flug + (ziel - flug) * MIN(1.0, 4 * dt)
+    ' <<< neu
+    CLS(RGB(0, 0, 0))
+    FOR i = 0 TO ANZAHL - 1
+        ' >>> neu
+        sz[i] = sz[i] - flug * dt
+        ' <<< neu
+        IF sz[i] < 1 THEN neuerStern(i, sz[i] + TIEFE)
+        DIM px AS FLOAT : px = 400 + sx[i] * BRENNWEITE / sz[i]
+        DIM py AS FLOAT : py = 250 + sy[i] * BRENNWEITE / sz[i]
+        ' Nah heisst: z klein. naehe ist 0 ganz hinten, 1 ganz vorn.
+        DIM naehe AS FLOAT : naehe = 1 - sz[i] / TIEFE
+        DIM hell AS INTEGER : hell = INT(60 + naehe * 195)
+        ' Der Schweif reicht bis dorthin, wo der Stern vor einem kurzen
+        ' Moment war: dieselbe Rechnung mit einem groesseren z.
+        ' >>> neu
+        DIM hz AS FLOAT : hz = sz[i] + flug * 0.15
+        ' <<< neu
+        DIM hx AS FLOAT : hx = 400 + sx[i] * BRENNWEITE / hz
+        DIM hy AS FLOAT : hy = 250 + sy[i] * BRENNWEITE / hz
+        LINEW(hx, hy, px, py, 0.5 + naehe * 3, RGB(hell, hell, hell))
+    NEXT
+    FLIP()
+WEND

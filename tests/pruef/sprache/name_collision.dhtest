@@ -235,3 +235,33 @@ END IF
 --- fehler
 Namens-Kollision: 'modus' ist zugleich eine Variable und eine CONST -- das geht nicht, weil Drachenhauch Gross-/Kleinschreibung ignoriert. Benenne eines um.
 
+
+=== zuweisung an eine konstante faellt vor dem start auf
+' Bis 2026-11-19 erst beim Laufen ("CONST kann nicht ueberschrieben
+' werden"), und --check schwieg. Jetzt ein Fehler beim Uebersetzen: das
+' PRINT davor laeuft nicht mehr. Eine lokale Variable, ein Parameter oder
+' ein Feld gleichen Namens verdeckt die Konstante (dort bleibt es erlaubt).
+CONST RADIUS = 220
+PRINT "vorher"
+RADIUS = 300
+--- fehler
+fall.dh:7: Compile-Fehler: Zuweisung an die Konstante 'radius'
+
+=== verdeckt durch parameter oder lokale variable bleibt die zuweisung erlaubt
+CONST RADIUS = 220
+FUNCTION doppelt(radius AS FLOAT) AS FLOAT
+    radius = radius * 2
+    RETURN radius
+END FUNCTION
+SUB lokal()
+    DIM radius AS INTEGER
+    radius = 5
+    PRINT radius
+END SUB
+PRINT doppelt(3)
+lokal()
+PRINT RADIUS
+--- erwartet
+6.0
+5
+220

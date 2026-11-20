@@ -1,0 +1,44 @@
+' Bild fuer Kapitel 4: wo 0 Grad ist. Links die Uhr: 0 oben, im
+' Uhrzeigersinn. Rechts SIN und COS auf dem Bildschirm: 0 rechts, und
+' weil y nach unten waechst, ebenfalls im Uhrzeigersinn. Der Unterschied
+' ist eine Vierteldrehung -- daher RAD(grad - 90).
+SCREEN(800, 440, "Winkel")
+DIM bild AS INTEGER
+FOR bild = 1 TO 3
+    CLS(RGB(250, 250, 248))
+    DIM tinte AS INTEGER : tinte = RGB(40, 40, 50)
+    DIM blau AS INTEGER : blau = RGB(60, 110, 190)
+    DIM rot AS INTEGER : rot = RGB(200, 70, 60)
+    DIM k AS INTEGER
+    FOR k = 0 TO 1
+        DIM mx AS INTEGER : mx = 180 + k * 440
+        CIRCLE_OUTLINE(mx, 200, 120, tinte)
+        DIM g AS INTEGER
+        FOR g = 0 TO 270 STEP 90
+            ' k = 0: Uhrwinkel (0 oben), k = 1: Bildschirmwinkel (0 rechts)
+            DIM w AS FLOAT : w = RAD(g - IIF(k = 0, 90, 0))
+            DIM px AS FLOAT : px = mx + COS(w) * 120
+            DIM py AS FLOAT : py = 200 + SIN(w) * 120
+            CIRCLE(px, py, 6, IIF(g = 0, rot, blau))
+            DIM s AS STRING : s = STR$(g) + " Grad"
+            ' Oben und unten mittig neben den Punkt, links und rechts
+            ' darueber, nach aussen geschoben.
+            DIM tx AS FLOAT : tx = px - TEXT_WIDTH(s) / 2
+            DIM ty AS FLOAT : ty = py + SIN(w) * 26 - 9
+            IF ABS(COS(w)) > 0.5 THEN
+                ty = py - 38
+                tx = IIF(COS(w) > 0, px - 20, px - TEXT_WIDTH(s) + 20)
+            END IF
+            TEXT(tx, ty, s, IIF(g = 0, rot, tinte))
+        NEXT
+        ' Ein Pfeil fuer die Drehrichtung
+        DIM a AS FLOAT
+        FOR a = 20 TO 70 STEP 2
+            DIM wa AS FLOAT : wa = RAD(a - IIF(k = 0, 90, 0))
+            CIRCLE(mx + COS(wa) * 92, 200 + SIN(wa) * 92, 2, blau)
+        NEXT
+    NEXT
+    TEXT(130, 405, "auf der Uhr", tinte)
+    TEXT(500, 405, "SIN und COS auf dem Bildschirm", tinte)
+    FLIP()
+NEXT

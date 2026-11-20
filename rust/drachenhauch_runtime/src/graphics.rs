@@ -1292,6 +1292,10 @@ pub struct Graphics {
     zoom_rt: Option<(usize, i32, i32)>,
     zoom_vorher: Option<Option<usize>>,
     active_rt: Option<usize>,
+    /// Hat das PROGRAMM ein Render-Ziel begonnen (RENDERTARGET_BEGIN) und noch
+    /// nicht beendet? Getrennt von `active_rt`, das auch native Fenster und
+    /// die Lupe setzen -- FLIP fragt nur nach dem, was das Programm vergass.
+    pub rt_vom_programm: bool,
     clear_color: Color,
     // Transparenter Fenster-Framebuffer (SCREEN_TRANSPARENT): der Desktop scheint
     // dort durch, wo mit Alpha < 255 gecleart/gezeichnet wird. Steuert, ob CLS das
@@ -2270,6 +2274,7 @@ impl Graphics {
             zoom_rt: None,
             zoom_vorher: None,
             active_rt: None,
+            rt_vom_programm: false,
             // Transparente Fenster starten voll durchsichtig (Alpha 0), normale deckend schwarz.
             clear_color: if transparent { Color::new(0, 0, 0, 0) } else { Color::BLACK },
             transparent,
@@ -2788,9 +2793,10 @@ impl Graphics {
     pub fn rendertarget_begin(&mut self, idx: i64) -> Result<(), String> {
         let i = self.check_rt(idx, "RENDERTARGET_BEGIN")?;
         self.active_rt = Some(i);
+        self.rt_vom_programm = true;
         Ok(())
     }
-    pub fn rendertarget_end(&mut self) { self.active_rt = None; }
+    pub fn rendertarget_end(&mut self) { self.active_rt = None; self.rt_vom_programm = false; }
 
     /// RENDERTARGET_IMAGE(rt): der Inhalt eines Render-Targets als IMAGE --
     /// was seit RENDERTARGET_BEGIN aufgezeichnet ist, wird dafuer SOFORT

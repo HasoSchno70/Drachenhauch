@@ -1,0 +1,4 @@
+DIM a AS INTEGER : a = 255
+DIM halb AS INTEGER
+halb = a / 2
+PRINT halb

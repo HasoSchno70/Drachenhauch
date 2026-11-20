@@ -1,0 +1,51 @@
+' Loesung zu Kapitel 1, Erweitern 1: ferne Sterne sind kraeftig blau,
+' nahe fast weiss.
+' Die Stellen, die neu sind, stehen zwischen >>> und <<<.
+CONST ANZAHL = 400
+CONST BRENNWEITE = 300.0
+CONST TIEFE = 1000
+CONST TEMPO = 250.0
+
+DIM sx[ANZAHL] AS FLOAT
+DIM sy[ANZAHL] AS FLOAT
+DIM sz[ANZAHL] AS FLOAT
+
+' Ein Stern an einer zufaelligen Stelle, z frei waehlbar.
+SUB neuerStern(i AS INTEGER, z AS FLOAT)
+    sx[i] = RANDINT(-400, 400)
+    sy[i] = RANDINT(-250, 250)
+    sz[i] = z
+END SUB
+
+DIM i AS INTEGER
+FOR i = 0 TO ANZAHL - 1
+    neuerStern(i, RANDINT(1, TIEFE))
+NEXT
+
+SCREEN(800, 500, "Sternenflug")
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
+    DIM dt AS FLOAT : dt = DELTA()
+    CLS(RGB(0, 0, 0))
+    FOR i = 0 TO ANZAHL - 1
+        sz[i] = sz[i] - TEMPO * dt
+        IF sz[i] < 1 THEN neuerStern(i, sz[i] + TIEFE)
+        DIM px AS FLOAT : px = 400 + sx[i] * BRENNWEITE / sz[i]
+        DIM py AS FLOAT : py = 250 + sy[i] * BRENNWEITE / sz[i]
+        ' Nah heisst: z klein. naehe ist 0 ganz hinten, 1 ganz vorn.
+        DIM naehe AS FLOAT : naehe = 1 - sz[i] / TIEFE
+        DIM hell AS INTEGER : hell = INT(60 + naehe * 195)
+        ' Der Schweif reicht bis dorthin, wo der Stern vor einem kurzen
+        ' Moment war: dieselbe Rechnung mit einem groesseren z.
+        DIM hz AS FLOAT : hz = sz[i] + TEMPO * 0.15
+        DIM hx AS FLOAT : hx = 400 + sx[i] * BRENNWEITE / hz
+        DIM hy AS FLOAT : hy = 250 + sy[i] * BRENNWEITE / hz
+        ' >>> neu
+        ' Blau (Farbton 220), das mit der Naehe blasser wird: weit weg
+        ' kraeftig blau, ganz vorn fast weiss.
+        DIM satt AS FLOAT : satt = 0.7 * (1 - naehe)
+        DIM farbe AS INTEGER : farbe = HSV(220, satt, hell / 255)
+        LINEW(hx, hy, px, py, 0.5 + naehe * 3, farbe)
+        ' <<< neu
+    NEXT
+    FLIP()
+WEND

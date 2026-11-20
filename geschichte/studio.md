@@ -571,3 +571,16 @@ Datenbank-Element importiert es schon).
   heisst `studioLaufApp`, weil das erzeugte main.dh schon `studioDieApp`
   anlegt.
 
+- **Enter- und Esc-Knopf beim Namen (2026-11-19, beim Probekapitel des
+  Buchs "Fenster, Formulare, Daten").** Die Vorlage "Formular" trug
+  `default_button: 9`/`cancel_button: 10` als Nummer, wie GUI_SAVE sie
+  schreibt; das Studio kennt die Knoepfe aber nur beim Namen
+  (`studio_standard`/`studio_abbrechen`). Der Inspektor zeigte darum
+  "(keiner)", und das erzeugte Programm drueckte ueber die Nummer, die
+  verrutscht, sobald ein Widget davor geloescht wird. `knoepfeBeimNamen`
+  in `projektLaden$` macht beim Laden aus der Nummer den Namen (ein Name,
+  der schon dasteht, gewinnt; eine Nummer ins Leere faellt weg) und nimmt
+  die Nummer heraus; die Vorlagen (deutsch und englisch) tragen jetzt
+  Namen. Fall in `werkzeug_studio2.dhtest`, Gegenprobe: ohne den Aufruf
+  "standard -". Gefunden beim Aufnehmen eines Bildes, nicht von einer
+  Pruefung -- die Vorlagen-Faelle pruefen nur, dass das Programm laeuft.

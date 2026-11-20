@@ -1,0 +1,185 @@
+' Bilder aus Drachenhauch Studio fuer das Buch "Fenster, Formulare, Daten".
+'
+' Das Studio laeuft als Kind mit fester Groesse (DH_STUDIO_GROESSE), einer
+' eigenen studio.json (DH_STUDIO_KONFIG, sonst schriebe jeder Lauf dem
+' Nutzer eine Sitzung) und auf einer KOPIE des Projekts aus ../code --
+' F5 legt _studio/ an, und das gehoert nicht ins Buch. Wo eine Bedienung
+' noetig ist (ein Dialog, ein Reiter), spielt das Studio eine kleine
+' Aufnahme ab (DH_STUDIO_AUFNAHME). Format: "e BILD ART P0 P1 0 0", Maus
+' 7 = hin, 6 = Taste runter, 5 = hoch; Tasten 2 = runter, 1 = hoch.
+'
+' Die Lagen der Klicks (Navigator, Controls) gelten fuer 1280x800 und die
+' Projekte unter ../code. Aendert sich das Studio, zeigt das Bild etwas
+' anderes -- darum alle Bilder nach jeder Fassung neu ziehen und ansehen.
+'
+'     dhrt run buecher/anwendungen/buch/studio_bilder.dh [-- name ...]
+IMPORT "imgfx"
+
+CONST GROESSE = "1280x800"
+CONST BILDER_STUDIO = 60
+DIM hier AS STRING : hier = CWD$()
+DIM wurzel AS STRING : wurzel = hier + "/../../.."
+DIM studio AS STRING : studio = wurzel + "/studio/studio.dh"
+DIM bilder AS STRING : bilder = hier + "/images"
+DIM arbeit AS STRING : arbeit = hier + "/_studio_bilder"
+
+SUB ordnerKopieren(von AS STRING, nach AS STRING)
+    IF NOT DIREXISTS(nach) THEN MKDIR(nach)
+    DIM n AS STRING
+    FOR EACH n IN DIRLIST(von)
+        IF DIREXISTS(von + "/" + n) THEN
+            ordnerKopieren(von + "/" + n, nach + "/" + n)
+        ELSE
+            COPYFILE(von + "/" + n, nach + "/" + n)
+        END IF
+    NEXT
+END SUB
+
+SUB ordnerWeg(pfad AS STRING)
+    IF NOT DIREXISTS(pfad) THEN RETURN
+    DIM n AS STRING
+    FOR EACH n IN DIRLIST(pfad)
+        IF DIREXISTS(pfad + "/" + n) THEN ordnerWeg(pfad + "/" + n) ELSE DELETEFILE(pfad + "/" + n)
+    NEXT
+    RMDIR(pfad)
+END SUB
+
+' Eine frische Kopie des Projekts aus ../code/<rel>.
+FUNCTION projekt$(rel AS STRING) AS STRING
+    DIM ziel AS STRING : ziel = arbeit + "/" + BASENAME(rel)
+    ordnerWeg(ziel)
+    ordnerKopieren(hier + "/../code/" + rel, ziel)
+    RETURN ziel
+END FUNCTION
+
+FUNCTION aufnahme$(name AS STRING, zeilen AS ARRAY OF STRING) AS STRING
+    DIM p AS STRING : p = arbeit + "/" + name + ".txt"
+    WRITEALL(p, "c " + STR$(LEN(zeilen)) + CHR$(10) + JOIN$(zeilen, CHR$(10)) + CHR$(10))
+    RETURN p
+END FUNCTION
+
+' Laeuft ein Kind bis zum Ende; liefert seine Ausgabe.
+FUNCTION laufen$(p AS INTEGER) AS STRING
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    WHILE leer < 5
+        DIM t AS STRING : t = PROCESS_READ$(p) + PROCESS_ERR$(p)
+        aus = aus + t
+        IF t = "" AND NOT PROCESS_RUNNING(p) THEN leer = leer + 1
+        SLEEP(20)
+    WEND
+    RETURN aus
+END FUNCTION
+
+' Das Studio mit einem Projekt, `bilder` Bilder lang; am Ende ein Bild.
+SUB studioBild(name AS STRING, proj AS STRING, oeffnen AS STRING, ev AS STRING, n AS INTEGER)
+    SETENV("DH_STUDIO_KONFIG", arbeit + "/studio.json")
+    SETENV("DH_STUDIO_GROESSE", GROESSE)
+    SETENV("DH_STUDIO_OEFFNEN", oeffnen)
+    SETENV("DH_STUDIO_AUFNAHME", ev)
+    SETENV("DH_STUDIO_LAUF_BILDER", "3")
+    ' PROCESS_START nimmt Kindern DHRT_FRAMES/DHRT_SCREENSHOT ab -- darum
+    ' `dhrt bild`, das beides selbst setzt.
+    DIM ziel AS STRING : ziel = bilder + "/" + name + ".png"
+    IF FILEEXISTS(ziel) THEN DELETEFILE(ziel)
+    DIM p AS INTEGER : p = PROCESS_START("dhrt", "bild", studio, ziel, STR$(n), "--", proj)
+    DIM aus AS STRING : aus = laufen$(p)
+    IF FILEEXISTS(bilder + "/" + name + ".png") THEN
+        PRINT "  "; name; ".png"
+    ELSE
+        PRINT "  FEHLER "; name; " "; LEFT$(TRIM$(aus), 300)
+        EXIT(1)
+    END IF
+END SUB
+
+' Ein Ausschnitt statt des ganzen Studios: ein Dialog in der Mitte waere
+' auf der Buchseite sonst briefmarkengross.
+SUB zuschneiden(name AS STRING, x AS INTEGER, y AS INTEGER, w AS INTEGER, h AS INTEGER)
+    DIM p AS STRING : p = bilder + "/" + name + ".png"
+    DIM b AS IMAGE : b = IMAGE_LOAD(p)
+    IMAGE_SAVE(IMAGE_CROP(b, x, y, w, h), p)
+END SUB
+
+IF NOT DIREXISTS(arbeit) THEN MKDIR(arbeit)
+IF NOT DIREXISTS(bilder) THEN MKDIR(bilder)
+DIM ohne AS ARRAY OF INTEGER : ohne = []
+
+' Ein Klick an (x, y) ab Bild b: hin, Taste runter, hoch.
+SUB klick(z AS ARRAY OF STRING, b AS INTEGER, x AS INTEGER, y AS INTEGER)
+    ARRAY_PUSH(z, "e " + STR$(b) + " 7 " + STR$(x) + " " + STR$(y) + " 0 0")
+    ARRAY_PUSH(z, "e " + STR$(b + 2) + " 7 " + STR$(x) + " " + STR$(y) + " 0 0")
+    ARRAY_PUSH(z, "e " + STR$(b + 3) + " 6 0 0 0 0")
+    ARRAY_PUSH(z, "e " + STR$(b + 5) + " 5 0 0 0 0")
+END SUB
+
+' Eine Taste ab Bild b, mit gehaltenen Umschaltern (341 Strg, 340 Umschalt).
+SUB taste(z AS ARRAY OF STRING, b AS INTEGER, halten AS ARRAY OF INTEGER, code AS INTEGER)
+    DIM h AS INTEGER
+    FOR EACH h IN halten
+        ARRAY_PUSH(z, "e " + STR$(b) + " 2 " + STR$(h) + " 0 0 0")
+    NEXT
+    ARRAY_PUSH(z, "e " + STR$(b + 2) + " 2 " + STR$(code) + " 0 0 0")
+    ARRAY_PUSH(z, "e " + STR$(b + 4) + " 1 " + STR$(code) + " 0 0 0")
+    FOR EACH h IN halten
+        ARRAY_PUSH(z, "e " + STR$(b + 6) + " 1 " + STR$(h) + " 0 0 0")
+    NEXT
+END SUB
+
+DIM nur AS ARRAY OF STRING : nur = []
+DIM a AS INTEGER
+FOR a = 0 TO ARGC() - 1
+    ARRAY_PUSH(nur, ARG$(a))
+NEXT
+FUNCTION gewuenscht(name AS STRING) AS BOOLEAN
+    RETURN LEN(nur) = 0 OR ARRAY_INDEXOF(nur, name) >= 0
+END FUNCTION
+
+DIM m AS STRING
+DIM z AS ARRAY OF STRING
+
+' Kapitel 8: der Entwurf der Mediathek, ohne Bedienung.
+IF gewuenscht("kap08_entwurf") THEN
+    m = projekt$("kap08/mediathek")
+    studioBild("kap08_entwurf", m, "Hauptfenster", "", BILDER_STUDIO)
+END IF
+
+' Kapitel 8: Strg+Umschalt+N fragt, womit ein neues Projekt anfaengt.
+IF gewuenscht("kap08_neu") THEN
+    m = projekt$("kap08/mediathek")
+    z = ["e 0 7 640 400 0 0"]
+    taste(z, 20, [341, 340], 78)   ' N
+    studioBild("kap08_neu", m, "", aufnahme$("neu", z), BILDER_STUDIO)
+    zuschneiden("kap08_neu", 372, 192, 536, 416)
+END IF
+
+' Kapitel 8: ein Klick auf "Klick" im Navigator oeffnet den Code.
+IF gewuenscht("kap08_code") THEN
+    m = projekt$("kap08/mediathek")
+    z = []
+    klick(z, 20, 113, 253)
+    studioBild("kap08_code", m, "Hauptfenster", aufnahme$("code", z), BILDER_STUDIO)
+END IF
+
+' Kapitel 8: F5 erzeugt _studio/ und startet; das Bild zeigt danach das
+' erzeugte Programm selbst, nach einem Klick auf "Aufnehmen" mit leerem
+' Feld.
+IF gewuenscht("kap08_laeuft") THEN
+    m = projekt$("kap08/mediathek")
+    z = ["e 0 7 640 400 0 0"]
+    taste(z, 20, ohne, 294)   ' F5 -- raylibs Code, nicht KEY_F5
+    studioBild("_kap08_f5", m, "Hauptfenster", aufnahme$("f5", z), 70)
+    IF NOT FILEEXISTS(m + "/_studio/main.dh") THEN
+        PRINT "  FEHLER kap08_laeuft: F5 hat _studio/main.dh nicht erzeugt"
+        EXIT(1)
+    END IF
+    z = ["e 0 7 435 34 0 0"]
+    klick(z, 10, 435, 34)
+    SETENV("DHRT_ABSPIELEN", aufnahme$("klick", z))
+    DIM ziel AS STRING : ziel = bilder + "/kap08_laeuft.png"
+    DIM pl AS INTEGER : pl = PROCESS_START("dhrt", "bild", m + "/_studio/main.dh", ziel, "40")
+    DIM aus AS STRING : aus = laufen$(pl)
+    SETENV("DHRT_ABSPIELEN", "")
+    IF FILEEXISTS(ziel) THEN PRINT "  kap08_laeuft.png" ELSE PRINT "  FEHLER kap08_laeuft "; LEFT$(aus, 300)
+    IF FILEEXISTS(bilder + "/_kap08_f5.png") THEN DELETEFILE(bilder + "/_kap08_f5.png")
+END IF
+PRINT "fertig"

@@ -985,6 +985,14 @@ FUNCTION tr$(t AS STRING) AS STRING
     RETURN t
 END FUNCTION
 
+' Mit Einzahl: ein deutsches Wort wie "Fehler" ist Ein- und Mehrzahl, das
+' englische nicht ("1 errors"). Bei n = 1 gilt ein eigener Eintrag
+' "text|1" der Tafel, wenn es ihn gibt; sonst wie tr$.
+FUNCTION trn$(t AS STRING, n AS INTEGER) AS STRING
+    IF englisch AND n = 1 AND MAPHAS(uebersetzung, t + "|1") THEN RETURN MAPGET(uebersetzung, t + "|1")
+    RETURN tr$(t)
+END FUNCTION
+
 ' Kuerzel fuer die Anzeige: auf Englisch "Ctrl+Shift+Down" statt
 ' "Strg+Umschalt+Runter". Die Laufzeit versteht beide Schreibweisen.
 FUNCTION kz$(k AS STRING) AS STRING

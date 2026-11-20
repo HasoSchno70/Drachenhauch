@@ -1,0 +1,55 @@
+' Kapitel 5, Schritt 2 -- viele Funken in einem Feld. Alle zwei
+' Sekunden stieben hundert davon aus der Mitte, ein Mausklick
+' setzt eine Explosion dorthin, wo die Maus steht.
+CONST SCHWERE = 120.0
+
+STRUCT Funke
+    DIM x AS FLOAT
+    DIM y AS FLOAT
+    DIM vx AS FLOAT
+    DIM vy AS FLOAT
+    DIM leben AS FLOAT
+END STRUCT
+
+DIM funken AS ARRAY OF Funke
+
+SUB explosion(x AS FLOAT, y AS FLOAT)
+    DIM i AS INTEGER
+    FOR i = 1 TO 100
+        DIM f AS Funke
+        DIM winkel AS FLOAT : winkel = RND() * 2 * PI
+        DIM tempo AS FLOAT : tempo = 40 + RND() * 140
+        f.x = x
+        f.y = y
+        f.vx = COS(winkel) * tempo
+        f.vy = SIN(winkel) * tempo
+        f.leben = 1.5
+        ARRAY_PUSH(funken, f)
+    NEXT
+END SUB
+
+SCREEN(800, 500, "Viele Funken")
+DIM uhr AS FLOAT : uhr = 0
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
+    DIM dt AS FLOAT : dt = DELTA()
+    uhr = uhr - dt
+    IF uhr <= 0 THEN
+        explosion(400, 200)
+        uhr = 2
+    END IF
+    IF MOUSE_HIT(0) THEN explosion(MOUSE_X(), MOUSE_Y())
+    DIM i AS INTEGER
+    FOR i = LEN(funken) - 1 TO 0 STEP -1
+        funken[i].vy = funken[i].vy + SCHWERE * dt
+        funken[i].x = funken[i].x + funken[i].vx * dt
+        funken[i].y = funken[i].y + funken[i].vy * dt
+        funken[i].leben = funken[i].leben - dt
+        IF funken[i].leben <= 0 THEN ARRAY_REMOVE_AT(funken, i)
+    NEXT
+    CLS(RGB(8, 10, 24))
+    FOR i = 0 TO LEN(funken) - 1
+        CIRCLE(INT(funken[i].x), INT(funken[i].y), 2, RGB(255, 220, 120))
+    NEXT
+    TEXT(10, 10, "Funken: " + STR$(LEN(funken)), RGB(120, 130, 160))
+    FLIP()
+WEND

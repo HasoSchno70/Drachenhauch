@@ -1,0 +1,65 @@
+' Loesung zu Kapitel 1, Erfinden: das ganze Sternenfeld dreht sich um
+' die Blickachse -- ein Flug durch einen Wirbel.
+' Die Stellen, die neu sind, stehen zwischen >>> und <<<.
+CONST ANZAHL = 400
+CONST BRENNWEITE = 300.0
+CONST TIEFE = 1000
+CONST TEMPO = 250.0
+
+DIM sx[ANZAHL] AS FLOAT
+DIM sy[ANZAHL] AS FLOAT
+DIM sz[ANZAHL] AS FLOAT
+
+' Ein Stern an einer zufaelligen Stelle, z frei waehlbar.
+SUB neuerStern(i AS INTEGER, z AS FLOAT)
+    sx[i] = RANDINT(-400, 400)
+    sy[i] = RANDINT(-250, 250)
+    sz[i] = z
+END SUB
+
+DIM i AS INTEGER
+FOR i = 0 TO ANZAHL - 1
+    neuerStern(i, RANDINT(1, TIEFE))
+NEXT
+
+SCREEN(800, 500, "Sternenflug")
+' >>> neu
+DIM drehung AS FLOAT
+' <<< neu
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
+    DIM dt AS FLOAT : dt = DELTA()
+    ' >>> neu
+    drehung = drehung + RAD(20) * dt
+    DIM c AS FLOAT : c = COS(drehung)
+    DIM s AS FLOAT : s = SIN(drehung)
+    ' <<< neu
+    CLS(RGB(0, 0, 0))
+    FOR i = 0 TO ANZAHL - 1
+        sz[i] = sz[i] - TEMPO * dt
+        IF sz[i] < 1 THEN neuerStern(i, sz[i] + TIEFE)
+        ' >>> neu
+        ' Erst um die Blickachse drehen, dann wie gehabt teilen.
+        ' Nahe Sterne werden staerker gedreht: der Wirbel.
+        DIM w AS FLOAT : w = drehung * (2 - sz[i] / TIEFE)
+        DIM rx AS FLOAT : rx = sx[i] * COS(w) - sy[i] * SIN(w)
+        DIM ry AS FLOAT : ry = sx[i] * SIN(w) + sy[i] * COS(w)
+        DIM px AS FLOAT : px = 400 + rx * BRENNWEITE / sz[i]
+        DIM py AS FLOAT : py = 250 + ry * BRENNWEITE / sz[i]
+        ' <<< neu
+        ' Nah heisst: z klein. naehe ist 0 ganz hinten, 1 ganz vorn.
+        DIM naehe AS FLOAT : naehe = 1 - sz[i] / TIEFE
+        DIM hell AS INTEGER : hell = INT(60 + naehe * 195)
+        ' Der Schweif reicht bis dorthin, wo der Stern vor einem kurzen
+        ' Moment war: dieselbe Rechnung mit einem groesseren z.
+        DIM hz AS FLOAT : hz = sz[i] + TEMPO * 0.15
+        ' >>> neu
+        DIM hw AS FLOAT : hw = drehung * (2 - hz / TIEFE)
+        DIM hrx AS FLOAT : hrx = sx[i] * COS(hw) - sy[i] * SIN(hw)
+        DIM hry AS FLOAT : hry = sx[i] * SIN(hw) + sy[i] * COS(hw)
+        DIM hx AS FLOAT : hx = 400 + hrx * BRENNWEITE / hz
+        DIM hy AS FLOAT : hy = 250 + hry * BRENNWEITE / hz
+        ' <<< neu
+        LINEW(hx, hy, px, py, 0.5 + naehe * 3, RGB(hell, hell, hell))
+    NEXT
+    FLIP()
+WEND

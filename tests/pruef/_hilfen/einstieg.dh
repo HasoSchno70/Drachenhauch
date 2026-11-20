@@ -20,6 +20,11 @@ END FUNCTION
 
 ' Die Werkzeuge suchen dhrt unter rust/drachenhauch_runtime/target/release.
 SUB buchWerkzeug(wurzel AS STRING, skript AS STRING)
+    buchWerkzeugIn(wurzel, "einstieg", skript)
+END SUB
+
+' Dasselbe fuer ein anderes Buch unter buecher/ (wunder, anwendungen).
+SUB buchWerkzeugIn(wurzel AS STRING, buch AS STRING, skript AS STRING)
     IF NOT nodeDa() THEN
         PRINT "UEBERSPRINGEN: node fehlt"
         EXIT(0)
@@ -29,5 +34,5 @@ SUB buchWerkzeug(wurzel AS STRING, skript AS STRING)
         PRINT "UEBERSPRINGEN: dhrt nicht gebaut"
         EXIT(0)
     END IF
-    nlStarten(wurzel + "/buecher/einstieg/buch", skript)
+    nlStarten(wurzel + "/buecher/" + buch + "/buch", skript)
 END SUB

@@ -1,0 +1,15 @@
+' Kapitel 1, Schritt 1 -- ein Fenster mit einer Zeile Text.
+IMPORT "gui"
+
+SCREEN(520, 300, "Mediathek", 1)
+DIM fenster AS GUI_WINDOW
+fenster = GUI_WINDOW("Mediathek", 0, 0, 520, 300)
+DIM gruss AS GUI_WIDGET
+gruss = GUI_LABEL(fenster, "Hier entsteht die Mediathek.", 20, 20)
+
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(RGB(32, 36, 44))
+    GUI_DRAW()
+    FLIP()
+WEND

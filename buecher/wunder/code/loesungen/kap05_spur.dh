@@ -1,0 +1,128 @@
+' Loesung zu Kapitel 5, Erweitern 2: die Rakete zieht beim Steigen
+' eine Spur aus kurzlebigen, gelblichen Funken hinter sich her.
+' Die Stellen, die neu sind, stehen zwischen >>> und <<<.
+CONST BREITE = 800
+CONST HOEHE = 500
+CONST SCHWERE = 120.0
+CONST FUNKEN_JE_RAKETE = 140
+
+STRUCT Funke
+    DIM x AS FLOAT
+    DIM y AS FLOAT
+    DIM vx AS FLOAT
+    DIM vy AS FLOAT
+    DIM farbe AS INTEGER
+    DIM leben AS FLOAT
+END STRUCT
+
+STRUCT Rakete
+    DIM x AS FLOAT
+    DIM y AS FLOAT
+    DIM vy AS FLOAT
+    DIM farbton AS FLOAT
+END STRUCT
+
+DIM funken AS ARRAY OF Funke
+DIM raketen AS ARRAY OF Rakete
+
+SUB raketeStarten()
+    DIM r AS Rakete
+    r.x = RANDINT(100, BREITE - 100)
+    r.y = HOEHE
+    r.vy = -RANDINT(230, 300)
+    r.farbton = RANDINT(0, 359)
+    ARRAY_PUSH(raketen, r)
+END SUB
+
+SUB zerplatzen(r AS Rakete)
+    DIM i AS INTEGER
+    FOR i = 1 TO FUNKEN_JE_RAKETE
+        DIM f AS Funke
+        DIM winkel AS FLOAT : winkel = RND() * 2 * PI
+        DIM tempo AS FLOAT : tempo = 40 + RND() * 140
+        f.x = r.x
+        f.y = r.y
+        f.vx = COS(winkel) * tempo
+        f.vy = SIN(winkel) * tempo
+        f.farbe = HSV(r.farbton + RANDINT(-20, 20), 0.8, 1.0)
+        f.leben = 1.2 + RND() * 0.8
+        ARRAY_PUSH(funken, f)
+    NEXT
+END SUB
+
+SUB raketenBewegen(dt AS FLOAT)
+    DIM i AS INTEGER
+    FOR i = LEN(raketen) - 1 TO 0 STEP -1
+        raketen[i].vy = raketen[i].vy + SCHWERE * dt
+        raketen[i].y = raketen[i].y + raketen[i].vy * dt
+        ' >>> neu
+        DIM s AS Funke
+        s.x = raketen[i].x + RND() * 4 - 2
+        s.y = raketen[i].y + 4
+        s.vx = RND() * 20 - 10
+        s.vy = 20 + RND() * 30
+        s.farbe = RGB(255, 200, 120)
+        s.leben = 0.3 + RND() * 0.3
+        ARRAY_PUSH(funken, s)
+        ' <<< neu
+        ' Am hoechsten Punkt (die Rakete faellt wieder) zerplatzt sie.
+        IF raketen[i].vy >= 0 THEN
+            zerplatzen(raketen[i])
+            ARRAY_REMOVE_AT(raketen, i)
+        END IF
+    NEXT
+END SUB
+
+SUB funkenBewegen(dt AS FLOAT)
+    DIM i AS INTEGER
+    FOR i = LEN(funken) - 1 TO 0 STEP -1
+        funken[i].vy = funken[i].vy + SCHWERE * dt
+        funken[i].x = funken[i].x + funken[i].vx * dt
+        funken[i].y = funken[i].y + funken[i].vy * dt
+        funken[i].leben = funken[i].leben - dt
+        IF funken[i].leben <= 0 THEN ARRAY_REMOVE_AT(funken, i)
+    NEXT
+END SUB
+
+SUB zeichnen()
+    CLS(RGB(8, 10, 24))
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(raketen) - 1
+        DIM r AS Rakete : r = raketen[i]
+        CIRCLE(INT(r.x), INT(r.y), 3, HSV(r.farbton, 0.3, 1.0))
+    NEXT
+    FOR i = 0 TO LEN(funken) - 1
+        DIM f AS Funke : f = funken[i]
+        ' Ein Funke verblasst in seiner letzten Sekunde.
+        DIM a AS INTEGER : a = INT(CLAMP(f.leben, 0.0, 1.0) * 255)
+        DIM rot AS INTEGER : rot = RED(f.farbe)
+        DIM gruen AS INTEGER : gruen = GREEN(f.farbe)
+        DIM blau AS INTEGER : blau = BLUE(f.farbe)
+        ' Der Schweif zeigt dorthin, woher der Funke kam: ein Stueck
+        ' gegen seine Geschwindigkeit.
+        DIM sx AS INTEGER : sx = INT(f.x - f.vx * 0.08)
+        DIM sy AS INTEGER : sy = INT(f.y - f.vy * 0.08)
+        DIM x AS INTEGER : x = INT(f.x)
+        DIM y AS INTEGER : y = INT(f.y)
+        LINEW(sx, sy, x, y, 2, RGBA(rot, gruen, blau, a \ 2))
+        CIRCLE(x, y, 6, RGBA(rot, gruen, blau, a \ 6))
+        CIRCLE(x, y, 2, RGBA(255, 255, 255, a))
+    NEXT
+    TEXT(10, 10, "Leertaste: noch eine Rakete", RGB(120, 130, 160))
+    FLIP()
+END SUB
+
+SCREEN(BREITE, HOEHE, "Feuerwerk")
+DIM bisZurNaechsten AS FLOAT : bisZurNaechsten = 0
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
+    DIM dt AS FLOAT : dt = DELTA()
+    bisZurNaechsten = bisZurNaechsten - dt
+    IF bisZurNaechsten <= 0 THEN
+        raketeStarten()
+        bisZurNaechsten = 0.6 + RND() * 0.8
+    END IF
+    IF KEY_HIT(KEY_SPACE) THEN raketeStarten()
+    raketenBewegen(dt)
+    funkenBewegen(dt)
+    zeichnen()
+WEND

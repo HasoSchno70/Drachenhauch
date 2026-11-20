@@ -1,0 +1,5 @@
+DIM z AS INTEGER : z = 20
+WHILE z > -10
+    PRINT 300 / z
+    z = z - 5
+WEND
