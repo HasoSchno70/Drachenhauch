@@ -461,4 +461,42 @@ module.exports = (H) => [
   ...neu("loesungen/kap11_titel.dh").map((t) => H.code(t)),
 
   H.p("huepfen ist aus drei Bögen gebaut: erst ein Fall bis ganz unten (4 · p² erreicht bei p = 0,5 die 1), dann ein kleiner Sprung auf 88 Prozent und zurück, dann ein winziger. Das Menü fährt jetzt doppelt so lange und beginnt erst nach 45 Prozent der Zeit — wenn der Titel fast steht. Alles hängt am selben Werkzeug: eine Funktion, die eine Kurve herstellt."),
+
+  H.h2("Kapitel 12 · Ein Garten wächst"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Mit 10 Grad wird der Baum schmal und hoch, die Krone ein Fächer wie bei einem Besen. Mit 60 Grad biegen sich die Äste nach drei Gabeln wieder nach unten, und es entsteht ein Muster aus Sechsecken wie Bienenwaben. Mit 0.5 bleibt ein kleines Bäumchen: Die Äste schrumpfen so schnell, dass alles über dem Stamm zusammen kürzer ist als der Stamm selbst — 110 · (0,5 + 0,25 + …) bleibt unter 110. Mit 0.85 wird er riesig, wächst oben aus dem Fenster, und die Äste kreuzen sich: Die Längen über dem Stamm ergeben zusammen gut 470 Punkte."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Bei Tiefe 14 sind es 32 767 Linien statt 1023 — jede Tiefe mehr verdoppelt sie. Zu sehen ist kaum ein Unterschied: Die neuen Ästchen sind 110 · 0,72¹⁴ ≈ 1 Punkt lang, die Krone wird am Rand nur etwas dichter. Bezahlt wird mit Zeit: Auf meinem Rechner fiel das Programm von 60 auf 50 Bilder je Sekunde. Mehr Tiefe, als das Auge auflöst, ist verschwendet."),
+
+  H.h3("Drehen 3"),
+
+  H.p("Der Farn wird schlanker und steht steiler, mehr wie eine Feder oder ein Grashalm. Ein einziger Winkel im Bauplan verändert die ganze Pflanze, weil er in jeder Generation an jeder Verzweigung wirkt."),
+
+  H.h3("Erweitern 1: Wind im Baum"),
+
+  H.p("Eine Neigung, die in jedem Bild aus der Uhr kommt, und ast addiert sie zu beiden Zweigen — umso mehr, je weiter außen die Gabel sitzt (code/loesungen/kap12_wind.dh):"),
+
+  ...neu("loesungen/kap12_wind.dh").map((t) => H.code(t)),
+
+  H.p("Weil jede Gabel ihre Neigung zur Richtung ihres Astes dazuzählt, summiert sie sich nach außen: Der Stamm bewegt sich gar nicht, die Spitzen am meisten — wie bei einem echten Baum. Zwei Sinuswellen mit verschiedenem Tempo übereinander ergeben ein unregelmäßiges Wiegen statt eines gleichmäßigen Pendelns."),
+
+  H.h3("Erweitern 2: Jahreszeiten"),
+
+  H.p("Die Jahreszeit ist eine Zahl von 0 bis 4, die mit der Uhr wandert, und blatt macht daraus eine Farbe — oder -1 für „kein Blatt“ (code/loesungen/kap12_jahreszeiten.dh):"),
+
+  ...neu("loesungen/kap12_jahreszeiten.dh").map((t) => H.code(t)),
+
+  H.pmix(["Blätter wachsen nur bei ", ["tiefe = 0", true], ", an den äußersten Spitzen — dort, wo die Rekursion endet. Im SELECT CASE nach INT(j) ist j selbst der genaue Stand im Jahr: Im Herbst wandert der Farbton mit ", ["55 - (j - 2) * 50", true], " von Gelb (55) nach Rot (5)."]),
+
+  H.h3("Erfinden: die Drachenkurve"),
+
+  H.p("Ein eigenes kleines Programm mit derselben Art Bauplan, aber zwei Regeln für X und Y, rechten Winkeln und ohne Klammern (code/loesungen/kap12_drache.dh):"),
+
+  H.code(zeilen("loesungen/kap12_drache.dh")),
+
+  H.p("Faltet man einen Papierstreifen immer wieder in der Mitte und klappt ihn danach so auf, dass jede Falte einen rechten Winkel bildet, entsteht genau diese Kurve — Generation 12 sind zwölf Faltungen. Jede Generation macht den Drachen um den Faktor √2 größer; darum schrumpft der Schritt um denselben Faktor, und das Bild bleibt gleich groß. Die Farbe zählt die Striche mit, so sieht man, wie die eine Linie durch das ganze Bild läuft."),
 ];

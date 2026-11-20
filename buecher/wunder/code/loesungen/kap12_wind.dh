@@ -1,0 +1,38 @@
+' Loesung zu Kapitel 12, Erweitern 1: Wind im Baum -- jeder Ast neigt
+' sich ein wenig, die duennen weiter aussen mehr als der Stamm.
+' Die Stellen, die neu sind, stehen zwischen >>> und <<<.
+CONST BREITE = 800
+CONST HOEHE = 500
+' >>> neu
+' Wie weit sich jede Astgabel gerade neigt, in Grad.
+DIM wind AS FLOAT
+' <<< neu
+
+' Ein Ast von (x, y) in Richtung `winkel` (Grad, 0 = nach oben). Ist
+' noch Tiefe uebrig, wachsen an seiner Spitze zwei kuerzere.
+SUB ast(x AS FLOAT, y AS FLOAT, winkel AS FLOAT, laenge AS FLOAT, _
+        tiefe AS INTEGER)
+    DIM ex AS FLOAT : ex = x + SIN(RAD(winkel)) * laenge
+    DIM ey AS FLOAT : ey = y - COS(RAD(winkel)) * laenge
+    DIM farbe AS INTEGER : farbe = HSV(30 + (10 - tiefe) * 10, 0.6, 0.7)
+    LINEW(x, y, ex, ey, MAX(1, tiefe), farbe)
+    IF tiefe > 0 THEN
+        ' >>> neu
+        ' Je hoeher die Gabel (kleine Tiefe), desto mehr gibt sie nach.
+        DIM neigen AS FLOAT : neigen = wind * (10 - tiefe) / 10
+        ast(ex, ey, winkel - 25 + neigen, laenge * 0.72, tiefe - 1)
+        ast(ex, ey, winkel + 25 + neigen, laenge * 0.72, tiefe - 1)
+        ' <<< neu
+    END IF
+END SUB
+
+SCREEN(BREITE, HOEHE, "Baum")
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
+    CLS(RGB(225, 235, 245))
+    ' >>> neu
+    ' Boeen: zwei Wellen uebereinander -- sonst wirkt es wie ein Pendel.
+    wind = 6 * SIN(TIMER() * 1.3) + 3 * SIN(TIMER() * 3.1)
+    ' <<< neu
+    ast(BREITE / 2, HOEHE - 20, 0, 110, 9)
+    FLIP()
+WEND

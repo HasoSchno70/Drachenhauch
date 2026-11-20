@@ -1,0 +1,50 @@
+' Loesung zu Kapitel 12, Erweitern 2: die Jahreszeiten -- an den
+' Astspitzen wachsen Blaetter, werden dunkel, gelb, rot und fallen ab.
+' Ein Jahr dauert zwoelf Sekunden.
+' Die Stellen, die neu sind, stehen zwischen >>> und <<<.
+CONST BREITE = 800
+CONST HOEHE = 500
+' >>> neu
+' Wo im Jahr wir sind: 0 Fruehling, 1 Sommer, 2 Herbst, 3 Winter (und
+' alles dazwischen).
+DIM jahr AS FLOAT
+
+' Die Farbe eines Blatts in der Jahreszeit; -1: keins.
+FUNCTION blatt(j AS FLOAT) AS INTEGER
+    SELECT CASE INT(j)
+        CASE 0 : RETURN HSV(100, 0.5 + j * 0.3, 0.85)
+        CASE 1 : RETURN HSV(120, 0.8, 0.75 - (j - 1) * 0.2)
+        CASE 2 : RETURN HSV(55 - (j - 2) * 50, 0.85, 0.9)
+    END SELECT
+    RETURN -1
+END FUNCTION
+' <<< neu
+
+' Ein Ast von (x, y) in Richtung `winkel` (Grad, 0 = nach oben). Ist
+' noch Tiefe uebrig, wachsen an seiner Spitze zwei kuerzere.
+SUB ast(x AS FLOAT, y AS FLOAT, winkel AS FLOAT, laenge AS FLOAT, _
+        tiefe AS INTEGER)
+    DIM ex AS FLOAT : ex = x + SIN(RAD(winkel)) * laenge
+    DIM ey AS FLOAT : ey = y - COS(RAD(winkel)) * laenge
+    DIM farbe AS INTEGER : farbe = HSV(30 + (10 - tiefe) * 10, 0.6, 0.7)
+    LINEW(x, y, ex, ey, MAX(1, tiefe), farbe)
+    ' >>> neu
+    IF tiefe = 0 AND blatt(jahr) <> -1 THEN
+        CIRCLE(ex, ey, 4, blatt(jahr))
+    END IF
+    ' <<< neu
+    IF tiefe > 0 THEN
+        ast(ex, ey, winkel - 25, laenge * 0.72, tiefe - 1)
+        ast(ex, ey, winkel + 25, laenge * 0.72, tiefe - 1)
+    END IF
+END SUB
+
+SCREEN(BREITE, HOEHE, "Baum")
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
+    ' >>> neu
+    jahr = (TIMER() / 3) MOD 4
+    CLS(IIF(jahr >= 3, RGB(235, 240, 248), RGB(225, 235, 245)))
+    ' <<< neu
+    ast(BREITE / 2, HOEHE - 20, 0, 110, 9)
+    FLIP()
+WEND
