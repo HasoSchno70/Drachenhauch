@@ -347,7 +347,7 @@ Farben können einen **Alpha-Kanal** tragen (`&Haarrggbb`, oberstes Byte = Deckk
 |---|---|
 | `RGBA(r, g, b, a)` → INTEGER | Farbe mit Alpha (`a` 0..255, 255 = voll deckend) |
 | `ALPHA(color)` → INTEGER | Alpha-Kanal (0..255) aus einer Farbe lesen |
-| `BLEND_MODE(name$)` | Mischmodus für folgende Draws: `"alpha"` (Standard), `"add"` (additiv – Glow/Licht), `"mult"` (multiplikativ – Schatten/Tönung), `"subtract"` |
+| `BLEND_MODE(name$)` | Mischmodus für folgende Draws: `"alpha"` (Standard), `"add"` (additiv – Glow/Licht), `"mult"` (multiplikativ – Schatten/Tönung), `"subtract"` (Hintergrund minus Farbe, mal deren Deckkraft – die Deckkraft des Hintergrunds bleibt) |
 
 `BLEND_MODE` gilt bis zum nächsten Aufruf — nach einem Effekt mit `BLEND_MODE("alpha")` zurückstellen.
 

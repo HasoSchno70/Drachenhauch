@@ -378,6 +378,32 @@ void main() {
     finalColor = vec4(uFarbe, uStaerke * n * fragColor.a);
 }
 "#;
+
+/// Einen Mischmodus aus `BLEND_MODE` einschalten (1 = add, 2 = mult,
+/// 4 = subtract). "subtract" ist NICHT raylibs `BLEND_SUBTRACT_COLORS`: das
+/// rechnet Farbe minus Hintergrund (GL_FUNC_SUBTRACT) und zieht auch die
+/// Deckkraft ab -- eine dunkle Fuellung loeschte so alles Helle und machte
+/// das Ziel durchsichtig. Gemeint ist Hintergrund minus Farbe (wie in jedem
+/// Malprogramm), gewichtet mit der Deckkraft der Farbe, und die Deckkraft des
+/// Hintergrunds bleibt.
+fn blend_an(m: i32) {
+    use raylib::ffi;
+    const GL_ZERO: i32 = 0;
+    const GL_ONE: i32 = 1;
+    const GL_SRC_ALPHA: i32 = 0x0302;
+    const GL_FUNC_ADD: i32 = 0x8006;
+    const GL_FUNC_REVERSE_SUBTRACT: i32 = 0x800B;
+    unsafe {
+        if m == 4 {
+            ffi::rlSetBlendFactorsSeparate(GL_SRC_ALPHA, GL_ONE, GL_ZERO, GL_ONE,
+                                           GL_FUNC_REVERSE_SUBTRACT, GL_FUNC_ADD);
+            ffi::BeginBlendMode(ffi::BlendMode::BLEND_CUSTOM_SEPARATE as i32);
+        } else {
+            ffi::BeginBlendMode(m);
+        }
+    }
+}
+
 /// Zeichnet `f` ohne die Matrix des Abspiel-Massstabs und gibt ihm den
 /// Faktor mit, um den es Lage und Groesse selbst vergroessern soll.
 fn ohne_rt_matrix<R>(f: impl FnOnce(f32) -> R) -> R {
@@ -9885,7 +9911,7 @@ fn render_scene<D: RaylibDraw>(
                                     ffi::DrawRectangleRounded(ffi::Rectangle { x: x as f32, y: y as f32, width: w as f32, height: h as f32 }, rund, 12, weiss);
                                 } else { ffi::DrawRectangle(x, y, w, h, weiss); }
                                 ffi::EndBlendMode();
-                                if cur_blend != 0 { ffi::BeginBlendMode(cur_blend); }
+                                if cur_blend != 0 { blend_an(cur_blend); }
                                 ffi::EndShaderMode();
                             }
                         }
@@ -10031,7 +10057,7 @@ fn render_scene<D: RaylibDraw>(
                         // m == 0 (alpha) => zurueck auf Default (EndBlendMode).
                         unsafe {
                             if *m == 0 { raylib::ffi::EndBlendMode(); }
-                            else { raylib::ffi::BeginBlendMode(*m); }
+                            else { blend_an(*m); }
                         }
                         cur_blend = *m;
                     }

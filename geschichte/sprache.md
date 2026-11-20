@@ -1215,3 +1215,19 @@ haeufig, etwa wenn ein Helfer `resolution` an jeden Shader gibt.
 Kind) und drei Rust-Tests in `glsl.rs`; Gegenproben: Datei immer/nie als
 Quelltext, jedes Mal warnen, Deklarierte nicht ausnehmen, kein
 Gross/klein-Satz, gar nicht warnen -- jede laesst genau ihren Fall fallen.
+
+Im selben Kapitel sollte eine Spur verblassen: `BLEND_MODE("mult")` mit
+einem hellen Grau. Gemessen bleibt sie bei 15 von 255 stehen -- 15 * 247 /
+255 = 14,5 rundet wieder auf 15, und das Gluehen macht das Grau sichtbar.
+Die uebliche Abhilfe, zusaetzlich 1 abziehen, ging nicht:
+`BLEND_MODE("subtract")` war raylibs `BLEND_SUBTRACT_COLORS`, und das
+rechnet Farbe minus Hintergrund (GL_FUNC_SUBTRACT) und zieht die Deckkraft
+mit ab. Eine dunkle Fuellung loeschte so alles Helle und machte das
+Render-Ziel durchsichtig. Jetzt schaltet `blend_an` fuer "subtract" eine
+eigene Mischung ein (`rlSetBlendFactorsSeparate`: Hintergrund minus Farbe
+mal deren Deckkraft, GL_FUNC_REVERSE_SUBTRACT; die Deckkraft bleibt), auch
+nach dem Lichtfleck, der den Modus kurz wechselt. Kein Beispiel im Repo
+benutzte den Modus. **Aendert bestehende Programme:** wer sich auf das alte
+Ergebnis verlassen hat, bekommt das Gegenteil. `rendertarget_persistenz.dhtest`
+(zwei Faelle); Gegenproben: raylibs Modus laesst beide fallen, ohne
+Gewichtung mit der Deckkraft nur den halb deckenden Teil.

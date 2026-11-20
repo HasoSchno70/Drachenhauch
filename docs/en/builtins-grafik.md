@@ -347,7 +347,7 @@ Colours can carry an **alpha channel** (`&Haarrggbb`, top byte = opacity):
 |---|---|
 | `RGBA(r, g, b, a)` → INTEGER | colour with alpha (`a` 0..255, 255 = fully opaque) |
 | `ALPHA(color)` → INTEGER | read the alpha channel (0..255) from a colour |
-| `BLEND_MODE(name$)` | blend mode for subsequent draws: `"alpha"` (default), `"add"` (additive – glow/light), `"mult"` (multiplicative – shadow/tint), `"subtract"` |
+| `BLEND_MODE(name$)` | blend mode for subsequent draws: `"alpha"` (default), `"add"` (additive – glow/light), `"mult"` (multiplicative – shadow/tint), `"subtract"` (background minus colour, times its opacity – the background keeps its opacity) |
 
 `BLEND_MODE` applies until the next call — after an effect, set it back with `BLEND_MODE("alpha")`.
 
