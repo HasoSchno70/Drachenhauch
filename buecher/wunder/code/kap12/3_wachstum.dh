@@ -1,0 +1,19 @@
+' Kapitel 12, zum Nachrechnen -- wie lang wird der Bauplan des Buschs?
+DIM regeln AS MAP OF STRING
+regeln["F"] = "FF+[+F-F-F]-[-F+F+F]"
+
+FUNCTION ausrollen(wort AS STRING, tiefe AS INTEGER) AS STRING
+    IF tiefe = 0 THEN RETURN wort
+    DIM neu AS STRING : neu = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(wort) - 1
+        DIM z AS STRING : z = MID$(wort, i, 1)
+        neu = neu + IIF(MAP_HAS(regeln, z), regeln[z], z)
+    NEXT
+    RETURN ausrollen(neu, tiefe - 1)
+END FUNCTION
+
+DIM g AS INTEGER
+FOR g = 1 TO 7
+    PRINT "Generation "; g; ": "; LEN(ausrollen("F", g)); " Zeichen"
+NEXT

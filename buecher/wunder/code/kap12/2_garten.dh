@@ -1,0 +1,111 @@
+' Kapitel 12 -- ein Garten aus Bauplaenen. Jede Pflanze ist ein Wort aus
+' Zeichen, das Regeln Generation fuer Generation umschreiben; eine
+' Schildkroete zeichnet es. Jede Sekunde waechst der Garten ein Stueck.
+CONST BREITE = 800
+CONST HOEHE = 500
+CONST BODEN = 470
+
+STRUCT Pflanze
+    DIM anfang AS STRING
+    DIM regeln AS MAP OF STRING
+    DIM winkel AS FLOAT
+    DIM groesse AS FLOAT
+    DIM x AS FLOAT
+    DIM bisTiefe AS INTEGER
+    DIM farbe AS INTEGER
+END STRUCT
+
+' Ein Wort `tiefe` Generationen lang umschreiben: jedes Zeichen, fuer
+' das es eine Regel gibt, wird durch sie ersetzt, die anderen bleiben.
+FUNCTION ausrollen(wort AS STRING, regeln AS MAP OF STRING, _
+                   tiefe AS INTEGER) AS STRING
+    IF tiefe = 0 THEN RETURN wort
+    DIM neu AS STRING : neu = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(wort) - 1
+        DIM z AS STRING : z = MID$(wort, i, 1)
+        neu = neu + IIF(MAP_HAS(regeln, z), regeln[z], z)
+    NEXT
+    RETURN ausrollen(neu, regeln, tiefe - 1)
+END FUNCTION
+
+' Die Schildkroete: F zeichnet einen Schritt, + und - drehen, [ merkt
+' sich Ort und Richtung, ] kehrt dorthin zurueck. Andere Zeichen tun
+' nichts.
+SUB zeichnen(p AS Pflanze, wort AS STRING, schritt AS FLOAT)
+    DIM x AS FLOAT : x = p.x
+    DIM y AS FLOAT : y = BODEN
+    DIM w AS FLOAT : w = 0
+    DIM mx AS ARRAY OF FLOAT
+    DIM my AS ARRAY OF FLOAT
+    DIM mw AS ARRAY OF FLOAT
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(wort) - 1
+        SELECT CASE MID$(wort, i, 1)
+            CASE "F"
+                DIM nx AS FLOAT : nx = x + SIN(RAD(w)) * schritt
+                DIM ny AS FLOAT : ny = y - COS(RAD(w)) * schritt
+                LINE(x, y, nx, ny, p.farbe)
+                x = nx : y = ny
+            CASE "+" : w = w + p.winkel
+            CASE "-" : w = w - p.winkel
+            CASE "["
+                ARRAY_PUSH(mx, x)
+                ARRAY_PUSH(my, y)
+                ARRAY_PUSH(mw, w)
+            CASE "]"
+                x = ARRAY_POP(mx)
+                y = ARRAY_POP(my)
+                w = ARRAY_POP(mw)
+        END SELECT
+    NEXT
+END SUB
+
+DIM garten AS ARRAY OF Pflanze
+SUB pflanzen(anfang AS STRING, regeln AS MAP OF STRING, _
+             winkel AS FLOAT, groesse AS FLOAT, x AS FLOAT, _
+             bisTiefe AS INTEGER, farbe AS INTEGER)
+    DIM p AS Pflanze
+    p.anfang = anfang : p.regeln = regeln : p.winkel = winkel
+    p.groesse = groesse : p.x = x
+    p.bisTiefe = bisTiefe : p.farbe = farbe
+    ARRAY_PUSH(garten, p)
+END SUB
+
+pflanzen("X", {"X": "F+[[X]-X]-F[-FX]+X", "F": "FF"}, 25, 147, 195, 6, _
+         RGB(60, 140, 60))
+pflanzen("F", {"F": "FF+[+F-F-F]-[-F+F+F]"}, 22.5, 106, 380, 4, _
+         RGB(40, 110, 70))
+pflanzen("X", {"X": "F[+X][-X]FX", "F": "FF"}, 25.7, 188, 650, 6, _
+         RGB(120, 90, 50))
+
+' Den ganzen Garten in Generation `g` in ein Bild zeichnen -- nur, wenn
+' sich etwas aendert, nicht in jedem Bild.
+SUB gartenZeichnen(bild AS INTEGER, g AS INTEGER)
+    RENDERTARGET_BEGIN(bild)
+    CLS(RGB(220, 235, 245))
+    BOX(0, BODEN, BREITE, HOEHE, RGB(120, 95, 70))
+    FOR EACH p IN garten
+        DIM t AS INTEGER : t = MIN(g, p.bisTiefe)
+        ' F wird jede Generation zu FF: Damit die Pflanze nicht
+        ' doppelt so gross wird, halbiert sich der Schritt.
+        zeichnen(p, ausrollen(p.anfang, p.regeln, t), p.groesse / 2 ^ t)
+    NEXT
+    RENDERTARGET_END()
+END SUB
+
+SCREEN(BREITE, HOEHE, "Garten")
+DIM bild AS INTEGER : bild = RENDERTARGET_NEW(BREITE, HOEHE, TRUE)
+DIM generation AS INTEGER : generation = 0
+gartenZeichnen(bild, generation)
+DIM uhr AS FLOAT
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
+    uhr = uhr + DELTA()
+    IF uhr >= 1.0 AND generation < 6 THEN
+        generation = generation + 1
+        gartenZeichnen(bild, generation)
+        uhr = 0
+    END IF
+    RENDERTARGET_DRAW(bild, 0, 0)
+    FLIP()
+WEND

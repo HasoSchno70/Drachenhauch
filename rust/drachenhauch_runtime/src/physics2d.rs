@@ -38,6 +38,8 @@ pub struct Phys2dWorld {
     /// Tempo, Position, Wecken) nimmt den Koerper vorher aus der Liste.
     schlaf_offen: Vec<RigidBodyHandle>,
     handles: Vec<Option<RigidBodyHandle>>,
+    /// Gelenke nach Nummer, wie `handles` (entfernte bleiben als None).
+    gelenke: Vec<Option<ImpulseJointHandle>>,
 }
 
 impl Phys2dWorld {
@@ -60,6 +62,7 @@ impl Phys2dWorld {
             soft_bodies: SoftBodySet::new(),
             schlaf_offen: Vec::new(),
             handles: Vec::new(),
+            gelenke: Vec::new(),
         }
     }
 
@@ -253,6 +256,55 @@ impl Phys2dWorld {
             self.bodies.remove(h, &mut self.islands, &mut self.colliders,
                                &mut self.impulse_joints, &mut self.multibody_joints,
                                &mut self.soft_bodies, true);
+        }
+    }
+
+    /// Gibt es den Koerper -- angelegt und nicht entfernt?
+    pub fn gibt_es(&self, idx: i64) -> bool {
+        self.handle(idx).is_some_and(|h| self.bodies.get(h).is_some())
+    }
+
+    /// Ein Punkt der Welt, ausgedrueckt im Koerper `h` (fuer Gelenk-Anker).
+    fn lokal(&self, h: RigidBodyHandle, x: f32, y: f32) -> Vector {
+        self.bodies[h].position().inverse_transform_point(Vector::new(x, y))
+    }
+
+    fn gelenk_einfuegen(&mut self, ha: RigidBodyHandle, hb: RigidBodyHandle,
+                        data: impl Into<GenericJoint>) -> i64 {
+        self.angestossen(ha);
+        self.angestossen(hb);
+        let j = self.impulse_joints.insert(ha, hb, data, true);
+        self.gelenke.push(Some(j));
+        (self.gelenke.len() - 1) as i64
+    }
+
+    /// Scharnier: `a` und `b` haengen am Weltpunkt (x, y) aneinander und
+    /// drehen sich frei um ihn. Der Aufrufer prueft, dass es beide gibt.
+    /// Die beiden beruehren sich nicht -- sonst stiessen sich zwei
+    /// ueberlappende Glieder einer Kette staendig ab.
+    pub fn add_hinge(&mut self, a: i64, b: i64, x: f32, y: f32) -> i64 {
+        let (ha, hb) = (self.handle(a).unwrap(), self.handle(b).unwrap());
+        let gelenk = RevoluteJointBuilder::new()
+            .local_anchor1(self.lokal(ha, x, y))
+            .local_anchor2(self.lokal(hb, x, y))
+            .contacts_enabled(false);
+        self.gelenk_einfuegen(ha, hb, gelenk)
+    }
+
+    /// Seil: die Mittelpunkte von `a` und `b` hoechstens `laenge` weit
+    /// auseinander -- naeher duerfen sie, wie bei einem echten Seil.
+    pub fn add_rope(&mut self, a: i64, b: i64, laenge: f32) -> i64 {
+        let (ha, hb) = (self.handle(a).unwrap(), self.handle(b).unwrap());
+        self.gelenk_einfuegen(ha, hb, RopeJointBuilder::new(laenge))
+    }
+
+    /// Ein Gelenk loesen. Was schon weg ist (auch mit einem seiner Koerper
+    /// entfernt), schadet nicht.
+    pub fn remove_joint(&mut self, j: i64) {
+        let i = j as usize;
+        if j < 0 || i >= self.gelenke.len() { return; }
+        if let Some(h) = self.gelenke[i].take() {
+            self.impulse_joints.remove(h, true);
         }
     }
 

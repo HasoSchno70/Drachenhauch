@@ -1,0 +1,7 @@
+' Ein Ast, der vergessen hat, wann er aufhoeren soll.
+SUB ast(laenge AS FLOAT, tiefe AS INTEGER)
+    ast(laenge * 0.72, tiefe - 1)
+    ast(laenge * 0.72, tiefe - 1)
+END SUB
+ast(110, 9)
+PRINT "fertig"

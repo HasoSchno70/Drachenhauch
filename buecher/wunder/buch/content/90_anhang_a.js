@@ -1,4 +1,4 @@
-const { neu, stueck: stueckLoesung } = require("../code_lesen");
+const { neu, zeilen, stueck: stueckLoesung } = require("../code_lesen");
 
 // Anhang A: die Loesungen. Der Code kommt aus code/loesungen/ -- nur die
 // Stellen zwischen ' >>> neu und ' <<< neu, der Rest ist das Programm des
@@ -229,4 +229,274 @@ module.exports = (H) => [
   ...neu("loesungen/kap05_kaskade.dh").map((t) => H.code(t)),
 
   H.pmix(["Zwei Dinge sind daran lehrreich. Erstens nehmen die neuen Funken das Tempo des Knallers mit (", ["k.vx + …", true], "), so fliegt die kleine Explosion in seine Richtung weiter, wie bei einer echten. Zweitens hängt ", ["nachknallen", true], " neue Funken an das Feld an, WÄHREND die Schleife es rückwärts durchläuft. Das ist sicher: Die neuen landen hinten, an Stellen, die die Schleife schon hinter sich hat — sie werden erst im nächsten Bild bewegt."]),
+
+  H.h2("Kapitel 6 · Das Spiel des Lebens"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Mit 0.05 sind zu wenige Zellen da, um einander am Leben zu halten: Fast alles stirbt in den ersten Generationen, übrig bleiben ein paar einsame Blöcke und Blinker. Mit 0.7 ist es zu voll: Fast alles stirbt an Überfüllung, und aus den Resten wächst ein ähnliches Bild wie bei 0.25, nur später. Leben braucht die mittlere Dichte — irgendwo zwischen einem Fünftel und der Hälfte entsteht das meiste."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Mit Geburt auch bei sechs Nachbarn heißt die Variante HighLife. Das meiste sieht aus wie vorher, aber hin und wieder taucht ein Muster auf, das sich selbst kopiert: der Replikator. Er hinterlässt eine Spur von Abbildern seiner selbst. Eine einzige Zahl in den Regeln ändert, was in der Welt möglich ist."),
+
+  H.h3("Drehen 3"),
+
+  H.p("Drei Zellen waagrecht nebeneinander: Die mittlere hat zwei Nachbarn und überlebt, die beiden äußeren haben nur einen und sterben. Über und unter der mittleren liegen je eine tote Zelle mit genau drei lebenden Nachbarn — sie werden geboren. Aus der waagrechten Reihe wird eine senkrechte, in der nächsten Generation wieder eine waagrechte: Der Blinker blinkt, für immer."),
+
+  H.h3("Erweitern 1: die Maus"),
+
+  H.p("Die Zelle unter der Maus ist die Mausstelle, ganzzahlig durch die Zellgröße geteilt, plus eins, weil das Feld bei 1 beginnt (code/loesungen/kap06_maus.dh):"),
+
+  ...neu("loesungen/kap06_maus.dh").map((t) => H.code(t)),
+
+  H.p("MOUSE_DOWN statt MOUSE_HIT: Solange die Taste gedrückt ist, zeichnet man, wie mit einem Stift. Die Prüfung der Grenzen schützt vor einem Index außerhalb, wenn die Maus am Rand des Fensters steht."),
+
+  H.h3("Erweitern 2: herumlaufende Ränder"),
+
+  H.p("Nur lebt ändert sich (code/loesungen/kap06_torus.dh):"),
+
+  ...neu("loesungen/kap06_torus.dh").map((t) => H.code(t)),
+
+  H.p("(x - 1) MOD B rechnet die Spalte auf 0 bis B - 1 um, + 1 wieder auf 1 bis B. Für x = 0 ist (x - 1) MOD B in Drachenhauch B - 1, denn MOD rundet wie \ nach unten, auch bei negativen Zahlen — in vielen anderen Sprachen käme -1 heraus, und man bräuchte noch ein + B. Ein Gleiter, der rechts unten hinausfliegt, kommt jetzt links oben wieder herein."),
+
+  H.h3("Erfinden: Farbe nach Alter"),
+
+  H.p("Eine Möglichkeit (code/loesungen/kap06_alter.dh): Statt 0 und 1 steht im Feld das Alter der Zelle. lebt antwortet weiter mit 0 oder 1, damit die Regeln dieselben bleiben; nur die Geburt setzt 1, das Überleben zählt hoch:"),
+
+  ...neu("loesungen/kap06_alter.dh").map((t) => H.code(t)),
+
+  H.p("Hier zahlt sich die Funktion lebt ein zweites Mal aus: nachbarn musste fast nicht geändert werden, weil es nie selbst auf das Feld geschaut hat. Nur das Abziehen der Zelle selbst fragt jetzt lebt statt das Feld — sonst zöge es ihr Alter ab statt einer 1."),
+
+  H.h2("Kapitel 7 · Fallender Sand"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Das Wasser wird zäh wie Honig. Unter der Düse wächst ein Buckel, der nur langsam auseinanderläuft, und auf dem Brett staut es sich, statt hinunterzufließen. Eine Zelle je Schritt ist zu langsam gegen den Nachschub; vier sind schnell genug, dass der See eben aussieht. Echtes Wasser hat keine Zellen, aber dieselbe Frage — wie schnell es nachgibt — unterscheidet auch dort Wasser von Honig."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Die Sandhaufen bleiben, wie sie waren: Ist links besetzt, rutscht ein Korn eben nach rechts, und 45 Grad ist auf beiden Seiten die einzige Schräge, die hält. Das Wasser aber fließt nur noch nach links. Es läuft am linken Ende vom Brett, füllt den Boden links von der Düse, und rechts davon bleibt es trocken. Der Unterschied: Sand bewegt sich nur, wenn er fallen kann, und das Fallen ist auf beiden Seiten gleich. Wasser bewegt sich auch waagrecht, und dort entscheidet allein s, wohin."),
+
+  H.h3("Drehen 3"),
+
+  H.p("Alles läuft viermal so schnell, und weil die Düsen je Schritt ein Korn und einen Tropfen geben, kommt in den zehn Sekunden viermal so viel heraus: ein großer Haufen, ein tiefer See. Die Formen bleiben — 45 Grad, ebenes Wasser —, denn die Regeln wissen nichts von Sekunden, nur von Zellen. TAKT bestimmt allein, wie oft sie gelten."),
+
+  H.h3("Erweitern 1: Pinselgröße"),
+
+  H.p("Der Radius wird eine Variable, und das Mausrad verstellt ihn (code/loesungen/kap07_pinsel.dh):"),
+
+  ...neu("loesungen/kap07_pinsel.dh").map((t) => H.code(t)),
+
+  H.p("MOUSE_WHEEL liefert, wie weit das Rad seit dem letzten Aufruf gedreht wurde, meist 0. CLAMP hält den Radius zwischen 1 und 12. Statt 9 steht im Vergleich jetzt radius ^ 2 — die 9 war der Radius 3 zum Quadrat, nur ohne es zu sagen."),
+
+  H.h3("Erweitern 2: Schwerkraft umdrehen"),
+
+  H.p("Aus jedem y + 1 in den Regeln wird y + g, und die Taste G kehrt g um (code/loesungen/kap07_schwerkraft.dh):"),
+
+  ...neu("loesungen/kap07_schwerkraft.dh").map((t) => H.code(t)),
+
+  H.p("Was sich außer dem Fallen noch umdrehen muss, ist die Reihenfolge des Schritts. Er muss immer beim „Boden“ anfangen, sonst fiele ein Korn in einem Schritt bis ans Ende — der Fehler aus „Warum so?“, nur nach oben. Und die Zeile, die er überspringt, wechselt mit: Fällt alles nach oben, kann in der obersten Zeile nichts mehr fallen, und die unterste muss mitrechnen."),
+
+  H.h3("Erfinden: Holz und Feuer"),
+
+  H.p("Eine Möglichkeit (code/loesungen/kap07_feuer.dh): zwei neue Stoffe im ENUM, eine neue Regel für Feuer, eine Zeile im SELECT CASE. Holz braucht keine Regel; es liegt, bis Feuer es erreicht:"),
+
+  ...neu("loesungen/kap07_feuer.dh").map((t) => H.code(t)),
+
+  H.p("Die Zahlen 0.02 und 0.01 sind ausprobiert. Mit 0.2 statt 0.02 brennt der Stapel in einem Augenblick ab; mit 0.1 statt 0.01 geht das Feuer aus, bevor es das nächste Holz erreicht. Die Flammen haben eine Zufallsfarbe in jedem Bild — darum flackern sie, ohne dass es dafür eigenen Code braucht."),
+
+  H.h2("Kapitel 8 · Schwarm"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Nur noch eine Handvoll — acht, zehn Dreiecke. Die Vögel sind alle noch da, aber ohne Abstand ziehen Zusammenhalt und Ausrichtung sie aufeinander, bis mehrere genau übereinander fliegen, gleich schnell, in dieselbe Richtung. Die Regel, die am wenigsten nach Schwarm aussieht, hält ihn erst auseinander."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Kein Schwarm mehr, sondern ein Gewimmel wie bei Mücken. Vögel finden sich zu kleinen Klumpen, aber jeder fliegt in seine eigene Richtung, und die Klumpen zerfallen wieder. Zusammenhalt allein macht einen Haufen; erst die Ausrichtung macht daraus einen Schwarm, der irgendwohin fliegt."),
+
+  H.h3("Drehen 3"),
+
+  H.p("Mit SICHT 20 sieht ein Vogel kaum jemanden. Es dauert lange, bis sich kleine Gruppen finden, und große Schwärme entstehen nicht. Mit 150 sieht jeder fast den halben Himmel: Nach wenigen Sekunden gibt es einen oder zwei große Schwärme, breite Bänder, die quer über das Bild ziehen. Rechnen muss das Programm in beiden Fällen gleich viel, denn umschauen geht immer alle Vögel durch — 150 mal 150, gut zwanzigtausend Abstände in jedem Bild."),
+
+  H.h3("Erweitern 1: zur Maus"),
+
+  H.p("Eine vierte Regel, gebaut wie der Zusammenhalt, nur mit der Maus als Mitte (code/loesungen/kap08_maus.dh):"),
+
+  ...neu("loesungen/kap08_maus.dh").map((t) => H.code(t)),
+
+  H.p("Der Aufruf steht nach dem IF nachbarn > 0: Auch ein Vogel, der allein fliegt, soll zur Maus. Hält man die Taste lange gedrückt, kreist der Schwarm um die Maus, statt auf ihr zu landen — tempoHalten lässt ihn nicht langsamer werden, also schießt er immer wieder vorbei."),
+
+  H.h3("Erweitern 2: Felsen"),
+
+  H.p("Drei Felsen als drei Felder mit Mitte und Radius, und eine Regel, die von jedem wegschiebt, dem der Vogel zu nah kommt (code/loesungen/kap08_hindernisse.dh):"),
+
+  ...neu("loesungen/kap08_hindernisse.dh").map((t) => H.code(t)),
+
+  H.p("rand ist der Abstand vom Rand des Felsens, nicht von seiner Mitte. st wächst von 0, VORSICHT Punkte vor dem Rand, bis 1 am Rand. So weicht ein Vogel sanft aus, wenn er von weitem kommt, und scharf, wenn er schon fast dran ist. Die beiden Zahlen sind ausprobiert: Mit KRAFT_FELS = 900 und VORSICHT = 30 steckte in jedem fünften Bild irgendwo ein Vogel im Felsen, gedrängt vom Schwarm hinter ihm. Jetzt kommt das noch vor, aber selten und nur für einen Augenblick. Ganz verhindern könnte es erst bewegen, indem es einen Vogel gar nicht hineinlässt."),
+
+  H.h3("Erfinden: ein Raubvogel"),
+
+  H.p("Eine Möglichkeit (code/loesungen/kap08_raubvogel.dh). Der Raubvogel ist auch ein Vogel — er hat einen Ort und eine Geschwindigkeit, er fliegt und kommt am Rand wieder herein. Nur entscheidet er anders und sieht anders aus. Genau das sagt EXTENDS: Raubvogel bekommt alles von Vogel und ersetzt, was er anders macht. Die Vögel bekommen eine Regel dazu, die Flucht:"),
+
+  ...neu("loesungen/kap08_raubvogel.dh").map((t) => H.code(t)),
+
+  H.pmix(["Bewegen und Init schreibt der Raubvogel nicht selbst; ", ["NEW Raubvogel()", true], " ruft das Init von Vogel, und ", ["jaeger.bewegen(dt)", true], " das bewegen von Vogel. ", ["jaeger.entscheiden(…)", true], " dagegen ruft seine eigene Fassung. In ihr beginnt ", ["ziel", true], " als NIL und wird der Vogel mit dem kleinsten Abstand. Der Raubvogel ist mit 170 etwas langsamer als die schnellsten Vögel — sonst wäre die Jagd zu schnell vorbei."]),
+
+  H.h2("Kapitel 9 · Federn und Seile"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Mit einer Runde ist das Seil mal 300, mal fast 390 lang statt 285, und es wippt wie Gummi: Die Glieder rücken ihre Punkte zurecht, verschieben dabei die Nachbarn und haben keine zweite Gelegenheit. Mit hundert Runden ist es genau 285 lang — und sieht trotzdem aus wie mit zwanzig, denn dort war es 286 bis 288, weniger als ein Zehntel Bildpunkt je Glied. Hundert Runden kosten aber fünfmal so viel Rechenzeit. Wie viele Runden man braucht, ist eine Abwägung, und das Auge ist der Maßstab."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Mit 1.0 verliert das Seil keine Bewegung: Nach zehn Sekunden schwingt es noch fast so weit wie am Anfang, und es hört nie auf. Mit 0.95 hängt es nach drei Sekunden still, als hinge es in Honig. 0.995 liegt dazwischen und schwingt lange aus wie ein echtes Seil. Eine Zahl so nah an 1 wirkt klein, aber sie gilt sechzigmal je Sekunde: 0.995 hoch 60 ist etwa 0.74 — jede Sekunde ein Viertel weniger Schwung."),
+
+  H.h3("Drehen 3"),
+
+  H.p("Die Fahrbahn hängt durch wie eine Hängematte. Gemessen sinkt ihre Mitte ohne Hänger um 49 Punkte, mit Hängern um 6. Dabei ist die Fahrbahn ohne Hänger nur um 10 Punkte länger geworden, 610 statt 600 — jedes Glied gibt ein wenig nach, weil zwanzig Runden es nie ganz genau machen. Ein Seil, das zwischen zwei Punkten gespannt ist, verwandelt ein kleines Zuviel an Länge in viel Durchhang. Darum tragen Hängebrücken ihre Fahrbahn an einem Tragseil: Es hängt ohnehin durch, und die Fahrbahn darf gerade bleiben."),
+
+  H.h3("Erweitern 1: ein Vorhang"),
+
+  H.p("ziehen, fliegen, die Maus — alles bleibt. Neu ist nur, welche Punkte und welche Glieder es gibt (code/loesungen/kap09_vorhang.dh):"),
+
+  ...neu("loesungen/kap09_vorhang.dh").map((t) => H.code(t)),
+
+  H.p("netz merkt sich, welche Nummer der Punkt in Spalte sp und Zeile ze bekommen hat; so lassen sich die Nachbarn finden, ohne nachzurechnen, in welcher Reihenfolge punkt sie angelegt hat. Sechshundert Punkte und gut tausend Glieder, zwanzigmal je Schritt — das ist das Meiste, was dieses Kapitel rechnet, und es läuft noch flüssig."),
+
+  H.h3("Erweitern 2: ein Seil, das reißt"),
+
+  H.p("Jedes Glied bekommt ein Feld, ob es noch heil ist. Wird es mehr als 1,6-mal so lang, wie es sein soll, reißt es: Es zieht nicht mehr und wird nicht mehr gezeichnet (code/loesungen/kap09_reissen.dh):"),
+
+  ...neu("loesungen/kap09_reissen.dh").map((t) => H.code(t)),
+
+  H.figure("kap09_reissen.png", "Wer die Mitte der Fahrbahn weit genug nach unten zieht, reißt sie heraus: Das Stück fällt ins Wasser, die beiden Hälften hängen weiter an ihren Hängern.", 420, 262),
+
+  H.p("Gerissen wird nur in ziehen, und nur, wenn das Glied zu lang ist. Gedehnt wird es meist von der Maus: Ein Punkt, den sie hält, gibt nicht nach, und das Glied daneben muss alles allein tragen."),
+
+  H.h3("Erfinden: eine Fahne im Wind"),
+
+  H.p("Eine Möglichkeit (code/loesungen/kap09_wind.dh): ein Netz wie der Vorhang, aber an der linken Spalte fest statt an der oberen Reihe, und in fliegen eine zweite Kraft neben der Schwerkraft:"),
+
+  ...neu("loesungen/kap09_wind.dh").map((t) => H.code(t)),
+
+  H.pmix(["Der Wind hat zwei Teile. ", ["boe", true], " schwillt langsam an und ab, für alle Punkte gleich — dann hebt und senkt sich die ganze Fahne. Die ", ["welle", true], " hängt von der Zeit UND vom Ort ab: ", ["SIN(zeit * 7 - x / 25)", true], " hat an jeder Stelle einen anderen Wert und wandert mit der Zeit nach rechts, vom Mast weg. So läuft eine Welle durch den Stoff. Einen Vorhang von vorn könnte der Wind übrigens nur zur Seite schieben: Flattern geht aus dem Bild heraus, und dieses Bild hat nur zwei Richtungen."]),
+
+  H.h2("Kapitel 10 · Bälle in der Kiste"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Der große Ball räumt den mittleren und den rechten Turm ab; übrig bleibt ein Haufen Klötze, nur der linke Turm steht. Ein Ball mit dem Radius 30 hat gut viermal so viel Fläche wie einer mit 14, und die Physik gibt ihm entsprechend mehr Masse. Bei gleichem Tempo trägt er viermal so viel Schwung in die Türme."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Die Säulen biegen sich, als wären sie aus Gummi, und Klötze stecken ein Stück ineinander: In großen Schritten merkt die Physik eine Berührung erst, wenn die Körper schon überlappen, und schiebt sie dann ruckartig auseinander. Außerdem läuft alles langsamer. PHYS2D_STEP nimmt höchstens 0,05 Sekunden auf einmal; fünfzehn Schritte je Sekunde sind also nur drei Viertel einer Sekunde Physik."),
+
+  H.h3("Drehen 3"),
+
+  H.p("Mit demselben Zug wie vorher fliegt der Ball fast gerade und weit über die Türme hinweg. Auf dem Mond zielt man direkt auf das Ziel und zieht dafür weniger nach unten. Fällt dann etwas um, fällt es gemächlich, wie in Zeitlupe."),
+
+  H.h3("Erweitern 1: Domino"),
+
+  H.p("Nur aufbauen ändert sich (code/loesungen/kap10_domino.dh):"),
+
+  ...neu("loesungen/kap10_domino.dh").map((t) => H.code(t)),
+
+  H.p("Die Steine sind 60 hoch und 34 auseinander. Kippt einer, trifft er den nächsten etwa auf halber Höhe. Ein Abstand über 60 hieße: Er fällt flach auf den Boden, und die Kette reißt ab. Zielen muss man flach, denn ein Ball im hohen Bogen fliegt über die niedrigen Steine hinweg."),
+
+  H.h3("Erweitern 2: die Abrissbirne"),
+
+  H.p("Ein fester Haken, eine schwere Kugel, ein Seil dazwischen — und eine Linie, die das Seil zeichnet, denn die Welt kennt es, aber das Bild nicht (code/loesungen/kap10_abrissbirne.dh):"),
+
+  ...neu("loesungen/kap10_abrissbirne.dh").map((t) => H.code(t)),
+
+  H.figure("kap10_abrissbirne.png", "Die Abrissbirne ist in die Türme geschwungen und pendelt zurück; der mittlere Turm ist eingeknickt.", 420, 262),
+
+  H.p("Am Anfang ist die Kugel 276 vom Haken entfernt, das Seil aber 280 lang: Es hängt lose, und die Kugel fällt erst ein Stück, bis es sich strafft. Von da an zieht das Seil sie auf einen Bogen um den Haken. Ein Seil zieht nur, es drückt nie — darum PHYS2D_ADD_ROPE, „höchstens so weit“."),
+
+  H.h3("Erfinden: eine Brücke aus Brettern"),
+
+  H.p("Eine Möglichkeit (code/loesungen/kap10_bruecke.dh): zwei feste Pfosten, dazwischen zwölf Bretter, und an jeder Stelle, an der sich zwei berühren, ein Scharnier:"),
+
+  ...neu("loesungen/kap10_bruecke.dh").map((t) => H.code(t)),
+
+  H.pmix(["Das Scharnier sitzt bei ", ["x - 380 / 24", true], ", einer halben Brettlänge links von der Brettmitte — dort, wo das Brett das vorige berührt. Das erste Brett hängt am linken Pfosten, das letzte am rechten. Vergleiche mit Kapitel 9: Dort waren es Punkte und Glieder, und wir haben jede Zeile der Rechnung selbst geschrieben. Hier sind es echte Bretter mit Breite, auf die Klötze fallen und liegen bleiben — mit einer Handvoll Befehlen."]),
+
+  H.h2("Kapitel 11 · Sanft ankommen"),
+
+  H.h3("Drehen 1"),
+
+  H.p("in_back holt Schwung: Der Punkt fährt erst ein Stück nach links, hinter den Start, und dann immer schneller nach rechts — das Gegenstück zu out_back. inout_elastic schwingt an beiden Enden: am Anfang zittert er um den Start, schießt dann in wenigen weiten Sprüngen hinüber und zittert am Ende um das Ziel, ein Stück darüber hinaus. in_bounce hüpft am Anfang ein paar kleine Sprünge auf der Stelle und fährt dann los. Die Regel dahinter: in_x ist out_x rückwärts abgespielt."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Mit spaeter(0) kommen alle vier Knöpfe gleichzeitig, als ein Block — die Staffelung ist weg, und das Menü wirkt sofort steifer. Mit spaeter(i * 0.3) wartet der letzte Knopf 90 Prozent der Zeit und muss den ganzen Weg in den restlichen 0,12 Sekunden fahren: Er schießt herein. Die Verzüge sollten so klein sein, dass alle Knöpfe noch genug Zeit für ihren Weg haben."),
+
+  H.h3("Drehen 3"),
+
+  H.p("s bestimmt, wie weit die Kurve über das Ziel hinausschießt. Mit s = 0 wird aus zurueck die Formel 1 + q³ — genau out_cubic: sanft ankommen, ohne Überschießen. Mit s = 1,70158 sind es etwa zehn Prozent des Wegs, rund 53 Punkte. Mit s = 4 sind es fast vierzig Prozent, über 200 Punkte: Die Knöpfe fliegen weit nach rechts und kommen dann zurück, als wären sie an einem Gummiband."),
+
+  H.h3("Erweitern 1: eigene Kurven"),
+
+  H.p("Zwei Funktionen, die p bekommen und den Anteil des Wegs liefern, und zwei Tweens mehr (code/loesungen/kap11_eigene.dh):"),
+
+  ...neu("loesungen/kap11_eigene.dh").map((t) => H.code(t)),
+
+  H.pmix(["treppe rundet p auf Viertel auf: Bis p = 0,25 ist der Punkt schon ein Viertel weit, dann steht er, bis p über 0,25 kommt, und so fort. Ein Tween, dessen Kurve springt, springt eben auch. zittern ist p plus eine kleine Welle, ", ["(1 - p)", true], " lässt sie zum Ende hin ausklingen, damit der Punkt genau am Ziel ankommt. Eine Kurve darf alles, solange sie bei p = 1 den Wert 1 liefert — sonst endet der Tween woanders als bei seinem Ende."]),
+
+  H.h3("Erweitern 2: eine Kette von Bewegungen"),
+
+  H.p("Ein eigenes kleines Programm (code/loesungen/kap11_kette.dh). Eine Strecke sind zwei Tweens, einer für x, einer für y, mit derselben Kurve; an jeder Ecke steht die Kurve, mit der es von dort weitergeht:"),
+
+  H.code(zeilen("loesungen/kap11_kette.dh")),
+
+  H.p("Der Trick ist TWEEN_DONE: Sobald die laufende Strecke fertig ist, legt strecke die nächste an, beginnend genau an der Ecke, an der die vorige endete. Darum gibt es keinen Sprung, obwohl jede Strecke ein neuer Tween ist."),
+
+  H.h3("Erfinden: ein Titelbildschirm"),
+
+  H.p("Eine Möglichkeit (code/loesungen/kap11_titel.dh): Jeder Buchstabe des Titels bekommt einen Tween für seine Höhe, mit einer Hüpfkurve, die wie spaeter um einen kleinen Verzug versetzt ist:"),
+
+  ...neu("loesungen/kap11_titel.dh").map((t) => H.code(t)),
+
+  H.p("huepfen ist aus drei Bögen gebaut: erst ein Fall bis ganz unten (4 · p² erreicht bei p = 0,5 die 1), dann ein kleiner Sprung auf 88 Prozent und zurück, dann ein winziger. Das Menü fährt jetzt doppelt so lange und beginnt erst nach 45 Prozent der Zeit — wenn der Titel fast steht. Alles hängt am selben Werkzeug: eine Funktion, die eine Kurve herstellt."),
+
+  H.h2("Kapitel 12 · Ein Garten wächst"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Mit 10 Grad wird der Baum schmal und hoch, die Krone ein Fächer wie bei einem Besen. Mit 60 Grad biegen sich die Äste nach drei Gabeln wieder nach unten, und es entsteht ein Muster aus Sechsecken wie Bienenwaben. Mit 0.5 bleibt ein kleines Bäumchen: Die Äste schrumpfen so schnell, dass alles über dem Stamm zusammen kürzer ist als der Stamm selbst — 110 · (0,5 + 0,25 + …) bleibt unter 110. Mit 0.85 wird er riesig, wächst oben aus dem Fenster, und die Äste kreuzen sich: Die Längen über dem Stamm ergeben zusammen gut 470 Punkte."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Bei Tiefe 14 sind es 32 767 Linien statt 1023 — jede Tiefe mehr verdoppelt sie. Zu sehen ist kaum ein Unterschied: Die neuen Ästchen sind 110 · 0,72¹⁴ ≈ 1 Punkt lang, die Krone wird am Rand nur etwas dichter. Bezahlt wird mit Zeit: Auf meinem Rechner fiel das Programm von 60 auf 50 Bilder je Sekunde. Mehr Tiefe, als das Auge auflöst, ist verschwendet."),
+
+  H.h3("Drehen 3"),
+
+  H.p("Der Farn wird schlanker und steht steiler, mehr wie eine Feder oder ein Grashalm. Ein einziger Winkel im Bauplan verändert die ganze Pflanze, weil er in jeder Generation an jeder Verzweigung wirkt."),
+
+  H.h3("Erweitern 1: Wind im Baum"),
+
+  H.p("Eine Neigung, die in jedem Bild aus der Uhr kommt, und ast addiert sie zu beiden Zweigen — umso mehr, je weiter außen die Gabel sitzt (code/loesungen/kap12_wind.dh):"),
+
+  ...neu("loesungen/kap12_wind.dh").map((t) => H.code(t)),
+
+  H.p("Weil jede Gabel ihre Neigung zur Richtung ihres Astes dazuzählt, summiert sie sich nach außen: Der Stamm bewegt sich gar nicht, die Spitzen am meisten — wie bei einem echten Baum. Zwei Sinuswellen mit verschiedenem Tempo übereinander ergeben ein unregelmäßiges Wiegen statt eines gleichmäßigen Pendelns."),
+
+  H.h3("Erweitern 2: Jahreszeiten"),
+
+  H.p("Die Jahreszeit ist eine Zahl von 0 bis 4, die mit der Uhr wandert, und blatt macht daraus eine Farbe — oder -1 für „kein Blatt“ (code/loesungen/kap12_jahreszeiten.dh):"),
+
+  ...neu("loesungen/kap12_jahreszeiten.dh").map((t) => H.code(t)),
+
+  H.pmix(["Blätter wachsen nur bei ", ["tiefe = 0", true], ", an den äußersten Spitzen — dort, wo die Rekursion endet. Im SELECT CASE nach INT(j) ist j selbst der genaue Stand im Jahr: Im Herbst wandert der Farbton mit ", ["55 - (j - 2) * 50", true], " von Gelb (55) nach Rot (5)."]),
+
+  H.h3("Erfinden: die Drachenkurve"),
+
+  H.p("Ein eigenes kleines Programm mit derselben Art Bauplan, aber zwei Regeln für X und Y, rechten Winkeln und ohne Klammern (code/loesungen/kap12_drache.dh):"),
+
+  H.code(zeilen("loesungen/kap12_drache.dh")),
+
+  H.p("Faltet man einen Papierstreifen immer wieder in der Mitte und klappt ihn danach so auf, dass jede Falte einen rechten Winkel bildet, entsteht genau diese Kurve — Generation 12 sind zwölf Faltungen. Jede Generation macht den Drachen um den Faktor √2 größer; darum schrumpft der Schritt um denselben Faktor, und das Bild bleibt gleich groß. Die Farbe zählt die Striche mit, so sieht man, wie die eine Linie durch das ganze Bild läuft."),
 ];

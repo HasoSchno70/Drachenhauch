@@ -1,0 +1,96 @@
+' Kapitel 9, zum Vergleich -- dasselbe Seil, aber jedes Glied ist eine
+' Feder, und jeder Punkt hat eine Geschwindigkeit, die Kraefte aendern.
+' Tasten 1, 2, 3: weiche, mittlere, harte Federn (das Seil faengt neu an).
+IMPORT "vec2"
+CONST BREITE = 800
+CONST HOEHE = 500
+CONST PUNKTE = 20
+CONST GLIED = 15.0
+CONST SCHWERE = 900.0
+CONST TAKT = 1.0 / 60
+
+' Wie hart die Federn sind: Kraft je Punkt, um den ein Glied zu lang ist.
+DIM feder AS FLOAT : feder = 400
+
+DIM ort AS ARRAY OF VEC2
+DIM tempo AS ARRAY OF VEC2
+
+' Das Seil waagrecht auslegen, alles in Ruhe.
+SUB neu()
+    ort = []
+    tempo = []
+    DIM i AS INTEGER
+    FOR i = 0 TO PUNKTE - 1
+        ARRAY_PUSH(ort, VEC2_NEW(400 + i * GLIED, 80))
+        ARRAY_PUSH(tempo, VEC2_ZERO())
+    NEXT
+END SUB
+
+' Die Kraft der Feder zwischen a und b, auf a: zieht, wenn sie zu lang
+' ist, drueckt, wenn sie zu kurz ist.
+FUNCTION federKraft(a AS INTEGER, b AS INTEGER) AS VEC2
+    DIM d AS VEC2 : d = ort[b] - ort[a]
+    DIM l AS FLOAT : l = VEC2_LENGTH(d)
+    IF l = 0 THEN RETURN VEC2_ZERO()
+    RETURN d * ((l - GLIED) / l * feder)
+END FUNCTION
+
+SUB schritt()
+    ' Erst alle Kraefte, dann alle bewegen -- wie beim Schwarm.
+    DIM kraft AS ARRAY OF VEC2
+    DIM k AS INTEGER
+    FOR k = 0 TO PUNKTE - 1
+        DIM f AS VEC2 : f = VEC2_NEW(0, SCHWERE)
+        IF k > 0 THEN f = f + federKraft(k, k - 1)
+        IF k < PUNKTE - 1 THEN f = f + federKraft(k, k + 1)
+        ARRAY_PUSH(kraft, f)
+    NEXT
+    ' Punkt 0 ist fest.
+    FOR k = 1 TO PUNKTE - 1
+        tempo[k] = (tempo[k] + kraft[k] * TAKT) * 0.995
+        ort[k] = ort[k] + tempo[k] * TAKT
+    NEXT
+END SUB
+
+' Wie lang ist das Seil gerade?
+FUNCTION seilLaenge() AS FLOAT
+    DIM s AS FLOAT : s = 0
+    DIM k AS INTEGER
+    FOR k = 0 TO PUNKTE - 2
+        s = s + VEC2_DISTANCE(ort[k], ort[k + 1])
+    NEXT
+    RETURN s
+END FUNCTION
+
+SUB zeichnen()
+    CLS(RGB(20, 24, 36))
+    DIM k AS INTEGER
+    FOR k = 0 TO PUNKTE - 2
+        LINEW(ort[k].x, ort[k].y, ort[k + 1].x, ort[k + 1].y, 3, _
+              RGB(210, 180, 120))
+    NEXT
+    FOR k = 0 TO PUNKTE - 1
+        CIRCLE(ort[k].x, ort[k].y, IIF(k = 0, 6, 3), RGB(240, 220, 170))
+    NEXT
+    DIM soll AS FLOAT : soll = GLIED * (PUNKTE - 1)
+    DIM zeile AS STRING
+    zeile = "Feder " + STR$(INT(feder)) + "   Seil " _
+        + STR$(INT(seilLaenge())) + " lang (soll " + STR$(INT(soll)) + ")"
+    TEXT(8, 8, zeile, RGB(220, 225, 240))
+    FLIP()
+END SUB
+
+neu()
+SCREEN(BREITE, HOEHE, "Federn")
+DIM uhr AS FLOAT
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
+    IF KEY_HIT(KEY_1) THEN feder = 400 : neu()
+    IF KEY_HIT(KEY_2) THEN feder = 2000 : neu()
+    IF KEY_HIT(KEY_3) THEN feder = 4000 : neu()
+    uhr = MIN(uhr + DELTA(), 0.1)
+    WHILE uhr >= TAKT
+        schritt()
+        uhr = uhr - TAKT
+    WEND
+    zeichnen()
+WEND

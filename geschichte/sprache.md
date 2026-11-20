@@ -1132,3 +1132,67 @@ schwieg oder unklar sprach. Je ein Fall mit Gegenprobe:
 
 Dazu in der IDE: "1 Warnung" (deutsch) und "1 error" (englisch, ueber
 `trn$` und den Eintrag " Fehler, |1"), siehe `geschichte/ide.md`.
+
+Ein fuenfter Fund kam mit Kapitel 7 (Fallender Sand), dessen Entwurf
+versprach: "ENUM statt Zahlen -- ein Tippfehler faellt beim Uebersetzen
+auf". Er fiel erst beim Laufen auf ("stoff hat keinen Member 'snad'"),
+ohne Vorschlag, und `--check` schwieg; stand er in einer SUB, die nie
+lief, gar nicht. Jetzt sammelt der Vorlauf (`collect_globals_in`) die
+Werte jedes ENUM in `enum_werte`, und ein Zugriff `Name.WERT` auf einen
+Wert, den es nicht gibt, ist ein Compile-Fehler mit Vorschlag und Liste
+-- auch wenn das ENUM weiter unten steht. Eine lokale Variable oder ein
+Feld gleichen Namens verdeckt das ENUM. `enum.dhtest`, der alte Fall
+"unknown member raises" erwartet jetzt die neue Meldung; Gegenprobe: ohne
+die Pruefung fallen genau diese beiden Faelle.
+
+Ein sechster kam mit Kapitel 9 (Federn und Seile), das mit `VEC2` rechnet:
+`p.x` brach mit "Zugriff auf '.x' bei nicht-Objekt (VEC2)" ab, man musste
+in jeder Zeile `VEC2_X(p)` schreiben. Jetzt liest `member_laden` die
+Teile von VEC2, VEC3, VEC4 und QUAT wie Felder (`vektor_teil`, gross oder
+klein, auch im Maschinencode, der ueber dieselbe Stelle geht). Setzen
+bleibt verboten -- die Werte sind unveraenderlich --, aber die Meldung
+sagt das jetzt und nennt `VEC2_NEW(...)`. `modules_vec2.dhtest` (vier
+Faelle); Gegenproben: vertauschte Teile und ein abgeschalteter
+Setz-Zweig lassen je genau ihren Fall fallen.
+
+Ein siebter kam beim Umbrechen einer zu langen Kopfzeile im selben
+Kapitel: `SUB verbinden(a AS INTEGER, b AS INTEGER, breite AS FLOAT,`
+und auf der naechsten Zeile `farbe AS INTEGER)`. Einzeilig schwieg
+`--check`; zweizeilig meldete es jedes `breite` im Rumpf als "anders
+geschrieben als angelegt" -- angelegt sei es als `CONST BREITE`.
+`symbole::definitionen` las Parameter nur, wenn `(` und `)` auf derselben
+Zeile standen, und `schreibweise::gilt` ordnete einen Parameter nur der SUB
+zu, deren Kopf auf seiner Zeile beginnt. Jetzt liest `definitionen` einen
+offenen Kopf auf den Folgezeilen weiter (ein `_` am Ende ist kein Name),
+und ein Parameter gehoert zu der SUB, in deren Zeilen er steht. Springen,
+Umbenennen und Hover fanden solche Parameter vorher ebenso wenig.
+`schreibweise.dhtest` und ein Rust-Test in `symbole.rs`; Gegenproben: jede
+der beiden Stellen allein zurueckgesetzt laesst den Fall fallen.
+
+Kapitel 10 (Baelle in der Kiste) brachte zwei Funde in `physics2d`. Die
+Gliederung plante eine Uebung "Gelenke" -- das Modul hatte keine, obwohl
+die Welt intern schon einen `ImpulseJointSet` trug. Neu sind
+`PHYS2D_ADD_HINGE` (Scharnier um einen Weltpunkt, die beiden Koerper
+stossen sich nicht), `PHYS2D_ADD_ROPE` (hoechstens so weit auseinander)
+und `PHYS2D_REMOVE_JOINT`. Und ein entfernter oder nie angelegter Koerper
+lieferte still die Lage (0, 0) und das Tempo 0 -- er schien oben links zu
+stehen. Jetzt prueft jeder Befehl mit einem Koerper die Nummer
+(`phys2d_koerper`) und bricht mit einer Meldung ab; `PHYS2D_BODY_EXISTS`
+fragt vorher. Zweimal entfernen bleibt ohne Fehler. **Aendert bestehende
+Programme:** wer einen entfernten Koerper weiter abfragt, bekommt jetzt
+eine Meldung statt (0, 0). `physics2d.dhtest` (sechs Faelle); Gegenproben:
+`gibt_es` immer wahr, ein Seil ohne Gelenk und ein Scharnier mit falschem
+Anker lassen je genau ihre Faelle fallen. `physics3d` hat dieselbe stille
+(0, 0) noch.
+
+Kapitel 11 (Sanft ankommen) sollte zeigen, wie man eine Kurve als
+Funktion uebergibt statt fuenf fast gleicher Befehle -- `TWEEN_NEW` nahm
+aber nur einen Namen. Jetzt nimmt es auch eine Funktion (FUNCREF, Lambda,
+gebundene Methode); sie bekommt den Fortschritt 0..1 und liefert den
+Anteil des Wegs. `TWEEN_NEW` bleibt rein und merkt sie sich
+(`TweenObj::kurve`), `TWEEN_VALUE` rechnet seitdem in der Familie 2
+(`Vm::tween_wert`, wie ARRAY_MAP), weil es Drachenhauch-Code ruft -- der
+Maschinencode laesst die Familie ohnehin aus, und `gerufenes_harmlos`
+kennt den Namen. Benannte Kurven rechnet dieselbe `builtins::ease`.
+`modules_tween.dhtest` (vier Faelle); Gegenprobe: ohne den Aufruf der
+Kurve fallen genau die drei, die sie betreffen.

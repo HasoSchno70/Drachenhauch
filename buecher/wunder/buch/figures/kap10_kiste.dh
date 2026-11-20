@@ -1,0 +1,3 @@
+' Bild fuer Kapitel 10: die Kiste.
+RANDOMIZE(4)
+IMPORT "../../code/kap10/1_kiste.dh"

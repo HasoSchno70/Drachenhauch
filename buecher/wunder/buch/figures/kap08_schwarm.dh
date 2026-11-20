@@ -1,0 +1,3 @@
+' Bild fuer Kapitel 8: der Schwarm.
+RANDOMIZE(3)
+IMPORT "../../code/kap08/2_schwarm.dh"

@@ -1,0 +1,4 @@
+' Bild fuer Kapitel 6: das Spiel des Lebens nach einigen Generationen,
+' mit fester Saat.
+RANDOMIZE(7)
+IMPORT "../../code/kap06/2_leben.dh"

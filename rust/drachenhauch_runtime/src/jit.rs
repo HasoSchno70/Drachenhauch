@@ -1156,7 +1156,9 @@ fn gerufenes_harmlos<'a>(prog: &'a Program, f: &'a Func, b: &Bereich, start: Vec
                     // Rueckruf rufen (GTK bei gtk_notebook_remove_page das
                     // Signal page-removed) -- und der saehe die Globalen, die
                     // der Bereich gerade haelt, als NIL.
+                    // TWEEN_VALUE ruft eine eigene Kurve (FUNCREF).
                     if n == "sort" || n == "__comp_iter" || n.starts_with("coro_") || n.starts_with("task_")
+                        || n == "tween_value"
                         || n == "gui_update" || n == "timer_update" || n == "exit" || n == "end"
                         || (n == "__ffi" && crate::ffi::rueckrufe_vergeben()) {
                         return Err(format!("{}: {} ruft {}", name, g.name, n.to_uppercase()));

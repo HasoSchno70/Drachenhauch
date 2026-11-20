@@ -1,0 +1,61 @@
+' Kapitel 8, Schritt 1 -- Voegel, die geradeaus fliegen. Noch kein
+' Schwarm: jeder fliegt fuer sich.
+CONST BREITE = 800
+CONST HOEHE = 500
+CONST ANZAHL = 150
+CONST FLUGTEMPO = 120.0
+
+CLASS Vogel
+    DIM x AS FLOAT
+    DIM y AS FLOAT
+    DIM vx AS FLOAT
+    DIM vy AS FLOAT
+
+    ' Ein neuer Vogel: irgendwo, in irgendeine Richtung.
+    SUB Init()
+        x = RND() * BREITE
+        y = RND() * HOEHE
+        DIM w AS FLOAT : w = RND() * 2 * PI
+        vx = COS(w) * FLUGTEMPO
+        vy = SIN(w) * FLUGTEMPO
+    END SUB
+
+    SUB bewegen(dt AS FLOAT)
+        x = x + vx * dt
+        y = y + vy * dt
+        ' Wer hinausfliegt, kommt auf der anderen Seite wieder herein.
+        IF x < 0 THEN x = x + BREITE
+        IF x >= BREITE THEN x = x - BREITE
+        IF y < 0 THEN y = y + HOEHE
+        IF y >= HOEHE THEN y = y - HOEHE
+    END SUB
+
+    ' Ein schmales Dreieck, das in Flugrichtung zeigt.
+    SUB zeichnen()
+        DIM w AS FLOAT : w = ATAN2(vy, vx)
+        DIM sx AS FLOAT : sx = x + COS(w) * 8
+        DIM sy AS FLOAT : sy = y + SIN(w) * 8
+        DIM lx AS FLOAT : lx = x + COS(w + 2.5) * 5
+        DIM ly AS FLOAT : ly = y + SIN(w + 2.5) * 5
+        DIM rx AS FLOAT : rx = x + COS(w - 2.5) * 5
+        DIM ry AS FLOAT : ry = y + SIN(w - 2.5) * 5
+        TRIANGLE(sx, sy, lx, ly, rx, ry, RGB(230, 236, 250))
+    END SUB
+END CLASS
+
+DIM schwarm AS ARRAY OF Vogel
+DIM i AS INTEGER
+FOR i = 1 TO ANZAHL
+    ARRAY_PUSH(schwarm, NEW Vogel())
+NEXT
+
+SCREEN(BREITE, HOEHE, "Voegel")
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
+    DIM dt AS FLOAT : dt = DELTA()
+    CLS(RGB(18, 26, 48))
+    FOR EACH v IN schwarm
+        v.bewegen(dt)
+        v.zeichnen()
+    NEXT
+    FLIP()
+WEND

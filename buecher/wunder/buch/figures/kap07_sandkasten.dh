@@ -1,0 +1,4 @@
+' Bild fuer Kapitel 7: der Sandkasten nach einigen Sekunden, mit
+' fester Saat.
+RANDOMIZE(3)
+IMPORT "../../code/kap07/2_sandkasten.dh"

@@ -1,0 +1,58 @@
+' Loesung zu Kapitel 12, Erfinden: ein eigenes Regelwerk -- die
+' Drachenkurve. Zwei Regeln, Winkel 90 Grad; jede Generation faltet die
+' Linie noch einmal. Pfeil hoch und runter aendern die Generation.
+CONST BREITE = 800
+CONST HOEHE = 500
+
+FUNCTION ausrollen(wort AS STRING, regeln AS MAP OF STRING, _
+                   tiefe AS INTEGER) AS STRING
+    IF tiefe = 0 THEN RETURN wort
+    DIM neu AS STRING : neu = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(wort) - 1
+        DIM z AS STRING : z = MID$(wort, i, 1)
+        neu = neu + IIF(MAP_HAS(regeln, z), regeln[z], z)
+    NEXT
+    RETURN ausrollen(neu, regeln, tiefe - 1)
+END FUNCTION
+
+' Die Schildkroete: F ein Schritt, + und - eine Vierteldrehung. Die
+' Farbe wandert ueber die Linie, damit man sieht, wie sie sich faltet.
+SUB zeichnen(wort AS STRING, schritt AS FLOAT)
+    DIM x AS FLOAT : x = 516
+    DIM y AS FLOAT : y = 218
+    DIM w AS FLOAT : w = 0
+    DIM n AS INTEGER : n = 0
+    ' So viele F stehen im Wort -- jedes F wird ein Strich.
+    DIM alle AS INTEGER
+    alle = MAX(1, LEN(REPLACE$(wort, "F", "FF")) - LEN(wort))
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(wort) - 1
+        SELECT CASE MID$(wort, i, 1)
+            CASE "F"
+                DIM nx AS FLOAT : nx = x + COS(RAD(w)) * schritt
+                DIM ny AS FLOAT : ny = y + SIN(RAD(w)) * schritt
+                LINE(x, y, nx, ny, HSV(n * 300 / alle, 0.7, 0.9))
+                x = nx : y = ny
+                n = n + 1
+            CASE "+" : w = w + 90
+            CASE "-" : w = w - 90
+        END SELECT
+    NEXT
+END SUB
+
+DIM regeln AS MAP OF STRING
+regeln = {"X": "X+YF+", "Y": "-FX-Y"}
+DIM generation AS INTEGER : generation = 12
+SCREEN(BREITE, HOEHE, "Drachenkurve")
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
+    IF KEY_HIT(KEY_UP) THEN generation = MIN(generation + 1, 14)
+    IF KEY_HIT(KEY_DOWN) THEN generation = MAX(generation - 1, 1)
+    CLS(RGB(18, 20, 30))
+    ' Jede Generation ist um den Faktor Wurzel 2 groesser -- der Schritt
+    ' schrumpft entsprechend, damit der Drache ins Bild passt.
+    DIM schritt AS FLOAT : schritt = 280 / SQR(2) ^ generation
+    zeichnen(ausrollen("FX", regeln, generation), schritt)
+    TEXT(10, 10, "Generation " + STR$(generation), RGB(200, 205, 220))
+    FLIP()
+WEND

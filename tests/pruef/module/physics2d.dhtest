@@ -205,3 +205,76 @@ PRINT "wach "; NOT PHYS2D_SLEEPING(w, b)
 --- erwartet
 noch TRUE still TRUE nah am start TRUE
 wach TRUE
+
+=== ein koerper den es nicht gibt meldet sich
+' Frueher lieferte ein entfernter oder nie angelegter Koerper still die Lage
+' (0, 0) -- er schien oben links zu stehen. Jetzt fragt PHYS2D_BODY_EXISTS,
+' und jeder andere Befehl bricht ab. Zweimal entfernen schadet nicht.
+IMPORT "physics2d"
+DIM w AS PHYS2D_WORLD : w = PHYS2D_NEW()
+DIM b AS INTEGER : b = PHYS2D_ADD_BOX(w, 100.0, 100.0, 10.0, 10.0, TRUE, 0.2)
+PRINT PHYS2D_BODY_EXISTS(w, b); " "; PHYS2D_BODY_EXISTS(w, 7)
+PHYS2D_REMOVE(w, b)
+PHYS2D_REMOVE(w, b)
+PRINT PHYS2D_BODY_EXISTS(w, b)
+--- erwartet
+TRUE FALSE
+FALSE
+
+=== die lage eines entfernten koerpers ist ein fehler
+IMPORT "physics2d"
+DIM w AS PHYS2D_WORLD : w = PHYS2D_NEW()
+DIM b AS INTEGER : b = PHYS2D_ADD_BOX(w, 100.0, 100.0, 10.0, 10.0, TRUE, 0.2)
+PHYS2D_REMOVE(w, b)
+PRINT PHYS2D_BODY_X(w, b)
+--- fehler
+PHYS2D_BODY_X: einen Koerper 0 gibt es nicht
+
+=== scharnier haelt ein pendel auf abstand
+' Ein Kasten haengt 100 neben einem festen Anker am Scharnier: er schwingt
+' nach unten, bleibt aber 100 vom Drehpunkt entfernt.
+IMPORT "physics2d"
+DIM w AS PHYS2D_WORLD : w = PHYS2D_NEW()
+DIM anker AS INTEGER : anker = PHYS2D_ADD_BOX(w, 200.0, 100.0, 5.0, 5.0, FALSE, 0.0)
+DIM k AS INTEGER : k = PHYS2D_ADD_BOX(w, 300.0, 100.0, 10.0, 10.0, TRUE, 0.0)
+DIM j AS INTEGER : j = PHYS2D_ADD_HINGE(w, anker, k, 200.0, 100.0)
+DIM i AS INTEGER
+FOR i = 1 TO 30 : PHYS2D_STEP(w, 1.0 / 60) : NEXT
+DIM d AS FLOAT : d = HYPOT(PHYS2D_BODY_X(w, k) - 200.0, PHYS2D_BODY_Y(w, k) - 100.0)
+PRINT "nummer "; j; " geschwungen "; PHYS2D_BODY_Y(w, k) > 150.0; " abstand "; ABS(d - 100.0) < 2.0
+--- erwartet
+nummer 0 geschwungen TRUE abstand TRUE
+
+=== seil haelt und laesst nach remove_joint los
+IMPORT "physics2d"
+DIM w AS PHYS2D_WORLD : w = PHYS2D_NEW()
+DIM anker AS INTEGER : anker = PHYS2D_ADD_BOX(w, 200.0, 100.0, 5.0, 5.0, FALSE, 0.0)
+DIM ball AS INTEGER : ball = PHYS2D_ADD_CIRCLE(w, 200.0, 150.0, 10.0, TRUE, 0.0)
+DIM seil AS INTEGER : seil = PHYS2D_ADD_ROPE(w, anker, ball, 100.0)
+DIM i AS INTEGER
+FOR i = 1 TO 90 : PHYS2D_STEP(w, 1.0 / 60) : NEXT
+PRINT "haengt "; ABS(PHYS2D_BODY_Y(w, ball) - 200.0) < 2.0
+PHYS2D_REMOVE_JOINT(w, seil)
+PHYS2D_REMOVE_JOINT(w, seil)
+FOR i = 1 TO 30 : PHYS2D_STEP(w, 1.0 / 60) : NEXT
+PRINT "faellt "; PHYS2D_BODY_Y(w, ball) > 300.0
+--- erwartet
+haengt TRUE
+faellt TRUE
+
+=== ein gelenk mit sich selbst
+IMPORT "physics2d"
+DIM w AS PHYS2D_WORLD : w = PHYS2D_NEW()
+DIM k AS INTEGER : k = PHYS2D_ADD_BOX(w, 100.0, 100.0, 10.0, 10.0, TRUE, 0.0)
+PHYS2D_ADD_HINGE(w, k, k, 100.0, 100.0)
+--- fehler
+PHYS2D_ADD_HINGE: ein Koerper kann nicht mit sich selbst verbunden werden (0)
+
+=== ein seil mit negativer laenge
+IMPORT "physics2d"
+DIM w AS PHYS2D_WORLD : w = PHYS2D_NEW()
+DIM k AS INTEGER : k = PHYS2D_ADD_BOX(w, 100.0, 100.0, 10.0, 10.0, TRUE, 0.0)
+DIM m AS INTEGER : m = PHYS2D_ADD_BOX(w, 150.0, 100.0, 10.0, 10.0, TRUE, 0.0)
+PHYS2D_ADD_ROPE(w, k, m, -5)
+--- fehler
+PHYS2D_ADD_ROPE: die Laenge muss 0 oder mehr sein, nicht -5

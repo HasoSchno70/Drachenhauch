@@ -1,0 +1,11 @@
+// Bild fuer Kapitel 9: die Mitte der Fahrbahn greifen (400, 335) und
+// nach unten ziehen. Mausstellen mal 2 (SKALIERUNG).
+c 9
+e 0 7 800 670 0 0
+e 60 7 800 670 0 0
+e 62 6 0 0 0 0
+e 66 7 800 700 0 0
+e 70 7 800 730 0 0
+e 74 7 805 760 0 0
+e 78 7 810 790 0 0
+e 82 7 815 800 0 0

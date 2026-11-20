@@ -1,0 +1,100 @@
+' Kapitel 11 -- ein Menue, dessen Knoepfe nacheinander hereingleiten und
+' federnd an ihrem Platz ankommen. Unter der Maus rueckt ein Knopf ein
+' Stueck vor; ein Klick schickt alle hinaus, der naechste holt sie
+' zurueck.
+IMPORT "tween"
+CONST BREITE = 800
+CONST HOEHE = 500
+CONST KNOPF_B = 260
+CONST KNOPF_H = 54
+CONST ZIEL_X = 270
+CONST DAUER = 1200
+
+DIM texte AS ARRAY OF STRING
+texte = ["Neues Spiel", "Weiterspielen", "Einstellungen", "Beenden"]
+
+' Ueberschiessen und zurueckfedern -- dieselbe Form wie "out_back", hier
+' selbst geschrieben, damit sie in die Kurve spaeter passt.
+FUNCTION zurueck(p AS FLOAT) AS FLOAT
+    DIM s AS FLOAT : s = 1.70158
+    DIM q AS FLOAT : q = p - 1
+    RETURN 1 + q * q * ((s + 1) * q + s)
+END FUNCTION
+
+' Eine Kurve, die erst nach dem Anteil `verzug` der Zeit losfaehrt, dann
+' wie zurueck faehrt. Das Ergebnis ist eine Funktion.
+FUNCTION spaeter(verzug AS FLOAT) AS FUNCREF
+    RETURN FUNCTION(p) zurueck(MAX(0.0, (p - verzug) / (1 - verzug)))
+END FUNCTION
+
+' Je Knopf: die Fahrt herein und der kleine Schub unter der Maus.
+DIM fahrt AS ARRAY OF TWEEN
+DIM schub AS ARRAY OF TWEEN
+DIM unterMaus AS ARRAY OF BOOLEAN
+DIM i AS INTEGER
+FOR i = 0 TO LEN(texte) - 1
+    DIM kurve AS FUNCREF : kurve = spaeter(i * 0.15)
+    ARRAY_PUSH(fahrt, TWEEN_NEW(-KNOPF_B, ZIEL_X, DAUER, kurve))
+    ARRAY_PUSH(schub, TWEEN_NEW(0.0, 0.0, 0))
+    ARRAY_PUSH(unterMaus, FALSE)
+NEXT
+
+FUNCTION knopfY(k AS INTEGER) AS FLOAT
+    RETURN 170 + k * 72
+END FUNCTION
+
+FUNCTION knopfX(k AS INTEGER) AS FLOAT
+    RETURN TWEEN_VALUE(fahrt[k]) + TWEEN_VALUE(schub[k])
+END FUNCTION
+
+' Kommt die Maus auf einen Knopf oder geht sie, faehrt sein Schub vom
+' AKTUELLEN Wert zum neuen Ziel -- nicht von einem festen Anfang.
+SUB mausPruefen()
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(texte) - 1
+        DIM x AS FLOAT : x = knopfX(k)
+        DIM y AS FLOAT : y = knopfY(k)
+        DIM drauf AS BOOLEAN
+        drauf = MOUSE_X() >= x AND MOUSE_X() <= x + KNOPF_B _
+            AND MOUSE_Y() >= y AND MOUSE_Y() <= y + KNOPF_H
+        IF drauf <> unterMaus[k] THEN
+            DIM ziel AS FLOAT : ziel = IIF(drauf, 18.0, 0.0)
+            DIM jetzt AS FLOAT : jetzt = TWEEN_VALUE(schub[k])
+            schub[k] = TWEEN_NEW(jetzt, ziel, 180, "out_quad")
+            unterMaus[k] = drauf
+        END IF
+    NEXT
+END SUB
+
+SUB zeichnen()
+    CLS(RGB(30, 34, 54))
+    TEXT_SIZE(40)
+    TEXT(ZIEL_X, 70, "Kleine Wunder", RGB(250, 210, 120))
+    TEXT_SIZE(22)
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(texte) - 1
+        DIM x AS FLOAT : x = knopfX(k)
+        DIM y AS FLOAT : y = knopfY(k)
+        DIM farbe AS INTEGER
+        farbe = IIF(unterMaus[k], RGB(90, 120, 210), RGB(60, 70, 110))
+        BOXROUND(x, y, x + KNOPF_B, y + KNOPF_H, 10, farbe)
+        TEXT(x + 24, y + 15, texte[k], RGB(235, 238, 250))
+    NEXT
+    FLIP()
+END SUB
+
+SCREEN(BREITE, HOEHE, "Menue")
+FOR i = 0 TO LEN(texte) - 1
+    TWEEN_RESTART(fahrt[i])
+NEXT
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
+    mausPruefen()
+    ' Ein Klick schickt alle Knoepfe hinaus oder holt sie zurueck:
+    ' TWEEN_REVERSE tauscht Anfang und Ende und faengt neu an.
+    IF MOUSE_HIT(0) THEN
+        FOR i = 0 TO LEN(texte) - 1
+            TWEEN_REVERSE(fahrt[i])
+        NEXT
+    END IF
+    zeichnen()
+WEND

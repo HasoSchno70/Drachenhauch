@@ -1,0 +1,139 @@
+' Loesung zu Kapitel 10, Erweitern 2: eine Abrissbirne -- ein schwerer
+' Ball an einem Seil (PHYS2D_ADD_ROPE), der in die Tuerme schwingt.
+' Die Stellen, die neu sind, stehen zwischen >>> und <<<.
+IMPORT "physics2d"
+IMPORT "vec2"
+CONST BREITE = 800
+CONST HOEHE = 500
+CONST TAKT = 1.0 / 60
+CONST STEIN = 14
+CONST BODEN = 480
+
+DIM welt AS PHYS2D_WORLD
+DIM koerper AS ARRAY OF INTEGER
+DIM rund AS ARRAY OF BOOLEAN
+DIM halbB AS ARRAY OF FLOAT
+DIM halbH AS ARRAY OF FLOAT
+DIM farbe AS ARRAY OF INTEGER
+' >>> neu
+DIM haken AS INTEGER
+DIM birne AS INTEGER
+' <<< neu
+
+' Einen Koerper anlegen und sich merken, wie er aussieht.
+SUB merken(k AS INTEGER, istRund AS BOOLEAN, hb AS FLOAT, hh AS FLOAT, _
+           f AS INTEGER)
+    ARRAY_PUSH(koerper, k)
+    ARRAY_PUSH(rund, istRund)
+    ARRAY_PUSH(halbB, hb)
+    ARRAY_PUSH(halbH, hh)
+    ARRAY_PUSH(farbe, f)
+END SUB
+
+' Ein Klotz: halbe Breite hb, halbe Hoehe hh, kaum Sprungkraft.
+SUB klotz(x AS FLOAT, y AS FLOAT, hb AS FLOAT, hh AS FLOAT)
+    DIM k AS INTEGER
+    k = PHYS2D_ADD_BOX(welt, x, y, hb, hh, TRUE, 0.05)
+    merken(k, FALSE, hb, hh, HSV(RANDINT(20, 40), 0.65, 0.85))
+END SUB
+
+' Ein Turm: zwei Saeulen aus je HOCH Steinen, oben ein Brett darueber.
+SUB turm(x AS FLOAT, hoch AS INTEGER)
+    DIM i AS INTEGER
+    FOR i = 0 TO hoch - 1
+        DIM y AS FLOAT : y = BODEN - STEIN - i * STEIN * 2
+        klotz(x - 24, y, STEIN, STEIN)
+        klotz(x + 24, y, STEIN, STEIN)
+    NEXT
+    klotz(x, BODEN - hoch * STEIN * 2 - 6, 46, 6)
+END SUB
+
+SUB aufbauen()
+    welt = PHYS2D_NEW()
+    koerper = [] : rund = [] : halbB = [] : halbH = [] : farbe = []
+    ' Der Boden: 800 breit, 20 hoch, fest.
+    PHYS2D_ADD_BOX(welt, 400, BODEN + 10, 400, 10, FALSE, 0.2)
+    turm(480, 4)
+    turm(590, 6)
+    turm(700, 3)
+    ' >>> neu
+    ' Oben ein fester Haken, links davon die Birne, 280 lang am Seil. Sie
+    ' haengt zuerst lose und schwingt dann nach rechts in die Tuerme.
+    haken = PHYS2D_ADD_BOX(welt, 450, 60, 6, 6, FALSE, 0.0)
+    birne = PHYS2D_ADD_CIRCLE(welt, 180, 120, 26, TRUE, 0.1)
+    PHYS2D_ADD_ROPE(welt, haken, birne, 280)
+    merken(birne, TRUE, 26, 26, RGB(60, 60, 70))
+    ' <<< neu
+END SUB
+
+' Die Schleuder
+DIM schleuder AS VEC2 : schleuder = VEC2_NEW(110, 360)
+DIM zielt AS BOOLEAN
+
+' Wohin der Ball beim Zielen gezogen ist -- hoechstens 100 weit.
+FUNCTION zug() AS VEC2
+    DIM d AS VEC2 : d = VEC2_NEW(MOUSE_X(), MOUSE_Y()) - schleuder
+    IF VEC2_LENGTH(d) > 100 THEN d = VEC2_NORMALIZE(d) * 100
+    RETURN d
+END FUNCTION
+
+SUB abschiessen()
+    DIM k AS INTEGER
+    k = PHYS2D_ADD_CIRCLE(welt, schleuder.x, schleuder.y, 14, TRUE, 0.3)
+    ' In die Gegenrichtung des Zugs, je weiter gezogen, desto schneller.
+    DIM v AS VEC2 : v = zug() * -12
+    PHYS2D_SET_VEL(welt, k, v.x, v.y)
+    merken(k, TRUE, 14, 14, RGB(220, 70, 60))
+END SUB
+
+SUB zeichnen()
+    CLS(RGB(150, 190, 225))
+    BOX(0, BODEN, BREITE, HOEHE, RGB(90, 140, 70))
+    ' Die Schleuder: ein Pfosten und, beim Zielen, Gummi und Ball.
+    DIM holz AS INTEGER : holz = RGB(110, 80, 50)
+    BOX(schleuder.x - 4, schleuder.y, schleuder.x + 4, BODEN, holz)
+    IF zielt THEN
+        DIM b AS VEC2 : b = schleuder + zug()
+        LINEW(schleuder.x, schleuder.y, b.x, b.y, 3, RGB(70, 40, 30))
+        CIRCLE(b.x, b.y, 14, RGB(220, 70, 60))
+    ELSE
+        CIRCLE(schleuder.x, schleuder.y, 14, RGB(220, 70, 60))
+    END IF
+    ' >>> neu
+    ' Das Seil: eine Linie vom Haken zur Birne.
+    LINEW(PHYS2D_BODY_X(welt, haken), PHYS2D_BODY_Y(welt, haken), _
+          PHYS2D_BODY_X(welt, birne), PHYS2D_BODY_Y(welt, birne), _
+          2, RGB(60, 50, 40))
+    ' <<< neu
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(koerper) - 1
+        DIM x AS FLOAT : x = PHYS2D_BODY_X(welt, koerper[i])
+        DIM y AS FLOAT : y = PHYS2D_BODY_Y(welt, koerper[i])
+        DIM w AS FLOAT : w = PHYS2D_BODY_ANGLE(welt, koerper[i])
+        IF rund[i] THEN
+            CIRCLE(x, y, halbB[i], farbe[i])
+        ELSE
+            BOXROT(x, y, halbB[i] * 2, halbH[i] * 2, DEG(w), farbe[i])
+        END IF
+    NEXT
+    FLIP()
+END SUB
+
+aufbauen()
+SCREEN(BREITE, HOEHE, "Tuerme")
+DIM uhr AS FLOAT
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
+    DIM maus AS VEC2 : maus = VEC2_NEW(MOUSE_X(), MOUSE_Y())
+    IF MOUSE_HIT(0) THEN zielt = VEC2_DISTANCE(maus, schleuder) < 30
+    IF MOUSE_RELEASED(0) AND zielt THEN
+        abschiessen()
+        zielt = FALSE
+    END IF
+    IF KEY_HIT(KEY_R) THEN aufbauen()
+    uhr = MIN(uhr + DELTA(), 0.1)
+    WHILE uhr >= TAKT
+        PHYS2D_STEP(welt, TAKT)
+        uhr = uhr - TAKT
+    WEND
+    zeichnen()
+WEND

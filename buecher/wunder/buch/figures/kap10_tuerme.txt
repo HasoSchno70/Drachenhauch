@@ -1,0 +1,12 @@
+// Bild fuer Kapitel 10: den Ball an der Schleuder (110, 360) greifen,
+// nach links unten ziehen und loslassen. Mausstellen mal 2 (SKALIERUNG).
+c 9
+e 0 7 220 720 0 0
+e 30 7 220 720 0 0
+e 32 6 0 0 0 0
+e 36 7 180 740 0 0
+e 40 7 120 770 0 0
+e 44 7 30 770 0 0
+e 50 7 30 770 0 0
+e 52 5 0 0 0 0
+e 53 7 30 770 0 0

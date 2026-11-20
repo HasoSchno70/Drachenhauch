@@ -1,0 +1,3 @@
+' Bild fuer Kapitel 7, Erfinden: Feuer frisst Holz.
+RANDOMIZE(3)
+IMPORT "../../code/loesungen/kap07_feuer.dh"

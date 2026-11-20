@@ -166,9 +166,37 @@ pub fn definitionen(quelle: &str) -> Vec<Definition> {
     let param = re(r"(?i)^\s*(?:BYREF\s+|\.\.\.)?([A-Za-z_][A-Za-z0-9_]*)\$?", &PARAM);
     let muster = definitions_muster();
     let mut out = Vec::new();
+    // Die Parameter zwischen `ab` und `bis` (Bytes) einer Zeile.
+    let params = |out: &mut Vec<Definition>, sauber: &str, ln: usize, ab: usize, bis: usize| {
+        let mut versatz = ab;
+        for seg in sauber[ab..bis].split(',') {
+            // Ein `_` am Zeilenende ist Fortsetzung, kein Parameter.
+            if seg.trim() != "_" {
+                if let Some(c) = param.captures(seg) {
+                    let g = c.get(1).unwrap();
+                    out.push(Definition {
+                        name: g.as_str().to_string(), art: "param", zeile: ln,
+                        spalte: spalte(sauber, versatz + g.start()),
+                        spalte_ende: spalte(sauber, versatz + g.end()),
+                    });
+                }
+            }
+            versatz += seg.len() + 1;
+        }
+    };
+    // Steht die schliessende Klammer eines SUB-Kopfs noch aus? In Klammern
+    // geht eine Zeile weiter -- die Parameter der Folgezeilen gehoeren dazu.
+    let mut kopf_offen = false;
     for (i, roh) in quelle.split('\n').enumerate() {
         let ln = i + 1;
         let sauber = ohne_kommentare_und_texte(roh);
+        if kopf_offen {
+            match sauber.find(')') {
+                Some(zu) => { params(&mut out, &sauber, ln, 0, zu); kopf_offen = false; }
+                None => params(&mut out, &sauber, ln, 0, sauber.len()),
+            }
+            continue;
+        }
         for m in &muster {
             if let Some(c) = m.re.captures(&sauber) {
                 let g = c.get(1).unwrap();
@@ -197,20 +225,9 @@ pub fn definitionen(quelle: &str) -> Vec<Definition> {
             || kopf.starts_with("ABSTRACT SUB ") || kopf.starts_with("ABSTRACT FUNCTION ")
         {
             if let Some(auf) = sauber.find('(') {
-                if let Some(zu_rel) = sauber[auf + 1..].find(')') {
-                    let zone = &sauber[auf + 1..auf + 1 + zu_rel];
-                    let mut versatz = auf + 1;
-                    for seg in zone.split(',') {
-                        if let Some(c) = param.captures(seg) {
-                            let g = c.get(1).unwrap();
-                            out.push(Definition {
-                                name: g.as_str().to_string(), art: "param", zeile: ln,
-                                spalte: spalte(&sauber, versatz + g.start()),
-                                spalte_ende: spalte(&sauber, versatz + g.end()),
-                            });
-                        }
-                        versatz += seg.len() + 1;
-                    }
+                match sauber[auf + 1..].find(')') {
+                    Some(zu_rel) => params(&mut out, &sauber, ln, auf + 1, auf + 1 + zu_rel),
+                    None => { params(&mut out, &sauber, ln, auf + 1, sauber.len()); kopf_offen = true; }
                 }
             }
         }
@@ -581,6 +598,16 @@ DECLARE SUB qsort LIB \"c\" (f AS BUFFER, n AS ZEIGER, g AS ZEIGER, cmp AS FUNCT
         assert!(d.iter().any(|x| x.art == "param" && x.name == "n" && x.zeile == 2));
         // `DIM abstract` bleibt eine Variable.
         assert!(definitionen("DIM abstract AS INTEGER\n").iter().any(|x| x.art == "dim" && x.name == "abstract"));
+    }
+
+    #[test]
+    fn parameter_auf_folgezeilen_des_kopfs() {
+        // In Klammern geht eine Zeile weiter; ein `_` am Ende ist kein Name.
+        let src = "SUB f(a AS INTEGER,\n      b AS FLOAT, _\n      c AS STRING)\n    PRINT b\nEND SUB\n";
+        let d = definitionen(src);
+        let p: Vec<(&str, usize, usize)> = d.iter().filter(|x| x.art == "param")
+            .map(|x| (x.name.as_str(), x.zeile, x.spalte)).collect();
+        assert_eq!(p, [("a", 1, 7), ("b", 2, 7), ("c", 3, 7)]);
     }
 
     #[test]

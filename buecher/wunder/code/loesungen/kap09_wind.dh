@@ -1,0 +1,168 @@
+' Loesung zu Kapitel 9, Erfinden: eine Fahne im Wind -- am Mast fest,
+' der Wind blaest sie zur Seite, und Wellen laufen durch den Stoff.
+' Die Stellen, die neu sind, stehen zwischen >>> und <<<.
+IMPORT "vec2"
+CONST BREITE = 800
+CONST HOEHE = 500
+CONST FELDER = 24
+CONST SCHWERE = 900.0
+CONST TAKT = 1.0 / 60
+CONST RUNDEN = 20
+' >>> neu
+CONST WIND = 1600.0
+DIM zeit AS FLOAT
+' <<< neu
+
+DIM ort AS ARRAY OF VEC2
+DIM alt AS ARRAY OF VEC2
+DIM fest AS ARRAY OF BOOLEAN
+' Die Glieder: welche zwei Punkte, wie lang, und wie gezeichnet.
+DIM gliedA AS ARRAY OF INTEGER
+DIM gliedB AS ARRAY OF INTEGER
+DIM gliedL AS ARRAY OF FLOAT
+DIM gliedDicke AS ARRAY OF FLOAT
+DIM gliedFarbe AS ARRAY OF INTEGER
+
+' Einen Punkt anlegen; liefert seine Nummer.
+FUNCTION punkt(x AS FLOAT, y AS FLOAT, istFest AS BOOLEAN) AS INTEGER
+    ARRAY_PUSH(ort, VEC2_NEW(x, y))
+    ARRAY_PUSH(alt, VEC2_NEW(x, y))
+    ARRAY_PUSH(fest, istFest)
+    RETURN LEN(ort) - 1
+END FUNCTION
+
+' Zwei Punkte verbinden -- so lang, wie sie jetzt auseinander sind.
+SUB verbinden(a AS INTEGER, b AS INTEGER, dicke AS FLOAT,
+              farbe AS INTEGER)
+    ARRAY_PUSH(gliedA, a)
+    ARRAY_PUSH(gliedB, b)
+    ARRAY_PUSH(gliedL, VEC2_DISTANCE(ort[a], ort[b]))
+    ARRAY_PUSH(gliedDicke, dicke)
+    ARRAY_PUSH(gliedFarbe, farbe)
+END SUB
+
+' >>> neu
+' Die Fahne: SPALTEN mal ZEILEN Punkte im Abstand 14, die erste Spalte
+' am Mast (fest), jeder Punkt mit dem linken und dem oberen Nachbarn
+' verbunden.
+CONST SPALTEN = 24
+CONST ZEILEN = 13
+DIM netz[0 TO SPALTEN - 1, 0 TO ZEILEN - 1] AS INTEGER
+DIM sp AS INTEGER
+DIM ze AS INTEGER
+FOR ze = 0 TO ZEILEN - 1
+    FOR sp = 0 TO SPALTEN - 1
+        netz[sp, ze] = punkt(150 + sp * 14, 100 + ze * 14, sp = 0)
+    NEXT
+NEXT
+DIM stoff AS INTEGER : stoff = RGB(200, 50, 60)
+FOR ze = 0 TO ZEILEN - 1
+    FOR sp = 0 TO SPALTEN - 1
+        IF sp > 0 THEN
+            verbinden(netz[sp - 1, ze], netz[sp, ze], 2, stoff)
+        END IF
+        IF ze > 0 THEN
+            verbinden(netz[sp, ze - 1], netz[sp, ze], 2, stoff)
+        END IF
+    NEXT
+NEXT
+' <<< neu
+
+DIM gegriffen AS INTEGER : gegriffen = -1
+
+FUNCTION haelt(k AS INTEGER) AS BOOLEAN
+    RETURN fest[k] OR k = gegriffen
+END FUNCTION
+
+' Verlet: Die Geschwindigkeit steckt in ort - alt.
+SUB fliegen()
+    DIM g AS VEC2 : g = VEC2_NEW(0, SCHWERE * TAKT * TAKT)
+    ' >>> neu
+    zeit = zeit + TAKT
+    ' Boeen: der Wind schwillt an und ab, alle paar Sekunden.
+    DIM boe AS FLOAT : boe = 0.75 + 0.25 * SIN(zeit * 0.9)
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(ort) - 1
+        IF NOT haelt(k) THEN
+            ' Eine Welle, die vom Mast weg durch den Stoff laeuft.
+            DIM welle AS FLOAT : welle = SIN(zeit * 7 - ort[k].x / 25)
+            DIM luft AS VEC2 : luft = VEC2_NEW(boe, 0.35 * welle) * WIND
+            DIM vorher AS VEC2 : vorher = ort[k]
+            ort[k] = ort[k] + (ort[k] - alt[k]) * 0.995 + g _
+                + luft * (TAKT * TAKT)
+            alt[k] = vorher
+        END IF
+    NEXT
+    ' <<< neu
+END SUB
+
+' Glied k wieder auf seine Laenge bringen.
+SUB ziehen(k AS INTEGER)
+    DIM a AS INTEGER : a = gliedA[k]
+    DIM b AS INTEGER : b = gliedB[k]
+    DIM d AS VEC2 : d = ort[b] - ort[a]
+    DIM l AS FLOAT : l = VEC2_LENGTH(d)
+    IF l = 0 THEN RETURN
+    DIM zuviel AS VEC2 : zuviel = d * ((l - gliedL[k]) / l)
+    IF haelt(a) AND haelt(b) THEN RETURN
+    IF haelt(a) THEN
+        ort[b] = ort[b] - zuviel
+    ELSEIF haelt(b) THEN
+        ort[a] = ort[a] + zuviel
+    ELSE
+        ort[a] = ort[a] + zuviel / 2
+        ort[b] = ort[b] - zuviel / 2
+    END IF
+END SUB
+
+SUB schritt()
+    fliegen()
+    DIM r AS INTEGER
+    DIM k AS INTEGER
+    FOR r = 1 TO RUNDEN
+        FOR k = 0 TO LEN(gliedA) - 1
+            ziehen(k)
+        NEXT
+    NEXT
+END SUB
+
+FUNCTION punktBei(m AS VEC2) AS INTEGER
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(ort) - 1
+        IF VEC2_DISTANCE(ort[k], m) < 15 THEN RETURN k
+    NEXT
+    RETURN -1
+END FUNCTION
+
+SUB zeichnen()
+    ' >>> neu
+    CLS(RGB(150, 190, 225))
+    ' Der Mast
+    BOX(142, 90, 148, 480, RGB(110, 110, 120))
+    ' <<< neu
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(gliedA) - 1
+        DIM a AS VEC2 : a = ort[gliedA[k]]
+        DIM b AS VEC2 : b = ort[gliedB[k]]
+        LINEW(a.x, a.y, b.x, b.y, gliedDicke[k], gliedFarbe[k])
+    NEXT
+    FLIP()
+END SUB
+
+SCREEN(BREITE, HOEHE, "Fahne")
+DIM uhr AS FLOAT
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
+    DIM maus AS VEC2 : maus = VEC2_NEW(MOUSE_X(), MOUSE_Y())
+    IF MOUSE_HIT(0) THEN gegriffen = punktBei(maus)
+    IF MOUSE_RELEASED(0) THEN gegriffen = -1
+    uhr = MIN(uhr + DELTA(), 0.1)
+    WHILE uhr >= TAKT
+        IF gegriffen >= 0 THEN
+            alt[gegriffen] = ort[gegriffen]
+            ort[gegriffen] = maus
+        END IF
+        schritt()
+        uhr = uhr - TAKT
+    WEND
+    zeichnen()
+WEND

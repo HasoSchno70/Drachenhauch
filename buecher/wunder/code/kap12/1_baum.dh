@@ -1,0 +1,25 @@
+' Kapitel 12, Schritt 1 -- ein Baum aus einer einzigen Regel: Ein Ast
+' traegt zwei kuerzere Aeste, die wieder zwei tragen, und so weiter.
+CONST BREITE = 800
+CONST HOEHE = 500
+
+' Ein Ast von (x, y) in Richtung `winkel` (Grad, 0 = nach oben). Ist
+' noch Tiefe uebrig, wachsen an seiner Spitze zwei kuerzere.
+SUB ast(x AS FLOAT, y AS FLOAT, winkel AS FLOAT, laenge AS FLOAT, _
+        tiefe AS INTEGER)
+    DIM ex AS FLOAT : ex = x + SIN(RAD(winkel)) * laenge
+    DIM ey AS FLOAT : ey = y - COS(RAD(winkel)) * laenge
+    DIM farbe AS INTEGER : farbe = HSV(30 + (10 - tiefe) * 10, 0.6, 0.7)
+    LINEW(x, y, ex, ey, MAX(1, tiefe), farbe)
+    IF tiefe > 0 THEN
+        ast(ex, ey, winkel - 25, laenge * 0.72, tiefe - 1)
+        ast(ex, ey, winkel + 25, laenge * 0.72, tiefe - 1)
+    END IF
+END SUB
+
+SCREEN(BREITE, HOEHE, "Baum")
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
+    CLS(RGB(225, 235, 245))
+    ast(BREITE / 2, HOEHE - 20, 0, 110, 9)
+    FLIP()
+WEND

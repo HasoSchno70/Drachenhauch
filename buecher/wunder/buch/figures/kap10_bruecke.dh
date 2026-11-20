@@ -1,0 +1,3 @@
+' Bild fuer Kapitel 10, Erfinden: eine Bruecke aus Brettern an Scharnieren.
+RANDOMIZE(4)
+IMPORT "../../code/loesungen/kap10_bruecke.dh"

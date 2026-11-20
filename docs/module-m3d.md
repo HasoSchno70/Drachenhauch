@@ -49,7 +49,8 @@ jemand beschwert.
 | `VEC3_TRANSFORM_DIR(v, mat)` | VEC3 | als **Richtung** (w=0, Verschiebung wird ignoriert) |
 
 Operatoren: `a + b`, `a - b` (VEC3), `v * s` / `s * v` / `v / s` (Skalar),
-`=` / `<>`.
+`=` / `<>`. Die Teile lesen sich auch wie Felder: `v.x`, `v.y`, `v.z`
+(bei VEC4 und QUAT dazu `.w`) -- nur lesen, die Werte sind unveraenderlich.
 
 ## VEC4
 

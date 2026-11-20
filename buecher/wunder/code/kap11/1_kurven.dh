@@ -1,0 +1,73 @@
+' Kapitel 11, Schritt 1 -- sieben Kurven nebeneinander. Jeder Punkt
+' faehrt in 1,5 Sekunden von links nach rechts; alle zwanzigstel Sekunde
+' bleibt ein Abdruck liegen. Wo sie weit auseinander liegen, war er schnell.
+IMPORT "tween"
+CONST BREITE = 800
+CONST HOEHE = 500
+CONST LINKS = 160
+CONST RECHTS = 740
+CONST ABDRUCK = 0.05
+
+DIM namen AS ARRAY OF STRING
+namen = ["linear", "in_quad", "out_quad", "inout_sine", _
+         "out_back", "out_elastic", "out_bounce"]
+DIM n AS INTEGER : n = LEN(namen)
+DIM fahrt AS ARRAY OF TWEEN
+DIM i AS INTEGER
+FOR i = 0 TO n - 1
+    ARRAY_PUSH(fahrt, TWEEN_NEW(LINKS, RECHTS, 1500, namen[i]))
+NEXT
+
+' Die Spur: je Kurve hoechstens 40 Abdruecke.
+DIM spur[0 TO 6, 0 TO 39] AS FLOAT
+DIM abdruecke AS INTEGER
+DIM uhr AS FLOAT
+DIM pause AS FLOAT
+
+SUB zeichnen()
+    CLS(RGB(24, 26, 36))
+    DIM k AS INTEGER
+    DIM j AS INTEGER
+    FOR k = 0 TO n - 1
+        DIM y AS FLOAT : y = 60 + k * 62
+        TEXT(16, y - 8, namen[k], RGB(200, 205, 220))
+        LINE(LINKS, y, RECHTS, y, RGB(60, 64, 80))
+        FOR j = 0 TO abdruecke - 1
+            CIRCLE(spur[k, j], y, 3, RGB(110, 140, 220))
+        NEXT
+        CIRCLE(TWEEN_VALUE(fahrt[k]), y, 9, RGB(250, 200, 90))
+    NEXT
+    FLIP()
+END SUB
+
+SCREEN(BREITE, HOEHE, "Kurven")
+' Ein Tween laeuft ab dem Anlegen -- das Fenster aufzumachen dauert
+' einen Moment. Darum hier noch einmal von vorn.
+FOR i = 0 TO n - 1
+    TWEEN_RESTART(fahrt[i])
+NEXT
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
+    DIM dt AS FLOAT : dt = DELTA()
+    ' Abdruecke, solange die Fahrt laeuft.
+    uhr = uhr + dt
+    IF uhr >= ABDRUCK AND NOT TWEEN_DONE(fahrt[0]) AND abdruecke < 40 THEN
+        FOR i = 0 TO n - 1
+            spur[i, abdruecke] = TWEEN_VALUE(fahrt[i])
+        NEXT
+        abdruecke = abdruecke + 1
+        uhr = uhr - ABDRUCK
+    END IF
+    ' Am Ende eine Sekunde stehen lassen, dann von vorn.
+    IF TWEEN_DONE(fahrt[0]) THEN
+        pause = pause + dt
+        IF pause > 1.0 THEN
+            FOR i = 0 TO n - 1
+                TWEEN_RESTART(fahrt[i])
+            NEXT
+            abdruecke = 0
+            pause = 0
+            uhr = 0
+        END IF
+    END IF
+    zeichnen()
+WEND

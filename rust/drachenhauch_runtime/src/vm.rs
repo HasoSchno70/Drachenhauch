@@ -1892,6 +1892,15 @@ impl<'p> Vm<'p> {
                     },
                 }
             }
+            // Die Teile eines Vektors lesen sich wie Felder: `v.x` statt
+            // `VEC2_X(v)` -- wer mit Vektoren rechnet, schreibt das sonst in
+            // jeder Zeile (gefunden beim Buch "Kleine Wunder", Kapitel 9).
+            Value::Vec2(x, y) => vektor_teil(name, "VEC2", &[*x, *y]),
+            Value::Vec3(x, y, z) => vektor_teil(name, "VEC3", &[*x as f64, *y as f64, *z as f64]),
+            Value::Vec4(x, y, z, w) =>
+                vektor_teil(name, "VEC4", &[*x as f64, *y as f64, *z as f64, *w as f64]),
+            Value::Quat(x, y, z, w) =>
+                vektor_teil(name, "QUAT", &[*x as f64, *y as f64, *z as f64, *w as f64]),
             _ => Err(format!("Zugriff auf '.{}' bei nicht-Objekt ({})", name, obj.type_name())),
         }
     }
@@ -1954,6 +1963,11 @@ impl<'p> Vm<'p> {
                 };
                 rcb.fields[i] = cv;
                 Ok(())
+            }
+            Value::Vec2(..) | Value::Vec3(..) | Value::Vec4(..) | Value::Quat(..) => {
+                let typ = obj.type_name();
+                Err(format!("{} ist unveraenderlich: '.{}' laesst sich lesen, aber nicht setzen -- einen neuen Wert bauen, etwa v = {}_NEW(...)",
+                    typ, name, typ))
             }
             _ => Err(format!("Zuweisung an '.{}' bei nicht-Objekt ({})", name, obj.type_name())),
         }
@@ -2743,7 +2757,48 @@ impl<'p> Vm<'p> {
         if matches!(name, "array_map" | "array_filter" | "array_reduce" | "array_find") {
             return self.array_mit_funktion(name, a).map(Some);
         }
+        // TWEEN_VALUE immer hier (am Namen, nie am Argument): eine eigene
+        // Kurve ist Drachenhauch-Code. Benannte Kurven rechnet dieselbe
+        // Funktion wie der reine Weg (`builtins::ease`).
+        if name == "tween_value" {
+            return self.tween_wert(a).map(Some);
+        }
         Ok(None)
+    }
+
+    /// TWEEN_VALUE: Start + Weg * Kurve(Fortschritt). Die Kurve ist ein Name
+    /// oder eine Funktion, die den Fortschritt 0..1 bekommt.
+    fn tween_wert(&mut self, a: &[Value]) -> R<Value> {
+        if a.len() != 1 {
+            return Err(format!("TWEEN_VALUE: erwartet 1 Argument(e), erhalten {} -- Aufruf: TWEEN_VALUE(t)", a.len()));
+        }
+        let t = match &a[0] {
+            Value::Tween(t) => t.clone(),
+            _ => return Err("TWEEN_VALUE erwartet TWEEN".to_string()),
+        };
+        let (start, ende, p, easing, kurve) = {
+            let b = t.borrow();
+            (b.start, b.end, crate::builtins::progress(&b), b.easing.clone(), b.kurve.clone())
+        };
+        let anteil = match kurve {
+            None => crate::builtins::ease(&easing, p),
+            Some(k) => {
+                let cb = crate::value::Rueckruf::aus_wert(&k).ok_or("TWEEN_VALUE: Kurve")?;
+                let (f, empf) = self.rueckruf_aufloesen(&cb, "TWEEN_VALUE")?;
+                if let Some(n) = Self::rueckruf_stellen(&cb, f) {
+                    if n != 1 {
+                        return Err(format!("TWEEN_VALUE: die Kurve nimmt {} Wert(e), TWEEN_VALUE gibt ihr 1 (den Fortschritt 0..1)", n));
+                    }
+                }
+                match self.rueckruf_exec(&cb, f, &empf, vec![Value::Float(p)])? {
+                    Value::Float(x) => x,
+                    Value::Int(n) => n as f64,
+                    andere => return Err(format!(
+                        "TWEEN_VALUE: die Kurve muss eine Zahl liefern, lieferte {}", andere.type_name())),
+                }
+            }
+        };
+        Ok(Value::Float(start + (ende - start) * anteil))
     }
 
     /// ARRAY_MAP / ARRAY_FILTER / ARRAY_REDUCE / ARRAY_FIND: die Funktion

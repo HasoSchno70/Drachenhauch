@@ -249,6 +249,10 @@ pub struct TweenObj {
     pub start_ms: i64,
     pub paused_at: Option<i64>,
     pub mode: String, // "once" | "loop" | "pingpong"
+    /// Eine eigene Kurve (FUNCREF, Lambda, gebundene Methode) statt eines
+    /// Namens -- dann ist `easing` "funktion", und TWEEN_VALUE ruft sie in
+    /// der VM (`Vm::tween_wert`, Familie 2).
+    pub kurve: Option<Value>,
 }
 
 /// Zustand eines `sprite`-Objekts (entspricht `_Sprite`).

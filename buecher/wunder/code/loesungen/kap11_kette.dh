@@ -1,0 +1,42 @@
+' Loesung zu Kapitel 11, Erweitern 2: eine Kette von Bewegungen -- ein
+' Ball faehrt die Ecken eines Rechtecks ab, eine Strecke nach der
+' anderen. Ist eine fertig (TWEEN_DONE), beginnt die naechste.
+IMPORT "tween"
+IMPORT "vec2"
+
+DIM ecken AS ARRAY OF VEC2
+ecken = [VEC2_NEW(150, 120), VEC2_NEW(650, 120), _
+         VEC2_NEW(650, 380), VEC2_NEW(150, 380)]
+DIM kurven AS ARRAY OF STRING
+kurven = ["out_quad", "out_bounce", "inout_sine", "out_back"]
+
+' Die laufende Strecke: von Ecke `nr` zur naechsten, x und y je ein
+' Tween mit derselben Kurve.
+DIM nr AS INTEGER
+DIM tx AS TWEEN
+DIM ty AS TWEEN
+
+SUB strecke(k AS INTEGER)
+    DIM a AS VEC2 : a = ecken[k]
+    DIM b AS VEC2 : b = ecken[(k + 1) MOD LEN(ecken)]
+    tx = TWEEN_NEW(a.x, b.x, 900, kurven[k])
+    ty = TWEEN_NEW(a.y, b.y, 900, kurven[k])
+END SUB
+
+SCREEN(800, 500, "Kette")
+strecke(0)
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
+    IF TWEEN_DONE(tx) THEN
+        nr = (nr + 1) MOD LEN(ecken)
+        strecke(nr)
+    END IF
+    CLS(RGB(24, 26, 36))
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(ecken) - 1
+        CIRCLE(ecken[k].x, ecken[k].y, 6, RGB(80, 90, 120))
+        DIM grau AS INTEGER : grau = RGB(150, 160, 190)
+        TEXT(ecken[k].x - 30, ecken[k].y + 14, kurven[k], grau)
+    NEXT
+    CIRCLE(TWEEN_VALUE(tx), TWEEN_VALUE(ty), 16, RGB(250, 200, 90))
+    FLIP()
+WEND

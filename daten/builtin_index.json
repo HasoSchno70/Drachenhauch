@@ -11247,6 +11247,30 @@
    "module": "physics2d"
   },
   {
+   "name": "PHYS2D_BODY_EXISTS",
+   "kind": "core",
+   "signature": "PHYS2D_BODY_EXISTS(w, idx) AS BOOLEAN",
+   "module": "physics2d"
+  },
+  {
+   "name": "PHYS2D_ADD_HINGE",
+   "kind": "core",
+   "signature": "PHYS2D_ADD_HINGE(w, body_a, body_b, x, y) AS INTEGER",
+   "module": "physics2d"
+  },
+  {
+   "name": "PHYS2D_ADD_ROPE",
+   "kind": "core",
+   "signature": "PHYS2D_ADD_ROPE(w, body_a, body_b, length) AS INTEGER",
+   "module": "physics2d"
+  },
+  {
+   "name": "PHYS2D_REMOVE_JOINT",
+   "kind": "core",
+   "signature": "PHYS2D_REMOVE_JOINT(w, joint)",
+   "module": "physics2d"
+  },
+  {
    "name": "PHYS2D_SET_DYNAMIC",
    "kind": "core",
    "signature": "PHYS2D_SET_DYNAMIC(w, idx, dynamic)",

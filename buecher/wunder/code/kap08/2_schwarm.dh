@@ -1,0 +1,158 @@
+' Kapitel 8 -- der Schwarm: jeder Vogel schaut sich um und lenkt nach
+' drei Regeln -- Abstand, Ausrichtung, Zusammenhalt. ESC beendet.
+CONST BREITE = 800
+CONST HOEHE = 500
+CONST ANZAHL = 150
+CONST FLUGTEMPO = 120.0
+CONST TEMPO_MIN = 80.0
+CONST TEMPO_MAX = 180.0
+' Wie weit ein Vogel sieht, und ab wann ihm einer zu nah ist.
+CONST SICHT = 60.0
+CONST NAEHE = 18.0
+' Wie stark jede Regel lenkt.
+CONST KRAFT_ABSTAND = 4000.0
+CONST KRAFT_RICHTUNG = 1.5
+CONST KRAFT_MITTE = 0.8
+
+CLASS Vogel
+    DIM x AS FLOAT
+    DIM y AS FLOAT
+    DIM vx AS FLOAT
+    DIM vy AS FLOAT
+    ' Was der Vogel beim Umschauen gesehen hat.
+    DIM nachbarn AS INTEGER
+    DIM summeX AS FLOAT
+    DIM summeY AS FLOAT
+    DIM summeVx AS FLOAT
+    DIM summeVy AS FLOAT
+    DIM wegX AS FLOAT
+    DIM wegY AS FLOAT
+    ' Die neue Geschwindigkeit -- gilt erst nach bewegen.
+    DIM neuVx AS FLOAT
+    DIM neuVy AS FLOAT
+
+    ' Ein neuer Vogel: irgendwo, in irgendeine Richtung.
+    SUB Init()
+        x = RND() * BREITE
+        y = RND() * HOEHE
+        DIM w AS FLOAT : w = RND() * 2 * PI
+        vx = COS(w) * FLUGTEMPO
+        vy = SIN(w) * FLUGTEMPO
+    END SUB
+
+    ' Alle anderen ansehen und zusammenzaehlen, was in Sicht ist.
+    SUB umschauen(alle AS ARRAY OF Vogel)
+        nachbarn = 0
+        summeX = 0 : summeY = 0 : summeVx = 0 : summeVy = 0
+        wegX = 0 : wegY = 0
+        FOR EACH v IN alle
+            IF v = Self THEN CONTINUE
+            DIM dx AS FLOAT : dx = v.x - x
+            DIM dy AS FLOAT : dy = v.y - y
+            DIM d AS FLOAT : d = HYPOT(dx, dy)
+            IF d < SICHT THEN
+                nachbarn = nachbarn + 1
+                summeX = summeX + v.x
+                summeY = summeY + v.y
+                summeVx = summeVx + v.vx
+                summeVy = summeVy + v.vy
+                ' Je naeher, desto staerker weg von ihm.
+                IF d < NAEHE THEN
+                    wegX = wegX - dx / (d * d)
+                    wegY = wegY - dy / (d * d)
+                END IF
+            END IF
+        NEXT
+    END SUB
+
+    ' Regel 1, Abstand: weg von denen, die zu nah sind.
+    SUB abstandHalten(dt AS FLOAT)
+        neuVx = neuVx + wegX * KRAFT_ABSTAND * dt
+        neuVy = neuVy + wegY * KRAFT_ABSTAND * dt
+    END SUB
+
+    ' Regel 2, Ausrichtung: so fliegen wie die Nachbarn.
+    SUB ausrichten(dt AS FLOAT)
+        DIM mx AS FLOAT : mx = summeVx / nachbarn
+        DIM my AS FLOAT : my = summeVy / nachbarn
+        neuVx = neuVx + (mx - vx) * KRAFT_RICHTUNG * dt
+        neuVy = neuVy + (my - vy) * KRAFT_RICHTUNG * dt
+    END SUB
+
+    ' Regel 3, Zusammenhalt: zur Mitte der Nachbarn.
+    SUB zusammenbleiben(dt AS FLOAT)
+        DIM mx AS FLOAT : mx = summeX / nachbarn
+        DIM my AS FLOAT : my = summeY / nachbarn
+        neuVx = neuVx + (mx - x) * KRAFT_MITTE * dt
+        neuVy = neuVy + (my - y) * KRAFT_MITTE * dt
+    END SUB
+
+    ' Nie zu langsam, nie zu schnell.
+    SUB tempoHalten()
+        DIM t AS FLOAT : t = HYPOT(neuVx, neuVy)
+        DIM soll AS FLOAT : soll = CLAMP(t, TEMPO_MIN, TEMPO_MAX)
+        neuVx = neuVx * soll / t
+        neuVy = neuVy * soll / t
+    END SUB
+
+    ' Umschauen und nach den drei Regeln die neue Richtung waehlen.
+    SUB entscheiden(alle AS ARRAY OF Vogel, dt AS FLOAT)
+        umschauen(alle)
+        neuVx = vx
+        neuVy = vy
+        IF nachbarn > 0 THEN
+            abstandHalten(dt)
+            ausrichten(dt)
+            zusammenbleiben(dt)
+        END IF
+        tempoHalten()
+    END SUB
+
+    SUB bewegen(dt AS FLOAT)
+        vx = neuVx
+        vy = neuVy
+        x = x + vx * dt
+        y = y + vy * dt
+        ' Wer hinausfliegt, kommt auf der anderen Seite wieder herein.
+        IF x < 0 THEN x = x + BREITE
+        IF x >= BREITE THEN x = x - BREITE
+        IF y < 0 THEN y = y + HOEHE
+        IF y >= HOEHE THEN y = y - HOEHE
+    END SUB
+
+    ' Ein schmales Dreieck, das in Flugrichtung zeigt.
+    SUB zeichnen()
+        DIM w AS FLOAT : w = ATAN2(vy, vx)
+        DIM sx AS FLOAT : sx = x + COS(w) * 8
+        DIM sy AS FLOAT : sy = y + SIN(w) * 8
+        DIM lx AS FLOAT : lx = x + COS(w + 2.5) * 5
+        DIM ly AS FLOAT : ly = y + SIN(w + 2.5) * 5
+        DIM rx AS FLOAT : rx = x + COS(w - 2.5) * 5
+        DIM ry AS FLOAT : ry = y + SIN(w - 2.5) * 5
+        TRIANGLE(sx, sy, lx, ly, rx, ry, RGB(230, 236, 250))
+    END SUB
+END CLASS
+
+DIM schwarm AS ARRAY OF Vogel
+DIM i AS INTEGER
+FOR i = 1 TO ANZAHL
+    ARRAY_PUSH(schwarm, NEW Vogel())
+NEXT
+
+SCREEN(BREITE, HOEHE, "Schwarm")
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
+    ' Bei einem Ruckler nicht weit springen.
+    DIM dt AS FLOAT : dt = MIN(DELTA(), 0.05)
+    ' Erst entscheiden ALLE, dann bewegen sich alle.
+    FOR EACH v IN schwarm
+        v.entscheiden(schwarm, dt)
+    NEXT
+    FOR EACH v IN schwarm
+        v.bewegen(dt)
+    NEXT
+    CLS(RGB(18, 26, 48))
+    FOR EACH v IN schwarm
+        v.zeichnen()
+    NEXT
+    FLIP()
+WEND

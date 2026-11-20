@@ -1,0 +1,17 @@
+CLASS Vogel
+    DIM x AS FLOAT
+    SUB bewegen(dt AS FLOAT)
+        x = x + 120 * dt
+    END SUB
+END CLASS
+
+DIM schwarm AS ARRAY OF Vogel
+DIM i AS INTEGER
+FOR i = 1 TO 3
+    DIM einer AS Vogel
+    ARRAY_PUSH(schwarm, einer)
+NEXT
+FOR EACH v IN schwarm
+    v.bewegen(0.1)
+NEXT
+PRINT "alle bewegt"
