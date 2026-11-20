@@ -884,3 +884,38 @@ Laeufe): ohne Maschinencode alles gleich; mit ihm `familien.dh` 15,7 ->
 17,5 ms (ein `ZEIT_WOCHENTAG` je Runde, rund 9 ns mehr je Aufruf) und
 `felder.dh` 12,6 -> 11,3 ms, der Rest gleich -- die Lage des Codes nach dem
 Linken, nicht ein anderer Weg (`lto = true` fuegt ohnehin alles zusammen).
+
+## Schleifen, die bei jeder Runde aussteigen (2026-11-20)
+
+Gefunden beim Buch "Kleine Wunder", Kapitel 13: Die Mandelbrotmenge mit
+einem `VEC2` z statt zweier Zahlen brauchte MIT Maschinencode doppelt so
+lange wie ohne (7,7 s gegen 3,9 s). `DHRT_JIT_BILANZ` zeigte 11 Millionen
+Ausstiege mitten in der Schleife -- einen je Runde. Der Maschinencode
+uebersetzt die Schleife, kann `z * 0.5 + c` mit VEC2 aber nicht selbst
+rechnen, steigt an dieser Stelle aus, die VM rechnet den Befehl, und am
+naechsten Ruecksprung (`vm.rs`, `Jit::schleife`) geht es wieder hinein.
+`MAX_FEHLSCHLAEGE` zaehlte nur das Aufgeben vor dem ersten Befehl, nicht
+die Ausstiege mitten drin.
+
+Jetzt zaehlt ein Bereich mit `mitten` seine Runden am Kopf in einer
+Cranelift-Variablen (`Bauer::runden`) und schreibt sie nur beim Aussteigen
+in den Kontext (`K_RUNDEN`, in `aussteigen_wenn`). `Jit::schleife` summiert
+je Schleife Ausstiege und eigene Runden; `Schleife::vergeblich` sagt nach
+`MIN_AUSSTIEGE` (64) Ausstiegen, ob es im Schnitt keine zwei eigenen Runden
+je Ausstieg waren -- dann bleibt die Schleife in der VM (`marke.set(1)`),
+die Bilanz nennt sie. Eine Schleife, die nur jede tausendste Runde
+aussteigt, behaelt den Maschinencode.
+
+Gemessen (Profil `gegenprobe`): `z = z * 0.5 + c` zwei Millionen Mal 1,0 s
+-> 0,16 s (VM allein 0,15 s); die Mandelbrot-Rechnung mit VEC2 10,5 s ->
+7,1 s (VM 7,1 s). `bench_dhrt.dh` abwechselnd alt und neu, je dreimal:
+ohne Unterschied ausser `ganzzahl.dh` 9,1-9,4 -> 9,4-9,5 ms und
+`teilchen.dh` 13,7 -> 13,9 ms -- die eine Addition je Runde. Der erste
+Versuch zaehlte im Speicher (laden, addieren, speichern je Runde) und kostete
+dort 3-5 %.
+
+`jit.dhtest`: zwei neue Faelle (bleibt in der VM / behaelt den
+Maschinencode), und "mehr als vier klassen bilden keine familie" steigt
+jetzt 73 statt 400 Mal aus. Gegenproben: ohne die Regel fallen die beiden
+Faelle mit staendigem Aussteigen, mit einer viel zu strengen Regel
+(`< 2000 * n`) faellt der mit seltenem.

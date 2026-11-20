@@ -7865,6 +7865,10 @@ DHRT_JIT=aus
 1000
 
 === mehr als vier klassen bilden keine familie (maschinencode)
+' Ohne Familie steigt der Code bei jedem Objekt einer anderen Klasse aus
+' -- hier bei vier von fuenf Aufrufen. Bis 2026-11-20 tat er das alle 400
+' Male; seit `Schleife::vergeblich` bleibt die innere Schleife nach 64
+' Ausstiegen mit kaum eigenen Runden in der VM.
 CLASS F
     FUNCTION z() AS INTEGER
         RETURN 0
@@ -7915,7 +7919,8 @@ DHRT_JIT_BILANZ=1
 --- erwartet
 1000
 --- stderr
-jit: 400 mal mitten in einer Schleife ausgestiegen
+bleibt in der VM: 64 Ausstiege mitten drin bei 79 eigenen Runden
+jit: 73 mal mitten in einer Schleife ausgestiegen
 
 === variable und feld vom typ der oberklasse
 ' Eine lokale Variable `AS Form` und ein Feld `form AS Form` halten Kreise
@@ -8253,3 +8258,46 @@ DHRT_JIT_BILANZ=1
 2000
 --- stderr
 jit: 20 mal mitten in einer Schleife ausgestiegen
+
+=== eine schleife die bei jeder runde aussteigt bleibt in der vm
+' Mit VEC2 in jeder Runde gibt der Maschinencode bei jeder Runde an die VM
+' ab -- das Ein- und Aussteigen kostete mehr, als er sparte (zwei Millionen
+' Runden: 0.88 s mit, 0.13 s ohne Maschinencode). Nach 64 Ausstiegen mit
+' im Schnitt weniger als zwei eigenen Runden bleibt die Schleife in der VM.
+IMPORT "vec2"
+DIM z AS VEC2
+DIM c AS VEC2 : c = VEC2_NEW(0.1, 0.1)
+DIM i AS INTEGER
+FOR i = 1 TO 1000
+    z = z * 0.5 + c
+NEXT
+PRINT z
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+Vec2(0.2, 0.2)
+--- stderr
+bleibt in der VM: 64 Ausstiege mitten drin bei 64 eigenen Runden
+jit: 64 mal mitten in einer Schleife ausgestiegen
+
+=== eine schleife die selten aussteigt behaelt den maschinencode
+' Gegenstueck: nur jede tausendste Runde fasst einen VEC2 an. Dazwischen
+' rechnet der Maschinencode Hunderte Runden selbst -- er darf bei allen 200
+' Ausstiegen wieder einsteigen.
+IMPORT "vec2"
+DIM v AS VEC2
+DIM s AS INTEGER
+DIM i AS INTEGER
+FOR i = 1 TO 200000
+    s = s + i MOD 7
+    IF i MOD 1000 = 0 THEN v = v + VEC2_NEW(1, 0)
+NEXT
+PRINT s; " "; VEC2_X(v)
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+599997 200.0
+--- stderr
+jit: 200 mal mitten in einer Schleife ausgestiegen

@@ -215,6 +215,10 @@ Einzelheiten stehen in der Geschichte des Bereichs.
   die CI fährt beide Wege.
 - Gemessen wird mit `dhrt run bench_dhrt.dh` mit UND ohne `DHRT_JIT=aus`,
   nicht an gezählten Runden (`DHRT_JIT_BILANZ=1` zeigt nur, wo die VM rechnet).
+- Eine Schleife, die fast jede Runde mitten drin aussteigt, bleibt nach
+  64 Ausstiegen in der VM (`Schleife::vergeblich`). Gezählt wird in
+  `aussteigen_wenn`: ein neuer Weg, mitten drin auszusteigen, muss dort
+  vorbei, sonst stimmt die Rechnung nicht.
 
 **Grafik und Eingabe**
 - Jede Tastenabfrage in `graphics.rs` geht über `t_unten/t_neu/t_los` bzw.
