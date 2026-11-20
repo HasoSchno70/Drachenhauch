@@ -1,0 +1,3 @@
+' Bild fuer Kapitel 15, Erfinden (Loesung kap15_plasmaspur).
+CHDIR("../../code/loesungen")
+IMPORT "../../code/loesungen/kap15_plasmaspur.dh"

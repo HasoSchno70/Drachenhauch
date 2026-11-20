@@ -1,0 +1,5 @@
+// Kapitel 13: Taste 1 -- das Seepferdchental.
+c 3
+e 0 7 0 0 0 0
+e 5 2 49 0 0 0
+e 7 1 49 0 0 0

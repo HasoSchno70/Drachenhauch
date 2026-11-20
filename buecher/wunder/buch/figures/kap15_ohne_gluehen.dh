@@ -1,0 +1,4 @@
+' Bild fuer Kapitel 15: die Leuchtspuren ohne Gluehen (Taste G, siehe
+' .txt). Der Shader liegt neben dem Programm, darum erst dorthin.
+CHDIR("../../code/kap15")
+IMPORT "../../code/kap15/2_neon.dh"

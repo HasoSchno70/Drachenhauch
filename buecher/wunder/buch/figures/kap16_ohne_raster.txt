@@ -1,0 +1,4 @@
+// Kapitel 16: gleich zu Beginn R -- Rasterung aus.
+c 2
+e 2 2 82 0 0 0
+e 4 1 82 0 0 0

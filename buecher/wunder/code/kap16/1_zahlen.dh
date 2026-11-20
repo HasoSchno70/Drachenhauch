@@ -1,0 +1,18 @@
+' Kapitel 16, Schritt 1 -- eine Farbe ist eine Zahl. Hier wird eine
+' zerlegt und wieder zusammengesetzt.
+DIM farbe AS INTEGER : farbe = RGB(255, 160, 32)
+PRINT "als Zahl: "; farbe
+PRINT "hex:      "; HEX$(farbe)
+PRINT "binaer:   "; BIN$(farbe)
+
+' Rot steht 16 Stellen weiter links als Blau, Gruen 8. SHR schiebt die
+' Stellen nach rechts, BAND 255 behaelt nur die letzten acht.
+DIM rot AS INTEGER : rot = (farbe SHR 16) BAND 255
+DIM gruen AS INTEGER : gruen = (farbe SHR 8) BAND 255
+DIM blau AS INTEGER : blau = farbe BAND 255
+PRINT "rot "; rot; ", gruen "; gruen; ", blau "; blau
+
+' Zusammen geht es mit SHL (nach links schieben) und BOR (vereinen).
+DIM wieder AS INTEGER
+wieder = (rot SHL 16) BOR (gruen SHL 8) BOR blau
+PRINT "zusammen: "; HEX$(wieder); " -- gleich? "; wieder = farbe

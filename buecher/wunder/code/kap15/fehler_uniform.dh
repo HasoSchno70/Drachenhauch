@@ -1,0 +1,11 @@
+' Kapitel 15 -- ein Uniform mit falschem Namen: das Plasma steht still.
+SCREEN(800, 500, "Plasma")
+DIM plasma AS INTEGER : plasma = SHADER_LOAD("plasma.fs")
+SHADER_SET2(plasma, "groesse", 800, 500)
+POSTFX(plasma)
+DIM bild AS INTEGER
+FOR bild = 1 TO 120
+    SHADER_SET(plasma, "Zeit", bild / 60)
+    CLS()
+    FLIP()
+NEXT

@@ -1,0 +1,22 @@
+' Kapitel 15, Schritt 1 -- das Plasma aus Kapitel 2, aber gerechnet von
+' der Grafikkarte: jeder Bildpunkt, in voller Groesse, in jedem Bild.
+CONST BREITE = 800
+CONST HOEHE = 500
+
+SCREEN(BREITE, HOEHE, "Plasma auf der Grafikkarte")
+DIM plasma AS INTEGER : plasma = SHADER_LOAD("plasma.fs")
+IF plasma < 0 THEN
+    PRINT "plasma.fs liess sich nicht laden"
+    END
+END IF
+SHADER_SET2(plasma, "groesse", BREITE, HOEHE)
+' Ab jetzt geht jedes fertige Bild durch den Shader.
+POSTFX(plasma)
+
+DIM zeit AS FLOAT
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
+    zeit = zeit + DELTA()
+    SHADER_SET(plasma, "zeit", zeit)
+    CLS()
+    FLIP()
+WEND

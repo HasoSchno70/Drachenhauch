@@ -65,14 +65,20 @@ pub struct Parser {
     /// nicht zur INNERSTEN Schleife passt, ist ein Fehler statt still das
     /// Falsche zu verlassen.
     bloecke: Vec<&'static str>,
+    /// Warnungen, die nur der Parser sehen kann, weil der Baum keine Klammern
+    /// mehr kennt (`a BAND b + c`, siehe `vorrang_pruefen`). Zeile, Text.
+    warnungen: Vec<(u32, String)>,
 }
 
 impl Parser {
     pub fn new(toks: Vec<Token>) -> Self {
         Parser { toks, pos: 0, enum_names: HashSet::new(),
                  with_counter: 0, with_stack: Vec::new(), privat: Vec::new(),
-                 bloecke: Vec::new() }
+                 bloecke: Vec::new(), warnungen: Vec::new() }
     }
+
+    /// Die Warnungen dieses Laufs (Zeile, Text). Erst nach `parse()` gefuellt.
+    pub fn warnungen(&self) -> &[(u32, String)] { &self.warnungen }
 
     /// Die `PRIVATE`-Namen dieses Laufs. Erst nach `parse()` gefuellt.
     pub fn private_namen(&self) -> &[(u32, String)] { &self.privat }
@@ -2258,17 +2264,62 @@ impl Parser {
     }
 
     fn bitwise(&mut self) -> R<Node> {
+        let start = self.pos;
         let mut left = self.addition()?;
+        let mut links = Some((start, self.pos));
         while self.checks(&[Tt::Band, Tt::Bor, Tt::Bxor, Tt::Shl, Tt::Shr]) {
             let op = match self.tt(0) {
                 Tt::Band => "band", Tt::Bor => "bor", Tt::Bxor => "bxor",
                 Tt::Shl => "shl", Tt::Shr => "shr", _ => unreachable!(),
             };
+            let zeile = self.peek(0).line as u32;
             self.pos += 1;
+            let r_start = self.pos;
             let right = self.addition()?;
+            if let Some((a, b)) = links.take() { self.vorrang_pruefen(op, a, b, true, zeile); }
+            self.vorrang_pruefen(op, r_start, self.pos, false, zeile);
             left = Node::BinaryOp { op: op.into(), left: Box::new(left), right: Box::new(right) };
         }
         Ok(left)
+    }
+
+    /// `a BAND b + c` rechnet `a BAND (b + c)` -- BAND, BOR, BXOR, SHL und
+    /// SHR binden schwaecher als + und - (wie in C). Wer `(a BAND b) + c`
+    /// meint, bekommt still eine andere Zahl; im Buch "Kleine Wunder" lieferte
+    /// `farbe BAND 255 + 20` so 0 statt des Blauanteils plus 20. Steht in
+    /// einem Operanden (Tokens `von..bis`) ein + oder - ohne eigene Klammern,
+    /// gibt es eine Warnung (wie GCCs "suggest parentheses"). Der Baum kennt
+    /// keine Klammern mehr, darum sieht nur der Parser das.
+    fn vorrang_pruefen(&mut self, op: &str, von: usize, bis: usize, links: bool, zeile: u32) {
+        let mut tiefe = 0i32;
+        let mut zeichen = None;
+        for i in von..bis.min(self.toks.len()) {
+            match self.toks[i].tt {
+                Tt::Lparen | Tt::Lbracket | Tt::Lbrace => tiefe += 1,
+                Tt::Rparen | Tt::Rbracket | Tt::Rbrace => tiefe -= 1,
+                Tt::Plus | Tt::Minus if tiefe == 0 && i > von => {
+                    // Nur das zweistellige: davor steht das Ende eines Werts
+                    // (sonst ist es ein Vorzeichen wie in `a * -b`).
+                    let davor = self.toks[i - 1].tt;
+                    if matches!(davor, Tt::Number | Tt::Str | Tt::Ident | Tt::Rparen
+                                     | Tt::Rbracket | Tt::Rbrace | Tt::True | Tt::False | Tt::Nil) {
+                        zeichen = Some(if self.toks[i].tt == Tt::Plus { "+" } else { "-" });
+                        break;
+                    }
+                }
+                _ => {}
+            }
+        }
+        let Some(z) = zeichen else { return };
+        let o = op.to_uppercase();
+        let (gerechnet, sonst) = if links {
+            (format!("(a {} b) {} c", z, o), format!("a {} (b {} c)", z, o))
+        } else {
+            (format!("a {} (b {} c)", o, z), format!("(a {} b) {} c", o, z))
+        };
+        self.warnungen.push((zeile, format!(
+            "{} bindet schwaecher als {}: gerechnet wird {}. Ist das gemeint, die Klammern hinschreiben; sonst {}",
+            o, z, gerechnet, sonst)));
     }
 
     fn addition(&mut self) -> R<Node> {

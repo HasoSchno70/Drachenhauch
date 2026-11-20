@@ -73,6 +73,58 @@ NEXT
 SAVESCREENSHOT("out.png")
 --- erwartet
 
+=== abziehen nimmt die farbe vom hintergrund und laesst die deckkraft
+' BLEND_MODE("subtract") rechnete bis 2026-11-20 Farbe minus Hintergrund
+' (raylibs BLEND_SUBTRACT_COLORS) und zog die Deckkraft mit ab.
+SCREEN(64, 64, "rt", 1)
+DIM rt AS INTEGER : rt = RENDERTARGET_NEW(64, 64, TRUE)
+RENDERTARGET_BEGIN(rt)
+BOX(0, 0, 64, 64, RGB(200, 100, 20))
+BLEND_MODE("subtract")
+BOX(0, 0, 32, 64, RGB(50, 50, 50))
+' Halb deckend zieht halb so viel ab.
+BOX(32, 0, 64, 64, RGBA(100, 100, 100, 128))
+BLEND_MODE("alpha")
+RENDERTARGET_END()
+DIM b AS INTEGER : b = RENDERTARGET_IMAGE(rt)
+PRINT HEX$(IMAGE_GET_PIXEL(b, 10, 10)); " "; IMAGE_GET_ALPHA(b, 10, 10)
+DIM c AS INTEGER : c = IMAGE_GET_PIXEL(b, 50, 10)
+PRINT (c SHR 16) BAND 255; " "; (c SHR 8) BAND 255; " "; c BAND 255; " "; IMAGE_GET_ALPHA(b, 50, 10)
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+963200 255
+150 50 0 255
+
+=== verblassen mit abziehen kommt bei schwarz an
+' Nur multiplizieren bleibt bei einem dunklen Grau stehen (die Rundung
+' haelt 15 * 247 / 255 bei 15); 1 abziehen zieht es auf null.
+SCREEN(64, 64, "rt", 1)
+DIM rt AS INTEGER : rt = RENDERTARGET_NEW(64, 64, TRUE)
+RENDERTARGET_BEGIN(rt)
+BOX(0, 0, 64, 64, RGB(255, 200, 40))
+RENDERTARGET_END()
+DIM i AS INTEGER
+FOR i = 1 TO 400
+    RENDERTARGET_BEGIN(rt)
+    BLEND_MODE("mult")
+    BOX(0, 0, 64, 64, RGB(247, 247, 247))
+    IF i MOD 2 = 0 THEN
+        BLEND_MODE("subtract")
+        BOX(0, 0, 32, 64, RGB(1, 1, 1))
+    END IF
+    BLEND_MODE("alpha")
+    RENDERTARGET_END()
+NEXT
+DIM b AS INTEGER : b = RENDERTARGET_IMAGE(rt)
+PRINT "mit abziehen "; HEX$(IMAGE_GET_PIXEL(b, 10, 10)); " "; IMAGE_GET_ALPHA(b, 10, 10)
+PRINT "nur mult "; HEX$(IMAGE_GET_PIXEL(b, 50, 10))
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+mit abziehen 0 255
+nur mult F0F0F
+
 === inhalt wird nicht vom fenster massstab verzerrt
 SCREEN(64, 64, "rt", 2)
 DIM rt AS INTEGER

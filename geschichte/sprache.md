@@ -1196,3 +1196,61 @@ Maschinencode laesst die Familie ohnehin aus, und `gerufenes_harmlos`
 kennt den Namen. Benannte Kurven rechnet dieselbe `builtins::ease`.
 `modules_tween.dhtest` (vier Faelle); Gegenprobe: ohne den Aufruf der
 Kurve fallen genau die drei, die sie betreffen.
+
+Kapitel 15 (Leuchten) laedt Shader -- und ein vertippter Dateiname
+(`SHADER_LOAD("plasmaa.fs")`) ging als Quelltext an den Treiber, der mit
+"syntax error, unexpected '.', expecting '::'" antwortete. Jetzt ist ein
+Argument ohne `;`, `{` und Zeilenumbruch ein Dateiname (`glsl::ist_quelltext`),
+und fehlt die Datei, sagt es `datei_da` wie bei LOADIMAGE: Name und Ort.
+Und `SHADER_SET(s, "zeitt", 1)` tat einfach nichts; das Plasma stand still,
+ohne Meldung. `load_shader` merkt sich jetzt die Uniforms, die der Quelltext
+deklariert (`glsl::uniforme`), und jeder `SHADER_SET*` warnt einmal je Shader
+und Name, wenn es den Namen dort nicht gibt -- mit dem aehnlichsten, und bei
+anderer Gross-/Kleinschreibung mit dem Satz, dass sie im Shader zaehlt (im
+Programm zaehlt sie nicht, ein naheliegender Irrtum). Deklariert, aber
+unbenutzt (vom Treiber wegoptimiert) bleibt still: das ist harmlos und
+haeufig, etwa wenn ein Helfer `resolution` an jeden Shader gibt. Die
+Warnung nennt Datei und Zeile wie die vor dem Start (`x.dh:5: Warnung:`):
+`Graphics` legt sie in `shader_warnung` ab, `Vm::shader_warnung_zeigen`
+gibt sie aus. Die Zeile kennt die VM nur beim Fehler -- darum schlaegt sie
+sie fuer `vm::braucht_zeile` nach (ASSERT und SHADER_SET*, ein
+Byte-Vergleich fuer alle anderen), und der Maschinencode laesst diese
+Befehle der VM; sonst stuende dort die Zeile des letzten Befehls, den die
+VM gerufen hat.
+**Aendert bestehende Programme:** ein fehlender Shader ist ein Fehler statt
+-1. `shader_namen.dhtest` (drei Faelle, der dritte zaehlt die Warnungen im
+Kind) und drei Rust-Tests in `glsl.rs`; Gegenproben: Datei immer/nie als
+Quelltext, jedes Mal warnen, Deklarierte nicht ausnehmen, kein
+Gross/klein-Satz, gar nicht warnen -- jede laesst genau ihren Fall fallen.
+
+Im selben Kapitel sollte eine Spur verblassen: `BLEND_MODE("mult")` mit
+einem hellen Grau. Gemessen bleibt sie bei 15 von 255 stehen -- 15 * 247 /
+255 = 14,5 rundet wieder auf 15, und das Gluehen macht das Grau sichtbar.
+Die uebliche Abhilfe, zusaetzlich 1 abziehen, ging nicht:
+`BLEND_MODE("subtract")` war raylibs `BLEND_SUBTRACT_COLORS`, und das
+rechnet Farbe minus Hintergrund (GL_FUNC_SUBTRACT) und zieht die Deckkraft
+mit ab. Eine dunkle Fuellung loeschte so alles Helle und machte das
+Render-Ziel durchsichtig. Jetzt schaltet `blend_an` fuer "subtract" eine
+eigene Mischung ein (`rlSetBlendFactorsSeparate`: Hintergrund minus Farbe
+mal deren Deckkraft, GL_FUNC_REVERSE_SUBTRACT; die Deckkraft bleibt), auch
+nach dem Lichtfleck, der den Modus kurz wechselt. Kein Beispiel im Repo
+benutzte den Modus. **Aendert bestehende Programme:** wer sich auf das alte
+Ergebnis verlassen hat, bekommt das Gegenteil. `rendertarget_persistenz.dhtest`
+(zwei Faelle); Gegenproben: raylibs Modus laesst beide fallen, ohne
+Gewichtung mit der Deckkraft nur den halb deckenden Teil.
+
+Kapitel 16 (Pixelkunst und Paletten) zerlegt Farben mit `SHR` und `BAND`,
+und die Gliederung wollte erklaeren, warum `BAND` schwaecher bindet als `+`.
+Beim Ausprobieren lieferte `farbe BAND 255 + 20` still 0 statt Blau + 20
+(`farbe BAND 275`). Jetzt warnt der Parser (`Parser::vorrang_pruefen`), wenn
+ein Operand von BAND/BOR/BXOR/SHL/SHR ein + oder - ohne eigene Klammern
+enthaelt -- wie GCCs "suggest parentheses" -- und nennt beide Lesarten. Der
+Baum kennt keine Klammern mehr, darum ist es eine Warnung des Parsers, die
+`compile_source_programm` und `--check` mit denen des Compilers mischen.
+Vorzeichen (`-1 BAND 7`), Klammern, Feldindex und Argumente bleiben still,
+`*` neben BAND auch (wie in C liest das jeder richtig). Im ganzen Repo traf
+es nur die eine Zeile in `examples/53_bitwise.dh`, die den Vorrang absichtlich
+vorfuehrte; sie hat jetzt Klammern. `compiler_warnungen.dhtest` (zwei Faelle);
+Gegenproben: linken Operanden nicht pruefen, Vorzeichen mitzaehlen, Klammern
+ignorieren, Lauf ohne die Parser-Warnungen -- jede laesst genau ihren Fall
+fallen.

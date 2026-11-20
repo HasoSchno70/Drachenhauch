@@ -1,0 +1,5 @@
+' Kapitel 16 -- eine Nummer, zu der es keine Farbe gibt.
+DIM palette AS ARRAY OF INTEGER
+palette = [&H000000, &H3A6A9A, &HFFFFFF]
+CONST SCHNEE = 3
+PRINT HEX$(palette[SCHNEE])

@@ -482,3 +482,25 @@ unterscheidet der Editor „Probleme gefunden" von „Werkzeug kaputt".
 
 Was dabei gefunden wird, steht in
 [Sprachreferenz → Was der Übersetzer prüft](sprache.md#was-der-übersetzer-prüft).
+
+## Maschinencode: `dhrt --jit` und `DHRT_JIT`
+
+Funktionen und Schleifen, die oft laufen, übersetzt dhrt in Maschinencode
+für den Prozessor; der Rest läuft in der VM, die Befehl für Befehl liest.
+Übersetzt wird alles, was mit Zahlen (`INTEGER`, `FLOAT`, `BOOLEAN`) und
+Feldern aus Zahlen rechnet. Texte, Objekte und Vektoren gibt der
+Maschinencode an die VM ab. In einer Schleife, die Millionen Schritte
+rechnet, kann das teurer sein, als es spart -- dort gehören nur Zahlen hin.
+
+```bash
+dhrt --jit datei.dh               # je Funktion: uebersetzt, oder warum nicht
+DHRT_JIT=aus dhrt run datei.dh    # nur die VM -- zum Vergleichen
+DHRT_JIT_BILANZ=1 dhrt run datei.dh   # am Ende: Schleifen, Laeufe, Ausstiege
+```
+
+`dhrt --jit` sagt etwa `mitzahlen: uebersetzt` oder `mitvec2: VM: Platz 0
+hat den Typ 'vec2'`. Die Bilanz zählt die übersetzten Schleifen, wie oft
+sie liefen und wie oft der Maschinencode mitten drin an die VM abgeben
+musste. Wo die Zeit hingeht, misst `dhrt profile datei.dh` je Zeile.
+Eingeschaltet ist der Maschinencode immer; `DHRT_JIT=aus` ist nur zum
+Messen da.

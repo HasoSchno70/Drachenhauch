@@ -49,7 +49,8 @@ const dateien = [];
 for (const kap of fs.readdirSync(codeDir)) {
   const d = path.join(codeDir, kap);
   if (!fs.statSync(d).isDirectory()) continue;
-  for (const f of fs.readdirSync(d).filter((f) => f.endsWith(".dh"))) {
+  // Dazu die Shader (.fs, ab Kapitel 15): auch die stehen ganz im Buch.
+  for (const f of fs.readdirSync(d).filter((f) => f.endsWith(".dh") || f.endsWith(".fs"))) {
     dateien.push({ pfad: path.join(kap, f), inhalt: fs.readFileSync(path.join(d, f), "utf8") });
   }
 }
@@ -73,7 +74,8 @@ function ausruecken(zeilen) {
 
 const norm = (text) => (Array.isArray(text) ? text : text.replace(/\r/g, "").split("\n"))
   .map((z) => z.trimEnd())
-  .filter((z) => z.trim() !== "" && !z.trim().startsWith("'"));
+  // Kommentare: ' in Drachenhauch, // in GLSL.
+  .filter((z) => z.trim() !== "" && !z.trim().startsWith("'") && !z.trim().startsWith("//"));
 
 function gleich(a, b) {
   if (a.length !== b.length) return false;

@@ -1,0 +1,94 @@
+' Loesung zu Kapitel 15, Erfinden: Licht malt Plasma. Die Lichter
+' zeichnen weiss; ein Shader faerbt jeden hellen Punkt mit dem Plasma
+' aus Schritt 1 ein -- Shader koennen Bilder nicht nur erzeugen,
+' sondern auch umfaerben. Der Shader steht in kap15_plasmaspur.fs.
+' Die Stellen, die neu sind, stehen zwischen >>> und <<<.
+CONST BREITE = 800
+CONST HOEHE = 500
+' So viel von einer Spur ist nach einer Sekunde noch zu sehen.
+CONST REST = 0.4
+' Verblasst wird in festen Schritten, 60-mal je Sekunde.
+CONST SCHRITT = 1 / 60
+' So viele Lichter ziehen ihre Bahn.
+CONST LICHTER = 5
+
+SCREEN(BREITE, HOEHE, "Leuchtspuren")
+' Ein Zeichenblatt, das stehen bleibt: TRUE heisst, es wird nicht
+' zu Beginn jedes Bildes geleert.
+DIM blatt AS INTEGER : blatt = RENDERTARGET_NEW(BREITE, HOEHE, TRUE)
+
+' >>> neu
+DIM glow AS INTEGER : glow = SHADER_LOAD("kap15_plasmaspur.fs")
+' <<< neu
+SHADER_SET2(glow, "groesse", BREITE, HOEHE)
+SHADER_SET(glow, "staerke", 2.5)
+POSTFX(glow)
+DIM gluehen AS BOOLEAN : gluehen = TRUE
+
+' Je Schritt bleibt so viel uebrig, dass nach einer Sekunde REST da ist.
+DIM faktor AS INTEGER : faktor = ROUND(255 * REST ^ SCHRITT)
+
+' Alles auf dem Blatt wird mit faktor / 255 malgenommen, also etwas
+' dunkler. Danach noch 1 von jeder Farbe abziehen -- sonst bleibt eine
+' Spur ewig als dunkles Grau stehen (siehe "Was schiefgehen kann").
+SUB verblassen()
+    BLEND_MODE("mult")
+    BOX(0, 0, BREITE, HOEHE, RGB(faktor, faktor, faktor))
+    BLEND_MODE("subtract")
+    BOX(0, 0, BREITE, HOEHE, RGB(1, 1, 1))
+    BLEND_MODE("alpha")
+END SUB
+
+' Wo ein Licht zur Zeit t steht: eine Lissajous-Figur, wie die
+' Spirographen aus Kapitel 3, nur mit zwei verschiedenen Takten.
+FUNCTION bahn_x(nr AS INTEGER, t AS FLOAT) AS FLOAT
+    RETURN BREITE / 2 + 330 * SIN(t * (0.7 + nr * 0.23))
+END FUNCTION
+FUNCTION bahn_y(nr AS INTEGER, t AS FLOAT) AS FLOAT
+    RETURN HOEHE / 2 + 200 * SIN(t * (1.1 + nr * 0.17) + nr)
+END FUNCTION
+
+DIM zeit AS FLOAT
+DIM vorher AS FLOAT
+DIM uhr AS FLOAT
+DIM mx AS INTEGER : mx = MOUSEX()
+DIM my AS INTEGER : my = MOUSEY()
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
+    vorher = zeit
+    zeit = zeit + DELTA()
+    IF KEYHIT(KEY_G) THEN
+        gluehen = NOT gluehen
+        POSTFX(IIF(gluehen, glow, -1))
+    END IF
+    IF KEYHIT(KEY_SPACE) THEN RENDERTARGET_CLEAR(blatt, RGB(0, 0, 0))
+
+    RENDERTARGET_BEGIN(blatt)
+    uhr = uhr + DELTA()
+    WHILE uhr >= SCHRITT
+        uhr = uhr - SCHRITT
+        verblassen()
+    WEND
+
+    ' Die Lichter: je ein Strich von vorhin bis jetzt.
+    DIM nr AS INTEGER
+    FOR nr = 0 TO LICHTER - 1
+        ' >>> neu
+        DIM farbe AS INTEGER : farbe = RGB(255, 255, 255)
+        ' <<< neu
+        LINEW(bahn_x(nr, vorher), bahn_y(nr, vorher), _
+              bahn_x(nr, zeit), bahn_y(nr, zeit), 5, farbe)
+    NEXT
+    ' Malen mit der Maus.
+    IF MOUSEBUTTON(0) THEN
+        LINEW(mx, my, MOUSEX(), MOUSEY(), 6, HSV(zeit * 60, 0.6, 1))
+    END IF
+    mx = MOUSEX()
+    my = MOUSEY()
+    RENDERTARGET_END()
+
+    RENDERTARGET_DRAW(blatt, 0, 0)
+    ' >>> neu
+    SHADER_SET(glow, "zeit", zeit)
+    ' <<< neu
+    FLIP()
+WEND

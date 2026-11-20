@@ -1,0 +1,15 @@
+' Wie viele verschiedene x-Werte bekommen die 800 Bildpunkte einer
+' Zeile, je tiefer man hineinzoomt?
+DIM mitte AS FLOAT : mitte = -0.743643887037151
+FOR EACH e IN [30, 40, 46, 48, 50, 52]
+    DIM weite AS FLOAT : weite = 3.2 / 2 ^ e
+    DIM vorher AS FLOAT : vorher = mitte - weite / 2
+    DIM verschieden AS INTEGER : verschieden = 1
+    DIM px AS INTEGER
+    FOR px = 1 TO 799
+        DIM cx AS FLOAT : cx = mitte - weite / 2 + px * weite / 800
+        IF cx <> vorher THEN verschieden = verschieden + 1
+        vorher = cx
+    NEXT
+    PRINT "2 hoch "; e; ": "; verschieden; " verschiedene Werte"
+NEXT

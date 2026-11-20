@@ -1,0 +1,4 @@
+' Bild fuer Kapitel 15, Erweitern 1 (Loesung kap15_roehre): mit G auf die
+' Roehre umgeschaltet, siehe .txt.
+CHDIR("../../code/loesungen")
+IMPORT "../../code/loesungen/kap15_roehre.dh"

@@ -6,6 +6,16 @@
 use super::*;
 
 impl<'p> Vm<'p> {
+    /// Eine Warnung, die ein `SHADER_SET*` hinterlassen hat, mit Datei und
+    /// Zeile ausgeben -- wie die Warnungen vor dem Start (`x.dh:4: Warnung:`).
+    #[cfg(feature = "graphics")]
+    fn shader_warnung_zeigen(&mut self) {
+        let Some(w) = self.gfx.as_mut().and_then(|g| g.shader_warnung.take()) else { return };
+        let zeile = self.cur_line;
+        let wo = crate::preprocess::lauf_stelle(zeile).unwrap_or_else(|| zeile.to_string());
+        eprintln!("{}: {}: {}", wo, crate::meldung::wort("Warnung", "Warning"), crate::meldung::t(&w));
+    }
+
     #[cfg(feature = "graphics")]
     pub(super) fn try_graphics(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         // Grafik-Koordinaten sind "intish": INTEGER direkt, FLOAT wird zu int
@@ -1094,34 +1104,47 @@ impl<'p> Vm<'p> {
                 let resolved = crate::builtins::resolve_asset_path(arg);
                 let code = match std::fs::read_to_string(&resolved) {
                     Ok(text) => text,
-                    Err(_) => arg.to_string(), // kein Pfad -> als Code behandeln
+                    // Keine Datei: Quelltext, wenn es danach aussieht. Ein
+                    // vertippter Dateiname ging sonst an den Treiber und kam
+                    // als "syntax error, unexpected '.'" zurueck.
+                    Err(_) if crate::glsl::ist_quelltext(arg) => arg.to_string(),
+                    Err(_) => {
+                        crate::builtins::datei_da(&resolved, "SHADER_LOAD")?;
+                        // Da, aber nicht lesbar (kein Text, keine Rechte).
+                        return Err(format!("SHADER_LOAD: '{}' laesst sich nicht als Text lesen", arg));
+                    }
                 };
                 Value::Int(g!().load_shader(&code))
             }
             "shader_set" => {
                 g!().shader_set_float(gi(a,0,"SHADER_SET")?, gs(a,1,"SHADER_SET")?, need_f(a,2,"SHADER_SET")?);
+                self.shader_warnung_zeigen();
                 Value::Nil
             }
             "shader_set2" => {
                 g!().shader_set_vec2(gi(a,0,"SHADER_SET2")?, gs(a,1,"SHADER_SET2")?,
                     need_f(a,2,"SHADER_SET2")?, need_f(a,3,"SHADER_SET2")?);
+                self.shader_warnung_zeigen();
                 Value::Nil
             }
             "shader_set3" => {
                 g!().shader_set_vec3(gi(a,0,"SHADER_SET3")?, gs(a,1,"SHADER_SET3")?,
                     need_f(a,2,"SHADER_SET3")?, need_f(a,3,"SHADER_SET3")?, need_f(a,4,"SHADER_SET3")?);
+                self.shader_warnung_zeigen();
                 Value::Nil
             }
             "shader_set_array" => {
                 let (h, n) = (gi(a,0,"SHADER_SET_ARRAY")?, gs(a,1,"SHADER_SET_ARRAY")?.to_string());
                 let v = gfloats(a, 2, "SHADER_SET_ARRAY")?;
                 g!().shader_set_array(h, &n, &v)?;
+                self.shader_warnung_zeigen();
                 Value::Nil
             }
             "shader_set_texture" => {
                 let (h, n) = (gi(a,0,"SHADER_SET_TEXTURE")?, gs(a,1,"SHADER_SET_TEXTURE")?.to_string());
                 let img = gi(a,2,"SHADER_SET_TEXTURE")?;
                 g!().shader_set_texture(h, &n, img)?;
+                self.shader_warnung_zeigen();
                 Value::Nil
             }
             "shader_set_matrix" => {
@@ -1131,6 +1154,7 @@ impl<'p> Vm<'p> {
                     _ => return Err("SHADER_SET_MATRIX: erwartet MAT4 (Modul m3d)".into()),
                 };
                 g!().shader_set_matrix(h, &n, &m)?;
+                self.shader_warnung_zeigen();
                 Value::Nil
             }
             "postfx" => {

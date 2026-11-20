@@ -1,0 +1,186 @@
+' Loesung zu Kapitel 16, Erweitern 2: ein Wasserfall ueber den Felsen.
+' Vier neue Nummern; ihre Farben wandern schnell und nach unten.
+' Die Stellen, die neu sind, stehen zwischen >>> und <<<.
+IMPORT "imgfx"
+
+CONST B = 200
+CONST H = 125
+CONST MASSSTAB = 4
+CONST HORIZONT = 88
+
+' Die Nummern in der Palette.
+CONST HIMMEL = 0
+CONST HIMMEL_STUFEN = 6
+CONST SONNE = 6
+CONST BERG = 7
+CONST FELS = 9
+CONST GRAS = 12
+CONST SEE = 14
+CONST SEE_STUFEN = 4
+' >>> neu
+CONST FALL = 18
+CONST FALL_STUFEN = 4
+' <<< neu
+
+' Die Palette: jede Farbe eine Zahl, &H und dann Rot, Gruen, Blau.
+DIM palette AS ARRAY OF INTEGER
+palette = [&H1A1C4E, &H3A2A6E, &H6E3A7E, &HB04E6E, &HE8784E, _
+           &HF8B85A, _
+           &HFFF0B0, _
+           &H4E3A6A, &H38305A, _
+           &H2A2030, &H3E3040, &H564450, _
+           &H2E4A2E, &H4A6E3A, _
+           &H1E3A6A, &H2A4E80, &H3A6A9A, &H6E9EC6, _
+           &HF4F8FF, &HA6CAE6, &H5E8EBE, &HA6CAE6]
+
+' Die Bayer-Matrix: 16 Schwellen fuer ein Feld von 4 x 4 Punkten, so
+' verteilt, dass Nachbarn moeglichst verschiedene haben.
+DIM bayer AS ARRAY OF INTEGER
+bayer = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5]
+
+' Das Bild: je Punkt die Nummer seiner Farbe.
+DIM bild[0 TO B - 1, 0 TO H - 1] AS INTEGER
+DIM rastern AS BOOLEAN : rastern = TRUE
+
+' Ein Wert zwischen zwei Stufen wird zur unteren oder zur oberen --
+' je nachdem, wie weit er schon ist und welche Schwelle an (x, y) gilt.
+FUNCTION gerastert(wert AS FLOAT, x AS INTEGER, y AS INTEGER) AS INTEGER
+    DIM stufe AS INTEGER : stufe = FLOOR(wert)
+    DIM rest AS FLOAT : rest = wert - stufe
+    IF rastern AND rest * 16 > bayer[(y MOD 4) * 4 + x MOD 4] THEN
+        stufe = stufe + 1
+    END IF
+    RETURN stufe
+END FUNCTION
+
+SUB malen()
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 0 TO H - 1
+        FOR x = 0 TO B - 1
+            DIM nr AS INTEGER
+            IF y < HORIZONT THEN
+                ' Himmel: oben dunkel, zum Horizont hin hell.
+                DIM t AS FLOAT : t = y / HORIZONT * (HIMMEL_STUFEN - 1)
+                nr = HIMMEL + gerastert(t, x, y)
+                ' Die Sonne, halb hinter den Bergen.
+                IF (x - 140) ^ 2 + (y - 72) ^ 2 < 14 ^ 2 THEN nr = SONNE
+                ' Ferne Berge: ihre Hoehe kommt aus dem Rauschen.
+                DIM gipfel AS FLOAT
+                gipfel = 72 + 12 * NOISE2(x * 0.03, 1.5)
+                IF y > gipfel THEN
+                    nr = BERG + gerastert((y - gipfel) / 8, x, y) MOD 2
+                END IF
+            ELSE
+                ' Der See: Wellen als kurze Striche der vier Stufen, je
+                ' Zeile ein Stueck verschoben.
+                DIM versatz AS INTEGER
+                versatz = ROUND(NOISE2(0.5, y * 0.7) * 20)
+                DIM welle AS INTEGER : welle = (x + versatz) \ 7 + y
+                nr = SEE + welle MOD SEE_STUFEN
+                ' Unter der Sonne ihr Spiegelbild, jede zweite Zeile.
+                DIM breite AS FLOAT : breite = 12 - (y - HORIZONT) / 3
+                IF ABS(x - 140) < breite AND y MOD 2 = 0 THEN nr = SONNE
+            END IF
+            ' Der Felsen links, oben mit Gras.
+            DIM kante AS FLOAT
+            kante = 40 + 6 * NOISE2(x * 0.08, 7) + MAX(0, x - 52) * 3
+            IF y > kante THEN
+                IF y < kante + 3 THEN
+                    nr = GRAS + (x + y) MOD 2
+                ELSE
+                    DIM r AS FLOAT
+                    r = 1 + NOISE2(x * 0.15, y * 0.15) * 1.5
+                    nr = FELS + MIN(2, MAX(0, gerastert(r, x, y)))
+                END IF
+            END IF
+            ' >>> neu
+            ' Der Wasserfall: zehn Spalten vor dem Felsen. Jede Spalte
+            ' ist um ein paar Zeilen versetzt, damit die Streifen nicht
+            ' wie mit dem Lineal gezogen aussehen.
+            IF x >= 40 AND x < 50 AND y > kante + 1 THEN
+                DIM versetzt AS INTEGER : versetzt = (x * 7) MOD 5
+                nr = FALL + ((y + versetzt) \ 2) MOD FALL_STUFEN
+            END IF
+            ' <<< neu
+            bild[x, y] = nr
+        NEXT
+    NEXT
+END SUB
+
+' Eine Farbe mit einer anderen mischen: t = 0 die erste, 1 die zweite.
+' Dazu wird jede in Rot, Gruen und Blau zerlegt.
+FUNCTION mischen(a AS INTEGER, b AS INTEGER, t AS FLOAT) AS INTEGER
+    DIM r AS FLOAT
+    r = LERP((a SHR 16) BAND 255, (b SHR 16) BAND 255, t)
+    DIM g AS FLOAT
+    g = LERP((a SHR 8) BAND 255, (b SHR 8) BAND 255, t)
+    DIM bl AS FLOAT
+    bl = LERP(a BAND 255, b BAND 255, t)
+    RETURN RGB(r, g, bl)
+END FUNCTION
+
+' Die Farben, mit denen gerade gezeichnet wird: die Palette, im See um
+' `schritt` Stellen gedreht und zur Nacht hin abgedunkelt.
+DIM farben AS ARRAY OF INTEGER : farben = ARRAY_COPY(palette)
+SUB farben_stellen(schritt AS INTEGER, nacht AS FLOAT)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(palette) - 1
+        DIM quelle AS INTEGER : quelle = i
+        ' >>> neu
+        ' Die Uhr laeuft jetzt dreimal so schnell; der See nimmt nur
+        ' jeden dritten Schritt, der Fall jeden -- und andersherum
+        ' (minus), damit seine Streifen nach unten wandern.
+        IF i >= SEE AND i < SEE + SEE_STUFEN THEN
+            quelle = SEE + (i - SEE + schritt \ 3) MOD SEE_STUFEN
+        END IF
+        IF i >= FALL AND i < FALL + FALL_STUFEN THEN
+            quelle = FALL + (i - FALL - schritt) MOD FALL_STUFEN
+        END IF
+        ' <<< neu
+        farben[i] = mischen(palette[quelle], &H06081A, nacht)
+    NEXT
+END SUB
+
+SCREEN(B * MASSSTAB, H * MASSSTAB, "Abendsee")
+DIM klein AS INTEGER : klein = RENDERTARGET_NEW(B, H)
+malen()
+
+DIM zeit AS FLOAT
+DIM nacht AS FLOAT
+DIM ziel_nacht AS FLOAT
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
+    zeit = zeit + DELTA()
+    IF KEYHIT(KEY_R) THEN
+        rastern = NOT rastern
+        malen()
+    END IF
+    IF KEYHIT(KEY_N) THEN ziel_nacht = 0.75 - ziel_nacht
+    ' Die Nacht kommt langsam: je Sekunde ein Viertel des Wegs.
+    nacht = nacht + (ziel_nacht - nacht) * MIN(1, DELTA() * 0.8)
+
+    ' Viermal je Sekunde wandern die Farben des Sees eine Stelle weiter.
+    ' >>> neu
+    farben_stellen(FLOOR(zeit * 12), nacht)
+    ' <<< neu
+
+    RENDERTARGET_BEGIN(klein)
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 0 TO H - 1
+        FOR x = 0 TO B - 1
+            PLOT(x, y, farben[bild[x, y]])
+        NEXT
+    NEXT
+    RENDERTARGET_END()
+    RENDERTARGET_DRAW(klein, 0, 0, MASSSTAB)
+
+    IF KEYHIT(KEY_S) THEN
+        ' Vergroessern ohne Glaetten -- sonst verschwimmen die Punkte.
+        DIM foto AS INTEGER : foto = RENDERTARGET_IMAGE(klein)
+        DIM gross AS INTEGER
+        gross = IMAGE_SCALE_NN(foto, B * MASSSTAB, H * MASSSTAB)
+        IMAGE_SAVE(gross, "abendsee.png")
+    END IF
+    FLIP()
+WEND

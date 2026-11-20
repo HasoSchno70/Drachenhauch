@@ -499,4 +499,170 @@ module.exports = (H) => [
   H.code(zeilen("loesungen/kap12_drache.dh")),
 
   H.p("Faltet man einen Papierstreifen immer wieder in der Mitte und klappt ihn danach so auf, dass jede Falte einen rechten Winkel bildet, entsteht genau diese Kurve — Generation 12 sind zwölf Faltungen. Jede Generation macht den Drachen um den Faktor √2 größer; darum schrumpft der Schritt um denselben Faktor, und das Bild bleibt gleich groß. Die Farbe zählt die Striche mit, so sieht man, wie die eine Linie durch das ganze Bild läuft."),
+
+  H.h2("Kapitel 13 · Die Mandelbrotmenge"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Mit 20 Schritten sieht die Menge aufgeblasen aus: Die kleinen runden Knospen verschmelzen mit der großen Form, weil viele Punkte am Rand mehr als zwanzig Schritte brauchen, um davonzulaufen, und darum fälschlich schwarz werden. Mit 1000 Schritten ändert sich in diesem Ausschnitt fast nichts — der Rand wird nur ein wenig feiner. Gerechnet werden dann 97 statt 11 Millionen Schritte; mit Maschinencode sind das immer noch nur 0,19 Sekunden. Länger dauert das Zeichnen der 400 000 Punkte."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Mit 2 wandert der Farbton langsam: Fast das ganze Bild bleibt im selben Blau-Violett, nur der Rand wird heller. Mit 30 springt die Farbe bei jedem Schritt um ein Zwölftel des Farbkreises, und um die Menge legen sich schmale bunte Ringe. Die Zahl sagt, wie viel Farbe ein Schritt wert ist."),
+
+  H.h3("Drehen 3"),
+
+  H.p("Die Übergänge bleiben weich, aber im Hintergrund erscheinen feine Bögen, wo die Farbe einen kleinen Sprung macht. Die Formel für den Bruchteil stimmt nur ungefähr, und umso genauer, je weiter z beim Überschreiten der Grenze schon draußen ist. Bei Radius 16 ist der Fehler unsichtbar, bei Radius 2 nicht."),
+
+  H.h3("Erweitern 1: das Mausrad"),
+
+  H.p("Der Punkt unter der Maus soll stehen bleiben. Darum rückt alles um denselben Faktor näher an ihn heran — auch die Mitte (code/loesungen/kap13_mausrad.dh):"),
+
+  ...neu("loesungen/kap13_mausrad.dh").map((t) => H.code(t)),
+
+  H.pmix(["Ein Schritt am Rad vergrößert anderthalbfach. ", ["mx + (mitteX - mx) * f", true], " ist die Mitte, um den Faktor f näher an mx gerückt; der Punkt mx selbst rückt nirgendwohin. Dieselbe Rechnung braucht jedes Programm, das an einer Stelle heranzoomt, ob Karte, Zeichenprogramm oder Spiel."]),
+
+  H.h3("Erweitern 2: als PNG sichern"),
+
+  H.p("Das Bild liegt schon fertig in einem Render-Ziel; RENDERTARGET_IMAGE macht daraus ein Bild, IMAGE_SAVE schreibt es (code/loesungen/kap13_png.dh):"),
+
+  ...neu("loesungen/kap13_png.dh").map((t) => H.code(t)),
+
+  H.p("IMAGE_SAVE gehört zum Modul imgfx, darum das IMPORT. Die Datei landet im Ordner des Programms — dhrt run wechselt dorthin, bevor es startet. Drei Sekunden lang steht ihr Name im Bild, damit man weiß, dass etwas geschehen ist."),
+
+  H.h3("Erfinden: Julia-Mengen"),
+
+  H.p("Eine Möglichkeit (code/loesungen/kap13_julia.dh): dieselbe Rechnung, aber z beginnt beim Bildpunkt und c steht fest. Ein Klick in die Mandelbrotmenge nimmt den Punkt unter der Maus als c:"),
+
+  ...neu("loesungen/kap13_julia.dh").map((t) => H.code(t)),
+
+  H.p("Die Mandelbrotmenge ist eine Landkarte der Julia-Mengen. Klickt man in ihr Inneres, ist die Julia-Menge ein zusammenhängendes Gebilde; klickt man weit draußen, zerfällt sie in Staub; und klickt man an den Rand, sieht die Julia-Menge aus wie die Mandelbrotmenge an genau dieser Stelle — Spiralen im Seepferdchental, Rüssel im Elefantental."),
+
+  H.h2("Kapitel 14 · Wolken und Landschaften"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Mit 0.03 ist das Bild ein Inselmeer: viele kleine Inseln, jede mit einem kleinen Gipfel, weil man sich viermal so schnell über die Rauschfläche bewegt und auf dieselbe Bildbreite viermal so viele Hügel kommen. Mit 0.002 sieht man von oben auf ein Stück eines großen Kontinents mit einer Küste am Rand — und alles wirkt unscharf, denn auch die feinste der sechs Lagen ist jetzt viel größer als ein Bildpunkt."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Mit einer Lage wird die Karte glatt wie Knetmasse: runde Kontinente, glatte Küsten, Berge als weiche Kuppen. Mit zehn Lagen sieht sie fast genauso aus wie mit sechs — die Lagen sieben bis zehn sind kleiner als ein Bildpunkt und haben zusammen nur wenige Prozent der Stärke. Mehr Lagen kosten Zeit und zeigen nichts."),
+
+  H.h3("Drehen 3"),
+
+  H.p("Fast alles wird Land, und aus den Meeren werden Seen mit Stränden ringsum. Die Berge werden höher und bekommen mehr Schnee. Der Meeresspiegel ist nur die Höhe, an der der Farbverlauf von Blau zu Sand wechselt — wer ihn verschiebt, verschiebt die ganze Welt."),
+
+  H.h3("Erweitern 1: eine Insel"),
+
+  H.p("Zum Rauschen kommt eine Schale: in der Mitte hoch, zum Rand hin tief (code/loesungen/kap14_inseln.dh):"),
+
+  ...neu("loesungen/kap14_inseln.dh").map((t) => H.code(t)),
+
+  H.figure("kap14_inseln.png", "Die Insel: Das Rauschen bestimmt die Küste und die Berge, die Schale sorgt dafür, dass ringsum Meer ist.", 420, 262),
+
+  H.p("d ist 0 in der Mitte und 1 an den Rändern, 2 in den Ecken. + 0.25 hebt alles an, − 0.6 · d senkt es nach außen ab. Wo die Schale das Land unter 0 drückt, ist Meer — das Rauschen entscheidet nur noch, wie die Küste verläuft und wo die Berge stehen."),
+
+  H.h3("Erweitern 2: Höhenlinien"),
+
+  H.p("Eine Höhenlinie liegt dort, wo ein Punkt und sein Nachbar auf verschiedenen Stufen liegen — FLOOR(h / LINIE) zählt die Stufen (code/loesungen/kap14_hoehenlinien.dh):"),
+
+  ...neu("loesungen/kap14_hoehenlinien.dh").map((t) => H.code(t)),
+
+  H.figure("kap14_hoehenlinien.png", "Höhenlinien alle 0.04: Wo sie dicht liegen, ist der Hang steil.", 420, 262),
+
+  H.p("Hier zahlt sich das Feld gelaende aus: Die Linie braucht die Höhe des Nachbarn, und die steht schon da. Unter Wasser gibt es keine Linien (hier > 0). Wie auf einer echten Karte liegen die Linien an steilen Hängen dicht und auf flachen Wiesen weit auseinander."),
+
+  H.h3("Erfinden: Wolken, die ziehen"),
+
+  H.p("Eine Möglichkeit (code/loesungen/kap14_wolken.dh): ein zweites Rauschen, in jedem Bild neu gerechnet, auf einem kleinen Bild, das durchsichtig über der Karte liegt:"),
+
+  ...neu("loesungen/kap14_wolken.dh").map((t) => H.code(t)),
+
+  H.pmix(["Die Wolken ziehen, weil die Zeit in die x-Koordinate eingeht: ", ["x * 0.025 - zeit * 0.15", true], " schaut jede Sekunde an einer anderen Stelle der Rauschfläche nach. Wo das Rauschen klein ist, bleibt der Himmel frei; darüber wird die Wolke dichter, bis höchstens 85 Prozent Deckkraft. Das Wolkenbild ist nur 200 mal 125 Punkte groß und wird viermal vergrößert — Wolken brauchen keine Schärfe, und so sind es pro Bild 25 000 statt 400 000 Rechnungen."]),
+
+  H.h2("Kapitel 15 · Leuchten"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Mit 0.9 verblasst fast nichts: Die Lichter ziehen lange Bänder, und nach einer halben Minute ist der Schirm voller Schleifen, die sich kreuzen. Mit 0.05 bleibt von jeder Spur nach einer Sekunde ein Zwanzigstel — die Lichter werden zu Kometen mit kurzem Schweif. REST ist ein Anteil je Sekunde, keine Länge; wie lang die Spur aussieht, hängt auch davon ab, wie schnell das Licht fliegt."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Mit staerke 0 kommt nichts dazu: Das Bild sieht aus wie ohne Shader (Taste G). Mit 8 werden die Linien zu dicken, grellen Röhren, und wo zwei sich kreuzen, wird es fast weiß. Die 3.0 in glow.fs ist der Abstand der Nachbarn: Mit 1.0 liest der Shader nur 4 Bildpunkte weit, der Schein wird eng wie ein Rand; mit 8.0 reicht er 32 Bildpunkte weit, ist aber gitterig — zwischen den gelesenen Punkten liegen jetzt Lücken von 8 Bildpunkten, und das Muster der 81 Proben wird sichtbar. Ein weiterer Schein braucht mehr Proben, nicht nur größere Abstände."),
+
+  H.h3("Drehen 3"),
+
+  H.p("Das Plasma steht auf dem Kopf. Auf einem Standbild fällt das kaum auf, denn ein Plasma hat kein Oben. Man sieht es an der Bewegung: Die Wellen von sin(y / 30.0 − zeit) wandern jetzt nach oben statt nach unten, und die schrägen Bänder von sin((x + y) / 60.0 + zeit) laufen von links unten nach rechts oben. Wer ein Bild mit Schrift durch einen Shader schickt, sieht es sofort — dort ist der Fehler nicht zu übersehen."),
+
+  H.h3("Erweitern 1: ein Röhrenbildschirm"),
+
+  H.p("Der Shader (code/loesungen/kap15_roehre.fs) macht drei Dinge nacheinander:"),
+
+  H.code(zeilen("loesungen/kap15_roehre.fs")),
+
+  H.p("Im Programm wird er geladen wie glow.fs, und G wechselt zwischen beiden (code/loesungen/kap15_roehre.dh):"),
+
+  ...neu("loesungen/kap15_roehre.dh").map((t) => H.code(t)),
+
+  H.figure("kap15_roehre.png", "Die Leuchtspuren auf einer alten Röhre: dunkle Zeilen zwischen den hellen, das Bild leicht gewölbt.", 420, 262),
+
+  H.p("Die Wölbung ist ein Trick beim Lesen, nicht beim Schreiben: Jeder Punkt holt seine Farbe von einer Stelle, die etwas weiter außen liegt — je weiter vom Mittelpunkt, desto mehr. Dadurch rückt der Inhalt zur Mitte zusammen, und die Ränder wirken nach hinten gebogen. Ein Shader kann nicht bestimmen, wohin sein Punkt geht; er kann nur bestimmen, woher er seine Farbe nimmt."),
+
+  H.h3("Erweitern 2: Glühen im Takt"),
+
+  H.p("Eine Möglichkeit (code/loesungen/kap15_takt.dh):"),
+
+  ...neu("loesungen/kap15_takt.dh").map((t) => H.code(t)),
+
+  H.pmix(["AUDIO_NOTE baut einen Ton aus Welle, Tonhöhe, Dauer und Hüllkurve: 55 Hertz sind ein tiefes A, 2 Millisekunden Anstieg machen den Schlag hart, 180 Millisekunden Abfall auf 0 lassen ihn verklingen. ", ["AUDIO_PEAK()", true], " liefert den lautesten Ausschlag seit der letzten Frage; beim Schlag gemessen 0,66, eine halbe Sekunde später fast 0. Weil es zwischen zwei Bildern auch einmal nichts zu messen gibt, nimmt das Programm den größeren Wert von neuem Ausschlag und 90 Prozent des alten — so fällt das Glühen weich ab, statt zu flackern. Kapitel 18 und 19 machen aus Tönen Musik und aus Musik Bilder."]),
+
+  H.h3("Erfinden: Licht malt Plasma"),
+
+  H.p("Eine Möglichkeit: Die Lichter malen weiß, und ein Shader verbindet glow.fs mit plasma.fs (code/loesungen/kap15_plasmaspur.fs):"),
+
+  H.code(stueckLoesung("loesungen/kap15_plasmaspur.fs", "void main", "}", 3)),
+
+  H.pmix(["Der Shader liest nur den roten Anteil des Bildes — bei Weiß sind alle drei gleich — und nimmt ihn als Helligkeit: ", ["licht", true], ". Die Farbe kommt aus der Funktion plasma, die dieselbe Formel rechnet wie in Schritt 1. Ein Shader muss also nicht entweder ein Bild erzeugen oder eines verändern — er kann beides zugleich. Im Programm ändert sich nur, welche Datei geladen wird, dass die Lichter weiß sind und dass der Shader die Zeit bekommt (code/loesungen/kap15_plasmaspur.dh)."]),
+
+  H.h2("Kapitel 16 · Pixelkunst und Paletten"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Mit 1 macht der See einen Schritt je Sekunde: Man sieht jedes Mal deutlich, wie die Farben springen, und es wirkt eher wie ein Blinken als wie Wasser. Mit 20 wechselt jeder Strich zwanzigmal je Sekunde die Farbe, und das Auge kann den Wellen nicht mehr folgen — der See flimmert, statt zu fließen. Farbzyklen leben von einem mittleren Tempo, bei dem man die Bewegung gerade noch verfolgt."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Der Himmel zerfällt wieder in harte Streifen, wie mit der Taste R. Aber die Grenzen liegen anders: Mit lauter gleichen Schwellen wird jeder Punkt, dessen Rest über der Hälfte liegt, zur oberen Farbe — aus dem Abschneiden von FLOOR wird Runden. Die oberste Farbe bekommt nur einen halb so breiten Streifen, und das Gold am Horizont taucht auf. Die Rasterung lebt also nicht davon, dass es Schwellen gibt, sondern davon, dass sie verschieden sind."),
+
+  H.h3("Drehen 3"),
+
+  H.p("Mit IMAGE_SCALE wird das Bild weich: Jeder neue Punkt mischt die Farben der alten in seiner Nähe. Die Kanten des Felsens verschwimmen, und das Raster des Himmels wird zu einem grauen Schleier — es sieht aus wie ein unscharfes Foto eines Bildschirms. Für Fotos ist das richtig, für Pixelkunst nicht."),
+
+  H.h3("Erweitern 1: eine eigene Palette"),
+
+  H.p("Eine zweite Palette mit genauso vielen Farben in derselben Reihenfolge — die Nummer 6 ist auch im Winter die Sonne, 12 und 13 das, was vorher Gras war (code/loesungen/kap16_winter.dh):"),
+
+  ...neu("loesungen/kap16_winter.dh").map((t) => H.code(t)),
+
+  H.figure("kap16_winter.png", "Derselbe See mit der Winterpalette: Kein Punkt hat seine Nummer geändert.", 420, 262),
+
+  H.pmix(["abend merkt sich die ursprüngliche Palette. ", ["palette = IIF(palette = abend, winter, abend)", true], " tauscht: Ist palette gerade das Feld abend, wird es winter, sonst wieder abend. Die Nacht, der glitzernde See und die Rasterung gehen mit, weil sie nur mit Nummern arbeiten. Ein neues Bild malt das Programm dafür nicht — so konnten alte Spiele ein und dieselbe Landschaft als Sommer, Winter und Nacht zeigen, ohne dreimal Platz für das Bild."]),
+
+  H.h3("Erweitern 2: ein Wasserfall"),
+
+  H.p("Vier neue Nummern ab 18 und ihre vier Farben am Ende der Palette: Weiß, Hellblau, Blau, Hellblau. Der Fall ist zehn Spalten breit und liegt vor dem Felsen (code/loesungen/kap16_wasserfall.dh):"),
+
+  ...neu("loesungen/kap16_wasserfall.dh").map((t) => H.code(t)),
+
+  H.pmix(["Jeder Streifen ist zwei Zeilen hoch, ", ["(y + versetzt) \\ 2", true], ", und jede Spalte ist um ein paar Zeilen gegen die Nachbarn verschoben. Gedreht wird mit Minus statt Plus: Damit die Farbe, die gerade in Zeile y steht, im nächsten Schritt in Zeile y + 2 steht, muss jede Nummer die Farbe der Nummer davor bekommen. Und weil fallendes Wasser schneller ist als Wellen, läuft die Uhr jetzt mit zwölf Schritten je Sekunde; der See nimmt nur jeden dritten, ", ["schritt \\ 3", true], ". Der naheliegende Weg, im Fall einfach um schritt · 3 zu drehen, geht schief: Bei vier Farben ist eine Drehung um drei Stellen dasselbe wie eine um eine Stelle zurück — der Fall wäre nicht schneller geworden, sondern nach oben geflossen. So stand es im ersten Entwurf dieser Lösung."]),
+
+  H.h3("Erfinden: Sterne"),
+
+  H.p("Eine Möglichkeit (code/loesungen/kap16_sterne.dh): drei Nummern für drei Helligkeiten, verstreut über den oberen Himmel:"),
+
+  ...neu("loesungen/kap16_sterne.dh").map((t) => H.code(t)),
+
+  H.figure("kap16_sterne.png", "Nachts erscheinen die Sterne; ihre drei Helligkeiten wandern reihum, darum funkeln sie.", 420, 262),
+
+  H.p("Der Trick steckt in der Farbe: Ein Stern mischt die Farbe des Himmels mit seiner eigenen, und zwar umso mehr, je dunkler es ist. Am Tag ist dunkel 0, der Stern hat die Farbe des Himmels und ist unsichtbar; in der Nacht ist dunkel 1, und er leuchtet. Die Bedingung (x · 31 + y · 57) MOD 97 = 0 trifft etwa jeden 97. Punkt, und weil 97 eine Primzahl ist, liegen die Sterne nicht in Reihen. Weil die Sterne kein Rauschen brauchen, sieht der Himmel bei jedem Start gleich aus — wie ein Sternbild."),
 ];

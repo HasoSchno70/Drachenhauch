@@ -1,0 +1,4 @@
+' Kapitel 16 -- den Blauanteil, um 20 heller. So nicht:
+DIM farbe AS INTEGER : farbe = RGB(255, 160, 32)
+DIM blau AS INTEGER : blau = farbe BAND 255 + 20
+PRINT "Blau: "; blau
