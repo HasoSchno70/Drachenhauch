@@ -1,0 +1,3 @@
+IMPORT "tween"
+DIM t AS TWEEN
+t = TWEEN_NEW(0.0, 100.0, 600, "out_bonce")

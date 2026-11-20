@@ -1,4 +1,4 @@
-const { neu, stueck: stueckLoesung } = require("../code_lesen");
+const { neu, zeilen, stueck: stueckLoesung } = require("../code_lesen");
 
 // Anhang A: die Loesungen. Der Code kommt aus code/loesungen/ -- nur die
 // Stellen zwischen ' >>> neu und ' <<< neu, der Rest ist das Programm des
@@ -423,4 +423,42 @@ module.exports = (H) => [
   ...neu("loesungen/kap10_bruecke.dh").map((t) => H.code(t)),
 
   H.pmix(["Das Scharnier sitzt bei ", ["x - 380 / 24", true], ", einer halben Brettlänge links von der Brettmitte — dort, wo das Brett das vorige berührt. Das erste Brett hängt am linken Pfosten, das letzte am rechten. Vergleiche mit Kapitel 9: Dort waren es Punkte und Glieder, und wir haben jede Zeile der Rechnung selbst geschrieben. Hier sind es echte Bretter mit Breite, auf die Klötze fallen und liegen bleiben — mit einer Handvoll Befehlen."]),
+
+  H.h2("Kapitel 11 · Sanft ankommen"),
+
+  H.h3("Drehen 1"),
+
+  H.p("in_back holt Schwung: Der Punkt fährt erst ein Stück nach links, hinter den Start, und dann immer schneller nach rechts — das Gegenstück zu out_back. inout_elastic schwingt an beiden Enden: am Anfang zittert er um den Start, schießt dann in wenigen weiten Sprüngen hinüber und zittert am Ende um das Ziel, ein Stück darüber hinaus. in_bounce hüpft am Anfang ein paar kleine Sprünge auf der Stelle und fährt dann los. Die Regel dahinter: in_x ist out_x rückwärts abgespielt."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Mit spaeter(0) kommen alle vier Knöpfe gleichzeitig, als ein Block — die Staffelung ist weg, und das Menü wirkt sofort steifer. Mit spaeter(i * 0.3) wartet der letzte Knopf 90 Prozent der Zeit und muss den ganzen Weg in den restlichen 0,12 Sekunden fahren: Er schießt herein. Die Verzüge sollten so klein sein, dass alle Knöpfe noch genug Zeit für ihren Weg haben."),
+
+  H.h3("Drehen 3"),
+
+  H.p("s bestimmt, wie weit die Kurve über das Ziel hinausschießt. Mit s = 0 wird aus zurueck die Formel 1 + q³ — genau out_cubic: sanft ankommen, ohne Überschießen. Mit s = 1,70158 sind es etwa zehn Prozent des Wegs, rund 53 Punkte. Mit s = 4 sind es fast vierzig Prozent, über 200 Punkte: Die Knöpfe fliegen weit nach rechts und kommen dann zurück, als wären sie an einem Gummiband."),
+
+  H.h3("Erweitern 1: eigene Kurven"),
+
+  H.p("Zwei Funktionen, die p bekommen und den Anteil des Wegs liefern, und zwei Tweens mehr (code/loesungen/kap11_eigene.dh):"),
+
+  ...neu("loesungen/kap11_eigene.dh").map((t) => H.code(t)),
+
+  H.pmix(["treppe rundet p auf Viertel auf: Bis p = 0,25 ist der Punkt schon ein Viertel weit, dann steht er, bis p über 0,25 kommt, und so fort. Ein Tween, dessen Kurve springt, springt eben auch. zittern ist p plus eine kleine Welle, ", ["(1 - p)", true], " lässt sie zum Ende hin ausklingen, damit der Punkt genau am Ziel ankommt. Eine Kurve darf alles, solange sie bei p = 1 den Wert 1 liefert — sonst endet der Tween woanders als bei seinem Ende."]),
+
+  H.h3("Erweitern 2: eine Kette von Bewegungen"),
+
+  H.p("Ein eigenes kleines Programm (code/loesungen/kap11_kette.dh). Eine Strecke sind zwei Tweens, einer für x, einer für y, mit derselben Kurve; an jeder Ecke steht die Kurve, mit der es von dort weitergeht:"),
+
+  H.code(zeilen("loesungen/kap11_kette.dh")),
+
+  H.p("Der Trick ist TWEEN_DONE: Sobald die laufende Strecke fertig ist, legt strecke die nächste an, beginnend genau an der Ecke, an der die vorige endete. Darum gibt es keinen Sprung, obwohl jede Strecke ein neuer Tween ist."),
+
+  H.h3("Erfinden: ein Titelbildschirm"),
+
+  H.p("Eine Möglichkeit (code/loesungen/kap11_titel.dh): Jeder Buchstabe des Titels bekommt einen Tween für seine Höhe, mit einer Hüpfkurve, die wie spaeter um einen kleinen Verzug versetzt ist:"),
+
+  ...neu("loesungen/kap11_titel.dh").map((t) => H.code(t)),
+
+  H.p("huepfen ist aus drei Bögen gebaut: erst ein Fall bis ganz unten (4 · p² erreicht bei p = 0,5 die 1), dann ein kleiner Sprung auf 88 Prozent und zurück, dann ein winziger. Das Menü fährt jetzt doppelt so lange und beginnt erst nach 45 Prozent der Zeit — wenn der Titel fast steht. Alles hängt am selben Werkzeug: eine Funktion, die eine Kurve herstellt."),
 ];
