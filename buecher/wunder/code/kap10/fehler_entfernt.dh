@@ -1,0 +1,8 @@
+IMPORT "physics2d"
+DIM welt AS PHYS2D_WORLD : welt = PHYS2D_NEW()
+DIM ball AS INTEGER
+ball = PHYS2D_ADD_CIRCLE(welt, 100, 50, 10, TRUE, 0.5)
+' Der Ball ist ins Aus geflogen -- weg damit.
+PHYS2D_REMOVE(welt, ball)
+' ... spaeter, beim Zeichnen:
+PRINT PHYS2D_BODY_X(welt, ball)

@@ -1,0 +1,3 @@
+' Bild fuer Kapitel 10, Erweitern 2: die Abrissbirne.
+RANDOMIZE(4)
+IMPORT "../../code/loesungen/kap10_abrissbirne.dh"

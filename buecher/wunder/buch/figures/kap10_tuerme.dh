@@ -1,0 +1,3 @@
+' Bild fuer Kapitel 10: ein Schuss in die Tuerme (Bedienung in .txt).
+RANDOMIZE(4)
+IMPORT "../../code/kap10/2_tuerme.dh"

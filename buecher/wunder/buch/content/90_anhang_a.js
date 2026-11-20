@@ -383,4 +383,44 @@ module.exports = (H) => [
   ...neu("loesungen/kap09_wind.dh").map((t) => H.code(t)),
 
   H.pmix(["Der Wind hat zwei Teile. ", ["boe", true], " schwillt langsam an und ab, für alle Punkte gleich — dann hebt und senkt sich die ganze Fahne. Die ", ["welle", true], " hängt von der Zeit UND vom Ort ab: ", ["SIN(zeit * 7 - x / 25)", true], " hat an jeder Stelle einen anderen Wert und wandert mit der Zeit nach rechts, vom Mast weg. So läuft eine Welle durch den Stoff. Einen Vorhang von vorn könnte der Wind übrigens nur zur Seite schieben: Flattern geht aus dem Bild heraus, und dieses Bild hat nur zwei Richtungen."]),
+
+  H.h2("Kapitel 10 · Bälle in der Kiste"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Der große Ball räumt den mittleren und den rechten Turm ab; übrig bleibt ein Haufen Klötze, nur der linke Turm steht. Ein Ball mit dem Radius 30 hat gut viermal so viel Fläche wie einer mit 14, und die Physik gibt ihm entsprechend mehr Masse. Bei gleichem Tempo trägt er viermal so viel Schwung in die Türme."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Die Säulen biegen sich, als wären sie aus Gummi, und Klötze stecken ein Stück ineinander: In großen Schritten merkt die Physik eine Berührung erst, wenn die Körper schon überlappen, und schiebt sie dann ruckartig auseinander. Außerdem läuft alles langsamer. PHYS2D_STEP nimmt höchstens 0,05 Sekunden auf einmal; fünfzehn Schritte je Sekunde sind also nur drei Viertel einer Sekunde Physik."),
+
+  H.h3("Drehen 3"),
+
+  H.p("Mit demselben Zug wie vorher fliegt der Ball fast gerade und weit über die Türme hinweg. Auf dem Mond zielt man direkt auf das Ziel und zieht dafür weniger nach unten. Fällt dann etwas um, fällt es gemächlich, wie in Zeitlupe."),
+
+  H.h3("Erweitern 1: Domino"),
+
+  H.p("Nur aufbauen ändert sich (code/loesungen/kap10_domino.dh):"),
+
+  ...neu("loesungen/kap10_domino.dh").map((t) => H.code(t)),
+
+  H.p("Die Steine sind 60 hoch und 34 auseinander. Kippt einer, trifft er den nächsten etwa auf halber Höhe. Ein Abstand über 60 hieße: Er fällt flach auf den Boden, und die Kette reißt ab. Zielen muss man flach, denn ein Ball im hohen Bogen fliegt über die niedrigen Steine hinweg."),
+
+  H.h3("Erweitern 2: die Abrissbirne"),
+
+  H.p("Ein fester Haken, eine schwere Kugel, ein Seil dazwischen — und eine Linie, die das Seil zeichnet, denn die Welt kennt es, aber das Bild nicht (code/loesungen/kap10_abrissbirne.dh):"),
+
+  ...neu("loesungen/kap10_abrissbirne.dh").map((t) => H.code(t)),
+
+  H.figure("kap10_abrissbirne.png", "Die Abrissbirne ist in die Türme geschwungen und pendelt zurück; der mittlere Turm ist eingeknickt.", 420, 262),
+
+  H.p("Am Anfang ist die Kugel 276 vom Haken entfernt, das Seil aber 280 lang: Es hängt lose, und die Kugel fällt erst ein Stück, bis es sich strafft. Von da an zieht das Seil sie auf einen Bogen um den Haken. Ein Seil zieht nur, es drückt nie — darum PHYS2D_ADD_ROPE, „höchstens so weit“."),
+
+  H.h3("Erfinden: eine Brücke aus Brettern"),
+
+  H.p("Eine Möglichkeit (code/loesungen/kap10_bruecke.dh): zwei feste Pfosten, dazwischen zwölf Bretter, und an jeder Stelle, an der sich zwei berühren, ein Scharnier:"),
+
+  ...neu("loesungen/kap10_bruecke.dh").map((t) => H.code(t)),
+
+  H.pmix(["Das Scharnier sitzt bei ", ["x - 380 / 24", true], ", einer halben Brettlänge links von der Brettmitte — dort, wo das Brett das vorige berührt. Das erste Brett hängt am linken Pfosten, das letzte am rechten. Vergleiche mit Kapitel 9: Dort waren es Punkte und Glieder, und wir haben jede Zeile der Rechnung selbst geschrieben. Hier sind es echte Bretter mit Breite, auf die Klötze fallen und liegen bleiben — mit einer Handvoll Befehlen."]),
 ];

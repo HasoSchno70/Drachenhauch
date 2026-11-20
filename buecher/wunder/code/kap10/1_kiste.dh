@@ -1,0 +1,80 @@
+' Kapitel 10, Schritt 1 -- eine Kiste voller Baelle und Kloetze. Linke
+' Maustaste: ein Ball, rechte: ein Klotz. Am Anfang regnet es ein paar.
+IMPORT "physics2d"
+CONST BREITE = 800
+CONST HOEHE = 500
+CONST TAKT = 1.0 / 60
+
+DIM welt AS PHYS2D_WORLD : welt = PHYS2D_NEW()
+' Boden und zwei Waende: statisch (FALSE), Masse als HALBE Breite/Hoehe.
+PHYS2D_ADD_BOX(welt, BREITE / 2, HOEHE - 10, BREITE / 2, 10, FALSE, 0.2)
+PHYS2D_ADD_BOX(welt, 10, HOEHE / 2, 10, HOEHE / 2, FALSE, 0.2)
+PHYS2D_ADD_BOX(welt, BREITE - 10, HOEHE / 2, 10, HOEHE / 2, FALSE, 0.2)
+
+' Was die Physik nicht weiss: wie jeder Koerper aussieht.
+DIM koerper AS ARRAY OF INTEGER
+DIM rund AS ARRAY OF BOOLEAN
+DIM halb AS ARRAY OF FLOAT
+DIM farbe AS ARRAY OF INTEGER
+
+SUB ball(x AS FLOAT, y AS FLOAT)
+    DIM r AS FLOAT : r = RANDINT(10, 22)
+    ARRAY_PUSH(koerper, PHYS2D_ADD_CIRCLE(welt, x, y, r, TRUE, 0.5))
+    ARRAY_PUSH(rund, TRUE)
+    ARRAY_PUSH(halb, r)
+    ARRAY_PUSH(farbe, HSV(RANDINT(180, 240), 0.6, 0.95))
+END SUB
+
+SUB klotz(x AS FLOAT, y AS FLOAT)
+    DIM h AS FLOAT : h = RANDINT(12, 26)
+    ARRAY_PUSH(koerper, PHYS2D_ADD_BOX(welt, x, y, h, h, TRUE, 0.1))
+    ARRAY_PUSH(rund, FALSE)
+    ARRAY_PUSH(halb, h)
+    ARRAY_PUSH(farbe, HSV(RANDINT(20, 45), 0.7, 0.9))
+END SUB
+
+SUB zeichnen()
+    CLS(RGB(28, 30, 40))
+    BOX(0, HOEHE - 20, BREITE, HOEHE, RGB(70, 72, 84))
+    BOX(0, 0, 20, HOEHE, RGB(70, 72, 84))
+    BOX(BREITE - 20, 0, BREITE, HOEHE, RGB(70, 72, 84))
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(koerper) - 1
+        DIM x AS FLOAT : x = PHYS2D_BODY_X(welt, koerper[i])
+        DIM y AS FLOAT : y = PHYS2D_BODY_Y(welt, koerper[i])
+        DIM w AS FLOAT : w = PHYS2D_BODY_ANGLE(welt, koerper[i])
+        DIM h AS FLOAT : h = halb[i]
+        IF rund[i] THEN
+            CIRCLE(x, y, h, farbe[i])
+            ' Ein Strich vom Mittelpunkt -- damit man das Rollen sieht.
+            LINE(x, y, x + COS(w) * h, y + SIN(w) * h, RGB(20, 24, 40))
+        ELSE
+            ' BOXROT will die ganze Breite und den Winkel in Grad.
+            BOXROT(x, y, h * 2, h * 2, DEG(w), farbe[i])
+        END IF
+    NEXT
+    TEXT(28, 8, STR$(LEN(koerper)) + " Koerper", RGB(200, 205, 220))
+    FLIP()
+END SUB
+
+DIM n AS INTEGER
+FOR n = 1 TO 24
+    IF n MOD 2 = 0 THEN
+        ball(RANDINT(100, 700), RANDINT(-400, 50))
+    ELSE
+        klotz(RANDINT(100, 700), RANDINT(-400, 50))
+    END IF
+NEXT
+
+SCREEN(BREITE, HOEHE, "Kiste")
+DIM uhr AS FLOAT
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
+    IF MOUSE_HIT(0) THEN ball(MOUSE_X(), MOUSE_Y())
+    IF MOUSE_HIT(1) THEN klotz(MOUSE_X(), MOUSE_Y())
+    uhr = MIN(uhr + DELTA(), 0.1)
+    WHILE uhr >= TAKT
+        PHYS2D_STEP(welt, TAKT)
+        uhr = uhr - TAKT
+    WEND
+    zeichnen()
+WEND

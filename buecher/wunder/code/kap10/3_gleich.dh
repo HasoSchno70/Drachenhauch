@@ -1,0 +1,31 @@
+' Kapitel 10, zum Vergleich -- dieselbe Szene viermal: ein Ball trifft
+' einen Stapel aus sechs Kloetzen. Zweimal in festen Schritten, zweimal in
+' Schritten, die schwanken wie DELTA(). Wo liegt danach der oberste Klotz?
+IMPORT "physics2d"
+
+' Zwei Sekunden rechnen. schwanken = FALSE: immer 1/60 Sekunde; TRUE:
+' mal kuerzer, mal laenger, zusammen aber genauso lang.
+FUNCTION lauf(schwanken AS BOOLEAN) AS STRING
+    DIM w AS PHYS2D_WORLD : w = PHYS2D_NEW()
+    PHYS2D_ADD_BOX(w, 400, 490, 400, 10, FALSE, 0.2)
+    DIM oben AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO 5
+        oben = PHYS2D_ADD_BOX(w, 500, 466 - i * 28, 14, 14, TRUE, 0.05)
+    NEXT
+    DIM ball AS INTEGER : ball = PHYS2D_ADD_CIRCLE(w, 100, 380, 14, TRUE, 0.3)
+    PHYS2D_SET_VEL(w, ball, 900, -150)
+    DIM zeit AS FLOAT : zeit = 0
+    WHILE zeit < 2.0
+        DIM dt AS FLOAT : dt = 1.0 / 60
+        IF schwanken THEN dt = 1.0 / 60 * (0.7 + RND() * 0.6)
+        dt = MIN(dt, 2.0 - zeit)
+        PHYS2D_STEP(w, dt)
+        zeit = zeit + dt
+    WEND
+    RETURN STR$(ROUND(PHYS2D_BODY_X(w, oben), 1)) + ", " _
+        + STR$(ROUND(PHYS2D_BODY_Y(w, oben), 1))
+END FUNCTION
+
+PRINT "fest:      "; lauf(FALSE); "   "; lauf(FALSE)
+PRINT "schwankend: "; lauf(TRUE); "   "; lauf(TRUE)
