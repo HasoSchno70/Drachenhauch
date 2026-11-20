@@ -678,6 +678,19 @@ der Schwarm zittert nicht, wenn Entscheiden und Bewegen in einer Schleife
 stehen; die erste Fassung der Felsen ließ in jedem fünften Bild einen Vogel
 hinein.
 
+Danach (2026-11-20): Teil III, Kapitel 9–12 (Federn und Seile, Bälle in
+der Kiste, Sanft ankommen, Ein Garten wächst). Fünf Funde in der
+Laufzeit, alle behoben und in `geschichte/sprache.md`: `v.x` las die Teile
+eines VEC2 nicht; ein Parameter auf der Folgezeile eines SUB-Kopfs fehlte
+`--check`; `physics2d` hatte keine Gelenke und lieferte für einen
+entfernten Körper still (0, 0); `TWEEN_NEW` nahm keine eigene Kurve (die
+Gliederung wollte genau das zeigen), und ein vertippter Kurvenname bekam
+keinen Vorschlag. `shoot.dh` spielt seitdem eine Bedienung aus
+`figures/<name>.txt` ab. Was sich am Entwurf geändert hat: Kapitel 10
+zeigt die Gelenke in der Erfinden-Übung (Brücke aus Brettern), und die
+festen Schritte an vier Läufen (`3_gleich.dh`); das Schlafen der Klötze
+brachte beim Nachmessen nichts und flog wieder hinaus.
+
 Was beim Bauen festgelegt wurde:
 
 * **Code kommt aus Dateien.** `buch/code_lesen.js` holt ganze Programme,
