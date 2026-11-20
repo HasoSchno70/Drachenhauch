@@ -4419,7 +4419,12 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 Some(v) => return err(format!("{}: die Kurve ist ein Name wie \"out_quad\" oder eine Funktion, nicht {}",
                                               name.to_uppercase(), v.type_name())),
             };
-            if kurve.is_none() && !is_easing(&easing) { return err(format!("TWEEN: unbekanntes easing '{}'", easing)); }
+            if kurve.is_none() && !is_easing(&easing) {
+                // Mit Vorschlag: "out_bonce" ist fast immer "out_bounce".
+                let namen = EASINGS.split(", ");
+                return err(format!("TWEEN: unbekanntes easing '{}'.{} Alle Kurven nennt TWEEN_EASINGS()",
+                                   easing, crate::aehnlich::hinweis_klein(&easing, namen)));
+            }
             Ok(Value::Tween(Rc::new(RefCell::new(TweenObj { start, end, duration, easing, start_ms: now_ms(), paused_at: None, mode: mode.to_string(), kurve }))))
         }
         "tween_value" => {
@@ -4435,7 +4440,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "tween_pause" => { arity!(1); let mut t = tween_h(&a[0], "TWEEN_PAUSE")?.borrow_mut(); if t.paused_at.is_none() { t.paused_at = Some(elapsed(&t)); } Ok(Value::Nil) }
         "tween_resume" => { arity!(1); let mut t = tween_h(&a[0], "TWEEN_RESUME")?.borrow_mut(); if let Some(p) = t.paused_at { t.start_ms = now_ms() - p; t.paused_at = None; } Ok(Value::Nil) }
         "tween_reverse" => { arity!(1); let mut t = tween_h(&a[0], "TWEEN_REVERSE")?.borrow_mut(); let s = t.start; t.start = t.end; t.end = s; t.start_ms = now_ms(); t.paused_at = None; Ok(Value::Nil) }
-        "tween_easings" => { arity!(0); Ok(Value::str_rc("in_back, in_bounce, in_cubic, in_elastic, in_quad, in_sine, inout_back, inout_bounce, inout_cubic, inout_elastic, inout_quad, inout_sine, linear, out_back, out_bounce, out_cubic, out_elastic, out_quad, out_sine")) }
+        "tween_easings" => { arity!(0); Ok(Value::str_rc(EASINGS)) }
 
         // ===== Modul: xml =====
         //
@@ -6539,6 +6544,9 @@ pub(crate) fn progress(t: &TweenObj) -> f64 {
         _ => if e >= d { 1.0 } else { e as f64 / d as f64 },
     }
 }
+
+/// Alle Kurvennamen, wie TWEEN_EASINGS sie liefert.
+const EASINGS: &str = "in_back, in_bounce, in_cubic, in_elastic, in_quad, in_sine, inout_back, inout_bounce, inout_cubic, inout_elastic, inout_quad, inout_sine, linear, out_back, out_bounce, out_cubic, out_elastic, out_quad, out_sine";
 
 fn is_easing(n: &str) -> bool {
     matches!(n, "linear" | "in_quad" | "out_quad" | "inout_quad" | "in_cubic" | "out_cubic" | "inout_cubic"

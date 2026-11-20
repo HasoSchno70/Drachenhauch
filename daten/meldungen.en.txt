@@ -778,6 +778,7 @@ Ungueltige Regex '{}': {}	Invalid regex '{}': {}
 {}: ms_min >= 0 und ms_max >= ms_min noetig	{}: ms_min >= 0 and ms_max >= ms_min are required
 {}: Sekunden duerfen nicht negativ sein	{}: seconds must not be negative
 {}: unbekanntes easing '{}'	{}: unknown easing '{}'
+{}: unbekanntes easing '{}'.{} Alle Kurven nennt TWEEN_EASINGS()	{}: unknown easing '{}'.{} TWEEN_EASINGS() names all curves
 {}: unbekannter Modus '{}'	{}: unknown mode '{}'
 {}: unbekannte Art '{}' (gueltig: kuchen, balken, linie, tacho)	{}: unknown kind '{}' (valid: kuchen, balken, linie, tacho)
 {}: unbekannte Kennzahl '{}' (gueltig: anzahl, summe, mittel, min, max)	{}: unknown statistic '{}' (valid: anzahl, summe, mittel, min, max)

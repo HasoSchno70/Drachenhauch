@@ -33,6 +33,14 @@ t = TWEEN_NEW(0.0, 1.0, 100, "schwurbel")
 --- fehler
 TWEEN: unbekanntes easing 'schwurbel'
 
+=== ein vertippter kurvenname bekommt einen vorschlag
+IMPORT "tween"
+DIM t AS TWEEN
+t = TWEEN_NEW(0.0, 1.0, 100, "out_bonce")
+--- fehler
+TWEEN: unbekanntes easing 'out_bonce'. Meintest du out_bounce,
+Alle Kurven nennt TWEEN_EASINGS()
+
 === easing names are case insensitive
 IMPORT "tween"
 DIM t AS TWEEN
