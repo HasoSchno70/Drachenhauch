@@ -897,7 +897,7 @@ eines anderen Ziels tut nichts.
 
 | Funktion | Zweck |
 |---|---|
-| `SHADER_LOAD(src$)` → INTEGER | Fragment-Shader laden — aus einer Datei oder direkt als Quelltext; `-1` bei Fehler |
+| `SHADER_LOAD(src$)` → INTEGER | Fragment-Shader laden — aus einer Datei oder direkt als Quelltext; `-1`, wenn er sich nicht übersetzen lässt (die Meldung des Treibers steht davor). Ein Name ohne `;`, `{` und Zeilenumbruch ist ein Dateiname: fehlt die Datei, ist das ein Fehler, der den Ort nennt |
 | `POSTFX(shader [, scale])` | jedes fertige Bild durch diesen Shader schicken; `-1` schaltet ab. `scale` (0.25..1, Vorgabe 1) lässt den Shader in kleinerer Auflösung rechnen und vergrößert das Ergebnis weich — für aufwendige Shader auf schwachen Grafikchips (bei 0.7 etwa die Hälfte der Arbeit); Text im Bild wird dabei etwas weicher |
 | `SHADER_SET(shader, name$, v)` | eine Zahl an ein `uniform float` geben |
 | `SHADER_SET2(shader, name$, x, y)` | zwei Werte (`vec2`) |
@@ -905,6 +905,12 @@ eines anderen Ziels tut nichts.
 | `SHADER_SET_ARRAY(shader, name$, values)` | ein `uniform float[]` aus einem `ARRAY OF FLOAT` füllen — Lichtpositionen, Verlaufsstufen |
 | `SHADER_SET_MATRIX(shader, name$, mat)` | eine `MAT4` aus [`m3d`](module-m3d.md) übergeben |
 | `SHADER_SET_TEXTURE(shader, name$, image)` | einen **zweiten** Sampler belegen — Masken, Paletten, Überblendungen |
+
+Gibt es den Namen im Quelltext des Shaders nicht, warnt jeder `SHADER_SET*`
+einmal je Shader und Name auf der Fehlerausgabe und schlägt den ähnlichsten
+vor -- in GLSL zählt Groß/klein, `Zeit` ist nicht `zeit`. Ein deklariertes
+Uniform, das der Shader nicht benutzt, bleibt still (der Treiber wirft es weg,
+das ist harmlos).
 
 `SHADER_SET_TEXTURE` wird gemerkt und erst beim Zeichnen gesetzt. Der Grund ist
 eine Eigenheit von raylib: die Zuweisung wirkt auf das *gerade aktive*

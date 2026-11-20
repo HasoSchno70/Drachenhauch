@@ -1196,3 +1196,22 @@ Maschinencode laesst die Familie ohnehin aus, und `gerufenes_harmlos`
 kennt den Namen. Benannte Kurven rechnet dieselbe `builtins::ease`.
 `modules_tween.dhtest` (vier Faelle); Gegenprobe: ohne den Aufruf der
 Kurve fallen genau die drei, die sie betreffen.
+
+Kapitel 15 (Leuchten) laedt Shader -- und ein vertippter Dateiname
+(`SHADER_LOAD("plasmaa.fs")`) ging als Quelltext an den Treiber, der mit
+"syntax error, unexpected '.', expecting '::'" antwortete. Jetzt ist ein
+Argument ohne `;`, `{` und Zeilenumbruch ein Dateiname (`glsl::ist_quelltext`),
+und fehlt die Datei, sagt es `datei_da` wie bei LOADIMAGE: Name und Ort.
+Und `SHADER_SET(s, "zeitt", 1)` tat einfach nichts; das Plasma stand still,
+ohne Meldung. `load_shader` merkt sich jetzt die Uniforms, die der Quelltext
+deklariert (`glsl::uniforme`), und jeder `SHADER_SET*` warnt einmal je Shader
+und Name, wenn es den Namen dort nicht gibt -- mit dem aehnlichsten, und bei
+anderer Gross-/Kleinschreibung mit dem Satz, dass sie im Shader zaehlt (im
+Programm zaehlt sie nicht, ein naheliegender Irrtum). Deklariert, aber
+unbenutzt (vom Treiber wegoptimiert) bleibt still: das ist harmlos und
+haeufig, etwa wenn ein Helfer `resolution` an jeden Shader gibt.
+**Aendert bestehende Programme:** ein fehlender Shader ist ein Fehler statt
+-1. `shader_namen.dhtest` (drei Faelle, der dritte zaehlt die Warnungen im
+Kind) und drei Rust-Tests in `glsl.rs`; Gegenproben: Datei immer/nie als
+Quelltext, jedes Mal warnen, Deklarierte nicht ausnehmen, kein
+Gross/klein-Satz, gar nicht warnen -- jede laesst genau ihren Fall fallen.

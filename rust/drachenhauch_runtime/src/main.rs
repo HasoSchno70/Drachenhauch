@@ -69,6 +69,9 @@ mod formung;
 #[cfg(feature = "graphics")]
 mod farbglyphe;
 mod geld;
+// Lesehilfen fuer Shader-Quelltext (SHADER_LOAD, SHADER_SET).
+#[allow(dead_code)]
+mod glsl;
 mod httpd;
 #[cfg(feature = "smtp")]
 mod smtp;

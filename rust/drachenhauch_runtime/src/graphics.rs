@@ -10,7 +10,7 @@
 //! -- verifiziert wird per Headless-Screenshot (DHRT_FRAMES/DHRT_SCREENSHOT);
 //! deterministisch testbar ist nur `PRINT`/stdout.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 use raylib::prelude::*;
@@ -1618,6 +1618,12 @@ pub struct Graphics {
     /// Ausserhalb von `BeginShaderMode` landet die Zuweisung also am falschen
     /// Shader und der Sampler bleibt schwarz.
     shader_textures: HashMap<usize, Vec<(i32, raylib::ffi::Texture2D)>>,
+    /// Die Uniforms, die der Quelltext eines Shaders aus `SHADER_LOAD`
+    /// deklariert (`glsl::uniforme`), und die Namen, zu denen schon gewarnt
+    /// wurde -- `SHADER_SET` mit einem Namen, den es nicht gibt, sagt es
+    /// einmal, statt still nichts zu tun.
+    shader_uniforme: HashMap<usize, Vec<String>>,
+    shader_gewarnt: HashSet<(usize, String)>,
     post_shader_idx: Option<usize>,
     /// Rechenaufloesung des Post-Shaders (POSTFX(h, massstab)): 1 = volle
     /// Fenstergroesse. Darunter rechnet der Shader in `post_klein` und das
@@ -2264,6 +2270,7 @@ impl Graphics {
             ansage: String::new(), ansage_dringend: false, ansage_nr: 0,
             fullscreen: false, pre_fullscreen: None,
             shaders: Vec::new(), nebel_sh: 0, shader_textures: HashMap::new(),
+            shader_uniforme: HashMap::new(), shader_gewarnt: HashSet::new(),
             post_shader_idx: None, post_massstab: 1.0, post_klein: None,
             gfx_stack: Vec::new(), clip_tiefe: 0, scene_rt,
             abgelegt: Vec::new(),
@@ -8049,24 +8056,49 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
                                         Some(&fuer_ziel_uebersetzen(code)));
         if !sh.is_shader_valid() { return -1; }
         self.shaders.push(sh);
-        (self.shaders.len() - 1) as i64
+        let idx = self.shaders.len() - 1;
+        self.shader_uniforme.insert(idx, crate::glsl::uniforme(code));
+        idx as i64
+    }
+    /// Der Ort eines Uniforms, oder -1. Deklariert der Quelltext den Namen gar
+    /// nicht, steht einmal je Shader und Name eine Warnung auf stderr -- mit dem
+    /// aehnlichsten Namen, denn im Shader zaehlt Gross/klein, im Programm nicht.
+    /// Ein deklariertes, aber unbenutztes Uniform (vom Treiber wegoptimiert)
+    /// bleibt still: das ist harmlos und haeufig.
+    fn uniform_ort(&mut self, h: usize, name: &str, befehl: &str) -> i32 {
+        let Some(sh) = self.shaders.get(h) else { return -1 };
+        let loc = sh.get_shader_location(name);
+        if loc >= 0 { return loc; }
+        let Some(namen) = self.shader_uniforme.get(&h) else { return loc };
+        if namen.iter().any(|n| n == name) { return loc; }
+        if self.shader_gewarnt.insert((h, name.to_string())) {
+            let gleich = namen.iter().find(|n| n.eq_ignore_ascii_case(name));
+            let hinweis = match gleich {
+                Some(n) => format!(" Meintest du {}? Im Shader zaehlt Gross/klein.", n),
+                None => crate::aehnlich::hinweis_klein(name, namen.iter().map(|s| s.as_str())),
+            };
+            eprintln!("{}", crate::meldung::t(&format!(
+                "Warnung: {}: der Shader hat kein uniform '{}' -- der Wert kommt nicht an.{}",
+                befehl, name, hinweis)));
+        }
+        loc
     }
     pub fn shader_set_float(&mut self, h: i64, name: &str, v: f64) {
-        if let Some(sh) = self.shaders.get_mut(h as usize) {
-            let loc = sh.get_shader_location(name);
-            if loc >= 0 { sh.set_shader_value(loc, v as f32); }
+        let loc = self.uniform_ort(h as usize, name, "SHADER_SET");
+        if let (Some(sh), true) = (self.shaders.get_mut(h as usize), loc >= 0) {
+            sh.set_shader_value(loc, v as f32);
         }
     }
     pub fn shader_set_vec2(&mut self, h: i64, name: &str, x: f64, y: f64) {
-        if let Some(sh) = self.shaders.get_mut(h as usize) {
-            let loc = sh.get_shader_location(name);
-            if loc >= 0 { sh.set_shader_value(loc, [x as f32, y as f32]); }
+        let loc = self.uniform_ort(h as usize, name, "SHADER_SET2");
+        if let (Some(sh), true) = (self.shaders.get_mut(h as usize), loc >= 0) {
+            sh.set_shader_value(loc, [x as f32, y as f32]);
         }
     }
     pub fn shader_set_vec3(&mut self, h: i64, name: &str, x: f64, y: f64, z: f64) {
-        if let Some(sh) = self.shaders.get_mut(h as usize) {
-            let loc = sh.get_shader_location(name);
-            if loc >= 0 { sh.set_shader_value(loc, [x as f32, y as f32, z as f32]); }
+        let loc = self.uniform_ort(h as usize, name, "SHADER_SET3");
+        if let (Some(sh), true) = (self.shaders.get_mut(h as usize), loc >= 0) {
+            sh.set_shader_value(loc, [x as f32, y as f32, z as f32]);
         }
     }
     /// SHADER_SET_ARRAY(shader, name$, werte): `uniform float[]` fuellen.
@@ -8077,9 +8109,11 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         if vals.is_empty() {
             return Err("SHADER_SET_ARRAY: Werte-Array ist leer".into());
         }
-        let sh = self.shaders.get_mut(h as usize)
-            .ok_or("SHADER_SET_ARRAY: ungueltiges SHADER-Handle")?;
-        let loc = sh.get_shader_location(name);
+        if h < 0 || self.shaders.get(h as usize).is_none() {
+            return Err("SHADER_SET_ARRAY: ungueltiges SHADER-Handle".into());
+        }
+        let loc = self.uniform_ort(h as usize, name, "SHADER_SET_ARRAY");
+        let sh = &mut self.shaders[h as usize];
         if loc < 0 {
             // Kein Fehler: ein Uniform, das der Shader wegoptimiert hat, ist
             // ein haeufiger und harmloser Fall (wie bei SHADER_SET).
@@ -8100,9 +8134,10 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
             .ok_or_else(|| self.tex_fehler(img, "SHADER_SET_TEXTURE"))?
             .tex;
         let idx = h as usize;
-        let sh = self.shaders.get(idx)
-            .ok_or("SHADER_SET_TEXTURE: ungueltiges SHADER-Handle")?;
-        let loc = sh.get_shader_location(name);
+        if self.shaders.get(idx).is_none() {
+            return Err("SHADER_SET_TEXTURE: ungueltiges SHADER-Handle".into());
+        }
+        let loc = self.uniform_ort(idx, name, "SHADER_SET_TEXTURE");
         if loc < 0 { return Ok(()); }            // Uniform wegoptimiert: harmlos
         // Nur vormerken -- gesetzt wird beim Zeichnen (siehe Feld-Kommentar).
         let slots = self.shader_textures.entry(idx).or_default();
@@ -8115,9 +8150,11 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     /// SHADER_SET_MATRIX(shader, name$, mat): MAT4 aus dem `m3d`-Modul als
     /// `uniform mat4` -- eigene Projektionen/Bone-Transformationen im Shader.
     pub fn shader_set_matrix(&mut self, h: i64, name: &str, m: &[f32; 16]) -> Result<(), String> {
-        let sh = self.shaders.get_mut(h as usize)
-            .ok_or("SHADER_SET_MATRIX: ungueltiges SHADER-Handle")?;
-        let loc = sh.get_shader_location(name);
+        if h < 0 || self.shaders.get(h as usize).is_none() {
+            return Err("SHADER_SET_MATRIX: ungueltiges SHADER-Handle".into());
+        }
+        let loc = self.uniform_ort(h as usize, name, "SHADER_SET_MATRIX");
+        let sh = &mut self.shaders[h as usize];
         if loc >= 0 {
             // m3d liefert column-major (wie OpenGL), raylibs Matrix ist
             // row-major -> beim Umfuellen transponieren.

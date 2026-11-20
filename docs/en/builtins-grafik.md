@@ -893,7 +893,7 @@ does nothing.
 
 | Function | Purpose |
 |---|---|
-| `SHADER_LOAD(src$)` → INTEGER | load a fragment shader — from a file or directly as source text; `-1` on error |
+| `SHADER_LOAD(src$)` → INTEGER | load a fragment shader — from a file or directly as source text; `-1` if it does not compile (the driver's message comes before it). A name without `;`, `{` and line break is a file name: a missing file is an error that names the location |
 | `POSTFX(shader [, scale])` | send every finished frame through this shader; `-1` switches it off. `scale` (0.25..1, default 1) lets the shader work at a lower resolution and enlarges the result smoothly -- for expensive shaders on weak graphics chips (at 0.7 about half the work); text in the picture becomes a little softer |
 | `SHADER_SET(shader, name$, v)` | pass a number to a `uniform float` |
 | `SHADER_SET2(shader, name$, x, y)` | two values (`vec2`) |
@@ -901,6 +901,11 @@ does nothing.
 | `SHADER_SET_ARRAY(shader, name$, values)` | fill a `uniform float[]` from an `ARRAY OF FLOAT` — light positions, gradient stops |
 | `SHADER_SET_MATRIX(shader, name$, mat)` | pass a `MAT4` from [`m3d`](module-m3d.md) |
 | `SHADER_SET_TEXTURE(shader, name$, image)` | occupy a **second** sampler — masks, palettes, cross-fades |
+
+If the shader's source has no such name, every `SHADER_SET*` warns once per
+shader and name on the error output and suggests the closest one -- case
+matters in GLSL, `Zeit` is not `zeit`. A declared uniform the shader does not
+use stays quiet (the driver drops it, which is harmless).
 
 `SHADER_SET_TEXTURE` is remembered and only set when drawing. The reason is
 a quirk of raylib: the assignment affects the *currently active* shader

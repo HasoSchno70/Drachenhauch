@@ -1094,7 +1094,15 @@ impl<'p> Vm<'p> {
                 let resolved = crate::builtins::resolve_asset_path(arg);
                 let code = match std::fs::read_to_string(&resolved) {
                     Ok(text) => text,
-                    Err(_) => arg.to_string(), // kein Pfad -> als Code behandeln
+                    // Keine Datei: Quelltext, wenn es danach aussieht. Ein
+                    // vertippter Dateiname ging sonst an den Treiber und kam
+                    // als "syntax error, unexpected '.'" zurueck.
+                    Err(_) if crate::glsl::ist_quelltext(arg) => arg.to_string(),
+                    Err(_) => {
+                        crate::builtins::datei_da(&resolved, "SHADER_LOAD")?;
+                        // Da, aber nicht lesbar (kein Text, keine Rechte).
+                        return Err(format!("SHADER_LOAD: '{}' laesst sich nicht als Text lesen", arg));
+                    }
                 };
                 Value::Int(g!().load_shader(&code))
             }

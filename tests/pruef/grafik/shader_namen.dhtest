@@ -1,0 +1,91 @@
+' Namen rund um Shader: ein vertippter Dateiname bei SHADER_LOAD und ein
+' Uniform, das es im Shader nicht gibt. Beides blieb bis 2026-11-20 stumm
+' oder ging als Raetsel an den Treiber (geschichte/module.md).
+
+=== ein vertippter dateiname bei shader_load nennt die datei
+SCREEN(64, 64, "S", 1)
+DIM s AS INTEGER : s = SHADER_LOAD("plasmaa.fs")
+PRINT "nicht erreicht "; s
+--- datei plasma.fs
+#version 330
+out vec4 finalColor;
+void main() { finalColor = vec4(1.0); }
+--- umgebung
+DHRT_FRAMES=1
+--- fehler
+SHADER_LOAD: Datei 'plasmaa.fs' nicht gefunden
+
+=== quelltext direkt geht weiter
+SCREEN(64, 64, "S", 1)
+DIM a AS INTEGER
+a = SHADER_LOAD("#version 330" + CHR$(10) + "out vec4 finalColor; void main() { finalColor = vec4(1.0); }")
+DIM b AS INTEGER : b = SHADER_LOAD("plasma.fs")
+PRINT a >= 0; " "; b >= 0; " "; a <> b
+--- datei plasma.fs
+#version 330
+out vec4 finalColor;
+void main() { finalColor = vec4(0.5); }
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+TRUE TRUE TRUE
+
+=== ein uniform, das es nicht gibt, warnt einmal mit vorschlag
+' Die Warnung steht auf stderr; gezaehlt wird sie im Kind.
+SCREEN(64, 64, "S", 1)
+FUNCTION lauf$(p AS INTEGER) AS STRING
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    WHILE leer < 5
+        DIM teil AS STRING : teil = PROCESS_READ$(p) + PROCESS_ERR$(p)
+        IF teil <> "" THEN
+            aus = aus + teil
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    RETURN REPLACE$(aus, CHR$(13), "")
+END FUNCTION
+FUNCTION wie_oft(text AS STRING, teil AS STRING) AS INTEGER
+    RETURN (LEN(text) - LEN(REPLACE$(text, teil, ""))) \ LEN(teil)
+END FUNCTION
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", CWD$() + "/kind.dh")
+DIM aus AS STRING : aus = lauf$(p)
+PRINT "fertig "; (INSTR(aus, "kind fertig") >= 0)
+PRINT "zeitt einmal "; wie_oft(aus, "kein uniform 'zeitt'")
+PRINT "vorschlag "; (INSTR(aus, "'zeitt' -- der Wert kommt nicht an. Meintest du zeit?") >= 0)
+PRINT "gross/klein "; (INSTR(aus, "'Zeit' -- der Wert kommt nicht an. Meintest du zeit? Im Shader zaehlt Gross/klein.") >= 0)
+PRINT "set3 "; (INSTR(aus, "SHADER_SET3: der Shader hat kein uniform 'farbe'") >= 0)
+PRINT "deklariert, unbenutzt still "; (INSTR(aus, "'ungenutzt'") < 0)
+PRINT "richtig still "; (INSTR(aus, "'zeit'") < 0)
+--- datei kind.dh
+SCREEN(64, 64, "K", 1)
+DIM s AS INTEGER : s = SHADER_LOAD("u.fs")
+SHADER_SET(s, "zeitt", 1)
+SHADER_SET(s, "zeitt", 2)
+SHADER_SET(s, "Zeit", 2)
+SHADER_SET(s, "ungenutzt", 2)
+SHADER_SET(s, "zeit", 2)
+SHADER_SET3(s, "farbe", 1, 2, 3)
+PRINT "kind fertig"
+--- datei u.fs
+#version 330
+in vec2 fragTexCoord;
+uniform sampler2D texture0;
+uniform float zeit;
+// uniform float imkommentar;
+uniform float ungenutzt;
+out vec4 finalColor;
+void main() { finalColor = texture(texture0, fragTexCoord) * zeit; }
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+fertig TRUE
+zeitt einmal 1
+vorschlag TRUE
+gross/klein TRUE
+set3 TRUE
+deklariert, unbenutzt still TRUE
+richtig still TRUE
