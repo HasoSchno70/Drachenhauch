@@ -1,0 +1,4 @@
+' Kapitel 15 -- ein Fehler IM Shader: es fehlt ein Semikolon.
+SCREEN(400, 250, "Shader mit Fehler")
+DIM s AS INTEGER : s = SHADER_LOAD("fehler_glsl.fs")
+PRINT "SHADER_LOAD lieferte "; s

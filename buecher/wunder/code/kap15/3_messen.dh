@@ -1,0 +1,23 @@
+' Kapitel 15 -- wie lange braucht die Grafikkarte fuer das Plasma? 300
+' Bilder ohne Warten auf den Bildschirm, gemessen mit MILLIS.
+CONST BREITE = 800
+CONST HOEHE = 500
+CONST BILDER = 300
+
+SCREEN(BREITE, HOEHE, "Plasma messen")
+' 0 = nicht auf den Bildschirm warten, so schnell es geht.
+SETFPS(0)
+DIM plasma AS INTEGER : plasma = SHADER_LOAD("plasma.fs")
+SHADER_SET2(plasma, "groesse", BREITE, HOEHE)
+POSTFX(plasma)
+
+DIM start AS INTEGER : start = MILLIS()
+DIM bild AS INTEGER
+FOR bild = 1 TO BILDER
+    SHADER_SET(plasma, "zeit", bild * 0.02)
+    CLS()
+    FLIP()
+NEXT
+DIM ms AS INTEGER : ms = MILLIS() - start
+PRINT "Ein Bild: "; FORMAT$(ms / BILDER, "%.2f"); " ms"
+PRINT "Bilder je Sekunde: "; ROUND(BILDER * 1000 / ms)

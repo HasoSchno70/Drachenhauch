@@ -579,4 +579,48 @@ module.exports = (H) => [
   ...neu("loesungen/kap14_wolken.dh").map((t) => H.code(t)),
 
   H.pmix(["Die Wolken ziehen, weil die Zeit in die x-Koordinate eingeht: ", ["x * 0.025 - zeit * 0.15", true], " schaut jede Sekunde an einer anderen Stelle der Rauschfläche nach. Wo das Rauschen klein ist, bleibt der Himmel frei; darüber wird die Wolke dichter, bis höchstens 85 Prozent Deckkraft. Das Wolkenbild ist nur 200 mal 125 Punkte groß und wird viermal vergrößert — Wolken brauchen keine Schärfe, und so sind es pro Bild 25 000 statt 400 000 Rechnungen."]),
+
+  H.h2("Kapitel 15 · Leuchten"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Mit 0.9 verblasst fast nichts: Die Lichter ziehen lange Bänder, und nach einer halben Minute ist der Schirm voller Schleifen, die sich kreuzen. Mit 0.05 bleibt von jeder Spur nach einer Sekunde ein Zwanzigstel — die Lichter werden zu Kometen mit kurzem Schweif. REST ist ein Anteil je Sekunde, keine Länge; wie lang die Spur aussieht, hängt auch davon ab, wie schnell das Licht fliegt."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Mit staerke 0 kommt nichts dazu: Das Bild sieht aus wie ohne Shader (Taste G). Mit 8 werden die Linien zu dicken, grellen Röhren, und wo zwei sich kreuzen, wird es fast weiß. Die 3.0 in glow.fs ist der Abstand der Nachbarn: Mit 1.0 liest der Shader nur 4 Bildpunkte weit, der Schein wird eng wie ein Rand; mit 8.0 reicht er 32 Bildpunkte weit, ist aber gitterig — zwischen den gelesenen Punkten liegen jetzt Lücken von 8 Bildpunkten, und das Muster der 81 Proben wird sichtbar. Ein weiterer Schein braucht mehr Proben, nicht nur größere Abstände."),
+
+  H.h3("Drehen 3"),
+
+  H.p("Das Plasma steht auf dem Kopf. Auf einem Standbild fällt das kaum auf, denn ein Plasma hat kein Oben. Man sieht es an der Bewegung: Die Wellen von sin(y / 30.0 − zeit) wandern jetzt nach oben statt nach unten, und die schrägen Bänder von sin((x + y) / 60.0 + zeit) laufen von links unten nach rechts oben. Wer ein Bild mit Schrift durch einen Shader schickt, sieht es sofort — dort ist der Fehler nicht zu übersehen."),
+
+  H.h3("Erweitern 1: ein Röhrenbildschirm"),
+
+  H.p("Der Shader (code/loesungen/kap15_roehre.fs) macht drei Dinge nacheinander:"),
+
+  H.code(zeilen("loesungen/kap15_roehre.fs")),
+
+  H.p("Im Programm wird er geladen wie glow.fs, und G wechselt zwischen beiden (code/loesungen/kap15_roehre.dh):"),
+
+  ...neu("loesungen/kap15_roehre.dh").map((t) => H.code(t)),
+
+  H.figure("kap15_roehre.png", "Die Leuchtspuren auf einer alten Röhre: dunkle Zeilen zwischen den hellen, das Bild leicht gewölbt.", 420, 262),
+
+  H.p("Die Wölbung ist ein Trick beim Lesen, nicht beim Schreiben: Jeder Punkt holt seine Farbe von einer Stelle, die etwas weiter außen liegt — je weiter vom Mittelpunkt, desto mehr. Dadurch rückt der Inhalt zur Mitte zusammen, und die Ränder wirken nach hinten gebogen. Ein Shader kann nicht bestimmen, wohin sein Punkt geht; er kann nur bestimmen, woher er seine Farbe nimmt."),
+
+  H.h3("Erweitern 2: Glühen im Takt"),
+
+  H.p("Eine Möglichkeit (code/loesungen/kap15_takt.dh):"),
+
+  ...neu("loesungen/kap15_takt.dh").map((t) => H.code(t)),
+
+  H.pmix(["AUDIO_NOTE baut einen Ton aus Welle, Tonhöhe, Dauer und Hüllkurve: 55 Hertz sind ein tiefes A, 2 Millisekunden Anstieg machen den Schlag hart, 180 Millisekunden Abfall auf 0 lassen ihn verklingen. ", ["AUDIO_PEAK()", true], " liefert den lautesten Ausschlag seit der letzten Frage; beim Schlag gemessen 0,66, eine halbe Sekunde später fast 0. Weil es zwischen zwei Bildern auch einmal nichts zu messen gibt, nimmt das Programm den größeren Wert von neuem Ausschlag und 90 Prozent des alten — so fällt das Glühen weich ab, statt zu flackern. Kapitel 18 und 19 machen aus Tönen Musik und aus Musik Bilder."]),
+
+  H.h3("Erfinden: Licht malt Plasma"),
+
+  H.p("Eine Möglichkeit: Die Lichter malen weiß, und ein Shader verbindet glow.fs mit plasma.fs (code/loesungen/kap15_plasmaspur.fs):"),
+
+  H.code(stueckLoesung("loesungen/kap15_plasmaspur.fs", "void main", "}", 3)),
+
+  H.pmix(["Der Shader liest nur den roten Anteil des Bildes — bei Weiß sind alle drei gleich — und nimmt ihn als Helligkeit: ", ["licht", true], ". Die Farbe kommt aus der Funktion plasma, die dieselbe Formel rechnet wie in Schritt 1. Ein Shader muss also nicht entweder ein Bild erzeugen oder eines verändern — er kann beides zugleich. Im Programm ändert sich nur, welche Datei geladen wird, dass die Lichter weiß sind und dass der Shader die Zeit bekommt (code/loesungen/kap15_plasmaspur.dh)."]),
 ];

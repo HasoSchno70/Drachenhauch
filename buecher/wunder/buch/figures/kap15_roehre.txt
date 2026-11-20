@@ -1,0 +1,4 @@
+// Kapitel 15: gleich zu Beginn G -- vom Gluehen auf die Roehre.
+c 2
+e 2 2 71 0 0 0
+e 4 1 71 0 0 0

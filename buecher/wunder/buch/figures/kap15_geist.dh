@@ -1,0 +1,42 @@
+' Bild fuer Kapitel 15, "Was schiefgehen kann": Verblassen nur mit
+' "mult". Was die Lichter vor Sekunden gezogen haben, bleibt als graue
+' Spur stehen -- das Gluehen macht sie erst richtig sichtbar.
+CONST BREITE = 800
+CONST HOEHE = 500
+CONST REST = 0.4
+CONST SCHRITT = 1 / 60
+CONST LICHTER = 5
+SCREEN(BREITE, HOEHE, "Geisterspuren")
+CHDIR("../../code/kap15")
+DIM blatt AS INTEGER : blatt = RENDERTARGET_NEW(BREITE, HOEHE, TRUE)
+DIM glow AS INTEGER : glow = SHADER_LOAD("glow.fs")
+SHADER_SET2(glow, "groesse", BREITE, HOEHE)
+SHADER_SET(glow, "staerke", 2.5)
+POSTFX(glow)
+DIM faktor AS INTEGER : faktor = ROUND(255 * REST ^ SCHRITT)
+FUNCTION bahn_x(nr AS INTEGER, t AS FLOAT) AS FLOAT
+    RETURN BREITE / 2 + 330 * SIN(t * (0.7 + nr * 0.23))
+END FUNCTION
+FUNCTION bahn_y(nr AS INTEGER, t AS FLOAT) AS FLOAT
+    RETURN HOEHE / 2 + 200 * SIN(t * (1.1 + nr * 0.17) + nr)
+END FUNCTION
+DIM zeit AS FLOAT
+DIM vorher AS FLOAT
+WHILE NOT QUITREQUESTED()
+    vorher = zeit
+    zeit = zeit + SCHRITT
+    RENDERTARGET_BEGIN(blatt)
+    BLEND_MODE("mult")
+    BOX(0, 0, BREITE, HOEHE, RGB(faktor, faktor, faktor))
+    BLEND_MODE("alpha")
+    DIM nr AS INTEGER
+    FOR nr = 0 TO LICHTER - 1
+        DIM farbe AS INTEGER
+        farbe = HSV(nr * 360 / LICHTER + zeit * 20, 0.8, 1)
+        LINEW(bahn_x(nr, vorher), bahn_y(nr, vorher), _
+              bahn_x(nr, zeit), bahn_y(nr, zeit), 5, farbe)
+    NEXT
+    RENDERTARGET_END()
+    RENDERTARGET_DRAW(blatt, 0, 0)
+    FLIP()
+WEND
