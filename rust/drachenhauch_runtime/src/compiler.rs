@@ -491,6 +491,10 @@ pub struct Compiler {
     /// zweite ENUM-Deklaration desselben Namens ist idempotent (identische
     /// Member) oder ein Fehler (abweichende Member).
     enum_decls: HashMap<String, Vec<(String, i64)>>,
+    /// Alle ENUMs des Programms aus dem Vorlauf (klein -> Name wie
+    /// angelegt, Werte wie angelegt) -- damit `Stoff.SNAD` schon beim Uebersetzen
+    /// auffaellt, auch wenn das ENUM weiter unten steht.
+    enum_werte: HashMap<String, (String, Vec<String>)>,
     /// Angesagter Typ je globaler Variable (Name klein). Aus `collect_globals`,
     /// also gefuellt BEVOR Phase 2/3 die Funktionsruempfe uebersetzt -- ohne
     /// das saehe eine Funktion die Typen der Globals nicht (`ctx.dim_types`
@@ -942,7 +946,7 @@ impl Compiler {
                    external_types, builtin_aliases,
                    importierte_module,
                    gemeldete_module: std::collections::HashSet::new(),
-                   enum_decls: HashMap::new(), global_types: HashMap::new(), konst_werte: HashMap::new(),
+                   enum_decls: HashMap::new(), enum_werte: HashMap::new(), global_types: HashMap::new(), konst_werte: HashMap::new(),
                    ctx: Ctx::new(), err_line: 0, stmt_nr: 0,
                    warnings: vec![], foreach_kopien: vec![] }
     }
@@ -1204,7 +1208,9 @@ impl Compiler {
                         self.alloc_slot(n);
                     }
                 }
-                Node::EnumDecl { name, .. } => {
+                Node::EnumDecl { name, members } => {
+                    self.enum_werte.insert(name.to_lowercase(), (name.clone(),
+                        members.iter().map(|(m, _)| m.clone()).collect()));
                     self.global_consts.insert(name.to_lowercase());
                     self.alloc_slot(name);
                 }
@@ -3477,6 +3483,24 @@ impl Compiler {
                 if let Some(o) = self.struct_ort(e) {
                     let o = o?;
                     if !o.ganz { return self.struct_lesen(o); }
+                }
+                // Ein Wert, den das ENUM nicht hat: beim Uebersetzen, mit
+                // Vorschlag (bis 2026-11-19 erst beim Laufen, "stoff hat keinen
+                // Member 'snad'", und --check schwieg). Eine Variable gleichen
+                // Namens verdeckt das ENUM; dann ist es ein Objekt.
+                if let Node::Identifier(en) = &**target {
+                    let klein = en.to_lowercase();
+                    if !self.ctx.local_slots.contains_key(en.as_str()) && !self.is_field(en) {
+                        if let Some((ename, werte)) = self.enum_werte.get(&klein) {
+                            let m = name.to_lowercase();
+                            if !werte.iter().any(|w| w.to_lowercase() == m) {
+                                return Err(format!("ENUM {} hat keinen Wert '{}'.{} Die Werte heissen {}",
+                                    ename, name,
+                                    crate::aehnlich::hinweis_klein(name, werte.iter().map(|w| w.as_str())),
+                                    werte.join(", ")));
+                            }
+                        }
+                    }
                 }
                 self.warn_unbekanntes_mitglied(target, name, false);
                 self.expr(target)?;

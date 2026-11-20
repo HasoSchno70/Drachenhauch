@@ -1132,3 +1132,15 @@ schwieg oder unklar sprach. Je ein Fall mit Gegenprobe:
 
 Dazu in der IDE: "1 Warnung" (deutsch) und "1 error" (englisch, ueber
 `trn$` und den Eintrag " Fehler, |1"), siehe `geschichte/ide.md`.
+
+Ein fuenfter Fund kam mit Kapitel 7 (Fallender Sand), dessen Entwurf
+versprach: "ENUM statt Zahlen -- ein Tippfehler faellt beim Uebersetzen
+auf". Er fiel erst beim Laufen auf ("stoff hat keinen Member 'snad'"),
+ohne Vorschlag, und `--check` schwieg; stand er in einer SUB, die nie
+lief, gar nicht. Jetzt sammelt der Vorlauf (`collect_globals_in`) die
+Werte jedes ENUM in `enum_werte`, und ein Zugriff `Name.WERT` auf einen
+Wert, den es nicht gibt, ist ein Compile-Fehler mit Vorschlag und Liste
+-- auch wenn das ENUM weiter unten steht. Eine lokale Variable oder ein
+Feld gleichen Namens verdeckt das ENUM. `enum.dhtest`, der alte Fall
+"unknown member raises" erwartet jetzt die neue Meldung; Gegenprobe: ohne
+die Pruefung fallen genau diese beiden Faelle.

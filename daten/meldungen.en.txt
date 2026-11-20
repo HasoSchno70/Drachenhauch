@@ -314,6 +314,7 @@ In FUNCTION {} steht eine Zuweisung an '{}' -- in Drachenhauch liefert eine FUNC
 {}: kein Parameter '{}'	{}: no parameter '{}'
 {}: kein Parameter '{}'.{} Die Parameter heissen {}	{}: no parameter '{}'.{} The parameters are {}
 Zuweisung an die Konstante '{}' -- eine CONST behaelt ihren Wert. Was sich aendern soll, ist eine Variable (DIM).	Assignment to the constant '{}' -- a CONST keeps its value. What is meant to change is a variable (DIM).
+ENUM {} hat keinen Wert '{}'.{} Die Werte heissen {}	ENUM {} has no value '{}'.{} The values are {}
 FLIP: ein Render-Ziel ist noch offen -- nach RENDERTARGET_BEGIN fehlt RENDERTARGET_END(). Bis dahin geht alles Gezeichnete ins Ziel statt auf den Bildschirm	FLIP: a render target is still open -- RENDERTARGET_END() is missing after RENDERTARGET_BEGIN. Until then everything drawn goes into the target instead of onto the screen
 {}: Parameter '{}' doppelt belegt	{}: parameter '{}' given twice
 {}: Parameter '{}' fehlt	{}: parameter '{}' is missing

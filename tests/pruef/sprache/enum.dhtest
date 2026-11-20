@@ -138,10 +138,11 @@ END SELECT
 traurig
 
 === unknown member raises
+' Seit 2026-11-19 beim Uebersetzen, mit der Liste der Werte.
 ENUM E = A, B
 PRINT E.SCHWURBEL
 --- fehler
-e hat keinen Member 'schwurbel'
+Compile-Fehler: ENUM e hat keinen Wert 'schwurbel'. Die Werte heissen a, b
 
 === duplicate member raises
 ENUM E = A, A, B
@@ -190,3 +191,19 @@ PRINT Color.RED + Color.BLUE
 2
 5
 
+
+=== ein wert, den das enum nicht hat, faellt vor dem start auf
+' Bis 2026-11-19 erst beim Laufen ("stoff hat keinen Member 'snad'"), ohne
+' Vorschlag, und --check schwieg -- gefunden am Buch "Kleine Wunder", das
+' genau das Gegenteil versprach. Auch wenn das ENUM weiter unten steht.
+SUB zeigen()
+    PRINT Stoff.SNAD
+END SUB
+PRINT "vorher"
+ENUM Stoff
+    LEER
+    SAND
+    WASSER
+END ENUM
+--- fehler
+fall.dh:5: Compile-Fehler: ENUM stoff hat keinen Wert 'snad'. Meintest du sand? Die Werte heissen leer, sand, wasser
