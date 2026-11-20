@@ -1154,3 +1154,17 @@ bleibt verboten -- die Werte sind unveraenderlich --, aber die Meldung
 sagt das jetzt und nennt `VEC2_NEW(...)`. `modules_vec2.dhtest` (vier
 Faelle); Gegenproben: vertauschte Teile und ein abgeschalteter
 Setz-Zweig lassen je genau ihren Fall fallen.
+
+Ein siebter kam beim Umbrechen einer zu langen Kopfzeile im selben
+Kapitel: `SUB verbinden(a AS INTEGER, b AS INTEGER, breite AS FLOAT,`
+und auf der naechsten Zeile `farbe AS INTEGER)`. Einzeilig schwieg
+`--check`; zweizeilig meldete es jedes `breite` im Rumpf als "anders
+geschrieben als angelegt" -- angelegt sei es als `CONST BREITE`.
+`symbole::definitionen` las Parameter nur, wenn `(` und `)` auf derselben
+Zeile standen, und `schreibweise::gilt` ordnete einen Parameter nur der SUB
+zu, deren Kopf auf seiner Zeile beginnt. Jetzt liest `definitionen` einen
+offenen Kopf auf den Folgezeilen weiter (ein `_` am Ende ist kein Name),
+und ein Parameter gehoert zu der SUB, in deren Zeilen er steht. Springen,
+Umbenennen und Hover fanden solche Parameter vorher ebenso wenig.
+`schreibweise.dhtest` und ein Rust-Test in `symbole.rs`; Gegenproben: jede
+der beiden Stellen allein zurueckgesetzt laesst den Fall fallen.

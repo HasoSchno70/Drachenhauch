@@ -45,6 +45,18 @@ PRINT "meldungen "; CODE_CHECK$(q)
 --- erwartet
 meldungen []
 
+=== parameter auf der zweiten kopfzeile gehoert zur sub
+' In Klammern geht eine Zeile weiter: `breite` auf der zweiten Zeile des
+' SUB-Kopfs ist ein Parameter wie auf der ersten, nicht die Konstante
+' BREITE (gefunden am Buch "Kleine Wunder", Kapitel 9).
+DIM NL AS STRING : NL = CHR$(10)
+DIM q AS STRING
+q = "CONST BREITE = 800" + NL + "SUB f(a AS INTEGER," + NL + "      breite AS FLOAT)" + NL
+q = q + "    PRINT breite" + NL + "END SUB" + NL + "f(1, 2)" + NL
+PRINT "meldungen "; CODE_CHECK$(q)
+--- erwartet
+meldungen []
+
 === die schnellkorrektur schreibt wie angelegt
 IMPORT "json"
 DIM NL AS STRING : NL = CHR$(10)

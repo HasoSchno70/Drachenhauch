@@ -55,7 +55,12 @@ fn innerster<'a>(bl: &'a [Bereich], z: usize, art: fn(&Bereich) -> bool) -> Opti
 
 fn gilt(d: &Definition, bl: &[Bereich]) -> Gilt {
     if d.art == "param" {
-        return bl.iter().filter(|b| aufrufbar(b) && b.zeile == d.zeile).max_by_key(|b| b.zeile)
+        // Der Kopf darf ueber mehrere Zeilen gehen (in Klammern geht eine
+        // Zeile weiter): ein Parameter auf der zweiten Zeile gehoert genauso
+        // zur SUB. Vorher galt er dann als global, und neben `CONST BREITE`
+        // hiess jedes `breite` im Rumpf "anders geschrieben als angelegt".
+        return bl.iter().filter(|b| aufrufbar(b) && b.zeile <= d.zeile && d.zeile <= b.ende)
+            .max_by_key(|b| b.zeile)
             .map(|b| Gilt::Block(b.zeile, b.ende)).unwrap_or(Gilt::Global);
     }
     match d.art {
