@@ -488,3 +488,26 @@ broken".
 
 What gets found is described in
 [Language reference → What the compiler checks](sprache.md#what-the-compiler-checks).
+
+## Machine code: `dhrt --jit` and `DHRT_JIT`
+
+dhrt translates functions and loops that run often into machine code for
+the processor; the rest runs in the VM, which reads instruction by
+instruction. Everything that computes with numbers (`INTEGER`, `FLOAT`,
+`BOOLEAN`) and arrays of numbers is translated. Strings, objects and
+vectors are handed to the VM by the machine code. In a loop that computes
+millions of steps this can cost more than it saves -- only numbers belong
+there.
+
+```bash
+dhrt --jit datei.dh               # je Funktion: uebersetzt, oder warum nicht
+DHRT_JIT=aus dhrt run datei.dh    # nur die VM -- zum Vergleichen
+DHRT_JIT_BILANZ=1 dhrt run datei.dh   # am Ende: Schleifen, Laeufe, Ausstiege
+```
+
+(The comments are the German ones of the tool.) `dhrt --jit` says for example `mitzahlen: uebersetzt` or `mitvec2: VM:
+Platz 0 hat den Typ 'vec2'` (these diagnostics stay German). The tally
+counts the translated loops, how often they ran and how often the machine
+code had to hand over to the VM in the middle. Where the time goes is
+measured per line by `dhrt profile datei.dh`. Machine code is always on;
+`DHRT_JIT=aus` is only there for measuring.
