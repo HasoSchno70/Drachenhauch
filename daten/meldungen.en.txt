@@ -1360,6 +1360,7 @@ SHADER_SET_ARRAY: Werte-Array ist leer	SHADER_SET_ARRAY: the value array is empt
 SHADER_SET_ARRAY: ungueltiges SHADER-Handle	SHADER_SET_ARRAY: invalid SHADER handle
 SHADER_SET_TEXTURE: ungueltiges SHADER-Handle	SHADER_SET_TEXTURE: invalid SHADER handle
 SHADER_SET_MATRIX: ungueltiges SHADER-Handle	SHADER_SET_MATRIX: invalid SHADER handle
+{} bindet schwaecher als {}: gerechnet wird {}. Ist das gemeint, die Klammern hinschreiben; sonst {}	{} binds more weakly than {}: this computes {}. If that is what you mean, write the brackets; otherwise {}
 {}: der Shader hat kein uniform '{}' -- der Wert kommt nicht an.{}	{}: the shader has no uniform '{}' -- the value does not arrive.{}
 Meintest du {}? Im Shader zaehlt Gross/klein.	Did you mean {}? Case matters in the shader.
 SHADER_LOAD: '{}' laesst sich nicht als Text lesen	SHADER_LOAD: '{}' cannot be read as text

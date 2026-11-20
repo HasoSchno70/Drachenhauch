@@ -1238,3 +1238,19 @@ benutzte den Modus. **Aendert bestehende Programme:** wer sich auf das alte
 Ergebnis verlassen hat, bekommt das Gegenteil. `rendertarget_persistenz.dhtest`
 (zwei Faelle); Gegenproben: raylibs Modus laesst beide fallen, ohne
 Gewichtung mit der Deckkraft nur den halb deckenden Teil.
+
+Kapitel 16 (Pixelkunst und Paletten) zerlegt Farben mit `SHR` und `BAND`,
+und die Gliederung wollte erklaeren, warum `BAND` schwaecher bindet als `+`.
+Beim Ausprobieren lieferte `farbe BAND 255 + 20` still 0 statt Blau + 20
+(`farbe BAND 275`). Jetzt warnt der Parser (`Parser::vorrang_pruefen`), wenn
+ein Operand von BAND/BOR/BXOR/SHL/SHR ein + oder - ohne eigene Klammern
+enthaelt -- wie GCCs "suggest parentheses" -- und nennt beide Lesarten. Der
+Baum kennt keine Klammern mehr, darum ist es eine Warnung des Parsers, die
+`compile_source_programm` und `--check` mit denen des Compilers mischen.
+Vorzeichen (`-1 BAND 7`), Klammern, Feldindex und Argumente bleiben still,
+`*` neben BAND auch (wie in C liest das jeder richtig). Im ganzen Repo traf
+es nur die eine Zeile in `examples/53_bitwise.dh`, die den Vorrang absichtlich
+vorfuehrte; sie hat jetzt Klammern. `compiler_warnungen.dhtest` (zwei Faelle);
+Gegenproben: linken Operanden nicht pruefen, Vorzeichen mitzaehlen, Klammern
+ignorieren, Lauf ohne die Parser-Warnungen -- jede laesst genau ihren Fall
+fallen.

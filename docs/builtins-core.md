@@ -387,6 +387,12 @@ Die Klammern um `1 SHL 3` sind nötig: alle binären Bit-Operatoren liegen auf
 **einer** Präzedenzebene und werden von links abgearbeitet, `a BOR 1 SHL 3`
 wäre also `(a BOR 1) SHL 3`.
 
+Und diese Ebene liegt **unter** `+` und `-` (wie in C): `farbe BAND 255 + 20`
+rechnet `farbe BAND 275`, nicht den Blauanteil plus 20. Steht ein `+` oder
+`-` ohne eigene Klammern neben einem Bit-Operator, warnen `dhrt --check` und
+der Start (`BAND bindet schwaecher als +: gerechnet wird a BAND (b + c) …`);
+Klammern in die eine oder andere Richtung machen die Warnung still.
+
 > Früher gab es dafür die Funktionen `BITAND`/`BITOR`/`BITXOR`/`BITNOT`/`SHL`/
 > `SHR`. Sie sind **entfernt** — mit den Operatoren wären sie doppelt.
 

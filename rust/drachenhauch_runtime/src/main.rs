@@ -1913,7 +1913,10 @@ fn compile_source_mit<T>(raw_source: &str, base: &std::path::Path, label: &str,
         return Err(ExitCode::from(3));
     }
     match uebersetze(&ast, &ext_types, &aliases, &module, &herkunft, label) {
-        Ok((j, warns)) => {
+        Ok((j, mut warns)) => {
+            // Dazu die des Parsers (Vorrang von BAND & Co.), hinter denen des
+            // Compilers -- deren Reihenfolge bleibt, wie sie ist.
+            warns.extend(p.warnungen().iter().cloned());
             let warns = lsp::verdeckung_filtern(warns, &source);
             // Nicht-fatale Compile-Warnungen (z.B. unbekanntes Builtin) vor dem
             // Lauf auf stderr -- der Lauf geht weiter, schlaegt aber spaeter ggf.
@@ -2243,7 +2246,8 @@ fn check_source_roh(raw_source: &str, base: &std::path::Path, label: &str) -> Ve
         // Hardware-Modulen ergaenzen, die in diesem dhrt-Build fehlen -- damit
         // der Editor das schon auf der IMPORT-Zeile markiert (nicht erst beim
         // Lauf). Leer, wenn kein solches Modul importiert wird.
-        Ok((_, warns)) => {
+        Ok((_, mut warns)) => {
+            warns.extend(p.warnungen().iter().cloned());
             let warns = lsp::verdeckung_filtern(warns, &source);
             let mut diags: Vec<serde_json::Value> =
                 preprocess::missing_hardware_imports_with_lines(raw_source).into_iter()

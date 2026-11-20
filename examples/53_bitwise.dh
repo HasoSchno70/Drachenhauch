@@ -56,7 +56,8 @@ PRINT "Toggle zweimal:  ", state
 
 PRINT ""
 PRINT "=== Praezedenz: + ist hoeher als BAND ==="
-' "5 + 3 BAND 6" parst als "(5 + 3) BAND 6" = 8 BAND 6 = 0
-PRINT "5 + 3 BAND 6 =", 5 + 3 BAND 6
+' "5 + 3 BAND 6" parst als "(5 + 3) BAND 6" = 8 BAND 6 = 0 -- ohne die
+' Klammern warnt dhrt davor (vor dem Start und in --check).
+PRINT "(5 + 3) BAND 6 =", (5 + 3) BAND 6
 ' Wer C-Stil will, klammert: "5 + (3 BAND 6)" = 5 + 2 = 7
 PRINT "5 + (3 BAND 6) =", 5 + (3 BAND 6)

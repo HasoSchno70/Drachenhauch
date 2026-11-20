@@ -388,6 +388,12 @@ The parentheses around `1 SHL 3` are needed: all binary bit operators sit on
 **one** precedence level and are evaluated from the left, so `a BOR 1 SHL 3`
 would be `(a BOR 1) SHL 3`.
 
+And that level sits **below** `+` and `-` (as in C): `colour BAND 255 + 20`
+computes `colour BAND 275`, not the blue part plus 20. If a `+` or `-` without
+its own brackets stands next to a bit operator, `dhrt --check` and the start
+warn (`BAND binds more weakly than +: this computes a BAND (b + c) …`);
+brackets in either direction silence the warning.
+
 > There used to be the functions `BITAND`/`BITOR`/`BITXOR`/`BITNOT`/`SHL`/
 > `SHR` for this. They have been **removed** — with the operators they would be duplicates.
 
