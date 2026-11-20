@@ -881,7 +881,7 @@ extern "C" fn w_wahr(k: *mut Kontext, i: u64) -> i64 { w_nehmen(k, i).truthy() a
 /// Vergleich (2), Coroutinen (4), TIMER_UPDATE und GUI_UPDATE (Rueckrufe),
 /// Auftraege (8, lesen die Globalen). Und nicht ASSERT (braucht die Zeile).
 fn befehl_im_bereich(f: u8, name: &str) -> bool {
-    f != 0 && !matches!(f, 2 | 4 | 8) && !name.starts_with("assert")
+    f != 0 && !matches!(f, 2 | 4 | 8) && !crate::vm::braucht_zeile(name)
         && !matches!(name, "gui_update" | "timer_update")
         // Eine Funktion einer Bibliothek koennte einen vergebenen Rueckruf
         // rufen (siehe `ffi::ohne_drachenhauch_code`, das je Aufruf fragt).

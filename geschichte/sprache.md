@@ -1209,7 +1209,14 @@ und Name, wenn es den Namen dort nicht gibt -- mit dem aehnlichsten, und bei
 anderer Gross-/Kleinschreibung mit dem Satz, dass sie im Shader zaehlt (im
 Programm zaehlt sie nicht, ein naheliegender Irrtum). Deklariert, aber
 unbenutzt (vom Treiber wegoptimiert) bleibt still: das ist harmlos und
-haeufig, etwa wenn ein Helfer `resolution` an jeden Shader gibt.
+haeufig, etwa wenn ein Helfer `resolution` an jeden Shader gibt. Die
+Warnung nennt Datei und Zeile wie die vor dem Start (`x.dh:5: Warnung:`):
+`Graphics` legt sie in `shader_warnung` ab, `Vm::shader_warnung_zeigen`
+gibt sie aus. Die Zeile kennt die VM nur beim Fehler -- darum schlaegt sie
+sie fuer `vm::braucht_zeile` nach (ASSERT und SHADER_SET*, ein
+Byte-Vergleich fuer alle anderen), und der Maschinencode laesst diese
+Befehle der VM; sonst stuende dort die Zeile des letzten Befehls, den die
+VM gerufen hat.
 **Aendert bestehende Programme:** ein fehlender Shader ist ein Fehler statt
 -1. `shader_namen.dhtest` (drei Faelle, der dritte zaehlt die Warnungen im
 Kind) und drei Rust-Tests in `glsl.rs`; Gegenproben: Datei immer/nie als

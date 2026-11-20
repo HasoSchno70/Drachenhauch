@@ -51,10 +51,23 @@ END FUNCTION
 FUNCTION wie_oft(text AS STRING, teil AS STRING) AS INTEGER
     RETURN (LEN(text) - LEN(REPLACE$(text, teil, ""))) \ LEN(teil)
 END FUNCTION
-DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", CWD$() + "/kind.dh")
-DIM aus AS STRING : aus = lauf$(p)
-PRINT "fertig "; (INSTR(aus, "kind fertig") >= 0)
-PRINT "zeitt einmal "; wie_oft(aus, "kein uniform 'zeitt'")
+' Einmal in der VM, einmal mit Maschinencode: die Zeile stimmt in beiden.
+DIM aus AS STRING
+DIM weg AS STRING
+FOR EACH weg IN ["aus", "immer"]
+    SETENV("DHRT_JIT", weg)
+    DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", CWD$() + "/kind.dh")
+    DIM teil AS STRING : teil = lauf$(p)
+    ' 'zeitx' kommt erst in der hundertsten Runde -- liefe die Schleife dann
+    ' als Maschinencode, staende dort die Zeile des letzten Befehls, den die
+    ' VM gerufen hat (6).
+    PRINT weg; ": zeile "; (INSTR(teil, "kind.dh:5: Warnung: SHADER_SET: der Shader hat kein uniform 'zeitt'") >= 0); _
+        " "; (INSTR(teil, "kind.dh:5: Warnung: SHADER_SET: der Shader hat kein uniform 'zeitx'") >= 0); _
+        " "; (INSTR(teil, "kind.dh:11: Warnung: SHADER_SET3: der Shader hat kein uniform 'farbe'") >= 0)
+    aus = aus + teil
+NEXT
+PRINT "fertig "; wie_oft(aus, "kind fertig")
+PRINT "zeitt einmal je lauf "; wie_oft(aus, "kein uniform 'zeitt'")
 PRINT "vorschlag "; (INSTR(aus, "'zeitt' -- der Wert kommt nicht an. Meintest du zeit?") >= 0)
 PRINT "gross/klein "; (INSTR(aus, "'Zeit' -- der Wert kommt nicht an. Meintest du zeit? Im Shader zaehlt Gross/klein.") >= 0)
 PRINT "set3 "; (INSTR(aus, "SHADER_SET3: der Shader hat kein uniform 'farbe'") >= 0)
@@ -63,8 +76,11 @@ PRINT "richtig still "; (INSTR(aus, "'zeit'") < 0)
 --- datei kind.dh
 SCREEN(64, 64, "K", 1)
 DIM s AS INTEGER : s = SHADER_LOAD("u.fs")
-SHADER_SET(s, "zeitt", 1)
-SHADER_SET(s, "zeitt", 2)
+DIM i AS INTEGER
+FOR i = 1 TO 200
+    SHADER_SET(s, IIF(i < 100, "zeitt", "zeitx"), i)
+    SHADER_SET(s, "zeit", i)
+NEXT
 SHADER_SET(s, "Zeit", 2)
 SHADER_SET(s, "ungenutzt", 2)
 SHADER_SET(s, "zeit", 2)
@@ -82,8 +98,10 @@ void main() { finalColor = texture(texture0, fragTexCoord) * zeit; }
 --- umgebung
 DHRT_FRAMES=1
 --- erwartet
-fertig TRUE
-zeitt einmal 1
+aus: zeile TRUE TRUE TRUE
+immer: zeile TRUE TRUE TRUE
+fertig 2
+zeitt einmal je lauf 2
 vorschlag TRUE
 gross/klein TRUE
 set3 TRUE

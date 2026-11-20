@@ -595,6 +595,20 @@ fn ui_preset_metrics(name: &str) -> Vec<(&'static str, i64)> {
 /// damit ein Tippfehler im DH-Programm NICHT die Runtime abstuerzen laesst,
 /// sondern einen klaren Laufzeitfehler liefert.
 /// Zahl der Befehlsfamilien in `Vm::familie_rufen`; die letzte sind die reinen.
+/// Befehle, die die Zeile ihres Aufrufs brauchen, ohne abzubrechen: ASSERT
+/// fuer seine Meldung, SHADER_SET* fuer die Warnung bei einem Uniform, das es
+/// nicht gibt. Die VM schlaegt sie nur fuer diese nach (sonst zahlt kein
+/// Befehl etwas dafuer, ein Byte-Vergleich), und der Maschinencode laesst sie
+/// der VM (`jit::befehl_im_bereich`).
+#[inline]
+pub(crate) fn braucht_zeile(name: &str) -> bool {
+    match name.as_bytes().first() {
+        Some(b'a') => name.starts_with("assert"),
+        Some(b's') => name.starts_with("shader_set"),
+        _ => false,
+    }
+}
+
 pub(crate) const BUILTIN_FAMILIEN: u8 = 34;
 
 fn safe_call_builtin(name: &str, args: &[Value]) -> Option<Result<Value, String>> {
@@ -3525,14 +3539,15 @@ impl<'p> Vm<'p> {
                     // Call); Ergebnis erst nach dem Truncate pushen.
                     // Reihenfolge: array-HOF (FUNCREF-Comparator) -> scene (VM-State)
                     // -> coro (VM-State) -> Grafik -> pure.
-                    // ASSERT braucht die Quell-Zeile fuer seine Meldung. Die
+                    // ASSERT braucht die Quell-Zeile fuer seine Meldung (und
+                    // SHADER_SET* fuer seine Warnung, `braucht_zeile`). Die
                     // wird sonst NUR beim Profilieren/Debuggen mitgefuehrt --
                     // der Normalfall zahlt bewusst nichts pro Instruktion
                     // (s. `track_lines` oben). Also hier gezielt fuer diese
                     // eine Familie nachschlagen; das erste Byte zu vergleichen
                     // haelt die Kosten fuer alle anderen Builtins bei einem
                     // Byte-Vergleich.
-                    if !track_lines && name.as_bytes().first() == Some(&b'a') && name.starts_with("assert") {
+                    if !track_lines && braucht_zeile(name) {
                         self.cur_line = fn_.lines.get(*ip).copied().unwrap_or(0);
                     }
                     let v = {

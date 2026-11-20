@@ -1650,6 +1650,9 @@ pub struct Graphics {
     /// einmal, statt still nichts zu tun.
     shader_uniforme: HashMap<usize, Vec<String>>,
     shader_gewarnt: HashSet<(usize, String)>,
+    /// Die Warnung des letzten `SHADER_SET*`, bis die VM sie mit Datei und
+    /// Zeile ausgibt (`Vm::shader_warnung_zeigen`) -- hier kennt man keine.
+    pub(crate) shader_warnung: Option<String>,
     post_shader_idx: Option<usize>,
     /// Rechenaufloesung des Post-Shaders (POSTFX(h, massstab)): 1 = volle
     /// Fenstergroesse. Darunter rechnet der Shader in `post_klein` und das
@@ -2296,7 +2299,7 @@ impl Graphics {
             ansage: String::new(), ansage_dringend: false, ansage_nr: 0,
             fullscreen: false, pre_fullscreen: None,
             shaders: Vec::new(), nebel_sh: 0, shader_textures: HashMap::new(),
-            shader_uniforme: HashMap::new(), shader_gewarnt: HashSet::new(),
+            shader_uniforme: HashMap::new(), shader_gewarnt: HashSet::new(), shader_warnung: None,
             post_shader_idx: None, post_massstab: 1.0, post_klein: None,
             gfx_stack: Vec::new(), clip_tiefe: 0, scene_rt,
             abgelegt: Vec::new(),
@@ -8087,7 +8090,7 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         idx as i64
     }
     /// Der Ort eines Uniforms, oder -1. Deklariert der Quelltext den Namen gar
-    /// nicht, steht einmal je Shader und Name eine Warnung auf stderr -- mit dem
+    /// nicht, gibt es einmal je Shader und Name eine Warnung -- mit dem
     /// aehnlichsten Namen, denn im Shader zaehlt Gross/klein, im Programm nicht.
     /// Ein deklariertes, aber unbenutztes Uniform (vom Treiber wegoptimiert)
     /// bleibt still: das ist harmlos und haeufig.
@@ -8103,9 +8106,9 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
                 Some(n) => format!(" Meintest du {}? Im Shader zaehlt Gross/klein.", n),
                 None => crate::aehnlich::hinweis_klein(name, namen.iter().map(|s| s.as_str())),
             };
-            eprintln!("{}", crate::meldung::t(&format!(
-                "Warnung: {}: der Shader hat kein uniform '{}' -- der Wert kommt nicht an.{}",
-                befehl, name, hinweis)));
+            self.shader_warnung = Some(format!(
+                "{}: der Shader hat kein uniform '{}' -- der Wert kommt nicht an.{}",
+                befehl, name, hinweis));
         }
         loc
     }

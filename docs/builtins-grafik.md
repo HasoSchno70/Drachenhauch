@@ -907,8 +907,8 @@ eines anderen Ziels tut nichts.
 | `SHADER_SET_TEXTURE(shader, name$, image)` | einen **zweiten** Sampler belegen — Masken, Paletten, Überblendungen |
 
 Gibt es den Namen im Quelltext des Shaders nicht, warnt jeder `SHADER_SET*`
-einmal je Shader und Name auf der Fehlerausgabe und schlägt den ähnlichsten
-vor -- in GLSL zählt Groß/klein, `Zeit` ist nicht `zeit`. Ein deklariertes
+einmal je Shader und Name auf der Fehlerausgabe, mit Datei und Zeile
+(`spiel.dh:12: Warnung: …`), und schlägt den ähnlichsten vor -- in GLSL zählt Groß/klein, `Zeit` ist nicht `zeit`. Ein deklariertes
 Uniform, das der Shader nicht benutzt, bleibt still (der Treiber wirft es weg,
 das ist harmlos).
 

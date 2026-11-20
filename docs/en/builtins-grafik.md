@@ -903,7 +903,8 @@ does nothing.
 | `SHADER_SET_TEXTURE(shader, name$, image)` | occupy a **second** sampler — masks, palettes, cross-fades |
 
 If the shader's source has no such name, every `SHADER_SET*` warns once per
-shader and name on the error output and suggests the closest one -- case
+shader and name on the error output, with file and line
+(`spiel.dh:12: Warnung: …`), and suggests the closest one -- case
 matters in GLSL, `Zeit` is not `zeit`. A declared uniform the shader does not
 use stays quiet (the driver drops it, which is harmless).
 
