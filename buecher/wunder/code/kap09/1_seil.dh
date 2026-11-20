@@ -1,0 +1,118 @@
+' Kapitel 9, Schritt 1 -- ein Seil aus 20 Punkten, oben festgehalten.
+' Mit der Maus einen Punkt greifen, ziehen und loslassen.
+IMPORT "vec2"
+CONST BREITE = 800
+CONST HOEHE = 500
+CONST PUNKTE = 20
+CONST GLIED = 15.0
+CONST SCHWERE = 900.0
+CONST TAKT = 1.0 / 60
+' Wie oft je Schritt alle Glieder nachgezogen werden.
+CONST RUNDEN = 20
+
+' Jeder Punkt: wo er ist, wo er einen Schritt vorher war, und ob er
+' festgehalten wird.
+DIM ort AS ARRAY OF VEC2
+DIM alt AS ARRAY OF VEC2
+DIM fest AS ARRAY OF BOOLEAN
+
+DIM i AS INTEGER
+FOR i = 0 TO PUNKTE - 1
+    ' Waagrecht ausgelegt -- so faellt das Seil am Anfang herunter.
+    DIM p AS VEC2 : p = VEC2_NEW(400 + i * GLIED, 80)
+    ARRAY_PUSH(ort, p)
+    ARRAY_PUSH(alt, p)
+    ARRAY_PUSH(fest, i = 0)
+NEXT
+
+' Der Punkt, den die Maus haelt (-1: keiner).
+DIM gegriffen AS INTEGER : gegriffen = -1
+
+' Haelt etwas den Punkt k fest -- ein Nagel oder die Maus?
+FUNCTION haelt(k AS INTEGER) AS BOOLEAN
+    RETURN fest[k] OR k = gegriffen
+END FUNCTION
+
+' Verlet: Die Geschwindigkeit ist nirgends gespeichert -- sie steckt im
+' Unterschied zwischen jetzt und vorher.
+SUB fliegen()
+    DIM g AS VEC2 : g = VEC2_NEW(0, SCHWERE * TAKT * TAKT)
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(ort) - 1
+        IF NOT haelt(k) THEN
+            DIM vorher AS VEC2 : vorher = ort[k]
+            ort[k] = ort[k] + (ort[k] - alt[k]) * 0.995 + g
+            alt[k] = vorher
+        END IF
+    NEXT
+END SUB
+
+' Zwei Punkte wieder auf den Abstand GLIED bringen. Beide gehen die
+' Haelfte des Wegs; ist einer fest, geht der andere den ganzen.
+SUB ziehen(a AS INTEGER, b AS INTEGER)
+    DIM d AS VEC2 : d = ort[b] - ort[a]
+    DIM l AS FLOAT : l = VEC2_LENGTH(d)
+    IF l = 0 THEN RETURN
+    DIM zuviel AS VEC2 : zuviel = d * ((l - GLIED) / l)
+    IF haelt(a) THEN
+        ort[b] = ort[b] - zuviel
+    ELSEIF haelt(b) THEN
+        ort[a] = ort[a] + zuviel
+    ELSE
+        ort[a] = ort[a] + zuviel / 2
+        ort[b] = ort[b] - zuviel / 2
+    END IF
+END SUB
+
+SUB schritt()
+    fliegen()
+    DIM r AS INTEGER
+    DIM k AS INTEGER
+    FOR r = 1 TO RUNDEN
+        FOR k = 0 TO LEN(ort) - 2
+            ziehen(k, k + 1)
+        NEXT
+    NEXT
+END SUB
+
+' Welcher Punkt liegt naeher als 20 an der Maus? -1: keiner.
+FUNCTION punktBei(m AS VEC2) AS INTEGER
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(ort) - 1
+        IF VEC2_DISTANCE(ort[k], m) < 20 THEN RETURN k
+    NEXT
+    RETURN -1
+END FUNCTION
+
+SUB zeichnen()
+    CLS(RGB(20, 24, 36))
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(ort) - 2
+        LINEW(ort[k].x, ort[k].y, ort[k + 1].x, ort[k + 1].y, 3, _
+              RGB(210, 180, 120))
+    NEXT
+    FOR k = 0 TO LEN(ort) - 1
+        CIRCLE(ort[k].x, ort[k].y, IIF(fest[k], 6, 3), RGB(240, 220, 170))
+    NEXT
+    FLIP()
+END SUB
+
+SCREEN(BREITE, HOEHE, "Seil")
+DIM uhr AS FLOAT
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
+    DIM maus AS VEC2 : maus = VEC2_NEW(MOUSE_X(), MOUSE_Y())
+    IF MOUSE_HIT(0) THEN gegriffen = punktBei(maus)
+    IF MOUSE_RELEASED(0) THEN gegriffen = -1
+    uhr = MIN(uhr + DELTA(), 0.1)
+    WHILE uhr >= TAKT
+        IF gegriffen >= 0 THEN
+            ' Der gegriffene Punkt geht dorthin, wo die Maus ist; sein
+            ' "vorher" bleibt -- so fliegt er weiter, wenn man loslaesst.
+            alt[gegriffen] = ort[gegriffen]
+            ort[gegriffen] = maus
+        END IF
+        schritt()
+        uhr = uhr - TAKT
+    WEND
+    zeichnen()
+WEND

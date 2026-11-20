@@ -1,0 +1,3 @@
+DIM p AS VEC2
+p = VEC2_NEW(100, 80)
+PRINT p

@@ -1,0 +1,2 @@
+' Bild fuer Kapitel 9: an der Bruecke ziehen (Bedienung in kap09_bruecke.txt).
+IMPORT "../../code/kap09/2_bruecke.dh"

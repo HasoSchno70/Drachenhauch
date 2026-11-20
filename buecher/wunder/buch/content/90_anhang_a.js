@@ -343,4 +343,44 @@ module.exports = (H) => [
   ...neu("loesungen/kap08_raubvogel.dh").map((t) => H.code(t)),
 
   H.pmix(["Bewegen und Init schreibt der Raubvogel nicht selbst; ", ["NEW Raubvogel()", true], " ruft das Init von Vogel, und ", ["jaeger.bewegen(dt)", true], " das bewegen von Vogel. ", ["jaeger.entscheiden(…)", true], " dagegen ruft seine eigene Fassung. In ihr beginnt ", ["ziel", true], " als NIL und wird der Vogel mit dem kleinsten Abstand. Der Raubvogel ist mit 170 etwas langsamer als die schnellsten Vögel — sonst wäre die Jagd zu schnell vorbei."]),
+
+  H.h2("Kapitel 9 · Federn und Seile"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Mit einer Runde ist das Seil mal 300, mal fast 390 lang statt 285, und es wippt wie Gummi: Die Glieder rücken ihre Punkte zurecht, verschieben dabei die Nachbarn und haben keine zweite Gelegenheit. Mit hundert Runden ist es genau 285 lang — und sieht trotzdem aus wie mit zwanzig, denn dort war es 286 bis 288, weniger als ein Zehntel Bildpunkt je Glied. Hundert Runden kosten aber fünfmal so viel Rechenzeit. Wie viele Runden man braucht, ist eine Abwägung, und das Auge ist der Maßstab."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Mit 1.0 verliert das Seil keine Bewegung: Nach zehn Sekunden schwingt es noch fast so weit wie am Anfang, und es hört nie auf. Mit 0.95 hängt es nach drei Sekunden still, als hinge es in Honig. 0.995 liegt dazwischen und schwingt lange aus wie ein echtes Seil. Eine Zahl so nah an 1 wirkt klein, aber sie gilt sechzigmal je Sekunde: 0.995 hoch 60 ist etwa 0.74 — jede Sekunde ein Viertel weniger Schwung."),
+
+  H.h3("Drehen 3"),
+
+  H.p("Die Fahrbahn hängt durch wie eine Hängematte. Gemessen sinkt ihre Mitte ohne Hänger um 49 Punkte, mit Hängern um 6. Dabei ist die Fahrbahn ohne Hänger nur um 10 Punkte länger geworden, 610 statt 600 — jedes Glied gibt ein wenig nach, weil zwanzig Runden es nie ganz genau machen. Ein Seil, das zwischen zwei Punkten gespannt ist, verwandelt ein kleines Zuviel an Länge in viel Durchhang. Darum tragen Hängebrücken ihre Fahrbahn an einem Tragseil: Es hängt ohnehin durch, und die Fahrbahn darf gerade bleiben."),
+
+  H.h3("Erweitern 1: ein Vorhang"),
+
+  H.p("ziehen, fliegen, die Maus — alles bleibt. Neu ist nur, welche Punkte und welche Glieder es gibt (code/loesungen/kap09_vorhang.dh):"),
+
+  ...neu("loesungen/kap09_vorhang.dh").map((t) => H.code(t)),
+
+  H.p("netz merkt sich, welche Nummer der Punkt in Spalte sp und Zeile ze bekommen hat; so lassen sich die Nachbarn finden, ohne nachzurechnen, in welcher Reihenfolge punkt sie angelegt hat. Sechshundert Punkte und gut tausend Glieder, zwanzigmal je Schritt — das ist das Meiste, was dieses Kapitel rechnet, und es läuft noch flüssig."),
+
+  H.h3("Erweitern 2: ein Seil, das reißt"),
+
+  H.p("Jedes Glied bekommt ein Feld, ob es noch heil ist. Wird es mehr als 1,6-mal so lang, wie es sein soll, reißt es: Es zieht nicht mehr und wird nicht mehr gezeichnet (code/loesungen/kap09_reissen.dh):"),
+
+  ...neu("loesungen/kap09_reissen.dh").map((t) => H.code(t)),
+
+  H.figure("kap09_reissen.png", "Wer die Mitte der Fahrbahn weit genug nach unten zieht, reißt sie heraus: Das Stück fällt ins Wasser, die beiden Hälften hängen weiter an ihren Hängern.", 420, 262),
+
+  H.p("Gerissen wird nur in ziehen, und nur, wenn das Glied zu lang ist. Gedehnt wird es meist von der Maus: Ein Punkt, den sie hält, gibt nicht nach, und das Glied daneben muss alles allein tragen."),
+
+  H.h3("Erfinden: eine Fahne im Wind"),
+
+  H.p("Eine Möglichkeit (code/loesungen/kap09_wind.dh): ein Netz wie der Vorhang, aber an der linken Spalte fest statt an der oberen Reihe, und in fliegen eine zweite Kraft neben der Schwerkraft:"),
+
+  ...neu("loesungen/kap09_wind.dh").map((t) => H.code(t)),
+
+  H.pmix(["Der Wind hat zwei Teile. ", ["boe", true], " schwillt langsam an und ab, für alle Punkte gleich — dann hebt und senkt sich die ganze Fahne. Die ", ["welle", true], " hängt von der Zeit UND vom Ort ab: ", ["SIN(zeit * 7 - x / 25)", true], " hat an jeder Stelle einen anderen Wert und wandert mit der Zeit nach rechts, vom Mast weg. So läuft eine Welle durch den Stoff. Einen Vorhang von vorn könnte der Wind übrigens nur zur Seite schieben: Flattern geht aus dem Bild heraus, und dieses Bild hat nur zwei Richtungen."]),
 ];

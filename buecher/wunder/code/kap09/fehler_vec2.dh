@@ -1,0 +1,5 @@
+IMPORT "vec2"
+DIM p AS VEC2 : p = VEC2_NEW(100, 80)
+' Den Punkt fuenf nach unten schieben:
+p.y = p.y + 5
+PRINT p

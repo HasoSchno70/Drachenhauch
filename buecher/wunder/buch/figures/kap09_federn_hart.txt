@@ -1,0 +1,6 @@
+// Bild fuer Kapitel 9: Taste 3 (raylib KEY_THREE = 51) -- harte Federn,
+// das Seil faengt neu an; das Bild entsteht gut 50 Bilder danach.
+c 3
+e 0 7 0 0 0 0
+e 2 2 51 0 0 0
+e 4 1 51 0 0 0

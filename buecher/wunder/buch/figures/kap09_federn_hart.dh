@@ -1,0 +1,2 @@
+' Bild fuer Kapitel 9: das Seil aus harten Federn (Taste 3, siehe .txt).
+IMPORT "../../code/kap09/3_federn.dh"
