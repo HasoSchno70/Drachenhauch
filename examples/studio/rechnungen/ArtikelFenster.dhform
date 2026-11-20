@@ -265,7 +265,7 @@
   "tabs": [],
   "active_tab": 0,
   "tabs_closable": false,
-  "default_button": 9,
-  "cancel_button": 11,
-  "name": "ArtikelFenster"
+  "name": "ArtikelFenster",
+  "studio_standard": "knopfSichern",
+  "studio_abbrechen": "knopfSchliessen"
 }

@@ -8,7 +8,6 @@
   "movable": true,
   "closable": true,
   "visible": true,
-  "default_button": 2,
   "widgets": [
     {
       "kind": "label",
@@ -57,5 +56,6 @@
       "h": 16,
       "wrap": true
     }
-  ]
+  ],
+  "studio_standard": "knopfAufnehmen"
 }
