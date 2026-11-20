@@ -1,0 +1,119 @@
+' Loesung zu Kapitel 13, Erweitern 1: zoomen mit dem Mausrad -- der
+' Punkt unter der Maus bleibt dabei, wo er ist.
+' Die Stellen, die neu sind, stehen zwischen >>> und <<<.
+CONST BREITE = 800
+CONST HOEHE = 500
+
+' Der Ausschnitt: seine Mitte und wie breit er ist.
+DIM mitteX AS FLOAT
+DIM mitteY AS FLOAT
+DIM weite AS FLOAT
+DIM grenze AS INTEGER
+DIM dauer AS FLOAT
+
+' Wie weit kommt z, bis es davonlaeuft -- als Kommazahl, damit die
+' Farben ohne Stufen ineinander uebergehen. -1: gar nicht, c gehoert
+' zur Menge.
+FUNCTION flucht(cx AS FLOAT, cy AS FLOAT, bis AS INTEGER) AS FLOAT
+    DIM x AS FLOAT : x = 0
+    DIM y AS FLOAT : y = 0
+    DIM n AS INTEGER : n = 0
+    DO WHILE n < bis
+        DIM xx AS FLOAT : xx = x * x
+        DIM yy AS FLOAT : yy = y * y
+        IF xx + yy > 256 THEN
+            ' Wie weit z schon jenseits der Grenze war: der Bruchteil.
+            RETURN n + 1 - LOG(LOG(SQR(xx + yy))) / LOG(2)
+        END IF
+        y = 2 * x * y + cy
+        x = xx - yy + cx
+        n = n + 1
+    LOOP
+    RETURN -1
+END FUNCTION
+
+' Dieselben Farben wie in Schritt 1, nur ohne Stufen: v ist eine
+' Kommazahl, und der Farbton waechst mit ihr stetig.
+FUNCTION farbe(v AS FLOAT) AS INTEGER
+    IF v < 0 THEN RETURN RGB(0, 0, 0)
+    RETURN HSV(220 + v * 8, 0.75, MIN(1.0, v / 12))
+END FUNCTION
+
+SUB rechnen(bild AS INTEGER)
+    DIM start AS FLOAT : start = TIMER()
+    ' Je tiefer hinein, desto mehr Schritte braucht der Rand.
+    grenze = 100 + INT(60 * LOG(3.2 / weite) / LOG(2))
+    DIM hoch AS FLOAT : hoch = weite * HOEHE / BREITE
+    RENDERTARGET_BEGIN(bild)
+    DIM px AS INTEGER
+    DIM py AS INTEGER
+    FOR py = 0 TO HOEHE - 1
+        DIM cy AS FLOAT : cy = mitteY - hoch / 2 + py * hoch / HOEHE
+        FOR px = 0 TO BREITE - 1
+            DIM cx AS FLOAT
+            cx = mitteX - weite / 2 + px * weite / BREITE
+            PLOT(px, py, farbe(flucht(cx, cy, grenze)))
+        NEXT
+    NEXT
+    RENDERTARGET_END()
+    dauer = TIMER() - start
+END SUB
+
+SUB vonVorn()
+    mitteX = -0.6 : mitteY = 0 : weite = 3.2
+END SUB
+
+' Drei Ausflugsziele: das Seepferdchental, das Elefantental und eine
+' kleine Kopie der ganzen Menge, gut eine Billion Mal vergroessert.
+SUB ausflug(nr AS INTEGER)
+    SELECT CASE nr
+        CASE 1 : mitteX = -0.7453 : mitteY = 0.1127 : weite = 0.01
+        CASE 2 : mitteX = 0.285 : mitteY = 0.011 : weite = 0.012
+        CASE 3
+            mitteX = -0.743643887037151 : mitteY = 0.13182590420533
+            weite = 3.2 / 2 ^ 40
+    END SELECT
+END SUB
+
+SCREEN(BREITE, HOEHE, "Mandelbrot-Zoom")
+DIM bild AS INTEGER : bild = RENDERTARGET_NEW(BREITE, HOEHE, TRUE)
+vonVorn()
+rechnen(bild)
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
+    DIM neu AS BOOLEAN : neu = FALSE
+    IF MOUSE_HIT(0) OR MOUSE_HIT(1) THEN
+        ' Der Punkt unter der Maus wird die neue Mitte.
+        mitteX = mitteX - weite / 2 + MOUSE_X() * weite / BREITE
+        mitteY = mitteY - weite * HOEHE / BREITE / 2 _
+               + MOUSE_Y() * weite / BREITE
+        weite = IIF(MOUSE_HIT(0), weite / 2, weite * 2)
+        neu = TRUE
+    END IF
+    IF KEY_HIT(KEY_R) THEN vonVorn() : neu = TRUE
+    IF KEY_HIT(KEY_1) THEN ausflug(1) : neu = TRUE
+    IF KEY_HIT(KEY_2) THEN ausflug(2) : neu = TRUE
+    IF KEY_HIT(KEY_3) THEN ausflug(3) : neu = TRUE
+    ' >>> neu
+    DIM rad AS INTEGER : rad = MOUSE_WHEEL()
+    IF rad <> 0 THEN
+        ' Der Punkt unter der Maus ...
+        DIM mx AS FLOAT
+        mx = mitteX - weite / 2 + MOUSE_X() * weite / BREITE
+        DIM my AS FLOAT
+        my = mitteY - weite * HOEHE / BREITE / 2 _
+           + MOUSE_Y() * weite / BREITE
+        ' ... und alles rueckt um den Faktor f naeher an ihn heran.
+        DIM f AS FLOAT : f = IIF(rad > 0, 1 / 1.5, 1.5)
+        mitteX = mx + (mitteX - mx) * f
+        mitteY = my + (mitteY - my) * f
+        weite = weite * f
+        neu = TRUE
+    END IF
+    ' <<< neu
+    IF neu THEN rechnen(bild)
+    RENDERTARGET_DRAW(bild, 0, 0)
+    TEXT(10, 10, STR$(ROUND(3.2 / weite)) + "-fach, " _
+         + STR$(grenze) + " Schritte, " _
+         + STR$(ROUND(dauer * 1000)) + " ms", RGB(255, 255, 255))
+    FLIP()
+WEND

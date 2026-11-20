@@ -1,0 +1,6 @@
+// Kapitel 13, Erfinden: ins Seepferdchental klicken. Mausstellen mal 2.
+c 4
+e 0 7 724 550 0 0
+e 10 7 724 550 0 0
+e 12 6 0 0 0 0
+e 13 5 0 0 0 0

@@ -1,0 +1,5 @@
+// Kapitel 13: Taste 3 -- die kleine Kopie, 2 hoch 40 vergroessert.
+c 3
+e 0 7 0 0 0 0
+e 5 2 51 0 0 0
+e 7 1 51 0 0 0

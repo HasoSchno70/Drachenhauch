@@ -1,0 +1,54 @@
+' Kapitel 13, zum Messen -- dasselbe Bild zweimal gerechnet: einmal mit
+' zwei Zahlen x und y, einmal mit einem VEC2 z wie in Kapitel 9.
+IMPORT "vec2"
+
+FUNCTION mitZahlen(cx AS FLOAT, cy AS FLOAT) AS INTEGER
+    DIM x AS FLOAT : x = 0
+    DIM y AS FLOAT : y = 0
+    DIM n AS INTEGER : n = 0
+    DO WHILE n < 100
+        DIM xx AS FLOAT : xx = x * x
+        DIM yy AS FLOAT : yy = y * y
+        IF xx + yy > 4 THEN EXIT DO
+        y = 2 * x * y + cy
+        x = xx - yy + cx
+        n = n + 1
+    LOOP
+    RETURN n
+END FUNCTION
+
+FUNCTION mitVec2(c AS VEC2) AS INTEGER
+    DIM z AS VEC2 : z = VEC2_ZERO()
+    DIM n AS INTEGER : n = 0
+    DO WHILE n < 100
+        IF VEC2_LENGTH_SQ(z) > 4 THEN EXIT DO
+        z = VEC2_NEW(z.x * z.x - z.y * z.y, 2 * z.x * z.y) + c
+        n = n + 1
+    LOOP
+    RETURN n
+END FUNCTION
+
+' 800 mal 500 Punkte, die Schritte zusammengezaehlt.
+FUNCTION bild(art AS STRING) AS INTEGER
+    DIM summe AS INTEGER
+    DIM px AS INTEGER
+    DIM py AS INTEGER
+    FOR py = 0 TO 499
+        FOR px = 0 TO 799
+            DIM cx AS FLOAT : cx = -2.2 + px * 3.2 / 800
+            DIM cy AS FLOAT : cy = -1.0 + py * 2.0 / 500
+            IF art = "zahlen" THEN
+                summe = summe + mitZahlen(cx, cy)
+            ELSE
+                summe = summe + mitVec2(VEC2_NEW(cx, cy))
+            END IF
+        NEXT
+    NEXT
+    RETURN summe
+END FUNCTION
+
+FOR EACH art IN ["zahlen", "vec2"]
+    DIM t AS FLOAT : t = TIMER()
+    DIM s AS INTEGER : s = bild(art)
+    PRINT art; ": "; s; " Schritte in "; FORMAT$(TIMER() - t, "%.2f"); " s"
+NEXT

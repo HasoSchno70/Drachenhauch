@@ -1,0 +1,97 @@
+' Loesung zu Kapitel 13, Erfinden: Julia-Mengen. Ein Klick in die
+' Mandelbrotmenge zeigt die Julia-Menge zu dem Punkt unter der Maus, der
+' naechste Klick wieder die Mandelbrotmenge.
+' Die Stellen, die neu sind, stehen zwischen >>> und <<<.
+CONST BREITE = 800
+CONST HOEHE = 500
+CONST GRENZE = 100
+
+' Wie viele Schritte, bis z den Kreis mit Radius 2 verlaesst? GRENZE:
+' gar nicht -- c gehoert (vermutlich) zur Menge. Dabei ist z = x + i*y
+' und c = cx + i*cy.
+FUNCTION schritte(cx AS FLOAT, cy AS FLOAT) AS INTEGER
+    DIM x AS FLOAT : x = 0
+    DIM y AS FLOAT : y = 0
+    DIM n AS INTEGER : n = 0
+    DO WHILE n < GRENZE
+        DIM xx AS FLOAT : xx = x * x
+        DIM yy AS FLOAT : yy = y * y
+        IF xx + yy > 4 THEN EXIT DO
+        y = 2 * x * y + cy
+        x = xx - yy + cx
+        n = n + 1
+    LOOP
+    RETURN n
+END FUNCTION
+
+' >>> neu
+' Die Julia-Menge zu c: dieselbe Rechnung, aber z beginnt beim
+' Bildpunkt, und c steht fest.
+DIM julia AS BOOLEAN
+DIM jx AS FLOAT
+DIM jy AS FLOAT
+
+FUNCTION juliaSchritte(zx AS FLOAT, zy AS FLOAT) AS INTEGER
+    DIM x AS FLOAT : x = zx
+    DIM y AS FLOAT : y = zy
+    DIM n AS INTEGER : n = 0
+    DO WHILE n < GRENZE
+        DIM xx AS FLOAT : xx = x * x
+        DIM yy AS FLOAT : yy = y * y
+        IF xx + yy > 4 THEN EXIT DO
+        y = 2 * x * y + jy
+        x = xx - yy + jx
+        n = n + 1
+    LOOP
+    RETURN n
+END FUNCTION
+' <<< neu
+
+' Die Farbe nach der Zahl der Schritte: schwarz fuer die Menge, sonst
+' ein Farbton, der mit den Schritten wandert.
+FUNCTION farbe(n AS INTEGER) AS INTEGER
+    IF n = GRENZE THEN RETURN RGB(0, 0, 0)
+    RETURN HSV(220 + n * 8, 0.75, MIN(1.0, n / 12))
+END FUNCTION
+
+' Das ganze Bild einmal rechnen. Der Ausschnitt: x von -2.2 bis 1.0,
+' y von -1.0 bis 1.0 -- 3.2 breit und 2.0 hoch, wie das Fenster 8 zu 5.
+SUB rechnen(bild AS INTEGER)
+    RENDERTARGET_BEGIN(bild)
+    DIM px AS INTEGER
+    DIM py AS INTEGER
+    FOR py = 0 TO HOEHE - 1
+        FOR px = 0 TO BREITE - 1
+            DIM cx AS FLOAT : cx = -2.2 + px * 3.2 / BREITE
+            DIM cy AS FLOAT : cy = -1.0 + py * 2.0 / HOEHE
+            ' >>> neu
+            IF julia THEN
+                ' Die Julia-Menge liegt um 0 herum: x von -1.6 bis 1.6.
+                PLOT(px, py, farbe(juliaSchritte(cx + 0.6, cy)))
+            ELSE
+                PLOT(px, py, farbe(schritte(cx, cy)))
+            END IF
+            ' <<< neu
+        NEXT
+    NEXT
+    RENDERTARGET_END()
+END SUB
+
+SCREEN(BREITE, HOEHE, "Mandelbrot")
+' Ein Bild, das sein Aussehen behaelt: gerechnet wird nur einmal.
+DIM bild AS INTEGER : bild = RENDERTARGET_NEW(BREITE, HOEHE, TRUE)
+rechnen(bild)
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
+    ' >>> neu
+    IF MOUSE_HIT(0) THEN
+        IF NOT julia THEN
+            jx = -2.2 + MOUSE_X() * 3.2 / BREITE
+            jy = -1.0 + MOUSE_Y() * 2.0 / HOEHE
+        END IF
+        julia = NOT julia
+        rechnen(bild)
+    END IF
+    ' <<< neu
+    RENDERTARGET_DRAW(bild, 0, 0)
+    FLIP()
+WEND

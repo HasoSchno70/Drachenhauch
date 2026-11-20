@@ -499,4 +499,42 @@ module.exports = (H) => [
   H.code(zeilen("loesungen/kap12_drache.dh")),
 
   H.p("Faltet man einen Papierstreifen immer wieder in der Mitte und klappt ihn danach so auf, dass jede Falte einen rechten Winkel bildet, entsteht genau diese Kurve — Generation 12 sind zwölf Faltungen. Jede Generation macht den Drachen um den Faktor √2 größer; darum schrumpft der Schritt um denselben Faktor, und das Bild bleibt gleich groß. Die Farbe zählt die Striche mit, so sieht man, wie die eine Linie durch das ganze Bild läuft."),
+
+  H.h2("Kapitel 13 · Die Mandelbrotmenge"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Mit 20 Schritten sieht die Menge aufgeblasen aus: Die kleinen runden Knospen verschmelzen mit der großen Form, weil viele Punkte am Rand mehr als zwanzig Schritte brauchen, um davonzulaufen, und darum fälschlich schwarz werden. Mit 1000 Schritten ändert sich in diesem Ausschnitt fast nichts — der Rand wird nur ein wenig feiner. Gerechnet werden dann 97 statt 11 Millionen Schritte; mit Maschinencode sind das immer noch nur 0,19 Sekunden. Länger dauert das Zeichnen der 400 000 Punkte."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Mit 2 wandert der Farbton langsam: Fast das ganze Bild bleibt im selben Blau-Violett, nur der Rand wird heller. Mit 30 springt die Farbe bei jedem Schritt um ein Zwölftel des Farbkreises, und um die Menge legen sich schmale bunte Ringe. Die Zahl sagt, wie viel Farbe ein Schritt wert ist."),
+
+  H.h3("Drehen 3"),
+
+  H.p("Die Übergänge bleiben weich, aber im Hintergrund erscheinen feine Bögen, wo die Farbe einen kleinen Sprung macht. Die Formel für den Bruchteil stimmt nur ungefähr, und umso genauer, je weiter z beim Überschreiten der Grenze schon draußen ist. Bei Radius 16 ist der Fehler unsichtbar, bei Radius 2 nicht."),
+
+  H.h3("Erweitern 1: das Mausrad"),
+
+  H.p("Der Punkt unter der Maus soll stehen bleiben. Darum rückt alles um denselben Faktor näher an ihn heran — auch die Mitte (code/loesungen/kap13_mausrad.dh):"),
+
+  ...neu("loesungen/kap13_mausrad.dh").map((t) => H.code(t)),
+
+  H.pmix(["Ein Schritt am Rad vergrößert anderthalbfach. ", ["mx + (mitteX - mx) * f", true], " ist die Mitte, um den Faktor f näher an mx gerückt; der Punkt mx selbst rückt nirgendwohin. Dieselbe Rechnung braucht jedes Programm, das an einer Stelle heranzoomt, ob Karte, Zeichenprogramm oder Spiel."]),
+
+  H.h3("Erweitern 2: als PNG sichern"),
+
+  H.p("Das Bild liegt schon fertig in einem Render-Ziel; RENDERTARGET_IMAGE macht daraus ein Bild, IMAGE_SAVE schreibt es (code/loesungen/kap13_png.dh):"),
+
+  ...neu("loesungen/kap13_png.dh").map((t) => H.code(t)),
+
+  H.p("IMAGE_SAVE gehört zum Modul imgfx, darum das IMPORT. Die Datei landet im Ordner des Programms — dhrt run wechselt dorthin, bevor es startet. Drei Sekunden lang steht ihr Name im Bild, damit man weiß, dass etwas geschehen ist."),
+
+  H.h3("Erfinden: Julia-Mengen"),
+
+  H.p("Eine Möglichkeit (code/loesungen/kap13_julia.dh): dieselbe Rechnung, aber z beginnt beim Bildpunkt und c steht fest. Ein Klick in die Mandelbrotmenge nimmt den Punkt unter der Maus als c:"),
+
+  ...neu("loesungen/kap13_julia.dh").map((t) => H.code(t)),
+
+  H.p("Die Mandelbrotmenge ist eine Landkarte der Julia-Mengen. Klickt man in ihr Inneres, ist die Julia-Menge ein zusammenhängendes Gebilde; klickt man weit draußen, zerfällt sie in Staub; und klickt man an den Rand, sieht die Julia-Menge aus wie die Mandelbrotmenge an genau dieser Stelle — Spiralen im Seepferdchental, Rüssel im Elefantental."),
 ];
