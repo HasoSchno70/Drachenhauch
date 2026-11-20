@@ -229,4 +229,42 @@ module.exports = (H) => [
   ...neu("loesungen/kap05_kaskade.dh").map((t) => H.code(t)),
 
   H.pmix(["Zwei Dinge sind daran lehrreich. Erstens nehmen die neuen Funken das Tempo des Knallers mit (", ["k.vx + …", true], "), so fliegt die kleine Explosion in seine Richtung weiter, wie bei einer echten. Zweitens hängt ", ["nachknallen", true], " neue Funken an das Feld an, WÄHREND die Schleife es rückwärts durchläuft. Das ist sicher: Die neuen landen hinten, an Stellen, die die Schleife schon hinter sich hat — sie werden erst im nächsten Bild bewegt."]),
+
+  H.h2("Kapitel 6 · Das Spiel des Lebens"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Mit 0.05 sind zu wenige Zellen da, um einander am Leben zu halten: Fast alles stirbt in den ersten Generationen, übrig bleiben ein paar einsame Blöcke und Blinker. Mit 0.7 ist es zu voll: Fast alles stirbt an Überfüllung, und aus den Resten wächst ein ähnliches Bild wie bei 0.25, nur später. Leben braucht die mittlere Dichte — irgendwo zwischen einem Fünftel und der Hälfte entsteht das meiste."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Mit Geburt auch bei sechs Nachbarn heißt die Variante HighLife. Das meiste sieht aus wie vorher, aber hin und wieder taucht ein Muster auf, das sich selbst kopiert: der Replikator. Er hinterlässt eine Spur von Abbildern seiner selbst. Eine einzige Zahl in den Regeln ändert, was in der Welt möglich ist."),
+
+  H.h3("Drehen 3"),
+
+  H.p("Drei Zellen waagrecht nebeneinander: Die mittlere hat zwei Nachbarn und überlebt, die beiden äußeren haben nur einen und sterben. Über und unter der mittleren liegen je eine tote Zelle mit genau drei lebenden Nachbarn — sie werden geboren. Aus der waagrechten Reihe wird eine senkrechte, in der nächsten Generation wieder eine waagrechte: Der Blinker blinkt, für immer."),
+
+  H.h3("Erweitern 1: die Maus"),
+
+  H.p("Die Zelle unter der Maus ist die Mausstelle, ganzzahlig durch die Zellgröße geteilt, plus eins, weil das Feld bei 1 beginnt (code/loesungen/kap06_maus.dh):"),
+
+  ...neu("loesungen/kap06_maus.dh").map((t) => H.code(t)),
+
+  H.p("MOUSE_DOWN statt MOUSE_HIT: Solange die Taste gedrückt ist, zeichnet man, wie mit einem Stift. Die Prüfung der Grenzen schützt vor einem Index außerhalb, wenn die Maus am Rand des Fensters steht."),
+
+  H.h3("Erweitern 2: herumlaufende Ränder"),
+
+  H.p("Nur lebt ändert sich (code/loesungen/kap06_torus.dh):"),
+
+  ...neu("loesungen/kap06_torus.dh").map((t) => H.code(t)),
+
+  H.p("(x - 1) MOD B rechnet die Spalte auf 0 bis B - 1 um, + 1 wieder auf 1 bis B. Für x = 0 ist (x - 1) MOD B in Drachenhauch B - 1, denn MOD rundet wie \ nach unten, auch bei negativen Zahlen — in vielen anderen Sprachen käme -1 heraus, und man bräuchte noch ein + B. Ein Gleiter, der rechts unten hinausfliegt, kommt jetzt links oben wieder herein."),
+
+  H.h3("Erfinden: Farbe nach Alter"),
+
+  H.p("Eine Möglichkeit (code/loesungen/kap06_alter.dh): Statt 0 und 1 steht im Feld das Alter der Zelle. lebt antwortet weiter mit 0 oder 1, damit die Regeln dieselben bleiben; nur die Geburt setzt 1, das Überleben zählt hoch:"),
+
+  ...neu("loesungen/kap06_alter.dh").map((t) => H.code(t)),
+
+  H.p("Hier zahlt sich die Funktion lebt ein zweites Mal aus: nachbarn musste fast nicht geändert werden, weil es nie selbst auf das Feld geschaut hat. Nur das Abziehen der Zelle selbst fragt jetzt lebt statt das Feld — sonst zöge es ihr Alter ab statt einer 1."),
 ];

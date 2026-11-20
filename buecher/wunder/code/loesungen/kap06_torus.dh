@@ -1,0 +1,105 @@
+' Loesung zu Kapitel 6, Erweitern 2: die Raender laufen herum. Was
+' rechts hinausgeht, kommt links wieder herein, oben und unten ebenso.
+' Die Stellen, die neu sind, stehen zwischen >>> und <<<.
+CONST B = 80
+CONST H = 50
+CONST ZELLE = 10
+CONST TAKT = 0.1
+
+DIM jetzt[1 TO B, 1 TO H] AS INTEGER
+DIM danach[1 TO B, 1 TO H] AS INTEGER
+
+' >>> neu
+' Lebt die Zelle (x, y)? Ausserhalb wird herumgerechnet: 0 ist B,
+' B + 1 ist 1. MOD passt zu \ und liefert auch fuer -1 einen Rest ab 0.
+FUNCTION lebt(x AS INTEGER, y AS INTEGER) AS INTEGER
+    DIM rx AS INTEGER : rx = (x - 1) MOD B + 1
+    DIM ry AS INTEGER : ry = (y - 1) MOD H + 1
+    RETURN jetzt[rx, ry]
+END FUNCTION
+' <<< neu
+
+' Wie viele der acht Nachbarn leben?
+FUNCTION nachbarn(x AS INTEGER, y AS INTEGER) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM dx AS INTEGER
+    DIM dy AS INTEGER
+    FOR dy = -1 TO 1
+        FOR dx = -1 TO 1
+            n = n + lebt(x + dx, y + dy)
+        NEXT
+    NEXT
+    ' Die Schleife hat die Zelle selbst mitgezaehlt.
+    RETURN n - jetzt[x, y]
+END FUNCTION
+
+' Eine Generation: jede Zelle nach den Regeln in das ZWEITE Feld.
+SUB schritt()
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 1 TO H
+        FOR x = 1 TO B
+            DIM n AS INTEGER : n = nachbarn(x, y)
+            IF jetzt[x, y] = 1 THEN
+                danach[x, y] = IIF(n = 2 OR n = 3, 1, 0)
+            ELSE
+                danach[x, y] = IIF(n = 3, 1, 0)
+            END IF
+        NEXT
+    NEXT
+    ' Tauschen: das neue Feld ist ab jetzt das aktuelle.
+    DIM t AS ARRAY OF INTEGER : t = jetzt
+    jetzt = danach
+    danach = t
+END SUB
+
+SUB zeichnen()
+    CLS(RGB(10, 14, 24))
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 1 TO H
+        FOR x = 1 TO B
+            IF jetzt[x, y] = 1 THEN
+                DIM px AS INTEGER : px = (x - 1) * ZELLE
+                DIM py AS INTEGER : py = (y - 1) * ZELLE
+                DIM farbe AS INTEGER : farbe = RGB(120, 230, 160)
+                DIM ex AS INTEGER : ex = px + ZELLE - 1
+                DIM ey AS INTEGER : ey = py + ZELLE - 1
+                BOX(px + 1, py + 1, ex, ey, farbe)
+            END IF
+        NEXT
+    NEXT
+    TEXT(8, 8, "Generation " + STR$(generation), RGB(200, 210, 230))
+    FLIP()
+END SUB
+
+' Etwa jede vierte Zelle lebt am Anfang.
+SUB wuerfeln()
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 1 TO H
+        FOR x = 1 TO B
+            jetzt[x, y] = IIF(RND() < 0.25, 1, 0)
+        NEXT
+    NEXT
+    generation = 0
+END SUB
+
+DIM generation AS INTEGER
+DIM pause AS BOOLEAN
+wuerfeln()
+SCREEN(B * ZELLE, H * ZELLE, "Spiel des Lebens")
+DIM uhr AS FLOAT
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
+    IF KEY_HIT(KEY_R) THEN wuerfeln()
+    IF KEY_HIT(KEY_SPACE) THEN pause = NOT pause
+    uhr = uhr + DELTA()
+    IF uhr >= TAKT THEN
+        IF NOT pause THEN
+            schritt()
+            generation = generation + 1
+        END IF
+        uhr = uhr - TAKT
+    END IF
+    zeichnen()
+WEND

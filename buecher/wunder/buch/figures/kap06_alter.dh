@@ -1,0 +1,3 @@
+' Bild fuer Kapitel 6, Erfinden: Farbe nach dem Alter der Zellen.
+RANDOMIZE(7)
+IMPORT "../../code/loesungen/kap06_alter.dh"
