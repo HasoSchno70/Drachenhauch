@@ -314,3 +314,49 @@ PRINT VEC2_Y(v)
 3.5
 -2.0
 
+=== vec2 teile lesen wie felder
+' v.x / v.y lesen dasselbe wie VEC2_X / VEC2_Y, auch gross geschrieben
+' und in einer Funktion (Maschinencode-Bereich), auch an einem Ergebnis.
+IMPORT "vec2"
+FUNCTION summe(n AS INTEGER) AS FLOAT
+    DIM p AS VEC2 : p = VEC2_NEW(1.5, 2.0)
+    DIM s AS FLOAT : s = 0
+    DIM i AS INTEGER
+    FOR i = 1 TO n
+        s = s + p.x * p.Y
+    NEXT
+    RETURN s
+END FUNCTION
+DIM v AS VEC2
+v = VEC2_NEW(3.5, -2.0)
+PRINT v.x; " "; v.y; " "; v.X
+PRINT (v + VEC2_NEW(1, 1)).y
+PRINT summe(1000)
+--- erwartet
+3.5 -2.0 3.5
+-1.0
+3000.0
+
+=== vec2 hat kein teil z
+IMPORT "vec2"
+DIM v AS VEC2
+PRINT v.z
+--- fehler
+VEC2 hat kein Teil 'z' -- es gibt x, y
+
+=== vec2 teil setzen erklaert die unveraenderlichkeit
+IMPORT "vec2"
+DIM v AS VEC2
+v.x = 5
+--- fehler
+VEC2 ist unveraenderlich: '.x' laesst sich lesen, aber nicht setzen
+
+=== vec3 vec4 quat teile
+IMPORT "m3d"
+DIM a AS VEC3 : a = VEC3_NEW(1, 2, 3)
+DIM b AS VEC4 : b = VEC4_NEW(4, 5, 6, 7)
+DIM q AS QUAT : q = QUAT_IDENTITY()
+PRINT a.x; a.y; a.z; " "; b.z; b.w; " "; q.w
+--- erwartet
+1.02.03.0 6.07.0 1.0
+

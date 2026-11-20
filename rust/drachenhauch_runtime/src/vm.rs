@@ -1892,6 +1892,15 @@ impl<'p> Vm<'p> {
                     },
                 }
             }
+            // Die Teile eines Vektors lesen sich wie Felder: `v.x` statt
+            // `VEC2_X(v)` -- wer mit Vektoren rechnet, schreibt das sonst in
+            // jeder Zeile (gefunden beim Buch "Kleine Wunder", Kapitel 9).
+            Value::Vec2(x, y) => vektor_teil(name, "VEC2", &[*x, *y]),
+            Value::Vec3(x, y, z) => vektor_teil(name, "VEC3", &[*x as f64, *y as f64, *z as f64]),
+            Value::Vec4(x, y, z, w) =>
+                vektor_teil(name, "VEC4", &[*x as f64, *y as f64, *z as f64, *w as f64]),
+            Value::Quat(x, y, z, w) =>
+                vektor_teil(name, "QUAT", &[*x as f64, *y as f64, *z as f64, *w as f64]),
             _ => Err(format!("Zugriff auf '.{}' bei nicht-Objekt ({})", name, obj.type_name())),
         }
     }
@@ -1954,6 +1963,11 @@ impl<'p> Vm<'p> {
                 };
                 rcb.fields[i] = cv;
                 Ok(())
+            }
+            Value::Vec2(..) | Value::Vec3(..) | Value::Vec4(..) | Value::Quat(..) => {
+                let typ = obj.type_name();
+                Err(format!("{} ist unveraenderlich: '.{}' laesst sich lesen, aber nicht setzen -- einen neuen Wert bauen, etwa v = {}_NEW(...)",
+                    typ, name, typ))
             }
             _ => Err(format!("Zuweisung an '.{}' bei nicht-Objekt ({})", name, obj.type_name())),
         }

@@ -44,7 +44,25 @@ PRINT v = w            ' FALSE
 PRINT v <> w           ' TRUE
 ```
 
-**Multiplication Vec2 * Vec2** is not defined — for the dot product use `VEC2_DOT(a, b)`, for component-wise multiplication `VEC2_NEW(VEC2_X(a) * VEC2_X(b), VEC2_Y(a) * VEC2_Y(b))`.
+**Multiplication Vec2 * Vec2** is not defined — for the dot product use `VEC2_DOT(a, b)`, for component-wise multiplication `VEC2_NEW(a.x * b.x, a.y * b.y)`.
+
+## Reading the components: `v.x` and `v.y`
+
+The two numbers of a vector read like fields -- `v.x` is the same as
+`VEC2_X(v)`, `v.y` the same as `VEC2_Y(v)`:
+
+```basic
+IMPORT "vec2"
+DIM v AS VEC2
+v = VEC2_NEW(3.0, 4.0)
+PRINT v.x, v.y          ' 3.0  4.0
+CIRCLE(v.x, v.y, 10)    ' where a command wants two numbers
+```
+
+Setting is not possible: a Vec2 is immutable (see below), `v.x = 5`
+stops with the hint to build a new value -- `v = VEC2_NEW(5, v.y)`. The
+same holds for `VEC3`, `VEC4` and `QUAT` from the `m3d` module (there also
+`.z` and `.w`).
 
 ## Classic game patterns
 

@@ -1144,3 +1144,13 @@ Wert, den es nicht gibt, ist ein Compile-Fehler mit Vorschlag und Liste
 Feld gleichen Namens verdeckt das ENUM. `enum.dhtest`, der alte Fall
 "unknown member raises" erwartet jetzt die neue Meldung; Gegenprobe: ohne
 die Pruefung fallen genau diese beiden Faelle.
+
+Ein sechster kam mit Kapitel 9 (Federn und Seile), das mit `VEC2` rechnet:
+`p.x` brach mit "Zugriff auf '.x' bei nicht-Objekt (VEC2)" ab, man musste
+in jeder Zeile `VEC2_X(p)` schreiben. Jetzt liest `member_laden` die
+Teile von VEC2, VEC3, VEC4 und QUAT wie Felder (`vektor_teil`, gross oder
+klein, auch im Maschinencode, der ueber dieselbe Stelle geht). Setzen
+bleibt verboten -- die Werte sind unveraenderlich --, aber die Meldung
+sagt das jetzt und nennt `VEC2_NEW(...)`. `modules_vec2.dhtest` (vier
+Faelle); Gegenproben: vertauschte Teile und ein abgeschalteter
+Setz-Zweig lassen je genau ihren Fall fallen.

@@ -60,6 +60,18 @@ pub(crate) fn ist_schirmbefehl(name: &str) -> bool {
 /// Objekt mit der Deklaration, darum ist das die haeufigste NIL-Quelle.
 pub(super) const NIL_NEW: &str = " -- die Variable ist noch NIL: eine Klasse muss mit NEW angelegt werden (p = NEW Klasse())";
 
+/// `v.x` bei einem Vektor: das Teil mit diesem Namen (x, y, z, w in dieser
+/// Reihenfolge, so viele, wie `teile` hat), gross oder klein geschrieben.
+pub(super) fn vektor_teil(name: &str, typ: &str, teile: &[f64]) -> Result<Value, String> {
+    const NAMEN: [&str; 4] = ["x", "y", "z", "w"];
+    let klein = name.to_lowercase();
+    match NAMEN[..teile.len()].iter().position(|n| *n == klein) {
+        Some(i) => Ok(Value::Float(teile[i])),
+        None => Err(format!("{} hat kein Teil '{}' -- es gibt {}",
+            typ, name, NAMEN[..teile.len()].join(", "))),
+    }
+}
+
 /// Sagt diese Meldung "den Befehl hat dieser Bau nicht" (statt "falsche
 /// Argumente")? Fuer `dhrt --fehlende`, das die kleinen Laufzeiten fragt.
 /// Muss jede Form von `unknown_builtin_msg` und der Feature-Huellen treffen.

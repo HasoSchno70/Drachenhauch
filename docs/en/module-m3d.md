@@ -49,7 +49,8 @@ complaining.
 | `VEC3_TRANSFORM_DIR(v, mat)` | VEC3 | as a **direction** (w=0, translation is ignored) |
 
 Operators: `a + b`, `a - b` (VEC3), `v * s` / `s * v` / `v / s` (scalar),
-`=` / `<>`.
+`=` / `<>`. The components also read like fields: `v.x`, `v.y`, `v.z`
+(for VEC4 and QUAT also `.w`) -- read only, the values are immutable.
 
 ## VEC4
 
