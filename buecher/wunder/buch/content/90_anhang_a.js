@@ -623,4 +623,46 @@ module.exports = (H) => [
   H.code(stueckLoesung("loesungen/kap15_plasmaspur.fs", "void main", "}", 3)),
 
   H.pmix(["Der Shader liest nur den roten Anteil des Bildes — bei Weiß sind alle drei gleich — und nimmt ihn als Helligkeit: ", ["licht", true], ". Die Farbe kommt aus der Funktion plasma, die dieselbe Formel rechnet wie in Schritt 1. Ein Shader muss also nicht entweder ein Bild erzeugen oder eines verändern — er kann beides zugleich. Im Programm ändert sich nur, welche Datei geladen wird, dass die Lichter weiß sind und dass der Shader die Zeit bekommt (code/loesungen/kap15_plasmaspur.dh)."]),
+
+  H.h2("Kapitel 16 · Pixelkunst und Paletten"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Mit 1 macht der See einen Schritt je Sekunde: Man sieht jedes Mal deutlich, wie die Farben springen, und es wirkt eher wie ein Blinken als wie Wasser. Mit 20 wechselt jeder Strich zwanzigmal je Sekunde die Farbe, und das Auge kann den Wellen nicht mehr folgen — der See flimmert, statt zu fließen. Farbzyklen leben von einem mittleren Tempo, bei dem man die Bewegung gerade noch verfolgt."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Der Himmel zerfällt wieder in harte Streifen, wie mit der Taste R. Aber die Grenzen liegen anders: Mit lauter gleichen Schwellen wird jeder Punkt, dessen Rest über der Hälfte liegt, zur oberen Farbe — aus dem Abschneiden von FLOOR wird Runden. Die oberste Farbe bekommt nur einen halb so breiten Streifen, und das Gold am Horizont taucht auf. Die Rasterung lebt also nicht davon, dass es Schwellen gibt, sondern davon, dass sie verschieden sind."),
+
+  H.h3("Drehen 3"),
+
+  H.p("Mit IMAGE_SCALE wird das Bild weich: Jeder neue Punkt mischt die Farben der alten in seiner Nähe. Die Kanten des Felsens verschwimmen, und das Raster des Himmels wird zu einem grauen Schleier — es sieht aus wie ein unscharfes Foto eines Bildschirms. Für Fotos ist das richtig, für Pixelkunst nicht."),
+
+  H.h3("Erweitern 1: eine eigene Palette"),
+
+  H.p("Eine zweite Palette mit genauso vielen Farben in derselben Reihenfolge — die Nummer 6 ist auch im Winter die Sonne, 12 und 13 das, was vorher Gras war (code/loesungen/kap16_winter.dh):"),
+
+  ...neu("loesungen/kap16_winter.dh").map((t) => H.code(t)),
+
+  H.figure("kap16_winter.png", "Derselbe See mit der Winterpalette: Kein Punkt hat seine Nummer geändert.", 420, 262),
+
+  H.pmix(["abend merkt sich die ursprüngliche Palette. ", ["palette = IIF(palette = abend, winter, abend)", true], " tauscht: Ist palette gerade das Feld abend, wird es winter, sonst wieder abend. Die Nacht, der glitzernde See und die Rasterung gehen mit, weil sie nur mit Nummern arbeiten. Ein neues Bild malt das Programm dafür nicht — so konnten alte Spiele ein und dieselbe Landschaft als Sommer, Winter und Nacht zeigen, ohne dreimal Platz für das Bild."]),
+
+  H.h3("Erweitern 2: ein Wasserfall"),
+
+  H.p("Vier neue Nummern ab 18 und ihre vier Farben am Ende der Palette: Weiß, Hellblau, Blau, Hellblau. Der Fall ist zehn Spalten breit und liegt vor dem Felsen (code/loesungen/kap16_wasserfall.dh):"),
+
+  ...neu("loesungen/kap16_wasserfall.dh").map((t) => H.code(t)),
+
+  H.pmix(["Jeder Streifen ist zwei Zeilen hoch, ", ["(y + versetzt) \\ 2", true], ", und jede Spalte ist um ein paar Zeilen gegen die Nachbarn verschoben. Gedreht wird mit Minus statt Plus: Damit die Farbe, die gerade in Zeile y steht, im nächsten Schritt in Zeile y + 2 steht, muss jede Nummer die Farbe der Nummer davor bekommen. Und weil fallendes Wasser schneller ist als Wellen, läuft die Uhr jetzt mit zwölf Schritten je Sekunde; der See nimmt nur jeden dritten, ", ["schritt \\ 3", true], ". Der naheliegende Weg, im Fall einfach um schritt · 3 zu drehen, geht schief: Bei vier Farben ist eine Drehung um drei Stellen dasselbe wie eine um eine Stelle zurück — der Fall wäre nicht schneller geworden, sondern nach oben geflossen. So stand es im ersten Entwurf dieser Lösung."]),
+
+  H.h3("Erfinden: Sterne"),
+
+  H.p("Eine Möglichkeit (code/loesungen/kap16_sterne.dh): drei Nummern für drei Helligkeiten, verstreut über den oberen Himmel:"),
+
+  ...neu("loesungen/kap16_sterne.dh").map((t) => H.code(t)),
+
+  H.figure("kap16_sterne.png", "Nachts erscheinen die Sterne; ihre drei Helligkeiten wandern reihum, darum funkeln sie.", 420, 262),
+
+  H.p("Der Trick steckt in der Farbe: Ein Stern mischt die Farbe des Himmels mit seiner eigenen, und zwar umso mehr, je dunkler es ist. Am Tag ist dunkel 0, der Stern hat die Farbe des Himmels und ist unsichtbar; in der Nacht ist dunkel 1, und er leuchtet. Die Bedingung (x · 31 + y · 57) MOD 97 = 0 trifft etwa jeden 97. Punkt, und weil 97 eine Primzahl ist, liegen die Sterne nicht in Reihen. Weil die Sterne kein Rauschen brauchen, sieht der Himmel bei jedem Start gleich aus — wie ein Sternbild."),
 ];

@@ -1,0 +1,4 @@
+// Kapitel 16: gleich zu Beginn N -- die Nacht kommt.
+c 2
+e 2 2 78 0 0 0
+e 4 1 78 0 0 0

@@ -1,6 +1,6 @@
 # Entwurf: zwei neue Bücher
 
-Stand 2026-11-19. Zwei Bücher, die Drachenhauch für Leute öffnen, die mehr
+Stand 2026-11-20. Zwei Bücher, die Drachenhauch für Leute öffnen, die mehr
 wollen als den [Einstieg](../../buecher/einstieg/README.md), aber nicht das
 Nachschlagewerk lesen möchten:
 
@@ -690,6 +690,20 @@ keinen Vorschlag. `shoot.dh` spielt seitdem eine Bedienung aus
 zeigt die Gelenke in der Erfinden-Übung (Brücke aus Brettern), und die
 festen Schritte an vier Läufen (`3_gleich.dh`); das Schlafen der Klötze
 brachte beim Nachmessen nichts und flog wieder hinaus.
+
+Danach (2026-11-20): Teil IV, Kapitel 13–16 (Die Mandelbrotmenge, Wolken
+und Landschaften, Leuchten, Pixelkunst und Paletten). Funde in der
+Laufzeit, alle behoben und in `geschichte/`: Schleifen mit `VEC2` waren
+mit Maschinencode langsamer als ohne (#591, `geschichte/tempo.md`); ein
+vertippter Shader-Dateiname ging als GLSL an den Treiber, ein Uniform, das
+es nicht gibt, blieb still (jetzt Fehler bzw. Warnung mit Zeile);
+`BLEND_MODE("subtract")` rechnete Farbe minus Hintergrund; `a BAND b + c`
+rechnete still `a BAND (b + c)` (jetzt eine Warnung). Was sich am Entwurf
+geändert hat: Kapitel 15 baut zuerst das Plasma aus Kapitel 2 als Shader
+(Kapitel 2 hatte es versprochen), und das Glühen im Takt nimmt eine
+Trommel aus `AUDIO_NOTE`, keine Musikdatei. Kapitel 16 zeigt den
+Wasserfall als Übung; das Hauptprogramm ist ein Abendsee mit glitzerndem
+Wasser. `pruef_abdruck.js` prüft auch `.fs`-Dateien.
 
 Was beim Bauen festgelegt wurde:
 
