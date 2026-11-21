@@ -170,7 +170,7 @@ mysql = { version = "28", default-features = false, features = ["minimal-rust", 
 serialport = { version = "4", optional = true }   # serial
 hidapi = { version = "2", optional = true }        # usb (HID)
 midir = { version = "0.11", optional = true }      # midi (WinMM/ALSA/CoreMIDI)
-btleplug = { version = "0.11", optional = true }   # bt (BLE, async)
+btleplug = { version = "0.13", optional = true }   # bt (BLE, async)
 tokio = { version = "1", features = ["rt-multi-thread", "time"], optional = true }
 futures = { version = "0.3", optional = true }
 # Audio-Backend Kira (cpal): entkoppelt vom Game-Loop, Busse/Echtzeit-Effekte.
