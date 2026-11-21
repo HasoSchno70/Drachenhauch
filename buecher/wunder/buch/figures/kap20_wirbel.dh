@@ -1,0 +1,3 @@
+' Bild fuer Kapitel 20: das zweite Rezept, der Wirbel (Leertaste, siehe .txt).
+RANDOMIZE(20)
+IMPORT "../../code/kap20/2_maschine.dh"
