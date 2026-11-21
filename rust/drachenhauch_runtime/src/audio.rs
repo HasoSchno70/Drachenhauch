@@ -712,6 +712,13 @@ struct SoundSlot {
     vol: f32,                 // getrackte Lautstaerke (linear 0..1)
     loops: i64,               // verbleibende endliche Wiederholungen (>0); -1 endlos via loop_region; 0 keine
     pan_anim: Option<Pendulum>, // AUTOPAN (per-Frame); SLIDE laeuft als Kira-Tween
+    /// Dieselbe Welle ohne die 5-ms-Blenden -- nur bei AUDIO_TONE und
+    /// AUDIO_NOISE. Endlos gespielt (loops = -1) laeuft diese: Die Blenden
+    /// sind fuer einen einzelnen Ton da, in einer Schleife waeren sie an
+    /// jeder Naht eine Luecke (Buch "Kleine Wunder", Kapitel 18: der
+    /// Theremin flatterte viermal je Sekunde, gemessen -6 dB fuer zwei
+    /// Halbwellen).
+    schleife: Option<StaticSoundData>,
 }
 
 impl SoundSlot {
@@ -936,6 +943,12 @@ impl Audio {
     // ---- intern: Sound aus Float-Buffer bauen + registrieren ----------
 
     fn make_data_mono(&self, buf: &[f64], vol: f64, sr: u32) -> StaticSoundData {
+        self.mono_daten(buf, vol, sr, true)
+    }
+
+    /// Wie `make_data_mono`; `blenden = false` laesst die 5-ms-Flanken weg
+    /// (die Fassung fuer Endlosschleifen, `SoundSlot::schleife`).
+    fn mono_daten(&self, buf: &[f64], vol: f64, sr: u32, blenden: bool) -> StaticSoundData {
         let n = buf.len();
         let vol = vol.clamp(0.0, 1.0);
         let mut work;
@@ -944,7 +957,7 @@ impl Audio {
             lofi_chain(&mut work, sr, self.lofi_bits, self.lofi_cutoff);
             &work
         } else { buf };
-        let fade = ((sr as f64 * 0.005) as usize).min(n / 4);
+        let fade = if blenden { ((sr as f64 * 0.005) as usize).min(n / 4) } else { 0 };
         let frames: Arc<[Frame]> = (0..n).map(|i| {
             let mut e = 1.0;
             if fade > 0 {
@@ -983,7 +996,7 @@ impl Audio {
     }
 
     fn push_slot(&mut self, data: StaticSoundData, vol: f32) -> i64 {
-        self.sounds.push(SoundSlot { data: Some(data), handle: None, geplant: Vec::new(), start: None, vol, loops: 0, pan_anim: None });
+        self.sounds.push(SoundSlot { data: Some(data), handle: None, geplant: Vec::new(), start: None, vol, loops: 0, pan_anim: None, schleife: None });
         (self.sounds.len() - 1) as i64
     }
 
@@ -1039,6 +1052,7 @@ impl Audio {
         s.weitere_stoppen();
         s.handle = None;
         s.data = None;
+        s.schleife = None;
         s.pan_anim = None;
         self.sample_cache.retain(|_, &mut v| v != idx);
         Ok(())
@@ -1072,9 +1086,7 @@ impl Audio {
         let mut settings = StaticSoundSettings::new();
         if loops < 0 { settings = settings.loop_region(0.0..); }
         settings = settings.volume(if fade_in_ms > 0 { Decibels::SILENCE } else { db(vol) });
-        let data = self.slot(idx, fn_)?.data.as_ref()
-            .ok_or_else(|| format!("{}: Sound {} wurde freigegeben (UNLOADSOUND)", fn_, idx))?
-            .clone().with_settings(settings);
+        let data = self.spieldaten(idx, fn_, loops < 0)?.with_settings(settings);
         let mut handle = self.sfx_track.play(data)   // SFX-Bus
             .map_err(|e| format!("{}: {:?}", fn_, e))?;
         if fade_in_ms > 0 { handle.set_volume(db(vol), tween_ms_eased(fade_in_ms, curve)); }
@@ -1107,9 +1119,7 @@ impl Audio {
             .start_time(ClockTime { clock: clock_id, ticks: ticks as u64, fraction: 0.0 })
             .volume(db(vol));
         if loops < 0 { settings = settings.loop_region(0.0..); }
-        let data = self.slot(idx, "AUDIO_PLAY_AT")?.data.as_ref()
-            .ok_or_else(|| format!("AUDIO_PLAY_AT: Sound {} wurde freigegeben (UNLOADSOUND)", idx))?
-            .clone().with_settings(settings);
+        let data = self.spieldaten(idx, "AUDIO_PLAY_AT", loops < 0)?.with_settings(settings);
         let handle = self.sfx_track.play(data)
             .map_err(|e| format!("AUDIO_PLAY_AT: {:?}", e))?;
         let s = self.slot_mut(idx, "AUDIO_PLAY_AT")?;
@@ -1458,9 +1468,7 @@ resonance/reverb/distortion", other)),
         let mut settings = StaticSoundSettings::new();
         if loops < 0 { settings = settings.loop_region(0.0..); }
         settings = settings.volume(if fade_in_ms > 0 { Decibels::SILENCE } else { db(vol) });
-        let data = self.slot(idx, "AUDIO_PLAY_ON")?.data.as_ref()
-            .ok_or_else(|| format!("AUDIO_PLAY_ON: Sound {} wurde freigegeben (UNLOADSOUND)", idx))?
-            .clone().with_settings(settings);
+        let data = self.spieldaten(idx, "AUDIO_PLAY_ON", loops < 0)?.with_settings(settings);
         let emitter = self.emitter_slot_mut(emitter_idx, "AUDIO_PLAY_ON")?;
         let mut handle = emitter.play(data).map_err(|e| format!("AUDIO_PLAY_ON: {:?}", e))?;
         if fade_in_ms > 0 { handle.set_volume(db(vol), tween_ms_eased(fade_in_ms, curve)); }
@@ -1717,7 +1725,10 @@ resonance/reverb/distortion", other)),
             *b = waveform_value(&wf, freq, i as f64 / sr as f64);
         }
         let data = self.make_data_mono(&buf, volume, sr);
-        Ok(self.push_slot(data, volume.clamp(0.0, 1.0) as f32))
+        let schleife = self.mono_daten(&buf, volume, sr, false);
+        let idx = self.push_slot(data, volume.clamp(0.0, 1.0) as f32);
+        self.sounds[idx as usize].schleife = Some(schleife);
+        Ok(idx)
     }
 
     pub fn noise(&mut self, dur_ms: i64, volume: f64) -> Result<i64, String> {
@@ -1728,7 +1739,19 @@ resonance/reverb/distortion", other)),
         let mut buf = vec![0.0f64; n];
         for b in buf.iter_mut() { *b = rng_uniform(); }
         let data = self.make_data_mono(&buf, volume, sr);
-        Ok(self.push_slot(data, volume.clamp(0.0, 1.0) as f32))
+        let schleife = self.mono_daten(&buf, volume, sr, false);
+        let idx = self.push_slot(data, volume.clamp(0.0, 1.0) as f32);
+        self.sounds[idx as usize].schleife = Some(schleife);
+        Ok(idx)
+    }
+
+    /// Die Daten eines Slots zum Abspielen: endlos die ohne Blenden, wo es
+    /// sie gibt (`SoundSlot::schleife`), sonst die gewoehnlichen.
+    fn spieldaten(&self, idx: i64, fn_: &str, endlos: bool) -> Result<StaticSoundData, String> {
+        let s = self.slot(idx, fn_)?;
+        let data = s.data.as_ref()
+            .ok_or_else(|| format!("{}: Sound {} wurde freigegeben (UNLOADSOUND)", fn_, idx))?;
+        Ok(if endlos { s.schleife.as_ref().unwrap_or(data) } else { data }.clone())
     }
 
     /// AUDIO_NOTE -- eine MUSIKALISCHE Note, kein Effekt.

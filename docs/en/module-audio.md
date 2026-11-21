@@ -188,7 +188,7 @@ For procedural sounds without audio files. Returns a `SOUND` object that you can
 
 | Function | Effect |
 |---|---|
-| `AUDIO_TONE(freq_hz, duration_ms[, waveform$[, vol]])` | sine/square/saw/triangle tone |
+| `AUDIO_TONE(freq_hz, duration_ms[, waveform$[, vol]])` | sine/square/saw/triangle tone, faded in and out over 5 ms against clicks -- played endlessly (`loops = -1`) without the fades; the loop is seamless when it holds whole cycles (1000 ms at a whole-number frequency) |
 | `AUDIO_NOISE(duration_ms[, vol])` | white noise |
 | `AUDIO_NOTE(wf$, freq, duration_ms, attack_ms, decay_ms, sustain, release_ms, vol[, vib_depth, vib_speed, detune_cents, slide_semitones])` | a held note with a real ADSR envelope, vibrato, detune layer and portamento — the instrument for trackers and music; `vib_depth` is a fraction of the frequency (0.005 = ±0.5 %), not semitones |
 

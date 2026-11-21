@@ -153,7 +153,7 @@
   "AUDIO_SOUND_WAVE": "count points of the waveform, -1..1 — for drawing",
   "AUDIO_STOP": "stop the channel, optionally fade out",
   "AUDIO_STOP_ALL": "stop all",
-  "AUDIO_TONE": "sine/square/saw/triangle tone",
+  "AUDIO_TONE": "sine/square/saw/triangle tone, faded in and out over 5 ms against clicks -- played endlessly (loops = -1) without the fades; the loop is seamless when it holds whole cycles (1000 ms at a whole-number frequency)",
   "AUDIO_TWEENER_NEW": "AUDIO_MOD — modulator that moves to a target on command",
   "AUDIO_TWEENER_TO": "move there (linear, in, out, inout)",
   "AUDIO_VOLUME": "set the volume 0..1",

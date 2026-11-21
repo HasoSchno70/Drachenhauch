@@ -211,3 +211,23 @@ SLEEP(400)
 AUDIO_SAVE_WAV(AUDIO_RECORD_STOP(), "halb.wav")
 --- ton halb.wav
 spitze 0.4 +-0.03
+
+=== eine endlose schleife hat an der naht keine luecke
+' AUDIO_TONE blendet jeden Ton 5 ms ein und aus -- fuer einen einzelnen
+' Ton richtig, in einer Endlosschleife war das an jeder Naht eine Luecke
+' (Buch "Kleine Wunder", Kapitel 18: der Theremin flatterte). Endlos
+' gespielt laeuft jetzt dieselbe Welle ohne Blenden. Mit Tonhoehe 0.25
+' dauert jede Blende 20 ms, die Luecke saehe man also in den 10-ms-
+' Fenstern; 500 ms bei 500 Hz sind ganze Schwingungen, die Naht ist glatt.
+IMPORT "audio"
+DIM ton AS SOUND : ton = AUDIO_TONE(500, 500, "sine", 0.8)
+DIM k AS AUDIO_CHANNEL : k = AUDIO_PLAY(ton, -1, 1.0)
+AUDIO_PITCH(k, 0.25)
+SLEEP(100)
+AUDIO_RECORD_START()
+SLEEP(2400)
+DIM auf AS SOUND : auf = AUDIO_RECORD_STOP()
+AUDIO_STOP(k)
+AUDIO_SAVE_WAV(auf, "schleife.wav")
+--- ton schleife.wav
+pegel 50 2350 > 0.5

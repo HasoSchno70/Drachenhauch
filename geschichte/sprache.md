@@ -1266,3 +1266,19 @@ Handle sofort (`tex_frei`), raeumt die Textur aber erst nach dem FLIP ab
 sonst wie bisher gleich -- ein Werkzeug, das ohne FLIP viele Bilder
 freigibt, sammelt so nichts an. `image_io.dhtest` (ein Fall); Gegenprobe:
 ohne den Aufschub faellt genau er (Pixel 0 statt FF0000).
+
+Kapitel 18 (Der Theremin) spielt einen Ton aus `AUDIO_TONE(110, 1000)`
+endlos (`loops = -1`) und fuehrt die Tonhoehe mit `AUDIO_PITCH` nach. Eine
+Sekunde mit 110 Hz sind ganze Schwingungen, die Schleife sollte nahtlos
+sein. Gemessen am Mitschnitt (Halbwelle fuer Halbwelle) brach der Pegel an
+jeder Naht fuer zwei Halbwellen auf die Haelfte ein, bei Tonhoehe 4 viermal
+je Sekunde: `make_data_mono` blendet jeden Ton 5 ms ein und aus -- fuer
+einen einzelnen Ton gegen Knacken richtig, in einer Schleife eine Luecke.
+Jetzt legen `AUDIO_TONE` und `AUDIO_NOISE` dieselbe Welle zusaetzlich ohne
+Blenden ab (`SoundSlot::schleife`), und endlos gespielt (AUDIO_PLAY,
+AUDIO_PLAY_AT, AUDIO_PLAY_ON mit loops < 0) laeuft diese. Eine Schleife,
+die keine ganzen Schwingungen enthaelt (1003 ms), springt an der Naht --
+das ist jetzt ehrlich hoerbar und im Buch ein Fehlerbeispiel.
+`audio_planen.dhtest` (ein Fall: Tonhoehe 0.25 dehnt die Blenden auf 20 ms,
+die Luecke faellt dann in die 10-ms-Pegelfenster); Gegenprobe: endlos die
+Fassung mit Blenden, leisestes Fenster 0.25 statt ueber 0.5.

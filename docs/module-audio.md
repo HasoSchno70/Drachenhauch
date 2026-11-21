@@ -189,7 +189,7 @@ Fuer prozedurale Sounds ohne Audio-Files. Liefert ein `SOUND`-Objekt, das du wie
 
 | Funktion | Wirkung |
 |---|---|
-| `AUDIO_TONE(freq_hz, duration_ms[, waveform$[, vol]])` | Sine/Square/Saw/Triangle-Ton |
+| `AUDIO_TONE(freq_hz, duration_ms[, waveform$[, vol]])` | Sine/Square/Saw/Triangle-Ton, 5 ms ein- und ausgeblendet gegen Knacken -- endlos gespielt (`loops = -1`) ohne die Blenden; nahtlos ist die Schleife, wenn sie ganze Schwingungen enthält (1000 ms bei ganzzahliger Frequenz) |
 | `AUDIO_NOISE(duration_ms[, vol])` | Weisses Rauschen |
 | `AUDIO_NOTE(wf$, freq, duration_ms, attack_ms, decay_ms, sustain, release_ms, vol[, vib_depth, vib_speed, detune_cents, slide_semitones])` | eine gehaltene Note mit echter ADSR-Hüllkurve, Vibrato, Detune-Schicht und Portamento — das Instrument für Tracker und Musik; `vib_depth` ist ein Anteil der Frequenz (0.005 = ±0,5 %), keine Halbtöne |
 

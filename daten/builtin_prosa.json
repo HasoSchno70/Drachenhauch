@@ -152,7 +152,7 @@
   "AUDIO_SOUND_WAVE": "count Punkte der Wellenform, -1..1 — zum Zeichnen",
   "AUDIO_STOP": "Channel stoppen, optional ausfaden",
   "AUDIO_STOP_ALL": "alle stoppen",
-  "AUDIO_TONE": "Sine/Square/Saw/Triangle-Ton",
+  "AUDIO_TONE": "Sine/Square/Saw/Triangle-Ton, 5 ms ein- und ausgeblendet gegen Knacken -- endlos gespielt (loops = -1) ohne die Blenden; nahtlos ist die Schleife, wenn sie ganze Schwingungen enthält (1000 ms bei ganzzahliger Frequenz)",
   "AUDIO_TWEENER_NEW": "AUDIO_MOD — Modulator, der auf Kommando zu einem Ziel fährt",
   "AUDIO_TWEENER_TO": "dorthin fahren (linear, in, out, inout)",
   "AUDIO_VOLUME": "Lautstaerke 0..1 setzen",
