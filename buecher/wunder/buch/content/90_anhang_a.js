@@ -787,4 +787,172 @@ module.exports = (H) => [
   H.figure("kap19_funken.png", "Erfinden: Vierzig Funken springen bei jedem Schlag aus dem Bass hoch und fallen zurück.", 420, 262),
 
   H.p("Die Funken starten links unten, wo der Bass steht, und fliegen nach rechts oben; 500 Punkte je Sekunde zum Quadrat ziehen sie wieder herunter. Alles ist mit DELTA() gerechnet, wie im Kapitel. Entfernt wird von hinten nach vorn: Nimmt man Platz k heraus, rücken die dahinter nach vorn, und eine Schleife, die vorwärts zählt, übersprünge den nächsten. Hier wird es wichtig, dass ein Schlag nur einmal zählt — ohne die Sperre aus Drehen 2 kämen bei jedem Schlag 200 Funken statt 40."),
+
+
+  H.h2("Kapitel 20 · Die Partikelmaschine"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Mit 1000 Teilchen je Sekunde wird das Feuer dicht, und weil leuchtende Teilchen ihre Farben addieren, brennt sein Kern weiß — wie die heißeste Stelle eines echten Feuers. Mit 20 zerfällt es in einzelne Flocken, die nacheinander aufsteigen, und man sieht, dass eine Flamme nur viele kleine Kreise sind. Die Zahl ändert nur, wie oft neues aufgerufen wird; alles andere bleibt gleich."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Ohne Leuchten deckt jedes Teilchen die darunter halb zu, statt seine Farbe dazuzugeben. Das Feuer wird stumpf orange, wie aus Papier geschnitten, und wo viele Teilchen übereinanderliegen, wird es nicht heller, sondern bleibt bei der Farbe des obersten. Leuchten ist das, was einem Feuer seine Hitze gibt."),
+
+  H.h3("Drehen 3"),
+
+  H.p("Alle. Effekt.bewegen ist die Fassung, auf der jede Unterklasse aufbaut — entweder erbt sie sie unverändert, oder sie ruft sie mit SUPER.bewegen auf. Darum fällt jetzt alles: Der Funkenregen fällt schneller, der Schnee rascher, die Flammen werden kürzer, und der Rauch steigt erst ein Stück und sinkt dann zu Boden. Eine Zeile in der Basisklasse ändert jeden Effekt — das ist die Stärke der Vererbung und zugleich ihr Risiko."),
+
+  H.h3("Erweitern 1: Glühwürmchen"),
+
+  H.p("Eine Unterklasse mehr, und eine Zeile, die sie in die Liste der Effekte setzt (code/loesungen/kap20_gluehwuermchen.dh):"),
+
+  ...neu("loesungen/kap20_gluehwuermchen.dh").map((t) => H.code(t)),
+
+  H.figure("kap20_gluehwuermchen.png", "Erweitern 1: Gelbgrüne Glühwürmchen schwirren rechts über dem Boden, jedes blinkt in seinem eigenen Takt.", 420, 262),
+
+  H.p("Jedes Bild bekommt ein Glühwürmchen einen kleinen zufälligen Schubs, darum fliegen sie in Haken. Die Größe dient zugleich als Takt: SIN(t.alter * 3 + t.groesse * 9) ist für jedes Glühwürmchen gegeneinander verschoben, weil keine zwei gleich groß sind. Die Hauptschleife wurde nicht angefasst — sie zeichnet, was in der Liste steht."),
+
+  H.h3("Erweitern 2: Effekte kombinieren"),
+
+  H.p("Eine Taste, drei Zufallszahlen, ein neues Rezept (code/loesungen/kap20_kombinieren.dh):"),
+
+  ...neu("loesungen/kap20_kombinieren.dh").map((t) => H.code(t)),
+
+  H.figure("kap20_kombinieren.png", "Erweitern 2: ein gemischtes Rezept — Anfang, Zug und Farbe aus drei verschiedenen Rezepten.", 420, 262),
+
+  H.p("a.anfang ist das Lambda, das im ersten Rezept steht; das neue Rezept bekommt es, ohne dass es kopiert oder umgeschrieben wird. Mit drei Rezepten gibt es 27 Mischungen, darunter Funken, die kreisen, oder Blasen, die durch den Farbkreis wandern. Als Klassen wären das 27 Unterklassen; hier ist es ein NEW."),
+
+  H.h3("Erfinden: ein Editor mit Reglern"),
+
+  H.p("Eine Möglichkeit (code/loesungen/kap20_regler.dh): Die drei Effekte bekommen Namen, damit die Regler sie finden, und der Wind des Rauchs wird ein Feld:"),
+
+  ...neu("loesungen/kap20_regler.dh").map((t) => H.code(t)),
+
+  H.p("Die Regler sind dieselben wie in Kapitel 3. Neu ist nur, dass sie Felder von Objekten setzen, und zwar in jedem Bild: feuer.rate = GUI_VALUE(rFeuer). Das Feuer merkt davon nichts — beim nächsten schritt wirft es eben mehr oder weniger aus. Die Liste effekte und die Variable feuer zeigen auf dasselbe Objekt; was man über die eine ändert, sieht man über die andere."),
+
+
+  H.h2("Kapitel 21 · Geschichten, die warten"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Der Drache spricht schon, während er noch hereinläuft: Nach einer halben Sekunde steht die Sprechblase über ihm und wandert mit, bis er ankommt. Das Drehbuch weiß mit einer festen Zeit nicht, wann er steht — BIS_ALLE_STEHEN fragt die Figuren selbst. Darum ist es die bessere Wahl, wann immer eine Zeile auf eine Bewegung folgt."),
+
+  H.h3("Drehen 2"),
+
+  H.p("„Ist hier jemand?“ bekommt dann 1,3 statt 2 Sekunden, „Psst! Du weckst den ganzen Wald.“ 1,6 statt 2,9. Kurze Sätze kann man noch lesen, lange verschwinden, bevor man am Ende ist. Weil die Lesezeit an einer Stelle ausgerechnet wird, in sagen, ändert eine Zahl jede Sprechblase der Geschichte — und mit der Leertaste kann ohnehin jeder schneller lesen, der will."),
+
+  H.h3("Drehen 3"),
+
+  H.p("Nein. Der Igel ist in gut einer Sekunde da statt in vier, und das Drehbuch wartet genau so lange, weil es mit BIS_ALLE_STEHEN auf ihn wartet und nicht auf eine feste Zeit. Im Zustandsautomaten wäre es genauso — dort fragt Zustand 4 auch igel.geht(). Mit einem festen YIELD 4 dagegen stünde der Igel drei Sekunden lang wortlos herum."),
+
+  H.h3("Erweitern 1: eine Zwischensequenz"),
+
+  H.p("Die Eule ist eine Figur, die sich anders zeichnet — eine Unterklasse wie in Kapitel 20. Das Drehbuch bekommt ein paar Zeilen am Ende, und der Treiber muss auch auf sie warten (code/loesungen/kap21_eule.dh):"),
+
+  ...neu("loesungen/kap21_eule.dh").map((t) => H.code(t)),
+
+  H.figure("kap21_eule.png", "Erweitern 1: Die Eule kommt dazu und fragt, wer so laut niest.", 420, 262),
+
+  H.p("Eule überschreibt nur zeichnen; gehen, schritt und die Sprechblase erbt sie von Figur. Am Drehbuch sieht man, warum die Koroutine sich lohnt: Die Fortsetzung steht einfach unter dem, was vorher war. Im Zustandsautomaten wären es sechs neue Zustände mit Nummern."),
+
+  H.h3("Erweitern 2: ein Tutorial"),
+
+  H.p("Eine dritte Art zu warten: bis eine Taste kommt (code/loesungen/kap21_tutorial.dh):"),
+
+  ...neu("loesungen/kap21_tutorial.dh").map((t) => H.code(t)),
+
+  H.figure("kap21_tutorial.png", "Erweitern 2: Die Geschichte steht, bis der Spieler die Leertaste drückt.", 420, 262),
+
+  H.p("Im Drehbuch stehen nur zwei neue Zeilen in der Schleife, die Anweisung und das Warten. Der Treiber kennt jetzt drei Arten: eine Zeit, bis alle stehen, und bis zur Taste. So arbeiten viele Anleitungen in Spielen: Sie erklären einen Schritt und gehen erst weiter, wenn der Spieler ihn getan hat."),
+
+  H.h3("Erfinden: der Spieler entscheidet mit"),
+
+  H.p("Eine Möglichkeit (code/loesungen/kap21_antwort.dh): Das YIELD gibt nicht nur eine Zahl heraus, es bekommt auch eine zurück:"),
+
+  ...neu("loesungen/kap21_antwort.dh").map((t) => H.code(t)),
+
+  H.pmix([["antwort = YIELD FRAGE", true], " hält an wie jedes YIELD, aber der Treiber setzt diesmal nicht mit CORO_RESUME fort, sondern mit ", ["CORO_SEND(ablauf, \"j\")", true], ": Der zweite Wert wird zum Ergebnis des YIELD, und das Drehbuch hat die Antwort in der Hand. Danach erzählt es mit einem gewöhnlichen IF weiter — bei N schickt der Igel den Drachen schlafen, und die Geschichte endet mit RETURN 0 schon dort. Ausprobiert: mit N geht der Drache ab, mit J sagt der Igel „Na gut. Aber leise.“, und es wird weiter geniest."]),
+
+  H.h2("Kapitel 22 · Die Datenwerkstatt"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Der Ring wird halb so breit und rückt nach innen: 30 Grad liegen jetzt bei 140 statt bei 220 Punkten. Die Gradkreise rücken zusammen, ihre Zahlen stehen dicht übereinander, und die warmen und kalten Wochen sind schwerer zu sehen, weil jeder Strahl nur halb so lang ist. Die Regenpunkte bleiben, wo sie waren, bei 230 — dort stehen sie als feste Zahl, nicht über radius. Zwischen Ring und Regen klafft jetzt eine Lücke. Wer den Maßstab ändert, sieht so, welche Stellen davon abhängen und welche nicht."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Links steht jetzt „an 21 Tagen“ statt „an 119 Tagen“: So oft fielen mehr als 10 Millimeter. Die Regenmenge darüber, 663 mm, bleibt gleich — sie ist ARRAY_SUM(regen), die Summe über alle Tage, und fragt nass gar nicht. Auch die blauen Punkte außen bleiben, denn die Zeichenschleife prüft regen[i] > 0 selbst. Nur, was aus nass berechnet wird, ändert sich. Übrigens brachten diese 21 Tage zusammen 279 mm, fast die Hälfte des Jahres."),
+
+  H.h3("Drehen 3"),
+
+  H.p("Die Zahlen sind andere: Der wärmste Tag hat 31,7 Grad am 24. Juli, der kälteste −6,9 Grad am 24. Januar, es regnet 540 mm an 109 Tagen. Die Form bleibt: oben blau, unten rot, im Frühling und Herbst grün und gelb. Die Jahreszeiten kommen aus der Kosinuskurve, die bei jeder Saat gleich ist; der Zufall bestimmt nur, welche Wochen wärmer oder kälter sind und wann es regnet. Danach RANDOMIZE(2025) zurückstellen und 1_daten.dh noch einmal laufen lassen — sonst passen die Zahlen in diesem Kapitel nicht mehr."),
+
+  H.h3("Erweitern 1: Monatsmittel als Balken"),
+
+  H.p("Die Mittel rechnet die Schleife aus „Warum so?“; gezeichnet wird je Monat ein Balken (code/loesungen/kap22_monate.dh):"),
+
+  ...neu("loesungen/kap22_monate.dh").map((t) => H.code(t)),
+
+  H.figure("kap22_monate.png", "Erweitern 1: Rechts je Monat das Mittel der Höchsttemperaturen.", 420, 262),
+
+  H.p("Jeder Balken ist drei Punkte je Grad lang und hat die Farbe, die ein Tag mit dieser Temperatur im Kreis hätte — farbe() wird einfach noch einmal gefragt. Dass der Juni hier wärmer ist als der Juli, ist kein Fehler: In diesem erfundenen Jahr lag eine warme Woche Ende Juni, mit dem wärmsten Tag am 25."),
+
+  H.h3("Erweitern 2: eigene Daten"),
+
+  H.p("Damit eine andere Datei geladen werden kann, wird aus dem Laden eine SUB, die alle Spalten neu füllt (code/loesungen/kap22_eigene.dh):"),
+
+  ...neu("loesungen/kap22_eigene.dh").map((t) => H.code(t)),
+
+  H.pmix(["Die Spalten sind jetzt globale Variablen, die zuerst leer sind; ", ["laden", true], " füllt sie aus einer Datei, und alles, was daraus folgt — der wärmste Tag, die Regentage, die Monate —, wird mit neu berechnet. In ", ["spalte", true], " steht jetzt das REPLACE$ aus „Was schiefgehen kann“: Eine Datei mit 24,8 statt 24.8 lädt genauso. Beim Start nimmt ", ["ARGPATH$(0)", true], " eine Datei aus der Befehlszeile, ", ["dhrt run kap22_eigene.dh -- meine.csv", true], "; ARGPATH$ macht daraus einen vollständigen Pfad, denn dhrt wechselt beim Start in den Ordner des Programms. Und während es läuft, kann man eine Datei aufs Fenster ziehen: ", ["FILES_DROPPED()", true], " zählt, was in diesem Bild abgelegt wurde, ", ["FILE_DROPPED(0)", true], " ist der Pfad. Das Jahr oben links kommt aus dem ersten Datum. Die eigene Datei braucht dieselben fünf Spalten, getrennt durch Semikolons; eine Kopfzeile, die mit „datum“ beginnt, wird übersprungen."]),
+
+  H.h3("Erfinden: ein Diagramm zum Anklicken"),
+
+  H.p("Eine Möglichkeit, als eigenes Programm (code/loesungen/kap22_diagramm.dh):"),
+
+  H.code(zeilen("loesungen/kap22_diagramm.dh")),
+
+  H.pmix(["Das Wichtigste steht in ", ["im_monat", true], ": Die Funktion liefert die Nummern der Tage eines Monats, und damit holt jede Spalte ihre Werte — ", ["[hoch[i] FOR i IN im_monat(m)]", true], " sind die Höchsttemperaturen des Monats m. So steckt zwar wieder eine Comprehension in einer anderen, aber die innere hat einen Namen und liest sich wie ein Satz: das Mittel der tiefsten Temperaturen der Tage im Monat, für jeden Monat. Den Rest macht das Modul chart: ", ["CHART_NEW(\"balken\", …)", true], " legt das Diagramm an, ", ["CHART_SERIES", true], " je eine Reihe mit Namen und Farbe, ", ["CHART_DATA", true], " gibt ihr die Werte. ", ["CHART_CLICKED", true], " sagt, welcher Monat in diesem Bild angeklickt wurde, sonst −1; der gewählte merkt sich gewaehlt. Darunter stehen der wärmste Tag des Monats, sein Regen und seine Sonne — dreimal dieselbe Liste tm, dreimal eine Comprehension darüber. Beim Schreiben stand an der Nulllinie der Skala „-0 Grad“: Die Skala trifft die Null nur beinahe, und das Minus blieb beim Runden stehen. Jetzt schreibt chart eine Null ohne Vorzeichen."]),
+
+  H.h2("Kapitel 23 · Fehler, die man fängt"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Das Fenster geht auf und gleich wieder zu, und es bleibt die Meldung aus Schritt 2: LOADIMAGE: 'bilder/halb.png' beginnt wie ein PNG-Bild, ist aber beschaedigt oder unvollstaendig. Die Diaschau zeigt kein einziges Bild, auch nicht die sechs guten — das Laden steht vor der Hauptschleife, und der erste Fehler beendet alles. Ein TRY von zwei Zeilen macht den Unterschied zwischen „zeigt sechs Bilder“ und „zeigt nichts“."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Unten steht eine vierte Zeile, etwa „bilder/titel.txt, Zeile 3: kein Semikolon“, und alle Bilder zeigen statt des Titels ihren Dateinamen — auch die, deren Zeilen in Ordnung sind. titel_lesen bricht beim THROW ab, und ihr Ergebnis kommt nie an. Wer lieber die guten Zeilen behält, lässt titel_lesen eine schlechte Zeile überspringen und sich merken, statt zu werfen. Was besser ist, hängt davon ab, wie wichtig die Titel sind; eine kaputte Zeile in einer Einstellungsdatei will man meist sofort sehen. Das FINALLY hat die Datei übrigens trotzdem geschlossen."),
+
+  H.h3("Drehen 3"),
+
+  H.p("Die Bilder zeigen ihre Dateinamen statt der Titel, und unten bleibt es bei drei Zeilen. Eine fehlende titel.txt ist kein Fehler, denn die Titel sind freiwillig — darum fragt FILEEXISTS vorher, und titel_lesen wird gar nicht erst gerufen. Ohne diese Frage käme der Fehler von OPENFILE mit dem Code \"\" im CATCH an und würde weitergeworfen, die Diaschau bräche ab."),
+
+  H.h3("Erweitern 1: Übergänge"),
+
+  H.p("Statt der einen Überblendung drei Arten, reihum (code/loesungen/kap23_uebergaenge.dh):"),
+
+  ...neu("loesungen/kap23_uebergaenge.dh").map((t) => H.code(t)),
+
+  H.pmix(["w läuft während des Wechsels von 0 bis 1. ", ["w * w * (3 - 2 * w)", true], " macht daraus eine Kurve, die sanft anfährt und abbremst; ohne sie ruckt das Schieben am Anfang und am Ende. Beim Schieben zeichnet ", ["DRAW_IMAGE_PART", true], " von jedem Bild nur das Stück, das in den Rahmen passt: vom alten den rechten Teil ab s, vom neuen den linken bis s. So braucht es keine Schere, die alles außerhalb abschneidet. Beim Wachsen bekommt DRAWIMAGE eine Breite und eine Höhe und streckt das Bild darauf. Die beiden IF verhindern, dass ein Stück mit der Breite 0 gezeichnet wird."]),
+
+  H.h3("Erweitern 2: ein Fortschrittsbalken"),
+
+  H.p("Das Laden wandert in die Hauptschleife, eine Datei je Bild (code/loesungen/kap23_fortschritt.dh):"),
+
+  ...neu("loesungen/kap23_fortschritt.dh").map((t) => H.code(t)),
+
+  H.figure("kap23_fortschritt.png", "Erweitern 2: Vier von neun Dateien sind versucht.", 420, 262),
+
+  H.pmix(["Vor der Schleife entsteht nur die Liste. In der Schleife lädt jedes Bild genau eine Datei, im selben TRY wie vorher, zeichnet den Balken und geht mit ", ["CONTINUE", true], " gleich zur nächsten Runde; die Diaschau beginnt erst, wenn alles versucht ist. Bei unseren kleinen Bildern huscht der Balken in einer Sechstelsekunde vorbei, bei zweihundert Fotos von einer Kamera braucht er Sekunden — und in der Zeit sieht man, dass etwas geschieht, statt auf ein schwarzes Fenster zu schauen, das nicht antwortet."]),
+
+  H.h3("Erfinden: eine Diaschau, die beobachtet"),
+
+  H.p("Eine Möglichkeit (code/loesungen/kap23_beobachten.dh):"),
+
+  ...neu("loesungen/kap23_beobachten.dh").map((t) => H.code(t)),
+
+  H.pmix([["nachsehen", true], " merkt sich je Datei, wie sie zuletzt aussah — Änderungszeit und Größe als ein Text. Nur was neu ist oder sich geändert hat, wird geladen; ein geändertes Bild ersetzt sein altes an derselben Stelle. Die Probleme stehen jetzt in einer MAP je Datei: Lässt sich eine Datei später laden, nimmt ", ["MAP_REMOVE", true], " ihr Problem wieder weg. ", ["bild_laden", true], " zeigt den eigenen Fehler: LOADIMAGE lädt ein Bild von 32 Punkten Breite klaglos, aber für die Diaschau ist es zu klein, also wirft bild_laden selbst, mit dem Code KLEIN. Ausprobiert, während die Diaschau lief: Ein neues Bild im Ordner war nach zwei Sekunden da, leer.png mit einem echten Bild überschrieben verschwand aus den Problemen, und ein Bild von 32 Punkten erschien als „bilder/klein.png: nur 32 Punkte breit“."]),
+
+  H.p("Dabei fiel ein Fehler in Drachenhauch auf: LOADIMAGE merkt sich jedes Bild nach seinem Pfad, damit ein Programm, das es in jedem Bild lädt, nicht jedes Mal die Festplatte fragt. Wurde die Datei aber neu geschrieben, kam still das alte Bild zurück. Jetzt merkt sich LOADIMAGE auch, wie groß und wie alt die Datei war, und lädt sie neu, wenn sich das geändert hat."),
 ];
