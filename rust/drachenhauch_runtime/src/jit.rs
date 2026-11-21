@@ -386,8 +386,13 @@ pub struct Kontext {
     /// Bereichs gehoeren NICHT hinein (sie gelten, und sie waeren bei
     /// 10 000 Objekten mal 100 Runden ein unnoetig grosses Journal).
     journal_bereich: *mut Vec<(u64, u64, Value)>,
+    /// Nur Bereiche: wie oft der Maschinencode am Kopf der Schleife vorbeikam
+    /// -- die Runden, die er selbst gerechnet hat. `schleife` vergleicht sie
+    /// mit den Ausstiegen mitten drin (siehe `Schleife::vergeblich`).
+    runden: u64,
 }
 
+const K_RUNDEN: i32 = std::mem::offset_of!(Kontext, runden) as i32;
 const K_JOURNAL: i32 = std::mem::offset_of!(Kontext, journal) as i32;
 const K_JOURNAL_BEREICH: i32 = std::mem::offset_of!(Kontext, journal_bereich) as i32;
 
@@ -1385,6 +1390,10 @@ struct Schleife {
     ausgaenge: Vec<(usize, Vec<Option<Art>>)>,
     beruehrt: Vec<usize>,
     fehlschlaege: std::cell::Cell<u32>,
+    /// Wie oft der Bereich mitten drin an die VM abgab, und wie viele Runden
+    /// er bis dahin zusammen selbst rechnete.
+    ausstiege: std::cell::Cell<u64>,
+    runden_selbst: std::cell::Cell<u64>,
     felder: Vec<FeldInfo>,
     aussteige: Vec<Aussteig>,
     klassen: Vec<Klasse>,
@@ -1406,6 +1415,21 @@ struct Schleife {
     /// Bereich Globale haelt -- dann wird neu gebaut (und abgelehnt).
     ffi_gerufen: bool,
 }
+
+impl Schleife {
+    /// Steigt der Bereich so oft mitten drin aus, dass er zwischen zwei
+    /// Ausstiegen im Schnitt keine zwei Runden selbst rechnet? Erst nach
+    /// `MIN_AUSSTIEGE`, damit ein paar seltene Faelle am Anfang (ein Ueberlauf,
+    /// ein Zweig, der einmal einen Text anfasst) eine Schleife nicht
+    /// verurteilen, die sonst Tausende Runden am Stueck rechnet.
+    fn vergeblich(&self) -> bool {
+        let n = self.ausstiege.get();
+        n >= MIN_AUSSTIEGE && self.runden_selbst.get() < 2 * n
+    }
+}
+
+/// Ab so vielen Ausstiegen mitten drin urteilt `Schleife::vergeblich`.
+const MIN_AUSSTIEGE: u64 = 64;
 
 /// Was der Maschinencode ueber die globalen Plaetze wissen muss: ihre Art
 /// (aus den DECLARE-Befehlen des Hauptprogramms; widersprechen sich zwei,
@@ -2405,6 +2429,10 @@ struct Bauer<'a, 'b> {
     /// genau diesem Befehl weiter. `punkt` ist dieser Stand (Stelle, Stapel,
     /// Arten der Locals), `aussteige` sammelt die Stellen.
     mitten: bool,
+    /// Nur mit `mitten`: die Runden am Kopf des Bereichs, gezaehlt in einer
+    /// Variablen -- in den Kontext (`K_RUNDEN`) erst beim Aussteigen, damit
+    /// eine Runde, die nicht aussteigt, nichts in den Speicher schreibt.
+    runden: Option<Variable>,
     punkt: Option<(usize, Vec<(CWert, Art)>, Vec<Option<Art>>)>,
     aussteige: Vec<Aussteig>,
     lok_zeiger: Option<CWert>,
@@ -2471,6 +2499,10 @@ impl<'a, 'b> Bauer<'a, 'b> {
                 }
                 let nr = self.aussteige.len() as i64;
                 self.aussteige.push(Aussteig { stelle, lokal, stapel: st.iter().map(|(_, a)| *a).collect() });
+                if let Some(v) = self.runden {
+                    let n = self.b.use_var(v);
+                    self.b.ins().store(MemFlagsData::trusted(), n, self.ctx, K_RUNDEN);
+                }
                 let code = self.b.ins().iconst(types::I64, -2 - nr);
                 self.b.ins().return_(&[code]);
             }
@@ -2741,10 +2773,16 @@ fn erzeugen(modul: &mut JITModule, prog: &Program, glob: &Globale, f: &Func, an:
         let h_lage = modul.declare_func_in_func(hilfe.lage, fb.func);
         let selbst = if an.selbst.is_some() { Some(fb.ins().load(types::I64, MemFlagsData::trusted(), ctxp, K_SELBST)) } else { None };
         let mut bau = Bauer { b: &mut fb, ctx: ctxp, fehler, vars: HashMap::new(), schatten, marken, holen,
-                              befoerdert: HashMap::new(), felder: Vec::new(), mitten, punkt: None,
+                              befoerdert: HashMap::new(), felder: Vec::new(), mitten, runden: None, punkt: None,
                               aussteige: Vec::new(), lok_zeiger, zu_tief: false, selbst,
                               h_lesen_i, h_lesen_f, h_setzen_i, h_setzen_f, h_element_i, h_element_f, h_gfeld, h_journal, h_mathe1, h_mathe2, h_ffi, h_lage,
                               hw: Vec::new(), w_basis: an.typen.len() as i64 };
+        if mitten {
+            let v = bau.b.declare_var(types::I64);
+            let null = bau.b.ins().iconst(types::I64, 0);
+            bau.b.def_var(v, null);
+            bau.runden = Some(v);
+        }
         if an.modus_w {
             for id in hilfe.w { let r = modul.declare_func_in_func(id, bau.b.func); bau.hw.push(r); }
         }
@@ -2828,6 +2866,12 @@ fn erzeugen(modul: &mut JITModule, prog: &Program, glob: &Globale, f: &Func, an:
             // Blockanfang
             let blk = bloecke[&ip];
             bau.b.switch_to_block(blk);
+            // Am Kopf eines Bereichs: eine Runde mehr (`Kontext::runden`).
+            if let (Some(v), true) = (bau.runden, ip == von) {
+                let n = bau.b.use_var(v);
+                let n = bau.b.ins().iadd_imm(n, 1);
+                bau.b.def_var(v, n);
+            }
             let mut st: Vec<(CWert, Art)> = Vec::new();
             for (d, a) in an.vor[ip].as_ref().unwrap().stapel.iter().enumerate() {
                 let v = bau.var(0, d, *a);
@@ -4083,6 +4127,20 @@ impl Jit {
         let nr = (nr - 2) as usize;
         let s: Rc<Schleife> = match self.schleifen.borrow().get(nr) { Some(s) => s.clone(), None => return None };
         if s.kopf != kopf || s.fehlschlaege.get() >= MAX_FEHLSCHLAEGE { return None; }
+        // Gibt der Bereich bei fast jeder Runde an die VM ab (eine Rechnung
+        // mit VEC2 in jeder Runde), kostet jedes Ein- und Aussteigen mehr, als
+        // die eine Runde Maschinencode spart -- dann bleibt die Schleife in
+        // der VM. Gemessen 2026-11-20: `z = z * 0.5 + c` zwei Millionen Mal,
+        // 0.88 s mit, 0.13 s ohne Maschinencode.
+        if s.vergeblich() {
+            if self.bilanz {
+                eprintln!("jit: Schleife an Stelle {} in {} bleibt in der VM: {} Ausstiege mitten drin bei {} eigenen Runden",
+                          kopf, if f.name.is_empty() || f.name == "__main__" { "(Hauptprogramm)" } else { &f.name },
+                          s.ausstiege.get(), s.runden_selbst.get());
+            }
+            marke.set(1);
+            return None;
+        }
         // Erreicht er eine Bibliothek und sind inzwischen Rueckrufe vergeben,
         // bleibt die Schleife fortan in der VM (neu bauen hiesse hier: bei
         // jedem Ruecksprung neu uebersetzen, falls der Bau es nicht ablehnt).
@@ -4186,7 +4244,7 @@ impl Jit {
             stapel: st_puffer.as_mut_ptr(), felder: besch.as_ptr(), selbst: selbst_zeiger,
             werte: arena.as_mut_ptr(),
             vm: vm as *mut crate::vm::Vm<'static>, meldung: None, journal: std::ptr::null_mut(),
-            journal_bereich: &mut bereich_journal,
+            journal_bereich: &mut bereich_journal, runden: 0,
         };
         let aus = unsafe { (s.einstieg)(&mut k, lok.as_mut_ptr()) };
         if aus <= -2 { *self.meldung.borrow_mut() = k.meldung.take(); }
@@ -4258,6 +4316,8 @@ impl Jit {
                 stapel.push(if *art == Art::W { aus_arena(n_gesamt + d) } else { wert(art, st_puffer[d]) });
             }
             self.zahl_aussteige.set(self.zahl_aussteige.get() + 1);
+            s.ausstiege.set(s.ausstiege.get() + 1);
+            s.runden_selbst.set(s.runden_selbst.get() + k.runden);
             return Some(a.stelle);
         }
         let aus = aus as usize;
@@ -4430,6 +4490,8 @@ impl Jit {
             ausgaenge,
             beruehrt,
             fehlschlaege: std::cell::Cell::new(0),
+            ausstiege: std::cell::Cell::new(0),
+            runden_selbst: std::cell::Cell::new(0),
             felder: an.felder.clone(),
             aussteige,
             klassen: an.klassen.clone(),
@@ -4532,7 +4594,7 @@ impl Jit {
             schatten: schatten.as_mut_ptr(), marken: marken.as_mut_ptr(),
             slots: slots.as_ptr(), n_slots: slots.len() as u64, arten: self.arten.as_ptr(),
             stapel: std::ptr::null_mut(), felder: std::ptr::null(), selbst, werte: std::ptr::null_mut(),
-            vm: std::ptr::null_mut(), meldung: None, journal: std::ptr::null_mut(), journal_bereich: std::ptr::null_mut(),
+            vm: std::ptr::null_mut(), meldung: None, journal: std::ptr::null_mut(), journal_bereich: std::ptr::null_mut(), runden: 0,
         };
         let mut journal: Vec<(u64, u64, Value)> = Vec::new();
         k.journal = &mut journal;
