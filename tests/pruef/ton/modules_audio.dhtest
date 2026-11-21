@@ -408,3 +408,13 @@ END TRY
 {sammlung}/../../../examples/assets/demo.mod
 --- enthaelt
 MOD-/XM-Musik laesst sich nicht auf eine Sekunde setzen
+
+=== audio fft mit leerem feld meldet sich
+' `DIM sp AS ARRAY OF FLOAT` ist ein leeres Feld, und AUDIO_FFT fuellt so
+' viele Baender, wie es Plaetze hat -- bisher also still keines (Buch
+' "Kleine Wunder", Kapitel 19).
+IMPORT "audio"
+DIM sp AS ARRAY OF FLOAT
+AUDIO_FFT(sp)
+--- fehler
+AUDIO_FFT: das Feld hat keine Plaetze

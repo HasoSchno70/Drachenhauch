@@ -255,3 +255,29 @@ AUDIO_MODULATE("sfx", "quatsch", m, 0.0, 1.0)
 --- fehler
 AUDIO_MODULATE: unbekanntes Ziel 'quatsch' -- erwartet volume/pan/filter/resonance/reverb/distortion
 
+=== ohne modulator kehrt die lautstaerke zum festen wert zurueck
+' AUDIO_MOD_REMOVE liess den Bus auf dem letzten Wert des Modulators
+' stehen, und AUDIO_BUS_GET_VOLUME meldete trotzdem den festen (Buch
+' "Kleine Wunder", Kapitel 18: Tremolo aus, der Bus blieb bei 94 %). Jetzt
+' kommt der feste Wert zurueck. Der Tweener steht auf -1, also auf dem
+' leisen Ende (0.1) -- anders als ein LFO haengt das nicht von der Zeit ab.
+IMPORT "audio"
+DIM leise AS AUDIO_MOD : leise = AUDIO_TWEENER_NEW(-1.0)
+AUDIO_MODULATE("sfx", "volume", leise, 0.1, 1.0)
+DIM ton AS SOUND : ton = AUDIO_TONE(440, 1000, "sine", 0.8)
+DIM k AS AUDIO_CHANNEL : k = AUDIO_PLAY(ton, -1, 1.0)
+SLEEP(100)
+AUDIO_RECORD_START()
+SLEEP(400)
+AUDIO_MOD_REMOVE(leise)
+SLEEP(400)
+DIM auf AS SOUND : auf = AUDIO_RECORD_STOP()
+AUDIO_STOP(k)
+AUDIO_SAVE_WAV(auf, "zurueck.wav")
+PRINT AUDIO_BUS_GET_VOLUME("sfx")
+--- erwartet
+1.0
+--- ton zurueck.wav
+pegel 50 300 < 0.12
+pegel 550 750 > 0.7
+

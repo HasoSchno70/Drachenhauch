@@ -1,0 +1,11 @@
+' Kapitel 18, was schiefgehen kann: die Frequenz gleichmaessig ueber die
+' Breite verteilt statt in Oktaven.
+CONST BREITE = 800
+CONST TIEF = 110
+CONST HOCH = 1760
+DIM oktave AS INTEGER
+FOR oktave = 0 TO 4
+    DIM f AS FLOAT : f = TIEF * 2 ^ oktave
+    DIM x AS FLOAT : x = (f - TIEF) / (HOCH - TIEF) * BREITE
+    PRINT "A"; oktave + 2; " ("; f; " Hz) bei x = "; ROUND(x)
+NEXT

@@ -665,4 +665,126 @@ module.exports = (H) => [
   H.figure("kap16_sterne.png", "Nachts erscheinen die Sterne; ihre drei Helligkeiten wandern reihum, darum funkeln sie.", 420, 262),
 
   H.p("Der Trick steckt in der Farbe: Ein Stern mischt die Farbe des Himmels mit seiner eigenen, und zwar umso mehr, je dunkler es ist. Am Tag ist dunkel 0, der Stern hat die Farbe des Himmels und ist unsichtbar; in der Nacht ist dunkel 1, und er leuchtet. Die Bedingung (x · 31 + y · 57) MOD 97 = 0 trifft etwa jeden 97. Punkt, und weil 97 eine Primzahl ist, liegen die Sterne nicht in Reihen. Weil die Sterne kein Rauschen brauchen, sieht der Himmel bei jedem Start gleich aus — wie ein Sternbild."),
+
+  H.h2("Kapitel 17 · Malen mit Symmetrie"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Mit 2 Teilen und Spiegeln erscheint jeder Strich viermal: einmal, wo man malt, einmal um die halbe Drehung versetzt auf der anderen Seite der Mitte und zweimal gespiegelt. Die Spiegelachsen sind die waagerechte und die senkrechte Linie durch die Mitte — das Muster sieht aus wie eine Spielkarte oder ein Schmetterling von oben. Ohne Spiegeln bleiben zwei Kopien, die einander gegenüberliegen, als hätte man das Blatt um 180 Grad gedreht."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Die Farbe hängt jetzt nur vom Abstand zur Mitte ab, nicht mehr von der Zeit. Alles, was gleich weit von der Mitte entfernt ist, hat dieselbe Farbe, und das Muster bekommt Ringe: innen Orange, dann Gelb, Grün, Blau und am Rand Violett. Malt man denselben Strich zweimal, hat er beide Male dieselben Farben."),
+
+  H.h3("Drehen 3"),
+
+  H.p("alt_x und alt_y behalten für immer die Stelle, an der die Maus beim Start war. Jede Linie geht dann von dort zur Maus, in jedem Bild eine neue — statt eines Strichs entsteht ein Fächer, der ganze Flächen füllt, und mit zwölf Kopien ein Stern aus Strahlen. Dieselben zwei Zeilen machen also den Unterschied zwischen Malen und etwas ganz anderem: Der Zustand von einem Bild zum nächsten ist das Gedächtnis des Pinsels."),
+
+  H.h3("Erweitern 1: ein zweiter Pinsel"),
+
+  H.p("Die Sprühdose braucht nur einen Schalter und eine Schleife (code/loesungen/kap17_pinsel.dh):"),
+
+  ...neu("loesungen/kap17_pinsel.dh").map((t) => H.code(t)),
+
+  H.p("Jeder Tupfen ist ein Strich, der dort endet, wo er beginnt: Die Linie hat keine Länge, der Kreis am Ende macht einen Punkt. Weil strich die Arbeit des Drehens und Spiegelns schon tut, bekommt die Sprühdose die Symmetrie umsonst. Ein zufälliger Winkel und ein zufälliger Abstand ergeben einen Kreis, in dem die Tupfen zur Mitte hin dichter stehen — wie bei einer echten Sprühdose. Gleichmäßig verteilt wären sie mit SQR(RND()) für den Abstand."),
+
+  H.h3("Erweitern 2: Rückgängig"),
+
+  H.p("Vor jedem Strich fotografiert das Programm das Blatt, Z legt das letzte Foto zurück (code/loesungen/kap17_rueckgaengig.dh):"),
+
+  ...neu("loesungen/kap17_rueckgaengig.dh").map((t) => H.code(t)),
+
+  H.pmix(["Ein Foto ist ein IMAGE, eine Kopie des Blatts im Arbeitsspeicher. ", ["ARRAY_POP", true], " nimmt das jüngste vom Ende des Felds. Danach wird es mit ", ["IMAGE_FREE", true], " freigegeben, denn 30 Fotos zu je 800 · 500 Punkten mal vier Bytes sind fast 50 MB. Auch das Wischen macht vorher ein Foto, damit man es zurücknehmen kann."]),
+
+  H.p("Diese Lösung hat einen Fehler in Drachenhauch gefunden. Im ersten Versuch tat Z nichts. Die Laufzeit zeichnet erst beim FLIP, was das Programm im Lauf des Bildes zeichnen lässt — und IMAGE_FREE gab das Foto sofort frei, also bevor es gezeichnet war. Gezeichnet wurde dann ein leeres Bild. Jetzt gibt IMAGE_FREE ein Bild, das im selben Bild noch gebraucht wird, erst nach dem FLIP frei."),
+
+  H.h3("Erfinden: eine Tapete"),
+
+  H.p("Eine Möglichkeit (code/loesungen/kap17_tapete.dh): Das Fenster wird in vier mal zwei Kacheln geteilt, und linie bekommt die Mitte als Parameter, statt immer MITTE_X und MITTE_Y zu nehmen:"),
+
+  ...neu("loesungen/kap17_tapete.dh").map((t) => H.code(t)),
+
+  H.figure("kap17_tapete.png", "In der Kachel oben links gemalt, erscheint jeder Strich um alle acht Mitten herum.", 420, 262),
+
+  H.pmix(["Winkel und Abstand misst der Strich von der Mitte der Kachel, in der er beginnt; gezeichnet wird er um jede Mitte herum. Wo die Rosetten über ihre Kachel hinausreichen, greifen sie ineinander, und es entsteht ein Muster ohne Nähte. S sichert das Blatt mit ", ["RENDERTARGET_IMAGE", true], " und ", ["IMAGE_SAVE", true], ". Im PNG stehen nur die Striche, keine Hilfslinien und keine Zeile oben — die stehen nur auf dem Fenster. Das ist der Lohn für die Trennung aus Schritt 3."]),
+
+  H.h2("Kapitel 18 · Der Theremin"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Mit 2 Oktaven ist ein Halbton 33 Punkte breit: Man trifft die Töne leicht, hat aber nur zwei Oktaven Platz — für die meisten Melodien reicht das. Mit 7 Oktaven sind es knapp zehn Punkte, und schon ein Zittern der Hand macht den Ton schief; dafür reicht der Bereich vom tiefsten Brummen bis zum Pfeifen. Ein echtes Theremin hat dasselbe Problem: Je mehr Umfang, desto genauer muss man die Hand halten."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Mit −80 dB ganz oben liegt die ganze obere Hälfte des Fensters unter −40 dB, also unter einem Hundertstel des vollen Ausschlags. Über Lautsprecher hört man dort kaum etwas; gespielt wird nur noch in der unteren Hälfte. −40 dB ist für ein Instrument, das man über Lautsprecher hört, ein guter Bereich — leiser ist neben dem Lüfter des Rechners ohnehin nichts zu hören."),
+
+  H.h3("Drehen 3"),
+
+  H.p("Das Bild zeigt weiter einen Sinus, denn welle rechnet mit SIN — es zeigt, wie hoch und wie laut, nicht welche Form. Zu hören ist der Unterschied sofort: Die Rechteckwelle klingt hohl und nach alter Spielkonsole, der Sägezahn scharf und hell wie ein Synthesizer. Beide haben Obertöne, Vielfache der Frequenz, die mitklingen; der Sinus hat keine und klingt darum so weich und rund, wie man ein Theremin kennt."),
+
+  H.h3("Erweitern 1: Einrasten"),
+
+  H.p("Die Leiter steht als Halbtöne über dem A in einem Feld; gesucht wird der nächste Ton darin (code/loesungen/kap18_einrasten.dh):"),
+
+  ...neu("loesungen/kap18_einrasten.dh").map((t) => H.code(t)),
+
+  H.p("eingerastet rechnet zuerst in Halbtönen über TIEF, wie tonname$, und teilt sie in die Oktave und den Rest darin. Für den Rest sucht die Schleife die nächste Stufe; best beginnt bei 12, dem A der nächsten Oktave, damit ein Ton knapp darunter nach oben rastet statt zum G. Gemessen: Steht die Maus 4,4 Halbtöne über dem A, kommen ohne Einrasten 142 Hz heraus, mit Einrasten 147 Hz — das D. Gleiten tut der Ton ebenfalls in Halbtönen, damit es oben so schnell geht wie unten. Die Spur zeigt jetzt den gespielten Ton, nicht die Maus, und wird zur Treppe."),
+
+  H.h3("Erweitern 2: Vibrato"),
+
+  H.p("Ein Modulator kann die Tonhöhe nicht fahren, also rechnet das Programm sie in jedem Bild selbst (code/loesungen/kap18_vibrato.dh):"),
+
+  ...neu("loesungen/kap18_vibrato.dh").map((t) => H.code(t)),
+
+  H.p("Die Schwingung rechnet in Halbtönen: ±0,25 Halbtöne, umgerechnet mit 2 ^ (halb / 12) wie in Schritt 1. Bei 220 Hz schwankt der Ton damit zwischen 217 und 223 Hz — so stand es auch im Mitschnitt, fünfmal je Sekunde. Dass das Programm nur 60-mal je Sekunde nachstellt, hört man nicht: Je Schwingung sind es zwölf Schritte, und AUDIO_PITCH gleitet jeden über 4 ms. Erst wenn ein Bild hängt, stockt auch das Vibrato — der Preis dafür, dass es kein Modulator ist."),
+
+  H.h3("Erfinden: zwei Stimmen"),
+
+  H.p("Eine Möglichkeit (code/loesungen/kap18_zwei_stimmen.dh): ein zweiter Klang, eine Quinte höher, mit Z an und aus; R wechselt zwischen zwei Arten von Quinte:"),
+
+  ...neu("loesungen/kap18_zwei_stimmen.dh").map((t) => H.code(t)),
+
+  H.p("Die zweite Stimme braucht einen eigenen Klang, denn AUDIO_PLAY beendet einen Klang, bevor es ihn neu startet. Und beide Stimmen sind Sägezähne, denn erst an den Obertönen hört man, worum es geht. Eine Quinte ist das Verhältnis 3 : 2 — das Dreifache des unteren Tons ist dann genau das Doppelte des oberen, und beide klingen im Sägezahn mit. Auf dem Klavier ist die Quinte aber sieben gleichstufige Halbtöne, 2^(7/12) = 1,4983, ein wenig kleiner. Bei 220 Hz liegen die beiden Obertöne dann bei 660 und 659,3 Hz, und zwei so nahe Töne schweben: Sie verstärken und schwächen sich im Wechsel, 0,74-mal je Sekunde. Gemessen schwoll der Anteil bei 660 Hz alle 1,35 Sekunden von fast null zum Höchstwert und zurück. Mit der reinen Quinte stand er still. Diesen Preis zahlt jedes Klavier für die zwölf gleichen Schritte: Keine Quinte ist ganz rein, dafür klingen alle Tonarten gleich."),
+
+  H.h2("Kapitel 19 · Ein Bild, das zuhört"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Mit 12 Bändern werden die Balken breit und ruhig, man sieht nur noch grob, ob unten, in der Mitte oder oben etwas los ist. Mit 128 werden die Höhen fein und unruhig, jeder Ton der Melodie hat seinen eigenen Strich. Links ändert sich dagegen wenig: Ganz links stehen jetzt 17 gleich hohe Balken statt 6. Mehr Bänder machen die Tiefe nicht genauer — dort reicht die Auflösung der FFT nicht, wie unter „Warum so?“ beschrieben. Bass, Mitte und Höhen bleiben ungefähr gleich, weil ihre Grenzen Anteile von BAENDER sind."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Ohne die Sperre zählt jeder Schlag etwa fünfmal: Der Bass bleibt nach dem Anschlag der Trommel einige Bilder lang über dem Schnitt, und in jedem dieser Bilder gilt die Bedingung — gemessen fünf Auslösungen im Abstand von 17 ms, also Bild für Bild. Zu sehen ist nur, dass der Blitz etwas länger hell bleibt. Wer aber auf jeden Schlag etwas tut, das zählt — Funken werfen, einen Zähler erhöhen —, tut es fünfmal. Die Sperre von 0,2 Sekunden ist kürzer als der Abstand zweier Schläge (0,5 s) und länger als ein Anschlag."),
+
+  H.h3("Drehen 3"),
+
+  H.p("Mit 0,1 je Sekunde brauchen die Spitzen zehn Sekunden für die ganze Höhe — sie bleiben fast als Linie stehen und zeigen, wie laut jedes Band in den letzten Sekunden höchstens war. Mit 3 sind sie in einer Drittelsekunde unten und kleben fast an den Balken. Dazwischen liegt, was man von Pegelanzeigen kennt: Die Spitze hält kurz, damit das Auge sie fassen kann."),
+
+  H.h3("Erweitern 1: Kreis statt Balken"),
+
+  H.p("Statt der Balkenschleife eine, die Strahlen zeichnet (code/loesungen/kap19_kreis.dh):"),
+
+  ...neu("loesungen/kap19_kreis.dh").map((t) => H.code(t)),
+
+  H.p("Der Winkel läuft für die Bänder nur über eine halbe Runde, von oben (0) nach unten (π); die äußere Schleife zeichnet jedes Band zweimal, mit seite = −1 und +1, und spiegelt so die rechte Hälfte nach links. SIN des Winkels ist der Schritt nach rechts, −COS der nach oben — dieselbe Rechnung wie beim Ziffernblatt in Kapitel 4, nur dass dort die Zeiger zur Uhrzeit zeigen und hier die Bänder zum Bass. Der innere Kreis wächst mit dem Bass, und alle Strahlen wandern mit ihm nach außen: Das ganze Bild atmet."),
+
+  H.h3("Erweitern 2: Farbe nach Bass"),
+
+  H.p("Zwei Zeilen genügen (code/loesungen/kap19_farbe.dh):"),
+
+  ...neu("loesungen/kap19_farbe.dh").map((t) => H.code(t)),
+
+  H.figure("kap19_farbe.png", "Erweitern 2: Bei kräftigem Bass hat sich der ganze Farbkreis um ein Stück gedreht, der Hintergrund ist blau statt violett.", 420, 262),
+
+  H.p("Mit bass statt bass_schnitt würden die Farben bei jedem Schlag springen und dazwischen zurückfallen — ein Flackern, viermal je Sekunde. Der Schnitt ändert sich langsam; die Farben wandern dann mit der Musik, lauter Bass zieht sie Richtung Grün und Blau, leiser zurück nach Rot."),
+
+  H.h3("Erfinden: Funken auf jedem Schlag"),
+
+  H.p("Eine Möglichkeit (code/loesungen/kap19_funken.dh): fünf Felder für die Funken, gefüllt bei jedem Schlag, bewegt in jedem Bild:"),
+
+  ...neu("loesungen/kap19_funken.dh").map((t) => H.code(t)),
+
+  H.figure("kap19_funken.png", "Erfinden: Vierzig Funken springen bei jedem Schlag aus dem Bass hoch und fallen zurück.", 420, 262),
+
+  H.p("Die Funken starten links unten, wo der Bass steht, und fliegen nach rechts oben; 500 Punkte je Sekunde zum Quadrat ziehen sie wieder herunter. Alles ist mit DELTA() gerechnet, wie im Kapitel. Entfernt wird von hinten nach vorn: Nimmt man Platz k heraus, rücken die dahinter nach vorn, und eine Schleife, die vorwärts zählt, übersprünge den nächsten. Hier wird es wichtig, dass ein Schlag nur einmal zählt — ohne die Sperre aus Drehen 2 kämen bei jedem Schlag 200 Funken statt 40."),
 ];

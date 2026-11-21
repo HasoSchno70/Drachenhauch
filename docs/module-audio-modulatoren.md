@@ -25,7 +25,7 @@ Es gibt zwei Sorten, beide mit demselben Handle-Typ `AUDIO_MOD`:
 | `AUDIO_TWEENER_NEW([start_value])` | AUDIO_MOD | Modulator, der auf Kommando zu einem Ziel fährt |
 | `AUDIO_TWEENER_TO(mod, target [, duration_ms [, easing$]])` | — | dorthin fahren (`linear`, `in`, `out`, `inout`) |
 | `AUDIO_MODULATE(bus$, target$, mod, min, max)` | — | Modulator an einen Bus-Parameter binden; sein Bereich wird auf `min..max` abgebildet |
-| `AUDIO_MOD_REMOVE(mod)` | — | Modulator freigeben — der Parameter bleibt auf seinem letzten Wert stehen |
+| `AUDIO_MOD_REMOVE(mod)` | — | Modulator freigeben — der Parameter kehrt zu seinem festen Wert zurück |
 
 ## LFO
 
@@ -95,9 +95,12 @@ einfach — es nimmt beide. Ruft man aber eine LFO-Funktion auf einem Tweener
 auf (oder umgekehrt), sagt die Meldung im Klartext, was los ist, statt nur
 „ungültiges Handle".
 
-**`AUDIO_MOD_REMOVE` gibt den Modulator frei**, aber die Bindung an den
-Parameter bleibt auf dem letzten Wert stehen. Wer wieder einen festen Wert
-will, setzt ihn direkt (`AUDIO_FILTER("sfx", 2000.0)`).
+**`AUDIO_MOD_REMOVE` gibt den Modulator frei**, und was er gefahren hat,
+kehrt zu seinem festen Wert zurück: dem letzten `AUDIO_BUS_VOLUME`,
+`AUDIO_BUS_PAN`, `AUDIO_FILTER`, `AUDIO_REVERB` oder `AUDIO_DISTORTION`
+(ohne einen solchen Aufruf die Vorgabe). Das ist auch der Wert, den
+`AUDIO_BUS_GET_VOLUME` meldet. Bis 2026.52 blieb der Parameter auf dem
+letzten Wert des Modulators stehen -- bei einem LFO ein zufälliger.
 
 ## Demo und Tests
 

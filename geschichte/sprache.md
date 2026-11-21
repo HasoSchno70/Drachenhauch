@@ -1254,3 +1254,69 @@ vorfuehrte; sie hat jetzt Klammern. `compiler_warnungen.dhtest` (zwei Faelle);
 Gegenproben: linken Operanden nicht pruefen, Vorzeichen mitzaehlen, Klammern
 ignorieren, Lauf ohne die Parser-Warnungen -- jede laesst genau ihren Fall
 fallen.
+
+Kapitel 17 (Malen mit Symmetrie) hat als Uebung ein Rueckgaengig: vor
+jedem Strich `RENDERTARGET_IMAGE` als Foto, auf Z das letzte Foto mit
+`DRAWIMAGE` zurueck aufs Blatt und gleich `IMAGE_FREE`. Es tat nichts. Die
+Laufzeit zeichnet erst beim FLIP (Aufzeichnungs-Modell), und `IMAGE_FREE`
+ersetzte die Textur sofort durch den 1x1-Platzhalter -- der aufgezeichnete
+Befehl zeichnete dann den leeren Platzhalter. Jetzt sperrt `IMAGE_FREE` das
+Handle sofort (`tex_frei`), raeumt die Textur aber erst nach dem FLIP ab
+(`tex_abraeumen`), wenn in diesem Bild schon etwas zum Zeichnen ansteht;
+sonst wie bisher gleich -- ein Werkzeug, das ohne FLIP viele Bilder
+freigibt, sammelt so nichts an. `image_io.dhtest` (ein Fall); Gegenprobe:
+ohne den Aufschub faellt genau er (Pixel 0 statt FF0000).
+
+Kapitel 18 (Der Theremin) spielt einen Ton aus `AUDIO_TONE(110, 1000)`
+endlos (`loops = -1`) und fuehrt die Tonhoehe mit `AUDIO_PITCH` nach. Eine
+Sekunde mit 110 Hz sind ganze Schwingungen, die Schleife sollte nahtlos
+sein. Gemessen am Mitschnitt (Halbwelle fuer Halbwelle) brach der Pegel an
+jeder Naht fuer zwei Halbwellen auf die Haelfte ein, bei Tonhoehe 4 viermal
+je Sekunde: `make_data_mono` blendet jeden Ton 5 ms ein und aus -- fuer
+einen einzelnen Ton gegen Knacken richtig, in einer Schleife eine Luecke.
+Jetzt legen `AUDIO_TONE` und `AUDIO_NOISE` dieselbe Welle zusaetzlich ohne
+Blenden ab (`SoundSlot::schleife`), und endlos gespielt (AUDIO_PLAY,
+AUDIO_PLAY_AT, AUDIO_PLAY_ON mit loops < 0) laeuft diese. Eine Schleife,
+die keine ganzen Schwingungen enthaelt (1003 ms), springt an der Naht --
+das ist jetzt ehrlich hoerbar und im Buch ein Fehlerbeispiel.
+`audio_planen.dhtest` (ein Fall: Tonhoehe 0.25 dehnt die Blenden auf 20 ms,
+die Luecke faellt dann in die 10-ms-Pegelfenster); Gegenprobe: endlos die
+Fassung mit Blenden, leisestes Fenster 0.25 statt ueber 0.5.
+
+Im selben Kapitel schaltet T ein Tremolo (`AUDIO_LFO_NEW` auf der
+Lautstaerke des SFX-Busses) ein und aus. Nach `AUDIO_MOD_REMOVE` blieb der
+Bus auf dem letzten Wert des LFO stehen -- gemessen 94 %, bei jedem Lauf
+ein anderer --, und `AUDIO_BUS_GET_VOLUME` meldete dabei 1.0. Das Handbuch
+sagte es so, und das Programm brauchte eine Zeile `AUDIO_BUS_VOLUME("sfx",
+1.0)` nur zum Ausweichen. Jetzt merkt sich `AUDIO_MODULATE` die Bindung
+(`mod_bindungen`), und `AUDIO_MOD_REMOVE` schreibt den festen Wert aus
+`bus_values` ueber die gewoehnlichen Setter zurueck, wie `AUDIO_POP`.
+**Aendert bestehende Programme:** wer sich auf das Stehenbleiben verlassen
+hat, bekommt den festen Wert. `audio_modulators.dhtest` (ein Fall, ein
+Tweener auf dem leisen Ende statt eines LFO, damit es nicht von der Zeit
+abhaengt); Gegenprobe: ohne das Zurueckschreiben bleibt der Pegel bei 0.08.
+
+Kapitel 19 (Ein Bild, das zuhoert) glaettet ein Spektrum ueber die Zeit und
+erklaert, warum man dabei die Uhr fragt und nicht die Bilder zaehlt. Beim
+Messen zeigte sich, dass `AUDIO_FFT` selbst Bilder zaehlt: Jedes Band fiel
+je AUFRUF auf 80 %, die Verstaerkung auf 99,5 %. 50 ms nach einem Ton
+stand ein Band alle 4 ms gefragt bei 0.03, alle 16 ms bei 0.33 -- ein
+Visualisierer fiel auf einem 144-Hz-Schirm gut doppelt so schnell, und
+wer zwei Felder je Bild fuellte, sah sie halb so lange. Jetzt rechnet
+`baender_rechnen` mit der Zeit seit dem letzten Aufruf (`audio::vergangen`,
+fuer `AUDIO_FFT` und `MIC_FFT` je eine eigene Uhr): bei 60 Aufrufen je
+Sekunde wie bisher. Der Fall "derselbe klang zweimal geplant" in
+`audio_planen.dhtest` hatte sich darauf verlassen -- er fragte alle 4 ms
+und erwartete zwischen zwei Toenen eine Summe unter 0.05; nach der Uhr
+bleibt sie bei 0.18, seine Schwellen sind jetzt 1.5 und 0.5. Dazu ein
+Fall, der beide Abfrageraten vergleicht; Gegenprobe: mit Abfall je
+Aufruf faellt genau er. Das Handbuch hatte fuer `AUDIO_FFT` keine Zeile;
+jetzt steht dort, was das Feld enthaelt.
+
+Im selben Kapitel: `DIM sp AS ARRAY OF FLOAT` ist ein leeres Feld, und
+`AUDIO_FFT` fuellt so viele Baender, wie das Feld Plaetze hat -- also still
+keines; das Bild bleibt leer, ohne Meldung. Jetzt melden sich `AUDIO_FFT`,
+`MIC_FFT` und `MIC_WAVE` bei einem Feld ohne Plaetze und zeigen, wie es
+geht (`vm_grafik::leeres_feld`). `modules_audio.dhtest` und
+`mikrofon.dhtest` (je ein Fall, die Pruefung kommt vor Soundkarte und
+Mikrofon); Gegenprobe: ohne die Pruefung fallen beide.

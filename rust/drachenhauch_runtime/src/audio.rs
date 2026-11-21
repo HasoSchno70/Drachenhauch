@@ -571,7 +571,16 @@ fn fft(re: &mut [f32], im: &mut [f32]) {
 /// logarithmisch verteilte Band-Pegel 0..1, mit Nachleuchten (`baender`)
 /// und selbst nachgefuehrter Verstaerkung (`agc`). Eine Rechnung fuer
 /// AUDIO_FFT (der Mischer) und MIC_FFT (das Mikrofon).
-pub(crate) fn baender_rechnen(proben: &[f32], baender: &mut Vec<f32>, agc: &mut f32, out: &mut [f32]) {
+///
+/// `dt` ist die Zeit seit dem letzten Aufruf (`vergangen`): Nachleuchten
+/// und Verstaerkung klingen nach der Uhr ab, wie bisher bei 60 Aufrufen
+/// je Sekunde. Bis 2026.52 klangen sie je AUFRUF ab -- auf einem 144-Hz-
+/// Schirm fiel ein Spektrum gut doppelt so schnell, und wer zweimal je
+/// Bild fragte, sah es halb so lange (Buch "Kleine Wunder", Kapitel 19:
+/// alle 4 ms gefragt 0.03, alle 16 ms 0.33, 50 ms nach dem Ton).
+pub(crate) fn baender_rechnen(proben: &[f32], baender: &mut Vec<f32>, agc: &mut f32, dt: f32,
+                              out: &mut [f32]) {
+    let schritte = (dt * 60.0).clamp(0.0, 60.0);
     let b = out.len();
     if b == 0 || proben.len() < FFT_N { return; }
     if baender.len() != b { *baender = vec![0.0; b]; }
@@ -596,12 +605,22 @@ pub(crate) fn baender_rechnen(proben: &[f32], baender: &mut Vec<f32>, agc: &mut 
         raw[j] = sum / (hi - lo) as f32;
         if raw[j] > framemax { framemax = raw[j]; }
     }
-    *agc = (*agc * 0.995).max(framemax).max(1e-4);
+    *agc = (*agc * 0.995f32.powf(schritte)).max(framemax).max(1e-4);
+    let fall = 0.80f32.powf(schritte);
     for j in 0..b {
         let norm = (raw[j] / *agc).clamp(0.0, 1.0).sqrt();
-        baender[j] = norm.max(baender[j] * 0.80);
+        baender[j] = norm.max(baender[j] * fall);
         out[j] = baender[j];
     }
+}
+
+/// Sekunden seit dem letzten Aufruf mit derselben Uhr (`zuletzt`), und die
+/// Uhr weiterstellen. Der erste Aufruf zaehlt als ein Bild (1/60 s).
+pub(crate) fn vergangen(zuletzt: &mut Option<std::time::Instant>) -> f32 {
+    let jetzt = std::time::Instant::now();
+    let dt = zuletzt.map(|t| jetzt.duration_since(t).as_secs_f32()).unwrap_or(1.0 / 60.0);
+    *zuletzt = Some(jetzt);
+    dt
 }
 
 // --- Hilfs-Konvertierungen ---------------------------------------------
@@ -712,6 +731,13 @@ struct SoundSlot {
     vol: f32,                 // getrackte Lautstaerke (linear 0..1)
     loops: i64,               // verbleibende endliche Wiederholungen (>0); -1 endlos via loop_region; 0 keine
     pan_anim: Option<Pendulum>, // AUTOPAN (per-Frame); SLIDE laeuft als Kira-Tween
+    /// Dieselbe Welle ohne die 5-ms-Blenden -- nur bei AUDIO_TONE und
+    /// AUDIO_NOISE. Endlos gespielt (loops = -1) laeuft diese: Die Blenden
+    /// sind fuer einen einzelnen Ton da, in einer Schleife waeren sie an
+    /// jeder Naht eine Luecke (Buch "Kleine Wunder", Kapitel 18: der
+    /// Theremin flatterte viermal je Sekunde, gemessen -6 dB fuer zwei
+    /// Halbwellen).
+    schleife: Option<StaticSoundData>,
 }
 
 impl SoundSlot {
@@ -878,9 +904,18 @@ pub struct Audio {
     // NICHTS nachrechnen. Gleiches Tombstone-Vec-Pattern wie Clocks (Kira kennt
     // kein remove_modulator(), nur Handle-Drop gibt sie frei).
     mods: Vec<Option<ModSlot>>,
+    /// Welcher Modulator welchen Bus-Parameter faehrt (Modulator, Bus, Ziel).
+    /// AUDIO_MOD_REMOVE schreibt danach den festen Wert aus `bus_values`
+    /// zurueck -- sonst bliebe der Parameter auf dem zufaelligen letzten
+    /// Wert stehen, und AUDIO_BUS_GET_VOLUME meldete etwas anderes, als man
+    /// hoert (Buch "Kleine Wunder", Kapitel 18: Tremolo aus, der Bus blieb
+    /// bei 94 %, die Abfrage sagte 1.0).
+    mod_bindungen: Vec<(usize, String, String)>,
     num_channels: i64,
     bands: Vec<f32>,
     agc: f32,
+    /// Wann AUDIO_FFT zuletzt gefragt wurde (`vergangen`).
+    fft_zuletzt: Option<std::time::Instant>,
     lofi: bool,
     lofi_bits: u32,
     lofi_cutoff: f64,
@@ -925,8 +960,8 @@ impl Audio {
             bus_values: [BusValues::default(); 3], audio_stack: Vec::new(),
             sounds: Vec::new(), samples: Vec::new(),
             sample_cache: HashMap::new(), clocks: Vec::new(),
-            listeners: Vec::new(), emitters: Vec::new(), mods: Vec::new(), num_channels: 16,
-            bands: Vec::new(), agc: 1e-4,
+            listeners: Vec::new(), emitters: Vec::new(), mods: Vec::new(), mod_bindungen: Vec::new(), num_channels: 16,
+            bands: Vec::new(), agc: 1e-4, fft_zuletzt: None,
             lofi: false, lofi_bits: 8, lofi_cutoff: 3300.0,
             music_source: None, music_handle: None, music_vol: 1.0, music_pitch: 1.0,
             music_loops: -1, music_queue: None, music_paused: false,
@@ -936,6 +971,12 @@ impl Audio {
     // ---- intern: Sound aus Float-Buffer bauen + registrieren ----------
 
     fn make_data_mono(&self, buf: &[f64], vol: f64, sr: u32) -> StaticSoundData {
+        self.mono_daten(buf, vol, sr, true)
+    }
+
+    /// Wie `make_data_mono`; `blenden = false` laesst die 5-ms-Flanken weg
+    /// (die Fassung fuer Endlosschleifen, `SoundSlot::schleife`).
+    fn mono_daten(&self, buf: &[f64], vol: f64, sr: u32, blenden: bool) -> StaticSoundData {
         let n = buf.len();
         let vol = vol.clamp(0.0, 1.0);
         let mut work;
@@ -944,7 +985,7 @@ impl Audio {
             lofi_chain(&mut work, sr, self.lofi_bits, self.lofi_cutoff);
             &work
         } else { buf };
-        let fade = ((sr as f64 * 0.005) as usize).min(n / 4);
+        let fade = if blenden { ((sr as f64 * 0.005) as usize).min(n / 4) } else { 0 };
         let frames: Arc<[Frame]> = (0..n).map(|i| {
             let mut e = 1.0;
             if fade > 0 {
@@ -983,7 +1024,7 @@ impl Audio {
     }
 
     fn push_slot(&mut self, data: StaticSoundData, vol: f32) -> i64 {
-        self.sounds.push(SoundSlot { data: Some(data), handle: None, geplant: Vec::new(), start: None, vol, loops: 0, pan_anim: None });
+        self.sounds.push(SoundSlot { data: Some(data), handle: None, geplant: Vec::new(), start: None, vol, loops: 0, pan_anim: None, schleife: None });
         (self.sounds.len() - 1) as i64
     }
 
@@ -1039,6 +1080,7 @@ impl Audio {
         s.weitere_stoppen();
         s.handle = None;
         s.data = None;
+        s.schleife = None;
         s.pan_anim = None;
         self.sample_cache.retain(|_, &mut v| v != idx);
         Ok(())
@@ -1072,9 +1114,7 @@ impl Audio {
         let mut settings = StaticSoundSettings::new();
         if loops < 0 { settings = settings.loop_region(0.0..); }
         settings = settings.volume(if fade_in_ms > 0 { Decibels::SILENCE } else { db(vol) });
-        let data = self.slot(idx, fn_)?.data.as_ref()
-            .ok_or_else(|| format!("{}: Sound {} wurde freigegeben (UNLOADSOUND)", fn_, idx))?
-            .clone().with_settings(settings);
+        let data = self.spieldaten(idx, fn_, loops < 0)?.with_settings(settings);
         let mut handle = self.sfx_track.play(data)   // SFX-Bus
             .map_err(|e| format!("{}: {:?}", fn_, e))?;
         if fade_in_ms > 0 { handle.set_volume(db(vol), tween_ms_eased(fade_in_ms, curve)); }
@@ -1107,9 +1147,7 @@ impl Audio {
             .start_time(ClockTime { clock: clock_id, ticks: ticks as u64, fraction: 0.0 })
             .volume(db(vol));
         if loops < 0 { settings = settings.loop_region(0.0..); }
-        let data = self.slot(idx, "AUDIO_PLAY_AT")?.data.as_ref()
-            .ok_or_else(|| format!("AUDIO_PLAY_AT: Sound {} wurde freigegeben (UNLOADSOUND)", idx))?
-            .clone().with_settings(settings);
+        let data = self.spieldaten(idx, "AUDIO_PLAY_AT", loops < 0)?.with_settings(settings);
         let handle = self.sfx_track.play(data)
             .map_err(|e| format!("AUDIO_PLAY_AT: {:?}", e))?;
         let s = self.slot_mut(idx, "AUDIO_PLAY_AT")?;
@@ -1228,7 +1266,27 @@ schwingt von selbst und faehrt nicht zu einem Ziel".into()),
         let slot = self.mods.get_mut(idx.max(-1) as usize)
             .ok_or("AUDIO_MOD_REMOVE: ungueltiges AUDIO_MOD-Handle")?;
         *slot = None;                  // Drop gibt den Modulator frei
+        // Was er fuhr, bekommt wieder seinen festen Wert.
+        let i = idx as usize;
+        let weg: Vec<(String, String)> = self.mod_bindungen.iter()
+            .filter(|b| b.0 == i).map(|b| (b.1.clone(), b.2.clone())).collect();
+        self.mod_bindungen.retain(|b| b.0 != i);
+        for (bus, ziel) in weg { self.fester_wert(&bus, &ziel)?; }
         Ok(())
+    }
+
+    /// Den festen Wert (`bus_values`) eines Bus-Parameters wieder setzen --
+    /// ueber die gewoehnlichen Setter, wie AUDIO_POP.
+    fn fester_wert(&mut self, bus: &str, ziel: &str) -> Result<(), String> {
+        let w = self.bus_values[Self::bus_idx(bus, "AUDIO_MOD_REMOVE")?];
+        match ziel {
+            "volume" => self.set_bus_volume(bus, w.volume),
+            "pan" => self.bus_pan(bus, w.pan),
+            "filter" | "resonance" => self.set_filter(bus, w.filter_cutoff, w.filter_res),
+            "reverb" => self.set_reverb(bus, w.reverb_mix, w.reverb_fb, w.reverb_damp),
+            "distortion" => self.set_distortion(bus, w.dist_amount, w.dist_mix),
+            _ => Ok(()),
+        }
     }
 
     /// AUDIO_MODULATE(bus$, ziel$, mod, min, max): Bus-Parameter von einem
@@ -1236,6 +1294,26 @@ schwingt von selbst und faehrt nicht zu einem Ziel".into()),
     /// LFO mit Standard-Amplitude) wird auf `min..max` abgebildet.
     pub fn modulate(&mut self, bus: &str, target: &str, m: i64,
                     lo: f64, hi: f64) -> Result<(), String> {
+        self.modulate_binden(bus, target, m, lo, hi)?;
+        let ziel = match target.to_ascii_lowercase().as_str() {
+            "lautstaerke" | "volume" => "volume",
+            "cutoff" | "filter" => "filter",
+            "panning" | "pan" => "pan",
+            t => return self.binden_merken(m, bus, t),
+        }.to_string();
+        self.binden_merken(m, bus, &ziel)
+    }
+
+    /// Die Bindung merken; eine fruehere an denselben Parameter ist abgeloest.
+    fn binden_merken(&mut self, m: i64, bus: &str, ziel: &str) -> Result<(), String> {
+        let bus = bus.to_ascii_lowercase();
+        self.mod_bindungen.retain(|b| !(b.1 == bus && b.2 == ziel));
+        self.mod_bindungen.push((m as usize, bus, ziel.to_string()));
+        Ok(())
+    }
+
+    fn modulate_binden(&mut self, bus: &str, target: &str, m: i64,
+                       lo: f64, hi: f64) -> Result<(), String> {
         let id = self.mods.get(m.max(-1) as usize).and_then(|o| o.as_ref())
             .ok_or("AUDIO_MODULATE: ungueltiges AUDIO_MOD-Handle")?
             .id();
@@ -1458,9 +1536,7 @@ resonance/reverb/distortion", other)),
         let mut settings = StaticSoundSettings::new();
         if loops < 0 { settings = settings.loop_region(0.0..); }
         settings = settings.volume(if fade_in_ms > 0 { Decibels::SILENCE } else { db(vol) });
-        let data = self.slot(idx, "AUDIO_PLAY_ON")?.data.as_ref()
-            .ok_or_else(|| format!("AUDIO_PLAY_ON: Sound {} wurde freigegeben (UNLOADSOUND)", idx))?
-            .clone().with_settings(settings);
+        let data = self.spieldaten(idx, "AUDIO_PLAY_ON", loops < 0)?.with_settings(settings);
         let emitter = self.emitter_slot_mut(emitter_idx, "AUDIO_PLAY_ON")?;
         let mut handle = emitter.play(data).map_err(|e| format!("AUDIO_PLAY_ON: {:?}", e))?;
         if fade_in_ms > 0 { handle.set_volume(db(vol), tween_ms_eased(fade_in_ms, curve)); }
@@ -1482,7 +1558,8 @@ resonance/reverb/distortion", other)),
             let start = (ring.pos + RING - FFT_N) % RING;
             for (i, p) in proben.iter_mut().enumerate() { *p = ring.buf[(start + i) % RING]; }
         }
-        baender_rechnen(&proben, &mut self.bands, &mut self.agc, out);
+        let dt = vergangen(&mut self.fft_zuletzt);
+        baender_rechnen(&proben, &mut self.bands, &mut self.agc, dt, out);
     }
 
     // ================= Lo-Fi =================
@@ -1558,6 +1635,8 @@ resonance/reverb/distortion", other)),
     /// Bus-Einstellungen zurueckholen. `false`, wenn der Stapel leer ist.
     pub fn audio_pop(&mut self) -> Result<bool, String> {
         let Some((werte, sprache)) = self.audio_stack.pop() else { return Ok(false) };
+        // Die Setter loesen jede Modulation ab (siehe unten).
+        self.mod_bindungen.clear();
         // Ueber die normalen Setter zurueckschreiben -- so landet alles auch
         // wirklich bei Kira (und loest nebenbei Modulationen ab).
         for (i, name) in ["sfx", "music", "master"].iter().enumerate() {
@@ -1717,7 +1796,10 @@ resonance/reverb/distortion", other)),
             *b = waveform_value(&wf, freq, i as f64 / sr as f64);
         }
         let data = self.make_data_mono(&buf, volume, sr);
-        Ok(self.push_slot(data, volume.clamp(0.0, 1.0) as f32))
+        let schleife = self.mono_daten(&buf, volume, sr, false);
+        let idx = self.push_slot(data, volume.clamp(0.0, 1.0) as f32);
+        self.sounds[idx as usize].schleife = Some(schleife);
+        Ok(idx)
     }
 
     pub fn noise(&mut self, dur_ms: i64, volume: f64) -> Result<i64, String> {
@@ -1728,7 +1810,19 @@ resonance/reverb/distortion", other)),
         let mut buf = vec![0.0f64; n];
         for b in buf.iter_mut() { *b = rng_uniform(); }
         let data = self.make_data_mono(&buf, volume, sr);
-        Ok(self.push_slot(data, volume.clamp(0.0, 1.0) as f32))
+        let schleife = self.mono_daten(&buf, volume, sr, false);
+        let idx = self.push_slot(data, volume.clamp(0.0, 1.0) as f32);
+        self.sounds[idx as usize].schleife = Some(schleife);
+        Ok(idx)
+    }
+
+    /// Die Daten eines Slots zum Abspielen: endlos die ohne Blenden, wo es
+    /// sie gibt (`SoundSlot::schleife`), sonst die gewoehnlichen.
+    fn spieldaten(&self, idx: i64, fn_: &str, endlos: bool) -> Result<StaticSoundData, String> {
+        let s = self.slot(idx, fn_)?;
+        let data = s.data.as_ref()
+            .ok_or_else(|| format!("{}: Sound {} wurde freigegeben (UNLOADSOUND)", fn_, idx))?;
+        Ok(if endlos { s.schleife.as_ref().unwrap_or(data) } else { data }.clone())
     }
 
     /// AUDIO_NOTE -- eine MUSIKALISCHE Note, kein Effekt.

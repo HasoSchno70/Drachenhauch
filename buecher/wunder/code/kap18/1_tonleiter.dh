@@ -1,0 +1,14 @@
+' Kapitel 18, Schritt 1 -- eine Tonleiter aus Zahlen: Jeder Halbton ist
+' das 2^(1/12)-fache des vorigen, und nach zwoelf Halbtoenen hat sich
+' die Frequenz verdoppelt -- eine Oktave.
+IMPORT "audio"
+DIM namen AS ARRAY OF STRING
+namen = ["A", "B", "H", "C", "Cis", "D", "Dis", "E", "F", "Fis", "G", _
+         "Gis", "A"]
+DIM n AS INTEGER
+FOR n = 0 TO 12
+    DIM f AS FLOAT : f = 220 * 2 ^ (n / 12)
+    PRINT LEFT$(namen[n] + "    ", 4); FORMAT$(f, "%6.1f"); " Hz"
+    AUDIO_PLAY(AUDIO_NOTE("triangle", f, 250, 5, 0, 1, 60, 0.5))
+    SLEEP(300)
+NEXT

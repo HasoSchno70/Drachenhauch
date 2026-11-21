@@ -573,7 +573,7 @@ impl Parser {
         let mut targets = vec![self.tuple_assign_target()?];
         while self.matches(Tt::Comma) { targets.push(self.tuple_assign_target()?); }
         if targets.len() < 2 {
-            return self.err("Tupel-Destructuring erwartet mindestens 2 Ziele");
+            return self.err("Tupel entpacken braucht links mindestens 2 Namen");
         }
         self.expect(Tt::Rparen, "")?;
         self.expect(Tt::Eq, "Erwartet '=' nach Tupel-Zielen")?;
