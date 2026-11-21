@@ -67,7 +67,7 @@ module.exports = (H) => [
 
   H.code(["zahlen: 11405483 Schritte in 0.03 s"], { out: true }),
 
-  H.p("Drei hundertstel Sekunden. Startet man dasselbe Programm mit der Umgebungsvariablen DHRT_JIT=aus, braucht es 1,8 Sekunden — sechzigmal so lange. Der Unterschied ist der Maschinencode. Normalerweise führt Drachenhauch ein Programm in seiner eigenen kleinen Maschine aus, der VM: Sie liest Befehl für Befehl und tut, was er sagt. Merkt dhrt, dass eine Schleife oder eine Funktion oft läuft, übersetzt es sie in Befehle für den Prozessor selbst — Maschinencode —, und von da an rechnet der Prozessor ohne den Umweg. Eingeschaltet ist das immer; DHRT_JIT=aus ist nur zum Vergleichen da."),
+  H.p("Drei hundertstel Sekunden. Startet man dasselbe Programm mit der Umgebungsvariablen DHRT_JIT=aus, braucht es 1,7 Sekunden — fast sechzigmal so lange. Der Unterschied ist der Maschinencode. Normalerweise führt Drachenhauch ein Programm in seiner eigenen kleinen Maschine aus, der VM: Sie liest Befehl für Befehl und tut, was er sagt. Merkt dhrt, dass eine Schleife oder eine Funktion oft läuft, übersetzt es sie in Befehle für den Prozessor selbst — Maschinencode —, und von da an rechnet der Prozessor ohne den Umweg. Eingeschaltet ist das immer; DHRT_JIT=aus ist nur zum Vergleichen da."),
 
   H.p("Welche Funktionen übersetzt werden und warum andere nicht, sagt dhrt auf Nachfrage:"),
 
@@ -81,7 +81,7 @@ module.exports = (H) => [
 
   H.code(stueck("kap13/3_messen.dh", "FUNCTION mitVec2", "END FUNCTION")),
 
-  H.p("Sie ist hübscher zu lesen und liefert genau dieselben elf Millionen Schritte — aber sie braucht ohne Maschinencode 3,9 Sekunden und mit Maschinencode sogar 7,7. Der Maschinencode übersetzt die Schleife, kann die VEC2-Rechnung darin aber nicht selbst ausführen, gibt bei jedem Schritt an die VM ab und steigt danach wieder ein — das Hin und Her kostet mehr, als es spart. (Gefunden beim Schreiben dieses Kapitels und als Aufgabe für dhrt notiert; vielleicht ist der Unterschied kleiner, wenn du das liest.) Die Regel bleibt: In die innerste Schleife eines Programms, das Millionen Schritte rechnet, gehören nur Zahlen."),
+  H.p("Sie ist hübscher zu lesen und liefert genau dieselben elf Millionen Schritte — aber sie braucht 3,5 Sekunden, mit Maschinencode wie ohne, mehr als hundertmal so lange wie die Rechnung mit Zahlen. Die VEC2-Rechnung läuft in der VM. Als dieses Kapitel entstand, war es noch schlimmer: Mit Maschinencode dauerte sie 7,7 Sekunden, doppelt so lange wie ohne. Der Maschinencode übersetzte die Schleife, konnte die VEC2-Rechnung darin aber nicht selbst ausführen, gab bei jedem Schritt an die VM ab und stieg danach wieder ein — das Hin und Her kostete mehr, als es sparte. Seitdem merkt dhrt nach wenigen Runden, dass eine Schleife jedes Mal aussteigt, und lässt sie in der VM. Mit DHRT_JIT_BILANZ=1 sagt es auch, welche: „Schleife an Stelle 6 in mitvec2 bleibt in der VM“. Die Regel bleibt: In die innerste Schleife eines Programms, das Millionen Schritte rechnet, gehören nur Zahlen."),
 
   H.p("Ob die Rechnung in einer eigenen Funktion steht oder mitten im Hauptprogramm, ist für den Maschinencode übrigens gleich — beides gemessen 0,03 Sekunden. Die Funktion steht da, weil sie einen Namen hat und an einer Stelle steht: Die Zoom-Fassung ändert die Rechnung nur in flucht."),
 
