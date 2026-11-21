@@ -1,0 +1,63 @@
+' Kapitel 26 -- die Musik der Demo, eingebunden als Namensraum musik:
+' acht Takte, die sich wiederholen. Trommel und Zischen halten den Takt,
+' ein weicher Klangteppich traegt die Akkorde, darueber eine Melodie.
+IMPORT "audio"
+
+' Ein Schlag dauert 600 ms -- hundert Schlaege je Minute.
+CONST SCHLAG = 600
+CONST TAKTE = 8
+
+' Die Frequenz eines Tons, gezaehlt in Halbtoenen ueber dem A (440 Hz).
+PRIVATE FUNCTION ton(halbtoene AS INTEGER) AS FLOAT
+    RETURN 440 * 2 ^ (halbtoene / 12)
+END FUNCTION
+
+' Wie lang das Stueck ist, in Sekunden -- fuer die Szenen nebenan.
+FUNCTION dauer() AS FLOAT
+    RETURN TAKTE * 4 * SCHLAG / 1000
+END FUNCTION
+
+FUNCTION stueck() AS SOUND
+    DIM s AS SOUND : s = AUDIO_SOUND_NEW(TAKTE * 4 * SCHLAG)
+    DIM trommel AS SOUND
+    trommel = AUDIO_NOTE("sine", 110, 40, 1, 140, 0, 60, 1, _
+                         0, 0, 0, -24)
+    DIM zisch AS SOUND
+    zisch = AUDIO_NOTE("noise", 1, 10, 1, 30, 0, 20, 0.2)
+    ' Je Takt ein Akkord: a-Moll, F, C, G -- als Halbtoene unter dem A.
+    DIM grund AS ARRAY OF INTEGER : grund = [-12, -16, -9, -14]
+    ' Die Melodie, je Schlag ein Ton ueber dem A; -99 ist eine Pause.
+    DIM lied AS ARRAY OF INTEGER
+    lied = [0, 3, 7, 5, 3, -99, 0, -2, _
+            -4, -99, 0, 3, 5, 3, -2, -99, _
+            3, 7, 10, 8, 7, -99, 3, 5, _
+            7, 5, 3, 0, -2, -99, -99, -99]
+    DIM t AS INTEGER
+    FOR t = 0 TO TAKTE - 1
+        DIM beginn AS INTEGER : beginn = t * 4 * SCHLAG
+        ' Der Klangteppich: Grundton und Quinte, einen ganzen Takt lang.
+        DIM g AS INTEGER : g = grund[t MOD 4]
+        DIM teppich AS SOUND
+        teppich = AUDIO_NOTE("triangle", ton(g), 4 * SCHLAG, 300, 400, _
+                             0.6, 600, 0.15)
+        AUDIO_SOUND_MIX(s, teppich, beginn)
+        DIM quinte AS SOUND
+        quinte = AUDIO_NOTE("triangle", ton(g + 7), 4 * SCHLAG, 300, _
+                            400, 0.6, 600, 0.1)
+        AUDIO_SOUND_MIX(s, quinte, beginn)
+        DIM k AS INTEGER
+        FOR k = 0 TO 3
+            DIM jetzt AS INTEGER : jetzt = beginn + k * SCHLAG
+            IF k MOD 2 = 0 THEN AUDIO_SOUND_MIX(s, trommel, jetzt, 0.5)
+            AUDIO_SOUND_MIX(s, zisch, jetzt + SCHLAG \ 2, 0.3)
+            DIM m AS INTEGER : m = lied[(t * 4 + k) MOD LEN(lied)]
+            IF m > -99 THEN
+                DIM note AS SOUND
+                note = AUDIO_NOTE("sine", ton(m), SCHLAG, 10, 200, _
+                                  0.5, 250, 0.25, 0.004, 5)
+                AUDIO_SOUND_MIX(s, note, jetzt)
+            END IF
+        NEXT
+    NEXT
+    RETURN s
+END FUNCTION

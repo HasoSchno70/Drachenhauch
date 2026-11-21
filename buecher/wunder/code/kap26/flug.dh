@@ -1,0 +1,106 @@
+' Kapitel 26 -- die zweite Szene, eingebunden als Namensraum flug: ein
+' Flug ueber eine Abendlandschaft wie in Kapitel 25, aber ohne Steuer --
+' die Kamera zieht von selbst einen grossen Bogen.
+IMPORT "g3d"
+IMPORT "m3d"
+IMPORT "imgfx"
+
+CONST N = 96
+CONST WELT = 300
+CONST BERGE = 50
+CONST DUNST = &HD88A6A
+CONST HIMMEL = &H3A3468
+
+DIM hoehe[0 TO N - 1, 0 TO N - 1] AS FLOAT
+DIM land AS INTEGER
+DIM krone AS INTEGER
+DIM kronen AS ARRAY OF MAT4
+DIM sonne AS INTEGER
+
+' Wie hoch der Boden an einer Stelle der Welt ist (wie in Kapitel 25).
+PRIVATE FUNCTION boden(wx AS FLOAT, wz AS FLOAT) AS FLOAT
+    DIM fx AS FLOAT : fx = CLAMP(wx / WELT * (N - 1), 0, N - 1.001)
+    DIM fz AS FLOAT : fz = CLAMP(wz / WELT * (N - 1), 0, N - 1.001)
+    DIM ix AS INTEGER : ix = INT(fx)
+    DIM iz AS INTEGER : iz = INT(fz)
+    DIM a AS FLOAT : a = LERP(hoehe[ix, iz], hoehe[ix + 1, iz], fx - ix)
+    DIM b AS FLOAT
+    b = LERP(hoehe[ix, iz + 1], hoehe[ix + 1, iz + 1], fx - ix)
+    RETURN LERP(a, b, fz - iz) * BERGE
+END FUNCTION
+
+' Einmal vor dem ersten Bild: Gelaende, Wald, Himmel und Abendlicht.
+SUB vorbereiten()
+    DIM grau AS IMAGE : grau = IMAGE_NEW(N, N)
+    DIM bunt AS IMAGE : bunt = IMAGE_NEW(N, N)
+    DIM x AS INTEGER
+    DIM z AS INTEGER
+    FOR z = 0 TO N - 1
+        FOR x = 0 TO N - 1
+            DIM r AS FLOAT : r = FBM(x * 0.03 + 11, z * 0.03 + 5, 5)
+            DIM h AS FLOAT : h = CLAMP((r + 0.3) / 0.62, 0, 1) ^ 2
+            hoehe[x, z] = h
+            DIM g AS INTEGER : g = INT(h * 255)
+            IMAGE_DRAW_RECT(grau, x, z, 1, 1, RGB(g, g, g))
+            IMAGE_DRAW_RECT(bunt, x, z, 1, 1, _
+                            COLOR_LERP(&H4A7A3A, &HB0A090, h * 1.6))
+        NEXT
+    NEXT
+    land = MESH_HEIGHTMAP(grau, WELT, BERGE, WELT)
+    MODEL_TEXTURE(land, bunt)
+    krone = MESH_CONE(1.2, 3.5, 8)
+    WHILE LEN(kronen) < 900
+        DIM bx AS FLOAT : bx = RND() * WELT
+        DIM bz AS FLOAT : bz = RND() * WELT
+        DIM by AS FLOAT : by = boden(bx, bz)
+        IF by > 0.05 * BERGE AND by < 0.35 * BERGE THEN
+            ARRAY_PUSH(kronen, MAT4_TRANSLATE(bx, by, bz))
+        END IF
+    WEND
+    ' Der Himmel: oben dunkelviolett, zum Horizont glutrot.
+    DIM bild AS IMAGE : bild = IMAGE_NEW(6 * 32, 32)
+    DIM seite AS INTEGER
+    FOR seite = 0 TO 5
+        DIM l AS INTEGER : l = seite * 32
+        IF seite = 2 THEN
+            IMAGE_FILL_RECT(bild, l, 0, l + 31, 31, HIMMEL)
+        ELSEIF seite = 3 THEN
+            IMAGE_FILL_RECT(bild, l, 0, l + 31, 31, DUNST)
+        ELSE
+            IMAGE_GRADIENT(bild, l, 0, l + 31, 31, HIMMEL, DUNST)
+        END IF
+    NEXT
+    SKYBOX_IMAGE(bild)
+    SKYBOX(FALSE)
+    LIGHT_ENABLE()
+    LIGHT_AMBIENT(DUNST, 0.15)
+    sonne = LIGHT_DIRECTIONAL(-1, -0.3, -0.2, &HFFA070)
+    LIGHT_FOG(DUNST, 0.006)
+    MODEL_LIT(land)
+    MODEL_LIT(krone)
+END SUB
+
+' Ein Bild der Szene; t sind die Sekunden seit ihrem Anfang.
+SUB zeichnen(t AS FLOAT)
+    SKYBOX(TRUE)
+    CLS(DUNST)
+    ' Ein grosser Bogen um die Mitte der Welt, hoch ueber den Gipfeln,
+    ' den Blick voraus und ein wenig nach unten.
+    DIM w AS FLOAT : w = t * 0.12
+    DIM px AS FLOAT : px = WELT / 2 + COS(w) * 100
+    DIM pz AS FLOAT : pz = WELT / 2 + SIN(w) * 100
+    DIM py AS FLOAT : py = MAX(boden(px, pz), BERGE) + 12
+    CAMERA3D(px, py, pz, px - SIN(w) * 30, py - 12, pz + COS(w) * 30, _
+             60)
+    MODEL(land, 0, 0, 0, 1.0, RGB(255, 255, 255))
+    MODEL_INSTANCED(krone, kronen, RGB(40, 80, 50))
+END SUB
+
+' Nach der Szene: Was sie eingeschaltet hat, schaltet sie wieder aus --
+' den Himmel, ihre Sonne und den Dunst. Die naechste Szene faengt sonst
+' im Abendlicht an.
+SUB beenden()
+    SKYBOX(FALSE)
+    LIGHT_SET_ENABLED(sonne, FALSE)
+    LIGHT_FOG(DUNST, 0)
+END SUB

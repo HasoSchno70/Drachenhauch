@@ -1,0 +1,59 @@
+' Kapitel 26 -- die erste Szene, eingebunden als Namensraum titel: ein
+' Sternenhimmel, aus dem Funken aufsteigen, und ein Titel, der langsam
+' hell wird. Alles, was die Szene braucht, steht in dieser Datei.
+
+CONST BREITE = 800
+CONST HOEHE = 500
+CONST FUNKEN = 160
+
+' Sterne und Funken -- die Felder gehoeren der Szene, nicht der Demo.
+DIM sx AS ARRAY OF FLOAT
+DIM sy AS ARRAY OF FLOAT
+DIM fx[FUNKEN] AS FLOAT
+DIM fy[FUNKEN] AS FLOAT
+DIM fv[FUNKEN] AS FLOAT
+DIM fh[FUNKEN] AS FLOAT
+
+' Einmal vor dem ersten Bild: Sterne verteilen, Funken irgendwo unten.
+SUB vorbereiten()
+    DIM i AS INTEGER
+    FOR i = 1 TO 200
+        ARRAY_PUSH(sx, RND() * BREITE)
+        ARRAY_PUSH(sy, RND() * HOEHE)
+    NEXT
+    FOR i = 0 TO FUNKEN - 1
+        fx[i] = RND() * BREITE
+        fy[i] = HOEHE + RND() * HOEHE
+        fv[i] = 40 + RND() * 80
+        fh[i] = 15 + RND() * 30
+    NEXT
+END SUB
+
+' Ein Bild der Szene; t sind die Sekunden seit ihrem Anfang.
+SUB zeichnen(t AS FLOAT)
+    CLS(RGB(6, 6, 18))
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(sx) - 1
+        ' Jeder Stern funkelt in seinem eigenen Takt.
+        DIM hell AS FLOAT : hell = 0.5 + 0.5 * SIN(t * 2 + i)
+        PLOT(sx[i], sy[i], RGBA(255, 255, 255, 60 + hell * 140))
+    NEXT
+    ' Die Funken steigen, schwanken und fangen unten neu an.
+    FOR i = 0 TO FUNKEN - 1
+        fy[i] = fy[i] - fv[i] * DELTA()
+        IF fy[i] < -10 THEN fy[i] = HOEHE + 10
+        DIM x AS FLOAT : x = fx[i] + SIN(t + i) * 12
+        CIRCLE(x, fy[i], 2, HSV(fh[i], 0.9, 1))
+    NEXT
+    ' Der Titel kommt in vier Sekunden aus dem Dunkel.
+    DIM a AS INTEGER : a = INT(CLAMP(t / 4, 0, 1) * 255)
+    TEXT_SIZE(64)
+    DIM titel AS STRING : titel = "Kleine Wunder"
+    TEXT((BREITE - TEXT_WIDTH(titel)) / 2, 180, titel, _
+         RGBA(255, 200, 120, a))
+    TEXT_SIZE(22)
+    DIM unter AS STRING : unter = "eine Demo in Drachenhauch"
+    TEXT((BREITE - TEXT_WIDTH(unter)) / 2, 270, unter, _
+         RGBA(255, 255, 255, a * 0.7))
+    TEXT_SIZE(16)
+END SUB

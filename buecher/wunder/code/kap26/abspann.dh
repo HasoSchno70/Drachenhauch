@@ -1,0 +1,41 @@
+' Kapitel 26 -- die letzte Szene, eingebunden als Namensraum abspann:
+' Zeilen, die langsam nach oben ziehen, wie am Ende eines Films.
+
+CONST BREITE = 800
+CONST HOEHE = 500
+
+DIM zeilen AS ARRAY OF STRING
+
+SUB vorbereiten()
+    zeilen = ["Kleine Wunder", "", "Musik", "AUDIO_NOTE, acht Takte", _
+              "", _
+              "Funken und Sterne", "zwei Felder und ein SIN", "", _
+              "Berge", "FBM und MESH_HEIGHTMAP", "", _
+              "Wald", "900 Baeume, ein MODEL_INSTANCED", "", _
+              "Gluehen", "ein Shader aus Kapitel 15", "", "", _
+              "Programmiert von dir.", "", "Danke fuers Zuschauen!"]
+END SUB
+
+' Ein Bild der Szene; t sind die Sekunden seit ihrem Anfang.
+SUB zeichnen(t AS FLOAT)
+    CLS(RGB(8, 8, 16))
+    TEXT_SIZE(24)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(zeilen) - 1
+        ' Jede Zeile 36 Punkte unter der vorigen, alles 40 Punkte je
+        ' Sekunde nach oben.
+        DIM y AS FLOAT : y = HOEHE + i * 36 - t * 40
+        IF y > -40 AND y < HOEHE THEN
+            ' Ueberschriften warm, die Zeilen darunter blass.
+            DIM farbe AS INTEGER : farbe = RGBA(255, 255, 255, 170)
+            IF i = 0 THEN
+                farbe = RGB(255, 200, 120)
+            ELSEIF zeilen[i - 1] = "" THEN
+                farbe = RGB(255, 200, 120)
+            END IF
+            DIM x AS FLOAT : x = (BREITE - TEXT_WIDTH(zeilen[i])) / 2
+            TEXT(x, y, zeilen[i], farbe)
+        END IF
+    NEXT
+    TEXT_SIZE(16)
+END SUB

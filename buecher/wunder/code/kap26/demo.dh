@@ -1,0 +1,60 @@
+' Kapitel 26 -- das grosse Finale: eine Demo in drei Szenen, mit Musik
+' und einem Leuchten ueber allem. Dieses Programm ist nur der Taktgeber;
+' was in den Szenen geschieht, steht in je einer eigenen Datei. Die
+' Leertaste springt zur naechsten Szene, ESC beendet.
+IMPORT "audio"
+IMPORT "musik.dh" AS musik
+IMPORT "titel.dh" AS titel
+IMPORT "flug.dh" AS flug
+IMPORT "abspann.dh" AS abspann
+
+CONST BREITE = 800
+CONST HOEHE = 500
+' Wie lange jede Szene dauert, und wie lange es dazwischen dunkel wird.
+CONST BLENDE = 1.0
+DIM dauer AS ARRAY OF FLOAT : dauer = [9.6, 19.2, 16]
+
+SCREEN(BREITE, HOEHE, "Kleine Wunder -- die Demo")
+RANDOMIZE(26)
+titel.vorbereiten()
+flug.vorbereiten()
+abspann.vorbereiten()
+
+' Das Leuchten aus Kapitel 15, ueber jedes Bild gelegt.
+DIM glanz AS INTEGER : glanz = SHADER_LOAD("assets/glanz.fs")
+SHADER_SET2(glanz, "groesse", BREITE, HOEHE)
+SHADER_SET(glanz, "staerke", 1.2)
+POSTFX(glanz)
+
+DIM kanal AS AUDIO_CHANNEL : kanal = AUDIO_PLAY(musik.stueck(), -1)
+DIM szene AS INTEGER
+DIM zeit AS FLOAT
+
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE) _
+      AND szene < LEN(dauer)
+    zeit = zeit + DELTA()
+    IF KEY_HIT(KEY_SPACE) THEN zeit = dauer[szene]
+    ' Ist die Szene vorbei, kommt die naechste.
+    IF zeit >= dauer[szene] THEN
+        IF szene = 1 THEN flug.beenden()
+        szene = szene + 1
+        zeit = 0
+        ' Ueber der Landschaft leuchtet es weniger, sonst blendet es.
+        SHADER_SET(glanz, "staerke", IIF(szene = 1, 0.4, 1.2))
+        IF szene = 2 THEN AUDIO_STOP(kanal, INT(dauer[2] * 1000))
+        IF szene = LEN(dauer) THEN EXIT WHILE
+    END IF
+
+    SELECT CASE szene
+        CASE 0 : titel.zeichnen(zeit)
+        CASE 1 : flug.zeichnen(zeit)
+        CASE 2 : abspann.zeichnen(zeit)
+    END SELECT
+
+    ' Die Blende: am Anfang und am Ende jeder Szene ein Schwarz, das
+    ' kommt und geht.
+    DIM rest AS FLOAT : rest = MIN(zeit, dauer[szene] - zeit)
+    DIM dunkel AS FLOAT : dunkel = CLAMP(1 - rest / BLENDE, 0, 1)
+    BOX(0, 0, BREITE, HOEHE, RGBA(0, 0, 0, INT(dunkel * 255)))
+    FLIP()
+WEND

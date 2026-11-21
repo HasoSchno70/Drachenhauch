@@ -1,0 +1,3 @@
+' Bild fuer Kapitel 26, Erfinden (Loesung kap26_vier).
+CHDIR("../../code/loesungen")
+IMPORT "../../code/loesungen/kap26_vier.dh"
