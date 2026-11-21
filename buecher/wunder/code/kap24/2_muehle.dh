@@ -1,0 +1,107 @@
+' Kapitel 24 -- eine Windmuehle auf einer Wiese, mit Sonne, Schatten und
+' Dunst in der Ferne. Die Fluegel haengen an der Nabe, die Nabe an der
+' Muehle: jedes Teil hat eine Matrix, die auf der seines Traegers
+' aufbaut. Mit gedrueckter Maustaste dreht man die Kamera um die Szene,
+' das Mausrad holt sie naeher.
+IMPORT "g3d"
+IMPORT "m3d"
+CONST BREITE = 800
+CONST HOEHE = 500
+
+SCREEN(BREITE, HOEHE, "Die Windmuehle")
+RANDOMIZE(24)
+
+' Die Teile, je einmal gebaut und dann beliebig oft gezeichnet.
+DIM boden AS INTEGER : boden = MESH_PLANE(160, 160, 1, 1)
+DIM turm AS INTEGER : turm = MESH_CYLINDER(1.3, 5, 24)
+DIM dach AS INTEGER : dach = MESH_CONE(1.6, 1.6, 24)
+DIM nabe AS INTEGER : nabe = MESH_SPHERE(0.3, 12, 16)
+DIM fluegel AS INTEGER : fluegel = MESH_CUBE(0.5, 3.4, 0.08)
+DIM haus AS INTEGER : haus = MESH_CUBE(2, 1.6, 1.6)
+DIM giebel AS INTEGER : giebel = MESH_CONE(1.5, 1.1, 4)
+DIM stamm AS INTEGER : stamm = MESH_CYLINDER(0.15, 0.8, 8)
+DIM krone AS INTEGER : krone = MESH_CONE(0.8, 2.2, 10)
+
+' Licht: eine Sonne von schraeg oben, ein wenig Grundhelligkeit, Dunst.
+LIGHT_ENABLE()
+LIGHT_AMBIENT(RGB(120, 140, 170), 0.35)
+DIM sonne AS INTEGER
+sonne = LIGHT_DIRECTIONAL(-0.6, -1, -0.4, RGB(255, 240, 215))
+LIGHT_FOG(RGB(185, 210, 235), 0.02)
+SHADOW_ENABLE(2048)
+SHADOW_AREA(30, 40)
+SHADOW_TARGET(0, 0, 0)
+DIM m AS INTEGER
+FOR EACH m IN [boden, turm, dach, nabe, fluegel, haus, giebel, stamm, _
+               krone]
+    MODEL_LIT(m)
+NEXT
+
+' Wo die Baeume stehen: zufaellig, aber nicht auf der Muehle und nicht
+' in den Haeusern (bei -7, 3 und 6, -5).
+DIM baumX AS ARRAY OF FLOAT
+DIM baumZ AS ARRAY OF FLOAT
+WHILE LEN(baumX) < 24
+    DIM bx AS FLOAT : bx = RND() * 40 - 20
+    DIM bz AS FLOAT : bz = RND() * 40 - 20
+    IF SQR(bx * bx + bz * bz) > 5 AND ABS(bx + 7) + ABS(bz - 3) > 3 _
+       AND ABS(bx - 6) + ABS(bz + 5) > 3 THEN
+        ARRAY_PUSH(baumX, bx)
+        ARRAY_PUSH(baumZ, bz)
+    END IF
+WEND
+
+' Die Kamera: ein Winkel um die Muehle, eine Hoehe und ein Abstand.
+DIM winkel AS FLOAT : winkel = 0.7
+DIM hoch AS FLOAT : hoch = 5
+DIM abstand AS FLOAT : abstand = 16
+DIM drehung AS FLOAT
+
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
+    IF MOUSE_DOWN(0) THEN
+        winkel = winkel - MOUSE_DELTA_X() * 0.01
+        hoch = CLAMP(hoch + MOUSE_DELTA_Y() * 0.05, 1, 15)
+    END IF
+    abstand = CLAMP(abstand - MOUSE_WHEEL() * 1.5, 6, 30)
+    drehung = drehung + DELTA() * 0.8
+
+    CLS(RGB(185, 210, 235))
+    CAMERA3D(COS(winkel) * abstand, hoch, SIN(winkel) * abstand, _
+             0, 2.5, 0, 45)
+
+    MODEL(boden, 0, 0, 0, 1.0, RGB(110, 170, 80))
+    MODEL(turm, 0, 0, 0, 1.0, RGB(235, 225, 205))
+    MODEL(dach, 0, 5, 0, 1.0, RGB(150, 70, 50))
+
+    ' Die Nabe sitzt vorn am Dach und dreht sich um ihre Achse.
+    DIM anNabe AS MAT4
+    anNabe = MAT4_MUL(MAT4_TRANSLATE(0, 5.2, 1.5), _
+                      MAT4_ROTATE_Z(drehung))
+    MODEL_MATRIX(nabe, anNabe, RGB(90, 70, 60))
+    ' Jeder Fluegel: erst nach aussen geschoben, dann um k Viertel um
+    ' die Nabe gedreht (MAT4_MUL wendet die rechte Matrix zuerst an) --
+    ' und das alles in der Lage der Nabe.
+    DIM k AS INTEGER
+    FOR k = 0 TO 3
+        DIM f AS MAT4
+        f = MAT4_MUL(anNabe, MAT4_MUL(MAT4_ROTATE_Z(k * PI / 2), _
+                                      MAT4_TRANSLATE(0, 1.9, 0.15)))
+        MODEL_MATRIX(fluegel, f, RGB(245, 240, 230))
+    NEXT
+
+    ' Zwei Haeuser -- ein Quader steht um seine Mitte, also halb so hoch
+    ' ueber dem Boden, wie er hoch ist -- und die Baeume.
+    MODEL(haus, -7, 0.8, 3, 1.0, RGB(230, 200, 160))
+    MODEL_EX(giebel, -7, 1.6, 3, 0, 1, 0, 45, 1.0, RGB(170, 60, 50))
+    MODEL(haus, 6, 0.8, -5, 1.0, RGB(220, 215, 200))
+    MODEL_EX(giebel, 6, 1.6, -5, 0, 1, 0, 45, 1.0, RGB(90, 90, 110))
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(baumX) - 1
+        MODEL(stamm, baumX[i], 0, baumZ[i], 1.0, RGB(100, 70, 40))
+        MODEL(krone, baumX[i], 0.6, baumZ[i], 1.0, RGB(50, 120, 60))
+    NEXT
+
+    TEXT(12, 12, "Maus ziehen: drehen   Mausrad: naeher", _
+         RGBA(0, 0, 0, 140))
+    FLIP()
+WEND

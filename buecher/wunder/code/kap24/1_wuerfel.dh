@@ -1,0 +1,18 @@
+' Kapitel 24, Schritt 1 -- der erste Wuerfel: eine Kamera, die um den
+' Ursprung kreist, ein Raster auf dem Boden, ein Wuerfel und eine Kugel.
+IMPORT "g3d"
+SCREEN(800, 500, "Der erste Wuerfel")
+
+DIM t AS FLOAT
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
+    t = t + DELTA() * 0.5
+    CLS(RGB(20, 22, 32))
+    ' Wo die Kamera steht, wohin sie blickt, wie weit sie sieht (Grad).
+    CAMERA3D(COS(t) * 8, 4, SIN(t) * 8, 0, 0.5, 0, 45)
+    GRID3D(20, 1)
+    CUBE(0, 0.5, 0, 1, 1, 1, RGB(230, 90, 110))
+    SPHERE(2, 0.5, 0, 0.5, RGB(60, 160, 255))
+    CUBE_WIRES(-2, 1, 0, 1, 2, 1, RGB(255, 220, 120))
+    TEXT(12, 12, "2D liegt immer obenauf", RGBA(255, 255, 255, 160))
+    FLIP()
+WEND

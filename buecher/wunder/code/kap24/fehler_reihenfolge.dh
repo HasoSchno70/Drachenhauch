@@ -1,0 +1,20 @@
+' Kapitel 24, was schiefgehen kann: die Matrizen in der falschen
+' Reihenfolge. MAT4_MUL wendet zuerst die rechte an -- hier wird also
+' erst gedreht, dann geschoben, und jeder Fluegel dreht sich um seine
+' eigene Mitte statt um die Nabe.
+IMPORT "g3d"
+IMPORT "m3d"
+SCREEN(800, 500, "Reihenfolge")
+DIM fluegel AS INTEGER : fluegel = MESH_CUBE(0.5, 3.4, 0.08)
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
+    CLS(RGB(185, 210, 235))
+    CAMERA3D(0, 0, 12, 0, 0, 0, 45)
+    DIM k AS INTEGER
+    FOR k = 0 TO 3
+        DIM f AS MAT4
+        f = MAT4_MUL(MAT4_TRANSLATE(0, 1.9, 0), _
+                     MAT4_ROTATE_Z(k * PI / 2))
+        MODEL_MATRIX(fluegel, f, RGB(120, 90, 70))
+    NEXT
+    FLIP()
+WEND

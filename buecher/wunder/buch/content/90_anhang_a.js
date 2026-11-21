@@ -955,4 +955,46 @@ module.exports = (H) => [
   H.pmix([["nachsehen", true], " merkt sich je Datei, wie sie zuletzt aussah — Änderungszeit und Größe als ein Text. Nur was neu ist oder sich geändert hat, wird geladen; ein geändertes Bild ersetzt sein altes an derselben Stelle. Die Probleme stehen jetzt in einer MAP je Datei: Lässt sich eine Datei später laden, nimmt ", ["MAP_REMOVE", true], " ihr Problem wieder weg. ", ["bild_laden", true], " zeigt den eigenen Fehler: LOADIMAGE lädt ein Bild von 32 Punkten Breite klaglos, aber für die Diaschau ist es zu klein, also wirft bild_laden selbst, mit dem Code KLEIN. Ausprobiert, während die Diaschau lief: Ein neues Bild im Ordner war nach zwei Sekunden da, leer.png mit einem echten Bild überschrieben verschwand aus den Problemen, und ein Bild von 32 Punkten erschien als „bilder/klein.png: nur 32 Punkte breit“."]),
 
   H.p("Dabei fiel ein Fehler in Drachenhauch auf: LOADIMAGE merkt sich jedes Bild nach seinem Pfad, damit ein Programm, das es in jedem Bild lädt, nicht jedes Mal die Festplatte fragt. Wurde die Datei aber neu geschrieben, kam still das alte Bild zurück. Jetzt merkt sich LOADIMAGE auch, wie groß und wie alt die Datei war, und lädt sie neu, wenn sich das geändert hat."),
+
+  H.h2("Kapitel 24 · Würfel, Licht und Schatten"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Die Kamera sieht doppelt so weit nach oben und unten: Alles rückt weg und wird kleiner, die Mühle steht klein in der Mitte, und man sieht viel mehr Wiese und Himmel. Am Rand wird es verzerrt — eine Tanne unten rechts ist breit und schief gezogen. So sieht ein Weitwinkel aus. Kleinere Zahlen wirken wie ein Fernrohr: Alles rückt heran, und der Raum wirkt flacher."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Dichter Nebel: Die Häuser sind nur noch als blasse Umrisse da, die hinteren Bäume ganz verschwunden, und selbst die Mühle wird bläulich. Je größer die Zahl, desto näher beginnt der Dunst. Mit sehr kleinen Zahlen sieht man bis zum Rand der Wiese."),
+
+  H.h3("Drehen 3"),
+
+  H.p("Die Bäume weiter hinten haben keinen Schatten mehr. SHADOW_AREA gibt an, wie groß das Stück Welt um SHADOW_TARGET ist, für das Schatten berechnet werden; draußen gibt es keine. Dafür sind die Schatten innen schärfer, denn dieselbe Anzahl Punkte im Schattenbild deckt jetzt eine kleinere Fläche. Darum führt man das Stück in einem Spiel der Figur nach."),
+
+  H.h3("Erweitern 1: ein Sonnensystem"),
+
+  H.p("Ein eigenes Programm (code/loesungen/kap24_sonnensystem.dh):"),
+
+  H.code(zeilen("loesungen/kap24_sonnensystem.dh")),
+
+  H.figure("kap24_sonnensystem.png", "Erweitern 1: Erde mit Mond und Mars auf ihren Bahnen, auf der Seite zur Sonne hin beleuchtet.", 420, 262),
+
+  H.pmix(["Die Sonne leuchtet selbst — ", ["MODEL_EMISSIVE", true], " —, und ein ", ["LIGHT_POINT", true], " in ihrer Mitte beleuchtet die anderen, jeden auf der Seite, die zu ihr zeigt. Das Wichtigste steht in den Matrizen: bahn dreht um die Sonne und schiebt dann nach außen. Die Erde hängt an der Bahn und dreht sich darin noch um sich selbst. Der Mond hängt ebenfalls an der Bahn, nicht an der Erde — sonst nähme ihn ihre schnelle Drehung mit, und er raste einmal am Tag um sie herum. ", ["MAT4_SCALE", true], " macht aus derselben Kugel große und kleine Himmelskörper. Die Sterne sind Punkte auf einer großen Kugel um alles herum."]),
+
+  H.h3("Erweitern 2: Tag und Nacht"),
+
+  H.p("Eine Uhr, eine Laterne und ein Himmel, der seine Farbe wechselt (code/loesungen/kap24_tag.dh):"),
+
+  ...neu("loesungen/kap24_tag.dh").map((t) => H.code(t)),
+
+  H.figure("kap24_tag.png", "Erweitern 2: Nacht an der Mühle, die Laterne macht einen warmen Fleck auf der Wiese.", 420, 262),
+
+  H.pmix(["Die Sonne läuft auf einem Kreis: ", ["LIGHT_SET_POS", true], " setzt bei einem Sonnenlicht die Richtung, und die zeigt nach unten, solange stand positiv ist. Unter dem Horizont würde sie von unten leuchten — darum bleibt die Richtung dort flach, und ", ["LIGHT_SET_COLOR", true], " dreht das Licht mit hell auf Schwarz herunter. ", ["COLOR_LERP", true], " mischt zwei Farben: nachts dunkelblau, tief stehend rot, hoch oben blau. Der Dunst bekommt jedes Mal dieselbe Farbe wie der Himmel, sonst stünde die Wiese vor einem fremden Horizont. Die Laterne ist ein Punktlicht, das ", ["LIGHT_SET_ENABLED", true], " nur nachts einschaltet."]),
+
+  H.h3("Erfinden: ein Labyrinth von oben"),
+
+  H.p("Eine Möglichkeit (code/loesungen/kap24_labyrinth.dh):"),
+
+  H.code(zeilen("loesungen/kap24_labyrinth.dh")),
+
+  H.pmix(["Der Irrgarten entsteht mit einer Tiefensuche, wie sie in vielen Spielen steckt: Von der ersten Zelle aus geht es zu einer zufälligen Nachbarzelle, die noch zu ist, die Mauer dazwischen fällt, und so weiter, bis es nicht mehr weitergeht; dann geht es auf dem Stapel zurück bis zur letzten Zelle, die noch einen geschlossenen Nachbarn hat. So entsteht genau ein Weg zwischen je zwei Stellen. Das Raster wird ein Bild mit einem Punkt je Feld, und ", ["MESH_CUBICMAP", true], " macht aus jedem weißen Punkt einen Würfel. Schwarze Punkte bekämen Boden und Decke; graue lässt es leer, darum sind die Gänge grau, und der Boden ist eine eigene Ebene in anderer Farbe. Die Kugel springt nicht von Feld zu Feld: Sie ist auf einem Feld, wird aber mit ", ["LERP", true], " gleitend gezeichnet. Ausprobiert mit einer Aufnahme: Ein Schritt in eine Mauer zählt nicht, einer in den Gang schon."]),
 ];
