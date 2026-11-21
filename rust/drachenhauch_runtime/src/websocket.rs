@@ -160,7 +160,7 @@ fn kopf<'a>(k: &'a [(String, String)], name: &str) -> Option<&'a str> {
 
 fn zufall<const N: usize>() -> [u8; N] {
     let mut b = [0u8; N];
-    if getrandom::getrandom(&mut b).is_err() {
+    if getrandom::fill(&mut b).is_err() {
         let t = Instant::now().elapsed().as_nanos() as u64 ^ std::process::id() as u64;
         for (i, x) in b.iter_mut().enumerate() { *x = (t >> ((i % 8) * 8)) as u8 ^ i as u8; }
     }

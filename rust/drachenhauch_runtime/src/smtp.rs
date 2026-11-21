@@ -583,7 +583,7 @@ fn anmelden(s: &mut Strom, faehig: &str, benutzer: &str, kennwort: &str) -> Resu
 /// Zufall fuer Trennzeichen und Message-ID.
 pub fn zufallszahl() -> u64 {
     let mut b = [0u8; 8];
-    if getrandom::getrandom(&mut b).is_err() {
+    if getrandom::fill(&mut b).is_err() {
         // Notnagel: die Uhr. Beides dient nur der Eindeutigkeit, nicht der
         // Sicherheit -- eine Trennzeichenkette muss nicht unerratbar sein.
         let n = std::time::SystemTime::now()

@@ -2869,7 +2869,7 @@ fn erzeugen(modul: &mut JITModule, prog: &Program, glob: &Globale, f: &Func, an:
             // Am Kopf eines Bereichs: eine Runde mehr (`Kontext::runden`).
             if let (Some(v), true) = (bau.runden, ip == von) {
                 let n = bau.b.use_var(v);
-                let n = bau.b.ins().iadd_imm(n, 1);
+                let n = bau.b.ins().iadd_imm_s(n, 1);
                 bau.b.def_var(v, n);
             }
             let mut st: Vec<(CWert, Art)> = Vec::new();
@@ -3101,7 +3101,7 @@ fn erzeugen(modul: &mut JITModule, prog: &Program, glob: &Globale, f: &Func, an:
                             for &(lage, j) in &ziele {
                                 let treffer = bau.b.create_block();
                                 let weiter = bau.b.create_block();
-                                let c = bau.b.ins().icmp_imm(IntCC::Equal, lg, lage);
+                                let c = bau.b.ins().icmp_imm_s(IntCC::Equal, lg, lage);
                                 bau.b.ins().brif(c, treffer, &[], weiter, &[]);
                                 bau.b.switch_to_block(treffer);
                                 let w = rufen(&mut bau, j);
@@ -3420,7 +3420,7 @@ fn erzeugen(modul: &mut JITModule, prog: &Program, glob: &Globale, f: &Func, an:
                             op::BXOR => bau.b.ins().bxor(x, y),
                             _ => {
                                 // Schiebeweite ausserhalb 0..63: aussteigen, die VM meldet es
-                                let weit = bau.b.ins().icmp_imm(IntCC::UnsignedGreaterThan, y, 63);
+                                let weit = bau.b.ins().icmp_imm_s(IntCC::UnsignedGreaterThan, y, 63);
                                 bau.aussteigen_wenn(weit);
                                 if ins.op == op::SHL { bau.b.ins().ishl(x, y) } else { bau.b.ins().sshr(x, y) }
                             }
@@ -3452,7 +3452,7 @@ fn erzeugen(modul: &mut JITModule, prog: &Program, glob: &Globale, f: &Func, an:
                         let z = bau.iconst(bau.w_slot(st.len() - 1));
                         st.pop();
                         let w = bau.w_ruf_w(W_WAHR, &[z]);
-                        let n = bau.b.ins().bxor_imm(w, 1);
+                        let n = bau.b.ins().bxor_imm_s(w, 1);
                         st.push((n, Art::B));
                     }
                     op::NOT => {
@@ -3714,15 +3714,15 @@ fn zahl_rechnen(bau: &mut Bauer, name: &str, args: &[(CWert, Art)]) -> (CWert, A
             // der Code aus und die VM meldet ihn); Deckkraft 0 wird 1.
             let mut w = bau.iconst(0);
             for (i, (x, _)) in args.iter().enumerate() {
-                let u = bau.b.ins().icmp_imm(IntCC::UnsignedGreaterThan, *x, 255);
+                let u = bau.b.ins().icmp_imm_s(IntCC::UnsignedGreaterThan, *x, 255);
                 bau.aussteigen_wenn(u);
                 let x = if name == "rgba" && i == 3 {
-                    let null = bau.b.ins().icmp_imm(IntCC::Equal, *x, 0);
+                    let null = bau.b.ins().icmp_imm_s(IntCC::Equal, *x, 0);
                     let eins = bau.iconst(1);
                     bau.b.ins().select(null, eins, *x)
                 } else { *x };
                 let schub = if name == "rgba" && i == 3 { 24 } else { 16 - 8 * i as i64 };
-                let t = bau.b.ins().ishl_imm(x, schub);
+                let t = bau.b.ins().ishl_imm_s(x, schub);
                 w = bau.b.ins().bor(w, t);
             }
             w
@@ -3779,7 +3779,7 @@ fn rechnen(bau: &mut Bauer, o: u16, x: CWert, xa: Art, y: CWert, ya: Art) -> (CW
                     let yn = bau.b.ins().icmp_imm_s(IntCC::SignedLessThan, y, 0);
                     let versch = bau.b.ins().bxor(xn, yn);
                     let korr = bau.b.ins().band(nz, versch);
-                    let q1 = bau.b.ins().iadd_imm(q, -1);
+                    let q1 = bau.b.ins().iadd_imm_s(q, -1);
                     bau.b.ins().select(korr, q1, q)
                 } else {
                     // Vorzeichen folgt dem Teiler (wie Python): -17 MOD 5 = 3.
