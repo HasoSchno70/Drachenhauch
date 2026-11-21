@@ -754,6 +754,20 @@ hat fünf Dateien als Namensräume, eine Musik aus `AUDIO_NOTE` und endet
 mit dem Export. In die Spielwiese passt die Demo nicht (ein Textfeld, keine
 weiteren Dateien) -- das Kapitel sagt es so.
 
+Danach (2026-11-21): die Anhänge B bis E -- damit ist das Buch vollständig.
+B ist ein Spickzettel aus Tabellen und kurzen Codestücken (jede Aussage
+an einem Probeprogramm nachgemessen, etwa `-7 \ 2` = -4 und `MID$` ab 0),
+C Farben mit Farbfeldern (die HSV-Felder rechnet die Inhaltsdatei aus
+denselben Zahlen), Tasten, Maus und Formeln mit Kapitelverweis. D wird
+nicht geschrieben, sondern **gesammelt**: `93_anhang_d.js` lädt die
+Kapitel davor mit einem stillen `H`, nimmt jeden Ausgabe-Block, der wie bei
+`pruef_meldungen.js` mit `datei.dh:N:` beginnt, fasst gleiche Meldungen
+zusammen und schlägt die Seite des Kapitels in `toc_pages.de.json` nach.
+E rechnet seine Zahlen (Befehle im Buch, Befehle insgesamt, Programme) aus
+`code/` und `daten/builtin_index.json`, wie es das Einstiegsbuch tut. Der
+Hinweis „Arbeitsstand“ im Vorwort ist einem Wegweiser zu den Anhängen
+gewichen; Anhang A steht unter einem eigenen Teil „Anhang“.
+
 Was beim Bauen festgelegt wurde:
 
 * **Code kommt aus Dateien.** `buch/code_lesen.js` holt ganze Programme,

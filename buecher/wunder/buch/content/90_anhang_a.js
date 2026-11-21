@@ -4,6 +4,7 @@ const { neu, zeilen, stueck: stueckLoesung } = require("../code_lesen");
 // Stellen zwischen ' >>> neu und ' <<< neu, der Rest ist das Programm des
 // Kapitels. Die Dateien selbst laufen in der Pruefsammlung.
 module.exports = (H) => [
+  H.part("Anhang"),
   H.chapter("A · Lösungen der Übungen"),
 
   H.p("Zu den Drehen-Übungen steht hier die Antwort mit ihrer Begründung. Zu Erweitern und Erfinden steht eine Lösung als Datei in code/loesungen; abgedruckt sind nur die Stellen, die gegenüber dem Programm des Kapitels neu sind. In den Dateien sind sie mit >>> und <<< markiert. Eine andere Lösung ist nicht falsch, nur weil sie anders aussieht — wenn sie tut, was die Aufgabe verlangt, ist sie richtig."),

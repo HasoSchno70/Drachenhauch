@@ -29,5 +29,5 @@ module.exports = (H) => [
 
   H.p("Jedes Programm und jeder Zwischenstand liegt als Datei bei, im Ordner buecher/wunder/code des Drachenhauch-Repositorys, die Lösungen der Übungen unter code/loesungen. Das Buch druckt sie aus diesen Dateien ab, und eine Prüfsammlung lässt sie bei jeder neuen Fassung von Drachenhauch laufen: Jedes Programm übersetzt, jede abgedruckte Ausgabe stimmt, jede Fehlermeldung hat den Wortlaut, den dhrt wirklich ausgibt. Auch die Bilder entstehen aus den Programmen, nicht von Hand."),
 
-  H.note("Dieser Stand enthält das Vorwort, Kapitel 0 (die Werkstatt), Teil I mit den Kapiteln 1 bis 4, Teil II mit den Kapiteln 5 bis 8, Teil III mit den Kapiteln 9 bis 12, Teil IV mit den Kapiteln 13 bis 16, Teil V mit den Kapiteln 17 bis 19, Teil VI mit den Kapiteln 20 bis 23 und Teil VII mit den Kapiteln 24 bis 26, dazu die Lösungen all dieser Kapitel. Damit sind alle Kapitel da; die Anhänge B bis E (Spickzettel, Farben und Formeln, Meldungen, wie es weitergeht) folgen nach der Gliederung in docs/intern/entwurf-buecher.md.", "Arbeitsstand"),
+  H.note("Hinten im Buch stehen fünf Anhänge: A die Lösungen aller Übungen, B ein Spickzettel der Sprache, C Farben, Tasten und Formeln, D jede Meldung von dhrt, die im Buch vorkommt, mit ihrem Kapitel, und E, wie es nach diesem Buch weitergeht.", "Hinten im Buch"),
 ];
