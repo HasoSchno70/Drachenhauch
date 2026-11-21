@@ -1418,3 +1418,13 @@ Uebersetzer warnt jetzt; ein leeres `CATCH` schluckt ausdruecklich und
 bleibt still. Im Repo traf die Warnung keine Datei.
 `compiler_warnungen.dhtest` (ein Fall: genau eine Warnung unter vier
 Formen); Gegenprobe: ohne die Warnung faellt er.
+
+Fuer die Loesung "Ordner beobachten" (eine Diaschau, die neue und neu
+geschriebene Bilder nachlaedt) fiel auf: `LOADIMAGE` merkt sich Bilder
+nach dem Pfad und gab nach dem Neuschreiben der Datei still das alte Bild
+zurueck -- erst ein `IMAGE_FREE` raeumte den Eintrag. Jetzt merkt sich
+`Graphics::bild_stand` je Handle Groesse und Aenderungszeit der Datei;
+weichen sie ab, wird neu geladen (neues Handle, das alte gilt weiter).
+Fehlt die Datei inzwischen, bleibt es beim Cache wie bisher.
+`image_io.dhtest` (ein Fall); Gegenprobe: ohne den Vergleich faellt er
+mit "100 TRUE 100 TRUE 100".

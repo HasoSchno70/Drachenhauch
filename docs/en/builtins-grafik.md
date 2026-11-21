@@ -603,7 +603,7 @@ WEND
 
 For animated sprites with frame logic, see the [sprite module](module-sprite.md). For effects such as scaling, rotating, tinting, see the [imgfx module](module-imgfx.md).
 
-**Asset cache:** `LOADIMAGE` and `LOADSOUND` cache their results automatically. Repeated calls with the same (or an equivalent) path return the same image, without disk I/O. The cache keys are both the raw path and the normalized absolute path, so that different spellings (`"x.png"`, `"./x.png"`, absolute) hit the same entry.
+**Asset cache:** `LOADIMAGE` and `LOADSOUND` cache their results automatically. Repeated calls with the same (or an equivalent) path return the same image, without disk I/O. The cache keys are both the raw path and the normalized absolute path, so that different spellings (`"x.png"`, `"./x.png"`, absolute) hit the same entry. An image stays valid as long as its file is unchanged: if the file has been rewritten in the meantime (different size or modification time), `LOADIMAGE` loads it again and returns a new handle; the old one stays valid.
 
 ## Asset preloader
 

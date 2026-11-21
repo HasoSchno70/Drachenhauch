@@ -606,7 +606,7 @@ WEND
 
 Für animierte Sprites mit Frame-Logik siehe [Sprite-Modul](module-sprite.md). Für Effekte wie Skalieren, Rotieren, Tinten siehe [imgfx-Modul](module-imgfx.md).
 
-**Asset-Cache:** `LOADIMAGE` und `LOADSOUND` cachen ihre Ergebnisse automatisch. Mehrfache Aufrufe mit demselben (oder gleichbedeutendem) Pfad liefern dasselbe Bild zurück, ohne Disk-IO. Cache-Schlüssel sind sowohl der rohe Pfad als auch der normalisierte Absolut-Pfad, sodass verschiedene Schreibweisen (`"x.png"`, `"./x.png"`, absolut) denselben Eintrag treffen.
+**Asset-Cache:** `LOADIMAGE` und `LOADSOUND` cachen ihre Ergebnisse automatisch. Mehrfache Aufrufe mit demselben (oder gleichbedeutendem) Pfad liefern dasselbe Bild zurück, ohne Disk-IO. Cache-Schlüssel sind sowohl der rohe Pfad als auch der normalisierte Absolut-Pfad, sodass verschiedene Schreibweisen (`"x.png"`, `"./x.png"`, absolut) denselben Eintrag treffen. Ein Bild gilt, solange seine Datei unverändert ist: Wurde sie inzwischen neu geschrieben (andere Größe oder Änderungszeit), lädt `LOADIMAGE` sie neu und liefert ein neues Handle; das alte bleibt gültig.
 
 ## Asset-Preloader
 

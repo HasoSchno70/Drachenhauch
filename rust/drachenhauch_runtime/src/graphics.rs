@@ -1518,6 +1518,9 @@ pub struct Graphics {
     text_spacing: f32,
     textures: Vec<Tex>,
     image_cache: HashMap<String, i64>,
+    /// Groesse und Aenderungszeit der Datei, als LOADIMAGE sie las -- je
+    /// Handle. Hat sich die Datei seitdem geaendert, gilt der Cache nicht.
+    bild_stand: HashMap<i64, (u64, Option<std::time::SystemTime>)>,
     /// Platz je Textur: wurde sie mit IMAGE_FREE freigegeben? Der Platz
     /// bleibt stehen und wird NICHT neu vergeben -- sonst zeigte ein
     /// stehengebliebenes Handle spaeter still auf ein fremdes Bild.
@@ -2409,6 +2412,7 @@ impl Graphics {
             text_spacing: 0.0,
             textures: Vec::new(),
             image_cache: HashMap::new(),
+            bild_stand: HashMap::new(),
             tex_frei: Vec::new(),
             tex_veraltet: Vec::new(),
             tex_abraeumen: Vec::new(),
@@ -5668,7 +5672,17 @@ impl Graphics {
     pub fn load_texture(&mut self, path: &str) -> Result<i64, String> {
         let resolved = crate::builtins::resolve_asset_path(path);
         let path = resolved.as_str();
-        if let Some(&h) = self.image_cache.get(path) { return Ok(h); }
+        // Der Cache gilt, solange die Datei dieselbe ist. Wer sie neu
+        // schreibt und wieder laedt, bekam sonst still das alte Bild
+        // (Buch "Kleine Wunder", Kapitel 23: ein Ordner, der beobachtet
+        // wird). Das alte Handle bleibt gueltig fuer den, der es hat.
+        let stand = std::fs::metadata(path).ok().map(|m| (m.len(), m.modified().ok()));
+        if let Some(&h) = self.image_cache.get(path) {
+            match (self.bild_stand.get(&h), stand) {
+                (Some(alt), Some(jetzt)) if *alt != jetzt => {}
+                _ => return Ok(h),
+            }
+        }
         // Vorher pruefen: raylib sagt sonst nur "image data is null, either
         // the file doesnt exist or the image type is unsupported".
         crate::builtins::datei_da(path, "LOADIMAGE")?;
@@ -5678,6 +5692,7 @@ impl Graphics {
         self.textures.push(Tex { tex, img });
         self.tex_frei.push(false);
         let h = (self.textures.len() - 1) as i64;
+        if let Some(st) = stand { self.bild_stand.insert(h, st); }
         self.image_cache.insert(path.to_string(), h);
         if let Ok(abs) = std::fs::canonicalize(path) {
             self.image_cache.insert(abs.to_string_lossy().to_string(), h);
