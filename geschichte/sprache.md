@@ -1391,3 +1391,12 @@ und es heisst "Array ist leer". Dabei fiel auf, dass `ARRAY_SUM` eines
 leeren `ARRAY OF FLOAT` "-0.0" lieferte -- Rusts `sum()` ueber f64 beginnt
 bei -0.0; jetzt `fold(0.0, ...)`. `comprehensions.dhtest` (ein Fall);
 Gegenproben: strenge Typpruefung bzw. `sum()` lassen ihn je fallen.
+
+Die Loesung zu "Erfinden" zeigt die Monatsmittel als Balkendiagramm
+(`chart`) von etwa -4 bis 26 Grad. Die Skala schrieb an die Nullinie
+"-0 Grad": `lo + (hi - lo) * t` trifft die Null nur beinahe (-1e-15), und
+`format!("{:.0}")` behaelt das Vorzeichen. `ChartObj::fmt_value` streicht
+jetzt das Minus, wenn nach dem Runden nur Nullen bleiben -- das gilt fuer
+jede Beschriftung (Skala, Werte, Tooltip, Tacho). Rust-Test
+`fmt_value_null_ohne_vorzeichen`; Gegenprobe: ohne das Streichen faellt er
+an "-0 Grad".
