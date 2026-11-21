@@ -454,9 +454,10 @@ Maps, Tupel, Strings, alle Benchmarks), 0 echte Mismatches.
 ## Schritt 4: raylib-Grafik
 
 Grafik ist **feature-gated** (`graphics`, default aus): der pure VM-Kern baut
-ohne C-Toolchain. Mit Grafik wird [`raylib`](https://crates.io/crates/raylib)
-(raylib-rs 6.0, [raylib-rs/raylib-rs](https://github.com/raylib-rs/raylib-rs))
-eingebunden.
+ohne C-Toolchain. Mit Grafik wird raylib 6.2 über
+[`sola-raylib`](https://crates.io/crates/sola-raylib) (gepflegter Fork von
+raylib-rs, [brettchalupa/sola-raylib](https://github.com/brettchalupa/sola-raylib))
+eingebunden; im Code heißt die Crate weiter `raylib`.
 
 **Bit-Identität gilt NICHT für Pixel** (Grafik rendert nur die native Runtime) —
 nur `PRINT`/stdout bleibt bit-identisch. Grafik wird per Screenshot verifiziert.

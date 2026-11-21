@@ -1308,7 +1308,6 @@ dependencies = [
  "postgres",
  "rapier2d",
  "rapier3d",
- "raylib",
  "regex",
  "rfd",
  "rusqlite",
@@ -1321,6 +1320,7 @@ dependencies = [
  "sha1 0.11.0",
  "sha2 0.11.1",
  "socket2",
+ "sola-raylib",
  "spellbook",
  "symphonia",
  "tokio",
@@ -3185,6 +3185,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "paste"
+version = "1.0.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
+
+[[package]]
 name = "pastey"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3559,28 +3565,6 @@ name = "rawpointer"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "60a357793950651c4ed0f3f52338f53b2f809f32d83a07f72909fa13e4c6c1e3"
-
-[[package]]
-name = "raylib"
-version = "6.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "74b6057eb69bc6ac196260f5751a9bc69d69a445174d288ad87b9f6cefecd88c"
-dependencies = [
- "raylib-sys",
- "seq-macro",
- "thiserror 2.0.21",
-]
-
-[[package]]
-name = "raylib-sys"
-version = "6.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "36be0f95d9ea818847eedf4a6a73cbd5331db5a558069747dae827ac3c12fdf8"
-dependencies = [
- "bindgen",
- "cc",
- "cmake",
-]
 
 [[package]]
 name = "read-fonts"
@@ -4127,6 +4111,30 @@ checksum = "c3d1e2c7f27f8d4cb10542a02c49005dbd6e93095799d6f3be745fae9f8fedd4"
 dependencies = [
  "libc",
  "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "sola-raylib"
+version = "6.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "259b6041eb97d5e1ee1819ee3ee0c852d7877541119bd259580c792408b4e3fb"
+dependencies = [
+ "cfg-if",
+ "paste",
+ "seq-macro",
+ "sola-raylib-sys",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "sola-raylib-sys"
+version = "6.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cad06140287479a9bc9ad703fcb0bd2d8ee74dc293ab54d714021a3e8e12c8cc"
+dependencies = [
+ "bindgen",
+ "cc",
+ "cmake",
 ]
 
 [[package]]

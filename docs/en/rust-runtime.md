@@ -464,9 +464,10 @@ maps, tuples, strings, all benchmarks), 0 real mismatches.
 ## Step 4: raylib graphics
 
 Graphics is **feature-gated** (`graphics`, off by default): the pure VM core
-builds without a C toolchain. With graphics,
-[`raylib`](https://crates.io/crates/raylib) (raylib-rs 6.0,
-[raylib-rs/raylib-rs](https://github.com/raylib-rs/raylib-rs)) is brought in.
+builds without a C toolchain. With graphics, raylib 6.2 is brought in through
+[`sola-raylib`](https://crates.io/crates/sola-raylib) (a maintained fork of
+raylib-rs, [brettchalupa/sola-raylib](https://github.com/brettchalupa/sola-raylib));
+in the code the crate is still called `raylib`.
 
 **Bit identity does NOT apply to pixels** (only the native runtime renders
 graphics) — only `PRINT`/stdout stays bit-identical. Graphics is verified by

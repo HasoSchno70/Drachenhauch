@@ -26,6 +26,20 @@ extern "C" {
 use raylib::core::shaders::RaylibShader;   // get_shader_location auf Shader
 use raylib::core::texture::RaylibRenderTexture2D;   // .texture() auf RenderTexture2D
 
+/// Shader aus Quelltext, so wie raylib ihn liefert: scheitert das Uebersetzen,
+/// ist es raylibs Vorgabe-Shader. sola-raylib meldet dafuer ein `Err` ohne
+/// Shader; die Aufrufer hier pruefen selbst (`id == 0`, Vorgabe-Shader,
+/// `is_shader_valid`) und brauchen den Shader auch im Fehlerfall -- so wie
+/// `load_shader_from_memory` von raylib-rs 6.0 ihn lieferte.
+fn shader_aus_quelltext(vs: Option<&str>, fs: Option<&str>) -> Shader {
+    let vs = vs.map(|t| std::ffi::CString::new(t).unwrap_or_default());
+    let fs = fs.map(|t| std::ffi::CString::new(t).unwrap_or_default());
+    let vs_p = vs.as_ref().map_or(std::ptr::null(), |c| c.as_ptr());
+    let fs_p = fs.as_ref().map_or(std::ptr::null(), |c| c.as_ptr());
+    // SAFETY: raylib liefert einen eigenen Shader, den nur dieser Wert besitzt.
+    unsafe { Shader::from_raw(raylib::ffi::LoadShaderFromMemory(vs_p as _, fs_p as _)) }
+}
+
 /// Das Format einer Bilddatei an ihren ersten Bytes, als Endung fuer
 /// raylibs LoadImageFromMemory. None = keins, das dhrt laden kann.
 fn bildformat(b: &[u8]) -> Option<&'static str> {
@@ -1375,11 +1389,12 @@ pub struct Graphics {
     cam3d_proj: Option<[f32; 16]>,
     // 3D-Modelle (LOADMODEL / MESH_*): bleiben ueber Frames erhalten.
     models: Vec<Model>,
-    // Skelett-Animationen (MODEL_LOAD_ANIMS): je Set eine RAII-`ModelAnimations`-
-    // Collection (raylib-rs 6.0 -- ersetzt den fruehreren rohen FFI-Workaround,
-    // der noetig war weil der 5.x-Wrapper die Structs flach kopierte und dann
-    // UnloadModelAnimations rief -> Use-after-free).
-    model_anims: Vec<ModelAnimations>,
+    // Skelett-Animationen (MODEL_LOAD_ANIMS): je Set die Animationen einer
+    // Datei. sola-raylib kopiert sie aus raylibs Feld heraus und gibt das Feld
+    // frei; jede `ModelAnimation` raeumt beim Drop nur ihre eigenen
+    // Schluesselbilder ab (nicht mehr UnloadModelAnimations auf eine Kopie --
+    // daran hing im 5.x-Wrapper von raylib-rs ein Use-after-free).
+    model_anims: Vec<Vec<ModelAnimation>>,
     // Beleuchtung (Blinn-Phong via rlights-Shader). light_shader wird beim
     // ersten LIGHT_ENABLE geladen; lights[] sind bis zu MAX_LIGHTS Lichter.
     light_shader: Option<Shader>,
@@ -2008,13 +2023,49 @@ fn fenster_handle(rl: &mut RaylibHandle) -> *mut std::ffi::c_void {
 /// `glTexImage2D`; Mesa lehnt GL_RGBA dort ab, und die Textur bleibt ohne
 /// Speicher. Mit Daten nimmt raylib den richtigen Weg -- darum legt dhrt
 /// das Ziel selbst an, mit einem leeren Puffer, auf jedem System gleich.
+/// Eine Linie in ein Bild, Punkt fuer Punkt wie raylibs `ImageDrawLine` bis
+/// 6.0: ohne den Endpunkt und ohne die halbe Rundung, die raylib 6.2 dazunahm.
+/// Mit 6.2 wurde jede Linie einen Punkt laenger und eine schraege anders
+/// gerastert -- eine gestrichelte Linie der Druckvorschau hatte 9 statt 8
+/// Punkte je Strich, und jedes Bild aus IMAGE_DRAW_LINE sah anders aus als in
+/// der Fassung davor.
+fn bild_linie(img: &mut Image, x1: i32, y1: i32, x2: i32, y2: i32, farbe: Color) {
+    let (mut kurz, mut lang) = (y2.wrapping_sub(y1), x2.wrapping_sub(x1));
+    let y_laenger = kurz.wrapping_abs() > lang.wrapping_abs();
+    if y_laenger { std::mem::swap(&mut kurz, &mut lang); }
+    let ende = lang;
+    let schritt = if lang < 0 { lang = lang.wrapping_neg(); -1 } else { 1 };
+    let zuwachs = if lang == 0 { 0 } else { kurz.wrapping_shl(16) / lang };
+    let (mut i, mut j) = (0i32, 0i32);
+    while i != ende {
+        if y_laenger { img.draw_pixel(x1.wrapping_add(j >> 16), y1.wrapping_add(i), farbe); }
+        else { img.draw_pixel(x1.wrapping_add(i), y1.wrapping_add(j >> 16), farbe); }
+        i = i.wrapping_add(schritt);
+        j = j.wrapping_add(zuwachs);
+    }
+}
+
+/// Steckt in Slot `n` ein Pad? raylibs eigene Antwort. sola-raylibs
+/// `is_gamepad_available` verlangt zusaetzlich eine Zuordnung
+/// (glfwJoystickIsGamepad) und laesst Joysticks ohne sie weg -- dann zaehlte
+/// JOYSTICK_COUNT einen Flugknueppel nicht mehr, den JOYSTICK_MAPPINGS erst
+/// belegen soll.
+fn pad_da(n: i32) -> bool {
+    // SAFETY: reine Abfrage, nach InitWindow (alle Aufrufer haben ein Fenster).
+    unsafe { raylib::ffi::IsGamepadAvailable(n) }
+}
+
+/// Der Wortlaut von raylib-rs (`LoadTextureError::CreateRenderTextureFailed`);
+/// sola-raylib hat keinen eigenen Fehlertyp dafuer.
+const RENDER_ZIEL_FEHLT: &str = "failed to create render texture";
+
 fn render_ziel(_rl: &mut RaylibHandle, _thread: &RaylibThread, w: u32, h: u32)
-    -> Result<RenderTexture2D, raylib::core::error::LoadTextureError> {
+    -> Result<RenderTexture2D, &'static str> {
     use raylib::ffi;
     unsafe {
         let (wi, hi) = (w.max(1) as i32, h.max(1) as i32);
         let id = ffi::rlLoadFramebuffer();
-        if id == 0 { return Err(raylib::core::error::LoadTextureError::CreateRenderTextureFailed); }
+        if id == 0 { return Err(RENDER_ZIEL_FEHLT); }
         ffi::rlEnableFramebuffer(id);
         let farbe = leere_textur(wi, hi);
         let tiefe = ffi::rlLoadTextureDepth(wi, hi, true);
@@ -2031,7 +2082,7 @@ fn render_ziel(_rl: &mut RaylibHandle, _thread: &RaylibThread, w: u32, h: u32)
         };
         if !fertig {
             ffi::UnloadRenderTexture(roh);
-            return Err(raylib::core::error::LoadTextureError::CreateRenderTextureFailed);
+            return Err(RENDER_ZIEL_FEHLT);
         }
         Ok(RenderTexture2D::from_raw(roh))
     }
@@ -3441,7 +3492,7 @@ impl Graphics {
             4 => CAMERA_THIRD_PERSON,
             _ => CAMERA_CUSTOM,
         };
-        self.cam3d.update_camera(m);
+        self.rl.update_camera(&mut self.cam3d, m);
     }
     /// CAMERA3D_MOVE: die 3D-Kamera vom Programm aus bewegen (vor, rechts,
     /// hoch in Einheiten, auf der Bodenebene) und drehen (gieren nach rechts,
@@ -3453,7 +3504,7 @@ impl Graphics {
     pub fn camera3d_move(&mut self, vor: f32, rechts: f32, hoch: f32, gieren: f32, neigen: f32, zoom: f32) {
         // raylib: positives rotation.x dreht nach rechts, positives
         // rotation.y neigt nach UNTEN (wie die Maus) -- darum das Minus.
-        self.cam3d.update_camera_pro(Vector3::new(vor, rechts, hoch), Vector3::new(gieren, -neigen, 0.0), zoom);
+        self.rl.update_camera_pro(&mut self.cam3d, Vector3::new(vor, rechts, hoch), Vector3::new(gieren, -neigen, 0.0), zoom);
     }
     pub fn cam3d_pos(&self) -> (f64, f64, f64) {
         (self.cam3d.position.x as f64, self.cam3d.position.y as f64, self.cam3d.position.z as f64)
@@ -3745,8 +3796,7 @@ impl Graphics {
     /// view/ambient/lightCount-Locations werden gecacht.
     fn ensure_inst_shader(&mut self) {
         if self.inst_shader.is_some() { return; }
-        let mut sh = self.rl.load_shader_from_memory(&self.thread,
-            Some(&fuer_ziel_uebersetzen(INST_VS)), Some(&fuer_ziel_uebersetzen(INST_FS)));
+        let mut sh = shader_aus_quelltext(Some(&fuer_ziel_uebersetzen(INST_VS)), Some(&fuer_ziel_uebersetzen(INST_FS)));
         // instanceTransform-Attribut-Location -> SHADER_LOC_MATRIX_MODEL.
         let cname = std::ffi::CString::new("instanceTransform").unwrap();
         let attr = unsafe { raylib::ffi::rlGetLocationAttrib(sh.id, cname.as_ptr()) };
@@ -4051,8 +4101,7 @@ impl Graphics {
     /// Uniform-Locations fuer viewPos/ambient werden gecacht.
     pub fn light_enable(&mut self) {
         if self.light_shader.is_some() { return; }
-        let mut sh = self.rl.load_shader_from_memory(&self.thread,
-            Some(&fuer_ziel_uebersetzen(LIGHT_VS)), Some(&fuer_ziel_uebersetzen(LIGHT_FS)));
+        let mut sh = shader_aus_quelltext(Some(&fuer_ziel_uebersetzen(LIGHT_VS)), Some(&fuer_ziel_uebersetzen(LIGHT_FS)));
         // matModel fuer fragPosition (Weltkoordinaten) explizit binden.
         let loc_model = sh.get_shader_location("matModel");
         sh.locs_mut()[raylib::consts::ShaderLocationIndex::SHADER_LOC_MATRIX_MODEL as usize] = loc_model;
@@ -4120,14 +4169,13 @@ impl Graphics {
         let (near, far) = unsafe {
             (raylib::ffi::rlGetCullDistanceNear(), raylib::ffi::rlGetCullDistanceFar())
         };
-        Matrix::perspective(90.0_f64.to_radians(), 1.0, near, far).into()
+        Matrix::perspective(90.0_f32.to_radians(), 1.0, near as f32, far as f32).into()
     }
 
     /// Rendert eine einfache (1-Mip) Cubemap mit `fs` ueber die 6 Faces. Quelle ist
     /// eine 2D-Textur (equirect) oder eine Cubemap (irradiance). Liefert die GL-ID.
     fn ibl_render_cube(&mut self, fs: &str, src_id: u32, src_cubemap: bool, size: i32) -> Result<u32, String> {
-        let sh = self.rl.load_shader_from_memory(&self.thread,
-            Some(&fuer_ziel_uebersetzen(CUBEMAP_VS)), Some(&fuer_ziel_uebersetzen(fs)));
+        let sh = shader_aus_quelltext(Some(&fuer_ziel_uebersetzen(CUBEMAP_VS)), Some(&fuer_ziel_uebersetzen(fs)));
         let id = sh.id;
         if id == 0 {
             // Der Grund steht dabei, weil er nicht am Aufruf liegt: unser
@@ -4184,8 +4232,7 @@ impl Graphics {
     /// rlGenTextureMipmaps fuer Cubemaps moeglich -> bindet GL_TEXTURE_2D).
     fn ibl_render_prefilter(&mut self, env_cubemap: u32, size: i32) -> Result<u32, String> {
         const MIPS: i32 = 5;
-        let sh = self.rl.load_shader_from_memory(&self.thread,
-            Some(&fuer_ziel_uebersetzen(CUBEMAP_VS)), Some(&fuer_ziel_uebersetzen(PREFILTER_FS)));
+        let sh = shader_aus_quelltext(Some(&fuer_ziel_uebersetzen(CUBEMAP_VS)), Some(&fuer_ziel_uebersetzen(PREFILTER_FS)));
         let id = sh.id;
         if id == 0 { return Err("LIGHT_ENV_HDR: Prefilter-Shader nicht ladbar".into()); }
         let loc_proj = sh.get_shader_location("matProjection");
@@ -4237,8 +4284,7 @@ impl Graphics {
 
     /// BRDF-Integrations-LUT (2D, NdotV x roughness) via Fullscreen-Quad.
     fn ibl_render_brdf(&mut self, size: i32) -> Result<u32, String> {
-        let sh = self.rl.load_shader_from_memory(&self.thread,
-            Some(&fuer_ziel_uebersetzen(BRDF_VS)), Some(&fuer_ziel_uebersetzen(BRDF_FS)));
+        let sh = shader_aus_quelltext(Some(&fuer_ziel_uebersetzen(BRDF_VS)), Some(&fuer_ziel_uebersetzen(BRDF_FS)));
         let id = sh.id;
         if id == 0 { return Err("LIGHT_ENV_HDR: BRDF-Shader nicht ladbar".into()); }
         let (win_w, win_h) = (self.width * self.scale, self.height * self.scale);
@@ -4332,8 +4378,7 @@ impl Graphics {
     /// Hintergrund. Ohne vorheriges LIGHT_ENV_HDR (ibl_env == 0) ein No-Op.
     pub fn skybox(&mut self, on: bool) {
         if on && self.skybox_shader.is_none() {
-            let sh = self.rl.load_shader_from_memory(&self.thread,
-                Some(&fuer_ziel_uebersetzen(SKYBOX_VS)), Some(&fuer_ziel_uebersetzen(SKYBOX_FS)));
+            let sh = shader_aus_quelltext(Some(&fuer_ziel_uebersetzen(SKYBOX_VS)), Some(&fuer_ziel_uebersetzen(SKYBOX_FS)));
             self.skybox_loc_proj = sh.get_shader_location("matProjection");
             self.skybox_loc_view = sh.get_shader_location("matView");
             self.skybox_loc_ldr = sh.get_shader_location("ldr");
@@ -4499,7 +4544,7 @@ impl Graphics {
         let mi = self.check_model(model_idx, "MODEL_LIT")?;
         let sh_ffi = *self.light_shader.as_ref().unwrap().as_ref();   // ffi::Shader (Copy)
         for mat in self.models[mi].materials_mut() {
-            unsafe { mat.as_raw_mut().shader = sh_ffi; }
+            mat.as_mut().shader = sh_ffi;
         }
         Ok(())
     }
@@ -4926,7 +4971,10 @@ impl Graphics {
 
     pub fn gen_tex_perlin(&mut self, w: i32, h: i32, scale: f64) -> Result<i64, String> {
         let (w, h) = Self::check_gentex_dims("GENTEX_PERLIN", w, h)?;
-        let img = Image::gen_image_perlin_noise(w, h, 0, 0, scale.max(0.1) as f32);
+        // sola-raylib 6.4 nimmt hier versehentlich `&self` (ein Bild, das es
+        // nicht braucht) -- darum raylib direkt.
+        // SAFETY: raylib liefert ein eigenes Bild, das nur dieser Wert besitzt.
+        let img = unsafe { Image::from_raw(raylib::ffi::GenImagePerlinNoise(w, h, 0, 0, scale.max(0.1) as f32)) };
         self.push_tex_from_image(img)
     }
     /// GENTEX_CELLULAR(w, h, kachel): Voronoi-/Zellrauschen -- Steinboden,
@@ -5581,7 +5629,7 @@ impl Graphics {
         let f = unsafe { Font::from_raw(roh) };
         if self.sdf_shader.is_none() {
             let fs = fuer_ziel_uebersetzen(SDF_FS);
-            let sh = self.rl.load_shader_from_memory(&self.thread, None, Some(&fs));
+            let sh = shader_aus_quelltext(None, Some(&fs));
             if !sh.is_shader_valid() || sh.id == unsafe { raylib::ffi::rlGetShaderIdDefault() } {
                 return Err("LOADFONT_SDF: der Schrift-Shader liess sich nicht uebersetzen".into());
             }
@@ -6004,7 +6052,8 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     }
     pub fn image_contrast(&mut self, idx: i64, n: f32) -> Result<i64, String> {
         let mut img = self.src_image(idx, "IMAGE_CONTRAST")?;
-        img.color_contrast(n.clamp(-100.0, 100.0));
+        // raylib 6.2 nimmt den Kontrast als ganze Zahl (-100..100).
+        img.color_contrast(n.clamp(-100.0, 100.0).round() as i32);
         self.push_tex_from_image(img)
     }
     pub fn image_grayscale(&mut self, idx: i64) -> Result<i64, String> {
@@ -6067,7 +6116,7 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         let i = idx as usize;
         if !self.tex_ok(idx) { return Err(self.tex_fehler(idx, "IMAGE_DRAW_LINE")); }
         let t = &mut self.textures[i];
-        t.img.draw_line(x1, y1, x2, y2, col(color));
+        bild_linie(&mut t.img, x1, y1, x2, y2, col(color));
         self.reupload_tex(i)
     }
     pub fn image_draw_circle(&mut self, idx: i64, cx: i32, cy: i32, r: i32, color: i64) -> Result<(), String> {
@@ -6395,7 +6444,7 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
                     vorschau_strichzug(&mut img, &[(*x1 * f, *y1 * f), (*x2 * f, *y2 * f)], (strichel.0 * f, strichel.1 * f), farbe(*c, *deck));
                 }
                 Op::Linie { x1, y1, x2, y2, farbe: c, deck, .. } => {
-                    img.draw_line(px(*x1), px(*y1), px(*x2), px(*y2), farbe(*c, *deck));
+                    bild_linie(&mut img, px(*x1), px(*y1), px(*x2), px(*y2), farbe(*c, *deck));
                 }
                 // gestrichelte Umrisse: als Zug, die Strichfolge laeuft ueber
                 // die Ecken weiter
@@ -6420,7 +6469,7 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
                     if *fuellen {
                         img.draw_rectangle(px(*x), px(*y), px(*b).max(1), px(*h).max(1), farbe(*c, *deck));
                     } else {
-                        img.draw_rectangle_lines(Rectangle::new(px(*x) as f32, px(*y) as f32, px(*b) as f32, px(*h) as f32), 1, farbe(*c, *deck));
+                        img.draw_rectangle_lines_ex(Rectangle::new(px(*x) as f32, px(*y) as f32, px(*b) as f32, px(*h) as f32), 1, farbe(*c, *deck));
                     }
                 }
                 Op::Kreis { x, y, r, fuellen, farbe: c, deck, .. } => {
@@ -6531,7 +6580,7 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     /// Schwarz zurueck. Deshalb ein eigener Getter statt eines vierten Bytes.
     pub fn get_alpha(&mut self, idx: i64, x: i32, y: i32) -> i64 {
         if !self.tex_ok(idx) { return -1; }
-        let img = &self.textures[idx as usize].img;
+        let img = &mut self.textures[idx as usize].img;
         if x < 0 || y < 0 || x >= img.width || y >= img.height { return -1; }
         img.get_color(x, y).a as i64
     }
@@ -6546,7 +6595,7 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         let mut bilder = Vec::with_capacity(handles.len());
         for &idx in handles {
             if !self.tex_ok(idx) { return Err(self.tex_fehler(idx, "IMAGE_SAVE_GIF")); }
-            let img = &self.textures[idx as usize].img;
+            let img = &mut self.textures[idx as usize].img;
             let (w, h) = (img.width, img.height);
             if w <= 0 || h <= 0 || w > u16::MAX as i32 || h > u16::MAX as i32 {
                 return Err(std::format!("IMAGE_SAVE_GIF: Bildgroesse {}x{} geht nicht", w, h));
@@ -6946,17 +6995,17 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     /// Anzahl zusammenhaengend verfuegbarer Pads ab Slot 0.
     pub fn joy_count(&self) -> i64 {
         let mut n = 0;
-        while self.rl.is_gamepad_available(n) { n += 1; }
+        while pad_da(n) { n += 1; }
         n as i64
     }
     pub fn joy_name(&self, idx: i64) -> String {
-        if idx < 0 || !self.rl.is_gamepad_available(idx as i32) { return String::new(); }
+        if idx < 0 || !pad_da(idx as i32) { return String::new(); }
         self.rl.get_gamepad_name(idx as i32).unwrap_or_default()
     }
     /// Rohe Achsen-Bewegung (-1..+1) fuer Achs-Index 0..5 (Deadzone macht der Aufrufer).
     pub fn joy_axis(&self, pad: i64, axis_idx: i32) -> f64 {
         use raylib::consts::GamepadAxis::*;
-        if pad < 0 || !self.rl.is_gamepad_available(pad as i32) { return 0.0; }
+        if pad < 0 || !pad_da(pad as i32) { return 0.0; }
         let ax = match axis_idx {
             0 => GAMEPAD_AXIS_LEFT_X, 1 => GAMEPAD_AXIS_LEFT_Y,
             2 => GAMEPAD_AXIS_RIGHT_X, 3 => GAMEPAD_AXIS_RIGHT_Y,
@@ -6987,7 +7036,7 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
             _ => return false,
         };
         let mut i = 0;
-        while self.rl.is_gamepad_available(i) {
+        while pad_da(i) {
             if self.rl.is_gamepad_button_down(i, btn) { return true; }
             i += 1;
         }
@@ -7021,7 +7070,7 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     // Hat-Unterindex liefert dagegen 0/false (kein Fehler).
     pub fn joystick_count(&self) -> i64 { self.joy_count() }
     fn joystick_check(&self, idx: i64, fn_: &str) -> Result<(), String> {
-        if idx < 0 || !self.rl.is_gamepad_available(idx as i32) {
+        if idx < 0 || !pad_da(idx as i32) {
             let n = self.joy_count();
             return Err(if n > 0 {
                 format!("{}: Joystick-Index {} ausserhalb [0..{}]", fn_, idx, n - 1)
@@ -7492,10 +7541,9 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     /// auch exotische Pads die richtige Knopf-Belegung bekommen. Liefert
     /// raylibs Rueckgabe (Anzahl erkannter Zuordnungen, -1 bei Fehler).
     pub fn joystick_mappings(&self, text: &str) -> i64 {
-        let Ok(cs) = std::ffi::CString::new(text) else { return -1; };
-        let bytes: Vec<std::os::raw::c_char> =
-            cs.as_bytes_with_nul().iter().map(|&b| b as std::os::raw::c_char).collect();
-        self.rl.set_gamepad_mappings(&bytes) as i64
+        // Ein NUL im Text: -1 wie bisher (sola-raylib lieferte dafuer 0).
+        if text.contains(char::from(0)) { return -1; }
+        self.rl.set_gamepad_mappings(text) as i64
     }
     /// WINDOW_DPI_X/Y(): Skalierungsfaktor des Bildschirms (1.0 = normal,
     /// 2.0 = HiDPI/Retina). Ohne den weiss ein Programm nicht, ob seine
@@ -8158,7 +8206,7 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     // --- Shader / Post-Processing ---
     /// Laedt einen Fragment-Shader (GLSL-Quelltext) -> Handle (Index) oder -1.
     pub fn load_shader(&mut self, code: &str) -> i64 {
-        let sh = self.rl.load_shader_from_memory(&self.thread, None,
+        let sh = shader_aus_quelltext(None,
                                         Some(&fuer_ziel_uebersetzen(code)));
         if !sh.is_shader_valid() { return -1; }
         self.shaders.push(sh);
@@ -9562,15 +9610,19 @@ fn render_scene<D: RaylibDraw>(
                         Cmd3D::CubeWires(x, y, z, w, h, dd, col) =>
                             d3.draw_cube_wires(Vector3::new(*x, *y, *z), *w, *h, *dd, *col),
                         Cmd3D::Sphere(x, y, z, r, col) =>
-                            d3.draw_sphere(Vector3::new(*x, *y, *z), *r, *col),
+                            // raylib 6.2 zaehlt `rings` als Baender, 6.0 zeichnete
+                            // rings + 1 (DrawSphere = 16/16 ergab 17 Baender) -- so
+                            // bleibt die Kugel, wie sie war.
+                            d3.draw_sphere_ex(Vector3::new(*x, *y, *z), *r, 17, 16, *col),
                         Cmd3D::SphereWires(x, y, z, r, col) =>
-                            d3.draw_sphere_wires(Vector3::new(*x, *y, *z), *r, 12, 12, *col),
+                            // Ebenso die Drahtkugel: 12 Ringe in 6.0 = 13 Baender in 6.2.
+                            d3.draw_sphere_wires(Vector3::new(*x, *y, *z), *r, 13, 12, *col),
                         Cmd3D::Cylinder(x, y, z, rt, rb, h, col) =>
                             d3.draw_cylinder(Vector3::new(*x, *y, *z), *rt, *rb, *h, 16, *col),
                         Cmd3D::Plane(x, y, z, sx, sz, col) =>
                             d3.draw_plane(Vector3::new(*x, *y, *z), Vector2::new(*sx, *sz), *col),
                         Cmd3D::Line(x1, y1, z1, x2, y2, z2, col) =>
-                            d3.draw_line3D(Vector3::new(*x1, *y1, *z1), Vector3::new(*x2, *y2, *z2), *col),
+                            d3.draw_line_3D(Vector3::new(*x1, *y1, *z1), Vector3::new(*x2, *y2, *z2), *col),
                         Cmd3D::Point(x, y, z, col) =>
                             d3.draw_point3D(Vector3::new(*x, *y, *z), *col),
                         Cmd3D::Grid(slices, spacing) =>
@@ -9657,8 +9709,10 @@ fn render_scene<D: RaylibDraw>(
                         }
                         Cmd3D::Capsule(p, r, col, wires) => {
                             let (a, b) = (Vector3::new(p[0], p[1], p[2]), Vector3::new(p[3], p[4], p[5]));
-                            if *wires { d3.draw_capsule_wires(a, b, *r, 16, 8, *col); }
-                            else { d3.draw_capsule(a, b, *r, 16, 8, *col); }
+                            // raylib 6.2: (rings, slices) wie DrawSphere -- vorher
+                            // (slices, rings). Weiter 8 Ringe, 16 Segmente.
+                            if *wires { d3.draw_capsule_wires(a, b, *r, 8, 16, *col); }
+                            else { d3.draw_capsule(a, b, *r, 8, 16, *col); }
                         }
                         Cmd3D::CylinderEx(p, r1, r2, col) =>
                             d3.draw_cylinder_ex(Vector3::new(p[0], p[1], p[2]), Vector3::new(p[3], p[4], p[5]),
@@ -9675,7 +9729,7 @@ fn render_scene<D: RaylibDraw>(
                         }
                         Cmd3D::Circle3D(x, y, z, r, col) =>
                             // raylibs Kreis liegt in der x-y-Ebene; um x gedreht liegt er flach.
-                            d3.draw_circle3D(Vector3::new(*x, *y, *z), *r, Vector3::new(1.0, 0.0, 0.0), 90.0, *col),
+                            d3.draw_circle_3D(Vector3::new(*x, *y, *z), *r, Vector3::new(1.0, 0.0, 0.0), 90.0, *col),
                         Cmd3D::BBox(p, col) =>
                             d3.draw_bounding_box(raylib::ffi::BoundingBox {
                                 min: Vector3::new(p[0], p[1], p[2]).into(),
@@ -9950,7 +10004,20 @@ fn render_scene<D: RaylibDraw>(
                         let roundness = if half > 0.0 { ((*radius * s) as f32 / half).clamp(0.0, 1.0) } else { 0.0 };
                         let rec = Rectangle::new(x as f32, y as f32, w as f32, h as f32);
                         if *filled { d.draw_rectangle_rounded(rec, roundness, 12, *col); }
-                        else { d.draw_rectangle_rounded_lines(rec, roundness, 12, *col); }
+                        else {
+                            // Der Umriss liegt wie bis raylib 6.0 einen Punkt
+                            // AUSSERHALB des Rechtecks (Radius + 1). raylib 6.2
+                            // zeichnet ihn innen; mit dem um 1 vergroesserten
+                            // Rechteck und Radius ergeben sich genau die alten
+                            // Eckpunkte und Boegen (Auswahl im Fliesslayout).
+                            let aussen = Rectangle::new(x as f32 - 1.0, y as f32 - 1.0, w as f32 + 2.0, h as f32 + 2.0);
+                            let r = half * roundness;
+                            if roundness <= 0.0 { d.draw_rectangle_lines_ex(aussen, 1.0, *col); }
+                            else if r > 0.0 {
+                                let rund = (2.0 * (r + 1.0) / aussen.width.min(aussen.height)).min(1.0);
+                                d.draw_rectangle_rounded_lines(aussen, rund, 12, *col);
+                            }
+                        }
                     }
                     Cmd::RoundGradient(x1, y1, x2, y2, radius, c1, c2) => {
                         let x = (*x1).min(*x2) * s;
@@ -11214,7 +11281,7 @@ fn vorschau_strichzug(img: &mut Image, punkte: &[(f64, f64)], strichel: (f64, f6
             if strich {
                 let p = |t: f64| (a.0 + (b.0 - a.0) * t / laenge, a.1 + (b.1 - a.1) * t / laenge);
                 let (p1, p2) = (p(s), p(e));
-                img.draw_line(p1.0.round() as i32, p1.1.round() as i32, p2.0.round() as i32, p2.1.round() as i32, farbe);
+                bild_linie(img, p1.0.round() as i32, p1.1.round() as i32, p2.0.round() as i32, p2.1.round() as i32, farbe);
             }
             stand += e - s;
             s = e;

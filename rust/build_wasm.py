@@ -1,6 +1,6 @@
 """Baut `dhrt` als WebAssembly (emscripten) fuer den Web-Playground.
 
-**Status: experimentell.** Die native Runtime nutzt raylib (raylib-rs); ein
+**Status: experimentell.** Die native Runtime nutzt raylib (sola-raylib); ein
 funktionierender Web-Build braucht die emscripten-Toolchain (`emcc`) UND den
 Rust-Target `wasm32-unknown-emscripten`. Beides ist in dieser Umgebung nicht
 installiert -> das Skript kompiliert dann nur die `.dhc` und gibt eine
@@ -177,6 +177,12 @@ def emcc_flags(out_dir: str | Path) -> list:
         # dem Web-Pfad auf, und ohne den Export bricht das Programm ab
         # (SET_FULLSCREEN(TRUE) ist in Spielen/Demos die Regel).
         "-s", "EXPORTED_RUNTIME_METHODS=['callMain','FS','print','requestFullscreen']",
+        # JPG laedt raylib 6.2 per Vorgabe nicht (config.h, `#ifndef`), und
+        # sola-raylib bietet dafuer kein Feature. emcc nimmt EMCC_CFLAGS bei
+        # JEDEM Aufruf mit, also auch beim Uebersetzen von raylib -- die
+        # CFLAGS der Umgebung ersetzt sola-raylib-sys unter Windows durch
+        # eigene (rust/build_runtime.py, RAYLIB_CFLAGS, fuer den Desktop).
+        "-DSUPPORT_FILEFORMAT_JPG=1",
         # Quelle einbetten -> dhrt kompiliert sie im Browser selbst (Front-End-
         # Port, kein Pyodide). Der frühere Python-.dhc-Fallback entfällt (Stufe B:
         # Python-Compiler/serialize entfernt).
@@ -262,7 +268,7 @@ def copy_assets(dh_path: str | Path, out_dir: str | Path = WEB) -> int:
 def leere_gl_ersatzbibliotheken() -> Path:
     """Leere `libGLESv2.a`/`libGLdispatch.a` anlegen und ihren Ordner liefern.
 
-    raylib-sys haengt fuer sein `opengl_es_30`-Feature bedingungslos
+    sola-raylib-sys haengt fuer sein `opengl_es_30`-Feature bedingungslos
     `-lGLESv2 -lGLdispatch` an -- auch fuer emscripten, wo es diese
     Bibliotheken gar nicht gibt (der Browser liefert GL selbst, und emscripten
     linkt es ueber `-lGL-webgl2-getprocaddr`). Der Ziel-Filter fehlt dort
