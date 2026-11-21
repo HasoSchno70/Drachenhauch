@@ -2016,4 +2016,5 @@ GUI_FILETREE_ICON: kein Muster -- so: "*.dh", "*.json;*.ini" oder "/" fuer Ordne
 {}: '{}' ist leer (0 Byte)	{}: '{}' is empty (0 bytes)
 {}: '{}' beginnt wie ein {}-Bild, ist aber beschaedigt oder unvollstaendig ({} Byte)	{}: '{}' starts like a {} image but is damaged or incomplete ({} bytes)
 {}: '{}' ist kein Bild, das sich lesen laesst -- gelesen werden PNG, JPG, BMP, GIF und QOI	{}: '{}' is not an image that can be read -- readable formats are PNG, JPG, BMP, GIF and QOI
+TRY ohne CATCH und ohne FINALLY verschluckt jeden Fehler still -- danach weiss niemand, dass einer da war. Mit CATCH e den Fehler ansehen (oder ausdruecklich schlucken: ein leeres CATCH); FINALLY raeumt nur auf und reicht ihn weiter	TRY without CATCH and without FINALLY silently swallows every error -- afterwards nobody knows there was one. Look at the error with CATCH e (or swallow it on purpose: an empty CATCH); FINALLY only cleans up and passes it on
 {}: Erwartet COROUTINE, erhalten {} -- eine Koroutine liefert nur der Aufruf einer FUNCTION oder SUB, die YIELD enthaelt	{}: expected COROUTINE, got {} -- only a call of a FUNCTION or SUB that contains YIELD gives a coroutine

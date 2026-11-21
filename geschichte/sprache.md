@@ -1400,3 +1400,21 @@ jetzt das Minus, wenn nach dem Runden nur Nullen bleiben -- das gilt fuer
 jede Beschriftung (Skala, Werte, Tooltip, Tacho). Rust-Test
 `fmt_value_null_ohne_vorzeichen`; Gegenprobe: ohne das Streichen faellt er
 an "-0 Grad".
+
+Kapitel 23 (Fehler, die man faengt) baut eine Diaschau, die kaputte
+Dateien ueberlebt. Ein leeres, ein halbes und ein Text-"Bild" lieferten
+dreimal dieselbe Zeile von raylib: "image data is null, either the file
+doesnt exist or the image type is unsupported" -- ohne Dateinamen, und
+"doesnt exist" stimmte nicht (das fehlende Bild faengt `datei_da` vorher
+ab). Jetzt sagt `builtins::bild_unlesbar`, welche Datei und warum: leer
+(0 Byte), beginnt wie ein PNG/JPG/GIF/BMP/QOI-Bild und ist beschaedigt,
+oder ist gar keins. `image_io.dhtest` (ein Fall) und ein Rust-Test;
+Gegenprobe: mit der alten Meldung faellt der Fall.
+
+Dazu: `TRY ... END TRY` ganz ohne CATCH und FINALLY verschluckt jeden
+Fehler still -- im Kapitel das Beispiel, in dem eine Division durch null
+spurlos verschwindet. Das Verhalten bleibt (bestehender Code), aber der
+Uebersetzer warnt jetzt; ein leeres `CATCH` schluckt ausdruecklich und
+bleibt still. Im Repo traf die Warnung keine Datei.
+`compiler_warnungen.dhtest` (ein Fall: genau eine Warnung unter vier
+Formen); Gegenprobe: ohne die Warnung faellt er.

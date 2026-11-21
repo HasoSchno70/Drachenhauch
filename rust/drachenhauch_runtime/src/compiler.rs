@@ -4646,6 +4646,15 @@ impl Compiler {
                       has_catch: bool, finally_block: &[Node]) -> CR {
         let try_zeile = self.ctx.cur_line;
         let hat_finally = !finally_block.is_empty();
+        // Ganz ohne CATCH und FINALLY verschwindet jeder Fehler spurlos (das
+        // bleibt so, siehe unten) -- aber gewollt ist das selten; ein leeres
+        // `CATCH` sagt es ausdruecklich (Buch "Kleine Wunder", Kapitel 23).
+        if !has_catch && !hat_finally {
+            self.warnings.push((try_zeile,
+                "TRY ohne CATCH und ohne FINALLY verschluckt jeden Fehler still -- danach weiss niemand, dass einer da war. \
+                 Mit CATCH e den Fehler ansehen (oder ausdruecklich schlucken: ein leeres CATCH); \
+                 FINALLY raeumt nur auf und reicht ihn weiter".to_string()));
+        }
         let fin_jmp = if hat_finally { Some(self.ctx.emit(oc::TRY_BEGIN, Value::Null)) } else { None };
         // Ohne CATCH gibt es keinen zweiten Handler. Ausnahme: das alte
         // `TRY ... END TRY` ganz ohne beides schluckt Fehler -- das war schon

@@ -4088,3 +4088,48 @@ nachher
 --- stderr
 fall.dh:19: Warnung: 'warten' ist eine Koroutine (sie enthaelt YIELD)
 fall.dh:28: Warnung: 'gehen' ist eine Koroutine
+
+=== try ohne catch und finally warnt
+' TRY ... END TRY ganz ohne CATCH und FINALLY verschluckt jeden Fehler
+' still (Buch "Kleine Wunder", Kapitel 23). Ein leeres CATCH schluckt
+' ausdruecklich, FINALLY reicht weiter -- beide bleiben still, ebenso
+' CATCH mit Namen. Genau eine Warnung, an Zeile 2.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = lesen$(pc)
+DIM teile AS ARRAY OF STRING : teile = SPLIT$(roh, "TRY ohne CATCH und ohne FINALLY")
+PRINT "warnungen: "; LEN(teile) - 1
+PRINT "an zeile 2: "; INSTR(roh, CHR$(34) + "line" + CHR$(34) + ":2,") >= 0
+--- datei w.dh
+DIM n AS INTEGER
+TRY
+    n = 1 \ n
+END TRY
+TRY
+    n = 1 \ n
+CATCH
+END TRY
+TRY
+    n = 2
+FINALLY
+    PRINT n
+END TRY
+TRY
+    n = 1 \ n
+CATCH e
+    PRINT e
+END TRY
+
+--- erwartet
+warnungen: 1
+an zeile 2: TRUE

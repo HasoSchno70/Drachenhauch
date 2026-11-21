@@ -1596,7 +1596,8 @@ nach außen.
 
 > **`TRY ... END TRY` ganz ohne `CATCH` und ohne `FINALLY`** verschluckt einen
 > Fehler stillschweigend. Das war schon immer so und bleibt so — aber es ist
-> selten das, was man will.
+> selten das, was man will. Darum warnt der Übersetzer dabei; wer einen
+> Fehler wirklich schlucken will, schreibt ein leeres `CATCH`.
 
 ### Fehler-Code: entscheiden, ohne Texte zu vergleichen
 

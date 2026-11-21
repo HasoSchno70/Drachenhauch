@@ -1593,7 +1593,8 @@ out.
 
 > **`TRY ... END TRY` with neither `CATCH` nor `FINALLY`** silently swallows an
 > error. That has always been so and stays so — but it is
-> rarely what you want.
+> rarely what you want. That is why the compiler warns about it; if you
+> really want to swallow an error, write an empty `CATCH`.
 
 ### Error code: decide without comparing texts
 
