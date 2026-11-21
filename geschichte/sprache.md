@@ -1449,3 +1449,12 @@ einem Licht 4 Einheiten ueber dem Boden: 46 von 255 mit `MODEL`, 200 mit
 der Rest ist der Unterschied zwischen PBR und Blinn-Phong).
 `g3d_licht.dhtest` (ein Fall); Gegenprobe: mit 1/d^2 faellt er an
 #2E2E2E.
+
+Kapitel 25 (Flug ueber eine Landschaft) zeichnet 1500 Baeume mit zwei
+`MODEL_INSTANCED`-Aufrufen ueber einem Gelaende im Dunst. Die fernen
+Baeume standen scharf und dunkel vor Bergen, die schon im Nebel
+verschwanden: Der Instancing-Shader kannte `LIGHT_FOG` nicht. Jetzt hat
+er dieselben Uniforms (`fogColor`, `fogDensity`) und dieselbe Formel wie
+der Licht-Shader, mit und ohne Licht. `g3d_licht.dhtest` (ein Fall:
+ein ferner Wuerfel in rotem Nebel, aus `MODEL` und aus `MODEL_INSTANCED`);
+Gegenprobe: ohne den Nebel im beleuchteten Zweig ist der rechte #FFFFFF.

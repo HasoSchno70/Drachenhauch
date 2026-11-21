@@ -98,3 +98,33 @@ DHRT_FRAMES=3
 groesse 320 200
 87 100 nicht #000000 +-80
 233 100 nicht #000000 +-80
+
+=== instanzen verschwinden im nebel wie modelle
+' Der Instancing-Shader kannte LIGHT_FOG nicht: tausend Baeume aus
+' MODEL_INSTANCED standen scharf vor Bergen im Dunst (Buch "Kleine
+' Wunder", Kapitel 25). In dichtem rotem Nebel ist ein ferner Wuerfel
+' rot -- links aus MODEL, rechts aus MODEL_INSTANCED.
+IMPORT "g3d"
+IMPORT "m3d"
+SCREEN(320, 200, "nebel", 1)
+LIGHT_ENABLE()
+LIGHT_AMBIENT(&HFFFFFF, 0.5)
+LIGHT_DIRECTIONAL(0, -1, -1, &HFFFFFF)
+LIGHT_FOG(&HFF0000, 0.2)
+DIM w AS INTEGER : w = MESH_CUBE(4, 4, 4) : MODEL_LIT(w)
+DIM v AS INTEGER : v = MESH_CUBE(4, 4, 4) : MODEL_LIT(v)
+DIM m[1] AS MAT4
+m[0] = MAT4_TRANSLATE(4, 0, -20)
+WHILE NOT QUITREQUESTED()
+    CLS(&H000000)
+    CAMERA3D(0, 0, 5, 0, 0, -20, 40)
+    MODEL(w, -4, 0, -20, 1.0, &HFFFFFF)
+    MODEL_INSTANCED(v, m, &HFFFFFF)
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=3
+--- bild
+groesse 320 200
+112 100 #FF0000 +-30
+206 100 #FF0000 +-30
