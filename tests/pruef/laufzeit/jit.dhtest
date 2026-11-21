@@ -6443,7 +6443,7 @@ PRINT i; " "; s
 --- umgebung
 DHRT_JIT=aus
 --- erwartet
-gefangen: Tupel-Destructuring: 2 Ziele, aber Tupel hat 3 Element(e)
+gefangen: Tupel entpacken: links stehen 2 Namen, das Tupel hat aber 3 Werte
 3 9
 
 === tupel mit falscher laenge (maschinencode)
@@ -6468,7 +6468,7 @@ PRINT i; " "; s
 DHRT_JIT=immer
 DHRT_JIT_BILANZ=1
 --- erwartet
-gefangen: Tupel-Destructuring: 2 Ziele, aber Tupel hat 3 Element(e)
+gefangen: Tupel entpacken: links stehen 2 Namen, das Tupel hat aber 3 Werte
 3 9
 --- stderr
 jit: 0 Funktionen, 1 Schleifen, 0 Schleifenlaeufe

@@ -1,0 +1,18 @@
+' Kapitel 19, was schiefgehen kann: je Bild geglaettet statt nach der
+' Zeit. Eine halbe Sekunde lang folgt ein Wert der 1 -- bei 30, 60 und
+' 144 Bildern je Sekunde.
+DIM fps AS INTEGER
+FOR EACH fps IN [30, 60, 144]
+    DIM je_bild AS FLOAT
+    DIM nach_zeit AS FLOAT
+    ' So weit kommt der Wert je Bild, wenn er in 0,25 s zwei Drittel
+    ' des Wegs zuruecklegen soll.
+    DIM anteil AS FLOAT : anteil = 1 - EXP(-(1 / fps) / 0.25)
+    DIM bild AS INTEGER
+    FOR bild = 1 TO fps \ 2
+        je_bild = je_bild + (1 - je_bild) * 0.1
+        nach_zeit = nach_zeit + (1 - nach_zeit) * anteil
+    NEXT
+    PRINT fps; " Bilder/s: je Bild "; FORMAT$(je_bild, "%.2f"); _
+          ", nach der Zeit "; FORMAT$(nach_zeit, "%.2f")
+NEXT

@@ -1,0 +1,3 @@
+' Bild fuer Kapitel 17: dieselben Striche mit neun Teilen und ohne
+' Spiegeln (Tasten 9 und M, siehe .txt).
+IMPORT "../../code/kap17/2_kaleidoskop.dh"

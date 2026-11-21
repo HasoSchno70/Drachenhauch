@@ -189,7 +189,7 @@ Fuer prozedurale Sounds ohne Audio-Files. Liefert ein `SOUND`-Objekt, das du wie
 
 | Funktion | Wirkung |
 |---|---|
-| `AUDIO_TONE(freq_hz, duration_ms[, waveform$[, vol]])` | Sine/Square/Saw/Triangle-Ton |
+| `AUDIO_TONE(freq_hz, duration_ms[, waveform$[, vol]])` | Sine/Square/Saw/Triangle-Ton, 5 ms ein- und ausgeblendet gegen Knacken -- endlos gespielt (`loops = -1`) ohne die Blenden; nahtlos ist die Schleife, wenn sie ganze Schwingungen enthält (1000 ms bei ganzzahliger Frequenz) |
 | `AUDIO_NOISE(duration_ms[, vol])` | Weisses Rauschen |
 | `AUDIO_NOTE(wf$, freq, duration_ms, attack_ms, decay_ms, sustain, release_ms, vol[, vib_depth, vib_speed, detune_cents, slide_semitones])` | eine gehaltene Note mit echter ADSR-Hüllkurve, Vibrato, Detune-Schicht und Portamento — das Instrument für Tracker und Musik; `vib_depth` ist ein Anteil der Frequenz (0.005 = ±0,5 %), keine Halbtöne |
 
@@ -502,6 +502,7 @@ kommt, als Datei will, schneidet den Mixer mit:
 | `AUDIO_RECORD_STOP()` → SOUND | beenden und als Klang liefern (Stereo, Abtastrate des Geraets); ohne laufenden Mitschnitt ein Fehler |
 | `AUDIO_RECORDING()` → BOOLEAN | laeuft ein Mitschnitt? |
 | `AUDIO_PEAK()` → FLOAT | hoechster Ausschlag am Master seit dem letzten Aufruf, nach der Master-Lautstaerke; ueber 1.0 heisst Uebersteuern |
+| `AUDIO_FFT(arr)` | das Spektrum des Masters: fuellt ein `ARRAY OF FLOAT` mit so vielen Baendern, wie es Plaetze hat, tief links, hoch rechts, logarithmisch verteilt (jede Oktave gleich viele), jedes 0..1. Die Hoehe regelt sich selbst nach (der lauteste Wert der letzten Sekunden ist 1), und ein Band faellt langsam statt sofort (auf 80 % je sechzigstel Sekunde) -- beides nach der Uhr, nicht nach der Zahl der Aufrufe. Ein Feld ohne Plaetze (`DIM sp AS ARRAY OF FLOAT`) ist ein Fehler: `DIM sp[64] AS FLOAT` |
 
 ```basic
 AUDIO_RECORD_START()

@@ -1094,6 +1094,9 @@ pub struct Vm<'p> {
     mic_baender: Vec<f32>,
     #[cfg(feature = "graphics")]
     mic_agc: f32,
+    /// Wann MIC_FFT zuletzt gefragt wurde (`audio::vergangen`).
+    #[cfg(feature = "graphics")]
+    mic_fft_zuletzt: Option<std::time::Instant>,
     /// WebSocket-Server und -Verbindungen (WS_*), OSC-Anschluesse,
     /// das Ergebnis der letzten mDNS-Suche und der mDNS-Antworter.
     #[cfg(feature = "net")]
@@ -1315,6 +1318,8 @@ impl<'p> Vm<'p> {
             mic_baender: Vec::new(),
             #[cfg(feature = "graphics")]
             mic_agc: 1e-4,
+            #[cfg(feature = "graphics")]
+            mic_fft_zuletzt: None,
             #[cfg(feature = "net")]
             ws_server: Vec::new(),
             #[cfg(feature = "net")]
@@ -4022,7 +4027,7 @@ impl<'p> Vm<'p> {
                     let t = vm_pop(stack)?;
                     if let Value::Tuple(items) = t {
                         if items.len() != len {
-                            return Err(format!("Tupel-Destructuring: {} Ziele, aber Tupel hat {} Element(e)", len, items.len()));
+                            return Err(format!("Tupel entpacken: links stehen {} Namen, das Tupel hat aber {} Werte", len, items.len()));
                         }
                         for v in items.iter().rev() { stack.push(v.clone()); }
                     } else {

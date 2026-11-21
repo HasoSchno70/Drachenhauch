@@ -1,0 +1,10 @@
+' Kapitel 17, was schiefgehen kann: ATAN2 mit vertauschten Argumenten.
+CONST MITTE_X = 400
+CONST MITTE_Y = 250
+DIM x AS INTEGER : x = 600
+DIM y AS INTEGER : y = 250
+DIM w AS FLOAT : w = ATAN2(x - MITTE_X, y - MITTE_Y)
+DIM r AS FLOAT : r = HYPOT(x - MITTE_X, y - MITTE_Y)
+PRINT "Maus bei "; x; ", "; y
+PRINT "gemalt bei "; ROUND(MITTE_X + r * COS(w)); ", "; _
+      ROUND(MITTE_Y + r * SIN(w))

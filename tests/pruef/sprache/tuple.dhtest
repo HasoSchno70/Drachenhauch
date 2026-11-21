@@ -91,14 +91,14 @@ DIM x AS INTEGER
 DIM y AS INTEGER
 (x, y) = (1, 2, 3)
 --- fehler
-Tupel-Destructuring: 2 Ziele, aber Tupel hat 3 Element(e)
+Tupel entpacken: links stehen 2 Namen, das Tupel hat aber 3 Werte
 
 === destructure length mismatch throws (2)
 DIM x AS INTEGER
 DIM y AS INTEGER
 (x, y) = (1, 2, 3)
 --- fehler
-Tupel-Destructuring: 2 Ziele, aber Tupel hat 3 Element(e)
+Tupel entpacken: links stehen 2 Namen, das Tupel hat aber 3 Werte
 
 === destructure non tuple throws (1)
 DIM x AS INTEGER

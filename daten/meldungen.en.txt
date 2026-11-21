@@ -86,7 +86,8 @@ SWAP a, b: erwartet ',' zwischen den beiden Variablen	SWAP a, b: expected ',' be
 IMPORT braucht Anfuehrungszeichen: IMPORT "{}" (eigene Datei mit Endung: IMPORT "{}.dh")	IMPORT needs quotes: IMPORT "{}" (your own file with its extension: IMPORT "{}.dh")
 '=' als Anweisung -- meintest du eine Zuweisung?	'=' as a statement -- did you mean an assignment?
 +=, -=, ++ ... auf dem Ergebnis eines Aufrufs liefe den Aufruf zweimal -- erst einer Variable zuweisen und dort aendern: r = f(...) : r[0] += 1	+=, -=, ++ ... on the result of a call would run the call twice -- assign it to a variable first and change it there: r = f(...) : r[0] += 1
-Tupel-Destructuring erwartet mindestens 2 Ziele	Tuple destructuring needs at least 2 targets
+Tupel entpacken braucht links mindestens 2 Namen	unpacking a tuple needs at least 2 names on the left
+Tupel entpacken: links stehen {} Namen, das Tupel hat aber {} Werte	unpacking a tuple: {} names on the left, but the tuple has {} values
 Erwartet '=' nach Tupel-Zielen	Expected '=' after the tuple targets
 Erwartet Variablenname als Tupel-Ziel	Expected a variable name as tuple target
 Erwartet ']'	Expected ']'
@@ -2009,3 +2010,4 @@ MIDI_CLOCK_SEND: Tempo {} ausserhalb 1..999 (0 haelt die Uhr an)	MIDI_CLOCK_SEND
 {}: {} Sechzehntel ausserhalb 0..16383	{}: {} sixteenths outside 0..16383
 GUI_FILETREE_COLOR: kein Muster -- so: "*.dh", "*.json;*.ini" oder "/" fuer Ordner	GUI_FILETREE_COLOR: no pattern -- like this: "*.dh", "*.json;*.ini" or "/" for folders
 GUI_FILETREE_ICON: kein Muster -- so: "*.dh", "*.json;*.ini" oder "/" fuer Ordner	GUI_FILETREE_ICON: no pattern -- like this: "*.dh", "*.json;*.ini" or "/" for folders
+{}: das Feld hat keine Plaetze -- es bekommt so viele Werte, wie es Plaetze hat: DIM werte[64] AS FLOAT	{}: the array has no slots -- it gets as many values as it has slots: DIM werte[64] AS FLOAT

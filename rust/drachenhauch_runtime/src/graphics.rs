@@ -1527,6 +1527,13 @@ pub struct Graphics {
     /// des naechsten FLIP hochgeladen -- tausend Formen in ein Bild kosteten
     /// sonst tausendmal die ganze Textur. Gelesen wird ohnehin `img`.
     tex_veraltet: Vec<usize>,
+    /// Mit IMAGE_FREE freigegebene Plaetze, deren Textur noch in einem
+    /// aufgezeichneten Befehl dieses Bildes stecken kann. Gezeichnet wird
+    /// erst beim FLIP; wer `DRAWIMAGE(b, ...) : IMAGE_FREE(b)` schreibt,
+    /// bekaeme sonst still nichts (Buch "Kleine Wunder", Kapitel 17:
+    /// Rueckgaengig legte ein Foto zurueck und gab es gleich frei). Das
+    /// Handle ist sofort gesperrt, die Textur geht erst nach dem FLIP.
+    tex_abraeumen: Vec<usize>,
     atlases: Vec<Atlas>,
     pub frame_count: u64,
     max_frames: Option<u64>,
@@ -2404,6 +2411,7 @@ impl Graphics {
             image_cache: HashMap::new(),
             tex_frei: Vec::new(),
             tex_veraltet: Vec::new(),
+            tex_abraeumen: Vec::new(),
             atlases: Vec::new(),
             frame_count: 0,
             max_frames,
@@ -5720,11 +5728,26 @@ impl Graphics {
         // weiter dieses Handle heraus, und der naechste Aufruf haette ein
         // freigegebenes Bild in der Hand.
         self.image_cache.retain(|_, h| *h != idx);
+        self.tex_frei[i] = true;
+        // Steht in diesem Bild schon etwas zum Zeichnen an, kann es dieses
+        // Bild brauchen: dann erst nach dem FLIP abraeumen (`tex_abraeumen`).
+        let ansteht = self.layers.iter().any(|l| !l.cmds.is_empty())
+            || self.render_targets.iter().any(|r| !r.cmds.is_empty())
+            || !self.cmds3d.is_empty();
+        if ansteht {
+            self.tex_abraeumen.push(i);
+            return Ok(());
+        }
+        self.textur_abraeumen(i)
+    }
+
+    /// Die Textur eines freigegebenen Platzes durch einen 1x1-Platzhalter
+    /// ersetzen -- erst damit sind Bild und GPU-Textur wirklich weg.
+    fn textur_abraeumen(&mut self, i: usize) -> Result<(), String> {
         let leer = Image::gen_image_color(1, 1, Color::new(0, 0, 0, 0));
         let tex = self.rl.load_texture_from_image(&self.thread, &leer)
             .map_err(|e| format!("IMAGE_FREE: {}", e))?;
         self.textures[i] = Tex { tex, img: leer };
-        self.tex_frei[i] = true;
         Ok(())
     }
 
@@ -8712,6 +8735,10 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         // Layer + 3D-Befehle fuer den naechsten Frame leeren (Immediate-Mode).
         for l in self.layers.iter_mut() { l.cmds.clear(); }
         self.cmds3d.clear();
+        // Was IMAGE_FREE in diesem Bild freigab, ist jetzt gezeichnet.
+        for i in std::mem::take(&mut self.tex_abraeumen) {
+            let _ = self.textur_abraeumen(i);
+        }
         // Der Abspieler schliesst offen gebliebene Clips am Bildende; der
         // Zaehler muss ihm folgen, sonst schleppte ein vergessenes SCISSOR
         // seine Tiefe ins naechste Bild und SCISSOR_END traefe dort ins Leere.

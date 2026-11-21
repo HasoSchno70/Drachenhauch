@@ -1859,6 +1859,7 @@ impl<'p> Vm<'p> {
                     if b.element_type != "float" || b.dims.len() != 1 {
                         return Err("AUDIO_FFT: erwartet 1D ARRAY OF FLOAT".into());
                     }
+                    if b.cells.len() == 0 { return Err(leeres_feld("AUDIO_FFT")); }
                     b.cells.len()
                 };
                 let mut tmp = vec![0.0f32; n];
@@ -3219,4 +3220,12 @@ wie viele Plaetze gelten", i + 1)),
         };
         Ok(Some(r))
     }
+}
+
+/// Ein Feld ohne Plaetze fuer AUDIO_FFT, MIC_FFT, MIC_WAVE: Sie fuellen so
+/// viele Werte, wie das Feld Plaetze hat -- bei `DIM sp AS ARRAY OF FLOAT`
+/// (leer) also still keinen (Buch "Kleine Wunder", Kapitel 19).
+#[allow(dead_code)]
+pub(crate) fn leeres_feld(f: &str) -> String {
+    format!("{}: das Feld hat keine Plaetze -- es bekommt so viele Werte, wie es Plaetze hat: DIM werte[64] AS FLOAT", f)
 }

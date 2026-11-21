@@ -1,0 +1,144 @@
+' Loesung zu Kapitel 17, Erweitern 2: Rueckgaengig. Vor jedem Strich
+' und vor dem Wischen wird das Blatt fotografiert; Z legt das letzte
+' Foto wieder auf das Blatt.
+' Die Stellen, die neu sind, stehen zwischen >>> und <<<.
+' >>> neu
+IMPORT "imgfx"
+' <<< neu
+CONST BREITE = 800
+CONST HOEHE = 500
+CONST MITTE_X = BREITE / 2
+CONST MITTE_Y = HOEHE / 2
+CONST GRUND = &H0C0A18
+
+SCREEN(BREITE, HOEHE, "Kaleidoskop")
+' Das Blatt: ein Zeichenziel, das von Bild zu Bild stehen bleibt.
+DIM blatt AS INTEGER : blatt = RENDERTARGET_NEW(BREITE, HOEHE, TRUE)
+RENDERTARGET_CLEAR(blatt, GRUND)
+
+DIM teile AS INTEGER : teile = 6
+DIM spiegeln AS BOOLEAN : spiegeln = TRUE
+DIM hilfe AS BOOLEAN : hilfe = TRUE
+DIM dicke AS INTEGER : dicke = 4
+DIM farbton AS FLOAT
+' >>> neu
+' Die Fotos, das juengste hinten. Jedes ist so gross wie das Fenster
+' (1,6 MB), darum hoechstens FOTOS_MAX.
+CONST FOTOS_MAX = 30
+DIM fotos AS ARRAY OF IMAGE
+
+SUB foto_machen()
+    ARRAY_PUSH(fotos, RENDERTARGET_IMAGE(blatt))
+    IF LEN(fotos) > FOTOS_MAX THEN
+        IMAGE_FREE(fotos[0])
+        ARRAY_REMOVE_AT(fotos, 0)
+    END IF
+END SUB
+' <<< neu
+
+' Ein Stueck Strich zwischen zwei Punkten, die als Winkel und Abstand
+' von der Mitte gegeben sind. Die Kreise an den Enden machen die Ecken
+' rund, wo zwei Stuecke aneinanderstossen.
+SUB linie(wa AS FLOAT, ra AS FLOAT, wb AS FLOAT, rb AS FLOAT, _
+          farbe AS INTEGER)
+    DIM xa AS FLOAT : xa = MITTE_X + ra * COS(wa)
+    DIM ya AS FLOAT : ya = MITTE_Y + ra * SIN(wa)
+    DIM xb AS FLOAT : xb = MITTE_X + rb * COS(wb)
+    DIM yb AS FLOAT : yb = MITTE_Y + rb * SIN(wb)
+    LINEW(xa, ya, xb, yb, dicke, farbe)
+    CIRCLE(xb, yb, dicke / 2, farbe)
+END SUB
+
+' Einen Strich von (x1, y1) nach (x2, y2) in jedem Teil zeichnen.
+' Gerechnet wird mit Winkel und Abstand von der Mitte: Drehen heisst
+' dann, zum Winkel etwas dazuzaehlen; Spiegeln, ihn umzudrehen.
+SUB strich(x1 AS FLOAT, y1 AS FLOAT, x2 AS FLOAT, y2 AS FLOAT, _
+           farbe AS INTEGER)
+    DIM w1 AS FLOAT : w1 = ATAN2(y1 - MITTE_Y, x1 - MITTE_X)
+    DIM r1 AS FLOAT : r1 = HYPOT(x1 - MITTE_X, y1 - MITTE_Y)
+    DIM w2 AS FLOAT : w2 = ATAN2(y2 - MITTE_Y, x2 - MITTE_X)
+    DIM r2 AS FLOAT : r2 = HYPOT(x2 - MITTE_X, y2 - MITTE_Y)
+    DIM k AS INTEGER
+    FOR k = 0 TO teile - 1
+        DIM dreh AS FLOAT : dreh = k * 2 * PI / teile
+        linie(w1 + dreh, r1, w2 + dreh, r2, farbe)
+        IF spiegeln THEN linie(dreh - w1, r1, dreh - w2, r2, farbe)
+    NEXT
+END SUB
+
+' Was nur zum Ansehen da ist und nicht ins Bild gehoert: die Grenzen
+' der Teile und, wo die Maus ist, ihre Spiegelbilder als Ringe.
+SUB hilfe_zeichnen(x AS FLOAT, y AS FLOAT)
+    DIM k AS INTEGER
+    FOR k = 0 TO teile - 1
+        DIM w AS FLOAT : w = k * 2 * PI / teile
+        LINE(MITTE_X, MITTE_Y, MITTE_X + 600 * COS(w), _
+             MITTE_Y + 600 * SIN(w), RGBA(255, 255, 255, 40))
+    NEXT
+    DIM wm AS FLOAT : wm = ATAN2(y - MITTE_Y, x - MITTE_X)
+    DIM rm AS FLOAT : rm = HYPOT(x - MITTE_X, y - MITTE_Y)
+    FOR k = 0 TO teile - 1
+        DIM dreh AS FLOAT : dreh = k * 2 * PI / teile
+        CIRCLE_OUTLINE(MITTE_X + rm * COS(wm + dreh), _
+                       MITTE_Y + rm * SIN(wm + dreh), _
+                       dicke / 2 + 3, RGBA(255, 255, 255, 120))
+        IF spiegeln THEN
+            CIRCLE_OUTLINE(MITTE_X + rm * COS(dreh - wm), _
+                           MITTE_Y + rm * SIN(dreh - wm), _
+                           dicke / 2 + 3, RGBA(255, 255, 255, 120))
+        END IF
+    NEXT
+    DIM zeile AS STRING : zeile = STR$(teile) + " Teile"
+    IF spiegeln THEN zeile = zeile + ", gespiegelt"
+    TEXT(10, 10, zeile + ", Dicke " + STR$(dicke), _
+         RGBA(255, 255, 255, 160))
+END SUB
+
+' Wo die Maus im letzten Bild war: Jeder Strich geht von dort nach hier.
+DIM alt_x AS FLOAT : alt_x = MOUSE_X()
+DIM alt_y AS FLOAT : alt_y = MOUSE_Y()
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
+    DIM x AS FLOAT : x = MOUSE_X()
+    DIM y AS FLOAT : y = MOUSE_Y()
+
+    ' Die Tasten: jede wirkt einmal, wenn sie heruntergeht.
+    DIM n AS INTEGER
+    FOR n = 2 TO 9
+        IF KEY_HIT(STR$(n)) THEN teile = n
+    NEXT
+    IF KEY_HIT(KEY_M) THEN spiegeln = NOT spiegeln
+    IF KEY_HIT(KEY_H) THEN hilfe = NOT hilfe
+    ' >>> neu
+    IF KEY_HIT(KEY_SPACE) THEN
+        foto_machen()
+        RENDERTARGET_CLEAR(blatt, GRUND)
+    END IF
+    IF KEY_HIT(KEY_Z) AND LEN(fotos) > 0 THEN
+        DIM foto AS IMAGE : foto = ARRAY_POP(fotos)
+        RENDERTARGET_BEGIN(blatt)
+        DRAWIMAGE(foto, 0, 0)
+        RENDERTARGET_END()
+        IMAGE_FREE(foto)
+    END IF
+    ' Ein Strich beginnt: vorher das Blatt festhalten.
+    IF MOUSE_HIT(0) THEN foto_machen()
+    ' <<< neu
+    dicke = CLAMP(dicke + ROUND(MOUSE_WHEEL()), 1, 20)
+
+    ' Malen: aufs Blatt, damit es bleibt. Die Farbe wandert durch den
+    ' Farbkreis, solange man malt -- in drei Sekunden einmal herum.
+    IF MOUSE_DOWN(0) THEN
+        farbton = farbton + DELTA() * 120
+        RENDERTARGET_BEGIN(blatt)
+        strich(alt_x, alt_y, x, y, HSV(farbton, 0.7, 1))
+        RENDERTARGET_END()
+    END IF
+    alt_x = x
+    alt_y = y
+
+    ' Jedes Bild: erst das Blatt, dann die Hilfe darueber -- die Hilfe
+    ' ist im naechsten Bild wieder weg, das Blatt nicht.
+    RENDERTARGET_DRAW(blatt, 0, 0)
+    IF hilfe THEN hilfe_zeichnen(x, y)
+    FLIP()
+WEND

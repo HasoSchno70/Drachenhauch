@@ -136,7 +136,7 @@ at all could be saved.
 | `IMAGE_DRAW_IMAGE(target, source, x, y [, qx, qy, qb, qh] [, tint])` | draw one image into another, blended with opacity; optionally only a section of the source (`qb`/`qh` = -1: up to the edge, so `tint:` alone works too) |
 | `IMAGE_SAVE(image, path$ [, with_alpha])` | write the image to a file (`.png`, `.bmp`, `.jpg`, `.tga`); with `FALSE` without an opacity channel (RGB) — print services reject a PNG with an alpha channel, even if every point is opaque. The opacity is simply left out, not blended in: anyone who wants a background lays the image onto an opaque one first |
 | `GETALPHA(image, x, y)` | opacity of an image point, 0..255; `-1` outside (core, no IMPORT needed) |
-| `IMAGE_FREE(image)` | release the image and its graphics-memory texture |
+| `IMAGE_FREE(image)` | release the image and its graphics-memory texture -- the handle is invalid at once; whatever this frame already drew with it still appears at `FLIP` |
 | `IMAGE_FROM_BUFFER(buffer)` | IMAGE — an image from the bytes of an image file (PNG, JPG, BMP, GIF, QOI, DDS), for example from `HTTP_BYTES` or `BUFFER_FROM_BASE64`; the format is in the first bytes |
 | `IMAGE_TO_BUFFER(image [, with_alpha])` | BUFFER — the image as PNG bytes, without a detour through a file; with `FALSE` without an opacity channel as with `IMAGE_SAVE` |
 | `IMAGE_MIPMAPS(image)` | INTEGER — create downscaled levels for the texture and filter trilinearly: a fine pattern on a distant 3D surface then no longer flickers. Returns the number of levels; after `IMAGE_DRAW_*` they are updated |

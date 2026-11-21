@@ -1,0 +1,24 @@
+' Kapitel 19, Schritt 1 -- ein Ton gleitet in acht Sekunden sieben
+' Oktaven hinauf, und das Spektrum zeigt, wo er gerade ist.
+IMPORT "audio"
+CONST BAENDER = 48
+CONST BODEN = 420
+
+SCREEN(800, 500, "Spektrum")
+DIM sp[BAENDER] AS FLOAT
+' Ein Sinus mit 55 Hz, acht Sekunden lang, der um 84 Halbtoene gleitet.
+DIM ton AS SOUND
+ton = AUDIO_NOTE("sine", 55, 8000, 5, 0, 1, 50, 0.6, 0, 0, 0, 84)
+AUDIO_PLAY(ton, -1)
+
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
+    AUDIO_FFT(sp)
+    CLS(RGB(10, 8, 24))
+    DIM i AS INTEGER
+    FOR i = 0 TO BAENDER - 1
+        DIM x AS FLOAT : x = i * 800 / BAENDER
+        BOX(x + 1, BODEN - sp[i] * 350, x + 800 / BAENDER - 1, BODEN, _
+            HSV(i / BAENDER * 280, 0.7, 1))
+    NEXT
+    FLIP()
+WEND

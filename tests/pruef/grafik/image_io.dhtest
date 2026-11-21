@@ -753,3 +753,39 @@ b = IMAGE_NEW(30, 20)
 PRINT IMAGE_WIDTH(b); " "; IMAGE_HEIGHT(b); " "; IMAGEWIDTH(b); " "; IMAGEHEIGHT(b)
 --- erwartet
 30 20 30 20
+
+=== freigeben gleich nach dem zeichnen zeichnet trotzdem
+' Gezeichnet wird erst beim FLIP. `DRAWIMAGE(b, ...) : IMAGE_FREE(b)` im
+' selben Bild zeichnete darum still nichts -- im Buch "Kleine Wunder"
+' (Kapitel 17) legte so ein Rueckgaengig sein Foto zurueck und gab es
+' gleich frei. Das Handle ist sofort gesperrt, die Textur geht erst
+' nach dem FLIP.
+IMPORT "imgfx"
+SCREEN(64, 64, "t", 1)
+DIM rt AS INTEGER : rt = RENDERTARGET_NEW(64, 64, TRUE)
+DIM b AS IMAGE : b = IMAGE_NEW(16, 16, &HFF0000)
+RENDERTARGET_BEGIN(rt)
+DRAWIMAGE(b, 0, 0)
+RENDERTARGET_END()
+IMAGE_FREE(b)
+TRY
+    PRINT IMAGEWIDTH(b)
+CATCH e
+    PRINT "gleich gesperrt"
+END TRY
+FLIP()
+DIM foto AS IMAGE : foto = RENDERTARGET_IMAGE(rt)
+PRINT HEX$(IMAGE_GET_PIXEL(foto, 4, 4))
+' Ohne anstehende Befehle geht es sofort, auch mehrmals hintereinander.
+DIM i AS INTEGER
+FOR i = 1 TO 3
+    DIM c AS IMAGE : c = IMAGE_NEW(8, 8, &H00FF00)
+    IMAGE_FREE(c)
+NEXT
+PRINT "fertig"
+--- umgebung
+DHRT_FRAMES=5
+--- erwartet
+gleich gesperrt
+FF0000
+fertig

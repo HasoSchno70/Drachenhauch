@@ -1,0 +1,17 @@
+' Kapitel 17, was schiefgehen kann: Die alte Mausstelle wird nur
+' beim Malen nachgefuehrt.
+SCREEN(800, 500, "Sprung")
+DIM blatt AS INTEGER : blatt = RENDERTARGET_NEW(800, 500, TRUE)
+DIM alt_x AS FLOAT
+DIM alt_y AS FLOAT
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
+    IF MOUSE_DOWN(0) THEN
+        RENDERTARGET_BEGIN(blatt)
+        LINEW(alt_x, alt_y, MOUSE_X(), MOUSE_Y(), 6, RGB(255, 200, 60))
+        RENDERTARGET_END()
+        alt_x = MOUSE_X()
+        alt_y = MOUSE_Y()
+    END IF
+    RENDERTARGET_DRAW(blatt, 0, 0)
+    FLIP()
+WEND
