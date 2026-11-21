@@ -745,4 +745,46 @@ module.exports = (H) => [
   ...neu("loesungen/kap18_zwei_stimmen.dh").map((t) => H.code(t)),
 
   H.p("Die zweite Stimme braucht einen eigenen Klang, denn AUDIO_PLAY beendet einen Klang, bevor es ihn neu startet. Und beide Stimmen sind Sägezähne, denn erst an den Obertönen hört man, worum es geht. Eine Quinte ist das Verhältnis 3 : 2 — das Dreifache des unteren Tons ist dann genau das Doppelte des oberen, und beide klingen im Sägezahn mit. Auf dem Klavier ist die Quinte aber sieben gleichstufige Halbtöne, 2^(7/12) = 1,4983, ein wenig kleiner. Bei 220 Hz liegen die beiden Obertöne dann bei 660 und 659,3 Hz, und zwei so nahe Töne schweben: Sie verstärken und schwächen sich im Wechsel, 0,74-mal je Sekunde. Gemessen schwoll der Anteil bei 660 Hz alle 1,35 Sekunden von fast null zum Höchstwert und zurück. Mit der reinen Quinte stand er still. Diesen Preis zahlt jedes Klavier für die zwölf gleichen Schritte: Keine Quinte ist ganz rein, dafür klingen alle Tonarten gleich."),
+
+  H.h2("Kapitel 19 · Ein Bild, das zuhört"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Mit 12 Bändern werden die Balken breit und ruhig, man sieht nur noch grob, ob unten, in der Mitte oder oben etwas los ist. Mit 128 werden die Höhen fein und unruhig, jeder Ton der Melodie hat seinen eigenen Strich. Links ändert sich dagegen wenig: Ganz links stehen jetzt 17 gleich hohe Balken statt 6. Mehr Bänder machen die Tiefe nicht genauer — dort reicht die Auflösung der FFT nicht, wie unter „Warum so?“ beschrieben. Bass, Mitte und Höhen bleiben ungefähr gleich, weil ihre Grenzen Anteile von BAENDER sind."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Ohne die Sperre zählt jeder Schlag etwa fünfmal: Der Bass bleibt nach dem Anschlag der Trommel einige Bilder lang über dem Schnitt, und in jedem dieser Bilder gilt die Bedingung — gemessen fünf Auslösungen im Abstand von 17 ms, also Bild für Bild. Zu sehen ist nur, dass der Blitz etwas länger hell bleibt. Wer aber auf jeden Schlag etwas tut, das zählt — Funken werfen, einen Zähler erhöhen —, tut es fünfmal. Die Sperre von 0,2 Sekunden ist kürzer als der Abstand zweier Schläge (0,5 s) und länger als ein Anschlag."),
+
+  H.h3("Drehen 3"),
+
+  H.p("Mit 0,1 je Sekunde brauchen die Spitzen zehn Sekunden für die ganze Höhe — sie bleiben fast als Linie stehen und zeigen, wie laut jedes Band in den letzten Sekunden höchstens war. Mit 3 sind sie in einer Drittelsekunde unten und kleben fast an den Balken. Dazwischen liegt, was man von Pegelanzeigen kennt: Die Spitze hält kurz, damit das Auge sie fassen kann."),
+
+  H.h3("Erweitern 1: Kreis statt Balken"),
+
+  H.p("Statt der Balkenschleife eine, die Strahlen zeichnet (code/loesungen/kap19_kreis.dh):"),
+
+  ...neu("loesungen/kap19_kreis.dh").map((t) => H.code(t)),
+
+  H.p("Der Winkel läuft für die Bänder nur über eine halbe Runde, von oben (0) nach unten (π); die äußere Schleife zeichnet jedes Band zweimal, mit seite = −1 und +1, und spiegelt so die rechte Hälfte nach links. SIN des Winkels ist der Schritt nach rechts, −COS der nach oben — dieselbe Rechnung wie beim Ziffernblatt in Kapitel 4, nur dass dort die Zeiger zur Uhrzeit zeigen und hier die Bänder zum Bass. Der innere Kreis wächst mit dem Bass, und alle Strahlen wandern mit ihm nach außen: Das ganze Bild atmet."),
+
+  H.h3("Erweitern 2: Farbe nach Bass"),
+
+  H.p("Zwei Zeilen genügen (code/loesungen/kap19_farbe.dh):"),
+
+  ...neu("loesungen/kap19_farbe.dh").map((t) => H.code(t)),
+
+  H.figure("kap19_farbe.png", "Erweitern 2: Bei kräftigem Bass hat sich der ganze Farbkreis um ein Stück gedreht, der Hintergrund ist blau statt violett.", 420, 262),
+
+  H.p("Mit bass statt bass_schnitt würden die Farben bei jedem Schlag springen und dazwischen zurückfallen — ein Flackern, viermal je Sekunde. Der Schnitt ändert sich langsam; die Farben wandern dann mit der Musik, lauter Bass zieht sie Richtung Grün und Blau, leiser zurück nach Rot."),
+
+  H.h3("Erfinden: Funken auf jedem Schlag"),
+
+  H.p("Eine Möglichkeit (code/loesungen/kap19_funken.dh): fünf Felder für die Funken, gefüllt bei jedem Schlag, bewegt in jedem Bild:"),
+
+  ...neu("loesungen/kap19_funken.dh").map((t) => H.code(t)),
+
+  H.figure("kap19_funken.png", "Erfinden: Vierzig Funken springen bei jedem Schlag aus dem Bass hoch und fallen zurück.", 420, 262),
+
+  H.p("Die Funken starten links unten, wo der Bass steht, und fliegen nach rechts oben; 500 Punkte je Sekunde zum Quadrat ziehen sie wieder herunter. Alles ist mit DELTA() gerechnet, wie im Kapitel. Entfernt wird von hinten nach vorn: Nimmt man Platz k heraus, rücken die dahinter nach vorn, und eine Schleife, die vorwärts zählt, übersprünge den nächsten. Hier wird es wichtig, dass ein Schlag nur einmal zählt — ohne die Sperre aus Drehen 2 kämen bei jedem Schlag 200 Funken statt 40."),
 ];

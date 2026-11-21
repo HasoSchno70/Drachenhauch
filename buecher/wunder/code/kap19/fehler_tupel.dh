@@ -1,0 +1,8 @@
+' Kapitel 19, was schiefgehen kann: ein Tupel mit drei Werten in zwei
+' Namen entpackt.
+FUNCTION drei_teile() AS TUPLE
+    RETURN (0.8, 0.4, 0.1)
+END FUNCTION
+DIM bass AS FLOAT
+DIM mitte AS FLOAT
+(bass, mitte) = drei_teile()

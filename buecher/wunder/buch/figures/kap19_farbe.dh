@@ -1,0 +1,3 @@
+' Bild fuer Kapitel 19 (Loesung kap19_farbe).
+RANDOMIZE(19)
+IMPORT "../../code/loesungen/kap19_farbe.dh"

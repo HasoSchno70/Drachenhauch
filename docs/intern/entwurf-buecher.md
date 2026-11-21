@@ -1,6 +1,6 @@
 # Entwurf: zwei neue Bücher
 
-Stand 2026-11-20. Zwei Bücher, die Drachenhauch für Leute öffnen, die mehr
+Stand 2026-11-21. Zwei Bücher, die Drachenhauch für Leute öffnen, die mehr
 wollen als den [Einstieg](../../buecher/einstieg/README.md), aber nicht das
 Nachschlagewerk lesen möchten:
 
@@ -704,6 +704,20 @@ geändert hat: Kapitel 15 baut zuerst das Plasma aus Kapitel 2 als Shader
 Trommel aus `AUDIO_NOTE`, keine Musikdatei. Kapitel 16 zeigt den
 Wasserfall als Übung; das Hauptprogramm ist ein Abendsee mit glitzerndem
 Wasser. `pruef_abdruck.js` prüft auch `.fs`-Dateien.
+
+Danach (2026-11-21): Teil V, Kapitel 17–19 (Malen mit Symmetrie, Der
+Theremin, Ein Bild, das zuhört). Funde in der Laufzeit, alle behoben und in
+`geschichte/sprache.md`: `IMAGE_FREE` gleich nach `DRAWIMAGE` zeichnete
+still nichts; eine endlose Schleife aus `AUDIO_TONE` hatte an jeder Naht
+eine Lücke (die 5-ms-Blenden); `AUDIO_MOD_REMOVE` ließ den Bus auf dem
+letzten Wert des Modulators stehen; `AUDIO_FFT` klang je Aufruf statt nach
+der Uhr ab; ein leeres Feld für `AUDIO_FFT` blieb still; die Meldung beim
+Entpacken eines Tupels war halb englisch. Was sich am Entwurf geändert
+hat: Kapitel 18 nimmt statt eines Modulators auf der Tonhöhe (gibt es
+nicht, Modulatoren fahren nur Bus-Parameter) ein Tremolo auf der
+Lautstärke, das Vibrato rechnet die Übung selbst; Kapitel 19 spielt ein
+selbst gemischtes Stück, keine Musikdatei. Ton wird am Mitschnitt gemessen
+(`AUDIO_RECORD_START`, als WAV gesichert und ausgewertet), nicht nach Gehör.
 
 Was beim Bauen festgelegt wurde:
 
