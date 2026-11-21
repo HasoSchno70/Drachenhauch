@@ -1428,3 +1428,12 @@ weichen sie ab, wird neu geladen (neues Handle, das alte gilt weiter).
 Fehlt die Datei inzwischen, bleibt es beim Cache wie bisher.
 `image_io.dhtest` (ein Fall); Gegenprobe: ohne den Vergleich faellt er
 mit "100 TRUE 100 TRUE 100".
+
+Beim Nachpruefen einer Antwort (die Diaschau ohne `FILEEXISTS` vor
+`titel_lesen`) kam "OPENFILE: Das System kann die angegebene Datei nicht
+finden. (os error 2)" -- ohne den Namen der Datei. Zum Lesen fragt
+`OPENFILE` jetzt vorher `datei_da` wie `LOADIMAGE` und `LOADSOUND` ("Datei
+'x' nicht gefunden (gesucht relativ zu ...)"), beim Schreiben und Anhaengen
+steht der Name vor dem Text des Betriebssystems. `umstieg.dhtest` (zwei
+Faelle); Gegenprobe: ohne `datei_da` bzw. mit der alten Meldung faellt je
+der eine.

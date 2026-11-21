@@ -946,6 +946,20 @@ PLAYMUSIC("gibtsnicht.ogg")
 --- fehler
 AUDIO_MUSIC_LOAD: Datei 'gibtsnicht.ogg' nicht gefunden (gesucht relativ zu
 
+=== eine fehlende datei zum lesen nennt datei und ordner
+' "OPENFILE: Das System kann die angegebene Datei nicht finden" sagte
+' nicht, welche (Buch "Kleine Wunder", Kapitel 23).
+DIM f AS FILE : f = OPENFILE("gibtsnicht.txt", "r")
+--- fehler
+OPENFILE: Datei 'gibtsnicht.txt' nicht gefunden (gesucht relativ zu
+
+=== eine datei in einem fehlenden ordner nennt sich
+' Der Text des Betriebssystems ist uebersetzt -- geprueft wird der eigene
+' Teil mit dem Namen.
+DIM f AS FILE : f = OPENFILE("gibtsnicht/x.txt", "w")
+--- fehler
+OPENFILE: 'gibtsnicht/x.txt':
+
 === eine klasse braucht NEW
 CLASS Spieler
     DIM hp AS INTEGER

@@ -3471,9 +3471,18 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 false => crate::kodierung::Kodierung::Utf8,
             };
             let h = match mode {
-                "r" => FileH::Read(std::io::BufReader::new(std::fs::File::open(resolve_asset_path(&path)).map_err(|e| format!("OPENFILE: {}", e))?)),
-                "w" => FileH::Write(std::fs::File::create(&path).map_err(|e| format!("OPENFILE: {}", e))?),
-                "a" => FileH::Write(std::fs::OpenOptions::new().append(true).create(true).open(&path).map_err(|e| format!("OPENFILE: {}", e))?),
+                // Die Meldung nennt die Datei: "OPENFILE: Das System kann die
+                // angegebene Datei nicht finden" sagte nicht, welche (Buch
+                // "Kleine Wunder", Kapitel 23).
+                "r" => {
+                    let p = resolve_asset_path(&path);
+                    datei_da(&p, "OPENFILE")?;
+                    FileH::Read(std::io::BufReader::new(std::fs::File::open(&p)
+                        .map_err(|e| format!("OPENFILE: '{}': {}", path, e))?))
+                }
+                "w" => FileH::Write(std::fs::File::create(&path).map_err(|e| format!("OPENFILE: '{}': {}", path, e))?),
+                "a" => FileH::Write(std::fs::OpenOptions::new().append(true).create(true).open(&path)
+                    .map_err(|e| format!("OPENFILE: '{}': {}", path, e))?),
                 _ => return err(format!("OPENFILE: ungueltiger Modus '{}' (erlaubt: r, w, a)", mode)),
             };
             Ok(Value::File(Rc::new(RefCell::new(DhFile { path, h, kod, am_anfang: true }))))
