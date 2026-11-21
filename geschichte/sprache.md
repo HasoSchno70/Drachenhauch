@@ -1382,3 +1382,12 @@ MIN, MAX, INDEXOF, MAP, FILTER, REDUCE, FIND, COPY, JOIN$). SORT und die
 anderen, die ein Feld veraendern, bleiben beim Fehler. Der Weg kostet je
 Aufruf einen Blick auf das erste Argument. `comprehensions.dhtest` (ein
 Fall); Gegenprobe: ohne den Umbau faellt er an ARRAY_AVG.
+
+Beim Fehlerbeispiel dazu (ein vertippter Monat, das WHERE laesst nichts
+durch) meldete `ARRAY_AVG` "nur ARRAY OF INTEGER/FLOAT": Ein leeres Tupel
+wird ein Feld ohne Elementtyp, und die Typpruefung kam vor der Pruefung
+auf leer. Jetzt laesst `numeric_1d_array` ein leeres Feld ohne Typ durch,
+und es heisst "Array ist leer". Dabei fiel auf, dass `ARRAY_SUM` eines
+leeren `ARRAY OF FLOAT` "-0.0" lieferte -- Rusts `sum()` ueber f64 beginnt
+bei -0.0; jetzt `fold(0.0, ...)`. `comprehensions.dhtest` (ein Fall);
+Gegenproben: strenge Typpruefung bzw. `sum()` lassen ihn je fallen.

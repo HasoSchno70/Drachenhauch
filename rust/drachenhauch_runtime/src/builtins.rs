@@ -487,7 +487,12 @@ fn numeric_1d_array<'a>(v: &'a Value, fn_: &str) -> Result<std::cell::Ref<'a, Dh
         _ => return Err(format!("{} erwartet ARRAY", fn_)),
     };
     if arr.dims.len() != 1 { return Err(format!("{}: nur 1D-Arrays", fn_)); }
-    if !matches!(arr.element_type.as_str(), "integer" | "float") {
+    // Ein leeres Feld ohne Elementtyp -- etwa aus einer Comprehension, deren
+    // WHERE nichts durchliess -- ist kein Typfehler: Es meldet sich danach
+    // mit "Array ist leer", das sagt, was los ist (Buch "Kleine Wunder",
+    // Kapitel 22: ein vertippter Monat).
+    let leer_ohne_typ = arr.cells.len() == 0 && arr.element_type == "any";
+    if !matches!(arr.element_type.as_str(), "integer" | "float") && !leer_ohne_typ {
         return Err(format!("{}: nur ARRAY OF INTEGER/FLOAT", fn_));
     }
     Ok(arr)
@@ -2221,7 +2226,9 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "array_sum" => {
             arity!(1);
             let arr = numeric_1d_array(&a[0], "ARRAY_SUM")?;
-            if arr.element_type == "integer" {
+            // Ein leeres Feld ohne Typ (eine leere Comprehension) summiert
+            // sich wie eines aus Ganzzahlen zu 0.
+            if arr.element_type == "integer" || arr.element_type == "any" {
                 let mut s: i64 = 0;
                 // Ueberlauf -> Fehler (konsistent mit Skalar-Arithmetik).
                 for v in arr.cells.iter() {
@@ -2233,7 +2240,9 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 }
                 Ok(Value::Int(s))
             } else {
-                Ok(Value::Float(arr.cells.iter().map(|v| as_f64(&v)).sum()))
+                // fold ab 0.0: `sum()` beginnt bei -0.0, und ein leeres
+                // ARRAY OF FLOAT ergab so "-0.0".
+                Ok(Value::Float(arr.cells.iter().fold(0.0, |s, v| s + as_f64(&v))))
             }
         }
         "array_avg" => {

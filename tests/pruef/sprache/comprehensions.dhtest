@@ -290,3 +290,20 @@ END TRY
 1.5 2.5
 3
 SORT erwartet ARRAY
+
+=== eine leere comprehension ist leer und kein typfehler
+' Liess das WHERE nichts durch, hiess ARRAY_AVG([...]) "nur ARRAY OF
+' INTEGER/FLOAT" -- das leere Feld hatte keinen Elementtyp. Jetzt kommt
+' "Array ist leer"; ARRAY_SUM eines leeren Felds ist 0 -- und eines leeren
+' ARRAY OF FLOAT 0.0, nicht wie bisher -0.0.
+DIM werte AS ARRAY OF FLOAT
+werte = [3.0, 1.5]
+PRINT ARRAY_SUM([w FOR w IN werte WHERE w > 5])
+DIM nichts AS ARRAY OF FLOAT
+PRINT ARRAY_SUM(nichts)
+PRINT ARRAY_AVG([w FOR w IN werte WHERE w > 5])
+--- erwartet
+0
+0.0
+--- fehler
+ARRAY_AVG: Array ist leer
