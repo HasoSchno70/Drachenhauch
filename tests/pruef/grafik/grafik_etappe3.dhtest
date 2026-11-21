@@ -43,6 +43,34 @@ halbkugel -1.00 -0.00 -1.00 1.00 1.00 1.00
 vieleck -0.87 0.00 -1.00 0.87 0.00 1.00
 labyrinth -0.50 0.00 -0.50 3.50 2.00 2.50
 
+=== ring und knoten so gross wie angegeben
+' MESH_TORUS(radius, thickness): die Mitte des Rohrs radius vom Zentrum,
+' das Rohr thickness dick -- der Ring steht aufrecht (x, y), z ist die
+' halbe Dicke. Bis 2026.52 gingen die Zahlen ungeaendert an raylib, das
+' sie anders liest: MESH_TORUS(1.0, 0.3) war ein Klumpen von 0.3 (Buch
+' "Kleine Wunder", Kapitel 25). Der Knoten reicht etwa radius weit.
+IMPORT "g3d"
+FUNCTION q$(m AS INTEGER) AS STRING
+    DIM b AS TUPLE : b = MODEL_BBOX(m)
+    DIM r AS STRING : r = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO 5
+        r = r + FORMAT$(b[i], "%.2f") + IIF(i < 5, " ", "")
+    NEXT
+    RETURN r
+END FUNCTION
+SCREEN(320, 200, "t")
+PRINT "ring "; q$(MESH_TORUS(1.0, 0.3, 16, 64))
+PRINT "gross "; q$(MESH_TORUS(4, 1, 16, 64))
+DIM b AS TUPLE : b = MODEL_BBOX(MESH_KNOT(2, 0.3, 16, 256))
+PRINT "knoten "; ROUND(MAX(b[3], b[4]), 1)
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+ring -1.15 -1.15 -0.15 1.15 1.15 0.15
+gross -4.50 -4.50 -0.50 4.50 4.50 0.50
+knoten 2.0
+
 === himmel aus einem bild in allen sechs richtungen
 ' Ein Streifen aus sechs Feldern (+X, -X, +Y, -Y, +Z, -Z) in mittleren
 ' Farben: in jeder Richtung genau die Farbe des Feldes. Mittlere Toene, weil

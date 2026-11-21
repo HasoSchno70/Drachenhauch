@@ -1458,3 +1458,18 @@ er dieselben Uniforms (`fogColor`, `fogDensity`) und dieselbe Formel wie
 der Licht-Shader, mit und ohne Licht. `g3d_licht.dhtest` (ein Fall:
 ein ferner Wuerfel in rotem Nebel, aus `MODEL` und aus `MODEL_INSTANCED`);
 Gegenprobe: ohne den Nebel im beleuchteten Zweig ist der rechte #FFFFFF.
+
+Fuer die Erfinden-Uebung in Kapitel 25 (Ringe zum Durchfliegen) war der
+Ring aus `MESH_TORUS(4, 0.5, ...)` ein Punkt. Die Laufzeit reichte
+`radius` und `thickness` ungeaendert an raylibs `GenMeshTorus(radius,
+size)` weiter, das sie anders liest: Ringradius size/2, Rohr size/2 mal
+radius (0.1..1). So war `MESH_TORUS(1.0, 0.3)` aus dem Handbuch ein
+Klumpen von 0.3, und jedes Beispiel mit Torus oder Knoten (88, 91, 93, 97,
+110, dhdemo) zeigte ihn zu klein -- niemandem aufgefallen, weil ein
+kleiner Ring auch ein Ring ist. Jetzt rechnen `torus_fuer_raylib` und
+`knoten_fuer_raylib` um: der Ring hat seinen Radius bis zur Mitte des
+Rohrs und seine Dicke, der Knoten reicht etwa radius weit (seine Dicke
+laesst raylib nur zwischen etwa einem Achtel und einem Viertel davon zu).
+Aufgefallen beim Vermessen: der Torus steht aufrecht in x-y, er liegt
+nicht. `grafik_etappe3.dhtest` (ein Fall); Gegenproben: ohne Umrechnung
+faellt der Ring (0.30 statt 1.15) bzw. der Knoten (0.3 statt 2.0).

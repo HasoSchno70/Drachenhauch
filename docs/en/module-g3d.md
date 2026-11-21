@@ -65,8 +65,8 @@ and guide lines. Anyone who needs the same shape often uses a model (see below).
 | `MESH_CUBE(width, height, depth)` | INTEGER | box as a model — without a file |
 | `MESH_SPHERE(radius, rings, segments)` | INTEGER | sphere; more rings and segments = rounder and more expensive |
 | `MESH_CYLINDER(radius, height, segments)` | INTEGER | cylinder |
-| `MESH_TORUS(radius, thickness, rad_seg, pages)` | INTEGER | ring |
-| `MESH_KNOT(radius, thickness, rad_seg, pages)` | INTEGER | trefoil knot |
+| `MESH_TORUS(radius, thickness, rad_seg, pages)` | INTEGER | ring, upright in the x-y plane: the middle of the tube `radius` from the centre, the tube `thickness` thick (between a fifth of `radius` and `2 * radius`). Up to 2026.52 it came out as a far too small lump |
+| `MESH_KNOT(radius, thickness, rad_seg, pages)` | INTEGER | trefoil knot, about `radius` wide; the thickness follows `thickness` only between an eighth and a quarter of `radius` (a raylib limit). Up to 2026.52 far too small |
 | `MESH_PLANE(width, length, res_x, res_z)` | INTEGER | plane with subdivision |
 | `MESH_HEIGHTMAP(image, size_x, size_y, size_z)` | INTEGER | terrain from a greyscale image: bright = high, `size_y` determines how high |
 | `MESH_CONE(radius, height, segments)` | INTEGER | cone standing on the ground (y from 0 to `height`) |

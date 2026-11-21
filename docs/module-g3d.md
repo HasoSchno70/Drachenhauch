@@ -64,8 +64,8 @@ Hilfslinien. Wer dieselbe Form oft braucht, nimmt ein Modell (siehe unten).
 | `MESH_CUBE(width, height, depth)` | INTEGER | Quader als Modell — ohne Datei |
 | `MESH_SPHERE(radius, rings, segments)` | INTEGER | Kugel; mehr Ringe und Segmente = runder und teurer |
 | `MESH_CYLINDER(radius, height, segments)` | INTEGER | Zylinder |
-| `MESH_TORUS(radius, thickness, rad_seg, pages)` | INTEGER | Ring |
-| `MESH_KNOT(radius, thickness, rad_seg, pages)` | INTEGER | Kleeblattknoten |
+| `MESH_TORUS(radius, thickness, rad_seg, pages)` | INTEGER | Ring, aufrecht in der x-y-Ebene: die Mitte des Rohrs `radius` vom Zentrum, das Rohr `thickness` dick (zwischen einem Fünftel von `radius` und `2 * radius`). Bis 2026.52 kam ein viel zu kleiner Klumpen heraus |
+| `MESH_KNOT(radius, thickness, rad_seg, pages)` | INTEGER | Kleeblattknoten, etwa `radius` weit; die Dicke folgt `thickness` nur zwischen einem Achtel und einem Viertel von `radius` (Grenze von raylib). Bis 2026.52 viel zu klein |
 | `MESH_PLANE(width, length, res_x, res_z)` | INTEGER | Ebene mit Unterteilung |
 | `MESH_HEIGHTMAP(image, size_x, size_y, size_z)` | INTEGER | Gelände aus einem Graustufenbild: hell = hoch, `size_y` bestimmt wie hoch |
 | `MESH_CONE(radius, height, segments)` | INTEGER | Kegel, der auf dem Boden steht (y von 0 bis `height`) |
