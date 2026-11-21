@@ -227,12 +227,8 @@ pub fn aus_meldung(m: &str) -> Option<(String, String)> {
     Some((geschrieben.to_string(), angelegt.to_string()))
 }
 
-/// Warnungen je Zeile (eine je Zeile und Schreibweise) fuer den Uebersetzer-Weg.
-pub fn warnungen(quelle: &str) -> Vec<(u32, String)> {
-    warnungen_in_raeumen(quelle, &[])
-}
-
-/// Wie `warnungen`, mit einem Raum je Zeile (siehe `pruefen_in_raeumen`).
+/// Warnungen je Zeile (eine je Zeile und Schreibweise) fuer den Uebersetzer-Weg,
+/// mit einem Raum je Zeile (siehe `pruefen_in_raeumen`; leer = alles ein Raum).
 pub fn warnungen_in_raeumen(quelle: &str, raeume: &[String]) -> Vec<(u32, String)> {
     let mut gesehen = std::collections::HashSet::new();
     pruefen_in_raeumen(quelle, raeume).into_iter()
