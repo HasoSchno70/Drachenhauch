@@ -976,6 +976,16 @@ pub(crate) fn coerce(value: Value, target: &str, ctx: &str) -> R<Value> {
             Value::FuncRef(_) | Value::BoundMethod(_) | Value::Closure(_) | Value::Nil => Ok(value),
             _ => Err(format!("{}: Erwartet FUNCREF, erhalten {}", ctx, value.type_name())),
         },
+        // Eine Koroutine ist ein eigener Wert. Bis dahin nahm eine
+        // COROUTINE-Variable alles, und eine Funktion ohne YIELD lieferte ihre
+        // Zahl hinein -- der Fehler kam erst beim naechsten CORO_RESUME
+        // (Buch "Kleine Wunder", Kapitel 21).
+        "coroutine" => match value {
+            Value::Coroutine(_) | Value::Nil => Ok(value),
+            _ => Err(format!(
+                "{}: Erwartet COROUTINE, erhalten {} -- eine Koroutine liefert nur der Aufruf einer FUNCTION oder SUB, die YIELD enthaelt",
+                ctx, value.type_name())),
+        },
         // GELD ist streng, anders als die uebrigen Modul-Typen: eine Zahl
         // stillschweigend in einer GELD-Variablen abzulegen wuerde genau
         // die Trennung aufweichen, fuer die es den Typ gibt.

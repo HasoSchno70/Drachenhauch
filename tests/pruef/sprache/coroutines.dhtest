@@ -234,3 +234,27 @@ PRINT CORO_RESUME(c)
 1.0
 2.0
 
+
+=== eine coroutine-variable nimmt nur koroutinen
+' Eine COROUTINE-Variable nahm jeden Wert -- eine Funktion ohne YIELD
+' lieferte ihre Zahl hinein, und der Fehler kam erst beim naechsten
+' CORO_RESUME (Buch "Kleine Wunder", Kapitel 21). Jetzt bricht die
+' Zuweisung ab und nennt die Ursache; eine echte Koroutine und NIL gehen.
+FUNCTION ohne_yield() AS FLOAT
+    RETURN 2.5
+END FUNCTION
+FUNCTION mit_yield() AS FLOAT
+    YIELD 1
+    RETURN 0
+END FUNCTION
+DIM c AS COROUTINE
+c = mit_yield()
+PRINT CORO_RESUME(c)
+c = NIL
+PRINT "nil geht"
+c = ohne_yield()
+--- erwartet
+1.0
+nil geht
+--- fehler
+Zuweisung an 'c': Erwartet COROUTINE, erhalten FLOAT -- eine Koroutine liefert nur der Aufruf einer FUNCTION oder SUB, die YIELD enthaelt

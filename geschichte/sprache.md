@@ -1346,3 +1346,14 @@ ruft (Funktion, Methode der eigenen oder einer bekannten Klasse), und
 zeigt, wie man sie aufhebt. Im ganzen Repo traf es keine Zeile.
 `compiler_warnungen.dhtest` (ein Fall, Funktion und Methode); Gegenprobe:
 ohne die Warnung faellt genau er.
+
+Im selben Kapitel: Ein Drehbuch, in dem (versehentlich) kein YIELD mehr
+stand, war keine Koroutine; `c = szene()` lief es sofort ganz durch und
+legte seine Zahl in die COROUTINE-Variable. Die nahm jeden Wert, und der
+Fehler kam erst beim naechsten CORO_RESUME. Jetzt prueft `coerce` den Typ
+COROUTINE wie TUPLE und FUNCREF (Koroutine oder NIL) und nennt die
+Ursache; `passt_nie` kennt ihn auch, so warnt schon das Uebersetzen, wenn
+rechts sicher eine Zahl steht. Aufrufe von Koroutinen haben dort keinen
+festen Typ und bleiben still. Im ganzen Repo traf es keine Zeile.
+`coroutines.dhtest` (ein Fall); Gegenprobe: ohne den Zweig in `coerce`
+laeuft er durch.

@@ -2079,7 +2079,7 @@ impl Compiler {
         let zahl = |t: &str| t == "integer" || t == "float";
         match ziel {
             "integer" | "float" => !zahl(quelle),
-            "string" | "boolean" | "tuple" | "funcref" => quelle != ziel,
+            "string" | "boolean" | "tuple" | "funcref" | "coroutine" => quelle != ziel,
             z if self.classes.contains_key(z) => match quelle {
                 "integer" | "float" | "string" | "boolean" => true,
                 q if self.classes.contains_key(q) =>
