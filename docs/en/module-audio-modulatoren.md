@@ -25,7 +25,7 @@ There are two kinds, both with the same handle type `AUDIO_MOD`:
 | `AUDIO_TWEENER_NEW([start_value])` | AUDIO_MOD | modulator that moves to a target on command |
 | `AUDIO_TWEENER_TO(mod, target [, duration_ms [, easing$]])` | — | move there (`linear`, `in`, `out`, `inout`) |
 | `AUDIO_MODULATE(bus$, target$, mod, min, max)` | — | bind a modulator to a bus parameter; its range is mapped to `min..max` |
-| `AUDIO_MOD_REMOVE(mod)` | — | free the modulator — the parameter stays at its last value |
+| `AUDIO_MOD_REMOVE(mod)` | — | free the modulator — the parameter returns to its fixed value |
 
 ## LFO
 
@@ -95,9 +95,12 @@ simple — it takes both. But if you call an LFO function on a tweener (or vice
 versa), the message says in plain words what is going on instead of just
 “invalid handle".
 
-**`AUDIO_MOD_REMOVE` frees the modulator**, but the binding to the parameter
-stays at the last value. If you want a fixed value again, set it directly
-(`AUDIO_FILTER("sfx", 2000.0)`).
+**`AUDIO_MOD_REMOVE` frees the modulator**, and whatever it drove returns
+to its fixed value: the last `AUDIO_BUS_VOLUME`, `AUDIO_BUS_PAN`,
+`AUDIO_FILTER`, `AUDIO_REVERB` or `AUDIO_DISTORTION` (the default without
+such a call). That is also the value `AUDIO_BUS_GET_VOLUME` reports. Up to
+2026.52 the parameter stayed at the modulator's last value -- with an LFO,
+a random one.
 
 ## Demo and tests
 

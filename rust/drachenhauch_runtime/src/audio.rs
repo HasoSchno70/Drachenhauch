@@ -885,6 +885,13 @@ pub struct Audio {
     // NICHTS nachrechnen. Gleiches Tombstone-Vec-Pattern wie Clocks (Kira kennt
     // kein remove_modulator(), nur Handle-Drop gibt sie frei).
     mods: Vec<Option<ModSlot>>,
+    /// Welcher Modulator welchen Bus-Parameter faehrt (Modulator, Bus, Ziel).
+    /// AUDIO_MOD_REMOVE schreibt danach den festen Wert aus `bus_values`
+    /// zurueck -- sonst bliebe der Parameter auf dem zufaelligen letzten
+    /// Wert stehen, und AUDIO_BUS_GET_VOLUME meldete etwas anderes, als man
+    /// hoert (Buch "Kleine Wunder", Kapitel 18: Tremolo aus, der Bus blieb
+    /// bei 94 %, die Abfrage sagte 1.0).
+    mod_bindungen: Vec<(usize, String, String)>,
     num_channels: i64,
     bands: Vec<f32>,
     agc: f32,
@@ -932,7 +939,7 @@ impl Audio {
             bus_values: [BusValues::default(); 3], audio_stack: Vec::new(),
             sounds: Vec::new(), samples: Vec::new(),
             sample_cache: HashMap::new(), clocks: Vec::new(),
-            listeners: Vec::new(), emitters: Vec::new(), mods: Vec::new(), num_channels: 16,
+            listeners: Vec::new(), emitters: Vec::new(), mods: Vec::new(), mod_bindungen: Vec::new(), num_channels: 16,
             bands: Vec::new(), agc: 1e-4,
             lofi: false, lofi_bits: 8, lofi_cutoff: 3300.0,
             music_source: None, music_handle: None, music_vol: 1.0, music_pitch: 1.0,
@@ -1238,7 +1245,27 @@ schwingt von selbst und faehrt nicht zu einem Ziel".into()),
         let slot = self.mods.get_mut(idx.max(-1) as usize)
             .ok_or("AUDIO_MOD_REMOVE: ungueltiges AUDIO_MOD-Handle")?;
         *slot = None;                  // Drop gibt den Modulator frei
+        // Was er fuhr, bekommt wieder seinen festen Wert.
+        let i = idx as usize;
+        let weg: Vec<(String, String)> = self.mod_bindungen.iter()
+            .filter(|b| b.0 == i).map(|b| (b.1.clone(), b.2.clone())).collect();
+        self.mod_bindungen.retain(|b| b.0 != i);
+        for (bus, ziel) in weg { self.fester_wert(&bus, &ziel)?; }
         Ok(())
+    }
+
+    /// Den festen Wert (`bus_values`) eines Bus-Parameters wieder setzen --
+    /// ueber die gewoehnlichen Setter, wie AUDIO_POP.
+    fn fester_wert(&mut self, bus: &str, ziel: &str) -> Result<(), String> {
+        let w = self.bus_values[Self::bus_idx(bus, "AUDIO_MOD_REMOVE")?];
+        match ziel {
+            "volume" => self.set_bus_volume(bus, w.volume),
+            "pan" => self.bus_pan(bus, w.pan),
+            "filter" | "resonance" => self.set_filter(bus, w.filter_cutoff, w.filter_res),
+            "reverb" => self.set_reverb(bus, w.reverb_mix, w.reverb_fb, w.reverb_damp),
+            "distortion" => self.set_distortion(bus, w.dist_amount, w.dist_mix),
+            _ => Ok(()),
+        }
     }
 
     /// AUDIO_MODULATE(bus$, ziel$, mod, min, max): Bus-Parameter von einem
@@ -1246,6 +1273,26 @@ schwingt von selbst und faehrt nicht zu einem Ziel".into()),
     /// LFO mit Standard-Amplitude) wird auf `min..max` abgebildet.
     pub fn modulate(&mut self, bus: &str, target: &str, m: i64,
                     lo: f64, hi: f64) -> Result<(), String> {
+        self.modulate_binden(bus, target, m, lo, hi)?;
+        let ziel = match target.to_ascii_lowercase().as_str() {
+            "lautstaerke" | "volume" => "volume",
+            "cutoff" | "filter" => "filter",
+            "panning" | "pan" => "pan",
+            t => return self.binden_merken(m, bus, t),
+        }.to_string();
+        self.binden_merken(m, bus, &ziel)
+    }
+
+    /// Die Bindung merken; eine fruehere an denselben Parameter ist abgeloest.
+    fn binden_merken(&mut self, m: i64, bus: &str, ziel: &str) -> Result<(), String> {
+        let bus = bus.to_ascii_lowercase();
+        self.mod_bindungen.retain(|b| !(b.1 == bus && b.2 == ziel));
+        self.mod_bindungen.push((m as usize, bus, ziel.to_string()));
+        Ok(())
+    }
+
+    fn modulate_binden(&mut self, bus: &str, target: &str, m: i64,
+                       lo: f64, hi: f64) -> Result<(), String> {
         let id = self.mods.get(m.max(-1) as usize).and_then(|o| o.as_ref())
             .ok_or("AUDIO_MODULATE: ungueltiges AUDIO_MOD-Handle")?
             .id();
@@ -1566,6 +1613,8 @@ resonance/reverb/distortion", other)),
     /// Bus-Einstellungen zurueckholen. `false`, wenn der Stapel leer ist.
     pub fn audio_pop(&mut self) -> Result<bool, String> {
         let Some((werte, sprache)) = self.audio_stack.pop() else { return Ok(false) };
+        // Die Setter loesen jede Modulation ab (siehe unten).
+        self.mod_bindungen.clear();
         // Ueber die normalen Setter zurueckschreiben -- so landet alles auch
         // wirklich bei Kira (und loest nebenbei Modulationen ab).
         for (i, name) in ["sfx", "music", "master"].iter().enumerate() {

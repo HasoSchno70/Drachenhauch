@@ -107,7 +107,7 @@
   "AUDIO_LISTENER_SET_POSITION": "Ohr bewegen (etwa der Kamera nach)",
   "AUDIO_LOFI": "Gibt einem frisch erzeugten Sound (TONE/NOISE/SFX/SAMPLE) einen körnigen Retro-Charakter: bit-crush (Standard 8 bit) plus ein weicher Tiefpass-Filter (Standard 3300 Hz) – der typische Amiga/Lo-Fi-Sound.",
   "AUDIO_MODULATE": "Modulator an einen Bus-Parameter binden; sein Bereich wird auf min..max abgebildet",
-  "AUDIO_MOD_REMOVE": "Modulator freigeben — der Parameter bleibt auf seinem letzten Wert stehen",
+  "AUDIO_MOD_REMOVE": "Modulator freigeben — der Parameter kehrt zu seinem festen Wert zurück",
   "AUDIO_MUSIC_BUSY": "Spielt gerade?",
   "AUDIO_MUSIC_GET_PITCH": "aktueller Pitch",
   "AUDIO_MUSIC_LOAD": "Track laden (laeuft noch nicht)",

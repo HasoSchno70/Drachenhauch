@@ -1282,3 +1282,16 @@ das ist jetzt ehrlich hoerbar und im Buch ein Fehlerbeispiel.
 `audio_planen.dhtest` (ein Fall: Tonhoehe 0.25 dehnt die Blenden auf 20 ms,
 die Luecke faellt dann in die 10-ms-Pegelfenster); Gegenprobe: endlos die
 Fassung mit Blenden, leisestes Fenster 0.25 statt ueber 0.5.
+
+Im selben Kapitel schaltet T ein Tremolo (`AUDIO_LFO_NEW` auf der
+Lautstaerke des SFX-Busses) ein und aus. Nach `AUDIO_MOD_REMOVE` blieb der
+Bus auf dem letzten Wert des LFO stehen -- gemessen 94 %, bei jedem Lauf
+ein anderer --, und `AUDIO_BUS_GET_VOLUME` meldete dabei 1.0. Das Handbuch
+sagte es so, und das Programm brauchte eine Zeile `AUDIO_BUS_VOLUME("sfx",
+1.0)` nur zum Ausweichen. Jetzt merkt sich `AUDIO_MODULATE` die Bindung
+(`mod_bindungen`), und `AUDIO_MOD_REMOVE` schreibt den festen Wert aus
+`bus_values` ueber die gewoehnlichen Setter zurueck, wie `AUDIO_POP`.
+**Aendert bestehende Programme:** wer sich auf das Stehenbleiben verlassen
+hat, bekommt den festen Wert. `audio_modulators.dhtest` (ein Fall, ein
+Tweener auf dem leisen Ende statt eines LFO, damit es nicht von der Zeit
+abhaengt); Gegenprobe: ohne das Zurueckschreiben bleibt der Pegel bei 0.08.
