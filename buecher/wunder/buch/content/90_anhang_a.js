@@ -1039,4 +1039,46 @@ module.exports = (H) => [
   ...neu("loesungen/kap25_ringe.dh").map((t) => H.code(t)),
 
   H.pmix(["Die Ringe liegen auf einem großen Kreis um die Mitte der Welt, jeder zwölf Einheiten über seinem Boden. ", ["MESH_TORUS", true], " steht von sich aus aufrecht und blickt nach z; ", ["MODEL_EX", true], " dreht ihn um die senkrechte Achse, bis er entlang des Kreises blickt — wer die Runde fliegt, fliegt von einem durch den nächsten. Durchflogen ist ein Ring, wenn der Abstand zu seiner Mitte kleiner als sein Radius ist; dann ist der nächste dran. Der Flug beginnt sechzig Einheiten vor dem ersten Ring. Ausprobiert: Geradeaus geflogen steht nach gut drei Sekunden „Ring 2 von 8“ oben links."]),
+
+  H.h2("Kapitel 26 · Das große Finale"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Jede Szene braucht drei Sekunden, bis sie ganz da ist, und wird drei Sekunden vor ihrem Ende schon dunkler — die Wechsel werden zu langen, langsamen Übergängen. Ist eine Szene kürzer als zwei Blenden, wird sie nie ganz hell: rest, der Abstand zum nächsten Rand, erreicht höchstens die halbe Dauer, und die bleibt unter BLENDE. Die Blende steht an einer einzigen Stelle, im Taktgeber; keine Szene muss davon wissen."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Alles verschwimmt im Schimmer: Der Titel ist kaum noch zu lesen, jeder Funke wird zu einem kleinen Fleck Licht. Das Leuchten addiert den Schimmer der Umgebung auf jeden Bildpunkt; mal 3 überstrahlt es das Bild selbst. Über der Landschaft bleibt es bei 0.4, weil der Taktgeber die Stärke dort selbst setzt."),
+
+  H.h3("Drehen 3"),
+
+  H.p("Der Titel läuft wie immer — aber wenn der Flug beginnen soll, bricht die Demo ab: „MODEL: ungueltiges MODEL-Handle 0“, in flug.dh. Ohne vorbereiten hat die Szene kein Gelände gebaut; land ist noch 0, und ein Modell mit dieser Nummer gibt es nicht. Darum ruft der Taktgeber alle vorbereiten am Anfang auf, bevor das erste Bild kommt — dann kostet das Bauen auch keine Zeit mitten in der Demo."),
+
+  H.h3("Erweitern 1: die Szenen als Liste"),
+
+  H.p("Statt SELECT CASE ein Feld aus Funktionsreferenzen (code/loesungen/kap26_liste.dh):"),
+
+  ...neu("loesungen/kap26_liste.dh").map((t) => H.code(t)),
+
+  H.pmix(["Eine SUB ohne Klammern ist ein Wert, den man in ein Feld legen kann — eine ", ["Funktionsreferenz", true], " wie in Kapitel 20, und das geht auch mit SUBs aus einem Namensraum. ", ["szenen[szene](zeit)", true], " ruft die mit der Nummer der Szene. Eine vierte Szene ist dann ein Eintrag mehr in szenen und in dauer, ohne einen neuen CASE. Weil alle Szenen dieselbe Form haben — zeichnen mit der Zeit als Parameter —, passen sie in dasselbe Feld."]),
+
+  H.h3("Erweitern 2: eine Pause"),
+
+  H.p("Mit P halten Bild und Musik an (code/loesungen/kap26_pause.dh):"),
+
+  ...neu("loesungen/kap26_pause.dh").map((t) => H.code(t)),
+
+  H.pmix(["Während der Pause wächst zeit nicht mehr, also steht alles still, was mit der Zeit der Szene rechnet: Der Titel wird nicht heller, die Sterne funkeln nicht. Die Funken steigen allerdings weiter — sie rechnen mit DELTA(), der Zeit seit dem letzten Bild, und die läuft auch in der Pause. Wer auch sie anhalten will, gibt der Szene die vergangene Zeit als zweiten Parameter. ", ["AUDIO_PAUSE", true], " und ", ["AUDIO_RESUME", true], " halten die Musik an und lassen sie an derselben Stelle weiterlaufen. Ausprobiert mit einer Aufnahme, die nach einer Sekunde P drückt: Vier Sekunden später ist der Titel noch so blass wie nach einer Sekunde."]),
+
+  H.h3("Erfinden: eine vierte Szene"),
+
+  H.p("Das Sonnensystem aus Kapitel 24 als eigene Datei mit derselben Form wie die anderen Szenen (code/loesungen/kap26_sonne.dh):"),
+
+  H.code(zeilen("loesungen/kap26_sonne.dh")),
+
+  H.p("Und im Taktgeber (code/loesungen/kap26_vier.dh):"),
+
+  ...neu("loesungen/kap26_vier.dh").map((t) => H.code(t)),
+
+  H.p("Die Szene bekommt eine vierte SUB, beginnen: Ihr Punktlicht soll erst leuchten, wenn sie dran ist, und beim Gehen schaltet beenden es wieder aus. Im Taktgeber kommen ein IMPORT, ein vorbereiten, eine Dauer und ein CASE dazu, und die Musik klingt jetzt in der vierten Szene aus statt in der dritten. Die anderen Szenen bleiben, wie sie sind — keine Zeile in titel.dh, flug.dh oder abspann.dh ändert sich. Das ist der Lohn der Aufteilung."),
 ];
