@@ -64,8 +64,8 @@ Hilfslinien. Wer dieselbe Form oft braucht, nimmt ein Modell (siehe unten).
 | `MESH_CUBE(width, height, depth)` | INTEGER | Quader als Modell — ohne Datei |
 | `MESH_SPHERE(radius, rings, segments)` | INTEGER | Kugel; mehr Ringe und Segmente = runder und teurer |
 | `MESH_CYLINDER(radius, height, segments)` | INTEGER | Zylinder |
-| `MESH_TORUS(radius, thickness, rad_seg, pages)` | INTEGER | Ring |
-| `MESH_KNOT(radius, thickness, rad_seg, pages)` | INTEGER | Kleeblattknoten |
+| `MESH_TORUS(radius, thickness, rad_seg, pages)` | INTEGER | Ring, aufrecht in der x-y-Ebene: die Mitte des Rohrs `radius` vom Zentrum, das Rohr `thickness` dick (zwischen einem Fünftel von `radius` und `2 * radius`). Bis 2026.52 kam ein viel zu kleiner Klumpen heraus |
+| `MESH_KNOT(radius, thickness, rad_seg, pages)` | INTEGER | Kleeblattknoten, etwa `radius` weit; die Dicke folgt `thickness` nur zwischen einem Achtel und einem Viertel von `radius` (Grenze von raylib). Bis 2026.52 viel zu klein |
 | `MESH_PLANE(width, length, res_x, res_z)` | INTEGER | Ebene mit Unterteilung |
 | `MESH_HEIGHTMAP(image, size_x, size_y, size_z)` | INTEGER | Gelände aus einem Graustufenbild: hell = hoch, `size_y` bestimmt wie hoch |
 | `MESH_CONE(radius, height, segments)` | INTEGER | Kegel, der auf dem Boden steht (y von 0 bis `height`) |
@@ -99,7 +99,7 @@ Hilfslinien. Wer dieselbe Form oft braucht, nimmt ein Modell (siehe unten).
 | `LIGHT_ENABLE()` | — | Beleuchtung einschalten (einmalig; es gibt kein Gegenstück zum Ausschalten) |
 | `LIGHT_AMBIENT(color, strength)` | — | Grundhelligkeit, damit Schattenseiten nicht schwarz absaufen |
 | `LIGHT_DIRECTIONAL(x, y, z, color)` | INTEGER | Licht aus einer Richtung, wie die Sonne — liefert die Lichtnummer |
-| `LIGHT_POINT(x, y, z, color)` | INTEGER | Licht von einem Punkt aus, wie eine Lampe |
+| `LIGHT_POINT(x, y, z, color)` | INTEGER | Licht von einem Punkt aus, wie eine Lampe; mit der Entfernung schwächer: in 4 Einheiten etwa halb so hell, in 10 ein Fünftel (bis 2026.52 fiel es mit 1/d² ab und war schon in 4 Einheiten fast dunkel) |
 | `LIGHT_SET_POS(light, x, y, z)` | — | Licht bewegen |
 | `LIGHT_SET_COLOR(light, color)` | — | Lichtfarbe ändern |
 | `LIGHT_SET_ENABLED(light [, on])` | — | einzelnes Licht an- oder ausschalten |

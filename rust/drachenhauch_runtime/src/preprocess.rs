@@ -372,6 +372,13 @@ pub struct Herkunft {
     pub pfad: String,
 }
 
+/// Zu welchem Namensraum jede gemergte Zeile gehoert: der Alias ihrer Datei,
+/// wenn sie mit `IMPORT "x.dh" AS x` kam, sonst leer.
+pub fn raeume_je_zeile(herkunft: &[Herkunft], namensraeume: &[(String, String)]) -> Vec<String> {
+    herkunft.iter().map(|h| namensraeume.iter().find(|(d, _)| *d == h.datei)
+        .map(|(_, a)| a.clone()).unwrap_or_default()).collect()
+}
+
 /// Die Herkunft einer gemergten Zeile (1-basiert) als `datei:zeile`.
 ///
 /// `haupt` ist der Name, unter dem die Hauptdatei gemeldet wird -- ueblicherweise

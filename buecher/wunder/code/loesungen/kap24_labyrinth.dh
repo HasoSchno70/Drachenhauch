@@ -1,0 +1,142 @@
+' Loesung zu Kapitel 24, Erfinden: ein Labyrinth von oben. Das Programm
+' baut den Irrgarten selbst, malt ihn in ein Bild -- weiss ist Mauer --
+' und laesst MESH_CUBICMAP daraus Wuerfel machen. Mit den Pfeiltasten
+' rollt die Kugel von links oben zum Ziel rechts unten; R baut ein
+' neues Labyrinth.
+IMPORT "g3d"
+IMPORT "imgfx"
+CONST ZELLEN_X = 15
+CONST ZELLEN_Y = 9
+CONST BX = ZELLEN_X * 2 + 1
+CONST BY = ZELLEN_Y * 2 + 1
+
+SCREEN(800, 500, "Ein Labyrinth von oben")
+RANDOMIZE(24)
+DIM mauer[0 TO BX - 1, 0 TO BY - 1] AS BOOLEAN
+
+' Der Irrgarten: anfangs ist alles Mauer. Von der ersten Zelle aus geht
+' es zu einer zufaelligen Nachbarzelle, die noch zu ist, und die Mauer
+' dazwischen faellt. Wo es nicht weitergeht, geht es auf dem Stapel
+' zurueck, bis wieder eine Nachbarzelle zu ist.
+SUB bauen()
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 0 TO BY - 1
+        FOR x = 0 TO BX - 1
+            mauer[x, y] = TRUE
+        NEXT
+    NEXT
+    DIM sx AS ARRAY OF INTEGER : sx = [0]
+    DIM sy AS ARRAY OF INTEGER : sy = [0]
+    mauer[1, 1] = FALSE
+    DIM dx AS ARRAY OF INTEGER : dx = [1, -1, 0, 0]
+    DIM dy AS ARRAY OF INTEGER : dy = [0, 0, 1, -1]
+    WHILE LEN(sx) > 0
+        DIM cx AS INTEGER : cx = sx[LEN(sx) - 1]
+        DIM cy AS INTEGER : cy = sy[LEN(sy) - 1]
+        ' Welche Richtungen fuehren zu einer Zelle, die noch zu ist?
+        DIM frei AS ARRAY OF INTEGER
+        DIM r AS INTEGER
+        FOR r = 0 TO 3
+            DIM nx AS INTEGER : nx = cx + dx[r]
+            DIM ny AS INTEGER : ny = cy + dy[r]
+            IF nx >= 0 AND nx < ZELLEN_X AND ny >= 0 _
+               AND ny < ZELLEN_Y THEN
+                IF mauer[nx * 2 + 1, ny * 2 + 1] THEN
+                    ARRAY_PUSH(frei, r)
+                END IF
+            END IF
+        NEXT
+        IF LEN(frei) = 0 THEN
+            ARRAY_POP(sx)
+            ARRAY_POP(sy)
+        ELSE
+            r = frei[INT(RND() * LEN(frei))]
+            mauer[cx * 2 + 1 + dx[r], cy * 2 + 1 + dy[r]] = FALSE
+            mauer[(cx + dx[r]) * 2 + 1, (cy + dy[r]) * 2 + 1] = FALSE
+            ARRAY_PUSH(sx, cx + dx[r])
+            ARRAY_PUSH(sy, cy + dy[r])
+        END IF
+    WEND
+END SUB
+
+' Das Raster als Bild, ein Punkt je Feld, und daraus das Modell. Weiss
+' wird Mauer; die Gaenge sind grau, denn was weder weiss noch schwarz
+' ist, laesst MESH_CUBICMAP leer -- den Boden legen wir selbst darunter.
+FUNCTION modell() AS INTEGER
+    DIM bild AS IMAGE : bild = IMAGE_NEW(BX, BY, RGB(128, 128, 128))
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 0 TO BY - 1
+        FOR x = 0 TO BX - 1
+            IF mauer[x, y] THEN
+                IMAGE_DRAW_RECT(bild, x, y, 1, 1, RGB(255, 255, 255))
+            END IF
+        NEXT
+    NEXT
+    DIM m AS INTEGER : m = MESH_CUBICMAP(bild, 1, 1, 1)
+    MODEL_LIT(m)
+    RETURN m
+END FUNCTION
+
+LIGHT_ENABLE()
+LIGHT_AMBIENT(RGB(150, 160, 190), 0.3)
+DIM sonne AS INTEGER
+sonne = LIGHT_DIRECTIONAL(-0.4, -1, -0.6, RGB(255, 245, 225))
+SHADOW_ENABLE(2048)
+SHADOW_AREA(40, 40)
+SHADOW_TARGET(BX / 2, 0, BY / 2)
+DIM kugel AS INTEGER : kugel = MESH_SPHERE(0.35, 16, 24)
+MODEL_LIT(kugel)
+DIM boden AS INTEGER : boden = MESH_PLANE(BX, BY, 1, 1)
+MODEL_LIT(boden)
+DIM ziel AS INTEGER : ziel = MESH_CYLINDER(0.35, 0.1, 24)
+MODEL_EMISSIVE(ziel, RGB(255, 200, 60), 1.0)
+
+bauen()
+DIM karte AS INTEGER : karte = modell()
+' Wo die Kugel ist (Feld) und wo sie gerade gezeichnet wird (gleitend).
+DIM px AS INTEGER : px = 1
+DIM py AS INTEGER : py = 1
+DIM zx AS FLOAT : zx = 1
+DIM zy AS FLOAT : zy = 1
+DIM schritte AS INTEGER
+
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
+    ' Ein Schritt je Tastendruck, aber nur, wo keine Mauer ist.
+    DIM wx AS INTEGER : wx = px
+    DIM wy AS INTEGER : wy = py
+    IF KEY_HIT(KEY_RIGHT) THEN wx = px + 1
+    IF KEY_HIT(KEY_LEFT) THEN wx = px - 1
+    IF KEY_HIT(KEY_DOWN) THEN wy = py + 1
+    IF KEY_HIT(KEY_UP) THEN wy = py - 1
+    IF NOT mauer[wx, wy] AND (wx <> px OR wy <> py) THEN
+        px = wx
+        py = wy
+        schritte = schritte + 1
+    END IF
+    IF KEY_HIT(KEY_R) THEN
+        bauen()
+        karte = modell()
+        px = 1 : py = 1 : schritte = 0
+    END IF
+    zx = LERP(zx, px, 0.3)
+    zy = LERP(zy, py, 0.3)
+
+    CLS(RGB(30, 34, 48))
+    CAMERA3D(BX / 2, 27, BY / 2 + 12, BX / 2 - 0.5, 0, BY / 2 + 0.5, 45)
+    ' Der Boden: seine Mitte unter der Mitte des Rasters.
+    MODEL(boden, BX / 2 - 0.5, -0.49, BY / 2 - 0.5, 1.0, _
+          RGB(110, 140, 90))
+    MODEL(karte, 0, 0, 0, 1.0, RGB(215, 205, 185))
+    MODEL(ziel, BX - 2, 0, BY - 2, 1.0, RGB(255, 210, 90))
+    MODEL(kugel, zx, 0.35, zy, 1.0, RGB(80, 160, 255))
+    IF px = BX - 2 AND py = BY - 2 THEN
+        TEXT(16, 16, f"Geschafft in {schritte} Schritten -- " _
+             + "R fuer ein neues", RGB(255, 220, 120))
+    ELSE
+        TEXT(16, 16, "Pfeiltasten: rollen   R: neues Labyrinth   " _
+             + f"{schritte}", RGBA(255, 255, 255, 170))
+    END IF
+    FLIP()
+WEND

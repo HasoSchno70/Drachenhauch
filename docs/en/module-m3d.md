@@ -185,7 +185,8 @@ projection, say) therefore cannot be drawn with `MODEL_INSTANCED`. Measured:
 (`MODEL_PBR`/`LIGHT_ENV*`), **no** shadows (`SHADOW_*`) and **no**
 normal maps (`MODEL_TEXTURE_NORMAL`) — use `MODEL_MATRIX`/`MODEL_LIT` for
 those. `MODEL_TEXTURE` (diffuse map) works, since it sets the material's
-albedo texture.
+albedo texture. `LIGHT_FOG` works as with `MODEL` (up to 2026.52 instances
+stood sharp in the fog).
 
 ## Custom camera: CAMERA3D_VIEW / CAMERA3D_PROJECTION
 

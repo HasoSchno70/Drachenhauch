@@ -1,0 +1,6 @@
+' Kapitel 26, was schiefgehen kann: eine Szene, die eine Konstante des
+' Hauptprogramms benutzt. Mit AS eingebunden, sieht sie sie nicht.
+CONST BREITE = 800
+IMPORT "fehler_szene.dh" AS szene
+SCREEN(BREITE, 500, "Namensraum")
+szene.zeichnen()

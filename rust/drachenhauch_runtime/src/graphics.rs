@@ -783,7 +783,11 @@ void main()
             L = -normalize(lights[i].target - lights[i].position);
         } else {
             vec3 d = lights[i].position - fragPosition;
-            L = normalize(d); float dist = length(d); atten = 1.0/(dist*dist);
+            // Derselbe Abfall wie im Instancing-Shader: mit 1/d^2 kam in 4
+            // Einheiten ein Sechzehntel an, ein Punktlicht war ausserhalb
+            // einer Armlaenge kaum zu sehen (Buch "Kleine Wunder", Kap. 24).
+            L = normalize(d); float dist = length(d);
+            atten = 1.0/(1.0 + 0.09*dist + 0.032*dist*dist);
         }
         vec3 H = normalize(V + L);
         vec3 radiance = lights[i].color.rgb*atten;
@@ -905,11 +909,21 @@ uniform Light lights[MAX_LIGHTS];
 uniform vec4 ambient;
 uniform vec3 viewPos;
 uniform int lightCount;
+// Derselbe Tiefen-Fog wie im Licht-Shader -- ohne ihn standen tausend
+// Baeume aus MODEL_INSTANCED scharf vor Bergen im Dunst (Buch "Kleine
+// Wunder", Kapitel 25).
+uniform vec4 fogColor;
+uniform float fogDensity;
+vec3 nebel(vec3 c)
+{
+    float fd = length(viewPos - fragPosition)*fogDensity;
+    return mix(fogColor.rgb, c, clamp(1.0/exp(fd*fd), 0.0, 1.0));
+}
 void main()
 {
     vec3 albedo = colDiffuse.rgb*texture(texture0, fragTexCoord).rgb*fragColor.rgb;
     float alpha = colDiffuse.a*texture(texture0, fragTexCoord).a*fragColor.a;
-    if (lightCount == 0) { finalColor = vec4(albedo, alpha); return; }
+    if (lightCount == 0) { finalColor = vec4(nebel(albedo), alpha); return; }
     vec3 N = normalize(fragNormal);
     vec3 V = normalize(viewPos - fragPosition);
     vec3 lit = ambient.rgb*albedo;
@@ -929,7 +943,7 @@ void main()
         float spec = pow(max(dot(N, H), 0.0), 32.0)*0.3;
         lit += (albedo*NdotL + vec3(spec))*lights[i].color.rgb*atten;
     }
-    finalColor = vec4(lit, alpha);
+    finalColor = vec4(nebel(lit), alpha);
 }
 "#;
 
@@ -1437,6 +1451,8 @@ pub struct Graphics {
     inst_loc_view: i32,
     inst_loc_ambient: i32,
     inst_loc_count: i32,
+    inst_loc_fog_color: i32,
+    inst_loc_fog_density: i32,
     inst_light_locs: Vec<[i32; 5]>,
     text_size: i32,
     // TTF-Fonts (LOADFONT): via raylib load_font_ex geladen. active_font = -1
@@ -2383,6 +2399,8 @@ impl Graphics {
             inst_loc_view: -1,
             inst_loc_ambient: -1,
             inst_loc_count: -1,
+            inst_loc_fog_color: -1,
+            inst_loc_fog_density: -1,
             inst_light_locs: Vec::new(),
             // Default-Blick: schraeg von vorn-oben auf den Ursprung.
             cam3d: Camera3D::perspective(
@@ -3595,17 +3613,32 @@ impl Graphics {
         let mesh = Mesh::gen_mesh_cylinder(&self.thread, r, h, slices.clamp(3, Self::MAX_MESH_SEGMENTS));
         self.push_model_from_mesh(mesh, "MESH_CYLINDER")
     }
-    pub fn mesh_torus(&mut self, r: f32, size: f32, rad_seg: i32, sides: i32) -> Result<i64, String> {
-        Self::check_mesh_dim("MESH_TORUS", "r", r)?;
-        Self::check_mesh_dim("MESH_TORUS", "size", size)?;
-        let mesh = Mesh::gen_mesh_torus(&self.thread, r, size,
+    /// MESH_TORUS(radius, thickness): ein Ring, dessen Rohr in der Mitte
+    /// `radius` vom Zentrum entfernt ist und `thickness` dick ist. raylib
+    /// nimmt andere Zahlen -- GenMeshTorus(verhaeltnis, groesse) baut einen
+    /// Ring mit Radius groesse/2 und Rohr groesse/2 * verhaeltnis (auf
+    /// 0.1..1 begrenzt). Bis 2026.52 gingen radius und thickness ungeaendert
+    /// hinein: MESH_TORUS(1.0, 0.3) war ein Klumpen von 0.3 statt eines
+    /// Rings von 1 (Buch "Kleine Wunder", Kapitel 25).
+    pub fn mesh_torus(&mut self, r: f32, dicke: f32, rad_seg: i32, sides: i32) -> Result<i64, String> {
+        Self::check_mesh_dim("MESH_TORUS", "radius", r)?;
+        Self::check_mesh_dim("MESH_TORUS", "thickness", dicke)?;
+        let (verhaeltnis, groesse) = torus_fuer_raylib(r, dicke);
+        let mesh = Mesh::gen_mesh_torus(&self.thread, verhaeltnis, groesse,
             rad_seg.clamp(3, Self::MAX_MESH_SEGMENTS), sides.clamp(3, Self::MAX_MESH_SEGMENTS));
         self.push_model_from_mesh(mesh, "MESH_TORUS")
     }
-    pub fn mesh_knot(&mut self, r: f32, size: f32, rad_seg: i32, sides: i32) -> Result<i64, String> {
-        Self::check_mesh_dim("MESH_KNOT", "r", r)?;
-        Self::check_mesh_dim("MESH_KNOT", "size", size)?;
-        let mesh = Mesh::gen_mesh_knot(&self.thread, r, size,
+    /// MESH_KNOT(radius, thickness): ein Kleeblattknoten, der etwa `radius`
+    /// weit reicht. raylibs GenMeshKnot(verhaeltnis, groesse) reicht 0.85
+    /// seiner Groesse weit, sein Rohr ist 0.2 * verhaeltnis * groesse dick
+    /// und laesst sich nur zwischen einem Zehntel und einem Fuenftel der
+    /// Groesse einstellen (verhaeltnis 0.5..1). Bis 2026.52 wie beim Torus
+    /// ungeaendert durchgereicht.
+    pub fn mesh_knot(&mut self, r: f32, dicke: f32, rad_seg: i32, sides: i32) -> Result<i64, String> {
+        Self::check_mesh_dim("MESH_KNOT", "radius", r)?;
+        Self::check_mesh_dim("MESH_KNOT", "thickness", dicke)?;
+        let (verhaeltnis, groesse) = knoten_fuer_raylib(r, dicke);
+        let mesh = Mesh::gen_mesh_knot(&self.thread, verhaeltnis, groesse,
             rad_seg.clamp(3, Self::MAX_MESH_SEGMENTS), sides.clamp(3, Self::MAX_MESH_SEGMENTS));
         self.push_model_from_mesh(mesh, "MESH_KNOT")
     }
@@ -3721,6 +3754,8 @@ impl Graphics {
         self.inst_loc_view = sh.get_shader_location("viewPos");
         self.inst_loc_ambient = sh.get_shader_location("ambient");
         self.inst_loc_count = sh.get_shader_location("lightCount");
+        self.inst_loc_fog_color = sh.get_shader_location("fogColor");
+        self.inst_loc_fog_density = sh.get_shader_location("fogDensity");
         self.inst_shader = Some(sh);
         self.inst_light_locs.clear();   // wird in update_inst_light_uniforms gefuellt
     }
@@ -4576,6 +4611,8 @@ impl Graphics {
         let ambient = self.light_ambient;
         let (loc_view, loc_ambient, loc_count) =
             (self.inst_loc_view, self.inst_loc_ambient, self.inst_loc_count);
+        let (fog_color, fog_density) = (self.light_fog, self.light_fog_density);
+        let (loc_fog_color, loc_fog_density) = (self.inst_loc_fog_color, self.inst_loc_fog_density);
         let active = self.lights.iter().filter(|l| l.enabled).count() as i32;
         // Licht-Daten + ihre Instancing-Locations lokal kopieren (Borrow-Trennung).
         let lights: Vec<([i32; 5], i32, i32, [f32; 3], [f32; 3], [f32; 4])> =
@@ -4585,6 +4622,8 @@ impl Graphics {
         if loc_view >= 0 { sh.set_shader_value(loc_view, view); }
         if loc_ambient >= 0 { sh.set_shader_value(loc_ambient, ambient); }
         if loc_count >= 0 { sh.set_shader_value(loc_count, active); }
+        if loc_fog_color >= 0 { sh.set_shader_value(loc_fog_color, fog_color); }
+        if loc_fog_density >= 0 { sh.set_shader_value(loc_fog_density, fog_density); }
         for (locs, en, kind, pos, target, color) in lights {
             if locs[0] >= 0 { sh.set_shader_value(locs[0], en); }
             if locs[1] >= 0 { sh.set_shader_value(locs[1], kind); }
@@ -11197,4 +11236,16 @@ mod unschaerfe_tests {
         assert!(px[9 * 4] > 60 && px[9 * 4] < 200, "an der Kante grau: {}", px[9 * 4]);
         assert_eq!(px[9 * 4 + 3], 255, "Deckkraft bleibt");
     }
+}
+
+/// Radius und Dicke eines Rings in raylibs (verhaeltnis, groesse).
+pub fn torus_fuer_raylib(radius: f32, dicke: f32) -> (f32, f32) {
+    let groesse = 2.0 * radius;
+    ((dicke / 2.0 / radius).clamp(0.1, 1.0), groesse)
+}
+
+/// Reichweite und Dicke eines Kleeblattknotens in raylibs (verhaeltnis, groesse).
+pub fn knoten_fuer_raylib(radius: f32, dicke: f32) -> (f32, f32) {
+    let groesse = radius / 0.85;
+    ((dicke / (0.2 * groesse)).clamp(0.5, 1.0), groesse)
 }

@@ -1,0 +1,8 @@
+' Kapitel 24, was schiefgehen kann: ein Modell beleuchten, bevor es
+' Licht gibt.
+IMPORT "g3d"
+SCREEN(800, 500, "Ohne Licht")
+DIM kugel AS INTEGER : kugel = MESH_SPHERE(1, 24, 32)
+MODEL_LIT(kugel)
+LIGHT_ENABLE()
+DIM sonne AS INTEGER : sonne = LIGHT_DIRECTIONAL(-1, -1, -1, &HFFFFFF)

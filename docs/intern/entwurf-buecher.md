@@ -737,6 +737,23 @@ Wetter selbst (feste Saat, keine Datei von draußen) und nimmt keine
 Kapitel 23 malt seine Bilder selbst und legt die kaputten Dateien dazu.
 Die Diaschau bekam als Erfinden-Übung einen beobachteten Ordner.
 
+Danach (2026-11-21): Teil VII, Kapitel 24–26 (Würfel, Licht und
+Schatten, Flug über eine Landschaft, Das große Finale). Funde in der
+Laufzeit, alle behoben und in `geschichte/sprache.md`: Ein Punktlicht fiel
+im Licht-Shader mit 1/d² ab und war schon in vier Einheiten fast dunkel
+(der Instancing-Shader rechnete weicher); `MODEL_INSTANCED` kannte
+`LIGHT_FOG` nicht; `MESH_TORUS` und `MESH_KNOT` reichten Radius und Dicke
+ungeändert an raylib, das sie anders liest -- jeder Ring war ein Klumpen;
+die Schreibweisen-Prüfung schaute über die Grenze eines Namensraums. Was
+sich am Entwurf geändert hat: Kapitel 24 baut eine Windmühle (die Flügel
+als Matrizen an der Nabe) statt nur Grundkörpern, das Labyrinth der
+Erfinden-Übung baut sich das Programm selbst; Kapitel 25 nimmt einen
+Himmel aus `SKYBOX_IMAGE` (selbst gemalt, keine `.hdr`) und misst den
+Gewinn der Instanzen (3000 Bäume: 7,1 gegen 0,2 ms je Bild); Kapitel 26
+hat fünf Dateien als Namensräume, eine Musik aus `AUDIO_NOTE` und endet
+mit dem Export. In die Spielwiese passt die Demo nicht (ein Textfeld, keine
+weiteren Dateien) -- das Kapitel sagt es so.
+
 Was beim Bauen festgelegt wurde:
 
 * **Code kommt aus Dateien.** `buch/code_lesen.js` holt ganze Programme,

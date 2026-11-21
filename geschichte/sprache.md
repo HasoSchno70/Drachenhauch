@@ -1437,3 +1437,51 @@ finden. (os error 2)" -- ohne den Namen der Datei. Zum Lesen fragt
 steht der Name vor dem Text des Betriebssystems. `umstieg.dhtest` (zwei
 Faelle); Gegenprobe: ohne `datei_da` bzw. mit der alten Meldung faellt je
 der eine.
+
+Kapitel 24 (Wuerfel, Licht und Schatten) hat als Uebung ein
+Sonnensystem: ein Punktlicht in der Sonne, Planeten in 6 und 10 Einheiten.
+Die Planeten blieben fast schwarz. Der Licht-Shader liess ein Punktlicht
+mit 1/d^2 abfallen -- in 4 Einheiten ein Sechzehntel, auch der blaue
+Lichtfleck in `examples/91_lighting.dh` war kaum zu ahnen --, der
+Instancing-Shader dagegen mit 1/(1 + 0.09 d + 0.032 d^2). Gemessen unter
+einem Licht 4 Einheiten ueber dem Boden: 46 von 255 mit `MODEL`, 200 mit
+`MODEL_INSTANCED`. Jetzt rechnet der Licht-Shader denselben Abfall (118;
+der Rest ist der Unterschied zwischen PBR und Blinn-Phong).
+`g3d_licht.dhtest` (ein Fall); Gegenprobe: mit 1/d^2 faellt er an
+#2E2E2E.
+
+Kapitel 25 (Flug ueber eine Landschaft) zeichnet 1500 Baeume mit zwei
+`MODEL_INSTANCED`-Aufrufen ueber einem Gelaende im Dunst. Die fernen
+Baeume standen scharf und dunkel vor Bergen, die schon im Nebel
+verschwanden: Der Instancing-Shader kannte `LIGHT_FOG` nicht. Jetzt hat
+er dieselben Uniforms (`fogColor`, `fogDensity`) und dieselbe Formel wie
+der Licht-Shader, mit und ohne Licht. `g3d_licht.dhtest` (ein Fall:
+ein ferner Wuerfel in rotem Nebel, aus `MODEL` und aus `MODEL_INSTANCED`);
+Gegenprobe: ohne den Nebel im beleuchteten Zweig ist der rechte #FFFFFF.
+
+Fuer die Erfinden-Uebung in Kapitel 25 (Ringe zum Durchfliegen) war der
+Ring aus `MESH_TORUS(4, 0.5, ...)` ein Punkt. Die Laufzeit reichte
+`radius` und `thickness` ungeaendert an raylibs `GenMeshTorus(radius,
+size)` weiter, das sie anders liest: Ringradius size/2, Rohr size/2 mal
+radius (0.1..1). So war `MESH_TORUS(1.0, 0.3)` aus dem Handbuch ein
+Klumpen von 0.3, und jedes Beispiel mit Torus oder Knoten (88, 91, 93, 97,
+110, dhdemo) zeigte ihn zu klein -- niemandem aufgefallen, weil ein
+kleiner Ring auch ein Ring ist. Jetzt rechnen `torus_fuer_raylib` und
+`knoten_fuer_raylib` um: der Ring hat seinen Radius bis zur Mitte des
+Rohrs und seine Dicke, der Knoten reicht etwa radius weit (seine Dicke
+laesst raylib nur zwischen etwa einem Achtel und einem Viertel davon zu).
+Aufgefallen beim Vermessen: der Torus steht aufrecht in x-y, er liegt
+nicht. `grafik_etappe3.dhtest` (ein Fall); Gegenproben: ohne Umrechnung
+faellt der Ring (0.30 statt 1.15) bzw. der Knoten (0.3 statt 2.0).
+
+Kapitel 26 (Das grosse Finale) teilt eine Demo in Dateien, jede mit
+`IMPORT "x.dh" AS x` als Namensraum. `flug.dh` hat ein `DIM hoehe`, das
+Hauptprogramm ein `CONST HOEHE` -- und jeder Lauf meldete in flug.dh
+"'hoehe' ist als 'HOEHE' angelegt". Die Werte stimmten (der Namensraum
+sieht HOEHE gar nicht), nur die Schreibweisen-Pruefung schaute ueber die
+Grenze: Sie laeuft ueber die gemergte Quelle und kannte keine Namensraeume.
+Jetzt bekommt sie aus der Herkunftstabelle einen Raum je Zeile
+(`preprocess::raeume_je_zeile`); eine Deklaration zaehlt nur fuer Woerter
+im eigenen Raum. `schreibweise.dhtest` (ein Fall: kein Fehlalarm ueber die
+Grenze, aber `Hoehe` neben `DIM hoehe` in derselben Datei wird weiter
+gemeldet); Gegenprobe: ohne den Raumvergleich faellt er an "fehlalarm".

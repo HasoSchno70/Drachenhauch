@@ -1,0 +1,49 @@
+' Loesung zu Kapitel 26, Erfinden: das Sonnensystem aus Kapitel 24 als
+' Szene, eingebunden als Namensraum sonne. Was sie einschaltet -- ein
+' Punktlicht in der Sonne --, schaltet sie beim Gehen wieder aus.
+IMPORT "g3d"
+IMPORT "m3d"
+
+DIM kugel AS INTEGER
+DIM stern AS INTEGER
+DIM licht AS INTEGER
+
+SUB vorbereiten()
+    kugel = MESH_SPHERE(1, 24, 32)
+    stern = MESH_SPHERE(1.4, 32, 48)
+END SUB
+
+' Zu Beginn der Szene: das Licht in der Mitte.
+SUB beginnen()
+    LIGHT_ENABLE()
+    LIGHT_AMBIENT(RGB(60, 70, 110), 0.08)
+    licht = LIGHT_POINT(0, 0, 0, RGB(255, 240, 220))
+    MODEL_LIT(kugel)
+    MODEL_EMISSIVE(stern, RGB(255, 200, 90), 1.0)
+END SUB
+
+SUB zeichnen(t AS FLOAT)
+    CLS(RGB(4, 5, 14))
+    CAMERA3D(0, 9, 16, 0, 0, 0, 45)
+    CIRCLE3D(0, 0, 0, 6, RGBA(255, 255, 255, 40))
+    CIRCLE3D(0, 0, 0, 10, RGBA(255, 255, 255, 40))
+    MODEL(stern, 0, 0, 0, 1.0, RGB(255, 210, 120))
+    DIM bahn AS MAT4
+    bahn = MAT4_MUL(MAT4_ROTATE_Y(t * 0.5), MAT4_TRANSLATE(6, 0, 0))
+    MODEL_MATRIX(kugel, MAT4_MUL(bahn, MAT4_SCALE(0.5, 0.5, 0.5)), _
+                 RGB(70, 130, 230))
+    DIM mond AS MAT4
+    mond = MAT4_MUL(bahn, MAT4_MUL(MAT4_ROTATE_Y(t * 2), _
+                    MAT4_MUL(MAT4_TRANSLATE(1.2, 0, 0), _
+                             MAT4_SCALE(0.15, 0.15, 0.15))))
+    MODEL_MATRIX(kugel, mond, RGB(200, 200, 200))
+    DIM mars AS MAT4
+    mars = MAT4_MUL(MAT4_ROTATE_Y(t * 0.27), _
+                    MAT4_MUL(MAT4_TRANSLATE(10, 0, 0), _
+                             MAT4_SCALE(0.35, 0.35, 0.35)))
+    MODEL_MATRIX(kugel, mars, RGB(210, 100, 60))
+END SUB
+
+SUB beenden()
+    LIGHT_SET_ENABLED(licht, FALSE)
+END SUB

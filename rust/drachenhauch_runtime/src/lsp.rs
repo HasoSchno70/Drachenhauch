@@ -345,9 +345,16 @@ fn einfaches_dim(zeile: &str) -> Option<String> {
 /// Warnung fuer lokale Variablen bleibt, wie sie war. `source` = die
 /// gemergte Quelle, auf die sich die Zeilen der Warnungen beziehen.
 pub fn verdeckung_filtern(warns: Vec<(u32, String)>, source: &str) -> Vec<(u32, String)> {
+    verdeckung_filtern_in_raeumen(warns, source, &[])
+}
+
+/// Wie `verdeckung_filtern`; `raeume` sagt je Zeile der gemergten Quelle,
+/// zu welchem Namensraum sie gehoert (`schreibweise::pruefen_in_raeumen`).
+pub fn verdeckung_filtern_in_raeumen(warns: Vec<(u32, String)>, source: &str, raeume: &[String])
+    -> Vec<(u32, String)> {
     let mut warns = schreibweise_pruefen(warns, source);
     // Eigene Namen so geschrieben wie angelegt (schreibweise.rs).
-    warns.extend(crate::schreibweise::warnungen(source));
+    warns.extend(crate::schreibweise::warnungen_in_raeumen(source, raeume));
     if !warns.iter().any(|(_, m)| (m.starts_with("Parameter '") || m.starts_with("Feld '"))
                                   && m.contains("' verdeckt die gleichnamige Konstante")) {
         return warns;

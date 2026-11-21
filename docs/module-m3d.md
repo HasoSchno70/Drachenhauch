@@ -185,7 +185,8 @@ Projektion), lässt sich darum mit `MODEL_INSTANCED` nicht zeichnen. Gemessen:
 **Grenze:** Der Instancing-Shader unterstützt **kein** PBR/IBL
 (`MODEL_PBR`/`LIGHT_ENV*`), **keine** Schatten (`SHADOW_*`) und **keine**
 Normal-Maps (`MODEL_TEXTURE_NORMAL`) — dafür `MODEL_MATRIX`/`MODEL_LIT` nutzen.
-`MODEL_TEXTURE` (Diffuse-Map) wirkt, da es die Albedo-Textur des Materials setzt.
+`MODEL_TEXTURE` (Diffuse-Map) wirkt, da es die Albedo-Textur des Materials setzt. `LIGHT_FOG` wirkt wie bei `MODEL` (bis 2026.52 standen Instanzen scharf im
+Nebel).
 
 ## Custom-Kamera: CAMERA3D_VIEW / CAMERA3D_PROJECTION
 

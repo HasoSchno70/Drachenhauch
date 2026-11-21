@@ -1,0 +1,25 @@
+' Kapitel 24, Warum so? -- was eine Kamera ist: eine Matrix, die jeden
+' Punkt der Welt so verschiebt und dreht, dass die Kamera im Ursprung
+' steht und nach -Z blickt. Drei Punkte, von zwei Kameras aus gesehen.
+IMPORT "m3d"
+DIM oben AS VEC3 : oben = VEC3_NEW(0, 1, 0)
+
+FUNCTION zeige$(v AS VEC3) AS STRING
+    RETURN f"({VEC3_X(v):.1f}, {VEC3_Y(v):.1f}, {VEC3_Z(v):.1f})"
+END FUNCTION
+
+' Was die Kamera bei auge, die auf den Ursprung blickt, von drei Punkten
+' sieht: x nach rechts, y nach oben, z zu ihr hin (davor ist z negativ).
+SUB von(auge AS VEC3)
+    DIM blick AS MAT4 : blick = MAT4_LOOKAT(auge, VEC3_ZERO(), oben)
+    PRINT "Kamera bei "; zeige$(auge)
+    DIM punkte AS ARRAY OF VEC3
+    punkte = [VEC3_NEW(0, 0, 0), VEC3_NEW(3, 0, 0), VEC3_NEW(0, 2, 0)]
+    DIM p AS VEC3
+    FOR EACH p IN punkte
+        PRINT "  "; zeige$(p); " -> "; zeige$(VEC3_TRANSFORM(p, blick))
+    NEXT
+END SUB
+
+von(VEC3_NEW(0, 0, 10))
+von(VEC3_NEW(10, 0, 0))

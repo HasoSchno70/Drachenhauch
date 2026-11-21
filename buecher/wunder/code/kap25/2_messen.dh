@@ -1,0 +1,53 @@
+' Kapitel 25, Warum so? -- dieselben 3000 Baeume, einmal mit einem
+' MODEL je Baum und einmal mit einem einzigen MODEL_INSTANCED. Je 200
+' Bilder ohne Warten auf den Bildschirm, gemessen mit MILLIS.
+IMPORT "g3d"
+IMPORT "m3d"
+CONST BAEUME = 3000
+CONST BILDER = 200
+
+SCREEN(800, 500, "Baeume messen")
+SETFPS(0)
+RANDOMIZE(25)
+LIGHT_ENABLE()
+LIGHT_AMBIENT(RGB(150, 170, 200), 0.35)
+DIM sonne AS INTEGER
+sonne = LIGHT_DIRECTIONAL(-0.5, -1, -0.3, RGB(255, 245, 225))
+DIM krone AS INTEGER : krone = MESH_CONE(1.2, 3.5, 8)
+MODEL_LIT(krone)
+
+' Die Plaetze: als Zahlen fuer MODEL, als Matrizen fuer die Instanzen.
+DIM bx AS ARRAY OF FLOAT
+DIM bz AS ARRAY OF FLOAT
+DIM mats AS ARRAY OF MAT4
+DIM i AS INTEGER
+FOR i = 1 TO BAEUME
+    ARRAY_PUSH(bx, RND() * 200)
+    ARRAY_PUSH(bz, RND() * 200)
+    ARRAY_PUSH(mats, MAT4_TRANSLATE(bx[i - 1], 0, bz[i - 1]))
+NEXT
+
+' Ein Durchgang: BILDER Bilder, je alle Baeume; einzeln oder auf einmal.
+FUNCTION messen(einzeln AS BOOLEAN) AS FLOAT
+    DIM start AS INTEGER : start = MILLIS()
+    DIM bild AS INTEGER
+    FOR bild = 1 TO BILDER
+        CLS(RGB(190, 210, 232))
+        CAMERA3D(-20, 30, -20, 100, 0, 100, 60)
+        IF einzeln THEN
+            DIM k AS INTEGER
+            FOR k = 0 TO BAEUME - 1
+                MODEL(krone, bx[k], 0, bz[k], 1.0, RGB(40, 100, 50))
+            NEXT
+        ELSE
+            MODEL_INSTANCED(krone, mats, RGB(40, 100, 50))
+        END IF
+        FLIP()
+    NEXT
+    RETURN (MILLIS() - start) / BILDER
+END FUNCTION
+
+DIM einzeln AS FLOAT : einzeln = messen(TRUE)
+DIM zusammen AS FLOAT : zusammen = messen(FALSE)
+PRINT f"je Baum ein MODEL:   {einzeln:.1f} ms je Bild"
+PRINT f"ein MODEL_INSTANCED: {zusammen:.1f} ms je Bild"

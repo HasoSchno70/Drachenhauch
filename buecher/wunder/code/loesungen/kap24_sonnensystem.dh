@@ -1,0 +1,70 @@
+' Loesung zu Kapitel 24, Erweitern 1: ein Sonnensystem. Die Sonne
+' leuchtet selbst und ist zugleich die Lampe fuer die anderen; die Erde
+' kreist um sie und dreht sich dabei, der Mond kreist um die Erde, Mars
+' weiter draussen und langsamer. Jede Bahn ist eine Matrix, die auf der
+' ihres Traegers aufbaut.
+IMPORT "g3d"
+IMPORT "m3d"
+SCREEN(800, 500, "Ein Sonnensystem")
+RANDOMIZE(8)
+
+DIM kugel AS INTEGER : kugel = MESH_SPHERE(1, 24, 32)
+DIM sonne AS INTEGER : sonne = MESH_SPHERE(1.4, 32, 48)
+
+' Ein Punktlicht in der Mitte: die Planeten sind auf der Seite hell,
+' die zur Sonne zeigt.
+LIGHT_ENABLE()
+LIGHT_AMBIENT(RGB(60, 70, 110), 0.08)
+DIM licht AS INTEGER : licht = LIGHT_POINT(0, 0, 0, RGB(255, 240, 220))
+MODEL_LIT(kugel)
+MODEL_EMISSIVE(sonne, RGB(255, 200, 90), 1.0)
+
+' Sterne: feste Punkte weit draussen.
+DIM sx AS ARRAY OF FLOAT
+DIM sy AS ARRAY OF FLOAT
+DIM sz AS ARRAY OF FLOAT
+DIM i AS INTEGER
+FOR i = 1 TO 300
+    DIM w AS FLOAT : w = RND() * 2 * PI
+    DIM h AS FLOAT : h = RND() * 2 - 1
+    ARRAY_PUSH(sx, COS(w) * SQR(1 - h * h) * 60)
+    ARRAY_PUSH(sy, h * 60)
+    ARRAY_PUSH(sz, SIN(w) * SQR(1 - h * h) * 60)
+NEXT
+
+DIM t AS FLOAT
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
+    t = t + DELTA()
+    CLS(RGB(4, 5, 14))
+    CAMERA3D(0, 9, 16, 0, 0, 0, 45)
+    FOR i = 0 TO LEN(sx) - 1
+        POINT3D(sx[i], sy[i], sz[i], RGB(220, 220, 255))
+    NEXT
+    CIRCLE3D(0, 0, 0, 6, RGBA(255, 255, 255, 40))
+    CIRCLE3D(0, 0, 0, 10, RGBA(255, 255, 255, 40))
+
+    MODEL(sonne, 0, 0, 0, 1.0, RGB(255, 210, 120))
+
+    ' Die Bahn der Erde: um die Sonne gedreht, dann nach aussen. Die
+    ' Erde selbst dreht sich darin noch um ihre eigene Achse.
+    DIM bahn AS MAT4
+    bahn = MAT4_MUL(MAT4_ROTATE_Y(t * 0.5), MAT4_TRANSLATE(6, 0, 0))
+    DIM erde AS MAT4
+    erde = MAT4_MUL(bahn, MAT4_MUL(MAT4_ROTATE_Y(t * 3), _
+                                   MAT4_SCALE(0.5, 0.5, 0.5)))
+    MODEL_MATRIX(kugel, erde, RGB(70, 130, 230))
+    ' Der Mond haengt an der Bahn der Erde, nicht an ihrer Drehung --
+    ' sonst raste er mit jedem Erdentag einmal herum.
+    DIM mond AS MAT4
+    mond = MAT4_MUL(bahn, MAT4_MUL(MAT4_ROTATE_Y(t * 2), _
+                    MAT4_MUL(MAT4_TRANSLATE(1.2, 0, 0), _
+                             MAT4_SCALE(0.15, 0.15, 0.15))))
+    MODEL_MATRIX(kugel, mond, RGB(200, 200, 200))
+    ' Mars: weiter draussen, langsamer, kleiner, rot.
+    DIM mars AS MAT4
+    mars = MAT4_MUL(MAT4_ROTATE_Y(t * 0.27), _
+                    MAT4_MUL(MAT4_TRANSLATE(10, 0, 0), _
+                             MAT4_SCALE(0.35, 0.35, 0.35)))
+    MODEL_MATRIX(kugel, mars, RGB(210, 100, 60))
+    FLIP()
+WEND

@@ -955,4 +955,130 @@ module.exports = (H) => [
   H.pmix([["nachsehen", true], " merkt sich je Datei, wie sie zuletzt aussah — Änderungszeit und Größe als ein Text. Nur was neu ist oder sich geändert hat, wird geladen; ein geändertes Bild ersetzt sein altes an derselben Stelle. Die Probleme stehen jetzt in einer MAP je Datei: Lässt sich eine Datei später laden, nimmt ", ["MAP_REMOVE", true], " ihr Problem wieder weg. ", ["bild_laden", true], " zeigt den eigenen Fehler: LOADIMAGE lädt ein Bild von 32 Punkten Breite klaglos, aber für die Diaschau ist es zu klein, also wirft bild_laden selbst, mit dem Code KLEIN. Ausprobiert, während die Diaschau lief: Ein neues Bild im Ordner war nach zwei Sekunden da, leer.png mit einem echten Bild überschrieben verschwand aus den Problemen, und ein Bild von 32 Punkten erschien als „bilder/klein.png: nur 32 Punkte breit“."]),
 
   H.p("Dabei fiel ein Fehler in Drachenhauch auf: LOADIMAGE merkt sich jedes Bild nach seinem Pfad, damit ein Programm, das es in jedem Bild lädt, nicht jedes Mal die Festplatte fragt. Wurde die Datei aber neu geschrieben, kam still das alte Bild zurück. Jetzt merkt sich LOADIMAGE auch, wie groß und wie alt die Datei war, und lädt sie neu, wenn sich das geändert hat."),
+
+  H.h2("Kapitel 24 · Würfel, Licht und Schatten"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Die Kamera sieht doppelt so weit nach oben und unten: Alles rückt weg und wird kleiner, die Mühle steht klein in der Mitte, und man sieht viel mehr Wiese und Himmel. Am Rand wird es verzerrt — eine Tanne unten rechts ist breit und schief gezogen. So sieht ein Weitwinkel aus. Kleinere Zahlen wirken wie ein Fernrohr: Alles rückt heran, und der Raum wirkt flacher."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Dichter Nebel: Die Häuser sind nur noch als blasse Umrisse da, die hinteren Bäume ganz verschwunden, und selbst die Mühle wird bläulich. Je größer die Zahl, desto näher beginnt der Dunst. Mit sehr kleinen Zahlen sieht man bis zum Rand der Wiese."),
+
+  H.h3("Drehen 3"),
+
+  H.p("Die Bäume weiter hinten haben keinen Schatten mehr. SHADOW_AREA gibt an, wie groß das Stück Welt um SHADOW_TARGET ist, für das Schatten berechnet werden; draußen gibt es keine. Dafür sind die Schatten innen schärfer, denn dieselbe Anzahl Punkte im Schattenbild deckt jetzt eine kleinere Fläche. Darum führt man das Stück in einem Spiel der Figur nach."),
+
+  H.h3("Erweitern 1: ein Sonnensystem"),
+
+  H.p("Ein eigenes Programm (code/loesungen/kap24_sonnensystem.dh):"),
+
+  H.code(zeilen("loesungen/kap24_sonnensystem.dh")),
+
+  H.figure("kap24_sonnensystem.png", "Erweitern 1: Erde mit Mond und Mars auf ihren Bahnen, auf der Seite zur Sonne hin beleuchtet.", 420, 262),
+
+  H.pmix(["Die Sonne leuchtet selbst — ", ["MODEL_EMISSIVE", true], " —, und ein ", ["LIGHT_POINT", true], " in ihrer Mitte beleuchtet die anderen, jeden auf der Seite, die zu ihr zeigt. Das Wichtigste steht in den Matrizen: bahn dreht um die Sonne und schiebt dann nach außen. Die Erde hängt an der Bahn und dreht sich darin noch um sich selbst. Der Mond hängt ebenfalls an der Bahn, nicht an der Erde — sonst nähme ihn ihre schnelle Drehung mit, und er raste einmal am Tag um sie herum. ", ["MAT4_SCALE", true], " macht aus derselben Kugel große und kleine Himmelskörper. Die Sterne sind Punkte auf einer großen Kugel um alles herum."]),
+
+  H.h3("Erweitern 2: Tag und Nacht"),
+
+  H.p("Eine Uhr, eine Laterne und ein Himmel, der seine Farbe wechselt (code/loesungen/kap24_tag.dh):"),
+
+  ...neu("loesungen/kap24_tag.dh").map((t) => H.code(t)),
+
+  H.figure("kap24_tag.png", "Erweitern 2: Nacht an der Mühle, die Laterne macht einen warmen Fleck auf der Wiese.", 420, 262),
+
+  H.pmix(["Die Sonne läuft auf einem Kreis: ", ["LIGHT_SET_POS", true], " setzt bei einem Sonnenlicht die Richtung, und die zeigt nach unten, solange stand positiv ist. Unter dem Horizont würde sie von unten leuchten — darum bleibt die Richtung dort flach, und ", ["LIGHT_SET_COLOR", true], " dreht das Licht mit hell auf Schwarz herunter. ", ["COLOR_LERP", true], " mischt zwei Farben: nachts dunkelblau, tief stehend rot, hoch oben blau. Der Dunst bekommt jedes Mal dieselbe Farbe wie der Himmel, sonst stünde die Wiese vor einem fremden Horizont. Die Laterne ist ein Punktlicht, das ", ["LIGHT_SET_ENABLED", true], " nur nachts einschaltet."]),
+
+  H.h3("Erfinden: ein Labyrinth von oben"),
+
+  H.p("Eine Möglichkeit (code/loesungen/kap24_labyrinth.dh):"),
+
+  H.code(zeilen("loesungen/kap24_labyrinth.dh")),
+
+  H.pmix(["Der Irrgarten entsteht mit einer Tiefensuche, wie sie in vielen Spielen steckt: Von der ersten Zelle aus geht es zu einer zufälligen Nachbarzelle, die noch zu ist, die Mauer dazwischen fällt, und so weiter, bis es nicht mehr weitergeht; dann geht es auf dem Stapel zurück bis zur letzten Zelle, die noch einen geschlossenen Nachbarn hat. So entsteht genau ein Weg zwischen je zwei Stellen. Das Raster wird ein Bild mit einem Punkt je Feld, und ", ["MESH_CUBICMAP", true], " macht aus jedem weißen Punkt einen Würfel. Schwarze Punkte bekämen Boden und Decke; graue lässt es leer, darum sind die Gänge grau, und der Boden ist eine eigene Ebene in anderer Farbe. Die Kugel springt nicht von Feld zu Feld: Sie ist auf einem Feld, wird aber mit ", ["LERP", true], " gleitend gezeichnet. Ausprobiert mit einer Aufnahme: Ein Schritt in eine Mauer zählt nicht, einer in den Gang schon."]),
+
+  H.h2("Kapitel 25 · Flug über eine Landschaft"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Aus wenigen großen Bergen werden viele kleine, spitze, dicht an dicht — ein Hochgebirge. MASSSTAB bestimmt, wie weit man im Rauschen pro Kartenpunkt weitergeht: Größere Schritte heißen, dass mehr Rauschen auf dieselbe Karte passt, also mehr Berge auf demselben Land. Weil die Karte aber gleich viele Punkte hat, werden die Berge dabei eckiger."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Fast alles liegt jetzt hoch: eine breite, graue Felslandschaft mit runden Kuppen, und der Wald wächst nur noch in den wenigen Senken. Das Quadrat machte kleine Höhen kleiner und ließ große groß — ohne es fehlen die flachen Täler."),
+
+  H.h3("Drehen 3"),
+
+  H.p("Mit 90 Grad sieht man viel mehr Land auf einmal, und die Berge wirken weiter weg und flacher. Zusammen mit dem höheren Tempo zieht der Boden am Rand schnell vorbei — der Flug fühlt sich viel schneller an, obwohl er nur doppelt so schnell ist. Rennspiele machen genau das: Sie weiten das Bild, wenn es schnell wird."),
+
+  H.h3("Erweitern 1: eine Wasserfläche"),
+
+  H.p("Eine große Ebene auf einer festen Höhe, halb durchsichtig (code/loesungen/kap25_wasser.dh):"),
+
+  ...neu("loesungen/kap25_wasser.dh").map((t) => H.code(t)),
+
+  H.figure("kap25_wasser.png", "Erweitern 1: Ein See in einem Tal, an seinem Ufer beginnt der Wald.", 420, 262),
+
+  H.pmix(["Das Wasser ist eine einzige ", ["MESH_PLANE", true], " so groß wie die Welt, auf der Höhe SPIEGEL. Wo das Gelände darunter liegt, sieht man Wasser, wo es darüber ragt, Land — die Ufer entstehen von selbst. ", ["MODEL_PBR", true], " mit kleiner Rauheit macht die Fläche glatt, so dass die Sonne in ihr glänzt. Die Farbe hat eine Deckkraft von 190: Man ahnt den Grund. Durchsichtiges kommt zuletzt in die Zeichenliste, sonst verdeckt es, was danach gezeichnet wird. Und der Flug bleibt drei Einheiten über dem Wasser, nicht nur über dem Grund."]),
+
+  H.h3("Erweitern 2: Tageszeit"),
+
+  H.p("Himmel, Dunst und Sonne werden zu einer Funktion mit Zahlen (code/loesungen/kap25_tageszeit.dh):"),
+
+  ...neu("loesungen/kap25_tageszeit.dh").map((t) => H.code(t)),
+
+  H.figure("kap25_tageszeit.png", "Erweitern 2: Abend — die Sonne steht tief, die Berge glühen, der Himmel ist violett.", 420, 262),
+
+  H.pmix(["Aus den festen Farben DUNST und BLAU werden Parameter, und ", ["tageszeit", true], " baut den Himmel jedes Mal neu: Bild malen, ", ["SKYBOX_IMAGE", true], ", denselben Horizont als Dunst, die Sonne gedreht und gefärbt. Die Grundhelligkeit nimmt die Farbe des Horizonts an, dadurch werden auch die Schatten abends rötlich. Drei kleine SUBs geben den Tageszeiten Namen, und in der Schleife löst je eine Taste eine aus. Ausprobiert mit einer Aufnahme, die die 3 drückt: Danach liegt das Land im Abendlicht."]),
+
+  H.h3("Erfinden: Ringe zum Durchfliegen"),
+
+  H.p("Eine Möglichkeit (code/loesungen/kap25_ringe.dh):"),
+
+  ...neu("loesungen/kap25_ringe.dh").map((t) => H.code(t)),
+
+  H.pmix(["Die Ringe liegen auf einem großen Kreis um die Mitte der Welt, jeder zwölf Einheiten über seinem Boden. ", ["MESH_TORUS", true], " steht von sich aus aufrecht und blickt nach z; ", ["MODEL_EX", true], " dreht ihn um die senkrechte Achse, bis er entlang des Kreises blickt — wer die Runde fliegt, fliegt von einem durch den nächsten. Durchflogen ist ein Ring, wenn der Abstand zu seiner Mitte kleiner als sein Radius ist; dann ist der nächste dran. Der Flug beginnt sechzig Einheiten vor dem ersten Ring. Ausprobiert: Geradeaus geflogen steht nach gut drei Sekunden „Ring 2 von 8“ oben links."]),
+
+  H.h2("Kapitel 26 · Das große Finale"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Jede Szene braucht drei Sekunden, bis sie ganz da ist, und wird drei Sekunden vor ihrem Ende schon dunkler — die Wechsel werden zu langen, langsamen Übergängen. Ist eine Szene kürzer als zwei Blenden, wird sie nie ganz hell: rest, der Abstand zum nächsten Rand, erreicht höchstens die halbe Dauer, und die bleibt unter BLENDE. Die Blende steht an einer einzigen Stelle, im Taktgeber; keine Szene muss davon wissen."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Alles verschwimmt im Schimmer: Der Titel ist kaum noch zu lesen, jeder Funke wird zu einem kleinen Fleck Licht. Das Leuchten addiert den Schimmer der Umgebung auf jeden Bildpunkt; mal 3 überstrahlt es das Bild selbst. Über der Landschaft bleibt es bei 0.4, weil der Taktgeber die Stärke dort selbst setzt."),
+
+  H.h3("Drehen 3"),
+
+  H.p("Der Titel läuft wie immer — aber wenn der Flug beginnen soll, bricht die Demo ab: „MODEL: ungueltiges MODEL-Handle 0“, in flug.dh. Ohne vorbereiten hat die Szene kein Gelände gebaut; land ist noch 0, und ein Modell mit dieser Nummer gibt es nicht. Darum ruft der Taktgeber alle vorbereiten am Anfang auf, bevor das erste Bild kommt — dann kostet das Bauen auch keine Zeit mitten in der Demo."),
+
+  H.h3("Erweitern 1: die Szenen als Liste"),
+
+  H.p("Statt SELECT CASE ein Feld aus Funktionsreferenzen (code/loesungen/kap26_liste.dh):"),
+
+  ...neu("loesungen/kap26_liste.dh").map((t) => H.code(t)),
+
+  H.pmix(["Eine SUB ohne Klammern ist ein Wert, den man in ein Feld legen kann — eine ", ["Funktionsreferenz", true], " wie in Kapitel 20, und das geht auch mit SUBs aus einem Namensraum. ", ["szenen[szene](zeit)", true], " ruft die mit der Nummer der Szene. Eine vierte Szene ist dann ein Eintrag mehr in szenen und in dauer, ohne einen neuen CASE. Weil alle Szenen dieselbe Form haben — zeichnen mit der Zeit als Parameter —, passen sie in dasselbe Feld."]),
+
+  H.h3("Erweitern 2: eine Pause"),
+
+  H.p("Mit P halten Bild und Musik an (code/loesungen/kap26_pause.dh):"),
+
+  ...neu("loesungen/kap26_pause.dh").map((t) => H.code(t)),
+
+  H.pmix(["Während der Pause wächst zeit nicht mehr, also steht alles still, was mit der Zeit der Szene rechnet: Der Titel wird nicht heller, die Sterne funkeln nicht. Die Funken steigen allerdings weiter — sie rechnen mit DELTA(), der Zeit seit dem letzten Bild, und die läuft auch in der Pause. Wer auch sie anhalten will, gibt der Szene die vergangene Zeit als zweiten Parameter. ", ["AUDIO_PAUSE", true], " und ", ["AUDIO_RESUME", true], " halten die Musik an und lassen sie an derselben Stelle weiterlaufen. Ausprobiert mit einer Aufnahme, die nach einer Sekunde P drückt: Vier Sekunden später ist der Titel noch so blass wie nach einer Sekunde."]),
+
+  H.h3("Erfinden: eine vierte Szene"),
+
+  H.p("Das Sonnensystem aus Kapitel 24 als eigene Datei mit derselben Form wie die anderen Szenen (code/loesungen/kap26_sonne.dh):"),
+
+  H.code(zeilen("loesungen/kap26_sonne.dh")),
+
+  H.p("Und im Taktgeber (code/loesungen/kap26_vier.dh):"),
+
+  ...neu("loesungen/kap26_vier.dh").map((t) => H.code(t)),
+
+  H.p("Die Szene bekommt eine vierte SUB, beginnen: Ihr Punktlicht soll erst leuchten, wenn sie dran ist, und beim Gehen schaltet beenden es wieder aus. Im Taktgeber kommen ein IMPORT, ein vorbereiten, eine Dauer und ein CASE dazu, und die Musik klingt jetzt in der vierten Szene aus statt in der dritten. Die anderen Szenen bleiben, wie sie sind — keine Zeile in titel.dh, flug.dh oder abspann.dh ändert sich. Das ist der Lohn der Aufteilung."),
 ];
