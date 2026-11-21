@@ -707,4 +707,42 @@ module.exports = (H) => [
   H.figure("kap17_tapete.png", "In der Kachel oben links gemalt, erscheint jeder Strich um alle acht Mitten herum.", 420, 262),
 
   H.pmix(["Winkel und Abstand misst der Strich von der Mitte der Kachel, in der er beginnt; gezeichnet wird er um jede Mitte herum. Wo die Rosetten über ihre Kachel hinausreichen, greifen sie ineinander, und es entsteht ein Muster ohne Nähte. S sichert das Blatt mit ", ["RENDERTARGET_IMAGE", true], " und ", ["IMAGE_SAVE", true], ". Im PNG stehen nur die Striche, keine Hilfslinien und keine Zeile oben — die stehen nur auf dem Fenster. Das ist der Lohn für die Trennung aus Schritt 3."]),
+
+  H.h2("Kapitel 18 · Der Theremin"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Mit 2 Oktaven ist ein Halbton 33 Punkte breit: Man trifft die Töne leicht, hat aber nur zwei Oktaven Platz — für die meisten Melodien reicht das. Mit 7 Oktaven sind es knapp zehn Punkte, und schon ein Zittern der Hand macht den Ton schief; dafür reicht der Bereich vom tiefsten Brummen bis zum Pfeifen. Ein echtes Theremin hat dasselbe Problem: Je mehr Umfang, desto genauer muss man die Hand halten."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Mit −80 dB ganz oben liegt die ganze obere Hälfte des Fensters unter −40 dB, also unter einem Hundertstel des vollen Ausschlags. Über Lautsprecher hört man dort kaum etwas; gespielt wird nur noch in der unteren Hälfte. −40 dB ist für ein Instrument, das man über Lautsprecher hört, ein guter Bereich — leiser ist neben dem Lüfter des Rechners ohnehin nichts zu hören."),
+
+  H.h3("Drehen 3"),
+
+  H.p("Das Bild zeigt weiter einen Sinus, denn welle rechnet mit SIN — es zeigt, wie hoch und wie laut, nicht welche Form. Zu hören ist der Unterschied sofort: Die Rechteckwelle klingt hohl und nach alter Spielkonsole, der Sägezahn scharf und hell wie ein Synthesizer. Beide haben Obertöne, Vielfache der Frequenz, die mitklingen; der Sinus hat keine und klingt darum so weich und rund, wie man ein Theremin kennt."),
+
+  H.h3("Erweitern 1: Einrasten"),
+
+  H.p("Die Leiter steht als Halbtöne über dem A in einem Feld; gesucht wird der nächste Ton darin (code/loesungen/kap18_einrasten.dh):"),
+
+  ...neu("loesungen/kap18_einrasten.dh").map((t) => H.code(t)),
+
+  H.p("eingerastet rechnet zuerst in Halbtönen über TIEF, wie tonname$, und teilt sie in die Oktave und den Rest darin. Für den Rest sucht die Schleife die nächste Stufe; best beginnt bei 12, dem A der nächsten Oktave, damit ein Ton knapp darunter nach oben rastet statt zum G. Gemessen: Steht die Maus 4,4 Halbtöne über dem A, kommen ohne Einrasten 142 Hz heraus, mit Einrasten 147 Hz — das D. Gleiten tut der Ton ebenfalls in Halbtönen, damit es oben so schnell geht wie unten. Die Spur zeigt jetzt den gespielten Ton, nicht die Maus, und wird zur Treppe."),
+
+  H.h3("Erweitern 2: Vibrato"),
+
+  H.p("Ein Modulator kann die Tonhöhe nicht fahren, also rechnet das Programm sie in jedem Bild selbst (code/loesungen/kap18_vibrato.dh):"),
+
+  ...neu("loesungen/kap18_vibrato.dh").map((t) => H.code(t)),
+
+  H.p("Die Schwingung rechnet in Halbtönen: ±0,25 Halbtöne, umgerechnet mit 2 ^ (halb / 12) wie in Schritt 1. Bei 220 Hz schwankt der Ton damit zwischen 217 und 223 Hz — so stand es auch im Mitschnitt, fünfmal je Sekunde. Dass das Programm nur 60-mal je Sekunde nachstellt, hört man nicht: Je Schwingung sind es zwölf Schritte, und AUDIO_PITCH gleitet jeden über 4 ms. Erst wenn ein Bild hängt, stockt auch das Vibrato — der Preis dafür, dass es kein Modulator ist."),
+
+  H.h3("Erfinden: zwei Stimmen"),
+
+  H.p("Eine Möglichkeit (code/loesungen/kap18_zwei_stimmen.dh): ein zweiter Klang, eine Quinte höher, mit Z an und aus; R wechselt zwischen zwei Arten von Quinte:"),
+
+  ...neu("loesungen/kap18_zwei_stimmen.dh").map((t) => H.code(t)),
+
+  H.p("Die zweite Stimme braucht einen eigenen Klang, denn AUDIO_PLAY beendet einen Klang, bevor es ihn neu startet. Und beide Stimmen sind Sägezähne, denn erst an den Obertönen hört man, worum es geht. Eine Quinte ist das Verhältnis 3 : 2 — das Dreifache des unteren Tons ist dann genau das Doppelte des oberen, und beide klingen im Sägezahn mit. Auf dem Klavier ist die Quinte aber sieben gleichstufige Halbtöne, 2^(7/12) = 1,4983, ein wenig kleiner. Bei 220 Hz liegen die beiden Obertöne dann bei 660 und 659,3 Hz, und zwei so nahe Töne schweben: Sie verstärken und schwächen sich im Wechsel, 0,74-mal je Sekunde. Gemessen schwoll der Anteil bei 660 Hz alle 1,35 Sekunden von fast null zum Höchstwert und zurück. Mit der reinen Quinte stand er still. Diesen Preis zahlt jedes Klavier für die zwölf gleichen Schritte: Keine Quinte ist ganz rein, dafür klingen alle Tonarten gleich."),
 ];

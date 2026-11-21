@@ -1,0 +1,209 @@
+' Loesung zu Kapitel 18, Erfinden: eine zweite Stimme. Mit Z klingt
+' eine Quinte ueber dem Ton mit, mit R wechselt sie zwischen der Quinte
+' des Klaviers (7 Halbtoene) und der reinen Quinte (3 : 2).
+' Die Stellen, die neu sind, stehen zwischen >>> und <<<.
+IMPORT "audio"
+CONST BREITE = 800
+CONST HOEHE = 500
+' Der tiefste Ton (ein A) und wie viele Oktaven ueber die Breite gehen.
+CONST TIEF = 110
+CONST OKTAVEN = 4
+' So leise ist es ganz oben, in Dezibel.
+CONST LEISE_DB = -40
+
+' Die Tonnamen, beim C beginnend wie die Oktaven.
+DIM namen AS ARRAY OF STRING
+namen = ["C", "Cis", "D", "Dis", "E", "F", "Fis", "G", "Gis", "A", _
+         "B", "H"]
+
+' Wie hoch an der Stelle x: Jede Oktave ist gleich breit, und eine
+' Oktave hoeher heisst doppelt so viele Schwingungen.
+FUNCTION frequenz(x AS FLOAT) AS FLOAT
+    RETURN TIEF * 2 ^ (x / BREITE * OKTAVEN)
+END FUNCTION
+
+' Wie laut an der Stelle y: oben LEISE_DB, unten 0 dB. Aus den Dezibel
+' wird der Faktor, mit dem die Welle malgenommen wird.
+FUNCTION dezibel(y AS FLOAT) AS FLOAT
+    RETURN LEISE_DB * (1 - y / HOEHE)
+END FUNCTION
+FUNCTION faktor(db AS FLOAT) AS FLOAT
+    RETURN 10 ^ (db / 20)
+END FUNCTION
+
+' Der naechste Ton zur Frequenz f und wie weit f daneben liegt. Gezaehlt
+' wird in Halbtoenen wie bei MIDI: Das A mit 440 Hz hat die Nummer 69.
+FUNCTION tonname$(f AS FLOAT) AS STRING
+    DIM halb AS FLOAT : halb = 69 + 12 * LOG(f / 440) / LOG(2)
+    DIM n AS INTEGER : n = ROUND(halb)
+    DIM cent AS INTEGER : cent = ROUND((halb - n) * 100)
+    RETURN namen[n MOD 12] + STR$(n \ 12 - 1) + "  " _
+           + IIF(cent >= 0, "+", "") + STR$(cent) + " Cent"
+END FUNCTION
+
+SCREEN(BREITE, HOEHE, "Theremin")
+
+' Der Ton: eine Sekunde Sinus mit TIEF Hz -- genau 110 Schwingungen.
+' Darum passt das Ende nahtlos an den Anfang, und er laeuft endlos
+' (-1), ohne bei jeder Runde zu knacken. Er beginnt stumm.
+' >>> neu
+' Saegezahn statt Sinus: Er hat alle Obertoene, und an ihnen hoert man,
+' ob zwei Toene zueinander passen.
+DIM ton AS SOUND : ton = AUDIO_TONE(TIEF, 1000, "saw")
+' <<< neu
+DIM kanal AS AUDIO_CHANNEL : kanal = AUDIO_PLAY(ton, -1, 0)
+' >>> neu
+' Die zweite Stimme braucht einen eigenen Klang: AUDIO_PLAY spielt einen
+' Klang nur einmal zugleich.
+DIM ton2 AS SOUND : ton2 = AUDIO_TONE(TIEF, 1000, "saw")
+DIM kanal2 AS AUDIO_CHANNEL : kanal2 = AUDIO_PLAY(ton2, -1, 0)
+DIM zweite AS BOOLEAN
+DIM rein AS BOOLEAN
+' <<< neu
+
+' Das Tremolo: ein Modulator, der sechsmal je Sekunde schwingt und die
+' Lautstaerke des SFX-Busses zwischen 40 und 100 Prozent bewegt.
+DIM tremolo AS AUDIO_MOD
+DIM zittern AS BOOLEAN
+
+' Ein Netz zum Zielen: senkrecht die Halbtoene (die C hell und
+' beschriftet), waagerecht alle 10 dB.
+SUB netz()
+    DIM h AS INTEGER
+    FOR h = 0 TO OKTAVEN * 12
+        DIM x AS FLOAT : x = h * BREITE / (OKTAVEN * 12)
+        ' TIEF ist ein A, das naechste C liegt drei Halbtoene hoeher.
+        IF (h - 3) MOD 12 = 0 THEN
+            LINE(x, 0, x, HOEHE, RGBA(255, 255, 255, 70))
+            TEXT(x + 4, HOEHE - 20, "C" + STR$((h - 3) \ 12 + 3), _
+                 RGBA(255, 255, 255, 120))
+        ELSE
+            LINE(x, 0, x, HOEHE, RGBA(255, 255, 255, 18))
+        END IF
+    NEXT
+    DIM db AS INTEGER
+    FOR db = -10 TO LEISE_DB STEP -10
+        DIM y AS FLOAT : y = HOEHE * (1 - db / LEISE_DB)
+        LINE(0, y, BREITE, y, RGBA(255, 255, 255, 18))
+        TEXT(BREITE - 60, y + 4, STR$(db) + " dB", _
+             RGBA(255, 255, 255, 90))
+    NEXT
+END SUB
+
+' Jede Oktave eine Farbe weiter: Ein A ist immer gleich weit herum.
+FUNCTION farbe_von(f AS FLOAT) AS INTEGER
+    RETURN HSV(LOG(f / TIEF) / LOG(2) * 80, 0.7, 1)
+END FUNCTION
+
+' Dieselbe Farbe, aber durchscheinend: zerlegt wie in Kapitel 16.
+FUNCTION mit_deckkraft(farbe AS INTEGER, a AS FLOAT) AS INTEGER
+    RETURN RGBA((farbe SHR 16) BAND 255, (farbe SHR 8) BAND 255, _
+                farbe BAND 255, a)
+END FUNCTION
+
+' Die Spur: wo die Maus in den letzten zwei Sekunden war und wie laut.
+CONST SPUR = 120
+DIM spur_x AS ARRAY OF FLOAT
+DIM spur_y AS ARRAY OF FLOAT
+DIM spur_v AS ARRAY OF FLOAT
+
+' Wie stark ein Faktor klingt: 0 bei LEISE_DB und darunter, 1 bei
+' 0 dB -- in Dezibel gemessen, so wie das Ohr hoert.
+FUNCTION staerke(v AS FLOAT) AS FLOAT
+    IF v <= 0 THEN RETURN 0
+    RETURN CLAMP(1 - 20 * LOG10(v) / LEISE_DB, 0, 1)
+END FUNCTION
+
+SUB spur_zeichnen()
+    DIM i AS INTEGER
+    FOR i = 1 TO LEN(spur_x) - 1
+        ' Je aelter, desto blasser; je lauter, desto dicker.
+        DIM alter AS FLOAT : alter = i / LEN(spur_x)
+        DIM s AS FLOAT : s = staerke(spur_v[i])
+        IF s > 0 THEN
+            DIM farbe AS INTEGER
+            farbe = farbe_von(frequenz(spur_x[i]))
+            LINEW(spur_x[i - 1], spur_y[i - 1], spur_x[i], spur_y[i], _
+                  1 + s * 18, mit_deckkraft(farbe, alter * 220))
+            CIRCLE(spur_x[i], spur_y[i], (1 + s * 18) / 2, _
+                   mit_deckkraft(farbe, alter * 220))
+        END IF
+    NEXT
+END SUB
+
+' Die Welle, wie sie klingt -- stark verlangsamt: hoeher heisst enger,
+' lauter heisst hoeher ausschlagend.
+SUB welle(f AS FLOAT, v AS FLOAT, phase AS FLOAT)
+    DIM laenge AS FLOAT : laenge = 20000 / f
+    DIM farbe AS INTEGER : farbe = farbe_von(f)
+    DIM alt_y AS FLOAT : alt_y = HOEHE / 2
+    DIM x AS INTEGER
+    FOR x = 0 TO BREITE STEP 2
+        DIM y AS FLOAT
+        y = HOEHE / 2 - v * 200 * SIN(phase + x / laenge * 2 * PI)
+        IF x > 0 THEN LINEW(x - 2, alt_y, x, y, 3, farbe)
+        alt_y = y
+    NEXT
+END SUB
+
+DIM v AS FLOAT
+DIM phase AS FLOAT
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
+    DIM x AS FLOAT : x = CLAMP(MOUSE_X(), 0, BREITE)
+    DIM y AS FLOAT : y = CLAMP(MOUSE_Y(), 0, HOEHE)
+    DIM f AS FLOAT : f = frequenz(x)
+
+    ' Die Lautstaerke springt nicht, sie gleitet zum Ziel: Je Bild ein
+    ' Viertel des Wegs, so setzt der Ton weich ein und klingt weich aus.
+    DIM ziel AS FLOAT : ziel = 0
+    IF MOUSE_DOWN(0) THEN ziel = faktor(dezibel(y))
+    v = v + (ziel - v) * MIN(1, DELTA() * 15)
+    ARRAY_PUSH(spur_x, x)
+    ARRAY_PUSH(spur_y, y)
+    ARRAY_PUSH(spur_v, v)
+    IF LEN(spur_x) > SPUR THEN
+        ARRAY_REMOVE_AT(spur_x, 0)
+        ARRAY_REMOVE_AT(spur_y, 0)
+        ARRAY_REMOVE_AT(spur_v, 0)
+    END IF
+    AUDIO_PITCH(kanal, f / TIEF)
+    AUDIO_VOLUME(kanal, v)
+    ' >>> neu
+    IF KEY_HIT(KEY_Z) THEN zweite = NOT zweite
+    IF KEY_HIT(KEY_R) THEN rein = NOT rein
+    DIM quinte AS FLOAT : quinte = 2 ^ (7 / 12)
+    IF rein THEN quinte = 3 / 2
+    AUDIO_PITCH(kanal2, f * quinte / TIEF)
+    AUDIO_VOLUME(kanal2, IIF(zweite, v * 0.7, 0))
+    ' <<< neu
+
+    IF KEY_HIT(KEY_T) THEN
+        zittern = NOT zittern
+        IF zittern THEN
+            tremolo = AUDIO_LFO_NEW("sine", 6)
+            AUDIO_MODULATE("sfx", "volume", tremolo, 0.4, 1.0)
+        ELSE
+            ' Ohne Modulator kehrt der Bus zu seiner festen Lautstaerke
+            ' zurueck.
+            AUDIO_MOD_REMOVE(tremolo)
+        END IF
+    END IF
+
+    CLS(RGB(14, 12, 26))
+    netz()
+    phase = phase + DELTA() * 6
+    welle(f, v, phase)
+    spur_zeichnen()
+    CIRCLE(x, y, 6 + v * 24, RGBA(255, 255, 255, 60 + v * 160))
+    TEXT(10, 10, tonname$(f) + "   " + FORMAT$(f, "%.1f") + " Hz   " _
+         + FORMAT$(dezibel(y), "%.0f") + " dB", _
+         RGBA(255, 255, 255, 200))
+    IF zittern THEN TEXT(10, 32, "Tremolo", RGBA(255, 200, 120, 200))
+    ' >>> neu
+    IF zweite THEN
+        TEXT(10, 54, IIF(rein, "reine Quinte 3:2", _
+             "Quinte, 7 Halbtoene"), RGBA(120, 220, 255, 200))
+    END IF
+    ' <<< neu
+    FLIP()
+WEND
