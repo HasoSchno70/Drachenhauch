@@ -245,3 +245,12 @@ DIM b[8] AS INTEGER
 MIC_FFT(b)
 --- fehler
 MIC_FFT: erwartet 1D ARRAY OF FLOAT
+
+=== mic fft mit leerem feld meldet sich
+' Wie AUDIO_FFT: ein Feld ohne Plaetze bekaeme still keine Werte. Die
+' Pruefung kommt vor dem Mikrofon -- es braucht keins.
+IMPORT "audio"
+DIM sp AS ARRAY OF FLOAT
+MIC_FFT(sp)
+--- fehler
+MIC_FFT: das Feld hat keine Plaetze

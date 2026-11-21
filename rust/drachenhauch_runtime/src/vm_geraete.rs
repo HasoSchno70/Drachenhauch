@@ -1082,6 +1082,9 @@ impl<'p> Vm<'p> {
                 if b.element_type != "float" || b.dims.len() != 1 {
                     return Err(format!("{}: erwartet 1D ARRAY OF FLOAT", f));
                 }
+                if b.cells.len() == 0 {
+                    return Err(super::grafik::leeres_feld(f));
+                }
             }
             Ok(arr)
         }

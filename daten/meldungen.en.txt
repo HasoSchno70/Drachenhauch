@@ -2009,3 +2009,4 @@ MIDI_CLOCK_SEND: Tempo {} ausserhalb 1..999 (0 haelt die Uhr an)	MIDI_CLOCK_SEND
 {}: {} Sechzehntel ausserhalb 0..16383	{}: {} sixteenths outside 0..16383
 GUI_FILETREE_COLOR: kein Muster -- so: "*.dh", "*.json;*.ini" oder "/" fuer Ordner	GUI_FILETREE_COLOR: no pattern -- like this: "*.dh", "*.json;*.ini" or "/" for folders
 GUI_FILETREE_ICON: kein Muster -- so: "*.dh", "*.json;*.ini" oder "/" fuer Ordner	GUI_FILETREE_ICON: no pattern -- like this: "*.dh", "*.json;*.ini" or "/" for folders
+{}: das Feld hat keine Plaetze -- es bekommt so viele Werte, wie es Plaetze hat: DIM werte[64] AS FLOAT	{}: the array has no slots -- it gets as many values as it has slots: DIM werte[64] AS FLOAT

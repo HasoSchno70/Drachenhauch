@@ -92,7 +92,7 @@
   "AUDIO_EMITTER_REMOVE": "dismantle the source",
   "AUDIO_EMITTER_SET_POSITION": "move the source",
   "AUDIO_EQ": "parametric bell EQ (one band). gain_db 0 = transparent, >0 boost / <0 cut, q bandwidth (default 1)",
-  "AUDIO_FFT": "the spectrum of the master: fills an ARRAY OF FLOAT with as many bands as it has slots, low on the left, high on the right, spread logarithmically (every octave gets the same number), each 0..1. The height adjusts itself (the loudest value of the last seconds is 1), and a band falls slowly rather than at once (to 80 % per sixtieth of a second) -- both by the clock, not by the number of calls",
+  "AUDIO_FFT": "the spectrum of the master: fills an ARRAY OF FLOAT with as many bands as it has slots, low on the left, high on the right, spread logarithmically (every octave gets the same number), each 0..1. The height adjusts itself (the loudest value of the last seconds is 1), and a band falls slowly rather than at once (to 80 % per sixtieth of a second) -- both by the clock, not by the number of calls. An …",
   "AUDIO_FILTER": "low-pass. cutoff_hz 20..20000 (≤0 or ≥20000 = open/off), resonance 0..1 (emphasis at the cutoff — the “weeoow\" SID/acid character)",
   "AUDIO_GET_VOLUME": "current volume",
   "AUDIO_INIT": "makes sure the audio system is running. Accepts arguments and ignores them -- they date from the mixer era and are only tolerated for compatibility",

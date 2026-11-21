@@ -1312,3 +1312,11 @@ bleibt sie bei 0.18, seine Schwellen sind jetzt 1.5 und 0.5. Dazu ein
 Fall, der beide Abfrageraten vergleicht; Gegenprobe: mit Abfall je
 Aufruf faellt genau er. Das Handbuch hatte fuer `AUDIO_FFT` keine Zeile;
 jetzt steht dort, was das Feld enthaelt.
+
+Im selben Kapitel: `DIM sp AS ARRAY OF FLOAT` ist ein leeres Feld, und
+`AUDIO_FFT` fuellt so viele Baender, wie das Feld Plaetze hat -- also still
+keines; das Bild bleibt leer, ohne Meldung. Jetzt melden sich `AUDIO_FFT`,
+`MIC_FFT` und `MIC_WAVE` bei einem Feld ohne Plaetze und zeigen, wie es
+geht (`vm_grafik::leeres_feld`). `modules_audio.dhtest` und
+`mikrofon.dhtest` (je ein Fall, die Pruefung kommt vor Soundkarte und
+Mikrofon); Gegenprobe: ohne die Pruefung fallen beide.

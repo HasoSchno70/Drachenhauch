@@ -500,7 +500,7 @@ as a file, record the mixer:
 | `AUDIO_RECORD_STOP()` → SOUND | stop and return it as a sound (stereo, the device's sample rate); without a running recording an error |
 | `AUDIO_RECORDING()` → BOOLEAN | is a recording running? |
 | `AUDIO_PEAK()` → FLOAT | highest swing at the master since the last call, after the master volume; above 1.0 means clipping |
-| `AUDIO_FFT(arr)` | the spectrum of the master: fills an `ARRAY OF FLOAT` with as many bands as it has slots, low on the left, high on the right, spread logarithmically (every octave gets the same number), each 0..1. The height adjusts itself (the loudest value of the last seconds is 1), and a band falls slowly rather than at once (to 80 % per sixtieth of a second) -- both by the clock, not by the number of calls |
+| `AUDIO_FFT(arr)` | the spectrum of the master: fills an `ARRAY OF FLOAT` with as many bands as it has slots, low on the left, high on the right, spread logarithmically (every octave gets the same number), each 0..1. The height adjusts itself (the loudest value of the last seconds is 1), and a band falls slowly rather than at once (to 80 % per sixtieth of a second) -- both by the clock, not by the number of calls. An array without slots (`DIM sp AS ARRAY OF FLOAT`) is an error: `DIM sp[64] AS FLOAT` |
 
 ```basic
 AUDIO_RECORD_START()
