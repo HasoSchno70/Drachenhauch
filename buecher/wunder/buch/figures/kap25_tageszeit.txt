@@ -1,0 +1,5 @@
+// Kapitel 25, Erweitern 2: Taste 3 fuer den Abend.
+c 3
+e 0 7 10 10 0 0
+e 2 2 51 0 0 0
+e 4 1 51 0 0 0

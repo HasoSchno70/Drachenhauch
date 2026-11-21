@@ -997,4 +997,46 @@ module.exports = (H) => [
   H.code(zeilen("loesungen/kap24_labyrinth.dh")),
 
   H.pmix(["Der Irrgarten entsteht mit einer Tiefensuche, wie sie in vielen Spielen steckt: Von der ersten Zelle aus geht es zu einer zufälligen Nachbarzelle, die noch zu ist, die Mauer dazwischen fällt, und so weiter, bis es nicht mehr weitergeht; dann geht es auf dem Stapel zurück bis zur letzten Zelle, die noch einen geschlossenen Nachbarn hat. So entsteht genau ein Weg zwischen je zwei Stellen. Das Raster wird ein Bild mit einem Punkt je Feld, und ", ["MESH_CUBICMAP", true], " macht aus jedem weißen Punkt einen Würfel. Schwarze Punkte bekämen Boden und Decke; graue lässt es leer, darum sind die Gänge grau, und der Boden ist eine eigene Ebene in anderer Farbe. Die Kugel springt nicht von Feld zu Feld: Sie ist auf einem Feld, wird aber mit ", ["LERP", true], " gleitend gezeichnet. Ausprobiert mit einer Aufnahme: Ein Schritt in eine Mauer zählt nicht, einer in den Gang schon."]),
+
+  H.h2("Kapitel 25 · Flug über eine Landschaft"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Aus wenigen großen Bergen werden viele kleine, spitze, dicht an dicht — ein Hochgebirge. MASSSTAB bestimmt, wie weit man im Rauschen pro Kartenpunkt weitergeht: Größere Schritte heißen, dass mehr Rauschen auf dieselbe Karte passt, also mehr Berge auf demselben Land. Weil die Karte aber gleich viele Punkte hat, werden die Berge eckiger; bei 0.1 wird das Land zu einem Feld aus Zacken."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Fast alles liegt jetzt hoch: eine breite, graue Felslandschaft mit runden Kuppen, und der Wald wächst nur noch in den wenigen Senken. Das Quadrat machte kleine Höhen kleiner und ließ große groß — ohne es fehlen die flachen Täler. Mit t * t * t würde es noch alpiner: noch breitere Täler, noch einzelnere Gipfel."),
+
+  H.h3("Drehen 3"),
+
+  H.p("Mit 90 Grad sieht man viel mehr Land auf einmal, und die Berge wirken weiter weg und flacher. Zusammen mit dem höheren Tempo zieht der Boden am Rand schnell vorbei — der Flug fühlt sich viel schneller an, obwohl er nur doppelt so schnell ist. Rennspiele machen genau das: Sie weiten das Bild, wenn es schnell wird."),
+
+  H.h3("Erweitern 1: eine Wasserfläche"),
+
+  H.p("Eine große Ebene auf einer festen Höhe, halb durchsichtig (code/loesungen/kap25_wasser.dh):"),
+
+  ...neu("loesungen/kap25_wasser.dh").map((t) => H.code(t)),
+
+  H.figure("kap25_wasser.png", "Erweitern 1: Ein See in einem Tal, an seinem Ufer beginnt der Wald.", 420, 262),
+
+  H.pmix(["Das Wasser ist eine einzige ", ["MESH_PLANE", true], " so groß wie die Welt, auf der Höhe SPIEGEL. Wo das Gelände darunter liegt, sieht man Wasser, wo es darüber ragt, Land — die Ufer entstehen von selbst. ", ["MODEL_PBR", true], " mit kleiner Rauheit macht die Fläche glatt, so dass die Sonne in ihr glänzt. Die Farbe hat eine Deckkraft von 190: Man ahnt den Grund. Durchsichtiges kommt zuletzt in die Zeichenliste, sonst verdeckt es, was danach gezeichnet wird. Und der Flug bleibt drei Einheiten über dem Wasser, nicht nur über dem Grund."]),
+
+  H.h3("Erweitern 2: Tageszeit"),
+
+  H.p("Himmel, Dunst und Sonne werden zu einer Funktion mit Zahlen (code/loesungen/kap25_tageszeit.dh):"),
+
+  ...neu("loesungen/kap25_tageszeit.dh").map((t) => H.code(t)),
+
+  H.figure("kap25_tageszeit.png", "Erweitern 2: Abend — die Sonne steht tief, die Berge glühen, der Himmel ist violett.", 420, 262),
+
+  H.pmix(["Aus den festen Farben DUNST und BLAU werden Parameter, und ", ["tageszeit", true], " baut den Himmel jedes Mal neu: Bild malen, ", ["SKYBOX_IMAGE", true], ", denselben Horizont als Dunst, die Sonne gedreht und gefärbt. Die Grundhelligkeit nimmt die Farbe des Horizonts an, dadurch werden auch die Schatten abends rötlich. Drei kleine SUBs geben den Tageszeiten Namen, und in der Schleife löst je eine Taste eine aus. Ausprobiert mit einer Aufnahme, die die 3 drückt: Danach liegt das Land im Abendlicht."]),
+
+  H.h3("Erfinden: Ringe zum Durchfliegen"),
+
+  H.p("Eine Möglichkeit (code/loesungen/kap25_ringe.dh):"),
+
+  ...neu("loesungen/kap25_ringe.dh").map((t) => H.code(t)),
+
+  H.pmix(["Die Ringe liegen auf einem großen Kreis um die Mitte der Welt, jeder zwölf Einheiten über seinem Boden. ", ["MESH_TORUS", true], " steht von sich aus aufrecht und blickt nach z; ", ["MODEL_EX", true], " dreht ihn um die senkrechte Achse, bis er entlang des Kreises blickt — wer die Runde fliegt, fliegt von einem durch den nächsten. Durchflogen ist ein Ring, wenn der Abstand zu seiner Mitte kleiner als sein Radius ist; dann ist der nächste dran. Der Flug beginnt sechzig Einheiten vor dem ersten Ring. Ausprobiert: Geradeaus geflogen steht nach gut drei Sekunden „Ring 2 von 8“ oben links."]),
 ];

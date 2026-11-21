@@ -1,0 +1,51 @@
+' Kapitel 25, was schiefgehen kann: Baeume auf der falschen Hoehe. Die
+' Karte sagt 0 bis 1, die Welt aber 0 bis BERGE -- wer das Mal vergisst,
+' pflanzt den Wald in den Berg.
+IMPORT "g3d"
+IMPORT "m3d"
+IMPORT "imgfx"
+CONST N = 32
+CONST WELT = 40
+CONST BERGE = 12
+SCREEN(800, 500, "Baeume im Berg")
+
+' Ein runder Huegel: in der Mitte hoch, zum Rand hin flach.
+DIM hoehe[0 TO N - 1, 0 TO N - 1] AS FLOAT
+DIM grau AS IMAGE : grau = IMAGE_NEW(N, N)
+DIM x AS INTEGER
+DIM z AS INTEGER
+FOR z = 0 TO N - 1
+    FOR x = 0 TO N - 1
+        DIM d AS FLOAT : d = SQR((x - 15.5) ^ 2 + (z - 15.5) ^ 2) / 16
+        hoehe[x, z] = CLAMP(1 - d * d, 0, 1)
+        DIM g AS INTEGER : g = INT(hoehe[x, z] * 255)
+        IMAGE_DRAW_RECT(grau, x, z, 1, 1, RGB(g, g, g))
+    NEXT
+NEXT
+DIM land AS INTEGER : land = MESH_HEIGHTMAP(grau, WELT, BERGE, WELT)
+
+' Baeume auf einem Kreis um den Gipfel -- hier fehlt das "* BERGE".
+DIM mats AS ARRAY OF MAT4
+DIM k AS INTEGER
+FOR k = 0 TO 23
+    DIM px AS INTEGER : px = INT(16 + COS(k / 24 * 2 * PI) * 8)
+    DIM pz AS INTEGER : pz = INT(16 + SIN(k / 24 * 2 * PI) * 8)
+    DIM wx AS FLOAT : wx = px / (N - 1) * WELT
+    DIM wz AS FLOAT : wz = pz / (N - 1) * WELT
+    ARRAY_PUSH(mats, MAT4_TRANSLATE(wx, hoehe[px, pz], wz))
+NEXT
+DIM krone AS INTEGER : krone = MESH_CONE(0.8, 2.5, 8)
+
+LIGHT_ENABLE()
+LIGHT_AMBIENT(RGB(150, 170, 200), 0.35)
+DIM sonne AS INTEGER
+sonne = LIGHT_DIRECTIONAL(-0.5, -1, -0.3, RGB(255, 245, 225))
+MODEL_LIT(land)
+MODEL_LIT(krone)
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
+    CLS(RGB(190, 210, 232))
+    CAMERA3D(56, 28, 56, WELT / 2, 3, WELT / 2, 45)
+    MODEL(land, 0, 0, 0, 1.0, RGB(120, 160, 90))
+    MODEL_INSTANCED(krone, mats, RGB(40, 100, 50))
+    FLIP()
+WEND

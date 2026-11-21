@@ -1,0 +1,206 @@
+' Loesung zu Kapitel 25, Erfinden: Ringe zum Durchfliegen. Acht
+' goldene Ringe schweben ueber dem Land; der naechste leuchtet, und wer
+' durch ihn fliegt, bekommt den naechsten.
+' Die Stellen, die neu sind, stehen zwischen >>> und <<<.
+IMPORT "g3d"
+IMPORT "m3d"
+IMPORT "imgfx"
+CONST N = 128
+CONST WELT = 400
+CONST BERGE = 60
+CONST MASSSTAB = 0.02
+
+SCREEN(800, 500, "Flug ueber eine Landschaft")
+RANDOMIZE(25)
+
+' Die Hoehen, ein Wert je Punkt der Karte, 0 (Tal) bis 1 (Gipfel). Das
+' Rauschen liegt etwa zwischen -0.3 und 0.3; ins Quadrat genommen werden
+' die Taeler flach und die Gipfel spitz.
+DIM hoehe[0 TO N - 1, 0 TO N - 1] AS FLOAT
+DIM x AS INTEGER
+DIM z AS INTEGER
+FOR z = 0 TO N - 1
+    FOR x = 0 TO N - 1
+        DIM h AS FLOAT : h = FBM(x * MASSSTAB + 3, z * MASSSTAB + 7, 6)
+        DIM t AS FLOAT : t = CLAMP((h + 0.3) / 0.62, 0, 1)
+        hoehe[x, z] = t * t
+    NEXT
+NEXT
+
+' Die Farbe zu einer Hoehe: Wiese, Wald, Fels, Schnee.
+FUNCTION farbe(h AS FLOAT) AS INTEGER
+    IF h < 0.2 THEN RETURN COLOR_LERP(&H6AA84E, &H3E7A3A, h / 0.2)
+    IF h < 0.45 THEN
+        RETURN COLOR_LERP(&H3E7A3A, &H7A6E62, (h - 0.2) / 0.25)
+    END IF
+    IF h < 0.65 THEN
+        RETURN COLOR_LERP(&H7A6E62, &H9A948E, (h - 0.45) / 0.2)
+    END IF
+    RETURN COLOR_LERP(&H9A948E, &HF4F6FA, CLAMP((h - 0.65) / 0.1, 0, 1))
+END FUNCTION
+
+' Zwei Bilder aus den Hoehen: grau fuer die Form, bunt fuer die Farbe.
+DIM grau AS IMAGE : grau = IMAGE_NEW(N, N)
+DIM bunt AS IMAGE : bunt = IMAGE_NEW(N, N)
+FOR z = 0 TO N - 1
+    FOR x = 0 TO N - 1
+        DIM g AS INTEGER : g = INT(hoehe[x, z] * 255)
+        IMAGE_DRAW_RECT(grau, x, z, 1, 1, RGB(g, g, g))
+        IMAGE_DRAW_RECT(bunt, x, z, 1, 1, farbe(hoehe[x, z]))
+    NEXT
+NEXT
+DIM land AS INTEGER : land = MESH_HEIGHTMAP(grau, WELT, BERGE, WELT)
+MODEL_TEXTURE(land, bunt)
+
+' Wie hoch der Boden an einer Stelle der Welt ist: zwischen den vier
+' Kartenpunkten darum gemischt.
+FUNCTION boden(wx AS FLOAT, wz AS FLOAT) AS FLOAT
+    DIM fx AS FLOAT : fx = CLAMP(wx / WELT * (N - 1), 0, N - 1.001)
+    DIM fz AS FLOAT : fz = CLAMP(wz / WELT * (N - 1), 0, N - 1.001)
+    DIM ix AS INTEGER : ix = INT(fx)
+    DIM iz AS INTEGER : iz = INT(fz)
+    DIM a AS FLOAT : a = LERP(hoehe[ix, iz], hoehe[ix + 1, iz], fx - ix)
+    DIM b AS FLOAT
+    b = LERP(hoehe[ix, iz + 1], hoehe[ix + 1, iz + 1], fx - ix)
+    RETURN LERP(a, b, fz - iz) * BERGE
+END FUNCTION
+
+' Baeume: wo es Wald ist, zufaellig verstreut -- jeder als Matrix.
+DIM kronen AS ARRAY OF MAT4
+DIM staemme AS ARRAY OF MAT4
+WHILE LEN(kronen) < 1500
+    DIM bx AS FLOAT : bx = RND() * WELT
+    DIM bz AS FLOAT : bz = RND() * WELT
+    DIM by AS FLOAT : by = boden(bx, bz)
+    IF by > 0.08 * BERGE AND by < 0.4 * BERGE THEN
+        DIM gr AS FLOAT : gr = 0.7 + RND() * 0.6
+        DIM gross AS MAT4 : gross = MAT4_SCALE(gr, gr, gr)
+        DIM unten AS MAT4 : unten = MAT4_TRANSLATE(bx, by, bz)
+        DIM oben AS MAT4 : oben = MAT4_TRANSLATE(bx, by + 0.8 * gr, bz)
+        ARRAY_PUSH(staemme, MAT4_MUL(unten, gross))
+        ARRAY_PUSH(kronen, MAT4_MUL(oben, gross))
+    END IF
+WEND
+DIM stamm AS INTEGER : stamm = MESH_CYLINDER(0.25, 1, 6)
+DIM krone AS INTEGER : krone = MESH_CONE(1.2, 3.5, 8)
+' >>> neu
+' Acht Ringe auf einem grossen Kreis, je zwoelf Einheiten ueber dem
+' Boden. Ein Torus steht aufrecht und blickt nach z.
+CONST RINGE = 8
+DIM ring AS INTEGER : ring = MESH_TORUS(4, 0.5, 12, 32)
+DIM rx AS ARRAY OF FLOAT
+DIM ry AS ARRAY OF FLOAT
+DIM rz AS ARRAY OF FLOAT
+DIM rw AS ARRAY OF FLOAT
+DIM r AS INTEGER
+FOR r = 0 TO RINGE - 1
+    DIM w AS FLOAT : w = r / RINGE * 2 * PI
+    ARRAY_PUSH(rx, WELT / 2 + COS(w) * 120)
+    ARRAY_PUSH(rz, WELT / 2 + SIN(w) * 120)
+    ARRAY_PUSH(ry, boden(rx[r], rz[r]) + 12)
+    ' Um y gedreht, bis er entlang des Kreises blickt -- so fliegt man
+    ' auf der Runde von einem durch den naechsten.
+    ARRAY_PUSH(rw, -DEG(w))
+NEXT
+DIM naechster AS INTEGER
+' <<< neu
+
+' Der Himmel: sechs Bilder nebeneinander -- rechts, links, oben, unten,
+' hinten, vorn. Die Seiten oben tiefblau, zum Horizont in der Farbe des
+' Dunstes; oben ganz blau, unten ganz Dunst.
+CONST DUNST = &HBED2E8
+CONST BLAU = &H4A7CC8
+CONST S = 64
+DIM himmel AS IMAGE : himmel = IMAGE_NEW(6 * S, S)
+DIM seite AS INTEGER
+FOR seite = 0 TO 5
+    DIM l AS INTEGER : l = seite * S
+    IF seite = 2 THEN
+        IMAGE_FILL_RECT(himmel, l, 0, l + S - 1, S - 1, BLAU)
+    ELSEIF seite = 3 THEN
+        IMAGE_FILL_RECT(himmel, l, 0, l + S - 1, S - 1, DUNST)
+    ELSE
+        IMAGE_GRADIENT(himmel, l, 0, l + S - 1, S - 1, BLAU, DUNST)
+    END IF
+NEXT
+SKYBOX_IMAGE(himmel)
+
+' Licht und Dunst.
+LIGHT_ENABLE()
+LIGHT_AMBIENT(RGB(150, 170, 200), 0.35)
+DIM sonne AS INTEGER
+sonne = LIGHT_DIRECTIONAL(-0.5, -1, -0.3, RGB(255, 245, 225))
+MODEL_LIT(land)
+' >>> neu
+MODEL_LIT(ring)
+' <<< neu
+LIGHT_FOG(DUNST, 0.0045)
+
+' Wo wir sind und wohin wir fliegen.
+DIM px AS FLOAT : px = 40
+DIM pz AS FLOAT : pz = 40
+DIM py AS FLOAT : py = 70
+DIM kurs AS FLOAT : kurs = 0.8
+DIM tempo AS FLOAT : tempo = 25
+' >>> neu
+' Los geht es sechzig Einheiten vor dem ersten Ring, auf ihn zu.
+px = rx[0]
+pz = rz[0] - 60
+py = ry[0]
+kurs = PI / 2
+' <<< neu
+
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
+    DIM dt AS FLOAT : dt = DELTA()
+    IF KEY_DOWN(KEY_LEFT) THEN kurs = kurs - 1.2 * dt
+    IF KEY_DOWN(KEY_RIGHT) THEN kurs = kurs + 1.2 * dt
+    IF KEY_DOWN(KEY_UP) THEN py = py + 15 * dt
+    IF KEY_DOWN(KEY_DOWN) THEN py = py - 15 * dt
+    tempo = IIF(KEY_DOWN(KEY_SPACE), 60, 25)
+    px = px + COS(kurs) * tempo * dt
+    pz = pz + SIN(kurs) * tempo * dt
+    ' Am Rand der Welt kehrt der Flug um.
+    IF px < 0 OR px > WELT OR pz < 0 OR pz > WELT THEN
+        kurs = kurs + PI
+        px = CLAMP(px, 0, WELT)
+        pz = CLAMP(pz, 0, WELT)
+    END IF
+    ' Nie tiefer als drei Einheiten ueber dem Boden.
+    py = MAX(py, boden(px, pz) + 3)
+    ' >>> neu
+    ' Durchflogen, wenn wir der Mitte des naechsten Rings nahe sind.
+    IF naechster < RINGE THEN
+        DIM dx AS FLOAT : dx = px - rx[naechster]
+        DIM dy AS FLOAT : dy = py - ry[naechster]
+        DIM dz AS FLOAT : dz = pz - rz[naechster]
+        IF SQR(dx * dx + dy * dy + dz * dz) < 4 THEN
+            naechster = naechster + 1
+        END IF
+    END IF
+    ' <<< neu
+
+    CLS(DUNST)
+    CAMERA3D(px, py, pz, px + COS(kurs) * 10, py - 2, _
+             pz + SIN(kurs) * 10, 60)
+    MODEL(land, 0, 0, 0, 1.0, RGB(255, 255, 255))
+    MODEL_INSTANCED(stamm, staemme, RGB(110, 80, 50))
+    MODEL_INSTANCED(krone, kronen, RGB(40, 100, 50))
+    ' >>> neu
+    ' Die Ringe: geschaffte blass, der naechste golden, der Rest gelb.
+    FOR r = 0 TO RINGE - 1
+        DIM gold AS INTEGER : gold = RGB(240, 210, 90)
+        IF r < naechster THEN gold = RGBA(255, 255, 255, 60)
+        IF r = naechster THEN gold = RGB(255, 170, 30)
+        MODEL_EX(ring, rx[r], ry[r], rz[r], 0, 1, 0, rw[r], 1.0, gold)
+    NEXT
+    IF naechster < RINGE THEN
+        TEXT(12, 36, f"Ring {naechster + 1} von {RINGE}", _
+             RGB(255, 200, 80))
+    ELSE
+        TEXT(12, 36, "Alle Ringe!", RGB(255, 200, 80))
+    END IF
+    ' <<< neu
+    TEXT(12, 12, f"Hoehe ueber Grund: {py - boden(px, pz):.0f}", _
+         RGBA(0, 0, 0, 150))
+    FLIP()
+WEND
