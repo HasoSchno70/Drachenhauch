@@ -1,0 +1,32 @@
+' Kapitel 22, Schritt 3 -- das Mittel der hoechsten Temperaturen je
+' Monat, zweimal gerechnet: als eine verschachtelte Comprehension und
+' als Schleife. Beide liefern dasselbe.
+DIM zeilen AS ARRAY OF STRING : zeilen = READLINES("wetter.csv")
+DIM tage AS ARRAY OF STRING
+tage = [z FOR z IN zeilen WHERE z <> "" AND LEFT$(z, 5) <> "datum"]
+DIM datum AS ARRAY OF STRING
+datum = [SPLIT$(z, ";")[0] FOR z IN tage]
+DIM hoch AS ARRAY OF FLOAT
+hoch = [VAL(SPLIT$(z, ";")[2]) FOR z IN tage]
+DIM monate AS TUPLE : monate = {LEFT$(d, 7) FOR d IN datum}
+
+' Erstens: alles in einer Zeile.
+DIM mittel AS MAP OF FLOAT
+mittel = {m: ARRAY_AVG([hoch[i] FOR i IN RANGE(LEN(hoch)) _
+          WHERE LEFT$(datum[i], 7) = m]) FOR m IN monate}
+
+' Zweitens: eine Schleife, die summiert und zaehlt.
+DIM summe AS MAP OF FLOAT
+DIM zahl AS MAP OF INTEGER
+DIM i AS INTEGER
+FOR i = 0 TO LEN(hoch) - 1
+    DIM m AS STRING : m = LEFT$(datum[i], 7)
+    summe[m] = MAP_GET_OR(summe, m, 0.0) + hoch[i]
+    zahl[m] = MAP_GET_OR(zahl, m, 0) + 1
+NEXT
+
+DIM monat AS STRING
+FOR EACH monat IN monate
+    DIM zweitens AS FLOAT : zweitens = summe[monat] / zahl[monat]
+    PRINT f"{monat}: {mittel[monat]:5.1f} {zweitens:5.1f}"
+NEXT

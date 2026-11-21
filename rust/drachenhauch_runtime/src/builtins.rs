@@ -55,6 +55,37 @@ pub fn datei_da(pfad: &str, befehl: &str) -> Result<(), String> {
     Err(format!("{}: Datei '{}' nicht gefunden (gesucht relativ zu {})", befehl, pfad, ort))
 }
 
+/// Warum sich eine Datei, die es gibt, nicht als Bild lesen liess. raylib
+/// sagt nur "image data is null, either the file doesnt exist or the image
+/// type is unsupported" -- ohne Dateinamen, und "doesnt exist" fuehrt in
+/// die Irre (gefunden mit dem Buch "Kleine Wunder", Kapitel 23: drei kaputte
+/// Dateien in einer Diaschau gaben drei gleiche Zeilen).
+pub fn bild_unlesbar(pfad: &str, befehl: &str) -> String {
+    use std::io::Read;
+    let laenge = std::fs::metadata(pfad).map(|m| m.len()).unwrap_or(0);
+    let mut kopf = [0u8; 8];
+    let n = std::fs::File::open(pfad).and_then(|mut f| f.read(&mut kopf)).unwrap_or(0);
+    bild_unlesbar_aus(pfad, befehl, laenge, &kopf[..n])
+}
+
+fn bild_unlesbar_aus(pfad: &str, befehl: &str, laenge: u64, kopf: &[u8]) -> String {
+    if laenge == 0 {
+        return format!("{}: '{}' ist leer (0 Byte)", befehl, pfad);
+    }
+    let art = if kopf.starts_with(b"\x89PNG") { Some("PNG") }
+        else if kopf.starts_with(&[0xFF, 0xD8]) { Some("JPG") }
+        else if kopf.starts_with(b"GIF8") { Some("GIF") }
+        else if kopf.starts_with(b"BM") { Some("BMP") }
+        else if kopf.starts_with(b"qoif") { Some("QOI") }
+        else { None };
+    match art {
+        Some(a) => format!("{}: '{}' beginnt wie ein {}-Bild, ist aber beschaedigt oder unvollstaendig ({} Byte)",
+                           befehl, pfad, a, laenge),
+        None => format!("{}: '{}' ist kein Bild, das sich lesen laesst -- gelesen werden PNG, JPG, BMP, GIF und QOI",
+                        befehl, pfad),
+    }
+}
+
 // --- PRNG fuer RND/RANDOMIZE: xorshift64, ohne RANDOMIZE(seed) zeitbasiert
 // geseedet -- Laeufe sind dann bewusst nicht reproduzierbar.
 thread_local! {
@@ -487,7 +518,12 @@ fn numeric_1d_array<'a>(v: &'a Value, fn_: &str) -> Result<std::cell::Ref<'a, Dh
         _ => return Err(format!("{} erwartet ARRAY", fn_)),
     };
     if arr.dims.len() != 1 { return Err(format!("{}: nur 1D-Arrays", fn_)); }
-    if !matches!(arr.element_type.as_str(), "integer" | "float") {
+    // Ein leeres Feld ohne Elementtyp -- etwa aus einer Comprehension, deren
+    // WHERE nichts durchliess -- ist kein Typfehler: Es meldet sich danach
+    // mit "Array ist leer", das sagt, was los ist (Buch "Kleine Wunder",
+    // Kapitel 22: ein vertippter Monat).
+    let leer_ohne_typ = arr.cells.len() == 0 && arr.element_type == "any";
+    if !matches!(arr.element_type.as_str(), "integer" | "float") && !leer_ohne_typ {
         return Err(format!("{}: nur ARRAY OF INTEGER/FLOAT", fn_));
     }
     Ok(arr)
@@ -2221,7 +2257,9 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "array_sum" => {
             arity!(1);
             let arr = numeric_1d_array(&a[0], "ARRAY_SUM")?;
-            if arr.element_type == "integer" {
+            // Ein leeres Feld ohne Typ (eine leere Comprehension) summiert
+            // sich wie eines aus Ganzzahlen zu 0.
+            if arr.element_type == "integer" || arr.element_type == "any" {
                 let mut s: i64 = 0;
                 // Ueberlauf -> Fehler (konsistent mit Skalar-Arithmetik).
                 for v in arr.cells.iter() {
@@ -2233,7 +2271,9 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 }
                 Ok(Value::Int(s))
             } else {
-                Ok(Value::Float(arr.cells.iter().map(|v| as_f64(&v)).sum()))
+                // fold ab 0.0: `sum()` beginnt bei -0.0, und ein leeres
+                // ARRAY OF FLOAT ergab so "-0.0".
+                Ok(Value::Float(arr.cells.iter().fold(0.0, |s, v| s + as_f64(&v))))
             }
         }
         "array_avg" => {
@@ -3431,9 +3471,18 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 false => crate::kodierung::Kodierung::Utf8,
             };
             let h = match mode {
-                "r" => FileH::Read(std::io::BufReader::new(std::fs::File::open(resolve_asset_path(&path)).map_err(|e| format!("OPENFILE: {}", e))?)),
-                "w" => FileH::Write(std::fs::File::create(&path).map_err(|e| format!("OPENFILE: {}", e))?),
-                "a" => FileH::Write(std::fs::OpenOptions::new().append(true).create(true).open(&path).map_err(|e| format!("OPENFILE: {}", e))?),
+                // Die Meldung nennt die Datei: "OPENFILE: Das System kann die
+                // angegebene Datei nicht finden" sagte nicht, welche (Buch
+                // "Kleine Wunder", Kapitel 23).
+                "r" => {
+                    let p = resolve_asset_path(&path);
+                    datei_da(&p, "OPENFILE")?;
+                    FileH::Read(std::io::BufReader::new(std::fs::File::open(&p)
+                        .map_err(|e| format!("OPENFILE: '{}': {}", path, e))?))
+                }
+                "w" => FileH::Write(std::fs::File::create(&path).map_err(|e| format!("OPENFILE: '{}': {}", path, e))?),
+                "a" => FileH::Write(std::fs::OpenOptions::new().append(true).create(true).open(&path)
+                    .map_err(|e| format!("OPENFILE: '{}': {}", path, e))?),
                 _ => return err(format!("OPENFILE: ungueltiger Modus '{}' (erlaubt: r, w, a)", mode)),
             };
             Ok(Value::File(Rc::new(RefCell::new(DhFile { path, h, kod, am_anfang: true }))))
@@ -7077,6 +7126,21 @@ mod zahl_text_tests {
         assert_eq!(zahl_text(&Value::Float(999.995), Some(2)).unwrap(), "1.000,00");
         assert_eq!(zahl_text(&Value::Int(7), None).unwrap(), "7");
         assert!(zahl_text(&Value::Float(f64::NAN), None).is_err());
+    }
+}
+
+#[cfg(test)]
+mod bild_unlesbar_tests {
+    use super::bild_unlesbar_aus;
+    #[test]
+    fn sagt_welche_datei_und_warum() {
+        assert_eq!(bild_unlesbar_aus("b/leer.png", "LOADIMAGE", 0, b""),
+                   "LOADIMAGE: 'b/leer.png' ist leer (0 Byte)");
+        assert_eq!(bild_unlesbar_aus("halb.png", "LOADIMAGE", 6662, b"\x89PNG\r\n\x1a\n"),
+                   "LOADIMAGE: 'halb.png' beginnt wie ein PNG-Bild, ist aber beschaedigt oder unvollstaendig (6662 Byte)");
+        assert!(bild_unlesbar_aus("f.jpg", "X", 9, &[0xFF, 0xD8, 0xFF]).contains("wie ein JPG-Bild"));
+        assert_eq!(bild_unlesbar_aus("notiz.png", "LOADIMAGE", 33, b"Hier feh"),
+                   "LOADIMAGE: 'notiz.png' ist kein Bild, das sich lesen laesst -- gelesen werden PNG, JPG, BMP, GIF und QOI");
     }
 }
 

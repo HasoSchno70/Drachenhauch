@@ -719,6 +719,24 @@ Lautstärke, das Vibrato rechnet die Übung selbst; Kapitel 19 spielt ein
 selbst gemischtes Stück, keine Musikdatei. Ton wird am Mitschnitt gemessen
 (`AUDIO_RECORD_START`, als WAV gesichert und ausgewertet), nicht nach Gehör.
 
+Danach (2026-11-21): Teil VI, Kapitel 20–23 (Die Partikelmaschine,
+Geschichten, die warten, Die Datenwerkstatt, Fehler, die man fängt). Funde
+in der Laufzeit, alle behoben und in `geschichte/sprache.md`: ein FUNCREF
+in einem Feld ließ sich nicht wie eine Methode rufen; eine Koroutine als
+Anweisung lief still nie (jetzt eine Warnung), eine COROUTINE-Variable
+nahm jeden Wert; eine Comprehension (ein TUPLE) passte in kein
+typisiertes Feld und in keinen Feld-Befehl; ein leeres Feld hieß bei
+`ARRAY_AVG` „nur ARRAY OF INTEGER/FLOAT“, `ARRAY_SUM` eines leeren Felds
+gab -0.0; die Skala von `chart` schrieb „-0 Grad“; `LOADIMAGE` meldete
+eine kaputte Datei englisch und ohne Namen und gab nach dem Neuschreiben
+einer Datei still das alte Bild; `OPENFILE` nannte eine fehlende Datei
+nicht; `TRY ... END TRY` ohne CATCH und FINALLY verschluckt still (jetzt
+eine Warnung). Was sich am Entwurf geändert hat: Kapitel 22 erfindet sein
+Wetter selbst (feste Saat, keine Datei von draußen) und nimmt keine
+`ARRAY_MAP`/`ARRAY_FILTER` -- Comprehensions sagen dasselbe kürzer;
+Kapitel 23 malt seine Bilder selbst und legt die kaputten Dateien dazu.
+Die Diaschau bekam als Erfinden-Übung einen beobachteten Ordner.
+
 Was beim Bauen festgelegt wurde:
 
 * **Code kommt aus Dateien.** `buch/code_lesen.js` holt ganze Programme,

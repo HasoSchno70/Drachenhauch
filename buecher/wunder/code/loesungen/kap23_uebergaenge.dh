@@ -1,0 +1,145 @@
+' Loesung zu Kapitel 23, Erweitern 1: drei Arten zu wechseln, reihum --
+' blenden, schieben, wachsen.
+' Die Stellen, die neu sind, stehen zwischen >>> und <<<.
+CONST BREITE = 800
+CONST HOEHE = 500
+CONST DAUER = 4.0
+CONST BLENDE = 0.8
+
+' Die Endung einer Datei, klein geschrieben: "Bild.PNG" -> "png".
+FUNCTION endung$(datei AS STRING) AS STRING
+    RETURN LOWER$(MID$(datei, INSTRREV(datei, ".") + 1))
+END FUNCTION
+
+' Die Titel aus einer Datei: je Zeile "datei;titel". Eine Zeile ohne
+' Semikolon ist ein Fehler in der Datei -- den melden wir mit eigenem
+' Code und eigener Zeilennummer, statt still weiterzulesen.
+FUNCTION titel_lesen(pfad AS STRING) AS MAP OF STRING
+    DIM titel AS MAP OF STRING
+    DIM f AS FILE : f = OPENFILE(pfad, "r")
+    TRY
+        DIM nr AS INTEGER
+        WHILE NOT EOF(f)
+            DIM zeile AS STRING : zeile = READLINE(f)
+            nr = nr + 1
+            DIM trenner AS INTEGER : trenner = INSTR(zeile, ";")
+            IF trenner < 0 THEN
+                THROW "TITEL", f"{pfad}, Zeile {nr}: kein Semikolon"
+            END IF
+            titel[LEFT$(zeile, trenner)] = MID$(zeile, trenner + 1)
+        WEND
+    FINALLY
+        ' Zu machen muss die Datei immer, auch nach dem THROW.
+        CLOSEFILE(f)
+    END TRY
+    RETURN titel
+END FUNCTION
+
+' Die Bilder liegen beim Kapitel.
+CHDIR("../kap23")
+SCREEN(BREITE, HOEHE, "Diaschau")
+TEXT_SIZE(16)
+
+' Was sich laden liess, und was nicht.
+DIM bilder AS ARRAY OF IMAGE
+DIM namen AS ARRAY OF STRING
+DIM probleme AS ARRAY OF STRING
+
+' Jede Datei mit der Endung eines Bilds versuchen. Was dabei schiefgeht,
+' kommt von draussen -- aus der Datei, nicht aus dem Programm. Also
+' fangen wir es, schreiben es auf und machen mit der naechsten weiter.
+DIM dateien AS ARRAY OF STRING : dateien = DIRLIST("bilder")
+SORT(dateien)
+DIM datei AS STRING
+FOR EACH datei IN dateien
+    IF endung$(datei) <> "png" AND endung$(datei) <> "jpg" THEN CONTINUE
+    TRY
+        ARRAY_PUSH(bilder, LOADIMAGE("bilder/" + datei))
+        ARRAY_PUSH(namen, datei)
+    CATCH fehler
+        ARRAY_PUSH(probleme, fehler)
+    END TRY
+NEXT
+
+' Die Titel sind freiwillig: Fehlt die Datei, ist das kein Fehler -- das
+' fragen wir vorher. Ist sie kaputt, landet das bei den Problemen.
+DIM titel AS MAP OF STRING
+IF FILEEXISTS("bilder/titel.txt") THEN
+    TRY
+        titel = titel_lesen("bilder/titel.txt")
+    CATCH fehler
+        IF ERROR_CODE$() <> "TITEL" THEN THROW fehler
+        ARRAY_PUSH(probleme, fehler)
+    END TRY
+END IF
+
+DIM nr AS INTEGER
+DIM zeit AS FLOAT
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
+    CLS(RGB(16, 16, 22))
+    IF LEN(bilder) = 0 THEN
+        ' Ohne ein einziges Bild gibt es nichts zu zeigen -- und auch
+        ' kein bilder[0]. Diesen Fehler fangen wir nicht, wir vermeiden
+        ' ihn.
+        TEXT(40, 40, "Keine Bilder in bilder/", RGB(255, 255, 255))
+    ELSE
+        zeit = zeit + DELTA()
+        IF KEY_HIT(KEY_RIGHT) THEN zeit = DAUER
+        IF KEY_HIT(KEY_LEFT) THEN
+            nr = (nr + LEN(bilder) - 1) MOD LEN(bilder)
+            zeit = 0
+        END IF
+        IF zeit >= DAUER THEN
+            nr = (nr + 1) MOD LEN(bilder)
+            zeit = 0
+        END IF
+        ' >>> neu
+        ' Wie weit der Wechsel ist, von 0 bis 1 -- sanft angefahren und
+        ' abgebremst, wie bei den Kurven in Kapitel 11.
+        DIM w AS FLOAT : w = MAX(0, (zeit - DAUER + BLENDE) / BLENDE)
+        w = w * w * (3 - 2 * w)
+        DIM alt AS IMAGE : alt = bilder[nr]
+        DIM neu AS IMAGE : neu = bilder[(nr + 1) MOD LEN(bilder)]
+        SELECT CASE nr MOD 3
+            CASE 0
+                ' Blenden: das naechste wird immer weniger durchsichtig.
+                DRAWIMAGE(alt, 80, 16)
+                DRAWIMAGE(neu, 80, 16, -1, -1, 0, _
+                          RGBA(255, 255, 255, INT(w * 255)))
+            CASE 1
+                ' Schieben: von jedem Bild nur das Stueck, das im Rahmen
+                ' liegt -- das alte rutscht links hinaus.
+                DIM s AS INTEGER : s = INT(w * 640)
+                DRAW_IMAGE_PART(alt, s, 0, 640 - s, 400, 80, 16)
+                IF s > 0 THEN
+                    DRAW_IMAGE_PART(neu, 0, 0, s, 400, 720 - s, 16)
+                END IF
+            CASE ELSE
+                ' Wachsen: das naechste kommt klein aus der Mitte.
+                DRAWIMAGE(alt, 80, 16)
+                IF w > 0 THEN
+                    DRAWIMAGE(neu, 400 - 320 * w, 216 - 200 * w, _
+                              640 * w, 400 * w)
+                END IF
+        END SELECT
+        ' <<< neu
+        TEXT(80, 426, MAP_GET_OR(titel, namen[nr], namen[nr]), _
+             RGB(255, 255, 255))
+        DIM seite AS STRING : seite = f"{nr + 1} / {LEN(bilder)}"
+        TEXT(720 - TEXT_WIDTH(seite), 426, seite, _
+             RGBA(255, 255, 255, 140))
+    END IF
+    ' Unten, klein: was nicht ging. Platz ist fuer vier Zeilen; sind es
+    ' mehr, sagt die vierte, wie viele noch fehlen.
+    TEXT_SIZE(12)
+    DIM k AS INTEGER
+    FOR k = 0 TO MIN(LEN(probleme), 4) - 1
+        DIM zeile AS STRING : zeile = probleme[k]
+        IF k = 3 AND LEN(probleme) > 4 THEN
+            zeile = f"... und {LEN(probleme) - 3} weitere"
+        END IF
+        TEXT(80, 448 + k * 13, zeile, RGBA(255, 150, 120, 200))
+    NEXT
+    TEXT_SIZE(16)
+    FLIP()
+WEND

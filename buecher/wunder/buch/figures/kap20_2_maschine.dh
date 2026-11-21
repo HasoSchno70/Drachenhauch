@@ -1,0 +1,3 @@
+' Bild fuer Kapitel 20: die Partikelmaschine mit fester Saat (siehe .txt).
+RANDOMIZE(20)
+IMPORT "../../code/kap20/2_maschine.dh"

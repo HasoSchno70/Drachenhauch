@@ -330,6 +330,11 @@ FOR i = 0 TO LEN(roh) - 1
     ' Die Dateien eines Studio-Projekts erben von erzeugten Basisklassen
     ' (werkzeug_studio_beispiel.dhtest prueft das erzeugte Programm).
     IF FILEEXISTS(wurzel + "/" + DIRNAME(roh[i]) + "/projekt.dhstudio") THEN CONTINUE
+    ' Die Fehlerbeispiele der Buecher (buecher/*/code/*/fehler_*.dh) sind
+    ' mit Absicht falsch -- Kleine Wunder, Kapitel 23 vertippt einen Namen,
+    ' um genau diese Warnung zu zeigen. Keine Falschmeldung.
+    DIM rel AS STRING : rel = REPLACE$(roh[i], CHR$(92), "/")
+    IF LEFT$(rel, 8) = "buecher/" AND LEFT$(BASENAME(rel), 7) = "fehler_" THEN CONTINUE
     ARRAY_PUSH(dateien, wurzel + "/" + roh[i])
 NEXT
 PRINT "genug dateien "; (LEN(dateien) > 300)

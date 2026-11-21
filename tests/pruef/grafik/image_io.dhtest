@@ -789,3 +789,45 @@ DHRT_FRAMES=5
 gleich gesperrt
 FF0000
 fertig
+
+=== ein unlesbares bild sagt welche datei und warum
+' raylib sagte nur "image data is null, either the file doesnt exist or
+' the image type is unsupported" -- ohne Dateinamen, und die Datei gab es
+' (Buch "Kleine Wunder", Kapitel 23: eine Diaschau mit drei kaputten
+' Dateien zeigte dreimal dieselbe Zeile).
+SCREEN(160, 80, "t", 1)
+FILE_WRITE("leer.png", "")
+FILE_WRITE("text.png", "kein Bild")
+FILE_WRITE_BYTES("halb.png", BUFFER_FROM_HEX("89504E470D0A1A0A0000000D"))
+DIM n AS STRING
+FOR EACH n IN ["leer.png", "text.png", "halb.png"]
+    TRY
+        DIM i AS IMAGE : i = LOADIMAGE(n)
+    CATCH e
+        PRINT e
+    END TRY
+NEXT
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+LOADIMAGE: 'leer.png' ist leer (0 Byte)
+LOADIMAGE: 'text.png' ist kein Bild, das sich lesen laesst -- gelesen werden PNG, JPG, BMP, GIF und QOI
+LOADIMAGE: 'halb.png' beginnt wie ein PNG-Bild, ist aber beschaedigt oder unvollstaendig (12 Byte)
+
+=== ein geaendertes bild wird neu geladen
+' LOADIMAGE merkt sich Bilder nach dem Pfad. Wurde die Datei inzwischen
+' neu geschrieben, kam still das alte Bild zurueck (Buch "Kleine Wunder",
+' Kapitel 23: eine Diaschau, die ihren Ordner beobachtet). Unveraendert
+' bleibt es dasselbe Handle, und das alte gilt weiter.
+IMPORT "imgfx"
+SCREEN(160, 80, "t", 1)
+IMAGE_SAVE(IMAGE_NEW(100, 50, &HFF0000), "x.png")
+DIM a AS IMAGE : a = LOADIMAGE("x.png")
+DIM b AS IMAGE : b = LOADIMAGE("x.png")
+IMAGE_SAVE(IMAGE_NEW(200, 80, &H00FF00), "x.png")
+DIM c AS IMAGE : c = LOADIMAGE("x.png")
+PRINT IMAGE_WIDTH(a); " "; a = b; " "; IMAGE_WIDTH(c); " "; a = c; " "; IMAGE_WIDTH(a)
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+100 TRUE 200 FALSE 100

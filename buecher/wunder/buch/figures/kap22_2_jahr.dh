@@ -1,0 +1,3 @@
+' Bild fuer Kapitel 22: das ganze Jahr als Kreis.
+CHDIR("../../code/kap22")
+IMPORT "../../code/kap22/2_jahr.dh"

@@ -1,0 +1,125 @@
+' Kapitel 21 -- die Buehne: Figuren, die gehen und sprechen, und die
+' Lichtung, auf der sie stehen. 1_automat.dh und 2_szene.dh binden diese
+' Datei ein; was sie unterscheidet, ist nur der Ablauf.
+CONST BREITE = 800
+CONST HOEHE = 500
+CONST BODEN = 410
+
+CLASS Figur
+    DIM art AS STRING
+    DIM x AS FLOAT
+    DIM ziel AS FLOAT
+    DIM tempo AS FLOAT
+    DIM groesse AS FLOAT
+    DIM farbe AS INTEGER
+    ' 1 schaut nach rechts, -1 nach links.
+    DIM schaut AS INTEGER
+    ' Was in der Sprechblase steht; leer heisst keine Blase.
+    DIM text AS STRING
+    ' Laeuft beim Gehen, damit die Figur dabei huepft.
+    DIM uhr AS FLOAT
+
+    SUB Init(part AS STRING, px AS FLOAT, pgroesse AS FLOAT, _
+             pfarbe AS INTEGER, ptempo AS FLOAT)
+        art = part
+        x = px
+        ziel = px
+        groesse = pgroesse
+        farbe = pfarbe
+        tempo = ptempo
+        schaut = 1
+    END SUB
+
+    SUB gehe_zu(px AS FLOAT)
+        ziel = px
+        schaut = IIF(ziel < x, -1, 1)
+    END SUB
+
+    FUNCTION geht() AS BOOLEAN
+        RETURN ABS(ziel - x) > 0.5
+    END FUNCTION
+
+    SUB schritt(dt AS FLOAT)
+        IF geht() THEN
+            x = x + SGN(ziel - x) * MIN(tempo * dt, ABS(ziel - x))
+            uhr = uhr + dt
+        END IF
+    END SUB
+
+    SUB zeichnen()
+        DIM hops AS FLOAT : hops = 0
+        IF geht() THEN hops = ABS(SIN(uhr * 9)) * groesse * 0.25
+        DIM my AS FLOAT : my = BODEN - groesse * 0.8 - hops
+        IF art = "igel" THEN
+            ' Stacheln: ein Kranz aus Dreiecken hinter dem Koerper.
+            DIM k AS INTEGER
+            FOR k = 0 TO 10
+                DIM w AS FLOAT : w = PI + k / 10 * PI
+                TRIANGLE(x + COS(w - 0.15) * groesse * 0.9, _
+                         my + SIN(w - 0.15) * groesse * 0.7, _
+                         x + COS(w + 0.15) * groesse * 0.9, _
+                         my + SIN(w + 0.15) * groesse * 0.7, _
+                         x + COS(w) * groesse * 1.4, _
+                         my + SIN(w) * groesse * 1.1, RGB(70, 50, 40))
+            NEXT
+        ELSE
+            ' Der Drache: ein Schwanz nach hinten und Zacken oben.
+            DIM hx AS FLOAT : hx = x - schaut * groesse * 0.6
+            DIM sx AS FLOAT : sx = x - schaut * groesse * 1.8
+            TRIANGLE(hx, my, hx, my + groesse * 0.5, _
+                     sx, my + groesse * 0.5, farbe)
+            DIM z AS INTEGER
+            FOR z = -1 TO 1
+                DIM zx AS FLOAT : zx = x + z * groesse * 0.35
+                TRIANGLE(zx - 8, my - groesse * 0.7, zx + 8, _
+                         my - groesse * 0.7, zx, my - groesse * 1.1, _
+                         RGB(240, 170, 60))
+            NEXT
+        END IF
+        ELLIPSE(x - groesse, my - groesse * 0.8, x + groesse, _
+                my + groesse * 0.8, farbe)
+        ' Ein Auge, das in Blickrichtung sitzt.
+        DIM ax AS FLOAT : ax = x + schaut * groesse * 0.45
+        CIRCLE(ax, my - groesse * 0.2, groesse * 0.2, _
+               RGB(255, 255, 255))
+        CIRCLE(ax + schaut * 3, my - groesse * 0.2, groesse * 0.1, _
+               RGB(20, 20, 30))
+        IF text <> "" THEN blase(my - groesse - 30)
+    END SUB
+
+    ' Die Sprechblase: so breit wie der Text, mit einer Spitze zur
+    ' Figur.
+    SUB blase(unten AS FLOAT)
+        TEXT_SIZE(20)
+        DIM b AS FLOAT : b = TEXT_WIDTH(text) + 28
+        DIM links AS FLOAT
+        links = CLAMP(x - b / 2, 10, BREITE - b - 10)
+        TRIANGLE(x - 10, unten, x + 10, unten, x, unten + 18, _
+                 RGB(250, 248, 240))
+        BOX_ROUND(links, unten - 44, links + b, unten, 12, _
+                  RGB(250, 248, 240))
+        TEXT(links + 14, unten - 33, text, RGB(30, 30, 40))
+    END SUB
+END CLASS
+
+' Etwas sagen lassen. Die Rueckgabe ist, wie lange man zum Lesen
+' braucht: eine Sekunde und ein bisschen je Buchstabe.
+FUNCTION sagen(wer AS Figur, was AS STRING) AS FLOAT
+    wer.text = was
+    RETURN 1 + LEN(was) * 0.06
+END FUNCTION
+
+' Die Lichtung bei Nacht: Himmel, Mond, Baeume, Wiese.
+SUB lichtung()
+    CLS(RGB(14, 18, 40))
+    CIRCLE(660, 90, 36, RGB(250, 246, 220))
+    CIRCLE(675, 80, 36, RGB(14, 18, 40))
+    DIM b AS INTEGER
+    FOR b = 0 TO 7
+        DIM bx AS FLOAT : bx = 40 + b * 105 + (b MOD 3) * 20
+        DIM bh AS FLOAT : bh = 150 + (b * 37) MOD 90
+        TRIANGLE(bx - 45, BODEN + 5, bx + 45, BODEN + 5, _
+                 bx, BODEN - bh, RGB(18, 40, 36))
+    NEXT
+    BOX(0, BODEN, BREITE, HOEHE, RGB(30, 56, 40))
+END SUB

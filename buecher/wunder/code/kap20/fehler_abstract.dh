@@ -1,0 +1,12 @@
+' Kapitel 20, was schiefgehen kann: die angekuendigte Methode vertippt.
+CLASS Effekt
+    ABSTRACT FUNCTION neues() AS INTEGER
+END CLASS
+
+CLASS Funken EXTENDS Effekt
+    FUNCTION neue() AS INTEGER
+        RETURN 1
+    END FUNCTION
+END CLASS
+
+DIM f AS Funken : f = NEW Funken()

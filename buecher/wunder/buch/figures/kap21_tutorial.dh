@@ -1,0 +1,4 @@
+' Bild fuer Kapitel 21 (Loesung kap21_tutorial).
+RANDOMIZE(21)
+CHDIR("../../code/loesungen")
+IMPORT "../../code/loesungen/kap21_tutorial.dh"

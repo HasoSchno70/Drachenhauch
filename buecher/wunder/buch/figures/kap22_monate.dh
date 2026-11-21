@@ -1,0 +1,3 @@
+' Bild fuer Kapitel 22, Erweitern 1 (Loesung kap22_monate).
+CHDIR("../../code/loesungen")
+IMPORT "../../code/loesungen/kap22_monate.dh"

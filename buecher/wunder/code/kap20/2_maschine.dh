@@ -1,0 +1,259 @@
+' Kapitel 20 -- die Partikelmaschine: Feuer, Rauch, Schnee und Magie aus
+' einem Baukasten. Feuer, Rauch und Schnee sind Unterklassen eines
+' Effekts, die Magie ist ein Rezept aus drei Lambdas. Sie folgt der
+' Maus; die Leertaste wechselt ihr Rezept.
+CONST BREITE = 800
+CONST HOEHE = 500
+
+' Ein Teilchen: nur Daten. Was es tut, sagt sein Effekt.
+CLASS Teilchen
+    DIM x AS FLOAT
+    DIM y AS FLOAT
+    DIM vx AS FLOAT
+    DIM vy AS FLOAT
+    DIM alter AS FLOAT
+    DIM leben AS FLOAT
+    DIM groesse AS FLOAT
+
+    SUB Init(px AS FLOAT, py AS FLOAT, pvx AS FLOAT, pvy AS FLOAT, _
+             pleben AS FLOAT, pgroesse AS FLOAT)
+        x = px
+        y = py
+        vx = pvx
+        vy = pvy
+        leben = pleben
+        groesse = pgroesse
+    END SUB
+
+    ' Wie weit es in seinem Leben ist: 0 am Anfang, 1 am Ende.
+    FUNCTION anteil() AS FLOAT
+        RETURN alter / leben
+    END FUNCTION
+END CLASS
+
+' Ein Effekt wirft Teilchen aus, bewegt und zeichnet sie und raeumt die
+' verbrauchten weg. Wie ein Teilchen beginnt, weiss erst die
+' Unterklasse.
+CLASS Effekt
+    DIM x AS FLOAT
+    DIM y AS FLOAT
+    ' Wie viele Teilchen je Sekunde neu entstehen.
+    DIM rate AS FLOAT
+    DIM teile AS ARRAY OF Teilchen
+    ' Ein angefangenes Teilchen: bei 160 je Sekunde sind es je Bild 2,7.
+    DIM vorrat AS FLOAT
+    ' Leuchten: Farben addieren sich, wo Teilchen uebereinanderliegen.
+    DIM leuchten AS BOOLEAN
+    ' Ein ruhender Effekt wirft nichts Neues aus; seine Teilchen klingen
+    ' aus.
+    DIM ruht AS BOOLEAN
+
+    SUB Init(px AS FLOAT, py AS FLOAT, prate AS FLOAT)
+        x = px
+        y = py
+        rate = prate
+    END SUB
+
+    ' Ein neues Teilchen -- das muss jede Unterklasse selbst sagen.
+    ABSTRACT FUNCTION neues() AS Teilchen
+
+    ' Wie sich ein Teilchen bewegt: geradeaus. Unterklassen duerfen es
+    ' anders, meist zusaetzlich.
+    SUB bewegen(t AS Teilchen, dt AS FLOAT)
+        t.x = t.x + t.vx * dt
+        t.y = t.y + t.vy * dt
+    END SUB
+
+    ' Welche Farbe es hat: weiss, und es verblasst mit dem Alter.
+    FUNCTION farbe(t AS Teilchen) AS INTEGER
+        RETURN RGBA(255, 255, 255, 255 * (1 - t.anteil()))
+    END FUNCTION
+
+    SUB schritt(dt AS FLOAT)
+        IF NOT ruht THEN vorrat = vorrat + rate * dt
+        WHILE vorrat >= 1
+            ARRAY_PUSH(teile, neues())
+            vorrat = vorrat - 1
+        WEND
+        ' Von hinten nach vorn, damit das Entfernen nichts ueberspringt.
+        DIM i AS INTEGER
+        FOR i = LEN(teile) - 1 TO 0 STEP -1
+            DIM t AS Teilchen : t = teile[i]
+            t.alter = t.alter + dt
+            IF t.alter >= t.leben THEN
+                ARRAY_REMOVE_AT(teile, i)
+            ELSE
+                bewegen(t, dt)
+            END IF
+        NEXT
+    END SUB
+
+    SUB zeichnen()
+        IF leuchten THEN BLEND_MODE("add")
+        DIM t AS Teilchen
+        FOR EACH t IN teile
+            CIRCLE(t.x, t.y, t.groesse, farbe(t))
+        NEXT
+        BLEND_MODE("alpha")
+    END SUB
+END CLASS
+
+' Feuer: Flammen steigen auf, werden schmaler und gehen von Gelb ueber
+' Orange nach Rot.
+CLASS Feuer EXTENDS Effekt
+    SUB Init(px AS FLOAT, py AS FLOAT)
+        SUPER.Init(px, py, 160)
+        leuchten = TRUE
+    END SUB
+
+    FUNCTION neues() AS Teilchen
+        RETURN NEW Teilchen(x + (RND() - 0.5) * 70, y, _
+                            (RND() - 0.5) * 40, -90 - RND() * 110, _
+                            0.7 + RND() * 0.7, 10 + RND() * 8)
+    END FUNCTION
+
+    SUB bewegen(t AS Teilchen, dt AS FLOAT)
+        SUPER.bewegen(t, dt)
+        ' Zur Mitte gezogen und kleiner: So wird die Flamme spitz.
+        t.vx = t.vx + (x - t.x) * 2 * dt
+        t.groesse = t.groesse * (1 - 1.2 * dt)
+    END SUB
+
+    FUNCTION farbe(t AS Teilchen) AS INTEGER
+        DIM a AS FLOAT : a = t.anteil()
+        RETURN RGBA(255, MAX(0, 200 - a * 240), MAX(0, 70 - a * 160), _
+                    80 * (1 - a))
+    END FUNCTION
+END CLASS
+
+' Rauch: steigt langsam, waechst, treibt im Wind und wird blasser.
+CLASS Rauch EXTENDS Effekt
+    SUB Init(px AS FLOAT, py AS FLOAT)
+        SUPER.Init(px, py, 25)
+    END SUB
+
+    FUNCTION neues() AS Teilchen
+        RETURN NEW Teilchen(x + (RND() - 0.5) * 20, y, 0, _
+                            -35 - RND() * 15, 4, 8)
+    END FUNCTION
+
+    SUB bewegen(t AS Teilchen, dt AS FLOAT)
+        SUPER.bewegen(t, dt)
+        t.groesse = t.groesse + 9 * dt
+        t.vx = t.vx + 12 * dt
+    END SUB
+
+    FUNCTION farbe(t AS Teilchen) AS INTEGER
+        RETURN RGBA(150, 150, 160, 90 * (1 - t.anteil()))
+    END FUNCTION
+END CLASS
+
+' Schnee: faellt ueber die ganze Breite und schaukelt dabei.
+CLASS Schnee EXTENDS Effekt
+    SUB Init()
+        SUPER.Init(0, -10, 40)
+    END SUB
+
+    FUNCTION neues() AS Teilchen
+        RETURN NEW Teilchen(RND() * BREITE, y, 0, 30 + RND() * 30, 16, _
+                            1.5 + RND() * 2)
+    END FUNCTION
+
+    SUB bewegen(t AS Teilchen, dt AS FLOAT)
+        SUPER.bewegen(t, dt)
+        t.x = t.x + SIN(t.alter * 1.5 + t.groesse * 3) * 25 * dt
+    END SUB
+
+    ' Weiss bis kurz vor dem Ende, dann verblassen.
+    FUNCTION farbe(t AS Teilchen) AS INTEGER
+        RETURN RGBA(240, 245, 255, 230 * MIN(1, (1 - t.anteil()) * 8))
+    END FUNCTION
+END CLASS
+
+' Ein Effekt aus einem Rezept: drei Lambdas statt einer neuen Klasse --
+' wie ein Teilchen beginnt, was es zusaetzlich bewegt, welche Farbe es
+' hat.
+CLASS Rezept EXTENDS Effekt
+    DIM anfang AS FUNCREF
+    DIM zug AS FUNCREF
+    DIM faerben AS FUNCREF
+
+    SUB Init(prate AS FLOAT, panfang AS FUNCREF, pzug AS FUNCREF, _
+             pfaerben AS FUNCREF)
+        SUPER.Init(0, 0, prate)
+        anfang = panfang
+        zug = pzug
+        faerben = pfaerben
+        leuchten = TRUE
+    END SUB
+
+    FUNCTION neues() AS Teilchen
+        RETURN anfang(x, y)
+    END FUNCTION
+
+    SUB bewegen(t AS Teilchen, dt AS FLOAT)
+        SUPER.bewegen(t, dt)
+        zug(t, dt)
+    END SUB
+
+    FUNCTION farbe(t AS Teilchen) AS INTEGER
+        RETURN faerben(t)
+    END FUNCTION
+END CLASS
+
+' Fuer den Wirbel reicht eine Zeile nicht -- das Lambda ruft dann eine
+' benannte SUB.
+SUB kreisen(t AS Teilchen, dt AS FLOAT)
+    DIM w AS FLOAT : w = t.alter * 7
+    t.vx = COS(w) * 90
+    t.vy = SIN(w) * 90 - 30
+END SUB
+
+' Drei Rezepte fuer die Magie.
+DIM magie AS ARRAY OF Rezept
+ARRAY_PUSH(magie, NEW Rezept(150, _
+    FUNCTION(x, y) NEW Teilchen(x, y, (RND() - 0.5) * 220, _
+                                -RND() * 220, 1.4, 3), _
+    SUB(t, dt) t.vy = t.vy + 320 * dt, _
+    FUNCTION(t) HSV(t.alter * 300, 0.6, 1)))
+ARRAY_PUSH(magie, NEW Rezept(120, _
+    FUNCTION(x, y) NEW Teilchen(x, y, 0, 0, 1.6, 3), _
+    SUB(t, dt) kreisen(t, dt), _
+    FUNCTION(t) RGBA(180, 120, 255, 220 * (1 - t.anteil()))))
+ARRAY_PUSH(magie, NEW Rezept(40, _
+    FUNCTION(x, y) NEW Teilchen(x + (RND() - 0.5) * 30, y, 0, -50, _
+                                2.5, 2 + RND() * 6), _
+    SUB(t, dt) t.x = t.x + SIN(t.alter * 5 + t.groesse) * 40 * dt, _
+    FUNCTION(t) RGBA(120, 190, 255, 160 * (1 - t.anteil()))))
+
+SCREEN(BREITE, HOEHE, "Partikelmaschine")
+DIM effekte AS ARRAY OF Effekt
+ARRAY_PUSH(effekte, NEW Rauch(240, 320))
+ARRAY_PUSH(effekte, NEW Feuer(240, 425))
+ARRAY_PUSH(effekte, NEW Schnee())
+DIM welche AS INTEGER
+
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
+    IF KEY_HIT(KEY_SPACE) THEN welche = (welche + 1) MOD LEN(magie)
+    DIM zauber AS Rezept : zauber = magie[welche]
+    zauber.x = MOUSE_X()
+    zauber.y = MOUSE_Y()
+
+    CLS(RGB(12, 14, 30))
+    ' Der Boden, auf dem das Feuer brennt.
+    BOX(0, 430, BREITE, HOEHE, RGB(30, 26, 34))
+    DIM e AS Effekt
+    FOR EACH e IN effekte
+        e.schritt(DELTA())
+        e.zeichnen()
+    NEXT
+    ' Alle Rezepte laufen weiter, damit ihre Teilchen ausklingen; neue
+    ' wirft nur das gewaehlte aus.
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(magie) - 1
+        magie[k].ruht = (k <> welche)
+        magie[k].schritt(DELTA())
+        magie[k].zeichnen()
+    NEXT
+    FLIP()
+WEND

@@ -1326,6 +1326,7 @@ impl Compiler {
                 Ok(())
             }
             Node::ExprStmt { expr } => {
+                self.koroutine_verworfen(expr);
                 // Ein Name ALLEIN als Anweisung (`CLS`, `FLIP`, `meineSub`): in
                 // anderen BASICs ein Aufruf. Hier wurde daraus bisher still ein
                 // geladener und weggeworfener Wert -- die SUB lief einfach nicht.
@@ -2078,7 +2079,7 @@ impl Compiler {
         let zahl = |t: &str| t == "integer" || t == "float";
         match ziel {
             "integer" | "float" => !zahl(quelle),
-            "string" | "boolean" | "tuple" | "funcref" => quelle != ziel,
+            "string" | "boolean" | "tuple" | "funcref" | "coroutine" => quelle != ziel,
             z if self.classes.contains_key(z) => match quelle {
                 "integer" | "float" | "string" | "boolean" => true,
                 q if self.classes.contains_key(q) =>
@@ -2124,9 +2125,10 @@ impl Compiler {
                 }
                 true
             }
-            // Nicht dieselbe Art: eine Zahl, ein Text, ein Objekt, ein Tupel,
-            // ein Feld an eine MAP oder eine MAP an ein Feld passen nie.
-            None => bekannt(quelle) || quelle == "tuple"
+            // Nicht dieselbe Art: eine Zahl, ein Text, ein Objekt, ein Feld
+            // an eine MAP oder eine MAP an ein Feld passen nie. Ein Tupel an
+            // ein Feld wird umgebaut (`coerce_array`), an eine MAP nicht.
+            None => bekannt(quelle) || (quelle == "tuple" && art == "map:")
                 || quelle.starts_with("map:") || quelle.starts_with("array:"),
         }
     }
@@ -3699,6 +3701,40 @@ impl Compiler {
         Ok(())
     }
 
+    /// Eine Koroutine als Anweisung (`warten(3)` mit YIELD in `warten`):
+    /// Der Aufruf liefert nur das COROUTINE-Handle, und weggeworfen laeuft
+    /// sie nie -- still, kein Schritt davon geschieht. In einer Szene, die
+    /// einen Helfer mit YIELD aufruft, wartet so nichts (Buch "Kleine
+    /// Wunder", Kapitel 21). Eine Warnung, mit dem Weg hinaus.
+    fn koroutine_verworfen(&mut self, expr: &Node) {
+        let Node::Call { callee, .. } = expr else { return };
+        let (name, ist) = match &**callee {
+            Node::Identifier(n) => {
+                let low = n.to_lowercase();
+                let lokal = self.ctx.local_slots.contains_key(n) || self.global_vars.contains(n);
+                let methode = self.ctx.current_class.clone()
+                    .and_then(|cn| self.find_method_sig(&cn, &low).map(|s| s.is_coroutine));
+                let ist = if lokal { false } else if let Some(m) = methode { m } else {
+                    self.fn_sigs.get(&low).map_or(false, |s| s.is_coroutine)
+                };
+                (n.clone(), ist)
+            }
+            Node::MemberAccess { target, name } => {
+                let ist = self.statischer_typ(target)
+                    .and_then(|k| self.find_method_sig(&k, &name.to_lowercase()).map(|s| s.is_coroutine))
+                    .unwrap_or(false);
+                (name.clone(), ist)
+            }
+            _ => return,
+        };
+        if ist {
+            self.warnings.push((self.ctx.cur_line, format!(
+                "'{}' ist eine Koroutine (sie enthaelt YIELD) -- als Anweisung aufgerufen, entsteht sie nur und laeuft nie. \
+                 Das Ergebnis aufheben und mit CORO_RESUME fortsetzen: DIM c AS COROUTINE : c = {}(...)",
+                name, name)));
+        }
+    }
+
     /// Eine SUB liefert keinen Wert -- `x = meineSub()` bricht sonst erst zur
     /// Laufzeit ab ("Erwartet INTEGER, erhalten NIL"), und zwar an der
     /// ZUWEISUNG, nicht am Aufruf.
@@ -3934,6 +3970,23 @@ impl Compiler {
                 }
                 self.ctx.emit(oc::LOAD_SELF, Value::Null);
                 return self.methode_rufen(&name, args, &byref);
+            }
+            // Ein Feld der Klasse, das eine Funktion haelt (`DIM zug AS
+            // FUNCREF`): `zug(t, dt)` ruft den Wert in `Self.zug` -- wie ein
+            // Feld sonst auch ohne `Self.` gemeint ist. Vor den globalen
+            // Funktionen, wie die Methoden (Buch "Kleine Wunder", Kapitel 20).
+            if self.feld_typ(&cn, &name.to_lowercase()).map_or(false, |t| t == "funcref") {
+                if has_named {
+                    return Err("Benannte Argumente gehen nur bei SUB/FUNCTION/NEW, nicht beim Aufruf eines Wertes".into());
+                }
+                let feld = Node::MemberAccess {
+                    target: Box::new(Node::Identifier("self".into())),
+                    name: name.clone(),
+                };
+                self.expr(&feld)?;
+                for a in args { self.expr(a)?; }
+                self.ctx.emit(oc::CALL_VALUE, json!([name.clone(), args.len()]));
+                return Ok(());
             }
         }
         if let Some(d) = self.ffi_decls.get(&name.to_lowercase()).cloned() {
@@ -4593,6 +4646,15 @@ impl Compiler {
                       has_catch: bool, finally_block: &[Node]) -> CR {
         let try_zeile = self.ctx.cur_line;
         let hat_finally = !finally_block.is_empty();
+        // Ganz ohne CATCH und FINALLY verschwindet jeder Fehler spurlos (das
+        // bleibt so, siehe unten) -- aber gewollt ist das selten; ein leeres
+        // `CATCH` sagt es ausdruecklich (Buch "Kleine Wunder", Kapitel 23).
+        if !has_catch && !hat_finally {
+            self.warnings.push((try_zeile,
+                "TRY ohne CATCH und ohne FINALLY verschluckt jeden Fehler still -- danach weiss niemand, dass einer da war. \
+                 Mit CATCH e den Fehler ansehen (oder ausdruecklich schlucken: ein leeres CATCH); \
+                 FINALLY raeumt nur auf und reicht ihn weiter".to_string()));
+        }
         let fin_jmp = if hat_finally { Some(self.ctx.emit(oc::TRY_BEGIN, Value::Null)) } else { None };
         // Ohne CATCH gibt es keinen zweiten Handler. Ausnahme: das alte
         // `TRY ... END TRY` ganz ohne beides schluckt Fehler -- das war schon

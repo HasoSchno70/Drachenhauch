@@ -1,0 +1,8 @@
+' Kapitel 20, was schiefgehen kann: drei Lambdas in einer Schleife des
+' Hauptprogramms -- sie sehen i, wie es JETZT ist, nicht wie es war.
+DIM mal AS ARRAY OF FUNCREF
+DIM i AS INTEGER
+FOR i = 1 TO 3
+    ARRAY_PUSH(mal, FUNCTION(x) x * i)
+NEXT
+PRINT mal[0](10); " "; mal[1](10); " "; mal[2](10)

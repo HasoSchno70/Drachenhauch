@@ -976,6 +976,16 @@ pub(crate) fn coerce(value: Value, target: &str, ctx: &str) -> R<Value> {
             Value::FuncRef(_) | Value::BoundMethod(_) | Value::Closure(_) | Value::Nil => Ok(value),
             _ => Err(format!("{}: Erwartet FUNCREF, erhalten {}", ctx, value.type_name())),
         },
+        // Eine Koroutine ist ein eigener Wert. Bis dahin nahm eine
+        // COROUTINE-Variable alles, und eine Funktion ohne YIELD lieferte ihre
+        // Zahl hinein -- der Fehler kam erst beim naechsten CORO_RESUME
+        // (Buch "Kleine Wunder", Kapitel 21).
+        "coroutine" => match value {
+            Value::Coroutine(_) | Value::Nil => Ok(value),
+            _ => Err(format!(
+                "{}: Erwartet COROUTINE, erhalten {} -- eine Koroutine liefert nur der Aufruf einer FUNCTION oder SUB, die YIELD enthaelt",
+                ctx, value.type_name())),
+        },
         // GELD ist streng, anders als die uebrigen Modul-Typen: eine Zahl
         // stillschweigend in einer GELD-Variablen abzulegen wuerde genau
         // die Trennung aufweichen, fuer die es den Typ gibt.
@@ -1072,6 +1082,15 @@ pub(super) fn coerce_map(value: Value, vt: &str, ctx: &str) -> R<Value> {
 #[inline(never)]
 pub(super) fn coerce_array(value: Value, elem: &str, ctx: &str) -> R<Value> {
     if matches!(value, Value::Nil) { return Ok(value); }
+    // Ein TUPLE an einem Feld-Ziel: daraus ein frisches Feld bauen, wie aus
+    // einem Literal `[...]`, und das pruefen wie jedes andere. So passt eine
+    // Comprehension `[w * 2 FOR w IN werte]` -- sie liefert ein TUPLE, sieht
+    // aber aus wie ein Feld -- in ein `ARRAY OF FLOAT` (Buch "Kleine Wunder",
+    // Kapitel 22). Ein Tupel ist unveraenderlich; die Kopie verliert nichts.
+    if let Value::Tuple(items) = &value {
+        let feld = array_literal(items.as_ref().clone());
+        return coerce_array(feld, elem, ctx);
+    }
     let ziel = if elem.is_empty() { "ARRAY".to_string() }
                else { format!("ARRAY OF {}", typ_lesbar(elem)) };
     let arr = match &value {
@@ -1298,4 +1317,36 @@ pub(super) fn zahl_arg(a: &[Value], i: usize, f: &str) -> R<f64> {
         Some(Value::Float(x)) => Ok(*x),
         _ => Err(format!("{}: erwartet eine Zahl (Arg {})", f, i + 1)),
     }
+}
+
+/// `obj.name(...)` ohne Methode dieses Namens, aber mit einem Feld, das
+/// einen Funktionswert haelt (FUNCREF, Lambda, gebundene Methode): Dann ist
+/// der Aufruf der Aufruf dieses Werts. Bis dahin hiess es "Methode existiert
+/// nicht", und ein Lambda im Feld liess sich nur ueber eine lokale Variable
+/// rufen (Buch "Kleine Wunder", Kapitel 20: ein Effekt aus drei Lambdas).
+pub(super) fn feld_rufbar(rc: &Rc<std::cell::RefCell<Instance>>, name: &str) -> Option<Value> {
+    let b = rc.borrow();
+    let i = b.platz(&name.to_lowercase())?;
+    match &b.fields[i] {
+        v @ (Value::FuncRef(_) | Value::BoundMethod(_) | Value::Closure(_)) => Some(v.clone()),
+        _ => None,
+    }
+}
+
+/// Ein Feld-Befehl, der nur liest, bekommt ein TUPLE: daraus ein frisches
+/// Feld bauen (wie `[...]`). Eine Comprehension `[x FOR x IN ...]` ist ein
+/// TUPLE, sieht aber aus wie ein Feld; `ARRAY_AVG([...])` hiess bis dahin
+/// "erwartet ARRAY" (Buch "Kleine Wunder", Kapitel 22). Befehle, die ein
+/// Feld veraendern (SORT, ARRAY_PUSH ...), bleiben beim Fehler -- ein Tupel
+/// laesst sich nicht veraendern. `None`: nichts umzubauen.
+#[cold]
+pub(super) fn tupel_fuer_feldbefehl(name: &str, a: &[Value]) -> Option<Vec<Value>> {
+    let liest = matches!(name, "array_sum" | "array_avg" | "array_min" | "array_max"
+        | "array_indexof" | "join" | "join$" | "array_map" | "array_filter"
+        | "array_reduce" | "array_find" | "array_copy");
+    let Some(Value::Tuple(t)) = a.first() else { return None };
+    if !liest { return None; }
+    let mut neu = a.to_vec();
+    neu[0] = array_literal(t.as_ref().clone());
+    Some(neu)
 }

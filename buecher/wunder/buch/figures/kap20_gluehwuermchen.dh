@@ -1,0 +1,3 @@
+' Bild fuer Kapitel 20 (Loesung kap20_gluehwuermchen).
+RANDOMIZE(20)
+IMPORT "../../code/loesungen/kap20_gluehwuermchen.dh"

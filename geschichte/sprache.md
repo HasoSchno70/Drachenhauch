@@ -1320,3 +1320,120 @@ keines; das Bild bleibt leer, ohne Meldung. Jetzt melden sich `AUDIO_FFT`,
 geht (`vm_grafik::leeres_feld`). `modules_audio.dhtest` und
 `mikrofon.dhtest` (je ein Fall, die Pruefung kommt vor Soundkarte und
 Mikrofon); Gegenprobe: ohne die Pruefung fallen beide.
+
+Kapitel 20 (Die Partikelmaschine) baut einen Effekt aus drei Lambdas, die
+in Feldern eines Objekts stehen (`DIM zug AS FUNCREF`). `zug(t, dt)` in
+einer Methode suchte einen Befehl ZUG ("Unbekanntes Builtin"), und von
+aussen hiess `r.wie(5)` "Methode 'wie' existiert nicht" -- ein Funktionswert
+im Feld liess sich nur ueber eine lokale Variable rufen, obwohl das
+Handbuch sagt, ein FUNCREF werde aufgerufen wie eine Funktion. Jetzt: Der
+Compiler uebersetzt den blossen Namen eines FUNCREF-Felds in einer Methode
+als Aufruf des Werts `Self.feld` (nach den Methoden, vor den globalen
+Funktionen), und CALL_METHOD ruft, wenn es keine Methode findet, den
+Funktionswert eines gleichnamigen Felds (`vm_helfer::feld_rufbar`) -- so
+auch bei einem Objekt, dessen Klasse der Uebersetzer nicht kennt, und im
+Maschinencode-Weg (`methode_rufen`). Ein Feld ohne Funktionswert bleibt
+"Methode existiert nicht". `funcref.dhtest` (ein Fall, mit und ohne
+Maschinencode); Gegenproben: ohne den VM-Weg faellt er an `r.wie(5)`,
+ohne den Compiler-Weg an `wie(a)` in der Methode.
+
+Kapitel 21 (Geschichten, die warten) erzaehlt eine Szene als Koroutine.
+Ein Helfer `warten(n)` mit YIELD ist selbst eine Koroutine; in der Szene
+als Anweisung aufgerufen, entstand er nur, wurde weggeworfen und lief nie
+-- still, die Szene wartete einfach nicht. Jetzt warnt der Compiler
+(`koroutine_verworfen`) bei einer Ausdrucksanweisung, die eine Koroutine
+ruft (Funktion, Methode der eigenen oder einer bekannten Klasse), und
+zeigt, wie man sie aufhebt. Im ganzen Repo traf es keine Zeile.
+`compiler_warnungen.dhtest` (ein Fall, Funktion und Methode); Gegenprobe:
+ohne die Warnung faellt genau er.
+
+Im selben Kapitel: Ein Drehbuch, in dem (versehentlich) kein YIELD mehr
+stand, war keine Koroutine; `c = szene()` lief es sofort ganz durch und
+legte seine Zahl in die COROUTINE-Variable. Die nahm jeden Wert, und der
+Fehler kam erst beim naechsten CORO_RESUME. Jetzt prueft `coerce` den Typ
+COROUTINE wie TUPLE und FUNCREF (Koroutine oder NIL) und nennt die
+Ursache; `passt_nie` kennt ihn auch, so warnt schon das Uebersetzen, wenn
+rechts sicher eine Zahl steht. Aufrufe von Koroutinen haben dort keinen
+festen Typ und bleiben still. Im ganzen Repo traf es keine Zeile.
+`coroutines.dhtest` (ein Fall); Gegenprobe: ohne den Zweig in `coerce`
+laeuft er durch.
+
+Kapitel 22 (Die Datenwerkstatt) formt Wetterdaten mit Comprehensions um
+und zeichnet sie. `[w * 2 FOR w IN werte]` liefert ein TUPLE (so war es
+seit der ersten Fassung gebaut, BUILD_TUPLE_DYN), sieht aber aus wie ein
+Feld -- an ein `ARRAY OF FLOAT` zugewiesen hiess es "Erwartet ARRAY OF
+FLOAT, erhalten TUPLE", und `passt_nie` warnte schon beim Uebersetzen.
+Jetzt baut `coerce_array` aus einem TUPLE ein frisches Feld (wie ein
+Literal, `array_literal`) und prueft es nach denselben Regeln: Ganzzahlen
+an FLOAT werden umgebaut, Falsches bricht ab; `feld_passt_nie` laesst ein
+Tupel an einem Feld durch, an einer MAP nicht. Das Handbuch hatte keinen
+Abschnitt zu Comprehensions; jetzt steht er vor "Arrays".
+`comprehensions.dhtest` (ein Fall); Gegenprobe: ohne den Umbau faellt er
+an der ersten Zuweisung.
+
+Gleich danach: `ARRAY_AVG([hoch[i] FOR i IN ... WHERE ...])` hiess
+"ARRAY_AVG erwartet ARRAY" -- dieselbe Ursache, die Comprehension ist ein
+TUPLE. Die Feld-Befehle holen ihr Argument je fuer sich, ohne gemeinsame
+Stelle; die Comprehension auf ARRAY umzustellen haette bestehende
+Programme veraendert (Ausgabe, Entpacken). Stattdessen baut
+`Vm::builtin_rufen` ein TUPLE als erstes Argument zu einem frischen Feld
+um, aber nur fuer die Befehle, die lesen (`tupel_fuer_feldbefehl`: SUM, AVG,
+MIN, MAX, INDEXOF, MAP, FILTER, REDUCE, FIND, COPY, JOIN$). SORT und die
+anderen, die ein Feld veraendern, bleiben beim Fehler. Der Weg kostet je
+Aufruf einen Blick auf das erste Argument. `comprehensions.dhtest` (ein
+Fall); Gegenprobe: ohne den Umbau faellt er an ARRAY_AVG.
+
+Beim Fehlerbeispiel dazu (ein vertippter Monat, das WHERE laesst nichts
+durch) meldete `ARRAY_AVG` "nur ARRAY OF INTEGER/FLOAT": Ein leeres Tupel
+wird ein Feld ohne Elementtyp, und die Typpruefung kam vor der Pruefung
+auf leer. Jetzt laesst `numeric_1d_array` ein leeres Feld ohne Typ durch,
+und es heisst "Array ist leer". Dabei fiel auf, dass `ARRAY_SUM` eines
+leeren `ARRAY OF FLOAT` "-0.0" lieferte -- Rusts `sum()` ueber f64 beginnt
+bei -0.0; jetzt `fold(0.0, ...)`. `comprehensions.dhtest` (ein Fall);
+Gegenproben: strenge Typpruefung bzw. `sum()` lassen ihn je fallen.
+
+Die Loesung zu "Erfinden" zeigt die Monatsmittel als Balkendiagramm
+(`chart`) von etwa -4 bis 26 Grad. Die Skala schrieb an die Nullinie
+"-0 Grad": `lo + (hi - lo) * t` trifft die Null nur beinahe (-1e-15), und
+`format!("{:.0}")` behaelt das Vorzeichen. `ChartObj::fmt_value` streicht
+jetzt das Minus, wenn nach dem Runden nur Nullen bleiben -- das gilt fuer
+jede Beschriftung (Skala, Werte, Tooltip, Tacho). Rust-Test
+`fmt_value_null_ohne_vorzeichen`; Gegenprobe: ohne das Streichen faellt er
+an "-0 Grad".
+
+Kapitel 23 (Fehler, die man faengt) baut eine Diaschau, die kaputte
+Dateien ueberlebt. Ein leeres, ein halbes und ein Text-"Bild" lieferten
+dreimal dieselbe Zeile von raylib: "image data is null, either the file
+doesnt exist or the image type is unsupported" -- ohne Dateinamen, und
+"doesnt exist" stimmte nicht (das fehlende Bild faengt `datei_da` vorher
+ab). Jetzt sagt `builtins::bild_unlesbar`, welche Datei und warum: leer
+(0 Byte), beginnt wie ein PNG/JPG/GIF/BMP/QOI-Bild und ist beschaedigt,
+oder ist gar keins. `image_io.dhtest` (ein Fall) und ein Rust-Test;
+Gegenprobe: mit der alten Meldung faellt der Fall.
+
+Dazu: `TRY ... END TRY` ganz ohne CATCH und FINALLY verschluckt jeden
+Fehler still -- im Kapitel das Beispiel, in dem eine Division durch null
+spurlos verschwindet. Das Verhalten bleibt (bestehender Code), aber der
+Uebersetzer warnt jetzt; ein leeres `CATCH` schluckt ausdruecklich und
+bleibt still. Im Repo traf die Warnung keine Datei.
+`compiler_warnungen.dhtest` (ein Fall: genau eine Warnung unter vier
+Formen); Gegenprobe: ohne die Warnung faellt er.
+
+Fuer die Loesung "Ordner beobachten" (eine Diaschau, die neue und neu
+geschriebene Bilder nachlaedt) fiel auf: `LOADIMAGE` merkt sich Bilder
+nach dem Pfad und gab nach dem Neuschreiben der Datei still das alte Bild
+zurueck -- erst ein `IMAGE_FREE` raeumte den Eintrag. Jetzt merkt sich
+`Graphics::bild_stand` je Handle Groesse und Aenderungszeit der Datei;
+weichen sie ab, wird neu geladen (neues Handle, das alte gilt weiter).
+Fehlt die Datei inzwischen, bleibt es beim Cache wie bisher.
+`image_io.dhtest` (ein Fall); Gegenprobe: ohne den Vergleich faellt er
+mit "100 TRUE 100 TRUE 100".
+
+Beim Nachpruefen einer Antwort (die Diaschau ohne `FILEEXISTS` vor
+`titel_lesen`) kam "OPENFILE: Das System kann die angegebene Datei nicht
+finden. (os error 2)" -- ohne den Namen der Datei. Zum Lesen fragt
+`OPENFILE` jetzt vorher `datei_da` wie `LOADIMAGE` und `LOADSOUND` ("Datei
+'x' nicht gefunden (gesucht relativ zu ...)"), beim Schreiben und Anhaengen
+steht der Name vor dem Text des Betriebssystems. `umstieg.dhtest` (zwei
+Faelle); Gegenprobe: ohne `datei_da` bzw. mit der alten Meldung faellt je
+der eine.

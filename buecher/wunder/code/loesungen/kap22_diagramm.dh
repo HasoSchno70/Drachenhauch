@@ -1,0 +1,79 @@
+' Loesung zu Kapitel 22, Erfinden: ein Diagramm, das man anklickt. Je
+' Monat zwei Balken -- das Mittel der tiefsten und der hoechsten
+' Temperatur. Ein Klick auf einen Monat zeigt darunter, was ihn
+' ausmacht: den waermsten Tag, den Regen, die Sonne.
+IMPORT "chart"
+CONST BREITE = 800
+CONST HOEHE = 500
+
+DIM zeilen AS ARRAY OF STRING
+zeilen = READLINES("../kap22/wetter.csv")
+DIM tage AS ARRAY OF STRING
+tage = [z FOR z IN zeilen WHERE z <> "" AND LEFT$(z, 5) <> "datum"]
+DIM datum AS ARRAY OF STRING
+datum = [SPLIT$(z, ";")[0] FOR z IN tage]
+FUNCTION spalte(nr AS INTEGER) AS ARRAY OF FLOAT
+    RETURN [VAL(SPLIT$(z, ";")[nr]) FOR z IN tage]
+END FUNCTION
+DIM tief AS ARRAY OF FLOAT : tief = spalte(1)
+DIM hoch AS ARRAY OF FLOAT : hoch = spalte(2)
+DIM regen AS ARRAY OF FLOAT : regen = spalte(3)
+DIM sonne AS ARRAY OF FLOAT : sonne = spalte(4)
+DIM monate AS TUPLE : monate = {LEFT$(d, 7) FOR d IN datum}
+DIM namen AS ARRAY OF STRING
+namen = ["Januar", "Februar", "Maerz", "April", "Mai", "Juni", "Juli", _
+         "August", "September", "Oktober", "November", "Dezember"]
+
+' Die Tage eines Monats als Nummern -- damit holt jede Spalte ihre
+' Werte.
+FUNCTION im_monat(m AS STRING) AS ARRAY OF INTEGER
+    RETURN [i FOR i IN RANGE(LEN(datum)) WHERE LEFT$(datum[i], 7) = m]
+END FUNCTION
+
+SCREEN(BREITE, HOEHE, "Ein Jahr Wetter: Monate")
+DIM c AS CHART : c = CHART_NEW("balken", 30, 20, 740, 360)
+CHART_SET(c, "titel", "Mittel je Monat")
+CHART_SET(c, "einheit", " Grad")
+CHART_SET(c, "legende", "oben")
+DIM r_tief AS INTEGER
+r_tief = CHART_SERIES(c, "tiefste", RGB(110, 160, 255))
+DIM r_hoch AS INTEGER
+r_hoch = CHART_SERIES(c, "hoechste", RGB(255, 140, 90))
+DIM mt AS ARRAY OF FLOAT
+mt = [ARRAY_AVG([tief[i] FOR i IN im_monat(m)]) FOR m IN monate]
+DIM mh AS ARRAY OF FLOAT
+mh = [ARRAY_AVG([hoch[i] FOR i IN im_monat(m)]) FOR m IN monate]
+CHART_DATA(c, r_tief, mt)
+CHART_DATA(c, r_hoch, mh)
+' Unten je Monat drei Buchstaben, aus einer langen Zeichenkette.
+DIM kurz AS STRING : kurz = "JanFebMrzAprMaiJunJulAugSepOktNovDez"
+DIM k AS INTEGER
+FOR k = 0 TO 11
+    CHART_LABEL(c, k, MID$(kurz, k * 3, 3))
+NEXT
+
+DIM gewaehlt AS INTEGER : gewaehlt = -1
+TEXT_SIZE(18)
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
+    IF CHART_CLICKED(c) >= 0 THEN gewaehlt = CHART_CLICKED(c)
+    CLS(RGB(20, 22, 32))
+    CHART_DRAW(c)
+    IF gewaehlt < 0 THEN
+        TEXT(40, 410, "Einen Monat anklicken.", _
+             RGBA(255, 255, 255, 150))
+    ELSE
+        ' Die Tage des Monats, und welcher davon der waermste war.
+        DIM tm AS ARRAY OF INTEGER : tm = im_monat(monate[gewaehlt])
+        DIM warm AS ARRAY OF FLOAT : warm = [hoch[i] FOR i IN tm]
+        DIM b AS INTEGER : b = tm[ARRAY_INDEXOF(warm, ARRAY_MAX(warm))]
+        DIM nass AS FLOAT : nass = ARRAY_SUM([regen[i] FOR i IN tm])
+        DIM hell AS FLOAT : hell = ARRAY_SUM([sonne[i] FOR i IN tm])
+        TEXT(40, 400, namen[gewaehlt], RGBA(255, 255, 255, 230))
+        DIM tag AS INTEGER : tag = VAL(MID$(datum[b], 8, 2))
+        TEXT(40, 428, f"waermster Tag: {hoch[b]:.1f} Grad am {tag}.", _
+             RGBA(255, 170, 120, 220))
+        TEXT(40, 452, f"Regen: {nass:.0f} mm, Sonne: {hell:.0f} " _
+             + "Stunden", RGBA(255, 255, 255, 170))
+    END IF
+    FLIP()
+WEND

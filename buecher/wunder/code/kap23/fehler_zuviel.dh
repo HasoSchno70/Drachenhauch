@@ -1,0 +1,15 @@
+' Kapitel 23, was schiefgehen kann: ein TRY, das zu viel faengt. Der
+' Fehler liegt im eigenen Programm -- eine Breite fehlt --, aber das
+' CATCH haelt ihn fuer eine kaputte Datei.
+DIM dateien AS ARRAY OF STRING
+dateien = ["1_morgen.png", "2_mittag.png", "3_abend.png"]
+DIM breiten AS ARRAY OF INTEGER : breiten = [640, 640]
+DIM i AS INTEGER
+FOR i = 0 TO LEN(dateien) - 1
+    TRY
+        DIM bild AS IMAGE : bild = LOADIMAGE("bilder/" + dateien[i])
+        PRINT f"{dateien[i]}: {breiten[i]} Punkte breit"
+    CATCH
+        PRINT f"{dateien[i]}: kaputt, uebersprungen"
+    END TRY
+NEXT

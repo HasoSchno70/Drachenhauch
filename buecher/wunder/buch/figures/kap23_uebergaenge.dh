@@ -1,0 +1,4 @@
+' Bild fuer Kapitel 23, Erweitern 1 (Loesung kap23_uebergaenge): mitten
+' im Schieben vom zweiten zum dritten Bild.
+CHDIR("../../code/loesungen")
+IMPORT "../../code/loesungen/kap23_uebergaenge.dh"

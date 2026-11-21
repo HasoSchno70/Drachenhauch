@@ -1,0 +1,5 @@
+// Kapitel 20, Erweitern 1: die Maus weit links ausserhalb, damit die
+// Magie nicht mitzeichnet. Mausstellen mal 2.
+c 2
+e 0 7 -2000 -2000 0 0
+e 2 7 -2000 -2000 0 0

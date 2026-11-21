@@ -1,0 +1,142 @@
+' Kapitel 22 -- ein Jahr Wetter als Kreis: jeder Tag ein Strahl von der
+' tiefsten zur hoechsten Temperatur, Januar oben, im Uhrzeigersinn.
+' Blaue Punkte aussen sind Regen. Der Kreis zeichnet sich in zwoelf
+' Sekunden selbst; die Leertaste faengt von vorn an.
+CONST BREITE = 800
+CONST HOEHE = 500
+CONST MX = 420
+CONST MY = 255
+
+' Die Datei lesen und mit Comprehensions in Spalten zerlegen.
+DIM zeilen AS ARRAY OF STRING : zeilen = READLINES("wetter.csv")
+DIM tage AS ARRAY OF STRING
+tage = [z FOR z IN zeilen WHERE z <> "" AND LEFT$(z, 5) <> "datum"]
+DIM datum AS ARRAY OF STRING
+datum = [SPLIT$(z, ";")[0] FOR z IN tage]
+
+' Eine Spalte als Zahlen: aus jeder Zeile das nr-te Stueck.
+FUNCTION spalte(nr AS INTEGER) AS ARRAY OF FLOAT
+    RETURN [VAL(SPLIT$(z, ";")[nr]) FOR z IN tage]
+END FUNCTION
+DIM tief AS ARRAY OF FLOAT : tief = spalte(1)
+DIM hoch AS ARRAY OF FLOAT : hoch = spalte(2)
+DIM regen AS ARRAY OF FLOAT : regen = spalte(3)
+DIM sonne AS ARRAY OF FLOAT : sonne = spalte(4)
+DIM anzahl AS INTEGER : anzahl = LEN(tage)
+
+' Was das Jahr ausmacht, je eine Zeile.
+DIM heiss AS INTEGER : heiss = ARRAY_INDEXOF(hoch, ARRAY_MAX(hoch))
+DIM kalt AS INTEGER : kalt = ARRAY_INDEXOF(tief, ARRAY_MIN(tief))
+DIM nass AS ARRAY OF FLOAT : nass = [r FOR r IN regen WHERE r > 0]
+DIM monate AS TUPLE : monate = {LEFT$(d, 7) FOR d IN datum}
+
+' Die Monatsnamen, fuer die Beschriftung und die Anzeige.
+DIM namen AS ARRAY OF STRING
+namen = ["Jan", "Feb", "Mrz", "Apr", "Mai", "Jun", "Jul", "Aug", _
+         "Sep", "Okt", "Nov", "Dez"]
+
+' Aus einem Datum wie 2025-07-15 wird "15. Jul".
+FUNCTION schoen$(d AS STRING) AS STRING
+    RETURN f"{VAL(MID$(d, 8, 2))}. {namen[VAL(MID$(d, 5, 2)) - 1]}"
+END FUNCTION
+
+' Die Temperatur als Abstand von der Mitte: -10 Grad innen, 30 aussen.
+FUNCTION radius(grad AS FLOAT) AS FLOAT
+    RETURN 60 + (grad + 10) * 4
+END FUNCTION
+
+' Die Farbe nach der Waerme: blau, gruen, gelb, rot.
+FUNCTION farbe(grad AS FLOAT) AS INTEGER
+    RETURN HSV(240 - CLAMP((grad + 5) / 35, 0, 1) * 240, 0.75, 1)
+END FUNCTION
+
+' Wohin Tag i zeigt: Januar oben, dann im Uhrzeigersinn.
+FUNCTION winkel(i AS INTEGER) AS FLOAT
+    RETURN -PI / 2 + i / anzahl * 2 * PI
+END FUNCTION
+
+' Kreise fuer 0, 10, 20 und 30 Grad, Striche und Namen der Monate.
+SUB netz()
+    DIM g AS INTEGER
+    FOR g = 0 TO 30 STEP 10
+        CIRCLE_OUTLINE(MX, MY, radius(g), RGBA(255, 255, 255, 30))
+    NEXT
+    TEXT_SIZE(13)
+    DIM m AS INTEGER
+    FOR m = 0 TO 11
+        DIM w AS FLOAT : w = -PI / 2 + m / 12 * 2 * PI
+        LINE(MX + COS(w) * 60, MY + SIN(w) * 60, MX + COS(w) * 225, _
+             MY + SIN(w) * 225, RGBA(255, 255, 255, 18))
+        ' Der Name mitten im Monat, um seine Mitte gesetzt.
+        DIM wm AS FLOAT : wm = w + PI / 12
+        TEXT(MX + COS(wm) * 46 - TEXT_WIDTH(namen[m]) / 2, _
+             MY + SIN(wm) * 46 - 7, namen[m], RGBA(255, 255, 255, 140))
+    NEXT
+    TEXT_SIZE(16)
+END SUB
+
+' Die Gradzahlen kommen zuletzt, sonst verdeckt sie ein Strahl.
+SUB skala()
+    DIM g AS INTEGER
+    FOR g = 0 TO 30 STEP 10
+        TEXT(MX + 4, MY - radius(g) - 14, f"{g}", _
+             RGBA(255, 255, 255, 160))
+    NEXT
+END SUB
+
+SCREEN(BREITE, HOEHE, "Ein Jahr Wetter")
+TEXT_SIZE(16)
+DIM zeit AS FLOAT
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
+    IF KEY_HIT(KEY_SPACE) THEN zeit = 0
+    zeit = zeit + DELTA()
+    ' In zwoelf Sekunden durchs ganze Jahr.
+    DIM bis AS INTEGER : bis = MIN(anzahl, INT(zeit / 12 * anzahl))
+
+    CLS(RGB(14, 16, 28))
+    netz()
+    DIM i AS INTEGER
+    FOR i = 0 TO bis - 1
+        DIM w AS FLOAT : w = winkel(i)
+        DIM innen AS FLOAT : innen = radius(tief[i])
+        DIM aussen AS FLOAT : aussen = radius(hoch[i])
+        LINEW(MX + COS(w) * innen, MY + SIN(w) * innen, _
+              MX + COS(w) * aussen, MY + SIN(w) * aussen, _
+              2.5, farbe(hoch[i]))
+        IF regen[i] > 0 THEN
+            CIRCLE(MX + COS(w) * 230, MY + SIN(w) * 230, _
+                   1 + SQR(regen[i]), RGBA(110, 170, 255, 200))
+        END IF
+    NEXT
+    skala()
+
+    ' Links: das ganze Jahr in Zahlen.
+    TEXT(14, 16, "2025", RGBA(255, 255, 255, 220))
+    TEXT(14, 46, f"waermster Tag: {hoch[heiss]:.1f} Grad", _
+         RGBA(255, 160, 120, 220))
+    TEXT(14, 66, f"  am {schoen$(datum[heiss])}", _
+         RGBA(255, 255, 255, 150))
+    TEXT(14, 92, f"kaeltester: {tief[kalt]:.1f} Grad", _
+         RGBA(140, 180, 255, 220))
+    TEXT(14, 112, f"  am {schoen$(datum[kalt])}", _
+         RGBA(255, 255, 255, 150))
+    TEXT(14, 138, f"Regen: {ARRAY_SUM(regen):.0f} mm", _
+         RGBA(110, 170, 255, 220))
+    TEXT(14, 158, f"  an {LEN(nass)} Tagen", RGBA(255, 255, 255, 150))
+    TEXT(14, 184, f"Sonne: {ARRAY_SUM(sonne):.0f} Stunden", _
+         RGBA(255, 220, 120, 220))
+    TEXT(14, 210, f"{LEN(monate)} Monate, {anzahl} Tage", _
+         RGBA(255, 255, 255, 110))
+
+    ' Unten links: der Tag, bei dem der Kreis gerade ist.
+    IF bis > 0 THEN
+        DIM h AS INTEGER : h = bis - 1
+        TEXT(14, HOEHE - 50, schoen$(datum[h]), _
+             RGBA(255, 255, 255, 220))
+        DIM zeile AS STRING
+        zeile = f"{tief[h]:.1f} bis {hoch[h]:.1f} Grad, " _
+                + f"{regen[h]:.1f} mm"
+        TEXT(14, HOEHE - 28, zeile, RGBA(255, 255, 255, 150))
+    END IF
+    FLIP()
+WEND

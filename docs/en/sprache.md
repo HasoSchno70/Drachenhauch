@@ -968,6 +968,12 @@ f)`, `ARRAY_MAP/FILTER/REDUCE/FIND`, `GUI_ON_CLICK` and the other
 `GUI_ON_*`, `TIMER_AFTER/EVERY`, `TASK_START` and every parameter of your own
 declared `AS FUNCREF`.
 
+When a FUNCREF sits in a field of an object, you call it like a method:
+`effekt.zug(t, dt)`; inside a method of the same class `zug(t, dt)` is
+enough, as with any field without `Self.`. A method of the same name comes
+first. Up to 2026.52 this said "method does not exist", and the field could
+only be called through a local variable.
+
 ### Lambdas
 
 The notation is that of VB.NET:
@@ -1076,12 +1082,46 @@ For infinite generators use `CORO_RESUME`/`CORO_DONE` manually instead.
 
 **Semantics & restrictions:**
 - `dhrt` suspends a coroutine via a **frame snapshot** (ip/locals/stack are stored at `YIELD` and restored on resume) — no OS thread, deterministic, safe for the raylib main thread.
-- **No cross-frame `YIELD`:** a helper with `YIELD` is itself a coroutine; so `YIELD` never runs across a normal function call.
+- **No cross-frame `YIELD`:** a helper with `YIELD` is itself a coroutine; so `YIELD` never runs across a normal function call. Called as a statement (`warten(3)`), the helper is only created and never runs -- dhrt warns about it. To pass its steps on, keep it and continue it yourself: `DIM w AS COROUTINE : w = warten(3)`, then `WHILE NOT CORO_DONE(w) : YIELD CORO_RESUME(w) : WEND`.
 - In `FUNCTION ... AS T`, `YIELD` *and* `RETURN` values are coerced to `T`. A `SUB` coroutine yields without type coercion.
 - A manual `WHILE NOT CORO_DONE(c)` loop receives the `RETURN` value on the last (finishing) `CORO_RESUME`. Give the generator a typed `RETURN` so that the assignment to a typed variable works — or use `FOR EACH`.
 - Also works in the standalone `.exe` export (same `dhrt` VM).
 
 Complete example: [examples/98_coroutines.dh](../../examples/98_coroutines.dh).
+
+## Comprehensions
+
+A comprehension builds a new sequence from another one, in one line:
+
+```basic
+DIM werte AS ARRAY OF FLOAT
+werte = [1.5, 2.5, 30.0]
+DIM doppelt AS ARRAY OF FLOAT
+doppelt = [w * 2 FOR w IN werte]            ' 3.0, 5.0, 60.0
+DIM warm AS TUPLE
+warm = [w FOR w IN werte WHERE w > 2]       ' (2.5, 30.0)
+DIM buchstaben AS TUPLE
+buchstaben = {c FOR c IN "banane"}          ' (b, a, n, e) -- each once
+DIM preise AS MAP OF FLOAT
+preise = {name: 1.5 FOR name IN ("Brot", "Milch")}
+```
+
+- `[expression FOR x IN sequence]` gives a TUPLE with one value per
+  element; `WHERE condition` lets through only what meets it. The sequence
+  may be an array, a tuple, a string (character by character), a MAP (its
+  keys) or a coroutine.
+- Assigned to an `ARRAY OF T`, the tuple becomes an array, like a literal
+  `[...]`: whole numbers are rebuilt as FLOAT, a value that does not fit
+  stops the assignment. Up to 2026.52 this said "expected ARRAY OF FLOAT,
+  got TUPLE".
+- Array commands that only read -- `ARRAY_SUM`, `ARRAY_AVG`, `ARRAY_MIN`,
+  `ARRAY_MAX`, `ARRAY_INDEXOF`, `ARRAY_MAP`, `ARRAY_FILTER`, `ARRAY_REDUCE`,
+  `ARRAY_FIND`, `ARRAY_COPY`, `JOIN$` --, take a comprehension directly:
+  `ARRAY_AVG([w FOR w IN werte WHERE w > 0])`. Commands that change an
+  array (`SORT`, `ARRAY_PUSH` ...) need a real array.
+- `{expression FOR x IN sequence}` is a set: each value only once, in the
+  order it first appeared (a TUPLE).
+- `{key: value FOR x IN sequence}` builds a MAP; the key is a string.
 
 ## Arrays
 
@@ -1553,7 +1593,8 @@ out.
 
 > **`TRY ... END TRY` with neither `CATCH` nor `FINALLY`** silently swallows an
 > error. That has always been so and stays so — but it is
-> rarely what you want.
+> rarely what you want. That is why the compiler warns about it; if you
+> really want to swallow an error, write an empty `CATCH`.
 
 ### Error code: decide without comparing texts
 

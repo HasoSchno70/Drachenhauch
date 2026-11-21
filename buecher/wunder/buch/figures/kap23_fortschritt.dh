@@ -1,0 +1,3 @@
+' Bild fuer Kapitel 23, Erweitern 2 (Loesung kap23_fortschritt).
+CHDIR("../../code/loesungen")
+IMPORT "../../code/loesungen/kap23_fortschritt.dh"

@@ -971,6 +971,12 @@ f)`, `ARRAY_MAP/FILTER/REDUCE/FIND`, `GUI_ON_CLICK` und die anderen
 `GUI_ON_*`, `TIMER_AFTER/EVERY`, `TASK_START` und jeder eigene Parameter
 `AS FUNCREF`.
 
+Steht ein FUNCREF in einem Feld eines Objekts, ruft man es wie eine
+Methode: `effekt.zug(t, dt)`; in einer Methode der eigenen Klasse genügt
+`zug(t, dt)`, wie bei jedem Feld ohne `Self.`. Eine Methode desselben
+Namens geht vor. Bis 2026.52 hieß das „Methode existiert nicht“, und das
+Feld ließ sich nur über eine lokale Variable rufen.
+
 ### Lambdas
 
 Die Schreibweise ist die von VB.NET:
@@ -1079,12 +1085,47 @@ Bei unendlichen Generatoren stattdessen manuell `CORO_RESUME`/`CORO_DONE`.
 
 **Semantik & Einschränkungen:**
 - `dhrt` suspendiert eine Coroutine via **Frame-Snapshot** (ip/locals/stack werden beim `YIELD` abgelegt und beim Resume restauriert) — kein OS-Thread, deterministisch, raylib-Main-Thread-sicher.
-- **Kein Cross-Frame-`YIELD`:** ein Helfer mit `YIELD` ist selbst eine Coroutine; `YIELD` läuft also nie über einen normalen Funktionsaufruf hinweg.
+- **Kein Cross-Frame-`YIELD`:** ein Helfer mit `YIELD` ist selbst eine Coroutine; `YIELD` läuft also nie über einen normalen Funktionsaufruf hinweg. Als Anweisung aufgerufen (`warten(3)`) entsteht der Helfer nur und läuft nie -- dhrt warnt davor. Wer seine Schritte weitergeben will, hebt ihn auf und setzt ihn selbst fort: `DIM w AS COROUTINE : w = warten(3)`, dann `WHILE NOT CORO_DONE(w) : YIELD CORO_RESUME(w) : WEND`.
 - In `FUNCTION ... AS T` werden `YIELD`- *und* `RETURN`-Werte auf `T` gecoerct. Eine `SUB`-Coroutine yieldet ohne Typ-Coercion.
 - Ein manueller `WHILE NOT CORO_DONE(c)`-Loop bekommt beim letzten (beendenden) `CORO_RESUME` den `RETURN`-Wert. Gib dem Generator einen typisierten `RETURN`, damit die Zuweisung an eine typisierte Variable klappt — oder nutze `FOR EACH`.
 - Funktioniert auch im Standalone-`.exe`-Export (gleiche `dhrt`-VM).
 
 Vollständiges Beispiel: [examples/98_coroutines.dh](../examples/98_coroutines.dh).
+
+## Comprehensions
+
+Eine Comprehension baut aus einer Folge eine neue, in einer Zeile:
+
+```basic
+DIM werte AS ARRAY OF FLOAT
+werte = [1.5, 2.5, 30.0]
+DIM doppelt AS ARRAY OF FLOAT
+doppelt = [w * 2 FOR w IN werte]            ' 3.0, 5.0, 60.0
+DIM warm AS TUPLE
+warm = [w FOR w IN werte WHERE w > 2]       ' (2.5, 30.0)
+DIM buchstaben AS TUPLE
+buchstaben = {c FOR c IN "banane"}          ' (b, a, n, e) -- jeder einmal
+DIM preise AS MAP OF FLOAT
+preise = {name: 1.5 FOR name IN ("Brot", "Milch")}
+```
+
+- `[ausdruck FOR x IN folge]` liefert ein TUPLE mit einem Wert je Element;
+  `WHERE bedingung` lässt nur durch, was sie erfüllt. Die Folge darf ein
+  Feld, ein Tupel, ein Text (Zeichen für Zeichen), eine MAP (die Schlüssel)
+  oder eine Koroutine sein.
+- An ein `ARRAY OF T` zugewiesen wird das Tupel zu einem Feld, wie ein
+  Literal `[...]`: Ganzzahlen werden an FLOAT umgebaut, ein Wert, der nicht
+  passt, bricht die Zuweisung ab. Bis 2026.52 hieß das „Erwartet ARRAY OF
+  FLOAT, erhalten TUPLE“.
+- Feld-Befehle, die nur lesen -- `ARRAY_SUM`, `ARRAY_AVG`, `ARRAY_MIN`,
+  `ARRAY_MAX`, `ARRAY_INDEXOF`, `ARRAY_MAP`, `ARRAY_FILTER`, `ARRAY_REDUCE`,
+  `ARRAY_FIND`, `ARRAY_COPY`, `JOIN$` --, nehmen eine Comprehension direkt:
+  `ARRAY_AVG([w FOR w IN werte WHERE w > 0])`. Befehle, die ein Feld
+  verändern (`SORT`, `ARRAY_PUSH` ...), brauchen ein echtes Feld.
+- `{ausdruck FOR x IN folge}` ist eine Menge: jeder Wert nur einmal, in der
+  Reihenfolge, in der er zuerst vorkam (ein TUPLE).
+- `{schluessel: wert FOR x IN folge}` baut eine MAP; der Schlüssel ist ein
+  Text.
 
 ## Arrays
 
@@ -1555,7 +1596,8 @@ nach außen.
 
 > **`TRY ... END TRY` ganz ohne `CATCH` und ohne `FINALLY`** verschluckt einen
 > Fehler stillschweigend. Das war schon immer so und bleibt so — aber es ist
-> selten das, was man will.
+> selten das, was man will. Darum warnt der Übersetzer dabei; wer einen
+> Fehler wirklich schlucken will, schreibt ein leeres `CATCH`.
 
 ### Fehler-Code: entscheiden, ohne Texte zu vergleichen
 

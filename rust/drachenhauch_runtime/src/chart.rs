@@ -828,6 +828,12 @@ impl ChartObj {
         } else {
             format!("{:.*}", n as usize, v)
         };
+        // Was zu null rundet, hat kein Vorzeichen: eine Skala von -5 bis 25
+        // trifft die Null nur fast (-1e-15) und schrieb "-0 Grad".
+        let s = match s.strip_prefix('-') {
+            Some(rest) if rest.chars().all(|c| c == '0' || c == '.') => rest.to_string(),
+            _ => s,
+        };
         let s = if self.style.f_komma { s.replace('.', ",") } else { s };
         format!("{}{}", s, self.style.einheit)
     }
@@ -3016,6 +3022,20 @@ mod tests {
         assert_eq!(c.fmt_value(1_500_000.0), "1,50M km/h");
         c.set_flag("kurz", false).unwrap();
         assert_eq!(c.fmt_value(42.25), "42,25 km/h");
+    }
+
+    #[test]
+    fn fmt_value_null_ohne_vorzeichen() {
+        let mut c = ChartObj::new(Kind::Bar, 0, 0, 100, 100);
+        c.set_str("einheit", " Grad").unwrap();
+        // Ein Skalenstrich, der die Null nur beinahe trifft.
+        assert_eq!(c.fmt_value(-4.0 + 4.0 * (1.0 - 1e-16) - 1e-15), "0 Grad");
+        assert_eq!(c.fmt_value(-0.0), "0 Grad");
+        assert_eq!(c.fmt_value(-0.4), "0 Grad");
+        assert_eq!(c.fmt_value(-0.6), "-1 Grad");
+        c.set_num("nachkomma", 2.0).unwrap();
+        assert_eq!(c.fmt_value(-0.001), "0.00 Grad");
+        assert_eq!(c.fmt_value(-0.01), "-0.01 Grad");
     }
 
     #[test]

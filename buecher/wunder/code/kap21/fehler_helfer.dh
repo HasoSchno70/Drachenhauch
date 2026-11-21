@@ -1,0 +1,19 @@
+' Kapitel 21, was schiefgehen kann: ein Helfer mit YIELD, in der Szene
+' als Anweisung aufgerufen.
+SUB warten(sekunden AS FLOAT)
+    YIELD sekunden
+END SUB
+
+FUNCTION szene() AS FLOAT
+    PRINT "Der Drache kommt."
+    YIELD 1
+    PRINT "Der Drache wartet."
+    warten(2)
+    PRINT "Der Drache spricht."
+    RETURN 0
+END FUNCTION
+
+DIM c AS COROUTINE : c = szene()
+WHILE NOT CORO_DONE(c)
+    PRINT "-> warten "; CORO_RESUME(c)
+WEND
