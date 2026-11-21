@@ -1,0 +1,11 @@
+' Kapitel 23, Schritt 2 -- erst ohne Netz: jede Datei laden, die wie
+' ein Bild heisst, und sagen, wie gross es ist.
+DIM dateien AS ARRAY OF STRING : dateien = DIRLIST("bilder")
+SORT(dateien)
+DIM datei AS STRING
+FOR EACH datei IN dateien
+    IF RIGHT$(datei, 4) <> ".png" THEN CONTINUE
+    DIM bild AS IMAGE : bild = LOADIMAGE("bilder/" + datei)
+    PRINT f"{datei}: {IMAGE_WIDTH(bild)} x {IMAGE_HEIGHT(bild)}"
+NEXT
+PRINT "fertig"

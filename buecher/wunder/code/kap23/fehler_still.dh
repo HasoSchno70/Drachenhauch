@@ -1,0 +1,10 @@
+' Kapitel 23, was schiefgehen kann: ein TRY ohne CATCH. Es faengt den
+' Fehler -- und dann ist er weg, ohne eine Spur.
+DIM teiler AS ARRAY OF INTEGER : teiler = [2, 0, 5]
+DIM t AS INTEGER
+FOR EACH t IN teiler
+    TRY
+        PRINT 100 \ t
+    END TRY
+NEXT
+PRINT "fertig"

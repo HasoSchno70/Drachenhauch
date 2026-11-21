@@ -1,0 +1,179 @@
+' Loesung zu Kapitel 23, Erfinden: eine Diaschau, die ihren Ordner
+' beobachtet. Alle zwei Sekunden sieht sie nach; neue Bilder kommen
+' dazu, geaenderte werden neu geladen, und eine kaputte Datei wird noch
+' einmal versucht, sobald sich etwas an ihr aendert. Dazu ein eigener
+' Fehler: Bilder unter 64 Punkten Breite sind zu klein.
+' Die Stellen, die neu sind, stehen zwischen >>> und <<<.
+CONST BREITE = 800
+CONST HOEHE = 500
+CONST DAUER = 4.0
+CONST BLENDE = 0.8
+
+' Die Endung einer Datei, klein geschrieben: "Bild.PNG" -> "png".
+FUNCTION endung$(datei AS STRING) AS STRING
+    RETURN LOWER$(MID$(datei, INSTRREV(datei, ".") + 1))
+END FUNCTION
+
+' >>> neu
+' Ein Bild laden -- und pruefen, was LOADIMAGE nicht prueft: Unter 64
+' Punkten Breite ist es fuer die Diaschau zu klein. Das ist unser
+' eigener Fehler, mit eigenem Code.
+FUNCTION bild_laden(pfad AS STRING) AS IMAGE
+    DIM b AS IMAGE : b = LOADIMAGE(pfad)
+    IF IMAGE_WIDTH(b) < 64 THEN
+        THROW "KLEIN", f"{pfad}: nur {IMAGE_WIDTH(b)} Punkte breit"
+    END IF
+    RETURN b
+END FUNCTION
+' <<< neu
+
+' Die Titel aus einer Datei: je Zeile "datei;titel". Eine Zeile ohne
+' Semikolon ist ein Fehler in der Datei -- den melden wir mit eigenem
+' Code und eigener Zeilennummer, statt still weiterzulesen.
+FUNCTION titel_lesen(pfad AS STRING) AS MAP OF STRING
+    DIM titel AS MAP OF STRING
+    DIM f AS FILE : f = OPENFILE(pfad, "r")
+    TRY
+        DIM nr AS INTEGER
+        WHILE NOT EOF(f)
+            DIM zeile AS STRING : zeile = READLINE(f)
+            nr = nr + 1
+            DIM trenner AS INTEGER : trenner = INSTR(zeile, ";")
+            IF trenner < 0 THEN
+                THROW "TITEL", f"{pfad}, Zeile {nr}: kein Semikolon"
+            END IF
+            titel[LEFT$(zeile, trenner)] = MID$(zeile, trenner + 1)
+        WEND
+    FINALLY
+        ' Zu machen muss die Datei immer, auch nach dem THROW.
+        CLOSEFILE(f)
+    END TRY
+    RETURN titel
+END FUNCTION
+
+' Die Bilder liegen beim Kapitel.
+CHDIR("../kap23")
+SCREEN(BREITE, HOEHE, "Diaschau")
+TEXT_SIZE(16)
+
+' Was sich laden liess, und was nicht.
+DIM bilder AS ARRAY OF IMAGE
+DIM namen AS ARRAY OF STRING
+DIM probleme AS ARRAY OF STRING
+' >>> neu
+' Je Datei hoechstens ein offenes Problem, und was wir zuletzt von
+' ihr gesehen haben.
+DIM offen AS MAP OF STRING
+DIM gesehen AS MAP OF STRING
+' <<< neu
+
+' >>> neu
+' Jede Bilddatei laden, die neu ist oder sich geaendert hat -- an Zeit
+' und Groesse zu erkennen. Ein Problem verschwindet, sobald sich die
+' Datei laden laesst.
+SUB nachsehen()
+    DIM dateien AS ARRAY OF STRING : dateien = DIRLIST("bilder")
+    SORT(dateien)
+    DIM datei AS STRING
+    FOR EACH datei IN dateien
+        DIM art AS STRING : art = endung$(datei)
+        IF art <> "png" AND art <> "jpg" THEN CONTINUE
+        DIM pfad AS STRING : pfad = "bilder/" + datei
+        DIM stand AS STRING
+        stand = f"{FILE_TIME(pfad)} {FILE_SIZE(pfad)}"
+        IF MAP_GET_OR(gesehen, datei, "") = stand THEN CONTINUE
+        gesehen[datei] = stand
+        TRY
+            DIM b AS IMAGE : b = bild_laden(pfad)
+            DIM k AS INTEGER : k = ARRAY_INDEXOF(namen, datei)
+            IF k >= 0 THEN
+                bilder[k] = b
+            ELSE
+                ARRAY_PUSH(bilder, b)
+                ARRAY_PUSH(namen, datei)
+            END IF
+            MAP_REMOVE(offen, datei)
+        CATCH fehler
+            offen[datei] = fehler
+        END TRY
+    NEXT
+END SUB
+nachsehen()
+DIM blick AS FLOAT
+' <<< neu
+
+' Die Titel sind freiwillig: Fehlt die Datei, ist das kein Fehler -- das
+' fragen wir vorher. Ist sie kaputt, landet das bei den Problemen.
+DIM titel AS MAP OF STRING
+IF FILEEXISTS("bilder/titel.txt") THEN
+    TRY
+        titel = titel_lesen("bilder/titel.txt")
+    CATCH fehler
+        IF ERROR_CODE$() <> "TITEL" THEN THROW fehler
+        ' >>> neu
+        offen["titel.txt"] = fehler
+        ' <<< neu
+    END TRY
+END IF
+
+DIM nr AS INTEGER
+DIM zeit AS FLOAT
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
+    ' >>> neu
+    ' Alle zwei Sekunden in den Ordner sehen.
+    blick = blick + DELTA()
+    IF blick > 2 THEN
+        nachsehen()
+        blick = 0
+    END IF
+    ' <<< neu
+    CLS(RGB(16, 16, 22))
+    IF LEN(bilder) = 0 THEN
+        ' Ohne ein einziges Bild gibt es nichts zu zeigen -- und auch
+        ' kein bilder[0]. Diesen Fehler fangen wir nicht, wir vermeiden
+        ' ihn.
+        TEXT(40, 40, "Keine Bilder in bilder/", RGB(255, 255, 255))
+    ELSE
+        zeit = zeit + DELTA()
+        IF KEY_HIT(KEY_RIGHT) THEN zeit = DAUER
+        IF KEY_HIT(KEY_LEFT) THEN
+            nr = (nr + LEN(bilder) - 1) MOD LEN(bilder)
+            zeit = 0
+        END IF
+        IF zeit >= DAUER THEN
+            nr = (nr + 1) MOD LEN(bilder)
+            zeit = 0
+        END IF
+        ' Das Bild, und in der letzten Weile das naechste darueber,
+        ' immer weniger durchsichtig.
+        DRAWIMAGE(bilder[nr], 80, 16)
+        IF zeit > DAUER - BLENDE THEN
+            DIM deck AS FLOAT : deck = (zeit - DAUER + BLENDE) / BLENDE
+            DIM dann AS INTEGER : dann = (nr + 1) MOD LEN(bilder)
+            DRAWIMAGE(bilder[dann], 80, 16, -1, -1, 0, _
+                      RGBA(255, 255, 255, INT(deck * 255)))
+        END IF
+        TEXT(80, 426, MAP_GET_OR(titel, namen[nr], namen[nr]), _
+             RGB(255, 255, 255))
+        DIM seite AS STRING : seite = f"{nr + 1} / {LEN(bilder)}"
+        TEXT(720 - TEXT_WIDTH(seite), 426, seite, _
+             RGBA(255, 255, 255, 140))
+    END IF
+    ' >>> neu
+    ' Die Liste unten ist, was gerade offen ist.
+    probleme = MAP_VALUES(offen)
+    ' <<< neu
+    ' Unten, klein: was nicht ging. Platz ist fuer vier Zeilen; sind es
+    ' mehr, sagt die vierte, wie viele noch fehlen.
+    TEXT_SIZE(12)
+    DIM k AS INTEGER
+    FOR k = 0 TO MIN(LEN(probleme), 4) - 1
+        DIM zeile AS STRING : zeile = probleme[k]
+        IF k = 3 AND LEN(probleme) > 4 THEN
+            zeile = f"... und {LEN(probleme) - 3} weitere"
+        END IF
+        TEXT(80, 448 + k * 13, zeile, RGBA(255, 150, 120, 200))
+    NEXT
+    TEXT_SIZE(16)
+    FLIP()
+WEND

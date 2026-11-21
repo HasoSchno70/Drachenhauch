@@ -1,0 +1,79 @@
+' Kapitel 23, Schritt 1 -- ein Ordner voller Bilder fuer die Diaschau:
+' sechs Landschaften zu verschiedenen Tageszeiten, gemalt in Bilder
+' statt auf den Bildschirm, und eine Datei mit ihren Titeln. Dazu drei
+' Dateien, die heissen wie Bilder, aber keine sind -- so etwas liegt in
+' echten Ordnern auch.
+IMPORT "imgfx"
+RANDOMIZE(23)
+CONST BREITE = 640
+CONST HOEHE = 400
+
+' Eine Bergkette als Vieleck: alle 40 Punkte ein Gipfel um die Hoehe
+' y, unten bis zum Bildrand geschlossen.
+SUB berge(bild AS IMAGE, y AS INTEGER, zacken AS INTEGER, _
+          farbe AS INTEGER)
+    DIM xs AS ARRAY OF FLOAT
+    DIM ys AS ARRAY OF FLOAT
+    ARRAY_PUSH(xs, 0)
+    ARRAY_PUSH(ys, HOEHE)
+    DIM x AS INTEGER
+    FOR x = 0 TO BREITE STEP 40
+        ARRAY_PUSH(xs, x)
+        ARRAY_PUSH(ys, y - RND() * zacken)
+    NEXT
+    ARRAY_PUSH(xs, BREITE)
+    ARRAY_PUSH(ys, HOEHE)
+    IMAGE_FILL_POLY(bild, xs, ys, farbe)
+END SUB
+
+' Eine Landschaft: der Himmel als Verlauf, eine Sonne oder ein Mond bei
+' (lx, ly), davor zwei Bergketten, die hintere heller.
+SUB landschaft(name AS STRING, oben AS INTEGER, unten AS INTEGER, _
+               licht AS INTEGER, lx AS INTEGER, ly AS INTEGER, _
+               fern AS INTEGER, nah AS INTEGER)
+    DIM bild AS IMAGE : bild = IMAGE_NEW(BREITE, HOEHE)
+    IMAGE_GRADIENT(bild, 0, 0, BREITE, HOEHE, oben, unten)
+    IMAGE_FILL_ELLIPSE(bild, lx, ly, 34, 34, licht)
+    berge(bild, 260, 90, fern)
+    berge(bild, 330, 60, nah)
+    IMAGE_SAVE(bild, "bilder/" + name + ".png")
+    IMAGE_FREE(bild)
+END SUB
+
+IF NOT DIREXISTS("bilder") THEN MKDIR("bilder")
+landschaft("1_morgen", RGB(120, 140, 200), RGB(250, 190, 150), _
+           RGB(255, 240, 200), 150, 165, RGB(150, 130, 170), _
+           RGB(90, 80, 120))
+landschaft("2_mittag", RGB(70, 140, 230), RGB(180, 220, 250), _
+           RGB(255, 250, 220), 420, 70, RGB(120, 160, 150), _
+           RGB(60, 120, 80))
+landschaft("3_abend", RGB(60, 40, 110), RGB(250, 120, 70), _
+           RGB(255, 200, 120), 470, 160, RGB(120, 60, 90), _
+           RGB(60, 30, 60))
+landschaft("4_nacht", RGB(5, 8, 30), RGB(30, 40, 80), _
+           RGB(230, 230, 210), 500, 80, RGB(30, 40, 70), _
+           RGB(15, 20, 40))
+landschaft("5_nebel", RGB(170, 175, 185), RGB(220, 222, 225), _
+           RGB(240, 240, 235), 200, 120, RGB(185, 188, 195), _
+           RGB(150, 155, 165))
+landschaft("6_schnee", RGB(150, 190, 230), RGB(235, 240, 250), _
+           RGB(255, 255, 240), 320, 90, RGB(220, 230, 240), _
+           RGB(250, 252, 255))
+
+' Die Titel: je Zeile Dateiname und Titel, getrennt durch ein Semikolon.
+FILE_WRITE("bilder/titel.txt", "1_morgen.png;Morgen in den Bergen" _
+           + CHR$(10) + "2_mittag.png;Mittag" + CHR$(10) _
+           + "3_abend.png;Abendrot" + CHR$(10) _
+           + "4_nacht.png;Vollmond" + CHR$(10) _
+           + "5_nebel.png;Nebel im Tal" + CHR$(10) _
+           + "6_schnee.png;Der erste Schnee" + CHR$(10))
+
+' Drei Dateien, die nur so tun: Text, nichts, und ein halbes Bild --
+' wie nach einem abgebrochenen Herunterladen.
+FILE_WRITE("bilder/notiz.png", "Hier fehlt noch ein Bild vom See.")
+FILE_WRITE("bilder/leer.png", "")
+DIM ganz AS BUFFER : ganz = FILE_READ_BYTES("bilder/2_mittag.png")
+FILE_WRITE_BYTES("bilder/halb.png", _
+                 BUFFER_SLICE(ganz, 0, BUFFER_LEN(ganz) \ 2))
+DIM alle AS ARRAY OF STRING : alle = DIRLIST("bilder")
+PRINT f"{LEN(alle)} Dateien in bilder/"

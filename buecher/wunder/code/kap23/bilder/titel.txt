@@ -1,0 +1,6 @@
+1_morgen.png;Morgen in den Bergen
+2_mittag.png;Mittag
+3_abend.png;Abendrot
+4_nacht.png;Vollmond
+5_nebel.png;Nebel im Tal
+6_schnee.png;Der erste Schnee

@@ -1,0 +1,148 @@
+' Loesung zu Kapitel 23, Erweitern 2: ein Fortschrittsbalken. Geladen
+' wird in der Hauptschleife, eine Datei je Bild, damit das Fenster
+' dabei zeigen kann, wie weit es ist.
+' Die Stellen, die neu sind, stehen zwischen >>> und <<<.
+CONST BREITE = 800
+CONST HOEHE = 500
+CONST DAUER = 4.0
+CONST BLENDE = 0.8
+
+' Die Endung einer Datei, klein geschrieben: "Bild.PNG" -> "png".
+FUNCTION endung$(datei AS STRING) AS STRING
+    RETURN LOWER$(MID$(datei, INSTRREV(datei, ".") + 1))
+END FUNCTION
+
+' Die Titel aus einer Datei: je Zeile "datei;titel". Eine Zeile ohne
+' Semikolon ist ein Fehler in der Datei -- den melden wir mit eigenem
+' Code und eigener Zeilennummer, statt still weiterzulesen.
+FUNCTION titel_lesen(pfad AS STRING) AS MAP OF STRING
+    DIM titel AS MAP OF STRING
+    DIM f AS FILE : f = OPENFILE(pfad, "r")
+    TRY
+        DIM nr AS INTEGER
+        WHILE NOT EOF(f)
+            DIM zeile AS STRING : zeile = READLINE(f)
+            nr = nr + 1
+            DIM trenner AS INTEGER : trenner = INSTR(zeile, ";")
+            IF trenner < 0 THEN
+                THROW "TITEL", f"{pfad}, Zeile {nr}: kein Semikolon"
+            END IF
+            titel[LEFT$(zeile, trenner)] = MID$(zeile, trenner + 1)
+        WEND
+    FINALLY
+        ' Zu machen muss die Datei immer, auch nach dem THROW.
+        CLOSEFILE(f)
+    END TRY
+    RETURN titel
+END FUNCTION
+
+' Die Bilder liegen beim Kapitel.
+CHDIR("../kap23")
+SCREEN(BREITE, HOEHE, "Diaschau")
+TEXT_SIZE(16)
+
+' Was sich laden liess, und was nicht.
+DIM bilder AS ARRAY OF IMAGE
+DIM namen AS ARRAY OF STRING
+DIM probleme AS ARRAY OF STRING
+
+' Jede Datei mit der Endung eines Bilds versuchen. Was dabei schiefgeht,
+' kommt von draussen -- aus der Datei, nicht aus dem Programm. Also
+' fangen wir es, schreiben es auf und machen mit der naechsten weiter.
+DIM dateien AS ARRAY OF STRING : dateien = DIRLIST("bilder")
+SORT(dateien)
+' >>> neu
+' Hier nur die Liste; geladen wird in der Schleife.
+DIM zu_laden AS ARRAY OF STRING
+DIM datei AS STRING
+FOR EACH datei IN dateien
+    IF endung$(datei) = "png" OR endung$(datei) = "jpg" THEN
+        ARRAY_PUSH(zu_laden, datei)
+    END IF
+NEXT
+DIM geladen AS INTEGER
+' <<< neu
+
+' Die Titel sind freiwillig: Fehlt die Datei, ist das kein Fehler -- das
+' fragen wir vorher. Ist sie kaputt, landet das bei den Problemen.
+DIM titel AS MAP OF STRING
+IF FILEEXISTS("bilder/titel.txt") THEN
+    TRY
+        titel = titel_lesen("bilder/titel.txt")
+    CATCH fehler
+        IF ERROR_CODE$() <> "TITEL" THEN THROW fehler
+        ARRAY_PUSH(probleme, fehler)
+    END TRY
+END IF
+
+DIM nr AS INTEGER
+DIM zeit AS FLOAT
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
+    CLS(RGB(16, 16, 22))
+    ' >>> neu
+    ' Solange noch Dateien fehlen: eine laden, den Balken zeichnen, und
+    ' gleich zum naechsten Bild.
+    IF geladen < LEN(zu_laden) THEN
+        DIM jetzt AS STRING : jetzt = zu_laden[geladen]
+        TRY
+            ARRAY_PUSH(bilder, LOADIMAGE("bilder/" + jetzt))
+            ARRAY_PUSH(namen, jetzt)
+        CATCH fehler
+            ARRAY_PUSH(probleme, fehler)
+        END TRY
+        geladen = geladen + 1
+        DIM anteil AS FLOAT : anteil = geladen / LEN(zu_laden)
+        TEXT(80, 216, f"lade {jetzt}", RGBA(255, 255, 255, 180))
+        BOX(80, 244, 720, 260, RGBA(255, 255, 255, 30))
+        BOX(80, 244, 80 + 640 * anteil, 260, RGB(120, 180, 255))
+        TEXT(80, 270, f"{geladen} von {LEN(zu_laden)}", _
+             RGBA(255, 255, 255, 120))
+        FLIP()
+        CONTINUE
+    END IF
+    ' <<< neu
+    IF LEN(bilder) = 0 THEN
+        ' Ohne ein einziges Bild gibt es nichts zu zeigen -- und auch
+        ' kein bilder[0]. Diesen Fehler fangen wir nicht, wir vermeiden
+        ' ihn.
+        TEXT(40, 40, "Keine Bilder in bilder/", RGB(255, 255, 255))
+    ELSE
+        zeit = zeit + DELTA()
+        IF KEY_HIT(KEY_RIGHT) THEN zeit = DAUER
+        IF KEY_HIT(KEY_LEFT) THEN
+            nr = (nr + LEN(bilder) - 1) MOD LEN(bilder)
+            zeit = 0
+        END IF
+        IF zeit >= DAUER THEN
+            nr = (nr + 1) MOD LEN(bilder)
+            zeit = 0
+        END IF
+        ' Das Bild, und in der letzten Weile das naechste darueber,
+        ' immer weniger durchsichtig.
+        DRAWIMAGE(bilder[nr], 80, 16)
+        IF zeit > DAUER - BLENDE THEN
+            DIM deck AS FLOAT : deck = (zeit - DAUER + BLENDE) / BLENDE
+            DIM dann AS INTEGER : dann = (nr + 1) MOD LEN(bilder)
+            DRAWIMAGE(bilder[dann], 80, 16, -1, -1, 0, _
+                      RGBA(255, 255, 255, INT(deck * 255)))
+        END IF
+        TEXT(80, 426, MAP_GET_OR(titel, namen[nr], namen[nr]), _
+             RGB(255, 255, 255))
+        DIM seite AS STRING : seite = f"{nr + 1} / {LEN(bilder)}"
+        TEXT(720 - TEXT_WIDTH(seite), 426, seite, _
+             RGBA(255, 255, 255, 140))
+    END IF
+    ' Unten, klein: was nicht ging. Platz ist fuer vier Zeilen; sind es
+    ' mehr, sagt die vierte, wie viele noch fehlen.
+    TEXT_SIZE(12)
+    DIM k AS INTEGER
+    FOR k = 0 TO MIN(LEN(probleme), 4) - 1
+        DIM zeile AS STRING : zeile = probleme[k]
+        IF k = 3 AND LEN(probleme) > 4 THEN
+            zeile = f"... und {LEN(probleme) - 3} weitere"
+        END IF
+        TEXT(80, 448 + k * 13, zeile, RGBA(255, 150, 120, 200))
+    NEXT
+    TEXT_SIZE(16)
+    FLIP()
+WEND

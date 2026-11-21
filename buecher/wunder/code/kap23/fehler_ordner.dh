@@ -1,0 +1,10 @@
+' Kapitel 23, was schiefgehen kann: ein Tippfehler in einem Zweig, der
+' fast nie laeuft. Ein Probelauf findet ihn nicht -- das Uebersetzen
+' schon.
+DIM ordner AS STRING : ordner = "bilder"
+DIM dateien AS ARRAY OF STRING : dateien = DIRLIST(ordner)
+IF LEN(dateien) = 0 THEN
+    PRINT "Keine Bilder in " + oredner
+ELSE
+    PRINT f"{LEN(dateien)} Dateien in {ordner}"
+END IF

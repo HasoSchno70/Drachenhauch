@@ -1,0 +1,3 @@
+' Bild fuer Kapitel 23: die Diaschau mit drei kaputten Dateien.
+CHDIR("../../code/kap23")
+IMPORT "../../code/kap23/3_diaschau.dh"
