@@ -4027,7 +4027,7 @@ impl<'p> Vm<'p> {
                     let t = vm_pop(stack)?;
                     if let Value::Tuple(items) = t {
                         if items.len() != len {
-                            return Err(format!("Tupel-Destructuring: {} Ziele, aber Tupel hat {} Element(e)", len, items.len()));
+                            return Err(format!("Tupel entpacken: links stehen {} Namen, das Tupel hat aber {} Werte", len, items.len()));
                         }
                         for v in items.iter().rev() { stack.push(v.clone()); }
                     } else {
