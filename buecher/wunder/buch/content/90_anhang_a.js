@@ -1002,11 +1002,11 @@ module.exports = (H) => [
 
   H.h3("Drehen 1"),
 
-  H.p("Aus wenigen großen Bergen werden viele kleine, spitze, dicht an dicht — ein Hochgebirge. MASSSTAB bestimmt, wie weit man im Rauschen pro Kartenpunkt weitergeht: Größere Schritte heißen, dass mehr Rauschen auf dieselbe Karte passt, also mehr Berge auf demselben Land. Weil die Karte aber gleich viele Punkte hat, werden die Berge eckiger; bei 0.1 wird das Land zu einem Feld aus Zacken."),
+  H.p("Aus wenigen großen Bergen werden viele kleine, spitze, dicht an dicht — ein Hochgebirge. MASSSTAB bestimmt, wie weit man im Rauschen pro Kartenpunkt weitergeht: Größere Schritte heißen, dass mehr Rauschen auf dieselbe Karte passt, also mehr Berge auf demselben Land. Weil die Karte aber gleich viele Punkte hat, werden die Berge dabei eckiger."),
 
   H.h3("Drehen 2"),
 
-  H.p("Fast alles liegt jetzt hoch: eine breite, graue Felslandschaft mit runden Kuppen, und der Wald wächst nur noch in den wenigen Senken. Das Quadrat machte kleine Höhen kleiner und ließ große groß — ohne es fehlen die flachen Täler. Mit t * t * t würde es noch alpiner: noch breitere Täler, noch einzelnere Gipfel."),
+  H.p("Fast alles liegt jetzt hoch: eine breite, graue Felslandschaft mit runden Kuppen, und der Wald wächst nur noch in den wenigen Senken. Das Quadrat machte kleine Höhen kleiner und ließ große groß — ohne es fehlen die flachen Täler."),
 
   H.h3("Drehen 3"),
 
