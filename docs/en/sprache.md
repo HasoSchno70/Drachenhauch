@@ -1114,6 +1114,11 @@ preise = {name: 1.5 FOR name IN ("Brot", "Milch")}
   `[...]`: whole numbers are rebuilt as FLOAT, a value that does not fit
   stops the assignment. Up to 2026.52 this said "expected ARRAY OF FLOAT,
   got TUPLE".
+- Array commands that only read -- `ARRAY_SUM`, `ARRAY_AVG`, `ARRAY_MIN`,
+  `ARRAY_MAX`, `ARRAY_INDEXOF`, `ARRAY_MAP`, `ARRAY_FILTER`, `ARRAY_REDUCE`,
+  `ARRAY_FIND`, `ARRAY_COPY`, `JOIN$` --, take a comprehension directly:
+  `ARRAY_AVG([w FOR w IN werte WHERE w > 0])`. Commands that change an
+  array (`SORT`, `ARRAY_PUSH` ...) need a real array.
 - `{expression FOR x IN sequence}` is a set: each value only once, in the
   order it first appeared (a TUPLE).
 - `{key: value FOR x IN sequence}` builds a MAP; the key is a string.

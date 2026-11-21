@@ -1370,3 +1370,15 @@ Tupel an einem Feld durch, an einer MAP nicht. Das Handbuch hatte keinen
 Abschnitt zu Comprehensions; jetzt steht er vor "Arrays".
 `comprehensions.dhtest` (ein Fall); Gegenprobe: ohne den Umbau faellt er
 an der ersten Zuweisung.
+
+Gleich danach: `ARRAY_AVG([hoch[i] FOR i IN ... WHERE ...])` hiess
+"ARRAY_AVG erwartet ARRAY" -- dieselbe Ursache, die Comprehension ist ein
+TUPLE. Die Feld-Befehle holen ihr Argument je fuer sich, ohne gemeinsame
+Stelle; die Comprehension auf ARRAY umzustellen haette bestehende
+Programme veraendert (Ausgabe, Entpacken). Stattdessen baut
+`Vm::builtin_rufen` ein TUPLE als erstes Argument zu einem frischen Feld
+um, aber nur fuer die Befehle, die lesen (`tupel_fuer_feldbefehl`: SUM, AVG,
+MIN, MAX, INDEXOF, MAP, FILTER, REDUCE, FIND, COPY, JOIN$). SORT und die
+anderen, die ein Feld veraendern, bleiben beim Fehler. Der Weg kostet je
+Aufruf einen Blick auf das erste Argument. `comprehensions.dhtest` (ein
+Fall); Gegenprobe: ohne den Umbau faellt er an ARRAY_AVG.

@@ -1332,3 +1332,21 @@ pub(super) fn feld_rufbar(rc: &Rc<std::cell::RefCell<Instance>>, name: &str) -> 
         _ => None,
     }
 }
+
+/// Ein Feld-Befehl, der nur liest, bekommt ein TUPLE: daraus ein frisches
+/// Feld bauen (wie `[...]`). Eine Comprehension `[x FOR x IN ...]` ist ein
+/// TUPLE, sieht aber aus wie ein Feld; `ARRAY_AVG([...])` hiess bis dahin
+/// "erwartet ARRAY" (Buch "Kleine Wunder", Kapitel 22). Befehle, die ein
+/// Feld veraendern (SORT, ARRAY_PUSH ...), bleiben beim Fehler -- ein Tupel
+/// laesst sich nicht veraendern. `None`: nichts umzubauen.
+#[cold]
+pub(super) fn tupel_fuer_feldbefehl(name: &str, a: &[Value]) -> Option<Vec<Value>> {
+    let liest = matches!(name, "array_sum" | "array_avg" | "array_min" | "array_max"
+        | "array_indexof" | "join" | "join$" | "array_map" | "array_filter"
+        | "array_reduce" | "array_find" | "array_copy");
+    let Some(Value::Tuple(t)) = a.first() else { return None };
+    if !liest { return None; }
+    let mut neu = a.to_vec();
+    neu[0] = array_literal(t.as_ref().clone());
+    Some(neu)
+}

@@ -2349,6 +2349,9 @@ impl<'p> Vm<'p> {
     }
 
     pub(crate) fn builtin_rufen(&mut self, name: &str, a: &[Value], merk: &std::cell::Cell<u8>) -> R<Value> {
+        if let Some(Value::Tuple(_)) = a.first() {
+            if let Some(neu) = tupel_fuer_feldbefehl(name, a) { return self.builtin_rufen(name, &neu, merk); }
+        }
         let f = merk.get();
         if f != 0 {
             if let Some(v) = self.familie_rufen(f, name, a)? { return Ok(v); }

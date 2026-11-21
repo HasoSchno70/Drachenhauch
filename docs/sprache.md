@@ -1117,6 +1117,11 @@ preise = {name: 1.5 FOR name IN ("Brot", "Milch")}
   Literal `[...]`: Ganzzahlen werden an FLOAT umgebaut, ein Wert, der nicht
   passt, bricht die Zuweisung ab. Bis 2026.52 hieß das „Erwartet ARRAY OF
   FLOAT, erhalten TUPLE“.
+- Feld-Befehle, die nur lesen -- `ARRAY_SUM`, `ARRAY_AVG`, `ARRAY_MIN`,
+  `ARRAY_MAX`, `ARRAY_INDEXOF`, `ARRAY_MAP`, `ARRAY_FILTER`, `ARRAY_REDUCE`,
+  `ARRAY_FIND`, `ARRAY_COPY`, `JOIN$` --, nehmen eine Comprehension direkt:
+  `ARRAY_AVG([w FOR w IN werte WHERE w > 0])`. Befehle, die ein Feld
+  verändern (`SORT`, `ARRAY_PUSH` ...), brauchen ein echtes Feld.
 - `{ausdruck FOR x IN folge}` ist eine Menge: jeder Wert nur einmal, in der
   Reihenfolge, in der er zuerst vorkam (ein TUPLE).
 - `{schluessel: wert FOR x IN folge}` baut eine MAP; der Schlüssel ist ein

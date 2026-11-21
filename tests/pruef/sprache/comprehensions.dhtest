@@ -266,3 +266,27 @@ END TRY
 1.0
 2
 Zuweisung an 'zahlen': Erwartet ARRAY OF INTEGER, erhalten ARRAY OF FLOAT
+
+=== lesende feld-befehle nehmen eine comprehension
+' Eine Comprehension ist ein TUPLE; `ARRAY_AVG([...])` hiess "erwartet
+' ARRAY" (Buch "Kleine Wunder", Kapitel 22). Befehle, die nur lesen,
+' bauen jetzt ein Feld daraus; SORT veraendert und bleibt beim Fehler.
+DIM werte AS ARRAY OF FLOAT
+werte = [3.0, 1.5, 2.5, 9.0]
+PRINT ARRAY_AVG([w FOR w IN werte WHERE w < 5])
+PRINT ARRAY_MAX([w * 2 FOR w IN werte])
+PRINT ARRAY_SUM([w FOR w IN werte WHERE w > 2])
+PRINT JOIN$([STR$(w) FOR w IN werte WHERE w < 3], " ")
+PRINT LEN(ARRAY_FILTER([w FOR w IN werte], FUNCTION(x) x > 2))
+TRY
+    SORT([w FOR w IN werte])
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+2.3333333333333335
+18.0
+14.5
+1.5 2.5
+3
+SORT erwartet ARRAY
