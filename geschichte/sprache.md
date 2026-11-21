@@ -1295,3 +1295,20 @@ sagte es so, und das Programm brauchte eine Zeile `AUDIO_BUS_VOLUME("sfx",
 hat, bekommt den festen Wert. `audio_modulators.dhtest` (ein Fall, ein
 Tweener auf dem leisen Ende statt eines LFO, damit es nicht von der Zeit
 abhaengt); Gegenprobe: ohne das Zurueckschreiben bleibt der Pegel bei 0.08.
+
+Kapitel 19 (Ein Bild, das zuhoert) glaettet ein Spektrum ueber die Zeit und
+erklaert, warum man dabei die Uhr fragt und nicht die Bilder zaehlt. Beim
+Messen zeigte sich, dass `AUDIO_FFT` selbst Bilder zaehlt: Jedes Band fiel
+je AUFRUF auf 80 %, die Verstaerkung auf 99,5 %. 50 ms nach einem Ton
+stand ein Band alle 4 ms gefragt bei 0.03, alle 16 ms bei 0.33 -- ein
+Visualisierer fiel auf einem 144-Hz-Schirm gut doppelt so schnell, und
+wer zwei Felder je Bild fuellte, sah sie halb so lange. Jetzt rechnet
+`baender_rechnen` mit der Zeit seit dem letzten Aufruf (`audio::vergangen`,
+fuer `AUDIO_FFT` und `MIC_FFT` je eine eigene Uhr): bei 60 Aufrufen je
+Sekunde wie bisher. Der Fall "derselbe klang zweimal geplant" in
+`audio_planen.dhtest` hatte sich darauf verlassen -- er fragte alle 4 ms
+und erwartete zwischen zwei Toenen eine Summe unter 0.05; nach der Uhr
+bleibt sie bei 0.18, seine Schwellen sind jetzt 1.5 und 0.5. Dazu ein
+Fall, der beide Abfrageraten vergleicht; Gegenprobe: mit Abfall je
+Aufruf faellt genau er. Das Handbuch hatte fuer `AUDIO_FFT` keine Zeile;
+jetzt steht dort, was das Feld enthaelt.

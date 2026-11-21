@@ -571,7 +571,16 @@ fn fft(re: &mut [f32], im: &mut [f32]) {
 /// logarithmisch verteilte Band-Pegel 0..1, mit Nachleuchten (`baender`)
 /// und selbst nachgefuehrter Verstaerkung (`agc`). Eine Rechnung fuer
 /// AUDIO_FFT (der Mischer) und MIC_FFT (das Mikrofon).
-pub(crate) fn baender_rechnen(proben: &[f32], baender: &mut Vec<f32>, agc: &mut f32, out: &mut [f32]) {
+///
+/// `dt` ist die Zeit seit dem letzten Aufruf (`vergangen`): Nachleuchten
+/// und Verstaerkung klingen nach der Uhr ab, wie bisher bei 60 Aufrufen
+/// je Sekunde. Bis 2026.52 klangen sie je AUFRUF ab -- auf einem 144-Hz-
+/// Schirm fiel ein Spektrum gut doppelt so schnell, und wer zweimal je
+/// Bild fragte, sah es halb so lange (Buch "Kleine Wunder", Kapitel 19:
+/// alle 4 ms gefragt 0.03, alle 16 ms 0.33, 50 ms nach dem Ton).
+pub(crate) fn baender_rechnen(proben: &[f32], baender: &mut Vec<f32>, agc: &mut f32, dt: f32,
+                              out: &mut [f32]) {
+    let schritte = (dt * 60.0).clamp(0.0, 60.0);
     let b = out.len();
     if b == 0 || proben.len() < FFT_N { return; }
     if baender.len() != b { *baender = vec![0.0; b]; }
@@ -596,12 +605,22 @@ pub(crate) fn baender_rechnen(proben: &[f32], baender: &mut Vec<f32>, agc: &mut 
         raw[j] = sum / (hi - lo) as f32;
         if raw[j] > framemax { framemax = raw[j]; }
     }
-    *agc = (*agc * 0.995).max(framemax).max(1e-4);
+    *agc = (*agc * 0.995f32.powf(schritte)).max(framemax).max(1e-4);
+    let fall = 0.80f32.powf(schritte);
     for j in 0..b {
         let norm = (raw[j] / *agc).clamp(0.0, 1.0).sqrt();
-        baender[j] = norm.max(baender[j] * 0.80);
+        baender[j] = norm.max(baender[j] * fall);
         out[j] = baender[j];
     }
+}
+
+/// Sekunden seit dem letzten Aufruf mit derselben Uhr (`zuletzt`), und die
+/// Uhr weiterstellen. Der erste Aufruf zaehlt als ein Bild (1/60 s).
+pub(crate) fn vergangen(zuletzt: &mut Option<std::time::Instant>) -> f32 {
+    let jetzt = std::time::Instant::now();
+    let dt = zuletzt.map(|t| jetzt.duration_since(t).as_secs_f32()).unwrap_or(1.0 / 60.0);
+    *zuletzt = Some(jetzt);
+    dt
 }
 
 // --- Hilfs-Konvertierungen ---------------------------------------------
@@ -895,6 +914,8 @@ pub struct Audio {
     num_channels: i64,
     bands: Vec<f32>,
     agc: f32,
+    /// Wann AUDIO_FFT zuletzt gefragt wurde (`vergangen`).
+    fft_zuletzt: Option<std::time::Instant>,
     lofi: bool,
     lofi_bits: u32,
     lofi_cutoff: f64,
@@ -940,7 +961,7 @@ impl Audio {
             sounds: Vec::new(), samples: Vec::new(),
             sample_cache: HashMap::new(), clocks: Vec::new(),
             listeners: Vec::new(), emitters: Vec::new(), mods: Vec::new(), mod_bindungen: Vec::new(), num_channels: 16,
-            bands: Vec::new(), agc: 1e-4,
+            bands: Vec::new(), agc: 1e-4, fft_zuletzt: None,
             lofi: false, lofi_bits: 8, lofi_cutoff: 3300.0,
             music_source: None, music_handle: None, music_vol: 1.0, music_pitch: 1.0,
             music_loops: -1, music_queue: None, music_paused: false,
@@ -1537,7 +1558,8 @@ resonance/reverb/distortion", other)),
             let start = (ring.pos + RING - FFT_N) % RING;
             for (i, p) in proben.iter_mut().enumerate() { *p = ring.buf[(start + i) % RING]; }
         }
-        baender_rechnen(&proben, &mut self.bands, &mut self.agc, out);
+        let dt = vergangen(&mut self.fft_zuletzt);
+        baender_rechnen(&proben, &mut self.bands, &mut self.agc, dt, out);
     }
 
     // ================= Lo-Fi =================

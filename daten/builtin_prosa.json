@@ -92,7 +92,7 @@
   "AUDIO_EMITTER_REMOVE": "Quelle abbauen",
   "AUDIO_EMITTER_SET_POSITION": "Quelle bewegen",
   "AUDIO_EQ": "parametrischer Glocken-EQ (eine Band). gain_db 0 = transparent, >0 anheben / <0 absenken, q Bandbreite (Default 1)",
-  "AUDIO_FFT": "Füllt ein dimensioniertes ARRAY OF FLOAT mit den Bandpegeln des Klangs, der GERADE ZU HÖREN IST.",
+  "AUDIO_FFT": "das Spektrum des Masters: fuellt ein ARRAY OF FLOAT mit so vielen Baendern, wie es Plaetze hat, tief links, hoch rechts, logarithmisch verteilt (jede Oktave gleich viele), jedes 0..1. Die Hoehe regelt sich selbst nach (der lauteste Wert der letzten Sekunden ist 1), und ein Band faellt langsam statt sofort (auf 80 % je sechzigstel Sekunde) -- beides nach der Uhr, nicht nach der Zahl der Aufrufe",
   "AUDIO_FILTER": "Tiefpass. cutoff_hz 20..20000 (≤0 oder ≥20000 = offen/aus), resonance 0..1 (Betonung am Cutoff — der „weeoow\"-SID/Acid-Charakter)",
   "AUDIO_GET_VOLUME": "aktuelle Lautstaerke",
   "AUDIO_INIT": "stellt sicher, dass das Audio-System laeuft. Nimmt Argumente entgegen und ignoriert sie -- sie stammen aus der Mixer-Zeit und sind nur der Vertraeglichkeit halber geduldet",

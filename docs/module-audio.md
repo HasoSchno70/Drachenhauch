@@ -502,6 +502,7 @@ kommt, als Datei will, schneidet den Mixer mit:
 | `AUDIO_RECORD_STOP()` → SOUND | beenden und als Klang liefern (Stereo, Abtastrate des Geraets); ohne laufenden Mitschnitt ein Fehler |
 | `AUDIO_RECORDING()` → BOOLEAN | laeuft ein Mitschnitt? |
 | `AUDIO_PEAK()` → FLOAT | hoechster Ausschlag am Master seit dem letzten Aufruf, nach der Master-Lautstaerke; ueber 1.0 heisst Uebersteuern |
+| `AUDIO_FFT(arr)` | das Spektrum des Masters: fuellt ein `ARRAY OF FLOAT` mit so vielen Baendern, wie es Plaetze hat, tief links, hoch rechts, logarithmisch verteilt (jede Oktave gleich viele), jedes 0..1. Die Hoehe regelt sich selbst nach (der lauteste Wert der letzten Sekunden ist 1), und ein Band faellt langsam statt sofort (auf 80 % je sechzigstel Sekunde) -- beides nach der Uhr, nicht nach der Zahl der Aufrufe |
 
 ```basic
 AUDIO_RECORD_START()

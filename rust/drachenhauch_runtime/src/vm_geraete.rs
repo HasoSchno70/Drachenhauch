@@ -1137,7 +1137,8 @@ impl<'p> Vm<'p> {
                 let n = arr.borrow().cells.len();
                 let mut tmp = vec![0.0f32; n];
                 let proben = mic::juengste(crate::audio::FFT_N);
-                crate::audio::baender_rechnen(&proben, &mut self.mic_baender, &mut self.mic_agc, &mut tmp);
+                let dt = crate::audio::vergangen(&mut self.mic_fft_zuletzt);
+                crate::audio::baender_rechnen(&proben, &mut self.mic_baender, &mut self.mic_agc, dt, &mut tmp);
                 let mut b = arr.borrow_mut();
                 for i in 0..n { b.cells.set(i, Value::Float(tmp[i] as f64)); }
                 Value::Nil

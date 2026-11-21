@@ -12,7 +12,9 @@
 === derselbe klang zweimal geplant klingt zweimal
 ' Gezaehlt wird am Mischer (AUDIO_FFT): wie oft wird es laut? AUDIO_IS_PLAYING
 ' taugt dafuer nicht -- ein Klang, der auf seinen Tick wartet, gilt schon als
-' spielend.
+' spielend. Die Summe der Baender liegt beim Einsatz bei 4 bis 8 und klingt
+' nach der Uhr ab (seit 2026-11-21, nicht mehr je Aufruf): vor dem zweiten
+' Einsatz ist sie unter 0.5, aber nicht unter 0.05.
 IMPORT "audio"
 DIM ton AS SOUND
 ton = AUDIO_TONE(440, 120, "sine", 0.8)
@@ -28,10 +30,10 @@ WHILE AUDIO_CLOCK_TICKS(uhr) < 100 AND MILLIS() - t0 < 3000
     AUDIO_FFT(f)
     DIM e AS FLOAT, i AS INTEGER
     FOR i = 0 TO 31 : e = e + f[i] : NEXT
-    IF e > 0.5 AND NOT laut THEN
+    IF e > 1.5 AND NOT laut THEN
         laut = TRUE : n = n + 1
         PRINT "einsatz bei tick "; (AUDIO_CLOCK_TICKS(uhr) + 5) \ 10 * 10
-    ELSEIF e < 0.05 THEN
+    ELSEIF e < 0.5 THEN
         laut = FALSE
     END IF
     SLEEP(4)
@@ -231,3 +233,36 @@ AUDIO_STOP(k)
 AUDIO_SAVE_WAV(auf, "schleife.wav")
 --- ton schleife.wav
 pegel 50 2350 > 0.5
+
+=== das spektrum klingt nach der uhr ab nicht nach den aufrufen
+' AUDIO_FFT liess jedes Band je AUFRUF auf 80 % fallen -- wer oefter
+' fragte (ein schneller Bildschirm, zwei Felder je Bild), sah es schneller
+' verloeschen (Buch "Kleine Wunder", Kapitel 19: 50 ms nach dem Ton alle
+' 4 ms gefragt 0.03, alle 16 ms 0.33). Jetzt zaehlt die vergangene Zeit:
+' Beide Abfrageraten landen nahe beieinander.
+IMPORT "audio"
+DIM sp[32] AS FLOAT
+FUNCTION nach_dem_ton(takt AS INTEGER) AS FLOAT
+    DIM ton AS SOUND : ton = AUDIO_TONE(440, 400, "sine", 0.8)
+    DIM k AS AUDIO_CHANNEL : k = AUDIO_PLAY(ton)
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 460
+        AUDIO_FFT(sp)
+        SLEEP(takt)
+    WEND
+    AUDIO_FFT(sp)
+    DIM m AS FLOAT : m = 0
+    DIM j AS INTEGER
+    FOR j = 0 TO 31
+        m = MAX(m, sp[j])
+    NEXT
+    SLEEP(600)
+    RETURN m
+END FUNCTION
+DIM langsam AS FLOAT : langsam = nach_dem_ton(16)
+DIM schnell AS FLOAT : schnell = nach_dem_ton(4)
+PRINT "beide sichtbar "; langsam > 0.1 AND schnell > 0.1
+PRINT "nah beieinander "; schnell > langsam * 0.5 AND schnell < langsam * 2
+--- erwartet
+beide sichtbar TRUE
+nah beieinander TRUE
