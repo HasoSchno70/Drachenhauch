@@ -1113,7 +1113,7 @@ fn bild_laden(pfad: &std::path::Path) -> Result<pruefsammlung::Bild, BildFehler>
     // raylib meldet jedes geladene Bild als INFO auf stdout -- in der Bilanz
     // eines Testlaufs ist das Rauschen; ab WARNING wie das Fenster selbst.
     unsafe { raylib::ffi::SetTraceLogLevel(raylib::consts::TraceLogLevel::LOG_WARNING as i32); }
-    let img = Image::load_image(&pfad.to_string_lossy()).map_err(|e| BildFehler::Lesen(format!("nicht lesbar: {}", e)))?;
+    let mut img = Image::load_image(&pfad.to_string_lossy()).map_err(|e| BildFehler::Lesen(format!("nicht lesbar: {}", e)))?;
     let (breite, hoehe) = (img.width.max(0) as u32, img.height.max(0) as u32);
     let mut pixel = Vec::with_capacity((breite * hoehe) as usize);
     for y in 0..hoehe as i32 {
