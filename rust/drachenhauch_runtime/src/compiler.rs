@@ -1326,6 +1326,7 @@ impl Compiler {
                 Ok(())
             }
             Node::ExprStmt { expr } => {
+                self.koroutine_verworfen(expr);
                 // Ein Name ALLEIN als Anweisung (`CLS`, `FLIP`, `meineSub`): in
                 // anderen BASICs ein Aufruf. Hier wurde daraus bisher still ein
                 // geladener und weggeworfener Wert -- die SUB lief einfach nicht.
@@ -3697,6 +3698,40 @@ impl Compiler {
         };
         self.ctx.emit(code, Value::Null);
         Ok(())
+    }
+
+    /// Eine Koroutine als Anweisung (`warten(3)` mit YIELD in `warten`):
+    /// Der Aufruf liefert nur das COROUTINE-Handle, und weggeworfen laeuft
+    /// sie nie -- still, kein Schritt davon geschieht. In einer Szene, die
+    /// einen Helfer mit YIELD aufruft, wartet so nichts (Buch "Kleine
+    /// Wunder", Kapitel 21). Eine Warnung, mit dem Weg hinaus.
+    fn koroutine_verworfen(&mut self, expr: &Node) {
+        let Node::Call { callee, .. } = expr else { return };
+        let (name, ist) = match &**callee {
+            Node::Identifier(n) => {
+                let low = n.to_lowercase();
+                let lokal = self.ctx.local_slots.contains_key(n) || self.global_vars.contains(n);
+                let methode = self.ctx.current_class.clone()
+                    .and_then(|cn| self.find_method_sig(&cn, &low).map(|s| s.is_coroutine));
+                let ist = if lokal { false } else if let Some(m) = methode { m } else {
+                    self.fn_sigs.get(&low).map_or(false, |s| s.is_coroutine)
+                };
+                (n.clone(), ist)
+            }
+            Node::MemberAccess { target, name } => {
+                let ist = self.statischer_typ(target)
+                    .and_then(|k| self.find_method_sig(&k, &name.to_lowercase()).map(|s| s.is_coroutine))
+                    .unwrap_or(false);
+                (name.clone(), ist)
+            }
+            _ => return,
+        };
+        if ist {
+            self.warnings.push((self.ctx.cur_line, format!(
+                "'{}' ist eine Koroutine (sie enthaelt YIELD) -- als Anweisung aufgerufen, entsteht sie nur und laeuft nie. \
+                 Das Ergebnis aufheben und mit CORO_RESUME fortsetzen: DIM c AS COROUTINE : c = {}(...)",
+                name, name)));
+        }
     }
 
     /// Eine SUB liefert keinen Wert -- `x = meineSub()` bricht sonst erst zur

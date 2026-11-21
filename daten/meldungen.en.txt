@@ -2011,3 +2011,5 @@ MIDI_CLOCK_SEND: Tempo {} ausserhalb 1..999 (0 haelt die Uhr an)	MIDI_CLOCK_SEND
 GUI_FILETREE_COLOR: kein Muster -- so: "*.dh", "*.json;*.ini" oder "/" fuer Ordner	GUI_FILETREE_COLOR: no pattern -- like this: "*.dh", "*.json;*.ini" or "/" for folders
 GUI_FILETREE_ICON: kein Muster -- so: "*.dh", "*.json;*.ini" oder "/" fuer Ordner	GUI_FILETREE_ICON: no pattern -- like this: "*.dh", "*.json;*.ini" or "/" for folders
 {}: das Feld hat keine Plaetze -- es bekommt so viele Werte, wie es Plaetze hat: DIM werte[64] AS FLOAT	{}: the array has no slots -- it gets as many values as it has slots: DIM werte[64] AS FLOAT
+
+'{}' ist eine Koroutine (sie enthaelt YIELD) -- als Anweisung aufgerufen, entsteht sie nur und laeuft nie. Das Ergebnis aufheben und mit CORO_RESUME fortsetzen: DIM c AS COROUTINE : c = {}(...)	'{}' is a coroutine (it contains YIELD) -- called as a statement, it is only created and never runs. Keep the result and continue it with CORO_RESUME: DIM c AS COROUTINE : c = {}(...)

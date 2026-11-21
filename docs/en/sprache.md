@@ -1082,7 +1082,7 @@ For infinite generators use `CORO_RESUME`/`CORO_DONE` manually instead.
 
 **Semantics & restrictions:**
 - `dhrt` suspends a coroutine via a **frame snapshot** (ip/locals/stack are stored at `YIELD` and restored on resume) — no OS thread, deterministic, safe for the raylib main thread.
-- **No cross-frame `YIELD`:** a helper with `YIELD` is itself a coroutine; so `YIELD` never runs across a normal function call.
+- **No cross-frame `YIELD`:** a helper with `YIELD` is itself a coroutine; so `YIELD` never runs across a normal function call. Called as a statement (`warten(3)`), the helper is only created and never runs -- dhrt warns about it. To pass its steps on, keep it and continue it yourself: `DIM w AS COROUTINE : w = warten(3)`, then `WHILE NOT CORO_DONE(w) : YIELD CORO_RESUME(w) : WEND`.
 - In `FUNCTION ... AS T`, `YIELD` *and* `RETURN` values are coerced to `T`. A `SUB` coroutine yields without type coercion.
 - A manual `WHILE NOT CORO_DONE(c)` loop receives the `RETURN` value on the last (finishing) `CORO_RESUME`. Give the generator a typed `RETURN` so that the assignment to a typed variable works — or use `FOR EACH`.
 - Also works in the standalone `.exe` export (same `dhrt` VM).

@@ -1336,3 +1336,13 @@ Maschinencode-Weg (`methode_rufen`). Ein Feld ohne Funktionswert bleibt
 "Methode existiert nicht". `funcref.dhtest` (ein Fall, mit und ohne
 Maschinencode); Gegenproben: ohne den VM-Weg faellt er an `r.wie(5)`,
 ohne den Compiler-Weg an `wie(a)` in der Methode.
+
+Kapitel 21 (Geschichten, die warten) erzaehlt eine Szene als Koroutine.
+Ein Helfer `warten(n)` mit YIELD ist selbst eine Koroutine; in der Szene
+als Anweisung aufgerufen, entstand er nur, wurde weggeworfen und lief nie
+-- still, die Szene wartete einfach nicht. Jetzt warnt der Compiler
+(`koroutine_verworfen`) bei einer Ausdrucksanweisung, die eine Koroutine
+ruft (Funktion, Methode der eigenen oder einer bekannten Klasse), und
+zeigt, wie man sie aufhebt. Im ganzen Repo traf es keine Zeile.
+`compiler_warnungen.dhtest` (ein Fall, Funktion und Methode); Gegenprobe:
+ohne die Warnung faellt genau er.

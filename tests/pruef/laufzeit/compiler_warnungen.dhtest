@@ -4051,3 +4051,40 @@ PRINT 1234 BAND 255 + 20
 18
 --- stderr
 Warnung: BAND bindet schwaecher als +: gerechnet wird a BAND (b + c)
+
+=== eine koroutine als anweisung warnt
+' Eine SUB mit YIELD ist eine Koroutine; als Anweisung aufgerufen
+' entsteht sie nur und laeuft nie. In einer Szene, die einen Helfer mit
+' YIELD ruft, wartete so still nichts (Buch "Kleine Wunder", Kapitel 21).
+' Aufgehoben und fortgesetzt ist sie still -- und eine Methode mit YIELD
+' warnt genauso.
+SUB warten(n AS INTEGER)
+    DIM i AS INTEGER
+    FOR i = 1 TO n
+        YIELD i
+    NEXT
+END SUB
+CLASS Figur
+    SUB gehen()
+        YIELD 1
+    END SUB
+END CLASS
+SUB szene()
+    PRINT "vorher"
+    warten(3)
+    PRINT "nachher"
+    YIELD 0
+END SUB
+DIM c AS COROUTINE : c = szene()
+CORO_RESUME(c)
+DIM w AS COROUTINE : w = warten(2)
+PRINT CORO_RESUME(w)
+DIM f AS Figur : f = NEW Figur()
+f.gehen()
+--- erwartet
+vorher
+nachher
+1
+--- stderr
+fall.dh:19: Warnung: 'warten' ist eine Koroutine (sie enthaelt YIELD)
+fall.dh:28: Warnung: 'gehen' ist eine Koroutine

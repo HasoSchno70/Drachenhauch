@@ -1085,7 +1085,7 @@ Bei unendlichen Generatoren stattdessen manuell `CORO_RESUME`/`CORO_DONE`.
 
 **Semantik & Einschränkungen:**
 - `dhrt` suspendiert eine Coroutine via **Frame-Snapshot** (ip/locals/stack werden beim `YIELD` abgelegt und beim Resume restauriert) — kein OS-Thread, deterministisch, raylib-Main-Thread-sicher.
-- **Kein Cross-Frame-`YIELD`:** ein Helfer mit `YIELD` ist selbst eine Coroutine; `YIELD` läuft also nie über einen normalen Funktionsaufruf hinweg.
+- **Kein Cross-Frame-`YIELD`:** ein Helfer mit `YIELD` ist selbst eine Coroutine; `YIELD` läuft also nie über einen normalen Funktionsaufruf hinweg. Als Anweisung aufgerufen (`warten(3)`) entsteht der Helfer nur und läuft nie -- dhrt warnt davor. Wer seine Schritte weitergeben will, hebt ihn auf und setzt ihn selbst fort: `DIM w AS COROUTINE : w = warten(3)`, dann `WHILE NOT CORO_DONE(w) : YIELD CORO_RESUME(w) : WEND`.
 - In `FUNCTION ... AS T` werden `YIELD`- *und* `RETURN`-Werte auf `T` gecoerct. Eine `SUB`-Coroutine yieldet ohne Typ-Coercion.
 - Ein manueller `WHILE NOT CORO_DONE(c)`-Loop bekommt beim letzten (beendenden) `CORO_RESUME` den `RETURN`-Wert. Gib dem Generator einen typisierten `RETURN`, damit die Zuweisung an eine typisierte Variable klappt — oder nutze `FOR EACH`.
 - Funktioniert auch im Standalone-`.exe`-Export (gleiche `dhrt`-VM).
