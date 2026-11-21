@@ -136,7 +136,7 @@ und ueberhaupt nichts speichern.
 | `IMAGE_DRAW_IMAGE(target, source, x, y [, qx, qy, qb, qh] [, tint])` | ein Bild in ein anderes zeichnen, mit Deckkraft gemischt; wahlweise nur ein Ausschnitt der Quelle (`qb`/`qh` = -1: bis zum Rand, so geht auch `tint:` allein) |
 | `IMAGE_SAVE(image, path$ [, with_alpha])` | das Bild in eine Datei schreiben (`.png`, `.bmp`, `.jpg`, `.tga`); mit `FALSE` ohne Deckkraft-Kanal (RGB) — Druckdienste lehnen ein PNG mit Alphakanal ab, auch wenn jeder Punkt deckend ist. Die Deckkraft wird dabei weggelassen, nicht verrechnet: wer einen Grund will, legt das Bild vorher auf ein deckendes |
 | `GETALPHA(image, x, y)` | Deckkraft eines Bildpunkts, 0..255; `-1` ausserhalb (core, kein IMPORT noetig) |
-| `IMAGE_FREE(image)` | das Bild und seine Grafikspeicher-Textur freigeben |
+| `IMAGE_FREE(image)` | das Bild und seine Grafikspeicher-Textur freigeben -- das Handle ist sofort ungültig; was in diesem Bild schon damit gezeichnet wurde, erscheint beim `FLIP` noch |
 | `IMAGE_FROM_BUFFER(buffer)` | IMAGE — ein Bild aus den Bytes einer Bilddatei (PNG, JPG, BMP, GIF, QOI, DDS), etwa aus `HTTP_BYTES` oder `BUFFER_FROM_BASE64`; das Format steht in den ersten Bytes |
 | `IMAGE_TO_BUFFER(image [, with_alpha])` | BUFFER — das Bild als PNG-Bytes, ohne Umweg über eine Datei; mit `FALSE` ohne Deckkraft-Kanal wie bei `IMAGE_SAVE` |
 | `IMAGE_MIPMAPS(image)` | INTEGER — verkleinerte Stufen für die Textur anlegen und trilinear filtern: ein feines Muster auf einer fernen 3D-Fläche flimmert dann nicht mehr. Liefert die Zahl der Stufen; nach `IMAGE_DRAW_*` werden sie nachgezogen |

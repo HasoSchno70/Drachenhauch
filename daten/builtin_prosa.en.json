@@ -1363,7 +1363,7 @@
   "IMAGE_FILL_ROUNDRECT": "rectangle with rounded corners",
   "IMAGE_FLIP": "IMAGE (new, mirrored)",
   "IMAGE_FRAME": "frame of width width, drawn inwards",
-  "IMAGE_FREE": "release the image and its graphics-memory texture",
+  "IMAGE_FREE": "release the image and its graphics-memory texture -- the handle is invalid at once; whatever this frame already drew with it still appears at FLIP",
   "IMAGE_FROM_BUFFER": "IMAGE — an image from the bytes of an image file (PNG, JPG, BMP, GIF, QOI, DDS), for example from HTTP_BYTES or BUFFER_FROM_BASE64; the format is in the first bytes",
   "IMAGE_GET_ALPHA": "opacity at (x, y), 0..255; -1 for an index outside. Needed because GETPIXEL returns a colour, and there … — formerly GETALPHA",
   "IMAGE_GET_PIXEL": "read the pixel colour (&HRRGGBB) at (x, y); -1 for an index outside. Counterpart to PLOT (write) — for … — formerly GETPIXEL",

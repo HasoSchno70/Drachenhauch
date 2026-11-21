@@ -1254,3 +1254,15 @@ vorfuehrte; sie hat jetzt Klammern. `compiler_warnungen.dhtest` (zwei Faelle);
 Gegenproben: linken Operanden nicht pruefen, Vorzeichen mitzaehlen, Klammern
 ignorieren, Lauf ohne die Parser-Warnungen -- jede laesst genau ihren Fall
 fallen.
+
+Kapitel 17 (Malen mit Symmetrie) hat als Uebung ein Rueckgaengig: vor
+jedem Strich `RENDERTARGET_IMAGE` als Foto, auf Z das letzte Foto mit
+`DRAWIMAGE` zurueck aufs Blatt und gleich `IMAGE_FREE`. Es tat nichts. Die
+Laufzeit zeichnet erst beim FLIP (Aufzeichnungs-Modell), und `IMAGE_FREE`
+ersetzte die Textur sofort durch den 1x1-Platzhalter -- der aufgezeichnete
+Befehl zeichnete dann den leeren Platzhalter. Jetzt sperrt `IMAGE_FREE` das
+Handle sofort (`tex_frei`), raeumt die Textur aber erst nach dem FLIP ab
+(`tex_abraeumen`), wenn in diesem Bild schon etwas zum Zeichnen ansteht;
+sonst wie bisher gleich -- ein Werkzeug, das ohne FLIP viele Bilder
+freigibt, sammelt so nichts an. `image_io.dhtest` (ein Fall); Gegenprobe:
+ohne den Aufschub faellt genau er (Pixel 0 statt FF0000).
