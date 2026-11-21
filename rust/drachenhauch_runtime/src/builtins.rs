@@ -55,6 +55,37 @@ pub fn datei_da(pfad: &str, befehl: &str) -> Result<(), String> {
     Err(format!("{}: Datei '{}' nicht gefunden (gesucht relativ zu {})", befehl, pfad, ort))
 }
 
+/// Warum sich eine Datei, die es gibt, nicht als Bild lesen liess. raylib
+/// sagt nur "image data is null, either the file doesnt exist or the image
+/// type is unsupported" -- ohne Dateinamen, und "doesnt exist" fuehrt in
+/// die Irre (gefunden mit dem Buch "Kleine Wunder", Kapitel 23: drei kaputte
+/// Dateien in einer Diaschau gaben drei gleiche Zeilen).
+pub fn bild_unlesbar(pfad: &str, befehl: &str) -> String {
+    use std::io::Read;
+    let laenge = std::fs::metadata(pfad).map(|m| m.len()).unwrap_or(0);
+    let mut kopf = [0u8; 8];
+    let n = std::fs::File::open(pfad).and_then(|mut f| f.read(&mut kopf)).unwrap_or(0);
+    bild_unlesbar_aus(pfad, befehl, laenge, &kopf[..n])
+}
+
+fn bild_unlesbar_aus(pfad: &str, befehl: &str, laenge: u64, kopf: &[u8]) -> String {
+    if laenge == 0 {
+        return format!("{}: '{}' ist leer (0 Byte)", befehl, pfad);
+    }
+    let art = if kopf.starts_with(b"\x89PNG") { Some("PNG") }
+        else if kopf.starts_with(&[0xFF, 0xD8]) { Some("JPG") }
+        else if kopf.starts_with(b"GIF8") { Some("GIF") }
+        else if kopf.starts_with(b"BM") { Some("BMP") }
+        else if kopf.starts_with(b"qoif") { Some("QOI") }
+        else { None };
+    match art {
+        Some(a) => format!("{}: '{}' beginnt wie ein {}-Bild, ist aber beschaedigt oder unvollstaendig ({} Byte)",
+                           befehl, pfad, a, laenge),
+        None => format!("{}: '{}' ist kein Bild, das sich lesen laesst -- gelesen werden PNG, JPG, BMP, GIF und QOI",
+                        befehl, pfad),
+    }
+}
+
 // --- PRNG fuer RND/RANDOMIZE: xorshift64, ohne RANDOMIZE(seed) zeitbasiert
 // geseedet -- Laeufe sind dann bewusst nicht reproduzierbar.
 thread_local! {
@@ -7086,6 +7117,21 @@ mod zahl_text_tests {
         assert_eq!(zahl_text(&Value::Float(999.995), Some(2)).unwrap(), "1.000,00");
         assert_eq!(zahl_text(&Value::Int(7), None).unwrap(), "7");
         assert!(zahl_text(&Value::Float(f64::NAN), None).is_err());
+    }
+}
+
+#[cfg(test)]
+mod bild_unlesbar_tests {
+    use super::bild_unlesbar_aus;
+    #[test]
+    fn sagt_welche_datei_und_warum() {
+        assert_eq!(bild_unlesbar_aus("b/leer.png", "LOADIMAGE", 0, b""),
+                   "LOADIMAGE: 'b/leer.png' ist leer (0 Byte)");
+        assert_eq!(bild_unlesbar_aus("halb.png", "LOADIMAGE", 6662, b"\x89PNG\r\n\x1a\n"),
+                   "LOADIMAGE: 'halb.png' beginnt wie ein PNG-Bild, ist aber beschaedigt oder unvollstaendig (6662 Byte)");
+        assert!(bild_unlesbar_aus("f.jpg", "X", 9, &[0xFF, 0xD8, 0xFF]).contains("wie ein JPG-Bild"));
+        assert_eq!(bild_unlesbar_aus("notiz.png", "LOADIMAGE", 33, b"Hier feh"),
+                   "LOADIMAGE: 'notiz.png' ist kein Bild, das sich lesen laesst -- gelesen werden PNG, JPG, BMP, GIF und QOI");
     }
 }
 

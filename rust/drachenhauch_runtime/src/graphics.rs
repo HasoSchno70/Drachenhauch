@@ -5673,7 +5673,7 @@ impl Graphics {
         // the file doesnt exist or the image type is unsupported".
         crate::builtins::datei_da(path, "LOADIMAGE")?;
         // CPU-Image laden (fuer imgfx) + GPU-Textur daraus.
-        let img = Image::load_image(path).map_err(|e| format!("LOADIMAGE: {}", e))?;
+        let img = Image::load_image(path).map_err(|_| crate::builtins::bild_unlesbar(path, "LOADIMAGE"))?;
         let tex = self.rl.load_texture_from_image(&self.thread, &img).map_err(|e| format!("LOADIMAGE: {}", e))?;
         self.textures.push(Tex { tex, img });
         self.tex_frei.push(false);
