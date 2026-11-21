@@ -1,0 +1,7 @@
+' Kapitel 22, was schiefgehen kann: ein Monat, den es so nicht gibt.
+DIM datum AS ARRAY OF STRING
+datum = ["2025-07-01", "2025-07-02", "2025-08-01"]
+DIM hoch AS ARRAY OF FLOAT : hoch = [24.1, 26.3, 22.0]
+DIM juli AS ARRAY OF FLOAT
+juli = [hoch[i] FOR i IN RANGE(3) WHERE LEFT$(datum[i], 7) = "2025-7"]
+PRINT ARRAY_AVG(juli)

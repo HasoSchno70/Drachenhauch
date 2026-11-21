@@ -1,0 +1,7 @@
+// Kapitel 22, Erfinden: ein Klick auf den Juli.
+// Mausstellen mal 2.
+c 4
+e 0 7 862 500 0 0
+e 10 6 0 0 0 0
+e 12 5 0 0 0 0
+e 14 7 862 500 0 0

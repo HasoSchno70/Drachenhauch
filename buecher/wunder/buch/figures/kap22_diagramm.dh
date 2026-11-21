@@ -1,0 +1,3 @@
+' Bild fuer Kapitel 22, Erfinden (Loesung kap22_diagramm, Klick auf Juli).
+CHDIR("../../code/loesungen")
+IMPORT "../../code/loesungen/kap22_diagramm.dh"

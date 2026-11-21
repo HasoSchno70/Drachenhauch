@@ -1,0 +1,47 @@
+' Kapitel 22, Schritt 1 -- ein Jahr Wetter fuer einen erfundenen Ort,
+' Tag fuer Tag: tiefste und hoechste Temperatur, Regen in Millimetern,
+' Sonne in Stunden. Erfunden, aber mit Jahreszeiten, warmen und kalten
+' Wochen und Regen, der meist an kuehlen Tagen faellt. Die feste Saat
+' sorgt dafuer, dass jedes Mal dieselbe Datei entsteht.
+RANDOMIZE(2025)
+
+DIM zeilen AS ARRAY OF STRING
+ARRAY_PUSH(zeilen, "datum;min;max;regen;sonne")
+DIM tage AS ARRAY OF INTEGER
+tage = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+
+' Wie viel waermer oder kaelter als ueblich: wandert langsam, so
+' entstehen warme und kalte Wochen statt Zufall von Tag zu Tag.
+DIM abweichung AS FLOAT
+DIM tag AS INTEGER
+DIM monat AS INTEGER
+FOR monat = 1 TO 12
+    DIM t AS INTEGER
+    FOR t = 1 TO tage[monat - 1]
+        ' Die Jahreszeit: im Mittel 0 Grad Mitte Januar, 20 Mitte Juli.
+        DIM mitte AS FLOAT
+        mitte = 10 - 10 * COS(2 * PI * (tag - 15) / 365)
+        abweichung = abweichung * 0.85 + (RND() - 0.5) * 3.6
+        ' Im Sommer liegen Tag und Nacht weiter auseinander.
+        DIM spanne AS FLOAT : spanne = 6 + 5 * (mitte / 20)
+        DIM tief AS FLOAT : tief = mitte - spanne / 2 + abweichung
+        DIM hoch AS FLOAT
+        hoch = mitte + spanne / 2 + abweichung + RND() * 2
+        ' Regen eher an kuehlen Tagen, und dann unterschiedlich viel.
+        DIM regen AS FLOAT : regen = 0
+        IF RND() < 0.32 - abweichung * 0.04 THEN
+            regen = -LOG(1 - RND()) * 5.5
+        END IF
+        ' Sonne: so lang wie der Tag, weniger, wenn es regnet.
+        DIM tageslicht AS FLOAT
+        tageslicht = 12 - 4 * COS(2 * PI * (tag + 10) / 365)
+        DIM sonne AS FLOAT
+        sonne = tageslicht * IIF(regen > 0, 0.15, 0.3 + RND() * 0.45)
+        ARRAY_PUSH(zeilen, f"2025-{monat:02d}-{t:02d};{tief:.1f};" _
+                   + f"{hoch:.1f};{regen:.1f};{sonne:.1f}")
+        tag = tag + 1
+    NEXT
+NEXT
+
+FILE_WRITE("wetter.csv", JOIN$(zeilen, CHR$(10)) + CHR$(10))
+PRINT f"{LEN(zeilen) - 1} Tage geschrieben"

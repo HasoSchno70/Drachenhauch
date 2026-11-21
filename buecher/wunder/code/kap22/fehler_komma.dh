@@ -1,0 +1,5 @@
+' Kapitel 22, was schiefgehen kann: Daten mit deutschem Komma.
+DIM zeile AS STRING : zeile = "2025-07-15;14,3;24,8"
+DIM teile AS ARRAY OF STRING : teile = SPLIT$(zeile, ";")
+PRINT VAL(teile[2]); " "; ISNUMERIC(teile[2])
+PRINT VAL(REPLACE$(teile[2], ",", "."))
