@@ -665,4 +665,46 @@ module.exports = (H) => [
   H.figure("kap16_sterne.png", "Nachts erscheinen die Sterne; ihre drei Helligkeiten wandern reihum, darum funkeln sie.", 420, 262),
 
   H.p("Der Trick steckt in der Farbe: Ein Stern mischt die Farbe des Himmels mit seiner eigenen, und zwar umso mehr, je dunkler es ist. Am Tag ist dunkel 0, der Stern hat die Farbe des Himmels und ist unsichtbar; in der Nacht ist dunkel 1, und er leuchtet. Die Bedingung (x · 31 + y · 57) MOD 97 = 0 trifft etwa jeden 97. Punkt, und weil 97 eine Primzahl ist, liegen die Sterne nicht in Reihen. Weil die Sterne kein Rauschen brauchen, sieht der Himmel bei jedem Start gleich aus — wie ein Sternbild."),
+
+  H.h2("Kapitel 17 · Malen mit Symmetrie"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Mit 2 Teilen und Spiegeln erscheint jeder Strich viermal: einmal, wo man malt, einmal um die halbe Drehung versetzt auf der anderen Seite der Mitte und zweimal gespiegelt. Die Spiegelachsen sind die waagerechte und die senkrechte Linie durch die Mitte — das Muster sieht aus wie eine Spielkarte oder ein Schmetterling von oben. Ohne Spiegeln bleiben zwei Kopien, die einander gegenüberliegen, als hätte man das Blatt um 180 Grad gedreht."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Die Farbe hängt jetzt nur vom Abstand zur Mitte ab, nicht mehr von der Zeit. Alles, was gleich weit von der Mitte entfernt ist, hat dieselbe Farbe, und das Muster bekommt Ringe: innen Orange, dann Gelb, Grün, Blau und am Rand Violett. Malt man denselben Strich zweimal, hat er beide Male dieselben Farben."),
+
+  H.h3("Drehen 3"),
+
+  H.p("alt_x und alt_y behalten für immer die Stelle, an der die Maus beim Start war. Jede Linie geht dann von dort zur Maus, in jedem Bild eine neue — statt eines Strichs entsteht ein Fächer, der ganze Flächen füllt, und mit zwölf Kopien ein Stern aus Strahlen. Dieselben zwei Zeilen machen also den Unterschied zwischen Malen und etwas ganz anderem: Der Zustand von einem Bild zum nächsten ist das Gedächtnis des Pinsels."),
+
+  H.h3("Erweitern 1: ein zweiter Pinsel"),
+
+  H.p("Die Sprühdose braucht nur einen Schalter und eine Schleife (code/loesungen/kap17_pinsel.dh):"),
+
+  ...neu("loesungen/kap17_pinsel.dh").map((t) => H.code(t)),
+
+  H.p("Jeder Tupfen ist ein Strich, der dort endet, wo er beginnt: Die Linie hat keine Länge, der Kreis am Ende macht einen Punkt. Weil strich die Arbeit des Drehens und Spiegelns schon tut, bekommt die Sprühdose die Symmetrie umsonst. Ein zufälliger Winkel und ein zufälliger Abstand ergeben einen Kreis, in dem die Tupfen zur Mitte hin dichter stehen — wie bei einer echten Sprühdose. Gleichmäßig verteilt wären sie mit SQR(RND()) für den Abstand."),
+
+  H.h3("Erweitern 2: Rückgängig"),
+
+  H.p("Vor jedem Strich fotografiert das Programm das Blatt, Z legt das letzte Foto zurück (code/loesungen/kap17_rueckgaengig.dh):"),
+
+  ...neu("loesungen/kap17_rueckgaengig.dh").map((t) => H.code(t)),
+
+  H.pmix(["Ein Foto ist ein IMAGE, eine Kopie des Blatts im Arbeitsspeicher. ", ["ARRAY_POP", true], " nimmt das jüngste vom Ende des Felds. Danach wird es mit ", ["IMAGE_FREE", true], " freigegeben, denn 30 Fotos zu je 800 · 500 Punkten mal vier Bytes sind fast 50 MB. Auch das Wischen macht vorher ein Foto, damit man es zurücknehmen kann."]),
+
+  H.p("Diese Lösung hat einen Fehler in Drachenhauch gefunden. Im ersten Versuch tat Z nichts. Die Laufzeit zeichnet erst beim FLIP, was das Programm im Lauf des Bildes zeichnen lässt — und IMAGE_FREE gab das Foto sofort frei, also bevor es gezeichnet war. Gezeichnet wurde dann ein leeres Bild. Jetzt gibt IMAGE_FREE ein Bild, das im selben Bild noch gebraucht wird, erst nach dem FLIP frei."),
+
+  H.h3("Erfinden: eine Tapete"),
+
+  H.p("Eine Möglichkeit (code/loesungen/kap17_tapete.dh): Das Fenster wird in vier mal zwei Kacheln geteilt, und linie bekommt die Mitte als Parameter, statt immer MITTE_X und MITTE_Y zu nehmen:"),
+
+  ...neu("loesungen/kap17_tapete.dh").map((t) => H.code(t)),
+
+  H.figure("kap17_tapete.png", "In der Kachel oben links gemalt, erscheint jeder Strich um alle acht Mitten herum.", 420, 262),
+
+  H.pmix(["Winkel und Abstand misst der Strich von der Mitte der Kachel, in der er beginnt; gezeichnet wird er um jede Mitte herum. Wo die Rosetten über ihre Kachel hinausreichen, greifen sie ineinander, und es entsteht ein Muster ohne Nähte. S sichert das Blatt mit ", ["RENDERTARGET_IMAGE", true], " und ", ["IMAGE_SAVE", true], ". Im PNG stehen nur die Striche, keine Hilfslinien und keine Zeile oben — die stehen nur auf dem Fenster. Das ist der Lohn für die Trennung aus Schritt 3."]),
 ];

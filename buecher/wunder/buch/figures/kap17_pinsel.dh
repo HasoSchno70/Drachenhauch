@@ -1,0 +1,3 @@
+' Bild fuer Kapitel 17, Erweitern 1 (Loesung kap17_pinsel, Taste P).
+RANDOMIZE(17)
+IMPORT "../../code/loesungen/kap17_pinsel.dh"
