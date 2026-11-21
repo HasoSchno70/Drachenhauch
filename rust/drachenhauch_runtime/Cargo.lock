@@ -1314,7 +1314,7 @@ dependencies = [
  "md-5",
  "midir",
  "mimalloc",
- "miniz_oxide 0.8.9",
+ "miniz_oxide 0.9.1",
  "mint",
  "mp4",
  "mysql",

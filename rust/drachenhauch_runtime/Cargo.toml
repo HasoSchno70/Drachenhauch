@@ -44,7 +44,7 @@ indexmap = "2"
 # COMPRESS$/DECOMPRESS$ (DEFLATE). Pure-Rust und ohnehin schon transitiv in der
 # Lockfile -> ungated, damit auch Konsolen-Programme ihre Savegames packen
 # koennen (raylibs CompressData haengt dagegen am graphics-Feature).
-miniz_oxide = "0.8"
+miniz_oxide = "0.9"
 # PDF-Modul (PDF_*): krilla schreibt das PDF samt eingebetteter, auf die
 # benutzten Zeichen beschnittener Schriften (CID-Fonts mit ToUnicode) --
 # vorher standen hier 440 Zeilen Handarbeit, die nur die vierzehn
