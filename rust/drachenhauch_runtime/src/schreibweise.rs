@@ -129,6 +129,17 @@ fn woerter(quelle: &str) -> Vec<Wort> {
 /// Alle Stellen, an denen ein eigener Name anders geschrieben ist als bei
 /// seiner Deklaration (Quell-Reihenfolge).
 pub fn pruefen(quelle: &str) -> Vec<Abweichung> {
+    pruefen_in_raeumen(quelle, &[])
+}
+
+/// Wie `pruefen`, aber jede Zeile der gemergten Quelle gehoert zu einem
+/// Raum (`raeume[zeile - 1]`: der Alias eines `IMPORT "x.dh" AS x`, sonst
+/// leer). Eine Deklaration gilt nur fuer Woerter in ihrem eigenen Raum --
+/// sonst hiess `DIM hoehe` in einem Namensraum "als 'HOEHE' angelegt", nur
+/// weil das Hauptprogramm ein `CONST HOEHE` hat, das der Namensraum gar
+/// nicht sieht (Buch "Kleine Wunder", Kapitel 26).
+pub fn pruefen_in_raeumen(quelle: &str, raeume: &[String]) -> Vec<Abweichung> {
+    let raum = |zeile: usize| -> &str { raeume.get(zeile.wrapping_sub(1)).map(|s| s.as_str()).unwrap_or("") };
     let bl = bereiche(quelle);
     let defs = definitionen(quelle);
     let mut nach_name: HashMap<String, Vec<(&Definition, Gilt)>> = HashMap::new();
@@ -156,7 +167,10 @@ pub fn pruefen(quelle: &str) -> Vec<Abweichung> {
         // `St.DIVE` ist ein Wert der Aufzaehlung St, keine Methode `Dive`.
         if w.nach_punkt && enums.contains(&w.objekt) { continue; }
         let schluessel = format!("{}{}", klein, if w.dollar { "$" } else { "" });
-        let Some(kand) = nach_name.get(&schluessel) else { continue };
+        let Some(alle) = nach_name.get(&schluessel) else { continue };
+        let kand: Vec<(&Definition, Gilt)> = alle.iter()
+            .filter(|(d, _)| raum(d.zeile) == raum(w.zeile)).cloned().collect();
+        if kand.is_empty() { continue; }
         let typ_stelle = matches!(w.davor.as_str(), "as" | "new" | "of" | "extends" | "is");
         let gemeint: Option<&Definition> = if w.nach_punkt {
             // Mitglied hinter einem Punkt: nur wenn alle Klassen es gleich schreiben.
@@ -215,8 +229,13 @@ pub fn aus_meldung(m: &str) -> Option<(String, String)> {
 
 /// Warnungen je Zeile (eine je Zeile und Schreibweise) fuer den Uebersetzer-Weg.
 pub fn warnungen(quelle: &str) -> Vec<(u32, String)> {
+    warnungen_in_raeumen(quelle, &[])
+}
+
+/// Wie `warnungen`, mit einem Raum je Zeile (siehe `pruefen_in_raeumen`).
+pub fn warnungen_in_raeumen(quelle: &str, raeume: &[String]) -> Vec<(u32, String)> {
     let mut gesehen = std::collections::HashSet::new();
-    pruefen(quelle).into_iter()
+    pruefen_in_raeumen(quelle, raeume).into_iter()
         .filter(|a| gesehen.insert((a.zeile, a.geschrieben.clone())))
         .map(|a| (a.zeile as u32, meldung(&a)))
         .collect()

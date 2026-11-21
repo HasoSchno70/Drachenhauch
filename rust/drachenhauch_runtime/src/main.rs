@@ -1917,7 +1917,8 @@ fn compile_source_mit<T>(raw_source: &str, base: &std::path::Path, label: &str,
             // Dazu die des Parsers (Vorrang von BAND & Co.), hinter denen des
             // Compilers -- deren Reihenfolge bleibt, wie sie ist.
             warns.extend(p.warnungen().iter().cloned());
-            let warns = lsp::verdeckung_filtern(warns, &source);
+            let warns = lsp::verdeckung_filtern_in_raeumen(warns, &source,
+                &preprocess::raeume_je_zeile(&herkunft, &namensraeume));
             // Nicht-fatale Compile-Warnungen (z.B. unbekanntes Builtin) vor dem
             // Lauf auf stderr -- der Lauf geht weiter, schlaegt aber spaeter ggf.
             // beim Aufruf fehl.
@@ -2248,7 +2249,8 @@ fn check_source_roh(raw_source: &str, base: &std::path::Path, label: &str) -> Ve
         // Lauf). Leer, wenn kein solches Modul importiert wird.
         Ok((_, mut warns)) => {
             warns.extend(p.warnungen().iter().cloned());
-            let warns = lsp::verdeckung_filtern(warns, &source);
+            let warns = lsp::verdeckung_filtern_in_raeumen(warns, &source,
+                &preprocess::raeume_je_zeile(&herkunft, &namensraeume));
             let mut diags: Vec<serde_json::Value> =
                 preprocess::missing_hardware_imports_with_lines(raw_source).into_iter()
                     .map(|(line, m)| serde_json::json!({

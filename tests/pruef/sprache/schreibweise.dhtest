@@ -114,3 +114,42 @@ DIM eins AS INTEGER
 PRINT !"{\"text\":\"Eins\"}", eins
 
 meldungen []
+
+=== ein namensraum sieht die schreibweise des hauptprogramms nicht
+' `DIM hoehe` in einer Datei, die mit IMPORT ... AS kommt, hiess "als
+' 'HOEHE' angelegt", nur weil das Hauptprogramm ein CONST HOEHE hat, das
+' der Namensraum gar nicht sieht (Buch "Kleine Wunder", Kapitel 26). In der
+' Datei selbst wird anders Geschriebenes weiter gemeldet: `Hoehe` in teil.dh.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "haupt.dh")
+DIM roh AS STRING : roh = lesen$(pc)
+PRINT "fehlalarm "; INSTR(roh, "'hoehe' ist als 'HOEHE'") >= 0
+PRINT "echt "; INSTR(roh, "'Hoehe' ist als 'hoehe'") >= 0
+--- datei haupt.dh
+CONST HOEHE = 500
+IMPORT "teil.dh" AS teil
+teil.setzen()
+PRINT HOEHE; " "; teil.lesen()
+
+--- datei teil.dh
+DIM hoehe AS INTEGER
+SUB setzen()
+    hoehe = 7
+END SUB
+FUNCTION lesen() AS INTEGER
+    RETURN Hoehe
+END FUNCTION
+
+--- erwartet
+fehlalarm FALSE
+echt TRUE

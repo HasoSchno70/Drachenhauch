@@ -1473,3 +1473,15 @@ laesst raylib nur zwischen etwa einem Achtel und einem Viertel davon zu).
 Aufgefallen beim Vermessen: der Torus steht aufrecht in x-y, er liegt
 nicht. `grafik_etappe3.dhtest` (ein Fall); Gegenproben: ohne Umrechnung
 faellt der Ring (0.30 statt 1.15) bzw. der Knoten (0.3 statt 2.0).
+
+Kapitel 26 (Das grosse Finale) teilt eine Demo in Dateien, jede mit
+`IMPORT "x.dh" AS x` als Namensraum. `flug.dh` hat ein `DIM hoehe`, das
+Hauptprogramm ein `CONST HOEHE` -- und jeder Lauf meldete in flug.dh
+"'hoehe' ist als 'HOEHE' angelegt". Die Werte stimmten (der Namensraum
+sieht HOEHE gar nicht), nur die Schreibweisen-Pruefung schaute ueber die
+Grenze: Sie laeuft ueber die gemergte Quelle und kannte keine Namensraeume.
+Jetzt bekommt sie aus der Herkunftstabelle einen Raum je Zeile
+(`preprocess::raeume_je_zeile`); eine Deklaration zaehlt nur fuer Woerter
+im eigenen Raum. `schreibweise.dhtest` (ein Fall: kein Fehlalarm ueber die
+Grenze, aber `Hoehe` neben `DIM hoehe` in derselben Datei wird weiter
+gemeldet); Gegenprobe: ohne den Raumvergleich faellt er an "fehlalarm".
