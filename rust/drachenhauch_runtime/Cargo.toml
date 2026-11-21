@@ -206,11 +206,11 @@ mp4 = { version = "0.14", optional = true }
 # Automation), damit Bildschirmleser, Lupe und Sprachsteuerung ihn sehen.
 # Reines Rust; der Baum wird nur gebaut, wenn ein Hilfsprogramm danach fragt.
 accesskit = { version = "0.25", optional = true }
-cranelift-codegen = { version = "0.136", optional = true }
-cranelift-frontend = { version = "0.136", optional = true }
-cranelift-jit = { version = "0.136", optional = true }
-cranelift-module = { version = "0.136", optional = true }
-cranelift-native = { version = "0.136", optional = true }
+cranelift-codegen = { version = "0.138", optional = true }
+cranelift-frontend = { version = "0.138", optional = true }
+cranelift-jit = { version = "0.138", optional = true }
+cranelift-module = { version = "0.138", optional = true }
+cranelift-native = { version = "0.138", optional = true }
 # Fremde Bibliotheken laden (DECLARE ... LIB, src/ffi.rs).
 libloading = { version = "0.9", optional = true }
 
