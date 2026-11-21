@@ -1089,6 +1089,35 @@ For infinite generators use `CORO_RESUME`/`CORO_DONE` manually instead.
 
 Complete example: [examples/98_coroutines.dh](../../examples/98_coroutines.dh).
 
+## Comprehensions
+
+A comprehension builds a new sequence from another one, in one line:
+
+```basic
+DIM werte AS ARRAY OF FLOAT
+werte = [1.5, 2.5, 30.0]
+DIM doppelt AS ARRAY OF FLOAT
+doppelt = [w * 2 FOR w IN werte]            ' 3.0, 5.0, 60.0
+DIM warm AS TUPLE
+warm = [w FOR w IN werte WHERE w > 2]       ' (2.5, 30.0)
+DIM buchstaben AS TUPLE
+buchstaben = {c FOR c IN "banane"}          ' (b, a, n, e) -- each once
+DIM preise AS MAP OF FLOAT
+preise = {name: 1.5 FOR name IN ("Brot", "Milch")}
+```
+
+- `[expression FOR x IN sequence]` gives a TUPLE with one value per
+  element; `WHERE condition` lets through only what meets it. The sequence
+  may be an array, a tuple, a string (character by character), a MAP (its
+  keys) or a coroutine.
+- Assigned to an `ARRAY OF T`, the tuple becomes an array, like a literal
+  `[...]`: whole numbers are rebuilt as FLOAT, a value that does not fit
+  stops the assignment. Up to 2026.52 this said "expected ARRAY OF FLOAT,
+  got TUPLE".
+- `{expression FOR x IN sequence}` is a set: each value only once, in the
+  order it first appeared (a TUPLE).
+- `{key: value FOR x IN sequence}` builds a MAP; the key is a string.
+
 ## Arrays
 
 One-dimensional:

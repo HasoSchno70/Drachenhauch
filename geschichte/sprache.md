@@ -1357,3 +1357,16 @@ rechts sicher eine Zahl steht. Aufrufe von Koroutinen haben dort keinen
 festen Typ und bleiben still. Im ganzen Repo traf es keine Zeile.
 `coroutines.dhtest` (ein Fall); Gegenprobe: ohne den Zweig in `coerce`
 laeuft er durch.
+
+Kapitel 22 (Die Datenwerkstatt) formt Wetterdaten mit Comprehensions um
+und zeichnet sie. `[w * 2 FOR w IN werte]` liefert ein TUPLE (so war es
+seit der ersten Fassung gebaut, BUILD_TUPLE_DYN), sieht aber aus wie ein
+Feld -- an ein `ARRAY OF FLOAT` zugewiesen hiess es "Erwartet ARRAY OF
+FLOAT, erhalten TUPLE", und `passt_nie` warnte schon beim Uebersetzen.
+Jetzt baut `coerce_array` aus einem TUPLE ein frisches Feld (wie ein
+Literal, `array_literal`) und prueft es nach denselben Regeln: Ganzzahlen
+an FLOAT werden umgebaut, Falsches bricht ab; `feld_passt_nie` laesst ein
+Tupel an einem Feld durch, an einer MAP nicht. Das Handbuch hatte keinen
+Abschnitt zu Comprehensions; jetzt steht er vor "Arrays".
+`comprehensions.dhtest` (ein Fall); Gegenprobe: ohne den Umbau faellt er
+an der ersten Zuweisung.

@@ -236,3 +236,33 @@ r = [x FOR x IN 42]
 --- fehler
 Comprehension: nicht iterierbar (INTEGER)
 
+
+=== eine comprehension passt in ein typisiertes feld
+' `[w * 2 FOR w IN werte]` liefert ein TUPLE, sieht aber aus wie ein Feld
+' -- an ein `ARRAY OF FLOAT` zugewiesen hiess es "Erwartet ARRAY OF FLOAT,
+' erhalten TUPLE" (Buch "Kleine Wunder", Kapitel 22). Jetzt baut das Ziel
+' ein frisches Feld daraus, mit denselben Regeln wie fuer ein Literal:
+' Ganzzahlen werden an FLOAT umgebaut, Falsches bricht ab. An einer MAP
+' bleibt ein Tupel ein Fehler.
+DIM werte AS ARRAY OF FLOAT
+werte = [1.5, 2.5, 30.0]
+DIM doppelt AS ARRAY OF FLOAT
+doppelt = [w * 2 FOR w IN werte]
+PRINT doppelt[2]; " "; LEN(doppelt)
+DIM ganz AS ARRAY OF FLOAT
+ganz = [n FOR n IN (1, 2, 3)]
+PRINT ganz[0]
+DIM warm AS ARRAY OF FLOAT
+warm = [w FOR w IN werte WHERE w > 2]
+PRINT LEN(warm)
+TRY
+    DIM zahlen AS ARRAY OF INTEGER
+    zahlen = [w FOR w IN werte]
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+60.0 3
+1.0
+2
+Zuweisung an 'zahlen': Erwartet ARRAY OF INTEGER, erhalten ARRAY OF FLOAT

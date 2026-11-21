@@ -2125,9 +2125,10 @@ impl Compiler {
                 }
                 true
             }
-            // Nicht dieselbe Art: eine Zahl, ein Text, ein Objekt, ein Tupel,
-            // ein Feld an eine MAP oder eine MAP an ein Feld passen nie.
-            None => bekannt(quelle) || quelle == "tuple"
+            // Nicht dieselbe Art: eine Zahl, ein Text, ein Objekt, ein Feld
+            // an eine MAP oder eine MAP an ein Feld passen nie. Ein Tupel an
+            // ein Feld wird umgebaut (`coerce_array`), an eine MAP nicht.
+            None => bekannt(quelle) || (quelle == "tuple" && art == "map:")
                 || quelle.starts_with("map:") || quelle.starts_with("array:"),
         }
     }

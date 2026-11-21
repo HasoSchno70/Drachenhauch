@@ -1092,6 +1092,36 @@ Bei unendlichen Generatoren stattdessen manuell `CORO_RESUME`/`CORO_DONE`.
 
 Vollständiges Beispiel: [examples/98_coroutines.dh](../examples/98_coroutines.dh).
 
+## Comprehensions
+
+Eine Comprehension baut aus einer Folge eine neue, in einer Zeile:
+
+```basic
+DIM werte AS ARRAY OF FLOAT
+werte = [1.5, 2.5, 30.0]
+DIM doppelt AS ARRAY OF FLOAT
+doppelt = [w * 2 FOR w IN werte]            ' 3.0, 5.0, 60.0
+DIM warm AS TUPLE
+warm = [w FOR w IN werte WHERE w > 2]       ' (2.5, 30.0)
+DIM buchstaben AS TUPLE
+buchstaben = {c FOR c IN "banane"}          ' (b, a, n, e) -- jeder einmal
+DIM preise AS MAP OF FLOAT
+preise = {name: 1.5 FOR name IN ("Brot", "Milch")}
+```
+
+- `[ausdruck FOR x IN folge]` liefert ein TUPLE mit einem Wert je Element;
+  `WHERE bedingung` lässt nur durch, was sie erfüllt. Die Folge darf ein
+  Feld, ein Tupel, ein Text (Zeichen für Zeichen), eine MAP (die Schlüssel)
+  oder eine Koroutine sein.
+- An ein `ARRAY OF T` zugewiesen wird das Tupel zu einem Feld, wie ein
+  Literal `[...]`: Ganzzahlen werden an FLOAT umgebaut, ein Wert, der nicht
+  passt, bricht die Zuweisung ab. Bis 2026.52 hieß das „Erwartet ARRAY OF
+  FLOAT, erhalten TUPLE“.
+- `{ausdruck FOR x IN folge}` ist eine Menge: jeder Wert nur einmal, in der
+  Reihenfolge, in der er zuerst vorkam (ein TUPLE).
+- `{schluessel: wert FOR x IN folge}` baut eine MAP; der Schlüssel ist ein
+  Text.
+
 ## Arrays
 
 Eindimensional:

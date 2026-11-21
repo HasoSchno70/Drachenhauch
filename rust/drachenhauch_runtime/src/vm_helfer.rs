@@ -1082,6 +1082,15 @@ pub(super) fn coerce_map(value: Value, vt: &str, ctx: &str) -> R<Value> {
 #[inline(never)]
 pub(super) fn coerce_array(value: Value, elem: &str, ctx: &str) -> R<Value> {
     if matches!(value, Value::Nil) { return Ok(value); }
+    // Ein TUPLE an einem Feld-Ziel: daraus ein frisches Feld bauen, wie aus
+    // einem Literal `[...]`, und das pruefen wie jedes andere. So passt eine
+    // Comprehension `[w * 2 FOR w IN werte]` -- sie liefert ein TUPLE, sieht
+    // aber aus wie ein Feld -- in ein `ARRAY OF FLOAT` (Buch "Kleine Wunder",
+    // Kapitel 22). Ein Tupel ist unveraenderlich; die Kopie verliert nichts.
+    if let Value::Tuple(items) = &value {
+        let feld = array_literal(items.as_ref().clone());
+        return coerce_array(feld, elem, ctx);
+    }
     let ziel = if elem.is_empty() { "ARRAY".to_string() }
                else { format!("ARRAY OF {}", typ_lesbar(elem)) };
     let arr = match &value {
