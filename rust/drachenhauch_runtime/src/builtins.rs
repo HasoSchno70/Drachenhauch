@@ -3676,7 +3676,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             let ordner = std::env::temp_dir();
             for _ in 0..64 {
                 let mut roh = [0u8; 8];
-                if getrandom::getrandom(&mut roh).is_err() { return err("TEMPFILE$: keine Zufallsquelle"); }
+                if getrandom::fill(&mut roh).is_err() { return err("TEMPFILE$: keine Zufallsquelle"); }
                 let name = format!("{}{}{}", praefix,
                                    roh.iter().map(|b| format!("{:02x}", b)).collect::<String>(),
                                    endung);
@@ -4016,7 +4016,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             // RND-Generator dieser Datei: der ist gesaet und vorhersagbar
             // (RANDOMIZE(1) liefert zweimal dieselbe Folge). Fuer ein
             // Wuerfelspiel richtig, fuer ein Passwort ein Fehler.
-            getrandom::getrandom(&mut out)
+            getrandom::fill(&mut out)
                 .map_err(|e| format!("RANDOM_BYTES: Zufallsquelle des Systems nicht verfuegbar: {}", e))?;
             Ok(neuer_buffer(out))
         }

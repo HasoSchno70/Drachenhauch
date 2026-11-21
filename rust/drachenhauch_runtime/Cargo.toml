@@ -91,7 +91,7 @@ sha1 = "0.11"
 md-5 = "0.11"
 hmac = "0.13"
 uuid = { version = "1", features = ["v4"] }
-getrandom = "0.2"
+getrandom = "0.4"
 # mDNS-Antworter (src/mdns.rs): SO_REUSEADDR/-PORT auf 5353 neben dem
 # Antworter des Systems; dieselbe Fassung, die schon im Baum liegt.
 socket2 = { version = "0.6.5", features = ["all"] }
