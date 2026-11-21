@@ -1,0 +1,134 @@
+' Loesung zu Kapitel 21, Erweitern 2: ein Tutorial, das auf den
+' Spieler wartet. Vor jedem Niesen sagt der Drache, welche Taste es
+' ausloest, und das Drehbuch wartet, bis sie kommt.
+' Die Stellen, die neu sind, stehen zwischen >>> und <<<.
+IMPORT "../kap21/figur.dh"
+
+' YIELD mit dieser Zahl heisst: warten, bis niemand mehr geht.
+CONST BIS_ALLE_STEHEN = -1
+' >>> neu
+' YIELD mit dieser Zahl heisst: warten, bis die Leertaste kommt.
+CONST AUF_TASTE = -2
+' <<< neu
+
+DIM drache AS Figur
+drache = NEW Figur("drache", -80, 34, RGB(90, 180, 110), 120)
+DIM igel AS Figur
+igel = NEW Figur("igel", BREITE + 60, 26, RGB(150, 110, 80), 70)
+
+' Die Funken des Drachen.
+DIM fx AS ARRAY OF FLOAT
+DIM fy AS ARRAY OF FLOAT
+DIM fvx AS ARRAY OF FLOAT
+DIM fvy AS ARRAY OF FLOAT
+DIM fleben AS ARRAY OF FLOAT
+
+SUB funken(n AS INTEGER)
+    DIM k AS INTEGER
+    FOR k = 1 TO n
+        ARRAY_PUSH(fx, drache.x + drache.schaut * 40)
+        ARRAY_PUSH(fy, BODEN - 40)
+        ARRAY_PUSH(fvx, drache.schaut * (60 + RND() * 160))
+        ARRAY_PUSH(fvy, -60 - RND() * 120)
+        ARRAY_PUSH(fleben, 0.6 + RND() * 0.6)
+    NEXT
+END SUB
+
+' Die Sterne gehen am Ende langsam an.
+DIM sterne AS FLOAT
+DIM sterne_an AS BOOLEAN
+
+' Das Drehbuch. Jedes YIELD sagt, wie lange gewartet wird; danach geht
+' es in der naechsten Zeile weiter, als waere nichts gewesen.
+FUNCTION szene() AS FLOAT
+    YIELD 1
+    drache.gehe_zu(260)
+    YIELD BIS_ALLE_STEHEN
+    YIELD sagen(drache, "Ist hier jemand?")
+    drache.text = ""
+    YIELD 1.5
+    igel.gehe_zu(560)
+    YIELD BIS_ALLE_STEHEN
+    YIELD sagen(igel, "Psst! Du weckst den ganzen Wald.")
+    igel.text = ""
+    YIELD sagen(drache, "Verzeihung. Ich uebe nur Feuer.")
+    drache.text = ""
+    ' Drei Versuche, jeder ein bisschen kraeftiger.
+    DIM versuch AS INTEGER
+    FOR versuch = 1 TO 3
+        ' >>> neu
+        drache.text = "Leertaste: niesen (" + STR$(versuch) + " von 3)"
+        YIELD AUF_TASTE
+        drache.text = ""
+        ' <<< neu
+        funken(versuch * versuch * 8)
+        YIELD 1
+    NEXT
+    YIELD sagen(igel, "War das ... ein Niesen?")
+    igel.text = ""
+    sterne_an = TRUE
+    YIELD sagen(drache, "Immerhin leuchtet es jetzt.")
+    drache.text = ""
+    igel.gehe_zu(430)
+    YIELD BIS_ALLE_STEHEN
+    YIELD sagen(igel, "Na gut. Gute Nacht, Drache.")
+    igel.text = ""
+    RETURN 0
+END FUNCTION
+
+SCREEN(BREITE, HOEHE, "Geschichten, die warten")
+DIM ablauf AS COROUTINE : ablauf = szene()
+DIM warte AS FLOAT
+
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
+    DIM dt AS FLOAT : dt = DELTA()
+
+    ' Ist das Warten vorbei, geht das Drehbuch eine Zeile weiter.
+    IF NOT CORO_DONE(ablauf) THEN
+        DIM weiter AS BOOLEAN
+        ' >>> neu
+        IF warte = BIS_ALLE_STEHEN THEN
+            weiter = NOT drache.geht() AND NOT igel.geht()
+        ELSEIF warte = AUF_TASTE THEN
+            weiter = KEY_HIT(KEY_SPACE)
+        ELSE
+            warte = warte - dt
+            weiter = warte <= 0 OR KEY_HIT(KEY_SPACE)
+        END IF
+        ' <<< neu
+        IF weiter THEN warte = CORO_RESUME(ablauf)
+    END IF
+
+    drache.schritt(dt)
+    igel.schritt(dt)
+    IF sterne_an THEN sterne = MIN(1, sterne + dt * 0.4)
+
+    lichtung()
+    DIM s AS INTEGER
+    FOR s = 0 TO 40
+        CIRCLE((s * 197) MOD BREITE, (s * 89) MOD 260, 1.5, _
+               RGBA(255, 255, 230, sterne * 220))
+    NEXT
+    drache.zeichnen()
+    igel.zeichnen()
+
+    ' Die Funken: fliegen, fallen, verloeschen.
+    DIM k AS INTEGER
+    FOR k = LEN(fx) - 1 TO 0 STEP -1
+        fvy[k] = fvy[k] + 300 * dt
+        fx[k] = fx[k] + fvx[k] * dt
+        fy[k] = fy[k] + fvy[k] * dt
+        fleben[k] = fleben[k] - dt
+        IF fleben[k] <= 0 THEN
+            ARRAY_REMOVE_AT(fx, k)
+            ARRAY_REMOVE_AT(fy, k)
+            ARRAY_REMOVE_AT(fvx, k)
+            ARRAY_REMOVE_AT(fvy, k)
+            ARRAY_REMOVE_AT(fleben, k)
+        ELSE
+            CIRCLE(fx[k], fy[k], 3, _
+                   RGBA(255, 200, 80, MIN(1, fleben[k]) * 255))
+        END IF
+    NEXT
+    FLIP()
+WEND

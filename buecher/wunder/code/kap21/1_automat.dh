@@ -1,0 +1,71 @@
+' Kapitel 21, Schritt 1 -- der Anfang der Szene als Zustandsautomat:
+' Jeder Abschnitt des Ablaufs ist ein Zustand mit einer Nummer, und in
+' jedem Bild fragt das Programm, ob der Zustand vorbei ist und welcher
+' dann kommt.
+IMPORT "figur.dh"
+
+DIM drache AS Figur
+drache = NEW Figur("drache", -80, 34, RGB(90, 180, 110), 120)
+DIM igel AS Figur
+igel = NEW Figur("igel", BREITE + 60, 26, RGB(150, 110, 80), 70)
+
+DIM zustand AS INTEGER
+' Wie lange der Zustand schon dauert, und wie lange er dauern soll.
+DIM uhr AS FLOAT
+DIM dauer AS FLOAT
+
+SUB naechster(z AS INTEGER)
+    zustand = z
+    uhr = 0
+END SUB
+
+SCREEN(BREITE, HOEHE, "Zustandsautomat")
+WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
+    DIM dt AS FLOAT : dt = DELTA()
+    uhr = uhr + dt
+    SELECT CASE zustand
+    CASE 0
+        ' Stille zu Beginn.
+        IF uhr > 1 THEN
+            drache.gehe_zu(260)
+            naechster(1)
+        END IF
+    CASE 1
+        ' Der Drache geht -- bis er steht.
+        IF NOT drache.geht() THEN
+            dauer = sagen(drache, "Ist hier jemand?")
+            naechster(2)
+        END IF
+    CASE 2
+        ' Der Drache spricht.
+        IF uhr > dauer THEN
+            drache.text = ""
+            naechster(3)
+        END IF
+    CASE 3
+        ' Eine Pause.
+        IF uhr > 1.5 THEN
+            igel.gehe_zu(560)
+            naechster(4)
+        END IF
+    CASE 4
+        ' Der Igel geht.
+        IF NOT igel.geht() THEN
+            dauer = sagen(igel, "Psst! Du weckst den ganzen Wald.")
+            naechster(5)
+        END IF
+    CASE 5
+        ' Der Igel spricht -- und dann?
+        IF uhr > dauer THEN
+            igel.text = ""
+            naechster(6)
+        END IF
+    END SELECT
+
+    drache.schritt(dt)
+    igel.schritt(dt)
+    lichtung()
+    drache.zeichnen()
+    igel.zeichnen()
+    FLIP()
+WEND

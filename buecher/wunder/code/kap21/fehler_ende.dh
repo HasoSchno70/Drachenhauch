@@ -1,0 +1,12 @@
+' Kapitel 21, was schiefgehen kann: das Drehbuch als SUB, ohne RETURN.
+SUB szene()
+    YIELD 1.5
+    YIELD 2
+END SUB
+
+DIM ablauf AS COROUTINE : ablauf = szene()
+DIM warte AS FLOAT
+WHILE NOT CORO_DONE(ablauf)
+    warte = CORO_RESUME(ablauf)
+    PRINT "warten: "; warte
+WEND

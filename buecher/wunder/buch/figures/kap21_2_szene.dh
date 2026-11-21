@@ -1,0 +1,4 @@
+' Bild fuer Kapitel 21: die Szene, als die Sterne angehen.
+RANDOMIZE(21)
+CHDIR("../../code/kap21")
+IMPORT "../../code/kap21/2_szene.dh"
