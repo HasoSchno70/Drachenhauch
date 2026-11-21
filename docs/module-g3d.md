@@ -99,7 +99,7 @@ Hilfslinien. Wer dieselbe Form oft braucht, nimmt ein Modell (siehe unten).
 | `LIGHT_ENABLE()` | — | Beleuchtung einschalten (einmalig; es gibt kein Gegenstück zum Ausschalten) |
 | `LIGHT_AMBIENT(color, strength)` | — | Grundhelligkeit, damit Schattenseiten nicht schwarz absaufen |
 | `LIGHT_DIRECTIONAL(x, y, z, color)` | INTEGER | Licht aus einer Richtung, wie die Sonne — liefert die Lichtnummer |
-| `LIGHT_POINT(x, y, z, color)` | INTEGER | Licht von einem Punkt aus, wie eine Lampe |
+| `LIGHT_POINT(x, y, z, color)` | INTEGER | Licht von einem Punkt aus, wie eine Lampe; mit der Entfernung schwächer: in 4 Einheiten etwa halb so hell, in 10 ein Fünftel (bis 2026.52 fiel es mit 1/d² ab und war schon in 4 Einheiten fast dunkel) |
 | `LIGHT_SET_POS(light, x, y, z)` | — | Licht bewegen |
 | `LIGHT_SET_COLOR(light, color)` | — | Lichtfarbe ändern |
 | `LIGHT_SET_ENABLED(light [, on])` | — | einzelnes Licht an- oder ausschalten |

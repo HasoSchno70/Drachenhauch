@@ -100,7 +100,7 @@ and guide lines. Anyone who needs the same shape often uses a model (see below).
 | `LIGHT_ENABLE()` | — | switch lighting on (once; there is no counterpart for switching it off) |
 | `LIGHT_AMBIENT(color, strength)` | — | base brightness, so that shadow sides do not sink into black |
 | `LIGHT_DIRECTIONAL(x, y, z, color)` | INTEGER | light from one direction, like the sun — returns the light number |
-| `LIGHT_POINT(x, y, z, color)` | INTEGER | light from a point, like a lamp |
+| `LIGHT_POINT(x, y, z, color)` | INTEGER | light from a point, like a lamp; weaker with distance: about half as bright at 4 units, a fifth at 10 (up to 2026.52 it fell off with 1/d² and was almost dark at 4 units already) |
 | `LIGHT_SET_POS(light, x, y, z)` | — | move a light |
 | `LIGHT_SET_COLOR(light, color)` | — | change the light colour |
 | `LIGHT_SET_ENABLED(light [, on])` | — | switch a single light on or off |

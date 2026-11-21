@@ -783,7 +783,11 @@ void main()
             L = -normalize(lights[i].target - lights[i].position);
         } else {
             vec3 d = lights[i].position - fragPosition;
-            L = normalize(d); float dist = length(d); atten = 1.0/(dist*dist);
+            // Derselbe Abfall wie im Instancing-Shader: mit 1/d^2 kam in 4
+            // Einheiten ein Sechzehntel an, ein Punktlicht war ausserhalb
+            // einer Armlaenge kaum zu sehen (Buch "Kleine Wunder", Kap. 24).
+            L = normalize(d); float dist = length(d);
+            atten = 1.0/(1.0 + 0.09*dist + 0.032*dist*dist);
         }
         vec3 H = normalize(V + L);
         vec3 radiance = lights[i].color.rgb*atten;

@@ -66,3 +66,35 @@ DHRT_FRAMES=3
 groesse 320 200
 150 100 <> 120 100
 172 100 <> 190 100
+
+=== ein punktlicht erhellt den boden auch in vier einheiten
+' Bis 2026.52 fiel ein Punktlicht im Licht-Shader mit 1/d^2 ab: in vier
+' Einheiten kam ein Sechzehntel an, der Boden darunter blieb fast schwarz
+' (46 von 255), waehrend MODEL_INSTANCED mit demselben Licht 200 zeigte.
+' Jetzt fallen beide gleich ab (Buch "Kleine Wunder", Kapitel 24: ein
+' Sonnensystem, dessen Planeten schwarz blieben). Links MODEL, rechts
+' MODEL_INSTANCED, je ein Punktlicht vier Einheiten darueber.
+IMPORT "g3d"
+IMPORT "m3d"
+SCREEN(320, 200, "punkt", 1)
+LIGHT_ENABLE()
+LIGHT_AMBIENT(&HFFFFFF, 0.0)
+LIGHT_POINT(-2.5, 4, 0, &HFFFFFF)
+LIGHT_POINT(2.5, 4, 0, &HFFFFFF)
+DIM w AS INTEGER : w = MESH_CUBE(2, 0.2, 2) : MODEL_LIT(w)
+DIM v AS INTEGER : v = MESH_CUBE(2, 0.2, 2) : MODEL_LIT(v)
+DIM m[1] AS MAT4
+m[0] = MAT4_TRANSLATE(2.5, 0, 0)
+WHILE NOT QUITREQUESTED()
+    CLS(&H000000)
+    CAMERA3D(0, 12, 0.01, 0, 0, 0, 40)
+    MODEL(w, -2.5, 0, 0, 1.0, &HFFFFFF)
+    MODEL_INSTANCED(v, m, &HFFFFFF)
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=3
+--- bild
+groesse 320 200
+87 100 nicht #000000 +-80
+233 100 nicht #000000 +-80

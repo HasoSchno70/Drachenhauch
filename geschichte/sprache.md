@@ -1437,3 +1437,15 @@ finden. (os error 2)" -- ohne den Namen der Datei. Zum Lesen fragt
 steht der Name vor dem Text des Betriebssystems. `umstieg.dhtest` (zwei
 Faelle); Gegenprobe: ohne `datei_da` bzw. mit der alten Meldung faellt je
 der eine.
+
+Kapitel 24 (Wuerfel, Licht und Schatten) hat als Uebung ein
+Sonnensystem: ein Punktlicht in der Sonne, Planeten in 6 und 10 Einheiten.
+Die Planeten blieben fast schwarz. Der Licht-Shader liess ein Punktlicht
+mit 1/d^2 abfallen -- in 4 Einheiten ein Sechzehntel, auch der blaue
+Lichtfleck in `examples/91_lighting.dh` war kaum zu ahnen --, der
+Instancing-Shader dagegen mit 1/(1 + 0.09 d + 0.032 d^2). Gemessen unter
+einem Licht 4 Einheiten ueber dem Boden: 46 von 255 mit `MODEL`, 200 mit
+`MODEL_INSTANCED`. Jetzt rechnet der Licht-Shader denselben Abfall (118;
+der Rest ist der Unterschied zwischen PBR und Blinn-Phong).
+`g3d_licht.dhtest` (ein Fall); Gegenprobe: mit 1/d^2 faellt er an
+#2E2E2E.
