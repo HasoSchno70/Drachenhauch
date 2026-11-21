@@ -263,7 +263,7 @@ accesskit_macos = { version = "0.27", optional = true }
 libc = "0.2"
 
 [target.'cfg(all(unix, not(target_os = "macos"), not(target_os = "emscripten")))'.dependencies]
-accesskit_unix = { version = "0.23", optional = true, features = ["async-io"] }
+accesskit_unix = { version = "0.24", optional = true, features = ["async-io"] }
 # Tray-Symbol unter Linux (tray.rs): StatusNotifierItem und com.canonical.dbusmenu
 # ueber D-Bus. Dieselbe zbus-Fassung, die AccessKit ohnehin mitbringt; dazu nur
 # die blockierende Schnittstelle.
