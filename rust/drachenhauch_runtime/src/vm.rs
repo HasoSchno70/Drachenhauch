@@ -1764,7 +1764,6 @@ impl<'p> Vm<'p> {
 
     /// Fuer Rueckrufe aus einer fremden Bibliothek (ffi.rs): einen
     /// Funktionswert (FUNCREF, gebundene Methode, Lambda) mit Argumenten rufen.
-    #[cfg_attr(not(feature = "ffi"), allow(dead_code))]
     pub(crate) fn wert_rufen(&mut self, wert: &Value, args: Vec<Value>, kontext: &str) -> R<Value> {
         let cb = crate::value::Rueckruf::aus_wert(wert)
             .ok_or_else(|| format!("{}: erwartet eine Funktion, erhalten {}", kontext, wert.type_name()))?;
@@ -2318,8 +2317,13 @@ impl<'p> Vm<'p> {
                     unsafe { &*(f_p as *const Func) }
                 } else {
                     let cn = rc.borrow().class_name.clone();
-                    let m = self.resolve_method(&cn, method)
-                        .ok_or_else(|| format!("Methode '{}' existiert nicht in {}", method, cn))?;
+                    let m = match self.resolve_method(&cn, method) {
+                        Some(m) => m,
+                        None => match feld_rufbar(rc, method) {
+                            Some(f) => return self.wert_rufen(&f, margs, method),
+                            None => return Err(format!("Methode '{}' existiert nicht in {}", method, cn)),
+                        },
+                    };
                     instr.merk.set((Rc::as_ptr(&rc.borrow().layout), m as *const Func as usize));
                     m
                 };
@@ -3580,8 +3584,20 @@ impl<'p> Vm<'p> {
                                 unsafe { &*(f_p as *const Func) }
                             } else {
                                 let cn = rc.borrow().class_name.clone();
-                                let m = self.resolve_method(&cn, method)
-                                    .ok_or_else(|| format!("Methode '{}' existiert nicht in {}", method, cn))?;
+                                let m = match self.resolve_method(&cn, method) {
+                                    Some(m) => m,
+                                    None => match feld_rufbar(rc, method) {
+                                        // Ein Feld mit einem Funktionswert: ihn rufen.
+                                        Some(f) => {
+                                            let margs: Vec<Value> = stack.drain(split..).collect();
+                                            stack.pop();
+                                            let ret = self.wert_rufen(&f, margs, method)?;
+                                            stack.push(ret);
+                                            continue;
+                                        }
+                                        None => return Err(format!("Methode '{}' existiert nicht in {}", method, cn)),
+                                    },
+                                };
                                 byref_ohne_typ(m, method, &cn, argc)?;
                                 instr.merk.set((Rc::as_ptr(&rc.borrow().layout), m as *const Func as usize));
                                 m
@@ -3612,8 +3628,17 @@ impl<'p> Vm<'p> {
                     match &obj {
                         Value::Instance(rc) => {
                             let cn = rc.borrow().class_name.clone();
-                            let m = self.resolve_method(&cn, method)
-                                .ok_or_else(|| format!("Methode '{}' existiert nicht in {}", method, cn))?;
+                            let m = match self.resolve_method(&cn, method) {
+                                Some(m) => m,
+                                None => match feld_rufbar(rc, method) {
+                                    Some(f) => {
+                                        let ret = self.wert_rufen(&f, margs, method)?;
+                                        stack.push(ret);
+                                        continue;
+                                    }
+                                    None => return Err(format!("Methode '{}' existiert nicht in {}", method, cn)),
+                                },
+                            };
                             byref_ohne_typ(m, method, &cn, argc)?;
                             if m.is_coroutine {
                                 stack.push(make_coro(m, margs, Some(obj.clone())));

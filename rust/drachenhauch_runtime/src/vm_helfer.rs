@@ -1299,3 +1299,17 @@ pub(super) fn zahl_arg(a: &[Value], i: usize, f: &str) -> R<f64> {
         _ => Err(format!("{}: erwartet eine Zahl (Arg {})", f, i + 1)),
     }
 }
+
+/// `obj.name(...)` ohne Methode dieses Namens, aber mit einem Feld, das
+/// einen Funktionswert haelt (FUNCREF, Lambda, gebundene Methode): Dann ist
+/// der Aufruf der Aufruf dieses Werts. Bis dahin hiess es "Methode existiert
+/// nicht", und ein Lambda im Feld liess sich nur ueber eine lokale Variable
+/// rufen (Buch "Kleine Wunder", Kapitel 20: ein Effekt aus drei Lambdas).
+pub(super) fn feld_rufbar(rc: &Rc<std::cell::RefCell<Instance>>, name: &str) -> Option<Value> {
+    let b = rc.borrow();
+    let i = b.platz(&name.to_lowercase())?;
+    match &b.fields[i] {
+        v @ (Value::FuncRef(_) | Value::BoundMethod(_) | Value::Closure(_)) => Some(v.clone()),
+        _ => None,
+    }
+}

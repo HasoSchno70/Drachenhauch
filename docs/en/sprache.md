@@ -968,6 +968,12 @@ f)`, `ARRAY_MAP/FILTER/REDUCE/FIND`, `GUI_ON_CLICK` and the other
 `GUI_ON_*`, `TIMER_AFTER/EVERY`, `TASK_START` and every parameter of your own
 declared `AS FUNCREF`.
 
+When a FUNCREF sits in a field of an object, you call it like a method:
+`effekt.zug(t, dt)`; inside a method of the same class `zug(t, dt)` is
+enough, as with any field without `Self.`. A method of the same name comes
+first. Up to 2026.52 this said "method does not exist", and the field could
+only be called through a local variable.
+
 ### Lambdas
 
 The notation is that of VB.NET:

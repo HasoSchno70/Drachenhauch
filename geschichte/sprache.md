@@ -1320,3 +1320,19 @@ keines; das Bild bleibt leer, ohne Meldung. Jetzt melden sich `AUDIO_FFT`,
 geht (`vm_grafik::leeres_feld`). `modules_audio.dhtest` und
 `mikrofon.dhtest` (je ein Fall, die Pruefung kommt vor Soundkarte und
 Mikrofon); Gegenprobe: ohne die Pruefung fallen beide.
+
+Kapitel 20 (Die Partikelmaschine) baut einen Effekt aus drei Lambdas, die
+in Feldern eines Objekts stehen (`DIM zug AS FUNCREF`). `zug(t, dt)` in
+einer Methode suchte einen Befehl ZUG ("Unbekanntes Builtin"), und von
+aussen hiess `r.wie(5)` "Methode 'wie' existiert nicht" -- ein Funktionswert
+im Feld liess sich nur ueber eine lokale Variable rufen, obwohl das
+Handbuch sagt, ein FUNCREF werde aufgerufen wie eine Funktion. Jetzt: Der
+Compiler uebersetzt den blossen Namen eines FUNCREF-Felds in einer Methode
+als Aufruf des Werts `Self.feld` (nach den Methoden, vor den globalen
+Funktionen), und CALL_METHOD ruft, wenn es keine Methode findet, den
+Funktionswert eines gleichnamigen Felds (`vm_helfer::feld_rufbar`) -- so
+auch bei einem Objekt, dessen Klasse der Uebersetzer nicht kennt, und im
+Maschinencode-Weg (`methode_rufen`). Ein Feld ohne Funktionswert bleibt
+"Methode existiert nicht". `funcref.dhtest` (ein Fall, mit und ohne
+Maschinencode); Gegenproben: ohne den VM-Weg faellt er an `r.wie(5)`,
+ohne den Compiler-Weg an `wie(a)` in der Methode.

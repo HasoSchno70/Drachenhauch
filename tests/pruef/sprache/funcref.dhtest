@@ -228,3 +228,55 @@ PRINT foo
 --- erwartet
 99
 
+
+=== ein funktionswert in einem feld ruft sich wie eine methode
+' `obj.feld(...)` mit einem FUNCREF im Feld hiess "Methode existiert
+' nicht", und in einer Methode suchte `feld(...)` einen Befehl dieses
+' Namens. Ein Lambda im Objekt liess sich nur ueber eine lokale Variable
+' rufen (Buch "Kleine Wunder", Kapitel 20: ein Effekt aus drei Lambdas).
+' Jetzt ruft beides den Wert -- auch bei einem Objekt, dessen Klasse der
+' Uebersetzer nicht kennt (FOR EACH ueber ein Tupel). Ein Feld ohne
+' Funktion bleibt ein Fehler.
+CLASS Rechner
+    DIM wie AS FUNCREF
+    DIM tun AS FUNCREF
+    DIM zahl AS INTEGER
+    SUB Init(f AS FUNCREF)
+        wie = f
+        tun = SUB(x) PRINT "getan "; x
+    END SUB
+    FUNCTION innen(a AS INTEGER) AS INTEGER
+        RETURN wie(a) + 1
+    END FUNCTION
+    SUB los()
+        tun(7)
+    END SUB
+END CLASS
+DIM r AS Rechner : r = NEW Rechner(FUNCTION(x) x * 2)
+PRINT r.wie(5)
+PRINT r.innen(5)
+r.tun(3)
+r.los()
+FOR EACH q IN (r, r)
+    PRINT q.wie(21)
+NEXT
+DIM k AS INTEGER
+DIM summe AS INTEGER
+FOR k = 1 TO 100
+    summe = summe + r.wie(k)
+NEXT
+PRINT summe
+TRY
+    PRINT r.zahl(1)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+10
+11
+getan 3
+getan 7
+42
+42
+10100
+Methode 'zahl' existiert nicht in rechner

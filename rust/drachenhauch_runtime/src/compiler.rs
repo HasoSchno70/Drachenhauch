@@ -3935,6 +3935,23 @@ impl Compiler {
                 self.ctx.emit(oc::LOAD_SELF, Value::Null);
                 return self.methode_rufen(&name, args, &byref);
             }
+            // Ein Feld der Klasse, das eine Funktion haelt (`DIM zug AS
+            // FUNCREF`): `zug(t, dt)` ruft den Wert in `Self.zug` -- wie ein
+            // Feld sonst auch ohne `Self.` gemeint ist. Vor den globalen
+            // Funktionen, wie die Methoden (Buch "Kleine Wunder", Kapitel 20).
+            if self.feld_typ(&cn, &name.to_lowercase()).map_or(false, |t| t == "funcref") {
+                if has_named {
+                    return Err("Benannte Argumente gehen nur bei SUB/FUNCTION/NEW, nicht beim Aufruf eines Wertes".into());
+                }
+                let feld = Node::MemberAccess {
+                    target: Box::new(Node::Identifier("self".into())),
+                    name: name.clone(),
+                };
+                self.expr(&feld)?;
+                for a in args { self.expr(a)?; }
+                self.ctx.emit(oc::CALL_VALUE, json!([name.clone(), args.len()]));
+                return Ok(());
+            }
         }
         if let Some(d) = self.ffi_decls.get(&name.to_lowercase()).cloned() {
             if is_local || is_global {

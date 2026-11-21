@@ -971,6 +971,12 @@ f)`, `ARRAY_MAP/FILTER/REDUCE/FIND`, `GUI_ON_CLICK` und die anderen
 `GUI_ON_*`, `TIMER_AFTER/EVERY`, `TASK_START` und jeder eigene Parameter
 `AS FUNCREF`.
 
+Steht ein FUNCREF in einem Feld eines Objekts, ruft man es wie eine
+Methode: `effekt.zug(t, dt)`; in einer Methode der eigenen Klasse genügt
+`zug(t, dt)`, wie bei jedem Feld ohne `Self.`. Eine Methode desselben
+Namens geht vor. Bis 2026.52 hieß das „Methode existiert nicht“, und das
+Feld ließ sich nur über eine lokale Variable rufen.
+
 ### Lambdas
 
 Die Schreibweise ist die von VB.NET:
