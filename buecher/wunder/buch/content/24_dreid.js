@@ -1,6 +1,10 @@
 const { zeilen, stueck } = require("../code_lesen");
 
 module.exports = (H) => [
+  H.part("Teil VII · Die dritte Dimension"),
+
+  H.p("Bis hierher war alles flach. In diesem letzten Teil bekommt die Welt eine Tiefe: Körper im Raum, eine Kamera, die man herumträgt, Licht, Schatten und Dunst, eine Landschaft zum Hineinfliegen. Die Programme werden dabei nicht viel länger, denn das Schwere — welcher Punkt der Welt wo auf dem Bildschirm landet — rechnet die Grafikkarte. Zum Schluss kommt alles zusammen, was das Buch gezeigt hat, in einer Demo mit Musik, die man an andere weitergeben kann."),
+
   H.chapter("Würfel, Licht und Schatten", 24),
 
   H.h2("Was wir bauen"),
