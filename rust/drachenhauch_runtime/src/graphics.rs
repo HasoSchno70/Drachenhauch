@@ -9610,9 +9610,13 @@ fn render_scene<D: RaylibDraw>(
                         Cmd3D::CubeWires(x, y, z, w, h, dd, col) =>
                             d3.draw_cube_wires(Vector3::new(*x, *y, *z), *w, *h, *dd, *col),
                         Cmd3D::Sphere(x, y, z, r, col) =>
-                            d3.draw_sphere(Vector3::new(*x, *y, *z), *r, *col),
+                            // raylib 6.2 zaehlt `rings` als Baender, 6.0 zeichnete
+                            // rings + 1 (DrawSphere = 16/16 ergab 17 Baender) -- so
+                            // bleibt die Kugel, wie sie war.
+                            d3.draw_sphere_ex(Vector3::new(*x, *y, *z), *r, 17, 16, *col),
                         Cmd3D::SphereWires(x, y, z, r, col) =>
-                            d3.draw_sphere_wires(Vector3::new(*x, *y, *z), *r, 12, 12, *col),
+                            // Ebenso die Drahtkugel: 12 Ringe in 6.0 = 13 Baender in 6.2.
+                            d3.draw_sphere_wires(Vector3::new(*x, *y, *z), *r, 13, 12, *col),
                         Cmd3D::Cylinder(x, y, z, rt, rb, h, col) =>
                             d3.draw_cylinder(Vector3::new(*x, *y, *z), *rt, *rb, *h, 16, *col),
                         Cmd3D::Plane(x, y, z, sx, sz, col) =>
