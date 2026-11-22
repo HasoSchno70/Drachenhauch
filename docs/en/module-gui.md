@@ -3561,8 +3561,8 @@ IF GUI_FORM_CHANGED(win, "kunde") THEN nachfragen()
   writes `INSERT` (for `id < 0`, returns the new id) or `UPDATE`. The
   column is called `id` — SQLite's convention. Values are stored **typed**:
   a numeric field as a number (unless it starts with a zero before a digit
-  like the postcode `01234` — that stays text; `0,99` is a number), a
-  checkbox as 0/1, a dropdown as its index, a slider as a floating-point
+  like the postcode `01234` — that stays text; `0,99` is a number; empty
+  it is NULL), a checkbox as 0/1, a dropdown as its index, a slider as a floating-point
   number, everything else as text. A **money field** (`zahlen` 3) is typed
   and shown like a decimal with two places and bound as an INTEGER in
   cents — `48,50` in the field is `4850` in the column, and loading turns

@@ -1383,3 +1383,8 @@ am Zeilenende der Erwartung ab, die Ausgabe nicht.
   Loesung "eine Farbe je Art" fehlte die Abfrage zur Zellfarbe:
   GUI_TABLE_GET_CELL_COLOR und GUI_TABLE_GET_ROW_COLOR (`fg`/`bg`, -1 =
   nicht gesetzt).
+- **Leeres Zahlenfeld ist NULL (2026-11-22).** Kapitel 5 desselben Buchs
+  bindet das Erscheinungsjahr als Zahlenfeld: leer schrieb GUI_FORM_SAVE
+  den leeren Text in die INTEGER-Spalte, und das DB_GET_INT der Mediathek
+  aus Kapitel 4 scheiterte beim naechsten Laden. `wert_typisiert` liefert
+  fuer ein leeres Zahlenfeld jetzt NIL; geladen wird NULL als leeres Feld.

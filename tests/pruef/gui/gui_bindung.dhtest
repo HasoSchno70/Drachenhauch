@@ -406,3 +406,31 @@ TRUE 0 % Österreich
 -1
 0
 GUI_LISTBOX_SET_DATA: das Widget ist keine Liste und keine Klappliste
+
+=== ein leeres zahlenfeld speichert null und laedt leer
+' Ein Zahlenfeld ohne Eingabe ist "kein Wert": GUI_FORM_SAVE schreibt
+' NULL. Bis 2026-11 stand dort der leere Text '' in der INTEGER-Spalte,
+' und DB_GET_INT scheiterte beim Lesen (Buch "Fenster, Formulare, Daten",
+' Kapitel 5). Ein freies Textfeld bleibt beim leeren Text.
+IMPORT "gui"
+IMPORT "db"
+SCREEN(400, 200, "G", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("G", 0, 0, 400, 200)
+DIM jahr AS GUI_WIDGET : jahr = GUI_TEXTINPUT(w, 10, 10, 150, 28, "")
+GUI_TEXTINPUT_SET(jahr, "zahlen", 1)
+DIM name AS GUI_WIDGET : name = GUI_TEXTINPUT(w, 10, 50, 150, 28, "")
+GUI_BIND(jahr, "jahr") : GUI_BIND(name, "name")
+DIM c AS DB_CONN : c = DB_OPEN(":memory:")
+DB_EXEC(c, "CREATE TABLE t (id INTEGER PRIMARY KEY, jahr INTEGER, name TEXT)")
+DIM id AS INTEGER : id = GUI_FORM_SAVE(w, c, "t", -1)
+DIM r AS DB_RESULT : r = DB_QUERY(c, "SELECT typeof(jahr), typeof(name) FROM t")
+DB_NEXT(r)
+PRINT DB_GET_STRING(r, 0); " "; DB_GET_STRING(r, 1)
+GUI_SET_TEXT(jahr, "1973")
+PRINT GUI_FORM_LOAD(w, c, "t", id); " ["; GUI_TEXT(jahr); "]"
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+null text
+TRUE []

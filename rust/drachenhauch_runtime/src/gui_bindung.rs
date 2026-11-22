@@ -74,6 +74,11 @@ impl Gui {
             // Null und hat mehr als eine Stelle: das ist eine Postleitzahl
             // oder eine Nummer, und die verloere als INTEGER ihre Null.
             // Ein Geldfeld (zahlen 3) liefert ganze Cent.
+            // Leer ist "kein Wert" -- NULL in der Datenbank, nicht der
+            // leere Text: der stand bis 2026-11 als '' in einer INTEGER-
+            // Spalte, und DB_GET_INT scheiterte beim Laden daran (Buch
+            // "Fenster, Formulare, Daten", Kapitel 5, das Erscheinungsjahr).
+            Kind::TextInput if w.zahlen > 0 && w.text.trim().is_empty() => Value::Nil,
             Kind::TextInput if w.zahlen > 0 && !nummer_mit_null(&w.text) => match zahl_lesen(&w.text) {
                 Some(x) if w.zahlen == 3 => Value::Int((x * 100.0).round() as i64),
                 Some(x) if w.zahlen == 1 && x.fract() == 0.0 => Value::Int(x as i64),

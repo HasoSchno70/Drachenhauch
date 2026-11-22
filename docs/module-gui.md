@@ -3583,7 +3583,7 @@ IF GUI_FORM_CHANGED(win, "kunde") THEN nachfragen()
   Spalte heißt `id` — die Konvention von SQLite. Gespeichert wird
   **typisiert**: ein Zahlenfeld als Zahl (außer es beginnt mit einer Null vor
   einer Ziffer wie die Postleitzahl `01234` — das bleibt Text; `0,99` ist
-  eine Zahl), ein Kästchen als 0/1, eine Klappliste als Index, ein Regler als
+  eine Zahl; leer ist es NULL), ein Kästchen als 0/1, eine Klappliste als Index, ein Regler als
   Kommazahl, alles andere als Text. Ein **Geldfeld** (`zahlen` 3) wird
   getippt und gezeigt wie eine Kommazahl mit zwei Stellen und gebunden als
   INTEGER in Cent — `48,50` im Feld ist `4850` in der Spalte, und beim Laden
