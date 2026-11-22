@@ -3,7 +3,7 @@
 IMPORT "db"
 
 DIM db AS DB_CONN
-db = DB_OPEN("mediathek.db")
+db = DB_OPEN("versuch.db")
 
 ' Die Tabelle beschreibt, wie ein Eintrag aussieht. IF NOT EXISTS: nur
 ' beim allerersten Start anlegen.

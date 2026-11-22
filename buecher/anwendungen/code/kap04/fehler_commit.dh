@@ -1,6 +1,6 @@
 ' Kapitel 4, was schiefgehen kann -- eine Transaktion ohne COMMIT.
 IMPORT "db"
-DIM db AS DB_CONN : db = DB_OPEN("mediathek.db")
+DIM db AS DB_CONN : db = DB_OPEN("probe.db")
 DB_EXEC(db, "CREATE TABLE IF NOT EXISTS eintrag (titel TEXT)")
 DB_BEGIN(db)
 DB_EXEC(db, "INSERT INTO eintrag (titel) VALUES (?)", "Momo")
@@ -8,7 +8,7 @@ PRINT "aufgenommen"
 DB_CLOSE(db)
 
 ' Spaeter, beim naechsten Start:
-db = DB_OPEN("mediathek.db")
+db = DB_OPEN("probe.db")
 DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT COUNT(*) FROM eintrag")
 DB_NEXT(r)
 PRINT DB_GET_INT(r, 0); " Eintraege in der Datei"

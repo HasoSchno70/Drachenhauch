@@ -3,7 +3,7 @@
 IMPORT "gui"
 IMPORT "db"
 SCREEN(400, 200, "Mediathek", 1)
-DIM db AS DB_CONN : db = DB_OPEN("mediathek.db")
+DIM db AS DB_CONN : db = DB_OPEN("probe.db")
 DB_EXEC(db, "CREATE TABLE IF NOT EXISTS eintrag (" + _
             "id INTEGER PRIMARY KEY, titel TEXT NOT NULL)")
 DIM fenster AS GUI_WINDOW

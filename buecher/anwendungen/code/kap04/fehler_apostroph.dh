@@ -1,6 +1,6 @@
 ' Kapitel 4, was schiefgehen kann -- der Wert ins SQL geklebt.
 IMPORT "db"
-DIM db AS DB_CONN : db = DB_OPEN("mediathek.db")
+DIM db AS DB_CONN : db = DB_OPEN("probe.db")
 DB_EXEC(db, "CREATE TABLE IF NOT EXISTS eintrag (titel TEXT)")
 DIM t AS STRING : t = "Sgt. Pepper's Lonely Hearts Club Band"
 ' So nicht! Der Titel wird Teil des SQL-Texts:

@@ -23,7 +23,7 @@ module.exports = (H) => [
 
   H.code(["2  Metropolis (1927)", "1  Momo (1973)"], { out: true }),
 
-  H.pmix([["DB_OPEN", true], " öffnet die Datei mediathek.db und legt sie an, wenn es sie noch nicht gibt. Der Griff, den es liefert, hat den Typ ", ["DB_CONN", true], " — eine Verbindung zur Datenbank. ", ["DB_EXEC", true], " schickt einen SQL-Satz, der nichts zurückliefert. Der erste beschreibt die Tabelle: eine Spalte id, die die Datenbank selbst hochzählt (INTEGER PRIMARY KEY), ein Titel, der nicht fehlen darf (NOT NULL), und die drei anderen Angaben. IF NOT EXISTS legt sie nur an, wenn es sie noch nicht gibt."]),
+  H.pmix([["DB_OPEN", true], " öffnet die Datei versuch.db und legt sie an, wenn es sie noch nicht gibt. Der Griff, den es liefert, hat den Typ ", ["DB_CONN", true], " — eine Verbindung zur Datenbank. ", ["DB_EXEC", true], " schickt einen SQL-Satz, der nichts zurückliefert. Der erste beschreibt die Tabelle: eine Spalte id, die die Datenbank selbst hochzählt (INTEGER PRIMARY KEY), ein Titel, der nicht fehlen darf (NOT NULL), und die drei anderen Angaben. IF NOT EXISTS legt sie nur an, wenn es sie noch nicht gibt."]),
 
   H.pmix(["Im INSERT stehen für die Werte vier Fragezeichen. Das sind ", ["Parameter", true], ": Platzhalter, deren Werte hinter dem SQL-Text als eigene Argumente mitkommen, in derselben Reihenfolge. ", ["DB_QUERY", true], " schickt ein SELECT und liefert ein Ergebnis vom Typ ", ["DB_RESULT", true], ". ", ["DB_NEXT", true], " rückt darin eine Zeile weiter und ist FALSE, wenn keine mehr kommt; ", ["DB_GET_INT", true], " und ", ["DB_GET_STRING", true], " lesen eine Spalte der aktuellen Zeile, gezählt ab 0."]),
 
@@ -31,7 +31,7 @@ module.exports = (H) => [
 
   H.h2("Schritt 2: die Mediathek in der Datenbank"),
 
-  H.p("Die Mediathek aus Kapitel 3 behält ihr Feld von Einträgen und ihre Tabelle. Neu ist, dass das Feld beim Start aus der Datenbank gefüllt wird und jede Änderung zuerst in die Datenbank geht. Dafür bekommt jeder Eintrag seine Kennung, die id aus der Datenbank:"),
+  H.p("Die Mediathek bekommt ihre eigene Datei, mediathek.db — die aus Schritt 1 war zum Ausprobieren. Sie behält ihr Feld von Einträgen und ihre Tabelle aus Kapitel 3. Neu ist, dass das Feld beim Start aus der Datenbank gefüllt wird und jede Änderung zuerst in die Datenbank geht. Dafür bekommt jeder Eintrag seine Kennung, die id aus der Datenbank:"),
 
   H.code(stueck("kap04/eintrag.dh", "' Die Kennung, die", "DIM id AS INTEGER")),
 
