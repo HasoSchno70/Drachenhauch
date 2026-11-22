@@ -799,6 +799,26 @@ Feldern (die eigenen zuerst), den Stapel wie geschrieben und ein Feld von
 Objekten mit dem Klassennamen, und eine Zeile mit Aufruf beginnt nach der
 Rückkehr nicht neu (Haltepunkt und F10 hielten zweimal).
 
+Danach (2026-11-22): Buch B, Teil III, Kapitel 13–16 (Das
+Datenbank-Element, Datenbindung, Abfragen, die rechnen, Aus dem Netz).
+Die Mediathek bekommt ein Datenbank-Element mit Verweisen und
+Löschregeln, gebundene Fenster und Tabellen mit Suchfeld, drei Abfragen
+(`LEFT JOIN`, Überfälliges mit `julianday`, Statistik mit `GROUP BY`) und
+ein Bearbeitungsfenster, das eine ISBN bei Open Library nachschlägt --
+im Hintergrund, mit Timer, Abbrechen und Cover. Für Bild und Prüfung
+spielt `buch/spielserver.dh` Open Library. Eingetippter Text kommt jetzt
+über die Zwischenablage ins Bild: Die Kopie des Projekts legt ihn mit
+`CLIPBOARD_SET` hinein, die Aufnahme drückt Strg+V. Funde, je mit Fall
+und Gegenprobe: `GUI_TEXT_WIDTH` misst eine Beschriftung (Spalten-Gitter
+und Inspektor des Studios schneiden nichts mehr ab); ein gescheiterter
+Fremdschlüssel nennt die Spalten, die zeigen, und das Studio übersetzt
+die Meldung; eine Klappliste an einer Textspalte zeigt deren Werte; die
+erzeugte Tabelle behält die Köpfe des Entwurfs; `Neuladen` behält die
+gewählte Zeile auch an einer Abfrage; eine Abfrage über mehrere Zeilen
+geht in den erzeugten Code; `GUI_STATE$` zeigt Tabellen samt gewählter
+Zeile; HTTP-Fehler nennen die Adresse einmal und sagen, ob das Netz oder
+die Zeitgrenze schuld war.
+
 Was beim Bauen festgelegt wurde:
 
 * **Code kommt aus Dateien.** `buch/code_lesen.js` holt ganze Programme,

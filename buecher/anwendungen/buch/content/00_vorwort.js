@@ -23,5 +23,5 @@ module.exports = (H) => [
 
   H.p("Jedes Programm, jedes Studio-Projekt und jede Lösung liegt im Ordner buecher/anwendungen/code des Drachenhauch-Repositorys. Das Buch druckt den Code aus diesen Dateien ab, und eine Prüfsammlung lässt sie bei jeder neuen Fassung laufen. Auch die Bilder entstehen aus ihnen: die Fenster der Programme mit dhrt bild, die Bilder des Studios, indem ein Skript das Studio startet und bedient. Ein Bild, das von Hand gemacht ist, veraltet still; diese lassen sich mit jeder Fassung neu ziehen."),
 
-  H.note("Dieser Stand enthält Teil I, Kapitel 1 bis 7 — die Mediathek von Hand —, und Teil II, Kapitel 8 bis 12 — dieselbe Mediathek im Studio —, alle mit ihren Lösungen. Die übrigen Kapitel folgen nach der Gliederung in docs/intern/entwurf-buecher.md; Kapitel 0, der Rundgang durch die fertige Mediathek, kommt, wenn sie fertig ist.", "Arbeitsstand"),
+  H.note("Dieser Stand enthält Teil I, Kapitel 1 bis 7 — die Mediathek von Hand —, Teil II, Kapitel 8 bis 12 — dieselbe Mediathek im Studio —, und Teil III, Kapitel 13 bis 16 — ihre Daten in einer richtigen Datenbank und aus dem Netz —, alle mit ihren Lösungen. Die übrigen Kapitel folgen nach der Gliederung in docs/intern/entwurf-buecher.md; Kapitel 0, der Rundgang durch die fertige Mediathek, kommt, wenn sie fertig ist.", "Arbeitsstand"),
 ];
