@@ -604,3 +604,15 @@ Loeschregel zeigte (Lena, die noch Tetris hat), las in der Statuszeile nur
 `dbMeldung$` sagt es in den Worten des Spalten-Gitters ("Beim Loeschen"
 auf "mitloeschen"). `status()` schreibt seine Meldung ins Protokoll
 (`status ...`), damit eine Pruefung sie lesen kann.
+
+Ebenda, Kapitel 14 (Datenbindung):
+
+- Eine Klappliste mit festen Eintraegen (Buch;Film;Spiel;Musik), gebunden
+  an die Textspalte art, schrieb beim Sichern "2" statt "Spiel": die gui
+  bindet ohne Werte je Eintrag die Nummer. In Teil I hatte das Buch die
+  Werte von Hand gesetzt (GUI_LISTBOX_SET_DATA); im Studio ging das nur mit
+  Code. `dbKlappWerte` gibt jetzt im erzeugten Layout jedem Eintrag seinen
+  Text als Wert, wenn die Spalte keine Zahl ist.
+- Eine Tabelle mit Datenquelle bekam immer die Namen der Spalten als Koepfe
+  ("titel" statt "Titel" aus dem Entwurf). Jetzt bleiben die Koepfe des
+  Entwurfs, wenn es so viele sind wie gezeigte Spalten.

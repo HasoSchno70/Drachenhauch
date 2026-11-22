@@ -354,6 +354,7 @@ FUNCTION basisCode$(ei AS INTEGER) AS STRING
         DIM rumpf AS JSON_HANDLE : rumpf = JSON_PARSE(JSON_STRINGIFY(aus))
         IF JSON_HAS(rumpf, "timer") THEN JSON_REMOVE(rumpf, "timer")
         IF JSON_HAS(rumpf, "menus") THEN JSON_REMOVE(rumpf, "menus")
+        dbKlappWerte(rumpf)
         ' Die Menueleiste kommt obendrauf: "h" ist die Hoehe des Fensters mit
         ' Titelleiste, aber ohne Menueleiste.
         DIM mlh AS INTEGER : mlh = menueLeisteH(aus)

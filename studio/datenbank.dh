@@ -1489,6 +1489,33 @@ FUNCTION dbBindAn(d AS JSON_HANDLE, pfad AS STRING) AS BOOLEAN
 END FUNCTION
 
 ' Die Tabelle eines Fensters, "" = keine (oder es gibt sie nicht mehr).
+' Eine Klappliste mit festen Eintraegen (ohne Datenquelle), gebunden an eine
+' Spalte, die keine Zahl ist: jeder Eintrag traegt seinen Text als Wert. Sonst
+' bindet die gui die Nummer des Eintrags, und in der Textspalte art stand "2"
+' statt "Spiel" (Buch "Fenster, Formulare, Daten", Kapitel 14). Die Werte
+' bleiben die Texte des Entwurfs, auch wenn das Programm uebersetzt zeigt.
+SUB dbKlappWerte(rumpf AS JSON_HANDLE)
+    DIM ft AS STRING : ft = dbFensterTabelle$(rumpf)
+    IF ft = "" THEN RETURN
+    IF NOT dbRef(ft) THEN RETURN
+    DIM s AS JSON_HANDLE : s = dbSchema(dbRefEl)
+    DIM t AS INTEGER : t = dbRefT
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(rumpf, "widgets") - 1
+        DIM p AS STRING : p = "widgets." + STR$(i)
+        IF JSON_GET_STRING(rumpf, p + ".kind") <> "dropdown" THEN CONTINUE
+        DIM sp AS STRING : sp = dbBindText$(rumpf, p + ".bind")
+        IF sp = "" OR dbBindText$(rumpf, p + ".studio_quelle") <> "" THEN CONTINUE
+        IF NOT JSON_HAS(rumpf, p + ".items") THEN CONTINUE
+        IF JSON_HAS(rumpf, p + ".list.daten") THEN CONTINUE
+        DIM k AS INTEGER : k = dbSpIndex(s, t, sp)
+        IF k < 0 THEN CONTINUE
+        IF ARRAY_INDEXOF(["ganz", "zahl", "geld", "wahr"], dbSp$(s, t, k, "typ")) >= 0 THEN CONTINUE
+        IF NOT JSON_HAS(rumpf, p + ".list") THEN JSON_SET_JSON(rumpf, p + ".list", JSON_NEW_OBJECT())
+        JSON_SET_JSON(rumpf, p + ".list.daten", JSON_GET_JSON(rumpf, p + ".items"))
+    NEXT
+END SUB
+
 FUNCTION dbFensterTabelle$(d AS JSON_HANDLE) AS STRING
     DIM ref AS STRING : ref = dbBindText$(d, "studio_tabelle")
     IF ref = "" OR NOT dbRef(ref) THEN RETURN ""
@@ -1944,7 +1971,26 @@ SUB dbBasisMethoden(z AS ARRAY OF STRING, d AS JSON_HANDLE, namen AS ARRAY OF ST
             ARRAY_PUSH(z, "        NEXT")
             ARRAY_PUSH(z, "        Self.studioBilder_" + namen[li] + " = []")
             ARRAY_PUSH(z, "        GUI_TABLE_CLEAR(" + w + ")")
-            ARRAY_PUSH(z, "        GUI_TABLE_HEADERS(" + w + ", studioQuelleSpalten)")
+            ' Die Koepfe aus dem Entwurf ("Titel"), wenn es so viele sind, wie
+            ' die Quelle Spalten zeigt -- sonst ihre Namen ("titel"). Vorher
+            ' standen immer die Namen der Spalten da (Buch "Fenster,
+            ' Formulare, Daten", Kapitel 14).
+            DIM koepfe AS ARRAY OF STRING : koepfe = []
+            IF JSON_HAS(d, wp + "table.headers") THEN
+                DIM kk AS INTEGER
+                FOR kk = 0 TO JSON_LEN(d, wp + "table.headers") - 1
+                    ARRAY_PUSH(koepfe, "studioTr$(" + dbText$(JSON_GET_STRING(d, wp + "table.headers." + STR$(kk))) + ")")
+                NEXT
+            END IF
+            IF LEN(koepfe) > 0 THEN
+                ARRAY_PUSH(z, "        IF LEN(studioQuelleSpalten) = " + STR$(LEN(koepfe)) + " THEN")
+                ARRAY_PUSH(z, "            GUI_TABLE_HEADERS(" + w + ", [" + JOIN$(koepfe, ", ") + "])")
+                ARRAY_PUSH(z, "        ELSE")
+                ARRAY_PUSH(z, "            GUI_TABLE_HEADERS(" + w + ", studioQuelleSpalten)")
+                ARRAY_PUSH(z, "        END IF")
+            ELSE
+                ARRAY_PUSH(z, "        GUI_TABLE_HEADERS(" + w + ", studioQuelleSpalten)")
+            END IF
         ELSE
             ARRAY_PUSH(z, "        GUI_LISTBOX_CLEAR(" + w + ")")
         END IF

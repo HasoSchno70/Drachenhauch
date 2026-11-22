@@ -594,7 +594,9 @@ gebunden: Text, Zahl und Geld als Textfeld (Geld mit Komma), Datum als
 Textfeld für `JJJJ-MM-TT`, Ja/Nein als Kästchen. Ein Doppelklick auf eine
 Spalte legt ihr Feld unter das letzte Control. Hat das Fenster noch keine
 Tabelle, bekommt es diese; im Inspektor steht sie in der Gruppe **Daten**
-(Tabelle am Fenster, Spalte an jedem Feld).
+(Tabelle am Fenster, Spalte an jedem Feld). Eine Klappliste mit festen
+Einträgen bindet an einer Textspalte den Text des gewählten Eintrags, an
+einer Zahlspalte seine Nummer.
 
 | Methode | tut |
 |---|---|
@@ -610,7 +612,9 @@ nennt welche (durch Semikolon; leer: bei einer Tabelle alle, sonst die
 erste). Das Fenster füllt sie beim Öffnen; `Neuladen()` holt sie neu, und
 `IdVon(liste)` liefert die id der gewählten Zeile. Zeigt eine Liste die
 Tabelle des Fensters, lädt ein Klick auf eine Zeile sie in die Felder, und
-nach Sichern und Löschen steht die Liste schon richtig.
+nach Sichern und Löschen steht die Liste schon richtig. Eine Tabelle behält
+die Spaltenköpfe aus dem Entwurf, wenn es so viele sind, wie sie Spalten
+zeigt; sonst stehen dort die Namen der Spalten.
 
 ```text
 SUB knopfNeu_Klick()

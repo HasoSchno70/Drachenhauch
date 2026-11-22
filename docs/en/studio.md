@@ -583,7 +583,8 @@ and money as a text field (money with a decimal comma), a date as a text
 field for `YYYY-MM-DD`, yes/no as a check box. Double-clicking a column puts
 its field below the last control. If the window has no table yet, it gets
 this one; the inspector shows it in the **Data** group (Table on the window,
-Column on each field).
+Column on each field). A drop-down list with fixed entries binds the text of
+the chosen entry to a text column and its number to a number column.
 
 | Method | does |
 |---|---|
@@ -599,7 +600,9 @@ A list, a table or a drop-down list shows the rows of a table when its
 window fills it when it opens; `Neuladen()` fetches it again, and
 `IdVon(list)` returns the id of the selected row. If a list shows the
 window's own table, clicking a row loads it into the fields, and after
-saving and deleting the list is already up to date.
+saving and deleting the list is already up to date. A table keeps the column
+headers from the design when there are as many as it shows columns;
+otherwise the column names stand there.
 
 ```text
 SUB knopfNeu_Klick()
