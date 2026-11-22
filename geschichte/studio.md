@@ -654,3 +654,11 @@ Bericht) bot der Entwurf seit Stufe 2 an, die Auslegung las sie nie -- eine
 Summe rechnete immer ueber die Zeilen ihres Bandes. Aufgefallen beim
 Ausprobieren einer Drehen-Uebung ("was zeigt der Gruppenfuss mit Bereich
 Bericht?": dasselbe wie vorher). Jetzt rechnet "bericht" ueber alle Zeilen.
+
+Ebenda, Kapitel 18 (Diagramme): ein Diagramm im Statistikfenster -- einem
+zweiten Fenster ueber dem Hauptfenster -- blieb leer. `studioMalen`
+zeichnete erst alle Flaechen und Diagramme, danach die Nebenfenster mit
+GUI_DRAW_WINDOW; ein Nebenfenster deckte so sein eigenes Gemaltes zu. Das
+gilt fuer jede Zeichenflaeche und jedes eigene Zeichnen in einem zweiten
+Fenster. Jetzt malt jedes Nebenfenster sich und gleich danach seine
+Flaechen.

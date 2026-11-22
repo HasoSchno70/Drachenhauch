@@ -627,11 +627,16 @@ SUB studioMalen()
     DIM f AS StudioFenster
     CLS(0)
     GUI_DRAW(FALSE)
+    ' Was ein Fenster selbst malt (Zeichenflaeche, Diagramm), kommt nach
+    ' seinem Fenster -- sonst deckt ein zweites Fenster es zu.
     FOR EACH f IN studioFenster
-        f.studioZeichnen()
+        IF f.studioHaupt THEN f.studioZeichnen()
     NEXT
     FOR EACH f IN studioFenster
-        IF NOT f.studioHaupt THEN GUI_DRAW_WINDOW(f.studioWin)
+        IF NOT f.studioHaupt THEN
+            GUI_DRAW_WINDOW(f.studioWin)
+            f.studioZeichnen()
+        END IF
     NEXT
     DIM d AS GUI_WINDOW
     FOR EACH d IN studioDialoge
