@@ -379,3 +379,10 @@ aus Excel (cp1252) ohne Kodierung gelesen meldete "Zeile 2 ist kein UTF-8
 war der Abstand vom Dateianfang, neben "Zeile 2" irrefuehrend. Jetzt
 "Byte 0xE4, Zeichen 30 der Zeile" (in Zeichen gezaehlt, davor ist alles
 gueltiges UTF-8). Rust-Test und Fall in kodierung.dhtest, englische Vorlage.
+
+2026-11-22, DIR_USER_DATA$(app$): der Ordner fuer die Daten des Benutzers
+(Windows %APPDATA%, macOS Application Support, sonst XDG_DATA_HOME bzw.
+~/.local/share), angelegt beim ersten Aufruf. Vorher musste jedes Programm
+GETENV$ je System selbst zusammensetzen -- und ein installiertes Programm
+schrieb seine Datenbank neben die Exe, wo es unter "Programme" nicht darf
+(Buch "Fenster, Formulare, Daten", Kapitel 23).

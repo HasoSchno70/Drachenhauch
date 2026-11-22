@@ -13593,6 +13593,12 @@
    "module": "dhrt"
   },
   {
+   "name": "DIR_USER_DATA$",
+   "kind": "core",
+   "signature": "DIR_USER_DATA$(app$) AS STRING",
+   "module": "dhrt"
+  },
+  {
    "name": "TEMPFILE$",
    "kind": "core",
    "signature": "TEMPFILE$([prefix$ = \"dh\" [, extension$]]) AS STRING",

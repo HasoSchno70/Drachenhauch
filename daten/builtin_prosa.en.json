@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/en und dem englischen Buch von `dhrt doku prosa` -- NICHT von Hand aendern. Der Hover nimmt sie mit DHRT_LANG=en.",
- "count": 2614,
+ "count": 2615,
  "docs": {
   "ABS": "Absolute value.",
   "ACOS": "Arc sine/cosine (x in [-1, 1])",
@@ -420,6 +420,7 @@
   "DIR_EXISTS": "directory present? — formerly DIREXISTS",
   "DIR_LIST": "entry names (sorted), optionally filtered; with recursive: TRUE like DIR_LIST_REC — formerly DIRLIST",
   "DIR_LIST_REC": "as above, but recursive — files only, relative paths with / — formerly DIRLIST_REC",
+  "DIR_USER_DATA$": "the folder for the user's data, created if missing: Windows %APPDATA%\\app, macOS ~/Library/Application Support/app, otherwise $XDG_DATA_HOME/app or ~/.local/share/app — that is where an installed program keeps its database and settings, not next to the executable",
   "DOC_OPEN": "Opens a local file with its default program – the PDF you have written in the viewer, the table in the … — formerly OPENDOC",
   "DRAG_OUT_FILES": "drag files out of the window (onto the desktop, into a mail program …); returns \"kopieren\", \"verschieben\", \"verknuepfen\" or \"\"",
   "DRAG_OUT_TEXT": "drag text out (into an editor, a text field) — like DRAG_OUT_FILES",

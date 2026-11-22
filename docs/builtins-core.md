@@ -988,6 +988,7 @@ Pfadbasiert, ohne FILE-Handle *(nur native Runtime)*:
 | `RMDIR(path$[, with_content])` | Verzeichnis löschen (leer; mit `TRUE` samt Inhalt) |
 | `FILETIME(path$)` → INTEGER | zuletzt geändert, Sekunden wie im Modul `zeit` |
 | `TEMPDIR$()` → STRING | das Temp-Verzeichnis des Systems |
+| `DIR_USER_DATA$(app$)` → STRING | der Ordner für die Daten des Benutzers, angelegt, wenn er fehlt: Windows `%APPDATA%\app`, macOS `~/Library/Application Support/app`, sonst `$XDG_DATA_HOME/app` bzw. `~/.local/share/app` — dorthin gehören Datenbank und Einstellungen eines installierten Programms, nicht neben die Exe |
 | `TEMPFILE$([prefix$[, extension$]])` → STRING | freier Name im Temp-Verzeichnis, **leer angelegt** |
 | `MKDIR(path$)` | Verzeichnis anlegen (inkl. Eltern) |
 | `COPYFILE(src$, dst$)` | Datei kopieren |

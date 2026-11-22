@@ -2033,3 +2033,5 @@ TRY ohne CATCH und ohne FINALLY verschluckt jeden Fehler still -- danach weiss n
 {}: {} -- steht ein ' in einem eingeklebten Wert? Werte mit ? uebergeben: DB_EXEC(db, "... VALUES (?)", wert)	{}: {} -- is there a ' in a value pasted into the SQL? Pass values with ?: DB_EXEC(db, "... VALUES (?)", value)
 GUI_MENU_ENABLED: erwartet einen Menue-Eintrag	GUI_MENU_ENABLED: expects a menu item
 GUI_MENU_ENABLED: ungueltiges Eintrags-Handle	GUI_MENU_ENABLED: invalid item handle
+DIR_USER_DATA$: erwartet den Namen des Programms (ohne / und \)	DIR_USER_DATA$: expects the name of the program (without / and \)
+DIR_USER_DATA$: kein Benutzerordner (APPDATA bzw. HOME ist nicht gesetzt)	DIR_USER_DATA$: no user folder (APPDATA or HOME is not set)

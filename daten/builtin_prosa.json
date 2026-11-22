@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 2622,
+ "count": 2623,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -420,6 +420,7 @@
   "DIR_EXISTS": "Verzeichnis vorhanden? — bisher DIREXISTS",
   "DIR_LIST": "Eintragsnamen (sortiert), optional gefiltert; mit recursive: TRUE wie DIR_LIST_REC — bisher DIRLIST",
   "DIR_LIST_REC": "wie oben, aber rekursiv — nur Dateien, Pfade relativ mit / — bisher DIRLIST_REC",
+  "DIR_USER_DATA$": "der Ordner für die Daten des Benutzers, angelegt, wenn er fehlt: Windows %APPDATA%\\app, macOS ~/Library/Application Support/app, sonst $XDG_DATA_HOME/app bzw. ~/.local/share/app — dorthin gehören Datenbank und Einstellungen eines installierten Programms, nicht neben die Exe",
   "DOC_OPEN": "Öffnet eine lokale Datei mit ihrem Standardprogramm – die geschriebene PDF im Betrachter, die Tabelle in … — bisher OPENDOC",
   "DRAG_OUT_FILES": "Dateien aus dem Fenster hinausziehen (auf den Desktop, in ein Mail-Programm …); liefert \"kopieren\", \"verschieben\", \"verknuepfen\" oder \"\"",
   "DRAG_OUT_TEXT": "Text hinausziehen (in einen Editor, ein Textfeld) — wie DRAG_OUT_FILES",
