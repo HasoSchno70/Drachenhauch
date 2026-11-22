@@ -98,6 +98,7 @@ Ein Element hat `art`, `x`, `y`, `b`, `h` in mm relativ zu seinem Band:
 | `datum` | das Datum des Drucks |
 | `linie`, `rechteck` | Strichstärke, Farbe, bei `rechteck` eine Füllung |
 | `bild` | ein Bild aus `bilder/` im Projekt oder aus einer Bildspalte (`spalte`) |
+| `strichcode` | EAN-13 aus `spalte` (je Zeile) oder `text`; ISBN-10 wird ISBN-13, falsche Prüfziffer = kein Code |
 
 Schrift (`sans`, `serif`, `mono`), Größe in pt, fett, kursiv, Farbe und
 Ausrichtung (links, mitte, rechts) gelten für die Arten mit Text.

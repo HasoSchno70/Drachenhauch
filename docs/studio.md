@@ -696,7 +696,7 @@ Zeile der Quelle), Gruppenfuß, Seitenfuß, Berichtsfuß. Darin stehen
 Elemente in mm: fester Text, Felder (eine Spalte der Quelle, auch
 `kunde.name` über einen Verweis), Summen (Summe, Anzahl, Mittel, Min, Max je
 Gruppe oder Bericht), Seitenzahl („Seite {n} von {m}“), Datum, Linien,
-Rechtecke und Bilder.
+Rechtecke, Bilder und Strichcodes.
 
 Die **Quelle** ist eine Tabelle oder Abfrage einer Datenbank des Projekts;
 die **Bedingung** darf Parameter haben (`rechnung = :id`). Passt ein Band
@@ -707,7 +707,7 @@ Der Reiter eines Berichts ist sein **Entwurf**: die Seite in Millimetern,
 jedes Band mit einer Leiste, die seinen Namen trägt, darin die Elemente.
 
 * **Ablegen:** oben die Leiste der Elemente (Text, Feld, Summe, Seitenzahl,
-  Datum, Linie, Rechteck, Bild) -- eine Art wählen, dann in ein Band klicken
+  Datum, Linie, Rechteck, Bild, Strichcode) -- eine Art wählen, dann in ein Band klicken
   (Vorgabegröße) oder ein Rechteck ziehen. Esc bricht ab.
 * **Spalten der Quelle** stehen rechts oben; eine Spalte in ein Band ziehen
   macht im Gruppen- oder Berichtsfuß eine Summe, im Seitenkopf eine
@@ -753,6 +753,14 @@ wenn es eine **Spalte** nennt, je Zeile das Bild aus dieser Bildspalte -- etwa
 ein Foto je Artikel im Detail. Ein Bild wird ins Rechteck eingepasst, ohne es
 zu verzerren; eine leere Zelle oder Bytes, die kein Bild sind, lassen es
 leer.
+
+Ein **Strichcode** zeichnet einen EAN-13 aus einer **Spalte** (je Zeile)
+oder aus seinem festen **Text**: eine ISBN-13 oder EAN mit oder ohne
+Bindestriche, zwölf Ziffern (die Prüfziffer kommt dazu) oder eine ISBN-10
+(sie wird zur ISBN-13 mit 978 davor). Unter den Strichen stehen die Ziffern,
+links und rechts bleibt die Ruhezone im Rechteck frei. Ein Wert mit falscher
+Prüfziffer oder mit anderen Zeichen gibt keinen Strichcode -- lieber keinen
+als einen falschen. Das Nennmaß ist 37 × 26 mm.
 
 Im Programm ist ein Bericht ein Objekt unter seinem Namen:
 

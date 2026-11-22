@@ -427,3 +427,49 @@ berichtskopf 20 (1), seitenkopf 10 (0), gruppenkopf0 10 (3), detail 6 (2), grupp
 berichtskopf 20 (1), seitenkopf 10 (0), gruppenkopf0 10 (3), gruppenkopf1 8 (0), detail 6 (2), gruppenfuss1 8 (0), gruppenfuss0 10 (3), seitenfuss 8 (1), berichtsfuss 10 (2)
 gruppen [{"spalte":"rechnung"},{"spalte":"rechnung"}]
 nach strg+z TRUE TRUE 2
+
+=== ein strichcode aus der leiste
+' [Strichcode] (seit 2026-11-22, fuer die Karteikarte im Buch "Fenster,
+' Formulare, Daten") in der Leiste, ein Klick bei 120/2 mm in den
+' Berichtskopf legt ihn mit den Massen seiner Art ab (30 x 20 mm, noch ohne
+' Spalte) -- der Kopf ist 20 mm hoch, darum oben an seiner Kante. Strg+S
+' sichert. Der Knopf steht beim ersten Bild noch im Ueberlauf (geschaetzte
+' Breiten); das Protokoll der Lagen kommt darum nach dem Messen noch einmal.
+IMPORT "laeufer.dh"
+brProjekt()
+DIM p AS STRING : p = CWD$() + "/proj"
+DIM m AS STRING : m = CWD$() + "/m.log"
+SETENV("DH_STUDIO_OEFFNEN", "Liste")
+slStarten(m, "", 12, p)
+brMessen(m)
+DIM kx AS INTEGER
+DIM ky AS INTEGER
+(kx, ky) = slLage(m, "berknopf strichcode")
+DIM ax AS INTEGER
+DIM ay AS INTEGER
+(ax, ay) = brPunkt(m, 0, 120.2, 2.2)
+slHin(10, 10)
+slWarten(14)
+slKlick(kx, ky)
+slWarten(4)
+slKlick(ax, ay)
+slWarten(6)
+slMit([341], 83)
+slWarten(10)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+PRINT "abgelegt "; slHat(log, "bericht abgelegt strichcode berichtskopf")
+DIM j AS JSON_HANDLE : j = brBericht()
+PRINT brEl$(j, 0, 1)
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/berichtprojekt.dh"
+IMPORT "json"
+slStudio = ARG$(0)
+--- erwartet
+abgelegt TRUE
+strichcode x=120 y=0 b=30 h=20

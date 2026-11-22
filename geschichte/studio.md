@@ -635,3 +635,16 @@ nur A3, A4, A5, Letter und Legal, `PDF_NEW` aber A0 bis A6. Das PDF hatte
 das richtige Blatt, die Baender liefen ueber seinen Rand hinaus (70 Zeilen:
 2 Seiten statt 5). Jetzt dieselben Formate wie `pdf::seitenmass`, und die
 Wahl im Reiter bietet A6 an.
+
+Ebenda, Kapitel 17: ein Berichts-Element **Strichcode** (EAN-13) fuer die
+Karteikarte -- der Strichcode der ISBN war eine Uebung ("Etiketten mit
+Barcode" im Entwurf des Buchs), die es nicht gab. Gerechnet in
+`studio/berichte_laufzeit.dh` (`studioBEanZiffern$`: ISBN-10 wird ISBN-13,
+falsche Pruefziffer = kein Code; `studioBEan13$`: die 95 Module), gezeichnet
+als gefuellte Rechtecke, die Ziffern als Text darunter -- der Reihe nach,
+damit das PDF beim Kopieren die Nummer liefert (erst standen sie links und
+rechts verschraenkt). Die Muster sind gegen eine eigene Rechnung mit den
+Tabellen der Wikipedia geprueft (G als umgedrehtes R). Mit dem neunten
+Knopf stand "Strichcode" beim ersten Bild im Ueberlauf der Leiste;
+`berichtLagen` protokolliert nur sichtbare Knoepfe und dann, wenn gemessen
+ist, noch einmal.

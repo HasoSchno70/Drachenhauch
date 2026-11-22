@@ -641,6 +641,7 @@ Feld	Field
 Summe	Sum
 Seitenzahl	Page number
 Rechteck	Rectangle
+Strichcode	Barcode
 Links (mm)	Left (mm)
 Oben (mm)	Top (mm)
 Breite (mm)	Width (mm)

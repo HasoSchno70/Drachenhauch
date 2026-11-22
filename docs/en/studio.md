@@ -681,7 +681,7 @@ other: report header, page header, group header, detail (per row of the
 source), group footer, page footer, report footer. They hold elements in mm:
 fixed text, fields (a column of the source, also `kunde.name` through a
 reference), sums (sum, count, average, min, max per group or report), page
-number ("Seite {n} von {m}"), date, lines, rectangles and images.
+number ("Seite {n} von {m}"), date, lines, rectangles, images and barcodes.
 
 The **source** is a table or query of a database of the project; the
 **condition** may have parameters (`rechnung = :id`). If a band no longer fits
@@ -692,7 +692,7 @@ The tab of a report is its **design**: the page in millimetres, every band
 with a bar carrying its name, the elements inside.
 
 * **Placing:** at the top the bar of elements (text, field, sum, page number,
-  date, line, rectangle, image) -- choose a kind, then click into a band
+  date, line, rectangle, image, barcode) -- choose a kind, then click into a band
   (default size) or drag a rectangle. Esc cancels.
 * **Columns of the source** are at the top right; dragging a column into a
   band makes a sum in a group or report footer, a heading in the page header,
@@ -739,6 +739,14 @@ names a **column**, the image from that image column for each row -- a photo
 per article in the detail, for example. An image is fitted into the rectangle
 without distorting it; an empty cell or bytes that are not an image leave it
 empty.
+
+A **barcode** draws an EAN-13 from a **column** (for each row) or from its
+fixed **text**: an ISBN-13 or EAN with or without hyphens, twelve digits (the
+check digit is added) or an ISBN-10 (it becomes the ISBN-13 with 978 in
+front). The digits stand below the bars, and the quiet zone stays free inside
+the rectangle on the left and right. A value with a wrong check digit or with
+other characters gives no barcode -- better none than a wrong one. The
+nominal size is 37 × 26 mm.
 
 In the program a report is an object under its name:
 

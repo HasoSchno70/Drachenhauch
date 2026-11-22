@@ -578,6 +578,12 @@ SUB studioBElement(pdf AS PDF, j AS JSON_HANDLE, p AS STRING, ox AS FLOAT, oy AS
                 PDF_COLOR(pdf, studioBFarbe(j, p, "farbe", 0))
                 PDF_RECT(pdf, x, y, b, h)
             END IF
+        CASE "strichcode"
+            ' Aus einer Spalte (je Zeile) oder fest aus text.
+            DIM csp AS STRING : csp = TRIM$(studioBText$(j, p, "spalte", ""))
+            DIM cwert AS STRING : cwert = studioBText$(j, p, "text", "")
+            IF csp <> "" THEN cwert = studioBWert$(zeile, studioBSpalte(csp))
+            studioBStrichcode(pdf, studioBEanZiffern$(cwert), x, y, b, h, studioBFarbe(j, p, "farbe", 0))
         CASE "bild"
             ' Aus einer Bildspalte (je Zeile ein anderes) oder eine Datei aus
             ' bilder/. Was sich nicht als Bild lesen laesst, bleibt leer.
@@ -603,6 +609,117 @@ SUB studioBElement(pdf AS PDF, j AS JSON_HANDLE, p AS STRING, ox AS FLOAT, oy AS
                 END IF
             END IF
     END SELECT
+END SUB
+
+' --- Strichcode (EAN-13) -----------------------------------------------------------
+' Die 13 Ziffern eines EAN-13 aus einem Wert: Bindestriche und Leerzeichen
+' fallen weg, 12 Ziffern bekommen ihre Pruefziffer, eine ISBN-10 wird zur
+' ISBN-13 (978 davor, neue Pruefziffer). "" = kein gueltiger Code -- eine
+' falsche Pruefziffer gibt keinen Strichcode statt eines falschen.
+FUNCTION studioBEanZiffern$(wert AS STRING) AS STRING
+    DIM z AS STRING : z = ""
+    DIM i AS INTEGER
+    DIM w AS STRING : w = TRIM$(wert)
+    FOR i = 0 TO LEN(w) - 1
+        DIM c AS STRING : c = MID$(w, i, 1)
+        IF c >= "0" AND c <= "9" THEN
+            z = z + c
+        ELSEIF UPPER$(c) = "X" AND i = LEN(w) - 1 THEN
+            z = z + "X"
+        ELSEIF c <> "-" AND c <> " " THEN
+            RETURN ""
+        END IF
+    NEXT
+    IF LEN(z) = 10 THEN
+        ' ISBN-10: Gewichte 10 bis 1, X = 10, die Summe teilbar durch 11.
+        DIM s AS INTEGER : s = 0
+        FOR i = 0 TO 9
+            DIM d AS INTEGER
+            IF MID$(z, i, 1) = "X" THEN d = 10 ELSE d = INT(VAL(MID$(z, i, 1)))
+            IF MID$(z, i, 1) = "X" AND i < 9 THEN RETURN ""
+            s = s + d * (10 - i)
+        NEXT
+        IF s MOD 11 <> 0 THEN RETURN ""
+        z = "978" + LEFT$(z, 9)
+    END IF
+    IF INSTR(z, "X") >= 0 THEN RETURN ""
+    IF LEN(z) = 12 THEN RETURN z + studioBEanPruef$(z)
+    IF LEN(z) = 13 AND RIGHT$(z, 1) = studioBEanPruef$(LEFT$(z, 12)) THEN RETURN z
+    RETURN ""
+END FUNCTION
+
+' Die Pruefziffer zu 12 Ziffern: Gewichte 1, 3, 1, 3 ... von links.
+FUNCTION studioBEanPruef$(z12 AS STRING) AS STRING
+    DIM s AS INTEGER : s = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO 11
+        s = s + INT(VAL(MID$(z12, i, 1))) * IIF(i MOD 2 = 0, 1, 3)
+    NEXT
+    RETURN STR$((10 - s MOD 10) MOD 10)
+END FUNCTION
+
+' Die 95 Module eines EAN-13 (1 = Strich): Randzeichen 101, sechs Ziffern
+' links (L oder G, je nach der ersten Ziffer), Mitte 01010, sechs rechts
+' (R), Randzeichen 101.
+FUNCTION studioBEan13$(z AS STRING) AS STRING
+    IF LEN(z) <> 13 THEN RETURN ""
+    DIM l AS ARRAY OF STRING
+    l = ["0001101", "0011001", "0010011", "0111101", "0100011", "0110001", "0101111", "0111011", "0110111", "0001011"]
+    DIM g AS ARRAY OF STRING
+    g = ["0100111", "0110011", "0011011", "0100001", "0011101", "0111001", "0000101", "0010001", "0001001", "0010111"]
+    DIM r AS ARRAY OF STRING
+    r = ["1110010", "1100110", "1101100", "1000010", "1011100", "1001110", "1010000", "1000100", "1001000", "1110100"]
+    DIM par AS ARRAY OF STRING
+    par = ["LLLLLL", "LLGLGG", "LLGGLG", "LLGGGL", "LGLLGG", "LGGLLG", "LGGGLL", "LGLGLG", "LGLGGL", "LGGLGL"]
+    DIM muster AS STRING : muster = par[INT(VAL(LEFT$(z, 1)))]
+    DIM aus AS STRING : aus = "101"
+    DIM i AS INTEGER
+    FOR i = 1 TO 6
+        DIM d AS INTEGER : d = INT(VAL(MID$(z, i, 1)))
+        IF MID$(muster, i - 1, 1) = "L" THEN aus = aus + l[d] ELSE aus = aus + g[d]
+    NEXT
+    aus = aus + "01010"
+    FOR i = 7 TO 12
+        aus = aus + r[INT(VAL(MID$(z, i, 1)))]
+    NEXT
+    RETURN aus + "101"
+END FUNCTION
+
+' Den Strichcode ins Rechteck: 113 Module breit (95 und die Ruhezonen, 11
+' links, 7 rechts), unten die Ziffern; die Randzeichen reichen tiefer.
+SUB studioBStrichcode(pdf AS PDF, z AS STRING, x AS FLOAT, y AS FLOAT, b AS FLOAT, h AS FLOAT, farbe AS INTEGER)
+    DIM bits AS STRING : bits = studioBEan13$(z)
+    IF bits = "" OR b <= 0.0 OR h <= 0.0 THEN RETURN
+    DIM m AS FLOAT : m = b / 113.0
+    DIM zh AS FLOAT : zh = MIN(h * 0.25, m * 10.0)
+    DIM sh AS FLOAT : sh = h - zh
+    PDF_COLOR(pdf, farbe)
+    DIM i AS INTEGER : i = 0
+    WHILE i < 95
+        IF MID$(bits, i, 1) = "1" THEN
+            DIM e AS INTEGER : e = i
+            WHILE e < 95 AND MID$(bits, e, 1) = "1"
+                e = e + 1
+            WEND
+            ' Randzeichen und Mitte reichen bis zur Haelfte der Ziffern.
+            DIM tief AS FLOAT : tief = sh
+            IF i < 3 OR i >= 92 OR (i >= 45 AND i < 50) THEN tief = sh + zh / 2.0
+            PDF_RECT_FILL(pdf, x + (11 + i) * m, y, (e - i) * m, tief)
+            i = e
+        ELSE
+            i = i + 1
+        END IF
+    WEND
+    PDF_FONT(pdf, "mono", zh / 0.3528 * 0.85)
+    DIM k AS INTEGER
+    ' Der Reihe nach, damit der Text im PDF die Nummer ist (Kopieren, Suchen).
+    PDF_TEXT(pdf, x + 4.0 * m, y + sh, LEFT$(z, 1))
+    FOR k = 0 TO 11
+        DIM dz AS STRING : dz = MID$(z, 1 + k, 1)
+        DIM mod0 AS INTEGER : mod0 = 14 + 7 * k
+        IF k >= 6 THEN mod0 = 61 + 7 * (k - 6)
+        PDF_TEXT(pdf, x + (mod0 + 3.5) * m - PDF_TEXT_WIDTH(pdf, dz) / 2.0, y + sh, dz)
+    NEXT
 END SUB
 
 ' Der ganze Bericht: Beschreibung (JSON-Text), Verbindung, SELECT der Quelle
