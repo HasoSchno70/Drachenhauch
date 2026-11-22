@@ -1,0 +1,6 @@
+' Kapitel 2, was schiefgehen kann -- der Massstab kommt zu spaet.
+IMPORT "gui"
+SCREEN(560, 300, "Mediathek", 1)
+DIM fenster AS GUI_WINDOW
+fenster = GUI_WINDOW("Mediathek", 0, 0, 560, 300)
+GUI_SCALE(1.5)

@@ -1,0 +1,30 @@
+' Kapitel 2, Schritt 1 -- vier Felder, jedes an seinem festen Platz.
+IMPORT "gui"
+
+SCREEN(560, 300, "Mediathek", 1)
+WINDOW_RESIZABLE(TRUE)
+DIM fenster AS GUI_WINDOW
+fenster = GUI_WINDOW("Mediathek", 0, 0, 560, 300)
+GUI_WINDOW_CHROME(fenster, FALSE)
+
+DIM l1 AS GUI_WIDGET : l1 = GUI_LABEL(fenster, "Titel", 20, 26)
+DIM titel AS GUI_WIDGET
+titel = GUI_TEXTINPUT(fenster, 100, 20, 300, 28)
+DIM l2 AS GUI_WIDGET : l2 = GUI_LABEL(fenster, "Urheber", 20, 62)
+DIM urheber AS GUI_WIDGET
+urheber = GUI_TEXTINPUT(fenster, 100, 56, 300, 28)
+DIM l3 AS GUI_WIDGET : l3 = GUI_LABEL(fenster, "Art", 20, 98)
+DIM art AS GUI_WIDGET : art = GUI_TEXTINPUT(fenster, 100, 92, 300, 28)
+DIM l4 AS GUI_WIDGET
+l4 = GUI_LABEL(fenster, "Erscheinungsjahr", 20, 134)
+DIM jahr AS GUI_WIDGET : jahr = GUI_TEXTINPUT(fenster, 100, 128, 80, 28)
+DIM knopf AS GUI_WIDGET
+knopf = GUI_BUTTON(fenster, "Aufnehmen", 410, 20, 130, 28)
+
+WINDOW_WAIT_EVENTS(1)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(RGB(32, 36, 44))
+    GUI_DRAW()
+    FLIP()
+WEND
