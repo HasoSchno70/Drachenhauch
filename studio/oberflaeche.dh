@@ -51,6 +51,7 @@ DIM miKlasseNeu AS INTEGER
 DIM miDatenbankNeu AS INTEGER
 DIM miDatenbankDatei AS INTEGER
 DIM miBerichtNeu AS INTEGER
+DIM miSprachtafel AS INTEGER
 DIM miMethodeNeu AS INTEGER
 DIM miEreignisNeu AS INTEGER
 DIM miMethodeWeg AS INTEGER
@@ -160,6 +161,7 @@ SUB oberflaecheAnlegen()
     miDatenbankDatei = GUI_MENU_ITEM(m, tr$("Datenbank aus Datei übernehmen …"))
     miBerichtNeu = GUI_MENU_ITEM(m, tr$("Bericht hinzufügen …"))
     miBildNeu = GUI_MENU_ITEM(m, tr$("Bild hinzufügen …"), kz$("Strg+Umschalt+B"))
+    miSprachtafel = GUI_MENU_ITEM(m, tr$("Sprachtafel ergänzen …"))
     GUI_MENU_SEPARATOR(m)
     miMethodeNeu = GUI_MENU_ITEM(m, tr$("Methode hinzufügen …"), kz$("Strg+Umschalt+M")) : GUI_MENU_ICON(miMethodeNeu, "stift")
     miEreignisNeu = GUI_MENU_ITEM(m, tr$("Ereignis hinzufügen …"), kz$("Strg+Umschalt+E")) : GUI_MENU_ICON(miEreignisNeu, "einfuegen")

@@ -693,3 +693,11 @@ setzte die Laufzeit das Startfenster auf SCREENWIDTH() Pixel statt
 logischer Punkte (und mittelte Fenster und Dialoge damit). `studioLauf`
 oeffnet den Schirm nach App.Geoeffnet im Massstab neu, `studioSchirmLB/LH`
 rechnen die Lage logisch (Fall in werkzeug_studio_aussehen).
+
+Kapitel 22 (Zwei Sprachen): eine Tafel sprache/<code>.txt konnte das Studio
+lesen, aber nicht anlegen -- wer sein Projekt uebersetzen wollte, suchte jeden
+Text selbst zusammen: Fenster, Menues, Spaltenkoepfe, Eintraege, Berichte,
+jedes tr$ im Code. Projekt -> Sprachtafel ergaenzen (studio/sprachtafel.dh)
+sammelt sie mit denselben Feldern wie studioTexteIn und haengt die fehlenden
+als "Text<Tab>" an; SpracheWaehlen laesst eine leere Uebersetzung aus (sonst
+haette sie den Text geloescht). Fall in werkzeug_studio_sprache.

@@ -329,7 +329,10 @@ vor dem ersten Fenster; später lässt die gui ihn nicht mehr ändern.
 **Sprachen.** Ein Projekt schreibt seine Texte in einer Sprache, der seiner
 Quelle. Eine Tafel `sprache/<code>.txt` im Projektordner macht eine zweite
 daraus: je Zeile der Text, wie er im Projekt steht, ein Tabulator, die
-Übersetzung (`sprache/en.txt`). Von selbst übersetzt werden die Texte der
+Übersetzung (`sprache/en.txt`). **Projekt → Sprachtafel ergänzen …**
+sammelt jeden Text des Projekts, den die Laufzeit übersetzt, und hängt die,
+die der Tafel fehlen, mit leerer Übersetzung an (`Text` und ein Tabulator);
+eine leere Übersetzung lässt die Laufzeit aus. Von selbst übersetzt werden die Texte der
 Fenster (Titel, Beschriftungen, Platzhalter, Tooltips, Spaltenköpfe,
 Einträge, Reiter, Meldungen der Prüfregeln, Diagrammtitel, Werkzeugleisten),
 die Menüs samt Kürzeln (`Strg+S` wird `Ctrl+S`), die Texte der Berichte und

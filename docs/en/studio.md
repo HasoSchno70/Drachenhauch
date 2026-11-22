@@ -326,7 +326,10 @@ before the first window; later the gui does not let it change.
 **Languages.** A project writes its texts in one language, that of its
 source. A table `sprache/<code>.txt` in the project folder makes a second one
 from it: per line the text as it stands in the project, a tab, the
-translation (`sprache/en.txt`). Translated by themselves are the texts of
+translation (`sprache/en.txt`). **Projekt → Sprachtafel ergänzen …**
+collects every text of the project that the runtime translates and appends
+those missing from the table with an empty translation (`text` and a tab);
+the runtime skips an empty translation. Translated by themselves are the texts of
 the windows (titles, captions, placeholders, tooltips, column headers,
 entries, tabs, messages of the validation rules, chart titles, toolbars),
 the menus including their shortcuts (`Strg+S` becomes `Ctrl+S`), the texts

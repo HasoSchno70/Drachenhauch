@@ -941,7 +941,9 @@ FUNCTION SpracheWaehlen(code AS STRING) AS BOOLEAN
     FOR EACH z IN READLINES(pfad)
         z = REPLACE$(REPLACE$(z, CHR$(13), ""), CHR$(&HFEFF), "")
         DIM t AS INTEGER : t = INSTR(z, CHR$(9))
-        IF t > 0 THEN MAPPUT(studioTafel, LEFT$(z, t), MID$(z, t + 1))
+        ' "Text<Tab>" ohne Uebersetzung (so haengt Projekt -> Sprachtafel
+        ' ergaenzen neue Texte an) zaehlt nicht: der Text bleibt, wie er ist.
+        IF t > 0 AND MID$(z, t + 1) <> "" THEN MAPPUT(studioTafel, LEFT$(z, t), MID$(z, t + 1))
     NEXT
     studioSprache = code
     RETURN TRUE
