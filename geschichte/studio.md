@@ -669,3 +669,13 @@ jedes Mal eine NEUE Reihe an -- CHART_CLEAR behaelt die Reihen, nur ihre
 Werte gehen --, neben der alten leeren; die Balken wurden halb so breit und
 orange (die zweite Farbe der Palette). Jetzt merkt sich das Diagramm Namen
 und Index (`studioReihen`), dieselbe Reihe bekommt die neuen Werte.
+
+Ebenda, Kapitel 20 (Aussehen): ein Studio-Projekt hatte keinen Weg zu einer
+Stildatei. Die gui liest Klassen aus der .dhform (`klassen`), aber der
+Inspektor bot kein Feld dafuer; und eine .dhstil im Projektordner kam beim
+Starten nicht mit, das Programm haette ihren Pfad selbst suchen muessen.
+Jetzt: Kennung -> Klassen im Inspektor (neben dem Namen, beides Selektoren:
+#name, .klasse), jede *.dhstil im Projektordner geht nach _studio/assets/,
+und `StilLaden(name)` laedt sie (am besten in App.Geoeffnet). Der Entwurf
+zeigt sie bewusst nicht -- er steht in der Stildatei des Studios selbst.
+Pruefung werkzeug_studio_aussehen.

@@ -642,6 +642,8 @@ Summe	Sum
 Seitenzahl	Page number
 Rechteck	Rectangle
 Strichcode	Barcode
+Klassen	Classes
+Klassen für eine Stildatei (button.gefahr { ... }), durch Semikolon getrennt	Classes for a style sheet (button.gefahr { ... }), separated by semicolons
 Links (mm)	Left (mm)
 Oben (mm)	Top (mm)
 Breite (mm)	Width (mm)

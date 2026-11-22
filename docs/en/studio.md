@@ -294,6 +294,7 @@ they are stored under `kontextmenues`.
 | `FarbeWaehlen(vorgabe [, titel$])` | a colour in the colour picker; returns `&HRRGGBB`, `-1` on cancel |
 | `fenster.ZeigenModal()` | shows a window modally and returns only when it is closed |
 | `Bild(name$)` | an image from the project's `bilder/` as IMAGE |
+| `StilLaden(name$)` | load a style sheet (`.dhstil`) from the project folder, best in `App.Geoeffnet` |
 
 All four return only with the answer, as in Xojo or Visual Basic. This works
 because the generated base class polls the events **after** `GUI_UPDATE`
@@ -306,6 +307,16 @@ project folder; an image control picks its image in the inspector under
 "Bild" and shows it in the designer already. When starting and building,
 the images go to `_studio/assets/bilder/`, and `dhrt --export` takes
 `assets/` next to the executable.
+
+**Style sheet.** A file `<name>.dhstil` in the project folder says by rule
+how widgets look -- by kind, class, name and state as in CSS
+([style sheet of the gui](module-gui.md#7-stylesheet-rules-by-kind-class-name-and-state)).
+When starting and building it goes to `_studio/assets/`; the program loads
+it with `StilLaden("<name>.dhstil")`, best in `App.Geoeffnet`. A widget gets
+classes in the inspector under Kennung → **Klassen** (`gefahr; klein`);
+they are stored in the `.dhform` under `klassen`. The designer does not
+show the style sheet -- it stands in the look of the Studio --, the started
+program does; an error in it stops it with the line.
 
 **Languages.** A project writes its texts in one language, that of its
 source. A table `sprache/<code>.txt` in the project folder makes a second one

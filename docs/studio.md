@@ -298,6 +298,7 @@ Menüleiste nicht). Im Layout stehen sie unter `kontextmenues`.
 | `FarbeWaehlen(vorgabe [, titel$])` | eine Farbe im Farbwähler; liefert `&HRRGGBB`, `-1` bei Abbrechen |
 | `fenster.ZeigenModal()` | zeigt ein Fenster modal und kehrt erst zurück, wenn es geschlossen ist |
 | `Bild(name$)` | ein Bild aus `bilder/` des Projekts als IMAGE |
+| `StilLaden(name$)` | eine Stildatei (`.dhstil`) aus dem Projektordner laden, am besten in `App.Geoeffnet` |
 
 Alle vier kehren erst mit der Antwort zurück, wie in Xojo oder Visual
 Basic. Das geht, weil die erzeugte Basisklasse die Ereignisse **nach** dem
@@ -309,6 +310,16 @@ währenddessen, liefert `Frage` 0. Timer laufen auch während eines Dialogs.
 Projektordner; ein Bild-Control wählt seins im Inspektor unter „Bild“ und
 zeigt es schon im Entwurf. Beim Starten und Bauen kommen die Bilder nach
 `_studio/assets/bilder/`, und `dhrt --export` nimmt `assets/` neben die Exe.
+
+**Stildatei.** Eine Datei `<name>.dhstil` im Projektordner sagt per Regel,
+wie Widgets aussehen -- nach Art, Klasse, Name und Zustand wie in CSS
+([Stildatei der gui](module-gui.md#7-stildatei-regeln-nach-art-klasse-name-und-zustand)).
+Beim Starten und Bauen kommt sie nach `_studio/assets/`; das Programm lädt
+sie mit `StilLaden("<name>.dhstil")`, am besten in `App.Geoeffnet`. Klassen
+bekommt ein Widget im Inspektor unter Kennung → **Klassen** (`gefahr;
+klein`), sie stehen in der `.dhform` unter `klassen`. Der Entwurf zeigt die
+Stildatei nicht -- er steht im Aussehen des Studios --, das gestartete
+Programm schon; ein Fehler darin hält es mit der Zeile an.
 
 **Sprachen.** Ein Projekt schreibt seine Texte in einer Sprache, der seiner
 Quelle. Eine Tafel `sprache/<code>.txt` im Projektordner macht eine zweite

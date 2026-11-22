@@ -862,6 +862,13 @@ FUNCTION Bild(name AS STRING) AS IMAGE
     RETURN LOADIMAGE(studioDatei$("bilder/" + name))
 END FUNCTION
 
+' Eine Stildatei des Projekts laden: eine .dhstil aus dem Projektordner, die
+' beim Starten und Bauen nach assets/ kommt -- am besten in App.Geoeffnet,
+' vor dem ersten Fenster. Ein Fehler darin ist ein Laufzeitfehler mit Zeile.
+SUB StilLaden(name AS STRING)
+    GUI_STYLESHEET_LOAD(studioDatei$(name))
+END SUB
+
 FUNCTION studioDatei$(rel AS STRING) AS STRING
     RETURN "assets/" + rel
 END FUNCTION
