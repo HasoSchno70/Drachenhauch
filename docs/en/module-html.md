@@ -205,7 +205,7 @@ After `HTTP_RESULT`, `HTTP_STATUS()` and `HTTP_HEADER()` are ready exactly as af
 
 **Details:**
 
-- **Errors come when collecting.** A 404, a timeout or a connection error lets `HTTP_GET_START` pass and only throws at `HTTP_RESULT` — where the program can deal with it (`TRY`/`CATCH` around the collecting).
+- **Errors come when collecting.** A 404, a timeout or a connection error lets `HTTP_GET_START` pass and only throws at `HTTP_RESULT` — where the program can deal with it (`TRY`/`CATCH` around the collecting). Without a connection the message ends with "no connection: no network, or the server cannot be reached", after the time limit with "no answer within the time limit (HTTP_TIMEOUT)".
 - **`HTTP_READY` may be asked any number of times.** After the first `TRUE` the response stays there until it is collected. Only `HTTP_RESULT` consumes it.
 - **`HTTP_RESULT` before `HTTP_READY`** aborts with a plain-language message instead of blocking — otherwise the advantage would be thrown away again.
 - **Several requests really run at the same time.** Two requests of 300 ms each are done after ~300 ms, not after 600.

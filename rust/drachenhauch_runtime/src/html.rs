@@ -69,11 +69,31 @@ fn map_err(e: ureq::Error, url: &str) -> HttpErr {
                 headers,
             }
         }
-        ureq::Error::Transport(t) => HttpErr {
-            msg: format!("HTTP-Fehler: {} - {}", t, url),
-            status: 0,
-            headers: vec![],
-        },
+        ureq::Error::Transport(t) => {
+            // Ohne Verbindung (kein Netz, falscher Rechner, niemand am Port)
+            // ein Wort, was das heisst -- die Meldung von ureq ist englisch.
+            let zeit_um = {
+                use std::error::Error;
+                t.source().and_then(|s| s.downcast_ref::<std::io::Error>())
+                    .map(|io| matches!(io.kind(), std::io::ErrorKind::TimedOut | std::io::ErrorKind::WouldBlock))
+                    .unwrap_or(false)
+            };
+            let hinweis = match t.kind() {
+                ureq::ErrorKind::ConnectionFailed | ureq::ErrorKind::Dns =>
+                    " -- keine Verbindung: kein Netz, oder der Server ist nicht erreichbar",
+                _ if zeit_um => " -- keine Antwort in der Zeitgrenze (HTTP_TIMEOUT)",
+                _ => "",
+            };
+            // Die Meldung von ureq nennt die URL schon, wenn sie sich lesen
+            // liess; sonst stand sie doppelt da (Buch "Fenster, Formulare,
+            // Daten", Kapitel 16).
+            let msg = if t.url().is_some() {
+                format!("HTTP-Fehler: {}{}", t, hinweis)
+            } else {
+                format!("HTTP-Fehler: {} - {}{}", t, url, hinweis)
+            };
+            HttpErr { msg, status: 0, headers: vec![] }
+        }
     }
 }
 

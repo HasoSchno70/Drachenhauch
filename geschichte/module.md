@@ -359,3 +359,9 @@ Syntaxfehler bleibt ohne Hinweis (Gegenfall im selben Prueffall).
   anderer Tabellen ohne Loeschregel auf die Tabelle zeigen (PRAGMA
   foreign_key_list), bei INSERT/UPDATE die eigenen Verweise, und haengt es
   an die Meldung -- das Studio zeigt sie so in der Statuszeile.
+
+- **HTTP-Fehler sagen, was los ist (2026-11-22).** Buch "Fenster,
+  Formulare, Daten", Kapitel 16: ohne Netz nannte die Meldung die URL
+  zweimal (ureq nennt sie schon, `map_err` haengte sie noch einmal an) und
+  sonst nur englische Systemworte. Jetzt einmal, und bei fehlender
+  Verbindung bzw. abgelaufener Zeitgrenze ein Hinweis.
