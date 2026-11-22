@@ -2624,7 +2624,7 @@ Drei Hilfen fürs Gestalten und für die Barrierefreiheit:
 | `GUI_INSPECTOR([on])` | BOOLEAN ohne Argument | Inspektor zeigen (`TRUE`) oder schließen; ohne Argument: ist er offen? |
 | `GUI_INSPECTOR_SELECTED()` | GUI_WIDGET | das Widget, das im Inspektor gewählt ist, -1 = keins |
 | `GUI_INSPECT$(widget)` | STRING | was der Inspektor über ein Widget zeigt: Art, Name, Klassen, Lage, Zustand, Form, die passenden Regeln der Stildatei mit Zeile und was je Zustand gilt |
-| `GUI_STATE$()` | STRING | der Zustand aller sichtbaren Fenster als Text: je Widget mit Zustand eine Zeile (Texte, Haken, Werte, Auswahl) -- die Erwartung, die `dhrt aufnehmen` schreibt ([werkzeuge.md](werkzeuge.md#dhrt-aufnehmen--bedienung-als-prüffall)) |
+| `GUI_STATE$()` | STRING | der Zustand aller sichtbaren Fenster als Text: je Widget mit Zustand eine Zeile (Texte, Haken, Werte, Auswahl, Zeilen einer Tabelle) -- die Erwartung, die `dhrt aufnehmen` schreibt ([werkzeuge.md](werkzeuge.md#dhrt-aufnehmen--bedienung-als-prüffall)) |
 | `GUI_SET_MOTION(mode$)` | — | `"system"` (Vorgabe): wie das Betriebssystem; `"an"`: Animationen immer; `"aus"`: nie |
 | `GUI_MOTION()` | BOOLEAN | spielt die gui gerade Bewegung ab? |
 

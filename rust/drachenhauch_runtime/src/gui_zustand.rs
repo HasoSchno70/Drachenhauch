@@ -53,6 +53,18 @@ impl Gui {
                         let t = if k >= 0 { w.items.get(k as usize).map(|s| kurz(s)).unwrap_or_default() } else { String::new() };
                         format!("{} {} \"{}\"", wer, k, t)
                     }
+                    // Zeilenzahl, die gewaehlte und die erste Spalte (bis zu
+                    // 20 Zeilen) -- ohne das sah ein Test nicht, was ein
+                    // Suchfeld oder eine Datenquelle gefuellt hat (Buch
+                    // "Fenster, Formulare, Daten", Kapitel 14).
+                    Kind::Table => {
+                        let n = self.table_row_count(h).unwrap_or(0);
+                        let sel = self.table_selected(h).unwrap_or(-1);
+                        let erste: Vec<String> = (0..n.min(20))
+                            .map(|r| format!("\"{}\"", kurz(&self.table_get_cell(h, r, 0).unwrap_or_default())))
+                            .collect();
+                        format!("{} {} Zeilen, gewaehlt {}: {}", wer, n, sel, erste.join(" "))
+                    }
                     _ => continue,
                 };
                 z.push(format!("  {}", zeile));

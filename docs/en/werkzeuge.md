@@ -371,7 +371,8 @@ fenster "Notizbuch"
 ```
 
 What is expected is the **state of the gui at the end** (`GUI_STATE$`):
-texts of fields and labels, ticks, values, selection -- one line per
+texts of fields and labels, ticks, values, selection, for a table the
+number of rows, the selected one and the first column -- one line per
 visible widget, named after `GUI_SET_NAME` or after its number among the
 widgets of the same kind. Delete from the block what need not match; add
 what should. The program needs no line for it: the runtime plays the

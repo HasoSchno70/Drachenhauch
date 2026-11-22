@@ -24,6 +24,12 @@ DIM c AS GUI_WIDGET : c = GUI_CHECKBOX(w, "Rabatt", 10, 100, TRUE)
 DIM s AS GUI_WIDGET : s = GUI_SLIDER(w, 10, 130, 200, 0, 10, 2.5)
 DIM d AS GUI_WIDGET : d = GUI_DROPDOWN(w, 10, 160, 200, 26, ["rot", "gruen", "blau"])
 GUI_DROPDOWN_SET_SELECTED(d, 2)
+' Eine Tabelle: Zeilen, die gewaehlte und die erste Spalte (seit 2026-11-22).
+DIM tb AS GUI_WIDGET : tb = GUI_TABLE(w, 220, 100, 260, 120)
+GUI_TABLE_HEADERS(tb, ["Titel", "Jahr"])
+GUI_TABLE_ADD_ROW(tb, ["Momo", "1973"])
+GUI_TABLE_ADD_ROW(tb, ["Tetris", "1984"])
+GUI_TABLE_SET_SELECTED(tb, 1)
 DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "Knopf", 300, 10, 100, 30)
 DIM weg AS GUI_WIDGET : weg = GUI_LABEL(w, "versteckt", 300, 60)
 GUI_SET_VISIBLE(weg, FALSE)
@@ -37,6 +43,7 @@ fenster "Form"
   checkbox(1) "Rabatt" an
   slider(1) 2.5
   dropdown(1) 2 "blau"
+  table(1) 2 Zeilen, gewaehlt 1: "Momo" "Tetris"
 
 === eine aufnahme spielt ohne code ab und der zustand steht am ende da
 IMPORT "gui"

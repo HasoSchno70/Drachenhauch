@@ -1423,3 +1423,7 @@ am Zeilenende der Erwartung ab, die Ausgabe nicht.
   raylib statt der des Widgets (gemessen 57 statt 113 fuer "Umbenennen").
   `GUI_TEXT_WIDTH(widget, text)` misst ueber `wtext_width`, also genau so,
   wie das Widget zeichnet, und liefert logisch (`unsk`).
+- **Tabellen im Zustand (2026-11-22).** Ebenda, Kapitel 14: `GUI_STATE$`
+  (und `DHRT_GUI_ZUSTAND`) nannte Felder, Haken und Klapplisten, aber keine
+  Tabelle -- ob ein Suchfeld die Liste gefiltert hatte, sah ein Test nicht.
+  Jetzt eine Zeile je Tabelle: Zeilen, die gewaehlte, die erste Spalte.

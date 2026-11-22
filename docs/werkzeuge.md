@@ -364,7 +364,8 @@ fenster "Notizbuch"
 ```
 
 Erwartet wird der **Zustand der gui am Ende** (`GUI_STATE$`): Texte von
-Feldern und Beschriftungen, Haken, Werte, Auswahl -- je sichtbarem Widget
+Feldern und Beschriftungen, Haken, Werte, Auswahl, bei einer Tabelle die
+Zahl der Zeilen, die gewählte und die erste Spalte -- je sichtbarem Widget
 eine Zeile, benannt nach `GUI_SET_NAME` oder nach der Nummer unter den
 Widgets derselben Art. Was nicht stimmen soll, löscht man aus dem Block;
 was dazu soll, schreibt man dazu. Das Programm braucht dafür keine Zeile:
