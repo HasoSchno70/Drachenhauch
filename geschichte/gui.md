@@ -1416,3 +1416,10 @@ am Zeilenende der Erwartung ab, die Ausgabe nicht.
   mit Zeigen anlegt -- und bekam nur "GUI_SET_TEXT: erwartet INTEGER
   (Arg 1)". Ein NIL an einer INTEGER-Stelle der gui sagt jetzt, dass das
   Widget oder Fenster noch nicht existiert (`try_gui_innen`, `gi`).
+- **GUI_TEXT_WIDTH (2026-11-22).** Buch "Fenster, Formulare, Daten",
+  Kapitel 13: im Spalten-Gitter des Studios stand bei 1280 x 800 "Ganze Za"
+  und "Pfli" -- die Spalten waren Anteile an einer geschaetzten Breite.
+  Messen konnte ein Programm nur mit `TEXT_WIDTH`, also mit der Schrift von
+  raylib statt der des Widgets (gemessen 57 statt 113 fuer "Umbenennen").
+  `GUI_TEXT_WIDTH(widget, text)` misst ueber `wtext_width`, also genau so,
+  wie das Widget zeichnet, und liefert logisch (`unsk`).

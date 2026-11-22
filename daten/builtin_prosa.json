@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 2620,
+ "count": 2621,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -1160,6 +1160,7 @@
   "GUI_TEXTINPUT_ICON": "ein eingebautes Sinnbild left und right im Feld (\"\" = keins) -- siehe Suchfeld, Sinnbilder, Vorschläge",
   "GUI_TEXTINPUT_PLACEHOLDER$": "STRING — der graue Text im leeren Feld (auch eines GUI_TEXTAREA)",
   "GUI_TEXTINPUT_SET": "passwort, nur_lesen, maxlaenge, zahlen (0 frei, 1 ganze Zahl, 2 Kommazahl, 3 Geldbetrag in Cent), suche (Suchfeld mit Lupe und Kreuz)",
+  "GUI_TEXT_WIDTH": "INTEGER — wie breit das Widget text zeichnet (seine Schrift, Größe, Stil; logisch) — für Spalten- und Knopfbreiten, statt an der Zeichenzahl zu schätzen",
   "GUI_THEME": "Akzentfarbe (RGB) umstellen (Kurzform)",
   "GUI_THEME_GET": "— / INT — einzelne Theme-Farbe setzen/lesen",
   "GUI_THEME_PRESET": "Look: dark/light/retro/contrast + modern_dark/modern_light (rund + Schatten)",

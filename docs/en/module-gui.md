@@ -100,6 +100,7 @@ IMPORT "gui"
 | `GUI_SET_MIN_SIZE(widget, min_w, min_h)` | — | minimum size: a weighted child in a container and an anchored widget do not shrink below it |
 | `GUI_GET_MIN_W(widget)` / `GUI_GET_MIN_H(widget)` | INTEGER | the minimum size that was set, 0 = none |
 | `GUI_LAYOUT_MIN_W(layout)` / `GUI_LAYOUT_MIN_H(layout)` | INTEGER | what a container needs at least — the value for `WINDOW_MIN_SIZE` |
+| `GUI_TEXT_WIDTH(widget, text)` | INTEGER | how wide the widget draws `text` (its font, size, style; logical) — for column and button widths instead of guessing from the character count |
 | `GUI_RULE(feld, art$[, a, b][, muster$][, meldung$])` | — | attach a **validation rule**: `pflicht` (required), `zahl` (number), `ganz` (integer), `bereich a b` (range), `laenge min max` (length), `email`, `datum` (date), `muster regex$` (pattern) — see [Form validation](#form-validation) |
 | `GUI_VALIDATE(win)` / `GUI_VALIDATE_WIDGET(feld)` | INTEGER / STRING | check all rules of the window (number of errors, the first field gets focus) / one field (message or "") |
 | `GUI_ERROR(field)` / `GUI_SET_ERROR(field, meldung$)` / `GUI_CLEAR_ERRORS(win)` | STRING / — / — | read the message, set it from outside (e.g. from the database), clear all |

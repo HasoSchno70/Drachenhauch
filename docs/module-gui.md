@@ -100,6 +100,7 @@ IMPORT "gui"
 | `GUI_SET_MIN_SIZE(widget, min_w, min_h)` | — | Mindestmaß: ein gewichtetes Kind im Behälter und ein verankertes Widget schrumpfen nicht darunter |
 | `GUI_GET_MIN_W(widget)` / `GUI_GET_MIN_H(widget)` | INTEGER | das gesetzte Mindestmaß, 0 = keins |
 | `GUI_LAYOUT_MIN_W(layout)` / `GUI_LAYOUT_MIN_H(layout)` | INTEGER | was ein Behälter mindestens braucht — der Wert für `WINDOW_MIN_SIZE` |
+| `GUI_TEXT_WIDTH(widget, text)` | INTEGER | wie breit das Widget `text` zeichnet (seine Schrift, Größe, Stil; logisch) — für Spalten- und Knopfbreiten, statt an der Zeichenzahl zu schätzen |
 | `GUI_RULE(feld, art$[, a, b][, muster$][, meldung$])` | — | **Prüfregel** anhängen: `pflicht`, `zahl`, `ganz`, `bereich a b`, `laenge min max`, `email`, `datum`, `muster regex$` — siehe [Formularprüfung](#formularprüfung) |
 | `GUI_VALIDATE(win)` / `GUI_VALIDATE_WIDGET(feld)` | INTEGER / STRING | alle Regeln des Fensters prüfen (Zahl der Fehler, erstes Feld bekommt den Fokus) / ein Feld (Meldung oder "") |
 | `GUI_ERROR(field)` / `GUI_SET_ERROR(field, meldung$)` / `GUI_CLEAR_ERRORS(win)` | STRING / — / — | Meldung lesen, von außen setzen (z. B. aus der Datenbank), alle löschen |

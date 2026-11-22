@@ -306,3 +306,47 @@ DHRT_FRAMES=2
 --- erwartet
 akzent gueltig TRUE
 passt TRUE
+
+=== wie breit ein widget einen text zeichnet
+' GUI_TEXT_WIDTH misst mit Schrift und Groesse des Widgets, logisch wie
+' alle Lagen nach aussen -- das Studio bemisst damit Knoepfe und Spalten,
+' statt an der Zeichenzahl zu schaetzen ("Ganze Za").
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 300)
+DIM k AS GUI_WIDGET : k = GUI_BUTTON(w, "x", 10, 10, 80, 26)
+DIM gross AS GUI_WIDGET : gross = GUI_BUTTON(w, "x", 10, 50, 80, 26)
+' Die Standardgroesse ist 20: 40 zeichnet genau doppelt so breit.
+GUI_SET_FONT_SIZE(gross, 40)
+DIM a AS INTEGER : a = GUI_TEXT_WIDTH(k, "Umbenennen")
+DIM b AS INTEGER : b = GUI_TEXT_WIDTH(k, "OK")
+DIM c AS INTEGER : c = GUI_TEXT_WIDTH(gross, "Umbenennen")
+PRINT "laenger "; a > b * 3; " groesser "; c = a * 2; " leer "; GUI_TEXT_WIDTH(k, "")
+PRINT "breite "; a
+TRY
+    PRINT GUI_TEXT_WIDTH(-1, "x")
+CATCH e
+    PRINT "kein widget"
+END TRY
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+laenger TRUE groesser TRUE leer 0
+breite 113
+kein widget
+
+=== text breite bei massstab 2 bleibt logisch
+' Bei Massstab 2 zeichnet das Widget doppelt so breit; GUI_TEXT_WIDTH
+' liefert dieselbe logische Breite wie im Fall davor.
+IMPORT "gui"
+GUI_SCALE(2)
+SCREEN(800, 600, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 300)
+DIM k AS GUI_WIDGET : k = GUI_BUTTON(w, "x", 10, 10, 80, 26)
+PRINT "breite "; GUI_TEXT_WIDTH(k, "Umbenennen")
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+breite 113
