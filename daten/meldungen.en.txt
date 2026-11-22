@@ -813,8 +813,10 @@ Ungueltige Regex '{}': {}	Invalid regex '{}': {}
 {}: erwartet BOOLEAN (Arg {})	{}: expected BOOLEAN (argument {})
 {}: erwartet FUNCREF (Arg {})	{}: expected FUNCREF (argument {})
 {}: erwartet INTEGER (Arg {})	{}: expected INTEGER (argument {})
+{}: erwartet INTEGER (Arg {}), erhalten NIL	{}: expected INTEGER (argument {}), got NIL
 {}: erwartet STRING (Arg {})	{}: expected STRING (argument {})
 {}: erwartet Zahl (Arg {})	{}: expected a number (argument {})
+das Widget oder Fenster gibt es noch nicht (ein Fenster aus dem Studio legt seine Controls erst mit Zeigen an)	the widget or window does not exist yet (a window from the Studio only creates its controls when Zeigen shows it)
 {}: erwartet einen Zeitwert (INTEGER, Arg {})	{}: expected a time value (INTEGER, argument {})
 {}: erwartet den Namen eines Sinnbilds (STRING) oder ein Bild (Arg {})	{}: expected the name of a symbol (STRING) or an image (argument {})
 {}: erwartet INTEGER (Rueckgabewert)	{}: expected INTEGER (return value)

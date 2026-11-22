@@ -107,6 +107,10 @@ impl<'p> Vm<'p> {
                     f, i + 1, crate::value::fmt_float(*x), crate::builtins::KEIN_GANZ_HINWEIS)),
                 Some(Value::Str(t)) => Err(format!("{}: erwartet INTEGER (Arg {}){}", f, i + 1,
                     crate::umstieg::text_statt_zahl(f, t))),
+                // Ein Feld AS GUI_WIDGET, dem noch nichts zugewiesen wurde --
+                // typisch: ein Fenster aus dem Studio, das noch nicht
+                // gezeigt wurde, hat seine Controls noch nicht angelegt.
+                Some(Value::Nil) => Err(format!("{}: erwartet INTEGER (Arg {}), erhalten NIL -- das Widget oder Fenster gibt es noch nicht (ein Fenster aus dem Studio legt seine Controls erst mit Zeigen an)", f, i + 1)),
                 _ => Err(format!("{}: erwartet INTEGER (Arg {})", f, i + 1)) }
         }
         fn gs(a: &[Value], i: usize, f: &str) -> R<String> {
