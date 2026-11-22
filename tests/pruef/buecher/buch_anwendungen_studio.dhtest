@@ -211,3 +211,200 @@ zeigen warnt TRUE
 zeigen haelt TRUE
 zeile TRUE
 meldung TRUE
+
+=== kapitel 11: drei fenster, modal und nicht
+' Kapitel 11: Bearbeiten in einem modalen Fenster, Ausleihen in einem, das
+' offen bleibt und der Auswahl folgt; die Loesungen (Einstellungen, ein
+' Info-Fenster je Eintrag) und der Fehler aus "Was schiefgehen kann".
+' Lagen im Hauptfenster (760 x 480): Zeilen Momo 51, Metropolis 71,
+' Tetris 91, Emil 131; Knoepfe auf 427. Mit Menueleiste 26 tiefer.
+IMPORT "laeufer.dh"
+IMPORT "imgfx"
+SUB kopieren(von AS STRING, nach AS STRING)
+    IF NOT DIREXISTS(nach) THEN MKDIR(nach)
+    DIM n AS STRING
+    FOR EACH n IN DIRLIST(von)
+        IF DIREXISTS(von + "/" + n) THEN
+            IF n <> "_studio" THEN kopieren(von + "/" + n, nach + "/" + n)
+        ELSE
+            COPYFILE(von + "/" + n, nach + "/" + n)
+        END IF
+    NEXT
+END SUB
+FUNCTION bedienen$(main AS STRING, ev AS ARRAY OF STRING, bilder AS INTEGER) AS STRING
+    DIM pf AS STRING : pf = CWD$() + "/bedienung.txt"
+    WRITEALL(pf, "c " + STR$(LEN(ev)) + CHR$(10) + JOIN$(ev, CHR$(10)) + CHR$(10) + CHR$(10))
+    SETENV("DHRT_ABSPIELEN", pf)
+    SETENV("DHRT_GUI_ZUSTAND", "1")
+    DIM q AS INTEGER : q = PROCESS_START("dhrt", "run", "--bilder", STR$(bilder), main)
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    WHILE leer < 5
+        DIM t AS STRING : t = PROCESS_READ$(q) + PROCESS_ERR$(q)
+        aus = aus + t
+        IF t = "" AND NOT PROCESS_RUNNING(q) THEN leer = leer + 1
+        SLEEP(20)
+    WEND
+    SETENV("DHRT_ABSPIELEN", "")
+    SETENV("DHRT_GUI_ZUSTAND", "")
+    RETURN aus
+END FUNCTION
+' Ein Klick an (x, y) ab Bild b.
+SUB klick(ev AS ARRAY OF STRING, b AS INTEGER, x AS INTEGER, y AS INTEGER)
+    ARRAY_PUSH(ev, "e " + STR$(b) + " 7 " + STR$(x) + " " + STR$(y) + " 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 2) + " 7 " + STR$(x) + " " + STR$(y) + " 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 4) + " 6 0 0 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 6) + " 5 0 0 0 0")
+END SUB
+' Strg+I ab Bild b.
+SUB strgI(ev AS ARRAY OF STRING, b AS INTEGER)
+    ARRAY_PUSH(ev, "e " + STR$(b) + " 2 341 0 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 2) + " 2 73 0 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 4) + " 1 73 0 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 6) + " 1 341 0 0 0")
+END SUB
+' Wie orange die Zeile Tetris (y 117 mit Menueleiste) ist: groesster
+' Abstand Rot - Blau ueber ihrem Titel.
+FUNCTION orange(png AS STRING) AS INTEGER
+    DIM b AS IMAGE : b = IMAGE_LOAD(png)
+    DIM best AS INTEGER : best = -999
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 110 TO 124
+        FOR x = 24 TO 80
+            DIM c AS INTEGER : c = IMAGE_GET_PIXEL(b, x, y)
+            ' BAND bindet schwaecher als -, darum die Klammern.
+            best = MAX(best, ((c SHR 16) BAND 255) - (c BAND 255))
+        NEXT
+    NEXT
+    RETURN best
+END FUNCTION
+FUNCTION bild$(main AS STRING, ev AS ARRAY OF STRING, n AS INTEGER, name AS STRING) AS STRING
+    DIM pf AS STRING : pf = CWD$() + "/" + name + ".txt"
+    WRITEALL(pf, "c " + STR$(LEN(ev)) + CHR$(10) + JOIN$(ev, CHR$(10)) + CHR$(10) + CHR$(10))
+    SETENV("DHRT_ABSPIELEN", pf)
+    DIM png AS STRING : png = CWD$() + "/" + name + ".png"
+    DIM q AS INTEGER : q = PROCESS_START("dhrt", "bild", main, png, STR$(n))
+    WHILE PROCESS_RUNNING(q)
+        SLEEP(50)
+    WEND
+    SETENV("DHRT_ABSPIELEN", "")
+    RETURN png
+END FUNCTION
+
+DIM code AS STRING : code = ARG$(1) + "/buecher/anwendungen/code/"
+DIM proj AS STRING
+FOR EACH proj IN ["kap11/mediathek", "loesungen/kap11_einstellungen", "loesungen/kap11_info"]
+    DIM nm AS STRING : nm = BASENAME(proj)
+    IF nm = "mediathek" THEN nm = "kap11_mediathek"
+    DIM p AS STRING : p = CWD$() + "/" + nm
+    kopieren(code + proj, p)
+    slZeilen = []
+    slBild = 0
+    slHin(10, 10)
+    slWarten(10)
+    slTaste(294)
+    slWarten(150)
+    slAufnahmeSchreiben(CWD$() + "/ev.txt")
+    SETENV("DH_STUDIO_LAUF_BILDER", "20")
+    DIM log AS STRING : log = CWD$() + "/" + nm + ".log"
+    DIM aus AS STRING : aus = slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+    PRINT nm; " geprueft "; slHat(log, "geprueft 0 0"); " beendet "; slHat(log, "beendet 0")
+    IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+NEXT
+DIM m AS STRING : m = CWD$() + "/kap11_mediathek/_studio/main.dh"
+DIM ev AS ARRAY OF STRING
+DIM a AS STRING
+
+' Modal: Metropolis, "Bearbeiten ...", ein Klick dahinter auf Emil (das
+' Hauptfenster nimmt ihn nicht), Art auf Spiel, OK. Noch einmal
+' "Bearbeiten ...": wieder Metropolis, jetzt ein Spiel.
+ev = []
+klick(ev, 0, 100, 71)
+klick(ev, 10, 415, 427)
+klick(ev, 24, 60, 131)
+klick(ev, 34, 420, 233)
+klick(ev, 48, 420, 301)
+klick(ev, 58, 410, 337)
+klick(ev, 70, 415, 427)
+a = bedienen$(m, ev, 100)
+PRINT "modal "; INSTR(a, "feldtitel " + CHR$(34) + "Metropolis") >= 0; " "; INSTR(a, "wahlart 2 " + CHR$(34) + "Spiel") >= 0
+
+' Nicht modal: Tetris, "Ausleihen ...", dann Momo -- das Fenster folgt.
+ev = []
+klick(ev, 0, 100, 91)
+klick(ev, 10, 670, 427)
+klick(ev, 30, 100, 51)
+PRINT "folgt "; INSTR(bedienen$(m, ev, 60), "gewaehlt " + CHR$(34) + "Momo ist da.") >= 0
+
+' Drehen 3: Momo, Ausleihen, mit dem Kreuz zu, Tetris, wieder Ausleihen.
+ev = []
+klick(ev, 0, 100, 51)
+klick(ev, 10, 670, 427)
+klick(ev, 30, 558, 155)
+klick(ev, 44, 100, 91)
+klick(ev, 58, 670, 427)
+PRINT "wieder auf "; INSTR(bedienen$(m, ev, 90), "Tetris ist bei Lena.") >= 0
+
+' Zurueck nimmt die Ausleihe zurueck.
+ev = []
+klick(ev, 0, 100, 91)
+klick(ev, 10, 670, 427)
+klick(ev, 30, 505, 292)
+PRINT "zurueck "; INSTR(bedienen$(m, ev, 60), "Tetris ist da.") >= 0
+
+' Erweitern 1: Bearbeiten -> Einstellungen ..., das Kaestchen, OK -- die
+' verliehene Zeile wird orange. Ohne das Kaestchen bleibt sie es nicht.
+DIM me AS STRING : me = CWD$() + "/kap11_einstellungen/_studio/main.dh"
+ev = []
+klick(ev, 0, 40, 13)
+klick(ev, 12, 80, 40)
+DIM ohne AS INTEGER : ohne = orange(bild$(me, ev, 60, "ohne"))
+klick(ev, 26, 228, 230)
+klick(ev, 38, 370, 296)
+DIM mit AS INTEGER : mit = orange(bild$(me, ev, 60, "mit"))
+PRINT "orange "; mit > 80; " "; ohne < 30
+IF mit <= 80 OR ohne >= 30 THEN PRINT mit; " "; ohne
+' Das Kaestchen, aber Abbrechen: es bleibt, wie es war.
+ev = []
+klick(ev, 0, 40, 13)
+klick(ev, 12, 80, 40)
+klick(ev, 26, 228, 230)
+klick(ev, 38, 485, 296)
+PRINT "abbrechen "; orange(bild$(me, ev, 60, "abbrechen")) < 30
+
+' Erweitern 2: Momo und Tetris, je Strg+I -- zwei Info-Fenster.
+DIM mi AS STRING : mi = CWD$() + "/kap11_info/_studio/main.dh"
+ev = []
+klick(ev, 0, 100, 77)
+strgI(ev, 10)
+klick(ev, 24, 100, 117)
+strgI(ev, 34)
+a = bedienen$(mi, ev, 60)
+DIM zahl AS INTEGER : zahl = LEN(SPLIT$(a, "fenster #infofenster")) - 1
+PRINT "info "; zahl; " "; INSTR(a, "Momo von Michael Ende") >= 0; " "; INSTR(a, "Tetris von Alexei Paschitnow") >= 0
+
+' Was schiefgehen kann: ohne die Abfrage, ob das Ausleihfenster offen ist,
+' spricht folgen Controls an, die es noch nicht gibt.
+DIM af AS STRING : af = CWD$() + "/kap11_mediathek/_studio/projekt/AusleihFenster.dh"
+WRITEALL(af, REPLACE$(READALL(af), "IF Self.offen THEN Self.anzeigen()", "Self.anzeigen()"))
+a = bedienen$(m, ["e 0 7 100 91 0 0", "e 2 7 100 91 0 0", "e 4 6 0 0 0 0", "e 6 5 0 0 0 0"], 30)
+PRINT "nil "; INSTR(a, "AusleihFenster.dh:33: GUI_SET_TEXT: erwartet INTEGER (Arg 1), erhalten NIL -- das Widget oder Fenster gibt es noch nicht") >= 0
+--- argumente
+{sammlung}/../../../studio/studio.dh
+{sammlung}/../../..
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- erwartet
+kap11_mediathek geprueft TRUE beendet TRUE
+kap11_einstellungen geprueft TRUE beendet TRUE
+kap11_info geprueft TRUE beendet TRUE
+modal TRUE TRUE
+folgt TRUE
+wieder auf TRUE
+zurueck TRUE
+orange TRUE TRUE
+abbrechen TRUE
+info 2 TRUE TRUE
+nil TRUE
