@@ -2158,3 +2158,197 @@ table#tabelle 1 Zeilen, gewaehlt -1: "Momo"
 ansage "Ein Eintrag gefunden"
 schirm 760 fenster 760
 schirm 1140 fenster 760
+
+=== kapitel 22: zwei sprachen
+' Kapitel 22: die Tafel sprache/en.txt. Mit DHRT_LANG=en spricht die
+' Mediathek Englisch (Suchfeld, Statuszeile, das Ausleihfenster mit
+' umgestellten Platzhaltern), ohne Deutsch. Eine im englischen Programm
+' gewaehlte Art "Book" steht als "Buch" in der Datenbank, und eine Liste
+' mit "Book" wird als "Buch" eingelesen. Dazu die Loesungen: die Spalte Art
+' uebersetzt (die Suche bleibt bei der Datenbank) und Franzoesisch nach der
+' Sprache des Systems.
+IMPORT "laeufer.dh"
+IMPORT "db"
+SUB kopieren(von AS STRING, nach AS STRING)
+    IF NOT DIREXISTS(nach) THEN MKDIR(nach)
+    DIM n AS STRING
+    FOR EACH n IN DIRLIST(von)
+        IF DIREXISTS(von + "/" + n) THEN
+            IF n <> "_studio" THEN kopieren(von + "/" + n, nach + "/" + n)
+        ELSEIF RIGHT$(n, 3) <> ".db" THEN
+            COPYFILE(von + "/" + n, nach + "/" + n)
+        END IF
+    NEXT
+END SUB
+FUNCTION laufen$(main AS STRING, bilder AS INTEGER, arg AS STRING) AS STRING
+    DIM q AS INTEGER
+    IF arg = "" THEN
+        q = PROCESS_START("dhrt", "run", "--bilder", STR$(bilder), main)
+    ELSE
+        q = PROCESS_START("dhrt", "run", "--bilder", STR$(bilder), main, "--", arg)
+    END IF
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    WHILE leer < 5
+        DIM t AS STRING : t = PROCESS_READ$(q) + PROCESS_ERR$(q)
+        aus = aus + t
+        IF t = "" AND NOT PROCESS_RUNNING(q) THEN leer = leer + 1
+        SLEEP(20)
+    WEND
+    RETURN aus
+END FUNCTION
+FUNCTION bedienen$(main AS STRING, ev AS ARRAY OF STRING, bilder AS INTEGER) AS STRING
+    DIM pf AS STRING : pf = CWD$() + "/bedienung.txt"
+    WRITEALL(pf, "c " + STR$(LEN(ev)) + CHR$(10) + JOIN$(ev, CHR$(10)) + CHR$(10) + CHR$(10))
+    SETENV("DHRT_ABSPIELEN", pf)
+    SETENV("DHRT_GUI_ZUSTAND", "1")
+    DIM aus AS STRING : aus = laufen$(main, bilder, "")
+    SETENV("DHRT_ABSPIELEN", "")
+    SETENV("DHRT_GUI_ZUSTAND", "")
+    IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+    RETURN aus
+END FUNCTION
+SUB klick(ev AS ARRAY OF STRING, b AS INTEGER, x AS INTEGER, y AS INTEGER)
+    ARRAY_PUSH(ev, "e " + STR$(b) + " 7 " + STR$(x) + " " + STR$(y) + " 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 2) + " 7 " + STR$(x) + " " + STR$(y) + " 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 4) + " 6 0 0 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 6) + " 5 0 0 0 0")
+END SUB
+' Eine Taste ab Bild b, wahlweise mit gehaltenem Strg (341).
+SUB taste(ev AS ARRAY OF STRING, b AS INTEGER, strg AS BOOLEAN, code AS INTEGER)
+    IF strg THEN ARRAY_PUSH(ev, "e " + STR$(b) + " 2 341 0 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 2) + " 2 " + STR$(code) + " 0 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 4) + " 1 " + STR$(code) + " 0 0 0")
+    IF strg THEN ARRAY_PUSH(ev, "e " + STR$(b + 6) + " 1 341 0 0 0")
+END SUB
+FUNCTION zeile$(aus AS STRING, was AS STRING) AS STRING
+    DIM z AS STRING
+    FOR EACH z IN SPLIT$(REPLACE$(aus, CHR$(13), ""), CHR$(10))
+        IF INSTR(z, was) >= 0 THEN RETURN TRIM$(z)
+    NEXT
+    RETURN ""
+END FUNCTION
+SUB f5(nm AS STRING, p AS STRING)
+    slZeilen = []
+    slBild = 0
+    slHin(10, 10)
+    slWarten(10)
+    slTaste(294)
+    slWarten(150)
+    slAufnahmeSchreiben(CWD$() + "/f5.txt")
+    SETENV("DH_STUDIO_LAUF_BILDER", "20")
+    DIM lg AS STRING : lg = CWD$() + "/" + nm + ".log"
+    DIM aus AS STRING : aus = slStarten(lg, CWD$() + "/f5.txt", slBild + 20, p)
+    PRINT nm; " geprueft "; slHat(lg, "geprueft 0 0"); " beendet "; slHat(lg, "beendet 0")
+    IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+END SUB
+' Eine Methode vor das Ende der Klasse Hauptfenster der Kopie.
+SUB einschieben(nm AS STRING, zeilen AS ARRAY OF STRING)
+    DIM h AS STRING : h = CWD$() + "/" + nm + "/_studio/projekt/Hauptfenster.dh"
+    DIM t AS STRING : t = READALL(h)
+    DIM p AS INTEGER : p = INSTRREV(t, "END CLASS")
+    WRITEALL(h, LEFT$(t, p) + JOIN$(zeilen, CHR$(10)) + CHR$(10) + MID$(t, p))
+END SUB
+FUNCTION q$(s AS STRING) AS STRING
+    RETURN CHR$(34) + s + CHR$(34)
+END FUNCTION
+
+FUNCTION wert$(datei AS STRING, sql AS STRING) AS STRING
+    DIM d AS DB_CONN : d = DB_OPEN(datei)
+    DIM r AS DB_RESULT : r = DB_QUERY(d, sql)
+    DIM w AS STRING : w = "?"
+    IF DB_NEXT(r) THEN w = DB_GET_STRING(r, 0)
+    DB_CLOSE(d)
+    RETURN w
+END FUNCTION
+
+DIM code AS STRING : code = ARG$(1) + "/buecher/anwendungen/code/"
+DIM proj AS STRING
+FOR EACH proj IN ["kap22/mediathek", "loesungen/kap22_art", "loesungen/kap22_franzoesisch"]
+    DIM nm AS STRING : nm = BASENAME(proj)
+    IF nm = "mediathek" THEN nm = "kap22_mediathek"
+    kopieren(code + proj, CWD$() + "/" + nm)
+    f5(nm, CWD$() + "/" + nm)
+NEXT
+DIM m AS STRING : m = CWD$() + "/kap22_mediathek/_studio/main.dh"
+DIM a AS STRING
+DIM ev AS ARRAY OF STRING
+' Englisch: Tetris waehlen, Lend ...
+SETENV("DHRT_LANG", "en")
+ev = []
+klick(ev, 4, 100, 197)
+klick(ev, 14, 670, 452)
+a = bedienen$(m, ev, 40)
+PRINT zeile$(a, "label#beschriftungsuche")
+PRINT zeile$(a, "label#status")
+PRINT zeile$(a, "label#gewaehlt")
+' Kind of Blue bearbeiten, Art Book, OK.
+ev = []
+klick(ev, 4, 100, 137)
+klick(ev, 12, 415, 452)
+klick(ev, 25, 320, 265)
+klick(ev, 36, 300, 289)
+klick(ev, 50, 510, 387)
+a = bedienen$(m, ev, 80)
+PRINT "kind of blue "; wert$(CWD$() + "/kap22_mediathek/_studio/mediathek.db", "SELECT art FROM eintrag WHERE titel = 'Kind of Blue'")
+' Eine Liste mit Book, auf Englisch eingelesen.
+WRITEALL(CWD$() + "/dublin.csv", "titel;art" + CHR$(10) + "Dubliners;Book" + CHR$(10) + "Ulysses;Gedicht" + CHR$(10))
+einschieben("kap22_mediathek", ["    DIM probeN AS INTEGER", _
+    "    SUB Takt()", _
+    "        Self.probeN = Self.probeN + 1", _
+    "        IF Self.probeN = 3 THEN", _
+    "            DIM e AS Einlesung : e = einlesen(" + q$(CWD$() + "/dublin.csv") + ")", _
+    "            PRINT " + q$("eingelesen ") + "; e.neu; " + q$(" | ") + "; JOIN$(e.meldungen, " + q$(" | ") + ")", _
+    "            END", _
+    "        END IF", _
+    "    END SUB"])
+PRINT zeile$(laufen$(m, 20, ""), "eingelesen ")
+PRINT "dubliners "; wert$(CWD$() + "/kap22_mediathek/_studio/mediathek.db", "SELECT art FROM eintrag WHERE titel = 'Dubliners'")
+SETENV("DHRT_LANG", "")
+a = bedienen$(m, [], 20)
+PRINT zeile$(a, "label#status")
+' Erweitern 1: die Spalte Art auf Englisch, gesucht wird in der Datenbank.
+SETENV("DHRT_LANG", "en")
+DIM ma AS STRING : ma = CWD$() + "/kap22_art/_studio/main.dh"
+ev = []
+klick(ev, 4, 100, 197)
+a = bedienen$(ma, ev, 30)
+PRINT zeile$(a, "table#tabelle")
+DIM ha AS STRING : ha = CWD$() + "/kap22_art/_studio/projekt/Hauptfenster.dh"
+DIM hat AS STRING : hat = READALL(ha)
+WRITEALL(ha, REPLACE$(hat, "        Self.ausleihe.haupt = Self", "        Self.ausleihe.haupt = Self" + CHR$(10) + "        GUI_SET_TEXT(Self.feldSuche, " + q$("Game") + ") : Self.Neuladen()"))
+PRINT "game "; zeile$(bedienen$(ma, [], 20), "table#tabelle")
+WRITEALL(ha, REPLACE$(hat, "        Self.ausleihe.haupt = Self", "        Self.ausleihe.haupt = Self" + CHR$(10) + "        GUI_SET_TEXT(Self.feldSuche, " + q$("Spiel") + ") : Self.Neuladen()"))
+PRINT "spiel "; zeile$(bedienen$(ma, [], 20), "table#tabelle")
+SETENV("DHRT_LANG", "")
+' Erweitern 2: Franzoesisch, Deutsch, sonst Englisch.
+DIM mf AS STRING : mf = CWD$() + "/kap22_franzoesisch/_studio/main.dh"
+DIM sys AS STRING
+FOR EACH sys IN ["fr", "de", "it"]
+    SETENV("DHRT_SYSTEM_LANG", sys)
+    PRINT sys; " "; zeile$(bedienen$(mf, [], 20), "label#status")
+NEXT
+SETENV("DHRT_SYSTEM_LANG", "de")
+--- argumente
+{sammlung}/../../../studio/studio.dh
+{sammlung}/../../..
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- erwartet
+kap22_mediathek geprueft TRUE beendet TRUE
+kap22_art geprueft TRUE beendet TRUE
+kap22_franzoesisch geprueft TRUE beendet TRUE
+label#beschriftungsuche "Search"
+label#status "5 entries"
+label#gewaehlt "Tetris has been with Lena for 40 days."
+kind of blue Buch
+eingelesen 1 | Line 3: there is no type “Gedicht” (Book, Film, Game, Music).
+dubliners Buch
+label#status "6 Einträge"
+table#tabelle 5 Zeilen, gewaehlt 4 ("Tetris" "Alexei Paschitnow" "Game" "1984" "Lena"): "Emil und die Detektive" "Kind of Blue" "Metropolis" "Momo" "Tetris"
+game table#tabelle 0 Zeilen, gewaehlt -1:
+spiel table#tabelle 1 Zeilen, gewaehlt -1: "Tetris"
+fr label#status "5 fiches"
+de label#status "5 Einträge"
+it label#status "5 entries"

@@ -1,0 +1,59 @@
+' Kapitel 15 -- das Ausleihfenster sagt auch, seit wann ein Eintrag weg
+' ist, und laedt die Tabelle des Hauptfensters neu, wenn sich etwas
+' aendert (die Spalte "Verliehen an").
+CLASS AusleihFenster EXTENDS AusleihFenster_Basis
+    DIM haupt AS Hauptfenster
+    ' Der Eintrag, um den es gerade geht (0 = keiner).
+    DIM id AS INTEGER
+    DIM offen AS BOOLEAN
+
+    SUB Geoeffnet()
+        Self.offen = TRUE
+        Self.anzeigen()
+    END SUB
+
+    SUB Schliessen()
+        Self.offen = FALSE
+    END SUB
+
+    SUB folgen(eid AS INTEGER)
+        Self.id = eid
+        IF Self.offen THEN Self.anzeigen()
+    END SUB
+
+    SUB anzeigen()
+        IF Self.id = 0 THEN
+            GUI_SET_TEXT(Self.gewaehlt, tr$("Kein Eintrag gewählt."))
+            RETURN
+        END IF
+        DIM t AS STRING : t = titelVon$(Self.id)
+        DIM bei AS STRING : bei = verliehenAn$(Self.id)
+        IF bei = "" THEN
+            GUI_SET_TEXT(Self.gewaehlt, trf$("{0} ist da.", [t]))
+        ELSE
+            DIM seit AS STRING : seit = seitWann$(seitTagen(Self.id))
+            GUI_SET_TEXT(Self.gewaehlt, _
+                         trf$("{0} ist {1} bei {2}.", [t, seit, bei]))
+        END IF
+    END SUB
+
+    SUB knopfVerleihen_Klick()
+        DIM wer AS STRING : wer = TRIM$(GUI_TEXT(Self.feldAn))
+        IF Self.id = 0 OR wer = "" THEN RETURN
+        ' Wer etwas hat, gibt es erst zurueck.
+        IF verliehenAn$(Self.id) <> "" THEN RETURN
+        verleihen(Self.id, wer)
+        Self.haupt.Neuladen()
+        Self.anzeigen()
+        GUI_ANNOUNCE(trf$("{0} an {1} verliehen", _
+                          [titelVon$(Self.id), wer]))
+    END SUB
+
+    SUB knopfZurueck_Klick()
+        IF Self.id = 0 THEN RETURN
+        zurueckgeben(Self.id)
+        Self.haupt.Neuladen()
+        Self.anzeigen()
+        GUI_ANNOUNCE(trf$("{0} ist zurück", [titelVon$(Self.id)]))
+    END SUB
+END CLASS

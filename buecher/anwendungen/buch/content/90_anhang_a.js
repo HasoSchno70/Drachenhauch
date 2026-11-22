@@ -670,4 +670,34 @@ module.exports = (H) => [
   ...neu("loesungen/kap21_gross/App.dh").map((t) => H.code(t)),
 
   H.p("GUI_SCALE vergrößert alles — Schrift, Widgets und das Programmfenster mit. Es muss vor dem ersten Fenster stehen; einen Menüeintrag, der den Maßstab mitten im Lauf ändert, lässt die gui nicht zu. Ausprobieren lässt es sich im Projektordner mit dhrt run _studio/main.dh -- --gross; ein gebautes Programm bekommt die Option in seiner Verknüpfung. Wie man sich die Wahl für den nächsten Start merkt, zeigt Kapitel 23."),
+
+  H.h2("Kapitel 22 · Zwei Sprachen"),
+
+  H.h3("Drehen 1"),
+
+  H.p("„5 Einträge“ — der deutsche Text. Eine Zeile ohne Übersetzung zählt nicht, und was die Tafel nicht kennt, zeigt tr$ so, wie es im Code steht. Ein halb übersetztes Programm bleibt so wenigstens lesbar."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Das englische Programm zeigt den neuen deutschen Satz: Der Schlüssel hat sich geändert, und die Tafel kennt nur den alten. „Sprachtafel ergänzen“ hängt „Bitte erst einen Eintrag wählen.“ mit leerer Übersetzung an; die alte Zeile bleibt stehen, unbenutzt, bis man sie löscht. Wer einen Text der Quelle ändert, sieht danach in die Tafel."),
+
+  H.h3("Drehen 3"),
+
+  H.p("„Buch“. Die Klappliste zeigt die Übersetzung, gebunden ist aber ihr Wert, und das ist der Text des Entwurfs. Darum zählt die Statistik weiter vier Arten, gleich in welcher Sprache gespeichert wurde."),
+
+  H.h3("Erweitern 1: die Art übersetzt zeigen"),
+
+  H.p("Die Basisklasse füllt die Tabelle in Neuladen; das Hauptfenster überschreibt die Methode, ruft die der Basis und übersetzt danach die dritte Spalte (code/loesungen/kap22_art/Hauptfenster.dh):"),
+
+  ...neu("loesungen/kap22_art/Hauptfenster.dh").map((t) => H.code(t)),
+
+  H.p("Neuladen läuft auch, wenn jemand ins Suchfeld tippt — die Spalte bleibt also übersetzt. Gesucht wird aber weiter in der Datenbank: „Game“ findet nichts, „Spiel“ schon. Wer auch das will, gibt der Abfrage die Übersetzung mit, und das ist ein größerer Umbau."),
+
+  H.h3("Erweitern 2: Französisch"),
+
+  H.p("„Sprachtafel ergänzen“ mit fr legt sprache/fr.txt an, mit allen Texten und leeren Übersetzungen; sie bekommen französische (code/loesungen/kap22_franzoesisch/sprache/fr.txt). Von selbst wählt die Laufzeit aber nur Englisch. App.Geoeffnet wählt darum selbst (App.dh):"),
+
+  ...neu("loesungen/kap22_franzoesisch/App.dh").map((t) => H.code(t)),
+
+  H.p("SpracheWaehlen liefert FALSE, wenn es keine Tafel für die Sprache gibt — auf einem italienischen System also, und auf einem deutschen, denn eine de.txt gibt es nicht: Deutsch ist die Quelle. Dann gilt Englisch, außer auf dem deutschen System."),
 ];
