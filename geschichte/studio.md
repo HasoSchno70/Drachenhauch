@@ -616,3 +616,7 @@ Ebenda, Kapitel 14 (Datenbindung):
 - Eine Tabelle mit Datenquelle bekam immer die Namen der Spalten als Koepfe
   ("titel" statt "Titel" aus dem Entwurf). Jetzt bleiben die Koepfe des
   Entwurfs, wenn es so viele sind wie gezeigte Spalten.
+- Im Inspektor waren die Beschriftungen fest 112 Punkte breit: "Angezeigte
+  Spalten" stand als "Angezeigte Spalte" da. Jetzt so breit wie die
+  breiteste (GUI_TEXT_WIDTH), hoechstens knapp die halbe Leiste; das
+  Protokoll nennt je Feld `beschriftung <schluessel> <breite> <gebraucht>`.

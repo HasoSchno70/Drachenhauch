@@ -266,6 +266,16 @@ DIM j AS JSON_HANDLE : j = JSON_LOAD(p + "/Hauptfenster.dhform")
 PRINT "tabelle "; JSON_GET_STRING(j, "studio_tabelle")
 PRINT "quelle "; JSON_GET_STRING(j, "widgets.0.studio_quelle")
 PRINT "kopf "; JSON_GET_STRING(j, "widgets.0.table.headers.0"); " "; JSON_GET_STRING(j, "widgets.0.table.headers.1")
+' Jede Beschriftung im Inspektor hat Platz fuer ihren Text -- fest 112
+' schnitt "Angezeigte Spalten" (Buch "Fenster, Formulare, Daten", Kap. 14).
+DIM eng AS ARRAY OF STRING : eng = []
+DIM n AS INTEGER : n = 0
+FOR EACH z IN slAnfang(log, "beschriftung ")
+    DIM t AS ARRAY OF STRING : t = SPLIT$(z, " ")
+    n = n + 1
+    IF VAL(t[2]) < VAL(t[3]) THEN ARRAY_PUSH(eng, t[1])
+NEXT
+PRINT "beschriftungen "; n > 10; " zu eng: "; JOIN$(eng, " ")
 --- argumente
 {sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
@@ -289,6 +299,7 @@ fenster tabelle Daten.kunden
 tabelle Daten.kunden
 quelle Daten.kunden
 kopf name ort
+beschriftungen TRUE zu eng: 
 
 === eine klappliste mit festen eintraegen bindet an einer textspalte ihren text
 ' Eine Klappliste ohne Datenquelle, gebunden an eine Textspalte: jeder
