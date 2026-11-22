@@ -349,4 +349,46 @@ module.exports = (H) => [
   ...neu("loesungen/kap12_hinweis/Hauptfenster.dh").map((t) => H.code(t)),
 
   H.p("Die nächste Aktion, die die Tabelle neu füllt, schreibt wieder die Zahl der Einträge in die Statuszeile; der Hinweis verschwindet von selbst."),
+
+  H.h2("Kapitel 13 · Das Datenbank-Element"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Nichts — Lena bleibt in freund. Die Statuszeile sagt, dass in ausleihe (Spalte freund) noch eine Zeile auf sie zeigt. Erst wenn Tetris zurück ist und die Ausleihe gelöscht, lässt sich Lena löschen; eine zurückgegebene Ausleihe zeigt aber weiter auf sie. Wer Freunde löschen will, die etwas hatten, braucht eine andere Regel — oder behält sie."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Keine Zeile mehr, die auf Tetris zeigt: Der Verweis ausleihe.eintrag löscht mit. Das Programm tut dafür nichts — entfernen schickt nur DELETE FROM eintrag, den Rest erledigt die Datenbank."),
+
+  H.h3("Drehen 3"),
+
+  H.p("„Die Spalte freund ist Pflicht -- leeren geht nur ohne.“ Leeren hieße, die Spalte auf NULL zu setzen, und eine Pflichtspalte darf nicht leer sein. Die Regel bleibt, wie sie war."),
+
+  H.h3("Erweitern 1: die Telefonnummer"),
+
+  H.p("Das Modul bekommt eine Funktion; weil name in freund eindeutig ist, gibt es höchstens eine Zeile (code/loesungen/kap13_telefon):"),
+
+  ...neu("loesungen/kap13_telefon/Bestand.dh").map((t) => H.code(t)),
+
+  H.p("Und das Ausleihfenster hängt sie an den Namen:"),
+
+  ...neu("loesungen/kap13_telefon/AusleihFenster.dh").map((t) => H.code(t)),
+
+  H.h3("Erweitern 2: Schlagwörter"),
+
+  H.p("Viele zu viele braucht eine Tabelle dazwischen. Ein Schlagwort steht einmal in schlagwort; jede Zeile in markierung verbindet einen Eintrag mit einem Schlagwort (code/loesungen/kap13_schlagwoerter):"),
+
+  H.table([
+    [{ text: "schlagwort.name", mono: true }, "Text", "Pflicht, Eindeutig"],
+    [{ text: "markierung.eintrag", mono: true }, "Ganze Zahl", "Pflicht, Verweis auf eintrag, mitlöschen"],
+    [{ text: "markierung.schlagwort", mono: true }, "Ganze Zahl", "Pflicht, Verweis auf schlagwort, mitlöschen"],
+  ], { headers: ["Spalte", "Art", "dazu"], widths: [3000, 1600, 4426] }),
+
+  H.p("Beide Verweise löschen mit: Geht ein Eintrag, gehen seine Markierungen; geht ein Schlagwort, ebenso. Im Modul legt markieren eine Verbindung an, schlagwoerter$ sammelt die Namen eines Eintrags, und einrichten markiert die Beispiele:"),
+
+  ...neu("loesungen/kap13_schlagwoerter/Bestand.dh").map((t) => H.code(t)),
+
+  H.p("Ein Klick in die Tabelle zeigt sie:"),
+
+  ...neu("loesungen/kap13_schlagwoerter/Hauptfenster.dh").map((t) => H.code(t)),
 ];

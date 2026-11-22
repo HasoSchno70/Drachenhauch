@@ -16,6 +16,9 @@
 IMPORT "imgfx"
 
 CONST GROESSE = "1280x800"
+' Fuer den Reiter einer Datenbank breiter: erst ab 1440 stehen alle
+' sieben Spalten des Spalten-Gitters ohne Rollen da.
+DIM fenstergroesse AS STRING : fenstergroesse = GROESSE
 CONST BILDER_STUDIO = 60
 DIM hier AS STRING : hier = CWD$()
 DIM wurzel AS STRING : wurzel = hier + "/../../.."
@@ -74,7 +77,7 @@ END FUNCTION
 ' Das Studio mit einem Projekt, `bilder` Bilder lang; am Ende ein Bild.
 SUB studioBild(name AS STRING, proj AS STRING, oeffnen AS STRING, ev AS STRING, n AS INTEGER)
     SETENV("DH_STUDIO_KONFIG", arbeit + "/studio.json")
-    SETENV("DH_STUDIO_GROESSE", GROESSE)
+    SETENV("DH_STUDIO_GROESSE", fenstergroesse)
     SETENV("DH_STUDIO_OEFFNEN", oeffnen)
     SETENV("DH_STUDIO_AUFNAHME", ev)
     SETENV("DH_STUDIO_LAUF_BILDER", "3")
@@ -293,6 +296,30 @@ IF gewuenscht("kap12_halt") THEN
     SETENV("DHRT_ABSPIELEN", "")
     ' Ohne Menue und Werkzeugleiste.
     zuschneiden("kap12_halt", 0, 66, 1280, 709)
+END IF
+
+' Kapitel 13: der Reiter der Datenbank. Erst F5 -- der erste Start legt die
+' Tabellen an und traegt die Beispiele ein --, dann die Spalten von
+' ausleihe (Verweise, Beim Loeschen) und die Daten von eintrag. Lagen fuer
+' 1440 x 900 (Protokoll: "lage db daten").
+IF gewuenscht("kap13_spalten") OR gewuenscht("kap13_daten") THEN
+    m = projekt$("kap13/mediathek")
+    fenstergroesse = "1440x900"
+    z = ["e 0 7 640 400 0 0"]
+    taste(z, 20, ohne, 294)
+    studioBild("_kap13_f5", m, "", aufnahme$("f5_kap13", z), 70)
+    IF FILEEXISTS(bilder + "/_kap13_f5.png") THEN DELETEFILE(bilder + "/_kap13_f5.png")
+    IF gewuenscht("kap13_spalten") THEN
+        studioBild("kap13_spalten", m, "Mediathek.ausleihe", "", 30)
+        zuschneiden("kap13_spalten", 290, 66, 812, 640)
+    END IF
+    IF gewuenscht("kap13_daten") THEN
+        z = []
+        klick(z, 10, 618, 150)
+        studioBild("kap13_daten", m, "Mediathek.eintrag", aufnahme$("daten", z), 40)
+        zuschneiden("kap13_daten", 290, 66, 812, 640)
+    END IF
+    fenstergroesse = GROESSE
 END IF
 
 ' Kapitel 11: Tetris waehlen, "Ausleihen ..." -- das Fenster daneben.

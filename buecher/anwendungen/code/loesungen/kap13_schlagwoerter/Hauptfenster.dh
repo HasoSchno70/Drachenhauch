@@ -1,0 +1,97 @@
+' Kapitel 13 -- die Eintraege kommen aus dem Datenbank-Element und gehen
+' dorthin zurueck; was dafuer zu tun ist, steht im Modul Bestand.
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+    DIM eintraege AS ARRAY OF Eintrag
+    DIM ausleihe AS AusleihFenster
+
+    SUB Geoeffnet()
+        ' Spaltenbreiten hat der Inspektor nicht -- eine Zeile Code.
+        GUI_TABLE_COL_WIDTHS(Self.tabelle, [200, 170, 80, 70, 180])
+        einrichten()
+        Self.eintraege = alleEintraege()
+        Self.ausleihe = NEW AusleihFenster()
+        Self.ausleihe.haupt = Self
+        Self.tabelleFuellen()
+    END SUB
+
+    SUB tabelleFuellen()
+        DIM z AS INTEGER : z = GUI_TABLE_SELECTED(Self.tabelle)
+        GUI_TABLE_CLEAR(Self.tabelle)
+        DIM e AS Eintrag
+        FOR EACH e IN Self.eintraege
+            GUI_TABLE_ADD_ROW(Self.tabelle, e.zellen())
+        NEXT
+        GUI_TABLE_SET_SELECTED(Self.tabelle, z)
+        DIM n AS INTEGER : n = LEN(Self.eintraege)
+        GUI_SET_TEXT(Self.status, STR$(n) + " Einträge")
+    END SUB
+
+    ' Den Eintrag in einem eigenen Fenster bearbeiten lassen.
+    ' ZeigenModal kehrt erst zurueck, wenn das Fenster zu ist -- dann
+    ' steht in ok, ob es mit OK geschlossen wurde.
+    FUNCTION bearbeitenLassen(e AS Eintrag) AS Eintrag
+        DIM f AS EintragFenster : f = NEW EintragFenster()
+        f.eintrag = e
+        f.ZeigenModal()
+        IF NOT f.ok THEN RETURN NIL
+        RETURN f.eintrag
+    END FUNCTION
+
+    SUB knopfNeu_Klick()
+        DIM neu AS Eintrag : neu = Self.bearbeitenLassen(NIL)
+        IF neu IS NIL THEN RETURN
+        sichern(neu)
+        ARRAY_PUSH(Self.eintraege, neu)
+        Self.tabelleFuellen()
+    END SUB
+
+    SUB knopfBearbeiten_Klick()
+        DIM z AS INTEGER : z = GUI_TABLE_SELECTED(Self.tabelle)
+        IF z < 0 THEN RETURN
+        IF Self.bearbeitenLassen(Self.eintraege[z]) IS NIL THEN RETURN
+        sichern(Self.eintraege[z])
+        Self.tabelleFuellen()
+        Self.ausleihe.folgen(Self.eintraege[z])
+    END SUB
+
+    SUB tabelle_Doppelklick()
+        Self.knopfBearbeiten_Klick()
+    END SUB
+
+    SUB knopfEntfernen_Klick()
+        DIM z AS INTEGER : z = GUI_TABLE_SELECTED(Self.tabelle)
+        IF z < 0 THEN RETURN
+        ' Frage wartet auf die Antwort; im Studio darf ein Ereignis das.
+        DIM t AS STRING : t = Self.eintraege[z].titel
+        DIM antwort AS INTEGER
+        antwort = Frage(t + " entfernen?", "Entfernen|Abbrechen")
+        IF antwort <> 1 THEN RETURN
+        entfernen(Self.eintraege[z])
+        ARRAY_REMOVE_AT(Self.eintraege, z)
+        Self.tabelleFuellen()
+        ' tabelleFuellen waehlt wieder Zeile z -- jetzt der naechste
+        ' Eintrag. Das Ausleihfenster folgt der Tabelle, nicht NIL.
+        Self.tabelle_Geaendert()
+    END SUB
+
+    SUB knopfAusleihen_Klick()
+        Self.ausleihe.Zeigen()
+    END SUB
+
+    ' Eine andere Zeile gewaehlt: das Ausleihfenster folgt.
+    SUB tabelle_Geaendert()
+        DIM z AS INTEGER : z = GUI_TABLE_SELECTED(Self.tabelle)
+        IF z < 0 THEN
+            Self.ausleihe.folgen(NIL)
+        ELSE
+            Self.ausleihe.folgen(Self.eintraege[z])
+            ' >>> neu
+            DIM e AS Eintrag : e = Self.eintraege[z]
+            DIM w AS STRING : w = schlagwoerter$(e.id)
+            IF w <> "" THEN
+                GUI_SET_TEXT(Self.status, e.titel + ": " + w)
+            END IF
+            ' <<< neu
+        END IF
+    END SUB
+END CLASS
