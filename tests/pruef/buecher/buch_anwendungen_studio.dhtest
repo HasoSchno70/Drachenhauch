@@ -2567,3 +2567,166 @@ label#status "Die Schrift ändert sich beim nächsten Start."
 schirm 1140 haken TRUE
 notify Mediathek | Überfällig: 1 Ausleihe
 notify Media Library | Overdue: 1 loan
+
+=== kapitel 24: was nun
+' Kapitel 24: Datei -> Im Heimnetz zeigen startet den Webserver (hier auf
+' einem freien Port), ein Timer bedient ihn. Die Seite zeigt den Bestand
+' nach dem Titel sortiert, wer was hat, und maskiert, was aus der
+' Datenbank kommt (ein Titel mit & und <).
+IMPORT "html"
+IMPORT "laeufer.dh"
+IMPORT "db"
+SUB kopieren(von AS STRING, nach AS STRING)
+    IF NOT DIREXISTS(nach) THEN MKDIR(nach)
+    DIM n AS STRING
+    FOR EACH n IN DIRLIST(von)
+        IF DIREXISTS(von + "/" + n) THEN
+            IF n <> "_studio" THEN kopieren(von + "/" + n, nach + "/" + n)
+        ELSEIF RIGHT$(n, 3) <> ".db" THEN
+            COPYFILE(von + "/" + n, nach + "/" + n)
+        END IF
+    NEXT
+END SUB
+FUNCTION laufen$(main AS STRING, bilder AS INTEGER, arg AS STRING) AS STRING
+    DIM q AS INTEGER
+    IF arg = "" THEN
+        q = PROCESS_START("dhrt", "run", "--bilder", STR$(bilder), main)
+    ELSE
+        q = PROCESS_START("dhrt", "run", "--bilder", STR$(bilder), main, "--", arg)
+    END IF
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    WHILE leer < 5
+        DIM t AS STRING : t = PROCESS_READ$(q) + PROCESS_ERR$(q)
+        aus = aus + t
+        IF t = "" AND NOT PROCESS_RUNNING(q) THEN leer = leer + 1
+        SLEEP(20)
+    WEND
+    RETURN aus
+END FUNCTION
+FUNCTION bedienen$(main AS STRING, ev AS ARRAY OF STRING, bilder AS INTEGER) AS STRING
+    DIM pf AS STRING : pf = CWD$() + "/bedienung.txt"
+    WRITEALL(pf, "c " + STR$(LEN(ev)) + CHR$(10) + JOIN$(ev, CHR$(10)) + CHR$(10) + CHR$(10))
+    SETENV("DHRT_ABSPIELEN", pf)
+    SETENV("DHRT_GUI_ZUSTAND", "1")
+    DIM aus AS STRING : aus = laufen$(main, bilder, "")
+    SETENV("DHRT_ABSPIELEN", "")
+    SETENV("DHRT_GUI_ZUSTAND", "")
+    IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+    RETURN aus
+END FUNCTION
+SUB klick(ev AS ARRAY OF STRING, b AS INTEGER, x AS INTEGER, y AS INTEGER)
+    ARRAY_PUSH(ev, "e " + STR$(b) + " 7 " + STR$(x) + " " + STR$(y) + " 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 2) + " 7 " + STR$(x) + " " + STR$(y) + " 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 4) + " 6 0 0 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 6) + " 5 0 0 0 0")
+END SUB
+' Eine Taste ab Bild b, wahlweise mit gehaltenem Strg (341).
+SUB taste(ev AS ARRAY OF STRING, b AS INTEGER, strg AS BOOLEAN, code AS INTEGER)
+    IF strg THEN ARRAY_PUSH(ev, "e " + STR$(b) + " 2 341 0 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 2) + " 2 " + STR$(code) + " 0 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 4) + " 1 " + STR$(code) + " 0 0 0")
+    IF strg THEN ARRAY_PUSH(ev, "e " + STR$(b + 6) + " 1 341 0 0 0")
+END SUB
+FUNCTION zeile$(aus AS STRING, was AS STRING) AS STRING
+    DIM z AS STRING
+    FOR EACH z IN SPLIT$(REPLACE$(aus, CHR$(13), ""), CHR$(10))
+        IF INSTR(z, was) >= 0 THEN RETURN TRIM$(z)
+    NEXT
+    RETURN ""
+END FUNCTION
+SUB f5(nm AS STRING, p AS STRING)
+    slZeilen = []
+    slBild = 0
+    slHin(10, 10)
+    slWarten(10)
+    slTaste(294)
+    slWarten(150)
+    slAufnahmeSchreiben(CWD$() + "/f5.txt")
+    SETENV("DH_STUDIO_LAUF_BILDER", "20")
+    DIM lg AS STRING : lg = CWD$() + "/" + nm + ".log"
+    DIM aus AS STRING : aus = slStarten(lg, CWD$() + "/f5.txt", slBild + 20, p)
+    PRINT nm; " geprueft "; slHat(lg, "geprueft 0 0"); " beendet "; slHat(lg, "beendet 0")
+    IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+END SUB
+' Eine Methode vor das Ende der Klasse Hauptfenster der Kopie.
+SUB einschieben(nm AS STRING, zeilen AS ARRAY OF STRING)
+    DIM h AS STRING : h = CWD$() + "/" + nm + "/_studio/projekt/Hauptfenster.dh"
+    DIM t AS STRING : t = READALL(h)
+    DIM p AS INTEGER : p = INSTRREV(t, "END CLASS")
+    WRITEALL(h, LEFT$(t, p) + JOIN$(zeilen, CHR$(10)) + CHR$(10) + MID$(t, p))
+END SUB
+FUNCTION q$(s AS STRING) AS STRING
+    RETURN CHR$(34) + s + CHR$(34)
+END FUNCTION
+
+FUNCTION wert$(datei AS STRING, sql AS STRING) AS STRING
+    DIM d AS DB_CONN : d = DB_OPEN(datei)
+    DIM r AS DB_RESULT : r = DB_QUERY(d, sql)
+    DIM w AS STRING : w = "?"
+    IF DB_NEXT(r) THEN w = DB_GET_STRING(r, 0)
+    DB_CLOSE(d)
+    RETURN w
+END FUNCTION
+
+SUB benutzer(ordner AS STRING)
+    IF NOT DIREXISTS(ordner) THEN MKDIR(ordner)
+    SETENV("APPDATA", ordner)
+    SETENV("XDG_DATA_HOME", ordner)
+    SETENV("HOME", ordner)
+END SUB
+
+
+DIM code AS STRING : code = ARG$(1) + "/buecher/anwendungen/code/"
+benutzer(CWD$() + "/benutzer")
+DIM pm AS STRING : pm = CWD$() + "/kap24_mediathek"
+kopieren(code + "kap24/mediathek", pm)
+f5("kap24_mediathek", pm)
+DIM ns AS STRING : ns = pm + "/_studio/projekt/Netzseite.dh"
+WRITEALL(ns, REPLACE$(READALL(ns), "CONST NETZ_PORT = 8080", "CONST NETZ_PORT = 0"))
+einschieben("kap24_mediathek", ["    DIM probeN AS INTEGER", _
+    "    SUB Takt()", _
+    "        Self.probeN = Self.probeN + 1", _
+    "        IF Self.probeN = 3 THEN", _
+    "            DB_EXEC(Mediathek, " + q$("INSERT INTO eintrag (titel, urheber, art) VALUES (?, ?, ?)") + ", " + q$("Tom & Jerry <1>") + ", " + q$("Hanna") + ", " + q$("Film") + ")", _
+    "            GUI_MENU_CHECK(Self.miNetz, TRUE)", _
+    "            Self.miNetz_Aktion()", _
+    "            EPRINT(" + q$("netzstatus ") + " + GUI_TEXT(Self.status))", _
+    "            EPRINT(" + q$("netzport ") + " + STR$(netzPort()) + CHR$(10))", _
+    "        END IF", _
+    "    END SUB"])
+DIM kp AS INTEGER : kp = PROCESS_START("dhrt", "run", "--bilder", "900", pm + "/_studio/main.dh")
+DIM alles AS STRING
+DIM port AS STRING : port = ""
+DIM n AS INTEGER
+WHILE port = "" AND n < 500
+    alles = alles + PROCESS_ERR$(kp) + PROCESS_READ$(kp)
+    DIM ip AS INTEGER : ip = INSTR(alles, "netzport ")
+    IF ip >= 0 THEN
+        DIM rest AS STRING : rest = MID$(alles, ip + 9)
+        DIM ez AS INTEGER : ez = INSTR(rest, CHR$(10))
+        IF ez > 0 THEN port = TRIM$(LEFT$(rest, ez))
+    END IF
+    SLEEP(20)
+    n = n + 1
+WEND
+PRINT "port da "; port <> "" AND port <> "0"
+PRINT "status "; INSTR(alles, "netzstatus Im Heimnetz, Port " + port) >= 0
+DIM seite AS STRING : seite = HTTP_GET("http://127.0.0.1:" + port + "/")
+PRINT "sortiert "; INSTR(seite, "<tr><td>Emil") >= 0 AND INSTR(seite, "<tr><td>Emil") < INSTR(seite, "<tr><td>Kind of Blue")
+PRINT "tetris "; INSTR(seite, "<tr><td>Tetris<td>Alexei Paschitnow<td>Spiel<td>Lena") >= 0
+PRINT "maskiert "; INSTR(seite, "<td>Tom &amp; Jerry &lt;1&gt;<td>Hanna") >= 0
+PROCESS_KILL(kp)
+--- argumente
+{sammlung}/../../../studio/studio.dh
+{sammlung}/../../..
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- erwartet
+kap24_mediathek geprueft TRUE beendet TRUE
+port da TRUE
+status TRUE
+sortiert TRUE
+tetris TRUE
+maskiert TRUE

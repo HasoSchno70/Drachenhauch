@@ -1,0 +1,105 @@
+{
+  "format": "drachenhauch-studio",
+  "fassung": 1,
+  "name": "Mediathek",
+  "start": "Hauptfenster",
+  "elemente": [
+    {
+      "art": "app",
+      "name": "App",
+      "code": "App.dh"
+    },
+    {
+      "art": "datenbank",
+      "name": "Mediathek",
+      "schema": "Mediathek.dhdb"
+    },
+    {
+      "art": "klasse",
+      "name": "Eintrag",
+      "code": "Eintrag.dh"
+    },
+    {
+      "art": "klasse",
+      "name": "Einlesung",
+      "code": "Einlesung.dh"
+    },
+    {
+      "art": "modul",
+      "name": "Beispiele",
+      "code": "Beispiele.dh"
+    },
+    {
+      "art": "modul",
+      "name": "Bestand",
+      "code": "Bestand.dh"
+    },
+    {
+      "art": "modul",
+      "name": "Austausch",
+      "code": "Austausch.dh"
+    },
+    {
+      "art": "modul",
+      "name": "Einstellungen",
+      "code": "Einstellungen.dh"
+    },
+    {
+      "art": "modul",
+      "name": "Netzseite",
+      "code": "Netzseite.dh"
+    },
+    {
+      "art": "control",
+      "name": "CoverKachel",
+      "code": "CoverKachel.dh",
+      "layout": "CoverKachel.dhform"
+    },
+    {
+      "art": "fenster",
+      "name": "Hauptfenster",
+      "code": "Hauptfenster.dh",
+      "layout": "Hauptfenster.dhform"
+    },
+    {
+      "art": "fenster",
+      "name": "EintragFenster",
+      "code": "EintragFenster.dh",
+      "layout": "EintragFenster.dhform"
+    },
+    {
+      "art": "fenster",
+      "name": "AusleihFenster",
+      "code": "AusleihFenster.dh",
+      "layout": "AusleihFenster.dhform"
+    },
+    {
+      "art": "fenster",
+      "name": "UeberfaelligFenster",
+      "code": "UeberfaelligFenster.dh",
+      "layout": "UeberfaelligFenster.dhform"
+    },
+    {
+      "art": "fenster",
+      "name": "StatistikFenster",
+      "code": "StatistikFenster.dh",
+      "layout": "StatistikFenster.dhform"
+    },
+    {
+      "art": "fenster",
+      "name": "EinlesenFenster",
+      "code": "EinlesenFenster.dh",
+      "layout": "EinlesenFenster.dhform"
+    },
+    {
+      "art": "bericht",
+      "name": "Ausleihliste",
+      "bericht": "Ausleihliste.dhreport"
+    },
+    {
+      "art": "bericht",
+      "name": "Karteikarte",
+      "bericht": "Karteikarte.dhreport"
+    }
+  ]
+}
