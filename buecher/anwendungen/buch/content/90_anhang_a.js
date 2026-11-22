@@ -319,4 +319,34 @@ module.exports = (H) => [
   ...neu("loesungen/kap11_info/Hauptfenster.dh").map((t) => H.code(t)),
 
   H.p("Anders als das Ausleihfenster merkt sich das Hauptfenster die Info-Fenster nicht. Sie brauchen es auch nicht: Niemand muss ihnen später Bescheid geben. Jedes neue Fenster erscheint in der Mitte, über dem vorigen; man zieht es an der Titelleiste beiseite."),
+
+  H.h2("Kapitel 12 · Der Debugger"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Bei jedem Wechsel der gewählten Zeile (über tabelle_Geaendert), nach „Bearbeiten …“, wenn das Fenster mit OK geschlossen wurde, und nach „Entfernen“, wenn die Rückfrage bestätigt wurde. Nicht beim Start und nicht bei „Ausleihen …“ — dort ruft niemand folgen. Ein Haltepunkt an der Stelle, an der etwas ankommt, hält oft; einer an der Stelle, an der es abgeschickt wird, nur dort, wo man sucht."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Vier. Der Haltepunkt hält vor Zeile 10, also nachdem Zeile 8 Metropolis schon aus eintraege genommen hat. Der Debugger zeigt immer den Stand, bevor die markierte Zeile läuft."),
+
+  H.h3("Drehen 3"),
+
+  H.p("Keine, und das Ausleihfenster sagt „Kein Eintrag gewählt.“. z ist 4; tabelleFuellen wählt wieder Zeile 4, und die gibt es mit vier Einträgen nicht mehr (gezählt wird ab 0). tabelle_Geaendert findet keine gewählte Zeile und schickt NIL — Tabelle und Ausleihfenster sagen dasselbe, nur eben „nichts“."),
+
+  H.h3("Erweitern 1: der Eintrag davor"),
+
+  H.p("Nach tabelleFuellen prüft knopfEntfernen_Klick, ob es Zeile z noch gibt (code/loesungen/kap12_letzter):"),
+
+  ...neu("loesungen/kap12_letzter/Hauptfenster.dh").map((t) => H.code(t)),
+
+  H.p("Ein Haltepunkt auf die neue IF-Zeile zeigt beim Entfernen von Emil z = 4 und n = 4: Gewählt wird Zeile 3, Kind of Blue, und das Ausleihfenster folgt."),
+
+  H.h3("Erweitern 2: ein Hinweis statt nichts"),
+
+  H.p("Beide Knöpfe fragen die gewählte Zeile über eine neue Methode ab, die den Hinweis gleich mitschreibt (code/loesungen/kap12_hinweis):"),
+
+  ...neu("loesungen/kap12_hinweis/Hauptfenster.dh").map((t) => H.code(t)),
+
+  H.p("Die nächste Aktion, die die Tabelle neu füllt, schreibt wieder die Zahl der Einträge in die Statuszeile; der Hinweis verschwindet von selbst."),
 ];

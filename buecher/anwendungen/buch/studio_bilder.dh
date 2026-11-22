@@ -254,6 +254,47 @@ IF gewuenscht("kap11_bearbeiten") THEN
     programmBild("kap11_bearbeiten", "kap11/mediathek", z, 40)
 END IF
 
+' Kapitel 12: der Fehler -- Metropolis, "Ausleihen ...", "Entfernen",
+' Enter. Tetris ist gewaehlt, das Ausleihfenster sagt "Kein Eintrag".
+IF gewuenscht("kap12_fehler") THEN
+    z = []
+    klick(z, 0, 100, 71)
+    klick(z, 10, 670, 427)
+    klick(z, 28, 540, 427)
+    taste(z, 48, ohne, 257)
+    programmBild("kap12_fehler", "kap11/mediathek", z, 80)
+END IF
+
+' Kapitel 12: der Debugger haelt in knopfEntfernen_Klick vor folgen(NIL).
+' Das Studio oeffnet die Methode, setzt den Haltepunkt (Strg+Pos1, neunmal
+' Pfeil runter, F9) und startet mit F7. Das Programm bekommt seine Klicks
+' ueber DHRT_ABSPIELEN, das es vom Studio erbt (das Studio selbst spielt
+' DH_STUDIO_AUFNAHME): Metropolis, "Ausleihen ...", "Entfernen", Enter.
+IF gewuenscht("kap12_halt") THEN
+    m = projekt$("kap11/mediathek")
+    ' Der Navigator ist kurz: 16 Raststufen am Mausrad (je eine Zeile, 22
+    ' Punkte) bringen knopfEntfernen_Klick von 540 auf 188.
+    z = ["e 10 7 150 200 0 0", "e 12 8 0 -16 0 0"]
+    klick(z, 20, 130, 188)
+    taste(z, 40, [341], 268)
+    DIM k AS INTEGER
+    FOR k = 1 TO 9
+        taste(z, 44 + k * 6, ohne, 264)
+    NEXT
+    taste(z, 110, ohne, 298)
+    taste(z, 120, ohne, 296)
+    DIM kz AS ARRAY OF STRING : kz = ["e 0 7 600 470 0 0"]
+    klick(kz, 30, 100, 71)
+    klick(kz, 50, 670, 427)
+    klick(kz, 80, 540, 427)
+    taste(kz, 110, ohne, 257)
+    SETENV("DHRT_ABSPIELEN", aufnahme$("kind_halt", kz))
+    studioBild("kap12_halt", m, "", aufnahme$("halt", z), 600)
+    SETENV("DHRT_ABSPIELEN", "")
+    ' Ohne Menue und Werkzeugleiste.
+    zuschneiden("kap12_halt", 0, 66, 1280, 709)
+END IF
+
 ' Kapitel 11: Tetris waehlen, "Ausleihen ..." -- das Fenster daneben.
 IF gewuenscht("kap11_ausleihen") THEN
     z = []
