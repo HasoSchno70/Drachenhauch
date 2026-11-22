@@ -30,6 +30,18 @@ impl<'p> Vm<'p> {
             let name = self.dbg_klassen.get(&cn.to_lowercase()).cloned().unwrap_or(cn);
             return (name.clone(), format!("<{}>", name));
         }
+        // Ein Feld von Objekten: die Klasse wie geschrieben, wie bei einer
+        // Instanz (`<ARRAY[4] OF Eintrag>` statt `OF EINTRAG`).
+        if let Value::Array(rc) = v {
+            let a = rc.borrow();
+            if let Some(k) = self.dbg_klassen.get(&a.element_type.to_lowercase()) {
+                let s = dbg_short(v);
+                let gross = format!(" OF {}>", a.element_type.to_uppercase());
+                if let Some(vorn) = s.strip_suffix(&gross) {
+                    return (v.type_name().to_string(), format!("{} OF {}>", vorn, k));
+                }
+            }
+        }
         (v.type_name().to_string(), dbg_short(v))
     }
 

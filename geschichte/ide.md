@@ -3097,3 +3097,7 @@ Debugger, an der Mediathek aus dem Studio) zwei Luecken in `dhrt debug`:
   einmal stehen. `exec` merkt sich jetzt die Zeile (`DebugState::mitten`);
   Haltepunkt, "bis hier" und Schritt ueber gehen dort weiter, Schritt
   heraus haelt wie vorher auf der Zeile des Aufrufs.
+- **Ein Feld von Objekten hiess `OF EINTRAG`.** Instanzen trugen ihren
+  Klassennamen wie geschrieben (`<Eintrag>`), ein Feld davon aber den
+  grossgeschriebenen Elementtyp aus `Value::fmt`. `dbg_anzeige` setzt dort
+  jetzt ebenfalls die geschriebene Form ein.

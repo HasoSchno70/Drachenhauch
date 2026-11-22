@@ -576,10 +576,10 @@ fehler eval: Ausdruck nicht unterstue
 ' geschrieben wurde (der Parser fuehrt sie klein).
 IMPORT "sitzung.dh"
 DIM q AS STRING : q = CHR$(34)
-sitzung("d.dh", ["{" + q + "cmd" + q + ":" + q + "set-breakpoints" + q + "," + q + "lines" + q + ":[12]}", _
+sitzung("d.dh", ["{" + q + "cmd" + q + ":" + q + "set-breakpoints" + q + "," + q + "lines" + q + ":[16]}", _
     "{" + q + "cmd" + q + ":" + q + "continue" + q + "}", _
     "{" + q + "cmd" + q + ":" + q + "stop" + q + "}"])
-DIM h AS INTEGER : h = ersteMit("paused", 12)
+DIM h AS INTEGER : h = ersteMit("paused", 16)
 DIM k AS JSON_HANDLE : k = JSON_PARSE(ereignisse[h])
 DIM i AS INTEGER
 FOR i = 0 TO JSON_LEN(k, "globals") - 1
@@ -602,6 +602,10 @@ CLASS Held
 END CLASS
 DIM held AS Held : held = NEW Held()
 held.hp = 7 : held.name = "Ada"
+' Ein Feld von Objekten nennt die Klasse ebenso wie geschrieben (bis
+' 2026-11-22 "OF HELD").
+DIM helden AS ARRAY OF Held
+ARRAY_PUSH(helden, held)
 DIM gross[150] AS INTEGER
 DIM m AS MAP OF INTEGER : m = {"a": 1, "b": 2}
 DIM t AS TUPLE : t = (1, "zwei")
@@ -612,6 +616,7 @@ PRINT held.hp
 --- erwartet
 gross ARRAY <ARRAY[150] OF INTEGER> | 101: [0]=0 ... ...=50 weitere
 held Held <Held> | 2: hp=7 ... name=Ada
+helden ARRAY <ARRAY[1] OF Held> | 1: [0]=<Held> ... [0]=<Held>
 i INTEGER 150
 m MAP <MAP[2] OF INTEGER> | 2: "a"=1 ... "b"=2
 t TUPLE (1, zwei) | 2: [0]=1 ... [1]=zwei
