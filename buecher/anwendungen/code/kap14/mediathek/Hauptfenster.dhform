@@ -1,0 +1,109 @@
+{
+  "title": "Mediathek",
+  "name": "Hauptfenster",
+  "x": 0,
+  "y": 0,
+  "w": 760,
+  "h": 480,
+  "movable": true,
+  "closable": true,
+  "visible": true,
+  "resizable": true,
+  "min_w": 600,
+  "min_h": 360,
+  "widgets": [
+    {
+      "kind": "label",
+      "name": "beschriftungSuche",
+      "text": "Suchen",
+      "x": 20,
+      "y": 26,
+      "w": 60,
+      "h": 16
+    },
+    {
+      "kind": "textinput",
+      "name": "feldSuche",
+      "text": "",
+      "placeholder": "Titel, Urheber, Art oder Jahr",
+      "x": 90,
+      "y": 20,
+      "w": 300,
+      "h": 28,
+      "tooltip": "Zeigt nur Einträge, in denen der Text vorkommt"
+    },
+    {
+      "kind": "table",
+      "name": "tabelle",
+      "x": 20,
+      "y": 60,
+      "w": 720,
+      "h": 340,
+      "anchor": "lrtb",
+      "table": {
+        "headers": [
+          "Titel",
+          "Urheber",
+          "Art",
+          "Jahr"
+        ],
+        "rows": []
+      },
+      "studio_quelle": "Mediathek.eintrag",
+      "studio_spalten": "titel;urheber;art;jahr",
+      "studio_sortieren": "titel",
+      "studio_suchfeld": "feldSuche"
+    },
+    {
+      "kind": "label",
+      "name": "status",
+      "text": "",
+      "x": 20,
+      "y": 420,
+      "w": 260,
+      "h": 16,
+      "anchor": "lb"
+    },
+    {
+      "kind": "button",
+      "name": "knopfNeu",
+      "text": "Neu ...",
+      "x": 250,
+      "y": 412,
+      "w": 90,
+      "h": 30,
+      "anchor": "rb"
+    },
+    {
+      "kind": "button",
+      "name": "knopfBearbeiten",
+      "text": "Bearbeiten ...",
+      "x": 350,
+      "y": 412,
+      "w": 130,
+      "h": 30,
+      "anchor": "rb"
+    },
+    {
+      "kind": "button",
+      "name": "knopfEntfernen",
+      "text": "Entfernen",
+      "x": 490,
+      "y": 412,
+      "w": 100,
+      "h": 30,
+      "anchor": "rb"
+    },
+    {
+      "kind": "button",
+      "name": "knopfAusleihen",
+      "text": "Ausleihen ...",
+      "x": 600,
+      "y": 412,
+      "w": 140,
+      "h": 30,
+      "anchor": "rb"
+    }
+  ],
+  "studio_tabelle": "Mediathek.eintrag"
+}

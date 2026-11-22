@@ -1,0 +1,10 @@
+' Loesung Kapitel 14, Erweitern 1 -- nur was gerade verliehen ist. Die
+' Bedingung der Datenquelle (Inspektor: Bedingung) waehlt die Zeilen:
+' id IN (SELECT eintrag FROM ausleihe WHERE zurueck IS NULL).
+CLASS VerliehenFenster EXTENDS VerliehenFenster_Basis
+    ' >>> neu
+    SUB knopfZu_Klick()
+        Self.Zumachen()
+    END SUB
+    ' <<< neu
+END CLASS

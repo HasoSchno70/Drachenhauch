@@ -322,6 +322,16 @@ IF gewuenscht("kap13_spalten") OR gewuenscht("kap13_daten") THEN
     fenstergroesse = GROESSE
 END IF
 
+' Kapitel 14: die Tabelle im Entwurf gewaehlt, der Inspektor zeigt ihre
+' Gruppe Daten (Datenquelle, Spalten, Sortierung, Suchfeld).
+IF gewuenscht("kap14_inspektor") THEN
+    m = projekt$("kap14/mediathek")
+    z = []
+    klick(z, 10, 600, 400)
+    studioBild("kap14_inspektor", m, "Hauptfenster", aufnahme$("inspektor", z), 40)
+    zuschneiden("kap14_inspektor", 290, 66, 990, 540)
+END IF
+
 ' Kapitel 11: Tetris waehlen, "Ausleihen ..." -- das Fenster daneben.
 IF gewuenscht("kap11_ausleihen") THEN
     z = []

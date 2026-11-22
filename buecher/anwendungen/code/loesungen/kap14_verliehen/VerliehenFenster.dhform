@@ -1,0 +1,42 @@
+{
+  "title": "Verliehen",
+  "name": "VerliehenFenster",
+  "x": 0,
+  "y": 0,
+  "w": 420,
+  "h": 320,
+  "movable": true,
+  "closable": true,
+  "visible": true,
+  "widgets": [
+    {
+      "kind": "table",
+      "name": "liste",
+      "x": 20,
+      "y": 20,
+      "w": 380,
+      "h": 220,
+      "table": {
+        "headers": [
+          "Titel",
+          "Urheber"
+        ]
+      },
+      "studio_quelle": "Mediathek.eintrag",
+      "studio_spalten": "titel;urheber",
+      "studio_sortieren": "titel",
+      "studio_filter": "id IN (SELECT eintrag FROM ausleihe WHERE zurueck IS NULL)"
+    },
+    {
+      "kind": "button",
+      "name": "knopfZu",
+      "text": "Schließen",
+      "x": 290,
+      "y": 252,
+      "w": 110,
+      "h": 30
+    }
+  ],
+  "studio_standard": "knopfZu",
+  "studio_abbrechen": "knopfZu"
+}

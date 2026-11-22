@@ -391,4 +391,40 @@ module.exports = (H) => [
   H.p("Ein Klick in die Tabelle zeigt sie:"),
 
   ...neu("loesungen/kap13_schlagwoerter/Hauptfenster.dh").map((t) => H.code(t)),
+
+  H.h2("Kapitel 14 · Datenbindung"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Momo, Metropolis, Tetris, Kind of Blue, Emil und die Detektive — in der Reihenfolge, in der die Datei die Zeilen liefert, hier die, in der sie aufgenommen wurden. Ohne ORDER BY verspricht SQLite keine Reihenfolge; wer eine will, sagt sie."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Alle fünf. Das Suchfeld sucht in allen angezeigten Spalten, auch in jahr — und jedes Jahr der Beispiele beginnt mit 19. Wer nur im Titel suchen will, zeigt nur den Titel oder nimmt eine Bedingung im eigenen Code."),
+
+  H.h3("Drehen 3"),
+
+  H.p("Die Namen der Spalten: titel, urheber, art, jahr. Die Köpfe aus dem Entwurf gelten nur, wenn es so viele sind, wie die Tabelle Spalten zeigt — sonst wüsste das Fenster nicht, welcher Kopf zu welcher Spalte gehört."),
+
+  H.h3("Erweitern 1: was gerade verliehen ist"),
+
+  H.p("Ein neues Fenster VerliehenFenster mit einer Tabelle: Datenquelle Mediathek.eintrag, Angezeigte Spalten titel;urheber und als Bedingung, was hinter WHERE stünde (code/loesungen/kap14_verliehen):"),
+
+  H.code(["id IN (SELECT eintrag FROM ausleihe WHERE zurueck IS NULL)"], { out: true }),
+
+  H.p("Der Code des Fensters schließt es nur:"),
+
+  ...neu("loesungen/kap14_verliehen/VerliehenFenster.dh").map((t) => H.code(t)),
+
+  H.p("Das Hauptfenster bekommt das Menü und öffnet bei jedem Aufruf ein neues Fenster — es liest beim Öffnen, was in dem Moment weg ist:"),
+
+  ...neu("loesungen/kap14_verliehen/Hauptfenster.dh").map((t) => H.code(t)),
+
+  H.h3("Erweitern 2: die Freunde"),
+
+  H.p("Ein Fenster FreundeFenster mit der Tabelle Mediathek.freund; die Liste zeigt dieselbe Tabelle (Datenquelle Mediathek.freund, Spalten name;telefon), die beiden Felder sind an name und telefon gebunden. Weil die Liste die Tabelle des Fensters zeigt, lädt ein Klick die Zeile in die Felder (code/loesungen/kap14_freunde):"),
+
+  ...neu("loesungen/kap14_freunde/FreundeFenster.dh").map((t) => H.code(t)),
+
+  H.p("Lena löschen geht nicht, solange Tetris bei ihr ist — der Verweis aus Kapitel 13 verbietet es. Loeschen() bekommt den Fehler der Datenbank, und das Fenster zeigt ihn: „Nicht gelöscht: DB_EXEC: FOREIGN KEY constraint failed -- auf die Zeile zeigt noch eine Zeile in ausleihe (Spalte freund); …“. Ohne TRY hielte das Programm mit diesem Laufzeitfehler an."),
 ];

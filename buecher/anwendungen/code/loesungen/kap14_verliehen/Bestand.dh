@@ -1,0 +1,69 @@
+' Ein Modul: was die Mediathek mit ihrer Datenbank tut, soweit es nicht
+' die Bindung der Fenster erledigt. Seit Kapitel 14 nur noch die
+' Beispiele, die Ausleihen und ein paar Auskuenfte.
+
+' Beim allerersten Start ist die Tabelle leer: dann die Beispiele
+' hinein, samt der Ausleihe an Lena -- alles in einer Transaktion.
+SUB einrichten()
+    IF anzahlEintraege() > 0 THEN RETURN
+    DB_BEGIN(Mediathek)
+    DIM e AS Eintrag
+    FOR EACH e IN beispiele()
+        DB_EXEC(Mediathek, "INSERT INTO eintrag " + _
+                "(titel, urheber, art, jahr) VALUES (?, ?, ?, ?)", _
+                e.titel, e.urheber, e.art, INT(VAL(e.jahr)))
+        IF e.verliehen <> "" THEN
+            verleihen(DB_LAST_ROWID(Mediathek), e.verliehen)
+        END IF
+    NEXT
+    DB_COMMIT(Mediathek)
+END SUB
+
+FUNCTION anzahlEintraege() AS INTEGER
+    DIM r AS DB_RESULT
+    r = DB_QUERY(Mediathek, "SELECT COUNT(*) FROM eintrag")
+    IF DB_NEXT(r) THEN RETURN DB_GET_INT(r, 0)
+    RETURN 0
+END FUNCTION
+
+FUNCTION titelVon$(id AS INTEGER) AS STRING
+    DIM r AS DB_RESULT
+    r = DB_QUERY(Mediathek, "SELECT titel FROM eintrag WHERE id = ?", _
+                 id)
+    IF DB_NEXT(r) THEN RETURN DB_GET_STRING(r, 0)
+    RETURN ""
+END FUNCTION
+
+' Wer den Eintrag gerade hat ("" = niemand).
+FUNCTION verliehenAn$(id AS INTEGER) AS STRING
+    DIM r AS DB_RESULT
+    r = DB_QUERY(Mediathek, "SELECT name FROM freund WHERE id = " + _
+                 "(SELECT freund FROM ausleihe " + _
+                 "WHERE eintrag = ? AND zurueck IS NULL)", id)
+    IF DB_NEXT(r) THEN RETURN DB_GET_STRING(r, 0)
+    RETURN ""
+END FUNCTION
+
+' Den Freund beim Namen -- gibt es ihn noch nicht, wird er angelegt.
+FUNCTION freundId(name AS STRING) AS INTEGER
+    DIM r AS DB_RESULT
+    r = DB_QUERY(Mediathek, "SELECT id FROM freund WHERE name = ?", _
+                 name)
+    IF DB_NEXT(r) THEN RETURN DB_GET_INT(r, 0)
+    DB_EXEC(Mediathek, "INSERT INTO freund (name) VALUES (?)", name)
+    RETURN DB_LAST_ROWID(Mediathek)
+END FUNCTION
+
+' Von heute an verliehen. Das Datum rechnet die Datenbank.
+SUB verleihen(id AS INTEGER, an AS STRING)
+    DB_EXEC(Mediathek, "INSERT INTO ausleihe " + _
+            "(eintrag, freund, von) " + _
+            "VALUES (?, ?, date('now', 'localtime'))", _
+            id, freundId(an))
+END SUB
+
+SUB zurueckgeben(id AS INTEGER)
+    DB_EXEC(Mediathek, "UPDATE ausleihe " + _
+            "SET zurueck = date('now', 'localtime') " + _
+            "WHERE eintrag = ? AND zurueck IS NULL", id)
+END SUB

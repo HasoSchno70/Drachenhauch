@@ -1,0 +1,34 @@
+' Loesung Kapitel 14, Erweitern 2 -- die Freunde, gebunden an die
+' Tabelle freund: die Liste zeigt dieselbe Tabelle, ein Klick laedt die
+' Zeile in die Felder.
+CLASS FreundeFenster EXTENDS FreundeFenster_Basis
+    ' >>> neu
+    SUB Geoeffnet()
+        GUI_RULE(Self.feldName, "pflicht", _
+                 "Ein Freund braucht einen Namen.")
+        GUI_ERROR_LABEL(Self.feldName, Self.hinweis)
+    END SUB
+
+    SUB knopfNeu_Klick()
+        Self.Neu()
+        GUI_SET_TEXT(Self.hinweis, "")
+        GUI_FOCUS(Self.feldName)
+    END SUB
+
+    SUB knopfSichern_Klick()
+        IF Self.Sichern() THEN GUI_SET_TEXT(Self.hinweis, "Gesichert.")
+    END SUB
+
+    ' Wer noch etwas hat, darf nicht weg (Verweis: verbieten) -- die
+    ' Datenbank sagt es, das Fenster zeigt es.
+    SUB knopfLoeschen_Klick()
+        TRY
+            IF Self.Loeschen() THEN
+                GUI_SET_TEXT(Self.hinweis, "Gelöscht.")
+            END IF
+        CATCH e
+            GUI_SET_TEXT(Self.hinweis, "Nicht gelöscht: " + e)
+        END TRY
+    END SUB
+    ' <<< neu
+END CLASS
