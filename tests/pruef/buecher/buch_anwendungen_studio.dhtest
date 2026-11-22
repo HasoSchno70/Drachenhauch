@@ -920,3 +920,173 @@ label#status "4 Einträge" ausleihen 0
 table#liste 1 Zeilen, gewaehlt -1: "Tetris"
 textinput#feldname "Lena" | TRUE
 ohne regel 1
+
+
+=== kapitel 15: abfragen, die rechnen
+' Kapitel 15: die Tabelle an der Abfrage bestand (Verliehen an), die
+' Fenster Ueberfaellig und Statistik aus dem Menue Ansicht, "seit 40 Tagen"
+' mit dem Zeit-Modul, und nach Zurueck behaelt die Tabelle ihre Auswahl.
+' Dazu die Loesungen (am haeufigsten verliehen, Ausleihen je Monat).
+IMPORT "laeufer.dh"
+IMPORT "db"
+IMPORT "json"
+SUB kopieren(von AS STRING, nach AS STRING)
+    IF NOT DIREXISTS(nach) THEN MKDIR(nach)
+    DIM n AS STRING
+    FOR EACH n IN DIRLIST(von)
+        IF DIREXISTS(von + "/" + n) THEN
+            IF n <> "_studio" THEN kopieren(von + "/" + n, nach + "/" + n)
+        ELSEIF RIGHT$(n, 3) <> ".db" THEN
+            COPYFILE(von + "/" + n, nach + "/" + n)
+        END IF
+    NEXT
+END SUB
+FUNCTION bedienen$(main AS STRING, ev AS ARRAY OF STRING, bilder AS INTEGER) AS STRING
+    DIM pf AS STRING : pf = CWD$() + "/bedienung.txt"
+    WRITEALL(pf, "c " + STR$(LEN(ev)) + CHR$(10) + JOIN$(ev, CHR$(10)) + CHR$(10) + CHR$(10))
+    SETENV("DHRT_ABSPIELEN", pf)
+    SETENV("DHRT_GUI_ZUSTAND", "1")
+    DIM q AS INTEGER : q = PROCESS_START("dhrt", "run", "--bilder", STR$(bilder), main)
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    WHILE leer < 5
+        DIM t AS STRING : t = PROCESS_READ$(q) + PROCESS_ERR$(q)
+        aus = aus + t
+        IF t = "" AND NOT PROCESS_RUNNING(q) THEN leer = leer + 1
+        SLEEP(20)
+    WEND
+    SETENV("DHRT_ABSPIELEN", "")
+    SETENV("DHRT_GUI_ZUSTAND", "")
+    RETURN aus
+END FUNCTION
+SUB klick(ev AS ARRAY OF STRING, b AS INTEGER, x AS INTEGER, y AS INTEGER)
+    ARRAY_PUSH(ev, "e " + STR$(b) + " 7 " + STR$(x) + " " + STR$(y) + " 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 2) + " 7 " + STR$(x) + " " + STR$(y) + " 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 4) + " 6 0 0 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 6) + " 5 0 0 0 0")
+END SUB
+' Die Zeile des Zustands zu einem Widget.
+FUNCTION zeile$(aus AS STRING, was AS STRING) AS STRING
+    DIM z AS STRING
+    FOR EACH z IN SPLIT$(REPLACE$(aus, CHR$(13), ""), CHR$(10))
+        IF INSTR(z, was) >= 0 THEN RETURN TRIM$(z)
+    NEXT
+    RETURN ""
+END FUNCTION
+FUNCTION wert$(datei AS STRING, sql AS STRING) AS STRING
+    DIM d AS DB_CONN : d = DB_OPEN(datei)
+    DIM r AS DB_RESULT : r = DB_QUERY(d, sql)
+    DIM w AS STRING : w = "?"
+    IF DB_NEXT(r) THEN w = DB_GET_STRING(r, 0)
+    DB_CLOSE(d)
+    RETURN w
+END FUNCTION
+SUB f5(nm AS STRING, p AS STRING)
+    slZeilen = []
+    slBild = 0
+    slHin(10, 10)
+    slWarten(10)
+    slTaste(294)
+    slWarten(150)
+    slAufnahmeSchreiben(CWD$() + "/f5.txt")
+    SETENV("DH_STUDIO_LAUF_BILDER", "20")
+    DIM lg AS STRING : lg = CWD$() + "/" + nm + ".log"
+    DIM aus AS STRING : aus = slStarten(lg, CWD$() + "/f5.txt", slBild + 20, p)
+    PRINT nm; " geprueft "; slHat(lg, "geprueft 0 0"); " beendet "; slHat(lg, "beendet 0")
+    IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+END SUB
+SUB ersetzen(datei AS STRING, alt AS STRING, neu AS STRING)
+    DIM t AS STRING : t = READALL(datei)
+    IF INSTR(t, alt) < 0 THEN PRINT "nicht gefunden: "; alt
+    WRITEALL(datei, REPLACE$(t, alt, neu))
+END SUB
+
+DIM code AS STRING : code = ARG$(1) + "/buecher/anwendungen/code/"
+DIM proj AS STRING
+FOR EACH proj IN ["kap15/mediathek", "loesungen/kap15_beliebt", "loesungen/kap15_monate"]
+    DIM nm AS STRING : nm = BASENAME(proj)
+    IF nm = "mediathek" THEN nm = "kap15_mediathek"
+    kopieren(code + proj, CWD$() + "/" + nm)
+    f5(nm, CWD$() + "/" + nm)
+NEXT
+DIM m AS STRING : m = CWD$() + "/kap15_mediathek/_studio/main.dh"
+DIM sd AS STRING : sd = CWD$() + "/kap15_mediathek/_studio/mediathek.db"
+ersetzen(CWD$() + "/kap15_mediathek/_studio/projekt/Hauptfenster.dh", "        Self.statusZeigen()" + CHR$(10) + "    END SUB", "        Self.statusZeigen()" + CHR$(10) + "        CLIPBOARD_SET(GETENV$(" + CHR$(34) + "SUCHE" + CHR$(34) + "))" + CHR$(10) + "    END SUB")
+DIM ev AS ARRAY OF STRING
+DIM a AS STRING
+' Mit Menueleiste liegt alles 26 tiefer: Suchfeld 60, Zeilen ab 117.
+SETENV("SUCHE", "Lena")
+ev = []
+klick(ev, 0, 200, 60)
+ARRAY_PUSH(ev, "e 12 2 341 0 0 0")
+ARRAY_PUSH(ev, "e 14 2 86 0 0 0")
+ARRAY_PUSH(ev, "e 16 1 86 0 0 0")
+ARRAY_PUSH(ev, "e 18 1 341 0 0 0")
+PRINT "Lena: "; zeile$(bedienen$(m, ev, 40), "table#tabelle")
+' Jonas hat Momo zurueckgegeben -- bestand zeigt ihn nirgends.
+SETENV("SUCHE", "Jonas")
+PRINT "Jonas: "; zeile$(bedienen$(m, ev, 40), "table#tabelle")
+' Tetris (197) waehlen, Ausleihen (453): seit 40 Tagen.
+ev = []
+klick(ev, 0, 100, 197)
+klick(ev, 10, 670, 453)
+PRINT zeile$(bedienen$(m, ev, 50), "label#gewaehlt")
+' Ansicht -> Ueberfaellig, Ansicht -> Statistik.
+ev = []
+klick(ev, 0, 40, 13)
+klick(ev, 12, 60, 40)
+PRINT "ueberfaellig "; zeile$(bedienen$(m, ev, 40), "table#liste")
+ev = []
+klick(ev, 0, 40, 13)
+klick(ev, 12, 60, 63)
+PRINT "statistik "; zeile$(bedienen$(m, ev, 40), "table#liste")
+' Die Zahlen rechnet die Abfrage statistik selbst -- aus der Datei des
+' Projekts gelesen und an der Datenbank des Programms ausgefuehrt.
+DIM schema AS JSON_HANDLE : schema = JSON_LOAD(CWD$() + "/kap15_mediathek/Mediathek.dhdb")
+DIM stat AS STRING : stat = JSON_GET_STRING(schema, "abfragen.2.sql")
+DIM d AS DB_CONN : d = DB_OPEN(sd)
+DIM r AS DB_RESULT : r = DB_QUERY(d, "SELECT art, eintraege, verliehen FROM (" + stat + ") ORDER BY art")
+DIM zahlen AS ARRAY OF STRING
+WHILE DB_NEXT(r)
+    ARRAY_PUSH(zahlen, DB_GET_STRING(r, 0) + " " + DB_GET_STRING(r, 1) + " " + DB_GET_STRING(r, 2))
+WEND
+PRINT "zahlen "; JOIN$(zahlen, ", ")
+DB_CLOSE(d)
+' Zurueck: die Tabelle laedt neu und behaelt Tetris; nichts ist ueberfaellig.
+ev = []
+klick(ev, 0, 100, 197)
+klick(ev, 10, 670, 453)
+klick(ev, 30, 505, 318)
+a = bedienen$(m, ev, 60)
+PRINT zeile$(a, "table#tabelle"); " | "; zeile$(a, "label#gewaehlt")
+ev = []
+klick(ev, 0, 40, 13)
+klick(ev, 12, 60, 40)
+PRINT "danach "; zeile$(bedienen$(m, ev, 40), "table#liste")
+' Die Loesungen: der dritte Punkt im Menue Ansicht.
+ev = []
+klick(ev, 0, 40, 13)
+klick(ev, 12, 60, 87)
+PRINT "beliebt "; zeile$(bedienen$(CWD$() + "/kap15_beliebt/_studio/main.dh", ev, 40), "table#liste")
+a = zeile$(bedienen$(CWD$() + "/kap15_monate/_studio/main.dh", ev, 40), "table#liste")
+PRINT "monate "; LEFT$(a, 20)
+--- argumente
+{sammlung}/../../../studio/studio.dh
+{sammlung}/../../..
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- erwartet
+kap15_mediathek geprueft TRUE beendet TRUE
+kap15_beliebt geprueft TRUE beendet TRUE
+kap15_monate geprueft TRUE beendet TRUE
+Lena: table#tabelle 1 Zeilen, gewaehlt -1: "Tetris"
+Jonas: table#tabelle 0 Zeilen, gewaehlt -1:
+label#gewaehlt "Tetris ist seit 40 Tagen bei Lena."
+ueberfaellig table#liste 1 Zeilen, gewaehlt -1: "Tetris"
+statistik table#liste 4 Zeilen, gewaehlt -1: "Buch" "Film" "Musik" "Spiel"
+zahlen Buch 2 0, Film 1 0, Musik 1 0, Spiel 1 1
+table#tabelle 5 Zeilen, gewaehlt 4 ("Tetris" "Alexei Paschitnow" "Spiel" "1984" ""): "Emil und die Detektive" "Kind of Blue" "Metropolis" "Momo" "Tetris" | label#gewaehlt "Tetris ist da."
+danach table#liste 0 Zeilen, gewaehlt -1:
+beliebt table#liste 2 Zeilen, gewaehlt -1: "Momo" "Tetris"
+monate table#liste 2 Zeilen
