@@ -213,4 +213,34 @@ module.exports = (H) => [
   H.h3("Erweitern 2"),
 
   H.p("Das Programm beginnt mit dem Info-Fenster. Wer es schließt, beendet das Programm, denn das Startfenster zu schließen beendet immer das ganze Programm. Das Hauptfenster bekommt man so nie zu sehen: Es wird nur geöffnet, wenn jemand es öffnet, und das tut hier niemand. Projekt → Als Startfenster auf dem Hauptfenster stellt es wieder her."),
+
+  H.h2("Kapitel 9 · Der Inspektor"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Die Tabelle wird breiter, aber nicht höher; sie bleibt 300 Punkte hoch. Die Knöpfe und die Statuszeile wandern trotzdem an den unteren Rand, denn ihr Anker U ist noch gesetzt. Dazwischen liegt ein leerer Streifen, so hoch wie der ganze Zuwachs."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Das Feld Urheber bleibt 570 Punkte breit, während das Titelfeld darüber bis an den rechten Rand wächst. Ohne Anker R weiß das Feld nicht, dass es dem rechten Rand folgen soll — es bleibt, wie es im Entwurf war."),
+
+  H.h3("Drehen 3"),
+
+  H.p("„Speichern“: Es hat die Tab-Folge 5, das Jahr die 4. Tab geht nach den Zahlen, nicht nach der Lage. Dass „Neu“ links von „Speichern“ steht, spielt keine Rolle — und genau das ist gewollt, denn nach dem Ausfüllen will man speichern."),
+
+  H.h3("Erweitern 1: Vollbild"),
+
+  H.p("Projekt → Menüs des Fensters öffnet den Menü-Editor: ein Menü Ansicht, darin ein Eintrag Vollbild mit dem Namen miVollbild und dem Kürzel F11. Das Ereignis eines Menüeintrags heißt Aktion (code/loesungen/kap09_vollbild):"),
+
+  ...neu("loesungen/kap09_vollbild/Hauptfenster.dh").map((t) => H.code(t)),
+
+  H.p("WINDOW_MAXIMIZED sagt, ob das Fenster gerade den Bildschirm füllt; WINDOW_RESTORE holt es auf die Größe aus dem Entwurf zurück. Dass beide Größen gut aussehen, besorgen die Anker aus Schritt 2 — ohne eine Zeile Code dafür. Das Kürzel steht im Menü, wie in Kapitel 6: Dort sieht man es, und es gilt genau einmal."),
+
+  H.h3("Erweitern 2: Entfernen nur mit Auswahl"),
+
+  H.p("Im Inspektor bekommt knopfEntfernen unter Verhalten „Aktiviert“ aus — beim Start ist keine Zeile gewählt. Die Tabelle bekommt ihr Ereignis Geaendert (code/loesungen/kap09_entfernen):"),
+
+  ...neu("loesungen/kap09_entfernen/Hauptfenster.dh").map((t) => H.code(t)),
+
+  H.p("Geaendert kommt, wenn eine andere Zeile gewählt wird. Nach dem Entfernen ist keine mehr gewählt; darum ruft knopfEntfernen_Klick die Methode danach selbst auf, und der Knopf wird wieder grau."),
 ];

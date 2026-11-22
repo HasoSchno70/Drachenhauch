@@ -125,6 +125,35 @@ SUB taste(z AS ARRAY OF STRING, b AS INTEGER, halten AS ARRAY OF INTEGER, code A
     NEXT
 END SUB
 
+' Ein Studio-Projekt mit F5 uebersetzen lassen und das erzeugte Programm
+' aufnehmen, auf Wunsch mit einer Bedienung (Klicklagen im Programm, ohne
+' SKALIERUNG). Fuer Kapitel 8 stand das einmal von Hand weiter unten.
+SUB programmBild(name AS STRING, rel AS STRING, bedienung AS ARRAY OF STRING, n AS INTEGER)
+    DIM pm AS STRING : pm = projekt$(rel)
+    DIM zf AS ARRAY OF STRING : zf = ["e 0 7 640 400 0 0"]
+    taste(zf, 20, ohne, 294)   ' F5 -- raylibs Code, nicht KEY_F5
+    studioBild("_" + name + "_f5", pm, "", aufnahme$("f5_" + name, zf), 70)
+    IF FILEEXISTS(bilder + "/_" + name + "_f5.png") THEN DELETEFILE(bilder + "/_" + name + "_f5.png")
+    IF NOT FILEEXISTS(pm + "/_studio/main.dh") THEN
+        PRINT "  FEHLER "; name; ": F5 hat _studio/main.dh nicht erzeugt"
+        EXIT(1)
+    END IF
+    IF LEN(bedienung) > 0 THEN
+        SETENV("DHRT_ABSPIELEN", aufnahme$("bed_" + name, bedienung))
+    END IF
+    DIM ziel AS STRING : ziel = bilder + "/" + name + ".png"
+    DIM pl AS INTEGER
+    pl = PROCESS_START("dhrt", "bild", pm + "/_studio/main.dh", ziel, STR$(n))
+    DIM aus AS STRING : aus = laufen$(pl)
+    SETENV("DHRT_ABSPIELEN", "")
+    IF FILEEXISTS(ziel) THEN
+        PRINT "  "; name; ".png"
+    ELSE
+        PRINT "  FEHLER "; name; " "; LEFT$(aus, 300)
+        EXIT(1)
+    END IF
+END SUB
+
 DIM nur AS ARRAY OF STRING : nur = []
 DIM a AS INTEGER
 FOR a = 0 TO ARGC() - 1
@@ -182,4 +211,29 @@ IF gewuenscht("kap08_laeuft") THEN
     IF FILEEXISTS(ziel) THEN PRINT "  kap08_laeuft.png" ELSE PRINT "  FEHLER kap08_laeuft "; LEFT$(aus, 300)
     IF FILEEXISTS(bilder + "/_kap08_f5.png") THEN DELETEFILE(bilder + "/_kap08_f5.png")
 END IF
+' Kapitel 9: ein Klick auf die Tabelle im Entwurf -- der Inspektor zeigt
+' ihre Lage samt Anker.
+IF gewuenscht("kap09_anker") THEN
+    m = projekt$("kap09/mediathek")
+    z = []
+    klick(z, 20, 615, 385)
+    ' Die Gruppe "Daten" zuklappen, damit "Lage" mit dem Anker zu sehen ist.
+    klick(z, 32, 1005, 169)
+    studioBild("kap09_anker", m, "Hauptfenster", aufnahme$("anker", z), BILDER_STUDIO)
+    ' Entwurf und Inspektor; Navigator und Bibliothek kennt Kapitel 8.
+    zuschneiden("kap09_anker", 290, 66, 980, 536)
+END IF
+
+' Kapitel 9: das erzeugte Programm.
+IF gewuenscht("kap09_programm") THEN
+    programmBild("kap09_programm", "kap09/mediathek", [], 12)
+END IF
+
+' Kapitel 9, Loesung Erweitern 1: F11 (raylibs Code 300) maximiert.
+IF gewuenscht("kap09_vollbild") THEN
+    z = ["e 0 7 600 540 0 0"]
+    taste(z, 6, ohne, 300)
+    programmBild("kap09_vollbild", "loesungen/kap09_vollbild", z, 30)
+END IF
+
 PRINT "fertig"
