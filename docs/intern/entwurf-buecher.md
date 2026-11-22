@@ -768,6 +768,23 @@ E rechnet seine Zahlen (Befehle im Buch, Befehle insgesamt, Programme) aus
 Hinweis „Arbeitsstand“ im Vorwort ist einem Wegweiser zu den Anhängen
 gewichen; Anhang A steht unter einem eigenen Teil „Anhang“.
 
+Danach (2026-11-22): Buch B, Teil I, Kapitel 2–7 (Ordnung im Fenster,
+Listen und Tabellen, Daten, die bleiben, Formulare, die prüfen, Menüs,
+Kürzel, Dialoge, Was wir von Hand gelernt haben). Die Mediathek wächst
+von Kapitel zu Kapitel: Behälter mit Größengruppe, Klasse `Eintrag` in
+`eintrag.dh`, SQLite mit Kennung und Transaktion, gebundenes Formular mit
+Regeln, Menü und `GUI_DIALOG`. Kapitel 7 rechnet seine Tabelle (Zeilen je
+SUB, Aufbau, Schleife) aus dem letzten Stand. Kapitel 0 (Rundgang durch
+die fertige Mediathek) kommt, wenn sie fertig ist. Zehn Funde in der
+Laufzeit, je mit Fall und Gegenprobe: `GUI_LAYOUT_MIN_W/H` vor dem ersten
+Bild, Zebra und Zeilenfarbe über die ganze Breite, Abfragen
+`GUI_TABLE_GET_CELL_COLOR`/`GET_ROW_COLOR` und `GUI_MENU_ENABLED`,
+„database is locked“ mit Ursache, Apostroph-Hinweis bei eingeklebten
+Werten, leeres Zahlenfeld bindet NULL, `GUI_FORM_SET/LOAD/CLEAR` nehmen
+alte Meldungen mit, die Live-Prüfung prüft nur Geändertes und lässt
+einen Dialog den Fokus leihen. `pruef_ausgaben.js` lässt Datenbank-Blöcke
+jetzt laufen, jeden in eigenem Ordner.
+
 Was beim Bauen festgelegt wurde:
 
 * **Code kommt aus Dateien.** `buch/code_lesen.js` holt ganze Programme,
