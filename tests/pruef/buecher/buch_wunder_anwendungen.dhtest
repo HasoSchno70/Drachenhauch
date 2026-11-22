@@ -280,3 +280,135 @@ DHRT_ABSEITS=1
 --- erwartet
 fenster 700 360
 formular 700 360
+
+=== mediathek kapitel 3: aufnehmen haengt an daten und tabelle an
+' Der neue Eintrag steht im Feld UND als gewaehlte letzte Zeile in der
+' Tabelle; das Formular ist danach leer.
+prBild = prBild + 1
+IF prBild = 2 THEN
+    aufnehmen()
+    DIM k AS INTEGER : k = LEN(mediathek) - 1
+    PRINT LEN(mediathek); " "; GUI_TABLE_ROW_COUNT(tabelle); " "; GUI_TABLE_SELECTED(tabelle)
+    PRINT mediathek[k].titel; " | "; GUI_TABLE_GET_CELL(tabelle, k, 0); " | "; GUI_TABLE_GET_CELL(tabelle, k, 3)
+    PRINT GUI_TEXT(status); " | leer: "; GUI_TEXT(urheber) = ""
+    EXIT(0)
+END IF
+--- programm ../../../buecher/anwendungen/code/kap03/2_aufnehmen.dh nach     GUI_UPDATE()
+--- einschub nach WINDOW_WAIT_EVENTS(1)
+DIM prBild AS INTEGER
+--- ersetzen TRIM$(GUI_TEXT(titel))
+TRIM$("Ronja Räubertochter")
+--- ersetzen TRIM$(GUI_TEXT(urheber))
+"Astrid Lindgren"
+--- ersetzen TRIM$(GUI_TEXT(jahr))
+"1981"
+--- umgebung
+DHRT_FRAMES=5
+DHRT_ABSEITS=1
+--- erwartet
+11 11 10
+Ronja Räubertochter | Ronja Räubertochter | 1981
+11 Einträge | leer: TRUE
+
+=== mediathek kapitel 3: entfernen trifft auch sortiert die richtigen
+' Nach Jahr sortiert, Datenzeilen 1 und 2 (Metropolis, Tetris) gewaehlt:
+' genau die beiden fallen weg, aus dem Feld wie aus der Tabelle. Von
+' vorn nach hinten entfernt fiele Kind of Blue statt Tetris.
+prBild = prBild + 1
+IF prBild = 2 THEN
+    GUI_TABLE_SORT(tabelle, 3, FALSE)
+    GUI_TABLE_SELECT(tabelle, 1, TRUE)
+    GUI_TABLE_SELECT(tabelle, 2, TRUE)
+    auswahl_entfernen()
+    PRINT GUI_TEXT(status)
+    DIM k AS INTEGER
+    DIM gleich AS BOOLEAN : gleich = TRUE
+    FOR k = 0 TO LEN(mediathek) - 1
+        IF mediathek[k].titel <> GUI_TABLE_GET_CELL(tabelle, k, 0) THEN gleich = FALSE
+    NEXT
+    PRINT "gleich "; gleich; " | "; mediathek[1].titel; " | "; mediathek[2].titel
+    EXIT(0)
+END IF
+--- programm ../../../buecher/anwendungen/code/kap03/3_auswahl.dh nach     GUI_UPDATE()
+--- einschub nach WINDOW_WAIT_EVENTS(1)
+DIM prBild AS INTEGER
+--- umgebung
+DHRT_FRAMES=5
+DHRT_ABSEITS=1
+--- erwartet
+2 entfernt, 8 Einträge
+gleich TRUE | Kind of Blue | Emil und die Detektive
+
+=== mediathek kapitel 3: enter auf einer zeile zeigt den eintrag
+' Klick auf Tetris, dann Enter: das ist der Doppelklick der Tabelle --
+' nicht der Standard-Knopf "Aufnehmen", der hiesse "Bitte einen Titel".
+--- programm ../../../buecher/anwendungen/code/kap03/3_auswahl.dh
+--- datei enter.txt
+c 8
+e 0 7 100 289 0 0
+e 2 7 100 289 0 0
+e 4 6 0 0 0 0
+e 6 5 0 0 0 0
+e 10 2 257 0 0 0
+e 12 1 257 0 0 0
+e 14 7 600 500 0 0
+e 16 7 600 500 0 0
+
+--- umgebung
+DHRT_FRAMES=30
+DHRT_ABSPIELEN=enter.txt
+DHRT_GUI_ZUSTAND=1
+DHRT_ABSEITS=1
+--- enthaelt
+  label(5) "Tetris von Alexei Paschitnow (Spiel, 1984)"
+
+=== loesung kapitel 3: jede art hat ihre farbe
+PRINT GUI_TABLE_GET_CELL_COLOR(tabelle, 0, 2, "fg") = RGB(120, 170, 255)
+PRINT GUI_TABLE_GET_CELL_COLOR(tabelle, 1, 2, "fg") = RGB(255, 140, 120)
+PRINT GUI_TABLE_GET_CELL_COLOR(tabelle, 0, 0, "fg")
+aufnehmen()
+PRINT GUI_TABLE_GET_CELL_COLOR(tabelle, 10, 2, "fg") = RGB(230, 190, 90)
+EXIT(0)
+--- programm ../../../buecher/anwendungen/code/loesungen/kap03_farben.dh nach     GUI_UPDATE()
+--- ersetzen TRIM$(GUI_TEXT(titel))
+TRIM$("Abbey Road")
+--- ersetzen GUI_TEXT(art)
+"Musik"
+--- umgebung
+DHRT_FRAMES=5
+DHRT_ABSEITS=1
+--- erwartet
+TRUE
+TRUE
+-1
+TRUE
+
+=== loesung kapitel 3: die suche trifft alle spalten und die richtigen eintraege
+prBild = prBild + 1
+IF prBild = 2 THEN
+    GUI_SET_TEXT(suche, "ende")
+    neu_aufbauen()
+    PRINT GUI_TEXT(status)
+    zeigen(1)
+    PRINT GUI_TEXT(status)
+    GUI_TABLE_SELECT(tabelle, 0, TRUE)
+    GUI_TABLE_SELECT(tabelle, 1, TRUE)
+    auswahl_entfernen()
+    GUI_SET_TEXT(suche, "spiel")
+    neu_aufbauen()
+    PRINT GUI_TEXT(status)
+    zeigen(1)
+    PRINT GUI_TEXT(status)
+    EXIT(0)
+END IF
+--- programm ../../../buecher/anwendungen/code/loesungen/kap03_suche.dh nach     GUI_UPDATE()
+--- einschub nach WINDOW_WAIT_EVENTS(1)
+DIM prBild AS INTEGER
+--- umgebung
+DHRT_FRAMES=5
+DHRT_ABSEITS=1
+--- erwartet
+2 von 10 Einträgen
+Die unendliche Geschichte von Michael Ende (Buch, 1979)
+2 von 8 Einträgen
+Die Siedler von Catan von Klaus Teuber (Spiel, 1995)
