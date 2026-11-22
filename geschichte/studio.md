@@ -628,3 +628,10 @@ Ebenda, Kapitel 14 (Datenbindung):
   (wie man es im Abfragefeld schreibt), hielt das erzeugte Programm mit
   "Zeilenumbruch im String" an -- `dbText$`/`dhText$` maskierten nur
   Rueckstrich und Anfuehrungszeichen. Jetzt auch \n, \r und \t.
+
+Ebenda, Kapitel 17 (Berichte), 2026-11-22: ein Bericht auf A6 (die
+Karteikarte der Mediathek) legte aus wie auf A4 -- `studioBSeite` kannte
+nur A3, A4, A5, Letter und Legal, `PDF_NEW` aber A0 bis A6. Das PDF hatte
+das richtige Blatt, die Baender liefen ueber seinen Rand hinaus (70 Zeilen:
+2 Seiten statt 5). Jetzt dieselben Formate wie `pdf::seitenmass`, und die
+Wahl im Reiter bietet A6 an.

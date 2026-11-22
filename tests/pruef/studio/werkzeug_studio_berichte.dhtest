@@ -50,6 +50,16 @@ CATCH fehler
     PRINT fehler
 END TRY
 PRINT "text "; studioBParameter$("a = :x AND b = ':x' AND c = :y", {"x": "O'Neil", "Y": 2.5})
+' Derselbe Bericht auf A6: ausgelegt wird auf dem Blatt, das das PDF hat
+' (bis 2026-11-22 legte A6 wie A4 aus -- zu wenig Seiten, der Rest unter
+' dem Blattrand).
+DIM a6 AS JSON_HANDLE : a6 = JSON_PARSE(b.schema)
+JSON_SET_STRING(a6, "seite.format", "A6")
+p = studioBerichtPdf(JSON_STRINGIFY(a6), db, sql, {"ab": 1})
+PRINT "a6 seiten "; PDF_PAGE_COUNT(p)
+PDF_SAVE(p, "a6.pdf")
+s = pdfSeiten("a6.pdf")
+PRINT "a6 fuss "; INSTR(s[0], "Seite 1 von " + STR$(LEN(s))) >= 0; " letzte "; INSTR(s[LEN(s) - 1], "3.106,25") >= 0
 --- vorher
 IMPORT "db"
 DIM db AS DB_CONN : db = DB_OPEN("proj/daten.sqlite")
@@ -94,6 +104,8 @@ nur rechnung 2: 1
   TRUE TRUE
 Bericht: Parameter :ab fehlt
 text a = 'O''Neil' AND b = ':x' AND c = 2.5
+a6 seiten 5
+a6 fuss TRUE letzte TRUE
 
 === nur zeilen mit: summen und elemente je wert
 ' Vier Positionen, drei zu 19 % und eine zu 7 %. Die Summen im Berichtsfuss

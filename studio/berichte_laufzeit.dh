@@ -339,9 +339,15 @@ SUB studioBSeite(j AS JSON_HANDLE)
     END IF
     DIM b AS FLOAT : b = 210.0
     DIM h AS FLOAT : h = 297.0
+    ' Dieselben Formate wie PDF_NEW (pdf.rs) -- sonst legt der Bericht
+    ' anders aus, als das PDF dann gross ist.
     SELECT CASE format
+        CASE "a0" : b = 841.0 : h = 1189.0
+        CASE "a1" : b = 594.0 : h = 841.0
+        CASE "a2" : b = 420.0 : h = 594.0
         CASE "a3" : b = 297.0 : h = 420.0
         CASE "a5" : b = 148.0 : h = 210.0
+        CASE "a6" : b = 105.0 : h = 148.0
         CASE "letter" : b = 215.9 : h = 279.4
         CASE "legal" : b = 215.9 : h = 355.6
     END SELECT

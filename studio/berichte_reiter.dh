@@ -523,7 +523,7 @@ FUNCTION berEigWahl(r AS Reiter, name AS STRING) AS ARRAY OF STRING
         CASE "bereich" : RETURN ["gruppe", "bericht"]
         CASE "schrift" : RETURN ["sans", "serif", "mono"]
         CASE "ausrichtung" : RETURN ["links", "mitte", "rechts"]
-        CASE "papier" : RETURN ["A4", "A5", "A3", "Letter", "Legal"]
+        CASE "papier" : RETURN ["A4", "A5", "A6", "A3", "Letter", "Legal"]
         CASE "bild"
             DIM b AS ARRAY OF STRING : b = [""]
             DIM n AS STRING
