@@ -493,7 +493,7 @@
   "FILE_READ_LINE$": "next line (without \\n); at the end of the file \"\" like an empty line, so ask EOF(f) — formerly READLINE",
   "FILE_READ_LINES": "FILE_OPEN/FILE_READ_LINE$/FILE_CLOSE with a handle for large files",
   "FILE_SAME": "do both paths mean the same file? A text comparison goes wrong with / versus \\, with a .. in the path, … — formerly SAMEFILE",
-  "FILE_SAVE_DIALOG": "choose a file to save (default$ = suggested file name)",
+  "FILE_SAVE_DIALOG": "choose a file to save (default$ = suggested file name, only the third argument holds the extensions -- --check warns when only an extension stands second)",
   "FILE_SIZE": "size in bytes — formerly FILESIZE",
   "FILE_TIME": "last modified, seconds as in the module zeit — formerly FILETIME",
   "FILE_WRITE": "FILE_OPEN/FILE_READ_LINE$/FILE_CLOSE with a handle for large files",

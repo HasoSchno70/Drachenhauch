@@ -493,7 +493,7 @@
   "FILE_READ_LINE$": "nächste Zeile (ohne \\n); am Dateiende \"\" wie eine leere Zeile, darum EOF(f) fragen — bisher READLINE",
   "FILE_READ_LINES": "FILE_OPEN/FILE_READ_LINE$/FILE_CLOSE mit Handle für große Dateien",
   "FILE_SAME": "meinen beide Pfade dieselbe Datei? Ein Textvergleich irrt bei / gegen \\, bei einem .. im Pfad, bei kurzen … — bisher SAMEFILE",
-  "FILE_SAVE_DIALOG": "Datei zum Speichern wählen (default$ = vorgeschlagener Dateiname)",
+  "FILE_SAVE_DIALOG": "Datei zum Speichern wählen (default$ = vorgeschlagener Dateiname, erst das dritte Argument sind die Endungen -- --check warnt, wenn an zweiter Stelle nur eine Endung steht)",
   "FILE_SIZE": "Größe in Bytes — bisher FILESIZE",
   "FILE_TIME": "zuletzt geändert, Sekunden wie im Modul zeit — bisher FILETIME",
   "FILE_WRITE": "FILE_OPEN/FILE_READ_LINE$/FILE_CLOSE mit Handle für große Dateien",

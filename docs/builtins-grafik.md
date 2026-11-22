@@ -252,7 +252,7 @@ Echte Windows-Dialoge zum Auswählen von Dateien/Ordnern. Alle drei sind **block
 | Funktion | Zweck |
 |---|---|
 | `FILE_OPEN_DIALOG([title$[, extensions$]])` → STRING | Datei zum Öffnen wählen |
-| `FILE_SAVE_DIALOG([title$[, default$[, extensions$]]])` → STRING | Datei zum Speichern wählen (`default$` = vorgeschlagener Dateiname) |
+| `FILE_SAVE_DIALOG([title$[, default$[, extensions$]]])` → STRING | Datei zum Speichern wählen (`default$` = vorgeschlagener Dateiname, erst das dritte Argument sind die Endungen -- `--check` warnt, wenn an zweiter Stelle nur eine Endung steht) |
 | `FOLDER_DIALOG([title$])` → STRING | Ordner wählen |
 
 ```basic

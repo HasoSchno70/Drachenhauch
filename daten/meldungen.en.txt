@@ -1816,6 +1816,7 @@ IMAGE_ENHANCE: erwartet (bild, art$, faktor)	IMAGE_ENHANCE: expects (image, kind
 IMAGE_ENHANCE: unbekannte Art '{}' -- moeglich sind helligkeit, kontrast, saettigung	IMAGE_ENHANCE: unknown kind '{}' -- possible are brightness, contrast, saturation
 IMAGE_ENHANCE: der Faktor muss eine Zahl ab 0 sein	IMAGE_ENHANCE: the factor must be a number from 0 up
 {} liefert nie "{}" -- der Vergleich trifft nie. Moeglich sind: {}.	{} never returns "{}" -- the comparison never matches. Possible are: {}.
+FILE_SAVE_DIALOG: das zweite Argument ist der vorgeschlagene Dateiname, nicht die Endung -- "{}" wird so zum Namen der Datei. Mit Filter: FILE_SAVE_DIALOG(titel, "name.{}", "{}") (anders als FILE_OPEN_DIALOG(titel, endungen)).	FILE_SAVE_DIALOG: the second argument is the suggested file name, not the extension -- "{}" becomes the name of the file. With a filter: FILE_SAVE_DIALOG(title, "name.{}", "{}") (unlike FILE_OPEN_DIALOG(title, extensions)).
 {}: {} ist kein Woerterbuch (SPELL_LOAD oder SPELL_SYSTEM)	{}: {} is not a dictionary (SPELL_LOAD or SPELL_SYSTEM)
 {}: '{}' laesst sich nicht lesen: {}	{}: '{}' cannot be read: {}
 {}: '{}' ist kein Hunspell-Woerterbuch: {}	{}: '{}' is not a Hunspell dictionary: {}

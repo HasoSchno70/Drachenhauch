@@ -839,7 +839,9 @@ SUB studioBerichtVorschau(p AS PDF, titel AS STRING)
         IF GUI_CLICKED(zurueck) AND nr > 1 THEN nr = nr - 1 : neu = TRUE
         IF GUI_CLICKED(drucken) THEN PDF_PRINT(p)
         IF GUI_CLICKED(sichern) THEN
-            DIM ziel AS STRING : ziel = FILE_SAVE_DIALOG(studioTr$("PDF sichern"), "pdf")
+            ' Zweites Argument ist der vorgeschlagene NAME, erst das dritte
+            ' die Endungen (bis 2026-11-22 stand hier "pdf" als Name).
+            DIM ziel AS STRING : ziel = FILE_SAVE_DIALOG(studioTr$("PDF sichern"), titel + ".pdf", "pdf")
             IF ziel <> "" THEN PDF_SAVE(p, ziel)
         END IF
     WEND

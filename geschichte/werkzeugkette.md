@@ -226,3 +226,11 @@ echte Pakete fuer `dhrt paket`.
 - **Discussions** im Repository eingeschaltet (Kategorien Q&A, Show and
   tell ...), `docs/galerie.md` (+en) mit den eigenen Programmen, Verweise
   aus README, CONTRIBUTING und dem Issue-Dialog.
+
+2026-11-22, Buch "Fenster, Formulare, Daten", Kapitel 19: die Vorschau eines
+Berichts im Studio rief `FILE_SAVE_DIALOG(titel, "pdf")` -- aber das zweite
+Argument ist der vorgeschlagene Dateiname (die Endungen kommen erst an
+dritter Stelle, anders als bei `FILE_OPEN_DIALOG(titel, endungen)`). Der
+Dialog schlug eine Datei "pdf" vor und filterte nichts. Behoben im Studio;
+dazu warnt `--check`, wenn bei zwei Argumenten an zweiter Stelle nur eine
+Endung (ohne Punkt) steht (compiler.rs, Fall in compiler_warnungen).
