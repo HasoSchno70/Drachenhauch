@@ -1364,3 +1364,13 @@ am Zeilenende der Erwartung ab, die Ausgabe nicht.
   behalten den Balken rechts. GUI_TREE_EDIT endet ohne Fokus auf dem Baum im
   naechsten Bild -- im Fall erst GUI_FOCUS.
 
+- **Mindestmass vor dem ersten Bild (2026-11-22).** Beim Schreiben von
+  Kapitel 2 des Buchs "Fenster, Formulare, Daten": `WINDOW_MIN_SIZE(
+  GUI_LAYOUT_MIN_W(form), GUI_LAYOUT_MIN_H(form))` gleich nach dem Aufbau
+  liess das Fenster auf 272x160 ziehen, gebraucht waren 403x240 -- vor dem
+  ersten GUI_UPDATE kannten Beschriftungen und Felder "nach Inhalt" ihre
+  Breite noch nicht (gemessen wird in `layout_pass`, nur dort gab es die
+  Schrift). Die Abfrage misst jetzt selbst, wenn ein Fenster da ist
+  (`layout_min_messen`), wie GUI_AUTOSIZE. Dabei gesehen, aber gewollt:
+  ein zweites GUI_LAYOUT_ADD desselben Widgets haengt es still um (die
+  erste Zeile ist danach leer) -- das Buch zeigt es als Falle.

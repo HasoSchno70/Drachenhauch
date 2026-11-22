@@ -246,6 +246,18 @@ impl Gui {
     }
     /// GUI_LAYOUT_MIN_W / _H: was ein Behaelter mindestens braucht --
     /// gedacht fuer WINDOW_MIN_SIZE / GUI_WINDOW_SET_MIN_SIZE.
+    ///
+    /// Mit Grafik wird vorher gemessen wie in GUI_UPDATE: Beschriftungen
+    /// und Felder "nach Inhalt" kennen ihre Breite erst mit der Schrift.
+    /// Bis 2026-11 lieferte die Frage direkt nach dem Aufbau (vor dem
+    /// ersten GUI_UPDATE) die Schaetzung -- 272x160 statt 403x240 fuer das
+    /// Formular aus Kapitel 2 von "Fenster, Formulare, Daten", und
+    /// WINDOW_MIN_SIZE liess das Fenster zu klein ziehen.
+    pub fn layout_min_messen(&mut self, g: Option<&Graphics>, h: i64) -> Result<(i64, i64), String> {
+        self.wdg(h, "GUI_LAYOUT_MIN_W")?;
+        if let Some(g) = g { self.layout_pass(g); }
+        self.layout_min(h)
+    }
     pub fn layout_min(&self, h: i64) -> Result<(i64, i64), String> {
         let (wi, i) = Self::dec_widget(h);
         let w = self.wdg(h, "GUI_LAYOUT_MIN_W")?;

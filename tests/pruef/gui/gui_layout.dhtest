@@ -367,6 +367,34 @@ DHRT_FRAMES=1
 184 130
 80
 
+=== mindestmass schon vor dem ersten update
+' Direkt nach dem Aufbau kennen Beschriftungen und Knoepfe "nach Inhalt"
+' ihre Breite noch nicht -- GUI_LAYOUT_MIN_W misst darum selbst. Bis
+' 2026-11 kam hier die Schaetzung heraus, und WINDOW_MIN_SIZE damit liess
+' das Fenster zu klein ziehen (Buch "Fenster, Formulare, Daten", Kap. 2).
+IMPORT "gui"
+SCREEN(500, 400, "T", 1)
+GUI_FONT(-1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 500, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM z AS GUI_WIDGET : z = GUI_LAYOUT(w, "zeile", 0, 0, 10, 10)
+GUI_LAYOUT_SET(z, "abstand", 4)
+GUI_LAYOUT_ADD(z, GUI_LABEL(w, "Erscheinungsjahr", 0, 0))
+GUI_LAYOUT_ADD(z, GUI_TEXTINPUT(w, 0, 0, 0, 0), 1)
+GUI_LAYOUT_ADD(z, GUI_BUTTON(w, "Aufnehmen", 0, 0, 0, 0))
+DIM vw AS INTEGER : vw = GUI_LAYOUT_MIN_W(z)
+DIM vh AS INTEGER : vh = GUI_LAYOUT_MIN_H(z)
+GUI_UPDATE()
+PRINT vw ; " " ; vh
+PRINT GUI_LAYOUT_MIN_W(z) ; " " ; GUI_LAYOUT_MIN_H(z)
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+316 32
+316 32
+
 === anker schrumpfen nicht unter das mindestmass
 IMPORT "gui"
 SCREEN(500, 400, "T", 1)

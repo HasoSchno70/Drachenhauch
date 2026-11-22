@@ -685,8 +685,8 @@ impl<'p> Vm<'p> {
                 if a.len() != 1 { return Err(format!("{}: erwartet (widget)", n)); }
                 let (mw, mh) = self.gui.get_min_size(gi(a,0,n)?, n)?;
                 Value::Int(if name == "gui_get_min_w" { mw } else { mh }) }
-            "gui_layout_min_w" => Value::Int(self.gui.layout_min(gi(a,0,"GUI_LAYOUT_MIN_W")?)?.0),
-            "gui_layout_min_h" => Value::Int(self.gui.layout_min(gi(a,0,"GUI_LAYOUT_MIN_H")?)?.1),
+            "gui_layout_min_w" => { let g = self.gfx.as_ref(); Value::Int(self.gui.layout_min_messen(g, gi(a,0,"GUI_LAYOUT_MIN_W")?)?.0) }
+            "gui_layout_min_h" => { let g = self.gfx.as_ref(); Value::Int(self.gui.layout_min_messen(g, gi(a,0,"GUI_LAYOUT_MIN_H")?)?.1) }
             "gui_rule" => {
                 // GUI_RULE(feld, art$[, a, b][, muster$][, meldung$]) -- die
                 // Zahl der Argumente haengt an der Art; der letzte Text ist
