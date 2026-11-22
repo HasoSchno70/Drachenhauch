@@ -1394,3 +1394,8 @@ am Zeilenende der Erwartung ab, die Ausgabe nicht.
   die Meldung blieb unter dem geladenen Titel stehen. GUI_FORM_SET/LOAD
   nehmen die Meldungen der gesetzten Felder jetzt mit, GUI_FORM_CLEAR
   leert dabei auch die Fehlerzeile (es ging an `fehler_setzen` vorbei).
+- **Ein Dialog leiht den Fokus (2026-11-22).** Kapitel 6 desselben Buchs:
+  die Rueckfrage beim Beenden nahm dem leeren Titelfeld den Fokus, und die
+  Live-Pruefung meldete dahinter "Ohne Titel geht es nicht.". Steht ein
+  modales Fenster obenauf, ist der Fokusverlust der Felder anderer Fenster
+  jetzt kein Verlassen (`gui_eingabe.rs`, `geliehen`).

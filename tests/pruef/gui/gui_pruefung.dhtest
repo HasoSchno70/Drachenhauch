@@ -254,3 +254,41 @@ DHRT_FRAMES=1
 TRUE TRUE TRUE
 2
 
+
+=== ein dialog leiht den fokus, ohne das feld zu pruefen
+' Live-Pruefung prueft ein Feld, wenn man es verlaesst. Ein Dialog nimmt
+' den Fokus nur auf Zeit -- das ist kein Verlassen. Bis 2026-11 stand
+' hinter jeder Rueckfrage "Pflichtfeld" am leeren Feld (Buch "Fenster,
+' Formulare, Daten", Kapitel 6). Ein echtes Verlassen prueft weiter.
+IMPORT "gui"
+SCREEN(400, 300, "P", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("P", 0, 0, 400, 300)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM titel AS GUI_WIDGET : titel = GUI_TEXTINPUT(w, 10, 10, 200, 28, "")
+DIM anderes AS GUI_WIDGET : anderes = GUI_TEXTINPUT(w, 10, 50, 200, 28, "")
+DIM zeile AS GUI_WIDGET : zeile = GUI_LABEL(w, "", 10, 90)
+GUI_RULE(titel, "pflicht", "Ohne Titel geht es nicht.")
+GUI_ERROR_LABEL(titel, zeile)
+GUI_VALIDATE_LIVE(w, TRUE)
+GUI_FOCUS(titel)
+DIM d AS GUI_WINDOW : d = -1
+DIM bild AS INTEGER
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    bild = bild + 1
+    IF bild = 2 THEN d = GUI_DIALOG("Frage", "Wirklich?", "janein")
+    IF bild = 5 THEN PRINT "hinter dem dialog [" + GUI_TEXT(zeile) + "]"
+    IF bild = 6 THEN GUI_WINDOW_DESTROY(d)
+    IF bild = 8 THEN GUI_FOCUS(anderes)
+    IF bild = 10 THEN
+        PRINT "verlassen [" + GUI_TEXT(zeile) + "]"
+        EXIT(0)
+    END IF
+    CLS(0) : GUI_DRAW() : FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=20
+--- erwartet
+hinter dem dialog []
+verlassen [Ohne Titel geht es nicht.]

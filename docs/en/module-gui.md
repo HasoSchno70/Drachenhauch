@@ -3651,6 +3651,7 @@ END IF
   them — they were about the old content.
 - `GUI_VALIDATE_LIVE(win, TRUE)` checks a field as soon as the focus leaves
   it — not on every keystroke: a half-typed address is not a wrong one.
+  A dialog that only borrows the focus does not count as leaving.
 - Rules are stored in the `.dhform` (`rules`, `error_label`), for example
   `pflicht; laenge 2 60; email`.
 

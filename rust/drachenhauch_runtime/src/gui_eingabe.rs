@@ -451,7 +451,13 @@ impl Gui {
                 }
                 let verlassen = !f_jetzt && f_vorher && !w.regeln.is_empty();
                 self.pending.extend(feuern);
-                if verlassen && self.windows[wi].pruefung_live { self.widget_pruefen(wi, i); }
+                // Nimmt ein modales Fenster (ein Dialog) den Fokus, ist er nur
+                // geliehen -- er kommt zurueck, und verlassen hat das Feld
+                // niemand. Bis 2026-11 meldete die Live-Pruefung dann hinter
+                // dem Dialog "Ohne Titel geht es nicht." (Buch "Fenster,
+                // Formulare, Daten", Kapitel 6, Rueckfrage beim Beenden).
+                let geliehen = self.modal.map_or(false, |m| m != wi);
+                if verlassen && self.windows[wi].pruefung_live && !geliehen { self.widget_pruefen(wi, i); }
             }
         }
 
