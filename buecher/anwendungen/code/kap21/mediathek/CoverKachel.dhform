@@ -1,0 +1,20 @@
+{
+  "title": "CoverKachel",
+  "name": "CoverKachel",
+  "w": 160,
+  "h": 250,
+  "studio_ereignisse": "Angeklickt",
+  "widgets": [
+    {
+      "kind": "card",
+      "name": "kachel",
+      "x": 0,
+      "y": 0,
+      "w": 160,
+      "h": 250,
+      "text": "",
+      "placeholder": "",
+      "anchor": "lrtb"
+    }
+  ]
+}

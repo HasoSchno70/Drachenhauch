@@ -14,6 +14,7 @@
 '
 '     dhrt run buecher/anwendungen/buch/studio_bilder.dh [-- name ...]
 IMPORT "imgfx"
+IMPORT "json"
 
 CONST GROESSE = "1280x800"
 ' Fuer den Reiter einer Datenbank breiter: erst ab 1440 stehen alle
@@ -524,6 +525,38 @@ IF gewuenscht("kap20_aussehen") OR gewuenscht("kap20_hell") THEN
         IF FILEEXISTS(bilder + "/kap20_hell.png") THEN PRINT "  kap20_hell.png" ELSE PRINT "  FEHLER kap20_hell "; LEFT$(aus20h, 300)
     END IF
     SETENV("DHRT_ABSPIELEN", "")
+END IF
+
+' Kapitel 21: Hilfe -> Barrierefreiheit pruefen, im hellen Aussehen, an
+' dem Stand VOR den Korrekturen des Kapitels: die Kopie verliert Tab-Folge
+' und Tabellennamen, und leise bekommt wieder das feste Grau.
+IF gewuenscht("kap21_pruefen") THEN
+    m = projekt$("kap21/mediathek")
+    DIM hj AS JSON_HANDLE : hj = JSON_PARSE(READALL(m + "/Hauptfenster.dhform"))
+    DIM k21 AS INTEGER
+    FOR k21 = 0 TO JSON_LEN(hj, "widgets") - 1
+        DIM p21 AS STRING : p21 = "widgets." + STR$(k21)
+        IF JSON_HAS(hj, p21 + ".tab_index") THEN JSON_REMOVE(hj, p21 + ".tab_index")
+        IF JSON_GET_STRING(hj, p21 + ".name") = "tabelle" THEN JSON_REMOVE(hj, p21 + ".tooltip")
+    NEXT
+    WRITEALL(m + "/Hauptfenster.dhform", JSON_STRINGIFY(hj))
+    WRITEALL(m + "/mediathek.dhstil", REPLACE$(READALL(m + "/mediathek.dhstil"), "{ fg: muted_fg }", "{ fg: #8A93A6 }"))
+    z = ["e 0 7 640 400 0 0"]
+    taste(z, 20, ohne, 294)
+    studioBild("_kap21_f5", m, "", aufnahme$("f5_kap21", z), 70)
+    IF FILEEXISTS(bilder + "/_kap21_f5.png") THEN DELETEFILE(bilder + "/_kap21_f5.png")
+    z = []
+    klick(z, 0, 215, 13)
+    klick(z, 10, 260, 87)
+    klick(z, 24, 280, 13)
+    klick(z, 34, 320, 39)
+    ARRAY_PUSH(z, "e 50 7 750 500 0 0")
+    SETENV("DHRT_ABSPIELEN", aufnahme$("bed_kap21", z))
+    DIM ziel21 AS STRING : ziel21 = bilder + "/kap21_pruefen.png"
+    DIM pp21 AS INTEGER : pp21 = PROCESS_START("dhrt", "bild", m + "/_studio/main.dh", ziel21, "70")
+    DIM aus21 AS STRING : aus21 = laufen$(pp21)
+    SETENV("DHRT_ABSPIELEN", "")
+    IF FILEEXISTS(ziel21) THEN PRINT "  kap21_pruefen.png" ELSE PRINT "  FEHLER kap21_pruefen "; LEFT$(aus21, 300)
 END IF
 
 ' Kapitel 11: Tetris waehlen, "Ausleihen ..." -- das Fenster daneben.
