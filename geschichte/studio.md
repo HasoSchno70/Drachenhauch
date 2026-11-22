@@ -679,3 +679,9 @@ Jetzt: Kennung -> Klassen im Inspektor (neben dem Namen, beides Selektoren:
 und `StilLaden(name)` laedt sie (am besten in App.Geoeffnet). Der Entwurf
 zeigt sie bewusst nicht -- er steht in der Stildatei des Studios selbst.
 Pruefung werkzeug_studio_aussehen.
+
+Ebenda, Kapitel 21 (Fuer alle): GUI_A11Y_CHECK$ fand an der Mediathek "Tab
+springt zurueck" bei der Cover-Kachel -- die Tab-Folge im Inspektor stand
+nur am Behaelter der Instanz, ihre Teile hatten 0 und kamen nach allen
+gezaehlten Widgets des Fensters. `studioTeil` gibt jedem Teil ohne eigene
+Tab-Folge die der Instanz (Fall in werkzeug_studio_controls).

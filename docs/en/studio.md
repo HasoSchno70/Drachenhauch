@@ -459,7 +459,9 @@ The library lists all custom controls under **Project**. You place one into
 a window like a button and get an instance (`zaehler1`). It can be moved,
 resized, anchored and put into rows, columns and grid layouts; in the design
 it shows its real content, outlined with a dashed line, and a click on one
-of its parts selects the whole instance.
+of its parts selects the whole instance. Its tab order (inspector,
+Verhalten) applies to its parts, among themselves in the order they have in
+the control.
 
 ```basic
 ' in the code of the control Zaehler

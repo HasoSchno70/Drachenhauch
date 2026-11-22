@@ -263,6 +263,13 @@ CLASS StudioControl
 
     SUB studioTeil(w AS GUI_WIDGET, frei AS BOOLEAN, x AS INTEGER, y AS INTEGER, b AS INTEGER, h AS INTEGER, anker AS STRING)
         ARRAY_PUSH(Self.studioAlle, w)
+        ' Die Tab-Folge der Instanz gilt fuer ihre Teile (die selbst keine
+        ' haben): sonst kamen sie nach allen gezaehlten Widgets des Fensters
+        ' (Buch "Fenster, Formulare, Daten", Kapitel 21: die Cover-Kachel
+        ' nach "Ausleihen"). Gleicher Index: die Reihenfolge des Anlegens.
+        IF GUI_GET_TAB_INDEX(Self.studioHost) > 0 AND GUI_GET_TAB_INDEX(w) = 0 THEN
+            GUI_SET_TAB_INDEX(w, GUI_GET_TAB_INDEX(Self.studioHost))
+        END IF
         IF NOT frei THEN RETURN
         ARRAY_PUSH(Self.studioTeile, w)
         ARRAY_PUSH(Self.studioTx, x) : ARRAY_PUSH(Self.studioTy, y)

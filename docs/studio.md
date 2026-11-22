@@ -465,7 +465,9 @@ In der Bibliothek stehen alle eigenen Controls unter **Projekt**. Man legt
 sie ins Fenster wie einen Knopf und bekommt eine Instanz (`zaehler1`). Sie
 lässt sich verschieben, größer ziehen, verankern und in Zeilen, Spalten und
 Raster legen; im Entwurf zeigt sie ihren echten Inhalt, gestrichelt
-umrandet, und ein Klick auf einen ihrer Teile wählt die ganze Instanz.
+umrandet, und ein Klick auf einen ihrer Teile wählt die ganze Instanz. Ihre
+Tab-Folge (Inspektor, Verhalten) gilt für ihre Teile, untereinander in der
+Reihenfolge, in der sie im Control liegen.
 
 ```basic
 ' im Code des Controls Zaehler
