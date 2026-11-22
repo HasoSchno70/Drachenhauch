@@ -7875,6 +7875,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_TABLE_ROW_RECT",
+   "kind": "core",
+   "signature": "GUI_TABLE_ROW_RECT(tbl, row) AS TUPLE",
+   "module": "gui"
+  },
+  {
    "name": "GUI_TREE_ITEM_RECT",
    "kind": "core",
    "signature": "GUI_TREE_ITEM_RECT(tree, node) AS TUPLE",

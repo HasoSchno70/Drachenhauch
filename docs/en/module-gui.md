@@ -324,6 +324,7 @@ IMPORT "gui"
 | `GUI_TABLE_SET_SELECTED(tbl, row)` | — | set the selection (-1 = none) |
 | `GUI_TABLE_CLICKED(tbl)` | INTEGER | row clicked in this frame (-1) |
 | `GUI_TABLE_ROW_COUNT(tbl)` | INTEGER | number of data rows |
+| `GUI_TABLE_ROW_RECT(tbl, row)` | TUPLE | where data row `row` is right now (x, y, w, h), in screen pixels like `GUI_HIT_TEST`, after sorting, filter and scrolling; filtered out (0, 0, 0, 0) -- for tests with real clicks and pictures |
 | `GUI_UPDATE()` | — | **required** every frame: process mouse/keys |
 | `GUI_DRAW([on_top])` | — | draw all windows (back→front); `on_top`=FALSE leaves out the context menu and tooltip |
 | `GUI_DRAW_TOP()` | — | only what lies above all windows: open menu (bar or context), open dropdown list, tooltip |

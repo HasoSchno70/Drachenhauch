@@ -5,6 +5,55 @@
 ' y 32 + 20 r .. + 19. Tasten: F2 291, Enter 257, B 66, 4 52.
 ' Format: docs/werkzeuge.md, dhrt test.
 
+=== gui_table_row_rect nennt die lage einer datenzeile
+' Seit 2026-11-22 (Buch "Fenster, Formulare, Daten", Kapitel 21: der Kontrast
+' der gewaehlten Zeile wird am Bild gemessen). Die Lage folgt der
+' Sortierung (absteigend steht Apfel unten), ein Filter blendet aus (0, 0,
+' 0, 0), eine Zeile ausserhalb ist ein Fehler.
+IMPORT "gui"
+SCREEN(300, 220, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 220)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM tb AS GUI_WIDGET : tb = GUI_TABLE(w, 10, 10, 280, 200)
+GUI_TABLE_HEADERS(tb, ["Name", "Preis"])
+GUI_TABLE_ADD_ROW(tb, ["Apfel", "1"]) : GUI_TABLE_ADD_ROW(tb, ["Birne", "2"]) : GUI_TABLE_ADD_ROW(tb, ["Kirsche", "3"])
+GUI_UPDATE()
+DIM x AS INTEGER
+DIM y AS INTEGER
+DIM b AS INTEGER
+DIM h AS INTEGER
+DIM r AS INTEGER
+FOR r = 0 TO 2
+    (x, y, b, h) = GUI_TABLE_ROW_RECT(tb, r)
+    PRINT r; ": "; y; " "; h; " "; x >= 10 AND b > 250
+NEXT
+GUI_TABLE_SORT(tb, 0, TRUE)
+GUI_UPDATE()
+(x, y, b, h) = GUI_TABLE_ROW_RECT(tb, 0)
+PRINT "absteigend apfel "; y
+GUI_TABLE_FILTER(tb, 0, "Bir")
+GUI_UPDATE()
+(x, y, b, h) = GUI_TABLE_ROW_RECT(tb, 0)
+PRINT "weggefiltert "; x; " "; y; " "; b; " "; h
+(x, y, b, h) = GUI_TABLE_ROW_RECT(tb, 1)
+PRINT "birne "; y
+TRY
+    (x, y, b, h) = GUI_TABLE_ROW_RECT(tb, 9)
+CATCH e
+    PRINT e
+END TRY
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+0: 32 20 TRUE
+1: 52 20 TRUE
+2: 72 20 TRUE
+absteigend apfel 72
+weggefiltert 0 0 0 0
+birne 32
+GUI_TABLE_ROW_RECT: Zeile 9 ausserhalb [0..2]
+
 === ein doppelklick meldet und waehlt die zeile
 IMPORT "gui"
 SCREEN(300, 220, "T", 1)

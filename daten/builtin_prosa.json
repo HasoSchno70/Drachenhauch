@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 2621,
+ "count": 2622,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -1086,6 +1086,7 @@
   "GUI_TABLE_ROWS": "Datenzeilen setzen (2D ARRAY OF STRING)",
   "GUI_TABLE_ROW_COLOR": "ganze Zeile färben — ein Aufruf statt einer je Spalte",
   "GUI_TABLE_ROW_COUNT": "INTEGER — Anzahl Datenzeilen",
+  "GUI_TABLE_ROW_RECT": "TUPLE — wo die Datenzeile row gerade steht (x, y, b, h), in Bildschirmpunkten wie GUI_HIT_TEST, nach Sortierung, Filter und Rollen; weggefiltert (0, 0, 0, 0) -- für Prüfungen mit echten Klicks und Bildern",
   "GUI_TABLE_SELECT": "Zeile dazunehmen / herausnehmen",
   "GUI_TABLE_SELECTED": "INTEGER — selektierte Zeile (-1 wenn keine)",
   "GUI_TABLE_SELECT_RANGE": "Bereich setzen",

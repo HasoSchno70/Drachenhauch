@@ -649,6 +649,28 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         Ok(self.tbl_ref(h, "GUI_TABLE_ROW_COUNT")?.zeilen_zahl() as i64)
     }
 
+    /// GUI_TABLE_ROW_RECT(tb, row): wo die Datenzeile `row` gerade steht
+    /// (x, y, Breite, Hoehe in Bildschirmpunkten wie GUI_HIT_TEST, wie die
+    /// Liste -- fuer Pruefungen mit echten Klicks und Bildern) -- aus derselben
+    /// Geometrie, mit der gezeichnet und getroffen wird (`table_geom`), samt
+    /// Sortierung, Filter und Rollen. (0, 0, 0, 0), wenn ein Filter sie
+    /// ausblendet. Wie GUI_LISTBOX_ITEM_RECT und GUI_TREE_ITEM_RECT.
+    pub fn table_row_rect(&self, h: i64, row: i64) -> Result<(i32, i32, i32, i32), String> {
+        let t = self.tbl_ref(h, "GUI_TABLE_ROW_RECT")?;
+        let n = t.zeilen_zahl() as i64;
+        if row < 0 || row >= n {
+            return Err(format!("GUI_TABLE_ROW_RECT: Zeile {} ausserhalb [0..{}]", row, n - 1));
+        }
+        let ansicht = match (0..t.ansicht_len()).find(|&r| t.ansicht(r) == Some(row as usize)) {
+            Some(r) => r as i32,
+            None => return Ok((0, 0, 0, 0)),
+        };
+        let (wi, idx) = Self::dec_widget(h);
+        let gm = self.table_geom(wi, idx);
+        let y = gm.body_y + ansicht * gm.row_h - t.scroll_y;
+        Ok((gm.body_x, y, gm.body_w, gm.row_h))
+    }
+
     // --- Virtueller Modus ----------------------------------------------------
 
     /// GUI_TABLE_VIRTUAL(tbl, zeilen): die Tabelle zeigt `zeilen` Zeilen,

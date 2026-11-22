@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/en und dem englischen Buch von `dhrt doku prosa` -- NICHT von Hand aendern. Der Hover nimmt sie mit DHRT_LANG=en.",
- "count": 2613,
+ "count": 2614,
  "docs": {
   "ABS": "Absolute value.",
   "ACOS": "Arc sine/cosine (x in [-1, 1])",
@@ -1085,6 +1085,7 @@
   "GUI_TABLE_ROWS": "set the data rows (2D ARRAY OF STRING)",
   "GUI_TABLE_ROW_COLOR": "colour a whole row — one call instead of one per column",
   "GUI_TABLE_ROW_COUNT": "INTEGER — number of data rows",
+  "GUI_TABLE_ROW_RECT": "TUPLE — where data row row is right now (x, y, w, h), in screen pixels like GUI_HIT_TEST, after sorting, filter and scrolling; filtered out (0, 0, 0, 0) -- for tests with real clicks and pictures",
   "GUI_TABLE_SELECT": "add / remove a row",
   "GUI_TABLE_SELECTED": "INTEGER — selected row (-1 if none)",
   "GUI_TABLE_SELECT_RANGE": "set the range",

@@ -324,6 +324,7 @@ IMPORT "gui"
 | `GUI_TABLE_SET_SELECTED(tbl, row)` | — | Selektion setzen (-1 = keine) |
 | `GUI_TABLE_CLICKED(tbl)` | INTEGER | in diesem Frame geklickte Zeile (-1) |
 | `GUI_TABLE_ROW_COUNT(tbl)` | INTEGER | Anzahl Datenzeilen |
+| `GUI_TABLE_ROW_RECT(tbl, row)` | TUPLE | wo die Datenzeile `row` gerade steht (x, y, b, h), in Bildschirmpunkten wie `GUI_HIT_TEST`, nach Sortierung, Filter und Rollen; weggefiltert (0, 0, 0, 0) -- für Prüfungen mit echten Klicks und Bildern |
 | `GUI_UPDATE()` | — | **Pflicht** pro Frame: Maus/Tasten verarbeiten |
 | `GUI_DRAW([on_top])` | — | alle Fenster zeichnen (hinten→vorne); `on_top`=FALSE lässt Kontextmenü und Tooltip weg |
 | `GUI_DRAW_TOP()` | — | nur was über allen Fenstern liegt: offenes Menü (Leiste oder Kontext), offene Klappliste, Tooltip |
