@@ -60,6 +60,20 @@ PRINT "a6 seiten "; PDF_PAGE_COUNT(p)
 PDF_SAVE(p, "a6.pdf")
 s = pdfSeiten("a6.pdf")
 PRINT "a6 fuss "; INSTR(s[0], "Seite 1 von " + STR$(LEN(s))) >= 0; " letzte "; INSTR(s[LEN(s) - 1], "3.106,25") >= 0
+' Die Summe im Gruppenfuss mit Bereich "bericht": in jedem Gruppenfuss die
+' Summe aller Zeilen (bis 2026-11-22 las die Auslegung "bereich" nicht --
+' dort stand trotzdem die Zwischensumme). Mit "gruppe" die Zwischensummen.
+DIM gb AS JSON_HANDLE : gb = JSON_PARSE(b.schema)
+JSON_SET_STRING(gb, "baender.4.elemente.1.bereich", "bericht")
+p = studioBerichtPdf(JSON_STRINGIFY(gb), db, sql, {"ab": 1})
+PDF_SAVE(p, "gb.pdf")
+alles = JOIN$(pdfSeiten("gb.pdf"), CHR$(10))
+PRINT "bereich bericht "; LEN(SPLIT(alles, "3.106,25")) - 1; " zwischen "; INSTR(alles, "975,00") >= 0
+JSON_SET_STRING(gb, "baender.4.elemente.1.bereich", "gruppe")
+p = studioBerichtPdf(JSON_STRINGIFY(gb), db, sql, {"ab": 1})
+PDF_SAVE(p, "gg.pdf")
+alles = JOIN$(pdfSeiten("gg.pdf"), CHR$(10))
+PRINT "bereich gruppe "; LEN(SPLIT(alles, "3.106,25")) - 1; " zwischen "; INSTR(alles, "975,00") >= 0
 --- vorher
 IMPORT "db"
 DIM db AS DB_CONN : db = DB_OPEN("proj/daten.sqlite")
@@ -106,6 +120,8 @@ Bericht: Parameter :ab fehlt
 text a = 'O''Neil' AND b = ':x' AND c = 2.5
 a6 seiten 5
 a6 fuss TRUE letzte TRUE
+bereich bericht 3 zwischen FALSE
+bereich gruppe 1 zwischen TRUE
 
 === nur zeilen mit: summen und elemente je wert
 ' Vier Positionen, drei zu 19 % und eine zu 7 %. Die Summen im Berichtsfuss

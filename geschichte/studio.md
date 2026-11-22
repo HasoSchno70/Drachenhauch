@@ -648,3 +648,9 @@ Tabellen der Wikipedia geprueft (G als umgedrehtes R). Mit dem neunten
 Knopf stand "Strichcode" beim ersten Bild im Ueberlauf der Leiste;
 `berichtLagen` protokolliert nur sichtbare Knoepfe und dann, wenn gemessen
 ist, noch einmal.
+
+Ebenda, Kapitel 17: die Eigenschaft "Bereich" einer Summe (Gruppe oder
+Bericht) bot der Entwurf seit Stufe 2 an, die Auslegung las sie nie -- eine
+Summe rechnete immer ueber die Zeilen ihres Bandes. Aufgefallen beim
+Ausprobieren einer Drehen-Uebung ("was zeigt der Gruppenfuss mit Bereich
+Bericht?": dasselbe wie vorher). Jetzt rechnet "bericht" ueber alle Zeilen.

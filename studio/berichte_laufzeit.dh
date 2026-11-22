@@ -554,7 +554,14 @@ SUB studioBElement(pdf AS PDF, j AS JSON_HANDLE, p AS STRING, ox AS FLOAT, oy AS
             DIM ss AS INTEGER : ss = studioBSpalte(studioBText$(j, p, "spalte", ""))
             DIM fn AS STRING : fn = studioBText$(j, p, "funktion", "summe")
             DIM roh AS STRING : roh = ""
-            IF ss >= 0 OR fn = "anzahl" THEN roh = studioBSumme$(ss, fn, von, bis, wo)
+            ' Bereich "bericht": ueber alle Zeilen, auch im Gruppenfuss (etwa
+            ' fuer "von insgesamt"); sonst ueber die Zeilen des Bandes.
+            DIM sv AS INTEGER : sv = von
+            DIM sb AS INTEGER : sb = bis
+            IF studioBText$(j, p, "bereich", "gruppe") = "bericht" THEN
+                sv = 0 : sb = studioBZeilen - 1
+            END IF
+            IF ss >= 0 OR fn = "anzahl" THEN roh = studioBSumme$(ss, fn, sv, sb, wo)
             DIM fm AS STRING : fm = studioBText$(j, p, "format", "text")
             IF fn = "anzahl" THEN fm = "ganz"
             IF fm = "geld" AND fn = "mittel" THEN roh = STR$(ROUND(VAL(roh)))
