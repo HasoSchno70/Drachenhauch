@@ -1485,3 +1485,11 @@ Jetzt bekommt sie aus der Herkunftstabelle einen Raum je Zeile
 im eigenen Raum. `schreibweise.dhtest` (ein Fall: kein Fehlalarm ueber die
 Grenze, aber `Hoehe` neben `DIM hoehe` in derselben Datei wird weiter
 gemeldet); Gegenprobe: ohne den Raumvergleich faellt er an "fehlalarm".
+
+2026-11-22, Schreibweise und Vererbung: im Rumpf einer Klasse nahm die
+Pruefung der Schreibweise (schreibweise.rs) ein Mitglied IRGENDEINER Klasse
+als geerbt an, noch vor dem globalen Namen. So hiess `Bild("symbol.png")`
+(die Studio-Funktion) in der App "als 'bild' angelegt", weil die
+Cover-Kachel ein Feld `bild` hat (Buch "Fenster, Formulare, Daten",
+Kapitel 23). Geerbt ist jetzt nur, was eine Klasse der EXTENDS-Kette hat;
+steht eine Elternklasse nicht im Quelltext, bleibt es bei jeder Klasse.

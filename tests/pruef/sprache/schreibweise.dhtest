@@ -153,3 +153,26 @@ END FUNCTION
 --- erwartet
 fehlalarm FALSE
 echt TRUE
+
+=== geerbt ist nur, was eine elternklasse hat
+' In App meint `Bild(...)` die globale Funktion -- das Feld `bild` einer
+' fremden Klasse ist nicht geerbt (so warnte jedes Studio-Programm, das
+' Bild("symbol.png") rief, weil die Cover-Kachel ein Feld bild hat; Buch
+' "Fenster, Formulare, Daten", Kapitel 23). In Kind (EXTENDS Basis) meint
+' `WERT` das geerbte Feld `wert`.
+IMPORT "json"
+DIM NL AS STRING : NL = CHR$(10)
+DIM q AS STRING
+q = "FUNCTION Bild(n AS STRING) AS STRING" + NL + "    RETURN n" + NL + "END FUNCTION" + NL
+q = q + "CLASS Kachel" + NL + "    DIM bild AS STRING" + NL + "END CLASS" + NL
+q = q + "CLASS App" + NL + "    SUB Auf()" + NL + "        PRINT Bild(" + CHR$(34) + "x" + CHR$(34) + ")" + NL + "    END SUB" + NL + "END CLASS" + NL
+q = q + "CLASS Basis" + NL + "    DIM wert AS INTEGER" + NL + "END CLASS" + NL
+q = q + "CLASS Kind EXTENDS Basis" + NL + "    SUB Zeigen()" + NL + "        PRINT WERT" + NL + "    END SUB" + NL + "END CLASS" + NL
+DIM j AS JSON_HANDLE : j = JSON_PARSE("{" + CHR$(34) + "d" + CHR$(34) + ":" + CODE_CHECK$(q) + "}")
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(j, "d") - 1
+    DIM m AS STRING : m = JSON_GET_STRING(j, "d." + STR$(i) + ".meldung")
+    IF INSTR(m, "angelegt") >= 0 THEN PRINT JSON_GET_INT(j, "d." + STR$(i) + ".zeile"); " "; LEFT$(m, INSTR(m, " --"))
+NEXT
+--- erwartet
+17 'WERT' ist als 'wert' angelegt

@@ -53,6 +53,25 @@ fn innerster<'a>(bl: &'a [Bereich], z: usize, art: fn(&Bereich) -> bool) -> Opti
     bl.iter().filter(|b| art(b) && b.zeile < z && z <= b.ende).max_by_key(|b| b.zeile)
 }
 
+/// Die Elternklassen von `k` (ihre Kopfzeilen), der `EXTENDS`-Kette nach;
+/// `None`, wenn eine davon nicht im Quelltext steht.
+fn vorfahren(k: &Bereich, bl: &[Bereich], zeilen: &[Vec<char>]) -> Option<Vec<usize>> {
+    let mut aus = Vec::new();
+    let mut jetzt = k;
+    for _ in 0..64 {
+        let kopf: String = zeilen.get(jetzt.zeile - 1).map(|z| z.iter().collect()).unwrap_or_default();
+        let kopf = ohne_kommentare_und_texte(&kopf).to_ascii_lowercase();
+        let teile: Vec<&str> = kopf.split_whitespace().collect();
+        let Some(i) = teile.iter().position(|t| *t == "extends") else { return Some(aus) };
+        let basis = teile.get(i + 1)?.to_string();
+        let b = bl.iter().find(|b| klasse(b) && b.name.eq_ignore_ascii_case(&basis))?;
+        if aus.contains(&b.zeile) { return Some(aus); }
+        aus.push(b.zeile);
+        jetzt = b;
+    }
+    Some(aus)
+}
+
 fn gilt(d: &Definition, bl: &[Bereich]) -> Gilt {
     if d.art == "param" {
         // Der Kopf darf ueber mehrere Zeilen gehen (in Klammern geht eine
@@ -190,11 +209,19 @@ pub fn pruefen_in_raeumen(quelle: &str, raeume: &[String]) -> Vec<Abweichung> {
                 .max_by_key(|(a, _)| *a).map(|(_, d)| d);
             let global = || kand.iter().find(|(d, g)| *g == Gilt::Global && !matches!(d.art, "class" | "struct" | "enum")).map(|(d, _)| *d)
                 .or_else(|| kand.iter().find(|(_, g)| *g == Gilt::Global).map(|(d, _)| *d));
-            // Geerbt: in einer Klasse ein Mitglied einer anderen, wenn alle
-            // Klassen es gleich schreiben.
+            // Geerbt: in einer Klasse ein Mitglied einer ihrer Elternklassen,
+            // wenn alle es gleich schreiben. Nur der Elternklassen: sonst hiess
+            // `Bild(...)` (eine Funktion des Studios) "als 'bild' angelegt",
+            // weil eine fremde Klasse ein Feld `bild` hat (Buch "Fenster,
+            // Formulare, Daten", Kapitel 23). Steht eine Elternklasse nicht im
+            // Quelltext, kann es jede Klasse sein.
             let geerbt = || {
-                innerster(&bl, w.zeile, klasse)?;
-                let m: Vec<&Definition> = kand.iter().filter(|(_, g)| matches!(g, Gilt::Mitglied(..))).map(|(d, _)| *d).collect();
+                let k = innerster(&bl, w.zeile, klasse)?;
+                let eltern = vorfahren(k, &bl, &zeilen);
+                let m: Vec<&Definition> = kand.iter().filter(|(_, g)| match g {
+                    Gilt::Mitglied(a, _) => eltern.as_ref().map(|v| v.contains(a)).unwrap_or(true),
+                    _ => false,
+                }).map(|(d, _)| *d).collect();
                 match m.first() { Some(e) if m.iter().all(|d| d.name == e.name) => Some(*e), _ => None }
             };
             im_block.or_else(in_klasse).or_else(geerbt).or_else(global)
@@ -285,6 +312,19 @@ mod tests {
             (4, "xpos".into(), "xPos".into()), (4, "NEUX".into(), "neuX".into()),
             (7, "punkt".into(), "Punkt".into()), (9, "setzen".into(), "Setzen".into()),
             (10, "XPos".into(), "xPos".into())]);
+    }
+
+    #[test]
+    fn geerbt_nur_von_den_elternklassen() {
+        // `Bild(...)` in App meint die globale Funktion, nicht das Feld `bild`
+        // der fremden Klasse Kachel; in Kind (EXTENDS Basis) meint `WERT` das
+        // geerbte Feld `wert`.
+        let q = "FUNCTION Bild(n AS STRING) AS STRING\n    RETURN n\nEND FUNCTION\n\
+                 CLASS Kachel\n    DIM bild AS STRING\nEND CLASS\n\
+                 CLASS App\n    SUB Auf()\n        PRINT Bild(\"x\")\n    END SUB\nEND CLASS\n\
+                 CLASS Basis\n    DIM wert AS INTEGER\nEND CLASS\n\
+                 CLASS Kind EXTENDS Basis\n    SUB Zeigen()\n        PRINT WERT\n    END SUB\nEND CLASS";
+        assert_eq!(namen(q), vec![(17, "WERT".into(), "wert".into())]);
     }
 
     #[test]
