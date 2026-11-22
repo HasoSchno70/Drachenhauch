@@ -72,6 +72,7 @@ buecher/tippspiel/code/*.db*
 # Einstellungen neben dem Programm an (Kapitel 2 und 4, Loesungen).
 buecher/anwendungen/code/**/*.db*
 buecher/anwendungen/code/**/mediathek.ini
+buecher/anwendungen/buch/figures/*.db*
 buecher/tippspiel/code/kap*/*.db*
 # Der Export legt den Ordner mit der .exe an -- Bauergebnis, kein Quelltext.
 buecher/tippspiel/code/*_dist/
