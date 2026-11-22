@@ -391,6 +391,53 @@ IF gewuenscht("kap16_nachschlagen") THEN
     IF FILEEXISTS(ziel) THEN PRINT "  kap16_nachschlagen.png" ELSE PRINT "  FEHLER kap16_nachschlagen "; LEFT$(aus16, 300)
 END IF
 
+' Kapitel 17: der Entwurf der Ausleihliste im Studio, dazu beide Berichte
+' als Seite. Die Seiten rendert die Kopie selbst (PDF_PREVIEW auf
+' Erzeugen): Geoeffnet ruft eine SUB, die hinten an Bestand.dh kommt --
+' vorher traegt sie "Die unendliche Geschichte" mit Cover ein (wie nach
+' Kapitel 16), damit die Karteikarte ein Bild hat.
+IF gewuenscht("kap17_entwurf") THEN
+    m = projekt$("kap17/mediathek")
+    ' Breit, damit die Seite im Entwurf gross wird (sie passt sich der
+    ' Breite an); danach nur die Mitte.
+    fenstergroesse = "2200x1000"
+    studioBild("kap17_entwurf", m, "Ausleihliste", "", 30)
+    zuschneiden("kap17_entwurf", 290, 95, 1570, 705)
+    fenstergroesse = GROESSE
+END IF
+IF gewuenscht("kap17_liste") OR gewuenscht("kap17_karte") THEN
+    m = projekt$("kap17/mediathek")
+    z = ["e 0 7 640 400 0 0"]
+    taste(z, 20, ohne, 294)
+    studioBild("_kap17_f5", m, "", aufnahme$("f5_kap17", z), 70)
+    IF FILEEXISTS(bilder + "/_kap17_f5.png") THEN DELETEFILE(bilder + "/_kap17_f5.png")
+    DIM q AS STRING : q = CHR$(34)
+    DIM nl AS STRING : nl = CHR$(10)
+    DIM sub17 AS ARRAY OF STRING
+    sub17 = ["", "SUB berichteFotografieren()", _
+             "    DB_EXEC(Mediathek, " + q + "INSERT INTO eintrag (titel, urheber, art, jahr, isbn, cover) VALUES (?, ?, ?, ?, ?, ?)" + q + ", " + q + "Die unendliche Geschichte" + q + ", " + q + "Michael Ende" + q + ", " + q + "Buch" + q + ", 2019, " + q + "978-3-522-20260-2" + q + ", READALL_BYTES(" + q + wurzel + "/daten/bilder/logo.png" + q + "))", _
+             "    DIM karte AS INTEGER : karte = DB_LAST_ROWID(Mediathek)", _
+             "    IMAGE_SAVE(PDF_PREVIEW(Ausleihliste.Erzeugen({}), 1, 1200), " + q + arbeit + "/liste.png" + q + ")", _
+             "    IMAGE_SAVE(PDF_PREVIEW(Karteikarte.Erzeugen({" + q + "id" + q + ": karte}), 1, 1000), " + q + arbeit + "/karte.png" + q + ")", _
+             "    END", _
+             "END SUB", ""]
+    DIM bf AS STRING : bf = m + "/_studio/projekt/Bestand.dh"
+    WRITEALL(bf, READALL(bf) + JOIN$(sub17, nl))
+    DIM hf AS STRING : hf = m + "/_studio/projekt/Hauptfenster.dh"
+    WRITEALL(hf, REPLACE$(READALL(hf), "        Self.statusZeigen()" + nl + "    END SUB", "        Self.statusZeigen()" + nl + "        berichteFotografieren()" + nl + "    END SUB"))
+    IF FILEEXISTS(arbeit + "/liste.png") THEN DELETEFILE(arbeit + "/liste.png")
+    DIM p17 AS INTEGER : p17 = PROCESS_START("dhrt", "run", "--bilder", "10", m + "/_studio/main.dh")
+    DIM aus17 AS STRING : aus17 = laufen$(p17)
+    IF NOT FILEEXISTS(arbeit + "/liste.png") THEN
+        PRINT "  FEHLER kap17_liste "; LEFT$(aus17, 300)
+        EXIT(1)
+    END IF
+    ' Von der Liste nur der obere Teil -- darunter ist das Blatt leer.
+    IMAGE_SAVE(IMAGE_CROP(IMAGE_LOAD(arbeit + "/liste.png"), 0, 0, 1200, 640), bilder + "/kap17_liste.png")
+    COPYFILE(arbeit + "/karte.png", bilder + "/kap17_karte.png")
+    PRINT "  kap17_liste.png, kap17_karte.png"
+END IF
+
 ' Kapitel 11: Tetris waehlen, "Ausleihen ..." -- das Fenster daneben.
 IF gewuenscht("kap11_ausleihen") THEN
     z = []

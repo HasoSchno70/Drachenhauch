@@ -2,6 +2,13 @@ const fs = require("fs");
 const path = require("path");
 const { neu } = require("../code_lesen");
 
+// Das Strichcode-Element der Karteikarte (Loesung Kapitel 17, Erweitern 1).
+function strichcode() {
+  const d = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "..", "code", "loesungen", "kap17_strichcode", "Karteikarte.dhreport"), "utf8"));
+  const e = d.baender[0].elemente.find((x) => x.art === "strichcode");
+  return JSON.stringify(e, null, 2).split("\n");
+}
+
 // Das SQL einer Abfrage aus dem Datenbank-Element einer Loesung.
 function sql(rel, name) {
   const d = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "..", "code", rel), "utf8"));
@@ -503,4 +510,38 @@ module.exports = (H) => [
   ...neu("loesungen/kap16_sekunden/EintragFenster.dh").map((t) => H.code(t)),
 
   H.p("Der Timer läuft ohnehin alle 100 ms; er hat nur bisher nichts gesagt, solange er wartete. Gezählt wird nach der Uhr (MILLIS), nicht nach Timer-Runden — so stimmt die Zahl auch, wenn sich ein Aufruf des Timers verspätet."),
+
+  H.h2("Kapitel 17 · Berichte und Drucken"),
+
+  H.h3("Drehen 1"),
+
+  H.p("„Die unendliche Geschich…“. Ein Feld bricht nicht um; was nicht in seine Breite passt, kürzt es und hängt „…“ an. Gemessen wird mit der echten Schrift, darum zeigt die Vorschau genau, was gedruckt wird."),
+
+  H.h3("Drehen 2"),
+
+  H.p("In beiden Gruppenfüßen steht 55 statt 15 und 40 — die Tage aller Ausleihen. Der Bereich sagt, über welche Zeilen eine Summe rechnet: Gruppe heißt über die Zeilen ihrer Gruppe, Bericht über alle. Im Berichtsfuß ist beides dasselbe."),
+
+  H.h3("Drehen 3"),
+
+  H.p("Fünf Seiten, eine je Eintrag: Ohne Bedingung ist jede Zeile der Tabelle dran, und weil das Detail so hoch ist wie die Seite, kommt jede auf ein eigenes Blatt. Der Wert für id stört nicht — ein Parameter, den die Bedingung nicht nennt, wird nicht gebraucht."),
+
+  H.h3("Erweitern 1: der Strichcode"),
+
+  H.p("Ein Element Strichcode aus der Leiste, unter die ISBN gelegt, mit der Spalte isbn; 37,29 × 25,93 mm ist die Nenngröße eines EAN-13 (code/loesungen/kap17_strichcode/Karteikarte.dhreport):"),
+
+  H.code(strichcode(), { out: true }),
+
+  H.p("Eine ISBN-13 ist ein EAN-13; Bindestriche fallen weg, eine ISBN-10 bekommt 978 davor. Ein Eintrag ohne ISBN, oder mit einer, deren Prüfziffer nicht stimmt, bekommt keinen Strichcode — lieber keinen als einen, den der Scanner falsch liest."),
+
+  H.h3("Erweitern 2: der Jahresrückblick"),
+
+  H.p("Eine Abfrage rueckblick liefert je Ausleihe das Jahr und den Monat als Text (code/loesungen/kap17_rueckblick):"),
+
+  H.code(sql("loesungen/kap17_rueckblick/Mediathek.dhdb", "rueckblick"), { out: true }),
+
+  H.p("Der Bericht Rueckblick hat die Bedingung jahr = :jahr, eine Gruppe nach monat, im Detail titel und freund, im Gruppenfuß die Anzahl der Gruppe und im Berichtsfuß die des Berichts. Das Menü Datei bekommt einen dritten Eintrag:"),
+
+  ...neu("loesungen/kap17_rueckblick/Hauptfenster.dh").map((t) => H.code(t)),
+
+  H.p("Mit {\"jahr\": 2026} statt des Textes bliebe der Rückblick leer: strftime liefert Text, und SQLite hält die Zahl 2026 und den Text '2026' nicht für gleich."),
 ];

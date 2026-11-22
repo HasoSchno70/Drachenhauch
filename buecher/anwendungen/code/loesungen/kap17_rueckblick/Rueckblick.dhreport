@@ -1,0 +1,169 @@
+{
+  "titel": "Jahresrückblick",
+  "seite": {
+    "format": "A4",
+    "hoch": true,
+    "rand": [
+      15,
+      15,
+      15,
+      15
+    ]
+  },
+  "quelle": "Mediathek.rueckblick",
+  "bedingung": "jahr = :jahr",
+  "sortieren": [
+    "titel"
+  ],
+  "gruppen": [
+    {
+      "spalte": "monat"
+    }
+  ],
+  "baender": [
+    {
+      "art": "berichtskopf",
+      "hoehe": 18,
+      "elemente": [
+        {
+          "art": "text",
+          "x": 0,
+          "y": 0,
+          "b": 120,
+          "h": 10,
+          "text": "Jahresrückblick",
+          "groesse": 18,
+          "fett": true
+        },
+        {
+          "art": "feld",
+          "spalte": "jahr",
+          "x": 120,
+          "y": 1,
+          "b": 60,
+          "h": 9,
+          "groesse": 16,
+          "ausrichtung": "rechts"
+        }
+      ]
+    },
+    {
+      "art": "gruppenkopf",
+      "gruppe": 0,
+      "hoehe": 9,
+      "elemente": [
+        {
+          "art": "feld",
+          "spalte": "monat",
+          "x": 0,
+          "y": 2,
+          "b": 60,
+          "h": 6,
+          "groesse": 12,
+          "fett": true
+        }
+      ]
+    },
+    {
+      "art": "detail",
+      "hoehe": 6,
+      "elemente": [
+        {
+          "art": "feld",
+          "spalte": "titel",
+          "x": 5,
+          "y": 0,
+          "b": 100,
+          "h": 5
+        },
+        {
+          "art": "feld",
+          "spalte": "freund",
+          "x": 110,
+          "y": 0,
+          "b": 70,
+          "h": 5
+        }
+      ]
+    },
+    {
+      "art": "gruppenfuss",
+      "gruppe": 0,
+      "hoehe": 9,
+      "elemente": [
+        {
+          "art": "text",
+          "x": 110,
+          "y": 1,
+          "b": 40,
+          "h": 6,
+          "text": "Ausleihen",
+          "farbe": "#666666"
+        },
+        {
+          "art": "summe",
+          "spalte": "id",
+          "funktion": "anzahl",
+          "bereich": "gruppe",
+          "x": 150,
+          "y": 1,
+          "b": 30,
+          "h": 6,
+          "ausrichtung": "rechts",
+          "fett": true
+        }
+      ]
+    },
+    {
+      "art": "seitenfuss",
+      "hoehe": 8,
+      "elemente": [
+        {
+          "art": "seitenzahl",
+          "x": 0,
+          "y": 2,
+          "b": 180,
+          "h": 5,
+          "ausrichtung": "mitte",
+          "groesse": 9,
+          "farbe": "#666666"
+        }
+      ]
+    },
+    {
+      "art": "berichtsfuss",
+      "hoehe": 12,
+      "elemente": [
+        {
+          "art": "linie",
+          "x": 0,
+          "y": 1,
+          "b": 180,
+          "h": 0,
+          "staerke": 0.5
+        },
+        {
+          "art": "text",
+          "x": 5,
+          "y": 3,
+          "b": 100,
+          "h": 6,
+          "text": "Ausleihen im Jahr",
+          "fett": true
+        },
+        {
+          "art": "summe",
+          "spalte": "id",
+          "funktion": "anzahl",
+          "bereich": "bericht",
+          "x": 150,
+          "y": 3,
+          "b": 30,
+          "h": 6,
+          "ausrichtung": "rechts",
+          "fett": true
+        }
+      ]
+    }
+  ]
+}
