@@ -1442,3 +1442,17 @@ eine Nummer ausserhalb der Leiste.
 Ebenda, Kapitel 20: `GUI_STATE$` nennt auch Kacheln (Titel, Beschreibung,
 mit oder ohne Bild). Die Cover-Kachel der Mediathek zeigt, was in der
 Tabelle gewaehlt ist -- ob sie dem folgt, sah ein Test vorher nicht.
+
+Ebenda, Kapitel 21 (Fuer alle): `GUI_TABLE_ROW_RECT(tbl, row)` -- wo eine
+Datenzeile gerade steht, nach Sortierung, Filter und Rollen, in
+Bildschirmpunkten wie die Liste. Fehlte, als der Kontrast der gewaehlten
+Zeile am Bild gemessen werden sollte; nachrechnen aus Kopf- und
+Zeilenhoehe waere die zweite Quelle, die auseinanderlaeuft.
+
+Ebenda: die gewaehlte Zeile einer Tabelle legte die Auswahlfarbe
+(shade(accent, -110)) zu 150/255 ueber den Grund, die Schrift blieb
+text_fg. Im hellen Thema ergab das 2,4:1, im hellen modern-Thema 3,0:1 --
+dunkle Schrift auf Violett, gefunden am Bild der Mediathek nach Ansicht ->
+Helles Aussehen. GUI_A11Y_CHECK$ misst die Auswahl nicht. Jetzt nimmt die
+Zeile die lesbare Schrift (`lesbar_auf_allen`), wenn text_fg auf dem
+gemischten Grund unter 4,5:1 bleibt; eigene Zellfarben bleiben.
