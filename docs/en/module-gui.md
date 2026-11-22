@@ -3646,7 +3646,9 @@ END IF
   error there would be one with no way out.
 - `GUI_SET_ERROR(feld, meldung$)` sets a message from outside, such as
   "number already taken" from the database; an empty text removes it.
-  `GUI_CLEAR_ERRORS(win)` clears them all.
+  `GUI_CLEAR_ERRORS(win)` clears them all. New values from `GUI_FORM_SET`,
+  `GUI_FORM_LOAD` or `GUI_FORM_CLEAR` take their fields' messages with
+  them — they were about the old content.
 - `GUI_VALIDATE_LIVE(win, TRUE)` checks a field as soon as the focus leaves
   it — not on every keystroke: a half-typed address is not a wrong one.
 - Rules are stored in the `.dhform` (`rules`, `error_label`), for example

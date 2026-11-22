@@ -1388,3 +1388,9 @@ am Zeilenende der Erwartung ab, die Ausgabe nicht.
   den leeren Text in die INTEGER-Spalte, und das DB_GET_INT der Mediathek
   aus Kapitel 4 scheiterte beim naechsten Laden. `wert_typisiert` liefert
   fuer ein leeres Zahlenfeld jetzt NIL; geladen wird NULL als leeres Feld.
+- **Neue Werte, alte Meldungen (2026-11-22).** Ebenda: wer in der
+  Mediathek das leere Titelfeld verliess, um einen Eintrag doppelt
+  anzuklicken, bekam (Live-Pruefung) "Ohne Titel geht es nicht." -- und
+  die Meldung blieb unter dem geladenen Titel stehen. GUI_FORM_SET/LOAD
+  nehmen die Meldungen der gesetzten Felder jetzt mit, GUI_FORM_CLEAR
+  leert dabei auch die Fehlerzeile (es ging an `fehler_setzen` vorbei).

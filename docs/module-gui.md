@@ -3667,7 +3667,9 @@ END IF
   zählen nicht — ein Fehler dort wäre einer ohne Ausweg.
 - `GUI_SET_ERROR(feld, meldung$)` setzt eine Meldung von außen, etwa
   „Nummer schon vergeben" aus der Datenbank; leer nimmt sie zurück.
-  `GUI_CLEAR_ERRORS(win)` löscht alle.
+  `GUI_CLEAR_ERRORS(win)` löscht alle. Neue Werte durch `GUI_FORM_SET`,
+  `GUI_FORM_LOAD` oder `GUI_FORM_CLEAR` nehmen die Meldungen ihrer Felder
+  mit — sie galten dem alten Inhalt.
 - `GUI_VALIDATE_LIVE(win, TRUE)` prüft ein Feld, sobald der Fokus es
   verlässt — nicht bei jedem Anschlag: eine halb getippte Adresse ist keine
   falsche.

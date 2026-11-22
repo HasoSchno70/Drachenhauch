@@ -434,3 +434,32 @@ DHRT_FRAMES=1
 --- erwartet
 null text
 TRUE []
+
+=== neue werte nehmen alte meldungen mit
+' Eine Meldung gilt dem Inhalt, den das Feld hatte. GUI_FORM_SET (und
+' damit GUI_FORM_LOAD) und GUI_FORM_CLEAR nehmen sie weg, auch aus der
+' Fehlerzeile. Bis 2026-11 blieb sie nach dem Laden stehen, und
+' GUI_FORM_CLEAR leerte das Feld, aber nicht die Zeile.
+IMPORT "gui"
+SCREEN(400, 200, "G", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("G", 0, 0, 400, 200)
+DIM titel AS GUI_WIDGET : titel = GUI_TEXTINPUT(w, 10, 10, 150, 28, "")
+DIM zeile AS GUI_WIDGET : zeile = GUI_LABEL(w, "", 10, 50)
+GUI_BIND(titel, "titel", "e")
+GUI_RULE(titel, "pflicht", "Ohne Titel geht es nicht.")
+GUI_ERROR_LABEL(titel, zeile)
+PRINT GUI_VALIDATE(w); " ["; GUI_TEXT(zeile); "]"
+GUI_FORM_SET(w, {"titel": "Momo"}, "e")
+PRINT "[" + GUI_TEXT(zeile) + "]"
+GUI_FORM_CLEAR(w, "e")
+PRINT GUI_VALIDATE(w); " ["; GUI_TEXT(zeile); "]"
+GUI_FORM_CLEAR(w, "e")
+PRINT "[" + GUI_TEXT(zeile) + "]"
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+1 [Ohne Titel geht es nicht.]
+[]
+1 [Ohne Titel geht es nicht.]
+[]

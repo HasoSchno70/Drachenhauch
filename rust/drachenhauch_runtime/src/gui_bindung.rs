@@ -188,6 +188,11 @@ impl Gui {
         for (k, i) in self.form_widgets(wi, form) {
             if let Some((_, v)) = werte.iter().find(|(wk, _)| wk.eq_ignore_ascii_case(&k)) {
                 self.wert_setzen(wi, i, v);
+                // Eine Meldung galt dem alten Inhalt -- mit dem neuen ist sie
+                // weg, samt Fehlerzeile. Bis 2026-11 stand nach GUI_FORM_LOAD
+                // "Ohne Titel geht es nicht." unter einem geladenen Titel
+                // (Buch "Fenster, Formulare, Daten", Kapitel 5).
+                self.fehler_setzen(wi, i, String::new());
             }
         }
         self.form_clean(win, form)
@@ -206,7 +211,8 @@ impl Gui {
                 Kind::DatePicker | Kind::ColorPicker => {}
                 _ => { w.text.clear(); w.caret = 0; w.sel_anchor = 0; w.scroll = 0; w.scroll_x = 0; w.undo.clear(); w.redo.clear(); }
             }
-            w.fehler.clear();
+            // Ueber fehler_setzen, damit auch die Fehlerzeile leer wird.
+            self.fehler_setzen(wi, i, String::new());
         }
         self.form_clean(win, form)
     }
