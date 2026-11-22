@@ -702,3 +702,58 @@ END CLASS
 filter fehler no such column: stadt
 sortieren ort
 bedingung stadt = 1
+
+=== das spalten-gitter misst seine spalten und knoepfe
+' Jede Spalte mindestens so breit wie ihr Kopf bzw. ihr laengster Wert
+' (gemessen mit GUI_TEXT_WIDTH) -- vorher Anteile an geschaetzten 460
+' Punkten: "Ganze Za", "Pfli". Bei der Groesse der Pruefungen passen alle
+' sieben ins Gitter, und "Umbenennen ..." hat Platz fuer seine Beschriftung
+' (Buch "Fenster, Formulare, Daten", Kapitel 13).
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+SETENV("DH_STUDIO_OEFFNEN", "Daten.kunden")
+DIM log AS STRING : log = CWD$() + "/s.log"
+slStarten(log, "", 12, p)
+DIM breiten AS ARRAY OF STRING
+DIM bedarf AS ARRAY OF STRING
+DIM knopf AS ARRAY OF STRING
+DIM z AS STRING
+FOR EACH z IN slProtokoll(log)
+    IF LEFT$(z, 22) = "spaltengitter breiten " THEN breiten = SPLIT$(MID$(z, 22, 200), " ")
+    IF LEFT$(z, 21) = "spaltengitter bedarf " THEN bedarf = SPLIT$(MID$(z, 21, 200), " ")
+    IF LEFT$(z, 20) = "spaltengitter knopf " THEN knopf = SPLIT$(MID$(z, 20, 200), " ")
+NEXT
+DIM ok AS BOOLEAN : ok = LEN(breiten) = 8 AND LEN(bedarf) = 7
+DIM summe AS INTEGER : summe = 0
+DIM k AS INTEGER
+IF ok THEN
+    FOR k = 0 TO 6
+        IF VAL(breiten[k + 1]) < VAL(bedarf[k]) THEN ok = FALSE
+        summe = summe + VAL(breiten[k + 1])
+    NEXT
+END IF
+PRINT "jede spalte breit genug "; ok
+PRINT "alle im gitter "; ok AND summe <= VAL(breiten[0]) - 12
+PRINT "knopf "; LEN(knopf) = 2 AND VAL(knopf[0]) >= VAL(knopf[1]) + 20
+IF NOT ok THEN PRINT JOIN$(breiten, " "); " / "; JOIN$(bedarf, " ")
+--- argumente
+{sammlung}/../../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"},{"art":"datenbank","name":"Daten","schema":"Daten.dhdb"}]}
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":420,"h":300,"widgets":[]}
+--- datei proj/Hauptfenster.dh
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+END CLASS
+--- datei proj/App.dh
+CLASS App EXTENDS StudioApp
+END CLASS
+--- datei proj/Daten.dhdb
+{"datei":"daten.sqlite","tabellen":[{"name":"kunden","spalten":[{"name":"name","typ":"text","pflicht":true,"eindeutig":false,"vorgabe":""},{"name":"jahr","typ":"ganz","pflicht":false,"eindeutig":false,"vorgabe":""}]}]}
+--- erwartet
+jede spalte breit genug TRUE
+alle im gitter TRUE
+knopf TRUE

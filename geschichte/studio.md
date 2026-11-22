@@ -584,3 +584,16 @@ Datenbank-Element importiert es schon).
   Namen. Fall in `werkzeug_studio2.dhtest`, Gegenprobe: ohne den Aufruf
   "standard -". Gefunden beim Aufnehmen eines Bildes, nicht von einer
   Pruefung -- die Vorlagen-Faelle pruefen nur, dass das Programm laeuft.
+
+## Spalten-Gitter der Datenbank misst (2026-11-22)
+
+Beim Schreiben von Kapitel 13 von "Fenster, Formulare, Daten": im Reiter
+einer Datenbank stand bei 1280 x 800 "Ganze Za", "Pfli" und "Eind" -- die
+Spalten des Spalten-Gitters waren Anteile an mindestens 460 Punkten, die
+Tabellenliste links fest 290 breit. Jetzt misst `dbSpMindest` Kopf und
+laengsten Wert jeder Spalte mit `GUI_TEXT_WIDTH` (neu in der gui); was frei
+ist, geht nach den alten Anteilen dazu, zu wenig Platz rollt waagerecht. Die
+vier Knoepfe der Liste stehen untereinander, die Liste ist so breit wie der
+breiteste ("Umbenennen ..."). Bei 1440 x 900 passen alle sieben Spalten.
+Das Protokoll nennt `spaltengitter breiten/bedarf/knopf` (Pruefung in
+`werkzeug_studio_datenbank3.dhtest`).
