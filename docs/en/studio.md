@@ -318,6 +318,11 @@ they are stored in the `.dhform` under `klassen`. The designer does not
 show the style sheet -- it stands in the look of the Studio --, the started
 program does; an error in it stops it with the line.
 
+**Large text.** `GUI_SCALE(1.5)` in `App.Geoeffnet` makes everything half
+again as large -- text, widgets and the program window too, which then
+opens one and a half times as large as in the designer. The scale is set
+before the first window; later the gui does not let it change.
+
 **Languages.** A project writes its texts in one language, that of its
 source. A table `sprache/<code>.txt` in the project folder makes a second one
 from it: per line the text as it stands in the project, a tab, the

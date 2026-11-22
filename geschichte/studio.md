@@ -685,3 +685,11 @@ springt zurueck" bei der Cover-Kachel -- die Tab-Folge im Inspektor stand
 nur am Behaelter der Instanz, ihre Teile hatten 0 und kamen nach allen
 gezaehlten Widgets des Fensters. `studioTeil` gibt jedem Teil ohne eigene
 Tab-Folge die der Instanz (Fall in werkzeug_studio_controls).
+
+Ebenda: GUI_SCALE in App.Geoeffnet (grosse Schrift) vergroesserte Schrift
+und Widgets, aber nicht das Programmfenster -- SCREEN war schon in der
+Groesse des Entwurfs offen, rechts und unten fehlte ein Drittel. Dazu
+setzte die Laufzeit das Startfenster auf SCREENWIDTH() Pixel statt
+logischer Punkte (und mittelte Fenster und Dialoge damit). `studioLauf`
+oeffnet den Schirm nach App.Geoeffnet im Massstab neu, `studioSchirmLB/LH`
+rechnen die Lage logisch (Fall in werkzeug_studio_aussehen).

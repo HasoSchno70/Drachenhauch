@@ -321,6 +321,11 @@ klein`), sie stehen in der `.dhform` unter `klassen`. Der Entwurf zeigt die
 Stildatei nicht -- er steht im Aussehen des Studios --, das gestartete
 Programm schon; ein Fehler darin hält es mit der Zeile an.
 
+**Große Schrift.** `GUI_SCALE(1.5)` in `App.Geoeffnet` vergrößert alles
+um die Hälfte -- Schrift, Widgets und das Programmfenster mit, das dann
+anderthalb mal so groß aufgeht wie im Entwurf. Gesetzt wird der Maßstab
+vor dem ersten Fenster; später lässt die gui ihn nicht mehr ändern.
+
 **Sprachen.** Ein Projekt schreibt seine Texte in einer Sprache, der seiner
 Quelle. Eine Tafel `sprache/<code>.txt` im Projektordner macht eine zweite
 daraus: je Zeile der Text, wie er im Projekt steht, ein Tabulator, die

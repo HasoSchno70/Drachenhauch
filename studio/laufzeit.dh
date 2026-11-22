@@ -461,11 +461,11 @@ CLASS StudioFenster
         Self.studioOffen = TRUE
         IF Self.studioHaupt THEN
             GUI_WINDOW_CHROME(Self.studioWin, FALSE)
-            GUI_WINDOW_SET_BOUNDS(Self.studioWin, 0, 0, SCREENWIDTH(), SCREENHEIGHT())
+            GUI_WINDOW_SET_BOUNDS(Self.studioWin, 0, 0, studioSchirmLB(), studioSchirmLH())
         ELSE
             DIM b AS INTEGER : b = GUI_WINDOW_GET_W(Self.studioWin)
             DIM h AS INTEGER : h = GUI_WINDOW_GET_H(Self.studioWin)
-            GUI_WINDOW_SET_BOUNDS(Self.studioWin, MAX(0, (SCREENWIDTH() - b) \ 2), MAX(0, (SCREENHEIGHT() - h) \ 2), b, h)
+            GUI_WINDOW_SET_BOUNDS(Self.studioWin, MAX(0, (studioSchirmLB() - b) \ 2), MAX(0, (studioSchirmLH() - h) \ 2), b, h)
             GUI_WINDOW_FRONT(Self.studioWin)
         END IF
         Self.studioWarB = GUI_WINDOW_GET_W(Self.studioWin)
@@ -512,6 +512,19 @@ DIM studioDieStartseite AS StudioFenster
 DIM studioDialoge AS ARRAY OF GUI_WINDOW : studioDialoge = []
 DIM studioSchirmB AS INTEGER : studioSchirmB = 0
 DIM studioSchirmH AS INTEGER : studioSchirmH = 0
+
+' Breite und Hoehe des Programmfensters in den Punkten der gui -- bei einem
+' Massstab (GUI_SCALE, grosse Schrift) weniger als SCREENWIDTH() Pixel.
+' Lagen von Fenstern sind logisch; mit Pixeln ragte das Startfenster rechts
+' und unten ueber den Rand.
+FUNCTION studioSchirmLB() AS INTEGER
+    RETURN ROUND(SCREENWIDTH() / GUI_SCALE_GET())
+END FUNCTION
+
+FUNCTION studioSchirmLH() AS INTEGER
+    RETURN ROUND(SCREENHEIGHT() / GUI_SCALE_GET())
+END FUNCTION
+
 ' Der Tastaturfokus im vorigen und in diesem Bild -- daraus werden
 ' FokusRein und FokusRaus.
 DIM studioFokusAlt AS INTEGER : studioFokusAlt = -1
@@ -580,7 +593,7 @@ FUNCTION studioBild() AS BOOLEAN
     END IF
     IF SCREENWIDTH() <> studioSchirmB OR SCREENHEIGHT() <> studioSchirmH THEN
         studioSchirmB = SCREENWIDTH() : studioSchirmH = SCREENHEIGHT()
-        IF studioDieStartseite.studioOffen THEN GUI_WINDOW_SET_BOUNDS(studioDieStartseite.studioWin, 0, 0, studioSchirmB, studioSchirmH)
+        IF studioDieStartseite.studioOffen THEN GUI_WINDOW_SET_BOUNDS(studioDieStartseite.studioWin, 0, 0, studioSchirmLB(), studioSchirmLH())
     END IF
     GUI_UPDATE()
     studioVerteiltNr = studioBildNr
@@ -689,6 +702,13 @@ SUB studioLauf(app AS StudioApp, start AS StudioFenster, b AS INTEGER, h AS INTE
     studioLaufApp = app
     studioSpracheVorgabe()
     app.Geoeffnet()
+    ' Grosse Schrift: ein Massstab aus App.Geoeffnet (GUI_SCALE) macht auch
+    ' das Programmfenster groesser -- sonst blieb es in der Groesse des
+    ' Entwurfs und schnitt rechts und unten ab.
+    IF GUI_SCALE_GET() <> 1 THEN
+        SCREEN(ROUND(b * GUI_SCALE_GET()), ROUND(h * GUI_SCALE_GET()), titel)
+        studioSchirmB = SCREENWIDTH() : studioSchirmH = SCREENHEIGHT()
+    END IF
     IF studioSprache <> "" THEN SETWINDOWTITLE(studioTr$(titel))
     start.studioHaupt = TRUE
     start.Zeigen()
@@ -765,7 +785,7 @@ END FUNCTION
 
 FUNCTION studioKleinesFenster(titel AS STRING, text AS STRING) AS GUI_WINDOW
     DIM b AS INTEGER : b = 380
-    DIM w AS GUI_WINDOW : w = GUI_WINDOW(titel, MAX(0, (SCREENWIDTH() - b) \ 2), MAX(0, (SCREENHEIGHT() - 150) \ 2), b, 150)
+    DIM w AS GUI_WINDOW : w = GUI_WINDOW(titel, MAX(0, (studioSchirmLB() - b) \ 2), MAX(0, (studioSchirmLH() - 150) \ 2), b, 150)
     GUI_LABEL(w, text, 14, 12)
     RETURN w
 END FUNCTION
@@ -802,7 +822,7 @@ END FUNCTION
 ' Waehler beginnt bei vorgabe (-1 = Weiss).
 FUNCTION FarbeWaehlen(vorgabe AS INTEGER, titel AS STRING = "") AS INTEGER
     DIM b AS INTEGER : b = 380
-    DIM w AS GUI_WINDOW : w = GUI_WINDOW(titel, MAX(0, (SCREENWIDTH() - b) \ 2), MAX(0, (SCREENHEIGHT() - 320) \ 2), b, 320)
+    DIM w AS GUI_WINDOW : w = GUI_WINDOW(titel, MAX(0, (studioSchirmLB() - b) \ 2), MAX(0, (studioSchirmLH() - 320) \ 2), b, 320)
     DIM feld AS GUI_WIDGET : feld = GUI_COLORPICKER(w, 14, 12, 352, 220)
     GUI_SET_PICKED_COLOR(feld, IIF(vorgabe < 0, &HFFFFFF, vorgabe))
     DIM ok AS GUI_WIDGET : ok = GUI_BUTTON(w, "OK", 166, 248, 96, 30)
@@ -817,7 +837,7 @@ END FUNCTION
 ' Seite, Blaettern, Drucken, Sichern und Schliessen. Kehrt zurueck, wenn es
 ' zu ist -- wie Frage() dreht sie dafuer selbst Bilder.
 SUB studioBerichtVorschau(p AS PDF, titel AS STRING)
-    DIM w AS GUI_WINDOW : w = GUI_WINDOW(titel, 40, 30, 640, MIN(860, SCREENHEIGHT() - 60))
+    DIM w AS GUI_WINDOW : w = GUI_WINDOW(titel, 40, 30, 640, MIN(860, studioSchirmLH() - 60))
     DIM zurueck AS GUI_WIDGET : zurueck = GUI_BUTTON(w, "<", 10, 8, 40, 26)
     DIM seite AS GUI_WIDGET : seite = GUI_LABEL(w, "", 58, 12)
     DIM weiter AS GUI_WIDGET : weiter = GUI_BUTTON(w, ">", 150, 8, 40, 26)

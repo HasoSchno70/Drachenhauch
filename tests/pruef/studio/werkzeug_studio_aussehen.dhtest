@@ -139,3 +139,65 @@ geprueft TRUE
 in assets TRUE
 bg weg C0392B gut TRUE
 kaputt TRUE
+
+=== grosse schrift vergroessert das programmfenster
+' GUI_SCALE in App.Geoeffnet (grosse Schrift, Buch "Fenster, Formulare,
+' Daten", Kapitel 21): das Programmfenster waechst mit dem Massstab, das
+' Startfenster fuellt es in logischen Punkten. Vorher blieb der Schirm in
+' der Groesse des Entwurfs und schnitt rechts und unten ab; mit Pixeln als
+' Lage ragte das Startfenster ueber den Rand.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+slHin(10, 10)
+slWarten(10)
+slTaste(294)
+slWarten(150)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+SETENV("DH_STUDIO_LAUF_BILDER", "20")
+DIM log AS STRING : log = CWD$() + "/s.log"
+slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+PRINT "geprueft "; slHat(log, "geprueft 0 0")
+DIM k AS INTEGER : k = PROCESS_START("dhrt", "run", "--bilder", "20", p + "/_studio/main.dh")
+DIM r AS STRING : r = ""
+DIM leer AS INTEGER : leer = 0
+WHILE leer < 5
+    DIM t AS STRING : t = PROCESS_READ$(k) + PROCESS_ERR$(k)
+    r = r + t
+    IF t = "" AND NOT PROCESS_RUNNING(k) THEN leer = leer + 1
+    SLEEP(20)
+WEND
+DIM z AS STRING
+FOR EACH z IN SPLIT(REPLACE$(r, CHR$(13), ""), CHR$(10))
+    IF LEFT$(z, 7) = "schirm " OR INSTR(LOWER$(z), "fehler") >= 0 THEN PRINT z
+NEXT
+--- argumente
+{sammlung}/../../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"}]}
+--- datei proj/App.dh
+CLASS App EXTENDS StudioApp
+    SUB Geoeffnet()
+        GUI_SCALE(1.5)
+    END SUB
+END CLASS
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":400,"h":200,"widgets":[
+{"kind":"button","name":"ok","text":"OK","x":20,"y":20,"w":120,"h":32}]}
+--- datei proj/Hauptfenster.dh
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+    DIM n AS INTEGER
+
+    SUB Takt()
+        Self.n = Self.n + 1
+        IF Self.n = 3 THEN
+            PRINT "schirm "; SCREENWIDTH(); " "; SCREENHEIGHT(); " fenster "; GUI_WINDOW_GET_W(Self.studioWin); " "; GUI_WINDOW_GET_H(Self.studioWin)
+            END
+        END IF
+    END SUB
+END CLASS
+--- erwartet
+geprueft TRUE
+schirm 600 300 fenster 400 200
