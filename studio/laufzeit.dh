@@ -114,6 +114,9 @@ CLASS StudioDiagramm
     DIM Diagramm AS CHART
     DIM Art AS STRING
     DIM studioHell AS INTEGER     ' -1 = noch kein Thema gesetzt, 0 dunkel, 1 hell
+    ' Name -> Index der Reihen: Leeren (CHART_CLEAR) behaelt die Reihen, nur
+    ' ihre Werte gehen -- eine Reihe mit demselben Namen bekommt sie neu.
+    DIM studioReihen AS MAP OF INTEGER
 
     SUB Leeren()
         CHART_CLEAR(Self.Diagramm)
@@ -124,9 +127,17 @@ CLASS StudioDiagramm
         CHART_ADD(Self.Diagramm, name, wert, farbe)
     END SUB
 
-    ' Eine Reihe mit ihren Werten -> ihr Index.
+    ' Eine Reihe mit ihren Werten -> ihr Index. Gibt es die Reihe schon
+    ' (nach Leeren, zum Neu-Fuellen), bekommt sie die Werte -- sonst stuende
+    ' neben ihr eine zweite, leere, und die Balken wuerden schmal.
     FUNCTION Reihe(name AS STRING, werte AS ARRAY OF FLOAT) AS INTEGER
-        DIM r AS INTEGER : r = CHART_SERIES(Self.Diagramm, name)
+        DIM r AS INTEGER
+        IF MAPHAS(Self.studioReihen, name) THEN
+            r = MAPGET(Self.studioReihen, name)
+        ELSE
+            r = CHART_SERIES(Self.Diagramm, name)
+            MAPPUT(Self.studioReihen, name, r)
+        END IF
         CHART_DATA(Self.Diagramm, r, werte)
         RETURN r
     END FUNCTION
@@ -188,6 +199,7 @@ FUNCTION studioDiagramm(flaeche AS GUI_WIDGET, art AS STRING, titel AS STRING) A
     d.Flaeche = flaeche
     d.Art = art
     d.studioHell = -1
+    d.studioReihen = {}
     d.Diagramm = CHART_NEW(art, 0, 0, 10, 10)
     IF titel <> "" THEN CHART_SET(d.Diagramm, "titel", titel)
     CHART_SET_FLAG(d.Diagramm, "komma", TRUE)

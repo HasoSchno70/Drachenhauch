@@ -163,7 +163,12 @@ Self.vorrat.SetzenSchalter("prozent", TRUE)             ' CHART_SET_FLAG
 
 Also `Reihe(name, werte)` for lines and grouped bars, `Beschriften`, `Wert`
 for gauge, bar gauge and LEDs, `Titel`, `SetzenZahl`, `Anzahl()`; `Flaeche`
-is the canvas, `Diagramm` the CHART handle for everything else.
+is the canvas, `Diagramm` the CHART handle for everything else. `Leeren`
+discards the values, not the series: refill with the same names, and `Reihe`
+gives an existing series the new values. A click on a slice or a bar is
+asked in `Takt` (`CHART_CLICKED(Self.<name>.Diagramm)`, the number of the
+point) -- it holds after drawing, that is in the next frame; in the event
+`Maus` it is not there yet.
 
 An event with parentheses calls its method with values: `Ziehen` (drag)
 with the position on the canvas (while the button is held after a press on

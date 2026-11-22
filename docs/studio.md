@@ -166,7 +166,12 @@ Self.vorrat.SetzenSchalter("prozent", TRUE)             ' CHART_SET_FLAG
 Dazu `Reihe(name, werte)` für Linien und gruppierte Balken, `Beschriften`,
 `Wert` für Tacho, Leiste und Lampen, `Titel`, `SetzenZahl`, `Anzahl()`;
 `Flaeche` ist die Zeichenfläche, `Diagramm` der CHART-Handle für alles
-Weitere.
+Weitere. `Leeren` verwirft die Werte, nicht die Reihen: Neu gefüllt wird mit
+denselben Namen, und `Reihe` gibt einer Reihe, die es schon gibt, die neuen
+Werte. Einen Klick auf ein Stück oder einen Balken fragt `Takt` ab
+(`CHART_CLICKED(Self.<name>.Diagramm)`, die Nummer des Punkts) -- er gilt
+nach dem Zeichnen, also im Bild danach; im Ereignis `Maus` steht er noch
+nicht.
 
 Ein Ereignis mit Klammern ruft seine Methode mit Werten: `Ziehen` mit der
 Lage auf der Fläche (solange die Taste nach einem Druck auf die Fläche

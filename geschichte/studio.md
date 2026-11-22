@@ -662,3 +662,10 @@ GUI_DRAW_WINDOW; ein Nebenfenster deckte so sein eigenes Gemaltes zu. Das
 gilt fuer jede Zeichenflaeche und jedes eigene Zeichnen in einem zweiten
 Fenster. Jetzt malt jedes Nebenfenster sich und gleich danach seine
 Flaechen.
+
+Ebenda, Kapitel 18: das Statistikfenster fuellt seine Balken neu, wenn man
+den Zeitraum wechselt (Leeren, Reihe). `StudioDiagramm.Reihe` legte dabei
+jedes Mal eine NEUE Reihe an -- CHART_CLEAR behaelt die Reihen, nur ihre
+Werte gehen --, neben der alten leeren; die Balken wurden halb so breit und
+orange (die zweite Farbe der Palette). Jetzt merkt sich das Diagramm Namen
+und Index (`studioReihen`), dieselbe Reihe bekommt die neuen Werte.

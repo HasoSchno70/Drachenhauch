@@ -117,6 +117,14 @@ WHILE n < 3 AND studioBild()
     n = n + 1
 WEND
 PRINT "hell "; f.kuchen.studioHell; " | balken hinten "; f.teil.balken.studioHell
+' Neu fuellen: Leeren, dieselbe Reihe noch einmal -- es bleibt eine Reihe
+' (bis 2026-11-22 legte Reihe() jedes Mal eine neue an, neben der alten,
+' leeren; die Balken wurden schmal). Eine andere bekommt ihren eigenen Index.
+f.teil.balken.Leeren()
+PRINT "reihe "; f.teil.balken.Reihe("Monate", [1.0, 2.0, 3.0])
+f.teil.balken.Leeren()
+PRINT "nochmal "; f.teil.balken.Reihe("Monate", [4.0, 5.0]); " reihen "; CHART_SERIES_COUNT(f.teil.balken.Diagramm); " punkte "; f.teil.balken.Anzahl()
+PRINT "andere "; f.teil.balken.Reihe("Plan", [1.0, 1.0]); " reihen "; CHART_SERIES_COUNT(f.teil.balken.Diagramm)
 --- datei proj/projekt.dhstudio
 {"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"control","name":"Teil"},{"art":"fenster","name":"Hauptfenster"}]}
 --- datei proj/App.dh
@@ -153,6 +161,9 @@ seite 0: balken FALSE
 seite 1: balken TRUE
 dunkel 0
 hell 1 | balken hinten 1
+reihe 1
+nochmal 1 reihen 2 punkte 2
+andere 2 reihen 3
 code 0
 
 === ein diagramm aus der bibliothek: zeichenflaeche mit art, muster im entwurf
