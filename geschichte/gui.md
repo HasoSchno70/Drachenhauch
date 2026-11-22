@@ -1456,3 +1456,8 @@ dunkle Schrift auf Violett, gefunden am Bild der Mediathek nach Ansicht ->
 Helles Aussehen. GUI_A11Y_CHECK$ misst die Auswahl nicht. Jetzt nimmt die
 Zeile die lesbare Schrift (`lesbar_auf_allen`), wenn text_fg auf dem
 gemischten Grund unter 4,5:1 bleibt; eigene Zellfarben bleiben.
+
+Ebenda, Kapitel 21: `GUI_STATE$` endet mit der letzten Ansage an den
+Bildschirmleser (`ansage "..."`). Was ein Programm mit GUI_ANNOUNCE sagt,
+liess sich vorher nur mit einem echten Leser pruefen (UIA, nur Windows) --
+die Mediathek sagt jetzt an, was sonst nur in der Statuszeile steht.

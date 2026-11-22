@@ -84,6 +84,12 @@ impl Gui {
                 z.push(format!("  {}", zeile));
             }
         }
+        // Die letzte Ansage an den Bildschirmleser (GUI_ANNOUNCE) -- sonst
+        // sah ein Test nicht, was ein Programm ansagt, ohne einen echten
+        // Leser (Buch "Fenster, Formulare, Daten", Kapitel 21).
+        if !self.ansage.is_empty() {
+            z.push(format!("ansage \"{}\"", kurz(&self.ansage)));
+        }
         z.join("\n")
     }
 }

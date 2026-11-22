@@ -38,6 +38,9 @@ GUI_SET_NAME(k2, "rot")
 DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "Knopf", 300, 10, 100, 30)
 DIM weg AS GUI_WIDGET : weg = GUI_LABEL(w, "versteckt", 300, 60)
 GUI_SET_VISIBLE(weg, FALSE)
+' Die letzte Ansage an den Bildschirmleser steht am Ende (seit 2026-11-22).
+GUI_ANNOUNCE("erst diese")
+GUI_ANNOUNCE("Momo entfernt")
 GUI_UPDATE()
 PRINT GUI_STATE$()
 --- erwartet
@@ -51,6 +54,7 @@ fenster "Form"
   table(1) 2 Zeilen, gewaehlt 1 ("Tetris" "1984"): "Momo" "Tetris"
   card(1) "Momo" "Michael Ende" ohne Bild
   card#rot "Rot" "" mit Bild
+ansage "Momo entfernt"
 
 === eine aufnahme spielt ohne code ab und der zustand steht am ende da
 IMPORT "gui"

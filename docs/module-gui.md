@@ -2625,7 +2625,7 @@ Drei Hilfen fürs Gestalten und für die Barrierefreiheit:
 | `GUI_INSPECTOR([on])` | BOOLEAN ohne Argument | Inspektor zeigen (`TRUE`) oder schließen; ohne Argument: ist er offen? |
 | `GUI_INSPECTOR_SELECTED()` | GUI_WIDGET | das Widget, das im Inspektor gewählt ist, -1 = keins |
 | `GUI_INSPECT$(widget)` | STRING | was der Inspektor über ein Widget zeigt: Art, Name, Klassen, Lage, Zustand, Form, die passenden Regeln der Stildatei mit Zeile und was je Zustand gilt |
-| `GUI_STATE$()` | STRING | der Zustand aller sichtbaren Fenster als Text: je Widget mit Zustand eine Zeile (Texte, Haken, Werte, Auswahl, Zeilen einer Tabelle, Titel und Beschreibung einer Kachel) -- die Erwartung, die `dhrt aufnehmen` schreibt ([werkzeuge.md](werkzeuge.md#dhrt-aufnehmen--bedienung-als-prüffall)) |
+| `GUI_STATE$()` | STRING | der Zustand aller sichtbaren Fenster als Text: je Widget mit Zustand eine Zeile (Texte, Haken, Werte, Auswahl, Zeilen einer Tabelle, Titel und Beschreibung einer Kachel; am Ende die letzte Ansage an den Bildschirmleser) -- die Erwartung, die `dhrt aufnehmen` schreibt ([werkzeuge.md](werkzeuge.md#dhrt-aufnehmen--bedienung-als-prüffall)) |
 | `GUI_SET_MOTION(mode$)` | — | `"system"` (Vorgabe): wie das Betriebssystem; `"an"`: Animationen immer; `"aus"`: nie |
 | `GUI_MOTION()` | BOOLEAN | spielt die gui gerade Bewegung ab? |
 
@@ -3868,7 +3868,7 @@ Was das Programm beisteuern kann:
 
 | Befehl | Beschreibung |
 |---|---|
-| `GUI_ANNOUNCE(text$[, urgent])` | einen Satz an den Bildschirmleser des Nutzers geben — er spricht ihn mit seiner Stimme (höflich: nach dem laufenden Satz; urgent: sofort). Ohne Hilfsprogramm passiert nichts. Für alles, was sonst nur in einer Statuszeile steht: „Rechnung gespeichert“, „3 Zeilen gelöscht“ |
+| `GUI_ANNOUNCE(text$[, urgent])` | einen Satz an den Bildschirmleser des Nutzers geben — er spricht ihn mit seiner Stimme (höflich: nach dem laufenden Satz; urgent: sofort). Ohne Hilfsprogramm passiert nichts. Für alles, was sonst nur in einer Statuszeile steht: „Rechnung gespeichert“, „3 Zeilen gelöscht“. Die letzte steht in `GUI_STATE$` |
 | `GUI_SCREENREADER()` | `TRUE`, sobald ein Hilfsprogramm den Baum angefordert hat — etwa um mehr anzusagen oder Bewegung abzuschalten |
 | `GUI_SET_TAB_INDEX(widget, index)` | Tab-Reihenfolge festlegen: Widgets mit Index über 0 zuerst, aufsteigend; 0 (Vorgabe) = Reihenfolge des Anlegens |
 | `GUI_GET_TAB_INDEX(widget)` | den gesetzten Index lesen (0 = Anlege-Reihenfolge) |

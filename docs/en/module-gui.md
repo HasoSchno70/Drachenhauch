@@ -2610,7 +2610,7 @@ Three helpers for designing and for accessibility:
 | `GUI_INSPECTOR([on])` | BOOLEAN without argument | show the inspector (`TRUE`) or close it; without argument: is it open? |
 | `GUI_INSPECTOR_SELECTED()` | GUI_WIDGET | the widget selected in the inspector, -1 = none |
 | `GUI_INSPECT$(widget)` | STRING | what the inspector shows about a widget: kind, name, classes, position, state, shape, the matching stylesheet rules with their line and what applies per state |
-| `GUI_STATE$()` | STRING | the state of all visible windows as text: one line per widget with a state (texts, ticks, values, selection, rows of a table, title and description of a card) -- the expectation `dhrt aufnehmen` writes ([werkzeuge.md](werkzeuge.md#dhrt-aufnehmen--operating-a-program-as-a-test-case)) |
+| `GUI_STATE$()` | STRING | the state of all visible windows as text: one line per widget with a state (texts, ticks, values, selection, rows of a table, title and description of a card; at the end the last announcement to the screen reader) -- the expectation `dhrt aufnehmen` writes ([werkzeuge.md](werkzeuge.md#dhrt-aufnehmen--operating-a-program-as-a-test-case)) |
 | `GUI_SET_MOTION(mode$)` | — | `"system"` (default): like the operating system; `"an"`: animations always; `"aus"`: never |
 | `GUI_MOTION()` | BOOLEAN | is the gui playing motion right now? |
 
@@ -3846,7 +3846,7 @@ What the program can contribute:
 
 | Command | Description |
 |---|---|
-| `GUI_ANNOUNCE(text$[, urgent])` | hand a sentence to the user's screen reader — it speaks it with its voice (polite: after the current sentence; urgent: immediately). Without an assistive program nothing happens. For everything that would otherwise only appear in a status line: "Invoice saved", "3 rows deleted" |
+| `GUI_ANNOUNCE(text$[, urgent])` | hand a sentence to the user's screen reader — it speaks it with its voice (polite: after the current sentence; urgent: immediately). Without an assistive program nothing happens. For everything that would otherwise only appear in a status line: "Invoice saved", "3 rows deleted". The last one is in `GUI_STATE$` |
 | `GUI_SCREENREADER()` | `TRUE` as soon as an assistive program has requested the tree — for example to announce more or to switch off motion |
 | `GUI_SET_TAB_INDEX(widget, index)` | set the tab order: widgets with an index above 0 first, ascending; 0 (default) = order of creation |
 | `GUI_GET_TAB_INDEX(widget)` | read the index that was set (0 = creation order) |
