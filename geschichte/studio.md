@@ -620,3 +620,7 @@ Ebenda, Kapitel 14 (Datenbindung):
   Spalten" stand als "Angezeigte Spalte" da. Jetzt so breit wie die
   breiteste (GUI_TEXT_WIDTH), hoechstens knapp die halbe Leiste; das
   Protokoll nennt je Feld `beschriftung <schluessel> <breite> <gebraucht>`.
+- Ebenda, Kapitel 15: eine Tabelle an einer Abfrage verlor nach jedem
+  `Neuladen()` ihre Auswahl -- gehalten wurde sie nur bei der Tabelle des
+  Fensters (ueber DatensatzId). Jetzt merkt sich jede Liste ausser einer
+  Klappliste (die hielt ihre Wahl schon) die id der gewaehlten Zeile.

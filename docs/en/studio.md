@@ -602,7 +602,8 @@ window fills it when it opens; `Neuladen()` fetches it again, and
 window's own table, clicking a row loads it into the fields, and after
 saving and deleting the list is already up to date. A table keeps the column
 headers from the design when there are as many as it shows columns;
-otherwise the column names stand there.
+otherwise the column names stand there. Across `Neuladen()` the selected
+row stays selected (by its id), also for a query.
 
 ```text
 SUB knopfNeu_Klick()

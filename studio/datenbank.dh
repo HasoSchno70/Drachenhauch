@@ -1962,6 +1962,17 @@ SUB dbBasisMethoden(z AS ARRAY OF STRING, d AS JSON_HANDLE, namen AS ARRAY OF ST
             ARRAY_PUSH(z, "        DIM " + war + " AS STRING : " + war + " = " + CHR$(34) + CHR$(34))
             ARRAY_PUSH(z, "        IF GUI_DROPDOWN_SELECTED(" + w + ") >= 0 THEN " + war + " = GUI_LISTBOX_DATA$(" + w + ", GUI_DROPDOWN_SELECTED(" + w + "))")
         END IF
+        ' Eine Tabelle oder Liste, die nicht die Tabelle des Fensters zeigt,
+        ' merkt sich ihre gewaehlte Zeile ueber das Neuladen (bei der Tabelle
+        ' des Fensters gilt DatensatzId). Ohne das verlor eine Tabelle an einer
+        ' Abfrage nach jedem Neuladen ihre Auswahl (Buch "Fenster, Formulare,
+        ' Daten", Kapitel 15).
+        DIM warId AS STRING : warId = "studioWarId_" + namen[li]
+        IF ref <> ft AND arten[li] <> "dropdown" THEN
+            DIM wahlAlt AS STRING : wahlAlt = IIF(arten[li] = "table", "GUI_TABLE_SELECTED", "GUI_LISTBOX_SELECTED")
+            ARRAY_PUSH(z, "        DIM " + warId + " AS INTEGER : " + warId + " = 0")
+            ARRAY_PUSH(z, "        IF " + wahlAlt + "(" + w + ") >= 0 AND " + wahlAlt + "(" + w + ") < LEN(" + ids + ") THEN " + warId + " = " + ids + "[" + wahlAlt + "(" + w + ")]")
+        END IF
         ARRAY_PUSH(z, "        " + ids + " = []")
         ARRAY_PUSH(z, "        r = studioQuelle(" + le.name + ", " + dbText$(quelle) + ", " + dbText$(spalten) + ", " + dbText$(dbBindText$(d, wp + "studio_filter")) + ", " + dbText$(dbBindText$(d, wp + "studio_sortieren")) + ", " + IIF(dbBindAn(d, wp + "studio_absteigend"), "TRUE", "FALSE") + ", " + IIF(such = "", dbText$(""), "GUI_TEXT(Self." + such + ")") + ")")
         IF arten[li] = "table" THEN
@@ -2020,6 +2031,9 @@ SUB dbBasisMethoden(z AS ARRAY OF STRING, d AS JSON_HANDLE, namen AS ARRAY OF ST
         IF ref = ft THEN
             DIM setzen AS STRING : setzen = IIF(arten[li] = "table", "GUI_TABLE_SET_SELECTED", IIF(arten[li] = "dropdown", "GUI_DROPDOWN_SET_SELECTED", "GUI_LISTBOX_SET_SELECTED"))
             ARRAY_PUSH(z, "        IF Self.DatensatzId > 0 AND ARRAY_INDEXOF(" + ids + ", Self.DatensatzId) >= 0 THEN " + setzen + "(" + w + ", ARRAY_INDEXOF(" + ids + ", Self.DatensatzId))")
+        ELSEIF arten[li] <> "dropdown" THEN
+            DIM setzenAlt AS STRING : setzenAlt = IIF(arten[li] = "table", "GUI_TABLE_SET_SELECTED", "GUI_LISTBOX_SET_SELECTED")
+            ARRAY_PUSH(z, "        IF " + warId + " > 0 AND ARRAY_INDEXOF(" + ids + ", " + warId + ") >= 0 THEN " + setzenAlt + "(" + w + ", ARRAY_INDEXOF(" + ids + ", " + warId + "))")
         END IF
     NEXT
     ARRAY_PUSH(z, "    END SUB")

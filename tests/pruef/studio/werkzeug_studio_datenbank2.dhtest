@@ -396,3 +396,57 @@ END CLASS
 --- erwartet
 entwurf TRUE
 sonst namen TRUE
+
+=== neuladen behaelt die gewaehlte zeile auch an einer abfrage
+' Eine Tabelle an einer Abfrage (nicht die Tabelle des Fensters) merkt sich
+' die id der gewaehlten Zeile: Bert ist gewaehlt, Aaron kommt davor dazu,
+' nach Neuladen steht die Wahl auf Bert in Zeile 2. Vorher war die Wahl weg
+' (Buch "Fenster, Formulare, Daten", Kapitel 15).
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+slHin(10, 10)
+slWarten(10)
+slTaste(294)
+slWarten(150)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+SETENV("DH_STUDIO_LAUF_BILDER", "20")
+DIM log AS STRING : log = CWD$() + "/s.log"
+slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+DIM z AS STRING
+FOR EACH z IN slAnfang(log, "ausgabe ")
+    IF INSTR(z, "▶") < 0 AND INSTR(z, "■") < 0 AND INSTR(z, "WARNING") < 0 THEN PRINT z
+NEXT
+--- argumente
+{sammlung}/../../../studio/studio.dh
+--- vorher
+IMPORT "db"
+DIM db AS DB_CONN : db = DB_OPEN("proj/daten.sqlite")
+DB_EXEC(db, "CREATE TABLE kunden (id INTEGER PRIMARY KEY, name TEXT)")
+DB_EXEC(db, "INSERT INTO kunden (name) VALUES ('Anna')")
+DB_EXEC(db, "INSERT INTO kunden (name) VALUES ('Bert')")
+DB_CLOSE(db)
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"},{"art":"datenbank","name":"Daten","schema":"Daten.dhdb"}]}
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":400,"h":300,"widgets":[{"kind":"table","name":"liste","x":10,"y":10,"w":300,"h":200,"table":{"headers":["Name"]},"studio_quelle":"Daten.namen","studio_sortieren":"name"}]}
+--- datei proj/Hauptfenster.dh
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+    SUB Geoeffnet()
+        GUI_TABLE_SET_SELECTED(Self.liste, 1)
+        PRINT "vorher "; GUI_TABLE_SELECTED(Self.liste); " id "; Self.IdVon(Self.liste)
+        DB_EXEC(Daten, "INSERT INTO kunden (name) VALUES ('Aaron')")
+        Self.Neuladen()
+        PRINT "nachher "; GUI_TABLE_SELECTED(Self.liste); " id "; Self.IdVon(Self.liste)
+    END SUB
+END CLASS
+--- datei proj/App.dh
+CLASS App EXTENDS StudioApp
+END CLASS
+--- datei proj/Daten.dhdb
+{"datei":"daten.sqlite","tabellen":[{"name":"kunden","spalten":[{"name":"name","typ":"text","pflicht":false,"eindeutig":false,"vorgabe":""}]}],"abfragen":[{"name":"namen","sql":"SELECT id, name FROM kunden"}]}
+--- erwartet
+ausgabe vorher 1 id 2
+ausgabe nachher 2 id 2

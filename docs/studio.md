@@ -614,7 +614,8 @@ erste). Das Fenster füllt sie beim Öffnen; `Neuladen()` holt sie neu, und
 Tabelle des Fensters, lädt ein Klick auf eine Zeile sie in die Felder, und
 nach Sichern und Löschen steht die Liste schon richtig. Eine Tabelle behält
 die Spaltenköpfe aus dem Entwurf, wenn es so viele sind, wie sie Spalten
-zeigt; sonst stehen dort die Namen der Spalten.
+zeigt; sonst stehen dort die Namen der Spalten. Über `Neuladen()` hinweg
+bleibt die gewählte Zeile gewählt (an ihrer id), auch an einer Abfrage.
 
 ```text
 SUB knopfNeu_Klick()
