@@ -1,0 +1,74 @@
+{
+  "title": "Statistik",
+  "name": "StatistikFenster",
+  "x": 0,
+  "y": 0,
+  "w": 700,
+  "h": 440,
+  "movable": true,
+  "closable": true,
+  "visible": true,
+  "widgets": [
+    {
+      "kind": "canvas",
+      "name": "diagArt",
+      "x": 20,
+      "y": 20,
+      "w": 320,
+      "h": 240,
+      "studio_diagramm": "kuchen",
+      "studio_diagramm_titel": "Einträge je Art"
+    },
+    {
+      "kind": "canvas",
+      "name": "diagMonate",
+      "x": 360,
+      "y": 20,
+      "w": 320,
+      "h": 240,
+      "studio_diagramm": "balken",
+      "studio_diagramm_titel": "Ausleihen je Monat"
+    },
+    {
+      "kind": "label",
+      "name": "hinweis",
+      "text": "Ein Klick auf ein Stück oder einen Balken zeigt, was dazugehört.",
+      "x": 20,
+      "y": 272,
+      "w": 660,
+      "h": 20
+    },
+    {
+      "kind": "listbox",
+      "name": "liste",
+      "x": 20,
+      "y": 296,
+      "w": 540,
+      "h": 96,
+      "items": []
+    },
+    {
+      "kind": "dropdown",
+      "name": "wahlZeitraum",
+      "x": 570,
+      "y": 296,
+      "w": 110,
+      "h": 28,
+      "items": [
+        "6 Monate",
+        "12 Monate"
+      ]
+    },
+    {
+      "kind": "button",
+      "name": "knopfZu",
+      "text": "Schließen",
+      "x": 570,
+      "y": 362,
+      "w": 110,
+      "h": 30
+    }
+  ],
+  "studio_standard": "knopfZu",
+  "studio_abbrechen": "knopfZu"
+}

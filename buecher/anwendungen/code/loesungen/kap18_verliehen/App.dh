@@ -1,0 +1,7 @@
+' Kapitel 14 -- vor dem ersten Fenster: eine leere Mediathek bekommt
+' ihre Beispiele. Danach zeigt das Hauptfenster schon alles an.
+CLASS App EXTENDS StudioApp
+    SUB Geoeffnet()
+        einrichten()
+    END SUB
+END CLASS

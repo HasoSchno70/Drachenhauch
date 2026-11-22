@@ -1,0 +1,21 @@
+' Ein Eintrag der Mediathek. Seit Kapitel 13 kennt er seine Zeile in der
+' Tabelle eintrag: id, 0 = noch nicht gesichert.
+CLASS Eintrag
+    DIM id AS INTEGER
+    DIM titel AS STRING
+    DIM urheber AS STRING
+    DIM art AS STRING
+    DIM jahr AS STRING
+    DIM verliehen AS STRING
+
+    SUB Init(t AS STRING, u AS STRING, a AS STRING, j AS STRING)
+        titel = t
+        urheber = u
+        art = a
+        jahr = j
+    END SUB
+
+    FUNCTION zellen() AS ARRAY OF STRING
+        RETURN [titel, urheber, art, jahr, verliehen]
+    END FUNCTION
+END CLASS

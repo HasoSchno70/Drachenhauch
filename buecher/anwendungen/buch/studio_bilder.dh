@@ -438,6 +438,24 @@ IF gewuenscht("kap17_liste") OR gewuenscht("kap17_karte") THEN
     PRINT "  kap17_liste.png, kap17_karte.png"
 END IF
 
+' Kapitel 18: das Statistikfenster im Entwurf, der Kuchen gewaehlt (der
+' Inspektor zeigt Diagramm und Titel); dazu das Fenster im Programm nach
+' einem Klick auf das Stueck Buch.
+IF gewuenscht("kap18_entwurf") THEN
+    m = projekt$("kap18/mediathek")
+    z = []
+    klick(z, 10, 450, 300)
+    studioBild("kap18_entwurf", m, "StatistikFenster", aufnahme$("entwurf_kap18", z), 40)
+    zuschneiden("kap18_entwurf", 290, 66, 990, 540)
+END IF
+IF gewuenscht("kap18_statistik") THEN
+    z = []
+    klick(z, 0, 70, 13)
+    klick(z, 10, 110, 63)
+    klick(z, 26, 230, 200)
+    programmBild("kap18_statistik", "kap18/mediathek", z, 50)
+END IF
+
 ' Kapitel 11: Tetris waehlen, "Ausleihen ..." -- das Fenster daneben.
 IF gewuenscht("kap11_ausleihen") THEN
     z = []

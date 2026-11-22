@@ -544,4 +544,34 @@ module.exports = (H) => [
   ...neu("loesungen/kap17_rueckblick/Hauptfenster.dh").map((t) => H.code(t)),
 
   H.p("Mit {\"jahr\": 2026} statt des Textes bliebe der Rückblick leer: strftime liefert Text, und SQLite hält die Zahl 2026 und den Text '2026' nicht für gleich."),
+
+  H.h2("Kapitel 18 · Diagramme"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Nichts. Die Balken stehen da, aber unter ihnen ist die Achse leer: Das Diagramm kennt nur sechs Werte, nicht, welche Monate sie sind. Woher die Zahlen kommen, weiß nur der Code — er muss es dazuschreiben."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Mit werte innen steht in jedem Stück seine Zahl: 2 im Stück Buch, 1 in den drei anderen. Mit prozent dazu der Anteil: 40 % und dreimal 20 %. Die Prozente rechnet das Diagramm selbst aus der Summe aller Stücke."),
+
+  H.h3("Drehen 3"),
+
+  H.p("Nichts — der Hinweis bleibt, wie er war. Maus kommt, wenn die Taste gedrückt wird, vor dem Zeichnen dieses Bildes; erst das Zeichnen stellt fest, welches Stück unter der Maus lag. In Takt, im Bild danach, steht der Klick da."),
+
+  H.h3("Erweitern 1: der Zeitraum"),
+
+  H.p("Eine Klappliste wahlZeitraum mit den Einträgen „6 Monate“ und „12 Monate“ rechts neben der Liste. Geoeffnet wählt den ersten Eintrag; monateFuellen zählt nicht mehr fest sechs, sondern n Monate (code/loesungen/kap18_zeitraum/StatistikFenster.dh):"),
+
+  ...neu("loesungen/kap18_zeitraum/StatistikFenster.dh").map((t) => H.code(t)),
+
+  H.p("Die drei FOR-Schleifen, die bis 5 liefen, laufen bis n - 1. Weil monateFuellen das Diagramm erst leert und Reihe die Reihe „Ausleihen“ wiederfindet, stehen danach zwölf Balken da, nicht sechs neben zwölf."),
+
+  H.h3("Erweitern 2: wie viel verliehen ist"),
+
+  H.p("Ein drittes Diagramm anteil mit der Art leiste, unter dem Balkendiagramm; die Liste wird dafür schmaler (code/loesungen/kap18_verliehen/StatistikFenster.dh):"),
+
+  ...neu("loesungen/kap18_verliehen/StatistikFenster.dh").map((t) => H.code(t)),
+
+  H.p("Eine Leiste zeigt einen Wert zwischen min und max; max 100 und die Einheit „ %“ machen daraus Prozent. Bei einer verliehenen von fünf steht dort 20 %."),
 ];
