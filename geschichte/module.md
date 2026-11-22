@@ -345,3 +345,9 @@ Transaktion 5 s (die Vorgabe von rusqlite) und meldete dann nur
 Ursache an (ein zweites Programm oder eine Transaktion ohne DB_COMMIT,
 nach 5 Sekunden aufgegeben) -- fuer DB_EXEC, DB_QUERY und
 BEGIN/COMMIT/ROLLBACK. Fall in `tests/pruef/module/modules_db.dhtest`.
+
+Ebenda: ein Wert mit Apostroph, der ins SQL geklebt wurde ("Sgt.
+Pepper's Lonely Hearts Club Band"), gab `near "s": syntax error` -- die
+Meldung sagt jetzt, dass Werte mit `?` uebergeben werden. Ausloeser ist
+ein Syntaxfehler in einem SQL mit ungerader Zahl von `'`; ein anderer
+Syntaxfehler bleibt ohne Hinweis (Gegenfall im selben Prueffall).
