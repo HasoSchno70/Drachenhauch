@@ -1314,3 +1314,178 @@ cache 1 textinput#feldtitel "Die unendliche Geschichte"
 label#hinweis "Abgebrochen."
 sekunden TRUE
 kein netz TRUE
+
+=== kapitel 17: berichte und drucken
+' Kapitel 17: die Berichte Ausleihliste (gruppiert nach Freund) und
+' Karteikarte (A6 quer, Parameter :id). Datei -> Karteikarte ohne gewaehlte
+' Zeile sagt es in der Statuszeile. Die Berichte selbst prueft der Fall an
+' den PDFs: berichte.dh kommt hinten an das Modul Bestand der Kopie, traegt
+' "Die unendliche Geschichte" mit ISBN ein, sichert die PDFs (ZIEL) und
+' laesst einmal den Parameter weg. Dazu die Loesungen: Strichcode auf der
+' Karte, Jahresrueckblick (Jahr als Text und, zum Vergleich, als Zahl).
+IMPORT "laeufer.dh"
+SUB kopieren(von AS STRING, nach AS STRING)
+    IF NOT DIREXISTS(nach) THEN MKDIR(nach)
+    DIM n AS STRING
+    FOR EACH n IN DIRLIST(von)
+        IF DIREXISTS(von + "/" + n) THEN
+            IF n <> "_studio" THEN kopieren(von + "/" + n, nach + "/" + n)
+        ELSEIF RIGHT$(n, 3) <> ".db" THEN
+            COPYFILE(von + "/" + n, nach + "/" + n)
+        END IF
+    NEXT
+END SUB
+FUNCTION laufen$(main AS STRING, bilder AS INTEGER) AS STRING
+    DIM q AS INTEGER : q = PROCESS_START("dhrt", "run", "--bilder", STR$(bilder), main)
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    WHILE leer < 5
+        DIM t AS STRING : t = PROCESS_READ$(q) + PROCESS_ERR$(q)
+        aus = aus + t
+        IF t = "" AND NOT PROCESS_RUNNING(q) THEN leer = leer + 1
+        SLEEP(20)
+    WEND
+    RETURN aus
+END FUNCTION
+FUNCTION bedienen$(main AS STRING, ev AS ARRAY OF STRING, bilder AS INTEGER) AS STRING
+    DIM pf AS STRING : pf = CWD$() + "/bedienung.txt"
+    WRITEALL(pf, "c " + STR$(LEN(ev)) + CHR$(10) + JOIN$(ev, CHR$(10)) + CHR$(10) + CHR$(10))
+    SETENV("DHRT_ABSPIELEN", pf)
+    SETENV("DHRT_GUI_ZUSTAND", "1")
+    DIM aus AS STRING : aus = laufen$(main, bilder)
+    SETENV("DHRT_ABSPIELEN", "")
+    SETENV("DHRT_GUI_ZUSTAND", "")
+    RETURN aus
+END FUNCTION
+SUB klick(ev AS ARRAY OF STRING, b AS INTEGER, x AS INTEGER, y AS INTEGER)
+    ARRAY_PUSH(ev, "e " + STR$(b) + " 7 " + STR$(x) + " " + STR$(y) + " 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 2) + " 7 " + STR$(x) + " " + STR$(y) + " 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 4) + " 6 0 0 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 6) + " 5 0 0 0 0")
+END SUB
+FUNCTION zeile$(aus AS STRING, was AS STRING) AS STRING
+    DIM z AS STRING
+    FOR EACH z IN SPLIT$(REPLACE$(aus, CHR$(13), ""), CHR$(10))
+        IF INSTR(z, was) >= 0 THEN RETURN TRIM$(z)
+    NEXT
+    RETURN ""
+END FUNCTION
+SUB f5(nm AS STRING, p AS STRING)
+    slZeilen = []
+    slBild = 0
+    slHin(10, 10)
+    slWarten(10)
+    slTaste(294)
+    slWarten(150)
+    slAufnahmeSchreiben(CWD$() + "/f5.txt")
+    SETENV("DH_STUDIO_LAUF_BILDER", "20")
+    DIM lg AS STRING : lg = CWD$() + "/" + nm + ".log"
+    DIM aus AS STRING : aus = slStarten(lg, CWD$() + "/f5.txt", slBild + 20, p)
+    PRINT nm; " geprueft "; slHat(lg, "geprueft 0 0"); " beendet "; slHat(lg, "beendet 0")
+    IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+END SUB
+' Haengt eine Datei an das Modul Bestand der Kopie, ruft ihre SUB am Ende
+' von Hauptfenster.Geoeffnet und laesst das Programm laufen; die PDFs
+' landen in <nm>_pdf.
+SUB drucken(nm AS STRING, datei AS STRING, aufruf AS STRING)
+    DIM pr AS STRING : pr = CWD$() + "/" + nm + "/_studio/projekt/"
+    WRITEALL(pr + "Bestand.dh", READALL(pr + "Bestand.dh") + CHR$(10) + READALL(CWD$() + "/" + datei))
+    DIM h AS STRING : h = READALL(pr + "Hauptfenster.dh")
+    DIM alt AS STRING : alt = "        Self.statusZeigen()" + CHR$(10) + "    END SUB"
+    IF INSTR(h, alt) < 0 THEN PRINT "nicht gefunden: Geoeffnet"
+    WRITEALL(pr + "Hauptfenster.dh", REPLACE$(h, alt, "        Self.statusZeigen()" + CHR$(10) + "        " + aufruf + "()" + CHR$(10) + "    END SUB"))
+    MKDIR(CWD$() + "/" + nm + "_pdf")
+    SETENV("ZIEL", CWD$() + "/" + nm + "_pdf")
+    DIM aus AS STRING : aus = laufen$(CWD$() + "/" + nm + "/_studio/main.dh", 20)
+    SETENV("ZIEL", "")
+    IF INSTR(LOWER$(aus), "fehler") >= 0 THEN PRINT aus
+END SUB
+FUNCTION text$(datei AS STRING) AS STRING
+    IF NOT FILEEXISTS(datei) THEN RETURN "(keine Datei " + BASENAME(datei) + ")"
+    RETURN JOIN$(pdfSeiten(datei), CHR$(10))
+END FUNCTION
+FUNCTION hat(t AS STRING, s AS STRING) AS BOOLEAN
+    RETURN INSTR(t, s) >= 0
+END FUNCTION
+
+DIM code AS STRING : code = ARG$(1) + "/buecher/anwendungen/code/"
+DIM proj AS STRING
+FOR EACH proj IN ["kap17/mediathek", "loesungen/kap17_strichcode", "loesungen/kap17_rueckblick"]
+    DIM nm AS STRING : nm = BASENAME(proj)
+    IF nm = "mediathek" THEN nm = "kap17_mediathek"
+    kopieren(code + proj, CWD$() + "/" + nm)
+    f5(nm, CWD$() + "/" + nm)
+NEXT
+' Datei -> Karteikarte, ohne dass eine Zeile gewaehlt ist.
+DIM ev AS ARRAY OF STRING : ev = []
+klick(ev, 4, 20, 13)
+klick(ev, 14, 60, 63)
+PRINT zeile$(bedienen$(CWD$() + "/kap17_mediathek/_studio/main.dh", ev, 50), "label#status")
+' Die Berichte als PDF.
+drucken("kap17_mediathek", "berichte.dh", "berichteSichern")
+DIM d AS STRING : d = CWD$() + "/kap17_mediathek_pdf/"
+DIM t AS STRING : t = text$(d + "liste.pdf")
+PRINT "liste "; hat(t, "Jonas") AND INSTR(t, "Jonas") < INSTR(t, "Lena"); " "; hat(t, "Momo"); " "; hat(t, "Tetris"); " noch da "; hat(t, "noch da")
+PRINT "tage "; hat(t, CHR$(10) + "15" + CHR$(10)); " "; hat(t, CHR$(10) + "40" + CHR$(10)); " "; hat(t, CHR$(10) + "55" + CHR$(10)); " "; hat(t, "Seite 1 von 1")
+t = text$(d + "karte_neu.pdf")
+PRINT "karte "; hat(t, "Die unendliche Geschichte"); " "; hat(t, "Michael Ende"); " isbn "; hat(t, "ISBN"); " "; hat(t, "978-3-522-20260-2")
+PRINT "karte momo isbn "; hat(text$(d + "karte_momo.pdf"), "ISBN"); " seiten "; LEN(pdfSeiten(d + "karte_momo.pdf"))
+PRINT READALL(d + "fehler.txt")
+' Erweitern 1: der Strichcode -- seine Ziffern stehen als Text im PDF.
+drucken("kap17_strichcode", "berichte.dh", "berichteSichern")
+d = CWD$() + "/kap17_strichcode_pdf/"
+PRINT "strichcode "; hat(REPLACE$(text$(d + "karte_neu.pdf"), CHR$(10), ""), "9783522202602"); " momo "; hat(REPLACE$(text$(d + "karte_momo.pdf"), CHR$(10), ""), "978")
+' Erweitern 2: der Rueckblick des Jahres, in dem Tetris verliehen wurde.
+drucken("kap17_rueckblick", "rueckblick.dh", "rueckblickSichern")
+d = CWD$() + "/kap17_rueckblick_pdf/"
+t = text$(d + "text.pdf")
+PRINT "rueckblick "; hat(t, "Tetris"); " "; hat(t, READALL(d + "monat.txt")); " zahl "; hat(text$(d + "zahl.pdf"), "Tetris")
+--- argumente
+{sammlung}/../../../studio/studio.dh
+{sammlung}/../../..
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+IMPORT "{sammlung}/../_hilfen/pdftext.dh"
+slStudio = ARG$(0)
+--- datei berichte.dh
+SUB berichteSichern()
+    DIM ziel AS STRING : ziel = GETENV$("ZIEL")
+    DB_EXEC(Mediathek, "INSERT INTO eintrag (titel, urheber, art, jahr, isbn) VALUES (?, ?, ?, ?, ?)", "Die unendliche Geschichte", "Michael Ende", "Buch", 2019, "978-3-522-20260-2")
+    DIM neu AS INTEGER : neu = DB_LAST_ROWID(Mediathek)
+    DIM momo AS INTEGER : momo = 0
+    DIM r AS DB_RESULT : r = DB_QUERY(Mediathek, "SELECT id FROM eintrag WHERE titel = 'Momo'")
+    IF DB_NEXT(r) THEN momo = DB_GET_INT(r, 0)
+    Ausleihliste.Pdf(ziel + "/liste.pdf", {})
+    Karteikarte.Pdf(ziel + "/karte_neu.pdf", {"id": neu})
+    Karteikarte.Pdf(ziel + "/karte_momo.pdf", {"id": momo})
+    TRY
+        Karteikarte.Pdf(ziel + "/ohne.pdf", {})
+    CATCH e
+        WRITEALL(ziel + "/fehler.txt", e)
+    END TRY
+    END
+END SUB
+--- datei rueckblick.dh
+SUB rueckblickSichern()
+    DIM ziel AS STRING : ziel = GETENV$("ZIEL")
+    DIM r AS DB_RESULT
+    r = DB_QUERY(Mediathek, "SELECT strftime('%Y', von), strftime('%Y-%m', von) FROM ausleihe WHERE zurueck IS NULL")
+    IF DB_NEXT(r) THEN
+        WRITEALL(ziel + "/monat.txt", DB_GET_STRING(r, 1))
+        Rueckblick.Pdf(ziel + "/text.pdf", {"jahr": DB_GET_STRING(r, 0)})
+        Rueckblick.Pdf(ziel + "/zahl.pdf", {"jahr": INT(VAL(DB_GET_STRING(r, 0)))})
+    END IF
+    END
+END SUB
+--- erwartet
+kap17_mediathek geprueft TRUE beendet TRUE
+kap17_strichcode geprueft TRUE beendet TRUE
+kap17_rueckblick geprueft TRUE beendet TRUE
+label#status "Erst einen Eintrag wählen."
+liste TRUE TRUE TRUE noch da TRUE
+tage TRUE TRUE TRUE TRUE
+karte TRUE TRUE isbn TRUE TRUE
+karte momo isbn FALSE seiten 1
+Bericht: Parameter :id fehlt
+strichcode TRUE momo FALSE
+rueckblick TRUE TRUE zahl FALSE
