@@ -1,0 +1,12 @@
+/* Die Mediathek -- wie sie aussieht. Farben mit Namen (accent,
+   text_fg ...) folgen dem Thema, feste Farben bleiben. */
+
+button              { radius: 6 }
+button.gefahr       { bg: #B03A2E; fg: #FFFFFF }
+button.gefahr:hover { bg: #D04437 }
+
+.leise              { fg: #8A93A6 }
+label.titel         { groesse: 18; stil: fett }
+
+textinput:focus     { border: accent }
+card                { radius: 10 }

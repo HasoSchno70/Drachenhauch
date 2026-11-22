@@ -481,6 +481,51 @@ IF gewuenscht("kap19_einlesen") THEN
     IF FILEEXISTS(ziel19) THEN PRINT "  kap19_einlesen.png" ELSE PRINT "  FEHLER kap19_einlesen "; LEFT$(aus19, 300)
 END IF
 
+' Kapitel 20: das Hauptfenster mit Stildatei und Cover-Kachel, dunkel und
+' (Ansicht -> Helles Aussehen) hell. Damit die Kachel ein Cover hat, traegt
+' die Kopie "Die unendliche Geschichte" mit Cover ein (wie nach Kapitel 16);
+' sie steht dann oben in der Tabelle.
+IF gewuenscht("kap20_aussehen") OR gewuenscht("kap20_hell") THEN
+    m = projekt$("kap20/mediathek")
+    z = ["e 0 7 640 400 0 0"]
+    taste(z, 20, ohne, 294)
+    studioBild("_kap20_f5", m, "", aufnahme$("f5_kap20", z), 70)
+    IF FILEEXISTS(bilder + "/_kap20_f5.png") THEN DELETEFILE(bilder + "/_kap20_f5.png")
+    DIM q20 AS STRING : q20 = CHR$(34)
+    DIM nl20 AS STRING : nl20 = CHR$(10)
+    DIM sub20 AS ARRAY OF STRING
+    sub20 = ["", "SUB coverEintragen()", _
+             "    DIM r AS DB_RESULT : r = DB_QUERY(Mediathek, " + q20 + "SELECT id FROM eintrag WHERE titel = 'Die unendliche Geschichte'" + q20 + ")", _
+             "    IF DB_NEXT(r) THEN RETURN", _
+             "    DB_EXEC(Mediathek, " + q20 + "INSERT INTO eintrag (titel, urheber, art, jahr, isbn, cover) VALUES (?, ?, ?, ?, ?, ?)" + q20 + ", " + q20 + "Die unendliche Geschichte" + q20 + ", " + q20 + "Michael Ende" + q20 + ", " + q20 + "Buch" + q20 + ", 2019, " + q20 + "978-3-522-20260-2" + q20 + ", READALL_BYTES(" + q20 + wurzel + "/daten/bilder/logo.png" + q20 + "))", _
+             "END SUB", ""]
+    DIM bf20 AS STRING : bf20 = m + "/_studio/projekt/Bestand.dh"
+    WRITEALL(bf20, READALL(bf20) + JOIN$(sub20, nl20))
+    DIM af20 AS STRING : af20 = m + "/_studio/projekt/App.dh"
+    WRITEALL(af20, REPLACE$(READALL(af20), "        einrichten()", "        einrichten()" + nl20 + "        coverEintragen()"))
+    IF gewuenscht("kap20_aussehen") THEN
+        z = []
+        klick(z, 0, 100, 117)
+        ARRAY_PUSH(z, "e 20 7 300 300 0 0")
+        SETENV("DHRT_ABSPIELEN", aufnahme$("bed_kap20", z))
+        DIM p20 AS INTEGER : p20 = PROCESS_START("dhrt", "bild", m + "/_studio/main.dh", bilder + "/kap20_aussehen.png", "40")
+        DIM aus20 AS STRING : aus20 = laufen$(p20)
+        IF FILEEXISTS(bilder + "/kap20_aussehen.png") THEN PRINT "  kap20_aussehen.png" ELSE PRINT "  FEHLER kap20_aussehen "; LEFT$(aus20, 300)
+    END IF
+    IF gewuenscht("kap20_hell") THEN
+        z = []
+        klick(z, 0, 100, 13)
+        klick(z, 10, 120, 87)
+        klick(z, 24, 100, 117)
+        ARRAY_PUSH(z, "e 40 7 300 300 0 0")
+        SETENV("DHRT_ABSPIELEN", aufnahme$("bed_kap20h", z))
+        DIM p20h AS INTEGER : p20h = PROCESS_START("dhrt", "bild", m + "/_studio/main.dh", bilder + "/kap20_hell.png", "60")
+        DIM aus20h AS STRING : aus20h = laufen$(p20h)
+        IF FILEEXISTS(bilder + "/kap20_hell.png") THEN PRINT "  kap20_hell.png" ELSE PRINT "  FEHLER kap20_hell "; LEFT$(aus20h, 300)
+    END IF
+    SETENV("DHRT_ABSPIELEN", "")
+END IF
+
 ' Kapitel 11: Tetris waehlen, "Ausleihen ..." -- das Fenster daneben.
 IF gewuenscht("kap11_ausleihen") THEN
     z = []

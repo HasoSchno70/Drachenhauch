@@ -1,0 +1,64 @@
+{
+  "title": "Sterne",
+  "name": "Sterne",
+  "w": 166,
+  "h": 28,
+  "studio_ereignisse": "Geaendert",
+  "widgets": [
+    {
+      "kind": "button",
+      "name": "s1",
+      "text": "☆",
+      "x": 0,
+      "y": 0,
+      "w": 30,
+      "h": 28,
+      "variant": "flach",
+      "font_size": 20
+    },
+    {
+      "kind": "button",
+      "name": "s2",
+      "text": "☆",
+      "x": 34,
+      "y": 0,
+      "w": 30,
+      "h": 28,
+      "variant": "flach",
+      "font_size": 20
+    },
+    {
+      "kind": "button",
+      "name": "s3",
+      "text": "☆",
+      "x": 68,
+      "y": 0,
+      "w": 30,
+      "h": 28,
+      "variant": "flach",
+      "font_size": 20
+    },
+    {
+      "kind": "button",
+      "name": "s4",
+      "text": "☆",
+      "x": 102,
+      "y": 0,
+      "w": 30,
+      "h": 28,
+      "variant": "flach",
+      "font_size": 20
+    },
+    {
+      "kind": "button",
+      "name": "s5",
+      "text": "☆",
+      "x": 136,
+      "y": 0,
+      "w": 30,
+      "h": 28,
+      "variant": "flach",
+      "font_size": 20
+    }
+  ]
+}

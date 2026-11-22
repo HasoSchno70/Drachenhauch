@@ -1,0 +1,13 @@
+' Kapitel 19 -- was beim Einlesen einer Liste herauskam: wie viele
+' Zeilen, wie viele davon neu und wie viele schon da waren, und je
+' Zeile, die nicht ging, eine Meldung.
+CLASS Einlesung
+    DIM zeilen AS INTEGER
+    DIM neu AS INTEGER
+    DIM schonDa AS INTEGER
+    DIM meldungen AS ARRAY OF STRING
+
+    FUNCTION fehler() AS INTEGER
+        RETURN Self.zeilen - Self.neu - Self.schonDa
+    END FUNCTION
+END CLASS

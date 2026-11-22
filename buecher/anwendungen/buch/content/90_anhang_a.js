@@ -1,6 +1,6 @@
 const fs = require("fs");
 const path = require("path");
-const { neu } = require("../code_lesen");
+const { neu, stueck } = require("../code_lesen");
 
 // Das Strichcode-Element der Karteikarte (Loesung Kapitel 17, Erweitern 1).
 function strichcode() {
@@ -604,4 +604,40 @@ module.exports = (H) => [
   ...neu("loesungen/kap19_fehler/Austausch.dh").map((t) => H.code(t)),
 
   H.p("FILE_ENCODING$ sagt, in welcher Kodierung \"auto\" die Liste gelesen hat; mit derselben wird die Fehlerdatei geschrieben, und Excel öffnet sie wie die Liste selbst. Aus der alten Liste wird so alte_liste_fehler.csv mit drei Zeilen, die erste „;Astrid Lindgren;Buch;1945;kein Titel.“ Wer dort den Titel einträgt und die Datei einliest, braucht die Spalte Fehler nicht zu löschen — einlesen kennt sie nicht und übergeht sie."),
+
+  H.h2("Kapitel 20 · Aussehen"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Das Programm hält gleich beim Start an: „GUI_STYLESHEET_LOAD (assets/mediathek.dhstil): Zeile 5: '#B03A2' ist keine Farbe -- erwartet #RGB, #RRGGBB, #AARRGGBB oder ein Name des Themas“. Fünf Ziffern sind weder die kurze noch die lange Schreibweise. Die Meldung nennt die Datei, wie StilLaden sie geladen hat — die Kopie unter assets/ —, ausgebessert wird aber die im Projektordner."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Fenster, Felder, Tabelle und die übrigen Knöpfe werden hell: Ihre Farben kommen aus dem Thema. „Entfernen“ bleibt rot und die Statuszeile grau — beide haben feste Farben aus der Stildatei, und eine Regel schlägt das Thema. Auch die Rahmenfarbe eines Felds mit Fokus wechselt mit: textinput:focus nennt accent, einen Namen des Themas, keine feste Farbe."),
+
+  H.h3("Drehen 3"),
+
+  H.p("Wie „Neu“ oder „Bearbeiten“: Keine Regel trifft ihn mehr, nur button { radius: 6 }, und die Farbe kommt aus dem Thema. Am Code hat sich nichts geändert — nur, was der Knopf ist."),
+
+  H.h3("Erweitern 1: wie das System"),
+
+  H.p("Ein Eintrag „Wie das System“ mit Haken im Menü Ansicht (code/loesungen/kap20_system/Hauptfenster.dh):"),
+
+  ...neu("loesungen/kap20_system/Hauptfenster.dh").map((t) => H.code(t)),
+
+  H.p("Das Thema system fragt das Betriebssystem, ob es dunkel eingestellt ist, und nimmt dann modern_dark, sonst modern_light, dazu seine Akzentfarbe. Wählt man danach „Helles Aussehen“, verliert „Wie das System“ seinen Haken — es gibt nur ein Aussehen auf einmal."),
+
+  H.h3("Erweitern 2: Sterne"),
+
+  H.p("Ein eigenes Control Sterne aus fünf flachen Knöpfen, mit dem Ereignis Geaendert (code/loesungen/kap20_sterne/Sterne.dh):"),
+
+  H.code(stueck("loesungen/kap20_sterne/Sterne.dh", "SUB Setzen", "END SUB")),
+
+  H.code(stueck("loesungen/kap20_sterne/Sterne.dh", "SUB waehlen", "END SUB")),
+
+  H.p("Jeder Stern ruft waehlen mit seiner Nummer; ein Klick auf den gefüllten letzten nimmt die Bewertung zurück. Die Tabelle eintrag bekommt eine Spalte bewertung (Ganze Zahl), das Bearbeitungsfenster eine Instanz sterne1 neben dem Jahr. Weil die Sterne nicht an der Bindung hängen, lädt und sichert das Fenster sie selbst (EintragFenster.dh):"),
+
+  ...neu("loesungen/kap20_sterne/EintragFenster.dh").map((t) => H.code(t)),
+
+  H.p("Sichern schreibt erst die gebundenen Felder; danach ist DatensatzId die Zeile — auch bei einem neuen Eintrag, der erst jetzt eine id bekommen hat. Darum kommt das UPDATE nach Sichern, nicht davor."),
 ];
