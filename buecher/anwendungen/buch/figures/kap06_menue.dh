@@ -1,0 +1,3 @@
+' Bild fuer Kapitel 6: das Menue Datei aufgeklappt, mit den Kuerzeln.
+' Klicklage in Fensterpixeln mal SKALIERUNG (2) aus shoot.dh.
+IMPORT "../../code/kap06/1_menue.dh"

@@ -158,6 +158,36 @@ module.exports = (H) => [
 
   H.p("Als Regel ginge das nicht, denn pflicht gälte für jede Art. GUI_SET_ERROR setzt die Meldung so, wie eine Regel es täte: roter Rahmen, Text in der Fehlerzeile. Ändert man danach die Art auf Film, verschwindet die Meldung beim nächsten Speichern, denn GUI_VALIDATE prüft alle Felder neu."),
 
+  H.h2("Kapitel 6 · Menüs, Kürzel, Dialoge"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Gespeichert wird einmal, und danach steht „Ohne Titel geht es nicht.“ unter dem Formular. Die gui hat das Kürzel des Menüeintrags erkannt, GUI_CLICKED(miSpeichern) war wahr, und formular_speichern hat gespeichert und das Formular geleert. Dann kam die eigene Abfrage, sah dieselbe Taste und rief formular_speichern ein zweites Mal — mit einem leeren Formular, das die Regel für den Titel aufhält. Ohne die Regel stünde jetzt ein leerer Eintrag in der Mediathek."),
+
+  H.h3("Drehen 2"),
+
+  H.p("„Ja“ und „Nein“, in dieser Reihenfolge: Ja ist 1, Nein ist 2 — die Auswertung in der Schleife bleibt richtig. Nur muss man jetzt die Frage lesen, um zu wissen, was „Ja“ tut. „Entfernen“ sagt es selbst."),
+
+  H.h3("Drehen 3"),
+
+  H.p("Ein Zeichen im Titelfeld, das hinter der Schreibmarke. Ein Kürzel ohne Strg oder Alt gehört dem Textfeld, in dem die Schreibmarke steht — sonst ließe sich in keinem Feld mehr ein Zeichen löschen. Steht der Fokus in der Tabelle, fragt Entf, ob die gewählten Einträge entfernt werden sollen."),
+
+  H.h3("Erweitern 1: Entfernen rückgängig"),
+
+  H.p("auswahl_entfernen merkt sich, was es entfernt, und ein neuer Menüeintrag fügt es wieder ein (code/loesungen/kap06_zurueck.dh):"),
+
+  ...neu("loesungen/kap06_zurueck.dh").map((t) => H.code(t)),
+
+  H.p("Die Einträge kommen mit ihrer alten Kennung zurück — INSERT mit der Spalte id —, und weil laden nach Kennung sortiert, stehen sie danach wieder an ihrem alten Platz. Der Eintrag hat kein Kürzel: Strg+Z gehört den Textfeldern, die damit das letzte Tippen zurücknehmen; ein Menüeintrag mit demselben Kürzel nähme es ihnen weg. GUI_MENU_ENABLE in jedem Bild hält ihn gesperrt, solange es nichts zurückzuholen gibt."),
+
+  H.h3("Erweitern 2: die Filterzeile im Menü"),
+
+  H.p("Ein drittes Menü mit einem Häkchen-Eintrag (code/loesungen/kap06_filter.dh):"),
+
+  ...neu("loesungen/kap06_filter.dh").map((t) => H.code(t)),
+
+  H.p("GUI_MENU_CHECK macht den Eintrag zu einem mit Häkchen und setzt es; danach kippt jeder Klick es selbst. Das Programm liest mit GUI_MENU_CHECKED, wie es steht, und stellt die Tabelle danach ein. IIF wählt zwischen zwei Werten: 1, wenn das Häkchen gesetzt ist, sonst 0."),
+
   H.h2("Kapitel 8 · Das erste Projekt"),
 
   H.h3("Drehen 1"),

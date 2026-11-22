@@ -51,7 +51,7 @@ module.exports = (H) => [
 
   H.pmix([["GUI_RULE", true], " hängt eine Regel an ein Feld: ", ["pflicht", true], " (darf nicht leer sein, eine Auswahl muss gewählt sein), ", ["laenge", true], " (so viele Zeichen), ", ["bereich", true], " (eine Zahl zwischen zwei Grenzen). Der letzte Text ist die Meldung; ohne ihn sagt die gui selbst etwas Passendes. Es gibt noch ", ["zahl", true], ", ", ["ganz", true], ", ", ["email", true], ", ", ["datum", true], " und ", ["muster", true], " für alles, was sich als regulärer Ausdruck schreiben lässt."]),
 
-  H.pmix(["Wohin die Meldung kommt, sagt ", ["GUI_ERROR_LABEL", true], ": in eine Beschriftung, die sich alle Felder teilen und die zwischen Formular und Tabelle steht. ", ["GUI_VALIDATE_LIVE", true], " prüft ein Feld, sobald man es verlässt — nicht bei jedem Tastendruck, denn ein halb getipptes Jahr ist noch kein falsches. Beim Speichern prüft ein Befehl alles:"]),
+  H.pmix(["Wohin die Meldung kommt, sagt ", ["GUI_ERROR_LABEL", true], ": in eine Beschriftung, die sich alle Felder teilen und die zwischen Formular und Tabelle steht. ", ["GUI_VALIDATE_LIVE", true], " prüft ein Feld, sobald man es verlässt — nicht bei jedem Tastendruck, denn ein halb getipptes Jahr ist noch kein falsches, und nur, wenn man darin etwas geändert hat: Wer durch ein leeres Feld nur hindurchgeht, hat noch nichts falsch gemacht. Beim Speichern prüft ein Befehl alles:"]),
 
   H.code(stueck("kap05/2_pruefen.dh", "' Alle Regeln auf einmal", "IF GUI_VALIDATE")),
 
