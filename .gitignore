@@ -68,6 +68,10 @@ examples/feedleser/*.db*
 # selbst an (tippspiel.db, kapNN.db, kapNN_sicherung.db, dazu -wal/-shm).
 # Das sind die Daten des Lesers, nicht der Quelltext des Buchs.
 buecher/tippspiel/code/*.db*
+# "Fenster, Formulare, Daten": die Mediathek legt ihre Datenbank und
+# Einstellungen neben dem Programm an (Kapitel 2 und 4, Loesungen).
+buecher/anwendungen/code/**/*.db*
+buecher/anwendungen/code/**/mediathek.ini
 buecher/tippspiel/code/kap*/*.db*
 # Der Export legt den Ordner mit der .exe an -- Bauergebnis, kein Quelltext.
 buecher/tippspiel/code/*_dist/

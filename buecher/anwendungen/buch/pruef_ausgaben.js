@@ -33,7 +33,10 @@ const DHRT = process.argv[2] || path.join(HERE, "..", "..", "..", "rust",
 
 // Oeffnet ein Fenster, braucht Geraete oder wartet -- ausfuehren wuerde
 // haengen oder scheitern, ohne etwas ueber das Buch zu sagen.
-const NICHT_LAUFFAEHIG = /\b(SCREEN|FLIP|WAITKEY|INPUT\b|SLEEP|HTTP_|NET_|GUI_|UI_|PLAYSOUND|PLAYMUSIC|LOADSOUND|LOADIMAGE|LOADFONT|AUDIO_|DB_|SAVE_|MOUSEX|KEYPRESSED|KEYHIT)/;
+// DB_ mit einer Datei laeuft: der Block laeuft in einem leeren
+// Verzeichnis, die Datenbank entsteht dort frisch (ab Kapitel 4 dieses
+// Buchs, 2026-11). Nur ein Server-Ziel braucht einen Server.
+const NICHT_LAUFFAEHIG = /\b(SCREEN|FLIP|WAITKEY|INPUT\b|SLEEP|HTTP_|NET_|GUI_|UI_|PLAYSOUND|PLAYMUSIC|LOADSOUND|LOADIMAGE|LOADFONT|AUDIO_|SAVE_|MOUSEX|KEYPRESSED|KEYHIT)|(postgres|postgresql|mysql|mariadb):\/\//;
 
 const bloecke = [];   // in Dokumentreihenfolge: {datei, zeilen, ist_ausgabe}
 let datei = "";
@@ -72,7 +75,11 @@ const befunde = [];
 for (const p of paare) {
   const quelle = p.code.zeilen.join("\n") + "\n";
   if (NICHT_LAUFFAEHIG.test(quelle)) { uebersprungen++; continue; }
-  const f = path.join(tmp, "block.dh");
+  // Jeder Block in einem EIGENEN leeren Verzeichnis: ein Block, der eine
+  // Datenbank anlegt, darf dem naechsten nichts hinterlassen (Kapitel 4:
+  // "0 Eintraege" nach dem vergessenen Commit war sonst "2", die Zeilen
+  // aus Schritt 1).
+  const f = path.join(fs.mkdtempSync(path.join(tmp, "b")), "block.dh");
   fs.writeFileSync(f, quelle, "utf8");
   const r = spawnSync(DHRT, ["run", f], { encoding: "utf8", timeout: 20000 });
   if (r.error || r.status !== 0) { uebersprungen++; continue; }   // Bruchstueck

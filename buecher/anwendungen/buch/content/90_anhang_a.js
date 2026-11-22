@@ -66,7 +66,7 @@ module.exports = (H) => [
 
   ...neu("loesungen/kap02_groesse.dh").map((t) => H.code(t)),
 
-  H.p("MAPGETOR liefert die Vorgabe, solange es die Datei oder den Eintrag nicht gibt — beim allerersten Start. Fenster und Spalte entstehen danach mit breite und hoehe statt mit 560 und 300. Wer das Fenster maximiert und dann beendet, findet es beim nächsten Start so groß wie den Bildschirm, aber nicht maximiert; wer das unterscheiden will, fragt WINDOW_MAXIMIZED() und legt es mit ab."),
+  H.p("MAP_GET_OR liefert die Vorgabe, solange es die Datei oder den Eintrag nicht gibt — beim allerersten Start. Fenster und Spalte entstehen danach mit breite und hoehe statt mit 560 und 300. Wer das Fenster maximiert und dann beendet, findet es beim nächsten Start so groß wie den Bildschirm, aber nicht maximiert; wer das unterscheiden will, fragt WINDOW_MAXIMIZED() und legt es mit ab."),
 
   H.h2("Kapitel 3 · Listen und Tabellen"),
 
@@ -97,6 +97,36 @@ module.exports = (H) => [
   ...neu("loesungen/kap03_suche.dh").map((t) => H.code(t)),
 
   H.p("Jede Stelle, die von einer Zeile zu einem Eintrag geht, übersetzt jetzt über zu_eintrag — zeigen und das Entfernen. Entfernt wird aus dem Feld, dann wird die Tabelle neu gebaut; das ist einfacher, als beide Felder und die Tabelle gleichzeitig nachzuführen. GUI_CHANGED(suche) ist in jedem Bild wahr, in dem jemand im Suchfeld etwas geändert hat, die Tabelle folgt also jedem Buchstaben."),
+
+  H.h2("Kapitel 4 · Daten, die bleiben"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Die zehn Beispiele sind wieder da, mit den Kennungen 1 bis 10, und alles, was man aufgenommen oder entfernt hatte, ist vergessen. Ohne Datei legt DB_OPEN eine neue, leere an, laden findet nichts, und die Mediathek füllt sich wie beim allerersten Start. Die Datei IST die Mediathek; wer sie sichert, sichert alles."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Der erste Start läuft wie gewohnt. Beim zweiten gibt es die Tabelle schon, und CREATE TABLE ohne IF NOT EXISTS bricht ab: „DB_EXEC: table eintrag already exists“. Ein Programm, das mit einer Datei arbeitet, startet fast nie zum ersten Mal — IF NOT EXISTS sagt: Lege an, was fehlt, und lass stehen, was da ist."),
+
+  H.h3("Drehen 3"),
+
+  H.p("Die Tabelle beginnt alphabetisch: Abbey Road, Der kleine Prinz, Die Siedler von Catan … Das Feld mediathek ist in derselben Reihenfolge gefüllt, Zeile n ist also weiter Eintrag n, und das DELETE geht nach der Kennung, nicht nach der Position. Entfernen trifft darum das Richtige. Ein neu aufgenommener Eintrag kommt aber ans Ende, nicht an seinen Platz im Alphabet — bis zum nächsten Start."),
+
+  H.h3("Erweitern 1: Ausleihen"),
+
+  H.p("Eine zweite Tabelle, deren Schlüssel die Kennung des Eintrags ist; damit kann ein Eintrag höchstens einmal verliehen sein (code/loesungen/kap04_ausleihe.dh):"),
+
+  ...neu("loesungen/kap04_ausleihe.dh").map((t) => H.code(t)),
+
+  H.p("REFERENCES eintrag(id) sagt, dass in der Spalte eintrag die Kennung eines Eintrags steht. INSERT OR REPLACE legt eine Ausleihe an oder ersetzt die vorhandene — wer einen verliehenen Eintrag an jemand anderen gibt, braucht keinen eigenen Fall. Beim Entfernen eines Eintrags fällt seine Ausleihe in derselben Transaktion mit weg; sonst stünde in der Tabelle ausleihe eine Kennung, die es nicht mehr gibt. Die Namen liegen im Programm in einer MAP von der Kennung zum Namen, damit die fünfte Spalte beim Laden schnell gefüllt ist."),
+
+  H.h3("Erweitern 2: Entfernen mit Nachfrage"),
+
+  H.p("Ein Merker und zwei kleine SUBs; die Schleife fragt den Merker, bevor sie entfernt (code/loesungen/kap04_nachfrage.dh):"),
+
+  ...neu("loesungen/kap04_nachfrage.dh").map((t) => H.code(t)),
+
+  H.p("Die Frage steht im Knopf selbst, dort, wo man gerade hinsieht, und die Statuszeile sagt, wie viele es sind. Ein Klick in die Tabelle oder auf „Aufnehmen“ nimmt die Frage zurück — wer etwas anderes tut, meint das Entfernen nicht mehr. Einen richtigen Dialog, der wartet, bis man antwortet, zeigt Kapitel 6."),
 
   H.h2("Kapitel 8 · Das erste Projekt"),
 

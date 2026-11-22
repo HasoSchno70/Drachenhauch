@@ -9,9 +9,9 @@ IF FILEEXISTS("mediathek.ini") THEN
     einstellungen = INI_LOAD("mediathek.ini")
 END IF
 DIM breite AS INTEGER
-breite = INT(VAL(MAPGETOR(einstellungen, "fenster.breite", "560")))
+breite = INT(VAL(MAP_GET_OR(einstellungen, "fenster.breite", "560")))
 DIM hoehe AS INTEGER
-hoehe = INT(VAL(MAPGETOR(einstellungen, "fenster.hoehe", "300")))
+hoehe = INT(VAL(MAP_GET_OR(einstellungen, "fenster.hoehe", "300")))
 SCREEN(breite, hoehe, "Mediathek", 1)
 ' <<< neu
 WINDOW_RESIZABLE(TRUE)
@@ -99,7 +99,7 @@ WEND
 ' >>> neu
 ' Beim Beenden die Groesse ablegen -- beim naechsten Start oeffnet
 ' SCREEN das Fenster gleich so.
-MAPPUT(einstellungen, "fenster.breite", STR$(SCREENWIDTH()))
-MAPPUT(einstellungen, "fenster.hoehe", STR$(SCREENHEIGHT()))
+MAP_PUT(einstellungen, "fenster.breite", STR$(SCREENWIDTH()))
+MAP_PUT(einstellungen, "fenster.hoehe", STR$(SCREENHEIGHT()))
 INI_SAVE("mediathek.ini", einstellungen)
 ' <<< neu
