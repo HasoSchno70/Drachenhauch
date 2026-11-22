@@ -819,6 +819,26 @@ geht in den erzeugten Code; `GUI_STATE$` zeigt Tabellen samt gewählter
 Zeile; HTTP-Fehler nennen die Adresse einmal und sagen, ob das Netz oder
 die Zeitgrenze schuld war.
 
+Danach (2026-11-22): Buch B, Teil IV, Kapitel 17–24 (Berichte und
+Drucken, Diagramme, Ein- und Ausfuhr, Aussehen, Für alle, Zwei Sprachen,
+Weitergeben, Was nun?). Die Mediathek bekommt eine Ausleihliste und eine
+Karteikarte mit Strichcode, eine Statistik mit zwei Diagrammen, Excel-
+Ausfuhr und das Einlesen einer alten CSV mit Fehlerliste, ein Thema, eine
+Stildatei und ein eigenes Control (Cover-Kachel), Tab-Folge, Kürzel und
+Ansagen nach `GUI_A11Y_CHECK$`, eine englische Tafel, Daten und
+Einstellungen im Benutzerordner, ein Symbol, einen Installer (Inno Setup)
+und eine Web-Seite im Heimnetz (`httpd`). Funde, je mit Fall und
+Gegenprobe: Strichcode und Summen über den ganzen Bericht, eine Warnung
+für `FILE_SAVE_DIALOG` mit nur einer Endung, Diagrammschritte nach den
+Nachkommastellen, die Stildatei im Projekt und Klassen im Inspektor, die
+Tab-Folge einer Instanz für ihre Teile, `GUI_STATE$` mit Kacheln und der
+letzten Ansage, `GUI_TABLE_ROW_RECT`, lesbare gewählte Zeile und leise
+Schrift mit 4,5:1 in jedem Thema, `GUI_DIALOG` bricht lange Zeilen um,
+`GUI_SCALE` in `App.Geoeffnet` vergrößert das Programmfenster,
+Projekt → Sprachtafel ergänzen, `DIR_USER_DATA$` und der Haken „Im
+Benutzerordner“ am Datenbank-Element, und die Prüfung der Schreibweise
+nimmt nur Mitglieder der Elternklassen als geerbt.
+
 Was beim Bauen festgelegt wurde:
 
 * **Code kommt aus Dateien.** `buch/code_lesen.js` holt ganze Programme,
