@@ -1090,3 +1090,227 @@ table#tabelle 5 Zeilen, gewaehlt 4 ("Tetris" "Alexei Paschitnow" "Spiel" "1984" 
 danach table#liste 0 Zeilen, gewaehlt -1:
 beliebt table#liste 2 Zeilen, gewaehlt -1: "Momo" "Tetris"
 monate table#liste 2 Zeilen
+
+
+=== kapitel 16: aus dem netz
+' Kapitel 16: das Bearbeitungsfenster schlaegt eine ISBN nach -- gegen einen
+' Server, der Open Library spielt (server.dh, Port in port.txt). Die Kopien
+' der Programme bekommen dessen Adresse als QUELLE und legen die ISBN
+' (Umgebung ISBN) in die Zwischenablage. Bekannt mit Bindestrichen, mit
+' Cover und Sichern; unbekannt; zu kurz; Abbrechen einer langsamen Antwort;
+' kein Netz. Dazu die Loesungen (Cache, Sekunden).
+IMPORT "laeufer.dh"
+IMPORT "db"
+IMPORT "json"
+SUB kopieren(von AS STRING, nach AS STRING)
+    IF NOT DIREXISTS(nach) THEN MKDIR(nach)
+    DIM n AS STRING
+    FOR EACH n IN DIRLIST(von)
+        IF DIREXISTS(von + "/" + n) THEN
+            IF n <> "_studio" THEN kopieren(von + "/" + n, nach + "/" + n)
+        ELSEIF RIGHT$(n, 3) <> ".db" THEN
+            COPYFILE(von + "/" + n, nach + "/" + n)
+        END IF
+    NEXT
+END SUB
+FUNCTION bedienen$(main AS STRING, ev AS ARRAY OF STRING, bilder AS INTEGER) AS STRING
+    DIM pf AS STRING : pf = CWD$() + "/bedienung.txt"
+    WRITEALL(pf, "c " + STR$(LEN(ev)) + CHR$(10) + JOIN$(ev, CHR$(10)) + CHR$(10) + CHR$(10))
+    SETENV("DHRT_ABSPIELEN", pf)
+    SETENV("DHRT_GUI_ZUSTAND", "1")
+    DIM q AS INTEGER : q = PROCESS_START("dhrt", "run", "--bilder", STR$(bilder), main)
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    WHILE leer < 5
+        DIM t AS STRING : t = PROCESS_READ$(q) + PROCESS_ERR$(q)
+        aus = aus + t
+        IF t = "" AND NOT PROCESS_RUNNING(q) THEN leer = leer + 1
+        SLEEP(20)
+    WEND
+    SETENV("DHRT_ABSPIELEN", "")
+    SETENV("DHRT_GUI_ZUSTAND", "")
+    RETURN aus
+END FUNCTION
+SUB klick(ev AS ARRAY OF STRING, b AS INTEGER, x AS INTEGER, y AS INTEGER)
+    ARRAY_PUSH(ev, "e " + STR$(b) + " 7 " + STR$(x) + " " + STR$(y) + " 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 2) + " 7 " + STR$(x) + " " + STR$(y) + " 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 4) + " 6 0 0 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 6) + " 5 0 0 0 0")
+END SUB
+' Die Zeile des Zustands zu einem Widget.
+FUNCTION zeile$(aus AS STRING, was AS STRING) AS STRING
+    DIM z AS STRING
+    FOR EACH z IN SPLIT$(REPLACE$(aus, CHR$(13), ""), CHR$(10))
+        IF INSTR(z, was) >= 0 THEN RETURN TRIM$(z)
+    NEXT
+    RETURN ""
+END FUNCTION
+FUNCTION wert$(datei AS STRING, sql AS STRING) AS STRING
+    DIM d AS DB_CONN : d = DB_OPEN(datei)
+    DIM r AS DB_RESULT : r = DB_QUERY(d, sql)
+    DIM w AS STRING : w = "?"
+    IF DB_NEXT(r) THEN w = DB_GET_STRING(r, 0)
+    DB_CLOSE(d)
+    RETURN w
+END FUNCTION
+SUB f5(nm AS STRING, p AS STRING)
+    slZeilen = []
+    slBild = 0
+    slHin(10, 10)
+    slWarten(10)
+    slTaste(294)
+    slWarten(150)
+    slAufnahmeSchreiben(CWD$() + "/f5.txt")
+    SETENV("DH_STUDIO_LAUF_BILDER", "20")
+    DIM lg AS STRING : lg = CWD$() + "/" + nm + ".log"
+    DIM aus AS STRING : aus = slStarten(lg, CWD$() + "/f5.txt", slBild + 20, p)
+    PRINT nm; " geprueft "; slHat(lg, "geprueft 0 0"); " beendet "; slHat(lg, "beendet 0")
+    IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+END SUB
+SUB ersetzen(datei AS STRING, alt AS STRING, neu AS STRING)
+    DIM t AS STRING : t = READALL(datei)
+    IF INSTR(t, alt) < 0 THEN PRINT "nicht gefunden: "; alt
+    WRITEALL(datei, REPLACE$(t, alt, neu))
+END SUB
+
+SUB umleiten(main AS STRING, quelle AS STRING)
+    DIM f AS STRING : f = main + "/../projekt/EintragFenster.dh"
+    ersetzen(f, "CONST QUELLE = " + CHR$(34) + "https://openlibrary.org" + CHR$(34), "CONST QUELLE = " + CHR$(34) + quelle + CHR$(34))
+    ersetzen(f, "        GUI_FOCUS(Self.feldIsbn)" + CHR$(10) + "    END SUB", "        GUI_FOCUS(Self.feldIsbn)" + CHR$(10) + "        CLIPBOARD_SET(GETENV$(" + CHR$(34) + "ISBN" + CHR$(34) + "))" + CHR$(10) + "    END SUB")
+END SUB
+' Neu, ISBN einfuegen, Nachschlagen (Lagen mit Menueleiste).
+FUNCTION nachschlagen(isbn AS STRING, nochmal AS BOOLEAN) AS ARRAY OF STRING
+    SETENV("ISBN", isbn)
+    DIM ev AS ARRAY OF STRING : ev = []
+    klick(ev, 0, 295, 453)
+    klick(ev, 20, 320, 148)
+    ARRAY_PUSH(ev, "e 30 2 341 0 0 0")
+    ARRAY_PUSH(ev, "e 32 2 86 0 0 0")
+    ARRAY_PUSH(ev, "e 34 1 86 0 0 0")
+    ARRAY_PUSH(ev, "e 36 1 341 0 0 0")
+    klick(ev, 42, 474, 148)
+    IF nochmal THEN klick(ev, 70, 474, 148)
+    RETURN ev
+END FUNCTION
+FUNCTION zeilen$(aus AS STRING, was AS ARRAY OF STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = []
+    DIM w AS STRING
+    FOR EACH w IN was
+        ARRAY_PUSH(t, zeile$(aus, w))
+    NEXT
+    RETURN JOIN$(t, " | ")
+END FUNCTION
+
+DIM code AS STRING : code = ARG$(1) + "/buecher/anwendungen/code/"
+DIM proj AS STRING
+FOR EACH proj IN ["kap16/mediathek", "loesungen/kap16_cache", "loesungen/kap16_sekunden"]
+    DIM nm AS STRING : nm = BASENAME(proj)
+    IF nm = "mediathek" THEN nm = "kap16_mediathek"
+    kopieren(code + proj, CWD$() + "/" + nm)
+    f5(nm, CWD$() + "/" + nm)
+NEXT
+COPYFILE(ARG$(1) + "/daten/bilder/logo.png", CWD$() + "/cover.png")
+WRITEALL(CWD$() + "/anfragen.txt", "")
+DIM sp AS INTEGER : sp = PROCESS_START("dhrt", "run", CWD$() + "/server.dh", "--", "150")
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE NOT FILEEXISTS(CWD$() + "/port.txt") AND MILLIS() - t0 < 15000
+    SLEEP(20)
+WEND
+DIM quelle AS STRING : quelle = "http://127.0.0.1:" + TRIM$(READALL(CWD$() + "/port.txt"))
+DIM nm2 AS STRING
+FOR EACH nm2 IN ["kap16_mediathek", "kap16_cache", "kap16_sekunden"]
+    umleiten(CWD$() + "/" + nm2 + "/_studio/main.dh", quelle)
+NEXT
+DIM m AS STRING : m = CWD$() + "/kap16_mediathek/_studio/main.dh"
+DIM felder AS ARRAY OF STRING
+felder = ["textinput#feldtitel", "textinput#feldurheber", "textinput#feldjahr", "label#hinweis"]
+DIM ev AS ARRAY OF STRING
+DIM a AS STRING
+' Bekannt, mit Bindestrichen (Drehen 2), dann OK: isbn und Cover in der Datei.
+PRINT zeilen$(bedienen$(m, nachschlagen("978-3-522-20260-2", FALSE), 120), felder)
+ev = nachschlagen("978-3-522-20260-2", FALSE)
+klick(ev, 90, 510, 379)
+a = bedienen$(m, ev, 120)
+DIM d AS DB_CONN : d = DB_OPEN(CWD$() + "/kap16_mediathek/_studio/mediathek.db")
+DIM r AS DB_RESULT : r = DB_QUERY(d, "SELECT isbn, length(cover) > 1000 FROM eintrag WHERE titel = 'Die unendliche Geschichte'")
+IF DB_NEXT(r) THEN PRINT "gesichert "; DB_GET_STRING(r, 0); " cover "; DB_GET_STRING(r, 1)
+DB_CLOSE(d)
+PRINT zeile$(bedienen$(m, nachschlagen("9783000000001", FALSE), 80), "label#hinweis")
+PRINT zeile$(bedienen$(m, nachschlagen("123", FALSE), 60), "label#hinweis")
+' Erweitern 1: zweimal dieselbe ISBN -- der Server sieht eine Anfrage.
+DIM mc AS STRING : mc = CWD$() + "/kap16_cache/_studio/main.dh"
+DIM vorher AS INTEGER : vorher = LEN(READLINES(CWD$() + "/anfragen.txt"))
+a = bedienen$(mc, nachschlagen("9783522202602", FALSE), 100)
+a = bedienen$(mc, nachschlagen("9783522202602", FALSE), 100)
+DIM api AS INTEGER : api = 0
+DIM z AS STRING
+DIM alle AS ARRAY OF STRING : alle = READLINES(CWD$() + "/anfragen.txt")
+DIM i AS INTEGER
+FOR i = vorher TO LEN(alle) - 1
+    IF LEFT$(alle[i], 10) = "/api/books" THEN api = api + 1
+NEXT
+PRINT "cache "; api; " "; zeile$(a, "textinput#feldtitel")
+' Langsame Antwort (der Server schlaeft 15 s und bedient solange keinen
+' anderen -- darum am Schluss), zweiter Klick bricht ab.
+PRINT zeile$(bedienen$(m, nachschlagen("9783000000002", TRUE), 100), "label#hinweis")
+' Erweitern 2: waehrend der langsamen Antwort zaehlt der Hinweis.
+a = zeile$(bedienen$(CWD$() + "/kap16_sekunden/_studio/main.dh", nachschlagen("9783000000002", FALSE), 200), "label#hinweis")
+PRINT "sekunden "; INSTR(a, "Frage Open Library ... ") >= 0 AND INSTR(a, " s" + CHR$(34)) >= 0
+PROCESS_KILL(sp)
+' Kein Netz: niemand lauscht.
+ersetzen(m + "/../projekt/EintragFenster.dh", quelle, "http://127.0.0.1:9")
+a = zeile$(bedienen$(m, nachschlagen("9783522202602", FALSE), 200), "label#hinweis")
+PRINT "kein netz "; INSTR(a, "Keine Antwort: HTTP-Fehler: http://127.0.0.1:9/api/books") >= 0
+--- argumente
+{sammlung}/../../../studio/studio.dh
+{sammlung}/../../..
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei server.dh
+' Spielt Open Library fuer die Pruefung: /api/books?bibkeys=ISBN:...
+' 9783522202602 -> Daten mit Cover, 9783000000001 -> {} (unbekannt),
+' 9783000000002 -> antwortet erst nach 15 s (Zeitgrenze), /cover.png.
+' Laeuft hoechstens ARG$(0) Sekunden; schreibt "port N" in port.txt.
+IMPORT "httpd"
+DIM s AS HTTPD : s = HTTPD_START(0, "127.0.0.1")
+DIM port AS INTEGER : port = HTTPD_PORT(s)
+WRITEALL("port.txt", STR$(port))
+DIM q AS STRING : q = CHR$(34)
+DIM bis AS INTEGER : bis = MILLIS() + INT(VAL(ARG$(0))) * 1000
+WHILE MILLIS() < bis
+    IF HTTPD_ACCEPT(s) THEN
+        DIM pfad AS STRING : pfad = HTTPD_PATH$(s)
+        DIM k AS STRING : k = HTTPD_QUERY$(s, "bibkeys")
+        APPENDFILE("anfragen.txt", pfad + " " + k + CHR$(10))
+        IF pfad = "/cover.png" THEN
+            HTTPD_SEND_FILE(s, 200, "cover.png")
+        ELSEIF k = "ISBN:9783522202602" THEN
+            DIM j AS STRING
+            j = "{" + q + k + q + ": {" + q + "title" + q + ": " + q + "Die unendliche Geschichte" + q + ", "
+            j = j + q + "authors" + q + ": [{" + q + "name" + q + ": " + q + "Michael Ende" + q + "}], "
+            j = j + q + "publish_date" + q + ": " + q + "Jan 15, 2019" + q + ", "
+            j = j + q + "cover" + q + ": {" + q + "medium" + q + ": " + q + "http://127.0.0.1:" + STR$(port) + "/cover.png" + q + "}}}"
+            HTTPD_SEND(s, 200, "application/json", j)
+        ELSEIF k = "ISBN:9783000000002" THEN
+            SLEEP(15000)
+            HTTPD_SEND(s, 200, "application/json", "{}")
+        ELSE
+            HTTPD_SEND(s, 200, "application/json", "{}")
+        END IF
+    END IF
+    SLEEP(5)
+WEND
+HTTPD_STOP(s)
+--- erwartet
+kap16_mediathek geprueft TRUE beendet TRUE
+kap16_cache geprueft TRUE beendet TRUE
+kap16_sekunden geprueft TRUE beendet TRUE
+textinput#feldtitel "Die unendliche Geschichte" | textinput#feldurheber "Michael Ende" | textinput#feldjahr "2019" | label#hinweis "Gefunden, mit Cover."
+gesichert 978-3-522-20260-2 cover 1
+label#hinweis "Unter dieser ISBN kennt Open Library nichts."
+label#hinweis "Eine ISBN hat 10 oder 13 Ziffern."
+cache 1 textinput#feldtitel "Die unendliche Geschichte"
+label#hinweis "Abgebrochen."
+sekunden TRUE
+kein netz TRUE
