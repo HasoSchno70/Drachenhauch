@@ -408,3 +408,209 @@ orange TRUE TRUE
 abbrechen TRUE
 info 2 TRUE TRUE
 nil TRUE
+
+=== kapitel 12: der debugger findet den fehler nach entfernen
+' Kapitel 12: Haltepunkt auf Self.ausleihe.folgen(NIL) in
+' knopfEntfernen_Klick (Mediathek aus Kapitel 11), F7. Das Programm
+' bekommt seine Klicks ueber DHRT_ABSPIELEN, das es vom Studio erbt:
+' Metropolis, "Ausleihen ...", "Entfernen", Enter. Der Debugger haelt in
+' Zeile 10 mit Self und z = 1; F11 geht in folgen, dort ist e NIL. Dazu
+' die korrigierte Mediathek (Kapitel 12) und die Loesungen.
+IMPORT "laeufer.dh"
+SUB kopieren(von AS STRING, nach AS STRING)
+    IF NOT DIREXISTS(nach) THEN MKDIR(nach)
+    DIM n AS STRING
+    FOR EACH n IN DIRLIST(von)
+        IF DIREXISTS(von + "/" + n) THEN
+            IF n <> "_studio" THEN kopieren(von + "/" + n, nach + "/" + n)
+        ELSE
+            COPYFILE(von + "/" + n, nach + "/" + n)
+        END IF
+    NEXT
+END SUB
+FUNCTION bedienen$(main AS STRING, ev AS ARRAY OF STRING, bilder AS INTEGER) AS STRING
+    DIM pf AS STRING : pf = CWD$() + "/bedienung.txt"
+    WRITEALL(pf, "c " + STR$(LEN(ev)) + CHR$(10) + JOIN$(ev, CHR$(10)) + CHR$(10) + CHR$(10))
+    SETENV("DHRT_ABSPIELEN", pf)
+    SETENV("DHRT_GUI_ZUSTAND", "1")
+    DIM q AS INTEGER : q = PROCESS_START("dhrt", "run", "--bilder", STR$(bilder), main)
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    WHILE leer < 5
+        DIM t AS STRING : t = PROCESS_READ$(q) + PROCESS_ERR$(q)
+        aus = aus + t
+        IF t = "" AND NOT PROCESS_RUNNING(q) THEN leer = leer + 1
+        SLEEP(20)
+    WEND
+    SETENV("DHRT_ABSPIELEN", "")
+    SETENV("DHRT_GUI_ZUSTAND", "")
+    RETURN aus
+END FUNCTION
+SUB klick(ev AS ARRAY OF STRING, b AS INTEGER, x AS INTEGER, y AS INTEGER)
+    ARRAY_PUSH(ev, "e " + STR$(b) + " 7 " + STR$(x) + " " + STR$(y) + " 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 2) + " 7 " + STR$(x) + " " + STR$(y) + " 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 4) + " 6 0 0 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 6) + " 5 0 0 0 0")
+END SUB
+' Metropolis, Ausleihen, Entfernen, Enter (Lagen im Hauptfenster).
+FUNCTION entfernen(zeile AS INTEGER) AS ARRAY OF STRING
+    DIM ev AS ARRAY OF STRING : ev = ["e 0 7 600 470 0 0"]
+    klick(ev, 30, 100, zeile)
+    klick(ev, 50, 670, 427)
+    klick(ev, 80, 540, 427)
+    ARRAY_PUSH(ev, "e 110 2 257 0 0 0")
+    ARRAY_PUSH(ev, "e 112 1 257 0 0 0")
+    RETURN ev
+END FUNCTION
+
+DIM code AS STRING : code = ARG$(1) + "/buecher/anwendungen/code/"
+DIM p AS STRING : p = CWD$() + "/kap11_mediathek"
+kopieren(code + "kap11/mediathek", p)
+' Erster Lauf misst die Lagen im Navigator.
+DIM m AS STRING : m = CWD$() + "/messen.log"
+slStarten(m, "", 6, p)
+DIM px AS INTEGER
+DIM py AS INTEGER
+(px, py) = slLage(m, "knoten (projekt)")
+DIM kx AS INTEGER
+DIM ky AS INTEGER
+(kx, ky) = slLage(m, "knoten Hauptfenster.knopfEntfernen_Klick")
+' Der Navigator ist kurz: das Mausrad schiebt je Raststufe eine Zeile (22).
+DIM stufen AS INTEGER : stufen = MAX(0, (ky - py - 88) \ 22)
+slZeilen = []
+slBild = 0
+slHin(px + 60, py + 40)
+slWarten(10)
+ARRAY_PUSH(slZeilen, "e " + STR$(slBild) + " 8 0 " + STR$(-stufen) + " 0 0")
+slWarten(10)
+slKlick(kx + 40, ky - 22 * stufen)
+slWarten(20)
+slMit([341], 268)
+slWarten(4)
+DIM k AS INTEGER
+FOR k = 1 TO 9
+    slTaste(264)
+NEXT
+slTaste(298)
+slWarten(10)
+slTaste(296)
+slWarten(600)
+slTaste(300)
+slWarten(120)
+slMit([340], 294)
+slWarten(60)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+DIM kind AS STRING : kind = CWD$() + "/kind.txt"
+DIM ke AS ARRAY OF STRING : ke = entfernen(71)
+WRITEALL(kind, "c " + STR$(LEN(ke)) + CHR$(10) + JOIN$(ke, CHR$(10)) + CHR$(10) + CHR$(10))
+SETENV("DHRT_ABSPIELEN", kind)
+DIM log AS STRING : log = CWD$() + "/s.log"
+slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+SETENV("DHRT_ABSPIELEN", "")
+DIM z AS STRING
+FOR EACH z IN slProtokoll(log)
+    IF LEFT$(z, 11) = "haltepunkt " OR LEFT$(z, 11) = "angehalten " OR LEFT$(z, 6) = "debug " THEN PRINT z
+    IF z = "variable Self = <Hauptfenster>" OR z = "variable z = 1" OR z = "variable t = Metropolis" THEN PRINT z
+    IF z = "variable Self = <AusleihFenster>" THEN PRINT z
+    IF z = "variable eintraege = <ARRAY[4] OF Eintrag>" OR LEFT$(z, 11) = "variable e " THEN PRINT z
+NEXT
+
+' Was schiefgehen kann: ein Laufzeitfehler haelt im Debugger an seiner
+' Stelle -- die Mediathek aus Kapitel 11 ohne die Abfrage, ob das
+' Ausleihfenster offen ist; ein Klick auf Momo. Self.gewaehlt ist NIL.
+DIM pf AS STRING : pf = CWD$() + "/kap11_ohne_offen"
+kopieren(code + "kap11/mediathek", pf)
+DIM af AS STRING : af = pf + "/AusleihFenster.dh"
+WRITEALL(af, REPLACE$(READALL(af), "IF Self.offen THEN Self.anzeigen()", "Self.anzeigen()"))
+slZeilen = []
+slBild = 0
+slHin(10, 10)
+slWarten(10)
+slTaste(296)
+slWarten(600)
+slMit([340], 294)
+slWarten(60)
+slAufnahmeSchreiben(CWD$() + "/ev2.txt")
+ke = ["e 0 7 600 470 0 0"]
+klick(ke, 30, 100, 51)
+WRITEALL(kind, "c " + STR$(LEN(ke)) + CHR$(10) + JOIN$(ke, CHR$(10)) + CHR$(10) + CHR$(10))
+SETENV("DHRT_ABSPIELEN", kind)
+DIM log2 AS STRING : log2 = CWD$() + "/s2.log"
+slStarten(log2, CWD$() + "/ev2.txt", slBild + 20, pf)
+SETENV("DHRT_ABSPIELEN", "")
+FOR EACH z IN slProtokoll(log2)
+    IF LEFT$(z, 11) = "angehalten " OR z = "variable Self = <AusleihFenster>" OR z = "variable gewaehlt = NIL" THEN PRINT z
+    IF z = "variable offen = FALSE" OR INSTR(z, "Laufzeitfehler in AusleihFenster.anzeigen") >= 0 THEN PRINT z
+NEXT
+
+' Die Korrektur: nach Entfernen folgt das Ausleihfenster der Tabelle.
+DIM proj AS STRING
+FOR EACH proj IN ["kap12/mediathek", "loesungen/kap12_letzter", "loesungen/kap12_hinweis"]
+    DIM nm AS STRING : nm = BASENAME(proj)
+    IF nm = "mediathek" THEN nm = "kap12_mediathek"
+    DIM pp AS STRING : pp = CWD$() + "/" + nm
+    kopieren(code + proj, pp)
+    slZeilen = []
+    slBild = 0
+    slHin(10, 10)
+    slWarten(10)
+    slTaste(294)
+    slWarten(150)
+    slAufnahmeSchreiben(CWD$() + "/f5.txt")
+    SETENV("DH_STUDIO_LAUF_BILDER", "20")
+    DIM lg AS STRING : lg = CWD$() + "/" + nm + ".log"
+    DIM aus AS STRING : aus = slStarten(lg, CWD$() + "/f5.txt", slBild + 20, pp)
+    PRINT nm; " geprueft "; slHat(lg, "geprueft 0 0"); " beendet "; slHat(lg, "beendet 0")
+    IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+NEXT
+DIM a AS STRING
+a = bedienen$(CWD$() + "/kap12_mediathek/_studio/main.dh", entfernen(71), 140)
+PRINT "korrigiert "; INSTR(a, "Tetris ist bei Lena.") >= 0
+' Drehen 3: der letzte Eintrag -- danach ist keine Zeile gewaehlt.
+a = bedienen$(CWD$() + "/kap12_mediathek/_studio/main.dh", entfernen(131), 140)
+PRINT "letzter "; INSTR(a, "Kein Eintrag gew") >= 0
+' Erweitern 1: dann der davor.
+a = bedienen$(CWD$() + "/kap12_letzter/_studio/main.dh", entfernen(131), 140)
+PRINT "davor "; INSTR(a, "Kind of Blue ist da.") >= 0
+' Erweitern 2: Bearbeiten und Entfernen ohne Auswahl sagen es.
+DIM ohne AS ARRAY OF STRING
+FOR EACH k IN [415, 540]
+    ohne = ["e 0 7 600 470 0 0"]
+    klick(ohne, 6, k, 427)
+    a = bedienen$(CWD$() + "/kap12_hinweis/_studio/main.dh", ohne, 30)
+    PRINT "hinweis "; INSTR(a, "Bitte erst einen Eintrag w") >= 0
+NEXT
+--- argumente
+{sammlung}/../../../studio/studio.dh
+{sammlung}/../../..
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- erwartet
+haltepunkt Hauptfenster.knopfEntfernen_Klick 10
+debug gestartet
+debug continue
+variable Self = <Hauptfenster>
+variable eintraege = <ARRAY[4] OF Eintrag>
+variable z = 1
+variable t = Metropolis
+angehalten Hauptfenster.knopfEntfernen_Klick, Zeile 10
+debug step-into
+variable Self = <AusleihFenster>
+variable e = NIL
+angehalten AusleihFenster.folgen, Zeile 1
+debug stop
+debug ende
+ausgabe Laufzeitfehler in AusleihFenster.anzeigen, Zeile 4: GUI_SET_TEXT: erwartet INTEGER (Arg 1), erhalten NIL -- das Widget oder Fenster gibt es noch nicht (ein Fenster aus dem Studio legt seine Controls erst mit Zeigen an)
+variable Self = <AusleihFenster>
+variable offen = FALSE
+variable gewaehlt = NIL
+angehalten AusleihFenster.anzeigen, Zeile 4
+kap12_mediathek geprueft TRUE beendet TRUE
+kap12_letzter geprueft TRUE beendet TRUE
+kap12_hinweis geprueft TRUE beendet TRUE
+korrigiert TRUE
+letzter TRUE
+davor TRUE
+hinweis TRUE
+hinweis TRUE
