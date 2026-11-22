@@ -667,9 +667,9 @@ nach neu FALSE
 Metropolis
 
 === mediathek kapitel 5: nach dem doppelklick keine alte meldung
-' Start (Fokus im leeren Titel), Doppelklick auf Metropolis: das
-' Verlassen des Titels meldet live "Ohne Titel", das Laden nimmt die
-' Meldung wieder mit.
+' Start (Fokus im leeren Titel), Doppelklick auf Metropolis: das leere
+' Titelfeld nur zu verlassen meldet nichts, und das Laden laesst keine
+' Meldung stehen.
 prBild = prBild + 1
 IF prBild = 25 THEN
     PRINT "titel ["; GUI_TEXT(titel); "] fehler ["; GUI_TEXT(fehlerzeile); "]"
@@ -745,3 +745,208 @@ DHRT_ABSEITS=1
 --- erwartet
 Ein Buch hat einen Autor. | 10
 [] | 11
+
+=== mediathek kapitel 6: strg+s speichert genau einmal
+prBild = prBild + 1
+IF prBild = 2 THEN GUI_SET_TEXT(titel, "Ronja")
+IF prBild = 25 THEN
+    PRINT LEN(mediathek); " ["; GUI_TEXT(fehlerzeile); "] "; GUI_TEXT(status)
+    EXIT(0)
+END IF
+--- programm ../../../buecher/anwendungen/code/kap06/1_menue.dh nach     GUI_UPDATE()
+--- einschub nach WINDOW_WAIT_EVENTS(1)
+DIM prBild AS INTEGER
+--- datei tasten.txt
+c 5
+e 0 7 600 500 0 0
+e 6 2 341 0 0 0
+e 8 2 83 0 0 0
+e 9 1 83 0 0 0
+e 10 1 341 0 0 0
+
+--- umgebung
+DHRT_FRAMES=40
+DHRT_ABSPIELEN=tasten.txt
+DHRT_ABSEITS=1
+--- erwartet
+11 [] Gespeichert: Ronja
+
+=== mediathek kapitel 6: entf fragt, enter entfernt, esc nicht
+' Klick auf Metropolis (die Tabelle bekommt den Fokus), Entf: der
+' Dialog. Im ersten Lauf Enter (erster Knopf, Entfernen), im zweiten
+' Esc (letzter Knopf, Abbrechen).
+prBild = prBild + 1
+IF prBild = 12 THEN PRINT "dialog "; frage >= 0
+IF prBild = 30 THEN
+    PRINT LEN(mediathek); " "; mediathek[1].titel
+    EXIT(0)
+END IF
+--- programm ../../../buecher/anwendungen/code/kap06/2_nachfrage.dh nach     GUI_UPDATE()
+--- einschub nach WINDOW_WAIT_EVENTS(1)
+DIM prBild AS INTEGER
+--- datei tasten.txt
+c 8
+e 0 7 100 312 0 0
+e 2 7 100 312 0 0
+e 4 6 0 0 0 0
+e 5 5 0 0 0 0
+e 8 2 261 0 0 0
+e 9 1 261 0 0 0
+e 16 2 257 0 0 0
+e 17 1 257 0 0 0
+
+--- umgebung
+DHRT_FRAMES=40
+DHRT_ABSPIELEN=tasten.txt
+DHRT_ABSEITS=1
+--- erwartet
+dialog TRUE
+9 Tetris
+
+=== mediathek kapitel 6: esc im dialog laesst alles stehen
+prBild = prBild + 1
+IF prBild = 30 THEN
+    PRINT LEN(mediathek); " "; mediathek[1].titel; " "; frage
+    EXIT(0)
+END IF
+--- programm ../../../buecher/anwendungen/code/kap06/2_nachfrage.dh nach     GUI_UPDATE()
+--- einschub nach WINDOW_WAIT_EVENTS(1)
+DIM prBild AS INTEGER
+--- datei tasten.txt
+c 8
+e 0 7 100 312 0 0
+e 2 7 100 312 0 0
+e 4 6 0 0 0 0
+e 5 5 0 0 0 0
+e 8 2 261 0 0 0
+e 9 1 261 0 0 0
+e 16 2 256 0 0 0
+e 17 1 256 0 0 0
+
+--- umgebung
+DHRT_FRAMES=40
+DHRT_ABSPIELEN=tasten.txt
+DHRT_ABSEITS=1
+--- erwartet
+10 Metropolis -1
+
+=== mediathek kapitel 6: beenden ohne aenderung endet sofort
+prBild = prBild + 1
+IF prBild = 30 THEN
+    PRINT "laeuft noch"
+    EXIT(0)
+END IF
+--- programm ../../../buecher/anwendungen/code/kap06/3_schliessen.dh nach     GUI_UPDATE()
+--- einschub nach WINDOW_WAIT_EVENTS(1)
+DIM prBild AS INTEGER
+--- einschub nach DB_CLOSE(db)
+PRINT "beendet vor bild 30: "; prBild < 30
+--- datei tasten.txt
+c 5
+e 0 7 600 500 0 0
+e 6 2 341 0 0 0
+e 8 2 81 0 0 0
+e 9 1 81 0 0 0
+e 10 1 341 0 0 0
+
+--- umgebung
+DHRT_FRAMES=40
+DHRT_ABSPIELEN=tasten.txt
+DHRT_ABSEITS=1
+--- erwartet
+beendet vor bild 30: TRUE
+
+=== mediathek kapitel 6: beenden mit aenderung fragt und speichert
+' Strg+Q mit einem Titel im Formular: die Frage. Enter = Speichern --
+' gespeichert, dann beendet.
+prBild = prBild + 1
+IF prBild = 2 THEN GUI_SET_TEXT(titel, "Ronja")
+IF prBild = 14 THEN PRINT "frage "; ende >= 0
+IF prBild = 39 THEN
+    PRINT "laeuft noch"
+    EXIT(0)
+END IF
+--- programm ../../../buecher/anwendungen/code/kap06/3_schliessen.dh nach     GUI_UPDATE()
+--- einschub nach WINDOW_WAIT_EVENTS(1)
+DIM prBild AS INTEGER
+--- einschub nach DB_CLOSE(db)
+PRINT "beendet, "; LEN(mediathek); " eintraege"
+--- datei tasten.txt
+c 7
+e 0 7 600 500 0 0
+e 6 2 341 0 0 0
+e 8 2 81 0 0 0
+e 9 1 81 0 0 0
+e 10 1 341 0 0 0
+e 18 2 257 0 0 0
+e 19 1 257 0 0 0
+
+--- umgebung
+DHRT_FRAMES=40
+DHRT_ABSPIELEN=tasten.txt
+DHRT_ABSEITS=1
+--- erwartet
+frage TRUE
+beendet, 11 eintraege
+
+=== loesung kapitel 6: entfernen laesst sich rueckgaengig machen
+prBild = prBild + 1
+IF prBild = 2 THEN
+    PRINT "anfangs frei "; GUI_MENU_ENABLED(miZurueck)
+    GUI_TABLE_SELECT(tabelle, 1, TRUE)
+    GUI_TABLE_SELECT(tabelle, 2, TRUE)
+    auswahl_entfernen()
+    PRINT LEN(mediathek)
+END IF
+IF prBild = 3 THEN
+    PRINT "danach frei "; GUI_MENU_ENABLED(miZurueck)
+    zurueckholen()
+    PRINT GUI_TEXT(status); " | "; mediathek[1].id; " "; mediathek[1].titel; " "; mediathek[2].titel
+END IF
+IF prBild = 4 THEN
+    PRINT "zuletzt frei "; GUI_MENU_ENABLED(miZurueck)
+    EXIT(0)
+END IF
+--- programm ../../../buecher/anwendungen/code/loesungen/kap06_zurueck.dh nach     GUI_UPDATE()
+--- einschub nach WINDOW_WAIT_EVENTS(1)
+DIM prBild AS INTEGER
+--- umgebung
+DHRT_FRAMES=8
+DHRT_ABSEITS=1
+--- erwartet
+anfangs frei FALSE
+8
+danach frei TRUE
+2 zurückgeholt | 2 Metropolis Tetris
+zuletzt frei FALSE
+
+=== loesung kapitel 6: das haekchen blendet die filterzeile aus
+prBild = prBild + 1
+IF prBild = 2 THEN PRINT GUI_MENU_CHECKED(miFilter); " "; GUI_TABLE_GET(tabelle, "filterzeile")
+IF prBild = 30 THEN
+    PRINT GUI_MENU_CHECKED(miFilter); " "; GUI_TABLE_GET(tabelle, "filterzeile")
+    EXIT(0)
+END IF
+--- programm ../../../buecher/anwendungen/code/loesungen/kap06_filter.dh nach     GUI_UPDATE()
+--- einschub nach WINDOW_WAIT_EVENTS(1)
+DIM prBild AS INTEGER
+--- datei klicks.txt
+c 10
+e 0 7 200 12 0 0
+e 2 7 200 12 0 0
+e 4 6 0 0 0 0
+e 5 5 0 0 0 0
+e 10 7 230 40 0 0
+e 12 7 230 40 0 0
+e 14 6 0 0 0 0
+e 15 5 0 0 0 0
+e 18 7 600 500 0 0
+e 20 7 600 500 0 0
+
+--- umgebung
+DHRT_FRAMES=40
+DHRT_ABSPIELEN=klicks.txt
+DHRT_ABSEITS=1
+--- erwartet
+TRUE 1.0
+FALSE 0.0
