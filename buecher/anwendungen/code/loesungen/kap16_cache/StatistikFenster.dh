@@ -1,0 +1,7 @@
+' Kapitel 15 -- je Art, wie viele Eintraege und wie viele davon gerade
+' verliehen sind. Gezaehlt wird in der Abfrage statistik.
+CLASS StatistikFenster EXTENDS StatistikFenster_Basis
+    SUB knopfZu_Klick()
+        Self.Zumachen()
+    END SUB
+END CLASS

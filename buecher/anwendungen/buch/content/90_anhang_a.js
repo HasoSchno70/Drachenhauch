@@ -469,4 +469,38 @@ module.exports = (H) => [
   ...neu("loesungen/kap15_monate/Hauptfenster.dh").map((t) => H.code(t)),
 
   H.p("Die Abfrage hat keine Spalte id; die Tabelle zeigt sie trotzdem, nur IdVon liefert dort 0."),
+
+  H.h2("Kapitel 16 · Aus dem Netz"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Der Hinweis sagt „Frage Open Library ...“, der Knopf heißt „Abbrechen“ — und dabei bleibt es. Die Antwort kommt zwar an, aber niemand holt sie ab: HTTP_GET_START beginnt den Abruf nur, nachsehen muss der Timer. Ein zweiter Klick findet einen laufenden Abruf, verwirft ihn und meldet „Abgebrochen.“"),
+
+  H.h3("Drehen 2"),
+
+  H.p("„Eine ISBN hat 10 oder 13 Ziffern.“ Mit den vier Bindestrichen ist der Text 17 Zeichen lang. Ohne die Prüfung ginge die ISBN samt Bindestrichen an Open Library, und die Antwort stünde unter einem anderen Schlüssel, als datenLesen sucht."),
+
+  H.h3("Drehen 3"),
+
+  H.p("„Keine Antwort: HTTP-Fehler:“, die Adresse, „Dns Failed“ mit der Meldung des Betriebssystems, dass es den Namen nicht kennt, und am Ende „keine Verbindung: kein Netz, oder der Server ist nicht erreichbar“. Die Endung .invalid ist für Namen reserviert, die es nie gibt — so lässt sich ausprobieren, was ohne Netz geschieht, ohne das Netz abzuschalten."),
+
+  H.h3("Erweitern 1: ein Cache"),
+
+  H.p("Das Datenbank-Element bekommt eine Tabelle nachschlag mit den Spalten isbn (Text, Pflicht, Eindeutig) und antwort (Text, Pflicht). Vor dem Abruf sieht knopfNachschlagen_Klick dort nach (code/loesungen/kap16_cache):"),
+
+  H.code(neu("loesungen/kap16_cache/EintragFenster.dh")[0]),
+
+  H.p("Und abfrageTimer_Aktion legt eine neue Antwort ab, bevor sie gelesen wird:"),
+
+  H.code(neu("loesungen/kap16_cache/EintragFenster.dh")[1]),
+
+  H.p("Eine leere Antwort {} kommt nicht hinein: Vielleicht kennt Open Library die ISBN morgen. INSERT OR REPLACE ersetzt eine Zeile mit derselben isbn, statt am Eindeutig zu scheitern. Das Cover kommt auch so aus dem Netz: Im Cache steht nur die Antwort, und darin seine Adresse."),
+
+  H.h3("Erweitern 2: die Sekunden"),
+
+  H.p("Das Fenster merkt sich, wann der Abruf begann, und der Timer schreibt die Sekunden in den Hinweis, solange die Antwort nicht da ist (code/loesungen/kap16_sekunden):"),
+
+  ...neu("loesungen/kap16_sekunden/EintragFenster.dh").map((t) => H.code(t)),
+
+  H.p("Der Timer läuft ohnehin alle 100 ms; er hat nur bisher nichts gesagt, solange er wartete. Gezählt wird nach der Uhr (MILLIS), nicht nach Timer-Runden — so stimmt die Zahl auch, wenn sich ein Aufruf des Timers verspätet."),
 ];

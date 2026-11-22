@@ -352,6 +352,45 @@ IF gewuenscht("kap15_ueberfaellig") THEN
     programmBild("kap15_ueberfaellig", "kap15/mediathek", z, 40)
 END IF
 
+' Kapitel 16: Neu, eine ISBN, Nachschlagen. Gegen spielserver.dh statt
+' Open Library (kein Netz, kein fremdes Cover): nach F5 bekommt die Kopie
+' dessen Adresse als QUELLE und legt die ISBN in ihre Zwischenablage.
+IF gewuenscht("kap16_nachschlagen") THEN
+    m = projekt$("kap16/mediathek")
+    z = ["e 0 7 640 400 0 0"]
+    taste(z, 20, ohne, 294)
+    studioBild("_kap16_f5", m, "", aufnahme$("f5_kap16", z), 70)
+    IF FILEEXISTS(bilder + "/_kap16_f5.png") THEN DELETEFILE(bilder + "/_kap16_f5.png")
+    COPYFILE(wurzel + "/daten/bilder/logo.png", arbeit + "/cover.png")
+    COPYFILE(hier + "/spielserver.dh", arbeit + "/spielserver.dh")
+    IF FILEEXISTS(arbeit + "/port.txt") THEN DELETEFILE(arbeit + "/port.txt")
+    DIM srv AS INTEGER : srv = PROCESS_START("dhrt", "run", arbeit + "/spielserver.dh", "--", "60")
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE NOT FILEEXISTS(arbeit + "/port.txt") AND MILLIS() - t0 < 15000
+        SLEEP(20)
+    WEND
+    DIM ef AS STRING : ef = m + "/_studio/projekt/EintragFenster.dh"
+    DIM et AS STRING : et = READALL(ef)
+    et = REPLACE$(et, "https://openlibrary.org", "http://127.0.0.1:" + TRIM$(READALL(arbeit + "/port.txt")))
+    et = REPLACE$(et, "        GUI_FOCUS(Self.feldIsbn)" + CHR$(10) + "    END SUB", "        GUI_FOCUS(Self.feldIsbn)" + CHR$(10) + "        CLIPBOARD_SET(" + CHR$(34) + "978-3-522-20260-2" + CHR$(34) + ")" + CHR$(10) + "    END SUB")
+    WRITEALL(ef, et)
+    z = []
+    klick(z, 0, 295, 453)
+    klick(z, 20, 320, 148)
+    taste(z, 30, [341], 86)
+    klick(z, 42, 474, 148)
+    ARRAY_PUSH(z, "e 60 7 380 330 0 0")
+    SETENV("DHRT_ZWISCHENABLAGE", "privat")
+    SETENV("DHRT_ABSPIELEN", aufnahme$("bed_kap16", z))
+    DIM ziel AS STRING : ziel = bilder + "/kap16_nachschlagen.png"
+    DIM pl AS INTEGER : pl = PROCESS_START("dhrt", "bild", m + "/_studio/main.dh", ziel, "120")
+    DIM aus16 AS STRING : aus16 = laufen$(pl)
+    SETENV("DHRT_ABSPIELEN", "")
+    SETENV("DHRT_ZWISCHENABLAGE", "")
+    PROCESS_KILL(srv)
+    IF FILEEXISTS(ziel) THEN PRINT "  kap16_nachschlagen.png" ELSE PRINT "  FEHLER kap16_nachschlagen "; LEFT$(aus16, 300)
+END IF
+
 ' Kapitel 11: Tetris waehlen, "Ausleihen ..." -- das Fenster daneben.
 IF gewuenscht("kap11_ausleihen") THEN
     z = []
