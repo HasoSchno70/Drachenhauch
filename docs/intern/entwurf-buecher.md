@@ -785,6 +785,20 @@ alte Meldungen mit, die Live-Prüfung prüft nur Geändertes und lässt
 einen Dialog den Fokus leihen. `pruef_ausgaben.js` lässt Datenbank-Blöcke
 jetzt laufen, jeden in eigenem Ordner.
 
+Danach (2026-11-22): Buch B, Teil II, Kapitel 9–12 im Studio (Der
+Inspektor, Code und Ereignisse, Mehrere Fenster, Der Debugger). Die
+Mediathek wird ein Studio-Projekt: Anker, Tab-Folge und Hinweise im
+Inspektor, Klasse und Modul, ein modales Bearbeitungsfenster und ein
+Ausleihfenster, das der Auswahl folgt; Kapitel 12 findet mit dem Debugger
+einen echten Fehler aus Kapitel 11 (nach Entfernen zeigte das
+Ausleihfenster NIL). Die Bilder zieht `studio_bilder.dh`, auch das
+Programm unter dem Debugger (es erbt `DHRT_ABSPIELEN` vom Studio). Funde
+in der Laufzeit, je mit Fall und Gegenprobe: ein NIL statt Widget sagt,
+dass es das Widget noch nicht gibt; `dhrt debug` zeigt Self mit seinen
+Feldern (die eigenen zuerst), den Stapel wie geschrieben und ein Feld von
+Objekten mit dem Klassennamen, und eine Zeile mit Aufruf beginnt nach der
+Rückkehr nicht neu (Haltepunkt und F10 hielten zweimal).
+
 Was beim Bauen festgelegt wurde:
 
 * **Code kommt aus Dateien.** `buch/code_lesen.js` holt ganze Programme,
