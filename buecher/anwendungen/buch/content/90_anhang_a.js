@@ -574,4 +574,34 @@ module.exports = (H) => [
   ...neu("loesungen/kap18_verliehen/StatistikFenster.dh").map((t) => H.code(t)),
 
   H.p("Eine Leiste zeigt einen Wert zwischen min und max; max 100 und die Einheit „ %“ machen daraus Prozent. Bei einer verliehenen von fünf steht dort 20 %."),
+
+  H.h2("Kapitel 19 · Ein- und Ausfuhr"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Das Programm hält an: „CSV_LOAD: alte_liste.csv: Zeile 2 ist kein UTF-8 (Byte 0xE4, Zeichen 30 der Zeile).“ Das dreißigste Zeichen der zweiten Zeile ist das „ä“ in Kästner. Die Meldung sagt gleich dazu, was zu tun ist: cp1252 als letztes Argument. READLINES davor hat \"auto\" noch — dort fällt es nicht auf, erst beim zweiten Lesen."),
+
+  H.h3("Drehen 2"),
+
+  H.p("„alte_liste.csv: 8 Zeilen, 0 neu, 5 schon da, 3 mit Fehler“. Die vier Einträge vom ersten Mal und Momo sind schon da; die drei falschen Zeilen sind immer noch falsch. Weil schonDa nach Titel und Urheber fragt, kommt nichts doppelt hinein."),
+
+  H.h3("Drehen 3"),
+
+  H.p("Nichts. \"auto\" erkennt UTF-8, die erste Zeile verrät das Komma, und die Spalten sucht spalte nach ihrem Kopf, nicht nach ihrer Stelle. Eine Liste mit dem Kopf Jahr,Titel,Art,Urheber kommt genauso herein."),
+
+  H.h3("Erweitern 1: CSV für Excel"),
+
+  H.p("Ein Menüeintrag „Als CSV für Excel sichern …“ und im Modul Austausch eine SUB alsCsv (code/loesungen/kap19_csv):"),
+
+  ...neu("loesungen/kap19_csv/Austausch.dh").map((t) => H.code(t)),
+
+  H.p("Semikolon, weil Excel im deutschen Windows daran Spalten erkennt; cp1252, weil Excel eine CSV ohne Kennzeichnung so liest — in UTF-8 stünde dort „KÃ¤stner“. CSV_ROW$ setzt Anführungszeichen nur um „Krieg und Frieden; Band 1“, wo das Semikolon sie braucht. Ein Titel mit einem Zeichen, das cp1252 nicht kennt, ließe WRITEALL anhalten, statt still ein Fragezeichen zu schreiben."),
+
+  H.h3("Erweitern 2: die Fehlerdatei"),
+
+  H.p("einlesen merkt sich die Kopfzeile und jede falsche Zeile samt ihrem Fehler und schreibt sie am Ende neben die Liste (code/loesungen/kap19_fehler/Austausch.dh):"),
+
+  ...neu("loesungen/kap19_fehler/Austausch.dh").map((t) => H.code(t)),
+
+  H.p("FILE_ENCODING$ sagt, in welcher Kodierung \"auto\" die Liste gelesen hat; mit derselben wird die Fehlerdatei geschrieben, und Excel öffnet sie wie die Liste selbst. Aus der alten Liste wird so alte_liste_fehler.csv mit drei Zeilen, die erste „;Astrid Lindgren;Buch;1945;kein Titel.“ Wer dort den Titel einträgt und die Datei einliest, braucht die Spalte Fehler nicht zu löschen — einlesen kennt sie nicht und übergeht sie."),
 ];

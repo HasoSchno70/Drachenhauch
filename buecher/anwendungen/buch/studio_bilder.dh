@@ -456,6 +456,31 @@ IF gewuenscht("kap18_statistik") THEN
     programmBild("kap18_statistik", "kap18/mediathek", z, 50)
 END IF
 
+' Kapitel 19: Datei -> Liste einlesen mit der alten Liste aus code/kap19.
+' Den Dateidialog erreicht keine Aufnahme: die Kopie bekommt nach F5 den
+' Pfad statt des Dialogs.
+IF gewuenscht("kap19_einlesen") THEN
+    m = projekt$("kap19/mediathek")
+    z = ["e 0 7 640 400 0 0"]
+    taste(z, 20, ohne, 294)
+    studioBild("_kap19_f5", m, "", aufnahme$("f5_kap19", z), 70)
+    IF FILEEXISTS(bilder + "/_kap19_f5.png") THEN DELETEFILE(bilder + "/_kap19_f5.png")
+    COPYFILE(wurzel + "/buecher/anwendungen/code/kap19/alte_liste.csv", arbeit + "/alte_liste.csv")
+    DIM hf19 AS STRING : hf19 = m + "/_studio/projekt/Hauptfenster.dh"
+    DIM q19 AS STRING : q19 = CHR$(34)
+    WRITEALL(hf19, REPLACE$(READALL(hf19), "FILE_OPEN_DIALOG(" + q19 + "Liste einlesen" + q19 + ", " + q19 + "csv,txt" + q19 + ")", q19 + arbeit + "/alte_liste.csv" + q19))
+    z = []
+    klick(z, 0, 20, 13)
+    klick(z, 10, 80, 111)
+    ARRAY_PUSH(z, "e 30 7 700 470 0 0")
+    SETENV("DHRT_ABSPIELEN", aufnahme$("bed_kap19", z))
+    DIM ziel19 AS STRING : ziel19 = bilder + "/kap19_einlesen.png"
+    DIM p19 AS INTEGER : p19 = PROCESS_START("dhrt", "bild", m + "/_studio/main.dh", ziel19, "50")
+    DIM aus19 AS STRING : aus19 = laufen$(p19)
+    SETENV("DHRT_ABSPIELEN", "")
+    IF FILEEXISTS(ziel19) THEN PRINT "  kap19_einlesen.png" ELSE PRINT "  FEHLER kap19_einlesen "; LEFT$(aus19, 300)
+END IF
+
 ' Kapitel 11: Tetris waehlen, "Ausleihen ..." -- das Fenster daneben.
 IF gewuenscht("kap11_ausleihen") THEN
     z = []

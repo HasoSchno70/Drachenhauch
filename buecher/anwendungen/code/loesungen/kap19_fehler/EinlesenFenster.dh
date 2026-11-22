@@ -1,0 +1,22 @@
+' Kapitel 19 -- liest die Liste ein, sobald es aufgeht, und zeigt, was
+' dabei herauskam: oben die Zahlen, darunter je Zeile, die nicht ging,
+' warum.
+CLASS EinlesenFenster EXTENDS EinlesenFenster_Basis
+    DIM pfad AS STRING
+
+    SUB Geoeffnet()
+        DIM e AS Einlesung : e = einlesen(Self.pfad)
+        DIM text AS STRING
+        text = BASENAME(Self.pfad) + ": " + _
+               anzahlText$(e.zeilen, "Zeile", "Zeilen") + ", " + _
+               STR$(e.neu) + " neu, " + _
+               STR$(e.schonDa) + " schon da, " + _
+               STR$(e.fehler()) + " mit Fehler"
+        GUI_SET_TEXT(Self.zusammenfassung, text)
+        GUI_LISTBOX_ITEMS(Self.meldungen, e.meldungen)
+    END SUB
+
+    SUB knopfOk_Klick()
+        Self.Zumachen()
+    END SUB
+END CLASS

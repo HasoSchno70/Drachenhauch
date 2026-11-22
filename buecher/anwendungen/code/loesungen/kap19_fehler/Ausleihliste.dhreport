@@ -1,0 +1,271 @@
+{
+  "titel": "Ausleihliste",
+  "seite": {
+    "format": "A4",
+    "hoch": true,
+    "rand": [
+      15,
+      15,
+      15,
+      15
+    ]
+  },
+  "quelle": "Mediathek.ausleihbuch",
+  "bedingung": "",
+  "sortieren": [
+    "von"
+  ],
+  "gruppen": [
+    {
+      "spalte": "freund"
+    }
+  ],
+  "baender": [
+    {
+      "art": "berichtskopf",
+      "hoehe": 18,
+      "elemente": [
+        {
+          "art": "text",
+          "x": 0,
+          "y": 0,
+          "b": 120,
+          "h": 10,
+          "text": "Ausleihliste",
+          "groesse": 18,
+          "fett": true
+        },
+        {
+          "art": "datum",
+          "x": 120,
+          "y": 3,
+          "b": 60,
+          "h": 6,
+          "ausrichtung": "rechts",
+          "farbe": "#666666"
+        }
+      ]
+    },
+    {
+      "art": "seitenkopf",
+      "hoehe": 9,
+      "elemente": [
+        {
+          "art": "text",
+          "x": 5,
+          "y": 1,
+          "b": 85,
+          "h": 6,
+          "text": "Titel",
+          "fett": true
+        },
+        {
+          "art": "text",
+          "x": 95,
+          "y": 1,
+          "b": 25,
+          "h": 6,
+          "text": "Von",
+          "fett": true
+        },
+        {
+          "art": "text",
+          "x": 122,
+          "y": 1,
+          "b": 25,
+          "h": 6,
+          "text": "Zurück",
+          "fett": true
+        },
+        {
+          "art": "text",
+          "x": 150,
+          "y": 1,
+          "b": 30,
+          "h": 6,
+          "text": "Tage",
+          "fett": true,
+          "ausrichtung": "rechts"
+        },
+        {
+          "art": "linie",
+          "x": 0,
+          "y": 8,
+          "b": 180,
+          "h": 0,
+          "staerke": 0.3
+        }
+      ]
+    },
+    {
+      "art": "gruppenkopf",
+      "gruppe": 0,
+      "hoehe": 9,
+      "elemente": [
+        {
+          "art": "feld",
+          "spalte": "freund",
+          "x": 0,
+          "y": 2,
+          "b": 120,
+          "h": 6,
+          "groesse": 12,
+          "fett": true
+        }
+      ]
+    },
+    {
+      "art": "detail",
+      "hoehe": 6,
+      "elemente": [
+        {
+          "art": "feld",
+          "spalte": "titel",
+          "x": 5,
+          "y": 0,
+          "b": 88,
+          "h": 5
+        },
+        {
+          "art": "feld",
+          "spalte": "von",
+          "x": 95,
+          "y": 0,
+          "b": 25,
+          "h": 5,
+          "format": "datum"
+        },
+        {
+          "art": "feld",
+          "spalte": "zurueck",
+          "x": 122,
+          "y": 0,
+          "b": 25,
+          "h": 5,
+          "format": "datum"
+        },
+        {
+          "art": "feld",
+          "spalte": "tage",
+          "x": 150,
+          "y": 0,
+          "b": 30,
+          "h": 5,
+          "format": "ganz",
+          "ausrichtung": "rechts"
+        }
+      ]
+    },
+    {
+      "art": "gruppenfuss",
+      "gruppe": 0,
+      "hoehe": 10,
+      "elemente": [
+        {
+          "art": "linie",
+          "x": 95,
+          "y": 0,
+          "b": 85,
+          "h": 0,
+          "staerke": 0.2,
+          "farbe": "#666666"
+        },
+        {
+          "art": "text",
+          "x": 95,
+          "y": 1,
+          "b": 25,
+          "h": 6,
+          "text": "Ausleihen",
+          "farbe": "#666666"
+        },
+        {
+          "art": "summe",
+          "spalte": "id",
+          "funktion": "anzahl",
+          "bereich": "gruppe",
+          "x": 122,
+          "y": 1,
+          "b": 25,
+          "h": 6
+        },
+        {
+          "art": "summe",
+          "spalte": "tage",
+          "funktion": "summe",
+          "bereich": "gruppe",
+          "x": 150,
+          "y": 1,
+          "b": 30,
+          "h": 6,
+          "format": "ganz",
+          "ausrichtung": "rechts",
+          "fett": true
+        }
+      ]
+    },
+    {
+      "art": "seitenfuss",
+      "hoehe": 8,
+      "elemente": [
+        {
+          "art": "seitenzahl",
+          "x": 0,
+          "y": 2,
+          "b": 180,
+          "h": 5,
+          "ausrichtung": "mitte",
+          "groesse": 9,
+          "farbe": "#666666"
+        }
+      ]
+    },
+    {
+      "art": "berichtsfuss",
+      "hoehe": 12,
+      "elemente": [
+        {
+          "art": "linie",
+          "x": 0,
+          "y": 1,
+          "b": 180,
+          "h": 0,
+          "staerke": 0.5
+        },
+        {
+          "art": "text",
+          "x": 5,
+          "y": 3,
+          "b": 85,
+          "h": 6,
+          "text": "Insgesamt",
+          "fett": true
+        },
+        {
+          "art": "summe",
+          "spalte": "id",
+          "funktion": "anzahl",
+          "bereich": "bericht",
+          "x": 122,
+          "y": 3,
+          "b": 25,
+          "h": 6,
+          "fett": true
+        },
+        {
+          "art": "summe",
+          "spalte": "tage",
+          "funktion": "summe",
+          "bereich": "bericht",
+          "x": 150,
+          "y": 3,
+          "b": 30,
+          "h": 6,
+          "format": "ganz",
+          "ausrichtung": "rechts",
+          "fett": true
+        }
+      ]
+    }
+  ]
+}
