@@ -320,6 +320,10 @@ FOR i = 0 TO LEN(roh) - 1
     ' koennen -- Bauausgabe wie target/.
     IF INSTR(REPLACE$(roh[i], CHR$(92), "/"), "installer/output/") >= 0 THEN CONTINUE
     IF LEFT$(BASENAME(roh[i]), 7) = "_dhtmp_" THEN CONTINUE
+    ' .claude/ (nicht versioniert) haelt die Worktrees anderer Sitzungen --
+    ' ganze Kopien des Repos, deren Buch-Fehlerbeispiele die Ausnahme unten
+    ' nicht trafen, weil ihr Pfad nicht mit buecher/ beginnt (2026-11-22).
+    IF INSTR(REPLACE$(roh[i], CHR$(92), "/"), ".claude/") >= 0 THEN CONTINUE
     ' Die Bastelzentrale: bereiche/*.dh sind Teile ihrer main.dh, ihre
     ' globalen Namen legt ein anderer Teil an (so waren auch Glutfaden und
     ' Funkenflug gebaut, bis sie 2026-11 eigene Repos bekamen).
