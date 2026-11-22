@@ -3101,3 +3101,10 @@ Debugger, an der Mediathek aus dem Studio) zwei Luecken in `dhrt debug`:
   Klassennamen wie geschrieben (`<Eintrag>`), ein Feld davon aber den
   grossgeschriebenen Elementtyp aus `Value::fmt`. `dbg_anzeige` setzt dort
   jetzt ebenfalls die geschriebene Form ein.
+- **Eigene Felder zuerst, der Stapel wie geschrieben.** Unter Self standen
+  die Felder in der Reihenfolge ihrer Plaetze, also die der Laufzeit des
+  Studios (`studioWin`, `studioControls` ...) und die Controls vor
+  `eintraege` -- in der kleinen Leiste des Studios sah man die eigenen
+  nicht. `dbg_kinder` ordnet jetzt nach `Layout::vorfahren`. Der
+  Aufrufstapel nannte die Methoden klein (`knopfentfernen_klick`); er geht
+  jetzt durch dieselbe Namenstafel wie die Variablen.

@@ -606,7 +606,9 @@ a class) instead of `INTEGER`. An uncaught error first reports itself as
 `paused` with `reason: "error"` and `message` (at the error location, `eval` and
 `set-watches` still work), then after the next command as `error`.
 In a method, `locals` starts with `Self`, its fields as `children` --
-that is where a window from the Studio keeps everything. When a call
+that is where a window from the Studio keeps everything. The fields of
+an object come in class order: its own class first, then the parents;
+the names in `stack` appear as written. When a call
 returns into its line, the line does not start again: a breakpoint on
 `x = f(1)` pauses once, `step-over` steps past the call to the next
 line; `step-out` and a step past the end of a function pause on the

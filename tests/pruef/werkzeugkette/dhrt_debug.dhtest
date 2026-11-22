@@ -767,6 +767,48 @@ haltepunkt, weiter: 5 ende
 in b, heraus, ueber: 2 5 6 ende
 in b, ueber, ueber: 2 5 6 ende
 
+=== eigene felder zuerst und der stapel wie geschrieben
+' Ein Fenster aus dem Studio erbt Controls und die Laufzeit des Studios;
+' seine eigenen Felder standen unter Self ganz unten, und der Stapel nannte
+' knopfentfernen_klick klein (Buch "Fenster, Formulare, Daten", Kapitel 12).
+IMPORT "sitzung.dh"
+DIM q AS STRING : q = CHR$(34)
+sitzung("d.dh", ["{" + q + "cmd" + q + ":" + q + "set-breakpoints" + q + "," + q + "lines" + q + ":[11]}", _
+    "{" + q + "cmd" + q + ":" + q + "continue" + q + "}", _
+    "{" + q + "cmd" + q + ":" + q + "stop" + q + "}"])
+DIM h AS INTEGER : h = ersteMit("paused", 11)
+DIM k AS JSON_HANDLE : k = JSON_PARSE(ereignisse[h])
+DIM z AS STRING : z = "Self:"
+DIM c AS INTEGER
+FOR c = 0 TO JSON_LEN(k, "locals.0.children") - 1
+    z = z + " " + JSON_GET_STRING(k, "locals.0.children." + STR$(c) + ".name")
+NEXT
+PRINT z
+PRINT "stapel: "; JSON_GET_STRING(k, "stack.0.name"); " "; JSON_GET_STRING(k, "stack.1.name")
+--- datei sitzung.dh
+IMPORT "{sammlung}/../_hilfen/debugsitzung.dh"
+
+--- datei d.dh
+CLASS FensterLaufzeit
+    DIM studioWin AS INTEGER
+END CLASS
+CLASS Basis EXTENDS FensterLaufzeit
+    DIM knopfOk AS INTEGER
+END CLASS
+CLASS Haupt EXTENDS Basis
+    DIM eintraege AS ARRAY OF STRING
+    DIM bearbeitet AS INTEGER
+    SUB knopfOk_Klick()
+        PRINT bearbeitet
+    END SUB
+END CLASS
+DIM h AS Haupt : h = NEW Haupt()
+h.knopfOk_Klick()
+
+--- erwartet
+Self: eintraege bearbeitet knopfOk studioWin
+stapel: knopfOk_Klick __main__
+
 === ein grafikfenster bleibt im halt ansprechbar
 ' Waehrend der Debugger auf Kommandos wartet, holt er alle 50 ms die
 ' Fensternachrichten ab -- sonst meldete Windows das Fenster nach wenigen
