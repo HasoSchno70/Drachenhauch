@@ -3913,9 +3913,10 @@ Nachbar-Beschriftung baut, gibt ihm also wenigstens einen `GUI_TOOLTIP`.
 
 **Was das Toolkit sonst schon mitbringt:** Bedienung ohne Maus (oben),
 `GUI_SCALE` für große Schrift, das Thema `contrast` (Weiß auf Schwarz,
-gelbe Rahmen, Kontrast 21:1) über `GUI_THEME_PRESET("contrast")`; die
-Vorgabe `dark` und das helle Thema liegen mit allen Texten über dem
-WCAG-Wert von 4,5:1.
+gelbe Rahmen, Kontrast 21:1) über `GUI_THEME_PRESET("contrast")`; alle
+eingebauten Themen liegen mit allen Texten über dem WCAG-Wert von 4,5:1 --
+auch die gedämpfte Schrift (`muted_fg`, Platzhalter) auf dem Fenster und im
+Feld und die gewählte Zeile einer Tabelle.
 
 **Was das Programm tun muss — und nur es kann:** nie eine Information nur
 über Farbe geben (das rote Feld hat deshalb auch eine Meldung), jede

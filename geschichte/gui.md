@@ -1461,3 +1461,13 @@ Ebenda, Kapitel 21: `GUI_STATE$` endet mit der letzten Ansage an den
 Bildschirmleser (`ansage "..."`). Was ein Programm mit GUI_ANNOUNCE sagt,
 liess sich vorher nur mit einem echten Leser pruefen (UIA, nur Windows) --
 die Mediathek sagt jetzt an, was sonst nur in der Statuszeile steht.
+
+Ebenda, Kapitel 21: die gedaempfte Schrift `muted_fg` aller Themen
+nachgezogen -- mindestens 4,5:1 auf dem Fenster- und dem Widget-Grund.
+Gefunden, als die Statuszeile der Mediathek von einem festen Grau auf den
+Namen muted_fg umzog und GUI_A11Y_CHECK$ im hellen modern-Thema immer noch
+3,0:1 meldete: das Thema selbst lag darunter. Nachgemessen ueber alle:
+modern_light 3,0 (Fenster), dark 3,7, modern_dark 4,0, glas_dunkel 3,4,
+retro 4,2 (im Feld), glas_hell 4,1 (Fenster). Neue Werte je Thema auf den
+naechsten Ton mit 4,6:1 gemischt (Farbton bleibt). Die Pruefung der Themen
+kannte nur Schrift in text_fg.

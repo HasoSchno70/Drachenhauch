@@ -155,6 +155,61 @@ contrast: ok
 modern_dark: ok
 modern_light: ok
 
+=== die leise schrift jedes themas ist lesbar
+' muted_fg (leise Beschriftungen, Platzhalter im Feld) hat in jedem Thema
+' mindestens 4,5:1 auf dem Fenster- und dem Widget-Grund. Vorher: modern_light
+' 3,0:1 auf dem Fenster -- gefunden an der Statuszeile der Mediathek (Buch
+' "Fenster, Formulare, Daten", Kapitel 21) --, dark, modern_dark, glas_dunkel
+' und retro unter 4,5:1 im Feld. Dazu ein Label mit fg: muted_fg aus der
+' Stildatei durch GUI_A11Y_CHECK$.
+TRY
+    SCREEN(400, 200, "T", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+IMPORT "gui"
+FUNCTION kanal(v AS INTEGER) AS FLOAT
+    DIM s AS FLOAT : s = v / 255.0
+    IF s <= 0.03928 THEN RETURN s / 12.92
+    RETURN ((s + 0.055) / 1.055) ^ 2.4
+END FUNCTION
+FUNCTION leucht(c AS INTEGER) AS FLOAT
+    RETURN 0.2126 * kanal((c SHR 16) BAND 255) + 0.7152 * kanal((c SHR 8) BAND 255) + 0.0722 * kanal(c BAND 255)
+END FUNCTION
+FUNCTION abstand(a AS INTEGER, b AS INTEGER) AS FLOAT
+    RETURN (MAX(leucht(a), leucht(b)) + 0.05) / (MIN(leucht(a), leucht(b)) + 0.05)
+END FUNCTION
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 200)
+DIM lbl AS GUI_WIDGET : lbl = GUI_LABEL(w, "5 Eintraege", 20, 20)
+GUI_ADD_CLASS(lbl, "leise")
+GUI_STYLESHEET(".leise { fg: muted_fg }")
+DIM th AS STRING
+FOR EACH th IN ["dark", "light", "retro", "contrast", "modern_dark", "modern_light", "glas_dunkel", "glas_hell"]
+    GUI_THEME_PRESET(th)
+    GUI_UPDATE()
+    DIM m AS INTEGER : m = GUI_THEME_GET("muted_fg") BAND &HFFFFFF
+    DIM fenster AS FLOAT : fenster = abstand(m, GUI_THEME_GET("win_bg") BAND &HFFFFFF)
+    DIM feld AS FLOAT : feld = abstand(m, GUI_THEME_GET("widget_bg") BAND &HFFFFFF)
+    DIM b AS STRING : b = GUI_A11Y_CHECK$()
+    IF fenster >= 4.5 AND feld >= 4.5 AND b = "" THEN
+        PRINT th; ": lesbar"
+    ELSE
+        PRINT th; ": fenster "; FORMAT$(fenster, "%.2f"); " feld "; FORMAT$(feld, "%.2f"); " "; b
+    END IF
+NEXT
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+dark: lesbar
+light: lesbar
+retro: lesbar
+contrast: lesbar
+modern_dark: lesbar
+modern_light: lesbar
+glas_dunkel: lesbar
+glas_hell: lesbar
+
 === die gewaehlte zeile einer tabelle ist in jedem thema lesbar
 ' Die Auswahl liegt halbdurchsichtig ueber dem Grund; die Schrift blieb
 ' text_fg. Im hellen modern-Thema stand so dunkle Schrift auf Violett mit

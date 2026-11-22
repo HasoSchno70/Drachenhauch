@@ -3892,9 +3892,10 @@ label should at least give it a `GUI_TOOLTIP`.
 
 **What the toolkit brings along anyway:** operation without a mouse
 (above), `GUI_SCALE` for large text, the theme `contrast` (white on black,
-yellow frames, contrast 21:1) via `GUI_THEME_PRESET("contrast")`; the
-default `dark` and the light theme are above the WCAG value of 4.5:1 with
-all their texts.
+yellow frames, contrast 21:1) via `GUI_THEME_PRESET("contrast")`; all
+built-in themes are above the WCAG value of 4.5:1 with all their texts --
+also the muted text (`muted_fg`, placeholders) on the window and in a field
+and the selected row of a table.
 
 **What the program must do — and only it can:** never convey information
 through colour alone (that is why the red field also has a message), offer
