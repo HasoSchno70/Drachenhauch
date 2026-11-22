@@ -845,6 +845,7 @@ impl<'p> Vm<'p> {
             "gui_menu_enable" => { self.gui.menu_enable(gi(a,0,"GUI_MENU_ENABLE")?, gbool(a,1,"GUI_MENU_ENABLE")?)?; Value::Nil }
             "gui_menu_check" => { self.gui.menu_check(gi(a,0,"GUI_MENU_CHECK")?, gbool(a,1,"GUI_MENU_CHECK")?)?; Value::Nil }
             "gui_menu_checked" => Value::Bool(self.gui.menu_checked(gi(a,0,"GUI_MENU_CHECKED")?)?),
+            "gui_menu_enabled" => Value::Bool(self.gui.menu_enabled(gi(a,0,"GUI_MENU_ENABLED")?)?),
             "gui_menu_icon" => {
                 match gsym(a,1,"GUI_MENU_ICON")? {
                     (Some(s), _) => self.gui.menu_icon_symbol(gi(a,0,"GUI_MENU_ICON")?, &s)?,

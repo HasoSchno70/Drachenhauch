@@ -368,6 +368,7 @@ IMPORT "gui"
 | `GUI_MENU_SEPARATOR(menu)` | — | Trennlinie anhängen |
 | `GUI_MENU_SHORTCUT(item, shortcut$)` | — | Kürzel setzen oder mit `""` entfernen |
 | `GUI_MENU_ENABLE(item, on)` | — | Eintrag sperren (grau, kein Klick, kein Kürzel) oder freigeben |
+| `GUI_MENU_ENABLED(item)` | BOOLEAN | ist der Eintrag bedienbar? |
 | `GUI_MENU_CHECK(item, on)` | — | macht den Eintrag zum **Häkchen-Eintrag** und setzt ihn; ein Klick kippt ihn danach selbst |
 | `GUI_MENU_CHECKED(item)` | BOOLEAN | Zustand des Häkchens |
 | `GUI_MENU_ICON(item, image)` | — | Sinnbild links vom Text (Name eines eingebauten Sinnbilds oder Textur-Handle wie bei `GUI_ICON_BUTTON`, -1 entfernt) |

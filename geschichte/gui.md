@@ -1399,3 +1399,6 @@ am Zeilenende der Erwartung ab, die Ausgabe nicht.
   Live-Pruefung meldete dahinter "Ohne Titel geht es nicht.". Steht ein
   modales Fenster obenauf, ist der Fokusverlust der Felder anderer Fenster
   jetzt kein Verlassen (`gui_eingabe.rs`, `geliehen`).
+- **GUI_MENU_ENABLED (2026-11-22).** Ebenda, Kapitel 6: zu GUI_MENU_ENABLE
+  fehlte die Abfrage; der Test fuer "Entfernen rueckgaengig ist nur frei,
+  wenn es etwas gibt" haette sonst nur ein Bild messen koennen.

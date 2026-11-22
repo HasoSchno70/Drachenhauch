@@ -368,6 +368,7 @@ IMPORT "gui"
 | `GUI_MENU_SEPARATOR(menu)` | — | append a separator line |
 | `GUI_MENU_SHORTCUT(item, shortcut$)` | — | set a shortcut or remove it with `""` |
 | `GUI_MENU_ENABLE(item, on)` | — | disable an entry (grey, no click, no shortcut) or enable it |
+| `GUI_MENU_ENABLED(item)` | BOOLEAN | is the item enabled? |
 | `GUI_MENU_CHECK(item, on)` | — | makes the entry a **check-mark entry** and sets it; afterwards a click toggles it by itself |
 | `GUI_MENU_CHECKED(item)` | BOOLEAN | state of the check mark |
 | `GUI_MENU_ICON(item, image)` | — | icon to the left of the text (name of a built-in icon or texture handle as with `GUI_ICON_BUTTON`, -1 removes it) |

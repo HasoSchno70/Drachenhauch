@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/en und dem englischen Buch von `dhrt doku prosa` -- NICHT von Hand aendern. Der Hover nimmt sie mit DHRT_LANG=en.",
- "count": 2611,
+ "count": 2612,
  "docs": {
   "ABS": "Absolute value.",
   "ACOS": "Arc sine/cosine (x in [-1, 1])",
@@ -885,6 +885,7 @@
   "GUI_MENU_CHECK": "makes the entry a check-mark entry and sets it; afterwards a click toggles it by itself",
   "GUI_MENU_CHECKED": "BOOLEAN — state of the check mark",
   "GUI_MENU_ENABLE": "disable an entry (grey, no click, no shortcut) or enable it",
+  "GUI_MENU_ENABLED": "BOOLEAN — is the item enabled?",
   "GUI_MENU_ICON": "icon to the left of the text (name of a built-in icon or texture handle as with GUI_ICON_BUTTON, -1 removes it)",
   "GUI_MENU_ITEM": "item handle — append an entry — handle for GUI_CLICKED; shortcut$ (shortcut) e.g. \"Strg+S\"",
   "GUI_MENU_SEPARATOR": "append a separator line",

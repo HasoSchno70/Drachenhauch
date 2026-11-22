@@ -751,3 +751,29 @@ e 8 1 257 0 0 0 // Event: test
 DHRT_FRAMES=14
 --- erwartet
 schritt
+
+=== gui_menu_enabled fragt, ob ein eintrag bedienbar ist
+' Die Abfrage zu GUI_MENU_ENABLE (fehlte bis 2026-11). Ein Handle, das
+' kein Menue-Eintrag ist, ist ein Fehler.
+IMPORT "gui"
+SCREEN(300, 200, "M", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("M", 0, 0, 300, 200)
+DIM m AS INTEGER : m = GUI_MENU(w, "Bearbeiten")
+DIM a AS INTEGER : a = GUI_MENU_ITEM(m, "Entfernen", "Entf")
+DIM b AS INTEGER : b = GUI_MENU_ITEM(m, "Rückgängig")
+GUI_MENU_ENABLE(b, FALSE)
+PRINT GUI_MENU_ENABLED(a); " "; GUI_MENU_ENABLED(b)
+GUI_MENU_ENABLE(b, TRUE)
+PRINT GUI_MENU_ENABLED(b)
+TRY
+    PRINT GUI_MENU_ENABLED(m)
+CATCH e
+    PRINT e
+END TRY
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+TRUE FALSE
+TRUE
+GUI_MENU_ENABLED: erwartet einen Menue-Eintrag
