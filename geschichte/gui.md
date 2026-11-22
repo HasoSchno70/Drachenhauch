@@ -1438,3 +1438,7 @@ Ueberlauf (>>), weil vor dem ersten Messen die Breiten geschaetzt werden
 (8 Punkte je Zeichen). `toolbar_item_rect` sagt jetzt, dass er im Ueberlauf
 steht und wer zaehlt, wie viele dort stehen; "gibt es nicht" nur noch fuer
 eine Nummer ausserhalb der Leiste.
+
+Ebenda, Kapitel 20: `GUI_STATE$` nennt auch Kacheln (Titel, Beschreibung,
+mit oder ohne Bild). Die Cover-Kachel der Mediathek zeigt, was in der
+Tabelle gewaehlt ist -- ob sie dem folgt, sah ein Test vorher nicht.

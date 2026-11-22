@@ -74,6 +74,11 @@ impl Gui {
                         } else { String::new() };
                         format!("{} {} Zeilen, gewaehlt {}{}: {}", wer, n, sel, ganz, erste.join(" "))
                     }
+                    // Titel, Beschreibung und ob ein Bild darin steht -- eine
+                    // Kachel, die zeigt, was gewaehlt ist (Buch "Fenster,
+                    // Formulare, Daten", Kapitel 20), sah ein Test sonst nicht.
+                    Kind::Card => format!("{} \"{}\" \"{}\" {}", wer, kurz(&w.text), kurz(&w.placeholder),
+                                          if w.sel >= 0 { "mit Bild" } else { "ohne Bild" }),
                     _ => continue,
                 };
                 z.push(format!("  {}", zeile));
