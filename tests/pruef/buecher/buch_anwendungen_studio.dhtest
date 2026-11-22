@@ -1985,3 +1985,176 @@ system hell
 system dunkel
 sterne 4
 zurueck 0
+
+=== kapitel 21: fuer alle
+' Kapitel 21: GUI_A11Y_CHECK$ findet am Hauptfenster nichts, dunkel wie
+' hell (Tab-Folge, Name der Tabelle, leise ueber muted_fg). Entf entfernt
+' den gewaehlten Eintrag nach der Frage und sagt es an (GUI_STATE$ nennt
+' die letzte Ansage); Strg+F setzt den Fokus ins Suchfeld. Dazu die
+' Loesungen: Enter im Suchfeld sagt die Treffer an, --gross vergroessert
+' das Programm.
+IMPORT "laeufer.dh"
+SUB kopieren(von AS STRING, nach AS STRING)
+    IF NOT DIREXISTS(nach) THEN MKDIR(nach)
+    DIM n AS STRING
+    FOR EACH n IN DIRLIST(von)
+        IF DIREXISTS(von + "/" + n) THEN
+            IF n <> "_studio" THEN kopieren(von + "/" + n, nach + "/" + n)
+        ELSEIF RIGHT$(n, 3) <> ".db" THEN
+            COPYFILE(von + "/" + n, nach + "/" + n)
+        END IF
+    NEXT
+END SUB
+FUNCTION laufen$(main AS STRING, bilder AS INTEGER, arg AS STRING) AS STRING
+    DIM q AS INTEGER
+    IF arg = "" THEN
+        q = PROCESS_START("dhrt", "run", "--bilder", STR$(bilder), main)
+    ELSE
+        q = PROCESS_START("dhrt", "run", "--bilder", STR$(bilder), main, "--", arg)
+    END IF
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    WHILE leer < 5
+        DIM t AS STRING : t = PROCESS_READ$(q) + PROCESS_ERR$(q)
+        aus = aus + t
+        IF t = "" AND NOT PROCESS_RUNNING(q) THEN leer = leer + 1
+        SLEEP(20)
+    WEND
+    RETURN aus
+END FUNCTION
+FUNCTION bedienen$(main AS STRING, ev AS ARRAY OF STRING, bilder AS INTEGER) AS STRING
+    DIM pf AS STRING : pf = CWD$() + "/bedienung.txt"
+    WRITEALL(pf, "c " + STR$(LEN(ev)) + CHR$(10) + JOIN$(ev, CHR$(10)) + CHR$(10) + CHR$(10))
+    SETENV("DHRT_ABSPIELEN", pf)
+    SETENV("DHRT_GUI_ZUSTAND", "1")
+    DIM aus AS STRING : aus = laufen$(main, bilder, "")
+    SETENV("DHRT_ABSPIELEN", "")
+    SETENV("DHRT_GUI_ZUSTAND", "")
+    IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+    RETURN aus
+END FUNCTION
+SUB klick(ev AS ARRAY OF STRING, b AS INTEGER, x AS INTEGER, y AS INTEGER)
+    ARRAY_PUSH(ev, "e " + STR$(b) + " 7 " + STR$(x) + " " + STR$(y) + " 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 2) + " 7 " + STR$(x) + " " + STR$(y) + " 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 4) + " 6 0 0 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 6) + " 5 0 0 0 0")
+END SUB
+' Eine Taste ab Bild b, wahlweise mit gehaltenem Strg (341).
+SUB taste(ev AS ARRAY OF STRING, b AS INTEGER, strg AS BOOLEAN, code AS INTEGER)
+    IF strg THEN ARRAY_PUSH(ev, "e " + STR$(b) + " 2 341 0 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 2) + " 2 " + STR$(code) + " 0 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 4) + " 1 " + STR$(code) + " 0 0 0")
+    IF strg THEN ARRAY_PUSH(ev, "e " + STR$(b + 6) + " 1 341 0 0 0")
+END SUB
+FUNCTION zeile$(aus AS STRING, was AS STRING) AS STRING
+    DIM z AS STRING
+    FOR EACH z IN SPLIT$(REPLACE$(aus, CHR$(13), ""), CHR$(10))
+        IF INSTR(z, was) >= 0 THEN RETURN TRIM$(z)
+    NEXT
+    RETURN ""
+END FUNCTION
+SUB f5(nm AS STRING, p AS STRING)
+    slZeilen = []
+    slBild = 0
+    slHin(10, 10)
+    slWarten(10)
+    slTaste(294)
+    slWarten(150)
+    slAufnahmeSchreiben(CWD$() + "/f5.txt")
+    SETENV("DH_STUDIO_LAUF_BILDER", "20")
+    DIM lg AS STRING : lg = CWD$() + "/" + nm + ".log"
+    DIM aus AS STRING : aus = slStarten(lg, CWD$() + "/f5.txt", slBild + 20, p)
+    PRINT nm; " geprueft "; slHat(lg, "geprueft 0 0"); " beendet "; slHat(lg, "beendet 0")
+    IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+END SUB
+' Eine Methode vor das Ende der Klasse Hauptfenster der Kopie.
+SUB einschieben(nm AS STRING, zeilen AS ARRAY OF STRING)
+    DIM h AS STRING : h = CWD$() + "/" + nm + "/_studio/projekt/Hauptfenster.dh"
+    DIM t AS STRING : t = READALL(h)
+    DIM p AS INTEGER : p = INSTRREV(t, "END CLASS")
+    WRITEALL(h, LEFT$(t, p) + JOIN$(zeilen, CHR$(10)) + CHR$(10) + MID$(t, p))
+END SUB
+FUNCTION q$(s AS STRING) AS STRING
+    RETURN CHR$(34) + s + CHR$(34)
+END FUNCTION
+
+DIM code AS STRING : code = ARG$(1) + "/buecher/anwendungen/code/"
+DIM proj AS STRING
+FOR EACH proj IN ["kap21/mediathek", "loesungen/kap21_suche", "loesungen/kap21_gross"]
+    DIM nm AS STRING : nm = BASENAME(proj)
+    IF nm = "mediathek" THEN nm = "kap21_mediathek"
+    kopieren(code + proj, CWD$() + "/" + nm)
+    f5(nm, CWD$() + "/" + nm)
+NEXT
+DIM m AS STRING : m = CWD$() + "/kap21_mediathek/_studio/main.dh"
+DIM a AS STRING
+DIM ev AS ARRAY OF STRING
+' Momo waehlen, Entf, in der Frage Enter: entfernt und angesagt.
+ev = []
+klick(ev, 4, 100, 177)
+taste(ev, 16, FALSE, 261)
+taste(ev, 30, FALSE, 257)
+a = bedienen$(m, ev, 60)
+PRINT zeile$(a, "table#tabelle")
+PRINT zeile$(a, "ansage ")
+' Die Pruefung dunkel und hell, dann Strg+F.
+einschieben("kap21_mediathek", ["    DIM probeN AS INTEGER", _
+    "    SUB Takt()", _
+    "        Self.probeN = Self.probeN + 1", _
+    "        IF Self.probeN = 3 THEN", _
+    "            PRINT " + q$("dunkel [") + "; GUI_A11Y_CHECK$(Self.studioWin); " + q$("]"), _
+    "            GUI_THEME_PRESET(" + q$("modern_light") + ")", _
+    "        END IF", _
+    "        IF Self.probeN = 6 THEN PRINT " + q$("hell [") + "; GUI_A11Y_CHECK$(Self.studioWin); " + q$("]"), _
+    "        IF Self.probeN = 30 THEN", _
+    "            PRINT " + q$("fokus suche ") + "; GUI_FOCUSED() = Self.feldSuche", _
+    "            END", _
+    "        END IF", _
+    "    END SUB"])
+ev = []
+klick(ev, 4, 100, 177)
+taste(ev, 14, TRUE, 70)
+a = bedienen$(m, ev, 40)
+PRINT zeile$(a, "dunkel [")
+PRINT zeile$(a, "hell [")
+PRINT zeile$(a, "fokus suche ")
+' Erweitern 1: "mo" im Suchfeld, Enter -- die Zahl der Treffer.
+DIM hs AS STRING : hs = CWD$() + "/kap21_suche/_studio/projekt/Hauptfenster.dh"
+WRITEALL(hs, REPLACE$(READALL(hs), "        Self.ausleihe.haupt = Self", "        Self.ausleihe.haupt = Self" + CHR$(10) + "        GUI_SET_TEXT(Self.feldSuche, " + q$("mo") + ") : Self.Neuladen()"))
+ev = []
+klick(ev, 4, 240, 60)
+taste(ev, 14, FALSE, 257)
+a = bedienen$(CWD$() + "/kap21_suche/_studio/main.dh", ev, 40)
+PRINT zeile$(a, "table#tabelle")
+PRINT zeile$(a, "ansage ")
+' Erweitern 2: ohne und mit --gross.
+einschieben("kap21_gross", ["    DIM probeN AS INTEGER", _
+    "    SUB Takt()", _
+    "        Self.probeN = Self.probeN + 1", _
+    "        IF Self.probeN = 3 THEN", _
+    "            PRINT " + q$("schirm ") + "; SCREENWIDTH(); " + q$(" fenster ") + "; GUI_WINDOW_GET_W(Self.studioWin)", _
+    "            END", _
+    "        END IF", _
+    "    END SUB"])
+DIM mg AS STRING : mg = CWD$() + "/kap21_gross/_studio/main.dh"
+PRINT zeile$(laufen$(mg, 20, ""), "schirm ")
+PRINT zeile$(laufen$(mg, 20, "--gross"), "schirm ")
+--- argumente
+{sammlung}/../../../studio/studio.dh
+{sammlung}/../../..
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- erwartet
+kap21_mediathek geprueft TRUE beendet TRUE
+kap21_suche geprueft TRUE beendet TRUE
+kap21_gross geprueft TRUE beendet TRUE
+table#tabelle 4 Zeilen, gewaehlt -1: "Emil und die Detektive" "Kind of Blue" "Metropolis" "Tetris"
+ansage "Momo entfernt"
+dunkel []
+hell []
+fokus suche TRUE
+table#tabelle 1 Zeilen, gewaehlt -1: "Momo"
+ansage "Ein Eintrag gefunden"
+schirm 760 fenster 760
+schirm 1140 fenster 760

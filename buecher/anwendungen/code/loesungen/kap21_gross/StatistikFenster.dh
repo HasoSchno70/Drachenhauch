@@ -1,0 +1,84 @@
+' Kapitel 18 -- die Statistik als Diagramme: links die Eintraege je
+' Art (die Abfrage statistik aus Kapitel 15), rechts die Ausleihen
+' der letzten sechs Monate. Ein Klick auf ein Stueck oder einen Balken
+' fuellt die Liste darunter.
+CLASS StatistikFenster EXTENDS StatistikFenster_Basis
+    ' Was die Punkte bedeuten: die Arten im Kuchen, die Monate
+    ' (JJJJ-MM) der Balken -- in der Reihenfolge der Punkte.
+    DIM arten AS ARRAY OF STRING
+    DIM monate AS ARRAY OF STRING
+
+    SUB Geoeffnet()
+        Self.artenFuellen()
+        Self.monateFuellen()
+    END SUB
+
+    SUB artenFuellen()
+        Self.arten = []
+        Self.diagArt.Leeren()
+        DIM r AS DB_RESULT : r = Abfrage("statistik")
+        WHILE DB_NEXT(r)
+            ARRAY_PUSH(Self.arten, DB_GET_STRING(r, 0))
+            Self.diagArt.Hinzufuegen(DB_GET_STRING(r, 0), _
+                                     DB_GET_INT(r, 1))
+        WEND
+        Self.diagArt.Setzen("legende", "rechts")
+        Self.diagArt.SetzenSchalter("tooltip", TRUE)
+    END SUB
+
+    ' Sechs Monate bis heute, auch die ohne Ausleihe -- eine Luecke
+    ' im Verlauf ist auch eine Auskunft.
+    SUB monateFuellen()
+        DIM heute AS STRING : heute = tagVor$(0)
+        DIM jahr AS INTEGER : jahr = INT(VAL(LEFT$(heute, 4)))
+        DIM monat AS INTEGER : monat = INT(VAL(MID$(heute, 5, 2)))
+        DIM k AS INTEGER
+        FOR k = 1 TO 5
+            monat = monat - 1
+            IF monat = 0 THEN monat = 12 : jahr = jahr - 1
+        NEXT
+        Self.monate = []
+        DIM werte AS ARRAY OF FLOAT : werte = []
+        FOR k = 0 TO 5
+            DIM m AS STRING
+            m = STR$(jahr) + "-" + RIGHT$("0" + STR$(monat), 2)
+            ARRAY_PUSH(Self.monate, m)
+            ARRAY_PUSH(werte, anzahlImMonat(m))
+            monat = monat + 1
+            IF monat = 13 THEN monat = 1 : jahr = jahr + 1
+        NEXT
+        Self.diagMonate.Leeren()
+        Self.diagMonate.Reihe("Ausleihen", werte)
+        FOR k = 0 TO 5
+            Self.diagMonate.Beschriften(k, MID$(Self.monate[k], 5, 2))
+        NEXT
+        Self.diagMonate.SetzenSchalter("tooltip", TRUE)
+    END SUB
+
+    ' Ein Klick auf einen Punkt meldet das Diagramm nach dem Zeichnen;
+    ' Takt laeuft im naechsten Bild und fragt es ab.
+    SUB Takt()
+        DIM p AS INTEGER : p = CHART_CLICKED(Self.diagArt.Diagramm)
+        IF p >= 0 THEN Self.artZeigen(Self.arten[p])
+        p = CHART_CLICKED(Self.diagMonate.Diagramm)
+        IF p >= 0 THEN Self.monatZeigen(Self.monate[p])
+    END SUB
+
+    SUB artZeigen(art AS STRING)
+        DIM titel AS ARRAY OF STRING : titel = titelDerArt(art)
+        GUI_LISTBOX_ITEMS(Self.liste, titel)
+        GUI_SET_TEXT(Self.hinweis, art + ": " + _
+                     anzahlText$(LEN(titel), "Eintrag", "Einträge"))
+    END SUB
+
+    SUB monatZeigen(monat AS STRING)
+        DIM was AS ARRAY OF STRING : was = ausleihenImMonat(monat)
+        GUI_LISTBOX_ITEMS(Self.liste, was)
+        GUI_SET_TEXT(Self.hinweis, monat + ": " + _
+                     anzahlText$(LEN(was), "Ausleihe", "Ausleihen"))
+    END SUB
+
+    SUB knopfZu_Klick()
+        Self.Zumachen()
+    END SUB
+END CLASS

@@ -640,4 +640,34 @@ module.exports = (H) => [
   ...neu("loesungen/kap20_sterne/EintragFenster.dh").map((t) => H.code(t)),
 
   H.p("Sichern schreibt erst die gebundenen Felder; danach ist DatensatzId die Zeile — auch bei einem neuen Eintrag, der erst jetzt eine id bekommen hat. Darum kommt das UPDATE nach Sichern, nicht davor."),
+
+  H.h2("Kapitel 21 · Für alle"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Im dunklen Aussehen nichts, im hellen „label #status in \"Mediathek\": Kontrast 3,0:1 -- mindestens 4,5:1 (Schrift #8A93A6 auf #FAFBFC)“. Dasselbe Grau, ein anderer Grund: Auf Dunkel ist es hell genug, auf fast Weiß nicht. Darum steht in der Regel muted_fg — die Farbe wechselt mit dem Thema."),
+
+  H.h3("Drehen 2"),
+
+  H.p("„table #tabelle in \"Mediathek\": Tab springt hierher zurueck (von button #knopfausleihen in \"Mediathek\") -- die Reihenfolge folgt nicht der Lage“. Von „Ausleihen …“ unten rechts geht Tab jetzt nach oben links in die Tabelle. Den Befund bekommt das Widget, zu dem Tab springt — dort merkt man den Sprung."),
+
+  H.h3("Drehen 3"),
+
+  H.p("Nein. Ein Ziel unter 24 × 24 Punkten ist nur dann ein Befund, wenn ein Kreis von 24 Punkten um seine Mitte ein anderes Ziel berührt (WCAG 2.5.8). Zwischen „Entfernen“ und seinen Nachbarn liegen 10 Punkte; wer ihn knapp verfehlt, trifft nichts Falsches. Kleiner wird er trotzdem schwerer zu treffen — die Prüfung sagt nur, ab wann es nicht mehr reicht."),
+
+  H.h3("Erweitern 1: Treffer ansagen"),
+
+  H.p("Das Suchfeld bekommt das Ereignis Enter (code/loesungen/kap21_suche/Hauptfenster.dh):"),
+
+  ...neu("loesungen/kap21_suche/Hauptfenster.dh").map((t) => H.code(t)),
+
+  H.p("Die Tabelle ist beim Enter schon gefiltert — sie lädt neu, sobald sich der Suchtext ändert. Angesagt wird erst auf Enter, nicht bei jedem Buchstaben: So entscheidet der Nutzer, wann er es hören will."),
+
+  H.h3("Erweitern 2: große Schrift"),
+
+  H.p("App.Geoeffnet sieht in den Argumenten nach (code/loesungen/kap21_gross/App.dh):"),
+
+  ...neu("loesungen/kap21_gross/App.dh").map((t) => H.code(t)),
+
+  H.p("GUI_SCALE vergrößert alles — Schrift, Widgets und das Programmfenster mit. Es muss vor dem ersten Fenster stehen; einen Menüeintrag, der den Maßstab mitten im Lauf ändert, lässt die gui nicht zu. Ausprobieren lässt es sich im Projektordner mit dhrt run _studio/main.dh -- --gross; ein gebautes Programm bekommt die Option in seiner Verknüpfung. Wie man sich die Wahl für den nächsten Start merkt, zeigt Kapitel 23."),
 ];
