@@ -614,3 +614,141 @@ letzter TRUE
 davor TRUE
 hinweis TRUE
 hinweis TRUE
+
+=== kapitel 13: das datenbank-element
+' Kapitel 13: die Mediathek mit dem Datenbank-Element Mediathek (eintrag,
+' freund, ausleihe). Der erste Start traegt die Beispiele samt der
+' Ausleihe an Lena ein; Zurueck schreibt das Datum, Entfernen loescht die
+' Ausleihe mit (Verweis mit "mitloeschen"). Eine Datei aus Teil I behaelt
+' ihre Eintraege und bekommt die neuen Tabellen. Dazu die Loesungen.
+IMPORT "laeufer.dh"
+IMPORT "db"
+SUB kopieren(von AS STRING, nach AS STRING)
+    IF NOT DIREXISTS(nach) THEN MKDIR(nach)
+    DIM n AS STRING
+    FOR EACH n IN DIRLIST(von)
+        IF DIREXISTS(von + "/" + n) THEN
+            IF n <> "_studio" THEN kopieren(von + "/" + n, nach + "/" + n)
+        ELSEIF RIGHT$(n, 3) <> ".db" THEN
+            COPYFILE(von + "/" + n, nach + "/" + n)
+        END IF
+    NEXT
+END SUB
+FUNCTION bedienen$(main AS STRING, ev AS ARRAY OF STRING, bilder AS INTEGER) AS STRING
+    DIM pf AS STRING : pf = CWD$() + "/bedienung.txt"
+    WRITEALL(pf, "c " + STR$(LEN(ev)) + CHR$(10) + JOIN$(ev, CHR$(10)) + CHR$(10) + CHR$(10))
+    SETENV("DHRT_ABSPIELEN", pf)
+    SETENV("DHRT_GUI_ZUSTAND", "1")
+    DIM q AS INTEGER : q = PROCESS_START("dhrt", "run", "--bilder", STR$(bilder), main)
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    WHILE leer < 5
+        DIM t AS STRING : t = PROCESS_READ$(q) + PROCESS_ERR$(q)
+        aus = aus + t
+        IF t = "" AND NOT PROCESS_RUNNING(q) THEN leer = leer + 1
+        SLEEP(20)
+    WEND
+    SETENV("DHRT_ABSPIELEN", "")
+    SETENV("DHRT_GUI_ZUSTAND", "")
+    RETURN aus
+END FUNCTION
+SUB klick(ev AS ARRAY OF STRING, b AS INTEGER, x AS INTEGER, y AS INTEGER)
+    ARRAY_PUSH(ev, "e " + STR$(b) + " 7 " + STR$(x) + " " + STR$(y) + " 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 2) + " 7 " + STR$(x) + " " + STR$(y) + " 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 4) + " 6 0 0 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 6) + " 5 0 0 0 0")
+END SUB
+' Zahl der Zeilen einer Abfrage in einer Datei.
+FUNCTION zahl(datei AS STRING, sql AS STRING) AS INTEGER
+    DIM d AS DB_CONN : d = DB_OPEN(datei)
+    DIM r AS DB_RESULT : r = DB_QUERY(d, sql)
+    DIM n AS INTEGER : n = -1
+    IF DB_NEXT(r) THEN n = DB_GET_INT(r, 0)
+    DB_CLOSE(d)
+    RETURN n
+END FUNCTION
+SUB f5(nm AS STRING, p AS STRING)
+    slZeilen = []
+    slBild = 0
+    slHin(10, 10)
+    slWarten(10)
+    slTaste(294)
+    slWarten(150)
+    slAufnahmeSchreiben(CWD$() + "/f5.txt")
+    SETENV("DH_STUDIO_LAUF_BILDER", "20")
+    DIM lg AS STRING : lg = CWD$() + "/" + nm + ".log"
+    DIM aus AS STRING : aus = slStarten(lg, CWD$() + "/f5.txt", slBild + 20, p)
+    PRINT nm; " geprueft "; slHat(lg, "geprueft 0 0"); " beendet "; slHat(lg, "beendet 0")
+    IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+END SUB
+
+DIM code AS STRING : code = ARG$(1) + "/buecher/anwendungen/code/"
+DIM proj AS STRING
+FOR EACH proj IN ["kap13/mediathek", "loesungen/kap13_telefon", "loesungen/kap13_schlagwoerter"]
+    DIM nm AS STRING : nm = BASENAME(proj)
+    IF nm = "mediathek" THEN nm = "kap13_mediathek"
+    kopieren(code + proj, CWD$() + "/" + nm)
+    f5(nm, CWD$() + "/" + nm)
+NEXT
+' Der erste Start aus dem Studio arbeitet auf der Datei im Projektordner.
+DIM pd AS STRING : pd = CWD$() + "/kap13_mediathek/mediathek.db"
+PRINT "eingerichtet "; zahl(pd, "SELECT COUNT(*) FROM eintrag"); " "; zahl(pd, "SELECT COUNT(*) FROM freund"); " "; zahl(pd, "SELECT COUNT(*) FROM ausleihe")
+' Das Programm selbst (ohne Studio) legt seine Datei neben main.dh an.
+DIM m AS STRING : m = CWD$() + "/kap13_mediathek/_studio/main.dh"
+DIM sd AS STRING : sd = CWD$() + "/kap13_mediathek/_studio/mediathek.db"
+DIM ev AS ARRAY OF STRING
+DIM a AS STRING
+ev = []
+klick(ev, 0, 100, 91)
+klick(ev, 10, 670, 427)
+klick(ev, 30, 505, 292)
+a = bedienen$(m, ev, 60)
+PRINT "zurueck "; INSTR(a, "Tetris ist da.") >= 0; " "; zahl(sd, "SELECT COUNT(*) FROM ausleihe WHERE zurueck IS NOT NULL")
+ev = []
+klick(ev, 0, 100, 91)
+klick(ev, 10, 540, 427)
+ARRAY_PUSH(ev, "e 30 2 257 0 0 0")
+ARRAY_PUSH(ev, "e 32 1 257 0 0 0")
+a = bedienen$(m, ev, 70)
+PRINT "entfernt "; zahl(sd, "SELECT COUNT(*) FROM eintrag"); " ausleihen "; zahl(sd, "SELECT COUNT(*) FROM ausleihe")
+' Die Datei aus Teil I: fuenf Eintraege, nur die Tabelle eintrag.
+DIM pt AS STRING : pt = CWD$() + "/teil1"
+kopieren(code + "kap13/mediathek", pt)
+DIM d1 AS DB_CONN : d1 = DB_OPEN(pt + "/mediathek.db")
+DB_EXEC(d1, "CREATE TABLE eintrag (id INTEGER PRIMARY KEY, titel TEXT NOT NULL, urheber TEXT, art TEXT, jahr INTEGER)")
+DB_EXEC(d1, "INSERT INTO eintrag (titel, urheber, art, jahr) VALUES ('Momo', 'Michael Ende', 'Buch', 1973)")
+DB_EXEC(d1, "INSERT INTO eintrag (titel, urheber, art, jahr) VALUES ('Ronja', 'Astrid Lindgren', 'Buch', NULL)")
+DB_CLOSE(d1)
+f5("teil1", pt)
+PRINT "teil 1 "; zahl(pt + "/mediathek.db", "SELECT COUNT(*) FROM eintrag"); " "; zahl(pt + "/mediathek.db", "SELECT COUNT(*) FROM freund"); " "; zahl(pt + "/mediathek.db", "SELECT COUNT(*) FROM ausleihe")
+' Erweitern 1: Lenas Telefonnummer im Ausleihfenster.
+DIM mt AS STRING : mt = CWD$() + "/kap13_telefon/_studio/main.dh"
+a = bedienen$(mt, ["e 0 7 1 1 0 0"], 5)
+DIM d2 AS DB_CONN : d2 = DB_OPEN(CWD$() + "/kap13_telefon/_studio/mediathek.db")
+DB_EXEC(d2, "UPDATE freund SET telefon = '0151 2345678' WHERE name = 'Lena'")
+DB_CLOSE(d2)
+ev = []
+klick(ev, 0, 100, 91)
+klick(ev, 10, 670, 427)
+PRINT "telefon "; INSTR(bedienen$(mt, ev, 50), "Tetris ist bei Lena (0151 2345678).") >= 0
+' Erweitern 2: Schlagwoerter in der Statuszeile.
+ev = []
+klick(ev, 0, 100, 131)
+PRINT "schlagwoerter "; INSTR(bedienen$(CWD$() + "/kap13_schlagwoerter/_studio/main.dh", ev, 40), "Emil und die Detektive: Kinderbuch, Klassiker") >= 0
+--- argumente
+{sammlung}/../../../studio/studio.dh
+{sammlung}/../../..
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- erwartet
+kap13_mediathek geprueft TRUE beendet TRUE
+kap13_telefon geprueft TRUE beendet TRUE
+kap13_schlagwoerter geprueft TRUE beendet TRUE
+eingerichtet 5 1 1
+zurueck TRUE 1
+entfernt 4 ausleihen 0
+teil1 geprueft TRUE beendet TRUE
+teil 1 2 0 0
+telefon TRUE
+schlagwoerter TRUE
