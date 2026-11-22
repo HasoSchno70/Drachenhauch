@@ -1,0 +1,22 @@
+' Kapitel 3, was schiefgehen kann -- eine Zeile nur in der Tabelle.
+IMPORT "gui"
+IMPORT "eintrag.dh"
+
+DIM mediathek AS ARRAY OF Eintrag
+mediathek = beispiele()
+SCREEN(760, 400, "Mediathek", 1)
+DIM fenster AS GUI_WINDOW
+fenster = GUI_WINDOW("Mediathek", 0, 0, 760, 400)
+DIM tabelle AS GUI_WIDGET
+tabelle = GUI_TABLE(fenster, 20, 20, 720, 360)
+DIM e AS Eintrag
+FOR EACH e IN mediathek
+    GUI_TABLE_ADD_ROW(tabelle, e.zellen())
+NEXT
+
+' Aufgenommen -- aber nur in die Tabelle, nicht ins Feld:
+GUI_TABLE_ADD_ROW(tabelle, ["Ronja", "Astrid Lindgren", "Buch", "1981"])
+
+' Ein Doppelklick auf die neue Zeile will ihren Eintrag zeigen:
+DIM z AS INTEGER : z = GUI_TABLE_ROW_COUNT(tabelle) - 1
+PRINT mediathek[z].titel

@@ -217,3 +217,45 @@ PRINT BUFFER_LEN(DB_GET_BUFFER(r, 0)); " "; BUFFER_LEN(DB_GET_BUFFER(r, 1))
 2
 DB_GET_BUFFER: Spalte 2 ist eine Zahl, keine Bytes
 0 0
+
+=== eine gesperrte datei sagt, woran es liegt
+' Eine offene Transaktion auf Verbindung a sperrt die Datei; b wartet
+' 5 s und gibt auf. Die Meldung nennt die Ursache dazu, nicht nur
+' "database is locked" (Buch "Fenster, Formulare, Daten", Kapitel 4).
+IMPORT "db"
+DIM a AS DB_CONN : a = DB_OPEN("gesperrt.db")
+DB_EXEC(a, "CREATE TABLE t (n INTEGER)")
+DIM b AS DB_CONN : b = DB_OPEN("gesperrt.db")
+DB_BEGIN(a)
+DB_EXEC(a, "INSERT INTO t VALUES (1)")
+TRY
+    DB_EXEC(b, "INSERT INTO t VALUES (2)")
+CATCH e
+    PRINT e
+END TRY
+DB_COMMIT(a)
+PRINT DB_EXEC(b, "INSERT INTO t VALUES (3)")
+--- erwartet
+DB_EXEC: database is locked -- eine andere Verbindung schreibt gerade in die Datei (ein zweites Programm oder eine Transaktion ohne DB_COMMIT); nach 5 Sekunden aufgegeben
+1
+
+=== ein eingeklebter wert mit apostroph bekommt den weg mit fragezeichen
+' Ungerade Zahl von ' im SQL plus Syntaxfehler: fast immer ein Wert, der
+' ins SQL geklebt wurde. Ein anderer Syntaxfehler bleibt ohne Hinweis.
+IMPORT "db"
+DIM c AS DB_CONN : c = DB_OPEN(":memory:")
+DB_EXEC(c, "CREATE TABLE t (titel TEXT)")
+DIM t AS STRING : t = "Sgt. Pepper's"
+TRY
+    DB_EXEC(c, "INSERT INTO t (titel) VALUES ('" + t + "')")
+CATCH e
+    PRINT e
+END TRY
+TRY
+    DB_EXEC(c, "INSERT INTO t (titel) VALUES ('a',)")
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+DB_EXEC: near "s": syntax error in INSERT INTO t (titel) VALUES ('Sgt. Pepper's') at offset 43 -- steht ein ' in einem eingeklebten Wert? Werte mit ? uebergeben: DB_EXEC(db, "... VALUES (?)", wert)
+DB_EXEC: near ")": syntax error in INSERT INTO t (titel) VALUES ('a',) at offset 34

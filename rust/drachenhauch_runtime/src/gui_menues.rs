@@ -100,6 +100,15 @@ impl Gui {
         it.haken = true; it.an = an; Ok(())
     }
     /// GUI_MENU_CHECKED(item) -> BOOLEAN
+    /// GUI_MENU_ENABLED(item) -- ist der Eintrag bedienbar? Die Abfrage zu
+    /// GUI_MENU_ENABLE fehlte bis 2026-11 (Buch "Fenster, Formulare, Daten",
+    /// Kapitel 6: "Entfernen rueckgaengig" ist nur frei, wenn es etwas gibt).
+    pub fn menu_enabled(&self, h: i64) -> Result<bool, String> {
+        if h & ITEM_FLAG == 0 { return Err("GUI_MENU_ENABLED: erwartet einen Menue-Eintrag".into()); }
+        let (wi, mi, ii) = dec_item(h);
+        self.windows.get(wi).and_then(|w| w.menus.get(mi)).and_then(|m| m.items.get(ii))
+            .map(|it| it.enabled).ok_or_else(|| "GUI_MENU_ENABLED: ungueltiges Eintrags-Handle".into())
+    }
     pub fn menu_checked(&self, h: i64) -> Result<bool, String> {
         if h & ITEM_FLAG == 0 { return Err("GUI_MENU_CHECKED: erwartet einen Menue-Eintrag".into()); }
         let (wi, mi, ii) = dec_item(h);

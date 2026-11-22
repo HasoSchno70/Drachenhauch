@@ -1,0 +1,30 @@
+' Kapitel 2, was schiefgehen kann -- ein Feld in zwei Zeilen.
+IMPORT "gui"
+SCREEN(560, 140, "Mediathek", 1)
+DIM fenster AS GUI_WINDOW
+fenster = GUI_WINDOW("Mediathek", 0, 0, 560, 140)
+GUI_WINDOW_CHROME(fenster, FALSE)
+DIM form AS GUI_WIDGET
+form = GUI_LAYOUT(fenster, "spalte", 0, 0, 560, 140)
+GUI_LAYOUT_SET(form, "rand", 20)
+GUI_LAYOUT_SET(form, "abstand", 8)
+DIM oben AS GUI_WIDGET
+oben = GUI_LAYOUT(fenster, "zeile", 0, 0, 10, 10)
+DIM unten AS GUI_WIDGET
+unten = GUI_LAYOUT(fenster, "zeile", 0, 0, 10, 10)
+GUI_LAYOUT_ADD(form, oben)
+GUI_LAYOUT_ADD(form, unten)
+
+' Dasselbe Feld fuer beide Zeilen -- so nicht!
+DIM feld AS GUI_WIDGET : feld = GUI_TEXTINPUT(fenster, 0, 0, 0, 0)
+GUI_LAYOUT_ADD(oben, GUI_LABEL(fenster, "Titel", 0, 0))
+GUI_LAYOUT_ADD(oben, feld, 1)
+GUI_LAYOUT_ADD(unten, GUI_LABEL(fenster, "Originaltitel", 0, 0))
+GUI_LAYOUT_ADD(unten, feld, 1)
+
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(RGB(32, 36, 44))
+    GUI_DRAW()
+    FLIP()
+WEND

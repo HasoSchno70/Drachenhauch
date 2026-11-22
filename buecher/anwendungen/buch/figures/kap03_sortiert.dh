@@ -1,0 +1,4 @@
+' Bild fuer Kapitel 3: die Tabelle nach einem Klick auf den Kopf
+' "Jahr". Die Aufnahme daneben klickt in Fensterpixeln, also mal
+' SKALIERUNG (2) aus shoot.dh.
+IMPORT "../../code/kap03/1_tabelle.dh"

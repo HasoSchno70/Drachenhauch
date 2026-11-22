@@ -368,6 +368,7 @@ IMPORT "gui"
 | `GUI_MENU_SEPARATOR(menu)` | — | append a separator line |
 | `GUI_MENU_SHORTCUT(item, shortcut$)` | — | set a shortcut or remove it with `""` |
 | `GUI_MENU_ENABLE(item, on)` | — | disable an entry (grey, no click, no shortcut) or enable it |
+| `GUI_MENU_ENABLED(item)` | BOOLEAN | is the item enabled? |
 | `GUI_MENU_CHECK(item, on)` | — | makes the entry a **check-mark entry** and sets it; afterwards a click toggles it by itself |
 | `GUI_MENU_CHECKED(item)` | BOOLEAN | state of the check mark |
 | `GUI_MENU_ICON(item, image)` | — | icon to the left of the text (name of a built-in icon or texture handle as with `GUI_ICON_BUTTON`, -1 removes it) |
@@ -1529,11 +1530,13 @@ Every cell carries text, its own **foreground and background colour**, an
 | `GUI_TABLE_SET_CELL(tbl, row, column, text$)` | cell content |
 | `GUI_TABLE_GET_CELL(tbl, row, column)` | read cell content |
 | `GUI_TABLE_CELL_COLOR(tbl, row, column, foreground, background)` | colours; `-1` = not set |
+| `GUI_TABLE_GET_CELL_COLOR(tbl, row, column, role$)` | read the colour set on the cell: `fg` (text) or `bg` (area); `-1` = not set |
 | `GUI_TABLE_CELL_ALIGN(tbl, z, s, "links"/"mitte"/"rechts")` | alignment of this cell |
 | `GUI_TABLE_CELL_KIND(tbl, row, column, kind$)` | kind (see the table above) |
 | `GUI_TABLE_CELL_IMAGE(tbl, row, column, image)` | set an image (sets the kind along with it) |
 | `GUI_TABLE_CELL_VALUE(tbl, row, column, value)` / `GUI_TABLE_GET_VALUE(...)` | check mark (0/1) or bar (0..1) |
 | `GUI_TABLE_ROW_COLOR(tbl, row, foreground, background)` | colour a whole row — **one** call instead of one per column |
+| `GUI_TABLE_GET_ROW_COLOR(tbl, row, role$)` | read the row's colour: `fg` or `bg`; `-1` = not set |
 | `GUI_TABLE_COL_ALIGN(tbl, column, align$)` | alignment of the whole column |
 
 **Colours in three levels:** cell → row → zebra. `-1` means “not set” and
@@ -3559,8 +3562,8 @@ IF GUI_FORM_CHANGED(win, "kunde") THEN nachfragen()
   writes `INSERT` (for `id < 0`, returns the new id) or `UPDATE`. The
   column is called `id` — SQLite's convention. Values are stored **typed**:
   a numeric field as a number (unless it starts with a zero before a digit
-  like the postcode `01234` — that stays text; `0,99` is a number), a
-  checkbox as 0/1, a dropdown as its index, a slider as a floating-point
+  like the postcode `01234` — that stays text; `0,99` is a number; empty
+  it is NULL), a checkbox as 0/1, a dropdown as its index, a slider as a floating-point
   number, everything else as text. A **money field** (`zahlen` 3) is typed
   and shown like a decimal with two places and bound as an INTEGER in
   cents — `48,50` in the field is `4850` in the column, and loading turns
@@ -3644,9 +3647,15 @@ END IF
   error there would be one with no way out.
 - `GUI_SET_ERROR(feld, meldung$)` sets a message from outside, such as
   "number already taken" from the database; an empty text removes it.
-  `GUI_CLEAR_ERRORS(win)` clears them all.
+  `GUI_CLEAR_ERRORS(win)` clears them all. New values from `GUI_FORM_SET`,
+  `GUI_FORM_LOAD` or `GUI_FORM_CLEAR` take their fields' messages with
+  them — they were about the old content.
 - `GUI_VALIDATE_LIVE(win, TRUE)` checks a field as soon as the focus leaves
   it — not on every keystroke: a half-typed address is not a wrong one.
+  Only what changed since the field got the focus, or already carries a
+  message, is checked: a field you merely pass through is not wrong (an
+  empty required field is reported by `GUI_VALIDATE` on saving). A dialog
+  that only borrows the focus does not count as leaving.
 - Rules are stored in the `.dhform` (`rules`, `error_label`), for example
   `pflicht; laenge 2 60; email`.
 

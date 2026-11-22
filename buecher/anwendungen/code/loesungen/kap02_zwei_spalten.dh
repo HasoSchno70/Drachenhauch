@@ -1,0 +1,107 @@
+' Loesung Kapitel 2, Erweitern 1 -- dasselbe Formular in zwei Spalten:
+' Titel und Urheber links, Art und Jahr rechts.
+IMPORT "gui"
+
+SCREEN(760, 220, "Mediathek", 1)
+WINDOW_RESIZABLE(TRUE)
+DIM fenster AS GUI_WINDOW
+fenster = GUI_WINDOW("Mediathek", 0, 0, 760, 220)
+GUI_WINDOW_CHROME(fenster, FALSE)
+
+' Aussen eine Spalte, so gross wie das Fenster und an allen vier Kanten
+' verankert -- sie ist das Einzige, das eine Lage und eine Groesse hat.
+DIM form AS GUI_WIDGET
+form = GUI_LAYOUT(fenster, "spalte", 0, 0, 760, 220)
+GUI_SET_ANCHOR(form, "lrtb")
+GUI_LAYOUT_SET(form, "rand", 20)
+GUI_LAYOUT_SET(form, "abstand", 8)
+
+' >>> neu
+' Zwei Spalten nebeneinander in einer Zeile, jede mit Gewicht 1: sie
+' teilen sich die Breite gerecht.
+DIM spalten AS GUI_WIDGET
+spalten = GUI_LAYOUT(fenster, "zeile", 0, 0, 10, 10)
+GUI_LAYOUT_SET(spalten, "abstand", 24)
+GUI_LAYOUT_SET(spalten, "dehnen", 0)
+DIM links AS GUI_WIDGET
+links = GUI_LAYOUT(fenster, "spalte", 0, 0, 10, 10)
+DIM rechts AS GUI_WIDGET
+rechts = GUI_LAYOUT(fenster, "spalte", 0, 0, 10, 10)
+GUI_LAYOUT_SET(links, "abstand", 8)
+GUI_LAYOUT_SET(rechts, "abstand", 8)
+GUI_LAYOUT_ADD(spalten, links, 1)
+GUI_LAYOUT_ADD(spalten, rechts, 1)
+GUI_LAYOUT_ADD(form, spalten)
+
+' Die Zeile kommt jetzt in die Spalte, die man ihr nennt, und jede
+' Spalte hat ihre eigene Groessengruppe: links richten sich die Felder
+' nach "Urheber", rechts nach "Erscheinungsjahr".
+SUB zeile(spalte AS GUI_WIDGET, gruppe AS STRING, text AS STRING, _
+          feld AS GUI_WIDGET, gewicht AS INTEGER)
+    DIM z AS GUI_WIDGET : z = GUI_LAYOUT(fenster, "zeile", 0, 0, 10, 10)
+    GUI_LAYOUT_SET(z, "abstand", 12)
+    GUI_LAYOUT_SET(z, "ausrichtung", 1)
+    GUI_LAYOUT_SET(z, "dehnen", 0)
+    DIM l AS GUI_WIDGET : l = GUI_LABEL(fenster, text, 0, 0)
+    GUI_SIZE_GROUP(l, gruppe, "breite")
+    GUI_LAYOUT_ADD(z, l)
+    GUI_LAYOUT_ADD(z, feld, gewicht)
+    IF gewicht = 0 THEN GUI_LAYOUT_SPACER(z)
+    GUI_LAYOUT_ADD(spalte, z)
+END SUB
+' <<< neu
+
+DIM titel AS GUI_WIDGET : titel = GUI_TEXTINPUT(fenster, 0, 0, 0, 0)
+DIM urheber AS GUI_WIDGET : urheber = GUI_TEXTINPUT(fenster, 0, 0, 0, 0)
+DIM art AS GUI_WIDGET
+DIM arten AS ARRAY OF STRING
+arten = ["Buch", "Film", "Spiel", "Musik"]
+art = GUI_DROPDOWN(fenster, 0, 0, 160, 0, arten)
+GUI_DROPDOWN_SET_SELECTED(art, 0)
+DIM jahr AS GUI_WIDGET : jahr = GUI_TEXTINPUT(fenster, 0, 0, 80, 0)
+' >>> neu
+zeile(links, "links", "Titel", titel, 1)
+zeile(links, "links", "Urheber", urheber, 1)
+zeile(rechts, "rechts", "Art", art, 0)
+zeile(rechts, "rechts", "Erscheinungsjahr", jahr, 0)
+' <<< neu
+
+' Die Knopfreihe: ein Leerraum vorn schiebt den Knopf nach rechts.
+DIM knoepfe AS GUI_WIDGET
+knoepfe = GUI_LAYOUT(fenster, "zeile", 0, 0, 10, 10)
+DIM status AS GUI_WIDGET
+status = GUI_LABEL(fenster, "Noch nichts aufgenommen.", 0, 0)
+DIM knopf AS GUI_WIDGET
+knopf = GUI_BUTTON(fenster, "Aufnehmen", 0, 0, 0, 0)
+GUI_LAYOUT_SET(knoepfe, "ausrichtung", 1)
+GUI_LAYOUT_SET(knoepfe, "dehnen", 0)
+GUI_LAYOUT_ADD(knoepfe, status)
+GUI_LAYOUT_SPACER(knoepfe)
+GUI_LAYOUT_ADD(knoepfe, knopf)
+GUI_LAYOUT_SPACER(form)
+GUI_LAYOUT_ADD(form, knoepfe)
+
+GUI_WINDOW_DEFAULT(fenster, knopf)
+GUI_FOCUS(titel)
+
+' Die Spalte weiss, wie viel Platz ihr Inhalt mindestens braucht --
+' kleiner laesst sich das Fenster nicht ziehen.
+WINDOW_MIN_SIZE(GUI_LAYOUT_MIN_W(form), GUI_LAYOUT_MIN_H(form))
+
+WINDOW_WAIT_EVENTS(1)
+WHILE NOT QUITREQUESTED()
+    ' Das Programmfenster waechst -> das gui-Fenster mit -> die Spalte
+    ' (Anker) -> alles darin.
+    IF WINDOW_RESIZED() THEN
+        DIM b AS INTEGER : b = SCREENWIDTH()
+        DIM h AS INTEGER : h = SCREENHEIGHT()
+        GUI_WINDOW_SET_BOUNDS(fenster, 0, 0, b, h)
+    END IF
+    GUI_UPDATE()
+    IF GUI_CLICKED(knopf) THEN
+        GUI_SET_TEXT(status, "Aufgenommen: " + GUI_TEXT(titel))
+    END IF
+    CLS(RGB(32, 36, 44))
+    GUI_DRAW()
+    FLIP()
+WEND

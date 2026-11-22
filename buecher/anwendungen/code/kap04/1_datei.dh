@@ -1,0 +1,28 @@
+' Kapitel 4, Schritt 1 -- eine Datenbank in einer Datei: anlegen, zwei
+' Eintraege hinein, alles wieder heraus. Noch ohne Fenster.
+IMPORT "db"
+
+DIM db AS DB_CONN
+db = DB_OPEN("versuch.db")
+
+' Die Tabelle beschreibt, wie ein Eintrag aussieht. IF NOT EXISTS: nur
+' beim allerersten Start anlegen.
+DB_EXEC(db, "CREATE TABLE IF NOT EXISTS eintrag (" + _
+            "id INTEGER PRIMARY KEY, titel TEXT NOT NULL, " + _
+            "urheber TEXT, art TEXT, jahr INTEGER)")
+
+' Die Werte kommen als Parameter: ein ? je Wert, die Werte dahinter.
+DIM neu AS STRING
+neu = "INSERT INTO eintrag (titel, urheber, art, jahr) " + _
+      "VALUES (?, ?, ?, ?)"
+DB_EXEC(db, neu, "Momo", "Michael Ende", "Buch", 1973)
+DB_EXEC(db, neu, "Metropolis", "Fritz Lang", "Film", 1927)
+
+' Und alles wieder heraus, nach Jahr sortiert.
+DIM r AS DB_RESULT
+r = DB_QUERY(db, "SELECT id, titel, jahr FROM eintrag ORDER BY jahr")
+WHILE DB_NEXT(r)
+    DIM titel AS STRING : titel = DB_GET_STRING(r, 1)
+    PRINT DB_GET_INT(r, 0); "  "; titel; " ("; DB_GET_INT(r, 2); ")"
+WEND
+DB_CLOSE(db)

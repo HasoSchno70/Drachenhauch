@@ -368,6 +368,7 @@ IMPORT "gui"
 | `GUI_MENU_SEPARATOR(menu)` | — | Trennlinie anhängen |
 | `GUI_MENU_SHORTCUT(item, shortcut$)` | — | Kürzel setzen oder mit `""` entfernen |
 | `GUI_MENU_ENABLE(item, on)` | — | Eintrag sperren (grau, kein Klick, kein Kürzel) oder freigeben |
+| `GUI_MENU_ENABLED(item)` | BOOLEAN | ist der Eintrag bedienbar? |
 | `GUI_MENU_CHECK(item, on)` | — | macht den Eintrag zum **Häkchen-Eintrag** und setzt ihn; ein Klick kippt ihn danach selbst |
 | `GUI_MENU_CHECKED(item)` | BOOLEAN | Zustand des Häkchens |
 | `GUI_MENU_ICON(item, image)` | — | Sinnbild links vom Text (Name eines eingebauten Sinnbilds oder Textur-Handle wie bei `GUI_ICON_BUTTON`, -1 entfernt) |
@@ -1536,11 +1537,13 @@ Jede Zelle trägt Text, eigene **Vorder- und Hintergrundfarbe**, eine
 | `GUI_TABLE_SET_CELL(tbl, row, column, text$)` | Zellinhalt |
 | `GUI_TABLE_GET_CELL(tbl, row, column)` | Zellinhalt lesen |
 | `GUI_TABLE_CELL_COLOR(tbl, row, column, foreground, background)` | Farben; `-1` = nicht gesetzt |
+| `GUI_TABLE_GET_CELL_COLOR(tbl, row, column, role$)` | gesetzte Farbe der Zelle lesen: `fg` (Schrift) oder `bg` (Fläche); `-1` = nicht gesetzt |
 | `GUI_TABLE_CELL_ALIGN(tbl, z, s, "links"/"mitte"/"rechts")` | Ausrichtung dieser Zelle |
 | `GUI_TABLE_CELL_KIND(tbl, row, column, kind$)` | Art (siehe Tabelle oben) |
 | `GUI_TABLE_CELL_IMAGE(tbl, row, column, image)` | Bild setzen (setzt die Art gleich mit) |
 | `GUI_TABLE_CELL_VALUE(tbl, row, column, value)` / `GUI_TABLE_GET_VALUE(...)` | Haken (0/1) bzw. Balken (0..1) |
 | `GUI_TABLE_ROW_COLOR(tbl, row, foreground, background)` | ganze Zeile färben — **ein** Aufruf statt einer je Spalte |
+| `GUI_TABLE_GET_ROW_COLOR(tbl, row, role$)` | Farbe der Zeile lesen: `fg` oder `bg`; `-1` = nicht gesetzt |
 | `GUI_TABLE_COL_ALIGN(tbl, column, align$)` | Ausrichtung der ganzen Spalte |
 
 **Farben in drei Stufen:** Zelle → Zeile → Zebra. `-1` heißt „nicht gesetzt"
@@ -3581,7 +3584,7 @@ IF GUI_FORM_CHANGED(win, "kunde") THEN nachfragen()
   Spalte heißt `id` — die Konvention von SQLite. Gespeichert wird
   **typisiert**: ein Zahlenfeld als Zahl (außer es beginnt mit einer Null vor
   einer Ziffer wie die Postleitzahl `01234` — das bleibt Text; `0,99` ist
-  eine Zahl), ein Kästchen als 0/1, eine Klappliste als Index, ein Regler als
+  eine Zahl; leer ist es NULL), ein Kästchen als 0/1, eine Klappliste als Index, ein Regler als
   Kommazahl, alles andere als Text. Ein **Geldfeld** (`zahlen` 3) wird
   getippt und gezeigt wie eine Kommazahl mit zwei Stellen und gebunden als
   INTEGER in Cent — `48,50` im Feld ist `4850` in der Spalte, und beim Laden
@@ -3665,10 +3668,15 @@ END IF
   zählen nicht — ein Fehler dort wäre einer ohne Ausweg.
 - `GUI_SET_ERROR(feld, meldung$)` setzt eine Meldung von außen, etwa
   „Nummer schon vergeben" aus der Datenbank; leer nimmt sie zurück.
-  `GUI_CLEAR_ERRORS(win)` löscht alle.
+  `GUI_CLEAR_ERRORS(win)` löscht alle. Neue Werte durch `GUI_FORM_SET`,
+  `GUI_FORM_LOAD` oder `GUI_FORM_CLEAR` nehmen die Meldungen ihrer Felder
+  mit — sie galten dem alten Inhalt.
 - `GUI_VALIDATE_LIVE(win, TRUE)` prüft ein Feld, sobald der Fokus es
   verlässt — nicht bei jedem Anschlag: eine halb getippte Adresse ist keine
-  falsche.
+  falsche. Geprüft wird nur, was sich seit dem Fokus geändert hat oder
+  schon eine Meldung trägt: ein Feld, das man nur durchquert, ist nicht
+  falsch (ein leeres Pflichtfeld meldet `GUI_VALIDATE` beim Speichern). Ein
+  Dialog, der den Fokus nur leiht, ist kein Verlassen.
 - Regeln stehen in der `.dhform` (`rules`, `error_label`), etwa
   `pflicht; laenge 2 60; email`.
 

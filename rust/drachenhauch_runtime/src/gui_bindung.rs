@@ -74,6 +74,11 @@ impl Gui {
             // Null und hat mehr als eine Stelle: das ist eine Postleitzahl
             // oder eine Nummer, und die verloere als INTEGER ihre Null.
             // Ein Geldfeld (zahlen 3) liefert ganze Cent.
+            // Leer ist "kein Wert" -- NULL in der Datenbank, nicht der
+            // leere Text: der stand bis 2026-11 als '' in einer INTEGER-
+            // Spalte, und DB_GET_INT scheiterte beim Laden daran (Buch
+            // "Fenster, Formulare, Daten", Kapitel 5, das Erscheinungsjahr).
+            Kind::TextInput if w.zahlen > 0 && w.text.trim().is_empty() => Value::Nil,
             Kind::TextInput if w.zahlen > 0 && !nummer_mit_null(&w.text) => match zahl_lesen(&w.text) {
                 Some(x) if w.zahlen == 3 => Value::Int((x * 100.0).round() as i64),
                 Some(x) if w.zahlen == 1 && x.fract() == 0.0 => Value::Int(x as i64),
@@ -183,6 +188,11 @@ impl Gui {
         for (k, i) in self.form_widgets(wi, form) {
             if let Some((_, v)) = werte.iter().find(|(wk, _)| wk.eq_ignore_ascii_case(&k)) {
                 self.wert_setzen(wi, i, v);
+                // Eine Meldung galt dem alten Inhalt -- mit dem neuen ist sie
+                // weg, samt Fehlerzeile. Bis 2026-11 stand nach GUI_FORM_LOAD
+                // "Ohne Titel geht es nicht." unter einem geladenen Titel
+                // (Buch "Fenster, Formulare, Daten", Kapitel 5).
+                self.fehler_setzen(wi, i, String::new());
             }
         }
         self.form_clean(win, form)
@@ -201,7 +211,8 @@ impl Gui {
                 Kind::DatePicker | Kind::ColorPicker => {}
                 _ => { w.text.clear(); w.caret = 0; w.sel_anchor = 0; w.scroll = 0; w.scroll_x = 0; w.undo.clear(); w.redo.clear(); }
             }
-            w.fehler.clear();
+            // Ueber fehler_setzen, damit auch die Fehlerzeile leer wird.
+            self.fehler_setzen(wi, i, String::new());
         }
         self.form_clean(win, form)
     }

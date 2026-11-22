@@ -1,0 +1,11 @@
+' Kapitel 4, was schiefgehen kann -- zwei Verbindungen, eine Datei.
+IMPORT "db"
+DIM a AS DB_CONN : a = DB_OPEN("probe.db")
+DB_EXEC(a, "CREATE TABLE IF NOT EXISTS eintrag (titel TEXT)")
+' Ein zweites Programm -- hier eine zweite Verbindung -- auf dieselbe
+' Datei, mitten in einer Transaktion:
+DIM b AS DB_CONN : b = DB_OPEN("probe.db")
+DB_BEGIN(b)
+DB_EXEC(b, "INSERT INTO eintrag (titel) VALUES (?)", "Momo")
+' Und jetzt will a schreiben:
+DB_EXEC(a, "INSERT INTO eintrag (titel) VALUES (?)", "Metropolis")

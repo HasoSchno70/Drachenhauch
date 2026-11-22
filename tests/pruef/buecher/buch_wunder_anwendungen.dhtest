@@ -209,3 +209,744 @@ DHRT_ABSEITS=1
 --- enthaelt
   label(2) "Die Mediathek ist leer."
   label(3) ""
+
+=== mediathek kapitel 2: felder buendig, mindestmass schon beim aufbau
+' Die Groessengruppe macht alle Beschriftungen so breit wie
+' "Erscheinungsjahr", die Felder stehen darum buendig; Titel und Urheber
+' haben Gewicht 1 und sind breiter als das Jahr. Das Mindestmass wird
+' gleich nach dem Aufbau gefragt -- wie im Buch, vor dem ersten Bild.
+PRINT "buendig "; GUI_GET_X(titel) = GUI_GET_X(jahr) AND GUI_GET_X(urheber) = GUI_GET_X(art)
+PRINT "rechts von der beschriftung "; GUI_GET_X(jahr) > 150
+PRINT "titel breiter "; GUI_GET_W(titel) > 3 * GUI_GET_W(jahr)
+PRINT "mindestmass "; prMinW; " "; prMinH
+EXIT(0)
+--- programm ../../../buecher/anwendungen/code/kap02/3_mindestmass.dh nach     GUI_UPDATE()
+--- einschub nach WINDOW_MIN_SIZE(GUI_LAYOUT_MIN_W(form), GUI_LAYOUT_MIN_H(form))
+DIM prMinW AS INTEGER : prMinW = GUI_LAYOUT_MIN_W(form)
+DIM prMinH AS INTEGER : prMinH = GUI_LAYOUT_MIN_H(form)
+--- umgebung
+DHRT_FRAMES=5
+DHRT_ABSEITS=1
+--- erwartet
+buendig TRUE
+rechts von der beschriftung TRUE
+titel breiter TRUE
+mindestmass 403 240
+
+=== loesung kapitel 2: zwei spalten richten sich je fuer sich aus
+PRINT "links buendig "; GUI_GET_X(titel) = GUI_GET_X(urheber)
+PRINT "rechts buendig "; GUI_GET_X(art) = GUI_GET_X(jahr)
+PRINT "rechte spalte rechts "; GUI_GET_X(art) > GUI_GET_X(titel) + GUI_GET_W(titel)
+' Links ist "Urheber" die breiteste Beschriftung, rechts
+' "Erscheinungsjahr": links fangen die Felder darum frueher in ihrer
+' Spalte an. Mit einer gemeinsamen Gruppe waeren beide gleich.
+PRINT "links schmaler beschriftet "; GUI_GET_X(titel) - GUI_GET_X(links) < GUI_GET_X(art) - GUI_GET_X(rechts)
+PRINT "eine hoehe "; GUI_GET_Y(titel) = GUI_GET_Y(art)
+EXIT(0)
+--- programm ../../../buecher/anwendungen/code/loesungen/kap02_zwei_spalten.dh nach     GUI_UPDATE()
+--- umgebung
+DHRT_FRAMES=5
+DHRT_ABSEITS=1
+--- erwartet
+links buendig TRUE
+rechts buendig TRUE
+rechte spalte rechts TRUE
+links schmaler beschriftet TRUE
+eine hoehe TRUE
+
+=== loesung kapitel 2: die groesse kommt in die ini-datei
+--- programm ../../../buecher/anwendungen/code/loesungen/kap02_groesse.dh
+--- umgebung
+DHRT_FRAMES=3
+DHRT_ABSEITS=1
+--- inhalt _programm/mediathek.ini
+[fenster]
+breite=560
+hoehe=300
+
+=== loesung kapitel 2: die gemerkte groesse gilt beim naechsten start
+PRINT "fenster "; SCREENWIDTH(); " "; SCREENHEIGHT()
+PRINT "formular "; GUI_GET_W(form); " "; GUI_GET_H(form)
+EXIT(0)
+--- programm ../../../buecher/anwendungen/code/loesungen/kap02_groesse.dh nach     GUI_UPDATE()
+--- datei _programm/mediathek.ini
+[fenster]
+breite=700
+hoehe=360
+
+--- umgebung
+DHRT_FRAMES=5
+DHRT_ABSEITS=1
+--- erwartet
+fenster 700 360
+formular 700 360
+
+=== mediathek kapitel 3: aufnehmen haengt an daten und tabelle an
+' Der neue Eintrag steht im Feld UND als gewaehlte letzte Zeile in der
+' Tabelle; das Formular ist danach leer.
+prBild = prBild + 1
+IF prBild = 2 THEN
+    aufnehmen()
+    DIM k AS INTEGER : k = LEN(mediathek) - 1
+    PRINT LEN(mediathek); " "; GUI_TABLE_ROW_COUNT(tabelle); " "; GUI_TABLE_SELECTED(tabelle)
+    PRINT mediathek[k].titel; " | "; GUI_TABLE_GET_CELL(tabelle, k, 0); " | "; GUI_TABLE_GET_CELL(tabelle, k, 3)
+    PRINT GUI_TEXT(status); " | leer: "; GUI_TEXT(urheber) = ""
+    EXIT(0)
+END IF
+--- programm ../../../buecher/anwendungen/code/kap03/2_aufnehmen.dh nach     GUI_UPDATE()
+--- einschub nach WINDOW_WAIT_EVENTS(1)
+DIM prBild AS INTEGER
+--- ersetzen TRIM$(GUI_TEXT(titel))
+TRIM$("Ronja Räubertochter")
+--- ersetzen TRIM$(GUI_TEXT(urheber))
+"Astrid Lindgren"
+--- ersetzen TRIM$(GUI_TEXT(jahr))
+"1981"
+--- umgebung
+DHRT_FRAMES=5
+DHRT_ABSEITS=1
+--- erwartet
+11 11 10
+Ronja Räubertochter | Ronja Räubertochter | 1981
+11 Einträge | leer: TRUE
+
+=== mediathek kapitel 3: entfernen trifft auch sortiert die richtigen
+' Nach Jahr sortiert, Datenzeilen 1 und 2 (Metropolis, Tetris) gewaehlt:
+' genau die beiden fallen weg, aus dem Feld wie aus der Tabelle. Von
+' vorn nach hinten entfernt fiele Kind of Blue statt Tetris.
+prBild = prBild + 1
+IF prBild = 2 THEN
+    GUI_TABLE_SORT(tabelle, 3, FALSE)
+    GUI_TABLE_SELECT(tabelle, 1, TRUE)
+    GUI_TABLE_SELECT(tabelle, 2, TRUE)
+    auswahl_entfernen()
+    PRINT GUI_TEXT(status)
+    DIM k AS INTEGER
+    DIM gleich AS BOOLEAN : gleich = TRUE
+    FOR k = 0 TO LEN(mediathek) - 1
+        IF mediathek[k].titel <> GUI_TABLE_GET_CELL(tabelle, k, 0) THEN gleich = FALSE
+    NEXT
+    PRINT "gleich "; gleich; " | "; mediathek[1].titel; " | "; mediathek[2].titel
+    EXIT(0)
+END IF
+--- programm ../../../buecher/anwendungen/code/kap03/3_auswahl.dh nach     GUI_UPDATE()
+--- einschub nach WINDOW_WAIT_EVENTS(1)
+DIM prBild AS INTEGER
+--- umgebung
+DHRT_FRAMES=5
+DHRT_ABSEITS=1
+--- erwartet
+2 entfernt, 8 Einträge
+gleich TRUE | Kind of Blue | Emil und die Detektive
+
+=== mediathek kapitel 3: enter auf einer zeile zeigt den eintrag
+' Klick auf Tetris, dann Enter: das ist der Doppelklick der Tabelle --
+' nicht der Standard-Knopf "Aufnehmen", der hiesse "Bitte einen Titel".
+--- programm ../../../buecher/anwendungen/code/kap03/3_auswahl.dh
+--- datei enter.txt
+c 8
+e 0 7 100 289 0 0
+e 2 7 100 289 0 0
+e 4 6 0 0 0 0
+e 6 5 0 0 0 0
+e 10 2 257 0 0 0
+e 12 1 257 0 0 0
+e 14 7 600 500 0 0
+e 16 7 600 500 0 0
+
+--- umgebung
+DHRT_FRAMES=30
+DHRT_ABSPIELEN=enter.txt
+DHRT_GUI_ZUSTAND=1
+DHRT_ABSEITS=1
+--- enthaelt
+  label(5) "Tetris von Alexei Paschitnow (Spiel, 1984)"
+
+=== loesung kapitel 3: jede art hat ihre farbe
+PRINT GUI_TABLE_GET_CELL_COLOR(tabelle, 0, 2, "fg") = RGB(120, 170, 255)
+PRINT GUI_TABLE_GET_CELL_COLOR(tabelle, 1, 2, "fg") = RGB(255, 140, 120)
+PRINT GUI_TABLE_GET_CELL_COLOR(tabelle, 0, 0, "fg")
+aufnehmen()
+PRINT GUI_TABLE_GET_CELL_COLOR(tabelle, 10, 2, "fg") = RGB(230, 190, 90)
+EXIT(0)
+--- programm ../../../buecher/anwendungen/code/loesungen/kap03_farben.dh nach     GUI_UPDATE()
+--- ersetzen TRIM$(GUI_TEXT(titel))
+TRIM$("Abbey Road")
+--- ersetzen GUI_TEXT(art)
+"Musik"
+--- umgebung
+DHRT_FRAMES=5
+DHRT_ABSEITS=1
+--- erwartet
+TRUE
+TRUE
+-1
+TRUE
+
+=== loesung kapitel 3: die suche trifft alle spalten und die richtigen eintraege
+prBild = prBild + 1
+IF prBild = 2 THEN
+    GUI_SET_TEXT(suche, "ende")
+    neu_aufbauen()
+    PRINT GUI_TEXT(status)
+    zeigen(1)
+    PRINT GUI_TEXT(status)
+    GUI_TABLE_SELECT(tabelle, 0, TRUE)
+    GUI_TABLE_SELECT(tabelle, 1, TRUE)
+    auswahl_entfernen()
+    GUI_SET_TEXT(suche, "spiel")
+    neu_aufbauen()
+    PRINT GUI_TEXT(status)
+    zeigen(1)
+    PRINT GUI_TEXT(status)
+    EXIT(0)
+END IF
+--- programm ../../../buecher/anwendungen/code/loesungen/kap03_suche.dh nach     GUI_UPDATE()
+--- einschub nach WINDOW_WAIT_EVENTS(1)
+DIM prBild AS INTEGER
+--- umgebung
+DHRT_FRAMES=5
+DHRT_ABSEITS=1
+--- erwartet
+2 von 10 Einträgen
+Die unendliche Geschichte von Michael Ende (Buch, 1979)
+2 von 8 Einträgen
+Die Siedler von Catan von Klaus Teuber (Spiel, 1995)
+
+=== mediathek kapitel 4: was man aufnimmt und entfernt, bleibt
+' Erster Lauf: Ronja ohne Jahr aufnehmen, Metropolis und Tetris
+' entfernen. Zweiter Lauf (mit Argument): aus der Datei neu geladen.
+prBild = prBild + 1
+IF prBild = 2 AND ARGC() = 0 THEN
+    aufnehmen()
+    GUI_TABLE_CLEAR_SELECTION(tabelle)
+    GUI_TABLE_SELECT(tabelle, 1, TRUE)
+    GUI_TABLE_SELECT(tabelle, 2, TRUE)
+    auswahl_entfernen()
+    EXIT(0)
+END IF
+IF prBild = 2 THEN
+    PRINT LEN(mediathek); " "; GUI_TABLE_ROW_COUNT(tabelle)
+    PRINT mediathek[0].id; " "; mediathek[0].titel; " "; mediathek[0].jahr
+    PRINT mediathek[1].id; " "; mediathek[1].titel
+    DIM k AS INTEGER : k = LEN(mediathek) - 1
+    PRINT mediathek[k].id; " "; mediathek[k].titel; " ["; mediathek[k].jahr; "]"
+    EXIT(0)
+END IF
+--- programm ../../../buecher/anwendungen/code/kap04/3_transaktion.dh nach     GUI_UPDATE()
+--- einschub nach WINDOW_WAIT_EVENTS(1)
+DIM prBild AS INTEGER
+--- ersetzen TRIM$(GUI_TEXT(titel))
+TRIM$("Ronja Räubertochter")
+--- ersetzen TRIM$(GUI_TEXT(jahr))
+""
+--- umgebung
+DHRT_FRAMES=5
+DHRT_ABSEITS=1
+--- nochmal
+danach
+--- erwartet
+9 9
+1 Momo 1973
+4 Kind of Blue
+11 Ronja Räubertochter []
+
+=== mediathek kapitel 4: ist die datei gesperrt, wird nichts entfernt
+' Eine zweite Verbindung haelt eine Transaktion offen: das Entfernen
+' wartet 5 s, nimmt alles zurueck und laesst Feld und Tabelle stehen.
+prBild = prBild + 1
+IF prBild = 2 THEN
+    DIM fremd AS DB_CONN : fremd = DB_OPEN("mediathek.db")
+    DB_BEGIN(fremd)
+    DB_EXEC(fremd, "UPDATE eintrag SET jahr = jahr WHERE id = 1")
+    GUI_TABLE_SELECT(tabelle, 1, TRUE)
+    GUI_TABLE_SELECT(tabelle, 2, TRUE)
+    auswahl_entfernen()
+    PRINT LEFT$(GUI_TEXT(status), 44)
+    PRINT LEN(mediathek); " "; GUI_TABLE_ROW_COUNT(tabelle)
+    DB_ROLLBACK(fremd)
+    DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT COUNT(*) FROM eintrag")
+    DB_NEXT(r)
+    PRINT "in der datei "; DB_GET_INT(r, 0)
+    EXIT(0)
+END IF
+--- programm ../../../buecher/anwendungen/code/kap04/3_transaktion.dh nach     GUI_UPDATE()
+--- einschub nach WINDOW_WAIT_EVENTS(1)
+DIM prBild AS INTEGER
+--- umgebung
+DHRT_FRAMES=5
+DHRT_ABSEITS=1
+--- erwartet
+Nichts entfernt: DB_EXEC: database is locked
+10 10
+in der datei 10
+
+=== loesung kapitel 4: eine ausleihe bleibt und geht mit dem eintrag
+prBild = prBild + 1
+IF prBild = 2 AND ARGC() = 0 THEN
+    GUI_TABLE_SET_SELECTED(tabelle, 2)
+    ausleihe_setzen("Lena")
+    GUI_TABLE_SET_SELECTED(tabelle, 0)
+    ausleihe_setzen("Paul")
+    EXIT(0)
+END IF
+IF prBild = 2 AND ARG$(0) = "zwei" THEN
+    PRINT GUI_TABLE_GET_CELL(tabelle, 0, 4); " "; GUI_TABLE_GET_CELL(tabelle, 2, 4)
+    GUI_TABLE_CLEAR_SELECTION(tabelle)
+    GUI_TABLE_SELECT(tabelle, 2, TRUE)
+    auswahl_entfernen()
+    EXIT(0)
+END IF
+IF prBild = 2 THEN
+    DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT eintrag, an FROM ausleihe")
+    WHILE DB_NEXT(r)
+        PRINT DB_GET_INT(r, 0); " "; DB_GET_STRING(r, 1)
+    WEND
+    EXIT(0)
+END IF
+--- programm ../../../buecher/anwendungen/code/loesungen/kap04_ausleihe.dh nach     GUI_UPDATE()
+--- einschub nach WINDOW_WAIT_EVENTS(1)
+DIM prBild AS INTEGER
+--- umgebung
+DHRT_FRAMES=5
+DHRT_ABSEITS=1
+--- nochmal
+zwei
+--- nochmal
+drei
+--- erwartet
+1 Paul
+
+=== loesung kapitel 4: erst der zweite klick entfernt
+' Klick auf Metropolis, einmal "Entfernen": nur die Frage. Ein zweiter
+' Klick entfernt. Ein Klick in die Tabelle dazwischen nimmt die Frage
+' zurueck (dritter Fall unten, mit eigener Aufnahme).
+prBild = prBild + 1
+IF prBild = 20 THEN PRINT LEN(mediathek); " "; GUI_TEXT(entfernen)
+IF prBild = 40 THEN
+    PRINT LEN(mediathek); " "; GUI_TEXT(entfernen); " "; mediathek[1].titel
+    EXIT(0)
+END IF
+--- programm ../../../buecher/anwendungen/code/loesungen/kap04_nachfrage.dh nach     GUI_UPDATE()
+--- einschub nach WINDOW_WAIT_EVENTS(1)
+DIM prBild AS INTEGER
+--- datei klicks.txt
+c 12
+e 0 7 100 263 0 0
+e 2 7 100 263 0 0
+e 4 6 0 0 0 0
+e 6 5 0 0 0 0
+e 8 7 590 484 0 0
+e 10 7 590 484 0 0
+e 12 6 0 0 0 0
+e 14 5 0 0 0 0
+e 25 7 590 484 0 0
+e 27 6 0 0 0 0
+e 29 5 0 0 0 0
+e 31 7 600 30 0 0
+
+--- umgebung
+DHRT_FRAMES=60
+DHRT_ABSPIELEN=klicks.txt
+DHRT_ABSEITS=1
+--- erwartet
+10 Wirklich?
+9 Entfernen Tetris
+
+=== loesung kapitel 4: ein klick in die tabelle nimmt die frage zurueck
+prBild = prBild + 1
+IF prBild = 40 THEN
+    PRINT LEN(mediathek); " "; GUI_TEXT(entfernen)
+    EXIT(0)
+END IF
+--- programm ../../../buecher/anwendungen/code/loesungen/kap04_nachfrage.dh nach     GUI_UPDATE()
+--- einschub nach WINDOW_WAIT_EVENTS(1)
+DIM prBild AS INTEGER
+--- datei klicks.txt
+c 12
+e 0 7 100 263 0 0
+e 2 7 100 263 0 0
+e 4 6 0 0 0 0
+e 6 5 0 0 0 0
+e 8 7 590 484 0 0
+e 10 7 590 484 0 0
+e 12 6 0 0 0 0
+e 14 5 0 0 0 0
+e 20 7 100 289 0 0
+e 22 6 0 0 0 0
+e 24 5 0 0 0 0
+e 31 7 600 30 0 0
+
+--- umgebung
+DHRT_FRAMES=60
+DHRT_ABSPIELEN=klicks.txt
+DHRT_ABSEITS=1
+--- erwartet
+10 Entfernen
+
+=== mediathek kapitel 5: bearbeiten, speichern, und es bleibt
+' Metropolis laden, Jahr und Art aendern, speichern: dieselbe Zahl von
+' Eintraegen, die Zeile zeigt den neuen Stand -- auch nach dem Neustart.
+prBild = prBild + 1
+IF prBild = 2 AND ARGC() = 0 THEN
+    bearbeiten(1)
+    GUI_SET_TEXT(jahr, "1926")
+    GUI_SET_TEXT(art, "Buch")
+    formular_speichern()
+    PRINT LEN(mediathek); " "; GUI_TABLE_GET_CELL(tabelle, 1, 2); " "; GUI_TABLE_GET_CELL(tabelle, 1, 3); " "; bearbeitet
+    EXIT(0)
+END IF
+IF prBild = 2 THEN
+    PRINT mediathek[1].titel; " "; mediathek[1].art; " "; mediathek[1].jahr
+    EXIT(0)
+END IF
+--- programm ../../../buecher/anwendungen/code/kap05/1_bearbeiten.dh nach     GUI_UPDATE()
+--- einschub nach WINDOW_WAIT_EVENTS(1)
+DIM prBild AS INTEGER
+--- umgebung
+DHRT_FRAMES=5
+DHRT_ABSEITS=1
+--- nochmal
+danach
+--- erwartet
+Metropolis Buch 1926
+
+=== mediathek kapitel 5: die regeln halten falsches auf
+prBild = prBild + 1
+IF prBild = 2 THEN
+    formular_speichern()
+    PRINT GUI_TEXT(fehlerzeile); " | "; LEN(mediathek)
+    GUI_SET_TEXT(titel, "Ronja")
+    GUI_SET_TEXT(jahr, "1200")
+    formular_speichern()
+    PRINT GUI_TEXT(fehlerzeile); " | "; LEN(mediathek)
+    GUI_SET_TEXT(jahr, "")
+    formular_speichern()
+    PRINT "["; GUI_TEXT(fehlerzeile); "] | "; LEN(mediathek); " ["; mediathek[10].jahr; "]"
+    EXIT(0)
+END IF
+--- programm ../../../buecher/anwendungen/code/kap05/2_pruefen.dh nach     GUI_UPDATE()
+--- einschub nach WINDOW_WAIT_EVENTS(1)
+DIM prBild AS INTEGER
+--- umgebung
+DHRT_FRAMES=5
+DHRT_ABSEITS=1
+--- erwartet
+Ohne Titel geht es nicht. | 10
+Ein Jahr von 1450 bis 2100. | 10
+[] | 11 []
+
+=== mediathek kapitel 5: ungespeichertes wird nicht ueberschrieben
+prBild = prBild + 1
+IF prBild = 2 THEN PRINT "anfangs "; GUI_ENABLED(knopf)
+IF prBild = 3 THEN
+    bearbeiten(0)
+    GUI_SET_TEXT(urheber, "M. Ende")
+END IF
+IF prBild = 4 THEN
+    PRINT "geaendert "; GUI_ENABLED(knopf)
+    bearbeiten(1)
+    PRINT GUI_TEXT(status); " | "; GUI_TEXT(titel)
+    formular_leeren()
+    PRINT "nach neu "; GUI_FORM_CHANGED(fenster, "e")
+    bearbeiten(1)
+    PRINT GUI_TEXT(titel)
+    EXIT(0)
+END IF
+--- programm ../../../buecher/anwendungen/code/kap05/3_geaendert.dh nach     GUI_SET_ENABLED(knopf, GUI_FORM_CHANGED(fenster, "e"))
+--- einschub nach WINDOW_WAIT_EVENTS(1)
+DIM prBild AS INTEGER
+--- umgebung
+DHRT_FRAMES=8
+DHRT_ABSEITS=1
+--- erwartet
+anfangs FALSE
+geaendert TRUE
+Erst speichern oder mit Neu verwerfen. | Momo
+nach neu FALSE
+Metropolis
+
+=== mediathek kapitel 5: nach dem doppelklick keine alte meldung
+' Start (Fokus im leeren Titel), Doppelklick auf Metropolis: das leere
+' Titelfeld nur zu verlassen meldet nichts, und das Laden laesst keine
+' Meldung stehen.
+prBild = prBild + 1
+IF prBild = 25 THEN
+    PRINT "titel ["; GUI_TEXT(titel); "] fehler ["; GUI_TEXT(fehlerzeile); "]"
+    EXIT(0)
+END IF
+--- programm ../../../buecher/anwendungen/code/kap05/3_geaendert.dh nach     GUI_SET_ENABLED(knopf, GUI_FORM_CHANGED(fenster, "e"))
+--- einschub nach WINDOW_WAIT_EVENTS(1)
+DIM prBild AS INTEGER
+--- datei dk.txt
+c 10
+e 0 7 100 286 0 0
+e 2 7 100 286 0 0
+e 4 6 0 0 0 0
+e 5 5 0 0 0 0
+e 7 6 0 0 0 0
+e 8 5 0 0 0 0
+e 12 7 600 30 0 0
+e 14 7 600 30 0 0
+e 16 7 600 31 0 0
+e 18 7 600 30 0 0
+
+--- umgebung
+DHRT_FRAMES=40
+DHRT_ABSPIELEN=dk.txt
+DHRT_ABSEITS=1
+--- erwartet
+titel [Metropolis] fehler []
+
+=== loesung kapitel 5: isbn mit pruefziffer
+prBild = prBild + 1
+IF prBild = 2 THEN
+    PRINT isbn_stimmt("978-3-16-148410-0"); " "; isbn_stimmt("9783161484101"); " "; isbn_stimmt("123")
+    GUI_SET_TEXT(titel, "Momo")
+    GUI_SET_TEXT(isbn, "978-3-16-148410-1")
+    formular_speichern()
+    PRINT GUI_TEXT(fehlerzeile); " | "; LEN(mediathek)
+    GUI_SET_TEXT(isbn, "978-3-16-148410-0")
+    formular_speichern()
+    PRINT "["; GUI_TEXT(fehlerzeile); "] | "; LEN(mediathek)
+    bearbeiten(10)
+    PRINT GUI_TEXT(isbn)
+    EXIT(0)
+END IF
+--- programm ../../../buecher/anwendungen/code/loesungen/kap05_isbn.dh nach     GUI_SET_ENABLED(knopf, GUI_FORM_CHANGED(fenster, "e"))
+--- einschub nach WINDOW_WAIT_EVENTS(1)
+DIM prBild AS INTEGER
+--- umgebung
+DHRT_FRAMES=5
+DHRT_ABSEITS=1
+--- erwartet
+TRUE FALSE FALSE
+Die Prüfziffer der ISBN stimmt nicht. | 10
+[] | 11
+978-3-16-148410-0
+
+=== loesung kapitel 5: ein buch braucht einen urheber
+prBild = prBild + 1
+IF prBild = 2 THEN
+    GUI_SET_TEXT(titel, "Ronja")
+    formular_speichern()
+    PRINT GUI_TEXT(fehlerzeile); " | "; LEN(mediathek)
+    GUI_SET_TEXT(art, "Film")
+    formular_speichern()
+    PRINT "["; GUI_TEXT(fehlerzeile); "] | "; LEN(mediathek)
+    EXIT(0)
+END IF
+--- programm ../../../buecher/anwendungen/code/loesungen/kap05_urheber.dh nach     GUI_SET_ENABLED(knopf, GUI_FORM_CHANGED(fenster, "e"))
+--- einschub nach WINDOW_WAIT_EVENTS(1)
+DIM prBild AS INTEGER
+--- umgebung
+DHRT_FRAMES=5
+DHRT_ABSEITS=1
+--- erwartet
+Ein Buch hat einen Autor. | 10
+[] | 11
+
+=== mediathek kapitel 6: strg+s speichert genau einmal
+prBild = prBild + 1
+IF prBild = 2 THEN GUI_SET_TEXT(titel, "Ronja")
+IF prBild = 25 THEN
+    PRINT LEN(mediathek); " ["; GUI_TEXT(fehlerzeile); "] "; GUI_TEXT(status)
+    EXIT(0)
+END IF
+--- programm ../../../buecher/anwendungen/code/kap06/1_menue.dh nach     GUI_UPDATE()
+--- einschub nach WINDOW_WAIT_EVENTS(1)
+DIM prBild AS INTEGER
+--- datei tasten.txt
+c 5
+e 0 7 600 500 0 0
+e 6 2 341 0 0 0
+e 8 2 83 0 0 0
+e 9 1 83 0 0 0
+e 10 1 341 0 0 0
+
+--- umgebung
+DHRT_FRAMES=40
+DHRT_ABSPIELEN=tasten.txt
+DHRT_ABSEITS=1
+--- erwartet
+11 [] Gespeichert: Ronja
+
+=== mediathek kapitel 6: entf fragt, enter entfernt, esc nicht
+' Klick auf Metropolis (die Tabelle bekommt den Fokus), Entf: der
+' Dialog. Im ersten Lauf Enter (erster Knopf, Entfernen), im zweiten
+' Esc (letzter Knopf, Abbrechen).
+prBild = prBild + 1
+IF prBild = 12 THEN PRINT "dialog "; frage >= 0
+IF prBild = 30 THEN
+    PRINT LEN(mediathek); " "; mediathek[1].titel
+    EXIT(0)
+END IF
+--- programm ../../../buecher/anwendungen/code/kap06/2_nachfrage.dh nach     GUI_UPDATE()
+--- einschub nach WINDOW_WAIT_EVENTS(1)
+DIM prBild AS INTEGER
+--- datei tasten.txt
+c 8
+e 0 7 100 312 0 0
+e 2 7 100 312 0 0
+e 4 6 0 0 0 0
+e 5 5 0 0 0 0
+e 8 2 261 0 0 0
+e 9 1 261 0 0 0
+e 16 2 257 0 0 0
+e 17 1 257 0 0 0
+
+--- umgebung
+DHRT_FRAMES=40
+DHRT_ABSPIELEN=tasten.txt
+DHRT_ABSEITS=1
+--- erwartet
+dialog TRUE
+9 Tetris
+
+=== mediathek kapitel 6: esc im dialog laesst alles stehen
+prBild = prBild + 1
+IF prBild = 30 THEN
+    PRINT LEN(mediathek); " "; mediathek[1].titel; " "; frage
+    EXIT(0)
+END IF
+--- programm ../../../buecher/anwendungen/code/kap06/2_nachfrage.dh nach     GUI_UPDATE()
+--- einschub nach WINDOW_WAIT_EVENTS(1)
+DIM prBild AS INTEGER
+--- datei tasten.txt
+c 8
+e 0 7 100 312 0 0
+e 2 7 100 312 0 0
+e 4 6 0 0 0 0
+e 5 5 0 0 0 0
+e 8 2 261 0 0 0
+e 9 1 261 0 0 0
+e 16 2 256 0 0 0
+e 17 1 256 0 0 0
+
+--- umgebung
+DHRT_FRAMES=40
+DHRT_ABSPIELEN=tasten.txt
+DHRT_ABSEITS=1
+--- erwartet
+10 Metropolis -1
+
+=== mediathek kapitel 6: beenden ohne aenderung endet sofort
+prBild = prBild + 1
+IF prBild = 30 THEN
+    PRINT "laeuft noch"
+    EXIT(0)
+END IF
+--- programm ../../../buecher/anwendungen/code/kap06/3_schliessen.dh nach     GUI_UPDATE()
+--- einschub nach WINDOW_WAIT_EVENTS(1)
+DIM prBild AS INTEGER
+--- einschub nach DB_CLOSE(db)
+PRINT "beendet vor bild 30: "; prBild < 30
+--- datei tasten.txt
+c 5
+e 0 7 600 500 0 0
+e 6 2 341 0 0 0
+e 8 2 81 0 0 0
+e 9 1 81 0 0 0
+e 10 1 341 0 0 0
+
+--- umgebung
+DHRT_FRAMES=40
+DHRT_ABSPIELEN=tasten.txt
+DHRT_ABSEITS=1
+--- erwartet
+beendet vor bild 30: TRUE
+
+=== mediathek kapitel 6: beenden mit aenderung fragt und speichert
+' Strg+Q mit einem Titel im Formular: die Frage. Enter = Speichern --
+' gespeichert, dann beendet.
+prBild = prBild + 1
+IF prBild = 2 THEN GUI_SET_TEXT(titel, "Ronja")
+IF prBild = 14 THEN PRINT "frage "; ende >= 0
+IF prBild = 39 THEN
+    PRINT "laeuft noch"
+    EXIT(0)
+END IF
+--- programm ../../../buecher/anwendungen/code/kap06/3_schliessen.dh nach     GUI_UPDATE()
+--- einschub nach WINDOW_WAIT_EVENTS(1)
+DIM prBild AS INTEGER
+--- einschub nach DB_CLOSE(db)
+PRINT "beendet, "; LEN(mediathek); " eintraege"
+--- datei tasten.txt
+c 7
+e 0 7 600 500 0 0
+e 6 2 341 0 0 0
+e 8 2 81 0 0 0
+e 9 1 81 0 0 0
+e 10 1 341 0 0 0
+e 18 2 257 0 0 0
+e 19 1 257 0 0 0
+
+--- umgebung
+DHRT_FRAMES=40
+DHRT_ABSPIELEN=tasten.txt
+DHRT_ABSEITS=1
+--- erwartet
+frage TRUE
+beendet, 11 eintraege
+
+=== loesung kapitel 6: entfernen laesst sich rueckgaengig machen
+prBild = prBild + 1
+IF prBild = 2 THEN
+    PRINT "anfangs frei "; GUI_MENU_ENABLED(miZurueck)
+    GUI_TABLE_SELECT(tabelle, 1, TRUE)
+    GUI_TABLE_SELECT(tabelle, 2, TRUE)
+    auswahl_entfernen()
+    PRINT LEN(mediathek)
+END IF
+IF prBild = 3 THEN
+    PRINT "danach frei "; GUI_MENU_ENABLED(miZurueck)
+    zurueckholen()
+    PRINT GUI_TEXT(status); " | "; mediathek[1].id; " "; mediathek[1].titel; " "; mediathek[2].titel
+END IF
+IF prBild = 4 THEN
+    PRINT "zuletzt frei "; GUI_MENU_ENABLED(miZurueck)
+    EXIT(0)
+END IF
+--- programm ../../../buecher/anwendungen/code/loesungen/kap06_zurueck.dh nach     GUI_UPDATE()
+--- einschub nach WINDOW_WAIT_EVENTS(1)
+DIM prBild AS INTEGER
+--- umgebung
+DHRT_FRAMES=8
+DHRT_ABSEITS=1
+--- erwartet
+anfangs frei FALSE
+8
+danach frei TRUE
+2 zurückgeholt | 2 Metropolis Tetris
+zuletzt frei FALSE
+
+=== loesung kapitel 6: das haekchen blendet die filterzeile aus
+prBild = prBild + 1
+IF prBild = 2 THEN PRINT GUI_MENU_CHECKED(miFilter); " "; GUI_TABLE_GET(tabelle, "filterzeile")
+IF prBild = 30 THEN
+    PRINT GUI_MENU_CHECKED(miFilter); " "; GUI_TABLE_GET(tabelle, "filterzeile")
+    EXIT(0)
+END IF
+--- programm ../../../buecher/anwendungen/code/loesungen/kap06_filter.dh nach     GUI_UPDATE()
+--- einschub nach WINDOW_WAIT_EVENTS(1)
+DIM prBild AS INTEGER
+--- datei klicks.txt
+c 10
+e 0 7 200 12 0 0
+e 2 7 200 12 0 0
+e 4 6 0 0 0 0
+e 5 5 0 0 0 0
+e 10 7 230 40 0 0
+e 12 7 230 40 0 0
+e 14 6 0 0 0 0
+e 15 5 0 0 0 0
+e 18 7 600 500 0 0
+e 20 7 600 500 0 0
+
+--- umgebung
+DHRT_FRAMES=40
+DHRT_ABSPIELEN=klicks.txt
+DHRT_ABSEITS=1
+--- erwartet
+TRUE 1.0
+FALSE 0.0

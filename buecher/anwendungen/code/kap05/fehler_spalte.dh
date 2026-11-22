@@ -1,0 +1,14 @@
+' Kapitel 5, was schiefgehen kann -- der Schluessel heisst anders als
+' die Spalte in der Datenbank.
+IMPORT "gui"
+IMPORT "db"
+SCREEN(400, 200, "Mediathek", 1)
+DIM db AS DB_CONN : db = DB_OPEN("probe.db")
+DB_EXEC(db, "CREATE TABLE IF NOT EXISTS eintrag (" + _
+            "id INTEGER PRIMARY KEY, titel TEXT NOT NULL)")
+DIM fenster AS GUI_WINDOW
+fenster = GUI_WINDOW("Mediathek", 0, 0, 400, 200)
+DIM titel AS GUI_WIDGET : titel = GUI_TEXTINPUT(fenster, 10, 10, 200, 0)
+GUI_BIND(titel, "name", "e")
+GUI_SET_TEXT(titel, "Momo")
+PRINT GUI_FORM_SAVE(fenster, db, "eintrag", -1, "e")

@@ -1364,3 +1364,48 @@ am Zeilenende der Erwartung ab, die Ausgabe nicht.
   behalten den Balken rechts. GUI_TREE_EDIT endet ohne Fokus auf dem Baum im
   naechsten Bild -- im Fall erst GUI_FOCUS.
 
+- **Mindestmass vor dem ersten Bild (2026-11-22).** Beim Schreiben von
+  Kapitel 2 des Buchs "Fenster, Formulare, Daten": `WINDOW_MIN_SIZE(
+  GUI_LAYOUT_MIN_W(form), GUI_LAYOUT_MIN_H(form))` gleich nach dem Aufbau
+  liess das Fenster auf 272x160 ziehen, gebraucht waren 403x240 -- vor dem
+  ersten GUI_UPDATE kannten Beschriftungen und Felder "nach Inhalt" ihre
+  Breite noch nicht (gemessen wird in `layout_pass`, nur dort gab es die
+  Schrift). Die Abfrage misst jetzt selbst, wenn ein Fenster da ist
+  (`layout_min_messen`), wie GUI_AUTOSIZE. Dabei gesehen, aber gewollt:
+  ein zweites GUI_LAYOUT_ADD desselben Widgets haengt es still um (die
+  erste Zeile ist danach leer) -- das Buch zeigt es als Falle.
+- **Zeilenfarbe ueber die ganze Breite, Farben lesen (2026-11-22).** Im
+  Buch "Fenster, Formulare, Daten", Kapitel 3: sind die Spalten einer
+  Tabelle schmaler als sie selbst, hoerten Zebrastreifen und
+  GUI_TABLE_ROW_COLOR an der letzten Spalte auf, waehrend Auswahl und
+  Gitterlinie bis zum Rand gingen. Die Zeilenflaeche wird jetzt ueber die
+  ganze Breite gemalt, Zellfarben darueber. Fuer den Test der
+  Loesung "eine Farbe je Art" fehlte die Abfrage zur Zellfarbe:
+  GUI_TABLE_GET_CELL_COLOR und GUI_TABLE_GET_ROW_COLOR (`fg`/`bg`, -1 =
+  nicht gesetzt).
+- **Leeres Zahlenfeld ist NULL (2026-11-22).** Kapitel 5 desselben Buchs
+  bindet das Erscheinungsjahr als Zahlenfeld: leer schrieb GUI_FORM_SAVE
+  den leeren Text in die INTEGER-Spalte, und das DB_GET_INT der Mediathek
+  aus Kapitel 4 scheiterte beim naechsten Laden. `wert_typisiert` liefert
+  fuer ein leeres Zahlenfeld jetzt NIL; geladen wird NULL als leeres Feld.
+- **Neue Werte, alte Meldungen (2026-11-22).** Ebenda: wer in der
+  Mediathek das leere Titelfeld verliess, um einen Eintrag doppelt
+  anzuklicken, bekam (Live-Pruefung) "Ohne Titel geht es nicht." -- und
+  die Meldung blieb unter dem geladenen Titel stehen. GUI_FORM_SET/LOAD
+  nehmen die Meldungen der gesetzten Felder jetzt mit, GUI_FORM_CLEAR
+  leert dabei auch die Fehlerzeile (es ging an `fehler_setzen` vorbei).
+- **Ein Dialog leiht den Fokus (2026-11-22).** Kapitel 6 desselben Buchs:
+  die Rueckfrage beim Beenden nahm dem leeren Titelfeld den Fokus, und die
+  Live-Pruefung meldete dahinter "Ohne Titel geht es nicht.". Steht ein
+  modales Fenster obenauf, ist der Fokusverlust der Felder anderer Fenster
+  jetzt kein Verlassen (`gui_eingabe.rs`, `geliehen`).
+- **GUI_MENU_ENABLED (2026-11-22).** Ebenda, Kapitel 6: zu GUI_MENU_ENABLE
+  fehlte die Abfrage; der Test fuer "Entfernen rueckgaengig ist nur frei,
+  wenn es etwas gibt" haette sonst nur ein Bild messen koennen.
+- **Durchqueren ist kein Fehler (2026-11-22).** Ebenda: ein Klick in die
+  Tabelle verliess das leere Titelfeld, und die Live-Pruefung meldete
+  "Ohne Titel geht es nicht.", obwohl man nur einen Eintrag entfernen
+  wollte. Beim Verlassen prueft sie jetzt nur, was sich seit dem
+  Fokuserhalt geaendert hat oder schon eine Meldung traegt
+  (`Widget::fokus_wert`, ueber einen geliehenen Fokus hinweg gehalten).
+  Leere Pflichtfelder meldet GUI_VALIDATE beim Speichern.

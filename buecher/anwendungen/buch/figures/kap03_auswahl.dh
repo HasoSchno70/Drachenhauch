@@ -1,0 +1,4 @@
+' Bild fuer Kapitel 3: zwei Zeilen gewaehlt -- ein Klick auf
+' "Metropolis", Strg+Klick auf "Kind of Blue". Klicklagen in
+' Fensterpixeln mal SKALIERUNG (2) aus shoot.dh.
+IMPORT "../../code/kap03/3_auswahl.dh"

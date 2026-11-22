@@ -685,8 +685,8 @@ impl<'p> Vm<'p> {
                 if a.len() != 1 { return Err(format!("{}: erwartet (widget)", n)); }
                 let (mw, mh) = self.gui.get_min_size(gi(a,0,n)?, n)?;
                 Value::Int(if name == "gui_get_min_w" { mw } else { mh }) }
-            "gui_layout_min_w" => Value::Int(self.gui.layout_min(gi(a,0,"GUI_LAYOUT_MIN_W")?)?.0),
-            "gui_layout_min_h" => Value::Int(self.gui.layout_min(gi(a,0,"GUI_LAYOUT_MIN_H")?)?.1),
+            "gui_layout_min_w" => { let g = self.gfx.as_ref(); Value::Int(self.gui.layout_min_messen(g, gi(a,0,"GUI_LAYOUT_MIN_W")?)?.0) }
+            "gui_layout_min_h" => { let g = self.gfx.as_ref(); Value::Int(self.gui.layout_min_messen(g, gi(a,0,"GUI_LAYOUT_MIN_H")?)?.1) }
             "gui_rule" => {
                 // GUI_RULE(feld, art$[, a, b][, muster$][, meldung$]) -- die
                 // Zahl der Argumente haengt an der Art; der letzte Text ist
@@ -845,6 +845,7 @@ impl<'p> Vm<'p> {
             "gui_menu_enable" => { self.gui.menu_enable(gi(a,0,"GUI_MENU_ENABLE")?, gbool(a,1,"GUI_MENU_ENABLE")?)?; Value::Nil }
             "gui_menu_check" => { self.gui.menu_check(gi(a,0,"GUI_MENU_CHECK")?, gbool(a,1,"GUI_MENU_CHECK")?)?; Value::Nil }
             "gui_menu_checked" => Value::Bool(self.gui.menu_checked(gi(a,0,"GUI_MENU_CHECKED")?)?),
+            "gui_menu_enabled" => Value::Bool(self.gui.menu_enabled(gi(a,0,"GUI_MENU_ENABLED")?)?),
             "gui_menu_icon" => {
                 match gsym(a,1,"GUI_MENU_ICON")? {
                     (Some(s), _) => self.gui.menu_icon_symbol(gi(a,0,"GUI_MENU_ICON")?, &s)?,
@@ -1304,6 +1305,10 @@ impl<'p> Vm<'p> {
             "gui_table_cell_value" => { self.gui.table_cell_value(gi(a,0,"GUI_TABLE_CELL_VALUE")?, gi(a,1,"GUI_TABLE_CELL_VALUE")?, gi(a,2,"GUI_TABLE_CELL_VALUE")?, gnum(a,3,"GUI_TABLE_CELL_VALUE")?)?; Value::Nil }
             "gui_table_get_value" => Value::Float(self.gui.table_get_value(gi(a,0,"GUI_TABLE_GET_VALUE")?, gi(a,1,"GUI_TABLE_GET_VALUE")?, gi(a,2,"GUI_TABLE_GET_VALUE")?)?),
             // --- Zeilen / Spalten ---
+            "gui_table_get_cell_color" => { let n = "GUI_TABLE_GET_CELL_COLOR";
+                Value::Int(self.gui.table_get_cell_color(gi(a,0,n)?, gi(a,1,n)?, gi(a,2,n)?, &gs(a,3,n)?)?) }
+            "gui_table_get_row_color" => { let n = "GUI_TABLE_GET_ROW_COLOR";
+                Value::Int(self.gui.table_get_row_color(gi(a,0,n)?, gi(a,1,n)?, &gs(a,2,n)?)?) }
             "gui_table_row_color" => { self.gui.table_row_color(gi(a,0,"GUI_TABLE_ROW_COLOR")?, gi(a,1,"GUI_TABLE_ROW_COLOR")?, gi(a,2,"GUI_TABLE_ROW_COLOR")?, gi(a,3,"GUI_TABLE_ROW_COLOR")?)?; Value::Nil }
             "gui_table_col_align" => { self.gui.table_col_align(gi(a,0,"GUI_TABLE_COL_ALIGN")?, gi(a,1,"GUI_TABLE_COL_ALIGN")?, &gs(a,2,"GUI_TABLE_COL_ALIGN")?)?; Value::Nil }
             "gui_table_add_row" => Value::Int(self.gui.table_add_row(gi(a,0,"GUI_TABLE_ADD_ROW")?, gstrs(a,1,"GUI_TABLE_ADD_ROW")?)?),

@@ -1,0 +1,152 @@
+' Kapitel 3, Schritt 3 -- mehrere Zeilen waehlen und entfernen, ein
+' Doppelklick zeigt einen Eintrag ganz.
+IMPORT "gui"
+IMPORT "eintrag.dh"
+
+DIM mediathek AS ARRAY OF Eintrag
+mediathek = beispiele()
+
+SCREEN(760, 520, "Mediathek", 1)
+WINDOW_RESIZABLE(TRUE)
+DIM fenster AS GUI_WINDOW
+fenster = GUI_WINDOW("Mediathek", 0, 0, 760, 520)
+GUI_WINDOW_CHROME(fenster, FALSE)
+
+DIM form AS GUI_WIDGET
+form = GUI_LAYOUT(fenster, "spalte", 0, 0, 760, 520)
+GUI_SET_ANCHOR(form, "lrtb")
+GUI_LAYOUT_SET(form, "rand", 20)
+GUI_LAYOUT_SET(form, "abstand", 8)
+
+' Eine Zeile des Formulars, wie in Kapitel 2.
+SUB zeile(text AS STRING, feld AS GUI_WIDGET, gewicht AS INTEGER)
+    DIM z AS GUI_WIDGET : z = GUI_LAYOUT(fenster, "zeile", 0, 0, 10, 10)
+    GUI_LAYOUT_SET(z, "abstand", 12)
+    GUI_LAYOUT_SET(z, "ausrichtung", 1)
+    GUI_LAYOUT_SET(z, "dehnen", 0)
+    DIM l AS GUI_WIDGET : l = GUI_LABEL(fenster, text, 0, 0)
+    GUI_SIZE_GROUP(l, "beschriftung", "breite")
+    GUI_LAYOUT_ADD(z, l)
+    GUI_LAYOUT_ADD(z, feld, gewicht)
+    IF gewicht = 0 THEN GUI_LAYOUT_SPACER(z)
+    GUI_LAYOUT_ADD(form, z)
+END SUB
+
+DIM titel AS GUI_WIDGET : titel = GUI_TEXTINPUT(fenster, 0, 0, 0, 0)
+DIM urheber AS GUI_WIDGET : urheber = GUI_TEXTINPUT(fenster, 0, 0, 0, 0)
+DIM arten AS ARRAY OF STRING
+arten = ["Buch", "Film", "Spiel", "Musik"]
+DIM art AS GUI_WIDGET : art = GUI_DROPDOWN(fenster, 0, 0, 160, 0, arten)
+GUI_DROPDOWN_SET_SELECTED(art, 0)
+DIM jahr AS GUI_WIDGET : jahr = GUI_TEXTINPUT(fenster, 0, 0, 80, 0)
+zeile("Titel", titel, 1)
+zeile("Urheber", urheber, 1)
+zeile("Art", art, 0)
+zeile("Erscheinungsjahr", jahr, 0)
+
+' Die Tabelle bekommt allen Platz, der uebrig bleibt (Gewicht 1).
+DIM tabelle AS GUI_WIDGET : tabelle = GUI_TABLE(fenster, 0, 0, 10, 10)
+GUI_TABLE_HEADERS(tabelle, ["Titel", "Urheber", "Art", "Jahr"])
+GUI_TABLE_COL_WIDTHS(tabelle, [280, 220, 100, 100])
+GUI_TABLE_SET(tabelle, "zebra", 1)
+GUI_TABLE_SET(tabelle, "zeilenhoehe", 26)
+GUI_TABLE_SET(tabelle, "filterzeile", 1)
+GUI_TABLE_PLACEHOLDER(tabelle, "Keine Treffer.")
+GUI_TABLE_SET(tabelle, "mehrfachauswahl", 1)
+GUI_LAYOUT_ADD(form, tabelle, 1)
+
+DIM knoepfe AS GUI_WIDGET
+knoepfe = GUI_LAYOUT(fenster, "zeile", 0, 0, 10, 10)
+DIM status AS GUI_WIDGET : status = GUI_LABEL(fenster, "", 0, 0)
+DIM knopf AS GUI_WIDGET
+knopf = GUI_BUTTON(fenster, "Aufnehmen", 0, 0, 0, 0)
+GUI_LAYOUT_SET(knoepfe, "ausrichtung", 1)
+GUI_LAYOUT_SET(knoepfe, "dehnen", 0)
+DIM entfernen AS GUI_WIDGET
+entfernen = GUI_BUTTON(fenster, "Entfernen", 0, 0, 0, 0)
+GUI_LAYOUT_ADD(knoepfe, status)
+GUI_LAYOUT_SPACER(knoepfe)
+GUI_LAYOUT_ADD(knoepfe, entfernen)
+GUI_LAYOUT_ADD(knoepfe, knopf)
+GUI_LAYOUT_ADD(form, knoepfe)
+
+GUI_WINDOW_DEFAULT(fenster, knopf)
+GUI_FOCUS(titel)
+
+' Was im Feld steht, zeigt die Tabelle -- einmal am Anfang alles.
+DIM e AS Eintrag
+FOR EACH e IN mediathek
+    GUI_TABLE_ADD_ROW(tabelle, e.zellen())
+NEXT
+GUI_SET_TEXT(status, STR$(LEN(mediathek)) + " Einträge")
+
+SUB aufnehmen()
+    DIM t AS STRING : t = TRIM$(GUI_TEXT(titel))
+    IF t = "" THEN
+        GUI_SET_TEXT(status, "Bitte einen Titel eingeben.")
+        GUI_FOCUS(titel)
+        RETURN
+    END IF
+    DIM neu AS Eintrag
+    neu = NEW Eintrag(t, TRIM$(GUI_TEXT(urheber)), GUI_TEXT(art), _
+                      TRIM$(GUI_TEXT(jahr)))
+    ' Erst in die Daten, dann in die Anzeige -- beide in derselben
+    ' Reihenfolge, damit Zeile n der Tabelle Eintrag n ist.
+    ARRAY_PUSH(mediathek, neu)
+    DIM z AS INTEGER : z = GUI_TABLE_ADD_ROW(tabelle, neu.zellen())
+    GUI_TABLE_SET_SELECTED(tabelle, z)
+    GUI_SET_TEXT(status, STR$(LEN(mediathek)) + " Einträge")
+    GUI_SET_TEXT(titel, "")
+    GUI_SET_TEXT(urheber, "")
+    GUI_SET_TEXT(jahr, "")
+    GUI_FOCUS(titel)
+END SUB
+
+' Alle gewaehlten Eintraege entfernen -- aus den Daten und aus der
+' Tabelle, und zwar von hinten nach vorn.
+SUB auswahl_entfernen()
+    DIM n AS INTEGER : n = GUI_TABLE_SEL_COUNT(tabelle)
+    IF n = 0 THEN
+        GUI_SET_TEXT(status, "Erst eine Zeile wählen.")
+        RETURN
+    END IF
+    DIM zeilen AS ARRAY OF INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        ARRAY_PUSH(zeilen, GUI_TABLE_SEL_ROW(tabelle, i))
+    NEXT
+    SORT(zeilen, TRUE)
+    DIM z AS INTEGER
+    FOR EACH z IN zeilen
+        ARRAY_REMOVE_AT(mediathek, z)
+        GUI_TABLE_REMOVE_ROW(tabelle, z)
+    NEXT
+    GUI_SET_TEXT(status, STR$(n) + " entfernt, " + _
+                         STR$(LEN(mediathek)) + " Einträge")
+END SUB
+
+' Ein Eintrag ganz, in einem Satz -- fuer den Doppelklick.
+SUB zeigen(z AS INTEGER)
+    DIM e AS Eintrag : e = mediathek[z]
+    GUI_SET_TEXT(status, e.titel + " von " + e.urheber + " (" + _
+                         e.art + ", " + e.jahr + ")")
+END SUB
+
+WINDOW_MIN_SIZE(GUI_LAYOUT_MIN_W(form), GUI_LAYOUT_MIN_H(form))
+WINDOW_WAIT_EVENTS(1)
+WHILE NOT QUITREQUESTED()
+    IF WINDOW_RESIZED() THEN
+        DIM b AS INTEGER : b = SCREENWIDTH()
+        DIM h AS INTEGER : h = SCREENHEIGHT()
+        GUI_WINDOW_SET_BOUNDS(fenster, 0, 0, b, h)
+    END IF
+    GUI_UPDATE()
+    IF GUI_CLICKED(knopf) THEN aufnehmen()
+    IF GUI_CLICKED(entfernen) THEN auswahl_entfernen()
+    IF GUI_DOUBLE_CLICKED(tabelle) THEN
+        zeigen(GUI_TABLE_SELECTED(tabelle))
+    END IF
+    CLS(RGB(32, 36, 44))
+    GUI_DRAW()
+    FLIP()
+WEND

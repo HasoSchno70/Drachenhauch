@@ -1,0 +1,8 @@
+' Kapitel 6, was schiefgehen kann -- "kein Dialog offen" als 0.
+IMPORT "gui"
+SCREEN(400, 200, "Mediathek", 1)
+DIM fenster AS GUI_WINDOW
+fenster = GUI_WINDOW("Mediathek", 0, 0, 400, 200)
+DIM frage AS GUI_WINDOW : frage = 0
+' ... in der Schleife, noch bevor je ein Dialog offen war:
+IF frage >= 0 THEN PRINT GUI_ANSWER(frage)

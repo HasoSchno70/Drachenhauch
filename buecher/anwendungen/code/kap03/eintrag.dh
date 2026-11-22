@@ -1,0 +1,46 @@
+' Kapitel 3 -- der Eintrag der Mediathek und ein paar Beispiele. Die
+' Programme des Kapitels holen beides mit IMPORT "eintrag.dh".
+
+' Ein Eintrag der Mediathek: was man ueber ein Buch, einen Film, ein
+' Spiel oder eine Platte wissen will.
+CLASS Eintrag
+    DIM titel AS STRING
+    DIM urheber AS STRING
+    DIM art AS STRING
+    DIM jahr AS STRING
+
+    SUB Init(t AS STRING, u AS STRING, a AS STRING, j AS STRING)
+        titel = t
+        urheber = u
+        art = a
+        jahr = j
+    END SUB
+
+    ' Die Zeile, wie die Tabelle sie zeigt: eine Zelle je Spalte.
+    FUNCTION zellen() AS ARRAY OF STRING
+        RETURN [titel, urheber, art, jahr]
+    END FUNCTION
+END CLASS
+
+' Zehn Eintraege zum Ausprobieren, damit die Tabelle nicht leer
+' anfaengt: je ein Text mit den vier Angaben, getrennt durch |.
+FUNCTION beispiele() AS ARRAY OF Eintrag
+    DIM daten AS ARRAY OF STRING
+    daten = ["Momo|Michael Ende|Buch|1973", _
+             "Metropolis|Fritz Lang|Film|1927", _
+             "Tetris|Alexei Paschitnow|Spiel|1984", _
+             "Kind of Blue|Miles Davis|Musik|1959", _
+             "Emil und die Detektive|Erich Kästner|Buch|1929", _
+             "Lola rennt|Tom Tykwer|Film|1998", _
+             "Die Siedler von Catan|Klaus Teuber|Spiel|1995", _
+             "Abbey Road|The Beatles|Musik|1969", _
+             "Die unendliche Geschichte|Michael Ende|Buch|1979", _
+             "Der kleine Prinz|Antoine de Saint-Exupéry|Buch|1943"]
+    DIM m AS ARRAY OF Eintrag
+    DIM d AS STRING
+    FOR EACH d IN daten
+        DIM t AS ARRAY OF STRING : t = SPLIT$(d, "|")
+        ARRAY_PUSH(m, NEW Eintrag(t[0], t[1], t[2], t[3]))
+    NEXT
+    RETURN m
+END FUNCTION

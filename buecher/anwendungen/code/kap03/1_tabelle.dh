@@ -1,0 +1,33 @@
+' Kapitel 3, Schritt 1 -- die Mediathek als Tabelle. Die Eintraege
+' liegen in einem Feld; die Tabelle zeigt sie nur.
+IMPORT "gui"
+IMPORT "eintrag.dh"
+
+DIM mediathek AS ARRAY OF Eintrag
+mediathek = beispiele()
+
+SCREEN(760, 400, "Mediathek", 1)
+DIM fenster AS GUI_WINDOW
+fenster = GUI_WINDOW("Mediathek", 0, 0, 760, 400)
+GUI_WINDOW_CHROME(fenster, FALSE)
+
+DIM tabelle AS GUI_WIDGET
+tabelle = GUI_TABLE(fenster, 20, 20, 720, 360)
+GUI_TABLE_HEADERS(tabelle, ["Titel", "Urheber", "Art", "Jahr"])
+GUI_TABLE_COL_WIDTHS(tabelle, [280, 220, 100, 100])
+GUI_TABLE_SET(tabelle, "zebra", 1)
+GUI_TABLE_SET(tabelle, "zeilenhoehe", 26)
+
+' Jeder Eintrag wird eine Zeile -- in derselben Reihenfolge wie im Feld.
+DIM e AS Eintrag
+FOR EACH e IN mediathek
+    GUI_TABLE_ADD_ROW(tabelle, e.zellen())
+NEXT
+
+WINDOW_WAIT_EVENTS(1)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(RGB(32, 36, 44))
+    GUI_DRAW()
+    FLIP()
+WEND

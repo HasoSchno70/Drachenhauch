@@ -3100,6 +3100,9 @@ pub struct Widget {
     /// stehenbleibt.
     was_hovered: bool,
     was_focused: bool,
+    /// Der Wert beim Fokuserhalt (`wert_text`) -- die Live-Pruefung prueft
+    /// beim Verlassen nur, wenn er sich geaendert hat.
+    fokus_wert: Option<String>,
     /// Uebergaenge 0..1, je Bild in `update` nachgefuehrt: Ueberfahren,
     /// Druecken, Fokus. Gezeichnet wird ueber `weich()` -- die Flags
     /// `hovered`/`press_origin`/`focus_widget` bleiben die Wahrheit fuer
@@ -5251,7 +5254,7 @@ impl Gui {
             umbruch: false, bind: String::new(), form: String::new(),
             min_w: 0, min_h: 0, nat_w: w, nat_h: h, regeln: Vec::new(), fehler: String::new(), fehler_label: -1,
             on_hover: None, on_leave: None, on_focus: None, on_blur: None,
-            was_hovered: false, was_focused: false,
+            was_hovered: false, was_focused: false, fokus_wert: None,
             ueber_t: 0.0, druck_t: 0.0, fokus_t: 0.0, rollen_t: None, zeile_b: Blende::default(), zeile_jetzt: -1, ganzer_text: String::new(), rad_ziel: None, rad_letzt: 0.0,
             alive: true, visible: true, rund: false, variante: 0,
             group: String::new(), items: Vec::new(), sel: -1,

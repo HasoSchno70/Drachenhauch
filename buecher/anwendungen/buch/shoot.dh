@@ -25,7 +25,7 @@ DIM schrift AS STRING : schrift = GETENV$("BUCH_FONT", "C:\Windows\Fonts\segoeui
 
 ' Mehr Bilder, wo sich etwas entwickeln muss (Animation, Partikel).
 DIM anzahl AS MAP OF INTEGER
-anzahl = {"kap01_leer": 30}
+anzahl = {"kap01_leer": 30, "kap03_sortiert": 20, "kap03_auswahl": 40, "kap05_pruefen": 30, "kap06_menue": 20, "kap06_frage": 40}
 
 FUNCTION quelle$(name AS STRING) AS STRING
     ' Erst figures/, dann das Kapitelprogramm selbst.

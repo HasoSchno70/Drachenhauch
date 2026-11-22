@@ -2018,3 +2018,8 @@ GUI_FILETREE_ICON: kein Muster -- so: "*.dh", "*.json;*.ini" oder "/" fuer Ordne
 {}: '{}' ist kein Bild, das sich lesen laesst -- gelesen werden PNG, JPG, BMP, GIF und QOI	{}: '{}' is not an image that can be read -- readable formats are PNG, JPG, BMP, GIF and QOI
 TRY ohne CATCH und ohne FINALLY verschluckt jeden Fehler still -- danach weiss niemand, dass einer da war. Mit CATCH e den Fehler ansehen (oder ausdruecklich schlucken: ein leeres CATCH); FINALLY raeumt nur auf und reicht ihn weiter	TRY without CATCH and without FINALLY silently swallows every error -- afterwards nobody knows there was one. Look at the error with CATCH e (or swallow it on purpose: an empty CATCH); FINALLY only cleans up and passes it on
 {}: Erwartet COROUTINE, erhalten {} -- eine Koroutine liefert nur der Aufruf einer FUNCTION oder SUB, die YIELD enthaelt	{}: expected COROUTINE, got {} -- only a call of a FUNCTION or SUB that contains YIELD gives a coroutine
+{}: '{}' unbekannt -- fg (Schrift) oder bg (Flaeche)	{}: '{}' unknown -- fg (text) or bg (area)
+{}: {} -- eine andere Verbindung schreibt gerade in die Datei (ein zweites Programm oder eine Transaktion ohne DB_COMMIT); nach 5 Sekunden aufgegeben	{}: {} -- another connection is writing to the file right now (a second program or a transaction without DB_COMMIT); gave up after 5 seconds
+{}: {} -- steht ein ' in einem eingeklebten Wert? Werte mit ? uebergeben: DB_EXEC(db, "... VALUES (?)", wert)	{}: {} -- is there a ' in a value pasted into the SQL? Pass values with ?: DB_EXEC(db, "... VALUES (?)", value)
+GUI_MENU_ENABLED: erwartet einen Menue-Eintrag	GUI_MENU_ENABLED: expects a menu item
+GUI_MENU_ENABLED: ungueltiges Eintrags-Handle	GUI_MENU_ENABLED: invalid item handle
