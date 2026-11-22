@@ -757,3 +757,65 @@ END CLASS
 jede spalte breit genug TRUE
 alle im gitter TRUE
 knopf TRUE
+
+=== eine zeile loeschen, auf die ein verweis zeigt
+' Im Daten-Gitter Lena loeschen, solange eine Ausleihe auf sie zeigt
+' (Verweis ohne Loeschregel): die Statuszeile sagt, wo, in den Worten des
+' Spalten-Gitters -- vorher stand dort nur "FOREIGN KEY constraint failed"
+' (Buch "Fenster, Formulare, Daten", Kapitel 13).
+IMPORT "laeufer.dh"
+IMPORT "db"
+DIM p AS STRING : p = CWD$() + "/proj"
+SETENV("DH_STUDIO_OEFFNEN", "Daten.freund")
+DIM log AS STRING : log = CWD$() + "/s.log"
+slStarten(log, "", 12, p)
+DIM x AS INTEGER
+DIM y AS INTEGER
+slHin(10, 10)
+slWarten(10)
+(x, y) = slLage(log, "db daten")
+slKlick(x, y)
+slWarten(10)
+(x, y) = slLage(log, "dbzelle da 0 0")
+slKlick(x, y)
+slWarten(6)
+(x, y) = slLage(log, "db zeweg")
+slKlick(x, y)
+slWarten(10)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+slStarten(log, CWD$() + "/ev.txt", slBild + 10, p)
+DIM z AS STRING
+FOR EACH z IN slAnfang(log, "status Auf die Zeile")
+    PRINT z
+NEXT
+DIM db AS DB_CONN : db = DB_OPEN(p + "/daten.sqlite")
+DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT COUNT(*) FROM freund")
+IF DB_NEXT(r) THEN PRINT "freunde "; DB_GET_INT(r, 0)
+--- argumente
+{sammlung}/../../../studio/studio.dh
+--- vorher
+IMPORT "db"
+DIM db AS DB_CONN : db = DB_OPEN("proj/daten.sqlite")
+DB_EXEC(db, "CREATE TABLE freund (id INTEGER PRIMARY KEY, name TEXT NOT NULL DEFAULT '')")
+DB_EXEC(db, "CREATE TABLE ausleihe (id INTEGER PRIMARY KEY, freund INTEGER NOT NULL DEFAULT 0 REFERENCES freund(id))")
+DB_EXEC(db, "INSERT INTO freund (name) VALUES ('Lena')")
+DB_EXEC(db, "INSERT INTO ausleihe (freund) VALUES (1)")
+DB_CLOSE(db)
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"},{"art":"datenbank","name":"Daten","schema":"Daten.dhdb"}]}
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":420,"h":300,"widgets":[]}
+--- datei proj/Hauptfenster.dh
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+END CLASS
+--- datei proj/App.dh
+CLASS App EXTENDS StudioApp
+END CLASS
+--- datei proj/Daten.dhdb
+{"datei":"daten.sqlite","tabellen":[{"name":"freund","spalten":[{"name":"name","typ":"text","pflicht":true,"eindeutig":false,"vorgabe":""}]},{"name":"ausleihe","spalten":[{"name":"freund","typ":"ganz","pflicht":true,"eindeutig":false,"vorgabe":"","verweis":"freund"}]}]}
+--- erwartet
+status Auf die Zeile zeigt noch eine Zeile in ausleihe (Spalte freund) -- erst dort löschen, oder dort „Beim Löschen“ auf „mitlöschen“ stellen.
+freunde 1

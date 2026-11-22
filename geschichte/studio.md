@@ -597,3 +597,10 @@ vier Knoepfe der Liste stehen untereinander, die Liste ist so breit wie der
 breiteste ("Umbenennen ..."). Bei 1440 x 900 passen alle sieben Spalten.
 Das Protokoll nennt `spaltengitter breiten/bedarf/knopf` (Pruefung in
 `werkzeug_studio_datenbank3.dhtest`).
+
+Ebenda: wer im Daten-Gitter eine Zeile loeschte, auf die ein Verweis ohne
+Loeschregel zeigte (Lena, die noch Tetris hat), las in der Statuszeile nur
+"FOREIGN KEY constraint failed". dhrt nennt jetzt Tabelle und Spalte, und
+`dbMeldung$` sagt es in den Worten des Spalten-Gitters ("Beim Loeschen"
+auf "mitloeschen"). `status()` schreibt seine Meldung ins Protokoll
+(`status ...`), damit eine Pruefung sie lesen kann.

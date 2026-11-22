@@ -493,6 +493,7 @@ Ja/Nein	Yes/No
 Namen mit {0} vorn sind vergeben.	Names starting with {0} are reserved.
 Die Spalte id hat jede Tabelle schon.	Every table already has the column id.
 In {0} gibt es einen Wert doppelt -- die Spalte ist eindeutig.	{0} has a value twice -- the column is unique.
+Auf die Zeile zeigt noch eine Zeile in {0} -- erst dort löschen, oder dort „Beim Löschen“ auf „mitlöschen“ stellen.	A row in {0} still points to this one -- delete it there first, or set "On delete" there to "delete too".
 ja	yes
 nein	no
 Eine Tabelle {0} gibt es schon.	There already is a table {0}.

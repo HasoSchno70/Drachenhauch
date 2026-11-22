@@ -177,6 +177,14 @@ FUNCTION dbMeldung$(f AS STRING) AS STRING
     IF k >= 0 AND LEFT$(m, 3) = "DB_" THEN m = MID$(m, k + 2, LEN(m))
     DIM u AS STRING : u = "UNIQUE constraint failed: "
     IF LEFT$(m, LEN(u)) = u THEN RETURN trf$("In {0} gibt es einen Wert doppelt -- die Spalte ist eindeutig.", [MID$(m, LEN(u), LEN(m))])
+    ' Ein Verweis ohne Loeschregel haelt die Zeile fest (dhrt nennt, wo) --
+    ' in den Worten des Spalten-Gitters statt ON DELETE CASCADE.
+    DIM f AS STRING : f = "FOREIGN KEY constraint failed -- auf die Zeile zeigt noch eine Zeile in "
+    IF LEFT$(m, LEN(f)) = f THEN
+        DIM wo AS STRING : wo = MID$(m, LEN(f), LEN(m))
+        IF INSTR(wo, ";") >= 0 THEN wo = LEFT$(wo, INSTR(wo, ";"))
+        RETURN trf$("Auf die Zeile zeigt noch eine Zeile in {0} -- erst dort löschen, oder dort „Beim Löschen“ auf „mitlöschen“ stellen.", [wo])
+    END IF
     RETURN m
 END FUNCTION
 
