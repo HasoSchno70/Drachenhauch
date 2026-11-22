@@ -673,7 +673,7 @@
   "GUI_DATE_RANGE": "erlaubter Bereich (leerer Text = keine Grenze)",
   "GUI_DATE_UNMARK": "eine Marke wegnehmen",
   "GUI_DESTROY": "Widget entfernen (Handle wird ungültig, andere bleiben gültig)",
-  "GUI_DIALOG": "GUI_WINDOW — modalen Dialog öffnen (\"ok\" = Vorgabe, \"janein\", oder eigene Knöpfe mit \\ getrennt: \"Speichern\\ Verwerfen\\ Abbrechen\")",
+  "GUI_DIALOG": "GUI_WINDOW — modalen Dialog öffnen (\"ok\" = Vorgabe, \"janein\", oder eigene Knöpfe mit \\ getrennt: \"Speichern\\ Verwerfen\\ Abbrechen\"); höchstens 640 breit, längere Zeilen brechen an Wortgrenzen um",
   "GUI_DIALOG_TEXT": "STRING — was in das Eingabefeld eines GUI_PROMPT getippt wurde — auch nach der Antwort",
   "GUI_DOCK": "ein Dock auf dem Fenster einrichten bzw. sein Rechteck setzen -- Leisten links, rechts und unten, die Mitte bleibt dem Programm (siehe Dock)",
   "GUI_DOCK_ACTIVATE": "den Reiter der Leiste nach vorn holen",

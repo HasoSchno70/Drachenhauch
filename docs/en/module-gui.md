@@ -547,7 +547,7 @@ clicks.
 
 | Function | Returns | Purpose |
 |---|---|---|
-| `GUI_DIALOG(title$, text$[, style$])` | GUI_WINDOW | open a modal dialog (`"ok"` = default, `"janein"`, or **your own buttons** separated with `\|`: `"Speichern\|Verwerfen\|Abbrechen"`) |
+| `GUI_DIALOG(title$, text$[, style$])` | GUI_WINDOW | open a modal dialog (`"ok"` = default, `"janein"`, or **your own buttons** separated with `\|`: `"Speichern\|Verwerfen\|Abbrechen"`); at most 640 wide, longer lines wrap at word boundaries |
 | `GUI_PROMPT(title$, text$[, default$[, buttons$]])` | GUI_WINDOW | question **with an input field** (default value selected; without `buttons$` OK/Cancel) |
 | `GUI_ANSWER(dialog)` | INTEGER | `0` = still open, otherwise the **number of the button** (1-based): `1` = OK/Yes, `2` = Cancel/No |
 | `GUI_DIALOG_TEXT(dialog)` | STRING | what was typed into the input field of a `GUI_PROMPT` — also after the answer |

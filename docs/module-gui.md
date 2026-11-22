@@ -548,7 +548,7 @@ an.
 
 | Funktion | Rückgabe | Zweck |
 |---|---|---|
-| `GUI_DIALOG(title$, text$[, style$])` | GUI_WINDOW | modalen Dialog öffnen (`"ok"` = Vorgabe, `"janein"`, oder **eigene Knöpfe** mit `\|` getrennt: `"Speichern\|Verwerfen\|Abbrechen"`) |
+| `GUI_DIALOG(title$, text$[, style$])` | GUI_WINDOW | modalen Dialog öffnen (`"ok"` = Vorgabe, `"janein"`, oder **eigene Knöpfe** mit `\|` getrennt: `"Speichern\|Verwerfen\|Abbrechen"`); höchstens 640 breit, längere Zeilen brechen an Wortgrenzen um |
 | `GUI_PROMPT(title$, text$[, default$[, buttons$]])` | GUI_WINDOW | Frage **mit Eingabefeld** (Vorgabe markiert; ohne `buttons$` OK/Abbrechen) |
 | `GUI_ANSWER(dialog)` | INTEGER | `0` = noch offen, sonst die **Nummer des Knopfs** (1-basiert): `1` = OK/Ja, `2` = Abbrechen/Nein |
 | `GUI_DIALOG_TEXT(dialog)` | STRING | was in das Eingabefeld eines `GUI_PROMPT` getippt wurde — auch nach der Antwort |

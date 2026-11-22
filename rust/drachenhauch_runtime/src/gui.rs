@@ -4334,9 +4334,16 @@ impl Gui {
         }
         // In LOGISCHEN Einheiten rechnen -- `new_window`/`add_widget`
         // skalieren selbst, und zweimal waere zweimal zu viel.
-        let zeilen: Vec<String> = text.split('\n').map(|z| z.to_string()).collect();
         let zh = self.unsk(self.ctext_height(g)) + 6;
         let pad = 16;
+        // Hoechstens 640 breit (und nicht breiter als der Schirm); laengere
+        // Zeilen brechen an Wortgrenzen um. Vorher liefen sie ueber den Rand
+        // (Buch "Fenster, Formulare, Daten", Kapitel 21: die Befunde von
+        // GUI_A11Y_CHECK$ in einer Meldung).
+        let schirm_b = self.unsk(g.screen_width() as i32);
+        let max_ww = 640.min((schirm_b - 40).max(220));
+        let innen = max_ww - 2 * pad - 8;
+        let zeilen: Vec<String> = text.split('\n').flat_map(|z| self.umbrechen_grund(g, z, innen)).collect();
         // Knopfbreite nach der laengsten Beschriftung -- "Verwerfen" passt
         // nicht in 84 Pixel.
         let bw = knoepfe.iter().map(|k| self.unsk(self.ctext_width(g, k)) + 24).max().unwrap_or(84).max(84);
@@ -4347,7 +4354,7 @@ impl Gui {
             .max().unwrap_or(0)
             .max(self.unsk(self.ctext_width(g, &titel)) + 30)
             .max(gesamt);
-        let ww = (breiteste + 2 * pad + 8).clamp(220, 640);
+        let ww = (breiteste + 2 * pad + 8).clamp(220, max_ww.max(220));
         let feld_h = if eingabe.is_some() { 28 + 10 } else { 0 };
         // Widget-Koordinaten sind RELATIV zum Inhaltsbereich, die Fensterhoehe
         // ist es nicht -- die Titelleiste kommt oben drauf. Ohne diesen
@@ -4393,6 +4400,36 @@ impl Gui {
         // soll sofort mit der Tastatur zu bedienen sein.
         self.focus_widget = Some((wi, feld.unwrap_or(erster)));
         Ok(h)
+    }
+
+    /// Eine Zeile an Wortgrenzen auf `breite` (logische Punkte, Grundschrift
+    /// wie im Dialog) umbrechen; ein Wort, das allein zu breit ist, an der
+    /// Zeichengrenze. Wie `umbrechen`, aber ohne Widget.
+    fn umbrechen_grund(&self, g: &Graphics, text: &str, breite: i32) -> Vec<String> {
+        let passt = |s: &str| self.unsk(self.ctext_width(g, s)) <= breite;
+        if passt(text) { return vec![text.to_string()]; }
+        let mut zeilen: Vec<String> = Vec::new();
+        let mut zeile = String::new();
+        for wort in text.split(' ') {
+            let mut rest = wort.to_string();
+            loop {
+                let probe = if zeile.is_empty() { rest.clone() } else { format!("{} {}", zeile, rest) };
+                if passt(&probe) { zeile = probe; break; }
+                if !zeile.is_empty() { zeilen.push(std::mem::take(&mut zeile)); continue; }
+                let mut teil = String::new();
+                let mut n = 0usize;
+                for ch in rest.chars() {
+                    let p2 = format!("{}{}", teil, ch);
+                    if n > 0 && !passt(&p2) { break; }
+                    teil = p2; n += 1;
+                }
+                zeilen.push(teil);
+                rest = rest.chars().skip(n).collect();
+                if rest.is_empty() { break; }
+            }
+        }
+        if !zeile.is_empty() { zeilen.push(zeile); }
+        zeilen
     }
 
     /// GUI_DIALOG_TEXT(dlg) -- was in das Eingabefeld eines GUI_PROMPT getippt

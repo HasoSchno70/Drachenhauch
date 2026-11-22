@@ -1471,3 +1471,9 @@ modern_light 3,0 (Fenster), dark 3,7, modern_dark 4,0, glas_dunkel 3,4,
 retro 4,2 (im Feld), glas_hell 4,1 (Fenster). Neue Werte je Thema auf den
 naechsten Ton mit 4,6:1 gemischt (Farbton bleibt). Die Pruefung der Themen
 kannte nur Schrift in text_fg.
+
+Ebenda: GUI_DIALOG (und damit Meldung/Frage im Studio) war hoechstens 640
+breit, brach eine laengere Zeile aber nicht um -- sie lief ueber den Rand.
+Gesehen an den Befunden von GUI_A11Y_CHECK$ in einer Meldung. Jetzt bricht
+`umbrechen_grund` an Wortgrenzen um (Grundschrift, logische Punkte, nicht
+breiter als der Schirm).
