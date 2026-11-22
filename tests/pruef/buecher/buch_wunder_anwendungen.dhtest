@@ -209,3 +209,74 @@ DHRT_ABSEITS=1
 --- enthaelt
   label(2) "Die Mediathek ist leer."
   label(3) ""
+
+=== mediathek kapitel 2: felder buendig, mindestmass schon beim aufbau
+' Die Groessengruppe macht alle Beschriftungen so breit wie
+' "Erscheinungsjahr", die Felder stehen darum buendig; Titel und Urheber
+' haben Gewicht 1 und sind breiter als das Jahr. Das Mindestmass wird
+' gleich nach dem Aufbau gefragt -- wie im Buch, vor dem ersten Bild.
+PRINT "buendig "; GUI_GET_X(titel) = GUI_GET_X(jahr) AND GUI_GET_X(urheber) = GUI_GET_X(art)
+PRINT "rechts von der beschriftung "; GUI_GET_X(jahr) > 150
+PRINT "titel breiter "; GUI_GET_W(titel) > 3 * GUI_GET_W(jahr)
+PRINT "mindestmass "; prMinW; " "; prMinH
+EXIT(0)
+--- programm ../../../buecher/anwendungen/code/kap02/3_mindestmass.dh nach     GUI_UPDATE()
+--- einschub nach WINDOW_MIN_SIZE(GUI_LAYOUT_MIN_W(form), GUI_LAYOUT_MIN_H(form))
+DIM prMinW AS INTEGER : prMinW = GUI_LAYOUT_MIN_W(form)
+DIM prMinH AS INTEGER : prMinH = GUI_LAYOUT_MIN_H(form)
+--- umgebung
+DHRT_FRAMES=5
+DHRT_ABSEITS=1
+--- erwartet
+buendig TRUE
+rechts von der beschriftung TRUE
+titel breiter TRUE
+mindestmass 403 240
+
+=== loesung kapitel 2: zwei spalten richten sich je fuer sich aus
+PRINT "links buendig "; GUI_GET_X(titel) = GUI_GET_X(urheber)
+PRINT "rechts buendig "; GUI_GET_X(art) = GUI_GET_X(jahr)
+PRINT "rechte spalte rechts "; GUI_GET_X(art) > GUI_GET_X(titel) + GUI_GET_W(titel)
+' Links ist "Urheber" die breiteste Beschriftung, rechts
+' "Erscheinungsjahr": links fangen die Felder darum frueher in ihrer
+' Spalte an. Mit einer gemeinsamen Gruppe waeren beide gleich.
+PRINT "links schmaler beschriftet "; GUI_GET_X(titel) - GUI_GET_X(links) < GUI_GET_X(art) - GUI_GET_X(rechts)
+PRINT "eine hoehe "; GUI_GET_Y(titel) = GUI_GET_Y(art)
+EXIT(0)
+--- programm ../../../buecher/anwendungen/code/loesungen/kap02_zwei_spalten.dh nach     GUI_UPDATE()
+--- umgebung
+DHRT_FRAMES=5
+DHRT_ABSEITS=1
+--- erwartet
+links buendig TRUE
+rechts buendig TRUE
+rechte spalte rechts TRUE
+links schmaler beschriftet TRUE
+eine hoehe TRUE
+
+=== loesung kapitel 2: die groesse kommt in die ini-datei
+--- programm ../../../buecher/anwendungen/code/loesungen/kap02_groesse.dh
+--- umgebung
+DHRT_FRAMES=3
+DHRT_ABSEITS=1
+--- inhalt _programm/mediathek.ini
+[fenster]
+breite=560
+hoehe=300
+
+=== loesung kapitel 2: die gemerkte groesse gilt beim naechsten start
+PRINT "fenster "; SCREENWIDTH(); " "; SCREENHEIGHT()
+PRINT "formular "; GUI_GET_W(form); " "; GUI_GET_H(form)
+EXIT(0)
+--- programm ../../../buecher/anwendungen/code/loesungen/kap02_groesse.dh nach     GUI_UPDATE()
+--- datei _programm/mediathek.ini
+[fenster]
+breite=700
+hoehe=360
+
+--- umgebung
+DHRT_FRAMES=5
+DHRT_ABSEITS=1
+--- erwartet
+fenster 700 360
+formular 700 360
