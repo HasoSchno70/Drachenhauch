@@ -700,6 +700,15 @@ impl Gui {
             // Zebra nach der ANSICHTSzeile, nicht nach der Datenzeile --
             // sonst waeren die Streifen nach dem Filtern unregelmaessig.
             let zebra = if t.zebra && r % 2 == 1 { zebra_bg } else { -1 };
+            // Die Flaeche der Zeile (Zeilenfarbe, sonst Zebra) ueber die
+            // ganze Breite, wie Auswahl und Gitterlinie -- sind die Spalten
+            // schmaler als die Tabelle, hoerte der Streifen sonst an der
+            // letzten Spalte auf (gesehen 2026-11 im Buch "Fenster,
+            // Formulare, Daten", Kapitel 3). Zellfarben malen darueber.
+            let zeile_bg = match t.row_bg.get(ri) { Some(&rb) if rb >= 0 => rb, _ => zebra };
+            if zeile_bg >= 0 {
+                g.box_fill(body_x, row_y, body_x + body_w - 1, row_y + gm.row_h - 1, zeile_bg);
+            }
 
             // Zellflaechen zuerst, danach Auswahl/Hover DARUEBER -- sonst
             // deckte eine eigene Zellfarbe die Auswahl zu und man saehe nicht
