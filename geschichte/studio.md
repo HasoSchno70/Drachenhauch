@@ -624,3 +624,7 @@ Ebenda, Kapitel 14 (Datenbindung):
   `Neuladen()` ihre Auswahl -- gehalten wurde sie nur bei der Tabelle des
   Fensters (ueber DatensatzId). Jetzt merkt sich jede Liste ausser einer
   Klappliste (die hielt ihre Wahl schon) die id der gewaehlten Zeile.
+- Ebenda, Kapitel 15: eine Abfrage, deren SQL auf mehreren Zeilen stand
+  (wie man es im Abfragefeld schreibt), hielt das erzeugte Programm mit
+  "Zeilenumbruch im String" an -- `dbText$`/`dhText$` maskierten nur
+  Rueckstrich und Anfuehrungszeichen. Jetzt auch \n, \r und \t.

@@ -1084,8 +1084,15 @@ END FUNCTION
 '  _studio/studio_datenbanken.dh: je Datenbank eine globale Verbindung unter
 '  ihrem Namen, beim Start geoeffnet; fehlende Tabellen, Spalten und Indexe
 '  legt das Programm selbst an. Ohne Datenbank im Projekt: "".
+' Ein Text als Zeichenkette mit Escape-Folgen (!"..."). Auch Zeilenumbrueche:
+' das SQL einer Abfrage steht im Studio meist auf mehreren Zeilen, und ein
+' roher Umbruch im Literal hielt das erzeugte Programm an (Buch "Fenster,
+' Formulare, Daten", Kapitel 15).
 FUNCTION dbText$(roh AS STRING) AS STRING
-    RETURN "!" + CHR$(34) + REPLACE$(REPLACE$(roh, "\", "\\"), CHR$(34), "\" + CHR$(34)) + CHR$(34)
+    ' Wie dhText$ in erzeugen.dh -- datenbank.dh laeuft auch ohne (Pruefungen).
+    DIM t AS STRING : t = REPLACE$(REPLACE$(roh, "\", "\\"), CHR$(34), "\" + CHR$(34))
+    t = REPLACE$(REPLACE$(REPLACE$(t, CHR$(13), "\r"), CHR$(10), "\n"), CHR$(9), "\t")
+    RETURN "!" + CHR$(34) + t + CHR$(34)
 END FUNCTION
 
 FUNCTION datenbankCode$() AS STRING
