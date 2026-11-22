@@ -217,3 +217,24 @@ PRINT BUFFER_LEN(DB_GET_BUFFER(r, 0)); " "; BUFFER_LEN(DB_GET_BUFFER(r, 1))
 2
 DB_GET_BUFFER: Spalte 2 ist eine Zahl, keine Bytes
 0 0
+
+=== eine gesperrte datei sagt, woran es liegt
+' Eine offene Transaktion auf Verbindung a sperrt die Datei; b wartet
+' 5 s und gibt auf. Die Meldung nennt die Ursache dazu, nicht nur
+' "database is locked" (Buch "Fenster, Formulare, Daten", Kapitel 4).
+IMPORT "db"
+DIM a AS DB_CONN : a = DB_OPEN("gesperrt.db")
+DB_EXEC(a, "CREATE TABLE t (n INTEGER)")
+DIM b AS DB_CONN : b = DB_OPEN("gesperrt.db")
+DB_BEGIN(a)
+DB_EXEC(a, "INSERT INTO t VALUES (1)")
+TRY
+    DB_EXEC(b, "INSERT INTO t VALUES (2)")
+CATCH e
+    PRINT e
+END TRY
+DB_COMMIT(a)
+PRINT DB_EXEC(b, "INSERT INTO t VALUES (3)")
+--- erwartet
+DB_EXEC: database is locked -- eine andere Verbindung schreibt gerade in die Datei (ein zweites Programm oder eine Transaktion ohne DB_COMMIT); nach 5 Sekunden aufgegeben
+1

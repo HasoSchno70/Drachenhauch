@@ -227,7 +227,7 @@ impl Verbindung {
     pub fn exec(&mut self, sql: &str, params: &[Param], fn_: &str) -> Result<i64, String> {
         match self {
             Verbindung::Sqlite(c) => c.execute(sql, rusqlite::params_from_iter(params.iter().map(sqlite_param)))
-                .map(|n| n as i64).map_err(|e| format!("{}: {}", fn_, e)),
+                .map(|n| n as i64).map_err(|e| sqlite_fehler(fn_, &e)),
             #[cfg(feature = "pg")]
             Verbindung::Pg(c) => pg::exec(c, sql, params).map_err(|e| format!("{}: {}", fn_, e)),
             #[cfg(feature = "mysql")]
@@ -238,7 +238,7 @@ impl Verbindung {
     /// Eine Abfrage; alle Zeilen auf einmal.
     pub fn query(&mut self, sql: &str, params: &[Param], fn_: &str) -> Result<DbResult, String> {
         match self {
-            Verbindung::Sqlite(c) => sqlite_query(c, sql, params).map_err(|e| format!("{}: {}", fn_, e)),
+            Verbindung::Sqlite(c) => sqlite_query(c, sql, params).map_err(|e| sqlite_fehler(fn_, &e)),
             #[cfg(feature = "pg")]
             Verbindung::Pg(c) => pg::query(c, sql, params).map_err(|e| format!("{}: {}", fn_, e)),
             #[cfg(feature = "mysql")]
@@ -249,7 +249,7 @@ impl Verbindung {
     /// BEGIN, COMMIT, ROLLBACK -- ohne Platzhalter, ohne Ergebnis.
     pub fn befehl(&mut self, sql: &str, fn_: &str) -> Result<(), String> {
         match self {
-            Verbindung::Sqlite(c) => c.execute_batch(sql).map_err(|e| format!("{}: {}", fn_, e)),
+            Verbindung::Sqlite(c) => c.execute_batch(sql).map_err(|e| sqlite_fehler(fn_, &e)),
             #[cfg(feature = "pg")]
             Verbindung::Pg(c) => c.batch_execute(sql).map_err(|e| format!("{}: {}", fn_, pg::fehler(&e))),
             #[cfg(feature = "mysql")]
@@ -302,6 +302,21 @@ impl Verbindung {
             #[cfg(feature = "mysql")]
             Verbindung::My(c) => c.ping().is_ok(),
         }
+    }
+}
+
+/// Fehler von SQLite mit dem Namen des Befehls davor. "database is
+/// locked" bekommt die Ursache dazu: rusqlite wartet 5 s auf die Datei und
+/// gibt dann auf -- meist schreibt ein zweites Programm hinein, oder eine
+/// Transaktion (DB_BEGIN) derselben Datei ist noch offen. Gesehen 2026-11
+/// im Buch "Fenster, Formulare, Daten", Kapitel 4; die nackte Meldung
+/// sagte nicht, worauf.
+fn sqlite_fehler(fn_: &str, e: &dyn std::fmt::Display) -> String {
+    let t = e.to_string();
+    if t.contains("database is locked") || t.contains("database table is locked") {
+        format!("{}: {} -- eine andere Verbindung schreibt gerade in die Datei (ein zweites Programm oder eine Transaktion ohne DB_COMMIT); nach 5 Sekunden aufgegeben", fn_, t)
+    } else {
+        format!("{}: {}", fn_, t)
     }
 }
 

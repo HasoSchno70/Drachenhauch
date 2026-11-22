@@ -335,3 +335,13 @@ viele Entities laeuft, sollte es als Bulk-Op-Builtin schreiben statt
 als pro-Entity-BASIC-Loop. Boilerplate fuer einen neuen Bulk-Builtin:
 die Logik in `rust/drachenhauch_runtime/src/ecs.rs` + Dispatch-Arm in `vm.rs`
 (`try_ecs`) + Eintrag in `daten/builtin_index.json` + Fall in einer Pruefsammlung.
+
+## db: gesperrte Datei (2026-11-22)
+
+Beim Schreiben von Kapitel 4 des Buchs "Fenster, Formulare, Daten": eine
+zweite Verbindung auf dieselbe SQLite-Datei wartete hinter einer offenen
+Transaktion 5 s (die Vorgabe von rusqlite) und meldete dann nur
+`DB_EXEC: database is locked`. `db::sqlite_fehler` haengt jetzt die
+Ursache an (ein zweites Programm oder eine Transaktion ohne DB_COMMIT,
+nach 5 Sekunden aufgegeben) -- fuer DB_EXEC, DB_QUERY und
+BEGIN/COMMIT/ROLLBACK. Fall in `tests/pruef/module/modules_db.dhtest`.
