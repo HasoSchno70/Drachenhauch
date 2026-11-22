@@ -124,7 +124,7 @@ CHART_SET_NUM: unbekannte Eigenschaft 'innen_radius' (gueltig: min, max, innenra
 | `abstand` | Kuchen: Segmente herausziehen. Balken: Lücke |
 | `ecken` | Eckenradius |
 | `rahmen_dicke`, `polster` | Rahmenstärke, Innenabstand |
-| `gitter` | Schrittweite der Wertachse; 0 = automatisch (runde Schritte) |
+| `gitter` | Schrittweite der Wertachse; 0 = automatisch (runde Schritte, nie feiner als `nachkomma` schreiben kann -- ohne Nachkommastellen mindestens 1) |
 | `nachkomma` | Nachkommastellen aller Zahlen |
 | `titel_groesse`, `text_groesse` | Schriftgrößen |
 | `schrift` | FONT-Handle aus `LOADFONT`; -1 = die Schrift der Oberfläche (eingebaute Sans bzw. die per `SETFONT` gesetzte) |

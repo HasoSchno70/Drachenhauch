@@ -365,3 +365,10 @@ Syntaxfehler bleibt ohne Hinweis (Gegenfall im selben Prueffall).
   zweimal (ureq nennt sie schon, `map_err` haengte sie noch einmal an) und
   sonst nur englische Systemworte. Jetzt einmal, und bei fehlender
   Verbindung bzw. abgelaufener Zeitgrenze ein Hinweis.
+
+2026-11-22, Buch "Fenster, Formulare, Daten", Kapitel 18: ein Balkendiagramm
+der Ausleihen je Monat (Werte 0 und 1) schrieb an die Wertachse
+"0 0 0 1 1 1" -- die automatische Schrittweite war 0,2, die Beschriftung
+ohne Nachkommastellen. `auto_schritt` waehlt jetzt nie feiner, als
+`nachkomma` schreiben kann (ohne also mindestens 1); Rust-Test
+`auto_schritt_nie_feiner_als_die_beschriftung`.
