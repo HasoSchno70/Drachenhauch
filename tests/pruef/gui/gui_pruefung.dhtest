@@ -269,6 +269,7 @@ DIM titel AS GUI_WIDGET : titel = GUI_TEXTINPUT(w, 10, 10, 200, 28, "")
 DIM anderes AS GUI_WIDGET : anderes = GUI_TEXTINPUT(w, 10, 50, 200, 28, "")
 DIM zeile AS GUI_WIDGET : zeile = GUI_LABEL(w, "", 10, 90)
 GUI_RULE(titel, "pflicht", "Ohne Titel geht es nicht.")
+GUI_RULE(titel, "laenge", 3, 60, "Mindestens drei Zeichen.")
 GUI_ERROR_LABEL(titel, zeile)
 GUI_VALIDATE_LIVE(w, TRUE)
 GUI_FOCUS(titel)
@@ -280,6 +281,7 @@ WHILE NOT QUITREQUESTED()
     IF bild = 2 THEN d = GUI_DIALOG("Frage", "Wirklich?", "janein")
     IF bild = 5 THEN PRINT "hinter dem dialog [" + GUI_TEXT(zeile) + "]"
     IF bild = 6 THEN GUI_WINDOW_DESTROY(d)
+    IF bild = 7 THEN GUI_SET_TEXT(titel, "ab")
     IF bild = 8 THEN GUI_FOCUS(anderes)
     IF bild = 10 THEN
         PRINT "verlassen [" + GUI_TEXT(zeile) + "]"
@@ -291,4 +293,48 @@ WEND
 DHRT_FRAMES=20
 --- erwartet
 hinter dem dialog []
-verlassen [Ohne Titel geht es nicht.]
+verlassen [Mindestens drei Zeichen.]
+
+=== ein feld nur zu durchqueren ist kein fehler
+' Live-Pruefung prueft beim Verlassen nur, was sich seit dem Fokus
+' geaendert hat (oder schon eine Meldung traegt). Ein leeres Pflichtfeld,
+' durch das man nur hindurchgeht -- etwa mit einem Klick in eine Tabelle
+' --, meldet erst GUI_VALIDATE. Bis 2026-11 stand dann sofort "Pflicht"
+' (Buch "Fenster, Formulare, Daten", Kapitel 6).
+IMPORT "gui"
+SCREEN(400, 300, "P", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("P", 0, 0, 400, 300)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM titel AS GUI_WIDGET : titel = GUI_TEXTINPUT(w, 10, 10, 200, 28, "")
+DIM jahr AS GUI_WIDGET : jahr = GUI_TEXTINPUT(w, 10, 50, 200, 28, "")
+DIM zeile AS GUI_WIDGET : zeile = GUI_LABEL(w, "", 10, 90)
+GUI_RULE(titel, "pflicht", "Ohne Titel geht es nicht.")
+GUI_RULE(jahr, "bereich", 1450, 2100, "Kein Jahr.")
+GUI_ERROR_LABEL(titel, zeile)
+GUI_ERROR_LABEL(jahr, zeile)
+GUI_VALIDATE_LIVE(w, TRUE)
+GUI_FOCUS(titel)
+DIM bild AS INTEGER
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    bild = bild + 1
+    IF bild = 3 THEN GUI_FOCUS(jahr)
+    IF bild = 5 THEN
+        PRINT "durchquert [" + GUI_TEXT(zeile) + "]"
+        GUI_SET_TEXT(jahr, "999")
+    END IF
+    IF bild = 6 THEN GUI_FOCUS(titel)
+    IF bild = 8 THEN
+        PRINT "geaendert [" + GUI_TEXT(zeile) + "]"
+        PRINT GUI_VALIDATE(w)
+        EXIT(0)
+    END IF
+    CLS(0) : GUI_DRAW() : FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=20
+--- erwartet
+durchquert []
+geaendert [Kein Jahr.]
+2

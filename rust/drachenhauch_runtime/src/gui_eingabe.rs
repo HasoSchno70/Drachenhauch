@@ -430,8 +430,15 @@ impl Gui {
         // werden nach `update()` von der VM aufgerufen, damit ein Handler die
         // GUI nicht mitten im Zustands-Update umbauen kann.
         let fokus = self.focus_widget;
+        let modal = self.modal;
         for wi in 0..self.windows.len() {
             for i in 0..self.windows[wi].widgets.len() {
+                // Den Wert beim Fokuserhalt merken und beim Verlassen
+                // vergleichen -- nur fuer Felder mit Regeln.
+                let (wert_jetzt, hat_regeln) = {
+                    let w = &self.windows[wi].widgets[i];
+                    if w.regeln.is_empty() { (String::new(), false) } else { (self.wert_text(w), true) }
+                };
                 let w = &mut self.windows[wi].widgets[i];
                 let ist_fokus = fokus == Some((wi, i));
                 let (h_jetzt, h_vorher) = (w.hovered, w.was_hovered);
@@ -449,15 +456,28 @@ impl Gui {
                 } else if !f_jetzt && f_vorher {
                     if let Some(f) = w.on_blur.clone() { feuern.push(f); }
                 }
-                let verlassen = !f_jetzt && f_vorher && !w.regeln.is_empty();
-                self.pending.extend(feuern);
                 // Nimmt ein modales Fenster (ein Dialog) den Fokus, ist er nur
                 // geliehen -- er kommt zurueck, und verlassen hat das Feld
                 // niemand. Bis 2026-11 meldete die Live-Pruefung dann hinter
                 // dem Dialog "Ohne Titel geht es nicht." (Buch "Fenster,
                 // Formulare, Daten", Kapitel 6, Rueckfrage beim Beenden).
-                let geliehen = self.modal.map_or(false, |m| m != wi);
-                if verlassen && self.windows[wi].pruefung_live && !geliehen { self.widget_pruefen(wi, i); }
+                let geliehen = modal.map_or(false, |m| m != wi);
+                // Der Wert beim Fokuserhalt; ueber einen geliehenen Fokus
+                // hinweg bleibt der alte stehen.
+                if hat_regeln && f_jetzt && !f_vorher && w.fokus_wert.is_none() {
+                    w.fokus_wert = Some(wert_jetzt.clone());
+                }
+                // Verlassen zaehlt nur, wenn sich etwas geaendert hat (oder
+                // schon eine Meldung dasteht, die die Aenderung aufheben
+                // koennte): ein Feld, das man nur durchquert, ist nicht
+                // falsch -- ein leeres Pflichtfeld meldet GUI_VALIDATE beim
+                // Speichern. Bis 2026-11 rief schon ein Klick in die Tabelle
+                // "Ohne Titel geht es nicht." hervor (ebenda).
+                let veraendert = w.fokus_wert.as_deref() != Some(wert_jetzt.as_str()) || !w.fehler.is_empty();
+                let verlassen = !f_jetzt && f_vorher && hat_regeln && veraendert && !geliehen;
+                if !f_jetzt && f_vorher && !geliehen { w.fokus_wert = None; }
+                self.pending.extend(feuern);
+                if verlassen && self.windows[wi].pruefung_live { self.widget_pruefen(wi, i); }
             }
         }
 

@@ -3673,7 +3673,10 @@ END IF
   mit — sie galten dem alten Inhalt.
 - `GUI_VALIDATE_LIVE(win, TRUE)` prüft ein Feld, sobald der Fokus es
   verlässt — nicht bei jedem Anschlag: eine halb getippte Adresse ist keine
-  falsche. Ein Dialog, der den Fokus nur leiht, ist kein Verlassen.
+  falsche. Geprüft wird nur, was sich seit dem Fokus geändert hat oder
+  schon eine Meldung trägt: ein Feld, das man nur durchquert, ist nicht
+  falsch (ein leeres Pflichtfeld meldet `GUI_VALIDATE` beim Speichern). Ein
+  Dialog, der den Fokus nur leiht, ist kein Verlassen.
 - Regeln stehen in der `.dhform` (`rules`, `error_label`), etwa
   `pflicht; laenge 2 60; email`.
 

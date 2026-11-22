@@ -1402,3 +1402,10 @@ am Zeilenende der Erwartung ab, die Ausgabe nicht.
 - **GUI_MENU_ENABLED (2026-11-22).** Ebenda, Kapitel 6: zu GUI_MENU_ENABLE
   fehlte die Abfrage; der Test fuer "Entfernen rueckgaengig ist nur frei,
   wenn es etwas gibt" haette sonst nur ein Bild messen koennen.
+- **Durchqueren ist kein Fehler (2026-11-22).** Ebenda: ein Klick in die
+  Tabelle verliess das leere Titelfeld, und die Live-Pruefung meldete
+  "Ohne Titel geht es nicht.", obwohl man nur einen Eintrag entfernen
+  wollte. Beim Verlassen prueft sie jetzt nur, was sich seit dem
+  Fokuserhalt geaendert hat oder schon eine Meldung traegt
+  (`Widget::fokus_wert`, ueber einen geliehenen Fokus hinweg gehalten).
+  Leere Pflichtfelder meldet GUI_VALIDATE beim Speichern.
