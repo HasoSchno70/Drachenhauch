@@ -1427,3 +1427,5 @@ am Zeilenende der Erwartung ab, die Ausgabe nicht.
   (und `DHRT_GUI_ZUSTAND`) nannte Felder, Haken und Klapplisten, aber keine
   Tabelle -- ob ein Suchfeld die Liste gefiltert hatte, sah ein Test nicht.
   Jetzt eine Zeile je Tabelle: Zeilen, die gewaehlte, die erste Spalte.
+  Seit Kapitel 15 dazu die gewaehlte Zeile ganz: ob nach "Zurueck" die
+  Spalte "Verliehen an" leer wurde, sah ein Test sonst nicht.

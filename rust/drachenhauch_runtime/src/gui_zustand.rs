@@ -63,7 +63,16 @@ impl Gui {
                         let erste: Vec<String> = (0..n.min(20))
                             .map(|r| format!("\"{}\"", kurz(&self.table_get_cell(h, r, 0).unwrap_or_default())))
                             .collect();
-                        format!("{} {} Zeilen, gewaehlt {}: {}", wer, n, sel, erste.join(" "))
+                        // Die gewaehlte Zeile ganz -- sonst sah ein Test nicht,
+                        // ob eine Spalte ausser der ersten sich geaendert hat.
+                        let ganz = if sel >= 0 {
+                            let spalten = self.table_get_col_widths(h).map(|v| v.len()).unwrap_or(0) as i64;
+                            let z: Vec<String> = (0..spalten)
+                                .map(|c| format!("\"{}\"", kurz(&self.table_get_cell(h, sel, c).unwrap_or_default())))
+                                .collect();
+                            format!(" ({})", z.join(" "))
+                        } else { String::new() };
+                        format!("{} {} Zeilen, gewaehlt {}{}: {}", wer, n, sel, ganz, erste.join(" "))
                     }
                     _ => continue,
                 };
