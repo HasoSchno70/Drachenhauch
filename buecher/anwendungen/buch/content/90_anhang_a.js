@@ -243,4 +243,42 @@ module.exports = (H) => [
   ...neu("loesungen/kap09_entfernen/Hauptfenster.dh").map((t) => H.code(t)),
 
   H.p("Geaendert kommt, wenn eine andere Zeile gewählt wird. Nach dem Entfernen ist keine mehr gewählt; darum ruft knopfEntfernen_Klick die Methode danach selbst auf, und der Knopf wird wieder grau."),
+
+  H.h2("Kapitel 10 · Code und Ereignisse"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Ja. In einer Methode findet ein Aufruf ohne Self die Methoden der eigenen Klasse. Self. macht nur sichtbar, dass es eine Methode des Fensters ist und kein Befehl und keine Funktion aus einem Modul — wer den Code später liest, muss nicht suchen."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Das Studio warnt zweimal: „HAUPTFENSTER hat kein Mitglied 'eintraege'“ — an den Stellen, an denen andere Methoden Self.eintraege lesen. Beim Start hält das Programm mit „Feld 'eintraege' existiert nicht in hauptfenster“. Ein DIM in einer Methode legt eine Variable an, die mit der Methode endet; was mehrere Methoden teilen, muss ein Feld sein."),
+
+  H.h3("Drehen 3"),
+
+  H.p("Momo ist weg — an seiner Stelle steht der neue Eintrag. bearbeitet hat ohne formularLeeren den Anfangswert 0, und knopfSpeichern_Klick hält das für „Zeile 0 wird bearbeitet“. Die Mediathek hat danach weiter fünf Einträge, nur der erste ist ein anderer."),
+
+  H.h3("Erweitern 1: Statistik"),
+
+  H.p("Ein neues Modul (Projekt → Modul hinzufügen) mit einer Funktion (code/loesungen/kap10_statistik):"),
+
+  ...neu("loesungen/kap10_statistik/Statistik.dh").map((t) => H.code(t)),
+
+  H.p("Und tabelleFuellen schreibt die Zusammenfassung in die Statuszeile:"),
+
+  ...neu("loesungen/kap10_statistik/Hauptfenster.dh").map((t) => H.code(t)),
+
+  H.p("Die Funktion bekommt das Feld als Parameter, statt Self.eintraege zu lesen — ein Modul hat kein Self. Darum ließe sie sich ohne Fenster prüfen, mit einem Feld aus beispiele()."),
+
+  H.h3("Erweitern 2: ein Eintrag in einem Satz"),
+
+  H.p("Die Klasse bekommt eine Methode, die nur ihre eigenen Felder braucht (code/loesungen/kap10_alstext):"),
+
+  ...neu("loesungen/kap10_alstext/Eintrag.dh").map((t) => H.code(t)),
+
+  H.p("Das Fenster bekommt das Ereignis Geaendert der Tabelle:"),
+
+  ...neu("loesungen/kap10_alstext/Hauptfenster.dh").map((t) => H.code(t)),
+
+  H.p("Wie ein Eintrag als Satz aussieht, weiß der Eintrag; wo der Satz erscheint, weiß das Fenster. So kann ein Bericht in Kapitel 17 denselben Satz drucken, ohne das Fenster zu fragen."),
 ];

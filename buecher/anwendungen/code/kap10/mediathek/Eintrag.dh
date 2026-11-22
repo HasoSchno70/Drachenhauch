@@ -1,0 +1,20 @@
+' Ein Eintrag der Mediathek -- die Klasse aus Kapitel 3, jetzt ein
+' Element des Projekts. Sie kennt kein Fenster.
+CLASS Eintrag
+    DIM titel AS STRING
+    DIM urheber AS STRING
+    DIM art AS STRING
+    DIM jahr AS STRING
+
+    SUB Init(t AS STRING, u AS STRING, a AS STRING, j AS STRING)
+        titel = t
+        urheber = u
+        art = a
+        jahr = j
+    END SUB
+
+    ' Die Zellen einer Zeile der Tabelle.
+    FUNCTION zellen() AS ARRAY OF STRING
+        RETURN [titel, urheber, art, jahr]
+    END FUNCTION
+END CLASS

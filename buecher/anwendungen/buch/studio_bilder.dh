@@ -236,4 +236,14 @@ IF gewuenscht("kap09_vollbild") THEN
     programmBild("kap09_vollbild", "loesungen/kap09_vollbild", z, 30)
 END IF
 
+' Kapitel 10: das Modul Beispiele im Code-Reiter; der Navigator zeigt
+' Klasse, Modul und Fenster.
+IF gewuenscht("kap10_modul") THEN
+    m = projekt$("kap10/mediathek")
+    z = []
+    klick(z, 20, 110, 271)   ' die Funktion beispiele im Navigator
+    studioBild("kap10_modul", m, "", aufnahme$("modul", z), BILDER_STUDIO)
+    zuschneiden("kap10_modul", 0, 66, 940, 536)
+END IF
+
 PRINT "fertig"

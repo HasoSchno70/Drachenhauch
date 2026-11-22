@@ -1,0 +1,21 @@
+' Loesung Kapitel 10, Erweitern 1 -- ein Modul, das zaehlt. Es kennt
+' Eintraege, aber kein Fenster: man koennte es ohne Fenster pruefen.
+
+' >>> neu
+' "5 Einträge -- Buch 2, Film 1, Spiel 1, Musik 1"
+FUNCTION zusammenfassung$(m AS ARRAY OF Eintrag) AS STRING
+    DIM arten AS ARRAY OF STRING
+    arten = ["Buch", "Film", "Spiel", "Musik"]
+    DIM teile AS ARRAY OF STRING
+    DIM a AS STRING
+    FOR EACH a IN arten
+        DIM n AS INTEGER : n = 0
+        DIM e AS Eintrag
+        FOR EACH e IN m
+            IF e.art = a THEN n = n + 1
+        NEXT
+        IF n > 0 THEN ARRAY_PUSH(teile, a + " " + STR$(n))
+    NEXT
+    RETURN STR$(LEN(m)) + " Einträge -- " + JOIN$(teile, ", ")
+END FUNCTION
+' <<< neu
