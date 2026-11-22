@@ -1,0 +1,19 @@
+' Kapitel 14 -- vor dem ersten Fenster: eine leere Mediathek bekommt
+' ihre Beispiele. Seit Kapitel 20 dazu das Aussehen: ein Thema und die
+' Stildatei des Projekts. Seit Kapitel 23 das Aussehen vom letzten Mal
+' und ein eigenes Symbol fuer Fenster und Taskleiste.
+CLASS App EXTENDS StudioApp
+    SUB Geoeffnet()
+        ' >>> neu
+        IF einstellung("gross", FALSE) THEN GUI_SCALE(1.5)
+        ' <<< neu
+        IF einstellung("hell", FALSE) THEN
+            GUI_THEME_PRESET("modern_light")
+        ELSE
+            GUI_THEME_PRESET("modern_dark")
+        END IF
+        StilLaden("mediathek.dhstil")
+        WINDOW_ICON(Bild("symbol.png"))
+        einrichten()
+    END SUB
+END CLASS

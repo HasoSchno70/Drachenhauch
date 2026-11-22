@@ -1,0 +1,23 @@
+' Kapitel 23 -- was sich die Mediathek zwischen zwei Starts merkt, und
+' ihre Fassung. Die Datei liegt im Datenordner des Benutzers wie die
+' Datenbank: Jeder Benutzer hat seine eigenen Einstellungen, und ein
+' Programm unter "Programme" darf neben sich nichts schreiben.
+IMPORT "save"
+
+CONST FASSUNG = "1.0"
+
+FUNCTION einstellungsDatei$() AS STRING
+    RETURN PATHJOIN(DIR_USER_DATA$("Mediathek"), "einstellungen.save")
+END FUNCTION
+
+' Ein Schalter, oder die Vorgabe, wenn er noch nie gesetzt wurde.
+FUNCTION einstellung(name AS STRING, vorgabe AS BOOLEAN) AS BOOLEAN
+    DIM s AS SAVE_HANDLE : s = SAVE_LOAD_OR_NEW(einstellungsDatei$())
+    RETURN SAVE_GET_BOOL_OR(s, name, vorgabe)
+END FUNCTION
+
+SUB einstellungMerken(name AS STRING, wert AS BOOLEAN)
+    DIM s AS SAVE_HANDLE : s = SAVE_LOAD_OR_NEW(einstellungsDatei$())
+    SAVE_SET_BOOL(s, name, wert)
+    SAVE_WRITE(s, einstellungsDatei$())
+END SUB

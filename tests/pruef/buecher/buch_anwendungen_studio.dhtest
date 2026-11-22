@@ -2352,3 +2352,218 @@ spiel table#tabelle 1 Zeilen, gewaehlt -1: "Tetris"
 fr label#status "5 fiches"
 de label#status "5 Einträge"
 it label#status "5 entries"
+
+=== kapitel 23: weitergeben
+' Kapitel 23: die Datenbank im Benutzerordner (DIR_USER_DATA$, hier auf
+' einen Ordner des Falls gelenkt), das helle Aussehen gemerkt, ein Symbol,
+' ohne Warnung. Strg+B baut nach bau/ -- Exe, assets/ und die Daten --, und
+' die gebaute Exe kopiert beim ersten Start ihre Daten zum Benutzer. Dazu
+' die Loesungen: grosse Schrift ab dem naechsten Start und die Erinnerung
+' an Ueberfaelliges.
+IMPORT "laeufer.dh"
+IMPORT "db"
+SUB kopieren(von AS STRING, nach AS STRING)
+    IF NOT DIREXISTS(nach) THEN MKDIR(nach)
+    DIM n AS STRING
+    FOR EACH n IN DIRLIST(von)
+        IF DIREXISTS(von + "/" + n) THEN
+            IF n <> "_studio" THEN kopieren(von + "/" + n, nach + "/" + n)
+        ELSEIF RIGHT$(n, 3) <> ".db" THEN
+            COPYFILE(von + "/" + n, nach + "/" + n)
+        END IF
+    NEXT
+END SUB
+FUNCTION laufen$(main AS STRING, bilder AS INTEGER, arg AS STRING) AS STRING
+    DIM q AS INTEGER
+    IF arg = "" THEN
+        q = PROCESS_START("dhrt", "run", "--bilder", STR$(bilder), main)
+    ELSE
+        q = PROCESS_START("dhrt", "run", "--bilder", STR$(bilder), main, "--", arg)
+    END IF
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    WHILE leer < 5
+        DIM t AS STRING : t = PROCESS_READ$(q) + PROCESS_ERR$(q)
+        aus = aus + t
+        IF t = "" AND NOT PROCESS_RUNNING(q) THEN leer = leer + 1
+        SLEEP(20)
+    WEND
+    RETURN aus
+END FUNCTION
+FUNCTION bedienen$(main AS STRING, ev AS ARRAY OF STRING, bilder AS INTEGER) AS STRING
+    DIM pf AS STRING : pf = CWD$() + "/bedienung.txt"
+    WRITEALL(pf, "c " + STR$(LEN(ev)) + CHR$(10) + JOIN$(ev, CHR$(10)) + CHR$(10) + CHR$(10))
+    SETENV("DHRT_ABSPIELEN", pf)
+    SETENV("DHRT_GUI_ZUSTAND", "1")
+    DIM aus AS STRING : aus = laufen$(main, bilder, "")
+    SETENV("DHRT_ABSPIELEN", "")
+    SETENV("DHRT_GUI_ZUSTAND", "")
+    IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+    RETURN aus
+END FUNCTION
+SUB klick(ev AS ARRAY OF STRING, b AS INTEGER, x AS INTEGER, y AS INTEGER)
+    ARRAY_PUSH(ev, "e " + STR$(b) + " 7 " + STR$(x) + " " + STR$(y) + " 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 2) + " 7 " + STR$(x) + " " + STR$(y) + " 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 4) + " 6 0 0 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 6) + " 5 0 0 0 0")
+END SUB
+' Eine Taste ab Bild b, wahlweise mit gehaltenem Strg (341).
+SUB taste(ev AS ARRAY OF STRING, b AS INTEGER, strg AS BOOLEAN, code AS INTEGER)
+    IF strg THEN ARRAY_PUSH(ev, "e " + STR$(b) + " 2 341 0 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 2) + " 2 " + STR$(code) + " 0 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 4) + " 1 " + STR$(code) + " 0 0 0")
+    IF strg THEN ARRAY_PUSH(ev, "e " + STR$(b + 6) + " 1 341 0 0 0")
+END SUB
+FUNCTION zeile$(aus AS STRING, was AS STRING) AS STRING
+    DIM z AS STRING
+    FOR EACH z IN SPLIT$(REPLACE$(aus, CHR$(13), ""), CHR$(10))
+        IF INSTR(z, was) >= 0 THEN RETURN TRIM$(z)
+    NEXT
+    RETURN ""
+END FUNCTION
+SUB f5(nm AS STRING, p AS STRING)
+    slZeilen = []
+    slBild = 0
+    slHin(10, 10)
+    slWarten(10)
+    slTaste(294)
+    slWarten(150)
+    slAufnahmeSchreiben(CWD$() + "/f5.txt")
+    SETENV("DH_STUDIO_LAUF_BILDER", "20")
+    DIM lg AS STRING : lg = CWD$() + "/" + nm + ".log"
+    DIM aus AS STRING : aus = slStarten(lg, CWD$() + "/f5.txt", slBild + 20, p)
+    PRINT nm; " geprueft "; slHat(lg, "geprueft 0 0"); " beendet "; slHat(lg, "beendet 0")
+    IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+END SUB
+' Eine Methode vor das Ende der Klasse Hauptfenster der Kopie.
+SUB einschieben(nm AS STRING, zeilen AS ARRAY OF STRING)
+    DIM h AS STRING : h = CWD$() + "/" + nm + "/_studio/projekt/Hauptfenster.dh"
+    DIM t AS STRING : t = READALL(h)
+    DIM p AS INTEGER : p = INSTRREV(t, "END CLASS")
+    WRITEALL(h, LEFT$(t, p) + JOIN$(zeilen, CHR$(10)) + CHR$(10) + MID$(t, p))
+END SUB
+FUNCTION q$(s AS STRING) AS STRING
+    RETURN CHR$(34) + s + CHR$(34)
+END FUNCTION
+
+FUNCTION wert$(datei AS STRING, sql AS STRING) AS STRING
+    DIM d AS DB_CONN : d = DB_OPEN(datei)
+    DIM r AS DB_RESULT : r = DB_QUERY(d, sql)
+    DIM w AS STRING : w = "?"
+    IF DB_NEXT(r) THEN w = DB_GET_STRING(r, 0)
+    DB_CLOSE(d)
+    RETURN w
+END FUNCTION
+
+SUB benutzer(ordner AS STRING)
+    IF NOT DIREXISTS(ordner) THEN MKDIR(ordner)
+    SETENV("APPDATA", ordner)
+    SETENV("XDG_DATA_HOME", ordner)
+    SETENV("HOME", ordner)
+END SUB
+
+DIM code AS STRING : code = ARG$(1) + "/buecher/anwendungen/code/"
+benutzer(CWD$() + "/benutzer")
+DIM proj AS STRING
+FOR EACH proj IN ["kap23/mediathek", "loesungen/kap23_gross", "loesungen/kap23_erinnern"]
+    DIM nm AS STRING : nm = BASENAME(proj)
+    IF nm = "mediathek" THEN nm = "kap23_mediathek"
+    kopieren(code + proj, CWD$() + "/" + nm)
+    f5(nm, CWD$() + "/" + nm)
+NEXT
+DIM pm AS STRING : pm = CWD$() + "/kap23_mediathek"
+DIM m AS STRING : m = pm + "/_studio/main.dh"
+PRINT "symbol "; FILEEXISTS(pm + "/_studio/assets/bilder/symbol.png")
+' Wie gebaut: ein neuer Benutzer, die Daten neben dem Programm.
+benutzer(CWD$() + "/lena")
+IF NOT FILEEXISTS(pm + "/_studio/mediathek.db") THEN COPYFILE(pm + "/mediathek.db", pm + "/_studio/mediathek.db")
+DIM a AS STRING
+DIM ev AS ARRAY OF STRING
+ev = []
+klick(ev, 4, 215, 13)
+klick(ev, 14, 260, 87)
+a = bedienen$(m, ev, 40)
+PRINT "ohne warnung "; INSTR(a, "Warnung") < 0
+PRINT zeile$(a, "table#tabelle 5")
+DIM beim AS STRING : beim = DIR_USER_DATA$("Mediathek")
+PRINT "beim benutzer "; wert$(beim + "/mediathek.db", "SELECT COUNT(*) FROM eintrag")
+PRINT "einstellungen "; FILEEXISTS(beim + "/einstellungen.save")
+einschieben("kap23_mediathek", ["    DIM probeN AS INTEGER", _
+    "    SUB Takt()", _
+    "        Self.probeN = Self.probeN + 1", _
+    "        IF Self.probeN = 3 THEN", _
+    "            DIM bg AS INTEGER : bg = GUI_THEME_GET(" + q$("win_bg") + ")", _
+    "            PRINT " + q$("hell ") + "; ((bg SHR 16) BAND 255) > 200; " + q$(" haken ") + "; GUI_MENU_CHECKED(Self.miHell)", _
+    "            END", _
+    "        END IF", _
+    "    END SUB"])
+PRINT zeile$(laufen$(m, 20, ""), "hell ")
+' Bauen: Strg+B im Studio, dann die Exe von woanders gestartet.
+slZeilen = []
+slBild = 0
+slHin(10, 10)
+slWarten(10)
+slMit([341], 66)
+slWarten(600)
+slAufnahmeSchreiben(CWD$() + "/bau.txt")
+DIM lg AS STRING : lg = CWD$() + "/bau.log"
+a = slStarten(lg, CWD$() + "/bau.txt", slBild + 20, pm)
+PRINT "gebaut "; LEN(slAnfang(lg, "gebaut ")) = 1
+DIM exe AS STRING : exe = "Mediathek" + IIF(LOWER$(RIGHT$(EXEPATH$(), 4)) = ".exe", ".exe", "")
+PRINT "im bau "; JOIN$(DIRLIST(pm + "/bau"), " ") = "Mediathek.exe assets mediathek.db" OR JOIN$(DIRLIST(pm + "/bau"), " ") = "Mediathek assets mediathek.db"
+PRINT "assets "; JOIN$(DIRLIST_REC(pm + "/bau/assets"), " ")
+benutzer(CWD$() + "/jonas")
+SETENV("DHRT_FRAMES", "20")
+DIM lauf AS STRING : lauf = SHELL_OUT$(PATHJOIN(pm + "/bau", exe))
+SETENV("DHRT_FRAMES", "")
+PRINT "exe beim benutzer "; wert$(DIR_USER_DATA$("Mediathek") + "/mediathek.db", "SELECT COUNT(*) FROM eintrag")
+' Erweitern 1: grosse Schrift ab dem naechsten Start.
+benutzer(CWD$() + "/gross")
+DIM mg AS STRING : mg = CWD$() + "/kap23_gross/_studio/main.dh"
+IF NOT FILEEXISTS(CWD$() + "/kap23_gross/_studio/mediathek.db") THEN COPYFILE(CWD$() + "/kap23_gross/mediathek.db", CWD$() + "/kap23_gross/_studio/mediathek.db")
+ev = []
+klick(ev, 4, 215, 13)
+klick(ev, 14, 260, 111)
+a = bedienen$(mg, ev, 40)
+PRINT zeile$(a, "label#status")
+einschieben("kap23_gross", ["    DIM probeN AS INTEGER", _
+    "    SUB Takt()", _
+    "        Self.probeN = Self.probeN + 1", _
+    "        IF Self.probeN = 3 THEN", _
+    "            PRINT " + q$("schirm ") + "; SCREENWIDTH(); " + q$(" haken ") + "; GUI_MENU_CHECKED(Self.miGross)", _
+    "            END", _
+    "        END IF", _
+    "    END SUB"])
+PRINT zeile$(laufen$(mg, 20, ""), "schirm ")
+' Erweitern 2: die Erinnerung (NOTIFY hier als Ausgabe).
+DIM he AS STRING : he = CWD$() + "/kap23_erinnern/_studio/projekt/Hauptfenster.dh"
+WRITEALL(he, REPLACE$(READALL(he), "NOTIFY(", "probeNotify(") + CHR$(10) + "SUB probeNotify(t AS STRING, x AS STRING)" + CHR$(10) + "    PRINT " + q$("notify ") + "; t; " + q$(" | ") + "; x" + CHR$(10) + "END SUB" + CHR$(10))
+DIM me AS STRING : me = CWD$() + "/kap23_erinnern/_studio/main.dh"
+PRINT zeile$(laufen$(me, 10, ""), "notify ")
+SETENV("DHRT_LANG", "en")
+PRINT zeile$(laufen$(me, 10, ""), "notify ")
+SETENV("DHRT_LANG", "")
+--- argumente
+{sammlung}/../../../studio/studio.dh
+{sammlung}/../../..
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- erwartet
+kap23_mediathek geprueft TRUE beendet TRUE
+kap23_gross geprueft TRUE beendet TRUE
+kap23_erinnern geprueft TRUE beendet TRUE
+symbol TRUE
+ohne warnung TRUE
+table#tabelle 5 Zeilen, gewaehlt -1: "Emil und die Detektive" "Kind of Blue" "Metropolis" "Momo" "Tetris"
+beim benutzer 5
+einstellungen TRUE
+hell TRUE haken TRUE
+gebaut TRUE
+im bau TRUE
+assets bilder/symbol.png mediathek.dhstil sprache/en.txt
+exe beim benutzer 5
+label#status "Die Schrift ändert sich beim nächsten Start."
+schirm 1140 haken TRUE
+notify Mediathek | Überfällig: 1 Ausleihe
+notify Media Library | Overdue: 1 loan

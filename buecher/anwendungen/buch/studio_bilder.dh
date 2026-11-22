@@ -581,6 +581,12 @@ IF gewuenscht("kap22_englisch") THEN
     IF FILEEXISTS(ziel22) THEN PRINT "  kap22_englisch.png" ELSE PRINT "  FEHLER kap22_englisch "; LEFT$(aus22, 300)
 END IF
 
+' Kapitel 23: der Reiter der Datenbank mit dem Haken "Im Benutzerordner".
+IF gewuenscht("kap23_benutzerordner") THEN
+    m = projekt$("kap23/mediathek")
+    studioBild("kap23_benutzerordner", m, "Mediathek.eintrag", "", 30)
+END IF
+
 ' Kapitel 11: Tetris waehlen, "Ausleihen ..." -- das Fenster daneben.
 IF gewuenscht("kap11_ausleihen") THEN
     z = []

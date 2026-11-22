@@ -700,4 +700,42 @@ module.exports = (H) => [
   ...neu("loesungen/kap22_franzoesisch/App.dh").map((t) => H.code(t)),
 
   H.p("SpracheWaehlen liefert FALSE, wenn es keine Tafel für die Sprache gibt — auf einem italienischen System also, und auf einem deutschen, denn eine de.txt gibt es nicht: Deutsch ist die Quelle. Dann gilt Englisch, außer auf dem deutschen System."),
+
+  H.h2("Kapitel 23 · Weitergeben"),
+
+  H.h3("Drehen 1"),
+
+  H.p("In bau/mediathek.db, neben der Exe — dort, wo Bauen die Entwicklungsdaten hingelegt hat. Solange bau/ im eigenen Projektordner liegt, geht das gut; unter „Programme“ installiert dürfte das Programm die Datei nicht ändern."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Dunkel, wie beim allerersten Start: einstellung(\"hell\", FALSE) findet keine Datei und liefert die Vorgabe. Ein Häkchen bei „Helles Aussehen“ legt sie wieder an."),
+
+  H.h3("Drehen 3"),
+
+  H.p("„Über die Mediathek“ sagt 1.1, die Datei des Installers heißt weiter Mediathek-1.0-Setup.exe, und unter „Apps“ steht 1.0. Zwei Stellen, eine Fassung — darum steht sie in mediathek.iss ganz oben, als #define, wo man sie sieht."),
+
+  H.h3("Erweitern 1: große Schrift"),
+
+  H.p("Ein Eintrag „Große Schrift“ mit Haken im Menü Ansicht. App.Geoeffnet setzt den Maßstab vor dem ersten Fenster (code/loesungen/kap23_gross/App.dh):"),
+
+  ...neu("loesungen/kap23_gross/App.dh").map((t) => H.code(t)),
+
+  H.p("Das Hauptfenster setzt den Haken beim Öffnen und merkt sich jede Änderung (Hauptfenster.dh):"),
+
+  ...neu("loesungen/kap23_gross/Hauptfenster.dh").map((t) => H.code(t)),
+
+  H.p("Die zwei neuen Texte kommen mit „Sprachtafel ergänzen“ in sprache/en.txt und bekommen dort ihre Übersetzung."),
+
+  H.h3("Erweitern 2: Erinnerung"),
+
+  H.p("Bestand.dh zählt die Zeilen der Abfrage ueberfaellig aus Kapitel 15 (code/loesungen/kap23_erinnern):"),
+
+  ...neu("loesungen/kap23_erinnern/Bestand.dh").map((t) => H.code(t)),
+
+  H.p("Das Hauptfenster fragt beim Öffnen und meldet sich, wenn es etwas gibt:"),
+
+  ...neu("loesungen/kap23_erinnern/Hauptfenster.dh").map((t) => H.code(t)),
+
+  H.p("NOTIFY zeigt eine Mitteilung des Systems — unter Windows am Symbol im Infobereich, das es dafür anlegt, unter macOS und Linux in der Mitteilungszentrale. Sie erscheint auch, wenn die Mediathek gerade nicht vorn ist."),
 ];
