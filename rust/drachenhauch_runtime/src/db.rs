@@ -227,7 +227,11 @@ impl Verbindung {
     pub fn exec(&mut self, sql: &str, params: &[Param], fn_: &str) -> Result<i64, String> {
         match self {
             Verbindung::Sqlite(c) => c.execute(sql, rusqlite::params_from_iter(params.iter().map(sqlite_param)))
-                .map(|n| n as i64).map_err(|e| sqlite_fehler(fn_, &e, sql)),
+                .map(|n| n as i64).map_err(|e| {
+                    let m = sqlite_fehler(fn_, &e, sql);
+                    if !e.to_string().contains("FOREIGN KEY constraint failed") { return m; }
+                    match fk_hinweis(c, sql) { Some(h) => format!("{} -- {}", m, h), None => m }
+                }),
             #[cfg(feature = "pg")]
             Verbindung::Pg(c) => pg::exec(c, sql, params).map_err(|e| format!("{}: {}", fn_, e)),
             #[cfg(feature = "mysql")]
@@ -324,6 +328,56 @@ fn sqlite_fehler(fn_: &str, e: &dyn std::fmt::Display, sql: &str) -> String {
     } else {
         format!("{}: {}", fn_, t)
     }
+}
+
+/// "FOREIGN KEY constraint failed" sagt nicht, WELCHER Verweis. Fuer ein
+/// DELETE: welche Spalten anderer Tabellen ohne Loeschregel auf diese
+/// Tabelle zeigen; fuer INSERT/UPDATE: die eigenen Verweis-Spalten. Buch
+/// "Fenster, Formulare, Daten", Kapitel 13: wer im Studio einen Freund
+/// loeschte, der noch etwas ausgeliehen hatte, las nur die SQLite-Meldung.
+fn fk_hinweis(c: &Connection, sql: &str) -> Option<String> {
+    let klein = sql.trim_start().to_lowercase();
+    // Der Tabellenname hinter dem Schluesselwort, ohne Anfuehrungszeichen.
+    let name = |rest: &str| -> String {
+        rest.trim_start().trim_start_matches(|z| z == '"' || z == '`' || z == '[')
+            .chars().take_while(|z| z.is_alphanumeric() || *z == '_').collect()
+    };
+    // Je Tabelle ihre Verweise: (Spalte, Zieltabelle, ON DELETE).
+    let verweise = |tab: &str| -> Vec<(String, String, String)> {
+        let q = format!("PRAGMA foreign_key_list(\"{}\")", tab.replace('"', "\"\""));
+        let mut st = match c.prepare(&q) { Ok(s) => s, Err(_) => return Vec::new() };
+        let zeilen = st.query_map([], |r| Ok((r.get::<_, String>(3)?, r.get::<_, String>(2)?, r.get::<_, String>(6)?)));
+        match zeilen { Ok(z) => z.flatten().collect(), Err(_) => Vec::new() }
+    };
+    if let Some(rest) = klein.strip_prefix("delete") {
+        let t = name(rest.trim_start().strip_prefix("from")?);
+        let mut st = c.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").ok()?;
+        let tabellen: Vec<String> = st.query_map([], |r| r.get::<_, String>(0)).ok()?.flatten().collect();
+        let mut zeiger = Vec::new();
+        for tab in tabellen {
+            for (von, ziel, beim) in verweise(&tab) {
+                let regel = beim.to_uppercase();
+                if ziel.eq_ignore_ascii_case(&t) && !matches!(regel.as_str(), "CASCADE" | "SET NULL" | "SET DEFAULT") {
+                    zeiger.push(format!("{} (Spalte {})", tab, von));
+                }
+            }
+        }
+        if zeiger.is_empty() { return None; }
+        return Some(format!("auf die Zeile zeigt noch eine Zeile in {}; erst diese loeschen, oder der Verweis loescht mit (ON DELETE CASCADE)",
+                            zeiger.join(", ")));
+    }
+    let t = if let Some(rest) = klein.strip_prefix("insert") {
+        let rest = rest.trim_start();
+        let rest = rest.strip_prefix("or replace").or_else(|| rest.strip_prefix("or ignore")).unwrap_or(rest);
+        name(rest.trim_start().strip_prefix("into")?)
+    } else if let Some(rest) = klein.strip_prefix("update") {
+        name(rest)
+    } else {
+        return None;
+    };
+    let eigene: Vec<String> = verweise(&t).into_iter().map(|(von, ziel, _)| format!("{} -> {}", von, ziel)).collect();
+    if eigene.is_empty() { return None; }
+    Some(format!("eine Verweis-Spalte nennt eine id, die es in der Zieltabelle nicht gibt: {}", eigene.join(", ")))
 }
 
 fn sqlite_query(conn: &Connection, sql: &str, params: &[Param]) -> Result<DbResult, String> {

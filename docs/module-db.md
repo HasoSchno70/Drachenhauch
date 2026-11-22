@@ -232,6 +232,7 @@ Siehe [examples/25_db.dh](../examples/25_db.dh) — zeigt CREATE, INSERT mit Bin
   DB_EXEC(con, "CREATE INDEX IF NOT EXISTS idx_score ON scores(score)")
   ```
 - **Schema-Init** mit `IF NOT EXISTS` — dann ist mehrfaches Programm-Starten ungefährlich.
+- **Verweise** (`REFERENCES t(id)`) prüft SQLite immer. Scheitert ein DELETE daran, nennt die Meldung hinter „FOREIGN KEY constraint failed“, welche Tabelle und Spalte noch ohne Löschregel auf die Zeile zeigt; bei INSERT und UPDATE die Verweis-Spalten der Tabelle.
 
 ## In der nativen Runtime (dhrt)
 

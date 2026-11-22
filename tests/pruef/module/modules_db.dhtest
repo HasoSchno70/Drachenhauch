@@ -259,3 +259,51 @@ END TRY
 --- erwartet
 DB_EXEC: near "s": syntax error in INSERT INTO t (titel) VALUES ('Sgt. Pepper's') at offset 43 -- steht ein ' in einem eingeklebten Wert? Werte mit ? uebergeben: DB_EXEC(db, "... VALUES (?)", wert)
 DB_EXEC: near ")": syntax error in INSERT INTO t (titel) VALUES ('a',) at offset 34
+
+=== ein verletzter verweis sagt, welcher
+' "FOREIGN KEY constraint failed" nennt weder Tabelle noch Spalte. Beim
+' Loeschen nennt der Hinweis, wer ohne Loeschregel noch auf die Tabelle
+' zeigt (nicht, wer mitloescht); beim Einfuegen die eigenen Verweise. Ohne
+' Verweis bleibt es bei der Meldung (Buch "Fenster, Formulare, Daten",
+' Kapitel 13).
+IMPORT "db"
+DIM c AS DB_CONN : c = DB_OPEN(":memory:")
+DB_EXEC(c, "CREATE TABLE freund (id INTEGER PRIMARY KEY, name TEXT)")
+DB_EXEC(c, "CREATE TABLE eintrag (id INTEGER PRIMARY KEY, titel TEXT)")
+DB_EXEC(c, "CREATE TABLE ausleihe (id INTEGER PRIMARY KEY, " + _
+           "eintrag INTEGER REFERENCES eintrag(id) ON DELETE CASCADE, " + _
+           "freund INTEGER REFERENCES freund(id))")
+DB_EXEC(c, "INSERT INTO freund (name) VALUES ('Lena')")
+DB_EXEC(c, "INSERT INTO eintrag (titel) VALUES ('Tetris')")
+DB_EXEC(c, "INSERT INTO ausleihe (eintrag, freund) VALUES (1, 1)")
+TRY
+    DB_EXEC(c, "DELETE FROM " + CHR$(34) + "freund" + CHR$(34) + " WHERE id = ?", 1)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    DB_EXEC(c, "INSERT INTO ausleihe (eintrag, freund) VALUES (1, 99)")
+CATCH e2
+    PRINT e2
+END TRY
+' Mitloeschen geht durch: Tetris und seine Ausleihe sind weg.
+DB_EXEC(c, "DELETE FROM eintrag WHERE id = 1")
+DIM r AS DB_RESULT : r = DB_QUERY(c, "SELECT COUNT(*) FROM ausleihe")
+IF DB_NEXT(r) THEN PRINT "ausleihen "; DB_GET_INT(r, 0)
+--- erwartet
+DB_EXEC: FOREIGN KEY constraint failed -- auf die Zeile zeigt noch eine Zeile in ausleihe (Spalte freund); erst diese loeschen, oder der Verweis loescht mit (ON DELETE CASCADE)
+DB_EXEC: FOREIGN KEY constraint failed -- eine Verweis-Spalte nennt eine id, die es in der Zieltabelle nicht gibt: freund -> freund, eintrag -> eintrag
+ausleihen 0
+
+=== ein verletzter verweis auf englisch
+IMPORT "db"
+DIM c AS DB_CONN : c = DB_OPEN(":memory:")
+DB_EXEC(c, "CREATE TABLE freund (id INTEGER PRIMARY KEY, name TEXT)")
+DB_EXEC(c, "CREATE TABLE ausleihe (id INTEGER PRIMARY KEY, freund INTEGER REFERENCES freund(id))")
+DB_EXEC(c, "INSERT INTO freund (name) VALUES ('Lena')")
+DB_EXEC(c, "INSERT INTO ausleihe (freund) VALUES (1)")
+DB_EXEC(c, "DELETE FROM freund WHERE id = 1")
+--- umgebung
+DHRT_LANG=en
+--- fehler
+DB_EXEC: FOREIGN KEY constraint failed -- another row still points to this one in ausleihe (column freund); delete it first, or let the reference delete along (ON DELETE CASCADE)
