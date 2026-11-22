@@ -986,3 +986,42 @@ erster start TRUE
 zweiter start TRUE
 beim benutzer TRUE
 neben dem programm unberuehrt TRUE
+
+=== die kopfzeile des datenbank-reiters deckt sich nicht
+' Ueberschrift, Haken "Im Benutzerordner" und "Datei:" nebeneinander, auch
+' im schmalen Mittelteil (1280 breit): vorher lag der Haken ueber der
+' Ueberschrift ("Datenbank Media|"). Die Ueberschrift passt ganz hinein.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+SETENV("DH_STUDIO_OEFFNEN", "Daten.kunden")
+DIM g AS STRING
+FOR EACH g IN ["1280x800", "1440x900"]
+    SETENV("SL_GROESSE", g)
+    DIM log AS STRING : log = CWD$() + "/s" + g + ".log"
+    slStarten(log, "", 12, p)
+    DIM alle AS ARRAY OF STRING : alle = slAnfang(log, "db kopfzeile ")
+    DIM z AS STRING : z = alle[LEN(alle) - 1]
+    DIM t AS ARRAY OF STRING : t = SPLIT$(MID$(z, 13), " ")
+    PRINT g; " frei "; VAL(t[0]) <= VAL(t[1]) AND VAL(t[2]) <= VAL(t[3]); " ganz "; t[4]
+NEXT
+--- argumente
+{sammlung}/../../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "json"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"},{"art":"datenbank","name":"Daten","schema":"Daten.dhdb"}]}
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":420,"h":300,"widgets":[]}
+--- datei proj/Hauptfenster.dh
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+END CLASS
+--- datei proj/App.dh
+CLASS App EXTENDS StudioApp
+END CLASS
+--- datei proj/Daten.dhdb
+{"datei":"daten.sqlite","tabellen":[{"name":"kunden","spalten":[{"name":"name","typ":"text","pflicht":true,"eindeutig":false,"vorgabe":""}]}]}
+--- erwartet
+1280x800 frei TRUE ganz TRUE
+1440x900 frei TRUE ganz TRUE

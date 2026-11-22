@@ -136,10 +136,15 @@ SUB dbLegen(r AS Reiter)
     DIM y0 AS INTEGER : y0 = mitteKy + KOPF_H + 8
     DIM b AS INTEGER : b = mitteKb - 16
     DIM h AS INTEGER : h = mitteKh - KOPF_H - 16
-    GUI_SET_BOUNDS(a.kopf, x0 + 6, y0 + 3, MAX(120, MIN(b \ 2, b - 530)), 20)
-    GUI_SET_BOUNDS(a.dateiText, x0 + b - 330, y0 + 3, 56, 20)
-    GUI_SET_BOUNDS(a.cbBenutzer, x0 + b - 520, y0 + 3, 180, 20)
-    GUI_SET_BOUNDS(a.tfDatei, x0 + b - 270, y0, 270, 26)
+    ' Die Kopfzeile von rechts: Datei, ihr Haken "Im Benutzerordner" so breit
+    ' wie sein Text, links davon die Ueberschrift -- wird es eng, wird das
+    ' Dateifeld schmaler.
+    DIM fw AS INTEGER : fw = IIF(b < 760, 200, 270)
+    DIM cbw AS INTEGER : cbw = GUI_TEXT_WIDTH(a.cbBenutzer, GUI_TEXT(a.cbBenutzer)) + 30
+    GUI_SET_BOUNDS(a.tfDatei, x0 + b - fw, y0, fw, 26)
+    GUI_SET_BOUNDS(a.dateiText, x0 + b - fw - 60, y0 + 3, 56, 20)
+    GUI_SET_BOUNDS(a.cbBenutzer, x0 + b - fw - 72 - cbw, y0 + 3, cbw, 20)
+    GUI_SET_BOUNDS(a.kopf, x0 + 6, y0 + 3, MAX(80, b - fw - 84 - cbw), 20)
     DIM y1 AS INTEGER : y1 = y0 + 36
     DIM unten AS INTEGER : unten = y0 + h - 28
     ' Links unter der Liste vier Knoepfe untereinander: anlegen (Tabelle,
@@ -247,6 +252,9 @@ SUB dbLagen(r AS Reiter)
     dbLage("bild", a.btBild)
     dbLage("datei", a.tfDatei)
     dbLage("benutzer", a.cbBenutzer)
+    ' Die Kopfzeile von links nach rechts: Ende der Ueberschrift, Anfang und
+    ' Ende des Hakens, Anfang von "Datei:" -- nichts darf das Naechste decken.
+    protokoll("db kopfzeile " + STR$(GUI_GET_X(a.kopf) + GUI_GET_W(a.kopf)) + " " + STR$(GUI_GET_X(a.cbBenutzer)) + " " + STR$(GUI_GET_X(a.cbBenutzer) + GUI_GET_W(a.cbBenutzer)) + " " + STR$(GUI_GET_X(a.dateiText)) + " " + STR$(GUI_TEXT_WIDTH(a.kopf, GUI_TEXT(a.kopf)) <= GUI_GET_W(a.kopf)))
     dbLage("abfneu", a.btAbfNeu) : dbLage("ausfuehren", a.btAusfuehren) : dbLage("sql", a.taSql)
     ' Breiten des Spalten-Gitters, was jede Spalte braucht, und wie breit
     ' der Knopf "Umbenennen ..." fuer seine Beschriftung sein muss.
