@@ -128,6 +128,36 @@ module.exports = (H) => [
 
   H.p("Die Frage steht im Knopf selbst, dort, wo man gerade hinsieht, und die Statuszeile sagt, wie viele es sind. Ein Klick in die Tabelle oder auf „Aufnehmen“ nimmt die Frage zurück — wer etwas anderes tut, meint das Entfernen nicht mehr. Einen richtigen Dialog, der wartet, bis man antwortet, zeigt Kapitel 6."),
 
+  H.h2("Kapitel 5 · Formulare, die prüfen"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Nein. Gespeichert wird ein Eintrag ohne Titel, und in der Tabelle steht eine Zeile, deren erste Zelle leer ist. NOT NULL verbietet „kein Wert“, aber ein leeres Feld ist der leere Text — ein Wert, nur ein leerer. Auch laenge 1 bis 200 hält ihn nicht auf, denn jede Regel außer pflicht lässt ein leeres Feld durch. Dass ein Feld ausgefüllt sein muss, sagt allein pflicht."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Erst beim Klick auf „Speichern“: Dann prüft GUI_VALIDATE alle Felder, und das Jahr bekommt seinen Rahmen und seine Meldung. Mit GUI_VALIDATE_LIVE kommt die Meldung schon, wenn man das Feld verlässt — dann, wenn man noch weiß, was man gerade getippt hat."),
+
+  H.h3("Drehen 3"),
+
+  H.p("Tetris wird geladen, in beiden Fällen. GUI_FORM_CHANGED vergleicht die Werte mit dem Stand nach dem Laden, nicht die Tastendrücke: Wer ein Zeichen tippt und wieder löscht, hat danach denselben Urheber wie vorher, und das Formular gilt als unverändert."),
+
+  H.h3("Erweitern 1: die ISBN"),
+
+  H.p("Eine Spalte, ein Feld mit Regel und eine Funktion für die Prüfziffer (code/loesungen/kap05_isbn.dh):"),
+
+  ...neu("loesungen/kap05_isbn.dh").map((t) => H.code(t)),
+
+  H.p("ALTER TABLE fügt die Spalte in eine Datenbank ein, die es schon gibt — die aus Kapitel 4 hat sie noch nicht. Gibt es sie schon, meldet SQLite einen Fehler, den das leere CATCH schluckt: Das ist der eine Fehler, der hier erwartet ist. Die Regel muster lässt nur Ziffern und Striche durch; die Prüfziffer prüft das Programm nach GUI_VALIDATE und meldet sie mit GUI_SET_ERROR. Ein leeres Feld ist erlaubt. Zum Ausprobieren: 978-3-16-148410-0 hat die richtige Prüfziffer, mit einer 1 am Ende nicht."),
+
+  H.h3("Erweitern 2: ein Buch braucht einen Urheber"),
+
+  H.p("Drei Zeilen nach GUI_VALIDATE (code/loesungen/kap05_urheber.dh):"),
+
+  ...neu("loesungen/kap05_urheber.dh").map((t) => H.code(t)),
+
+  H.p("Als Regel ginge das nicht, denn pflicht gälte für jede Art. GUI_SET_ERROR setzt die Meldung so, wie eine Regel es täte: roter Rahmen, Text in der Fehlerzeile. Ändert man danach die Art auf Film, verschwindet die Meldung beim nächsten Speichern, denn GUI_VALIDATE prüft alle Felder neu."),
+
   H.h2("Kapitel 8 · Das erste Projekt"),
 
   H.h3("Drehen 1"),

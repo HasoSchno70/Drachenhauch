@@ -1,0 +1,281 @@
+' Kapitel 5, Schritt 2 -- Regeln am Feld: ein Titel muss sein, ein Jahr
+' muss passen, und die Meldung steht dort, wo man hinsieht.
+IMPORT "gui"
+IMPORT "db"
+IMPORT "../kap04/eintrag.dh"
+
+' Die Datenbank liegt neben dem Programm; DB_OPEN legt die Datei beim
+' ersten Start an.
+DIM db AS DB_CONN
+db = DB_OPEN("mediathek.db")
+DB_EXEC(db, "CREATE TABLE IF NOT EXISTS eintrag (" + _
+            "id INTEGER PRIMARY KEY, titel TEXT NOT NULL, " + _
+            "urheber TEXT, art TEXT, jahr INTEGER)")
+
+' Alle Eintraege aus der Datenbank, in der Reihenfolge, in der sie
+' aufgenommen wurden.
+FUNCTION laden() AS ARRAY OF Eintrag
+    DIM m AS ARRAY OF Eintrag
+    DIM r AS DB_RESULT
+    r = DB_QUERY(db, "SELECT id, titel, urheber, art, jahr " + _
+                     "FROM eintrag ORDER BY id")
+    WHILE DB_NEXT(r)
+        DIM e AS Eintrag
+        e = NEW Eintrag(DB_GET_STRING(r, 1), DB_GET_STRING(r, 2), _
+                        DB_GET_STRING(r, 3), "")
+        e.id = DB_GET_INT(r, 0)
+        ' Ein Jahr kann fehlen -- dann steht NULL in der Spalte.
+        IF NOT DB_IS_NULL(r, 4) THEN e.jahr = STR$(DB_GET_INT(r, 4))
+        ARRAY_PUSH(m, e)
+    WEND
+    RETURN m
+END FUNCTION
+
+' Einen Eintrag in die Datenbank einfuegen (fuer die Beispiele beim
+' ersten Start) und sich seine Kennung merken.
+SUB einfuegen(e AS Eintrag)
+    DIM sql AS STRING
+    sql = "INSERT INTO eintrag (titel, urheber, art, jahr) " + _
+          "VALUES (?, ?, ?, ?)"
+    IF e.jahr = "" THEN
+        DB_EXEC(db, sql, e.titel, e.urheber, e.art, NIL)
+    ELSE
+        DB_EXEC(db, sql, e.titel, e.urheber, e.art, INT(VAL(e.jahr)))
+    END IF
+    e.id = DB_LAST_ROWID(db)
+END SUB
+
+DIM mediathek AS ARRAY OF Eintrag
+mediathek = laden()
+' Beim allerersten Start ist sie leer: dann die Beispiele hinein --
+' alle in einer Transaktion.
+IF LEN(mediathek) = 0 THEN
+    DB_BEGIN(db)
+    DIM beispiel AS Eintrag
+    FOR EACH beispiel IN beispiele()
+        einfuegen(beispiel)
+    NEXT
+    DB_COMMIT(db)
+    mediathek = laden()
+END IF
+
+SCREEN(760, 520, "Mediathek", 1)
+WINDOW_RESIZABLE(TRUE)
+DIM fenster AS GUI_WINDOW
+fenster = GUI_WINDOW("Mediathek", 0, 0, 760, 520)
+GUI_WINDOW_CHROME(fenster, FALSE)
+
+DIM form AS GUI_WIDGET
+form = GUI_LAYOUT(fenster, "spalte", 0, 0, 760, 520)
+GUI_SET_ANCHOR(form, "lrtb")
+GUI_LAYOUT_SET(form, "rand", 20)
+GUI_LAYOUT_SET(form, "abstand", 8)
+
+' Eine Zeile des Formulars, wie in Kapitel 2.
+SUB zeile(text AS STRING, feld AS GUI_WIDGET, gewicht AS INTEGER)
+    DIM z AS GUI_WIDGET : z = GUI_LAYOUT(fenster, "zeile", 0, 0, 10, 10)
+    GUI_LAYOUT_SET(z, "abstand", 12)
+    GUI_LAYOUT_SET(z, "ausrichtung", 1)
+    GUI_LAYOUT_SET(z, "dehnen", 0)
+    DIM l AS GUI_WIDGET : l = GUI_LABEL(fenster, text, 0, 0)
+    GUI_SIZE_GROUP(l, "beschriftung", "breite")
+    GUI_LAYOUT_ADD(z, l)
+    GUI_LAYOUT_ADD(z, feld, gewicht)
+    IF gewicht = 0 THEN GUI_LAYOUT_SPACER(z)
+    GUI_LAYOUT_ADD(form, z)
+END SUB
+
+DIM titel AS GUI_WIDGET : titel = GUI_TEXTINPUT(fenster, 0, 0, 0, 0)
+DIM urheber AS GUI_WIDGET : urheber = GUI_TEXTINPUT(fenster, 0, 0, 0, 0)
+DIM arten AS ARRAY OF STRING
+arten = ["Buch", "Film", "Spiel", "Musik"]
+DIM art AS GUI_WIDGET : art = GUI_DROPDOWN(fenster, 0, 0, 160, 0, arten)
+' Jeder Eintrag der Auswahl traegt seinen Text als Wert -- gebunden wird
+' dann "Film", nicht die Nummer 1.
+DIM a AS INTEGER
+FOR a = 0 TO LEN(arten) - 1
+    GUI_LISTBOX_SET_DATA(art, a, arten[a])
+NEXT
+GUI_DROPDOWN_SET_SELECTED(art, 0)
+DIM jahr AS GUI_WIDGET : jahr = GUI_TEXTINPUT(fenster, 0, 0, 80, 0)
+' Ein Zahlenfeld: nimmt nur Ziffern an und bindet eine Zahl.
+GUI_TEXTINPUT_SET(jahr, "zahlen", 1)
+zeile("Titel", titel, 1)
+zeile("Urheber", urheber, 1)
+zeile("Art", art, 0)
+zeile("Erscheinungsjahr", jahr, 0)
+
+' Jedes Feld traegt den Namen seiner Spalte in der Datenbank. "e" ist
+' der Name des Formulars -- ein Fenster kann mehrere haben.
+GUI_BIND(titel, "titel", "e")
+GUI_BIND(urheber, "urheber", "e")
+GUI_BIND(art, "art", "e")
+GUI_BIND(jahr, "jahr", "e")
+
+' Was fuer jedes Feld gilt -- die Regeln haengen am Feld.
+GUI_RULE(titel, "pflicht", "Ohne Titel geht es nicht.")
+GUI_RULE(titel, "laenge", 1, 200)
+GUI_RULE(art, "pflicht")
+GUI_RULE(jahr, "bereich", 1450, 2100, "Ein Jahr von 1450 bis 2100.")
+
+' Unter dem Formular eine Zeile fuer die Meldungen aller Felder.
+DIM fehlerzeile AS GUI_WIDGET
+fehlerzeile = GUI_LABEL(fenster, "", 0, 0)
+GUI_SET_COLOR(fehlerzeile, "fg", RGB(255, 150, 120))
+GUI_LAYOUT_ADD(form, fehlerzeile)
+DIM f AS GUI_WIDGET
+FOR EACH f IN [titel, urheber, art, jahr]
+    GUI_ERROR_LABEL(f, fehlerzeile)
+NEXT
+' Ein Feld wird geprueft, sobald man es verlaesst.
+GUI_VALIDATE_LIVE(fenster, TRUE)
+
+' Die Kennung des Eintrags im Formular; -1 heisst: ein neuer.
+DIM bearbeitet AS INTEGER : bearbeitet = -1
+
+' Die Tabelle bekommt allen Platz, der uebrig bleibt (Gewicht 1).
+DIM tabelle AS GUI_WIDGET : tabelle = GUI_TABLE(fenster, 0, 0, 10, 10)
+GUI_TABLE_HEADERS(tabelle, ["Titel", "Urheber", "Art", "Jahr"])
+GUI_TABLE_COL_WIDTHS(tabelle, [280, 220, 100, 100])
+GUI_TABLE_SET(tabelle, "zebra", 1)
+GUI_TABLE_SET(tabelle, "zeilenhoehe", 26)
+GUI_TABLE_SET(tabelle, "filterzeile", 1)
+GUI_TABLE_PLACEHOLDER(tabelle, "Keine Treffer.")
+GUI_TABLE_SET(tabelle, "mehrfachauswahl", 1)
+GUI_LAYOUT_ADD(form, tabelle, 1)
+
+DIM knoepfe AS GUI_WIDGET
+knoepfe = GUI_LAYOUT(fenster, "zeile", 0, 0, 10, 10)
+DIM status AS GUI_WIDGET : status = GUI_LABEL(fenster, "", 0, 0)
+DIM knopf AS GUI_WIDGET
+knopf = GUI_BUTTON(fenster, "Speichern", 0, 0, 0, 0)
+DIM neu AS GUI_WIDGET : neu = GUI_BUTTON(fenster, "Neu", 0, 0, 0, 0)
+GUI_LAYOUT_SET(knoepfe, "ausrichtung", 1)
+GUI_LAYOUT_SET(knoepfe, "dehnen", 0)
+DIM entfernen AS GUI_WIDGET
+entfernen = GUI_BUTTON(fenster, "Entfernen", 0, 0, 0, 0)
+GUI_LAYOUT_ADD(knoepfe, status)
+GUI_LAYOUT_SPACER(knoepfe)
+GUI_LAYOUT_ADD(knoepfe, entfernen)
+GUI_LAYOUT_ADD(knoepfe, neu)
+GUI_LAYOUT_ADD(knoepfe, knopf)
+GUI_LAYOUT_ADD(form, knoepfe)
+
+GUI_WINDOW_DEFAULT(fenster, knopf)
+GUI_FOCUS(titel)
+
+' Die Tabelle aus dem Feld fuellen: am Anfang und nach jedem Speichern.
+SUB tabelle_fuellen()
+    GUI_TABLE_CLEAR(tabelle)
+    DIM e AS Eintrag
+    FOR EACH e IN mediathek
+        GUI_TABLE_ADD_ROW(tabelle, e.zellen())
+    NEXT
+    GUI_SET_TEXT(status, STR$(LEN(mediathek)) + " Einträge")
+END SUB
+tabelle_fuellen()
+
+' Die Zeile des Eintrags mit dieser Kennung, -1 = keine.
+FUNCTION zeile_von(id AS INTEGER) AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(mediathek) - 1
+        IF mediathek[i].id = id THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
+
+' Ein leeres Formular fuer einen neuen Eintrag.
+SUB formular_leeren()
+    GUI_FORM_CLEAR(fenster, "e")
+    GUI_DROPDOWN_SET_SELECTED(art, 0)
+    bearbeitet = -1
+    GUI_FOCUS(titel)
+END SUB
+
+' Einen Eintrag der Tabelle ins Formular laden.
+SUB bearbeiten(z AS INTEGER)
+    bearbeitet = mediathek[z].id
+    GUI_FORM_LOAD(fenster, db, "eintrag", bearbeitet, "e")
+    GUI_SET_TEXT(status, "Bearbeiten: " + mediathek[z].titel)
+    GUI_FOCUS(titel)
+END SUB
+
+' Das Formular speichern: neu (bearbeitet = -1) oder ueber den
+' bearbeiteten Eintrag.
+SUB formular_speichern()
+    ' Alle Regeln auf einmal; der Fokus springt ins erste falsche Feld.
+    IF GUI_VALIDATE(fenster) > 0 THEN RETURN
+    DIM id AS INTEGER
+    id = GUI_FORM_SAVE(fenster, db, "eintrag", bearbeitet, "e")
+    DIM t AS STRING : t = GUI_TEXT(titel)
+    ' Alles neu aus der Datenbank: die Tabelle zeigt das Gespeicherte.
+    mediathek = laden()
+    tabelle_fuellen()
+    GUI_TABLE_SET_SELECTED(tabelle, zeile_von(id))
+    GUI_SET_TEXT(status, "Gespeichert: " + t)
+    formular_leeren()
+END SUB
+
+' Alle gewaehlten Eintraege entfernen -- aus den Daten und aus der
+' Tabelle, und zwar von hinten nach vorn.
+SUB auswahl_entfernen()
+    DIM n AS INTEGER : n = GUI_TABLE_SEL_COUNT(tabelle)
+    IF n = 0 THEN
+        GUI_SET_TEXT(status, "Erst eine Zeile wählen.")
+        RETURN
+    END IF
+    DIM zeilen AS ARRAY OF INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        ARRAY_PUSH(zeilen, GUI_TABLE_SEL_ROW(tabelle, i))
+    NEXT
+    SORT(zeilen, TRUE)
+    ' Erst die Datenbank, ganz oder gar nicht. Geht dort etwas schief,
+    ' nimmt ROLLBACK alles zurueck, und Feld und Tabelle bleiben, wie
+    ' sie sind.
+    DIM z AS INTEGER
+    DB_BEGIN(db)
+    TRY
+        FOR EACH z IN zeilen
+            DIM weg AS INTEGER : weg = mediathek[z].id
+            DB_EXEC(db, "DELETE FROM eintrag WHERE id = ?", weg)
+        NEXT
+        DB_COMMIT(db)
+    CATCH fehler
+        DB_ROLLBACK(db)
+        GUI_SET_TEXT(status, "Nichts entfernt: " + fehler)
+        RETURN
+    END TRY
+    ' Dann Feld und Tabelle.
+    FOR EACH z IN zeilen
+        ARRAY_REMOVE_AT(mediathek, z)
+        GUI_TABLE_REMOVE_ROW(tabelle, z)
+    NEXT
+    GUI_SET_TEXT(status, STR$(n) + " entfernt, " + _
+                         STR$(LEN(mediathek)) + " Einträge")
+    ' War der Eintrag im Formular dabei, ist das Formular jetzt leer.
+    IF bearbeitet >= 0 AND zeile_von(bearbeitet) < 0 THEN
+        formular_leeren()
+    END IF
+END SUB
+
+WINDOW_MIN_SIZE(GUI_LAYOUT_MIN_W(form), GUI_LAYOUT_MIN_H(form))
+WINDOW_WAIT_EVENTS(1)
+WHILE NOT QUITREQUESTED()
+    IF WINDOW_RESIZED() THEN
+        DIM b AS INTEGER : b = SCREENWIDTH()
+        DIM h AS INTEGER : h = SCREENHEIGHT()
+        GUI_WINDOW_SET_BOUNDS(fenster, 0, 0, b, h)
+    END IF
+    GUI_UPDATE()
+    IF GUI_CLICKED(knopf) THEN formular_speichern()
+    IF GUI_CLICKED(neu) THEN formular_leeren()
+    IF GUI_CLICKED(entfernen) THEN auswahl_entfernen()
+    IF GUI_DOUBLE_CLICKED(tabelle) THEN
+        bearbeiten(GUI_TABLE_SELECTED(tabelle))
+    END IF
+    CLS(RGB(32, 36, 44))
+    GUI_DRAW()
+    FLIP()
+WEND
+DB_CLOSE(db)
