@@ -128,7 +128,7 @@ fn utf8_meldung(fn_: &str, pfad: &str, bytes: &[u8], bis: usize) -> String {
     let zeile = bytes[..bis].iter().filter(|&&b| b == b'\n').count() + 1;
     // Und wo in der Zeile -- in Zeichen, davor ist alles gueltiges UTF-8.
     // (Bis 2026-11-22 stand hier der Abstand vom Dateianfang: "Zeile 2 ...
-    // an Stelle 53" fuer das neunundzwanzigste Zeichen der Zeile.)
+    // an Stelle 53" fuer das dreissigste Zeichen der Zeile.)
     let anfang = bytes[..bis].iter().rposition(|&b| b == b'\n').map(|p| p + 1).unwrap_or(0);
     let zeichen = std::str::from_utf8(&bytes[anfang..bis]).map(|s| s.chars().count()).unwrap_or(bis - anfang) + 1;
     let byte = bytes.get(bis).copied().unwrap_or(0);
