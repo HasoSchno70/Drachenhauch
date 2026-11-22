@@ -100,6 +100,7 @@ IMPORT "gui"
 | `GUI_SET_MIN_SIZE(widget, min_w, min_h)` | — | Mindestmaß: ein gewichtetes Kind im Behälter und ein verankertes Widget schrumpfen nicht darunter |
 | `GUI_GET_MIN_W(widget)` / `GUI_GET_MIN_H(widget)` | INTEGER | das gesetzte Mindestmaß, 0 = keins |
 | `GUI_LAYOUT_MIN_W(layout)` / `GUI_LAYOUT_MIN_H(layout)` | INTEGER | was ein Behälter mindestens braucht — der Wert für `WINDOW_MIN_SIZE` |
+| `GUI_TEXT_WIDTH(widget, text)` | INTEGER | wie breit das Widget `text` zeichnet (seine Schrift, Größe, Stil; logisch) — für Spalten- und Knopfbreiten, statt an der Zeichenzahl zu schätzen |
 | `GUI_RULE(feld, art$[, a, b][, muster$][, meldung$])` | — | **Prüfregel** anhängen: `pflicht`, `zahl`, `ganz`, `bereich a b`, `laenge min max`, `email`, `datum`, `muster regex$` — siehe [Formularprüfung](#formularprüfung) |
 | `GUI_VALIDATE(win)` / `GUI_VALIDATE_WIDGET(feld)` | INTEGER / STRING | alle Regeln des Fensters prüfen (Zahl der Fehler, erstes Feld bekommt den Fokus) / ein Feld (Meldung oder "") |
 | `GUI_ERROR(field)` / `GUI_SET_ERROR(field, meldung$)` / `GUI_CLEAR_ERRORS(win)` | STRING / — / — | Meldung lesen, von außen setzen (z. B. aus der Datenbank), alle löschen |
@@ -2623,7 +2624,7 @@ Drei Hilfen fürs Gestalten und für die Barrierefreiheit:
 | `GUI_INSPECTOR([on])` | BOOLEAN ohne Argument | Inspektor zeigen (`TRUE`) oder schließen; ohne Argument: ist er offen? |
 | `GUI_INSPECTOR_SELECTED()` | GUI_WIDGET | das Widget, das im Inspektor gewählt ist, -1 = keins |
 | `GUI_INSPECT$(widget)` | STRING | was der Inspektor über ein Widget zeigt: Art, Name, Klassen, Lage, Zustand, Form, die passenden Regeln der Stildatei mit Zeile und was je Zustand gilt |
-| `GUI_STATE$()` | STRING | der Zustand aller sichtbaren Fenster als Text: je Widget mit Zustand eine Zeile (Texte, Haken, Werte, Auswahl) -- die Erwartung, die `dhrt aufnehmen` schreibt ([werkzeuge.md](werkzeuge.md#dhrt-aufnehmen--bedienung-als-prüffall)) |
+| `GUI_STATE$()` | STRING | der Zustand aller sichtbaren Fenster als Text: je Widget mit Zustand eine Zeile (Texte, Haken, Werte, Auswahl, Zeilen einer Tabelle) -- die Erwartung, die `dhrt aufnehmen` schreibt ([werkzeuge.md](werkzeuge.md#dhrt-aufnehmen--bedienung-als-prüffall)) |
 | `GUI_SET_MOTION(mode$)` | — | `"system"` (Vorgabe): wie das Betriebssystem; `"an"`: Animationen immer; `"aus"`: nie |
 | `GUI_MOTION()` | BOOLEAN | spielt die gui gerade Bewegung ab? |
 

@@ -576,10 +576,10 @@ fehler eval: Ausdruck nicht unterstue
 ' geschrieben wurde (der Parser fuehrt sie klein).
 IMPORT "sitzung.dh"
 DIM q AS STRING : q = CHR$(34)
-sitzung("d.dh", ["{" + q + "cmd" + q + ":" + q + "set-breakpoints" + q + "," + q + "lines" + q + ":[12]}", _
+sitzung("d.dh", ["{" + q + "cmd" + q + ":" + q + "set-breakpoints" + q + "," + q + "lines" + q + ":[16]}", _
     "{" + q + "cmd" + q + ":" + q + "continue" + q + "}", _
     "{" + q + "cmd" + q + ":" + q + "stop" + q + "}"])
-DIM h AS INTEGER : h = ersteMit("paused", 12)
+DIM h AS INTEGER : h = ersteMit("paused", 16)
 DIM k AS JSON_HANDLE : k = JSON_PARSE(ereignisse[h])
 DIM i AS INTEGER
 FOR i = 0 TO JSON_LEN(k, "globals") - 1
@@ -602,6 +602,10 @@ CLASS Held
 END CLASS
 DIM held AS Held : held = NEW Held()
 held.hp = 7 : held.name = "Ada"
+' Ein Feld von Objekten nennt die Klasse ebenso wie geschrieben (bis
+' 2026-11-22 "OF HELD").
+DIM helden AS ARRAY OF Held
+ARRAY_PUSH(helden, held)
 DIM gross[150] AS INTEGER
 DIM m AS MAP OF INTEGER : m = {"a": 1, "b": 2}
 DIM t AS TUPLE : t = (1, "zwei")
@@ -612,6 +616,7 @@ PRINT held.hp
 --- erwartet
 gross ARRAY <ARRAY[150] OF INTEGER> | 101: [0]=0 ... ...=50 weitere
 held Held <Held> | 2: hp=7 ... name=Ada
+helden ARRAY <ARRAY[1] OF Held> | 1: [0]=<Held> ... [0]=<Held>
 i INTEGER 150
 m MAP <MAP[2] OF INTEGER> | 2: "a"=1 ... "b"=2
 t TUPLE (1, zwei) | 2: [0]=1 ... [1]=zwei
@@ -652,6 +657,157 @@ halt 2 []  __main__
 halt 11 [error] 3 fuellen
 wert 30
 fehler 11
+
+=== in einer methode steht self mit seinen feldern vorn
+' Ein Fenster aus dem Studio merkt sich alles in Feldern -- ohne Self sah
+' der Debugger davon nichts (Buch "Fenster, Formulare, Daten", Kapitel
+' 12). Eine schlichte Funktion, aus der Methode gerufen, hat kein Self;
+' ein Fehler in der Methode haelt mit Self. Der Haltepunkt in Zeile 5
+' haelt nach der Rueckkehr aus verdoppelt nicht ein zweites Mal.
+IMPORT "sitzung.dh"
+DIM q AS STRING : q = CHR$(34)
+sitzung("d.dh", ["{" + q + "cmd" + q + ":" + q + "set-breakpoints" + q + "," + q + "lines" + q + ":[5, 10]}", _
+    "{" + q + "cmd" + q + ":" + q + "continue" + q + "}", _
+    "{" + q + "cmd" + q + ":" + q + "continue" + q + "}", _
+    "{" + q + "cmd" + q + ":" + q + "continue" + q + "}", _
+    "{" + q + "cmd" + q + ":" + q + "continue" + q + "}"])
+' Der erste Halt steht vor der ersten Zeile mit Code (12).
+DIM i AS INTEGER
+FOR i = 0 TO LEN(ereignisse) - 1
+    IF art$(i) = "paused" AND feld$(i, "line") <> "12" THEN
+        DIM k AS JSON_HANDLE : k = JSON_PARSE(ereignisse[i])
+        DIM z AS STRING : z = "halt " + feld$(i, "line") + " [" + feld$(i, "reason") + "]"
+        DIM j AS INTEGER
+        FOR j = 0 TO JSON_LEN(k, "locals") - 1
+            DIM p AS STRING : p = "locals." + STR$(j)
+            z = z + " " + JSON_GET_STRING(k, p + ".name") + "=" + JSON_GET_STRING(k, p + ".value")
+            IF JSON_HAS(k, p + ".children") THEN
+                DIM c AS INTEGER
+                FOR c = 0 TO JSON_LEN(k, p + ".children") - 1
+                    DIM pc AS STRING : pc = p + ".children." + STR$(c)
+                    z = z + " ." + JSON_GET_STRING(k, pc + ".name") + "=" + JSON_GET_STRING(k, pc + ".value")
+                NEXT
+            END IF
+        NEXT
+        PRINT z
+    END IF
+NEXT
+--- datei sitzung.dh
+IMPORT "{sammlung}/../_hilfen/debugsitzung.dh"
+
+--- datei d.dh
+CLASS Konto
+    DIM stand AS INTEGER
+    DIM name AS STRING
+    SUB einzahlen(b AS INTEGER)
+        stand = stand + verdoppelt(b)
+        PRINT stand \ (stand - 10)
+    END SUB
+END CLASS
+FUNCTION verdoppelt(x AS INTEGER) AS INTEGER
+    RETURN x * 2
+END FUNCTION
+DIM konto AS Konto : konto = NEW Konto()
+konto.name = "Ada"
+konto.einzahlen(5)
+
+--- erwartet
+halt 5 [] Self=<Konto> .stand=0 .name=Ada b=5
+halt 10 [] x=5
+halt 6 [error] Self=<Konto> .stand=10 .name=Ada b=5
+
+=== zurueck aus einem aufruf beginnt die zeile nicht neu
+' Ein Haltepunkt auf einer Zeile mit Aufruf hielt nach der Rueckkehr ein
+' zweites Mal, und Schritt ueber blieb einmal auf derselben Zeile stehen
+' (Buch "Fenster, Formulare, Daten", Kapitel 12). Schritt heraus und ein
+' Schritt ueber das Ende einer SUB landen weiter auf der Zeile des Aufrufs.
+IMPORT "sitzung.dh"
+DIM q AS STRING : q = CHR$(34)
+FUNCTION kmd$(c AS STRING) AS STRING
+    RETURN "{" + CHR$(34) + "cmd" + CHR$(34) + ":" + CHR$(34) + c + CHR$(34) + "}"
+END FUNCTION
+SUB zeilen(titel AS STRING)
+    DIM z AS STRING : z = titel
+    DIM i AS INTEGER
+    FOR i = 1 TO LEN(ereignisse) - 1
+        IF art$(i) = "paused" THEN z = z + " " + feld$(i, "line")
+        IF art$(i) = "finished" THEN z = z + " ende"
+    NEXT
+    PRINT z
+    ' Die Sitzung haengt an; die naechste faengt leer an.
+    ereignisse = []
+END SUB
+DIM bp5 AS STRING : bp5 = "{" + q + "cmd" + q + ":" + q + "set-breakpoints" + q + "," + q + "lines" + q + ":[5]}"
+DIM bp2 AS STRING : bp2 = "{" + q + "cmd" + q + ":" + q + "set-breakpoints" + q + "," + q + "lines" + q + ":[2]}"
+sitzung("d.dh", [bp5, kmd$("continue"), kmd$("step-over"), kmd$("continue")])
+zeilen("haltepunkt, ueber, weiter:")
+sitzung("d.dh", [bp5, kmd$("continue"), kmd$("continue")])
+zeilen("haltepunkt, weiter:")
+sitzung("d.dh", [bp2, kmd$("continue"), kmd$("step-out"), kmd$("step-over"), kmd$("stop")])
+zeilen("in b, heraus, ueber:")
+sitzung("d.dh", [bp2, kmd$("continue"), kmd$("step-over"), kmd$("step-over"), kmd$("stop")])
+zeilen("in b, ueber, ueber:")
+--- datei sitzung.dh
+IMPORT "{sammlung}/../_hilfen/debugsitzung.dh"
+
+--- datei d.dh
+SUB b()
+    PRINT "b"
+END SUB
+SUB a()
+    b()
+    PRINT "a"
+END SUB
+a()
+PRINT "ende"
+
+--- erwartet
+haltepunkt, ueber, weiter: 5 6 ende
+haltepunkt, weiter: 5 ende
+in b, heraus, ueber: 2 5 6 ende
+in b, ueber, ueber: 2 5 6 ende
+
+=== eigene felder zuerst und der stapel wie geschrieben
+' Ein Fenster aus dem Studio erbt Controls und die Laufzeit des Studios;
+' seine eigenen Felder standen unter Self ganz unten, und der Stapel nannte
+' knopfentfernen_klick klein (Buch "Fenster, Formulare, Daten", Kapitel 12).
+IMPORT "sitzung.dh"
+DIM q AS STRING : q = CHR$(34)
+sitzung("d.dh", ["{" + q + "cmd" + q + ":" + q + "set-breakpoints" + q + "," + q + "lines" + q + ":[11]}", _
+    "{" + q + "cmd" + q + ":" + q + "continue" + q + "}", _
+    "{" + q + "cmd" + q + ":" + q + "stop" + q + "}"])
+DIM h AS INTEGER : h = ersteMit("paused", 11)
+DIM k AS JSON_HANDLE : k = JSON_PARSE(ereignisse[h])
+DIM z AS STRING : z = "Self:"
+DIM c AS INTEGER
+FOR c = 0 TO JSON_LEN(k, "locals.0.children") - 1
+    z = z + " " + JSON_GET_STRING(k, "locals.0.children." + STR$(c) + ".name")
+NEXT
+PRINT z
+PRINT "stapel: "; JSON_GET_STRING(k, "stack.0.name"); " "; JSON_GET_STRING(k, "stack.1.name")
+--- datei sitzung.dh
+IMPORT "{sammlung}/../_hilfen/debugsitzung.dh"
+
+--- datei d.dh
+CLASS FensterLaufzeit
+    DIM studioWin AS INTEGER
+END CLASS
+CLASS Basis EXTENDS FensterLaufzeit
+    DIM knopfOk AS INTEGER
+END CLASS
+CLASS Haupt EXTENDS Basis
+    DIM eintraege AS ARRAY OF STRING
+    DIM bearbeitet AS INTEGER
+    SUB knopfOk_Klick()
+        PRINT bearbeitet
+    END SUB
+END CLASS
+DIM h AS Haupt : h = NEW Haupt()
+h.knopfOk_Klick()
+
+--- erwartet
+Self: eintraege bearbeitet knopfOk studioWin
+stapel: knopfOk_Klick __main__
 
 === ein grafikfenster bleibt im halt ansprechbar
 ' Waehrend der Debugger auf Kommandos wartet, holt er alle 50 ms die

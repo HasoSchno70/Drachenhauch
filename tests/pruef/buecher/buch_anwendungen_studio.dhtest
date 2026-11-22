@@ -10,6 +10,7 @@
 --- langsam
 === f5 auf mediathek und loesung, die zitierte zeile, der vertippte name
 IMPORT "laeufer.dh"
+IMPORT "imgfx"
 SUB kopieren(von AS STRING, nach AS STRING)
     IF NOT DIREXISTS(nach) THEN MKDIR(nach)
     DIM n AS STRING
@@ -24,8 +25,15 @@ END SUB
 
 DIM code AS STRING : code = ARG$(1) + "/buecher/anwendungen/code/"
 DIM proj AS STRING
-FOR EACH proj IN ["kap08/mediathek", "loesungen/kap08_info"]
-    DIM p AS STRING : p = CWD$() + "/" + BASENAME(proj)
+FOR EACH proj IN ["kap08/mediathek", "loesungen/kap08_info", "kap09/mediathek", _
+                  "loesungen/kap09_vollbild", "loesungen/kap09_entfernen", _
+                  "kap10/mediathek", "loesungen/kap10_statistik", _
+                  "loesungen/kap10_alstext"]
+    ' Zwei Projekte heissen mediathek (Kapitel 8 und 9): der Ordner der
+    ' Kopie bekommt den Namen des Kapitels davor.
+    DIM nm AS STRING : nm = BASENAME(proj)
+    IF nm = "mediathek" AND LEFT$(proj, 5) <> "kap08" THEN nm = LEFT$(proj, 5) + "_" + nm
+    DIM p AS STRING : p = CWD$() + "/" + nm
     kopieren(code + proj, p)
     slZeilen = []
     slBild = 0
@@ -35,11 +43,112 @@ FOR EACH proj IN ["kap08/mediathek", "loesungen/kap08_info"]
     slWarten(150)
     slAufnahmeSchreiben(CWD$() + "/ev.txt")
     SETENV("DH_STUDIO_LAUF_BILDER", "20")
-    DIM log AS STRING : log = CWD$() + "/" + BASENAME(proj) + ".log"
+    DIM log AS STRING : log = CWD$() + "/" + nm + ".log"
     DIM aus AS STRING : aus = slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
-    PRINT BASENAME(proj); " geprueft "; slHat(log, "geprueft 0 0"); " beendet "; slHat(log, "beendet 0")
+    PRINT nm; " geprueft "; slHat(log, "geprueft 0 0"); " beendet "; slHat(log, "beendet 0")
     IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
 NEXT
+
+' Kapitel 9: das erzeugte Programm mit echter Bedienung. Die Aufnahme
+' spielt Tasten und Klicks ab (Lagen im Fenster), DHRT_GUI_ZUSTAND schreibt
+' am Ende den Zustand der Widgets.
+FUNCTION bedienen$(main AS STRING, ev AS ARRAY OF STRING, bilder AS INTEGER) AS STRING
+    DIM pf AS STRING : pf = CWD$() + "/bedienung.txt"
+    WRITEALL(pf, "c " + STR$(LEN(ev)) + CHR$(10) + JOIN$(ev, CHR$(10)) + CHR$(10) + CHR$(10))
+    SETENV("DHRT_ABSPIELEN", pf)
+    SETENV("DHRT_GUI_ZUSTAND", "1")
+    DIM q AS INTEGER : q = PROCESS_START("dhrt", "run", "--bilder", STR$(bilder), main)
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    WHILE leer < 5
+        DIM t AS STRING : t = PROCESS_READ$(q) + PROCESS_ERR$(q)
+        aus = aus + t
+        IF t = "" AND NOT PROCESS_RUNNING(q) THEN leer = leer + 1
+        SLEEP(20)
+    WEND
+    SETENV("DHRT_ABSPIELEN", "")
+    SETENV("DHRT_GUI_ZUSTAND", "")
+    RETURN aus
+END FUNCTION
+FUNCTION tabs(n AS INTEGER) AS ARRAY OF STRING
+    DIM ev AS ARRAY OF STRING : ev = ["e 0 7 600 540 0 0"]
+    DIM b AS INTEGER : b = 6
+    DIM k AS INTEGER
+    FOR k = 1 TO n
+        ARRAY_PUSH(ev, "e " + STR$(b) + " 2 258 0 0 0")
+        ARRAY_PUSH(ev, "e " + STR$(b + 1) + " 1 258 0 0 0")
+        b = b + 4
+    NEXT
+    ARRAY_PUSH(ev, "e " + STR$(b) + " 2 32 0 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 1) + " 1 32 0 0 0")
+    RETURN ev
+END FUNCTION
+DIM m9 AS STRING : m9 = CWD$() + "/kap09_mediathek/_studio/main.dh"
+' Vier Tabs vom Titel aus und die Leertaste: Speichern (Tab-Folge 5)
+' meldet den leeren Titel. Nach drei Tabs steht der Fokus im Jahr.
+PRINT "tab 4 "; INSTR(bedienen$(m9, tabs(4), 40), "Bitte einen Titel eingeben.") >= 0
+PRINT "tab 3 "; INSTR(bedienen$(m9, tabs(3), 40), "3 Eintr") >= 0
+' Erweitern 1: F11 aus dem Menue maximiert -- das Fenster wird breiter
+' als im Entwurf (760).
+DIM mv AS STRING : mv = CWD$() + "/kap09_vollbild/_studio/main.dh"
+DIM vev AS STRING : vev = CWD$() + "/f11.txt"
+WRITEALL(vev, "c 3" + CHR$(10) + "e 0 7 600 540 0 0" + CHR$(10) + "e 6 2 300 0 0 0" + _
+              CHR$(10) + "e 8 1 300 0 0 0" + CHR$(10) + CHR$(10))
+SETENV("DHRT_ABSPIELEN", vev)
+DIM vpng AS STRING : vpng = CWD$() + "/vollbild.png"
+DIM vq AS INTEGER : vq = PROCESS_START("dhrt", "bild", mv, vpng, "40")
+WHILE PROCESS_RUNNING(vq)
+    SLEEP(50)
+WEND
+SETENV("DHRT_ABSPIELEN", "")
+DIM vbild AS IMAGE : vbild = IMAGE_LOAD(vpng)
+PRINT "vollbild "; IMAGE_WIDTH(vbild) > 760
+' Erweitern 2: ein Klick auf "Entfernen" ohne Auswahl, dann auf Momo und
+' wieder auf "Entfernen": erst jetzt ist er frei und entfernt eine Zeile.
+DIM me AS STRING : me = CWD$() + "/kap09_entfernen/_studio/main.dh"
+DIM ee AS ARRAY OF STRING
+ee = ["e 0 7 470 503 0 0", "e 2 7 470 503 0 0", "e 4 6 0 0 0 0", "e 6 5 0 0 0 0"]
+ARRAY_PUSH(ee, "e 10 7 100 203 0 0") : ARRAY_PUSH(ee, "e 12 7 100 203 0 0")
+ARRAY_PUSH(ee, "e 14 6 0 0 0 0") : ARRAY_PUSH(ee, "e 16 5 0 0 0 0")
+ARRAY_PUSH(ee, "e 20 7 470 503 0 0") : ARRAY_PUSH(ee, "e 22 7 470 503 0 0")
+ARRAY_PUSH(ee, "e 24 6 0 0 0 0") : ARRAY_PUSH(ee, "e 26 5 0 0 0 0")
+PRINT "frei "; INSTR(bedienen$(me, ee, 40), "2 Eintr") >= 0
+
+' Kapitel 10: ein Doppelklick auf Metropolis laedt es ins Formular; die
+' Loesungen zaehlen je Art und zeigen einen Eintrag als Satz.
+DIM m10 AS STRING : m10 = CWD$() + "/kap10_mediathek/_studio/main.dh"
+DIM dk AS ARRAY OF STRING
+dk = ["e 0 7 100 223 0 0", "e 2 7 100 223 0 0", "e 4 6 0 0 0 0", "e 5 5 0 0 0 0", _
+      "e 7 6 0 0 0 0", "e 8 5 0 0 0 0", "e 12 7 600 540 0 0", "e 14 7 600 540 0 0"]
+PRINT "doppelklick "; INSTR(bedienen$(m10, dk, 30), "feldtitel " + CHR$(34) + "Metropolis") >= 0
+DIM ms AS STRING : ms = CWD$() + "/kap10_statistik/_studio/main.dh"
+PRINT "statistik "; INSTR(bedienen$(ms, ["e 0 7 600 540 0 0"], 5), "Buch 2, Film 1, Spiel 1, Musik 1") >= 0
+DIM ma AS STRING : ma = CWD$() + "/kap10_alstext/_studio/main.dh"
+DIM kl AS ARRAY OF STRING
+kl = ["e 0 7 100 223 0 0", "e 2 7 100 223 0 0", "e 4 6 0 0 0 0", "e 5 5 0 0 0 0", "e 9 7 600 540 0 0"]
+PRINT "als text "; INSTR(bedienen$(ma, kl, 20), "Metropolis von Fritz Lang (Film, 1927)") >= 0
+
+' Kapitel 10, "Was schiefgehen kann": eine Methode zeigen, die in die
+' Statuszeile schreibt, ueberschreibt Zeigen -- das Studio warnt, und der
+' Start haelt in zeigen, Zeile 1.
+DIM pz AS STRING : pz = CWD$() + "/kap10_zeigen"
+kopieren(code + "kap10/mediathek", pz)
+DIM hz AS STRING : hz = READALL(pz + "/Hauptfenster.dh")
+DIM zg AS STRING
+zg = "    SUB zeigen()" + CHR$(10) + "        GUI_SET_TEXT(Self.status, " + CHR$(34) + "x" + CHR$(34) + ")" + _
+     CHR$(10) + "    END SUB" + CHR$(10) + "END CLASS"
+WRITEALL(pz + "/Hauptfenster.dh", REPLACE$(hz, "END CLASS", zg))
+slZeilen = []
+slBild = 0
+slHin(10, 10)
+slWarten(10)
+slTaste(294)
+slWarten(150)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+DIM lz AS STRING : lz = CWD$() + "/kap10_zeigen.log"
+DIM az AS STRING : az = slStarten(lz, CWD$() + "/ev.txt", slBild + 20, pz)
+PRINT "zeigen warnt "; INSTR(READALL(lz), "ueberschreibt 'Zeigen' aus STUDIOFENSTER") >= 0
+PRINT "zeigen haelt "; slHat(lz, "laufzeitfehler Hauptfenster.zeigen, Zeile 1")
 
 ' Die Zeile, die das Kapitel unter "Was das Studio erzeugt" zitiert.
 DIM basis AS STRING : basis = CWD$() + "/mediathek/_studio/Hauptfenster_basis.dh"
@@ -85,5 +194,1123 @@ slStudio = ARG$(0)
 --- erwartet
 mediathek geprueft TRUE beendet TRUE
 kap08_info geprueft TRUE beendet TRUE
+kap09_mediathek geprueft TRUE beendet TRUE
+kap09_vollbild geprueft TRUE beendet TRUE
+kap09_entfernen geprueft TRUE beendet TRUE
+kap10_mediathek geprueft TRUE beendet TRUE
+kap10_statistik geprueft TRUE beendet TRUE
+kap10_alstext geprueft TRUE beendet TRUE
+tab 4 TRUE
+tab 3 TRUE
+vollbild TRUE
+frei TRUE
+doppelklick TRUE
+statistik TRUE
+als text TRUE
+zeigen warnt TRUE
+zeigen haelt TRUE
 zeile TRUE
 meldung TRUE
+
+=== kapitel 11: drei fenster, modal und nicht
+' Kapitel 11: Bearbeiten in einem modalen Fenster, Ausleihen in einem, das
+' offen bleibt und der Auswahl folgt; die Loesungen (Einstellungen, ein
+' Info-Fenster je Eintrag) und der Fehler aus "Was schiefgehen kann".
+' Lagen im Hauptfenster (760 x 480): Zeilen Momo 51, Metropolis 71,
+' Tetris 91, Emil 131; Knoepfe auf 427. Mit Menueleiste 26 tiefer.
+IMPORT "laeufer.dh"
+IMPORT "imgfx"
+SUB kopieren(von AS STRING, nach AS STRING)
+    IF NOT DIREXISTS(nach) THEN MKDIR(nach)
+    DIM n AS STRING
+    FOR EACH n IN DIRLIST(von)
+        IF DIREXISTS(von + "/" + n) THEN
+            IF n <> "_studio" THEN kopieren(von + "/" + n, nach + "/" + n)
+        ELSE
+            COPYFILE(von + "/" + n, nach + "/" + n)
+        END IF
+    NEXT
+END SUB
+FUNCTION bedienen$(main AS STRING, ev AS ARRAY OF STRING, bilder AS INTEGER) AS STRING
+    DIM pf AS STRING : pf = CWD$() + "/bedienung.txt"
+    WRITEALL(pf, "c " + STR$(LEN(ev)) + CHR$(10) + JOIN$(ev, CHR$(10)) + CHR$(10) + CHR$(10))
+    SETENV("DHRT_ABSPIELEN", pf)
+    SETENV("DHRT_GUI_ZUSTAND", "1")
+    DIM q AS INTEGER : q = PROCESS_START("dhrt", "run", "--bilder", STR$(bilder), main)
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    WHILE leer < 5
+        DIM t AS STRING : t = PROCESS_READ$(q) + PROCESS_ERR$(q)
+        aus = aus + t
+        IF t = "" AND NOT PROCESS_RUNNING(q) THEN leer = leer + 1
+        SLEEP(20)
+    WEND
+    SETENV("DHRT_ABSPIELEN", "")
+    SETENV("DHRT_GUI_ZUSTAND", "")
+    RETURN aus
+END FUNCTION
+' Ein Klick an (x, y) ab Bild b.
+SUB klick(ev AS ARRAY OF STRING, b AS INTEGER, x AS INTEGER, y AS INTEGER)
+    ARRAY_PUSH(ev, "e " + STR$(b) + " 7 " + STR$(x) + " " + STR$(y) + " 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 2) + " 7 " + STR$(x) + " " + STR$(y) + " 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 4) + " 6 0 0 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 6) + " 5 0 0 0 0")
+END SUB
+' Strg+I ab Bild b.
+SUB strgI(ev AS ARRAY OF STRING, b AS INTEGER)
+    ARRAY_PUSH(ev, "e " + STR$(b) + " 2 341 0 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 2) + " 2 73 0 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 4) + " 1 73 0 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 6) + " 1 341 0 0 0")
+END SUB
+' Wie orange die Zeile Tetris (y 117 mit Menueleiste) ist: groesster
+' Abstand Rot - Blau ueber ihrem Titel.
+FUNCTION orange(png AS STRING) AS INTEGER
+    DIM b AS IMAGE : b = IMAGE_LOAD(png)
+    DIM best AS INTEGER : best = -999
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 110 TO 124
+        FOR x = 24 TO 80
+            DIM c AS INTEGER : c = IMAGE_GET_PIXEL(b, x, y)
+            ' BAND bindet schwaecher als -, darum die Klammern.
+            best = MAX(best, ((c SHR 16) BAND 255) - (c BAND 255))
+        NEXT
+    NEXT
+    RETURN best
+END FUNCTION
+FUNCTION bild$(main AS STRING, ev AS ARRAY OF STRING, n AS INTEGER, name AS STRING) AS STRING
+    DIM pf AS STRING : pf = CWD$() + "/" + name + ".txt"
+    WRITEALL(pf, "c " + STR$(LEN(ev)) + CHR$(10) + JOIN$(ev, CHR$(10)) + CHR$(10) + CHR$(10))
+    SETENV("DHRT_ABSPIELEN", pf)
+    DIM png AS STRING : png = CWD$() + "/" + name + ".png"
+    DIM q AS INTEGER : q = PROCESS_START("dhrt", "bild", main, png, STR$(n))
+    WHILE PROCESS_RUNNING(q)
+        SLEEP(50)
+    WEND
+    SETENV("DHRT_ABSPIELEN", "")
+    RETURN png
+END FUNCTION
+
+DIM code AS STRING : code = ARG$(1) + "/buecher/anwendungen/code/"
+DIM proj AS STRING
+FOR EACH proj IN ["kap11/mediathek", "loesungen/kap11_einstellungen", "loesungen/kap11_info"]
+    DIM nm AS STRING : nm = BASENAME(proj)
+    IF nm = "mediathek" THEN nm = "kap11_mediathek"
+    DIM p AS STRING : p = CWD$() + "/" + nm
+    kopieren(code + proj, p)
+    slZeilen = []
+    slBild = 0
+    slHin(10, 10)
+    slWarten(10)
+    slTaste(294)
+    slWarten(150)
+    slAufnahmeSchreiben(CWD$() + "/ev.txt")
+    SETENV("DH_STUDIO_LAUF_BILDER", "20")
+    DIM log AS STRING : log = CWD$() + "/" + nm + ".log"
+    DIM aus AS STRING : aus = slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+    PRINT nm; " geprueft "; slHat(log, "geprueft 0 0"); " beendet "; slHat(log, "beendet 0")
+    IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+NEXT
+DIM m AS STRING : m = CWD$() + "/kap11_mediathek/_studio/main.dh"
+DIM ev AS ARRAY OF STRING
+DIM a AS STRING
+
+' Modal: Metropolis, "Bearbeiten ...", ein Klick dahinter auf Emil (das
+' Hauptfenster nimmt ihn nicht), Art auf Spiel, OK. Noch einmal
+' "Bearbeiten ...": wieder Metropolis, jetzt ein Spiel.
+ev = []
+klick(ev, 0, 100, 71)
+klick(ev, 10, 415, 427)
+klick(ev, 24, 60, 131)
+klick(ev, 34, 420, 233)
+klick(ev, 48, 420, 301)
+klick(ev, 58, 410, 337)
+klick(ev, 70, 415, 427)
+a = bedienen$(m, ev, 100)
+PRINT "modal "; INSTR(a, "feldtitel " + CHR$(34) + "Metropolis") >= 0; " "; INSTR(a, "wahlart 2 " + CHR$(34) + "Spiel") >= 0
+
+' Nicht modal: Tetris, "Ausleihen ...", dann Momo -- das Fenster folgt.
+ev = []
+klick(ev, 0, 100, 91)
+klick(ev, 10, 670, 427)
+klick(ev, 30, 100, 51)
+PRINT "folgt "; INSTR(bedienen$(m, ev, 60), "gewaehlt " + CHR$(34) + "Momo ist da.") >= 0
+
+' Drehen 3: Momo, Ausleihen, mit dem Kreuz zu, Tetris, wieder Ausleihen.
+ev = []
+klick(ev, 0, 100, 51)
+klick(ev, 10, 670, 427)
+klick(ev, 30, 558, 155)
+klick(ev, 44, 100, 91)
+klick(ev, 58, 670, 427)
+PRINT "wieder auf "; INSTR(bedienen$(m, ev, 90), "Tetris ist bei Lena.") >= 0
+
+' Zurueck nimmt die Ausleihe zurueck.
+ev = []
+klick(ev, 0, 100, 91)
+klick(ev, 10, 670, 427)
+klick(ev, 30, 505, 292)
+PRINT "zurueck "; INSTR(bedienen$(m, ev, 60), "Tetris ist da.") >= 0
+
+' Erweitern 1: Bearbeiten -> Einstellungen ..., das Kaestchen, OK -- die
+' verliehene Zeile wird orange. Ohne das Kaestchen bleibt sie es nicht.
+DIM me AS STRING : me = CWD$() + "/kap11_einstellungen/_studio/main.dh"
+ev = []
+klick(ev, 0, 40, 13)
+klick(ev, 12, 80, 40)
+DIM ohne AS INTEGER : ohne = orange(bild$(me, ev, 60, "ohne"))
+klick(ev, 26, 228, 230)
+klick(ev, 38, 370, 296)
+DIM mit AS INTEGER : mit = orange(bild$(me, ev, 60, "mit"))
+PRINT "orange "; mit > 80; " "; ohne < 30
+IF mit <= 80 OR ohne >= 30 THEN PRINT mit; " "; ohne
+' Das Kaestchen, aber Abbrechen: es bleibt, wie es war.
+ev = []
+klick(ev, 0, 40, 13)
+klick(ev, 12, 80, 40)
+klick(ev, 26, 228, 230)
+klick(ev, 38, 485, 296)
+PRINT "abbrechen "; orange(bild$(me, ev, 60, "abbrechen")) < 30
+
+' Erweitern 2: Momo und Tetris, je Strg+I -- zwei Info-Fenster.
+DIM mi AS STRING : mi = CWD$() + "/kap11_info/_studio/main.dh"
+ev = []
+klick(ev, 0, 100, 77)
+strgI(ev, 10)
+klick(ev, 24, 100, 117)
+strgI(ev, 34)
+a = bedienen$(mi, ev, 60)
+DIM zahl AS INTEGER : zahl = LEN(SPLIT$(a, "fenster #infofenster")) - 1
+PRINT "info "; zahl; " "; INSTR(a, "Momo von Michael Ende") >= 0; " "; INSTR(a, "Tetris von Alexei Paschitnow") >= 0
+
+' Was schiefgehen kann: ohne die Abfrage, ob das Ausleihfenster offen ist,
+' spricht folgen Controls an, die es noch nicht gibt.
+DIM af AS STRING : af = CWD$() + "/kap11_mediathek/_studio/projekt/AusleihFenster.dh"
+WRITEALL(af, REPLACE$(READALL(af), "IF Self.offen THEN Self.anzeigen()", "Self.anzeigen()"))
+a = bedienen$(m, ["e 0 7 100 91 0 0", "e 2 7 100 91 0 0", "e 4 6 0 0 0 0", "e 6 5 0 0 0 0"], 30)
+PRINT "nil "; INSTR(a, "AusleihFenster.dh:33: GUI_SET_TEXT: erwartet INTEGER (Arg 1), erhalten NIL -- das Widget oder Fenster gibt es noch nicht") >= 0
+--- argumente
+{sammlung}/../../../studio/studio.dh
+{sammlung}/../../..
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- erwartet
+kap11_mediathek geprueft TRUE beendet TRUE
+kap11_einstellungen geprueft TRUE beendet TRUE
+kap11_info geprueft TRUE beendet TRUE
+modal TRUE TRUE
+folgt TRUE
+wieder auf TRUE
+zurueck TRUE
+orange TRUE TRUE
+abbrechen TRUE
+info 2 TRUE TRUE
+nil TRUE
+
+=== kapitel 12: der debugger findet den fehler nach entfernen
+' Kapitel 12: Haltepunkt auf Self.ausleihe.folgen(NIL) in
+' knopfEntfernen_Klick (Mediathek aus Kapitel 11), F7. Das Programm
+' bekommt seine Klicks ueber DHRT_ABSPIELEN, das es vom Studio erbt:
+' Metropolis, "Ausleihen ...", "Entfernen", Enter. Der Debugger haelt in
+' Zeile 10 mit Self und z = 1; F11 geht in folgen, dort ist e NIL. Dazu
+' die korrigierte Mediathek (Kapitel 12) und die Loesungen.
+IMPORT "laeufer.dh"
+SUB kopieren(von AS STRING, nach AS STRING)
+    IF NOT DIREXISTS(nach) THEN MKDIR(nach)
+    DIM n AS STRING
+    FOR EACH n IN DIRLIST(von)
+        IF DIREXISTS(von + "/" + n) THEN
+            IF n <> "_studio" THEN kopieren(von + "/" + n, nach + "/" + n)
+        ELSE
+            COPYFILE(von + "/" + n, nach + "/" + n)
+        END IF
+    NEXT
+END SUB
+FUNCTION bedienen$(main AS STRING, ev AS ARRAY OF STRING, bilder AS INTEGER) AS STRING
+    DIM pf AS STRING : pf = CWD$() + "/bedienung.txt"
+    WRITEALL(pf, "c " + STR$(LEN(ev)) + CHR$(10) + JOIN$(ev, CHR$(10)) + CHR$(10) + CHR$(10))
+    SETENV("DHRT_ABSPIELEN", pf)
+    SETENV("DHRT_GUI_ZUSTAND", "1")
+    DIM q AS INTEGER : q = PROCESS_START("dhrt", "run", "--bilder", STR$(bilder), main)
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    WHILE leer < 5
+        DIM t AS STRING : t = PROCESS_READ$(q) + PROCESS_ERR$(q)
+        aus = aus + t
+        IF t = "" AND NOT PROCESS_RUNNING(q) THEN leer = leer + 1
+        SLEEP(20)
+    WEND
+    SETENV("DHRT_ABSPIELEN", "")
+    SETENV("DHRT_GUI_ZUSTAND", "")
+    RETURN aus
+END FUNCTION
+SUB klick(ev AS ARRAY OF STRING, b AS INTEGER, x AS INTEGER, y AS INTEGER)
+    ARRAY_PUSH(ev, "e " + STR$(b) + " 7 " + STR$(x) + " " + STR$(y) + " 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 2) + " 7 " + STR$(x) + " " + STR$(y) + " 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 4) + " 6 0 0 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 6) + " 5 0 0 0 0")
+END SUB
+' Metropolis, Ausleihen, Entfernen, Enter (Lagen im Hauptfenster).
+FUNCTION entfernen(zeile AS INTEGER) AS ARRAY OF STRING
+    DIM ev AS ARRAY OF STRING : ev = ["e 0 7 600 470 0 0"]
+    klick(ev, 30, 100, zeile)
+    klick(ev, 50, 670, 427)
+    klick(ev, 80, 540, 427)
+    ARRAY_PUSH(ev, "e 110 2 257 0 0 0")
+    ARRAY_PUSH(ev, "e 112 1 257 0 0 0")
+    RETURN ev
+END FUNCTION
+
+DIM code AS STRING : code = ARG$(1) + "/buecher/anwendungen/code/"
+DIM p AS STRING : p = CWD$() + "/kap11_mediathek"
+kopieren(code + "kap11/mediathek", p)
+' Erster Lauf misst die Lagen im Navigator.
+DIM m AS STRING : m = CWD$() + "/messen.log"
+slStarten(m, "", 6, p)
+DIM px AS INTEGER
+DIM py AS INTEGER
+(px, py) = slLage(m, "knoten (projekt)")
+DIM kx AS INTEGER
+DIM ky AS INTEGER
+(kx, ky) = slLage(m, "knoten Hauptfenster.knopfEntfernen_Klick")
+' Der Navigator ist kurz: das Mausrad schiebt je Raststufe eine Zeile (22).
+DIM stufen AS INTEGER : stufen = MAX(0, (ky - py - 88) \ 22)
+slZeilen = []
+slBild = 0
+slHin(px + 60, py + 40)
+slWarten(10)
+ARRAY_PUSH(slZeilen, "e " + STR$(slBild) + " 8 0 " + STR$(-stufen) + " 0 0")
+slWarten(10)
+slKlick(kx + 40, ky - 22 * stufen)
+slWarten(20)
+slMit([341], 268)
+slWarten(4)
+DIM k AS INTEGER
+FOR k = 1 TO 9
+    slTaste(264)
+NEXT
+slTaste(298)
+slWarten(10)
+slTaste(296)
+slWarten(600)
+slTaste(300)
+slWarten(120)
+slMit([340], 294)
+slWarten(60)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+DIM kind AS STRING : kind = CWD$() + "/kind.txt"
+DIM ke AS ARRAY OF STRING : ke = entfernen(71)
+WRITEALL(kind, "c " + STR$(LEN(ke)) + CHR$(10) + JOIN$(ke, CHR$(10)) + CHR$(10) + CHR$(10))
+SETENV("DHRT_ABSPIELEN", kind)
+DIM log AS STRING : log = CWD$() + "/s.log"
+slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+SETENV("DHRT_ABSPIELEN", "")
+DIM z AS STRING
+FOR EACH z IN slProtokoll(log)
+    IF LEFT$(z, 11) = "haltepunkt " OR LEFT$(z, 11) = "angehalten " OR LEFT$(z, 6) = "debug " THEN PRINT z
+    IF z = "variable Self = <Hauptfenster>" OR z = "variable z = 1" OR z = "variable t = Metropolis" THEN PRINT z
+    IF z = "variable Self = <AusleihFenster>" THEN PRINT z
+    IF z = "variable eintraege = <ARRAY[4] OF Eintrag>" OR LEFT$(z, 11) = "variable e " THEN PRINT z
+NEXT
+
+' Was schiefgehen kann: ein Laufzeitfehler haelt im Debugger an seiner
+' Stelle -- die Mediathek aus Kapitel 11 ohne die Abfrage, ob das
+' Ausleihfenster offen ist; ein Klick auf Momo. Self.gewaehlt ist NIL.
+DIM pf AS STRING : pf = CWD$() + "/kap11_ohne_offen"
+kopieren(code + "kap11/mediathek", pf)
+DIM af AS STRING : af = pf + "/AusleihFenster.dh"
+WRITEALL(af, REPLACE$(READALL(af), "IF Self.offen THEN Self.anzeigen()", "Self.anzeigen()"))
+slZeilen = []
+slBild = 0
+slHin(10, 10)
+slWarten(10)
+slTaste(296)
+slWarten(600)
+slMit([340], 294)
+slWarten(60)
+slAufnahmeSchreiben(CWD$() + "/ev2.txt")
+ke = ["e 0 7 600 470 0 0"]
+klick(ke, 30, 100, 51)
+WRITEALL(kind, "c " + STR$(LEN(ke)) + CHR$(10) + JOIN$(ke, CHR$(10)) + CHR$(10) + CHR$(10))
+SETENV("DHRT_ABSPIELEN", kind)
+DIM log2 AS STRING : log2 = CWD$() + "/s2.log"
+slStarten(log2, CWD$() + "/ev2.txt", slBild + 20, pf)
+SETENV("DHRT_ABSPIELEN", "")
+FOR EACH z IN slProtokoll(log2)
+    IF LEFT$(z, 11) = "angehalten " OR z = "variable Self = <AusleihFenster>" OR z = "variable gewaehlt = NIL" THEN PRINT z
+    IF z = "variable offen = FALSE" OR INSTR(z, "Laufzeitfehler in AusleihFenster.anzeigen") >= 0 THEN PRINT z
+NEXT
+
+' Die Korrektur: nach Entfernen folgt das Ausleihfenster der Tabelle.
+DIM proj AS STRING
+FOR EACH proj IN ["kap12/mediathek", "loesungen/kap12_letzter", "loesungen/kap12_hinweis"]
+    DIM nm AS STRING : nm = BASENAME(proj)
+    IF nm = "mediathek" THEN nm = "kap12_mediathek"
+    DIM pp AS STRING : pp = CWD$() + "/" + nm
+    kopieren(code + proj, pp)
+    slZeilen = []
+    slBild = 0
+    slHin(10, 10)
+    slWarten(10)
+    slTaste(294)
+    slWarten(150)
+    slAufnahmeSchreiben(CWD$() + "/f5.txt")
+    SETENV("DH_STUDIO_LAUF_BILDER", "20")
+    DIM lg AS STRING : lg = CWD$() + "/" + nm + ".log"
+    DIM aus AS STRING : aus = slStarten(lg, CWD$() + "/f5.txt", slBild + 20, pp)
+    PRINT nm; " geprueft "; slHat(lg, "geprueft 0 0"); " beendet "; slHat(lg, "beendet 0")
+    IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+NEXT
+DIM a AS STRING
+a = bedienen$(CWD$() + "/kap12_mediathek/_studio/main.dh", entfernen(71), 140)
+PRINT "korrigiert "; INSTR(a, "Tetris ist bei Lena.") >= 0
+' Drehen 3: der letzte Eintrag -- danach ist keine Zeile gewaehlt.
+a = bedienen$(CWD$() + "/kap12_mediathek/_studio/main.dh", entfernen(131), 140)
+PRINT "letzter "; INSTR(a, "Kein Eintrag gew") >= 0
+' Erweitern 1: dann der davor.
+a = bedienen$(CWD$() + "/kap12_letzter/_studio/main.dh", entfernen(131), 140)
+PRINT "davor "; INSTR(a, "Kind of Blue ist da.") >= 0
+' Erweitern 2: Bearbeiten und Entfernen ohne Auswahl sagen es.
+DIM ohne AS ARRAY OF STRING
+FOR EACH k IN [415, 540]
+    ohne = ["e 0 7 600 470 0 0"]
+    klick(ohne, 6, k, 427)
+    a = bedienen$(CWD$() + "/kap12_hinweis/_studio/main.dh", ohne, 30)
+    PRINT "hinweis "; INSTR(a, "Bitte erst einen Eintrag w") >= 0
+NEXT
+--- argumente
+{sammlung}/../../../studio/studio.dh
+{sammlung}/../../..
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- erwartet
+haltepunkt Hauptfenster.knopfEntfernen_Klick 10
+debug gestartet
+debug continue
+variable Self = <Hauptfenster>
+variable eintraege = <ARRAY[4] OF Eintrag>
+variable z = 1
+variable t = Metropolis
+angehalten Hauptfenster.knopfEntfernen_Klick, Zeile 10
+debug step-into
+variable Self = <AusleihFenster>
+variable e = NIL
+angehalten AusleihFenster.folgen, Zeile 1
+debug stop
+debug ende
+ausgabe Laufzeitfehler in AusleihFenster.anzeigen, Zeile 4: GUI_SET_TEXT: erwartet INTEGER (Arg 1), erhalten NIL -- das Widget oder Fenster gibt es noch nicht (ein Fenster aus dem Studio legt seine Controls erst mit Zeigen an)
+variable Self = <AusleihFenster>
+variable offen = FALSE
+variable gewaehlt = NIL
+angehalten AusleihFenster.anzeigen, Zeile 4
+kap12_mediathek geprueft TRUE beendet TRUE
+kap12_letzter geprueft TRUE beendet TRUE
+kap12_hinweis geprueft TRUE beendet TRUE
+korrigiert TRUE
+letzter TRUE
+davor TRUE
+hinweis TRUE
+hinweis TRUE
+
+=== kapitel 13: das datenbank-element
+' Kapitel 13: die Mediathek mit dem Datenbank-Element Mediathek (eintrag,
+' freund, ausleihe). Der erste Start traegt die Beispiele samt der
+' Ausleihe an Lena ein; Zurueck schreibt das Datum, Entfernen loescht die
+' Ausleihe mit (Verweis mit "mitloeschen"). Eine Datei aus Teil I behaelt
+' ihre Eintraege und bekommt die neuen Tabellen. Dazu die Loesungen.
+IMPORT "laeufer.dh"
+IMPORT "db"
+SUB kopieren(von AS STRING, nach AS STRING)
+    IF NOT DIREXISTS(nach) THEN MKDIR(nach)
+    DIM n AS STRING
+    FOR EACH n IN DIRLIST(von)
+        IF DIREXISTS(von + "/" + n) THEN
+            IF n <> "_studio" THEN kopieren(von + "/" + n, nach + "/" + n)
+        ELSEIF RIGHT$(n, 3) <> ".db" THEN
+            COPYFILE(von + "/" + n, nach + "/" + n)
+        END IF
+    NEXT
+END SUB
+FUNCTION bedienen$(main AS STRING, ev AS ARRAY OF STRING, bilder AS INTEGER) AS STRING
+    DIM pf AS STRING : pf = CWD$() + "/bedienung.txt"
+    WRITEALL(pf, "c " + STR$(LEN(ev)) + CHR$(10) + JOIN$(ev, CHR$(10)) + CHR$(10) + CHR$(10))
+    SETENV("DHRT_ABSPIELEN", pf)
+    SETENV("DHRT_GUI_ZUSTAND", "1")
+    DIM q AS INTEGER : q = PROCESS_START("dhrt", "run", "--bilder", STR$(bilder), main)
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    WHILE leer < 5
+        DIM t AS STRING : t = PROCESS_READ$(q) + PROCESS_ERR$(q)
+        aus = aus + t
+        IF t = "" AND NOT PROCESS_RUNNING(q) THEN leer = leer + 1
+        SLEEP(20)
+    WEND
+    SETENV("DHRT_ABSPIELEN", "")
+    SETENV("DHRT_GUI_ZUSTAND", "")
+    RETURN aus
+END FUNCTION
+SUB klick(ev AS ARRAY OF STRING, b AS INTEGER, x AS INTEGER, y AS INTEGER)
+    ARRAY_PUSH(ev, "e " + STR$(b) + " 7 " + STR$(x) + " " + STR$(y) + " 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 2) + " 7 " + STR$(x) + " " + STR$(y) + " 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 4) + " 6 0 0 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 6) + " 5 0 0 0 0")
+END SUB
+' Zahl der Zeilen einer Abfrage in einer Datei.
+FUNCTION zahl(datei AS STRING, sql AS STRING) AS INTEGER
+    DIM d AS DB_CONN : d = DB_OPEN(datei)
+    DIM r AS DB_RESULT : r = DB_QUERY(d, sql)
+    DIM n AS INTEGER : n = -1
+    IF DB_NEXT(r) THEN n = DB_GET_INT(r, 0)
+    DB_CLOSE(d)
+    RETURN n
+END FUNCTION
+SUB f5(nm AS STRING, p AS STRING)
+    slZeilen = []
+    slBild = 0
+    slHin(10, 10)
+    slWarten(10)
+    slTaste(294)
+    slWarten(150)
+    slAufnahmeSchreiben(CWD$() + "/f5.txt")
+    SETENV("DH_STUDIO_LAUF_BILDER", "20")
+    DIM lg AS STRING : lg = CWD$() + "/" + nm + ".log"
+    DIM aus AS STRING : aus = slStarten(lg, CWD$() + "/f5.txt", slBild + 20, p)
+    PRINT nm; " geprueft "; slHat(lg, "geprueft 0 0"); " beendet "; slHat(lg, "beendet 0")
+    IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+END SUB
+
+DIM code AS STRING : code = ARG$(1) + "/buecher/anwendungen/code/"
+DIM proj AS STRING
+FOR EACH proj IN ["kap13/mediathek", "loesungen/kap13_telefon", "loesungen/kap13_schlagwoerter"]
+    DIM nm AS STRING : nm = BASENAME(proj)
+    IF nm = "mediathek" THEN nm = "kap13_mediathek"
+    kopieren(code + proj, CWD$() + "/" + nm)
+    f5(nm, CWD$() + "/" + nm)
+NEXT
+' Der erste Start aus dem Studio arbeitet auf der Datei im Projektordner.
+DIM pd AS STRING : pd = CWD$() + "/kap13_mediathek/mediathek.db"
+PRINT "eingerichtet "; zahl(pd, "SELECT COUNT(*) FROM eintrag"); " "; zahl(pd, "SELECT COUNT(*) FROM freund"); " "; zahl(pd, "SELECT COUNT(*) FROM ausleihe")
+' Das Programm selbst (ohne Studio) legt seine Datei neben main.dh an.
+DIM m AS STRING : m = CWD$() + "/kap13_mediathek/_studio/main.dh"
+DIM sd AS STRING : sd = CWD$() + "/kap13_mediathek/_studio/mediathek.db"
+DIM ev AS ARRAY OF STRING
+DIM a AS STRING
+ev = []
+klick(ev, 0, 100, 91)
+klick(ev, 10, 670, 427)
+klick(ev, 30, 505, 292)
+a = bedienen$(m, ev, 60)
+PRINT "zurueck "; INSTR(a, "Tetris ist da.") >= 0; " "; zahl(sd, "SELECT COUNT(*) FROM ausleihe WHERE zurueck IS NOT NULL")
+ev = []
+klick(ev, 0, 100, 91)
+klick(ev, 10, 540, 427)
+ARRAY_PUSH(ev, "e 30 2 257 0 0 0")
+ARRAY_PUSH(ev, "e 32 1 257 0 0 0")
+a = bedienen$(m, ev, 70)
+PRINT "entfernt "; zahl(sd, "SELECT COUNT(*) FROM eintrag"); " ausleihen "; zahl(sd, "SELECT COUNT(*) FROM ausleihe")
+' Die Datei aus Teil I: fuenf Eintraege, nur die Tabelle eintrag.
+DIM pt AS STRING : pt = CWD$() + "/teil1"
+kopieren(code + "kap13/mediathek", pt)
+DIM d1 AS DB_CONN : d1 = DB_OPEN(pt + "/mediathek.db")
+DB_EXEC(d1, "CREATE TABLE eintrag (id INTEGER PRIMARY KEY, titel TEXT NOT NULL, urheber TEXT, art TEXT, jahr INTEGER)")
+DB_EXEC(d1, "INSERT INTO eintrag (titel, urheber, art, jahr) VALUES ('Momo', 'Michael Ende', 'Buch', 1973)")
+DB_EXEC(d1, "INSERT INTO eintrag (titel, urheber, art, jahr) VALUES ('Ronja', 'Astrid Lindgren', 'Buch', NULL)")
+DB_CLOSE(d1)
+f5("teil1", pt)
+PRINT "teil 1 "; zahl(pt + "/mediathek.db", "SELECT COUNT(*) FROM eintrag"); " "; zahl(pt + "/mediathek.db", "SELECT COUNT(*) FROM freund"); " "; zahl(pt + "/mediathek.db", "SELECT COUNT(*) FROM ausleihe")
+' Erweitern 1: Lenas Telefonnummer im Ausleihfenster.
+DIM mt AS STRING : mt = CWD$() + "/kap13_telefon/_studio/main.dh"
+a = bedienen$(mt, ["e 0 7 1 1 0 0"], 5)
+DIM d2 AS DB_CONN : d2 = DB_OPEN(CWD$() + "/kap13_telefon/_studio/mediathek.db")
+DB_EXEC(d2, "UPDATE freund SET telefon = '0151 2345678' WHERE name = 'Lena'")
+DB_CLOSE(d2)
+ev = []
+klick(ev, 0, 100, 91)
+klick(ev, 10, 670, 427)
+PRINT "telefon "; INSTR(bedienen$(mt, ev, 50), "Tetris ist bei Lena (0151 2345678).") >= 0
+' Erweitern 2: Schlagwoerter in der Statuszeile.
+ev = []
+klick(ev, 0, 100, 131)
+PRINT "schlagwoerter "; INSTR(bedienen$(CWD$() + "/kap13_schlagwoerter/_studio/main.dh", ev, 40), "Emil und die Detektive: Kinderbuch, Klassiker") >= 0
+--- argumente
+{sammlung}/../../../studio/studio.dh
+{sammlung}/../../..
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- erwartet
+kap13_mediathek geprueft TRUE beendet TRUE
+kap13_telefon geprueft TRUE beendet TRUE
+kap13_schlagwoerter geprueft TRUE beendet TRUE
+eingerichtet 5 1 1
+zurueck TRUE 1
+entfernt 4 ausleihen 0
+teil1 geprueft TRUE beendet TRUE
+teil 1 2 0 0
+telefon TRUE
+schlagwoerter TRUE
+
+=== kapitel 14: datenbindung
+' Kapitel 14: das Bearbeitungsfenster an die Tabelle eintrag gebunden, die
+' Tabelle des Hauptfensters an eine Datenquelle mit Sortierung und
+' Suchfeld. Eine Kopie des Programms legt den Suchtext (SUCHE) in die
+' Zwischenablage -- jedes Kind im Test hat eine eigene --, Strg+V im
+' Suchfeld filtert. Dazu die Loesungen und "Pflicht ist keine Pruefregel".
+IMPORT "laeufer.dh"
+IMPORT "db"
+SUB kopieren(von AS STRING, nach AS STRING)
+    IF NOT DIREXISTS(nach) THEN MKDIR(nach)
+    DIM n AS STRING
+    FOR EACH n IN DIRLIST(von)
+        IF DIREXISTS(von + "/" + n) THEN
+            IF n <> "_studio" THEN kopieren(von + "/" + n, nach + "/" + n)
+        ELSEIF RIGHT$(n, 3) <> ".db" THEN
+            COPYFILE(von + "/" + n, nach + "/" + n)
+        END IF
+    NEXT
+END SUB
+FUNCTION bedienen$(main AS STRING, ev AS ARRAY OF STRING, bilder AS INTEGER) AS STRING
+    DIM pf AS STRING : pf = CWD$() + "/bedienung.txt"
+    WRITEALL(pf, "c " + STR$(LEN(ev)) + CHR$(10) + JOIN$(ev, CHR$(10)) + CHR$(10) + CHR$(10))
+    SETENV("DHRT_ABSPIELEN", pf)
+    SETENV("DHRT_GUI_ZUSTAND", "1")
+    DIM q AS INTEGER : q = PROCESS_START("dhrt", "run", "--bilder", STR$(bilder), main)
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    WHILE leer < 5
+        DIM t AS STRING : t = PROCESS_READ$(q) + PROCESS_ERR$(q)
+        aus = aus + t
+        IF t = "" AND NOT PROCESS_RUNNING(q) THEN leer = leer + 1
+        SLEEP(20)
+    WEND
+    SETENV("DHRT_ABSPIELEN", "")
+    SETENV("DHRT_GUI_ZUSTAND", "")
+    RETURN aus
+END FUNCTION
+SUB klick(ev AS ARRAY OF STRING, b AS INTEGER, x AS INTEGER, y AS INTEGER)
+    ARRAY_PUSH(ev, "e " + STR$(b) + " 7 " + STR$(x) + " " + STR$(y) + " 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 2) + " 7 " + STR$(x) + " " + STR$(y) + " 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 4) + " 6 0 0 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 6) + " 5 0 0 0 0")
+END SUB
+' Die Zeile des Zustands zu einem Widget.
+FUNCTION zeile$(aus AS STRING, was AS STRING) AS STRING
+    DIM z AS STRING
+    FOR EACH z IN SPLIT$(REPLACE$(aus, CHR$(13), ""), CHR$(10))
+        IF INSTR(z, was) >= 0 THEN RETURN TRIM$(z)
+    NEXT
+    RETURN ""
+END FUNCTION
+FUNCTION wert$(datei AS STRING, sql AS STRING) AS STRING
+    DIM d AS DB_CONN : d = DB_OPEN(datei)
+    DIM r AS DB_RESULT : r = DB_QUERY(d, sql)
+    DIM w AS STRING : w = "?"
+    IF DB_NEXT(r) THEN w = DB_GET_STRING(r, 0)
+    DB_CLOSE(d)
+    RETURN w
+END FUNCTION
+SUB f5(nm AS STRING, p AS STRING)
+    slZeilen = []
+    slBild = 0
+    slHin(10, 10)
+    slWarten(10)
+    slTaste(294)
+    slWarten(150)
+    slAufnahmeSchreiben(CWD$() + "/f5.txt")
+    SETENV("DH_STUDIO_LAUF_BILDER", "20")
+    DIM lg AS STRING : lg = CWD$() + "/" + nm + ".log"
+    DIM aus AS STRING : aus = slStarten(lg, CWD$() + "/f5.txt", slBild + 20, p)
+    PRINT nm; " geprueft "; slHat(lg, "geprueft 0 0"); " beendet "; slHat(lg, "beendet 0")
+    IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+END SUB
+SUB ersetzen(datei AS STRING, alt AS STRING, neu AS STRING)
+    DIM t AS STRING : t = READALL(datei)
+    IF INSTR(t, alt) < 0 THEN PRINT "nicht gefunden: "; alt
+    WRITEALL(datei, REPLACE$(t, alt, neu))
+END SUB
+
+DIM code AS STRING : code = ARG$(1) + "/buecher/anwendungen/code/"
+DIM proj AS STRING
+FOR EACH proj IN ["kap14/mediathek", "loesungen/kap14_verliehen", "loesungen/kap14_freunde"]
+    DIM nm AS STRING : nm = BASENAME(proj)
+    IF nm = "mediathek" THEN nm = "kap14_mediathek"
+    kopieren(code + proj, CWD$() + "/" + nm)
+    f5(nm, CWD$() + "/" + nm)
+NEXT
+DIM m AS STRING : m = CWD$() + "/kap14_mediathek/_studio/main.dh"
+DIM sd AS STRING : sd = CWD$() + "/kap14_mediathek/_studio/mediathek.db"
+' Die Suche: die Kopie legt SUCHE in die Zwischenablage.
+ersetzen(CWD$() + "/kap14_mediathek/_studio/projekt/Hauptfenster.dh", "        Self.statusZeigen()" + CHR$(10) + "    END SUB", "        Self.statusZeigen()" + CHR$(10) + "        CLIPBOARD_SET(GETENV$(" + CHR$(34) + "SUCHE" + CHR$(34) + "))" + CHR$(10) + "    END SUB")
+DIM ev AS ARRAY OF STRING
+DIM a AS STRING
+PRINT zeile$(bedienen$(m, ["e 0 7 1 1 0 0"], 10), "table#tabelle")
+DIM such AS STRING
+FOR EACH such IN ["Ende", "19"]
+    SETENV("SUCHE", such)
+    ev = []
+    klick(ev, 0, 200, 34)
+    ARRAY_PUSH(ev, "e 12 2 341 0 0 0")
+    ARRAY_PUSH(ev, "e 14 2 86 0 0 0")
+    ARRAY_PUSH(ev, "e 16 1 86 0 0 0")
+    ARRAY_PUSH(ev, "e 18 1 341 0 0 0")
+    PRINT such; ": "; zeile$(bedienen$(m, ev, 40), "table#tabelle")
+NEXT
+' Das Ausleihfenster folgt der Auswahl (Zeilen nach Titel: Tetris 171).
+ev = []
+klick(ev, 0, 100, 171)
+klick(ev, 10, 670, 427)
+PRINT zeile$(bedienen$(m, ev, 50), "label#gewaehlt")
+' Metropolis (131) bearbeiten: die Klappliste schreibt "Spiel".
+ev = []
+klick(ev, 0, 100, 131)
+klick(ev, 10, 415, 427)
+klick(ev, 28, 420, 233)
+klick(ev, 46, 420, 301)
+klick(ev, 60, 410, 337)
+a = bedienen$(m, ev, 100)
+PRINT "metropolis "; wert$(sd, "SELECT art FROM eintrag WHERE titel = 'Metropolis'")
+' Tetris entfernen: die Ausleihe geht mit.
+ev = []
+klick(ev, 0, 100, 171)
+klick(ev, 10, 540, 427)
+ARRAY_PUSH(ev, "e 30 2 257 0 0 0")
+ARRAY_PUSH(ev, "e 32 1 257 0 0 0")
+a = bedienen$(m, ev, 70)
+PRINT zeile$(a, "label#status"); " ausleihen "; wert$(sd, "SELECT COUNT(*) FROM ausleihe")
+' Erweitern 1: nur was verliehen ist (Menueleiste: 26 tiefer).
+ev = []
+klick(ev, 0, 40, 13)
+klick(ev, 12, 80, 40)
+PRINT zeile$(bedienen$(CWD$() + "/kap14_verliehen/_studio/main.dh", ev, 40), "table#liste")
+' Erweitern 2: Lena laden und loeschen -- der Verweis verbietet es.
+ev = []
+klick(ev, 0, 45, 13)
+klick(ev, 12, 80, 40)
+klick(ev, 28, 160, 167)
+klick(ev, 42, 575, 381)
+a = bedienen$(CWD$() + "/kap14_freunde/_studio/main.dh", ev, 60)
+PRINT zeile$(a, "textinput#feldname"); " | "; INSTR(zeile$(a, "label#hinweis"), "Nicht gelöscht: DB_EXEC: FOREIGN KEY constraint failed -- auf die Zeile zeigt noch") >= 0
+' Was schiefgehen kann: ohne GUI_RULE nimmt das Fenster einen leeren Titel.
+ersetzen(CWD$() + "/kap14_mediathek/_studio/projekt/EintragFenster.dh", "GUI_RULE(", "' GUI_RULE(")
+ersetzen(CWD$() + "/kap14_mediathek/_studio/projekt/EintragFenster.dh", "                 " + CHR$(34) + "Bitte einen Titel", "' " + CHR$(34) + "Bitte einen Titel")
+ev = []
+klick(ev, 0, 295, 427)
+klick(ev, 20, 410, 337)
+a = bedienen$(m, ev, 60)
+PRINT "ohne regel "; wert$(sd, "SELECT COUNT(*) FROM eintrag WHERE titel = ''")
+--- argumente
+{sammlung}/../../../studio/studio.dh
+{sammlung}/../../..
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- erwartet
+kap14_mediathek geprueft TRUE beendet TRUE
+kap14_verliehen geprueft TRUE beendet TRUE
+kap14_freunde geprueft TRUE beendet TRUE
+table#tabelle 5 Zeilen, gewaehlt -1: "Emil und die Detektive" "Kind of Blue" "Metropolis" "Momo" "Tetris"
+Ende: table#tabelle 1 Zeilen, gewaehlt -1: "Momo"
+19: table#tabelle 5 Zeilen, gewaehlt -1: "Emil und die Detektive" "Kind of Blue" "Metropolis" "Momo" "Tetris"
+label#gewaehlt "Tetris ist bei Lena."
+metropolis Spiel
+label#status "4 Einträge" ausleihen 0
+table#liste 1 Zeilen, gewaehlt -1: "Tetris"
+textinput#feldname "Lena" | TRUE
+ohne regel 1
+
+
+=== kapitel 15: abfragen, die rechnen
+' Kapitel 15: die Tabelle an der Abfrage bestand (Verliehen an), die
+' Fenster Ueberfaellig und Statistik aus dem Menue Ansicht, "seit 40 Tagen"
+' mit dem Zeit-Modul, und nach Zurueck behaelt die Tabelle ihre Auswahl.
+' Dazu die Loesungen (am haeufigsten verliehen, Ausleihen je Monat).
+IMPORT "laeufer.dh"
+IMPORT "db"
+IMPORT "json"
+SUB kopieren(von AS STRING, nach AS STRING)
+    IF NOT DIREXISTS(nach) THEN MKDIR(nach)
+    DIM n AS STRING
+    FOR EACH n IN DIRLIST(von)
+        IF DIREXISTS(von + "/" + n) THEN
+            IF n <> "_studio" THEN kopieren(von + "/" + n, nach + "/" + n)
+        ELSEIF RIGHT$(n, 3) <> ".db" THEN
+            COPYFILE(von + "/" + n, nach + "/" + n)
+        END IF
+    NEXT
+END SUB
+FUNCTION bedienen$(main AS STRING, ev AS ARRAY OF STRING, bilder AS INTEGER) AS STRING
+    DIM pf AS STRING : pf = CWD$() + "/bedienung.txt"
+    WRITEALL(pf, "c " + STR$(LEN(ev)) + CHR$(10) + JOIN$(ev, CHR$(10)) + CHR$(10) + CHR$(10))
+    SETENV("DHRT_ABSPIELEN", pf)
+    SETENV("DHRT_GUI_ZUSTAND", "1")
+    DIM q AS INTEGER : q = PROCESS_START("dhrt", "run", "--bilder", STR$(bilder), main)
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    WHILE leer < 5
+        DIM t AS STRING : t = PROCESS_READ$(q) + PROCESS_ERR$(q)
+        aus = aus + t
+        IF t = "" AND NOT PROCESS_RUNNING(q) THEN leer = leer + 1
+        SLEEP(20)
+    WEND
+    SETENV("DHRT_ABSPIELEN", "")
+    SETENV("DHRT_GUI_ZUSTAND", "")
+    RETURN aus
+END FUNCTION
+SUB klick(ev AS ARRAY OF STRING, b AS INTEGER, x AS INTEGER, y AS INTEGER)
+    ARRAY_PUSH(ev, "e " + STR$(b) + " 7 " + STR$(x) + " " + STR$(y) + " 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 2) + " 7 " + STR$(x) + " " + STR$(y) + " 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 4) + " 6 0 0 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 6) + " 5 0 0 0 0")
+END SUB
+' Die Zeile des Zustands zu einem Widget.
+FUNCTION zeile$(aus AS STRING, was AS STRING) AS STRING
+    DIM z AS STRING
+    FOR EACH z IN SPLIT$(REPLACE$(aus, CHR$(13), ""), CHR$(10))
+        IF INSTR(z, was) >= 0 THEN RETURN TRIM$(z)
+    NEXT
+    RETURN ""
+END FUNCTION
+FUNCTION wert$(datei AS STRING, sql AS STRING) AS STRING
+    DIM d AS DB_CONN : d = DB_OPEN(datei)
+    DIM r AS DB_RESULT : r = DB_QUERY(d, sql)
+    DIM w AS STRING : w = "?"
+    IF DB_NEXT(r) THEN w = DB_GET_STRING(r, 0)
+    DB_CLOSE(d)
+    RETURN w
+END FUNCTION
+SUB f5(nm AS STRING, p AS STRING)
+    slZeilen = []
+    slBild = 0
+    slHin(10, 10)
+    slWarten(10)
+    slTaste(294)
+    slWarten(150)
+    slAufnahmeSchreiben(CWD$() + "/f5.txt")
+    SETENV("DH_STUDIO_LAUF_BILDER", "20")
+    DIM lg AS STRING : lg = CWD$() + "/" + nm + ".log"
+    DIM aus AS STRING : aus = slStarten(lg, CWD$() + "/f5.txt", slBild + 20, p)
+    PRINT nm; " geprueft "; slHat(lg, "geprueft 0 0"); " beendet "; slHat(lg, "beendet 0")
+    IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+END SUB
+SUB ersetzen(datei AS STRING, alt AS STRING, neu AS STRING)
+    DIM t AS STRING : t = READALL(datei)
+    IF INSTR(t, alt) < 0 THEN PRINT "nicht gefunden: "; alt
+    WRITEALL(datei, REPLACE$(t, alt, neu))
+END SUB
+
+DIM code AS STRING : code = ARG$(1) + "/buecher/anwendungen/code/"
+DIM proj AS STRING
+FOR EACH proj IN ["kap15/mediathek", "loesungen/kap15_beliebt", "loesungen/kap15_monate"]
+    DIM nm AS STRING : nm = BASENAME(proj)
+    IF nm = "mediathek" THEN nm = "kap15_mediathek"
+    kopieren(code + proj, CWD$() + "/" + nm)
+    f5(nm, CWD$() + "/" + nm)
+NEXT
+DIM m AS STRING : m = CWD$() + "/kap15_mediathek/_studio/main.dh"
+DIM sd AS STRING : sd = CWD$() + "/kap15_mediathek/_studio/mediathek.db"
+ersetzen(CWD$() + "/kap15_mediathek/_studio/projekt/Hauptfenster.dh", "        Self.statusZeigen()" + CHR$(10) + "    END SUB", "        Self.statusZeigen()" + CHR$(10) + "        CLIPBOARD_SET(GETENV$(" + CHR$(34) + "SUCHE" + CHR$(34) + "))" + CHR$(10) + "    END SUB")
+DIM ev AS ARRAY OF STRING
+DIM a AS STRING
+' Mit Menueleiste liegt alles 26 tiefer: Suchfeld 60, Zeilen ab 117.
+SETENV("SUCHE", "Lena")
+ev = []
+klick(ev, 0, 200, 60)
+ARRAY_PUSH(ev, "e 12 2 341 0 0 0")
+ARRAY_PUSH(ev, "e 14 2 86 0 0 0")
+ARRAY_PUSH(ev, "e 16 1 86 0 0 0")
+ARRAY_PUSH(ev, "e 18 1 341 0 0 0")
+PRINT "Lena: "; zeile$(bedienen$(m, ev, 40), "table#tabelle")
+' Jonas hat Momo zurueckgegeben -- bestand zeigt ihn nirgends.
+SETENV("SUCHE", "Jonas")
+PRINT "Jonas: "; zeile$(bedienen$(m, ev, 40), "table#tabelle")
+' Tetris (197) waehlen, Ausleihen (453): seit 40 Tagen.
+ev = []
+klick(ev, 0, 100, 197)
+klick(ev, 10, 670, 453)
+PRINT zeile$(bedienen$(m, ev, 50), "label#gewaehlt")
+' Ansicht -> Ueberfaellig, Ansicht -> Statistik.
+ev = []
+klick(ev, 0, 40, 13)
+klick(ev, 12, 60, 40)
+PRINT "ueberfaellig "; zeile$(bedienen$(m, ev, 40), "table#liste")
+ev = []
+klick(ev, 0, 40, 13)
+klick(ev, 12, 60, 63)
+PRINT "statistik "; zeile$(bedienen$(m, ev, 40), "table#liste")
+' Die Zahlen rechnet die Abfrage statistik selbst -- aus der Datei des
+' Projekts gelesen und an der Datenbank des Programms ausgefuehrt.
+DIM schema AS JSON_HANDLE : schema = JSON_LOAD(CWD$() + "/kap15_mediathek/Mediathek.dhdb")
+DIM stat AS STRING : stat = JSON_GET_STRING(schema, "abfragen.2.sql")
+DIM d AS DB_CONN : d = DB_OPEN(sd)
+DIM r AS DB_RESULT : r = DB_QUERY(d, "SELECT art, eintraege, verliehen FROM (" + stat + ") ORDER BY art")
+DIM zahlen AS ARRAY OF STRING
+WHILE DB_NEXT(r)
+    ARRAY_PUSH(zahlen, DB_GET_STRING(r, 0) + " " + DB_GET_STRING(r, 1) + " " + DB_GET_STRING(r, 2))
+WEND
+PRINT "zahlen "; JOIN$(zahlen, ", ")
+DB_CLOSE(d)
+' Zurueck: die Tabelle laedt neu und behaelt Tetris; nichts ist ueberfaellig.
+ev = []
+klick(ev, 0, 100, 197)
+klick(ev, 10, 670, 453)
+klick(ev, 30, 505, 318)
+a = bedienen$(m, ev, 60)
+PRINT zeile$(a, "table#tabelle"); " | "; zeile$(a, "label#gewaehlt")
+ev = []
+klick(ev, 0, 40, 13)
+klick(ev, 12, 60, 40)
+PRINT "danach "; zeile$(bedienen$(m, ev, 40), "table#liste")
+' Die Loesungen: der dritte Punkt im Menue Ansicht.
+ev = []
+klick(ev, 0, 40, 13)
+klick(ev, 12, 60, 87)
+PRINT "beliebt "; zeile$(bedienen$(CWD$() + "/kap15_beliebt/_studio/main.dh", ev, 40), "table#liste")
+a = zeile$(bedienen$(CWD$() + "/kap15_monate/_studio/main.dh", ev, 40), "table#liste")
+PRINT "monate "; LEFT$(a, 20)
+--- argumente
+{sammlung}/../../../studio/studio.dh
+{sammlung}/../../..
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- erwartet
+kap15_mediathek geprueft TRUE beendet TRUE
+kap15_beliebt geprueft TRUE beendet TRUE
+kap15_monate geprueft TRUE beendet TRUE
+Lena: table#tabelle 1 Zeilen, gewaehlt -1: "Tetris"
+Jonas: table#tabelle 0 Zeilen, gewaehlt -1:
+label#gewaehlt "Tetris ist seit 40 Tagen bei Lena."
+ueberfaellig table#liste 1 Zeilen, gewaehlt -1: "Tetris"
+statistik table#liste 4 Zeilen, gewaehlt -1: "Buch" "Film" "Musik" "Spiel"
+zahlen Buch 2 0, Film 1 0, Musik 1 0, Spiel 1 1
+table#tabelle 5 Zeilen, gewaehlt 4 ("Tetris" "Alexei Paschitnow" "Spiel" "1984" ""): "Emil und die Detektive" "Kind of Blue" "Metropolis" "Momo" "Tetris" | label#gewaehlt "Tetris ist da."
+danach table#liste 0 Zeilen, gewaehlt -1:
+beliebt table#liste 2 Zeilen, gewaehlt -1: "Momo" "Tetris"
+monate table#liste 2 Zeilen
+
+
+=== kapitel 16: aus dem netz
+' Kapitel 16: das Bearbeitungsfenster schlaegt eine ISBN nach -- gegen einen
+' Server, der Open Library spielt (server.dh, Port in port.txt). Die Kopien
+' der Programme bekommen dessen Adresse als QUELLE und legen die ISBN
+' (Umgebung ISBN) in die Zwischenablage. Bekannt mit Bindestrichen, mit
+' Cover und Sichern; unbekannt; zu kurz; Abbrechen einer langsamen Antwort;
+' kein Netz. Dazu die Loesungen (Cache, Sekunden).
+IMPORT "laeufer.dh"
+IMPORT "db"
+IMPORT "json"
+SUB kopieren(von AS STRING, nach AS STRING)
+    IF NOT DIREXISTS(nach) THEN MKDIR(nach)
+    DIM n AS STRING
+    FOR EACH n IN DIRLIST(von)
+        IF DIREXISTS(von + "/" + n) THEN
+            IF n <> "_studio" THEN kopieren(von + "/" + n, nach + "/" + n)
+        ELSEIF RIGHT$(n, 3) <> ".db" THEN
+            COPYFILE(von + "/" + n, nach + "/" + n)
+        END IF
+    NEXT
+END SUB
+FUNCTION bedienen$(main AS STRING, ev AS ARRAY OF STRING, bilder AS INTEGER) AS STRING
+    DIM pf AS STRING : pf = CWD$() + "/bedienung.txt"
+    WRITEALL(pf, "c " + STR$(LEN(ev)) + CHR$(10) + JOIN$(ev, CHR$(10)) + CHR$(10) + CHR$(10))
+    SETENV("DHRT_ABSPIELEN", pf)
+    SETENV("DHRT_GUI_ZUSTAND", "1")
+    DIM q AS INTEGER : q = PROCESS_START("dhrt", "run", "--bilder", STR$(bilder), main)
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    WHILE leer < 5
+        DIM t AS STRING : t = PROCESS_READ$(q) + PROCESS_ERR$(q)
+        aus = aus + t
+        IF t = "" AND NOT PROCESS_RUNNING(q) THEN leer = leer + 1
+        SLEEP(20)
+    WEND
+    SETENV("DHRT_ABSPIELEN", "")
+    SETENV("DHRT_GUI_ZUSTAND", "")
+    RETURN aus
+END FUNCTION
+SUB klick(ev AS ARRAY OF STRING, b AS INTEGER, x AS INTEGER, y AS INTEGER)
+    ARRAY_PUSH(ev, "e " + STR$(b) + " 7 " + STR$(x) + " " + STR$(y) + " 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 2) + " 7 " + STR$(x) + " " + STR$(y) + " 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 4) + " 6 0 0 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 6) + " 5 0 0 0 0")
+END SUB
+' Die Zeile des Zustands zu einem Widget.
+FUNCTION zeile$(aus AS STRING, was AS STRING) AS STRING
+    DIM z AS STRING
+    FOR EACH z IN SPLIT$(REPLACE$(aus, CHR$(13), ""), CHR$(10))
+        IF INSTR(z, was) >= 0 THEN RETURN TRIM$(z)
+    NEXT
+    RETURN ""
+END FUNCTION
+FUNCTION wert$(datei AS STRING, sql AS STRING) AS STRING
+    DIM d AS DB_CONN : d = DB_OPEN(datei)
+    DIM r AS DB_RESULT : r = DB_QUERY(d, sql)
+    DIM w AS STRING : w = "?"
+    IF DB_NEXT(r) THEN w = DB_GET_STRING(r, 0)
+    DB_CLOSE(d)
+    RETURN w
+END FUNCTION
+SUB f5(nm AS STRING, p AS STRING)
+    slZeilen = []
+    slBild = 0
+    slHin(10, 10)
+    slWarten(10)
+    slTaste(294)
+    slWarten(150)
+    slAufnahmeSchreiben(CWD$() + "/f5.txt")
+    SETENV("DH_STUDIO_LAUF_BILDER", "20")
+    DIM lg AS STRING : lg = CWD$() + "/" + nm + ".log"
+    DIM aus AS STRING : aus = slStarten(lg, CWD$() + "/f5.txt", slBild + 20, p)
+    PRINT nm; " geprueft "; slHat(lg, "geprueft 0 0"); " beendet "; slHat(lg, "beendet 0")
+    IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+END SUB
+SUB ersetzen(datei AS STRING, alt AS STRING, neu AS STRING)
+    DIM t AS STRING : t = READALL(datei)
+    IF INSTR(t, alt) < 0 THEN PRINT "nicht gefunden: "; alt
+    WRITEALL(datei, REPLACE$(t, alt, neu))
+END SUB
+
+SUB umleiten(main AS STRING, quelle AS STRING)
+    DIM f AS STRING : f = main + "/../projekt/EintragFenster.dh"
+    ersetzen(f, "CONST QUELLE = " + CHR$(34) + "https://openlibrary.org" + CHR$(34), "CONST QUELLE = " + CHR$(34) + quelle + CHR$(34))
+    ersetzen(f, "        GUI_FOCUS(Self.feldIsbn)" + CHR$(10) + "    END SUB", "        GUI_FOCUS(Self.feldIsbn)" + CHR$(10) + "        CLIPBOARD_SET(GETENV$(" + CHR$(34) + "ISBN" + CHR$(34) + "))" + CHR$(10) + "    END SUB")
+END SUB
+' Neu, ISBN einfuegen, Nachschlagen (Lagen mit Menueleiste).
+FUNCTION nachschlagen(isbn AS STRING, nochmal AS BOOLEAN) AS ARRAY OF STRING
+    SETENV("ISBN", isbn)
+    DIM ev AS ARRAY OF STRING : ev = []
+    klick(ev, 0, 295, 453)
+    klick(ev, 20, 320, 148)
+    ARRAY_PUSH(ev, "e 30 2 341 0 0 0")
+    ARRAY_PUSH(ev, "e 32 2 86 0 0 0")
+    ARRAY_PUSH(ev, "e 34 1 86 0 0 0")
+    ARRAY_PUSH(ev, "e 36 1 341 0 0 0")
+    klick(ev, 42, 474, 148)
+    IF nochmal THEN klick(ev, 70, 474, 148)
+    RETURN ev
+END FUNCTION
+FUNCTION zeilen$(aus AS STRING, was AS ARRAY OF STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = []
+    DIM w AS STRING
+    FOR EACH w IN was
+        ARRAY_PUSH(t, zeile$(aus, w))
+    NEXT
+    RETURN JOIN$(t, " | ")
+END FUNCTION
+
+DIM code AS STRING : code = ARG$(1) + "/buecher/anwendungen/code/"
+DIM proj AS STRING
+FOR EACH proj IN ["kap16/mediathek", "loesungen/kap16_cache", "loesungen/kap16_sekunden"]
+    DIM nm AS STRING : nm = BASENAME(proj)
+    IF nm = "mediathek" THEN nm = "kap16_mediathek"
+    kopieren(code + proj, CWD$() + "/" + nm)
+    f5(nm, CWD$() + "/" + nm)
+NEXT
+COPYFILE(ARG$(1) + "/daten/bilder/logo.png", CWD$() + "/cover.png")
+WRITEALL(CWD$() + "/anfragen.txt", "")
+DIM sp AS INTEGER : sp = PROCESS_START("dhrt", "run", CWD$() + "/server.dh", "--", "150")
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE NOT FILEEXISTS(CWD$() + "/port.txt") AND MILLIS() - t0 < 15000
+    SLEEP(20)
+WEND
+DIM quelle AS STRING : quelle = "http://127.0.0.1:" + TRIM$(READALL(CWD$() + "/port.txt"))
+DIM nm2 AS STRING
+FOR EACH nm2 IN ["kap16_mediathek", "kap16_cache", "kap16_sekunden"]
+    umleiten(CWD$() + "/" + nm2 + "/_studio/main.dh", quelle)
+NEXT
+DIM m AS STRING : m = CWD$() + "/kap16_mediathek/_studio/main.dh"
+DIM felder AS ARRAY OF STRING
+felder = ["textinput#feldtitel", "textinput#feldurheber", "textinput#feldjahr", "label#hinweis"]
+DIM ev AS ARRAY OF STRING
+DIM a AS STRING
+' Bekannt, mit Bindestrichen (Drehen 2), dann OK: isbn und Cover in der Datei.
+PRINT zeilen$(bedienen$(m, nachschlagen("978-3-522-20260-2", FALSE), 120), felder)
+ev = nachschlagen("978-3-522-20260-2", FALSE)
+klick(ev, 90, 510, 379)
+a = bedienen$(m, ev, 120)
+DIM d AS DB_CONN : d = DB_OPEN(CWD$() + "/kap16_mediathek/_studio/mediathek.db")
+DIM r AS DB_RESULT : r = DB_QUERY(d, "SELECT isbn, length(cover) > 1000 FROM eintrag WHERE titel = 'Die unendliche Geschichte'")
+IF DB_NEXT(r) THEN PRINT "gesichert "; DB_GET_STRING(r, 0); " cover "; DB_GET_STRING(r, 1)
+DB_CLOSE(d)
+PRINT zeile$(bedienen$(m, nachschlagen("9783000000001", FALSE), 80), "label#hinweis")
+PRINT zeile$(bedienen$(m, nachschlagen("123", FALSE), 60), "label#hinweis")
+' Erweitern 1: zweimal dieselbe ISBN -- der Server sieht eine Anfrage.
+DIM mc AS STRING : mc = CWD$() + "/kap16_cache/_studio/main.dh"
+DIM vorher AS INTEGER : vorher = LEN(READLINES(CWD$() + "/anfragen.txt"))
+a = bedienen$(mc, nachschlagen("9783522202602", FALSE), 100)
+a = bedienen$(mc, nachschlagen("9783522202602", FALSE), 100)
+DIM api AS INTEGER : api = 0
+DIM z AS STRING
+DIM alle AS ARRAY OF STRING : alle = READLINES(CWD$() + "/anfragen.txt")
+DIM i AS INTEGER
+FOR i = vorher TO LEN(alle) - 1
+    IF LEFT$(alle[i], 10) = "/api/books" THEN api = api + 1
+NEXT
+PRINT "cache "; api; " "; zeile$(a, "textinput#feldtitel")
+' Langsame Antwort (der Server schlaeft 15 s und bedient solange keinen
+' anderen -- darum am Schluss), zweiter Klick bricht ab.
+PRINT zeile$(bedienen$(m, nachschlagen("9783000000002", TRUE), 100), "label#hinweis")
+' Erweitern 2: waehrend der langsamen Antwort zaehlt der Hinweis.
+a = zeile$(bedienen$(CWD$() + "/kap16_sekunden/_studio/main.dh", nachschlagen("9783000000002", FALSE), 200), "label#hinweis")
+PRINT "sekunden "; INSTR(a, "Frage Open Library ... ") >= 0 AND INSTR(a, " s" + CHR$(34)) >= 0
+PROCESS_KILL(sp)
+' Kein Netz: niemand lauscht.
+ersetzen(m + "/../projekt/EintragFenster.dh", quelle, "http://127.0.0.1:9")
+a = zeile$(bedienen$(m, nachschlagen("9783522202602", FALSE), 200), "label#hinweis")
+PRINT "kein netz "; INSTR(a, "Keine Antwort: HTTP-Fehler: http://127.0.0.1:9/api/books") >= 0
+--- argumente
+{sammlung}/../../../studio/studio.dh
+{sammlung}/../../..
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei server.dh
+' Spielt Open Library fuer die Pruefung: /api/books?bibkeys=ISBN:...
+' 9783522202602 -> Daten mit Cover, 9783000000001 -> {} (unbekannt),
+' 9783000000002 -> antwortet erst nach 15 s (Zeitgrenze), /cover.png.
+' Laeuft hoechstens ARG$(0) Sekunden; schreibt "port N" in port.txt.
+IMPORT "httpd"
+DIM s AS HTTPD : s = HTTPD_START(0, "127.0.0.1")
+DIM port AS INTEGER : port = HTTPD_PORT(s)
+WRITEALL("port.txt", STR$(port))
+DIM q AS STRING : q = CHR$(34)
+DIM bis AS INTEGER : bis = MILLIS() + INT(VAL(ARG$(0))) * 1000
+WHILE MILLIS() < bis
+    IF HTTPD_ACCEPT(s) THEN
+        DIM pfad AS STRING : pfad = HTTPD_PATH$(s)
+        DIM k AS STRING : k = HTTPD_QUERY$(s, "bibkeys")
+        APPENDFILE("anfragen.txt", pfad + " " + k + CHR$(10))
+        IF pfad = "/cover.png" THEN
+            HTTPD_SEND_FILE(s, 200, "cover.png")
+        ELSEIF k = "ISBN:9783522202602" THEN
+            DIM j AS STRING
+            j = "{" + q + k + q + ": {" + q + "title" + q + ": " + q + "Die unendliche Geschichte" + q + ", "
+            j = j + q + "authors" + q + ": [{" + q + "name" + q + ": " + q + "Michael Ende" + q + "}], "
+            j = j + q + "publish_date" + q + ": " + q + "Jan 15, 2019" + q + ", "
+            j = j + q + "cover" + q + ": {" + q + "medium" + q + ": " + q + "http://127.0.0.1:" + STR$(port) + "/cover.png" + q + "}}}"
+            HTTPD_SEND(s, 200, "application/json", j)
+        ELSEIF k = "ISBN:9783000000002" THEN
+            SLEEP(15000)
+            HTTPD_SEND(s, 200, "application/json", "{}")
+        ELSE
+            HTTPD_SEND(s, 200, "application/json", "{}")
+        END IF
+    END IF
+    SLEEP(5)
+WEND
+HTTPD_STOP(s)
+--- erwartet
+kap16_mediathek geprueft TRUE beendet TRUE
+kap16_cache geprueft TRUE beendet TRUE
+kap16_sekunden geprueft TRUE beendet TRUE
+textinput#feldtitel "Die unendliche Geschichte" | textinput#feldurheber "Michael Ende" | textinput#feldjahr "2019" | label#hinweis "Gefunden, mit Cover."
+gesichert 978-3-522-20260-2 cover 1
+label#hinweis "Unter dieser ISBN kennt Open Library nichts."
+label#hinweis "Eine ISBN hat 10 oder 13 Ziffern."
+cache 1 textinput#feldtitel "Die unendliche Geschichte"
+label#hinweis "Abgebrochen."
+sekunden TRUE
+kein netz TRUE

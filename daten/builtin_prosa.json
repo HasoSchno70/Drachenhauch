@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 2620,
+ "count": 2621,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -1005,7 +1005,7 @@
   "GUI_SPELL_COUNT": "Wie viele Wörter gerade als falsch markiert sind",
   "GUI_SPINNER": "GUI_WIDGET — Zahlenfeld mit +/- (Klick/Mausrad/Pfeiltasten; Wert via GUI_VALUE). Mit dem Fokus nimmt es auch getippte Zahlen (Komma wie Punkt): das erste Getippte ersetzt den markierten Wert, eine Zahl im Bereich gilt schon beim Tippen, Enter oder Fokus woanders klemmt auf min/max (meldet GUI_ENTERED), ESC holt den Wert von vorher zurück; ganzzahlig bleibt ganz",
   "GUI_SPLITTER": "GUI_WIDGET — verschiebbare Trennlinie (\"v\"/\"h\"); Position via GUI_VALUE",
-  "GUI_STATE$": "STRING — der Zustand aller sichtbaren Fenster als Text: je Widget mit Zustand eine Zeile (Texte, Haken, Werte, Auswahl) -- die Erwartung, die dhrt aufnehmen schreibt (werkzeuge.md)",
+  "GUI_STATE$": "STRING — der Zustand aller sichtbaren Fenster als Text: je Widget mit Zustand eine Zeile (Texte, Haken, Werte, Auswahl, Zeilen einer Tabelle) -- die Erwartung, die dhrt aufnehmen schreibt (werkzeuge.md)",
   "GUI_STATUSBAR": "GUI_WIDGET — Statusleiste; text$ ist das erste Feld",
   "GUI_STATUSBAR_ADD": "INTEGER — Feld anhängen: width in Punkten, 0 = teilt sich den Rest; links/mitte/rechts. Passt ein Text nicht, endet er mit ...",
   "GUI_STATUSBAR_CLICKABLE": "Feld anklickbar machen",
@@ -1160,6 +1160,7 @@
   "GUI_TEXTINPUT_ICON": "ein eingebautes Sinnbild left und right im Feld (\"\" = keins) -- siehe Suchfeld, Sinnbilder, Vorschläge",
   "GUI_TEXTINPUT_PLACEHOLDER$": "STRING — der graue Text im leeren Feld (auch eines GUI_TEXTAREA)",
   "GUI_TEXTINPUT_SET": "passwort, nur_lesen, maxlaenge, zahlen (0 frei, 1 ganze Zahl, 2 Kommazahl, 3 Geldbetrag in Cent), suche (Suchfeld mit Lupe und Kreuz)",
+  "GUI_TEXT_WIDTH": "INTEGER — wie breit das Widget text zeichnet (seine Schrift, Größe, Stil; logisch) — für Spalten- und Knopfbreiten, statt an der Zeichenzahl zu schätzen",
   "GUI_THEME": "Akzentfarbe (RGB) umstellen (Kurzform)",
   "GUI_THEME_GET": "— / INT — einzelne Theme-Farbe setzen/lesen",
   "GUI_THEME_PRESET": "Look: dark/light/retro/contrast + modern_dark/modern_light (rund + Schatten)",

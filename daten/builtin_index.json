@@ -7167,6 +7167,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_TEXT_WIDTH",
+   "kind": "core",
+   "signature": "GUI_TEXT_WIDTH(widget, text)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_TEXTAREA",
    "kind": "core",
    "signature": "GUI_TEXTAREA(win, x, y, w, h[, placeholder$])",

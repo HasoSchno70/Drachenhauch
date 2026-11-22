@@ -232,6 +232,7 @@ See [examples/25_db.dh](../../examples/25_db.dh) — shows CREATE, INSERT with b
   DB_EXEC(con, "CREATE INDEX IF NOT EXISTS idx_score ON scores(score)")
   ```
 - **Initialise the schema** with `IF NOT EXISTS` — then starting the program several times is harmless.
+- **References** (`REFERENCES t(id)`) are always checked by SQLite. When a DELETE fails on one, the message after "FOREIGN KEY constraint failed" names the table and column that still points to the row without a delete rule; for INSERT and UPDATE the reference columns of the table.
 
 ## In the native runtime (dhrt)
 

@@ -3078,3 +3078,33 @@ liefern (`... AS IMAGE`). Rust-Test `hinter_as_nur_typen` mit Gegenprobe.
   kann es nicht unterscheiden. Darum `trn$(text, n)`: bei n = 1 der
   Eintrag "text|1" der Tafel, wenn es ihn gibt (" Fehler, |1" -> " error, ").
   Fall "englisch: ein fehler ist 1 error" in `werkzeug_ide_lesbarkeit.dhtest`.
+
+## Self im Debugger, Rueckkehr in die Zeile (2026-11-22)
+
+Beim Schreiben von Kapitel 12 von "Fenster, Formulare, Daten" (Der
+Debugger, an der Mediathek aus dem Studio) zwei Luecken in `dhrt debug`:
+
+- **Self fehlte.** Die Variablenliste zeigte nur die Locals einer Methode.
+  Ein Fenster aus dem Studio haelt aber alles in Feldern (`eintraege`,
+  `ausleihe`) -- im Halt war davon nichts zu sehen, obwohl
+  `docs/studio.md` "bei Self die Felder des Fensters" versprach. Self ist
+  kein Local (`LOAD_SELF`); `debug_on_line` bekommt es jetzt aus
+  `run_frame` mit, ein Fehler-Halt aus `FehlerStand::selbst`.
+- **Eine Zeile mit Aufruf begann nach der Rueckkehr neu.** Die VM meldet
+  einen Zeilenwechsel, sobald sich `cur_line` aendert -- nach `f()` also
+  auch die Rueckkehr in die Zeile des Aufrufs. Ein Haltepunkt auf
+  `Self.ausleihe.folgen(NIL)` hielt nach F5 ein zweites Mal, F10 blieb
+  einmal stehen. `exec` merkt sich jetzt die Zeile (`DebugState::mitten`);
+  Haltepunkt, "bis hier" und Schritt ueber gehen dort weiter, Schritt
+  heraus haelt wie vorher auf der Zeile des Aufrufs.
+- **Ein Feld von Objekten hiess `OF EINTRAG`.** Instanzen trugen ihren
+  Klassennamen wie geschrieben (`<Eintrag>`), ein Feld davon aber den
+  grossgeschriebenen Elementtyp aus `Value::fmt`. `dbg_anzeige` setzt dort
+  jetzt ebenfalls die geschriebene Form ein.
+- **Eigene Felder zuerst, der Stapel wie geschrieben.** Unter Self standen
+  die Felder in der Reihenfolge ihrer Plaetze, also die der Laufzeit des
+  Studios (`studioWin`, `studioControls` ...) und die Controls vor
+  `eintraege` -- in der kleinen Leiste des Studios sah man die eigenen
+  nicht. `dbg_kinder` ordnet jetzt nach `Layout::vorfahren`. Der
+  Aufrufstapel nannte die Methoden klein (`knopfentfernen_klick`); er geht
+  jetzt durch dieselbe Namenstafel wie die Variablen.

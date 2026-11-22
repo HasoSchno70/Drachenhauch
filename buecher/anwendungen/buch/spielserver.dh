@@ -1,0 +1,34 @@
+' Spielt Open Library fuer die Bilder des Buchs (studio_bilder.dh,
+' Kapitel 16) -- ohne Netz und ohne fremdes Cover (cover.png ist das Logo). /api/books?bibkeys=ISBN:...
+' 9783522202602 -> Daten mit Cover, 9783000000001 -> {} (unbekannt),
+' 9783000000002 -> antwortet erst nach 15 s (Zeitgrenze), /cover.png.
+' Laeuft hoechstens ARG$(0) Sekunden; schreibt "port N" in port.txt.
+IMPORT "httpd"
+DIM s AS HTTPD : s = HTTPD_START(0, "127.0.0.1")
+DIM port AS INTEGER : port = HTTPD_PORT(s)
+WRITEALL("port.txt", STR$(port))
+DIM q AS STRING : q = CHR$(34)
+DIM bis AS INTEGER : bis = MILLIS() + INT(VAL(ARG$(0))) * 1000
+WHILE MILLIS() < bis
+    IF HTTPD_ACCEPT(s) THEN
+        DIM pfad AS STRING : pfad = HTTPD_PATH$(s)
+        DIM k AS STRING : k = HTTPD_QUERY$(s, "bibkeys")
+        IF pfad = "/cover.png" THEN
+            HTTPD_SEND_FILE(s, 200, "cover.png")
+        ELSEIF k = "ISBN:9783522202602" THEN
+            DIM j AS STRING
+            j = "{" + q + k + q + ": {" + q + "title" + q + ": " + q + "Die unendliche Geschichte" + q + ", "
+            j = j + q + "authors" + q + ": [{" + q + "name" + q + ": " + q + "Michael Ende" + q + "}], "
+            j = j + q + "publish_date" + q + ": " + q + "Jan 15, 2019" + q + ", "
+            j = j + q + "cover" + q + ": {" + q + "medium" + q + ": " + q + "http://127.0.0.1:" + STR$(port) + "/cover.png" + q + "}}}"
+            HTTPD_SEND(s, 200, "application/json", j)
+        ELSEIF k = "ISBN:9783000000002" THEN
+            SLEEP(15000)
+            HTTPD_SEND(s, 200, "application/json", "{}")
+        ELSE
+            HTTPD_SEND(s, 200, "application/json", "{}")
+        END IF
+    END IF
+    SLEEP(5)
+WEND
+HTTPD_STOP(s)

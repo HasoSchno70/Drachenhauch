@@ -206,7 +206,7 @@ Nach `HTTP_RESULT` stehen `HTTP_STATUS()` und `HTTP_HEADER()` genau wie nach `HT
 
 **Details:**
 
-- **Fehler kommen beim Abholen.** Ein 404, ein Timeout oder ein Verbindungsfehler lässt `HTTP_GET_START` durchgehen und wirft erst bei `HTTP_RESULT` — dort, wo das Programm damit umgehen kann (`TRY`/`CATCH` um das Abholen).
+- **Fehler kommen beim Abholen.** Ein 404, ein Timeout oder ein Verbindungsfehler lässt `HTTP_GET_START` durchgehen und wirft erst bei `HTTP_RESULT` — dort, wo das Programm damit umgehen kann (`TRY`/`CATCH` um das Abholen). Ohne Verbindung endet die Meldung mit „keine Verbindung: kein Netz, oder der Server ist nicht erreichbar“, nach der Zeitgrenze mit „keine Antwort in der Zeitgrenze (HTTP_TIMEOUT)“.
 - **`HTTP_READY` darf beliebig oft gefragt werden.** Nach dem ersten `TRUE` bleibt die Antwort liegen, bis sie abgeholt wird. Erst `HTTP_RESULT` verbraucht sie.
 - **`HTTP_RESULT` vor `HTTP_READY`** bricht mit Klartext ab statt zu blockieren — sonst wäre der Vorteil wieder verspielt.
 - **Mehrere Abrufe laufen wirklich gleichzeitig.** Zwei Anfragen zu je 300 ms sind nach ~300 ms fertig, nicht nach 600.

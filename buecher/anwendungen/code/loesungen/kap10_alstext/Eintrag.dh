@@ -1,0 +1,32 @@
+' Loesung Kapitel 10, Erweitern 2 -- der Eintrag kann sich in einem
+' Satz beschreiben.
+CLASS Eintrag
+    DIM titel AS STRING
+    DIM urheber AS STRING
+    DIM art AS STRING
+    DIM jahr AS STRING
+
+    SUB Init(t AS STRING, u AS STRING, a AS STRING, j AS STRING)
+        titel = t
+        urheber = u
+        art = a
+        jahr = j
+    END SUB
+
+    ' Die Zellen einer Zeile der Tabelle.
+    FUNCTION zellen() AS ARRAY OF STRING
+        RETURN [titel, urheber, art, jahr]
+    END FUNCTION
+
+    ' >>> neu
+    ' Der Eintrag in einem Satz: "Momo von Michael Ende (Buch, 1973)".
+    ' Was fehlt, faellt weg.
+    FUNCTION alsText$() AS STRING
+        DIM t AS STRING : t = titel
+        IF urheber <> "" THEN t = t + " von " + urheber
+        DIM klammer AS STRING : klammer = art
+        IF jahr <> "" THEN klammer = klammer + ", " + jahr
+        RETURN t + " (" + klammer + ")"
+    END FUNCTION
+    ' <<< neu
+END CLASS

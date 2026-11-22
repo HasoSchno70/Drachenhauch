@@ -107,6 +107,10 @@ impl<'p> Vm<'p> {
                     f, i + 1, crate::value::fmt_float(*x), crate::builtins::KEIN_GANZ_HINWEIS)),
                 Some(Value::Str(t)) => Err(format!("{}: erwartet INTEGER (Arg {}){}", f, i + 1,
                     crate::umstieg::text_statt_zahl(f, t))),
+                // Ein Feld AS GUI_WIDGET, dem noch nichts zugewiesen wurde --
+                // typisch: ein Fenster aus dem Studio, das noch nicht
+                // gezeigt wurde, hat seine Controls noch nicht angelegt.
+                Some(Value::Nil) => Err(format!("{}: erwartet INTEGER (Arg {}), erhalten NIL -- das Widget oder Fenster gibt es noch nicht (ein Fenster aus dem Studio legt seine Controls erst mit Zeigen an)", f, i + 1)),
                 _ => Err(format!("{}: erwartet INTEGER (Arg {})", f, i + 1)) }
         }
         fn gs(a: &[Value], i: usize, f: &str) -> R<String> {
@@ -685,6 +689,10 @@ impl<'p> Vm<'p> {
                 if a.len() != 1 { return Err(format!("{}: erwartet (widget)", n)); }
                 let (mw, mh) = self.gui.get_min_size(gi(a,0,n)?, n)?;
                 Value::Int(if name == "gui_get_min_w" { mw } else { mh }) }
+            "gui_text_width" => {
+                let (w, s) = (gi(a,0,"GUI_TEXT_WIDTH")?, gs(a,1,"GUI_TEXT_WIDTH")?);
+                Value::Int(self.gui.text_breite_messen(self.gfx.as_ref(), w, &s)?)
+            }
             "gui_layout_min_w" => { let g = self.gfx.as_ref(); Value::Int(self.gui.layout_min_messen(g, gi(a,0,"GUI_LAYOUT_MIN_W")?)?.0) }
             "gui_layout_min_h" => { let g = self.gfx.as_ref(); Value::Int(self.gui.layout_min_messen(g, gi(a,0,"GUI_LAYOUT_MIN_H")?)?.1) }
             "gui_rule" => {

@@ -351,3 +351,17 @@ Pepper's Lonely Hearts Club Band"), gab `near "s": syntax error` -- die
 Meldung sagt jetzt, dass Werte mit `?` uebergeben werden. Ausloeser ist
 ein Syntaxfehler in einem SQL mit ungerader Zahl von `'`; ein anderer
 Syntaxfehler bleibt ohne Hinweis (Gegenfall im selben Prueffall).
+
+- **Welcher Verweis (2026-11-22).** Buch "Fenster, Formulare, Daten",
+  Kapitel 13: wer im Studio einen Freund loeschte, der noch etwas
+  ausgeliehen hatte, las in der Statuszeile nur "FOREIGN KEY constraint
+  failed". `db::fk_hinweis` sieht bei einem DELETE nach, welche Spalten
+  anderer Tabellen ohne Loeschregel auf die Tabelle zeigen (PRAGMA
+  foreign_key_list), bei INSERT/UPDATE die eigenen Verweise, und haengt es
+  an die Meldung -- das Studio zeigt sie so in der Statuszeile.
+
+- **HTTP-Fehler sagen, was los ist (2026-11-22).** Buch "Fenster,
+  Formulare, Daten", Kapitel 16: ohne Netz nannte die Meldung die URL
+  zweimal (ureq nennt sie schon, `map_err` haengte sie noch einmal an) und
+  sonst nur englische Systemworte. Jetzt einmal, und bei fehlender
+  Verbindung bzw. abgelaufener Zeitgrenze ein Hinweis.

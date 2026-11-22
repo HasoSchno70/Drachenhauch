@@ -605,6 +605,14 @@ oder noch NIL -- trägt als `type` den angesagten Typ (`GUI_WIDGET`, `DB_CONN`,
 eine Klasse) statt `INTEGER`. Ein nicht abgefangener Fehler meldet sich erst als
 `paused` mit `reason: "error"` und `message` (an der Fehlerstelle, `eval` und
 `set-watches` gehen noch), dann nach dem nächsten Kommando als `error`.
+In einer Methode steht in `locals` vorn `Self` mit seinen Feldern als
+`children` -- dort merkt sich ein Fenster aus dem Studio alles. Die Felder
+eines Objekts kommen in der Reihenfolge der Klassen: erst die eigene, dann
+die Eltern; die Namen im `stack` stehen wie geschrieben. Kehrt ein
+Aufruf in seine Zeile zurück, beginnt sie nicht neu: Ein Haltepunkt auf
+`x = f(1)` hält einmal, `step-over` geht über den Aufruf hinweg zur nächsten
+Zeile; `step-out` und ein Schritt über das Ende einer Funktion halten auf
+der Zeile des Aufrufs.
 
 **Zeilen sind Zeilen der Datei, nicht der zusammengefügten Quelle.** Bis
 2026-09-27 zählte der Debugger nach dem Einsetzen der `IMPORT`s: mit einem

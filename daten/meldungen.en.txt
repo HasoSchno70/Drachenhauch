@@ -813,8 +813,16 @@ Ungueltige Regex '{}': {}	Invalid regex '{}': {}
 {}: erwartet BOOLEAN (Arg {})	{}: expected BOOLEAN (argument {})
 {}: erwartet FUNCREF (Arg {})	{}: expected FUNCREF (argument {})
 {}: erwartet INTEGER (Arg {})	{}: expected INTEGER (argument {})
+{}: erwartet INTEGER (Arg {}), erhalten NIL	{}: expected INTEGER (argument {}), got NIL
 {}: erwartet STRING (Arg {})	{}: expected STRING (argument {})
 {}: erwartet Zahl (Arg {})	{}: expected a number (argument {})
+GUI_TEXT_WIDTH: braucht ein Fenster (SCREEN)	GUI_TEXT_WIDTH: needs a window (SCREEN)
+auf die Zeile zeigt noch eine Zeile in {}; erst diese loeschen, oder der Verweis loescht mit (ON DELETE CASCADE)	another row still points to this one in {}; delete it first, or let the reference delete along (ON DELETE CASCADE)
+eine Verweis-Spalte nennt eine id, die es in der Zieltabelle nicht gibt: {}	a reference column names an id that does not exist in the target table: {}
+{} (Spalte {})	{} (column {})
+keine Verbindung: kein Netz, oder der Server ist nicht erreichbar	no connection: no network, or the server cannot be reached
+keine Antwort in der Zeitgrenze (HTTP_TIMEOUT)	no answer within the time limit (HTTP_TIMEOUT)
+das Widget oder Fenster gibt es noch nicht (ein Fenster aus dem Studio legt seine Controls erst mit Zeigen an)	the widget or window does not exist yet (a window from the Studio only creates its controls when Zeigen shows it)
 {}: erwartet einen Zeitwert (INTEGER, Arg {})	{}: expected a time value (INTEGER, argument {})
 {}: erwartet den Namen eines Sinnbilds (STRING) oder ein Bild (Arg {})	{}: expected the name of a symbol (STRING) or an image (argument {})
 {}: erwartet INTEGER (Rueckgabewert)	{}: expected INTEGER (return value)

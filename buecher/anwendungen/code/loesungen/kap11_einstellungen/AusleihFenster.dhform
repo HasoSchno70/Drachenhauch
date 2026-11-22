@@ -1,0 +1,61 @@
+{
+  "title": "Ausleihen",
+  "name": "AusleihFenster",
+  "x": 0,
+  "y": 0,
+  "w": 380,
+  "h": 190,
+  "movable": true,
+  "closable": true,
+  "visible": true,
+  "widgets": [
+    {
+      "kind": "label",
+      "name": "gewaehlt",
+      "text": "Kein Eintrag gewählt.",
+      "x": 20,
+      "y": 20,
+      "w": 340,
+      "h": 16
+    },
+    {
+      "kind": "label",
+      "name": "beschriftungAn",
+      "text": "An",
+      "x": 20,
+      "y": 58,
+      "w": 30,
+      "h": 16
+    },
+    {
+      "kind": "textinput",
+      "name": "feldAn",
+      "text": "",
+      "placeholder": "Name",
+      "x": 60,
+      "y": 52,
+      "w": 300,
+      "h": 28
+    },
+    {
+      "kind": "button",
+      "name": "knopfVerleihen",
+      "text": "Verleihen",
+      "x": 160,
+      "y": 110,
+      "w": 100,
+      "h": 30,
+      "variant": "primaer"
+    },
+    {
+      "kind": "button",
+      "name": "knopfZurueck",
+      "text": "Zurück",
+      "x": 270,
+      "y": 110,
+      "w": 90,
+      "h": 30
+    }
+  ],
+  "studio_standard": "knopfVerleihen"
+}

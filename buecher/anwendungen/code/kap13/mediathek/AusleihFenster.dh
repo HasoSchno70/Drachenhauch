@@ -1,0 +1,54 @@
+' Kapitel 11 und 13 -- Ausleihen, nicht modal: es bleibt offen,
+' waehrend man im Hauptfenster weiterarbeitet, und folgt dessen Auswahl.
+' Seit Kapitel 13 landet jede Ausleihe in der Datenbank.
+CLASS AusleihFenster EXTENDS AusleihFenster_Basis
+    ' Das Hauptfenster, dem es Bescheid gibt.
+    DIM haupt AS Hauptfenster
+    ' Der Eintrag, um den es gerade geht (NIL = keiner).
+    DIM eintrag AS Eintrag
+    DIM offen AS BOOLEAN
+
+    SUB Geoeffnet()
+        Self.offen = TRUE
+        Self.anzeigen()
+    END SUB
+
+    SUB Schliessen()
+        Self.offen = FALSE
+    END SUB
+
+    ' Das Hauptfenster ruft das, wenn sich seine Auswahl aendert.
+    SUB folgen(e AS Eintrag)
+        Self.eintrag = e
+        IF Self.offen THEN Self.anzeigen()
+    END SUB
+
+    SUB anzeigen()
+        IF Self.eintrag IS NIL THEN
+            GUI_SET_TEXT(Self.gewaehlt, "Kein Eintrag gewählt.")
+        ELSEIF Self.eintrag.verliehen = "" THEN
+            GUI_SET_TEXT(Self.gewaehlt, Self.eintrag.titel + " ist da.")
+        ELSE
+            DIM t AS STRING : t = Self.eintrag.titel
+            DIM bei AS STRING : bei = Self.eintrag.verliehen
+            GUI_SET_TEXT(Self.gewaehlt, t + " ist bei " + bei + ".")
+        END IF
+    END SUB
+
+    SUB knopfVerleihen_Klick()
+        DIM wer AS STRING : wer = TRIM$(GUI_TEXT(Self.feldAn))
+        IF Self.eintrag IS NIL OR wer = "" THEN RETURN
+        ' Wer etwas hat, gibt es erst zurueck.
+        IF Self.eintrag.verliehen <> "" THEN RETURN
+        verleihen(Self.eintrag, wer)
+        Self.haupt.tabelleFuellen()
+        Self.anzeigen()
+    END SUB
+
+    SUB knopfZurueck_Klick()
+        IF Self.eintrag IS NIL THEN RETURN
+        zurueckgeben(Self.eintrag)
+        Self.haupt.tabelleFuellen()
+        Self.anzeigen()
+    END SUB
+END CLASS

@@ -584,3 +584,47 @@ Datenbank-Element importiert es schon).
   Namen. Fall in `werkzeug_studio2.dhtest`, Gegenprobe: ohne den Aufruf
   "standard -". Gefunden beim Aufnehmen eines Bildes, nicht von einer
   Pruefung -- die Vorlagen-Faelle pruefen nur, dass das Programm laeuft.
+
+## Spalten-Gitter der Datenbank misst (2026-11-22)
+
+Beim Schreiben von Kapitel 13 von "Fenster, Formulare, Daten": im Reiter
+einer Datenbank stand bei 1280 x 800 "Ganze Za", "Pfli" und "Eind" -- die
+Spalten des Spalten-Gitters waren Anteile an mindestens 460 Punkten, die
+Tabellenliste links fest 290 breit. Jetzt misst `dbSpMindest` Kopf und
+laengsten Wert jeder Spalte mit `GUI_TEXT_WIDTH` (neu in der gui); was frei
+ist, geht nach den alten Anteilen dazu, zu wenig Platz rollt waagerecht. Die
+vier Knoepfe der Liste stehen untereinander, die Liste ist so breit wie der
+breiteste ("Umbenennen ..."). Bei 1440 x 900 passen alle sieben Spalten.
+Das Protokoll nennt `spaltengitter breiten/bedarf/knopf` (Pruefung in
+`werkzeug_studio_datenbank3.dhtest`).
+
+Ebenda: wer im Daten-Gitter eine Zeile loeschte, auf die ein Verweis ohne
+Loeschregel zeigte (Lena, die noch Tetris hat), las in der Statuszeile nur
+"FOREIGN KEY constraint failed". dhrt nennt jetzt Tabelle und Spalte, und
+`dbMeldung$` sagt es in den Worten des Spalten-Gitters ("Beim Loeschen"
+auf "mitloeschen"). `status()` schreibt seine Meldung ins Protokoll
+(`status ...`), damit eine Pruefung sie lesen kann.
+
+Ebenda, Kapitel 14 (Datenbindung):
+
+- Eine Klappliste mit festen Eintraegen (Buch;Film;Spiel;Musik), gebunden
+  an die Textspalte art, schrieb beim Sichern "2" statt "Spiel": die gui
+  bindet ohne Werte je Eintrag die Nummer. In Teil I hatte das Buch die
+  Werte von Hand gesetzt (GUI_LISTBOX_SET_DATA); im Studio ging das nur mit
+  Code. `dbKlappWerte` gibt jetzt im erzeugten Layout jedem Eintrag seinen
+  Text als Wert, wenn die Spalte keine Zahl ist.
+- Eine Tabelle mit Datenquelle bekam immer die Namen der Spalten als Koepfe
+  ("titel" statt "Titel" aus dem Entwurf). Jetzt bleiben die Koepfe des
+  Entwurfs, wenn es so viele sind wie gezeigte Spalten.
+- Im Inspektor waren die Beschriftungen fest 112 Punkte breit: "Angezeigte
+  Spalten" stand als "Angezeigte Spalte" da. Jetzt so breit wie die
+  breiteste (GUI_TEXT_WIDTH), hoechstens knapp die halbe Leiste; das
+  Protokoll nennt je Feld `beschriftung <schluessel> <breite> <gebraucht>`.
+- Ebenda, Kapitel 15: eine Tabelle an einer Abfrage verlor nach jedem
+  `Neuladen()` ihre Auswahl -- gehalten wurde sie nur bei der Tabelle des
+  Fensters (ueber DatensatzId). Jetzt merkt sich jede Liste ausser einer
+  Klappliste (die hielt ihre Wahl schon) die id der gewaehlten Zeile.
+- Ebenda, Kapitel 15: eine Abfrage, deren SQL auf mehreren Zeilen stand
+  (wie man es im Abfragefeld schreibt), hielt das erzeugte Programm mit
+  "Zeilenumbruch im String" an -- `dbText$`/`dhText$` maskierten nur
+  Rueckstrich und Anfuehrungszeichen. Jetzt auch \n, \r und \t.

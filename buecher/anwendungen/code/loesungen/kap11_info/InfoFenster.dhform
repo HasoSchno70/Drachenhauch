@@ -1,0 +1,42 @@
+{
+  "title": "Eintrag",
+  "name": "InfoFenster",
+  "x": 0,
+  "y": 0,
+  "w": 340,
+  "h": 150,
+  "movable": true,
+  "closable": true,
+  "visible": true,
+  "widgets": [
+    {
+      "kind": "label",
+      "name": "zeile1",
+      "text": "",
+      "x": 20,
+      "y": 20,
+      "w": 300,
+      "h": 16
+    },
+    {
+      "kind": "label",
+      "name": "zeile2",
+      "text": "",
+      "x": 20,
+      "y": 44,
+      "w": 300,
+      "h": 16
+    },
+    {
+      "kind": "button",
+      "name": "knopfZu",
+      "text": "Schließen",
+      "x": 220,
+      "y": 76,
+      "w": 100,
+      "h": 30
+    }
+  ],
+  "studio_standard": "knopfZu",
+  "studio_abbrechen": "knopfZu"
+}

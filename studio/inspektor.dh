@@ -572,8 +572,17 @@ SUB inspektorLegen()
     IF pw <= 0 THEN RETURN
     GUI_SET_BOUNDS(inspPanel, px, py, pw, ph)
     DIM lx AS INTEGER : lx = px + 14
-    DIM ex AS INTEGER : ex = px + 128
-    DIM eb AS INTEGER : eb = MAX(60, pw - 128 - 14)
+    ' Die Beschriftungen so breit wie die breiteste (gemessen), mindestens
+    ' 112, hoechstens knapp die halbe Leiste -- fest 112 schnitt
+    ' "Angezeigte Spalten" zu "Angezeigte Spalte".
+    DIM lb AS INTEGER : lb = 112
+    DIM zl AS InspZeile
+    FOR EACH zl IN inspZeilen
+        lb = MAX(lb, GUI_TEXT_WIDTH(zl.lbl, GUI_TEXT(zl.lbl)) + 4)
+    NEXT
+    lb = MIN(lb, pw * 45 \ 100)
+    DIM ex AS INTEGER : ex = lx + lb + 2
+    DIM eb AS INTEGER : eb = MAX(60, pw - (ex - px) - 14)
     DIM y AS INTEGER : y = py + 12
     GUI_SET_BOUNDS(inspTitel, lx, y, pw - 28, 24)
     y = y + 26
@@ -608,7 +617,7 @@ SUB inspektorLegen()
                 GUI_SET_VISIBLE(z.ed, zeigen)
             END IF
             IF NOT zeigen THEN CONTINUE
-            GUI_SET_BOUNDS(z.lbl, lx, y + 5, 112, 18)
+            GUI_SET_BOUNDS(z.lbl, lx, y + 5, lb, 18)
             IF z.art = "schalter" THEN
                 GUI_SET_BOUNDS(z.ed, ex, y + 3, 48, 22)
             ELSEIF z.art = "info" THEN

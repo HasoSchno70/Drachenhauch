@@ -1,0 +1,29 @@
+{
+  "format": "drachenhauch-studio",
+  "fassung": 1,
+  "name": "Mediathek",
+  "start": "Hauptfenster",
+  "elemente": [
+    {
+      "art": "app",
+      "name": "App",
+      "code": "App.dh"
+    },
+    {
+      "art": "klasse",
+      "name": "Eintrag",
+      "code": "Eintrag.dh"
+    },
+    {
+      "art": "modul",
+      "name": "Beispiele",
+      "code": "Beispiele.dh"
+    },
+    {
+      "art": "fenster",
+      "name": "Hauptfenster",
+      "code": "Hauptfenster.dh",
+      "layout": "Hauptfenster.dhform"
+    }
+  ]
+}

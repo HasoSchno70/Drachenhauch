@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/en und dem englischen Buch von `dhrt doku prosa` -- NICHT von Hand aendern. Der Hover nimmt sie mit DHRT_LANG=en.",
- "count": 2612,
+ "count": 2613,
  "docs": {
   "ABS": "Absolute value.",
   "ACOS": "Arc sine/cosine (x in [-1, 1])",
@@ -1004,7 +1004,7 @@
   "GUI_SPELL_COUNT": "How many words are currently marked as misspelled",
   "GUI_SPINNER": "GUI_WIDGET — number field with +/- (click/mouse wheel/arrow keys; value via GUI_VALUE). With the focus it also takes typed numbers (comma like point): the first keystroke replaces the selected value, a number within the range applies while typing, Enter or moving the focus clamps to min/max (Enter reports GUI_ENTERED), Esc brings back the earlier value; an integer field stays integer",
   "GUI_SPLITTER": "GUI_WIDGET — movable divider (\"v\"/\"h\"); position via GUI_VALUE",
-  "GUI_STATE$": "STRING — the state of all visible windows as text: one line per widget with a state (texts, ticks, values, selection) -- the expectation dhrt aufnehmen writes (werkzeuge.md)",
+  "GUI_STATE$": "STRING — the state of all visible windows as text: one line per widget with a state (texts, ticks, values, selection, rows of a table) -- the expectation dhrt aufnehmen writes (werkzeuge.md)",
   "GUI_STATUSBAR": "GUI_WIDGET — status bar; text$ is the first field",
   "GUI_STATUSBAR_ADD": "INTEGER — append a field: width (width) in points, 0 = shares the rest; links/mitte/rechts (left/centre/right). A text that does not fit ends in ...",
   "GUI_STATUSBAR_CLICKABLE": "make a field clickable",
@@ -1159,6 +1159,7 @@
   "GUI_TEXTINPUT_ICON": "a built-in symbol on the left and right inside the field (\"\" = none) -- see Search field, symbols, suggestions",
   "GUI_TEXTINPUT_PLACEHOLDER$": "STRING — the grey text in the empty field (also of a GUI_TEXTAREA)",
   "GUI_TEXTINPUT_SET": "passwort (password), nur_lesen (read-only), maxlaenge (max length), zahlen (numbers: 0 free, 1 integer, 2 decimal, 3 amount of money in cents), suche (search field with magnifier and cross)",
+  "GUI_TEXT_WIDTH": "INTEGER — how wide the widget draws text (its font, size, style; logical) — for column and button widths instead of guessing from the character count",
   "GUI_THEME": "change the accent colour (RGB) (short form)",
   "GUI_THEME_GET": "— / INT — set/read a single theme colour",
   "GUI_THEME_PRESET": "look: dark/light/retro/contrast + modern_dark/modern_light (rounded + shadows)",

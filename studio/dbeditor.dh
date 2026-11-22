@@ -137,20 +137,29 @@ SUB dbLegen(r AS Reiter)
     GUI_SET_BOUNDS(a.tfDatei, x0 + b - 270, y0, 270, 26)
     DIM y1 AS INTEGER : y1 = y0 + 36
     DIM unten AS INTEGER : unten = y0 + h - 28
-    ' Links zwei Reihen Knoepfe: anlegen (Tabelle, Abfrage), dann umbenennen
-    ' und loeschen -- fuer das, was gewaehlt ist.
-    GUI_SET_BOUNDS(a.lstTab, x0, y1, 290, unten - y1 - 42)
-    GUI_SET_BOUNDS(a.btTabNeu, x0, unten - 34, 143, 28)
-    GUI_SET_BOUNDS(a.btAbfNeu, x0 + 147, unten - 34, 143, 28)
-    GUI_SET_BOUNDS(a.btTabUm, x0, unten, 143, 28)
-    GUI_SET_BOUNDS(a.btTabWeg, x0 + 147, unten, 143, 28)
-    DIM rx AS INTEGER : rx = x0 + 302
-    DIM rb AS INTEGER : rb = b - 302
+    ' Links unter der Liste vier Knoepfe untereinander: anlegen (Tabelle,
+    ' Abfrage), dann umbenennen und loeschen -- fuer das, was gewaehlt ist.
+    ' Die Liste so breit wie der breiteste Knopf, gemessen an seiner
+    ' Beschriftung ("Umbenennen ..."); was frei bleibt, bekommt das
+    ' Spalten-Gitter (bei fest 290 stand dort "Ganze Za").
+    DIM kb AS INTEGER : kb = 0
+    DIM kn AS GUI_WIDGET
+    FOR EACH kn IN [a.btTabNeu, a.btAbfNeu, a.btTabUm, a.btTabWeg]
+        kb = MAX(kb, GUI_TEXT_WIDTH(kn, GUI_TEXT(kn)) + 28)
+    NEXT
+    DIM lb AS INTEGER : lb = MAX(160, kb)
+    GUI_SET_BOUNDS(a.lstTab, x0, y1, lb, unten - y1 - 110)
+    GUI_SET_BOUNDS(a.btTabNeu, x0, unten - 102, lb, 28)
+    GUI_SET_BOUNDS(a.btAbfNeu, x0, unten - 68, lb, 28)
+    GUI_SET_BOUNDS(a.btTabUm, x0, unten - 34, lb, 28)
+    GUI_SET_BOUNDS(a.btTabWeg, x0, unten, lb, 28)
+    DIM rx AS INTEGER : rx = x0 + lb + 12
+    DIM rb AS INTEGER : rb = b - lb - 12
     GUI_SET_BOUNDS(a.btSpalten, rx, y1, 96, 28)
     GUI_SET_BOUNDS(a.btDaten, rx + 100, y1, 96, 28)
     GUI_SET_BOUNDS(a.hinweis, rx + 210, y1 + 5, rb - 210, 20)
     GUI_SET_BOUNDS(a.gitSp, rx, y1 + 36, rb, unten - y1 - 44)
-    GUI_TABLE_COL_WIDTHS(a.gitSp, dbSpBreiten(rb))
+    GUI_TABLE_COL_WIDTHS(a.gitSp, dbSpBreiten(a, rb))
     dbLegenNurDaten(r)
     GUI_SET_BOUNDS(a.btSpNeu, rx, unten, 160, 28)
     GUI_SET_BOUNDS(a.btSpWeg, rx + 164, unten, 140, 28)
@@ -165,16 +174,50 @@ SUB dbLegen(r AS Reiter)
     dbModusZeigen(r)
 END SUB
 
-' Die Spalten des Spalten-Gitters: fest bis auf die Vorgabe, die den Rest nimmt.
-FUNCTION dbSpBreiten(rb AS INTEGER) AS ARRAY OF INTEGER
-    DIM v AS INTEGER : v = MAX(460, rb - 2 - 12)
-    DIM n AS INTEGER : n = v * 19 \ 100
-    DIM t AS INTEGER : t = v * 14 \ 100
-    DIM p AS INTEGER : p = v * 10 \ 100
-    DIM e AS INTEGER : e = v * 11 \ 100
-    DIM g AS INTEGER : g = v * 14 \ 100
-    DIM r AS INTEGER : r = v * 16 \ 100
-    RETURN [n, t, p, e, g, r, v - n - t - p - e - g - r]
+' Die Spalten des Spalten-Gitters: jede mindestens so breit, dass ihr Kopf
+' und ihr laengster Wert ("Ganze Zahl", "mitloeschen") ganz dastehen --
+' gemessen mit der Schrift des Gitters; bei 1280 x 800 stand dort "Ganze Za"
+' und "Pfli". Was darueber frei ist, geht nach Anteilen dazu; reicht der
+' Platz nicht, rollt das Gitter waagerecht.
+FUNCTION dbSpBreiten(a AS DbAnsicht, rb AS INTEGER) AS ARRAY OF INTEGER
+    DIM v AS INTEGER : v = rb - 2 - 12
+    DIM anteil AS ARRAY OF INTEGER : anteil = [19, 14, 10, 11, 14, 16, 16]
+    DIM mindest AS ARRAY OF INTEGER : mindest = dbSpMindest(a)
+    DIM k AS INTEGER
+    DIM summe AS INTEGER : summe = 0
+    FOR k = 0 TO 6
+        summe = summe + mindest[k]
+    NEXT
+    DIM frei AS INTEGER : frei = MAX(0, v - summe)
+    DIM aus AS ARRAY OF INTEGER : aus = []
+    FOR k = 0 TO 6
+        ARRAY_PUSH(aus, mindest[k] + frei * anteil[k] \ 100)
+    NEXT
+    RETURN aus
+END FUNCTION
+
+' Was jede Spalte des Spalten-Gitters mindestens braucht: Kopf bzw. laengster
+' Wert, gemessen mit der Schrift des Gitters, und Rand (Auswahlspalten mit
+' Pfeil mehr).
+FUNCTION dbSpMindest(a AS DbAnsicht) AS ARRAY OF INTEGER
+    DIM koepfe AS ARRAY OF STRING
+    koepfe = [tr$("Name"), tr$("Art"), tr$("Pflicht"), tr$("Eindeutig"), tr$("Vorgabe"), tr$("Verweis auf"), tr$("Beim Löschen")]
+    DIM mindest AS ARRAY OF INTEGER : mindest = []
+    DIM k AS INTEGER
+    FOR k = 0 TO 6
+        ARRAY_PUSH(mindest, GUI_TEXT_WIDTH(a.gitSp, koepfe[k]) + 20)
+    NEXT
+    mindest[0] = MAX(mindest[0], 80)
+    mindest[4] = MAX(mindest[4], 60)
+    mindest[5] = MAX(mindest[5], 80)
+    DIM t AS STRING
+    FOR EACH t IN dbTypen()
+        mindest[1] = MAX(mindest[1], GUI_TEXT_WIDTH(a.gitSp, dbTypName$(t)) + 28)
+    NEXT
+    FOR EACH t IN dbLoeschenNamen()
+        mindest[6] = MAX(mindest[6], GUI_TEXT_WIDTH(a.gitSp, t) + 28)
+    NEXT
+    RETURN mindest
 END FUNCTION
 
 ' Die Spalten des Daten-Gitters: id schmal, der Rest zu gleichen Teilen.
@@ -199,6 +242,11 @@ SUB dbLagen(r AS Reiter)
     dbLage("bild", a.btBild)
     dbLage("datei", a.tfDatei)
     dbLage("abfneu", a.btAbfNeu) : dbLage("ausfuehren", a.btAusfuehren) : dbLage("sql", a.taSql)
+    ' Breiten des Spalten-Gitters, was jede Spalte braucht, und wie breit
+    ' der Knopf "Umbenennen ..." fuer seine Beschriftung sein muss.
+    protokoll("spaltengitter breiten " + GUI_GET_W(a.gitSp) + " " + JOIN$(GUI_TABLE_GET_COL_WIDTHS(a.gitSp), " "))
+    protokoll("spaltengitter bedarf " + JOIN$(dbSpMindest(a), " "))
+    protokoll("spaltengitter knopf " + GUI_GET_W(a.btTabUm) + " " + GUI_TEXT_WIDTH(a.btTabUm, GUI_TEXT(a.btTabUm)))
     DIM i AS INTEGER
     FOR i = 0 TO GUI_LISTBOX_COUNT(a.lstTab) - 1
         DIM x AS INTEGER
@@ -208,7 +256,7 @@ SUB dbLagen(r AS Reiter)
         (x, y, b, h) = GUI_LISTBOX_ITEM_RECT(a.lstTab, i)
         IF h > 0 THEN protokoll("lage dbtabelle " + GUI_LISTBOX_ITEM(a.lstTab, i) + " " + STR$(x + b \ 2) + " " + STR$(y + h \ 2))
     NEXT
-    dbZellLagen("sp", a.gitSp, dbSpBreiten(GUI_GET_W(a.gitSp)))
+    dbZellLagen("sp", a.gitSp, dbSpBreiten(a, GUI_GET_W(a.gitSp)))
     IF a.gitDa >= 0 THEN dbZellLagen("da", a.gitDa, dbDaBreiten(GUI_GET_W(a.gitDa), LEN(a.daSpalten)))
 END SUB
 

@@ -1,0 +1,60 @@
+' Loesung Kapitel 9, Erweitern 2 -- "Entfernen" ist nur bedienbar, wenn
+' eine Zeile gewaehlt ist. Im Inspektor steht "Aktiviert" aus.
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+
+    SUB Geoeffnet()
+        DIM z AS STRING
+        FOR EACH z IN ["Momo|Michael Ende|Buch|1973", _
+                       "Metropolis|Fritz Lang|Film|1927", _
+                       "Tetris|Alexei Paschitnow|Spiel|1984"]
+            GUI_TABLE_ADD_ROW(Self.tabelle, SPLIT$(z, "|"))
+        NEXT
+        GUI_DROPDOWN_SET_SELECTED(Self.wahlArt, 0)
+        Self.zaehlen()
+        GUI_FOCUS(Self.feldTitel)
+    END SUB
+
+    SUB zaehlen()
+        DIM n AS INTEGER : n = GUI_TABLE_ROW_COUNT(Self.tabelle)
+        GUI_SET_TEXT(Self.status, STR$(n) + " Einträge")
+    END SUB
+
+    SUB knopfSpeichern_Klick()
+        DIM t AS STRING : t = TRIM$(GUI_TEXT(Self.feldTitel))
+        IF t = "" THEN
+            GUI_SET_TEXT(Self.status, "Bitte einen Titel eingeben.")
+            GUI_FOCUS(Self.feldTitel)
+            RETURN
+        END IF
+        DIM u AS STRING : u = TRIM$(GUI_TEXT(Self.feldUrheber))
+        DIM j AS STRING : j = TRIM$(GUI_TEXT(Self.feldJahr))
+        DIM a AS STRING : a = GUI_TEXT(Self.wahlArt)
+        GUI_TABLE_ADD_ROW(Self.tabelle, [t, u, a, j])
+        Self.knopfNeu_Klick()
+        Self.zaehlen()
+    END SUB
+
+    SUB knopfNeu_Klick()
+        GUI_SET_TEXT(Self.feldTitel, "")
+        GUI_SET_TEXT(Self.feldUrheber, "")
+        GUI_SET_TEXT(Self.feldJahr, "")
+        GUI_FOCUS(Self.feldTitel)
+    END SUB
+
+    SUB knopfEntfernen_Klick()
+        DIM z AS INTEGER : z = GUI_TABLE_SELECTED(Self.tabelle)
+        IF z >= 0 THEN GUI_TABLE_REMOVE_ROW(Self.tabelle, z)
+        Self.zaehlen()
+        ' >>> neu
+        Self.tabelle_Geaendert()
+        ' <<< neu
+    END SUB
+
+    ' >>> neu
+    ' Das Ereignis Geaendert der Tabelle: eine andere Zeile ist gewaehlt.
+    SUB tabelle_Geaendert()
+        DIM frei AS BOOLEAN : frei = GUI_TABLE_SELECTED(Self.tabelle) >= 0
+        GUI_SET_ENABLED(Self.knopfEntfernen, frei)
+    END SUB
+    ' <<< neu
+END CLASS

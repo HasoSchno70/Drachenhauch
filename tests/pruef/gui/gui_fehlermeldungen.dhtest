@@ -1,0 +1,40 @@
+' Fehlermeldungen der gui, die sagen sollen, was eigentlich los ist.
+
+=== ein widget, das es noch nicht gibt
+' Ein Feld AS GUI_WIDGET ohne Zuweisung ist NIL. So geht es einem Fenster
+' aus dem Studio, dessen Code ein Control anspricht, bevor das Fenster mit
+' Zeigen aufgebaut wurde (Buch "Fenster, Formulare, Daten", Kapitel 11).
+' Vorher hiess es nur "erwartet INTEGER (Arg 1)".
+IMPORT "gui"
+SCREEN(300, 200, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM k AS GUI_WIDGET
+TRY
+    GUI_SET_TEXT(k, "Momo ist da.")
+CATCH e
+    PRINT e
+END TRY
+DIM w AS GUI_WINDOW
+TRY
+    GUI_WINDOW_TITLE(w, "Info")
+CATCH e2
+    PRINT e2
+END TRY
+--- umgebung
+DHRT_FRAMES=1
+--- enthaelt
+GUI_SET_TEXT: erwartet INTEGER (Arg 1), erhalten NIL -- das Widget oder Fenster gibt es noch nicht (ein Fenster aus dem Studio legt seine Controls erst mit Zeigen an)
+GUI_WINDOW_TITLE: erwartet INTEGER (Arg 1), erhalten NIL -- das Widget oder Fenster gibt es noch nicht
+
+=== auf englisch
+' Uebersetzt wird beim Ausgeben eines Laufzeitfehlers, nicht im CATCH.
+IMPORT "gui"
+SCREEN(300, 200, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM k AS GUI_WIDGET
+GUI_SET_TEXT(k, "x")
+--- umgebung
+DHRT_FRAMES=1
+DHRT_LANG=en
+--- fehler
+GUI_SET_TEXT: expected INTEGER (argument 1), got NIL -- the widget or window does not exist yet

@@ -311,7 +311,8 @@ bild gelb TRUE
 ' Strg+Pos1 an den Anfang, F9 setzt den Haltepunkt in Zeile 1, F7 startet;
 ' der Halt kommt aus dhrt debug und wird ueber die Zeilenkarte auf
 ' App.Geoeffnet, Zeile 1 umgerechnet. F10 geht eine Zeile weiter, F5 laesst
-' es weiterlaufen, Umschalt+F5 beendet.
+' es weiterlaufen, Umschalt+F5 beendet. In einer Methode steht Self mit
+' seinen Feldern vor den Locals.
 IMPORT "laeufer.dh"
 DIM p AS STRING : p = CWD$() + "/proj"
 DIM m AS STRING : m = CWD$() + "/m.log"
@@ -363,9 +364,13 @@ END CLASS
 haltepunkt App.Geoeffnet 1
 debug gestartet
 debug continue
+variable Self = <App>
+variable Leerlauf = FALSE
 variable x = 0
 angehalten App.Geoeffnet, Zeile 1
 debug step-over
+variable Self = <App>
+variable Leerlauf = FALSE
 variable x = 41
 angehalten App.Geoeffnet, Zeile 2
 debug continue

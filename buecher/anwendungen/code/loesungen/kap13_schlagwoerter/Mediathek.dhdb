@@ -1,0 +1,130 @@
+{
+  "datei": "mediathek.db",
+  "tabellen": [
+    {
+      "name": "eintrag",
+      "spalten": [
+        {
+          "name": "titel",
+          "typ": "text",
+          "pflicht": true,
+          "eindeutig": false,
+          "vorgabe": "",
+          "sqlvorgabe": ""
+        },
+        {
+          "name": "urheber",
+          "typ": "text",
+          "pflicht": false,
+          "eindeutig": false,
+          "vorgabe": ""
+        },
+        {
+          "name": "art",
+          "typ": "text",
+          "pflicht": false,
+          "eindeutig": false,
+          "vorgabe": ""
+        },
+        {
+          "name": "jahr",
+          "typ": "ganz",
+          "pflicht": false,
+          "eindeutig": false,
+          "vorgabe": ""
+        }
+      ]
+    },
+    {
+      "name": "freund",
+      "spalten": [
+        {
+          "name": "name",
+          "typ": "text",
+          "pflicht": true,
+          "eindeutig": true,
+          "vorgabe": ""
+        },
+        {
+          "name": "telefon",
+          "typ": "text",
+          "pflicht": false,
+          "eindeutig": false,
+          "vorgabe": ""
+        }
+      ]
+    },
+    {
+      "name": "ausleihe",
+      "spalten": [
+        {
+          "name": "eintrag",
+          "typ": "ganz",
+          "pflicht": true,
+          "eindeutig": false,
+          "vorgabe": "",
+          "verweis": "eintrag",
+          "beimLoeschen": "loeschen"
+        },
+        {
+          "name": "freund",
+          "typ": "ganz",
+          "pflicht": true,
+          "eindeutig": false,
+          "vorgabe": "",
+          "verweis": "freund",
+          "beimLoeschen": "verbieten"
+        },
+        {
+          "name": "von",
+          "typ": "datum",
+          "pflicht": true,
+          "eindeutig": false,
+          "vorgabe": ""
+        },
+        {
+          "name": "zurueck",
+          "typ": "datum",
+          "pflicht": false,
+          "eindeutig": false,
+          "vorgabe": ""
+        }
+      ]
+    },
+    {
+      "name": "schlagwort",
+      "spalten": [
+        {
+          "name": "name",
+          "typ": "text",
+          "pflicht": true,
+          "eindeutig": true,
+          "vorgabe": ""
+        }
+      ]
+    },
+    {
+      "name": "markierung",
+      "spalten": [
+        {
+          "name": "eintrag",
+          "typ": "ganz",
+          "pflicht": true,
+          "eindeutig": false,
+          "vorgabe": "",
+          "verweis": "eintrag",
+          "beimLoeschen": "loeschen"
+        },
+        {
+          "name": "schlagwort",
+          "typ": "ganz",
+          "pflicht": true,
+          "eindeutig": false,
+          "vorgabe": "",
+          "verweis": "schlagwort",
+          "beimLoeschen": "loeschen"
+        }
+      ]
+    }
+  ]
+}

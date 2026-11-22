@@ -785,6 +785,40 @@ alte Meldungen mit, die Live-Prüfung prüft nur Geändertes und lässt
 einen Dialog den Fokus leihen. `pruef_ausgaben.js` lässt Datenbank-Blöcke
 jetzt laufen, jeden in eigenem Ordner.
 
+Danach (2026-11-22): Buch B, Teil II, Kapitel 9–12 im Studio (Der
+Inspektor, Code und Ereignisse, Mehrere Fenster, Der Debugger). Die
+Mediathek wird ein Studio-Projekt: Anker, Tab-Folge und Hinweise im
+Inspektor, Klasse und Modul, ein modales Bearbeitungsfenster und ein
+Ausleihfenster, das der Auswahl folgt; Kapitel 12 findet mit dem Debugger
+einen echten Fehler aus Kapitel 11 (nach Entfernen zeigte das
+Ausleihfenster NIL). Die Bilder zieht `studio_bilder.dh`, auch das
+Programm unter dem Debugger (es erbt `DHRT_ABSPIELEN` vom Studio). Funde
+in der Laufzeit, je mit Fall und Gegenprobe: ein NIL statt Widget sagt,
+dass es das Widget noch nicht gibt; `dhrt debug` zeigt Self mit seinen
+Feldern (die eigenen zuerst), den Stapel wie geschrieben und ein Feld von
+Objekten mit dem Klassennamen, und eine Zeile mit Aufruf beginnt nach der
+Rückkehr nicht neu (Haltepunkt und F10 hielten zweimal).
+
+Danach (2026-11-22): Buch B, Teil III, Kapitel 13–16 (Das
+Datenbank-Element, Datenbindung, Abfragen, die rechnen, Aus dem Netz).
+Die Mediathek bekommt ein Datenbank-Element mit Verweisen und
+Löschregeln, gebundene Fenster und Tabellen mit Suchfeld, drei Abfragen
+(`LEFT JOIN`, Überfälliges mit `julianday`, Statistik mit `GROUP BY`) und
+ein Bearbeitungsfenster, das eine ISBN bei Open Library nachschlägt --
+im Hintergrund, mit Timer, Abbrechen und Cover. Für Bild und Prüfung
+spielt `buch/spielserver.dh` Open Library. Eingetippter Text kommt jetzt
+über die Zwischenablage ins Bild: Die Kopie des Projekts legt ihn mit
+`CLIPBOARD_SET` hinein, die Aufnahme drückt Strg+V. Funde, je mit Fall
+und Gegenprobe: `GUI_TEXT_WIDTH` misst eine Beschriftung (Spalten-Gitter
+und Inspektor des Studios schneiden nichts mehr ab); ein gescheiterter
+Fremdschlüssel nennt die Spalten, die zeigen, und das Studio übersetzt
+die Meldung; eine Klappliste an einer Textspalte zeigt deren Werte; die
+erzeugte Tabelle behält die Köpfe des Entwurfs; `Neuladen` behält die
+gewählte Zeile auch an einer Abfrage; eine Abfrage über mehrere Zeilen
+geht in den erzeugten Code; `GUI_STATE$` zeigt Tabellen samt gewählter
+Zeile; HTTP-Fehler nennen die Adresse einmal und sagen, ob das Netz oder
+die Zeitgrenze schuld war.
+
 Was beim Bauen festgelegt wurde:
 
 * **Code kommt aus Dateien.** `buch/code_lesen.js` holt ganze Programme,

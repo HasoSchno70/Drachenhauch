@@ -253,6 +253,16 @@ impl Gui {
     /// ersten GUI_UPDATE) die Schaetzung -- 272x160 statt 403x240 fuer das
     /// Formular aus Kapitel 2 von "Fenster, Formulare, Daten", und
     /// WINDOW_MIN_SIZE liess das Fenster zu klein ziehen.
+    /// GUI_TEXT_WIDTH(widget, text): so breit, wie DIESES Widget `text`
+    /// zeichnet (seine Schrift, Groesse, Stil, der Massstab) -- logisch, wie
+    /// alle Lagen nach aussen. Ohne das schaetzte ein Programm Spalten- und
+    /// Knopfbreiten an der Zeichenzahl (das Studio: "Ganze Za" im
+    /// Spalten-Gitter, Buch "Fenster, Formulare, Daten", Kapitel 13).
+    pub fn text_breite_messen(&self, g: Option<&Graphics>, h: i64, s: &str) -> Result<i64, String> {
+        let w = self.wdg(h, "GUI_TEXT_WIDTH")?;
+        let g = g.ok_or("GUI_TEXT_WIDTH: braucht ein Fenster (SCREEN)")?;
+        Ok(self.unsk(self.wtext_width(g, w, s)) as i64)
+    }
     pub fn layout_min_messen(&mut self, g: Option<&Graphics>, h: i64) -> Result<(i64, i64), String> {
         self.wdg(h, "GUI_LAYOUT_MIN_W")?;
         if let Some(g) = g { self.layout_pass(g); }

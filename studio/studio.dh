@@ -590,6 +590,8 @@ SUB felderProtokollieren()
     FOR EACH z IN inspZeilen
         IF NOT z.sichtbar OR NOT GUI_VISIBLE(z.ed) THEN CONTINUE
         protokoll("lage feld " + z.schluessel + " " + STR$(GUI_GET_X(z.ed) + 30) + " " + STR$(GUI_GET_Y(z.ed) + inhaltOben + 12))
+        ' Hat die Beschriftung Platz? (Breite, gebraucht)
+        protokoll("beschriftung " + z.schluessel + " " + STR$(GUI_GET_W(z.lbl)) + " " + STR$(GUI_TEXT_WIDTH(z.lbl, GUI_TEXT(z.lbl))))
     NEXT
 END SUB
 

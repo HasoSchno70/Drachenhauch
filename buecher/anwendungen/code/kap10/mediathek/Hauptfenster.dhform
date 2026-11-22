@@ -1,0 +1,168 @@
+{
+  "title": "Mediathek",
+  "name": "Hauptfenster",
+  "x": 0,
+  "y": 0,
+  "w": 760,
+  "h": 560,
+  "movable": true,
+  "closable": true,
+  "visible": true,
+  "resizable": true,
+  "min_w": 600,
+  "min_h": 420,
+  "widgets": [
+    {
+      "kind": "label",
+      "name": "beschriftungTitel",
+      "text": "Titel",
+      "x": 20,
+      "y": 26,
+      "w": 140,
+      "h": 16
+    },
+    {
+      "kind": "textinput",
+      "name": "feldTitel",
+      "text": "",
+      "placeholder": "z. B. Momo",
+      "x": 170,
+      "y": 20,
+      "w": 570,
+      "h": 28,
+      "anchor": "lrt",
+      "tab_index": 1
+    },
+    {
+      "kind": "label",
+      "name": "beschriftungUrheber",
+      "text": "Urheber",
+      "x": 20,
+      "y": 62,
+      "w": 140,
+      "h": 16
+    },
+    {
+      "kind": "textinput",
+      "name": "feldUrheber",
+      "text": "",
+      "x": 170,
+      "y": 56,
+      "w": 570,
+      "h": 28,
+      "anchor": "lrt",
+      "tab_index": 2
+    },
+    {
+      "kind": "label",
+      "name": "beschriftungArt",
+      "text": "Art",
+      "x": 20,
+      "y": 98,
+      "w": 140,
+      "h": 16
+    },
+    {
+      "kind": "dropdown",
+      "name": "wahlArt",
+      "items": [
+        "Buch",
+        "Film",
+        "Spiel",
+        "Musik"
+      ],
+      "x": 170,
+      "y": 92,
+      "w": 160,
+      "h": 28,
+      "tab_index": 3
+    },
+    {
+      "kind": "label",
+      "name": "beschriftungJahr",
+      "text": "Erscheinungsjahr",
+      "x": 20,
+      "y": 134,
+      "w": 140,
+      "h": 16
+    },
+    {
+      "kind": "textinput",
+      "name": "feldJahr",
+      "text": "",
+      "x": 170,
+      "y": 128,
+      "w": 80,
+      "h": 28,
+      "tooltip": "Vier Ziffern, z. B. 1973",
+      "tab_index": 4
+    },
+    {
+      "kind": "table",
+      "name": "tabelle",
+      "x": 20,
+      "y": 172,
+      "w": 720,
+      "h": 300,
+      "anchor": "lrtb",
+      "tab_index": 7,
+      "table": {
+        "headers": [
+          "Titel",
+          "Urheber",
+          "Art",
+          "Jahr"
+        ],
+        "rows": []
+      }
+    },
+    {
+      "kind": "label",
+      "name": "status",
+      "text": "",
+      "x": 20,
+      "y": 496,
+      "w": 300,
+      "h": 16,
+      "anchor": "lb"
+    },
+    {
+      "kind": "button",
+      "name": "knopfEntfernen",
+      "text": "Entfernen",
+      "x": 420,
+      "y": 488,
+      "w": 100,
+      "h": 30,
+      "anchor": "rb",
+      "tooltip": "Entfernt die gewählte Zeile",
+      "tab_index": 8
+    },
+    {
+      "kind": "button",
+      "name": "knopfNeu",
+      "text": "Neu",
+      "x": 530,
+      "y": 488,
+      "w": 90,
+      "h": 30,
+      "anchor": "rb",
+      "tooltip": "Leert das Formular",
+      "tab_index": 6
+    },
+    {
+      "kind": "button",
+      "name": "knopfSpeichern",
+      "text": "Speichern",
+      "x": 630,
+      "y": 488,
+      "w": 110,
+      "h": 30,
+      "anchor": "rb",
+      "variant": "primaer",
+      "tooltip": "Nimmt den Eintrag auf (Enter)",
+      "tab_index": 5
+    }
+  ],
+  "studio_standard": "knopfSpeichern"
+}

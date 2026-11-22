@@ -1,0 +1,108 @@
+{
+  "title": "Freunde",
+  "name": "FreundeFenster",
+  "x": 0,
+  "y": 0,
+  "w": 560,
+  "h": 320,
+  "movable": true,
+  "closable": true,
+  "visible": true,
+  "studio_tabelle": "Mediathek.freund",
+  "widgets": [
+    {
+      "kind": "table",
+      "name": "liste",
+      "x": 20,
+      "y": 20,
+      "w": 240,
+      "h": 220,
+      "table": {
+        "headers": [
+          "Name",
+          "Telefon"
+        ]
+      },
+      "studio_quelle": "Mediathek.freund",
+      "studio_spalten": "name;telefon",
+      "studio_sortieren": "name"
+    },
+    {
+      "kind": "label",
+      "name": "beschriftungName",
+      "text": "Name",
+      "x": 280,
+      "y": 26,
+      "w": 80,
+      "h": 16
+    },
+    {
+      "kind": "textinput",
+      "name": "feldName",
+      "text": "",
+      "x": 370,
+      "y": 20,
+      "w": 170,
+      "h": 28,
+      "bind": "name"
+    },
+    {
+      "kind": "label",
+      "name": "beschriftungTelefon",
+      "text": "Telefon",
+      "x": 280,
+      "y": 62,
+      "w": 80,
+      "h": 16
+    },
+    {
+      "kind": "textinput",
+      "name": "feldTelefon",
+      "text": "",
+      "x": 370,
+      "y": 56,
+      "w": 170,
+      "h": 28,
+      "bind": "telefon"
+    },
+    {
+      "kind": "label",
+      "name": "hinweis",
+      "text": "",
+      "x": 280,
+      "y": 100,
+      "w": 260,
+      "h": 120,
+      "wrap": true
+    },
+    {
+      "kind": "button",
+      "name": "knopfNeu",
+      "text": "Neu",
+      "x": 20,
+      "y": 252,
+      "w": 90,
+      "h": 30
+    },
+    {
+      "kind": "button",
+      "name": "knopfSichern",
+      "text": "Sichern",
+      "x": 280,
+      "y": 252,
+      "w": 120,
+      "h": 30,
+      "variant": "primaer"
+    },
+    {
+      "kind": "button",
+      "name": "knopfLoeschen",
+      "text": "Löschen",
+      "x": 410,
+      "y": 252,
+      "w": 130,
+      "h": 30
+    }
+  ],
+  "studio_standard": "knopfSichern"
+}

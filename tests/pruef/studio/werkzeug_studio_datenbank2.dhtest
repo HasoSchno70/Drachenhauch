@@ -266,6 +266,16 @@ DIM j AS JSON_HANDLE : j = JSON_LOAD(p + "/Hauptfenster.dhform")
 PRINT "tabelle "; JSON_GET_STRING(j, "studio_tabelle")
 PRINT "quelle "; JSON_GET_STRING(j, "widgets.0.studio_quelle")
 PRINT "kopf "; JSON_GET_STRING(j, "widgets.0.table.headers.0"); " "; JSON_GET_STRING(j, "widgets.0.table.headers.1")
+' Jede Beschriftung im Inspektor hat Platz fuer ihren Text -- fest 112
+' schnitt "Angezeigte Spalten" (Buch "Fenster, Formulare, Daten", Kap. 14).
+DIM eng AS ARRAY OF STRING : eng = []
+DIM n AS INTEGER : n = 0
+FOR EACH z IN slAnfang(log, "beschriftung ")
+    DIM t AS ARRAY OF STRING : t = SPLIT$(z, " ")
+    n = n + 1
+    IF VAL(t[2]) < VAL(t[3]) THEN ARRAY_PUSH(eng, t[1])
+NEXT
+PRINT "beschriftungen "; n > 10; " zu eng: "; JOIN$(eng, " ")
 --- argumente
 {sammlung}/../../../studio/studio.dh
 --- datei laeufer.dh
@@ -289,3 +299,154 @@ fenster tabelle Daten.kunden
 tabelle Daten.kunden
 quelle Daten.kunden
 kopf name ort
+beschriftungen TRUE zu eng: 
+
+=== eine klappliste mit festen eintraegen bindet an einer textspalte ihren text
+' Eine Klappliste ohne Datenquelle, gebunden an eine Textspalte: jeder
+' Eintrag traegt seinen Text als Wert -- vorher band die gui die Nummer, und
+' in art stand "1" statt "Film" (Buch "Fenster, Formulare, Daten",
+' Kapitel 14). An einer Zahlspalte bleibt es die Nummer.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+slHin(10, 10)
+slWarten(10)
+slTaste(294)
+slWarten(150)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+SETENV("DH_STUDIO_LAUF_BILDER", "20")
+DIM log AS STRING : log = CWD$() + "/s.log"
+slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+DIM z AS STRING
+FOR EACH z IN slAnfang(log, "ausgabe ")
+    IF INSTR(z, "▶") < 0 AND INSTR(z, "■") < 0 AND INSTR(z, "WARNING") < 0 THEN PRINT z
+NEXT
+--- argumente
+{sammlung}/../../../studio/studio.dh
+--- vorher
+IMPORT "db"
+DIM db AS DB_CONN : db = DB_OPEN("proj/daten.sqlite")
+DB_EXEC(db, "CREATE TABLE medien (id INTEGER PRIMARY KEY, art TEXT, stufe INTEGER)")
+DB_EXEC(db, "INSERT INTO medien (art, stufe) VALUES ('Spiel', 0)")
+DB_CLOSE(db)
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"},{"art":"datenbank","name":"Daten","schema":"Daten.dhdb"}]}
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":400,"h":200,"studio_tabelle":"Daten.medien","widgets":[{"kind":"dropdown","name":"wahlArt","x":10,"y":10,"w":160,"h":28,"items":["Buch","Film","Spiel"],"bind":"art"},{"kind":"dropdown","name":"wahlStufe","x":10,"y":50,"w":160,"h":28,"items":["leicht","schwer"],"bind":"stufe"}]}
+--- datei proj/Hauptfenster.dh
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+    SUB Geoeffnet()
+        ' Laden waehlt den Eintrag, dessen Text in der Zeile steht.
+        Self.Laden(1)
+        PRINT "geladen "; GUI_DROPDOWN_SELECTED(Self.wahlArt)
+        GUI_DROPDOWN_SET_SELECTED(Self.wahlArt, 1)
+        GUI_DROPDOWN_SET_SELECTED(Self.wahlStufe, 1)
+        Self.Sichern()
+        DIM r AS DB_RESULT : r = DB_QUERY(Daten, "SELECT art, stufe FROM medien WHERE id = 1")
+        IF DB_NEXT(r) THEN PRINT "gesichert "; DB_GET_STRING(r, 0); " "; DB_GET_STRING(r, 1)
+    END SUB
+END CLASS
+--- datei proj/App.dh
+CLASS App EXTENDS StudioApp
+END CLASS
+--- datei proj/Daten.dhdb
+{"datei":"daten.sqlite","tabellen":[{"name":"medien","spalten":[{"name":"art","typ":"text","pflicht":false,"eindeutig":false,"vorgabe":""},{"name":"stufe","typ":"ganz","pflicht":false,"eindeutig":false,"vorgabe":""}]}]}
+--- erwartet
+ausgabe geladen 2
+ausgabe gesichert Film 1
+
+=== eine tabelle mit datenquelle behaelt die koepfe aus dem entwurf
+' Zeigt die Quelle so viele Spalten, wie die Tabelle im Entwurf Koepfe hat,
+' bleiben die Koepfe ("Name", "Umsatz") -- vorher standen immer die Namen
+' der Spalten da ("name"). Passt die Zahl nicht, bleiben es die Namen
+' (Buch "Fenster, Formulare, Daten", Kapitel 14).
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+slHin(10, 10)
+slWarten(10)
+slTaste(294)
+slWarten(100)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+SETENV("DH_STUDIO_LAUF_BILDER", "10")
+DIM log AS STRING : log = CWD$() + "/s.log"
+slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+DIM b AS STRING : b = READALL(p + "/_studio/Hauptfenster_basis.dh")
+DIM q AS STRING : q = CHR$(34)
+PRINT "entwurf "; INSTR(b, "GUI_TABLE_HEADERS(Self.liste, [studioTr$(!" + q + "Name" + q + "), studioTr$(!" + q + "Umsatz" + q + ")])") >= 0
+PRINT "sonst namen "; INSTR(b, "GUI_TABLE_HEADERS(Self.alle, studioQuelleSpalten)") >= 0
+--- argumente
+{sammlung}/../../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"},{"art":"datenbank","name":"Daten","schema":"Daten.dhdb"}]}
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":400,"h":300,"widgets":[{"kind":"table","name":"liste","x":10,"y":10,"w":300,"h":120,"table":{"headers":["Name","Umsatz"]},"studio_quelle":"Daten.kunden","studio_spalten":"name;umsatz"},{"kind":"table","name":"alle","x":10,"y":140,"w":300,"h":120,"table":{"headers":["Name"]},"studio_quelle":"Daten.kunden"}]}
+--- datei proj/Hauptfenster.dh
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+END CLASS
+--- datei proj/App.dh
+CLASS App EXTENDS StudioApp
+END CLASS
+--- datei proj/Daten.dhdb
+{"datei":"daten.sqlite","tabellen":[{"name":"kunden","spalten":[{"name":"name","typ":"text","pflicht":false,"eindeutig":false,"vorgabe":""},{"name":"umsatz","typ":"geld","pflicht":false,"eindeutig":false,"vorgabe":""}]}]}
+--- erwartet
+entwurf TRUE
+sonst namen TRUE
+
+=== neuladen behaelt die gewaehlte zeile auch an einer abfrage
+' Eine Tabelle an einer Abfrage (nicht die Tabelle des Fensters) merkt sich
+' die id der gewaehlten Zeile: Bert ist gewaehlt, Aaron kommt davor dazu,
+' nach Neuladen steht die Wahl auf Bert in Zeile 2. Vorher war die Wahl weg
+' (Buch "Fenster, Formulare, Daten", Kapitel 15).
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+slHin(10, 10)
+slWarten(10)
+slTaste(294)
+slWarten(150)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+SETENV("DH_STUDIO_LAUF_BILDER", "20")
+DIM log AS STRING : log = CWD$() + "/s.log"
+slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+DIM z AS STRING
+FOR EACH z IN slAnfang(log, "ausgabe ")
+    IF INSTR(z, "▶") < 0 AND INSTR(z, "■") < 0 AND INSTR(z, "WARNING") < 0 THEN PRINT z
+NEXT
+--- argumente
+{sammlung}/../../../studio/studio.dh
+--- vorher
+IMPORT "db"
+DIM db AS DB_CONN : db = DB_OPEN("proj/daten.sqlite")
+DB_EXEC(db, "CREATE TABLE kunden (id INTEGER PRIMARY KEY, name TEXT)")
+DB_EXEC(db, "INSERT INTO kunden (name) VALUES ('Anna')")
+DB_EXEC(db, "INSERT INTO kunden (name) VALUES ('Bert')")
+DB_CLOSE(db)
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"},{"art":"datenbank","name":"Daten","schema":"Daten.dhdb"}]}
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":400,"h":300,"widgets":[{"kind":"table","name":"liste","x":10,"y":10,"w":300,"h":200,"table":{"headers":["Name"]},"studio_quelle":"Daten.namen","studio_sortieren":"name"}]}
+--- datei proj/Hauptfenster.dh
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+    SUB Geoeffnet()
+        GUI_TABLE_SET_SELECTED(Self.liste, 1)
+        PRINT "vorher "; GUI_TABLE_SELECTED(Self.liste); " id "; Self.IdVon(Self.liste)
+        DB_EXEC(Daten, "INSERT INTO kunden (name) VALUES ('Aaron')")
+        Self.Neuladen()
+        PRINT "nachher "; GUI_TABLE_SELECTED(Self.liste); " id "; Self.IdVon(Self.liste)
+    END SUB
+END CLASS
+--- datei proj/App.dh
+CLASS App EXTENDS StudioApp
+END CLASS
+--- datei proj/Daten.dhdb
+{"datei":"daten.sqlite","tabellen":[{"name":"kunden","spalten":[{"name":"name","typ":"text","pflicht":false,"eindeutig":false,"vorgabe":""}]}],"abfragen":[{"name":"namen","sql":"SELECT id, name FROM kunden"}]}
+--- erwartet
+ausgabe vorher 1 id 2
+ausgabe nachher 2 id 2

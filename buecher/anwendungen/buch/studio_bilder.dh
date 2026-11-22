@@ -16,6 +16,9 @@
 IMPORT "imgfx"
 
 CONST GROESSE = "1280x800"
+' Fuer den Reiter einer Datenbank breiter: erst ab 1440 stehen alle
+' sieben Spalten des Spalten-Gitters ohne Rollen da.
+DIM fenstergroesse AS STRING : fenstergroesse = GROESSE
 CONST BILDER_STUDIO = 60
 DIM hier AS STRING : hier = CWD$()
 DIM wurzel AS STRING : wurzel = hier + "/../../.."
@@ -74,7 +77,7 @@ END FUNCTION
 ' Das Studio mit einem Projekt, `bilder` Bilder lang; am Ende ein Bild.
 SUB studioBild(name AS STRING, proj AS STRING, oeffnen AS STRING, ev AS STRING, n AS INTEGER)
     SETENV("DH_STUDIO_KONFIG", arbeit + "/studio.json")
-    SETENV("DH_STUDIO_GROESSE", GROESSE)
+    SETENV("DH_STUDIO_GROESSE", fenstergroesse)
     SETENV("DH_STUDIO_OEFFNEN", oeffnen)
     SETENV("DH_STUDIO_AUFNAHME", ev)
     SETENV("DH_STUDIO_LAUF_BILDER", "3")
@@ -123,6 +126,35 @@ SUB taste(z AS ARRAY OF STRING, b AS INTEGER, halten AS ARRAY OF INTEGER, code A
     FOR EACH h IN halten
         ARRAY_PUSH(z, "e " + STR$(b + 6) + " 1 " + STR$(h) + " 0 0 0")
     NEXT
+END SUB
+
+' Ein Studio-Projekt mit F5 uebersetzen lassen und das erzeugte Programm
+' aufnehmen, auf Wunsch mit einer Bedienung (Klicklagen im Programm, ohne
+' SKALIERUNG). Fuer Kapitel 8 stand das einmal von Hand weiter unten.
+SUB programmBild(name AS STRING, rel AS STRING, bedienung AS ARRAY OF STRING, n AS INTEGER)
+    DIM pm AS STRING : pm = projekt$(rel)
+    DIM zf AS ARRAY OF STRING : zf = ["e 0 7 640 400 0 0"]
+    taste(zf, 20, ohne, 294)   ' F5 -- raylibs Code, nicht KEY_F5
+    studioBild("_" + name + "_f5", pm, "", aufnahme$("f5_" + name, zf), 70)
+    IF FILEEXISTS(bilder + "/_" + name + "_f5.png") THEN DELETEFILE(bilder + "/_" + name + "_f5.png")
+    IF NOT FILEEXISTS(pm + "/_studio/main.dh") THEN
+        PRINT "  FEHLER "; name; ": F5 hat _studio/main.dh nicht erzeugt"
+        EXIT(1)
+    END IF
+    IF LEN(bedienung) > 0 THEN
+        SETENV("DHRT_ABSPIELEN", aufnahme$("bed_" + name, bedienung))
+    END IF
+    DIM ziel AS STRING : ziel = bilder + "/" + name + ".png"
+    DIM pl AS INTEGER
+    pl = PROCESS_START("dhrt", "bild", pm + "/_studio/main.dh", ziel, STR$(n))
+    DIM aus AS STRING : aus = laufen$(pl)
+    SETENV("DHRT_ABSPIELEN", "")
+    IF FILEEXISTS(ziel) THEN
+        PRINT "  "; name; ".png"
+    ELSE
+        PRINT "  FEHLER "; name; " "; LEFT$(aus, 300)
+        EXIT(1)
+    END IF
 END SUB
 
 DIM nur AS ARRAY OF STRING : nur = []
@@ -182,4 +214,189 @@ IF gewuenscht("kap08_laeuft") THEN
     IF FILEEXISTS(ziel) THEN PRINT "  kap08_laeuft.png" ELSE PRINT "  FEHLER kap08_laeuft "; LEFT$(aus, 300)
     IF FILEEXISTS(bilder + "/_kap08_f5.png") THEN DELETEFILE(bilder + "/_kap08_f5.png")
 END IF
+' Kapitel 9: ein Klick auf die Tabelle im Entwurf -- der Inspektor zeigt
+' ihre Lage samt Anker.
+IF gewuenscht("kap09_anker") THEN
+    m = projekt$("kap09/mediathek")
+    z = []
+    klick(z, 20, 615, 385)
+    ' Die Gruppe "Daten" zuklappen, damit "Lage" mit dem Anker zu sehen ist.
+    klick(z, 32, 1005, 169)
+    studioBild("kap09_anker", m, "Hauptfenster", aufnahme$("anker", z), BILDER_STUDIO)
+    ' Entwurf und Inspektor; Navigator und Bibliothek kennt Kapitel 8.
+    zuschneiden("kap09_anker", 290, 66, 980, 536)
+END IF
+
+' Kapitel 9: das erzeugte Programm.
+IF gewuenscht("kap09_programm") THEN
+    programmBild("kap09_programm", "kap09/mediathek", [], 12)
+END IF
+
+' Kapitel 9, Loesung Erweitern 1: F11 (raylibs Code 300) maximiert.
+IF gewuenscht("kap09_vollbild") THEN
+    z = ["e 0 7 600 540 0 0"]
+    taste(z, 6, ohne, 300)
+    programmBild("kap09_vollbild", "loesungen/kap09_vollbild", z, 30)
+END IF
+
+' Kapitel 10: das Modul Beispiele im Code-Reiter; der Navigator zeigt
+' Klasse, Modul und Fenster.
+IF gewuenscht("kap10_modul") THEN
+    m = projekt$("kap10/mediathek")
+    z = []
+    klick(z, 20, 110, 271)   ' die Funktion beispiele im Navigator
+    studioBild("kap10_modul", m, "", aufnahme$("modul", z), BILDER_STUDIO)
+    zuschneiden("kap10_modul", 0, 66, 940, 536)
+END IF
+
+' Kapitel 11: Metropolis waehlen, "Bearbeiten ..." -- das modale Fenster.
+IF gewuenscht("kap11_bearbeiten") THEN
+    z = []
+    klick(z, 0, 100, 71)
+    klick(z, 10, 415, 427)
+    programmBild("kap11_bearbeiten", "kap11/mediathek", z, 40)
+END IF
+
+' Kapitel 12: der Fehler -- Metropolis, "Ausleihen ...", "Entfernen",
+' Enter. Tetris ist gewaehlt, das Ausleihfenster sagt "Kein Eintrag".
+IF gewuenscht("kap12_fehler") THEN
+    z = []
+    klick(z, 0, 100, 71)
+    klick(z, 10, 670, 427)
+    klick(z, 28, 540, 427)
+    taste(z, 48, ohne, 257)
+    programmBild("kap12_fehler", "kap11/mediathek", z, 80)
+END IF
+
+' Kapitel 12: der Debugger haelt in knopfEntfernen_Klick vor folgen(NIL).
+' Das Studio oeffnet die Methode, setzt den Haltepunkt (Strg+Pos1, neunmal
+' Pfeil runter, F9) und startet mit F7. Das Programm bekommt seine Klicks
+' ueber DHRT_ABSPIELEN, das es vom Studio erbt (das Studio selbst spielt
+' DH_STUDIO_AUFNAHME): Metropolis, "Ausleihen ...", "Entfernen", Enter.
+IF gewuenscht("kap12_halt") THEN
+    m = projekt$("kap11/mediathek")
+    ' Der Navigator ist kurz: 16 Raststufen am Mausrad (je eine Zeile, 22
+    ' Punkte) bringen knopfEntfernen_Klick von 540 auf 188.
+    z = ["e 10 7 150 200 0 0", "e 12 8 0 -16 0 0"]
+    klick(z, 20, 130, 188)
+    taste(z, 40, [341], 268)
+    DIM k AS INTEGER
+    FOR k = 1 TO 9
+        taste(z, 44 + k * 6, ohne, 264)
+    NEXT
+    taste(z, 110, ohne, 298)
+    taste(z, 120, ohne, 296)
+    DIM kz AS ARRAY OF STRING : kz = ["e 0 7 600 470 0 0"]
+    klick(kz, 30, 100, 71)
+    klick(kz, 50, 670, 427)
+    klick(kz, 80, 540, 427)
+    taste(kz, 110, ohne, 257)
+    SETENV("DHRT_ABSPIELEN", aufnahme$("kind_halt", kz))
+    studioBild("kap12_halt", m, "", aufnahme$("halt", z), 600)
+    SETENV("DHRT_ABSPIELEN", "")
+    ' Ohne Menue und Werkzeugleiste.
+    zuschneiden("kap12_halt", 0, 66, 1280, 709)
+END IF
+
+' Kapitel 13: der Reiter der Datenbank. Erst F5 -- der erste Start legt die
+' Tabellen an und traegt die Beispiele ein --, dann die Spalten von
+' ausleihe (Verweise, Beim Loeschen) und die Daten von eintrag. Lagen fuer
+' 1440 x 900 (Protokoll: "lage db daten").
+IF gewuenscht("kap13_spalten") OR gewuenscht("kap13_daten") THEN
+    m = projekt$("kap13/mediathek")
+    fenstergroesse = "1440x900"
+    z = ["e 0 7 640 400 0 0"]
+    taste(z, 20, ohne, 294)
+    studioBild("_kap13_f5", m, "", aufnahme$("f5_kap13", z), 70)
+    IF FILEEXISTS(bilder + "/_kap13_f5.png") THEN DELETEFILE(bilder + "/_kap13_f5.png")
+    IF gewuenscht("kap13_spalten") THEN
+        studioBild("kap13_spalten", m, "Mediathek.ausleihe", "", 30)
+        zuschneiden("kap13_spalten", 290, 66, 812, 640)
+    END IF
+    IF gewuenscht("kap13_daten") THEN
+        z = []
+        klick(z, 10, 618, 150)
+        studioBild("kap13_daten", m, "Mediathek.eintrag", aufnahme$("daten", z), 40)
+        zuschneiden("kap13_daten", 290, 66, 812, 640)
+    END IF
+    fenstergroesse = GROESSE
+END IF
+
+' Kapitel 14: die Tabelle im Entwurf gewaehlt, der Inspektor zeigt ihre
+' Gruppe Daten (Datenquelle, Spalten, Sortierung, Suchfeld).
+IF gewuenscht("kap14_inspektor") THEN
+    m = projekt$("kap14/mediathek")
+    z = []
+    klick(z, 10, 600, 400)
+    studioBild("kap14_inspektor", m, "Hauptfenster", aufnahme$("inspektor", z), 40)
+    zuschneiden("kap14_inspektor", 290, 66, 990, 540)
+END IF
+
+' Kapitel 15: die Abfrage bestand im Reiter der Datenbank, mit Ergebnis
+' (nach F5, damit die Datei Zeilen hat); dazu das Fenster Ueberfaellig.
+IF gewuenscht("kap15_abfrage") THEN
+    m = projekt$("kap15/mediathek")
+    fenstergroesse = "1440x900"
+    z = ["e 0 7 640 400 0 0"]
+    taste(z, 20, ohne, 294)
+    studioBild("_kap15_f5", m, "", aufnahme$("f5_kap15", z), 70)
+    IF FILEEXISTS(bilder + "/_kap15_f5.png") THEN DELETEFILE(bilder + "/_kap15_f5.png")
+    studioBild("kap15_abfrage", m, "Mediathek.bestand", "", 30)
+    zuschneiden("kap15_abfrage", 290, 66, 812, 640)
+    fenstergroesse = GROESSE
+END IF
+IF gewuenscht("kap15_ueberfaellig") THEN
+    z = []
+    klick(z, 0, 40, 13)
+    klick(z, 12, 60, 40)
+    programmBild("kap15_ueberfaellig", "kap15/mediathek", z, 40)
+END IF
+
+' Kapitel 16: Neu, eine ISBN, Nachschlagen. Gegen spielserver.dh statt
+' Open Library (kein Netz, kein fremdes Cover): nach F5 bekommt die Kopie
+' dessen Adresse als QUELLE und legt die ISBN in ihre Zwischenablage.
+IF gewuenscht("kap16_nachschlagen") THEN
+    m = projekt$("kap16/mediathek")
+    z = ["e 0 7 640 400 0 0"]
+    taste(z, 20, ohne, 294)
+    studioBild("_kap16_f5", m, "", aufnahme$("f5_kap16", z), 70)
+    IF FILEEXISTS(bilder + "/_kap16_f5.png") THEN DELETEFILE(bilder + "/_kap16_f5.png")
+    COPYFILE(wurzel + "/daten/bilder/logo.png", arbeit + "/cover.png")
+    COPYFILE(hier + "/spielserver.dh", arbeit + "/spielserver.dh")
+    IF FILEEXISTS(arbeit + "/port.txt") THEN DELETEFILE(arbeit + "/port.txt")
+    DIM srv AS INTEGER : srv = PROCESS_START("dhrt", "run", arbeit + "/spielserver.dh", "--", "60")
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE NOT FILEEXISTS(arbeit + "/port.txt") AND MILLIS() - t0 < 15000
+        SLEEP(20)
+    WEND
+    DIM ef AS STRING : ef = m + "/_studio/projekt/EintragFenster.dh"
+    DIM et AS STRING : et = READALL(ef)
+    et = REPLACE$(et, "https://openlibrary.org", "http://127.0.0.1:" + TRIM$(READALL(arbeit + "/port.txt")))
+    et = REPLACE$(et, "        GUI_FOCUS(Self.feldIsbn)" + CHR$(10) + "    END SUB", "        GUI_FOCUS(Self.feldIsbn)" + CHR$(10) + "        CLIPBOARD_SET(" + CHR$(34) + "978-3-522-20260-2" + CHR$(34) + ")" + CHR$(10) + "    END SUB")
+    WRITEALL(ef, et)
+    z = []
+    klick(z, 0, 295, 453)
+    klick(z, 20, 320, 148)
+    taste(z, 30, [341], 86)
+    klick(z, 42, 474, 148)
+    ARRAY_PUSH(z, "e 60 7 380 330 0 0")
+    SETENV("DHRT_ZWISCHENABLAGE", "privat")
+    SETENV("DHRT_ABSPIELEN", aufnahme$("bed_kap16", z))
+    DIM ziel AS STRING : ziel = bilder + "/kap16_nachschlagen.png"
+    DIM pl AS INTEGER : pl = PROCESS_START("dhrt", "bild", m + "/_studio/main.dh", ziel, "120")
+    DIM aus16 AS STRING : aus16 = laufen$(pl)
+    SETENV("DHRT_ABSPIELEN", "")
+    SETENV("DHRT_ZWISCHENABLAGE", "")
+    PROCESS_KILL(srv)
+    IF FILEEXISTS(ziel) THEN PRINT "  kap16_nachschlagen.png" ELSE PRINT "  FEHLER kap16_nachschlagen "; LEFT$(aus16, 300)
+END IF
+
+' Kapitel 11: Tetris waehlen, "Ausleihen ..." -- das Fenster daneben.
+IF gewuenscht("kap11_ausleihen") THEN
+    z = []
+    klick(z, 0, 100, 91)
+    klick(z, 10, 670, 427)
+    programmBild("kap11_ausleihen", "kap11/mediathek", z, 40)
+END IF
+
 PRINT "fertig"

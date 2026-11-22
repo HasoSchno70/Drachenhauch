@@ -1,0 +1,75 @@
+' Kapitel 14 -- die Tabelle zeigt die Tabelle eintrag ueber ihre
+' Datenquelle, sortiert nach Titel und mit Suchfeld (Inspektor: Daten).
+' Das Fenster gehoert zur Tabelle eintrag: ein Klick laedt die Zeile,
+' DatensatzId ist ihre id.
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+    DIM ausleihe AS AusleihFenster
+
+    SUB Geoeffnet()
+        GUI_TABLE_COL_WIDTHS(Self.tabelle, [260, 220, 110, 110])
+        Self.ausleihe = NEW AusleihFenster()
+        Self.ausleihe.haupt = Self
+        Self.statusZeigen()
+    END SUB
+
+    SUB statusZeigen()
+        DIM n AS INTEGER : n = anzahlEintraege()
+        GUI_SET_TEXT(Self.status, STR$(n) + " Einträge")
+    END SUB
+
+    ' Einen Eintrag bearbeiten lassen (id 0 = einen neuen). Liefert, ob
+    ' das Fenster mit OK zuging.
+    FUNCTION bearbeitenLassen(id AS INTEGER) AS BOOLEAN
+        DIM f AS EintragFenster : f = NEW EintragFenster()
+        f.id = id
+        f.ZeigenModal()
+        IF NOT f.ok THEN RETURN FALSE
+        Self.Neuladen()
+        Self.statusZeigen()
+        RETURN TRUE
+    END FUNCTION
+
+    SUB knopfNeu_Klick()
+        Self.bearbeitenLassen(0)
+    END SUB
+
+    SUB knopfBearbeiten_Klick()
+        IF Self.DatensatzId = 0 THEN RETURN
+        IF Self.bearbeitenLassen(Self.DatensatzId) THEN
+            Self.ausleihe.folgen(Self.DatensatzId)
+        END IF
+    END SUB
+
+    SUB tabelle_Doppelklick()
+        Self.knopfBearbeiten_Klick()
+    END SUB
+
+    SUB knopfEntfernen_Klick()
+        IF Self.DatensatzId = 0 THEN RETURN
+        DIM t AS STRING : t = titelVon$(Self.DatensatzId)
+        DIM antwort AS INTEGER
+        antwort = Frage(t + " entfernen?", "Entfernen|Abbrechen")
+        IF antwort <> 1 THEN RETURN
+        ' Loeschen nimmt die Zeile aus der Tabelle eintrag und laedt die
+        ' Liste neu; die Ausleihen gehen mit (Verweis: mitloeschen).
+        Self.Loeschen()
+        Self.statusZeigen()
+        Self.ausleihe.folgen(0)
+    END SUB
+
+    SUB knopfAusleihen_Klick()
+        Self.ausleihe.Zeigen()
+    END SUB
+
+    ' >>> neu
+    SUB miFreunde_Aktion()
+        DIM f AS FreundeFenster : f = NEW FreundeFenster()
+        f.ZeigenModal()
+    END SUB
+    ' <<< neu
+
+    ' Ein Klick hat die Zeile geladen: das Ausleihfenster folgt.
+    SUB tabelle_Geaendert()
+        Self.ausleihe.folgen(Self.IdVon(Self.tabelle))
+    END SUB
+END CLASS

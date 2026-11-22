@@ -887,6 +887,10 @@ CATCH e
     PRINT "fehler: "; e
     ' Erst nach der Zeitgrenze -- eine abgewiesene Verbindung waere ein SOFORTIGER Fehler.
     PRINT "nach der zeitgrenze "; MILLIS() - t0 >= 900 AND MILLIS() - t0 < 1900
+    ' Die Meldung sagt, dass es die Zeitgrenze war, und nennt die URL einmal
+    ' (seit 2026-11-22; vorher stand sie doppelt da).
+    PRINT "hinweis "; INSTR(e, "-- keine Antwort in der Zeitgrenze (HTTP_TIMEOUT)") >= 0
+    PRINT "url einmal "; LEN(SPLIT$(e, basis + "/langsam")) = 2
 END TRY
 PROCESS_KILL(VAL(srv[1]))
 --- argumente
@@ -894,6 +898,8 @@ PROCESS_KILL(VAL(srv[1]))
 --- enthaelt
 fehler: HTTP-Fehler
 nach der zeitgrenze TRUE
+hinweis TRUE
+url einmal TRUE
 
 === hintergrund kann jetzt auch post
 ' Vorher konnte der Hintergrund-Pfad NUR GET -- ausgerechnet ein POST
@@ -1039,3 +1045,29 @@ PROCESS_KILL(VAL(srv[1]))
 {sammlung}/../_hilfen/gegenserver.dh
 --- erwartet
 {"methode":"POST","pfad":"/x","auth":"","ctype":"application/x-www-form-urlencoded; charset=utf-8","eigen":"","rumpf_hex":"613d31"}
+
+=== keine verbindung sagt es und nennt die url einmal
+' Niemand lauscht am Port: die Meldung von ureq ist englisch und nennt die
+' URL schon -- dhrt haengte sie noch einmal an. Jetzt einmal, dazu ein
+' Wort, was das heisst (Buch "Fenster, Formulare, Daten", Kapitel 16).
+IMPORT "html"
+IMPORT "httpd"
+DIM s AS HTTPD : s = HTTPD_START(0, "127.0.0.1")
+DIM url AS STRING : url = "http://127.0.0.1:" + STR$(HTTPD_PORT(s)) + "/api/books"
+HTTPD_STOP(s)
+DIM a AS INTEGER : a = HTTP_GET_START(url)
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE NOT HTTP_READY(a) AND MILLIS() - t0 < 15000
+    SLEEP(20)
+WEND
+TRY
+    PRINT HTTP_RESULT(a)
+CATCH e
+    PRINT "hinweis "; INSTR(e, "-- keine Verbindung: kein Netz, oder der Server ist nicht erreichbar") >= 0
+    PRINT "url einmal "; LEN(SPLIT$(e, url)) = 2
+END TRY
+PRINT "status "; HTTP_STATUS()
+--- erwartet
+hinweis TRUE
+url einmal TRUE
+status 0

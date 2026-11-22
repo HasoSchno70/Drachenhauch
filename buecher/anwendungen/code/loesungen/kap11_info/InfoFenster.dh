@@ -1,0 +1,18 @@
+' Loesung Kapitel 11, Erweitern 2 -- ein Fenster je Eintrag. Jedes
+' NEW InfoFenster() ist ein eigenes Fenster mit eigenem Eintrag.
+CLASS InfoFenster EXTENDS InfoFenster_Basis
+    ' >>> neu
+    DIM eintrag AS Eintrag
+
+    SUB Geoeffnet()
+        GUI_WINDOW_TITLE(Self.Fenster(), Self.eintrag.titel)
+        DIM e AS Eintrag : e = Self.eintrag
+        GUI_SET_TEXT(Self.zeile1, e.titel + " von " + e.urheber)
+        GUI_SET_TEXT(Self.zeile2, e.art + ", " + e.jahr)
+    END SUB
+
+    SUB knopfZu_Klick()
+        Self.Zumachen()
+    END SUB
+    ' <<< neu
+END CLASS

@@ -1,4 +1,12 @@
+const fs = require("fs");
+const path = require("path");
 const { neu } = require("../code_lesen");
+
+// Das SQL einer Abfrage aus dem Datenbank-Element einer Loesung.
+function sql(rel, name) {
+  const d = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "..", "code", rel), "utf8"));
+  return d.abfragen.find((a) => a.name === name).sql.split("\n");
+}
 
 // Anhang A: die Loesungen. Der Code kommt aus code/loesungen/ -- nur die
 // Stellen zwischen ' >>> neu und ' <<< neu. Die Dateien und Projekte
@@ -213,4 +221,286 @@ module.exports = (H) => [
   H.h3("Erweitern 2"),
 
   H.p("Das Programm beginnt mit dem Info-Fenster. Wer es schließt, beendet das Programm, denn das Startfenster zu schließen beendet immer das ganze Programm. Das Hauptfenster bekommt man so nie zu sehen: Es wird nur geöffnet, wenn jemand es öffnet, und das tut hier niemand. Projekt → Als Startfenster auf dem Hauptfenster stellt es wieder her."),
+
+  H.h2("Kapitel 9 · Der Inspektor"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Die Tabelle wird breiter, aber nicht höher; sie bleibt 300 Punkte hoch. Die Knöpfe und die Statuszeile wandern trotzdem an den unteren Rand, denn ihr Anker U ist noch gesetzt. Dazwischen liegt ein leerer Streifen, so hoch wie der ganze Zuwachs."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Das Feld Urheber bleibt 570 Punkte breit, während das Titelfeld darüber bis an den rechten Rand wächst. Ohne Anker R weiß das Feld nicht, dass es dem rechten Rand folgen soll — es bleibt, wie es im Entwurf war."),
+
+  H.h3("Drehen 3"),
+
+  H.p("„Speichern“: Es hat die Tab-Folge 5, das Jahr die 4. Tab geht nach den Zahlen, nicht nach der Lage. Dass „Neu“ links von „Speichern“ steht, spielt keine Rolle — und genau das ist gewollt, denn nach dem Ausfüllen will man speichern."),
+
+  H.h3("Erweitern 1: Vollbild"),
+
+  H.p("Projekt → Menüs des Fensters öffnet den Menü-Editor: ein Menü Ansicht, darin ein Eintrag Vollbild mit dem Namen miVollbild und dem Kürzel F11. Das Ereignis eines Menüeintrags heißt Aktion (code/loesungen/kap09_vollbild):"),
+
+  ...neu("loesungen/kap09_vollbild/Hauptfenster.dh").map((t) => H.code(t)),
+
+  H.p("WINDOW_MAXIMIZED sagt, ob das Fenster gerade den Bildschirm füllt; WINDOW_RESTORE holt es auf die Größe aus dem Entwurf zurück. Dass beide Größen gut aussehen, besorgen die Anker aus Schritt 2 — ohne eine Zeile Code dafür. Das Kürzel steht im Menü, wie in Kapitel 6: Dort sieht man es, und es gilt genau einmal."),
+
+  H.h3("Erweitern 2: Entfernen nur mit Auswahl"),
+
+  H.p("Im Inspektor bekommt knopfEntfernen unter Verhalten „Aktiviert“ aus — beim Start ist keine Zeile gewählt. Die Tabelle bekommt ihr Ereignis Geaendert (code/loesungen/kap09_entfernen):"),
+
+  ...neu("loesungen/kap09_entfernen/Hauptfenster.dh").map((t) => H.code(t)),
+
+  H.p("Geaendert kommt, wenn eine andere Zeile gewählt wird. Nach dem Entfernen ist keine mehr gewählt; darum ruft knopfEntfernen_Klick die Methode danach selbst auf, und der Knopf wird wieder grau."),
+
+  H.h2("Kapitel 10 · Code und Ereignisse"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Ja. In einer Methode findet ein Aufruf ohne Self die Methoden der eigenen Klasse. Self. macht nur sichtbar, dass es eine Methode des Fensters ist und kein Befehl und keine Funktion aus einem Modul — wer den Code später liest, muss nicht suchen."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Das Studio warnt zweimal: „HAUPTFENSTER hat kein Mitglied 'eintraege'“ — an den Stellen, an denen andere Methoden Self.eintraege lesen. Beim Start hält das Programm mit „Feld 'eintraege' existiert nicht in hauptfenster“. Ein DIM in einer Methode legt eine Variable an, die mit der Methode endet; was mehrere Methoden teilen, muss ein Feld sein."),
+
+  H.h3("Drehen 3"),
+
+  H.p("Momo ist weg — an seiner Stelle steht der neue Eintrag. bearbeitet hat ohne formularLeeren den Anfangswert 0, und knopfSpeichern_Klick hält das für „Zeile 0 wird bearbeitet“. Die Mediathek hat danach weiter fünf Einträge, nur der erste ist ein anderer."),
+
+  H.h3("Erweitern 1: Statistik"),
+
+  H.p("Ein neues Modul (Projekt → Modul hinzufügen) mit einer Funktion (code/loesungen/kap10_statistik):"),
+
+  ...neu("loesungen/kap10_statistik/Statistik.dh").map((t) => H.code(t)),
+
+  H.p("Und tabelleFuellen schreibt die Zusammenfassung in die Statuszeile:"),
+
+  ...neu("loesungen/kap10_statistik/Hauptfenster.dh").map((t) => H.code(t)),
+
+  H.p("Die Funktion bekommt das Feld als Parameter, statt Self.eintraege zu lesen — ein Modul hat kein Self. Darum ließe sie sich ohne Fenster prüfen, mit einem Feld aus beispiele()."),
+
+  H.h3("Erweitern 2: ein Eintrag in einem Satz"),
+
+  H.p("Die Klasse bekommt eine Methode, die nur ihre eigenen Felder braucht (code/loesungen/kap10_alstext):"),
+
+  ...neu("loesungen/kap10_alstext/Eintrag.dh").map((t) => H.code(t)),
+
+  H.p("Das Fenster bekommt das Ereignis Geaendert der Tabelle:"),
+
+  ...neu("loesungen/kap10_alstext/Hauptfenster.dh").map((t) => H.code(t)),
+
+  H.p("Wie ein Eintrag als Satz aussieht, weiß der Eintrag; wo der Satz erscheint, weiß das Fenster. So kann ein Bericht in Kapitel 17 denselben Satz drucken, ohne das Fenster zu fragen."),
+
+  H.h2("Kapitel 11 · Mehrere Fenster"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Nichts: Solange das Bearbeitungsfenster offen ist, nimmt das Hauptfenster keine Klicks an. Ginge es doch, könnte man währenddessen eine andere Zeile wählen oder Metropolis entfernen — und das Fenster schriebe beim OK in einen Eintrag, der nicht mehr in der Tabelle steht. Wer es ausprobieren will, schreibt in bearbeitenLassen Zeigen statt ZeigenModal (siehe „Was schiefgehen kann“): Der Klick wählt dann die andere Zeile, und ein OK im Fenster ändert Metropolis, ohne dass die Tabelle es zeigt."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Den Eintrag, der jetzt gewählt ist. tabelle_Geaendert ruft folgen auch bei geschlossenem Fenster; folgen merkt sich den Eintrag in Self.eintrag und zeigt ihn nur nicht an. Beim Öffnen baut Zeigen das Fenster neu auf und ruft Geoeffnet, und Geoeffnet ruft anzeigen — mit dem gemerkten Eintrag."),
+
+  H.h3("Drehen 3"),
+
+  H.p("Esc drückt den Esc-Knopf, also knopfAbbrechen; der macht das Fenster nur zu. f.ok bleibt FALSE, bearbeitenLassen liefert NIL, und knopfBearbeiten_Klick kehrt in der zweiten IF-Zeile zurück, ohne die Tabelle anzufassen. Das Kreuz in der Titelleiste wirkt genauso."),
+
+  H.h3("Erweitern 1: Einstellungen"),
+
+  H.p("Ein neues Fenster EinstellungenFenster (360 × 160) mit einem Kästchen kaestchenFarbig und den Knöpfen OK und Abbrechen, die Enter- und Esc-Knopf sind (code/loesungen/kap11_einstellungen). Es redet wie das Bearbeitungsfenster über zwei Felder:"),
+
+  ...neu("loesungen/kap11_einstellungen/EinstellungenFenster.dh").map((t) => H.code(t)),
+
+  H.p("Das Hauptfenster bekommt im Menü-Editor ein Menü Bearbeiten mit dem Eintrag miEinstellungen, ein Feld farbig, und tabelleFuellen färbt verliehene Zeilen:"),
+
+  ...neu("loesungen/kap11_einstellungen/Hauptfenster.dh").map((t) => H.code(t)),
+
+  H.p("Das Fenster bekommt eine Kopie des Werts und gibt eine zurück. Erst nach OK übernimmt das Hauptfenster sie — bei Abbrechen bleibt alles, wie es war, auch wenn das Kästchen im Fenster schon umgeschaltet war."),
+
+  H.h3("Erweitern 2: ein Fenster je Eintrag"),
+
+  H.p("Ein Fenster InfoFenster mit zwei Beschriftungen und einem Knopf „Schließen“ (code/loesungen/kap11_info). Den Titel setzt es selbst, über das Fenster der gui:"),
+
+  ...neu("loesungen/kap11_info/InfoFenster.dh").map((t) => H.code(t)),
+
+  H.p("Im Hauptfenster entsteht bei jedem Aufruf ein neues Objekt und damit ein neues Fenster:"),
+
+  ...neu("loesungen/kap11_info/Hauptfenster.dh").map((t) => H.code(t)),
+
+  H.p("Anders als das Ausleihfenster merkt sich das Hauptfenster die Info-Fenster nicht. Sie brauchen es auch nicht: Niemand muss ihnen später Bescheid geben. Jedes neue Fenster erscheint in der Mitte, über dem vorigen; man zieht es an der Titelleiste beiseite."),
+
+  H.h2("Kapitel 12 · Der Debugger"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Bei jedem Wechsel der gewählten Zeile (über tabelle_Geaendert), nach „Bearbeiten …“, wenn das Fenster mit OK geschlossen wurde, und nach „Entfernen“, wenn die Rückfrage bestätigt wurde. Nicht beim Start und nicht bei „Ausleihen …“ — dort ruft niemand folgen. Ein Haltepunkt an der Stelle, an der etwas ankommt, hält oft; einer an der Stelle, an der es abgeschickt wird, nur dort, wo man sucht."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Vier. Der Haltepunkt hält vor Zeile 10, also nachdem Zeile 8 Metropolis schon aus eintraege genommen hat. Der Debugger zeigt immer den Stand, bevor die markierte Zeile läuft."),
+
+  H.h3("Drehen 3"),
+
+  H.p("Keine, und das Ausleihfenster sagt „Kein Eintrag gewählt.“. z ist 4; tabelleFuellen wählt wieder Zeile 4, und die gibt es mit vier Einträgen nicht mehr (gezählt wird ab 0). tabelle_Geaendert findet keine gewählte Zeile und schickt NIL — Tabelle und Ausleihfenster sagen dasselbe, nur eben „nichts“."),
+
+  H.h3("Erweitern 1: der Eintrag davor"),
+
+  H.p("Nach tabelleFuellen prüft knopfEntfernen_Klick, ob es Zeile z noch gibt (code/loesungen/kap12_letzter):"),
+
+  ...neu("loesungen/kap12_letzter/Hauptfenster.dh").map((t) => H.code(t)),
+
+  H.p("Ein Haltepunkt auf die neue IF-Zeile zeigt beim Entfernen von Emil z = 4 und n = 4: Gewählt wird Zeile 3, Kind of Blue, und das Ausleihfenster folgt."),
+
+  H.h3("Erweitern 2: ein Hinweis statt nichts"),
+
+  H.p("Beide Knöpfe fragen die gewählte Zeile über eine neue Methode ab, die den Hinweis gleich mitschreibt (code/loesungen/kap12_hinweis):"),
+
+  ...neu("loesungen/kap12_hinweis/Hauptfenster.dh").map((t) => H.code(t)),
+
+  H.p("Die nächste Aktion, die die Tabelle neu füllt, schreibt wieder die Zahl der Einträge in die Statuszeile; der Hinweis verschwindet von selbst."),
+
+  H.h2("Kapitel 13 · Das Datenbank-Element"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Nichts — Lena bleibt in freund. Die Statuszeile sagt, dass in ausleihe (Spalte freund) noch eine Zeile auf sie zeigt. Erst wenn Tetris zurück ist und die Ausleihe gelöscht, lässt sich Lena löschen; eine zurückgegebene Ausleihe zeigt aber weiter auf sie. Wer Freunde löschen will, die etwas hatten, braucht eine andere Regel — oder behält sie."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Keine Zeile mehr, die auf Tetris zeigt: Der Verweis ausleihe.eintrag löscht mit. Das Programm tut dafür nichts — entfernen schickt nur DELETE FROM eintrag, den Rest erledigt die Datenbank."),
+
+  H.h3("Drehen 3"),
+
+  H.p("„Die Spalte freund ist Pflicht -- leeren geht nur ohne.“ Leeren hieße, die Spalte auf NULL zu setzen, und eine Pflichtspalte darf nicht leer sein. Die Regel bleibt, wie sie war."),
+
+  H.h3("Erweitern 1: die Telefonnummer"),
+
+  H.p("Das Modul bekommt eine Funktion; weil name in freund eindeutig ist, gibt es höchstens eine Zeile (code/loesungen/kap13_telefon):"),
+
+  ...neu("loesungen/kap13_telefon/Bestand.dh").map((t) => H.code(t)),
+
+  H.p("Und das Ausleihfenster hängt sie an den Namen:"),
+
+  ...neu("loesungen/kap13_telefon/AusleihFenster.dh").map((t) => H.code(t)),
+
+  H.h3("Erweitern 2: Schlagwörter"),
+
+  H.p("Viele zu viele braucht eine Tabelle dazwischen. Ein Schlagwort steht einmal in schlagwort; jede Zeile in markierung verbindet einen Eintrag mit einem Schlagwort (code/loesungen/kap13_schlagwoerter):"),
+
+  H.table([
+    [{ text: "schlagwort.name", mono: true }, "Text", "Pflicht, Eindeutig"],
+    [{ text: "markierung.eintrag", mono: true }, "Ganze Zahl", "Pflicht, Verweis auf eintrag, mitlöschen"],
+    [{ text: "markierung.schlagwort", mono: true }, "Ganze Zahl", "Pflicht, Verweis auf schlagwort, mitlöschen"],
+  ], { headers: ["Spalte", "Art", "dazu"], widths: [3000, 1600, 4426] }),
+
+  H.p("Beide Verweise löschen mit: Geht ein Eintrag, gehen seine Markierungen; geht ein Schlagwort, ebenso. Im Modul legt markieren eine Verbindung an, schlagwoerter$ sammelt die Namen eines Eintrags, und einrichten markiert die Beispiele:"),
+
+  ...neu("loesungen/kap13_schlagwoerter/Bestand.dh").map((t) => H.code(t)),
+
+  H.p("Ein Klick in die Tabelle zeigt sie:"),
+
+  ...neu("loesungen/kap13_schlagwoerter/Hauptfenster.dh").map((t) => H.code(t)),
+
+  H.h2("Kapitel 14 · Datenbindung"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Momo, Metropolis, Tetris, Kind of Blue, Emil und die Detektive — in der Reihenfolge, in der die Datei die Zeilen liefert, hier die, in der sie aufgenommen wurden. Ohne ORDER BY verspricht SQLite keine Reihenfolge; wer eine will, sagt sie."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Alle fünf. Das Suchfeld sucht in allen angezeigten Spalten, auch in jahr — und jedes Jahr der Beispiele beginnt mit 19. Wer nur im Titel suchen will, zeigt nur den Titel oder nimmt eine Bedingung im eigenen Code."),
+
+  H.h3("Drehen 3"),
+
+  H.p("Die Namen der Spalten: titel, urheber, art, jahr. Die Köpfe aus dem Entwurf gelten nur, wenn es so viele sind, wie die Tabelle Spalten zeigt — sonst wüsste das Fenster nicht, welcher Kopf zu welcher Spalte gehört."),
+
+  H.h3("Erweitern 1: was gerade verliehen ist"),
+
+  H.p("Ein neues Fenster VerliehenFenster mit einer Tabelle: Datenquelle Mediathek.eintrag, Angezeigte Spalten titel;urheber und als Bedingung, was hinter WHERE stünde (code/loesungen/kap14_verliehen):"),
+
+  H.code(["id IN (SELECT eintrag FROM ausleihe WHERE zurueck IS NULL)"], { out: true }),
+
+  H.p("Der Code des Fensters schließt es nur:"),
+
+  ...neu("loesungen/kap14_verliehen/VerliehenFenster.dh").map((t) => H.code(t)),
+
+  H.p("Das Hauptfenster bekommt das Menü und öffnet bei jedem Aufruf ein neues Fenster — es liest beim Öffnen, was in dem Moment weg ist:"),
+
+  ...neu("loesungen/kap14_verliehen/Hauptfenster.dh").map((t) => H.code(t)),
+
+  H.h3("Erweitern 2: die Freunde"),
+
+  H.p("Ein Fenster FreundeFenster mit der Tabelle Mediathek.freund; die Liste zeigt dieselbe Tabelle (Datenquelle Mediathek.freund, Spalten name;telefon), die beiden Felder sind an name und telefon gebunden. Weil die Liste die Tabelle des Fensters zeigt, lädt ein Klick die Zeile in die Felder (code/loesungen/kap14_freunde):"),
+
+  ...neu("loesungen/kap14_freunde/FreundeFenster.dh").map((t) => H.code(t)),
+
+  H.p("Lena löschen geht nicht, solange Tetris bei ihr ist — der Verweis aus Kapitel 13 verbietet es. Loeschen() bekommt den Fehler der Datenbank, und das Fenster zeigt ihn: „Nicht gelöscht: DB_EXEC: FOREIGN KEY constraint failed -- auf die Zeile zeigt noch eine Zeile in ausleihe (Spalte freund); …“. Ohne TRY hielte das Programm mit diesem Laufzeitfehler an."),
+
+  H.h2("Kapitel 15 · Abfragen, die rechnen"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Nur Tetris. JOIN behält eine Zeile nur, wenn es auf beiden Seiten eine gibt — ein Eintrag ohne offene Ausleihe fällt heraus. Für „alle Einträge, und wo es einen gibt, den Freund“ braucht es LEFT JOIN."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Momo fehlt. Mit der Bedingung im ON hängt LEFT JOIN an Momo keine Ausleihe (seine ist zurück), und Momo bleibt mit leerer Spalte. Ohne sie hängt es Momos alte Ausleihe an Jonas an — und das WHERE am Ende wirft die ganze Zeile weg, weil a.zurueck dort nicht leer ist. Eine Bedingung im ON entscheidet, was angehängt wird; eine im WHERE, welche Zeilen bleiben."),
+
+  H.h3("Drehen 3"),
+
+  H.p("Nichts — Tetris ist erst 40 Tage weg. Die Grenze steht an einer einzigen Stelle, in der Abfrage; das Fenster muss nichts davon wissen."),
+
+  H.h3("Erweitern 1: am häufigsten verliehen"),
+
+  H.p("Eine Abfrage beliebt zählt die Ausleihen je Eintrag, sortiert absteigend und schneidet nach zehn ab (code/loesungen/kap15_beliebt):"),
+
+  H.code(sql("loesungen/kap15_beliebt/Mediathek.dhdb", "beliebt"), { out: true }),
+
+  H.p("Hier ist JOIN richtig: Ein Eintrag, der nie verliehen war, gehört nicht in die Liste. Das Fenster ist eine Tabelle mit dieser Datenquelle; das Hauptfenster bekommt einen Menüpunkt:"),
+
+  ...neu("loesungen/kap15_beliebt/Hauptfenster.dh").map((t) => H.code(t)),
+
+  H.h3("Erweitern 2: Ausleihen je Monat"),
+
+  H.p("strftime('%Y-%m', von) macht aus einem Datum seinen Monat; danach wird gruppiert (code/loesungen/kap15_monate):"),
+
+  H.code(sql("loesungen/kap15_monate/Mediathek.dhdb", "monate"), { out: true }),
+
+  ...neu("loesungen/kap15_monate/Hauptfenster.dh").map((t) => H.code(t)),
+
+  H.p("Die Abfrage hat keine Spalte id; die Tabelle zeigt sie trotzdem, nur IdVon liefert dort 0."),
+
+  H.h2("Kapitel 16 · Aus dem Netz"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Der Hinweis sagt „Frage Open Library ...“, der Knopf heißt „Abbrechen“ — und dabei bleibt es. Die Antwort kommt zwar an, aber niemand holt sie ab: HTTP_GET_START beginnt den Abruf nur, nachsehen muss der Timer. Ein zweiter Klick findet einen laufenden Abruf, verwirft ihn und meldet „Abgebrochen.“"),
+
+  H.h3("Drehen 2"),
+
+  H.p("„Eine ISBN hat 10 oder 13 Ziffern.“ Mit den vier Bindestrichen ist der Text 17 Zeichen lang. Ohne die Prüfung ginge die ISBN samt Bindestrichen an Open Library, und die Antwort stünde unter einem anderen Schlüssel, als datenLesen sucht."),
+
+  H.h3("Drehen 3"),
+
+  H.p("„Keine Antwort: HTTP-Fehler:“, die Adresse, „Dns Failed“ mit der Meldung des Betriebssystems, dass es den Namen nicht kennt, und am Ende „keine Verbindung: kein Netz, oder der Server ist nicht erreichbar“. Die Endung .invalid ist für Namen reserviert, die es nie gibt — so lässt sich ausprobieren, was ohne Netz geschieht, ohne das Netz abzuschalten."),
+
+  H.h3("Erweitern 1: ein Cache"),
+
+  H.p("Das Datenbank-Element bekommt eine Tabelle nachschlag mit den Spalten isbn (Text, Pflicht, Eindeutig) und antwort (Text, Pflicht). Vor dem Abruf sieht knopfNachschlagen_Klick dort nach (code/loesungen/kap16_cache):"),
+
+  H.code(neu("loesungen/kap16_cache/EintragFenster.dh")[0]),
+
+  H.p("Und abfrageTimer_Aktion legt eine neue Antwort ab, bevor sie gelesen wird:"),
+
+  H.code(neu("loesungen/kap16_cache/EintragFenster.dh")[1]),
+
+  H.p("Eine leere Antwort {} kommt nicht hinein: Vielleicht kennt Open Library die ISBN morgen. INSERT OR REPLACE ersetzt eine Zeile mit derselben isbn, statt am Eindeutig zu scheitern. Das Cover kommt auch so aus dem Netz: Im Cache steht nur die Antwort, und darin seine Adresse."),
+
+  H.h3("Erweitern 2: die Sekunden"),
+
+  H.p("Das Fenster merkt sich, wann der Abruf begann, und der Timer schreibt die Sekunden in den Hinweis, solange die Antwort nicht da ist (code/loesungen/kap16_sekunden):"),
+
+  ...neu("loesungen/kap16_sekunden/EintragFenster.dh").map((t) => H.code(t)),
+
+  H.p("Der Timer läuft ohnehin alle 100 ms; er hat nur bisher nichts gesagt, solange er wartete. Gezählt wird nach der Uhr (MILLIS), nicht nach Timer-Runden — so stimmt die Zahl auch, wenn sich ein Aufruf des Timers verspätet."),
 ];

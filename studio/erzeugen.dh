@@ -24,9 +24,13 @@ FUNCTION laufzeitQuelle$() AS STRING
     RETURN laufzeitText
 END FUNCTION
 
-' Ein Text als Zeichenkette mit Escape-Folgen (!"..."): nur \ und " brauchen eine.
+' Ein Text als Zeichenkette mit Escape-Folgen (!"..."): \ und " brauchen eine,
+' Zeilenumbruch, Wagenruecklauf und Tabulator ebenso (\n, \r, \t) -- roh
+' stehen sie in keinem Literal.
 FUNCTION dhText$(roh AS STRING) AS STRING
-    RETURN "!" + CHR$(34) + REPLACE$(REPLACE$(roh, "\", "\\"), CHR$(34), "\" + CHR$(34)) + CHR$(34)
+    DIM t AS STRING : t = REPLACE$(REPLACE$(roh, "\", "\\"), CHR$(34), "\" + CHR$(34))
+    t = REPLACE$(REPLACE$(REPLACE$(t, CHR$(13), "\r"), CHR$(10), "\n"), CHR$(9), "\t")
+    RETURN "!" + CHR$(34) + t + CHR$(34)
 END FUNCTION
 
 ' Das Layout eines Fensters ohne die Rueckrufe alter Formulare (die nennen
@@ -354,6 +358,7 @@ FUNCTION basisCode$(ei AS INTEGER) AS STRING
         DIM rumpf AS JSON_HANDLE : rumpf = JSON_PARSE(JSON_STRINGIFY(aus))
         IF JSON_HAS(rumpf, "timer") THEN JSON_REMOVE(rumpf, "timer")
         IF JSON_HAS(rumpf, "menus") THEN JSON_REMOVE(rumpf, "menus")
+        dbKlappWerte(rumpf)
         ' Die Menueleiste kommt obendrauf: "h" ist die Hoehe des Fensters mit
         ' Titelleiste, aber ohne Menueleiste.
         DIM mlh AS INTEGER : mlh = menueLeisteH(aus)

@@ -30,6 +30,18 @@ impl<'p> Vm<'p> {
             let name = self.dbg_klassen.get(&cn.to_lowercase()).cloned().unwrap_or(cn);
             return (name.clone(), format!("<{}>", name));
         }
+        // Ein Feld von Objekten: die Klasse wie geschrieben, wie bei einer
+        // Instanz (`<ARRAY[4] OF Eintrag>` statt `OF EINTRAG`).
+        if let Value::Array(rc) = v {
+            let a = rc.borrow();
+            if let Some(k) = self.dbg_klassen.get(&a.element_type.to_lowercase()) {
+                let s = dbg_short(v);
+                let gross = format!(" OF {}>", a.element_type.to_uppercase());
+                if let Some(vorn) = s.strip_suffix(&gross) {
+                    return (v.type_name().to_string(), format!("{} OF {}>", vorn, k));
+                }
+            }
+        }
         (v.type_name().to_string(), dbg_short(v))
     }
 
@@ -46,8 +58,19 @@ impl<'p> Vm<'p> {
         match v {
             Value::Instance(rc) => {
                 let inst = rc.borrow();
+                // Die Felder der eigenen Klasse zuerst, dann die der Eltern
+                // (je in der Reihenfolge des DIM). Ein Fenster aus dem Studio
+                // erbt Controls und die Laufzeit des Studios -- seine eigenen
+                // Felder standen sonst ganz unten (Buch "Fenster, Formulare,
+                // Daten", Kapitel 12).
+                let mut ebene: HashMap<String, usize> = HashMap::new();
+                for (d, k) in inst.layout.vorfahren.iter().enumerate() {
+                    if let Some(ci) = self.prog.classes.get(k) {
+                        for f in &ci.fields { ebene.entry(f.name.to_lowercase()).or_insert(d); }
+                    }
+                }
                 let mut namen: Vec<(&String, &u32)> = inst.layout.index.iter().collect();
-                namen.sort_by_key(|(_, &k)| k);
+                namen.sort_by_key(|(n, &k)| (ebene.get(n.as_str()).copied().unwrap_or(usize::MAX), k));
                 gesamt = namen.len();
                 for (n, &k) in namen.into_iter().take(JE_EBENE) {
                     if let Some(w) = inst.fields.get(k as usize) { paare.push((n.clone(), w.clone())); }
@@ -143,9 +166,9 @@ impl<'p> Vm<'p> {
         dbg_emit(&serde_json::json!({
             "event": "paused", "reason": "error", "message": crate::meldung::t(&meldung),
             "line": zeile, "file": datei, "depth": dbg.stapel.len(),
-            "locals": self.dbg_locals_json(fn_, &locals),
+            "locals": self.dbg_locals_json(fn_, &locals, stand.selbst.as_ref()),
             "globals": self.dbg_globals_json(),
-            "stack": Self::dbg_stack_json(&dbg, stand.zeile),
+            "stack": self.dbg_stack_json(&dbg, stand.zeile),
             "watches": self.dbg_watches_json(&dbg, fn_, &locals),
         }));
         while let Some(cmd) = dbg.kanal.naechstes(&mut Self::fenster_pumpe(self.fenster_da())) {
@@ -244,14 +267,15 @@ impl<'p> Vm<'p> {
     /// Per-Zeile-Hook fuer den Debugger. take/restore von self.dbg vermeidet
     /// Borrow-Konflikte mit self.globals/out beim Snapshot/eval.
     #[inline(never)]
-    pub(super) fn debug_on_line(&mut self, fn_: &Func, locals: &mut [Value]) -> R<()> {
+    pub(super) fn debug_on_line(&mut self, fn_: &Func, locals: &mut [Value], selbst: Option<&Value>) -> R<()> {
         let mut dbg = match self.dbg.take() { Some(d) => d, None => return Ok(()) };
-        let r = self.debug_cycle(&mut dbg, fn_, locals);
+        let r = self.debug_cycle(&mut dbg, fn_, locals, selbst);
         self.dbg = Some(dbg);
         r
     }
 
-    pub(super) fn debug_cycle(&mut self, dbg: &mut DebugState, fn_: &Func, locals: &mut [Value]) -> R<()> {
+    pub(super) fn debug_cycle(&mut self, dbg: &mut DebugState, fn_: &Func, locals: &mut [Value],
+                              selbst: Option<&Value>) -> R<()> {
         let line = self.cur_line;
         let depth = self.depth;
         // Was waehrend des Laufens kam: Haltepunkte, Ueberwachen, Anhalten.
@@ -269,16 +293,20 @@ impl<'p> Vm<'p> {
             dbg.out_sent = self.out.len();
             dbg_emit(&serde_json::json!({"event":"output","text":chunk}));
         }
+        // Zurueck aus einem Aufruf mitten in diese Zeile (`DebugState::mitten`):
+        // kein Haltepunkt, kein "bis hier", kein Schritt ueber den Aufruf --
+        // wohl aber das Ende eines Schritts hinaus oder aus der Funktion.
+        let mitten = dbg.mitten.take() == Some(line);
         // Pause noetig? (Step-Regel ODER Breakpoint mit erfuellter Bedingung)
         let mut pause = match dbg.step {
             StepMode::Into => true,
-            StepMode::Over => depth <= dbg.step_depth,
+            StepMode::Over => depth < dbg.step_depth || (depth == dbg.step_depth && !mitten),
             StepMode::Out  => depth <  dbg.step_depth,
             StepMode::Run  => false,
         };
-        if dbg.run_to == Some(line) { pause = true; }
+        if dbg.run_to == Some(line) && !mitten { pause = true; }
         let mut protokoll: Option<String> = None;
-        if !pause {
+        if !pause && !mitten {
             if let Some(hp) = dbg.breakpoints.get_mut(&line) {
                 // Bedingung: fail-open (bei Eval-Fehler trotzdem anhalten).
                 let bed_ok = match &hp.bed {
@@ -316,9 +344,9 @@ impl<'p> Vm<'p> {
         crate::prozess::vordergrund_freigeben();
         dbg_emit(&serde_json::json!({
             "event": "paused", "line": zeile, "file": datei, "depth": depth,
-            "locals": self.dbg_locals_json(fn_, locals),
+            "locals": self.dbg_locals_json(fn_, locals, selbst),
             "globals": self.dbg_globals_json(),
-            "stack": Self::dbg_stack_json(dbg, line),
+            "stack": self.dbg_stack_json(dbg, line),
             "watches": self.dbg_watches_json(dbg, fn_, locals),
         }));
         // Kommandos lesen bis continue/step/stop/EOF.
@@ -365,7 +393,7 @@ impl<'p> Vm<'p> {
                     match self.dbg_setzen(fn_, locals, &name, &src) {
                         Ok(v) => dbg_emit(&serde_json::json!({"event":"set-result","name":name,
                             "value":dbg_short(&v),"type":v.type_name(),
-                            "locals": self.dbg_locals_json(fn_, locals),
+                            "locals": self.dbg_locals_json(fn_, locals, selbst),
                             "globals": self.dbg_globals_json(),
                             "watches": self.dbg_watches_json(dbg, fn_, locals)})),
                         Err(e) => dbg_emit(&serde_json::json!({"event":"set-error","name":name,"message":e})),
@@ -380,13 +408,16 @@ impl<'p> Vm<'p> {
     /// Der Aufrufstapel fuer das paused-Ereignis: INNEN zuerst, je Eintrag
     /// Name und Zeile -- die innerste steht in `line`, jede aeussere in der
     /// Zeile, in der sie die naechst innere rief.
-    pub(super) fn dbg_stack_json(dbg: &DebugState, line: u32) -> serde_json::Value {
+    pub(super) fn dbg_stack_json(&self, dbg: &DebugState, line: u32) -> serde_json::Value {
         let n = dbg.stapel.len();
         let mut out = Vec::new();
         for k in (0..n).rev() {
             let gemergt = if k + 1 == n { line } else { dbg.stapel[k + 1].1 };
             let (datei, zeile) = dbg.stelle(gemergt);
-            out.push(serde_json::json!({"name": dbg.stapel[k].0, "line": zeile, "file": datei}));
+            // Wie geschrieben (`knopfEntfernen_Klick`, nicht klein), je Teil
+            // eines Namens mit Punkt.
+            let name: Vec<String> = dbg.stapel[k].0.split('.').map(|t| self.dbg_name(t)).collect();
+            out.push(serde_json::json!({"name": name.join("."), "line": zeile, "file": datei}));
         }
         serde_json::Value::Array(out)
     }
@@ -504,8 +535,12 @@ impl<'p> Vm<'p> {
         dbg_emit(&serde_json::json!({"event": "breakpoints", "breakpoints": antwort}));
     }
 
-    pub(super) fn dbg_locals_json(&self, fn_: &Func, locals: &[Value]) -> serde_json::Value {
+    /// Die Locals des Halts; in einer Methode vorneweg `Self` mit seinen
+    /// Feldern -- ein Fenster aus dem Studio merkt sich dort alles
+    /// (Buch "Fenster, Formulare, Daten", Kapitel 12).
+    pub(super) fn dbg_locals_json(&self, fn_: &Func, locals: &[Value], selbst: Option<&Value>) -> serde_json::Value {
         let mut out = Vec::new();
+        if let Some(s) = selbst { out.push(self.dbg_var_json("Self", s, None)); }
         for (i, nm) in fn_.local_names.iter().enumerate() {
             // Compiler-Zwischenwerte ueberspringen (namenlos oder __-Praefix).
             if nm.is_empty() || nm.starts_with("__") { continue; }

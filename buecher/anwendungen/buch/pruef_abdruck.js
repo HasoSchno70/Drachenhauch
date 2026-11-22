@@ -46,13 +46,19 @@ for (const m of fs.readdirSync(contentDir).filter((f) => f.endsWith(".js")).sort
 // ------------------------------------------------------------ Dateien sammeln
 const codeDir = path.join(HIER, "..", "code");
 const dateien = [];
-for (const kap of fs.readdirSync(codeDir)) {
-  const d = path.join(codeDir, kap);
-  if (!fs.statSync(d).isDirectory()) continue;
-  for (const f of fs.readdirSync(d).filter((f) => f.endsWith(".dh"))) {
-    dateien.push({ pfad: path.join(kap, f), inhalt: fs.readFileSync(path.join(d, f), "utf8") });
+// Rekursiv: ab Teil II liegen die Programme als Studio-Projekte in
+// Unterordnern (kap09/mediathek/Hauptfenster.dh); _studio/ ist erzeugt.
+function sammeln(rel) {
+  const d = path.join(codeDir, rel);
+  for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+    if (e.isDirectory()) {
+      if (e.name !== "_studio") sammeln(path.join(rel, e.name));
+    } else if (rel && e.name.endsWith(".dh")) {
+      dateien.push({ pfad: path.join(rel, e.name), inhalt: fs.readFileSync(path.join(d, e.name), "utf8") });
+    }
   }
 }
+sammeln("");
 
 // ------------------------------------------------------------------ Vergleich
 // Gemeinsame Grundeinrueckung abziehen. Ein Kapitel druckt Ausschnitte oft

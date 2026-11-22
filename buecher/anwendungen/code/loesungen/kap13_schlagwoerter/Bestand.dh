@@ -1,0 +1,140 @@
+' Loesung Kapitel 13, Erweitern 2 -- dazu Schlagwoerter: ein Eintrag hat
+' viele, ein Schlagwort gehoert zu vielen (Tabelle markierung).
+' Ein Modul: alles, was die Mediathek mit ihrer Datenbank tut. Das
+' Datenbank-Element Mediathek ist im Programm eine offene Verbindung
+' unter seinem Namen.
+
+' Beim allerersten Start ist die Tabelle leer: dann die Beispiele
+' hinein, samt der Ausleihe an Lena -- alles in einer Transaktion.
+SUB einrichten()
+    DIM r AS DB_RESULT
+    r = DB_QUERY(Mediathek, "SELECT COUNT(*) FROM eintrag")
+    IF DB_NEXT(r) THEN
+        IF DB_GET_INT(r, 0) > 0 THEN RETURN
+    END IF
+    DB_BEGIN(Mediathek)
+    DIM e AS Eintrag
+    FOR EACH e IN beispiele()
+        DIM an AS STRING : an = e.verliehen
+        sichern(e)
+        IF an <> "" THEN verleihen(e, an)
+        ' >>> neu
+        IF e.art = "Buch" THEN markieren(e, "Kinderbuch")
+        IF VAL(e.jahr) < 1960 THEN markieren(e, "Klassiker")
+        ' <<< neu
+    NEXT
+    DB_COMMIT(Mediathek)
+END SUB
+
+' Alle Eintraege, samt dem Freund, der einen gerade hat.
+FUNCTION alleEintraege() AS ARRAY OF Eintrag
+    DIM m AS ARRAY OF Eintrag
+    DIM r AS DB_RESULT
+    r = DB_QUERY(Mediathek, "SELECT id, titel, urheber, art, jahr " + _
+                            "FROM eintrag ORDER BY id")
+    WHILE DB_NEXT(r)
+        DIM e AS Eintrag
+        e = NEW Eintrag(DB_GET_STRING(r, 1), DB_GET_STRING(r, 2), _
+                        DB_GET_STRING(r, 3), "")
+        e.id = DB_GET_INT(r, 0)
+        ' Ein Jahr kann fehlen -- dann steht NULL in der Spalte.
+        IF NOT DB_IS_NULL(r, 4) THEN e.jahr = STR$(DB_GET_INT(r, 4))
+        e.verliehen = verliehenAn$(e.id)
+        ARRAY_PUSH(m, e)
+    WEND
+    RETURN m
+END FUNCTION
+
+' Wer den Eintrag gerade hat ("" = niemand). Die offene Ausleihe kennt
+' nur die id des Freundes; sein Name steht in der Tabelle freund.
+FUNCTION verliehenAn$(id AS INTEGER) AS STRING
+    DIM r AS DB_RESULT
+    r = DB_QUERY(Mediathek, "SELECT name FROM freund WHERE id = " + _
+                 "(SELECT freund FROM ausleihe " + _
+                 "WHERE eintrag = ? AND zurueck IS NULL)", id)
+    IF DB_NEXT(r) THEN RETURN DB_GET_STRING(r, 0)
+    RETURN ""
+END FUNCTION
+
+' Ein leeres Jahr wird NULL, sonst eine Zahl.
+FUNCTION jahrWert(e AS Eintrag) AS ANY
+    IF e.jahr = "" THEN RETURN NIL
+    RETURN INT(VAL(e.jahr))
+END FUNCTION
+
+' Neu (id 0) oder geaendert: in die Tabelle schreiben.
+SUB sichern(e AS Eintrag)
+    IF e.id = 0 THEN
+        DB_EXEC(Mediathek, "INSERT INTO eintrag " + _
+                "(titel, urheber, art, jahr) VALUES (?, ?, ?, ?)", _
+                e.titel, e.urheber, e.art, jahrWert(e))
+        e.id = DB_LAST_ROWID(Mediathek)
+    ELSE
+        DB_EXEC(Mediathek, "UPDATE eintrag SET titel = ?, " + _
+                "urheber = ?, art = ?, jahr = ? WHERE id = ?", _
+                e.titel, e.urheber, e.art, jahrWert(e), e.id)
+    END IF
+END SUB
+
+' Der Verweis von ausleihe auf eintrag loescht mit: die Ausleihen des
+' Eintrags gehen mit ihm.
+SUB entfernen(e AS Eintrag)
+    DB_EXEC(Mediathek, "DELETE FROM eintrag WHERE id = ?", e.id)
+END SUB
+
+' Den Freund beim Namen -- gibt es ihn noch nicht, wird er angelegt.
+FUNCTION freundId(name AS STRING) AS INTEGER
+    DIM r AS DB_RESULT
+    r = DB_QUERY(Mediathek, "SELECT id FROM freund WHERE name = ?", _
+                 name)
+    IF DB_NEXT(r) THEN RETURN DB_GET_INT(r, 0)
+    DB_EXEC(Mediathek, "INSERT INTO freund (name) VALUES (?)", name)
+    RETURN DB_LAST_ROWID(Mediathek)
+END FUNCTION
+
+' >>> neu
+' Das Schlagwort beim Namen; gibt es das noch nicht, wird es angelegt.
+FUNCTION schlagwortId(wort AS STRING) AS INTEGER
+    DIM r AS DB_RESULT
+    r = DB_QUERY(Mediathek, "SELECT id FROM schlagwort " + _
+                 "WHERE name = ?", wort)
+    IF DB_NEXT(r) THEN RETURN DB_GET_INT(r, 0)
+    DB_EXEC(Mediathek, "INSERT INTO schlagwort (name) VALUES (?)", wort)
+    RETURN DB_LAST_ROWID(Mediathek)
+END FUNCTION
+
+SUB markieren(e AS Eintrag, wort AS STRING)
+    DB_EXEC(Mediathek, "INSERT INTO markierung " + _
+            "(eintrag, schlagwort) VALUES (?, ?)", _
+            e.id, schlagwortId(wort))
+END SUB
+
+' Die Schlagwoerter eines Eintrags, mit Komma getrennt.
+FUNCTION schlagwoerter$(id AS INTEGER) AS STRING
+    DIM r AS DB_RESULT
+    r = DB_QUERY(Mediathek, "SELECT name FROM schlagwort " + _
+                 "WHERE id IN (SELECT schlagwort FROM markierung " + _
+                 "WHERE eintrag = ?) ORDER BY name", id)
+    DIM w AS ARRAY OF STRING
+    WHILE DB_NEXT(r)
+        ARRAY_PUSH(w, DB_GET_STRING(r, 0))
+    WEND
+    RETURN JOIN$(w, ", ")
+END FUNCTION
+' <<< neu
+
+' Von heute an verliehen. Das Datum rechnet die Datenbank.
+SUB verleihen(e AS Eintrag, an AS STRING)
+    DB_EXEC(Mediathek, "INSERT INTO ausleihe " + _
+            "(eintrag, freund, von) " + _
+            "VALUES (?, ?, date('now', 'localtime'))", _
+            e.id, freundId(an))
+    e.verliehen = an
+END SUB
+
+SUB zurueckgeben(e AS Eintrag)
+    DB_EXEC(Mediathek, "UPDATE ausleihe " + _
+            "SET zurueck = date('now', 'localtime') " + _
+            "WHERE eintrag = ? AND zurueck IS NULL", e.id)
+    e.verliehen = ""
+END SUB

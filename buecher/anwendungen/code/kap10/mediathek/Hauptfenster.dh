@@ -1,0 +1,83 @@
+' Kapitel 10 -- der Code der Mediathek: die Eintraege in einem Feld des
+' Fensters, die Ereignisse der Controls und eigene Methoden fuer das,
+' was mehrere Ereignisse brauchen.
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+    DIM eintraege AS ARRAY OF Eintrag
+    ' Die Zeile im Formular, -1 = ein neuer Eintrag.
+    DIM bearbeitet AS INTEGER
+
+    SUB Geoeffnet()
+        Self.eintraege = beispiele()
+        Self.tabelleFuellen()
+        Self.formularLeeren()
+    END SUB
+
+    ' --- eigene Methoden
+
+    SUB tabelleFuellen()
+        GUI_TABLE_CLEAR(Self.tabelle)
+        DIM e AS Eintrag
+        FOR EACH e IN Self.eintraege
+            GUI_TABLE_ADD_ROW(Self.tabelle, e.zellen())
+        NEXT
+        DIM n AS INTEGER : n = LEN(Self.eintraege)
+        GUI_SET_TEXT(Self.status, STR$(n) + " Einträge")
+    END SUB
+
+    SUB formularLeeren()
+        GUI_SET_TEXT(Self.feldTitel, "")
+        GUI_SET_TEXT(Self.feldUrheber, "")
+        GUI_DROPDOWN_SET_SELECTED(Self.wahlArt, 0)
+        GUI_SET_TEXT(Self.feldJahr, "")
+        Self.bearbeitet = -1
+        GUI_FOCUS(Self.feldTitel)
+    END SUB
+
+    SUB bearbeiten(z AS INTEGER)
+        DIM e AS Eintrag : e = Self.eintraege[z]
+        GUI_SET_TEXT(Self.feldTitel, e.titel)
+        GUI_SET_TEXT(Self.feldUrheber, e.urheber)
+        GUI_SET_TEXT(Self.wahlArt, e.art)
+        GUI_SET_TEXT(Self.feldJahr, e.jahr)
+        Self.bearbeitet = z
+        GUI_SET_TEXT(Self.status, "Bearbeiten: " + e.titel)
+    END SUB
+
+    ' --- Ereignisse
+
+    SUB knopfSpeichern_Klick()
+        DIM t AS STRING : t = TRIM$(GUI_TEXT(Self.feldTitel))
+        IF t = "" THEN
+            GUI_SET_TEXT(Self.status, "Bitte einen Titel eingeben.")
+            GUI_FOCUS(Self.feldTitel)
+            RETURN
+        END IF
+        DIM u AS STRING : u = TRIM$(GUI_TEXT(Self.feldUrheber))
+        DIM j AS STRING : j = TRIM$(GUI_TEXT(Self.feldJahr))
+        DIM a AS STRING : a = GUI_TEXT(Self.wahlArt)
+        DIM e AS Eintrag : e = NEW Eintrag(t, u, a, j)
+        IF Self.bearbeitet < 0 THEN
+            ARRAY_PUSH(Self.eintraege, e)
+        ELSE
+            Self.eintraege[Self.bearbeitet] = e
+        END IF
+        Self.tabelleFuellen()
+        Self.formularLeeren()
+    END SUB
+
+    SUB knopfNeu_Klick()
+        Self.formularLeeren()
+    END SUB
+
+    SUB knopfEntfernen_Klick()
+        DIM z AS INTEGER : z = GUI_TABLE_SELECTED(Self.tabelle)
+        IF z < 0 THEN RETURN
+        ARRAY_REMOVE_AT(Self.eintraege, z)
+        Self.tabelleFuellen()
+        Self.formularLeeren()
+    END SUB
+
+    SUB tabelle_Doppelklick()
+        Self.bearbeiten(GUI_TABLE_SELECTED(Self.tabelle))
+    END SUB
+END CLASS

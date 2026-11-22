@@ -503,6 +503,8 @@ END SUB
 
 SUB status(text AS STRING)
     GUI_STATUSBAR_SET(sb, 0, text)
+    ' Fuer Pruefungen: was in der Statuszeile steht (Meldungen der Datenbank).
+    protokoll("status " + text)
 END SUB
 
 SUB statusZoom()
