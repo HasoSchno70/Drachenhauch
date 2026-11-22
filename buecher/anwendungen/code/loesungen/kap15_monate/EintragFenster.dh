@@ -1,0 +1,30 @@
+' Kapitel 14 -- gebunden an die Tabelle eintrag: Laden fuellt die
+' Felder, Sichern prueft und schreibt. Wer es oeffnet, gibt die id mit
+' (0 fuer einen neuen) und liest danach ok.
+CLASS EintragFenster EXTENDS EintragFenster_Basis
+    DIM id AS INTEGER
+    DIM ok AS BOOLEAN
+
+    SUB Geoeffnet()
+        ' Pruefregeln wie in Kapitel 5; die Meldung steht im hinweis.
+        GUI_RULE(Self.feldTitel, "pflicht", _
+                 "Bitte einen Titel eingeben.")
+        GUI_ERROR_LABEL(Self.feldTitel, Self.hinweis)
+        IF Self.id > 0 THEN
+            Self.Laden(Self.id)
+        ELSE
+            GUI_DROPDOWN_SET_SELECTED(Self.wahlArt, 0)
+        END IF
+        GUI_FOCUS(Self.feldTitel)
+    END SUB
+
+    SUB knopfOk_Klick()
+        IF NOT Self.Sichern() THEN RETURN
+        Self.ok = TRUE
+        Self.Zumachen()
+    END SUB
+
+    SUB knopfAbbrechen_Klick()
+        Self.Zumachen()
+    END SUB
+END CLASS

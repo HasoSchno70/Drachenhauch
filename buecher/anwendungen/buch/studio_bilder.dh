@@ -332,6 +332,26 @@ IF gewuenscht("kap14_inspektor") THEN
     zuschneiden("kap14_inspektor", 290, 66, 990, 540)
 END IF
 
+' Kapitel 15: die Abfrage bestand im Reiter der Datenbank, mit Ergebnis
+' (nach F5, damit die Datei Zeilen hat); dazu das Fenster Ueberfaellig.
+IF gewuenscht("kap15_abfrage") THEN
+    m = projekt$("kap15/mediathek")
+    fenstergroesse = "1440x900"
+    z = ["e 0 7 640 400 0 0"]
+    taste(z, 20, ohne, 294)
+    studioBild("_kap15_f5", m, "", aufnahme$("f5_kap15", z), 70)
+    IF FILEEXISTS(bilder + "/_kap15_f5.png") THEN DELETEFILE(bilder + "/_kap15_f5.png")
+    studioBild("kap15_abfrage", m, "Mediathek.bestand", "", 30)
+    zuschneiden("kap15_abfrage", 290, 66, 812, 640)
+    fenstergroesse = GROESSE
+END IF
+IF gewuenscht("kap15_ueberfaellig") THEN
+    z = []
+    klick(z, 0, 40, 13)
+    klick(z, 12, 60, 40)
+    programmBild("kap15_ueberfaellig", "kap15/mediathek", z, 40)
+END IF
+
 ' Kapitel 11: Tetris waehlen, "Ausleihen ..." -- das Fenster daneben.
 IF gewuenscht("kap11_ausleihen") THEN
     z = []

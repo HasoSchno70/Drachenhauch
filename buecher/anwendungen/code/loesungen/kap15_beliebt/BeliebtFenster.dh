@@ -1,0 +1,9 @@
+' Loesung Kapitel 15, Erweitern 1 -- die zehn Titel mit den meisten
+' Ausleihen; die Abfrage beliebt zaehlt und schneidet ab.
+CLASS BeliebtFenster EXTENDS BeliebtFenster_Basis
+    ' >>> neu
+    SUB knopfZu_Klick()
+        Self.Zumachen()
+    END SUB
+    ' <<< neu
+END CLASS

@@ -1,0 +1,113 @@
+{
+  "datei": "mediathek.db",
+  "tabellen": [
+    {
+      "name": "eintrag",
+      "spalten": [
+        {
+          "name": "titel",
+          "typ": "text",
+          "pflicht": true,
+          "eindeutig": false,
+          "vorgabe": "",
+          "sqlvorgabe": ""
+        },
+        {
+          "name": "urheber",
+          "typ": "text",
+          "pflicht": false,
+          "eindeutig": false,
+          "vorgabe": ""
+        },
+        {
+          "name": "art",
+          "typ": "text",
+          "pflicht": false,
+          "eindeutig": false,
+          "vorgabe": ""
+        },
+        {
+          "name": "jahr",
+          "typ": "ganz",
+          "pflicht": false,
+          "eindeutig": false,
+          "vorgabe": ""
+        }
+      ]
+    },
+    {
+      "name": "freund",
+      "spalten": [
+        {
+          "name": "name",
+          "typ": "text",
+          "pflicht": true,
+          "eindeutig": true,
+          "vorgabe": ""
+        },
+        {
+          "name": "telefon",
+          "typ": "text",
+          "pflicht": false,
+          "eindeutig": false,
+          "vorgabe": ""
+        }
+      ]
+    },
+    {
+      "name": "ausleihe",
+      "spalten": [
+        {
+          "name": "eintrag",
+          "typ": "ganz",
+          "pflicht": true,
+          "eindeutig": false,
+          "vorgabe": "",
+          "verweis": "eintrag",
+          "beimLoeschen": "loeschen"
+        },
+        {
+          "name": "freund",
+          "typ": "ganz",
+          "pflicht": true,
+          "eindeutig": false,
+          "vorgabe": "",
+          "verweis": "freund",
+          "beimLoeschen": "verbieten"
+        },
+        {
+          "name": "von",
+          "typ": "datum",
+          "pflicht": true,
+          "eindeutig": false,
+          "vorgabe": ""
+        },
+        {
+          "name": "zurueck",
+          "typ": "datum",
+          "pflicht": false,
+          "eindeutig": false,
+          "vorgabe": ""
+        }
+      ]
+    }
+  ],
+  "abfragen": [
+    {
+      "name": "bestand",
+      "sql": "SELECT e.id AS id, e.titel AS titel, e.urheber AS urheber,\n       e.art AS art, e.jahr AS jahr, f.name AS verliehen\nFROM eintrag AS e\nLEFT JOIN ausleihe AS a ON a.eintrag = e.id AND a.zurueck IS NULL\nLEFT JOIN freund AS f ON f.id = a.freund"
+    },
+    {
+      "name": "ueberfaellig",
+      "sql": "SELECT a.id AS id, e.titel AS titel, f.name AS bei, a.von AS seit,\n       CAST(julianday('now', 'localtime') - julianday(a.von)\n            AS INTEGER) AS tage\nFROM ausleihe AS a\nJOIN eintrag AS e ON e.id = a.eintrag\nJOIN freund AS f ON f.id = a.freund\nWHERE a.zurueck IS NULL\n  AND a.von <= date('now', 'localtime', '-28 days')"
+    },
+    {
+      "name": "statistik",
+      "sql": "SELECT e.art AS art, COUNT(*) AS eintraege, COUNT(a.id) AS verliehen\nFROM eintrag AS e\nLEFT JOIN ausleihe AS a ON a.eintrag = e.id AND a.zurueck IS NULL\nGROUP BY e.art"
+    },
+    {
+      "name": "beliebt",
+      "sql": "SELECT e.id AS id, e.titel AS titel, COUNT(a.id) AS ausleihen\nFROM eintrag AS e\nJOIN ausleihe AS a ON a.eintrag = e.id\nGROUP BY e.id\nORDER BY ausleihen DESC, e.titel\nLIMIT 10"
+    }
+  ]
+}

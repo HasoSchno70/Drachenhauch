@@ -1,0 +1,132 @@
+{
+  "title": "Eintrag",
+  "name": "EintragFenster",
+  "x": 0,
+  "y": 0,
+  "w": 440,
+  "h": 270,
+  "movable": true,
+  "closable": true,
+  "visible": true,
+  "widgets": [
+    {
+      "kind": "label",
+      "name": "beschriftungTitel",
+      "text": "Titel",
+      "x": 20,
+      "y": 26,
+      "w": 140,
+      "h": 16
+    },
+    {
+      "kind": "textinput",
+      "name": "feldTitel",
+      "text": "",
+      "x": 180,
+      "y": 20,
+      "w": 240,
+      "h": 28,
+      "tab_index": 1,
+      "bind": "titel"
+    },
+    {
+      "kind": "label",
+      "name": "beschriftungUrheber",
+      "text": "Urheber",
+      "x": 20,
+      "y": 62,
+      "w": 140,
+      "h": 16
+    },
+    {
+      "kind": "textinput",
+      "name": "feldUrheber",
+      "text": "",
+      "x": 180,
+      "y": 56,
+      "w": 240,
+      "h": 28,
+      "tab_index": 2,
+      "bind": "urheber"
+    },
+    {
+      "kind": "label",
+      "name": "beschriftungArt",
+      "text": "Art",
+      "x": 20,
+      "y": 98,
+      "w": 140,
+      "h": 16
+    },
+    {
+      "kind": "dropdown",
+      "name": "wahlArt",
+      "items": [
+        "Buch",
+        "Film",
+        "Spiel",
+        "Musik"
+      ],
+      "x": 180,
+      "y": 92,
+      "w": 160,
+      "h": 28,
+      "tab_index": 3,
+      "bind": "art"
+    },
+    {
+      "kind": "label",
+      "name": "beschriftungJahr",
+      "text": "Erscheinungsjahr",
+      "x": 20,
+      "y": 134,
+      "w": 140,
+      "h": 16
+    },
+    {
+      "kind": "textinput",
+      "name": "feldJahr",
+      "text": "",
+      "x": 180,
+      "y": 128,
+      "w": 80,
+      "h": 28,
+      "tab_index": 4,
+      "bind": "jahr",
+      "zahlen": 1
+    },
+    {
+      "kind": "label",
+      "name": "hinweis",
+      "text": "",
+      "x": 20,
+      "y": 172,
+      "w": 400,
+      "h": 16
+    },
+    {
+      "kind": "button",
+      "name": "knopfOk",
+      "text": "OK",
+      "x": 200,
+      "y": 196,
+      "w": 100,
+      "h": 30,
+      "variant": "primaer",
+      "tab_index": 5
+    },
+    {
+      "kind": "button",
+      "name": "knopfAbbrechen",
+      "text": "Abbrechen",
+      "x": 310,
+      "y": 196,
+      "w": 110,
+      "h": 30,
+      "tab_index": 6
+    }
+  ],
+  "studio_standard": "knopfOk",
+  "studio_abbrechen": "knopfAbbrechen",
+  "studio_tabelle": "Mediathek.eintrag"
+}

@@ -1,0 +1,9 @@
+' Loesung Kapitel 15, Erweitern 2 -- wie viele Ausleihen in jedem
+' Monat begannen; die Abfrage monate gruppiert nach JJJJ-MM.
+CLASS MonateFenster EXTENDS MonateFenster_Basis
+    ' >>> neu
+    SUB knopfZu_Klick()
+        Self.Zumachen()
+    END SUB
+    ' <<< neu
+END CLASS

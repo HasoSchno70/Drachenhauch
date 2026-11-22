@@ -1,4 +1,12 @@
+const fs = require("fs");
+const path = require("path");
 const { neu } = require("../code_lesen");
+
+// Das SQL einer Abfrage aus dem Datenbank-Element einer Loesung.
+function sql(rel, name) {
+  const d = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "..", "code", rel), "utf8"));
+  return d.abfragen.find((a) => a.name === name).sql.split("\n");
+}
 
 // Anhang A: die Loesungen. Der Code kommt aus code/loesungen/ -- nur die
 // Stellen zwischen ' >>> neu und ' <<< neu. Die Dateien und Projekte
@@ -427,4 +435,38 @@ module.exports = (H) => [
   ...neu("loesungen/kap14_freunde/FreundeFenster.dh").map((t) => H.code(t)),
 
   H.p("Lena löschen geht nicht, solange Tetris bei ihr ist — der Verweis aus Kapitel 13 verbietet es. Loeschen() bekommt den Fehler der Datenbank, und das Fenster zeigt ihn: „Nicht gelöscht: DB_EXEC: FOREIGN KEY constraint failed -- auf die Zeile zeigt noch eine Zeile in ausleihe (Spalte freund); …“. Ohne TRY hielte das Programm mit diesem Laufzeitfehler an."),
+
+  H.h2("Kapitel 15 · Abfragen, die rechnen"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Nur Tetris. JOIN behält eine Zeile nur, wenn es auf beiden Seiten eine gibt — ein Eintrag ohne offene Ausleihe fällt heraus. Für „alle Einträge, und wo es einen gibt, den Freund“ braucht es LEFT JOIN."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Momo fehlt. Mit der Bedingung im ON hängt LEFT JOIN an Momo keine Ausleihe (seine ist zurück), und Momo bleibt mit leerer Spalte. Ohne sie hängt es Momos alte Ausleihe an Jonas an — und das WHERE am Ende wirft die ganze Zeile weg, weil a.zurueck dort nicht leer ist. Eine Bedingung im ON entscheidet, was angehängt wird; eine im WHERE, welche Zeilen bleiben."),
+
+  H.h3("Drehen 3"),
+
+  H.p("Nichts — Tetris ist erst 40 Tage weg. Die Grenze steht an einer einzigen Stelle, in der Abfrage; das Fenster muss nichts davon wissen."),
+
+  H.h3("Erweitern 1: am häufigsten verliehen"),
+
+  H.p("Eine Abfrage beliebt zählt die Ausleihen je Eintrag, sortiert absteigend und schneidet nach zehn ab (code/loesungen/kap15_beliebt):"),
+
+  H.code(sql("loesungen/kap15_beliebt/Mediathek.dhdb", "beliebt"), { out: true }),
+
+  H.p("Hier ist JOIN richtig: Ein Eintrag, der nie verliehen war, gehört nicht in die Liste. Das Fenster ist eine Tabelle mit dieser Datenquelle; das Hauptfenster bekommt einen Menüpunkt:"),
+
+  ...neu("loesungen/kap15_beliebt/Hauptfenster.dh").map((t) => H.code(t)),
+
+  H.h3("Erweitern 2: Ausleihen je Monat"),
+
+  H.p("strftime('%Y-%m', von) macht aus einem Datum seinen Monat; danach wird gruppiert (code/loesungen/kap15_monate):"),
+
+  H.code(sql("loesungen/kap15_monate/Mediathek.dhdb", "monate"), { out: true }),
+
+  ...neu("loesungen/kap15_monate/Hauptfenster.dh").map((t) => H.code(t)),
+
+  H.p("Die Abfrage hat keine Spalte id; die Tabelle zeigt sie trotzdem, nur IdVon liefert dort 0."),
 ];

@@ -1,0 +1,80 @@
+' Kapitel 15 -- die Tabelle zeigt die Abfrage bestand: die Eintraege und
+' wer sie gerade hat, aus drei Tabellen. Eine Abfrage ist nicht die
+' Tabelle des Fensters; die gewaehlte Zeile liefert IdVon.
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+    DIM ausleihe AS AusleihFenster
+
+    SUB Geoeffnet()
+        GUI_TABLE_COL_WIDTHS(Self.tabelle, [210, 170, 80, 70, 170])
+        Self.ausleihe = NEW AusleihFenster()
+        Self.ausleihe.haupt = Self
+        Self.statusZeigen()
+    END SUB
+
+    SUB statusZeigen()
+        DIM n AS INTEGER : n = anzahlEintraege()
+        GUI_SET_TEXT(Self.status, STR$(n) + " Einträge")
+    END SUB
+
+    FUNCTION bearbeitenLassen(id AS INTEGER) AS BOOLEAN
+        DIM f AS EintragFenster : f = NEW EintragFenster()
+        f.id = id
+        f.ZeigenModal()
+        IF NOT f.ok THEN RETURN FALSE
+        Self.Neuladen()
+        Self.statusZeigen()
+        RETURN TRUE
+    END FUNCTION
+
+    SUB knopfNeu_Klick()
+        Self.bearbeitenLassen(0)
+    END SUB
+
+    SUB knopfBearbeiten_Klick()
+        DIM id AS INTEGER : id = Self.IdVon(Self.tabelle)
+        IF id = 0 THEN RETURN
+        IF Self.bearbeitenLassen(id) THEN Self.ausleihe.folgen(id)
+    END SUB
+
+    SUB tabelle_Doppelklick()
+        Self.knopfBearbeiten_Klick()
+    END SUB
+
+    SUB knopfEntfernen_Klick()
+        DIM id AS INTEGER : id = Self.IdVon(Self.tabelle)
+        IF id = 0 THEN RETURN
+        DIM t AS STRING : t = titelVon$(id)
+        DIM antwort AS INTEGER
+        antwort = Frage(t + " entfernen?", "Entfernen|Abbrechen")
+        IF antwort <> 1 THEN RETURN
+        entfernen(id)
+        Self.Neuladen()
+        Self.statusZeigen()
+        Self.tabelle_Geaendert()
+    END SUB
+
+    SUB knopfAusleihen_Klick()
+        Self.ausleihe.Zeigen()
+    END SUB
+
+    SUB tabelle_Geaendert()
+        Self.ausleihe.folgen(Self.IdVon(Self.tabelle))
+    END SUB
+
+    SUB miUeberfaellig_Aktion()
+        DIM f AS UeberfaelligFenster : f = NEW UeberfaelligFenster()
+        f.Zeigen()
+    END SUB
+
+    ' >>> neu
+    SUB miBeliebt_Aktion()
+        DIM f AS BeliebtFenster : f = NEW BeliebtFenster()
+        f.Zeigen()
+    END SUB
+    ' <<< neu
+
+    SUB miStatistik_Aktion()
+        DIM f AS StatistikFenster : f = NEW StatistikFenster()
+        f.Zeigen()
+    END SUB
+END CLASS
