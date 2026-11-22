@@ -1489,3 +1489,140 @@ karte momo isbn FALSE seiten 1
 Bericht: Parameter :id fehlt
 strichcode TRUE momo FALSE
 rueckblick TRUE TRUE zahl FALSE
+
+=== kapitel 18: diagramme
+' Kapitel 18: Ansicht -> Statistik zeigt zwei Diagramme in einem zweiten
+' Fenster (bis 2026-11-22 blieben sie dort leer). Ein Klick auf das Stueck
+' Musik und auf den Balken des Monats, in dem Tetris verliehen wurde (40
+' Tage vor heute -- seine Lage rechnet der Fall aus), fuellt Hinweis und
+' Liste. Dazu die Loesungen: 12 Monate in der Klappliste (der Balken
+' wandert), und die Leiste "verliehen" (1 von 5 = 20 %).
+IMPORT "laeufer.dh"
+IMPORT "zeit"
+SUB kopieren(von AS STRING, nach AS STRING)
+    IF NOT DIREXISTS(nach) THEN MKDIR(nach)
+    DIM n AS STRING
+    FOR EACH n IN DIRLIST(von)
+        IF DIREXISTS(von + "/" + n) THEN
+            IF n <> "_studio" THEN kopieren(von + "/" + n, nach + "/" + n)
+        ELSEIF RIGHT$(n, 3) <> ".db" THEN
+            COPYFILE(von + "/" + n, nach + "/" + n)
+        END IF
+    NEXT
+END SUB
+FUNCTION laufen$(main AS STRING, bilder AS INTEGER) AS STRING
+    DIM q AS INTEGER : q = PROCESS_START("dhrt", "run", "--bilder", STR$(bilder), main)
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    WHILE leer < 5
+        DIM t AS STRING : t = PROCESS_READ$(q) + PROCESS_ERR$(q)
+        aus = aus + t
+        IF t = "" AND NOT PROCESS_RUNNING(q) THEN leer = leer + 1
+        SLEEP(20)
+    WEND
+    RETURN aus
+END FUNCTION
+FUNCTION bedienen$(main AS STRING, ev AS ARRAY OF STRING, bilder AS INTEGER) AS STRING
+    DIM pf AS STRING : pf = CWD$() + "/bedienung.txt"
+    WRITEALL(pf, "c " + STR$(LEN(ev)) + CHR$(10) + JOIN$(ev, CHR$(10)) + CHR$(10) + CHR$(10))
+    SETENV("DHRT_ABSPIELEN", pf)
+    SETENV("DHRT_GUI_ZUSTAND", "1")
+    DIM aus AS STRING : aus = laufen$(main, bilder)
+    SETENV("DHRT_ABSPIELEN", "")
+    SETENV("DHRT_GUI_ZUSTAND", "")
+    RETURN aus
+END FUNCTION
+SUB klick(ev AS ARRAY OF STRING, b AS INTEGER, x AS INTEGER, y AS INTEGER)
+    ARRAY_PUSH(ev, "e " + STR$(b) + " 7 " + STR$(x) + " " + STR$(y) + " 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 2) + " 7 " + STR$(x) + " " + STR$(y) + " 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 4) + " 6 0 0 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 6) + " 5 0 0 0 0")
+END SUB
+FUNCTION zeile$(aus AS STRING, was AS STRING) AS STRING
+    DIM z AS STRING
+    FOR EACH z IN SPLIT$(REPLACE$(aus, CHR$(13), ""), CHR$(10))
+        IF INSTR(z, was) >= 0 THEN RETURN TRIM$(z)
+    NEXT
+    RETURN ""
+END FUNCTION
+SUB f5(nm AS STRING, p AS STRING)
+    slZeilen = []
+    slBild = 0
+    slHin(10, 10)
+    slWarten(10)
+    slTaste(294)
+    slWarten(150)
+    slAufnahmeSchreiben(CWD$() + "/f5.txt")
+    SETENV("DH_STUDIO_LAUF_BILDER", "20")
+    DIM lg AS STRING : lg = CWD$() + "/" + nm + ".log"
+    DIM aus AS STRING : aus = slStarten(lg, CWD$() + "/f5.txt", slBild + 20, p)
+    PRINT nm; " geprueft "; slHat(lg, "geprueft 0 0"); " beendet "; slHat(lg, "beendet 0")
+    IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+END SUB
+' Ansicht -> Statistik ...
+FUNCTION statistik() AS ARRAY OF STRING
+    DIM ev AS ARRAY OF STRING : ev = []
+    klick(ev, 4, 70, 13)
+    klick(ev, 14, 110, 63)
+    RETURN ev
+END FUNCTION
+FUNCTION monatsnummer(t AS STRING) AS INTEGER
+    RETURN INT(VAL(LEFT$(t, 4))) * 12 + INT(VAL(MID$(t, 5, 2))) - 1
+END FUNCTION
+
+DIM code AS STRING : code = ARG$(1) + "/buecher/anwendungen/code/"
+DIM proj AS STRING
+FOR EACH proj IN ["kap18/mediathek", "loesungen/kap18_zeitraum", "loesungen/kap18_verliehen"]
+    DIM nm AS STRING : nm = BASENAME(proj)
+    IF nm = "mediathek" THEN nm = "kap18_mediathek"
+    kopieren(code + proj, CWD$() + "/" + nm)
+    f5(nm, CWD$() + "/" + nm)
+NEXT
+' Der Monat, in dem Tetris verliehen wurde, und wie viele Monate davor.
+DIM heute AS STRING : heute = ZEIT_TEXT$(ZEIT_JETZT())
+DIM tetris AS STRING : tetris = ZEIT_TEXT$(ZEIT_PLUS(ZEIT_JETZT(), -40 * 86400))
+DIM zurueck AS INTEGER : zurueck = monatsnummer(heute) - monatsnummer(tetris)
+DIM monat AS STRING : monat = LEFT$(tetris, 7)
+DIM m AS STRING : m = CWD$() + "/kap18_mediathek/_studio/main.dh"
+DIM ev AS ARRAY OF STRING
+DIM a AS STRING
+' Das Stueck Musik (unten links im Kuchen).
+ev = statistik()
+klick(ev, 30, 170, 210)
+PRINT zeile$(bedienen$(m, ev, 50), "label#hinweis")
+' Der Balken des Tetris-Monats (sechs Faecher zu 46,5 Punkten ab 418),
+' dann die erste Zeile der Liste.
+ev = statistik()
+klick(ev, 30, 441 + INT(46.5 * (5 - zurueck)), 250)
+klick(ev, 40, 150, 362)
+a = bedienen$(m, ev, 60)
+PRINT "monat "; zeile$(a, "label#hinweis") = "label#hinweis " + CHR$(34) + monat + ": 1 Ausleihe" + CHR$(34)
+PRINT zeile$(a, "listbox#liste")
+' Erweitern 1: 12 Monate -- zwoelf Faecher zu 23,25 Punkten.
+ev = statistik()
+klick(ev, 30, 655, 365)
+klick(ev, 40, 650, 411)
+klick(ev, 50, 430 + INT(23.25 * (11 - zurueck)), 250)
+a = bedienen$(CWD$() + "/kap18_zeitraum/_studio/main.dh", ev, 70)
+PRINT "zwoelf "; zeile$(a, "label#hinweis") = "label#hinweis " + CHR$(34) + monat + ": 1 Ausleihe" + CHR$(34); " "; zeile$(a, "dropdown#wahlzeitraum")
+' Erweitern 2: die Leiste bekommt 20 (ein Eintrag von fuenf verliehen).
+DIM sf AS STRING : sf = CWD$() + "/kap18_verliehen/_studio/projekt/StatistikFenster.dh"
+DIM st AS STRING : st = READALL(sf)
+IF INSTR(st, "        Self.anteil.Wert(prozent)") < 0 THEN PRINT "nicht gefunden: Wert"
+WRITEALL(sf, REPLACE$(st, "        Self.anteil.Wert(prozent)", "        Self.anteil.Wert(prozent)" + CHR$(10) + "        PRINT " + CHR$(34) + "anteil " + CHR$(34) + "; prozent"))
+PRINT zeile$(bedienen$(CWD$() + "/kap18_verliehen/_studio/main.dh", statistik(), 40), "anteil ")
+--- argumente
+{sammlung}/../../../studio/studio.dh
+{sammlung}/../../..
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- erwartet
+kap18_mediathek geprueft TRUE beendet TRUE
+kap18_zeitraum geprueft TRUE beendet TRUE
+kap18_verliehen geprueft TRUE beendet TRUE
+label#hinweis "Musik: 1 Eintrag"
+monat TRUE
+listbox#liste 0 "Tetris -- Lena"
+zwoelf TRUE dropdown#wahlzeitraum 1 "12 Monate"
+anteil 20.0
