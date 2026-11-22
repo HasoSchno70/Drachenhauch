@@ -26,7 +26,9 @@ END SUB
 DIM code AS STRING : code = ARG$(1) + "/buecher/anwendungen/code/"
 DIM proj AS STRING
 FOR EACH proj IN ["kap08/mediathek", "loesungen/kap08_info", "kap09/mediathek", _
-                  "loesungen/kap09_vollbild", "loesungen/kap09_entfernen"]
+                  "loesungen/kap09_vollbild", "loesungen/kap09_entfernen", _
+                  "kap10/mediathek", "loesungen/kap10_statistik", _
+                  "loesungen/kap10_alstext"]
     ' Zwei Projekte heissen mediathek (Kapitel 8 und 9): der Ordner der
     ' Kopie bekommt den Namen des Kapitels davor.
     DIM nm AS STRING : nm = BASENAME(proj)
@@ -112,6 +114,42 @@ ARRAY_PUSH(ee, "e 20 7 470 503 0 0") : ARRAY_PUSH(ee, "e 22 7 470 503 0 0")
 ARRAY_PUSH(ee, "e 24 6 0 0 0 0") : ARRAY_PUSH(ee, "e 26 5 0 0 0 0")
 PRINT "frei "; INSTR(bedienen$(me, ee, 40), "2 Eintr") >= 0
 
+' Kapitel 10: ein Doppelklick auf Metropolis laedt es ins Formular; die
+' Loesungen zaehlen je Art und zeigen einen Eintrag als Satz.
+DIM m10 AS STRING : m10 = CWD$() + "/kap10_mediathek/_studio/main.dh"
+DIM dk AS ARRAY OF STRING
+dk = ["e 0 7 100 223 0 0", "e 2 7 100 223 0 0", "e 4 6 0 0 0 0", "e 5 5 0 0 0 0", _
+      "e 7 6 0 0 0 0", "e 8 5 0 0 0 0", "e 12 7 600 540 0 0", "e 14 7 600 540 0 0"]
+PRINT "doppelklick "; INSTR(bedienen$(m10, dk, 30), "feldtitel " + CHR$(34) + "Metropolis") >= 0
+DIM ms AS STRING : ms = CWD$() + "/kap10_statistik/_studio/main.dh"
+PRINT "statistik "; INSTR(bedienen$(ms, ["e 0 7 600 540 0 0"], 5), "Buch 2, Film 1, Spiel 1, Musik 1") >= 0
+DIM ma AS STRING : ma = CWD$() + "/kap10_alstext/_studio/main.dh"
+DIM kl AS ARRAY OF STRING
+kl = ["e 0 7 100 223 0 0", "e 2 7 100 223 0 0", "e 4 6 0 0 0 0", "e 5 5 0 0 0 0", "e 9 7 600 540 0 0"]
+PRINT "als text "; INSTR(bedienen$(ma, kl, 20), "Metropolis von Fritz Lang (Film, 1927)") >= 0
+
+' Kapitel 10, "Was schiefgehen kann": eine Methode zeigen, die in die
+' Statuszeile schreibt, ueberschreibt Zeigen -- das Studio warnt, und der
+' Start haelt in zeigen, Zeile 1.
+DIM pz AS STRING : pz = CWD$() + "/kap10_zeigen"
+kopieren(code + "kap10/mediathek", pz)
+DIM hz AS STRING : hz = READALL(pz + "/Hauptfenster.dh")
+DIM zg AS STRING
+zg = "    SUB zeigen()" + CHR$(10) + "        GUI_SET_TEXT(Self.status, " + CHR$(34) + "x" + CHR$(34) + ")" + _
+     CHR$(10) + "    END SUB" + CHR$(10) + "END CLASS"
+WRITEALL(pz + "/Hauptfenster.dh", REPLACE$(hz, "END CLASS", zg))
+slZeilen = []
+slBild = 0
+slHin(10, 10)
+slWarten(10)
+slTaste(294)
+slWarten(150)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+DIM lz AS STRING : lz = CWD$() + "/kap10_zeigen.log"
+DIM az AS STRING : az = slStarten(lz, CWD$() + "/ev.txt", slBild + 20, pz)
+PRINT "zeigen warnt "; INSTR(READALL(lz), "ueberschreibt 'Zeigen' aus STUDIOFENSTER") >= 0
+PRINT "zeigen haelt "; slHat(lz, "laufzeitfehler Hauptfenster.zeigen, Zeile 1")
+
 ' Die Zeile, die das Kapitel unter "Was das Studio erzeugt" zitiert.
 DIM basis AS STRING : basis = CWD$() + "/mediathek/_studio/Hauptfenster_basis.dh"
 DIM zeile AS STRING : zeile = "IF GUI_CLICKED(Self.knopfAufnehmen) THEN Self.knopfAufnehmen_Klick()"
@@ -159,9 +197,17 @@ kap08_info geprueft TRUE beendet TRUE
 kap09_mediathek geprueft TRUE beendet TRUE
 kap09_vollbild geprueft TRUE beendet TRUE
 kap09_entfernen geprueft TRUE beendet TRUE
+kap10_mediathek geprueft TRUE beendet TRUE
+kap10_statistik geprueft TRUE beendet TRUE
+kap10_alstext geprueft TRUE beendet TRUE
 tab 4 TRUE
 tab 3 TRUE
 vollbild TRUE
 frei TRUE
+doppelklick TRUE
+statistik TRUE
+als text TRUE
+zeigen warnt TRUE
+zeigen haelt TRUE
 zeile TRUE
 meldung TRUE
