@@ -1799,3 +1799,189 @@ csv cp1252 TRUE TRUE
 fehlerdatei cp1252 4
 Titel;Urheber;Art;Jahr;Fehler
 ;Astrid Lindgren;Buch;1945;kein Titel.
+
+=== kapitel 20: aussehen
+' Kapitel 20: Thema modern_dark und die Stildatei mediathek.dhstil (F5 legt
+' sie nach assets/). Eine Takt-Methode, die die Kopie bekommt, misst die
+' Farben dunkel und nach Ansicht -> Helles Aussehen: "Entfernen" (Klasse
+' gefahr, feste Farbe) bleibt, die Farbe der Widgets im Thema wechselt,
+' die Statuszeile (leise) bleibt. Die Cover-Kachel folgt der Tabelle und oeffnet beim Klick
+' das Bearbeiten. Eine kaputte Farbe haelt mit der Zeile an. Dazu die
+' Loesungen: wie das System (DHRT_SYSTEM_DUNKEL) und die Sterne.
+IMPORT "laeufer.dh"
+IMPORT "db"
+SUB kopieren(von AS STRING, nach AS STRING)
+    IF NOT DIREXISTS(nach) THEN MKDIR(nach)
+    DIM n AS STRING
+    FOR EACH n IN DIRLIST(von)
+        IF DIREXISTS(von + "/" + n) THEN
+            IF n <> "_studio" THEN kopieren(von + "/" + n, nach + "/" + n)
+        ELSEIF RIGHT$(n, 3) <> ".db" THEN
+            COPYFILE(von + "/" + n, nach + "/" + n)
+        END IF
+    NEXT
+END SUB
+FUNCTION laufen$(main AS STRING, bilder AS INTEGER) AS STRING
+    DIM q AS INTEGER : q = PROCESS_START("dhrt", "run", "--bilder", STR$(bilder), main)
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    WHILE leer < 5
+        DIM t AS STRING : t = PROCESS_READ$(q) + PROCESS_ERR$(q)
+        aus = aus + t
+        IF t = "" AND NOT PROCESS_RUNNING(q) THEN leer = leer + 1
+        SLEEP(20)
+    WEND
+    RETURN aus
+END FUNCTION
+FUNCTION bedienen$(main AS STRING, ev AS ARRAY OF STRING, bilder AS INTEGER) AS STRING
+    DIM pf AS STRING : pf = CWD$() + "/bedienung.txt"
+    WRITEALL(pf, "c " + STR$(LEN(ev)) + CHR$(10) + JOIN$(ev, CHR$(10)) + CHR$(10) + CHR$(10))
+    SETENV("DHRT_ABSPIELEN", pf)
+    SETENV("DHRT_GUI_ZUSTAND", "1")
+    DIM aus AS STRING : aus = laufen$(main, bilder)
+    SETENV("DHRT_ABSPIELEN", "")
+    SETENV("DHRT_GUI_ZUSTAND", "")
+    IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+    RETURN aus
+END FUNCTION
+SUB klick(ev AS ARRAY OF STRING, b AS INTEGER, x AS INTEGER, y AS INTEGER)
+    ARRAY_PUSH(ev, "e " + STR$(b) + " 7 " + STR$(x) + " " + STR$(y) + " 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 2) + " 7 " + STR$(x) + " " + STR$(y) + " 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 4) + " 6 0 0 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 6) + " 5 0 0 0 0")
+END SUB
+FUNCTION zeile$(aus AS STRING, was AS STRING) AS STRING
+    DIM z AS STRING
+    FOR EACH z IN SPLIT$(REPLACE$(aus, CHR$(13), ""), CHR$(10))
+        IF INSTR(z, was) >= 0 THEN RETURN TRIM$(z)
+    NEXT
+    RETURN ""
+END FUNCTION
+SUB f5(nm AS STRING, p AS STRING)
+    slZeilen = []
+    slBild = 0
+    slHin(10, 10)
+    slWarten(10)
+    slTaste(294)
+    slWarten(150)
+    slAufnahmeSchreiben(CWD$() + "/f5.txt")
+    SETENV("DH_STUDIO_LAUF_BILDER", "20")
+    DIM lg AS STRING : lg = CWD$() + "/" + nm + ".log"
+    DIM aus AS STRING : aus = slStarten(lg, CWD$() + "/f5.txt", slBild + 20, p)
+    PRINT nm; " geprueft "; slHat(lg, "geprueft 0 0"); " beendet "; slHat(lg, "beendet 0")
+    IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+END SUB
+' Eine Methode vor das Ende der Klasse Hauptfenster der Kopie.
+SUB einschieben(nm AS STRING, zeilen AS ARRAY OF STRING)
+    DIM h AS STRING : h = CWD$() + "/" + nm + "/_studio/projekt/Hauptfenster.dh"
+    DIM t AS STRING : t = READALL(h)
+    DIM p AS INTEGER : p = INSTRREV(t, "END CLASS")
+    WRITEALL(h, LEFT$(t, p) + JOIN$(zeilen, CHR$(10)) + CHR$(10) + MID$(t, p))
+END SUB
+FUNCTION wert$(datei AS STRING, sql AS STRING) AS STRING
+    DIM d AS DB_CONN : d = DB_OPEN(datei)
+    DIM r AS DB_RESULT : r = DB_QUERY(d, sql)
+    DIM w AS STRING : w = "?"
+    IF DB_NEXT(r) THEN w = DB_GET_STRING(r, 0)
+    DB_CLOSE(d)
+    RETURN w
+END FUNCTION
+
+DIM code AS STRING : code = ARG$(1) + "/buecher/anwendungen/code/"
+DIM proj AS STRING
+FOR EACH proj IN ["kap20/mediathek", "loesungen/kap20_system", "loesungen/kap20_sterne"]
+    DIM nm AS STRING : nm = BASENAME(proj)
+    IF nm = "mediathek" THEN nm = "kap20_mediathek"
+    kopieren(code + proj, CWD$() + "/" + nm)
+    f5(nm, CWD$() + "/" + nm)
+NEXT
+DIM m AS STRING : m = CWD$() + "/kap20_mediathek/_studio/main.dh"
+PRINT "stildatei in assets "; FILEEXISTS(CWD$() + "/kap20_mediathek/_studio/assets/mediathek.dhstil")
+DIM a AS STRING
+DIM ev AS ARRAY OF STRING
+' Die Kachel folgt der Tabelle (Tetris), ein Klick auf sie oeffnet Bearbeiten.
+ev = []
+klick(ev, 4, 100, 197)
+a = bedienen$(m, ev, 30)
+PRINT zeile$(a, "card#kachel")
+klick(ev, 20, 660, 200)
+a = bedienen$(m, ev, 50)
+PRINT zeile$(a, "textinput#feldtitel")
+' Die Farben, dunkel und hell.
+einschieben("kap20_mediathek", ["    DIM probeN AS INTEGER", _
+    "    DIM probe AS ARRAY OF STRING", _
+    "    SUB Takt()", _
+    "        Self.probeN = Self.probeN + 1", _
+    "        IF Self.probeN = 3 OR Self.probeN = 8 THEN", _
+    "            ARRAY_PUSH(Self.probe, HEX$(GUI_GET_COLOR(Self.knopfEntfernen, " + CHR$(34) + "bg" + CHR$(34) + ") BAND &HFFFFFF))", _
+    "            ARRAY_PUSH(Self.probe, HEX$(GUI_THEME_GET(" + CHR$(34) + "widget_bg" + CHR$(34) + ") BAND &HFFFFFF))", _
+    "            ARRAY_PUSH(Self.probe, HEX$(GUI_GET_COLOR(Self.status, " + CHR$(34) + "fg" + CHR$(34) + ") BAND &HFFFFFF))", _
+    "        END IF", _
+    "        IF Self.probeN = 4 THEN", _
+    "            GUI_MENU_CHECK(Self.miHell, TRUE)", _
+    "            Self.miHell_Aktion()", _
+    "        END IF", _
+    "        IF Self.probeN = 8 THEN", _
+    "            PRINT " + CHR$(34) + "farben " + CHR$(34) + "; JOIN$(Self.probe, " + CHR$(34) + " " + CHR$(34) + ")", _
+    "            END", _
+    "        END IF", _
+    "    END SUB"])
+DIM f AS ARRAY OF STRING : f = SPLIT$(MID$(zeile$(laufen$(m, 20), "farben "), 7), " ")
+PRINT "entfernen "; f[0]; " bleibt "; f[0] = f[3]; " | thema wechselt "; f[1] <> f[4]; " | leise "; f[2]; " bleibt "; f[2] = f[5]
+' Eine kaputte Farbe in der Stildatei.
+DIM sd AS STRING : sd = CWD$() + "/kap20_mediathek/_studio/assets/mediathek.dhstil"
+WRITEALL(sd, REPLACE$(READALL(sd), "#B03A2E", "#B03A2"))
+a = laufen$(m, 10)
+PRINT "kaputt "; INSTR(a, "mediathek.dhstil): Zeile 5: '#B03A2' ist keine Farbe") >= 0
+' Erweitern 1: wie das System -- hell oder dunkel, wie DHRT_SYSTEM_DUNKEL sagt.
+einschieben("kap20_system", ["    DIM probeN AS INTEGER", _
+    "    SUB Takt()", _
+    "        Self.probeN = Self.probeN + 1", _
+    "        IF Self.probeN = 3 THEN", _
+    "            GUI_MENU_CHECK(Self.miSystem, TRUE)", _
+    "            Self.miSystem_Aktion()", _
+    "        END IF", _
+    "        IF Self.probeN = 6 THEN", _
+    "            DIM bg AS INTEGER : bg = GUI_THEME_GET(" + CHR$(34) + "win_bg" + CHR$(34) + ")", _
+    "            PRINT " + CHR$(34) + "system " + CHR$(34) + "; IIF(((bg SHR 16) BAND 255) + ((bg SHR 8) BAND 255) + (bg BAND 255) > 382, " + CHR$(34) + "hell" + CHR$(34) + ", " + CHR$(34) + "dunkel" + CHR$(34) + ")", _
+    "            END", _
+    "        END IF", _
+    "    END SUB"])
+DIM ms AS STRING : ms = CWD$() + "/kap20_system/_studio/main.dh"
+SETENV("DHRT_SYSTEM_DUNKEL", "0")
+PRINT zeile$(laufen$(ms, 20), "system ")
+SETENV("DHRT_SYSTEM_DUNKEL", "1")
+PRINT zeile$(laufen$(ms, 20), "system ")
+SETENV("DHRT_SYSTEM_DUNKEL", "")
+' Erweitern 2: Kind of Blue bearbeiten, den vierten Stern, OK -- dann noch
+' einmal: ein Klick auf den gefuellten vierten nimmt die Bewertung zurueck.
+DIM mst AS STRING : mst = CWD$() + "/kap20_sterne/_studio/main.dh"
+DIM dbs AS STRING : dbs = CWD$() + "/kap20_sterne/_studio/mediathek.db"
+ev = []
+klick(ev, 4, 100, 137)
+klick(ev, 14, 415, 453)
+klick(ev, 30, 467, 300)
+klick(ev, 40, 510, 387)
+a = bedienen$(mst, ev, 60)
+PRINT "sterne "; wert$(dbs, "SELECT bewertung FROM eintrag WHERE titel = 'Kind of Blue'")
+a = bedienen$(mst, ev, 60)
+PRINT "zurueck "; wert$(dbs, "SELECT bewertung FROM eintrag WHERE titel = 'Kind of Blue'")
+--- argumente
+{sammlung}/../../../studio/studio.dh
+{sammlung}/../../..
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- erwartet
+kap20_mediathek geprueft TRUE beendet TRUE
+kap20_system geprueft TRUE beendet TRUE
+kap20_sterne geprueft TRUE beendet TRUE
+stildatei in assets TRUE
+card#kachel1_kachel "Tetris" "Alexei Paschitnow, 1984" ohne Bild
+textinput#feldtitel "Tetris"
+entfernen B03A2E bleibt TRUE | thema wechselt TRUE | leise 8A93A6 bleibt TRUE
+kaputt TRUE
+system hell
+system dunkel
+sterne 4
+zurueck 0
