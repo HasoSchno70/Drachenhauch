@@ -1,0 +1,43 @@
+{
+  "title": "Einstellungen",
+  "name": "EinstellungenFenster",
+  "x": 0,
+  "y": 0,
+  "w": 360,
+  "h": 160,
+  "movable": true,
+  "closable": true,
+  "visible": true,
+  "widgets": [
+    {
+      "kind": "checkbox",
+      "name": "kaestchenFarbig",
+      "text": "Verliehene Einträge farbig zeigen",
+      "x": 20,
+      "y": 24,
+      "w": 320,
+      "h": 20
+    },
+    {
+      "kind": "button",
+      "name": "knopfOk",
+      "text": "OK",
+      "x": 120,
+      "y": 86,
+      "w": 100,
+      "h": 30,
+      "variant": "primaer"
+    },
+    {
+      "kind": "button",
+      "name": "knopfAbbrechen",
+      "text": "Abbrechen",
+      "x": 230,
+      "y": 86,
+      "w": 110,
+      "h": 30
+    }
+  ],
+  "studio_standard": "knopfOk",
+  "studio_abbrechen": "knopfAbbrechen"
+}

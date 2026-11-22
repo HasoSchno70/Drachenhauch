@@ -246,4 +246,20 @@ IF gewuenscht("kap10_modul") THEN
     zuschneiden("kap10_modul", 0, 66, 940, 536)
 END IF
 
+' Kapitel 11: Metropolis waehlen, "Bearbeiten ..." -- das modale Fenster.
+IF gewuenscht("kap11_bearbeiten") THEN
+    z = []
+    klick(z, 0, 100, 71)
+    klick(z, 10, 415, 427)
+    programmBild("kap11_bearbeiten", "kap11/mediathek", z, 40)
+END IF
+
+' Kapitel 11: Tetris waehlen, "Ausleihen ..." -- das Fenster daneben.
+IF gewuenscht("kap11_ausleihen") THEN
+    z = []
+    klick(z, 0, 100, 91)
+    klick(z, 10, 670, 427)
+    programmBild("kap11_ausleihen", "kap11/mediathek", z, 40)
+END IF
+
 PRINT "fertig"

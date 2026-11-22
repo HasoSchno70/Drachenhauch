@@ -1,0 +1,41 @@
+' Kapitel 11 -- ein Eintrag zum Bearbeiten, modal. Wer es oeffnet, gibt
+' den Eintrag mit (oder keinen fuer einen neuen) und liest danach ok.
+CLASS EintragFenster EXTENDS EintragFenster_Basis
+    ' Hinein: der Eintrag, NIL fuer einen neuen. Heraus: ok und eintrag.
+    DIM eintrag AS Eintrag
+    DIM ok AS BOOLEAN
+
+    SUB Geoeffnet()
+        IF Self.eintrag IS NIL THEN
+            GUI_DROPDOWN_SET_SELECTED(Self.wahlArt, 0)
+        ELSE
+            GUI_SET_TEXT(Self.feldTitel, Self.eintrag.titel)
+            GUI_SET_TEXT(Self.feldUrheber, Self.eintrag.urheber)
+            GUI_SET_TEXT(Self.wahlArt, Self.eintrag.art)
+            GUI_SET_TEXT(Self.feldJahr, Self.eintrag.jahr)
+        END IF
+        GUI_FOCUS(Self.feldTitel)
+    END SUB
+
+    SUB knopfOk_Klick()
+        DIM t AS STRING : t = TRIM$(GUI_TEXT(Self.feldTitel))
+        IF t = "" THEN
+            GUI_SET_TEXT(Self.hinweis, "Bitte einen Titel eingeben.")
+            GUI_FOCUS(Self.feldTitel)
+            RETURN
+        END IF
+        IF Self.eintrag IS NIL THEN
+            Self.eintrag = NEW Eintrag("", "", "", "")
+        END IF
+        Self.eintrag.titel = t
+        Self.eintrag.urheber = TRIM$(GUI_TEXT(Self.feldUrheber))
+        Self.eintrag.art = GUI_TEXT(Self.wahlArt)
+        Self.eintrag.jahr = TRIM$(GUI_TEXT(Self.feldJahr))
+        Self.ok = TRUE
+        Self.Zumachen()
+    END SUB
+
+    SUB knopfAbbrechen_Klick()
+        Self.Zumachen()
+    END SUB
+END CLASS

@@ -281,4 +281,42 @@ module.exports = (H) => [
   ...neu("loesungen/kap10_alstext/Hauptfenster.dh").map((t) => H.code(t)),
 
   H.p("Wie ein Eintrag als Satz aussieht, weiß der Eintrag; wo der Satz erscheint, weiß das Fenster. So kann ein Bericht in Kapitel 17 denselben Satz drucken, ohne das Fenster zu fragen."),
+
+  H.h2("Kapitel 11 · Mehrere Fenster"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Nichts: Solange das Bearbeitungsfenster offen ist, nimmt das Hauptfenster keine Klicks an. Ginge es doch, könnte man währenddessen eine andere Zeile wählen oder Metropolis entfernen — und das Fenster schriebe beim OK in einen Eintrag, der nicht mehr in der Tabelle steht. Wer es ausprobieren will, schreibt in bearbeitenLassen Zeigen statt ZeigenModal (siehe „Was schiefgehen kann“): Der Klick wählt dann die andere Zeile, und ein OK im Fenster ändert Metropolis, ohne dass die Tabelle es zeigt."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Den Eintrag, der jetzt gewählt ist. tabelle_Geaendert ruft folgen auch bei geschlossenem Fenster; folgen merkt sich den Eintrag in Self.eintrag und zeigt ihn nur nicht an. Beim Öffnen baut Zeigen das Fenster neu auf und ruft Geoeffnet, und Geoeffnet ruft anzeigen — mit dem gemerkten Eintrag."),
+
+  H.h3("Drehen 3"),
+
+  H.p("Esc drückt den Esc-Knopf, also knopfAbbrechen; der macht das Fenster nur zu. f.ok bleibt FALSE, bearbeitenLassen liefert NIL, und knopfBearbeiten_Klick kehrt in der zweiten IF-Zeile zurück, ohne die Tabelle anzufassen. Das Kreuz in der Titelleiste wirkt genauso."),
+
+  H.h3("Erweitern 1: Einstellungen"),
+
+  H.p("Ein neues Fenster EinstellungenFenster (360 × 160) mit einem Kästchen kaestchenFarbig und den Knöpfen OK und Abbrechen, die Enter- und Esc-Knopf sind (code/loesungen/kap11_einstellungen). Es redet wie das Bearbeitungsfenster über zwei Felder:"),
+
+  ...neu("loesungen/kap11_einstellungen/EinstellungenFenster.dh").map((t) => H.code(t)),
+
+  H.p("Das Hauptfenster bekommt im Menü-Editor ein Menü Bearbeiten mit dem Eintrag miEinstellungen, ein Feld farbig, und tabelleFuellen färbt verliehene Zeilen:"),
+
+  ...neu("loesungen/kap11_einstellungen/Hauptfenster.dh").map((t) => H.code(t)),
+
+  H.p("Das Fenster bekommt eine Kopie des Werts und gibt eine zurück. Erst nach OK übernimmt das Hauptfenster sie — bei Abbrechen bleibt alles, wie es war, auch wenn das Kästchen im Fenster schon umgeschaltet war."),
+
+  H.h3("Erweitern 2: ein Fenster je Eintrag"),
+
+  H.p("Ein Fenster InfoFenster mit zwei Beschriftungen und einem Knopf „Schließen“ (code/loesungen/kap11_info). Den Titel setzt es selbst, über das Fenster der gui:"),
+
+  ...neu("loesungen/kap11_info/InfoFenster.dh").map((t) => H.code(t)),
+
+  H.p("Im Hauptfenster entsteht bei jedem Aufruf ein neues Objekt und damit ein neues Fenster:"),
+
+  ...neu("loesungen/kap11_info/Hauptfenster.dh").map((t) => H.code(t)),
+
+  H.p("Anders als das Ausleihfenster merkt sich das Hauptfenster die Info-Fenster nicht. Sie brauchen es auch nicht: Niemand muss ihnen später Bescheid geben. Jedes neue Fenster erscheint in der Mitte, über dem vorigen; man zieht es an der Titelleiste beiseite."),
 ];

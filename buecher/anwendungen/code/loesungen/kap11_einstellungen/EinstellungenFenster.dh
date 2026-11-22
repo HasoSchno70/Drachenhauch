@@ -1,0 +1,22 @@
+' Loesung Kapitel 11, Erweitern 1 -- ein Einstellungsfenster, modal.
+' Hinein und heraus geht der Wert ueber ein Feld, wie beim Eintrag.
+CLASS EinstellungenFenster EXTENDS EinstellungenFenster_Basis
+    ' >>> neu
+    DIM farbig AS BOOLEAN
+    DIM ok AS BOOLEAN
+
+    SUB Geoeffnet()
+        GUI_SET_CHECKED(Self.kaestchenFarbig, Self.farbig)
+    END SUB
+
+    SUB knopfOk_Klick()
+        Self.farbig = GUI_CHECKED(Self.kaestchenFarbig)
+        Self.ok = TRUE
+        Self.Zumachen()
+    END SUB
+
+    SUB knopfAbbrechen_Klick()
+        Self.Zumachen()
+    END SUB
+    ' <<< neu
+END CLASS
