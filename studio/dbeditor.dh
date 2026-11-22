@@ -254,7 +254,7 @@ SUB dbLagen(r AS Reiter)
     dbLage("benutzer", a.cbBenutzer)
     ' Die Kopfzeile von links nach rechts: Ende der Ueberschrift, Anfang und
     ' Ende des Hakens, Anfang von "Datei:" -- nichts darf das Naechste decken.
-    protokoll("db kopfzeile " + STR$(GUI_GET_X(a.kopf) + GUI_GET_W(a.kopf)) + " " + STR$(GUI_GET_X(a.cbBenutzer)) + " " + STR$(GUI_GET_X(a.cbBenutzer) + GUI_GET_W(a.cbBenutzer)) + " " + STR$(GUI_GET_X(a.dateiText)) + " " + STR$(GUI_TEXT_WIDTH(a.kopf, GUI_TEXT(a.kopf)) <= GUI_GET_W(a.kopf)))
+    protokoll("kopfzeile db " + STR$(GUI_GET_X(a.kopf) + GUI_GET_W(a.kopf)) + " " + STR$(GUI_GET_X(a.cbBenutzer)) + " " + STR$(GUI_GET_X(a.cbBenutzer) + GUI_GET_W(a.cbBenutzer)) + " " + STR$(GUI_GET_X(a.dateiText)) + " " + STR$(GUI_TEXT_WIDTH(a.kopf, GUI_TEXT(a.kopf)) <= GUI_GET_W(a.kopf)))
     dbLage("abfneu", a.btAbfNeu) : dbLage("ausfuehren", a.btAusfuehren) : dbLage("sql", a.taSql)
     ' Breiten des Spalten-Gitters, was jede Spalte braucht, und wie breit
     ' der Knopf "Umbenennen ..." fuer seine Beschriftung sein muss.

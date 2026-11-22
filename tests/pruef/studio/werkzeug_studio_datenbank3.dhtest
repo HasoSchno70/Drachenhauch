@@ -999,7 +999,7 @@ FOR EACH g IN ["1280x800", "1440x900"]
     SETENV("SL_GROESSE", g)
     DIM log AS STRING : log = CWD$() + "/s" + g + ".log"
     slStarten(log, "", 12, p)
-    DIM alle AS ARRAY OF STRING : alle = slAnfang(log, "db kopfzeile ")
+    DIM alle AS ARRAY OF STRING : alle = slAnfang(log, "kopfzeile db ")
     DIM z AS STRING : z = alle[LEN(alle) - 1]
     DIM t AS ARRAY OF STRING : t = SPLIT$(MID$(z, 13), " ")
     PRINT g; " frei "; VAL(t[0]) <= VAL(t[1]) AND VAL(t[2]) <= VAL(t[3]); " ganz "; t[4]
