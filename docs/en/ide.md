@@ -605,6 +605,12 @@ or still NIL -- carries the declared type as `type` (`GUI_WIDGET`, `DB_CONN`,
 a class) instead of `INTEGER`. An uncaught error first reports itself as
 `paused` with `reason: "error"` and `message` (at the error location, `eval` and
 `set-watches` still work), then after the next command as `error`.
+In a method, `locals` starts with `Self`, its fields as `children` --
+that is where a window from the Studio keeps everything. When a call
+returns into its line, the line does not start again: a breakpoint on
+`x = f(1)` pauses once, `step-over` steps past the call to the next
+line; `step-out` and a step past the end of a function pause on the
+line of the call.
 
 **Lines are lines of the file, not of the merged source.** Until
 2026-09-27 the debugger counted after the `IMPORT`s were inserted: with an

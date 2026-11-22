@@ -700,6 +700,12 @@ struct DebugState {
     // Zeile) -- ein CATCH wirft sie weg; kommt der Fehler oben an, haelt der
     // Debugger mit diesem Stand an (`debug_fehler_halt`).
     fehler_stand: Option<FehlerStand>,
+    // Ein Aufruf ist eben in diese Zeile zurueckgekehrt: der naechste
+    // Zeilenwechsel dorthin ist kein neuer Beginn der Zeile. Ein Haltepunkt
+    // auf `x = f(1)` hielt sonst nach f ein zweites Mal, und F10 blieb
+    // einmal auf derselben Zeile stehen (Buch "Fenster, Formulare, Daten",
+    // Kapitel 12). Schritt heraus haelt dort wie bisher.
+    mitten: Option<u32>,
 }
 
 /// Ein Haltepunkt an einer (gemergten) Zeile: Bedingung, Trefferzahl,
@@ -721,6 +727,8 @@ struct FehlerStand {
     // CoroState::fn_ptr); nach dem Laden wird es nicht mehr veraendert.
     fn_: *const Func,
     locals: Vec<Value>,
+    /// Self der Methode, in der der Fehler fiel (None ausserhalb).
+    selbst: Option<Value>,
     stapel: Vec<(String, u32)>,
     zeile: u32,
 }
@@ -732,7 +740,7 @@ impl DebugState {
         DebugState { breakpoints: HashMap::new(), step: StepMode::Into,
                      step_depth: 0, out_sent: 0, stapel: Vec::new(),
                      watches: Vec::new(), run_to: None,
-                     kanal: crate::debugger::Kanal::neu(), karte: None, fehler_stand: None }
+                     kanal: crate::debugger::Kanal::neu(), karte: None, fehler_stand: None, mitten: None }
     }
 
     /// (Datei, Zeile) einer gemergten Zeile -- ohne Karte die Zeile selbst.
@@ -2449,7 +2457,12 @@ impl<'p> Vm<'p> {
         let line = self.cur_line;
         if let Some(d) = self.dbg.as_mut() { d.stapel.push((fn_.name.clone(), line)); }
         let r = self.exec_inner(fn_, args, self_obj);
-        if let Some(d) = self.dbg.as_mut() { d.stapel.pop(); }
+        if let Some(d) = self.dbg.as_mut() {
+            d.stapel.pop();
+            // Zurueck mitten in der Zeile des Aufrufers: sie beginnt nicht
+            // neu (`DebugState::mitten`).
+            if r.is_ok() { d.mitten = Some(line); }
+        }
         self.depth -= 1;
         r
     }
@@ -2488,7 +2501,10 @@ impl<'p> Vm<'p> {
         let line = self.cur_line;
         if let Some(d) = self.dbg.as_mut() { d.stapel.push((fn_.name.clone(), line)); }
         let r = self.exec_byref_inner(fn_, args, self_obj);
-        if let Some(d) = self.dbg.as_mut() { d.stapel.pop(); }
+        if let Some(d) = self.dbg.as_mut() {
+            d.stapel.pop();
+            if r.is_ok() { d.mitten = Some(line); }   // wie in `exec`
+        }
         self.depth -= 1;
         r
     }
@@ -2589,8 +2605,9 @@ impl<'p> Vm<'p> {
                         // er dort anhalten kann, falls kein CATCH den Fehler nimmt.
                         if self.dbg.is_some() {
                             let stapel = self.dbg.as_ref().map(|d| d.stapel.clone()).unwrap_or_default();
+                            let selbst = if self.rahmen.len() > basis { None } else { self_obj.cloned() };
                             let stand = FehlerStand { fn_: fn_ as *const Func, locals: locals.clone(),
-                                                      stapel, zeile: self.cur_line };
+                                                      selbst, stapel, zeile: self.cur_line };
                             if let Some(d) = self.dbg.as_mut() { d.fehler_stand = Some(stand); }
                         }
                         self.error_code = if self.throw_active {
@@ -3176,7 +3193,10 @@ impl<'p> Vm<'p> {
                             }
                         }
                         if self.dbg.is_some() {
-                            self.debug_on_line(fn_, locals)?;
+                            // Self gehoert dem Rahmen von run_frame; ein Rahmen
+                            // darueber ist eine schlichte Funktion ohne Self.
+                            let selbst = if self.rahmen.len() > basis { None } else { self_obj };
+                            self.debug_on_line(fn_, locals, selbst)?;
                         }
                     }
                 }
