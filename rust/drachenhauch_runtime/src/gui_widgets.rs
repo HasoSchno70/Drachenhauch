@@ -250,6 +250,12 @@ impl Gui {
         let geo = self.tb_geom(w.x, w.y, w.w, w.h, w);
         match geo.iter().find(|&&(k, _, _)| k as i64 == i) {
             Some(&(_, x0, x1)) => Ok((self.unsk(x0) as i64, self.unsk(x1 - x0) as i64)),
+            // Einen Eintrag, der gerade im Ueberlauf (>>) steht, gibt es --
+            // er hat nur keine Lage in der Leiste.
+            None if i >= 0 && (i as usize) < w.leiste.as_ref().map(|l| l.eintraege.len()).unwrap_or(0) => Err(format!(
+                "GUI_TOOLBAR_ITEM_X: Eintrag {} steht im Ueberlauf (>>), die Leiste ist zu schmal fuer ihn -- GUI_TOOLBAR_OVERFLOW sagt, wie viele dort stehen",
+                i
+            )),
             None => Err(format!("GUI_TOOLBAR_ITEM_X: Eintrag {} gibt es nicht", i)),
         }
     }

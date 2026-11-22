@@ -1,0 +1,43 @@
+' Loesung Kapitel 20, Erweitern 2 -- ein eigenes Control: fuenf Sterne,
+' von denen so viele gefuellt sind, wie Wert sagt. Ein Klick setzt den
+' Wert und meldet Geaendert; ein Klick auf den gefuellten letzten
+' Stern nimmt die Bewertung zurueck.
+CLASS Sterne EXTENDS Sterne_Basis
+    DIM Wert AS INTEGER
+
+    SUB Setzen(n AS INTEGER)
+        Self.Wert = n
+        DIM knoepfe AS ARRAY OF GUI_WIDGET
+        knoepfe = [Self.s1, Self.s2, Self.s3, Self.s4, Self.s5]
+        DIM k AS INTEGER
+        FOR k = 0 TO 4
+            GUI_SET_TEXT(knoepfe[k], IIF(k < n, "★", "☆"))
+        NEXT
+    END SUB
+
+    SUB waehlen(n AS INTEGER)
+        IF n = Self.Wert THEN n = 0
+        Self.Setzen(n)
+        Self.Ausloesen("Geaendert")
+    END SUB
+
+    SUB s1_Klick()
+        Self.waehlen(1)
+    END SUB
+
+    SUB s2_Klick()
+        Self.waehlen(2)
+    END SUB
+
+    SUB s3_Klick()
+        Self.waehlen(3)
+    END SUB
+
+    SUB s4_Klick()
+        Self.waehlen(4)
+    END SUB
+
+    SUB s5_Klick()
+        Self.waehlen(5)
+    END SUB
+END CLASS

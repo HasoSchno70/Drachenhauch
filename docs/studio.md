@@ -166,7 +166,12 @@ Self.vorrat.SetzenSchalter("prozent", TRUE)             ' CHART_SET_FLAG
 Dazu `Reihe(name, werte)` für Linien und gruppierte Balken, `Beschriften`,
 `Wert` für Tacho, Leiste und Lampen, `Titel`, `SetzenZahl`, `Anzahl()`;
 `Flaeche` ist die Zeichenfläche, `Diagramm` der CHART-Handle für alles
-Weitere.
+Weitere. `Leeren` verwirft die Werte, nicht die Reihen: Neu gefüllt wird mit
+denselben Namen, und `Reihe` gibt einer Reihe, die es schon gibt, die neuen
+Werte. Einen Klick auf ein Stück oder einen Balken fragt `Takt` ab
+(`CHART_CLICKED(Self.<name>.Diagramm)`, die Nummer des Punkts) -- er gilt
+nach dem Zeichnen, also im Bild danach; im Ereignis `Maus` steht er noch
+nicht.
 
 Ein Ereignis mit Klammern ruft seine Methode mit Werten: `Ziehen` mit der
 Lage auf der Fläche (solange die Taste nach einem Druck auf die Fläche
@@ -293,6 +298,7 @@ Menüleiste nicht). Im Layout stehen sie unter `kontextmenues`.
 | `FarbeWaehlen(vorgabe [, titel$])` | eine Farbe im Farbwähler; liefert `&HRRGGBB`, `-1` bei Abbrechen |
 | `fenster.ZeigenModal()` | zeigt ein Fenster modal und kehrt erst zurück, wenn es geschlossen ist |
 | `Bild(name$)` | ein Bild aus `bilder/` des Projekts als IMAGE |
+| `StilLaden(name$)` | eine Stildatei (`.dhstil`) aus dem Projektordner laden, am besten in `App.Geoeffnet` |
 
 Alle vier kehren erst mit der Antwort zurück, wie in Xojo oder Visual
 Basic. Das geht, weil die erzeugte Basisklasse die Ereignisse **nach** dem
@@ -305,10 +311,28 @@ Projektordner; ein Bild-Control wählt seins im Inspektor unter „Bild“ und
 zeigt es schon im Entwurf. Beim Starten und Bauen kommen die Bilder nach
 `_studio/assets/bilder/`, und `dhrt --export` nimmt `assets/` neben die Exe.
 
+**Stildatei.** Eine Datei `<name>.dhstil` im Projektordner sagt per Regel,
+wie Widgets aussehen -- nach Art, Klasse, Name und Zustand wie in CSS
+([Stildatei der gui](module-gui.md#7-stildatei-regeln-nach-art-klasse-name-und-zustand)).
+Beim Starten und Bauen kommt sie nach `_studio/assets/`; das Programm lädt
+sie mit `StilLaden("<name>.dhstil")`, am besten in `App.Geoeffnet`. Klassen
+bekommt ein Widget im Inspektor unter Kennung → **Klassen** (`gefahr;
+klein`), sie stehen in der `.dhform` unter `klassen`. Der Entwurf zeigt die
+Stildatei nicht -- er steht im Aussehen des Studios --, das gestartete
+Programm schon; ein Fehler darin hält es mit der Zeile an.
+
+**Große Schrift.** `GUI_SCALE(1.5)` in `App.Geoeffnet` vergrößert alles
+um die Hälfte -- Schrift, Widgets und das Programmfenster mit, das dann
+anderthalb mal so groß aufgeht wie im Entwurf. Gesetzt wird der Maßstab
+vor dem ersten Fenster; später lässt die gui ihn nicht mehr ändern.
+
 **Sprachen.** Ein Projekt schreibt seine Texte in einer Sprache, der seiner
 Quelle. Eine Tafel `sprache/<code>.txt` im Projektordner macht eine zweite
 daraus: je Zeile der Text, wie er im Projekt steht, ein Tabulator, die
-Übersetzung (`sprache/en.txt`). Von selbst übersetzt werden die Texte der
+Übersetzung (`sprache/en.txt`). **Projekt → Sprachtafel ergänzen …**
+sammelt jeden Text des Projekts, den die Laufzeit übersetzt, und hängt die,
+die der Tafel fehlen, mit leerer Übersetzung an (`Text` und ein Tabulator);
+eine leere Übersetzung lässt die Laufzeit aus. Von selbst übersetzt werden die Texte der
 Fenster (Titel, Beschriftungen, Platzhalter, Tooltips, Spaltenköpfe,
 Einträge, Reiter, Meldungen der Prüfregeln, Diagrammtitel, Werkzeugleisten),
 die Menüs samt Kürzeln (`Strg+S` wird `Ctrl+S`), die Texte der Berichte und
@@ -449,7 +473,9 @@ In der Bibliothek stehen alle eigenen Controls unter **Projekt**. Man legt
 sie ins Fenster wie einen Knopf und bekommt eine Instanz (`zaehler1`). Sie
 lässt sich verschieben, größer ziehen, verankern und in Zeilen, Spalten und
 Raster legen; im Entwurf zeigt sie ihren echten Inhalt, gestrichelt
-umrandet, und ein Klick auf einen ihrer Teile wählt die ganze Instanz.
+umrandet, und ein Klick auf einen ihrer Teile wählt die ganze Instanz. Ihre
+Tab-Folge (Inspektor, Verhalten) gilt für ihre Teile, untereinander in der
+Reihenfolge, in der sie im Control liegen.
 
 ```basic
 ' im Code des Controls Zaehler
@@ -587,6 +613,15 @@ SQLite sieht darin denselben Namen). Gelöschtes lässt es stehen. Das
 Element zu löschen nimmt nur den Aufbau aus dem Projekt; die Datei mit den
 Daten bleibt liegen.
 
+**Im Benutzerordner.** Ein Programm, das unter „Programme“ installiert ist,
+darf neben sich nichts schreiben. Mit dem Haken **Im Benutzerordner** im
+Reiter der Datenbank (`"ort": "benutzer"` im Aufbau) hält das gebaute
+Programm die Datei im Datenordner des Benutzers (`DIR_USER_DATA$` mit dem
+Namen des Projekts); beim ersten Start kommt die Datei, die neben dem
+Programm mitgeliefert wurde, dorthin, danach bleibt sie dort. Aus dem
+Studio gestartet arbeitet das Programm weiter auf der Datei im
+Projektordner.
+
 **Fenster an eine Tabelle binden.** Im Navigator stehen unter jeder Tabelle
 ihre Spalten. Eine Spalte oder die ganze Tabelle ins offene Fenster gezogen
 legt je Spalte eine Beschriftung und ein passendes Feld an, an die Spalte
@@ -696,7 +731,7 @@ Zeile der Quelle), Gruppenfuß, Seitenfuß, Berichtsfuß. Darin stehen
 Elemente in mm: fester Text, Felder (eine Spalte der Quelle, auch
 `kunde.name` über einen Verweis), Summen (Summe, Anzahl, Mittel, Min, Max je
 Gruppe oder Bericht), Seitenzahl („Seite {n} von {m}“), Datum, Linien,
-Rechtecke und Bilder.
+Rechtecke, Bilder und Strichcodes.
 
 Die **Quelle** ist eine Tabelle oder Abfrage einer Datenbank des Projekts;
 die **Bedingung** darf Parameter haben (`rechnung = :id`). Passt ein Band
@@ -707,7 +742,7 @@ Der Reiter eines Berichts ist sein **Entwurf**: die Seite in Millimetern,
 jedes Band mit einer Leiste, die seinen Namen trägt, darin die Elemente.
 
 * **Ablegen:** oben die Leiste der Elemente (Text, Feld, Summe, Seitenzahl,
-  Datum, Linie, Rechteck, Bild) -- eine Art wählen, dann in ein Band klicken
+  Datum, Linie, Rechteck, Bild, Strichcode) -- eine Art wählen, dann in ein Band klicken
   (Vorgabegröße) oder ein Rechteck ziehen. Esc bricht ab.
 * **Spalten der Quelle** stehen rechts oben; eine Spalte in ein Band ziehen
   macht im Gruppen- oder Berichtsfuß eine Summe, im Seitenkopf eine
@@ -753,6 +788,14 @@ wenn es eine **Spalte** nennt, je Zeile das Bild aus dieser Bildspalte -- etwa
 ein Foto je Artikel im Detail. Ein Bild wird ins Rechteck eingepasst, ohne es
 zu verzerren; eine leere Zelle oder Bytes, die kein Bild sind, lassen es
 leer.
+
+Ein **Strichcode** zeichnet einen EAN-13 aus einer **Spalte** (je Zeile)
+oder aus seinem festen **Text**: eine ISBN-13 oder EAN mit oder ohne
+Bindestriche, zwölf Ziffern (die Prüfziffer kommt dazu) oder eine ISBN-10
+(sie wird zur ISBN-13 mit 978 davor). Unter den Strichen stehen die Ziffern,
+links und rechts bleibt die Ruhezone im Rechteck frei. Ein Wert mit falscher
+Prüfziffer oder mit anderen Zeichen gibt keinen Strichcode -- lieber keinen
+als einen falschen. Das Nennmaß ist 37 × 26 mm.
 
 Im Programm ist ein Bericht ein Objekt unter seinem Namen:
 

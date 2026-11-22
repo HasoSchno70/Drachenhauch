@@ -114,6 +114,9 @@ CLASS StudioDiagramm
     DIM Diagramm AS CHART
     DIM Art AS STRING
     DIM studioHell AS INTEGER     ' -1 = noch kein Thema gesetzt, 0 dunkel, 1 hell
+    ' Name -> Index der Reihen: Leeren (CHART_CLEAR) behaelt die Reihen, nur
+    ' ihre Werte gehen -- eine Reihe mit demselben Namen bekommt sie neu.
+    DIM studioReihen AS MAP OF INTEGER
 
     SUB Leeren()
         CHART_CLEAR(Self.Diagramm)
@@ -124,9 +127,17 @@ CLASS StudioDiagramm
         CHART_ADD(Self.Diagramm, name, wert, farbe)
     END SUB
 
-    ' Eine Reihe mit ihren Werten -> ihr Index.
+    ' Eine Reihe mit ihren Werten -> ihr Index. Gibt es die Reihe schon
+    ' (nach Leeren, zum Neu-Fuellen), bekommt sie die Werte -- sonst stuende
+    ' neben ihr eine zweite, leere, und die Balken wuerden schmal.
     FUNCTION Reihe(name AS STRING, werte AS ARRAY OF FLOAT) AS INTEGER
-        DIM r AS INTEGER : r = CHART_SERIES(Self.Diagramm, name)
+        DIM r AS INTEGER
+        IF MAPHAS(Self.studioReihen, name) THEN
+            r = MAPGET(Self.studioReihen, name)
+        ELSE
+            r = CHART_SERIES(Self.Diagramm, name)
+            MAPPUT(Self.studioReihen, name, r)
+        END IF
         CHART_DATA(Self.Diagramm, r, werte)
         RETURN r
     END FUNCTION
@@ -188,6 +199,7 @@ FUNCTION studioDiagramm(flaeche AS GUI_WIDGET, art AS STRING, titel AS STRING) A
     d.Flaeche = flaeche
     d.Art = art
     d.studioHell = -1
+    d.studioReihen = {}
     d.Diagramm = CHART_NEW(art, 0, 0, 10, 10)
     IF titel <> "" THEN CHART_SET(d.Diagramm, "titel", titel)
     CHART_SET_FLAG(d.Diagramm, "komma", TRUE)
@@ -251,6 +263,13 @@ CLASS StudioControl
 
     SUB studioTeil(w AS GUI_WIDGET, frei AS BOOLEAN, x AS INTEGER, y AS INTEGER, b AS INTEGER, h AS INTEGER, anker AS STRING)
         ARRAY_PUSH(Self.studioAlle, w)
+        ' Die Tab-Folge der Instanz gilt fuer ihre Teile (die selbst keine
+        ' haben): sonst kamen sie nach allen gezaehlten Widgets des Fensters
+        ' (Buch "Fenster, Formulare, Daten", Kapitel 21: die Cover-Kachel
+        ' nach "Ausleihen"). Gleicher Index: die Reihenfolge des Anlegens.
+        IF GUI_GET_TAB_INDEX(Self.studioHost) > 0 AND GUI_GET_TAB_INDEX(w) = 0 THEN
+            GUI_SET_TAB_INDEX(w, GUI_GET_TAB_INDEX(Self.studioHost))
+        END IF
         IF NOT frei THEN RETURN
         ARRAY_PUSH(Self.studioTeile, w)
         ARRAY_PUSH(Self.studioTx, x) : ARRAY_PUSH(Self.studioTy, y)
@@ -442,11 +461,11 @@ CLASS StudioFenster
         Self.studioOffen = TRUE
         IF Self.studioHaupt THEN
             GUI_WINDOW_CHROME(Self.studioWin, FALSE)
-            GUI_WINDOW_SET_BOUNDS(Self.studioWin, 0, 0, SCREENWIDTH(), SCREENHEIGHT())
+            GUI_WINDOW_SET_BOUNDS(Self.studioWin, 0, 0, studioSchirmLB(), studioSchirmLH())
         ELSE
             DIM b AS INTEGER : b = GUI_WINDOW_GET_W(Self.studioWin)
             DIM h AS INTEGER : h = GUI_WINDOW_GET_H(Self.studioWin)
-            GUI_WINDOW_SET_BOUNDS(Self.studioWin, MAX(0, (SCREENWIDTH() - b) \ 2), MAX(0, (SCREENHEIGHT() - h) \ 2), b, h)
+            GUI_WINDOW_SET_BOUNDS(Self.studioWin, MAX(0, (studioSchirmLB() - b) \ 2), MAX(0, (studioSchirmLH() - h) \ 2), b, h)
             GUI_WINDOW_FRONT(Self.studioWin)
         END IF
         Self.studioWarB = GUI_WINDOW_GET_W(Self.studioWin)
@@ -493,6 +512,19 @@ DIM studioDieStartseite AS StudioFenster
 DIM studioDialoge AS ARRAY OF GUI_WINDOW : studioDialoge = []
 DIM studioSchirmB AS INTEGER : studioSchirmB = 0
 DIM studioSchirmH AS INTEGER : studioSchirmH = 0
+
+' Breite und Hoehe des Programmfensters in den Punkten der gui -- bei einem
+' Massstab (GUI_SCALE, grosse Schrift) weniger als SCREENWIDTH() Pixel.
+' Lagen von Fenstern sind logisch; mit Pixeln ragte das Startfenster rechts
+' und unten ueber den Rand.
+FUNCTION studioSchirmLB() AS INTEGER
+    RETURN ROUND(SCREENWIDTH() / GUI_SCALE_GET())
+END FUNCTION
+
+FUNCTION studioSchirmLH() AS INTEGER
+    RETURN ROUND(SCREENHEIGHT() / GUI_SCALE_GET())
+END FUNCTION
+
 ' Der Tastaturfokus im vorigen und in diesem Bild -- daraus werden
 ' FokusRein und FokusRaus.
 DIM studioFokusAlt AS INTEGER : studioFokusAlt = -1
@@ -561,7 +593,7 @@ FUNCTION studioBild() AS BOOLEAN
     END IF
     IF SCREENWIDTH() <> studioSchirmB OR SCREENHEIGHT() <> studioSchirmH THEN
         studioSchirmB = SCREENWIDTH() : studioSchirmH = SCREENHEIGHT()
-        IF studioDieStartseite.studioOffen THEN GUI_WINDOW_SET_BOUNDS(studioDieStartseite.studioWin, 0, 0, studioSchirmB, studioSchirmH)
+        IF studioDieStartseite.studioOffen THEN GUI_WINDOW_SET_BOUNDS(studioDieStartseite.studioWin, 0, 0, studioSchirmLB(), studioSchirmLH())
     END IF
     GUI_UPDATE()
     studioVerteiltNr = studioBildNr
@@ -627,11 +659,16 @@ SUB studioMalen()
     DIM f AS StudioFenster
     CLS(0)
     GUI_DRAW(FALSE)
+    ' Was ein Fenster selbst malt (Zeichenflaeche, Diagramm), kommt nach
+    ' seinem Fenster -- sonst deckt ein zweites Fenster es zu.
     FOR EACH f IN studioFenster
-        f.studioZeichnen()
+        IF f.studioHaupt THEN f.studioZeichnen()
     NEXT
     FOR EACH f IN studioFenster
-        IF NOT f.studioHaupt THEN GUI_DRAW_WINDOW(f.studioWin)
+        IF NOT f.studioHaupt THEN
+            GUI_DRAW_WINDOW(f.studioWin)
+            f.studioZeichnen()
+        END IF
     NEXT
     DIM d AS GUI_WINDOW
     FOR EACH d IN studioDialoge
@@ -665,6 +702,13 @@ SUB studioLauf(app AS StudioApp, start AS StudioFenster, b AS INTEGER, h AS INTE
     studioLaufApp = app
     studioSpracheVorgabe()
     app.Geoeffnet()
+    ' Grosse Schrift: ein Massstab aus App.Geoeffnet (GUI_SCALE) macht auch
+    ' das Programmfenster groesser -- sonst blieb es in der Groesse des
+    ' Entwurfs und schnitt rechts und unten ab.
+    IF GUI_SCALE_GET() <> 1 THEN
+        SCREEN(ROUND(b * GUI_SCALE_GET()), ROUND(h * GUI_SCALE_GET()), titel)
+        studioSchirmB = SCREENWIDTH() : studioSchirmH = SCREENHEIGHT()
+    END IF
     IF studioSprache <> "" THEN SETWINDOWTITLE(studioTr$(titel))
     start.studioHaupt = TRUE
     start.Zeigen()
@@ -741,7 +785,7 @@ END FUNCTION
 
 FUNCTION studioKleinesFenster(titel AS STRING, text AS STRING) AS GUI_WINDOW
     DIM b AS INTEGER : b = 380
-    DIM w AS GUI_WINDOW : w = GUI_WINDOW(titel, MAX(0, (SCREENWIDTH() - b) \ 2), MAX(0, (SCREENHEIGHT() - 150) \ 2), b, 150)
+    DIM w AS GUI_WINDOW : w = GUI_WINDOW(titel, MAX(0, (studioSchirmLB() - b) \ 2), MAX(0, (studioSchirmLH() - 150) \ 2), b, 150)
     GUI_LABEL(w, text, 14, 12)
     RETURN w
 END FUNCTION
@@ -778,7 +822,7 @@ END FUNCTION
 ' Waehler beginnt bei vorgabe (-1 = Weiss).
 FUNCTION FarbeWaehlen(vorgabe AS INTEGER, titel AS STRING = "") AS INTEGER
     DIM b AS INTEGER : b = 380
-    DIM w AS GUI_WINDOW : w = GUI_WINDOW(titel, MAX(0, (SCREENWIDTH() - b) \ 2), MAX(0, (SCREENHEIGHT() - 320) \ 2), b, 320)
+    DIM w AS GUI_WINDOW : w = GUI_WINDOW(titel, MAX(0, (studioSchirmLB() - b) \ 2), MAX(0, (studioSchirmLH() - 320) \ 2), b, 320)
     DIM feld AS GUI_WIDGET : feld = GUI_COLORPICKER(w, 14, 12, 352, 220)
     GUI_SET_PICKED_COLOR(feld, IIF(vorgabe < 0, &HFFFFFF, vorgabe))
     DIM ok AS GUI_WIDGET : ok = GUI_BUTTON(w, "OK", 166, 248, 96, 30)
@@ -793,7 +837,7 @@ END FUNCTION
 ' Seite, Blaettern, Drucken, Sichern und Schliessen. Kehrt zurueck, wenn es
 ' zu ist -- wie Frage() dreht sie dafuer selbst Bilder.
 SUB studioBerichtVorschau(p AS PDF, titel AS STRING)
-    DIM w AS GUI_WINDOW : w = GUI_WINDOW(titel, 40, 30, 640, MIN(860, SCREENHEIGHT() - 60))
+    DIM w AS GUI_WINDOW : w = GUI_WINDOW(titel, 40, 30, 640, MIN(860, studioSchirmLH() - 60))
     DIM zurueck AS GUI_WIDGET : zurueck = GUI_BUTTON(w, "<", 10, 8, 40, 26)
     DIM seite AS GUI_WIDGET : seite = GUI_LABEL(w, "", 58, 12)
     DIM weiter AS GUI_WIDGET : weiter = GUI_BUTTON(w, ">", 150, 8, 40, 26)
@@ -822,7 +866,9 @@ SUB studioBerichtVorschau(p AS PDF, titel AS STRING)
         IF GUI_CLICKED(zurueck) AND nr > 1 THEN nr = nr - 1 : neu = TRUE
         IF GUI_CLICKED(drucken) THEN PDF_PRINT(p)
         IF GUI_CLICKED(sichern) THEN
-            DIM ziel AS STRING : ziel = FILE_SAVE_DIALOG(studioTr$("PDF sichern"), "pdf")
+            ' Zweites Argument ist der vorgeschlagene NAME, erst das dritte
+            ' die Endungen (bis 2026-11-22 stand hier "pdf" als Name).
+            DIM ziel AS STRING : ziel = FILE_SAVE_DIALOG(studioTr$("PDF sichern"), titel + ".pdf", "pdf")
             IF ziel <> "" THEN PDF_SAVE(p, ziel)
         END IF
     WEND
@@ -842,6 +888,13 @@ END SUB
 FUNCTION Bild(name AS STRING) AS IMAGE
     RETURN LOADIMAGE(studioDatei$("bilder/" + name))
 END FUNCTION
+
+' Eine Stildatei des Projekts laden: eine .dhstil aus dem Projektordner, die
+' beim Starten und Bauen nach assets/ kommt -- am besten in App.Geoeffnet,
+' vor dem ersten Fenster. Ein Fehler darin ist ein Laufzeitfehler mit Zeile.
+SUB StilLaden(name AS STRING)
+    GUI_STYLESHEET_LOAD(studioDatei$(name))
+END SUB
 
 FUNCTION studioDatei$(rel AS STRING) AS STRING
     RETURN "assets/" + rel
@@ -888,7 +941,9 @@ FUNCTION SpracheWaehlen(code AS STRING) AS BOOLEAN
     FOR EACH z IN READLINES(pfad)
         z = REPLACE$(REPLACE$(z, CHR$(13), ""), CHR$(&HFEFF), "")
         DIM t AS INTEGER : t = INSTR(z, CHR$(9))
-        IF t > 0 THEN MAPPUT(studioTafel, LEFT$(z, t), MID$(z, t + 1))
+        ' "Text<Tab>" ohne Uebersetzung (so haengt Projekt -> Sprachtafel
+        ' ergaenzen neue Texte an) zaehlt nicht: der Text bleibt, wie er ist.
+        IF t > 0 AND MID$(z, t + 1) <> "" THEN MAPPUT(studioTafel, LEFT$(z, t), MID$(z, t + 1))
     NEXT
     studioSprache = code
     RETURN TRUE

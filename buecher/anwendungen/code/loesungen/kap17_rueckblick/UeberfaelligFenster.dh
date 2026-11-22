@@ -1,0 +1,8 @@
+' Kapitel 15 -- was laenger als vier Wochen weg ist. Die Abfrage
+' ueberfaellig rechnet die Tage; die Tabelle zeigt sie, die laengste
+' zuerst (Inspektor: Sortieren nach tage, Absteigend).
+CLASS UeberfaelligFenster EXTENDS UeberfaelligFenster_Basis
+    SUB knopfZu_Klick()
+        Self.Zumachen()
+    END SUB
+END CLASS

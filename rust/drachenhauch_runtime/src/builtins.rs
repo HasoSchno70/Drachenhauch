@@ -3665,6 +3665,23 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             arity!(0);
             Ok(Value::str_rc(std::env::temp_dir().to_string_lossy()))
         }
+        "dir_user_data$" | "dir_user_data" => {
+            // DIR_USER_DATA$(app$) -- der Ordner, in dem ein Programm die Daten
+            // seines Benutzers ablegt, angelegt, wenn es ihn noch nicht gibt.
+            // Ein Programm unter "Programme" darf neben sich nichts schreiben
+            // (Buch "Fenster, Formulare, Daten", Kapitel 23).
+            arity!(1);
+            let app = need_str(&a[0], "DIR_USER_DATA$")?.trim();
+            if app.is_empty() || app == "." || app == ".." || app.contains(['/', '\\']) {
+                return err("DIR_USER_DATA$: erwartet den Namen des Programms (ohne / und \\)");
+            }
+            let Some(basis) = benutzer_datenordner() else {
+                return err("DIR_USER_DATA$: kein Benutzerordner (APPDATA bzw. HOME ist nicht gesetzt)");
+            };
+            let ordner = basis.join(app);
+            std::fs::create_dir_all(&ordner).map_err(|e| format!("DIR_USER_DATA$: {}: {}", ordner.display(), e))?;
+            Ok(Value::str_rc(ordner.to_string_lossy()))
+        }
         "tempfile$" | "tempfile" => {
             // TEMPFILE$([praefix$ [, endung$]]) -- ein noch nicht vergebener
             // Name im Temp-Ordner. Die Datei wird LEER ANGELEGT: sonst
@@ -6098,6 +6115,20 @@ fn json_try_resolve<'a>(root: &'a serde_json::Value, path: &str) -> Option<&'a s
 /// Wie weit geht die Uhr dieses Rechners der Weltzeit voraus (in Sekunden)?
 ///
 /// Gebraucht fuer `FILETIME`: das Dateisystem liefert die Aenderungszeit in
+/// Wo Programme die Daten ihres Benutzers ablegen (DIR_USER_DATA$): Windows
+/// %APPDATA%, macOS ~/Library/Application Support, sonst $XDG_DATA_HOME
+/// bzw. ~/.local/share. `None`, wenn die Umgebung keinen nennt.
+fn benutzer_datenordner() -> Option<std::path::PathBuf> {
+    let env = |n: &str| std::env::var_os(n).filter(|v| !v.is_empty()).map(std::path::PathBuf::from);
+    if cfg!(windows) {
+        return env("APPDATA");
+    }
+    if cfg!(target_os = "macos") {
+        return env("HOME").map(|h| h.join("Library").join("Application Support"));
+    }
+    env("XDG_DATA_HOME").or_else(|| env("HOME").map(|h| h.join(".local").join("share")))
+}
+
 /// Weltzeit, das Modul `zeit` (und `ZEIT_JETZT`) rechnet in Ortszeit. Ohne
 /// diese Umrechnung waere `ZEIT_DIFF(FILETIME(f), ZEIT_JETZT())` um den
 /// Zeitzonenversatz daneben -- und genau diese Rechnung ist der Grund, warum

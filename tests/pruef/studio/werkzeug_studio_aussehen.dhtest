@@ -1,0 +1,203 @@
+' Drachenhauch Studio: Aussehen ueber eine Stildatei (gebaut fuer das Buch
+' "Fenster, Formulare, Daten", Kapitel 20). Der Inspektor hat unter Kennung
+' das Feld Klassen (in der .dhform "klassen", wie die gui es liest); eine
+' Datei <name>.dhstil im Projektordner kommt beim Starten nach
+' _studio/assets/, und StilLaden(name) laedt sie. Vorher kannte das Studio
+' weder Klassen noch einen Ort fuer eine Stildatei -- ein Projekt haette sie
+' von Hand in die .dhform schreiben und den Pfad selbst suchen muessen.
+' Format: docs/werkzeuge.md, dhrt test.
+
+--- langsam
+=== klassen im inspektor eintragen
+' Den Knopf waehlen, ins Feld Klassen klicken, Strg+A, Strg+V ("gefahr;
+' klein" aus der Ablage), Enter, Strg+S -- die Datei hat klassen als Feld,
+' und die gui liest sie.
+IMPORT "laeufer.dh"
+DIM m AS STRING : m = CWD$() + "/m.log"
+slStarten(m, "", 6, CWD$() + "/f.dhform")
+DIM fx AS INTEGER
+DIM fy AS INTEGER
+(fx, fy) = slLage(m, "fenster")
+slHin(10, 10)
+slKlick(fx + 80, fy + 36)
+slWarten(4)
+slAufnahmeSchreiben(CWD$() + "/ev1.txt")
+slStarten(m, CWD$() + "/ev1.txt", slBild + 10, CWD$() + "/f.dhform")
+DIM tx AS INTEGER
+DIM ty AS INTEGER
+(tx, ty) = slLage(m, "feld klassen")
+slZeilen = [] : slBild = 0
+slHin(10, 10)
+slKlick(fx + 80, fy + 36)
+slWarten(4)
+slKlick(tx, ty)
+slMit([341], 65)
+slMit([341], 86)
+slTaste(257)
+slWarten(4)
+slMit([341], 83)
+slWarten(6)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+SETENV("DH_STUDIO_ABLAGE", "gefahr; klein")
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = slStarten(log, CWD$() + "/ev.txt", slBild + 20, CWD$() + "/f.dhform")
+PRINT "feld gefunden "; tx > 0
+DIM d AS JSON_HANDLE : d = JSON_LOAD(CWD$() + "/f.dhform")
+IF JSON_HAS(d, "widgets.0.klassen") THEN
+    PRINT "klassen "; JSON_STRINGIFY(JSON_GET_JSON(d, "widgets.0.klassen"))
+ELSE
+    PRINT "klassen fehlen"
+END IF
+DIM w AS GUI_WINDOW : w = GUI_FROM_JSON(JSON_STRINGIFY(d))
+PRINT "gui "; GUI_HAS_CLASS(GUI_WINDOW_WIDGET(w, 0), "gefahr"); " "; GUI_HAS_CLASS(GUI_WINDOW_WIDGET(w, 0), "klein")
+IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+IMPORT "json"
+IMPORT "gui"
+slStudio = ARG$(0)
+--- datei f.dhform
+{"title":"F","name":"F","w":520,"h":360,"widgets":[
+{"kind":"button","name":"knopf","text":"Weg","x":20,"y":20,"w":120,"h":32}]}
+--- erwartet
+feld gefunden TRUE
+klassen ["gefahr","klein"]
+gui TRUE TRUE
+
+=== eine stildatei im projekt
+' stil.dhstil im Projektordner: F5 legt sie nach _studio/assets/, App.Geoeffnet
+' laedt sie mit StilLaden, und der Knopf mit der Klasse gefahr hat die Farbe
+' der Regel; der ohne Klasse nicht. Eine kaputte Regel haelt das Programm mit
+' der Zeile an.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+slHin(10, 10)
+slWarten(10)
+slTaste(294)
+slWarten(150)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+SETENV("DH_STUDIO_LAUF_BILDER", "20")
+DIM log AS STRING : log = CWD$() + "/s.log"
+slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+PRINT "geprueft "; slHat(log, "geprueft 0 0")
+PRINT "in assets "; FILEEXISTS(p + "/_studio/assets/stil.dhstil")
+FUNCTION lauf$(main AS STRING) AS STRING
+    DIM k AS INTEGER : k = PROCESS_START("dhrt", "run", "--bilder", "20", main)
+    DIM r AS STRING : r = ""
+    DIM leer AS INTEGER : leer = 0
+    WHILE leer < 5
+        DIM t AS STRING : t = PROCESS_READ$(k) + PROCESS_ERR$(k)
+        r = r + t
+        IF t = "" AND NOT PROCESS_RUNNING(k) THEN leer = leer + 1
+        SLEEP(20)
+    WEND
+    RETURN r
+END FUNCTION
+DIM z AS STRING
+FOR EACH z IN SPLIT(REPLACE$(lauf$(p + "/_studio/main.dh"), CHR$(13), ""), CHR$(10))
+    IF LEFT$(z, 3) = "bg " THEN PRINT z
+NEXT
+WRITEALL(p + "/_studio/assets/stil.dhstil", "button.gefahr { bg: #12G }" + CHR$(10))
+DIM a AS STRING : a = lauf$(p + "/_studio/main.dh")
+PRINT "kaputt "; INSTR(a, "stil.dhstil): Zeile 1: '#12G' ist keine Farbe") >= 0
+--- argumente
+{sammlung}/../../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"}]}
+--- datei proj/stil.dhstil
+/* die Probe: Gefahr ist rot */
+button.gefahr { bg: #C0392B; fg: #FFFFFF }
+--- datei proj/App.dh
+CLASS App EXTENDS StudioApp
+    SUB Geoeffnet()
+        StilLaden("stil.dhstil")
+    END SUB
+END CLASS
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":400,"h":200,"widgets":[
+{"kind":"button","name":"weg","text":"Weg","x":20,"y":20,"w":120,"h":32,"klassen":["gefahr"]},
+{"kind":"button","name":"gut","text":"Gut","x":160,"y":20,"w":120,"h":32}]}
+--- datei proj/Hauptfenster.dh
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+    DIM n AS INTEGER
+
+    SUB Takt()
+        Self.n = Self.n + 1
+        IF Self.n = 3 THEN
+            PRINT "bg weg "; HEX$(GUI_GET_COLOR(Self.weg, "bg") BAND &HFFFFFF); " gut "; HEX$(GUI_GET_COLOR(Self.gut, "bg") BAND &HFFFFFF) <> "C0392B"
+            END
+        END IF
+    END SUB
+END CLASS
+--- erwartet
+geprueft TRUE
+in assets TRUE
+bg weg C0392B gut TRUE
+kaputt TRUE
+
+=== grosse schrift vergroessert das programmfenster
+' GUI_SCALE in App.Geoeffnet (grosse Schrift, Buch "Fenster, Formulare,
+' Daten", Kapitel 21): das Programmfenster waechst mit dem Massstab, das
+' Startfenster fuellt es in logischen Punkten. Vorher blieb der Schirm in
+' der Groesse des Entwurfs und schnitt rechts und unten ab; mit Pixeln als
+' Lage ragte das Startfenster ueber den Rand.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+slHin(10, 10)
+slWarten(10)
+slTaste(294)
+slWarten(150)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+SETENV("DH_STUDIO_LAUF_BILDER", "20")
+DIM log AS STRING : log = CWD$() + "/s.log"
+slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+PRINT "geprueft "; slHat(log, "geprueft 0 0")
+DIM k AS INTEGER : k = PROCESS_START("dhrt", "run", "--bilder", "20", p + "/_studio/main.dh")
+DIM r AS STRING : r = ""
+DIM leer AS INTEGER : leer = 0
+WHILE leer < 5
+    DIM t AS STRING : t = PROCESS_READ$(k) + PROCESS_ERR$(k)
+    r = r + t
+    IF t = "" AND NOT PROCESS_RUNNING(k) THEN leer = leer + 1
+    SLEEP(20)
+WEND
+DIM z AS STRING
+FOR EACH z IN SPLIT(REPLACE$(r, CHR$(13), ""), CHR$(10))
+    IF LEFT$(z, 7) = "schirm " OR INSTR(LOWER$(z), "fehler") >= 0 THEN PRINT z
+NEXT
+--- argumente
+{sammlung}/../../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"}]}
+--- datei proj/App.dh
+CLASS App EXTENDS StudioApp
+    SUB Geoeffnet()
+        GUI_SCALE(1.5)
+    END SUB
+END CLASS
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":400,"h":200,"widgets":[
+{"kind":"button","name":"ok","text":"OK","x":20,"y":20,"w":120,"h":32}]}
+--- datei proj/Hauptfenster.dh
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+    DIM n AS INTEGER
+
+    SUB Takt()
+        Self.n = Self.n + 1
+        IF Self.n = 3 THEN
+            PRINT "schirm "; SCREENWIDTH(); " "; SCREENHEIGHT(); " fenster "; GUI_WINDOW_GET_W(Self.studioWin); " "; GUI_WINDOW_GET_H(Self.studioWin)
+            END
+        END IF
+    END SUB
+END CLASS
+--- erwartet
+geprueft TRUE
+schirm 600 300 fenster 400 200

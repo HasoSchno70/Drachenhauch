@@ -3465,6 +3465,72 @@ int: FALSE
 zahl: TRUE
 gesamt: 2
 
+=== file_save_dialog mit einer endung an zweiter stelle
+' FILE_SAVE_DIALOG(titel, name, endungen) -- anders als
+' FILE_OPEN_DIALOG(titel, endungen). Steht an zweiter Stelle nur eine Endung,
+' war der Filter gemeint; der Dialog schlug eine Datei "pdf" vor (so im
+' Studio bis 2026-11-22, Vorschau eines Berichts). Ein Name mit Punkt, drei
+' Argumente und FILE_OPEN_DIALOG bleiben still.
+IMPORT "json"
+' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM meldungen AS ARRAY OF STRING : meldungen = []
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    ARRAY_PUSH(meldungen, JSON_GET_STRING(h, "b." + STR$(i) + ".message"))
+NEXT
+' "A|B": gibt es EINE Meldung, die A und B enthaelt?
+FUNCTION eine$(teile AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(teile, "|")
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        DIM alle AS BOOLEAN : alle = TRUE
+        FOR k = 0 TO LEN(t) - 1
+            IF INSTR(meldungen[j], t[k]) < 0 THEN alle = FALSE
+        NEXT
+        IF alle THEN RETURN "TRUE"
+    NEXT
+    RETURN "FALSE"
+END FUNCTION
+FUNCTION wieviele(teil AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        IF INSTR(meldungen[j], teil) >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "pdf: "; eine$("FILE_SAVE_DIALOG: das zweite Argument|" + CHR$(34) + "pdf" + CHR$(34) + " wird so zum Namen|name.pdf")
+PRINT "zwei: "; eine$("name.xlsx|" + CHR$(34) + "xlsx,csv" + CHR$(34))
+PRINT "gesamt: "; wieviele("FILE_SAVE_DIALOG:")
+--- datei w.dh
+DIM p AS STRING
+p = FILE_SAVE_DIALOG("PDF sichern", "pdf")
+p = FILE_SAVE_DIALOG("Mappe", "xlsx,csv")
+p = FILE_SAVE_DIALOG("PDF sichern", "bericht.pdf", "pdf")
+p = FILE_SAVE_DIALOG("Liste", "liste.csv")
+p = FILE_OPEN_DIALOG("Bild", "png,jpg")
+
+--- erwartet
+pdf: TRUE
+zwei: TRUE
+gesamt: 2
+
 === ein dim nach catch mit demselben namen nennt die zeile des catch
 ' Die CATCH-Variable ist ein Text. Ein `DIM e AS Ding` weiter unten meint
 ' DIESELBE Variable -- bis 2026-10-17 kam nur "'e' ist als STRING angesagt",

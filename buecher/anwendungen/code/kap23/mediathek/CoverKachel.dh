@@ -1,0 +1,45 @@
+' Kapitel 20 -- ein eigenes Control: eine Kachel mit dem Cover, dem
+' Titel und dem Urheber eines Eintrags. Zeigen(id) holt sich alles aus
+' der Datenbank; ein Klick meldet das Ereignis Angeklickt.
+CLASS CoverKachel EXTENDS CoverKachel_Basis
+    ' Das Bild, das die Kachel gerade zeigt (-1 = keins) -- es gehoert
+    ' ihr, und sie gibt es frei, bevor sie das naechste nimmt.
+    DIM bild AS IMAGE
+
+    SUB Geoeffnet()
+        Self.bild = -1
+        Self.Zeigen(0)
+    END SUB
+
+    SUB Zeigen(id AS INTEGER)
+        GUI_SET_IMAGE(Self.kachel, -1)
+        IF Self.bild >= 0 THEN IMAGE_FREE(Self.bild)
+        Self.bild = -1
+        DIM r AS DB_RESULT
+        r = DB_QUERY(Mediathek, "SELECT titel, urheber, jahr, cover " + _
+                     "FROM eintrag WHERE id = ?", id)
+        IF NOT DB_NEXT(r) THEN
+            GUI_SET_TEXT(Self.kachel, tr$("Nichts gewählt"))
+            GUI_CARD_SET_TEXT(Self.kachel, "")
+            RETURN
+        END IF
+        GUI_SET_TEXT(Self.kachel, DB_GET_STRING(r, 0))
+        DIM unten AS STRING : unten = DB_GET_STRING(r, 1)
+        IF NOT DB_IS_NULL(r, 2) THEN
+            unten = unten + ", " + DB_GET_STRING(r, 2)
+        END IF
+        GUI_CARD_SET_TEXT(Self.kachel, unten)
+        IF DB_IS_NULL(r, 3) THEN RETURN
+        ' Bytes, die kein Bild sind, lassen die Kachel ohne Bild.
+        TRY
+            Self.bild = IMAGE_FROM_BUFFER(DB_GET_BUFFER(r, 3))
+            GUI_SET_IMAGE(Self.kachel, Self.bild)
+        CATCH e
+            Self.bild = -1
+        END TRY
+    END SUB
+
+    SUB kachel_Klick()
+        Self.Ausloesen("Angeklickt")
+    END SUB
+END CLASS

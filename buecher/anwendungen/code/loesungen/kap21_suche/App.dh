@@ -1,0 +1,10 @@
+' Kapitel 14 -- vor dem ersten Fenster: eine leere Mediathek bekommt
+' ihre Beispiele. Seit Kapitel 20 dazu das Aussehen: ein Thema und die
+' Stildatei des Projekts.
+CLASS App EXTENDS StudioApp
+    SUB Geoeffnet()
+        GUI_THEME_PRESET("modern_dark")
+        StilLaden("mediathek.dhstil")
+        einrichten()
+    END SUB
+END CLASS

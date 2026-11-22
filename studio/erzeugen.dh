@@ -767,6 +767,18 @@ SUB erzeugen()
             COPYFILE(PATHJOIN(psp, alt), PATHJOIN(asp, alt))
         NEXT
     END IF
+    ' Die Stildateien des Projekts (*.dhstil im Projektordner) unter
+    ' assets/ -- StilLaden(name) in der Laufzeit laedt eine davon.
+    DIM asd AS STRING : asd = PATHJOIN(o, "assets")
+    IF DIREXISTS(asd) THEN
+        FOR EACH alt IN DIRLIST(asd, "*.dhstil")
+            DELETEFILE(PATHJOIN(asd, alt))
+        NEXT
+    END IF
+    FOR EACH alt IN DIRLIST(projOrdner, "*.dhstil")
+        IF NOT DIREXISTS(asd) THEN MKDIR(asd)
+        COPYFILE(PATHJOIN(projOrdner, alt), PATHJOIN(asd, alt))
+    NEXT
     WRITEALL(PATHJOIN(o, "main.dh"), mainCode$())
     protokoll("erzeugt " + STR$(LEN(elemente)))
 END SUB

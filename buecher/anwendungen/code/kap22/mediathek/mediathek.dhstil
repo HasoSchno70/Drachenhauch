@@ -1,0 +1,13 @@
+/* Die Mediathek -- wie sie aussieht. Farben mit Namen (accent,
+   muted_fg ...) folgen dem Thema, feste Farben bleiben. Seit Kapitel 21
+   ist leise ein Name: das feste Grau hatte auf Hell nur 3,0:1. */
+
+button              { radius: 6 }
+button.gefahr       { bg: #B03A2E; fg: #FFFFFF }
+button.gefahr:hover { bg: #D04437 }
+
+.leise              { fg: muted_fg }
+label.titel         { groesse: 18; stil: fett }
+
+textinput:focus     { border: accent }
+card                { radius: 10 }

@@ -123,6 +123,75 @@ END FUNCTION
 --- erwartet
 genug TRUE
 
+=== rundgang kapitel 0: was der text zeigt, hat die fertige mediathek
+' Kapitel 0 fuehrt durch die fertige Mediathek (Stand Kapitel 24): die
+' Menues mit ihren Eintraegen und Kuerzeln, die Suche an der Tabelle, die
+' Kachel als eigenes Control, die Karten des Startbildschirms und wo
+' jeder Stand liegt. Aendert sich eines davon, stimmt der Rundgang nicht
+' mehr.
+IMPORT "json"
+DIM w AS STRING : w = ARG$(0)
+DIM c AS STRING : c = w + "/buecher/anwendungen/code/"
+DIM h AS JSON_HANDLE
+h = JSON_PARSE(READALL(c + "kap24/mediathek/Hauptfenster.dhform"))
+DIM menue AS ARRAY OF STRING : menue = []
+DIM i AS INTEGER
+DIM k AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "menus") - 1
+    DIM mp AS STRING : mp = "menus." + STR$(i)
+    DIM z AS STRING : z = JSON_GET_STRING(h, mp + ".label") + ":"
+    FOR k = 0 TO JSON_LEN(h, mp + ".items") - 1
+        DIM ep AS STRING : ep = mp + ".items." + STR$(k)
+        z = z + " " + JSON_GET_STRING(h, ep + ".label")
+        IF JSON_HAS(h, ep + ".shortcut") THEN z = z + " (" + JSON_GET_STRING(h, ep + ".shortcut") + ")"
+        z = z + ","
+    NEXT
+    PRINT z
+NEXT
+FOR i = 0 TO JSON_LEN(h, "widgets") - 1
+    DIM wp AS STRING : wp = "widgets." + STR$(i)
+    DIM n AS STRING : n = JSON_GET_STRING(h, wp + ".name")
+    IF n = "tabelle" THEN PRINT "suche "; JSON_GET_STRING(h, wp + ".studio_suchfeld")
+    IF n = "kachel1" THEN PRINT "kachel "; JSON_GET_STRING(h, wp + ".studio_control")
+NEXT
+DIM ef AS JSON_HANDLE
+ef = JSON_PARSE(READALL(c + "kap24/mediathek/EintragFenster.dhform"))
+FOR i = 0 TO JSON_LEN(ef, "widgets") - 1
+    IF JSON_GET_STRING(ef, "widgets." + STR$(i) + ".name") = "feldJahr" THEN
+        PRINT "jahr nur ziffern "; JSON_GET_INT(ef, "widgets." + STR$(i) + ".zahlen") = 1
+    END IF
+NEXT
+DIM sw AS STRING : sw = READALL(w + "/ide/teile/startwahl.dh")
+DIM t AS STRING
+FOR EACH t IN ["Wie möchtest du arbeiten?", "KLASSISCH", "Die IDE", "MODERN", "Das Studio"]
+    PRINT t; " "; INSTR(sw, "tr$(" + CHR$(34) + t + CHR$(34) + ")") >= 0
+NEXT
+DIM teil1 AS INTEGER : teil1 = 0
+FOR i = 1 TO 6
+    IF DIREXISTS(c + "kap0" + STR$(i)) THEN teil1 = teil1 + 1
+NEXT
+DIM studio AS INTEGER : studio = 0
+FOR i = 8 TO 24
+    IF FILEEXISTS(c + "kap" + RIGHT$("0" + STR$(i), 2) + "/mediathek/projekt.dhstudio") THEN studio = studio + 1
+NEXT
+PRINT "teil I "; teil1; ", studio "; studio; ", kap07 "; DIREXISTS(c + "kap07")
+--- argumente
+{sammlung}/../../..
+--- erwartet
+Datei: Ausleihliste ..., Karteikarte ..., Als Excel-Mappe sichern ..., Liste einlesen ..., Im Heimnetz zeigen,
+Bearbeiten: Neu ... (Strg+N), Bearbeiten ... (Strg+E), Entfernen (Entf), Suchen (Strg+F),
+Ansicht: Überfällig ..., Statistik ..., Helles Aussehen,
+Hilfe: Barrierefreiheit prüfen ..., Über die Mediathek ...,
+suche feldSuche
+kachel CoverKachel
+jahr nur ziffern TRUE
+Wie möchtest du arbeiten? TRUE
+KLASSISCH TRUE
+Die IDE TRUE
+MODERN TRUE
+Das Studio TRUE
+teil I 6, studio 17, kap07 FALSE
+
 === mediathek kapitel 1: leer abgewiesen, ein titel aufgenommen
 ' Tippen kann eine Aufnahme nicht (sie spielt Tasten, keine Zeichen) --
 ' die Faelle danach setzen darum statt des Felds einen festen Titel ein.

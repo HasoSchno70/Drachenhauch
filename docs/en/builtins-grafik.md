@@ -251,7 +251,7 @@ Real Windows dialogs for choosing files/folders. All three are **blocking** (mod
 | Function | Purpose |
 |---|---|
 | `FILE_OPEN_DIALOG([title$[, extensions$]])` → STRING | choose a file to open |
-| `FILE_SAVE_DIALOG([title$[, default$[, extensions$]]])` → STRING | choose a file to save (`default$` = suggested file name) |
+| `FILE_SAVE_DIALOG([title$[, default$[, extensions$]]])` → STRING | choose a file to save (`default$` = suggested file name, only the third argument holds the extensions -- `--check` warns when only an extension stands second) |
 | `FOLDER_DIALOG([title$])` → STRING | choose a folder |
 
 ```basic

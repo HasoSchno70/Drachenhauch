@@ -108,6 +108,8 @@ SUB inspektorAnlegen()
     inspGruppe("Kennung")
     inspZeile("Kennung", "name", "Name", "text", "*", "")
     inspZeile("Kennung", "kind", "Art", "info", "*", "")
+    ' Name und Klassen sind, was eine Stildatei trifft: #name, .klasse.
+    inspZeile("Kennung", "klassen", "Klassen", "eintraege", "*", "")
     inspGruppe("Lage")
     inspZeile("Lage", "x", "Links", "zahl", "*", "")
     inspZeile("Lage", "y", "Oben", "zahl", "*", "")
@@ -176,6 +178,7 @@ SUB inspektorAnlegen()
             CASE "text", "eintraege", "leiste", "felder"
                 z.ed = GUI_TEXTINPUT(win, 0, 0, 10, 26)
                 IF z.art = "eintraege" THEN GUI_TOOLTIP(z.ed, tr$("Einträge durch Semikolon getrennt"))
+                IF z.schluessel = "klassen" THEN GUI_TOOLTIP(z.ed, tr$("Klassen für eine Stildatei (button.gefahr { ... }), durch Semikolon getrennt"))
                 IF z.art = "leiste" THEN GUI_TOOLTIP(z.ed, tr$("Text|Sinnbild|Tipp je Knopf, durch Semikolon getrennt; - = Trenner, ~ = Lücke"))
                 IF z.art = "felder" THEN GUI_TOOLTIP(z.ed, tr$("Text|Breite[|links,mitte,rechts[|klick]] je Feld, durch Semikolon getrennt; Breite 0 = der Rest"))
             CASE "komma"

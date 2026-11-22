@@ -1,0 +1,18 @@
+' Kapitel 14 -- vor dem ersten Fenster: eine leere Mediathek bekommt
+' ihre Beispiele. Seit Kapitel 20 dazu das Aussehen: ein Thema und die
+' Stildatei des Projekts.
+CLASS App EXTENDS StudioApp
+    SUB Geoeffnet()
+        ' >>> neu
+        ' Die Sprache des Systems, wenn es eine Tafel dafuer gibt;
+        ' sonst Englisch -- ausser auf einem deutschen System.
+        DIM sys AS STRING : sys = SYSTEM_LANGUAGE$()
+        IF NOT SpracheWaehlen(sys) AND sys <> "de" THEN
+            SpracheWaehlen("en")
+        END IF
+        ' <<< neu
+        GUI_THEME_PRESET("modern_dark")
+        StilLaden("mediathek.dhstil")
+        einrichten()
+    END SUB
+END CLASS

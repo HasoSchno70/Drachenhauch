@@ -50,6 +50,30 @@ CATCH fehler
     PRINT fehler
 END TRY
 PRINT "text "; studioBParameter$("a = :x AND b = ':x' AND c = :y", {"x": "O'Neil", "Y": 2.5})
+' Derselbe Bericht auf A6: ausgelegt wird auf dem Blatt, das das PDF hat
+' (bis 2026-11-22 legte A6 wie A4 aus -- zu wenig Seiten, der Rest unter
+' dem Blattrand).
+DIM a6 AS JSON_HANDLE : a6 = JSON_PARSE(b.schema)
+JSON_SET_STRING(a6, "seite.format", "A6")
+p = studioBerichtPdf(JSON_STRINGIFY(a6), db, sql, {"ab": 1})
+PRINT "a6 seiten "; PDF_PAGE_COUNT(p)
+PDF_SAVE(p, "a6.pdf")
+s = pdfSeiten("a6.pdf")
+PRINT "a6 fuss "; INSTR(s[0], "Seite 1 von " + STR$(LEN(s))) >= 0; " letzte "; INSTR(s[LEN(s) - 1], "3.106,25") >= 0
+' Die Summe im Gruppenfuss mit Bereich "bericht": in jedem Gruppenfuss die
+' Summe aller Zeilen (bis 2026-11-22 las die Auslegung "bereich" nicht --
+' dort stand trotzdem die Zwischensumme). Mit "gruppe" die Zwischensummen.
+DIM gb AS JSON_HANDLE : gb = JSON_PARSE(b.schema)
+JSON_SET_STRING(gb, "baender.4.elemente.1.bereich", "bericht")
+p = studioBerichtPdf(JSON_STRINGIFY(gb), db, sql, {"ab": 1})
+PDF_SAVE(p, "gb.pdf")
+alles = JOIN$(pdfSeiten("gb.pdf"), CHR$(10))
+PRINT "bereich bericht "; LEN(SPLIT(alles, "3.106,25")) - 1; " zwischen "; INSTR(alles, "975,00") >= 0
+JSON_SET_STRING(gb, "baender.4.elemente.1.bereich", "gruppe")
+p = studioBerichtPdf(JSON_STRINGIFY(gb), db, sql, {"ab": 1})
+PDF_SAVE(p, "gg.pdf")
+alles = JOIN$(pdfSeiten("gg.pdf"), CHR$(10))
+PRINT "bereich gruppe "; LEN(SPLIT(alles, "3.106,25")) - 1; " zwischen "; INSTR(alles, "975,00") >= 0
 --- vorher
 IMPORT "db"
 DIM db AS DB_CONN : db = DB_OPEN("proj/daten.sqlite")
@@ -94,6 +118,10 @@ nur rechnung 2: 1
   TRUE TRUE
 Bericht: Parameter :ab fehlt
 text a = 'O''Neil' AND b = ':x' AND c = 2.5
+a6 seiten 5
+a6 fuss TRUE letzte TRUE
+bereich bericht 3 zwischen FALSE
+bereich gruppe 1 zwischen TRUE
 
 === nur zeilen mit: summen und elemente je wert
 ' Vier Positionen, drei zu 19 % und eine zu 7 %. Die Summen im Berichtsfuss
@@ -216,6 +244,69 @@ liste 2: markt TRUE | leer FALSE
 markt <> "" -> TRUE
 markt = '' -> TRUE
 markt <> -> FALSE
+
+=== strichcode: ean-13 aus einer spalte
+' Das Element "strichcode" (gebaut fuer die Karteikarte im Buch "Fenster,
+' Formulare, Daten", Kapitel 17): je Zeile der EAN-13 der Spalte isbn. Eine
+' ISBN-13 mit Bindestrichen, eine ISBN-10 (wird 978...), eine mit falscher
+' Pruefziffer (kein Code) und eine leere. Die Ziffern unter den Strichen
+' stehen als Text im PDF. Die Module vergleicht der Fall mit einer
+' unabhaengigen Rechnung (Tabellen aus der Wikipedia, G als umgedrehtes R).
+IMPORT "kern.dh"
+projOrdner = CWD$() + "/proj"
+DIM e AS Element : e = elementNeu("datenbank", "Daten")
+e.schema = READLINES("proj/Daten.dhdb")[0]
+DIM b AS Element : b = elementNeu("bericht", "Karten")
+b.schema = READLINES("proj/Karten.dhreport")[0]
+DIM db AS DB_CONN : db = DB_OPEN("proj/daten.sqlite")
+DIM p AS PDF : p = studioBerichtPdf(b.schema, db, berichtSql$(b), {})
+PDF_SAVE(p, "k.pdf")
+DIM t AS STRING : t = REPLACE$(JOIN$(pdfSeiten("k.pdf"), ""), CHR$(10), "")
+PRINT t
+DIM w AS STRING
+FOR EACH w IN ["978-3-522-20260-2", "978 3 522 20260 2", "978352220260", "3-522-12800-1", "3-522-12800-2", "123456789X", "978-3-522-20260-3", "97835222026", "ISBN 978-3-522-20260-2", ""]
+    PRINT w; " -> ["; studioBEanZiffern$(w); "]"
+NEXT
+PRINT studioBEan13$("9783522202602") = "10101110110001001010000101100010011011001001101010110110011100101101100101000011100101101100101"
+PRINT studioBEan13$("4003994155486") = "10100011010100111011110100010110010111001110101010110011010011101001110101110010010001010000101"
+--- vorher
+IMPORT "db"
+DIM db AS DB_CONN : db = DB_OPEN("proj/daten.sqlite")
+DB_EXEC(db, "CREATE TABLE buch (id INTEGER PRIMARY KEY, titel TEXT, isbn TEXT)")
+DB_EXEC(db, "INSERT INTO buch (titel, isbn) VALUES ('A', '978-3-522-20260-2'), ('B', '3-522-12800-1'), ('C', '978-3-522-20260-3'), ('D', NULL)")
+DB_CLOSE(db)
+--- datei proj/Daten.dhdb
+{"datei":"daten.sqlite","tabellen":[{"name":"buch","spalten":[{"name":"titel","typ":"text","pflicht":false,"eindeutig":false,"vorgabe":""},{"name":"isbn","typ":"text","pflicht":false,"eindeutig":false,"vorgabe":""}]}]}
+--- datei proj/Karten.dhreport
+{"titel":"Karten","seite":{"format":"A4","hoch":true,"rand":[15,15,15,15]},"quelle":"Daten.buch","bedingung":"","sortieren":["id"],"gruppen":[],"baender":[{"art":"detail","hoehe":30,"elemente":[{"art":"feld","spalte":"titel","x":0,"y":0,"b":40,"h":6},{"art":"strichcode","spalte":"isbn","x":50,"y":0,"b":37,"h":26}]}]}
+--- datei kern.dh
+IMPORT "json"
+IMPORT "regex"
+IMPORT "imgfx"
+IMPORT "db"
+IMPORT "pdf"
+IMPORT "{sammlung}/../../../studio/sprache.dh"
+IMPORT "{sammlung}/../../../studio/bibliothek.dh"
+IMPORT "{sammlung}/../../../studio/modell.dh"
+IMPORT "{sammlung}/../../../studio/projekt.dh"
+IMPORT "{sammlung}/../../../studio/datenbank.dh"
+IMPORT "{sammlung}/../../../studio/berichte_laufzeit.dh"
+IMPORT "{sammlung}/../../../studio/berichte.dh"
+IMPORT "{sammlung}/../_hilfen/pdftext.dh"
+--- erwartet
+A9783522202602B9783522128001CD
+978-3-522-20260-2 -> [9783522202602]
+978 3 522 20260 2 -> [9783522202602]
+978352220260 -> [9783522202602]
+3-522-12800-1 -> [9783522128001]
+3-522-12800-2 -> []
+123456789X -> [9781234567897]
+978-3-522-20260-3 -> []
+97835222026 -> []
+ISBN 978-3-522-20260-2 -> []
+ -> []
+TRUE
+TRUE
 
 === bildspalten: je zeile ihr bild, eingepasst
 ' Vier Artikel: ein rotes Quadrat, ein blaues Bild doppelt so breit wie hoch,

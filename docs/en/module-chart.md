@@ -124,7 +124,7 @@ CHART_SET_NUM: unbekannte Eigenschaft 'innen_radius' (gueltig: min, max, innenra
 | `abstand` | pie: pull segments out. Bar: gap |
 | `ecken` | corner radius |
 | `rahmen_dicke`, `polster` | frame thickness, padding |
-| `gitter` | step size of the value axis (grid); 0 = automatic (round steps) |
+| `gitter` | step size of the value axis (grid); 0 = automatic (round steps, never finer than `nachkomma` can write -- at least 1 without decimals) |
 | `nachkomma` | decimal places of all numbers |
 | `titel_groesse`, `text_groesse` | font sizes (title, text) |
 | `schrift` | FONT handle from `LOADFONT`; -1 = the interface font (built-in Sans or the one set via `SETFONT`) |

@@ -324,6 +324,10 @@ FOR i = 0 TO LEN(roh) - 1
     ' ganze Kopien des Repos, deren Buch-Fehlerbeispiele die Ausnahme unten
     ' nicht trafen, weil ihr Pfad nicht mit buecher/ beginnt (2026-11-22).
     IF INSTR(REPLACE$(roh[i], CHR$(92), "/"), ".claude/") >= 0 THEN CONTINUE
+    ' Was das Studio erzeugt (_studio/ eines Projekts, _studio_bilder/ der
+    ' Buchbilder, nicht versioniert): die Teile brauchen einander, die
+    ' Verbindung zur Datenbank steht in main.dh (2026-11-22, Kapitel 21).
+    IF INSTR("/" + REPLACE$(roh[i], CHR$(92), "/"), "/_studio") >= 0 THEN CONTINUE
     ' Die Bastelzentrale: bereiche/*.dh sind Teile ihrer main.dh, ihre
     ' globalen Namen legt ein anderer Teil an (so waren auch Glutfaden und
     ' Funkenflug gebaut, bis sie 2026-11 eigene Repos bekamen).

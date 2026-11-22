@@ -174,3 +174,94 @@ trf 3 pieces eingebaut Cancel kuerzel Ctrl+Shift+Q
 fr FALSE ''
 bericht Heading|Page 1 of 1|
 titel Shopping list
+
+=== projekt sprachtafel ergaenzen sammelt jeden text
+' Projekt -> Sprachtafel ergaenzen (DH_STUDIO_SPRACHTAFEL wie der Menuepunkt):
+' Fenster, Menue, Tabellenkoepfe, Eintraege, Diagrammtitel, Bericht und die
+' Literale in tr$/trf$ kommen mit leerer Uebersetzung an die Tafel; was sie
+' schon kennt (auch leer), nicht noch einmal; der Titel eines eigenen
+' Controls (sein Name, ohne Titelleiste) bleibt draussen. Ein zweiter Lauf findet
+' nichts Neues. Eine leere Uebersetzung laesst die Laufzeit aus: das
+' Programm zeigt den Text der Quelle.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+slHin(10, 10)
+slWarten(10)
+slTaste(294)
+slWarten(150)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+SETENV("DH_STUDIO_LAUF_BILDER", "20")
+SETENV("DH_STUDIO_SPRACHTAFEL", "en")
+DIM log AS STRING : log = CWD$() + "/s.log"
+slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+PRINT JOIN$(slAnfang(log, "sprachtafel "), "|")
+PRINT REPLACE$(REPLACE$(READALL(p + "/sprache/en.txt"), CHR$(9), "="), CHR$(10), "|")
+DIM log2 AS STRING : log2 = CWD$() + "/s2.log"
+slStarten(log2, CWD$() + "/ev.txt", slBild + 20, p)
+PRINT JOIN$(slAnfang(log2, "sprachtafel "), "|")
+SETENV("DH_STUDIO_SPRACHTAFEL", "fr!")
+DIM log3 AS STRING : log3 = CWD$() + "/s3.log"
+slStarten(log3, CWD$() + "/ev.txt", slBild + 20, p)
+PRINT "kein code "; LEN(slAnfang(log3, "sprachtafel ")) = 0
+SETENV("DH_STUDIO_SPRACHTAFEL", "")
+SETENV("DHRT_LANG", "en")
+DIM k AS INTEGER : k = PROCESS_START("dhrt", "run", "--bilder", "40", p + "/_studio/main.dh")
+DIM leer AS INTEGER : leer = 0
+WHILE leer < 5
+    DIM t AS STRING : t = PROCESS_READ$(k)
+    IF t <> "" THEN
+        DIM zeile AS STRING
+        FOR EACH zeile IN SPLIT(REPLACE$(t, CHR$(13), ""), CHR$(10))
+            IF LEFT$(zeile, 6) = "label " THEN PRINT zeile
+        NEXT
+        leer = 0
+    ELSEIF NOT PROCESS_RUNNING(k) THEN
+        leer = leer + 1
+        SLEEP(30)
+    END IF
+WEND
+--- argumente
+{sammlung}/../../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"},{"art":"control","name":"Teil"},{"art":"bericht","name":"Liste","bericht":"Liste.dhreport"}]}
+--- datei proj/Teil.dhform
+{"title":"Teil","name":"Teil","w":120,"h":40,"widgets":[{"kind":"label","name":"lab","text":"Im Teil","x":0,"y":0,"w":120,"h":20}]}
+--- datei proj/Teil.dh
+CLASS Teil EXTENDS Teil_Basis
+END CLASS
+--- datei proj/sprache/en.txt
+Haupt	Main
+Bereit	
+
+--- datei proj/Liste.dhreport
+{"titel":"Einkaufsliste","seite":{"format":"A4","hoch":true,"rand":[15,15,15,15]},"baender":[{"art":"berichtskopf","hoehe":20,"elemente":[{"art":"text","x":0,"y":0,"b":100,"h":8,"text":"Überschrift"},{"art":"seitenzahl","x":120,"y":0,"b":50,"h":8}]}]}
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":480,"h":320,"menus":[{"label":"Datei","items":[{"label":"Beenden","name":"miBeenden","shortcut":"Strg+Q"}]}],"widgets":[
+{"kind":"label","name":"lab","text":"Bereit","x":20,"y":10,"w":120,"h":20},
+{"kind":"button","name":"knopf","text":"Speichern","tooltip":"Sichert alles","x":20,"y":40,"w":120,"h":28},
+{"kind":"textinput","name":"feld","placeholder":"Name eingeben","x":20,"y":80,"w":200,"h":28},
+{"kind":"table","name":"tab","table":{"headers":["Produkt","Menge"],"rows":[]},"x":20,"y":120,"w":300,"h":100},
+{"kind":"dropdown","name":"wahl","items":["Rot","Grün"],"x":240,"y":80,"w":120,"h":28},
+{"kind":"label","name":"zahl","text":"42 ✓","x":200,"y":10,"w":60,"h":20},
+{"kind":"canvas","name":"dia","studio_diagramm":"kuchen","studio_diagramm_titel":"Anteile","x":340,"y":120,"w":120,"h":100}],
+"timer":[{"name":"messen","intervall":100,"aktiv":true,"wiederholen":false}]}
+--- datei proj/Hauptfenster.dh
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+
+    SUB messen_Aktion()
+        PRINT "label "; GUI_TEXT(Self.lab); " knopf "; GUI_TEXT(Self.knopf); " titel "; tr$("Haupt"); " "; trf$("{0} Stück", ["3"])
+        Self.Zumachen()
+    END SUB
+END CLASS
+--- datei proj/App.dh
+CLASS App EXTENDS StudioApp
+END CLASS
+--- erwartet
+sprachtafel en 14
+Haupt=Main|Bereit=|Datei=|Beenden=|Speichern=|Sichert alles=|Name eingeben=|Produkt=|Menge=|Rot=|Grün=|Anteile=|{0} Stück=|Im Teil=|Einkaufsliste=|Überschrift=|
+sprachtafel en 0
+kein code TRUE
+label Bereit knopf Speichern titel Main 3 Stück

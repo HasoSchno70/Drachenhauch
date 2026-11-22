@@ -162,7 +162,7 @@ IMPORT "gui"
 | `GUI_TOOLBAR_SET_TEXT(tb, entry, text$)` | — | Beschriftung eines Eintrags |
 | `GUI_TOOLBAR_SET(tb, key$, value)` | — | `beschriftung` (0/1: Text neben dem Sinnbild), `symbolgroesse` (Punkte, 0 = aus der Höhe) |
 | `GUI_TOOLBAR_GET(tb, key$)` | INTEGER | liest `beschriftung` und `symbolgroesse` zurück |
-| `GUI_TOOLBAR_ITEM_X(tb, entry)` | INTEGER | linke Kante eines Eintrags im Fenster (wie `GUI_GET_X`) |
+| `GUI_TOOLBAR_ITEM_X(tb, entry)` | INTEGER | linke Kante eines Eintrags im Fenster (wie `GUI_GET_X`); ein Eintrag im Überlauf (`GUI_TOOLBAR_OVERFLOW`) hat keine und ist ein Fehler |
 | `GUI_TOOLBAR_ITEM_W(tb, entry)` | INTEGER | Breite eines Eintrags |
 | `GUI_TOOLBAR_OVERFLOW(tb)` | INTEGER | wie viele Knöpfe gerade im »-Menü stehen (0 = alles passt) |
 | `GUI_STATUSBAR(win, x, y, w, h[, text$])` | GUI_WIDGET | Statusleiste; `text$` ist das erste Feld |
@@ -324,6 +324,7 @@ IMPORT "gui"
 | `GUI_TABLE_SET_SELECTED(tbl, row)` | — | Selektion setzen (-1 = keine) |
 | `GUI_TABLE_CLICKED(tbl)` | INTEGER | in diesem Frame geklickte Zeile (-1) |
 | `GUI_TABLE_ROW_COUNT(tbl)` | INTEGER | Anzahl Datenzeilen |
+| `GUI_TABLE_ROW_RECT(tbl, row)` | TUPLE | wo die Datenzeile `row` gerade steht (x, y, b, h), in Bildschirmpunkten wie `GUI_HIT_TEST`, nach Sortierung, Filter und Rollen; weggefiltert (0, 0, 0, 0) -- für Prüfungen mit echten Klicks und Bildern |
 | `GUI_UPDATE()` | — | **Pflicht** pro Frame: Maus/Tasten verarbeiten |
 | `GUI_DRAW([on_top])` | — | alle Fenster zeichnen (hinten→vorne); `on_top`=FALSE lässt Kontextmenü und Tooltip weg |
 | `GUI_DRAW_TOP()` | — | nur was über allen Fenstern liegt: offenes Menü (Leiste oder Kontext), offene Klappliste, Tooltip |
@@ -547,7 +548,7 @@ an.
 
 | Funktion | Rückgabe | Zweck |
 |---|---|---|
-| `GUI_DIALOG(title$, text$[, style$])` | GUI_WINDOW | modalen Dialog öffnen (`"ok"` = Vorgabe, `"janein"`, oder **eigene Knöpfe** mit `\|` getrennt: `"Speichern\|Verwerfen\|Abbrechen"`) |
+| `GUI_DIALOG(title$, text$[, style$])` | GUI_WINDOW | modalen Dialog öffnen (`"ok"` = Vorgabe, `"janein"`, oder **eigene Knöpfe** mit `\|` getrennt: `"Speichern\|Verwerfen\|Abbrechen"`); höchstens 640 breit, längere Zeilen brechen an Wortgrenzen um |
 | `GUI_PROMPT(title$, text$[, default$[, buttons$]])` | GUI_WINDOW | Frage **mit Eingabefeld** (Vorgabe markiert; ohne `buttons$` OK/Abbrechen) |
 | `GUI_ANSWER(dialog)` | INTEGER | `0` = noch offen, sonst die **Nummer des Knopfs** (1-basiert): `1` = OK/Ja, `2` = Abbrechen/Nein |
 | `GUI_DIALOG_TEXT(dialog)` | STRING | was in das Eingabefeld eines `GUI_PROMPT` getippt wurde — auch nach der Antwort |
@@ -2624,7 +2625,7 @@ Drei Hilfen fürs Gestalten und für die Barrierefreiheit:
 | `GUI_INSPECTOR([on])` | BOOLEAN ohne Argument | Inspektor zeigen (`TRUE`) oder schließen; ohne Argument: ist er offen? |
 | `GUI_INSPECTOR_SELECTED()` | GUI_WIDGET | das Widget, das im Inspektor gewählt ist, -1 = keins |
 | `GUI_INSPECT$(widget)` | STRING | was der Inspektor über ein Widget zeigt: Art, Name, Klassen, Lage, Zustand, Form, die passenden Regeln der Stildatei mit Zeile und was je Zustand gilt |
-| `GUI_STATE$()` | STRING | der Zustand aller sichtbaren Fenster als Text: je Widget mit Zustand eine Zeile (Texte, Haken, Werte, Auswahl, Zeilen einer Tabelle) -- die Erwartung, die `dhrt aufnehmen` schreibt ([werkzeuge.md](werkzeuge.md#dhrt-aufnehmen--bedienung-als-prüffall)) |
+| `GUI_STATE$()` | STRING | der Zustand aller sichtbaren Fenster als Text: je Widget mit Zustand eine Zeile (Texte, Haken, Werte, Auswahl, Zeilen einer Tabelle, Titel und Beschreibung einer Kachel; am Ende die letzte Ansage an den Bildschirmleser) -- die Erwartung, die `dhrt aufnehmen` schreibt ([werkzeuge.md](werkzeuge.md#dhrt-aufnehmen--bedienung-als-prüffall)) |
 | `GUI_SET_MOTION(mode$)` | — | `"system"` (Vorgabe): wie das Betriebssystem; `"an"`: Animationen immer; `"aus"`: nie |
 | `GUI_MOTION()` | BOOLEAN | spielt die gui gerade Bewegung ab? |
 
@@ -3867,7 +3868,7 @@ Was das Programm beisteuern kann:
 
 | Befehl | Beschreibung |
 |---|---|
-| `GUI_ANNOUNCE(text$[, urgent])` | einen Satz an den Bildschirmleser des Nutzers geben — er spricht ihn mit seiner Stimme (höflich: nach dem laufenden Satz; urgent: sofort). Ohne Hilfsprogramm passiert nichts. Für alles, was sonst nur in einer Statuszeile steht: „Rechnung gespeichert“, „3 Zeilen gelöscht“ |
+| `GUI_ANNOUNCE(text$[, urgent])` | einen Satz an den Bildschirmleser des Nutzers geben — er spricht ihn mit seiner Stimme (höflich: nach dem laufenden Satz; urgent: sofort). Ohne Hilfsprogramm passiert nichts. Für alles, was sonst nur in einer Statuszeile steht: „Rechnung gespeichert“, „3 Zeilen gelöscht“. Die letzte steht in `GUI_STATE$` |
 | `GUI_SCREENREADER()` | `TRUE`, sobald ein Hilfsprogramm den Baum angefordert hat — etwa um mehr anzusagen oder Bewegung abzuschalten |
 | `GUI_SET_TAB_INDEX(widget, index)` | Tab-Reihenfolge festlegen: Widgets mit Index über 0 zuerst, aufsteigend; 0 (Vorgabe) = Reihenfolge des Anlegens |
 | `GUI_GET_TAB_INDEX(widget)` | den gesetzten Index lesen (0 = Anlege-Reihenfolge) |
@@ -3912,9 +3913,10 @@ Nachbar-Beschriftung baut, gibt ihm also wenigstens einen `GUI_TOOLTIP`.
 
 **Was das Toolkit sonst schon mitbringt:** Bedienung ohne Maus (oben),
 `GUI_SCALE` für große Schrift, das Thema `contrast` (Weiß auf Schwarz,
-gelbe Rahmen, Kontrast 21:1) über `GUI_THEME_PRESET("contrast")`; die
-Vorgabe `dark` und das helle Thema liegen mit allen Texten über dem
-WCAG-Wert von 4,5:1.
+gelbe Rahmen, Kontrast 21:1) über `GUI_THEME_PRESET("contrast")`; alle
+eingebauten Themen liegen mit allen Texten über dem WCAG-Wert von 4,5:1 --
+auch die gedämpfte Schrift (`muted_fg`, Platzhalter) auf dem Fenster und im
+Feld und die gewählte Zeile einer Tabelle.
 
 **Was das Programm tun muss — und nur es kann:** nie eine Information nur
 über Farbe geben (das rote Feld hat deshalb auch eine Meldung), jede

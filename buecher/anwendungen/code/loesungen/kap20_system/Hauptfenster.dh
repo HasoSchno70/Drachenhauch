@@ -1,0 +1,146 @@
+' Loesung Kapitel 20, Erweitern 1 -- ein drittes Aussehen: wie das
+' Betriebssystem, hell oder dunkel und mit seiner Akzentfarbe.
+' Kapitel 15 bis 20 -- die Tabelle zeigt die Abfrage bestand: die
+' Eintraege und wer sie gerade hat, aus drei Tabellen. Eine Abfrage ist
+' nicht die Tabelle des Fensters; die gewaehlte Zeile liefert IdVon.
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+    DIM ausleihe AS AusleihFenster
+
+    SUB Geoeffnet()
+        GUI_TABLE_COL_WIDTHS(Self.tabelle, [160, 125, 60, 50, 125])
+        Self.ausleihe = NEW AusleihFenster()
+        Self.ausleihe.haupt = Self
+        Self.statusZeigen()
+    END SUB
+
+    SUB statusZeigen()
+        DIM n AS INTEGER : n = anzahlEintraege()
+        GUI_SET_TEXT(Self.status, STR$(n) + " Einträge")
+    END SUB
+
+    FUNCTION bearbeitenLassen(id AS INTEGER) AS BOOLEAN
+        DIM f AS EintragFenster : f = NEW EintragFenster()
+        f.id = id
+        f.ZeigenModal()
+        IF NOT f.ok THEN RETURN FALSE
+        Self.Neuladen()
+        Self.statusZeigen()
+        RETURN TRUE
+    END FUNCTION
+
+    SUB knopfNeu_Klick()
+        Self.bearbeitenLassen(0)
+    END SUB
+
+    SUB knopfBearbeiten_Klick()
+        DIM id AS INTEGER : id = Self.IdVon(Self.tabelle)
+        IF id = 0 THEN RETURN
+        IF Self.bearbeitenLassen(id) THEN Self.ausleihe.folgen(id)
+    END SUB
+
+    SUB tabelle_Doppelklick()
+        Self.knopfBearbeiten_Klick()
+    END SUB
+
+    SUB knopfEntfernen_Klick()
+        DIM id AS INTEGER : id = Self.IdVon(Self.tabelle)
+        IF id = 0 THEN RETURN
+        DIM t AS STRING : t = titelVon$(id)
+        DIM antwort AS INTEGER
+        antwort = Frage(t + " entfernen?", "Entfernen|Abbrechen")
+        IF antwort <> 1 THEN RETURN
+        entfernen(id)
+        Self.Neuladen()
+        Self.statusZeigen()
+        Self.tabelle_Geaendert()
+    END SUB
+
+    SUB knopfAusleihen_Klick()
+        Self.ausleihe.Zeigen()
+    END SUB
+
+    SUB tabelle_Geaendert()
+        Self.ausleihe.folgen(Self.IdVon(Self.tabelle))
+        Self.kachel1.Zeigen(Self.IdVon(Self.tabelle))
+    END SUB
+
+    ' Kapitel 17: die Berichte, je in ihrer Vorschau (dort Drucken und
+    ' Als PDF). Die Ausleihliste hat keine Parameter, die Karteikarte
+    ' den einen, den ihre Bedingung nennt: id = :id.
+    SUB miAusleihliste_Aktion()
+        Ausleihliste.Vorschau({})
+    END SUB
+
+    SUB miKarteikarte_Aktion()
+        DIM id AS INTEGER : id = Self.IdVon(Self.tabelle)
+        IF id = 0 THEN
+            GUI_SET_TEXT(Self.status, "Erst einen Eintrag wählen.")
+            RETURN
+        END IF
+        Karteikarte.Vorschau({"id": id})
+    END SUB
+
+    ' Kapitel 19: hinaus als Excel-Mappe, herein aus einer Liste.
+    ' FILE_SAVE_DIALOG schlaegt einen Namen vor, erst dann kommen die
+    ' Endungen; "" heisst: abgebrochen.
+    SUB miExcel_Aktion()
+        DIM pfad AS STRING
+        pfad = FILE_SAVE_DIALOG("Als Excel-Mappe sichern", _
+                                "mediathek.xlsx", "xlsx")
+        IF pfad = "" THEN RETURN
+        alsExcel(pfad)
+        GUI_SET_TEXT(Self.status, "Gesichert: " + BASENAME(pfad))
+    END SUB
+
+    SUB miEinlesen_Aktion()
+        DIM pfad AS STRING
+        pfad = FILE_OPEN_DIALOG("Liste einlesen", "csv,txt")
+        IF pfad = "" THEN RETURN
+        DIM f AS EinlesenFenster : f = NEW EinlesenFenster()
+        f.pfad = pfad
+        f.ZeigenModal()
+        Self.Neuladen()
+        Self.statusZeigen()
+    END SUB
+
+    ' Kapitel 20: die Kachel meldet ihren Klick -- wie Bearbeiten.
+    SUB kachel1_Angeklickt()
+        Self.knopfBearbeiten_Klick()
+    END SUB
+
+    ' Hell oder dunkel: das Thema wechselt, die Stildatei bleibt. Den
+    ' Haken hat der Klick schon gekippt.
+    SUB miHell_Aktion()
+        ' >>> neu
+        GUI_MENU_CHECK(Self.miSystem, FALSE)
+        ' <<< neu
+        IF GUI_MENU_CHECKED(Self.miHell) THEN
+            GUI_THEME_PRESET("modern_light")
+        ELSE
+            GUI_THEME_PRESET("modern_dark")
+        END IF
+    END SUB
+
+    ' >>> neu
+    ' "system" fragt das Betriebssystem: dunkel -> modern_dark, sonst
+    ' modern_light, dazu seine Akzentfarbe. Ohne Haken gilt wieder, was
+    ' Helles Aussehen sagt.
+    SUB miSystem_Aktion()
+        IF GUI_MENU_CHECKED(Self.miSystem) THEN
+            GUI_THEME_PRESET("system")
+        ELSE
+            Self.miHell_Aktion()
+        END IF
+    END SUB
+    ' <<< neu
+
+    SUB miUeberfaellig_Aktion()
+        DIM f AS UeberfaelligFenster : f = NEW UeberfaelligFenster()
+        f.Zeigen()
+    END SUB
+
+    SUB miStatistik_Aktion()
+        DIM f AS StatistikFenster : f = NEW StatistikFenster()
+        f.Zeigen()
+    END SUB
+END CLASS

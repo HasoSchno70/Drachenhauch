@@ -885,6 +885,15 @@ fn nice_step(span: f64, ziel: i32) -> f64 {
     basis * 10.0
 }
 
+/// Die Schrittweite der Wertachse, wenn das Programm keine setzt: rund, aber
+/// nie feiner als die Beschriftung zeigen kann -- ohne Nachkommastellen also
+/// mindestens 1. Sonst stand bei Zaehlwerten bis 1 an der Achse
+/// "0 0 0 1 1 1" (Schritte von 0,2, ganzzahlig geschrieben).
+fn auto_schritt(span: f64, nachkomma: i32) -> f64 {
+    let fein = 10f64.powi(-nachkomma.clamp(0, 9));
+    nice_step(span, 5).max(fein)
+}
+
 // ---------------------------------------------------------------------------
 // Zeichnen (nur mit Grafik-Feature -- das Datenmodell oben laeuft auch
 // konsolen-only, damit ein Programm ein Diagramm aufbauen kann, ohne dass
@@ -2484,7 +2493,7 @@ impl ChartObj {
 
     fn draw_grid(&self, g: &mut Graphics, plot: &Area, lo: f64, hi: f64, waagerecht: bool) {
         let st = &self.style;
-        let schritt = if st.gitter > 0.0 { st.gitter } else { nice_step(hi - lo, 5) };
+        let schritt = if st.gitter > 0.0 { st.gitter } else { auto_schritt(hi - lo, st.nachkomma) };
         if schritt <= 0.0 {
             return;
         }
@@ -2973,6 +2982,16 @@ mod tests {
         assert_eq!(nice_step(10.0, 5), 2.0);
         assert_eq!(nice_step(1.0, 5), 0.2);
         assert_eq!(nice_step(0.0, 5), 1.0, "Spanne 0 darf nicht endlos schleifen");
+    }
+
+    #[test]
+    fn auto_schritt_nie_feiner_als_die_beschriftung() {
+        assert_eq!(auto_schritt(1.0, 0), 1.0, "ganze Zahlen: kein Schritt 0,2");
+        assert_eq!(auto_schritt(3.0, 0), 1.0);
+        assert_eq!(auto_schritt(100.0, 0), 20.0);
+        assert_eq!(auto_schritt(1.0, 1), 0.2);
+        assert_eq!(auto_schritt(0.1, 1), 0.1);
+        assert_eq!(auto_schritt(0.1, 2), 0.02);
     }
 
     #[test]

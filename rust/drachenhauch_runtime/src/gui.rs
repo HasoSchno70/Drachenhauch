@@ -113,11 +113,16 @@ const DBL_TIME: f64 = 0.4;      // Doppelklick-Fenster (Sekunden)
 const DBL_DIST: i32 = 4;        // erlaubter Versatz zwischen beiden Klicks
 const HEAD_DRAG_MIN: i32 = 5;   // ab hier gilt eine Kopf-Geste als Zug
 
+// Gedaempfte Schrift (muted_fg) aller Themen nachgezogen (2026-11-22, Buch
+// "Fenster, Formulare, Daten", Kapitel 21): mindestens 4,5:1 auf dem
+// Fenster- UND dem Widget-Grund (Platzhalter stehen im Feld). Vorher lag
+// modern_light auf dem Fenster bei 3,0:1, dark/modern_dark/glas_dunkel/retro
+// auf dem Widget bei 3,4..4,2 -- nur "light" war schon 2026-09-06 gerichtet.
 fn default_theme() -> HashMap<String, i64> {
     [
         ("win_bg", 0x18222E), ("win_border", 0x2E3C50), ("title_bg", 0x123C50),
         ("title_bg_focus", 0x1C7DA0), ("title_fg", 0xE6F7FF), ("widget_bg", 0x26323F),
-        ("widget_border", 0x46586E), ("text_fg", 0xFFFFFF), ("muted_fg", 0x7A8AA0),
+        ("widget_border", 0x46586E), ("text_fg", 0xFFFFFF), ("muted_fg", 0x8E9CAE),
         ("accent", 0x2BC4E8), ("close_hover", 0xC04848),
         // Farbe des Drachenhauch-Nebels (Metrik `nebel`, Stildatei `nebel`).
         ("nebel", 0x73F2D9),
@@ -205,7 +210,7 @@ fn preset(name: &str) -> Option<HashMap<String, i64>> {
         "glas_dunkel" | "glas_dark" => Some(m(&[
             ("win_bg", 0x232A33), ("win_border", 0x151A21), ("title_bg", 0x2C343F),
             ("title_bg_focus", 0x1C6E96), ("title_fg", 0xEAF2F8), ("widget_bg", 0x39424F),
-            ("widget_border", 0x161B22), ("text_fg", 0xEAF2F8), ("muted_fg", 0x8B97A6),
+            ("widget_border", 0x161B22), ("text_fg", 0xEAF2F8), ("muted_fg", 0xA7B0BB),
             ("accent", 0x2FA8D8), ("close_hover", 0xC04848)])),
         // Helles Glas: Weiss/Silber mit demselben Blau.
         // Helles Glas: Weiss/Silber mit demselben Blau.
@@ -218,12 +223,12 @@ fn preset(name: &str) -> Option<HashMap<String, i64>> {
         "glas_hell" | "glas_light" => Some(m(&[
             ("win_bg", 0xE2E8EF), ("win_border", 0x6E7C8C), ("title_bg", 0xD2DAE3),
             ("title_bg_focus", 0x2A8FD0), ("title_fg", 0x1E2530), ("widget_bg", 0xFBFCFE),
-            ("widget_border", 0x63707F), ("text_fg", 0x1E2530), ("muted_fg", 0x66707C),
+            ("widget_border", 0x63707F), ("text_fg", 0x1E2530), ("muted_fg", 0x5E6772),
             ("accent", 0x2A8FD0), ("close_hover", 0xC04848)])),
         "retro" => Some(m(&[
             ("win_bg", 0x020802), ("win_border", 0x1F8C3C), ("title_bg", 0x0A2A0A),
             ("title_bg_focus", 0x0F4F1F), ("title_fg", 0x33FF66), ("widget_bg", 0x0A1A0A),
-            ("widget_border", 0x1F8C3C), ("text_fg", 0x33FF66), ("muted_fg", 0x1F8C3C),
+            ("widget_border", 0x1F8C3C), ("text_fg", 0x33FF66), ("muted_fg", 0x2C9348),
             ("accent", 0x33FF66), ("close_hover", 0xC04848)])),
         "contrast" => Some(m(&[
             ("win_bg", 0x000000), ("win_border", 0xFFD400), ("title_bg", 0x202000),
@@ -235,13 +240,13 @@ fn preset(name: &str) -> Option<HashMap<String, i64>> {
         "modern_dark" => Some(m(&[
             ("win_bg", 0x1E2630), ("win_border", 0x33414F), ("title_bg", 0x161D26),
             ("title_bg_focus", 0x223140), ("title_fg", 0xEAF2F8), ("widget_bg", 0x2A3542),
-            ("widget_border", 0x3C4A5A), ("text_fg", 0xEAF2F8), ("muted_fg", 0x8493A4),
+            ("widget_border", 0x3C4A5A), ("text_fg", 0xEAF2F8), ("muted_fg", 0x929FAE),
             ("accent", 0x2BC4E8), ("close_hover", 0xE03B3B)])),
         // "modern_light" -- heller, Windows-11-naher Look (Weiss/Hellgrau + Blau).
         "modern_light" => Some(m(&[
             ("win_bg", 0xFAFBFC), ("win_border", 0xD8DEE6), ("title_bg", 0xEFF2F5),
             ("title_bg_focus", 0xFFFFFF), ("title_fg", 0x1F2733), ("widget_bg", 0xFFFFFF),
-            ("widget_border", 0xCBD3DD), ("text_fg", 0x1F2733), ("muted_fg", 0x8A93A0),
+            ("widget_border", 0xCBD3DD), ("text_fg", 0x1F2733), ("muted_fg", 0x6C737D),
             // Akzent 0x2A7DE1 -> 0x1D6DCE (2026-11-15): als Schrift auf dem
             // Grund 4,0:1, mit weisser Schrift 4,1:1 -- jetzt 4,9 und 5,1.
             ("accent", 0x1D6DCE), ("close_hover", 0xE03B3B)])),
@@ -4329,9 +4334,16 @@ impl Gui {
         }
         // In LOGISCHEN Einheiten rechnen -- `new_window`/`add_widget`
         // skalieren selbst, und zweimal waere zweimal zu viel.
-        let zeilen: Vec<String> = text.split('\n').map(|z| z.to_string()).collect();
         let zh = self.unsk(self.ctext_height(g)) + 6;
         let pad = 16;
+        // Hoechstens 640 breit (und nicht breiter als der Schirm); laengere
+        // Zeilen brechen an Wortgrenzen um. Vorher liefen sie ueber den Rand
+        // (Buch "Fenster, Formulare, Daten", Kapitel 21: die Befunde von
+        // GUI_A11Y_CHECK$ in einer Meldung).
+        let schirm_b = self.unsk(g.screen_width() as i32);
+        let max_ww = 640.min((schirm_b - 40).max(220));
+        let innen = max_ww - 2 * pad - 8;
+        let zeilen: Vec<String> = text.split('\n').flat_map(|z| self.umbrechen_grund(g, z, innen)).collect();
         // Knopfbreite nach der laengsten Beschriftung -- "Verwerfen" passt
         // nicht in 84 Pixel.
         let bw = knoepfe.iter().map(|k| self.unsk(self.ctext_width(g, k)) + 24).max().unwrap_or(84).max(84);
@@ -4342,7 +4354,7 @@ impl Gui {
             .max().unwrap_or(0)
             .max(self.unsk(self.ctext_width(g, &titel)) + 30)
             .max(gesamt);
-        let ww = (breiteste + 2 * pad + 8).clamp(220, 640);
+        let ww = (breiteste + 2 * pad + 8).clamp(220, max_ww.max(220));
         let feld_h = if eingabe.is_some() { 28 + 10 } else { 0 };
         // Widget-Koordinaten sind RELATIV zum Inhaltsbereich, die Fensterhoehe
         // ist es nicht -- die Titelleiste kommt oben drauf. Ohne diesen
@@ -4388,6 +4400,36 @@ impl Gui {
         // soll sofort mit der Tastatur zu bedienen sein.
         self.focus_widget = Some((wi, feld.unwrap_or(erster)));
         Ok(h)
+    }
+
+    /// Eine Zeile an Wortgrenzen auf `breite` (logische Punkte, Grundschrift
+    /// wie im Dialog) umbrechen; ein Wort, das allein zu breit ist, an der
+    /// Zeichengrenze. Wie `umbrechen`, aber ohne Widget.
+    fn umbrechen_grund(&self, g: &Graphics, text: &str, breite: i32) -> Vec<String> {
+        let passt = |s: &str| self.unsk(self.ctext_width(g, s)) <= breite;
+        if passt(text) { return vec![text.to_string()]; }
+        let mut zeilen: Vec<String> = Vec::new();
+        let mut zeile = String::new();
+        for wort in text.split(' ') {
+            let mut rest = wort.to_string();
+            loop {
+                let probe = if zeile.is_empty() { rest.clone() } else { format!("{} {}", zeile, rest) };
+                if passt(&probe) { zeile = probe; break; }
+                if !zeile.is_empty() { zeilen.push(std::mem::take(&mut zeile)); continue; }
+                let mut teil = String::new();
+                let mut n = 0usize;
+                for ch in rest.chars() {
+                    let p2 = format!("{}{}", teil, ch);
+                    if n > 0 && !passt(&p2) { break; }
+                    teil = p2; n += 1;
+                }
+                zeilen.push(teil);
+                rest = rest.chars().skip(n).collect();
+                if rest.is_empty() { break; }
+            }
+        }
+        if !zeile.is_empty() { zeilen.push(zeile); }
+        zeilen
     }
 
     /// GUI_DIALOG_TEXT(dlg) -- was in das Eingabefeld eines GUI_PROMPT getippt

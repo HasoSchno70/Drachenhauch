@@ -1079,7 +1079,7 @@ CHART_SET: {} erwartet {}, nicht '{}'	CHART_SET: {} expects {}, not '{}'
 
 # ---------------------------------------------------------------- Dateien, Kodierung, ZIP, XML, Excel, CSV
 {}: Kodierung '{}' kenne ich nicht -- moeglich sind: {}	{}: unknown encoding '{}' -- possible are: {}
-{}: {}Zeile {} ist kein UTF-8 (Byte 0x{} an Stelle {}). Kommt die Datei aus Excel oder einem alten Windows-Programm, ist sie meist cp1252 -- dann als letztes Argument "cp1252" mitgeben. Moeglich sind: {}	{}: {}line {} is not UTF-8 (byte 0x{} at position {}). If the file comes from Excel or an old Windows program, it is usually cp1252 -- then pass "cp1252" as the last argument. Possible are: {}
+{}: {}Zeile {} ist kein UTF-8 (Byte 0x{}, Zeichen {} der Zeile). Kommt die Datei aus Excel oder einem alten Windows-Programm, ist sie meist cp1252 -- dann als letztes Argument "cp1252" mitgeben. Moeglich sind: {}	{}: {}line {} is not UTF-8 (byte 0x{}, character {} of the line). If the file comes from Excel or an old Windows program, it is usually cp1252 -- then pass "cp1252" as the last argument. Possible are: {}
 READALL$: die Kodierung einer offenen Datei steht schon bei OPENFILE(pfad, modus, kodierung)	READALL$: the encoding of an open file is already given at OPENFILE(pfad, modus, kodierung)
 {}: das Zeichen '{}' (U+{}) gibt es in {} nicht -- die Datei in utf8 schreiben oder das Zeichen ersetzen	{}: the character '{}' (U+{}) does not exist in {} -- write the file in utf8 or replace the character
 {}: das Trennzeichen muss genau ein Zeichen sein (bekommen: {})	{}: the separator must be exactly one character (got: {})
@@ -1451,6 +1451,7 @@ GUI_TOOLBAR_SET_CHECKED: Eintrag {} ist nicht kippbar (erst GUI_TOOLBAR_CHECKABL
 GUI_TOOLBAR_SET: unbekannte Einstellung '{}' -- bekannt sind: beschriftung, symbolgroesse	GUI_TOOLBAR_SET: unknown setting '{}' -- known are: beschriftung, symbolgroesse
 GUI_TOOLBAR_ITEM_X: Widget ist keine Werkzeugleiste (GUI_TOOLBAR)	GUI_TOOLBAR_ITEM_X: widget is not a toolbar (GUI_TOOLBAR)
 GUI_TOOLBAR_ITEM_X: Eintrag {} gibt es nicht	GUI_TOOLBAR_ITEM_X: there is no entry {}
+GUI_TOOLBAR_ITEM_X: Eintrag {} steht im Ueberlauf (>>), die Leiste ist zu schmal fuer ihn -- GUI_TOOLBAR_OVERFLOW sagt, wie viele dort stehen	GUI_TOOLBAR_ITEM_X: entry {} is in the overflow (>>), the toolbar is too narrow for it -- GUI_TOOLBAR_OVERFLOW tells how many are there
 GUI_TOOLBAR_OVERFLOW: Widget ist keine Werkzeugleiste (GUI_TOOLBAR)	GUI_TOOLBAR_OVERFLOW: widget is not a toolbar (GUI_TOOLBAR)
 {}: Widget ist keine Statusleiste (GUI_STATUSBAR)	{}: widget is not a status bar (GUI_STATUSBAR)
 {}: Feld {} gibt es nicht ({} Felder)	{}: there is no field {} ({} fields)
@@ -1815,6 +1816,7 @@ IMAGE_ENHANCE: erwartet (bild, art$, faktor)	IMAGE_ENHANCE: expects (image, kind
 IMAGE_ENHANCE: unbekannte Art '{}' -- moeglich sind helligkeit, kontrast, saettigung	IMAGE_ENHANCE: unknown kind '{}' -- possible are brightness, contrast, saturation
 IMAGE_ENHANCE: der Faktor muss eine Zahl ab 0 sein	IMAGE_ENHANCE: the factor must be a number from 0 up
 {} liefert nie "{}" -- der Vergleich trifft nie. Moeglich sind: {}.	{} never returns "{}" -- the comparison never matches. Possible are: {}.
+FILE_SAVE_DIALOG: das zweite Argument ist der vorgeschlagene Dateiname, nicht die Endung -- "{}" wird so zum Namen der Datei. Mit Filter: FILE_SAVE_DIALOG(titel, "name.{}", "{}") (anders als FILE_OPEN_DIALOG(titel, endungen)).	FILE_SAVE_DIALOG: the second argument is the suggested file name, not the extension -- "{}" becomes the name of the file. With a filter: FILE_SAVE_DIALOG(title, "name.{}", "{}") (unlike FILE_OPEN_DIALOG(title, extensions)).
 {}: {} ist kein Woerterbuch (SPELL_LOAD oder SPELL_SYSTEM)	{}: {} is not a dictionary (SPELL_LOAD or SPELL_SYSTEM)
 {}: '{}' laesst sich nicht lesen: {}	{}: '{}' cannot be read: {}
 {}: '{}' ist kein Hunspell-Woerterbuch: {}	{}: '{}' is not a Hunspell dictionary: {}
@@ -2031,3 +2033,5 @@ TRY ohne CATCH und ohne FINALLY verschluckt jeden Fehler still -- danach weiss n
 {}: {} -- steht ein ' in einem eingeklebten Wert? Werte mit ? uebergeben: DB_EXEC(db, "... VALUES (?)", wert)	{}: {} -- is there a ' in a value pasted into the SQL? Pass values with ?: DB_EXEC(db, "... VALUES (?)", value)
 GUI_MENU_ENABLED: erwartet einen Menue-Eintrag	GUI_MENU_ENABLED: expects a menu item
 GUI_MENU_ENABLED: ungueltiges Eintrags-Handle	GUI_MENU_ENABLED: invalid item handle
+DIR_USER_DATA$: erwartet den Namen des Programms (ohne / und \)	DIR_USER_DATA$: expects the name of the program (without / and \)
+DIR_USER_DATA$: kein Benutzerordner (APPDATA bzw. HOME ist nicht gesetzt)	DIR_USER_DATA$: no user folder (APPDATA or HOME is not set)

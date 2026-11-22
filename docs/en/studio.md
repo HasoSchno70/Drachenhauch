@@ -163,7 +163,12 @@ Self.vorrat.SetzenSchalter("prozent", TRUE)             ' CHART_SET_FLAG
 
 Also `Reihe(name, werte)` for lines and grouped bars, `Beschriften`, `Wert`
 for gauge, bar gauge and LEDs, `Titel`, `SetzenZahl`, `Anzahl()`; `Flaeche`
-is the canvas, `Diagramm` the CHART handle for everything else.
+is the canvas, `Diagramm` the CHART handle for everything else. `Leeren`
+discards the values, not the series: refill with the same names, and `Reihe`
+gives an existing series the new values. A click on a slice or a bar is
+asked in `Takt` (`CHART_CLICKED(Self.<name>.Diagramm)`, the number of the
+point) -- it holds after drawing, that is in the next frame; in the event
+`Maus` it is not there yet.
 
 An event with parentheses calls its method with values: `Ziehen` (drag)
 with the position on the canvas (while the button is held after a press on
@@ -289,6 +294,7 @@ they are stored under `kontextmenues`.
 | `FarbeWaehlen(vorgabe [, titel$])` | a colour in the colour picker; returns `&HRRGGBB`, `-1` on cancel |
 | `fenster.ZeigenModal()` | shows a window modally and returns only when it is closed |
 | `Bild(name$)` | an image from the project's `bilder/` as IMAGE |
+| `StilLaden(name$)` | load a style sheet (`.dhstil`) from the project folder, best in `App.Geoeffnet` |
 
 All four return only with the answer, as in Xojo or Visual Basic. This works
 because the generated base class polls the events **after** `GUI_UPDATE`
@@ -302,10 +308,28 @@ project folder; an image control picks its image in the inspector under
 the images go to `_studio/assets/bilder/`, and `dhrt --export` takes
 `assets/` next to the executable.
 
+**Style sheet.** A file `<name>.dhstil` in the project folder says by rule
+how widgets look -- by kind, class, name and state as in CSS
+([style sheet of the gui](module-gui.md#7-stylesheet-rules-by-kind-class-name-and-state)).
+When starting and building it goes to `_studio/assets/`; the program loads
+it with `StilLaden("<name>.dhstil")`, best in `App.Geoeffnet`. A widget gets
+classes in the inspector under Kennung → **Klassen** (`gefahr; klein`);
+they are stored in the `.dhform` under `klassen`. The designer does not
+show the style sheet -- it stands in the look of the Studio --, the started
+program does; an error in it stops it with the line.
+
+**Large text.** `GUI_SCALE(1.5)` in `App.Geoeffnet` makes everything half
+again as large -- text, widgets and the program window too, which then
+opens one and a half times as large as in the designer. The scale is set
+before the first window; later the gui does not let it change.
+
 **Languages.** A project writes its texts in one language, that of its
 source. A table `sprache/<code>.txt` in the project folder makes a second one
 from it: per line the text as it stands in the project, a tab, the
-translation (`sprache/en.txt`). Translated by themselves are the texts of
+translation (`sprache/en.txt`). **Projekt → Sprachtafel ergänzen …**
+collects every text of the project that the runtime translates and appends
+those missing from the table with an empty translation (`text` and a tab);
+the runtime skips an empty translation. Translated by themselves are the texts of
 the windows (titles, captions, placeholders, tooltips, column headers,
 entries, tabs, messages of the validation rules, chart titles, toolbars),
 the menus including their shortcuts (`Strg+S` becomes `Ctrl+S`), the texts
@@ -443,7 +467,9 @@ The library lists all custom controls under **Project**. You place one into
 a window like a button and get an instance (`zaehler1`). It can be moved,
 resized, anchored and put into rows, columns and grid layouts; in the design
 it shows its real content, outlined with a dashed line, and a click on one
-of its parts selects the whole instance.
+of its parts selects the whole instance. Its tab order (inspector,
+Verhalten) applies to its parts, among themselves in the order they have in
+the control.
 
 ```basic
 ' in the code of the control Zaehler
@@ -576,6 +602,14 @@ not (a rename that only changes case does not count, SQLite sees the same
 name). It leaves deleted things in place. Deleting the element only removes
 the structure from the project; the file with the data stays.
 
+**In the user folder.** A program installed under “Program Files” may not
+write next to itself. With **Im Benutzerordner** ticked on the database tab
+(`"ort": "benutzer"` in the structure) the built program keeps the file in
+the user's data folder (`DIR_USER_DATA$` with the project name); on the
+first start the file supplied next to the program is copied there, after
+that it stays. Started from the Studio, the program keeps working on the
+file in the project folder.
+
 **Binding a window to a table.** The navigator lists the columns under each
 table. Dragging a column or the whole table into the open window adds a
 label and a matching field per column, bound to the column: text, numbers
@@ -681,7 +715,7 @@ other: report header, page header, group header, detail (per row of the
 source), group footer, page footer, report footer. They hold elements in mm:
 fixed text, fields (a column of the source, also `kunde.name` through a
 reference), sums (sum, count, average, min, max per group or report), page
-number ("Seite {n} von {m}"), date, lines, rectangles and images.
+number ("Seite {n} von {m}"), date, lines, rectangles, images and barcodes.
 
 The **source** is a table or query of a database of the project; the
 **condition** may have parameters (`rechnung = :id`). If a band no longer fits
@@ -692,7 +726,7 @@ The tab of a report is its **design**: the page in millimetres, every band
 with a bar carrying its name, the elements inside.
 
 * **Placing:** at the top the bar of elements (text, field, sum, page number,
-  date, line, rectangle, image) -- choose a kind, then click into a band
+  date, line, rectangle, image, barcode) -- choose a kind, then click into a band
   (default size) or drag a rectangle. Esc cancels.
 * **Columns of the source** are at the top right; dragging a column into a
   band makes a sum in a group or report footer, a heading in the page header,
@@ -739,6 +773,14 @@ names a **column**, the image from that image column for each row -- a photo
 per article in the detail, for example. An image is fitted into the rectangle
 without distorting it; an empty cell or bytes that are not an image leave it
 empty.
+
+A **barcode** draws an EAN-13 from a **column** (for each row) or from its
+fixed **text**: an ISBN-13 or EAN with or without hyphens, twelve digits (the
+check digit is added) or an ISBN-10 (it becomes the ISBN-13 with 978 in
+front). The digits stand below the bars, and the quiet zone stays free inside
+the rectangle on the left and right. A value with a wrong check digit or with
+other characters gives no barcode -- better none than a wrong one. The
+nominal size is 37 × 26 mm.
 
 In the program a report is an object under its name:
 

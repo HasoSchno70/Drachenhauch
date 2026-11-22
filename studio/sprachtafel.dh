@@ -1,0 +1,151 @@
+' Drachenhauch Studio: Projekt -> Sprachtafel ergaenzen.
+'
+' Ein Projekt wird zweisprachig ueber eine Tafel sprache/<code>.txt im
+' Projektordner (laufzeit.dh: SpracheWaehlen, tr$). Welche Texte hineingehoeren,
+' musste man bisher selbst zusammensuchen -- aus jedem Fenster, jedem Menue,
+' jedem Bericht und jedem tr$ im Code (gefunden beim Buch "Fenster, Formulare,
+' Daten", Kapitel 22). Hier sammelt das Studio sie und haengt jeden Text, den
+' die Tafel noch nicht kennt, mit leerer Uebersetzung an: "Text<Tab>". Eine
+' solche Zeile laesst die Laufzeit aus, der Text bleibt, wie er ist, bis
+' jemand hinter dem Tabulator die Uebersetzung eintraegt.
+
+DIM dlgTafel AS INTEGER : dlgTafel = -1
+' Wie viele Zeilen das letzte Ergaenzen angehaengt hat (-1 = kein Code).
+DIM tafelZuletzt AS INTEGER : tafelZuletzt = 0
+
+SUB sprachtafelFragen()
+    IF GUI_MODAL() THEN RETURN
+    IF projOrdner = "" OR NOT DIREXISTS(projOrdner) THEN
+        status(tr$("Erst das Projekt sichern -- die Tafel kommt in seinen Ordner."))
+        RETURN
+    END IF
+    dlgTafel = GUI_PROMPT(tr$("Sprachtafel ergänzen"), tr$("Sprache (zwei Buchstaben, etwa en):"), "en", tr$("Ergänzen|Abbrechen"))
+END SUB
+
+SUB sprachtafelDialogPruefen()
+    IF dlgTafel < 0 THEN RETURN
+    DIM a AS INTEGER : a = GUI_ANSWER(dlgTafel)
+    IF a = 1 THEN
+        DIM code AS STRING : code = GUI_DIALOG_TEXT(dlgTafel)
+        dlgTafel = -1
+        tafelZuletzt = sprachtafelErgaenzen(code)
+    ELSEIF a > 1 THEN
+        dlgTafel = -1
+    END IF
+END SUB
+
+' Dieselben Felder wie studioTextFeld in laufzeit.dh -- was die Laufzeit
+' uebersetzt, muss die Sammlung finden, sonst fehlt es in der Tafel.
+FUNCTION tafelTextFeld(k AS STRING) AS BOOLEAN
+    SELECT CASE k
+        CASE "title", "titel", "text", "placeholder", "tooltip", "tip", "leer_text", "meldung", "label", "studio_diagramm_titel"
+            RETURN TRUE
+    END SELECT
+    RETURN FALSE
+END FUNCTION
+
+' Ein Text kommt in die Tafel, wenn er einen Buchstaben hat (wie
+' studioWortig: "42" oder "…" bleiben ohnehin) und in eine Zeile passt.
+SUB tafelDazu(texte AS ARRAY OF STRING, t AS STRING)
+    IF INSTR(t, CHR$(10)) >= 0 OR INSTR(t, CHR$(9)) >= 0 THEN RETURN
+    IF NOT REGEX_TEST(t, "\p{L}") THEN RETURN
+    IF ARRAY_INDEXOF(texte, t) < 0 THEN ARRAY_PUSH(texte, t)
+END SUB
+
+' Wie studioTexteIn: alle Textfelder, dazu Spaltenkoepfe und Eintraege.
+SUB tafelTexteIn(d AS JSON_HANDLE, pfad AS STRING, texte AS ARRAY OF STRING)
+    DIM k AS STRING
+    FOR EACH k IN JSON_KEYS(d, pfad)
+        DIM p AS STRING : p = IIF(pfad = "", "", pfad + ".") + JSON_KEY$(k)
+        DIM art AS STRING : art = JSON_TYPE(d, p)
+        IF art = "string" THEN
+            IF tafelTextFeld(k) THEN tafelDazu(texte, JSON_GET_STRING(d, p))
+        ELSEIF art = "object" THEN
+            tafelTexteIn(d, p, texte)
+        ELSEIF art = "array" THEN
+            DIM i AS INTEGER
+            FOR i = 0 TO JSON_LEN(d, p) - 1
+                DIM pe AS STRING : pe = p + "." + STR$(i)
+                DIM ae AS STRING : ae = JSON_TYPE(d, pe)
+                IF ae = "object" THEN
+                    tafelTexteIn(d, pe, texte)
+                ELSEIF ae = "string" AND (k = "headers" OR k = "items") THEN
+                    tafelDazu(texte, JSON_GET_STRING(d, pe))
+                END IF
+            NEXT
+        END IF
+    NEXT
+END SUB
+
+' Die Literale in tr$("..."), trf$("...", ...) und studioTr$("...").
+SUB tafelCode(code AS STRING, texte AS ARRAY OF STRING)
+    DIM t AS STRING
+    FOR EACH t IN REGEX_FIND_ALL(code, "(?i)\b(?:trf?|studiotr)\$\(\s*" + CHR$(34) + "[^" + CHR$(34) + "]*" + CHR$(34))
+        DIM a AS INTEGER : a = INSTR(t, CHR$(34))
+        tafelDazu(texte, MID$(t, a + 1, LEN(t) - a - 2))
+    NEXT
+END SUB
+
+' Alle Texte des Projekts, die die Laufzeit uebersetzt, in der Reihenfolge
+' der Elemente.
+FUNCTION tafelTexte() AS ARRAY OF STRING
+    DIM texte AS ARRAY OF STRING : texte = []
+    DIM ei AS INTEGER
+    FOR ei = 0 TO LEN(elemente) - 1
+        DIM e AS Element : e = elemente[ei]
+        IF e.art = "fenster" OR e.art = "control" THEN
+            DIM d AS JSON_HANDLE
+            IF ei = aktFenster THEN d = JSON_PARSE(JSON_STRINGIFY(doc)) ELSE d = JSON_PARSE(e.layout)
+            ' Ein eigenes Control hat keine Titelleiste: sein "title" ist
+            ' sein Name, den niemand liest.
+            IF e.art = "control" AND JSON_HAS(d, "title") THEN JSON_REMOVE(d, "title")
+            tafelTexteIn(d, "", texte)
+        ELSEIF e.art = "bericht" AND e.schema <> "" THEN
+            tafelTexteIn(JSON_PARSE(e.schema), "", texte)
+        END IF
+        tafelCode(e.vorspann + CHR$(10) + e.dekl + CHR$(10) + e.nachspann, texte)
+        DIM m AS Methode
+        FOR EACH m IN methoden
+            IF m.el = e THEN tafelCode(m.kopf + CHR$(10) + m.rumpf, texte)
+        NEXT
+    NEXT
+    RETURN texte
+END FUNCTION
+
+' Haengt an sprache/<code>.txt an, was ihr fehlt; liefert die Zahl der neuen
+' Zeilen (-1 = kein Code fuer eine Sprache).
+FUNCTION sprachtafelErgaenzen(code AS STRING) AS INTEGER
+    code = LOWER$(TRIM$(code))
+    IF NOT REGEX_TEST(code, "^[a-z]{2,3}$") THEN
+        status(trf$("'{0}' ist kein Sprachcode -- zwei Buchstaben wie en oder fr.", [code]))
+        RETURN -1
+    END IF
+    DIM pfad AS STRING : pfad = projOrdner + "/sprache/" + code + ".txt"
+    DIM bekannt AS MAP OF INTEGER : bekannt = {}
+    DIM alt AS STRING : alt = ""
+    IF FILEEXISTS(pfad) THEN
+        alt = READALL(pfad)
+        DIM z AS STRING
+        FOR EACH z IN SPLIT$(alt, CHR$(10))
+            z = REPLACE$(REPLACE$(z, CHR$(13), ""), CHR$(&HFEFF), "")
+            DIM tab AS INTEGER : tab = INSTR(z, CHR$(9))
+            IF tab > 0 THEN MAPPUT(bekannt, LEFT$(z, tab), 1)
+        NEXT
+    END IF
+    DIM neu AS ARRAY OF STRING : neu = []
+    DIM t AS STRING
+    FOR EACH t IN tafelTexte()
+        IF NOT MAPHAS(bekannt, t) THEN ARRAY_PUSH(neu, t)
+    NEXT
+    IF LEN(neu) > 0 THEN
+        IF NOT DIREXISTS(projOrdner + "/sprache") THEN MKDIR(projOrdner + "/sprache")
+        IF alt <> "" AND RIGHT$(alt, 1) <> CHR$(10) THEN alt = alt + CHR$(10)
+        FOR EACH t IN neu
+            alt = alt + t + CHR$(9) + CHR$(10)
+        NEXT
+        WRITEALL(pfad, alt)
+    END IF
+    status(trf$("{0} neue Texte in sprache/{1}.txt -- die Übersetzung kommt hinter den Tabulator.", [STR$(LEN(neu)), code]))
+    protokoll("sprachtafel " + code + " " + STR$(LEN(neu)))
+    RETURN LEN(neu)
+END FUNCTION

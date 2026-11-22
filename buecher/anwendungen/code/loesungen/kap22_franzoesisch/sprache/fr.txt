@@ -1,0 +1,98 @@
+seit heute	depuis aujourd’hui
+seit gestern	depuis hier
+seit {0} Tagen	depuis {0} jours
+Titel	Titre
+Urheber	Auteur
+Art	Genre
+Jahr	Année
+Verliehen an	Prêté à
+Freund	Ami
+Von	Du
+Zurück	Rendu
+Tage	Jours
+Die Datei ist leer.	Le fichier est vide.
+Die erste Zeile braucht die Spalten Titel und Art.	La première ligne doit avoir les colonnes Titel et Art.
+Zeile {0}: 	Ligne {0} : 
+{0} ist schon da.	{0} est déjà là.
+kein Titel.	pas de titre.
+die Art „{0}“ gibt es nicht ({1}).	le genre « {0} » n’existe pas ({1}).
+das Jahr „{0}“ ist keine Zahl.	l’année « {0} » n’est pas un nombre.
+Nichts gewählt	Rien de choisi
+Mediathek	Médiathèque
+Suchen	Chercher
+Titel, Urheber, Art, Jahr oder Name	Titre, auteur, genre, année ou nom
+Zeigt nur Einträge, in denen der Text vorkommt	N’affiche que les fiches qui contiennent le texte
+Bestand der Mediathek	Fonds de la médiathèque
+Neu ...	Nouveau ...
+Bearbeiten ...	Modifier ...
+Entfernen	Supprimer
+Ausleihen ...	Prêter ...
+Datei	Fichier
+Ausleihliste ...	Liste des prêts ...
+Karteikarte ...	Fiche ...
+Als Excel-Mappe sichern ...	Enregistrer comme classeur Excel ...
+Liste einlesen ...	Importer une liste ...
+Bearbeiten	Édition
+Ansicht	Affichage
+Überfällig ...	En retard ...
+Statistik ...	Statistiques ...
+Helles Aussehen	Apparence claire
+Hilfe	Aide
+Barrierefreiheit prüfen ...	Vérifier l’accessibilité ...
+{0} Einträge	{0} fiches
+{0} entfernen?	Supprimer {0} ?
+Entfernen|Abbrechen	Supprimer|Annuler
+{0} entfernt	{0} supprimé
+Erst einen Eintrag wählen.	Choisissez d’abord une fiche.
+Als Excel-Mappe sichern	Enregistrer comme classeur Excel
+Gesichert: {0}	Enregistré : {0}
+Liste einlesen	Importer une liste
+Keine Befunde.	Aucun problème.
+Barrierefreiheit	Accessibilité
+Eintrag	Fiche
+ISBN	ISBN
+Nachschlagen	Rechercher
+Titel, Urheber, Jahr und Cover von Open Library holen	Chercher titre, auteur, année et couverture sur Open Library
+Buch	Livre
+Film	Film
+Spiel	Jeu
+Musik	Musique
+Erscheinungsjahr	Année de parution
+OK	OK
+Abbrechen	Annuler
+Bitte einen Titel eingeben.	Veuillez saisir un titre.
+Abgebrochen.	Annulé.
+Eine ISBN hat 10 oder 13 Ziffern.	Un ISBN a 10 ou 13 chiffres.
+Frage Open Library ...	Je demande à Open Library ...
+Keine Antwort: {0}	Pas de réponse : {0}
+Unter dieser ISBN kennt Open Library nichts.	Open Library ne connaît rien sous cet ISBN.
+Gefunden, ohne Cover.	Trouvé, sans couverture.
+Gefunden. Lade das Cover ...	Trouvé. Je charge la couverture ...
+Gefunden, mit Cover.	Trouvé, avec couverture.
+Gefunden; das Cover ist kein Bild.	Trouvé ; la couverture n’est pas une image.
+Ausleihen	Prêts
+Kein Eintrag gewählt.	Aucune fiche choisie.
+An	À
+Name	Nom
+Verleihen	Prêter
+{0} ist da.	{0} est là.
+{0} ist {1} bei {2}.	{0} est chez {2} {1}.
+{0} an {1} verliehen	{0} prêté à {1}
+{0} ist zurück	{0} est rendu
+Überfällig	En retard
+Bei	Chez
+Seit	Depuis
+Schließen	Fermer
+Statistik	Statistiques
+Einträge je Art	Fiches par genre
+Ausleihen je Monat	Prêts par mois
+Ein Klick auf ein Stück oder einen Balken zeigt, was dazugehört.	Un clic sur une part ou une barre montre ce qui en fait partie.
+Einträge	fiches
+Ausleihe	prêt
+Zeile	ligne
+Zeilen	lignes
+{0} neu, {1} schon da, {2} mit Fehler	{0} nouvelles, {1} déjà là, {2} avec erreur
+Ausleihliste	Liste des prêts
+Insgesamt	Total
+Karteikarte	Fiche
+noch da	pas encore rendu

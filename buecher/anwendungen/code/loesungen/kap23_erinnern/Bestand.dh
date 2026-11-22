@@ -1,0 +1,170 @@
+' Ein Modul: was die Mediathek mit ihrer Datenbank tut, soweit es nicht
+' die Bindung erledigt. Seit Kapitel 15 rechnet es mit dem Datum,
+' seit Kapitel 18 zaehlt es fuer die Diagramme.
+IMPORT "zeit"
+
+' Beim allerersten Start ist die Tabelle leer: dann die Beispiele
+' hinein. Tetris ist seit 40 Tagen bei Lena, Momo war frueher bei Jonas
+' -- damit die Abfragen etwas zu rechnen haben.
+SUB einrichten()
+    IF anzahlEintraege() > 0 THEN RETURN
+    DB_BEGIN(Mediathek)
+    DIM e AS Eintrag
+    DIM momo AS INTEGER
+    FOR EACH e IN beispiele()
+        DB_EXEC(Mediathek, "INSERT INTO eintrag " + _
+                "(titel, urheber, art, jahr) VALUES (?, ?, ?, ?)", _
+                e.titel, e.urheber, e.art, INT(VAL(e.jahr)))
+        DIM id AS INTEGER : id = DB_LAST_ROWID(Mediathek)
+        IF e.titel = "Momo" THEN momo = id
+        IF e.verliehen <> "" THEN
+            ausleiheEintragen(id, e.verliehen, 40, -1)
+        END IF
+    NEXT
+    ausleiheEintragen(momo, "Jonas", 75, 60)
+    DB_COMMIT(Mediathek)
+END SUB
+
+' Eine Ausleihe, die vor `von` Tagen begann und vor `bis` Tagen endete
+' (-1 = sie laeuft noch).
+SUB ausleiheEintragen(id AS INTEGER, an AS STRING, von AS INTEGER, _
+                      bis AS INTEGER)
+    DIM sql AS STRING
+    sql = "INSERT INTO ausleihe (eintrag, freund, von, zurueck) " + _
+          "VALUES (?, ?, ?, ?)"
+    IF bis < 0 THEN
+        DB_EXEC(Mediathek, sql, id, freundId(an), tagVor$(von), NIL)
+    ELSE
+        DB_EXEC(Mediathek, sql, id, freundId(an), tagVor$(von), _
+                tagVor$(bis))
+    END IF
+END SUB
+
+' Das Datum vor n Tagen als JJJJ-MM-TT.
+FUNCTION tagVor$(n AS INTEGER) AS STRING
+    RETURN LEFT$(ZEIT_TEXT$(ZEIT_PLUS(ZEIT_JETZT(), -n * 86400)), 10)
+END FUNCTION
+
+FUNCTION anzahlEintraege() AS INTEGER
+    DIM r AS DB_RESULT
+    r = DB_QUERY(Mediathek, "SELECT COUNT(*) FROM eintrag")
+    IF DB_NEXT(r) THEN RETURN DB_GET_INT(r, 0)
+    RETURN 0
+END FUNCTION
+
+FUNCTION titelVon$(id AS INTEGER) AS STRING
+    DIM r AS DB_RESULT
+    r = DB_QUERY(Mediathek, "SELECT titel FROM eintrag WHERE id = ?", _
+                 id)
+    IF DB_NEXT(r) THEN RETURN DB_GET_STRING(r, 0)
+    RETURN ""
+END FUNCTION
+
+' Wer den Eintrag gerade hat ("" = niemand).
+FUNCTION verliehenAn$(id AS INTEGER) AS STRING
+    DIM r AS DB_RESULT
+    r = DB_QUERY(Mediathek, "SELECT name FROM freund WHERE id = " + _
+                 "(SELECT freund FROM ausleihe " + _
+                 "WHERE eintrag = ? AND zurueck IS NULL)", id)
+    IF DB_NEXT(r) THEN RETURN DB_GET_STRING(r, 0)
+    RETURN ""
+END FUNCTION
+
+' Seit wie vielen Tagen der Eintrag weg ist (-1 = er ist da). Das Datum
+' steht als Text in der Datei; das Zeit-Modul liest und rechnet es.
+FUNCTION seitTagen(id AS INTEGER) AS INTEGER
+    DIM r AS DB_RESULT
+    r = DB_QUERY(Mediathek, "SELECT von FROM ausleihe " + _
+                 "WHERE eintrag = ? AND zurueck IS NULL", id)
+    IF NOT DB_NEXT(r) THEN RETURN -1
+    DIM von AS INTEGER : von = ZEIT_PARSE(DB_GET_STRING(r, 0))
+    RETURN ZEIT_DIFF(ZEIT_JETZT(), von) \ 86400
+END FUNCTION
+
+FUNCTION seitWann$(tage AS INTEGER) AS STRING
+    IF tage <= 0 THEN RETURN tr$("seit heute")
+    IF tage = 1 THEN RETURN tr$("seit gestern")
+    RETURN trf$("seit {0} Tagen", [STR$(tage)])
+END FUNCTION
+
+' Der Verweis von ausleihe auf eintrag loescht mit.
+SUB entfernen(id AS INTEGER)
+    DB_EXEC(Mediathek, "DELETE FROM eintrag WHERE id = ?", id)
+END SUB
+
+' Den Freund beim Namen -- gibt es ihn noch nicht, wird er angelegt.
+FUNCTION freundId(name AS STRING) AS INTEGER
+    DIM r AS DB_RESULT
+    r = DB_QUERY(Mediathek, "SELECT id FROM freund WHERE name = ?", _
+                 name)
+    IF DB_NEXT(r) THEN RETURN DB_GET_INT(r, 0)
+    DB_EXEC(Mediathek, "INSERT INTO freund (name) VALUES (?)", name)
+    RETURN DB_LAST_ROWID(Mediathek)
+END FUNCTION
+
+' Von heute an verliehen.
+SUB verleihen(id AS INTEGER, an AS STRING)
+    ausleiheEintragen(id, an, 0, -1)
+END SUB
+
+SUB zurueckgeben(id AS INTEGER)
+    DB_EXEC(Mediathek, "UPDATE ausleihe SET zurueck = ? " + _
+            "WHERE eintrag = ? AND zurueck IS NULL", tagVor$(0), id)
+END SUB
+
+' Kapitel 18: "1 Eintrag", "2 Einträge" -- die Zahl mit dem Wort, das
+' zu ihr passt.
+' >>> neu
+' Wie viele Ausleihen laenger als vier Wochen laufen (die Abfrage
+' ueberfaellig aus Kapitel 15).
+FUNCTION anzahlUeberfaellig() AS INTEGER
+    DIM r AS DB_RESULT : r = Abfrage("ueberfaellig")
+    DIM n AS INTEGER : n = 0
+    WHILE DB_NEXT(r)
+        n = n + 1
+    WEND
+    RETURN n
+END FUNCTION
+' <<< neu
+
+FUNCTION anzahlText$(n AS INTEGER, eins AS STRING, viele AS STRING) AS STRING
+    IF n = 1 THEN RETURN "1 " + eins
+    RETURN STR$(n) + " " + viele
+END FUNCTION
+
+' Kapitel 18: wie viele Ausleihen in einem Monat (JJJJ-MM) begannen.
+FUNCTION anzahlImMonat(monat AS STRING) AS INTEGER
+    DIM r AS DB_RESULT
+    r = DB_QUERY(Mediathek, "SELECT COUNT(*) FROM ausleihe " + _
+                 "WHERE strftime('%Y-%m', von) = ?", monat)
+    DB_NEXT(r)
+    RETURN DB_GET_INT(r, 0)
+END FUNCTION
+
+' Die Titel einer Art, nach dem Alphabet.
+FUNCTION titelDerArt(art AS STRING) AS ARRAY OF STRING
+    DIM aus AS ARRAY OF STRING : aus = []
+    DIM r AS DB_RESULT
+    r = DB_QUERY(Mediathek, "SELECT titel FROM eintrag " + _
+                 "WHERE art = ? ORDER BY titel", art)
+    WHILE DB_NEXT(r)
+        ARRAY_PUSH(aus, DB_GET_STRING(r, 0))
+    WEND
+    RETURN aus
+END FUNCTION
+
+' Die Ausleihen, die in einem Monat begannen: "Titel -- Name".
+FUNCTION ausleihenImMonat(monat AS STRING) AS ARRAY OF STRING
+    DIM aus AS ARRAY OF STRING : aus = []
+    DIM r AS DB_RESULT
+    r = DB_QUERY(Mediathek, "SELECT e.titel, f.name FROM ausleihe " + _
+                 "AS a JOIN eintrag AS e ON e.id = a.eintrag " + _
+                 "JOIN freund AS f ON f.id = a.freund " + _
+                 "WHERE strftime('%Y-%m', a.von) = ? " + _
+                 "ORDER BY a.von", monat)
+    WHILE DB_NEXT(r)
+        ARRAY_PUSH(aus, DB_GET_STRING(r, 0) + " -- " + _
+                   DB_GET_STRING(r, 1))
+    WEND
+    RETURN aus
+END FUNCTION

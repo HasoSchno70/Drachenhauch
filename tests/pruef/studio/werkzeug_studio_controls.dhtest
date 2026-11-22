@@ -888,3 +888,60 @@ END CLASS
 --- erwartet
 ausgabe los 1
 ausgabe los zu
+
+=== die tab-folge einer instanz gilt fuer ihre teile
+' Feld (1), eine Instanz rechts oben (2) mit zwei Knoepfen, ein Knopf unten
+' (3). Die Teile der Instanz hatten keine Tab-Folge und kamen damit nach
+' allen gezaehlten Widgets: GUI_A11Y_CHECK$ meldete "Tab springt zurueck"
+' (Buch "Fenster, Formulare, Daten", Kapitel 21, die Cover-Kachel). Jetzt
+' erben sie die der Instanz, untereinander in der Reihenfolge des Anlegens.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+slHin(10, 10)
+slWarten(10)
+slTaste(294)
+slWarten(150)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+SETENV("DH_STUDIO_LAUF_BILDER", "20")
+DIM log AS STRING : log = CWD$() + "/s.log"
+DIM aus AS STRING : aus = slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+DIM z AS STRING
+FOR EACH z IN slAnfang(log, "ausgabe ")
+    IF INSTR(z, "tab ") >= 0 OR INSTR(z, "befund") >= 0 OR INSTR(z, "Tab springt") >= 0 THEN PRINT z
+NEXT
+--- argumente
+{sammlung}/../../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"control","name":"Paar"},{"art":"fenster","name":"Hauptfenster"}]}
+--- datei proj/Paar.dhform
+{"title":"Paar","name":"Paar","w":120,"h":70,"widgets":[{"kind":"button","name":"a","text":"Eins","x":0,"y":0,"w":120,"h":30},{"kind":"button","name":"b","text":"Zwei","x":0,"y":40,"w":120,"h":30}]}
+--- datei proj/Paar.dh
+CLASS Paar EXTENDS Paar_Basis
+END CLASS
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":420,"h":300,"widgets":[
+{"kind":"textinput","name":"feld","x":20,"y":20,"w":200,"h":28,"tooltip":"Feld","tab_index":1},
+{"kind":"studio_control","studio_control":"Paar","name":"paar1","x":280,"y":20,"w":120,"h":70,"tab_index":2},
+{"kind":"button","name":"unten","text":"Unten","x":20,"y":240,"w":120,"h":30,"tab_index":3}]}
+--- datei proj/Hauptfenster.dh
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+    DIM bilder AS INTEGER
+
+    SUB Takt()
+        Self.bilder = Self.bilder + 1
+        IF Self.bilder = 3 THEN
+            PRINT "tab "; GUI_GET_TAB_INDEX(Self.paar1.a); " "; GUI_GET_TAB_INDEX(Self.paar1.b)
+            DIM b AS STRING : b = GUI_A11Y_CHECK$()
+            IF b = "" THEN PRINT "befunde keine" ELSE PRINT b
+        END IF
+    END SUB
+END CLASS
+--- datei proj/App.dh
+CLASS App EXTENDS StudioApp
+END CLASS
+--- erwartet
+ausgabe tab 2 2
+ausgabe befunde keine

@@ -1,0 +1,216 @@
+' Loesung Kapitel 19, Erweitern 2 -- die Zeilen mit Fehler kommen in
+' eine eigene Datei neben der Liste, mit einer Spalte Fehler: dort
+' nachbessern, dann diese Datei einlesen.
+' Kapitel 19 -- Daten hinaus und herein: die Mediathek als Excel-Mappe,
+' und eine alte Liste (CSV, etwa aus Excel) in die Tabelle eintrag.
+IMPORT "xlsx"
+IMPORT "zeit"
+IMPORT "regex"
+
+' Zwei Blaetter: der Bestand (die Abfrage aus Kapitel 15) und alle
+' Ausleihen (aus Kapitel 17).
+SUB alsExcel(pfad AS STRING)
+    DIM x AS XLSX : x = XLSX_NEW("Bestand")
+    blattBestand(x)
+    XLSX_SHEET(x, "Ausleihen")
+    blattAusleihen(x)
+    XLSX_SAVE(x, pfad)
+    XLSX_CLOSE(x)
+END SUB
+
+' Das Jahr als Zahl -- in einer CSV waere es Text.
+SUB blattBestand(x AS XLSX)
+    kopf(x, ["Titel", "Urheber", "Art", "Jahr", "Verliehen an"], _
+         [36, 24, 8, 6, 14])
+    DIM r AS DB_RESULT : r = Abfrage("bestand")
+    DIM z AS INTEGER : z = 1
+    WHILE DB_NEXT(r)
+        XLSX_SET(x, z, 0, DB_GET_STRING(r, 1))
+        XLSX_SET(x, z, 1, DB_GET_STRING(r, 2))
+        XLSX_SET(x, z, 2, DB_GET_STRING(r, 3))
+        IF NOT DB_IS_NULL(r, 4) THEN
+            XLSX_SET_NUM(x, z, 3, DB_GET_INT(r, 4))
+        END IF
+        XLSX_SET(x, z, 4, DB_GET_STRING(r, 5))
+        z = z + 1
+    WEND
+END SUB
+
+' Beginn und Ende als Datum, die Tage als Zahl.
+SUB blattAusleihen(x AS XLSX)
+    kopf(x, ["Freund", "Titel", "Von", "Zurück", "Tage"], _
+         [14, 36, 11, 11, 6])
+    DIM r AS DB_RESULT : r = Abfrage("ausleihbuch")
+    DIM z AS INTEGER : z = 1
+    WHILE DB_NEXT(r)
+        XLSX_SET(x, z, 0, DB_GET_STRING(r, 1))
+        XLSX_SET(x, z, 1, DB_GET_STRING(r, 2))
+        XLSX_SET_DATE(x, z, 2, ZEIT_PARSE(DB_GET_STRING(r, 3)))
+        DIM zur AS STRING : zur = DB_GET_STRING(r, 4)
+        IF zur = "noch da" THEN
+            XLSX_SET(x, z, 3, zur)
+        ELSE
+            XLSX_SET_DATE(x, z, 3, ZEIT_PARSE(zur))
+        END IF
+        XLSX_SET_NUM(x, z, 4, DB_GET_INT(r, 5))
+        z = z + 1
+    WEND
+END SUB
+
+' Die Kopfzeile eines Blatts: fett, die Spalten so breit wie angegeben.
+SUB kopf(x AS XLSX, namen AS ARRAY OF STRING, _
+         breiten AS ARRAY OF INTEGER)
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(namen) - 1
+        XLSX_SET(x, 0, k, namen[k])
+        XLSX_COL_WIDTH(x, k, breiten[k])
+    NEXT
+    XLSX_BOLD_ROW(x, 0)
+END SUB
+
+' Eine Liste mit den Spalten Titel, Urheber, Art und Jahr -- in
+' beliebiger Reihenfolge, die erste Zeile nennt sie. Jede Zeile wird
+' geprueft: Was passt, kommt hinein, was schon da ist, nicht noch
+' einmal, und zu jeder anderen gibt es eine Meldung mit ihrer Nummer.
+FUNCTION einlesen(pfad AS STRING) AS Einlesung
+    DIM e AS Einlesung : e = NEW Einlesung()
+    e.meldungen = []
+    ' UTF-8 oder Windows-1252 (so sichert Excel): auto entscheidet.
+    DIM roh AS ARRAY OF STRING : roh = READLINES(pfad, "auto")
+    IF LEN(roh) = 0 THEN
+        ARRAY_PUSH(e.meldungen, "Die Datei ist leer.")
+        RETURN e
+    END IF
+    ' Excel trennt im deutschen Windows mit Semikolon, sonst Komma.
+    DIM trenner AS STRING : trenner = ","
+    IF INSTR(roh[0], ";") >= 0 THEN trenner = ";"
+    DIM t AS ARRAY OF STRING : t = CSV_LOAD(pfad, trenner, "auto")
+    DIM sTitel AS INTEGER : sTitel = spalte(t, "titel")
+    DIM sUrheber AS INTEGER : sUrheber = spalte(t, "urheber")
+    DIM sArt AS INTEGER : sArt = spalte(t, "art")
+    DIM sJahr AS INTEGER : sJahr = spalte(t, "jahr")
+    IF sTitel < 0 OR sArt < 0 THEN
+        ARRAY_PUSH(e.meldungen, "Die erste Zeile braucht die " + _
+                   "Spalten Titel und Art.")
+        RETURN e
+    END IF
+    DIM neuSql AS STRING
+    neuSql = "INSERT INTO eintrag (titel, urheber, art, jahr) " + _
+             "VALUES (?, ?, ?, ?)"
+    ' >>> neu
+    ' Kopf und Zeilen der Fehlerdatei, im Trenner der Liste.
+    DIM kopfzeile AS ARRAY OF STRING : kopfzeile = []
+    DIM k AS INTEGER
+    FOR k = 0 TO DIMSIZE(t, 1) - 1
+        ARRAY_PUSH(kopfzeile, t[0, k])
+    NEXT
+    ARRAY_PUSH(kopfzeile, "Fehler")
+    DIM schlecht AS ARRAY OF STRING : schlecht = []
+    ' <<< neu
+    DB_BEGIN(Mediathek)
+    DIM z AS INTEGER
+    FOR z = 1 TO DIMSIZE(t, 0) - 1
+        DIM titel AS STRING : titel = TRIM$(t[z, sTitel])
+        DIM urheber AS STRING : urheber = zelle$(t, z, sUrheber)
+        DIM art AS STRING : art = artGenau$(zelle$(t, z, sArt))
+        DIM jahr AS STRING : jahr = zelle$(t, z, sJahr)
+        IF titel = "" AND urheber = "" AND jahr = "" THEN CONTINUE
+        e.zeilen = e.zeilen + 1
+        DIM nr AS STRING : nr = "Zeile " + STR$(z + 1) + ": "
+        DIM falsch AS STRING
+        falsch = zeileFalsch$(t, z, sArt, titel, art, jahr)
+        IF falsch <> "" THEN
+            ARRAY_PUSH(e.meldungen, nr + falsch)
+            ' >>> neu
+            DIM zellen AS ARRAY OF STRING : zellen = []
+            FOR k = 0 TO DIMSIZE(t, 1) - 1
+                ARRAY_PUSH(zellen, t[z, k])
+            NEXT
+            ARRAY_PUSH(zellen, falsch)
+            ARRAY_PUSH(schlecht, CSV_ROW$(zellen, trenner))
+            ' <<< neu
+        ELSEIF schonDa(titel, urheber) THEN
+            e.schonDa = e.schonDa + 1
+            ARRAY_PUSH(e.meldungen, nr + titel + " ist schon da.")
+        ELSE
+            ' Ohne Jahr bleibt die Spalte leer (NIL = NULL).
+            IF jahr = "" THEN
+                DB_EXEC(Mediathek, neuSql, titel, urheber, art, NIL)
+            ELSE
+                DB_EXEC(Mediathek, neuSql, titel, urheber, art, _
+                        INT(VAL(jahr)))
+            END IF
+            e.neu = e.neu + 1
+        END IF
+    NEXT
+    DB_COMMIT(Mediathek)
+    ' >>> neu
+    ' In derselben Kodierung wie die Liste -- aus Excel also wieder
+    ' cp1252, damit Excel sie oeffnen kann.
+    IF LEN(schlecht) > 0 THEN
+        DIM name AS STRING : name = BASENAME(pfad)
+        DIM punkt AS INTEGER : punkt = INSTRREV(name, ".")
+        IF punkt > 0 THEN name = LEFT$(name, punkt)
+        DIM ziel AS STRING
+        ziel = PATHJOIN(DIRNAME(pfad), name + "_fehler.csv")
+        DIM inhalt AS STRING
+        inhalt = CSV_ROW$(kopfzeile, trenner) + CHR$(10) + _
+                 JOIN$(schlecht, CHR$(10)) + CHR$(10)
+        WRITEALL(ziel, inhalt, FILE_ENCODING$(pfad))
+        ARRAY_PUSH(e.meldungen, "Die Zeilen mit Fehler stehen in " + _
+                   BASENAME(ziel) + ".")
+    END IF
+    ' <<< neu
+    RETURN e
+END FUNCTION
+
+' Die Nummer der Spalte, deren Kopf so heisst (gross/klein egal), -1 =
+' keine.
+FUNCTION spalte(t AS ARRAY OF STRING, name AS STRING) AS INTEGER
+    DIM k AS INTEGER
+    FOR k = 0 TO DIMSIZE(t, 1) - 1
+        IF LOWER$(TRIM$(t[0, k])) = name THEN RETURN k
+    NEXT
+    RETURN -1
+END FUNCTION
+
+FUNCTION zelle$(t AS ARRAY OF STRING, z AS INTEGER, _
+                k AS INTEGER) AS STRING
+    IF k < 0 THEN RETURN ""
+    RETURN TRIM$(t[z, k])
+END FUNCTION
+
+' Die Art, wie die Mediathek sie schreibt ("buch" -> "Buch"), oder "".
+FUNCTION artGenau$(art AS STRING) AS STRING
+    DIM a AS STRING
+    FOR EACH a IN ["Buch", "Film", "Spiel", "Musik"]
+        IF LOWER$(a) = LOWER$(art) THEN RETURN a
+    NEXT
+    RETURN ""
+END FUNCTION
+
+' Was an einer Zeile falsch ist, oder "".
+FUNCTION zeileFalsch$(t AS ARRAY OF STRING, z AS INTEGER, _
+                      sArt AS INTEGER, titel AS STRING, _
+                      art AS STRING, jahr AS STRING) AS STRING
+    IF titel = "" THEN RETURN "kein Titel."
+    IF art = "" THEN
+        RETURN "die Art „" + zelle$(t, z, sArt) + _
+               "“ gibt es nicht (Buch, Film, Spiel, Musik)."
+    END IF
+    IF jahr <> "" THEN
+        IF NOT REGEX_TEST(jahr, "^[0-9]{3,4}$") THEN
+            RETURN "das Jahr „" + jahr + "“ ist keine Zahl."
+        END IF
+    END IF
+    RETURN ""
+END FUNCTION
+
+' Gibt es diesen Titel von diesem Urheber schon?
+FUNCTION schonDa(titel AS STRING, urheber AS STRING) AS BOOLEAN
+    DIM r AS DB_RESULT
+    r = DB_QUERY(Mediathek, "SELECT id FROM eintrag " + _
+                 "WHERE titel = ? AND COALESCE(urheber, '') = ?", _
+                 titel, urheber)
+    RETURN DB_NEXT(r)
+END FUNCTION

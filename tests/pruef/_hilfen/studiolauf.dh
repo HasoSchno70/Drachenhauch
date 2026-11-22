@@ -83,7 +83,8 @@ END SUB
 FUNCTION slStarten(log AS STRING, aufnahme AS STRING, bilder AS INTEGER, datei AS STRING) AS STRING
     IF FILEEXISTS(log) THEN DELETEFILE(log)
     SETENV("DH_STUDIO_LOG", log)
-    SETENV("DH_STUDIO_GROESSE", "1440x900")
+    ' Ein Fall darf eine andere Groesse waehlen (SL_GROESSE, etwa 1280x800).
+    SETENV("DH_STUDIO_GROESSE", IIF(GETENV$("SL_GROESSE") <> "", GETENV$("SL_GROESSE"), "1440x900"))
     SETENV("DH_STUDIO_AUFNAHME", aufnahme)
     ' Die Einstellungen des Studios (Sprache) im Fallordner -- sonst entschiede
     ' die studio.json bzw. ide.json des Nutzers, in welcher Sprache es aufgeht.

@@ -1,0 +1,70 @@
+' Kapitel 24 -- die Mediathek als Web-Seite im Heimnetz: Wer im selben
+' Netz ist, sieht im Browser, was da ist und wer was hat. Nur lesen --
+' aendern geht weiter nur am Programm.
+IMPORT "httpd"
+
+CONST NETZ_PORT = 8080
+DIM netz AS HTTPD
+DIM netzAn AS BOOLEAN
+
+SUB netzStarten()
+    IF netzAn THEN RETURN
+    netz = HTTPD_START(NETZ_PORT)
+    netzAn = TRUE
+END SUB
+
+SUB netzStoppen()
+    IF netzAn THEN HTTPD_STOP(netz)
+    netzAn = FALSE
+END SUB
+
+FUNCTION netzPort() AS INTEGER
+    IF NOT netzAn THEN RETURN 0
+    RETURN HTTPD_PORT(netz)
+END FUNCTION
+
+' Liegt eine Anfrage an? HTTPD_ACCEPT kehrt sofort zurueck, wenn
+' niemand anklopft -- das Programm laeuft weiter.
+SUB netzBedienen()
+    IF NOT netzAn THEN RETURN
+    IF NOT HTTPD_ACCEPT(netz) THEN RETURN
+    IF HTTPD_PATH$(netz) <> "/" THEN
+        HTTPD_SEND(netz, 404, "text/plain; charset=utf-8", "?")
+        RETURN
+    END IF
+    HTTPD_SEND(netz, 200, "text/html; charset=utf-8", netzSeite$())
+END SUB
+
+' Die Seite: der Bestand als Tabelle. Die Abfrage ist die aus dem
+' Hauptfenster, nach dem Titel sortiert -- dort sortiert die Tabelle.
+CONST NETZ_SQL = "SELECT e.titel, e.urheber, e.art, f.name " + _
+    "FROM eintrag AS e LEFT JOIN ausleihe AS a " + _
+    "ON a.eintrag = e.id AND a.zurueck IS NULL " + _
+    "LEFT JOIN freund AS f ON f.id = a.freund ORDER BY e.titel"
+
+FUNCTION netzSeite$() AS STRING
+    DIM z AS ARRAY OF STRING : z = []
+    ARRAY_PUSH(z, "<!doctype html><meta charset=utf-8>")
+    ARRAY_PUSH(z, "<title>" + html$(tr$("Mediathek")) + "</title>")
+    ARRAY_PUSH(z, "<h1>" + html$(tr$("Mediathek")) + "</h1>")
+    ARRAY_PUSH(z, "<table><tr><th>" + html$(tr$("Titel")) + _
+                  "<th>" + html$(tr$("Urheber")) + _
+                  "<th>" + html$(tr$("Art")) + _
+                  "<th>" + html$(tr$("Verliehen an")))
+    DIM r AS DB_RESULT : r = DB_QUERY(Mediathek, NETZ_SQL)
+    WHILE DB_NEXT(r)
+        ARRAY_PUSH(z, "<tr><td>" + html$(DB_GET_STRING(r, 0)) + _
+                      "<td>" + html$(DB_GET_STRING(r, 1)) + _
+                      "<td>" + html$(tr$(DB_GET_STRING(r, 2))) + _
+                      "<td>" + html$(DB_GET_STRING(r, 3)))
+    WEND
+    ARRAY_PUSH(z, "</table>")
+    RETURN JOIN$(z, CHR$(10))
+END FUNCTION
+
+' Ein Titel mit < oder & darf die Seite nicht zerbrechen.
+FUNCTION html$(t AS STRING) AS STRING
+    t = REPLACE$(t, "&", "&amp;")
+    t = REPLACE$(t, "<", "&lt;")
+    RETURN REPLACE$(t, ">", "&gt;")
+END FUNCTION

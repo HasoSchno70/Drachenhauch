@@ -117,6 +117,14 @@ WHILE n < 3 AND studioBild()
     n = n + 1
 WEND
 PRINT "hell "; f.kuchen.studioHell; " | balken hinten "; f.teil.balken.studioHell
+' Neu fuellen: Leeren, dieselbe Reihe noch einmal -- es bleibt eine Reihe
+' (bis 2026-11-22 legte Reihe() jedes Mal eine neue an, neben der alten,
+' leeren; die Balken wurden schmal). Eine andere bekommt ihren eigenen Index.
+f.teil.balken.Leeren()
+PRINT "reihe "; f.teil.balken.Reihe("Monate", [1.0, 2.0, 3.0])
+f.teil.balken.Leeren()
+PRINT "nochmal "; f.teil.balken.Reihe("Monate", [4.0, 5.0]); " reihen "; CHART_SERIES_COUNT(f.teil.balken.Diagramm); " punkte "; f.teil.balken.Anzahl()
+PRINT "andere "; f.teil.balken.Reihe("Plan", [1.0, 1.0]); " reihen "; CHART_SERIES_COUNT(f.teil.balken.Diagramm)
 --- datei proj/projekt.dhstudio
 {"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"control","name":"Teil"},{"art":"fenster","name":"Hauptfenster"}]}
 --- datei proj/App.dh
@@ -153,6 +161,9 @@ seite 0: balken FALSE
 seite 1: balken TRUE
 dunkel 0
 hell 1 | balken hinten 1
+reihe 1
+nochmal 1 reihen 2 punkte 2
+andere 2 reihen 3
 code 0
 
 === ein diagramm aus der bibliothek: zeichenflaeche mit art, muster im entwurf
@@ -221,3 +232,107 @@ neu TRUE
 muster kuchen TRUE
 im inspektor TRUE
 widgets 2 | canvas kuchen
+
+=== ein diagramm in einem zweiten fenster ist zu sehen
+' Ein Kuchen im Fenster Neben, das ueber dem Hauptfenster aufgeht (Buch
+' "Fenster, Formulare, Daten", Kapitel 18: die Statistik). studioMalen
+' zeichnete die Flaechen aller Fenster vor GUI_DRAW_WINDOW der Nebenfenster
+' -- das Fenster deckte sein Diagramm zu, es blieb leer. Gezaehlt werden
+' die Farben im Rechteck der Flaeche.
+IMPORT "laeufer.dh"
+DIM p AS STRING : p = CWD$() + "/proj"
+slHin(10, 10)
+slWarten(10)
+slTaste(294)
+slWarten(150)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+SETENV("DH_STUDIO_LAUF_BILDER", "20")
+DIM log AS STRING : log = CWD$() + "/s.log"
+slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+PRINT "geprueft "; slHat(log, "geprueft 0 0")
+DIM neu AS ARRAY OF STRING : neu = []
+DIM s AS STRING
+FOR EACH s IN READLINES(p + "/_studio/main.dh")
+    IF LEFT$(s, 11) = "studioLauf(" THEN
+        DIM t AS STRING
+        FOR EACH t IN READLINES(CWD$() + "/probe.dh")
+            ARRAY_PUSH(neu, t)
+        NEXT
+    ELSE
+        ARRAY_PUSH(neu, s)
+    END IF
+NEXT
+WRITEALL(p + "/_studio/probe.dh", JOIN$(neu, CHR$(10)) + CHR$(10))
+DIM k AS INTEGER : k = PROCESS_START("dhrt", "run", "--bilder", "40", p + "/_studio/probe.dh")
+DIM leer AS INTEGER : leer = 0
+WHILE leer < 5
+    DIM t2 AS STRING : t2 = PROCESS_READ$(k) + PROCESS_ERR$(k)
+    IF t2 <> "" THEN
+        DIM zeile AS STRING
+        FOR EACH zeile IN SPLIT(REPLACE$(t2, CHR$(13), ""), CHR$(10))
+            IF zeile <> "" AND LEFT$(zeile, 8) <> "WARNING:" AND LEFT$(zeile, 5) <> "INFO:" THEN PRINT zeile
+        NEXT
+        leer = 0
+    ELSEIF NOT PROCESS_RUNNING(k) THEN
+        leer = leer + 1
+        SLEEP(30)
+    END IF
+WEND
+PRINT "code "; PROCESS_CODE(k)
+--- argumente
+{sammlung}/../../../studio/studio.dh
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei probe.dh
+SCREEN(640, 480, "Probe")
+studioSchirmB = SCREENWIDTH() : studioSchirmH = SCREENHEIGHT()
+studioDieStartseite = studioStartFenster
+studioDieApp.Geoeffnet()
+studioStartFenster.studioHaupt = TRUE
+studioStartFenster.Zeigen()
+DIM nf AS Neben : nf = NEW Neben()
+nf.Zeigen()
+nf.kuchen.Hinzufuegen("Obst", 5)
+nf.kuchen.Hinzufuegen("Milch", 2)
+DIM n AS INTEGER
+WHILE n < 3 AND studioBild()
+    n = n + 1
+WEND
+SAVESCREENSHOT("schirm.png")
+n = 0
+WHILE n < 2 AND studioBild()
+    n = n + 1
+WEND
+DIM img AS IMAGE : img = LOADIMAGE("schirm.png")
+DIM gesehen AS ARRAY OF INTEGER : gesehen = []
+DIM px AS INTEGER
+DIM py AS INTEGER
+DIM x0 AS INTEGER : x0 = GUI_CANVAS_X(nf.kuchen.Flaeche)
+DIM y0 AS INTEGER : y0 = GUI_CANVAS_Y(nf.kuchen.Flaeche)
+FOR py = y0 TO y0 + GUI_CANVAS_H(nf.kuchen.Flaeche) - 1 STEP 3
+    FOR px = x0 TO x0 + GUI_CANVAS_W(nf.kuchen.Flaeche) - 1 STEP 3
+        DIM c AS INTEGER : c = GETPIXEL(img, px, py)
+        IF ARRAY_INDEXOF(gesehen, c) < 0 THEN ARRAY_PUSH(gesehen, c)
+    NEXT
+NEXT
+PRINT "neben farbig "; LEN(gesehen) > 4
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"},{"art":"fenster","name":"Neben"}]}
+--- datei proj/App.dh
+CLASS App EXTENDS StudioApp
+END CLASS
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":620,"h":420,"widgets":[{"kind":"label","name":"l","text":"Haupt","x":10,"y":10,"w":100,"h":20}]}
+--- datei proj/Hauptfenster.dh
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+END CLASS
+--- datei proj/Neben.dhform
+{"title":"Neben","name":"Neben","x":40,"y":40,"w":360,"h":280,"movable":true,"closable":true,"visible":true,"widgets":[{"kind":"canvas","name":"kuchen","x":20,"y":20,"w":240,"h":180,"studio_diagramm":"kuchen","studio_diagramm_titel":"Vorrat"}]}
+--- datei proj/Neben.dh
+CLASS Neben EXTENDS Neben_Basis
+END CLASS
+--- erwartet
+geprueft TRUE
+neben farbig TRUE
+code 0

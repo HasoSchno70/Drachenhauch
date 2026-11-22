@@ -147,6 +147,7 @@ FUNCTION berElementName$(art AS STRING) AS STRING
         CASE "linie" : RETURN tr$("Linie")
         CASE "rechteck" : RETURN tr$("Rechteck")
         CASE "bild" : RETURN tr$("Bild")
+        CASE "strichcode" : RETURN tr$("Strichcode")
     END SELECT
     RETURN art
 END FUNCTION
@@ -492,12 +493,12 @@ END FUNCTION
 FUNCTION berEigGilt(name AS STRING, art AS STRING) AS BOOLEAN
     SELECT CASE name
         CASE "x", "y", "b", "h", "wo" : RETURN TRUE
-        CASE "text" : RETURN art = "text" OR art = "seitenzahl"
-        CASE "spalte" : RETURN art = "feld" OR art = "summe" OR art = "bild"
+        CASE "text" : RETURN art = "text" OR art = "seitenzahl" OR art = "strichcode"
+        CASE "spalte" : RETURN art = "feld" OR art = "summe" OR art = "bild" OR art = "strichcode"
         CASE "format" : RETURN art = "feld" OR art = "summe"
         CASE "funktion", "bereich" : RETURN art = "summe"
         CASE "schrift", "groesse", "fett", "kursiv", "ausrichtung" : RETURN berIstTextArt(art)
-        CASE "farbe" : RETURN berIstTextArt(art) OR art = "linie" OR art = "rechteck"
+        CASE "farbe" : RETURN berIstTextArt(art) OR art = "linie" OR art = "rechteck" OR art = "strichcode"
         CASE "staerke" : RETURN art = "linie" OR art = "rechteck"
         CASE "fuellung" : RETURN art = "rechteck"
         CASE "bild" : RETURN art = "bild"
@@ -523,7 +524,7 @@ FUNCTION berEigWahl(r AS Reiter, name AS STRING) AS ARRAY OF STRING
         CASE "bereich" : RETURN ["gruppe", "bericht"]
         CASE "schrift" : RETURN ["sans", "serif", "mono"]
         CASE "ausrichtung" : RETURN ["links", "mitte", "rechts"]
-        CASE "papier" : RETURN ["A4", "A5", "A3", "Letter", "Legal"]
+        CASE "papier" : RETURN ["A4", "A5", "A6", "A3", "Letter", "Legal"]
         CASE "bild"
             DIM b AS ARRAY OF STRING : b = [""]
             DIM n AS STRING
@@ -1675,6 +1676,17 @@ SUB berichtElementZeichnen(j AS JSON_HANDLE, p AS STRING, ox AS FLOAT, oy AS INT
             IF berichtText$(j, p + ".spalte") <> "" THEN bn = "[" + berichtText$(j, p + ".spalte") + "]"
             TEXT(x1 + 3, y1 + 2, IIF(bn = "", tr$("Bild"), bn), RGB(120, 140, 180))
             RETURN
+        CASE "strichcode"
+            ' Im Entwurf ein angedeuteter Code und woher er kommt.
+            RECT(x1, y1, x2, y2, RGB(200, 210, 230))
+            DIM sx AS INTEGER
+            FOR sx = x1 + (x2 - x1) \ 10 TO x2 - (x2 - x1) \ 10 STEP 4
+                IF (sx \ 4) MOD 3 <> 1 THEN LINE(sx, y1 + 3, sx, y2 - 14, RGB(60, 60, 70))
+            NEXT
+            DIM sq AS STRING : sq = berichtText$(j, p + ".text")
+            IF berichtText$(j, p + ".spalte") <> "" THEN sq = "[" + berichtText$(j, p + ".spalte") + "]"
+            TEXT(x1 + 3, y2 - 13, IIF(sq = "", tr$("Strichcode"), sq), RGB(40, 90, 170))
+            RETURN
     END SELECT
     RECT(x1, y1, x2, y2, RGB(200, 210, 230))
     IF t = "" THEN RETURN
@@ -1693,6 +1705,7 @@ SUB berichtElementZeichnen(j AS JSON_HANDLE, p AS STRING, ox AS FLOAT, oy AS INT
 END SUB
 
 ' Fuer Pruefungen: wo was auf dem Schirm steht.
+DIM berLagenNochmal AS INTEGER : berLagenNochmal = 0
 SUB berichtLagen(r AS Reiter)
     r.ber.lagen = FALSE
     IF logDatei = "" THEN RETURN
@@ -1706,7 +1719,19 @@ SUB berichtLagen(r AS Reiter)
         protokoll("lage berleiste" + STR$(b) + " " + STR$(berSchirmX(berInhaltB() - 10.0)) + " " + STR$(berBandY(j, b) - BER_STRIP \ 2))
     NEXT
     DIM i AS INTEGER
-    FOR i = 0 TO LEN(r.ber.leisteArt) - 1
+    ' Was im Ueberlauf (>>) steht -- die hinteren Knoepfe, solange die Leiste
+    ' zu schmal ist (auch beim ersten Bild, bevor die Beschriftungen gemessen
+    ' sind) --, hat keine Lage.
+    DIM sichtbar AS INTEGER : sichtbar = LEN(r.ber.leisteArt) - GUI_TOOLBAR_OVERFLOW(r.ber.leiste)
+    ' Erst geschaetzt, im naechsten Bild gemessen: dann noch einmal (hoechstens
+    ' zehnmal, falls die Leiste wirklich zu schmal ist).
+    IF sichtbar < LEN(r.ber.leisteArt) AND berLagenNochmal < 10 THEN
+        berLagenNochmal = berLagenNochmal + 1
+        r.ber.lagen = TRUE
+    ELSEIF sichtbar = LEN(r.ber.leisteArt) THEN
+        berLagenNochmal = 0
+    END IF
+    FOR i = 0 TO sichtbar - 1
         protokoll("lage berknopf " + r.ber.leisteArt[i] + " " + STR$(GUI_TOOLBAR_ITEM_X(r.ber.leiste, i) + GUI_TOOLBAR_ITEM_W(r.ber.leiste, i) \ 2) + " " + STR$(GUI_GET_Y(r.ber.leiste) + inhaltOben + 15))
     NEXT
     FOR i = 0 TO LEN(r.ber.spalten) - 1

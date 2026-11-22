@@ -987,6 +987,7 @@ Path-based, without a FILE handle *(native runtime only)*:
 | `RMDIR(path$[, with_content])` | delete a directory (empty; with `TRUE` including its contents) |
 | `FILETIME(path$)` → INTEGER | last modified, seconds as in the module `zeit` |
 | `TEMPDIR$()` → STRING | the system's temp directory |
+| `DIR_USER_DATA$(app$)` → STRING | the folder for the user's data, created if missing: Windows `%APPDATA%\app`, macOS `~/Library/Application Support/app`, otherwise `$XDG_DATA_HOME/app` or `~/.local/share/app` — that is where an installed program keeps its database and settings, not next to the executable |
 | `TEMPFILE$([prefix$[, extension$]])` → STRING | a free name in the temp directory, **created empty** |
 | `MKDIR(path$)` | create a directory (including parents) |
 | `COPYFILE(src$, dst$)` | copy a file |

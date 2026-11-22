@@ -1,6 +1,13 @@
 const fs = require("fs");
 const path = require("path");
-const { neu } = require("../code_lesen");
+const { neu, stueck } = require("../code_lesen");
+
+// Das Strichcode-Element der Karteikarte (Loesung Kapitel 17, Erweitern 1).
+function strichcode() {
+  const d = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "..", "code", "loesungen", "kap17_strichcode", "Karteikarte.dhreport"), "utf8"));
+  const e = d.baender[0].elemente.find((x) => x.art === "strichcode");
+  return JSON.stringify(e, null, 2).split("\n");
+}
 
 // Das SQL einer Abfrage aus dem Datenbank-Element einer Loesung.
 function sql(rel, name) {
@@ -503,4 +510,232 @@ module.exports = (H) => [
   ...neu("loesungen/kap16_sekunden/EintragFenster.dh").map((t) => H.code(t)),
 
   H.p("Der Timer läuft ohnehin alle 100 ms; er hat nur bisher nichts gesagt, solange er wartete. Gezählt wird nach der Uhr (MILLIS), nicht nach Timer-Runden — so stimmt die Zahl auch, wenn sich ein Aufruf des Timers verspätet."),
+
+  H.h2("Kapitel 17 · Berichte und Drucken"),
+
+  H.h3("Drehen 1"),
+
+  H.p("„Die unendliche Geschich…“. Ein Feld bricht nicht um; was nicht in seine Breite passt, kürzt es und hängt „…“ an. Gemessen wird mit der echten Schrift, darum zeigt die Vorschau genau, was gedruckt wird."),
+
+  H.h3("Drehen 2"),
+
+  H.p("In beiden Gruppenfüßen steht 55 statt 15 und 40 — die Tage aller Ausleihen. Der Bereich sagt, über welche Zeilen eine Summe rechnet: Gruppe heißt über die Zeilen ihrer Gruppe, Bericht über alle. Im Berichtsfuß ist beides dasselbe."),
+
+  H.h3("Drehen 3"),
+
+  H.p("Fünf Seiten, eine je Eintrag: Ohne Bedingung ist jede Zeile der Tabelle dran, und weil das Detail so hoch ist wie die Seite, kommt jede auf ein eigenes Blatt. Der Wert für id stört nicht — ein Parameter, den die Bedingung nicht nennt, wird nicht gebraucht."),
+
+  H.h3("Erweitern 1: der Strichcode"),
+
+  H.p("Ein Element Strichcode aus der Leiste, unter die ISBN gelegt, mit der Spalte isbn; 37,29 × 25,93 mm ist die Nenngröße eines EAN-13 (code/loesungen/kap17_strichcode/Karteikarte.dhreport):"),
+
+  H.code(strichcode(), { out: true }),
+
+  H.p("Eine ISBN-13 ist ein EAN-13; Bindestriche fallen weg, eine ISBN-10 bekommt 978 davor. Ein Eintrag ohne ISBN, oder mit einer, deren Prüfziffer nicht stimmt, bekommt keinen Strichcode — lieber keinen als einen, den der Scanner falsch liest."),
+
+  H.h3("Erweitern 2: der Jahresrückblick"),
+
+  H.p("Eine Abfrage rueckblick liefert je Ausleihe das Jahr und den Monat als Text (code/loesungen/kap17_rueckblick):"),
+
+  H.code(sql("loesungen/kap17_rueckblick/Mediathek.dhdb", "rueckblick"), { out: true }),
+
+  H.p("Der Bericht Rueckblick hat die Bedingung jahr = :jahr, eine Gruppe nach monat, im Detail titel und freund, im Gruppenfuß die Anzahl der Gruppe und im Berichtsfuß die des Berichts. Das Menü Datei bekommt einen dritten Eintrag:"),
+
+  ...neu("loesungen/kap17_rueckblick/Hauptfenster.dh").map((t) => H.code(t)),
+
+  H.p("Mit {\"jahr\": 2026} statt des Textes bliebe der Rückblick leer: strftime liefert Text, und SQLite hält die Zahl 2026 und den Text '2026' nicht für gleich."),
+
+  H.h2("Kapitel 18 · Diagramme"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Nichts. Die Balken stehen da, aber unter ihnen ist die Achse leer: Das Diagramm kennt nur sechs Werte, nicht, welche Monate sie sind. Woher die Zahlen kommen, weiß nur der Code — er muss es dazuschreiben."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Mit werte innen steht in jedem Stück seine Zahl: 2 im Stück Buch, 1 in den drei anderen. Mit prozent dazu der Anteil: 40 % und dreimal 20 %. Die Prozente rechnet das Diagramm selbst aus der Summe aller Stücke."),
+
+  H.h3("Drehen 3"),
+
+  H.p("Nichts — der Hinweis bleibt, wie er war. Maus kommt, wenn die Taste gedrückt wird, vor dem Zeichnen dieses Bildes; erst das Zeichnen stellt fest, welches Stück unter der Maus lag. In Takt, im Bild danach, steht der Klick da."),
+
+  H.h3("Erweitern 1: der Zeitraum"),
+
+  H.p("Eine Klappliste wahlZeitraum mit den Einträgen „6 Monate“ und „12 Monate“ rechts neben der Liste. Geoeffnet wählt den ersten Eintrag; monateFuellen zählt nicht mehr fest sechs, sondern n Monate (code/loesungen/kap18_zeitraum/StatistikFenster.dh):"),
+
+  ...neu("loesungen/kap18_zeitraum/StatistikFenster.dh").map((t) => H.code(t)),
+
+  H.p("Die drei FOR-Schleifen, die bis 5 liefen, laufen bis n - 1. Weil monateFuellen das Diagramm erst leert und Reihe die Reihe „Ausleihen“ wiederfindet, stehen danach zwölf Balken da, nicht sechs neben zwölf."),
+
+  H.h3("Erweitern 2: wie viel verliehen ist"),
+
+  H.p("Ein drittes Diagramm anteil mit der Art leiste, unter dem Balkendiagramm; die Liste wird dafür schmaler (code/loesungen/kap18_verliehen/StatistikFenster.dh):"),
+
+  ...neu("loesungen/kap18_verliehen/StatistikFenster.dh").map((t) => H.code(t)),
+
+  H.p("Eine Leiste zeigt einen Wert zwischen min und max; max 100 und die Einheit „ %“ machen daraus Prozent. Bei einer verliehenen von fünf steht dort 20 %."),
+
+  H.h2("Kapitel 19 · Ein- und Ausfuhr"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Das Programm hält an: „CSV_LOAD: alte_liste.csv: Zeile 2 ist kein UTF-8 (Byte 0xE4, Zeichen 30 der Zeile).“ Das dreißigste Zeichen der zweiten Zeile ist das „ä“ in Kästner. Die Meldung sagt gleich dazu, was zu tun ist: cp1252 als letztes Argument. READLINES davor hat \"auto\" noch — dort fällt es nicht auf, erst beim zweiten Lesen."),
+
+  H.h3("Drehen 2"),
+
+  H.p("„alte_liste.csv: 8 Zeilen, 0 neu, 5 schon da, 3 mit Fehler“. Die vier Einträge vom ersten Mal und Momo sind schon da; die drei falschen Zeilen sind immer noch falsch. Weil schonDa nach Titel und Urheber fragt, kommt nichts doppelt hinein."),
+
+  H.h3("Drehen 3"),
+
+  H.p("Nichts. \"auto\" erkennt UTF-8, die erste Zeile verrät das Komma, und die Spalten sucht spalte nach ihrem Kopf, nicht nach ihrer Stelle. Eine Liste mit dem Kopf Jahr,Titel,Art,Urheber kommt genauso herein."),
+
+  H.h3("Erweitern 1: CSV für Excel"),
+
+  H.p("Ein Menüeintrag „Als CSV für Excel sichern …“ und im Modul Austausch eine SUB alsCsv (code/loesungen/kap19_csv):"),
+
+  ...neu("loesungen/kap19_csv/Austausch.dh").map((t) => H.code(t)),
+
+  H.p("Semikolon, weil Excel im deutschen Windows daran Spalten erkennt; cp1252, weil Excel eine CSV ohne Kennzeichnung so liest — in UTF-8 stünde dort „KÃ¤stner“. CSV_ROW$ setzt Anführungszeichen nur um „Krieg und Frieden; Band 1“, wo das Semikolon sie braucht. Ein Titel mit einem Zeichen, das cp1252 nicht kennt, ließe WRITEALL anhalten, statt still ein Fragezeichen zu schreiben."),
+
+  H.h3("Erweitern 2: die Fehlerdatei"),
+
+  H.p("einlesen merkt sich die Kopfzeile und jede falsche Zeile samt ihrem Fehler und schreibt sie am Ende neben die Liste (code/loesungen/kap19_fehler/Austausch.dh):"),
+
+  ...neu("loesungen/kap19_fehler/Austausch.dh").map((t) => H.code(t)),
+
+  H.p("FILE_ENCODING$ sagt, in welcher Kodierung \"auto\" die Liste gelesen hat; mit derselben wird die Fehlerdatei geschrieben, und Excel öffnet sie wie die Liste selbst. Aus der alten Liste wird so alte_liste_fehler.csv mit drei Zeilen, die erste „;Astrid Lindgren;Buch;1945;kein Titel.“ Wer dort den Titel einträgt und die Datei einliest, braucht die Spalte Fehler nicht zu löschen — einlesen kennt sie nicht und übergeht sie."),
+
+  H.h2("Kapitel 20 · Aussehen"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Das Programm hält gleich beim Start an: „GUI_STYLESHEET_LOAD (assets/mediathek.dhstil): Zeile 5: '#B03A2' ist keine Farbe -- erwartet #RGB, #RRGGBB, #AARRGGBB oder ein Name des Themas“. Fünf Ziffern sind weder die kurze noch die lange Schreibweise. Die Meldung nennt die Datei, wie StilLaden sie geladen hat — die Kopie unter assets/ —, ausgebessert wird aber die im Projektordner."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Fenster, Felder, Tabelle und die übrigen Knöpfe werden hell: Ihre Farben kommen aus dem Thema. „Entfernen“ bleibt rot und die Statuszeile grau — beide haben feste Farben aus der Stildatei, und eine Regel schlägt das Thema. Auch die Rahmenfarbe eines Felds mit Fokus wechselt mit: textinput:focus nennt accent, einen Namen des Themas, keine feste Farbe."),
+
+  H.h3("Drehen 3"),
+
+  H.p("Wie „Neu“ oder „Bearbeiten“: Keine Regel trifft ihn mehr, nur button { radius: 6 }, und die Farbe kommt aus dem Thema. Am Code hat sich nichts geändert — nur, was der Knopf ist."),
+
+  H.h3("Erweitern 1: wie das System"),
+
+  H.p("Ein Eintrag „Wie das System“ mit Haken im Menü Ansicht (code/loesungen/kap20_system/Hauptfenster.dh):"),
+
+  ...neu("loesungen/kap20_system/Hauptfenster.dh").map((t) => H.code(t)),
+
+  H.p("Das Thema system fragt das Betriebssystem, ob es dunkel eingestellt ist, und nimmt dann modern_dark, sonst modern_light, dazu seine Akzentfarbe. Wählt man danach „Helles Aussehen“, verliert „Wie das System“ seinen Haken — es gibt nur ein Aussehen auf einmal."),
+
+  H.h3("Erweitern 2: Sterne"),
+
+  H.p("Ein eigenes Control Sterne aus fünf flachen Knöpfen, mit dem Ereignis Geaendert (code/loesungen/kap20_sterne/Sterne.dh):"),
+
+  H.code(stueck("loesungen/kap20_sterne/Sterne.dh", "SUB Setzen", "END SUB")),
+
+  H.code(stueck("loesungen/kap20_sterne/Sterne.dh", "SUB waehlen", "END SUB")),
+
+  H.p("Jeder Stern ruft waehlen mit seiner Nummer; ein Klick auf den gefüllten letzten nimmt die Bewertung zurück. Die Tabelle eintrag bekommt eine Spalte bewertung (Ganze Zahl), das Bearbeitungsfenster eine Instanz sterne1 neben dem Jahr. Weil die Sterne nicht an der Bindung hängen, lädt und sichert das Fenster sie selbst (EintragFenster.dh):"),
+
+  ...neu("loesungen/kap20_sterne/EintragFenster.dh").map((t) => H.code(t)),
+
+  H.p("Sichern schreibt erst die gebundenen Felder; danach ist DatensatzId die Zeile — auch bei einem neuen Eintrag, der erst jetzt eine id bekommen hat. Darum kommt das UPDATE nach Sichern, nicht davor."),
+
+  H.h2("Kapitel 21 · Für alle"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Im dunklen Aussehen nichts, im hellen „label #status in \"Mediathek\": Kontrast 3,0:1 -- mindestens 4,5:1 (Schrift #8A93A6 auf #FAFBFC)“. Dasselbe Grau, ein anderer Grund: Auf Dunkel ist es hell genug, auf fast Weiß nicht. Darum steht in der Regel muted_fg — die Farbe wechselt mit dem Thema."),
+
+  H.h3("Drehen 2"),
+
+  H.p("„table #tabelle in \"Mediathek\": Tab springt hierher zurueck (von button #knopfausleihen in \"Mediathek\") -- die Reihenfolge folgt nicht der Lage“. Von „Ausleihen …“ unten rechts geht Tab jetzt nach oben links in die Tabelle. Den Befund bekommt das Widget, zu dem Tab springt — dort merkt man den Sprung."),
+
+  H.h3("Drehen 3"),
+
+  H.p("Nein. Ein Ziel unter 24 × 24 Punkten ist nur dann ein Befund, wenn ein Kreis von 24 Punkten um seine Mitte ein anderes Ziel berührt (WCAG 2.5.8). Zwischen „Entfernen“ und seinen Nachbarn liegen 10 Punkte; wer ihn knapp verfehlt, trifft nichts Falsches. Kleiner wird er trotzdem schwerer zu treffen — die Prüfung sagt nur, ab wann es nicht mehr reicht."),
+
+  H.h3("Erweitern 1: Treffer ansagen"),
+
+  H.p("Das Suchfeld bekommt das Ereignis Enter (code/loesungen/kap21_suche/Hauptfenster.dh):"),
+
+  ...neu("loesungen/kap21_suche/Hauptfenster.dh").map((t) => H.code(t)),
+
+  H.p("Die Tabelle ist beim Enter schon gefiltert — sie lädt neu, sobald sich der Suchtext ändert. Angesagt wird erst auf Enter, nicht bei jedem Buchstaben: So entscheidet der Nutzer, wann er es hören will."),
+
+  H.h3("Erweitern 2: große Schrift"),
+
+  H.p("App.Geoeffnet sieht in den Argumenten nach (code/loesungen/kap21_gross/App.dh):"),
+
+  ...neu("loesungen/kap21_gross/App.dh").map((t) => H.code(t)),
+
+  H.p("GUI_SCALE vergrößert alles — Schrift, Widgets und das Programmfenster mit. Es muss vor dem ersten Fenster stehen; einen Menüeintrag, der den Maßstab mitten im Lauf ändert, lässt die gui nicht zu. Ausprobieren lässt es sich im Projektordner mit dhrt run _studio/main.dh -- --gross; ein gebautes Programm bekommt die Option in seiner Verknüpfung. Wie man sich die Wahl für den nächsten Start merkt, zeigt Kapitel 23."),
+
+  H.h2("Kapitel 22 · Zwei Sprachen"),
+
+  H.h3("Drehen 1"),
+
+  H.p("„5 Einträge“ — der deutsche Text. Eine Zeile ohne Übersetzung zählt nicht, und was die Tafel nicht kennt, zeigt tr$ so, wie es im Code steht. Ein halb übersetztes Programm bleibt so wenigstens lesbar."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Das englische Programm zeigt den neuen deutschen Satz: Der Schlüssel hat sich geändert, und die Tafel kennt nur den alten. „Sprachtafel ergänzen“ hängt „Bitte erst einen Eintrag wählen.“ mit leerer Übersetzung an; die alte Zeile bleibt stehen, unbenutzt, bis man sie löscht. Wer einen Text der Quelle ändert, sieht danach in die Tafel."),
+
+  H.h3("Drehen 3"),
+
+  H.p("„Buch“. Die Klappliste zeigt die Übersetzung, gebunden ist aber ihr Wert, und das ist der Text des Entwurfs. Darum zählt die Statistik weiter vier Arten, gleich in welcher Sprache gespeichert wurde."),
+
+  H.h3("Erweitern 1: die Art übersetzt zeigen"),
+
+  H.p("Die Basisklasse füllt die Tabelle in Neuladen; das Hauptfenster überschreibt die Methode, ruft die der Basis und übersetzt danach die dritte Spalte (code/loesungen/kap22_art/Hauptfenster.dh):"),
+
+  ...neu("loesungen/kap22_art/Hauptfenster.dh").map((t) => H.code(t)),
+
+  H.p("Neuladen läuft auch, wenn jemand ins Suchfeld tippt — die Spalte bleibt also übersetzt. Gesucht wird aber weiter in der Datenbank: „Game“ findet nichts, „Spiel“ schon. Wer auch das will, gibt der Abfrage die Übersetzung mit, und das ist ein größerer Umbau."),
+
+  H.h3("Erweitern 2: Französisch"),
+
+  H.p("„Sprachtafel ergänzen“ mit fr legt sprache/fr.txt an, mit allen Texten und leeren Übersetzungen; sie bekommen französische (code/loesungen/kap22_franzoesisch/sprache/fr.txt). Von selbst wählt die Laufzeit aber nur Englisch. App.Geoeffnet wählt darum selbst (App.dh):"),
+
+  ...neu("loesungen/kap22_franzoesisch/App.dh").map((t) => H.code(t)),
+
+  H.p("SpracheWaehlen liefert FALSE, wenn es keine Tafel für die Sprache gibt — auf einem italienischen System also, und auf einem deutschen, denn eine de.txt gibt es nicht: Deutsch ist die Quelle. Dann gilt Englisch, außer auf dem deutschen System."),
+
+  H.h2("Kapitel 23 · Weitergeben"),
+
+  H.h3("Drehen 1"),
+
+  H.p("In bau/mediathek.db, neben der Exe — dort, wo Bauen die Entwicklungsdaten hingelegt hat. Solange bau/ im eigenen Projektordner liegt, geht das gut; unter „Programme“ installiert dürfte das Programm die Datei nicht ändern."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Dunkel, wie beim allerersten Start: einstellung(\"hell\", FALSE) findet keine Datei und liefert die Vorgabe. Ein Häkchen bei „Helles Aussehen“ legt sie wieder an."),
+
+  H.h3("Drehen 3"),
+
+  H.p("„Über die Mediathek“ sagt 1.1, die Datei des Installers heißt weiter Mediathek-1.0-Setup.exe, und unter „Apps“ steht 1.0. Zwei Stellen, eine Fassung — darum steht sie in mediathek.iss ganz oben, als #define, wo man sie sieht."),
+
+  H.h3("Erweitern 1: große Schrift"),
+
+  H.p("Ein Eintrag „Große Schrift“ mit Haken im Menü Ansicht. App.Geoeffnet setzt den Maßstab vor dem ersten Fenster (code/loesungen/kap23_gross/App.dh):"),
+
+  ...neu("loesungen/kap23_gross/App.dh").map((t) => H.code(t)),
+
+  H.p("Das Hauptfenster setzt den Haken beim Öffnen und merkt sich jede Änderung (Hauptfenster.dh):"),
+
+  ...neu("loesungen/kap23_gross/Hauptfenster.dh").map((t) => H.code(t)),
+
+  H.p("Die zwei neuen Texte kommen mit „Sprachtafel ergänzen“ in sprache/en.txt und bekommen dort ihre Übersetzung."),
+
+  H.h3("Erweitern 2: Erinnerung"),
+
+  H.p("Bestand.dh zählt die Zeilen der Abfrage ueberfaellig aus Kapitel 15 (code/loesungen/kap23_erinnern):"),
+
+  ...neu("loesungen/kap23_erinnern/Bestand.dh").map((t) => H.code(t)),
+
+  H.p("Das Hauptfenster fragt beim Öffnen und meldet sich, wenn es etwas gibt:"),
+
+  ...neu("loesungen/kap23_erinnern/Hauptfenster.dh").map((t) => H.code(t)),
+
+  H.p("NOTIFY zeigt eine Mitteilung des Systems — unter Windows am Symbol im Infobereich, das es dafür anlegt, unter macOS und Linux in der Mitteilungszentrale. Sie erscheint auch, wenn die Mediathek gerade nicht vorn ist."),
 ];

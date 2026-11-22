@@ -57,7 +57,7 @@ END SUB
 '  Alles hier arbeitet auf dem JSON-Handle des Berichts; der Reiter merkt
 '  sich danach den Stand fuers Rueckgaengig.
 CONST BERICHT_TEXTARTEN = "text,feld,summe,seitenzahl,datum"
-CONST BERICHT_ELEMENTARTEN = "text,feld,summe,seitenzahl,datum,linie,rechteck,bild"
+CONST BERICHT_ELEMENTARTEN = "text,feld,summe,seitenzahl,datum,linie,rechteck,bild,strichcode"
 
 ' Die feste Reihenfolge der Baender: Kopf vor Gruppenkoepfen (aussen zuerst),
 ' Detail, Gruppenfuesse (innen zuerst), Seitenfuss, Berichtsfuss.
@@ -195,6 +195,10 @@ FUNCTION berichtElementNeu(art AS STRING, x AS FLOAT, y AS FLOAT, spalte AS STRI
             JSON_SET_FLOAT(t, "staerke", 0.3)
         CASE "bild"
             b = 20.0 : h = 20.0
+        CASE "strichcode"
+            ' EAN-13 in etwa 80 % der Nenngroesse (37 x 26 mm).
+            IF spalte <> "" THEN JSON_SET_STRING(t, "spalte", spalte)
+            b = 30.0 : h = 20.0
     END SELECT
     JSON_SET_FLOAT(t, "x", x) : JSON_SET_FLOAT(t, "y", y)
     JSON_SET_FLOAT(t, "b", b) : JSON_SET_FLOAT(t, "h", h)

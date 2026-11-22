@@ -175,3 +175,38 @@ DHRT_FRAMES=2
 --- erwartet
 abgelehnt
 
+
+=== eine lange zeile bricht um, der dialog bleibt schmal
+' Seit 2026-11-22: eine Zeile, breiter als der Dialog (hoechstens 640), lief
+' ueber den Rand -- gefunden an den Befunden von GUI_A11Y_CHECK$ in einer
+' Meldung (Buch "Fenster, Formulare, Daten", Kapitel 21). Jetzt bricht sie
+' an Wortgrenzen um; jede Zeile ein Label, keines breiter als das Fenster.
+IMPORT "gui"
+SCREEN(800, 600, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM t AS STRING
+t = "table #tabelle in Mediathek: kein Name fuer den Bildschirmleser -- Text, eine Beschriftung davor (GUI_LABEL) oder GUI_TOOLTIP"
+DIM d AS GUI_WINDOW : d = GUI_DIALOG("Befunde", t + CHR$(10) + "kurz", "ok")
+GUI_UPDATE()
+DIM b AS INTEGER : b = GUI_WINDOW_GET_W(d)
+PRINT "schmal "; b <= 640
+DIM n AS INTEGER : n = 0
+DIM zu AS INTEGER : zu = 0
+DIM teile AS ARRAY OF STRING : teile = []
+DIM i AS INTEGER
+FOR i = 0 TO GUI_WINDOW_WIDGET_COUNT(d) - 1
+    DIM w AS GUI_WIDGET : w = GUI_WINDOW_WIDGET(d, i)
+    IF GUI_KIND(w) = "label" THEN
+        n = n + 1
+        ARRAY_PUSH(teile, GUI_TEXT(w))
+        IF GUI_GET_X(w) + GUI_TEXT_WIDTH(w, GUI_TEXT(w)) > b THEN zu = zu + 1
+    END IF
+NEXT
+PRINT "zeilen "; n > 2; " zu breit "; zu
+PRINT "alles da "; JOIN$(teile, " ") = t + " kurz"
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+schmal TRUE
+zeilen TRUE zu breit 0
+alles da TRUE

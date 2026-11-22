@@ -286,3 +286,32 @@ b
 --- erwartet
 TRUE
 TRUE
+
+=== dir_user_data legt den ordner fuer die daten des benutzers an
+' Windows nimmt APPDATA, macOS HOME/Library/Application Support, sonst
+' XDG_DATA_HOME -- alle drei zeigen hier auf einen Ordner der Pruefung.
+' Der Ordner entsteht beim ersten Aufruf; ein zweiter laesst ihn, wie er ist.
+DIM b AS STRING : b = REPLACE$(CWD$(), CHR$(92), "/") + "/benutzer"
+MKDIR(b)
+SETENV("APPDATA", b)
+SETENV("XDG_DATA_HOME", b)
+SETENV("HOME", b)
+DIM d AS STRING : d = REPLACE$(DIR_USER_DATA$("Mediathek"), CHR$(92), "/")
+PRINT "da "; DIREXISTS(d)
+PRINT "unter dem benutzerordner "; LEFT$(d, LEN(b)) = b
+DIM rest AS STRING : rest = MID$(d, LEN(b))
+IF rest = "/Library/Application Support/Mediathek" THEN rest = "/Mediathek"
+PRINT "rest "; rest
+WRITEALL(d + "/x.txt", "bleibt")
+DIM d2 AS STRING : d2 = REPLACE$(DIR_USER_DATA$(" Mediathek "), CHR$(92), "/")
+PRINT "nochmal "; d2 = d; " "; READALL(d + "/x.txt")
+--- erwartet
+da TRUE
+unter dem benutzerordner TRUE
+rest /Mediathek
+nochmal TRUE bleibt
+
+=== dir_user_data will den namen eines programms, keinen pfad
+PRINT DIR_USER_DATA$("../anderswo")
+--- fehler
+DIR_USER_DATA$: erwartet den Namen des Programms

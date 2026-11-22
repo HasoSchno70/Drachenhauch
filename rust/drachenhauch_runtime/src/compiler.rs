@@ -4099,6 +4099,24 @@ impl Compiler {
                     },
                     aehnliche_builtins(&bname))));
             }
+            // FILE_SAVE_DIALOG(titel, name, endungen) -- anders als
+            // FILE_OPEN_DIALOG(titel, endungen). Steht an zweiter Stelle nur
+            // eine Endung, war der Filter gemeint, und der Dialog schlaegt
+            // eine Datei "pdf" vor (so stand es im Studio bis 2026-11-22).
+            if bname.eq_ignore_ascii_case("file_save_dialog") && args.len() == 2 {
+                if let Node::StringLit(s) = &args[1] {
+                    let t = s.trim();
+                    if !t.is_empty() && !t.contains('.')
+                        && t.chars().all(|c| c.is_ascii_alphanumeric() || c == ',' || c == ';' || c == ' ') {
+                        self.warnings.push((self.ctx.cur_line, format!(
+                            "FILE_SAVE_DIALOG: das zweite Argument ist der vorgeschlagene Dateiname, \
+                             nicht die Endung -- \"{}\" wird so zum Namen der Datei. Mit Filter: \
+                             FILE_SAVE_DIALOG(titel, \"name.{}\", \"{}\") (anders als \
+                             FILE_OPEN_DIALOG(titel, endungen)).",
+                            t, t.split(|c| c == ',' || c == ';').next().unwrap_or(t).trim(), t)));
+                    }
+                }
+            }
             // Passt die Argumentzahl? Zu WENIGE meldet die Laufzeit selbst.
             // Zu VIELE geht je nach Builtin unterschiedlich aus, und der
             // Compiler kann nicht wissen, welcher Fall vorliegt:

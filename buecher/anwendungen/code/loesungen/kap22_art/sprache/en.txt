@@ -1,0 +1,98 @@
+seit heute	since today
+seit gestern	since yesterday
+seit {0} Tagen	for {0} days
+Titel	Title
+Urheber	Creator
+Art	Type
+Jahr	Year
+Verliehen an	Lent to
+Freund	Friend
+Von	From
+Zurück	Returned
+Tage	Days
+Die Datei ist leer.	The file is empty.
+Die erste Zeile braucht die Spalten Titel und Art.	The first line needs the columns Titel and Art.
+Zeile {0}: 	Line {0}: 
+{0} ist schon da.	{0} is already there.
+kein Titel.	no title.
+die Art „{0}“ gibt es nicht ({1}).	there is no type “{0}” ({1}).
+das Jahr „{0}“ ist keine Zahl.	the year “{0}” is not a number.
+Nichts gewählt	Nothing selected
+Mediathek	Media Library
+Suchen	Search
+Titel, Urheber, Art, Jahr oder Name	Title, creator, type, year or name
+Zeigt nur Einträge, in denen der Text vorkommt	Shows only entries that contain the text
+Bestand der Mediathek	Items in the library
+Neu ...	New ...
+Bearbeiten ...	Edit ...
+Entfernen	Remove
+Ausleihen ...	Lend ...
+Datei	File
+Ausleihliste ...	Loan list ...
+Karteikarte ...	Index card ...
+Als Excel-Mappe sichern ...	Save as Excel workbook ...
+Liste einlesen ...	Import list ...
+Bearbeiten	Edit
+Ansicht	View
+Überfällig ...	Overdue ...
+Statistik ...	Statistics ...
+Helles Aussehen	Light appearance
+Hilfe	Help
+Barrierefreiheit prüfen ...	Check accessibility ...
+{0} Einträge	{0} entries
+{0} entfernen?	Remove {0}?
+Entfernen|Abbrechen	Remove|Cancel
+{0} entfernt	{0} removed
+Erst einen Eintrag wählen.	Select an entry first.
+Als Excel-Mappe sichern	Save as Excel workbook
+Gesichert: {0}	Saved: {0}
+Liste einlesen	Import list
+Keine Befunde.	No findings.
+Barrierefreiheit	Accessibility
+Eintrag	Entry
+ISBN	ISBN
+Nachschlagen	Look up
+Titel, Urheber, Jahr und Cover von Open Library holen	Fetch title, creator, year and cover from Open Library
+Buch	Book
+Film	Film
+Spiel	Game
+Musik	Music
+Erscheinungsjahr	Year published
+OK	OK
+Abbrechen	Cancel
+Bitte einen Titel eingeben.	Please enter a title.
+Abgebrochen.	Cancelled.
+Eine ISBN hat 10 oder 13 Ziffern.	An ISBN has 10 or 13 digits.
+Frage Open Library ...	Asking Open Library ...
+Keine Antwort: {0}	No answer: {0}
+Unter dieser ISBN kennt Open Library nichts.	Open Library knows nothing under this ISBN.
+Gefunden, ohne Cover.	Found, without a cover.
+Gefunden. Lade das Cover ...	Found. Loading the cover ...
+Gefunden, mit Cover.	Found, with a cover.
+Gefunden; das Cover ist kein Bild.	Found; the cover is not an image.
+Ausleihen	Loans
+Kein Eintrag gewählt.	No entry selected.
+An	To
+Name	Name
+Verleihen	Lend
+{0} ist da.	{0} is here.
+{0} ist {1} bei {2}.	{0} has been with {2} {1}.
+{0} an {1} verliehen	{0} lent to {1}
+{0} ist zurück	{0} is back
+Überfällig	Overdue
+Bei	With
+Seit	Since
+Schließen	Close
+Statistik	Statistics
+Einträge je Art	Entries by type
+Ausleihen je Monat	Loans per month
+Ein Klick auf ein Stück oder einen Balken zeigt, was dazugehört.	Click a slice or a bar to see what belongs to it.
+Einträge	entries
+Ausleihe	loan
+Zeile	line
+Zeilen	lines
+{0} neu, {1} schon da, {2} mit Fehler	{0} new, {1} already there, {2} with errors
+Ausleihliste	Loan list
+Insgesamt	Total
+Karteikarte	Index card
+noch da	still out

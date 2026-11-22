@@ -751,6 +751,15 @@ impl Gui {
                            (a << 24) | (hover_bg & 0xFFFFFF));
             }
 
+            // Die Schrift einer gewaehlten Zeile: die Auswahl liegt zu 150/255
+            // ueber dem Grund. Reicht text_fg darauf nicht fuer 4,5:1, die
+            // lesbare von hell und dunkel -- im hellen modern-Thema stand
+            // sonst dunkle Schrift mit 3,0:1 auf dem Violett (Buch "Fenster,
+            // Formulare, Daten", Kapitel 21). Eigene Zellfarben bleiben.
+            let fg = if !t.zellmodus && t.ist_gewaehlt(ri as i32) {
+                let grund = mischen(bg & 0xFFFFFF, sel_bg & 0xFFFFFF, 150.0 / 255.0);
+                if kontrast(fg & 0xFFFFFF, grund) >= 4.5 { fg } else { lesbar_auf_allen(&[grund]) }
+            } else { fg };
             // Inhalte.
             for p in 0..gm.n_cols {
                 let c = gm.order[p];

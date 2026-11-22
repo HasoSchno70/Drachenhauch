@@ -350,7 +350,7 @@ t = READLINES("k.csv")
 --- datei k.csv base64
 TmFtZQpN/GxsZXIK
 --- fehler
-READLINES: k.csv: Zeile 2 ist kein UTF-8 (Byte 0xFC an Stelle 6). Kommt die Datei aus Excel oder einem alten Windows-Programm, ist sie meist cp1252 -- dann als letztes Argument "cp1252" mitgeben. Moeglich sind: utf8, utf8bom, cp1252 (= ansi, windows-1252), latin1 (= iso-8859-1)
+READLINES: k.csv: Zeile 2 ist kein UTF-8 (Byte 0xFC, Zeichen 2 der Zeile). Kommt die Datei aus Excel oder einem alten Windows-Programm, ist sie meist cp1252 -- dann als letztes Argument "cp1252" mitgeben. Moeglich sind: utf8, utf8bom, cp1252 (= ansi, windows-1252), latin1 (= iso-8859-1)
 
 === unbekannte kodierung zaehlt die moeglichen auf
 DIM t AS ARRAY OF STRING

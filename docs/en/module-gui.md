@@ -162,7 +162,7 @@ IMPORT "gui"
 | `GUI_TOOLBAR_SET_TEXT(tb, entry, text$)` | — | label of an entry |
 | `GUI_TOOLBAR_SET(tb, key$, value)` | — | `beschriftung` (0/1: text next to the icon), `symbolgroesse` (icon size in points, 0 = from the height) |
 | `GUI_TOOLBAR_GET(tb, key$)` | INTEGER | reads `beschriftung` and `symbolgroesse` back |
-| `GUI_TOOLBAR_ITEM_X(tb, entry)` | INTEGER | left edge of an entry in the window (like `GUI_GET_X`) |
+| `GUI_TOOLBAR_ITEM_X(tb, entry)` | INTEGER | left edge of an entry in the window (like `GUI_GET_X`); an entry in the overflow (`GUI_TOOLBAR_OVERFLOW`) has none and is an error |
 | `GUI_TOOLBAR_ITEM_W(tb, entry)` | INTEGER | width of an entry |
 | `GUI_TOOLBAR_OVERFLOW(tb)` | INTEGER | how many buttons are currently in the » menu (0 = everything fits) |
 | `GUI_STATUSBAR(win, x, y, w, h[, text$])` | GUI_WIDGET | status bar; `text$` is the first field |
@@ -324,6 +324,7 @@ IMPORT "gui"
 | `GUI_TABLE_SET_SELECTED(tbl, row)` | — | set the selection (-1 = none) |
 | `GUI_TABLE_CLICKED(tbl)` | INTEGER | row clicked in this frame (-1) |
 | `GUI_TABLE_ROW_COUNT(tbl)` | INTEGER | number of data rows |
+| `GUI_TABLE_ROW_RECT(tbl, row)` | TUPLE | where data row `row` is right now (x, y, w, h), in screen pixels like `GUI_HIT_TEST`, after sorting, filter and scrolling; filtered out (0, 0, 0, 0) -- for tests with real clicks and pictures |
 | `GUI_UPDATE()` | — | **required** every frame: process mouse/keys |
 | `GUI_DRAW([on_top])` | — | draw all windows (back→front); `on_top`=FALSE leaves out the context menu and tooltip |
 | `GUI_DRAW_TOP()` | — | only what lies above all windows: open menu (bar or context), open dropdown list, tooltip |
@@ -546,7 +547,7 @@ clicks.
 
 | Function | Returns | Purpose |
 |---|---|---|
-| `GUI_DIALOG(title$, text$[, style$])` | GUI_WINDOW | open a modal dialog (`"ok"` = default, `"janein"`, or **your own buttons** separated with `\|`: `"Speichern\|Verwerfen\|Abbrechen"`) |
+| `GUI_DIALOG(title$, text$[, style$])` | GUI_WINDOW | open a modal dialog (`"ok"` = default, `"janein"`, or **your own buttons** separated with `\|`: `"Speichern\|Verwerfen\|Abbrechen"`); at most 640 wide, longer lines wrap at word boundaries |
 | `GUI_PROMPT(title$, text$[, default$[, buttons$]])` | GUI_WINDOW | question **with an input field** (default value selected; without `buttons$` OK/Cancel) |
 | `GUI_ANSWER(dialog)` | INTEGER | `0` = still open, otherwise the **number of the button** (1-based): `1` = OK/Yes, `2` = Cancel/No |
 | `GUI_DIALOG_TEXT(dialog)` | STRING | what was typed into the input field of a `GUI_PROMPT` — also after the answer |
@@ -2609,7 +2610,7 @@ Three helpers for designing and for accessibility:
 | `GUI_INSPECTOR([on])` | BOOLEAN without argument | show the inspector (`TRUE`) or close it; without argument: is it open? |
 | `GUI_INSPECTOR_SELECTED()` | GUI_WIDGET | the widget selected in the inspector, -1 = none |
 | `GUI_INSPECT$(widget)` | STRING | what the inspector shows about a widget: kind, name, classes, position, state, shape, the matching stylesheet rules with their line and what applies per state |
-| `GUI_STATE$()` | STRING | the state of all visible windows as text: one line per widget with a state (texts, ticks, values, selection, rows of a table) -- the expectation `dhrt aufnehmen` writes ([werkzeuge.md](werkzeuge.md#dhrt-aufnehmen--operating-a-program-as-a-test-case)) |
+| `GUI_STATE$()` | STRING | the state of all visible windows as text: one line per widget with a state (texts, ticks, values, selection, rows of a table, title and description of a card; at the end the last announcement to the screen reader) -- the expectation `dhrt aufnehmen` writes ([werkzeuge.md](werkzeuge.md#dhrt-aufnehmen--operating-a-program-as-a-test-case)) |
 | `GUI_SET_MOTION(mode$)` | — | `"system"` (default): like the operating system; `"an"`: animations always; `"aus"`: never |
 | `GUI_MOTION()` | BOOLEAN | is the gui playing motion right now? |
 
@@ -3845,7 +3846,7 @@ What the program can contribute:
 
 | Command | Description |
 |---|---|
-| `GUI_ANNOUNCE(text$[, urgent])` | hand a sentence to the user's screen reader — it speaks it with its voice (polite: after the current sentence; urgent: immediately). Without an assistive program nothing happens. For everything that would otherwise only appear in a status line: "Invoice saved", "3 rows deleted" |
+| `GUI_ANNOUNCE(text$[, urgent])` | hand a sentence to the user's screen reader — it speaks it with its voice (polite: after the current sentence; urgent: immediately). Without an assistive program nothing happens. For everything that would otherwise only appear in a status line: "Invoice saved", "3 rows deleted". The last one is in `GUI_STATE$` |
 | `GUI_SCREENREADER()` | `TRUE` as soon as an assistive program has requested the tree — for example to announce more or to switch off motion |
 | `GUI_SET_TAB_INDEX(widget, index)` | set the tab order: widgets with an index above 0 first, ascending; 0 (default) = order of creation |
 | `GUI_GET_TAB_INDEX(widget)` | read the index that was set (0 = creation order) |
@@ -3891,9 +3892,10 @@ label should at least give it a `GUI_TOOLTIP`.
 
 **What the toolkit brings along anyway:** operation without a mouse
 (above), `GUI_SCALE` for large text, the theme `contrast` (white on black,
-yellow frames, contrast 21:1) via `GUI_THEME_PRESET("contrast")`; the
-default `dark` and the light theme are above the WCAG value of 4.5:1 with
-all their texts.
+yellow frames, contrast 21:1) via `GUI_THEME_PRESET("contrast")`; all
+built-in themes are above the WCAG value of 4.5:1 with all their texts --
+also the muted text (`muted_fg`, placeholders) on the window and in a field
+and the selected row of a table.
 
 **What the program must do — and only it can:** never convey information
 through colour alone (that is why the red field also has a message), offer

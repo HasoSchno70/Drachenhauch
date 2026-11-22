@@ -365,3 +365,24 @@ Syntaxfehler bleibt ohne Hinweis (Gegenfall im selben Prueffall).
   zweimal (ureq nennt sie schon, `map_err` haengte sie noch einmal an) und
   sonst nur englische Systemworte. Jetzt einmal, und bei fehlender
   Verbindung bzw. abgelaufener Zeitgrenze ein Hinweis.
+
+2026-11-22, Buch "Fenster, Formulare, Daten", Kapitel 18: ein Balkendiagramm
+der Ausleihen je Monat (Werte 0 und 1) schrieb an die Wertachse
+"0 0 0 1 1 1" -- die automatische Schrittweite war 0,2, die Beschriftung
+ohne Nachkommastellen. `auto_schritt` waehlt jetzt nie feiner, als
+`nachkomma` schreiben kann (ohne also mindestens 1); Rust-Test
+`auto_schritt_nie_feiner_als_die_beschriftung`.
+
+2026-11-22, Buch "Fenster, Formulare, Daten", Kapitel 19: eine alte Liste
+aus Excel (cp1252) ohne Kodierung gelesen meldete "Zeile 2 ist kein UTF-8
+(Byte 0xE4 an Stelle 53)" -- das "ae" stand aber an Stelle 30 der Zeile; 53
+war der Abstand vom Dateianfang, neben "Zeile 2" irrefuehrend. Jetzt
+"Byte 0xE4, Zeichen 30 der Zeile" (in Zeichen gezaehlt, davor ist alles
+gueltiges UTF-8). Rust-Test und Fall in kodierung.dhtest, englische Vorlage.
+
+2026-11-22, DIR_USER_DATA$(app$): der Ordner fuer die Daten des Benutzers
+(Windows %APPDATA%, macOS Application Support, sonst XDG_DATA_HOME bzw.
+~/.local/share), angelegt beim ersten Aufruf. Vorher musste jedes Programm
+GETENV$ je System selbst zusammensetzen -- und ein installiertes Programm
+schrieb seine Datenbank neben die Exe, wo es unter "Programme" nicht darf
+(Buch "Fenster, Formulare, Daten", Kapitel 23).

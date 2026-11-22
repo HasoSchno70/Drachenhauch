@@ -16,6 +16,7 @@ CLASS DbAnsicht
     DIM kopf AS GUI_WIDGET
     DIM dateiText AS GUI_WIDGET
     DIM tfDatei AS GUI_WIDGET
+    DIM cbBenutzer AS GUI_WIDGET
     DIM lstTab AS GUI_WIDGET
     DIM btTabNeu AS GUI_WIDGET
     DIM btTabUm AS GUI_WIDGET
@@ -87,6 +88,9 @@ FUNCTION dbReiterNeu(e AS Element) AS INTEGER
     a.dateiStand = dbDateiVon$(dbSchema(e))
     GUI_SET_TEXT(a.tfDatei, a.dateiStand)
     GUI_TOOLTIP(a.tfDatei, tr$("Die SQLite-Datei mit den Daten -- im Projektordner, und neben dem gebauten Programm."))
+    a.cbBenutzer = dbDazu(r, GUI_CHECKBOX(win, tr$("Im Benutzerordner"), 0, 0))
+    GUI_SET_CHECKED(a.cbBenutzer, dbImBenutzerordner(dbSchema(e)))
+    GUI_TOOLTIP(a.cbBenutzer, tr$("Das gebaute Programm hält die Datei im Datenordner des Benutzers (DIR_USER_DATA$), nicht neben sich -- nötig, wenn es unter „Programme“ installiert wird. Beim ersten Start kommen die mitgelieferten Daten dorthin."))
     a.lstTab = dbDazu(r, GUI_LISTBOX(win, 0, 0, 200, 200, []))
     GUI_LISTBOX_PLACEHOLDER(a.lstTab, tr$("Noch keine Tabelle -- „Tabelle …“ legt eine an."))
     a.btTabNeu = dbKnopf(r, tr$("Tabelle …"))
@@ -132,9 +136,15 @@ SUB dbLegen(r AS Reiter)
     DIM y0 AS INTEGER : y0 = mitteKy + KOPF_H + 8
     DIM b AS INTEGER : b = mitteKb - 16
     DIM h AS INTEGER : h = mitteKh - KOPF_H - 16
-    GUI_SET_BOUNDS(a.kopf, x0 + 6, y0 + 3, b \ 2, 20)
-    GUI_SET_BOUNDS(a.dateiText, x0 + b - 330, y0 + 3, 56, 20)
-    GUI_SET_BOUNDS(a.tfDatei, x0 + b - 270, y0, 270, 26)
+    ' Die Kopfzeile von rechts: Datei, ihr Haken "Im Benutzerordner" so breit
+    ' wie sein Text, links davon die Ueberschrift -- wird es eng, wird das
+    ' Dateifeld schmaler.
+    DIM fw AS INTEGER : fw = IIF(b < 760, 200, 270)
+    DIM cbw AS INTEGER : cbw = GUI_TEXT_WIDTH(a.cbBenutzer, GUI_TEXT(a.cbBenutzer)) + 30
+    GUI_SET_BOUNDS(a.tfDatei, x0 + b - fw, y0, fw, 26)
+    GUI_SET_BOUNDS(a.dateiText, x0 + b - fw - 60, y0 + 3, 56, 20)
+    GUI_SET_BOUNDS(a.cbBenutzer, x0 + b - fw - 72 - cbw, y0 + 3, cbw, 20)
+    GUI_SET_BOUNDS(a.kopf, x0 + 6, y0 + 3, MAX(80, b - fw - 84 - cbw), 20)
     DIM y1 AS INTEGER : y1 = y0 + 36
     DIM unten AS INTEGER : unten = y0 + h - 28
     ' Links unter der Liste vier Knoepfe untereinander: anlegen (Tabelle,
@@ -241,6 +251,10 @@ SUB dbLagen(r AS Reiter)
     dbLage("zeneu", a.btZeNeu) : dbLage("zeweg", a.btZeWeg) : dbLage("neuladen", a.btNeuLaden)
     dbLage("bild", a.btBild)
     dbLage("datei", a.tfDatei)
+    dbLage("benutzer", a.cbBenutzer)
+    ' Die Kopfzeile von links nach rechts: Ende der Ueberschrift, Anfang und
+    ' Ende des Hakens, Anfang von "Datei:" -- nichts darf das Naechste decken.
+    protokoll("kopfzeile db " + STR$(GUI_GET_X(a.kopf) + GUI_GET_W(a.kopf)) + " " + STR$(GUI_GET_X(a.cbBenutzer)) + " " + STR$(GUI_GET_X(a.cbBenutzer) + GUI_GET_W(a.cbBenutzer)) + " " + STR$(GUI_GET_X(a.dateiText)) + " " + STR$(GUI_TEXT_WIDTH(a.kopf, GUI_TEXT(a.kopf)) <= GUI_GET_W(a.kopf)))
     dbLage("abfneu", a.btAbfNeu) : dbLage("ausfuehren", a.btAusfuehren) : dbLage("sql", a.taSql)
     ' Breiten des Spalten-Gitters, was jede Spalte braucht, und wie breit
     ' der Knopf "Umbenennen ..." fuer seine Beschriftung sein muss.
@@ -310,7 +324,7 @@ END SUB
 
 SUB dbWidgetsWeg(r AS Reiter)
     DIM a AS DbAnsicht : a = r.db
-    GUI_DESTROY(a.kopf) : GUI_DESTROY(a.dateiText) : GUI_DESTROY(a.tfDatei)
+    GUI_DESTROY(a.kopf) : GUI_DESTROY(a.dateiText) : GUI_DESTROY(a.tfDatei) : GUI_DESTROY(a.cbBenutzer)
     GUI_DESTROY(a.lstTab) : GUI_DESTROY(a.btTabNeu) : GUI_DESTROY(a.btTabUm)
     GUI_DESTROY(a.btTabWeg) : GUI_DESTROY(a.btSpalten) : GUI_DESTROY(a.btDaten)
     GUI_DESTROY(a.hinweis) : GUI_DESTROY(a.gitSp) : GUI_DESTROY(a.btSpNeu)
@@ -751,6 +765,12 @@ SUB dbAnsichtPruefen(r AS Reiter)
     END IF
     IF GUI_CLICKED(a.btNeuLaden) THEN dbDatenFuellen(r)
     IF GUI_CLICKED(a.btBild) THEN dbBildWaehlen(r)
+    IF GUI_CHANGED(a.cbBenutzer) THEN
+        dbOrtSetzen(r.el, GUI_CHECKED(a.cbBenutzer))
+        status(IIF(GUI_CHECKED(a.cbBenutzer), tr$("Das gebaute Programm hält die Daten im Benutzerordner."), tr$("Das gebaute Programm hält die Daten neben sich.")))
+        protokoll("db ort " + IIF(GUI_CHECKED(a.cbBenutzer), "benutzer", "programm"))
+        werkzeugeNachziehen()
+    END IF
     ' Die Datei: uebernommen mit Enter oder wenn das Feld den Fokus abgibt.
     IF GUI_TEXT(a.tfDatei) <> a.dateiStand AND (GUI_ENTERED(a.tfDatei) OR GUI_FOCUSED() <> a.tfDatei) THEN
         DIM fd AS STRING : fd = dbDateiSetzen$(r.el, GUI_TEXT(a.tfDatei))

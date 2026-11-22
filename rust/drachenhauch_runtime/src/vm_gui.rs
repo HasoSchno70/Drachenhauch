@@ -448,6 +448,10 @@ impl<'p> Vm<'p> {
                 let (x, y, w, h) = self.gui.tabcontrol_item_rect(gi(a,0,"GUI_TABCONTROL_ITEM_RECT")?, gi(a,1,"GUI_TABCONTROL_ITEM_RECT")?)?;
                 Value::Tuple(std::rc::Rc::new(vec![Value::Int(x as i64), Value::Int(y as i64), Value::Int(w as i64), Value::Int(h as i64)]))
             }
+            "gui_table_row_rect" => {
+                let (x, y, w, h) = self.gui.table_row_rect(gi(a,0,"GUI_TABLE_ROW_RECT")?, gi(a,1,"GUI_TABLE_ROW_RECT")?)?;
+                Value::Tuple(std::rc::Rc::new(vec![Value::Int(x as i64), Value::Int(y as i64), Value::Int(w as i64), Value::Int(h as i64)]))
+            }
             "gui_tree_item_rect" => {
                 let (x, y, w, h) = self.gui.tree_item_rect(gi(a,0,"GUI_TREE_ITEM_RECT")?, gi(a,1,"GUI_TREE_ITEM_RECT")?)?;
                 Value::Tuple(std::rc::Rc::new(vec![Value::Int(x as i64), Value::Int(y as i64), Value::Int(w as i64), Value::Int(h as i64)]))

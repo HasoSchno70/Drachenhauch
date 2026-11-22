@@ -1429,3 +1429,51 @@ am Zeilenende der Erwartung ab, die Ausgabe nicht.
   Jetzt eine Zeile je Tabelle: Zeilen, die gewaehlte, die erste Spalte.
   Seit Kapitel 15 dazu die gewaehlte Zeile ganz: ob nach "Zurueck" die
   Spalte "Verliehen an" leer wurde, sah ein Test sonst nicht.
+
+2026-11-22, Buch "Fenster, Formulare, Daten", Kapitel 17: der
+Berichts-Entwurf des Studios bekam einen neunten Knopf (Strichcode), und
+sein Protokoll der Lagen hielt beim ersten Bild mit "GUI_TOOLBAR_ITEM_X:
+Eintrag 8 gibt es nicht" an. Den Eintrag gab es -- er stand nur im
+Ueberlauf (>>), weil vor dem ersten Messen die Breiten geschaetzt werden
+(8 Punkte je Zeichen). `toolbar_item_rect` sagt jetzt, dass er im Ueberlauf
+steht und wer zaehlt, wie viele dort stehen; "gibt es nicht" nur noch fuer
+eine Nummer ausserhalb der Leiste.
+
+Ebenda, Kapitel 20: `GUI_STATE$` nennt auch Kacheln (Titel, Beschreibung,
+mit oder ohne Bild). Die Cover-Kachel der Mediathek zeigt, was in der
+Tabelle gewaehlt ist -- ob sie dem folgt, sah ein Test vorher nicht.
+
+Ebenda, Kapitel 21 (Fuer alle): `GUI_TABLE_ROW_RECT(tbl, row)` -- wo eine
+Datenzeile gerade steht, nach Sortierung, Filter und Rollen, in
+Bildschirmpunkten wie die Liste. Fehlte, als der Kontrast der gewaehlten
+Zeile am Bild gemessen werden sollte; nachrechnen aus Kopf- und
+Zeilenhoehe waere die zweite Quelle, die auseinanderlaeuft.
+
+Ebenda: die gewaehlte Zeile einer Tabelle legte die Auswahlfarbe
+(shade(accent, -110)) zu 150/255 ueber den Grund, die Schrift blieb
+text_fg. Im hellen Thema ergab das 2,4:1, im hellen modern-Thema 3,0:1 --
+dunkle Schrift auf Violett, gefunden am Bild der Mediathek nach Ansicht ->
+Helles Aussehen. GUI_A11Y_CHECK$ misst die Auswahl nicht. Jetzt nimmt die
+Zeile die lesbare Schrift (`lesbar_auf_allen`), wenn text_fg auf dem
+gemischten Grund unter 4,5:1 bleibt; eigene Zellfarben bleiben.
+
+Ebenda, Kapitel 21: `GUI_STATE$` endet mit der letzten Ansage an den
+Bildschirmleser (`ansage "..."`). Was ein Programm mit GUI_ANNOUNCE sagt,
+liess sich vorher nur mit einem echten Leser pruefen (UIA, nur Windows) --
+die Mediathek sagt jetzt an, was sonst nur in der Statuszeile steht.
+
+Ebenda, Kapitel 21: die gedaempfte Schrift `muted_fg` aller Themen
+nachgezogen -- mindestens 4,5:1 auf dem Fenster- und dem Widget-Grund.
+Gefunden, als die Statuszeile der Mediathek von einem festen Grau auf den
+Namen muted_fg umzog und GUI_A11Y_CHECK$ im hellen modern-Thema immer noch
+3,0:1 meldete: das Thema selbst lag darunter. Nachgemessen ueber alle:
+modern_light 3,0 (Fenster), dark 3,7, modern_dark 4,0, glas_dunkel 3,4,
+retro 4,2 (im Feld), glas_hell 4,1 (Fenster). Neue Werte je Thema auf den
+naechsten Ton mit 4,6:1 gemischt (Farbton bleibt). Die Pruefung der Themen
+kannte nur Schrift in text_fg.
+
+Ebenda: GUI_DIALOG (und damit Meldung/Frage im Studio) war hoechstens 640
+breit, brach eine laengere Zeile aber nicht um -- sie lief ueber den Rand.
+Gesehen an den Befunden von GUI_A11Y_CHECK$ in einer Meldung. Jetzt bricht
+`umbrechen_grund` an Wortgrenzen um (Grundschrift, logische Punkte, nicht
+breiter als der Schirm).

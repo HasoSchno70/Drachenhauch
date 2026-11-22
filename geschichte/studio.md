@@ -628,3 +628,82 @@ Ebenda, Kapitel 14 (Datenbindung):
   (wie man es im Abfragefeld schreibt), hielt das erzeugte Programm mit
   "Zeilenumbruch im String" an -- `dbText$`/`dhText$` maskierten nur
   Rueckstrich und Anfuehrungszeichen. Jetzt auch \n, \r und \t.
+
+Ebenda, Kapitel 17 (Berichte), 2026-11-22: ein Bericht auf A6 (die
+Karteikarte der Mediathek) legte aus wie auf A4 -- `studioBSeite` kannte
+nur A3, A4, A5, Letter und Legal, `PDF_NEW` aber A0 bis A6. Das PDF hatte
+das richtige Blatt, die Baender liefen ueber seinen Rand hinaus (70 Zeilen:
+2 Seiten statt 5). Jetzt dieselben Formate wie `pdf::seitenmass`, und die
+Wahl im Reiter bietet A6 an.
+
+Ebenda, Kapitel 17: ein Berichts-Element **Strichcode** (EAN-13) fuer die
+Karteikarte -- der Strichcode der ISBN war eine Uebung ("Etiketten mit
+Barcode" im Entwurf des Buchs), die es nicht gab. Gerechnet in
+`studio/berichte_laufzeit.dh` (`studioBEanZiffern$`: ISBN-10 wird ISBN-13,
+falsche Pruefziffer = kein Code; `studioBEan13$`: die 95 Module), gezeichnet
+als gefuellte Rechtecke, die Ziffern als Text darunter -- der Reihe nach,
+damit das PDF beim Kopieren die Nummer liefert (erst standen sie links und
+rechts verschraenkt). Die Muster sind gegen eine eigene Rechnung mit den
+Tabellen der Wikipedia geprueft (G als umgedrehtes R). Mit dem neunten
+Knopf stand "Strichcode" beim ersten Bild im Ueberlauf der Leiste;
+`berichtLagen` protokolliert nur sichtbare Knoepfe und dann, wenn gemessen
+ist, noch einmal.
+
+Ebenda, Kapitel 17: die Eigenschaft "Bereich" einer Summe (Gruppe oder
+Bericht) bot der Entwurf seit Stufe 2 an, die Auslegung las sie nie -- eine
+Summe rechnete immer ueber die Zeilen ihres Bandes. Aufgefallen beim
+Ausprobieren einer Drehen-Uebung ("was zeigt der Gruppenfuss mit Bereich
+Bericht?": dasselbe wie vorher). Jetzt rechnet "bericht" ueber alle Zeilen.
+
+Ebenda, Kapitel 18 (Diagramme): ein Diagramm im Statistikfenster -- einem
+zweiten Fenster ueber dem Hauptfenster -- blieb leer. `studioMalen`
+zeichnete erst alle Flaechen und Diagramme, danach die Nebenfenster mit
+GUI_DRAW_WINDOW; ein Nebenfenster deckte so sein eigenes Gemaltes zu. Das
+gilt fuer jede Zeichenflaeche und jedes eigene Zeichnen in einem zweiten
+Fenster. Jetzt malt jedes Nebenfenster sich und gleich danach seine
+Flaechen.
+
+Ebenda, Kapitel 18: das Statistikfenster fuellt seine Balken neu, wenn man
+den Zeitraum wechselt (Leeren, Reihe). `StudioDiagramm.Reihe` legte dabei
+jedes Mal eine NEUE Reihe an -- CHART_CLEAR behaelt die Reihen, nur ihre
+Werte gehen --, neben der alten leeren; die Balken wurden halb so breit und
+orange (die zweite Farbe der Palette). Jetzt merkt sich das Diagramm Namen
+und Index (`studioReihen`), dieselbe Reihe bekommt die neuen Werte.
+
+Ebenda, Kapitel 20 (Aussehen): ein Studio-Projekt hatte keinen Weg zu einer
+Stildatei. Die gui liest Klassen aus der .dhform (`klassen`), aber der
+Inspektor bot kein Feld dafuer; und eine .dhstil im Projektordner kam beim
+Starten nicht mit, das Programm haette ihren Pfad selbst suchen muessen.
+Jetzt: Kennung -> Klassen im Inspektor (neben dem Namen, beides Selektoren:
+#name, .klasse), jede *.dhstil im Projektordner geht nach _studio/assets/,
+und `StilLaden(name)` laedt sie (am besten in App.Geoeffnet). Der Entwurf
+zeigt sie bewusst nicht -- er steht in der Stildatei des Studios selbst.
+Pruefung werkzeug_studio_aussehen.
+
+Ebenda, Kapitel 21 (Fuer alle): GUI_A11Y_CHECK$ fand an der Mediathek "Tab
+springt zurueck" bei der Cover-Kachel -- die Tab-Folge im Inspektor stand
+nur am Behaelter der Instanz, ihre Teile hatten 0 und kamen nach allen
+gezaehlten Widgets des Fensters. `studioTeil` gibt jedem Teil ohne eigene
+Tab-Folge die der Instanz (Fall in werkzeug_studio_controls).
+
+Ebenda: GUI_SCALE in App.Geoeffnet (grosse Schrift) vergroesserte Schrift
+und Widgets, aber nicht das Programmfenster -- SCREEN war schon in der
+Groesse des Entwurfs offen, rechts und unten fehlte ein Drittel. Dazu
+setzte die Laufzeit das Startfenster auf SCREENWIDTH() Pixel statt
+logischer Punkte (und mittelte Fenster und Dialoge damit). `studioLauf`
+oeffnet den Schirm nach App.Geoeffnet im Massstab neu, `studioSchirmLB/LH`
+rechnen die Lage logisch (Fall in werkzeug_studio_aussehen).
+
+Kapitel 22 (Zwei Sprachen): eine Tafel sprache/<code>.txt konnte das Studio
+lesen, aber nicht anlegen -- wer sein Projekt uebersetzen wollte, suchte jeden
+Text selbst zusammen: Fenster, Menues, Spaltenkoepfe, Eintraege, Berichte,
+jedes tr$ im Code. Projekt -> Sprachtafel ergaenzen (studio/sprachtafel.dh)
+sammelt sie mit denselben Feldern wie studioTexteIn und haengt die fehlenden
+als "Text<Tab>" an; SpracheWaehlen laesst eine leere Uebersetzung aus (sonst
+haette sie den Text geloescht). Fall in werkzeug_studio_sprache.
+
+Kapitel 23 (Weitergeben): das gebaute Programm oeffnete seine Datenbank
+neben der Exe -- unter "Programme" installiert darf es dort nicht schreiben.
+Neu: der Haken "Im Benutzerordner" im Datenbank-Reiter ("ort": "benutzer");
+studioDbPfad$ nimmt dann DIR_USER_DATA$(Projektname) und kopiert beim ersten
+Start die mitgelieferte Datei dorthin. Fall in werkzeug_studio_datenbank3.

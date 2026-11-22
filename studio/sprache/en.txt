@@ -641,6 +641,9 @@ Feld	Field
 Summe	Sum
 Seitenzahl	Page number
 Rechteck	Rectangle
+Strichcode	Barcode
+Klassen	Classes
+Klassen für eine Stildatei (button.gefahr { ... }), durch Semikolon getrennt	Classes for a style sheet (button.gefahr { ... }), separated by semicolons
 Links (mm)	Left (mm)
 Oben (mm)	Top (mm)
 Breite (mm)	Width (mm)
@@ -725,3 +728,14 @@ Ein eigenes Control hat keine Menüleiste. [+ Kontextmenü] legt eins für den R
 Ein Kontextmenü mit {0} Einträgen. Sein Name ist das Handle (GUI_CONTEXT); die Einträge haben ihr Ereignis wie im Menü.	A context menu with {0} entries. Its name is the handle (GUI_CONTEXT); the entries have their event as in the menu.
 Datumsfeld	Date field
 ein Datum im Feld, der Kalender klappt auf	a date in a field, the calendar drops down
+Sprachtafel ergänzen …	Complete language table …
+Erst das Projekt sichern -- die Tafel kommt in seinen Ordner.	Save the project first -- the table goes into its folder.
+Sprachtafel ergänzen	Complete language table
+Sprache (zwei Buchstaben, etwa en):	Language (two letters, such as en):
+Ergänzen|Abbrechen	Complete|Cancel
+'{0}' ist kein Sprachcode -- zwei Buchstaben wie en oder fr.	'{0}' is not a language code -- two letters such as en or fr.
+{0} neue Texte in sprache/{1}.txt -- die Übersetzung kommt hinter den Tabulator.	{0} new texts in sprache/{1}.txt -- the translation goes after the tab.
+Im Benutzerordner	In the user folder
+Das gebaute Programm hält die Datei im Datenordner des Benutzers (DIR_USER_DATA$), nicht neben sich -- nötig, wenn es unter „Programme“ installiert wird. Beim ersten Start kommen die mitgelieferten Daten dorthin.	The built program keeps the file in the user's data folder (DIR_USER_DATA$), not next to itself -- needed when it is installed under “Program Files”. On the first start the supplied data go there.
+Das gebaute Programm hält die Daten im Benutzerordner.	The built program keeps the data in the user folder.
+Das gebaute Programm hält die Daten neben sich.	The built program keeps the data next to itself.

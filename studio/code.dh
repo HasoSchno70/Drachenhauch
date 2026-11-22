@@ -1536,6 +1536,7 @@ SUB dialogePruefen()
     ereignisDialogPruefen()
     methodeDialogPruefen()
     elementDialogPruefen()
+    sprachtafelDialogPruefen()
     menueEditorPruefen()
 END SUB
 

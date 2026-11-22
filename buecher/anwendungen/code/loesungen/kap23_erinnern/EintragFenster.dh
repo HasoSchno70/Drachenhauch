@@ -1,0 +1,138 @@
+' Kapitel 16 -- das Bearbeitungsfenster fragt Open Library nach einer
+' ISBN. Der Abruf laeuft im Hintergrund; ein Timer sieht alle 100 ms
+' nach, ob die Antwort da ist. Erst die Daten, dann das Cover.
+IMPORT "html"
+IMPORT "json"
+IMPORT "regex"
+CONST QUELLE = "https://openlibrary.org"
+
+CLASS EintragFenster EXTENDS EintragFenster_Basis
+    DIM id AS INTEGER
+    DIM ok AS BOOLEAN
+    ' Der laufende Abruf (-1 = keiner), was er holt ("daten" oder
+    ' "cover") und nach welcher ISBN.
+    DIM abruf AS INTEGER
+    DIM holt AS STRING
+    DIM isbn AS STRING
+
+    SUB Geoeffnet()
+        Self.abruf = -1
+        GUI_RULE(Self.feldTitel, "pflicht", _
+                 tr$("Bitte einen Titel eingeben."))
+        GUI_ERROR_LABEL(Self.feldTitel, Self.hinweis)
+        IF Self.id > 0 THEN
+            Self.Laden(Self.id)
+        ELSE
+            GUI_DROPDOWN_SET_SELECTED(Self.wahlArt, 0)
+        END IF
+        GUI_FOCUS(Self.feldIsbn)
+    END SUB
+
+    ' Laeuft schon ein Abruf, bricht derselbe Knopf ihn ab.
+    SUB knopfNachschlagen_Klick()
+        IF Self.abruf >= 0 THEN
+            HTTP_CANCEL(Self.abruf)
+            Self.fertig(tr$("Abgebrochen."))
+            RETURN
+        END IF
+        Self.isbn = REPLACE$(TRIM$(GUI_TEXT(Self.feldIsbn)), "-", "")
+        IF LEN(Self.isbn) <> 10 AND LEN(Self.isbn) <> 13 THEN
+            GUI_SET_TEXT(Self.hinweis, _
+                         tr$("Eine ISBN hat 10 oder 13 Ziffern."))
+            RETURN
+        END IF
+        HTTP_TIMEOUT(10)
+        DIM url AS STRING
+        url = QUELLE + "/api/books?bibkeys=ISBN:" + Self.isbn + _
+              "&format=json&jscmd=data"
+        Self.abruf = HTTP_GET_START(url)
+        Self.holt = "daten"
+        GUI_SET_TEXT(Self.knopfNachschlagen, tr$("Abbrechen"))
+        GUI_SET_TEXT(Self.hinweis, tr$("Frage Open Library ..."))
+        Self.abfrageTimer.Starten()
+    END SUB
+
+    ' Alle 100 ms: ist die Antwort da? Fehler kommen erst beim Abholen.
+    SUB abfrageTimer_Aktion()
+        IF Self.abruf < 0 THEN RETURN
+        IF NOT HTTP_READY(Self.abruf) THEN RETURN
+        DIM antwort AS STRING
+        TRY
+            antwort = HTTP_RESULT(Self.abruf)
+        CATCH e
+            Self.fertig(trf$("Keine Antwort: {0}", [e]))
+            RETURN
+        END TRY
+        IF Self.holt = "daten" THEN
+            Self.datenLesen(antwort)
+        ELSE
+            Self.coverLesen()
+        END IF
+    END SUB
+
+    SUB datenLesen(antwort AS STRING)
+        DIM j AS JSON_HANDLE : j = JSON_PARSE(antwort)
+        DIM b AS STRING : b = "ISBN:" + Self.isbn
+        IF NOT JSON_HAS(j, b) THEN
+            Self.fertig(tr$("Unter dieser ISBN kennt Open Library nichts."))
+            RETURN
+        END IF
+        GUI_SET_TEXT(Self.feldTitel, JSON_GET_STRING(j, b + ".title"))
+        IF JSON_HAS(j, b + ".authors.0.name") THEN
+            DIM wer AS STRING
+            wer = JSON_GET_STRING(j, b + ".authors.0.name")
+            GUI_SET_TEXT(Self.feldUrheber, wer)
+        END IF
+        ' Das Jahr steckt in einem Text wie "Jan 15, 2019".
+        IF JSON_HAS(j, b + ".publish_date") THEN
+            DIM d AS STRING
+            d = JSON_GET_STRING(j, b + ".publish_date")
+            GUI_SET_TEXT(Self.feldJahr, REGEX_FIND(d, "[0-9]{4}"))
+        END IF
+        GUI_DROPDOWN_SET_SELECTED(Self.wahlArt, 0)
+        IF NOT JSON_HAS(j, b + ".cover.medium") THEN
+            Self.fertig(tr$("Gefunden, ohne Cover."))
+            RETURN
+        END IF
+        DIM bild AS STRING
+        bild = JSON_GET_STRING(j, b + ".cover.medium")
+        Self.abruf = HTTP_GET_START(bild)
+        Self.holt = "cover"
+        GUI_SET_TEXT(Self.hinweis, tr$("Gefunden. Lade das Cover ..."))
+    END SUB
+
+    ' Das Cover sind Bytes, kein Text: HTTP_BYTES, in eine Datei, ins
+    ' Bild.
+    SUB coverLesen()
+        DIM pfad AS STRING : pfad = TEMPFILE$("cover", "jpg")
+        WRITEALL_BYTES(pfad, HTTP_BYTES())
+        IF Self.BildSetzen(Self.bildCover, pfad) THEN
+            Self.fertig(tr$("Gefunden, mit Cover."))
+        ELSE
+            Self.fertig(tr$("Gefunden; das Cover ist kein Bild."))
+        END IF
+        DELETEFILE(pfad)
+    END SUB
+
+    SUB fertig(meldung AS STRING)
+        Self.abfrageTimer.Stoppen()
+        Self.abruf = -1
+        GUI_SET_TEXT(Self.knopfNachschlagen, tr$("Nachschlagen"))
+        GUI_SET_TEXT(Self.hinweis, meldung)
+    END SUB
+
+    SUB knopfOk_Klick()
+        IF NOT Self.Sichern() THEN RETURN
+        Self.ok = TRUE
+        Self.Zumachen()
+    END SUB
+
+    SUB knopfAbbrechen_Klick()
+        Self.Zumachen()
+    END SUB
+
+    ' Wer das Fenster schliesst, braucht die Antwort nicht mehr.
+    SUB Schliessen()
+        IF Self.abruf >= 0 THEN HTTP_CANCEL(Self.abruf)
+    END SUB
+END CLASS

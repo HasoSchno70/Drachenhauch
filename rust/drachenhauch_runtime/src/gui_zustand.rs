@@ -74,10 +74,21 @@ impl Gui {
                         } else { String::new() };
                         format!("{} {} Zeilen, gewaehlt {}{}: {}", wer, n, sel, ganz, erste.join(" "))
                     }
+                    // Titel, Beschreibung und ob ein Bild darin steht -- eine
+                    // Kachel, die zeigt, was gewaehlt ist (Buch "Fenster,
+                    // Formulare, Daten", Kapitel 20), sah ein Test sonst nicht.
+                    Kind::Card => format!("{} \"{}\" \"{}\" {}", wer, kurz(&w.text), kurz(&w.placeholder),
+                                          if w.sel >= 0 { "mit Bild" } else { "ohne Bild" }),
                     _ => continue,
                 };
                 z.push(format!("  {}", zeile));
             }
+        }
+        // Die letzte Ansage an den Bildschirmleser (GUI_ANNOUNCE) -- sonst
+        // sah ein Test nicht, was ein Programm ansagt, ohne einen echten
+        // Leser (Buch "Fenster, Formulare, Daten", Kapitel 21).
+        if !self.ansage.is_empty() {
+            z.push(format!("ansage \"{}\"", kurz(&self.ansage)));
         }
         z.join("\n")
     }
