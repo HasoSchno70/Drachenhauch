@@ -5,8 +5,12 @@
 ' buch_wunder_anwendungen.dhtest.
 '
 ' Format: docs/werkzeuge.md, dhrt test.
+'
+' Allein braucht der Fall gut vier Minuten (2026-11-22: 249 s); im vollen
+' Lauf neben sieben anderen Dateien riss er die Vorgabe von 300 s.
 
 --- langsam
+--- zeitgrenze 600
 === jedes fensterprogramm laeuft ohne laufzeitfehler
 ' 420 Bilder (sieben Sekunden) je Programm, Zwischenstand oder Loesung:
 ' Die erste Rakete zerplatzt nach gut zwei Sekunden, ihre Funken leben
