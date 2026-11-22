@@ -126,12 +126,17 @@ fn utf8_meldung(fn_: &str, pfad: &str, bytes: &[u8], bis: usize) -> String {
     let wo = if pfad.is_empty() { String::new() } else { format!("{}: ", pfad) };
     // Die Zeile ist fuer den Menschen nuetzlicher als der Byte-Versatz.
     let zeile = bytes[..bis].iter().filter(|&&b| b == b'\n').count() + 1;
+    // Und wo in der Zeile -- in Zeichen, davor ist alles gueltiges UTF-8.
+    // (Bis 2026-11-22 stand hier der Abstand vom Dateianfang: "Zeile 2 ...
+    // an Stelle 53" fuer das neunundzwanzigste Zeichen der Zeile.)
+    let anfang = bytes[..bis].iter().rposition(|&b| b == b'\n').map(|p| p + 1).unwrap_or(0);
+    let zeichen = std::str::from_utf8(&bytes[anfang..bis]).map(|s| s.chars().count()).unwrap_or(bis - anfang) + 1;
     let byte = bytes.get(bis).copied().unwrap_or(0);
-    format!("{}: {}Zeile {} ist kein UTF-8 (Byte 0x{:02X} an Stelle {}). \
+    format!("{}: {}Zeile {} ist kein UTF-8 (Byte 0x{:02X}, Zeichen {} der Zeile). \
              Kommt die Datei aus Excel oder einem alten Windows-Programm, ist sie \
              meist cp1252 -- dann als letztes Argument \"cp1252\" mitgeben. \
              Moeglich sind: {}",
-            fn_, wo, zeile, byte, bis, NAMEN)
+            fn_, wo, zeile, byte, zeichen, NAMEN)
 }
 
 /// Text zu Bytes.
@@ -297,7 +302,13 @@ mod tests {
         bytes.push(0xE4);              // ein einzelnes Latin-1-'ae'
         let e = dekodieren(&bytes, Kodierung::Utf8, "READLINES", "k.csv").unwrap_err();
         assert!(e.contains("Zeile 3"), "{}", e);
+        assert!(e.contains("Zeichen 1 der Zeile"), "{}", e);
         assert!(e.contains("0xE4"), "{}", e);
+        // Davor ein Umlaut in UTF-8: gezaehlt werden Zeichen, nicht Bytes.
+        let mut b2 = "Name\nM\u{fc}l\u{fc}".as_bytes().to_vec();
+        b2.push(0xFC);
+        let e2 = dekodieren(&b2, Kodierung::Utf8, "READLINES", "k.csv").unwrap_err();
+        assert!(e2.contains("Zeile 2") && e2.contains("Zeichen 5 der Zeile"), "{}", e2);
         assert!(e.contains("cp1252"), "{}", e);
         assert!(e.contains("k.csv"), "{}", e);
     }

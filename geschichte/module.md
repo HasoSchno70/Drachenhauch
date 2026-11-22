@@ -372,3 +372,10 @@ der Ausleihen je Monat (Werte 0 und 1) schrieb an die Wertachse
 ohne Nachkommastellen. `auto_schritt` waehlt jetzt nie feiner, als
 `nachkomma` schreiben kann (ohne also mindestens 1); Rust-Test
 `auto_schritt_nie_feiner_als_die_beschriftung`.
+
+2026-11-22, Buch "Fenster, Formulare, Daten", Kapitel 19: eine alte Liste
+aus Excel (cp1252) ohne Kodierung gelesen meldete "Zeile 2 ist kein UTF-8
+(Byte 0xE4 an Stelle 53)" -- das "ae" stand aber an Stelle 29 der Zeile; 53
+war der Abstand vom Dateianfang, neben "Zeile 2" irrefuehrend. Jetzt
+"Byte 0xE4, Zeichen 29 der Zeile" (in Zeichen gezaehlt, davor ist alles
+gueltiges UTF-8). Rust-Test und Fall in kodierung.dhtest, englische Vorlage.
