@@ -68,6 +68,36 @@ module.exports = (H) => [
 
   H.p("MAPGETOR liefert die Vorgabe, solange es die Datei oder den Eintrag nicht gibt — beim allerersten Start. Fenster und Spalte entstehen danach mit breite und hoehe statt mit 560 und 300. Wer das Fenster maximiert und dann beendet, findet es beim nächsten Start so groß wie den Bildschirm, aber nicht maximiert; wer das unterscheiden will, fragt WINDOW_MAXIMIZED() und legt es mit ab."),
 
+  H.h2("Kapitel 3 · Listen und Tabellen"),
+
+  H.h3("Drehen 1"),
+
+  H.p("Tetris verschwindet, und nur Tetris. In der sortierten Tabelle steht es weiter unten, aber seine Datenzeile ist 2, wie beim Anhängen: GUI_TABLE_SEL_ROW liefert 2, und mediathek[2] ist Tetris. Sortieren hat nur die Anzeige umgestellt."),
+
+  H.h3("Drehen 2"),
+
+  H.p("Strg+Klick wählt dann um statt dazu: Es bleibt immer genau eine Zeile gewählt, die zuletzt angeklickte. Der Knopf arbeitet trotzdem — GUI_TABLE_SEL_COUNT ist 1 und GUI_TABLE_SEL_ROW(tabelle, 0) die gewählte Zeile —, er entfernt eben nur diesen einen Eintrag. Der Code muss sich nicht ändern, wenn man die Mehrfachauswahl ein- oder ausschaltet."),
+
+  H.h3("Drehen 3"),
+
+  H.p("Es bleiben Momo und Die unendliche Geschichte, beide von Michael Ende — der Filter sucht Teiltext und kennt keine Groß- und Kleinschreibung. Ein Doppelklick auf die zweite zeigt „Die unendliche Geschichte von Michael Ende (Buch, 1979)“: Sichtbar ist sie Zeile 1, ihre Datenzeile ist aber 8, und GUI_TABLE_SELECTED liefert die 8."),
+
+  H.h3("Erweitern 1: eine Farbe je Art"),
+
+  H.p("Zwei Funktionen und ein Aufruf an beiden Stellen, an denen Zeilen entstehen (code/loesungen/kap03_farben.dh):"),
+
+  ...neu("loesungen/kap03_farben.dh").map((t) => H.code(t)),
+
+  H.p("ARRAY_INDEXOF sucht die Art in derselben Liste, aus der das Formular seine Auswahl baut, und die Farben stehen in derselben Reihenfolge. GUI_TABLE_CELL_COLOR setzt Schrift- und Hintergrundfarbe einer Zelle; -1 heißt „nicht gesetzt“, und der Hintergrund bleibt der der Zeile, mit Zebrastreifen und Auswahl. Weil das Anhängen und das Färben jetzt in einer Funktion stehen, kann man das eine nicht ohne das andere tun."),
+
+  H.h3("Erweitern 2: Suche über alle Spalten"),
+
+  H.p("Die Filterzeile der Tabelle filtert je Spalte; wer dort sucht, muss wissen, in welcher Spalte das Gesuchte steht, und mehrere Filter gelten zugleich. Für eine Suche über alle Spalten baut die Lösung die Tabelle selbst neu, nur mit den Treffern (code/loesungen/kap03_suche.dh). Damit ist Zeile z nicht mehr Eintrag z, und ein zweites Feld merkt sich, welcher es ist:"),
+
+  ...neu("loesungen/kap03_suche.dh").map((t) => H.code(t)),
+
+  H.p("Jede Stelle, die von einer Zeile zu einem Eintrag geht, übersetzt jetzt über zu_eintrag — zeigen und das Entfernen. Entfernt wird aus dem Feld, dann wird die Tabelle neu gebaut; das ist einfacher, als beide Felder und die Tabelle gleichzeitig nachzuführen. GUI_CHANGED(suche) ist in jedem Bild wahr, in dem jemand im Suchfeld etwas geändert hat, die Tabelle folgt also jedem Buchstaben."),
+
   H.h2("Kapitel 8 · Das erste Projekt"),
 
   H.h3("Drehen 1"),

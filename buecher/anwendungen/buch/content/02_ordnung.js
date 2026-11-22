@@ -111,7 +111,7 @@ module.exports = (H) => [
   H.h3("GUI_SCALE zu spät"),
 
   H.code(zeilen("kap02/fehler_massstab.dh")),
-  H.code(["Laufzeitfehler in fehler_massstab.dh:5: GUI_SCALE: erst den",
+  H.code(["Laufzeitfehler in fehler_massstab.dh:6: GUI_SCALE: erst den",
           "Massstab setzen, dann Fenster und Widgets anlegen (bereits",
           "angelegte werden nicht umgerechnet)"], { out: true }),
 
