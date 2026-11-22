@@ -41,9 +41,9 @@
       "kind": "button",
       "name": "knopfVerleihen",
       "text": "Verleihen",
-      "x": 160,
+      "x": 140,
       "y": 110,
-      "w": 100,
+      "w": 105,
       "h": 30,
       "variant": "primaer"
     },
@@ -51,9 +51,9 @@
       "kind": "button",
       "name": "knopfZurueck",
       "text": "Zurück",
-      "x": 270,
+      "x": 255,
       "y": 110,
-      "w": 90,
+      "w": 105,
       "h": 30
     }
   ],

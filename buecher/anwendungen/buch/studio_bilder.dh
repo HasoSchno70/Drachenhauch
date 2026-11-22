@@ -559,6 +559,28 @@ IF gewuenscht("kap21_pruefen") THEN
     IF FILEEXISTS(ziel21) THEN PRINT "  kap21_pruefen.png" ELSE PRINT "  FEHLER kap21_pruefen "; LEFT$(aus21, 300)
 END IF
 
+' Kapitel 22: die Mediathek auf Englisch (DHRT_LANG=en, die Tafel
+' sprache/en.txt), Tetris gewaehlt und "Lend ..." offen.
+IF gewuenscht("kap22_englisch") THEN
+    m = projekt$("kap22/mediathek")
+    z = ["e 0 7 640 400 0 0"]
+    taste(z, 20, ohne, 294)
+    studioBild("_kap22_f5", m, "", aufnahme$("f5_kap22", z), 70)
+    IF FILEEXISTS(bilder + "/_kap22_f5.png") THEN DELETEFILE(bilder + "/_kap22_f5.png")
+    z = []
+    klick(z, 0, 100, 197)
+    klick(z, 10, 670, 452)
+    ARRAY_PUSH(z, "e 30 7 750 500 0 0")
+    SETENV("DHRT_ABSPIELEN", aufnahme$("bed_kap22", z))
+    SETENV("DHRT_LANG", "en")
+    DIM ziel22 AS STRING : ziel22 = bilder + "/kap22_englisch.png"
+    DIM pp22 AS INTEGER : pp22 = PROCESS_START("dhrt", "bild", m + "/_studio/main.dh", ziel22, "60")
+    DIM aus22 AS STRING : aus22 = laufen$(pp22)
+    SETENV("DHRT_LANG", "")
+    SETENV("DHRT_ABSPIELEN", "")
+    IF FILEEXISTS(ziel22) THEN PRINT "  kap22_englisch.png" ELSE PRINT "  FEHLER kap22_englisch "; LEFT$(aus22, 300)
+END IF
+
 ' Kapitel 11: Tetris waehlen, "Ausleihen ..." -- das Fenster daneben.
 IF gewuenscht("kap11_ausleihen") THEN
     z = []
