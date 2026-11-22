@@ -98,6 +98,26 @@ FUNCTION dbDateiVon$(s AS JSON_HANDLE) AS STRING
     RETURN JSON_GET_STRING(s, "datei")
 END FUNCTION
 
+' Liegt die Datei im gebauten Programm im Datenordner des Benutzers
+' (DIR_USER_DATA$) statt neben der Exe? "ort": "benutzer" im Aufbau --
+' ein installiertes Programm darf unter "Programme" nichts schreiben.
+FUNCTION dbImBenutzerordner(s AS JSON_HANDLE) AS BOOLEAN
+    IF NOT JSON_HAS(s, "ort") THEN RETURN FALSE
+    RETURN JSON_GET_STRING(s, "ort") = "benutzer"
+END FUNCTION
+
+SUB dbOrtSetzen(e AS Element, benutzer AS BOOLEAN)
+    DIM s AS JSON_HANDLE : s = dbSchema(e)
+    IF benutzer = dbImBenutzerordner(s) THEN RETURN
+    IF benutzer THEN
+        JSON_SET_STRING(s, "ort", "benutzer")
+    ELSE
+        JSON_REMOVE(s, "ort")
+    END IF
+    e.schema = JSON_STRINGIFY(s)
+    e.geaendert = TRUE
+END SUB
+
 ' Die Entwicklungsdatei; leer, solange das Projekt keinen Ordner hat (oder
 ' der Ordner erst beim Sichern entsteht).
 FUNCTION dbPfad$(e AS Element) AS STRING
@@ -1106,10 +1126,16 @@ FUNCTION datenbankCode$() AS STRING
             ARRAY_PUSH(z, "IMPORT " + CHR$(34) + "imgfx" + CHR$(34))
             ARRAY_PUSH(z, "")
             ARRAY_PUSH(z, "' Aus dem Studio gestartet: die Entwicklungsdaten im Projektordner.")
-            ARRAY_PUSH(z, "FUNCTION studioDbPfad$(datei AS STRING) AS STRING")
+            ARRAY_PUSH(z, "' Sonst neben dem Programm -- oder, mit " + CHR$(34) + "Im Benutzerordner" + CHR$(34) + " (app),")
+            ARRAY_PUSH(z, "' im Datenordner des Benutzers; beim ersten Start kommen die")
+            ARRAY_PUSH(z, "' mitgelieferten Daten neben dem Programm dorthin.")
+            ARRAY_PUSH(z, "FUNCTION studioDbPfad$(datei AS STRING, app AS STRING) AS STRING")
             ARRAY_PUSH(z, "    DIM o AS STRING : o = GETENV$(" + CHR$(34) + "DH_STUDIO_DATEN" + CHR$(34) + ")")
-            ARRAY_PUSH(z, "    IF o = " + CHR$(34) + CHR$(34) + " THEN RETURN datei")
-            ARRAY_PUSH(z, "    RETURN PATHJOIN(o, datei)")
+            ARRAY_PUSH(z, "    IF o <> " + CHR$(34) + CHR$(34) + " THEN RETURN PATHJOIN(o, datei)")
+            ARRAY_PUSH(z, "    IF app = " + CHR$(34) + CHR$(34) + " THEN RETURN datei")
+            ARRAY_PUSH(z, "    DIM z AS STRING : z = PATHJOIN(DIR_USER_DATA$(app), datei)")
+            ARRAY_PUSH(z, "    IF NOT FILEEXISTS(z) AND FILEEXISTS(datei) THEN COPYFILE(datei, z)")
+            ARRAY_PUSH(z, "    RETURN z")
             ARRAY_PUSH(z, "END FUNCTION")
             ARRAY_PUSH(z, "")
             ARRAY_PUSH(z, "SUB studioDbSpalte(db AS DB_CONN, tabelle AS STRING, spalte AS STRING, def AS STRING)")
@@ -1298,7 +1324,7 @@ FUNCTION datenbankCode$() AS STRING
         DIM s AS JSON_HANDLE : s = dbSchema(e)
         ARRAY_PUSH(z, "")
         ARRAY_PUSH(z, "' Datenbank " + e.name)
-        ARRAY_PUSH(z, "DIM " + e.name + " AS DB_CONN : " + e.name + " = DB_OPEN(studioDbPfad$(" + dbText$(dbDateiVon$(s)) + "))")
+        ARRAY_PUSH(z, "DIM " + e.name + " AS DB_CONN : " + e.name + " = DB_OPEN(studioDbPfad$(" + dbText$(dbDateiVon$(s)) + ", " + dbText$(IIF(dbImBenutzerordner(s), projName, "")) + "))")
         DIM u AS INTEGER
         IF JSON_HAS(s, "umbenannt") THEN
             FOR u = 0 TO JSON_LEN(s, "umbenannt") - 1

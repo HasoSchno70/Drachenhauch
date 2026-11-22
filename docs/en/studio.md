@@ -602,6 +602,14 @@ not (a rename that only changes case does not count, SQLite sees the same
 name). It leaves deleted things in place. Deleting the element only removes
 the structure from the project; the file with the data stays.
 
+**In the user folder.** A program installed under “Program Files” may not
+write next to itself. With **Im Benutzerordner** ticked on the database tab
+(`"ort": "benutzer"` in the structure) the built program keeps the file in
+the user's data folder (`DIR_USER_DATA$` with the project name); on the
+first start the file supplied next to the program is copied there, after
+that it stays. Started from the Studio, the program keeps working on the
+file in the project folder.
+
 **Binding a window to a table.** The navigator lists the columns under each
 table. Dragging a column or the whole table into the open window adds a
 label and a matching field per column, bound to the column: text, numbers

@@ -735,3 +735,7 @@ Sprache (zwei Buchstaben, etwa en):	Language (two letters, such as en):
 Ergänzen|Abbrechen	Complete|Cancel
 '{0}' ist kein Sprachcode -- zwei Buchstaben wie en oder fr.	'{0}' is not a language code -- two letters such as en or fr.
 {0} neue Texte in sprache/{1}.txt -- die Übersetzung kommt hinter den Tabulator.	{0} new texts in sprache/{1}.txt -- the translation goes after the tab.
+Im Benutzerordner	In the user folder
+Das gebaute Programm hält die Datei im Datenordner des Benutzers (DIR_USER_DATA$), nicht neben sich -- nötig, wenn es unter „Programme“ installiert wird. Beim ersten Start kommen die mitgelieferten Daten dorthin.	The built program keeps the file in the user's data folder (DIR_USER_DATA$), not next to itself -- needed when it is installed under “Program Files”. On the first start the supplied data go there.
+Das gebaute Programm hält die Daten im Benutzerordner.	The built program keeps the data in the user folder.
+Das gebaute Programm hält die Daten neben sich.	The built program keeps the data next to itself.

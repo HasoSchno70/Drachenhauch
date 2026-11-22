@@ -613,6 +613,15 @@ SQLite sieht darin denselben Namen). Gelöschtes lässt es stehen. Das
 Element zu löschen nimmt nur den Aufbau aus dem Projekt; die Datei mit den
 Daten bleibt liegen.
 
+**Im Benutzerordner.** Ein Programm, das unter „Programme“ installiert ist,
+darf neben sich nichts schreiben. Mit dem Haken **Im Benutzerordner** im
+Reiter der Datenbank (`"ort": "benutzer"` im Aufbau) hält das gebaute
+Programm die Datei im Datenordner des Benutzers (`DIR_USER_DATA$` mit dem
+Namen des Projekts); beim ersten Start kommt die Datei, die neben dem
+Programm mitgeliefert wurde, dorthin, danach bleibt sie dort. Aus dem
+Studio gestartet arbeitet das Programm weiter auf der Datei im
+Projektordner.
+
 **Fenster an eine Tabelle binden.** Im Navigator stehen unter jeder Tabelle
 ihre Spalten. Eine Spalte oder die ganze Tabelle ins offene Fenster gezogen
 legt je Spalte eine Beschriftung und ein passendes Feld an, an die Spalte

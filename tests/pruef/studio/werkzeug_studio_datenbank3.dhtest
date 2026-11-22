@@ -873,3 +873,116 @@ END CLASS
 geprueft TRUE
 ausgabe zeilen 1 Anna
 ausgabe abfrage Anna
+
+=== im benutzerordner: das gebaute programm haelt die datei beim benutzer
+' Das Kaestchen "Im Benutzerordner" im Datenbank-Reiter schreibt "ort":
+' "benutzer" in den Aufbau (Strg+S). Das Programm ohne Studio (wie gebaut,
+' ohne DH_STUDIO_DATEN) oeffnet dann die Datei in DIR_USER_DATA$(Projekt):
+' beim ersten Start kommt die mitgelieferte Datei neben dem Programm dorthin,
+' danach bleibt sie dort -- die neben dem Programm wird nicht angefasst.
+' Gebaut fuer das Buch "Fenster, Formulare, Daten", Kapitel 23.
+IMPORT "laeufer.dh"
+IMPORT "db"
+DIM p AS STRING : p = CWD$() + "/proj"
+SETENV("DH_STUDIO_OEFFNEN", "Daten.kunden")
+DIM log AS STRING : log = CWD$() + "/s.log"
+slStarten(log, "", 12, p)
+DIM x AS INTEGER
+DIM y AS INTEGER
+(x, y) = slLage(log, "db benutzer")
+slHin(10, 10)
+slWarten(10)
+slKlick(x, y)
+slWarten(10)
+slMit([341], 83)
+slWarten(10)
+slTaste(294)
+slWarten(150)
+slAufnahmeSchreiben(CWD$() + "/ev.txt")
+SETENV("DH_STUDIO_LAUF_BILDER", "20")
+slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
+PRINT JOIN$(slAnfang(log, "db ort "), "|")
+DIM j AS JSON_HANDLE : j = JSON_LOAD(p + "/Daten.dhdb")
+PRINT "dhdb ort "; JSON_GET_STRING(j, "ort")
+SETENV("DH_STUDIO_OEFFNEN", "")
+' Wie gebaut: die Datei liegt neben dem Programm, das Studio ist weg.
+COPYFILE(p + "/daten.sqlite", p + "/_studio/daten.sqlite")
+DIM b AS STRING : b = CWD$() + "/benutzer"
+MKDIR(b)
+SETENV("APPDATA", b)
+SETENV("XDG_DATA_HOME", b)
+SETENV("HOME", b)
+SETENV("DH_STUDIO_DATEN", "")
+FUNCTION lauf$() AS STRING
+    DIM k AS INTEGER : k = PROCESS_START("dhrt", "run", "--bilder", "20", p + "/_studio/main.dh")
+    DIM r AS STRING : r = ""
+    DIM leer AS INTEGER : leer = 0
+    WHILE leer < 5
+        DIM t AS STRING : t = PROCESS_READ$(k) + PROCESS_ERR$(k)
+        r = r + t
+        IF t = "" AND NOT PROCESS_RUNNING(k) THEN leer = leer + 1
+        SLEEP(20)
+    WEND
+    DIM z AS STRING
+    FOR EACH z IN SPLIT(REPLACE$(r, CHR$(13), ""), CHR$(10))
+        IF LEFT$(z, 7) = "kunden " OR INSTR(LOWER$(z), "fehler") >= 0 THEN RETURN z
+    NEXT
+    RETURN "?"
+END FUNCTION
+FUNCTION zahl(datei AS STRING) AS INTEGER
+    DIM d AS DB_CONN : d = DB_OPEN(datei)
+    DIM r AS DB_RESULT : r = DB_QUERY(d, "SELECT COUNT(*) FROM kunden")
+    DIM n AS INTEGER : n = -1
+    IF DB_NEXT(r) THEN n = DB_GET_INT(r, 0)
+    DB_CLOSE(d)
+    RETURN n
+END FUNCTION
+DIM mit AS INTEGER : mit = zahl(p + "/_studio/daten.sqlite")
+PRINT "erster start "; lauf$() = "kunden " + STR$(mit)
+PRINT "zweiter start "; lauf$() = "kunden " + STR$(mit + 1)
+DIM beim AS STRING : beim = PATHJOIN(DIR_USER_DATA$("proj"), "daten.sqlite")
+PRINT "beim benutzer "; zahl(beim) = mit + 2
+PRINT "neben dem programm unberuehrt "; zahl(p + "/_studio/daten.sqlite") = mit
+--- argumente
+{sammlung}/../../../studio/studio.dh
+--- vorher
+IMPORT "db"
+DIM db AS DB_CONN : db = DB_OPEN("proj/daten.sqlite")
+DB_EXEC(db, "CREATE TABLE kunden (id INTEGER PRIMARY KEY, name TEXT NOT NULL DEFAULT '', ort TEXT)")
+DB_EXEC(db, "INSERT INTO kunden (name, ort) VALUES ('Anna', 'Köln')")
+DB_EXEC(db, "INSERT INTO kunden (name, ort) VALUES ('Bert', 'Bonn')")
+DB_CLOSE(db)
+--- datei laeufer.dh
+IMPORT "json"
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- datei proj/projekt.dhstudio
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"},{"art":"datenbank","name":"Daten","schema":"Daten.dhdb"}]}
+--- datei proj/Hauptfenster.dhform
+{"title":"Haupt","name":"Hauptfenster","w":420,"h":300,"widgets":[]}
+--- datei proj/Hauptfenster.dh
+CLASS Hauptfenster EXTENDS Hauptfenster_Basis
+    DIM n AS INTEGER
+
+    SUB Takt()
+        Self.n = Self.n + 1
+        IF Self.n = 3 THEN
+            DIM r AS DB_RESULT : r = DB_QUERY(Daten, "SELECT COUNT(*) FROM kunden")
+            IF DB_NEXT(r) THEN PRINT "kunden "; DB_GET_INT(r, 0)
+            DB_EXEC(Daten, "INSERT INTO kunden (name, ort) VALUES ('Cem', 'Bonn')")
+            END
+        END IF
+    END SUB
+END CLASS
+--- datei proj/App.dh
+CLASS App EXTENDS StudioApp
+END CLASS
+--- datei proj/Daten.dhdb
+{"datei":"daten.sqlite","tabellen":[{"name":"kunden","spalten":[{"name":"name","typ":"text","pflicht":true,"eindeutig":false,"vorgabe":""},{"name":"ort","typ":"text","pflicht":false,"eindeutig":false,"vorgabe":""}]}]}
+--- erwartet
+db ort benutzer
+dhdb ort benutzer
+erster start TRUE
+zweiter start TRUE
+beim benutzer TRUE
+neben dem programm unberuehrt TRUE

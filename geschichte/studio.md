@@ -701,3 +701,9 @@ jedes tr$ im Code. Projekt -> Sprachtafel ergaenzen (studio/sprachtafel.dh)
 sammelt sie mit denselben Feldern wie studioTexteIn und haengt die fehlenden
 als "Text<Tab>" an; SpracheWaehlen laesst eine leere Uebersetzung aus (sonst
 haette sie den Text geloescht). Fall in werkzeug_studio_sprache.
+
+Kapitel 23 (Weitergeben): das gebaute Programm oeffnete seine Datenbank
+neben der Exe -- unter "Programme" installiert darf es dort nicht schreiben.
+Neu: der Haken "Im Benutzerordner" im Datenbank-Reiter ("ort": "benutzer");
+studioDbPfad$ nimmt dann DIR_USER_DATA$(Projektname) und kopiert beim ersten
+Start die mitgelieferte Datei dorthin. Fall in werkzeug_studio_datenbank3.
