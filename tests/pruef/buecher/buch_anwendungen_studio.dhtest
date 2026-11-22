@@ -1626,3 +1626,176 @@ monat TRUE
 listbox#liste 0 "Tetris -- Lena"
 zwoelf TRUE dropdown#wahlzeitraum 1 "12 Monate"
 anteil 20.0
+
+=== kapitel 19: ein- und ausfuhr
+' Kapitel 19: Datei -> Liste einlesen (der Dialog wird in der Kopie durch
+' GETENV$("LISTE") ersetzt): die alte Liste aus dem Buch, Windows-1252 mit
+' Semikolon -- vier neu, Momo schon da, drei mit Fehler; ein zweites Mal
+' nichts neu; eine UTF-8-Liste mit Komma und anderer Spaltenfolge. Dazu
+' die Ausfuhr als Excel-Mappe (ZIEL) und die Loesungen: CSV fuer Excel und
+' die Fehlerdatei neben der Liste.
+IMPORT "laeufer.dh"
+IMPORT "db"
+SUB kopieren(von AS STRING, nach AS STRING)
+    IF NOT DIREXISTS(nach) THEN MKDIR(nach)
+    DIM n AS STRING
+    FOR EACH n IN DIRLIST(von)
+        IF DIREXISTS(von + "/" + n) THEN
+            IF n <> "_studio" THEN kopieren(von + "/" + n, nach + "/" + n)
+        ELSEIF RIGHT$(n, 3) <> ".db" THEN
+            COPYFILE(von + "/" + n, nach + "/" + n)
+        END IF
+    NEXT
+END SUB
+FUNCTION laufen$(main AS STRING, bilder AS INTEGER) AS STRING
+    DIM q AS INTEGER : q = PROCESS_START("dhrt", "run", "--bilder", STR$(bilder), main)
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    WHILE leer < 5
+        DIM t AS STRING : t = PROCESS_READ$(q) + PROCESS_ERR$(q)
+        aus = aus + t
+        IF t = "" AND NOT PROCESS_RUNNING(q) THEN leer = leer + 1
+        SLEEP(20)
+    WEND
+    RETURN aus
+END FUNCTION
+FUNCTION bedienen$(main AS STRING, ev AS ARRAY OF STRING, bilder AS INTEGER) AS STRING
+    DIM pf AS STRING : pf = CWD$() + "/bedienung.txt"
+    WRITEALL(pf, "c " + STR$(LEN(ev)) + CHR$(10) + JOIN$(ev, CHR$(10)) + CHR$(10) + CHR$(10))
+    SETENV("DHRT_ABSPIELEN", pf)
+    SETENV("DHRT_GUI_ZUSTAND", "1")
+    DIM aus AS STRING : aus = laufen$(main, bilder)
+    SETENV("DHRT_ABSPIELEN", "")
+    SETENV("DHRT_GUI_ZUSTAND", "")
+    IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+    RETURN aus
+END FUNCTION
+SUB klick(ev AS ARRAY OF STRING, b AS INTEGER, x AS INTEGER, y AS INTEGER)
+    ARRAY_PUSH(ev, "e " + STR$(b) + " 7 " + STR$(x) + " " + STR$(y) + " 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 2) + " 7 " + STR$(x) + " " + STR$(y) + " 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 4) + " 6 0 0 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 6) + " 5 0 0 0 0")
+END SUB
+FUNCTION zeile$(aus AS STRING, was AS STRING) AS STRING
+    DIM z AS STRING
+    FOR EACH z IN SPLIT$(REPLACE$(aus, CHR$(13), ""), CHR$(10))
+        IF INSTR(z, was) >= 0 THEN RETURN TRIM$(z)
+    NEXT
+    RETURN ""
+END FUNCTION
+SUB f5(nm AS STRING, p AS STRING)
+    slZeilen = []
+    slBild = 0
+    slHin(10, 10)
+    slWarten(10)
+    slTaste(294)
+    slWarten(150)
+    slAufnahmeSchreiben(CWD$() + "/f5.txt")
+    SETENV("DH_STUDIO_LAUF_BILDER", "20")
+    DIM lg AS STRING : lg = CWD$() + "/" + nm + ".log"
+    DIM aus AS STRING : aus = slStarten(lg, CWD$() + "/f5.txt", slBild + 20, p)
+    PRINT nm; " geprueft "; slHat(lg, "geprueft 0 0"); " beendet "; slHat(lg, "beendet 0")
+    IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+END SUB
+SUB ersetzen(datei AS STRING, alt AS STRING, neu AS STRING)
+    DIM t AS STRING : t = READALL(datei)
+    IF INSTR(t, alt) < 0 THEN PRINT "nicht gefunden: "; alt
+    WRITEALL(datei, REPLACE$(t, alt, neu))
+END SUB
+' Die Dialoge der Kopie durch Umgebungsvariablen ersetzen.
+SUB ohneDialoge(nm AS STRING)
+    DIM h AS STRING : h = CWD$() + "/" + nm + "/_studio/projekt/Hauptfenster.dh"
+    DIM q AS STRING : q = CHR$(34)
+    ersetzen(h, "FILE_OPEN_DIALOG(" + q + "Liste einlesen" + q + ", " + q + "csv,txt" + q + ")", "GETENV$(" + q + "LISTE" + q + ")")
+    ersetzen(h, "FILE_SAVE_DIALOG(" + q + "Als Excel-Mappe sichern" + q + ", _" + CHR$(10) + "                                " + q + "mediathek.xlsx" + q + ", " + q + "xlsx" + q + ")", "GETENV$(" + q + "ZIEL" + q + ")")
+END SUB
+' Datei -> Eintrag nr (ab 0, 24 Punkte je Zeile).
+FUNCTION menue(nr AS INTEGER) AS ARRAY OF STRING
+    DIM ev AS ARRAY OF STRING : ev = []
+    klick(ev, 4, 20, 13)
+    klick(ev, 14, 80, 39 + 24 * nr)
+    RETURN ev
+END FUNCTION
+FUNCTION wert$(datei AS STRING, sql AS STRING) AS STRING
+    DIM d AS DB_CONN : d = DB_OPEN(datei)
+    DIM r AS DB_RESULT : r = DB_QUERY(d, sql)
+    DIM w AS STRING : w = "?"
+    IF DB_NEXT(r) THEN w = DB_GET_STRING(r, 0)
+    DB_CLOSE(d)
+    RETURN w
+END FUNCTION
+
+DIM code AS STRING : code = ARG$(1) + "/buecher/anwendungen/code/"
+DIM proj AS STRING
+FOR EACH proj IN ["kap19/mediathek", "loesungen/kap19_csv", "loesungen/kap19_fehler"]
+    DIM nm AS STRING : nm = BASENAME(proj)
+    IF nm = "mediathek" THEN nm = "kap19_mediathek"
+    kopieren(code + proj, CWD$() + "/" + nm)
+    f5(nm, CWD$() + "/" + nm)
+    ohneDialoge(nm)
+NEXT
+COPYFILE(code + "kap19/alte_liste.csv", CWD$() + "/alte_liste.csv")
+WRITEALL(CWD$() + "/neue_liste.csv", "Jahr,Titel,Art,Urheber" + CHR$(10) + "1957,Die kleine Hexe,Buch,Otfried Preußler" + CHR$(10) + ",Das kalte Herz,Buch,Wilhelm Hauff" + CHR$(10))
+DIM m AS STRING : m = CWD$() + "/kap19_mediathek/_studio/main.dh"
+DIM db AS STRING : db = CWD$() + "/kap19_mediathek/_studio/mediathek.db"
+DIM ev AS ARRAY OF STRING
+DIM a AS STRING
+' Die alte Liste; die zweite Meldung waehlen.
+SETENV("LISTE", CWD$() + "/alte_liste.csv")
+ev = menue(3)
+klick(ev, 40, 300, 166)
+a = bedienen$(m, ev, 60)
+PRINT zeile$(a, "label#zusammenfassung")
+PRINT zeile$(a, "listbox#meldungen")
+PRINT "eintraege "; wert$(db, "SELECT COUNT(*) FROM eintrag")
+PRINT wert$(db, "SELECT art || ' ' || jahr FROM eintrag WHERE titel = 'Pünktchen und Anton'"); " | "; wert$(db, "SELECT urheber FROM eintrag WHERE titel = 'Krieg und Frieden; Band 1'"); " | "; wert$(db, "SELECT COUNT(*) FROM eintrag WHERE titel IN ('Ronja Räubertochter', 'Lola rennt')")
+' Noch einmal: nichts ist neu.
+PRINT zeile$(bedienen$(m, menue(3), 50), "label#zusammenfassung")
+' UTF-8, Komma, andere Reihenfolge der Spalten.
+SETENV("LISTE", CWD$() + "/neue_liste.csv")
+PRINT zeile$(bedienen$(m, menue(3), 50), "label#zusammenfassung")
+PRINT wert$(db, "SELECT urheber || ' ' || jahr FROM eintrag WHERE titel = 'Die kleine Hexe'"); " | "; wert$(db, "SELECT COALESCE(jahr, 'ohne Jahr') FROM eintrag WHERE titel = 'Das kalte Herz'")
+' Als Excel-Mappe: zwei Blaetter, Jahr als Zahl.
+SETENV("ZIEL", CWD$() + "/mediathek.xlsx")
+PRINT zeile$(bedienen$(m, menue(2), 40), "label#status")
+DIM blatt AS STRING : blatt = ZIP_READ$(CWD$() + "/mediathek.xlsx", "xl/worksheets/sheet1.xml")
+PRINT "mappe "; INSTR(blatt, "Die kleine Hexe") >= 0; " "; INSTR(blatt, "<v>1957</v>") >= 0; " "; INSTR(JOIN$(ZIP_LIST(CWD$() + "/mediathek.xlsx"), "|"), "sheet2.xml") >= 0
+' Erweitern 1: CSV fuer Excel, cp1252 mit Semikolon.
+DIM hc AS STRING : hc = CWD$() + "/kap19_csv/_studio/projekt/Hauptfenster.dh"
+ersetzen(hc, "FILE_SAVE_DIALOG(" + CHR$(34) + "Als CSV sichern" + CHR$(34) + ", " + CHR$(34) + "mediathek.csv" + CHR$(34) + ", _" + CHR$(10) + "                                " + CHR$(34) + "csv" + CHR$(34) + ")", "GETENV$(" + CHR$(34) + "ZIEL" + CHR$(34) + ")")
+SETENV("LISTE", CWD$() + "/alte_liste.csv")
+a = bedienen$(CWD$() + "/kap19_csv/_studio/main.dh", menue(4), 50)
+SETENV("ZIEL", CWD$() + "/mediathek.csv")
+PRINT zeile$(bedienen$(CWD$() + "/kap19_csv/_studio/main.dh", menue(3), 40), "label#status")
+DIM csv AS STRING : csv = READALL$(CWD$() + "/mediathek.csv", "cp1252")
+PRINT "csv "; FILE_ENCODING$(CWD$() + "/mediathek.csv"); " "; INSTR(csv, CHR$(34) + "Krieg und Frieden; Band 1" + CHR$(34) + ";Leo Tolstoi;Buch;1869") >= 0; " "; INSTR(csv, "Pünktchen und Anton;Erich Kästner") >= 0
+' Erweitern 2: die Fehlerdatei neben der Liste, wie die Liste kodiert.
+a = bedienen$(CWD$() + "/kap19_fehler/_studio/main.dh", menue(3), 50)
+DIM fz AS ARRAY OF STRING : fz = READLINES(CWD$() + "/alte_liste_fehler.csv", "cp1252")
+PRINT "fehlerdatei "; FILE_ENCODING$(CWD$() + "/alte_liste_fehler.csv"); " "; LEN(fz)
+PRINT fz[0]
+PRINT fz[1]
+--- argumente
+{sammlung}/../../../studio/studio.dh
+{sammlung}/../../..
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- erwartet
+kap19_mediathek geprueft TRUE beendet TRUE
+kap19_csv geprueft TRUE beendet TRUE
+kap19_fehler geprueft TRUE beendet TRUE
+label#zusammenfassung "alte_liste.csv: 8 Zeilen, 4 neu, 1 schon da, 3 mit Fehler"
+listbox#meldungen 1 "Zeile 6: die Art „Hörspiel“ gibt es nicht (Buch, Film, Spiel, Musik)."
+eintraege 9
+Buch 1931 | Leo Tolstoi | 0
+label#zusammenfassung "alte_liste.csv: 8 Zeilen, 0 neu, 5 schon da, 3 mit Fehler"
+label#zusammenfassung "neue_liste.csv: 2 Zeilen, 2 neu, 0 schon da, 0 mit Fehler"
+Otfried Preußler 1957 | ohne Jahr
+label#status "Gesichert: mediathek.xlsx"
+mappe TRUE TRUE TRUE
+label#status "Gesichert: mediathek.csv"
+csv cp1252 TRUE TRUE
+fehlerdatei cp1252 4
+Titel;Urheber;Art;Jahr;Fehler
+;Astrid Lindgren;Buch;1945;kein Titel.
