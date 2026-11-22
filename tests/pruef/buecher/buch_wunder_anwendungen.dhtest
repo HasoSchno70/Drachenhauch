@@ -412,3 +412,174 @@ DHRT_ABSEITS=1
 Die unendliche Geschichte von Michael Ende (Buch, 1979)
 2 von 8 Einträgen
 Die Siedler von Catan von Klaus Teuber (Spiel, 1995)
+
+=== mediathek kapitel 4: was man aufnimmt und entfernt, bleibt
+' Erster Lauf: Ronja ohne Jahr aufnehmen, Metropolis und Tetris
+' entfernen. Zweiter Lauf (mit Argument): aus der Datei neu geladen.
+prBild = prBild + 1
+IF prBild = 2 AND ARGC() = 0 THEN
+    aufnehmen()
+    GUI_TABLE_CLEAR_SELECTION(tabelle)
+    GUI_TABLE_SELECT(tabelle, 1, TRUE)
+    GUI_TABLE_SELECT(tabelle, 2, TRUE)
+    auswahl_entfernen()
+    EXIT(0)
+END IF
+IF prBild = 2 THEN
+    PRINT LEN(mediathek); " "; GUI_TABLE_ROW_COUNT(tabelle)
+    PRINT mediathek[0].id; " "; mediathek[0].titel; " "; mediathek[0].jahr
+    PRINT mediathek[1].id; " "; mediathek[1].titel
+    DIM k AS INTEGER : k = LEN(mediathek) - 1
+    PRINT mediathek[k].id; " "; mediathek[k].titel; " ["; mediathek[k].jahr; "]"
+    EXIT(0)
+END IF
+--- programm ../../../buecher/anwendungen/code/kap04/3_transaktion.dh nach     GUI_UPDATE()
+--- einschub nach WINDOW_WAIT_EVENTS(1)
+DIM prBild AS INTEGER
+--- ersetzen TRIM$(GUI_TEXT(titel))
+TRIM$("Ronja Räubertochter")
+--- ersetzen TRIM$(GUI_TEXT(jahr))
+""
+--- umgebung
+DHRT_FRAMES=5
+DHRT_ABSEITS=1
+--- nochmal
+danach
+--- erwartet
+9 9
+1 Momo 1973
+4 Kind of Blue
+11 Ronja Räubertochter []
+
+=== mediathek kapitel 4: ist die datei gesperrt, wird nichts entfernt
+' Eine zweite Verbindung haelt eine Transaktion offen: das Entfernen
+' wartet 5 s, nimmt alles zurueck und laesst Feld und Tabelle stehen.
+prBild = prBild + 1
+IF prBild = 2 THEN
+    DIM fremd AS DB_CONN : fremd = DB_OPEN("mediathek.db")
+    DB_BEGIN(fremd)
+    DB_EXEC(fremd, "UPDATE eintrag SET jahr = jahr WHERE id = 1")
+    GUI_TABLE_SELECT(tabelle, 1, TRUE)
+    GUI_TABLE_SELECT(tabelle, 2, TRUE)
+    auswahl_entfernen()
+    PRINT LEFT$(GUI_TEXT(status), 44)
+    PRINT LEN(mediathek); " "; GUI_TABLE_ROW_COUNT(tabelle)
+    DB_ROLLBACK(fremd)
+    DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT COUNT(*) FROM eintrag")
+    DB_NEXT(r)
+    PRINT "in der datei "; DB_GET_INT(r, 0)
+    EXIT(0)
+END IF
+--- programm ../../../buecher/anwendungen/code/kap04/3_transaktion.dh nach     GUI_UPDATE()
+--- einschub nach WINDOW_WAIT_EVENTS(1)
+DIM prBild AS INTEGER
+--- umgebung
+DHRT_FRAMES=5
+DHRT_ABSEITS=1
+--- erwartet
+Nichts entfernt: DB_EXEC: database is locked
+10 10
+in der datei 10
+
+=== loesung kapitel 4: eine ausleihe bleibt und geht mit dem eintrag
+prBild = prBild + 1
+IF prBild = 2 AND ARGC() = 0 THEN
+    GUI_TABLE_SET_SELECTED(tabelle, 2)
+    ausleihe_setzen("Lena")
+    GUI_TABLE_SET_SELECTED(tabelle, 0)
+    ausleihe_setzen("Paul")
+    EXIT(0)
+END IF
+IF prBild = 2 AND ARG$(0) = "zwei" THEN
+    PRINT GUI_TABLE_GET_CELL(tabelle, 0, 4); " "; GUI_TABLE_GET_CELL(tabelle, 2, 4)
+    GUI_TABLE_CLEAR_SELECTION(tabelle)
+    GUI_TABLE_SELECT(tabelle, 2, TRUE)
+    auswahl_entfernen()
+    EXIT(0)
+END IF
+IF prBild = 2 THEN
+    DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT eintrag, an FROM ausleihe")
+    WHILE DB_NEXT(r)
+        PRINT DB_GET_INT(r, 0); " "; DB_GET_STRING(r, 1)
+    WEND
+    EXIT(0)
+END IF
+--- programm ../../../buecher/anwendungen/code/loesungen/kap04_ausleihe.dh nach     GUI_UPDATE()
+--- einschub nach WINDOW_WAIT_EVENTS(1)
+DIM prBild AS INTEGER
+--- umgebung
+DHRT_FRAMES=5
+DHRT_ABSEITS=1
+--- nochmal
+zwei
+--- nochmal
+drei
+--- erwartet
+1 Paul
+
+=== loesung kapitel 4: erst der zweite klick entfernt
+' Klick auf Metropolis, einmal "Entfernen": nur die Frage. Ein zweiter
+' Klick entfernt. Ein Klick in die Tabelle dazwischen nimmt die Frage
+' zurueck (dritter Fall unten, mit eigener Aufnahme).
+prBild = prBild + 1
+IF prBild = 20 THEN PRINT LEN(mediathek); " "; GUI_TEXT(entfernen)
+IF prBild = 40 THEN
+    PRINT LEN(mediathek); " "; GUI_TEXT(entfernen); " "; mediathek[1].titel
+    EXIT(0)
+END IF
+--- programm ../../../buecher/anwendungen/code/loesungen/kap04_nachfrage.dh nach     GUI_UPDATE()
+--- einschub nach WINDOW_WAIT_EVENTS(1)
+DIM prBild AS INTEGER
+--- datei klicks.txt
+c 12
+e 0 7 100 263 0 0
+e 2 7 100 263 0 0
+e 4 6 0 0 0 0
+e 6 5 0 0 0 0
+e 8 7 590 484 0 0
+e 10 7 590 484 0 0
+e 12 6 0 0 0 0
+e 14 5 0 0 0 0
+e 25 7 590 484 0 0
+e 27 6 0 0 0 0
+e 29 5 0 0 0 0
+e 31 7 600 30 0 0
+
+--- umgebung
+DHRT_FRAMES=60
+DHRT_ABSPIELEN=klicks.txt
+DHRT_ABSEITS=1
+--- erwartet
+10 Wirklich?
+9 Entfernen Tetris
+
+=== loesung kapitel 4: ein klick in die tabelle nimmt die frage zurueck
+prBild = prBild + 1
+IF prBild = 40 THEN
+    PRINT LEN(mediathek); " "; GUI_TEXT(entfernen)
+    EXIT(0)
+END IF
+--- programm ../../../buecher/anwendungen/code/loesungen/kap04_nachfrage.dh nach     GUI_UPDATE()
+--- einschub nach WINDOW_WAIT_EVENTS(1)
+DIM prBild AS INTEGER
+--- datei klicks.txt
+c 12
+e 0 7 100 263 0 0
+e 2 7 100 263 0 0
+e 4 6 0 0 0 0
+e 6 5 0 0 0 0
+e 8 7 590 484 0 0
+e 10 7 590 484 0 0
+e 12 6 0 0 0 0
+e 14 5 0 0 0 0
+e 20 7 100 289 0 0
+e 22 6 0 0 0 0
+e 24 5 0 0 0 0
+e 31 7 600 30 0 0
+
+--- umgebung
+DHRT_FRAMES=60
+DHRT_ABSPIELEN=klicks.txt
+DHRT_ABSEITS=1
+--- erwartet
+10 Entfernen
