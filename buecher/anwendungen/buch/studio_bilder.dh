@@ -595,4 +595,97 @@ IF gewuenscht("kap11_ausleihen") THEN
     programmBild("kap11_ausleihen", "kap11/mediathek", z, 40)
 END IF
 
+' Kapitel 0: der Rundgang durch die fertige Mediathek (Stand Kapitel 24).
+' Seit Kapitel 23 legt sie Daten und Einstellungen in den Benutzerordner
+' -- ausserhalb des Studios hier in arbeit/benutzer statt beim Nutzer.
+' Damit die Kachel ein Cover zeigt, traegt die Kopie wie in Kapitel 20
+' "Die unendliche Geschichte" mit Cover ein.
+DIM rundgang AS ARRAY OF STRING
+rundgang = ["kap00_mediathek", "kap00_bearbeiten", "kap00_ausleihen", "kap00_statistik"]
+DIM rg AS STRING
+DIM rgNoetig AS BOOLEAN : rgNoetig = FALSE
+FOR EACH rg IN rundgang
+    IF gewuenscht(rg) THEN rgNoetig = TRUE
+NEXT
+IF rgNoetig THEN
+    m = projekt$("kap24/mediathek")
+    ' Schon vor F5: das Studio startet das Programm kurz, und das legt
+    ' den Ordner fuer die Einstellungen an.
+    DIM benutzer00 AS STRING : benutzer00 = arbeit + "/benutzer"
+    IF NOT DIREXISTS(benutzer00) THEN MKDIR(benutzer00)
+    SETENV("APPDATA", benutzer00)
+    SETENV("XDG_DATA_HOME", benutzer00)
+    z = ["e 0 7 640 400 0 0"]
+    taste(z, 20, ohne, 294)
+    studioBild("_kap00_f5", m, "", aufnahme$("f5_kap00", z), 70)
+    IF FILEEXISTS(bilder + "/_kap00_f5.png") THEN DELETEFILE(bilder + "/_kap00_f5.png")
+    DIM q00 AS STRING : q00 = CHR$(34)
+    DIM nl00 AS STRING : nl00 = CHR$(10)
+    DIM sub00 AS ARRAY OF STRING
+    sub00 = ["", "SUB coverEintragen()", _
+             "    DIM r AS DB_RESULT : r = DB_QUERY(Mediathek, " + q00 + "SELECT id FROM eintrag WHERE titel = 'Die unendliche Geschichte'" + q00 + ")", _
+             "    IF DB_NEXT(r) THEN RETURN", _
+             "    DB_EXEC(Mediathek, " + q00 + "INSERT INTO eintrag (titel, urheber, art, jahr, isbn, cover) VALUES (?, ?, ?, ?, ?, ?)" + q00 + ", " + q00 + "Die unendliche Geschichte" + q00 + ", " + q00 + "Michael Ende" + q00 + ", " + q00 + "Buch" + q00 + ", 2019, " + q00 + "978-3-522-20260-2" + q00 + ", READALL_BYTES(" + q00 + wurzel + "/daten/bilder/logo.png" + q00 + "))", _
+             "END SUB", ""]
+    DIM bf00 AS STRING : bf00 = m + "/_studio/projekt/Bestand.dh"
+    WRITEALL(bf00, READALL(bf00) + JOIN$(sub00, nl00))
+    DIM af00 AS STRING : af00 = m + "/_studio/projekt/App.dh"
+    WRITEALL(af00, REPLACE$(READALL(af00), "        einrichten()", "        einrichten()" + nl00 + "        coverEintragen()"))
+    SETENV("DH_STUDIO_DATEN", m)
+    DIM ziel00 AS STRING
+    DIM p00 AS INTEGER
+    FOR EACH rg IN rundgang
+        IF gewuenscht(rg) THEN
+            z = []
+            IF rg = "kap00_mediathek" THEN
+                klick(z, 0, 100, 117)
+                ' Die Maus weg von der Tabelle -- sonst steht ihr Hinweis da.
+                ARRAY_PUSH(z, "e 20 7 700 495 0 0")
+            ELSEIF rg = "kap00_bearbeiten" THEN
+                klick(z, 0, 100, 117)
+                klick(z, 10, 415, 452)
+                ARRAY_PUSH(z, "e 30 7 750 470 0 0")
+            ELSEIF rg = "kap00_ausleihen" THEN
+                klick(z, 0, 100, 197)
+                klick(z, 10, 670, 452)
+                ARRAY_PUSH(z, "e 30 7 750 470 0 0")
+            ELSE
+                klick(z, 0, 215, 13)
+                klick(z, 10, 250, 63)
+                klick(z, 26, 230, 200)
+                ARRAY_PUSH(z, "e 36 7 480 470 0 0")
+            END IF
+            SETENV("DHRT_ABSPIELEN", aufnahme$("bed_" + rg, z))
+            ziel00 = bilder + "/" + rg + ".png"
+            IF FILEEXISTS(ziel00) THEN DELETEFILE(ziel00)
+            p00 = PROCESS_START("dhrt", "bild", m + "/_studio/main.dh", ziel00, "60")
+            DIM aus00 AS STRING : aus00 = laufen$(p00)
+            IF FILEEXISTS(ziel00) THEN PRINT "  "; rg; ".png" ELSE PRINT "  FEHLER "; rg; " "; LEFT$(aus00, 300)
+        END IF
+    NEXT
+    SETENV("DHRT_ABSPIELEN", "")
+    SETENV("DH_STUDIO_DATEN", "")
+END IF
+
+' Kapitel 0: die fertige Mediathek im Studio, das Hauptfenster im Entwurf.
+IF gewuenscht("kap00_studio") THEN
+    m = projekt$("kap24/mediathek")
+    studioBild("kap00_studio", m, "Hauptfenster", "", BILDER_STUDIO)
+END IF
+
+' Kapitel 0: die IDE mit der Mediathek aus Kapitel 1 -- wie in "Kleine
+' Wunder" mit frischer ide.json, gestartet im Ordner des Kapitels.
+IF gewuenscht("kap00_ide") THEN
+    SETENV("DH_IDE_KONFIG", arbeit + "/ide.json")
+    IF FILEEXISTS(arbeit + "/ide.json") THEN DELETEFILE(arbeit + "/ide.json")
+    DIM ziel00i AS STRING : ziel00i = bilder + "/kap00_ide.png"
+    IF FILEEXISTS(ziel00i) THEN DELETEFILE(ziel00i)
+    DIM zurueck00 AS STRING : zurueck00 = CWD$()
+    CHDIR(hier + "/../code/kap01")
+    DIM p00i AS INTEGER : p00i = PROCESS_START("dhrt", "bild", wurzel + "/ide/ide.dh", ziel00i, "60", "--", "3_mediathek.dh")
+    CHDIR(zurueck00)
+    DIM aus00i AS STRING : aus00i = laufen$(p00i)
+    IF FILEEXISTS(ziel00i) THEN PRINT "  kap00_ide.png" ELSE PRINT "  FEHLER kap00_ide "; LEFT$(aus00i, 300)
+END IF
+
 PRINT "fertig"

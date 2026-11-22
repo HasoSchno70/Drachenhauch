@@ -839,6 +839,17 @@ Projekt → Sprachtafel ergänzen, `DIR_USER_DATA$` und der Haken „Im
 Benutzerordner“ am Datenbank-Element, und die Prüfung der Schreibweise
 nimmt nur Mitglieder der Elternklassen als geerbt.
 
+Danach (2026-11-22): Buch B, Kapitel 0 (Was eine Anwendung braucht):
+Spiel gegen Anwendung, der Rundgang durch die fertige Mediathek mit
+Bildern von Hauptfenster, Formular, Ausleihen und Statistik (Stand
+Kapitel 24, `studio_bilder.dh` lenkt dafür APPDATA in den Arbeitsordner),
+eine Tabelle „was eine Anwendung braucht → Kapitel“, deren Zahlen (Fenster,
+Berichte, Zeilen) das Kapitel aus `code/kap24` zählt, und IDE gegen Studio
+mit den Karten des Startbildschirms. Was der Rundgang behauptet (Menüs
+und Kürzel, Suche, Kachel, Startbildschirm, Stände in `code/`), prüft
+„rundgang kapitel 0“ in `buch_wunder_anwendungen.dhtest`. Es fehlen noch
+die Anhänge B–E.
+
 Was beim Bauen festgelegt wurde:
 
 * **Code kommt aus Dateien.** `buch/code_lesen.js` holt ganze Programme,
