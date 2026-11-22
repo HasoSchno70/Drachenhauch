@@ -10,6 +10,7 @@
 --- langsam
 === f5 auf mediathek und loesung, die zitierte zeile, der vertippte name
 IMPORT "laeufer.dh"
+IMPORT "imgfx"
 SUB kopieren(von AS STRING, nach AS STRING)
     IF NOT DIREXISTS(nach) THEN MKDIR(nach)
     DIM n AS STRING
@@ -24,8 +25,13 @@ END SUB
 
 DIM code AS STRING : code = ARG$(1) + "/buecher/anwendungen/code/"
 DIM proj AS STRING
-FOR EACH proj IN ["kap08/mediathek", "loesungen/kap08_info"]
-    DIM p AS STRING : p = CWD$() + "/" + BASENAME(proj)
+FOR EACH proj IN ["kap08/mediathek", "loesungen/kap08_info", "kap09/mediathek", _
+                  "loesungen/kap09_vollbild", "loesungen/kap09_entfernen"]
+    ' Zwei Projekte heissen mediathek (Kapitel 8 und 9): der Ordner der
+    ' Kopie bekommt den Namen des Kapitels davor.
+    DIM nm AS STRING : nm = BASENAME(proj)
+    IF nm = "mediathek" AND LEFT$(proj, 5) <> "kap08" THEN nm = LEFT$(proj, 5) + "_" + nm
+    DIM p AS STRING : p = CWD$() + "/" + nm
     kopieren(code + proj, p)
     slZeilen = []
     slBild = 0
@@ -35,11 +41,76 @@ FOR EACH proj IN ["kap08/mediathek", "loesungen/kap08_info"]
     slWarten(150)
     slAufnahmeSchreiben(CWD$() + "/ev.txt")
     SETENV("DH_STUDIO_LAUF_BILDER", "20")
-    DIM log AS STRING : log = CWD$() + "/" + BASENAME(proj) + ".log"
+    DIM log AS STRING : log = CWD$() + "/" + nm + ".log"
     DIM aus AS STRING : aus = slStarten(log, CWD$() + "/ev.txt", slBild + 20, p)
-    PRINT BASENAME(proj); " geprueft "; slHat(log, "geprueft 0 0"); " beendet "; slHat(log, "beendet 0")
+    PRINT nm; " geprueft "; slHat(log, "geprueft 0 0"); " beendet "; slHat(log, "beendet 0")
     IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
 NEXT
+
+' Kapitel 9: das erzeugte Programm mit echter Bedienung. Die Aufnahme
+' spielt Tasten und Klicks ab (Lagen im Fenster), DHRT_GUI_ZUSTAND schreibt
+' am Ende den Zustand der Widgets.
+FUNCTION bedienen$(main AS STRING, ev AS ARRAY OF STRING, bilder AS INTEGER) AS STRING
+    DIM pf AS STRING : pf = CWD$() + "/bedienung.txt"
+    WRITEALL(pf, "c " + STR$(LEN(ev)) + CHR$(10) + JOIN$(ev, CHR$(10)) + CHR$(10) + CHR$(10))
+    SETENV("DHRT_ABSPIELEN", pf)
+    SETENV("DHRT_GUI_ZUSTAND", "1")
+    DIM q AS INTEGER : q = PROCESS_START("dhrt", "run", "--bilder", STR$(bilder), main)
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    WHILE leer < 5
+        DIM t AS STRING : t = PROCESS_READ$(q) + PROCESS_ERR$(q)
+        aus = aus + t
+        IF t = "" AND NOT PROCESS_RUNNING(q) THEN leer = leer + 1
+        SLEEP(20)
+    WEND
+    SETENV("DHRT_ABSPIELEN", "")
+    SETENV("DHRT_GUI_ZUSTAND", "")
+    RETURN aus
+END FUNCTION
+FUNCTION tabs(n AS INTEGER) AS ARRAY OF STRING
+    DIM ev AS ARRAY OF STRING : ev = ["e 0 7 600 540 0 0"]
+    DIM b AS INTEGER : b = 6
+    DIM k AS INTEGER
+    FOR k = 1 TO n
+        ARRAY_PUSH(ev, "e " + STR$(b) + " 2 258 0 0 0")
+        ARRAY_PUSH(ev, "e " + STR$(b + 1) + " 1 258 0 0 0")
+        b = b + 4
+    NEXT
+    ARRAY_PUSH(ev, "e " + STR$(b) + " 2 32 0 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 1) + " 1 32 0 0 0")
+    RETURN ev
+END FUNCTION
+DIM m9 AS STRING : m9 = CWD$() + "/kap09_mediathek/_studio/main.dh"
+' Vier Tabs vom Titel aus und die Leertaste: Speichern (Tab-Folge 5)
+' meldet den leeren Titel. Nach drei Tabs steht der Fokus im Jahr.
+PRINT "tab 4 "; INSTR(bedienen$(m9, tabs(4), 40), "Bitte einen Titel eingeben.") >= 0
+PRINT "tab 3 "; INSTR(bedienen$(m9, tabs(3), 40), "3 Eintr") >= 0
+' Erweitern 1: F11 aus dem Menue maximiert -- das Fenster wird breiter
+' als im Entwurf (760).
+DIM mv AS STRING : mv = CWD$() + "/kap09_vollbild/_studio/main.dh"
+DIM vev AS STRING : vev = CWD$() + "/f11.txt"
+WRITEALL(vev, "c 3" + CHR$(10) + "e 0 7 600 540 0 0" + CHR$(10) + "e 6 2 300 0 0 0" + _
+              CHR$(10) + "e 8 1 300 0 0 0" + CHR$(10) + CHR$(10))
+SETENV("DHRT_ABSPIELEN", vev)
+DIM vpng AS STRING : vpng = CWD$() + "/vollbild.png"
+DIM vq AS INTEGER : vq = PROCESS_START("dhrt", "bild", mv, vpng, "40")
+WHILE PROCESS_RUNNING(vq)
+    SLEEP(50)
+WEND
+SETENV("DHRT_ABSPIELEN", "")
+DIM vbild AS IMAGE : vbild = IMAGE_LOAD(vpng)
+PRINT "vollbild "; IMAGE_WIDTH(vbild) > 760
+' Erweitern 2: ein Klick auf "Entfernen" ohne Auswahl, dann auf Momo und
+' wieder auf "Entfernen": erst jetzt ist er frei und entfernt eine Zeile.
+DIM me AS STRING : me = CWD$() + "/kap09_entfernen/_studio/main.dh"
+DIM ee AS ARRAY OF STRING
+ee = ["e 0 7 470 503 0 0", "e 2 7 470 503 0 0", "e 4 6 0 0 0 0", "e 6 5 0 0 0 0"]
+ARRAY_PUSH(ee, "e 10 7 100 203 0 0") : ARRAY_PUSH(ee, "e 12 7 100 203 0 0")
+ARRAY_PUSH(ee, "e 14 6 0 0 0 0") : ARRAY_PUSH(ee, "e 16 5 0 0 0 0")
+ARRAY_PUSH(ee, "e 20 7 470 503 0 0") : ARRAY_PUSH(ee, "e 22 7 470 503 0 0")
+ARRAY_PUSH(ee, "e 24 6 0 0 0 0") : ARRAY_PUSH(ee, "e 26 5 0 0 0 0")
+PRINT "frei "; INSTR(bedienen$(me, ee, 40), "2 Eintr") >= 0
 
 ' Die Zeile, die das Kapitel unter "Was das Studio erzeugt" zitiert.
 DIM basis AS STRING : basis = CWD$() + "/mediathek/_studio/Hauptfenster_basis.dh"
@@ -85,5 +156,12 @@ slStudio = ARG$(0)
 --- erwartet
 mediathek geprueft TRUE beendet TRUE
 kap08_info geprueft TRUE beendet TRUE
+kap09_mediathek geprueft TRUE beendet TRUE
+kap09_vollbild geprueft TRUE beendet TRUE
+kap09_entfernen geprueft TRUE beendet TRUE
+tab 4 TRUE
+tab 3 TRUE
+vollbild TRUE
+frei TRUE
 zeile TRUE
 meldung TRUE
