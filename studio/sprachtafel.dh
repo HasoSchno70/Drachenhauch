@@ -96,6 +96,9 @@ FUNCTION tafelTexte() AS ARRAY OF STRING
         IF e.art = "fenster" OR e.art = "control" THEN
             DIM d AS JSON_HANDLE
             IF ei = aktFenster THEN d = JSON_PARSE(JSON_STRINGIFY(doc)) ELSE d = JSON_PARSE(e.layout)
+            ' Ein eigenes Control hat keine Titelleiste: sein "title" ist
+            ' sein Name, den niemand liest.
+            IF e.art = "control" AND JSON_HAS(d, "title") THEN JSON_REMOVE(d, "title")
             tafelTexteIn(d, "", texte)
         ELSEIF e.art = "bericht" AND e.schema <> "" THEN
             tafelTexteIn(JSON_PARSE(e.schema), "", texte)

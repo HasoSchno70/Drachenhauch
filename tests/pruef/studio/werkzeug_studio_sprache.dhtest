@@ -179,7 +179,8 @@ titel Shopping list
 ' Projekt -> Sprachtafel ergaenzen (DH_STUDIO_SPRACHTAFEL wie der Menuepunkt):
 ' Fenster, Menue, Tabellenkoepfe, Eintraege, Diagrammtitel, Bericht und die
 ' Literale in tr$/trf$ kommen mit leerer Uebersetzung an die Tafel; was sie
-' schon kennt (auch leer), nicht noch einmal. Ein zweiter Lauf findet
+' schon kennt (auch leer), nicht noch einmal; der Titel eines eigenen
+' Controls (sein Name, ohne Titelleiste) bleibt draussen. Ein zweiter Lauf findet
 ' nichts Neues. Eine leere Uebersetzung laesst die Laufzeit aus: das
 ' Programm zeigt den Text der Quelle.
 IMPORT "laeufer.dh"
@@ -225,7 +226,12 @@ WEND
 IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
 slStudio = ARG$(0)
 --- datei proj/projekt.dhstudio
-{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"},{"art":"bericht","name":"Liste","bericht":"Liste.dhreport"}]}
+{"format":"drachenhauch-studio","fassung":1,"name":"proj","start":"Hauptfenster","elemente":[{"art":"app","name":"App"},{"art":"fenster","name":"Hauptfenster"},{"art":"control","name":"Teil"},{"art":"bericht","name":"Liste","bericht":"Liste.dhreport"}]}
+--- datei proj/Teil.dhform
+{"title":"Teil","name":"Teil","w":120,"h":40,"widgets":[{"kind":"label","name":"lab","text":"Im Teil","x":0,"y":0,"w":120,"h":20}]}
+--- datei proj/Teil.dh
+CLASS Teil EXTENDS Teil_Basis
+END CLASS
 --- datei proj/sprache/en.txt
 Haupt	Main
 Bereit	
@@ -254,8 +260,8 @@ END CLASS
 CLASS App EXTENDS StudioApp
 END CLASS
 --- erwartet
-sprachtafel en 13
-Haupt=Main|Bereit=|Datei=|Beenden=|Speichern=|Sichert alles=|Name eingeben=|Produkt=|Menge=|Rot=|Grün=|Anteile=|{0} Stück=|Einkaufsliste=|Überschrift=|
+sprachtafel en 14
+Haupt=Main|Bereit=|Datei=|Beenden=|Speichern=|Sichert alles=|Name eingeben=|Produkt=|Menge=|Rot=|Grün=|Anteile=|{0} Stück=|Im Teil=|Einkaufsliste=|Überschrift=|
 sprachtafel en 0
 kein code TRUE
 label Bereit knopf Speichern titel Main 3 Stück
