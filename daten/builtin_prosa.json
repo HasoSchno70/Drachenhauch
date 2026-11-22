@@ -1183,7 +1183,7 @@
   "GUI_TOOLBAR_ENABLED": "BOOLEAN — ob ein Knopf bedienbar ist",
   "GUI_TOOLBAR_GET": "INTEGER — liest beschriftung und symbolgroesse zurück",
   "GUI_TOOLBAR_ITEM_W": "INTEGER — Breite eines Eintrags",
-  "GUI_TOOLBAR_ITEM_X": "INTEGER — linke Kante eines Eintrags im Fenster (wie GUI_GET_X)",
+  "GUI_TOOLBAR_ITEM_X": "INTEGER — linke Kante eines Eintrags im Fenster (wie GUI_GET_X); ein Eintrag im Überlauf (GUI_TOOLBAR_OVERFLOW) hat keine und ist ein Fehler",
   "GUI_TOOLBAR_OVERFLOW": "INTEGER — wie viele Knöpfe gerade im »-Menü stehen (0 = alles passt)",
   "GUI_TOOLBAR_SEPARATOR": "INTEGER — senkrechter Trenner als Eintrag",
   "GUI_TOOLBAR_SET": "beschriftung (0/1: Text neben dem Sinnbild), symbolgroesse (Punkte, 0 = aus der Höhe)",

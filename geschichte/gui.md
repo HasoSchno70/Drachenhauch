@@ -1429,3 +1429,12 @@ am Zeilenende der Erwartung ab, die Ausgabe nicht.
   Jetzt eine Zeile je Tabelle: Zeilen, die gewaehlte, die erste Spalte.
   Seit Kapitel 15 dazu die gewaehlte Zeile ganz: ob nach "Zurueck" die
   Spalte "Verliehen an" leer wurde, sah ein Test sonst nicht.
+
+2026-11-22, Buch "Fenster, Formulare, Daten", Kapitel 17: der
+Berichts-Entwurf des Studios bekam einen neunten Knopf (Strichcode), und
+sein Protokoll der Lagen hielt beim ersten Bild mit "GUI_TOOLBAR_ITEM_X:
+Eintrag 8 gibt es nicht" an. Den Eintrag gab es -- er stand nur im
+Ueberlauf (>>), weil vor dem ersten Messen die Breiten geschaetzt werden
+(8 Punkte je Zeichen). `toolbar_item_rect` sagt jetzt, dass er im Ueberlauf
+steht und wer zaehlt, wie viele dort stehen; "gibt es nicht" nur noch fuer
+eine Nummer ausserhalb der Leiste.

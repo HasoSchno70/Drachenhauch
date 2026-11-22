@@ -229,6 +229,39 @@ bekannt sind: neu, datei, oeffnen, sichern
 keine Werkzeugleiste
 Eintrag 7 gibt es nicht
 
+=== ein eintrag im ueberlauf hat keine lage, aber es gibt ihn
+' Fuenf Knoepfe in 120 Punkten: die letzten stehen im Ueberlauf (>>). Ihre
+' Lage zu fragen ist ein Fehler -- aber nicht "gibt es nicht" (so stand es
+' bis 2026-11-22, gefunden, als der Berichts-Entwurf des Studios einen
+' neunten Knopf bekam und sein Protokoll beim ersten Bild daran scheiterte).
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM tb AS GUI_WIDGET : tb = GUI_TOOLBAR(w, 20, 20, 120, 34)
+DIM s AS STRING
+FOR EACH s IN ["neu", "oeffnen", "sichern", "start", "stopp"]
+    GUI_TOOLBAR_ADD(tb, s, s)
+NEXT
+PRINT "ueberlauf "; GUI_TOOLBAR_OVERFLOW(tb) > 0
+TRY
+    PRINT GUI_TOOLBAR_ITEM_X(tb, 4)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PRINT GUI_TOOLBAR_ITEM_X(tb, 9)
+CATCH e
+    PRINT e
+END TRY
+--- umgebung
+DHRT_FRAMES=1
+--- enthaelt
+ueberlauf TRUE
+Eintrag 4 steht im Ueberlauf (>>)
+Eintrag 9 gibt es nicht
+
 === die eintraege ueberleben das speichern
 IMPORT "gui"
 SCREEN(400, 300, "T", 1)

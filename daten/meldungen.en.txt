@@ -1451,6 +1451,7 @@ GUI_TOOLBAR_SET_CHECKED: Eintrag {} ist nicht kippbar (erst GUI_TOOLBAR_CHECKABL
 GUI_TOOLBAR_SET: unbekannte Einstellung '{}' -- bekannt sind: beschriftung, symbolgroesse	GUI_TOOLBAR_SET: unknown setting '{}' -- known are: beschriftung, symbolgroesse
 GUI_TOOLBAR_ITEM_X: Widget ist keine Werkzeugleiste (GUI_TOOLBAR)	GUI_TOOLBAR_ITEM_X: widget is not a toolbar (GUI_TOOLBAR)
 GUI_TOOLBAR_ITEM_X: Eintrag {} gibt es nicht	GUI_TOOLBAR_ITEM_X: there is no entry {}
+GUI_TOOLBAR_ITEM_X: Eintrag {} steht im Ueberlauf (>>), die Leiste ist zu schmal fuer ihn -- GUI_TOOLBAR_OVERFLOW sagt, wie viele dort stehen	GUI_TOOLBAR_ITEM_X: entry {} is in the overflow (>>), the toolbar is too narrow for it -- GUI_TOOLBAR_OVERFLOW tells how many are there
 GUI_TOOLBAR_OVERFLOW: Widget ist keine Werkzeugleiste (GUI_TOOLBAR)	GUI_TOOLBAR_OVERFLOW: widget is not a toolbar (GUI_TOOLBAR)
 {}: Widget ist keine Statusleiste (GUI_STATUSBAR)	{}: widget is not a status bar (GUI_STATUSBAR)
 {}: Feld {} gibt es nicht ({} Felder)	{}: there is no field {} ({} fields)

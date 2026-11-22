@@ -162,7 +162,7 @@ IMPORT "gui"
 | `GUI_TOOLBAR_SET_TEXT(tb, entry, text$)` | — | Beschriftung eines Eintrags |
 | `GUI_TOOLBAR_SET(tb, key$, value)` | — | `beschriftung` (0/1: Text neben dem Sinnbild), `symbolgroesse` (Punkte, 0 = aus der Höhe) |
 | `GUI_TOOLBAR_GET(tb, key$)` | INTEGER | liest `beschriftung` und `symbolgroesse` zurück |
-| `GUI_TOOLBAR_ITEM_X(tb, entry)` | INTEGER | linke Kante eines Eintrags im Fenster (wie `GUI_GET_X`) |
+| `GUI_TOOLBAR_ITEM_X(tb, entry)` | INTEGER | linke Kante eines Eintrags im Fenster (wie `GUI_GET_X`); ein Eintrag im Überlauf (`GUI_TOOLBAR_OVERFLOW`) hat keine und ist ein Fehler |
 | `GUI_TOOLBAR_ITEM_W(tb, entry)` | INTEGER | Breite eines Eintrags |
 | `GUI_TOOLBAR_OVERFLOW(tb)` | INTEGER | wie viele Knöpfe gerade im »-Menü stehen (0 = alles passt) |
 | `GUI_STATUSBAR(win, x, y, w, h[, text$])` | GUI_WIDGET | Statusleiste; `text$` ist das erste Feld |

@@ -162,7 +162,7 @@ IMPORT "gui"
 | `GUI_TOOLBAR_SET_TEXT(tb, entry, text$)` | — | label of an entry |
 | `GUI_TOOLBAR_SET(tb, key$, value)` | — | `beschriftung` (0/1: text next to the icon), `symbolgroesse` (icon size in points, 0 = from the height) |
 | `GUI_TOOLBAR_GET(tb, key$)` | INTEGER | reads `beschriftung` and `symbolgroesse` back |
-| `GUI_TOOLBAR_ITEM_X(tb, entry)` | INTEGER | left edge of an entry in the window (like `GUI_GET_X`) |
+| `GUI_TOOLBAR_ITEM_X(tb, entry)` | INTEGER | left edge of an entry in the window (like `GUI_GET_X`); an entry in the overflow (`GUI_TOOLBAR_OVERFLOW`) has none and is an error |
 | `GUI_TOOLBAR_ITEM_W(tb, entry)` | INTEGER | width of an entry |
 | `GUI_TOOLBAR_OVERFLOW(tb)` | INTEGER | how many buttons are currently in the » menu (0 = everything fits) |
 | `GUI_STATUSBAR(win, x, y, w, h[, text$])` | GUI_WIDGET | status bar; `text$` is the first field |
