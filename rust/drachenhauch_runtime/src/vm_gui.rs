@@ -1304,6 +1304,10 @@ impl<'p> Vm<'p> {
             "gui_table_cell_value" => { self.gui.table_cell_value(gi(a,0,"GUI_TABLE_CELL_VALUE")?, gi(a,1,"GUI_TABLE_CELL_VALUE")?, gi(a,2,"GUI_TABLE_CELL_VALUE")?, gnum(a,3,"GUI_TABLE_CELL_VALUE")?)?; Value::Nil }
             "gui_table_get_value" => Value::Float(self.gui.table_get_value(gi(a,0,"GUI_TABLE_GET_VALUE")?, gi(a,1,"GUI_TABLE_GET_VALUE")?, gi(a,2,"GUI_TABLE_GET_VALUE")?)?),
             // --- Zeilen / Spalten ---
+            "gui_table_get_cell_color" => { let n = "GUI_TABLE_GET_CELL_COLOR";
+                Value::Int(self.gui.table_get_cell_color(gi(a,0,n)?, gi(a,1,n)?, gi(a,2,n)?, &gs(a,3,n)?)?) }
+            "gui_table_get_row_color" => { let n = "GUI_TABLE_GET_ROW_COLOR";
+                Value::Int(self.gui.table_get_row_color(gi(a,0,n)?, gi(a,1,n)?, &gs(a,2,n)?)?) }
             "gui_table_row_color" => { self.gui.table_row_color(gi(a,0,"GUI_TABLE_ROW_COLOR")?, gi(a,1,"GUI_TABLE_ROW_COLOR")?, gi(a,2,"GUI_TABLE_ROW_COLOR")?, gi(a,3,"GUI_TABLE_ROW_COLOR")?)?; Value::Nil }
             "gui_table_col_align" => { self.gui.table_col_align(gi(a,0,"GUI_TABLE_COL_ALIGN")?, gi(a,1,"GUI_TABLE_COL_ALIGN")?, &gs(a,2,"GUI_TABLE_COL_ALIGN")?)?; Value::Nil }
             "gui_table_add_row" => Value::Int(self.gui.table_add_row(gi(a,0,"GUI_TABLE_ADD_ROW")?, gstrs(a,1,"GUI_TABLE_ADD_ROW")?)?),

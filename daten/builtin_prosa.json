@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 2617,
+ "count": 2619,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -1067,8 +1067,10 @@
   "GUI_TABLE_FILTER": "Filter setzen (leerer Text = kein Filter)",
   "GUI_TABLE_GET": "FLOAT — eine dieser Einstellungen zurueckreisen",
   "GUI_TABLE_GET_CELL": "Zellinhalt lesen",
+  "GUI_TABLE_GET_CELL_COLOR": "gesetzte Farbe der Zelle lesen: fg (Schrift) oder bg (Fläche); -1 = nicht gesetzt",
   "GUI_TABLE_GET_COL_WIDTHS": "ARRAY OF INTEGER die Breiten, die gerade gelten (eigene oder verteilte), je Datenspalte",
   "GUI_TABLE_GET_FILTER": "gesetzten Filter lesen",
+  "GUI_TABLE_GET_ROW_COLOR": "Farbe der Zeile lesen: fg oder bg; -1 = nicht gesetzt",
   "GUI_TABLE_GET_VALUE": "Haken (0/1) bzw. Balken (0..1)",
   "GUI_TABLE_HEADERS": "Spaltentitel setzen (1D ARRAY OF STRING)",
   "GUI_TABLE_IS_SELECTED": "ist diese Datenzeile gewählt?",

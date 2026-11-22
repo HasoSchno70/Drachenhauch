@@ -1529,11 +1529,13 @@ Every cell carries text, its own **foreground and background colour**, an
 | `GUI_TABLE_SET_CELL(tbl, row, column, text$)` | cell content |
 | `GUI_TABLE_GET_CELL(tbl, row, column)` | read cell content |
 | `GUI_TABLE_CELL_COLOR(tbl, row, column, foreground, background)` | colours; `-1` = not set |
+| `GUI_TABLE_GET_CELL_COLOR(tbl, row, column, role$)` | read the colour set on the cell: `fg` (text) or `bg` (area); `-1` = not set |
 | `GUI_TABLE_CELL_ALIGN(tbl, z, s, "links"/"mitte"/"rechts")` | alignment of this cell |
 | `GUI_TABLE_CELL_KIND(tbl, row, column, kind$)` | kind (see the table above) |
 | `GUI_TABLE_CELL_IMAGE(tbl, row, column, image)` | set an image (sets the kind along with it) |
 | `GUI_TABLE_CELL_VALUE(tbl, row, column, value)` / `GUI_TABLE_GET_VALUE(...)` | check mark (0/1) or bar (0..1) |
 | `GUI_TABLE_ROW_COLOR(tbl, row, foreground, background)` | colour a whole row — **one** call instead of one per column |
+| `GUI_TABLE_GET_ROW_COLOR(tbl, row, role$)` | read the row's colour: `fg` or `bg`; `-1` = not set |
 | `GUI_TABLE_COL_ALIGN(tbl, column, align$)` | alignment of the whole column |
 
 **Colours in three levels:** cell → row → zebra. `-1` means “not set” and

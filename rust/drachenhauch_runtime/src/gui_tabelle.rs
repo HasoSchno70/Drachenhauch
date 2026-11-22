@@ -133,6 +133,32 @@ impl Gui {
         cell.set_bg(bg);
         Ok(())
     }
+    /// GUI_TABLE_GET_CELL_COLOR(tbl, row, column, role$) -- die Farbe, die
+    /// GUI_TABLE_CELL_COLOR der Zelle gegeben hat (`fg`/`bg`), -1 = keine.
+    /// Fehlte bis 2026-11: ein Test konnte die Faerbung einer Zelle nur am
+    /// Bild nachmessen (Buch "Fenster, Formulare, Daten", Kapitel 3).
+    pub fn table_get_cell_color(&self, h: i64, r: i64, c: i64, rolle: &str) -> Result<i64, String> {
+        const F: &str = "GUI_TABLE_GET_CELL_COLOR";
+        let t = self.tbl_ref(h, F)?;
+        let (r, c) = Self::tbl_rc(t, r, c, F)?;
+        let zelle = t.cell(r, c);
+        match farb_rolle(rolle, F)? {
+            true => Ok(zelle.map(|z| z.fg()).unwrap_or(-1)),
+            false => Ok(zelle.map(|z| z.bg()).unwrap_or(-1)),
+        }
+    }
+    /// GUI_TABLE_GET_ROW_COLOR(tbl, row, role$) -- die Farbe aus
+    /// GUI_TABLE_ROW_COLOR (`fg`/`bg`), -1 = keine.
+    pub fn table_get_row_color(&self, h: i64, r: i64, rolle: &str) -> Result<i64, String> {
+        const F: &str = "GUI_TABLE_GET_ROW_COLOR";
+        let t = self.tbl_ref(h, F)?;
+        if r < 0 || r >= t.zeilen_zahl() as i64 {
+            return Err(format!("{}: Zeile {} gibt es nicht (0..{})", F, r, t.zeilen_zahl().saturating_sub(1)));
+        }
+        let r = r as usize;
+        let farben = if farb_rolle(rolle, F)? { &t.row_fg } else { &t.row_bg };
+        Ok(farben.get(r).copied().unwrap_or(-1))
+    }
     pub fn table_cell_align(&mut self, h: i64, r: i64, c: i64, wie: &str) -> Result<(), String> {
         let a = parse_align(wie).ok_or_else(|| format!(
             "GUI_TABLE_CELL_ALIGN: '{}' unbekannt -- links, mitte oder rechts", wie))?;
@@ -713,5 +739,14 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             v.cache.retain(|&r, _| r >= a && r < b);
         }
         Ok(())
+    }
+}
+
+/// `fg` -> true (Schrift), `bg` -> false (Flaeche) -- wie bei GUI_GET_COLOR.
+fn farb_rolle(rolle: &str, f: &str) -> Result<bool, String> {
+    match rolle.to_ascii_lowercase().as_str() {
+        "fg" => Ok(true),
+        "bg" => Ok(false),
+        _ => Err(format!("{}: '{}' unbekannt -- fg (Schrift) oder bg (Flaeche)", f, rolle)),
     }
 }

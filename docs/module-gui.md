@@ -1536,11 +1536,13 @@ Jede Zelle trägt Text, eigene **Vorder- und Hintergrundfarbe**, eine
 | `GUI_TABLE_SET_CELL(tbl, row, column, text$)` | Zellinhalt |
 | `GUI_TABLE_GET_CELL(tbl, row, column)` | Zellinhalt lesen |
 | `GUI_TABLE_CELL_COLOR(tbl, row, column, foreground, background)` | Farben; `-1` = nicht gesetzt |
+| `GUI_TABLE_GET_CELL_COLOR(tbl, row, column, role$)` | gesetzte Farbe der Zelle lesen: `fg` (Schrift) oder `bg` (Fläche); `-1` = nicht gesetzt |
 | `GUI_TABLE_CELL_ALIGN(tbl, z, s, "links"/"mitte"/"rechts")` | Ausrichtung dieser Zelle |
 | `GUI_TABLE_CELL_KIND(tbl, row, column, kind$)` | Art (siehe Tabelle oben) |
 | `GUI_TABLE_CELL_IMAGE(tbl, row, column, image)` | Bild setzen (setzt die Art gleich mit) |
 | `GUI_TABLE_CELL_VALUE(tbl, row, column, value)` / `GUI_TABLE_GET_VALUE(...)` | Haken (0/1) bzw. Balken (0..1) |
 | `GUI_TABLE_ROW_COLOR(tbl, row, foreground, background)` | ganze Zeile färben — **ein** Aufruf statt einer je Spalte |
+| `GUI_TABLE_GET_ROW_COLOR(tbl, row, role$)` | Farbe der Zeile lesen: `fg` oder `bg`; `-1` = nicht gesetzt |
 | `GUI_TABLE_COL_ALIGN(tbl, column, align$)` | Ausrichtung der ganzen Spalte |
 
 **Farben in drei Stufen:** Zelle → Zeile → Zebra. `-1` heißt „nicht gesetzt"

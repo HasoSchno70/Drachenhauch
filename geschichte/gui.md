@@ -1374,3 +1374,12 @@ am Zeilenende der Erwartung ab, die Ausgabe nicht.
   (`layout_min_messen`), wie GUI_AUTOSIZE. Dabei gesehen, aber gewollt:
   ein zweites GUI_LAYOUT_ADD desselben Widgets haengt es still um (die
   erste Zeile ist danach leer) -- das Buch zeigt es als Falle.
+- **Zeilenfarbe ueber die ganze Breite, Farben lesen (2026-11-22).** Im
+  Buch "Fenster, Formulare, Daten", Kapitel 3: sind die Spalten einer
+  Tabelle schmaler als sie selbst, hoerten Zebrastreifen und
+  GUI_TABLE_ROW_COLOR an der letzten Spalte auf, waehrend Auswahl und
+  Gitterlinie bis zum Rand gingen. Die Zeilenflaeche wird jetzt ueber die
+  ganze Breite gemalt, Zellfarben darueber. Fuer den Test der
+  Loesung "eine Farbe je Art" fehlte die Abfrage zur Zellfarbe:
+  GUI_TABLE_GET_CELL_COLOR und GUI_TABLE_GET_ROW_COLOR (`fg`/`bg`, -1 =
+  nicht gesetzt).

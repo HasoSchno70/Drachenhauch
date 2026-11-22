@@ -71,3 +71,67 @@ WHILE NOT QUITREQUESTED()
 WEND
 --- bild
 225 42 #F4F6F9 +-8
+
+=== die zeilenfarbe reicht ueber die letzte spalte hinaus
+' Sind die Spalten schmaler als die Tabelle, faerbt die Zeilenfarbe (und
+' ebenso der Zebrastreifen) trotzdem die ganze Zeile -- wie Auswahl und
+' Gitterlinie. Bis 2026-11 hoerte sie an der letzten Spalte auf (Buch
+' "Fenster, Formulare, Daten", Kapitel 3).
+IMPORT "gui"
+SCREEN(300, 220, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 300, 220)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM tb AS GUI_WIDGET : tb = GUI_TABLE(w, 10, 10, 280, 200)
+GUI_TABLE_HEADERS(tb, ["A", "B"])
+GUI_TABLE_COL_WIDTHS(tb, [80, 80])
+GUI_TABLE_SET(tb, "kopfhoehe", 30)
+GUI_TABLE_SET(tb, "zeilenhoehe", 30)
+GUI_TABLE_SET(tb, "gitter", 0)
+GUI_TABLE_ADD_ROW(tb, ["a", "b"])
+GUI_TABLE_ADD_ROW(tb, ["c", "d"])
+GUI_TABLE_ROW_COLOR(tb, 1, -1, &H00FF00)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=3
+--- bild
+60 85 #00FF00 +-40
+250 85 #00FF00 +-40
+250 55 nicht #00FF00 +-60
+
+=== die farben einer zelle und einer zeile lassen sich lesen
+' GUI_TABLE_GET_CELL_COLOR und GUI_TABLE_GET_ROW_COLOR liefern, was
+' GUI_TABLE_CELL_COLOR und GUI_TABLE_ROW_COLOR gesetzt haben; -1 heisst
+' nicht gesetzt (vorher gab es keine Abfrage dazu).
+IMPORT "gui"
+SCREEN(300, 220, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 300, 220)
+DIM tb AS GUI_WIDGET : tb = GUI_TABLE(w, 10, 10, 280, 200)
+GUI_TABLE_HEADERS(tb, ["A", "B"])
+GUI_TABLE_ADD_ROW(tb, ["a", "b"])
+GUI_TABLE_ADD_ROW(tb, ["c", "d"])
+GUI_TABLE_CELL_COLOR(tb, 1, 1, &H112233, -1)
+GUI_TABLE_ROW_COLOR(tb, 0, -1, &H445566)
+PRINT GUI_TABLE_GET_CELL_COLOR(tb, 1, 1, "fg"); " "; GUI_TABLE_GET_CELL_COLOR(tb, 1, 1, "BG")
+PRINT GUI_TABLE_GET_CELL_COLOR(tb, 0, 0, "fg"); " "; GUI_TABLE_GET_CELL_COLOR(tb, 0, 0, "bg")
+PRINT GUI_TABLE_GET_ROW_COLOR(tb, 0, "fg"); " "; GUI_TABLE_GET_ROW_COLOR(tb, 0, "bg")
+PRINT GUI_TABLE_GET_ROW_COLOR(tb, 1, "bg")
+TRY
+    PRINT GUI_TABLE_GET_CELL_COLOR(tb, 0, 0, "rand")
+CATCH e
+    PRINT e
+END TRY
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+1122867 -1
+-1 -1
+-1 4478310
+-1
+GUI_TABLE_GET_CELL_COLOR: 'rand' unbekannt -- fg (Schrift) oder bg (Flaeche)
