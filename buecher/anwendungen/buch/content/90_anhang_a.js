@@ -19,6 +19,8 @@ function sql(rel, name) {
 // Stellen zwischen ' >>> neu und ' <<< neu. Die Dateien und Projekte
 // selbst laufen in der Pruefsammlung.
 module.exports = (H) => [
+  H.part("Anhang"),
+
   H.chapter("A · Lösungen der Übungen"),
 
   H.p("Zu den Drehen-Übungen steht hier die Antwort mit ihrer Begründung, zu Erweitern eine Lösung als Datei oder Projekt in code/loesungen. Abgedruckt sind nur die Stellen, die gegenüber dem Stand des Kapitels neu sind; in den Dateien sind sie mit >>> und <<< markiert."),

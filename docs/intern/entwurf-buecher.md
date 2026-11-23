@@ -847,8 +847,22 @@ eine Tabelle „was eine Anwendung braucht → Kapitel“, deren Zahlen (Fenster
 Berichte, Zeilen) das Kapitel aus `code/kap24` zählt, und IDE gegen Studio
 mit den Karten des Startbildschirms. Was der Rundgang behauptet (Menüs
 und Kürzel, Suche, Kachel, Startbildschirm, Stände in `code/`), prüft
-„rundgang kapitel 0“ in `buch_wunder_anwendungen.dhtest`. Es fehlen noch
-die Anhänge B–E.
+„rundgang kapitel 0“ in `buch_wunder_anwendungen.dhtest`.
+
+Danach (2026-11-23): Buch B, Anhänge B–E -- damit ist es vollständig.
+B, der Spickzettel, liest Ereignisse je Baustein (`ereignisseFuer`,
+Beschreibung und Parameter in `studio/projekt.dh`, Namen aus
+`studio/bibliothek.dh`) und die Tasten (`studio/oberflaeche.dh`) beim
+Buchbau aus den Quellen; die gui-Befehle aus Teil I und was ein Programm
+aus dem Studio mitbringt, stehen in `buch/spickzettel.json`, und ein Fall
+prüft jede Signatur dort gegen den Code, den F5 für die fertige Mediathek
+erzeugt. C (SQL, „kurz gefasst“ -- zwei Seiten reichten nicht) druckt `code/anhang_c/beispiele.sql` und die Ergebnisse
+aus `ausgabe.txt`, die `sql.dh` liefern muss. D ist eine
+Entscheidungstafel mit Kapitelverweisen. E sammelt die Meldungen wie
+Anhang D von Buch A, dazu die des Debuggers (`Klasse.methode, Zeile N`)
+und die des Studios, die ein Kapitel mit `{ out: true, studio: "…" }`
+kennzeichnet. Der Hinweis „Arbeitsstand“ im Vorwort ist einem Wegweiser
+zu den Anhängen gewichen.
 
 Was beim Bauen festgelegt wurde:
 

@@ -1,0 +1,104 @@
+{
+  "_kommentar": "Anhang B, Spickzettel: die gui von Hand (Teil I) und was ein Programm aus dem Studio mitbringt. Die Pruefsammlung buch_anwendungen_studio.dhtest haelt fest, dass jeder gui-Befehl hier in einem Programm von Teil I vorkommt und dhrt ihn kennt, und dass jede Studio-Signatur woertlich im erzeugten Code der fertigen Mediathek (code/kap24) steht.",
+  "gui": [
+    ["Gerüst", [
+      ["SCREEN(w, h, titel, massstab)", "das Fenster des Programms öffnen"],
+      ["GUI_WINDOW(titel, x, y, w, h)", "ein Fenster der gui darin anlegen"],
+      ["GUI_WINDOW_CHROME(fenster, FALSE)", "ohne Titelleiste: die gui füllt das Programmfenster"],
+      ["GUI_UPDATE()", "in jedem Bild: Maus und Tasten verarbeiten"],
+      ["GUI_DRAW()", "in jedem Bild: alle Fenster zeichnen, dann FLIP()"],
+      ["WINDOW_WAIT_EVENTS(sekunden)", "schlafen, bis etwas passiert, höchstens so lange"],
+      ["WINDOW_CLOSE_REQUESTED()", "will jemand das Fenster schließen (Kreuz, Alt+F4)?"]
+    ]],
+    ["Bausteine", [
+      ["GUI_LABEL(fenster, text, x, y)", "eine Beschriftung"],
+      ["GUI_TEXTINPUT(fenster, x, y, w, h, platzhalter)", "ein Eingabefeld"],
+      ["GUI_BUTTON(fenster, text, x, y, w, h)", "ein Knopf"],
+      ["GUI_DROPDOWN(fenster, x, y, w, h, eintraege)", "eine Klappliste"],
+      ["GUI_TABLE(fenster, x, y, w, h)", "eine Tabelle"],
+      ["GUI_TEXT(w) / GUI_SET_TEXT(w, text)", "Text lesen und setzen"],
+      ["GUI_FOCUS(w)", "die Schreibmarke hineinsetzen"],
+      ["GUI_SET_ENABLED(w, an)", "sperren oder freigeben"],
+      ["GUI_WINDOW_DEFAULT(fenster, knopf)", "Enter drückt diesen Knopf"]
+    ]],
+    ["Ereignisse — je Bild gefragt", [
+      ["GUI_CLICKED(w)", "in diesem Bild geklickt (Knopf, Menüeintrag, Kästchen)?"],
+      ["GUI_DOUBLE_CLICKED(w)", "Doppelklick oder Enter auf eine Zeile?"],
+      ["GUI_ANSWER(dialog)", "0 = noch offen, sonst der Knopf, 1 = OK oder Ja"]
+    ]],
+    ["Ordnung", [
+      ["GUI_LAYOUT(fenster, art, x, y, w, h)", "ein Behälter: zeile, spalte, raster:N"],
+      ["GUI_LAYOUT_ADD(behaelter, w, gewicht)", "hineinlegen; ab Gewicht 1 teilt es sich den Rest"],
+      ["GUI_SIZE_GROUP(w, gruppe)", "gleich breit wie die anderen der Gruppe"],
+      ["GUI_SET_ANCHOR(w, \"lrtb\")", "an welchen Kanten es beim Ziehen klebt"],
+      ["WINDOW_MIN_SIZE(GUI_LAYOUT_MIN_W(b), GUI_LAYOUT_MIN_H(b))", "nie kleiner als nötig"]
+    ]],
+    ["Tabellen", [
+      ["GUI_TABLE_HEADERS(t, koepfe)", "die Spaltenköpfe"],
+      ["GUI_TABLE_ADD_ROW(t, zellen)", "eine Zeile anhängen"],
+      ["GUI_TABLE_CLEAR(t)", "alle Zeilen weg"],
+      ["GUI_TABLE_SELECTED(t)", "die gewählte Zeile, -1 = keine"],
+      ["GUI_TABLE_SEL_COUNT(t) / GUI_TABLE_SEL_ROW(t, i)", "mehrere gewählte Zeilen"],
+      ["GUI_TABLE_SET(t, \"filterzeile\", 1)", "Einstellungen: filterzeile, zebra, gitter …"]
+    ]],
+    ["Formulare und Daten", [
+      ["DB_OPEN(datei) / DB_EXEC / DB_QUERY", "Datenbank öffnen, ändern, abfragen (Anhang C)"],
+      ["GUI_BIND(w, spalte)", "das Feld gehört zu dieser Spalte"],
+      ["GUI_FORM_LOAD(fenster, db, tabelle, id)", "eine Zeile in die Felder laden"],
+      ["GUI_FORM_SAVE(fenster, db, tabelle, id)", "die Felder sichern; id < 0 = neu"],
+      ["GUI_FORM_CHANGED(fenster)", "seit dem Laden etwas geändert?"],
+      ["GUI_RULE(w, \"pflicht\", meldung)", "eine Prüfregel: pflicht, zahl, bereich a b …"],
+      ["GUI_VALIDATE(fenster)", "alle Regeln prüfen; 0 = alles in Ordnung"],
+      ["GUI_ERROR_LABEL(w, beschriftung)", "dort steht, was nicht stimmt"]
+    ]],
+    ["Menüs und Dialoge", [
+      ["GUI_MENU(fenster, \"Datei\")", "ein Menü in der Menüleiste"],
+      ["GUI_MENU_ITEM(menue, text, \"Strg+S\")", "ein Eintrag mit Kürzel; fragen mit GUI_CLICKED"],
+      ["GUI_MENU_SEPARATOR(menue)", "eine Trennlinie"],
+      ["GUI_MENU_ENABLE(eintrag, an)", "einen Eintrag sperren"],
+      ["GUI_DIALOG(titel, text, \"janein\")", "eine Frage; die Antwort kommt über GUI_ANSWER"]
+    ]]
+  ],
+  "studio": [
+    ["Jedes Fenster", [
+      ["SUB Zeigen()", "zeigen; beim ersten Mal wird es aufgebaut"],
+      ["SUB ZeigenModal()", "zeigen und warten, bis es zu ist"],
+      ["SUB Zumachen()", "schließen; das Startfenster beendet das Programm"],
+      ["FUNCTION Fenster() AS GUI_WINDOW", "das Fenster der gui, für alles Weitere"],
+      ["FUNCTION IdVon(w AS GUI_WIDGET) AS INTEGER", "die Kennung der gewählten Zeile einer Tabelle oder Liste mit Datenquelle, 0 = keine"],
+      ["SUB Neuladen()", "die Tabellen und Listen mit Datenquelle neu füllen"]
+    ]],
+    ["Ein Fenster, das an einer Tabelle hängt", [
+      ["DatensatzId", "die Kennung der Zeile, die dasteht; 0 = eine neue"],
+      ["FUNCTION Laden(id AS INTEGER) AS BOOLEAN", "die Zeile mit dieser Kennung in die Felder"],
+      ["SUB Neu()", "die Felder leeren, für eine neue Zeile"],
+      ["FUNCTION Sichern() AS BOOLEAN", "prüfen und sichern; FALSE, wenn eine Regel verletzt ist"],
+      ["FUNCTION Loeschen() AS BOOLEAN", "die geladene Zeile löschen"],
+      ["FUNCTION Ungesichert() AS BOOLEAN", "seit dem Laden etwas geändert?"],
+      ["FUNCTION BildSetzen(w AS GUI_WIDGET, pfad AS STRING) AS BOOLEAN", "ein Bild aus einer Datei in eine Bildspalte"],
+      ["SUB BildLeeren(w AS GUI_WIDGET)", "das Bild herausnehmen"]
+    ]],
+    ["Daten und Berichte", [
+      ["FUNCTION Abfrage(name AS STRING) AS DB_RESULT", "eine Abfrage des Datenbank-Elements ausführen"],
+      ["SUB Vorschau(werte AS MAP OF ANY)", "einen Bericht in der Vorschau zeigen"],
+      ["SUB Pdf(pfad AS STRING, werte AS MAP OF ANY)", "einen Bericht als PDF sichern"],
+      ["SUB Drucken(werte AS MAP OF ANY, drucker AS STRING = \"\")", "einen Bericht drucken"]
+    ]],
+    ["Timer und Diagramme", [
+      ["SUB Starten()", "einen Timer anwerfen"],
+      ["SUB Stoppen()", "ihn anhalten"],
+      ["SUB Leeren()", "ein Diagramm leeren"],
+      ["SUB Hinzufuegen(name AS STRING, wert AS FLOAT, farbe AS INTEGER = -1)", "ein Stück oder einen Balken dazu"],
+      ["SUB Titel(t AS STRING)", "die Überschrift des Diagramms"]
+    ]],
+    ["Für das ganze Programm", [
+      ["SUB Meldung(text AS STRING, titel AS STRING = \"\")", "eine Mitteilung mit OK"],
+      ["FUNCTION Frage(text AS STRING, knoepfe AS STRING = \"Ja|Nein\", titel AS STRING = \"\") AS INTEGER", "eine Frage; 1 = der erste Knopf"],
+      ["FUNCTION Eingabe(text AS STRING, vorgabe AS STRING = \"\", titel AS STRING = \"\") AS STRING", "eine Zeile erfragen"],
+      ["FUNCTION Bild(name AS STRING) AS IMAGE", "ein Bild aus dem Ordner bilder des Projekts"],
+      ["SUB StilLaden(name AS STRING)", "eine Stildatei des Projekts anwenden"],
+      ["FUNCTION SpracheWaehlen(code AS STRING) AS BOOLEAN", "eine Sprachtafel wählen"],
+      ["FUNCTION Sprache$() AS STRING", "die Sprache, die gilt"]
+    ]]
+  ]
+}

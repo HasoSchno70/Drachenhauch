@@ -1,0 +1,71 @@
+' Anhang C -- die Beispiele aus beispiele.sql, der Reihe nach in einer
+' Datenbank im Speicher ausgefuehrt. Jeder Block beginnt mit "-- name";
+' ein SELECT zeigt seine Zeilen, alles andere, wie viele Zeilen es
+' geaendert hat. Die Ausgabe steht in ausgabe.txt, und der Anhang druckt
+' sie von dort ab.
+IMPORT "db"
+
+DIM db AS DB_CONN : db = DB_OPEN(":memory:")
+
+' Die Zeilen eines SELECT, Spalten mit " | " getrennt.
+SUB zeigen(r AS DB_RESULT)
+    DIM k AS INTEGER
+    DIM kopf AS ARRAY OF STRING : kopf = []
+    FOR k = 0 TO DB_COL_COUNT(r) - 1
+        ARRAY_PUSH(kopf, DB_COL_NAME(r, k))
+    NEXT
+    PRINT JOIN$(kopf, " | ")
+    WHILE DB_NEXT(r)
+        DIM z AS ARRAY OF STRING : z = []
+        FOR k = 0 TO DB_COL_COUNT(r) - 1
+            IF DB_IS_NULL(r, k) THEN ARRAY_PUSH(z, "NULL") ELSE ARRAY_PUSH(z, DB_GET_STRING(r, k))
+        NEXT
+        PRINT JOIN$(z, " | ")
+    WEND
+END SUB
+
+' Ein Block: eine oder mehrere Anweisungen, jede endet mit ; am Zeilenende.
+SUB ausfuehren(name AS STRING, text AS STRING)
+    PRINT "== "; name
+    DIM teil AS STRING
+    FOR EACH teil IN SPLIT$(text, ";" + CHR$(10))
+        DIM sql AS STRING : sql = TRIM$(teil)
+        IF RIGHT$(sql, 1) = ";" THEN sql = LEFT$(sql, LEN(sql) - 1)
+        IF sql = "" THEN CONTINUE
+        IF UPPER$(LEFT$(sql, 6)) = "SELECT" THEN
+            zeigen(DB_QUERY(db, sql))
+        ELSE
+            PRINT "geändert: "; DB_EXEC(db, sql)
+        END IF
+    NEXT
+END SUB
+
+DIM name AS STRING : name = ""
+DIM block AS STRING : block = ""
+DIM zeile AS STRING
+FOR EACH zeile IN READLINES("beispiele.sql")
+    IF LEFT$(zeile, 3) = "-- " THEN
+        IF name <> "" THEN ausfuehren(name, block)
+        name = MID$(zeile, 3)
+        block = ""
+    ELSE
+        block = block + zeile + CHR$(10)
+    END IF
+NEXT
+IF name <> "" THEN ausfuehren(name, block)
+
+' Platzhalter: Werte kommen nie in den Text der Anweisung.
+PRINT "== platzhalter"
+DIM titel AS STRING : titel = "Sgt. Pepper's Lonely Hearts Club Band"
+DB_EXEC(db, "INSERT INTO eintrag (titel, art, jahr) VALUES (?, ?, ?)", _
+        titel, "Musik", 1967)
+PRINT DB_LAST_ROWID(db); " ist die neue Kennung"
+
+' Eine Transaktion: alles oder nichts.
+PRINT "== transaktion"
+DB_BEGIN(db)
+DB_EXEC(db, "DELETE FROM ausleihe")
+DB_EXEC(db, "DELETE FROM freund")
+DB_ROLLBACK(db)
+DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT COUNT(*) FROM freund")
+IF DB_NEXT(r) THEN PRINT DB_GET_INT(r, 0); " Freunde -- nichts gelöscht"
