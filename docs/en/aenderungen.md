@@ -7,6 +7,70 @@ described in [Stability](stabilitaet.md).
 *Generated with `dhrt doku aenderungen` from `docs/releases/`; changes belong
 in the release notes, not here.*
 
+## 2026.53
+
+**Compiling**
+
+* **Assigning to a `CONST` is a compile error**, even in code that never
+  runs (before: only at run time, and `--check` stayed silent). If a
+  parameter, a local variable or a field hides the constant, the assignment
+  stays allowed.
+* **An ENUM value that does not exist** (`Stoff.SNAD`) is a compile error,
+  with a suggestion.
+* **A `COROUTINE` variable only takes coroutines.**
+* **New warnings:** `a BAND b + c` without parentheses (it reads as
+  `a BAND (b + c)`; the same for `BOR`, `BXOR`, `SHL`, `SHR`), a coroutine
+  used as a bare statement (it would never run), `TRY … END TRY` without
+  `CATCH` and `FINALLY` (it swallows the error, as before).
+
+**Graphics**
+
+* **raylib 6.2** draws differently in a few places where 6.0 was wrong:
+  `NGONOUTLINE` with a thickness is as thick as the manual says (before
+  about a quarter), circles in images are one column wider on the right,
+  the pose of a GLTF animation differs slightly, and the frame timer waits
+  actively for about 0.8 ms per frame. Gamepads get raylib's own mappings.
+* **`SHADER_LOAD` with a missing file is an error** (with a suggestion)
+  instead of returning -1. An unknown uniform in `SHADER_SET…` warns once.
+* **`BLEND_MODE("subtract")`** subtracts the colour from the background and
+  leaves the alpha alone (before: the other way round, alpha included).
+* **`RENDERTARGET_BEGIN` without `RENDERTARGET_END` before `FLIP`** stops
+  with a message instead of carrying on black.
+* **Point lights** are brighter at a distance (the same fall-off as with
+  instancing): at 4 units about half as bright, at 10 a fifth.
+  `MODEL_INSTANCED` fades into fog like `MODEL`.
+* **`MESH_TORUS` and `MESH_KNOT` are as big as given** -- rings and knots
+  appear larger than before.
+* **`LOADIMAGE` reloads a file that was written anew** (new handle, the old
+  one stays valid) instead of returning the old image from the cache.
+
+**Sound**
+
+* **MOD and XM music is about 5 dB quieter**: the player now applies the
+  volume the module itself asks for, and no longer clips.
+* **`AUDIO_MOD_REMOVE`** restores the parameter's fixed value instead of
+  leaving the modulator's last value in place.
+* **`AUDIO_FFT` and `MIC_FFT` decay by the clock.** If you ask more than
+  sixty times a second, the bands fall more slowly than before.
+
+**Physics**
+
+* **A removed `physics2d` body reports itself** on every query instead of
+  quietly returning (0, 0); `PHYS2D_BODY_EXISTS` asks first.
+
+**User interface**
+
+* **`GUI_VALIDATE_LIVE`** checks a field on leaving only if it changed
+  since it got the focus; an empty required field is reported by
+  `GUI_VALIDATE`.
+* **An empty number field** binds `NULL` instead of an empty text.
+* **Row colour and zebra stripes of a table** reach the edge.
+* **`GUI_DIALOG`** is at most 640 wide and wraps long lines.
+* **Muted text (`muted_fg`) and the selected table row** have a contrast of
+  at least 4.5:1 in every theme; some colours are stronger for it.
+
+[All notes for 2026.53](../releases/release-2026.53.en.md)
+
 ## 2026.52
 
 * **Messages in the language of the system.** Without `DHRT_LANG`, dhrt
