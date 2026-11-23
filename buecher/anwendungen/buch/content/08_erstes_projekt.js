@@ -111,7 +111,7 @@ module.exports = (H) => [
   H.code(["HAUPTFENSTER hat kein Mitglied 'feldtitle' -- weder HAUPTFENSTER",
           "selbst noch eine ihrer Eltern- oder Kindklassen. Dieses Feld gibt",
           "es nicht, der Zugriff bricht beim Laufen ab. Meintest du",
-          "'feldtitel'?"], { out: true }),
+          "'feldtitel'?"], { out: true, studio: "Probleme" }),
 
   H.p("Die Namen stehen klein, weil Drachenhauch Groß- und Kleinschreibung nicht unterscheidet; der Vorschlag am Ende ist meist schon die Lösung. Ein Klick auf den Befund öffnet die Methode an der Stelle."),
 

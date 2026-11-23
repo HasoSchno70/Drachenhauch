@@ -80,7 +80,7 @@ module.exports = (H) => [
 
   H.code(["Hauptfenster.zeigen: Methode 'zeigen' in HAUPTFENSTER ueberschreibt",
           "'Zeigen' aus STUDIOFENSTER -- Gross-/Kleinschreibung zaehlt nicht,",
-          "es ist derselbe Name. Jeder Aufruf von 'Zeigen' landet jetzt hier."], { out: true }),
+          "es ist derselbe Name. Jeder Aufruf von 'Zeigen' landet jetzt hier."], { out: true, studio: "Probleme" }),
 
   H.p("Jedes Fenster erbt von der Laufzeit des Studios eine Methode Zeigen, die es aufbaut und öffnet. Namen kennen in Drachenhauch keine Groß- und Kleinschreibung; zeigen ist darum derselbe Name, und die eigene Methode ersetzt die geerbte. Startet man trotzdem, ruft die Laufzeit zum Öffnen des Fensters Zeigen auf und landet in der eigenen Methode. Schreibt die — wie die aus Kapitel 3 — in die Statuszeile, gibt es die noch gar nicht: Das Programm hält mit einem Laufzeitfehler in Hauptfenster.zeigen, Zeile 1, und das Fenster geht nie auf. Die Abhilfe ist ein anderer Name: eintragZeigen."),
 

@@ -80,7 +80,7 @@ module.exports = (H) => [
   H.p("Wer im Reiter der Datenbank Lena aus freund löscht, solange Tetris bei ihr ist, bekommt in der Statuszeile:"),
 
   H.code(["Auf die Zeile zeigt noch eine Zeile in ausleihe (Spalte freund) --",
-          "erst dort löschen, oder dort „Beim Löschen“ auf „mitlöschen“ stellen."], { out: true }),
+          "erst dort löschen, oder dort „Beim Löschen“ auf „mitlöschen“ stellen."], { out: true, studio: "Statuszeile" }),
 
   H.p("Die Datei bleibt, wie sie war. Ein Programm, das dasselbe mit DB_EXEC versucht, bekommt dieselbe Auskunft hinter „FOREIGN KEY constraint failed“ als Laufzeitfehler."),
 

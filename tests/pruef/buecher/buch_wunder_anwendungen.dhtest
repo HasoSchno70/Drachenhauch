@@ -219,6 +219,54 @@ PRINT "bloecke "; LEN(SPLIT$(soll, "== ")) - 1
 gleich TRUE
 bloecke 14
 
+=== anhang b und e: was der buchbau aus den quellen liest
+' Anhang B liest Ereignisse und Tasten aus den Quellen des Studios, Anhang
+' E sammelt die Meldungen aus den Kapiteln. Aendert sich die Form der
+' Quellen, fiele eine Tabelle still leer aus -- der Fall zeigt Stichproben.
+IMPORT "helfer.dh"
+CHDIR(ARG$(0) + "/buecher/anwendungen/buch")
+WRITEALL("_anhang_probe.js", READALL(ARG$(1)))
+nlWarten(PROCESS_START("node", "_anhang_probe.js"), 60000)
+DELETEFILE("_anhang_probe.js")
+PRINT nlAus;
+IF nlCode <> 0 THEN PRINT nlErr
+--- argumente
+{sammlung}/../../..
+{fall}/probe.js
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/nodelauf.dh"
+--- datei probe.js
+const path = require("path");
+const tabellen = {};
+let h2 = "";
+const H = new Proxy({
+  h2: (t) => { h2 = t; return null; },
+  table: (r, o) => {
+    (tabellen[h2] = tabellen[h2] || []).push(r.map((z) => z.map((c) => (typeof c === "object" ? c.text : c)).join(" | ")));
+    return null;
+  },
+}, { get: (t, k) => (k in t ? t[k] : () => null) });
+require(path.resolve("content/91_anhang_b.js"))(H);
+require(path.resolve("content/94_anhang_e.js"))(H);
+const hat = (h, z) => (tabellen[h] || []).some((t) => t.some((zeile) => zeile.includes(z)));
+console.log("textfeld", hat("Ereignisse im Studio", "Textfeld | Geaendert, Enter, FokusRein, FokusRaus"));
+console.log("fenster", hat("Ereignisse im Studio", "Fenster | Geoeffnet, Schliessen, Groesse, Taste, Takt"));
+console.log("zelle", hat("Ereignisse im Studio", "Zelle(zeile AS INTEGER, spalte AS INTEGER) | wenn eine Zelle angeklickt wird"));
+console.log("starten", hat("Tasten im Studio", "Ausführen | Starten | F5"));
+console.log("bauen", hat("Tasten im Studio", "Ausführen | Bauen | Strg+B"));
+console.log("alles", hat("Tasten im Studio", "Bearbeiten | Alles auswählen | Strg+A"));
+console.log("debugger und lauf eine zeile", (tabellen["Laufzeitfehler"] || []).flat().filter((z) => z.includes("GUI_SET_TEXT: erwartet INTEGER")).map((z) => z.split(" | ").slice(1, 2).join("")).join(";"));
+console.log("studio", (tabellen["Im Studio"] || []).flat().map((z) => z.split(" | ")[1]).join(", "));
+--- erwartet
+textfeld true
+fenster true
+zelle true
+starten true
+bauen true
+alles true
+debugger und lauf eine zeile 11, 12
+studio Probleme, Probleme, Statuszeile
+
 === mediathek kapitel 1: leer abgewiesen, ein titel aufgenommen
 ' Tippen kann eine Aufnahme nicht (sie spielt Tasten, keine Zeichen) --
 ' die Faelle danach setzen darum statt des Felds einen festen Titel ein.
