@@ -864,6 +864,21 @@ und die des Studios, die ein Kapitel mit `{ out: true, studio: "…" }`
 kennzeichnet. Der Hinweis „Arbeitsstand“ im Vorwort ist einem Wegweiser
 zu den Anhängen gewichen.
 
+Danach (2026-11-23): das Gerüst der englischen Fassung von „Kleine
+Wunder“ („Little Wonders“, `Drachenhauch-Wonders.docx/.epub`). Die
+Übersetzungsschicht des Lehrbuchs liegt jetzt für alle Bücher in
+`buecher/_i18n/` (kleine Aufrufer je Buch, `DH_BUCH`), mit `h3`, das das
+Lehrbuch nicht kannte. `--lang en` in `build_book.js`/`build_epub.js`,
+eigene EPUB-Kennung, Bilder je Sprache aus `images/en/` (die IDE englisch
+über `ide_bilder.dh -- --lang en`), `buch_bauen.dh` kennt den englischen
+Namen und bereitet `images/en/` mit auf. Der Katalog hat 3325 Texte (rund
+65 000 Wörter); übersetzt sind die 41 Titel. Code bleibt, Kommentare darin
+gehen durch den Katalog. Offen: der Text selbst, Ausgaben und Meldungen
+(englisch gemessen), Sätze mit eingesetzten Zahlen (Anhang E), Bilder mit
+deutschem Text in Programmen. Funde dabei: In drei EPUBs stand „undefined“
+über dem Inhaltsverzeichnis, jede EPUB trug die Beschreibung des Lehrbuchs,
+und die englische IDE schrieb „Zeile“ vor ihre Probleme.
+
 Was beim Bauen festgelegt wurde:
 
 * **Code kommt aus Dateien.** `buch/code_lesen.js` holt ganze Programme,

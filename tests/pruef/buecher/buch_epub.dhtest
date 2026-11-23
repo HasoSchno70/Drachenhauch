@@ -251,7 +251,7 @@ color-scheme TRUE
 ' traegt jedes Buch seine Unterzeile in seiner Sprache.
 IMPORT "helfer.dh"
 DIM buch AS STRING
-FOR EACH buch IN ["referenz de", "referenz en", "einstieg de", "anwendungen de"]
+FOR EACH buch IN ["referenz de", "referenz en", "einstieg de", "anwendungen de", "wunder de", "wunder en"]
     DIM t AS ARRAY OF STRING : t = SPLIT$(buch, " ")
     DIM epub AS STRING : epub = epubBauenVon$(ARG$(0), t[0], t[1])
     DIM nav AS STRING : nav = ZIP_READ$(epub, "OEBPS/text/nav.xhtml")
@@ -273,3 +273,44 @@ referenz de: Inhalt | Programmieren lernen und alle Befehle verstehen
 referenz en: Contents | Learn to program and understand every command
 einstieg de: Inhalt | Programmieren lernen von Null an
 anwendungen de: Inhalt | Anwendungen bauen mit gui, Studio und Datenbank
+wunder de: Inhalt | Die Sprache lernen mit Programmen, die staunen lassen
+wunder en: Contents | Learn the language with programs that make you marvel
+
+=== kleine wunder auf englisch
+' Das Geruest der englischen Fassung (2026-11-23): --lang en nimmt den
+' Katalog i18n/en.json, die englischen Texte des Renderers, eine eigene
+' Kennung (sonst hielte ein Lesegeraet sie fuer dasselbe Buch) und die
+' Bilder aus images/en/, wo es eines gibt. Uebersetzt sind bisher die Titel.
+IMPORT "helfer.dh"
+DIM de AS STRING : de = epubBauenVon$(ARG$(0), "wunder", "de")
+DIM en AS STRING : en = epubBauenVon$(ARG$(0), "wunder", "en")
+DIM opfDe AS STRING : opfDe = ZIP_READ$(de, "OEBPS/content.opf")
+DIM opfEn AS STRING : opfEn = ZIP_READ$(en, "OEBPS/content.opf")
+PRINT "sprache "; zwischen$(opfEn, "<dc:language>", "</dc:language>")
+PRINT "titel "; zwischen$(opfEn, "<dc:title>", "</dc:title>")
+DIM kennung AS STRING : kennung = "pub-id" + CHR$(34) + ">"
+PRINT "eigene kennung "; zwischen$(opfEn, kennung, "<") <> zwischen$(opfDe, kennung, "<")
+DIM nav AS STRING : nav = ZIP_READ$(en, "OEBPS/text/nav.xhtml")
+PRINT "kapitel 0 "; INSTR(nav, ">0 · The Workshop<") >= 0
+PRINT "teil vii "; INSTR(nav, ">Part VII · The Third Dimension<") >= 0
+DIM w AS STRING : w = ARG$(0) + "/buecher/wunder/buch/images/"
+PRINT "ide englisch "; BUFFER_LEN(ZIP_READ(en, "OEBPS/images/kap00_ide.png")) = FILESIZE(w + "en/kap00_ide.png")
+PRINT "ide deutsch "; BUFFER_LEN(ZIP_READ(de, "OEBPS/images/kap00_ide.png")) = FILESIZE(w + "kap00_ide.png")
+--- argumente
+{sammlung}/../../..
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/epub.dh"
+FUNCTION zwischen$(s AS STRING, a AS STRING, b AS STRING) AS STRING
+    DIM i AS INTEGER : i = INSTR(s, a)
+    IF i < 0 THEN RETURN "(fehlt)"
+    DIM rest AS STRING : rest = MID$(s, i + LEN(a))
+    RETURN LEFT$(rest, INSTR(rest, b))
+END FUNCTION
+--- erwartet
+sprache en
+titel Drachenhauch – Little Wonders
+eigene kennung TRUE
+kapitel 0 TRUE
+teil vii TRUE
+ide englisch TRUE
+ide deutsch TRUE

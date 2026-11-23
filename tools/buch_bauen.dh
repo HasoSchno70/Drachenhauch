@@ -4,6 +4,8 @@
 '     dhrt run tools/buch_bauen.dh -- buecher/einstieg
 '     dhrt run tools/buch_bauen.dh -- buecher/galaga
 '     dhrt run tools/buch_bauen.dh -- buecher/tippspiel
+'     dhrt run tools/buch_bauen.dh -- buecher/wunder [--lang de|en]
+'     dhrt run tools/buch_bauen.dh -- buecher/anwendungen
 '     dhrt run tools/buch_bauen.dh -- buecher/referenz --nur-messen   ' vorhandenes PDF messen
 '     dhrt run tools/buch_bauen.dh -- buecher/einstieg --nur-bilder   ' nur images/ druckfertig
 '
@@ -571,6 +573,7 @@ SELECT CASE name
         basis = "Drachenhauch-Tippspiel" : mitSprache = FALSE : genau = FALSE
     CASE "wunder"
         IF sprache = "de" THEN basis = "Drachenhauch-Wunder"
+        IF sprache = "en" THEN basis = "Drachenhauch-Wonders"
     CASE "anwendungen"
         IF sprache = "de" THEN basis = "Drachenhauch-Anwendungen"
     CASE ELSE
@@ -643,9 +646,15 @@ SUB bilderVorbereiten()
     ' Druckdienste verlangen: KEINE Transparenz und Bilder um 300 dpi. Alpha
     ' auf Weiss legen (-> RGB) und ganzzahlig hochskalieren, bis das Bild
     ' mindestens 1500 Punkte breit ist. Bereits aufbereitete Bilder (RGB,
-    ' mindestens 1400 breit) bleiben unberuehrt.
-    DIM ordner AS STRING : ordner = buch + "/images"
-    IF NOT DIREXISTS(ordner) THEN RETURN
+    ' mindestens 1400 breit) bleiben unberuehrt. Ein Buch mit Sprachen hat
+    ' unter images/<sprache>/ die Bilder, die es nur in dieser Sprache gibt.
+    DIM geaendert AS INTEGER : geaendert = bilderIn(buch + "/images")
+    IF sprache <> "de" THEN geaendert = geaendert + bilderIn(buch + "/images/" + sprache)
+    IF geaendert > 0 THEN PRINT "Bilder druckfertig gemacht: "; geaendert; " (Alpha flach -> RGB; kleine zusaetzlich hochskaliert)"
+END SUB
+
+FUNCTION bilderIn(ordner AS STRING) AS INTEGER
+    IF NOT DIREXISTS(ordner) THEN RETURN 0
     DIM alle AS ARRAY OF STRING : alle = DIRLIST(ordner)
     SORT(alle)
     DIM geaendert AS INTEGER : geaendert = 0
@@ -668,8 +677,8 @@ SUB bilderVorbereiten()
         IMAGE_SAVE(flach, pfad, FALSE)
         geaendert = geaendert + 1
     NEXT
-    IF geaendert > 0 THEN PRINT "Bilder druckfertig gemacht: "; geaendert; " (Alpha flach -> RGB; kleine zusaetzlich hochskaliert)"
-END SUB
+    RETURN geaendert
+END FUNCTION
 
 FUNCTION jsonText$(s AS STRING) AS STRING
     DIM a AS JSON_HANDLE : a = JSON_NEW_ARRAY()
