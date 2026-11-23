@@ -154,6 +154,9 @@ and 741 Rust test functions (732).
 * **Dependencies** as of 21 November, among them rusqlite 0.43, cranelift
   0.138 and xmrs 0.15.
 * The packages for macOS and Linux now include `dhrt-mini` as well.
+* **The Windows installer is about 90 MB** (before: 65): the two new books
+  come with it, and their pictures hardly compress -- "Kleine Wunder" alone
+  is 13 MB each as `.docx` and `.epub`.
 
 ## What remains open
 

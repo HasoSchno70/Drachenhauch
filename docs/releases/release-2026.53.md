@@ -157,6 +157,9 @@ in 518) und 741 Rust-Testfunktionen (732).
 * **Abhängigkeiten** auf dem Stand vom 21. November, darunter rusqlite
   0.43, cranelift 0.138 und xmrs 0.15.
 * Die Pakete für macOS und Linux bringen jetzt auch `dhrt-mini` mit.
+* **Der Windows-Installer ist rund 90 MB groß** (vorher 65): Die beiden
+  neuen Bücher liegen bei, und ihre Bilder lassen sich kaum packen --
+  „Kleine Wunder“ allein sind als `.docx` und `.epub` je 13 MB.
 
 ## Was offen bleibt
 

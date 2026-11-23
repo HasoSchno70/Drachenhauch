@@ -153,9 +153,9 @@ Details in the [manual](docs/en/README.md); how it got there is in the
 
 ## Download
 
-**[Download Drachenhauch](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — for Windows a single installer (about 65 MB), for macOS a `.dmg`, for Linux a `.tar.gz` (x86_64, and aarch64 for the [Raspberry Pi](docs/en/raspberry-pi.md)); currently version 2026.52.
+**[Download Drachenhauch](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — for Windows a single installer (about 90 MB), for macOS a `.dmg`, for Linux a `.tar.gz` (x86_64, and aarch64 for the [Raspberry Pi](docs/en/raspberry-pi.md)); currently version 2026.53.
 
-You do **not** need Python installed. It ships the complete development environment, the `dhrt` runtime, all examples with their assets, the textbook in both languages as `.docx` and `.epub`, and the ESP32 skeleton. The Windows installer is unsigned, so SmartScreen will speak up on first launch; the macOS app is not notarised yet.
+You do **not** need Python installed. It ships the complete development environment, the `dhrt` runtime, all examples with their assets, the books (the textbook in both languages, *Der Einstieg*, *Kleine Wunder* and *Fenster, Formulare, Daten*) as `.docx` and `.epub`, and the ESP32 skeleton. The Windows installer is unsigned, so SmartScreen will speak up on first launch; the macOS app is not notarised yet.
 
 ## Working from source
 
