@@ -1,0 +1,56 @@
+== anlegen
+geändert: 0
+geändert: 0
+geändert: 0
+== einfuegen
+geändert: 5
+geändert: 2
+geändert: 3
+== auswaehlen
+titel | jahr
+Emil und die Detektive | 1929
+Momo | 1973
+== suchen
+titel
+Emil und die Detektive
+Metropolis
+Momo
+== verbinden
+titel | name | von
+Tetris | Lena | 2026-10-11
+Metropolis | Jonas | 2026-11-01
+== alle
+titel | bei
+Emil und die Detektive | -
+Kind of Blue | -
+Metropolis | Jonas
+Momo | -
+Tetris | Lena
+== zaehlen
+art | anzahl
+Buch | 2
+Film | 1
+Musik | 1
+Spiel | 1
+== tage
+titel | tage
+Tetris | 40
+Metropolis | 19
+== monate
+monat | ausleihen
+2026-09 | 1
+2026-10 | 1
+2026-11 | 1
+== aendern
+geändert: 1
+== loeschen
+geändert: 1
+== danach
+titel
+Emil und die Detektive
+Metropolis
+Momo
+== platzhalter
+6 ist die neue Kennung
+== transaktion
+2 Freunde -- nichts gelöscht

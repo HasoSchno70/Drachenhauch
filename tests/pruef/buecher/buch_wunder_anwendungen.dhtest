@@ -192,6 +192,33 @@ MODERN TRUE
 Das Studio TRUE
 teil I 6, studio 17, kap07 FALSE
 
+=== anhang c: die sql-beispiele liefern, was der anhang abdruckt
+' Anhang C druckt jede Anweisung aus beispiele.sql und darunter ihr
+' Ergebnis aus ausgabe.txt. sql.dh fuehrt sie aus; was es ausgibt, muss
+' ausgabe.txt sein -- sonst stuende im Buch eine Antwort, die SQLite so
+' nicht gibt.
+DIM d AS STRING : d = ARG$(0) + "/buecher/anwendungen/code/anhang_c"
+CHDIR(d)
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", "sql.dh")
+DIM aus AS STRING
+DIM leer AS INTEGER
+WHILE leer < 5
+    DIM t AS STRING : t = PROCESS_READ$(p) + PROCESS_ERR$(p)
+    aus = aus + t
+    IF t = "" AND NOT PROCESS_RUNNING(p) THEN leer = leer + 1
+    SLEEP(20)
+WEND
+aus = REPLACE$(aus, CHR$(13), "")
+DIM soll AS STRING : soll = REPLACE$(READALL("ausgabe.txt"), CHR$(13), "")
+PRINT "gleich "; aus = soll
+IF aus <> soll THEN PRINT aus
+PRINT "bloecke "; LEN(SPLIT$(soll, "== ")) - 1
+--- argumente
+{sammlung}/../../..
+--- erwartet
+gleich TRUE
+bloecke 14
+
 === mediathek kapitel 1: leer abgewiesen, ein titel aufgenommen
 ' Tippen kann eine Aufnahme nicht (sie spielt Tasten, keine Zeichen) --
 ' die Faelle danach setzen darum statt des Felds einen festen Titel ein.
