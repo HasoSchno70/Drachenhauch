@@ -205,10 +205,12 @@ One thing stays German on purpose: the run-time error messages quoted in Appendi
 
 ### More books (German)
 
-Three shorter books build one finished program each, chapter by chapter:
+Five more books, each built from programs you can run:
 
 | Book | What you build | Download |
 |---|---|---|
+| **[Kleine Wunder](buecher/wunder/README.md)** | The language learned on programs worth watching — a starfield, fireworks, fractals, a flock, a theremin, a flight over a landscape — each with the reason behind its decisions | [.docx](buecher/wunder/buch/Drachenhauch-Wunder.docx?raw=1) · [.epub](buecher/wunder/buch/Drachenhauch-Wunder.epub?raw=1) |
+| **[Fenster, Formulare, Daten](buecher/anwendungen/README.md)** | A media library with forms, tables, database, reports, charts, two languages and an installer — first by hand, then in Drachenhauch Studio | [.docx](buecher/anwendungen/buch/Drachenhauch-Anwendungen.docx?raw=1) · [.epub](buecher/anwendungen/buch/Drachenhauch-Anwendungen.epub?raw=1) |
 | **[Der Einstieg](buecher/einstieg/README.md)** | Programming from zero, for people who have never written a line of code — the gentlest way in | [.docx](buecher/einstieg/buch/Drachenhauch-Einstieg.docx?raw=1) · [.epub](buecher/einstieg/buch/Drachenhauch-Einstieg.epub?raw=1) |
 | **[Arcade-Shooter](buecher/galaga/README.md)** | A space shooter with attack waves, with sprites you draw yourself in the pixel editor | [.docx](buecher/galaga/buch/Drachenhauch-Buch.docx?raw=1) |
 | **[Tippspiel](buecher/tippspiel/README.md)** | A football prediction app with a database, ranking table and schedule download — the first serious application | [.docx](buecher/tippspiel/buch/Drachenhauch-Tippspiel.docx?raw=1) |

@@ -1,0 +1,29 @@
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Keine Frage ist zu klein -- die Antwort hilft auch dem Nächsten. Wenn eine Antwort passt, markiere sie bitte als Antwort.
+        No question is too small -- the answer helps the next person too. When a reply solves it, please mark it as the answer.
+  - type: textarea
+    id: frage
+    attributes:
+      label: "Was möchtest du tun? / What are you trying to do?"
+      description: "Und was passiert stattdessen? / And what happens instead?"
+    validations:
+      required: true
+  - type: textarea
+    id: programm
+    attributes:
+      label: "Code, um den es geht / The code in question"
+      description: "So kurz wie möglich / As short as possible"
+      render: basic
+  - type: textarea
+    id: meldung
+    attributes:
+      label: "Meldung oder Ausgabe / Message or output"
+      render: text
+  - type: input
+    id: fassung
+    attributes:
+      label: "Fassung und System / Version and system"
+      description: "dhrt --version, z. B. 2026.52 unter Windows 11 / e.g. 2026.52 on Windows 11"

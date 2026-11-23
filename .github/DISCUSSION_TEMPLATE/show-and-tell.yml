@@ -1,0 +1,29 @@
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Zeig, was du mit Drachenhauch gebaut hast -- ein Spiel, eine Demo, ein Werkzeug, eine Anwendung. Ein Programm, das andere ausprobieren können, kommt auf Wunsch in die [Galerie](https://github.com/HasoSchno70/Drachenhauch/blob/main/docs/galerie.md).
+        Show what you built with Drachenhauch -- a game, a demo, a tool, an application. A program others can try goes into the [gallery](https://github.com/HasoSchno70/Drachenhauch/blob/main/docs/en/galerie.md) if you like.
+  - type: textarea
+    id: was
+    attributes:
+      label: "Was ist es? / What is it?"
+      description: "Ein, zwei Sätze und gern ein Bild (hineinziehen) / A sentence or two and a picture if you like (drag it in)"
+    validations:
+      required: true
+  - type: input
+    id: link
+    attributes:
+      label: "Wo kann man es ausprobieren? / Where can people try it?"
+      description: "Repository, Download oder Spielwiese / Repository, download or playground"
+  - type: textarea
+    id: gelernt
+    attributes:
+      label: "Was war knifflig, was hat geholfen? / What was tricky, what helped?"
+      description: "Freiwillig -- hilft anderen und uns / Optional -- helps others and us"
+  - type: checkboxes
+    id: galerie
+    attributes:
+      label: "Galerie / Gallery"
+      options:
+        - label: "Gern in die Galerie / Please add it to the gallery"

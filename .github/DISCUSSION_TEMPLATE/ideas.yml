@@ -1,0 +1,19 @@
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Ideen, über die man erst reden möchte. Ist sie schon klar umrissen, passt auch ein [Wunsch als Issue](https://github.com/HasoSchno70/Drachenhauch/issues/new?template=wunsch.yml).
+        Ideas you would like to talk through first. If it is already well defined, a [feature request issue](https://github.com/HasoSchno70/Drachenhauch/issues/new?template=wunsch.yml) works too.
+  - type: textarea
+    id: idee
+    attributes:
+      label: "Die Idee / The idea"
+      description: "Was soll gehen, und wofür brauchst du es? / What should be possible, and what do you need it for?"
+    validations:
+      required: true
+  - type: textarea
+    id: beispiel
+    attributes:
+      label: "Wie könnte es aussehen? / What could it look like?"
+      description: "Ein paar Zeilen Code, wie du es gern schreiben würdest / A few lines of code the way you would like to write it"
+      render: basic
