@@ -38,7 +38,7 @@ module.exports = (H) => [
 
   H.code(stueck("kap17/2_kaleidoskop.dh", "SUB strich", "END SUB")),
 
-  H.pmix(["ATAN2 kennen wir aus Kapitel 8: Es macht aus dem Weg von der Mitte zum Punkt einen Winkel. HYPOT ist der Satz des Pythagoras, die Länge dieses Wegs. Danach ist ", ["Drehen", true], " ein Plus: Ein Sechstel des Kreises sind 2π/6, und w1 + dreh ist derselbe Punkt, um so viel weitergedreht. ", ["Spiegeln", true], " ist ein Minus: −w1 ist der Punkt, an der waagerechten Linie durch die Mitte gespiegelt, denn was vorher 30 Grad über der Linie lag, liegt jetzt 30 Grad darunter. dreh − w1 dreht dieses Spiegelbild dann weiter. Zurück in x und y rechnet linie:"]),
+  H.pmix(["ATAN2 kennen wir aus Kapitel 8: Es macht aus dem Weg von der Mitte zum Punkt einen Winkel. HYPOT ist der Satz des Pythagoras, die Länge dieses Wegs. Danach ist Drehen ein Plus: Ein Sechstel des Kreises sind 2π/6, und w1 + dreh ist derselbe Punkt, um so viel weitergedreht. Spiegeln ist ein Minus: −w1 ist der Punkt, an der waagerechten Linie durch die Mitte gespiegelt, denn was vorher 30 Grad über der Linie lag, liegt jetzt 30 Grad darunter. dreh − w1 dreht dieses Spiegelbild dann weiter. Zurück in x und y rechnet linie:"]),
 
   H.code(stueck("kap17/2_kaleidoskop.dh", "SUB linie", "END SUB")),
 
