@@ -158,6 +158,12 @@ function baue(H, tr) {
         return fn(uebersetzePmix(args[0], tr), ...args.slice(1));
       }
       if (name === "code") {
+        // Ein Ausgabe-Block ist, was das Programm (oder dhrt) ausgibt --
+        // er bleibt woertlich. Eine Zeile wie "'CIRLCE' -- dhrt kennt ihn
+        // nicht" sah sonst wie ein Kommentar aus und ging in den Katalog.
+        // `{ out: [...] }` (Code MIT Ausgabe darunter, im Lehrbuch) bleibt
+        // Code; nur `{ out: true }` ist ein reiner Ausgabe-Block.
+        if (args[1] && args[1].out === true) return fn(...args);
         return fn(uebersetzeCode(args[0], tr), ...args.slice(1));
       }
       if (name === "cmd") {

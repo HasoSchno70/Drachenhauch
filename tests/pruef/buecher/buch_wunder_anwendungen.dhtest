@@ -271,7 +271,9 @@ studio Probleme, Probleme, Statuszeile
 ' buecher/_i18n/i18n.js schickt die Texte eines Kapitels durch den
 ' Katalog. Das Referenzbuch hat keine dritte Ueberschriftenebene,
 ' "Kleine Wunder" 326 -- ohne h3 in FELDER blieben sie im englischen Buch
-' still deutsch.
+' still deutsch. Ein Ausgabe-Block ({ out: true }) ging bis 2026-11-23 wie
+' Code durch die Kommentar-Uebersetzung: "'CIRLCE' -- dhrt kennt ihn nicht"
+' landete als Kommentar im Katalog.
 IMPORT "helfer.dh"
 CHDIR(ARG$(0) + "/buecher/referenz/buch")
 WRITEALL("_i18n_probe.js", READALL(ARG$(1)))
@@ -291,15 +293,22 @@ const H = wrap(roh, {
   "Drehen nach der Uhr": "Turning by the clock",
   "ein Kommentar": "a comment",
   "Taste": "Key",
+  "ein Kommentar' -- dhrt": "FALSCH UEBERSETZT",
 });
 console.log("h3 " + H.h3("Drehen nach der Uhr"));
 console.log("code " + H.code(["x = 1  ' ein Kommentar"])[0]);
 console.log("kopf " + H.table([], { headers: ["Taste", "PRINT"] }).join(", "));
+// Ein reiner Ausgabe-Block bleibt woertlich, auch wenn eine Zeile mit ' beginnt;
+// Code mit Ausgabe darunter (Lehrbuch: { out: [...] }) bleibt Code.
+console.log("ausgabe " + H.code(["'ein Kommentar' -- dhrt"], { out: true })[0]);
+console.log("mit ausgabe " + H.code(["x = 1  ' ein Kommentar"], { out: ["1"] })[0]);
 console.log("fehlt " + [...H.__fehlend].length);
 --- erwartet
 h3 Turning by the clock
 code x = 1  ' a comment
 kopf Key, PRINT
+ausgabe 'ein Kommentar' -- dhrt
+mit ausgabe x = 1  ' a comment
 fehlt 0
 
 === mediathek kapitel 1: leer abgewiesen, ein titel aufgenommen
