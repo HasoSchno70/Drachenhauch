@@ -50,11 +50,11 @@ module.exports = (H) => {
     H.h2("Wenn du weiterlesen willst"),
 
     H.table([
-      ["Das Lehrbuch", "nachschlagen", "die ganze Sprache und jeder Befehl mit einem kleinen Beispielprogramm"],
+      ["Das Lehrbuch", "zum Nachschlagen", "die ganze Sprache und jeder Befehl mit einem kleinen Beispielprogramm"],
       ["Der Einstieg", "von vorn", "für alle, die noch nie programmiert haben — langsamer als dieses Buch"],
       ["Galaga", "ein Spiel", "ein Arcade-Shooter in Kapiteln, mit selbst gezeichneten Sprites"],
       ["Tippspiel", "eine Anwendung", "Datenbank, Netz und Rangliste für eine Tipprunde"],
-      ["Fenster, Formulare, Daten", "Anwendungen", "das Gegenstück zu diesem Buch: Programme mit Knöpfen, Tabellen und Datenbank (in Arbeit)"],
+      ["Fenster, Formulare, Daten", "Anwendungen", "das Gegenstück zu diesem Buch: Programme mit Knöpfen, Tabellen und Datenbank"],
     ], { headers: ["Buch", "Wofür", "Was drinsteht"], widths: [2600, 1800, 4626] }),
 
     H.h2("Wenn du etwas zeigen willst"),
