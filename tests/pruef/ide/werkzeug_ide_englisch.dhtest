@@ -315,3 +315,31 @@ FOR i = 0 TO LEN(L) - 1
 NEXT
 --- erwartet
 pr aaa # Erstes Dokument
+
+=== englisch: die problemliste sagt line
+' Gefunden beim Bild der IDE fuer die englische Fassung von "Kleine
+' Wunder": vor der englischen Meldung stand "Zeile 4:".
+pruefen()
+protokoll("pr problem " + LEFT$(GUI_LISTBOX_ITEM(lstProbleme, 0), 8))
+EXIT(0)
+--- programm ../../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+tipp.dh
+--- datei tipp.dh
+SCREEN(320, 200)
+CIRLCE(10, 10, 5)
+--- datei _programm/ide.json
+{"sprache": "en"}
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../../..
+DH_IDE_KONFIG=ide.json
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " THEN PRINT L[i]
+NEXT
+--- erwartet
+pr problem Line 2: 
