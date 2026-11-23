@@ -90,9 +90,11 @@ function figure(name, caption) {
 }
 
 const p = (text) => `<p>${esc(text)}</p>`;
-// parts = ["text", ["code", true], ...] -- Array-Eintrag = Inline-Code
+// parts = ["text", ["code", true], ["betont", false], ...] -- Array-Eintrag =
+// Inline-Code, mit `false` an zweiter Stelle ein betontes Wort (kursiv).
 const pmix = (parts) => "<p>" + parts.map((x) =>
-  Array.isArray(x) ? `<code>${esc(x[0])}</code>` : esc(x)).join("") + "</p>";
+  Array.isArray(x) ? (x[1] === false ? `<em>${esc(x[0])}</em>` : `<code>${esc(x[0])}</code>`)
+    : esc(x)).join("") + "</p>";
 
 // Aufzaehlungen kommen als einzelne Aufrufe herein, nicht als Gruppe. Sie
 // werden hier als <li> erzeugt und spaeter von huelleListen() zu <ul>

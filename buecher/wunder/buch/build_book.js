@@ -96,10 +96,15 @@ function p(text, opts = {}) {
     children: [new TextRun({ text, size: 22 })] });
 }
 // Absatz mit gemischtem Text + Inline-Code: parts = ["text", ["code", true], ...]
+// parts = ["text", ["code", true], ["betont", false], ...]: ein Eintrag als
+// Liste ist Inline-Code, mit `false` an zweiter Stelle dagegen ein betontes
+// Wort im Fliesstext (kursiv) -- das geht auch durch den Katalog.
 function pmix(parts) {
   return new Paragraph({ spacing: SP(180),
     children: parts.map((x) => Array.isArray(x)
-      ? new TextRun({ text: x[0], font: "Consolas", size: 21, color: "335577" })
+      ? (x[1] === false
+        ? new TextRun({ text: x[0], italics: true, size: 22 })
+        : new TextRun({ text: x[0], font: "Consolas", size: 21, color: "335577" }))
       : new TextRun({ text: x, size: 22 })) });
 }
 function bullet(text) {

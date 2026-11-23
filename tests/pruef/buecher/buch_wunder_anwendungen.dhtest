@@ -288,11 +288,12 @@ IF nlCode <> 0 THEN PRINT nlErr
 IMPORT "{sammlung}/../_hilfen/nodelauf.dh"
 --- datei probe.js
 const { wrap } = require("../../_i18n/i18n");
-const roh = { h2: (t) => t, h3: (t) => t, code: (z) => z, table: (r, o) => o.headers };
+const roh = { h2: (t) => t, h3: (t) => t, code: (z) => z, table: (r, o) => o.headers, pmix: (t) => t };
 const H = wrap(roh, {
   "Drehen nach der Uhr": "Turning by the clock",
   "ein Kommentar": "a comment",
   "Taste": "Key",
+  "von unten nach oben": "from bottom to top",
   "ein Kommentar' -- dhrt": "FALSCH UEBERSETZT",
 });
 console.log("h3 " + H.h3("Drehen nach der Uhr"));
@@ -302,6 +303,9 @@ console.log("kopf " + H.table([], { headers: ["Taste", "PRINT"] }).join(", "));
 // Code mit Ausgabe darunter (Lehrbuch: { out: [...] }) bleibt Code.
 console.log("ausgabe " + H.code(["'ein Kommentar' -- dhrt"], { out: true })[0]);
 console.log("mit ausgabe " + H.code(["x = 1  ' ein Kommentar"], { out: ["1"] })[0]);
+// ["wort", false] in pmix ist ein betontes Wort und wird uebersetzt,
+// ["CODE", true] bleibt. "Ein Schritt, " fehlt im Probekatalog (1).
+console.log("betont " + JSON.stringify(H.pmix(["Ein Schritt, ", ["von unten nach oben", false], " mit ", ["DELTA()", true]])));
 console.log("fehlt " + [...H.__fehlend].length);
 --- erwartet
 h3 Turning by the clock
@@ -309,7 +313,8 @@ code x = 1  ' a comment
 kopf Key, PRINT
 ausgabe 'ein Kommentar' -- dhrt
 mit ausgabe x = 1  ' a comment
-fehlt 0
+betont ["Ein Schritt, ",["from bottom to top",false]," mit ",["DELTA()",true]]
+fehlt 1
 
 === mediathek kapitel 1: leer abgewiesen, ein titel aufgenommen
 ' Tippen kann eine Aufnahme nicht (sie spielt Tasten, keine Zeichen) --

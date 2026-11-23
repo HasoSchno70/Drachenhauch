@@ -107,10 +107,14 @@ function uebersetzeTabelle(zeilen, tr) {
 }
 
 // pmix(["text", ["code"], "text"]) -- Array-Eintraege sind Inline-Code
-// und bleiben; die nackten Strings sind Prosa.
+// und bleiben; die nackten Strings sind Prosa. ["wort", false] ist ein
+// betontes Wort im Fliesstext ("Kleine Wunder") und wird uebersetzt.
 function uebersetzePmix(teile, tr) {
   if (!Array.isArray(teile)) return teile;
-  return teile.map((x) => (istText(x) ? tr(x) : x));
+  return teile.map((x) => {
+    if (Array.isArray(x) && x[1] === false && istText(x[0])) return [tr(x[0]), false];
+    return istText(x) ? tr(x) : x;
+  });
 }
 
 // Kommentare in Beispielprogrammen. Der Code selbst MUSS unangetastet

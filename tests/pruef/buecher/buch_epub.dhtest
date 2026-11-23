@@ -296,6 +296,17 @@ PRINT "teil vii "; INSTR(nav, ">Part VII · The Third Dimension<") >= 0
 DIM w AS STRING : w = ARG$(0) + "/buecher/wunder/buch/images/"
 PRINT "ide englisch "; BUFFER_LEN(ZIP_READ(en, "OEBPS/images/kap00_ide.png")) = FILESIZE(w + "en/kap00_ide.png")
 PRINT "ide deutsch "; BUFFER_LEN(ZIP_READ(de, "OEBPS/images/kap00_ide.png")) = FILESIZE(w + "kap00_ide.png")
+' Ein betontes Wort ([text, false] in pmix) ist kursiv, nicht Code, und
+' geht durch den Katalog (Kapitel 7).
+DIM betont AS INTEGER : betont = 0
+DIM n AS STRING
+FOR EACH n IN ZIP_LIST(de)
+    IF INSTR(ZIP_READ$(de, n), "<em>von unten nach oben</em>") >= 0 THEN betont = betont + 1
+NEXT
+FOR EACH n IN ZIP_LIST(en)
+    IF INSTR(ZIP_READ$(en, n), "<em>from bottom to top</em>") >= 0 THEN betont = betont + 1
+NEXT
+PRINT "betont "; betont
 --- argumente
 {sammlung}/../../..
 --- datei helfer.dh
@@ -314,3 +325,4 @@ kapitel 0 TRUE
 teil vii TRUE
 ide englisch TRUE
 ide deutsch TRUE
+betont 2
