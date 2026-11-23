@@ -192,46 +192,6 @@ MODERN TRUE
 Das Studio TRUE
 teil I 6, studio 17, kap07 FALSE
 
-=== jedes buch mit docx und epub wird veroeffentlicht
-' Ein Buch, das als .docx UND .epub im Repo liegt, ist fertig zum Lesen:
-' Es gehoert in jedes Release (.github/workflows/release.yml), in den
-' Windows-Installer (Datei und Startmenue) und in beide READMEs. "Kleine
-' Wunder" und "Fenster, Formulare, Daten" fehlten dort monatelang, weil
-' die Liste von Hand gepflegt wird -- dieser Fall merkt das naechste.
-DIM w AS STRING : w = ARG$(0)
-DIM release AS STRING : release = READALL(w + "/.github/workflows/release.yml")
-DIM iss AS STRING : iss = READALL(w + "/installer/Drachenhauch-IDE.iss")
-DIM readme AS STRING : readme = READALL(w + "/README.md")
-DIM readmeDe AS STRING : readmeDe = READALL(w + "/README.de.md")
-DIM n AS INTEGER : n = 0
-DIM b AS STRING
-FOR EACH b IN DIRLIST(w + "/buecher")
-    DIM d AS STRING : d = w + "/buecher/" + b + "/buch"
-    IF NOT DIREXISTS(d) THEN CONTINUE
-    DIM f AS STRING
-    FOR EACH f IN DIRLIST(d)
-        IF RIGHT$(f, 5) <> ".docx" OR LEFT$(f, 2) = "~$" THEN CONTINUE
-        DIM name AS STRING : name = LEFT$(f, LEN(f) - 5)
-        IF NOT FILEEXISTS(d + "/" + name + ".epub") THEN CONTINUE
-        n = n + 1
-        DIM fehlt AS ARRAY OF STRING : fehlt = []
-        IF INSTR(release, " " + name + " ") < 0 AND INSTR(release, " " + name + ";") < 0 THEN ARRAY_PUSH(fehlt, "release.yml")
-        DIM t AS STRING
-        FOR EACH t IN ["docx", "epub"]
-            IF INSTR(iss, "..\buecher\" + b + "\buch\" + name + "." + t + CHR$(34)) < 0 THEN ARRAY_PUSH(fehlt, "Installer ." + t)
-            IF INSTR(readme, "buecher/" + b + "/buch/" + name + "." + t) < 0 THEN ARRAY_PUSH(fehlt, "README.md ." + t)
-            IF INSTR(readmeDe, "buecher/" + b + "/buch/" + name + "." + t) < 0 THEN ARRAY_PUSH(fehlt, "README.de.md ." + t)
-        NEXT
-        IF INSTR(iss, "{app}\buecher\" + name + ".docx" + CHR$(34) + "; Flags: createonlyiffileexists") < 0 THEN ARRAY_PUSH(fehlt, "Startmenue")
-        IF LEN(fehlt) > 0 THEN PRINT name; " fehlt in: "; JOIN$(fehlt, ", ")
-    NEXT
-NEXT
-PRINT "buecher "; n
---- argumente
-{sammlung}/../../..
---- erwartet
-buecher 5
-
 === mediathek kapitel 1: leer abgewiesen, ein titel aufgenommen
 ' Tippen kann eine Aufnahme nicht (sie spielt Tasten, keine Zeichen) --
 ' die Faelle danach setzen darum statt des Felds einen festen Titel ein.
@@ -1059,3 +1019,43 @@ DHRT_ABSEITS=1
 --- erwartet
 TRUE 1.0
 FALSE 0.0
+
+=== jedes buch mit docx und epub wird veroeffentlicht
+' Ein Buch, das als .docx UND .epub im Repo liegt, ist fertig zum Lesen:
+' Es gehoert in jedes Release (.github/workflows/release.yml), in den
+' Windows-Installer (Datei und Startmenue) und in beide READMEs. "Kleine
+' Wunder" und "Fenster, Formulare, Daten" fehlten dort monatelang, weil
+' die Liste von Hand gepflegt wird -- dieser Fall merkt das naechste.
+DIM w AS STRING : w = ARG$(0)
+DIM release AS STRING : release = READALL(w + "/.github/workflows/release.yml")
+DIM iss AS STRING : iss = READALL(w + "/installer/Drachenhauch-IDE.iss")
+DIM readme AS STRING : readme = READALL(w + "/README.md")
+DIM readmeDe AS STRING : readmeDe = READALL(w + "/README.de.md")
+DIM n AS INTEGER : n = 0
+DIM b AS STRING
+FOR EACH b IN DIRLIST(w + "/buecher")
+    DIM d AS STRING : d = w + "/buecher/" + b + "/buch"
+    IF NOT DIREXISTS(d) THEN CONTINUE
+    DIM f AS STRING
+    FOR EACH f IN DIRLIST(d)
+        IF RIGHT$(f, 5) <> ".docx" OR LEFT$(f, 2) = "~$" THEN CONTINUE
+        DIM name AS STRING : name = LEFT$(f, LEN(f) - 5)
+        IF NOT FILEEXISTS(d + "/" + name + ".epub") THEN CONTINUE
+        n = n + 1
+        DIM fehlt AS ARRAY OF STRING : fehlt = []
+        IF INSTR(release, " " + name + " ") < 0 AND INSTR(release, " " + name + ";") < 0 THEN ARRAY_PUSH(fehlt, "release.yml")
+        DIM t AS STRING
+        FOR EACH t IN ["docx", "epub"]
+            IF INSTR(iss, "..\buecher\" + b + "\buch\" + name + "." + t + CHR$(34)) < 0 THEN ARRAY_PUSH(fehlt, "Installer ." + t)
+            IF INSTR(readme, "buecher/" + b + "/buch/" + name + "." + t) < 0 THEN ARRAY_PUSH(fehlt, "README.md ." + t)
+            IF INSTR(readmeDe, "buecher/" + b + "/buch/" + name + "." + t) < 0 THEN ARRAY_PUSH(fehlt, "README.de.md ." + t)
+        NEXT
+        IF INSTR(iss, "{app}\buecher\" + name + ".docx" + CHR$(34) + "; Flags: createonlyiffileexists") < 0 THEN ARRAY_PUSH(fehlt, "Startmenue")
+        IF LEN(fehlt) > 0 THEN PRINT name; " fehlt in: "; JOIN$(fehlt, ", ")
+    NEXT
+NEXT
+PRINT "buecher "; n
+--- argumente
+{sammlung}/../../..
+--- erwartet
+buecher 5
