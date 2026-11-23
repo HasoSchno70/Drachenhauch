@@ -2730,3 +2730,165 @@ status TRUE
 sortiert TRUE
 tetris TRUE
 maskiert TRUE
+
+=== anhang b: der spickzettel stimmt mit dhrt und dem studio
+' Anhang B druckt aus buch/spickzettel.json die Befehle der gui aus Teil I
+' und was ein Programm aus dem Studio mitbringt. Jeder gui-Befehl muss in
+' einem Programm von Teil I vorkommen, jede Studio-Signatur woertlich im
+' Code stehen, den F5 fuer die fertige Mediathek erzeugt.
+IMPORT "json"
+IMPORT "regex"
+IMPORT "laeufer.dh"
+IMPORT "db"
+SUB kopieren(von AS STRING, nach AS STRING)
+    IF NOT DIREXISTS(nach) THEN MKDIR(nach)
+    DIM n AS STRING
+    FOR EACH n IN DIRLIST(von)
+        IF DIREXISTS(von + "/" + n) THEN
+            IF n <> "_studio" THEN kopieren(von + "/" + n, nach + "/" + n)
+        ELSEIF RIGHT$(n, 3) <> ".db" THEN
+            COPYFILE(von + "/" + n, nach + "/" + n)
+        END IF
+    NEXT
+END SUB
+FUNCTION laufen$(main AS STRING, bilder AS INTEGER, arg AS STRING) AS STRING
+    DIM q AS INTEGER
+    IF arg = "" THEN
+        q = PROCESS_START("dhrt", "run", "--bilder", STR$(bilder), main)
+    ELSE
+        q = PROCESS_START("dhrt", "run", "--bilder", STR$(bilder), main, "--", arg)
+    END IF
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    WHILE leer < 5
+        DIM t AS STRING : t = PROCESS_READ$(q) + PROCESS_ERR$(q)
+        aus = aus + t
+        IF t = "" AND NOT PROCESS_RUNNING(q) THEN leer = leer + 1
+        SLEEP(20)
+    WEND
+    RETURN aus
+END FUNCTION
+FUNCTION bedienen$(main AS STRING, ev AS ARRAY OF STRING, bilder AS INTEGER) AS STRING
+    DIM pf AS STRING : pf = CWD$() + "/bedienung.txt"
+    WRITEALL(pf, "c " + STR$(LEN(ev)) + CHR$(10) + JOIN$(ev, CHR$(10)) + CHR$(10) + CHR$(10))
+    SETENV("DHRT_ABSPIELEN", pf)
+    SETENV("DHRT_GUI_ZUSTAND", "1")
+    DIM aus AS STRING : aus = laufen$(main, bilder, "")
+    SETENV("DHRT_ABSPIELEN", "")
+    SETENV("DHRT_GUI_ZUSTAND", "")
+    IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+    RETURN aus
+END FUNCTION
+SUB klick(ev AS ARRAY OF STRING, b AS INTEGER, x AS INTEGER, y AS INTEGER)
+    ARRAY_PUSH(ev, "e " + STR$(b) + " 7 " + STR$(x) + " " + STR$(y) + " 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 2) + " 7 " + STR$(x) + " " + STR$(y) + " 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 4) + " 6 0 0 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 6) + " 5 0 0 0 0")
+END SUB
+' Eine Taste ab Bild b, wahlweise mit gehaltenem Strg (341).
+SUB taste(ev AS ARRAY OF STRING, b AS INTEGER, strg AS BOOLEAN, code AS INTEGER)
+    IF strg THEN ARRAY_PUSH(ev, "e " + STR$(b) + " 2 341 0 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 2) + " 2 " + STR$(code) + " 0 0 0")
+    ARRAY_PUSH(ev, "e " + STR$(b + 4) + " 1 " + STR$(code) + " 0 0 0")
+    IF strg THEN ARRAY_PUSH(ev, "e " + STR$(b + 6) + " 1 341 0 0 0")
+END SUB
+FUNCTION zeile$(aus AS STRING, was AS STRING) AS STRING
+    DIM z AS STRING
+    FOR EACH z IN SPLIT$(REPLACE$(aus, CHR$(13), ""), CHR$(10))
+        IF INSTR(z, was) >= 0 THEN RETURN TRIM$(z)
+    NEXT
+    RETURN ""
+END FUNCTION
+SUB f5(nm AS STRING, p AS STRING)
+    slZeilen = []
+    slBild = 0
+    slHin(10, 10)
+    slWarten(10)
+    slTaste(294)
+    slWarten(150)
+    slAufnahmeSchreiben(CWD$() + "/f5.txt")
+    SETENV("DH_STUDIO_LAUF_BILDER", "20")
+    DIM lg AS STRING : lg = CWD$() + "/" + nm + ".log"
+    DIM aus AS STRING : aus = slStarten(lg, CWD$() + "/f5.txt", slBild + 20, p)
+    PRINT nm; " geprueft "; slHat(lg, "geprueft 0 0"); " beendet "; slHat(lg, "beendet 0")
+    IF INSTR(aus, "Laufzeitfehler") >= 0 THEN PRINT aus
+END SUB
+' Eine Methode vor das Ende der Klasse Hauptfenster der Kopie.
+SUB einschieben(nm AS STRING, zeilen AS ARRAY OF STRING)
+    DIM h AS STRING : h = CWD$() + "/" + nm + "/_studio/projekt/Hauptfenster.dh"
+    DIM t AS STRING : t = READALL(h)
+    DIM p AS INTEGER : p = INSTRREV(t, "END CLASS")
+    WRITEALL(h, LEFT$(t, p) + JOIN$(zeilen, CHR$(10)) + CHR$(10) + MID$(t, p))
+END SUB
+FUNCTION q$(s AS STRING) AS STRING
+    RETURN CHR$(34) + s + CHR$(34)
+END FUNCTION
+
+FUNCTION wert$(datei AS STRING, sql AS STRING) AS STRING
+    DIM d AS DB_CONN : d = DB_OPEN(datei)
+    DIM r AS DB_RESULT : r = DB_QUERY(d, sql)
+    DIM w AS STRING : w = "?"
+    IF DB_NEXT(r) THEN w = DB_GET_STRING(r, 0)
+    DB_CLOSE(d)
+    RETURN w
+END FUNCTION
+
+SUB benutzer(ordner AS STRING)
+    IF NOT DIREXISTS(ordner) THEN MKDIR(ordner)
+    SETENV("APPDATA", ordner)
+    SETENV("XDG_DATA_HOME", ordner)
+    SETENV("HOME", ordner)
+END SUB
+
+
+DIM w AS STRING : w = ARG$(1)
+DIM teil1 AS STRING : teil1 = ""
+DIM o AS STRING
+FOR EACH o IN ["kap01", "kap02", "kap03", "kap04", "kap05", "kap06"]
+    DIM f AS STRING
+    FOR EACH f IN DIRLIST(w + "/buecher/anwendungen/code/" + o)
+        IF RIGHT$(f, 3) = ".dh" THEN teil1 = teil1 + UPPER$(READALL(w + "/buecher/anwendungen/code/" + o + "/" + f))
+    NEXT
+NEXT
+DIM pm AS STRING : pm = CWD$() + "/kap24_mediathek"
+benutzer(CWD$() + "/benutzer")
+kopieren(w + "/buecher/anwendungen/code/kap24/mediathek", pm)
+f5("kap24_mediathek", pm)
+DIM erzeugt AS STRING : erzeugt = ""
+FOR EACH o IN DIRLIST(pm + "/_studio")
+    IF RIGHT$(o, 3) = ".dh" THEN erzeugt = erzeugt + READALL(pm + "/_studio/" + o)
+NEXT
+DIM j AS JSON_HANDLE : j = JSON_PARSE(READALL(w + "/buecher/anwendungen/buch/spickzettel.json"))
+DIM n AS INTEGER
+DIM g AS INTEGER
+DIM e AS INTEGER
+DIM befehle AS INTEGER : befehle = 0
+FOR g = 0 TO JSON_LEN(j, "gui") - 1
+    FOR e = 0 TO JSON_LEN(j, "gui." + STR$(g) + ".1") - 1
+        DIM zeile AS STRING : zeile = JSON_GET_STRING(j, "gui." + STR$(g) + ".1." + STR$(e) + ".0")
+        DIM name AS STRING
+        FOR EACH name IN REGEX_FIND_ALL(zeile, "[A-Z][A-Z_]+\(")
+            name = LEFT$(name, LEN(name) - 1)
+            befehle = befehle + 1
+            IF INSTR(teil1, name + "(") < 0 THEN PRINT "nicht in Teil I: "; name
+        NEXT
+    NEXT
+NEXT
+DIM sigs AS INTEGER : sigs = 0
+FOR g = 0 TO JSON_LEN(j, "studio") - 1
+    FOR e = 0 TO JSON_LEN(j, "studio." + STR$(g) + ".1") - 1
+        DIM sig AS STRING : sig = JSON_GET_STRING(j, "studio." + STR$(g) + ".1." + STR$(e) + ".0")
+        sigs = sigs + 1
+        IF INSTR(erzeugt, sig) < 0 THEN PRINT "nicht erzeugt: "; sig
+    NEXT
+NEXT
+PRINT "befehle genug "; befehle >= 40; ", signaturen genug "; sigs >= 25
+--- argumente
+{sammlung}/../../../studio/studio.dh
+{sammlung}/../../..
+--- datei laeufer.dh
+IMPORT "{sammlung}/../_hilfen/studiolauf.dh"
+slStudio = ARG$(0)
+--- erwartet
+kap24_mediathek geprueft TRUE beendet TRUE
+befehle genug TRUE, signaturen genug TRUE
