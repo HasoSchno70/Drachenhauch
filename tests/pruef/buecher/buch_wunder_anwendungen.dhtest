@@ -267,6 +267,41 @@ alles true
 debugger und lauf eine zeile 11, 12
 studio Probleme, Probleme, Statuszeile
 
+=== die uebersetzungsschicht nimmt h3, kommentare und tabellenkoepfe
+' buecher/_i18n/i18n.js schickt die Texte eines Kapitels durch den
+' Katalog. Das Referenzbuch hat keine dritte Ueberschriftenebene,
+' "Kleine Wunder" 326 -- ohne h3 in FELDER blieben sie im englischen Buch
+' still deutsch.
+IMPORT "helfer.dh"
+CHDIR(ARG$(0) + "/buecher/referenz/buch")
+WRITEALL("_i18n_probe.js", READALL(ARG$(1)))
+nlWarten(PROCESS_START("node", "_i18n_probe.js"), 60000)
+DELETEFILE("_i18n_probe.js")
+PRINT nlAus;
+IF nlCode <> 0 THEN PRINT nlErr
+--- argumente
+{sammlung}/../../..
+{fall}/probe.js
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/nodelauf.dh"
+--- datei probe.js
+const { wrap } = require("../../_i18n/i18n");
+const roh = { h2: (t) => t, h3: (t) => t, code: (z) => z, table: (r, o) => o.headers };
+const H = wrap(roh, {
+  "Drehen nach der Uhr": "Turning by the clock",
+  "ein Kommentar": "a comment",
+  "Taste": "Key",
+});
+console.log("h3 " + H.h3("Drehen nach der Uhr"));
+console.log("code " + H.code(["x = 1  ' ein Kommentar"])[0]);
+console.log("kopf " + H.table([], { headers: ["Taste", "PRINT"] }).join(", "));
+console.log("fehlt " + [...H.__fehlend].length);
+--- erwartet
+h3 Turning by the clock
+code x = 1  ' a comment
+kopf Key, PRINT
+fehlt 0
+
 === mediathek kapitel 1: leer abgewiesen, ein titel aufgenommen
 ' Tippen kann eine Aufnahme nicht (sie spielt Tasten, keine Zeichen) --
 ' die Faelle danach setzen darum statt des Felds einen festen Titel ein.
