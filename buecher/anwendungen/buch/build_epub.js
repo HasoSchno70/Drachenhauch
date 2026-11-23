@@ -39,7 +39,7 @@ const UI = {
   titel: "Drachenhauch – Fenster, Formulare, Daten", untertitel: "Fenster, Formulare, Daten",
   zeile: "Anwendungen bauen mit gui, Studio und Datenbank", von: "von",
   merke: "Merke", achtung: "Achtung", beispiel: "Beispiel",
-  ausgabe: "Ausgabe", datei: "Drachenhauch-Anwendungen.epub",
+  ausgabe: "Ausgabe", datei: "Drachenhauch-Anwendungen.epub", inhalt: "Inhalt",
 };
 
 const TITEL = UI.titel;
@@ -404,7 +404,7 @@ function opf(datum) {
     <dc:title>${esc(TITEL)}</dc:title>
     <dc:creator>${esc(AUTOR)}</dc:creator>
     <dc:language>${LANG}</dc:language>
-    <dc:description>Programmieren lernen und alle Befehle von Drachenhauch verstehen.</dc:description>
+    <dc:description>${esc(UI.zeile)}</dc:description>
     <meta property="dcterms:modified">${datum}</meta>
   </metadata>
   <manifest>

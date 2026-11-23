@@ -242,3 +242,34 @@ IMPORT "{sammlung}/../_hilfen/epub.dh"
 --- erwartet
 prefers-color-scheme TRUE
 color-scheme TRUE
+
+=== inhaltsverzeichnis und beschreibung jedes buchs
+' Gefunden 2026-11-23: In "Der Einstieg", "Kleine Wunder" und "Fenster,
+' Formulare, Daten" stand ueber dem Inhaltsverzeichnis "undefined" (UI.inhalt
+' fehlte), und jede EPUB -- auch das englische Handbook -- beschrieb sich als
+' "Programmieren lernen und alle Befehle von Drachenhauch verstehen". Jetzt
+' traegt jedes Buch seine Unterzeile in seiner Sprache.
+IMPORT "helfer.dh"
+DIM buch AS STRING
+FOR EACH buch IN ["referenz de", "referenz en", "einstieg de", "anwendungen de"]
+    DIM t AS ARRAY OF STRING : t = SPLIT$(buch, " ")
+    DIM epub AS STRING : epub = epubBauenVon$(ARG$(0), t[0], t[1])
+    DIM nav AS STRING : nav = ZIP_READ$(epub, "OEBPS/text/nav.xhtml")
+    DIM opf AS STRING : opf = ZIP_READ$(epub, "OEBPS/content.opf")
+    PRINT buch; ": "; zwischen$(nav, "<h1>", "</h1>"); " | "; zwischen$(opf, "<dc:description>", "</dc:description>")
+NEXT
+--- argumente
+{sammlung}/../../..
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/epub.dh"
+FUNCTION zwischen$(s AS STRING, a AS STRING, b AS STRING) AS STRING
+    DIM i AS INTEGER : i = INSTR(s, a)
+    IF i < 0 THEN RETURN "(fehlt)"
+    DIM rest AS STRING : rest = MID$(s, i + LEN(a))
+    RETURN LEFT$(rest, INSTR(rest, b))
+END FUNCTION
+--- erwartet
+referenz de: Inhalt | Programmieren lernen und alle Befehle verstehen
+referenz en: Contents | Learn to program and understand every command
+einstieg de: Inhalt | Programmieren lernen von Null an
+anwendungen de: Inhalt | Anwendungen bauen mit gui, Studio und Datenbank
