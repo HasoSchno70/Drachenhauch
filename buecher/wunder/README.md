@@ -58,8 +58,11 @@ cd buecher/wunder/buch && node build_epub.js     # .epub
 
 Die englische Fassung („Little Wonders“) entsteht aus denselben Kapiteln:
 `--lang en` schickt jeden Text durch den Katalog `buch/i18n/en.json`;
-fehlt ein Eintrag, bleibt der deutsche Satz stehen. Bisher sind nur die
-Titel übersetzt. Die Werkzeuge dafür teilt das Buch mit dem Lehrbuch
+fehlt ein Eintrag, bleibt der deutsche Satz stehen. Der Text ist
+vollständig übersetzt, samt Kommentaren in den abgedruckten Programmen.
+Noch deutsch sind die Programme selbst (Namen und Texte im Code), ihre
+Ausgaben und die Meldungen von dhrt. Begriffe und Entscheidungen stehen in
+`buch/i18n/LEITFADEN.md`. Die Werkzeuge teilt das Buch mit dem Lehrbuch
 (`buecher/_i18n/`):
 
 ```
