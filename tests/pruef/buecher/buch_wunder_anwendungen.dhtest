@@ -379,6 +379,42 @@ console.log("genug texte " + (texte > 3000) + ", funde " + funde.length);
 
 genug texte true, funde 0
 
+=== anhang d nimmt die seiten der sprache, in der gebaut wird
+' Anhang D von Kleine Wunder nennt zu jeder Meldung die Seite ihres
+' Kapitels. Bis 2026-11-24 las er immer toc_pages.de.json -- im englischen
+' Buch haetten die deutschen Seiten gestanden. Jetzt die Datei der Sprache
+' (--lang), nachgeschlagen ueber die Kapitelnummer.
+IMPORT "helfer.dh"
+CHDIR(ARG$(0) + "/buecher/wunder/buch")
+WRITEALL("_seiten_probe.js", READALL(ARG$(1)))
+nlWarten(PROCESS_START("node", "_seiten_probe.js"), 60000)
+DELETEFILE("_seiten_probe.js")
+PRINT nlAus;
+IF nlCode <> 0 THEN PRINT nlErr
+--- argumente
+{sammlung}/../../..
+{fall}/probe.js
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/nodelauf.dh"
+--- datei probe.js
+const path = require("path");
+const zeilen = (sprache) => {
+  process.argv = ["node", "probe", "--lang", sprache];
+  delete require.cache[require.resolve(path.resolve("content/93_anhang_d.js"))];
+  const tabellen = [];
+  const H = new Proxy({ table: (r) => { tabellen.push(...r); return null; } },
+                      { get: (t, k) => (k in t ? t[k] : () => null) });
+  require(path.resolve("content/93_anhang_d.js"))(H);
+  return tabellen;
+};
+const de = zeilen("de");
+const xx = zeilen("xx");
+console.log("deutsch mit seiten " + (de.filter((z) => z[2] !== "").length === de.length));
+console.log("ohne messung keine seiten " + (xx.length === de.length && xx.every((z) => z[2] === "")));
+--- erwartet
+deutsch mit seiten true
+ohne messung keine seiten true
+
 === mediathek kapitel 1: leer abgewiesen, ein titel aufgenommen
 ' Tippen kann eine Aufnahme nicht (sie spielt Tasten, keine Zeichen) --
 ' die Faelle danach setzen darum statt des Felds einen festen Titel ein.

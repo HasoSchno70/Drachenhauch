@@ -47,16 +47,26 @@ const ART_TEXT = {
 };
 
 module.exports = (H) => {
-  const seitenDatei = path.join(__dirname, "..", "toc_pages.de.json");
-  const seiten = fs.existsSync(seitenDatei)
+  // Die Seiten der Sprache, in der gebaut wird (build_book.js --lang en),
+  // nachgeschlagen ueber die Kapitelnummer: die Titel sind je Sprache
+  // andere, die Nummern nicht.
+  const li = process.argv.indexOf("--lang");
+  const sprache = li >= 0 ? (process.argv[li + 1] || "de") : "de";
+  const seitenDatei = path.join(__dirname, "..", `toc_pages.${sprache}.json`);
+  const seitenJeTitel = fs.existsSync(seitenDatei)
     ? JSON.parse(fs.readFileSync(seitenDatei, "utf-8")) : {};
+  const seitenJeNr = {};
+  for (const [titel, seite] of Object.entries(seitenJeTitel)) {
+    const m = titel.match(/^(\d+) · /);
+    if (m) seitenJeNr[m[1]] = seite;
+  }
   // Dieselbe Meldung in mehreren Kapiteln: eine Zeile, alle Kapitel.
   const zeile = new Map();
   const nachArt = new Map();
   for (const f of sammeln()) {
     const [art, meldung] = zerlegen(f.text);
     const nr = f.kapitel.split(" · ")[0];
-    const seite = String(seiten[f.kapitel] || "");
+    const seite = String(seitenJeNr[nr] || "");
     if (zeile.has(meldung)) {
       const z = zeile.get(meldung);
       if (!z.kap.includes(nr)) { z.kap.push(nr); if (seite) z.seiten.push(seite); }
