@@ -3,8 +3,10 @@
 // sie findet: ein Ausgabe-Block, dessen erste Zeile mit `datei.dh:N:` (oder
 // `Laufzeitfehler in datei.dh:N:`) beginnt. Kommt eine Meldung in einem
 // Kapitel dazu oder aendert sich ihr Wortlaut, steht es hier von selbst.
-// Die Seite ist die, auf der das Kapitel beginnt (aus toc_pages.de.json,
-// die der erste Durchgang des Buchbaus misst).
+// Die Seite ist die, auf der das Kapitel beginnt (aus toc_pages.<sprache>.json,
+// die der erste Durchgang des Buchbaus misst). In einer anderen Sprache steht
+// die Meldung so, wie dhrt sie dort sagt (i18n/ausgaben.<sprache>.json, von
+// ausgaben.js geholt).
 const fs = require("fs");
 const path = require("path");
 const { mitZahlen } = require("../../../_i18n/vorlage");
@@ -40,6 +42,15 @@ function zerlegen(text) {
   return ["Andere", rest];
 }
 
+// Dasselbe fuer eine Meldung in der Zielsprache: nur den Text hinter dem
+// Rahmen ("Runtime error in x.dh:7: ", "x.dh:6: Warning: ").
+const RAHMEN = /^(?:[^:]*? in )?[\w.-]+\.dh:\d+: (?:[\w -]+: (?=.))?/;
+function ohneRahmen(text, art) {
+  if (art === "Andere") return text.replace(/^(?:[^:]*? in )?[\w.-]+\.dh:\d+: /, "");
+  if (art === "Laufzeitfehler") return text.replace(/^[^:]*? in [\w.-]+\.dh:\d+: /, "");
+  return text.replace(RAHMEN, "");
+}
+
 const ART_TEXT = {
   "Laufzeitfehler": "Das Programm lief und hielt an dieser Stelle an. Die Zeilennummer vorn in der Meldung sagt, wo.",
   "Warnung": "Beim Übersetzen bemerkt, noch bevor das Programm läuft. Es läuft trotzdem — aber meist nicht so, wie gemeint.",
@@ -55,6 +66,9 @@ module.exports = (H) => {
   const seitenDatei = path.join(__dirname, "..", `toc_pages.${sprache}.json`);
   const seitenJeTitel = fs.existsSync(seitenDatei)
     ? JSON.parse(fs.readFileSync(seitenDatei, "utf-8")) : {};
+  const ausgabenDatei = path.join(__dirname, "..", "i18n", `ausgaben.${sprache}.json`);
+  const ausgaben = sprache !== "de" && fs.existsSync(ausgabenDatei)
+    ? JSON.parse(fs.readFileSync(ausgabenDatei, "utf-8")) : {};
   const seitenJeNr = {};
   for (const [titel, seite] of Object.entries(seitenJeTitel)) {
     const m = titel.match(/^(\d+) · /);
@@ -65,6 +79,7 @@ module.exports = (H) => {
   const nachArt = new Map();
   for (const f of sammeln()) {
     const [art, meldung] = zerlegen(f.text);
+    const zeigen = ausgaben[f.text] !== undefined ? ohneRahmen(ausgaben[f.text], art) : meldung;
     const nr = f.kapitel.split(" · ")[0];
     const seite = String(seitenJeNr[nr] || "");
     if (zeile.has(meldung)) {
@@ -75,10 +90,10 @@ module.exports = (H) => {
     const z = { kap: [nr], seiten: seite ? [seite] : [] };
     zeile.set(meldung, z);
     if (!nachArt.has(art)) nachArt.set(art, []);
-    nachArt.get(art).push({ meldung, z });
+    nachArt.get(art).push({ meldung: zeigen, z });
   }
   for (const [art, liste] of nachArt) {
-    nachArt.set(art, liste.map(({ meldung, z }) => [{ text: meldung, mono: true, size: 17 },
+    nachArt.set(art, liste.map(({ meldung, z }) => [{ text: meldung, mono: true, size: 17, roh: true },
                                                     z.kap.join(", "), z.seiten.join(", ")]));
   }
   const anzahl = zeile.size;
