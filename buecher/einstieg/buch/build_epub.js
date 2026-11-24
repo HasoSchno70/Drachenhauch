@@ -39,7 +39,7 @@ const UI = {
   titel: "Drachenhauch – Der Einstieg", untertitel: "Der Einstieg",
   zeile: "Programmieren lernen von Null an", von: "von",
   merke: "Merke", achtung: "Achtung", beispiel: "Beispiel",
-  ausgabe: "Ausgabe", datei: "Drachenhauch-Einstieg.epub",
+  ausgabe: "Ausgabe", datei: "Drachenhauch-Einstieg.epub", inhalt: "Inhalt",
 };
 
 const TITEL = UI.titel;
@@ -400,7 +400,7 @@ function opf(datum) {
     <dc:title>${esc(TITEL)}</dc:title>
     <dc:creator>${esc(AUTOR)}</dc:creator>
     <dc:language>${LANG}</dc:language>
-    <dc:description>Programmieren lernen und alle Befehle von Drachenhauch verstehen.</dc:description>
+    <dc:description>${esc(UI.zeile)}</dc:description>
     <meta property="dcterms:modified">${datum}</meta>
   </metadata>
   <manifest>

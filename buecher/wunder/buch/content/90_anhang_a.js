@@ -259,7 +259,7 @@ module.exports = (H) => [
 
   ...neu("loesungen/kap06_torus.dh").map((t) => H.code(t)),
 
-  H.p("(x - 1) MOD B rechnet die Spalte auf 0 bis B - 1 um, + 1 wieder auf 1 bis B. Für x = 0 ist (x - 1) MOD B in Drachenhauch B - 1, denn MOD rundet wie \ nach unten, auch bei negativen Zahlen — in vielen anderen Sprachen käme -1 heraus, und man bräuchte noch ein + B. Ein Gleiter, der rechts unten hinausfliegt, kommt jetzt links oben wieder herein."),
+  H.p("(x - 1) MOD B rechnet die Spalte auf 0 bis B - 1 um, + 1 wieder auf 1 bis B. Für x = 0 ist (x - 1) MOD B in Drachenhauch B - 1, denn MOD rundet wie \\ nach unten, auch bei negativen Zahlen — in vielen anderen Sprachen käme -1 heraus, und man bräuchte noch ein + B. Ein Gleiter, der rechts unten hinausfliegt, kommt jetzt links oben wieder herein."),
 
   H.h3("Erfinden: Farbe nach Alter"),
 
@@ -1061,7 +1061,7 @@ module.exports = (H) => [
 
   ...neu("loesungen/kap26_liste.dh").map((t) => H.code(t)),
 
-  H.pmix(["Eine SUB ohne Klammern ist ein Wert, den man in ein Feld legen kann — eine ", ["Funktionsreferenz", true], " wie in Kapitel 20, und das geht auch mit SUBs aus einem Namensraum. ", ["szenen[szene](zeit)", true], " ruft die mit der Nummer der Szene. Eine vierte Szene ist dann ein Eintrag mehr in szenen und in dauer, ohne einen neuen CASE. Weil alle Szenen dieselbe Form haben — zeichnen mit der Zeit als Parameter —, passen sie in dasselbe Feld."]),
+  H.pmix(["Eine SUB ohne Klammern ist ein Wert, den man in ein Feld legen kann — eine ", ["Funktionsreferenz", false], " wie in Kapitel 20, und das geht auch mit SUBs aus einem Namensraum. ", ["szenen[szene](zeit)", true], " ruft die mit der Nummer der Szene. Eine vierte Szene ist dann ein Eintrag mehr in szenen und in dauer, ohne einen neuen CASE. Weil alle Szenen dieselbe Form haben — zeichnen mit der Zeit als Parameter —, passen sie in dasselbe Feld."]),
 
   H.h3("Erweitern 2: eine Pause"),
 

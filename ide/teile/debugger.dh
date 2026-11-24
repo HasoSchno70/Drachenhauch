@@ -309,7 +309,7 @@ SUB debugHaltZeigen(j AS JSON_HANDLE)
     variablenZeigen(j)
     stapelZeigen(j)
     watchesZeigen(j)
-    DIM wo AS STRING : wo = "Zeile " + STR$(debugZeile)
+    DIM wo AS STRING : wo = tr$("Zeile ") + STR$(debugZeile)
     IF NOT gleicheDatei(debugDatei, prozessDatei) THEN wo = BASENAME(debugDatei) + ", " + wo
     GUI_SET_TEXT(lblDebug, tr$("Debugger steht in ") + wo + tr$(" (Tiefe ") + STR$(JSON_GET_INT(j, "depth")) + ")")
     ' Ein Halt am FEHLER: Variablen so, wie sie beim Fehler waren; weiter

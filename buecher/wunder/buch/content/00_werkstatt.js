@@ -16,7 +16,7 @@ module.exports = (H) => [
   H.table([
     ["Strg+N", "eine neue Datei"],
     ["Strg+S", "sichern — beim ersten Mal mit Namen; er endet auf .dh"],
-    ["F5", "starten"],
+    ["F5", "das Programm starten"],
     ["Umschalt+F5", "ein laufendes Programm anhalten"],
     ["F1", "das Wort unter der Schreibmarke im Handbuch nachschlagen"],
     ["Strg+F3", "alle eingebauten Befehle, mit Beschreibung und Suchfeld"],

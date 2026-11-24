@@ -53,3 +53,26 @@ dhrt run buecher/wunder/code/kap05/3_feuerwerk.dh
 dhrt run tools/buch_bauen.dh -- buecher/wunder   # .docx mit Seitenzahlen im Inhalt
 cd buecher/wunder/buch && node build_epub.js     # .epub
 ```
+
+## Englisch
+
+Die englische Fassung („Little Wonders“) entsteht aus denselben Kapiteln:
+`--lang en` schickt jeden Text durch den Katalog `buch/i18n/en.json`;
+fehlt ein Eintrag, bleibt der deutsche Satz stehen. Der Text ist
+vollständig übersetzt, samt Kommentaren in den abgedruckten Programmen.
+Noch deutsch sind die Programme selbst (Namen und Texte im Code), ihre
+Ausgaben und die Meldungen von dhrt. Begriffe und Entscheidungen stehen in
+`buch/i18n/LEITFADEN.md`. Die Werkzeuge teilt das Buch mit dem Lehrbuch
+(`buecher/_i18n/`):
+
+```
+cd buecher/wunder/buch
+node extract_strings.js en          # neue Texte in den Katalog
+node fehlend.js en                  # was je Kapitel noch fehlt
+node offen.js en 05_feuerwerk       # die offenen Texte eines Kapitels
+dhrt run ../../referenz/buch/i18n/apply.dh -- patch.json i18n/en.json
+node build_epub.js --lang en        # Drachenhauch-Wonders.epub
+```
+
+Bilder, die es nur englisch gibt (die IDE mit englischer Oberfläche),
+liegen in `buch/images/en/` und kommen mit `ide_bilder.dh -- --lang en`.

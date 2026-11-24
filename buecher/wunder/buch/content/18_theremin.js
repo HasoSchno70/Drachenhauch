@@ -76,7 +76,7 @@ module.exports = (H) => [
 
   H.code(stueck("kap18/2_theremin.dh", "IF KEY_HIT(KEY_T)", "END IF", 2)),
 
-  H.pmix(["Ein Tremolo ist ein schnelles Zittern der Lautstärke. Das Programm könnte es selbst ausrechnen, in jedem Bild mit SIN. Statt dessen bekommt das Audio-Modul einen ", ["Modulator", true], ": ", ["AUDIO_LFO_NEW(\"sine\", 6)", true], " ist ein Wert, der sechsmal je Sekunde zwischen −1 und +1 schwingt, von selbst. ", ["AUDIO_MODULATE", true], " bindet ihn an die Lautstärke des SFX-Busses, auf dem alle Klänge laufen, und bildet −1 auf 40 % und +1 auf 100 % ab. ", ["AUDIO_MOD_REMOVE", true], " löst ihn wieder, und der Bus kehrt zu seiner festen Lautstärke zurück. Auch das hat das Buch verändert: Bisher blieb der Bus auf dem letzten Wert des Zitterns stehen, bei jedem Mal einem anderen."]),
+  H.pmix(["Ein Tremolo ist ein schnelles Zittern der Lautstärke. Das Programm könnte es selbst ausrechnen, in jedem Bild mit SIN. Statt dessen bekommt das Audio-Modul einen ", ["Modulator", false], ": ", ["AUDIO_LFO_NEW(\"sine\", 6)", true], " ist ein Wert, der sechsmal je Sekunde zwischen −1 und +1 schwingt, von selbst. ", ["AUDIO_MODULATE", true], " bindet ihn an die Lautstärke des SFX-Busses, auf dem alle Klänge laufen, und bildet −1 auf 40 % und +1 auf 100 % ab. ", ["AUDIO_MOD_REMOVE", true], " löst ihn wieder, und der Bus kehrt zu seiner festen Lautstärke zurück. Auch das hat das Buch verändert: Bisher blieb der Bus auf dem letzten Wert des Zitterns stehen, bei jedem Mal einem anderen."]),
 
   H.h2("Schritt 6: das Bild"),
 

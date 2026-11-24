@@ -37,7 +37,7 @@ module.exports = (H) => [
 
   H.code(stueck("kap25/1_flug.dh", "' Baeume: wo es Wald ist", "DIM krone")),
 
-  H.pmix(["Das Programm würfelt Plätze, bis es 1500 Bäume hat, aber nur dort, wo der Boden in der Waldhöhe liegt — nicht in der Talsohle, nicht im Fels. Jeder Baum wird keine Zeichnung, sondern eine ", ["Matrix", true], ": an seinen Platz geschoben und mit einer zufälligen Größe gestreckt. Stamm und Krone bekommen je eine Liste, und gezeichnet wird in der Hauptschleife mit nur zwei Befehlen:"]),
+  H.pmix(["Das Programm würfelt Plätze, bis es 1500 Bäume hat, aber nur dort, wo der Boden in der Waldhöhe liegt — nicht in der Talsohle, nicht im Fels. Jeder Baum wird keine Zeichnung, sondern eine ", ["Matrix", false], ": an seinen Platz geschoben und mit einer zufälligen Größe gestreckt. Stamm und Krone bekommen je eine Liste, und gezeichnet wird in der Hauptschleife mit nur zwei Befehlen:"]),
 
   H.code(stueck("kap25/1_flug.dh", "MODEL_INSTANCED(stamm", "MODEL_INSTANCED(krone")),
 

@@ -7,7 +7,11 @@
 ' Dateibaum nur dessen Dateien zeigt. Die Groesse ist die des Bildschirms
 ' (die IDE startet maximiert).
 '
-'     dhrt run buecher/wunder/buch/ide_bilder.dh [-- name ...]
+'     dhrt run buecher/wunder/buch/ide_bilder.dh [-- name ...] [--lang en]
+'
+' Mit --lang en laeuft die IDE englisch (DH_IDE_SPRACHE, DHRT_LANG), und
+' die Bilder landen in images/en/ -- der Buchbau nimmt sie dort fuer die
+' englische Fassung und sonst die aus images/.
 DIM hier AS STRING : hier = CWD$()
 DIM wurzel AS STRING : wurzel = hier + "/../../.."
 DIM ide AS STRING : ide = wurzel + "/ide/ide.dh"
@@ -15,10 +19,20 @@ DIM bilder AS STRING : bilder = hier + "/images"
 DIM arbeit AS STRING : arbeit = hier + "/_ide_bilder"
 
 DIM nur AS ARRAY OF STRING : nur = []
+DIM sprache AS STRING : sprache = "de"
 DIM a AS INTEGER
 FOR a = 0 TO ARGC() - 1
-    ARRAY_PUSH(nur, ARG$(a))
+    IF ARG$(a) = "--lang" AND a + 1 < ARGC() THEN
+        sprache = ARG$(a + 1)
+    ELSEIF a = 0 OR ARG$(a - 1) <> "--lang" THEN
+        ARRAY_PUSH(nur, ARG$(a))
+    END IF
 NEXT
+IF sprache <> "de" THEN
+    bilder = bilder + "/" + sprache
+    SETENV("DH_IDE_SPRACHE", sprache)
+    SETENV("DHRT_LANG", sprache)
+END IF
 
 SUB ordnerWeg(pfad AS STRING)
     IF NOT DIREXISTS(pfad) THEN RETURN

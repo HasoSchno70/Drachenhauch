@@ -36,7 +36,7 @@ module.exports = (H) => [
 
   H.code(stueck("kap20/2_maschine.dh", "CLASS Feuer", "END CLASS")),
 
-  H.pmix([["CLASS Feuer EXTENDS Effekt", true], " heißt: Ein Feuer ist ein Effekt. Es hat alle Felder und Methoden eines Effekts, ohne sie noch einmal hinzuschreiben, und schreibt neu, was bei ihm anders ist. Init ruft zuerst ", ["SUPER.Init", true], ", die Init des Effekts, und schaltet danach das Leuchten an. neues sagt, wo ein Flammenteilchen beginnt: unten, breit gestreut, schnell nach oben. bewegen ", ["überschreibt", true], " die Fassung des Effekts — aber nicht ganz: ", ["SUPER.bewegen(t, dt)", true], " lässt erst den Effekt geradeaus bewegen, danach zieht das Feuer das Teilchen zur Mitte und macht es kleiner. So wird die Flamme oben spitz. farbe geht von Gelb über Orange nach Rot."]),
+  H.pmix([["CLASS Feuer EXTENDS Effekt", true], " heißt: Ein Feuer ist ein Effekt. Es hat alle Felder und Methoden eines Effekts, ohne sie noch einmal hinzuschreiben, und schreibt neu, was bei ihm anders ist. Init ruft zuerst ", ["SUPER.Init", true], ", die Init des Effekts, und schaltet danach das Leuchten an. neues sagt, wo ein Flammenteilchen beginnt: unten, breit gestreut, schnell nach oben. bewegen ", ["überschreibt", false], " die Fassung des Effekts — aber nicht ganz: ", ["SUPER.bewegen(t, dt)", true], " lässt erst den Effekt geradeaus bewegen, danach zieht das Feuer das Teilchen zur Mitte und macht es kleiner. So wird die Flamme oben spitz. farbe geht von Gelb über Orange nach Rot."]),
 
   H.h2("Schritt 4: Rauch und Schnee"),
 

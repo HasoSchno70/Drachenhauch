@@ -406,7 +406,7 @@ function opf(datum) {
     <dc:title>${esc(TITEL)}</dc:title>
     <dc:creator>${esc(AUTOR)}</dc:creator>
     <dc:language>${LANG}</dc:language>
-    <dc:description>Programmieren lernen und alle Befehle von Drachenhauch verstehen.</dc:description>
+    <dc:description>${esc(UI.zeile)}</dc:description>
     <meta property="dcterms:modified">${datum}</meta>
   </metadata>
   <manifest>

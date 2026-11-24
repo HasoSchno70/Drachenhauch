@@ -2,7 +2,7 @@
 // druckbares .docx. Inhalt liegt modular in content/NN_*.js (jede Datei
 // exportiert (H)=>[bloecke]). Dieser Renderer stellt die Bausteine (H)
 // bereit, laedt die Module sortiert und setzt das Dokument zusammen.
-// Aufruf:  node build_book.js
+// Aufruf:  node build_book.js [--lang en]
 //
 // Werkzeugkette geerbt von buecher/referenz/buch/build_book.js -- dieselben
 // Bausteine, dieselbe Farbwelt, damit die Baende zusammen im Regal stehen.
@@ -32,22 +32,30 @@ const C_CMD = "9A3412";     // Befehlsname (kraeftiges Braun-Orange)
 const C_CAP = "6A6A6A";     // Bildunterschrift grau
 const C_CODEBG = "F4F4F4";  // Code-Hintergrund
 // ---------------------------------------------------------------- Sprache
-// Siehe build_epub.js: dieselbe Katalog-Schicht, damit .docx und .epub in
-// beiden Sprachen aus DERSELBEN Kapitelquelle entstehen.
-// Dieses Buch erscheint vorerst nur deutsch -- die Uebersetzungsschicht des
-// Referenzbuchs (i18n.js + i18n/en.json) ist bewusst NICHT mitkopiert. Sie
-// laesst sich jederzeit nachziehen, denn die Kapitel sind (H) => [bloecke]
-// und wissen nicht, in welcher Sprache sie gesetzt werden.
-const LANG = "de";
+// Siehe build_epub.js: dieselbe Katalog-Schicht wie im Referenzbuch
+// (buecher/_i18n/), damit .docx und .epub in beiden Sprachen aus DERSELBEN
+// Kapitelquelle entstehen. Mit --lang en gehen die Texte durch
+// i18n/en.json; fehlt ein Eintrag, bleibt der deutsche Satz stehen.
+const ARGS = process.argv.slice(2);
+const _li = ARGS.indexOf("--lang");
+const LANG = _li >= 0 ? (ARGS[_li + 1] || "de") : "de";
 const UI = {
-  titel: "Drachenhauch – Kleine Wunder",
-  untertitel: "Kleine Wunder",
-  zeile: "Die Sprache lernen mit Programmen, die staunen lassen",
-  von: "von", merke: "Merke", achtung: "Achtung",
-  beispiel: "Beispiel", ausgabe: "Ausgabe",
-  datei: "Drachenhauch-Wunder.docx",
-};
-const KATALOG = null;
+  de: {
+    titel: "Drachenhauch – Kleine Wunder", untertitel: "Kleine Wunder",
+    zeile: "Die Sprache lernen mit Programmen, die staunen lassen", von: "von",
+    merke: "Merke", achtung: "Achtung", beispiel: "Beispiel",
+    ausgabe: "Ausgabe", datei: "Drachenhauch-Wunder.docx",
+  },
+  en: {
+    titel: "Drachenhauch – Little Wonders", untertitel: "Little Wonders",
+    zeile: "Learn the language with programs that make you marvel", von: "by",
+    merke: "Remember", achtung: "Careful", beispiel: "Example",
+    ausgabe: "Output", datei: "Drachenhauch-Wonders.docx",
+  },
+}[LANG];
+if (!UI) { console.error(`Unbekannte Sprache: ${LANG} (de|en)`); process.exit(2); }
+const KATALOG = LANG === "de" ? null
+  : JSON.parse(fs.readFileSync(path.join(__dirname, "i18n", `${LANG}.json`), "utf8"));
 
 const C_OUTBG = "EAF4EA";   // Ausgabe-Hintergrund (gruenlich)
 const C_OUTBD = "9AC79A";
@@ -57,8 +65,14 @@ function pngSize(file) {
   const b = fs.readFileSync(file);
   return { w: b.readUInt32BE(16), h: b.readUInt32BE(20) };
 }
+// Ein Bild gibt es je Sprache: images/<sprache>/<name>, wenn es dort liegt
+// (etwa die IDE mit englischer Oberflaeche), sonst das gemeinsame aus images/.
+function bildDatei(name) {
+  const eigen = path.join(IMG, LANG, name);
+  return LANG !== "de" && fs.existsSync(eigen) ? eigen : path.join(IMG, name);
+}
 function figure(name, caption, maxW = 480, maxH = 320) {
-  const file = path.join(IMG, name);
+  const file = bildDatei(name);
   if (!fs.existsSync(file)) {                 // fehlendes Bild -> Platzhalter
     return [new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 160 },
       children: [new TextRun({ text: `[Bild: ${name}]`, italics: true, color: C_CAP, size: 18 })] })];
@@ -82,10 +96,15 @@ function p(text, opts = {}) {
     children: [new TextRun({ text, size: 22 })] });
 }
 // Absatz mit gemischtem Text + Inline-Code: parts = ["text", ["code", true], ...]
+// parts = ["text", ["code", true], ["betont", false], ...]: ein Eintrag als
+// Liste ist Inline-Code, mit `false` an zweiter Stelle dagegen ein betontes
+// Wort im Fliesstext (kursiv) -- das geht auch durch den Katalog.
 function pmix(parts) {
   return new Paragraph({ spacing: SP(180),
     children: parts.map((x) => Array.isArray(x)
-      ? new TextRun({ text: x[0], font: "Consolas", size: 21, color: "335577" })
+      ? (x[1] === false
+        ? new TextRun({ text: x[0], italics: true, size: 22 })
+        : new TextRun({ text: x[0], font: "Consolas", size: 21, color: "335577" }))
       : new TextRun({ text: x, size: 22 })) });
 }
 function bullet(text) {
