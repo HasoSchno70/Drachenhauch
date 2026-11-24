@@ -60,9 +60,12 @@ Die englische Fassung („Little Wonders“) entsteht aus denselben Kapiteln:
 `--lang en` schickt jeden Text durch den Katalog `buch/i18n/en.json`;
 fehlt ein Eintrag, bleibt der deutsche Satz stehen. Der Text ist
 vollständig übersetzt, samt Kommentaren in den abgedruckten Programmen.
-Noch deutsch sind die Programme selbst (Namen und Texte im Code), ihre
-Ausgaben und die Meldungen von dhrt. Begriffe und Entscheidungen stehen in
-`buch/i18n/LEITFADEN.md`. Die Werkzeuge teilt das Buch mit dem Lehrbuch
+Meldungen von dhrt und die Ausgaben seiner Werkzeuge stehen so im Buch, wie
+dhrt sie auf Englisch sagt: `node ausgaben.js en` lässt jedes dieser
+Programme mit `DHRT_LANG=de` und `=en` laufen und legt das Ergebnis in
+`buch/i18n/ausgaben.en.json` ab. Noch deutsch sind die Programme selbst
+(Namen und Texte im Code) und darum auch, was sie ausgeben. Begriffe und
+Entscheidungen stehen in `buch/i18n/LEITFADEN.md`. Die Werkzeuge teilt das Buch mit dem Lehrbuch
 (`buecher/_i18n/`):
 
 ```
@@ -70,6 +73,7 @@ cd buecher/wunder/buch
 node extract_strings.js en          # neue Texte in den Katalog
 node fehlend.js en                  # was je Kapitel noch fehlt
 node offen.js en 05_feuerwerk       # die offenen Texte eines Kapitels
+node ausgaben.js en                 # Meldungen von dhrt auf Englisch holen
 dhrt run ../../referenz/buch/i18n/apply.dh -- patch.json i18n/en.json
 node build_epub.js --lang en        # Drachenhauch-Wonders.epub
 ```
