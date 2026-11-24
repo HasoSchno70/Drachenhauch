@@ -16,6 +16,12 @@ text strings; code is never translated.
 - A single lowercase word is taken for a code identifier and NOT translated
   (i18n.js, NICHT_PROSA) -- write table cells as a phrase ("das Programm
   starten", not "starten").
+- In pmix, code is ALWAYS ["code", true]; a plain string or an emphasis
+  ["Wort", false] is always prose and goes through the catalogue, even a
+  single small word like " und " between two code pieces (since 2026-11-24).
+  A German word in a sentence must never be marked [x, true].
+- Multi-line code comments are translated line by line: avoid a line that
+  holds a single word (it cannot be translated sensibly on its own).
 
 ## Input / output format
 

@@ -32,7 +32,7 @@ module.exports = (H) => [
 
   H.code(stueck("kap21/2_szene.dh", "FUNCTION szene", "END FUNCTION")),
 
-  H.pmix(["Das ist die ganze Geschichte, von oben nach unten, wie ein Drehbuch. Das Besondere ist ", ["YIELD", true], ". Eine Funktion, die YIELD enthält, ist eine ", ["Koroutine", true], ": Ruft man sie auf, läuft sie noch nicht los, sondern liefert einen Griff vom Typ COROUTINE. Mit ", ["CORO_RESUME", true], " läuft sie bis zum nächsten YIELD, gibt dessen Wert heraus und hält an — mitten in der Funktion, mit allen lokalen Variablen. Beim nächsten CORO_RESUME geht es in der Zeile danach weiter, als wäre nichts gewesen. Selbst die FOR-Schleife mit den drei Niesern läuft so: Zwischen zwei Durchläufen hält die Koroutine an, und versuch behält seinen Wert."]),
+  H.pmix(["Das ist die ganze Geschichte, von oben nach unten, wie ein Drehbuch. Das Besondere ist ", ["YIELD", true], ". Eine Funktion, die YIELD enthält, ist eine ", ["Koroutine", false], ": Ruft man sie auf, läuft sie noch nicht los, sondern liefert einen Griff vom Typ COROUTINE. Mit ", ["CORO_RESUME", true], " läuft sie bis zum nächsten YIELD, gibt dessen Wert heraus und hält an — mitten in der Funktion, mit allen lokalen Variablen. Beim nächsten CORO_RESUME geht es in der Zeile danach weiter, als wäre nichts gewesen. Selbst die FOR-Schleife mit den drei Niesern läuft so: Zwischen zwei Durchläufen hält die Koroutine an, und versuch behält seinen Wert."]),
 
   H.p("Was YIELD herausgibt, ist hier immer eine Zahl: wie lange gewartet werden soll. 1 heißt eine Sekunde, sagen(…) liefert die Lesezeit, und BIS_ALLE_STEHEN, −1, heißt: so lange, bis niemand mehr geht. Am Ende steht RETURN 0 — warum, steht unter „Was schiefgehen kann“."),
 

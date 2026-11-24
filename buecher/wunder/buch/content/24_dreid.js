@@ -35,7 +35,7 @@ module.exports = (H) => [
 
   H.code(stueck("kap24/2_muehle.dh", "' Die Teile, je einmal gebaut", "DIM krone")),
 
-  H.pmix(["Formen wie CUBE baut Drachenhauch in jedem Bild neu. Für die Mühle nehmen wir ", ["Modelle", true], ": ", ["MESH_CYLINDER", true], ", ", ["MESH_CONE", true], " und ihre Geschwister bauen ein Teil einmal und liefern eine Nummer, mit der man es danach beliebig oft zeichnet — die Tanne vierundzwanzigmal, den Flügel viermal. Gezeichnet wird mit ", ["MODEL(teil, x, y, z, groesse, farbe)", true], ". Eines muss man wissen: Zylinder und Kegel stehen auf dem Boden, von y = 0 bis zu ihrer Höhe; ein Quader aber steht um seine Mitte. Darum steht das Haus mit seinen 1,6 Einheiten Höhe bei y = 0.8 und das Dach darauf bei 1.6. ", ["MODEL_EX", true], " dreht ein Modell beim Zeichnen um eine Achse — das Dach mit vier Seiten um 45 Grad, damit es zum Haus passt."]),
+  H.pmix(["Formen wie CUBE baut Drachenhauch in jedem Bild neu. Für die Mühle nehmen wir ", ["Modelle", false], ": ", ["MESH_CYLINDER", true], ", ", ["MESH_CONE", true], " und ihre Geschwister bauen ein Teil einmal und liefern eine Nummer, mit der man es danach beliebig oft zeichnet — die Tanne vierundzwanzigmal, den Flügel viermal. Gezeichnet wird mit ", ["MODEL(teil, x, y, z, groesse, farbe)", true], ". Eines muss man wissen: Zylinder und Kegel stehen auf dem Boden, von y = 0 bis zu ihrer Höhe; ein Quader aber steht um seine Mitte. Darum steht das Haus mit seinen 1,6 Einheiten Höhe bei y = 0.8 und das Dach darauf bei 1.6. ", ["MODEL_EX", true], " dreht ein Modell beim Zeichnen um eine Achse — das Dach mit vier Seiten um 45 Grad, damit es zum Haus passt."]),
 
   H.h2("Schritt 3: Licht, Dunst und Schatten"),
 
@@ -49,7 +49,7 @@ module.exports = (H) => [
 
   H.code(stueck("kap24/2_muehle.dh", "' Die Nabe sitzt vorn", "NEXT")),
 
-  H.pmix(["Die Flügel sind das Schwierigste: Sie drehen sich um die Nabe, die Nabe sitzt vorn an der Mühle, und jeder Flügel ist um ein Viertel weiter gedreht als der vorige. Mit x, y und z allein wäre das viel Rechnerei mit Sinus und Kosinus. Mit ", ["Matrizen", true], " schreibt man nur auf, was nacheinander geschieht. Eine Matrix vom Typ ", ["MAT4", true], " ist eine Bewegung als Wert: ", ["MAT4_TRANSLATE", true], " verschiebt, ", ["MAT4_ROTATE_Z", true], " dreht um die z-Achse, und ", ["MAT4_MUL(a, b)", true], " setzt zwei Bewegungen zusammen — erst b, dann a."]),
+  H.pmix(["Die Flügel sind das Schwierigste: Sie drehen sich um die Nabe, die Nabe sitzt vorn an der Mühle, und jeder Flügel ist um ein Viertel weiter gedreht als der vorige. Mit x, y und z allein wäre das viel Rechnerei mit Sinus und Kosinus. Mit ", ["Matrizen", false], " schreibt man nur auf, was nacheinander geschieht. Eine Matrix vom Typ ", ["MAT4", true], " ist eine Bewegung als Wert: ", ["MAT4_TRANSLATE", true], " verschiebt, ", ["MAT4_ROTATE_Z", true], " dreht um die z-Achse, und ", ["MAT4_MUL(a, b)", true], " setzt zwei Bewegungen zusammen — erst b, dann a."]),
 
   H.pmix(["Die Nabe: erst um drehung gedreht, dann an ihren Platz vorn am Dach geschoben — das ist ", ["anNabe", true], ". Ein Flügel: erst 1,9 Einheiten nach oben geschoben, dann um k Viertel um den Ursprung gedreht, und das Ganze dann noch durch anNabe. So hängt der Flügel an der Nabe, wie im echten Leben: Dreht sich die Nabe, drehen sich alle Flügel mit, und steht die Mühle woanders, wandert alles zusammen. ", ["MODEL_MATRIX", true], " zeichnet ein Modell mit so einer Matrix. Das ganze Programm:"]),
 

@@ -43,7 +43,7 @@ module.exports = (H) => {
 
     H.h2("Wenn du nachschlagen willst"),
 
-    H.pmix(["Das ", ["Handbuch", true], " liegt bei jeder Installation im Ordner docs, deutsch und englisch, und in der IDE öffnet F1 die Seite zu dem Wort unter der Schreibmarke. Es hat ein Kapitel zur Sprache, eines je Bereich der eingebauten Befehle und eines je Modul — g3d, audio, chart, gui und all die anderen. Wer dort liest, findet auch, was dieses Buch weggelassen hat: Datenbanken, Netz, Fenster mit Knöpfen und Tabellen, Drucken, Geräte am USB-Kabel."]),
+    H.pmix(["Das ", ["Handbuch", false], " liegt bei jeder Installation im Ordner docs, deutsch und englisch, und in der IDE öffnet F1 die Seite zu dem Wort unter der Schreibmarke. Es hat ein Kapitel zur Sprache, eines je Bereich der eingebauten Befehle und eines je Modul — g3d, audio, chart, gui und all die anderen. Wer dort liest, findet auch, was dieses Buch weggelassen hat: Datenbanken, Netz, Fenster mit Knöpfen und Tabellen, Drucken, Geräte am USB-Kabel."]),
 
     H.p("Daneben gibt es zu jedem Bereich Beispiele im Ordner examples, kurz und zum Ausprobieren, und die Stolpersteine — eine Seite mit allem, worüber man beim Umstieg aus einem anderen BASIC fällt."),
 
@@ -59,9 +59,9 @@ module.exports = (H) => {
 
     H.h2("Wenn du etwas zeigen willst"),
 
-    H.pmix(["Die ", ["Galerie", true], " im Handbuch sammelt Programme, die mit Drachenhauch gebaut sind: Spiele, Demos wie Nachtflug und Lichterglanz — die laufen auch im Browser —, und Anwendungen. Sie liegen in eigenen Repositorys, zum Ausprobieren, Nachlesen und Abschauen. Wer selbst etwas gebaut hat, zeigt es in den Diskussionen des Projekts auf GitHub unter „Show and tell“; Fragen gehören unter „Q&A“, und keine ist zu klein."]),
+    H.pmix(["Die ", ["Galerie", false], " im Handbuch sammelt Programme, die mit Drachenhauch gebaut sind: Spiele, Demos wie Nachtflug und Lichterglanz — die laufen auch im Browser —, und Anwendungen. Sie liegen in eigenen Repositorys, zum Ausprobieren, Nachlesen und Abschauen. Wer selbst etwas gebaut hat, zeigt es in den Diskussionen des Projekts auf GitHub unter „Show and tell“; Fragen gehören unter „Q&A“, und keine ist zu klein."]),
 
-    H.pmix(["Ein einzelnes Programm zeigt man am schnellsten in der ", ["Spielwiese", true], " auf der Webseite: einfügen, laufen lassen, und der Knopf für den Link packt den Quelltext in die Adresse. Für mehr als eine Datei ist die exportierte Datei aus Kapitel 26 der Weg."]),
+    H.pmix(["Ein einzelnes Programm zeigt man am schnellsten in der ", ["Spielwiese", false], " auf der Webseite: einfügen, laufen lassen, und der Knopf für den Link packt den Quelltext in die Adresse. Für mehr als eine Datei ist die exportierte Datei aus Kapitel 26 der Weg."]),
 
     H.h2("Wenn du nicht alles selbst bauen willst"),
 

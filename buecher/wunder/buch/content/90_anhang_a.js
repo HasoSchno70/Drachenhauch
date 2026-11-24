@@ -1061,7 +1061,7 @@ module.exports = (H) => [
 
   ...neu("loesungen/kap26_liste.dh").map((t) => H.code(t)),
 
-  H.pmix(["Eine SUB ohne Klammern ist ein Wert, den man in ein Feld legen kann — eine ", ["Funktionsreferenz", true], " wie in Kapitel 20, und das geht auch mit SUBs aus einem Namensraum. ", ["szenen[szene](zeit)", true], " ruft die mit der Nummer der Szene. Eine vierte Szene ist dann ein Eintrag mehr in szenen und in dauer, ohne einen neuen CASE. Weil alle Szenen dieselbe Form haben — zeichnen mit der Zeit als Parameter —, passen sie in dasselbe Feld."]),
+  H.pmix(["Eine SUB ohne Klammern ist ein Wert, den man in ein Feld legen kann — eine ", ["Funktionsreferenz", false], " wie in Kapitel 20, und das geht auch mit SUBs aus einem Namensraum. ", ["szenen[szene](zeit)", true], " ruft die mit der Nummer der Szene. Eine vierte Szene ist dann ein Eintrag mehr in szenen und in dauer, ohne einen neuen CASE. Weil alle Szenen dieselbe Form haben — zeichnen mit der Zeit als Parameter —, passen sie in dasselbe Feld."]),
 
   H.h3("Erweitern 2: eine Pause"),
 
