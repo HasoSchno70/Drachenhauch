@@ -287,14 +287,16 @@ IF nlCode <> 0 THEN PRINT nlErr
 --- datei helfer.dh
 IMPORT "{sammlung}/../_hilfen/nodelauf.dh"
 --- datei probe.js
-const { wrap } = require("../../_i18n/i18n");
-const roh = { h2: (t) => t, h3: (t) => t, code: (z) => z, table: (r, o) => o.headers, pmix: (t) => t };
+const { wrap, sammle } = require("../../_i18n/i18n");
+const { mitZahlen } = require("../../_i18n/vorlage");
+const roh = { h2: (t) => t, h3: (t) => t, code: (z) => z, table: (r, o) => o.headers, pmix: (t) => t, p: (t) => t };
 const H = wrap(roh, {
   "Drehen nach der Uhr": "Turning by the clock",
   "ein Kommentar": "a comment",
   "Taste": "Key",
   "von unten nach oben": "from bottom to top",
   " und ": " and ",
+  "Es fliegen {0} Funken, {1} davon rot.": "{0} sparks fly, {1} of them red.",
   "ein Kommentar' -- dhrt": "FALSCH UEBERSETZT",
 });
 console.log("h3 " + H.h3("Drehen nach der Uhr"));
@@ -310,6 +312,12 @@ console.log("betont " + JSON.stringify(H.pmix(["Ein Schritt, ", ["von unten nach
 // Ein kleines Wort zwischen zwei Codestuecken ist in pmix Prosa, auch wenn
 // es ausserhalb wie ein Bezeichner aussaehe (bis 2026-11-24 blieb es deutsch).
 console.log("bindewort " + JSON.stringify(H.pmix([["COS", true], " und ", ["SIN", true]])));
+// Ein Satz mit eingesetzten Zahlen: im Katalog steht die Vorlage, die
+// Zahlen kommen nach dem Uebersetzen hinein; eingesammelt wird die Vorlage.
+console.log("vorlage " + H.p(mitZahlen("Es fliegen {0} Funken, {1} davon rot.", [500, 12])));
+const [S, texte] = sammle({ p: (t) => t });
+S.p(mitZahlen("Es fliegen {0} Funken, {1} davon rot.", [7, 1]));
+console.log("gesammelt " + texte.join(" | "));
 console.log("fehlt " + [...H.__fehlend].length);
 --- erwartet
 h3 Turning by the clock
@@ -319,6 +327,8 @@ ausgabe 'ein Kommentar' -- dhrt
 mit ausgabe x = 1  ' a comment
 betont ["Ein Schritt, ",["from bottom to top",false]," mit ",["DELTA()",true]]
 bindewort [["COS",true]," and ",["SIN",true]]
+vorlage 500 sparks fly, 12 of them red.
+gesammelt Es fliegen {0} Funken, {1} davon rot.
 fehlt 2
 
 === mediathek kapitel 1: leer abgewiesen, ein titel aufgenommen

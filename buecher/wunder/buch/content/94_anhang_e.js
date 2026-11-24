@@ -4,6 +4,7 @@
 // mit dem naechsten Kapitel oder der naechsten Fassung.
 const fs = require("fs");
 const path = require("path");
+const { mitZahlen } = require("../../../_i18n/vorlage");
 
 function zahlen() {
   try {
@@ -34,7 +35,7 @@ function zahlen() {
 module.exports = (H) => {
   const z = zahlen();
   const satz = z
-    ? `Die ${z.programme} Programme der Kapitel und ihre Lösungen benutzen ${z.benutzt} verschiedene Befehle. Drachenhauch hat ${z.gesamt}. Was jetzt kommt, hängt davon ab, wohin du willst.`
+    ? mitZahlen("Die {0} Programme der Kapitel und ihre Lösungen benutzen {1} verschiedene Befehle. Drachenhauch hat {2}. Was jetzt kommt, hängt davon ab, wohin du willst.", [z.programme, z.benutzt, z.gesamt])
     : "Die Programme dieses Buchs benutzen nur einen kleinen Teil der Befehle, die Drachenhauch hat. Was jetzt kommt, hängt davon ab, wohin du willst.";
   return [
     H.chapter("E · Wie es weitergeht"),

@@ -18,6 +18,8 @@
 // als ein Abbruch mitten im Satz.
 "use strict";
 
+const { vorlagen, fuellen } = require("./vorlage");
+
 // Welche Argumente eines H-Aufrufs sind Text? Der Rest (Bilddateinamen,
 // Zahlen, Optionen) darf NICHT durch den Katalog.
 //   true  = uebersetzen
@@ -195,9 +197,13 @@ function baue(H, tr) {
 function wrap(H, katalog) {
   const fehlend = new Set();
   const tr = (s) => {
-    const t = katalog[s];
-    if (t === undefined || t === "") { fehlend.add(s); return s; }
-    return t;
+    // Ein Satz mit eingesetzten Zahlen (vorlage.js): uebersetzt wird die
+    // Vorlage, die Zahlen kommen danach hinein.
+    const v = vorlagen.get(s);
+    const schluessel = v ? v.vorlage : s;
+    const t = katalog[schluessel];
+    if (t === undefined || t === "") { fehlend.add(schluessel); return s; }
+    return v ? fuellen(t, v.werte) : t;
   };
   const H2 = baue(H, tr);
   H2.__fehlend = fehlend;
@@ -208,7 +214,12 @@ function wrap(H, katalog) {
 function sammle(H) {
   const texte = [];
   const gesehen = new Set();
-  const tr = (s) => { if (!gesehen.has(s)) { gesehen.add(s); texte.push(s); } return s; };
+  const tr = (s) => {
+    const v = vorlagen.get(s);
+    const schluessel = v ? v.vorlage : s;
+    if (!gesehen.has(schluessel)) { gesehen.add(schluessel); texte.push(schluessel); }
+    return s;
+  };
   return [baue(H, tr), texte];
 }
 

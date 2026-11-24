@@ -7,6 +7,7 @@
 // die der erste Durchgang des Buchbaus misst).
 const fs = require("fs");
 const path = require("path");
+const { mitZahlen } = require("../../../_i18n/vorlage");
 
 const MELDUNG = /^(?:Laufzeitfehler in )?([\w.-]+\.dh):\d+: /;
 
@@ -73,7 +74,7 @@ module.exports = (H) => {
   const anzahl = zeile.size;
   const out = [
     H.chapter("D · Die Meldungen im Buch"),
-    H.p(`Jede Meldung von dhrt, die in diesem Buch abgedruckt ist — ${anzahl} verschiedene —, mit dem Kapitel, in dem sie erklärt wird, und der Seite, auf der dieses Kapitel beginnt. Wer eine davon auf dem eigenen Bildschirm sieht, findet hier, wo sie besprochen wurde. Die Meldungen sind die, die dhrt beim Schreiben dieses Buchs wirklich ausgegeben hat; eine Prüfung lässt jedes Beispiel laufen und vergleicht.`),
+    H.p(mitZahlen("Jede Meldung von dhrt, die in diesem Buch abgedruckt ist — {0} verschiedene —, mit dem Kapitel, in dem sie erklärt wird, und der Seite, auf der dieses Kapitel beginnt. Wer eine davon auf dem eigenen Bildschirm sieht, findet hier, wo sie besprochen wurde. Die Meldungen sind die, die dhrt beim Schreiben dieses Buchs wirklich ausgegeben hat; eine Prüfung lässt jedes Beispiel laufen und vergleicht.", [anzahl])),
   ];
   const reihe = ["Laufzeitfehler", "Warnung"];
   const arten = [...nachArt.keys()].sort((a, b) =>
