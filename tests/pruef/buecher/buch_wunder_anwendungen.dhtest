@@ -331,6 +331,54 @@ vorlage 500 sparks fly, 12 of them red.
 gesammelt Es fliegen {0} Funken, {1} davon rot.
 fehlt 2
 
+=== kein doppeltes leerzeichen im fliesstext
+' Ein Rueckstrich vor einem Leerzeichen ist in JavaScript kein Zeichen: "wie
+' \ nach unten" stand in Anhang A von Kleine Wunder als "wie  nach unten" im
+' Buch (gefunden 2026-11-24 beim Uebersetzen). Was so verloren geht, hinterlaesst
+' ein doppeltes Leerzeichen -- in diesen beiden Buechern ist keines gewollt.
+IMPORT "helfer.dh"
+CHDIR(ARG$(0) + "/buecher")
+WRITEALL("_doppelt_probe.js", READALL(ARG$(1)))
+nlWarten(PROCESS_START("node", "_doppelt_probe.js"), 60000)
+DELETEFILE("_doppelt_probe.js")
+PRINT nlAus;
+IF nlCode <> 0 THEN PRINT nlErr
+--- argumente
+{sammlung}/../../..
+{fall}/probe.js
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/nodelauf.dh"
+--- datei probe.js
+const fs = require("fs");
+const path = require("path");
+let datei = "";
+let texte = 0;
+const funde = [];
+const pruefe = (t) => {
+  if (typeof t !== "string") return;
+  texte++;
+  if (/\S  +\S/.test(t)) funde.push(datei + ": " + t.slice(Math.max(0, t.search(/\S  +\S/) - 30), t.search(/\S  +\S/) + 30));
+};
+const H = new Proxy({
+  p: pruefe, h2: pruefe, h3: pruefe, bullet: pruefe, note: pruefe, tip: pruefe, warn: pruefe,
+  bulletRich: (a, b) => { pruefe(a); pruefe(b); },
+  figure: (n, c) => pruefe(c),
+  pmix: (teile) => teile.forEach((x) => { if (typeof x === "string") pruefe(x); else if (Array.isArray(x) && x[1] === false) pruefe(x[0]); }),
+  table: (r) => r.forEach((z) => Array.isArray(z) && z.forEach((c) => { if (typeof c === "string") pruefe(c); else if (c && !c.mono) pruefe(c.text); })),
+}, { get: (t, k) => (k in t ? t[k] : () => null) });
+for (const buch of ["wunder", "anwendungen"]) {
+  const dir = path.resolve(buch, "buch", "content");
+  for (const f of fs.readdirSync(dir).filter((f) => f.endsWith(".js")).sort()) {
+    datei = buch + "/" + f;
+    require(path.join(dir, f))(H);
+  }
+}
+console.log(funde.join("\n"));
+console.log("genug texte " + (texte > 3000) + ", funde " + funde.length);
+--- erwartet
+
+genug texte true, funde 0
+
 === mediathek kapitel 1: leer abgewiesen, ein titel aufgenommen
 ' Tippen kann eine Aufnahme nicht (sie spielt Tasten, keine Zeichen) --
 ' die Faelle danach setzen darum statt des Felds einen festen Titel ein.
