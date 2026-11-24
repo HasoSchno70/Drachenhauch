@@ -294,6 +294,7 @@ const H = wrap(roh, {
   "ein Kommentar": "a comment",
   "Taste": "Key",
   "von unten nach oben": "from bottom to top",
+  " und ": " and ",
   "ein Kommentar' -- dhrt": "FALSCH UEBERSETZT",
 });
 console.log("h3 " + H.h3("Drehen nach der Uhr"));
@@ -304,8 +305,11 @@ console.log("kopf " + H.table([], { headers: ["Taste", "PRINT"] }).join(", "));
 console.log("ausgabe " + H.code(["'ein Kommentar' -- dhrt"], { out: true })[0]);
 console.log("mit ausgabe " + H.code(["x = 1  ' ein Kommentar"], { out: ["1"] })[0]);
 // ["wort", false] in pmix ist ein betontes Wort und wird uebersetzt,
-// ["CODE", true] bleibt. "Ein Schritt, " fehlt im Probekatalog (1).
+// ["CODE", true] bleibt. "Ein Schritt, " und " mit " fehlen im Probekatalog (2).
 console.log("betont " + JSON.stringify(H.pmix(["Ein Schritt, ", ["von unten nach oben", false], " mit ", ["DELTA()", true]])));
+// Ein kleines Wort zwischen zwei Codestuecken ist in pmix Prosa, auch wenn
+// es ausserhalb wie ein Bezeichner aussaehe (bis 2026-11-24 blieb es deutsch).
+console.log("bindewort " + JSON.stringify(H.pmix([["COS", true], " und ", ["SIN", true]])));
 console.log("fehlt " + [...H.__fehlend].length);
 --- erwartet
 h3 Turning by the clock
@@ -314,7 +318,8 @@ kopf Key, PRINT
 ausgabe 'ein Kommentar' -- dhrt
 mit ausgabe x = 1  ' a comment
 betont ["Ein Schritt, ",["from bottom to top",false]," mit ",["DELTA()",true]]
-fehlt 1
+bindewort [["COS",true]," and ",["SIN",true]]
+fehlt 2
 
 === mediathek kapitel 1: leer abgewiesen, ein titel aufgenommen
 ' Tippen kann eine Aufnahme nicht (sie spielt Tasten, keine Zeichen) --

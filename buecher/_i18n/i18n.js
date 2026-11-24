@@ -109,11 +109,15 @@ function uebersetzeTabelle(zeilen, tr) {
 // pmix(["text", ["code"], "text"]) -- Array-Eintraege sind Inline-Code
 // und bleiben; die nackten Strings sind Prosa. ["wort", false] ist ein
 // betontes Wort im Fliesstext ("Kleine Wunder") und wird uebersetzt.
+// In pmix steht Code IMMER als ["code", true]; ein nackter Text und eine
+// Betonung sind darum immer Prosa -- auch " und " zwischen zwei Codestuecken
+// oder ein einzelnes Wort, das ausserhalb von pmix als Bezeichner gaelte.
+const hatBuchstaben = (x) => typeof x === "string" && /\p{L}/u.test(x);
 function uebersetzePmix(teile, tr) {
   if (!Array.isArray(teile)) return teile;
   return teile.map((x) => {
-    if (Array.isArray(x) && x[1] === false && istText(x[0])) return [tr(x[0]), false];
-    return istText(x) ? tr(x) : x;
+    if (Array.isArray(x) && x[1] === false && hatBuchstaben(x[0])) return [tr(x[0]), false];
+    return hatBuchstaben(x) ? tr(x) : x;
   });
 }
 
