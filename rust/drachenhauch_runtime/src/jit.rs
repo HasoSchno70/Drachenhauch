@@ -2397,7 +2397,8 @@ pub fn bericht(prog: &Program) -> Vec<(String, String)> {
     let glob = globale_lesen(prog);
     let (_, gruende) = auswahl(prog, &glob);
     alle_funktionen(prog, &glob).into_iter().zip(gruende).map(|((_, _, name), g)| {
-        (name, if g.is_empty() { "uebersetzt".to_string() } else { format!("VM: {}", g) })
+        (name, if g.is_empty() { crate::meldung::wort("uebersetzt", "compiled").to_string() }
+               else { format!("VM: {}", crate::meldung::t(&g)) })
     }).collect()
 }
 
@@ -4109,7 +4110,7 @@ impl Jit {
                     // Mit DHRT_JIT_BILANZ: warum eine Schleife in der VM bleibt.
                     if self.bilanz {
                         let wo = format!("Stelle {} in {}", kopf, if f.name.is_empty() { "(Hauptprogramm)" } else { &f.name });
-                        eprintln!("jit: Schleife an {} bleibt in der VM: {}", wo, e);
+                        eprintln!("{}", crate::meldung::t(&format!("jit: Schleife an {} bleibt in der VM: {}", wo, e)));
                         // Die Runden zaehlt die VM (`vm_runde`) -- eine
                         // Startschleife mit drei Runden wiegt nicht wie die
                         // Hauptschleife.
@@ -4134,9 +4135,9 @@ impl Jit {
         // 0.88 s mit, 0.13 s ohne Maschinencode.
         if s.vergeblich() {
             if self.bilanz {
-                eprintln!("jit: Schleife an Stelle {} in {} bleibt in der VM: {} Ausstiege mitten drin bei {} eigenen Runden",
+                eprintln!("{}", crate::meldung::t(&format!("jit: Schleife an Stelle {} in {} bleibt in der VM: {} Ausstiege mitten drin bei {} eigenen Runden",
                           kopf, if f.name.is_empty() || f.name == "__main__" { "(Hauptprogramm)" } else { &f.name },
-                          s.ausstiege.get(), s.runden_selbst.get());
+                          s.ausstiege.get(), s.runden_selbst.get())));
             }
             marke.set(1);
             return None;
@@ -4638,18 +4639,18 @@ impl Drop for Jit {
     fn drop(&mut self) {
         if std::env::var_os("DHRT_JIT_BILANZ").is_some() {
             let f = self.fns.iter().filter(|f| f.is_some()).count();
-            eprintln!("jit: {} Funktionen, {} Schleifen, {} Schleifenlaeufe",
-                      f, self.zahl_schleifen.get(), self.zahl_laeufe.get());
+            eprintln!("{}", crate::meldung::t(&format!("jit: {} Funktionen, {} Schleifen, {} Schleifenlaeufe",
+                      f, self.zahl_schleifen.get(), self.zahl_laeufe.get())));
             if self.zahl_aussteige.get() > 0 {
-                eprintln!("jit: {} mal mitten in einer Schleife ausgestiegen", self.zahl_aussteige.get());
+                eprintln!("{}", crate::meldung::t(&format!("jit: {} mal mitten in einer Schleife ausgestiegen", self.zahl_aussteige.get())));
             }
             if self.zahl_neu.get() > 0 {
-                eprintln!("jit: {} mal neu gebaut, weil eine globale Variable dazukam", self.zahl_neu.get());
+                eprintln!("{}", crate::meldung::t(&format!("jit: {} mal neu gebaut, weil eine globale Variable dazukam", self.zahl_neu.get())));
             }
             let mut r: Vec<(usize, String, u64)> = self.vm_runden.borrow().clone();
             r.sort_by(|a, b| b.2.cmp(&a.2));
             for (_, wo, n) in r.iter().filter(|e| e.2 > 0).take(10) {
-                eprintln!("jit: {} Runden in der VM -- {}", n, wo);
+                eprintln!("{}", crate::meldung::t(&format!("jit: {} Runden in der VM -- {}", n, wo)));
             }
         }
     }

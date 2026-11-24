@@ -440,7 +440,7 @@ fn main() -> ExitCode {
             let base = std::path::Path::new(&raw[2]).parent().map(|p| p.to_path_buf()).unwrap_or_else(|| std::path::PathBuf::from("."));
             let prog = match compile_source_programm(&src, &base, &raw[2]) { Ok(p) => p, Err(c) => return c };
             for (name, was) in jit::bericht(&prog) { println!("{}: {}", name, was); }
-            if let Err(e) = jit::Jit::neu(&prog) { println!("FEHLER beim Erzeugen: {}", e); return ExitCode::from(1); }
+            if let Err(e) = jit::Jit::neu(&prog) { println!("{}", meldung::t(&format!("FEHLER beim Erzeugen: {}", e))); return ExitCode::from(1); }
             return ExitCode::SUCCESS;
         }
         if raw.len() >= 3 && raw[1] == "--verschmolzen" {
@@ -2577,7 +2577,23 @@ fn laufzeit_fassung(laufzeit: &std::path::Path) -> Option<String> {
     text.lines().next()?.trim().strip_prefix("dhrt ").map(|s| s.trim().to_string())
 }
 
-fn mb(bytes: u64) -> String { format!("{:.1}", bytes as f64 / (1024.0 * 1024.0)).replace('.', ",") }
+/// Ein Pfad, wie ihn der Mensch sehen will: ohne `\\?\` (canonicalize unter
+/// Windows) und, wenn er im Arbeitsordner liegt, relativ dazu --
+/// `dhrt --export demo.dh` meldet `demo_dist\demo.exe`, nicht den ganzen Weg.
+fn pfad_zum_zeigen(p: &std::path::Path) -> std::path::PathBuf {
+    let p = strip_extended_prefix(p.to_path_buf());
+    let hier = std::env::current_dir().ok()
+        .map(|d| strip_extended_prefix(std::fs::canonicalize(&d).unwrap_or(d)));
+    match hier.as_deref().and_then(|h| p.strip_prefix(h).ok()) {
+        Some(r) if !r.as_os_str().is_empty() => r.to_path_buf(),
+        _ => p,
+    }
+}
+
+fn mb(bytes: u64) -> String {
+    let z = format!("{:.1}", bytes as f64 / (1024.0 * 1024.0));
+    if meldung::englisch() { z } else { z.replace('.', ",") }
+}
 
 fn export_main(path: &str, out_dir: Option<&str>, mit_daten: bool, schlank: bool) -> ExitCode {
     let abs = std::fs::canonicalize(path)
@@ -2588,7 +2604,7 @@ fn export_main(path: &str, out_dir: Option<&str>, mit_daten: bool, schlank: bool
         .unwrap_or_else(|| "programm".into());
     let raw_source = match std::fs::read_to_string(&abs) {
         Ok(t) => t,
-        Err(e) => { eprintln!("Kann '{}' nicht lesen: {}", path, e); return ExitCode::from(1); }
+        Err(e) => { eprintln!("{}", meldung::t(&format!("Kann '{}' nicht lesen: {}", path, e))); return ExitCode::from(1); }
     };
     // 1) Quelltext -> .dhc-JSON (kompakt).
     let label = abs.file_name().map(|s| s.to_string_lossy().into_owned())
@@ -2604,7 +2620,7 @@ fn export_main(path: &str, out_dir: Option<&str>, mit_daten: bool, schlank: bool
     // "Verwendung: dhrt <datei.dhc>" ausgibt.
     let gbc_bytes = match serde_json::to_string(&json) {
         Ok(s) => s.into_bytes(),
-        Err(e) => { eprintln!("Kann .dhc nicht serialisieren: {}", e); return ExitCode::from(1); }
+        Err(e) => { eprintln!("{}", meldung::t(&format!("Kann .dhc nicht serialisieren: {}", e))); return ExitCode::from(1); }
     };
     // 2) Eigene Exe lesen + Payload anhaengen. Mit --schlank die kleinste
     // Laufzeit, der keiner der gerufenen Befehle fehlt.
@@ -2629,34 +2645,35 @@ fn export_main(path: &str, out_dir: Option<&str>, mit_daten: bool, schlank: bool
             // daneben) -- sie wird uebergangen, und die Ausgabe sagt warum.
             match laufzeit_fassung(k) {
                 Some(f) if f == eigene_fassung => {}
-                Some(f) => { gruende.push(format!("{} ist Fassung {} statt {}", name, f, eigene_fassung)); continue; }
-                None => { gruende.push(format!("{} nennt keine Fassung", name)); continue; }
+                Some(f) => { gruende.push(meldung::t(&format!("{} ist Fassung {} statt {}", name, f, eigene_fassung))); continue; }
+                None => { gruende.push(meldung::t(&format!("{} nennt keine Fassung", name))); continue; }
             }
             match laufzeit_fehlende(k, &namen) {
                 Some(f) if f.is_empty() => {
-                    println!("Schlank: {} ({} MB statt {} MB)", name, mb(*groesse), mb(eigene));
+                    println!("{}", meldung::t(&format!("Schlank: {} ({} MB statt {} MB)", name, mb(*groesse), mb(eigene))));
                     laufzeit = k.clone();
                     break;
                 }
                 Some(f) => {
                     let liste: Vec<String> = f.iter().take(4).map(|s| s.to_uppercase()).collect();
-                    gruende.push(format!("{} fehlt {}{}", name, liste.join(", "), if f.len() > 4 { " ..." } else { "" }));
+                    let liste = format!("{}{}", liste.join(", "), if f.len() > 4 { " ..." } else { "" });
+                    gruende.push(meldung::t(&format!("{} fehlen die Befehle {}", name, liste)));
                 }
-                None => gruende.push(format!("{} liess sich nicht fragen", name)),
+                None => gruende.push(meldung::t(&format!("{} liess sich nicht fragen", name))),
             }
         }
         if laufzeit == exe {
             if kandidaten.is_empty() {
-                println!("Schlank: keine kleinen Laufzeiten gefunden (erwartet in {}) -- die volle wird genommen",
-                         exe.parent().map(|p| p.join("laufzeiten").display().to_string()).unwrap_or_default());
+                println!("{}", meldung::t(&format!("Schlank: keine kleinen Laufzeiten gefunden (erwartet in {}) -- die volle wird genommen",
+                         exe.parent().map(|p| p.join("laufzeiten").display().to_string()).unwrap_or_default())));
             } else {
-                println!("Schlank: keine kleine Laufzeit passt ({}) -- die volle wird genommen", gruende.join("; "));
+                println!("{}", meldung::t(&format!("Schlank: keine kleine Laufzeit passt ({}) -- die volle wird genommen", gruende.join("; "))));
             }
         }
     }
     let mut bundle = match std::fs::read(&laufzeit) {
         Ok(b) => b,
-        Err(e) => { eprintln!("Kann Runtime '{}' nicht lesen: {}", laufzeit.display(), e); return ExitCode::from(1); }
+        Err(e) => { eprintln!("{}", meldung::t(&format!("Kann Runtime '{}' nicht lesen: {}", laufzeit.display(), e))); return ExitCode::from(1); }
     };
     bundle.extend_from_slice(&gbc_bytes);
     bundle.extend_from_slice(&(gbc_bytes.len() as u64).to_le_bytes());
@@ -2700,21 +2717,21 @@ fn export_main(path: &str, out_dir: Option<&str>, mit_daten: bool, schlank: bool
             .unwrap_or(false);
         if ist_unser {
             if let Err(e) = std::fs::remove_dir_all(&out) {
-                eprintln!("Warnung: '{}' nicht geraeumt: {}", out.display(), e);
+                eprintln!("{}", meldung::t(&format!("Warnung: '{}' nicht geraeumt: {}", out.display(), e)));
             }
         } else if alte_exe.exists() {
-            eprintln!("Warnung: '{}' enthaelt eine fremde Datei gleichen Namens und wurde nicht geraeumt.", out.display());
+            eprintln!("{}", meldung::t(&format!("Warnung: '{}' enthaelt eine fremde Datei gleichen Namens und wurde nicht geraeumt.", out.display())));
         }
     } else if out_dir.is_some() && out.is_dir() {
-        eprintln!("Hinweis: '{}' wird nicht geraeumt (selbst angegeben), Dateien aus frueheren Laeufen bleiben liegen.", out.display());
+        eprintln!("{}", meldung::t(&format!("Hinweis: '{}' wird nicht geraeumt (selbst angegeben), Dateien aus frueheren Laeufen bleiben liegen.", out.display())));
     }
     if let Err(e) = std::fs::create_dir_all(&out) {
-        eprintln!("Kann Ausgabeverzeichnis '{}' nicht anlegen: {}", out.display(), e);
+        eprintln!("{}", meldung::t(&format!("Kann Ausgabeverzeichnis '{}' nicht anlegen: {}", out.display(), e)));
         return ExitCode::from(1);
     }
     let out_exe = out.join(exe_name.unwrap_or_else(|| format!("{}{}", stem, exe_suffix)));
     if let Err(e) = std::fs::write(&out_exe, &bundle) {
-        eprintln!("Kann '{}' nicht schreiben: {}", out_exe.display(), e);
+        eprintln!("{}", meldung::t(&format!("Kann '{}' nicht schreiben: {}", out_exe.display(), e)));
         return ExitCode::from(1);
     }
     #[cfg(unix)]
@@ -2726,7 +2743,7 @@ fn export_main(path: &str, out_dir: Option<&str>, mit_daten: bool, schlank: bool
     let assets = base.join("assets");
     if assets.is_dir() {
         if let Err(e) = copy_dir_recursive(&assets, &out.join("assets")) {
-            eprintln!("Warnung: assets/ nicht vollstaendig kopiert: {}", e);
+            eprintln!("{}", meldung::t(&format!("Warnung: assets/ nicht vollstaendig kopiert: {}", e)));
         }
     }
     // 4a) Fremde Bibliotheken (DECLARE ... LIB), die neben dem Programm
@@ -2734,9 +2751,9 @@ fn export_main(path: &str, out_dir: Option<&str>, mit_daten: bool, schlank: bool
     // nicht daneben liegt, muss das System des Zielrechners finden.
     for (lib, kopiert) in bibliotheken_mitnehmen(&json, &base, &out) {
         match kopiert {
-            Ok(Some(datei)) => println!("  Bibliothek \"{}\" mitkopiert: {}", lib, datei),
-            Ok(None) => println!("  Hinweis: Bibliothek \"{}\" liegt nicht neben dem Programm -- der Zielrechner muss sie haben (eine Systembibliothek wie kernel32 hat er)", lib),
-            Err(e) => eprintln!("Warnung: Bibliothek \"{}\" nicht kopiert: {}", lib, e),
+            Ok(Some(datei)) => println!("{}", meldung::t(&format!("  Bibliothek \"{}\" mitkopiert: {}", lib, datei))),
+            Ok(None) => println!("{}", meldung::t(&format!("  Hinweis: Bibliothek \"{}\" liegt nicht neben dem Programm -- der Zielrechner muss sie haben (eine Systembibliothek wie kernel32 hat er)", lib))),
+            Err(e) => eprintln!("{}", meldung::t(&format!("Warnung: Bibliothek \"{}\" nicht kopiert: {}", lib, e))),
         }
     }
     // 4b) Zusaetzlich alle im Quelltext referenzierten Dateien einsammeln --
@@ -2747,15 +2764,15 @@ fn export_main(path: &str, out_dir: Option<&str>, mit_daten: bool, schlank: bool
     // Mit Namen, nicht als Zahl: "1 Datei mitkopiert" sagt nicht, WELCHE --
     // und genau daran ist eine fremde Datenbank im Bundle nicht aufgefallen.
     if !bericht.kopiert.is_empty() {
-        println!("  {} referenzierte Datei(en) mitkopiert:", bericht.kopiert.len());
+        println!("{}", meldung::t(&format!("  {} referenzierte Datei(en) mitkopiert:", bericht.kopiert.len())));
         for f in &bericht.kopiert { println!("    {}", f); }
     }
     if !bericht.uebersprungen.is_empty() {
-        println!("  {} Datenbank(en) NICHT mitkopiert -- das Programm legt sie selbst an:", bericht.uebersprungen.len());
+        println!("{}", meldung::t(&format!("  {} Datenbank(en) NICHT mitkopiert -- das Programm legt sie selbst an:", bericht.uebersprungen.len())));
         for f in &bericht.uebersprungen { println!("    {}", f); }
-        println!("  (mit --mit-daten trotzdem mitnehmen)");
+        println!("  {}", meldung::t("(mit --mit-daten trotzdem mitnehmen)"));
     }
-    println!("Exportiert: {}", out_exe.display());
+    println!("{}", meldung::t(&format!("Exportiert: {}", pfad_zum_zeigen(&out_exe).display())));
     ExitCode::SUCCESS
 }
 
