@@ -195,7 +195,8 @@ copies of 256×256: **393 MB versus 91 MB.**
 After releasing, the handle is **not reusable and is not handed out again
 either**. Every further use reports itself in plain words
 (`… wurde mit IMAGE_FREE freigegeben`) instead of silently pointing at some
-other image — that is why the slot stays reserved. `GETPIXEL` and
+other image — that is why the slot stays reserved. A second
+`IMAGE_FREE` on the same handle is silent (up to 2026.53 an error). `GETPIXEL` and
 `GETALPHA` keep their old promise and return `-1`.
 
 `LOADIMAGE` remembers path → handle; when releasing, the entry is deleted

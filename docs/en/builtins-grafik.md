@@ -893,7 +893,7 @@ does nothing.
 
 | Function | Purpose |
 |---|---|
-| `SHADER_LOAD(src$)` → INTEGER | load a fragment shader — from a file or directly as source text; `-1` if it does not compile (the driver's message comes before it). A name without `;`, `{` and line break is a file name: a missing file is an error that names the location |
+| `SHADER_LOAD(src$)` → INTEGER | load a fragment shader — from a file or directly as source text; an error if it does not compile (the driver's message comes before it; up to 2026.53 `-1`). A name without `;`, `{` and line break is a file name: a missing file is an error that names the location |
 | `POSTFX(shader [, scale])` | send every finished frame through this shader; `-1` switches it off. `scale` (0.25..1, default 1) lets the shader work at a lower resolution and enlarges the result smoothly -- for expensive shaders on weak graphics chips (at 0.7 about half the work); text in the picture becomes a little softer |
 | `SHADER_SET(shader, name$, v)` | pass a number to a `uniform float` |
 | `SHADER_SET2(shader, name$, x, y)` | two values (`vec2`) |

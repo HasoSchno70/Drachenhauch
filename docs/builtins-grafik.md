@@ -897,7 +897,7 @@ eines anderen Ziels tut nichts.
 
 | Funktion | Zweck |
 |---|---|
-| `SHADER_LOAD(src$)` → INTEGER | Fragment-Shader laden — aus einer Datei oder direkt als Quelltext; `-1`, wenn er sich nicht übersetzen lässt (die Meldung des Treibers steht davor). Ein Name ohne `;`, `{` und Zeilenumbruch ist ein Dateiname: fehlt die Datei, ist das ein Fehler, der den Ort nennt |
+| `SHADER_LOAD(src$)` → INTEGER | Fragment-Shader laden — aus einer Datei oder direkt als Quelltext; ein Fehler, wenn er sich nicht übersetzen lässt (die Meldung des Treibers steht davor; bis 2026.53 `-1`). Ein Name ohne `;`, `{` und Zeilenumbruch ist ein Dateiname: fehlt die Datei, ist das ein Fehler, der den Ort nennt |
 | `POSTFX(shader [, scale])` | jedes fertige Bild durch diesen Shader schicken; `-1` schaltet ab. `scale` (0.25..1, Vorgabe 1) lässt den Shader in kleinerer Auflösung rechnen und vergrößert das Ergebnis weich — für aufwendige Shader auf schwachen Grafikchips (bei 0.7 etwa die Hälfte der Arbeit); Text im Bild wird dabei etwas weicher |
 | `SHADER_SET(shader, name$, v)` | eine Zahl an ein `uniform float` geben |
 | `SHADER_SET2(shader, name$, x, y)` | zwei Werte (`vec2`) |

@@ -9549,6 +9549,12 @@
    "module": "g3d"
   },
   {
+   "name": "MODEL_FREE",
+   "kind": "graphics",
+   "signature": "MODEL_FREE(model)",
+   "module": "g3d"
+  },
+  {
    "name": "LOADSOUND",
    "kind": "graphics",
    "signature": "LOADSOUND(path: STRING)",

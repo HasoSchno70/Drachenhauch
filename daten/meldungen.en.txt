@@ -1320,6 +1320,10 @@ MODEL_ANIM_COUNT: ungueltiges ANIM_SET-Handle {}	MODEL_ANIM_COUNT: invalid ANIM_
 {}: '{}' muss eine endliche Zahl > 0 sein, erhalten {}	{}: '{}' must be a finite number > 0, got {}
 MESH_CUBICMAP: eine Karte von {}x{} Punkten ist zu gross (hoechstens eine Million)	MESH_CUBICMAP: a map of {}x{} pixels is too large (at most one million)
 {}: ungueltiges MODEL-Handle {}	{}: invalid MODEL handle {}
+MODEL_FREE: ungueltiges MODEL-Handle {}	MODEL_FREE: invalid MODEL handle {}
+{}: dieses Modell wurde mit MODEL_FREE freigegeben	{}: this model was released with MODEL_FREE
+LOADMODEL: '{}' laesst sich nicht als Modell lesen (gelesen werden OBJ, GLTF/GLB, IQM, VOX und M3D)	LOADMODEL: '{}' cannot be read as a model (read are OBJ, GLTF/GLB, IQM, VOX and M3D)
+SHADER_LOAD: der Shader laesst sich nicht uebersetzen -- die Meldung des Grafiktreibers steht davor	SHADER_LOAD: the shader does not compile -- the graphics driver's message comes before this
 MODEL_TEXTURE: Modell hat kein Material	MODEL_TEXTURE: model has no material
 MODEL_SAVE: geschrieben wird Wavefront-OBJ, der Name muss auf .obj enden, nicht '{}'	MODEL_SAVE: the file is written as Wavefront OBJ, the name must end in .obj, not '{}'
 MODEL_SAVE: das Modell hat keine Eckpunkte	MODEL_SAVE: the model has no vertices

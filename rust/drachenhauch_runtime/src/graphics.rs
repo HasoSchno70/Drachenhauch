@@ -1394,6 +1394,11 @@ pub struct Graphics {
     cam3d_proj: Option<[f32; 16]>,
     // 3D-Modelle (LOADMODEL / MESH_*): bleiben ueber Frames erhalten.
     models: Vec<Model>,
+    /// MODEL_FREE: der Platz bleibt (ein altes Handle soll sich melden statt
+    /// auf ein fremdes Modell zu zeigen), das Modell selbst geht nach dem
+    /// FLIP (`model_abraeumen`) -- was schon zum Zeichnen ansteht, braucht es.
+    model_frei: Vec<bool>,
+    model_abraeumen: Vec<usize>,
     // Skelett-Animationen (MODEL_LOAD_ANIMS): je Set die Animationen einer
     // Datei. sola-raylib kopiert sie aus raylibs Feld heraus und gibt das Feld
     // frei; jede `ModelAnimation` raeumt beim Drop nur ihre eigenen
@@ -2401,6 +2406,8 @@ impl Graphics {
             shake_x: 0.0, shake_y: 0.0,
             cmds3d: Vec::new(),
             models: Vec::new(),
+            model_frei: Vec::new(),
+            model_abraeumen: Vec::new(),
             model_anims: Vec::new(),
             light_shader: None,
             normal_mapped: std::collections::HashSet::new(),
@@ -3553,11 +3560,55 @@ impl Graphics {
     /// Laedt ein Modell von Datei (OBJ/GLTF/...) -> MODEL-Handle (Index).
     pub fn load_model(&mut self, path: &str) -> Result<i64, String> {
         let resolved = crate::builtins::resolve_asset_path(path);
-        let path = resolved.as_str();
-        let m = self.rl.load_model(&self.thread, path)
+        // raylib liefert fuer eine fehlende oder unlesbare Datei ein Modell
+        // ohne Netz (und ein weisses Material) -- bis 2026.53 kam so Handle 0
+        // ohne jede Meldung zurueck, und das Bild blieb leer.
+        crate::builtins::datei_da(&resolved, "LOADMODEL")?;
+        let m = self.rl.load_model(&self.thread, resolved.as_str())
             .map_err(|e| format!("LOADMODEL: '{}' nicht ladbar: {}", path, e))?;
+        // Ohne Eckpunkte (raylibs Ersatz, oder eine OBJ ohne Flaechen) ist es
+        // kein Modell.
+        let roh: &raylib::ffi::Model = m.as_ref();
+        let punkte: i64 = (0..roh.meshCount.max(0) as usize)
+            .map(|k| unsafe { (*roh.meshes.add(k)).vertexCount.max(0) as i64 }).sum();
+        if punkte == 0 {
+            return Err(format!("LOADMODEL: '{}' laesst sich nicht als Modell lesen (gelesen werden OBJ, GLTF/GLB, IQM, VOX und M3D)", path));
+        }
+        Ok(self.model_neu(m))
+    }
+
+    /// Ein neues Modell ablegen -> Handle.
+    fn model_neu(&mut self, m: Model) -> i64 {
         self.models.push(m);
-        Ok((self.models.len() - 1) as i64)
+        self.model_frei.push(false);
+        (self.models.len() - 1) as i64
+    }
+
+    /// MODEL_FREE: Netze und Materialfelder des Modells freigeben. Still,
+    /// auch doppelt; nur ein Handle, das es nie gab, ist ein Fehler.
+    /// Texturen (MODEL_TEXTURE) und Shader (MODEL_LIT) bleiben -- sie
+    /// gehoeren dem Bild bzw. dem Licht, nicht dem Modell.
+    pub fn model_free(&mut self, idx: i64) -> Result<(), String> {
+        if idx < 0 || idx as usize >= self.models.len() {
+            return Err(format!("MODEL_FREE: ungueltiges MODEL-Handle {}", idx));
+        }
+        let i = idx as usize;
+        if self.model_frei[i] { return Ok(()); }
+        self.model_frei[i] = true;
+        self.normal_mapped.remove(&i);
+        if self.cmds3d.is_empty() { self.modell_abraeumen(i); } else { self.model_abraeumen.push(i); }
+        Ok(())
+    }
+
+    /// Den Speicher eines freigegebenen Modells abgeben. Zurueck bleibt ein
+    /// genulltes Modell: ohne Netze zeichnet es nichts, und raylibs
+    /// UnloadModel beim Beenden laeuft ueber leere Felder.
+    fn modell_abraeumen(&mut self, i: usize) {
+        let raw: &mut raylib::ffi::Model = self.models[i].as_mut();
+        unsafe {
+            raylib::ffi::UnloadModel(*raw);
+            *raw = std::mem::zeroed();
+        }
     }
     /// Laedt Skelett-Animationen (GLTF/IQM/M3D) aus einer Datei -> ANIM_SET-Index.
     pub fn load_model_anims(&mut self, path: &str) -> Result<i64, String> {
@@ -3633,8 +3684,7 @@ impl Graphics {
         let weak = unsafe { mesh.make_weak() };
         let m = self.rl.load_model_from_mesh(&self.thread, weak)
             .map_err(|e| format!("{}: Mesh-Modell fehlgeschlagen: {}", fn_, e))?;
-        self.models.push(m);
-        Ok((self.models.len() - 1) as i64)
+        Ok(self.model_neu(m))
     }
     // Review-Fund: Segment-Zahlen wurden nur nach UNTEN geklemmt (.max(3)
     // etc.), nie nach oben -- `MESH_SPHERE(1, 100000, 100000)` fordert von
@@ -3756,6 +3806,9 @@ impl Graphics {
         let i = idx as usize;
         if idx < 0 || i >= self.models.len() {
             return Err(format!("{}: ungueltiges MODEL-Handle {}", fn_, idx));
+        }
+        if self.model_frei[i] {
+            return Err(format!("{}: dieses Modell wurde mit MODEL_FREE freigegeben", fn_));
         }
         Ok(i)
     }
@@ -4070,7 +4123,7 @@ impl Graphics {
     #[allow(clippy::too_many_arguments)]
     pub fn ray_hit_model(&self, idx: i64, ox: f32, oy: f32, oz: f32, dx: f32, dy: f32, dz: f32,
                          px: f32, py: f32, pz: f32, scale: f32) -> f64 {
-        if idx < 0 || idx as usize >= self.models.len() { return -1.0; }
+        if idx < 0 || idx as usize >= self.models.len() || self.model_frei[idx as usize] { return -1.0; }
         let Some(ray) = Self::unit_ray(ox, oy, oz, dx, dy, dz) else { return -1.0; };
         // Gleiche Transform-Reihenfolge wie DrawModel: erst skalieren, dann verschieben.
         let transform = Matrix::scale(scale, scale, scale) * Matrix::translate(px, py, pz);
@@ -4810,7 +4863,7 @@ impl Graphics {
     pub fn nebel(&mut self, x1: i32, y1: i32, x2: i32, y2: i32, radius: i32, farbe: i64, staerke: f64, zeit: f64) {
         if staerke <= 0.0 { return; }
         if self.nebel_sh == 0 {
-            let h = self.load_shader(NEBEL_GLSL);
+            let h = self.load_shader(NEBEL_GLSL).unwrap_or(-1);
             self.nebel_sh = if h >= 0 { h + 1 } else { -1 };
             if let Some(sh) = usize::try_from(h).ok().and_then(|i| self.shaders.get_mut(i)) {
                 let lagen = [sh.get_shader_location("uZeit"), sh.get_shader_location("uMass"),
@@ -5846,6 +5899,9 @@ impl Graphics {
     /// noch in einem Widget oder einem Sprite-Atlas stecken -- die melden
     /// sich immerhin, weil ihr Zeichenweg das Handle prueft.
     pub fn image_free(&mut self, idx: i64) -> Result<(), String> {
+        // Freigeben ist still, auch doppelt (die Handle-Regel, CLAUDE.md);
+        // bis 2026.53 war das zweite IMAGE_FREE ein Fehler.
+        if idx >= 0 && (idx as usize) < self.textures.len() && self.tex_frei[idx as usize] { return Ok(()); }
         if !self.tex_ok(idx) { return Err(self.tex_fehler(idx, "IMAGE_FREE")); }
         let i = idx as usize;
         // Aus dem Pfad-Cache werfen: sonst gibt LOADIMAGE fuer denselben Pfad
@@ -8266,15 +8322,19 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     pub fn clip_depth(&self) -> i64 { self.clip_tiefe as i64 }
 
     // --- Shader / Post-Processing ---
-    /// Laedt einen Fragment-Shader (GLSL-Quelltext) -> Handle (Index) oder -1.
-    pub fn load_shader(&mut self, code: &str) -> i64 {
+    /// Laedt einen Fragment-Shader (GLSL-Quelltext) -> Handle (Index). Laesst
+    /// er sich nicht uebersetzen, ist das ein Fehler (bis 2026.53 -1, und der
+    /// naechste SHADER_SET/POSTFX lief still ins Leere).
+    pub fn load_shader(&mut self, code: &str) -> Result<i64, String> {
         let sh = shader_aus_quelltext(None,
                                         Some(&fuer_ziel_uebersetzen(code)));
-        if !sh.is_shader_valid() { return -1; }
+        if !sh.is_shader_valid() {
+            return Err("SHADER_LOAD: der Shader laesst sich nicht uebersetzen -- die Meldung des Grafiktreibers steht davor".into());
+        }
         self.shaders.push(sh);
         let idx = self.shaders.len() - 1;
         self.shader_uniforme.insert(idx, crate::glsl::uniforme(code));
-        idx as i64
+        Ok(idx as i64)
     }
     /// Der Ort eines Uniforms, oder -1. Deklariert der Quelltext den Namen gar
     /// nicht, gibt es einmal je Shader und Name eine Warnung -- mit dem
@@ -8899,9 +8959,12 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         // Layer + 3D-Befehle fuer den naechsten Frame leeren (Immediate-Mode).
         for l in self.layers.iter_mut() { l.cmds.clear(); }
         self.cmds3d.clear();
-        // Was IMAGE_FREE in diesem Bild freigab, ist jetzt gezeichnet.
+        // Was IMAGE_FREE/MODEL_FREE in diesem Bild freigab, ist jetzt gezeichnet.
         for i in std::mem::take(&mut self.tex_abraeumen) {
             let _ = self.textur_abraeumen(i);
+        }
+        for i in std::mem::take(&mut self.model_abraeumen) {
+            self.modell_abraeumen(i);
         }
         // Der Abspieler schliesst offen gebliebene Clips am Bildende; der
         // Zaehler muss ihm folgen, sonst schleppte ein vergessenes SCISSOR

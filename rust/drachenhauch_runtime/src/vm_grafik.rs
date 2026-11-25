@@ -1103,7 +1103,7 @@ impl<'p> Vm<'p> {
                         return Err(format!("SHADER_LOAD: '{}' laesst sich nicht als Text lesen", arg));
                     }
                 };
-                Value::Int(g!().load_shader(&code))
+                Value::Int(g!().load_shader(&code)?)
             }
             "shader_set" => {
                 g!().shader_set_float(gi(a,0,"SHADER_SET")?, gs(a,1,"SHADER_SET")?, need_f(a,2,"SHADER_SET")?);
@@ -2583,6 +2583,7 @@ optional dahinter (qx, qy, qb, qh) und eine Faerbung".into());
                 g!().image_save(gi(a,0,"IMAGE_SAVE")?, gs(a,1,"IMAGE_SAVE")?, ohne_alpha)?; Value::Nil
             }
             "image_free" => { g!().image_free(gi(a,0,"IMAGE_FREE")?)?; Value::Nil }
+            "model_free" => { g!().model_free(gi(a,0,"MODEL_FREE")?)?; Value::Nil }
             "image_from_buffer" => {
                 if a.len() != 1 {
                     return Err(format!("IMAGE_FROM_BUFFER: erwartet (puffer), erhalten {} Argumente", a.len()));

@@ -150,8 +150,11 @@ SCREEN(160, 80, "t", 1)
 
 DIM b AS IMAGE : b = IMAGE_NEW(8, 8, &HFF0000)
 IMAGE_FREE(b)
+' Ein zweites IMAGE_FREE ist still (seit 2026.54, die Handle-Regel); jeder
+' andere Gebrauch meldet sich.
+IMAGE_FREE(b)
 TRY
-    IMAGE_FREE(b)
+    DIM k AS INTEGER : k = IMAGE_COPY(b)
 CATCH e
     PRINT e
 END TRY
@@ -163,7 +166,7 @@ END TRY
 --- umgebung
 DHRT_FRAMES=2
 --- erwartet
-IMAGE_FREE: dieses Bild wurde mit IMAGE_FREE freigegeben
+IMAGE_COPY: dieses Bild wurde mit IMAGE_FREE freigegeben
 IMAGE_FREE: ungueltiges IMAGE-Handle 9999
 
 === getpixel und getalpha bleiben bei minus eins

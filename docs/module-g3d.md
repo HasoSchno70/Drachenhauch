@@ -60,7 +60,8 @@ Hilfslinien. Wer dieselbe Form oft braucht, nimmt ein Modell (siehe unten).
 
 | Funktion | Rückgabe | Bedeutung |
 |---|---|---|
-| `LOADMODEL(path$)` | INTEGER | Modell aus einer Datei laden (OBJ, GLTF, IQM …) |
+| `LOADMODEL(path$)` | INTEGER | Modell aus einer Datei laden (OBJ, GLTF, IQM …); eine fehlende oder unlesbare Datei ist ein Fehler |
+| `MODEL_FREE(model)` | — | das Modell freigeben (Netze und Grafikspeicher) — das Handle ist sofort ungültig, was in diesem Bild schon damit gezeichnet wurde, erscheint beim `FLIP` noch; doppelt freigeben ist still |
 | `MESH_CUBE(width, height, depth)` | INTEGER | Quader als Modell — ohne Datei |
 | `MESH_SPHERE(radius, rings, segments)` | INTEGER | Kugel; mehr Ringe und Segmente = runder und teurer |
 | `MESH_CYLINDER(radius, height, segments)` | INTEGER | Zylinder |
