@@ -1258,31 +1258,36 @@ Einzelbefunde. Darum stehen sie oben in der Rangliste.
 
 ## Kleine Einzelfehler (je eine Stelle, nebenbei gefunden)
 
-Diese sind keine Muster, aber sie brechen etwas und sind schnell behoben:
+Diese sind keine Muster, aber sie brechen etwas und sind schnell behoben.
 
-| Was | Wo | Beleg |
-|---|---|---|
-| **Webserver stürzt an einer Anfrage ab**: `&s[i+1..i+3]` schneidet mitten in einem Zeichen; HTTPD lauscht per Vorgabe auf `0.0.0.0` | `httpd.rs:194` | Lauf: `GET /%a` + `Ä` → Panik, Exit 101, kein TRY fängt es |
-| `GELD_*`/`MONEY_*` ohne Argument: Panik | `vm_dienste.rs:245-279` | Lauf (D2) |
-| Comprehension über Feld, dann Koroutine | `vm.rs:3015` | Lauf (D1) |
-| `HTML_FIND_ALL` verschluckt Treffer bei `<` im Text (Fix von 2026.27 nur in `HTML_TEXT`) | `html.rs:429` | Lauf: 0 statt 2 |
-| Menükürzel mit Enter/Esc löst zusätzlich Standard-/Abbrechen-Knopf aus | `gui_eingabe.rs:848, 852` | Lauf: „menue bild 6 / ok bild 6“ |
-| Bildschirmleser liest „&Speichern“ (`w.text` statt `anzeige_text`) | `gui_a11y.rs:216-257` | Lauf über UI Automation |
-| Popover weicht an `schirm_b/h` aus statt an `grenze()` | `gui_ueber.rs:195, 211` | Lauf: ragt im nativen Fenster 96 px heraus |
-| GroupBox schätzt Titelbreite aus Zeichenzahl | `gui_zeichnen.rs:1984` | Lauf: Rahmenlinie läuft durch den Titel |
-| `FILETIME` eine Stunde daneben (Sommer/Winter) | `builtins.rs:3662` | Lauf (A10) |
-| `TIME_FROM_PARTS(2026, 13, 1)` = 2027-01-01 | `vm_system.rs:92` | Lauf |
-| `FLOOR`/`CEIL`/`ROUND(1e19)` sättigen still | `builtins.rs:1660-1664` | Lauf |
-| `JSON_LOAD` scheitert an BOM | `builtins.rs:4644` | Lauf |
-| `SAVE_LOAD_OR_NEW` verwirft mitgelieferten Spielstand | `builtins.rs:4819` | Lauf (A11) |
-| `DIRLIST_REC(p, "")` liefert nichts, `DIRLIST` alles | `builtins.rs:3608/3621` | Lauf |
-| `SAVE_GET_INT_OR(s, "zz", "text")` liefert Text aus INT-Getter | `builtins.rs:4848-4851` | Lauf |
-| `SPEAK_SOUND`-Handle wird still freigegeben | `sprache.rs:144` | Lauf (A19) |
-| `PHYS3D_*` mit ungültiger Körpernummer still (0,0,0) | `physics3d.rs:123` | Lauf |
-| `TASK_READY`/`SHELL_READY` mit falscher Nummer ewig FALSE | `hintergrund.rs:62` | Lauf (A4) |
-| `HTTP_DOWNLOAD` lässt `HTTP_BYTES` auf altem Rumpf | `vm_dienste.rs:1203` | Code |
-| `AUDIO_PUSH` verschluckt ab 64 Ebenen still | `audio.rs:1630` | Lauf |
-| `MOUSE_SCALE`/`_OFFSET` wirken nicht auf `MOUSE_DELTA`/`MOUSE_SET_POS` | `graphics.rs:7269` | Vermutung (raylib) |
+**Stand 2026-11-25:** Auf dem Zweig `thema/argumente-einheitlich` sind 20 der
+21 behoben, je mit eigenem Commit, Prüffall und Gegenprobe (Spalte „Stand“).
+Offen ist nur der Popover; er ist größer als hier zuerst beschrieben (siehe
+seine Zeile).
+
+| Was | Wo | Beleg | Stand |
+|---|---|---|---|
+| **Webserver stürzt an einer Anfrage ab**: `&s[i+1..i+3]` schneidet mitten in einem Zeichen; HTTPD lauscht per Vorgabe auf `0.0.0.0` | `httpd.rs:194` | Lauf: `GET /%a` + `Ä` → Panik, Exit 101, kein TRY fängt es | behoben: ein Dekodierer auf Bytes für httpd und `URL_DECODE` (`kodierung::prozent_auf`) |
+| `GELD_*`/`MONEY_*` ohne Argument: Panik | `vm_dienste.rs:245-279` | Lauf (D2) | behoben |
+| Comprehension über Feld, dann Koroutine | `vm.rs:3015` | Lauf (D1) | behoben: vom Merken ausgenommen wie `SORT` |
+| `HTML_FIND_ALL` verschluckt Treffer bei `<` im Text (Fix von 2026.27 nur in `HTML_TEXT`) | `html.rs:429` | Lauf: 0 statt 2 | behoben |
+| Menükürzel mit Enter/Esc löst zusätzlich Standard-/Abbrechen-Knopf aus | `gui_eingabe.rs:848, 852` | Lauf: „menue bild 6 / ok bild 6“ | behoben |
+| Bildschirmleser liest „&Speichern“ (`w.text` statt `anzeige_text`) | `gui_a11y.rs:216-257` | Lauf über UI Automation | behoben, die Befehlspalette gleich mit |
+| Popover weicht an `schirm_b/h` aus statt an `grenze()` | `gui_ueber.rs:195, 211` | Lauf: ragt im nativen Fenster 96 px heraus | **offen**: Der eigentliche Fehler ist größer. Ein Popover wird immer auf der Hauptfläche gezeichnet (`gui_ueber.rs:768` `ueber_zeichnen`: „Ein Popover ist nie nativ“), auch wenn sein Widget in einem nativen Fenster steht, und `popup_rechtecke` kennt ihn nicht. Erst wenn er auf der Fläche seines Widgets liegt, ist `grenze()` die richtige Grenze; allein getauscht ändert es nichts Prüfbares. |
+| GroupBox schätzt Titelbreite aus Zeichenzahl | `gui_zeichnen.rs:1984` | Lauf: Rahmenlinie läuft durch den Titel | behoben |
+| `FILETIME` eine Stunde daneben (Sommer/Winter) | `builtins.rs:3662` | Lauf (A10) | behoben |
+| `TIME_FROM_PARTS(2026, 13, 1)` = 2027-01-01 | `vm_system.rs:92` | Lauf | behoben: dieselben Grenzen wie `ZEIT_PARSE` |
+| `FLOOR`/`CEIL`/`ROUND(1e19)` sättigen still | `builtins.rs:1660-1664` | Lauf | behoben, im Maschinencode mit |
+| `JSON_LOAD` scheitert an BOM | `builtins.rs:4644` | Lauf | behoben, dazu optional `encoding$` |
+| `SAVE_LOAD_OR_NEW` verwirft mitgelieferten Spielstand | `builtins.rs:4819` | Lauf (A11) | behoben, `SAVE_EXISTS` mit |
+| `DIRLIST_REC(p, "")` liefert nichts, `DIRLIST` alles | `builtins.rs:3608/3621` | Lauf | behoben |
+| `SAVE_GET_INT_OR(s, "zz", "text")` liefert Text aus INT-Getter | `builtins.rs:4848-4851` | Lauf | behoben |
+| `SPEAK_SOUND`-Handle wird still freigegeben | `sprache.rs:144` | Lauf (A19) | behoben: jeder Aufruf liefert eine eigene Kopie |
+| `PHYS3D_*` mit ungültiger Körpernummer still (0,0,0) | `physics3d.rs:123` | Lauf | behoben: ein Fehler wie in 2D |
+| `TASK_READY`/`SHELL_READY` mit falscher Nummer ewig FALSE | `hintergrund.rs:62` | Lauf (A4) | behoben, für `DB_QUERY_*` mit |
+| `HTTP_DOWNLOAD` lässt `HTTP_BYTES` auf altem Rumpf | `vm_dienste.rs:1203` | Code | behoben, dazu Kopfzeilen und Zeitgrenze wie bei `HTTP_GET` |
+| `AUDIO_PUSH` verschluckt ab 64 Ebenen still | `audio.rs:1630` | Lauf | behoben, `GFX_PUSH` hatte denselben Fehler und ist mit behoben |
+| `MOUSE_SCALE`/`_OFFSET` wirken nicht auf `MOUSE_DELTA`/`MOUSE_SET_POS` | `graphics.rs:7269` | Vermutung (raylib) | behoben für `MOUSE_SET_POS` (Lauf: nach `MOUSE_OFFSET(-40, 0)`, `MOUSE_SCALE(0.5, 0.5)`, `MOUSE_SET_POS(80, 50)` stand `MOUSEX` bei 20). `MOUSE_DELTA` war richtig: raylibs `GetMouseDelta` rechnet den Maßstab selbst ein, dieser Teil der Vermutung stimmte nicht. |
 
 ---
 
@@ -1291,7 +1296,10 @@ Diese sind keine Muster, aber sie brechen etwas und sind schnell behoben:
 Gewichtet nach „wie viele Befunde verschwinden“ × „wie schwer sie wiegen“ ÷
 Aufwand. Jeder Punkt hält `docs/stabilitaet.md` ein.
 
-1. **Ein Satz Argumenthelfer für alle Familien** (A1, A2, D3).
+1. **Ein Satz Argumenthelfer für alle Familien** (A1, A2, D3). *Umgesetzt auf
+   `thema/argumente-einheitlich` (`argument.rs`). Dabei blieb die Grafik bei
+   „Nachkommastellen fallen weg“ (`koord`), damit kein Bild um einen Punkt
+   verrutscht, und `RMDIR` blieb bewusst streng.*
    - `arg_int` (glatte FLOAT ja), `arg_koord`, `arg_num`, `arg_text`,
      `arg_schalter` (BOOLEAN oder 0/1) in `vm_helfer.rs`, mit **einer**
      Meldungsform `NAME: erwartet X, erhalten Y (Argument n)`.
