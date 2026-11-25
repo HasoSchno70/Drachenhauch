@@ -1300,11 +1300,9 @@ AUDIO_SAVE_WAV: bits muss 8 oder 16 sein	AUDIO_SAVE_WAV: bits must be 8 or 16
 AUDIO_SAVE_WAV: ungueltiges SOUND-Handle {}	AUDIO_SAVE_WAV: invalid SOUND handle {}
 AUDIO_SAVE_WAV: '{}' liess sich nicht schreiben -- {}	AUDIO_SAVE_WAV: '{}' could not be written -- {}
 SAMPLE_LOAD: Sample ist leer	SAMPLE_LOAD: sample is empty
-SAMPLE_SET_LOOP: ungueltiges SAMPLE-Handle {}	SAMPLE_SET_LOOP: invalid SAMPLE handle {}
-SAMPLE_NOTE: ungueltiges SAMPLE-Handle {}	SAMPLE_NOTE: invalid SAMPLE handle {}
+{}: ungueltiges SAMPLE-Handle {}	{}: invalid SAMPLE handle {}
+{}: ungueltiges {}-Handle {}	{}: invalid {} handle {}
 SAMPLE_NOTE: release_ms muss <= 60000 sein	SAMPLE_NOTE: release_ms must be <= 60000
-SAMPLE_LEN: ungueltiges SAMPLE-Handle {}	SAMPLE_LEN: invalid SAMPLE handle {}
-SAMPLE_PLAY: ungueltiges SAMPLE-Handle {}	SAMPLE_PLAY: invalid SAMPLE handle {}
 SAMPLE_PLAY: ungueltige Tonhoehe	SAMPLE_PLAY: invalid pitch
 AUDIO_MUSIC_PLAY: Modul konnte nicht gestartet werden	AUDIO_MUSIC_PLAY: module could not be started
 AUDIO_MUSIC_SEEK: MOD-/XM-Musik laesst sich nicht auf eine Sekunde setzen (ihre Zeitachse sind Pattern und Zeilen)	AUDIO_MUSIC_SEEK: MOD/XM music cannot be set to a second (its time axis is patterns and rows)
@@ -1322,6 +1320,13 @@ MESH_CUBICMAP: eine Karte von {}x{} Punkten ist zu gross (hoechstens eine Millio
 {}: ungueltiges MODEL-Handle {}	{}: invalid MODEL handle {}
 MODEL_FREE: ungueltiges MODEL-Handle {}	MODEL_FREE: invalid MODEL handle {}
 {}: dieses Modell wurde mit MODEL_FREE freigegeben	{}: this model was released with MODEL_FREE
+{}: {} wurde mit {} freigegeben	{}: {} was released with {}
+dieser Shader	this shader
+diese Schrift	this font
+dieser Atlas	this atlas
+{}: dieses Render-Ziel wurde mit RENDERTARGET_FREE freigegeben	{}: this render target was released with RENDERTARGET_FREE
+{}: dieses Sample wurde mit SAMPLE_FREE freigegeben	{}: this sample was released with SAMPLE_FREE
+RENDERTARGET_FREE: in das Ziel wird gerade gezeichnet -- erst RENDERTARGET_END()	RENDERTARGET_FREE: the target is being drawn into -- first RENDERTARGET_END()
 LOADMODEL: '{}' laesst sich nicht als Modell lesen (gelesen werden OBJ, GLTF/GLB, IQM, VOX und M3D)	LOADMODEL: '{}' cannot be read as a model (read are OBJ, GLTF/GLB, IQM, VOX and M3D)
 SHADER_LOAD: der Shader laesst sich nicht uebersetzen -- die Meldung des Grafiktreibers steht davor	SHADER_LOAD: the shader does not compile -- the graphics driver's message comes before this
 MODEL_TEXTURE: Modell hat kein Material	MODEL_TEXTURE: model has no material
@@ -1341,17 +1346,14 @@ IMAGE_FROM_BUFFER: {} liess sich nicht lesen ({})	IMAGE_FROM_BUFFER: {} could no
 IMAGE_FROM_BUFFER: {} liess sich nicht lesen	IMAGE_FROM_BUFFER: {} could not be read
 IMAGE_TO_BUFFER: raylib hat nichts geschrieben	IMAGE_TO_BUFFER: raylib wrote nothing
 {}: Breite*Hoehe ueberschreitet das Limit von {} Pixeln (erhalten {}x{})	{}: width*height exceeds the limit of {} pixels (got {}x{})
-FONT_STYLE: ungueltiges FONT-Handle {}	FONT_STYLE: invalid FONT handle {}
 LOADFONT: Font nicht ladbar: {}	LOADFONT: font cannot be loaded: {}
 LOADFONT: Font '{}' nicht ladbar (keine TrueType-/OpenType-Schrift, die raylib lesen kann)	LOADFONT: font '{}' cannot be loaded (not a TrueType/OpenType font raylib can read)
 DHRT_FONT nicht ladbar: {}	DHRT_FONT cannot be loaded: {}
-SETFONT: ungueltiges FONT-Handle {}	SETFONT: invalid FONT handle {}
 SETFONT: erwartet (handle[, groesse]), erhalten {} Argument(e)	SETFONT: expects (handle[, groesse]), got {} argument(s)
 SETFONT: groesse muss mindestens 1 sein, erhalten {}	SETFONT: groesse must be at least 1, got {}
 LOADFONT_SDF: Font nicht ladbar: {}	LOADFONT_SDF: font cannot be loaded: {}
 LOADFONT_SDF: Font '{}' nicht ladbar (keine TrueType-/OpenType-Schrift, die raylib lesen kann)	LOADFONT_SDF: font '{}' cannot be loaded (not a TrueType/OpenType font raylib can read)
 LOADFONT_SDF: der Schrift-Shader liess sich nicht uebersetzen	LOADFONT_SDF: the font shader could not be compiled
-{}: ungueltiges FONT-Handle {}	{}: invalid FONT handle {}
 FONT_TO_IMAGE: die Zeichen {}..{} gehen nicht -- hoechstens 256, das erste nicht nach dem letzten (so viele liest LOADFONT_IMAGE)	FONT_TO_IMAGE: the characters {}..{} do not work -- at most 256, the first not after the last (that is how many LOADFONT_IMAGE reads)
 {}: ungueltiges IMAGE-Handle {}	{}: invalid IMAGE handle {}
 IMAGE_CONVOLVE: Kern muss quadratisch sein (9 = 3x3, 25 = 5x5, ...), hat aber {} Werte	IMAGE_CONVOLVE: the kernel must be square (9 = 3x3, 25 = 5x5, ...), but has {} values
@@ -1371,7 +1373,6 @@ LOAD_ASSETS: Pfad muss STRING sein	LOAD_ASSETS: path must be a STRING
 ATLAS_LOAD: Manifest nicht gefunden: {}	ATLAS_LOAD: manifest not found: {}
 ATLAS_LOAD: 'image' fehlt im Manifest	ATLAS_LOAD: 'image' is missing from the manifest
 ATLAS_LOAD: rect muss [x,y,w,h] sein	ATLAS_LOAD: rect must be [x,y,w,h]
-ATLAS_DRAW: ungueltiges Atlas-Handle	ATLAS_DRAW: invalid atlas handle
 ATLAS_DRAW: Sprite '{}' nicht im Atlas	ATLAS_DRAW: sprite '{}' is not in the atlas
 AUTOMATION_RECORD: Dateiname fehlt	AUTOMATION_RECORD: file name is missing
 AUTOMATION_STOP: '{}' nicht schreibbar	AUTOMATION_STOP: '{}' is not writable
@@ -1381,9 +1382,6 @@ MOUSE_CURSOR: unbekannte Form '{}' -- erwartet {} oder auto	MOUSE_CURSOR: unknow
 {}: der Brennpunkt {},{} liegt nicht im Bild ({}x{})	{}: the hot spot {},{} is not inside the image ({}x{})
 OPENURL: nur http:// und https:// erlaubt (bekam '{}')	OPENURL: only http:// and https:// are allowed (got '{}')
 SHADER_SET_ARRAY: Werte-Array ist leer	SHADER_SET_ARRAY: the value array is empty
-SHADER_SET_ARRAY: ungueltiges SHADER-Handle	SHADER_SET_ARRAY: invalid SHADER handle
-SHADER_SET_TEXTURE: ungueltiges SHADER-Handle	SHADER_SET_TEXTURE: invalid SHADER handle
-SHADER_SET_MATRIX: ungueltiges SHADER-Handle	SHADER_SET_MATRIX: invalid SHADER handle
 {} bindet schwaecher als {}: gerechnet wird {}. Ist das gemeint, die Klammern hinschreiben; sonst {}	{} binds more weakly than {}: this computes {}. If that is what you mean, write the brackets; otherwise {}
 {}: der Shader hat kein uniform '{}' -- der Wert kommt nicht an.{}	{}: the shader has no uniform '{}' -- the value does not arrive.{}
 Meintest du {}? Im Shader zaehlt Gross/klein.	Did you mean {}? Case matters in the shader.

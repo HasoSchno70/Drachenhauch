@@ -105,3 +105,126 @@ DHRT_FRAMES=2
 --- enthaelt
 SHADER_LOAD: der Shader laesst sich nicht uebersetzen -- die Meldung des Grafiktreibers steht davor
 weiter
+
+=== shader_free und ein shader den es nicht gibt
+' Bis 2026.53 lief SHADER_SET(99, ...) still ins Leere und POSTFX(99)
+' schaltete still aus; ein Shader liess sich nicht freigeben.
+SCREEN(80, 60, "t")
+DIM s AS INTEGER : s = SHADER_LOAD("#version 330" + CHR$(10) + "in vec2 fragTexCoord; uniform sampler2D texture0; uniform float k; out vec4 finalColor; void main() { finalColor = texture(texture0, fragTexCoord) * k; }")
+SHADER_SET(s, "k", 1.0)
+POSTFX(s)
+SHADER_FREE(s)
+SHADER_FREE(s)
+PRINT "doppelt still"
+TRY
+    SHADER_SET(s, "k", 0.5)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    SHADER_SET(99, "k", 0.5)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    POSTFX(99)
+CATCH e
+    PRINT e
+END TRY
+POSTFX(-1)
+FLIP()
+PRINT "weiter"
+--- umgebung
+DHRT_FRAMES=3
+--- erwartet
+doppelt still
+SHADER_SET: dieser Shader wurde mit SHADER_FREE freigegeben
+SHADER_SET: ungueltiges SHADER-Handle 99
+POSTFX: ungueltiges SHADER-Handle 99
+weiter
+
+=== font_free gibt die schrift frei und die eingebaute gilt wieder
+SCREEN(80, 60, "t")
+DIM f AS INTEGER : f = LOADFONT("sans", 20)
+SETFONT(f)
+TEXT(1, 1, "vorher", WHITE)
+FONT_FREE(f)
+FONT_FREE(f)
+PRINT "doppelt still"
+TRY
+    SETFONT(f)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    FONT_FREE(-1)
+CATCH e
+    PRINT e
+END TRY
+TEXT(1, 20, "nachher", WHITE)
+FLIP()
+DIM g AS INTEGER : g = LOADFONT("sans", 12)
+PRINT "neu "; (g <> f)
+--- umgebung
+DHRT_FRAMES=3
+--- erwartet
+doppelt still
+SETFONT: diese Schrift wurde mit FONT_FREE freigegeben
+FONT_FREE: ungueltiges FONT-Handle -1
+neu TRUE
+
+=== rendertarget_free nicht waehrend hineingezeichnet wird
+SCREEN(80, 60, "t")
+DIM r AS INTEGER : r = RENDERTARGET_NEW(32, 32)
+RENDERTARGET_BEGIN(r)
+TRY
+    RENDERTARGET_FREE(r)
+CATCH e
+    PRINT e
+END TRY
+RENDERTARGET_END()
+RENDERTARGET_FREE(r)
+RENDERTARGET_FREE(r)
+PRINT "doppelt still"
+TRY
+    RENDERTARGET_BEGIN(r)
+CATCH e
+    PRINT e
+END TRY
+FLIP()
+TRY
+    RENDERTARGET_FREE(0 - 5)
+CATCH e
+    PRINT e
+END TRY
+--- umgebung
+DHRT_FRAMES=3
+--- erwartet
+RENDERTARGET_FREE: in das Ziel wird gerade gezeichnet -- erst RENDERTARGET_END()
+doppelt still
+RENDERTARGET_BEGIN: dieses Render-Ziel wurde mit RENDERTARGET_FREE freigegeben
+RENDERTARGET_FREE: ungueltiges RENDERTARGET-Handle -5
+
+=== atlas_free gibt atlas und bild frei
+IMPORT "imgfx"
+SCREEN(80, 60, "t")
+DIM b AS INTEGER : b = IMAGE_NEW(16, 8, RED)
+IMAGE_SAVE(b, "blatt.png")
+DIM a AS INTEGER : a = ATLAS_LOAD("blatt.json")
+ATLAS_DRAW(a, "links", 0, 0)
+ATLAS_FREE(a)
+ATLAS_FREE(a)
+PRINT "doppelt still"
+TRY
+    ATLAS_DRAW(a, "links", 0, 0)
+CATCH e
+    PRINT e
+END TRY
+FLIP()
+--- datei blatt.json
+{"image": "blatt.png", "sprites": {"links": [0, 0, 8, 8], "rechts": [8, 0, 8, 8]}}
+--- umgebung
+DHRT_FRAMES=3
+--- erwartet
+doppelt still
+ATLAS_DRAW: dieser Atlas wurde mit ATLAS_FREE freigegeben

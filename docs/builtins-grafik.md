@@ -404,6 +404,7 @@ zweite Zeichenfläche samt Speicher, wo ein Rechteck genügt.
 | `FONT_STYLE(font, style$)` → FONT | der echte fette/kursive Schnitt einer geladenen Schrift (sucht die Datei daneben, z. B. `segoeuib.ttf` zu `segoeui.ttf`); gibt es keinen, kommt `font` selbst zurück |
 | `FONT_HAS_STYLE(font, style$)` | TRUE, wenn es diesen Schnitt als Datei gibt -- sonst bildet die Laufzeit ihn nach |
 | `LOADFONT(path$, size[, chars$])` → FONT | TTF/OTF/TTC laden → FONT-Handle (INTEGER); `chars$` = Schriftblöcke (`"kyrillisch, griechisch"`, `"japanisch"`, `"emoji"` …) oder die Zeichen selbst, die gebacken werden sollen. Statt eines Pfads geht auch eine **eingebaute Schrift**: `"sans"`, `"serif"`, `"mono"` (DejaVu, je mit `-fett`, `-kursiv`, `-fett-kursiv`) und `"noten"` (Noto Music: Schlüssel, Notenköpfe, Pausen, Vorzeichen aus dem Block „Musical Symbols“, SIL OFL). Ein Zeichen, das nicht gebacken wurde, holt das nächste Bild aus derselben Datei nach |
+| `FONT_FREE(font)` | die Schrift samt ihren Schnitten (`FONT_STYLE`) freigeben — das Handle ist sofort ungültig; war sie die aktive, gilt wieder die eingebaute; doppelt freigeben ist still |
 | `LOADFONT_SDF(path$, size[, chars$])` → FONT | eine Schrift, die bei **jeder** Größe scharf bleibt: gebacken als Abstandsfeld, gezeichnet mit einem Shader, der die Kante einen Punkt weich hält. Eine gewöhnliche Schrift verschwimmt, sobald sie größer gezeichnet wird, als sie gebacken wurde (Titel, Kamera-Zoom). Ohne `chars$` ASCII und Latin-1 samt €; das Backen kostet je Zeichen mehr als bei `LOADFONT` (rund 130 ms für diese Auswahl) |
 | `FONT_HAS_GLYPH(font, char$)` → BOOLEAN | hat die Schrift selbst ein Zeichen dafür? Wenn nicht, zeichnet `TEXT` es mit der Ausweich-Schrift; `-1` = eingebaute Schrift |
 | `FONT_GLYPH_WIDTH(font, chars$, size)` → FLOAT | wie weit `TEXT` nach diesem Zeichen weiterrückt, bei `size` Punkten — gemessen wie `TEXT_WIDTH`, ohne die aktive Schrift umzustellen |
@@ -659,6 +660,7 @@ Ein **Sprite-Atlas** ist EIN großes Bild mit benannten Sub-Rects (`x, y, w, h`)
 | Funktion | Zweck |
 |---|---|
 | `ATLAS_LOAD(path$)` → SPRITE_ATLAS | Atlas aus JSON-Manifest laden |
+| `ATLAS_FREE(atlas)` | den Atlas und sein Bild freigeben (das Bild nur, wenn kein anderer Atlas es braucht); doppelt freigeben ist still |
 | `ATLAS_DRAW(atlas, name$, x, y[, tint])` | einzelnes Sub-Sprite zeichnen (Camera-aware) |
 | `ATLAS_DRAW_FLIPPED(atlas, name$, x, y[, flip_x[, flip_y[, tint]]])` | Sub-Sprite mit Spiegelung (X/Y, je `TRUE`/`FALSE` oder `1`/`0`); optional `tint` |
 | `BATCH_DRAW(atlas, name$, x, y[, tint])` | **Zweitname für `ATLAS_DRAW`** — zeichnet sofort, sammelt nichts |
@@ -879,6 +881,7 @@ wie auf das Fenster — für Spiegel, Minikarten, Bild-im-Bild oder Nachzieheffe
 | Funktion | Zweck |
 |---|---|
 | `RENDERTARGET_NEW(w, h [, keep])` → INTEGER | Ziel anlegen. `keep = TRUE` lässt den Inhalt über das Bild hinaus stehen — die Voraussetzung für Schweife |
+| `RENDERTARGET_FREE(rt)` | das Ziel und seinen Grafikspeicher freigeben — nicht, solange hineingezeichnet wird (erst `RENDERTARGET_END`); doppelt freigeben ist still |
 | `RENDERTARGET_BEGIN(target)` | ab jetzt dorthin zeichnen |
 | `RENDERTARGET_END()` | zurück auf das Fenster -- fehlt es vor `FLIP`, hält FLIP mit einer Meldung an (sonst ginge das ganze Bild ins Ziel) |
 | `RENDERTARGET_DRAW(rt, x, y [, scale [, tint [, mirrored]]])` | das Ziel wie ein Bild aufs Fenster stempeln |
@@ -898,6 +901,7 @@ eines anderen Ziels tut nichts.
 | Funktion | Zweck |
 |---|---|
 | `SHADER_LOAD(src$)` → INTEGER | Fragment-Shader laden — aus einer Datei oder direkt als Quelltext; ein Fehler, wenn er sich nicht übersetzen lässt (die Meldung des Treibers steht davor; bis 2026.53 `-1`). Ein Name ohne `;`, `{` und Zeilenumbruch ist ein Dateiname: fehlt die Datei, ist das ein Fehler, der den Ort nennt |
+| `SHADER_FREE(shader)` | den Shader freigeben — das Handle ist sofort ungültig; läuft er als `POSTFX`, ist der Effekt aus; doppelt freigeben ist still |
 | `POSTFX(shader [, scale])` | jedes fertige Bild durch diesen Shader schicken; `-1` schaltet ab. `scale` (0.25..1, Vorgabe 1) lässt den Shader in kleinerer Auflösung rechnen und vergrößert das Ergebnis weich — für aufwendige Shader auf schwachen Grafikchips (bei 0.7 etwa die Hälfte der Arbeit); Text im Bild wird dabei etwas weicher |
 | `SHADER_SET(shader, name$, v)` | eine Zahl an ein `uniform float` geben |
 | `SHADER_SET2(shader, name$, x, y)` | zwei Werte (`vec2`) |

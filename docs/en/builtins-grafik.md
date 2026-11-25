@@ -405,6 +405,7 @@ a second canvas with its own memory, where a rectangle is enough.
 | `FONT_STYLE(font, style$)` → FONT | the real bold/italic face of a loaded font (looks for the file next to it, e.g. `segoeuib.ttf` for `segoeui.ttf`); if there is none, `font` itself comes back |
 | `FONT_HAS_STYLE(font, style$)` | TRUE if this face exists as a file -- otherwise the runtime imitates it |
 | `LOADFONT(path$, size[, chars$])` → FONT | load TTF/OTF/TTC → FONT handle (INTEGER); `chars$` = script blocks (`"kyrillisch, griechisch"`, `"japanisch"`, `"emoji"` …) or the characters themselves that should be baked. Instead of a path a **built-in font** works too: `"sans"`, `"serif"`, `"mono"` (DejaVu, each with `-fett`, `-kursiv`, `-fett-kursiv`) and `"noten"` (Noto Music: clefs, note heads, rests, accidentals from the "Musical Symbols" block, SIL OFL). A character that was not baked is fetched from the same file in the next frame |
+| `FONT_FREE(font)` | release the font with its styles (`FONT_STYLE`) — the handle is invalid at once; if it was the active one, the built-in font applies again; releasing twice is silent |
 | `LOADFONT_SDF(path$, size[, chars$])` → FONT | a font that stays sharp at **any** size: baked as a distance field, drawn with a shader that keeps the edge soft by one pixel. An ordinary font blurs as soon as it is drawn larger than it was baked (titles, camera zoom). Without `chars$` ASCII and Latin-1 including €; baking costs more per character than with `LOADFONT` (about 130 ms for this selection) |
 | `FONT_HAS_GLYPH(font, char$)` → BOOLEAN | does the font itself have a glyph for it? If not, `TEXT` draws it with the fallback font; `-1` = built-in font |
 | `FONT_GLYPH_WIDTH(font, chars$, size)` → FLOAT | how far `TEXT` advances after this character at `size` points — measured like `TEXT_WIDTH`, without switching the active font |
@@ -656,6 +657,7 @@ A **sprite atlas** is ONE big image with named sub-rects (`x, y, w, h`). Instead
 | Function | Purpose |
 |---|---|
 | `ATLAS_LOAD(path$)` → SPRITE_ATLAS | load an atlas from a JSON manifest |
+| `ATLAS_FREE(atlas)` | release the atlas and its image (the image only if no other atlas needs it); releasing twice is silent |
 | `ATLAS_DRAW(atlas, name$, x, y[, tint])` | draw a single sub-sprite (camera-aware) |
 | `ATLAS_DRAW_FLIPPED(atlas, name$, x, y[, flip_x[, flip_y[, tint]]])` | sub-sprite with mirroring (X/Y, each `TRUE`/`FALSE` or `1`/`0`); optional `tint` |
 | `BATCH_DRAW(atlas, name$, x, y[, tint])` | **second name for `ATLAS_DRAW`** — draws immediately, collects nothing |
@@ -875,6 +877,7 @@ A render target is an off-screen surface you draw on just like on the window
 | Function | Purpose |
 |---|---|
 | `RENDERTARGET_NEW(w, h [, keep])` → INTEGER | create a target. `keep = TRUE` keeps the contents beyond the frame — the precondition for trails |
+| `RENDERTARGET_FREE(rt)` | release the target and its graphics memory — not while drawing into it (first `RENDERTARGET_END`); releasing twice is silent |
 | `RENDERTARGET_BEGIN(target)` | draw there from now on |
 | `RENDERTARGET_END()` | back to the window -- if it is missing before `FLIP`, FLIP stops with a message (otherwise the whole frame would go into the target) |
 | `RENDERTARGET_DRAW(rt, x, y [, scale [, tint [, mirrored]]])` | stamp the target onto the window like an image |
@@ -894,6 +897,7 @@ does nothing.
 | Function | Purpose |
 |---|---|
 | `SHADER_LOAD(src$)` → INTEGER | load a fragment shader — from a file or directly as source text; an error if it does not compile (the driver's message comes before it; up to 2026.53 `-1`). A name without `;`, `{` and line break is a file name: a missing file is an error that names the location |
+| `SHADER_FREE(shader)` | release the shader — the handle is invalid at once; if it runs as `POSTFX`, the effect is off; releasing twice is silent |
 | `POSTFX(shader [, scale])` | send every finished frame through this shader; `-1` switches it off. `scale` (0.25..1, default 1) lets the shader work at a lower resolution and enlarges the result smoothly -- for expensive shaders on weak graphics chips (at 0.7 about half the work); text in the picture becomes a little softer |
 | `SHADER_SET(shader, name$, v)` | pass a number to a `uniform float` |
 | `SHADER_SET2(shader, name$, x, y)` | two values (`vec2`) |

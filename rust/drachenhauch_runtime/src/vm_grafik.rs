@@ -1106,19 +1106,19 @@ impl<'p> Vm<'p> {
                 Value::Int(g!().load_shader(&code)?)
             }
             "shader_set" => {
-                g!().shader_set_float(gi(a,0,"SHADER_SET")?, gs(a,1,"SHADER_SET")?, need_f(a,2,"SHADER_SET")?);
+                g!().shader_set_float(gi(a,0,"SHADER_SET")?, gs(a,1,"SHADER_SET")?, need_f(a,2,"SHADER_SET")?)?;
                 self.shader_warnung_zeigen();
                 Value::Nil
             }
             "shader_set2" => {
                 g!().shader_set_vec2(gi(a,0,"SHADER_SET2")?, gs(a,1,"SHADER_SET2")?,
-                    need_f(a,2,"SHADER_SET2")?, need_f(a,3,"SHADER_SET2")?);
+                    need_f(a,2,"SHADER_SET2")?, need_f(a,3,"SHADER_SET2")?)?;
                 self.shader_warnung_zeigen();
                 Value::Nil
             }
             "shader_set3" => {
                 g!().shader_set_vec3(gi(a,0,"SHADER_SET3")?, gs(a,1,"SHADER_SET3")?,
-                    need_f(a,2,"SHADER_SET3")?, need_f(a,3,"SHADER_SET3")?, need_f(a,4,"SHADER_SET3")?);
+                    need_f(a,2,"SHADER_SET3")?, need_f(a,3,"SHADER_SET3")?, need_f(a,4,"SHADER_SET3")?)?;
                 self.shader_warnung_zeigen();
                 Value::Nil
             }
@@ -1664,6 +1664,7 @@ impl<'p> Vm<'p> {
                 let sl = if a.len() >= 9 { need_f(a, 8, f)? } else { 0.0 };
                 Value::Int(self.audio_mut()?.sample_note(idx, semis, dauer, atk, dec, sus, rel, vol, sl)?)
             }
+            "sample_free" => { let i = gi(a, 0, "SAMPLE_FREE")?; self.audio_mut()?.sample_free(i)?; Value::Nil }
             "sample_len" => {
                 // SAMPLE_LEN(sample) -> Sekunden bei Originaltonhoehe
                 let idx = gi(a, 0, "SAMPLE_LEN")?;
@@ -2584,6 +2585,10 @@ optional dahinter (qx, qy, qb, qh) und eine Faerbung".into());
             }
             "image_free" => { g!().image_free(gi(a,0,"IMAGE_FREE")?)?; Value::Nil }
             "model_free" => { g!().model_free(gi(a,0,"MODEL_FREE")?)?; Value::Nil }
+            "shader_free" => { g!().shader_free(gi(a,0,"SHADER_FREE")?)?; Value::Nil }
+            "font_free" => { g!().font_free(gi(a,0,"FONT_FREE")?)?; Value::Nil }
+            "rendertarget_free" => { g!().rendertarget_free(gi(a,0,"RENDERTARGET_FREE")?)?; Value::Nil }
+            "atlas_free" => { g!().atlas_free(gi(a,0,"ATLAS_FREE")?)?; Value::Nil }
             "image_from_buffer" => {
                 if a.len() != 1 {
                     return Err(format!("IMAGE_FROM_BUFFER: erwartet (puffer), erhalten {} Argumente", a.len()));

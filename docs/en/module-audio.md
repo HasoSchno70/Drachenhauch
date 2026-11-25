@@ -365,6 +365,7 @@ instrument.
 | Function | Effect |
 |---|---|
 | `SAMPLE_LOAD(path$)` → SAMPLE | load WAV/OGG/QOA, normalized to mono |
+| `SAMPLE_FREE(sample)` | release the sample's data — whatever already sounds plays to the end; releasing twice is silent |
 | `SAMPLE_FROM_BUFFER(buffer, sample_rate)` → SAMPLE | sample from raw 16-bit PCM (little endian, signed, mono) |
 | `SAMPLE_FROM_SOUND(sound)` → SAMPLE | a SOUND (from `SPEAK_SOUND`, `AUDIO_NOTE`, `LOADSOUND` ...) as a sample, channels averaged to mono, sample rate kept |
 | `SAMPLE_PLAY(sample, semitones, vol[, dur_ms])` → AUDIO_CHANNEL | play at a relative pitch |

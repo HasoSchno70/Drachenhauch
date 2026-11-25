@@ -411,6 +411,12 @@
    "module": "core"
   },
   {
+   "name": "ATLAS_FREE",
+   "kind": "graphics",
+   "signature": "ATLAS_FREE(atlas)",
+   "module": "core"
+  },
+  {
    "name": "AUDIO_AUTOPAN",
    "kind": "core",
    "signature": "AUDIO_AUTOPAN(ch, period_s[, depth])",
@@ -9513,6 +9519,12 @@
    "module": "core"
   },
   {
+   "name": "FONT_FREE",
+   "kind": "graphics",
+   "signature": "FONT_FREE(font)",
+   "module": "core"
+  },
+  {
    "name": "LOADFONT_IMAGE",
    "kind": "graphics",
    "signature": "LOADFONT_IMAGE(image: IMAGE, separator_color: Zahl, first_char: Zahl) -> FONT",
@@ -12225,6 +12237,12 @@
    "module": "core"
   },
   {
+   "name": "RENDERTARGET_FREE",
+   "kind": "graphics",
+   "signature": "RENDERTARGET_FREE(rt)",
+   "module": "core"
+  },
+  {
    "name": "REPEAT$",
    "kind": "core",
    "signature": "REPEAT$(s, n)",
@@ -12342,6 +12360,12 @@
    "name": "SAMPLE_LOAD",
    "kind": "core",
    "signature": "SAMPLE_LOAD(path$)",
+   "module": "audio"
+  },
+  {
+   "name": "SAMPLE_FREE",
+   "kind": "core",
+   "signature": "SAMPLE_FREE(sample)",
    "module": "audio"
   },
   {
@@ -12954,6 +12978,12 @@
    "name": "SHADER_LOAD",
    "kind": "graphics",
    "signature": "SHADER_LOAD(src: STRING)",
+   "module": "core"
+  },
+  {
+   "name": "SHADER_FREE",
+   "kind": "graphics",
+   "signature": "SHADER_FREE(shader)",
    "module": "core"
   },
   {

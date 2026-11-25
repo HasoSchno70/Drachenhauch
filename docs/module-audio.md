@@ -367,6 +367,7 @@ Drum-Sample wird so ein ganzes Instrument.
 | Funktion | Wirkung |
 |---|---|
 | `SAMPLE_LOAD(path$)` → SAMPLE | WAV/OGG/QOA laden, auf Mono normalisiert |
+| `SAMPLE_FREE(sample)` | die Daten des Samples freigeben — was schon klingt, klingt zu Ende; doppelt freigeben ist still |
 | `SAMPLE_FROM_BUFFER(buffer, sample_rate)` → SAMPLE | Sample aus rohem 16-Bit-PCM (little endian, vorzeichenbehaftet, mono) |
 | `SAMPLE_FROM_SOUND(sound)` → SAMPLE | ein SOUND (aus `SPEAK_SOUND`, `AUDIO_NOTE`, `LOADSOUND` ...) als Sample, Kanäle auf Mono gemittelt, Abtastrate übernommen |
 | `SAMPLE_PLAY(sample, semitones, vol[, dur_ms])` → AUDIO_CHANNEL | bei relativer Tonhoehe abspielen |

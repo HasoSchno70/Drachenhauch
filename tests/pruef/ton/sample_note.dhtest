@@ -391,3 +391,26 @@ IMPORT "audio"
 DIM s AS SAMPLE : s = SAMPLE_FROM_SOUND(99)
 --- fehler
 SAMPLE_FROM_SOUND: ungueltiges SOUND-Handle 99
+
+=== sample_free gibt die daten frei
+' Die Handle-Regel (CLAUDE.md): still, auch doppelt; danach meldet sich
+' jeder Gebrauch. Bis 2026.53 gab es kein SAMPLE_FREE.
+IMPORT "audio"
+DIM s AS SAMPLE : s = SAMPLE_FROM_BUFFER(BUFFER_NEW(44100), 22050)
+SAMPLE_FREE(s)
+SAMPLE_FREE(s)
+PRINT "doppelt still"
+TRY
+    PRINT SAMPLE_LEN(s)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    SAMPLE_FREE(77)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+doppelt still
+SAMPLE_LEN: dieses Sample wurde mit SAMPLE_FREE freigegeben
+SAMPLE_FREE: ungueltiges SAMPLE-Handle 77
