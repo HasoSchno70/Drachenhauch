@@ -245,33 +245,9 @@ pub fn url_encode(s: &str) -> String {
     out
 }
 
+/// URL_DECODE: `%XX` zurueck, `+` bleibt (anders als ein Formular).
 pub fn url_decode(s: &str) -> String {
-    let bytes = s.as_bytes();
-    let mut out: Vec<u8> = Vec::with_capacity(bytes.len());
-    let mut i = 0;
-    while i < bytes.len() {
-        if bytes[i] == b'%' && i + 2 < bytes.len() {
-            let h = hex_val(bytes[i + 1]);
-            let l = hex_val(bytes[i + 2]);
-            if let (Some(h), Some(l)) = (h, l) {
-                out.push(h * 16 + l);
-                i += 3;
-                continue;
-            }
-        }
-        out.push(bytes[i]);
-        i += 1;
-    }
-    String::from_utf8_lossy(&out).into_owned()
-}
-
-fn hex_val(b: u8) -> Option<u8> {
-    match b {
-        b'0'..=b'9' => Some(b - b'0'),
-        b'a'..=b'f' => Some(b - b'a' + 10),
-        b'A'..=b'F' => Some(b - b'A' + 10),
-        _ => None,
-    }
+    crate::kodierung::prozent_auf(s, false)
 }
 
 // --- HTML-Entities ----------------------------------------------------------

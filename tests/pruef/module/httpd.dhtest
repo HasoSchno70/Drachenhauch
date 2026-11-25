@@ -421,3 +421,31 @@ t = HTTPD_START(VAL(ARG$(0)))
 --- erwartet
 TRUE
 TRUE
+
+=== ein prozent vor einem umlaut legt den server nicht lahm
+' Bis 2026.53 schnitt der Dekodierer `&s[i+1..i+3]` aus dem TEXT: auf `%`
+' und ein Zeichen folgte ein Umlaut, der Schnitt lag mitten in ihm, und die
+' Laufzeit brach mit einer Panik ab -- eine einzige Anfrage beendete jeden
+' Server, auch einen, der auf 0.0.0.0 lauscht. Jetzt dekodiert httpd wie
+' URL_DECODE auf Bytes (kodierung::prozent_auf).
+IMPORT "httpd"
+IMPORT "net"
+DIM h AS HTTPD = HTTPD_START(0, "127.0.0.1")
+DIM roh AS NET_SOCKET = NET_TCP_CONNECT("127.0.0.1", HTTPD_PORT(h))
+NET_SEND(roh, "GET /%a" + CHR$(196) + "?k=%" + CHR$(196) + " HTTP/1.1" + CHR$(13) + CHR$(10) + CHR$(13) + CHR$(10))
+DIM n AS INTEGER
+FOR n = 1 TO 250
+    IF HTTPD_ACCEPT(h) THEN
+        PRINT HTTPD_PATH$(h) = "/%a" + CHR$(196); " "; HTTPD_QUERY$(h, "k") = "%" + CHR$(196)
+        HTTPD_SEND(h, 200, "text/plain", "ok")
+        EXIT FOR
+    END IF
+    SLEEP(20)
+NEXT
+PRINT URL_DECODE("%C3%84") = CHR$(196); " "; URL_DECODE("a+b%20c")
+PRINT "der server lebt"
+HTTPD_STOP(h)
+--- erwartet
+TRUE TRUE
+TRUE a+b c
+der server lebt

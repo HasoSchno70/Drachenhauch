@@ -183,24 +183,12 @@ fn pfad_und_abfrage(ziel: &str) -> (String, Vec<(String, String)>) {
     (prozent_auf(p), raus)
 }
 
-/// `%20` und `+` zurueckuebersetzen.
+/// `%20` und `+` zurueckuebersetzen (Formular-Kodierung). Bis 2026.53 stand
+/// hier ein eigener Dekodierer, der `&s[i+1..i+3]` aus dem TEXT schnitt: auf
+/// `%` und ein Zeichen folgte ein Umlaut, und der Schnitt lag mitten in ihm --
+/// eine einzige Anfrage `GET /%aÄ` beendete den Server (Panik).
 pub fn prozent_auf(s: &str) -> String {
-    let b = s.as_bytes();
-    let mut raus: Vec<u8> = Vec::with_capacity(b.len());
-    let mut i = 0;
-    while i < b.len() {
-        match b[i] {
-            b'%' if i + 2 < b.len() => {
-                match u8::from_str_radix(&s[i + 1..i + 3], 16) {
-                    Ok(v) => { raus.push(v); i += 3; }
-                    Err(_) => { raus.push(b[i]); i += 1; }
-                }
-            }
-            b'+' => { raus.push(b' '); i += 1; }
-            c => { raus.push(c); i += 1; }
-        }
-    }
-    String::from_utf8_lossy(&raus).into_owned()
+    crate::kodierung::prozent_auf(s, true)
 }
 
 /// Antworten und die Verbindung schliessen.
@@ -310,6 +298,13 @@ mod tests {
     #[test]
     fn plus_ist_ein_leerzeichen() {
         assert_eq!(prozent_auf("a+b%2Bc"), "a b+c");
+    }
+
+    #[test]
+    fn prozent_vor_einem_umlaut_stuerzt_nicht() {
+        assert_eq!(prozent_auf("/%a\u{c4}"), "/%a\u{c4}");
+        assert_eq!(prozent_auf("%\u{c4}x"), "%\u{c4}x");
+        assert_eq!(prozent_auf("%C3%84"), "\u{c4}");
     }
 
     #[test]
