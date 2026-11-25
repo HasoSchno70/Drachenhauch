@@ -843,7 +843,11 @@ impl Gui {
                     .and_then(|(_, i)| self.windows[top].widgets.get(i))
                     .map(Self::wird_umbenannt)
                     .unwrap_or(false);
-                let liste_edit = liste_edit || self.liste_taste;
+                // Eine Taste, die ein Widget oder ein Kuerzel schon genommen hat,
+                // ist verbraucht (CLAUDE.md). Bis 2026.53 fehlte das Kuerzel hier:
+                // ein Menueeintrag "Strg+Enter" loeste zusaetzlich den
+                // Standardknopf aus, ein Kuerzel "Esc" den Abbrechen-Knopf.
+                let liste_edit = liste_edit || self.liste_taste || self.kuerzel_gefeuert;
                 let enter_frei = enter_frei && !liste_edit;
                 if enter_frei && g.key_pressed(KEY_ENTER) {
                     let k = self.windows[top].default_btn;
