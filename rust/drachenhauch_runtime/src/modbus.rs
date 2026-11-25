@@ -487,3 +487,29 @@ mod tests {
         assert_eq!(format_lesen("9N1"), None);
     }
 }
+
+#[cfg(test)]
+mod zufall_tests {
+    use super::*;
+
+    #[test]
+    fn keine_antwort_fuehrt_zur_panik() {
+        let gueltig = vec![
+            rtu_rahmen(1, &[3, 4, 0, 1, 0, 2]),
+            rtu_rahmen(1, &[1, 1, 0b101]),
+            tcp_rahmen(5, 1, &[3, 2, 0, 9]),
+            vec![0x83, 0x02],
+        ];
+        crate::zufallsprobe::nie_panik("Modbus", &gueltig, |b| {
+            let _ = rtu_laenge(b);
+            for fc in [1u8, 2, 3, 4, 5, 6, 15, 16] {
+                let _ = antwort_pruefen(fc, b, "PROBE");
+            }
+            // Die Anzahl kommt vom Programm, geprüft bis 2000 (`bereich`).
+            for anzahl in [0usize, 1, 2, 8, 9, 125, 2000] {
+                let _ = antwort_bits(b, anzahl, "PROBE");
+                let _ = antwort_register(b, anzahl, "PROBE");
+            }
+        });
+    }
+}

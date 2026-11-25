@@ -128,6 +128,8 @@ mod pruef;
 mod pruefsammlung;
 mod prozess;
 mod text_stream;
+#[cfg(test)]
+mod zufallsprobe;
 #[cfg(feature = "bt")]
 mod bt;
 // midi.rs ist NICHT gegatet: die beiden Umrechner darin (Notenname,

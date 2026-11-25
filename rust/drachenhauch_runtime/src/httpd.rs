@@ -342,3 +342,21 @@ mod tests {
         assert_eq!(finde_kopfende(b"GET / HTTP/1.1\r\n"), None);
     }
 }
+
+#[cfg(test)]
+mod zufall_tests {
+    use super::*;
+
+    #[test]
+    fn keine_anfrage_fuehrt_zur_panik() {
+        let gueltig = vec![
+            b"/pfad/%C3%A4?a=1&b=zwei+drei&c".to_vec(),
+            b"/%aX%%2?%=%&=".to_vec(),
+            "/\u{e4}%a\u{c4}".as_bytes().to_vec(),
+        ];
+        crate::zufallsprobe::nie_panik("httpd", &gueltig, |b| {
+            let _ = pfad_und_abfrage(&String::from_utf8_lossy(b));
+            let _ = finde_kopfende(b);
+        });
+    }
+}

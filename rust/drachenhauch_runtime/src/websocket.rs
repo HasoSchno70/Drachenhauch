@@ -571,3 +571,18 @@ mod tests {
         assert_eq!((v.schliess_code, v.schliess_grund.as_str()), (1000, "fertig"));
     }
 }
+
+#[cfg(test)]
+mod zufall_tests {
+    use super::*;
+
+    #[test]
+    fn kein_rahmen_fuehrt_zur_panik() {
+        let gueltig = vec![
+            rahmen_bauen(1, b"Hallo", None),
+            rahmen_bauen(2, &[9u8; 130], Some([1, 2, 3, 4])),
+            rahmen_bauen(8, &[3, 232], None),
+        ];
+        crate::zufallsprobe::nie_panik("WebSocket", &gueltig, |b| { let _ = rahmen_lesen(b); });
+    }
+}

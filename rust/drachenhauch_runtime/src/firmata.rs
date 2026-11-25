@@ -1027,3 +1027,24 @@ mod tests {
         assert_eq!(tcp_ziel("COM3"), None);
     }
 }
+
+#[cfg(test)]
+mod zufall_tests {
+    use super::*;
+
+    #[test]
+    fn keine_nachricht_fuehrt_zur_panik() {
+        let gueltig = vec![
+            vec![CMD_DIGITAL_MESSAGE | 1, 0b0010101, 0b1],
+            vec![CMD_ANALOG_MESSAGE | 3, 0x7F, 0x07],
+            vec![0xF0, SYSEX_REPORT_FIRMWARE, 2, 5, b'A', 0, b'B', 0, 0xF7],
+            vec![0xF0, SYSEX_I2C_REPLY, 0x48, 0, 1, 0, 9, 0, 0xF7],
+        ];
+        crate::zufallsprobe::nie_panik("Firmata", &gueltig, |b| {
+            let (msgs, _) = parse_messages(b.to_vec());
+            for m in msgs {
+                if let Msg::Sysex(d) = m { let _ = paare(&d); if d.len() >= 5 { let _ = zahl32_lesen(&d[..5]); } }
+            }
+        });
+    }
+}

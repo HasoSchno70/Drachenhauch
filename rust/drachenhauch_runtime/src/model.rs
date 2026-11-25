@@ -950,8 +950,6 @@ DATA 1, "x", 2.5
         let unsinn = [J::Null, serde_json::json!("x"), serde_json::json!(-1), serde_json::json!(1.5),
                       serde_json::json!(true), serde_json::json!([]), serde_json::json!({}),
                       serde_json::json!({"q": 1}), serde_json::json!([1]), serde_json::json!(1e300)];
-        let alter = std::panic::take_hook();
-        std::panic::set_hook(Box::new(|_| {}));
         let mut paniken = Vec::new();
         for stelle in alle.iter().filter(|s| !s.is_empty()) {
             for u in &unsinn {
@@ -966,7 +964,6 @@ DATA 1, "x", 2.5
                 }
             }
         }
-        std::panic::set_hook(alter);
         assert!(paniken.is_empty(), "{} Paniken beim Laden, etwa: {:?}", paniken.len(),
                 &paniken[..paniken.len().min(20)]);
     }
