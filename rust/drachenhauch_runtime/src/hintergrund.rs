@@ -58,8 +58,13 @@ impl<T: Send + 'static> Auftraege<T> {
     ///
     /// `Err` heisst: der Thread ist weg, ohne zu senden -- das kann nur ein
     /// Absturz im Auftrag sein. Als Fehler melden statt ewig "noch nicht".
-    pub fn fertig(&mut self, id: i64) -> Result<bool, String> {
-        let Some(e) = self.eintrag(id) else { return Ok(false) };
+    /// Ebenso eine Nummer, die es nicht (mehr) gibt: bis 2026.53 hiess sie
+    /// FALSE, und `WHILE NOT TASK_READY(j)` mit einer falschen Nummer lief
+    /// ewig. `fn_` ist der Befehl fuer die Meldung.
+    pub fn fertig(&mut self, id: i64, fn_: &str) -> Result<bool, String> {
+        let Some(e) = self.eintrag(id) else {
+            return Err(format!("{}: einen Auftrag {} gibt es nicht -- nie gestartet, schon abgeholt oder abgebrochen", fn_, id));
+        };
         if e.ergebnis.is_some() { return Ok(true); }
         match e.empfang.try_recv() {
             Ok(r) => { e.ergebnis = Some(r); Ok(true) }
@@ -70,10 +75,10 @@ impl<T: Send + 'static> Auftraege<T> {
     }
 
     /// Holt das Ergebnis ab und gibt den Platz frei. `None` = noch nicht
-    /// fertig (oder unbekannte Nummer); der Aufrufer soll dann weiter
-    /// `fertig` fragen statt zu blockieren.
-    pub fn abholen(&mut self, id: i64) -> Result<Option<T>, String> {
-        if !self.fertig(id)? { return Ok(None); }
+    /// fertig; der Aufrufer soll dann weiter `fertig` fragen statt zu
+    /// blockieren. Eine unbekannte Nummer ist ein Fehler (`fertig`).
+    pub fn abholen(&mut self, id: i64, fn_: &str) -> Result<Option<T>, String> {
+        if !self.fertig(id, fn_)? { return Ok(None); }
         let Some(platz) = self.eintraege.get_mut(id as usize) else { return Ok(None) };
         Ok(platz.take().and_then(|e| e.ergebnis))
     }

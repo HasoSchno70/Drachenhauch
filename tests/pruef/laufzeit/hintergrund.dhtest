@@ -264,7 +264,7 @@ NEXT
 DB_COMMIT(c)
 DB_CLOSE(c)
 --- fehler
-erst DB_QUERY_READY
+DB_QUERY_RESULT: einen Auftrag 0 gibt es nicht -- nie gestartet, schon abgeholt oder abgebrochen
 
 === kaputtes sql meldet sich beim abholen
 ' Der Fehler entsteht auf dem Auftrags-Faden und wird beim Abholen geworfen.
@@ -301,7 +301,13 @@ DIM a AS INTEGER
 a = DB_QUERY_START("d.db", "SELECT a FROM zahlen")
 DB_QUERY_CANCEL(a)
 PRINT DB_QUERY_PENDING()
-PRINT DB_QUERY_READY(a)
+' Seit 2026.54 ist die abgebrochene Nummer weg: READY meldet einen Fehler
+' statt fuer immer FALSE (eine Warteschleife darauf lief ewig).
+TRY
+    PRINT DB_QUERY_READY(a)
+CATCH e
+    PRINT e
+END TRY
 --- vorher
 IMPORT "db"
 DIM c AS DB_CONN : c = DB_OPEN("d.db")
@@ -315,7 +321,7 @@ DB_COMMIT(c)
 DB_CLOSE(c)
 --- erwartet
 0
-FALSE
+DB_QUERY_READY: einen Auftrag 0 gibt es nicht -- nie gestartet, schon abgeholt oder abgebrochen
 
 === die eigene verbindung sieht nur festgeschriebenes
 ' Dokumentierte Grenze: der Auftrag oeffnet seine EIGENE Verbindung.

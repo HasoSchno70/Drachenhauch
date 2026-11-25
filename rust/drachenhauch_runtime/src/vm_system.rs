@@ -584,7 +584,7 @@ impl<'p> Vm<'p> {
                 Value::Int(self.task_auftraege.start(&was,
                     move || crate::hintergrund::task_arbeit(exe, datei, funktion, args)))
             }
-            "task_ready" => Value::Bool(self.task_auftraege.fertig(bi_int(a, 0, "TASK_READY")?)?),
+            "task_ready" => Value::Bool(self.task_auftraege.fertig(bi_int(a, 0, "TASK_READY")?, "TASK_READY")?),
             // Einmal abholbar, wie bei SHELL_RESULT$: `abholen` nimmt das
             // Ergebnis aus der Verwaltung. Darum gibt es KEIN zweites
             // TASK_OUTPUT$ daneben -- zwei Abholer wuerden sich gegenseitig
@@ -593,7 +593,7 @@ impl<'p> Vm<'p> {
             // er redet nicht.
             "task_result$" | "task_result" => {
                 let id = bi_int(a, 0, "TASK_RESULT$")?;
-                match self.task_auftraege.abholen(id)? {
+                match self.task_auftraege.abholen(id, "TASK_RESULT$")? {
                     Some(Ok(e)) => Value::str_rc(&e.ergebnis),
                     Some(Err(e)) => return Err(e),
                     None => return Err(format!(
@@ -604,10 +604,10 @@ impl<'p> Vm<'p> {
             "task_cancel" => { self.task_auftraege.abbrechen(bi_int(a, 0, "TASK_CANCEL")?); Value::Nil }
             "task_pending" => Value::Int(self.task_auftraege.offen()),
 
-            "shell_ready" => Value::Bool(self.shell_auftraege.fertig(bi_int(a, 0, "SHELL_READY")?)?),
+            "shell_ready" => Value::Bool(self.shell_auftraege.fertig(bi_int(a, 0, "SHELL_READY")?, "SHELL_READY")?),
             "shell_result$" | "shell_result" => {
                 let id = bi_int(a, 0, "SHELL_RESULT$")?;
-                match self.shell_auftraege.abholen(id)? {
+                match self.shell_auftraege.abholen(id, "SHELL_RESULT$")? {
                     Some(Ok(e)) => {
                         self.shell_letzter_code = e.code;
                         self.shell_letzter_fehler = e.stderr;
@@ -665,10 +665,10 @@ impl<'p> Vm<'p> {
                     conn.query(&sql, &params, "DB_QUERY_START")
                 }))
             }
-            "db_query_ready" => Value::Bool(self.db_auftraege.fertig(bi_int(a, 0, "DB_QUERY_READY")?)?),
+            "db_query_ready" => Value::Bool(self.db_auftraege.fertig(bi_int(a, 0, "DB_QUERY_READY")?, "DB_QUERY_READY")?),
             "db_query_result" => {
                 let id = bi_int(a, 0, "DB_QUERY_RESULT")?;
-                match self.db_auftraege.abholen(id)? {
+                match self.db_auftraege.abholen(id, "DB_QUERY_RESULT")? {
                     Some(Ok(res)) => {
                         self.db_results.push(res);
                         Value::Int((self.db_results.len() - 1) as i64)
