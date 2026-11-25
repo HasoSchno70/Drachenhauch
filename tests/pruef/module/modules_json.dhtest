@@ -144,5 +144,5 @@ JSON_GET_INT: Pfad 'x.y' nicht aufloesbar
 IMPORT "json"
 PRINT JSON_GET_STRING("nicht ein handle", "x")
 --- fehler
-JSON_GET_STRING erwartet JSON-Handle (aus JSON_PARSE)
+JSON_GET_STRING: erwartet JSON-Handle (aus JSON_PARSE)
 

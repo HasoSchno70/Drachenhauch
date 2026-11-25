@@ -38,3 +38,28 @@ DHRT_FRAMES=1
 DHRT_LANG=en
 --- fehler
 GUI_SET_TEXT: expected INTEGER (argument 1), got NIL -- the widget or window does not exist yet
+
+=== ein schalter der gui nimmt auch 1 und 0
+' Die gui verlangte bis 2026.53 TRUE/FALSE; GPIO_WRITE, DIRLIST und die
+' Physik nahmen schon 1/0. Jetzt gilt fuer jeden Schalter dieselbe Regel
+' (argument.rs).
+IMPORT "gui"
+SCREEN(300, 200, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW = GUI_WINDOW("w", 10, 10, 200, 120)
+DIM cb AS GUI_WIDGET = GUI_CHECKBOX(w, "Haken", 10, 10)
+GUI_SET_CHECKED(cb, 1)
+PRINT GUI_GET_CHECKED(cb)
+GUI_SET_CHECKED(cb, 0)
+PRINT GUI_GET_CHECKED(cb)
+TRY
+    GUI_SET_CHECKED(cb, "ja")
+CATCH e
+    PRINT e
+END TRY
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+TRUE
+FALSE
+GUI_SET_CHECKED: erwartet BOOLEAN oder Zahl (Arg 2), erhalten STRING

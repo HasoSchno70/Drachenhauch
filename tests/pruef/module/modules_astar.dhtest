@@ -209,7 +209,7 @@ PRINT ASTAR_PATH_LEN(g)
 IMPORT "astar"
 PRINT ASTAR_FIND("nicht ein grid", 0, 0, 1, 1)
 --- fehler
-ASTAR_FIND erwartet ASTAR_GRID
+ASTAR_FIND: erwartet ASTAR_GRID
 
 === diagonal cost must be positive (1)
 IMPORT "astar"

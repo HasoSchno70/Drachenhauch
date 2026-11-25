@@ -289,7 +289,7 @@ END TRY
 14.5
 1.5 2.5
 3
-SORT erwartet ARRAY
+SORT: erwartet ARRAY
 
 === eine leere comprehension ist leer und kein typfehler
 ' Liess das WHERE nichts durch, hiess ARRAY_AVG([...]) "nur ARRAY OF

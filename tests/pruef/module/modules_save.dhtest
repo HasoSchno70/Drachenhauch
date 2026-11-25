@@ -310,7 +310,7 @@ SAVE_LOAD: Save-Datei muss ein JSON-Objekt sein
 IMPORT "save"
 PRINT SAVE_GET_INT("nicht ein handle", "k")
 --- fehler
-SAVE_GET_INT erwartet SAVE_HANDLE (aus SAVE_NEW/SAVE_LOAD)
+SAVE_GET_INT: erwartet SAVE_HANDLE (aus SAVE_NEW/SAVE_LOAD)
 
 === set bool wrong type message
 IMPORT "save"
@@ -318,5 +318,5 @@ DIM s AS SAVE_HANDLE
 s = SAVE_NEW()
 SAVE_SET_BOOL(s, "k", 1)
 --- fehler
-SAVE_SET_BOOL erwartet BOOLEAN, erhalten INTEGER
+SAVE_SET_BOOL: erwartet BOOLEAN, erhalten INTEGER
 

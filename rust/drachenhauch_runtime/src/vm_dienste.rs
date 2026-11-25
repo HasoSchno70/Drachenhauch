@@ -1275,13 +1275,6 @@ impl<'p> Vm<'p> {
     #[cfg(feature = "http")]
     pub(super) fn try_cloud_impl(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         use crate::cloud;
-        fn bi_bool(a: &[Value], i: usize, fn_: &str) -> R<bool> {
-            match a.get(i) {
-                Some(Value::Bool(b)) => Ok(*b),
-                Some(v) => Err(format!("{}: erwartet BOOLEAN, erhalten {}", fn_, v.type_name())),
-                None => Err(format!("{}: fehlendes Argument {}", fn_, i + 1)),
-            }
-        }
         let v = match name {
             "cloud_configure" => {
                 self.cloud_base_url = bi_str(a, 0, "CLOUD_CONFIGURE")?.to_string();

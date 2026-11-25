@@ -327,23 +327,13 @@ fn vm_top(stack: &[Value]) -> R<&Value> {
         .ok_or_else(|| "VM: Stack underflow (kaputter/inkompatibler Bytecode?)".to_string())
 }
 
-// Arg-Helfer fuer die Modul-Dispatcher (db/net/html/serial/usb/wifi/bt).
+// Arg-Helfer fuer die Modul-Dispatcher (db/net/html/serial/usb/wifi/bt) --
+// die Regeln stehen in `argument.rs`. `allow(dead_code)`: in einem Bau ohne
+// die Module ruft sie niemand.
 #[allow(dead_code)]
-fn bi_int(a: &[Value], i: usize, fn_: &str) -> R<i64> {
-    match a.get(i) {
-        Some(Value::Int(n)) => Ok(*n),
-        Some(v) => Err(format!("{}: erwartet INTEGER, erhalten {}", fn_, v.type_name())),
-        None => Err(format!("{}: fehlendes Argument {}", fn_, i + 1)),
-    }
-}
+fn bi_int(a: &[Value], i: usize, fn_: &str) -> R<i64> { crate::argument::a_int(a, i, fn_) }
 #[allow(dead_code)]
-fn bi_str<'x>(a: &'x [Value], i: usize, fn_: &str) -> R<&'x str> {
-    match a.get(i) {
-        Some(Value::Str(s)) => Ok(s),
-        Some(v) => Err(format!("{}: erwartet STRING, erhalten {}", fn_, v.type_name())),
-        None => Err(format!("{}: fehlendes Argument {}", fn_, i + 1)),
-    }
-}
+fn bi_str<'x>(a: &'x [Value], i: usize, fn_: &str) -> R<&'x str> { crate::argument::a_text(a, i, fn_) }
 /// Der Ordner, von dem aus ein CODE_*-Befehl IMPORTs aufloest: das Argument
 /// an Stelle `i` -- ohne es None (der Befehl bleibt dann beim Text).
 fn code_basis(a: &[Value], i: usize, fn_: &str) -> R<Option<std::path::PathBuf>> {
@@ -353,22 +343,10 @@ fn code_basis(a: &[Value], i: usize, fn_: &str) -> R<Option<std::path::PathBuf>>
             else { std::path::PathBuf::from(b) }))
 }
 #[allow(dead_code)]
-fn bi_num(a: &[Value], i: usize, fn_: &str) -> R<f64> {
-    match a.get(i) {
-        Some(Value::Int(n)) => Ok(*n as f64),
-        Some(Value::Float(f)) => Ok(*f),
-        Some(v) => Err(format!("{}: erwartet Zahl, erhalten {}", fn_, v.type_name())),
-        None => Err(format!("{}: fehlendes Argument {}", fn_, i + 1)),
-    }
-}
+fn bi_num(a: &[Value], i: usize, fn_: &str) -> R<f64> { crate::argument::a_num(a, i, fn_) }
+/// Ein Schalter: BOOLEAN oder Zahl (`argument::schalter`).
 #[allow(dead_code)]
-fn bi_bool(a: &[Value], i: usize, fn_: &str) -> R<bool> {
-    match a.get(i) {
-        Some(Value::Bool(b)) => Ok(*b),
-        Some(v) => Err(format!("{}: erwartet BOOLEAN, erhalten {}", fn_, v.type_name())),
-        None => Err(format!("{}: fehlendes Argument {}", fn_, i + 1)),
-    }
-}
+fn bi_bool(a: &[Value], i: usize, fn_: &str) -> R<bool> { crate::argument::a_schalter(a, i, fn_) }
 #[cfg(feature = "db")]
 fn db_params(args: &[Value], fn_: &str) -> R<Vec<crate::db::Param>> {
     args.iter().map(|v| crate::db::dh_to_sql(v, fn_)).collect()
@@ -2817,7 +2795,7 @@ impl<'p> Vm<'p> {
         }
         let t = match &a[0] {
             Value::Tween(t) => t.clone(),
-            _ => return Err("TWEEN_VALUE erwartet TWEEN".to_string()),
+            _ => return Err("TWEEN_VALUE: erwartet TWEEN".to_string()),
         };
         let (start, ende, p, easing, kurve) = {
             let b = t.borrow();
@@ -2931,7 +2909,7 @@ impl<'p> Vm<'p> {
         use std::cmp::Ordering;
         let arr = match arr_v {
             Value::Array(x) => x.clone(),
-            _ => return Err("SORT erwartet ARRAY".to_string()),
+            _ => return Err("SORT: erwartet ARRAY".to_string()),
         };
         let cb = crate::value::Rueckruf::aus_wert(cmp)
             .ok_or_else(|| "SORT: Comparator muss FUNCREF sein".to_string())?;

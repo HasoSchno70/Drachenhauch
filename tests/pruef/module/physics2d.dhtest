@@ -112,7 +112,7 @@ PRINT INT(PHYS2D_BODY_Y(w, floor))
 IMPORT "physics2d"
 PHYS2D_STEP(42, 0.016)
 --- fehler
-PHYS2D_STEP erwartet PHYS2D_WORLD
+PHYS2D_STEP: erwartet PHYS2D_WORLD
 
 === statischer koerper faellt erst nach dem umschalten
 IMPORT "physics2d"

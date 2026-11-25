@@ -208,7 +208,7 @@ ECS_GET_INT: Component ist nicht INTEGER
 IMPORT "ecs"
 PRINT ECS_COUNT("not a world")
 --- fehler
-ECS_COUNT erwartet ECS_WORLD
+ECS_COUNT: erwartet ECS_WORLD
 
 === add to dead entity raises
 IMPORT "ecs"
@@ -357,5 +357,5 @@ DIM e AS INTEGER
 e = ECS_NEW_ENTITY(w)
 ECS_ADD_BOOL(w, e, "alive", 1)
 --- fehler
-ECS_ADD_BOOL erwartet BOOLEAN, erhalten INTEGER
+ECS_ADD_BOOL: erwartet BOOLEAN, erhalten INTEGER
 

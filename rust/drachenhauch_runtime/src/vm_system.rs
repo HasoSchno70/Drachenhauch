@@ -16,18 +16,14 @@ impl<'p> Vm<'p> {
         if !name.starts_with("zeit_") { return Ok(None); }
         use crate::zeit;
 
+        // Zeitwerte, Sekunden und Teile sind INTEGER. Eine Kommazahl mit
+        // Nachkommastellen ist ein Fehler -- bis 2026.53 wurde sie still
+        // abgeschnitten (`ZEIT_PLUS(t, 1.7)` zaehlte eine Sekunde).
         fn z_int(a: &[Value], i: usize, fn_: &str) -> R<i64> {
-            match a.get(i) {
-                Some(Value::Int(n)) => Ok(*n),
-                Some(Value::Float(f)) => Ok(*f as i64),
-                _ => Err(format!("{}: erwartet einen Zeitwert (INTEGER, Arg {})", fn_, i + 1)),
-            }
+            crate::argument::a_int(a, i, fn_)
         }
         fn z_str<'x>(a: &'x [Value], i: usize, fn_: &str) -> R<&'x str> {
-            match a.get(i) {
-                Some(Value::Str(s)) => Ok(s),
-                _ => Err(format!("{}: erwartet STRING (Arg {})", fn_, i + 1)),
-            }
+            crate::argument::a_text(a, i, fn_)
         }
 
         let v = match name {
@@ -152,7 +148,7 @@ impl<'p> Vm<'p> {
         }
         if !matches!(name, "exit" | "eprint" | "shell" | "shell_out$" | "shell_out") { return Ok(None); }
         fn o_str<'x>(a: &'x [Value], i: usize, fn_: &str) -> R<&'x str> {
-            match a.get(i) { Some(Value::Str(s)) => Ok(s), _ => Err(format!("{}: erwartet STRING (Arg {})", fn_, i + 1)) }
+            crate::argument::a_text(a, i, fn_)
         }
         let v = match name {
             "exit" => {
@@ -857,10 +853,10 @@ impl<'p> Vm<'p> {
     pub(super) fn try_timer(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         if !(name.starts_with("timer_") || name == "cooldown") { return Ok(None); }
         fn t_int(a: &[Value], i: usize, fn_: &str) -> R<i64> {
-            match a.get(i) { Some(Value::Int(n)) => Ok(*n), _ => Err(format!("{}: erwartet INTEGER (Arg {})", fn_, i + 1)) }
+            crate::argument::a_int(a, i, fn_)
         }
         fn t_str<'x>(a: &'x [Value], i: usize, fn_: &str) -> R<&'x str> {
-            match a.get(i) { Some(Value::Str(s)) => Ok(s), _ => Err(format!("{}: erwartet STRING (Arg {})", fn_, i + 1)) }
+            crate::argument::a_text(a, i, fn_)
         }
         fn t_func(a: &[Value], i: usize, fn_: &str) -> R<crate::value::Rueckruf> {
             match a.get(i).and_then(crate::value::Rueckruf::aus_wert) {
@@ -906,7 +902,7 @@ impl<'p> Vm<'p> {
     pub(super) fn try_scene(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         if !(name.starts_with("scene_")) { return Ok(None); }
         fn sa<'x>(a: &'x [Value], i: usize, fn_: &str) -> R<&'x str> {
-            match a.get(i) { Some(Value::Str(s)) => Ok(s), _ => Err(format!("{}: erwartet STRING", fn_)) }
+            crate::argument::a_text(a, i, fn_)
         }
         let r = match name {
             "scene_push" => { self.scene_stack.push((sa(a, 0, "SCENE_PUSH")?.to_string(), HashMap::new())); Value::Nil }

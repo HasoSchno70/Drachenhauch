@@ -348,7 +348,7 @@ CATCH e
     PRINT e
 END TRY
 --- erwartet
-CHART_COUNT erwartet CHART
+CHART_COUNT: erwartet CHART
 
 === reihe ausserhalb meldet klartext
 IMPORT "chart"

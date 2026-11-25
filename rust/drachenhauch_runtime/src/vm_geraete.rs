@@ -1226,14 +1226,13 @@ impl<'p> Vm<'p> {
             for (k, x) in v.into_iter().enumerate() { arr.cells.set(k, Value::Int(x)); }
             Value::Array(Rc::new(RefCell::new(arr)))
         }
-        // Wahrheitswert oder 0/1 -- ein Pin ist beides gewohnt.
+        // Wahrheitswert oder 0/1 -- ein Pin ist beides gewohnt. Eine andere
+        // Zahl ist hier ein Fehler: GPIO_WRITE(chip, pin, 5) ist ein Versehen.
         fn an_aus(a: &[Value], i: usize, f: &str) -> R<bool> {
             match a.get(i) {
-                Some(Value::Bool(b)) => Ok(*b),
-                Some(Value::Int(0)) => Ok(false),
-                Some(Value::Int(1)) => Ok(true),
-                Some(v) => Err(format!("{}: erwartet TRUE/FALSE oder 0/1, erhalten {}", f, v.type_name())),
-                None => Err(format!("{}: fehlendes Argument {}", f, i + 1)),
+                Some(Value::Int(n)) if *n != 0 && *n != 1 =>
+                    Err(crate::argument::erwartet(f, "TRUE/FALSE oder 0/1", Some(i + 1), &Value::Int(*n))),
+                _ => crate::argument::a_schalter(a, i, f),
             }
         }
         fn ziel(a: &[Value], i: usize, vorgabe: &str, f: &str) -> R<String> {

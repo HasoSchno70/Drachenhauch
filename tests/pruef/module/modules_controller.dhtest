@@ -358,5 +358,5 @@ TRUE
 IMPORT "controller"
 PRINT CHAR_X("not a controller")
 --- fehler
-CHAR_X erwartet CHAR_CONTROLLER
+CHAR_X: erwartet CHAR_CONTROLLER
 

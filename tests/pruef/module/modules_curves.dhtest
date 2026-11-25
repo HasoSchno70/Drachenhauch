@@ -148,13 +148,13 @@ NEXT
 IMPORT "curves"
 PRINT CURVE_LERP("nope", 1.0, 0.5)
 --- fehler
-CURVE_LERP erwartet Zahl, erhalten STRING
+CURVE_LERP: erwartet Zahl, erhalten STRING
 
 === bezier rejects bool
 IMPORT "curves"
 PRINT CURVE_BEZIER(TRUE, 0.0, 0.0, 0.0, 0.0)
 --- fehler
-CURVE_BEZIER erwartet Zahl, erhalten BOOLEAN
+CURVE_BEZIER: erwartet Zahl, erhalten BOOLEAN
 
 === curves in full program
 IMPORT "curves"

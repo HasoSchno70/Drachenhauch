@@ -1,0 +1,97 @@
+' Argumente der Befehle: EINE Regel je Art und EIN Wortlaut fuer alle
+' Familien (rust/drachenhauch_runtime/src/argument.rs). Bis 2026.53 hatte
+' jede try_*-Familie eigene Helfer -- HTTP_TIMEOUT(10 / 2) war ein Fehler,
+' MID$(s, 4 / 2, 2) nicht; ZEIT_PLUS(t, 1.7) schnitt still ab; SORT(a, 1)
+' war ein Fehler, DIRLIST(p, "", 1) nicht (docs/intern/inkonsistenzen-runtime.md,
+' A1/A2). Die Grafik-Faelle stehen in grafik/schriftstil.dhtest, die der gui
+' in gui/gui_fehlermeldungen.dhtest.
+' Format: docs/werkzeuge.md.
+
+=== eine glatte kommazahl gilt in jeder familie als integer
+' SLEEP gehoert zur Familie mit bi_int (db, net, Geraete, Prozesse) -- dort
+' war bis 2026.53 auch 2.0 ein Fehler.
+SLEEP(10 / 5)
+PRINT "SLEEP(10 / 5) ging"
+PRINT MID$("abcdef", 4 / 2, 2)
+TRY
+    SLEEP(1.5)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+SLEEP(10 / 5) ging
+cd
+SLEEP: erwartet INTEGER (Arg 1), erhalten FLOAT 1.5 -- keine ganze Zahl; INT(x) schneidet ab, ROUND(x) rundet, \ teilt ganzzahlig
+
+=== eine zeitangabe mit nachkommastellen ist ein fehler
+' ZEIT_PLUS(t, 1.7) zaehlte bis 2026.53 still eine Sekunde.
+IMPORT "zeit"
+DIM t AS INTEGER = ZEIT_AUS_TEILEN(2026, 1, 1)
+PRINT ZEIT_PLUS(t, 3 / 1) - t
+TRY
+    PRINT ZEIT_PLUS(t, 1.7) - t
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+3
+ZEIT_PLUS: erwartet INTEGER (Arg 2), erhalten FLOAT 1.7 -- keine ganze Zahl; INT(x) schneidet ab, ROUND(x) rundet, \ teilt ganzzahlig
+
+=== ein schalter nimmt boolean und zahl
+' SORT(a, absteigend): bisher nur TRUE/FALSE, eine Zahl war ein Fehler.
+DIM a AS ARRAY OF INTEGER = [3, 1, 2]
+SORT(a, 1)
+PRINT a[0]; a[1]; a[2]
+SORT(a, 0)
+PRINT a[0]; a[1]; a[2]
+--- erwartet
+321
+123
+
+=== astar diagonale mit 1
+' ASTAR_SET_DIAGONAL(g, 1) schaltete die Diagonalen bis 2026.53 still AUS.
+IMPORT "astar"
+DIM g AS ASTAR_GRID = ASTAR_NEW(5, 5)
+ASTAR_SET_DIAGONAL(g, 1)
+PRINT ASTAR_FIND(g, 0, 0, 4, 4); " "; ASTAR_PATH_LEN(g)
+ASTAR_SET_DIAGONAL(g, 0)
+PRINT ASTAR_FIND(g, 0, 0, 4, 4); " "; ASTAR_PATH_LEN(g)
+--- erwartet
+TRUE 5
+TRUE 9
+
+=== ein wert, der gespeichert wird, bleibt boolean
+' JSON_SET_BOOL & Co. speichern einen Wahrheitswert -- keine Option.
+IMPORT "json"
+DIM j AS JSON_HANDLE = JSON_PARSE("{}")
+TRY
+    JSON_SET_BOOL(j, "a", 1)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+JSON_SET_BOOL: erwartet BOOLEAN, erhalten INTEGER
+
+=== ein wort ist kein schalter
+DIM a AS ARRAY OF INTEGER = [3, 1, 2]
+TRY
+    SORT(a, "ja")
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+SORT: 2. Argument muss BOOLEAN (absteigend) oder FUNCREF (Comparator) sein
+
+=== die meldung hat den doppelpunkt und darum den aufruf
+' "UPPER$ erwartet STRING" (ohne Doppelpunkt) bekam von mit_signatur keine
+' Aufrufform -- gerade die haeufigsten Typfehler blieben ohne Hilfe.
+PRINT UPPER$(5)
+--- fehler
+UPPER$: erwartet STRING, erhalten INTEGER -- Aufruf: UPPER$(
+
+=== dieselbe form auf englisch
+PRINT UPPER$(5)
+--- umgebung
+DHRT_LANG=en
+--- fehler
+UPPER$: expected STRING, got INTEGER -- usage: UPPER$(
