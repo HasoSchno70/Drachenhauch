@@ -42,7 +42,11 @@ const MELDUNG = /^(?:Laufzeitfehler in )?([\w.-]+\.dh):\d+: /;
 // macOS/Linux heisst dieselbe Zeile demo_dist/demo. Verglichen wird ohne
 // diesen Unterschied.
 const norm = (z) => z.replace(/\\/g, "/").replace(/\.exe\b/g, "");
-const KEIN_FENSTER = /Kein Fenster moeglich/;
+// Ohne Bildschirm sagt SCREEN "Kein Fenster moeglich"; ein Bau ganz ohne
+// Grafik oder Ton (die CI auf macOS/Linux) kennt den Befehl gar nicht und
+// sagt "... noch nicht verfuegbar" bzw. "ist ohne das Feature ... gebaut"
+// (vm_helfer::fehlt_im_bau). Beides heisst: hier nicht pruefbar.
+const KEIN_FENSTER = /Kein Fenster moeglich|noch nicht verfuegbar|ist ohne das Feature|in diesem dhrt-Build fehlt/;
 
 // Die Bloecke in Buchreihenfolge, je mit dem Block davor.
 const bloecke = [];

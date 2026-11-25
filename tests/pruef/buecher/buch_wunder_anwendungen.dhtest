@@ -339,11 +339,13 @@ fehlt 2
 ' Zeile. Was ein Programm ausgibt, bleibt; eine Dateiliste mit
 ' { uebersetzen: true } schickt ihre Beschreibungen durch den Katalog; eine
 ' Tabellenzelle mit roh: true (Anhang D) geht nicht durch den Katalog.
+' Eigener Dateiname: die Faelle einer Sammlung laufen nebeneinander, und
+' mit dem Namen des Falls davor loeschten sie sich gegenseitig die Datei.
 IMPORT "helfer.dh"
 CHDIR(ARG$(0) + "/buecher/referenz/buch")
-WRITEALL("_i18n_probe.js", READALL(ARG$(1)))
-nlWarten(PROCESS_START("node", "_i18n_probe.js"), 60000)
-DELETEFILE("_i18n_probe.js")
+WRITEALL("_i18n_probe_ausgaben.js", READALL(ARG$(1)))
+nlWarten(PROCESS_START("node", "_i18n_probe_ausgaben.js"), 60000)
+DELETEFILE("_i18n_probe_ausgaben.js")
 PRINT nlAus;
 IF nlCode <> 0 THEN PRINT nlErr
 --- argumente
@@ -389,8 +391,11 @@ IF NOT nodeDa() THEN
 END IF
 CHDIR(ARG$(0) + "/buecher/wunder/buch")
 nlWarten(PROCESS_START("node", "ausgaben.js", "en", "--pruefen", "--dhrt", EXEPATH$()), 600000)
-PRINT "rueckgabe "; nlCode; " "; (zahlVor(nlAus, "Programme") >= 5)
-IF nlCode <> 0 THEN PRINT nlAus; nlErr
+' Im Fehlerfall stehen die Befunde in DIESER Zeile -- die CI zeigt nur die
+' erste abweichende Zeile eines Falls.
+PRINT "rueckgabe "; nlCode; " "; (zahlVor(nlAus, "Programme") >= 5);
+IF nlCode <> 0 THEN PRINT " "; REPLACE$(REPLACE$(nlAus + nlErr, CHR$(13), ""), CHR$(10), " | ");
+PRINT
 --- argumente
 {sammlung}/../../..
 --- datei helfer.dh
