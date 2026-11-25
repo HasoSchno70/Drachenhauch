@@ -194,11 +194,12 @@ dhrt run tools/buch_bauen.dh -- buecher/referenz [--lang en]   # Zwei-Pass-Build
 
 ### Weitere Bücher
 
-Fünf weitere Bücher, jedes aus Programmen gebaut, die laufen:
+Fünf weitere Bücher, jedes aus Programmen gebaut, die laufen; *Kleine Wunder*
+gibt es auch auf Englisch als *Little Wonders*:
 
 | Buch | Was entsteht | Herunterladen |
 |---|---|---|
-| **[Kleine Wunder](buecher/wunder/README.md)** | Die Sprache an Programmen, die man gern ansieht — Sternenflug, Feuerwerk, Fraktale, ein Schwarm, ein Theremin, ein Flug über eine Landschaft —, jedes mit dem Grund für seine Entscheidungen | [.docx](buecher/wunder/buch/Drachenhauch-Wunder.docx?raw=1) · [.epub](buecher/wunder/buch/Drachenhauch-Wunder.epub?raw=1) |
+| **[Kleine Wunder](buecher/wunder/README.md)** | Die Sprache an Programmen, die man gern ansieht — Sternenflug, Feuerwerk, Fraktale, ein Schwarm, ein Theremin, ein Flug über eine Landschaft —, jedes mit dem Grund für seine Entscheidungen | Deutsch: [.docx](buecher/wunder/buch/Drachenhauch-Wunder.docx?raw=1) · [.epub](buecher/wunder/buch/Drachenhauch-Wunder.epub?raw=1)<br>Englisch: [.docx](buecher/wunder/buch/Drachenhauch-Wonders.docx?raw=1) · [.epub](buecher/wunder/buch/Drachenhauch-Wonders.epub?raw=1) |
 | **[Fenster, Formulare, Daten](buecher/anwendungen/README.md)** | Eine Mediathek mit Formularen, Tabellen, Datenbank, Berichten, Diagrammen, zwei Sprachen und Installer — erst von Hand, dann im Drachenhauch Studio | [.docx](buecher/anwendungen/buch/Drachenhauch-Anwendungen.docx?raw=1) · [.epub](buecher/anwendungen/buch/Drachenhauch-Anwendungen.epub?raw=1) |
 | **[Der Einstieg](buecher/einstieg/README.md)** | Programmieren von null an, für Menschen, die noch nie eine Zeile geschrieben haben — der sanfteste Einstieg | [.docx](buecher/einstieg/buch/Drachenhauch-Einstieg.docx?raw=1) · [.epub](buecher/einstieg/buch/Drachenhauch-Einstieg.epub?raw=1) |
 | **[Arcade-Shooter](buecher/galaga/README.md)** | Ein Weltraum-Shooter mit Angriffswellen, die Sprites zeichnest du selbst im Pixel-Editor | [.docx](buecher/galaga/buch/Drachenhauch-Buch.docx?raw=1) |

@@ -203,13 +203,14 @@ dhrt run tools/buch_bauen.dh -- buecher/referenz [--lang en]   # two-pass build 
 
 One thing stays German on purpose: the run-time error messages quoted in Appendix D, because that is how `dhrt` prints them on a German system. On any other system, or with `DHRT_LANG=en`, the runtime prints its messages in English.
 
-### More books (German)
+### More books
 
-Five more books, each built from programs you can run:
+Five more books, each built from programs you can run -- in German, and
+*Kleine Wunder* also in English as *Little Wonders*:
 
 | Book | What you build | Download |
 |---|---|---|
-| **[Kleine Wunder](buecher/wunder/README.md)** | The language learned on programs worth watching — a starfield, fireworks, fractals, a flock, a theremin, a flight over a landscape — each with the reason behind its decisions | [.docx](buecher/wunder/buch/Drachenhauch-Wunder.docx?raw=1) · [.epub](buecher/wunder/buch/Drachenhauch-Wunder.epub?raw=1) |
+| **[Kleine Wunder](buecher/wunder/README.md)** | The language learned on programs worth watching — a starfield, fireworks, fractals, a flock, a theremin, a flight over a landscape — each with the reason behind its decisions | German: [.docx](buecher/wunder/buch/Drachenhauch-Wunder.docx?raw=1) · [.epub](buecher/wunder/buch/Drachenhauch-Wunder.epub?raw=1)<br>English: [.docx](buecher/wunder/buch/Drachenhauch-Wonders.docx?raw=1) · [.epub](buecher/wunder/buch/Drachenhauch-Wonders.epub?raw=1) |
 | **[Fenster, Formulare, Daten](buecher/anwendungen/README.md)** | A media library with forms, tables, database, reports, charts, two languages and an installer — first by hand, then in Drachenhauch Studio | [.docx](buecher/anwendungen/buch/Drachenhauch-Anwendungen.docx?raw=1) · [.epub](buecher/anwendungen/buch/Drachenhauch-Anwendungen.epub?raw=1) |
 | **[Der Einstieg](buecher/einstieg/README.md)** | Programming from zero, for people who have never written a line of code — the gentlest way in | [.docx](buecher/einstieg/buch/Drachenhauch-Einstieg.docx?raw=1) · [.epub](buecher/einstieg/buch/Drachenhauch-Einstieg.epub?raw=1) |
 | **[Arcade-Shooter](buecher/galaga/README.md)** | A space shooter with attack waves, with sprites you draw yourself in the pixel editor | [.docx](buecher/galaga/buch/Drachenhauch-Buch.docx?raw=1) |
