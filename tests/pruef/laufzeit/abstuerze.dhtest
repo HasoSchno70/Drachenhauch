@@ -86,3 +86,63 @@ RANGE klein ging
 PRINT ROUND(1.5, 65536); " "; ROUND(-0.125, 9223372036854775807); " "; ROUND(2.675, 2)
 --- erwartet
 1.5 -0.125 2.67
+
+=== imgfx stuerzt im c-code von raylib nicht ab
+' Bis 2026.53 Speicherzugriffsfehler (0xC0000005) oder Division durch null
+' (0xC0000094) in raylib, an TRY vorbei: IMAGE_DRAW_TEXT mit Groesse 0/1 oder
+' riesig, IMAGE_RESIZE_CANVAS mit einem Versatz neben die neue Flaeche,
+' IMAGE_SCALE ohne Grenze, IMAGE_BLUR mit riesigem Radius. IMAGE_NEW steht
+' ausserhalb von TRY: im Bau ohne Grafik faellt der Fall dort und gilt als
+' uebersprungen.
+IMPORT "imgfx"
+DIM b AS INTEGER : b = IMAGE_NEW(4, 4, RGB(10, 20, 30))
+SUB probe(was AS STRING, f AS FUNCREF)
+    TRY
+        f()
+        PRINT was; " ging"
+    CATCH e
+        PRINT e
+    END TRY
+END SUB
+probe("text 0", FUNCTION() IMAGE_DRAW_TEXT(b, 1, 1, "a", 0, 0))
+probe("text 1", FUNCTION() IMAGE_DRAW_TEXT(b, 1, 1, "a", 1, 0))
+probe("text riesig", FUNCTION() IMAGE_DRAW_TEXT(b, 1, 1, "a", 999999, 0))
+probe("bild aus text riesig", FUNCTION() IMAGE_TEXT("ab", 999999, 0))
+probe("skalieren", FUNCTION() IMAGE_SCALE(b, 50000, 50000))
+probe("skalieren nn", FUNCTION() IMAGE_SCALE_NN(b, 999999, 999999))
+probe("leinwand riesig", FUNCTION() IMAGE_RESIZE_CANVAS(b, 999999, 999999, 0, 0))
+probe("weich", FUNCTION() IMAGE_BLUR(b, 20000))
+' Ein frisches Bild -- IMAGE_DRAW_TEXT oben hat in b geschrieben.
+b = IMAGE_NEW(4, 4, RGB(10, 20, 30))
+' Ein Versatz neben die neue Flaeche: nur Fuellfarbe.
+DIM c AS INTEGER
+c = IMAGE_RESIZE_CANVAS(b, 8, 8, 100, 0, RGB(200, 0, 0))
+PRINT "rechts daneben "; HEX$((IMAGE_GET_PIXEL(c, 0, 0) BAND &HFFFFFF)); " "; IMAGE_WIDTH(c)
+c = IMAGE_RESIZE_CANVAS(b, 2, 3, 2, 0, RGB(200, 0, 0))
+PRINT "knapp daneben "; HEX$((IMAGE_GET_PIXEL(c, 1, 2) BAND &HFFFFFF))
+c = IMAGE_RESIZE_CANVAS(b, 8, 8, -5, 0, RGB(200, 0, 0))
+PRINT "links daneben "; HEX$((IMAGE_GET_PIXEL(c, 0, 0) BAND &HFFFFFF))
+' Was vorher ging, geht wie vorher.
+c = IMAGE_RESIZE_CANVAS(b, 8, 8, 2, 2, RGB(200, 0, 0))
+PRINT "mitten drin "; HEX$((IMAGE_GET_PIXEL(c, 0, 0) BAND &HFFFFFF)); " "; HEX$((IMAGE_GET_PIXEL(c, 3, 3) BAND &HFFFFFF))
+c = IMAGE_BLUR(b, 3)
+PRINT "weich klein "; HEX$((IMAGE_GET_PIXEL(c, 1, 1) BAND &HFFFFFF))
+' Ein Radius ueber der Kante las bis 2026.53 hinter das Bild (Zufallswerte):
+' jetzt wie der groesste, der passt.
+c = IMAGE_BLUR(b, 5)
+PRINT "weich gross "; HEX$((IMAGE_GET_PIXEL(c, 1, 1) BAND &HFFFFFF))
+--- erwartet
+text 0 ging
+text 1 ging
+IMAGE_DRAW_TEXT: Breite*Hoehe ueberschreitet das Limit von 64000000 Pixeln (erhalten 999999x999999)
+IMAGE_TEXT: Breite*Hoehe ueberschreitet das Limit von 64000000 Pixeln (erhalten 1999998x999999)
+IMAGE_SCALE: Breite*Hoehe ueberschreitet das Limit von 64000000 Pixeln (erhalten 50000x50000)
+IMAGE_SCALE_NN: Breite*Hoehe ueberschreitet das Limit von 64000000 Pixeln (erhalten 999999x999999)
+IMAGE_RESIZE_CANVAS: Breite*Hoehe ueberschreitet das Limit von 64000000 Pixeln (erhalten 999999x999999)
+weich ging
+rechts daneben C80000 8
+knapp daneben C80000
+links daneben C80000
+mitten drin C80000 A141E
+weich klein A141E
+weich gross A141E

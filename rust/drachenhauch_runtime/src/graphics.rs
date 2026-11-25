@@ -4968,6 +4968,17 @@ impl Graphics {
     /// abbricht statt einen fangbaren Fehler zu liefern.
     const MAX_GENTEX_CELLS: i64 = 64_000_000; // z.B. 8000x8000
 
+    /// Ein Text als Bild ist hoechstens so breit wie Zeichen x Groesse und so
+    /// hoch wie Zeilen x Groesse -- das darf die Grenze von IMAGE_NEW nicht
+    /// sprengen.
+    fn text_flaeche_pruefen(fn_: &str, text: &str, size: i32) -> Result<(), String> {
+        let zeilen = text.split('\n').count() as i64;
+        let breit = text.split('\n').map(|z| z.chars().count()).max().unwrap_or(0) as i64;
+        let s = size.max(1) as i64;
+        let eng = |v: i64| v.clamp(1, i32::MAX as i64) as i32;
+        Self::check_gentex_dims(fn_, eng(breit * s), eng(zeilen * s)).map(|_| ())
+    }
+
     fn check_gentex_dims(fn_: &str, w: i32, h: i32) -> Result<(i32, i32), String> {
         let w = w.max(1);
         let h = h.max(1);
@@ -5882,6 +5893,9 @@ impl Graphics {
     // --- imgfx (immutable: liefern neues IMAGE-Handle) ---
     pub fn image_scale(&mut self, idx: i64, w: i32, h: i32) -> Result<i64, String> {
         if w <= 0 || h <= 0 { return Err("IMAGE_SCALE: w und h muessen > 0 sein".into()); }
+        // Dieselbe Grenze wie IMAGE_NEW: IMAGE_SCALE(b, 50000, 50000) war ein
+        // Speicherzugriffsfehler in raylib (0xC0000005).
+        Self::check_gentex_dims("IMAGE_SCALE", w, h)?;
         let mut img = self.src_image(idx, "IMAGE_SCALE")?;
         img.resize(w, h);
         self.push_tex_from_image(img)
@@ -5892,6 +5906,7 @@ impl Graphics {
     /// diesen Zahlen. Ohne Filter bleibt es bei raylibs Glaetten.
     pub fn image_scale_filter(&mut self, idx: i64, w: i32, h: i32, filter: crate::resample::Filter) -> Result<i64, String> {
         if w <= 0 || h <= 0 { return Err("IMAGE_SCALE: w und h muessen > 0 sein".into()); }
+        Self::check_gentex_dims("IMAGE_SCALE", w, h)?;
         let (px, b, hh) = self.image_rgba(idx, "IMAGE_SCALE")?;
         let neu = crate::resample::skalieren(&px, b as usize, hh as usize, w as usize, h as usize, filter);
         self.bild_aus_rgba(&neu, w, h, "IMAGE_SCALE")
@@ -5917,6 +5932,7 @@ impl Graphics {
     /// matschig statt gross. Diese Variante behaelt die Bloecke.
     pub fn image_scale_nn(&mut self, idx: i64, w: i32, h: i32) -> Result<i64, String> {
         if w <= 0 || h <= 0 { return Err("IMAGE_SCALE_NN: w und h muessen > 0 sein".into()); }
+        Self::check_gentex_dims("IMAGE_SCALE_NN", w, h)?;
         let mut img = self.src_image(idx, "IMAGE_SCALE_NN")?;
         img.resize_nn(w, h);
         self.push_tex_from_image(img)
@@ -5971,13 +5987,32 @@ impl Graphics {
     }
     pub fn image_resize_canvas(&mut self, idx: i64, w: i32, h: i32, offx: i32, offy: i32, fill: i64) -> Result<i64, String> {
         if w <= 0 || h <= 0 { return Err("IMAGE_RESIZE_CANVAS: w und h muessen > 0 sein".into()); }
+        Self::check_gentex_dims("IMAGE_RESIZE_CANVAS", w, h)?;
         let mut img = self.src_image(idx, "IMAGE_RESIZE_CANVAS")?;
-        img.resize_canvas(w, h, offx, offy, col(fill));
+        // raylibs ImageResizeCanvas rechnet den kopierten Ausschnitt so aus;
+        // liegt das Bild ganz neben der neuen Flaeche, wird er leer oder
+        // negativ, und memcpy bekam eine negative Laenge (0xC0000005 bei
+        // IMAGE_RESIZE_CANVAS(b, 8, 8, 100, 0)). Dann bleibt nur die Fuellfarbe.
+        let ausschnitt = |alt: i32, neu: i32, off: i32| {
+            let mut n = alt;
+            if off < 0 { n += off } else if off + alt > neu { n = neu - off }
+            n.min(neu)
+        };
+        let anders = w != img.width || h != img.height;
+        if anders && (ausschnitt(img.width, w, offx) <= 0 || ausschnitt(img.height, h, offy) <= 0) {
+            img.resize_canvas(w, h, 0, 0, col(fill));
+            img.draw_rectangle(0, 0, w, h, col(fill));
+        } else {
+            img.resize_canvas(w, h, offx, offy, col(fill));
+        }
         self.push_tex_from_image(img)
     }
     pub fn image_blur(&mut self, idx: i64, radius: i32) -> Result<i64, String> {
         let mut img = self.src_image(idx, "IMAGE_BLUR")?;
-        img.blur_gaussian(radius.max(0));
+        // raylib liest bei einem Radius ueber Breite oder Hoehe hinter das
+        // Bild (undefiniert; ab etwa 10000 ein Absturz). Bis dahin ist alles
+        // gleich, darueber gibt es nichts Sinnvolles mehr zu verwischen.
+        img.blur_gaussian(radius.max(0).min(img.width.min(img.height)));
         self.push_tex_from_image(img)
     }
     /// IMAGE_CONVOLVE(bild, kern): freie Faltung mit einem quadratischen Kern
@@ -6154,6 +6189,7 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
             return Err(format!("{}: eine SDF-Schrift (LOADFONT_SDF) laesst sich nicht in ein Bild schreiben -- dort waere ihr Abstandsfeld zu sehen; dieselbe Datei mit LOADFONT laden", fn_));
         }
         if text.is_empty() { return Err(format!("{}: der Text ist leer", fn_)); }
+        Self::text_flaeche_pruefen(fn_, text, size.max(10))?;
         let (f, groesse, abstand) = match self.font_von(font) {
             Some(f) => (*f.as_ref(), size.max(1) as f32, self.text_spacing),
             // Wie raylibs ImageText: die eingebaute Schrift mindestens 10
@@ -6254,8 +6290,13 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     pub fn image_draw_text(&mut self, idx: i64, x: i32, y: i32, text: &str, size: i32, color: i64) -> Result<(), String> {
         let i = idx as usize;
         if !self.tex_ok(idx) { return Err(self.tex_fehler(idx, "IMAGE_DRAW_TEXT")); }
+        // Unter 2 Punkten werden raylibs Glyphen 0 Pixel breit, und es teilt
+        // durch null (0xC0000094 bei Groesse 0 oder 1); riesig wird das
+        // Zwischenbild zu gross (999999: 0xC0000005).
+        let size = size.max(2);
+        Self::text_flaeche_pruefen("IMAGE_DRAW_TEXT", text, size)?;
         let t = &mut self.textures[i];
-        t.img.draw_text(text, x, y, size.max(1), col(color));
+        t.img.draw_text(text, x, y, size, col(color));
         self.reupload_tex(i)
     }
 
