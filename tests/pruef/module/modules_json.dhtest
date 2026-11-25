@@ -146,3 +146,20 @@ PRINT JSON_GET_STRING("nicht ein handle", "x")
 --- fehler
 JSON_GET_STRING: erwartet JSON-Handle (aus JSON_PARSE)
 
+
+=== json load liest eine datei mit bom und waehlbarer kodierung
+' Bis 2026.53 las JSON_LOAD selbst (read_to_string): eine BOM -- Windows-
+' Editoren schreiben sie -- brach mit "expected value at line 1 column 1" ab,
+' Latin-1 mit "stream did not contain valid UTF-8". Jetzt wie INI_LOAD & Co.
+IMPORT "json"
+DIM j AS JSON_HANDLE = JSON_LOAD("bom.json")
+PRINT JSON_GET_INT(j, "a")
+DIM k AS JSON_HANDLE = JSON_LOAD("latin.json", "cp1252")
+PRINT LEN(JSON_GET_STRING(k, "s"))
+--- datei bom.json base64
+77u/eyJhIjogMX0=
+--- datei latin.json base64
+eyJzIjogImNhZukifQ==
+--- erwartet
+1
+4

@@ -1453,7 +1453,7 @@
   "JSON_KEY$": "STRING — field name as a path segment: dot and backslash escaped so that names from JSON_KEYS can be addressed again",
   "JSON_KEYS": "ARRAY OF STRING field names of an object",
   "JSON_LEN": "INTEGER — length of a list or number of fields of an object",
-  "JSON_LOAD": "JSON_HANDLE — read JSON from a file",
+  "JSON_LOAD": "JSON_HANDLE — read JSON from a file (a BOM does no harm; encoding as with FILE_READ$)",
   "JSON_NEW_ARRAY": "empty [] → JSON_HANDLE",
   "JSON_NEW_OBJECT": "empty {} → JSON_HANDLE",
   "JSON_PARSE": "JSON_HANDLE — read JSON from a string",

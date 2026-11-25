@@ -11,7 +11,7 @@ IMPORT "json"
 | Funktion | Rückgabe | Bedeutung |
 |---|---|---|
 | `JSON_PARSE(s$)` | JSON_HANDLE | JSON aus einem Text einlesen |
-| `JSON_LOAD(path$)` | JSON_HANDLE | JSON aus einer Datei einlesen |
+| `JSON_LOAD(path$[, encoding$])` | JSON_HANDLE | JSON aus einer Datei einlesen (eine BOM stört nicht; Kodierung wie bei `FILE_READ$`) |
 | `JSON_STRINGIFY(h)` | STRING (kompakt) | zurueck in Text -- ohne Umbrueche, zum Speichern oder Senden |
 | `JSON_PRETTY(h)` | STRING (eingerückt) | zurueck in Text -- eingerueckt, zum Lesen |
 | `JSON_GET_STRING(h, path$)` | STRING | Wert am Pfad als Text lesen (`"nutzer.name"`, `"posten.0"`) |

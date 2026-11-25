@@ -4629,9 +4629,14 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             Ok(json_wert(v))
         }
         "json_load" => {
-            arity!(1);
+            // Lesen wie READALL$/INI_LOAD/XML_LOAD/CSV_LOAD (text_lesen): eine
+            // BOM faellt weg, die Kodierung ist waehlbar, die Meldung nennt
+            // den Pfad. Bis 2026.53 las JSON_LOAD selbst und scheiterte an
+            // einer Datei mit BOM ("expected value at line 1 column 1").
+            arity!(1, 2);
             let path = need_str(&a[0], "JSON_LOAD")?;
-            let text = std::fs::read_to_string(resolve_asset_path(path)).map_err(|e| format!("JSON_LOAD: {}", e))?;
+            let kod = match a.get(1) { Some(v) => Some(need_str(v, "JSON_LOAD")?), None => None };
+            let text = text_lesen(path, kod, "JSON_LOAD")?;
             let v: serde_json::Value = serde_json::from_str(&text).map_err(|e| format!("JSON_LOAD: {}: {}", path, e))?;
             Ok(json_wert(v))
         }

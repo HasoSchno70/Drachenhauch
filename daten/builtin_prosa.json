@@ -1454,7 +1454,7 @@
   "JSON_KEY$": "STRING — Feldname als Pfad-Segment: Punkt und Rückstrich maskiert, damit JSON_KEYS-Namen wieder adressierbar sind",
   "JSON_KEYS": "ARRAY OF STRING Feldnamen eines Objekts",
   "JSON_LEN": "INTEGER — Laenge einer Liste bzw. Zahl der Felder eines Objekts",
-  "JSON_LOAD": "JSON_HANDLE — JSON aus einer Datei einlesen",
+  "JSON_LOAD": "JSON_HANDLE — JSON aus einer Datei einlesen (eine BOM stört nicht; Kodierung wie bei FILE_READ$)",
   "JSON_NEW_ARRAY": "leeres [] → JSON_HANDLE",
   "JSON_NEW_OBJECT": "leeres {} → JSON_HANDLE",
   "JSON_PARSE": "JSON_HANDLE — JSON aus einem Text einlesen",
