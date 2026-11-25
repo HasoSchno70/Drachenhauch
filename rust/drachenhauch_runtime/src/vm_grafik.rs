@@ -957,7 +957,12 @@ impl<'p> Vm<'p> {
             // Nebel, Himmel, Schatten, Kamera, Schrift und Post-Effekt sind
             // global -- ohne das muss jede Szene beim Verlassen von Hand
             // aufraeumen, und eine vergessene Zeile faellt erst spaeter auf.
-            "gfx_push" => { g!().gfx_push(); Value::Nil }
+            "gfx_push" => {
+                if !g!().gfx_push() {
+                    return Err("GFX_PUSH: mehr als 64 Ebenen -- fehlt ein GFX_POP?".into());
+                }
+                Value::Nil
+            }
             "gfx_pop" => {
                 if !g!().gfx_pop() {
                     return Err("GFX_POP: der Stapel ist leer -- zu jedem GFX_POP gehoert ein GFX_PUSH".into());
@@ -988,7 +993,12 @@ impl<'p> Vm<'p> {
             "scissor_depth" => Value::Int(g!().clip_depth()),
             // Dasselbe fuer die Audio-Busse: Effekte, die eine Szene anhaengt,
             // sollen den Rest des Programms nicht mitnehmen.
-            "audio_push" => { self.audio_mut()?.audio_push(); Value::Nil }
+            "audio_push" => {
+                if !self.audio_mut()?.audio_push() {
+                    return Err("AUDIO_PUSH: mehr als 64 Ebenen -- fehlt ein AUDIO_POP?".into());
+                }
+                Value::Nil
+            }
             "audio_pop" => {
                 if !self.audio_mut()?.audio_pop()? {
                     return Err("AUDIO_POP: der Stapel ist leer -- zu jedem AUDIO_POP gehoert ein AUDIO_PUSH".into());

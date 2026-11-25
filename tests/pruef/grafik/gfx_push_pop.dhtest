@@ -443,3 +443,26 @@ DIM ohne AS FLOAT : ohne = streuung()
 PRINT "modulation abgeloest "; ohne < mitLfo * 0.5
 --- erwartet
 modulation abgeloest TRUE
+
+=== mehr als 64 ebenen melden sich beim push
+' Bis 2026.53 verschluckten GFX_PUSH und AUDIO_PUSH ab 64 Ebenen still -- der
+' Fehler (ein vergessenes POP in einer Schleife) fiel erst viel spaeter bei
+' einem POP auf, das den Stapel leer fand.
+IMPORT "audio"
+SCREEN(64, 64, "p", 1)
+DIM i AS INTEGER
+TRY
+    FOR i = 1 TO 70 : GFX_PUSH() : NEXT
+CATCH e
+    PRINT i; " "; e
+END TRY
+TRY
+    FOR i = 1 TO 70 : AUDIO_PUSH() : NEXT
+CATCH e
+    PRINT i; " "; e
+END TRY
+PRINT AUDIO_DEPTH()
+--- erwartet
+65 GFX_PUSH: mehr als 64 Ebenen -- fehlt ein GFX_POP?
+65 AUDIO_PUSH: mehr als 64 Ebenen -- fehlt ein AUDIO_POP?
+64

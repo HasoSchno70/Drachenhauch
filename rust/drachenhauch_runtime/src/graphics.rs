@@ -7795,10 +7795,11 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     // --- GFX_PUSH / GFX_POP ------------------------------------------------
     /// Zeichenzustand auf den Stapel legen. Was genau dazugehoert, steht bei
     /// `GfxState`.
-    pub fn gfx_push(&mut self) {
-        // Obergrenze, damit eine PUSH-Schleife ohne POP nicht den Speicher
-        // auffrisst -- ein Programmierfehler soll auffallen, nicht wachsen.
-        if self.gfx_stack.len() >= 64 { return; }
+    /// `false` ab 64 Ebenen: eine PUSH-Schleife ohne POP soll auffallen statt
+    /// den Speicher aufzufressen -- der Befehl meldet es (bis 2026.53 wurde es
+    /// still verschluckt).
+    pub fn gfx_push(&mut self) -> bool {
+        if self.gfx_stack.len() >= 64 { return false; }
         let st = GfxState {
             cam: (self.cam_x, self.cam_y, self.cam_zoom, self.cam_rotation),
             shake: (self.shake_amp, self.shake_dur_ms, self.shake_start, self.shake_x, self.shake_y),
@@ -7821,6 +7822,7 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
             post_massstab: self.post_massstab,
         };
         self.gfx_stack.push(st);
+        true
     }
 
     /// Zustand vom Stapel zurueckholen. Liefert `false`, wenn der Stapel leer
