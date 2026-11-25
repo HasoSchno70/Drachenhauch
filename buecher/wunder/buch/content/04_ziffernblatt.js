@@ -111,11 +111,11 @@ module.exports = (H) => [
   H.h3("Die Teile einer Zeit heißen deutsch"),
 
   H.code(zeilen("kap04/fehler_teil.dh")),
-  H.code(["Laufzeitfehler in fehler_teil.dh:3: ZEIT_TEIL: 'hour' ist kein Feld",
+  H.code(["Laufzeitfehler in fehler_teil.dh:3: TIME_PART: 'hour' ist kein Feld",
           "-- moeglich sind jahr, monat, tag, stunde, minute, sekunde,",
           "wochentag"], { out: true }),
 
-  H.p("Die Befehle des Moduls heißen englisch (TIME_PART), die Namen der Teile aber deutsch: \"stunde\", \"minute\", \"sekunde\". Die Meldung nennt den Befehl bei seinem deutschen Zweitnamen ZEIT_TEIL — es ist derselbe — und zählt alle erlaubten Teile auf."),
+  H.p("Die Befehle des Moduls heißen englisch (TIME_PART), die Namen der Teile aber deutsch: \"stunde\", \"minute\", \"sekunde\". Die Meldung nennt den Befehl so, wie er im Programm steht, und zählt alle erlaubten Teile auf."),
 
   H.h2("Übungen"),
 
