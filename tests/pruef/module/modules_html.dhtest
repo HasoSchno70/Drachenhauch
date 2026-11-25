@@ -607,3 +607,17 @@ PROCESS_KILL(VAL(srv[1]))
 {sammlung}/../_hilfen/gegenserver.dh
 --- enthaelt
 fehler: HTTP 404
+
+=== find all nimmt ein kleiner-zeichen im text als text
+' Der Fix aus 2026.27 (ein `<` ohne Buchstaben dahinter ist Text) stand nur in
+' HTML_TEXT; HTML_FIND_ALL las `< b</p><p>` als ein Tag und fand nichts.
+IMPORT "html"
+DIM a AS ARRAY OF STRING
+a = HTML_FIND_ALL("<p>a < b</p><p>zwei</p>", "p")
+PRINT LEN(a)
+PRINT a[0]
+PRINT a[1]
+--- erwartet
+2
+a < b
+zwei

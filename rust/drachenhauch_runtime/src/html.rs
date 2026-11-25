@@ -402,7 +402,10 @@ pub fn html_find_all(s: &str, target: &str) -> Vec<String> {
     let mut depth = 0i32;
     let mut i = 0;
     while i < chars.len() {
-        if chars[i] == '<' {
+        // Wie in HTML_TEXT ist `<` nur dann ein Tag, wenn ein Buchstabe & Co.
+        // folgt -- bis 2026.53 fehlte das hier: `<p>a < b</p><p>zwei</p>`
+        // lieferte 0 statt 2 Treffer.
+        if chars[i] == '<' && tag_beginnt(&chars, i) {
             if let Some(end) = comment_end(&chars, i) {
                 if depth > 0 {
                     buf.extend(chars[i..end].iter());
