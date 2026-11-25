@@ -7177,17 +7177,6 @@ fn cmp_value(x: &Value, y: &Value) -> std::cmp::Ordering {
     }
 }
 
-/// Liste der Grafik-Builtin-Namen (nur fuer bessere Fehlermeldungen).
-pub fn is_graphics_builtin(name: &str) -> bool {
-    matches!(name,
-        "screen" | "cls" | "flip" | "text" | "text_bold" | "text_size" | "circle"
-        | "box" | "line" | "plot" | "rect" | "drawimage" | "loadimage" | "loadsound"
-        | "playsound" | "keypressed" | "keydown" | "mousex" | "mousey" | "mousebutton"
-        | "quitrequested" | "sleep" | "imagewidth" | "imageheight"
-        | "color" | "fill"
-    )
-}
-
 #[cfg(test)]
 mod zahl_text_tests {
     use super::zahl_text;

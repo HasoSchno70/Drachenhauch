@@ -291,13 +291,9 @@ impl<'p> Vm<'p> {
         if !name.starts_with("smtp_") { return Ok(None); }
         #[cfg(feature = "smtp")]
         { return self.try_smtp_impl(name, a); }
+        // Ohne das Feature: kein Befehl antwortet, unknown_builtin_msg sagt es.
         #[allow(unreachable_code)]
-        {
-            let _ = a;
-            Err(format!("{}: diese Fassung von dhrt ist ohne das Feature `smtp` \
-                         gebaut (verschluesselte Verbindungen fehlen dann)",
-                        name.to_uppercase()))
-        }
+        { let _ = a; Ok(None) }
     }
 
     #[cfg(feature = "smtp")]
@@ -580,12 +576,9 @@ impl<'p> Vm<'p> {
         if !name.starts_with("pdf_") { return Ok(None); }
         #[cfg(feature = "pdf")]
         { return self.try_pdf_impl(name, a); }
+        // Ohne das Feature: kein Befehl antwortet, unknown_builtin_msg sagt es.
         #[allow(unreachable_code)]
-        {
-            let _ = a;
-            Err(format!("{}: diese Fassung von dhrt ist ohne das Feature `pdf` gebaut",
-                        name.to_uppercase()))
-        }
+        { let _ = a; Ok(None) }
     }
 
     #[cfg(feature = "pdf")]
@@ -758,7 +751,7 @@ impl<'p> Vm<'p> {
                     Value::Nil
                 }
                 #[cfg(not(feature = "graphics"))]
-                { let _ = (i, bild, x, y, b, h); return Err("PDF_IMAGE: dieser Bau hat keine Grafik".into()); }
+                { let _ = (i, bild, x, y, b, h); return Err(crate::bau::fehlt_meldung("pdf_image", "graphics")); }
             }
             "pdf_save" => {
                 let i = bi_int(a, 0, "PDF_SAVE")?;
@@ -809,7 +802,7 @@ impl<'p> Vm<'p> {
                     Value::Int(g.pdf_vorschau(&ops, b_mm, h_mm, breite, &schriften)?)
                 }
                 #[cfg(not(feature = "graphics"))]
-                { let _ = (ops, b_mm, h_mm, breite, schriften); return Err("PDF_PREVIEW: dieser Bau hat keine Grafik".into()); }
+                { let _ = (ops, b_mm, h_mm, breite, schriften); return Err(crate::bau::fehlt_meldung("pdf_preview", "graphics")); }
             }
             "pdf_close" => {
                 let i = bi_int(a, 0, "PDF_CLOSE")? as usize;
@@ -834,9 +827,11 @@ impl<'p> Vm<'p> {
         if !name.starts_with("httpd_") { return Ok(None); }
         #[cfg(feature = "net")]
         { return self.try_httpd_impl(name, a); }
+        // Ohne das Feature: kein Befehl antwortet, unknown_builtin_msg sagt es.
+        // (Bis 2026.53 ein eigener Satz, den `dhrt --fehlende` nicht kannte --
+        // der schlanke Export gab ein httpd-Programm in die Mini-Laufzeit.)
         #[allow(unreachable_code)]
-        { let _ = (name, a);
-          Err("httpd: dieser dhrt-Build hat das Netz-Feature nicht (neu bauen mit python rust/build_runtime.py)".to_string()) }
+        { let _ = (name, a); Ok(None) }
     }
 
     #[cfg(feature = "net")]

@@ -44,9 +44,10 @@ const MELDUNG = /^(?:Laufzeitfehler in )?([\w.-]+\.dh):\d+: /;
 const norm = (z) => z.replace(/\\/g, "/").replace(/\.exe\b/g, "");
 // Ohne Bildschirm sagt SCREEN "Kein Fenster moeglich"; ein Bau ganz ohne
 // Grafik oder Ton (die CI auf macOS/Linux) kennt den Befehl gar nicht und
-// sagt "... noch nicht verfuegbar" bzw. "ist ohne das Feature ... gebaut"
-// (vm_helfer::fehlt_im_bau). Beides heisst: hier nicht pruefbar.
-const KEIN_FENSTER = /Kein Fenster moeglich|noch nicht verfuegbar|ist ohne das Feature|in diesem dhrt-Build fehlt/;
+// sagt "NAME: gibt es in dieser Laufzeit nicht (ohne grafik gebaut)" (bis
+// 2026.53 "... noch nicht verfuegbar" u. a.; bau::fehlt_im_bau). Beides
+// heisst: hier nicht pruefbar.
+const KEIN_FENSTER = /Kein Fenster moeglich|gibt es in dieser Laufzeit nicht|noch nicht verfuegbar|ist ohne das Feature|in diesem dhrt-Build fehlt/;
 
 // Die Bloecke in Buchreihenfolge, je mit dem Block davor.
 const bloecke = [];

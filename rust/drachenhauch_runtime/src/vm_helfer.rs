@@ -164,49 +164,29 @@ pub(crate) fn panik_meldung(name: &str, argc: usize, nutzlast: &(dyn std::any::A
             name.to_uppercase(), text, wo)
 }
 
-/// Sagt diese Meldung "den Befehl hat dieser Bau nicht" (statt "falsche
-/// Argumente")? Fuer `dhrt --fehlende`, das die kleinen Laufzeiten fragt.
-/// Muss jede Form von `unknown_builtin_msg` und der Feature-Huellen treffen.
+/// Sagt diese Meldung "den Befehl hat diese Laufzeit nicht"? (`bau.rs`)
 pub(crate) fn fehlt_im_bau(meldung: &str) -> bool {
-    meldung.contains("noch nicht verfuegbar")
-        || meldung.contains("ist ohne das Feature")
-        || meldung.contains("das in diesem dhrt-Build fehlt")
-        || meldung.starts_with("Unbekannter Befehl")
+    crate::bau::fehlt_im_bau(meldung)
 }
 
+/// Kein Befehl hat geantwortet. Entweder kennt dhrt den Namen nicht, oder
+/// er steckt nicht in dieser Laufzeit -- dann sagt es EINE Meldung, welches
+/// Feature fehlt (`bau.rs`; bis 2026.53 acht verschiedene Saetze).
 pub(super) fn unknown_builtin_msg(name: &str) -> String {
-    // Hardware-/IoT-Module sind hinter Cargo-Features (serial/usb/bt/wifi) und im
-    // Default-Build NICHT enthalten -- der Dispatch faellt dann hierher durch. Das
-    // Builtin EXISTIERT (in dhrt implementiert), es fehlt nur im aktuellen Build.
-    // Klare, handlungsleitende Meldung statt "noch nicht verfuegbar".
-    if name.starts_with("phys2d_") || name.starts_with("phys3d_") {
-        return format!("{}: diese Fassung von dhrt ist ohne das Feature `physik` gebaut",
-                       name.to_uppercase());
-    }
-    let hw_feature = if name.starts_with("serial_") { Some("serial") }
-        else if name.starts_with("usb_") { Some("usb") }
-        else if name.starts_with("bt_") { Some("bt") }
-        else if name.starts_with("wifi_") { Some("wifi") }
-        else { None };
-    if let Some(feat) = hw_feature {
-        return format!(
-            "Builtin '{}' gehoert zum Hardware-Modul '{}', das in diesem dhrt-Build \
-             fehlt. Neu bauen mit: python rust\\build_runtime.py --hardware",
-            name.to_uppercase(), feat);
-    }
-    // Ein Name, den das Befehlsverzeichnis gar nicht kennt, ist kein
-    // "noch nicht verfuegbar" (so klingen nur die Bauten ohne Grafik/Ton, und
-    // daran erkennen die Pruefsammlungen einen Bau ohne Fenster), sondern ein
+    // Ein Name, den das Befehlsverzeichnis gar nicht kennt, ist ein
     // unbekannter Befehl -- oft einer aus einem anderen BASIC.
     if !crate::compiler::is_known_builtin(name) {
         return format!("Unbekannter Befehl '{}' -- dhrt kennt ihn nicht (Tippfehler?){}{}",
                        name.to_uppercase(), crate::umstieg::befehl_hinweis(name),
                        crate::compiler::aehnliche_builtins(name));
     }
-    if builtins::is_graphics_builtin(name) {
-        format!("Grafik-Builtin '{}' im Rust-Kern noch nicht verfuegbar (Schritt 4)", name.to_uppercase())
-    } else {
-        format!("Builtin '{}' im Rust-Kern noch nicht verfuegbar", name.to_uppercase())
+    // Das Modul des Befehls sagt das Feature; Befehle des Kerns ohne Modul
+    // (CIRCLE, SCREEN ...) fehlen nur ohne Grafik oder ohne Dialoge.
+    let feature = crate::bau::befehl_fehlt(name)
+        .or_else(|| ["graphics", "dialogs"].into_iter().find(|f| !crate::bau::da(f)));
+    match feature {
+        Some(f) => crate::bau::fehlt_meldung(name, f),
+        None => format!("{}: gibt es in dieser Laufzeit nicht", name.to_uppercase()),
     }
 }
 

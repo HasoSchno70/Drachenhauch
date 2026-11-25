@@ -878,7 +878,7 @@ FLIP() fehlt
 IMPORT "helfer.dh"
 dlStarten(["run", "ohne.dh"])
 ' Gefragt wird der RUECKGABEWERT, nicht der Meldungstext: ein Bau ohne Grafik
-' sagt "im Rust-Kern noch nicht verfuegbar", eine Maschine ohne Bildschirm
+' sagt "SCREEN: gibt es in dieser Laufzeit nicht", eine Maschine ohne Bildschirm
 ' "Kein Fenster moeglich" -- beide Male ist am Hinweis nichts zu pruefen.
 IF dlCode <> 0 THEN
     PRINT "UEBERSPRINGEN: das Kind konnte nicht zeichnen"

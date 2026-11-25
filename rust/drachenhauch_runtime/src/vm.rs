@@ -105,7 +105,6 @@ const EXIT_REQUEST: &str = "__EXIT__";
 /// Windows (1 MB Vorgabe) crashte der Prozess bereits bei 147.
 const MAX_CALL_DEPTH: u32 = 1000;
 
-use crate::builtins;
 use crate::model::{op, Arg, ClassInfo, Func, Program};
 use crate::value::{as_f64, is_num, value_eq, Cells, CoroState, DhArray, DhMap, Instance, Value};
 

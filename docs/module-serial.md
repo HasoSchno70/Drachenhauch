@@ -15,7 +15,7 @@ IMPORT "serial"
 python rust/build_runtime.py --hardware
 ```
 
-Fehlt das Feature, meldet der erste Aufruf einer `SERIAL_*`-Funktion, dass sie in diesem Build nicht verfuegbar ist.
+Fehlt das Feature, meldet der erste Aufruf einer `SERIAL_*`-Funktion, dass es sie in dieser Laufzeit nicht gibt (`SERIAL_PORTS: gibt es in dieser Laufzeit nicht (ohne seriell gebaut)`).
 Ein Programm, das auch ohne die Schnittstelle auskommt, schreibt
 `IMPORT "serial" OPTIONAL` und fragt vorher `MODULE_AVAILABLE("serial")` --
 dann warnt ein Bau ohne das Feature nicht schon beim Start (siehe

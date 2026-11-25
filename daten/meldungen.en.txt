@@ -214,8 +214,10 @@ Der Ausdruck endet mitten drin -- geht er in der naechsten Zeile weiter, die Zei
 # ---------------------------------------------------------------- IMPORT
 IMPORT: Datei nicht gefunden: {} (gesucht: {})	IMPORT: file not found: {} (searched: {})
 IMPORT: Lesefehler bei {}: {}	IMPORT: error reading {}: {}
-Hardware-Modul '{}' ist in diesem dhrt-Build nicht enthalten -- Funktionsaufrufe schlagen zur Laufzeit fehl. Neu bauen mit: python rust\build_runtime.py --hardware	Hardware module '{}' is not included in this dhrt build -- calls will fail at run time. Rebuild with: python rust\build_runtime.py --hardware
-Hardware-Modul 'midi' ist in diesem dhrt-Build nur zum Teil enthalten -- MIDI-Dateien und MIDI_NOTE_NAME$/MIDI_NOTE_FREQ gehen, Ein- und Ausgaenge nicht. Neu bauen mit: python rust\build_runtime.py --hardware	Hardware module 'midi' is only partly included in this dhrt build -- MIDI files and MIDI_NOTE_NAME$/MIDI_NOTE_FREQ work, inputs and outputs do not. Rebuild with: python rust\build_runtime.py --hardware
+Modul '{}' gibt es in dieser Laufzeit nicht (ohne {} gebaut) -- jeder Aufruf meldet einen Fehler	Module '{}' does not exist in this runtime (built without {}) -- every call reports an error
+Modul 'midi' ist in dieser Laufzeit nur zum Teil enthalten -- MIDI-Dateien und MIDI_NOTE_NAME$/MIDI_NOTE_FREQ gehen, Ein- und Ausgaenge nicht (ohne {} gebaut)	Module 'midi' is only partly contained in this runtime -- MIDI files and MIDI_NOTE_NAME$/MIDI_NOTE_FREQ work, inputs and outputs do not (built without {})
+Modul '{}' gibt es in dieser Laufzeit nicht	Module '{}' does not exist in this runtime
+{}. Neu bauen mit: python rust/build_runtime.py{}	{}. Rebuild with: python rust/build_runtime.py{}
 {} kennt keine Klasse {}.{}	{} has no class {}.{}
 {} kennt keinen Namen {}.{}	{} has no name {}.{}
 {} steht in {}, und diese Datei gehoert nicht zum Namensraum {} -- was eine Datei des Namensraums ohne AS einbindet, bleibt draussen. Dort IMPORT "{}" AS {} schreiben.	{} is in {}, and that file does not belong to the namespace {} -- what a file of the namespace imports without AS stays outside. Write IMPORT "{}" AS {} there.
@@ -503,9 +505,21 @@ die Variable hat noch keinen Wert (Bild/Klang vorher laden, z.B. b = LOADIMAGE("
 Grafik-Builtin vor SCREEN aufgerufen	Graphics builtin called before SCREEN
 UI-Builtin vor SCREEN aufgerufen	UI builtin called before SCREEN
 Unbekannter Befehl '{}' -- dhrt kennt ihn nicht (Tippfehler?){}	Unknown command '{}' -- dhrt does not know it (typo?){}
-Builtin '{}' gehoert zum Hardware-Modul '{}', das in diesem dhrt-Build fehlt. Neu bauen mit: python rust\build_runtime.py --hardware	Builtin '{}' belongs to the hardware module '{}', which is missing in this dhrt build. Rebuild with: python rust\build_runtime.py --hardware
-Grafik-Builtin '{}' im Rust-Kern noch nicht verfuegbar (Schritt 4)	Graphics builtin '{}' is not available in this build
-Builtin '{}' im Rust-Kern noch nicht verfuegbar	Builtin '{}' is not available in this build
+{}: gibt es in dieser Laufzeit nicht (ohne {} gebaut) -- neu bauen mit: python rust/build_runtime.py{}	{}: does not exist in this runtime (built without {}) -- rebuild with: python rust/build_runtime.py{}
+{}: gibt es in dieser Laufzeit nicht (ohne {} gebaut)	{}: does not exist in this runtime (built without {})
+{}: gibt es in dieser Laufzeit nicht	{}: does not exist in this runtime
+{} -- native Dialoge gibt es nur auf dem Desktop, nicht im Browser	{} -- native dialogs exist only on the desktop, not in the browser
+{}: fremde Bibliotheken (DECLARE ... LIB) gibt es in dieser Laufzeit nicht (ohne ffi gebaut)	{}: foreign libraries (DECLARE ... LIB) do not exist in this runtime (built without ffi)
+{}: Zeiger gibt es in dieser Laufzeit nicht (ohne ffi gebaut)	{}: pointers do not exist in this runtime (built without ffi)
+grafik	graphics
+grafik (OpenGL ES)	graphics (OpenGL ES)
+dialoge	dialogs
+datenbank	database
+netz	network
+maschinencode	machine code
+schriften	fonts
+seriell	serial
+wlan	wifi
 {}: diese Fassung von dhrt ist ohne das Feature `{}` gebaut	{}: this version of dhrt is built without the feature `{}`
 ASSERT fehlgeschlagen: {}	ASSERT failed: {}
 Bedingung nicht erfuellt	condition not met
@@ -951,9 +965,6 @@ Action '{}' nicht gebunden	action '{}' is not bound
 {}: Text konnte nicht in die Zwischenablage gelegt werden -- ein anderes Programm haelt sie offen, oder der Text enthaelt ein Nullbyte	{}: the text could not be put into the clipboard -- another program holds it open, or the text contains a null byte
 {} muss die ERSTE Grafik-Anweisung sein (vor LOADIMAGE/SCREEN/... -- Transparenz kann nicht nachtraeglich gesetzt werden)	{} must be the FIRST graphics statement (before LOADIMAGE/SCREEN/... -- transparency cannot be set afterwards)
 {}: braucht ein Fenster (SCREEN) -- die Vorschau ist ein IMAGE	{}: needs a window (SCREEN) -- the preview is an IMAGE
-{}: dieser Bau hat keine Grafik	{}: this build has no graphics
-{}: in diesem Build nicht verfuegbar -- native OS-Dialoge gibt es nur auf dem Desktop (Feature `dialogs`), nicht im Browser.	{}: not available in this build -- native OS dialogs only exist on the desktop (feature `dialogs`), not in the browser.
-{}: diese Fassung von dhrt ist ohne das Feature `smtp` gebaut (verschluesselte Verbindungen fehlen dann)	{}: this version of dhrt is built without the feature `smtp` (encrypted connections are missing then)
 httpd: dieser dhrt-Build hat das Netz-Feature nicht (neu bauen mit python rust/build_runtime.py)	httpd: this dhrt build does not have the network feature (rebuild with python rust/build_runtime.py)
 GUI_FORM_LOAD/SAVE: dieser Bau hat kein db-Modul	GUI_FORM_LOAD/SAVE: this build has no db module
 {}: CLOUD_CONFIGURE(base_url, api_key) muss zuerst aufgerufen werden	{}: CLOUD_CONFIGURE(base_url, api_key) must be called first
@@ -1653,8 +1664,6 @@ die Funktion '{}' gibt es in "{}" nicht (Gross/klein zaehlt{})	there is no funct
 fremde Funktion: kaputte Signatur	foreign function: broken signature
 fremde Funktion: Signatur fehlt	foreign function: signature missing
 {}: fremde Bibliotheken (DECLARE ... LIB) gibt es im Browser nicht	{}: there are no foreign libraries (DECLARE ... LIB) in the browser
-{}: fremde Bibliotheken (DECLARE ... LIB) gehen in diesem Bau nicht -- er ist ohne das Feature ffi gebaut	{}: foreign libraries (DECLARE ... LIB) do not work in this build -- it was built without the ffi feature
-{}: Zeiger gibt es nur mit fremden Bibliotheken -- dieser Bau ist ohne das Feature ffi gebaut	{}: pointers only exist with foreign libraries -- this build was made without the ffi feature
 {}: erwartet einen Zeiger (INTEGER), erhalten {}	{}: expects a pointer (INTEGER), got {}
 {}: breit erwartet TRUE/FALSE, erhalten {}	{}: wide expects TRUE/FALSE, got {}
 {}: die Laenge erwartet INTEGER, erhalten {}	{}: the length expects INTEGER, got {}
@@ -1798,7 +1807,6 @@ CHART_X: der x-Wert von Punkt {} ist kleiner als der davor -- die Werte muessen 
 RENDERTARGET_IMAGE: das Ziel ist noch offen -- erst RENDERTARGET_END	RENDERTARGET_IMAGE: the target is still open -- RENDERTARGET_END first
 PDF_IMAGE: erwartet 5 oder 6 Argumente (pdf, bild, x, y, b [, h]), nicht {}	PDF_IMAGE: expects 5 or 6 arguments (pdf, image, x, y, w [, h]), not {}
 PDF_IMAGE: kein Bild geladen -- ein Bild kommt aus LOADIMAGE, IMAGE_NEW oder RENDERTARGET_IMAGE	PDF_IMAGE: no image loaded -- an image comes from LOADIMAGE, IMAGE_NEW or RENDERTARGET_IMAGE
-PDF_IMAGE: dieser Bau hat keine Grafik	PDF_IMAGE: this build has no graphics
 PDF_DASH: erwartet 2 oder 3 Argumente (pdf, strich_mm [, luecke_mm]), nicht {}	PDF_DASH: expects 2 or 3 arguments (pdf, dash_mm [, gap_mm]), not {}
 Strich und Luecke muessen beide groesser als 0 sein (oder beide 0 fuer durchgezogen), nicht {} und {}	dash and gap must both be greater than 0 (or both 0 for solid), not {} and {}
 die Breite muss groesser als 0 sein, nicht {}	the width must be greater than 0, not {}

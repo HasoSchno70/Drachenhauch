@@ -1432,7 +1432,7 @@ fn aufruf_bauen(sig: Signatur, ziel: *const u8) -> Result<Aufruf, String> {
 pub fn rufen(a: &[Value]) -> Result<Value, String> {
     // Ohne das Feature zuerst DAS sagen, vor jeder anderen Pruefung: die
     // Probe von `--export --schlank` (`--fehlende`, 40 x NIL) erkennt einen
-    // fehlenden Befehl an "ist ohne das Feature" (vm::fehlt_im_bau).
+    // fehlenden Befehl an "gibt es in dieser Laufzeit nicht" (bau::fehlt_im_bau).
     #[cfg(not(feature = "ffi"))]
     {
         let name = match a.first() {
@@ -1442,7 +1442,7 @@ pub fn rufen(a: &[Value]) -> Result<Value, String> {
         if cfg!(target_os = "emscripten") {
             return Err(format!("{}: fremde Bibliotheken (DECLARE ... LIB) gibt es im Browser nicht", name));
         }
-        return Err(format!("{}: fremde Bibliotheken (DECLARE ... LIB) gehen in diesem Bau nicht -- er ist ohne das Feature ffi gebaut", name));
+        return Err(format!("{}: fremde Bibliotheken (DECLARE ... LIB) gibt es in dieser Laufzeit nicht (ohne ffi gebaut)", name));
     }
     #[cfg(feature = "ffi")]
     {
@@ -1473,7 +1473,7 @@ pub fn zeiger_befehl(name: &str, a: &[Value]) -> Option<Result<Value, String>> {
     #[cfg(not(feature = "ffi"))]
     {
         let _ = a;
-        return Some(Err(format!("{}: Zeiger gibt es nur mit fremden Bibliotheken -- dieser Bau ist ohne das Feature ffi gebaut", gross)));
+        return Some(Err(format!("{}: Zeiger gibt es in dieser Laufzeit nicht (ohne ffi gebaut)", gross)));
     }
     #[cfg(feature = "ffi")]
     Some(zeiger_rufen(gross, a))

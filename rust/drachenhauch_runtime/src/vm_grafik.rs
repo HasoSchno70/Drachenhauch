@@ -1066,9 +1066,8 @@ impl<'p> Vm<'p> {
             #[cfg(not(feature = "dialogs"))]
             "file_open_dialog" | "file_save_dialog" | "folder_dialog"
             | "gui_message" | "gui_confirm" => {
-                return Err(format!(
-                    "{}: in diesem Build nicht verfuegbar -- native OS-Dialoge gibt es nur auf dem Desktop (Feature `dialogs`), nicht im Browser.",
-                    name.to_uppercase()));
+                return Err(format!("{} -- native Dialoge gibt es nur auf dem Desktop, nicht im Browser",
+                                   crate::bau::fehlt_meldung(name, "dialogs")));
             }
 
             // --- Monitore / Display-Infos ---
