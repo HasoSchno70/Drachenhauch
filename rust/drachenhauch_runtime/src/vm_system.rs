@@ -86,12 +86,13 @@ impl<'p> Vm<'p> {
                 }
             }
             "zeit_aus_teilen" => {
-                Value::Int(zeit::aus_teilen(
-                    z_int(a, 0, "ZEIT_AUS_TEILEN")?, z_int(a, 1, "ZEIT_AUS_TEILEN")?,
-                    z_int(a, 2, "ZEIT_AUS_TEILEN")?,
-                    if a.len() > 3 { z_int(a, 3, "ZEIT_AUS_TEILEN")? } else { 0 },
-                    if a.len() > 4 { z_int(a, 4, "ZEIT_AUS_TEILEN")? } else { 0 },
-                    if a.len() > 5 { z_int(a, 5, "ZEIT_AUS_TEILEN")? } else { 0 }))
+                const F: &str = "ZEIT_AUS_TEILEN";
+                let (j, mo, t) = (z_int(a, 0, F)?, z_int(a, 1, F)?, z_int(a, 2, F)?);
+                let h = if a.len() > 3 { z_int(a, 3, F)? } else { 0 };
+                let mi = if a.len() > 4 { z_int(a, 4, F)? } else { 0 };
+                let s = if a.len() > 5 { z_int(a, 5, F)? } else { 0 };
+                zeit::teile_pruefen(j, mo, t, h, mi, s).map_err(|e| format!("{}: {}", F, e))?;
+                Value::Int(zeit::aus_teilen(j, mo, t, h, mi, s))
             }
             "zeit_plus" => Value::Int(
                 z_int(a, 0, "ZEIT_PLUS")?.saturating_add(z_int(a, 1, "ZEIT_PLUS")?)),

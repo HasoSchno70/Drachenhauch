@@ -50,6 +50,24 @@ pub fn datum_aus_tagen(tage: i64) -> (i64, i64, i64) {
 }
 
 /// Zeitwert aus einzelnen Feldern.
+/// Gibt es diesen Tag und diese Uhrzeit? Dieselben Grenzen wie beim Lesen
+/// (`iso_lesen`/`uhr_lesen`, Sekunde 60 fuer die Schaltsekunde). Bis
+/// 2026.53 rechnete ZEIT_AUS_TEILEN(2026, 13, 1) still den 2027-01-01 aus,
+/// waehrend ZEIT_PARSE("2026-13-01") ablehnte.
+pub fn teile_pruefen(jahr: i64, monat: i64, tag: i64, stunde: i64, minute: i64, sekunde: i64) -> Result<(), String> {
+    if !(1..=12).contains(&monat) {
+        return Err(format!("Monat {} gibt es nicht (1..12) -- weiterzaehlen geht mit ZEIT_PLUS", monat));
+    }
+    let tage = tage_im_monat(jahr, monat);
+    if tag < 1 || tag > tage {
+        return Err(format!("Tag {} gibt es im Monat {} nicht (1..{}) -- weiterzaehlen geht mit ZEIT_PLUS", tag, monat, tage));
+    }
+    if !(0..=23).contains(&stunde) || !(0..=59).contains(&minute) || !(0..=60).contains(&sekunde) {
+        return Err(format!("Uhrzeit {}:{:02}:{:02} gibt es nicht (0..23, 0..59, 0..59)", stunde, minute, sekunde));
+    }
+    Ok(())
+}
+
 pub fn aus_teilen(jahr: i64, monat: i64, tag: i64, stunde: i64, minute: i64, sekunde: i64) -> i64 {
     tage_aus_datum(jahr, monat, tag) * SEK_PRO_TAG + stunde * 3600 + minute * 60 + sekunde
 }
