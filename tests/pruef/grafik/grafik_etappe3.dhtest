@@ -197,6 +197,22 @@ DHRT_FRAMES=60
 pixel TRUE TRUE
 maus 80 50
 
+=== maus setzen gilt in denselben einheiten wie mousex
+' MOUSE_OFFSET und MOUSE_SCALE rechnet raylib nur beim LESEN ein, nicht in
+' SetMousePosition. Bis 2026.53 ging MOUSE_SET_POS roh durch: mit
+' MOUSE_OFFSET(-40, 0) und MOUSE_SCALE(0.5, 0.5) lieferte MOUSEX danach 20
+' statt 80. Die Bewegung (MOUSE_DELTA) rechnet raylib selbst mit Massstab.
+SCREEN(320, 200, "t")
+SET_WINDOW_POS(-3000, -3000)
+MOUSE_OFFSET(-40, 0)
+MOUSE_SCALE(0.5, 0.5)
+MOUSE_SET_POS(80, 50)
+PRINT MOUSEX(); " "; MOUSEY()
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+80 50
+
 === falsche angaben sind fehler
 FUNCTION probe$(n AS INTEGER) AS STRING
     TRY

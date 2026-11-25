@@ -1326,6 +1326,11 @@ pub struct Graphics {
     width: i32,
     height: i32,
     scale: i32,
+    /// MOUSE_OFFSET / MOUSE_SCALE, wie an raylib gegeben -- gemerkt, weil
+    /// raylib sie nur in GetMousePosition einrechnet, nicht in
+    /// SetMousePosition (siehe `mouse_set_pos`).
+    maus_versatz: (f32, f32),
+    maus_massstab: (f32, f32),
     // SET_FULLSCREEN(TRUE): merkt sich, ob wir gerade im (pixel-skalierten,
     // borderless) Vollbild-Modus sind + die windowed (width,height,scale) zum
     // Zurueckschalten. Siehe set_fullscreen() fuer die Technik.
@@ -2368,7 +2373,7 @@ impl Graphics {
         // Szene-Render-Target (Fenstergroesse) fuer Post-Processing.
         let scene_rt = render_ziel(&mut rl, &thread, win_w as u32, win_h as u32).ok();
         let mut g = Graphics {
-            rl, thread, width, height, scale,
+            rl, thread, width, height, scale, maus_versatz: (0.0, 0.0), maus_massstab: (1.0, 1.0),
             a11y, a11y_versorgt: false, sichtbar: !hidden, flips: 0,
             titel: title.to_string(), fenster_symbol: None, esc_ausdruecklich: false,
             zeiger_prog: None, zeiger_gui: None, zeiger_gesetzt: None,
@@ -4429,8 +4434,14 @@ impl Graphics {
     /// MOUSE_OFFSET / MOUSE_SCALE: Mauskoordinaten = (roh + Versatz) * Massstab,
     /// fuer Spiele, die in eine kleinere Pixel-Aufloesung zeichnen und sie
     /// vergroessert (mit Rand) zeigen.
-    pub fn mouse_offset(&mut self, x: i32, y: i32) { self.rl.set_mouse_offset(Vector2::new(x as f32, y as f32)); }
-    pub fn mouse_scale(&mut self, sx: f32, sy: f32) { self.rl.set_mouse_scale(sx, sy); }
+    pub fn mouse_offset(&mut self, x: i32, y: i32) {
+        self.maus_versatz = (x as f32, y as f32);
+        self.rl.set_mouse_offset(Vector2::new(x as f32, y as f32));
+    }
+    pub fn mouse_scale(&mut self, sx: f32, sy: f32) {
+        self.maus_massstab = (sx, sy);
+        self.rl.set_mouse_scale(sx, sy);
+    }
 
     /// WINDOW_WAIT_EVENTS(sekunden): FLIP wartet auf eine Eingabe, hoechstens
     /// so lange -- eine Anwendung, die nur auf den Benutzer reagiert, braucht
@@ -7269,9 +7280,17 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     pub fn mouse_delta_x(&self) -> f64 { self.rl.get_mouse_delta().x as f64 / self.scale.max(1) as f64 }
     pub fn mouse_delta_y(&self) -> f64 { self.rl.get_mouse_delta().y as f64 / self.scale.max(1) as f64 }
     /// MOUSE_SET_POS(x, y): Zeiger setzen (z.B. Recentern bei Maus-Blick).
+    ///
+    /// MOUSEX liefert (roh + Versatz) * Massstab / scale; hier wird also
+    /// zurueckgerechnet, damit MOUSEX danach den gesetzten Wert liefert. Bis
+    /// 2026.53 ging der Wert roh an raylib: mit MOUSE_OFFSET(-40, 0) und
+    /// MOUSE_SCALE(0.5, 0.5) stand der Zeiger nach MOUSE_SET_POS(80, 50) bei
+    /// MOUSEX 20, MOUSEY 25.
     pub fn mouse_set_pos(&mut self, x: i64, y: i64) {
         let s = self.scale.max(1) as f32;
-        self.rl.set_mouse_position(Vector2::new(x as f32 * s, y as f32 * s));
+        let (vx, vy) = self.maus_versatz;
+        let (mx, my) = self.maus_massstab;
+        self.rl.set_mouse_position(Vector2::new(x as f32 * s / mx - vx, y as f32 * s / my - vy));
     }
     /// MOUSE_ON_SCREEN(): liegt der Zeiger ueber dem Fenster?
     pub fn mouse_on_screen(&self) -> bool { self.rl.is_cursor_on_screen() }
