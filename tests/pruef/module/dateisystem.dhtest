@@ -208,6 +208,41 @@ PRINT alter >= 0 AND alter < 120
 --- erwartet
 TRUE
 
+=== filetime nimmt die sommerzeit vom tag der datei
+' Bis 2026.53 rechnete FILETIME mit dem Zeitzonenversatz von HEUTE: eine
+' Datei vom Juli stand im Winter eine Stunde zu frueh da (und umgekehrt).
+' Zwei Dateien, eine im Winter, eine im Sommer -- eine liegt immer in der
+' anderen Jahreshaelfte als der Tag des Laufs.
+IMPORT "zeit"
+DIM r AS INTEGER
+r = SHELL("powershell", "-NoProfile", "-Command", "(Get-Item 'winter.txt').LastWriteTime = [datetime]'2026-01-15 12:00:00'; (Get-Item 'sommer.txt').LastWriteTime = [datetime]'2026-07-15 12:00:00'")
+PRINT TIME_TEXT$(FILETIME("winter.txt"))
+PRINT TIME_TEXT$(FILETIME("sommer.txt"))
+--- datei winter.txt
+w
+--- datei sommer.txt
+s
+--- system windows
+--- erwartet
+2026-01-15 12:00:00
+2026-07-15 12:00:00
+
+=== filetime nimmt die sommerzeit vom tag der datei (posix)
+IMPORT "zeit"
+DIM r AS INTEGER
+r = SHELL("touch", "-t", "202601151200", "winter.txt")
+r = SHELL("touch", "-t", "202607151200", "sommer.txt")
+PRINT TIME_TEXT$(FILETIME("winter.txt"))
+PRINT TIME_TEXT$(FILETIME("sommer.txt"))
+--- datei winter.txt
+w
+--- datei sommer.txt
+s
+--- system posix
+--- erwartet
+2026-01-15 12:00:00
+2026-07-15 12:00:00
+
 === filetime unterscheidet alt und neu
 ' Die Grundlage jeder Sicherung: welche Datei ist neuer? Die alte Datei legt
 ' der Laeufer vor dem Start an, die neue entsteht gut eine Sekunde spaeter.

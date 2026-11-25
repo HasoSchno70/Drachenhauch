@@ -3643,7 +3643,10 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 // Vor 1970 geaenderte Dateien gibt es (falsch gestellte Uhr) --
                 // dann der negative Abstand statt eines Fehlers.
                 .unwrap_or_else(|e| -(e.duration().as_secs() as i64));
-            Ok(Value::Int(utc + ortszeit_versatz()))
+            // Ortszeit mit dem Versatz vom TAG DER DATEI (Sommer- oder
+            // Winterzeit), wie ZEIT_AUS_UNIX. Bis 2026.53 galt der Versatz
+            // von heute: eine Datei vom Juli stand im Winter eine Stunde frueh.
+            Ok(Value::Int(crate::zeit::aus_unix_mit(utc, lokaler_versatz)))
         }
         "tempdir$" | "tempdir" => {
             arity!(0);
@@ -6096,9 +6099,6 @@ fn json_try_resolve<'a>(root: &'a serde_json::Value, path: &str) -> Option<&'a s
     Some(cur)
 }
 
-/// Wie weit geht die Uhr dieses Rechners der Weltzeit voraus (in Sekunden)?
-///
-/// Gebraucht fuer `FILETIME`: das Dateisystem liefert die Aenderungszeit in
 /// Wo Programme die Daten ihres Benutzers ablegen (DIR_USER_DATA$): Windows
 /// %APPDATA%, macOS ~/Library/Application Support, sonst $XDG_DATA_HOME
 /// bzw. ~/.local/share. `None`, wenn die Umgebung keinen nennt.
@@ -6111,24 +6111,6 @@ fn benutzer_datenordner() -> Option<std::path::PathBuf> {
         return env("HOME").map(|h| h.join("Library").join("Application Support"));
     }
     env("XDG_DATA_HOME").or_else(|| env("HOME").map(|h| h.join(".local").join("share")))
-}
-
-/// Weltzeit, das Modul `zeit` (und `ZEIT_JETZT`) rechnet in Ortszeit. Ohne
-/// diese Umrechnung waere `ZEIT_DIFF(FILETIME(f), ZEIT_JETZT())` um den
-/// Zeitzonenversatz daneben -- und genau diese Rechnung ist der Grund, warum
-/// es FILETIME gibt ("wie alt ist die Datei?").
-///
-/// Auf Volle Minuten gerundet: echte Zeitzonen sind Vielfache von 15 Minuten,
-/// und die beiden Uhrenabfragen darunter liegen Sekundenbruchteile
-/// auseinander -- ohne das Runden erschiene diese Luecke als Versatz.
-fn ortszeit_versatz() -> i64 {
-    let (j, mo, d, h, mi, s) = local_datetime();
-    let lokal = crate::zeit::aus_teilen(j, mo, d, h, mi, s);
-    let utc = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|x| x.as_secs() as i64)
-        .unwrap_or(0);
-    ((lokal - utc) as f64 / 60.0).round() as i64 * 60
 }
 
 /// Passt `name` auf das Muster? Erlaubt sind `*` (beliebig viele Zeichen,
