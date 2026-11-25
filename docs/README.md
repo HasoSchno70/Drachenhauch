@@ -151,6 +151,7 @@ Arbeitsnotizen, keine Anwender-Doku — sie erklären, warum etwas so ist, wie e
 - **[Entwurf: Drachenhauch Studio](intern/entwurf-studio.md)** — eine eigenständige IDE für Programme mit Oberfläche im Stil von Xojo: Projekt als Ordner, Fenster als Klasse mit Ereignis-Methoden, Layout-Editor, Bibliothek, Inspektor, Starten und Bauen; fünf Stufen
 - **[Entwurf: Berichte im Studio](intern/entwurf-berichte.md)** — gedruckte Seiten aus den Daten des Projekts (Rechnung, Liste): Bänder mit Gruppen und Summen, Quelle mit Parametern, Entwurf auf einer Seite in mm, PDF/Drucken/Vorschau im Programm; drei Stufen
 - **[Entwurf: Drucken](intern/entwurf-drucken.md)** — kein raylib fuers Papier: geprüfte Bausteine, vier Wege; Empfehlung: die Seite selbst zeichnen (GDI/CUPS als Ziele des pdf-Moduls), dazu ein Befehl, der eine Datei öffnet
+- **[Release 2026.53](releases/release-2026.53.md)** — was in dieser Fassung neu ist
 - **[Release 2026.52](releases/release-2026.52.md)** — was in dieser Fassung neu ist
 - **[Release 2026.51](releases/release-2026.51.md)** — was in dieser Fassung neu ist
 - **[Release 2026.50](releases/release-2026.50.md)** — was in dieser Fassung neu ist
