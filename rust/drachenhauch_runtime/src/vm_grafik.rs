@@ -2085,7 +2085,12 @@ impl<'p> Vm<'p> {
                 if a.len() != 1 { return Err("SPEAK_SOUND: erwartet (text$)".into()); }
                 self.audio_mut()?;
                 let au = self.audio.as_mut().unwrap();
-                Value::Int(self.sprecher.klang(au, &text)?)
+                // Eine eigene Kopie: der Slot im Vorrat gehoert SPEAK und wird
+                // nach 64 weiteren Saetzen verdraengt. Bis 2026.53 bekam das
+                // Programm ihn selbst -- derselbe Text lieferte dasselbe
+                // Handle, und das Handle starb spaeter still.
+                let vorrat = self.sprecher.klang(au, &text)?;
+                Value::Int(au.sound_kopie(vorrat, "SPEAK_SOUND")?)
             }
             "audio_music_load" => { let p = gs(a, 0, "AUDIO_MUSIC_LOAD")?.to_string(); self.audio_mut()?.music_load(&p)?; Value::Nil }
             "audio_music_play" => {

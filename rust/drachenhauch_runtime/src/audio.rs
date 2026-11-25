@@ -1036,6 +1036,14 @@ impl Audio {
         self.push_slot(data, 1.0)
     }
 
+    /// Eine eigene Kopie des Klangs in einem neuen Slot (SPEAK_SOUND). Die
+    /// Abtastwerte teilt Kira (`StaticSoundData` haelt sie in einem Arc).
+    pub fn sound_kopie(&mut self, idx: i64, fn_: &str) -> Result<i64, String> {
+        let data = self.slot(idx, fn_)?.data.clone()
+            .ok_or_else(|| format!("{}: Klang wurde freigegeben (UNLOADSOUND)", fn_))?;
+        Ok(self.push_slot(data, 1.0))
+    }
+
     /// Lebt der Slot noch (nicht per UNLOADSOUND freigegeben)?
     pub fn sound_lebt(&self, idx: i64) -> bool {
         usize::try_from(idx).ok().and_then(|i| self.sounds.get(i)).map_or(false, |s| s.data.is_some())
