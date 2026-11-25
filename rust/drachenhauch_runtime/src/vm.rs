@@ -4557,7 +4557,7 @@ impl<'p> Vm<'p> {
         // einem harten Allocator-Abort statt eines DH-Fehlers. Hier einmalig
         // mit checked_mul + einer Obergrenze validieren, BEVOR DhArray::new
         // (das selbst keinen Result-Rueckgabewert hat) ueberhaupt aufgerufen wird.
-        const MAX_ARRAY_ELEMENTS: i64 = 100_000_000;
+        use crate::builtins::MAX_ARRAY_ELEMENTS;
         let mut total: i64 = 1;
         for &d in &dims {
             total = total.checked_mul(d).ok_or_else(||

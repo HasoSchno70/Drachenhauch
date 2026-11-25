@@ -1660,6 +1660,8 @@ fremde Funktion: Signatur fehlt	foreign function: signature missing
 {}: die Laenge erwartet INTEGER, erhalten {}	{}: the length expects INTEGER, got {}
 {}: Laenge {} ist negativ	{}: length {} is negative
 {}: Laenge {} ueberschreitet die Obergrenze von {} Bytes	{}: length {} exceeds the limit of {} bytes
+{}: Laenge ueberschreitet die Obergrenze von {} Bytes	{}: length exceeds the limit of {} bytes
+{}: {} Elemente ueberschreiten die Obergrenze von {}	{}: {} elements exceed the limit of {}
 {}: der Zeiger ist 0 (NULL) -- dort liegen keine {} Bytes	{}: the pointer is 0 (NULL) -- there are no {} bytes there
 {}: erwartet einen BUFFER, erhalten {}	{}: expects a BUFFER, got {}
 BYREF geht nicht bei einem Rueckruf -- die Bibliothek bekommt ohnehin einen Zeiger auf die Funktion	BYREF does not work for a callback -- the library gets a pointer to the function anyway

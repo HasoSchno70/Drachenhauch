@@ -776,7 +776,8 @@ pub(super) fn mul(a: Value, b: Value) -> R<Value> {
             // Kapazitaets-Ueberlauf statt einen Fehler zu liefern -- ein
             // Deckel verhindert das bei absurd grossem `n` (z.B. aus einer
             // fehlerhaften Berechnung).
-            const MAX_REPEAT_LEN: usize = 10_000_000;
+            // Dieselbe Grenze wie REPEAT$ (bis 2026.53 hier 10 Millionen).
+            const MAX_REPEAT_LEN: usize = crate::builtins::MAX_TEXT_BYTES;
             return match s.len().checked_mul(*n as usize) {
                 Some(total) if total <= MAX_REPEAT_LEN => Ok(Value::str_rc(&s.repeat(*n as usize))),
                 _ => Err(format!("* : String-Wiederholung zu gross (max. {} Zeichen)", MAX_REPEAT_LEN)),

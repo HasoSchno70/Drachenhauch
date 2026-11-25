@@ -22,3 +22,67 @@ IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 code 1
 panik FALSE
 meldung TRUE
+
+=== riesige texte sind ein fehler mit grenze
+' Bis 2026.53 brachen SPACE$/PADL$/PADR$/REPEAT$ mit riesiger Laenge den
+' Prozess ab ("memory allocation of ... bytes failed", 0xC0000409) -- an
+' TRY und jeder Meldung vorbei. Die Grenze ist die von BUFFER_NEW (1 GiB).
+SUB probe(was AS STRING, f AS FUNCREF)
+    TRY
+        DIM t AS STRING : t = f()
+        PRINT was; " ging: "; LEN(t)
+    CATCH e
+        PRINT e
+    END TRY
+END SUB
+probe("SPACE$", FUNCTION() SPACE$(9223372036854775807))
+probe("PADL$", FUNCTION() PADL$("a", 9223372036854775807))
+probe("PADR$", FUNCTION() PADR$("a", 9223372036854775807, "€"))
+probe("REPEAT$", FUNCTION() REPEAT$("ab", 4611686018427387904))
+probe("*", FUNCTION() "äöü€" * 2147483648)
+' Was unter der Grenze liegt, geht wie immer.
+probe("klein", FUNCTION() REPEAT$("ab", 3) + SPACE$(2) + PADL$("x", 3, "€"))
+--- erwartet
+SPACE$: Laenge 9223372036854775807 ueberschreitet die Obergrenze von 1073741824 Bytes
+PADL$: Laenge 9223372036854775807 ueberschreitet die Obergrenze von 1073741824 Bytes
+PADR$: Laenge ueberschreitet die Obergrenze von 1073741824 Bytes
+REPEAT$: Laenge 9223372036854775808 ueberschreitet die Obergrenze von 1073741824 Bytes
+* : String-Wiederholung zu gross (max. 1073741824 Zeichen)
+klein ging: 11
+
+=== riesige felder sind ein fehler mit grenze
+' RANGE(2147483648) und REDIM/PARTICLE_EMIT mit riesiger Anzahl hingen,
+' GELD_TEILEN brach mit "capacity overflow" ab. Die Grenze ist die von DIM.
+IMPORT "geld"
+IMPORT "particles"
+SUB probe(was AS STRING, f AS FUNCREF)
+    TRY
+        f()
+        PRINT was; " ging"
+    CATCH e
+        PRINT e
+    END TRY
+END SUB
+DIM fi AS ARRAY OF INTEGER
+probe("RANGE", FUNCTION() RANGE(2147483648))
+probe("RANGE abwaerts", FUNCTION() RANGE(0, -2147483648, -1))
+probe("REDIM", FUNCTION() REDIM(fi, 9223372036854775807))
+probe("GELD_TEILEN", FUNCTION() GELD_TEILEN(MONEY_NEW(12.34), 9223372036854775807))
+probe("PARTICLE_EMIT", FUNCTION() PARTICLE_EMIT(PARTICLE_SYSTEM_NEW(0, 0), 9223372036854775807))
+probe("RANGE klein", FUNCTION() RANGE(0, 10, 3))
+PRINT LEN(RANGE(0, 10, 3)); " "; LEN(RANGE(10, 0, -3)); " "; LEN(RANGE(5)); " "; LEN(RANGE(3, 3))
+--- erwartet
+RANGE: 2147483648 Elemente ueberschreiten die Obergrenze von 100000000
+RANGE: 2147483648 Elemente ueberschreiten die Obergrenze von 100000000
+REDIM: 9223372036854775807 Elemente ueberschreiten die Obergrenze von 100000000
+GELD_TEILEN: 9223372036854775807 Elemente ueberschreiten die Obergrenze von 100000000
+PARTICLE_EMIT: 9223372036854775807 Elemente ueberschreiten die Obergrenze von 100000000
+RANGE klein ging
+4 4 5 0
+
+=== round mit sehr vielen stellen rechnet exakt
+' ROUND(1.5, 65536) war eine Panik in format! (hoechstens 65535 Stellen).
+' Mehr als 1074 Nachkommastellen hat ein FLOAT nicht -- es bleibt, wie es ist.
+PRINT ROUND(1.5, 65536); " "; ROUND(-0.125, 9223372036854775807); " "; ROUND(2.675, 2)
+--- erwartet
+1.5 -0.125 2.67

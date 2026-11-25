@@ -1415,6 +1415,10 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 }
                 _ => return err("RANGE: 1..3 Argumente".to_string()),
             };
+            // Wie viele es werden, vorher -- sonst hing RANGE(2147483648).
+            let anzahl = if step > 0 { (stop as i128 - start as i128 + step as i128 - 1) / step as i128 }
+                         else { (start as i128 - stop as i128 + (-(step as i128)) - 1) / -(step as i128) };
+            elemente_pruefen("RANGE", anzahl.clamp(0, i64::MAX as i128) as i64)?;
             let mut out = Vec::new();
             let mut k = start;
             if step > 0 { while k < stop { out.push(Value::Int(k)); k += step; } }
@@ -1648,8 +1652,10 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 let n = need_int(&a[1], "ROUND")?;
                 if n < 0 { return err("ROUND: decimals muss >= 0 sein".to_string()); }
                 // Auf n Nachkommastellen runden via Decimal-Formatierung
-                // (Half-to-even) -- exakt wie Python f"{x:.{n}f}".
-                let s = format!("{:.*}", n as usize, x);
+                // (Half-to-even) -- exakt wie Python f"{x:.{n}f}". Ein FLOAT
+                // hat hoechstens 1074 Nachkommastellen; mehr aendern nichts,
+                // und ab 65536 geriet `format!` in Panik (ROUND(1.5, 65536)).
+                let s = format!("{:.*}", n.min(1100) as usize, x);
                 Ok(Value::Float(s.parse::<f64>().unwrap_or(x)))
             } else {
                 err(format!("ROUND: erwartet 1 oder 2 Argument(e), erhalten {}", a.len()))
@@ -2073,6 +2079,8 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             } else { ' ' };
             let count = s.chars().count();
             if count >= n { return Ok(Value::str_rc(s)); }
+            let fn_ = if name.starts_with("padl") { "PADL$" } else { "PADR$" };
+            text_laenge_pruefen(fn_, (n - count).checked_mul(fill.len_utf8()).and_then(|p| p.checked_add(s.len())))?;
             let pad: String = std::iter::repeat(fill).take(n - count).collect();
             let left = name.starts_with("padl");
             Ok(Value::str_rc(&if left { format!("{}{}", pad, s) } else { format!("{}{}", s, pad) }))
@@ -2082,9 +2090,15 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             arity!(2);
             let s = need_str(&a[0], "REPEAT$")?;
             let n = need_int(&a[1], "REPEAT$")?.max(0) as usize;
+            text_laenge_pruefen("REPEAT$", s.len().checked_mul(n))?;
             Ok(Value::str_rc(&s.repeat(n)))
         }
-        "space$" | "space" => { arity!(1); Ok(Value::str_rc(&" ".repeat(need_int(&a[0], "SPACE$")?.max(0) as usize))) }
+        "space$" | "space" => {
+            arity!(1);
+            let n = need_int(&a[0], "SPACE$")?.max(0) as usize;
+            text_laenge_pruefen("SPACE$", Some(n))?;
+            Ok(Value::str_rc(&" ".repeat(n)))
+        }
         "hex$" | "hex" => {
             arity!(1);
             let n = need_int(&a[0], "HEX$")?;
@@ -2372,6 +2386,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 let et = { let b = arr.borrow(); if b.dims.len() != 1 { return err("REDIM: nur 1D-Arrays".to_string()); } b.element_type.clone() };
                 let new_len = need_int(&a[1], "REDIM")?;
                 if new_len < 0 { return err("REDIM: Groesse darf nicht negativ sein".to_string()); }
+                elemente_pruefen("REDIM", new_len)?;
                 let mut b = arr.borrow_mut();
                 let cur = b.cells.len() as i64;
                 if new_len < cur {
@@ -5158,6 +5173,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "particle_emit" => {
             arity!(2); let count = need_int_gerundet(&a[1], "PARTICLE_EMIT")?;
             if count < 0 { return err("PARTICLE_EMIT: count muss >= 0 sein"); }
+            elemente_pruefen("PARTICLE_EMIT", count)?;
             let s = psys(&a[0], "PARTICLE_EMIT")?; let mut s = s.borrow_mut();
             for _ in 0..count {
                 let p = Particle {
@@ -6491,6 +6507,32 @@ fn file_h<'a>(v: &'a Value, fn_: &str) -> Result<&'a Rc<RefCell<DhFile>>, String
 /// Meldung zu geben. 1 GiB ist weit jenseits dessen, was ein DH-Programm
 /// sinnvoll im Speicher haelt, und immer noch eine klare Ansage.
 const MAX_BUFFER: i64 = 1 << 30;
+
+/// Obergrenze fuer einen Text, den ein Befehl baut (REPEAT$, SPACE$, PADL$,
+/// `"ab" * n`): dieselbe wie fuer einen Puffer. Ohne sie brach
+/// `SPACE$(9223372036854775807)` den Prozess ab ("memory allocation failed").
+pub(crate) const MAX_TEXT_BYTES: usize = MAX_BUFFER as usize;
+
+/// Obergrenze fuer die Elemente eines Feldes -- dieselbe wie bei DIM. Ohne
+/// sie hing `RANGE(2147483648)` oder brach mit "capacity overflow" ab.
+pub(crate) const MAX_ARRAY_ELEMENTS: i64 = 100_000_000;
+
+/// Ein Text dieser Laenge in Bytes, oder die Meldung.
+pub(crate) fn text_laenge_pruefen(fn_: &str, bytes: Option<usize>) -> Result<(), String> {
+    match bytes {
+        Some(n) if n <= MAX_TEXT_BYTES => Ok(()),
+        Some(n) => Err(format!("{}: Laenge {} ueberschreitet die Obergrenze von {} Bytes", fn_, n, MAX_TEXT_BYTES)),
+        None => Err(format!("{}: Laenge ueberschreitet die Obergrenze von {} Bytes", fn_, MAX_TEXT_BYTES)),
+    }
+}
+
+/// So viele Elemente, oder die Meldung.
+pub(crate) fn elemente_pruefen(fn_: &str, n: i64) -> Result<(), String> {
+    if n > MAX_ARRAY_ELEMENTS {
+        return Err(format!("{}: {} Elemente ueberschreiten die Obergrenze von {}", fn_, n, MAX_ARRAY_ELEMENTS));
+    }
+    Ok(())
+}
 
 pub(crate) fn buf_h<'a>(v: &'a Value, fn_: &str) -> Result<&'a Rc<RefCell<Vec<u8>>>, String> {
     match v { Value::Buffer(b) => Ok(b), _ => Err(format!("{}: erwartet BUFFER", fn_)) }
