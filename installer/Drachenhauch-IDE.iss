@@ -132,6 +132,8 @@ Source: "..\buecher\einstieg\buch\Drachenhauch-Einstieg.docx"; DestDir: "{app}\b
 Source: "..\buecher\einstieg\buch\Drachenhauch-Einstieg.epub"; DestDir: "{app}\buecher"; Flags: ignoreversion skipifsourcedoesntexist
 Source: "..\buecher\wunder\buch\Drachenhauch-Wunder.docx"; DestDir: "{app}\buecher"; Flags: ignoreversion skipifsourcedoesntexist
 Source: "..\buecher\wunder\buch\Drachenhauch-Wunder.epub"; DestDir: "{app}\buecher"; Flags: ignoreversion skipifsourcedoesntexist
+Source: "..\buecher\wunder\buch\Drachenhauch-Wonders.docx"; DestDir: "{app}\buecher"; Flags: ignoreversion skipifsourcedoesntexist
+Source: "..\buecher\wunder\buch\Drachenhauch-Wonders.epub"; DestDir: "{app}\buecher"; Flags: ignoreversion skipifsourcedoesntexist
 Source: "..\buecher\anwendungen\buch\Drachenhauch-Anwendungen.docx"; DestDir: "{app}\buecher"; Flags: ignoreversion skipifsourcedoesntexist
 Source: "..\buecher\anwendungen\buch\Drachenhauch-Anwendungen.epub"; DestDir: "{app}\buecher"; Flags: ignoreversion skipifsourcedoesntexist
 Source: "LIZENZ.txt"; DestDir: "{app}"; Flags: ignoreversion
@@ -160,6 +162,7 @@ Name: "{group}\Lehrbuch"; Filename: "{app}\buecher\Drachenhauch-Lehrbuch.docx"; 
 Name: "{group}\Kleine Wunder"; Filename: "{app}\buecher\Drachenhauch-Wunder.docx"; Flags: createonlyiffileexists
 Name: "{group}\Fenster, Formulare, Daten"; Filename: "{app}\buecher\Drachenhauch-Anwendungen.docx"; Flags: createonlyiffileexists
 Name: "{group}\Handbook (English)"; Filename: "{app}\buecher\Drachenhauch-Handbook.docx"; Flags: createonlyiffileexists
+Name: "{group}\Little Wonders (English)"; Filename: "{app}\buecher\Drachenhauch-Wonders.docx"; Flags: createonlyiffileexists
 Name: "{group}\ESP32-Sketche"; Filename: "{commondocs}\Drachenhauch\esp32"
 Name: "{group}\Lizenzen\Lizenz (MIT oder Apache 2.0)"; Filename: "{app}\LIZENZ.txt"
 Name: "{group}\Lizenzen\Drittanbieter-Lizenzen"; Filename: "{app}\THIRD-PARTY-NOTICES-IDE.txt"; Flags: createonlyiffileexists

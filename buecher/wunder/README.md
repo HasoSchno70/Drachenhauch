@@ -19,8 +19,9 @@ Sprache mitbringt.
 | Zum Drucken (A4) | Für E-Reader |
 |---|---|
 | [`buch/Drachenhauch-Wunder.docx`](buch/Drachenhauch-Wunder.docx?raw=1) | [`buch/Drachenhauch-Wunder.epub`](buch/Drachenhauch-Wunder.epub?raw=1) |
+| englisch: [`buch/Drachenhauch-Wonders.docx`](buch/Drachenhauch-Wonders.docx?raw=1) | [`buch/Drachenhauch-Wonders.epub`](buch/Drachenhauch-Wonders.epub?raw=1) |
 
-Beide liegen auch dem Windows-Installer und jedem Release bei.
+Alle vier liegen auch dem Windows-Installer und jedem Release bei.
 
 | Teil | Kapitel |
 |---|---|

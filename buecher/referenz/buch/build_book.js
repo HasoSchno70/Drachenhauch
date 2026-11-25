@@ -35,11 +35,11 @@ const UI = {
   de: { titel: "Drachenhauch \u2013 Das Lehrbuch", untertitel: "Das Lehrbuch",
         zeile: "Programmieren lernen und alle Befehle verstehen", von: "von",
         merke: "Merke", achtung: "Achtung", beispiel: "Beispiel",
-        ausgabe: "Ausgabe", datei: "Drachenhauch-Lehrbuch.docx" },
+        ausgabe: "Ausgabe", datei: "Drachenhauch-Lehrbuch.docx", inhalt: "Inhalt" },
   en: { titel: "Drachenhauch \u2013 The Handbook", untertitel: "The Handbook",
         zeile: "Learn to program and understand every command", von: "by",
         merke: "Remember", achtung: "Careful", beispiel: "Example",
-        ausgabe: "Output", datei: "Drachenhauch-Handbook.docx" },
+        ausgabe: "Output", datei: "Drachenhauch-Handbook.docx", inhalt: "Contents" },
 }[LANG];
 if (!UI) { console.error(`Unbekannte Sprache: ${LANG} (de|en)`); process.exit(2); }
 const KATALOG = LANG === "de" ? null
@@ -285,7 +285,7 @@ fs.writeFileSync(TITLES_JSON,
 
 const tocChildren = [new Paragraph({ heading: HeadingLevel.HEADING_1, spacing: { after: 200 },
   border: { bottom: { style: BorderStyle.SINGLE, size: 12, color: C_ACCENT, space: 4 } },
-  children: [new TextRun({ text: "Inhalt" })] })];
+  children: [new TextRun({ text: UI.inhalt })] })];
 for (const e of tocEntries) {
   if (e.kind === "h1") continue;   // nur Teile + Kapitel ins Verzeichnis
   const pg = pages[e.title] ? String(pages[e.title]) : "";

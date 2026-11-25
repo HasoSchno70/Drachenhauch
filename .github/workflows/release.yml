@@ -132,7 +132,7 @@ jobs:
           # Die Buecher, die auch der Installer mitbringt (Ort vor und nach
           # dem Umzug nach buecher/) -- jedes mit .docx und .epub
           # (buch_wunder_anwendungen.dhtest haelt die Liste fest).
-          for b in Drachenhauch-Lehrbuch Drachenhauch-Handbook Drachenhauch-Einstieg Drachenhauch-Wunder Drachenhauch-Anwendungen; do
+          for b in Drachenhauch-Lehrbuch Drachenhauch-Handbook Drachenhauch-Einstieg Drachenhauch-Wunder Drachenhauch-Wonders Drachenhauch-Anwendungen; do
             for e in docx epub; do
               f=$(git ls-files "buecher/*/buch/$b.$e" "buch-*/buch/$b.$e" | head -n 1)
               if [ -z "$f" ]; then echo "::error::$b.$e fehlt im Repo"; exit 1; fi
