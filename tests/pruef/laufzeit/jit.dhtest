@@ -4440,6 +4440,86 @@ DHRT_JIT_BILANZ=1
 --- stderr
 jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
 
+=== floor ceil round einer zu grossen zahl ist ein ueberlauf
+' Bis 2026.53 meldete nur INT den Ueberlauf; FLOOR, CEIL und ROUND
+' saettigten in VM und Maschinencode still auf 9223372036854775807.
+DIM x AS FLOAT
+DIM i AS INTEGER
+DIM s AS INTEGER
+x = 1e10
+TRY
+    FOR i = 1 TO 10
+        s = FLOOR(x)
+        x = x * 100000.0
+    NEXT
+CATCH e
+    PRINT i; " "; e
+END TRY
+x = -1e10
+TRY
+    FOR i = 1 TO 10
+        s = CEIL(x)
+        x = x * 100000.0
+    NEXT
+CATCH e
+    PRINT i; " "; e
+END TRY
+x = 1e10
+TRY
+    FOR i = 1 TO 10
+        s = ROUND(x)
+        x = x * 100000.0
+    NEXT
+CATCH e
+    PRINT i; " "; e
+END TRY
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+3 FLOOR: Ganzzahl-Ueberlauf (INTEGER ist 64-bit; Wertebereich ueberschritten)
+3 CEIL: Ganzzahl-Ueberlauf (INTEGER ist 64-bit; Wertebereich ueberschritten)
+3 ROUND: Ganzzahl-Ueberlauf (INTEGER ist 64-bit; Wertebereich ueberschritten)
+
+=== floor ceil round einer zu grossen zahl ist ein ueberlauf (maschinencode)
+' Bis 2026.53 meldete nur INT den Ueberlauf; FLOOR, CEIL und ROUND
+' saettigten in VM und Maschinencode still auf 9223372036854775807.
+DIM x AS FLOAT
+DIM i AS INTEGER
+DIM s AS INTEGER
+x = 1e10
+TRY
+    FOR i = 1 TO 10
+        s = FLOOR(x)
+        x = x * 100000.0
+    NEXT
+CATCH e
+    PRINT i; " "; e
+END TRY
+x = -1e10
+TRY
+    FOR i = 1 TO 10
+        s = CEIL(x)
+        x = x * 100000.0
+    NEXT
+CATCH e
+    PRINT i; " "; e
+END TRY
+x = 1e10
+TRY
+    FOR i = 1 TO 10
+        s = ROUND(x)
+        x = x * 100000.0
+    NEXT
+CATCH e
+    PRINT i; " "; e
+END TRY
+--- umgebung
+DHRT_JIT=immer
+--- erwartet
+3 FLOOR: Ganzzahl-Ueberlauf (INTEGER ist 64-bit; Wertebereich ueberschritten)
+3 CEIL: Ganzzahl-Ueberlauf (INTEGER ist 64-bit; Wertebereich ueberschritten)
+3 ROUND: Ganzzahl-Ueberlauf (INTEGER ist 64-bit; Wertebereich ueberschritten)
+
 === int einer grossen ganzzahl geht ueber komma
 DIM x AS INTEGER
 DIM i AS INTEGER

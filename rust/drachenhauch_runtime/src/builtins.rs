@@ -969,7 +969,20 @@ fn euro_text(cent: i64, symbol: &str) -> String {
     out
 }
 
-fn round_half_even(x: f64) -> i64 {
+/// Eine gerundete Kommazahl als INTEGER -- oder ein Ueberlauf-Fehler.
+/// `f as i64` saettigt (seit Rust 1.45): FLOOR(1e19) lieferte bis 2026.53
+/// still i64::MAX, waehrend INT(1e19) schon meldete. NaN ebenso.
+fn ganz_aus(f: f64, fn_: &str) -> Result<i64, String> {
+    // 2^63 ist genau darstellbar, i64::MAX als f64 dagegen schon 2^63.
+    const GRENZE: f64 = 9_223_372_036_854_775_808.0;
+    if f >= -GRENZE && f < GRENZE {
+        Ok(f as i64)
+    } else {
+        Err(format!("{}: Ganzzahl-Ueberlauf (INTEGER ist 64-bit; Wertebereich ueberschritten)", fn_))
+    }
+}
+
+fn round_half_even(x: f64) -> f64 {
     let f = x.floor();
     let diff = x - f;
     let r = if diff < 0.5 {
@@ -978,9 +991,9 @@ fn round_half_even(x: f64) -> i64 {
         f + 1.0
     } else {
         // exakt .5 -> zur geraden Zahl
-        if (f as i64).rem_euclid(2) == 0 { f } else { f + 1.0 }
+        if f.rem_euclid(2.0) == 0.0 { f } else { f + 1.0 }
     };
-    r as i64
+    r
 }
 
 /// Minimaler printf fuer FORMAT$ / f-String-Specs: %[-][0][width][.prec](d|i|f|s|x|X).
@@ -1248,15 +1261,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         }
         "int" => {
             arity!(1);
-            let f = need_num(&a[0], "INT")?.floor();
-            // Review-Fund: `f as i64` saettigt (Rust seit 1.45) statt zu
-            // ueberlaufen -- INT(1e19) lieferte bisher stillschweigend
-            // i64::MAX statt eines Fehlers.
-            if f >= i64::MIN as f64 && f <= i64::MAX as f64 {
-                Ok(Value::Int(f as i64))
-            } else {
-                err("INT: Ganzzahl-Ueberlauf (INTEGER ist 64-bit; Wertebereich ueberschritten)".to_string())
-            }
+            Ok(Value::Int(ganz_aus(need_num(&a[0], "INT")?.floor(), "INT")?))
         }
         // FLT(x): Int/Float -> Float (Gegenstueck zu INT). Im Tree-Walker laengst
         // vorhanden; hier nachgezogen, damit `FLT(...)` auch nativ laeuft.
@@ -1633,11 +1638,11 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "tan" => { arity!(1); Ok(Value::Float(need_num(&a[0], "TAN")?.tan())) }
         "atan" => { arity!(1); Ok(Value::Float(need_num(&a[0], "ATAN")?.atan())) }
         "atan2" => { arity!(2); Ok(Value::Float(need_num(&a[0], "ATAN2")?.atan2(need_num(&a[1], "ATAN2")?))) }
-        "floor" => { arity!(1); Ok(Value::Int(need_num(&a[0], "FLOOR")?.floor() as i64)) }
-        "ceil" => { arity!(1); Ok(Value::Int(need_num(&a[0], "CEIL")?.ceil() as i64)) }
+        "floor" => { arity!(1); Ok(Value::Int(ganz_aus(need_num(&a[0], "FLOOR")?.floor(), "FLOOR")?)) }
+        "ceil" => { arity!(1); Ok(Value::Int(ganz_aus(need_num(&a[0], "CEIL")?.ceil(), "CEIL")?)) }
         "round" => {
             if a.len() == 1 {
-                Ok(Value::Int(round_half_even(need_num(&a[0], "ROUND")?)))
+                Ok(Value::Int(ganz_aus(round_half_even(need_num(&a[0], "ROUND")?), "ROUND")?))
             } else if a.len() == 2 {
                 let x = need_num(&a[0], "ROUND")?;
                 let n = need_int(&a[1], "ROUND")?;
