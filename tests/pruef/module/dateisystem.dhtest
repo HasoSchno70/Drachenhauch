@@ -87,6 +87,22 @@ PRINT LEN(d)
 --- erwartet
 4
 
+=== rekursiv mit leerem muster liefert alles wie dirlist
+' Ein leeres Muster heisst "alles" -- bei DIRLIST schon immer, bei
+' DIRLIST_REC passte es bis 2026.53 auf nichts: eine leere Filtervariable
+' lieferte still ein leeres Feld.
+DIM filter AS STRING
+DIM d AS ARRAY OF STRING
+d = DIRLIST_REC("baum", filter)
+SORT(d)
+PRINT JOIN$(d, ",")
+--- datei baum/a.csv
+1
+--- datei baum/unter/tief.txt
+2
+--- erwartet
+a.csv,unter/tief.txt
+
 === rekursiv findet auch tiefer und trennt mit schraegstrich
 ' Auch unter Windows -- ein Programm, das die Liste speichert, soll auf beiden
 ' Systemen dieselben Zeichenketten sehen.

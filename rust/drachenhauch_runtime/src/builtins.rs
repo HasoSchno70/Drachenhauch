@@ -3600,7 +3600,10 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             // zum Startordner, immer mit `/` getrennt.
             arity!(1, 2);
             let path = need_str(&a[0], "DIRLIST_REC")?;
-            let muster = if a.len() > 1 { Some(need_str(&a[1], "DIRLIST_REC")?) } else { None };
+            // Ein leeres Muster heisst "alles" wie bei DIRLIST -- bis 2026.53
+            // passte es hier auf nichts (eine leere Filtervariable lieferte
+            // still ein leeres Feld).
+            let muster = if a.len() > 1 { Some(need_str(&a[1], "DIRLIST_REC")?).filter(|m| !m.is_empty()) } else { None };
             let mut raus: Vec<String> = Vec::new();
             baum_lesen(std::path::Path::new(path), "", muster, &mut raus, "DIRLIST_REC")?;
             Ok(new_str_array(raus))
