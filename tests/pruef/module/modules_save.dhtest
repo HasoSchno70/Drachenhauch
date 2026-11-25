@@ -335,3 +335,30 @@ PRINT SAVE_GET_INT(s, "punkte")
 --- erwartet
 TRUE
 7
+
+=== die vorgabe hat den typ des getters
+' Bis 2026.53 pruefte nur SAVE_GET_FLOAT_OR die Vorgabe; SAVE_GET_INT_OR
+' lieferte einen Text aus einem INT-Getter, und die Meldungen nannten "S".
+IMPORT "save"
+DIM s AS SAVE_HANDLE = SAVE_NEW()
+PRINT SAVE_GET_INT_OR(s, "fehlt", 4 / 2)
+TRY
+    PRINT SAVE_GET_INT_OR(s, "fehlt", "kein int")
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PRINT SAVE_GET_BOOL_OR(s, "fehlt", "ja")
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PRINT SAVE_GET_FLOAT_OR(s, 5, 1.0)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+2
+SAVE_GET_INT_OR: erwartet INTEGER, erhalten STRING
+SAVE_GET_BOOL_OR: erwartet BOOLEAN, erhalten STRING
+SAVE_GET_FLOAT_OR: erwartet STRING, erhalten INTEGER
