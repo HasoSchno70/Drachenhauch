@@ -1,0 +1,24 @@
+' Nichts, was ein Programm oder eine Datei der Laufzeit vorsetzt, darf sie
+' mit einer Panik beenden (Exit 101, "thread 'main' panicked"). Es wird ein
+' Fehler mit Namen: abfangbar, wenn er in einem Befehl geschieht, ein
+' Lade-Fehler, wenn eine Datei kaputt ist.
+'
+' Rangliste Punkt 5 in docs/intern/inkonsistenzen-runtime.md (2026-11).
+
+=== eine kaputte dhc ist ein lade-fehler
+' Bis 2026.53: "thread 'main' panicked at src\model.rs:488:29: func ist
+' Objekt", Exit 101. Die Rust-Probe `kaputte_dhc_ist_ein_lade_fehler` tauscht
+' jede Stelle einer echten .dhc gegen Unsinn; hier der Weg von aussen.
+IMPORT "helfer.dh"
+dlStarten([CWD$() + "/kaputt.dhc"])
+PRINT "code "; dlCode
+PRINT "panik "; (INSTR(dlErr, "panicked") >= 0)
+PRINT "meldung "; (INSTR(dlErr, "eine Funktion ist kein Objekt") >= 0)
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
+--- datei kaputt.dhc
+{"format": "dhc", "main": "kaputt"}
+--- erwartet
+code 1
+panik FALSE
+meldung TRUE

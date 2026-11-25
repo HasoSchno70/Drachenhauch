@@ -441,77 +441,101 @@ pub(crate) fn neutrales_element(t: &str) -> Option<Value> {
     }
 }
 
-pub(crate) fn decode_value(j: &J) -> Value {
-    match j {
+/// Ein Wert aus dem Bytecode. Aus einer .dhc kann alles kommen: eine
+/// beschaedigte Datei wird ein Lade-Fehler (bis 2026.53 eine Panik mit
+/// Exit 101, `{"format":"dhc","main":"kaputt"}`).
+pub(crate) fn wert_lesen(j: &J) -> Result<Value, String> {
+    Ok(match j {
         J::Null => Value::Nil,
         J::Bool(b) => Value::Bool(*b), // sollte nur in {"b":..} auftreten
-        J::Number(n) => {
-            if let Some(i) = n.as_i64() {
-                Value::Int(i)
-            } else {
-                Value::Float(n.as_f64().expect("Zahl"))
-            }
-        }
+        J::Number(n) => match n.as_i64() {
+            Some(i) => Value::Int(i),
+            None => Value::Float(n.as_f64().ok_or_else(|| format!("Zahl {} passt nicht", n))?),
+        },
         J::String(s) => Value::Str(Rc::new(s.clone())),
-        J::Array(a) => Value::Tuple(Rc::new(a.iter().map(decode_value).collect())),
+        J::Array(a) => {
+            let teile: Result<Vec<Value>, String> = a.iter().map(wert_lesen).collect();
+            Value::Tuple(Rc::new(teile?))
+        }
         J::Object(map) => {
             if let Some(v) = map.get("f") {
-                Value::Float(v.as_f64().expect("f-Wert ist Zahl"))
+                Value::Float(v.as_f64().ok_or("ein f-Wert ist keine Zahl")?)
             } else if let Some(v) = map.get("b") {
-                Value::Bool(v.as_bool().expect("b-Wert ist Bool"))
+                Value::Bool(v.as_bool().ok_or("ein b-Wert ist kein Wahrheitswert")?)
             } else if map.contains_key("comp") {
                 Value::CompMarker
             } else if let Some(v) = map.get("funcref") {
-                Value::FuncRef(Rc::from(v.as_str().expect("funcref-Name")))
+                Value::FuncRef(Rc::from(v.as_str().ok_or("ein funcref ist kein Name")?))
             } else if let Some(ns) = map.get("ns") {
-                let obj = ns.as_object().expect("ns-Objekt");
+                let obj = ns.as_object().ok_or("ein ns ist kein Objekt")?;
                 let name = obj.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string();
                 let mut members = rustc_hash::FxHashMap::default();
                 if let Some(m) = obj.get("members").and_then(|v| v.as_object()) {
                     for (k, mv) in m {
-                        members.insert(k.clone(), decode_value(mv));
+                        members.insert(k.clone(), wert_lesen(mv)?);
                     }
                 }
                 Value::Namespace(Rc::new(crate::value::Namespace { name, members }))
             } else {
-                panic!("decode_value: unbekanntes Objekt {:?}", map)
+                return Err(format!("unbekannter Wert {}", kurz(j)));
             }
         }
-    }
+    })
+}
+
+/// Fuer Werte vom Compiler, die immer gueltig sind.
+pub(crate) fn decode_value(j: &J) -> Value {
+    wert_lesen(j).expect("Wert vom Compiler")
+}
+
+/// Ein Stueck JSON fuer eine Meldung, gekuerzt.
+fn kurz(j: &J) -> String {
+    let t = j.to_string();
+    if t.chars().count() > 60 { format!("{}...", t.chars().take(60).collect::<String>()) } else { t }
 }
 
 /// Dekodiert ein Code-Argument. Plain-Zahl -> Int (Index/Slot), String -> Str,
 /// null -> None, Array -> rekursive Liste. Getaggte Objekte ({"f"},{"b"},...)
 /// werden als eingebetteter Wert behandelt.
-pub(crate) fn decode_arg(j: &J) -> Arg {
-    match j {
+pub(crate) fn arg_lesen(j: &J) -> Result<Arg, String> {
+    Ok(match j {
         J::Null => Arg::None,
-        J::Number(n) => {
-            if let Some(i) = n.as_i64() {
-                Arg::Int(i)
-            } else {
-                Arg::Val(Value::Float(n.as_f64().unwrap()))
-            }
-        }
+        J::Number(n) => match n.as_i64() {
+            Some(i) => Arg::Int(i),
+            None => Arg::Val(Value::Float(n.as_f64().ok_or_else(|| format!("Zahl {} passt nicht", n))?)),
+        },
         J::String(s) => Arg::Str(Rc::from(s.as_str())),
-        J::Array(a) => Arg::List(a.iter().map(decode_arg).collect()),
-        J::Object(_) => Arg::Val(decode_value(j)),
+        J::Array(a) => {
+            let teile: Result<Vec<Arg>, String> = a.iter().map(arg_lesen).collect();
+            Arg::List(teile?.into())
+        }
+        J::Object(_) => Arg::Val(wert_lesen(j)?),
         J::Bool(b) => Arg::Val(Value::Bool(*b)),
+    })
+}
+
+/// Fuer Argumente vom Compiler, die immer gueltig sind.
+pub(crate) fn decode_arg(j: &J) -> Arg {
+    arg_lesen(j).expect("Argument vom Compiler")
+}
+
+/// Eine Liste von Werten (`constants`, `param_defaults` ...); fehlt sie, ist
+/// sie leer.
+fn werte_lesen(j: &J) -> Result<Vec<Value>, String> {
+    match j.as_array() {
+        Some(a) => a.iter().map(wert_lesen).collect(),
+        None => Ok(Vec::new()),
     }
 }
 
-fn decode_func(j: &J) -> Func {
-    let obj = j.as_object().expect("func ist Objekt");
+fn decode_func(j: &J) -> Result<Func, String> {
+    let obj = j.as_object().ok_or_else(|| format!("eine Funktion ist kein Objekt: {}", kurz(j)))?;
     let get = |k: &str| obj.get(k).unwrap_or(&J::Null);
+    let fname = get("name").as_str().unwrap_or("?");
+    let im = |e: String| format!("in {}: {}", if fname.is_empty() { "?" } else { fname }, e);
 
-    let constants = get("constants")
-        .as_array()
-        .map(|a| a.iter().map(decode_value).collect())
-        .unwrap_or_default();
-    let param_defaults = get("param_defaults")
-        .as_array()
-        .map(|a| a.iter().map(decode_value).collect())
-        .unwrap_or_default();
+    let constants = werte_lesen(get("constants")).map_err(im)?;
+    let param_defaults = werte_lesen(get("param_defaults")).map_err(im)?;
     let param_byref = get("param_byref")
         .as_array()
         .map(|a| a.iter().map(|x| x.as_bool().unwrap_or(false)).collect())
@@ -520,25 +544,27 @@ fn decode_func(j: &J) -> Func {
         .as_array()
         .map(|a| a.iter().map(|x| x.as_bool().unwrap_or(false)).collect())
         .unwrap_or_default();
-    let local_defaults: Vec<Value> = get("local_defaults")
-        .as_array()
-        .map(|a| a.iter().map(decode_value).collect())
-        .unwrap_or_default();
+    let local_defaults: Vec<Value> = werte_lesen(get("local_defaults")).map_err(im)?;
     let local_types: Vec<String> = get("local_types")
         .as_array()
         .map(|a| a.iter().map(|x| x.as_str().unwrap_or("any").to_string()).collect())
         .unwrap_or_default();
-    let code = get("code")
-        .as_array()
-        .map(|a| {
-            a.iter()
-                .map(|instr| {
-                    let pair = instr.as_array().expect("instr ist [op, arg]");
-                    (pair[0].as_u64().expect("op int") as u16, decode_arg(&pair[1]))
-                })
-                .collect()
-        })
-        .unwrap_or_default();
+    let mut code: Vec<(u16, Arg)> = Vec::new();
+    for (k, instr) in get("code").as_array().map(|a| a.as_slice()).unwrap_or(&[]).iter().enumerate() {
+        let schlecht = || im(format!("Befehl {} ist kein [op, arg]: {}", k, kurz(instr)));
+        let pair = instr.as_array().filter(|p| p.len() == 2).ok_or_else(schlecht)?;
+        let op = pair[0].as_u64().filter(|&o| o <= u16::MAX as u64).ok_or_else(schlecht)? as u16;
+        let arg = arg_lesen(&pair[1]).map_err(im)?;
+        // Sprungziele liest schon das Laden (`verschmelzen`), FOR_NEXT dazu
+        // als sieben Zahlen (`Arg::ints`) -- beides sonst eine Panik.
+        let gut = match op {
+            op::JUMP | op::JUMP_IF_FALSE | op::JUMP_IF_TRUE | op::TRY_BEGIN => matches!(arg, Arg::Int(_)),
+            op::FOR_NEXT => matches!(&arg, Arg::List(l) if l.len() == 7 && l.iter().all(|a| matches!(a, Arg::Int(_)))),
+            _ => true,
+        };
+        if !gut { return Err(schlecht()); }
+        code.push((op, arg));
+    }
     let lines = get("lines")
         .as_array()
         .map(|a| a.iter().map(|x| x.as_u64().unwrap_or(0) as u32).collect())
@@ -548,7 +574,7 @@ fn decode_func(j: &J) -> Func {
         .map(|a| a.iter().map(|x| x.as_str().unwrap_or("").to_string()).collect())
         .unwrap_or_default();
 
-    func_bauen(FuncRoh {
+    Ok(func_bauen(FuncRoh {
         name: get("name").as_str().unwrap_or("").to_string(),
         n_params: get("n_params").as_u64().unwrap_or(0) as usize,
         n_required: get("n_required").as_u64().unwrap_or(0) as usize,
@@ -565,7 +591,7 @@ fn decode_func(j: &J) -> Func {
         code,
         lines,
         local_names,
-    })
+    }))
 }
 
 /// Die Teile einer Funktion, schon als Laufzeit-Werte -- aus einer
@@ -636,16 +662,16 @@ pub(crate) fn func_bauen(r: FuncRoh) -> Func {
     }
 }
 
-fn decode_class(j: &J) -> ClassInfo {
-    let obj = j.as_object().expect("class ist Objekt");
+fn decode_class(j: &J) -> Result<ClassInfo, String> {
+    let obj = j.as_object().ok_or_else(|| format!("eine Klasse ist kein Objekt: {}", kurz(j)))?;
     let get = |k: &str| obj.get(k).unwrap_or(&J::Null);
     let fields = get("fields")
         .as_array()
         .map(|a| {
             a.iter()
                 .map(|f| {
-                    let fo = f.as_object().unwrap();
-                    FieldDecl {
+                    let fo = f.as_object().ok_or_else(|| format!("ein Feld ist kein Objekt: {}", kurz(f)))?;
+                    Ok(FieldDecl {
                         name: fo.get("name").and_then(|x| x.as_str()).unwrap_or("").to_string(),
                         type_name: fo.get("type_name").and_then(|x| x.as_str()).unwrap_or("any").to_string(),
                         array_dims: fo.get("array_dims")
@@ -657,22 +683,23 @@ fn decode_class(j: &J) -> ClassInfo {
                             .map(|a| a.iter().filter_map(|d| d.as_i64()).collect())
                             .unwrap_or_default(),
                         struct_bytes: fo.get("struct_bytes").and_then(|x| x.as_u64()).unwrap_or(0) as usize,
-                    }
+                    })
                 })
-                .collect()
+                .collect::<Result<Vec<_>, String>>()
         })
+        .transpose()?
         .unwrap_or_default();
     let mut methods = rustc_hash::FxHashMap::default();
     if let Some(mo) = get("methods").as_object() {
         for (name, mj) in mo {
-            methods.insert(name.clone(), decode_func(mj));
+            methods.insert(name.clone(), decode_func(mj)?);
         }
     }
     let properties = get("properties")
         .as_array()
         .map(|a| a.iter().filter_map(|x| x.as_str().map(|s| s.to_string())).collect())
         .unwrap_or_default();
-    ClassInfo {
+    Ok(ClassInfo {
         name: get("name").as_str().unwrap_or("").to_string(),
         parent_name: get("parent_name").as_str().unwrap_or("").to_string(),
         is_struct: get("is_struct").as_bool().unwrap_or(false),
@@ -685,7 +712,7 @@ fn decode_class(j: &J) -> ClassInfo {
         props_alle: Default::default(),
         layout: Default::default(),
         vorlage: Default::default(),
-    }
+    })
 }
 
 pub fn load_program(j: &J) -> Result<Program, String> {
@@ -712,23 +739,20 @@ pub fn load_program(j: &J) -> Result<Program, String> {
     let global_names: Vec<String> = obj.get("global_names").and_then(|v| v.as_array())
         .map(|a| a.iter().map(|x| x.as_str().unwrap_or("").to_string()).collect())
         .unwrap_or_default();
-    let main = decode_func(obj.get("main").ok_or("kein main")?);
+    let main = decode_func(obj.get("main").ok_or("kein main")?)?;
     let mut functions: Vec<(String, Func)> = Vec::new();
     if let Some(fobj) = obj.get("functions").and_then(|v| v.as_object()) {
         for (name, fj) in fobj {
-            functions.push((name.clone(), decode_func(fj)));
+            functions.push((name.clone(), decode_func(fj)?));
         }
     }
     let mut classes = rustc_hash::FxHashMap::default();
     if let Some(cobj) = obj.get("classes").and_then(|v| v.as_object()) {
         for (name, cj) in cobj {
-            classes.insert(name.clone(), decode_class(cj));
+            classes.insert(name.clone(), decode_class(cj)?);
         }
     }
-    let data = obj.get("data")
-        .and_then(|v| v.as_array())
-        .map(|a| a.iter().map(decode_value).collect())
-        .unwrap_or_default();
+    let data = werte_lesen(obj.get("data").unwrap_or(&J::Null))?;
     Ok(programm_bauen(n_globals, global_names, main, functions, classes, data))
 }
 
@@ -868,5 +892,82 @@ mod tests {
         assert!(p.func("DD1CHANGED").is_some());
         assert!(p.func("gibtesnicht").is_none());
         assert!(p.func("GibtEsNicht").is_none());    // Zweitversuch erfindet nichts
+    }
+
+    /// Ein kleines Programm mit allem, was in einer .dhc vorkommt: Funktion,
+    /// Klasse mit Feld und Methode, Lambda, Tupel, FLOAT, Text, DATA.
+    fn beispiel_dhc() -> J {
+        let quelle = r#"
+CLASS Punkt
+  DIM x AS FLOAT
+  FUNCTION laenge() AS FLOAT
+    RETURN ABS(x) * 1.5
+  END FUNCTION
+END CLASS
+FUNCTION doppelt(n AS INTEGER, z AS STRING = "a") AS INTEGER
+  RETURN n * 2
+END FUNCTION
+DIM p AS Punkt = NEW Punkt()
+p.x = -2.25
+DIM f AS FUNCREF : f = FUNCTION(k) k + 1
+DIM t AS TUPLE : t = (1, "zwei", 3.5, TRUE)
+DIM i AS INTEGER
+FOR i = 1 TO 3
+  PRINT doppelt(i); f(i); p.laenge(); t
+NEXT
+DATA 1, "x", 2.5
+"#;
+        let toks = crate::lexer::Lexer::new(quelle).tokenize().unwrap_or_else(|e| panic!("lexen: {}", e.msg));
+        let ast = crate::parser::Parser::new(toks).parse().unwrap_or_else(|e| panic!("parsen {}: {}", e.line, e.msg));
+        let leer = std::collections::HashSet::new();
+        crate::compiler::compile_to_gbc(&ast, &leer, &[], &leer, &[], "probe.dh").expect("uebersetzen").0
+    }
+
+    /// Alle Stellen eines JSON-Baums als Zeiger (`/main/code/3/1`).
+    fn stellen(j: &J, pfad: String, aus: &mut Vec<String>) {
+        aus.push(pfad.clone());
+        match j {
+            J::Array(a) => for (i, v) in a.iter().enumerate() { stellen(v, format!("{}/{}", pfad, i), aus) },
+            J::Object(o) => for (k, v) in o { stellen(v, format!("{}/{}", pfad, k), aus) },
+            _ => {}
+        }
+    }
+
+    /// Eine beschaedigte .dhc ist ein Lade-Fehler, keine Panik. Bis 2026.53
+    /// endete `{"format":"dhc","main":"kaputt"}` mit Exit 101. Jede Stelle
+    /// der Datei wird gegen jeden Unsinn getauscht; `load_program` darf
+    /// abweisen oder laden, aber nie in Panik geraten.
+    #[test]
+    fn kaputte_dhc_ist_ein_lade_fehler() {
+        let gut = beispiel_dhc();
+        assert!(load_program(&gut).is_ok());
+        let fall = serde_json::json!({"format": "dhc", "main": "kaputt"});
+        let e = load_program(&fall).err().expect("abgewiesen");
+        assert!(e.contains("Funktion ist kein Objekt"), "{}", e);
+
+        let mut alle = Vec::new();
+        stellen(&gut, String::new(), &mut alle);
+        let unsinn = [J::Null, serde_json::json!("x"), serde_json::json!(-1), serde_json::json!(1.5),
+                      serde_json::json!(true), serde_json::json!([]), serde_json::json!({}),
+                      serde_json::json!({"q": 1}), serde_json::json!([1]), serde_json::json!(1e300)];
+        let alter = std::panic::take_hook();
+        std::panic::set_hook(Box::new(|_| {}));
+        let mut paniken = Vec::new();
+        for stelle in alle.iter().filter(|s| !s.is_empty()) {
+            for u in &unsinn {
+                let mut j = gut.clone();
+                *j.pointer_mut(stelle).unwrap() = u.clone();
+                let r = std::panic::catch_unwind(|| { let _ = load_program(&j); });
+                if r.is_err() {
+                    // Der Befehl, in dem die Stelle liegt, sagt am meisten.
+                    let befehl: Vec<&str> = stelle.split('/').take(4).collect();
+                    let befehl = gut.pointer(&befehl.join("/")).map(|b| b.to_string()).unwrap_or_default();
+                    paniken.push(format!("{} = {} (in {})", stelle, u, befehl));
+                }
+            }
+        }
+        std::panic::set_hook(alter);
+        assert!(paniken.is_empty(), "{} Paniken beim Laden, etwa: {:?}", paniken.len(),
+                &paniken[..paniken.len().min(20)]);
     }
 }
