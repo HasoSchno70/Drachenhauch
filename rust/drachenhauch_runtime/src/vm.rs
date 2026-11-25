@@ -334,6 +334,30 @@ fn vm_top(stack: &[Value]) -> R<&Value> {
 fn bi_int(a: &[Value], i: usize, fn_: &str) -> R<i64> { crate::argument::a_int(a, i, fn_) }
 #[allow(dead_code)]
 fn bi_str<'x>(a: &'x [Value], i: usize, fn_: &str) -> R<&'x str> { crate::argument::a_text(a, i, fn_) }
+/// Den Befehlsnamen vorn in einer Meldung (`ALT: ...`, `ALT ...`) und in
+/// Anfuehrungszeichen (`'ALT'`) durch den geschriebenen ersetzen. Die
+/// Laufzeit kennt nur den alten Namen; mit und ohne `$` gilt er als derselbe.
+pub(crate) fn builtin_name_einsetzen(e: String, alt: &str, neu: &str) -> String {
+    let alt_g = alt.to_uppercase();
+    let neu_g = neu.to_uppercase();
+    let ohne = alt_g.trim_end_matches('$').to_string();
+    let formen = [alt_g.clone(), ohne.clone(), format!("{}$", ohne)];
+    let mut aus = e;
+    for f in &formen {
+        if let Some(rest) = aus.strip_prefix(f.as_str()) {
+            if rest.starts_with(':') || rest.starts_with(' ') {
+                aus = format!("{}{}", neu_g, rest);
+                break;
+            }
+        }
+    }
+    for f in &formen {
+        let zitat = format!("'{}'", f);
+        if aus.contains(&zitat) { aus = aus.replace(&zitat, &format!("'{}'", neu_g)); break; }
+    }
+    aus
+}
+
 /// Der Ordner, von dem aus ein CODE_*-Befehl IMPORTs aufloest: das Argument
 /// an Stelle `i` -- ohne es None (der Befehl bleibt dann beim Text).
 fn code_basis(a: &[Value], i: usize, fn_: &str) -> R<Option<std::path::PathBuf>> {
@@ -2647,6 +2671,17 @@ impl<'p> Vm<'p> {
     #[inline(never)]
     fn fehler_benennen(&self, e: String, fn_: &Func, i: usize) -> String {
         let Some(ins) = fn_.code.get(i) else { return e };
+        // Ein Befehl, der im Quelltext anders heisst als in der Laufzeit
+        // (neuer Name aus namen.rs, `IMPORT "json" AS j`): die Meldung nennt
+        // den geschriebenen. Bis 2026.53 sagte FILE_EXISTS(5) "FILEEXISTS
+        // erwartet ..." -- ein Name, der im Programm nirgends steht.
+        if ins.op == op::CALL_BUILTIN {
+            if let Arg::Call(name, _, k) = &ins.arg {
+                if let Some(neu) = usize::try_from(*k).ok().and_then(|k| fn_.anzeigen.get(k)) {
+                    return builtin_name_einsetzen(e, name, neu);
+                }
+            }
+        }
         // "Parameter #n: ..." aus bind_params: der aufrufende Befehl nennt die
         // Funktion oder Methode, deren n-ter Parameter gemeint ist.
         if let Some(rest) = e.strip_prefix("Parameter #") {

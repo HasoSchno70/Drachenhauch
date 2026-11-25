@@ -293,6 +293,12 @@ pub struct Func {
     /// Compiler-Zwischenwerte. Nur fuer `dhrt debug` (Variablen-Inspektion);
     /// leer wenn der Compiler keine Namen getrackt hat (alte .dhc).
     pub local_names: Vec<String>,
+    /// Wie ein Befehl im QUELLTEXT hiess, wo der Compiler ihn auf einen
+    /// anderen Namen abgebildet hat (`FILE_EXISTS` -> `fileexists`, namen.rs;
+    /// `j_parse` -> `json_parse`). Ein CALL_BUILTIN zeigt mit seinem dritten
+    /// Wert in `Arg::Call` hierher (sonst -1). Gebraucht nur im Fehlerfall:
+    /// die Meldung nennt den geschriebenen Namen (`Vm::fehler_benennen`).
+    pub anzeigen: Vec<Rc<str>>,
 }
 
 pub struct FieldDecl {
@@ -378,8 +384,12 @@ impl Program {
 /// - CALL_*: `[name, argc]` -> `Arg::Call(name, argc, idx)`; idx = vorab
 ///   aufgeloester Funktions-Index (nur CALL_USER, sonst/-unbekannt -1 --
 ///   die VM faellt dann auf den Namens-Lookup samt gewohnter Meldung zurueck).
+/// - CALL_BUILTIN `[name, argc, geschrieben]`: der dritte Wert ist der Name
+///   im Quelltext; er kommt in die zurueckgegebene Liste (`Func::anzeigen`),
+///   und `idx` zeigt darauf.
 /// - FOR_NEXT: All-Int-Liste -> `Arg::Ints` (kein per-Element-Match).
-fn specialize_args(code: &mut [Instr], fn_index: &rustc_hash::FxHashMap<String, usize>) {
+fn specialize_args(code: &mut [Instr], fn_index: &rustc_hash::FxHashMap<String, usize>) -> Vec<Rc<str>> {
+    let mut anzeigen: Vec<Rc<str>> = Vec::new();
     for ins in code.iter_mut() {
         match ins.op {
             op::FOR_NEXT => {
@@ -398,12 +408,18 @@ fn specialize_args(code: &mut [Instr], fn_index: &rustc_hash::FxHashMap<String, 
                             } else { -1 };
                             ins.arg = Arg::Call(name.clone(), *argc as u32, idx);
                         }
+                    } else if l.len() == 3 && ins.op == op::CALL_BUILTIN {
+                        if let (Arg::Str(name), Arg::Int(argc), Arg::Str(geschrieben)) = (&l[0], &l[1], &l[2]) {
+                            anzeigen.push(geschrieben.clone());
+                            ins.arg = Arg::Call(name.clone(), *argc as u32, (anzeigen.len() - 1) as i32);
+                        }
                     }
                 }
             }
             _ => {}
         }
     }
+    anzeigen
 }
 
 // ---------------------------------------------------------------------------
@@ -616,6 +632,7 @@ pub(crate) fn func_bauen(r: FuncRoh) -> Func {
         code,
         lines: r.lines,
         local_names: r.local_names,
+        anzeigen: Vec::new(),
     }
 }
 
@@ -730,10 +747,10 @@ pub(crate) fn programm_bauen(n_globals: usize, global_names: Vec<String>, main: 
     }
     // Heisse Opcode-Args vor-zerlegen (main + Funktionen + Methoden).
     let mut main = main;
-    specialize_args(&mut main.code, &fn_index);
-    for f in functions.iter_mut() { specialize_args(&mut f.code, &fn_index); }
+    main.anzeigen = specialize_args(&mut main.code, &fn_index);
+    for f in functions.iter_mut() { f.anzeigen = specialize_args(&mut f.code, &fn_index); }
     for c in classes.values_mut() {
-        for m in c.methods.values_mut() { specialize_args(&mut m.code, &fn_index); }
+        for m in c.methods.values_mut() { m.anzeigen = specialize_args(&mut m.code, &fn_index); }
     }
     // PROPERTY irgendwo in der Kette? (props_kette)
     let mit_props: Vec<String> = classes.keys().filter(|k| {
@@ -824,7 +841,7 @@ mod tests {
             param_defaults: Vec::new(), param_byref: Vec::new(),
             param_default_is_expr: Vec::new(), local_types: Vec::new(),
             local_defaults: Vec::new(), constants: Vec::new(), code: Vec::new(),
-            lines: Vec::new(), local_names: Vec::new(),
+            lines: Vec::new(), local_names: Vec::new(), anzeigen: Vec::new(),
         }
     }
 

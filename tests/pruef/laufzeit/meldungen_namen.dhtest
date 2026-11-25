@@ -133,3 +133,69 @@ f(x)
 DHRT_JIT=aus
 --- fehler
 Parameter 't' von f: Erwartet STRING, erhalten INTEGER
+
+=== ein befehl heisst in der meldung wie im quelltext
+' Der Compiler bildet einen neuen Namen (namen.rs) auf den bisherigen ab, die
+' Laufzeit kennt nur den. Bis 2026.53 sagte FILE_EXISTS(5) darum "FILEEXISTS
+' erwartet ..." -- ein Name, der im Programm nirgends steht. Jetzt nennt die
+' Meldung den geschriebenen Namen, auch in CATCH; der alte bleibt beim alten.
+IMPORT "zeit"
+SUB probe(n AS INTEGER)
+    TRY
+        SELECT CASE n
+            CASE 1 : PRINT FILE_EXISTS(5)
+            CASE 2 : PRINT FILEEXISTS(5)
+            CASE 3 : PRINT TIME_PART(5, "x")
+            CASE 4 : PRINT SET_COUNT(5)
+        END SELECT
+    CATCH e
+        PRINT e
+    END TRY
+END SUB
+DIM i AS INTEGER
+FOR i = 1 TO 4 : probe(i) : NEXT
+--- erwartet
+FILE_EXISTS: erwartet STRING, erhalten INTEGER
+FILEEXISTS: erwartet STRING, erhalten INTEGER
+TIME_PART: 'x' ist kein Feld -- moeglich sind jahr, monat, tag, stunde, minute, sekunde, wochentag
+SET_COUNT: erwartet eine MAP OF INTEGER als Menge
+
+=== ein befehl heisst in der meldung wie im quelltext (maschinencode)
+' Steigt der Maschinencode an dem Befehl aus, meldet die VM ihn an derselben
+' Stelle -- mit demselben Namen.
+DIM i AS INTEGER
+DIM s AS STRING
+TRY
+    FOR i = 1 TO 10
+        IF i = 7 THEN s = "" ELSE s = "a"
+        IF NOT FILE_EXISTS(s + STR$(i)) THEN PRINT FILE_SIZE(s)
+    NEXT
+CATCH e
+    PRINT LEFT$(e, 10)
+END TRY
+--- umgebung
+DHRT_JIT=immer
+--- erwartet
+FILE_SIZE:
+
+=== ein modulname aus import as
+IMPORT "json" AS j
+TRY
+    PRINT j_parse(5)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+J_PARSE: erwartet STRING, erhalten INTEGER
+
+=== die compiler-warnung nennt den geschriebenen namen
+PRINT MONEY_CENTS()
+--- fehler
+MONEY_CENTS: fehlendes Argument 1
+--- stderr
+MONEY_CENTS: nur 0 Argument(e) uebergeben
+
+=== der neue name in der meldung bekommt seine aufrufform
+PRINT FILE_EXISTS(5)
+--- fehler
+FILE_EXISTS: erwartet STRING, erhalten INTEGER -- Aufruf: FILE_EXISTS(p: STRING)

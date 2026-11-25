@@ -4084,6 +4084,9 @@ impl Compiler {
             // Aliasierten Builtin-Namen auf den kanonischen zurueckabbilden
             // (j_parse -> json_parse), damit dhrt ihn nativ findet.
             let bname = self.resolve_builtin_alias(&name);
+            // So heisst der Befehl im Quelltext -- in Warnungen und Meldungen
+            // steht DIESER Name, nicht der, auf den er abgebildet wurde.
+            let anzeige = name.to_uppercase();
             // Systemischer G1-Fix: kennt dhrt diesen Builtin ueberhaupt? Wenn
             // nicht, ist es vermutlich ein Tippfehler (oder ein veralteter/
             // entfernter Builtin) -> es wuerde erst zur LAUFZEIT scheitern.
@@ -4142,11 +4145,11 @@ impl Compiler {
                         "{}: {} Argumente uebergeben, erwartet werden {} -- die \
                          ueberzaehligen weglassen (viele Builtins brechen sonst \
                          zur Laufzeit ab).",
-                        bname.to_uppercase(), n, arity_text(min, max))));
+                        anzeige, n, arity_text(min, max))));
                 } else if n < min {
                     self.warnings.push((self.ctx.cur_line, format!(
                         "{}: nur {} Argument(e) uebergeben, erwartet werden {}.",
-                        bname.to_uppercase(), n, arity_text(min, max))));
+                        anzeige, n, arity_text(min, max))));
                 }
             }
             // Gehoert der Befehl zu einem Modul, das nicht importiert ist?
@@ -4161,11 +4164,18 @@ impl Compiler {
                          Preprocessor macht aus der Zeile einen Kommentar. Ohne sie ist \
                          aber `DIM x AS <Modultyp>` ein Fehler, und man sieht dem \
                          Quelltext nicht an, worauf er aufbaut.",
-                        bname.to_uppercase(), modul, modul)));
+                        anzeige, modul, modul)));
                 }
             }
             for a in args { self.expr(a)?; }
-            self.ctx.emit(oc::CALL_BUILTIN, json!([bname, args.len()]));
+            // Hiess der Befehl im Quelltext anders (neuer Name aus namen.rs,
+            // `IMPORT ... AS`), geht der geschriebene Name mit: eine Meldung
+            // nennt dann ihn statt des alten (Vm::fehler_benennen).
+            if anzeige.eq_ignore_ascii_case(&bname) {
+                self.ctx.emit(oc::CALL_BUILTIN, json!([bname, args.len()]));
+            } else {
+                self.ctx.emit(oc::CALL_BUILTIN, json!([bname, args.len(), anzeige]));
+            }
         }
         Ok(())
     }
